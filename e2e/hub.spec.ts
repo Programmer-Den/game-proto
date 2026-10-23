@@ -905,6 +905,70 @@ test('hub scans a progress code', async ({ page }, testInfo) => {
   testInfo.attach('scanned', { body: await page.screenshot(), contentType: 'image/png' });
 });
 
+// Progress too big for one QR code shows as a loop of codes, which Scan code collects.
+test('hub scans a loop of progress codes', async ({ page }, testInfo) => {
+  await page.goto('/');
+  // Random text barely compresses, so this takes several codes.
+  const big = await page.evaluate(() => {
+    const text = Array.from(crypto.getRandomValues(new Uint8Array(3000)), (b) => b.toString(36)).join('');
+    localStorage.setItem('riftblade-run', text);
+    return text;
+  });
+  await page.reload();
+  await page.getByRole('button', { name: 'Settings for Riftblade' }).click();
+  await page.getByRole('dialog', { name: 'Riftblade' }).getByRole('button', { name: 'QR code' }).click();
+  const codeDialog = page.getByRole('dialog', { name: 'Riftblade: progress code' });
+  await expect(codeDialog.locator('.lede')).toContainText('QR codes, shown in turn');
+  const count = Number((await codeDialog.locator('.frame-count').textContent())!.split(' of ')[1]);
+  expect(count).toBeGreaterThan(1);
+  testInfo.attach('progress loop', { body: await codeDialog.screenshot({ path: testInfo.outputPath('progress-loop.png') }), contentType: 'image/png' });
+  // Every frame as it is shown.
+  const svgs = new Map<string, string>();
+  await expect
+    .poll(async () => {
+      const [n, svg] = await page.evaluate(() => [
+        document.querySelector('#progress-code .frame-count')!.textContent!,
+        document.querySelector('#progress-code .qr')!.innerHTML,
+      ]);
+      svgs.set(n, svg);
+      return svgs.size;
+    }, { intervals: [50] })
+    .toBe(count);
+
+  // The camera here is a canvas that shows the frames in turn, as the other device would.
+  await page.addInitScript((svgs) => {
+    delete (window as { BarcodeDetector?: unknown }).BarcodeDetector;
+    navigator.mediaDevices.getUserMedia = async () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 640;
+      const g = canvas.getContext('2d')!;
+      const images = await Promise.all(
+        svgs.map(async (svg) => {
+          const image = new Image();
+          image.src = `data:image/svg+xml,${encodeURIComponent(svg)}`;
+          await image.decode();
+          return image;
+        }),
+      );
+      const start = performance.now();
+      const draw = () => {
+        g.fillStyle = '#888';
+        g.fillRect(0, 0, 640, 640);
+        g.drawImage(images[Math.floor((performance.now() - start) / 400) % images.length], 40, 40, 560, 560);
+        requestAnimationFrame(draw);
+      };
+      draw();
+      return canvas.captureStream(15);
+    };
+  }, [...svgs.values()]);
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  page.on('dialog', (d) => d.accept());
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Settings' }).getByRole('button', { name: 'Scan code' }).click();
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('riftblade-run')), { timeout: 30_000 }).toBe(big);
+});
+
 // The hub and every game link their own web app manifest, so each installs as an app of its own.
 test('hub and games install as apps', async ({ page, request }) => {
   for (const [path, name] of [['/', 'Game hub'], ...GAMES.map((g) => [g.path, g.name])]) {

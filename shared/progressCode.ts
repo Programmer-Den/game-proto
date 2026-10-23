@@ -2,6 +2,7 @@ import { ALL, cryptoKey, progressPayload, writeProgress } from './saveFile';
 import { SAVE_CODES } from './saveCodes';
 import { formatDate, t } from './i18n';
 import { qrCode, qrSvg } from './qr';
+import { loadSettings } from './settings';
 
 /**
  * Progress codes: the same progress a file carries (`saveFile.ts`), as a link with the data in its
@@ -11,6 +12,10 @@ import { qrCode, qrSvg } from './qr';
  * included in the seal, so a code that was changed, cut short or is of another kind fails to
  * unseal. Its bytes are written as digits, 7 bytes to 17 digits, which the QR code's numeric mode
  * packs almost as tightly as raw bytes and which pass through any link unchanged.
+ *
+ * Progress too big for one QR code is shown as a loop of smaller ones, frames that the hub's own
+ * scanner (`scanner.ts`) collects: `gp:<transfer id>:<n>:<count>:<digits>`, each with one slice of
+ * the digits, the transfer id telling two loops apart.
  */
 const FORMAT = 1;
 const ALL_CODE = 'gh';
@@ -18,6 +23,14 @@ const ALL_CODE = 'gh';
 const HASH = '#p=';
 /** The largest QR code shown; denser ones are hard to scan from a screen. */
 const MAX_VERSION = 25;
+/** Digits per frame of a loop, so each frame stays a version 20 code. */
+const FRAME_DIGITS = 1400;
+/** The most frames a loop shows; more is quicker to copy and paste. */
+const MAX_FRAMES = 40;
+/** How long each frame shows, in ms, and with reduced motion. */
+const FRAME_MS = 250;
+const CALM_FRAME_MS = 1500;
+const FRAME = /^gp:([0-9a-f]+):(\d+):(\d+):(\d+)$/;
 // Digits for a last group of 0 to 7 bytes: each the fewest that hold every value of that many bytes.
 const DIGITS = [0, 3, 5, 8, 10, 13, 15, 17];
 
@@ -95,24 +108,76 @@ export async function unpackProgress(text: string, games: string[]): Promise<Unp
   }
 }
 
+/** The frames of a loop for `link`, each a QR code's text. */
+function frames(link: string) {
+  const digits = link.split(HASH)[1];
+  const id = [...crypto.getRandomValues(new Uint8Array(3))].map((b) => b.toString(16).padStart(2, '0')).join('');
+  const count = Math.ceil(digits.length / FRAME_DIGITS);
+  return Array.from({ length: count }, (_, i) => `gp:${id}:${i + 1}:${count}:${digits.slice(i * FRAME_DIGITS, (i + 1) * FRAME_DIGITS)}`);
+}
+
 /**
- * Shows the progress `kind` covers in the `#progress-code` dialog: its QR code, when it fits one
- * that scans easily, and its link to copy. `title` names the game, or is empty for every game.
+ * Collects the frames of a loop as the scanner reads them. `add` takes a QR code's text and returns
+ * the whole code's digits once every frame of its loop is in, else null; `progress` says how many
+ * of how many are in, or null before the first frame.
+ */
+export function frameCollector() {
+  let id = '';
+  let parts: string[] = [];
+  return {
+    isFrame: (text: string) => FRAME.test(text),
+    add(text: string): string | null {
+      const m = FRAME.exec(text);
+      if (!m) return null;
+      const [, from, n, count] = m;
+      if (from !== id || parts.length !== Number(count)) {
+        id = from;
+        parts = new Array<string>(Number(count)).fill('');
+      }
+      if (Number(n) >= 1 && Number(n) <= parts.length) parts[Number(n) - 1] = m[4];
+      return parts.every(Boolean) ? parts.join('') : null;
+    },
+    progress: () => (parts.length ? { n: parts.filter(Boolean).length, count: parts.length } : null),
+  };
+}
+
+let looping: ReturnType<typeof setInterval> | undefined;
+
+/**
+ * Shows the progress `kind` covers in the `#progress-code` dialog: its QR code when it fits one
+ * that scans easily, else a loop of frames for the hub's scanner, and its link to copy. `title`
+ * names the game, or is empty for every game.
  */
 export async function showProgressCode(kind: string, games: string[], title: string) {
   const dialog = document.getElementById('progress-code') as HTMLDialogElement;
   const link = await progressLink(kind, games);
   const qr = dialog.querySelector<HTMLElement>('.qr')!;
+  const counter = dialog.querySelector<HTMLElement>('.frame-count')!;
   let fits = false;
   try {
     fits = (qrCode(link).length - 17) / 4 <= MAX_VERSION;
   } catch {
     // Too long for any QR code.
   }
-  qr.hidden = !fits;
-  qr.innerHTML = fits ? qrSvg(link) : '';
+  const loop = fits ? [] : frames(link);
+  const shown = fits ? [qrSvg(link)] : loop.length <= MAX_FRAMES ? loop.map((f) => qrSvg(f)) : [];
+  qr.hidden = !shown.length;
+  counter.hidden = shown.length < 2;
+  let i = 0;
+  const show = () => {
+    qr.innerHTML = shown[i] ?? '';
+    counter.textContent = t('frameCount', { n: i + 1, count: shown.length });
+    i = (i + 1) % Math.max(1, shown.length);
+  };
+  show();
+  clearInterval(looping);
+  if (shown.length > 1) looping = setInterval(show, loadSettings().reduceMotion ? CALM_FRAME_MS : FRAME_MS);
   dialog.querySelector('h2')!.textContent = kind === ALL ? t('progressCodeAll') : t('progressCodeGame', { game: title });
-  dialog.querySelector('.lede')!.textContent = t(fits ? 'progressCodeHint' : 'progressCodeTooBig');
+  dialog.querySelector('.lede')!.textContent = fits
+    ? t('progressCodeHint')
+    : shown.length
+      ? t('progressCodeLoop', { count: shown.length })
+      : t('progressCodeTooBig');
   dialog.querySelector('textarea')!.value = link;
   dialog.showModal();
 }
@@ -132,6 +197,7 @@ export function mountProgressCode() {
   });
   for (const button of dialog.querySelectorAll('.close, .done')) button.addEventListener('click', () => dialog.close());
   dialog.addEventListener('click', (e) => e.target === dialog && dialog.close());
+  dialog.addEventListener('close', () => clearInterval(looping));
 }
 
 /**

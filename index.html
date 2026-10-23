@@ -75,6 +75,7 @@
       #progress-code .code-body { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 16px; margin-bottom: 14px; }
       #progress-code .qr { flex: none; width: min(100%, 320px, 55vh); background: #fff; }
       #progress-code .code-side { flex: 1 1 220px; }
+      #progress-code .frame-count { margin: 0 0 8px; color: #f3c64e; font-variant-numeric: tabular-nums; }
       #scan-code video { display: block; width: 100%; max-height: 55vh; margin-bottom: 14px; object-fit: contain; background: #1f1712; }
       #progress-code .qr svg { display: block; width: 100%; height: auto; }
       #progress-code .code-text { display: block; box-sizing: border-box; width: 100%; padding: 6px;
@@ -159,6 +160,7 @@
           <div class="code-body">
             <div class="qr" role="img" data-i18n-label="progressQr" aria-label="QR code of the progress"></div>
             <div class="code-side">
+              <p class="frame-count" hidden></p>
               <p class="lede"></p>
               <textarea class="code-text" readonly rows="3" data-i18n-label="progressCodeText" aria-label="Progress code"></textarea>
             </div>

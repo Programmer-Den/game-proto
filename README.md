@@ -306,8 +306,10 @@ a format version, the game's code from `shared/saveCodes.ts` (`gh` for every gam
 file holds, deflated and sealed with the same AES-GCM key, all written as digits (7 bytes to 17
 digits) so the QR code packs them in its dense numeric mode (`shared/qr.ts`). A changed, cut short or
 unknown code is refused, and one from a newer hub asks to update first. Most games' progress fits
-one QR code; when it doesn't (a long run under way, or every game at once), the dialog says so and
-offers Copy code instead. On an iPhone the camera opens the link in Safari, which keeps other saves
+one QR code; when it doesn't (a long run under way, or every game at once), the dialog shows a loop
+of up to 40 smaller codes in turn (`gp:<id>:<n>:<count>:<digits>`, each with a slice of the digits),
+four a second (one every 1.5 seconds with reduced motion), which **Scan code** collects until it
+has them all. On an iPhone the camera opens the link in Safari, which keeps other saves
 than the installed app, so **Scan code** reads the code with the camera inside the hub instead
 (`shared/scanner.ts`): with the browser's own `BarcodeDetector` where there is one (Chrome on
 Android), elsewhere with the free, MIT-licensed `barcode-detector` package (ZXing as WebAssembly,
