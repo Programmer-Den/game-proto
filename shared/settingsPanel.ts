@@ -4,7 +4,8 @@ import { previewVolume } from './audio';
 import { clearAllProgress } from './progress';
 import { formatPlayTime, playTimes } from './playTime';
 import { ALL, askToExport, askToImport, pickFile } from './saveFile';
-import { askToPasteCode, showProgressCode } from './progressCode';
+import { askToImportCode, askToPasteCode, showProgressCode } from './progressCode';
+import { scanCode } from './scanner';
 import { shareUpdates, updateNow } from './install';
 
 /**
@@ -14,9 +15,9 @@ import { shareUpdates, updateNow } from './install';
  * after every change to update the page. Below the settings, a Saved progress row exports the saves
  * of every game in `games` (their folder names) and the settings to a `.gh` file
  * (`saveFile.ts`), imports such a file (and reloads the page, since it brings its own settings),
- * shows the same as a QR code and takes a pasted code (`progressCode.ts`, `titleOf` naming a game
- * whose code is pasted) and deletes the saves, calling `onChange` too, under a line with the time
- * played on this device over all the games (`playTime.ts`),
+ * shows the same as a QR code and takes a pasted or scanned code (`progressCode.ts`, `scanner.ts`,
+ * `titleOf` naming a game whose code is pasted) and deletes the saves, calling `onChange` too, under
+ * a line with the time played on this device over all the games (`playTime.ts`),
  * and the panel ends with Restore defaults and Done, which closes the dialog.
  */
 export function mountSettingsPanel(
@@ -60,13 +61,13 @@ export function mountSettingsPanel(
     pickFile((file) => askToImport(file, ALL, games, '', () => location.reload())),
   );
   const qrButton = action('qr-progress', () => showProgressCode(ALL, games, ''));
-  // A pasted code of every game brings its settings too; one game's only changes that game.
-  const pasteButton = action('paste-progress', () =>
-    askToPasteCode(games, titleOf, (kind) => (kind === ALL ? location.reload() : onChange(current))),
-  );
+  // A code of every game brings its settings too; one game's only changes that game.
+  const imported = (kind: string) => (kind === ALL ? location.reload() : onChange(current));
+  const pasteButton = action('paste-progress', () => askToPasteCode(games, titleOf, imported));
+  const scanButton = action('scan-progress', () => scanCode((text) => askToImportCode(text, games, titleOf, imported)));
   const resetRow = document.createElement('div');
   resetRow.className = 'setting-choices';
-  resetRow.append(exportButton, importButton, qrButton, pasteButton, reset);
+  resetRow.append(exportButton, importButton, qrButton, pasteButton, scanButton, reset);
   progress.append(progressName, playTimeLine, resetRow, progressHint);
   root.append(progress);
 
@@ -98,6 +99,7 @@ export function mountSettingsPanel(
     importButton.textContent = t('importAll');
     qrButton.textContent = t('qrCode');
     pasteButton.textContent = t('pasteCode');
+    scanButton.textContent = t('scanCode');
     progressName.textContent = t('savedProgress');
     progressHint.textContent = t('savedProgressHint');
     const times = playTimes();

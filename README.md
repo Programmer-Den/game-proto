@@ -104,19 +104,19 @@ The hub's **Settings** button opens the settings every game shares. They are sav
   ![The game turned on an upright phone](docs/screenshots/turned-game.webp)
 - **Controller** (on by default) and **Cursor speed** (1 to 10, 5 by default): see Controllers below.
 - **Saved progress**: **Export all** saves every game's progress and the settings to a `.gh` file,
-  and **Import all** loads one back, on this or another device. **QR code** and **Paste code** move
-  the same as a progress code (see Progress codes). The row also shows the time played on this
-  device over every game. **Delete all progress** erases every game's saves, time played and the
-  Continue playing row, and keeps the settings, the favourites and any other site's storage on the
-  same origin.
+  and **Import all** loads one back, on this or another device. **QR code**, **Paste code** and
+  **Scan code** move the same as a progress code (see Progress codes). The row also shows the time
+  played on this device over every game. **Delete all progress** erases every game's saves, time
+  played and the Continue playing row, and keeps the settings, the favourites and any other site's
+  storage on the same origin.
 
 ![Export all, Import all and Delete all progress](docs/screenshots/hub-progress-files.webp)
 - **Restore defaults** puts the settings back, and **Done** closes the panel.
 
 Each card also has a **⚙** in its corner that opens that game's own settings: whether it has
 anything saved on this device, when the game was last updated, **Export progress** and **Import progress** for just that game's
-progress (see Progress files), **QR code** and **Paste code** for the same as a progress code (see
-Progress codes), **Install**, which opens the game ready to install as an app (see
+progress (see Progress files), **QR code**, **Paste code** and **Scan code** for the same as a progress code
+(see Progress codes), **Install**, which opens the game ready to install as an app (see
 Install as an app), **Delete this game's progress** (its storage keys, which all start
 with its folder name, see `shared/progress.ts`) and **Play**.
 
@@ -211,7 +211,7 @@ pressed on the page.
 - `shared/`: the settings every game shares (`settings.ts`), the hub's Settings panel
   (`settingsPanel.ts`), `audio.ts`, the sound effects and music made in code, `corner.ts`, the corner buttons, `gamepad.ts` and `padCursor.ts`, the controller and its cursor (see Controllers), `setupGame.ts`, which each game calls to apply the frame cap, the FPS readout, reduced motion, full screen and the sound button
   and to add the loading, start and pause screens (`startScreen.ts`) with the game's How to play (`howToPlay.ts`), `watch.ts`, the Watch AI panel and its `?watch` flag,
-  `trophies.ts`, the trophies, their toast and the hub's trophy shelf, `playCount.ts`, the play counters (see Play counts), `progress.ts`, each game's saved progress and the recently played games, `gameDates.ts`, the Last updated line and the New and Updated badges, `playTime.ts` and `favourites.ts`, the time played and the starred games (see above), `saveFile.ts` and `saveCodes.ts`, the progress files (see Progress files), `progressCode.ts`, the progress codes (see Progress codes), `install.ts`, the installable apps (see Install as an app), `i18n.ts` with the shared texts in `i18n/`, the translations and number and date formats (see Language), and `scaling.ts`, which keeps a game sharp from a phone to a 4K screen (`grep -l setupScaling games/*/src/main.ts` lists the games that use it).
+  `trophies.ts`, the trophies, their toast and the hub's trophy shelf, `playCount.ts`, the play counters (see Play counts), `progress.ts`, each game's saved progress and the recently played games, `gameDates.ts`, the Last updated line and the New and Updated badges, `playTime.ts` and `favourites.ts`, the time played and the starred games (see above), `saveFile.ts` and `saveCodes.ts`, the progress files (see Progress files), `progressCode.ts` and `scanner.ts`, the progress codes and their camera scanner (see Progress codes), `install.ts`, the installable apps (see Install as an app), `i18n.ts` with the shared texts in `i18n/`, the translations and number and date formats (see Language), and `scaling.ts`, which keeps a game sharp from a phone to a 4K screen (`grep -l setupScaling games/*/src/main.ts` lists the games that use it).
 - `e2e/hub.spec.ts`: checks that the hub lists every game, that each card opens it, and that the
   settings are saved and reach a game, that a game's ⚙ deletes just its progress, the progress files and codes, that the hub and every game have an app manifest, the genre filter and Continue playing row, favourites, time played and Sort, the Last updated line and that an Updated badge clears once its game is opened, that a game starts and pauses and counts its time played, that trophies show on the cards, the shelf and the pause screen, that a stand-in controller walks the hub, the start and pause screens and taps a game with its cursor, and that the cards show play counts. `e2e/screens.spec.ts` opens each game that uses
   `shared/scaling.ts` on an upright and a sideways phone, a tablet, a laptop and a 4K screen.
@@ -308,7 +308,11 @@ digits) so the QR code packs them in its dense numeric mode (`shared/qr.ts`). A 
 unknown code is refused, and one from a newer hub asks to update first. Most games' progress fits
 one QR code; when it doesn't (a long run under way, or every game at once), the dialog says so and
 offers Copy code instead. On an iPhone the camera opens the link in Safari, which keeps other saves
-than the installed app.
+than the installed app, so **Scan code** reads the code with the camera inside the hub instead
+(`shared/scanner.ts`): with the browser's own `BarcodeDetector` where there is one (Chrome on
+Android), elsewhere with the free, MIT-licensed `barcode-detector` package (ZXing as WebAssembly,
+Apache 2.0), loaded only when the scanner opens. Its `.wasm` file is part of the build, so scanning
+works offline and fetches nothing from another site.
 
 ![A game's progress as a QR code](docs/screenshots/hub-progress-code.webp)
 

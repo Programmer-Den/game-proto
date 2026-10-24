@@ -87,6 +87,14 @@ const en = {
   importCodeAllConfirm: 'Replace the progress of every game and the settings on this device with the ones in the code, saved {date}?',
   importCodeFailed: 'This is not a progress code, or it was changed or cut short.',
   importCodeNewer: 'This code comes from a newer version of the hub. Update the hub with Update now in the Settings, then try again.',
+  scanCode: 'Scan code',
+  scanTitle: 'Scan a progress code',
+  scanStarting: 'Starting the camera…',
+  scanHint: "Point the camera at the progress code's QR code on the other device.",
+  scanNoCamera: 'The camera could not be used. Allow the hub to use it, or use Paste code instead.',
+  scanFailed: 'The scanner could not start. Use Paste code instead.',
+  scanNotProgress: 'That QR code holds no progress. Point the camera at a progress code.',
+  cancel: 'Cancel',
 
   // Settings panel
   off: 'Off',

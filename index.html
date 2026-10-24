@@ -75,6 +75,7 @@
       #progress-code .code-body { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 16px; margin-bottom: 14px; }
       #progress-code .qr { flex: none; width: min(100%, 320px, 55vh); background: #fff; }
       #progress-code .code-side { flex: 1 1 220px; }
+      #scan-code video { display: block; width: 100%; max-height: 55vh; margin-bottom: 14px; object-fit: contain; background: #1f1712; }
       #progress-code .qr svg { display: block; width: 100%; height: auto; }
       #progress-code .code-text { display: block; box-sizing: border-box; width: 100%; padding: 6px;
         font: 12px monospace; color: #d8c7a6; background: #1f1712; border: 2px solid #5a3f2a; resize: none; word-break: break-all; }
@@ -137,6 +138,7 @@
               <button type="button" id="import-game" data-i18n="importProgress">Import progress</button>
               <button type="button" id="qr-game" data-i18n="qrCode">QR code</button>
               <button type="button" id="paste-game" data-i18n="pasteCode">Paste code</button>
+              <button type="button" id="scan-game" data-i18n="scanCode">Scan code</button>
             </div>
             <div class="setting-hint" data-i18n="gameFileHint">Export saves this game's progress to a file, to keep or to load with Import on another device.</div>
           </div>
@@ -164,6 +166,18 @@
           <div class="settings-actions">
             <button type="button" class="copy-code" data-i18n="copyCode">Copy code</button>
             <button type="button" class="done primary" data-i18n="done" autofocus>Done</button>
+          </div>
+          <button type="button" class="close" data-i18n-label="close" aria-label="Close">✕</button>
+        </div>
+      </dialog>
+      <!-- The camera's picture while it looks for a progress code's QR code (shared/scanner.ts). -->
+      <dialog id="scan-code" aria-labelledby="scan-code-title">
+        <div class="panel">
+          <h2 id="scan-code-title" data-i18n="scanTitle">Scan a progress code</h2>
+          <p class="lede"></p>
+          <video muted playsinline></video>
+          <div class="settings-actions">
+            <button type="button" class="done" data-i18n="cancel">Cancel</button>
           </div>
           <button type="button" class="close" data-i18n-label="close" aria-label="Close">✕</button>
         </div>
@@ -379,6 +393,7 @@
       import { ALL, askToExport, askToImport, fileEnding, pickFile } from './shared/saveFile.ts';
       import { qrSvg } from './shared/qr.ts';
       import { askToImportCode, askToPasteCode, hubLink, mountProgressCode, openedCode, showProgressCode } from './shared/progressCode.ts';
+      import { mountScanner, scanCode } from './shared/scanner.ts';
       import { trophyCount, trophyCountText, trophyShelfHtml } from './shared/trophies.ts';
 
       // Each game with trophies lists them in games/<name>/src/trophies/index.ts.
@@ -562,6 +577,9 @@
         showTrophies();
       };
       document.getElementById('paste-game').addEventListener('click', () => askToPasteCode(cards.map(folder), titleOf, codeImported));
+      document.getElementById('scan-game').addEventListener('click', () =>
+        scanCode((text) => askToImportCode(text, cards.map(folder), titleOf, codeImported)),
+      );
 
       // Continue playing: the last three games played, linked by icon and name.
       const recent = document.querySelector('.recent');
@@ -666,6 +684,7 @@
         d.addEventListener('click', (e) => e.target === d && d.close());
       }
       mountProgressCode();
+      mountScanner();
       // A controller moves the focus between the cards and buttons, in the open dialog when there is
       // one: A presses, B closes the dialog, X opens the focused card's ⚙ and Start opens Settings
       // or closes them.

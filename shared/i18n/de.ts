@@ -87,6 +87,14 @@ const de: Translation<typeof en> = {
   importCodeAllConfirm: 'Den Fortschritt aller Spiele und die Einstellungen auf diesem Gerät durch die aus dem Code ersetzen, gespeichert am {date}?',
   importCodeFailed: 'Das ist kein Fortschrittscode, oder er wurde verändert oder ist unvollständig.',
   importCodeNewer: 'Dieser Code stammt aus einer neueren Version des Hubs. Aktualisiere den Hub mit „Jetzt aktualisieren“ in den Einstellungen und versuche es erneut.',
+  scanCode: 'Code scannen',
+  scanTitle: 'Fortschrittscode scannen',
+  scanStarting: 'Kamera startet …',
+  scanHint: 'Richte die Kamera auf den QR-Code des Fortschrittscodes auf dem anderen Gerät.',
+  scanNoCamera: 'Die Kamera konnte nicht verwendet werden. Erlaube dem Hub den Zugriff oder nutze stattdessen Code einfügen.',
+  scanFailed: 'Der Scanner konnte nicht starten. Nutze stattdessen Code einfügen.',
+  scanNotProgress: 'Dieser QR-Code enthält keinen Fortschritt. Richte die Kamera auf einen Fortschrittscode.',
+  cancel: 'Abbrechen',
 
   // Settings panel
   off: 'Aus',

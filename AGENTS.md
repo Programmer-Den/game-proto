@@ -198,8 +198,8 @@ and tries to link it to the repo (the run summary says if the link has to be mad
   files fetched from other sites), so it still plays offline. Its progress exports and imports from
   the hub as an encrypted `.gh<code>` file (`shared/saveFile.ts`), which carries every storage key
   with the game's prefix, and as a progress code, a QR code or copied link with the same data
-  (`shared/progressCode.ts`) except keys too big for a QR code (`fileOnly` in `saveFile.ts`: a
-  game's `<game>-replays`), which only the file carries.
+  (`shared/progressCode.ts`, scanned inside the hub with `shared/scanner.ts`) except keys too big
+  for a QR code (`fileOnly` in `saveFile.ts`: a game's `<game>-replays`), which only the file carries.
 - **Play counts come for free.** `setupGame` also bumps the game's public play counter
   (`shared/playCount.ts`, keyed by the game's folder name) and the hub shows the count on its card,
   so a new game needs nothing for it. Tests never count: browser automation skips it.

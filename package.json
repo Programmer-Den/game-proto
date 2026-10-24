@@ -15,6 +15,7 @@
     "screenshots": "node scripts/shrink-screenshots.mjs"
   },
   "dependencies": {
+    "barcode-detector": "3.2.2",
     "phaser": "^4.2.1"
   },
   "devDependencies": {

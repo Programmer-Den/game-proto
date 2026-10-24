@@ -858,6 +858,53 @@ test('hub progress codes', async ({ page }, testInfo) => {
   expect(JSON.parse((await stored('hub-settings'))!).difficulty).toBe('hard');
 });
 
+// Scan code reads a progress code's QR code with the camera inside the hub (shared/scanner.ts). The
+// camera here is a canvas showing the code, and the browser's own detector is taken away, so the
+// bundled one (barcode-detector) reads it, as on an iPhone.
+test('hub scans a progress code', async ({ page }, testInfo) => {
+  await page.goto('/');
+  await page.evaluate(() => localStorage.setItem('palisade-best', '7'));
+  await page.reload();
+  await page.getByRole('button', { name: 'Settings for Palisade' }).click();
+  await page.getByRole('dialog', { name: 'Palisade' }).getByRole('button', { name: 'QR code' }).click();
+  const svg = await page.locator('#progress-code .qr').innerHTML();
+
+  await page.addInitScript((svg) => {
+    delete (window as { BarcodeDetector?: unknown }).BarcodeDetector;
+    navigator.mediaDevices.getUserMedia = async () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 480;
+      const g = canvas.getContext('2d')!;
+      const image = new Image();
+      image.src = `data:image/svg+xml,${encodeURIComponent(svg)}`;
+      await image.decode();
+      const draw = () => {
+        g.fillStyle = '#888';
+        g.fillRect(0, 0, 480, 480);
+        g.drawImage(image, 60, 60, 360, 360);
+        requestAnimationFrame(draw);
+      };
+      draw();
+      return canvas.captureStream(15);
+    };
+  }, svg);
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  const messages: string[] = [];
+  page.on('dialog', (d) => {
+    messages.push(d.message());
+    d.accept();
+  });
+  await page.getByRole('button', { name: 'Settings for Palisade' }).click();
+  await page.getByRole('dialog', { name: 'Palisade' }).getByRole('button', { name: 'Scan code' }).click();
+  // The code can be read before a check of the open scanner would run, so only its result is checked.
+  const scanner = page.getByRole('dialog', { name: 'Scan a progress code' });
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('palisade-best')), { timeout: 20_000 }).toBe('7');
+  expect(messages.at(-1)).toMatch(/^Replace the progress of Palisade on this device with the one in the code/);
+  await expect(scanner).toBeHidden();
+  testInfo.attach('scanned', { body: await page.screenshot(), contentType: 'image/png' });
+});
+
 // The hub and every game link their own web app manifest, so each installs as an app of its own.
 test('hub and games install as apps', async ({ page, request }) => {
   for (const [path, name] of [['/', 'Game hub'], ...GAMES.map((g) => [g.path, g.name])]) {
