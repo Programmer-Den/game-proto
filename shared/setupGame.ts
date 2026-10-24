@@ -5,8 +5,12 @@ import { addStartScreen } from './startScreen';
 import type { HowToPlay } from './howToPlay';
 import { countPlay, gameOf } from './playCount';
 import { markPlayed } from './progress';
+import { markSeen } from './gameDates';
 import { addSoundButton, cornerBar } from './corner';
 import { registerServiceWorker } from './install';
+import type { TrophySet } from './trophies';
+import { trackPlayTime } from './playTime';
+import { addPadCursor } from './padCursor';
 
 /** Frames that come up to this early still run, so a display whose frames jitter keeps them all. */
 const SLACK_MS = 1;
@@ -17,13 +21,16 @@ const SLACK_MS = 1;
  * here too, as a button in the bottom left corner and the F key, in every game, and so is the sound
  * button beside it, which opens the sound menu, with the M key (`corner.ts`, which also lays out that row), and so are the
  * loading, start and pause screens (`startScreen.ts`), with the game's How to play behind a button on
- * the start and pause screens when it passes `howToPlay` (`howToPlay.ts`). It also counts the play
+ * the start and pause screens when it passes `howToPlay` (`howToPlay.ts`), and its trophies behind a
+ * Trophies button there when it passes `trophies` (`trophies.ts`). A controller moves around those
+ * screens and steers a cursor over the game (`gamepad.ts`, `padCursor.ts`). It also counts the play
  * on the game's public play counter (`playCount.ts`) and marks it played for the hub's Continue
- * playing row (`progress.ts`), and registers the service worker that lets the installed app play
+ * playing row (`progress.ts`), adds up its time played on this device for the hub
+ * (`playTime.ts`), clears its New or Updated badge on the hub (`gameDates.ts`), and registers the service worker that lets the installed app play
  * offline (`install.ts`). The browser's right-click menu is turned off
  * on the whole page, so a right click or a long press never pops it up over the game.
  */
-export function setupGame(game: Phaser.Game, options: { howToPlay?: HowToPlay } = {}) {
+export function setupGame(game: Phaser.Game, options: { howToPlay?: HowToPlay; trophies?: TrophySet } = {}) {
   setLanguage(language());
   document.addEventListener('contextmenu', (e) => e.preventDefault());
   capFrameRate(game, settings.fps);
@@ -31,11 +38,16 @@ export function setupGame(game: Phaser.Game, options: { howToPlay?: HowToPlay } 
   if (settings.reduceMotion) reduceMotion();
   addFullscreen();
   addSoundButton();
-  addStartScreen(game, options.howToPlay);
+  const playing = addStartScreen(game, options.howToPlay, options.trophies);
+  addPadCursor();
   countPlay();
   registerServiceWorker();
   const name = gameOf(location.pathname);
-  if (name) markPlayed(name);
+  if (name) {
+    markPlayed(name);
+    trackPlayTime(game, name, playing);
+    markSeen(name);
+  }
 }
 
 /**

@@ -104,6 +104,18 @@ study, shade gardens and a mirrored second production line.
   (`UPGRADES[id].name`, `WEATHER[w].name` and `.today`, `GARDEN_NAMES`, `GARDEN_NAMES_IN` for a
   garden inside a sentence, `SIGN_NAMES`, `SIGN_SET`), as do `GARDEN_AREAS` in layout. A new text
   gets its German entry (and a US one if its spelling differs) in the same PR.
+- `src/trophies/`: the game's ten trophies (`shared/trophies.ts`). `index.ts` lists them
+  (`trophies`: id, tier, icon, `hidden` for Merchant of the town and From village to city) with
+  their texts in `trophies/i18n/` (`en.ts` and `de.ts`: the name keyed by the id, what earns it by
+  `<id>Text`), and imports nothing else from the game, since the hub loads it for its trophy shelf.
+  `main.ts` hands `trophies` to `setupGame`, which lists them on the start and pause screens.
+  `check.ts` holds each trophy's condition on the `GameState` (`EARNED`: first potion sold, first
+  upgrade, first craftsman, first pixie route, 100 sold, `FULL_PURSE` 1,000 coins at once, every
+  recipe learned, the cure, a town shop bought, the city) and `checkTrophies(state)`, which
+  `GameScene`, `ShopScene` and `TownScene` call every frame after the tick; the first call after the
+  page loads awards quietly, so a loaded save and the time away earn theirs without a toast. A new
+  trophy is an entry in `index.ts`, its two texts in each language file and its condition in
+  `EARNED`.
 - `src/main.ts`: creates the `Phaser.Game` (960x540, FIT scaling, arcade physics with
   `fixedStep: false`, `pixelArt: false`, aged-paper background `PAPER`), registers `BootScene`, `GameScene`, `TownScene` and `ShopScene`, calls `setupGame(game)`
   from `shared/setupGame.ts` and `setupScaling(game, { fill: true })` from `shared/scaling.ts`, and puts `game` on window in dev.
@@ -644,6 +656,8 @@ brew's `out` may be `PANACEA`.
   not bumped; old orders without `tip` tip nothing, and an old save's rival picks its potion on
   the next tick.
 - `apothecary-zoom`: the main camera's zoom in the apothecary and every shop, a view preference that "New game" keeps.
+- `apothecary-trophies`: the trophies earned (`shared/trophies.ts`), each id with the time; "New
+  game" keeps them.
 - "New game" (`clearSave` + `scene.restart`) removes only `apothecary-save`. The old
   `apothecary-fps` key is no longer used; the frame rate comes from the hub.
 
@@ -796,6 +810,9 @@ Under browser automation the engine is a no-op, so the playthrough is unchanged.
 - The first round takes the first brew out in its fine window: it waits for 75% of the brew, walks
   to the pick-up marker and expects the fine potion; the second brew finishes plain. Day 1 is
   mild, so the weather changes nothing in it, and it ends long before a market day.
+- The first potion sold earns the First customer trophy, and the test checks that
+  `apothecary-trophies` then holds only `firstSale`; a trophy a first round can reach in another
+  way changes that expectation.
 
 ## Making common changes
 

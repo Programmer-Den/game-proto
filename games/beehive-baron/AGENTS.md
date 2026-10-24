@@ -409,7 +409,7 @@ only `GameScene` (and the refusal buzz in `ui/Button.ts`) plays them, so the sim
 - Canvas shadows ignore the context's scale, so `cut` and any hand-set `shadowBlur` or
   `shadowOffset` multiply them by `resOfCtx(ctx)`.
 - `e2e/screens.spec.ts` at the root opens the game on two phones, a tablet, a laptop and a 4K
-  screen; an upright phone shows the shared hint to turn it.
+  screen; on an upright phone the shared scaling turns the game to fill the screen.
 
 ### Hub settings
 

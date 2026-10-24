@@ -16,6 +16,7 @@ import { buyShop, tickTown } from '../game/townSim';
 import { t } from '../i18n';
 import { coined } from '../ui/coins';
 import { TOWN_HUD_H, TOWN_TEXT, TOWN_UI_DEPTH, keepSaving, leaveFor, townCard, townTopBar } from './townKit';
+import { checkTrophies } from '../trophies/check';
 
 // The town map: a page of the town with the apothecary and a lot for every shop, opened from the
 // apothecary's top bar once the town grants its charter. A shop bought is walked into from its lot;
@@ -218,6 +219,7 @@ export class TownScene extends Phaser.Scene {
     // The apothecary and the shops run on their own while the map is open, as while away.
     tick(this.state, dt, null);
     tickTown(this.state, dt, null);
+    checkTrophies(this.state);
     for (const view of this.views) view();
   }
 }

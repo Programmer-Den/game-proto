@@ -596,8 +596,8 @@ imports it. Under browser automation it all does nothing, so the playthrough is 
   a ricochet can fly down and leave at the bottom). Texts take `renderScale` as their resolution (don't set one). `bake` paints
   at `sharpRes`: full-screen textures (`FULL_SCREEN` in `paint.ts`) at 1x on a screen that needs no
   scaling and at most 2x, sprites at `HI` (2x) and at most 4x, since painting, and night vision's
-  per-pixel pass, slows with the square of it. On a phone held sideways a hint asks to turn it
-  upright. `e2e/screens.spec.ts` at the root opens the game on five screens.
+  per-pixel pass, slows with the square of it. On a phone held sideways the shared scaling turns
+  the game to fill the screen. `e2e/screens.spec.ts` at the root opens the game on five screens.
 - A texture's painted size depends on the screen, so read scales from it: `skin` sets the scale
   that fits the texture to its box (`unit(img)`), so don't set a sprite's scale before `skin`; set
   extra scale (splats, effects) after it, as `unit(img)` times the factor.

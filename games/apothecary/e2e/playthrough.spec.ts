@@ -506,6 +506,9 @@ test('plays a round of the game loop', async ({ page }, testInfo) => {
   // The Sleeping Tonics sold count towards today's contract, which needs more than one round's worth.
   expect(s.contract).toMatchObject({ ...FIRST_CONTRACT, made: contractBefore + tonics });
   expect(s.sold).toBe(2 - s.counter.shelf.length);
+  // The first potion sold earns the First customer trophy (src/trophies/), and nothing else yet.
+  const trophies = await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('apothecary-trophies') ?? '{}')));
+  expect(trophies, 'trophies earned in the first round').toEqual(['firstSale']);
   expect(filled, 'an order filled').toBeGreaterThan(0);
   expect(s.reputation, `${filled} orders filled, ${walkedOff} walked off`).toBe(
     Math.max(0, Math.min(100, reputationBefore + REPUTATION_SERVED * filled - REPUTATION_WALKED_OFF * walkedOff)),

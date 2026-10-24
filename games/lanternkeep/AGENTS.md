@@ -278,7 +278,7 @@ fade in over the band just outside the frame (`edgeFade`), so they don't pop int
 view. At 960x540 the frame is the whole view and nothing moves. Every tap is a `Zone`, which reads
 the world through the camera, so no `viewPoint` is needed; nothing reads `pointer.x/y` or
 `this.scale`. Texts take `renderScale` as their resolution, so don't set one.
-On a phone held upright a hint asks to turn it. `e2e/screens.spec.ts` at the root opens the game
+On a phone held upright the shared scaling turns the game to fill the screen. `e2e/screens.spec.ts` at the root opens the game
 on five screens.
 
 How it runs:

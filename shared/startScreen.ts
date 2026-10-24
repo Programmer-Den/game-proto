@@ -2,9 +2,11 @@ import Phaser from 'phaser';
 import { settings } from './settings';
 import { t } from './i18n';
 import type { HowToPlay } from './howToPlay';
-import { cornerBar, volumeSliders } from './corner';
+import { cornerBar, openSoundMenu, toggleSoundMenu, volumeSliders } from './corner';
+import { isDirection, moveFocus, onPadPress, pressFocused } from './gamepad';
 import { resumeAudio, suspendAudio, ui, unlockAudio } from './audio';
 import { mountInstallButton } from './install';
+import { trophyCountText, trophyListHtml, type TrophySet } from './trophies';
 
 /** The key that pauses the game and resumes it. Esc is left to the games, some of which close panels with it. */
 const PAUSE_KEY = 'p';
@@ -28,9 +30,14 @@ const HELP_KEY = 'h';
  *   play button (and the H key) that shows it in place of the card; Back, H or Esc go back.
  * - Install: where the game can be installed as an app, the start and pause screens show an Install
  *   button (`install.ts`).
+ * - Trophies: when the game hands over its `trophies` (`trophies.ts`), the start and pause screens get
+ *   a Trophies button with the count earned, which lists them in place of the card; Back or Esc go back.
+ * - Controller (`gamepad.ts`): Start pauses and resumes, the D-pad or left stick moves between the
+ *   screen's buttons and sliders, A presses, B resumes from the pause screen and leaves How to play
+ *   and Trophies, and Select opens the sound menu (on any screen, and while playing).
  * While a screen is up, keys go to it and not to the game.
  */
-export function addStartScreen(game: Phaser.Game, howToPlay?: HowToPlay) {
+export function addStartScreen(game: Phaser.Game, howToPlay?: HowToPlay, trophies?: TrophySet): () => boolean {
   injectStyles();
   const overlay = document.createElement('div');
   overlay.className = 'game-overlay loading';
@@ -42,17 +49,21 @@ export function addStartScreen(game: Phaser.Game, howToPlay?: HowToPlay) {
     `<button type="button" class="game-overlay-button game-start-button">${escapeHtml(t('start'))}</button>` +
     `<button type="button" class="game-overlay-button game-resume-button">${escapeHtml(t('resume'))}</button>` +
     (howToPlay ? `<button type="button" class="game-overlay-link game-help-button">${escapeHtml(t('howToPlay'))}</button>` : '') +
+    (trophies ? '<button type="button" class="game-overlay-link game-trophies-button"></button>' : '') +
     `<button type="button" class="game-overlay-link game-install-button" hidden>${escapeHtml(t('installGame'))}</button>` +
     '<div class="game-overlay-volumes"></div>' +
     '<div class="game-overlay-hint"></div>' +
     `<a class="game-overlay-hub" href="../../">${escapeHtml(t('allGames'))}</a>` +
     '</div>' +
-    (howToPlay ? helpHtml(howToPlay) : '');
+    (howToPlay ? helpHtml(howToPlay) : '') +
+    (trophies ? trophiesHtml() : '');
   document.body.append(overlay);
   const startButton = overlay.querySelector<HTMLButtonElement>('.game-start-button')!;
   const resumeButton = overlay.querySelector<HTMLButtonElement>('.game-resume-button')!;
   const hint = overlay.querySelector<HTMLDivElement>('.game-overlay-hint')!;
   const help = overlay.querySelector<HTMLElement>('.game-help-body');
+  const trophyButton = overlay.querySelector<HTMLButtonElement>('.game-trophies-button');
+  const trophyBody = overlay.querySelector<HTMLElement>('.game-trophies .game-panel-body');
   overlay.querySelector('.game-overlay-volumes')!.append(...volumeSliders('pause'));
   // Install the game as an app of its own; opened with ?install (the Install on its hub card), the
   // button shows in every browser and stands out as the main button.
@@ -72,9 +83,9 @@ export function addStartScreen(game: Phaser.Game, howToPlay?: HowToPlay) {
   pauseButton.hidden = true;
   cornerBar().append(pauseButton);
 
-  type Mode = 'loading' | 'start' | 'paused' | 'help' | 'playing';
+  type Mode = 'loading' | 'start' | 'paused' | 'help' | 'trophies' | 'playing';
   let mode: Mode = 'loading';
-  /** The screen How to play was opened from, to go back to. */
+  /** The screen How to play or Trophies was opened from, to go back to. */
   let helpFrom: 'start' | 'paused' = 'start';
   /** The scenes this pause stopped, to start again on resume, and none the game paused itself. */
   let held: Phaser.Scene[] = [];
@@ -91,10 +102,13 @@ export function addStartScreen(game: Phaser.Game, howToPlay?: HowToPlay) {
           ? t(help ? 'hintPausedHelp' : 'hintPaused')
           : '';
     // The help scrolls on its own, from the top, and takes the focus so arrow keys scroll it.
-    if (next === 'help' && help) {
-      help.scrollTop = 0;
-      help.focus({ preventScroll: true });
+    const body = next === 'help' ? help : next === 'trophies' ? trophyBody : null;
+    if (body) {
+      body.scrollTop = 0;
+      body.focus({ preventScroll: true });
     }
+    // The count changes as trophies are earned, so it is filled in each time the card shows.
+    if (trophies && trophyButton) trophyButton.textContent = `${t('trophies')} ${trophyCountText(trophies)}`;
     const button = next === 'start' ? startButton : next === 'paused' ? resumeButton : null;
     button?.focus({ preventScroll: true });
   };
@@ -102,6 +116,12 @@ export function addStartScreen(game: Phaser.Game, howToPlay?: HowToPlay) {
     if (!help || (mode !== 'start' && mode !== 'paused')) return;
     helpFrom = mode;
     show('help');
+  };
+  const openTrophies = () => {
+    if (!trophies || !trophyBody || (mode !== 'start' && mode !== 'paused')) return;
+    helpFrom = mode;
+    trophyBody.innerHTML = trophyListHtml(trophies);
+    show('trophies');
   };
   const closeHelp = () => show(helpFrom);
 
@@ -156,6 +176,8 @@ export function addStartScreen(game: Phaser.Game, howToPlay?: HowToPlay) {
   }
   overlay.querySelector('.game-help-button')?.addEventListener('click', openHelp);
   overlay.querySelector('.game-help-back')?.addEventListener('click', closeHelp);
+  trophyButton?.addEventListener('click', openTrophies);
+  overlay.querySelector('.game-trophies-back')?.addEventListener('click', closeHelp);
 
   // Captured on window, before the game's own listeners, so a screen that is up keeps its keys.
   // Key-ups always reach the game, so a key held when the screen came up is let go there too.
@@ -175,9 +197,9 @@ export function addStartScreen(game: Phaser.Game, howToPlay?: HowToPlay) {
       if (key === 'f' || key === 'm') return;
       e.stopPropagation();
       if (e.repeat) return;
-      if (mode === 'help') {
+      if (mode === 'help' || mode === 'trophies') {
         // Arrow and page keys stay with the browser, to scroll the help.
-        if (key === HELP_KEY || key === 'escape' || key === 'enter') {
+        if ((key === HELP_KEY && mode === 'help') || key === 'escape' || key === 'enter') {
           e.preventDefault();
           closeHelp();
         }
@@ -192,6 +214,30 @@ export function addStartScreen(game: Phaser.Game, howToPlay?: HowToPlay) {
     },
     { capture: true },
   );
+  onPadPress((button) => {
+    if (button === 'select') return toggleSoundMenu();
+    const menu = openSoundMenu();
+    if (menu) {
+      if (button === 'b') toggleSoundMenu();
+      else if (isDirection(button)) moveFocus(menu, button);
+      else if (button === 'a') pressFocused(menu);
+      return;
+    }
+    if (mode === 'loading') return;
+    if (mode === 'playing') {
+      if (button === 'start') pause();
+      return;
+    }
+    if (mode === 'help' || mode === 'trophies') {
+      const body = mode === 'help' ? help : trophyBody;
+      if (button === 'up' || button === 'down') body?.scrollBy({ top: button === 'up' ? -80 : 80 });
+      else if (button === 'a' || button === 'b') closeHelp();
+      return;
+    }
+    if (button === 'start' || (button === 'b' && mode === 'paused')) play();
+    else if (isDirection(button)) moveFocus(overlay, button);
+    else if (button === 'a') pressFocused(overlay);
+  });
   // The music plays on behind the pause screen, so its volume can be heard as it is set, but stops
   // with the tab out of sight.
   document.addEventListener('visibilitychange', () => {
@@ -200,6 +246,7 @@ export function addStartScreen(game: Phaser.Game, howToPlay?: HowToPlay) {
       suspendAudio();
     } else resumeAudio();
   });
+  return () => mode === 'playing';
 }
 
 /**
@@ -239,6 +286,12 @@ function helpHtml(howToPlay: HowToPlay) {
     { input: t('soundInput'), action: t('soundAction') },
     { input: t('soundMenuInput'), action: t('soundMenuAction') },
     ...(document.fullscreenEnabled ? [{ input: t('fullScreenInput'), action: t('fullScreenAction') }] : []),
+    ...(settings.controller
+      ? [
+          { input: t('padCursorInput'), action: t('padCursorAction') },
+          { input: t('padInput'), action: t('padAction') },
+        ]
+      : []),
   ];
   const list = (items: string[]) => items.map((item) => `<li>${escapeHtml(item)}</li>`).join('');
   return (
@@ -254,6 +307,17 @@ function helpHtml(howToPlay: HowToPlay) {
     (howToPlay.tips.length ? `<h3>${escapeHtml(t('goodToKnow'))}</h3><ul>${list(howToPlay.tips)}</ul>` : '') +
     '</div>' +
     `<button type="button" class="game-overlay-button game-help-back">${escapeHtml(t('back'))}</button>` +
+    '</section>'
+  );
+}
+
+/** The Trophies screen: the title, then the list, filled in each time it opens. */
+function trophiesHtml() {
+  return (
+    '<section class="game-trophies" aria-labelledby="game-trophies-title">' +
+    `<h2 id="game-trophies-title">${escapeHtml(t('trophiesTitle', { game: document.title }))}</h2>` +
+    '<div class="game-panel-body" tabindex="-1"></div>' +
+    `<button type="button" class="game-overlay-button game-trophies-back">${escapeHtml(t('back'))}</button>` +
     '</section>'
   );
 }
@@ -293,13 +357,13 @@ function injectStyles() {
 .game-overlay-link { padding: 4px 8px; font: 15px system-ui, sans-serif; cursor: pointer; color: #f3e9d2;
   background: none; border: none; text-decoration: underline; text-underline-offset: 3px; }
 .game-overlay-link:hover, .game-overlay-link:focus-visible { color: #ffc04d; outline: none; }
-.game-help { display: none; flex-direction: column; box-sizing: border-box; width: min(600px, 100%); max-height: 100%;
+.game-help, .game-trophies { display: none; flex-direction: column; box-sizing: border-box; width: min(600px, 100%); max-height: 100%;
   padding: 20px 24px; line-height: 1.4; background: rgba(20, 16, 12, 0.92);
   border: 1px solid rgba(243, 233, 210, 0.35); border-radius: 8px; }
-.game-help-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; outline: none; }
-.game-overlay.help .game-overlay-card { display: none; }
-.game-overlay.help .game-help { display: flex; }
-.game-help h2 { margin: 0 0 8px; font-size: 22px; }
+.game-help-body, .game-panel-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; outline: none; }
+.game-overlay.help .game-overlay-card, .game-overlay.trophies .game-overlay-card { display: none; }
+.game-overlay.help .game-help, .game-overlay.trophies .game-trophies { display: flex; }
+.game-help h2, .game-trophies h2 { margin: 0 0 8px; font-size: 22px; }
 .game-help h3 { margin: 16px 0 6px; font-size: 15px; color: #f0a830; text-transform: uppercase; letter-spacing: 0.06em; }
 .game-help-goal { margin: 0; }
 .game-help ol, .game-help ul { margin: 0; padding-left: 22px; }
@@ -308,12 +372,13 @@ function injectStyles() {
 .game-help-controls th, .game-help-controls td { padding: 4px 0; vertical-align: top; text-align: left;
   border-top: 1px solid rgba(243, 233, 210, 0.15); }
 .game-help-controls th { width: 45%; padding-right: 12px; font-weight: 600; }
-.game-help-back { flex: none; display: block; margin: 16px auto 0; }
+.game-help-back, .game-trophies-back { flex: none; display: block; margin: 16px auto 0; }
 .game-overlay:not(.loading) .game-overlay-loading,
 .game-overlay:not(.start) .game-start-button,
 .game-overlay:not(.paused) .game-resume-button,
 .game-overlay:not(.paused) .game-overlay-hub,
 .game-overlay:not(.start):not(.paused) .game-help-button,
+.game-overlay:not(.start):not(.paused) .game-trophies-button,
 .game-overlay:not(.start):not(.paused) .game-install-button { display: none; }
 .game-install-button[hidden] { display: none; }
 ${settings.reduceMotion ? '.game-overlay-loading span { animation: none; }' : ''}

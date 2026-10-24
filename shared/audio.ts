@@ -7,7 +7,7 @@ import { loadSettings, type Settings } from './settings';
  * square harmony, a triangle bass and noise drums.
  *
  * - `sounds(defs)` gives a game a `play(name)` for its own sound table; `ui` has the shared ones
- *   (a click, and the refusal buzz every game plays for an action it can't do).
+ *   (a click, the refusal buzz every game plays for an action it can't do, and the trophy fanfare).
  * - `playMusic(song, part)` starts a song, or switches to another part of it at the next bar;
  *   `playSting(song, part)` plays a part once over the music, which ducks; `stopMusic()` stops it.
  * - The volumes and mute come from the hub's settings (`music`, `effects`, `muted`); the sound
@@ -226,6 +226,8 @@ export const ui = sounds({
   refuse: { wave: 'square', freq: 150, to: 110, length: 0.16, volume: 0.3, gap: 120 },
   /** Coins gained. */
   coin: { wave: 'square', freq: 988, arp: [0, 5], arpStep: 0.05, length: 0.18, volume: 0.3 },
+  /** A trophy earned (`trophies.ts`): a rising fanfare. */
+  trophy: { wave: 'pulse25', freq: 523, arp: [0, 4, 7, 12], arpStep: 0.09, length: 0.5, volume: 0.3, gap: 400 },
 });
 
 // ---------------------------------------------------------------------------------------------

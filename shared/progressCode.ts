@@ -5,9 +5,9 @@ import { qrCode, qrSvg } from './qr';
 
 /**
  * Progress codes: the same progress a file carries (`saveFile.ts`), as a link with the data in its
- * `#p=` part, to show as a QR code that another device's camera opens, or to copy and paste. The
- * code is a format version byte, the two-letter kind (the game's code from `saveCodes.ts`, `gh` for
- * every game), a 12-byte IV and the deflated JSON sealed with AES-GCM, the first three bytes
+ * `#p=` part, to show as a QR code that another device's camera opens, or to copy and paste. It
+ * leaves out what only files carry (`fileOnly`: saved replays). The code is a format version byte,
+ * the two-letter kind (the game's code from `saveCodes.ts`, `gh` for every game), a 12-byte IV and the deflated JSON sealed with AES-GCM, the first three bytes
  * included in the seal, so a code that was changed, cut short or is of another kind fails to
  * unseal. Its bytes are written as digits, 7 bytes to 17 digits, which the QR code's numeric mode
  * packs almost as tightly as raw bytes and which pass through any link unchanged.
@@ -61,7 +61,7 @@ export async function progressLink(kind: string, games: string[]) {
   const code = kindCode(kind);
   const header = new Uint8Array([FORMAT, code.charCodeAt(0), code.charCodeAt(1)]);
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const packed = await through(new TextEncoder().encode(JSON.stringify(progressPayload(kind, games))), new CompressionStream('deflate-raw'));
+  const packed = await through(new TextEncoder().encode(JSON.stringify(progressPayload(kind, games, true))), new CompressionStream('deflate-raw'));
   const sealed = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: header }, await cryptoKey(), packed));
   const bytes = new Uint8Array(header.length + iv.length + sealed.length);
   bytes.set(header);

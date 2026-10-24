@@ -25,12 +25,19 @@
       .game h2, .share-card h2 { display: flex; align-items: center; gap: 10px; margin: 12px 14px 4px; font-size: 20px; color: #f3c64e; }
       .game .icon, .share-card .icon { width: 32px; height: 32px; flex: none; image-rendering: pixelated; }
       .game p, .share-card p { margin: 0 14px 16px; color: #d8c7a6; }
-      .game .plays { margin-top: -10px; font-size: 13px; color: #a8957a; }
+      /* New and Updated (shared/gameDates.ts), over the cover's top left corner. */
+      .game .badge { position: absolute; top: 8px; left: 8px; padding: 3px 8px; font-size: 13px; font-weight: bold;
+        color: #1b1410; background: #f3c64e; border: 2px solid #1b1410; box-shadow: 0 3px 0 #0e0a08; }
+      .game .badge.updated { background: #8fd0a8; }
+      .game .plays, .game .trophy-count, .game .playtime { margin-top: -10px; font-size: 13px; color: #a8957a; }
       /* Each card's ⚙ opens that game's own settings. */
       .game .game-gear { position: absolute; top: 8px; right: 8px; width: 36px; height: 36px; padding: 0; font-size: 20px;
         line-height: 1; background: rgba(44, 32, 24, 0.85); }
-      .filters, .recent { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 20px; }
-      .recent-title { margin: 0 4px 0 0; font-size: 16px; color: #f3c64e; }
+      /* The ☆ beside it stars the game, which then sorts to the top (shared/favourites.ts). */
+      .game .game-star { position: absolute; top: 8px; right: 52px; width: 36px; height: 36px; padding: 0; font-size: 20px;
+        line-height: 1; color: #f3c64e; background: rgba(44, 32, 24, 0.85); }
+      .filters, .recent, .sort { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 20px; }
+      .recent-title, .sort-title { margin: 0 4px 0 0; font-size: 16px; color: #f3c64e; }
       .recent a { display: flex; align-items: center; gap: 8px; padding: 6px 12px; color: inherit; text-decoration: none;
         background: #2c2018; border: 2px solid #5a3f2a; box-shadow: 0 3px 0 #0e0a08; }
       .recent a:hover, .recent a:focus-visible { border-color: #f3c64e; outline: none; }
@@ -96,6 +103,7 @@
         <div class="header-actions">
           <!-- Shown where the hub can be installed as an app; see shared/install.ts. -->
           <button type="button" id="install-app" data-i18n="installApp" hidden>Install</button>
+          <button type="button" id="open-trophies" data-i18n="trophies">Trophies</button>
           <button type="button" id="open-settings" data-i18n="settings">Settings</button>
         </div>
       </header>
@@ -108,10 +116,21 @@
         </div>
       </dialog>
       <!-- One game's settings, opened from the ⚙ on its card. -->
+      <!-- The trophy shelf: every trophy earned on this device, by game (shared/trophies.ts). -->
+      <dialog id="trophies" aria-labelledby="trophies-title">
+        <div class="panel">
+          <h2 id="trophies-title" data-i18n="trophies">Trophies</h2>
+          <p class="lede" data-i18n="trophyShelfLede">Every trophy earned on this device, by game.</p>
+          <div class="trophy-shelf"></div>
+          <button type="button" class="close" data-i18n-label="close" aria-label="Close">✕</button>
+        </div>
+      </dialog>
+
       <dialog id="game-settings" aria-labelledby="game-settings-title">
         <div class="panel">
           <h2 id="game-settings-title"></h2>
           <p class="lede" id="game-progress"></p>
+          <p class="lede" id="game-updated" hidden></p>
           <!-- Export and import just this game's progress, as a file ending in .gh and the game's code (shared/saveCodes.ts). -->
           <div class="setting">
             <div class="setting-choices">
@@ -167,6 +186,10 @@
       <nav class="recent" aria-labelledby="recent-title" hidden>
         <h2 class="recent-title" id="recent-title" data-i18n="continuePlaying">Continue playing</h2>
       </nav>
+      <!-- The card order, shown once a game has been played on this device. -->
+      <div class="sort" role="group" aria-labelledby="sort-title" hidden>
+        <span class="sort-title" id="sort-title" data-i18n="sortBy">Sort</span>
+      </div>
       <!-- Shown when the Genre filter setting is on; the genres come from each card's data-genres. -->
       <div class="filters" role="group" data-i18n-label="genres" aria-label="Genres" hidden></div>
       <!-- One entry per game in games/<name>; see AGENTS.md for adding a game. -->
@@ -282,6 +305,13 @@
             <p data-i18n="mapmakerCard">Reveal a fog-covered island tile by tile on a limited store of supplies, and trade your charts at port for upgrades.</p>
           </a>
         </li>
+        <li class="game" data-genres="strategy">
+          <a href="games/mazewright/">
+            <img class="cover" loading="lazy" decoding="async" width="960" height="540" data-i18n-alt="mazewrightCover" src="./games/mazewright/cover.png" alt="A hedge maze on a garden lawn, with stone towers in the hedges and beetles walking a dotted route to a cottage" />
+            <h2><img class="icon" src="./games/mazewright/favicon.svg" alt="" />Mazewright</h2>
+            <p data-i18n="mazewrightCard">Plant hedges and towers on an open lawn to build the maze the beetles must walk, but never close the last way through.</p>
+          </a>
+        </li>
         <li class="game" data-genres="puzzle">
           <a href="games/ninefold/">
             <img class="cover" loading="lazy" decoding="async" width="960" height="540" data-i18n-alt="ninefoldCover" src="./games/ninefold/cover.png" alt="A number puzzle board on layered paper, with a few digits written in and one cell picked" />
@@ -354,13 +384,21 @@
       import { mountSettingsPanel } from './shared/settingsPanel.ts';
       import { gameOf, showPlayCounts } from './shared/playCount.ts';
       import { clearProgress, hasProgress, recentlyPlayed } from './shared/progress.ts';
+      import { favourites, toggleFavourite, savedSort, saveSort, SORTS } from './shared/favourites.ts';
+      import { formatPlayTime, playTimes } from './shared/playTime.ts';
       import { loadSettings } from './shared/settings.ts';
-      import { language, setLanguage, t, translatePage } from './shared/i18n.ts';
+      import { formatDate, language, setLanguage, t, translatePage } from './shared/i18n.ts';
+      import { GAME_DATES, badge, markKnown, parseDay } from './shared/gameDates.ts';
       import { installed, mountInstallButton, onOpenFile, registerServiceWorker } from './shared/install.ts';
       import { ALL, askToExport, askToImport, fileEnding, pickFile } from './shared/saveFile.ts';
       import { qrSvg } from './shared/qr.ts';
       import { askToImportCode, askToPasteCode, hubLink, mountProgressCode, openedCode, showProgressCode } from './shared/progressCode.ts';
       import { mountScanner, scanCode } from './shared/scanner.ts';
+      import { trophyCount, trophyCountText, trophyShelfHtml } from './shared/trophies.ts';
+
+      // Each game with trophies lists them in games/<name>/src/trophies/index.ts.
+      const trophySets = Object.values(import.meta.glob('./games/*/src/trophies/index.ts', { eager: true, import: 'trophies' }));
+      import { isDirection, moveFocus, onPadPress, pressFocused } from './shared/gamepad.ts';
 
       const games = document.querySelector('.games');
       const shareCard = games.querySelector('.share-card');
@@ -368,9 +406,80 @@
       const folder = (li) => gameOf(li.querySelector('a').getAttribute('href'));
       const title = (li) => li.querySelector('h2').textContent.trim();
 
-      // Keep the cards in alphabetical order, so a new game lands in place wherever its card is added.
-      // The share card stays in front of them.
-      games.append(shareCard, ...cards.sort((a, b) => title(a).localeCompare(title(b), 'en')));
+      // The cards are listed by name, so a new game lands in place wherever its card is added, or by
+      // the order picked under Sort: last played first, or most played first. Starred games come
+      // before the rest, and the share card stays in front of them all.
+      const byName = (a, b) => title(a).localeCompare(title(b), 'en');
+      cards.sort(byName);
+      let sort = savedSort();
+      const arrange = () => {
+        const starred = favourites();
+        const played = recentlyPlayed();
+        const times = playTimes();
+        const lastPlayed = (c) => (played.includes(folder(c)) ? played.indexOf(folder(c)) : played.length);
+        const order = {
+          name: byName,
+          recent: (a, b) => lastPlayed(a) - lastPlayed(b) || byName(a, b),
+          most: (a, b) => (times[folder(b)] ?? 0) - (times[folder(a)] ?? 0) || byName(a, b),
+        }[sort];
+        const star = (c) => Number(starred.includes(folder(c)));
+        games.append(shareCard, ...[...cards].sort((a, b) => star(b) - star(a) || order(a, b)));
+      };
+      const sortRow = document.querySelector('.sort');
+      const showSort = () => {
+        sortRow.hidden = sort === 'name' && recentlyPlayed().length === 0;
+        sortRow.replaceChildren(
+          sortRow.querySelector('.sort-title'),
+          ...SORTS.map((s) => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.textContent = t(`sort${s[0].toUpperCase()}${s.slice(1)}`);
+            button.setAttribute('aria-pressed', String(s === sort));
+            button.addEventListener('click', () => {
+              sort = s;
+              saveSort(s);
+              showSort();
+              arrange();
+            });
+            return button;
+          }),
+        );
+      };
+
+      // Time played on this device (shared/playTime.ts), under each card's text once it reaches a minute.
+      const showPlayTimes = () => {
+        const times = playTimes();
+        for (const card of cards) {
+          const link = card.querySelector('a');
+          link.querySelector('.playtime')?.remove();
+          const time = formatPlayTime(times[folder(card)] ?? 0);
+          if (!time) continue;
+          const line = document.createElement('p');
+          line.className = 'playtime';
+          line.textContent = t('playTime', { time });
+          link.querySelector('h2 + p').after(line);
+        }
+      };
+
+      // New and Updated badges: a game that's new and never opened here, or changed since it was last
+      // opened here. Opening the game clears its badge (setupGame calls markSeen).
+      const day = (date) => formatDate(parseDay(date), { dateStyle: 'long' });
+      markKnown(cards.map(folder));
+      const showBadges = () => {
+        for (const card of cards) {
+          card.querySelector('.badge')?.remove();
+          const kind = badge(folder(card));
+          if (!kind) continue;
+          const dates = GAME_DATES[folder(card)];
+          const label = document.createElement('span');
+          label.className = `badge ${kind}`;
+          label.textContent = t(kind === 'new' ? 'badgeNew' : 'badgeUpdated');
+          label.title = t(kind === 'new' ? 'badgeNewTitle' : 'badgeUpdatedTitle', { date: day(kind === 'new' ? dates.added : dates.updated) });
+          card.querySelector('a').append(label);
+        }
+      };
+      // Coming back to the hub with the browser's back button shows it as it was, so look again.
+      window.addEventListener('pageshow', (e) => e.persisted && showBadges());
 
       // Each card gets a ⚙ that opens its game's own settings: delete just that game's progress, or play.
       const gameDialog = document.getElementById('game-settings');
@@ -379,6 +488,10 @@
         document.getElementById('game-settings-title').textContent = title(shown);
         const saved = hasProgress(folder(shown));
         document.getElementById('game-progress').textContent = t(saved ? 'gameProgressSaved' : 'gameProgressNone');
+        const dates = GAME_DATES[folder(shown)];
+        const updated = document.getElementById('game-updated');
+        updated.hidden = !dates;
+        if (dates) updated.textContent = t('lastUpdated', { date: day(dates.updated) });
         document.getElementById('reset-game').disabled = !saved;
         document.getElementById('export-game').disabled = !saved;
         document.getElementById('play-game').href = shown.querySelector('a').getAttribute('href');
@@ -395,12 +508,52 @@
           gameDialog.showModal();
         });
         card.append(gear);
+        const star = document.createElement('button');
+        star.type = 'button';
+        star.className = 'game-star';
+        const starred = favourites().includes(folder(card));
+        star.textContent = starred ? '★' : '☆';
+        star.setAttribute('aria-pressed', String(starred));
+        star.addEventListener('click', () => {
+          const on = toggleFavourite(folder(card));
+          star.textContent = on ? '★' : '☆';
+          star.setAttribute('aria-pressed', String(on));
+          arrange();
+          showGenres();
+        });
+        card.append(star);
       }
+      // Each card of a game with trophies counts the ones earned, and the header's Trophies opens the shelf.
+      const showTrophies = () => {
+        for (const set of trophySets) {
+          const card = cards.find((c) => folder(c) === set.game);
+          if (!card) continue;
+          let line = card.querySelector('.trophy-count');
+          if (!line) {
+            line = document.createElement('p');
+            line.className = 'trophy-count';
+            card.querySelector('a').append(line);
+          }
+          line.textContent = trophyCountText(set);
+          line.setAttribute('aria-label', t('trophyCountLabel', trophyCount(set)));
+        }
+        document.querySelector('.trophy-shelf').innerHTML = trophyShelfHtml(trophySets, (game) => {
+          const card = cards.find((c) => folder(c) === game);
+          return { title: title(card), icon: card.querySelector('h2 .icon').getAttribute('src') };
+        });
+      };
+      const trophyDialog = document.getElementById('trophies');
+      document.getElementById('open-trophies').addEventListener('click', () => {
+        showTrophies();
+        trophyDialog.showModal();
+      });
+
       document.getElementById('reset-game').addEventListener('click', () => {
         if (!confirm(t('resetGameConfirm', { game: title(shown) }))) return;
         clearProgress(folder(shown));
         showGame();
         showRecent();
+        showTrophies();
       });
 
       document.getElementById('export-game').addEventListener('click', () => askToExport(folder(shown), []));
@@ -408,6 +561,7 @@
         askToImport(file, folder(card), [], title(card), () => {
           showGame();
           showRecent();
+          showTrophies();
         });
       document.getElementById('import-game').addEventListener('click', () => pickFile((file) => importGame(shown, file)));
       document.getElementById('qr-game').addEventListener('click', () => showProgressCode(folder(shown), [], title(shown)));
@@ -420,6 +574,7 @@
         }
         if (shown) showGame();
         showRecent();
+        showTrophies();
       };
       document.getElementById('paste-game').addEventListener('click', () => askToPasteCode(cards.map(folder), titleOf, codeImported));
       document.getElementById('scan-game').addEventListener('click', () =>
@@ -439,10 +594,14 @@
           recent.append(link);
         }
         recent.hidden = played.length === 0;
+        // Deleting or importing progress changes the time played and the last played games too.
+        showPlayTimes();
+        showSort();
+        arrange();
       };
-      showRecent();
 
-      // The genre filter, when the setting is on: one button per genre on the cards, and All.
+      // The genre filter, when the setting is on: one button per genre on the cards, All, and
+      // Favourites once a game is starred.
       const filters = document.querySelector('.filters');
       const GENRES = ['action', 'strategy', 'management', 'puzzle', 'adventure'];
       let genre = 'all';
@@ -450,8 +609,10 @@
         const on = loadSettings().genreFilter;
         filters.hidden = !on;
         if (!on) genre = 'all';
+        const starred = favourites();
+        if (genre === 'favourites' && !starred.length) genre = 'all';
         filters.replaceChildren(
-          ...['all', ...GENRES].map((g) => {
+          ...['all', ...(starred.length ? ['favourites'] : []), ...GENRES].map((g) => {
             const button = document.createElement('button');
             button.type = 'button';
             button.textContent = t(`genre${g[0].toUpperCase()}${g.slice(1)}`);
@@ -463,7 +624,9 @@
             return button;
           }),
         );
-        for (const card of cards) card.hidden = genre !== 'all' && !card.dataset.genres.split(' ').includes(genre);
+        const shows = (card) =>
+          genre === 'all' || (genre === 'favourites' ? starred.includes(folder(card)) : card.dataset.genres.split(' ').includes(genre));
+        for (const card of cards) card.hidden = !shows(card);
       };
 
       // The page's text comes from shared/i18n (English in the markup is only the first paint), and
@@ -472,9 +635,15 @@
         translatePage();
         document.title = t('hubTitle');
         for (const line of document.querySelectorAll('.plays')) line.textContent = t('plays', { n: Number(line.dataset.plays) });
-        for (const card of cards) card.querySelector('.game-gear').setAttribute('aria-label', t('gameSettings', { game: title(card) }));
+        for (const card of cards) {
+          card.querySelector('.game-gear').setAttribute('aria-label', t('gameSettings', { game: title(card) }));
+          card.querySelector('.game-star').setAttribute('aria-label', t('favouriteGame', { game: title(card) }));
+        }
         if (shown) showGame();
         showGenres();
+        showTrophies();
+        showRecent();
+        showBadges();
       };
       setLanguage(language());
       translate();
@@ -509,13 +678,26 @@
       const shareButton = document.getElementById('share-link');
       shareButton.hidden = !navigator.share;
       shareButton.addEventListener('click', () => navigator.share({ title: t('hubTitle'), url: hub }).catch(() => {}));
-      for (const d of [dialog, gameDialog]) {
+      for (const d of [dialog, gameDialog, trophyDialog]) {
         d.querySelector('.close').addEventListener('click', () => d.close());
         // A click on the backdrop closes it too.
         d.addEventListener('click', (e) => e.target === d && d.close());
       }
       mountProgressCode();
       mountScanner();
+      // A controller moves the focus between the cards and buttons, in the open dialog when there is
+      // one: A presses, B closes the dialog, X opens the focused card's ⚙ and Start opens Settings
+      // or closes them.
+      onPadPress((button) => {
+        const open = [...document.querySelectorAll('dialog[open]')].pop();
+        if (button === 'x' && !open) document.activeElement?.closest('.game')?.querySelector('.game-gear')?.click();
+        else if (button === 'start') {
+          if (open === dialog) dialog.close();
+          else if (!open) dialog.showModal();
+        } else if (button === 'b') open?.close();
+        else if (isDirection(button)) moveFocus(open ?? document.body, button);
+        else if (button === 'a') pressFocused(open ?? document.body);
+      });
       // A progress code scanned with a phone's camera opens the hub with the code in its address.
       const opened = openedCode();
       if (opened) askToImportCode(opened, cards.map(folder), titleOf, codeImported);

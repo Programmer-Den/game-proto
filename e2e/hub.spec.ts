@@ -26,6 +26,7 @@ const GAMES = [
   { name: 'Bramblecrest', path: '/games/bramblecrest/' },
   { name: 'Ninefold', path: '/games/ninefold/' },
   { name: 'Augury', path: '/games/augury/' },
+  { name: 'Mazewright', path: '/games/mazewright/' },
 ];
 
 // The games with a Watch AI mode (`?watch`, see shared/watch.ts); there is no hub link to it.
@@ -122,6 +123,9 @@ test('hub settings reach the games', async ({ page }, testInfo) => {
     genreFilter: false,
     // Desktop Chromium can't tell WiFi from mobile data, so Wi-Fi only isn't offered.
     updates: 'auto',
+    turn: 'turn',
+    controller: true,
+    cursorSpeed: 5,
   });
   await expect(dialog.getByRole('slider', { name: 'Music' })).toHaveValue('35');
 
@@ -154,7 +158,8 @@ test('hub settings reach the games', async ({ page }, testInfo) => {
   page.once('dialog', (d) => d.accept());
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await dialog.getByRole('button', { name: 'Delete all progress' }).click();
-  expect((await page.evaluate(() => Object.keys(localStorage))).sort()).toEqual(['hub-settings', 'other-site-data']);
+  // The games each card last saw opened (shared/gameDates.ts) aren't progress, so they stay with the settings.
+  expect((await page.evaluate(() => Object.keys(localStorage))).sort()).toEqual(['hub-seen', 'hub-settings', 'other-site-data']);
   await expect(recent).toBeHidden();
 
   await dialog.getByRole('button', { name: 'Restore defaults' }).click();
@@ -189,7 +194,7 @@ test('hub game settings, continue playing and genre filter', async ({ page }, te
   await dialog.getByRole('button', { name: "Delete this game's progress" }).click();
   await expect(dialog).toContainText('Nothing is saved for this game yet.');
   await expect(dialog.getByRole('button', { name: "Delete this game's progress" })).toBeDisabled();
-  expect((await page.evaluate(() => Object.keys(localStorage))).sort()).toEqual(['deadline-best', 'hub-recent']);
+  expect((await page.evaluate(() => Object.keys(localStorage))).sort()).toEqual(['deadline-best', 'hub-recent', 'hub-seen']);
   await expect(recent).toBeHidden();
   await dialog.getByRole('button', { name: 'Close' }).click();
   await expect(dialog).toBeHidden();
@@ -350,6 +355,274 @@ test('games have start and pause screens', async ({ page }, testInfo) => {
   await page.keyboard.press('p');
   await expect(overlay).toBeHidden();
   expect(await running(), 'playing after P twice').toBe(true);
+});
+
+// Trophies (shared/trophies.ts): a stored trophy shows in its card's count, on the hub's trophy shelf
+// and in the game's Trophies list on the start and pause screens.
+test('hub and games show trophies', async ({ page }, testInfo) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('apothecary-trophies', JSON.stringify({ firstSale: Date.UTC(2026, 9, 24) }));
+    Object.assign(window, { showStartScreen: true });
+  });
+  await page.goto('/');
+  const card = page.locator('.game', { has: page.locator('a[href="games/apothecary/"]') });
+  await expect(card.locator('.trophy-count')).toHaveText('🏆 1/10');
+  await expect(card.locator('.trophy-count')).toHaveAttribute('aria-label', '1 of 10 trophies');
+  await page.getByRole('button', { name: 'Trophies' }).click();
+  const shelf = page.locator('#trophies');
+  await expect(shelf).toBeVisible();
+  await expect(shelf.locator('.trophy-game h3')).toHaveText(/Apothecary/);
+  await expect(shelf.locator('.trophy-chip')).toHaveText(['🧪First customer']);
+  await expect(shelf.locator('.trophy-total').first()).toHaveText('🏆Bronze 1');
+  testInfo.attach('trophy shelf', { body: await shelf.screenshot({ path: testInfo.outputPath('trophy-shelf.png') }), contentType: 'image/png' });
+  await shelf.locator('.close').click();
+
+  await page.goto('/games/apothecary/');
+  await page.getByRole('button', { name: 'Trophies 🏆 1/10' }).click();
+  await expect(page.getByRole('heading', { name: 'Trophies of Apothecary' })).toBeVisible();
+  const rows = page.locator('.trophy-row');
+  await expect(rows).toHaveCount(10);
+  await expect(rows.first()).toHaveClass(/earned/);
+  await expect(rows.first()).toContainText('First customer');
+  // A hidden trophy keeps its name until it is earned.
+  await expect(rows.last()).toContainText('Hidden trophy');
+  testInfo.attach('trophy list', { body: await page.screenshot({ path: testInfo.outputPath('trophy-list.png') }), contentType: 'image/png' });
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.game-start-button')).toBeVisible();
+});
+
+// A game adds up its time played on this device (shared/playTime.ts) only while it runs: not on its
+// start or pause screen. The test owns the clock, so the time counted is exact; `countPlayTime` lets
+// it count under automation, which never counts otherwise.
+test('games count time played', async ({ page }) => {
+  await page.addInitScript(() => Object.assign(window, { showStartScreen: true, countPlayTime: true }));
+  await page.clock.install();
+  await page.goto('/games/apothecary/');
+  const start = page.locator('.game-start-button');
+  await expect.poll(async () => (await page.clock.runFor(100), start.isVisible()), { message: 'start screen' }).toBe(true);
+  await page.clock.runFor(5000);
+  await start.click();
+  await page.clock.runFor(3000);
+  await page.locator('.pause-button').click();
+  await page.clock.runFor(5000);
+  // Leaving the page saves what was played.
+  await page.goto('/');
+  const seconds = await page.evaluate(() => JSON.parse(localStorage.getItem('hub-playtime') ?? '{}').apothecary);
+  expect(seconds, 'seconds counted between Start and pause').toBeGreaterThanOrEqual(2);
+  expect(seconds, 'seconds counted between Start and pause').toBeLessThanOrEqual(3);
+});
+
+// Each card shows the time played on this device and the Settings panel the total; Sort lists the
+// cards by name, last played or most played, and starred games come first, with a Favourites chip in
+// the genre filter. Deleting a game's progress forgets its time played but keeps its star.
+test('hub favourites, time played and sort', async ({ page }, testInfo) => {
+  await page.goto('/');
+  // No game played yet: no Sort row.
+  await expect(page.getByRole('group', { name: 'Sort' })).toBeHidden();
+  await page.evaluate(() => {
+    localStorage.setItem('hub-playtime', JSON.stringify({ apothecary: 12_000, deadline: 150, palisade: 30 }));
+    localStorage.setItem('hub-recent', JSON.stringify(['palisade', 'deadline', 'apothecary']));
+  });
+  await page.reload();
+  const card = (path: string) => page.locator('.game').filter({ has: page.locator(`a[href="${path}"]`) });
+  await expect(card('games/apothecary/').locator('.playtime')).toHaveText('3 h 20 min played');
+  await expect(card('games/deadline/').locator('.playtime')).toHaveText('2 min played');
+  // Under a minute shows nothing.
+  await expect(card('games/palisade/').locator('.playtime')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  const settings = page.getByRole('dialog', { name: 'Settings' });
+  await expect(settings.locator('.total-play-time')).toHaveText('Time played on this device: 3 h 23 min');
+  await settings.getByRole('button', { name: 'Close' }).click();
+
+  const names = () => page.locator('.game h2').allTextContents();
+  const sort = page.getByRole('group', { name: 'Sort' });
+  await expect(sort.getByRole('button', { name: 'Name' })).toHaveAttribute('aria-pressed', 'true');
+  await sort.getByRole('button', { name: 'Most played' }).click();
+  expect((await names()).slice(0, 3)).toEqual(['Apothecary', 'Deadline', 'Palisade']);
+  await sort.getByRole('button', { name: 'Last played' }).click();
+  expect((await names()).slice(0, 3)).toEqual(['Palisade', 'Deadline', 'Apothecary']);
+  // The order is kept across visits.
+  await page.reload();
+  await expect(sort.getByRole('button', { name: 'Last played' })).toHaveAttribute('aria-pressed', 'true');
+  expect((await names())[0]).toBe('Palisade');
+  await sort.getByRole('button', { name: 'Name' }).click();
+  expect((await names())[0]).toBe('Anvilheart');
+
+  // A starred game moves to the front and stays there.
+  const star = page.getByRole('button', { name: 'Favourite Wyrmrail' });
+  await expect(star).toHaveAttribute('aria-pressed', 'false');
+  await star.click();
+  await expect(star).toHaveAttribute('aria-pressed', 'true');
+  expect((await names()).slice(0, 2)).toEqual(['Wyrmrail', 'Anvilheart']);
+  testInfo.attach('favourites', { body: await page.screenshot({ path: testInfo.outputPath('favourites.png') }), contentType: 'image/png' });
+  await page.reload();
+  expect((await names())[0]).toBe('Wyrmrail');
+  expect(await page.evaluate(() => localStorage.getItem('hub-favourites'))).toBe('["wyrmrail"]');
+
+  // The genre filter gets a Favourites chip.
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('group', { name: 'Genre filter' }).getByRole('button', { name: 'On' }).click();
+  await settings.getByRole('button', { name: 'Close' }).click();
+  const genres = page.getByRole('group', { name: 'Genres' });
+  await genres.getByRole('button', { name: 'Favourites' }).click();
+  await expect(page.locator('.game:visible h2')).toHaveText(['Wyrmrail']);
+  await genres.getByRole('button', { name: 'All' }).click();
+
+  // Deleting Apothecary's progress forgets its time played, and none of it goes into its export.
+  await page.getByRole('button', { name: 'Settings for Apothecary' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Apothecary' });
+  await page.evaluate(() => localStorage.setItem('apothecary-save', '{}'));
+  await dialog.getByRole('button', { name: 'Close' }).click();
+  await page.getByRole('button', { name: 'Settings for Apothecary' }).click();
+  page.once('dialog', (d) => d.accept());
+  await dialog.getByRole('button', { name: "Delete this game's progress" }).click();
+  await expect(card('games/apothecary/').locator('.playtime')).toHaveCount(0);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('hub-playtime')!))).toEqual({ deadline: 150, palisade: 30 });
+  await dialog.getByRole('button', { name: 'Close' }).click();
+  await expect(star).toHaveAttribute('aria-pressed', 'true');
+});
+
+// A stand-in controller (shared/gamepad.ts reads it through navigator.getGamepads), with its
+// buttons pressed and its stick tilted by the test, since a test browser has no real one. A press
+// lasts exactly one read of the pad, so a slow frame never makes a held direction repeat.
+async function fakePad(page: Page) {
+  await page.addInitScript(() => {
+    const pad = {
+      id: 'Test pad',
+      index: 0,
+      connected: true,
+      mapping: 'standard',
+      timestamp: 0,
+      axes: [0, 0, 0, 0],
+      buttons: Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 })),
+    };
+    /** Called once the pad has been read and that frame's presses handled. */
+    let afterRead: (() => void)[] = [];
+    navigator.getGamepads = () => {
+      const waiting = afterRead;
+      afterRead = [];
+      queueMicrotask(() => waiting.forEach((f) => f()));
+      return [pad as unknown as Gamepad];
+    };
+    const nextRead = () => new Promise<void>((done) => afterRead.push(done));
+    Object.assign(window, { testPad: { pad, nextRead } });
+  });
+  const BUTTONS = { a: 0, b: 1, x: 2, select: 8, start: 9, up: 12, down: 13, left: 14, right: 15 };
+  return {
+    press: (button: keyof typeof BUTTONS) =>
+      page.evaluate(async (i) => {
+        const { pad, nextRead } = (window as any).testPad;
+        Object.assign(pad.buttons[i], { pressed: true, value: 1 });
+        await nextRead();
+        Object.assign(pad.buttons[i], { pressed: false, value: 0 });
+        await nextRead();
+      }, BUTTONS[button]),
+    stick: (x: number, y: number) =>
+      page.evaluate(async ([ax, ay]) => {
+        const { pad, nextRead } = (window as any).testPad;
+        pad.axes = [ax, ay, 0, 0];
+        await nextRead();
+      }, [x, y]),
+  };
+}
+
+// A controller walks the hub: the D-pad moves the focus between cards, X opens a card's ⚙, B closes
+// the dialog, and Start opens Settings, where A picks a choice and left and right move a slider.
+test('hub works with a controller', async ({ page }, testInfo) => {
+  const pad = await fakePad(page);
+  await page.goto('/');
+  const cards = page.locator('.game > a');
+  await cards.first().focus();
+  await pad.press('down');
+  // The card below the first one, in a grid of several columns.
+  const columns = await page.locator('.games').evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(' ').length);
+  const below = await page.evaluate(() => document.activeElement?.closest('.game')?.querySelector('h2')?.textContent?.trim());
+  const names = (await page.locator('.game h2').allTextContents()).map((n) => n.trim());
+  expect(below).toBe(names[columns]);
+  await expect(page.locator('html')).toHaveClass(/pad-focus/);
+  testInfo.attach('focus', { body: await page.screenshot({ path: testInfo.outputPath('pad-focus.png') }), contentType: 'image/png' });
+  await pad.press('up');
+  await expect(cards.first()).toBeFocused();
+  await pad.press('x');
+  const gameDialog = page.getByRole('dialog', { name: names[0] });
+  await expect(gameDialog).toBeVisible();
+  await pad.press('b');
+  await expect(gameDialog).toBeHidden();
+
+  await pad.press('start');
+  const settings = page.getByRole('dialog', { name: 'Settings' });
+  await expect(settings).toBeVisible();
+  // A pick in Settings draws the row again, and the focus stays on it.
+  const hard = settings.getByRole('group', { name: 'Difficulty' }).getByRole('button', { name: 'Hard', exact: true });
+  await hard.focus();
+  await pad.press('a');
+  await expect(hard).toHaveAttribute('aria-pressed', 'true');
+  await expect(hard).toBeFocused();
+  const speed = settings.getByRole('slider', { name: 'Cursor speed' });
+  await speed.focus();
+  await pad.press('right');
+  await expect(speed).toHaveValue('6');
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('hub-settings')!).cursorSpeed)).toBe(6);
+  await pad.press('start');
+  await expect(settings).toBeHidden();
+});
+
+// In a game the controller moves around the start and pause screens, and steers a cursor that taps
+// the game like a mouse: here the cursor sends the doctor walking.
+test('games work with a controller', async ({ page }, testInfo) => {
+  await page.addInitScript(() => Object.assign(window, { showStartScreen: true }));
+  const pad = await fakePad(page);
+  await page.goto('/games/apothecary/');
+  const running = () => page.evaluate(() => (window as any).game.scene.getScene('Game')?.sys.isActive() === true);
+  await expect(page.locator('.game-start-button')).toBeFocused();
+  // Down goes to How to play, A opens it and B goes back.
+  await pad.press('down');
+  await expect(page.getByRole('button', { name: 'How to play' })).toBeFocused();
+  await pad.press('a');
+  await expect(page.getByRole('heading', { name: 'How to play Apothecary' })).toBeVisible();
+  await expect(page.getByRole('rowheader', { name: 'Controller: left stick, A, B' })).toBeVisible();
+  await pad.press('b');
+  await expect(page.locator('.game-start-button')).toBeVisible();
+  await pad.press('start');
+  await expect(page.locator('.game-overlay')).toBeHidden();
+  expect(await running(), 'playing after Start').toBe(true);
+
+  // Start pauses; on the pause screen left and right move a focused volume, and B resumes.
+  await pad.press('start');
+  await expect(page.locator('.game-resume-button')).toBeFocused();
+  expect(await running(), 'paused by Start').toBe(false);
+  const music = page.locator('.game-overlay .volume-music');
+  await music.focus();
+  await pad.press('left');
+  await expect(music).toHaveValue('55');
+  await pad.press('b');
+  await expect(page.locator('.game-overlay')).toBeHidden();
+
+  // Select opens the sound menu, where the D-pad moves, and B closes it.
+  await pad.press('select');
+  await expect(page.locator('.sound-menu')).toBeVisible();
+  await pad.press('down');
+  await expect(page.locator('.sound-menu .volume-music')).toBeFocused();
+  await pad.press('b');
+  await expect(page.locator('.sound-menu')).toBeHidden();
+
+  // The stick brings up the cursor and moves it left; A taps there, and the doctor sets off.
+  const cursor = page.locator('.pad-cursor');
+  const left = () => cursor.evaluate((el) => el.getBoundingClientRect().left);
+  await expect(cursor).toBeHidden();
+  const middle = await page.evaluate(() => innerWidth / 2);
+  await pad.stick(-1, 0);
+  await expect(cursor).toBeVisible();
+  await expect.poll(left).toBeLessThan(middle - 150);
+  await pad.stick(0, 0);
+  const pointerTarget = () => page.evaluate(() => (window as any).game.scene.getScene('Game').pointerTarget);
+  expect(await pointerTarget(), 'standing before the tap').toBeNull();
+  await pad.press('a');
+  await expect.poll(pointerTarget).not.toBeNull();
+  testInfo.attach('cursor', { body: await page.screenshot({ path: testInfo.outputPath('pad-cursor.png') }), contentType: 'image/png' });
+  // A real mouse move hides it again.
+  await page.mouse.move(100, 100);
+  await expect(cursor).toBeHidden();
 });
 
 // The hub shows each game's play count from its counter (shared/playCount.ts), here answered by a
@@ -528,6 +801,8 @@ test('hub progress codes', async ({ page }, testInfo) => {
   await page.evaluate(() => {
     localStorage.setItem('apothecary-save', '{"coins":42}');
     localStorage.setItem('palisade-best', '7');
+    // Saved replays are too big for a code, so only files carry them.
+    localStorage.setItem('mazewright-replays', '{"meadow":{}}');
   });
   await page.reload();
   const messages: string[] = [];
@@ -579,6 +854,7 @@ test('hub progress codes', async ({ page }, testInfo) => {
   await reloaded;
   expect(await stored('apothecary-save')).toBe('{"coins":42}');
   expect(await stored('palisade-best')).toBe('7');
+  expect(await stored('mazewright-replays')).toBeNull();
   expect(JSON.parse((await stored('hub-settings'))!).difficulty).toBe('hard');
 });
 
@@ -700,4 +976,34 @@ test('hub offers Wi-Fi only updates where the connection type is known', async (
   const updates = page.getByRole('dialog', { name: 'Settings' }).getByRole('group', { name: 'Updates' });
   await expect(updates.getByRole('button', { name: 'Wi-Fi only' })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByText('Wi-Fi only waits while you are on mobile data.', { exact: false })).toBeVisible();
+});
+
+// Each game's settings say when it was last updated, and its card shows Updated (or New) until the
+// game is opened on this device (shared/gameDates.ts).
+test('hub marks updated games until they are opened', async ({ page }, testInfo) => {
+  await page.goto('/');
+  // A first visit counts every game that isn't new as seen, so nothing shows Updated.
+  const seen = await page.evaluate(() => JSON.parse(localStorage.getItem('hub-seen') ?? '{}'));
+  await expect(page.locator('.game .badge.updated')).toHaveCount(0);
+  // Apothecary was last opened long ago, before its latest update.
+  await page.evaluate((list) => localStorage.setItem('hub-seen', JSON.stringify({ ...list, apothecary: '2000-01-01' })), seen);
+  await page.reload();
+  const card = page.locator('.game').filter({ has: page.getByRole('heading', { name: 'Apothecary' }) });
+  await expect(card.locator('.badge')).toHaveText('Updated');
+  await expect(card.locator('.badge')).toHaveAttribute('title', /^Updated \d{1,2} \w+ \d{4}$/);
+  testInfo.attach('badge', { body: await card.screenshot({ path: testInfo.outputPath('badge.png') }), contentType: 'image/png' });
+
+  await card.getByRole('button', { name: 'Settings for Apothecary' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Apothecary' });
+  await expect(dialog.getByText(/^Last updated \d{1,2} \w+ \d{4}$/)).toBeVisible();
+  testInfo.attach('last-updated', { body: await dialog.screenshot({ path: testInfo.outputPath('last-updated.png') }), contentType: 'image/png' });
+  await dialog.getByRole('button', { name: 'Close' }).click();
+
+  // Opening the game clears its badge.
+  await card.getByRole('link').click();
+  await expect(page).toHaveURL(/\/games\/apothecary\/$/);
+  await expect(page.locator('canvas')).toBeVisible();
+  await page.goto('/');
+  await expect(card).toBeVisible();
+  await expect(card.locator('.badge')).toHaveCount(0);
 });

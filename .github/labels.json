@@ -133,6 +133,11 @@
     "description": "Game: Augury"
   },
   {
+    "name": "mazewright",
+    "color": "5b7a99",
+    "description": "Game: Mazewright"
+  },
+  {
     "name": "hub",
     "color": "5b7a99",
     "description": "Game: The hub page and its settings",

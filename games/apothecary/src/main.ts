@@ -5,6 +5,7 @@ import { ShopScene } from './scenes/ShopScene';
 import { TownScene } from './scenes/TownScene';
 import { setupGame } from '../../../shared/setupGame';
 import { howToPlay } from './howToPlay';
+import { trophies } from './trophies';
 import { setupScaling } from '../../../shared/scaling';
 
 export const GAME_WIDTH = 960;
@@ -29,7 +30,7 @@ const game = new Phaser.Game({
   },
   scene: [BootScene, GameScene, TownScene, ShopScene],
 });
-setupGame(game, { howToPlay });
+setupGame(game, { howToPlay, trophies });
 setupScaling(game, { fill: true });
 
 // Handy for poking at state from the browser console during development.

@@ -435,8 +435,8 @@ key (see Hub settings).
   A new tile sprite of a painted texture goes through `tileAt` too.
 - Read a pointer on the screen with `viewPoint(pointer)` (game pixels), never `pointer.x/y`
   (canvas pixels). Texts are drawn at `renderScale` by the shared module.
-- `index.html` has the shared `100dvh` and `touch-action: none` styles. A phone held upright gets
-  the shared hint to turn it. `e2e/screens.spec.ts` checks the game on five screens.
+- `index.html` has the shared `100dvh` and `touch-action: none` styles. On a phone held upright the
+  shared scaling turns the game to fill the screen. `e2e/screens.spec.ts` checks the game on five screens.
 
 ### Sound
 

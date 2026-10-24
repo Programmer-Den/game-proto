@@ -617,6 +617,15 @@ Notes:
 - One lookout can produce several finds at once, so play only the most important one.
 - No sounds while a saved game is restored.
 
+### Mazewright
+**Done.** See the Sound section of `games/mazewright/AGENTS.md`: a pastoral tune in G (`calm`) for
+building and the garden picker, a busier E minor `battle` part while a wave walks the maze, a
+heavier `boss` part for the beetle queen, and `win` and `lose` stings. Effects are a rustle for a
+hedge planted, a two-note build chime, a bow's swish, a cannon's thump, a frost shimmer, a pop for a
+beaten foe, a low buzz for a foe that gets in, a horn per wave, a fanfare for a held wave and a
+chewing scratch for the mole; a refused placement plays the shared `refuse` buzz. One sound per
+shot, rate-limited, so a full maze never turns into noise.
+
 ### Ninefold
 Number-placement puzzle in nine art styles; calm, tidy, a music box on a desk.
 

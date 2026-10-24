@@ -30,6 +30,7 @@ start page lists the games; each one lives in its own folder under `games/`.
 | [Bramblecrest](games/bramblecrest/README.md) | A small knight explores an overgrown kingdom by lamplight, finding a new tool in every dungeon that opens more of the world. |
 | [Ninefold](games/ninefold/README.md) | Fill every row, column and box with each digit once: a daily puzzle, Classic boards at three levels, and Delve, a run of ever bigger boards with hearts and relics, in nine unlockable art styles. |
 | [Augury](games/augury/README.md) | Nine kinds of brain puzzle dealt like tarot cards (picture grids, bridges, code breaking, calc cages, cross sums, sliding blocks, tile flips, path links and a memory echo), in six modes from an endless medley to pass and play. |
+| [Mazewright](games/mazewright/README.md) | A tower defense with no road: every hedge and tower you plant on the open lawn is a wall, so you build the maze the beetles walk, and a planting that would close the last way through is refused. Three gardens, twenty waves, moths that fly over and moles that chew through hedges. |
 
 ## Settings
 
@@ -75,6 +76,7 @@ The hub's **Settings** button opens the settings every game shares. They are sav
   | Bramblecrest | 5 hearts, and the bosses call in foes 25% less often | 2 hearts, and the bosses call in foes 30% more often |
   | Ninefold | 5 hints a Classic board, 4 hearts a Delve run | 2 hints a Classic board, 2 hearts a Delve run |
   | Augury | 4 hearts in Endless and Draft, 4 minutes of Blitz | 2 hearts in Endless and Draft, 2½ minutes of Blitz |
+  | Mazewright | 30 cabbages, and foes have 20% less health | 12 cabbages, and foes have 25% more health |
 
 - **Frame rate (FPS)**: the most frames per second a game draws, 30 to 320 (60 by default).
 - **Show FPS**: a readout of the frame rate in each game's corner.
@@ -92,17 +94,27 @@ The hub's **Settings** button opens the settings every game shares. They are sav
   when the browser has no app installed to update.
 
   ![The Updates setting](docs/screenshots/hub-updates.webp)
+- **Phone held the wrong way**: what a game does on a phone held upright when it plays sideways (or
+  the other way round). **Turn the game** (the default) turns the game a quarter round so it fills
+  the screen and the player just turns the phone, even with the phone's rotation locked; in full
+  screen on Android the screen is also locked the game's way round. **Ask me to turn it** covers the
+  paused game with a hint to turn the phone instead. Games that play both ways round (Augury and
+  Ninefold) just turn their view.
+
+  ![The game turned on an upright phone](docs/screenshots/turned-game.webp)
+- **Controller** (on by default) and **Cursor speed** (1 to 10, 5 by default): see Controllers below.
 - **Saved progress**: **Export all** saves every game's progress and the settings to a `.gh` file,
   and **Import all** loads one back, on this or another device. **QR code**, **Paste code** and
-  **Scan code** move the same as a progress code (see Progress codes). **Delete all progress** erases every
-  game's saves and the Continue playing row, and keeps the settings and any other site's storage on
-  the same origin.
+  **Scan code** move the same as a progress code (see Progress codes). The row also shows the time
+  played on this device over every game. **Delete all progress** erases every game's saves, time
+  played and the Continue playing row, and keeps the settings, the favourites and any other site's
+  storage on the same origin.
 
 ![Export all, Import all and Delete all progress](docs/screenshots/hub-progress-files.webp)
 - **Restore defaults** puts the settings back, and **Done** closes the panel.
 
 Each card also has a **⚙** in its corner that opens that game's own settings: whether it has
-anything saved on this device, **Export progress** and **Import progress** for just that game's
+anything saved on this device, when the game was last updated, **Export progress** and **Import progress** for just that game's
 progress (see Progress files), **QR code**, **Paste code** and **Scan code** for the same as a progress code
 (see Progress codes), **Install**, which opens the game ready to install as an app (see
 Install as an app), **Delete this game's progress** (its storage keys, which all start
@@ -119,9 +131,30 @@ when it loads (`shared/qr.ts`, no outside service), so it points wherever the hu
 Above the cards, **Continue playing** links the last three games played on this device, and a link
 at the bottom of the hub opens the bug and feedback forms. The covers load as they scroll into view.
 
+The **☆** beside a card's ⚙ stars the game: starred games come first, and the genre filter gets a
+**Favourites** button. Each card also shows how long the game has been played on this device, such
+as "3 h 20 min played", counted only while the game runs (not on its start or pause screen, nor with
+the tab hidden). Once a game has been played, **Sort** lists the cards by **Name**, **Last played**
+or **Most played**. Favourites, time played and the order stay on this device: they are kept under
+`hub-` keys (`shared/favourites.ts`, `shared/playTime.ts`), which no progress file or code carries,
+and nothing is sent anywhere. Deleting a game's progress also forgets its time played.
+
+![A starred game first, with its time played](docs/screenshots/hub-favourites.webp)
+
+A card shows **New** for a game added in the last 14 days that this device hasn't opened yet, and
+**Updated** for a game that changed since it was last opened here (hover the badge for the date).
+Opening the game clears its badge. On a first visit no game shows Updated. The dates come from git
+when the hub is built (`scripts/gameDates.ts`): a game counts as updated when its `src/` or
+`index.html` changed, not its screenshots, docs or `shared/`. Which version of each game was last
+opened is kept on the device only, under `hub-seen` (`shared/gameDates.ts`).
+
+![An Updated badge on a card](docs/screenshots/hub-badge.webp)
+
 Every game also has a full screen button in its bottom left corner, and the **F** key toggles full screen. Browsers that cannot take a page full screen, such as iPhones, don't show the button. Beside it, the speaker button opens the sound menu, with one volume for the music, one for the sound effects and a Mute button; the **M** key mutes every sound and turns it back on, and the pause screen sets the same volumes. The corner buttons keep 12px clear of the edges, plus a phone's safe area, so rounded corners never cut them.
 
 Every game shows a loading screen while its art is drawn, then waits on a start screen until **Start** is pressed (or Enter or Space). The pause button next to full screen, the **P** key or leaving the tab pauses it; Resume, P, Space or Esc play on, and the pause screen links back to all games. Both screens have a **How to play** button (or the **H** key) that shows the game's goal, its controls, how a round goes and a few tips; Back, H or Esc close it.
+
+Games with trophies (Apothecary so far) award bronze, silver and gold trophies for milestones, with a short toast and fanfare, and their start and pause screens list them under **Trophies**, earned or still to earn; hidden ones keep their name until earned. Each hub card shows how many of its game's trophies are earned (🏆 4/10), and the hub's **Trophies** button opens a shelf of every trophy earned on this device, by game. Trophies are saved with the game's progress (`shared/trophies.ts`), so they move with its progress file or code and go when its progress is deleted.
 
 ## Watch AI
 
@@ -149,17 +182,38 @@ npm run build     # typecheck (games, tests and configs) + production build of t
 npm run preview   # serve the production build
 ```
 
+## Controllers
+
+A game controller plays the hub and every game, read through the browser's Gamepad API in the
+standard layout (`shared/gamepad.ts`). Browsers make a controller known once one of its buttons is
+pressed on the page.
+
+- **Hub:** the D-pad or the left stick moves the focus between the cards and buttons (and inside an
+  open dialog), **A** presses, **B** closes the dialog, **X** opens the focused card's ⚙ and
+  **Start** opens Settings, where left and right move a slider.
+- **Start and pause screens:** **Start** pauses and resumes, the D-pad and **A** pick the buttons and
+  volumes, **B** resumes from the pause screen and leaves How to play and Trophies (where up and down scroll), and
+  **Select** opens the sound menu on any screen.
+- **In a game:** the left stick brings up a cursor over the game (`shared/padCursor.ts`), **A** taps
+  and holds like the left mouse button, **B** is the right button and the right stick scrolls like a
+  mouse wheel. It sends the same events a mouse would, so every game plays with it without code of
+  its own, and it hides on the first real mouse move or tap. **Cursor speed** sets how fast it goes.
+
+![The focus on a card, moved by a controller](docs/screenshots/hub-controller.webp)
+
+![The controller's cursor over Apothecary](docs/screenshots/controller-cursor.webp)
+
 ## Layout
 
 - `index.html`: the hub page, the share card and one card per game.
 - `games/<name>/`: one game, with its own `index.html`, `src/`, `e2e/` playthrough test, `docs/`
   screenshots and `README.md`. Games don't import from each other.
 - `shared/`: the settings every game shares (`settings.ts`), the hub's Settings panel
-  (`settingsPanel.ts`), `audio.ts`, the sound effects and music made in code, `corner.ts`, the corner buttons, `setupGame.ts`, which each game calls to apply the frame cap, the FPS readout, reduced motion, full screen and the sound button
+  (`settingsPanel.ts`), `audio.ts`, the sound effects and music made in code, `corner.ts`, the corner buttons, `gamepad.ts` and `padCursor.ts`, the controller and its cursor (see Controllers), `setupGame.ts`, which each game calls to apply the frame cap, the FPS readout, reduced motion, full screen and the sound button
   and to add the loading, start and pause screens (`startScreen.ts`) with the game's How to play (`howToPlay.ts`), `watch.ts`, the Watch AI panel and its `?watch` flag,
-  `playCount.ts`, the play counters (see Play counts), `progress.ts`, each game's saved progress and the recently played games, `saveFile.ts` and `saveCodes.ts`, the progress files (see Progress files), `progressCode.ts` and `scanner.ts`, the progress codes and their camera scanner (see Progress codes), `install.ts`, the installable apps (see Install as an app), `i18n.ts` with the shared texts in `i18n/`, the translations and number and date formats (see Language), and `scaling.ts`, which keeps a game sharp from a phone to a 4K screen (`grep -l setupScaling games/*/src/main.ts` lists the games that use it).
+  `trophies.ts`, the trophies, their toast and the hub's trophy shelf, `playCount.ts`, the play counters (see Play counts), `progress.ts`, each game's saved progress and the recently played games, `gameDates.ts`, the Last updated line and the New and Updated badges, `playTime.ts` and `favourites.ts`, the time played and the starred games (see above), `saveFile.ts` and `saveCodes.ts`, the progress files (see Progress files), `progressCode.ts` and `scanner.ts`, the progress codes and their camera scanner (see Progress codes), `install.ts`, the installable apps (see Install as an app), `i18n.ts` with the shared texts in `i18n/`, the translations and number and date formats (see Language), and `scaling.ts`, which keeps a game sharp from a phone to a 4K screen (`grep -l setupScaling games/*/src/main.ts` lists the games that use it).
 - `e2e/hub.spec.ts`: checks that the hub lists every game, that each card opens it, and that the
-  settings are saved and reach a game, that a game's ⚙ deletes just its progress, the progress files and codes, that the hub and every game have an app manifest, the genre filter and Continue playing row, that a game starts and pauses, and that the cards show play counts. `e2e/screens.spec.ts` opens each game that uses
+  settings are saved and reach a game, that a game's ⚙ deletes just its progress, the progress files and codes, that the hub and every game have an app manifest, the genre filter and Continue playing row, favourites, time played and Sort, the Last updated line and that an Updated badge clears once its game is opened, that a game starts and pauses and counts its time played, that trophies show on the cards, the shelf and the pause screen, that a stand-in controller walks the hub, the start and pause screens and taps a game with its cursor, and that the cards show play counts. `e2e/screens.spec.ts` opens each game that uses
   `shared/scaling.ts` on an upright and a sideways phone, a tablet, a laptop and a 4K screen.
 - `package.json`, `tsconfig.json`, `tsconfig.e2e.json`, `vite.config.ts` and `playwright.config.ts`
   are shared. `tsconfig.json` typechecks the games and `shared/`; `tsconfig.e2e.json` typechecks

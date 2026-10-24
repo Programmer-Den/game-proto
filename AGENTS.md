@@ -13,7 +13,8 @@ Broadside, in `games/broadside/`, TinctureTinker, in `games/tincture-tinker/`, C
 Mapmaker, in `games/mapmaker/`, Lanternkeep, in `games/lanternkeep/`, Space Wars, in
 `games/space-wars/`, Lane Brawl, in `games/lane-brawl/`, Colonizer, in `games/colonizer/`, Riftblade,
 in `games/riftblade/`, Scrapyard Titans, in `games/scrapyard-titans/`, Bramblecrest, in
-`games/bramblecrest/`, Ninefold, in `games/ninefold/`, and Augury, in `games/augury/`.
+`games/bramblecrest/`, Ninefold, in `games/ninefold/`, Augury, in `games/augury/`, and Mazewright, in
+`games/mazewright/`.
 
 Each game's guide for agents, to read before changing it:
 
@@ -42,6 +43,7 @@ Each game's guide for agents, to read before changing it:
 | Bramblecrest | [games/bramblecrest/AGENTS.md](games/bramblecrest/AGENTS.md) |
 | Ninefold | [games/ninefold/AGENTS.md](games/ninefold/AGENTS.md) |
 | Augury | [games/augury/AGENTS.md](games/augury/AGENTS.md) |
+| Mazewright | [games/mazewright/AGENTS.md](games/mazewright/AGENTS.md) |
 
 ## Feedback and issues
 
@@ -146,6 +148,13 @@ and tries to link it to the repo (the run summary says if the link has to be mad
   README. Skip camera shake and flashes, and hold blinking or jittering effects still, when
   `settings.reduceMotion` is on. A new setting goes into `shared/settings.ts` (its type, default and
   `SETTING_FIELDS` row, which the hub panel shows on its own) and then into every game.
+- **Play with a controller.** `shared/gamepad.ts` reads game controllers (standard layout) and
+  moves the focus on the hub and the shared start, pause and How to play screens and the sound menu
+  (`moveFocus`, `pressFocused`), and `shared/padCursor.ts`, added by `setupGame`, steers a cursor
+  over the game that sends real mouse and pointer events, so a game needs nothing of its own for it.
+  The hub's Controller setting turns both off and Cursor speed sets the cursor's pace. Tests stand
+  in for a controller by replacing `navigator.getGamepads` (`fakePad` in `e2e/hub.spec.ts`); a
+  playthrough never uses one.
 - **Make sound in code.** `shared/audio.ts` plays every game's sound, with no audio files:
   `sounds({ name: SoundDef })` gives a game a `play(name)` for its own table of synthesized effects
   (each with its own rate limit, at most 12 at once), `ui` has the shared `click`, `coin` and the
@@ -189,10 +198,30 @@ and tries to link it to the repo (the run summary says if the link has to be mad
   files fetched from other sites), so it still plays offline. Its progress exports and imports from
   the hub as an encrypted `.gh<code>` file (`shared/saveFile.ts`), which carries every storage key
   with the game's prefix, and as a progress code, a QR code or copied link with the same data
-  (`shared/progressCode.ts`, scanned inside the hub with `shared/scanner.ts`).
+  (`shared/progressCode.ts`, scanned inside the hub with `shared/scanner.ts`) except keys too big
+  for a QR code (`fileOnly` in `saveFile.ts`: a game's `<game>-replays`), which only the file carries.
 - **Play counts come for free.** `setupGame` also bumps the game's public play counter
   (`shared/playCount.ts`, keyed by the game's folder name) and the hub shows the count on its card,
   so a new game needs nothing for it. Tests never count: browser automation skips it.
+- **Trophies.** `shared/trophies.ts` gives every game the same trophies: a game lists 6 to 10 of
+  them (id, `bronze`, `silver` or `gold` tier, an emoji icon, `hidden` until earned) with
+  `trophySet` in `games/<name>/src/trophies/index.ts`, exported as `trophies`, with their texts in
+  `trophies/i18n/` (`en.ts`, `de.ts` and, where the spelling differs, `en-US.ts`; the name keyed by
+  the id, what earns it by `<id>Text`). That file imports nothing else from the game, since the hub
+  loads every game's (`import.meta.glob`) for each card's count and the Trophies shelf in its
+  header. The game hands `trophies` to `setupGame(game, { howToPlay, trophies })`, which adds a
+  Trophies list to the start and pause screens, and calls `award(trophies, id)` when one is earned:
+  it saves it under `<game>-trophies`, shows a toast at the top of the page and plays the shared
+  `ui('trophy')` fanfare, once. Pass `{ quiet: true }` while replaying time or restoring a save. Pick
+  milestones of a first hour and a few for long play, list them in the game's `AGENTS.md`, and
+  bring games over one per PR (`ls games/*/src/trophies/index.ts` lists the games that have them).
+  A playthrough may assert a trophy its first round earns.
+- **Time played comes for free too.** `setupGame` adds up the time the game runs on this device
+  (`shared/playTime.ts`, under `hub-playtime`), not on its start or pause screen, nor with the tab
+  hidden or the turn-phone hint up, and the hub shows it on the card, beside the starred games
+  (`shared/favourites.ts`, `hub-favourites`). Both stay on the device: `hub-` keys never go into a
+  progress file or code. Browser automation doesn't count it unless a test sets
+  `window.countPlayTime`, so a game needs nothing for it.
 - **Fit every screen.** A game stays sharp and fills the screen from an upright phone to a 4K
   monitor by calling `setupScaling(game)` from `shared/scaling.ts` right after `setupGame(game)`
   (`grep -l setupScaling games/*/src/main.ts` lists the games that do; bring the others over one game per PR). The canvas then has
@@ -201,8 +230,12 @@ and tries to link it to the repo (the run summary says if the link has to be mad
   `getWorldPoint` and `worldView` rather than `pointer.x/y` or `scrollX/Y`, give a camera that
   follows, scrolls or has bounds `scrollingCamera(camera)` and keep scroll-factor-0 objects off it
   (`splitHudCamera(scene)` draws them with a second, fixed camera; read pointers with `viewPoint`), multiply a game's own camera zoom by `renderScale`, and
-  paint canvas art at `sharpRes(w, h, res)`. A phone held the wrong way for the game gets a hint
-  to turn it. `e2e/screens.spec.ts` picks the game up on its own and checks it on five screens; the
+  paint canvas art at `sharpRes(w, h, res)`. On a phone held the wrong way for the game the
+  whole page (the canvas and the shared screens over it) is turned a quarter round to fill the
+  screen, and taps are turned back before Phaser reads them, so games need nothing for it; with the
+  hub's Phone held the wrong way setting on Ask me to turn it, a hint to turn the phone covers the
+  paused game instead. Shared overlays pin to the safe area with `var(--safe-left, env(...))` (and
+  `--safe-right`, `--safe-top`, `--safe-bottom`), which follow the turn. `e2e/screens.spec.ts` picks the game up on its own and checks it on five screens; the
   **Screens** workflow (`.github/workflows/screens.yml`) runs it in one job per game, on a PR only for
   the games whose folder changed (every game when `shared/` or the test changes).
   Give its `index.html` the same `100dvh` and `touch-action: none` styles as Apothecary's.

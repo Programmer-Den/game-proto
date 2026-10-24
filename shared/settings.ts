@@ -42,6 +42,14 @@ export const WIFI_KNOWN =
 const UPDATE_CHOICES = UPDATE_MODES.filter((u) => u !== 'wifi' || WIFI_KNOWN);
 const UPDATE_LABELS = { auto: 'updatesAuto', wifi: 'updatesWifi', off: 'off' } as const;
 
+/**
+ * What a game does on a phone held the wrong way for it (`scaling.ts`): turns its picture round to
+ * fill the screen, or asks the player to turn the phone and waits.
+ */
+export const TURN_MODES = ['turn', 'ask'] as const;
+export type TurnMode = (typeof TURN_MODES)[number];
+const TURN_LABELS = { turn: 'turnGame', ask: 'turnAsk' } as const;
+
 export interface Settings {
   /** How hard every game plays; each game decides what that scales. Normal is the game as designed. */
   difficulty: Difficulty;
@@ -63,6 +71,12 @@ export interface Settings {
   genreFilter: boolean;
   /** When the installed apps download a new version. */
   updates: UpdateMode;
+  /** What a game does on a phone held the wrong way for it. */
+  turn: TurnMode;
+  /** Lets a game controller move around the hub and the game screens, and steer a cursor in the games (`gamepad.ts`). */
+  controller: boolean;
+  /** How fast the controller's cursor moves, 1 to 10 (`padCursor.ts`). */
+  cursorSpeed: number;
 }
 
 export const DEFAULTS: Settings = {
@@ -76,6 +90,9 @@ export const DEFAULTS: Settings = {
   muted: false,
   genreFilter: false,
   updates: WIFI_KNOWN ? 'wifi' : 'auto',
+  turn: 'turn',
+  controller: true,
+  cursorSpeed: 5,
 };
 
 /**
@@ -126,6 +143,15 @@ export const SETTING_FIELDS: readonly SettingField[] = [
     kind: 'choice',
     options: UPDATE_CHOICES.map((u) => ({ value: u, label: UPDATE_LABELS[u] })),
   },
+  {
+    key: 'turn',
+    label: 'settingTurn',
+    hint: 'settingTurnHint',
+    kind: 'choice',
+    options: TURN_MODES.map((m) => ({ value: m, label: TURN_LABELS[m] })),
+  },
+  { key: 'controller', label: 'settingController', hint: 'settingControllerHint', kind: 'toggle' },
+  { key: 'cursorSpeed', label: 'settingCursorSpeed', hint: 'settingCursorSpeedHint', kind: 'range', min: 1, max: 10, step: 1 },
 ];
 
 export const SETTINGS_KEY = 'hub-settings';
@@ -152,6 +178,12 @@ export function loadSettings(): Settings {
       saved.updates === 'wifi' && !WIFI_KNOWN
         ? 'auto'
         : (UPDATE_CHOICES.find((u) => u === saved.updates) ?? DEFAULTS.updates),
+    turn: TURN_MODES.find((m) => m === saved.turn) ?? DEFAULTS.turn,
+    controller: typeof saved.controller === 'boolean' ? saved.controller : DEFAULTS.controller,
+    cursorSpeed:
+      typeof saved.cursorSpeed === 'number' && saved.cursorSpeed >= 1 && saved.cursorSpeed <= 10
+        ? Math.round(saved.cursorSpeed)
+        : DEFAULTS.cursorSpeed,
   };
 }
 

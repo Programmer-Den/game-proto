@@ -1,5 +1,5 @@
-// Checks every translation against its British English source: each `i18n/en.ts` in `shared/` or
-// a game's `src/` and the language files next to it (`de.ts`, `en-US.ts`). `npm run build` already
+// Checks every translation against its British English source: each `i18n/en.ts` in `shared/`, a
+// game's `src/` or its `src/trophies/` and the language files next to it (`de.ts`, `en-US.ts`). `npm run build` already
 // fails on a missing or extra key; this catches what the types can't:
 // - a text whose placeholders (`{n}`, `{name}`) differ from the English one,
 // - a plain text where English has plural forms, or the other way round,
@@ -19,7 +19,8 @@ const LONG_RATIO = 1.5;
 const LONG_MIN = 16;
 
 const dirs = [join(ROOT, 'shared', 'i18n')];
-for (const game of readdirSync(join(ROOT, 'games'))) dirs.push(join(ROOT, 'games', game, 'src', 'i18n'));
+// A game's trophy texts are a set of their own (shared/trophies.ts), so the hub can load them alone.
+for (const game of readdirSync(join(ROOT, 'games'))) dirs.push(join(ROOT, 'games', game, 'src', 'i18n'), join(ROOT, 'games', game, 'src', 'trophies', 'i18n'));
 
 let errors = 0;
 let warnings = 0;

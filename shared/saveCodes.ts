@@ -18,6 +18,7 @@ export const SAVE_CODES: Record<string, string> = {
   'lane-brawl': 'lb',
   lanternkeep: 'lk',
   mapmaker: 'mm',
+  mazewright: 'mw',
   ninefold: 'nf',
   palisade: 'pa',
   riftblade: 'rb',

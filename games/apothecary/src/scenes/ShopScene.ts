@@ -87,6 +87,7 @@ import {
   tickTown,
   tossGood,
 } from '../game/townSim';
+import { checkTrophies } from '../trophies/check';
 import { t } from '../i18n';
 import { coined } from '../ui/coins';
 import { ProgressBar } from '../ui/ProgressBar';
@@ -1061,6 +1062,7 @@ export class ShopScene extends Phaser.Scene {
     this.movePlayer();
     this.standOnMarkers();
     this.spinSickle(this.autoHarvest(), delta);
+    checkTrophies(this.state);
     for (const view of this.views) view();
   }
 }

@@ -2,6 +2,7 @@ import { DEFAULTS, SETTING_FIELDS, loadSettings, saveSettings, type Settings } f
 import { language, setLanguage, t } from './i18n';
 import { previewVolume } from './audio';
 import { clearAllProgress } from './progress';
+import { formatPlayTime, playTimes } from './playTime';
 import { ALL, askToExport, askToImport, pickFile } from './saveFile';
 import { askToImportCode, askToPasteCode, showProgressCode } from './progressCode';
 import { scanCode } from './scanner';
@@ -14,8 +15,9 @@ import { shareUpdates, updateNow } from './install';
  * after every change to update the page. Below the settings, a Saved progress row exports the saves
  * of every game in `games` (their folder names) and the settings to a `.gh` file
  * (`saveFile.ts`), imports such a file (and reloads the page, since it brings its own settings),
- * shows the same as a QR code and takes a pasted or scanned code (`progressCode.ts`, `scanner.ts`, `titleOf` naming a game
- * whose code is pasted) and deletes the saves, calling `onChange` too,
+ * shows the same as a QR code and takes a pasted or scanned code (`progressCode.ts`, `scanner.ts`,
+ * `titleOf` naming a game whose code is pasted) and deletes the saves, calling `onChange` too, under
+ * a line with the time played on this device over all the games (`playTime.ts`),
  * and the panel ends with Restore defaults and Done, which closes the dialog.
  */
 export function mountSettingsPanel(
@@ -45,10 +47,13 @@ export function mountSettingsPanel(
   progressName.className = 'setting-name';
   const progressHint = document.createElement('div');
   progressHint.className = 'setting-hint';
+  const playTimeLine = document.createElement('div');
+  playTimeLine.className = 'setting-hint total-play-time';
   const reset = action('reset-progress', () => {
     if (!confirm(t('resetProgressConfirm'))) return;
     clearAllProgress(games);
     onChange(current);
+    render();
   });
   const exportButton = action('export-progress', () => askToExport(ALL, games));
   // Importing brings the file's settings along, so the page reloads to show them.
@@ -63,7 +68,7 @@ export function mountSettingsPanel(
   const resetRow = document.createElement('div');
   resetRow.className = 'setting-choices';
   resetRow.append(exportButton, importButton, qrButton, pasteButton, scanButton, reset);
-  progress.append(progressName, resetRow, progressHint);
+  progress.append(progressName, playTimeLine, resetRow, progressHint);
   root.append(progress);
 
   // Update now sits in the Updates row and lets one update through whatever the setting says.
@@ -97,6 +102,10 @@ export function mountSettingsPanel(
     scanButton.textContent = t('scanCode');
     progressName.textContent = t('savedProgress');
     progressHint.textContent = t('savedProgressHint');
+    const times = playTimes();
+    const total = formatPlayTime(games.reduce((sum, game) => sum + (times[game] ?? 0), 0));
+    playTimeLine.hidden = !total;
+    playTimeLine.textContent = total ? t('totalPlayTime', { time: total }) : '';
     rows.replaceChildren(
       ...SETTING_FIELDS.map((field) => {
         const row = document.createElement('div');

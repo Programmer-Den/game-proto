@@ -424,8 +424,8 @@ capped at `ORDER_TOP`) and the difficulty, reputation and Haggler multipliers on
   on its `scale` targets `shown(key, scale)`. A bare `this.add.image` or `setScale` draws the art
   `renderScale` times too big. Containers (the banner, tags, buttons) scale as usual.
 - Texts are drawn at `renderScale` by `shared/scaling.ts`; Graphics are sharp on their own.
-- `index.html` has the shared `100dvh` and `touch-action: none` styles. A phone held upright gets
-  the shared hint to turn it. `e2e/screens.spec.ts` at the root opens the game on five screens.
+- `index.html` has the shared `100dvh` and `touch-action: none` styles. On a phone held upright the
+  shared scaling turns the game to fill the screen. `e2e/screens.spec.ts` at the root opens the game on five screens.
 - The shared corner buttons (full screen, sound, pause) sit in the bottom left, 12 to 114 CSS
   pixels across and 12 to 42 up. The left column under the furnace (`COLUMN` in `layout.ts`: the
   mode switch, Forge button, heat bar and the three upgrade buttons, 34px tall with 12.5px

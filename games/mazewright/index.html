@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <title>Mazewright</title>
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <style>
+      html, body { margin: 0; padding: 0; height: 100%; background: #8cc265; overflow: hidden; }
+      /* The visible height on phones, whose toolbars come and go; 100% stays as the fallback. */
+      body { height: 100dvh; }
+      /* Taps and drags go to the game: no scrolling, double-tap zoom, text selection or long-press menu. */
+      #game { width: 100%; height: 100%; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+    </style>
+  </head>
+  <body>
+    <div id="game"></div>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

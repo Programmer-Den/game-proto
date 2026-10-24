@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { t } from './i18n';
+import { settings } from './settings';
 
 /**
  * Keeps a game sharp and well placed on every screen, from an upright phone to a 4K monitor.
@@ -25,7 +26,10 @@ import { t } from './i18n';
  * - Texts are drawn at `renderScale` unless they set their own `resolution`.
  * - Art painted into canvases stays as sharp as its canvas; paint it `renderScale` times bigger to
  *   keep it crisp (see `sharpRes`).
- * - On a phone held the wrong way for the game, a hint to turn it covers the paused game.
+ * - On a phone held the wrong way for the game, the whole page is turned a quarter round so the
+ *   game fills the screen and the player just turns the phone; taps are turned back before Phaser
+ *   reads them, so the game reads pointers as usual. With the hub's Phone held the wrong way set to
+ *   Ask me to turn it, a hint to turn the phone covers the paused game instead.
  *
  * With `setupScaling(game, { fill: true })` the view also takes the screen's shape instead of
  * leaving bars at its sides: it keeps the designed size as its smallest and grows the other way,
@@ -90,7 +94,8 @@ export function setupScaling(game: Phaser.Game, { fill = false, bothWays = false
     window.addEventListener('resize', () => {
       if (game.renderer && windowUpright(game) !== (turned !== configured.h > configured.w)) apply();
     });
-  } else addTurnHint(game, configured.w >= configured.h);
+  } else if (settings.turn === 'ask') addTurnHint(game, configured.w >= configured.h);
+  else turnWhenHeldWrong(game, configured.w >= configured.h);
 }
 
 /** Whether the game's window (its parent element) is taller than it is wide. */
@@ -236,7 +241,102 @@ function sharpenTexts() {
 
 /**
  * On a phone or tablet held the wrong way for the game (upright for a wide game, sideways for a
- * tall one), covers the page with a hint to turn it and pauses the game until it is turned back.
+ * tall one), turns the page a quarter round, the game and the shared screens over it together, so
+ * the game fills the screen the way it was made and the player just turns the phone, even with the
+ * phone's own rotation locked. Turned back (or once the browser turns with the phone), the page
+ * stands straight again and the game carries on. In full screen, a browser that can lock the
+ * screen's orientation (Android) is asked to hold it the game's way round.
+ */
+function turnWhenHeldWrong(game: Phaser.Game, wide: boolean) {
+  const touch = window.matchMedia('(pointer: coarse)');
+  const upright = window.matchMedia('(orientation: portrait)');
+  // A wide game turns clockwise, so it stands the right way up on a phone turned anticlockwise
+  // (its top to the left), the usual way to turn one sideways; a tall game turns back the other way.
+  const angle = wide ? 90 : -90;
+  // Where the screen's safe area (notches, rounded corners) ends up on the turned page's sides.
+  const safe = (top: string, right: string, bottom: string, left: string) =>
+    Object.fromEntries(Object.entries({ top, right, bottom, left }).map(([side, edge]) => [`--safe-${side}`, `env(safe-area-inset-${edge}, 0px)`]));
+  const insets = wide ? safe('right', 'bottom', 'left', 'top') : safe('left', 'top', 'right', 'bottom');
+  const body = document.body;
+  let turnedPage = false;
+
+  // Turned, the boxes the browser reports on screen have their sides swapped, so Phaser sizes the
+  // game from its parent's own size, and turns each tap back into the page's own direction.
+  const scale = game.scale;
+  const parentBounds = scale.getParentBounds.bind(scale);
+  scale.getParentBounds = () => {
+    if (!turnedPage) return parentBounds();
+    const parent = scale.parent as HTMLElement;
+    const [w, h] = [parent.clientWidth, parent.clientHeight];
+    if (scale.parentSize.width === w && scale.parentSize.height === h) return false;
+    scale.parentSize.setSize(w, h);
+    return true;
+  };
+  const updateCenter = scale.updateCenter.bind(scale);
+  scale.updateCenter = () => {
+    if (!turnedPage) return updateCenter();
+    // Phaser centres the canvas by its box on screen: hand it the box with its sides swapped back.
+    const canvas = scale.canvas;
+    const box = canvas.getBoundingClientRect();
+    canvas.getBoundingClientRect = () => new DOMRect(box.y, box.x, box.height, box.width);
+    try {
+      updateCenter();
+    } finally {
+      delete (canvas as { getBoundingClientRect?: unknown }).getBoundingClientRect;
+    }
+  };
+  const input = game.input;
+  const transformPointer = input.transformPointer.bind(input);
+  input.transformPointer = (pointer, pageX, pageY, wasMove) => {
+    if (turnedPage) {
+      // How far across and down the game the tap is, then the page point Phaser reads as that.
+      const b = scale.canvasBounds;
+      const across = angle > 0 ? (pageY - b.top) / b.height : (b.bottom - pageY) / b.height;
+      const down = angle > 0 ? (b.right - pageX) / b.width : (pageX - b.left) / b.width;
+      [pageX, pageY] = [b.left + across * b.width, b.top + down * b.height];
+    }
+    transformPointer(pointer, pageX, pageY, wasMove);
+  };
+
+  const update = () => {
+    const wrong = touch.matches && upright.matches === wide;
+    if (!wrong && !turnedPage) return;
+    turnedPage = wrong;
+    const [w, h] = [window.innerWidth, window.innerHeight];
+    const style: Record<string, string> = {
+      position: 'fixed',
+      top: '0',
+      left: '0',
+      width: `${h}px`,
+      height: `${w}px`,
+      'transform-origin': '0 0',
+      transform: wide ? `translateX(${w}px) rotate(90deg)` : `translateY(${h}px) rotate(-90deg)`,
+      ...insets,
+    };
+    for (const [name, value] of Object.entries(style)) {
+      if (wrong) body.style.setProperty(name, value, 'important');
+      else body.style.removeProperty(name);
+    }
+    if (wrong) body.dataset.turned = String(angle);
+    else delete body.dataset.turned;
+    if (game.isBooted) scale.refresh();
+  };
+  upright.addEventListener('change', update);
+  touch.addEventListener('change', update);
+  // The phone's toolbars come and go, which changes the size the turned page needs.
+  window.addEventListener('resize', update);
+  document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement || !touch.matches) return;
+    const orientation = screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> };
+    // A browser that can't lock (iPhones, desktops) says no, and the turned page stays.
+    orientation?.lock?.(wide ? 'landscape' : 'portrait').catch(() => {});
+  });
+  update();
+}
+
+/**
+ * The hub's Phone held the wrong way set to Ask me to turn it: on a phone or tablet held the wrong
+ * way for the game (upright for a wide game, sideways for a tall one), covers the page with a hint to turn it and pauses the game until it is turned back.
  * The view would otherwise use about a quarter of the screen.
  */
 function addTurnHint(game: Phaser.Game, wide: boolean) {

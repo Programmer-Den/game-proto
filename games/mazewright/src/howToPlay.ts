@@ -1,0 +1,86 @@
+import type { HowToPlay } from '../../../shared/howToPlay';
+import { byLanguage } from '../../../shared/i18n';
+
+const en: HowToPlay = {
+  goal: 'Keep the beetles out of the cottage for 20 waves. There is no road: every tower you plant is also a wall, so you build the maze they must walk.',
+  controls: [
+    { input: 'Click or tap a tool', action: 'Pick a tower from your pouch (keys 1 to 8)' },
+    { input: 'Click, tap or drag on the lawn', action: 'Plant the tool there, or a whole line of them' },
+    { input: 'Click or tap a tower', action: 'Upgrade, sell (tap twice), set its aim, or turn a bonfire or sunglass' },
+    { input: 'Start wave button, Space', action: 'Send the next wave, early for a bonus; after wave 1 the wave timer sends it after 20 seconds (Calm on the garden picker turns it off)' },
+    { input: 'Speed button, F', action: 'Play at double speed' },
+    { input: 'Way of play (garden picker)', action: 'Classic, Swarm (no waiting, more gold), Endless or Sandbox' },
+    { input: 'One gardener / Two gardeners (garden picker)', action: 'Play together on one screen: each gardener plants on their half of the lawn with their own gold and tools' },
+    { input: 'Watch on a garden card', action: 'Watch your latest win in that garden again, at up to four times the speed' },
+  ],
+  loop: [
+    'Under the garden cards, pick up to four towers or traps to take along with the hedge and the bow.',
+    'Beetles come out of the burrows and walk the shortest free way to the cottage.',
+    'Plant hedges and towers to make that way long, past as many towers as you can.',
+    'A placement that would close the last way through is refused: one route must stay open from each burrow.',
+    'Beaten foes pay gold; a held wave pays more. Spend it between waves, or during them.',
+    'A foe that reaches the patch takes cabbages, your lives, and walks back to its burrow. Beat it on the way and they roll back home. Hold all 20 waves to save the garden.',
+  ],
+  tips: [
+    'Hold the pointer over the lawn to see the new route before you plant.',
+    'A new tower grows a second per 10 gold before it fires, and an upgrade grows again: plant and upgrade before the foes come.',
+    'Moths fly straight over the maze, so keep bows, frost or a swallow nest near the cottage too.',
+    'A win earns up to three stars by the cabbages you kept, and a fourth for a Swarm won without losing one.',
+    'Every game pays seeds; spend them in the potting shed on new towers, master levels and two more pouch slots.',
+    'A tower at level 3 can become a master, with a trick of its own: its panel tells which.',
+    'Traps never block: a honey pot draws foes into a crowd for a cannon, a snare holds one under a crossbow.',
+    'Moles chew through a hedge that blocks a much shorter way: put a tower there instead.',
+    'From wave 6 the second burrow opens, so plan a maze that serves both routes.',
+    'Stars open the summer, autumn and winter gardens. Water stops walkers but not moths, a tower on a raised bank reaches further, and in a path garden foes keep to the path.',
+    'Summer wilts a tower that fires nonstop unless a frost tower is close by; winter frost freezes a tower now and then unless a bonfire is close by.',
+    'Shells: stag beetles are waxy (heat does half, blast more), moles hairy (blast half, sharp more), weevils hard (sharp half, spark more). Poison goes through every shell.',
+    'A sunglass or bonfire heats foes up; a glowing foe takes double heat damage. Ember beetles are fire-proof.',
+    'Snails heal unless chilled or poisoned, and woodlice split in two when beaten.',
+    'A crowned king is six foes in one: put your strongest towers on the route it walks.',
+    'The Empress on wave 20 lays beetles and turns her shell against the damage that hurt her most, so mix your damage kinds.',
+    'A bonfire or sunglass likes a long straight corridor; a storm rod likes foes bunched in tight bends.',
+  ],
+};
+
+const de: HowToPlay = {
+  goal: 'Halte die Käfer 20 Wellen lang vom Häuschen fern. Es gibt keinen Weg: Jeder Turm, den du pflanzt, ist auch eine Mauer, also baust du das Labyrinth, durch das sie laufen müssen.',
+  controls: [
+    { input: 'Ein Werkzeug klicken oder tippen', action: 'Einen Turm aus deinem Beutel wählen (Tasten 1 bis 8)' },
+    { input: 'Auf den Rasen klicken, tippen oder ziehen', action: 'Das Werkzeug dort pflanzen, oder eine ganze Reihe' },
+    { input: 'Einen Turm klicken oder tippen', action: 'Ausbauen, verkaufen (zweimal tippen), sein Ziel wählen oder Feuerkorb und Brennglas drehen' },
+    { input: 'Knopf Welle starten, Leertaste', action: 'Die nächste Welle schicken, früh mit Bonus; nach Welle 1 schickt die Wellen-Uhr sie nach 20 Sekunden (Ruhig in der Gartenauswahl schaltet sie ab)' },
+    { input: 'Tempo-Knopf, F', action: 'Mit doppeltem Tempo spielen' },
+    { input: 'Spielart (Gartenauswahl)', action: 'Klassisch, Schwarm (ohne Pause, mehr Gold), Endlos oder Sandkasten' },
+    { input: 'Allein / Zu zweit gärtnern (Gartenauswahl)', action: 'Zu zweit an einem Bildschirm spielen: Jede Person pflanzt auf ihrer Rasenhälfte, mit eigenem Gold und eigenen Werkzeugen' },
+    { input: 'Ansehen auf einer Gartenkarte', action: 'Deinen letzten Sieg in diesem Garten noch einmal ansehen, mit bis zu vierfachem Tempo' },
+  ],
+  loop: [
+    'Wähle unter den Gartenkarten bis zu vier Türme oder Fallen, die du neben Hecke und Bogen mitnimmst.',
+    'Käfer kommen aus den Bauen und laufen den kürzesten freien Weg zum Häuschen.',
+    'Pflanze Hecken und Türme, damit dieser Weg lang wird und an möglichst vielen Türmen vorbeiführt.',
+    'Was den letzten Weg schließen würde, wird abgelehnt: Von jedem Bau muss ein Weg offen bleiben.',
+    'Besiegte Gegner bringen Gold, eine gehaltene Welle mehr. Gib es zwischen den Wellen aus oder währenddessen.',
+    'Ein Gegner, der das Beet erreicht, nimmt Kohlköpfe, deine Leben, und läuft zurück zu seinem Bau. Besiege ihn unterwegs, dann rollen sie heim. Halte alle 20 Wellen, um den Garten zu retten.',
+  ],
+  tips: [
+    'Halte den Zeiger über den Rasen, um den neuen Weg zu sehen, bevor du pflanzt.',
+    'Ein neuer Turm wächst eine Sekunde je 10 Gold, bevor er schießt, und ein Ausbau wächst wieder: Pflanze und baue aus, bevor die Gegner kommen.',
+    'Motten fliegen geradewegs über das Labyrinth, also stell Bögen, Frost oder ein Schwalbennest auch nahe ans Häuschen.',
+    'Ein Sieg bringt bis zu drei Sterne für die behaltenen Kohlköpfe, und einen vierten für einen Schwarm ohne Verlust.',
+    'Jedes Spiel bringt Samen; gib sie im Gartenschuppen für neue Türme, Meisterstufen und zwei weitere Beutelplätze aus.',
+    'Ein Turm auf Stufe 3 kann Meister werden, mit einem eigenen Kniff: Sein Feld verrät welchen.',
+    'Fallen versperren nie den Weg: Ein Honigtopf lockt Gegner für eine Kanone zusammen, eine Schlinge hält einen unter einer Armbrust fest.',
+    'Maulwürfe fressen sich durch eine Hecke, die einen viel kürzeren Weg versperrt: Stell dort lieber einen Turm hin.',
+    'Ab Welle 6 öffnet sich der zweite Bau, also plane ein Labyrinth für beide Wege.',
+    'Sterne öffnen die Gärten in Sommer, Herbst und Winter. Wasser hält Läufer auf, aber keine Motten, ein Turm auf einer Böschung reicht weiter, und in einem Weggarten bleiben die Gegner auf dem Weg.',
+    'Der Sommer lässt einen Turm verwelken, der ohne Pause schießt, außer ein Frostturm steht nah; Winterfrost friert ab und zu einen Turm ein, außer ein Feuerkorb steht nah.',
+    'Schalen: Hirschkäfer sind wachsig (Hitze halb, Wucht mehr), Maulwürfe haarig (Wucht halb, Spitzes mehr), Rüsselkäfer hart (Spitzes halb, Funken mehr). Gift geht durch jede Schale.',
+    'Brennglas und Feuerkorb heizen Gegner auf; ein glühender Gegner nimmt doppelten Hitzeschaden. Glutkäfer sind feuerfest.',
+    'Schnecken heilen sich, außer gekühlt oder vergiftet, und Asseln zerfallen besiegt in zwei.',
+    'Ein gekrönter König ist sechs Gegner in einem: Stell deine stärksten Türme an seinen Weg.',
+    'Die Kaiserin in Welle 20 legt Käfer und wechselt ihre Schale gegen den Schaden, der ihr am meisten wehtat, also mische die Schadensarten.',
+    'Feuerkorb und Brennglas mögen einen langen geraden Gang, der Sturmstab Gegner dicht gedrängt in engen Kurven.',
+  ],
+};
+
+export const howToPlay = byLanguage({ en, 'en-US': en, de });

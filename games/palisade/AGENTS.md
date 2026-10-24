@@ -527,8 +527,8 @@ fortifications' in `forts.ts` and the heats' in `heat.ts`. Arrow Rain's damage (
   records that factor per key. Every image showing a painted texture goes through `fit(image,
   scale)`, which sets its scale to `scale` over that factor; call `fit` again after `setTexture`
   and use it instead of `setScale`. A bare `add.image` shows the art `renderScale` times too big.
-- Texts are drawn at `renderScale` by `shared/scaling.ts`. An upright phone shows the shared hint
-  to turn it, and `e2e/screens.spec.ts` at the root opens the game on five screens.
+- Texts are drawn at `renderScale` by `shared/scaling.ts`. On an upright phone the shared
+  scaling turns the game to fill the screen, and `e2e/screens.spec.ts` at the root opens the game on five screens.
 
 ### Sound
 

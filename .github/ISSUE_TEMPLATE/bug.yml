@@ -32,10 +32,11 @@ body:
         - Bramblecrest
         - Ninefold
         - Augury
+        - Mazewright
         - Hub page
         - Shared / all games
       # Preselect Shared, so a report never lands on a game by accident.
-      default: 24
+      default: 25
     validations:
       required: true
   - type: textarea

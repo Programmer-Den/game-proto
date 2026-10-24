@@ -125,6 +125,7 @@ import {
   payBoost,
   payment,
 } from '../game/state';
+import { checkTrophies } from '../trophies/check';
 import { BackStack } from '../ui/BackStack';
 import { IconRow } from '../ui/IconRow';
 import { Pallet } from '../ui/Pallet';
@@ -2232,6 +2233,7 @@ export class GameScene extends Phaser.Scene {
     this.standOnMarkers();
 
     this.spinSickle(this.autoHarvest(), delta);
+    checkTrophies(this.state);
 
     this.state.player.x = this.player.x;
     this.state.player.y = this.player.y;
