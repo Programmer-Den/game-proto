@@ -1,5 +1,5 @@
 import { MAPS } from './maps';
-import type { Replay } from './sim';
+import { REPLAY_VERSION, type Action, type Replay } from './sim';
 import { ALWAYS, DEFAULT_POUCH, FREE, MODES, POUCH_PICKS, SEEDS, SLOT_SEEDS, TOWERS, type Mode, type TowerKind } from './rules';
 
 // Mazewright keeps seven keys: each garden's records (best wave, win, stars, best time, Endless
@@ -182,16 +182,31 @@ export function pouchOf(kinds: TowerKind[], shed: Shed): TowerKind[] {
 /** Each garden's latest win (Classic or Swarm), to watch again, by garden. */
 export type Replays = Record<string, Replay>;
 
+const ACTIONS: readonly Action['a'][] = ['build', 'upgrade', 'sell', 'turn', 'aim', 'wave'];
+const whole = (v: unknown) => Number.isInteger(v) && (v as number) >= 0;
+/** Whether a logged action can be played: a known action at a step, on a cell, with a tower that exists. */
+const playable = (a: Action) =>
+  a && ACTIONS.includes(a.a) && whole(a.s) && (a.c === undefined || whole(a.c)) && (a.k === undefined || TOWERS.includes(a.k));
+
+/** Whether a saved replay is one this version can play: its own rules version, a known way of play and playable actions. */
+function valid(r: Replay, map: string) {
+  return (
+    r && r.v === REPLAY_VERSION && r.map === map && MODES.includes(r.mode) && Array.isArray(r.log) && r.log.every(playable) &&
+    Number.isFinite(r.seed) && Number.isFinite(r.steps) && Number.isFinite(r.toughness) && whole(r.lives) && r.lives > 0 &&
+    (r.masters === null || (Array.isArray(r.masters) && r.masters.every((k) => TOWERS.includes(k))))
+  );
+}
+
 export function loadReplays(): Replays {
   const replays: Replays = {};
   try {
     const saved = JSON.parse(localStorage.getItem(REPLAY_KEY) ?? 'null');
     for (const m of MAPS) {
       const r = saved?.[m.id];
-      if (r && r.map === m.id && Array.isArray(r.log) && Number.isFinite(r.seed) && Number.isFinite(r.steps)) replays[m.id] = r;
+      if (valid(r, m.id)) replays[m.id] = r;
     }
   } catch {
-    // A broken or blocked save has no replays.
+    // A broken or blocked save has no replays; one from other rules, or a broken one, is dropped above.
   }
   return replays;
 }

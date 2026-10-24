@@ -28,7 +28,8 @@ Implemented today:
   route; for a path garden, towers on the lawn that covers most path) wins all twelve on Normal
   with a bow, frost and cannon pouch, weather included.
 - Season weather (`WEATHER`, in `step`): in summer gardens `wilt` stops a tower that has fired
-  nonstop (`busy`, no gap over `rest` since `lastShot`) for `wiltAfter` (8) seconds for
+  nonstop (`busy`, no gap over `rest` since `lastShot`, set only when it really fires, not when a toadstool looks
+  again for a foe to shrink) for `wiltAfter` (8) seconds for
   `wiltFor` (3), unless a grown frost tower's reach covers it; in winter gardens `frost` freezes a
   random firing tower no bonfire's reach covers every `frostEvery` (14) seconds of a wave, for
   `frostFor` (4). A `stopped` tower neither reloads, grows nor fires; events `wilt` and `frozen`,
@@ -51,11 +52,13 @@ Implemented today:
   came (`g.steps`). The wave timer starts waves through `beginWave`, which isn't logged. A Classic
   or Swarm win is kept with `replayOf` as the garden's `Replay` (`saveReplay`); the card's
   `watch-<garden>` button starts `replayGame(r)`, and `GameScene.update` calls `replayStep` before
-  each `step`, so the game plays out exactly as it did. While `replay` is set, the board and keys
+  each `step`, so the game plays out exactly as it did. A replay carries `REPLAY_VERSION` as `v`;
+  `loadReplays` drops one of another version, or with a mode, tower or action it doesn't know. While `replay` is set, the board and keys
   take nothing but F, the bottom bar shows `replayLabel` and the speed button (1x, 2x, 4x;
   `faster`), and records, seeds and replays are left alone; the end panel has Watch again
   (`again`) and Gardens. Any new chance in the sim must use `rand(g)`, never `Math.random`, and any
-  new player action must call `note`, or replays drift.
+  new player action must call `note`, or replays drift. Raise `REPLAY_VERSION` with any change that
+  makes the same actions play out differently (balance numbers, rules).
 - The pouch: under the garden cards, chips in two rows (`CHIPS.perRow`) for the thirteen towers and two traps besides `hedge` and `bow` (`ALWAYS`);
   up to `POUCH_PICKS` (4) are picked, saved, and make the run's tool bar (six buttons at most).
   `DEFAULT_POUCH` is today's four (hedge, bow, frost, cannon), which the playthrough uses.
@@ -124,12 +127,14 @@ Implemented today:
 - 20 waves (`WAVES`); each burrow is used from its wave in `GATE_WAVES` (`openGates`), with foes
   sent out of the open ones in turn, but every route must stay open all game. Wave 1 starts by hand (Start wave). After it, unless `calm` (the picker's
   toggle, saved), `nextAt` is set `WAVE_TIMER` (20) seconds after a wave is all out and `step`
-  starts the next then; Start wave still sends it early, for `EARLY_BONUS` gold while foes are out.
+  starts the next then; Start wave still sends it early, for `EARLY_BONUS` gold while foes are out (only by hand: a wave the timer starts pays no bonus).
 - Growing (`GROW_RATE`): `build` and `upgrade` set a tower's `grow` (and `growFull`) to its cost
   over 10 seconds; `fire` only counts it down while it grows, and a growing beehive boosts nothing.
   The scene draws it faint with a filling ring.
 - Building during a wave is allowed; a tile with a foe on it (or walking onto it) is refused.
-- Hover preview: the routes as they would be with the hovered tile planted, or the no-entry ring.
+- Hover preview: the routes as they would be with the hovered tile planted, or the no-entry ring;
+  made again when the board changes or a ground foe or loose cabbage moves on, and not shown while
+  watching a replay.
 - Drag to plant a line; keys 1 to 8 (the pouch, in order), Space and F; a 2x speed button. The
   picked tool's use is told in the top bar.
 - Banners name each new foe kind the first time it comes, the second burrow (and each later one,
@@ -151,7 +156,9 @@ Missing or rough:
   corridor in line with it. A tower's balance is a first pass.
 - `docs/screenshots/gardens.webp` (the picker on its autumn tab, with the pouch), `path.webp` (Gravel Walk), `ponds.webp` (Ice Pond, towers on its banks), `wilt.webp` (Brook, a wilted cannon), `frost.webp` (Ice Pond, a frozen frost tower), `towers.webp`, `aim.webp`, `kings.webp`, `cabbages.webp`, `grow.webp`, `master.webp`, `traps.webp`, `shed.webp`, `maze.webp`,
   `mole.webp` and `cover.png` were taken by hand (a
-  Playwright script that plants a maze and sends waves 8 and 9); `refused.webp` is the
+  Playwright script that plants a maze and sends waves 8 and 9); `duo-replay.webp` (a
+  two-gardener replay of the Meadow, both purses in the top bar) was made from a replay put in
+  storage; `refused.webp` is the
   playthrough's `playthrough-2-refused` shot. Refresh them when the look changes.
 
 ## Architecture
@@ -193,13 +200,15 @@ File map (`src/`):
   its next step. `canBuild` refuses a tile in this order: `reserved` (a burrow or the cottage),
   `taken` (a rock, water or tower; the scene opens the tower's panel instead; a trap off the
   walking cells), a path garden's lawn is then only checked for `gold` and its path is `reserved`,
-  then `foe`, `blocks` (the never-close rule: `open` checks every burrow and every ground foe's `to` cell against the new
-  field) and `gold`. Towers pick a foe in reach by their aim (`pick`;
+  then `foe`, `blocks` (the never-close rule: `open` checks every burrow, every ground foe's `to` cell and every
+  rolling cabbage's `to` cell against the new field, so a loose cabbage can't be walled in) and `gold`. Towers pick a foe in reach by their aim (`pick`;
   First is the least `remaining` distance). `step` moves foes, then `afflict` (burning, poison and its
   spread, and cooling), then fires every tower with its beehive `boosts`; `hurt` takes a damage kind
   through the foe's shell, `scorch` is a heat hit that also heats. Apple trees pay out with the wave reward.
 - `game/save.ts`: `loadRecords`, `noteRecord`, `loadPouch`, `savePouch`, `pouchOf` (hedge and bow,
-  then up to four more in tower order, traps included), `loadReplays`, `saveReplay`, `loadCalm`/`saveCalm` and `loadDuo`/`saveDuo`.
+  then up to four more in tower order, traps included), `loadShed`/`saveShed`, `usable`, `picksOf`,
+  `loadMode`/`saveMode`, `loadReplays` (only valid replays of this `REPLAY_VERSION`), `saveReplay`,
+  `loadCalm`/`saveCalm` and `loadDuo`/`saveDuo`.
 - `scenes/layout.ts`: `VIEW`, `CELL` (40), `GRID` (the grid's corner in the 960x540 frame), the bar
   height, the tool, wave, speed and Gardens buttons, `TIP_X` (the tool's use in the top bar), the
   tower panel (taller with Turn), the garden cards, the pouch's `CHIPS` (two rows, above the corner buttons)
@@ -219,7 +228,8 @@ Save keys: `mazewright-best` (per garden, `GardenRecord`: best wave, whether it 
 stars, fastest win in seconds and the Endless best), `mazewright-pouch` (the towers picked),
 `mazewright-calm` (`'1'` when waves wait for Start wave), `mazewright-duo` (`'1'` for two gardeners), `mazewright-mode` (the way of play) and
 `mazewright-shed` (seeds, `owned` towers, `masters` bought and extra `slots`) and
-`mazewright-replays` (per garden, the latest Classic or Swarm win as a `Replay`).
+`mazewright-replays` (per garden, the latest Classic or Swarm win as a `Replay`; progress files
+carry it, progress codes leave it out as too big for a QR code).
 
 Test hooks (read by `e2e/playthrough.spec.ts` through `window.game.scene.getScene('Game')`):
 `screen`, `state` (the `Game`), `replay` (the `Replay` watched, or null), `pouch`, `buttons` (every button by id, centred, in view pixels:
@@ -256,8 +266,8 @@ motion holds the frost pulse and cannon boom rings at full size and the gold num
 
 - **A tower's numbers**: `TOWER` in `rules.ts`. A new tower kind also needs its drawing in
   `art.tower`, its `${kind}Name`/`${kind}Text` texts, a sound named after it in `SFX` if it fires,
-  and its firing in `sim.fire`. It gets a pouch chip on its own; the chip row holds 10 at 84
-  pixels, so an eleventh pickable tower needs a second row or narrower chips.
+  and its firing in `sim.fire`. It gets a pouch chip on its own, in the two rows of
+  `CHIPS.perRow`.
 - **A foe**: add it to `FOES` and `FOE`, its look in `art.foe` (beetle-shaped foes in `beetle`), its colour in `FOE_COLOUR`, its
   `new_${kind}` text, and put it in `WAVES`.
 - **A garden**: add a `MapDef` to `MAPS` with its season (three a season fill `CARDS.xs`; keep the

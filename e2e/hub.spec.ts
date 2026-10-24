@@ -801,6 +801,8 @@ test('hub progress codes', async ({ page }, testInfo) => {
   await page.evaluate(() => {
     localStorage.setItem('apothecary-save', '{"coins":42}');
     localStorage.setItem('palisade-best', '7');
+    // Saved replays are too big for a code, so only files carry them.
+    localStorage.setItem('mazewright-replays', '{"meadow":{}}');
   });
   await page.reload();
   const messages: string[] = [];
@@ -852,6 +854,7 @@ test('hub progress codes', async ({ page }, testInfo) => {
   await reloaded;
   expect(await stored('apothecary-save')).toBe('{"coins":42}');
   expect(await stored('palisade-best')).toBe('7');
+  expect(await stored('mazewright-replays')).toBeNull();
   expect(JSON.parse((await stored('hub-settings'))!).difficulty).toBe('hard');
 });
 
