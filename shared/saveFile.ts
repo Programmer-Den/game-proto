@@ -44,11 +44,18 @@ export interface ProgressPayload {
   data: Record<string, string>;
 }
 
-/** The progress `kind` covers on this device, saved now. */
-export function progressPayload(kind: string, games: string[]): ProgressPayload {
+/**
+ * Whether storage `key` is too big for a progress code, so only files carry it: a game's saved
+ * replays (`<game>-replays`), which would push the code past what a QR code holds.
+ */
+export const fileOnly = (key: string) => key.endsWith('-replays');
+
+/** The progress `kind` covers on this device, saved now; `forCode` leaves out the `fileOnly` keys. */
+export function progressPayload(kind: string, games: string[], forCode = false): ProgressPayload {
   const keys = kind === ALL ? [...games.flatMap(progressKeys), RECENT_KEY, SETTINGS_KEY] : progressKeys(kind);
   const data: Record<string, string> = {};
   for (const k of keys) {
+    if (forCode && fileOnly(k)) continue;
     const value = localStorage.getItem(k);
     if (value !== null) data[k] = value;
   }

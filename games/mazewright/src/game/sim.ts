@@ -278,8 +278,17 @@ export interface Fixed {
   lives: number;
 }
 
+/**
+ * The version of the rules a replay was played under. Raise it with any change that makes the same
+ * actions play out differently (a tower's, foe's or wave's numbers, a new rule): replays of another
+ * version are dropped when they load, since they would no longer play out as they did.
+ */
+export const REPLAY_VERSION = 2;
+
 /** A game kept to watch again: how it began, and every action taken in it. */
 export interface Replay extends Fixed {
+  /** The rules version it was played under (`REPLAY_VERSION`). */
+  v: number;
   map: string;
   calm: boolean;
   duo?: boolean;
@@ -394,10 +403,12 @@ function refield(g: Game) {
 /** All the cabbages still in the game: in the patch, carried and loose. */
 export const cabbagesLeft = (g: Game) => g.lives + g.foes.reduce((n, f) => n + (f.dead ? 0 : f.carry), 0) + g.loose.reduce((n, c) => n + c.n, 0);
 
-/** Whether a field leaves every burrow, and every foe on the ground, a way to the cottage. */
+/** Whether a field leaves every burrow, every foe on the ground and every cabbage rolling on it a way to the cottage. */
 function open(g: Game, dist: Int16Array) {
   if (g.gates.some((gate) => dist[gate] === UNREACHABLE)) return false;
-  return g.foes.every((f) => f.dead || FOE[f.kind].flies || dist[f.to] !== UNREACHABLE);
+  if (!g.foes.every((f) => f.dead || FOE[f.kind].flies || dist[f.to] !== UNREACHABLE)) return false;
+  // A loose cabbage walled in would never roll home, and still count as kept.
+  return g.loose.every((c) => c.from < 0 || dist[c.to] !== UNREACHABLE);
 }
 
 /** Whether a `kind` tower can go on `cell` right now, and if not why. */
@@ -417,7 +428,7 @@ export function canBuild(g: Game, cell: number, kind: TowerKind): Refusal | null
   return null;
 }
 
-/** Whether blocking `cell` would cut every way from a burrow, or from a foe, to the cottage. */
+/** Whether blocking `cell` would cut every way from a burrow, a foe or a loose cabbage to the cottage. */
 export function wouldBlock(g: Game, cell: number) {
   if (g.blocked[cell]) return false;
   const blocked = g.blocked.slice();
@@ -587,15 +598,15 @@ export function stars(g: Game) {
 
 /** Starts the next wave by the player's hand; called while foes are still out, it pays a small bonus. */
 export function startWave(g: Game) {
-  if (!beginWave(g)) return false;
+  if (!beginWave(g, true)) return false;
   note(g, 'wave');
   return true;
 }
 
-/** Starts the next wave, by hand or by the wave timer. */
-function beginWave(g: Game) {
+/** Starts the next wave, by hand or by the wave timer; only a wave sent early by hand pays the bonus. */
+function beginWave(g: Game, byHand = false) {
   if (!canStartWave(g)) return false;
-  const early = g.foes.length > 0;
+  const early = byHand && g.foes.length > 0;
   if (early) share(g, EARLY_BONUS);
   g.nextAt = null;
   g.wave++;
@@ -1023,6 +1034,7 @@ function fire(g: Game, tower: Tower, dt: number, boost: number) {
     const hit = g.foes.filter((f) => reaches(f) && lit.has(Math.floor(f.y) * COLS + Math.floor(f.x)));
     if (hit.length === 0) return;
     tower.cooldown = def.reload[lvl];
+    tower.lastShot = g.clock;
     for (const f of hit) {
       scorch(g, f, def.damage[lvl]);
       // A master sunglass heats twice as fast.
@@ -1037,6 +1049,7 @@ function fire(g: Game, tower: Tower, dt: number, boost: number) {
     const hit = g.foes.filter((f) => reaches(f) && inCone(tower.cell, tower.face, f.x, f.y, f.body, range));
     if (hit.length === 0) return;
     tower.cooldown = def.reload[lvl];
+    tower.lastShot = g.clock;
     for (const f of hit) {
       scorch(g, f, def.damage[lvl], master);
       f.burnUntil = g.clock + def.dotFor!;
@@ -1048,7 +1061,30 @@ function fire(g: Game, tower: Tower, dt: number, boost: number) {
   }
   const inRange = g.foes.filter((f) => reaches(f) && Math.hypot(f.x - x, f.y - y) <= range);
   if (inRange.length === 0) return;
+  if (tower.kind === 'toadstool') {
+    // Shrinks the foes in reach not shrunk yet: one, or two at master level.
+    let shrunk = 0;
+    while (shrunk < (master ? 2 : 1)) {
+      const big = inRange.filter((f) => !f.shrunk);
+      if (big.length === 0) break;
+      const f = pick(g, big, tower.target);
+      shrunk++;
+      f.shrunk = true;
+      f.hp *= def.shrink!;
+      f.maxHp *= def.shrink!;
+      f.body *= 0.8;
+      f.lives = Math.max(1, f.lives - 1);
+      g.events.push({ type: 'shrink', x: f.x, y: f.y });
+    }
+    // Nothing left to shrink: look again soon rather than waiting a whole reload. That isn't a shot, so it never counts towards wilting.
+    if (shrunk === 0) return void (tower.cooldown = 0.3);
+    tower.cooldown = def.reload[lvl];
+    tower.lastShot = g.clock;
+    g.events.push({ type: 'shot', kind: 'toadstool' });
+    return;
+  }
   tower.cooldown = def.reload[lvl];
+  tower.lastShot = g.clock;
   if (tower.kind === 'frost') {
     for (const f of inRange) {
       // A master frost stops a foe it newly chills, for a moment.
@@ -1067,26 +1103,6 @@ function fire(g: Game, tower: Tower, dt: number, boost: number) {
       hurt(g, f, def.damage[lvl], 'sharp');
     }
     g.events.push({ type: 'sting', x, y, r: range }, { type: 'shot', kind: 'nettle' });
-    return;
-  }
-  if (tower.kind === 'toadstool') {
-    // Shrinks the foes in reach not shrunk yet: one, or two at master level.
-    let shrunk = 0;
-    while (shrunk < (master ? 2 : 1)) {
-      const big = inRange.filter((f) => !f.shrunk);
-      if (big.length === 0) break;
-      const f = pick(g, big, tower.target);
-      shrunk++;
-      f.shrunk = true;
-      f.hp *= def.shrink!;
-      f.maxHp *= def.shrink!;
-      f.body *= 0.8;
-      f.lives = Math.max(1, f.lives - 1);
-      g.events.push({ type: 'shrink', x: f.x, y: f.y });
-    }
-    // Nothing left to shrink: look again soon rather than waiting a whole reload.
-    if (shrunk === 0) tower.cooldown = 0.3;
-    else g.events.push({ type: 'shot', kind: 'toadstool' });
     return;
   }
   if (tower.kind === 'storm') {
@@ -1225,9 +1241,7 @@ export function step(g: Game, dt: number) {
   const boost = boosts(g);
   for (const t of g.towers) {
     if (stopped(g, t)) continue;
-    const before = t.cooldown;
     fire(g, t, dt, boost.get(t.id) ?? 0);
-    if (t.cooldown > before) t.lastShot = g.clock;
     if (g.map.season === 'summer') wilt(g, t, dt);
   }
   if (g.map.season === 'winter') frost(g);
@@ -1285,6 +1299,6 @@ export function replayStep(g: Game, r: Replay, from: number) {
 
 /** What to keep of a finished game to watch it again. */
 export const replayOf = (g: Game): Replay => ({
-  map: g.map.id, calm: g.calm, duo: g.duo, mode: g.mode, masters: g.masters ? [...g.masters] : null, seed: g.seed, toughness: g.toughness, lives: g.maxLives,
+  v: REPLAY_VERSION, map: g.map.id, calm: g.calm, duo: g.duo, mode: g.mode, masters: g.masters ? [...g.masters] : null, seed: g.seed, toughness: g.toughness, lives: g.maxLives,
   log: g.log, steps: g.steps, stars: stars(g), time: Math.round(g.clock),
 });

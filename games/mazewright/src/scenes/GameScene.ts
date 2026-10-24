@@ -106,7 +106,7 @@ export class GameScene extends Phaser.Scene {
   private painting = false;
   private lastPainted = -1;
   /** The route preview for the hovered cell, made once per cell and board. */
-  private preview: { cell: number; version: number; tool: TowerKind; blocks: boolean; face: number; routes: number[][] } | null = null;
+  private preview: { cell: number; version: number; walkers: string; tool: TowerKind; blocks: boolean; face: number; routes: number[][] } | null = null;
   private version = 0;
   private flashes: Flash[] = [];
   /** A Sell tapped once, waiting for the second tap until this time. */
@@ -761,20 +761,22 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  /** The route preview for the hovered tile, when it is free and nothing else is picked. */
+  /** The route preview for the hovered tile, when it is free and nothing else is picked (and never while watching a replay). */
   private previewFor(s: Game) {
     const cell = this.hover;
-    if (cell < 0 || this.selected >= 0 || cell === s.goal || s.gates.includes(cell) || s.phase === 'won' || s.phase === 'lost') return null;
+    if (cell < 0 || this.replay || this.selected >= 0 || cell === s.goal || s.gates.includes(cell) || s.phase === 'won' || s.phase === 'lost') return null;
     if (s.traps.some((t) => t.cell === cell)) return null;
     // Traps go where foes walk; in a path garden towers go only on the lawn beside the path.
     const tool = this.toolAt(cell);
     const trap = !!TOWER[tool].trap;
     if (s.blocked[cell] && !(s.blocked[cell] === LAWN && !trap)) return null;
     if (s.map.path && !s.blocked[cell] && !trap) return null;
-    if (this.preview?.cell === cell && this.preview.version === this.version && this.preview.tool === tool) return this.preview;
+    // Whether a tile blocks also hangs on the cells the ground foes and loose cabbages are heading for, so the preview is made again when they move on.
+    const walkers = s.foes.map((f) => (f.dead || FOE[f.kind].flies ? '' : f.to)).join() + '|' + s.loose.map((c) => c.to).join();
+    if (this.preview?.cell === cell && this.preview.version === this.version && this.preview.walkers === walkers && this.preview.tool === tool) return this.preview;
     // A trap, or a tower beside a path, never blocks: the routes stay as they are.
     if (trap || s.blocked[cell] === LAWN) {
-      this.preview = { cell, version: this.version, tool, blocks: false, face: 0, routes: s.gates.map((gate) => route(s.dist, gate)) };
+      this.preview = { cell, version: this.version, walkers, tool, blocks: false, face: 0, routes: s.gates.map((gate) => route(s.dist, gate)) };
       return this.preview;
     }
     const blocks = wouldBlock(s, cell);
@@ -786,7 +788,7 @@ export class GameScene extends Phaser.Scene {
       routes = s.gates.map((gate) => route(dist, gate));
     }
     const face = TOWER[tool].faces ? bestFace(s, cell, tool) : 0;
-    this.preview = { cell, version: this.version, tool, blocks, face, routes };
+    this.preview = { cell, version: this.version, walkers, tool, blocks, face, routes };
     return this.preview;
   }
 
@@ -868,12 +870,13 @@ export class GameScene extends Phaser.Scene {
     const by = vh - BAR_H + (BAR_H - TOOLS.h) / 2;
     const wx = vw - 16 - WAVE_BUTTON.w;
     // With two gardeners the wave and speed buttons go up into the top bar, by the second gardener's gold.
-    const top = this.duo && !this.replay;
+    const top = s.duo && !this.replay;
     const wave = { x: top ? backX - 12 - WAVE_BUTTON.w : wx, y: top ? (BAR_H - WAVE_BUTTON.h) / 2 : by };
     const speed = () => this.button('speed', wave.x - 8 - SPEED_BUTTON.w, wave.y, SPEED_BUTTON.w, SPEED_BUTTON.h, t('speed', { n: this.speed }), () => this.faster(), { on: this.speed > 1 });
     if (this.replay) {
-      // Watching: no tools and no wave button, just what is shown and how fast.
+      // Watching: no tools and no wave button, just what is shown and how fast, and the second gardener's gold.
       this.text(TOOLS.x, vh - BAR_H / 2, t('replayLabel', { stars: starText(this.replay.stars), t: clockText(this.replay.time) }), 15, css(C.gold));
+      if (s.duo) this.text(backX - 12, cy, `◆ ${s.gold2}`, 16, css(C.gold), 1);
       return speed();
     }
     if (top) this.text(wave.x - 8 - SPEED_BUTTON.w - 12, cy, `◆ ${s.gold2}`, 16, css(C.gold), 1);
@@ -882,7 +885,7 @@ export class GameScene extends Phaser.Scene {
       const tipX = this.fx + TIP_X;
       if (backX - 12 - tipX > 120) this.text(tipX, cy, !harms(this.tool) ? t(`${this.tool}Text` as TextKey) : `${t(`kind_${TOWER[this.tool].hits}` as TextKey)} · ${t(`${this.tool}Text` as TextKey)}`, 12, css(C.cream), 0, false).setWordWrapWidth(backX - 12 - tipX).setLineSpacing(-2);
     }
-    if (this.duo) {
+    if (s.duo) {
       // Each gardener's tools under their half of the lawn, as pictures when they are narrow.
       const room = Math.min(vw / 2 - 8 - TOOLS.x, vw / 2 - 8 - 16);
       const tw = Math.min(TOOLS.w, Math.floor(room / this.pouch.length) - TOOLS.gap);
