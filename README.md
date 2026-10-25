@@ -302,9 +302,14 @@ game's ⚙, or in the Settings panel for every game) shows a QR code of a link t
 progress in its `#p=` part. Scanning it with another device's camera opens the hub there, which asks
 and then loads it; **Copy code** copies the link, to send by chat or mail, and **Paste code** loads
 one. The link part after `#` never reaches the web server. `shared/progressCode.ts` makes the code:
-a format version, the game's code from `shared/saveCodes.ts` (`gh` for every game), then the JSON a
-file holds, deflated and sealed with the same AES-GCM key, all written as digits (7 bytes to 17
-digits) so the QR code packs them in its dense numeric mode (`shared/qr.ts`). A changed, cut short or
+a format version, the game's code from `shared/saveCodes.ts` (`gh` for every game), then the data a
+file holds, packed (`shared/pack.ts`), deflated and sealed with the same AES-GCM key, all written as
+digits (7 bytes to 17 digits) so the QR code packs them in its dense numeric mode (`shared/qr.ts`).
+Packing writes the saved JSON as compact binary, each key and repeated string once, whole numbers as
+varints and other numbers with their whole part and up to six significant digits (462.76886699627227
+becomes 462.769; a file keeps every digit), which makes a code between a sixth
+and two fifths smaller (two fifths for a Riftblade run under way). Codes from before packing
+(format 1) still load. A changed, cut short or
 unknown code is refused, and one from a newer hub asks to update first. Most games' progress fits
 one QR code; when it doesn't (a long run under way, or every game at once), the dialog shows a loop
 of up to 40 smaller codes in turn (`gp:<id>:<n>:<count>:<digits>`, each with a slice of the digits),

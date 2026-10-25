@@ -794,6 +794,9 @@ test('hub progress files', async ({ page }, testInfo) => {
   await expect.poll(() => alerts.at(-1)).toBe('This is not a .gh progress file, or it was changed.');
 });
 
+const FORMAT_1_CODE =
+  '00388611549979848084000525607965281983195443244506320428338445169006717417534230605292484273504822650227669183668994907657951656785173122606117826985689453211870339720797120018516295156754428079842309044543633554217027338667290099186711230786375732923460201123341995943232019404586200549';
+
 // A game's progress, or every game's, also moves as a QR code of a link that opens the hub and
 // imports it (shared/progressCode.ts), or as that link copied and pasted.
 test('hub progress codes', async ({ page }, testInfo) => {
@@ -801,6 +804,8 @@ test('hub progress codes', async ({ page }, testInfo) => {
   await page.evaluate(() => {
     localStorage.setItem('apothecary-save', '{"coins":42}');
     localStorage.setItem('palisade-best', '7');
+    // Codes keep six significant digits of a number.
+    localStorage.setItem('palisade-pos', '{"x":815.0696658242933,"kind":"wall"}');
     // Saved replays are too big for a code, so only files carry them.
     localStorage.setItem('mazewright-replays', '{"meadow":{}}');
   });
@@ -854,8 +859,16 @@ test('hub progress codes', async ({ page }, testInfo) => {
   await reloaded;
   expect(await stored('apothecary-save')).toBe('{"coins":42}');
   expect(await stored('palisade-best')).toBe('7');
+  expect(await stored('palisade-pos')).toBe('{"x":815.07,"kind":"wall"}');
   expect(await stored('mazewright-replays')).toBeNull();
   expect(JSON.parse((await stored('hub-settings'))!).difficulty).toBe('hard');
+
+  // A code made before codes were packed (format 1, Apothecary at 42 coins) still imports.
+  await page.evaluate(() => localStorage.setItem('apothecary-save', '{"coins":1}'));
+  paste = FORMAT_1_CODE;
+  await page.getByRole('button', { name: 'Settings for Apothecary' }).click();
+  await page.getByRole('dialog', { name: 'Apothecary' }).getByRole('button', { name: 'Paste code' }).click();
+  await expect.poll(() => stored('apothecary-save')).toBe('{"coins":42}');
 });
 
 // Scan code reads a progress code's QR code with the camera inside the hub (shared/scanner.ts). The
