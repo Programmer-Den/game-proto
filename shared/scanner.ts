@@ -1,4 +1,5 @@
 import { t } from './i18n';
+import { frameCollector } from './progressCode';
 
 /**
  * Scans a progress code (`progressCode.ts`) with the device's camera inside the hub, which matters
@@ -38,7 +39,8 @@ function qrDetector() {
 
 /**
  * Opens the `#scan-code` dialog with the camera's picture and calls `found` with the first QR code
- * that is a progress link (it has `#p=`), closing the dialog. Closing it stops the camera.
+ * that is a progress link (it has `#p=`), or with the digits of a loop of frames once every frame
+ * is in, closing the dialog. Closing it stops the camera.
  */
 export async function scanCode(found: (text: string) => void) {
   const dialog = document.getElementById('scan-code') as HTMLDialogElement;
@@ -69,17 +71,21 @@ export async function scanCode(found: (text: string) => void) {
     return;
   }
   status.textContent = t('scanHint');
+  const loop = frameCollector();
   const tick = async () => {
     if (!dialog.open) return;
     try {
       const codes = await reader.detect(video);
       const code = codes.find((c) => c.rawValue.includes('#p='));
-      if (code) {
+      const whole = code?.rawValue ?? codes.map((c) => loop.add(c.rawValue)).find(Boolean);
+      if (whole) {
         dialog.close();
-        found(code.rawValue);
+        found(whole);
         return;
       }
-      if (codes.length) status.textContent = t('scanNotProgress');
+      const got = loop.progress();
+      if (got) status.textContent = t('scanFrames', got);
+      else if (codes.length) status.textContent = t('scanNotProgress');
     } catch {
       // The picture isn't ready yet.
     }
