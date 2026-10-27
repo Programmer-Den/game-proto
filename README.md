@@ -76,7 +76,7 @@ The hub's **Settings** button opens the settings every game shares. They are sav
   | Bramblecrest | 5 hearts, and the bosses call in foes 25% less often | 2 hearts, and the bosses call in foes 30% more often |
   | Ninefold | 5 hints a Classic board, 4 hearts a Delve run | 2 hints a Classic board, 2 hearts a Delve run |
   | Augury | 4 hearts in Endless and Draft, 4 minutes of Blitz | 2 hearts in Endless and Draft, 2½ minutes of Blitz |
-  | Mazewright | 30 cabbages, and foes have 20% less health | 12 cabbages, and foes have 25% more health |
+  | Mazewright | 25 cabbages, and foes have 20% less health | 10 cabbages, and foes have 25% more health |
 
 - **Frame rate (FPS)**: the most frames per second a game draws, 30 to 320 (60 by default).
 - **Show FPS**: a readout of the frame rate in each game's corner.

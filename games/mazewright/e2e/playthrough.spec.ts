@@ -29,7 +29,7 @@ const VIEW = { w: 960, h: 540 };
 const COLS = 22;
 /** The rules the first wave goes through, from src/game/rules.ts. */
 const START_GOLD = 90;
-const LIVES_NORMAL = 20;
+const LIVES_NORMAL = 15;
 const COST = { hedge: 4, bow: 10 };
 const WAVE_1 = 6;
 const BEETLE_GOLD = 2;

@@ -251,12 +251,12 @@ export const WEATHER = { wiltAfter: 8, rest: 1.5, wiltFor: 3, frostEvery: 14, fr
 export const GROUP_GAP = 2;
 
 /** Foes get tougher each wave: health times this per wave after the first. */
-export const HP_PER_WAVE = 0.16;
+export const HP_PER_WAVE = 0.2;
 /** The queen of the last wave is this much tougher again. */
 export const FINAL_QUEEN = 1.6;
 
 /** Lives and starting gold, and the difficulty's foe health. */
-export const startLives = () => byDifficulty(30, 20, 12);
+export const startLives = () => byDifficulty(25, 15, 10);
 export const START_GOLD = 90;
 export const hpScale = () => byDifficulty(0.8, 1, 1.25);
 /** Gold for clearing a wave, and for calling the next one before the field is clear. */

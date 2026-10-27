@@ -19,6 +19,8 @@ beetle already on the lawn) is refused with an orange no-entry ring.
 | Tap, click or drag on the lawn | Plant the tool there, or a whole line of them |
 | Hover the lawn | See the new route before you plant |
 | Tap or click a tower | Open its panel: Upgrade, Sell (tap it twice), Aim for a tower that picks a target, and Turn for a bonfire or sunglass |
+| Upgrade button (after the tools), or U | Upgrade mode: every tower you tap or drag over is upgraded at once, and a gold mark shows the ones you can afford; tap Upgrade again to go back to the tool you had |
+| A tower tool on a hedge | Plant the tower in the hedge's place, for its cost less what the hedge sells for (the route doesn't change) |
 | Start wave, or Space | Send the next wave; once the last one is all out, send the next early for 5 gold |
 | Way of play (garden picker, top left) | Classic, Swarm, Endless or Sandbox, for every garden |
 | Wave timer / Calm (garden picker) | After wave 1 the next wave comes by itself 20 seconds after the last is all out; Calm waits for Start wave |
@@ -65,7 +67,8 @@ more of the other thirteen towers and the two garden traps. The pick is kept for
 plus one for every 4 waves held (Sandbox pays none). The potting shed (top right of the garden
 picker) sells them back: every tower but the hedge, bow, frost and cannon costs as many seeds as
 its gold price, each tower's master level twice that, and the pouch's fifth and sixth slots 60 and
-100. A tower still in the shed shows its price on its pouch chip. A first visit credits the gardens
+100. Each card tells what the buy brings: a tower's gold price and use, then its master level's trick, and
+the slots say they take one more tower along. A tower still in the shed shows its price on its pouch chip. A first visit credits the gardens
 already played, so seeds are waiting for players from before the shed.
 
 ![The potting shed](docs/screenshots/shed.webp)
@@ -196,7 +199,7 @@ foes come out of the open burrows in turn, so the maze has to serve every route;
 from the start. Beaten foes pay gold, and a held wave pays 6 more plus its number. Hold all 20 to save the
 garden.
 
-**Stolen cabbages.** The patch by the cottage holds 20 cabbages, the lives. A foe that gets there
+**Stolen cabbages.** The patch by the cottage holds 15 cabbages, the lives. A foe that gets there
 takes its share (a stag beetle two) and walks the maze back to its burrow with them, so every maze
 holds foes twice. Beat it on the way and the cabbages drop and roll back along the route to the
 patch, unless another foe picks them up. Cabbages carried into a burrow are lost, and the garden
@@ -214,8 +217,8 @@ played, and is kept for the next game:
 | Endless | Waves never stop: after wave 20, waves 11 to 20 come round again, bigger each time. The garden keeps the most waves held |
 | Sandbox | 10,000 gold, towers grow at once and waves never stop, with no records: a place to try mazes |
 
-**Difficulty** (hub setting): Easy gives 30 cabbages and foes 20% less health, Hard 12 cabbages and
-25% more health; Normal is 20 cabbages.
+**Difficulty** (hub setting): Easy gives 25 cabbages and foes 20% less health, Hard 10 cabbages and
+25% more health; Normal is 15 cabbages.
 
 ## Code layout
 
