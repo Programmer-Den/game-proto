@@ -136,6 +136,7 @@ const de: Translation<typeof en> = {
   sellMode: 'Verkaufen',
   sellModeText: 'Tippe oder ziehe über Türme, um sie sofort zu verkaufen. Nochmals Verkaufen zum Pflanzen.',
   upgradeModeText: 'Tippe oder ziehe über Türme, um sie auszubauen. Nochmals Ausbauen zum Pflanzen.',
+  noToolText: 'Kein Werkzeug in der Hand: Tippe einen Turm an, um sein Feld zu öffnen, oder wähle ein Werkzeug zum Pflanzen.',
   topLevel: 'Höchste Stufe',
   sell: 'Verkaufen +{n}',
   sellSure: 'Sicher? Verkaufen +{n}',

@@ -4,7 +4,7 @@ import { byLanguage } from '../../../shared/i18n';
 const en: HowToPlay = {
   goal: 'Keep the beetles out of the cottage for 20 waves. There is no road: every tower you plant is also a wall, so you build the maze they must walk.',
   controls: [
-    { input: 'Click or tap a tool', action: 'Pick a tower from your pouch (keys 1 to 8)' },
+    { input: 'Click or tap a tool', action: 'Pick a tower from your pouch (keys 1 to 8); pick it again or press Escape to put it away' },
     { input: 'Click, tap or drag on the lawn', action: 'Plant the tool there, or a whole line of them' },
     { input: 'Click or tap a tower', action: 'Upgrade, sell (tap twice), set its aim, or turn a bonfire or sunglass' },
     { input: 'Upgrade button, U', action: 'Upgrade mode: each tower you tap or drag over is upgraded at once; tap Upgrade again to plant' },
@@ -48,7 +48,7 @@ const en: HowToPlay = {
 const de: HowToPlay = {
   goal: 'Halte die Käfer 20 Wellen lang vom Häuschen fern. Es gibt keinen Weg: Jeder Turm, den du pflanzt, ist auch eine Mauer, also baust du das Labyrinth, durch das sie laufen müssen.',
   controls: [
-    { input: 'Ein Werkzeug klicken oder tippen', action: 'Einen Turm aus deinem Beutel wählen (Tasten 1 bis 8)' },
+    { input: 'Ein Werkzeug klicken oder tippen', action: 'Einen Turm aus deinem Beutel wählen (Tasten 1 bis 8); nochmals wählen oder Escape legt ihn weg' },
     { input: 'Auf den Rasen klicken, tippen oder ziehen', action: 'Das Werkzeug dort pflanzen, oder eine ganze Reihe' },
     { input: 'Einen Turm klicken oder tippen', action: 'Ausbauen, verkaufen (zweimal tippen), sein Ziel wählen oder Feuerkorb und Brennglas drehen' },
     { input: 'Knopf Ausbauen, U', action: 'Ausbaumodus: Jeder Turm, den du antippst oder überziehst, wird sofort ausgebaut; tippe nochmals auf Ausbauen, um zu pflanzen' },

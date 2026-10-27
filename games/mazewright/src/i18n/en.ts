@@ -133,6 +133,7 @@ const en = {
   sellMode: 'Sell',
   sellModeText: 'Tap or drag over towers to sell them at once. Tap Sell again to plant.',
   upgradeModeText: 'Tap or drag over towers to upgrade them. Tap Upgrade again to plant.',
+  noToolText: 'No tool in hand: tap a tower to open its panel, or pick a tool to plant.',
   topLevel: 'Top level',
   sell: 'Sell +{n}',
   sellSure: 'Sure? Sell +{n}',
