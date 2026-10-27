@@ -20,6 +20,7 @@ beetle already on the lawn) is refused with an orange no-entry ring.
 | Hover the lawn | See the new route before you plant |
 | Tap or click a tower | Open its panel: Upgrade, Sell (tap it twice), Aim for a tower that picks a target, and Turn for a bonfire or sunglass |
 | Upgrade button (after the tools), or U | Upgrade mode: every tower you tap or drag over is upgraded at once, and a gold mark shows the ones you can afford; tap Upgrade again to go back to the tool you had |
+| Sell button, or S | Sell mode: every tower you tap or drag over is sold at once for 70% of what it cost, to clear a lot of the maze quickly; tap Sell again to go back |
 | A tower tool on a hedge | Plant the tower in the hedge's place, for its cost less what the hedge sells for (the route doesn't change) |
 | Start wave, or Space | Send the next wave; once the last one is all out, send the next early for 5 gold |
 | Way of play (garden picker, top left) | Classic, Swarm, Endless or Sandbox, for every garden |

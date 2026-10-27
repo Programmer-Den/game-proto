@@ -139,15 +139,16 @@ Implemented today:
   `build` takes the hedge out (the cell stays blocked, so no `refield`) and drops a mole's `chew` of
   it. The new tower's `spent` is its full cost. The scene plants over a hedge on a tap or drag with a
   tower tool, so a hedge's panel opens only with the hedge tool (or Upgrade) picked.
-- Upgrade mode: the scene's `Tool` is a `TowerKind` or `'upgrade'`. The `tool-upgrade` button (and
-  `tool2-upgrade`) after each gardener's tools, or the U key, picks it; picking it again goes back
-  to the tower from before (`before`). Then a tap or drag on a tower calls `upgrade` (a tap that
-  can't buzzes), a gold mark sits on each tower the gardener can upgrade now, there is no hover
-  preview, and the top bar tells `upgradeModeText`.
+- Upgrade and sell modes: the scene's `Tool` is a `TowerKind` or a `ToolMode` (`'upgrade'`,
+  `'sell'`, `isMode`). The `tool-upgrade` and `tool-sell` buttons (and `tool2-...`) after each
+  gardener's tools, or the U and S keys, pick one; picking it again goes back to the tower from
+  before (`before`). Then a tap or drag on a tower calls `upgrade` or `sell` (no second tap; a tap
+  that can't buzzes), a mark sits on each tower (gold up: can be upgraded now; cream down: sell
+  mode), there is no hover preview, and the top bar tells `upgradeModeText` or `sellModeText`.
 - Hover preview: the routes as they would be with the hovered tile planted, or the no-entry ring;
   made again when the board changes or a ground foe or loose cabbage moves on, and not shown while
   watching a replay.
-- Drag to plant a line; keys 1 to 8 (the pouch, in order), U (upgrade mode), Space and F; a 2x speed button. The
+- Drag to plant a line; keys 1 to 8 (the pouch, in order), U and S (upgrade and sell mode), Space and F; a 2x speed button. The
   picked tool's use is told in the top bar.
 - Banners name each new foe kind the first time it comes, the second burrow (and each later one,
   `burrowOpens`), the first stolen
@@ -247,7 +248,7 @@ carry it, progress codes leave it out as too big for a QR code).
 
 Test hooks (read by `e2e/playthrough.spec.ts` through `window.game.scene.getScene('Game')`):
 `screen`, `state` (the `Game`), `replay` (the `Replay` watched, or null), `pouch`, `buttons` (every button by id, centred, in view pixels:
-`map-<garden>` (the cards of the season shown, `season-<season>`), `watch-<garden>`, `duo`, `pouch-<tower>`, `tool-<tower>`, `tool2-<tower>` (two gardeners), `tool-upgrade`, `tool2-upgrade`, `wave`, `speed`, `gardens`, `upgrade`, `sell`,
+`map-<garden>` (the cards of the season shown, `season-<season>`), `watch-<garden>`, `duo`, `pouch-<tower>`, `tool-<tower>`, `tool2-<tower>` (two gardeners), `tool-upgrade`, `tool-sell`, `tool2-upgrade`, `tool2-sell`, `wave`, `speed`, `gardens`, `upgrade`, `sell`,
 `turn`, `aim`, `again`) and `grid` (the grid's corner and cell size in view pixels).
 
 Difficulty: `startLives` (25, 15, 10) and `hpScale` (0.8, 1, 1.25) use `byDifficulty`. Reduced
