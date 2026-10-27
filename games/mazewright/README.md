@@ -15,7 +15,7 @@ beetle already on the lawn) is refused with an orange no-entry ring.
 
 | Control | Action |
 | --- | --- |
-| Tap or click a tool, or keys 1 to 8 | Pick a tower from your pouch; pick the same one again (or press Escape) to put it away, so taps on the lawn plant nothing |
+| Tap or click a tool, or keys 1 to 8 | Pick a tower from your pouch, even one you can't afford yet (it shows dim); pick the same one again (or press Escape) to put it away, so taps on the lawn plant nothing |
 | Tap, click or drag on the lawn | Plant the tool there, or a whole line of them |
 | Hover the lawn | See the new route before you plant |
 | Tap or click a tower | Open its panel: Upgrade, Sell (tap it twice), Aim for a tower that picks a target, and Turn for a bonfire or sunglass |
@@ -35,6 +35,11 @@ beetle already on the lawn) is refused with an orange no-entry ring.
 ![A bow about to take a hedge's place in the maze](docs/screenshots/hedge-swap.webp)
 
 ![No tool in hand: every tool button off, and the top bar says what a tap does](docs/screenshots/no-tool.webp)
+
+Every planting, upgrade and sale shows what it cost or paid in a short note rising from the tower
+(−21 ◆ for a cannon in a hedge's place, which already counts what the hedge sells for; +10 ◆ for a sale).
+
+![Gold notes over a cannon planted in a hedge's place, an upgraded bow and a sold one, with the Cannon picked though it is too dear for now](docs/screenshots/gold-notes.webp)
 
 ![A planting that would close the last way through is refused](docs/screenshots/refused.webp)
 

@@ -142,9 +142,9 @@ export interface Shot {
 }
 
 export type GameEvent =
-  | { type: 'built'; kind: TowerKind; cell: number }
+  | { type: 'built'; kind: TowerKind; cell: number; gold: number }
   | { type: 'refused'; cell: number; reason: Refusal }
-  | { type: 'upgraded'; cell: number }
+  | { type: 'upgraded'; cell: number; gold: number }
   | { type: 'sold'; cell: number; gold: number }
   | { type: 'shot'; kind: TowerKind }
   | { type: 'bolt'; points: { x: number; y: number }[] }
@@ -463,7 +463,8 @@ export function build(g: Game, cell: number, kind: TowerKind): Refusal | null {
     return refusal;
   }
   const hedge = hedgeUnder(g, cell, kind);
-  addGold(g, sideOf(g, cell), -costOn(g, cell, kind));
+  const cost = costOn(g, cell, kind);
+  addGold(g, sideOf(g, cell), -cost);
   // The hedge makes way; the cell stays blocked, so the routes don't change.
   if (hedge) {
     g.towers.splice(g.towers.indexOf(hedge), 1);
@@ -472,7 +473,7 @@ export function build(g: Game, cell: number, kind: TowerKind): Refusal | null {
   }
   if (TOWER[kind].trap) {
     g.traps.push({ id: g.nextId++, kind: kind as TrapKind, cell, sprung: false, until: 0, field: null });
-    g.events.push({ type: 'built', kind, cell });
+    g.events.push({ type: 'built', kind, cell, gold: cost });
     note(g, 'build', cell, kind);
     return null;
   }
@@ -481,7 +482,7 @@ export function build(g: Game, cell: number, kind: TowerKind): Refusal | null {
   growFor(g.towers[g.towers.length - 1], TOWER[kind].cost, g);
   g.blocked[cell] = 2;
   refield(g);
-  g.events.push({ type: 'built', kind, cell });
+  g.events.push({ type: 'built', kind, cell, gold: cost });
   note(g, 'build', cell, kind);
   return null;
 }
@@ -580,7 +581,7 @@ export function upgrade(g: Game, cell: number) {
   if (g.phase === 'build') tower.fresh += cost;
   tower.level++;
   growFor(tower, cost, g);
-  g.events.push({ type: 'upgraded', cell });
+  g.events.push({ type: 'upgraded', cell, gold: cost });
   note(g, 'upgrade', cell);
   return true;
 }

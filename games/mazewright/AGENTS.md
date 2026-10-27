@@ -145,6 +145,10 @@ Implemented today:
   before (`before`). Then a tap or drag on a tower calls `upgrade` or `sell` (no second tap; a tap
   that can't buzzes), a mark sits on each tower (gold up: can be upgraded now; cream down: sell
   mode), there is no hover preview, and the top bar tells `upgradeModeText` or `sellModeText`.
+- Gold notes: the `built` and `upgraded` events carry the `gold` they cost (`costOn`, so less a
+  replaced hedge's sell value), and `sold` what it paid; `goldNote` shows it as a rising coin flash
+  over the tower (`spent` draws it paler). Tool buttons are never disabled: a tool too dear for now
+  is drawn `dim` but can still be picked, and planting it is refused for gold as usual.
 - No tool: `Tool` can also be `'none'`, set by picking the tower tool in hand again (`pickTool`) or
   by Escape with no panel open (both gardeners). Then a tap on a tower opens its panel, a tap on
   the lawn plants nothing, there is no hover preview, and the top bar tells `noToolText`.
@@ -172,7 +176,7 @@ Missing or rough:
   crossbow, cannon, bow, whirligig and puffball do most, the storm rod, bonfire and beehive less
   but need bunched foes, a straight corridor or neighbours to shine, and the sunglass needs a
   corridor in line with it. A tower's balance is a first pass.
-- `docs/screenshots/gardens.webp` (the picker on its autumn tab, with the pouch), `path.webp` (Gravel Walk), `ponds.webp` (Ice Pond, towers on its banks), `wilt.webp` (Brook, a wilted cannon), `frost.webp` (Ice Pond, a frozen frost tower), `towers.webp`, `aim.webp`, `kings.webp`, `cabbages.webp`, `grow.webp`, `master.webp`, `traps.webp`, `shed.webp` (the shed's cards with their info lines), `modes.webp` (upgrade mode and its gold marks), `hedge-swap.webp` (a bow hovered over a hedge), `no-tool.webp` (the tool put away), `refund.webp` (a growing bow's panel, selling for all it cost), `maze.webp`,
+- `docs/screenshots/gardens.webp` (the picker on its autumn tab, with the pouch), `path.webp` (Gravel Walk), `ponds.webp` (Ice Pond, towers on its banks), `wilt.webp` (Brook, a wilted cannon), `frost.webp` (Ice Pond, a frozen frost tower), `towers.webp`, `aim.webp`, `kings.webp`, `cabbages.webp`, `grow.webp`, `master.webp`, `traps.webp`, `shed.webp` (the shed's cards with their info lines), `modes.webp` (upgrade mode and its gold marks), `hedge-swap.webp` (a bow hovered over a hedge), `no-tool.webp` (the tool put away), `gold-notes.webp` (the notes over a planting, an upgrade and a sale), `refund.webp` (a growing bow's panel, selling for all it cost), `maze.webp`,
   `mole.webp` and `cover.png` were taken by hand (a
   Playwright script that plants a maze and sends waves 8 and 9); `duo-replay.webp` (a
   two-gardener replay of the Meadow, both purses in the top bar) was made from a replay put in

@@ -38,6 +38,8 @@ const css = (c: number) => `#${c.toString(16).padStart(6, '0')}`;
 /** Something drawn for a moment: a pulse, a boom, a hit, a bolt, a flame, a beam, spores, a coin or a note. */
 interface Flash {
   kind: 'pulse' | 'sting' | 'shrink' | 'boom' | 'hit' | 'bolt' | 'flame' | 'beam' | 'puff' | 'coin' | 'note';
+  /** A coin note for gold spent rather than earned, drawn in a paler colour. */
+  spent?: boolean;
   x: number;
   y: number;
   r: number;
@@ -208,12 +210,19 @@ export class GameScene extends Phaser.Scene {
     g.events.length = 0;
   }
 
+  /** A short note rising from a tower with the gold its planting, upgrade (both negative) or sale cost or paid. */
+  private goldNote(cell: number, gold: number) {
+    const m = this.mid(cell);
+    this.flash({ kind: 'coin', x: m.x, y: m.y, r: 0, life: 1.2, text: `${gold < 0 ? '−' : '+'}${Math.abs(gold)} ◆`, spent: gold < 0 });
+  }
+
   private onEvent(g: Game, e: GameEvent) {
     const px = (x: number) => this.grid.x + x * CELL;
     const py = (y: number) => this.grid.y + y * CELL;
     switch (e.type) {
       case 'built':
         SFX(e.kind === 'hedge' || TOWER[e.kind].trap ? 'plant' : 'build');
+        this.goldNote(e.cell, -e.gold);
         this.changed();
         break;
       case 'refused':
@@ -221,10 +230,12 @@ export class GameScene extends Phaser.Scene {
         break;
       case 'upgraded':
         SFX('upgrade');
+        this.goldNote(e.cell, -e.gold);
         this.changed();
         break;
       case 'sold':
         SFX('sell');
+        this.goldNote(e.cell, e.gold);
         this.changed();
         break;
       case 'shot':
@@ -789,7 +800,7 @@ export class GameScene extends Phaser.Scene {
         g.fillStyle(0xffffff, 0.7 * (1 - k));
         g.fillCircle(f.x, f.y, f.r);
       } else if (f.kind === 'coin') {
-        f.label ??= this.add.text(0, 0, f.text!, { fontFamily: FONT, fontSize: '13px', color: css(C.gold), fontStyle: 'bold', stroke: '#3e2a1a', strokeThickness: 3 }).setOrigin(0.5).setDepth(DEPTH.fx);
+        f.label ??= this.add.text(0, 0, f.text!, { fontFamily: FONT, fontSize: '13px', color: f.spent ? '#ffcf9e' : css(C.gold), fontStyle: 'bold', stroke: '#3e2a1a', strokeThickness: 3 }).setOrigin(0.5).setDepth(DEPTH.fx);
         f.label.setPosition(f.x, f.y - 14 - (still ? 0 : k * 16)).setAlpha(1 - k * k);
       } else {
         art.noEntry(g, f.x, f.y);
@@ -845,10 +856,12 @@ export class GameScene extends Phaser.Scene {
     return text;
   }
 
-  private button(id: string, x: number, y: number, w: number, h: number, label: string, onTap: () => void, opts: { enabled?: boolean; on?: boolean; fill?: number; size?: number; sub?: string } = {}) {
+  private button(id: string, x: number, y: number, w: number, h: number, label: string, onTap: () => void, opts: { enabled?: boolean; dim?: boolean; on?: boolean; fill?: number; size?: number; sub?: string } = {}) {
     const enabled = opts.enabled ?? true;
+    // A dim button looks off but still takes taps: a tool too dear for now can still be picked.
+    const bright = enabled && !opts.dim;
     const g = this.hudG;
-    g.fillStyle(opts.fill ?? 0xffffff, opts.fill !== undefined ? (enabled ? 1 : 0.45) : opts.on ? 0.2 : 0.08);
+    g.fillStyle(opts.fill ?? 0xffffff, opts.fill !== undefined ? (bright ? 1 : 0.45) : opts.on ? 0.2 : 0.08);
     g.fillRoundedRect(x, y, w, h, 7);
     if (opts.on) {
       g.lineStyle(2, C.gold, 1);
@@ -857,9 +870,9 @@ export class GameScene extends Phaser.Scene {
     const dark = opts.fill !== undefined;
     const colour = dark ? '#2b1d10' : css(C.cream);
     if (opts.sub) {
-      this.text(x + w / 2, y + h / 2 - 7, label, opts.size ?? 13, colour, 0.5).setAlpha(enabled ? 1 : 0.6);
-      this.text(x + w / 2, y + h / 2 + 8, opts.sub, 11, dark ? '#2b1d10' : css(C.gold), 0.5, false).setAlpha(enabled ? 1 : 0.6);
-    } else this.text(x + w / 2, y + h / 2, label, opts.size ?? 14, colour, 0.5).setAlpha(enabled ? 1 : 0.6);
+      this.text(x + w / 2, y + h / 2 - 7, label, opts.size ?? 13, colour, 0.5).setAlpha(bright ? 1 : 0.6);
+      this.text(x + w / 2, y + h / 2 + 8, opts.sub, 11, dark ? '#2b1d10' : css(C.gold), 0.5, false).setAlpha(bright ? 1 : 0.6);
+    } else this.text(x + w / 2, y + h / 2, label, opts.size ?? 14, colour, 0.5).setAlpha(bright ? 1 : 0.6);
     this.hits.push({ x, y, w, h, onTap, enabled });
     this.buttons[id] = { x: x + w / 2, y: y + h / 2, w, h };
   }
@@ -958,7 +971,7 @@ export class GameScene extends Phaser.Scene {
     this.pouch.forEach((kind, i) => {
       const x = x0 + i * (tw + TOOLS.gap);
       this.button(`tool${side ? 2 : ''}-${kind}`, x, by, tw, TOOLS.h, pictures ? '' : t(`${kind}Name` as TextKey), () => this.pickTool(kind, side), {
-        on: tool === kind, sub: `◆ ${TOWER[kind].cost}`, enabled: gold >= TOWER[kind].cost || tool === kind, size: tw < 76 ? 10 : 12,
+        on: tool === kind, sub: `◆ ${TOWER[kind].cost}`, dim: gold < TOWER[kind].cost && tool !== kind, size: tw < 76 ? 10 : 12,
       });
       if (!pictures) return;
       const icon = this.add.graphics().setDepth(DEPTH.panel).setPosition(x + tw / 2, by + TOOLS.h / 2 - 6).setScale(0.48);
