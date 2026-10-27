@@ -3,21 +3,24 @@ import { SAVE_CODES } from './saveCodes';
 import { formatDate, t } from './i18n';
 import { qrCode, qrSvg } from './qr';
 import { loadSettings } from './settings';
+import { pack, unpack } from './pack';
 
 /**
  * Progress codes: the same progress a file carries (`saveFile.ts`), as a link with the data in its
  * `#p=` part, to show as a QR code that another device's camera opens, or to copy and paste. It
  * leaves out what only files carry (`fileOnly`: saved replays). The code is a format version byte,
- * the two-letter kind (the game's code from `saveCodes.ts`, `gh` for every game), a 12-byte IV and the deflated JSON sealed with AES-GCM, the first three bytes
+ * the two-letter kind (the game's code from `saveCodes.ts`, `gh` for every game), a 12-byte IV and the deflated payload sealed with AES-GCM, the first three bytes
  * included in the seal, so a code that was changed, cut short or is of another kind fails to
  * unseal. Its bytes are written as digits, 7 bytes to 17 digits, which the QR code's numeric mode
- * packs almost as tightly as raw bytes and which pass through any link unchanged.
+ * packs almost as tightly as raw bytes and which pass through any link unchanged. Format 2 packs
+ * the payload with `pack.ts` (each stored value that is JSON as packed data, its numbers rounded to
+ * six significant digits, the rest as text); format 1, still read, carried it as JSON text.
  *
  * Progress too big for one QR code is shown as a loop of smaller ones, frames that the hub's own
  * scanner (`scanner.ts`) collects: `gp:<transfer id>:<n>:<count>:<digits>`, each with one slice of
  * the digits, the transfer id telling two loops apart.
  */
-const FORMAT = 1;
+const FORMAT = 2;
 const ALL_CODE = 'gh';
 /** The hash that carries a code in the hub's link. */
 const HASH = '#p=';
@@ -64,6 +67,40 @@ async function through(bytes: Uint8Array<ArrayBuffer>, stream: CompressionStream
   return new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(stream)).arrayBuffer());
 }
 
+/** A stored value that JSON writes back exactly as it was, so a code can carry it packed. */
+function asJson(value: string): { value: unknown } | null {
+  try {
+    const parsed = JSON.parse(value);
+    return JSON.stringify(parsed) === value ? { value: parsed } : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The progress `kind` covers, packed: when it was saved (ms since 1970), its JSON values as data
+ * and the other values as text. The kind itself is in the code's header.
+ */
+function packPayload(kind: string, games: string[]) {
+  const { saved, data } = progressPayload(kind, games, true);
+  const json: Record<string, unknown> = {};
+  const text: Record<string, string> = {};
+  for (const [key, value] of Object.entries(data)) {
+    const parsed = asJson(value);
+    if (parsed) json[key] = parsed.value;
+    else text[key] = value;
+  }
+  return pack([Date.parse(saved), json, text]);
+}
+
+/** The payload `packPayload` packed for `kind`, its data back as stored text. */
+function unpackPayload(bytes: Uint8Array, kind: string) {
+  const [saved, json, text] = unpack(bytes) as [number, Record<string, unknown>, Record<string, string>];
+  const data: Record<string, string> = { ...text };
+  for (const [key, value] of Object.entries(json)) data[key] = JSON.stringify(value);
+  return { kind, saved: new Date(saved).toISOString(), data };
+}
+
 const kindCode = (kind: string) => (kind === ALL ? ALL_CODE : SAVE_CODES[kind]);
 
 /** The hub's own address, without a query, a hash or `index.html`. */
@@ -74,7 +111,7 @@ export async function progressLink(kind: string, games: string[]) {
   const code = kindCode(kind);
   const header = new Uint8Array([FORMAT, code.charCodeAt(0), code.charCodeAt(1)]);
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const packed = await through(new TextEncoder().encode(JSON.stringify(progressPayload(kind, games, true))), new CompressionStream('deflate-raw'));
+  const packed = await through(packPayload(kind, games), new CompressionStream('deflate-raw'));
   const sealed = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: header }, await cryptoKey(), packed));
   const bytes = new Uint8Array(header.length + iv.length + sealed.length);
   bytes.set(header);
@@ -94,14 +131,15 @@ export async function unpackProgress(text: string, games: string[]): Promise<Unp
   if (bytes[0] > FORMAT) return 'newer';
   const code = String.fromCharCode(bytes[1], bytes[2]);
   const kind = code === ALL_CODE ? ALL : games.find((g) => SAVE_CODES[g] === code);
-  if (bytes[0] !== FORMAT || !kind) return 'invalid';
+  if (bytes[0] < 1 || !kind) return 'invalid';
   try {
     const plain = await crypto.subtle.decrypt(
       { name: 'AES-GCM', iv: bytes.subarray(3, 15), additionalData: bytes.subarray(0, 3) },
       await cryptoKey(),
       bytes.subarray(15),
     );
-    const payload = JSON.parse(new TextDecoder().decode(await through(new Uint8Array(plain), new DecompressionStream('deflate-raw'))));
+    const inflated = await through(new Uint8Array(plain), new DecompressionStream('deflate-raw'));
+    const payload = bytes[0] === 1 ? JSON.parse(new TextDecoder().decode(inflated)) : unpackPayload(inflated, kind);
     return { kind, saved: String(payload?.saved ?? ''), payload };
   } catch {
     return 'invalid';
