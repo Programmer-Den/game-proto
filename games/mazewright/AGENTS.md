@@ -62,7 +62,7 @@ Implemented today:
 - The pouch: under the garden cards, chips in two rows (`CHIPS.perRow`) for the thirteen towers and two traps besides `hedge` and `bow` (`ALWAYS`);
   up to `POUCH_PICKS` (4) are picked, saved, and make the run's tool bar (six buttons at most).
   `DEFAULT_POUCH` is today's four (hedge, bow, frost, cannon), which the playthrough uses.
-- Towers (`TOWERS`), levels 1 to 3 and the master level `MASTER` (4; hedges stay at 1), sold for 70% of what they cost: `hedge`
+- Towers (`TOWERS`), levels 1 to 3 and the master level `MASTER` (4; hedges stay at 1), sold for 70% of what they cost (`sellValue`; the whole price of a growth still under way, so a tower still growing gives back all it cost, and one growing an upgrade gives back that upgrade's price): `hedge`
   (blocks only), `bow`, `frost` (pulse, slows), `cannon` (splash, ground only), `storm` (a bolt that
   chains to foes within `jump` of each other), `crossbow` (long reach, aims at the toughest),
   `bonfire` (a cone the way it faces, sets ground foes burning), `puffball` (poison that spreads once
@@ -92,7 +92,9 @@ Implemented today:
   in the patch it adds to `lives` (event `saved`). `remaining` for a foe going home is its way to
   the burrow. The game is lost when `cabbagesLeft` is 0; building on a loose cabbage is refused
   like a foe.
-- The potting shed (`Shed` in `save.ts`, the `shed` screen): `seedsFor` pays a finished game
+- The potting shed (`Shed` in `save.ts`, the `shed` screen; each card tells what the buy brings:
+  `◆ cost · ${kind}Text` while the tower is still to buy or a trap, `${kind}Master` after, and
+  `slotInfo` under the slots): `seedsFor` pays a finished game
   (`SEEDS`), and `buy` spends them on towers (`towerSeeds`; `FREE` needs none), master levels
   (`masterSeeds`; `newGame`'s `masters` list, which `nextUpgrade` and `masterOpen` check; null in
   the sim means all, as the bot and tests use) and pouch slots (`SLOT_SEEDS`, `picksOf`). `pouchOf`
@@ -132,10 +134,21 @@ Implemented today:
   over 10 seconds; `fire` only counts it down while it grows, and a growing beehive boosts nothing.
   The scene draws it faint with a filling ring.
 - Building during a wave is allowed; a tile with a foe on it (or walking onto it) is refused.
+- Building over a hedge: any tower but a hedge or trap may go on a hedge's tile (`hedgeUnder`).
+  `canBuild` then only checks the gold, `costOn` is its cost less the hedge's `sellValue`, and
+  `build` takes the hedge out (the cell stays blocked, so no `refield`) and drops a mole's `chew` of
+  it. The new tower's `spent` is its full cost. The scene plants over a hedge on a tap or drag with a
+  tower tool, so a hedge's panel opens only with the hedge tool (or Upgrade) picked.
+- Upgrade and sell modes: the scene's `Tool` is a `TowerKind` or a `ToolMode` (`'upgrade'`,
+  `'sell'`, `isMode`). The `tool-upgrade` and `tool-sell` buttons (and `tool2-...`) after each
+  gardener's tools, or the U and S keys, pick one; picking it again goes back to the tower from
+  before (`before`). Then a tap or drag on a tower calls `upgrade` or `sell` (no second tap; a tap
+  that can't buzzes), a mark sits on each tower (gold up: can be upgraded now; cream down: sell
+  mode), there is no hover preview, and the top bar tells `upgradeModeText` or `sellModeText`.
 - Hover preview: the routes as they would be with the hovered tile planted, or the no-entry ring;
   made again when the board changes or a ground foe or loose cabbage moves on, and not shown while
   watching a replay.
-- Drag to plant a line; keys 1 to 8 (the pouch, in order), Space and F; a 2x speed button. The
+- Drag to plant a line; keys 1 to 8 (the pouch, in order), U and S (upgrade and sell mode), Space and F; a 2x speed button. The
   picked tool's use is told in the top bar.
 - Banners name each new foe kind the first time it comes, the second burrow (and each later one,
   `burrowOpens`), the first stolen
@@ -147,6 +160,8 @@ Missing or rough:
 
 - A game in play is not saved; a reload starts at the garden picker.
 - No Watch AI mode, no upright layout (an upright phone gets the turn hint).
+- Normal was made harder after the bot runs below: 15 cabbages instead of 20 and `HP_PER_WAVE` 0.2
+  instead of 0.16 (wave 1 is unchanged). It has not been checked with the bot since.
 - Balance was tuned with a scripted bot (a fixed serpentine on the Meadow): building only between
   waves it loses at the final queen on Normal, building during waves it wins with a few lives left
   (before stolen cabbages, which made every maze hold foes twice and the game easier).
@@ -154,7 +169,7 @@ Missing or rough:
   crossbow, cannon, bow, whirligig and puffball do most, the storm rod, bonfire and beehive less
   but need bunched foes, a straight corridor or neighbours to shine, and the sunglass needs a
   corridor in line with it. A tower's balance is a first pass.
-- `docs/screenshots/gardens.webp` (the picker on its autumn tab, with the pouch), `path.webp` (Gravel Walk), `ponds.webp` (Ice Pond, towers on its banks), `wilt.webp` (Brook, a wilted cannon), `frost.webp` (Ice Pond, a frozen frost tower), `towers.webp`, `aim.webp`, `kings.webp`, `cabbages.webp`, `grow.webp`, `master.webp`, `traps.webp`, `shed.webp`, `maze.webp`,
+- `docs/screenshots/gardens.webp` (the picker on its autumn tab, with the pouch), `path.webp` (Gravel Walk), `ponds.webp` (Ice Pond, towers on its banks), `wilt.webp` (Brook, a wilted cannon), `frost.webp` (Ice Pond, a frozen frost tower), `towers.webp`, `aim.webp`, `kings.webp`, `cabbages.webp`, `grow.webp`, `master.webp`, `traps.webp`, `shed.webp` (the shed's cards with their info lines), `modes.webp` (upgrade mode and its gold marks), `hedge-swap.webp` (a bow hovered over a hedge), `refund.webp` (a growing bow's panel, selling for all it cost), `maze.webp`,
   `mole.webp` and `cover.png` were taken by hand (a
   Playwright script that plants a maze and sends waves 8 and 9); `duo-replay.webp` (a
   two-gardener replay of the Meadow, both purses in the top bar) was made from a replay put in
@@ -189,7 +204,7 @@ File map (`src/`):
   neighbours), `nextStep` (a neighbour one step closer, keeping the heading on ties, then right,
   down, up, left), `route`, `UNREACHABLE`, `DIRS`.
 - `game/sim.ts`: `Game`, `Tower`, `Foe`, `Shot`, `GameEvent`, `Refusal` and the actions:
-  `newGame`, `replayGame`, `replayStep`, `replayOf` (with `Action`, `Fixed` and `Replay`), `sideOf`, `goldAt`, `canBuild`, `wouldBlock`, `build`, `nextUpgrade`, `upgrade`, `sellValue`, `sell`, `turn`, `setAim`,
+  `newGame`, `replayGame`, `replayStep`, `replayOf` (with `Action`, `Fixed` and `Replay`), `sideOf`, `goldAt`, `canBuild`, `hedgeUnder`, `costOn`, `wouldBlock`, `build`, `nextUpgrade`, `upgrade`, `sellValue`, `sell`, `turn`, `setAim`,
   `canStartWave`, `startWave`, `step`, `remaining`, `routeLength`, `towerAt`, and `beamCells`,
   `inCone` and `bestFace` for the towers that point one way, `reachOf` and `openGates`. Only this file
   changes a `Game`. `g.blocked` is 0 free (a path garden's path), 1 rock, 2 tower, 3 water, 4
@@ -233,10 +248,10 @@ carry it, progress codes leave it out as too big for a QR code).
 
 Test hooks (read by `e2e/playthrough.spec.ts` through `window.game.scene.getScene('Game')`):
 `screen`, `state` (the `Game`), `replay` (the `Replay` watched, or null), `pouch`, `buttons` (every button by id, centred, in view pixels:
-`map-<garden>` (the cards of the season shown, `season-<season>`), `watch-<garden>`, `duo`, `pouch-<tower>`, `tool-<tower>`, `tool2-<tower>` (two gardeners), `wave`, `speed`, `gardens`, `upgrade`, `sell`,
+`map-<garden>` (the cards of the season shown, `season-<season>`), `watch-<garden>`, `duo`, `pouch-<tower>`, `tool-<tower>`, `tool2-<tower>` (two gardeners), `tool-upgrade`, `tool-sell`, `tool2-upgrade`, `tool2-sell`, `wave`, `speed`, `gardens`, `upgrade`, `sell`,
 `turn`, `aim`, `again`) and `grid` (the grid's corner and cell size in view pixels).
 
-Difficulty: `startLives` (30, 20, 12) and `hpScale` (0.8, 1, 1.25) use `byDifficulty`. Reduced
+Difficulty: `startLives` (25, 15, 10) and `hpScale` (0.8, 1, 1.25) use `byDifficulty`. Reduced
 motion holds the frost pulse and cannon boom rings at full size and the gold numbers still.
 
 ## Sound

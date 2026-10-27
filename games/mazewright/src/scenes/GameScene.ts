@@ -8,7 +8,7 @@ import { distances, route } from '../game/grid';
 import { cellIndex, cellOf, MAPS, SEASON_STARS, SEASONS, type MapDef, type Season } from '../game/maps';
 import { loadCalm, loadDuo, loadMode, loadPouch, loadRecords, loadReplays, loadShed, noteRecord, picksOf, pouchOf, saveCalm, saveDuo, saveMode, savePouch, saveReplay, saveShed, usable, type Records, type Replays, type Shed } from '../game/save';
 import {
-  beamCells, bestFace, build, LAWN, openGates, reachOf, cabbagesLeft, canStartWave, masterOpen, seedsFor, stars, totalWaves, newGame, nextUpgrade, goldAt, sideOf, replayGame, replayOf, replayStep, sell, sellValue, setAim, startWave, step, towerAt, turn, upgrade, wouldBlock,
+  beamCells, bestFace, build, hedgeUnder, LAWN, openGates, reachOf, cabbagesLeft, canStartWave, masterOpen, seedsFor, stars, totalWaves, newGame, nextUpgrade, goldAt, sideOf, replayGame, replayOf, replayStep, sell, sellValue, setAim, startWave, step, towerAt, turn, upgrade, wouldBlock,
   type Game, type GameEvent, type Refusal, type Replay, type Tower,
 } from '../game/sim';
 import { DIRS } from '../game/grid';
@@ -21,6 +21,10 @@ import { BACK_BUTTON, BAR_H, CARDS, CELL, CHIPS, DEPTH, GRID, PANEL, SPEED_BUTTO
 /** A spot the test can tap, by its centre in view pixels. */
 type Spot = { x: number; y: number; w: number; h: number };
 type Hit = { x: number; y: number; w: number; h: number; onTap: () => void; enabled: boolean };
+/** A gardener's tool: a tower to plant, or a mode where a tap on a tower upgrades or sells it. */
+type Tool = TowerKind | ToolMode;
+type ToolMode = 'upgrade' | 'sell';
+const isMode = (tool: Tool): tool is ToolMode => tool === 'upgrade' || tool === 'sell';
 
 /** The game runs in fixed steps of this many seconds, so it plays the same on every frame rate. */
 const STEP = 1 / 60;
@@ -59,9 +63,11 @@ export class GameScene extends Phaser.Scene {
   screen: 'menu' | 'play' | 'shed' = 'menu';
   state: Game | null = null;
   records!: Records;
-  tool: TowerKind = 'hedge';
+  tool: Tool = 'hedge';
   /** The right-hand gardener's tool, with two gardeners. */
-  tool2: TowerKind = 'hedge';
+  tool2: Tool = 'hedge';
+  /** Each gardener's tower tool from before upgrade mode, picked again when it is switched off. */
+  private before: TowerKind[] = ['hedge', 'hedge'];
   /** The towers this run can plant, picked under the garden cards: hedge, bow and up to four more. */
   pouch: TowerKind[] = [];
   /** The tower whose panel is open, by its cell. */
@@ -424,6 +430,15 @@ export class GameScene extends Phaser.Scene {
       this.selected = -1;
       return;
     }
+    const tool = this.toolAt(cell);
+    // Upgrade and sell mode upgrade or sell the tower tapped (and each one dragged over); a tower tool plants over a hedge.
+    if (isMode(tool) || (towerAt(g, cell) && hedgeUnder(g, cell, tool))) {
+      this.selected = -1;
+      this.painting = true;
+      this.lastPainted = cell;
+      this.place(cell, true);
+      return;
+    }
     if (towerAt(g, cell)) {
       this.selected = this.selected === cell ? -1 : cell;
       this.hudKey = '';
@@ -445,12 +460,16 @@ export class GameScene extends Phaser.Scene {
     const g = this.state;
     if (!this.painting || !down || !g || this.replay || cell < 0 || cell === this.lastPainted) return;
     this.lastPainted = cell;
-    if (!g.blocked[cell] || g.blocked[cell] === LAWN) this.place(cell);
+    const tool = this.toolAt(cell);
+    if (isMode(tool) ? towerAt(g, cell) : !g.blocked[cell] || g.blocked[cell] === LAWN || hedgeUnder(g, cell, tool)) this.place(cell);
   }
 
-  private place(cell: number) {
+  /** Plants the tool's tower on `cell`, or upgrades or sells the tower there in those modes (a tap that can't buzzes). */
+  private place(cell: number, tapped = false) {
     const g = this.state!;
-    build(g, cell, this.toolAt(cell));
+    const tool = this.toolAt(cell);
+    if (!isMode(tool)) build(g, cell, tool);
+    else if (!(tool === 'upgrade' ? upgrade(g, cell) : sell(g, cell)) && tapped) ui('refuse');
     this.drain(g);
   }
 
@@ -460,6 +479,8 @@ export class GameScene extends Phaser.Scene {
     if (e.key.toLowerCase() === 'f') this.faster();
     else if (this.replay) return;
     else if (n >= 1 && n <= this.pouch.length) this.pickTool(this.pouch[n - 1]);
+    else if (e.key.toLowerCase() === 'u') this.pickTool('upgrade');
+    else if (e.key.toLowerCase() === 's') this.pickTool('sell');
     else if (e.key === ' ') this.sendWave();
     else if (e.key === 'Escape') this.selected = -1;
     else return;
@@ -473,7 +494,11 @@ export class GameScene extends Phaser.Scene {
     this.speed = this.speed >= most ? 1 : this.speed * 2;
   }
 
-  private pickTool(kind: TowerKind, side = 0) {
+  /** Picks a gardener's tool; picking a mode while it is on goes back to the tower from before. */
+  private pickTool(kind: Tool, side = 0) {
+    const now = side ? this.tool2 : this.tool;
+    if (isMode(kind) && now === kind) kind = this.before[side];
+    else if (!isMode(now)) this.before[side] = now;
     if (side) this.tool2 = kind;
     else this.tool = kind;
     this.selected = -1;
@@ -514,6 +539,7 @@ export class GameScene extends Phaser.Scene {
     this.screen = 'play';
     this.tool = 'hedge';
     this.tool2 = 'hedge';
+    this.before = ['hedge', 'hedge'];
     this.selected = -1;
     this.speed = replay ? 2 : 1;
     this.acc = 0;
@@ -628,6 +654,16 @@ export class GameScene extends Phaser.Scene {
       } else art.tower(g, tw.kind, m.x, m.y, tw.level, tw.aim);
       if (s.clock < tw.wiltUntil) art.wilted(g, m.x, m.y);
       else if (s.clock < tw.frozenUntil) art.frozen(g, m.x, m.y);
+      // In upgrade mode a gold mark shows each tower its gardener can upgrade now; in sell mode a cream one points down on every tower.
+      const mode = this.replay ? null : this.toolAt(tw.cell);
+      const cost = mode === 'upgrade' ? nextUpgrade(tw, s) : null;
+      if (cost !== null && goldAt(s, tw.cell) >= cost) {
+        g.fillStyle(C.gold, 1);
+        g.fillTriangle(m.x + 9, m.y - 9, m.x + 17, m.y - 9, m.x + 13, m.y - 17);
+      } else if (mode === 'sell') {
+        g.fillStyle(C.cream, 1);
+        g.fillTriangle(m.x + 9, m.y - 17, m.x + 17, m.y - 17, m.x + 13, m.y - 9);
+      }
     }
     // The hovered tile: a ghost of the tool, its reach, or the no-entry ring.
     if (pv) {
@@ -768,14 +804,16 @@ export class GameScene extends Phaser.Scene {
     if (s.traps.some((t) => t.cell === cell)) return null;
     // Traps go where foes walk; in a path garden towers go only on the lawn beside the path.
     const tool = this.toolAt(cell);
+    if (isMode(tool)) return null;
     const trap = !!TOWER[tool].trap;
-    if (s.blocked[cell] && !(s.blocked[cell] === LAWN && !trap)) return null;
+    const overHedge = !!hedgeUnder(s, cell, tool);
+    if (s.blocked[cell] && !(s.blocked[cell] === LAWN && !trap) && !overHedge) return null;
     if (s.map.path && !s.blocked[cell] && !trap) return null;
     // Whether a tile blocks also hangs on the cells the ground foes and loose cabbages are heading for, so the preview is made again when they move on.
     const walkers = s.foes.map((f) => (f.dead || FOE[f.kind].flies ? '' : f.to)).join() + '|' + s.loose.map((c) => c.to).join();
     if (this.preview?.cell === cell && this.preview.version === this.version && this.preview.walkers === walkers && this.preview.tool === tool) return this.preview;
-    // A trap, or a tower beside a path, never blocks: the routes stay as they are.
-    if (trap || s.blocked[cell] === LAWN) {
+    // A trap, a tower beside a path or one taking a hedge's place never blocks: the routes stay as they are.
+    if (trap || s.blocked[cell] === LAWN || overHedge) {
       this.preview = { cell, version: this.version, walkers, tool, blocks: false, face: 0, routes: s.gates.map((gate) => route(s.dist, gate)) };
       return this.preview;
     }
@@ -826,7 +864,7 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     const key = JSON.stringify([
       this.screen, this.vw, this.vh, this.tool, this.tool2, this.duo, this.pouch, this.selected, this.sellArmed?.cell, this.speed, this.banner?.text, this.shed, this.earned, this.season, this.mode, !!this.replay,
-      s && [s.wave, s.phase, s.gold, s.gold2, s.lives, s.spawns.length > 0, s.foes.length > 0, s.gates.map((gate) => s.dist[gate]), s.nextAt === null ? -1 : Math.ceil(s.nextAt - s.clock), this.version], this.calm,
+      s && [s.wave, s.phase, s.gold, s.gold2, s.lives, s.spawns.length > 0, s.foes.length > 0, s.gates.map((gate) => s.dist[gate]), s.nextAt === null ? -1 : Math.ceil(s.nextAt - s.clock), this.version, (towerAt(s, this.selected)?.grow ?? 0) > 0], this.calm,
     ]);
     if (key === this.hudKey) return;
     this.hudKey = key;
@@ -883,20 +921,22 @@ export class GameScene extends Phaser.Scene {
     else {
       // The picked tool's use, in the top bar.
       const tipX = this.fx + TIP_X;
-      if (backX - 12 - tipX > 120) this.text(tipX, cy, !harms(this.tool) ? t(`${this.tool}Text` as TextKey) : `${t(`kind_${TOWER[this.tool].hits}` as TextKey)} · ${t(`${this.tool}Text` as TextKey)}`, 12, css(C.cream), 0, false).setWordWrapWidth(backX - 12 - tipX).setLineSpacing(-2);
+      const tool = this.tool;
+      const tip = tool === 'upgrade' ? t('upgradeModeText') : tool === 'sell' ? t('sellModeText') : !harms(tool) ? t(`${tool}Text` as TextKey) : `${t(`kind_${TOWER[tool].hits}` as TextKey)} · ${t(`${tool}Text` as TextKey)}`;
+      if (backX - 12 - tipX > 120) this.text(tipX, cy, tip, 12, css(C.cream), 0, false).setWordWrapWidth(backX - 12 - tipX).setLineSpacing(-2);
     }
     if (s.duo) {
       // Each gardener's tools under their half of the lawn, as pictures when they are narrow.
       const room = Math.min(vw / 2 - 8 - TOOLS.x, vw / 2 - 8 - 16);
-      const tw = Math.min(TOOLS.w, Math.floor(room / this.pouch.length) - TOOLS.gap);
+      const tw = Math.min(TOOLS.w, Math.floor(room / (this.pouch.length + 2)) - TOOLS.gap);
       g.fillStyle(C.cream, 0.3);
       g.fillRect(vw / 2 - 1, vh - BAR_H + 6, 2, BAR_H - 12);
       this.drawTools(s, 0, TOOLS.x, by, tw);
       this.drawTools(s, 1, vw / 2 + 8, by, tw);
     } else {
-      // The tools share the room up to the speed button: narrower with a fifth or sixth pick.
+      // The tools and the upgrade and sell buttons share the room up to the speed button: narrower with a fifth or sixth pick.
       const room = wx - 8 - SPEED_BUTTON.w - 8 - TOOLS.x;
-      this.drawTools(s, 0, TOOLS.x, by, Math.min(TOOLS.w, Math.floor(room / this.pouch.length) - TOOLS.gap));
+      this.drawTools(s, 0, TOOLS.x, by, Math.min(TOOLS.w, Math.floor(room / (this.pouch.length + 2)) - TOOLS.gap));
     }
     const ready = canStartWave(s);
     const label = !ready ? t('incoming') : s.foes.length > 0 ? t('nextEarly', { n: 5 }) : t('startWave', { n: s.wave + 1 });
@@ -905,7 +945,7 @@ export class GameScene extends Phaser.Scene {
     speed();
   }
 
-  /** A gardener's tool buttons (`tool-<kind>`, or `tool2-<kind>` for the second), `tw` wide from `x`. */
+  /** A gardener's tool buttons (`tool-<kind>`, or `tool2-<kind>` for the second), `tw` wide from `x`, then the upgrade and sell mode buttons (`tool-upgrade`, `tool-sell`). */
   private drawTools(s: Game, side: number, x0: number, by: number, tw: number) {
     const tool = side ? this.tool2 : this.tool;
     const gold = side ? s.gold2 : s.gold;
@@ -920,6 +960,13 @@ export class GameScene extends Phaser.Scene {
       if (TOWER[kind].trap) art.trap(icon, kind as TrapKind, 0, 0, 1, false);
       else art.tower(icon, kind, 0, 0, 1, -Math.PI / 2);
       this.icons.push(icon);
+    });
+    (['upgrade', 'sell'] as const).forEach((mode, i) => {
+      const x = x0 + (this.pouch.length + i) * (tw + TOOLS.gap);
+      const mark = mode === 'upgrade' ? '▲' : '▼';
+      this.button(`tool${side ? 2 : ''}-${mode}`, x, by, tw, TOOLS.h, pictures ? mark : t(`${mode}Mode`), () => this.pickTool(mode, side), {
+        on: tool === mode, sub: pictures ? undefined : mark, size: pictures ? 16 : tw < 76 ? 10 : 12,
+      });
     });
   }
 
@@ -1140,18 +1187,21 @@ export class GameScene extends Phaser.Scene {
     const kinds = TOWERS.filter((k) => k !== 'hedge');
     const cols = 4;
     const w = 214;
-    const h = 72;
-    const gap = 8;
+    const h = 88;
+    const gap = 6;
     const x0 = (this.vw - (cols * (w + gap) - gap)) / 2;
     kinds.forEach((kind, i) => {
       const x = x0 + (i % cols) * (w + gap);
       const y = fy + 96 + Math.floor(i / cols) * (h + gap);
       g.fillStyle(C.bar, 0.96);
       g.fillRoundedRect(x, y, w, h, 9);
-      this.text(x + 12, y + 16, t(`${kind}Name` as TextKey), 14, css(C.cream));
+      this.text(x + 12, y + 13, t(`${kind}Name` as TextKey), 13, css(C.cream));
       const owned = usable(this.shed, kind);
       const mastered = this.shed.masters.includes(kind);
       const noMaster = !!TOWER[kind].trap;
+      // What the buy brings: the tower's use while it is still to buy, then its master level's trick.
+      const info = !owned || noMaster ? `◆ ${TOWER[kind].cost} · ${t(`${kind}Text` as TextKey)}` : t(`${kind}Master` as TextKey);
+      this.text(x + 12, y + 32, info, 10, css(mastered || (owned && noMaster) ? C.gold : C.cream), 0, false).setWordWrapWidth(w - 24).setLineSpacing(-3);
       let label: string;
       let price = 0;
       let apply: (() => void) | null = null;
@@ -1165,12 +1215,12 @@ export class GameScene extends Phaser.Scene {
         label = t('buyMaster', { n: price });
         apply = () => this.shed.masters.push(kind);
       } else label = t('mastered');
-      this.button(`buy-${kind}`, x + 12, y + 32, w - 24, 30, label, () => apply && this.buy(price, apply), {
+      this.button(`buy-${kind}`, x + 12, y + 52, w - 24, 28, label, () => apply && this.buy(price, apply), {
         enabled: !!apply && this.shed.seeds >= price, fill: apply ? C.gold : undefined, size: 12,
       });
     });
     // The fifth and sixth pouch slots.
-    const sy = fy + 96 + Math.ceil(kinds.length / cols) * (h + gap) + 4;
+    const sy = fy + 96 + Math.ceil(kinds.length / cols) * (h + gap) + 2;
     SLOT_SEEDS.forEach((price, i) => {
       const x = this.vw / 2 - 220 + i * 228;
       const got = this.shed.slots > i;
@@ -1181,6 +1231,7 @@ export class GameScene extends Phaser.Scene {
         enabled: next && this.shed.seeds >= price, fill: next ? C.gold : undefined, size: 12,
       });
     });
+    this.text(this.vw / 2, sy + 42, t('slotInfo'), 11, css(C.cream), 0.5, false);
   }
 }
 
