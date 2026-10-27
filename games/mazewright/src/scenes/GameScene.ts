@@ -864,7 +864,7 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     const key = JSON.stringify([
       this.screen, this.vw, this.vh, this.tool, this.tool2, this.duo, this.pouch, this.selected, this.sellArmed?.cell, this.speed, this.banner?.text, this.shed, this.earned, this.season, this.mode, !!this.replay,
-      s && [s.wave, s.phase, s.gold, s.gold2, s.lives, s.spawns.length > 0, s.foes.length > 0, s.gates.map((gate) => s.dist[gate]), s.nextAt === null ? -1 : Math.ceil(s.nextAt - s.clock), this.version], this.calm,
+      s && [s.wave, s.phase, s.gold, s.gold2, s.lives, s.spawns.length > 0, s.foes.length > 0, s.gates.map((gate) => s.dist[gate]), s.nextAt === null ? -1 : Math.ceil(s.nextAt - s.clock), this.version, (towerAt(s, this.selected)?.grow ?? 0) > 0], this.calm,
     ]);
     if (key === this.hudKey) return;
     this.hudKey = key;

@@ -62,7 +62,7 @@ Implemented today:
 - The pouch: under the garden cards, chips in two rows (`CHIPS.perRow`) for the thirteen towers and two traps besides `hedge` and `bow` (`ALWAYS`);
   up to `POUCH_PICKS` (4) are picked, saved, and make the run's tool bar (six buttons at most).
   `DEFAULT_POUCH` is today's four (hedge, bow, frost, cannon), which the playthrough uses.
-- Towers (`TOWERS`), levels 1 to 3 and the master level `MASTER` (4; hedges stay at 1), sold for 70% of what they cost: `hedge`
+- Towers (`TOWERS`), levels 1 to 3 and the master level `MASTER` (4; hedges stay at 1), sold for 70% of what they cost (`sellValue`; the whole price of a growth still under way, so a tower still growing gives back all it cost, and one growing an upgrade gives back that upgrade's price): `hedge`
   (blocks only), `bow`, `frost` (pulse, slows), `cannon` (splash, ground only), `storm` (a bolt that
   chains to foes within `jump` of each other), `crossbow` (long reach, aims at the toughest),
   `bonfire` (a cone the way it faces, sets ground foes burning), `puffball` (poison that spreads once

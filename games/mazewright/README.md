@@ -108,7 +108,7 @@ the speed button (F). Nothing can be planted while it plays, and it changes no r
 Every tower stands on a hedge and blocks its tile. Every tower but the hedge rises to level 3, and
 then to a master level, which costs as much as the first three together, keeps level 3's numbers
 and adds a trick of its own (its panel tells it from level 3), once the potting shed has sold it. Selling gives back 70% of what a
-tower cost.
+tower cost, or all of it while the tower is still growing (and all of an upgrade still growing).
 
 | Tower | Cost | Reach | What it does |
 | --- | --- | --- | --- |

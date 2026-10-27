@@ -582,7 +582,11 @@ export function upgrade(g: Game, cell: number) {
   return true;
 }
 
-export const sellValue = (tower: Tower) => Math.floor(tower.spent * SELL_BACK);
+/** What selling gives back: 70% of what the tower cost, but all of what its growth still under way cost (the whole price of a tower still growing). */
+export function sellValue(tower: Tower) {
+  const growing = tower.grow > 0 ? Math.round(tower.growFull * GROW_RATE) : 0;
+  return growing + Math.floor((tower.spent - growing) * SELL_BACK);
+}
 
 /** Sells a tower; freeing a cell never closes a route, so it is always allowed. */
 export function sell(g: Game, cell: number) {
