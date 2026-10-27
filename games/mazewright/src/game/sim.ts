@@ -283,7 +283,7 @@ export interface Fixed {
  * actions play out differently (a tower's, foe's or wave's numbers, a new rule): replays of another
  * version are dropped when they load, since they would no longer play out as they did.
  */
-export const REPLAY_VERSION = 2;
+export const REPLAY_VERSION = 3;
 
 /** A game kept to watch again: how it began, and every action taken in it. */
 export interface Replay extends Fixed {
@@ -417,6 +417,9 @@ export function canBuild(g: Game, cell: number, kind: TowerKind): Refusal | null
   if (g.traps.some((t) => t.cell === cell)) return 'taken';
   // A trap never blocks, so it may go under foes and needs no way kept open, but only where foes walk.
   if (TOWER[kind].trap) return g.blocked[cell] ? 'taken' : goldAt(g, cell) < TOWER[kind].cost ? 'gold' : null;
+  // A tower may take a hedge's place, for its cost less what the hedge sells for; the cell stays a wall.
+  const hedge = hedgeUnder(g, cell, kind);
+  if (hedge) return goldAt(g, cell) < costOn(g, cell, kind) ? 'gold' : null;
   // A path garden's lawn is off the way already, and its path is kept for the foes.
   if (g.blocked[cell] === LAWN) return goldAt(g, cell) < TOWER[kind].cost ? 'gold' : null;
   if (g.blocked[cell]) return 'taken';
@@ -426,6 +429,19 @@ export function canBuild(g: Game, cell: number, kind: TowerKind): Refusal | null
   if (wouldBlock(g, cell)) return 'blocks';
   if (goldAt(g, cell) < TOWER[kind].cost) return 'gold';
   return null;
+}
+
+/** The hedge a `kind` tower would take the place of on `cell`, if any. */
+export function hedgeUnder(g: Game, cell: number, kind: TowerKind) {
+  if (kind === 'hedge' || TOWER[kind].trap) return undefined;
+  const tower = towerAt(g, cell);
+  return tower?.kind === 'hedge' ? tower : undefined;
+}
+
+/** What planting a `kind` tower on `cell` costs: less the hedge's sell value when it takes a hedge's place. */
+export function costOn(g: Game, cell: number, kind: TowerKind) {
+  const hedge = hedgeUnder(g, cell, kind);
+  return TOWER[kind].cost - (hedge ? sellValue(hedge) : 0);
 }
 
 /** Whether blocking `cell` would cut every way from a burrow, a foe or a loose cabbage to the cottage. */
@@ -444,7 +460,14 @@ export function build(g: Game, cell: number, kind: TowerKind): Refusal | null {
     g.events.push({ type: 'refused', cell, reason: refusal });
     return refusal;
   }
-  addGold(g, sideOf(g, cell), -TOWER[kind].cost);
+  const hedge = hedgeUnder(g, cell, kind);
+  addGold(g, sideOf(g, cell), -costOn(g, cell, kind));
+  // The hedge makes way; the cell stays blocked, so the routes don't change.
+  if (hedge) {
+    g.towers.splice(g.towers.indexOf(hedge), 1);
+    // A mole at it finds a tower now, which it can't chew.
+    for (const f of g.foes) if (f.chew?.cell === cell) f.chew = null;
+  }
   if (TOWER[kind].trap) {
     g.traps.push({ id: g.nextId++, kind: kind as TrapKind, cell, sprung: false, until: 0, field: null });
     g.events.push({ type: 'built', kind, cell });
@@ -559,7 +582,11 @@ export function upgrade(g: Game, cell: number) {
   return true;
 }
 
-export const sellValue = (tower: Tower) => Math.floor(tower.spent * SELL_BACK);
+/** What selling gives back: 70% of what the tower cost, but all of what its growth still under way cost (the whole price of a tower still growing). */
+export function sellValue(tower: Tower) {
+  const growing = tower.grow > 0 ? Math.round(tower.growFull * GROW_RATE) : 0;
+  return growing + Math.floor((tower.spent - growing) * SELL_BACK);
+}
 
 /** Sells a tower; freeing a cell never closes a route, so it is always allowed. */
 export function sell(g: Game, cell: number) {

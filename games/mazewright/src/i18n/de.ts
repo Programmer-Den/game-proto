@@ -58,6 +58,7 @@ const de: Translation<typeof en> = {
   mastered: 'Meisterstufe gekauft',
   buySlot: 'Beutelplatz {n}: {price} Samen',
   slotBought: 'Beutelplatz {n} gekauft',
+  slotInfo: 'Mit einem Beutelplatz nimmt jede Runde einen Turm mehr mit.',
   notPlayed: 'Noch nicht gespielt',
 
   wave: 'Welle {n} / {total}',
@@ -131,6 +132,10 @@ const de: Translation<typeof en> = {
   master: 'Meister',
   toMaster: 'Meister {n}',
   upgrade: 'Ausbauen {n}',
+  upgradeMode: 'Ausbauen',
+  sellMode: 'Verkaufen',
+  sellModeText: 'Tippe oder ziehe über Türme, um sie sofort zu verkaufen. Nochmals Verkaufen zum Pflanzen.',
+  upgradeModeText: 'Tippe oder ziehe über Türme, um sie auszubauen. Nochmals Ausbauen zum Pflanzen.',
   topLevel: 'Höchste Stufe',
   sell: 'Verkaufen +{n}',
   sellSure: 'Sicher? Verkaufen +{n}',
