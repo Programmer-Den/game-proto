@@ -62,7 +62,7 @@ Implemented today:
 - The pouch: under the garden cards, chips in two rows (`CHIPS.perRow`) for the thirteen towers and two traps besides `hedge` and `bow` (`ALWAYS`);
   up to `POUCH_PICKS` (4) are picked, saved, and make the run's tool bar (six buttons at most).
   `DEFAULT_POUCH` is today's four (hedge, bow, frost, cannon), which the playthrough uses.
-- Towers (`TOWERS`), levels 1 to 3 and the master level `MASTER` (4; hedges stay at 1), sold for 70% of what they cost (`sellValue`; the whole price of a growth still under way, so a tower still growing gives back all it cost, and one growing an upgrade gives back that upgrade's price): `hedge`
+- Towers (`TOWERS`), levels 1 to 3 and the master level `MASTER` (4; hedges stay at 1), sold for 70% of what they cost (`sellValue`; the whole price of a growth still under way, so a tower still growing gives back all it cost, and one growing an upgrade gives back that upgrade's price; and the whole of `Tower.fresh`, the gold paid for it in this break between waves, which `beginWave` clears): `hedge`
   (blocks only), `bow`, `frost` (pulse, slows), `cannon` (splash, ground only), `storm` (a bolt that
   chains to foes within `jump` of each other), `crossbow` (long reach, aims at the toughest),
   `bonfire` (a cone the way it faces, sets ground foes burning), `puffball` (poison that spreads once
@@ -145,6 +145,13 @@ Implemented today:
   before (`before`). Then a tap or drag on a tower calls `upgrade` or `sell` (no second tap; a tap
   that can't buzzes), a mark sits on each tower (gold up: can be upgraded now; cream down: sell
   mode), there is no hover preview, and the top bar tells `upgradeModeText` or `sellModeText`.
+- Gold notes: the `built` and `upgraded` events carry the `gold` they cost (`costOn`, so less a
+  replaced hedge's sell value), and `sold` what it paid; `goldNote` shows it as a rising coin flash
+  over the tower (`spent` draws it paler). Tool buttons are never disabled: a tool too dear for now
+  is drawn `dim` but can still be picked, and planting it is refused for gold as usual.
+- No tool: `Tool` can also be `'none'`, set by picking the tower tool in hand again (`pickTool`) or
+  by Escape with no panel open (both gardeners). Then a tap on a tower opens its panel, a tap on
+  the lawn plants nothing, there is no hover preview, and the top bar tells `noToolText`.
 - Hover preview: the routes as they would be with the hovered tile planted, or the no-entry ring;
   made again when the board changes or a ground foe or loose cabbage moves on, and not shown while
   watching a replay.
@@ -169,7 +176,7 @@ Missing or rough:
   crossbow, cannon, bow, whirligig and puffball do most, the storm rod, bonfire and beehive less
   but need bunched foes, a straight corridor or neighbours to shine, and the sunglass needs a
   corridor in line with it. A tower's balance is a first pass.
-- `docs/screenshots/gardens.webp` (the picker on its autumn tab, with the pouch), `path.webp` (Gravel Walk), `ponds.webp` (Ice Pond, towers on its banks), `wilt.webp` (Brook, a wilted cannon), `frost.webp` (Ice Pond, a frozen frost tower), `towers.webp`, `aim.webp`, `kings.webp`, `cabbages.webp`, `grow.webp`, `master.webp`, `traps.webp`, `shed.webp` (the shed's cards with their info lines), `modes.webp` (upgrade mode and its gold marks), `hedge-swap.webp` (a bow hovered over a hedge), `refund.webp` (a growing bow's panel, selling for all it cost), `maze.webp`,
+- `docs/screenshots/gardens.webp` (the picker on its autumn tab, with the pouch), `path.webp` (Gravel Walk), `ponds.webp` (Ice Pond, towers on its banks), `wilt.webp` (Brook, a wilted cannon), `frost.webp` (Ice Pond, a frozen frost tower), `towers.webp`, `aim.webp`, `kings.webp`, `cabbages.webp`, `grow.webp`, `master.webp`, `traps.webp`, `shed.webp` (the shed's cards with their info lines), `modes.webp` (upgrade mode and its gold marks), `hedge-swap.webp` (a bow hovered over a hedge), `no-tool.webp` (the tool put away), `gold-notes.webp` (the notes over a planting, an upgrade and a sale), `refund.webp` (a growing bow's panel, selling for all it cost), `maze.webp`,
   `mole.webp` and `cover.png` were taken by hand (a
   Playwright script that plants a maze and sends waves 8 and 9); `duo-replay.webp` (a
   two-gardener replay of the Meadow, both purses in the top bar) was made from a replay put in

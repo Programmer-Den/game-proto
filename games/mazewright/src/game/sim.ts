@@ -18,6 +18,8 @@ export interface Tower {
   level: number;
   /** Gold paid for it and its upgrades, for selling. */
   spent: number;
+  /** Gold paid for it and its upgrades in this break between waves, which selling gives back in full until the next wave starts. */
+  fresh: number;
   /** Seconds until it can fire again. */
   cooldown: number;
   /** Which way it last aimed, in radians, for drawing. */
@@ -140,9 +142,9 @@ export interface Shot {
 }
 
 export type GameEvent =
-  | { type: 'built'; kind: TowerKind; cell: number }
+  | { type: 'built'; kind: TowerKind; cell: number; gold: number }
   | { type: 'refused'; cell: number; reason: Refusal }
-  | { type: 'upgraded'; cell: number }
+  | { type: 'upgraded'; cell: number; gold: number }
   | { type: 'sold'; cell: number; gold: number }
   | { type: 'shot'; kind: TowerKind }
   | { type: 'bolt'; points: { x: number; y: number }[] }
@@ -283,7 +285,7 @@ export interface Fixed {
  * actions play out differently (a tower's, foe's or wave's numbers, a new rule): replays of another
  * version are dropped when they load, since they would no longer play out as they did.
  */
-export const REPLAY_VERSION = 3;
+export const REPLAY_VERSION = 4;
 
 /** A game kept to watch again: how it began, and every action taken in it. */
 export interface Replay extends Fixed {
@@ -461,7 +463,8 @@ export function build(g: Game, cell: number, kind: TowerKind): Refusal | null {
     return refusal;
   }
   const hedge = hedgeUnder(g, cell, kind);
-  addGold(g, sideOf(g, cell), -costOn(g, cell, kind));
+  const cost = costOn(g, cell, kind);
+  addGold(g, sideOf(g, cell), -cost);
   // The hedge makes way; the cell stays blocked, so the routes don't change.
   if (hedge) {
     g.towers.splice(g.towers.indexOf(hedge), 1);
@@ -470,16 +473,16 @@ export function build(g: Game, cell: number, kind: TowerKind): Refusal | null {
   }
   if (TOWER[kind].trap) {
     g.traps.push({ id: g.nextId++, kind: kind as TrapKind, cell, sprung: false, until: 0, field: null });
-    g.events.push({ type: 'built', kind, cell });
+    g.events.push({ type: 'built', kind, cell, gold: cost });
     note(g, 'build', cell, kind);
     return null;
   }
   const face = TOWER[kind].faces ? bestFace(g, cell, kind) : 0;
-  g.towers.push({ id: g.nextId++, kind, cell, level: 1, spent: TOWER[kind].cost, cooldown: 0, aim: Math.atan2(DIRS[face][1], DIRS[face][0]), face, spin: 0, idle: 0, target: TOWER[kind].aim ?? 'first', grow: 0, growFull: 0, lastShot: -Infinity, busy: 0, wiltUntil: 0, frozenUntil: 0 });
+  g.towers.push({ id: g.nextId++, kind, cell, level: 1, spent: TOWER[kind].cost, fresh: g.phase === 'build' ? TOWER[kind].cost : 0, cooldown: 0, aim: Math.atan2(DIRS[face][1], DIRS[face][0]), face, spin: 0, idle: 0, target: TOWER[kind].aim ?? 'first', grow: 0, growFull: 0, lastShot: -Infinity, busy: 0, wiltUntil: 0, frozenUntil: 0 });
   growFor(g.towers[g.towers.length - 1], TOWER[kind].cost, g);
   g.blocked[cell] = 2;
   refield(g);
-  g.events.push({ type: 'built', kind, cell });
+  g.events.push({ type: 'built', kind, cell, gold: cost });
   note(g, 'build', cell, kind);
   return null;
 }
@@ -575,17 +578,23 @@ export function upgrade(g: Game, cell: number) {
   if (!tower || cost === null || cost === undefined || goldAt(g, cell) < cost || over(g)) return false;
   addGold(g, sideOf(g, cell), -cost);
   tower.spent += cost;
+  if (g.phase === 'build') tower.fresh += cost;
   tower.level++;
   growFor(tower, cost, g);
-  g.events.push({ type: 'upgraded', cell });
+  g.events.push({ type: 'upgraded', cell, gold: cost });
   note(g, 'upgrade', cell);
   return true;
 }
 
-/** What selling gives back: 70% of what the tower cost, but all of what its growth still under way cost (the whole price of a tower still growing). */
+/**
+ * What selling gives back: 70% of what the tower cost, but all of what was paid for it in this break
+ * between waves, and all of what its growth still under way cost (the whole price of a tower still growing).
+ */
 export function sellValue(tower: Tower) {
   const growing = tower.grow > 0 ? Math.round(tower.growFull * GROW_RATE) : 0;
-  return growing + Math.floor((tower.spent - growing) * SELL_BACK);
+  // The growth under way is the last buy, so it is either part of this break's buys or came after them in a wave.
+  const full = Math.max(tower.fresh, growing);
+  return full + Math.floor((tower.spent - full) * SELL_BACK);
 }
 
 /** Sells a tower; freeing a cell never closes a route, so it is always allowed. */
@@ -638,6 +647,8 @@ function beginWave(g: Game, byHand = false) {
   g.nextAt = null;
   g.wave++;
   g.phase = 'wave';
+  // What was planted in the break is the maze now: it sells for 70% from here on.
+  for (const tower of g.towers) tower.fresh = 0;
   let at = g.clock + 0.5;
   let turn = 0;
   const open = openGates(g);

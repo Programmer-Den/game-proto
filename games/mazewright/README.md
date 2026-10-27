@@ -15,12 +15,12 @@ beetle already on the lawn) is refused with an orange no-entry ring.
 
 | Control | Action |
 | --- | --- |
-| Tap or click a tool, or keys 1 to 8 | Pick a tower from your pouch |
+| Tap or click a tool, or keys 1 to 8 | Pick a tower from your pouch, even one you can't afford yet (it shows dim); pick the same one again (or press Escape) to put it away, so taps on the lawn plant nothing |
 | Tap, click or drag on the lawn | Plant the tool there, or a whole line of them |
 | Hover the lawn | See the new route before you plant |
 | Tap or click a tower | Open its panel: Upgrade, Sell (tap it twice), Aim for a tower that picks a target, and Turn for a bonfire or sunglass |
 | Upgrade button (after the tools), or U | Upgrade mode: every tower you tap or drag over is upgraded at once, and a gold mark shows the ones you can afford; tap Upgrade again to go back to the tool you had |
-| Sell button, or S | Sell mode: every tower you tap or drag over is sold at once for 70% of what it cost, to clear a lot of the maze quickly; tap Sell again to go back |
+| Sell button, or S | Sell mode: every tower you tap or drag over is sold at once (for its whole price if it was planted since the last wave, else 70%), to clear a lot of the maze quickly; tap Sell again to go back |
 | A tower tool on a hedge | Plant the tower in the hedge's place, for its cost less what the hedge sells for (the route doesn't change) |
 | Start wave, or Space | Send the next wave; once the last one is all out, send the next early for 5 gold |
 | Way of play (garden picker, top left) | Classic, Swarm, Endless or Sandbox, for every garden |
@@ -33,6 +33,13 @@ beetle already on the lawn) is refused with an orange no-entry ring.
 ![Upgrade mode: the Upgrade and Sell buttons after the tools, and a gold mark on each tower that can be upgraded](docs/screenshots/modes.webp)
 
 ![A bow about to take a hedge's place in the maze](docs/screenshots/hedge-swap.webp)
+
+![No tool in hand: every tool button off, and the top bar says what a tap does](docs/screenshots/no-tool.webp)
+
+Every planting, upgrade and sale shows what it cost or paid in a short note rising from the tower
+(−21 ◆ for a cannon in a hedge's place, which already counts what the hedge sells for; +10 ◆ for a sale).
+
+![Gold notes over a cannon planted in a hedge's place, an upgraded bow and a sold one, with the Cannon picked though it is too dear for now](docs/screenshots/gold-notes.webp)
 
 ![A planting that would close the last way through is refused](docs/screenshots/refused.webp)
 
@@ -112,7 +119,10 @@ the speed button (F). Nothing can be planted while it plays, and it changes no r
 Every tower stands on a hedge and blocks its tile. Every tower but the hedge rises to level 3, and
 then to a master level, which costs as much as the first three together, keeps level 3's numbers
 and adds a trick of its own (its panel tells it from level 3), once the potting shed has sold it. Selling gives back 70% of what a
-tower cost, or all of it while the tower is still growing (and all of an upgrade still growing).
+tower cost, or all of it while the tower is still growing (and all of an upgrade still growing). Before
+the first wave and between waves, a tower planted in that break sells back for all it cost, and an
+upgrade bought in it for all of its price, until the next wave starts, so a maze can be tried and
+changed for free; towers from before the break keep the 70%.
 
 ![A bow still growing sells back all it cost](docs/screenshots/refund.webp)
 
