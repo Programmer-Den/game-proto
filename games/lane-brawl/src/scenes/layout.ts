@@ -70,6 +70,10 @@ export function shopRow(i: number) {
 
 /** The scoreboard, held open with Tab or opened from the kill score, over the same space as the shop. */
 export const SCORE_PANEL = { x: 100, y: 38, w: 760, h: 368 };
+/** The scoreboard's surrender button, in its header. */
+export function surrenderButton() {
+  return { x: SCORE_PANEL.x + 290, y: SCORE_PANEL.y + 7, w: 170, h: 22 };
+}
 
 /** The empowered-minion chips at the top right, under the top bar, one per team with the buff. */
 export function buffChip(i: number) {

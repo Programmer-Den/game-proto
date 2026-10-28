@@ -49,6 +49,7 @@ import {
   WATCHSTONES,
   WARD,
   QUICK,
+  SURRENDER,
 } from './data';
 import { openLanes } from './terrain';
 
@@ -269,7 +270,7 @@ export type SoundId =
   | 'burst' | 'bolt' | 'dash' | 'ally' | 'buff' | 'zone' | 'impact'
   | 'lastHit' | 'slain' | 'youDie' | 'streak' | 'crash' | 'nexus' | 'wardBreak'
   | 'levelUp' | 'flask' | 'blink' | 'ward' | 'recallHome' | 'respawn' | 'buyBack'
-  | 'wave' | 'watchstone' | 'rune' | 'runeTaken' | 'mercs' | 'spell' | 'ping' | 'drake' | 'drakeWakes' | 'firstBlood' | 'plate' | 'nightfall' | 'daybreak' | 'growl' | 'beastSlain' | 'brute' | 'objective' | 'objectiveMissed';
+  | 'wave' | 'watchstone' | 'rune' | 'runeTaken' | 'mercs' | 'spell' | 'ping' | 'drake' | 'drakeWakes' | 'firstBlood' | 'plate' | 'nightfall' | 'daybreak' | 'comeback' | 'vote' | 'growl' | 'beastSlain' | 'brute' | 'objective' | 'objectiveMissed';
 
 /**
  * A sound raised by the rules: at a point in the world (the view plays it only where blue sees and
@@ -378,6 +379,12 @@ export interface GameState {
   /** What hurt the player's champion in the last `RECAP.windowMs`, and the recap of its last death (null before one). */
   playerHits: { at: number; src: number; how: HitHow; amount: number }[];
   recap: DeathRecap | null;
+  /** When the player may next call a surrender vote, and the last vote's tally for the scoreboard. */
+  voteReadyAt: number;
+  vote: { yes: number; of: number; at: number } | null;
+  /** When the AI teams next weigh giving up, and the team that gave up, if one did. */
+  nextSurrender: number;
+  surrendered: Team | null;
   /** Pings on the map (the player's, and blue's AI calling a retreat), newest last, and when the player last pinged. */
   pings: Ping[];
   lastPingAt: number;
@@ -640,6 +647,10 @@ export function createGame(pick: ChampionDef, enemyDamage: number, opts: MatchOp
     drakeStacks: { blue: [], red: [] },
     playerHits: [],
     recap: null,
+    voteReadyAt: opts.quick ? SURRENDER.quickAt : SURRENDER.at,
+    vote: null,
+    nextSurrender: opts.quick ? SURRENDER.quickAt : SURRENDER.at,
+    surrendered: null,
     pings: [],
     lastPingAt: -Infinity,
     zones: [],

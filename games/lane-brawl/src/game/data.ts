@@ -1266,6 +1266,20 @@ export const FIRST_BLOOD = { gold: 150 };
 export const PLATING = { count: 5, gold: 120, share: 700, until: 300_000 };
 
 /**
+ * Comeback help (LB23): a team whose champions have `gap` less XP between them than the other's is
+ * behind, and each enemy champion it slays pays `gold` and `xp` more.
+ */
+export const COMEBACK = { gap: 0.15, gold: 150, xp: 80 };
+/**
+ * Surrender (LB23): from `at` (`quickAt` in a quick match) the player can call a vote from the
+ * scoreboard, once every `cd`. Each ally votes yes when the team is behind (`COMEBACK.gap`) or has
+ * lost `structs` more towers and inhibitors than the other; it passes with `pass` of the team. An
+ * AI team (red, and blue too when watching) gives up when it is `aiGap` behind on XP and `structs`
+ * behind on structures, looked at every `cd`.
+ */
+export const SURRENDER = { at: 900_000, quickAt: 600_000, cd: 180_000, pass: 0.7, structs: 2, aiGap: 0.25 };
+
+/**
  * Day and night (LB21): the match starts in the morning. Each day lasts `day` ms and each night
  * `night`, with `fade` ms of dusk and of dawn at the ends of the night. At full night champions see
  * only `sight` as far (minions, structures, watchstones and wards keep theirs), so the fog and the

@@ -270,7 +270,16 @@ left, under bevelled slate panels.
     The game remembers the choice, and Watch AI plays it too.
 
     ![The pick screen set to a quick match](docs/screenshots/quick-pick.webp)
-28. **Winning** destroys the red Nexus. Losing means your Nexus falls first.
+28. **Comeback and surrender**: a team whose champions have 15% less XP between them than the
+    other's is behind, and each enemy champion it slays then pays 150 gold and 80 XP more; a chip
+    at the top right says so while your team is behind. From 15:00 (10:00 in a quick match) the
+    scoreboard has a **Surrender** button: your allies vote yes when the team is behind on XP or
+    has lost two more towers and inhibitors than red, and the vote passes with 70% of the team. A
+    failed vote can be called again three minutes later. Red gives up on its own from then on when
+    it is far behind on both.
+
+    ![The scoreboard at 15:06 with the Surrender button in its header](docs/screenshots/surrender.webp)
+29. **Winning** destroys the red Nexus. Losing means your Nexus falls first.
 
 Every ability has an animation of its own (a hammer that splits the ground, a meteor from the
 sky, a harpoon on its rope, a coil pylon arcing, a blood moon rising and so on), and so do bolts in

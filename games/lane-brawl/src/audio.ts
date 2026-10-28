@@ -122,6 +122,8 @@ export const sfx = sounds<SfxName>({
   ping: { wave: 'sine', freq: 1319, arp: [0, 7], arpStep: 0.07, length: 0.2, volume: 0.24, gap: 250 },
   spell: { wave: 'triangle', freq: 523, arp: [0, 7, 12], arpStep: 0.04, length: 0.22, volume: 0.3 },
   firstBlood: { wave: 'square', freq: 440, arp: [0, 3, 7, 12, 15], arpStep: 0.06, length: 0.5, volume: 0.3 },
+  comeback: { wave: 'triangle', freq: 523, arp: [0, 4, 7, 12], arpStep: 0.05, length: 0.3, volume: 0.26 },
+  vote: { wave: 'square', freq: 330, arp: [0, 5], arpStep: 0.1, length: 0.25, volume: 0.22 },
   nightfall: { wave: 'triangle', freq: 392, to: 196, attack: 0.1, length: 0.9, volume: 0.2, gap: 1000 },
   daybreak: { wave: 'triangle', freq: 262, arp: [0, 4, 7, 12], arpStep: 0.12, length: 0.7, volume: 0.2, gap: 1000 },
   plate: { wave: 'square', freq: 880, to: 660, length: 0.12, volume: 0.22, gap: 120 },
