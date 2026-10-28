@@ -94,6 +94,10 @@ terrain tiles. The plan phase lasts 30 seconds; when it runs out the fight start
   UTC) picks one of the two seasons with or without terrain, in turn, so every combination comes
   round once a month. The card shows the rules and this week's best place, which is saved apart from
   the overall best.
+- **Trophies.** Ten, listed on the start and pause screens: First spark (win a fight), Podium
+  bound (top four), Gold-plated (a 3-star robot), Lucky draw (a rare power card), Full set (a won
+  fight with six robots of one origin), Top of the heap (level 9), Last one standing (win a match),
+  Full roster (every commander unlocked), and two hidden ones for the long run.
 - **Rank ladder.** A saved rank that only goes up: a finish in the top four earns rank points (50,
   35, 25 or 15), and the rank sets how hard the rivals play. Rust (0 points) is the game as
   designed; Iron (100) rivals reroll for copies sooner, Steel (250) also get 1 more gold a round,
@@ -140,6 +144,8 @@ shows your seat's fights on the board.
 ![A draft round: robots carrying parts on the board, picked lowest health first](docs/screenshots/draft.webp)
 
 ![A power card offer at 4-2 with a gold-edged rare card, Lucky Dice, in the third slot](docs/screenshots/rare-card.webp)
+
+![The Trophies list on the pause screen, four of ten earned](docs/screenshots/trophies.webp)
 
 ![The Scrap Rat chase: the squad hunts the rat across the board](docs/screenshots/scrap-rat.webp)
 

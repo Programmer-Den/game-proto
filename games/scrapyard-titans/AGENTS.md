@@ -84,6 +84,16 @@ Implemented today:
   `startMatch` uses instead of the menu's (the terrain toggle is greyed out), and passes the week as
   `MatchOptions.weekly`. `record` keeps the week's best place in `Progress.weekly` (`recordWeekly`);
   the card and the end screen show it (`weeklyBest`). A new week starts unplayed.
+- Trophies (`src/trophies/`, `shared/trophies.ts`): ten, saved under `scrapyard-titans-trophies`.
+  `index.ts` lists them (id, tier, icon; `titanRank` and `weeklyWin` hidden) with their texts in
+  `trophies/i18n/` (`en.ts`, `de.ts`; the name keyed by the id, what earns it by `<id>Text`) and
+  imports nothing else from the game, since the hub loads it. `main.ts` hands `trophies` to
+  `setupGame`. `GameScene` awards them, never under `?watch`: `firstWin` in `finishFight` (a won
+  fight), `rareCard` in `doAugment`, `weeklyWin` in `record` (1st in a weekly match), and
+  `awardProgress` the rest from `Progress`: each deed's trophy shares its id (`topFour`,
+  `threeStar`, `fullOrigin`, `maxLevel`, `champion`), `allCommanders` when every commander is
+  unlocked and `titanRank` at the top rank. `create` runs it quietly, so deeds saved before the
+  trophies came in earn theirs without a toast.
 - Rank ladder (`RANKS`, `RANK_POINTS` in `data.ts`): `Progress.points` grow by a top-four place in
   `record` (`addRankPoints`) and never drop; `rankOf(points)` gives the rank, which `startMatch`
   passes as `MatchOptions.rank` (0 under `?watch`). The rank gives each rival `gold` more a round
@@ -122,6 +132,7 @@ File map (`src/`):
   `addRankPoints`, `weekOf`, `weekStart`, `weeklyRules`, `weeklyBest`, `recordWeekly`, `isUnlocked`,
   `doDeeds` (saves new deeds, returns the commanders they unlock), `planDeeds`, `fullOrigin`. No
   Phaser.
+- `trophies/`: the game's trophies (see Current state).
 - `audio.ts`: the songs (`PLAN_SONG`, `FIGHT_SONG`) and the sound table (`play`, typed `Sfx`); see
   Sound below.
 - `game/data.ts`: every rule and number (see above). Every name and text in its tables (robots,
@@ -232,7 +243,7 @@ greyed-out button or shop card (`button` pushes a refusal for them).
   card (`SHOP_CARD_1`), bench slot 0 (`BENCH_SLOT_1`), tile 3,4 (`FRONT_TILE`), FIGHT
   (`FIGHT_BUTTON`); it asserts the bought robot moves bench → board, the fight is won with no
   damage, a part drops, the damage meter (`Match.meter`) lists the robot with damage dealt, and
-  round 1-2's plan starts with income paid. Change these together with
+  round 1-2's plan starts with income paid, and the win saved the `firstWin` trophy. Change these together with
   `layout.ts` (`SHOP`, `BENCH`, `BUTTONS.fight`, `BOARD_VIEW`), the menu's START MATCH rect in
   `buildMenu`, `ECONOMY.startGold`, and round 1-1's monsters (`MONSTERS.mite`), which every 1-cost
   robot must beat alone.
@@ -240,7 +251,7 @@ greyed-out button or shop card (`button` pushes a refusal for them).
   `cover.png`), `draft.webp` and `scrap-rat.webp` are from a scratch `?watch` run with the watch
   panel hidden; `scout.webp`, `part-preview.webp` and `damage-meter.webp` from a scratch run that
   plays round 1-1 with real clicks; `german-result.webp` is the test's `3-result` run with a
-  `de-DE` browser locale; `rare-card.webp` is a scratch run's 4-2 offer (set from the dev console) with Lucky Dice in the third slot; `fill-ultrawide.webp` (2560x1080) and `fill-tablet.webp` (1024x768)
+  `de-DE` browser locale; `trophies.webp` is the pause screen's Trophies list from a scratch run with five trophies saved; `rare-card.webp` is a scratch run's 4-2 offer (set from the dev console) with Lucky Dice in the third slot; `fill-ultrawide.webp` (2560x1080) and `fill-tablet.webp` (1024x768)
   show the plan phase on a wider and a taller view, from a scratch run.
 
 ## Making common changes
