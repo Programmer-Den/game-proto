@@ -271,6 +271,9 @@ test('plays the first night', async ({ page }, testInfo) => {
   expect(s).toMatchObject({ coins: NIGHTFALL_PAY + CLOSE_CALL_PAY, lives: LIVES, kept: 1 });
   expect(await play(3_000, () => game.panelOpen()), 'night panel opens').toBe(true);
   await snap('4-night');
+  // The close call earned Just in time and the night kept First light (src/trophies/), and nothing else yet.
+  const trophies = await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('lanternkeep-trophies') ?? '{}')));
+  expect(trophies, 'trophies earned in the first round').toEqual(['closeCall', 'firstNight']);
 
   const speed = gameMs / (Date.now() - startedAt);
   console.log(`Played ${Math.round(gameMs / 1000)}s of game time at ${speed.toFixed(1)}x (target ${SPEED}x).`);

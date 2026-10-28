@@ -79,6 +79,7 @@ import {
   UI_DEPTH,
   VIEW,
 } from './layout';
+import { checkTrophies } from '../trophies/check';
 
 /** The longest step of game time one frame may take, so a stalled tab doesn't skip the dusk. */
 const MAX_STEP_MS = 100;
@@ -556,6 +557,7 @@ export class GameScene extends Phaser.Scene {
     const phase = s.phase;
     const before = phase === 'dusk' ? snapshot(s) : null;
     tick(s, dt);
+    checkTrophies(s);
     const events = s.events.splice(0);
     if (before) frameSounds(before, s, events);
     for (const e of events) this.showEvent(e);
