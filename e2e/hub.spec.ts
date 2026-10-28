@@ -806,8 +806,9 @@ test('hub progress codes', async ({ page }, testInfo) => {
     localStorage.setItem('palisade-best', '7');
     // Codes keep six significant digits of a number.
     localStorage.setItem('palisade-pos', '{"x":815.0696658242933,"kind":"wall"}');
-    // Saved replays are too big for a code, so only files carry them.
+    // Saved replays and a run under way are too big for a code, so only files carry them.
     localStorage.setItem('mazewright-replays', '{"meadow":{}}');
+    localStorage.setItem('riftblade-run', '{"phase":"run"}');
   });
   await page.reload();
   const messages: string[] = [];
@@ -861,6 +862,7 @@ test('hub progress codes', async ({ page }, testInfo) => {
   expect(await stored('palisade-best')).toBe('7');
   expect(await stored('palisade-pos')).toBe('{"x":815.07,"kind":"wall"}');
   expect(await stored('mazewright-replays')).toBeNull();
+  expect(await stored('riftblade-run')).toBeNull();
   expect(JSON.parse((await stored('hub-settings'))!).difficulty).toBe('hard');
 
   // A code made before codes were packed (format 1, Apothecary at 42 coins) still imports.
@@ -924,7 +926,7 @@ test('hub scans a loop of progress codes', async ({ page }, testInfo) => {
   // Random text barely compresses, so this takes several codes.
   const big = await page.evaluate(() => {
     const text = Array.from(crypto.getRandomValues(new Uint8Array(3000)), (b) => b.toString(36)).join('');
-    localStorage.setItem('riftblade-run', text);
+    localStorage.setItem('riftblade-progress', text);
     return text;
   });
   await page.reload();
@@ -979,7 +981,7 @@ test('hub scans a loop of progress codes', async ({ page }, testInfo) => {
   page.on('dialog', (d) => d.accept());
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('dialog', { name: 'Settings' }).getByRole('button', { name: 'Scan code' }).click();
-  await expect.poll(() => page.evaluate(() => localStorage.getItem('riftblade-run')), { timeout: 30_000 }).toBe(big);
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('riftblade-progress')), { timeout: 30_000 }).toBe(big);
 });
 
 // The hub and every game link their own web app manifest, so each installs as an app of its own.

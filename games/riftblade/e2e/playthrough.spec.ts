@@ -293,8 +293,6 @@ test('plays the first minute', async ({ page }, testInfo) => {
   expect(Object.values(s.ranks).reduce((a, b) => a + b, 0), 'an upgrade tier for each card taken').toBeGreaterThanOrEqual(levelUps);
   expect(levelUps).toBeGreaterThan(1);
   expect(s.enemies, 'bots keep coming').toBeGreaterThan(0);
-  // The run is saved only between worlds, so none is saved in the first one.
-  expect(await page.evaluate(() => localStorage.getItem('riftblade-run')), 'no save mid-world').toBeNull();
 
   const speed = gameMs / (Date.now() - startedAt);
   console.log(`Played ${Math.round(gameMs / 1000)}s of game time at ${speed.toFixed(1)}x (target ${SPEED}x).`);
