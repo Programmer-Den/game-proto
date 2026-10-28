@@ -607,6 +607,64 @@ export function paintAll(scene: Phaser.Scene) {
     c.fillRect(11, 13, 3, 2);
     c.fillRect(20, 13, 3, 2);
   });
+  // A shelled beetle, and the same beetle flipped on its back, legs in the air.
+  paint(scene, 'beetle', 34, 28, (c) => {
+    shadow(c, 17, 24, 14, 4);
+    c.strokeStyle = '#1a1c24';
+    c.lineWidth = 2;
+    for (const x of [9, 15, 21]) {
+      c.beginPath();
+      c.moveTo(x, 18);
+      c.lineTo(x - 3, 25);
+      c.moveTo(x + 4, 18);
+      c.lineTo(x + 7, 25);
+      c.stroke();
+    }
+    ball(c, 27, 15, 5, '#2a3040');
+    ball(c, 15, 14, 12, '#2f6a78', 9);
+    c.strokeStyle = 'rgba(10,20,30,0.6)';
+    c.lineWidth = 1.5;
+    c.beginPath();
+    c.moveTo(15, 5);
+    c.lineTo(15, 23);
+    c.stroke();
+    glowDot(c, 10, 10, 4, 'rgba(200,240,255,0.5)');
+    c.fillStyle = '#e8d070';
+    c.fillRect(29, 13, 2, 2);
+  });
+  paint(scene, 'beetle-back', 34, 28, (c) => {
+    shadow(c, 17, 24, 14, 4);
+    ball(c, 17, 17, 12, '#2f6a78', 7);
+    ball(c, 17, 14, 9, '#c8b890', 5);
+    c.strokeStyle = '#1a1c24';
+    c.lineWidth = 2;
+    for (const x of [10, 15, 20, 25]) {
+      c.beginPath();
+      c.moveTo(x, 12);
+      c.lineTo(x + (x < 17 ? -2 : 2), 3);
+      c.stroke();
+    }
+  });
+  // A lantern moth: a big moth whose belly glows like a lamp. Its wings flap like the plain moth's.
+  const lantern = (key: string, up: boolean) =>
+    paint(scene, key, 40, 36, (c) => {
+      for (const s of [-1, 1]) {
+        c.fillStyle = '#8a6a9a';
+        c.beginPath();
+        c.ellipse(20 + s * 11, up ? 10 : 16, 11, up ? 8 : 6, s * (up ? -0.6 : 0.3), 0, Math.PI * 2);
+        c.fill();
+        glowDot(c, 20 + s * 12, up ? 10 : 16, 3, 'rgba(255,200,120,0.9)');
+      }
+      body(c, 20, 6, 7, 12, '#6a5a80', 0.5);
+      glowDot(c, 20, 24, 12, 'rgba(255,190,90,0.9)');
+      ball(c, 20, 24, 6, '#ffd080');
+    });
+  lantern('lantern-a', true);
+  lantern('lantern-b', false);
+  paint(scene, 'ember', 12, 12, (c) => {
+    glowDot(c, 6, 6, 6, 'rgba(255,170,70,0.7)');
+    ball(c, 6, 6, 3, '#ffb050');
+  });
   paint(scene, 'seed', 12, 12, (c) => {
     glowDot(c, 6, 6, 6, 'rgba(220,120,200,0.6)');
     ball(c, 6, 6, 3.5, '#c06aa0');
