@@ -179,8 +179,8 @@ a star map between them.
   `state.route`).
 - `src/game/save.ts`: `SAVE_KEY`, `loadProgress`, `saveProgress`, `recordRun`, `recordCharted`, `recordUnlocks`,
   `isUnlocked` (TR-9, a deed done, a hero the save shows as played, or the old world deeds) and
-  `unlockedHeroes`; the run under way: `RUN_KEY`, `isBetweenWorlds` (when it is saved),
-  `isResumable` (what loads), `saveRun`, `loadRun` and `clearRun`.
+  `unlockedHeroes`; the run under way: `RUN_KEY`, `isResumable`, `saveRun`, `loadRun` and
+  `clearRun`.
 - `src/audio/music.ts`: the songs (`PLANET_SONGS`, `MENU_SONG`, `STINGS`); `src/audio/sfx.ts`: the
   sound table `sfx`; `src/audio/cues.ts`: `SoundCues`, which plays them by watching the state (see
   Sound).
@@ -272,13 +272,9 @@ update, and `GameScene.settle` right after a panel choice or Leave, so no save l
 (`travel` is not saved) with a reward already taken. Run again resets to a fresh
 `select` state.
 
-The run under way is saved (`saveRun`) only between worlds (`isBetweenWorlds`): on the cards after
-a world or the elite arena is cleared (`levelup` with `after` other than `run`), the space and star
-maps, the trader and events, each time a panel opens or closes (`syncPanel`) and when the page is
-hidden or closed. The field is empty then, so the save stays small (about 1 KB). Nothing is saved
-in a fight or at a level-up in one: closing the game there picks up from the last save, before the
-world (or arena) under way, and closing it in the first world loses the run. A new run clears the
-old save (`begin`) and the end screen clears it. `create` loads it
+The run under way is saved (`saveRun`) in every phase but `select`, `won` and `lost`: when it
+starts, every time a panel opens or closes (`syncPanel`), every 5 s of run time in a fight
+(`RUN_SAVE_MS`) and when the page is hidden or closed. The end screen clears it. `create` loads it
 (`loadRun`) and `GameScene.resume` picks it up: the state as saved, `ringOut` worked out again for
 the screen's shape, `prepare` (the sim's stats and hero flags, so a rest or ration on the panel
 heals the right hero), `savedDeeds` at the deeds already done and `SoundCues.resume`, so nothing
@@ -323,8 +319,7 @@ saves load unchanged.
 - `riftblade-run`: the run under way, the whole `GameState` as JSON (it is plain data; `Infinity`,
   as in `nextElite` and `objectiveAt`, is stored as the text `"Infinity"`). `loadRun` lays it over
   `freshState()` (and the hero over `freshHero()`), so fields added since take their fresh values;
-  one with an unknown hero, a phase it can't resume in (`isResumable`, which still takes saves from
-  before runs were saved only between worlds, made in a fight), an unknown planet or `next`, a `stage`
+  one with an unknown hero, a phase it can't resume in, an unknown planet or `next`, a `stage`
   outside the crusade, unknown `nodes`, `offers` or `choices`, a malformed `event`, or a list field of the state or
   hero (`enemies`, `bullets`, `dashHit`, ...) that is not an array is dropped. Keep
   `GameState` plain data (no Maps, Sets, class instances or shared references), or teach
@@ -407,8 +402,7 @@ free of audio) or from the scene's input handler.
   paths and Brace length, the layout above, TR-9 surviving a minute of that walk on Normal, and the
   first minute's XP reaching level 3 (`xpFor(1) + xpFor(2)` = 17; the run gets 18).
   A fresh browser has no saved run, so the playthrough starts on the hero select as before; saving
-  draws no `Math.random`, and at the end the playthrough checks that no run was saved in the first
-  world.
+  draws no `Math.random`.
   Side objectives start at `OBJECTIVE_AT[0]` (1:00) and power-ups drop from `POWER.fromMs` (1:00),
   neither calling Math.random before then, so they leave the playthrough's minute as it was. Keep
   both at or after 1:00, or update the playthrough.

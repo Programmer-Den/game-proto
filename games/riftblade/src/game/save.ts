@@ -5,10 +5,7 @@ import { freshHero, freshState, type GameState, type Phase } from './state';
 import { UPGRADES } from './upgrades';
 
 export const SAVE_KEY = 'riftblade-progress';
-/**
- * The run under way as it stood after the last world cleared, so closing the game and opening it
- * again carries on from there.
- */
+/** The run under way, so closing the game mid-run and opening it again carries on with it. */
 export const RUN_KEY = 'riftblade-run';
 
 export interface Progress {
@@ -104,27 +101,15 @@ export function isUnlocked(progress: Progress, id: HeroId) {
 /** The heroes open to pick. */
 export const unlockedHeroes = (progress: Progress) => HERO_IDS.filter((id) => isUnlocked(progress, id));
 
-/**
- * The phases a saved run can be picked up from (`cleared` and `travel` pass within a frame). Saves
- * from before runs were saved only between worlds can still be in the middle of one.
- */
+/** The phases a run can be saved in and picked up from (`cleared` and `travel` pass within a frame). */
 const RESUMABLE: readonly Phase[] = ['run', 'levelup', 'chart', 'map', 'trader', 'event'];
 export const isResumable = (s: GameState) => s.hero !== null && RESUMABLE.includes(s.phase);
-
-/**
- * Whether the run is between worlds, the only time it is saved: the cards after a clear, the space
- * and star maps, the trader and events. The field is empty then, so the save stays small; closing
- * the game in a fight (an elite arena too) picks up again before it.
- */
-const BETWEEN: readonly Phase[] = ['chart', 'map', 'trader', 'event'];
-export const isBetweenWorlds = (s: GameState) =>
-  s.hero !== null && (BETWEEN.includes(s.phase) || (s.phase === 'levelup' && s.after !== 'run'));
 
 /** JSON has no Infinity (`nextElite` and `objectiveAt` once none are left), so it is kept as text. */
 const keepInfinity = (_key: string, v: unknown) => (typeof v === 'number' && !Number.isFinite(v) ? String(v) : v);
 const readInfinity = (_key: string, v: unknown) => (v === 'Infinity' ? Infinity : v === '-Infinity' ? -Infinity : v);
 
-/** Saves the run between worlds (the whole state: it is plain data). */
+/** Saves the run under way (the whole state: it is plain data). */
 export function saveRun(s: GameState) {
   try {
     localStorage.setItem(RUN_KEY, JSON.stringify(s, keepInfinity));

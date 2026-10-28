@@ -345,9 +345,10 @@ nothing is left a Field Ration heals you.
 ![Triad-77 in Spread, linked by its command bot](docs/screenshots/triad.webp)
 
 The longest run, the wins and the furthest world reached per hero, the heroes unlocked and the
-planets landed on are saved in the browser. So is the run under way, each time a world is
-cleared: close the game and it picks up on the space map, star map, trader or event where you left
-it. A world closed mid-fight starts again from the last save.
+planets landed on are saved in the browser. So is the run under way: close the game mid-run (in a
+fight, at a level-up or between planets) and it picks up where it stood when you open it again.
+
+![A run picked up again after the game was closed mid-fight](docs/screenshots/resumed-run.webp)
 
 ## Running locally
 
