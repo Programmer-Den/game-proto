@@ -43,7 +43,8 @@ export const saveDuo = (duo: boolean) => saveFlag(DUO_KEY, duo);
 
 /**
  * Per garden: the best wave reached and whether it was won (Classic or Swarm), the most stars, the
- * fastest win in seconds of game time (0 for none) and the most waves held in Endless.
+ * fastest win in seconds of game time (0 for none), the most waves held in Endless and whether its
+ * Challenge was won.
  */
 export interface GardenRecord {
   wave: number;
@@ -51,6 +52,8 @@ export interface GardenRecord {
   stars: number;
   time: number;
   endless: number;
+  /** Won its Challenge (its own pouch). */
+  challenge: boolean;
 }
 export type Records = Record<string, GardenRecord>;
 
@@ -58,7 +61,7 @@ const count = (v: unknown) => (Number.isFinite(v) && (v as number) > 0 ? Math.fl
 
 export function loadRecords(): Records {
   const records: Records = {};
-  for (const m of MAPS) records[m.id] = { wave: 0, won: false, stars: 0, time: 0, endless: 0 };
+  for (const m of MAPS) records[m.id] = { wave: 0, won: false, stars: 0, time: 0, endless: 0, challenge: false };
   try {
     const saved = JSON.parse(localStorage.getItem(KEY) ?? 'null');
     for (const m of MAPS) {
@@ -70,6 +73,7 @@ export function loadRecords(): Records {
       into.stars = Math.min(4, count(r.stars) || (into.won ? 1 : 0));
       into.time = count(r.time);
       into.endless = count(r.endless);
+      into.challenge = r.challenge === true;
     }
   } catch {
     // A broken or blocked save starts fresh.
@@ -87,6 +91,7 @@ export function noteRecord(records: Records, mapId: string, result: Partial<Gard
   r.stars = Math.max(r.stars, result.stars ?? 0);
   if (result.time) r.time = r.time ? Math.min(r.time, result.time) : result.time;
   r.endless = Math.max(r.endless, result.endless ?? 0);
+  r.challenge ||= !!result.challenge;
   if (JSON.stringify(r) === before) return;
   try {
     localStorage.setItem(KEY, JSON.stringify(records));

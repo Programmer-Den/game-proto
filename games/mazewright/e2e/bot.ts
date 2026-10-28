@@ -11,7 +11,7 @@
 
 import { distances, route } from '../src/game/grid';
 import { cellOf, MAPS } from '../src/game/maps';
-import { COLS, ROWS, startLives, TOWER, type TowerKind } from '../src/game/rules';
+import { attacks, COLS, ROWS, startLives, TOWER, type TowerKind } from '../src/game/rules';
 import { build, cabbagesLeft, canBuild, goldAt, newGame, nextUpgrade, reachOf, startWave, step, towerAt, upgrade, type Game } from '../src/game/sim';
 
 const POUCH = (process.env.POUCH ?? 'hedge,bow,frost,cannon').split(',') as TowerKind[];
@@ -49,13 +49,15 @@ function coverage(g: Game, cell: number, kind: TowerKind, cells: Map<number, num
   return n;
 }
 
-/** Bows mostly, a frost tower in five and a cannon in eight from wave 3, and the other picks in turn. */
+/** Bows mostly (or the pouch's first attacker), a frost tower in five and a cannon in eight from wave 3, and the other attackers in turn. */
 function nextKind(g: Game, built: number): TowerKind {
   const count = (k: TowerKind) => g.towers.filter((t) => t.kind === k).length;
-  if (POUCH.includes('frost') && count('frost') < Math.floor(built / 5) + (g.wave >= 3 ? 1 : 0)) return 'frost';
-  if (POUCH.includes('cannon') && g.wave >= 3 && count('cannon') < Math.floor(built / 8)) return 'cannon';
-  for (const k of POUCH.filter((k) => !['hedge', 'bow', 'frost', 'cannon'].includes(k))) if (g.wave >= 2 && count(k) < Math.floor(built / 4) + 1) return k;
-  return 'bow';
+  const attackers = POUCH.filter((k) => attacks(k));
+  const main = attackers.includes('bow') ? 'bow' : attackers[0];
+  if (attackers.includes('frost') && main !== 'frost' && count('frost') < Math.floor(built / 5) + (g.wave >= 3 ? 1 : 0)) return 'frost';
+  if (attackers.includes('cannon') && main !== 'cannon' && g.wave >= 3 && count('cannon') < Math.floor(built / 8)) return 'cannon';
+  for (const k of attackers.filter((k) => k !== main && k !== 'frost' && k !== 'cannon')) if (g.wave >= 2 && count(k) < Math.floor(built / 4) + 1) return k;
+  return main;
 }
 
 interface Spend {

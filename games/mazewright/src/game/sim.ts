@@ -568,7 +568,7 @@ export const masterOpen = (g: Game | undefined, kind: TowerKind) => !g?.masters 
 /** Seeds a finished game pays, by its result; none in Sandbox. */
 export function seedsFor(g: Game) {
   if (g.mode === 'sandbox') return 0;
-  if (g.phase === 'won') return SEEDS.win + SEEDS.star * stars(g);
+  if (g.phase === 'won') return SEEDS.win + SEEDS.star * stars(g) + (g.mode === 'challenge' ? SEEDS.challenge : 0);
   return SEEDS.loss + Math.floor(Math.max(0, g.wave - 1) / SEEDS.waves);
 }
 
