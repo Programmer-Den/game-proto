@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 // Plays the first round of Endless Medley with real inputs: opens the run from the menu, solves
 // the first two puzzles the deck deals (whichever kinds the seeded deck picks, each by taps and
 // drags like a player's) and checks their points and the streak, then skips the third and checks
-// it costs a heart. Game state is only read, through the `game` object the dev build puts on window.
+// it costs a heart, and that the first solve earned its trophy. Game state is only read, through the `game` object the dev build puts on window.
 
 type KindId = 'nonogram' | 'bridges' | 'code' | 'calc' | 'sums' | 'unjam' | 'flip' | 'link' | 'echo';
 interface Card {
@@ -262,6 +262,10 @@ test('plays the first round', async ({ page }, testInfo) => {
   expect(run.streak).toBe(0);
   expect(run.score).toBe(score);
   expect(await play(BETWEEN_MS + 1_000, async () => (await game.run()).phase === 'playing'), 'fourth puzzle dealt').toBe(true);
+
+  // The first puzzle solved earns the First sight trophy (src/trophies/), and nothing else yet.
+  const trophies = await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('augury-trophies') ?? '{}')));
+  expect(trophies, 'trophies earned in the first round').toEqual(['firstSight']);
 
   expect(errors).toEqual([]);
   const seconds = gameMs / 1000;

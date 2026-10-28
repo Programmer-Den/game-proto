@@ -13,6 +13,7 @@ import {
 } from '../game/run';
 import { clearRun, loadProgress, loadRun, saveProgress, saveRun } from '../game/save';
 import { t, type TextKey } from '../i18n';
+import { checkTrophies } from '../trophies/check';
 import { drawGlyph, drawKindIcon, drawRelic, trace } from './glyphs';
 import { layoutFor, UI_DEPTH, VIEW, WIDE, type Layout } from './layout';
 import { Painter } from './painter';
@@ -76,6 +77,7 @@ export class GameScene extends Phaser.Scene {
   create() {
     this.progress = loadProgress();
     this.saved = loadRun(this.progress);
+    checkTrophies(this.progress, this.saved, true);
     this.backdrop = this.add.graphics().setDepth(0);
     this.p = new Painter(this, UI_DEPTH);
     this.fitView();
@@ -264,7 +266,9 @@ export class GameScene extends Phaser.Scene {
 
   private drain() {
     const run = this.run!;
-    for (const e of run.events.splice(0)) {
+    const events = run.events.splice(0);
+    if (events.length) checkTrophies(this.progress, run);
+    for (const e of events) {
       this.dirty = true;
       switch (e.type) {
         case 'start':
