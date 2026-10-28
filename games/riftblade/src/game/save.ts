@@ -4,6 +4,7 @@ import { LAST_STAGE, NODE_INFO, PLANETS } from './planets';
 import { freshHero, freshState, type GameState, type Phase } from './state';
 import { UPGRADES } from './upgrades';
 import { MAX_HEAT } from './heat';
+import { ARMOURY_IDS, nextPrice, type ArmouryId } from './armoury';
 
 export const SAVE_KEY = 'riftblade-progress';
 /**
@@ -28,6 +29,9 @@ export interface Progress {
    * before rift heat count a hero's wins as heat 0.
    */
   heat: Partial<Record<HeroId, number>>;
+  /** Credits banked for the Armoury, and the ranks bought there. Saves from before it have none. */
+  bank: number;
+  armoury: Partial<Record<ArmouryId, number>>;
 }
 
 /** A saved count per hero, keeping only known heroes with a finite number. */
@@ -49,16 +53,25 @@ export function loadProgress(): Progress {
       if (heat[id] !== undefined) heat[id] = Math.max(0, Math.min(MAX_HEAT, Math.floor(heat[id]!)));
       else if ((wins[id] ?? 0) > 0) heat[id] = 0;
     }
+    const armoury: Partial<Record<ArmouryId, number>> = {};
+    if (typeof saved.armoury === 'object' && saved.armoury) {
+      for (const id of ARMOURY_IDS) {
+        const n = saved.armoury[id];
+        if (Number.isInteger(n) && n > 0) armoury[id] = n;
+      }
+    }
     return {
       bestMs: typeof saved.bestMs === 'number' ? saved.bestMs : 0,
       wins,
       heat,
+      bank: typeof saved.bank === 'number' && Number.isFinite(saved.bank) ? Math.max(0, Math.floor(saved.bank)) : 0,
+      armoury,
       furthest: perHero(saved.furthest),
       unlocked: Array.isArray(saved.unlocked) ? saved.unlocked.filter((id: unknown) => HERO_IDS.includes(id as HeroId)) : [],
       charted: Array.isArray(saved.charted) ? saved.charted.filter((id: unknown) => typeof id === 'string') : [],
     };
   } catch {
-    return { bestMs: 0, wins: {}, heat: {}, furthest: {}, unlocked: [], charted: [] };
+    return { bestMs: 0, wins: {}, heat: {}, bank: 0, armoury: {}, furthest: {}, unlocked: [], charted: [] };
   }
 }
 
@@ -72,10 +85,12 @@ export function saveProgress(progress: Progress) {
 
 /**
  * Records a finished run (`stage` is the jump reached, 1 to 4, `route` the planets landed on,
- * `heat` its rift heat) and returns the updated progress.
+ * `heat` its rift heat, `banked` the credits it adds to the Armoury's bank) and returns the
+ * updated progress.
  */
-export function recordRun(hero: HeroId, ms: number, won: boolean, stage: number, route: readonly string[] = [], heat = 0): Progress {
+export function recordRun(hero: HeroId, ms: number, won: boolean, stage: number, route: readonly string[] = [], heat = 0, banked = 0): Progress {
   const progress = loadProgress();
+  progress.bank += banked;
   progress.bestMs = Math.max(progress.bestMs, ms);
   if (won) {
     progress.wins[hero] = (progress.wins[hero] ?? 0) + 1;
@@ -83,6 +98,18 @@ export function recordRun(hero: HeroId, ms: number, won: boolean, stage: number,
   }
   progress.furthest[hero] = Math.max(progress.furthest[hero] ?? 0, stage);
   for (const id of route) if (!progress.charted.includes(id)) progress.charted.push(id);
+  saveProgress(progress);
+  return progress;
+}
+
+/** Buys the next rank of an Armoury piece with banked credits; the updated progress, or null if it can't. */
+export function buyArmoury(id: ArmouryId): Progress | null {
+  const progress = loadProgress();
+  const rank = progress.armoury[id] ?? 0;
+  const price = nextPrice(id, rank);
+  if (price === null || progress.bank < price) return null;
+  progress.bank -= price;
+  progress.armoury[id] = rank + 1;
   saveProgress(progress);
   return progress;
 }
