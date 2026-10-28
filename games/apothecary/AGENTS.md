@@ -161,7 +161,7 @@ study, shade gardens and a mirrored second production line.
   `sellHerb`) and `harvest` each change
   state and return `Feedback` lines, already translated with `t`. Also `refining`, `hasRoom`, `doneByHand` and `isBlighted`.
 - `src/game/save.ts`: `loadState`, `saveState` (stamps `lastSeen` with `Date.now()` and writes
-  `thinSave`), `clearSave` (key `apothecary-save`), `grantLessons` (lessons an old save was already
+  `thinSave`, which `baseline`, `trimmed`, `merged` and `roundTimers` serve), `clearSave` (key `apothecary-save`), `grantLessons` (lessons an old save was already
   using), and the `ontoOwnRuns`, `ontoColumns` and `ontoHeart` belt migrations.
 - `src/game/away.ts`: the autopilot. `catchUp(state, now, rand)` plays the time since `lastSeen`
   (capped at `AWAY_CAP_MS`, 2h; nothing under `AWAY_MIN_MS`, 60s) through `tick` in 500ms steps
@@ -635,11 +635,16 @@ brew's `out` may be `PANACEA`.
 ### Persistence
 
 - `apothecary-save`: the `GameState` (with `lastSeen` stamped by `saveState`), saved every `AUTOSAVE_MS` (3s), on tab hide and on
-  `pagehide` (not after "New game" is confirmed). It is saved thin (`thinSave`, marked `thin: true`)
-  to keep progress codes short: every entry of `upgrades`, `craftsmen`, `belts` and `expansion`
-  still at its start (`untouched`: only `0`, `false` or `[]` inside, so `{ level: 0, paid: 0 }` or
-  `{ built: false, paid: 0 }`) is left out, and so is each town shop's in `routes`, `counter`,
-  `outfitter`, `study`, `guild`, `recipes` and `line2`; the load's per-key merges fill them back in.
+  `pagehide` (not after "New game" is confirmed). It is saved thin (`thinSave`, marked `thin: 2`)
+  to keep progress codes short: only what differs from a new game (`baseline`: `createInitialState`
+  plus `createShop` for each shop the save has bought), object by object (`trimmed`; a list that
+  differs is kept whole), with `version` and `layout` always kept and every timer rounded to a
+  tenth of a second (`roundTimers`: numbers of 100 or more with a fraction; whole numbers stay
+  exact). `loadState` fills a thin save back in over the same baseline (`merged`) before anything
+  else, which also reads the first thin saves (`thin: true`, which left out only untouched upgrades,
+  craftsmen, belts, builds and shop records). So a value still at its default when saved loads as
+  today's default: changing a default in `createInitialState` or `createShop` changes it for such
+  saves too.
   `loadState` discards saves whose `version`
   differs or that lack `plots`, shallow-merges top-level fields, merges `upgrades`, `craftsmen`,
   `belts`, `expansion` and `priority` per key, appends new plots (or, when a saved plot's plant doesn't match
