@@ -161,6 +161,26 @@ Blessings can be taken more than once, and they add up.
 
 ![The temple has fallen](docs/screenshots/game-over.webp)
 
+### Trophies
+
+Eight trophies, listed behind the Trophies button on the start and pause screens and counted on the
+hub:
+
+| Trophy | Tier | How to earn it |
+| --- | --- | --- |
+| First course | Bronze | Finish your first tier. |
+| Grown back | Bronze | Grow a stone back with a chain of perfect drops. |
+| Bound by a curse | Bronze | Finish a tier under a curse you took for double favor. |
+| Leaf gold | Silver | Finish the gilded tenth tier. |
+| Crowned shrine | Silver | Finish tier 12 and crown the shrine. |
+| Flawless shrine | Gold | Crown the shrine with every tier balanced. |
+| Altar in the clouds | Gold, hidden | Finish a sky altar, the tenth tier past the crown. |
+| Stairway of altars | Gold, hidden | Finish three sky altars in one temple. |
+
+![A trophy earned on the first tier](docs/screenshots/trophy-earned.webp)
+
+![The trophy list on the pause screen](docs/screenshots/trophies.webp)
+
 The difficulty, set on the hub page's Settings, changes one thing: stones swing 20% slower on Easy
 and 25% faster on Hard.
 
@@ -195,6 +215,8 @@ All paths are inside `games/shrine-stack/`.
   reserve, trials, the lean, perfect chains, materials, patrons, curses, the gilded tier, the goal
   and the endless sky, `blessings.ts` the blessing names and texts, `catalog.ts` the shop items,
   stone kinds, trials, curses, materials and patrons, and `save.ts` the best height.
+- `src/trophies/`: the trophies (`index.ts`), their texts (`i18n/`) and when each is earned
+  (`check.ts`).
 - `src/scenes/`: `GameScene` draws the sky, the temple, the panel with the patron, the goal track,
   the next stone, the reserve, the trial, the curse and the lean meter, the patron cards, the
   blessing cards, the reroll button, the material row, the curse toggle and the shop, gusts, the
