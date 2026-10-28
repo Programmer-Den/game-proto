@@ -7,7 +7,7 @@
 import { byDifficulty } from '../../../../shared/settings';
 import type { TextKey } from '../i18n';
 import {
-  AUGMENTS, BENCH_SLOTS, BOARD, ECONOMY, GILDED, ITEM_BENCH, LEVEL_XP, MAX_ITEMS, MAX_LEVEL, PARTS, PLAYER_COMMANDERS,
+  AUGMENTS, BENCH_SLOTS, RANKS, BOARD, ECONOMY, GILDED, ITEM_BENCH, LEVEL_XP, MAX_ITEMS, MAX_LEVEL, PARTS, PLAYER_COMMANDERS,
   PLAYERS, RIVALS, SCRAP_TOKENS_PER_PART, SETS, SHOP_ODDS, SHOP_SLOTS, SURVIVOR_DAMAGE, TERRAIN_TILES, UNIT_BY_ID, comboOf,
   isPart, rosterOf, stageDamage, stageRounds,
   type AugmentId, type CommanderDef, type MonsterId, type OriginId, type PartId, type RoundDef, type SetId, type TerrainId,
@@ -106,6 +106,8 @@ export interface MatchOptions {
   terrain: boolean;
   /** The AI plays the player's seat too (`?watch`). */
   watch: boolean;
+  /** The player's saved rank (`RANKS`), which toughens the rivals; 0 plays as designed. */
+  rank: number;
 }
 
 export interface Match {
@@ -192,7 +194,7 @@ export function rollShop(m: Match, p: Player) {
   const roster = rosterOf(m.opts.set);
   const origins = SETS.find((s) => s.id === m.opts.set)!.origins;
   p.shop = Array.from({ length: SHOP_SLOTS }, () => {
-    const odds = SHOP_ODDS[p.level - 1];
+    const odds = SHOP_ODDS[Math.min(p.level + (p.seat !== 0 ? RANKS[m.opts.rank].odds : 0), MAX_LEVEL) - 1];
     let roll = Math.random() * 100;
     let cost = 1;
     for (let c = 0; c < 5; c++) {
@@ -405,7 +407,7 @@ export function startPlan(m: Match, planS: number) {
       const interestCap = ECONOMY.interestCap + (p.augments.includes('gold-rush') ? 3 : 0);
       const streak = ECONOMY.streakBonus[Math.min(Math.abs(p.streak), ECONOMY.streakBonus.length - 1)];
       p.gold += (m.stage === 1 ? ECONOMY.stageOneIncome : ECONOMY.baseIncome) + Math.min(Math.floor(p.gold / ECONOMY.interestPer), interestCap) + streak;
-      if (p.seat !== 0) p.gold = Math.max(0, p.gold + byDifficulty(-1, 0, 1));
+      if (p.seat !== 0) p.gold = Math.max(0, p.gold + byDifficulty(-1, 0, 1) + RANKS[m.opts.rank].gold);
       gainXp(p, ECONOMY.xpPerRound);
       if (!p.shopLocked) rollShop(m, p);
     }

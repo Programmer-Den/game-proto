@@ -365,6 +365,28 @@ gold at 2x and is remembered in the browser, separately from the hero.
 
 The difficulty, set on the hub page's Settings, changes one thing: foes have 25% less health on Easy and 30% more on Hard. The heats are separate from it.
 
+## Trophies
+
+Ten trophies, listed behind the Trophies button on the start and pause screens and counted on the
+hub's card:
+
+| Trophy | Tier | Earned by |
+| --- | --- | --- |
+| Holding the line | Bronze | Clearing your first wave |
+| Cloud of arrows | Bronze | Loosing an Arrow Rain |
+| Hired hands | Bronze | Hiring a guard |
+| On a roll | Silver | A kill streak of 10 |
+| Kingslayer | Silver | Clearing the Troll King's wave |
+| Matched pair | Silver | Holding every relic of a set |
+| A hero remembered (hidden) | Silver | Retiring a hero for a legacy |
+| Master ranger | Gold | Learning every skill |
+| Siege lifted | Gold | Clearing wave 30 |
+| Through the fire (hidden) | Gold | Lifting the siege at Heat 3 |
+
+![The Trophies list on the pause screen](docs/screenshots/trophy-list.webp)
+
+![A trophy earned in battle](docs/screenshots/trophy-toast.webp)
+
 ## Running locally
 
 `npm run dev` at the repo root, then open `/games/palisade/` (or pick Palisade on the hub page).
@@ -412,6 +434,8 @@ All paths are inside `games/palisade/`.
   the bosses, the hired guards and the missiles, `scenery.ts` the battlefield, the HUD bars and the barricade (which
   breaks up in stages), and `icons.ts` the upgrade and relic icons, the chest, the boss marks,
   the Arrow Rain and caltrops buttons, the coin and the road icons.
+- `src/trophies/`: the trophies (`index.ts`), their texts (`i18n/`) and when each is earned
+  (`check.ts`).
 - `src/ui/`: the level-up cards, the road cards (`RoadChoice`), the hire panel (`HirePanel`), the
   fortify panel (`FortifyPanel`), the omen card (`OmenCard`), the legacy cards (`LegacyPanel`), the skill book, and `panel.ts` with the slate-and-gold panels,
   buttons and text style.

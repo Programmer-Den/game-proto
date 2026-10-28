@@ -4,11 +4,11 @@ import { formatNumber } from '../../../../shared/i18n';
 import { viewFrame, viewSize } from '../../../../shared/scaling';
 import { settings } from '../../../../shared/settings';
 import { SFX, SONG } from '../audio';
-import { KIND_COLOR, MODES, RELIC_COLOR, type Mode, type RelicId } from '../game/catalog';
+import { CHARMS, KIND_COLOR, MODES, RELIC_COLOR, type Mode, type RelicId } from '../game/catalog';
 import { DEFS, KINDS, LEVELS, SKILLS, SKILL_OF, type KindId, type Level } from '../game/kinds';
 import type { Progress } from '../game/progress';
 import {
-  act, canHint, canUndo, dailyDone, draftPick, drag, hint, next, quit, skip, startRun, startSecondPlayer, takeRelic, tick, undo,
+  act, canHint, canUndo, dailyDone, draftPick, drag, hint, holdsCharm, next, quit, skip, startRun, startSecondPlayer, takeRelic, tick, undo,
   BLITZ_PENALTY_S, DUEL_FAIL_S, QUEUE, type Card, type Run,
 } from '../game/run';
 import { clearRun, loadProgress, loadRun, saveProgress, saveRun } from '../game/save';
@@ -490,7 +490,8 @@ export class GameScene extends Phaser.Scene {
       VIEWS[kind].draw(this.ctx());
       const def = DEFS[kind];
       p.button('undo', TOOLS.xs[0], TOOLS.y, TOOLS.w, TOOLS.h, t('undo'), () => undo(run) && SFX('tap'), { enabled: def.undo && canUndo(run) });
-      p.button('hint', TOOLS.xs[1], TOOLS.y, TOOLS.w, TOOLS.h, Number.isFinite(run.hints) ? t('hintButton', { n: run.hints }) : t('hint'), () => hint(run) || ui('refuse'), { enabled: canHint(run) });
+      const hintLabel = cur.freeHints > 0 ? t('hintFree') : Number.isFinite(run.hints) ? t('hintButton', { n: run.hints }) : t('hint');
+      p.button('hint', TOOLS.xs[1], TOOLS.y, TOOLS.w, TOOLS.h, hintLabel, () => hint(run) || ui('refuse'), { enabled: canHint(run) });
       p.button('skip', TOOLS.xs[2], TOOLS.y, TOOLS.w, TOOLS.h, run.mode === 'practice' ? t('newPuzzle') : t('skip'), () => skip(run), { enabled: run.phase === 'playing' });
     }
     this.drawSide(run);
@@ -713,7 +714,9 @@ export class GameScene extends Phaser.Scene {
         drawKindIcon(p.g, c.kind, x, y - 40, 58, KIND_COLOR[c.kind]);
         p.text(x, y + 26, t(`${c.kind}Name` as TextKey), { size: 18, color: C.goldText, bold: true, wrap: w - 20 });
         p.text(x, y + 54, `${ROMAN[c.level]} · ${t(`level${c.level}` as TextKey)}`, { size: 13, color: C.cyanText });
-        p.text(x, y + 80, t(SKILL_OF[c.kind]), { size: 12, color: C.inkDim });
+        // A held charm marks the cards it helps.
+        if (holdsCharm(this.run!, c.kind)) p.text(x, y + 80, `✦ ${t(`${CHARMS[c.kind]}Name` as TextKey)}`, { size: 12, color: C.cyanText, wrap: w - 16 });
+        else p.text(x, y + 80, t(SKILL_OF[c.kind]), { size: 12, color: C.inkDim });
       } else if (item.relic) {
         const r = item.relic;
         p.g.fillStyle(C.deep, 1).fillCircle(x, y - 40, 44);

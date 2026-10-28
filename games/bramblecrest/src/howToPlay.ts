@@ -26,7 +26,8 @@ const en: HowToPlay = {
   ],
   tips: [
     'Your journal line, top right, always says what to do next.',
-    'Swing at bushes: some hide moonstones, some drop hearts.',
+    'Swing at bushes: some hide moonstones, some drop hearts or coins.',
+    'Spend coins on upgrades: Marla sells a pie and boots, Old Sedge a bigger pouch and a longer vine.',
     'People drop hints. Listen to the baker, Pip and the hermit, and read the signs.',
     'Step back from a planted bellseed: its burst hurts you too.',
     'Fall in a fight and you wake where you last came in, healed.',
@@ -59,7 +60,8 @@ const de: HowToPlay = {
   ],
   tips: [
     'Deine Tagebuchzeile oben rechts sagt immer, was als Nächstes zu tun ist.',
-    'Schlag nach Büschen: Manche verstecken Mondsteine, manche lassen Herzen fallen.',
+    'Schlag nach Büschen: Manche verstecken Mondsteine, manche lassen Herzen oder Münzen fallen.',
+    'Gib Münzen für Verbesserungen aus: Marla verkauft eine Pastete und Stiefel, der alte Sedge einen größeren Beutel und eine längere Ranke.',
     'Die Leute geben Hinweise. Hör der Bäckerin, Pip und dem Einsiedler zu und lies die Schilder.',
     'Tritt von einem gepflanzten Glockensamen zurück: Sein Platzen trifft auch dich.',
     'Fällst du im Kampf, erwachst du geheilt dort, wo du zuletzt hereingekommen bist.',

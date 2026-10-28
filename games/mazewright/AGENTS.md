@@ -21,12 +21,11 @@ Implemented today:
   walkers go round, moths and sunglass beams cross, nothing is planted), `banks` (a tower there
   reaches `BANK_REACH` (1.25) times further, `reachOf`), a `path` (a path garden: foes keep to the
   gravel, towers go only on the lawn beside it, which never changes a route) and its own `lives`
-  (Last Cabbage: 1). The picker has a tab per season (`season-<season>` buttons); a season opens
+  (Last Cabbage: 1) and starting `gold` (Last Cabbage: 130). The picker has a tab per season (`season-<season>` buttons); a season opens
   at `SEASON_STARS` (0, 4, 10, 18) stars won across all gardens, and a shut one's cards are dimmed
   and refuse a tap. Each season has its own lawn colours (`art.SEASON_LAWN`), and winter's water is
-  ice. A greedy bot (each hedge where it lengthens the routes most, towers where they cover most
-  route; for a path garden, towers on the lawn that covers most path) wins all twelve on Normal
-  with a bow, frost and cannon pouch, weather included.
+  ice. The greedy bot (`e2e/bot.ts`, see Missing or rough) wins all twelve on
+  Normal with the default pouch, weather included.
 - Season weather (`WEATHER`, in `step`): in summer gardens `wilt` stops a tower that has fired
   nonstop (`busy`, no gap over `rest` since `lastShot`, set only when it really fires, not when a toadstool looks
   again for a foe to shrink) for `wiltAfter` (8) seconds for
@@ -167,12 +166,16 @@ Missing or rough:
 
 - A game in play is not saved; a reload starts at the garden picker.
 - No Watch AI mode, no upright layout (an upright phone gets the turn hint).
-- Normal was made harder after the bot runs below: 15 cabbages instead of 20 and `HP_PER_WAVE` 0.2
-  instead of 0.16 (wave 1 is unchanged). It has not been checked with the bot since.
-- Balance was tuned with a scripted bot (a fixed serpentine on the Meadow): building only between
-  waves it loses at the final queen on Normal, building during waves it wins with a few lives left
-  (before stolen cabbages, which made every maze hold foes twice and the game easier).
-  The new towers were checked one at a time beside a serpentine corridor for damage per gold:
+- Balance is checked with `e2e/bot.ts`, a greedy bot run in Node (how to build and run it is at
+  its top): hedges where they lengthen the routes most, towers where they cover most route, an
+  upgrade when it adds more per gold, Classic and Calm, no master levels. On Normal (15 cabbages,
+  `HP_PER_WAVE` 0.2) with the default pouch it wins all twelve gardens, building during waves or
+  only between them; most keep all 15 cabbages, Crossroads and Leaf Walk 7 to 10. Last Cabbage
+  starts with `gold` 130 (`MapDef.gold`), since at 90 the bot lost it on wave 2 or 3 every time; at
+  130 it wins it. With only hedges and bows it also wins every garden, so the bow is strong for
+  its price; with a cannon in every three towers it lost Leaf Walk's moth wave 17 (cannons can't
+  hit fliers). Run it again after a balance change.
+- The new towers were checked one at a time beside a serpentine corridor for damage per gold:
   crossbow, cannon, bow, whirligig and puffball do most, the storm rod, bonfire and beehive less
   but need bunched foes, a straight corridor or neighbours to shine, and the sunglass needs a
   corridor in line with it. A tower's balance is a first pass.

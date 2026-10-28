@@ -103,6 +103,15 @@ export interface Called {
   wave: number;
   /** Its Queen Slug was squashed (only a Queen Slug wave whose queen is off the path can be called early). */
   queenSquashed: boolean;
+  /** The Heartwood's leaves when it was called. */
+  heart: number;
+}
+
+/** A wave called early that came to an end. */
+export interface Settled {
+  wave: number;
+  /** The Heartwood lost no leaf between the call and the end (a leaf regrown in between doesn't count). */
+  clean: boolean;
 }
 
 /** A pest just squashed: where, and the sap it dropped. The scene shows it and then empties the list. */
@@ -173,7 +182,7 @@ export interface GameState {
   /** Waves called early whose last pests still walk: each is done (bonus, bud, best) once they are gone. */
   called: Called[];
   /** Waves called early that came to an end since the scene last looked. The scene empties it. */
-  settled: number[];
+  settled: Settled[];
   /** Leaves regrown this garden; each makes the next one dearer. */
   regrown: number;
   nextId: number;
@@ -482,7 +491,7 @@ export function startWave(s: GameState): 'start' | 'early' | null {
     return 'start';
   }
   if (!canCallEarly(s)) return null;
-  s.called.push({ wave: s.wave, queenSquashed: s.queenSquashed });
+  s.called.push({ wave: s.wave, queenSquashed: s.queenSquashed, heart: s.heart });
   s.wave++;
   beginWave(s);
   return 'early';
@@ -650,7 +659,7 @@ function step(s: GameState, dt: number) {
     const done = s.called.shift()!;
     finishWave(s, done.wave, done.queenSquashed);
     s.sap += EARLY_BONUS;
-    s.settled.push(done.wave);
+    s.settled.push({ wave: done.wave, clean: s.heart >= done.heart });
   }
   if (s.phase === 'wave' && !s.queue.length && !s.pests.length) {
     finishWave(s, s.wave, s.queenSquashed);

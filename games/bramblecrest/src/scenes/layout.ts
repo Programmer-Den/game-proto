@@ -8,6 +8,8 @@ export const WALK_SPEED = 130;
 export const ROLL_SPEED = 300;
 export const ROLL_MS = 280;
 export const ROLL_COOLDOWN_MS = 700;
+/** Marla's light boots: a roll this much longer, and a cooldown this much shorter. */
+export const BOOTS = { roll: 1.35, cooldown: 0.7 };
 /** A sword swing: how long it shows, how long before the next, and how far it reaches. */
 export const SWING_MS = 220;
 export const SWING_COOLDOWN_MS = 330;
@@ -17,6 +19,8 @@ export const SWING_RADIUS = 20;
 export const VINE_RANGE = 228;
 export const VINE_SPEED = 560;
 export const PULL_SPEED = 400;
+/** Sedge's long vine reaches this much farther. */
+export const LONG_VINE = 1.4;
 /** After a hit, how long the knight can't be hurt again. */
 export const HURT_MS = 1000;
 /** How close (in pixels) the knight's feet must be to pick something up. */

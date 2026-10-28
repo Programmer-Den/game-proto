@@ -1,5 +1,5 @@
 import { byDifficulty } from '../../../../shared/settings';
-import { RELICS, STYLES, TWISTS, type Level, type RelicId, type StyleId, type Twist } from './catalog';
+import { RELICS, STYLES, TWISTS, UNIQUE_RELICS, type Level, type RelicId, type StyleId, type Twist } from './catalog';
 import { dailySeed, makePuzzle, peersOf, seeded, SHAPES, shuffle, units, type Puzzle, type Random } from './sudoku';
 
 // Ninefold's rules: Classic (a daily puzzle and free play at three levels) and Delve (a run of
@@ -22,6 +22,12 @@ export const MAX_HEARTS = 5;
 export const RELIC_OFFER = 3;
 /** Cells each Seer's Eye fills in at the start of a floor. */
 export const SEER_CELLS = 2;
+/** Right digits in a row (no mistake between) for each Gambler's Die to pay a hint. */
+export const GAMBLER_STREAK = 8;
+/** A floor cleared within this much game time heals a heart per Sandglass. */
+export const SANDGLASS_MS = 4 * 60_000;
+/** Hearts the Iron Vow adds (up to `MAX_HEARTS`); it takes every hint. */
+export const VOW_HEARTS = 2;
 /** A 9x9 solved within this much game time unlocks Neon Arcade. */
 export const FAST_MS = 10 * 60_000;
 /** Delve floors from this one count as hard puzzles. */
@@ -119,6 +125,9 @@ export type GameEvent =
   | { type: 'placed'; cell: number }
   | { type: 'wrong'; cell: number; heart: boolean; warded: boolean }
   | { type: 'clock' }
+  | { type: 'phoenix' }
+  | { type: 'heal' }
+  | { type: 'gift' }
   | { type: 'unit'; cells: number[] }
   | { type: 'solved' }
   | { type: 'over' }
@@ -155,6 +164,10 @@ export interface GameState {
   relicOffer: RelicId[];
   /** The Ward has caught a mistake on this floor already. */
   warded: boolean;
+  /** Right digits written since the last mistake, for the Gambler's Die. */
+  streak: number;
+  /** Hearts the Keystone has given back on this floor. */
+  keyHealed: number;
   /** Units (as indexes into `units`) already complete, so each one is celebrated once. */
   doneUnits: number[];
   /** Styles unlocked by the last board solved. */
@@ -167,7 +180,7 @@ export function newGame(progress: Progress): GameState {
   return {
     phase: 'menu', mode: 'classic', level: 'easy', puzzle: null, values: [], notes: [], selected: -1, notesMode: false,
     mistakes: 0, hintsLeft: 0, hintsUsed: 0, timeMs: 0, hearts: 0, maxHearts: 0, floor: 0, plan: null, upcoming: null, dailyDate: 0, relics: [], relicOffer: [],
-    warded: false, doneUnits: [], newStyles: [], progress, events: [],
+    warded: false, streak: 0, keyHealed: 0, doneUnits: [], newStyles: [], progress, events: [],
   };
 }
 
@@ -181,6 +194,7 @@ function load(s: GameState, puzzle: Puzzle) {
   s.hintsUsed = 0;
   s.timeMs = 0;
   s.warded = false;
+  s.keyHealed = 0;
   s.newStyles = [];
   markDone(s);
   s.phase = 'playing';
@@ -213,6 +227,7 @@ export function startDelve(s: GameState) {
   s.dailyDate = 0;
   s.floor = 0;
   s.relics = [];
+  s.streak = 0;
   s.maxHearts = s.hearts = delveHearts();
   s.hintsLeft = DELVE_HINTS;
   s.upcoming = planFloor(1, Math.random);
@@ -236,6 +251,37 @@ function nextFloor(s: GameState) {
   }
   // The Seer's cells are givens for the player, so a unit they complete is not celebrated.
   markDone(s);
+  // Twin Sight pencils in every empty cell's candidates.
+  if (s.relics.includes('twin')) {
+    const peers = peersOf(s.puzzle!);
+    s.values.forEach((v, i) => {
+      if (v) return;
+      let used = 0;
+      for (const q of peers[i]) if (isRight(s, q)) used |= 1 << s.values[q];
+      for (let d = 1; d <= s.puzzle!.size; d++) if (!(used & (1 << d))) s.notes[i] |= 1 << d;
+    });
+  }
+}
+
+const count = (s: GameState, relic: RelicId) => s.relics.filter((r) => r === relic).length;
+
+/** Heals up to `n` hearts, no higher than the run's most. */
+function heal(s: GameState, n: number) {
+  const before = s.hearts;
+  s.hearts = Math.min(s.maxHearts, s.hearts + n);
+  if (s.hearts > before) s.events.push({ type: 'heal' });
+}
+
+/** Takes hearts; at none a Phoenix Feather, if held, burns for one, or the run ends. */
+function loseHearts(s: GameState, n: number) {
+  s.hearts -= n;
+  if (s.hearts > 0) return;
+  const feather = s.relics.indexOf('phoenix');
+  if (feather >= 0) {
+    s.relics.splice(feather, 1);
+    s.hearts = 1;
+    s.events.push({ type: 'phoenix' });
+  } else runOver(s);
 }
 
 /** Records every unit that is already complete, without celebrating it. */
@@ -285,20 +331,28 @@ export function enter(s: GameState, digit: number) {
   if (digit === p.solution[cell]) {
     fill(s, cell);
     s.events.push({ type: 'placed', cell });
+    s.streak++;
+    const dice = count(s, 'gambler');
+    if (s.mode === 'delve' && dice && s.streak % GAMBLER_STREAK === 0) {
+      s.hintsLeft += dice;
+      s.events.push({ type: 'gift' });
+    }
     afterFill(s);
     return true;
   }
   if (s.values[cell] === digit) return false;
   s.values[cell] = digit;
   s.mistakes++;
+  s.streak = 0;
   let heart = false;
   let warded = false;
   if (s.mode === 'delve') {
     if (s.relics.includes('ward') && !s.warded) s.warded = warded = true;
-    else (s.hearts--, (heart = true));
+    else heart = true;
   }
   s.events.push({ type: 'wrong', cell, heart, warded });
-  if (s.mode === 'delve' && s.hearts <= 0) runOver(s);
+  // Each Gambler's Die makes a mistake that costs a heart cost one more.
+  if (heart) loseHearts(s, 1 + count(s, 'gambler'));
   return true;
 }
 
@@ -346,6 +400,12 @@ function afterFill(s: GameState) {
     if (!s.doneUnits.includes(i) && u.every((c) => s.values[c] === p.solution[c])) {
       s.doneUnits.push(i);
       s.events.push({ type: 'unit', cells: u });
+      // Each Keystone gives back a heart for one finished box a floor (boxes follow the rows and columns).
+      const box = i >= 2 * p.size && i < 3 * p.size;
+      if (box && s.mode === 'delve' && s.keyHealed < count(s, 'keystone')) {
+        s.keyHealed++;
+        heal(s, 1);
+      }
     }
   });
   if (s.values.every((v, i) => v === p.solution[i])) solved(s);
@@ -371,9 +431,11 @@ function solved(s: GameState) {
       p.bosses++;
       s.hearts = s.maxHearts;
     }
+    if (s.timeMs <= SANDGLASS_MS) heal(s, count(s, 'sandglass'));
     s.upcoming = planFloor(s.floor + 1, Math.random);
     s.phase = 'relic';
-    s.relicOffer = shuffle([...RELICS], Math.random).slice(0, RELIC_OFFER);
+    const pool = RELICS.filter((r) => !(UNIQUE_RELICS.includes(r) && s.relics.includes(r)));
+    s.relicOffer = shuffle(pool, Math.random).slice(0, RELIC_OFFER);
   } else s.phase = 'solved';
 }
 
@@ -398,6 +460,15 @@ export function takeRelic(s: GameState, relic: RelicId) {
     s.maxHearts = Math.min(MAX_HEARTS, s.maxHearts + 1);
     s.hearts = Math.min(s.maxHearts, s.hearts + 1);
   }
+  if (relic === 'twin') {
+    s.maxHearts = Math.max(1, s.maxHearts - 1);
+    s.hearts = Math.min(s.maxHearts, s.hearts);
+  }
+  if (relic === 'vow') {
+    s.maxHearts = Math.min(MAX_HEARTS, s.maxHearts + VOW_HEARTS);
+    s.hearts = Math.min(s.maxHearts, s.hearts + VOW_HEARTS);
+    s.hintsLeft = 0;
+  }
   s.events.push({ type: 'relic', relic });
   nextFloor(s);
 }
@@ -421,9 +492,8 @@ export function tick(s: GameState, dt: number) {
   const before = Math.floor(s.timeMs / CLOCK_MS);
   s.timeMs += dt;
   if (hasTwist(s, 'clock') && Math.floor(s.timeMs / CLOCK_MS) > before) {
-    s.hearts--;
     s.events.push({ type: 'clock' });
-    if (s.hearts <= 0) runOver(s);
+    loseHearts(s, 1);
   }
 }
 
