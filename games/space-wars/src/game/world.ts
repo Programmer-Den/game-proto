@@ -4,10 +4,11 @@ import { ARENA, BUILD_RANGE, NODE_AMOUNT, NODE_CLEARANCE } from './arena';
 import { COMBAT_UNITS, FACTIONS, type Ability, type Faction, type Role, type UnitId } from './factions';
 import { beaconNode, localRandom, type DerelictKind, type MapLayout, type Point } from './map';
 import {
-  BOARD_MS, CONTRACT_STEPS, FLAGSHIP_STEP, NO_PERKS, RANKS, boardOffer, contractOf, type Contract, type Goal, type Perks,
+  BOARD_MS, CONTRACT_POOL, CONTRACT_STEPS, FLAGSHIP_STEP, NO_PERKS, RANKS, boardOffer, contractOf, type Contract, type Goal, type Perks,
 } from './contracts';
 import { SECTORS, type Sector } from './campaign';
 import { Fog } from './fog';
+import { PATH_CELL, Pathing } from './pathing';
 import { t, type TextKey } from '../i18n';
 import { locale } from '../../../../shared/i18n';
 import {
@@ -34,6 +35,19 @@ const AI_PICKET_MS = 30000;
 /** Game time a harvester takes to mine one crystal, in ms. */
 const MINE_MS = 500;
 const UNIT_RADIUS = 10;
+/**
+ * Simple pathing (`game/pathing.ts`): a ship flies straight where it can and round the rocks where
+ * it can't, never more than ROCK_OVERLAP px over a rock's edge, and finds its way again every
+ * ROUTE_MS or once its destination moves a cell. Ships closer than SPREAD px drift apart at up to
+ * SPREAD_SPEED px a second. A rock round the ship's destination is left out, so a node or target
+ * among the rocks can still be reached. A ship on a move order is never pushed, so it always arrives.
+ */
+const ROCK_OVERLAP = 4;
+const ROUTE_MS = 1000;
+export const SPREAD = 18;
+const SPREAD_SPEED = 40;
+/** A destination this close to a rock (past its edge) can be reached over it; a ship stopping further off a target than this finds another spot on its ring. */
+const REACH = 14;
 const BEAM_MS = 140;
 const BOOM_MS = 450;
 /** The relay beacon: how close a ship must be to hold it, how long a lone faction takes to capture it, and its pay. */
@@ -124,6 +138,18 @@ const AI_PICKET_STAGGER_MS = 90000;
 const AI_MAX_ARMY = 20;
 /** Warships an AI keeps home when it attacks, nearest its hub first. */
 const AI_HOME_GUARD = 2;
+/**
+ * Rival contracts: from AI_DEAL_MS on, each AI faction works through a chain of its own (steps 1
+ * to 4 of the board, with the same targets, rewards and perks as the player's), picking from
+ * AI_GOALS. One it hasn't finished in AI_DEAL_LIMIT_MS is dropped for another. A raid contract
+ * (`kills`, `razes`, `hubs`) sends the army out with AI_DEAL_EAGER fewer ships, `hold` keeps a
+ * picket on the beacon whoever is nearest, and `derelicts` claims stations anywhere with a smaller army.
+ */
+export const AI_DEAL_MS = 90000;
+const AI_DEAL_LIMIT_MS = 180000;
+export const AI_GOALS: readonly Goal[] = ['kills', 'hold', 'derelicts', 'razes', 'hubs'];
+const AI_DEAL_EAGER = 2;
+const AI_DEAL_CLAIM_ARMY = 2;
 /** How far an idle AI warship goes to fetch its faction's salvage shard. */
 const AI_SALVAGE_REACH = 360;
 /**
@@ -326,8 +352,10 @@ export interface Side {
   alive: boolean;
   thinkMs: number;
   attackMs: number;
-  /** Rank perks from finished contracts (the player's only). */
+  /** Rank perks from finished contracts: the player's, and a rival's from its own (`deal`). */
   perks: Perks;
+  /** A rival's own contract chain (see AI_DEAL_MS); the player's side keeps it empty. */
+  deal: Deal;
   /** The warship this rival has sent to contest the relay beacon, or -1. */
   picket: number;
   /** Hull, weapons and engines research, bought at the hub. */
@@ -352,6 +380,19 @@ export interface Side {
   rally: Point | null;
   /** The next of RALLY_SPOTS a new warship takes round the rally point. */
   rallyNext: number;
+}
+
+/**
+ * A rival's own contract chain: the board step it is on (1 to CONTRACT_STEPS), the contract it
+ * works on (null between two, and once the chain is done), its progress, how long it has worked
+ * on it, and the goals finished.
+ */
+export interface Deal {
+  step: number;
+  goal: Goal | null;
+  progress: number;
+  ms: number;
+  done: Goal[];
 }
 
 /**
@@ -571,6 +612,12 @@ export class World {
   private spotted = new Map<number, Set<number>>();
   /** The board's own generator, so drawing contracts leaves the battle's Math.random as it was. */
   private readonly rng: () => number;
+  /** The rivals' own generator for picking their contracts, so neither the board's draws nor Math.random move. */
+  private readonly dealRng: () => number;
+  /** Ships' way round the rocks. */
+  readonly pathing: Pathing;
+  /** Each ship's way round the rocks while its straight flight is blocked: the waypoints, where to, and when it was found. */
+  private readonly routes = new WeakMap<Unit, { path: Point[]; to: Point; at: number }>();
 
   /**
    * `pick` is the faction the player commands, an index into `FACTIONS`. It takes the player's start
@@ -584,10 +631,12 @@ export class World {
     this.sides = order.map((f, index) => ({
       index, def: FACTIONS[f], crystal: START_CRYSTAL, alive: true, thinkMs: 0, attackMs: 0, perks: { ...NO_PERKS }, picket: -1,
       research: noResearch(), grudge: -1, grudgeLockMs: 0, truceMs: 0, offerMs: 0, offerCooldownMs: 0, pressure: 0, claimer: -1,
-      flagship: { state: 'locked', left: 0 }, rally: null, rallyNext: 0,
+      flagship: { state: 'locked', left: 0 }, rally: null, rallyNext: 0, deal: { step: 1, goal: null, progress: 0, ms: 0, done: [] },
     }));
     for (const goal of kept) contractOf(goal).apply(this.sides[PLAYER].perks);
     this.rng = localRandom((layout.homes[0].x * 3.7 + layout.homes[0].y) % 1);
+    this.dealRng = localRandom((layout.homes[0].y * 5.3 + layout.homes[0].x) % 1);
+    this.pathing = new Pathing(layout.rocks, UNIT_RADIUS - ROCK_OVERLAP);
     const nodes = layout.nodes.map((n) => ({ id: this.id(), x: n.x, y: n.y, amount: n.amount }));
     // One loose crystal node partway to the centre becomes the relay beacon and is no longer mined.
     const spot = nodes[beaconNode(layout.homes, layout.nodes)];
@@ -1025,6 +1074,7 @@ export class World {
     for (const b of [...this.buildings]) this.updateBuilding(b, dt);
     for (const d of this.derelicts) this.updateDerelict(d, dt);
     for (const u of [...this.units]) this.updateUnit(u, dt);
+    this.spread(dt);
     for (const side of this.sides) {
       if (!side.alive || (side.index === PLAYER && !this.watch)) continue;
       this.updateTruce(side, dt);
@@ -1043,6 +1093,7 @@ export class World {
     this.updateShards(dt);
     // Contracts are the player's; a watched battle gives nobody their perks.
     if (!this.watch) this.updateContract(dt);
+    this.updateDeals(dt);
     this.updateFog();
     if (this.watch) {
       const left = this.sides.filter((s) => s.alive);
@@ -1144,6 +1195,8 @@ export class World {
     const order = u.order;
     if (!order) return;
     if (order.kind === 'move') {
+      // A move onto a rock stops at its edge.
+      this.offRocks(order, -1, -1, 0);
       if (this.approach(u, order.x, order.y, 2, dt, speed)) u.order = null;
       return;
     }
@@ -1556,14 +1609,112 @@ export class World {
    * Moves `u` toward (x, y) at `speed`, stopping `stop` short of the point. Returns true once it is
    * there; the half pixel of slack lets a unit that stops at exactly `stop` count as arrived.
    */
-  private approach(u: Point & { angle: number }, x: number, y: number, stop: number, dt: number, speed: number) {
+  private approach(u: Unit, x: number, y: number, stop: number, dt: number, speed: number) {
     const d = Math.hypot(x - u.x, y - u.y);
     if (d <= stop + 0.5) return true;
     const step = Math.min(d - stop, (speed * dt) / 1000);
-    u.x += ((x - u.x) / d) * step;
-    u.y += ((y - u.y) / d) * step;
-    u.angle = Math.atan2(y - u.y, x - u.x);
+    const heading = this.steer(u, x, y, stop);
+    if (heading === null) {
+      u.x += ((x - u.x) / d) * step;
+      u.y += ((y - u.y) / d) * step;
+      u.angle = Math.atan2(y - u.y, x - u.x);
+    } else {
+      u.x += Math.cos(heading) * step;
+      u.y += Math.sin(heading) * step;
+      u.angle = heading;
+    }
+    this.offRocks(u, x, y, stop);
     return false;
+  }
+
+  /**
+   * The heading that takes ship `u` round the rocks toward (x, y), or null when it can fly
+   * straight there. Rocks round the destination (`stop` short of it) and rocks the ship is already
+   * over are left out, for `offRocks` to slide it off.
+   */
+  private steer(u: Unit, x: number, y: number, stop: number): number | null {
+    const to = { x, y };
+    const ignore = [...this.pathing.over(to, Math.min(stop, REACH)), ...this.pathing.over(u)];
+    if (this.pathing.clear(u, to, ignore)) {
+      this.routes.delete(u);
+      return null;
+    }
+    let route = this.routes.get(u);
+    if (!route || dist(route.to, to) > PATH_CELL || this.elapsedMs - route.at > ROUTE_MS) {
+      const path = this.pathing.route(u, to, ignore);
+      if (!path) {
+        this.routes.delete(u);
+        return null;
+      }
+      route = { path, to, at: this.elapsedMs };
+      this.routes.set(u, route);
+    }
+    // Head for the furthest waypoint in a straight line, so the flight cuts the grid's corners.
+    const path = route.path;
+    while (path.length > 1 && (dist(u, path[0]) < 4 || this.pathing.clear(u, path[1], ignore))) path.shift();
+    return Math.atan2(path[0].y - u.y, path[0].x - u.x);
+  }
+
+  /** Slides a ship off any rock it has flown too far over, except a rock round its destination (x, y) `stop` short. */
+  private offRocks(u: Point, x: number, y: number, stop: number) {
+    for (const k of this.layout.rocks) {
+      const keep = k.r + UNIT_RADIUS - ROCK_OVERLAP;
+      const d = dist(u, k);
+      if (d >= keep || d === 0 || dist(k, { x, y }) < keep + Math.min(stop, REACH)) continue;
+      u.x = k.x + ((u.x - k.x) / d) * keep;
+      u.y = k.y + ((u.y - k.y) / d) * keep;
+    }
+  }
+
+  /**
+   * Ships (harvesters left out, as they share their nodes) closer than SPREAD drift apart, so a
+   * fresh wing or a stack at one spot fans out. A ship flying a move order holds its course and the
+   * other gives way; a drift that would put a ship over a rock is undone.
+   */
+  private spread(dt: number) {
+    const ships = this.units.filter((u) => u.type !== 'harvester' && !u.convoy && u.hp > 0);
+    const most = (SPREAD_SPEED * dt) / 1000;
+    // An idle ship left over a rock (after a fight among them) drifts off it.
+    for (const u of ships) {
+      if (u.order) continue;
+      const k = this.layout.rocks.find((r) => dist(r, u) < r.r + UNIT_RADIUS - ROCK_OVERLAP && dist(r, u) > 0);
+      if (k) this.nudge(u, ((u.x - k.x) / dist(k, u)) * most, ((u.y - k.y) / dist(k, u)) * most, true);
+    }
+    for (let i = 0; i < ships.length; i++) {
+      for (let j = i + 1; j < ships.length; j++) {
+        const a = ships[i];
+        const b = ships[j];
+        let dx = b.x - a.x;
+        let dy = b.y - a.y;
+        const d = Math.hypot(dx, dy);
+        if (d >= SPREAD) continue;
+        if (d < 0.01) {
+          // Two ships on one spot: part them along an angle picked from their ids.
+          const angle = (a.id * 2.399 + b.id) % (Math.PI * 2);
+          dx = Math.cos(angle);
+          dy = Math.sin(angle);
+        } else {
+          dx /= d;
+          dy /= d;
+        }
+        const holdA = a.order?.kind === 'move';
+        const holdB = b.order?.kind === 'move';
+        if (holdA && holdB) continue;
+        const push = Math.min(holdA || holdB ? SPREAD - d : (SPREAD - d) / 2, most);
+        if (!holdA) this.nudge(a, -dx * push, -dy * push);
+        if (!holdB) this.nudge(b, dx * push, dy * push);
+      }
+    }
+  }
+
+  /** Moves a ship by (dx, dy) on the battlefield, unless that puts it over a rock (or, `off`, deeper over one). */
+  private nudge(u: Unit, dx: number, dy: number, off = false) {
+    const x = Math.max(0, Math.min(ARENA.w, u.x + dx));
+    const y = Math.max(0, Math.min(ARENA.h, u.y + dy));
+    const deeper = (k: Point & { r: number }) => dist(k, { x, y }) < k.r + UNIT_RADIUS - ROCK_OVERLAP && (!off || dist(k, { x, y }) < dist(k, u));
+    if (this.layout.rocks.some(deeper)) return;
+    u.x = x;
+    u.y = y;
   }
 
   /** Harvesters work on their own: seek a node, mine until full, carry the crystal to a drop-off. */
@@ -1680,10 +1831,14 @@ export class World {
       }
     }
     side.attackMs += AI_THINK_MS;
-    if (this.elapsedMs < AI_GRACE_MS || army.length < AI_ARMY_TO_ATTACK || side.attackMs < AI_ATTACK_MS) return;
+    // A raid contract sends the army out sooner.
+    const raiding = side.deal.goal === 'kills' || side.deal.goal === 'razes' || side.deal.goal === 'hubs';
+    const need = raiding ? Math.max(2, AI_ARMY_TO_ATTACK - AI_DEAL_EAGER) : AI_ARMY_TO_ATTACK;
+    if (this.elapsedMs < AI_GRACE_MS || army.length < need || side.attackMs < AI_ATTACK_MS) return;
     side.attackMs = 0;
     const foe = side.grudge >= 0 && this.sides[side.grudge].alive && !this.atPeace(f, side.grudge) ? side.grudge : -1;
-    const target = this.nearestEnemyBuilding(hub, f, foe);
+    // A hub contract goes straight for the nearest main hub it may attack.
+    const target = (side.deal.goal === 'hubs' ? this.nearestEnemyHub(hub, f) : null) ?? this.nearestEnemyBuilding(hub, f, foe);
     if (!target) return;
     // The picket stays on the beacon, the claimer at its derelict, the hurt stay to repair and a few ships stay home; the rest go.
     const raid = army.filter((u) => u.id !== side.picket && u.id !== side.claimer && !u.repairing && u.hp >= u.maxHp * AI_FALL_BACK_HP)
@@ -1714,9 +1869,11 @@ export class World {
    */
   private contestDerelicts(side: Side, army: Unit[]) {
     const f = side.index;
-    if (this.elapsedMs < AI_CLAIM_MS || army.length < AI_CLAIM_ARMY) return;
+    // A derelicts contract claims stations anywhere, with a smaller army.
+    const keen = side.deal.goal === 'derelicts';
+    if (this.elapsedMs < AI_CLAIM_MS || army.length < (keen ? AI_DEAL_CLAIM_ARMY : AI_CLAIM_ARMY)) return;
     const hub = this.hubOf(f)!;
-    const open = this.derelicts.filter((d) => d.owner !== f && dist(d, hub) <= AI_CLAIM_REACH).sort((a, b) => dist(a, hub) - dist(b, hub));
+    const open = this.derelicts.filter((d) => d.owner !== f && (keen || dist(d, hub) <= AI_CLAIM_REACH)).sort((a, b) => dist(a, hub) - dist(b, hub));
     const target = open[0];
     const current = this.unit(side.claimer);
     if (current && current.faction === f) {
@@ -1790,7 +1947,9 @@ export class World {
       .filter((s) => (s.index !== PLAYER || this.watch) && s.alive && this.hubOf(s.index))
       .sort((a, b) => dist(this.hubOf(a.index)!, bc) - dist(this.hubOf(b.index)!, bc))
       .findIndex((s) => s.index === f);
-    if (rank < 0 || rank >= AI_PICKETS || this.elapsedMs < AI_PICKET_MS + rank * AI_PICKET_STAGGER_MS) return;
+    // A hold contract keeps a picket on the beacon however far the rival's hub is.
+    const keen = side.deal.goal === 'hold';
+    if (!keen && (rank < 0 || rank >= AI_PICKETS || this.elapsedMs < AI_PICKET_MS + rank * AI_PICKET_STAGGER_MS)) return;
     const current = this.unit(side.picket);
     if (current && current.faction === f) {
       // A picket that chased a target off the beacon heads back once it is idle.
@@ -1818,6 +1977,12 @@ export class World {
     }
   }
 
+  /** The nearest main hub of another faction not at peace with `faction`, or null. */
+  private nearestEnemyHub(from: Point, faction: number): Building | null {
+    const hubs = this.buildings.filter((b) => b.type === 'hub' && !b.expansion && b.faction !== faction && !this.atPeace(faction, b.faction));
+    return hubs.reduce<Building | null>((best, b) => (!best || dist(b, from) < dist(best, from) ? b : best), null);
+  }
+
   /** The nearest building of another faction, of `only` when it is given and has any. */
   private nearestEnemyBuilding(from: Point, faction: number, only = -1): Building | null {
     let best: Building | null = null;
@@ -1840,6 +2005,10 @@ export class World {
         fallen.add(b.faction);
         this.cue('hubFalls', b);
       }
+      if (b.lastHit >= 0 && b.lastHit !== b.faction) {
+        this.dealScore(b.lastHit, 'razes');
+        if (main) this.dealScore(b.lastHit, 'hubs');
+      }
       if (b.faction !== PLAYER && b.lastHit === PLAYER) {
         this.scoreRaze(b);
         if (main) {
@@ -1861,6 +2030,7 @@ export class World {
       // A destroyed ship leaves a salvage shard for whoever destroyed it; the player's count as kills.
       if (u.decoyMs !== null || u.lastHit < 0 || u.lastHit === u.faction) continue;
       this.shards.push({ id: this.id(), faction: u.lastHit, x: u.x, y: u.y, value: SHARD_VALUE, life: SHARD_LIFE_MS });
+      this.dealScore(u.lastHit, 'kills');
       const killer = this.unit(u.lastHitBy);
       if (killer && killer.hp > 0 && killer.faction === u.lastHit && killer.decoyMs === null) this.credit(killer);
       if (u.lastHit === PLAYER) {
@@ -1970,6 +2140,7 @@ export class World {
       return;
     }
     if (bc.owner === PLAYER && this.contract.goal === 'hold') this.contract.progress += dt / 1000;
+    this.dealScore(bc.owner, 'hold', dt / 1000);
     bc.payMs += dt;
     while (bc.payMs >= BEACON_PAY_MS) {
       bc.payMs -= BEACON_PAY_MS;
@@ -2057,6 +2228,57 @@ export class World {
     this.cue('contractDone');
     this.events.push({ kind: 'notice', text });
     this.openBoard();
+  }
+
+  /**
+   * The rivals' own contracts (see AI_DEAL_MS): each AI faction picks one from AI_GOALS open at its
+   * step, counts it (`dealScore`, and derelicts held here), drops it after AI_DEAL_LIMIT_MS, and once
+   * it is met takes its reward and perk; the player hears of each one finished.
+   */
+  private updateDeals(dt: number) {
+    if (this.elapsedMs < AI_DEAL_MS) return;
+    for (const side of this.sides) {
+      if (!side.alive || (side.index === PLAYER && !this.watch)) continue;
+      const deal = side.deal;
+      if (!deal.goal) {
+        if (deal.step >= CONTRACT_STEPS) continue;
+        const open = CONTRACT_POOL.filter((c) => AI_GOALS.includes(c.goal) && c.from <= deal.step && !deal.done.includes(c.goal));
+        if (!open.length) {
+          deal.step = CONTRACT_STEPS;
+          continue;
+        }
+        const c = open[Math.floor(this.dealRng() * open.length)];
+        deal.goal = c.goal;
+        deal.progress = 0;
+        deal.ms = 0;
+        aiLog(String(side.index), t('aiDeal', { rank: RANKS[deal.step], title: c.title(side.def) }));
+        continue;
+      }
+      const c = contractOf(deal.goal);
+      deal.ms += dt;
+      if (deal.goal === 'derelicts') deal.progress = this.derelicts.filter((d) => d.owner === side.index).length;
+      if (deal.progress >= c.target) {
+        side.crystal += c.reward;
+        c.apply(side.perks);
+        deal.done.push(c.goal);
+        aiLog(String(side.index), t('aiDealDone', { title: c.title(side.def), perk: c.perk(side.def) }));
+        if (side.index !== PLAYER && !this.watch) {
+          this.events.push({ kind: 'notice', text: t('rivalDealDone', { faction: t(side.def.name), title: c.title(side.def), perk: c.perk(side.def) }) });
+        }
+        deal.step += 1;
+        deal.goal = null;
+      } else if (deal.ms >= AI_DEAL_LIMIT_MS) {
+        // Dropped, not failed for good: the rival picks again at the same step, this one included.
+        deal.goal = null;
+      }
+    }
+  }
+
+  /** Counts `n` toward faction `f`'s own contract when it is an AI faction working on `goal`. */
+  private dealScore(f: number, goal: Goal, n = 1) {
+    if (f < 0 || (f === PLAYER && !this.watch) || this.elapsedMs < AI_DEAL_MS) return;
+    const deal = this.sides[f].deal;
+    if (deal.goal === goal) deal.progress += n;
   }
 
   /** Puts up the board for the next contract: two cards from the pool, or the chain's end. */

@@ -6,7 +6,7 @@ import { expect, test, type Page } from '@playwright/test';
 // floor 2's 6x6 board starts with that relic's effect.
 // Game state is only read, through the `game` object the dev build puts on window.
 
-type RelicId = 'lantern' | 'heartstone' | 'seer' | 'ward';
+type RelicId = 'lantern' | 'heartstone' | 'seer' | 'ward' | 'twin' | 'gambler' | 'phoenix' | 'sandglass' | 'vow' | 'keystone';
 interface GameState {
   phase: 'menu' | 'playing' | 'solved' | 'relic' | 'over';
   mode: 'classic' | 'daily' | 'delve';
@@ -212,6 +212,9 @@ test('plays the first round', async ({ page }, testInfo) => {
   await play(STEP_MS, async () => false);
   const saved = JSON.parse((await page.evaluate(() => localStorage.getItem('ninefold-progress')))!);
   expect(saved).toMatchObject({ solved: 1, bestFloor: 1, unlocked: ['paper', 'pixel'] });
+  // The first solve earns the First fill trophy (src/trophies/), and nothing else yet: it had a mistake.
+  const earned = await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('ninefold-trophies') ?? '{}')));
+  expect(earned, 'trophies earned in the first round').toEqual(['firstSolve']);
   await snap('3-relics');
 
   // Taking the first relic goes down to floor 2, a 6x6 board, with the relic's effect.
@@ -235,11 +238,25 @@ test('plays the first round', async ({ page }, testInfo) => {
     case 'seer':
       expect(revealed).toBe(SEER_CELLS);
       break;
+    case 'twin':
+      expect(s.maxHearts).toBe(before.maxHearts - 1);
+      expect(s.notes.some((n, i) => n && !s.values[i]), 'candidates noted').toBe(true);
+      break;
+    case 'vow':
+      expect(s.maxHearts).toBe(Math.min(MAX_HEARTS, before.maxHearts + 2));
+      expect(s.hearts).toBe(before.hearts + 2);
+      expect(s.hintsLeft).toBe(0);
+      break;
     case 'ward':
+    case 'gambler':
+    case 'phoenix':
+    case 'sandglass':
+    case 'keystone':
+      // These act later (on a mistake, a streak, a fast clear or a finished box).
       break;
   }
   if (relic !== 'seer') expect(revealed).toBe(0);
-  if (relic !== 'heartstone') expect(s.hearts).toBe(before.hearts);
+  if (relic !== 'heartstone' && relic !== 'vow') expect(s.hearts).toBe(Math.min(s.maxHearts, before.hearts));
   await play(1_000, async () => false);
   expect((await game.state()).puzzle!.size).toBe(FLOOR_2.size);
   await snap('4-floor-2');

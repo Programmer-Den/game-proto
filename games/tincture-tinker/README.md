@@ -236,6 +236,28 @@ The favicon is the hub's bear with three potions lined up: a match of three.
 
 The difficulty, set on the hub page's Settings, changes one thing: each order (and each guild examination) gives 5 more moves on Easy and 3 fewer on Hard.
 
+## Trophies
+
+Ten trophies, listed behind the Trophies button on the start and pause screens and counted on the
+hub's card:
+
+| Trophy | Tier | Earned by |
+| --- | --- | --- |
+| First tincture | Bronze | Selling your first potion |
+| Chain reaction | Bronze | Firing a Catalyst |
+| In full bloom | Bronze | Firing a Bloom |
+| Flawless | Bronze | Selling a potion for three stars |
+| A better bench | Bronze | Buying your first workbench upgrade |
+| Master Tinker | Silver | Reaching the rank of Master Tinker |
+| Busy shop | Silver | Selling 50 potions |
+| Fully fitted (hidden) | Silver | Buying every workbench upgrade to its top level |
+| Royal Apothecary | Gold | Filling the crown's last order |
+| Guild master (hidden) | Gold | Passing every guild examination |
+
+![The Trophies list on the pause screen](docs/screenshots/trophy-list.webp)
+
+![A trophy earned at the board](docs/screenshots/trophy-toast.webp)
+
 ## Running locally
 
 `npm run dev` at the repo root, then open `/games/tincture-tinker/` (or pick TinctureTinker on the hub
@@ -271,6 +293,8 @@ All paths are inside `games/tincture-tinker/`.
   `state.ts` holds the order being played, the pantry and the herbalist, `sim.ts` plays a swap out step by step
   (Catalysts, Blooms, jars, resin, mould, stages and customers included) and runs the bench tools,
   and `save.ts` keeps the progress.
+- `src/trophies/`: the trophies (`index.ts`), their texts (`i18n/`) and when each is earned
+  (`check.ts`).
 - `src/scenes/`: `BootScene` paints the textures, `GameScene` draws the board, the rank ribbon and
   the order label, animates each step of a swap and wires taps, drags and tools to the rules,
   `layout.ts` says where things are drawn.

@@ -2,11 +2,13 @@ import { MAPS } from './maps';
 import { REPLAY_VERSION, type Action, type Replay } from './sim';
 import { ALWAYS, DEFAULT_POUCH, FREE, MODES, POUCH_PICKS, SEEDS, SLOT_SEEDS, TOWERS, type Mode, type TowerKind } from './rules';
 
-// Mazewright keeps seven keys: each garden's records (best wave, win, stars, best time, Endless
+// Mazewright keeps eight keys: each garden's records (best wave, win, stars, best time, Endless
 // best), the towers picked for the pouch, whether waves wait to be started (calm), whether two
 // gardeners play (duo), the way of play
-// picked (mode), the potting shed (seeds, the towers and master levels bought, extra slots) and
-// each garden's latest win to watch again (replays). A game in play is not saved; a reload starts at the garden picker.
+// picked (mode), the potting shed (seeds, the towers and master levels bought, extra slots),
+// each garden's latest win to watch again (replays) and the game in play, kept at its last break
+// between waves as a replay of everything done so far (game). Both replay keys end in `-replays`,
+// so progress files carry them and progress codes, too small for them, leave them out.
 const KEY = 'mazewright-best';
 const POUCH_KEY = 'mazewright-pouch';
 const CALM_KEY = 'mazewright-calm';
@@ -14,6 +16,7 @@ const DUO_KEY = 'mazewright-duo';
 const MODE_KEY = 'mazewright-mode';
 const SHED_KEY = 'mazewright-shed';
 const REPLAY_KEY = 'mazewright-replays';
+const GAME_KEY = 'mazewright-game-replays';
 
 function loadFlag(key: string) {
   try {
@@ -40,7 +43,8 @@ export const saveDuo = (duo: boolean) => saveFlag(DUO_KEY, duo);
 
 /**
  * Per garden: the best wave reached and whether it was won (Classic or Swarm), the most stars, the
- * fastest win in seconds of game time (0 for none) and the most waves held in Endless.
+ * fastest win in seconds of game time (0 for none), the most waves held in Endless and whether its
+ * Challenge was won.
  */
 export interface GardenRecord {
   wave: number;
@@ -48,6 +52,8 @@ export interface GardenRecord {
   stars: number;
   time: number;
   endless: number;
+  /** Won its Challenge (its own pouch). */
+  challenge: boolean;
 }
 export type Records = Record<string, GardenRecord>;
 
@@ -55,7 +61,7 @@ const count = (v: unknown) => (Number.isFinite(v) && (v as number) > 0 ? Math.fl
 
 export function loadRecords(): Records {
   const records: Records = {};
-  for (const m of MAPS) records[m.id] = { wave: 0, won: false, stars: 0, time: 0, endless: 0 };
+  for (const m of MAPS) records[m.id] = { wave: 0, won: false, stars: 0, time: 0, endless: 0, challenge: false };
   try {
     const saved = JSON.parse(localStorage.getItem(KEY) ?? 'null');
     for (const m of MAPS) {
@@ -67,6 +73,7 @@ export function loadRecords(): Records {
       into.stars = Math.min(4, count(r.stars) || (into.won ? 1 : 0));
       into.time = count(r.time);
       into.endless = count(r.endless);
+      into.challenge = r.challenge === true;
     }
   } catch {
     // A broken or blocked save starts fresh.
@@ -84,6 +91,7 @@ export function noteRecord(records: Records, mapId: string, result: Partial<Gard
   r.stars = Math.max(r.stars, result.stars ?? 0);
   if (result.time) r.time = r.time ? Math.min(r.time, result.time) : result.time;
   r.endless = Math.max(r.endless, result.endless ?? 0);
+  r.challenge ||= !!result.challenge;
   if (JSON.stringify(r) === before) return;
   try {
     localStorage.setItem(KEY, JSON.stringify(records));
@@ -218,5 +226,31 @@ export function saveReplay(replays: Replays, replay: Replay) {
     localStorage.setItem(REPLAY_KEY, JSON.stringify(replays));
   } catch {
     // Storage can be full or blocked; the replay holds until the page is closed.
+  }
+}
+
+/** The game in play, saved in a break between waves: its replay so far, its pouch and the wave it is at. */
+export interface SavedGame extends Replay {
+  pouch: TowerKind[];
+  wave: number;
+}
+
+export function loadGame(): SavedGame | null {
+  try {
+    const saved = JSON.parse(localStorage.getItem(GAME_KEY) ?? 'null');
+    if (saved && MAPS.some((m) => m.id === saved.map) && valid(saved, saved.map) && Array.isArray(saved.pouch) && saved.pouch.every((k: TowerKind) => TOWERS.includes(k)) && whole(saved.wave)) return saved;
+  } catch {
+    // A broken or blocked save, or one from other rules, starts at the garden picker.
+  }
+  return null;
+}
+
+/** Keeps the game in play, or drops it (null) once it is over or another is started. */
+export function saveGame(game: SavedGame | null) {
+  try {
+    if (game) localStorage.setItem(GAME_KEY, JSON.stringify(game));
+    else localStorage.removeItem(GAME_KEY);
+  } catch {
+    // Storage can be full or blocked; the game goes on unsaved.
   }
 }

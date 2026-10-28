@@ -114,6 +114,7 @@ import {
   type ArtStyle,
 } from '../game/save';
 import { HUD_DEPTH, Hud, fireRate } from './Hud';
+import { checkTrophies } from '../trophies/check';
 // Text objects go by `t` in this scene, so the translator goes by `tr`.
 import { t as tr, type TextKey } from '../i18n';
 
@@ -858,6 +859,7 @@ export class GameScene extends Phaser.Scene {
   update(_time: number, delta: number) {
     const dt = Math.min(delta, 100);
     this.animateFeed();
+    checkTrophies(this.state);
     if (this.state.phase === 'over') this.overMs += dt;
     // Nothing moves while the game is over, or a supply drop or a survivor's role is being picked.
     if (this.state.phase === 'over' || this.state.phase === 'supply' || this.state.phase === 'role') return;

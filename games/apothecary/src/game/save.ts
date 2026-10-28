@@ -1,7 +1,7 @@
 import type { ItemId } from './items';
 import { BELT_GAP_MS, BELT_MS, BELTS, COLUMNS_BELT_MS, COLUMNS_LAYOUT, FEEDERS_LAYOUT, GUILD_UPGRADES, HEART_LAYOUT, PLOTS_PER_GARDEN, U_BELT_MS, createInitialState, gardenOf, type GameState, type Plot } from './state';
 import { beltSpan } from '../scenes/layout';
-import { normalizeTown, type ShopState } from './town';
+import { SHOP_IDS, createShop, normalizeTown } from './town';
 
 const KEY = 'apothecary-save';
 
@@ -11,7 +11,9 @@ export function loadState(): GameState {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return fresh;
-    const { thin, ...saved } = JSON.parse(raw) as Partial<GameState> & { thin?: boolean };
+    const { thin, ...stored } = JSON.parse(raw) as Partial<GameState> & { thin?: boolean | number };
+    // A thin save is filled back in from the start it was trimmed against; a whole one is as stored.
+    const saved = thin ? (merged(baseline(stored), stored) as Partial<GameState>) : stored;
     if (saved.version !== fresh.version || !saved.plots) return fresh;
     // Fields added after the save was written fall back to their defaults, including new plots,
     // stations' upgrades, craftsmen and belts, the contract, sales and tips counts, the last-seen
@@ -115,44 +117,53 @@ export function saveState(state: GameState) {
   }
 }
 
+type Json = Record<string, unknown>;
+const isRecord = (v: unknown): v is Json => typeof v === 'object' && v !== null && !Array.isArray(v);
+const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+
 /**
- * Whether a saved entry is still as the game starts it: an upgrade never bought (`level` and `paid`
- * 0), a build, belt or route never started (`built` false, nothing paid, nothing on it).
+ * What a thin save is trimmed against and filled back in from: a new game, with each shop the save
+ * has bought as it is bought. Both are the same every time, so the save and the load agree.
  */
-const untouched = (entry: unknown) =>
-  typeof entry === 'object' && entry !== null && Object.values(entry).every((v) => v === 0 || v === false || (Array.isArray(v) && v.length === 0));
+function baseline(saved: { town?: { shops?: object } }) {
+  const start = createInitialState();
+  for (const id of SHOP_IDS) if (isRecord(saved.town?.shops) && id in saved.town.shops) start.town.shops[id] = createShop(id);
+  return start;
+}
 
-/** A record without its untouched entries; the load spreads it over the defaults again. */
-const touched = <T extends object>(record: T) => Object.fromEntries(Object.entries(record).filter(([, v]) => !untouched(v))) as Partial<T>;
+/** `value` without whatever it shares with `start`, object by object; a list that differs is kept whole. */
+function trimmed(value: unknown, start: unknown): unknown {
+  if (!isRecord(value) || !isRecord(start)) return value;
+  return Object.fromEntries(Object.entries(value).filter(([k, v]) => !same(v, start[k])).map(([k, v]) => [k, trimmed(v, start[k])]));
+}
+
+/** `start` with `saved` laid over it, object by object, so what a thin save left out comes back. */
+function merged(start: unknown, saved: unknown): unknown {
+  if (!isRecord(start) || !isRecord(saved)) return saved;
+  const out: Json = { ...start };
+  for (const [k, v] of Object.entries(saved)) out[k] = merged(start[k], v);
+  return out;
+}
 
 /**
- * The state as saved: the upgrades, craftsmen, belts, second-line builds and the town shops'
- * routes and upgrades still at their start are left out, which keeps progress codes short. `thin`
- * tells `loadState` that a missing upgrade is one never bought, not one from before it existed.
+ * The state as saved, which keeps progress codes short: only what differs from a new game
+ * (`baseline`), with timers rounded (`roundTimers`). `version` and `layout` always stay, since the
+ * load decides on them, and `thin` tells `loadState` to fill the rest back in.
  */
 function thinSave(state: GameState) {
-  const shops: Partial<Record<string, Partial<ShopState>>> = {};
-  for (const [id, shop] of Object.entries(state.town.shops)) {
-    const { recipes, line2, ...rest } = shop;
-    shops[id] = {
-      ...rest,
-      ...touched({ recipes, line2 }),
-      routes: touched(shop.routes),
-      counter: touched(shop.counter) as ShopState['counter'],
-      outfitter: touched(shop.outfitter) as ShopState['outfitter'],
-      study: touched(shop.study) as ShopState['study'],
-      guild: touched(shop.guild) as ShopState['guild'],
-    } as Partial<ShopState>;
-  }
-  return {
-    ...state,
-    thin: true,
-    upgrades: touched(state.upgrades),
-    craftsmen: touched(state.craftsmen),
-    belts: touched(state.belts),
-    expansion: touched(state.expansion),
-    town: { ...state.town, shops },
-  };
+  return { ...(roundTimers(trimmed(state, baseline(state))) as Json), version: state.version, layout: state.layout, thin: 2 };
+}
+
+/**
+ * The value with every timer rounded to a tenth of a second: a number of 100 or more with a
+ * fraction is milliseconds counted by frames (growth, walks, belts, days), and its last digits
+ * only lengthen the progress code. Whole numbers, such as coins and times of day, stay exact.
+ */
+function roundTimers(value: unknown): unknown {
+  if (typeof value === 'number') return value >= 100 && !Number.isInteger(value) ? Math.round(value / 100) * 100 : value;
+  if (Array.isArray(value)) return value.map(roundTimers);
+  if (isRecord(value)) return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, roundTimers(v)]));
+  return value;
 }
 
 export function clearSave() {

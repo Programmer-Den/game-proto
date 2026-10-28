@@ -82,7 +82,10 @@ sky.
 15. **The endless sky**: after the crown, **Keep building** lifts the crown off, a break picks the
     first sky tier's stone (and a blessing, if tier 12 was balanced), and the temple climbs on. Gusts now push the falling stone sideways (the
     top of the screen and the streaks by the stone show which way and how hard), stronger the higher
-    you go (under the Storm Caller they just keep growing from tier 6). Aim upwind.
+    you go (under the Storm Caller they just keep growing from tier 6). Aim upwind. Every tenth tier
+    past the crown (22, 32, ...) is a **sky altar**: its stones are cloud-silver and earn double
+    favor, and finishing it offers a blessing even if it came out wobbly. The panel's goal box
+    names the next one.
 16. **The end** comes when a stone misses the temple. The most tiers built in one temple are saved
     in the browser.
 
@@ -146,6 +149,10 @@ Blessings can be taken more than once, and they add up.
 
 ![A gust in the endless sky](docs/screenshots/endless-gust.webp)
 
+![Building the cloud-silver sky altar on tier 22](docs/screenshots/sky-altar.webp)
+
+![The sky altar's blessing](docs/screenshots/sky-altar-blessing.webp)
+
 ![The gilded tenth tier going up](docs/screenshots/gilded.webp)
 
 ![The shrine crowned at tier 12](docs/screenshots/crowned.webp)
@@ -153,6 +160,26 @@ Blessings can be taken more than once, and they add up.
 ![After a balanced crown, Keep building offers tier 12's blessing](docs/screenshots/crowned-blessing.webp)
 
 ![The temple has fallen](docs/screenshots/game-over.webp)
+
+### Trophies
+
+Eight trophies, listed behind the Trophies button on the start and pause screens and counted on the
+hub:
+
+| Trophy | Tier | How to earn it |
+| --- | --- | --- |
+| First course | Bronze | Finish your first tier. |
+| Grown back | Bronze | Grow a stone back with a chain of perfect drops. |
+| Bound by a curse | Bronze | Finish a tier under a curse you took for double favor. |
+| Leaf gold | Silver | Finish the gilded tenth tier. |
+| Crowned shrine | Silver | Finish tier 12 and crown the shrine. |
+| Flawless shrine | Gold | Crown the shrine with every tier balanced. |
+| Altar in the clouds | Gold, hidden | Finish a sky altar, the tenth tier past the crown. |
+| Stairway of altars | Gold, hidden | Finish three sky altars in one temple. |
+
+![A trophy earned on the first tier](docs/screenshots/trophy-earned.webp)
+
+![The trophy list on the pause screen](docs/screenshots/trophies.webp)
 
 The difficulty, set on the hub page's Settings, changes one thing: stones swing 20% slower on Easy
 and 25% faster on Hard.
@@ -188,6 +215,8 @@ All paths are inside `games/shrine-stack/`.
   reserve, trials, the lean, perfect chains, materials, patrons, curses, the gilded tier, the goal
   and the endless sky, `blessings.ts` the blessing names and texts, `catalog.ts` the shop items,
   stone kinds, trials, curses, materials and patrons, and `save.ts` the best height.
+- `src/trophies/`: the trophies (`index.ts`), their texts (`i18n/`) and when each is earned
+  (`check.ts`).
 - `src/scenes/`: `GameScene` draws the sky, the temple, the panel with the patron, the goal track,
   the next stone, the reserve, the trial, the curse and the lean meter, the patron cards, the
   blessing cards, the reroll button, the material row, the curse toggle and the shop, gusts, the

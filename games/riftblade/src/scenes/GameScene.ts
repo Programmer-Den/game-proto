@@ -7,10 +7,14 @@ import { choose, inRingGap, phalanxSpots, prepare, shieldHalf, startRun, suppres
 import { bladeColor, dreadRadius, heroVariant, orbitBlades } from '../game/blades';
 import { bubble, rebuildTime } from '../game/squad';
 import { buy, chooseEvent, chooseNode, chooseWorld, chartOptions, frame, leave, nextPlanet, reroll } from '../game/voyage';
+import { heatOpen } from '../game/heat';
+import { checkTrophies } from '../trophies/check';
+import { ARMOURY, salvage, type ArmouryId } from '../game/armoury';
+import { reseed, unseed, weekOf, weekSeed, weeklyOf, type MutatorId } from '../game/weekly';
 import { ARENA_MS, BOSSES, CHAMPION, PLANETS, SIEGE, STRIKE, VENT, planetLabel } from '../game/planets';
 import { UPGRADES, MAX_TIER } from '../game/upgrades';
 import {
-  clearRun, isResumable, isUnlocked, loadProgress, loadRun, recordCharted, recordRun, recordUnlocks, saveRun, unlockedHeroes, type Progress,
+  clearRun, isResumable, isUnlocked, loadProgress, loadRun, buyArmoury, recordCharted, recordRun, recordWeekly, recordUnlocks, saveRun, unlockedHeroes, type Progress,
 } from '../game/save';
 import { C, hex } from '../art/glow';
 import { heroKey } from '../art/sprites';
@@ -22,7 +26,7 @@ import { OBJ_COLOR, drawObjectiveGround, drawPowerUp, drawStructure, objectiveTa
 import { objectiveHint, objectiveName, OBJ_MISC } from '../game/objectives';
 import { SoundCues } from '../audio/cues';
 import { sfx } from '../audio/sfx';
-import { Panel, endScreen, eventPanel, heroSelect, levelUp, spaceMap, starMap, trader, unlockPanel } from '../ui/panels';
+import { Panel, armouryPanel, weeklyPanel, endScreen, eventPanel, heroSelect, levelUp, spaceMap, starMap, trader, unlockPanel } from '../ui/panels';
 import {
   BOSS_BAR, CENTER, CREDITS_TAG, OBJECTIVE_HUD, DEPTH, FONT, HP_BAR, KIT, LEVEL, PLANET_TAG, SIG_BUTTON, STICK, TIMER, SCREEN, FRAME, VIEW, XP_BAR, fitLayout, inside,
 } from './layout';
@@ -90,6 +94,15 @@ export class GameScene extends Phaser.Scene {
   private worldsBaked = false;
   /** The hero chosen on the select screen (kept between runs), and deeds already saved this run. */
   chosen: HeroId = 'tr9';
+  /** The rift heat picked on the select screen for each hero (the highest open until changed). */
+  private heatPick: Partial<Record<HeroId, number>> = {};
+  /** Whether the Armoury is open over the hero select, and the credits the run that ended banked. */
+  armouryOpen = false;
+  private banked = 0;
+  /** Whether the weekly run's panel is open, this week's number, and the bonus the weekly win banked. */
+  weeklyOpen = false;
+  private week = weekOf(Date.now());
+  private bonus = 0;
   private savedDeeds = 0;
   /** Heroes just unlocked, waiting to be shown (the game stands still while one is). */
   unlocking: HeroId[] = [];
@@ -176,7 +189,10 @@ export class GameScene extends Phaser.Scene {
       this.keys[key].on('down', () => {
         const s = this.state;
         if (this.unlocking.length) return;
-        if (s.phase === 'select') {
+        if (s.phase === 'select' && this.weeklyOpen) return;
+        if (s.phase === 'select' && this.armouryOpen) {
+          if (ARMOURY[i]) this.buyArmoury(ARMOURY[i].id);
+        } else if (s.phase === 'select') {
           if (HERO_IDS[i]) this.choose(HERO_IDS[i]);
         } else if (s.phase === 'levelup') {
           if (i < (s.choices?.length ?? 0)) this.pickIndex(i);
@@ -184,9 +200,17 @@ export class GameScene extends Phaser.Scene {
         else if (i < 3) this.pickIndex(i);
       });
     });
+    // Left and right step the rift heat on the hero select.
+    for (const [key, dir] of [['LEFT', -1], ['RIGHT', 1], ['A', -1], ['D', 1]] as const) {
+      this.keys[key].on('down', () => {
+        if (this.state.phase === 'select' && !this.unlocking.length && !this.armouryOpen && !this.weeklyOpen) this.stepHeat(dir);
+      });
+    }
     this.keys.ENTER.on('down', () => {
       if (this.unlocking.length) this.closeUnlock();
       else if (this.state.phase === 'won' || this.state.phase === 'lost') this.backToSelect();
+      else if (this.state.phase === 'select' && this.armouryOpen) this.closeArmoury();
+      else if (this.state.phase === 'select' && this.weeklyOpen) this.beginWeekly();
       else if (this.state.phase === 'select') this.begin(this.chosen);
       else this.leave();
     });
@@ -251,6 +275,7 @@ export class GameScene extends Phaser.Scene {
     this.savedAt = s.runMs;
     this.hero.setTexture(heroKey(s.hero!, heroVariant(s))).setVisible(true);
     this.cues.resume(s);
+    if (s.week >= 0) reseed(weekSeed(s.week) + 7919 * s.stage + 17);
   }
 
   // -------------------------------------------------------------------------------------------
@@ -274,8 +299,27 @@ export class GameScene extends Phaser.Scene {
       if (spot.id === 'continue') this.closeUnlock();
       return;
     }
-    if (s.phase === 'select') {
+    if (s.phase === 'select' && this.weeklyOpen) {
+      if (spot.id === 'start') this.beginWeekly();
+      else if (spot.id === 'back') {
+        this.weeklyOpen = false;
+        ui('click');
+      }
+    } else if (s.phase === 'select' && this.armouryOpen) {
+      if (spot.id === 'back') this.closeArmoury();
+      else this.buyArmoury(spot.id as ArmouryId);
+    } else if (s.phase === 'select') {
       if (spot.id === 'fight') this.begin(this.chosen);
+      else if (spot.id === 'armoury') {
+        this.armouryOpen = true;
+        ui('click');
+      } else if (spot.id === 'weekly') {
+        this.week = weekOf(Date.now());
+        this.weeklyOpen = true;
+        ui('click');
+      }
+      else if (spot.id === 'heat-down') this.stepHeat(-1);
+      else if (spot.id === 'heat-up') this.stepHeat(1);
       else this.choose(spot.id as HeroId);
     }
     else if (s.phase === 'won' || s.phase === 'lost') this.backToSelect();
@@ -302,6 +346,54 @@ export class GameScene extends Phaser.Scene {
     if (isUnlocked(this.progress, id)) ui('click');
     else ui('refuse');
     this.chosen = id;
+  }
+
+  /** This week's hero and mutators, from the heroes open now. */
+  private weekly() {
+    return weeklyOf(this.week, unlockedHeroes(this.progress));
+  }
+
+  /** Starts this week's weekly run. */
+  private beginWeekly() {
+    const { hero, mutators } = this.weekly();
+    this.weeklyOpen = false;
+    this.chosen = hero;
+    this.begin(hero, { week: this.week, mutators });
+  }
+
+  /** Buys the next rank of an Armoury piece, if the bank holds enough. */
+  private buyArmoury(id: ArmouryId) {
+    const progress = buyArmoury(id);
+    if (!progress) {
+      ui('refuse');
+      return;
+    }
+    this.progress = progress;
+    ui('coin');
+  }
+
+  private closeArmoury() {
+    this.armouryOpen = false;
+    ui('click');
+  }
+
+  /** The rift heat the chosen hero would fight at: the one picked, else the highest open. */
+  private heatFor(id: HeroId) {
+    const open = isUnlocked(this.progress, id) ? heatOpen(this.progress.heat[id]) : 0;
+    return Math.min(open, this.heatPick[id] ?? open);
+  }
+
+  /** Steps the chosen hero's rift heat down or up, within what is open. */
+  private stepHeat(dir: -1 | 1) {
+    const id = this.chosen;
+    const open = isUnlocked(this.progress, id) ? heatOpen(this.progress.heat[id]) : 0;
+    const next = this.heatFor(id) + dir;
+    if (open === 0 || next < 0 || next > open) {
+      if (open > 0) ui('refuse');
+      return;
+    }
+    this.heatPick[id] = next;
+    ui('click');
   }
 
   private closeUnlock() {
@@ -352,13 +444,16 @@ export class GameScene extends Phaser.Scene {
     this.settle();
   }
 
-  private begin(id: HeroId) {
+  private begin(id: HeroId, weekly?: { week: number; mutators: MutatorId[] }) {
     if (!isUnlocked(this.progress, id)) {
       ui('refuse');
       return;
     }
     ui('click');
-    startRun(this.state, id, unlockedHeroes(this.progress), (Math.hypot(SCREEN.w, SCREEN.h) - Math.hypot(VIEW.w, VIEW.h)) / 2);
+    unseed();
+    // A weekly run is fought at heat 0 without the Armoury, and seeds Math.random (`startRun`).
+    const ringOut = (Math.hypot(SCREEN.w, SCREEN.h) - Math.hypot(VIEW.w, VIEW.h)) / 2;
+    startRun(this.state, id, unlockedHeroes(this.progress), ringOut, weekly ?? { heat: this.heatFor(id), perks: this.progress.armoury });
     this.savedDeeds = 0;
     this.recorded = false;
     this.saveRun();
@@ -370,6 +465,7 @@ export class GameScene extends Phaser.Scene {
 
   private backToSelect() {
     ui('click');
+    unseed();
     this.state = freshState();
     this.hero.setVisible(false);
   }
@@ -440,6 +536,7 @@ export class GameScene extends Phaser.Scene {
     if (here && this.state.phase === 'run' && !this.progress.charted.includes(here)) this.progress = recordCharted(here);
     if (this.panelKey() !== this.shown) this.syncPanel();
     else if (this.state.phase === 'run' && this.state.runMs - this.savedAt >= RUN_SAVE_MS) this.saveRun();
+    checkTrophies(this.state, this.progress);
     this.draw();
   }
 
@@ -448,7 +545,9 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     if (this.unlocking.length) return `unlock|${this.unlocking[0]}`;
     if (s.phase === 'run') return 'run';
-    return [s.phase, this.chosen, s.choices?.join(), s.offers.join(), s.credits, s.event?.id, s.nodes.join(), s.rewardPicks].join('|');
+    if (s.phase === 'select' && this.weeklyOpen) return `weekly|${this.week}|${JSON.stringify(this.progress.weekly)}`;
+    if (s.phase === 'select' && this.armouryOpen) return `armoury|${this.progress.bank}|${JSON.stringify(this.progress.armoury)}`;
+    return [s.phase, this.chosen, this.progress.bank, this.heatFor(this.chosen), s.choices?.join(), s.offers.join(), s.credits, s.event?.id, s.nodes.join(), s.rewardPicks].join('|');
   }
 
   /** Shows the panel for the phase the run is in. */
@@ -458,7 +557,12 @@ export class GameScene extends Phaser.Scene {
     this.panel = null;
     if ((s.phase === 'won' || s.phase === 'lost') && !this.recorded) {
       this.recorded = true;
-      this.progress = recordRun(s.hero!, s.runMs, s.phase === 'won', s.stage + 1, s.route.map((i) => PLANETS[i].id));
+      this.banked = salvage(s.credits, s.stage + 1);
+      this.bonus = 0;
+      unseed();
+      this.progress = recordRun(s.hero!, s.runMs, s.phase === 'won', s.stage + 1, s.route.map((i) => PLANETS[i].id), s.heat, this.banked);
+      if (s.week >= 0) this.bonus = recordWeekly(s.week, s.stage + 1, s.phase === 'won').bonus;
+      this.progress = loadProgress();
       clearRun();
     }
     // Every other panel (a level-up, the maps, the trader, an event) saves the run as it opens.
@@ -471,13 +575,15 @@ export class GameScene extends Phaser.Scene {
       p.place(FRAME.x, FRAME.y);
     };
     if (this.unlocking.length) build((p) => unlockPanel(p, this.unlocking[0]));
-    else if (s.phase === 'select') build((p) => heroSelect(p, this.progress, this.chosen));
+    else if (s.phase === 'select' && this.weeklyOpen) build((p) => weeklyPanel(p, this.progress, this.week, this.weekly().hero, this.weekly().mutators));
+    else if (s.phase === 'select' && this.armouryOpen) build((p) => armouryPanel(p, this.progress));
+    else if (s.phase === 'select') build((p) => heroSelect(p, this.progress, this.chosen, this.heatFor(this.chosen), this.week));
     else if (s.phase === 'levelup') build((p) => levelUp(p, s));
     else if (s.phase === 'chart') build((p) => spaceMap(p, s, this.progress.charted));
     else if (s.phase === 'map') build((p) => starMap(p, s));
     else if (s.phase === 'trader') build((p) => trader(p, s));
     else if (s.phase === 'event') build((p) => eventPanel(p, s));
-    else if (s.phase === 'won' || s.phase === 'lost') build((p) => endScreen(p, s, this.progress));
+    else if (s.phase === 'won' || s.phase === 'lost') build((p) => endScreen(p, s, this.progress, this.banked, this.bonus));
     this.shown = this.panelKey();
     this.walking = false;
     this.stick = null;
@@ -1167,7 +1273,9 @@ export class GameScene extends Phaser.Scene {
     if (s.arena) this.texts.timer.setText(clock(ARENA_MS - s.time)).setColor(C.elite);
     else this.texts.timer.setText(s.bossSpawned ? t('bossTimer') : clock(Math.min(s.time, RUN_MS))).setColor(s.bossSpawned ? C.boss : C.text);
     this.texts.level.setText(t('levelTag', { n: s.level }));
-    this.texts.planet.setText(s.arena ? t('eliteArena') : planetLabel(s.stage, s.planet)).setColor(s.arena ? C.elite : PLANETS[s.planet].ground.deco);
+    const where = s.arena ? t('eliteArena') : planetLabel(s.stage, s.planet);
+    const tag = s.week >= 0 ? t('weeklyTag', { label: where }) : s.heat > 0 ? t('heatTag', { label: where, n: s.heat }) : where;
+    this.texts.planet.setText(tag).setColor(s.arena ? C.elite : PLANETS[s.planet].ground.deco);
     this.texts.credits.setText(t('credits', { n: s.credits }));
     this.texts.boss.setVisible(!!boss);
     if (boss) {

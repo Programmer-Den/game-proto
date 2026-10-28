@@ -607,6 +607,64 @@ export function paintAll(scene: Phaser.Scene) {
     c.fillRect(11, 13, 3, 2);
     c.fillRect(20, 13, 3, 2);
   });
+  // A shelled beetle, and the same beetle flipped on its back, legs in the air.
+  paint(scene, 'beetle', 34, 28, (c) => {
+    shadow(c, 17, 24, 14, 4);
+    c.strokeStyle = '#1a1c24';
+    c.lineWidth = 2;
+    for (const x of [9, 15, 21]) {
+      c.beginPath();
+      c.moveTo(x, 18);
+      c.lineTo(x - 3, 25);
+      c.moveTo(x + 4, 18);
+      c.lineTo(x + 7, 25);
+      c.stroke();
+    }
+    ball(c, 27, 15, 5, '#2a3040');
+    ball(c, 15, 14, 12, '#2f6a78', 9);
+    c.strokeStyle = 'rgba(10,20,30,0.6)';
+    c.lineWidth = 1.5;
+    c.beginPath();
+    c.moveTo(15, 5);
+    c.lineTo(15, 23);
+    c.stroke();
+    glowDot(c, 10, 10, 4, 'rgba(200,240,255,0.5)');
+    c.fillStyle = '#e8d070';
+    c.fillRect(29, 13, 2, 2);
+  });
+  paint(scene, 'beetle-back', 34, 28, (c) => {
+    shadow(c, 17, 24, 14, 4);
+    ball(c, 17, 17, 12, '#2f6a78', 7);
+    ball(c, 17, 14, 9, '#c8b890', 5);
+    c.strokeStyle = '#1a1c24';
+    c.lineWidth = 2;
+    for (const x of [10, 15, 20, 25]) {
+      c.beginPath();
+      c.moveTo(x, 12);
+      c.lineTo(x + (x < 17 ? -2 : 2), 3);
+      c.stroke();
+    }
+  });
+  // A lantern moth: a big moth whose belly glows like a lamp. Its wings flap like the plain moth's.
+  const lantern = (key: string, up: boolean) =>
+    paint(scene, key, 40, 36, (c) => {
+      for (const s of [-1, 1]) {
+        c.fillStyle = '#8a6a9a';
+        c.beginPath();
+        c.ellipse(20 + s * 11, up ? 10 : 16, 11, up ? 8 : 6, s * (up ? -0.6 : 0.3), 0, Math.PI * 2);
+        c.fill();
+        glowDot(c, 20 + s * 12, up ? 10 : 16, 3, 'rgba(255,200,120,0.9)');
+      }
+      body(c, 20, 6, 7, 12, '#6a5a80', 0.5);
+      glowDot(c, 20, 24, 12, 'rgba(255,190,90,0.9)');
+      ball(c, 20, 24, 6, '#ffd080');
+    });
+  lantern('lantern-a', true);
+  lantern('lantern-b', false);
+  paint(scene, 'ember', 12, 12, (c) => {
+    glowDot(c, 6, 6, 6, 'rgba(255,170,70,0.7)');
+    ball(c, 6, 6, 3, '#ffb050');
+  });
   paint(scene, 'seed', 12, 12, (c) => {
     glowDot(c, 6, 6, 6, 'rgba(220,120,200,0.6)');
     ball(c, 6, 6, 3.5, '#c06aa0');
@@ -688,6 +746,20 @@ export function paintAll(scene: Phaser.Scene) {
     seedPod(c, 10, 12, 6);
   });
   paint(scene, 'pickup-seed', 18, 18, (c) => seedPod(c, 9, 10, 4.5));
+  // A coin: a lit gold disc with a raised rim, dropped by cut bushes and beaten foes.
+  const coin = (c: Ctx, x: number, y: number, r: number) => {
+    ball(c, x, y, r, '#e0b040', r * 0.92);
+    c.strokeStyle = shade('#e0b040', -0.35);
+    c.lineWidth = 1;
+    c.beginPath();
+    c.arc(x, y, r * 0.6, 0, Math.PI * 2);
+    c.stroke();
+  };
+  paint(scene, 'pickup-coin', 16, 16, (c) => {
+    shadow(c, 8, 13, 6, 2);
+    coin(c, 8, 8, 5);
+  });
+  paint(scene, 'ui-coin', 18, 18, (c) => coin(c, 9, 9, 7));
   const bell = (key: string, r: number) =>
     paint(scene, key, 40, 48, (c) => {
       shadow(c, 20, 44, r + 4, 4, 0.45);
@@ -724,6 +796,45 @@ export function paintAll(scene: Phaser.Scene) {
     c.moveTo(5, 11);
     c.quadraticCurveTo(7, 2, 9, 11);
     c.fill();
+  });
+  // The trial's hourglass: a wooden frame round two glass bulbs, the sand glowing like moonlight.
+  paint(scene, 'hourglass', 30, 48, (c) => {
+    shadow(c, 15, 45, 13, 4);
+    box(c, 2, 36, 26, 4, 5, '#6b4a30');
+    for (const x of [5, 25]) body(c, x, 8, 4, 30, '#7a5638', 0.2);
+    const glass = (top: boolean) => {
+      c.fillStyle = 'rgba(200,225,255,0.28)';
+      c.beginPath();
+      if (top) {
+        c.moveTo(7, 9);
+        c.quadraticCurveTo(15, 26, 15, 23);
+        c.quadraticCurveTo(15, 26, 23, 9);
+      } else {
+        c.moveTo(7, 36);
+        c.quadraticCurveTo(15, 19, 15, 23);
+        c.quadraticCurveTo(15, 19, 23, 36);
+      }
+      c.closePath();
+      c.fill();
+    };
+    glass(true);
+    glass(false);
+    glowDot(c, 15, 30, 12, 'rgba(170,220,255,0.55)');
+    c.fillStyle = '#cfe8ff';
+    c.beginPath();
+    c.moveTo(9, 12);
+    c.lineTo(21, 12);
+    c.lineTo(15, 20);
+    c.closePath();
+    c.fill();
+    c.beginPath();
+    c.moveTo(15, 28);
+    c.lineTo(22, 36);
+    c.lineTo(8, 36);
+    c.closePath();
+    c.fill();
+    c.fillRect(14.5, 20, 1, 8);
+    box(c, 2, 4, 26, 4, 5, '#6b4a30');
   });
   paint(scene, 'tower', 128, 152, (c) => {
     shadow(c, 64, 146, 62, 8, 0.5);

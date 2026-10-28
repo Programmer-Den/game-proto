@@ -12,6 +12,7 @@ import { blockersFor, MOVE_BONUS, orderFor, POTION_NAMES, RICH_BLOCKERS, RICH_MO
 import { RANKS, rankOf, starsFor, STARS_2, STARS_3 } from '../game/ranks';
 import { loadProgress, saveProgress } from '../game/save';
 import { canUse, funnel, nextExam, nextOrder, pestle, sift, stir, TOOL_ORDER, TOOLS, trySwap, type Step, type Tool } from '../game/sim';
+import { checkTrophies } from '../trophies/check';
 import { buyHerb, examOpen, heldPantry, HERB_COST, PANTRY_MAX, progressOf, standingOf, startOrder, type GameState } from '../game/state';
 import { buyUpgrade, UPGRADE_ORDER, upgradeCost, UPGRADES, type UpgradeId } from '../game/upgrades';
 import { sfx, SONG } from '../audio';
@@ -172,6 +173,7 @@ export class GameScene extends Phaser.Scene {
     this.clock += dt;
     this.runQueue(dt);
     this.updateHint(dt);
+    checkTrophies(this.state);
   }
 
   // ---- Playing an order ----

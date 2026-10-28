@@ -44,6 +44,14 @@ export const SETS: SetDef[] = [
   },
 ];
 
+/** The weekly season's rules, one a week in turn (`weekOf` in `progress.ts`): every season with and without terrain. */
+export const WEEKLY_ROTATION: { set: SetId; terrain: boolean }[] = [
+  { set: 'scrap', terrain: true },
+  { set: 'neon', terrain: false },
+  { set: 'scrap', terrain: false },
+  { set: 'neon', terrain: true },
+];
+
 /** Scrap tokens a Scrap Rush win pays, and how many build a part. */
 export const SCRAP_TOKENS_PER_PART = 3;
 /** Extra starting charge every robot gets in the Overcharge season. */
@@ -274,12 +282,15 @@ export const ITEM_BENCH = 10;
 
 export type AugmentId =
   | 'spare-parts' | 'front-plates' | 'overtime' | 'hot-wiring' | 'level-up' | 'recycler' | 'thick-hull'
-  | 'rapid-fire' | 'last-stand' | 'lucky-bolt' | 'gold-rush' | 'duplicator' | 'scrap-dividend' | 'big-battery' | 'war-chest';
+  | 'rapid-fire' | 'last-stand' | 'lucky-bolt' | 'gold-rush' | 'duplicator' | 'scrap-dividend' | 'big-battery' | 'war-chest'
+  | 'free-rolls' | 'hand-to-mouth' | 'gilded-shop';
 
 export interface AugmentDef {
   id: AugmentId;
   name: TextKey;
   text: TextKey;
+  /** A rare card that changes the economy: offered only in the third slot from stage 4 on (`RARE_FROM_STAGE`). */
+  rare?: boolean;
 }
 
 export const AUGMENTS: AugmentDef[] = [
@@ -298,13 +309,21 @@ export const AUGMENTS: AugmentDef[] = [
   { id: 'scrap-dividend', name: 'scrapDividendName', text: 'scrapDividendText' },
   { id: 'big-battery', name: 'bigBatteryName', text: 'bigBatteryText' },
   { id: 'war-chest', name: 'warChestName', text: 'warChestText' },
+  { id: 'free-rolls', name: 'freeRollsName', text: 'freeRollsText', rare: true },
+  { id: 'hand-to-mouth', name: 'handToMouthName', text: 'handToMouthText', rare: true },
+  { id: 'gilded-shop', name: 'gildedShopName', text: 'gildedShopText', rare: true },
 ];
+
+/** From this stage on, a power card offer holds one rare card. */
+export const RARE_FROM_STAGE = 4;
+/** What the rare cards do: free rerolls each round; gold a round instead of interest; the gilded chance from level 1. */
+export const RARE = { freeRolls: 2, handToMouthGold: 6, gildedChance: 0.2 };
 
 export const AUGMENT_BY_ID: Record<string, AugmentDef> = Object.fromEntries(AUGMENTS.map((a) => [a.id, a]));
 
 // ---------------------------------------------------------------- commanders
 
-export type SkillId = 'overclock' | 'zap' | 'bulwark';
+export type SkillId = 'overclock' | 'zap' | 'bulwark' | 'mend' | 'surge' | 'emp' | 'rally' | 'airstrike';
 
 export interface SkillDef {
   id: SkillId;
@@ -320,13 +339,34 @@ export const SKILL_POWER = {
   zap: { damage: 260, stunS: 1.5 },
   /** Shield on every ally and how long it lasts. */
   bulwark: { shield: 180, seconds: 5 },
+  /** Health given back to every ally. */
+  mend: { heal: 220 },
+  /** Every ally's charge is filled (no numbers). */
+  surge: {},
+  /** Every enemy loses its charge and is stunned this long. */
+  emp: { stunS: 0.8 },
+  /** Attack damage factor for allies and how long it lasts. */
+  rally: { damage: 1.35, seconds: 6 },
+  /** Damage to every enemy. */
+  airstrike: { damage: 140 },
 };
 
 export const SKILLS: Record<SkillId, SkillDef> = {
   overclock: { id: 'overclock', name: 'overclockSkill', text: 'overclockText' },
   zap: { id: 'zap', name: 'zapSkill', text: 'zapText' },
   bulwark: { id: 'bulwark', name: 'bulwarkSkill', text: 'bulwarkText' },
+  mend: { id: 'mend', name: 'mendSkill', text: 'mendText' },
+  surge: { id: 'surge', name: 'surgeSkill', text: 'surgeText' },
+  emp: { id: 'emp', name: 'empSkill', text: 'empText' },
+  rally: { id: 'rally', name: 'rallySkill', text: 'rallyText' },
+  airstrike: { id: 'airstrike', name: 'airstrikeSkill', text: 'airstrikeText' },
 };
+
+/**
+ * Deeds a commander's unlock asks for, saved once done (`progress.ts`): finish in the top four, a
+ * robot at three stars, a won fight with six robots of one origin, level 9, a won match.
+ */
+export type DeedId = 'topFour' | 'threeStar' | 'fullOrigin' | 'maxLevel' | 'champion';
 
 export interface CommanderDef {
   name: TextKey;
@@ -336,13 +376,20 @@ export interface CommanderDef {
   trim: number;
   /** Lines it calls out at the start and end of a fight (rivals only). */
   taunts: TextKey[];
+  /** The deed that unlocks it (player commanders only); open from the start without one. */
+  unlock?: DeedId;
 }
 
-/** The three commanders the player picks from. */
+/** The commanders the player picks from: three open from the start, five unlocked by deeds. */
 export const PLAYER_COMMANDERS: CommanderDef[] = [
   { name: 'grit', skill: 'overclock', color: 0xffb703, trim: 0x2b2d42, taunts: [] },
   { name: 'sparks', skill: 'zap', color: 0x7cf3ff, trim: 0x3a2a8a, taunts: [] },
   { name: 'magna', skill: 'bulwark', color: 0xe0566a, trim: 0xf2f2f2, taunts: [] },
+  { name: 'rosa', skill: 'mend', color: 0x4ccf6a, trim: 0xffffff, taunts: [], unlock: 'topFour' },
+  { name: 'volt', skill: 'surge', color: 0x5aa9ff, trim: 0xffd166, taunts: [], unlock: 'threeStar' },
+  { name: 'hexa', skill: 'emp', color: 0x9b5cff, trim: 0x39e58c, taunts: [], unlock: 'fullOrigin' },
+  { name: 'ironside', skill: 'rally', color: 0x8a8f9e, trim: 0xd9822b, taunts: [], unlock: 'maxLevel' },
+  { name: 'nova', skill: 'airstrike', color: 0xff8a2a, trim: 0x1a1030, taunts: [], unlock: 'champion' },
 ];
 
 /** The seven rivals, in seat order. */
@@ -452,7 +499,7 @@ export function stageRounds(stage: number): RoundDef[] {
       { stage, index: 4, kind: 'draft' },
     ];
   }
-  const augmentAt = stage === 2 ? 1 : stage === 3 || stage === 4 ? 2 : 0;
+  const augmentAt = stage === 2 ? 1 : stage >= 3 && stage <= 5 ? 2 : 0;
   const last: RoundDef =
     stage === 2
       ? { stage, index: 7, kind: 'rat', monsters: ['rat'] }
@@ -465,6 +512,35 @@ export function stageDamage(stage: number) {
   return Math.min(3 + Math.max(0, stage - 2) * 3, 15);
 }
 export const SURVIVOR_DAMAGE = [0, 1, 1, 2, 2, 3];
+
+// ---------------------------------------------------------------- rank ladder
+
+export interface RankDef {
+  name: TextKey;
+  /** What the rank changes for the rivals. */
+  text: TextKey;
+  /** Rank points needed. */
+  points: number;
+  /** Extra gold each rival gets a round. */
+  gold: number;
+  /** Rivals' shops roll as if they were this many levels higher. */
+  odds: number;
+  /** Rivals reroll for copies from this stage on, while they hold more than `rollAbove` gold. */
+  rollFrom: number;
+  rollAbove: number;
+}
+
+/** The saved rank ladder: points come from top-four finishes and never go down. Rust is the game as designed. */
+export const RANKS: RankDef[] = [
+  { name: 'rankRust', text: 'rankRustText', points: 0, gold: 0, odds: 0, rollFrom: 4, rollAbove: 50 },
+  { name: 'rankIron', text: 'rankIronText', points: 100, gold: 0, odds: 0, rollFrom: 3, rollAbove: 40 },
+  { name: 'rankSteel', text: 'rankSteelText', points: 250, gold: 1, odds: 0, rollFrom: 3, rollAbove: 36 },
+  { name: 'rankChrome', text: 'rankChromeText', points: 450, gold: 1, odds: 1, rollFrom: 3, rollAbove: 32 },
+  { name: 'rankTitan', text: 'rankTitanText', points: 700, gold: 2, odds: 1, rollFrom: 2, rollAbove: 28 },
+];
+
+/** Rank points by final place (index place; 1st to 4th score). */
+export const RANK_POINTS = [0, 50, 35, 25, 15, 0, 0, 0, 0];
 
 // ---------------------------------------------------------------- terrain
 

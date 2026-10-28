@@ -5,10 +5,13 @@ import { aiLog, mountWatch, watching, watchSteps } from '../../../../shared/watc
 import { playMusic, playSting, stopMusic, ui, type PlayOptions } from '../../../../shared/audio';
 import { FIGHT_SONG, PLAN_SONG, play, type Sfx } from '../audio';
 import {
-  AUGMENT_BY_ID, CLASS_STATS, COST_COLOR, DRAFT_PICK_S, ECONOMY, ITEM_BENCH, ITEMS, MAX_LEVEL, ORIGIN_COLOR, PLAN_S, PLAYER_COMMANDERS, RIVALS, SETS,
+  AUGMENT_BY_ID, CLASS_STATS, COST_COLOR, DRAFT_PICK_S, ECONOMY, ITEM_BENCH, ITEMS, MAX_LEVEL, ORIGIN_COLOR, PLAN_S, PLAYER_COMMANDERS, RANKS, RIVALS, SETS,
   PARTS, RAT, SCRAP_TOKENS_PER_PART, SKILLS, TERRAIN, TRAITS, UNIT_BY_ID, comboOf, isPart,
-  type PartId, type SetId, type TraitId,
+  type CommanderDef, type DeedId, type PartId, type SetId, type TraitId,
 } from '../game/data';
+import {
+  addRankPoints, doDeeds, fullOrigin, isUnlocked, loadProgress, planDeeds, rankOf, recordWeekly, saveProgress, weekOf, weekStart, weeklyBest, weeklyRules,
+} from '../progress';
 import { STEP_S, traitValue, type BEvent } from '../game/battle';
 import {
   advance, boardCount, boardUnits, buy, buyXp, countTraits, draftPick, endFight, equip, equipPreview, matchOver, moveUnit, newDrops, newMatch,
@@ -19,6 +22,9 @@ import {
 } from '../game/match';
 import { aiDraft, aiPickAugment, aiPlan } from '../game/ai';
 import { ordinal, t } from '../i18n';
+import { formatDate } from '../../../../shared/i18n';
+import { award } from '../../../../shared/trophies';
+import { trophies } from '../trophies';
 import { CMD_TEX, INK, UNIT_TEX, bakeAll, cmdKey, itemKey, monsterKey, textureRes, unitKey } from '../art/paint';
 import {
   BENCH, BUTTONS, COMMANDER_HOME, DRAFT_RING, INFO_PANEL, ITEMS_PANEL, PLAYERS_PANEL, RIVAL_HOME, SELL_ZONE, SHOP,
@@ -43,32 +49,10 @@ const C = {
 };
 const FONT = 'Verdana, Arial, sans-serif';
 const reduced = settings.reduceMotion;
-const STORE_KEY = 'scrapyard-titans-stats';
 /** Fight sounds left out of a watched match, which plays a thinner, quieter battle. */
 const WATCH_QUIET = new Set<Sfx>(['hit', 'punch', 'shot', 'heal', 'shield', 'dodge', 'tick']);
 const CAST_SOUND: Record<string, Sfx> = { shield: 'castShield', slam: 'castSlam', barrage: 'castBarrage', snipe: 'castSnipe', backstab: 'blink', repair: 'castRepair' };
 const PROJ_SOUND: Record<string, Sfx> = { shot: 'shot', shell: 'shell', snipe: 'snipe' };
-
-interface Stats {
-  played: number;
-  wins: number;
-  best: number;
-}
-function loadStats(): Stats {
-  try {
-    const s = JSON.parse(localStorage.getItem(STORE_KEY) ?? '{}');
-    return { played: Number(s.played) || 0, wins: Number(s.wins) || 0, best: Number(s.best) || 0 };
-  } catch {
-    return { played: 0, wins: 0, best: 0 };
-  }
-}
-function saveStats(s: Stats) {
-  try {
-    localStorage.setItem(STORE_KEY, JSON.stringify(s));
-  } catch {
-    // Blocked storage: the stats last until the page closes.
-  }
-}
 
 interface View {
   key: string;
@@ -136,7 +120,7 @@ export class GameScene extends Phaser.Scene {
   /** The match, or null on the menu. Read by the playthrough test. */
   state: Match | null = null;
   /** The menu's choices. */
-  menu = { commander: 0, set: 'scrap' as SetId, terrain: false };
+  menu = { commander: 0, set: 'scrap' as SetId | 'weekly', terrain: false };
   /** The fight's playback speed (1 or 2). */
   speed = 1;
   private t = 0;
@@ -184,7 +168,11 @@ export class GameScene extends Phaser.Scene {
   private zapReadyAt = 0;
   private resultUntil = 0;
   private fightDoneAt = 0;
-  private stats = loadStats();
+  private progress = loadProgress();
+  /** Commanders unlocked during this match, listed on the end screen. */
+  private unlockedNow: CommanderDef[] = [];
+  /** The rank points the finished match won, for the end screen. */
+  private rankGain: { gained: number; before: number; after: number } | null = null;
   private recorded = false;
 
   constructor() {
@@ -216,7 +204,16 @@ export class GameScene extends Phaser.Scene {
     this.input.on('pointerup', (p: Phaser.Input.Pointer) => this.onUp(p));
     this.input.keyboard?.on('keydown', (e: KeyboardEvent) => this.onKey(e));
     playMusic(PLAN_SONG, 'calm');
+    // Deeds done before the trophies came in earn theirs quietly.
+    if (!watching) this.awardProgress(true);
     if (watching) this.startMatch();
+  }
+
+  /** Awards the trophies the saved progress has earned: the deeds, every commander, the Titan rank. */
+  private awardProgress(quiet = false) {
+    for (const d of this.progress.deeds) award(trophies, d, { quiet });
+    if (PLAYER_COMMANDERS.every((c) => isUnlocked(this.progress, c))) award(trophies, 'allCommanders', { quiet });
+    if (rankOf(this.progress.points) === RANKS.length - 1) award(trophies, 'titanRank', { quiet });
   }
 
   /** Plays a sound effect; a watched match drops the small fight sounds and plays the rest softer. */
@@ -231,11 +228,16 @@ export class GameScene extends Phaser.Scene {
   // ------------------------------------------------------------------ match flow
 
   startMatch() {
-    const commander = watching ? Math.floor(Math.random() * 3) : this.menu.commander;
-    const set = watching ? (Math.random() < 0.5 ? 'scrap' : 'neon') : this.menu.set;
-    const terrain = watching ? Math.random() < 0.5 : this.menu.terrain;
-    this.state = newMatch({ set, commander, terrain, watch: watching });
+    const commander = watching ? Math.floor(Math.random() * PLAYER_COMMANDERS.length) : this.menu.commander;
+    // The weekly season takes its season and terrain from the date.
+    const week = !watching && this.menu.set === 'weekly' ? weekOf(Date.now()) : null;
+    const rules = week === null ? null : weeklyRules(week);
+    const set = rules ? rules.set : watching ? (Math.random() < 0.5 ? 'scrap' : 'neon') : (this.menu.set as SetId);
+    const terrain = rules ? rules.terrain : watching ? Math.random() < 0.5 : this.menu.terrain;
+    this.state = newMatch({ set, commander, terrain, watch: watching, rank: watching ? 0 : rankOf(this.progress.points), weekly: week });
     this.recorded = false;
+    this.unlockedNow = [];
+    this.rankGain = null;
     this.avatar.setTexture(cmdKey(PLAYER_COMMANDERS[commander].name)).setVisible(true);
     this.avatarPos = { ...COMMANDER_HOME };
     this.orbs = [];
@@ -296,6 +298,10 @@ export class GameScene extends Phaser.Scene {
   private finishFight() {
     const m = this.state!;
     endFight(m);
+    if (player(m).human && m.result?.outcome === 'win') {
+      award(trophies, 'firstWin');
+      if (fullOrigin(m)) this.noteDeeds(['fullOrigin']);
+    }
     for (const o of this.orbs) o.at = Math.min(o.at, this.t);
     const r = m.result;
     if (r) {
@@ -336,10 +342,28 @@ export class GameScene extends Phaser.Scene {
     // Watched matches are the AI's, not the player's: they never count.
     if (this.recorded || watching) return;
     this.recorded = true;
-    this.stats.played++;
-    if (place === 1) this.stats.wins++;
-    this.stats.best = this.stats.best ? Math.min(this.stats.best, place) : place;
-    saveStats(this.stats);
+    this.progress.played++;
+    if (place === 1) this.progress.wins++;
+    this.progress.best = this.progress.best ? Math.min(this.progress.best, place) : place;
+    this.rankGain = addRankPoints(this.progress, place);
+    if (this.state?.opts.weekly != null) recordWeekly(this.progress, this.state.opts.weekly, place);
+    saveProgress(this.progress);
+    this.noteDeeds(place <= 4 ? (place === 1 ? ['topFour', 'champion'] : ['topFour']) : []);
+    if (place === 1 && this.state?.opts.weekly != null) award(trophies, 'weeklyWin');
+    this.awardProgress();
+  }
+
+  /** Saves deeds the player has done and calls out the commanders they unlock. */
+  private noteDeeds(deeds: DeedId[]) {
+    if (watching || !deeds.length) return;
+    const unlocked = doDeeds(this.progress, deeds);
+    this.awardProgress();
+    for (const c of unlocked) {
+      this.unlockedNow.push(c);
+      this.number({ x: VIEW.w / 2, y: VIEW.fy + 230, s: 1 }, t('unlockedCall', { name: t(c.name) }), '#ffd166', 18, 2.6);
+      ui('coin');
+      this.dirty = true;
+    }
   }
 
   // ------------------------------------------------------------------ update
@@ -370,6 +394,7 @@ export class GameScene extends Phaser.Scene {
         this.lastTick = left;
         this.sfx('tick');
       }
+      if (me.human) this.noteDeeds(planDeeds(m));
       if (!me.human && me.augmentOffer) aiPickAugment(m, me);
       if (!me.human && m.phaseEnds - m.time < 2.5 && !this.watchPlanned) {
         this.watchPlanned = true;
@@ -552,6 +577,11 @@ export class GameScene extends Phaser.Scene {
           if (e.skill === 'overclock') for (const a of allies) this.fx.push({ kind: 'ring', at, dur: 0.7, from: a.id, color: 0xffb703 });
           if (e.skill === 'bulwark') for (const a of allies) this.fx.push({ kind: 'bubble', at, dur: 0.8, from: a.id });
           if (e.skill === 'zap' && e.target) this.fx.push({ kind: 'zap', at, dur: 0.4, to: e.target, x: e.team === 0 ? 0 : 1 });
+          if (e.skill === 'mend') for (const u of allies) this.fx.push({ kind: 'ring', at, dur: 0.7, from: u.id, color: 0x4ccf6a });
+          if (e.skill === 'surge') for (const u of allies) this.fx.push({ kind: 'ring', at, dur: 0.7, from: u.id, color: 0x5aa9ff });
+          if (e.skill === 'rally') for (const u of allies) this.fx.push({ kind: 'ring', at, dur: 0.7, from: u.id, color: 0xff8a2a });
+          if (e.skill === 'emp') for (const u of m.battle!.alive(e.team === 0 ? 1 : 0)) this.fx.push({ kind: 'ring', at, dur: 0.7, from: u.id, color: 0x9b5cff });
+          if (e.skill === 'airstrike') for (const u of m.battle!.alive(e.team === 0 ? 1 : 0)) this.fx.push({ kind: 'zap', at, dur: 0.4, to: u.id, x: e.team === 0 ? 0 : 1 });
           if (e.team === 0) this.avatarHop = at;
           // The rival's skill is seen too, a little softer than the player's own.
           this.sfx('skill', { volume: e.team === 0 ? 1 : 0.6 });
@@ -1118,7 +1148,7 @@ export class GameScene extends Phaser.Scene {
     g.fillStyle(C.mana).fillRect(92, lb + 20, need ? (60 * me.xp) / need : 60, 5);
     this.txt(92, lb + 25, need ? t('xp', { xp: me.xp, need }) : t('maxLevel'), 9, C.dim);
     const planning = m.phase === 'plan';
-    this.button(g, BUTTONS.reroll, t('reroll', { n: rerollCost(me) }), () => this.doReroll(), { on: planning && me.human && me.gold >= rerollCost(me), size: 11 });
+    this.button(g, BUTTONS.reroll, me.freeRolls > 0 ? t('rerollFree', { n: me.freeRolls }) : t('reroll', { n: rerollCost(me) }), () => this.doReroll(), { on: planning && me.human && me.gold >= rerollCost(me), size: 11 });
     this.button(g, BUTTONS.xp, t('buyXp', { n: ECONOMY.xpCost }), () => this.doXp(), { on: planning && me.human && me.gold >= ECONOMY.xpCost && me.level < MAX_LEVEL, size: 11 });
     const selUnit = this.selected?.kind === 'unit' ? unitAt(me, this.selected.spot) : null;
     if (selUnit && planning) this.button(g, BUTTONS.sell, t('sellFor', { n: sellValue(selUnit) }), () => this.doSell(), { color: 0xffb703, size: 11 });
@@ -1327,11 +1357,14 @@ export class GameScene extends Phaser.Scene {
       me.augmentOffer.forEach((id, i) => {
         const a = AUGMENT_BY_ID[id];
         const r = { x: VIEW.w / 2 - 330 + i * 230, y: VIEW.fy + 130, w: 200, h: 250 };
-        g.fillStyle(0x1d1846, 1).fillRoundedRect(r.x, r.y, r.w, r.h, 14);
-        g.lineStyle(3, 0xff5cf0, 1).strokeRoundedRect(r.x, r.y, r.w, r.h, 14);
+        // A rare card is gold-edged and tagged.
+        const edge = a.rare ? 0xffd166 : 0xff5cf0;
+        g.fillStyle(a.rare ? 0x2a2140 : 0x1d1846, 1).fillRoundedRect(r.x, r.y, r.w, r.h, 14);
+        g.lineStyle(3, edge, 1).strokeRoundedRect(r.x, r.y, r.w, r.h, 14);
+        if (a.rare) say(r.x + r.w / 2, r.y + 22, t('rareCard'), 12, C.gold, { fontStyle: 'bold' }).setOrigin(0.5);
         g.lineStyle(1.5, C.cyan, 0.6).strokeRoundedRect(r.x + 8, r.y + 8, r.w - 16, r.h - 16, 10);
-        g.fillStyle(0xff5cf0, 0.18).fillCircle(r.x + r.w / 2, r.y + 80, 44);
-        say(r.x + r.w / 2, r.y + 80, `${i + 1}`, 40, '#ff5cf0', { fontStyle: 'bold' }).setOrigin(0.5);
+        g.fillStyle(edge, 0.18).fillCircle(r.x + r.w / 2, r.y + 80, 44);
+        say(r.x + r.w / 2, r.y + 80, `${i + 1}`, 40, a.rare ? C.gold : '#ff5cf0', { fontStyle: 'bold' }).setOrigin(0.5);
         say(r.x + r.w / 2, r.y + 150, t(a.name), 17, '#ffffff', { fontStyle: 'bold' }).setOrigin(0.5);
         say(r.x + r.w / 2, r.y + 180, t(a.text), 12, C.text, { align: 'center', wordWrap: { width: r.w - 30 } }).setOrigin(0.5, 0);
         this.overlayButtons.push({ ...r, run: () => this.doAugment(i) });
@@ -1341,7 +1374,14 @@ export class GameScene extends Phaser.Scene {
       const place = m.phase === 'won' ? 1 : me.place;
       say(VIEW.w / 2, VIEW.fy + 150, t(m.phase === 'won' ? 'won' : 'lost'), 34, m.phase === 'won' ? '#7cf3ff' : '#ff8a7a', { fontStyle: 'bold', stroke: INK, strokeThickness: 6 }).setOrigin(0.5);
       say(VIEW.w / 2, VIEW.fy + 200, t(watching ? 'seatFinished' : 'youFinished', { place: ordinal(place), round: roundLabel(m) }), 16, '#ffffff').setOrigin(0.5);
-      say(VIEW.w / 2, VIEW.fy + 228, t('endStats', { played: this.stats.played, wins: this.stats.wins, best: this.stats.best ? ordinal(this.stats.best) : '-' }), 12, C.dim).setOrigin(0.5);
+      const rg = this.rankGain;
+      if (rg) {
+        const rankText = rg.after > rg.before ? t('rankUp', { rank: t(RANKS[rg.after].name) }) : t('rankPoints', { n: rg.gained, rank: t(RANKS[rg.after].name), points: this.progress.points });
+        say(VIEW.w / 2, VIEW.fy + 104, rankText, 15, rg.after > rg.before ? C.gold : C.text, { fontStyle: 'bold' }).setOrigin(0.5);
+      }
+      if (m.opts.weekly != null && !watching) say(VIEW.w / 2, VIEW.fy + 124, t('weeklyEnd', { place: ordinal(weeklyBest(this.progress, m.opts.weekly)) }), 13, C.gold).setOrigin(0.5);
+      if (this.unlockedNow.length) say(VIEW.w / 2, VIEW.fy + 248, t('unlockedList', { names: this.unlockedNow.map((c) => t(c.name)).join(', ') }), 12, C.gold, { fontStyle: 'bold' }).setOrigin(0.5);
+      say(VIEW.w / 2, VIEW.fy + 228, t('endStats', { played: this.progress.played, wins: this.progress.wins, best: this.progress.best ? ordinal(this.progress.best) : '-' }), 12, C.dim).setOrigin(0.5);
       this.button(g, { x: VIEW.w / 2 - 90, y: VIEW.fy + 270, w: 180, h: 44 }, t(watching ? 'watchAnother' : 'playAgain'), () => {
         ui('click');
         playMusic(PLAN_SONG, 'calm');
@@ -1361,42 +1401,72 @@ export class GameScene extends Phaser.Scene {
     say(VIEW.w / 2, VIEW.fy + 46, t('title'), 38, '#7cf3ff', { fontStyle: 'bold', stroke: INK, strokeThickness: 7 }).setOrigin(0.5);
     say(VIEW.w / 2, VIEW.fy + 82, t('tagline'), 13, C.text).setOrigin(0.5);
     say(VIEW.w / 2, VIEW.fy + 112, t('pickCommander'), 14, C.gold, { fontStyle: 'bold' }).setOrigin(0.5);
+    // Eight small cards; the picked one's skill (or what unlocks it) is spelled out under them.
+    const n = PLAYER_COMMANDERS.length;
+    const cw = 104;
+    const gap = 8;
     PLAYER_COMMANDERS.forEach((c, i) => {
-      const r = { x: VIEW.w / 2 - 345 + i * 235, y: VIEW.fy + 128, w: 220, h: 150 };
+      const r = { x: VIEW.w / 2 - (n * cw + (n - 1) * gap) / 2 + i * (cw + gap), y: VIEW.fy + 126, w: cw, h: 104 };
       const on = this.menu.commander === i;
-      g.fillStyle(on ? 0x2a2360 : C.panel, 0.95).fillRoundedRect(r.x, r.y, r.w, r.h, 12);
-      g.lineStyle(on ? 3 : 1.5, on ? 0xffb703 : C.panelLine, 1).strokeRoundedRect(r.x, r.y, r.w, r.h, 12);
-      this.overlay.add(this.add.image(r.x + 40, r.y + 100, cmdKey(c.name)).setOrigin(0.5, 1).setScale(1.6 / (textureRes.get(cmdKey(c.name)) ?? 2)));
-      say(r.x + 80, r.y + 14, t(c.name), 15, '#ffffff', { fontStyle: 'bold' });
-      say(r.x + 80, r.y + 38, t(SKILLS[c.skill].name), 13, '#ff5cf0', { fontStyle: 'bold' });
-      say(r.x + 80, r.y + 58, t(SKILLS[c.skill].text), 11, C.text, { wordWrap: { width: r.w - 90 } });
-      say(r.x + 14, r.y + 118, t('skillHint'), 9, C.dim, { wordWrap: { width: r.w - 20 } });
+      const open = isUnlocked(this.progress, c);
+      g.fillStyle(on ? 0x2a2360 : C.panel, 0.95).fillRoundedRect(r.x, r.y, r.w, r.h, 10);
+      g.lineStyle(on ? 3 : 1.5, on ? 0xffb703 : C.panelLine, 1).strokeRoundedRect(r.x, r.y, r.w, r.h, 10);
+      this.overlay.add(this.add.image(r.x + r.w / 2, r.y + 70, cmdKey(c.name)).setOrigin(0.5, 1).setScale(1.2 / (textureRes.get(cmdKey(c.name)) ?? 2)).setAlpha(open ? 1 : 0.35));
+      if (!open) this.padlock(g, r.x + r.w - 16, r.y + 16);
+      say(r.x + r.w / 2, r.y + 74, t(c.name), 11, open ? '#ffffff' : C.dim, { fontStyle: 'bold', align: 'center', wordWrap: { width: r.w - 8 } }).setOrigin(0.5, 0);
       this.overlayButtons.push({ ...r, run: () => {
         this.menu.commander = i;
         ui('click');
         this.dirty = true;
       } });
     });
+    const pickedC = PLAYER_COMMANDERS[this.menu.commander];
+    const pickedOpen = isUnlocked(this.progress, pickedC);
+    const skill = SKILLS[pickedC.skill];
+    if (pickedOpen) {
+      say(VIEW.w / 2, VIEW.fy + 240, `${t(pickedC.name)}: ${t(skill.name)}`, 13, '#ff5cf0', { fontStyle: 'bold' }).setOrigin(0.5, 0);
+      say(VIEW.w / 2, VIEW.fy + 260, `${t(skill.text)} ${t('skillHint')}`, 11, C.text, { align: 'center', wordWrap: { width: 640 } }).setOrigin(0.5, 0);
+    } else {
+      say(VIEW.w / 2, VIEW.fy + 240, t('lockedCommander', { name: t(pickedC.name), skill: t(skill.name) }), 13, C.dim, { fontStyle: 'bold' }).setOrigin(0.5, 0);
+      say(VIEW.w / 2, VIEW.fy + 260, t(`${pickedC.unlock!}Unlock`), 11, C.gold, { align: 'center', wordWrap: { width: 640 } }).setOrigin(0.5, 0);
+    }
     say(VIEW.w / 2, VIEW.fy + 296, t('season'), 13, C.gold, { fontStyle: 'bold' }).setOrigin(0.5);
-    SETS.forEach((s, i) => {
-      const r = { x: VIEW.w / 2 - 300 + i * 310, y: VIEW.fy + 312, w: 290, h: 58 };
-      const on = this.menu.set === s.id;
+    // The two seasons and this week's, three cards across.
+    const week = weekOf(Date.now());
+    const rules = weeklyRules(week);
+    const best = weeklyBest(this.progress, week);
+    const cards = [
+      ...SETS.map((s) => ({ id: s.id as SetId | 'weekly', name: t(s.name), blurb: t(s.blurb) })),
+      {
+        id: 'weekly' as const,
+        name: t('weeklySeason', { date: formatDate(weekStart(week), { day: 'numeric', month: 'short', timeZone: 'UTC' }) }),
+        blurb: `${t(SETS.find((s) => s.id === rules.set)!.name)}, ${t(rules.terrain ? 'weeklyTerrain' : 'weeklyNoTerrain')}\n${best ? t('weeklyBest', { place: ordinal(best) }) : t('weeklyUnplayed')}`,
+      },
+    ];
+    cards.forEach((c, i) => {
+      const r = { x: VIEW.w / 2 - 300 + i * 204, y: VIEW.fy + 312, w: 192, h: 62 };
+      const on = this.menu.set === c.id;
+      const color = c.id === 'weekly' ? 0xffd166 : C.cyan;
       g.fillStyle(on ? 0x2a2360 : C.panel, 0.95).fillRoundedRect(r.x, r.y, r.w, r.h, 10);
-      g.lineStyle(on ? 2.5 : 1.2, on ? C.cyan : C.panelLine, 1).strokeRoundedRect(r.x, r.y, r.w, r.h, 10);
-      say(r.x + 12, r.y + 8, t(s.name), 13, '#ffffff', { fontStyle: 'bold' });
-      say(r.x + 12, r.y + 28, t(s.blurb), 10, C.text, { wordWrap: { width: r.w - 24 } });
+      g.lineStyle(on ? 2.5 : 1.2, on ? color : C.panelLine, 1).strokeRoundedRect(r.x, r.y, r.w, r.h, 10);
+      say(r.x + 10, r.y + 6, c.name, 12, c.id === 'weekly' ? C.gold : '#ffffff', { fontStyle: 'bold' });
+      say(r.x + 10, r.y + 24, c.blurb, 9, C.text, { wordWrap: { width: r.w - 18 } });
       this.overlayButtons.push({ ...r, run: () => {
-        this.menu.set = s.id;
+        this.menu.set = c.id;
         ui('click');
         this.dirty = true;
       } });
     });
+    // The weekly season sets the terrain itself.
+    const weekly = this.menu.set === 'weekly';
+    const terrainOn = weekly ? rules.terrain : this.menu.terrain;
     const tr = { x: VIEW.w / 2 - 300, y: VIEW.fy + 384, w: 290, h: 40 };
-    g.fillStyle(this.menu.terrain ? 0x2a2360 : C.panel, 0.95).fillRoundedRect(tr.x, tr.y, tr.w, tr.h, 10);
-    g.lineStyle(this.menu.terrain ? 2.5 : 1.2, this.menu.terrain ? 0x39e58c : C.panelLine, 1).strokeRoundedRect(tr.x, tr.y, tr.w, tr.h, 10);
-    say(tr.x + 12, tr.y + 6, t(this.menu.terrain ? 'terrainOn' : 'terrainOff'), 13, '#ffffff', { fontStyle: 'bold' });
-    say(tr.x + 12, tr.y + 24, t('terrainKinds'), 9, C.dim);
+    g.fillStyle(terrainOn ? 0x2a2360 : C.panel, weekly ? 0.5 : 0.95).fillRoundedRect(tr.x, tr.y, tr.w, tr.h, 10);
+    g.lineStyle(terrainOn ? 2.5 : 1.2, terrainOn ? 0x39e58c : C.panelLine, weekly ? 0.4 : 1).strokeRoundedRect(tr.x, tr.y, tr.w, tr.h, 10);
+    say(tr.x + 12, tr.y + 6, t(terrainOn ? 'terrainOn' : 'terrainOff'), 13, weekly ? C.dim : '#ffffff', { fontStyle: 'bold' });
+    say(tr.x + 12, tr.y + 24, t(weekly ? 'weeklySetsTerrain' : 'terrainKinds'), 9, C.dim);
     this.overlayButtons.push({ ...tr, run: () => {
+      if (weekly) return ui('refuse');
       this.menu.terrain = !this.menu.terrain;
       ui('click');
       this.dirty = true;
@@ -1404,8 +1474,18 @@ export class GameScene extends Phaser.Scene {
     this.button(g, { x: VIEW.w / 2 + 10, y: VIEW.fy + 384, w: 290, h: 40 }, t('startMatch'), () => {
       ui('click');
       this.startMatch();
-    }, { list: this.overlayButtons, container: this.overlay, size: 16, color: 0xffb703 });
-    if (this.stats.played) say(VIEW.w / 2, VIEW.fy + 446, t('menuStats', { played: this.stats.played, wins: this.stats.wins, best: ordinal(this.stats.best) }), 11, C.dim).setOrigin(0.5);
+    }, { list: this.overlayButtons, container: this.overlay, size: 16, color: 0xffb703, on: pickedOpen });
+    const rank = rankOf(this.progress.points);
+    const next = RANKS[rank + 1];
+    say(VIEW.w / 2, VIEW.fy + 466, `${t('rankLine', { rank: t(RANKS[rank].name), points: this.progress.points })}${next ? t('rankNext', { rank: t(next.name), points: next.points }) : ''} · ${t(RANKS[rank].text)}`, 11, C.gold).setOrigin(0.5);
+    if (this.progress.played) say(VIEW.w / 2, VIEW.fy + 446, t('menuStats', { played: this.progress.played, wins: this.progress.wins, best: ordinal(this.progress.best) }), 11, C.dim).setOrigin(0.5);
+  }
+
+  /** A small padlock on a locked commander's card. */
+  private padlock(g: Phaser.GameObjects.Graphics, x: number, y: number) {
+    g.lineStyle(2.5, 0xa8b2c8, 1).beginPath().arc(x, y - 3, 5, Math.PI, 0).strokePath();
+    g.fillStyle(0xa8b2c8, 1).fillRoundedRect(x - 7, y - 3, 14, 11, 2);
+    g.fillStyle(0x15122e, 1).fillCircle(x, y + 2, 1.8);
   }
 
   // ------------------------------------------------------------------ actions
@@ -1482,7 +1562,9 @@ export class GameScene extends Phaser.Scene {
 
   private doAugment(i: number) {
     const m = this.state!;
+    const id = player(m).augmentOffer?.[i];
     pickAugment(m, player(m), i);
+    if (id && AUGMENT_BY_ID[id].rare && player(m).human) award(trophies, 'rareCard');
     this.sfx('augment');
     this.dirty = true;
   }

@@ -50,6 +50,7 @@ import {
   walkTo,
 } from '../game/sim';
 import { ENERGY, HAND_SIZE, POP_MS, WALK_MS, type Enemy, type GameState, type Status } from '../game/state';
+import { checkTrophies } from '../trophies/check';
 import { makeButton } from '../ui/Button';
 import { makeCard } from '../ui/CardView';
 import {
@@ -303,6 +304,7 @@ export class GameScene extends Phaser.Scene {
     this.clock += dt;
     this.tipMs = Math.max(0, this.tipMs - dt);
     tick(this.state, dt);
+    checkTrophies(this.state);
     this.cues.hear(this.state, dt);
 
     const s = this.state;

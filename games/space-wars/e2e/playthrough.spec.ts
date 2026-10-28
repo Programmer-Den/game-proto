@@ -342,6 +342,9 @@ test('plays the first round', async ({ page }, testInfo) => {
   expect(s.beacon.held).toBe(true);
   expect(s.sides[PLAYER].crystal, 'the beacon pays into the bank').toBeGreaterThanOrEqual(bank + BEACON_PAY);
   await snap('playthrough-3-beacon');
+  // The first contract and the beacon earn their trophies (src/trophies/), and nothing else yet.
+  const earned = await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('space-wars-trophies') ?? '{}')));
+  expect(earned.sort(), 'trophies earned in the first round').toEqual(['beacon', 'firstContract']);
 
   // The rival nearest the beacon sends a warship to contest it. The wing, holding the ring, fights
   // it off: the wreck leaves a salvage shard that flies to the nearest Lancer and pays 8 crystal,

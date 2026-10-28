@@ -30,6 +30,7 @@ left, under bevelled slate panels.
 | Control | Action |
 | --- | --- |
 | Click a champion card | Pick your champion and start the match |
+| Click Battle spell on the pick screen | Pick the next battle spell to take into matches (kept for next time) |
 | Click the ground | Walk there |
 | Click an enemy | Walk to it and attack it until it dies or you stop it by clicking the ground |
 | Touch: put a finger down and drag | A steering stick appears where the finger went down and your champion walks the way you drag; it follows a finger that goes past its rim, and letting go stops the champion. A tap without dragging walks or attacks as a click does |
@@ -38,10 +39,12 @@ left, under bevelled slate panels.
 | D, H, or click their buttons | Use an item's active: D dashes toward the cursor (Phase Boots), H drinks the Healing Flask |
 | V, or click its button | Plant a Vision Ward at the cursor (within 600 px), if you carry one |
 | T, or Recall home in the top bar | Channel 4 seconds standing still, then appear at your Nexus; damage, moving, attacking or casting cancels it |
+| G, or the battle spell button in the top bar | Cast your battle spell at the cursor |
 | X, or Buy back in the top bar | While dead: pay to respawn at once (100 gold + 50 per level), once every 2:30 |
 | 1, 2 or 3, or click an upgrade card | Keep one of the upgrades a new level offers |
 | B, or Shop | Open or close the shop; buy an item by clicking it |
-| Esc | Close the shop |
+| Tab (hold), or tap the kill score in the top bar | Show the scoreboard: every champion's level, kills, deaths and assists, last hits and items |
+| Esc | Close the shop or the scoreboard |
 | Play again | After a match: pick a champion again |
 
 ![The floating touch stick under a steering finger](docs/screenshots/touch-stick.webp)
@@ -49,7 +52,7 @@ left, under bevelled slate panels.
 1. **Your team**: you and four allies drawn at random from the other fourteen classes; red gets
    five more of them. Allies walk a lane each and fight what they meet. Each champion's name shows
    over its health bar, and a notice says who slew whom.
-2. **The map** is a 2800 px square: the blue Nexus at the bottom left, the red at the top right,
+2. **The map** is a 3500 px square: the blue Nexus at the bottom left, the red at the top right,
    the top and bottom lanes along the edges and the middle lane on the diagonal. A river runs from
    the top left corner to the bottom right one, across the middle lane, and splits the jungle
    between the lanes into four quarters.
@@ -182,7 +185,123 @@ left, under bevelled slate panels.
     notice names the streak. Whoever slays it takes the bounty on top of the kill's 300 gold, and
     the notice says so. The AI's roaming hunts go after the biggest bounty they can see, and come
     twice as often while anyone carries one. Dying ends the streak.
-17. **Winning** destroys the red Nexus. Losing means your Nexus falls first.
+17. **Scoreboard and assists**: the top bar keeps the kill score, blue against red, left of the
+    clock. Hold Tab (or tap the score) for the scoreboard: each champion's level, kills, deaths and
+    assists, last hits (minions and jungle monsters), items, and whether it is dead or carries a
+    bounty. Every enemy champion that hurt a slain champion in its last 10 seconds, other than the
+    slayer, gets an assist and 120 gold (a blue coin pops for yours), even when a tower or minion
+    lands the last blow.
+
+    ![The scoreboard at 7:02: blue and red's five champions with level, kills, deaths and assists, last hits, items, respawn timers and bounties](docs/screenshots/scoreboard.webp)
+18. **River runes**: from 2:00, every two minutes a rune appears on each of the two stone rings on
+    the river (between the watchstones), replacing one nobody took. The first champion to walk over
+    it takes it: **Might** (30% more damage for 30 s), **Haste** (40% faster for 25 s),
+    **Mending** (25 health a second for 20 s) or **Fortune** (120 gold, and 40 to each teammate).
+    The kinds take turns, so the two rings always hold different ones. A notice says when they
+    appear and who takes one; the minimap shows the ones you can see. The AI champion nearest a
+    rune, healthy and with no enemy near, walks over to take it.
+
+    ![A Might rune hovering over its stone ring on the river, a sword mark on its orange gem](docs/screenshots/river-rune.webp)
+19. **Mercenary camps**: two camps of three sellswords sit by the lanes, one on blue's half by the
+    bottom lane and one on red's by the top lane, among their tents. They fight as one band like a
+    wolf pack (45 gold and 70 XP each to the champion that fells one). The team that fells the last
+    of a band hires it: three mercenaries of its own appear at the camp, minions with 2.2 times a
+    minion's health and damage (drawn big, with the gold ring of a super minion), and march from
+    there down the nearest lane. A notice names the lane. The camp comes back 2:30 after each
+    sellsword falls. AI junglers go for the band on their own half as readily as for a brute.
+
+    ![The mercenary camp by the bottom lane: three sellswords in tan with kettle hats by a fire pit and two tents](docs/screenshots/merc-camp.webp)
+    ![Blue's hired mercenaries marching on the bottom lane, past their empty camp, into red's minions](docs/screenshots/mercs-march.webp)
+20. **Battle spells**: every champion carries one spell of its own, on a long cooldown, cast with G
+    or the button right of Recall in the top bar (it shows the time left while it cools down). Pick
+    yours with the Battle spell button under the champion cards, which steps through them (your
+    pick is kept for the next match): **Blink** jumps up to 260 px toward the cursor (every 2:00),
+    **Firebrand** burns the enemy champion nearest the cursor within 450 px for 90 + 22 per level
+    (every 1:30), **Mend** heals you and your most hurt ally within 420 px for 110 + 25 per level
+    (every 2:00), **Barrier** shields you from 140 + 30 per level damage for 2.5 s (every 1:40)
+    and **Teleport** channels 3.5 s like a recall, then puts you beside the allied tower or minion
+    nearest the cursor (within 600 px of it), on its side toward your Nexus (every 3:00). Damage, a
+    move or a cast breaks the channel, and if the minion dies first the teleport is lost; either
+    way the cooldown is spent. AI champions carry one by role (tanks Barrier, supports Mend, other casters Blink, the rest
+    Firebrand) and, from 1:40, use it when low with an enemy near, or Firebrand to finish one.
+
+    ![The pick screen's Battle spell button set to Firebrand, with what it does shown above it](docs/screenshots/pick-spell.webp)
+    ![The Firebrand button in the top bar counting down 1:30, right of Recall home](docs/screenshots/spell-button.webp)
+    ![Teleporting from the Nexus to the top lane's outer tower, 0.6 s left](docs/screenshots/teleport.webp)
+21. **Pings**: Z pings **Attack** at the cursor (Alt and a click does too): the two nearest
+    healthy allies drop what they do and come, and fight the enemy under the ping if there is one.
+    N pings **On my way**: the allies within 900 px of the point wait there for you. C pings
+    **Danger**: the allies near it fall back. On a phone, tap one of the three ping buttons left of
+    the minimap, then the map. Allies keep to a ping for 12 seconds, a notice names who answers,
+    and the ping shows on the map and the minimap. An ally calling a retreat shows a Danger ping too.
+
+    ![An Attack ping on a red tower with two allies walking to it, and the ping buttons by the minimap](docs/screenshots/pings.webp)
+22. **Death recap**: while your champion is dead, a card under the top bar names who slew it and
+    the damage it took in its last 10 seconds, split by attacker and hit (attacks, each ability,
+    the battle spell; all minions together), the four biggest with a bar each.
+
+    ![The death recap: slain by Grumm, 790 damage in the last 10 s, in four rows](docs/screenshots/death-recap.webp)
+23. **River drakes**: from 2:30 a drake wakes in its pit on the river at the top left, across the
+    map from the beast, and wakes again 2:30 after it falls. Each drake is of the next element:
+    **Fire** (+5% damage), **Stone** (+6 armor), **Storm** (+6% speed) and **Tide** (+4 health a
+    second). The team that slays one keeps its bonus for every one of its champions for the rest of
+    the match, and the bonuses stack. The fourth drake a team slays gives it the **drake soul**,
+    which doubles all of them; after that its drakes only pay gold. Chips at the top right show
+    each team's drakes. The AI sends two champions a side for an awake drake.
+
+    ![A fire drake awake in its pit on the river](docs/screenshots/drake.webp)
+    ![The chip for blue's two drakes, fire and stone](docs/screenshots/drake-stacks.webp)
+24. **Early gold**: the first champion kill of the match is **first blood** and pays 150 gold on
+    top. Until 5:00 each team's outer tower on every lane wears five **plates**, gold pips over its
+    bar: each fifth of its health it loses breaks one, worth 120 gold split between the enemy
+    champions within 700 px. At 5:00 the plates fall away.
+
+    ![A red outer tower with one of its five plates broken](docs/screenshots/plates.webp)
+25. **Bodies**: champions and minions no longer stand in each other: a crowd parts, minions body
+    block, and the ruins, the stones round the pits and every tower, inhibitor and Nexus stand in
+    the way (and, since item 30, the jungle's forest), so units walk round them. A dash or blink that lands in
+    one comes out at its edge.
+26. **Day and night**: the match starts in the morning. Every three minutes night falls for a
+    minute and a half: the map turns a deep blue, a moon replaces the sun by the clock, and
+    champions see only 80% as far (minions, towers, watchstones and wards see as before), so the
+    fog closes in and the tall grass is better for an ambush.
+
+    ![Night over the mid lane](docs/screenshots/night.webp)
+27. **Quick match**: the button beside the battle spell on the pick screen switches between a full
+    match (five a side on three lanes) and a quick one: three a side on the mid lane alone, with no
+    towers, inhibitors or minions on the other two and sturdier structures (2.5 times their
+    health), for a match of about ten minutes. The jungle, runes, drakes and the beast are the same.
+    The game remembers the choice, and Watch AI plays it too.
+
+    ![The pick screen set to a quick match](docs/screenshots/quick-pick.webp)
+28. **Comeback and surrender**: a team whose champions have 15% less XP between them than the
+    other's is behind, and each enemy champion it slays then pays 150 gold and 80 XP more; a chip
+    at the top right says so while your team is behind. From 15:00 (10:00 in a quick match) the
+    scoreboard has a **Surrender** button: your allies vote yes when the team is behind on XP or
+    has lost two more towers and inhibitors than red, and the vote passes with 70% of the team. A
+    failed vote can be called again three minutes later. Red gives up on its own from then on when
+    it is far behind on both.
+
+    ![The scoreboard at 15:06 with the Surrender button in its header](docs/screenshots/surrender.webp)
+29. **Match summary**: the end panel names the match's MVP, the champion on either team with the
+    best kills, assists and last hits for its deaths, and draws both teams' net worth (gold in hand
+    plus the price of every item held) over the match, noted every 20 seconds.
+
+    ![The end panel after a defeat: the MVP and the net worth of both teams over 7:54](docs/screenshots/match-summary.webp)
+30. **Walls and jungle paths**: the jungle is thick forest that no one walks through. Low stone
+    walls line both sides of every lane, broken by gaps where the jungle's paths come out, and the
+    paths, the same in each quarter of the map, join the gaps to the camps, the tall grass, the
+    ruins, the pits and the river. Units find their way along them: click anywhere and your
+    champion takes the paths there (a click in the trees goes to the nearest open ground). The
+    minimap draws the paths as thin tan lines. The forest stops walking only: bolts and sight go
+    over it, and a dash or blink that lands in the trees comes out at their nearest edge.
+
+    ![A lane between its stone walls, with a gap where a jungle path comes out](docs/screenshots/walls.webp)
+31. **Trophies**: ten trophies to earn, listed on the start and pause screens and on the hub:
+    a first takedown, a red tower down, a first drake, a quick match won, three kills without
+    dying, the guardian beast slain, a full match won and a drake soul, plus two hidden ones for
+    the long run. Each shows a toast the moment it is earned.
+32. **Winning** destroys the red Nexus. Losing means your Nexus falls first.
 
 Every ability has an animation of its own (a hammer that splits the ground, a meteor from the
 sky, a harpoon on its rope, a coil pylon arcing, a blood moon rising and so on), and so do bolts in
@@ -192,7 +311,7 @@ champion shows how far it attacks; hovering another champion shows its reach.
 The bars under the map show the Nexuses' health and your champion's health, experience, items and
 cooldowns, with the D, H and V buttons under the shop button and the Recall (or Buy back) button
 right of the clock; the portrait card shows your champion's
-name, class, passive and kills and deaths. Short notices under the top bar say when the beast
+name, class, passive, kills, deaths and assists. Short notices under the top bar say when the beast
 wakes or falls, an inhibitor falls, a watchstone is taken, a champion slays another, a champion
 roams to another lane, a bounty is set or claimed, you buy back or red destroys one of your wards.
 The minimap in the corner shows the river, every tower, inhibitor, Nexus,
@@ -208,8 +327,11 @@ Brutal Edge, Phase Boots and on), each starting with a Healing Flask they drink 
 and buy a Vision Ward whenever they have none. With the build done and gold to spare they drink an
 elixir before heading out (tanks the Iron Elixir, casters the Swift Elixir, the rest Wrath). They recall home when hurt with no enemy near, or
 with 900 gold and something to buy, and buy back when an enemy champion is at their Nexus.
-Every 70 seconds from 1:40, each team sends one healthy champion from another lane to gang up on
-the weakest enemy champion it can see. A champion that is low on health with an enemy champion
+Every 70 seconds from 1:40 (every 49 at night), each team sends one healthy champion from another
+lane to gang up on the weakest enemy champion it can see. When tall grass lies near its prey, the
+hunter slips into it first and waits there, hidden, for up to 7 seconds until the prey walks within
+260 px, then charges. From 1:40 the AI also wards the tall grass it passes as well as the river, so
+ambushes in it are seen. A champion that is low on health with an enemy champion
 near, or outnumbered by two, falls back to its nearest tower behind it, and its allies near by fall
 back with it (all of them when outnumbered, the hurt ones otherwise). Every 45 seconds from 2:00
 each team sends one healthy champion into the jungle for a brute's buff on its half, or else for a
@@ -342,7 +464,7 @@ A stunned champion or minion neither moves nor attacks. AI champions take upgrad
 ### Watch AI
 
 Add `?watch` to the game's URL (`/games/lane-brawl/?watch`) to skip the pick screen and let the AI
-play all ten champions, blue's with a random class, until a Nexus falls. The fog is lifted, the
+play every champion (ten, or six in a quick match), blue's with a random class, until a Nexus falls. The fog is lifted, the
 camera follows blue's champion, and the keys and clicks play nothing. The panel in the top right
 holds the match still, plays it from 1x to 8x (**[** and **]**) and opens a log (**L**) of each
 team's roams, jungle trips, retreats, upgrades, kills, towers and inhibitors. Objectives don't
@@ -372,7 +494,7 @@ it.
   where everything sits on screen.
 - `src/game/`: the rules, free of Phaser: `data.ts` (map, river, camps, watchstones, sight,
   champions and their passives, items, objectives, upgrades, buffs, the beast, inhibitors, bushes
-  and AI plans), `names.ts` (the champions' short names), `mastery.ts` (saved wins per class), `state.ts` (types and a new match) and
+  and AI plans), `names.ts` (the champions' short names), `mastery.ts` (saved wins per class), `terrain.ts` (the solid things units walk round), `state.ts` (types and a new match) and
   `sim.ts` (the rules, vision and the AI).
 - `src/art/`: `lowpoly.ts` (the software renderer), `models.ts` (every low-poly model), `bake.ts`
   (renders the models into sprite sheets at start-up) and `map.ts` (paints the map).

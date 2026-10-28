@@ -1,6 +1,6 @@
 import { byDifficulty } from '../../../../shared/settings';
-import { RELICS, STYLES, type Level, type RelicId, type StyleId } from './catalog';
-import { dailySeed, makePuzzle, peersOf, seeded, SHAPES, shuffle, units, type Puzzle, type Random } from './sudoku';
+import { RELICS, STYLES, TWISTS, UNIQUE_RELICS, type Level, type RelicId, type StyleId, type Twist } from './catalog';
+import { dailySeed, makePuzzle, nextDay, peersOf, seeded, SHAPES, shuffle, units, type Puzzle, type Random } from './sudoku';
 
 // Ninefold's rules: Classic (a daily puzzle and free play at three levels) and Delve (a run of
 // ever bigger puzzles with hearts and relics), and the progress that unlocks the art styles.
@@ -22,6 +22,12 @@ export const MAX_HEARTS = 5;
 export const RELIC_OFFER = 3;
 /** Cells each Seer's Eye fills in at the start of a floor. */
 export const SEER_CELLS = 2;
+/** Right digits in a row (no mistake between) for each Gambler's Die to pay a hint. */
+export const GAMBLER_STREAK = 8;
+/** A floor cleared within this much game time heals a heart per Sandglass. */
+export const SANDGLASS_MS = 4 * 60_000;
+/** Hearts the Iron Vow adds (up to `MAX_HEARTS`); it takes every hint. */
+export const VOW_HEARTS = 2;
 /** A 9x9 solved within this much game time unlocks Neon Arcade. */
 export const FAST_MS = 10 * 60_000;
 /** Delve floors from this one count as hard puzzles. */
@@ -37,6 +43,48 @@ export const FLOORS: { size: 4 | 6 | 9; givens: number }[] = [
   { size: 9, givens: 28 },
 ];
 export const floorSpec = (floor: number) => FLOORS[Math.min(floor, FLOORS.length) - 1];
+/** Past the last row of `FLOORS`, a floor loses one more given every this many floors, down to `MIN_GIVENS`. */
+export const DEEPER_EVERY = 3;
+export const MIN_GIVENS = 24;
+/** Floors from this one draw a twist (`TWISTS`). */
+export const TWIST_FLOOR = 4;
+/** Every this many floors is a boss floor: two twists, fewer givens, and clearing it restores every heart. */
+export const BOSS_EVERY = 5;
+export const BOSS_GIVENS = 3;
+/** Givens a twist takes away, since its rule tells the solver more. */
+export const TWIST_GIVENS: Record<Twist, number> = { diagonal: 2, parity: 6, clock: 0, sealed: 0 };
+/** On a Clock floor a heart is lost every this much game time. */
+export const CLOCK_MS = 3 * 60_000;
+
+/** What a Delve floor will be: its board size, givens, twists and whether it is a boss floor. */
+export interface FloorPlan {
+  floor: number;
+  size: 4 | 6 | 9;
+  givens: number;
+  twists: Twist[];
+  boss: boolean;
+}
+
+/** Plans a floor. Floors before `TWIST_FLOOR` use no randomness, so the first floors deal as before. */
+export function planFloor(floor: number, random: Random): FloorPlan {
+  const spec = floorSpec(floor);
+  const deeper = Math.max(0, Math.floor((floor - FLOORS.length) / DEEPER_EVERY));
+  let givens = Math.max(MIN_GIVENS, spec.givens - deeper);
+  if (spec.size !== 9) givens = spec.givens;
+  const boss = floor % BOSS_EVERY === 0;
+  let twists: Twist[] = [];
+  if (floor >= TWIST_FLOOR) {
+    if (boss) {
+      // One twist on the board's rules and one that presses the player.
+      twists = [pick(['diagonal', 'parity'] as const, random), pick(['clock', 'sealed'] as const, random)];
+      givens -= BOSS_GIVENS;
+    } else twists = [pick(TWISTS, random)];
+  }
+  for (const tw of twists) givens -= TWIST_GIVENS[tw];
+  return { floor, size: spec.size, givens, twists, boss };
+}
+
+const pick = <T>(items: readonly T[], random: Random) => items[Math.floor(random() * items.length)];
 
 export type Mode = 'classic' | 'daily' | 'delve';
 export type Phase = 'menu' | 'playing' | 'solved' | 'relic' | 'over';
@@ -49,13 +97,18 @@ export interface Progress {
   hard: number;
   fast: number;
   bestFloor: number;
+  /** Delve boss floors cleared. */
+  bosses: number;
   /** The date (`dailySeed`) of the last daily puzzle solved. */
   daily: number;
+  /** Daily puzzles solved on days in a row, ending with `daily`, and the longest such run. */
+  dailyStreak: number;
+  bestStreak: number;
   style: StyleId;
   unlocked: StyleId[];
 }
 
-export const newProgress = (): Progress => ({ solved: 0, flawless: 0, noHint: 0, hard: 0, fast: 0, bestFloor: 0, daily: 0, style: 'paper', unlocked: ['paper'] });
+export const newProgress = (): Progress => ({ solved: 0, flawless: 0, noHint: 0, hard: 0, fast: 0, bestFloor: 0, bosses: 0, daily: 0, dailyStreak: 0, bestStreak: 0, style: 'paper', unlocked: ['paper'] });
 
 /** When each style unlocks, from the progress. Stained Glass waits for every other one. */
 export const UNLOCKS: Record<StyleId, (p: Progress) => boolean> = {
@@ -74,6 +127,10 @@ export type GameEvent =
   | { type: 'board' }
   | { type: 'placed'; cell: number }
   | { type: 'wrong'; cell: number; heart: boolean; warded: boolean }
+  | { type: 'clock' }
+  | { type: 'phoenix' }
+  | { type: 'heal' }
+  | { type: 'gift' }
   | { type: 'unit'; cells: number[] }
   | { type: 'solved' }
   | { type: 'over' }
@@ -100,12 +157,22 @@ export interface GameState {
   hearts: number;
   maxHearts: number;
   floor: number;
+  /** The Delve floor in play (or, between floors, the one just cleared). */
+  plan: FloorPlan | null;
+  /** The next Delve floor, planned when a floor is cleared so its card can name it. */
+  upcoming: FloorPlan | null;
   /** The date (`dailySeed`) the daily board in play was dealt for, 0 for any other board. */
   dailyDate: number;
   relics: RelicId[];
   relicOffer: RelicId[];
   /** The Ward has caught a mistake on this floor already. */
   warded: boolean;
+  /** Right digits written since the last mistake, for the Gambler's Die. */
+  streak: number;
+  /** Hearts the Keystone has given back on this floor. */
+  keyHealed: number;
+  /** What Undo can take back, newest last: a cell's digit and notes before a note, a wrong digit or an erase. */
+  undo: { cell: number; value: number; notes: number }[];
   /** Units (as indexes into `units`) already complete, so each one is celebrated once. */
   doneUnits: number[];
   /** Styles unlocked by the last board solved. */
@@ -117,8 +184,8 @@ export interface GameState {
 export function newGame(progress: Progress): GameState {
   return {
     phase: 'menu', mode: 'classic', level: 'easy', puzzle: null, values: [], notes: [], selected: -1, notesMode: false,
-    mistakes: 0, hintsLeft: 0, hintsUsed: 0, timeMs: 0, hearts: 0, maxHearts: 0, floor: 0, dailyDate: 0, relics: [], relicOffer: [],
-    warded: false, doneUnits: [], newStyles: [], progress, events: [],
+    mistakes: 0, hintsLeft: 0, hintsUsed: 0, timeMs: 0, hearts: 0, maxHearts: 0, floor: 0, plan: null, upcoming: null, dailyDate: 0, relics: [], relicOffer: [],
+    warded: false, streak: 0, keyHealed: 0, undo: [], doneUnits: [], newStyles: [], progress, events: [],
   };
 }
 
@@ -132,6 +199,8 @@ function load(s: GameState, puzzle: Puzzle) {
   s.hintsUsed = 0;
   s.timeMs = 0;
   s.warded = false;
+  s.keyHealed = 0;
+  s.undo = [];
   s.newStyles = [];
   markDone(s);
   s.phase = 'playing';
@@ -143,6 +212,7 @@ export function startClassic(s: GameState, level: Level, random: Random = Math.r
   s.mode = 'classic';
   s.level = level;
   s.dailyDate = 0;
+  s.plan = s.upcoming = null;
   load(s, makePuzzle(SHAPES[9], CLASSIC_GIVENS[level], random));
   s.hintsLeft = classicHints();
 }
@@ -151,6 +221,7 @@ export function startClassic(s: GameState, level: Level, random: Random = Math.r
 export function startDaily(s: GameState, date: Date) {
   s.mode = 'daily';
   s.level = DAILY_LEVEL;
+  s.plan = s.upcoming = null;
   s.dailyDate = dailySeed(date);
   load(s, makePuzzle(SHAPES[9], CLASSIC_GIVENS[DAILY_LEVEL], seeded(s.dailyDate)));
   s.hintsLeft = classicHints();
@@ -162,16 +233,21 @@ export function startDelve(s: GameState) {
   s.dailyDate = 0;
   s.floor = 0;
   s.relics = [];
+  s.streak = 0;
   s.maxHearts = s.hearts = delveHearts();
   s.hintsLeft = DELVE_HINTS;
+  s.upcoming = planFloor(1, Math.random);
   nextFloor(s);
 }
 
 function nextFloor(s: GameState) {
-  s.floor++;
+  const plan = s.upcoming ?? planFloor(s.floor + 1, Math.random);
+  s.floor = plan.floor;
+  s.plan = plan;
+  s.upcoming = null;
   s.relicOffer = [];
-  const spec = floorSpec(s.floor);
-  load(s, makePuzzle(SHAPES[spec.size], spec.givens, Math.random));
+  const shape = { ...SHAPES[plan.size], ...(plan.twists.includes('diagonal') ? { diagonal: true } : {}) };
+  load(s, makePuzzle(shape, plan.givens, Math.random, plan.twists.includes('parity')));
   // Each Seer's Eye fills in a few cells, picked at random, before play starts.
   const seers = s.relics.filter((r) => r === 'seer').length * SEER_CELLS;
   const empty = s.values.flatMap((v, i) => (v ? [] : [i]));
@@ -181,6 +257,37 @@ function nextFloor(s: GameState) {
   }
   // The Seer's cells are givens for the player, so a unit they complete is not celebrated.
   markDone(s);
+  // Twin Sight pencils in every empty cell's candidates.
+  if (s.relics.includes('twin')) {
+    const peers = peersOf(s.puzzle!);
+    s.values.forEach((v, i) => {
+      if (v) return;
+      let used = 0;
+      for (const q of peers[i]) if (isRight(s, q)) used |= 1 << s.values[q];
+      for (let d = 1; d <= s.puzzle!.size; d++) if (!(used & (1 << d))) s.notes[i] |= 1 << d;
+    });
+  }
+}
+
+const count = (s: GameState, relic: RelicId) => s.relics.filter((r) => r === relic).length;
+
+/** Heals up to `n` hearts, no higher than the run's most. */
+function heal(s: GameState, n: number) {
+  const before = s.hearts;
+  s.hearts = Math.min(s.maxHearts, s.hearts + n);
+  if (s.hearts > before) s.events.push({ type: 'heal' });
+}
+
+/** Takes hearts; at none a Phoenix Feather, if held, burns for one, or the run ends. */
+function loseHearts(s: GameState, n: number) {
+  s.hearts -= n;
+  if (s.hearts > 0) return;
+  const feather = s.relics.indexOf('phoenix');
+  if (feather >= 0) {
+    s.relics.splice(feather, 1);
+    s.hearts = 1;
+    s.events.push({ type: 'phoenix' });
+  } else runOver(s);
 }
 
 /** Records every unit that is already complete, without celebrating it. */
@@ -224,47 +331,100 @@ export function enter(s: GameState, digit: number) {
   const cell = s.selected;
   if (s.notesMode) {
     if (s.values[cell]) return false;
+    remember(s, cell);
     s.notes[cell] ^= 1 << digit;
     return true;
   }
   if (digit === p.solution[cell]) {
     fill(s, cell);
     s.events.push({ type: 'placed', cell });
+    s.streak++;
+    const dice = count(s, 'gambler');
+    if (s.mode === 'delve' && dice && s.streak % GAMBLER_STREAK === 0) {
+      s.hintsLeft += dice;
+      s.events.push({ type: 'gift' });
+    }
     afterFill(s);
     return true;
   }
   if (s.values[cell] === digit) return false;
+  remember(s, cell);
   s.values[cell] = digit;
   s.mistakes++;
+  s.streak = 0;
   let heart = false;
   let warded = false;
   if (s.mode === 'delve') {
     if (s.relics.includes('ward') && !s.warded) s.warded = warded = true;
-    else (s.hearts--, (heart = true));
+    else heart = true;
   }
   s.events.push({ type: 'wrong', cell, heart, warded });
-  if (s.mode === 'delve' && s.hearts <= 0) {
-    s.phase = 'over';
-    s.progress.bestFloor = Math.max(s.progress.bestFloor, s.floor - 1);
-    s.events.push({ type: 'over' });
-  }
+  // Each Gambler's Die makes a mistake that costs a heart cost one more.
+  if (heart) loseHearts(s, 1 + count(s, 'gambler'));
   return true;
 }
+
+function runOver(s: GameState) {
+  s.phase = 'over';
+  s.progress.bestFloor = Math.max(s.progress.bestFloor, s.floor - 1);
+  s.events.push({ type: 'over' });
+}
+
+/** Whether a Delve twist is on the floor in play. */
+export const hasTwist = (s: GameState, twist: Twist) => s.mode === 'delve' && !!s.plan?.twists.includes(twist);
+
+/** Game time left on a Clock floor before the next heart is lost. */
+export const clockLeft = (s: GameState) => CLOCK_MS - (s.timeMs % CLOCK_MS);
 
 /** Clears a wrong digit from the selected cell, or, if it holds none, its notes; false if there was nothing to clear. */
 export function erase(s: GameState) {
   if (!canEnter(s)) return false;
   const cell = s.selected;
+  if (!s.values[cell] && !s.notes[cell]) return false;
+  remember(s, cell);
   if (s.values[cell]) s.values[cell] = 0;
-  else if (s.notes[cell]) s.notes[cell] = 0;
-  else return false;
+  else s.notes[cell] = 0;
   return true;
+}
+
+/** The most steps Undo keeps. */
+const UNDO_STEPS = 200;
+
+function remember(s: GameState, cell: number) {
+  s.undo.push({ cell, value: s.values[cell], notes: s.notes[cell] });
+  if (s.undo.length > UNDO_STEPS) s.undo.shift();
+}
+
+/** Whether Undo has a step to take back: one whose cell isn't right by now. */
+export const canUndo = (s: GameState) => s.phase === 'playing' && s.undo.some((u) => !isRight(s, u.cell));
+
+/**
+ * Takes back the latest note, wrong digit or erase, restoring that cell's digit and notes. A
+ * right digit stays (it is right), so steps on cells filled since are skipped; a mistake still
+ * counts and its heart stays lost.
+ */
+export function undoMove(s: GameState) {
+  if (s.phase !== 'playing') return false;
+  while (s.undo.length) {
+    const u = s.undo.pop()!;
+    if (isRight(s, u.cell)) continue;
+    s.values[u.cell] = u.value;
+    s.notes[u.cell] = u.notes;
+    s.selected = u.cell;
+    return true;
+  }
+  return false;
+}
+
+/** The daily streak as it stands today: kept while the last daily solved was today or yesterday. */
+export function dailyStreakNow(p: Progress, today: number) {
+  return p.daily === today || nextDay(p.daily) === today ? p.dailyStreak : 0;
 }
 
 /** Fills in the selected cell (or the first open one) with its digit, using up a hint. */
 export function hint(s: GameState) {
   const p = s.puzzle;
-  if (!p || s.phase !== 'playing' || s.hintsLeft <= 0) return false;
+  if (!p || s.phase !== 'playing' || s.hintsLeft <= 0 || hasTwist(s, 'sealed')) return false;
   const open = (c: number) => c >= 0 && !p.givens[c] && s.values[c] !== p.solution[c];
   const cell = open(s.selected) ? s.selected : s.values.findIndex((_, c) => open(c));
   if (cell < 0) return false;
@@ -283,6 +443,12 @@ function afterFill(s: GameState) {
     if (!s.doneUnits.includes(i) && u.every((c) => s.values[c] === p.solution[c])) {
       s.doneUnits.push(i);
       s.events.push({ type: 'unit', cells: u });
+      // Each Keystone gives back a heart for one finished box a floor (boxes follow the rows and columns).
+      const box = i >= 2 * p.size && i < 3 * p.size;
+      if (box && s.mode === 'delve' && s.keyHealed < count(s, 'keystone')) {
+        s.keyHealed++;
+        heal(s, 1);
+      }
     }
   });
   if (s.values.every((v, i) => v === p.solution[i])) solved(s);
@@ -295,15 +461,28 @@ function solved(s: GameState) {
   if (s.hintsUsed === 0) p.noHint++;
   if ((s.mode === 'classic' && s.level === 'hard') || (s.mode === 'delve' && s.floor >= HARD_FLOOR)) p.hard++;
   if (s.puzzle!.size === 9 && s.timeMs <= FAST_MS) p.fast++;
-  if (s.mode === 'daily') p.daily = s.dailyDate;
+  if (s.mode === 'daily') {
+    p.dailyStreak = p.daily && nextDay(p.daily) === s.dailyDate ? p.dailyStreak + 1 : 1;
+    p.bestStreak = Math.max(p.bestStreak, p.dailyStreak);
+    p.daily = s.dailyDate;
+  }
   if (s.mode === 'delve') p.bestFloor = Math.max(p.bestFloor, s.floor);
   s.selected = -1;
   s.events.push({ type: 'solved' });
   s.newStyles = unlock(p);
   for (const style of s.newStyles) s.events.push({ type: 'unlocked', style });
   if (s.mode === 'delve') {
+    // A Sealed floor pays back a hint, and a boss floor restores every heart.
+    if (hasTwist(s, 'sealed')) s.hintsLeft++;
+    if (s.plan?.boss) {
+      p.bosses++;
+      s.hearts = s.maxHearts;
+    }
+    if (s.timeMs <= SANDGLASS_MS) heal(s, count(s, 'sandglass'));
+    s.upcoming = planFloor(s.floor + 1, Math.random);
     s.phase = 'relic';
-    s.relicOffer = shuffle([...RELICS], Math.random).slice(0, RELIC_OFFER);
+    const pool = RELICS.filter((r) => !(UNIQUE_RELICS.includes(r) && s.relics.includes(r)));
+    s.relicOffer = shuffle(pool, Math.random).slice(0, RELIC_OFFER);
   } else s.phase = 'solved';
 }
 
@@ -328,6 +507,15 @@ export function takeRelic(s: GameState, relic: RelicId) {
     s.maxHearts = Math.min(MAX_HEARTS, s.maxHearts + 1);
     s.hearts = Math.min(s.maxHearts, s.hearts + 1);
   }
+  if (relic === 'twin') {
+    s.maxHearts = Math.max(1, s.maxHearts - 1);
+    s.hearts = Math.min(s.maxHearts, s.hearts);
+  }
+  if (relic === 'vow') {
+    s.maxHearts = Math.min(MAX_HEARTS, s.maxHearts + VOW_HEARTS);
+    s.hearts = Math.min(s.maxHearts, s.hearts + VOW_HEARTS);
+    s.hintsLeft = 0;
+  }
   s.events.push({ type: 'relic', relic });
   nextFloor(s);
 }
@@ -347,7 +535,13 @@ export function toMenu(s: GameState) {
 
 /** Moves the board's clock on while a board is being played. */
 export function tick(s: GameState, dt: number) {
-  if (s.phase === 'playing') s.timeMs += dt;
+  if (s.phase !== 'playing') return;
+  const before = Math.floor(s.timeMs / CLOCK_MS);
+  s.timeMs += dt;
+  if (hasTwist(s, 'clock') && Math.floor(s.timeMs / CLOCK_MS) > before) {
+    s.events.push({ type: 'clock' });
+    loseHearts(s, 1);
+  }
 }
 
 /** Whether a cell is right: a given or a correct entry. */

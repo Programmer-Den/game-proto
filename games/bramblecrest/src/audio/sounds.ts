@@ -50,6 +50,10 @@ export const sfx = sounds({
   wrong: { wave: 'square', freq: 233, arp: [0, 1, 0, 1], arpStep: 0.07, length: 0.32, volume: 0.16, gap: 300 },
   /** A foe hit by the knight. */
   hit: { wave: 'square', freq: 320, to: 120, length: 0.08, volume: 0.28, gap: 60, vary: 0.1 },
+  /** The sword glancing off a beetle's shell. */
+  tink: { wave: 'triangle', freq: 1320, to: 1050, length: 0.12, volume: 0.24, gap: 100 },
+  /** A beetle flipped or a lantern moth brought down. */
+  thud: { wave: 'noise', freq: 500, to: 120, length: 0.16, volume: 0.3, gap: 100 },
   /** A foe beaten. */
   pop: { wave: 'noise', freq: 1400, to: 300, length: 0.2, volume: 0.32, gap: 60, vary: 0.1 },
   /** The knight hurt. */

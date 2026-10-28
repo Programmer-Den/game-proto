@@ -128,9 +128,10 @@ and pressed lettering on clay tags. It is all painted in code at startup; there 
 
 13. **Speed.** The 1x button at the top right doubles the game's speed (2x) and back, at any time.
 14. **Call the next wave early.** Once every pest of the current wave has come onto the path, the
-    wave button turns into "Call wave N now, +15 early". Tapping it counts the current wave as done
-    at once (its clearing bonus and its bud) plus 15 sap, and the next wave starts coming in while
-    the last pests are still walking. Wave 30, the harvest, can't be called early: its stars wait for
+    wave button turns into "Call wave N now, +15 early". Tapping it starts the next wave coming in
+    while the last pests are still walking. The called wave counts as done once its last pest is
+    squashed or gets through: then it pays its clearing bonus plus 15 sap and opens its bud. Until
+    then a bite still costs a leaf, so a call early is a bet on golems that can hold both waves. Wave 30, the harvest, can't be called early: its stars wait for
     its last pest. Nor can a wave while its Queen Slug is on the path. The card above the button previews the next wave's pests,
     counted from the game's own wave list (in two rows once there are more than three kinds, with
     the Queen Slug named in its title), so you can weigh the sap against the crowd.
@@ -166,6 +167,21 @@ and pressed lettering on clay tags. It is all painted in code at startup; there 
     | Meadow | No hedges: the hedge seed is gone |
     | Forked Brook | Double crows: every crow comes with a twin |
     | Two Gates | Lean start: start with 30 sap instead of 60 |
+19. **Trophies.** Ten trophies, listed on the start and pause screens (Trophies) and counted on the
+    hub's card; a toast shows each one as it is earned:
+
+    | Trophy | Tier | Earned by |
+    | --- | --- | --- |
+    | Green thumb | bronze | clearing your first wave |
+    | Good neighbours | bronze | growing a moss golem beside a pebble or thorn golem |
+    | Fully grown | bronze | raising a golem to level 3 and picking its form |
+    | Bold call | bronze | calling a wave early and losing no leaf before its last pest is gone |
+    | In full bloom | silver | opening all five buds on the Heartwood |
+    | Queen squasher | silver | squashing a Queen Slug |
+    | First harvest | silver | reaching the harvest at wave 30 in any garden |
+    | Perfect harvest | gold | harvesting a garden with all ten leaves |
+    | Every garden | gold | harvesting all three gardens |
+    | Thorny laurel | gold, hidden | harvesting a thorny garden |
 
 ![A seed just planted, growing](docs/screenshots/playthrough-1-sprout.webp)
 
@@ -174,6 +190,8 @@ and pressed lettering on clay tags. It is all painted in code at startup; there 
 ![The Heartwood in full bloom, with Thorn golems planted and the Thorn golem's seed picked](docs/screenshots/heartwood-bloom.webp)
 
 ![Wave 2's last pests on the path, with the button offering to call wave 3 early and its preview](docs/screenshots/call-early.webp)
+
+![Wave 3 just called early: the banner says wave 2's 35 sap comes once its last beetles are gone](docs/screenshots/called-early.webp)
 
 ![Squashed pests leave splats and "+5" pops while sap droplets fly to the counter](docs/screenshots/sap-pops.webp)
 
@@ -208,6 +226,8 @@ and pressed lettering on clay tags. It is all painted in code at startup; there 
 ![The garden picker with thorny variant tags under three-star gardens, one with its laurel](docs/screenshots/thorny-picker.webp)
 
 ![The thorny Meadow: the hedge seed is faded out and the wave tag counts to the laurel](docs/screenshots/thorny-meadow.webp)
+
+![The Trophies list on the start screen, five earned](docs/screenshots/trophies.webp)
 
 The difficulty, set on the hub page's Settings, changes one thing: pests have 25% less health on
 Easy and 30% more on Hard.

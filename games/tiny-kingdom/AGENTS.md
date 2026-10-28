@@ -69,7 +69,13 @@ Implemented today:
   1 to `ISLANDS` (9999) with `Math.random`, and `islandMap` lays it out from that number with its
   own seeded generator: two or three lakes of 2 to 4 cells, then two or three woods of 1 to 3,
   each grown from a random grass cell, then the castle on a random grass cell. The same number
-  always gives the same island.
+  always gives the same island. `fairIsland` checks each layout: some lake needs 3 grass cells on
+  its shore (round 1's decree asks for 3 farms there) and the castle at least `CASTLE_ROOM` (6)
+  grass cells joined to it, so it is never walled in by lakes and woods. A layout that fails is
+  drawn again from the seed `island + attempt * (ISLANDS + 1)` (`layIsland`); 74 of the 9999 islands
+  are redrawn, none of the campaign's and not the playthrough's 1990, and every other island lies
+  as before. A greedy bot reaches round 1's goal on every island on Normal; on Hard it falls
+  short on 16, where a beam search (40 boards, merges included) still reaches it.
 - Islands card (`src/game/islands.ts`, `createIslandsCard` in the scene): opened by the island
   button on the panel's round line (`ISLAND_BUTTON`) or the game-over "Islands" button. It has
   the campaign's eight level plaques with their best stars (locked ones dimmed), a line with the
@@ -117,7 +123,10 @@ Implemented today:
   (farms beside a named lake), `wood` (houses beside a named wood) and `watch` (one tower with 3
   houses around it). For shore and wood, `need` is what the board already has plus `ASK` (3 farms,
   2 houses); a watch decree's `need` is a flat 3, offered only while no tower has 3 homes around
-  it, so a decree never starts fulfilled. Round 1 always asks for 3 more farms on the lake with
+  it, so a decree never starts fulfilled. A decree is also checked against the pouch the round
+  starts with (`decreeFor`'s `pouch`, the hand included): a shore or wood decree needs `ASK` farms
+  or houses in it, and a watch decree a tower standing or in the pouch with room for the missing
+  homes around it (`watchShort`) and that many houses, so every decree offered can be met. Round 1 always asks for 3 more farms on the lake with
   the most open shore; later rounds draw a kind and a place from a generator seeded by island and
   round, never repeating the last round's kind and place. Lakes and woods are named by
   `namedPlaces` from where their centre lies (North, South, East, West or Mid, plus mere / pool /
@@ -152,6 +161,17 @@ Implemented today:
   draws each as a dotted curve from a yellow "+N" pill (coral for a negative share) on the
   neighbour to the ghost, and the total in a bubble over it.
 - Rounds with goals from `goalFor` and pouch refills from `ROUND_POUCH`, without end.
+- Trophies (`src/trophies/`, `shared/trophies.ts`): ten, listed in `trophies/index.ts` and handed to
+  `setupGame(game, { howToPlay, trophies })`. Bronze: `firstCrown` (a decree fulfilled, `crowns >= 1`),
+  `firstManor` (a manor on the board), `firstTrade` (a market trade, `tradedIn > 0`) and `allGifts`
+  (all four `SPECIALS` in `unlocked`). Silver: `roundEight` (round 8 reached), `longChain` (40
+  buildings joined to the castle at once, `joinedCount`) and `tenCrowns` (10 crowns in all). Gold:
+  `bigKingdom` (a kingdom finished with 350), `threeStars` (three stars on a campaign level) and
+  `campaign` (hidden: a star on all eight levels), the last two read from `loadStars`. A greedy
+  player finishes with 210 to 340 and joins about 50, so the gold and silver numbers ask for more
+  than it. `checkTrophies` in `trophies/check.ts` runs at the end of the scene's `refresh`, after
+  every change; its first call on a page is quiet, so crowns and stars saved before trophies earn
+  theirs without a toast. The playthrough's decree earns `firstCrown`.
 - One undo per round: `state.undo` holds a snapshot taken in `place`, `clear` or `merge`; `undo`
   restores it (the hand and `draws` included) and records the round in `undoneIn`. A placement
   that fulfils a decree or starts a new round clears the snapshot, so it cannot be undone, and so
@@ -179,8 +199,8 @@ Missing or rough:
   human play; retune `LEVELS` if they feel off. The bot never trades or clears woods.
 - The castle bonus can be large on a crowded island (a greedy bot joins 40 to 50 buildings), since
   every building in one blob counts; the campaign's stars were set with it in.
-- Islands are not checked for winnability; decrees are only checked for enough open spots, not
-  for enough tiles in the pouch.
+- A decree only counts the tiles in the pouch when it is drawn, not the hands: an unlucky draw
+  or the player's own building on its spots can still leave it unmet.
 - The decree outline is drawn cell edge by cell edge (dashed, square corners), not as one rounded
   shape like the mockup.
 - `start` does not clear running score popups (it does stop the round banner).
@@ -236,7 +256,7 @@ File map (`src/`):
   `SPECIALS` (the four gift buildings), the `Building`, `Special`, `Structure` (a building or
   `'manor'`), `Terrain` (grass, lake, forest, castle) and `Cell` types, `INFO` (the `TextKey`s of
   each one's name, rule and count, such as "3 farms"), `isBuilding`, `isBuilt`, `scores`, `isHome`, `MAP_SIZE`, `ISLANDS`,
-  `SIDES`, `AROUND`, `islandMap` (lakes, woods, then the castle), `seeded` (mulberry32),
+  `SIDES`, `AROUND`, `islandMap` (lakes, woods, then the castle, redrawn until `fairIsland`), `seeded` (mulberry32),
   `randomIsland` and `startingGrid`.
 - `game/state.ts`: `GameState`, `Snapshot`, `Share`, `Preview`, `Placed`, `FIRST_POUCH`,
   `ROUND_POUCH`, `HAND`, `TRADE_GIVE`, `goalFor`, `season`, `newGame(best, crowns, island?,
@@ -275,6 +295,10 @@ File map (`src/`):
   them; `castle` in `wood.ts` paints it). The table, the decree sign, the tray, the panel and the title plaque are the one
   `bg` texture.
 - `ui/Button.ts`: `makeButton`, the beech plaque button used by the game-over overlay.
+- `trophies/index.ts`: the trophy list (`trophySet`), loaded by the hub too, so it imports nothing
+  else from the game; its texts are in `trophies/i18n/` (`en.ts`, `de.ts`, and `en-US.ts` for
+  fulfill and favor). `trophies/check.ts`: `checkTrophies(state)` and each trophy's condition
+  (`EARNED`) with its numbers (`ROUND`, `CHAIN`, `CROWNS`, `BIG`).
 
 Shared code it imports (outside the game folder): `shared/audio.ts` (`sounds`, `ui`, `playMusic`,
 `playSting`), `shared/setupGame.ts` (`setupGame`),
@@ -346,7 +370,8 @@ State model (`GameState` in `src/game/state.ts`):
 Persistence: `tiny-kingdom-best` (the best final score, written at game over),
 `tiny-kingdom-crowns` (crowns won, written whenever a decree pays), `tiny-kingdom-daily`
 (`{ day, best }`, the island of the day's best, replaced when a new day's game ends) and
-`tiny-kingdom-stars` (a JSON array of the best stars per campaign level, 0 to 3). Board and round
+`tiny-kingdom-stars` (a JSON array of the best stars per campaign level, 0 to 3) and
+`tiny-kingdom-trophies` (the trophies earned, written by `award`). Board and round
 are never saved. The hub's settings are read from the shared `hub-settings` key.
 
 Randomness and timing: `randomIsland` makes the game's only `Math.random` call, once per random
@@ -456,7 +481,8 @@ valid island number. Hovering makes no sound. The game has no `?watch` mode.
   use them.
 - Inputs: it clicks tile buttons, the undo button and a gift button at their centres, moves the
   mouse over cells to check `preview`, and clicks cell centres, scaling view pixels by the canvas
-  bounding box. It reads `localStorage['tiny-kingdom-crowns']` to check the crown is saved.
+  bounding box. It reads `localStorage['tiny-kingdom-crowns']` to check the crown is saved, and
+  `localStorage['tiny-kingdom-trophies']` to check the decree earned `firstCrown` and nothing else.
 - The test mirrors these, so change them together: the `GameState` shape, `GRID`, `VIEW`,
   `islandMap` (as `ISLAND` and `MAP`, the castle included), `FIRST_POUCH`, `ROUND_POUCH`, `HAND`,
   the goals 20 and 45 (`GOALS`), `DECREE_BONUS`, round 1's decree (`FIRST_DECREE`: kind `shore`,
@@ -519,6 +545,9 @@ valid island number. Hovering makes no sound. The game has no `?watch` mode.
 - **Add a decree kind**: add it to `DecreeKind`, `ASK`, `decreeMarks` (what counts and the open
   spots), `makeDecree` (when it can be offered) and the shuffle in `decreeFor`; its text in the
   `i18n/` files and the scene's `decreeLine`; pick its spot texture in `refreshDecree`.
+- **Add or change a trophy**: its row in `trophies/index.ts`, its name and `<id>Text` in every
+  `trophies/i18n/` file and its condition in `EARNED` (`trophies/check.ts`); a trophy the first
+  round earns changes the playthrough's trophy check.
 - **Add a gift**: add it to `GIFTS` and `GIFT_INFO` (its label and line in the `i18n/` files) and to a pool in `giftsFor`; a gift that is not
   a tile pack also needs handling in `chooseGift`.
 - **Retune rounds**: `FIRST_POUCH`, `ROUND_POUCH` and `goalFor` (keep its `byDifficulty` factor

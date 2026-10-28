@@ -38,7 +38,7 @@ const en = {
   objBell: 'Ask Old Sedge in Glimmer Fen about the bell',
   objBelfry: 'Find the Drowned Belfry in Glimmer Fen',
   objHome: 'Tell Elder Wren the bell is quiet',
-  objEnd: 'Chapter two is done. Keep exploring by lamplight',
+  objEnd: "Find every moonstone, or race the dungeons' hourglasses",
 
   // Pip
   pipNook1: 'Behind the shed there is a rock stuck between the trees.',
@@ -51,6 +51,7 @@ const en = {
   bakerBread: 'Fresh bread for the night watch! Elder Wren was looking for you, dear.',
   bakerTrees1: 'Mind the woods. My mother said two of the trees there never cast a shadow.',
   bakerTrees2: 'Walk right through them, she said. Nobody believed her.',
+  bakerShop: "Got coins from the woods, dear? I've a pie and a pair of boots for a brave knight.",
 
   // Biscuit the cat
   catAsleep: 'Biscuit is asleep, very pleased with herself.',
@@ -67,6 +68,7 @@ const en = {
   hermitQuiet2: "Rocks don't roll into rings of trees by themselves, you know. West of the river, there is one.",
   hermitRingers1: "The ringers who built that belfry walled up what they didn't want the river to take.",
   hermitRingers2: 'Mind the frogs down there. They bite.',
+  hermitShop: "Coins, have you? I'll part with a bigger pouch, or a longer vine.",
   hermitHello1: 'Hm. A knight, out here? Nobody crosses the river these days.',
   hermitHello2: 'Three stone watchers stare at one patch of mud. I never dig there. Bad luck, I say.',
   hermitHello3: 'And that wisp... it flees anyone who chases it. Follow it to the end and see.',
@@ -91,6 +93,7 @@ const en = {
   elderHome2: 'The shrine builders walled up their mistakes too, I hear. Listen for hollow stone near its door.',
   elderHome3: 'Rest now. The fen will keep for another night.',
   elderEnd: 'The night is long, and the fen still glimmers. Off you go.',
+  elderTrials: 'They say the old hourglasses by the shrine and belfry doors glow again. Turn one, if you dare.',
 
   // Chests and doors
   empty: 'Empty.',
@@ -123,6 +126,9 @@ const en = {
   noSeeds: 'No bellseeds left. Cut bushes, or ask Old Sedge.',
   barsOpen: 'Somewhere, iron bars grind open.',
   wake: 'You wake by the lamplight, a little bruised.',
+  shellHard: 'Tink! The shell is too hard. Flip it over first.',
+  beetleFlipped: 'On its back! Strike now.',
+  lanternDown: 'The lantern moth tumbles down. Strike!',
   bulbDown: 'The bulb is down. Strike it!',
   bellTipped: 'The bell tips over. Strike what hides inside!',
   clang: 'Clang! The bronze is too thick.',
@@ -147,6 +153,41 @@ const en = {
   endTwoFew: 'The frogs sing over the drowned belfry. The night is quiet, for now.',
   keepExploring: 'Keep exploring',
   newGame: 'New game',
+
+  // The hourglass trials
+  hourglassRead: 'An old hourglass full of glowing sand. Turn it, and every foe here wakes again, and the master of this place rises stronger. Beat it as fast as you can.',
+  hourglassBest: 'Your best time here: {time}.',
+  trialStart: 'The sand runs!',
+  trialBusy: 'The sand is already running.',
+  trialLost: 'The sand stops. The trial is over.',
+  trialDone: 'Trial done in {time}!',
+  trialRecord: 'A new best time!',
+  trialBestIs: 'Your best is still {time}.',
+
+  // The moonstone page
+  stonesTitle: 'Moonstones',
+  stonesTotal: '{n} of {total} found',
+  trialsTitle: 'Hourglass trials',
+  trialBest: '{place}: {time}',
+  trialNone: '{place}: not run yet',
+  closePage: 'Tap or N to close',
+
+  // The shops
+  shopTitle: "{name}'s wares",
+  price: '{n} coins',
+  owned: 'Yours',
+  notYet: 'Not yet',
+  closeShop: 'Tap outside, Space or Esc to close',
+  tooPoor: 'Not enough coins.',
+  bought: 'Bought: {item}!',
+  pie: 'Hearty pie',
+  pieText: 'One more heart, for good.',
+  boots: 'Light boots',
+  bootsText: 'Roll farther, and roll again sooner.',
+  pouch: 'Bigger pouch',
+  pouchText: 'Carry 15 bellseeds instead of 10.',
+  vine: 'Long vine',
+  vineText: 'The hookvine reaches much farther.',
 
   // HUD
   keys: 'Keys {n}',

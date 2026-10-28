@@ -24,6 +24,17 @@ Implemented today:
   the lane from the player's start to the beacon. Retries that keep them clear draw on a local
   generator (`localRandom`), so the map takes the same count from `Math.random` however many
   retries, and the stars and the battle's own randomness repeat as before.
+- Pathing (`game/pathing.ts`, `World.pathing`, `steer`, `offRocks`, `spread`, `nudge`): every flight goes
+  through `approach`, which flies straight when `Pathing.clear` says the way is open and otherwise
+  follows `Pathing.route`, an A* path on a 20 px grid (`PATH_CELL`) round the rocks, heading for the
+  furthest waypoint in a straight line. A path is kept per ship (`World.routes`, a `WeakMap`) and
+  found again every `ROUTE_MS` (1 s) or once the destination moves a cell. A ship keeps its centre
+  `UNIT_RADIUS - ROCK_OVERLAP` (6 px) off a rock's edge (`offRocks` slides it off); rocks round its
+  destination (within `REACH`, 14 px, of its stop) are left out, so a node or target among the
+  rocks can still be reached, and a move order onto a rock stops at its edge. After the units act,
+  `spread` pushes warships (not harvesters or convoy ships) closer than `SPREAD` (18 px) apart at up
+  to `SPREAD_SPEED` (40 px/s); a ship on a move order holds its course and the other gives way, and
+  no push puts a ship over a rock. An idle ship left over a rock drifts off it. No `Math.random`.
 - Nebulae (`World.inNebula`, `Unit.nebula`, `updateCover`): a ship inside one flies at 70% speed
   (`NEBULA_SLOW`) and is hidden from an enemy faction (`hidden`) unless that faction has a ship
   within 70 px (`NEBULA_SPOT`), a building within 70 px of its edge or claimed sensors in range, or
@@ -193,6 +204,21 @@ Implemented today:
   top bar's pill and the command bar's panel show the current contract or the board's countdown;
   the board itself is two cards over the map (`GameScene.boardCards`, `drawBoard`), hidden while the
   rivals panel is open.
+- Rival contracts (`Side.deal`, `Deal`, `World.updateDeals`, `dealScore`, `AI_DEAL_MS`, `AI_GOALS`,
+  `nearestEnemyHub`): from 90 s every AI side (slot 0 too when watching) works through a chain of
+  its own, board steps 1 to 4 (`deal.step`, ranks II to V), picking a goal from `AI_GOALS` (`kills`,
+  `hold`, `derelicts`, `razes`, `hubs`) open at that step and not done, with the world's `dealRng`
+  (a `localRandom` of its own, so neither the board's draws nor `Math.random` move). It counts in
+  `removeDead` (a kill, raze or main hub whose last hit was the side's), `updateBeacon` (seconds
+  held) and `updateDeals` (derelicts held now); met, it pays the reward and applies the perk to the
+  side's `perks` (which `unitStats` and the rest already read), and the player gets a notice
+  (`rivalDealDone`). One not met in `AI_DEAL_LIMIT_MS` (180 s) is dropped and picked again. A rival
+  plays to its contract: `kills`, `razes` and `hubs` attack with `AI_DEAL_EAGER` (2) ships fewer
+  (at least 2), `hubs` at the nearest main hub; `hold` keeps a picket on the beacon whatever its
+  rank in `contestBeacon`; `derelicts` claims stations at any reach with `AI_DEAL_CLAIM_ARMY` (2)
+  warships. The rivals panel shows each one's contract and progress (`GameScene.rivalDeals`,
+  `rivalDeal`, `rivalDealsDone`), and `updateDeals` logs `aiDeal` and `aiDealDone` to `aiLog`. The playthrough
+  ends before 90 s, so it plays as before.
 - Flagship (`Side.flagship`, `World.buildFlagship`, `updateFlagship`, `flagshipStats`, `Unit.flagship`,
   `Faction.flagship` in `game/factions.ts`): the third contract done (`FLAGSHIP_STEP`) turns the
   player's flagship from `locked` to `ready`. The Flagship button (`FLAGSHIP_BUTTON`, kind `command`)
@@ -253,13 +279,12 @@ Implemented today:
 
 Missing or rough:
 
-- No pathfinding (units move in straight lines and pass over rocks), no unit
-  collision and no save of a battle in progress (only the campaign is saved). No ambient hum under the music, and no per-faction music motif.
+- Pathing is round rocks only: ships still fly over buildings, nebulae and the derelicts, and
+  spread apart softly rather than colliding. No save of a battle in progress (only the campaign is saved). No ambient hum under the music, and no per-faction music motif.
 - No edge scrolling: the map scrolls with the keys, a two-finger drag or the minimap.
 - The rivals' Barracks and Turrets are placed at random within 60 to 150 px of their hub.
-- Ships of a type spawn on the same spot and stack (no collision), so a fresh wing looks like one
-  ship until it moves, unless a rally point fans it out.
-- The AI ignores contracts (beyond hunting a convoy and the survive raid) and sees through the fog
+- The AI runs its own contracts but doesn't play against the player's (beyond hunting a convoy and
+  the survive raid), and never takes the convoy, nebula, lattice or survive contracts. It sees through the fog
   (but not into nebulae). Rivals left alone wipe each other out fast: the centre faction usually
   falls first, until the last-stand pact turns the last two on the player.
 - Only the player makes truces and pays tribute; rivals never make peace with each other. The AI
@@ -284,10 +309,20 @@ File map (`src/`):
   Every text on screen, the notices and problems `World` returns and the Watch AI log go through
   `t` (`tr` in `GameScene`, where `t` names the text helper in `create`); game logic compares ids
   and keys, never shown text.
+- `trophies/`: the game's trophies (`shared/trophies.ts`). `index.ts` lists them with `trophySet`
+  (it imports only its own texts, since the hub loads it), `i18n/en.ts` and `de.ts` hold the names
+  and `<id>Text`s, and `check.ts` has `checkTrophies(world)`, which `GameScene.update` calls every
+  frame after the battle steps: it awards each trophy whose condition (`EARNED`) holds, never while
+  watching. The trophies: `firstContract` (bronze, a contract done), `beacon` (bronze, the beacon
+  owned), `truce` (bronze, a rival under truce), `ace` (silver, a player ship with Ace's kills),
+  `derelicts` (silver, all three derelicts held), `flagship` (silver, the flagship out), `victory`
+  (silver, a battle won), `outpaced` (gold, all five contracts done while no rival's `deal.step`
+  has reached `CONTRACT_STEPS`) and `campaign` (gold, hidden: the last sector won). A battle never
+  replays time, so no award is quiet.
 - `audio.ts`: the game's sound (see "Sound" below): `SONG`, the `sfx` table, its `Sfx` names and
   `LASER_PITCH`. Only `GameScene` imports it.
 - `main.ts`: creates the `Phaser.Game` (960x540, `Phaser.Scale.FIT`, `pixelArt: false`) with
-  `GameScene`, calls `setupGame(game)` from `shared/setupGame.ts` and `setupScaling(game, { fill: true })` from
+  `GameScene`, calls `setupGame(game, { howToPlay, trophies })` from `shared/setupGame.ts` and `setupScaling(game, { fill: true })` from
   `shared/scaling.ts`, and in dev builds puts `game` on `window`. The canvas has `renderScale`
   canvas pixels per view pixel (see "Screen scaling" below).
 - `game/factions.ts`: the `FACTIONS` list (name, outpost name, colours, `tune` multipliers, the
@@ -310,6 +345,8 @@ File map (`src/`):
   `sectorText`. No Phaser.
 - `game/arena.ts`: `ARENA` (the 1600 by 1000 battlefield in world pixels), `START_POINTS` (the five
   fixed hub spots, player first), `NODE_AMOUNT`, `NODE_CLEARANCE` and `BUILD_RANGE`.
+- `game/pathing.ts`: `Pathing` (built from the map's rocks and a clearance: `over`, `clear`,
+  `route`), `PATH_CELL` and the `Rock` type. No Phaser, no `Math.random`.
 - `game/map.ts`: `generateMap(count, loose)` returns a `MapLayout` (homes, nodes, rocks, nebulae, stars,
   derelicts), `beaconNode` (which node is the relay beacon), `DerelictKind` and `DERELICT_KINDS`.
   Uses `Math.random`, plus `localRandom` (exported: the world's board and the scene use it too) for
@@ -329,7 +366,7 @@ File map (`src/`):
   keys; `derelictText` fills in the numbers), `TRUCE_MS`,
   `TRUCE_TRIBUTE`, `OFFER_MS`, `BRIBE_COST`, `BRIBE_MS`), `RALLY_SPOTS`, the flagship, convoy and pact constants
   (`FLAGSHIP_COST`, `FLAGSHIP_MS`, `FLAGSHIP_HP`, `FLAGSHIP_DAMAGE`, `FLAGSHIP_SPEED`, `FLAGSHIP_RANGE`,
-  `CONVOY_SIZE`, `PACT_MS`, `PACT_WAVE_MS`), `flagshipStats` and the types `Beacon`, `Shard`, `Mine`,
+  `CONVOY_SIZE`, `PACT_MS`, `PACT_WAVE_MS`), the rival contract constants (`AI_DEAL_MS`, `AI_GOALS`), `flagshipStats` and the types `Beacon`, `Deal`, `Shard`, `Mine`,
   `Pop`, `Build`, `ContractState`, `Pact`, `WorldEvent`, `Struck`, `Cue`, `Derelict`, `SeenBuilding`. Fields `fog`, `known`, `mines`,
   `derelicts`, `contract`, `convoyTo`, `pact`, `sector`. Methods the scene and test use: `update(dt)`, `build`, `train`, `research`,
   `command`, `fallBack`, `setRally`, `clearRally`, `fleet`, `pickContract`, `currentContract`, `buildFlagship`, `abilityOf`, `acceptTruce`, `declineTruce`, `bribe`, `bribeTarget`, `selectableIn`,
@@ -410,11 +447,11 @@ How it runs:
 - `World.update` runs, in order: beams, wrecks and pops age; nebula cover is worked out
   (`updateCover`); buildings progress (construction, training, turret fire); derelicts claim, train
   and fire; units act (repair, harvesters `harvest`, others follow their order or acquire a
-  target, or a convoy harvester flies on); each rival's truce timers run and it `think`s once a second (including `contestBeacon`,
+  target, or a convoy harvester flies on) and warships spread apart (`spread`); each rival's truce timers run and it `think`s once a second (including `contestBeacon`,
   `contestDerelicts`, `considerTruce` and falling hurt ships back); the pact is signed or raids;
   dead entities are removed (kills, veteran credit, razes, pressure, shards and a lost flagship are
   recorded here, after mines go off); research, the flagship's build, the beacon, shards, the
-  contract (and board) and the fog update; the phase becomes `won` or `lost`.
+  contract (and board), the rivals' contracts (`updateDeals`) and the fog update; the phase becomes `won` or `lost`.
 - Boot bakes all sprites in `create` (320 ship frames and the rest); a new map only repaints the
   backdrop.
 - Time is simulated, not read from the clock: `elapsedMs` is game time, used for the AI grace and
@@ -493,7 +530,7 @@ follows or uses bounds (`scrollTo` clamps it), so it keeps the top-left origin r
 `e2e/screens.spec.ts` checks the game on five screens.
 
 Save keys: `space-wars-campaign` (`CAMPAIGN_KEY` in `game/campaign.ts`): the sector campaign, as
-`{ unlocked, kept }`. `loadCampaign` rounds `unlocked` to a whole sector and turns a `kept` goal
+`{ unlocked, kept }`, and `space-wars-trophies` (by `shared/trophies.ts`): the trophies earned. `loadCampaign` rounds `unlocked` to a whole sector and turns a `kept` goal
 the game no longer knows into `null`, so an old or hand-edited save still loads. Nothing else is kept between visits; the game reads the hub's settings
 (`byDifficulty`, `settings.reduceMotion`, the language through `shared/i18n.ts`) through `shared/`. The playthrough starts with empty
 storage, so it plays sector 1 with no kept perks.
@@ -513,8 +550,10 @@ Test hooks (read by `e2e/playthrough.spec.ts`):
   reward and perk, that the board offers two contracts with `kills` first, the beacon's capture and
   pay, and a kill and its salvage.
 - `scene.boardCards`: the board's cards; the test taps the `kills` card.
+- `localStorage['space-wars-trophies']`: the test checks the first round earns `firstContract` and
+  `beacon`, and nothing else.
 - `scene.selected`: the ids of the selected units; the test checks that its box selected the wing.
-- Not read by the test, but there: `scene.state.derelicts` (`perk`, `owner`, `claim`), `sides[i].truceMs`,
+- Not read by the test, but there: `scene.state.derelicts` (`perk`, `owner`, `claim`), `sides[i].deal`, `sides[i].truceMs`,
   `offerMs`, `grudge`, `flagship`, `units[i].kills`, `nebula`, `repairing`, `flagship`, `convoy`,
   `state.pact`, `state.convoyTo`, `scene.rivalsOpen`, `keepCards`, `campaign`, `sector` and `sectorNodes`.
 - `scene.camera.scrollX` and `scrollY`: the map's scroll, which the test reads to see whether a pan
@@ -564,7 +603,8 @@ Test hooks (read by `e2e/playthrough.spec.ts`):
 - **A contract**: add or change an entry in `CONTRACT_POOL` (with the step it is offered `from`).
   A new `Goal` needs counting in `World` (`score` for events, or a check in `updateContract`),
   any rule for when it can't be played in `contractOpen`, any setup in `startContract`, and a new
-  perk field in `Perks` and `NO_PERKS` that a stat reads. `FIRST_CONTRACT` and the second board's
+  perk field in `Perks` and `NO_PERKS` that a stat reads. Add it to `AI_GOALS` in `game/world.ts` if the rivals
+  can play it too, with its counting in `dealScore` or `updateDeals`. `FIRST_CONTRACT` and the second board's
   `kills` card are part of the first round, so changing them means updating the playthrough.
 - **A flagship**: its name and ability are `flagship` on each faction in `game/factions.ts`; its
   scaling is the `FLAGSHIP_*` constants in `game/world.ts`. Abilities on units go through
@@ -591,6 +631,9 @@ Test hooks (read by `e2e/playthrough.spec.ts`):
   `updateCover`, `updateFog` or `train`.
 - **A new rivals-panel action**: a method on `World` (so the AI could use it too), a `RivalButton`
   action in `GameScene.drawRivals` and its case in `onDown`.
+- **Pathing numbers**: `ROCK_OVERLAP`, `ROUTE_MS`, `SPREAD`, `SPREAD_SPEED` and `REACH` at the top
+  of `game/world.ts`, `PATH_CELL` in `game/pathing.ts`. A wing flies to the beacon and the
+  playthrough's box selects the fresh wing, so check it still plays.
 - **Research or expansion numbers**: `game/research.ts` and the expansion constants in
   `game/world.ts`; the tooltips read them, so update the README's numbers.
 - **Anything the playthrough depends on** (button positions, the first-round numbers, the hub or

@@ -59,6 +59,7 @@ import { TIRE_MS } from '../game/tired';
 import { UPGRADES, nextPrice, type UpgradeId } from '../game/upgrades';
 import { WASP_IN_MS, WASP_OUT_MS, WASP_STEAL_MS, type Wasp } from '../game/wasps';
 import { t } from '../i18n';
+import { checkTrophies } from '../trophies/check';
 import { Button } from '../ui/Button';
 import {
   AWAY,
@@ -377,6 +378,7 @@ export class GameScene extends Phaser.Scene {
     this.lastFrame = time;
     this.clock += dt;
     tick(this.state, dt);
+    checkTrophies(this.state);
     // Nectar coming home and cells capping change the comb; keep it. Save now and then anyway,
     // so the last-seen time stays fresh.
     const changed = (e: GameState['events'][number]) => ['nectar', 'capped', 'hatched', 'stolen', 'season', 'ate', 'mead', 'swarmed', 'returned', 'wilted', 'fair-closed'].includes(e.kind);

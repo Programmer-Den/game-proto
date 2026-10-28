@@ -31,6 +31,9 @@ import {
   drop,
   gusty,
   keepBuilding,
+  ALTAR_MULT,
+  isAltar,
+  nextAltar,
   GILDED_MULT,
   GILDED_TIER,
   GOAL_TIER,
@@ -54,6 +57,7 @@ import {
   type GameState,
 } from '../game/state';
 import { makeButton } from '../ui/Button';
+import { checkTrophies } from '../trophies/check';
 import { playMusic, playSting, ui } from '../../../../shared/audio';
 import { bellPitch, sfx, SONG } from '../audio';
 import { viewFrame, viewSize } from '../../../../shared/scaling';
@@ -103,6 +107,8 @@ const OUTLINE = 0x2a2036;
 const GOLD = 0xf3c64e;
 /** The gilded tier's stones are leaf gold whatever the tier colours say. */
 const GILT = 0xe9b949;
+/** A sky altar's stones are pale cloud-silver. */
+const ALTAR_STONE = 0xcfe2f2;
 /** Curses are drawn in a dusky plum. */
 const CURSE_COLOR = 0xb0609a;
 
@@ -205,7 +211,7 @@ function place(parts: UiPart[], x: number, y: number, alpha = 1) {
   return parts;
 }
 
-const tierColor = (tier: number) => (tier === GILDED_TIER ? GILT : TIER_COLORS[(tier - 1) % TIER_COLORS.length]);
+const tierColor = (tier: number) => (tier === GILDED_TIER ? GILT : isAltar(tier) ? ALTAR_STONE : TIER_COLORS[(tier - 1) % TIER_COLORS.length]);
 
 /** The colour of a tier's stone in a material: marble pale, sandstone warm, basalt dark; limestone is the tier's own colour. */
 function materialColor(tier: number, material: MaterialId) {
@@ -254,6 +260,11 @@ function drawStone(g: Phaser.GameObjects.Graphics, w: number, tier: number, perf
     // Pits in the dark rock.
     g.fillStyle(shade(color, -0.45));
     for (let px = x + 10, i = 0; px < x + w - 6; px += 17, i++) g.fillRect(Math.round(px), y + (i % 3 ? 8 : 15), 3, 2);
+  }
+  if (isAltar(tier) && w > 12) {
+    // A sky altar: a silver line along the top and a star near either end.
+    g.fillStyle(0xf4fbff).fillRect(x + 1, y + 1, w - 2, 2);
+    for (const sx of [x + 8, x + w - 11]) g.fillRect(Math.round(sx) + 1, y + 7, 1, 5).fillRect(Math.round(sx), y + 9, 3, 1);
   }
   if (tier === GILDED_TIER && w > 12) {
     // Gilding: a bright leaf along the top and a glint near either end.
@@ -305,6 +316,8 @@ export class GameScene extends Phaser.Scene {
   private leanLabel!: Phaser.GameObjects.Text;
   private leanBar!: Phaser.GameObjects.Graphics;
   private windText!: Phaser.GameObjects.Text;
+  /** The goal box's last line: the gilded tier, or in the sky the next sky altar. */
+  private goalNote!: Phaser.GameObjects.Text;
   private crown: Phaser.GameObjects.Graphics | null = null;
   /** "Build again" centred (after a fall) and beside "Keep building" (after the crown). */
   private againButton: UiPart[] = [];
@@ -423,7 +436,10 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     tick(s, dt);
     if (s.phase === 'crowned') this.crownedMs += dt;
-    for (const e of s.events.splice(0)) this.show(e);
+    for (const e of s.events.splice(0)) {
+      this.show(e);
+      checkTrophies(s, e);
+    }
     this.updateSound();
 
     // The camera follows the temple's top up, easing so each new stone slides the view gently.
@@ -542,7 +558,7 @@ export class GameScene extends Phaser.Scene {
     fixed(this.add.rectangle(PANEL.x + 10, goal, PANEL.w - 20, 76, 0x2c2446).setOrigin(0).setStrokeStyle(2, 0x6a5a9a));
     fixed(this.add.text(PANEL.x + 18, goal + 6, t('goal', { tier: GOAL_TIER }), textStyle(14, '#f3c64e')));
     this.goalPips = fixed(this.add.graphics());
-    fixed(this.add.text(PANEL.x + 18, goal + 52, t('gildedGoal', { tier: GILDED_TIER, mult: GILDED_MULT }), { fontFamily: FONT, fontSize: '12px', color: '#e9b949' }));
+    this.goalNote = fixed(this.add.text(PANEL.x + 18, goal + 52, '', { fontFamily: FONT, fontSize: '12px', color: '#e9b949' }));
     fixed(
       this.add.text(PANEL.x + 16, PANEL.y + PANEL.h - 68, t('rules'), {
         fontFamily: FONT,
@@ -575,7 +591,7 @@ export class GameScene extends Phaser.Scene {
   private updateSound() {
     const s = this.state;
     const playing = s.phase === 'swinging' || s.phase === 'falling';
-    const part = !playing ? 'break' : s.endless ? 'sky' : s.tier === GILDED_TIER ? 'gilded' : 'calm';
+    const part = !playing ? 'break' : s.tier === GILDED_TIER || isAltar(s.tier) ? 'gilded' : s.endless ? 'sky' : 'calm';
     if (part !== this.musicPart) {
       this.musicPart = part;
       playMusic(SONG, part);
@@ -678,6 +694,10 @@ export class GameScene extends Phaser.Scene {
     } else if (e.type === 'swapped') {
       sfx('swish');
       this.popup(PANEL.x + PANEL.w + 90, RESERVE_BUTTON.y + 8, t('inHand', { kind: t(KIND_INFO[e.kind].name) }), false, true);
+    } else if (e.type === 'altar') {
+      // A sky altar: trimmed and lit like a balanced tier, and a blessing either way.
+      this.ornament(e.tier);
+      sfx('gong');
     } else if (e.type === 'patron') {
       const info = PATRON_INFO[e.patron];
       sfx('gong');
@@ -829,6 +849,8 @@ export class GameScene extends Phaser.Scene {
       if (t === GILDED_TIER) this.goalPips.lineStyle(2, GILT).strokeRect(x - 1, y - 1, GOAL.pip + 2, GOAL.pip + 2);
       if (t === s.tier && s.phase !== 'crowned') this.goalPips.fillStyle(0xf3e9d2).fillRect(x, y + GOAL.pip + 2, GOAL.pip, 2);
     }
+    if (s.endless) setFitted(this.goalNote.setColor('#bfe4f4'), t('altarGoal', { tier: nextAltar(s.tier), mult: ALTAR_MULT }), PANEL_TEXT_W, 12);
+    else this.goalNote.setText(t('gildedGoal', { tier: GILDED_TIER, mult: GILDED_MULT }));
     this.favorText.setText(t('favour', { n: s.favor }));
     this.builtText.setText(t('built', { built: s.tiersBuilt, best: s.best }));
     const next = KIND_INFO[s.nextKind];
@@ -935,7 +957,13 @@ export class GameScene extends Phaser.Scene {
       this.addOffer(title, ...this.makeBuildOn());
       return;
     }
-    const title = this.add.text(OFFER_TITLE.x, OFFER_TITLE.y, t('balanced', { tier: s.tier - 1 }), textStyle(20, '#f3c64e')).setOrigin(0.5);
+    const done = s.tier - 1;
+    const title = setFitted(
+      this.add.text(OFFER_TITLE.x, OFFER_TITLE.y, '', textStyle(20, isAltar(done) ? '#bfe4f4' : '#f3c64e')).setOrigin(0.5),
+      isAltar(done) ? t('altarBlessing', { tier: done }) : t('balanced', { tier: done }),
+      2 * (REROLL.x - REROLL.w / 2 - OFFER_TITLE.x) - 16,
+      20,
+    );
     this.addOffer(title, ...this.makeReroll());
     if (s.curseOffer) this.addOffer(...this.makeCurse());
     const cards = s.offer.length > CARDS.xs.length ? CARDS_FOUR : CARDS;
@@ -1173,7 +1201,8 @@ export class GameScene extends Phaser.Scene {
       .on('pointerdown', () => {
         if (!buildOn(this.state)) return;
         sfx('rise');
-        if (this.state.tier === GILDED_TIER) this.announce([t('gildedTier', { tier: GILDED_TIER }), t('gildedFavour', { mult: GILDED_MULT })]);
+        const notice = this.tierNotice();
+        if (notice) this.announce(notice);
       });
     this.buildOnButton = { x, y, w, h };
     return place([bg, label], x, y);
@@ -1200,13 +1229,18 @@ export class GameScene extends Phaser.Scene {
   private onChosen(id: BlessingId, cursed: string | null) {
     sfx('choir');
     if (id === 'broad') this.redrawTop();
-    const gilded = this.state.tier === GILDED_TIER;
+    const tier = this.state.tier;
+    const special = tier === GILDED_TIER ? t('gildedTierFavour', { tier, mult: GILDED_MULT }) : isAltar(tier) ? t('altarTierFavour', { tier, mult: ALTAR_MULT }) : '';
     const curse = cursed ? t('cursedWith', { curse: t(CURSE_INFO[this.state.curse!.id].name), mult: CURSE_MULT }) : null;
-    this.announce(
-      gilded
-        ? [t('blessingYours', { blessing: t(BLESSING_INFO[id].name) }), curse ?? t('gildedTierFavour', { tier: GILDED_TIER, mult: GILDED_MULT })]
-        : [t('blessingYours', { blessing: t(BLESSING_INFO[id].name) }), curse ?? ''].filter(Boolean),
-    );
+    this.announce([t('blessingYours', { blessing: t(BLESSING_INFO[id].name) }), curse ?? special].filter(Boolean));
+  }
+
+  /** The banner for a tier that starts after a break with no blessing: the gilded tier or a sky altar. */
+  private tierNotice() {
+    const tier = this.state.tier;
+    if (tier === GILDED_TIER) return [t('gildedTier', { tier }), t('gildedFavour', { mult: GILDED_MULT })];
+    if (isAltar(tier)) return [t('altarTier', { tier }), t('altarFavour', { mult: ALTAR_MULT })];
+    return null;
   }
 
   /** Past the crown: the crown comes off so the temple can climb on. */

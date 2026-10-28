@@ -74,6 +74,8 @@ export interface Pest {
   kind: PestKind;
   hp: number;
   maxHp: number;
+  /** The wave it came with. */
+  wave: number;
   /** Which of the garden's routes it walks (an index into `Garden.routes`). */
   route: number;
   /** How far along its route it has walked, in pixels. */
@@ -94,6 +96,22 @@ export interface Shot {
   from: { x: number; y: number };
   to: { x: number; y: number };
   ms: number;
+}
+
+/** A wave called early, still waiting for its last pests to be squashed or get through. */
+export interface Called {
+  wave: number;
+  /** Its Queen Slug was squashed (only a Queen Slug wave whose queen is off the path can be called early). */
+  queenSquashed: boolean;
+  /** The Heartwood's leaves when it was called. */
+  heart: number;
+}
+
+/** A wave called early that came to an end. */
+export interface Settled {
+  wave: number;
+  /** The Heartwood lost no leaf between the call and the end (a leaf regrown in between doesn't count). */
+  clean: boolean;
 }
 
 /** A pest just squashed: where, and the sap it dropped. The scene shows it and then empties the list. */
@@ -161,6 +179,10 @@ export interface GameState {
   offer: Boon[];
   /** The Queen Slug was squashed this wave (one that got through to the Heartwood earns no boons). */
   queenSquashed: boolean;
+  /** Waves called early whose last pests still walk: each is done (bonus, bud, best) once they are gone. */
+  called: Called[];
+  /** Waves called early that came to an end since the scene last looked. The scene empties it. */
+  settled: Settled[];
   /** Leaves regrown this garden; each makes the next one dearer. */
   regrown: number;
   nextId: number;
@@ -208,6 +230,8 @@ export function newGame(best: number, bloom = 0, garden = 0, stars: number[] = [
     sunRows: [],
     offer: [],
     queenSquashed: false,
+    called: [],
+    settled: [],
     regrown: 0,
     nextId: 1,
   };
@@ -437,29 +461,28 @@ function beginWave(s: GameState) {
 }
 
 /**
- * Counts wave `s.wave` as done: its bonus, compost on the sap unspent (from COMPOST.fromWave), a bud
- * on the Heartwood, the best, after a Queen Slug wave whose queen was squashed three boons to pick
- * from, and at HARVEST_WAVE the garden's harvest stars (and in its thorny variant, its laurel), and
- * moves on.
+ * Counts wave `n` as done: its bonus, compost on the sap unspent (from COMPOST.fromWave), a bud on
+ * the Heartwood, the best, after a Queen Slug wave whose queen was squashed three boons to pick from,
+ * and at HARVEST_WAVE the garden's harvest stars (and in its thorny variant, its laurel).
  */
-function finishWave(s: GameState) {
-  s.compost = s.wave >= COMPOST.fromWave ? Math.min(compostCap(s), Math.floor(s.sap * COMPOST.rate)) : 0;
-  s.sap += waveBonus(s.wave) + s.compost;
+function finishWave(s: GameState, n: number, queenSquashed: boolean) {
+  s.compost = n >= COMPOST.fromWave ? Math.min(compostCap(s), Math.floor(s.sap * COMPOST.rate)) : 0;
+  s.sap += waveBonus(n) + s.compost;
   s.bloom = Math.min(BLOOM_GOAL, s.bloom + 1);
-  s.best = Math.max(s.best, s.wave);
-  if (s.wave === HARVEST_WAVE) {
+  s.best = Math.max(s.best, n);
+  if (n === HARVEST_WAVE) {
     s.harvest = harvestStars(s.heart);
     s.stars[s.garden] = Math.max(s.stars[s.garden], s.harvest);
     if (s.thorny) s.laurels[s.garden] = 1;
   }
-  if (s.wave % BOSS_EVERY === 0 && s.queenSquashed) s.offer = boonOffer(s.wave / BOSS_EVERY, twistOf(s));
-  s.wave++;
+  if (n % BOSS_EVERY === 0 && queenSquashed) s.offer = boonOffer(n / BOSS_EVERY, twistOf(s));
 }
 
 /**
  * The wave button: between waves it sends the next wave in. During a wave whose pests have all come
- * in, it calls the next wave early: the current wave counts as done at once (its bonus and its bud)
- * plus EARLY_BONUS sap, and the next wave's pests start coming while the last ones are still walking.
+ * in, it calls the next wave early: the next wave's pests start coming while the last ones are still
+ * walking, and the current wave waits in `called` until those are squashed or get through. Only then
+ * is it done, with EARLY_BONUS sap on top of its bonus, so a call early still risks its last pests.
  * Returns what it did.
  */
 export function startWave(s: GameState): 'start' | 'early' | null {
@@ -468,8 +491,8 @@ export function startWave(s: GameState): 'start' | 'early' | null {
     return 'start';
   }
   if (!canCallEarly(s)) return null;
-  finishWave(s);
-  s.sap += EARLY_BONUS;
+  s.called.push({ wave: s.wave, queenSquashed: s.queenSquashed, heart: s.heart });
+  s.wave++;
   beginWave(s);
   return 'early';
 }
@@ -521,7 +544,7 @@ function step(s: GameState, dt: number) {
       const { kind } = s.queue.shift()!;
       const hp = Math.round(PEST_INFO[kind].hp * s.waveHpScale);
       const route = s.spawned++ % routes.length;
-      s.pests.push({ id: s.nextId++, kind, hp, maxHp: hp, route, dist: 0, under: false, slowMs: 0, slowFactor: 1, hitMs: 0 });
+      s.pests.push({ id: s.nextId++, kind, wave: s.wave, hp, maxHp: hp, route, dist: 0, under: false, slowMs: 0, slowFactor: 1, hitMs: 0 });
     }
   }
 
@@ -631,8 +654,16 @@ function step(s: GameState, dt: number) {
   }
   s.pests = s.pests.filter((p) => p.hp > 0);
 
+  // A wave called early is done once its last pests are gone, oldest first.
+  while (s.called.length && !s.pests.some((p) => p.wave === s.called[0].wave)) {
+    const done = s.called.shift()!;
+    finishWave(s, done.wave, done.queenSquashed);
+    s.sap += EARLY_BONUS;
+    s.settled.push({ wave: done.wave, clean: s.heart >= done.heart });
+  }
   if (s.phase === 'wave' && !s.queue.length && !s.pests.length) {
-    finishWave(s);
+    finishWave(s, s.wave, s.queenSquashed);
+    s.wave++;
     s.phase = 'build';
   }
 }

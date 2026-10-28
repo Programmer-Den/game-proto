@@ -15,13 +15,37 @@ import {
   ELIXIR,
   ELIXIR_COLOR,
   AI_ELIXIR,
+  ASSIST,
   KILL,
+  SPELL_AI,
+  spellById,
+  MERC,
+  RUNE,
+  RUNES,
+  RUNE_ORDER,
+  BODY,
+  STUCK,
+  PLATING,
+  FIRST_BLOOD,
+  COMEBACK,
+  SURRENDER,
+  SUMMARY,
+  AMBUSH,
+  BUSHES,
+  DRAKE,
+  DRAKES,
+  DRAKE_ORDER,
+  RECAP,
+  PING,
+  PINGS,
+  PingKind,
   MINION,
   RESPAWN_BASE_MS,
   RESPAWN_PER_LEVEL_MS,
   SHOP_RANGE,
   FOUNTAIN,
   SIGHT,
+  DAYNIGHT,
   MAX_LEVEL,
   TOWER,
   Vec,
@@ -69,8 +93,9 @@ import {
   WARD_SPOTS,
   bountyOf,
 } from './data';
-import { GameState, ObjectiveTitle, SoundId, Unit, dist, getUnit, laneNear, levelFor, refreshStats, spawnWard, spawnWave } from './state';
+import { DeathRecap, GameState, HitHow, ObjectiveTitle, RecapRow, SoundId, Unit, dist, getUnit, laneNear, levelFor, refreshStats, spawnMercs, spawnWard, spawnWave } from './state';
 import { shortName } from './names';
+import { clearLine, route, settle, steer } from './terrain';
 import { aiLog } from '../../../../shared/watch';
 import { english, t as text, type TextKey } from '../i18n';
 
@@ -98,7 +123,23 @@ export function tick(s: GameState, dt: number) {
   updateContesters(s);
   updateGanks(s);
   updateJungle(s);
+  updateRunes(s);
+  if (!s.platesGone && s.time >= PLATING.until) {
+    s.platesGone = true;
+    for (const u of s.units) u.plates = 0;
+    notice(s, text('noticePlatesGone'), '#f2c14e');
+  }
+  updateSurrender(s);
+  if (s.time >= s.history.length * SUMMARY.every) sampleWorth(s);
+  const night = nightness(s.time) >= 0.5;
+  if (night !== s.night) {
+    s.night = night;
+    notice(s, text(night ? 'noticeNightfall' : 'noticeDaybreak'), night ? '#9fb4ff' : '#f2c14e');
+    sound(s, night ? 'nightfall' : 'daybreak');
+  }
+  if (s.pings.length && s.time - s.pings[0].at > PING.showMs) s.pings = s.pings.filter((p) => s.time - p.at <= PING.showMs);
   for (const u of [...s.units]) updateUnit(s, u, dt);
+  separate(s);
   updateProjectiles(s, dt);
   updateZones(s, dt);
   // Dead minions and wards are gone for good; their slots are cleaned up here.
@@ -161,9 +202,9 @@ export function chooseUpgrade(s: GameState, choice: number): boolean {
 // ---------------------------------------------------------------------------------------------
 // Stats as buffs and passives change them.
 
-/** The sum of one field over a unit's buffs. */
+/** The sum of one field over a unit's buffs, its team's drake bonus counted in. */
 function buffSum(u: Unit, key: Exclude<keyof BuffDef, 'stealth'>): number {
-  let n = 0;
+  let n = u.drake?.[key] ?? 0;
   for (const b of u.buffs) n += b.def[key] ?? 0;
   return n;
 }
@@ -307,7 +348,10 @@ function updateLastHitMark(s: GameState) {
 export function commandMove(s: GameState, point: Vec) {
   const p = getUnit(s, s.player);
   if (!p || p.dead) return;
-  p.moveTo = { x: clampWorld(point).x, y: clampWorld(point).y };
+  // A point inside a rock or a tower is moved to the nearest spot a champion can stand on.
+  p.moveTo = settle(clampWorld(point), bodyOf(p));
+  p.moveStuckMs = 0;
+  p.lastMoveDist = Infinity;
   p.target = null;
   p.recallMs = 0;
 }
@@ -383,8 +427,7 @@ export function useActive(s: GameState, u: Unit, id: ActiveId, aim: Vec): boolea
     s.fx.push({ kind: 'line', x: u.x, y: u.y, x2: to.x, y2: to.y, color: '#7fb6ff', ms: 250 });
     if (u.id === s.player) sound(s, 'blink', u, true);
     if (dist(u, to) > 1) u.facing = Math.atan2(to.y - u.y, to.x - u.x);
-    u.x = to.x;
-    u.y = to.y;
+    place(u, to);
     u.moveTo = null;
   } else {
     u.hp = Math.min(u.maxHp, u.hp + (def.heal ?? 0));
@@ -394,7 +437,144 @@ export function useActive(s: GameState, u: Unit, id: ActiveId, aim: Vec): boolea
   return true;
 }
 
+/** Casts a champion's battle spell toward `aim`. Returns false if it can't now (cooldown, no target). */
+export function castSpell(s: GameState, u: Unit, aim: Vec): boolean {
+  if (s.phase !== 'playing' || u.dead || !u.champ || !u.spell || u.stunMs > 0 || u.spellCd > 0 || u.side === 'neutral') return false;
+  const def = spellById(u.spell);
+  const amount = (def.base ?? 0) + (def.perLevel ?? 0) * u.level;
+  const side = u.side;
+  switch (def.id) {
+    case 'blink': {
+      const to = towards(u, aim, def.range ?? 0);
+      s.fx.push({ kind: 'ring', x: u.x, y: u.y, r: 26, color: def.color, ms: 350 }, { kind: 'line', x: u.x, y: u.y, x2: to.x, y2: to.y, color: def.color, ms: 250 });
+      if (dist(u, to) > 1) u.facing = Math.atan2(to.y - u.y, to.x - u.x);
+      place(u, to);
+      u.moveTo = null;
+      s.fx.push({ kind: 'ring', x: u.x, y: u.y, r: 26, color: def.color, ms: 350 });
+      break;
+    }
+    case 'firebrand': {
+      const foe = closest(
+        s.units.filter((e) => e.kind === 'champion' && !e.dead && e.side !== side && !hiddenFrom(s, side, e) && dist(e, u) <= (def.range ?? 0) && dist(e, aim) <= (def.aim ?? 0)),
+        aim,
+      );
+      if (!foe) return false;
+      damage(s, foe, dealt(s, u, amount), u.id, 'spell');
+      u.facing = Math.atan2(foe.y - u.y, foe.x - u.x);
+      s.fx.push({ kind: 'line', x: u.x, y: u.y, x2: foe.x, y2: foe.y, color: def.color, ms: 300 }, { kind: 'ring', x: foe.x, y: foe.y, r: 36, color: def.color, ms: 500 });
+      break;
+    }
+    case 'mend': {
+      const hurt = s.units
+        .filter((a) => a !== u && a.kind === 'champion' && !a.dead && a.side === side && dist(a, u) <= (def.range ?? 0))
+        .sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];
+      for (const a of hurt ? [u, hurt] : [u]) {
+        a.hp = Math.min(a.maxHp, a.hp + amount);
+        s.fx.push({ kind: 'ring', x: a.x, y: a.y, r: 34, color: def.color, ms: 500 });
+      }
+      break;
+    }
+    case 'barrier':
+      u.shield = Math.max(u.shield, amount);
+      u.shieldMs = Math.max(u.shieldMs, def.ms ?? 0);
+      s.fx.push({ kind: 'ring', x: u.x, y: u.y, r: 32, color: def.color, ms: 500 });
+      break;
+    case 'teleport': {
+      const to = closest(
+        s.units.filter((a) => !a.dead && a.side === side && (a.kind === 'tower' || a.kind === 'minion') && dist(a, aim) <= (def.aim ?? 0)),
+        aim,
+      );
+      if (!to || u.recallMs > 0) return false;
+      u.recallMs = u.recallFull = def.ms ?? 0;
+      u.portTo = to.id;
+      u.moveTo = null;
+      u.target = null;
+      s.fx.push({ kind: 'ring', x: to.x, y: to.y, r: 50, color: def.color, ms: def.ms ?? 0 });
+      break;
+    }
+  }
+  u.spellCd = def.cd;
+  if (def.id !== 'teleport') u.recallMs = 0;
+  u.castMs = 300;
+  if (u.id === s.player) sound(s, 'spell', u, true);
+  if (!u.player) aiLog(side, `${shortName(u.name)} casts ${english(def.name)}`);
+  return true;
+}
+
+/** An AI champion's battle spell: a shield, heal or blink away when low with a foe near, a firebrand to finish one. */
+function aiSpell(s: GameState, u: Unit) {
+  if (!u.spell || u.spellCd > 0 || u.dead || s.time < SPELL_AI.from) return;
+  const foe = nearest(s, u, SPELL_AI.look, (e) => e.kind === 'champion');
+  if (!foe) return;
+  const low = u.hp < u.maxHp * SPELL_AI.low;
+  switch (u.spell) {
+    case 'blink':
+      if (low) castSpell(s, u, fallbackPoint(s, u));
+      break;
+    case 'barrier':
+      if (low) castSpell(s, u, u);
+      break;
+    case 'mend': {
+      const ally = s.units.some((a) => a !== u && a.kind === 'champion' && !a.dead && a.side === u.side && a.hp < a.maxHp * SPELL_AI.low && dist(a, u) <= (spellById('mend').range ?? 0));
+      if (low || ally) castSpell(s, u, u);
+      break;
+    }
+    case 'firebrand': {
+      const def = spellById('firebrand');
+      const prey = nearest(s, u, def.range ?? 0, (e) => e.kind === 'champion' && e.hp < Math.max(e.maxHp * SPELL_AI.finish, (def.base ?? 0) + (def.perLevel ?? 0) * u.level));
+      if (prey) castSpell(s, u, prey);
+      break;
+    }
+  }
+}
+
 /** Plants one of a champion's wards within `WARD.range` of it, toward `aim`. */
+/**
+ * The player pings a point for the AI allies (see `PING`): `attack` sends the nearest free ones
+ * there, onto the enemy under the ping if there is one; `gather` has the free ones near it wait
+ * there; `danger` has the ones near it fall back. Returns the allies that answered, or null when
+ * the ping is refused (too soon after the last one, or the match is over).
+ */
+export function sendPing(s: GameState, u: Unit, kind: PingKind, at: Vec): Unit[] | null {
+  if (s.phase !== 'playing' || u.side === 'neutral' || s.time - s.lastPingAt < PING.cd) return null;
+  s.lastPingAt = s.time;
+  const side = u.side;
+  const p = clampWorld(at);
+  s.pings.push({ kind, x: p.x, y: p.y, side, at: s.time });
+  const allies = s.units.filter((a) => a !== u && a.kind === 'champion' && !a.player && !a.dead && a.side === side);
+  let answer: Unit[];
+  if (kind === 'danger') {
+    answer = allies.filter((a) => dist(a, p) <= PING.near);
+    for (const a of answer) {
+      a.retreatUntil = s.time + RETREAT.ms;
+      a.gankTarget = a.jungleTarget = a.pingGoal = a.pingTarget = null;
+    }
+  } else {
+    const foe = kind === 'attack'
+      ? closest(s.units.filter((e) => !e.dead && e.side !== side && e.kind !== 'ward' && e.kind !== 'watchstone' && !hiddenFrom(s, side, e) && dist(e, p) <= e.radius + PING.pick), p)
+      : null;
+    const ready = allies.filter((a) => a.recallMs <= 0 && a.hp >= a.maxHp * PING.minHp && s.time >= a.retreatUntil);
+    answer = kind === 'attack'
+      ? ready.filter((a) => dist(a, p) <= PING.reach).sort((a, b) => dist(a, p) - dist(b, p) || a.id - b.id).slice(0, PING.answer)
+      : ready.filter((a) => dist(a, p) <= PING.near);
+    for (const a of answer) {
+      a.pingGoal = { x: p.x, y: p.y };
+      a.pingTarget = foe ? foe.id : null;
+      a.pingUntil = s.time + PING.ms;
+      a.gankTarget = a.jungleTarget = null;
+    }
+    s.contesters = s.contesters.filter((id) => !answer.some((a) => a.id === id));
+  }
+  if (u.player) {
+    sound(s, 'ping', p, true);
+    const names = answer.map((a) => shortName(a.name)).join(', ');
+    const key: TextKey = !answer.length ? 'noticePingNobody' : kind === 'attack' ? 'noticePingAttack' : kind === 'gather' ? 'noticePingGather' : 'noticePingDanger';
+    notice(s, text(key, { names }), PINGS[kind].color);
+  }
+  aiLog(side, `${shortName(u.name)} pings ${english(PINGS[kind].name)}${answer.length ? `, ${answer.map((a) => shortName(a.name)).join(' and ')} answer` : ''}`);
+  return answer;
+}
+
 export function plantWard(s: GameState, u: Unit, aim: Vec): boolean {
   if (s.phase !== 'playing' || u.dead || u.wards <= 0 || u.side === 'neutral') return false;
   const at = towards(u, aim, WARD.range);
@@ -415,6 +595,8 @@ export function plantWard(s: GameState, u: Unit, aim: Vec): boolean {
 export function startRecall(s: GameState, u: Unit): boolean {
   if (s.phase !== 'playing' || u.dead || !u.champ || u.recallMs > 0 || u.stunMs > 0 || atFountain(u)) return false;
   u.recallMs = RECALL.ms;
+  u.recallFull = RECALL.ms;
+  u.portTo = 0;
   u.lastRecallAt = s.time;
   u.moveTo = null;
   u.target = null;
@@ -422,6 +604,7 @@ export function startRecall(s: GameState, u: Unit): boolean {
 }
 
 function finishRecall(s: GameState, u: Unit) {
+  if (u.portTo) return finishTeleport(s, u);
   s.fx.push({ kind: 'ring', x: u.x, y: u.y, r: 40, color: '#9fd8ff', ms: 500 });
   u.x = u.spawnX;
   u.y = u.spawnY;
@@ -432,6 +615,28 @@ function finishRecall(s: GameState, u: Unit) {
   if (u.id === s.player) sound(s, 'recallHome', u, true);
   if (!u.player) aiLog(u.side, `${shortName(u.name)} recalls home`);
 }
+
+/** A teleport goes through: the champion appears beside its tower or minion, on the side toward home. */
+function finishTeleport(s: GameState, u: Unit) {
+  const to = getUnit(s, u.portTo);
+  u.portTo = 0;
+  const color = spellById('teleport').color;
+  if (!to || to.dead) {
+    if (u.player) notice(s, text('noticeTeleportLost'), color);
+    return;
+  }
+  s.fx.push({ kind: 'ring', x: u.x, y: u.y, r: 40, color, ms: 500 });
+  const home = BASE[u.side as Team];
+  const d = Math.max(1, dist(to, home));
+  place(u, { x: to.x + ((home.x - to.x) / d) * TELEPORT_GAP, y: to.y + ((home.y - to.y) / d) * TELEPORT_GAP });
+  u.target = null;
+  u.moveTo = null;
+  s.fx.push({ kind: 'ring', x: u.x, y: u.y, r: 40, color, ms: 500 });
+  if (u.id === s.player) sound(s, 'recallHome', u, true);
+  if (!u.player) aiLog(u.side, `${shortName(u.name)} teleports to the ${laneNear(u)} lane`);
+}
+/** How far from its tower or minion a teleport lands, toward home. */
+const TELEPORT_GAP = 60;
 
 /** What a dead champion pays to respawn at once. */
 export function buybackCost(u: Unit): number {
@@ -467,8 +672,8 @@ function abilityDamage(s: GameState, caster: Unit, base: number): number {
 }
 
 /** Hurts an enemy with an ability: double damage below an execute threshold, then the stun and slow. */
-function abilityHit(s: GameState, caster: Unit, e: Unit, amount: number, ab: { stun?: number; slow?: number; executeBelow?: number }) {
-  if (amount > 0) damage(s, e, ab.executeBelow && e.hp < e.maxHp * ab.executeBelow ? amount * 2 : amount, caster.id);
+function abilityHit(s: GameState, caster: Unit, e: Unit, amount: number, ab: { stun?: number; slow?: number; executeBelow?: number }, how: HitHow) {
+  if (amount > 0) damage(s, e, ab.executeBelow && e.hp < e.maxHp * ab.executeBelow ? amount * 2 : amount, caster.id, how);
   if (e.kind === 'champion' || e.kind === 'minion') {
     if (ab.slow) e.slowMs = Math.max(e.slowMs, ab.slow);
     if (ab.stun) e.stunMs = Math.max(e.stunMs, ab.stun);
@@ -502,13 +707,12 @@ export function cast(s: GameState, caster: Unit, key: AbilityKey, aim: Vec): boo
       shot(c, r);
       for (const e of [...s.units]) {
         if (e.dead || e.side === caster.side || !hittable(e) || dist(e, c) > r + e.radius) continue;
-        abilityHit(s, caster, e, dmg, ab);
+        abilityHit(s, caster, e, dmg, ab, key);
         // A knock pushes champions and minions away from the centre.
         if (ab.knock && !e.dead && (e.kind === 'champion' || e.kind === 'minion')) {
           const d = Math.max(dist(e, c), 1);
           const to = clampWorld({ x: e.x + ((e.x - c.x) / d) * ab.knock, y: e.y + ((e.y - c.y) / d) * ab.knock });
-          e.x = to.x;
-          e.y = to.y;
+          place(e, to);
         }
       }
       break;
@@ -549,12 +753,11 @@ export function cast(s: GameState, caster: Unit, key: AbilityKey, aim: Vec): boo
     case 'dash': {
       const to = towards(caster, aim, ab.range);
       shot(to, ab.radius ?? 0);
-      caster.x = to.x;
-      caster.y = to.y;
+      place(caster, to);
       if (ab.damage) {
         for (const e of [...s.units]) {
           if (e.dead || e.side === caster.side || !hittable(e) || dist(e, to) > (ab.radius ?? 0) + e.radius) continue;
-          abilityHit(s, caster, e, dmg, ab);
+          abilityHit(s, caster, e, dmg, ab, key);
         }
       }
       break;
@@ -606,7 +809,7 @@ function campSpares(s: GameState, sourceId: number, t: Unit): boolean {
 }
 
 /** Hurts a unit after its armor and any shield. A unit reduced to 0 health dies. Returns the health it lost. */
-export function damage(s: GameState, t: Unit, amount: number, sourceId: number): number {
+export function damage(s: GameState, t: Unit, amount: number, sourceId: number, how: HitHow = 'attack'): number {
   if (t.dead || amount <= 0 || !hittable(t) || invulnerable(s, t)) return 0;
   // A ward falls to a fixed number of hits, whatever they are.
   if (t.kind === 'ward') {
@@ -633,6 +836,12 @@ export function damage(s: GameState, t: Unit, amount: number, sourceId: number):
   }
   const lost = Math.min(Math.max(0, t.hp), rest);
   t.hp -= rest;
+  if (t.plates > 0 && s.time < PLATING.until) breakPlates(s, t);
+  // The player's champion keeps what hurt it lately, for the death recap.
+  if (t.id === s.player && lost > 0) {
+    s.playerHits.push({ at: s.time, src: sourceId, how, amount: lost });
+    if (s.playerHits[0].at < s.time - RECAP.windowMs) s.playerHits = s.playerHits.filter((h) => h.at >= s.time - RECAP.windowMs);
+  }
   // ...and finish an enemy champion they leave nearly dead.
   if (blessed && t.kind === 'champion' && t.hp > 0 && t.hp < t.maxHp * ELDER.execute) {
     t.hp = 0;
@@ -644,7 +853,10 @@ export function damage(s: GameState, t: Unit, amount: number, sourceId: number):
   if (t.kind === 'champion') {
     t.recallMs = 0;
     const src = getUnit(s, sourceId);
-    if (src && src.kind === 'champion') src.aggroMs = TOWER.aggroMs;
+    if (src && src.kind === 'champion') {
+      src.aggroMs = TOWER.aggroMs;
+      if (src.side !== t.side) t.hurtBy[src.id] = s.time;
+    }
   }
   // A jungle monster that is hit wakes its whole pack.
   if (t.kind === 'camp') {
@@ -652,6 +864,79 @@ export function damage(s: GameState, t: Unit, amount: number, sourceId: number):
   }
   if (t.hp <= 0) kill(s, t, sourceId);
   return lost;
+}
+
+/** An outer tower that lost a share of its health drops a plate for each, paying the enemy champions near it. */
+function breakPlates(s: GameState, t: Unit) {
+  const left = Math.max(0, Math.ceil((t.hp / t.maxHp) * PLATING.count - 1e-6));
+  while (t.plates > left) {
+    t.plates--;
+    const near = s.units.filter((c) => c.kind === 'champion' && !c.dead && c.side !== t.side && c.side !== 'neutral' && dist(c, t) <= PLATING.share);
+    s.fx.push({ kind: 'ring', x: t.x, y: t.y - 30, r: 40, color: '#f2c14e', ms: 400 });
+    if (!near.length) continue;
+    const gold = Math.round(PLATING.gold / near.length);
+    for (const c of near) {
+      c.gold += gold;
+      if (c.player) s.fx.push({ kind: 'coin', x: t.x, y: t.y - 40, gold, color: '#f2c14e', ms: 900 });
+    }
+    sound(s, 'plate', t, near.some((c) => c.player));
+    aiLog(near[0].side as Team, `breaks a plate off the ${t.lane} tower for ${gold} gold each`);
+  }
+}
+
+/** Which hit an ability's look (`${championId}.${key}`) stands for: the key, or a plain attack without one. */
+function hitHowOf(look: string | undefined): HitHow {
+  const key = look?.split('.')[1];
+  return (ABILITY_KEYS as string[]).includes(key ?? '') ? (key as AbilityKey) : 'attack';
+}
+
+/**
+ * The death recap: what hurt the player's champion in its last `RECAP.windowMs`, summed by
+ * attacker and hit (all minions as one), the biggest first, at most `RECAP.rows` of them.
+ */
+function deathRecap(s: GameState, killerId: number): DeathRecap {
+  const rows: RecapRow[] = [];
+  for (const h of s.playerHits) {
+    if (h.at < s.time - RECAP.windowMs) continue;
+    const src = getUnit(s, h.src);
+    const minion = src?.kind === 'minion';
+    const row = rows.find((r) => (minion ? r.kind === 'minion' : r.src === h.src) && r.how === h.how);
+    if (row) row.amount += h.amount;
+    else rows.push({ src: minion ? -1 : h.src, kind: src?.kind ?? 'minion', how: h.how, amount: h.amount });
+  }
+  rows.sort((a, b) => b.amount - a.amount);
+  const total = rows.reduce((n, r) => n + r.amount, 0);
+  s.playerHits = [];
+  return { at: s.time, killer: killerId, total, rows: rows.slice(0, RECAP.rows) };
+}
+
+/**
+ * A champion slew the river drake: its team keeps a stack of the drake's element (until it has its
+ * soul), every champion of the team gets the new bonus, and the next drake is of the next element.
+ */
+function slayDrake(s: GameState, killer: Unit) {
+  const team = killer.side as Team;
+  const element = s.drakeElement;
+  const stacks = s.drakeStacks[team];
+  const def = DRAKES[element];
+  s.drakeRounds++;
+  s.drakeElement = DRAKE_ORDER[s.drakeRounds % DRAKE_ORDER.length];
+  if (stacks.length >= DRAKE.soul) {
+    aiLog(team, `${shortName(killer.name)} slays the ${english(def.name).toLowerCase()}`);
+    return;
+  }
+  stacks.push(element);
+  const soul = stacks.length >= DRAKE.soul;
+  const bonus: BuffDef = {};
+  for (const e of stacks) {
+    for (const [k, v] of Object.entries(DRAKES[e].bonus) as [keyof BuffDef, number][]) (bonus as Record<string, number>)[k] = ((bonus as Record<string, number>)[k] ?? 0) + v * (soul ? 2 : 1);
+  }
+  for (const c of s.units) if (c.kind === 'champion' && c.side === team) c.drake = bonus;
+  s.fx.push({ kind: 'ring', x: DRAKE.x, y: DRAKE.y, r: 90, color: def.color, ms: 800 });
+  sound(s, 'drake', DRAKE, killer.player);
+  aiLog(team, `${shortName(killer.name)} slays the ${english(def.name).toLowerCase()}${soul ? ', the team has its drake soul' : ''}`);
+  const vars = { drake: text(def.name), n: stacks.length };
+  notice(s, text(soul ? (team === 'blue' ? 'noticeSoulBlue' : 'noticeSoulRed') : team === 'blue' ? 'noticeDrakeBlue' : 'noticeDrakeRed', vars), def.color);
 }
 
 /** Whether a unit is a champion whose team has the elder's blessing now. */
@@ -706,6 +991,7 @@ function countDown(u: Unit, dt: number) {
   if (!u.champ) return;
   for (const k of ABILITY_KEYS) u.cds[k] = Math.max(0, u.cds[k] - dt);
   for (const k of Object.keys(u.activeCds)) u.activeCds[k] = Math.max(0, u.activeCds[k] - dt);
+  u.spellCd = Math.max(0, u.spellCd - dt);
   u.revealMs = Math.max(0, u.revealMs - dt);
   u.aggroMs = Math.max(0, u.aggroMs - dt);
   u.aiCastMs = Math.max(0, u.aiCastMs - dt);
@@ -735,6 +1021,11 @@ function updateUnit(s: GameState, u: Unit, dt: number) {
       if (u.kind === 'beast') {
         notice(s, text(s.beastElder ? 'noticeElderAwake' : 'noticeBeastAwake'), '#f2c14e');
         sound(s, 'growl');
+      }
+      if (u.id === s.drake) {
+        const def = DRAKES[s.drakeElement];
+        notice(s, text('noticeDrakeAwake', { drake: text(def.name) }), def.color);
+        sound(s, 'drakeWakes');
       }
       if (u.player) sound(s, 'respawn', undefined, true);
     } else if (u.kind === 'champion' && !u.player) {
@@ -824,6 +1115,7 @@ function kill(s: GameState, t: Unit, killerId: number) {
   t.target = null;
   t.moveTo = null;
   t.buffs = t.buffs.filter((b) => b.elixir);
+  if (t.id === s.player) s.recap = deathRecap(s, killerId);
   const killer = getUnit(s, killerId);
   const champKiller = killer && killer.kind === 'champion' ? killer : null;
   switch (t.kind) {
@@ -837,8 +1129,12 @@ function kill(s: GameState, t: Unit, killerId: number) {
         champKiller.gold += gold;
         s.fx.push({ kind: 'coin', x: t.x, y: t.y, gold, color: '#f2c14e', ms: 900 });
         sound(s, 'lastHit', t, true);
+        champKiller.cs++;
       } else {
-        if (champKiller) champKiller.gold += MINION.gold;
+        if (champKiller) {
+          champKiller.gold += MINION.gold;
+          champKiller.cs++;
+        }
         // The minion the player could have finished fell to someone else: the streak breaks.
         if (s.lastHitMark === t.id) s.streak = 0;
       }
@@ -853,6 +1149,7 @@ function kill(s: GameState, t: Unit, killerId: number) {
       t.respawnAt = s.time + def.respawnMs;
       if (champKiller) {
         champKiller.gold += def.gold;
+        champKiller.cs++;
         gainXp(s, champKiller, def.xp);
         // A brute's slayer carries its buff.
         if (def.buff) {
@@ -861,6 +1158,17 @@ function kill(s: GameState, t: Unit, killerId: number) {
           s.fx.push({ kind: 'ring', x: champKiller.x, y: champKiller.y, r: 60, color: b.color, ms: 700 });
           sound(s, 'brute', champKiller, champKiller.player);
           if (champKiller.side === 'blue') notice(s, champKiller.player ? text('noticeYouTakeBuff', { buff: text(b.name) }) : text('noticeTakesBuff', { name: shortName(champKiller.name), buff: text(b.name) }), b.color);
+        }
+        if (t.campKind === 'drake' && champKiller.side !== 'neutral') slayDrake(s, champKiller);
+        // The last of a mercenary band down: it marches for the slayer's team.
+        if (t.campKind === 'merc' && champKiller.side !== 'neutral' && !s.units.some((m) => m.kind === 'camp' && !m.dead && m.group === t.group)) {
+          const team = champKiller.side;
+          const camp = MERC.spots.reduce((a, b) => (dist(a, t) <= dist(b, t) ? a : b));
+          const lane = spawnMercs(s, team, camp);
+          aiLog(team, `${shortName(champKiller.name)} hires the mercenaries, who march on the ${lane} lane`);
+          notice(s, text(team === 'blue' ? 'noticeMercsBlue' : 'noticeMercsRed', { lane: text(LANE_NAME[lane]) }), SIDE_COLOR[team]);
+          s.fx.push({ kind: 'ring', x: camp.x, y: camp.y, r: 80, color: SIDE_COLOR[team], ms: 700 });
+          sound(s, 'mercs', camp, champKiller.player);
         }
       }
       break;
@@ -913,6 +1221,7 @@ function kill(s: GameState, t: Unit, killerId: number) {
       sound(s, 'crash', t);
       break;
     case 'nexus':
+      sampleWorth(s);
       sound(s, 'nexus');
       s.phase = t.side === 'blue' ? 'lost' : 'won';
       s.winner = t.side === 'blue' ? 'red' : 'blue';
@@ -926,6 +1235,25 @@ function kill(s: GameState, t: Unit, killerId: number) {
         // Rook, the bounty hunter, gets more for a head with a price on it.
         const bounty = Math.round(bountyOf(streak) * (1 + (champKiller.champ?.perk?.bountyGold ?? 0) / 100));
         champKiller.gold += KILL.gold + bounty;
+        // A team that is behind gets more for each kill, to climb back.
+        const comeback = behind(s, champKiller.side as Team, COMEBACK.gap);
+        if (comeback) {
+          champKiller.gold += COMEBACK.gold;
+          gainXp(s, champKiller, COMEBACK.xp);
+          aiLog(champKiller.side as Team, `${shortName(champKiller.name)} earns a comeback bounty`);
+          if (champKiller.player) {
+            notice(s, text('noticeComeback', { gold: COMEBACK.gold }), '#9fd8ff');
+            sound(s, 'comeback', undefined, true);
+          }
+        }
+        // The first kill of the match pays extra.
+        const first = !s.firstBlood;
+        if (first) {
+          s.firstBlood = true;
+          champKiller.gold += FIRST_BLOOD.gold;
+          sound(s, 'firstBlood', undefined, champKiller.player);
+          aiLog(champKiller.side as Team, `${shortName(champKiller.name)} draws first blood`);
+        }
         champKiller.kills++;
         champKiller.killStreak++;
         gainXp(s, champKiller, KILL.xp);
@@ -937,6 +1265,7 @@ function kill(s: GameState, t: Unit, killerId: number) {
             ? text('noticeSlewYou', { killer: shortName(champKiller.name) })
             : text('noticeSlew', { killer: shortName(champKiller.name), victim: shortName(t.name) });
         notice(s, bounty ? text('noticeBountyClaimed', { line: slain, gold: bounty }) : slain, SIDE_COLOR[side]);
+        if (first) notice(s, text('noticeFirstBlood', { line: slain, gold: FIRST_BLOOD.gold }), '#f2c14e');
         // Three kills in a row put a price on the killer's head, and every kill after raises it.
         const price = bountyOf(champKiller.killStreak);
         if (price || bounty) sound(s, 'streak', undefined, champKiller.player);
@@ -945,6 +1274,15 @@ function kill(s: GameState, t: Unit, killerId: number) {
           notice(s, champKiller.player ? text('noticeYourStreak', { n: champKiller.killStreak, gold: price }) : text('noticeStreak', { name: shortName(champKiller.name), n: champKiller.killStreak, gold: price }), '#f2c14e');
         }
       }
+      // Every other enemy champion that hurt it lately gets an assist.
+      for (const [id, at] of Object.entries(t.hurtBy)) {
+        const helper = getUnit(s, Number(id));
+        if (!helper || helper === champKiller || helper.side === t.side || s.time - at > ASSIST.windowMs) continue;
+        helper.assists++;
+        helper.gold += ASSIST.gold;
+        if (helper.player) s.fx.push({ kind: 'coin', x: t.x, y: t.y - 24, gold: ASSIST.gold, color: '#9fd8ff', ms: 900 });
+      }
+      t.hurtBy = {};
       t.respawnAt = s.time + RESPAWN_BASE_MS + t.level * RESPAWN_PER_LEVEL_MS;
       s.fx.push({ kind: 'ring', x: t.x, y: t.y, r: 50, color: SIDE_COLOR[t.side], ms: 500 });
       if (t.player) sound(s, 'youDie', undefined, true);
@@ -1007,7 +1345,11 @@ function playerAct(s: GameState, u: Unit, dt: number) {
   // A recalling champion stands and waits; a click breaks the channel.
   if (u.recallMs > 0) return;
   if (u.moveTo) {
-    if (dist(u, u.moveTo) < 4) u.moveTo = null;
+    const d = dist(u, u.moveTo);
+    // Walkers can crowd the spot: a champion that gets no closer for a while near it stops there.
+    u.moveStuckMs = d > u.lastMoveDist - (speedOf(u) * dt) / 4000 ? u.moveStuckMs + dt : 0;
+    u.lastMoveDist = d;
+    if (d < 4 || (u.moveStuckMs > STUCK.ms && d < STUCK.near)) u.moveTo = null;
     else {
       moveToward(u, u.moveTo, dt);
       return;
@@ -1033,6 +1375,7 @@ function aiAct(s: GameState, u: Unit, dt: number) {
     // A hurt champion drinks its flask, and one carrying a ward plants it at a spot it passes.
     if (u.hp < u.maxHp * 0.4) useActive(s, u, 'flask', u);
     aiWard(s, u);
+    aiSpell(s, u);
     if (championPlan(s, u, dt)) return;
   }
   const reach = u.kind === 'champion' ? CHAMP_AGGRO : MINION.aggro;
@@ -1090,6 +1433,11 @@ function championPlan(s: GameState, u: Unit, dt: number): boolean {
       // Hurt allies near by (or all of them, when outnumbered) fall back with it.
       u.retreatUntil = s.time + RETREAT.ms;
       if (outnumbered) aiLog(u.side, `${shortName(u.name)} calls a retreat, ${foes} against ${friends}`);
+      // On blue's side the call shows on the map, so the player sees the danger too.
+      if (outnumbered && u.side === 'blue' && !s.pings.some((p) => p.kind === 'danger' && dist(p, u) < PING.near && s.time - p.at < PING.showMs)) {
+        s.pings.push({ kind: 'danger', x: u.x, y: u.y, side: 'blue', at: s.time });
+        sound(s, 'ping', u);
+      }
       for (const a of s.units) {
         if (a === u || a.kind !== 'champion' || a.player || a.dead || a.side !== u.side || dist(a, u) > RETREAT.call) continue;
         if (outnumbered || a.hp < a.maxHp * 0.5) a.retreatUntil = s.time + RETREAT.ms;
@@ -1109,7 +1457,7 @@ function championPlan(s: GameState, u: Unit, dt: number): boolean {
     }
   }
   // Far from home with no enemy about, a champion that is low, or rich with something to buy, goes home.
-  if (s.time - u.lastRecallAt >= RECALL.aiEvery && !s.contesters.includes(u.id) && dist(u, home) > FOUNTAIN.radius + 300 && !foeNear(RECALL.aiLook)) {
+  if (s.time - u.lastRecallAt >= RECALL.aiEvery && u.pingGoal === null && !s.contesters.includes(u.id) && dist(u, home) > FOUNTAIN.radius + 300 && !foeNear(RECALL.aiLook)) {
     const low = u.hp < u.maxHp * RECALL.aiLow;
     const next = nextBuy(u);
     const rich = next !== null && u.gold >= Math.max(RECALL.rich, priceFor(u, next));
@@ -1118,8 +1466,32 @@ function championPlan(s: GameState, u: Unit, dt: number): boolean {
       return true;
     }
   }
+  // A ping's errand: hit the enemy it marked, else walk to its point and wait there.
+  if (u.pingGoal !== null) {
+    const mark = u.pingTarget !== null ? getUnit(s, u.pingTarget) : null;
+    if (s.time >= u.pingUntil || (u.pingTarget !== null && (!mark || mark.dead || hiddenFrom(s, u.side, mark)))) {
+      u.pingGoal = null;
+      u.pingTarget = null;
+    } else if (mark && !invulnerable(s, mark)) {
+      u.target = mark.id;
+      castAi(s, u, mark);
+      if (inRange(u, mark)) attack(s, u, mark);
+      else moveToward(u, mark, dt);
+      return true;
+    } else if (!foeNear(CHAMP_AGGRO)) {
+      u.target = null;
+      if (dist(u, u.pingGoal) > 60) moveToward(u, u.pingGoal, dt);
+      return true;
+    }
+  }
   // An enemy champion in reach: the lane fight below handles it.
   if (foeNear(CHAMP_AGGRO)) return false;
+  const rune = runeFor(s, u);
+  if (rune) {
+    u.target = null;
+    moveToward(u, rune, dt);
+    return true;
+  }
   const beast = s.contesters.includes(u.id) ? getUnit(s, s.beast) : null;
   if (beast && !beast.dead) {
     u.target = beast.id;
@@ -1130,9 +1502,23 @@ function championPlan(s: GameState, u: Unit, dt: number): boolean {
   }
   if (u.gankTarget !== null) {
     const prey = getUnit(s, u.gankTarget);
-    if (!prey || prey.dead || s.time >= u.gankUntil || hiddenFrom(s, u.side, prey)) u.gankTarget = null;
-    else {
+    if (!prey || prey.dead || s.time >= u.gankUntil || hiddenFrom(s, u.side, prey)) {
+      u.gankTarget = null;
+      u.ambushBush = -1;
+    } else {
       u.target = null;
+      // Lie in wait in the grass by the prey, and charge once it comes near.
+      const bush = ambushBush(s, u, prey);
+      if (bush >= 0) {
+        const b = BUSHES[bush];
+        if (bushAt(u) !== bush) moveToward(u, b, dt);
+        else if (u.ambushBush !== bush) {
+          u.ambushBush = bush;
+          u.ambushUntil = s.time + AMBUSH.waitMs;
+          aiLog(u.side, `${shortName(u.name)} lies in wait for ${shortName(prey.name)} in the tall grass`);
+        }
+        return true;
+      }
       moveToward(u, prey, dt);
       return true;
     }
@@ -1168,7 +1554,7 @@ function fallbackPoint(s: GameState, u: Unit): Vec {
 
 /** Whether an AI champion is free for a team plan: healthy, not falling back, not on another plan. */
 function free(s: GameState, u: Unit, minHp: number): boolean {
-  return u.kind === 'champion' && !u.player && !u.dead && u.recallMs <= 0 && u.hp >= u.maxHp * minHp && s.time >= u.retreatUntil && u.gankTarget === null && u.jungleTarget === null;
+  return u.kind === 'champion' && !u.player && !u.dead && u.recallMs <= 0 && u.hp >= u.maxHp * minHp && s.time >= u.retreatUntil && u.gankTarget === null && u.jungleTarget === null && u.pingGoal === null;
 }
 
 /** The next item on an AI champion's build that it doesn't own yet, or null when the build is done. */
@@ -1211,10 +1597,13 @@ function aiBuyBack(s: GameState, u: Unit) {
 /** An AI champion carrying a ward plants it at a spot it passes that its team has no ward at. */
 function aiWard(s: GameState, u: Unit) {
   if (u.wards <= 0 || u.recallMs > 0) return;
-  for (const spot of WARD_SPOTS) {
+  // The river spots, and later the tall grass on the way, so an ambush there is seen.
+  const spots = s.time >= WARD_AI.bushesFrom ? [...WARD_SPOTS, ...BUSHES] : WARD_SPOTS;
+  for (const spot of spots) {
     if (dist(u, spot) > WARD_AI.reach) continue;
     if (s.units.some((w) => w.kind === 'ward' && !w.dead && w.side === u.side && dist(w, spot) < WARD_AI.taken)) continue;
-    if (plantWard(s, u, spot)) aiLog(u.side, `${shortName(u.name)} wards ${spot.x === BEAST.x && spot.y === BEAST.y ? "the beast's pit" : 'the river'}`);
+    const where = !WARD_SPOTS.includes(spot) ? 'the tall grass' : spot.x === BEAST.x && spot.y === BEAST.y ? "the beast's pit" : 'the river';
+    if (plantWard(s, u, spot)) aiLog(u.side, `${shortName(u.name)} wards ${where}`);
     return;
   }
 }
@@ -1238,12 +1627,37 @@ function updateContesters(s: GameState) {
   s.contesters = next;
 }
 
+/**
+ * The bush a ganking champion should wait in for its prey (`AMBUSH`), or -1 to go straight at it:
+ * once it has waited its time, or the prey is within `AMBUSH.strike` of it, it charges.
+ */
+function ambushBush(s: GameState, u: Unit, prey: Unit): number {
+  if (u.ambushBush >= 0) {
+    const b = BUSHES[u.ambushBush];
+    if (s.time < u.ambushUntil && dist(prey, b) > AMBUSH.strike && dist(prey, b) <= AMBUSH.reach * 1.5) return u.ambushBush;
+    u.ambushUntil = Infinity;
+    return -1;
+  }
+  // Waited once already on this gank: no second ambush.
+  if (u.ambushUntil === Infinity) return -1;
+  if (dist(u, prey) <= AMBUSH.strike) return -1;
+  let best = -1, bestD = Infinity;
+  BUSHES.forEach((b, i) => {
+    const d = dist(prey, b);
+    if (d > AMBUSH.strike && d <= AMBUSH.reach && dist(u, b) < bestD && dist(u, b) < dist(u, prey)) {
+      best = i;
+      bestD = dist(u, b);
+    }
+  });
+  return best;
+}
+
 /** Now and then each team sends one AI champion from another lane to gang up on the weakest enemy. */
 function updateGanks(s: GameState) {
   if (s.time < s.nextGank) return;
   // While a champion carries a bounty, the hunts come twice as often.
   const hunted = s.units.some((u) => u.kind === 'champion' && !u.dead && bountyOf(u.killStreak) > 0);
-  s.nextGank = s.time + (hunted ? GANK.every / 2 : GANK.every);
+  s.nextGank = s.time + (hunted ? GANK.every / 2 : GANK.every) * (nightness(s.time) >= 0.5 ? GANK.night : 1);
   for (const team of TEAMS) {
     // The biggest bounty in sight first, then the weakest.
     const prey = s.units
@@ -1255,6 +1669,8 @@ function updateGanks(s: GameState) {
       .sort((a, b) => dist(a, prey) - dist(b, prey) || a.id - b.id)[0];
     if (!hunter) continue;
     hunter.gankTarget = prey.id;
+    hunter.ambushBush = -1;
+    hunter.ambushUntil = 0;
     hunter.gankUntil = s.time + GANK.ms;
     const lane = laneNear(prey);
     const price = bountyOf(prey.killStreak);
@@ -1270,14 +1686,75 @@ function ownHalf(team: Team, p: Vec): boolean {
   return team === 'blue' ? p.y > p.x : p.y < p.x;
 }
 
+/** River runes: new ones every `RUNE.every`, taken by the first champion to reach one. */
+function updateRunes(s: GameState) {
+  if (s.time >= s.nextRune) {
+    s.nextRune = s.time + RUNE.every;
+    const round = s.runeRounds++;
+    s.runes = RUNE.spots.map((p, i) => ({ kind: RUNE_ORDER[(round + i * 2) % RUNE_ORDER.length], x: p.x, y: p.y }));
+    aiLog('blue', `runes appear: ${s.runes.map((r) => r!.kind).join(' and ')}`);
+    notice(s, text('noticeRunes'), '#9fd8ff');
+    sound(s, 'rune');
+  }
+  s.runes.forEach((r, i) => {
+    if (!r) return;
+    const taker = s.units.find((u) => u.kind === 'champion' && !u.dead && dist(u, r) <= RUNE.pick);
+    if (!taker) return;
+    s.runes[i] = null;
+    const def = RUNES[r.kind];
+    if (def.buff && def.ms) addBuff(taker, def.name, def.buff, def.ms, def.color);
+    if (def.gold) {
+      taker.gold += def.gold;
+      for (const a of s.units) if (a !== taker && a.kind === 'champion' && a.side === taker.side) a.gold += def.teamGold ?? 0;
+      if (taker.player) s.fx.push({ kind: 'coin', x: r.x, y: r.y, gold: def.gold, color: def.color, ms: 900 });
+    }
+    s.fx.push({ kind: 'ring', x: r.x, y: r.y, r: 50, color: def.color, ms: 600 });
+    sound(s, 'runeTaken', r, taker.player);
+    aiLog(taker.side as Team, `${shortName(taker.name)} takes the ${r.kind} rune`);
+    const rune = text(def.name);
+    if (taker.player) notice(s, text('noticeRuneYou', { rune }), def.color);
+    else if (taker.side === 'blue') notice(s, text('noticeRuneAlly', { name: shortName(taker.name), rune }), def.color);
+    else if (!hiddenFrom(s, 'blue', taker)) notice(s, text('noticeRuneRed', { name: shortName(taker.name), rune }), SIDE_COLOR.red);
+  });
+}
+
+/** The rune an AI champion goes for: one within reach that it is its team's nearest AI champion to. */
+function runeFor(s: GameState, u: Unit): Vec | null {
+  if (u.player || u.hp < u.maxHp * RUNE.aiMinHp) return null;
+  for (const r of s.runes) {
+    if (!r || dist(u, r) > RUNE.aiReach) continue;
+    const closer = s.units.some((a) => a !== u && a.kind === 'champion' && !a.player && !a.dead && a.side === u.side && dist(a, r) < dist(u, r));
+    if (!closer) return r;
+  }
+  return null;
+}
+
 /** Now and then each team sends one AI champion for a jungle buff on its half, or a watchstone it lacks. */
 function updateJungle(s: GameState) {
   if (s.time < s.nextJungle) return;
   s.nextJungle = s.time + JUNGLE.every;
+  const drake = getUnit(s, s.drake);
   for (const team of TEAMS) {
+    // An awake drake draws a pair of champions from each team that can still stack it.
+    if (drake && !drake.dead && s.drakeStacks[team].length < DRAKE.soul) {
+      const hunters = s.units
+        .filter((u) => u.side === team && free(s, u, DRAKE.aiMinHp) && !s.contesters.includes(u.id))
+        .sort((a, b) => dist(a, drake) - dist(b, drake) || a.id - b.id)
+        .slice(0, DRAKE.ai);
+      for (const u of hunters) {
+        u.jungleTarget = drake.id;
+        u.jungleUntil = s.time + JUNGLE.ms;
+      }
+      if (hunters.length) {
+        aiLog(team, `${hunters.map((u) => shortName(u.name)).join(' and ')} go for the ${english(DRAKES[s.drakeElement].name).toLowerCase()}`);
+        continue;
+      }
+    }
     const buffs = s.units.filter((u) => u.kind === 'camp' && !u.dead && (u.campKind === 'ember' || u.campKind === 'moss') && ownHalf(team, u));
     const stones = s.units.filter((u) => u.kind === 'watchstone' && u.side !== team);
-    const goals = buffs.length ? buffs : stones;
+    // A mercenary band on the team's own half is worth the trip as much as a buff.
+    const mercs = s.units.filter((u) => u.kind === 'camp' && !u.dead && u.campKind === 'merc' && u.group === u.id && ownHalf(team, u));
+    const goals = buffs.length || mercs.length ? [...buffs, ...mercs] : stones;
     let best: { u: Unit; goal: Unit; d: number } | null = null;
     for (const u of s.units) {
       if (u.side !== team || !free(s, u, JUNGLE.minHp) || s.contesters.includes(u.id)) continue;
@@ -1329,10 +1806,102 @@ function updateWatchstones(s: GameState, dt: number) {
   }
 }
 
-/** How far a unit sees, or 0 if it gives its team no sight. */
-function sightOf(u: Unit): number {
+/** The XP of a team's champions together. */
+function teamXp(s: GameState, team: Team): number {
+  return s.units.reduce((n, u) => (u.kind === 'champion' && u.side === team ? n + u.xp : n), 0);
+}
+/** Whether a team's champions have `gap` (a share) less XP between them than the other team's. */
+export function behind(s: GameState, team: Team, gap: number): boolean {
+  return teamXp(s, team) < teamXp(s, team === 'blue' ? 'red' : 'blue') * (1 - gap);
+}
+/** How many more towers and inhibitors a team has lost than the other. */
+function structsBehind(s: GameState, team: Team): number {
+  let n = 0;
+  for (const u of s.units) if (u.dead && (u.kind === 'tower' || u.kind === 'inhibitor')) n += u.side === team ? 1 : -1;
+  return n;
+}
+/** Whether an AI champion votes to give up: its team is behind on XP or on structures. */
+function votesYes(s: GameState, team: Team): boolean {
+  return behind(s, team, COMEBACK.gap) || structsBehind(s, team) >= SURRENDER.structs;
+}
+
+/** A team's net worth: its champions' gold plus the full price of every item they hold. */
+export function netWorth(s: GameState, team: Team): number {
+  let n = 0;
+  for (const u of s.units) {
+    if (u.kind !== 'champion' || u.side !== team) continue;
+    n += u.gold;
+    for (const id of u.items) n += ITEMS.find((it) => it.id === id)?.cost ?? 0;
+  }
+  return Math.round(n);
+}
+/** Notes both teams' net worth now, for the end panel's graph. */
+function sampleWorth(s: GameState) {
+  s.history.push({ t: s.time, blue: netWorth(s, 'blue'), red: netWorth(s, 'red') });
+}
+/** The match's most valuable champion, on either team (`SUMMARY`). */
+export function mvpOf(s: GameState): Unit | null {
+  const score = (u: Unit) => u.kills * SUMMARY.kill + u.assists * SUMMARY.assist + u.cs * SUMMARY.cs - u.deaths * SUMMARY.death;
+  let best: Unit | null = null;
+  for (const u of s.units) if (u.kind === 'champion' && (!best || score(u) > score(best))) best = u;
+  return best;
+}
+
+/** A team gives up: the other wins, as if the Nexus fell. */
+function surrender(s: GameState, team: Team) {
+  sampleWorth(s);
+  s.surrendered = team;
+  s.phase = team === 'blue' ? 'lost' : 'won';
+  s.winner = team === 'blue' ? 'red' : 'blue';
+  aiLog(team, 'surrenders');
+  sound(s, 'nexus');
+}
+
+/**
+ * The player calls a surrender vote for blue. Returns false when it is too early or a vote was
+ * called lately. Each ally votes by `votesYes`; the player votes yes.
+ */
+export function callSurrender(s: GameState): boolean {
+  if (s.phase !== 'playing' || s.watch || s.time < s.voteReadyAt) return false;
+  const allies = s.units.filter((u) => u.kind === 'champion' && u.side === 'blue' && u.id !== s.player);
+  const yes = 1 + (votesYes(s, 'blue') ? allies.length : 0);
+  const of = allies.length + 1;
+  s.vote = { yes, of, at: s.time };
+  s.voteReadyAt = s.time + SURRENDER.cd;
+  sound(s, 'vote', undefined, true);
+  if (yes / of >= SURRENDER.pass) surrender(s, 'blue');
+  else notice(s, text('noticeVoteFails', { yes, of }), '#f2c14e');
+  return true;
+}
+
+/** From the surrender time on, every `SURRENDER.cd` each AI team that is far behind gives up. */
+function updateSurrender(s: GameState) {
+  if (s.time < s.nextSurrender) return;
+  s.nextSurrender = s.time + SURRENDER.cd;
+  for (const team of (s.watch ? TEAMS : ['red']) as Team[]) {
+    if (s.phase !== 'playing') return;
+    if (behind(s, team, SURRENDER.aiGap) && structsBehind(s, team) >= SURRENDER.structs) surrender(s, team);
+  }
+}
+
+/**
+ * How dark it is at a time of the match: 0 by day, 1 at full night, in between at dusk and dawn
+ * (the last `DAYNIGHT.fade` of the day and of the night).
+ */
+export function nightness(time: number): number {
+  const { day, night, fade } = DAYNIGHT;
+  const p = time % (day + night);
+  if (p < day - fade) return 0;
+  if (p < day) return (p - (day - fade)) / fade;
+  if (p < day + night - fade) return 1;
+  return 1 - (p - (day + night - fade)) / fade;
+}
+
+/** How far a unit sees at `dark` (from `nightness`), or 0 if it gives its team no sight. */
+function sightOf(u: Unit, dark: number): number {
   switch (u.kind) {
     case 'champion':
+      return SIGHT.champion * (1 - (1 - DAYNIGHT.sight) * dark);
     case 'minion':
     case 'tower':
     case 'inhibitor':
@@ -1349,9 +1918,10 @@ function sightOf(u: Unit): number {
 /** The units that give a team sight, with how far each sees. */
 export function viewers(s: GameState, team: Team): { x: number; y: number; r: number }[] {
   const out: { x: number; y: number; r: number }[] = [];
+  const dark = nightness(s.time);
   for (const v of s.units) {
     if (v.dead || v.side !== team) continue;
-    const r = sightOf(v);
+    const r = sightOf(v, dark);
     if (r > 0) out.push({ x: v.x, y: v.y, r });
   }
   return out;
@@ -1577,14 +2147,95 @@ function nearest(s: GameState, u: Unit, within: number, filter: (e: Unit) => boo
   return best;
 }
 
+/** Each walker's way round the forest to its goal: the goal it was found for, the points left and its age in ms. */
+const ROUTES = new WeakMap<Unit, { goal: Vec; pts: Vec[]; age: number }>();
+
+/**
+ * Where a walker heads next on its way to `goal`: straight there when nothing of the forest is in
+ * between, else the next point of a route along the jungle's paths, found again when the goal
+ * moves or every couple of seconds.
+ */
+function nextStop(u: Unit, goal: Vec, dt: number): Vec {
+  const body = bodyOf(u);
+  if (clearLine(u, goal, body)) {
+    ROUTES.delete(u);
+    return goal;
+  }
+  let r = ROUTES.get(u);
+  if (r) r.age += dt;
+  if (!r || dist(r.goal, goal) > 40 || r.age > 2000 || !r.pts.length) {
+    r = { goal: { x: goal.x, y: goal.y }, pts: route(u, goal, body), age: 0 };
+    ROUTES.set(u, r);
+  }
+  // Skip ahead past points already reached, or to the next one when it is in sight.
+  while (r.pts.length > 1 && (dist(u, r.pts[0]) < 8 || clearLine(u, r.pts[1], body))) r.pts.shift();
+  const last = r.pts.length === 1;
+  return last && dist(r.pts[0], goal) < 40 ? goal : r.pts[0];
+}
+
 function moveToward(u: Unit, goal: Vec, dt: number) {
-  const d = dist(u, goal);
+  if (dist(u, goal) < 0.5) return;
+  const stop = nextStop(u, goal, dt);
+  const d = dist(u, stop);
   if (d < 0.5) return;
   const step = Math.min(d, (speedOf(u) * dt) / 1000);
-  u.x += ((goal.x - u.x) / d) * step;
-  u.y += ((goal.y - u.y) / d) * step;
-  u.walk += step;
-  u.facing = Math.atan2(goal.y - u.y, goal.x - u.x);
+  const to = steer(u, stop, step, bodyOf(u));
+  if (Math.abs(to.x - u.x) + Math.abs(to.y - u.y) > 1e-6) u.facing = Math.atan2(to.y - u.y, to.x - u.x);
+  u.walk += Math.hypot(to.x - u.x, to.y - u.y);
+  u.x = to.x;
+  u.y = to.y;
+}
+
+/** How wide a unit is to the things it walks round and to other walkers (0 for what never moves). */
+export function bodyOf(u: Unit): number {
+  return u.kind === 'champion' ? BODY.champion : u.kind === 'minion' ? BODY.minion : u.kind === 'camp' ? u.radius * BODY.camp : u.kind === 'beast' ? BODY.beast : 0;
+}
+
+/** Puts a unit that was moved at once (a dash, a blink, a knock, a pull) at the point, or at the nearest free spot by it. */
+function place(u: Unit, to: Vec) {
+  const p = settle(clampWorld(to), bodyOf(u));
+  u.x = p.x;
+  u.y = p.y;
+}
+
+/**
+ * Walkers don't stand in each other: each pair of living champions and minions that overlap is
+ * pushed apart, half each, and a camp or the beast pushes them off itself, never the other way.
+ */
+function separate(s: GameState) {
+  const walkers = s.units.filter((u) => !u.dead && (u.kind === 'champion' || u.kind === 'minion'));
+  const fixed = s.units.filter((u) => !u.dead && (u.kind === 'camp' || u.kind === 'beast'));
+  for (let i = 0; i < walkers.length; i++) {
+    const a = walkers[i];
+    const ra = bodyOf(a);
+    for (let j = i + 1; j < walkers.length; j++) {
+      const b = walkers[j];
+      const r = ra + bodyOf(b);
+      const dx = b.x - a.x, dy = b.y - a.y;
+      if (Math.abs(dx) >= r || Math.abs(dy) >= r) continue;
+      const d = Math.hypot(dx, dy);
+      if (d >= r) continue;
+      // Two on the very same spot part along a fixed slant, by id, so it plays the same every time.
+      const ux = d > 1e-3 ? dx / d : 0.6, uy = d > 1e-3 ? dy / d : 0.8;
+      const push = ((r - d) / 2) * BODY.give;
+      a.x -= ux * push;
+      a.y -= uy * push;
+      b.x += ux * push;
+      b.y += uy * push;
+    }
+    for (const f of fixed) {
+      const r = ra + bodyOf(f);
+      const d = dist(a, f);
+      if (d >= r || d < 1e-3) continue;
+      a.x = f.x + ((a.x - f.x) / d) * r;
+      a.y = f.y + ((a.y - f.y) / d) * r;
+    }
+  }
+  for (const u of walkers) {
+    const p = settle(u, bodyOf(u));
+    u.x = p.x;
+    u.y = p.y;
+  }
 }
 
 /** The next point on a lane walk; the last point is the enemy Nexus. */
@@ -1621,15 +2272,14 @@ function updateProjectiles(s: GameState, dt: number) {
         s.fx.push({ kind: 'skill', look: `${p.look}>hit`, x: e.x, y: e.y, x2: p.x, y2: p.y, r: 0, a: Math.atan2(p.vy, p.vx), color: p.color, ms: 400 });
         if (owner && owner.id === s.player) sound(s, 'impact', e, true);
       }
-      if (owner && owner.kind === 'champion') abilityHit(s, owner, e, p.damage, p);
+      if (owner && owner.kind === 'champion') abilityHit(s, owner, e, p.damage, p, hitHowOf(p.look));
       else damage(s, e, p.damage, p.owner);
       // A harpoon drags what it caught to the thrower.
       if (p.pull && owner && !e.dead && (e.kind === 'champion' || e.kind === 'minion')) {
         const d = Math.max(dist(owner, e), 1);
         const stop = owner.radius + e.radius + 20;
         if (!p.look) s.fx.push({ kind: 'line', x: owner.x, y: owner.y, x2: e.x, y2: e.y, color: p.color, ms: 300 });
-        e.x = owner.x + ((e.x - owner.x) / d) * stop;
-        e.y = owner.y + ((e.y - owner.y) / d) * stop;
+        place(e, { x: owner.x + ((e.x - owner.x) / d) * stop, y: owner.y + ((e.y - owner.y) / d) * stop });
       }
       if (!p.pierce) {
         p.left = 0;
@@ -1647,7 +2297,7 @@ function updateZones(s: GameState, dt: number) {
     for (const e of s.units) {
       if (e.dead || e.side === z.side || !hittable(e) || e.kind === 'tower' || e.kind === 'inhibitor' || e.kind === 'nexus' || e.kind === 'ward') continue;
       if ((e.x - z.x) ** 2 + (e.y - z.y) ** 2 > (z.r + e.radius) ** 2) continue;
-      damage(s, e, (z.dps * dt) / 1000, z.owner);
+      damage(s, e, (z.dps * dt) / 1000, z.owner, hitHowOf(z.look));
       if (z.slow && (e.kind === 'champion' || e.kind === 'minion')) e.slowMs = Math.max(e.slowMs, Math.min(z.slow, 400));
     }
   }

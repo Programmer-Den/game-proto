@@ -26,6 +26,7 @@ It plays sideways or upright, and turns with the phone.
 | S and D, or Left and Right | Same or different (Memory Echo) |
 | Undo (U), Hint (H), Skip | Take back a move, use a hint, give the puzzle up |
 | Leave | Back to the menu (the run ends there, and its score and bests count) |
+| Continue | On the menu after a reload: picks the run up again (every mode but Practice) |
 
 ### The puzzles
 
@@ -57,8 +58,8 @@ Any answer that keeps the rules counts, not only the one the puzzle was made fro
 - **Blitz**: three minutes on one clock and no hearts. A solve gives back 10 to 25 seconds (more at
   higher levels), a skip or a loss takes 10. The level rises every two solves.
 - **Draft Run**: before each puzzle, choose one of the cards dealt. Every third solve offers three
-  relics, each of which can be taken again except the Crystal Ball (a draft deals three cards at
-  most):
+  relics: one charm (while any is left) and two of the others, each of which can be taken again
+  except the Crystal Ball (a draft deals three cards at most):
 
 | Relic | Effect |
 | --- | --- |
@@ -67,12 +68,39 @@ Any answer that keeps the rules counts, not only the one the puzzle was made fro
 | Hourglass | A quarter more time on every puzzle. |
 | Crystal Ball | One more card to choose from in every draft. |
 
+  Each puzzle kind has its own charm, taken once: Inkwell (Picture Grid), Bridgewright (Bridges),
+  Cipher Wheel (Code Breaker), Abacus (Calc Cages), Tally Stone (Cross Sums), Oiled Gear (Unjam),
+  Mirror Coin (Tile Flip), Silver Spool (Path Link) and Echo Shell (Memory Echo). Its kind's
+  puzzles come with a free hint, which costs no points, and pay half again the points; Memory Echo,
+  which has no hints, turns its cards a third slower instead. A draft card marks the charm it
+  is helped by, so the run leans towards the kinds you hold charms for.
+
+  ![A relic offer with a charm](docs/screenshots/charms.webp)
+
 - **Pass and Play**: two players take turns on the same three puzzles (Novice, Adept, Master). The
   lower total time wins; a skip or loss adds 30 seconds and a hint 15.
 - **Practice**: pick any puzzle and level. No clock, no hearts, free hints, and a new puzzle of the
   same kind whenever you like.
 
 ![A draft: two cards to choose from](docs/screenshots/draft.webp)
+
+**Bosses**: every fifth puzzle of Endless and Draft is a boss, framed in rose: two puzzles of two
+kinds played back to back on one clock (four fifths of their two times added up). Beat both for
+double points and a relic pick, in Endless too (there without the Crystal Ball); a loss, skip or
+timeout in either half loses the boss. Up next and the draft cards say which puzzle follows.
+
+![A boss: its second half, Picture Grid after Tile Flip](docs/screenshots/boss.webp)
+
+**Omens**: in Endless and Draft, each puzzle offers an omen in the top bar until its first move or
+hint. Tempt it for double points: **Haste** halves the puzzle's time, **Silence** takes away Undo
+and hints, and **Peril** makes a loss cost two hearts (Memory Echo only offers Peril).
+
+![An omen on offer: Tempt Haste](docs/screenshots/omen.webp)
+
+**Trophies**: ten to earn, from the first solve to a boss beaten under an omen, listed behind the
+Trophies button on the start and pause screens.
+
+![The Trophies list](docs/screenshots/trophies.webp)
 
 **Points**: 100 per level (Novice 100 to Oracle 400), plus 2 for every second left, less 40 per
 hint (never below 20), times a streak bonus of 10% per puzzle solved in a row (up to double).

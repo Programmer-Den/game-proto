@@ -1,43 +1,24 @@
-// Paints the whole 2800x2800 map once at boot onto one canvas: faceted grass, the river with its
+// Paints the whole 3500x3500 map once at boot onto one canvas: faceted grass, the river with its
 // islands for the watchstones, flagstone lanes with stone kerbs, paved plazas round the Nexuses,
 // dirt clearings for the camps, the guardian beast's pit, patches of tall grass (the bushes), flowers,
-// mushrooms and old ruins, and low-poly pines and rocks rendered with the same renderer as the
+// mushrooms, old ruins and stone walls, and low-poly pines and rocks rendered with the same renderer as the
 // units. The same seed paints the same map every time.
 
 import Phaser from 'phaser';
-import { BASE, BEAST, BUSHES, Bush, CAMPS, CampSpot, LANES, RIVER, Team, Vec, WATCHSTONES, WORLD } from '../game/data';
+import { BASE, BEAST, BUSHES, DRAKE, Bush, CampSpot, LANES, MAP_SCALE, RIVER, Team, Vec, WATCHSTONES, WORLD } from '../game/data';
 import { sharpRes } from '../../../../shared/scaling';
 import { render, seeded } from './lowpoly';
+import { CLEARINGS, LANE_HALF, LANE_WALK, PATHS, PATH_HALF, RUINS, SCENERY, clearance, clearingR, laneDist, pitStones, riverDist, ruinPieces } from '../game/terrain';
 import { TEAM_GLOW, pineModel, rockModel, ruinModel } from './models';
 
 export const MAP_KEY = 'lb-map';
 /** Canvas pixels per world pixel in the map's texture: 1, or more on a big screen (see `sharpRes`). */
 export let MAP_RES = 1;
-/** Half the width of a lane's paving, in pixels. */
-const LANE_HALF = 50;
 
 function shade(hex: string, k: number) {
   const n = parseInt(hex.slice(1), 16);
   const f = (v: number) => Math.max(0, Math.min(255, Math.round(v * k)));
   return `rgb(${f((n >> 16) & 255)},${f((n >> 8) & 255)},${f(n & 255)})`;
-}
-
-/** The distance from a point to the nearest lane's centre line. */
-function laneDist(p: Vec): number {
-  let best = Infinity;
-  for (const lane of Object.values(LANES)) {
-    for (let i = 0; i < lane.length - 1; i++) best = Math.min(best, segDist(p, lane[i], lane[i + 1]));
-  }
-  return best;
-}
-/** The distance from a point to the river's centre line. */
-function riverDist(p: Vec): number {
-  return segDist(p, RIVER.from, RIVER.to);
-}
-function segDist(p: Vec, a: Vec, b: Vec) {
-  const dx = b.x - a.x, dy = b.y - a.y;
-  const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy)));
-  return Math.hypot(p.x - (a.x + dx * t), p.y - (a.y + dy * t));
 }
 
 function grass(ctx: CanvasRenderingContext2D, rnd: () => number) {
@@ -81,7 +62,7 @@ function grass(ctx: CanvasRenderingContext2D, rnd: () => number) {
     }
   }
   // A few grass tufts: small pale triangles.
-  for (let i = 0; i < 1800; i++) {
+  for (let i = 0; i < 1800 * MAP_SCALE ** 2; i++) {
     const x = rnd() * WORLD.w, y = rnd() * WORLD.h;
     if (laneDist({ x, y }) < LANE_HALF + 12) continue;
     ctx.fillStyle = rnd() < 0.5 ? 'rgba(160,210,120,0.55)' : 'rgba(40,90,40,0.45)';
@@ -228,7 +209,6 @@ function plaza(ctx: CanvasRenderingContext2D, team: Team, rnd: () => number) {
 }
 
 /** How far a camp's clearing reaches, by kind: the brutes' are the widest. */
-const clearingR = (c: CampSpot) => (c.kind === 'ember' || c.kind === 'moss' ? 128 : c.kind === 'wolf' ? 112 : 100);
 
 function clearing(ctx: CanvasRenderingContext2D, c: CampSpot, rnd: () => number) {
   const n = 11;
@@ -258,6 +238,33 @@ function clearing(ctx: CanvasRenderingContext2D, c: CampSpot, rnd: () => number)
     ctx.beginPath();
     ctx.ellipse(c.x, c.y + 6, 62, 40, 0, 0, Math.PI * 2);
     ctx.stroke();
+  } else if (c.kind === 'merc') {
+    // The sellswords' camp: a fire pit ringed with stones, and two tents behind it.
+    ctx.fillStyle = '#3a2a1c';
+    ctx.beginPath();
+    ctx.ellipse(c.x, c.y + 4, 16, 10, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,170,70,0.7)';
+    ctx.beginPath();
+    ctx.ellipse(c.x, c.y + 3, 8, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    for (const side of [-1, 1]) {
+      const tx = c.x + side * 58, ty = c.y - 52;
+      ctx.fillStyle = side < 0 ? '#c9b48a' : '#b39b6c';
+      ctx.beginPath();
+      ctx.moveTo(tx - 26, ty + 18);
+      ctx.lineTo(tx, ty - 16);
+      ctx.lineTo(tx + 26, ty + 18);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#5a4128';
+      ctx.beginPath();
+      ctx.moveTo(tx - 6, ty + 18);
+      ctx.lineTo(tx, ty + 2);
+      ctx.lineTo(tx + 6, ty + 18);
+      ctx.closePath();
+      ctx.fill();
+    }
   } else if (c.kind === 'wolf') {
     ctx.strokeStyle = 'rgba(236,228,206,0.85)';
     ctx.lineWidth = 2.5;
@@ -372,7 +379,7 @@ function island(ctx: CanvasRenderingContext2D, c: Vec, rnd: () => number) {
 /** Little things in the jungle: patches of flowers and rings of mushrooms. */
 function flora(ctx: CanvasRenderingContext2D, rnd: () => number) {
   const petals = ['#f2e3a0', '#e9a3c9', '#b9d6ff', '#ffffff', '#f6b26b'];
-  for (let i = 0; i < 160; i++) {
+  for (let i = 0; i < 160 * MAP_SCALE ** 2; i++) {
     const c = { x: 60 + rnd() * (WORLD.w - 120), y: 60 + rnd() * (WORLD.h - 120) };
     if (laneDist(c) < LANE_HALF + 30 || riverDist(c) < RIVER.half + 30) continue;
     if (rnd() < 0.8) {
@@ -414,18 +421,78 @@ function ruins(ctx: CanvasRenderingContext2D, c: Vec, rnd: () => number) {
     ctx.fillStyle = shade('#a8a196', 0.8 + rnd() * 0.3);
     ctx.fillRect(x - 9, y - 6, 18, 12);
   }
-  for (let i = 0; i < 4; i++) {
-    const a = (i / 4) * Math.PI * 2 + 0.4;
-    render(ctx, ruinModel(i), c.x + Math.cos(a) * 52, c.y + Math.sin(a) * 32, 1, { yaw: rnd() * 6 });
+  ruinPieces(c).forEach((p, i) => render(ctx, ruinModel(i), p.x, p.y, 1, { yaw: rnd() * 6 }));
+}
+
+/** The forest floor: a darker, mossy green wherever the forest stands (`clearance` in `game/terrain.ts`), soft at its edge. */
+function forest(ctx: CanvasRenderingContext2D, rnd: () => number) {
+  const cell = 10;
+  const w = Math.ceil(WORLD.w / cell), h = Math.ceil(WORLD.h / cell);
+  const small = document.createElement('canvas');
+  small.width = w;
+  small.height = h;
+  const img = small.getContext('2d')!.createImageData(w, h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const c = clearance({ x: (x + 0.5) * cell, y: (y + 0.5) * cell });
+      // Darker the deeper in, so the forest's edge shades off into the open ground.
+      const deep = Math.min(1, Math.max(0, -c / 60));
+      const k = 1.18 - deep * 0.3 + (rnd() - 0.5) * 0.08;
+      const i = (y * w + x) * 4;
+      img.data[i] = 0x2c * k;
+      img.data[i + 1] = 0x4a * k;
+      img.data[i + 2] = 0x26 * k;
+      img.data[i + 3] = Math.max(0, Math.min(1, 0.5 - c / 10)) * 255;
+    }
+  }
+  small.getContext('2d')!.putImageData(img, 0, 0);
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(small, 0, 0, w * cell, h * cell);
+}
+
+/** The jungle's paths (`PATHS`): trodden earth with a lighter middle. */
+function trails(ctx: CanvasRenderingContext2D) {
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  for (const [w, colour] of [[PATH_HALF * 2 - 6, '#6f6440'], [PATH_HALF * 2 - 22, '#857a50']] as const) {
+    ctx.strokeStyle = colour;
+    ctx.lineWidth = w;
+    for (const l of PATHS) {
+      ctx.beginPath();
+      ctx.moveTo(l[0].x, l[0].y);
+      for (const p of l.slice(1)) ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+    }
   }
 }
 
-/** Where the ruins stand: one in each quarter of the jungle, mirrored. */
-const RUINS: Vec[] = [{ x: 560, y: 1560 }, { x: 1240, y: 2240 }, { x: 2240, y: 1240 }, { x: 1560, y: 560 }];
+/**
+ * The stone walls along the lanes: blocks on every bit of the forest's edge beside a lane, so the
+ * walls break off wherever a path goes into the jungle.
+ */
+function laneWalls(ctx: CanvasRenderingContext2D, rnd: () => number) {
+  const cell = 12;
+  const blocks: Vec[] = [];
+  for (let y = 0; y < WORLD.h; y += cell) {
+    for (let x = 0; x < WORLD.w; x += cell) {
+      const p = { x: x + cell / 2, y: y + cell / 2 };
+      const c = clearance(p);
+      if (c >= 0 || c < -22 || laneDist(p) > LANE_WALK + 34) continue;
+      blocks.push(p);
+    }
+  }
+  ctx.fillStyle = 'rgba(20,40,20,0.32)';
+  for (const p of blocks) ctx.fillRect(p.x - cell / 2 + 6, p.y - cell / 2 + 5, cell, cell);
+  ctx.fillStyle = '#5b5850';
+  for (const p of blocks) ctx.fillRect(p.x - cell / 2, p.y - cell / 2 + 3, cell, cell);
+  for (const p of blocks) {
+    ctx.fillStyle = shade('#a6a194', 0.82 + rnd() * 0.3);
+    ctx.fillRect(p.x - cell / 2 + 0.5, p.y - cell / 2, cell - 1, cell - 1.5);
+  }
+}
 
-/** The guardian beast's pit: a ring of dark flagstones round a sunken floor, with standing stones. */
-function pit(ctx: CanvasRenderingContext2D, rnd: () => number) {
-  const c = { x: BEAST.x, y: BEAST.y };
+/** A pit for the guardian beast or the river drake: a ring of dark flagstones round a sunken floor, with standing stones, glowing in `glow`. */
+function pit(ctx: CanvasRenderingContext2D, rnd: () => number, c: Vec, glow: string) {
   const n = 14;
   ctx.fillStyle = 'rgba(25,30,40,0.35)';
   ctx.beginPath();
@@ -445,16 +512,13 @@ function pit(ctx: CanvasRenderingContext2D, rnd: () => number) {
       ctx.stroke();
     }
   }
-  // A faint violet glow in the floor, the colour of the beast's crystals.
-  ctx.strokeStyle = 'rgba(185,140,255,0.45)';
+  // A faint glow in the floor, the colour of what sleeps there.
+  ctx.strokeStyle = glow;
   ctx.lineWidth = 4;
   ctx.beginPath();
   ctx.ellipse(c.x, c.y, 70, 56, 0, 0, Math.PI * 2);
   ctx.stroke();
-  for (let i = 0; i < 8; i++) {
-    const a = (i / 8) * Math.PI * 2 + 0.2;
-    render(ctx, rockModel(7 + rnd() * 3, i % 3), c.x + Math.cos(a) * 126, c.y + Math.sin(a) * 101, 1, { yaw: rnd() * 6 });
-  }
+  pitStones(c).forEach((p, i) => render(ctx, rockModel(7 + rnd() * 3, i % 3), p.x, p.y, 1, { yaw: rnd() * 6 }));
 }
 
 /** A patch of tall grass: a dark bed with clumps of faceted blades, lighter at the tips. */
@@ -505,20 +569,9 @@ function bush(ctx: CanvasRenderingContext2D, b: Bush, rnd: () => number) {
   }
 }
 
-function scenery(ctx: CanvasRenderingContext2D, rnd: () => number) {
-  const things: { x: number; y: number; kind: 'pine' | 'rock'; s: number; v: number }[] = [];
-  for (let i = 0; i < 4000 && things.length < 620; i++) {
-    const p = { x: 20 + rnd() * (WORLD.w - 40), y: 30 + rnd() * (WORLD.h - 40) };
-    if (laneDist(p) < LANE_HALF + 48 || riverDist(p) < RIVER.half + 40) continue;
-    if (Math.hypot(p.x - BASE.blue.x, p.y - BASE.blue.y) < 290 || Math.hypot(p.x - BASE.red.x, p.y - BASE.red.y) < 290) continue;
-    if (CAMPS.some((c) => Math.hypot(p.x - c.x, p.y - c.y) < clearingR(c) + 50)) continue;
-    if (RUINS.some((c) => Math.hypot(p.x - c.x, p.y - c.y) < 110)) continue;
-    if (WATCHSTONES.some((c) => Math.hypot(p.x - c.x, p.y - c.y) < 140)) continue;
-    if (Math.hypot(p.x - BEAST.x, p.y - BEAST.y) < 175) continue;
-    if (BUSHES.some((b) => ((p.x - b.x) / (b.rx + 40)) ** 2 + ((p.y - b.y) / (b.ry + 40)) ** 2 < 1)) continue;
-    if (things.some((t) => Math.hypot(t.x - p.x, t.y - p.y) < 46)) continue;
-    things.push({ ...p, kind: rnd() < 0.85 ? 'pine' : 'rock', s: 0.8 + rnd() * 0.5, v: Math.floor(rnd() * 4) });
-  }
+function scenery(ctx: CanvasRenderingContext2D) {
+  // The forest's pines and rocks (`SCENERY` in `game/terrain.ts`).
+  const things = [...SCENERY];
   things.sort((a, b) => a.y - b.y);
   for (const t of things) {
     // A soft shadow to the bottom right, away from the light.
@@ -543,17 +596,21 @@ export function paintMap(scene: Phaser.Scene) {
   const rnd = seeded(20261015);
   grass(ctx, rnd);
   flora(ctx, rnd);
+  forest(ctx, rnd);
+  trails(ctx);
   river(ctx, rnd);
-  for (const c of CAMPS) clearing(ctx, c, rnd);
+  for (const c of CLEARINGS) clearing(ctx, c, rnd);
   for (const r of RUINS) ruins(ctx, r, rnd);
-  pit(ctx, rnd);
+  pit(ctx, rnd, BEAST, 'rgba(185,140,255,0.45)');
+  pit(ctx, rnd, DRAKE, 'rgba(255,200,120,0.4)');
   for (const w of WATCHSTONES) island(ctx, w, rnd);
   lanes(ctx, rnd);
   plaza(ctx, 'blue', rnd);
   plaza(ctx, 'red', rnd);
   kerbs(ctx, rnd);
   for (const b of BUSHES) bush(ctx, b, rnd);
-  scenery(ctx, rnd);
+  laneWalls(ctx, rnd);
+  scenery(ctx);
   // A dark frame round the edge of the world.
   ctx.strokeStyle = 'rgba(15,28,18,0.85)';
   ctx.lineWidth = 8;

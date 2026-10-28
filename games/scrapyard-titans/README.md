@@ -76,11 +76,35 @@ terrain tiles. The plan phase lasts 30 seconds; when it runs out the fight start
   would build there, and the panel lists every recipe for that part.
 - **Damage meter.** After each fight the panel under the players list ranks your robots by the
   damage they dealt, and names the one that took the most.
-- **Power cards.** At rounds 2-1, 3-2 and 4-2 every commander picks one of three power cards
-  (15 in all, like Thick Hull, Recycler or War Chest) that last the whole match.
+- **Power cards.** At rounds 2-1, 3-2, 4-2 and 5-2 every commander picks one of three power cards
+  (15 in all, like Thick Hull, Recycler or War Chest) that last the whole match. From 4-2 on, the
+  third card is a rare one, gold-edged, that changes the economy: Lucky Dice (the first two rerolls
+  each round are free), Hand to Mouth (no interest, but 6 gold every round) or Gilded Shop (gilded
+  robots in one shop slot in five, from level 1).
 - **Commanders.** Foreman Grit (Overclock: robots attack 40% faster for 5 seconds), Sparks Malone
-  (Big Zap: zaps and stuns the toughest enemy) and Madame Magna (Scrap Wall: shields every robot).
-  The rivals use theirs on their own and call out a taunt at the start of a fight.
+  (Big Zap: zaps and stuns the toughest enemy) and Madame Magna (Scrap Wall: shields every robot)
+  are open from the start. Five more unlock through deeds, saved on the device: Patch Rosa
+  (Patch-Up: repairs every robot for 220) for a top-four finish, Volt Vance (Power Surge: fills
+  every robot's charge) for a 3-star robot, Hexa Byte (EMP Blast: drains and stuns every enemy) for
+  a won fight with six robots of one origin, Boss Ironside (Rally Cry: robots hit 35% harder for 6
+  seconds) for level 9 and Nova Quinn (Air Strike: 140 damage to every enemy) for a won match. A
+  locked commander's card says what unlocks it. The rivals use their skills on their own and call
+  out a taunt at the start of a fight.
+- **Weekly season.** The third season card is this week's: the date (weeks run Monday to Sunday,
+  UTC) picks one of the two seasons with or without terrain, in turn, so every combination comes
+  round once a month. The card shows the rules and this week's best place, which is saved apart from
+  the overall best.
+- **Trophies.** Ten, listed on the start and pause screens: First spark (win a fight), Podium
+  bound (top four), Gold-plated (a 3-star robot), Lucky draw (a rare power card), Full set (a won
+  fight with six robots of one origin), Top of the heap (level 9), Last one standing (win a match),
+  Full roster (every commander unlocked), and two hidden ones for the long run.
+- **Rank ladder.** A saved rank that only goes up: a finish in the top four earns rank points (50,
+  35, 25 or 15), and the rank sets how hard the rivals play. Rust (0 points) is the game as
+  designed; Iron (100) rivals reroll for copies sooner, Steel (250) also get 1 more gold a round,
+  Chrome (450) also find pricier robots in their shops, and Titan (700) get 2 more gold a round and
+  reroll from round 2-1. The menu shows the rank and the next one, the end screen the points won.
+  In AI-only test matches the AI seat's average place goes from about 4.2 at Rust to 5.1 at Steel
+  and 6.4 at Titan.
 - **Draft rounds.** Robots carrying a part or item walk a ring in the middle of the board; the
   commanders pick one each, lowest health first.
 - **Seasons.** Season 1, Scrap Rush, has Magnet and Salvager robots, and every won fight earns a
@@ -103,6 +127,7 @@ shows your seat's fights on the board.
 | --- | --- |
 | `src/main.ts` | Creates the game and calls the hub's `setupGame` and `setupScaling` |
 | `src/howToPlay.ts` | The How to play screen's text |
+| `src/progress.ts` | What lasts between matches: stats and the deeds that unlock commanders |
 | `src/game/data.ts` | Every rule and number: robots, traits, parts, items, power cards, commanders, monsters, rounds, economy, terrain |
 | `src/game/battle.ts` | The fight sim on the 8x8 board, in fixed 50 ms steps, raising events for the view |
 | `src/game/match.ts` | The match: players, shops, buying, merging, items, rounds, pairings, damage, drafts |
@@ -114,9 +139,13 @@ shows your seat's fights on the board.
 
 ## Screenshots
 
-![The menu: three commanders, two seasons and the terrain toggle](docs/screenshots/menu.webp)
+![The menu: eight commanders (some locked until their deed is done), two seasons and the weekly one, the terrain toggle and the rank](docs/screenshots/menu.webp)
 
 ![A draft round: robots carrying parts on the board, picked lowest health first](docs/screenshots/draft.webp)
+
+![A power card offer at 4-2 with a gold-edged rare card, Lucky Dice, in the third slot](docs/screenshots/rare-card.webp)
+
+![The Trophies list on the pause screen, four of ten earned](docs/screenshots/trophies.webp)
 
 ![The Scrap Rat chase: the squad hunts the rat across the board](docs/screenshots/scrap-rat.webp)
 

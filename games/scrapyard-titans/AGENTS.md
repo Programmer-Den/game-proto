@@ -12,8 +12,16 @@ fake 3D, all painted in code at start-up; the only image files are the cover and
 
 Implemented today:
 
-- Menu: three commanders (`PLAYER_COMMANDERS`, each with one skill in `SKILLS`), two seasons
-  (`SETS`) and a terrain toggle, then START MATCH. The menu shows the saved stats.
+- Menu: eight commanders (`PLAYER_COMMANDERS`, each with one skill in `SKILLS`) as small cards,
+  with the picked one's skill (or, while locked, its unlock) spelled out under them, two seasons
+  (`SETS`) and a terrain toggle, then START MATCH (greyed out on a locked commander). The menu shows
+  the saved stats.
+- Commander unlocks (`progress.ts`): Grit, Sparks and Magna are open; the other five each have an
+  `unlock` deed (`DeedId`): `topFour` (Rosa, Patch-Up), `threeStar` (Volt, Power Surge),
+  `fullOrigin` (Hexa, EMP Blast: a won fight with an origin at 6), `maxLevel` (Ironside, Rally Cry)
+  and `champion` (Nova, Air Strike). `GameScene.noteDeeds` saves them: `planDeeds` every plan
+  tick, `fullOrigin` in `finishFight`, `topFour` and `champion` in `record`; a new unlock floats
+  "New commander" over the board and is listed on the end screen. Watched matches never count.
 - Seasons: each `SetDef` lists five origins; `rosterOf(set)` gives its 30 robots (six per origin,
   one per class, costs 1 to 5). Scrap Rush adds scrap tokens on wins (`SCRAP_TOKENS_PER_PART`),
   Overcharge gives every robot `OVERCHARGE_MANA` at the start of a fight. `UNITS` holds both
@@ -30,8 +38,12 @@ Implemented today:
   `ITEM_BENCH` (10): every part or item a player gets (drops, sales, star-ups, drafts, power cards,
   scrap tokens) goes through `giveItem`, which scraps it when the bench is full. The scene then
   floats "Parts full" (`partsFull`) over an orb or the item bench instead of the item's name.
-- Power cards (`AUGMENTS`): offered at rounds with `augment` set (2-1, 3-2, 4-2) and picked with
-  `pickAugment`. Duplicator pays the robot's cost in gold instead when the bench is full. While
+- Power cards (`AUGMENTS`): offered at rounds with `augment` set (2-1, 3-2, 4-2, 5-2) and picked with
+  `pickAugment`. From `RARE_FROM_STAGE` (4) `offerAugments` puts a `rare` card in the third slot,
+  drawn gold-edged with a RARE tag: `free-rolls` (`Player.freeRolls`, reset to `RARE.freeRolls` in
+  `startPlan`, makes `rerollCost` 0 and the Reroll button read "Reroll free"), `hand-to-mouth`
+  (`startPlan` pays `RARE.handToMouthGold` instead of interest) and `gilded-shop` (`rollShop` uses
+  `RARE.gildedChance` from level 1). Duplicator pays the robot's cost in gold instead when the bench is full. While
   the card overlay is up, taps and keys other than 1-3 do nothing.
 - Rounds (`stageRounds`): stage 1 is three neutral rounds and a draft; later stages are
   pvp, pvp, pvp, draft, pvp, pvp, then a monster round (2-7 is the Scrap Rat, `RAT`).
@@ -67,8 +79,30 @@ Implemented today:
 - Part preview: with a part or item selected or dragged, `buildPreview` tags each robot with
   `equipPreview(id, robot)` (the finished item, the part, or full), and the info panel lists the
   part's six recipes.
-- Stats (matches, wins, best place) saved under `scrapyard-titans-stats`; watched matches never
-  count.
+- Weekly season: the menu's third season card (`menu.set` `'weekly'`). `weekOf(Date.now())` (UTC
+  weeks from Monday) picks `weeklyRules(week)` from `WEEKLY_ROTATION` (season and terrain), which
+  `startMatch` uses instead of the menu's (the terrain toggle is greyed out), and passes the week as
+  `MatchOptions.weekly`. `record` keeps the week's best place in `Progress.weekly` (`recordWeekly`);
+  the card and the end screen show it (`weeklyBest`). A new week starts unplayed.
+- Trophies (`src/trophies/`, `shared/trophies.ts`): ten, saved under `scrapyard-titans-trophies`.
+  `index.ts` lists them (id, tier, icon; `titanRank` and `weeklyWin` hidden) with their texts in
+  `trophies/i18n/` (`en.ts`, `de.ts`; the name keyed by the id, what earns it by `<id>Text`) and
+  imports nothing else from the game, since the hub loads it. `main.ts` hands `trophies` to
+  `setupGame`. `GameScene` awards them, never under `?watch`: `firstWin` in `finishFight` (a won
+  fight), `rareCard` in `doAugment`, `weeklyWin` in `record` (1st in a weekly match), and
+  `awardProgress` the rest from `Progress`: each deed's trophy shares its id (`topFour`,
+  `threeStar`, `fullOrigin`, `maxLevel`, `champion`), `allCommanders` when every commander is
+  unlocked and `titanRank` at the top rank. `create` runs it quietly, so deeds saved before the
+  trophies came in earn theirs without a toast.
+- Rank ladder (`RANKS`, `RANK_POINTS` in `data.ts`): `Progress.points` grow by a top-four place in
+  `record` (`addRankPoints`) and never drop; `rankOf(points)` gives the rank, which `startMatch`
+  passes as `MatchOptions.rank` (0 under `?watch`). The rank gives each rival `gold` more a round
+  in `startPlan`, rolls the rivals' shops `odds` levels higher in `rollShop`, and lets `aiPlan`
+  reroll from stage `rollFrom` while holding more than `rollAbove` gold (seat 0 always uses Rust's).
+  Rank 0 plays exactly as before. The menu shows it under the stats, the end screen the points won
+  or the rank up.
+- Progress (matches, wins, best place, `deeds`, rank `points` and `weekly` best) saved under `scrapyard-titans-stats`
+  (`progress.ts`, `loadProgress`/`saveProgress`); watched matches never count.
 
 Missing or rough:
 
@@ -76,7 +110,7 @@ Missing or rough:
 - AI rivals use a simple scored plan (`aiPlan`). Balance is checked with AI-only matches (see
   Gotchas); every origin's average place sits between about 4.0 and 4.9 of 8, and matches end
   around stages 5 and 6.
-- Seasons are picked on the menu; nothing rotates them.
+- Only the weekly season rotates; the two plain seasons are picked on the menu.
 
 ## Architecture
 
@@ -94,6 +128,11 @@ File map (`src/`):
   just 3 in German, where the text says "Platz"). Every text on screen goes through `t`, and a new
   one gets its German entry (and a US one if its spelling differs) in the same PR. The watch
   panel's title and `aiLog` lines stay English, with the names inside them translated.
+- `progress.ts`: what lasts between matches (`Progress`: stats, deeds, rank points), `rankOf`,
+  `addRankPoints`, `weekOf`, `weekStart`, `weeklyRules`, `weeklyBest`, `recordWeekly`, `isUnlocked`,
+  `doDeeds` (saves new deeds, returns the commanders they unlock), `planDeeds`, `fullOrigin`. No
+  Phaser.
+- `trophies/`: the game's trophies (see Current state).
 - `audio.ts`: the songs (`PLAN_SONG`, `FIGHT_SONG`) and the sound table (`play`, typed `Sfx`); see
   Sound below.
 - `game/data.ts`: every rule and number (see above). Every name and text in its tables (robots,
@@ -145,7 +184,7 @@ Shared code it imports: `shared/audio.ts`, `shared/setupGame.ts`, `shared/scalin
   gives each rival `byDifficulty(-1, 0, 1)` gold a round. Keep the README rows in step.
 - Reduced motion: no camera shake on slams, no hit flash, no idle sway or orb bob, no avatar walk
   bounce or skill hop, and stun stars and the draft ring stand still instead of circling.
-- Watch AI (`?watch`): the scene starts a match at once with a random commander, season and
+- Watch AI (`?watch`): the scene starts a match at once with a random commander (any of the eight), season and
   terrain, seat 0 is AI-run (`human` false: `aiPlan` once, near the end of each plan phase, where the
   rivals plan in `beginPlan`; skill at 3 s;
   the taps and keys that act for the player, R, X, E, L, 1-3 and Space, do nothing: the shop cards,
@@ -204,15 +243,15 @@ greyed-out button or shop card (`button` pushes a refusal for them).
   card (`SHOP_CARD_1`), bench slot 0 (`BENCH_SLOT_1`), tile 3,4 (`FRONT_TILE`), FIGHT
   (`FIGHT_BUTTON`); it asserts the bought robot moves bench → board, the fight is won with no
   damage, a part drops, the damage meter (`Match.meter`) lists the robot with damage dealt, and
-  round 1-2's plan starts with income paid. Change these together with
+  round 1-2's plan starts with income paid, and the win saved the `firstWin` trophy. Change these together with
   `layout.ts` (`SHOP`, `BENCH`, `BUTTONS.fight`, `BOARD_VIEW`), the menu's START MATCH rect in
   `buildMenu`, `ECONOMY.startGold`, and round 1-1's monsters (`MONSTERS.mite`), which every 1-cost
   robot must beat alone.
-- Screenshots: `docs/screenshots/menu.webp` is the test's `0-menu`; `fight.webp` (also
+- Screenshots: `docs/screenshots/menu.webp` is from a scratch run with three deeds, 285 rank points and a weekly best saved, the weekly season picked; `fight.webp` (also
   `cover.png`), `draft.webp` and `scrap-rat.webp` are from a scratch `?watch` run with the watch
   panel hidden; `scout.webp`, `part-preview.webp` and `damage-meter.webp` from a scratch run that
   plays round 1-1 with real clicks; `german-result.webp` is the test's `3-result` run with a
-  `de-DE` browser locale; `fill-ultrawide.webp` (2560x1080) and `fill-tablet.webp` (1024x768)
+  `de-DE` browser locale; `trophies.webp` is the pause screen's Trophies list from a scratch run with five trophies saved; `rare-card.webp` is a scratch run's 4-2 offer (set from the dev console) with Lucky Dice in the third slot; `fill-ultrawide.webp` (2560x1080) and `fill-tablet.webp` (1024x768)
   show the plan phase on a wider and a taller view, from a scratch run.
 
 ## Making common changes
@@ -228,8 +267,14 @@ greyed-out button or shop card (`button` pushes a refusal for them).
   `origins` and, for a class, `CLASS_STATS` with an ability the sim handles in `battle.ts`.
 - **Add an item**: add a part to `PARTS`/`PART_DEFS` (every pair then needs a combo) or change a
   `combo` row; a new `Special` needs handling in `battle.ts`.
+- **Add a commander**: a row in `PLAYER_COMMANDERS` (name key, skill, colours, `unlock` deed), its
+  skill in `SkillId`, `SKILL_POWER` and `SKILLS`, handled in `Battle.useSkill` and drawn in
+  `consume`'s `skill` case; a new deed goes into `DeedId`, `DEEDS` in `progress.ts`, a
+  `<deed>Unlock` text and a `noteDeeds` call where it happens. The menu row holds eight cards.
 - **Add a power card**: add it to `AugmentId`, `AUGMENTS` and `AUGMENT_TASTE` in `ai.ts`, then
   apply it in `match.ts` (one-off) or `battle.ts` (in fights).
+- **Change the rank ladder**: a row in `RANKS` (with its name and text keys), the points in
+  `RANK_POINTS`; check the effect with the balance harness at each rank.
 - **Change rounds or damage**: `stageRounds`, `stageDamage`, `SURVIVOR_DAMAGE`.
 
 ## Gotchas

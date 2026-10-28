@@ -5,6 +5,16 @@ import type { TextKey } from '../i18n';
 import {
   GANK,
   JUNGLE,
+  SpellId,
+  aiSpellFor,
+  MERC,
+  RUNE,
+  RuneKind,
+  PingKind,
+  DRAKE,
+  DRAKE_ORDER,
+  PLATING,
+  DrakeElement,
   AbilityKey,
   BASE,
   BuffDef,
@@ -38,7 +48,10 @@ import {
   PUPS,
   WATCHSTONES,
   WARD,
+  QUICK,
+  SURRENDER,
 } from './data';
+import { openLanes } from './terrain';
 
 export type Phase = 'pick' | 'playing' | 'won' | 'lost';
 export type UnitKind = 'champion' | 'minion' | 'tower' | 'nexus' | 'camp' | 'beast' | 'inhibitor' | 'watchstone' | 'ward';
@@ -132,14 +145,31 @@ export interface Unit {
   upgrades: string[];
   /** Cooldowns of item actives, by active id. */
   activeCds: Record<string, number>;
+  /** Champions: the battle spell carried (`SPELLS`) and the time left on its cooldown, in ms. */
+  spell: SpellId | null;
+  spellCd: number;
   /** AI champions: falling back until this game time. */
   retreatUntil: number;
   /** AI champions: the enemy champion it left its lane to gang up on, and until when. */
   gankTarget: number | null;
   gankUntil: number;
+  /** AI champions on a gank: the bush it lies in wait in (-1 for none), and until when it waits. */
+  ambushBush: number;
+  ambushUntil: number;
   /** AI champions: the camp or watchstone it went into the jungle for, and until when. */
   jungleTarget: number | null;
   jungleUntil: number;
+  /** The player's champion: how long it has got no closer to its `moveTo`, and how far it was. */
+  moveStuckMs: number;
+  lastMoveDist: number;
+  /** Outer towers: the plates still on it (`PLATING`), until they fall away. */
+  plates: number;
+  /** Champions: the bonus of their team's drake stacks (`DRAKES`), counted in with the buffs; null with none. */
+  drake: BuffDef | null;
+  /** AI champions: the point a ping of the player's sent it to, the enemy marked there, and until when. */
+  pingGoal: Vec | null;
+  pingTarget: number | null;
+  pingUntil: number;
   /** Attacks made, for a passive that hits harder every few attacks. */
   attackCount: number;
   /** Time since the champion last attacked or cast, in ms (an ambush needs a lull). */
@@ -148,12 +178,22 @@ export interface Unit {
   hasteMs: number;
   kills: number;
   deaths: number;
+  /** Champion kills this champion helped with (`ASSIST`). */
+  assists: number;
+  /** Minions and jungle monsters this champion finished, for the scoreboard. */
+  cs: number;
+  /** Champions: the enemy champions that hurt it, by id, with the game time of their last hit. */
+  hurtBy: Record<number, number>;
   /** Champions slain since this champion last died; three or more put a bounty on it (`bountyOf`). */
   killStreak: number;
   /** Vision wards carried, planted with V (`WARD.carry` at most). */
   wards: number;
   /** Time left on a recall channel, in ms; 0 when not recalling. */
   recallMs: number;
+  /** How long the current channel lasts in all (a recall's or a teleport's), for its bar. */
+  recallFull: number;
+  /** A teleport's channel: the allied tower or minion it lands by (0 for a recall home). */
+  portTo: number;
   /** When this champion last started a recall (the AI spaces its trips home). */
   lastRecallAt: number;
   /** A buy back is allowed again from this game time. */
@@ -237,7 +277,7 @@ export type SoundId =
   | 'burst' | 'bolt' | 'dash' | 'ally' | 'buff' | 'zone' | 'impact'
   | 'lastHit' | 'slain' | 'youDie' | 'streak' | 'crash' | 'nexus' | 'wardBreak'
   | 'levelUp' | 'flask' | 'blink' | 'ward' | 'recallHome' | 'respawn' | 'buyBack'
-  | 'wave' | 'watchstone' | 'growl' | 'beastSlain' | 'brute' | 'objective' | 'objectiveMissed';
+  | 'wave' | 'watchstone' | 'rune' | 'runeTaken' | 'mercs' | 'spell' | 'ping' | 'drake' | 'drakeWakes' | 'firstBlood' | 'plate' | 'nightfall' | 'daybreak' | 'comeback' | 'vote' | 'growl' | 'beastSlain' | 'brute' | 'objective' | 'objectiveMissed';
 
 /**
  * A sound raised by the rules: at a point in the world (the view plays it only where blue sees and
@@ -326,6 +366,37 @@ export interface GameState {
   /** When the AI next sends gankers, and next sends a champion into the jungle. */
   nextGank: number;
   nextJungle: number;
+  /** The rune at each of `RUNE.spots`, or null; when the next ones appear, and how many have so far. */
+  runes: ({ kind: RuneKind; x: number; y: number } | null)[];
+  nextRune: number;
+  runeRounds: number;
+  /** Whether the match's first champion kill has fallen, and whether the tower plates have fallen away. */
+  firstBlood: boolean;
+  platesGone: boolean;
+  /** Whether this is a quick match, and the lanes it plays on (all three, or `QUICK.lanes`). */
+  quick: boolean;
+  lanes: LaneId[];
+  /** Whether it is night, past the middle of dusk (for the notices). */
+  night: boolean;
+  /** The river drake's unit id, its element now, how many have woken, and each team's stacks. */
+  drake: number;
+  drakeElement: DrakeElement;
+  drakeRounds: number;
+  drakeStacks: Record<Team, DrakeElement[]>;
+  /** What hurt the player's champion in the last `RECAP.windowMs`, and the recap of its last death (null before one). */
+  playerHits: { at: number; src: number; how: HitHow; amount: number }[];
+  recap: DeathRecap | null;
+  /** When the player may next call a surrender vote, and the last vote's tally for the scoreboard. */
+  voteReadyAt: number;
+  vote: { yes: number; of: number; at: number } | null;
+  /** When the AI teams next weigh giving up, and the team that gave up, if one did. */
+  nextSurrender: number;
+  surrendered: Team | null;
+  /** Each team's net worth over the match, every `SUMMARY.every` ms and at its end (`sampleWorth`). */
+  history: { t: number; blue: number; red: number }[];
+  /** Pings on the map (the player's, and blue's AI calling a retreat), newest last, and when the player last pinged. */
+  pings: Ping[];
+  lastPingAt: number;
   /** Patches on the ground left by zone abilities. */
   zones: Zone[];
   /** Short messages for the player (the beast woke, an inhibitor fell), newest last. */
@@ -338,6 +409,34 @@ export function spawnWard(s: GameState, side: Team, x: number, y: number): Unit 
   w.expiresAt = s.time + WARD.ms;
   s.units.push(w);
   return w;
+}
+
+/** How a hit landed: a plain attack (towers, minions and the beast too), an ability by its key, or a battle spell. */
+export type HitHow = AbilityKey | 'attack' | 'spell';
+
+/** One row of the death recap: an attacker (-1 for all minions together), how it hit, and the health it took. */
+export interface RecapRow {
+  src: number;
+  kind: Unit['kind'];
+  how: HitHow;
+  amount: number;
+}
+
+/** What killed the player's champion: the killer, the damage taken over `RECAP.windowMs` and its biggest parts. */
+export interface DeathRecap {
+  at: number;
+  killer: number;
+  total: number;
+  rows: RecapRow[];
+}
+
+/** A ping on the map: its kind, where, by which team and when. */
+export interface Ping {
+  kind: PingKind;
+  x: number;
+  y: number;
+  side: Team;
+  at: number;
 }
 
 export interface Notice {
@@ -414,19 +513,35 @@ export function blankUnit(
     cdFull: { Q: 1, W: 1, E: 1, R: 1 },
     upgrades: [],
     activeCds: {},
+    spell: null,
+    spellCd: 0,
     retreatUntil: 0,
     gankTarget: null,
     gankUntil: 0,
+    ambushBush: -1,
+    ambushUntil: 0,
     jungleTarget: null,
     jungleUntil: 0,
+    moveStuckMs: 0,
+    lastMoveDist: Infinity,
+    plates: 0,
+    drake: null,
+    pingGoal: null,
+    pingTarget: null,
+    pingUntil: 0,
     attackCount: 0,
     lullMs: 0,
     hasteMs: 0,
     kills: 0,
     deaths: 0,
+    assists: 0,
+    cs: 0,
+    hurtBy: {},
     killStreak: 0,
     wards: 0,
     recallMs: 0,
+    recallFull: 0,
+    portTo: 0,
     lastRecallAt: -1e9,
     buybackReadyAt: 0,
   };
@@ -467,6 +582,7 @@ export function spawnChampion(s: GameState, def: ChampionDef, side: Team, x: num
   u.player = player;
   u.level = 1;
   u.gold = START_GOLD;
+  u.spell = aiSpellFor(def);
   if (lane) {
     u.path = pathFor(lane, side);
     u.wp = 1;
@@ -485,6 +601,10 @@ export interface MatchOptions {
   watch?: boolean;
   /** The player's mastery rank with the picked class (`masteryRank`), 0 when none. */
   mastery?: number;
+  /** The player's battle spell; its role's when not given (and always when watching). */
+  spell?: SpellId;
+  /** A quick match: three a side on one lane (`QUICK`). */
+  quick?: boolean;
 }
 
 /**
@@ -526,13 +646,35 @@ export function createGame(pick: ChampionDef, enemyDamage: number, opts: MatchOp
     contesters: [],
     nextGank: GANK.firstAt,
     nextJungle: JUNGLE.firstAt,
+    runes: RUNE.spots.map(() => null),
+    nextRune: RUNE.firstAt,
+    runeRounds: 0,
+    firstBlood: false,
+    platesGone: false,
+    quick: !!opts.quick,
+    lanes: opts.quick ? QUICK.lanes : ['top', 'mid', 'bottom'],
+    night: false,
+    drake: 0,
+    drakeElement: DRAKE_ORDER[0],
+    drakeRounds: 0,
+    drakeStacks: { blue: [], red: [] },
+    playerHits: [],
+    recap: null,
+    voteReadyAt: opts.quick ? SURRENDER.quickAt : SURRENDER.at,
+    vote: null,
+    nextSurrender: opts.quick ? SURRENDER.quickAt : SURRENDER.at,
+    surrendered: null,
+    history: [],
+    pings: [],
+    lastPingAt: -Infinity,
     zones: [],
     notices: [],
   };
 
+  const structHp = opts.quick ? QUICK.hp : 1;
   for (const team of ['blue', 'red'] as Team[]) {
     const nexus = blankUnit(s, 'nexus', team, BASE[team].x, BASE[team].y, {
-      hp: NEXUS_HP,
+      hp: NEXUS_HP * structHp,
       dmg: 0,
       armor: 0,
       range: 0,
@@ -542,9 +684,11 @@ export function createGame(pick: ChampionDef, enemyDamage: number, opts: MatchOp
     });
     s.units.push(nexus);
   }
+  openLanes(s.lanes);
   for (const t of TOWERS) {
+    if (!s.lanes.includes(t.lane)) continue;
     const tower = blankUnit(s, 'tower', t.team, t.x, t.y, {
-        hp: TOWER.hp,
+        hp: TOWER.hp * structHp,
         dmg: TOWER.dmg,
         armor: 0,
         range: TOWER.range,
@@ -553,11 +697,15 @@ export function createGame(pick: ChampionDef, enemyDamage: number, opts: MatchOp
         radius: TOWER.radius,
     });
     tower.lane = t.lane;
+    // The outer tower of a lane, the one farther from its Nexus, wears plates early on.
+    const twin = TOWERS.find((o) => o !== t && o.team === t.team && o.lane === t.lane);
+    if (twin && Math.hypot(t.x - BASE[t.team].x, t.y - BASE[t.team].y) > Math.hypot(twin.x - BASE[t.team].x, twin.y - BASE[t.team].y)) tower.plates = PLATING.count;
     s.units.push(tower);
   }
   for (const spot of INHIBITORS) {
+    if (!s.lanes.includes(spot.lane)) continue;
     const inhib = blankUnit(s, 'inhibitor', spot.team, spot.x, spot.y, {
-      hp: INHIBITOR.hp,
+      hp: INHIBITOR.hp * structHp,
       dmg: 0,
       armor: 0,
       range: 0,
@@ -611,16 +759,76 @@ export function createGame(pick: ChampionDef, enemyDamage: number, opts: MatchOp
   const blueAt = (i: number) => ({ x: BASE.blue.x + offsets[i].x, y: BASE.blue.y + offsets[i].y });
   const redAt = (i: number) => ({ x: BASE.red.x - offsets[i].x, y: BASE.red.y - offsets[i].y });
 
-  const player = spawnChampion(s, pick, 'blue', blueAt(0).x, blueAt(0).y, !opts.watch, opts.watch ? 'top' : null, pick.hero);
+  // A quick match has fewer a side, every one on its one lane.
+  const allies = opts.quick ? QUICK.allies : ALLY_LANES.length, enemies = opts.quick ? QUICK.enemies : ENEMY_LANES.length;
+  const laneOf = (lanes: LaneId[], i: number) => (opts.quick ? QUICK.lanes[i % QUICK.lanes.length] : lanes[i]);
+  const player = spawnChampion(s, pick, 'blue', blueAt(0).x, blueAt(0).y, !opts.watch, opts.watch ? laneOf(['top'], 0) : null, pick.hero);
   s.player = player.id;
-  others.slice(0, 4).forEach((def, i) => {
-    spawnChampion(s, def, 'blue', blueAt(i + 1).x, blueAt(i + 1).y, false, ALLY_LANES[i], def.hero);
+  if (opts.spell && !opts.watch) player.spell = opts.spell;
+  others.slice(0, allies).forEach((def, i) => {
+    spawnChampion(s, def, 'blue', blueAt(i + 1).x, blueAt(i + 1).y, false, laneOf(ALLY_LANES, i), def.hero);
   });
-  others.slice(4, 9).forEach((def, i) => {
-    spawnChampion(s, def, 'red', redAt(i).x, redAt(i).y, false, ENEMY_LANES[i], def.hero);
+  others.slice(allies, allies + enemies).forEach((def, i) => {
+    spawnChampion(s, def, 'red', redAt(i).x, redAt(i).y, false, laneOf(ENEMY_LANES, i), def.hero);
   });
 
+  // The mercenary camps, a band of sellswords each that fight as one.
+  for (const m of MERC.spots) {
+    let lead: Unit | null = null;
+    for (let i = 0; i < MERC.count; i++) {
+      const a = (i / MERC.count) * Math.PI * 2;
+      const u = spawnCamp(s, 'merc', m.x + Math.cos(a) * MERC.spread, m.y + Math.sin(a) * MERC.spread * 0.7, lead?.id ?? 0);
+      u.facing = Math.atan2(WORLD.h / 2 - m.y, WORLD.w / 2 - m.x);
+      lead ??= u;
+    }
+  }
+  // The river drake, asleep in its pit until `DRAKE.firstAt`.
+  const drake = spawnCamp(s, 'drake', DRAKE.x, DRAKE.y, 0);
+  drake.dead = true;
+  drake.respawnAt = DRAKE.firstAt;
+  drake.facing = Math.PI / 4;
+  s.drake = drake.id;
+
   return s;
+}
+
+/**
+ * A mercenary band won by `team`: `MERC.count` strong minions at a camp, which walk to the end of
+ * the nearest stretch of the nearest lane and on down it. Returns the lane.
+ */
+export function spawnMercs(s: GameState, team: Team, at: Vec): LaneId {
+  const lane = laneNear(at, s.lanes);
+  const full = pathFor(lane, team);
+  let seg = 0;
+  let bestD = Infinity;
+  for (let i = 0; i < full.length - 1; i++) {
+    const a = full[i], b = full[i + 1];
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const t = Math.max(0, Math.min(1, ((at.x - a.x) * dx + (at.y - a.y) * dy) / (dx * dx + dy * dy)));
+    const d = Math.hypot(at.x - (a.x + dx * t), at.y - (a.y + dy * t));
+    if (d < bestD) {
+      bestD = d;
+      seg = i;
+    }
+  }
+  const path = [{ x: at.x, y: at.y }, ...full.slice(seg + 1)];
+  for (let i = 0; i < MERC.count; i++) {
+    const m = blankUnit(s, 'minion', team, at.x + (i - 1) * 24, at.y + (i % 2) * 14, {
+      hp: MINION.hp * MERC.power,
+      dmg: MINION.dmg * MERC.power,
+      armor: 0,
+      range: MINION.range,
+      speed: MINION.speed,
+      attackMs: MINION.attackMs,
+      radius: MINION.radius,
+    });
+    m.path = path;
+    m.wp = 1;
+    m.lane = lane;
+    m.power = MERC.power;
+    s.units.push(m);
+  }
+  return lane;
 }
 
 /** A jungle monster of a kind at a spot; `group` is its pack's alpha (0 for itself). */
@@ -636,7 +844,7 @@ export function spawnCamp(s: GameState, kind: CampKind, x: number, y: number, gr
 /** Puts a wave of minions on each lane from both Nexuses. */
 export function spawnWave(s: GameState) {
   for (const team of ['blue', 'red'] as Team[]) {
-    for (const lane of ['top', 'mid', 'bottom'] as LaneId[]) {
+    for (const lane of s.lanes) {
       for (let i = 0; i < 3; i++) {
         const jitter = i * 12;
         const x = BASE[team].x + (team === 'blue' ? 1 : -1) * (30 + jitter);
@@ -679,10 +887,11 @@ export function dist(a: Vec, b: Vec): number {
 }
 
 /** The lane whose centre line runs nearest a point. */
-export function laneNear(p: Vec): LaneId {
-  let best: LaneId = 'mid';
+export function laneNear(p: Vec, lanes: LaneId[] = ['top', 'mid', 'bottom']): LaneId {
+  let best: LaneId = lanes[0];
   let bestD = Infinity;
-  for (const [id, pts] of Object.entries(LANES) as [LaneId, Vec[]][]) {
+  for (const id of lanes) {
+    const pts = LANES[id];
     for (let i = 0; i < pts.length - 1; i++) {
       const a = pts[i], b = pts[i + 1];
       const dx = b.x - a.x, dy = b.y - a.y;

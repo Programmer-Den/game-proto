@@ -4,6 +4,7 @@ import { MenuScene } from './scenes/MenuScene';
 import { GameScene } from './scenes/GameScene';
 import { setupGame } from '../../../shared/setupGame';
 import { howToPlay } from './howToPlay';
+import { trophies } from './trophies';
 import { setupScaling } from '../../../shared/scaling';
 
 const game = new Phaser.Game({
@@ -19,7 +20,7 @@ const game = new Phaser.Game({
   },
   scene: [BootScene, MenuScene, GameScene],
 });
-setupGame(game, { howToPlay });
+setupGame(game, { howToPlay, trophies });
 setupScaling(game, { fill: true });
 
 // Handy for poking at state from the browser console during development.

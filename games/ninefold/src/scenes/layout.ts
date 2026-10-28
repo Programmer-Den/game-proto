@@ -19,8 +19,8 @@ export type Layout = {
   dock?: Rect;
   /** The number pad: its top-left key's corner, key size, gap and keys per row. */
   pad: { x: number; y: number; w: number; h: number; gap: number; cols: number };
-  /** The Notes, Erase and Hint buttons, by their centres. */
-  tools: { xs: number[]; y: number; w: number; h: number };
+  /** The Notes, Erase, Undo and Hint buttons, by their centres, and their captions' size. */
+  tools: { xs: number[]; y: number; w: number; h: number; font: number };
   /** The line naming the keyboard keys, by its centre. */
   keysHint: Point;
   /** The Menu button at the panel's top right, by its centre. */
@@ -42,8 +42,8 @@ export type Layout = {
   /** The end-of-board card and its buttons, by their centres. */
   end: Rect;
   endButtons: { xs: number[]; y: number; w: number; h: number };
-  /** The cleared-floor card (top-left), its title and line, and the relic cards by their centres. */
-  relicBox: Rect & { title: number; line: number };
+  /** The cleared-floor card (top-left), its title, its line, the next floor's line, and the relic cards by their centres. */
+  relicBox: Rect & { title: number; line: number; next: number };
   relicCards: { xs: number[]; y: number; w: number; h: number };
 };
 
@@ -55,7 +55,7 @@ export const WIDE: Layout = {
   panel: WIDE_PANEL,
   rows: { kicker: 26, heading: 56, status: 100, relics: 128 },
   pad: { x: WIDE_PANEL.x + 24, y: WIDE_PANEL.y + 148, w: 104, h: 62, gap: 13, cols: 3 },
-  tools: { xs: [WIDE_PANEL.x + 76, WIDE_PANEL.x + 193, WIDE_PANEL.x + 310], y: WIDE_PANEL.y + 394, w: 104, h: 40 },
+  tools: { xs: [WIDE_PANEL.x + 64, WIDE_PANEL.x + 150, WIDE_PANEL.x + 236, WIDE_PANEL.x + 322], y: WIDE_PANEL.y + 394, w: 80, h: 40, font: 13 },
   keysHint: { x: WIDE_PANEL.x + WIDE_PANEL.w / 2, y: WIDE_PANEL.y + WIDE_PANEL.h - 22 },
   menuButton: { x: WIDE_PANEL.x + WIDE_PANEL.w - 58, y: WIDE_PANEL.y + 34, w: 92, h: 32 },
   menu: {
@@ -72,8 +72,8 @@ export const WIDE: Layout = {
   back: { x: 90, y: 50, w: 120, h: 40 },
   end: { x: 480, y: 270, w: 460, h: 280 },
   endButtons: { xs: [380, 580], y: 360, w: 170, h: 46 },
-  relicBox: { x: 120, y: 70, w: 720, h: 420, title: 112, line: 150 },
-  relicCards: { xs: [270, 480, 690], y: 300, w: 190, h: 200 },
+  relicBox: { x: 120, y: 60, w: 720, h: 440, title: 98, line: 134, next: 176 },
+  relicCards: { xs: [270, 480, 690], y: 330, w: 190, h: 200 },
 };
 
 const TALL_PANEL = { x: 20, y: 20, w: 500, h: 152 };
@@ -85,7 +85,7 @@ export const TALL: Layout = {
   rows: { kicker: 26, heading: 58, status: 104, relics: 134 },
   dock: { x: 20, y: 690, w: 500, h: 172 },
   pad: { x: 30, y: 704, w: 50, h: 70, gap: 3.75, cols: 9 },
-  tools: { xs: [109, 270, 431], y: 818, w: 150, h: 50 },
+  tools: { xs: [87, 209, 331, 453], y: 818, w: 114, h: 50, font: 15 },
   keysHint: { x: 270, y: 886 },
   menuButton: { x: TALL_PANEL.x + TALL_PANEL.w - 58, y: TALL_PANEL.y + 34, w: 92, h: 32 },
   menu: {
@@ -102,8 +102,8 @@ export const TALL: Layout = {
   back: { x: 90, y: 50, w: 120, h: 40 },
   end: { x: 270, y: 480, w: 460, h: 300 },
   endButtons: { xs: [170, 370], y: 580, w: 180, h: 50 },
-  relicBox: { x: 20, y: 240, w: 500, h: 470, title: 292, line: 334 },
-  relicCards: { xs: [107, 270, 433], y: 530, w: 156, h: 260 },
+  relicBox: { x: 20, y: 220, w: 500, h: 510, title: 266, line: 306, next: 360 },
+  relicCards: { xs: [107, 270, 433], y: 560, w: 156, h: 260 },
 };
 
 /** The layout for a view of this size: upright views get `TALL`. */

@@ -88,7 +88,7 @@ Implemented today:
   (`'move'` or `'peril'` in practice, as the festival comes at night 10 or later, and every such
   nightfall offers curses).
 - Seven upgrades (five of three levels, Firefly of two, Jar of one), bought between nights, plus
-  the Cask and Hearth cards. Only the most nights kept and the best peril multiplier persist.
+  the Cask and Hearth cards. Only the most nights kept, the best peril multiplier and the trophies persist.
 - Kinds of lantern (LK6): `LANTERN_KINDS` (`plain`, `beacon`, `candle`, `bell`), each with `oil`,
   `wick` and `pay` multipliers. `lanternKindsFor(night, count)` deals `min(LANTERN_KINDS_MAX,
   night - LANTERN_KINDS_NIGHT + 1)` special spots from `LANTERN_KINDS_NIGHT` (4), at indexes
@@ -197,6 +197,16 @@ File map (`src/`):
   its music. `audio/cues.ts`: when they play: `snapshot(s)` before `tick` and `frameSounds(before,
   s, events)` after it, `nightfallSounds`, and `updateMusic` (the part for the state, from
   `musicPart`). See Sound below.
+- `trophies/`: the game's ten trophies (`shared/trophies.ts`). `index.ts` lists them (`trophies`:
+  id, tier, icon, `hidden` for Keeper of the flame) with their texts in `trophies/i18n/` (`en.ts`,
+  `de.ts` and `en-US.ts` for "Good neighbor": the name keyed by the id, what earns it by `<id>Text`), and imports nothing else
+  from the game, since the hub loads it for its trophy shelf. `main.ts` hands `trophies` to
+  `setupGame`, which lists them on the start and pause screens. `check.ts` holds each trophy's
+  condition on the `GameState` (`EARNED`: a close call, the first night kept, a bat chased, a
+  window's call kept, a chain lit at nightfall, `NIGHT_WATCH` 5 nights kept, a district other than
+  the keep, the Great Festival, `CURSES` 4 curses taken, `KEEPER` 20 nights kept) and
+  `checkTrophies(state)`, which `GameScene.update` calls every frame after `tick`. A new trophy is
+  an entry in `index.ts`, its two texts in each language file and its condition in `EARNED`.
 - `main.ts`: creates the `Phaser.Game` (960x540, `Phaser.Scale.FIT`, `pixelArt: false`) with
   `BootScene` and `GameScene`, calls `setupGame(game)` from `shared/setupGame.ts` and
   `setupScaling(game, { fill: true })` from `shared/scaling.ts`, and in dev builds puts `game` on `window`.
@@ -340,9 +350,10 @@ State model (`GameState` in `src/game/state.ts`):
   reward, `lostHearth`, `orderMet`, `chains` lit, `festival`); `kept` counts nights that met the
   quota, `best` the most.
 
-Persistence: two `localStorage` keys: `lanternkeep-best`, the most nights kept, written when
-nightfall ends a dusk (to night or game over), and `lanternkeep-best-peril`, the best pay
-multiplier reached with curses, written when a curse is taken. The hub's settings are read from the shared
+Persistence: three `localStorage` keys: `lanternkeep-best`, the most nights kept, written when
+nightfall ends a dusk (to night or game over), `lanternkeep-best-peril`, the best pay
+multiplier reached with curses, written when a curse is taken, and `lanternkeep-trophies`, the
+trophies earned (`shared/trophies.ts`, each id with the time). The hub's settings are read from the shared
 `hub-settings` key.
 
 Randomness and timing: the only `Math.random` in the rules are `drawKind` (never on night 1, so the
@@ -437,6 +448,9 @@ scene. Under browser automation nothing plays, so the playthrough is unchanged.
   10 s after the wave, before nightfall. Slower moths, longer wicks, far lantern spots or moved
   gusts can break that; re-check the margins after changing `BASE_SPEED`, `BASE_LIGHT_MS`,
   `MOTH_KINDS`, `LANTERN_SPOTS`, `JAR`, `mothRest`, `gustsFor`, `GUST_WARN_MS` or `CLOSE_CALL`.
+- After the night panel opens it checks that `lanternkeep-trophies` holds `closeCall` and
+  `firstNight` (Just in time and First light) and nothing else; a trophy night 1 can reach in
+  another way changes that expectation.
 - It saves `playthrough-0-dusk`, `-1-first-lantern`, `-2-gust-shield`, `-3-all-lit` and
   `-4-night` screenshots; copy them into `docs/screenshots/` when the look changes.
 - `docs/screenshots/fill-ultrawide.webp` and `fill-tablet.webp` show the first dusk filling a

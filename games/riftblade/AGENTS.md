@@ -51,11 +51,46 @@ a star map between them.
   next stage's three; the Lava world last), the star map with 2-3 nodes (trader, elite
   arena, rest, event; four events), free arena picks, the escort bot. The hero, level, kit and
   allies carry over; the clock resets per planet. Victory after the Lava boss; the end screen
-  names the planet reached. Saved longest run, wins and furthest jump per hero, the heroes
+  names the planet reached. Saved longest run, wins, best rift heat and furthest jump per hero, the heroes
   unlocked and the planets charted (landed on), and the run under way: closed mid-run, the game
   opens on it again, where it stood.
 - The field is endless: the camera follows the hero, foes spawn on a ring just past the view's
   corners (whatever the screen's shape) and ones left far behind are brought round ahead again.
+- Rift heat (`heat.ts`): once a hero has won, its detail panel shows a Heat row (0 up to one
+  above the best heat won with it, at most `MAX_HEAT` = 5) and the run starts at the heat picked
+  (`state.heat`). Each heat keeps the rules below it and adds one (`HEAT_AT`): 1 elites twice as
+  often (`director`), 2 hits on the hero a quarter harder (`hurtHero`), 3 no rest node
+  (`rollNodes`), 4 a boss's frenzy below a quarter health (`Enemy.phase3`, `bossAttacks`: its shot
+  and add timers run `HEAT.frenzy` times as fast, the enraged speed `frenzySpeed` times), 5 foes
+  and bosses a quarter more health (`spawnAt`, not structures). A win records the heat in
+  `progress.heat`, opening the next. The HUD's planet tag and the end screen name the heat.
+- The Armoury (`armoury.ts`): a run's end banks its unspent credits plus `SALVAGE_PER_WORLD` per
+  world reached (`salvage`, into `progress.bank`, shown on the end screen); once anything is banked
+  the hero select shows an Armoury button (top left) that opens `armouryPanel` over it
+  (`GameScene.armouryOpen`). Five pieces (`ARMOURY`, ranks priced by `prices`): Field Rations
+  (`maxHpMod`), War Chest (starting credits), Lumen Lens (pickup radius in `statsOf`), Field
+  Briefing (a fourth card at the first level-up, `state.briefed` in `nextPick`, at most four) and
+  Spare Reroll (`state.freeReroll`, set when a trader opens, `rerollPrice`). `startRun` copies the
+  ranks into `state.perks` and applies them.
+- The weekly run (`weekly.ts`): once a run has ended (`progress.bestMs`), the hero select shows a
+  Weekly run button (top right) that opens `weeklyPanel` (`GameScene.weeklyOpen`). `weekOf(now)`
+  numbers the week (Mondays 00:00 UTC from 2024), `weeklyOf(week, open heroes)` picks its hero and
+  two of six `MUTATORS` with its own generator. The run (`state.week`, `state.mutators`) is fought
+  at heat 0 without the Armoury; `reseed` swaps `Math.random` for a seeded one at the start, on the
+  space map's choice (`chooseWorld`), at each new planet (`nextPlanet`) and on resume, and
+  `unseed` puts the page's own back at the run's end, Run again and any other run's start. Mutator
+  effects (`MUT`): Glass Cannon and Overcharged in `statsOf` and `startRun`, Swarm in `director`
+  and `spawnAt`, Haste in `statsOf` and `spawnAt`, Vampire in `kill` (and no regen), Fragile Foes
+  in `spawnAt` and `hurtHero`. `recordWeekly` keeps the week's furthest jump and win in
+  `progress.weekly`; the first win of a week banks `WEEKLY_BONUS`.
+- Trophies (`src/trophies/`, see `shared/trophies.ts`): ten, listed with `trophySet` in
+  `trophies/index.ts` (handed to `setupGame`), texts in `trophies/i18n/`. `trophies/check.ts`'s
+  `checkTrophies(state, progress)` runs every frame from `GameScene.update` and awards each one whose
+  condition holds (the first call of a page quietly): `firstBoss` (a stage past the Dune world or a
+  boss down, or a saved furthest jump of 2), `capstone` (one in the run), `newHero` (two heroes
+  open), `firstPiece` (any Armoury rank), `crusade` (any win), `weekly` (`progress.weekly.won`),
+  `heat3` and `heat5` (best heat won), `armouryFull` (every rank bought) and `allHeroes` (all twelve
+  open, hidden). The playthrough's first minute earns none.
 - Sound effects and music (see Sound below).
 - Not built yet: Watch AI.
 - No TODOs or FIXMEs in the code.
@@ -65,7 +100,7 @@ a star map between them.
 ### File map
 
 - `src/main.ts`: creates the `Phaser.Game` (960x540, `Scale.FIT`) with `BootScene` then
-  `GameScene`, calls `setupGame(game, { howToPlay })` and `setupScaling(game, { fill: true })` (the
+  `GameScene`, calls `setupGame(game, { howToPlay, trophies })` and `setupScaling(game, { fill: true })` (the
   view takes the screen's shape, 960x540 at the smallest, see Layout below), and puts `game` on
   `window` in dev builds.
 - `src/howToPlay.ts`: the How to play text in British English (which US English shares) and
@@ -77,6 +112,9 @@ a star map between them.
   in `heroes.ts`, `upgrades.ts`, `planets.ts` and the events is a `TextKey`, and every text on screen goes through `t` (in `sim.ts`, `blades.ts` and `squad.ts` it
   is imported as `tr`, since `t` is a common local name there). Floating texts are translated when
   they pop.
+- `src/trophies/index.ts` (`trophies`, imports nothing from the game so the hub can load it),
+  `src/trophies/check.ts` (`checkTrophies`, `EARNED`) and `src/trophies/i18n/` (`en.ts`, `de.ts`,
+  `en-US.ts` for Armory).
 - `src/game/heroes.ts`: `HeroId`, `HERO_IDS` (select order), `PoolId`, `HEROES` (weapon numbers,
   aim mode, `pools`, `extra` pool skills, signature, paths, blurb, `short` name for the Fight
   button, the `pathKind` line of their path cards, `r`, `armour` and `locked`)
@@ -102,6 +140,15 @@ a star map between them.
   The first four planets keep their indices 0 to 3 (Dune, Swamp, Ice, Lava); the later ones follow
   (4 Spore, 5 Scrap, 6 Crystal, 7 Storm), so tables by planet index (`WORLD_OBJECTIVES`,
   `PLANET_SONGS`) list them in that order.
+- `src/game/heat.ts`: rift heat: `MAX_HEAT`, `HEAT` (the rules' numbers), `HEAT_AT` (the heat
+  each rule comes in at), `HEAT_RULES` (each heat's text key), `hot(heat, rule)` and `heatOpen(best)`
+  (the highest heat open to a hero).
+- `src/game/armoury.ts`: the Armoury: `ArmouryId`, `ARMOURY` (name, text, rank prices),
+  `ARMOURY_IDS`, `PERK` (each rank's numbers), `salvage` and `SALVAGE_PER_WORLD`, `perkAmount` (a
+  card's `{n}`) and `nextPrice`. Imports nothing from the game but types.
+- `src/game/weekly.ts`: the weekly run: `MutatorId`, `MUTATORS`, `MUTATOR_IDS`, `MUT`,
+  `WEEKLY_BONUS`, `weekOf`, `weekSeed`, `seeded` (mulberry32), `weeklyOf`, `reseed` and `unseed`.
+  Imports nothing from the game but types.
 - `src/game/state.ts`: `GameState` and its parts (`Hero`, `Enemy`, `Bullet`, `Shard`, `Blast`,
   `Bomb`, `Fire`, `Ally`, `Pickup`, `Hazard`, `Pop`, `EventState`), the balance numbers (`RUN_MS`,
   `MAX_ENEMIES`, `MAX_SHARDS`, `ENEMY` for every foe kind, `ELITE`, `ROLLER`, `RATS`, `TOAD`,
@@ -178,7 +225,7 @@ a star map between them.
   events (`rollEvent`, `chooseEvent`) and `nextPlanet` (to `state.next`, `stage` + 1, onto
   `state.route`).
 - `src/game/save.ts`: `SAVE_KEY`, `loadProgress`, `saveProgress`, `recordRun`, `recordCharted`, `recordUnlocks`,
-  `isUnlocked` (TR-9, a deed done, a hero the save shows as played, or the old world deeds) and
+  `buyArmoury`, `recordWeekly`, `isUnlocked` ((TR-9, a deed done, a hero the save shows as played, or the old world deeds) and
   `unlockedHeroes`; the run under way: `RUN_KEY`, `isResumable`, `saveRun`, `loadRun` and
   `clearRun`.
 - `src/audio/music.ts`: the songs (`PLANET_SONGS`, `MENU_SONG`, `STINGS`); `src/audio/sfx.ts`: the
@@ -212,7 +259,8 @@ a star map between them.
 - `src/scenes/layout.ts`: `VIEW` (the designed 960x540), `SCREEN` (the real view), `FRAME` (where
   the designed rectangle sits in it), `fitLayout`, `CENTER`, HUD places (`XP_BAR`, `HP_BAR`, `KIT`, `TIMER`,
   `LEVEL`, `PLANET_TAG`, `CREDITS_TAG`, `BOSS_BAR`, `OBJECTIVE_HUD`, `SIG_BUTTON`, `STICK`), card rectangles
-  (`heroCardRect` for the 6x2 grid, `levelCardRect` with `LEVEL_CARD4` for four cards, `UNLOCK` and
+  (`heroCardRect` for the 6x2 grid, `HEAT_ROW`, `HEAT_DOWN` and `HEAT_UP` for the Heat row, `ARMOURY_BUTTON`, `armouryCardRect` and
+  `BACK` for the Armoury, `WEEKLY_BUTTON`, `MUTATOR_CARD`, `WEEKLY_START` and `WEEKLY_BACK` for the weekly run, `levelCardRect` with `LEVEL_CARD4` for four cards, `UNLOCK` and
   `CONTINUE` for the new hero panel, `CHART`, `chartSpot` / `chartRect` (the space map), `mapNodeRect` / `mapNodeSpot`, `tradeCardRect`, `REROLL`,
   `LEAVE`, `eventOptionRect`, `AGAIN`), `DEPTH`, `inside`.
 - `src/scenes/objectiveArt.ts`: the objectives and power-ups, drawn in code on the graphics
@@ -231,7 +279,8 @@ a star map between them.
 - `src/ui/panels.ts`: `Panel` (HUD objects plus tappable `spots`) and the builders, each filling a
   `Panel` it is handed: `heroSelect` (12 cards from
   `heroCardRect`, keyed by `heroKeyLabel`, and the detail panel `HERO_DETAIL` with the `FIGHT`
-  button; a locked hero shows only `rb-locked`), `unlockPanel` (the new hero, with a `continue`
+  button, and the Heat row (`heatRow`) once the hero has won, the detail lines shrinking to end
+  above it; a locked hero shows only `rb-locked`), `armouryPanel` (the Armoury, see Current state), `weeklyPanel` (the weekly run), `unlockPanel` (the new hero, with a `continue`
   spot), `levelUp` (also the arena's and an objective's reward, titled by `state.after`; three or four cards whose lines flow down; pool labels
   from `POOL_NAMES`, `linkIcon` for crossovers), `spaceMap` (the four jumps as columns, lanes, the
   route lit, the next jump's planets as cards with spot ids = `PlanetId`; a faction shows once
@@ -295,7 +344,9 @@ draws it. A second touch pointer (`addPointer(1)`) lets the other thumb tap the 
 `SIG_BUTTON` (or Space) queues the signature for the next frame of the sim; a press it cannot take
 (during a level-up or a panel) is dropped. Panel cards are hit-tested with `viewPoint` against
 `panel.spots`. On the hero select, tapping a card (or 1-9, 0, then - and = for the last two) sets
-`GameScene.chosen` and tapping Fight (or Enter) starts the run, if the hero is unlocked. At a
+`GameScene.chosen` and tapping Fight (or Enter) starts the run, if the hero is unlocked, at the
+heat `heatFor` gives (`heatPick`, else the highest open); the Heat row's arrows, Left / Right and
+A / D step it. At a
 level-up 1-4 pick a card (as many as there are); elsewhere 1/2/3 pick (a planet on the space
 map, a node, an offer or an answer), 4 rerolls at the trader, Enter leaves the trader or runs again. While `GameScene.unlocking`
 holds heroes just unlocked, `frame` is not run, the new hero panel shows, and Continue, Enter or
@@ -307,15 +358,16 @@ The foes and Triad-77's units are called bots everywhere (texts, ids, textures s
 `state.bots`); they went by another name before, but no save key or stored id ever held it, so old
 saves load unchanged.
 
-- `riftblade-progress`: `{ bestMs, wins: { [heroId]: count }, furthest: { [heroId]: jump 1-4 },
+- `riftblade-progress`: `{ bestMs, wins: { [heroId]: count }, heat: { [heroId]: best heat won 0-5 }, bank: credits, armoury: { [ArmouryId]: rank }, weekly: { week, best, won } | null, furthest: { [heroId]: jump 1-4 },
   unlocked: HeroId[], charted: PlanetId[] }`. `bestMs` is the whole run's time (`runMs`). Older saves without
-  `furthest` load with `{}`, without `unlocked` or `charted` with `[]`; unknown ids are dropped, and
+  `furthest` load with `{}`, without `bank` or `armoury` with 0 and `{}` (unknown pieces dropped), without `weekly` with null, without `heat` with heat 0 for every hero with a win, without `unlocked` or `charted` with `[]`; unknown ids are dropped, and
   so are `wins` and `furthest` values that are not finite numbers.
   `charted` gets a planet the first frame a run is on it (`recordCharted` in `GameScene.update`) and
   the route at the run's end (`recordRun`). A hero with a
   `furthest` world is open (so saves from when Rook and Bram were free keep them), and the deeds
   of reaching a world (Kael, Veyl, Joren) also count from `furthest`. `GameScene` saves new
   `state.deeds` with `recordUnlocks` as they happen.
+- `riftblade-trophies`: the trophies earned (`shared/trophies.ts`), each id with the time.
 - `riftblade-run`: the run under way (left out of progress codes by the hub's `fileOnly`, so a
   code moves only `riftblade-progress` and the trophies; files carry it), the whole `GameState` as JSON (it is plain data; `Infinity`,
   as in `nextElite` and `objectiveAt`, is stored as the text `"Infinity"`). `loadRun` lays it over
@@ -390,10 +442,17 @@ free of audio) or from the scene's input handler.
   under way, `objectivesDone` and `powerUps` count them).
 - `.panel.spots`: the cards of the panel showing (moved into `FRAME` on a wider or taller view; `id` is a `HeroId`, `fight`, an upgrade id, a
   node kind, a `PlanetId` on the space map, `option-0` / `option-1`, `sold`, `reroll`, `leave`, `again` or `continue`), in game
-  pixels. A locked hero card has `locked: true`. `.chosen` is the hero picked on the select screen
-  (TR-9 at first), `.unlocking` the heroes waiting to be shown.
+  pixels. A locked hero card has `locked: true`; `heat-down` and `heat-up` are the Heat row's
+  arrows (only once the chosen hero has won), `armoury` the Armoury button (once credits are
+  banked), `weekly` the Weekly run button (once a run has ended); in the Armoury (`.armouryOpen`)
+  the spots are the `ArmouryId`s and `back`, in the weekly panel (`.weeklyOpen`) `start` and
+  `back`. `state.week` and `state.mutators` are the weekly run's. `.chosen` is the hero picked on the select screen
+  (TR-9 at first), `.unlocking` the heroes waiting to be shown. `state.heat` is the run's heat.
 - The hero is always at `CENTER` (480, 270 at 960x540: the middle of the view) on screen;
   `SIG_BUTTON` is at (890, 470) at 960x540, 70 px in from the bottom right corner.
+- The Heat row and the Armoury and Weekly run buttons, like every new select-screen element, only shows once a hero has won: a Phaser
+  text made at boot shifts the seeded sequence (see Gotchas), so a fresh save's select screen
+  must make the same texts as before (a fresh save has no wins, nothing banked and no run ended).
 - The playthrough (`e2e/playthrough.spec.ts`) checks the twelve cards (all but TR-9 locked on a
   fresh save), waits out Phaser's start-up easing on the select screen (140 frames; its first 120
   steps are cut short, so a run started during them would play differently depending on load
@@ -451,6 +510,17 @@ free of audio) or from the scene's input handler.
   an `ENEMY` row and `drawStructure`), whether the HUD shows seconds (`timed` in
   `drawObjectiveHud`) and whether the arrow points at it (`objectiveTarget`), its texts
   `obj_<id>` and `obj_<id>_hint` in `i18n/`, and its README row.
+- **A new heat rule**: add it to `HEAT_AT` (and its numbers to `HEAT`), check it with
+  `hot(s.heat, rule)` where it acts, give its heat a `heatN` text (`HEAT_RULES`) and raise
+  `MAX_HEAT` if it adds a level, then the README's heat table and How to play.
+- **A new Armoury piece**: add it to `ArmouryId` and `ARMOURY` (prices), its numbers to `PERK`
+  and `perkAmount`, apply `s.perks.<id>` where it acts (`startRun`, `statsOf` or the voyage), its
+  `arm_<id>` and `arm_<id>_text` texts, and the README row. The panel lays out up to five cards.
+- **A new mutator**: add it to `MutatorId` and `MUTATORS`, its numbers to `MUT`, check
+  `s.mutators.includes(id)` where it acts, its `mut_<id>` and `mut_<id>_text` texts and the
+  README row. Adding one changes which mutators every later week picks.
+- **A new trophy**: add it to the list in `trophies/index.ts` (6 to 10 in all), its condition to
+  `EARNED` in `trophies/check.ts`, its name and `<id>Text` in `trophies/i18n/`, and the README row.
 - **A new power-up**: add it to `PowerUp`, `POWER_UPS` and `POWER.weights`, its effect in
   `powerUp` (sim.ts), its sign in `drawPowerUp` and `POWER_COLORS`, its `pu_<kind>` text, and the
   README row.

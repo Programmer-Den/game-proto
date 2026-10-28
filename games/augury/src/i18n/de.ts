@@ -27,6 +27,7 @@ const de: Translation<typeof en> = {
   runsLine: { one: '{n} Durchgang gespielt', other: '{n} Durchgänge gespielt' },
   back: 'Zurück',
   leave: 'Beenden',
+  resume: 'Weiter: {mode}',
 
   nonogramName: 'Bildraster',
   nonogramRule: 'Fülle Felder so, dass jede Zeile und Spalte ihre Blöcke in Reihenfolge zeigt. Nochmal tippen markiert ein Feld als leer.',
@@ -60,6 +61,19 @@ const de: Translation<typeof en> = {
   undo: 'Zurücknehmen',
   hint: 'Tipp',
   hintButton: 'Tipp · {n}',
+  hintFree: 'Tipp · gratis',
+  omenOffer: '{name} wagen ×2',
+  omenTaken: '{name} ×2',
+  hasteName: 'Eile',
+  hasteText: 'halbe Zeit',
+  silenceName: 'Stille',
+  silenceText: 'ohne Zurück und Tipps',
+  perilName: 'Gefahr',
+  perilText: 'Verlust kostet zwei Herzen',
+  omenLine: 'Omen ×2',
+  bossPart: 'Boss {n} von 2',
+  bossWith: 'Boss, dann {name}',
+  bossBeaten: 'Boss besiegt',
   skip: 'Überspringen',
   newPuzzle: 'Neues Rätsel',
   clear: 'Leeren',
@@ -90,6 +104,7 @@ const de: Translation<typeof en> = {
   res_skip: 'Übersprungen',
   pointsLine: '+{n} Punkte',
   heartLost: 'Ein Herz ist verloren',
+  heartsLost: '{n} Herzen sind verloren',
   timeLost: '{n} Sekunden weniger auf der Uhr',
   timeLine: 'Zeit {time}',
   nextPuzzle: 'Nächstes Rätsel',
@@ -105,6 +120,24 @@ const de: Translation<typeof en> = {
   hourglassText: 'Ein Viertel mehr Zeit für jedes Rätsel.',
   crystalName: 'Kristallkugel',
   crystalText: 'Eine Karte mehr zur Wahl bei jeder Kartenwahl.',
+  inkwellName: 'Tintenfass',
+  inkwellText: 'Bildraster: je ein Gratis-Tipp und anderthalbfache Punkte.',
+  bridgewrightName: 'Brückenbauer',
+  bridgewrightText: 'Brücken: je ein Gratis-Tipp und anderthalbfache Punkte.',
+  cipherName: 'Chiffrierrad',
+  cipherText: 'Codeknacker: je ein Gratis-Tipp und anderthalbfache Punkte.',
+  abacusName: 'Abakus',
+  abacusText: 'Rechenkäfige: je ein Gratis-Tipp und anderthalbfache Punkte.',
+  tallyName: 'Zählstein',
+  tallyText: 'Kreuzsummen: je ein Gratis-Tipp und anderthalbfache Punkte.',
+  gearName: 'Geöltes Zahnrad',
+  gearText: 'Freischieben: je ein Gratis-Tipp und anderthalbfache Punkte.',
+  mirrorName: 'Spiegelmünze',
+  mirrorText: 'Lichterwende: je ein Gratis-Tipp und anderthalbfache Punkte.',
+  spoolName: 'Silberspule',
+  spoolText: 'Pfadfinder: je ein Gratis-Tipp und anderthalbfache Punkte.',
+  shellName: 'Echomuschel',
+  shellText: 'Gedächtnisecho: Karten wechseln langsamer, anderthalbfache Punkte.',
 
   handoverTitle: 'Spieler 2, du bist dran',
   handoverLine: 'Spieler 1 brauchte {time} und löste {n} von {of}. Gib das Gerät weiter.',
@@ -146,6 +179,6 @@ const de: Translation<typeof en> = {
   echoSaidDiff: 'Deine Antwort: anders',
 };
 
-export const keepEnglish: (keyof typeof en)[] = ['title', 'blitzName', 'level1'];
+export const keepEnglish: (keyof typeof en)[] = ['title', 'blitzName', 'level1', 'omenTaken', 'omenLine'];
 
 export default de;

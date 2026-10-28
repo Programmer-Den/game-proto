@@ -7,8 +7,8 @@
 import Phaser from 'phaser';
 import { sharpRes } from '../../../../shared/scaling';
 import { INK, INK_WIDTH, Model, render } from './lowpoly';
-import { POSES, PoseName, TeamName, beastModel, bruteModel, inhibitorModel, boarModel, championModel, coinModel, minionModel, nexusModel, rubbleModel, towerModel, watchstoneModel, wolfModel } from './models';
-import { CHAMPIONS } from '../game/data';
+import { POSES, PoseName, TeamName, beastModel, bruteModel, drakeModel, inhibitorModel, boarModel, championModel, coinModel, mercModel, minionModel, nexusModel, rubbleModel, towerModel, watchstoneModel, wolfModel } from './models';
+import { CHAMPIONS, type DrakeElement } from '../game/data';
 
 /**
  * Canvas pixels per game pixel in the sheets; sprites are drawn at 1 / RES scale. 2 on a screen that
@@ -28,6 +28,7 @@ export interface SheetInfo {
 
 export const CHAMP_CELL = { w: 76, h: 98, footY: 80 };
 export const MINION_CELL = { w: 48, h: 56, footY: 42 };
+export const MERC_CELL = { w: 58, h: 68, footY: 52 };
 export const BOAR_CELL = { w: 84, h: 72, footY: 44 };
 export const WOLF_CELL = { w: 80, h: 66, footY: 44 };
 export const BRUTE_CELL = { w: 104, h: 112, footY: 84 };
@@ -36,6 +37,7 @@ export const TOWER_CELL = { w: 76, h: 124, footY: 104 };
 export const RUBBLE_CELL = { w: 76, h: 56, footY: 36 };
 export const NEXUS_CELL = { w: 120, h: 134, footY: 100 };
 export const BEAST_CELL = { w: 170, h: 150, footY: 104 };
+export const DRAKE_CELL = { w: 120, h: 110, footY: 74 };
 export const INHIB_CELL = { w: 72, h: 84, footY: 64 };
 export const COIN_CELL = { w: 26, h: 26, footY: 13 };
 
@@ -146,12 +148,15 @@ export const watchKey = (side: TeamName | 'neutral') => `lb-watch-${side}`;
 export const minionKey = (team: TeamName) => `lb-minion-${team}`;
 export const MINION_OUTLINE = 'lb-minion-outline';
 export const BOAR = 'lb-boar';
+export const MERC_KEY = 'lb-merc';
 export const towerKey = (team: TeamName) => `lb-tower-${team}`;
 export const nexusKey = (team: TeamName) => `lb-nexus-${team}`;
 export const RUBBLE = 'lb-rubble';
 export const BEAST_KEY = 'lb-beast';
 /** The elder beast's sheet, baked the first time it appears (`bakeElder`). */
 export const ELDER_KEY = 'lb-beast-elder';
+/** A river drake's sheet by element, baked the first time a drake of it appears (`bakeDrake`). */
+export const drakeKey = (element: DrakeElement) => `lb-drake-${element}`;
 export const inhibKey = (team: TeamName) => `lb-inhib-${team}`;
 export const COIN = 'lb-coin';
 
@@ -176,6 +181,7 @@ export function bakeUnits(scene: Phaser.Scene): number {
   }
   for (const side of ['neutral', ...TEAMS] as const) bake(scene, watchKey(side), WATCH_CELL, [{ name: 'idle', model: () => watchstoneModel(side), yaw: 0.3 }]);
   bake(scene, BOAR, BOAR_CELL, movingCells(boarModel));
+  bake(scene, MERC_KEY, MERC_CELL, movingCells(mercModel));
   bake(scene, WOLF, WOLF_CELL, movingCells(wolfModel));
   for (const kind of ['ember', 'moss'] as const) bake(scene, bruteKey(kind), BRUTE_CELL, movingCells((p) => bruteModel(kind, p)));
   bake(scene, BEAST_KEY, BEAST_CELL, movingCells(beastModel));
@@ -189,6 +195,14 @@ export function bakeElder(scene: Phaser.Scene): number {
   if (scene.textures.exists(ELDER_KEY)) return 0;
   const t0 = performance.now();
   bake(scene, ELDER_KEY, BEAST_CELL, movingCells((p) => beastModel(p, true)));
+  return performance.now() - t0;
+}
+
+/** Bakes a river drake's sheet if it is not baked yet. Returns the time it took, in ms. */
+export function bakeDrake(scene: Phaser.Scene, element: DrakeElement): number {
+  if (scene.textures.exists(drakeKey(element))) return 0;
+  const t0 = performance.now();
+  bake(scene, drakeKey(element), DRAKE_CELL, movingCells((p) => drakeModel(element, p)));
   return performance.now() - t0;
 }
 

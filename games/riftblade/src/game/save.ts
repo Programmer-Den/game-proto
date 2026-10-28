@@ -3,6 +3,9 @@ import { HEROES, HERO_IDS, type HeroId } from './heroes';
 import { LAST_STAGE, NODE_INFO, PLANETS } from './planets';
 import { freshHero, freshState, type GameState, type Phase } from './state';
 import { UPGRADES } from './upgrades';
+import { MAX_HEAT } from './heat';
+import { ARMOURY_IDS, nextPrice, type ArmouryId } from './armoury';
+import { MUTATOR_IDS, WEEKLY_BONUS } from './weekly';
 
 export const SAVE_KEY = 'riftblade-progress';
 /** The run under way, so closing the game mid-run and opening it again carries on with it. */
@@ -19,6 +22,16 @@ export interface Progress {
   charted: string[];
   /** Heroes whose deed is done. Saves from before the knights have none. */
   unlocked: HeroId[];
+  /**
+   * The highest rift heat won at (0 to `MAX_HEAT`), by hero: the next one up is open. Saves from
+   * before rift heat count a hero's wins as heat 0.
+   */
+  heat: Partial<Record<HeroId, number>>;
+  /** Credits banked for the Armoury, and the ranks bought there. Saves from before it have none. */
+  bank: number;
+  armoury: Partial<Record<ArmouryId, number>>;
+  /** The latest week a weekly run was played: its number, the furthest jump (1 to 4) and whether it was won. */
+  weekly: { week: number; best: number; won: boolean } | null;
 }
 
 /** A saved count per hero, keeping only known heroes with a finite number. */
@@ -34,15 +47,35 @@ const perHero = (v: unknown): Partial<Record<HeroId, number>> => {
 export function loadProgress(): Progress {
   try {
     const saved = JSON.parse(localStorage.getItem(SAVE_KEY) ?? '{}') ?? {};
+    const wins = perHero(saved.wins);
+    const heat = perHero(saved.heat);
+    for (const id of HERO_IDS) {
+      if (heat[id] !== undefined) heat[id] = Math.max(0, Math.min(MAX_HEAT, Math.floor(heat[id]!)));
+      else if ((wins[id] ?? 0) > 0) heat[id] = 0;
+    }
+    const armoury: Partial<Record<ArmouryId, number>> = {};
+    if (typeof saved.armoury === 'object' && saved.armoury) {
+      for (const id of ARMOURY_IDS) {
+        const n = saved.armoury[id];
+        if (Number.isInteger(n) && n > 0) armoury[id] = n;
+      }
+    }
     return {
       bestMs: typeof saved.bestMs === 'number' ? saved.bestMs : 0,
-      wins: perHero(saved.wins),
+      wins,
+      heat,
+      weekly:
+        typeof saved.weekly === 'object' && saved.weekly && Number.isInteger(saved.weekly.week) && typeof saved.weekly.best === 'number'
+          ? { week: saved.weekly.week, best: saved.weekly.best, won: saved.weekly.won === true }
+          : null,
+      bank: typeof saved.bank === 'number' && Number.isFinite(saved.bank) ? Math.max(0, Math.floor(saved.bank)) : 0,
+      armoury,
       furthest: perHero(saved.furthest),
       unlocked: Array.isArray(saved.unlocked) ? saved.unlocked.filter((id: unknown) => HERO_IDS.includes(id as HeroId)) : [],
       charted: Array.isArray(saved.charted) ? saved.charted.filter((id: unknown) => typeof id === 'string') : [],
     };
   } catch {
-    return { bestMs: 0, wins: {}, furthest: {}, unlocked: [], charted: [] };
+    return { bestMs: 0, wins: {}, heat: {}, bank: 0, armoury: {}, weekly: null, furthest: {}, unlocked: [], charted: [] };
   }
 }
 
@@ -55,15 +88,46 @@ export function saveProgress(progress: Progress) {
 }
 
 /**
- * Records a finished run (`stage` is the jump reached, 1 to 4, `route` the planets landed on) and
- * returns the updated progress.
+ * Records a finished run (`stage` is the jump reached, 1 to 4, `route` the planets landed on,
+ * `heat` its rift heat, `banked` the credits it adds to the Armoury's bank) and returns the
+ * updated progress.
  */
-export function recordRun(hero: HeroId, ms: number, won: boolean, stage: number, route: readonly string[] = []): Progress {
+export function recordRun(hero: HeroId, ms: number, won: boolean, stage: number, route: readonly string[] = [], heat = 0, banked = 0): Progress {
   const progress = loadProgress();
+  progress.bank += banked;
   progress.bestMs = Math.max(progress.bestMs, ms);
-  if (won) progress.wins[hero] = (progress.wins[hero] ?? 0) + 1;
+  if (won) {
+    progress.wins[hero] = (progress.wins[hero] ?? 0) + 1;
+    progress.heat[hero] = Math.max(progress.heat[hero] ?? 0, heat);
+  }
   progress.furthest[hero] = Math.max(progress.furthest[hero] ?? 0, stage);
   for (const id of route) if (!progress.charted.includes(id)) progress.charted.push(id);
+  saveProgress(progress);
+  return progress;
+}
+
+/**
+ * Records a weekly run's end (`stage` the jump reached, 1 to 4); its first win of the week banks
+ * `WEEKLY_BONUS`. Returns the updated progress and the bonus banked.
+ */
+export function recordWeekly(week: number, stage: number, won: boolean): { progress: Progress; bonus: number } {
+  const progress = loadProgress();
+  const before = progress.weekly?.week === week ? progress.weekly : { week, best: 0, won: false };
+  const bonus = won && !before.won ? WEEKLY_BONUS : 0;
+  progress.weekly = { week, best: Math.max(before.best, stage), won: before.won || won };
+  progress.bank += bonus;
+  saveProgress(progress);
+  return { progress, bonus };
+}
+
+/** Buys the next rank of an Armoury piece with banked credits; the updated progress, or null if it can't. */
+export function buyArmoury(id: ArmouryId): Progress | null {
+  const progress = loadProgress();
+  const rank = progress.armoury[id] ?? 0;
+  const price = nextPrice(id, rank);
+  if (price === null || progress.bank < price) return null;
+  progress.bank -= price;
+  progress.armoury[id] = rank + 1;
   saveProgress(progress);
   return progress;
 }
@@ -144,6 +208,8 @@ export function loadRun(): GameState | null {
     // The panels read these as they open, so a run they would throw on is dropped here.
     const known = (id: unknown) => typeof id === 'string' && id in UPGRADES;
     if (!Number.isInteger(s.stage) || s.stage < 0 || s.stage > LAST_STAGE) return null;
+    if (!Number.isInteger(s.heat) || s.heat < 0 || s.heat > MAX_HEAT) return null;
+    if (!Number.isInteger(s.week) || !Array.isArray(s.mutators) || !s.mutators.every((m) => MUTATOR_IDS.includes(m))) return null;
     if (s.next !== -1 && !PLANETS[s.next]) return null;
     if (!Array.isArray(s.nodes) || !s.nodes.every((k) => k in NODE_INFO)) return null;
     if (!Array.isArray(s.offers) || !s.offers.every((id) => id === null || known(id))) return null;

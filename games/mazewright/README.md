@@ -23,11 +23,12 @@ beetle already on the lawn) is refused with an orange no-entry ring.
 | Sell button, or S | Sell mode: every tower you tap or drag over is sold at once (for its whole price if it was planted since the last wave, else 70%), to clear a lot of the maze quickly; tap Sell again to go back |
 | A tower tool on a hedge | Plant the tower in the hedge's place, for its cost less what the hedge sells for (the route doesn't change) |
 | Start wave, or Space | Send the next wave; once the last one is all out, send the next early for 5 gold |
-| Way of play (garden picker, top left) | Classic, Swarm, Endless or Sandbox, for every garden |
+| Way of play (garden picker, top left) | Classic, Challenge, Swarm, Endless or Sandbox, for every garden |
 | Wave timer / Calm (garden picker) | After wave 1 the next wave comes by itself 20 seconds after the last is all out; Calm waits for Start wave |
 | Speed button, or F | Play at double speed |
 | One gardener / Two gardeners (garden picker) | Play alone, or two on one screen, each on their own half of the lawn |
 | Watch (on a garden card) | Watch your latest win in that garden again |
+| ▶ Wave (on a garden card) | Go on with the game you left there, from its last break between waves |
 | Gardens | Back to the garden picker |
 
 ![Upgrade mode: the Upgrade and Sell buttons after the tools, and a gold mark on each tower that can be upgraded](docs/screenshots/modes.webp)
@@ -63,7 +64,7 @@ and summer, autumn and winter open once 4, 10 and 18 stars are won across all ga
 | Spring | **Meadow** (open lawn), **Orchard** (rows of rocks), **Millpond** (a pond, a burrow at the top and the cottage in the corner) |
 | Summer | **Brook** (a brook with two fords and banks), **Warren** (three burrows), **Gravel Walk** (a path garden) |
 | Autumn | **Hillside** (a raised terrace), **Crossroads** (the cottage in the middle, four burrows), **Leaf Walk** (a winding path garden) |
-| Winter | **Ice Pond** (a frozen pond, three burrows), **Last Cabbage** (one cabbage, six burrows), **Snow Path** (a path garden with banks) |
+| Winter | **Ice Pond** (a frozen pond, three burrows), **Last Cabbage** (one cabbage, six burrows, 130 gold to start), **Snow Path** (a path garden with banks) |
 
 Rocks never move and nothing is planted on them. **Water** is the same for walkers, but moths fly
 over it and a sunglass beam shines across it. A tower on a raised **bank** (a lighter tile with a
@@ -113,6 +114,14 @@ that plays it back: every hedge, tower, upgrade and wave as you played it, at 2x
 the speed button (F). Nothing can be planted while it plays, and it changes no records or seeds.
 
 ![Watching a win on the Meadow again](docs/screenshots/replay.webp)
+
+**Going on later.** A game in play is saved in every break between waves. Close the page, or tap
+Gardens, and its garden's card gets a gold ▶ Wave button that takes you back to that break, with
+the maze, gold, cabbages and wave timer as they were. A wave left half-played starts again from the
+break before it. Tapping the card itself starts that garden afresh and drops the saved game, as does
+starting any other garden.
+
+![The Meadow's card with the button to go on with a game at wave 2](docs/screenshots/resume.webp)
 
 ### Towers
 
@@ -230,9 +239,27 @@ played, and is kept for the next game:
 | Way | |
 | --- | --- |
 | Classic | The 20 waves. A win earns one to three stars by cabbages kept (three with 90%, two with half), and the garden keeps its most stars and fastest win |
+| Challenge | The 20 waves with the garden's own pouch of two to four towers (lent even before the shed sells them), named on its card. A win earns the garden's ✦, which counts like a star for opening seasons, and 10 more seeds |
 | Swarm | The 20 waves, each sent the moment the last is all out, for a quarter more gold; won without losing a cabbage, it earns a fourth star |
 | Endless | Waves never stop: after wave 20, waves 11 to 20 come round again, bigger each time. The garden keeps the most waves held |
 | Sandbox | 10,000 gold, towers grow at once and waves never stop, with no records: a place to try mazes |
+
+![The picker in Challenge: each card names its garden's pouch, and the Meadow's challenge is won](docs/screenshots/challenge.webp)
+
+| Garden | Challenge pouch |
+| --- | --- |
+| Meadow | Hedge, Frost, Cannon |
+| Orchard | Hedge, Cannon, Swallow nest |
+| Millpond | Hedge, Frost, Crossbow |
+| Brook | Hedge, Whirligig, Frost |
+| Warren | Hedge, Crossbow, Nettle patch |
+| Gravel Walk | Whirligig, Cannon, Swallow nest |
+| Hillside | Hedge, Crossbow, Puffball |
+| Crossroads | Hedge, Crossbow, Frost, Swallow nest |
+| Leaf Walk | Crossbow, Swallow nest, Cannon |
+| Ice Pond | Hedge, Bonfire, Bow |
+| Last Cabbage | Hedge, Bow, Whirligig |
+| Snow Path | Sunglass, Bonfire, Bow |
 
 **Difficulty** (hub setting): Easy gives 25 cabbages and foes 20% less health, Hard 10 cabbages and
 25% more health; Normal is 15 cabbages.
@@ -243,11 +270,12 @@ played, and is kept for the next game:
 - `src/game/maps.ts`: the twelve gardens and their seasons (burrows, cottage, rocks, water, banks, paths).
 - `src/game/grid.ts`: the walking field (steps from every tile to the cottage) and routes.
 - `src/game/sim.ts`: a game: building and the never-close rule, foes, shots, waves and events.
-- `src/game/save.ts`: the records per garden, the pouch, the way of play and the potting shed.
+- `src/game/save.ts`: the records per garden, the pouch, the way of play, the potting shed, replays and the game in play.
 - `src/scenes/GameScene.ts`: the garden picker and the game screen: input, drawing and the bars.
 - `src/scenes/art.ts`, `layout.ts`: the flat vector art and where things go.
 - `src/audio.ts`: music and sound effects.
 - `src/i18n/`: the texts in British English, US English and German; `src/howToPlay.ts`.
 - `e2e/playthrough.spec.ts`: plays the first wave.
+- `e2e/bot.ts`: a greedy bot that plays every garden in Node, to check the balance (not a test).
 
 Run it with `npm run dev` from the repo root and open `/games/mazewright/`.

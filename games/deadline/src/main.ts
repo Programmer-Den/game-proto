@@ -4,6 +4,7 @@ import { GameScene } from './scenes/GameScene';
 import { VIEW } from './game/rules';
 import { setupGame } from '../../../shared/setupGame';
 import { howToPlay } from './howToPlay';
+import { trophies } from './trophies';
 import { setupScaling } from '../../../shared/scaling';
 
 // A portrait battlefield, like a phone held upright. It fills the screen's shape (taller on a long
@@ -21,7 +22,7 @@ const game = new Phaser.Game({
   },
   scene: [BootScene, GameScene],
 });
-setupGame(game, { howToPlay });
+setupGame(game, { howToPlay, trophies });
 setupScaling(game, { fill: true });
 
 // Handy for poking at state from the browser console during development.

@@ -6,7 +6,7 @@ the game, per the root AGENTS.md.
 
 ## Current state
 
-Lane Brawl is a single-player MOBA on one 2800x2800 square map with three lanes, a river, towers,
+Lane Brawl is a single-player MOBA on one 3500x3500 square map with three lanes, a river, towers,
 inhibitors, minion waves, a jungle of twelve camps, watchstones, a guardian beast, tall grass, fog of
 war, two Nexuses, five champions a side and a shop. The player picks one of fifteen champion classes,
 from medieval fantasy to steampunk and beasts,
@@ -21,7 +21,13 @@ Implemented today:
   class and role, passive), two lines under them for the card under the pointer (`hoverPick`): the
   champion's name, title, class, blurb and story perk, then their motive; with no card under the pointer, the
   setting in one line. Then one match.
-- Map (`WORLD` 2800x2800): the blue Nexus at the bottom left, the red at the top right; top and
+- Map (`WORLD` 3500x3500): every spot on it (Nexuses, lanes, towers, inhibitors, the river, camps,
+  watchstones, bushes, runes, ward spots, the beast's and the drake's pits, the ruins and the jungle's paths) is
+  written at the first 2800x2800 layout and scaled by `MAP_SCALE` (1.25) with `at` in `data.ts`.
+  Widths (a lane's, the river's, a bush's, a clearing's, a path's) and every range stay as they are, and the
+  pines, rocks, grass tufts and flowers grow in number with the map's area. To resize the map,
+  change `MAP_SCALE` and the two map points in the playthrough (`RED_MID_TOWER` and its walk goal).
+  The blue Nexus at the bottom left, the red at the top right; top and
   bottom lanes along the edges, the middle lane on the diagonal. Everything red is blue mirrored
   through the centre (`mirror`, `both` in `data.ts`), with top and bottom lanes swapped. Two towers
   per team per lane, an inhibitor per team per lane near its Nexus (`INHIBITORS`), the river
@@ -95,8 +101,8 @@ Implemented today:
   within that sight. `damage` takes exactly one hit off a ward whatever the amount; projectiles and
   zones skip wards; `kill` pays `WARD.gold` to a champion killer and notices blue's losses. Dead and
   burnt-out wards are dropped each tick like dead minions. AI champions (`aiWard`) plant a carried
-  ward at the first `WARD_SPOTS` entry within `WARD_AI.reach` that has no live ward of their team
-  within `WARD_AI.taken`, and in `aiAct` knock down an enemy ward within 220 px when nothing else is
+  ward at the first `WARD_SPOTS` entry (and from `WARD_AI.bushesFrom` the first bush, LB26) within
+  `WARD_AI.reach` that has no live ward of their team within `WARD_AI.taken`, and in `aiAct` knock down an enemy ward within 220 px when nothing else is
   in reach. The view draws wards with the Graphics (`drawWard`: stake, gem eye, hit pips, and blue's
   sight ring), not a baked sheet, and as diamonds on the minimap.
 - Recall (LB7, round 2): `startRecall` sets `Unit.recallMs` to `RECALL.ms` (and `lastRecallAt`);
@@ -157,8 +163,13 @@ Implemented today:
   Before that, `championPlan` (LB3): fall back to the nearest own tower behind (`fallbackPoint`) for
   `RETREAT.ms` when low or outnumbered by two, calling allies near by with it; go for the beast if
   picked as one of its team's two `contesters` (`updateContesters`); walk to a `gankTarget` set by
-  `updateGanks` (every 70 s from 100 s, per team: the weakest visible enemy champion, hunted by the
-  nearest healthy AI champion more than 550 px away). AI champions take upgrades on level up
+  `updateGanks` (every 70 s from 100 s, `GANK.night` times that at night, per team: the weakest
+  visible enemy champion, hunted by the nearest healthy AI champion more than 550 px away). On the
+  way, `ambushBush` (LB26, `AMBUSH`) picks a bush within `AMBUSH.reach` of the prey but farther than
+  `AMBUSH.strike`, nearer the hunter than the prey is; the hunter walks into it and waits
+  (`Unit.ambushBush`, `ambushUntil`) until the prey comes within `AMBUSH.strike` or `AMBUSH.waitMs`
+  passes, then charges (once per gank: `ambushUntil` is set to Infinity, and `updateGanks` resets
+  both). AI champions take upgrades on level up
   (`aiRate` picks). AI champions with reach kite melee ones (`KITE`), cast an escape when they
   fall back, keep R for champions and the beast, and from 2:00 every `JUNGLE.every` each team sends
   one free champion for a brute's buff on its half or a watchstone it lacks (`updateJungle`).
@@ -196,6 +207,18 @@ Implemented today:
   `ultRank(level)`, with a notice for the player. Gold pips under an ability box count its upgrades
   and, on R, its ranks; the upgrade panel names what the next level brings. AI champions pick theirs
   on their own.
+- Trophies: `src/trophies/` holds the game's ten trophies (`shared/trophies.ts`), saved under
+  `lane-brawl-trophies`. `index.ts` lists them (`trophies`: id, tier, icon, `hidden` for
+  Untouchable and Jack of all trades) with their texts in `trophies/i18n/` (`en.ts` and `de.ts`:
+  the name keyed by the id, what earns it by `<id>Text`), and imports nothing else from the game,
+  since the hub loads it. `main.ts` hands `trophies` to `setupGame`. `check.ts` holds each
+  trophy's condition (`EARNED`): First takedown (the player's first champion kill), Siege breaker
+  (a red tower down), Drake hunter (blue's first drake), Short and sweet (a quick match won), On a
+  roll (`SPREE` 3 kills without dying), Beast tamer (blue slays the beast or the elder), Nexus down
+  (a full match won), Drake soul (blue's `DRAKE.soul` drakes), Untouchable (a win with no deaths)
+  and Jack of all trades (wins with `CLASSES` 5 classes in `lane-brawl-mastery`).
+  `checkTrophies(state, mastery)` runs every frame in `GameScene.update` unless watching, after
+  the end panel has counted a win. A new trophy goes in `index.ts`, both text files and `EARNED`.
 - Class mastery (#292): `mastery.ts` keeps the player's wins per class under the save key
   `lane-brawl-mastery` (`loadMastery`, `recordWin`; JSON `{ classId: wins }`, every read and write
   in try/catch). `masteryRank` turns wins into a rank by `MASTERY_WINS` (1, 2, 4, 6, 9 wins for
@@ -231,7 +254,7 @@ Implemented today:
   frame, as the camera moves under it.
 - Player input: click the ground to walk, click an enemy to attack it, hold Q/W/E/R to aim and let go
   to cast at the cursor,
-  D/H use item actives at the cursor, B or the Shop button opens the shop, Esc closes it, 1, 2 and 3
+  D/H use item actives at the cursor, B or the Shop button opens the shop, Esc closes it (and the scoreboard), Tab held shows the scoreboard, 1, 2 and 3
   pick an upgrade (3 for mastery's third card). Clicking a watchstone walks to it rather than
   attacking it. Standing still auto-attacks the nearest enemy. The shop closes when a Nexus falls.
 - HUD (bevelled slate panels with gold trim, system font): gold with the streak chip, the Nexus
@@ -239,15 +262,176 @@ Implemented today:
   and a siege banner chip when it is up; at the bottom the champion's figure, health, XP, items,
   respawn timer and last hits, the four ability boxes with cooldowns, the shop button, the upgrade
   cards (or the upgrades taken) and a minimap.
+- Scoreboard and assists (LB12): `damage` notes in the victim's `hurtBy` (id to game time) every
+  enemy champion that hurts a champion; `kill` gives every one of them other than the slayer, hit
+  within `ASSIST.windowMs`, an assist (`Unit.assists`) and `ASSIST.gold`, whoever landed the blow
+  (a tower or minion too), then clears `hurtBy`; a player's assist pops a blue coin fx. `Unit.cs`
+  counts every champion's minion and camp kills (the player's own `s.lastHits` stays as it was, for
+  the streak and the end panel). The top bar shows the team kill score in `SCORE_CHIP`, left of the
+  clock; holding Tab (`keys.TAB`, also in watch mode) or tapping the chip (`scoreTapped`, closed by
+  another tap, Esc, the panel or the shop) shows `drawScoreboard` in `SCORE_PANEL` (where the shop
+  sits; it replaces the shop and hides the objective card, buffs and notice while it shows): per
+  team, each champion's class colour, name and class, level, K / D / A, last hits, items and its
+  respawn timer or bounty. The bottom bar's score line reads `K/D/A` plus the player's last hits.
+- River runes (LB13): `updateRunes` (in `tick`) fills `s.runes` (one per `RUNE.spots`, on the
+  river between the watchstones) every `RUNE.every` from `RUNE.firstAt`, the kinds by
+  `RUNE_ORDER[(s.runeRounds + i * 2) % 4]` (no `Math.random`), replacing any left, with a notice and
+  the `rune` sound. The first living champion within `RUNE.pick` takes one: `RUNES[kind]` gives a
+  `buff` for `ms` (its id is the rune's name key, so the buff strip names it) or `gold` plus
+  `teamGold` to each teammate, with a ring fx, the `runeTaken` sound and a notice (red's only when
+  blue sees the taker). In `championPlan`, after the lane fight check and before the beast,
+  `runeFor` sends an AI champion to a rune within `RUNE.aiReach` when it has `RUNE.aiMinHp` of its
+  health and no AI teammate is nearer. The view draws the stone rings always and a hovering hexagon
+  gem with the kind's mark (`drawRunes`, bobbing unless motion is reduced) and a minimap dot while
+  the spot is out of the fog.
+- Mercenary camps (LB14): `MERC.spots` holds two camps (blue's half by the bottom lane, its mirror
+  by the top lane); `createGame` spawns `MERC.count` `'merc'` camps at each, one `group`, after the
+  champions so every older unit keeps its id. When `kill` fells the last living one of a group to a
+  champion, `spawnMercs` (`state.ts`) gives the slayer's team `MERC.count` minions at the camp
+  with `power` `MERC.power` (drawn as super minions), on a path from the camp to the end of the
+  nearest stretch of `laneNear`'s lane and on to the enemy Nexus, with a notice, a ring and the
+  `mercs` sound. `updateJungle` counts a band's leader on a team's own half as a goal alongside the
+  brutes. The sellsword is `mercModel` (`models.ts`, a minion's figure in tan with a kettle hat and
+  a broad blade, scaled 0.78), baked as `MERC_KEY` in `MERC_CELL`; `map.ts` paints the camps'
+  clearings (`CLEARINGS`) with a fire pit and two tents.
+- Battle spells (LB15): `SPELLS` (`blink`, `firebrand`, `mend`, `barrier`, `teleport`) in `data.ts`; every
+  champion has `Unit.spell` (from `aiSpellFor(role)` in `spawnChampion`; the player's from
+  `MatchOptions.spell` unless watching) and `spellCd`, counted down in `countDown`. `castSpell(s, u,
+  aim)` in `sim.ts` casts it: Blink moves like Phase Boots, Firebrand `damage`s (through `dealt`)
+  the visible enemy champion nearest the aim within `range` and `aim`, Mend heals the caster and the
+  most hurt ally within `range`, Barrier sets `shield`/`shieldMs`; amounts are `base + perLevel *
+  level`. `aiSpell` (called in `aiAct` before `championPlan`) uses it from `SPELL_AI.from` (100 s, so
+  the first round plays as tuned), when under `SPELL_AI.low` with an enemy champion within
+  `SPELL_AI.look` (Blink toward `fallbackPoint`), Mend also for a low ally, Firebrand on a champion
+  it can finish. The player casts with G or `SPELL_BUTTON` (`drawSpellButton`, right of the recall
+  button, filling as it cools down); the pick screen's `SPELL_PICK` button steps through the
+  spells (`nextSpell`), and hovering it shows the spell's name and text in the champion lines. The
+  pick is kept under the save key `lane-brawl-spell` (`game/spellChoice.ts`: `loadSpell`,
+  `saveSpell`, in try/catch). The pick button is one text, replacing a hint line, because every
+  Phaser text draws `Math.random` for its texture key and the playthrough's seeded roster depends
+  on how many draws come before the shuffle.
+- Teleport (LB24): the fifth spell rides on the recall channel. `castSpell` picks the allied tower
+  or minion `closest` to the aim within `aim`, and sets `recallMs` and `recallFull` to its `ms` and
+  `Unit.portTo` to that unit's id (a recall sets `recallFull` to `RECALL.ms` and `portTo` to 0), so
+  everything that breaks a recall breaks it too. When the channel runs out `finishRecall` hands it
+  to `finishTeleport`, which `place`s the champion `TELEPORT_GAP` from its target toward home, or
+  says the teleport is lost if the target has fallen. The bar under the champion and the recall
+  button take the spell's colour and read Teleporting. No AI champion carries it.
+- Pings (LB16): `PINGS`, `PING_KINDS` (`attack`, `gather`, `danger`) and `PING` in `data.ts`.
+  `sendPing(s, u, kind, at)` in `sim.ts` (refused within `PING.cd` of the last, `s.lastPingAt`)
+  pushes a `Ping` to `s.pings` (dropped after `PING.showMs` in `tick`) and gives the AI allies an
+  errand: `attack` sends the `PING.answer` nearest ready allies within `PING.reach`, `gather` the
+  ready ones within `PING.near`, setting `Unit.pingGoal`, `pingTarget` (the visible enemy within
+  its radius plus `PING.pick` of the point, for `attack`) and `pingUntil` (`PING.ms`); `danger`
+  sets `retreatUntil` for the allies within `PING.near` and drops their plans. In `championPlan`
+  the errand comes after falling back and before runes: hit the marked enemy (unless it is
+  warded), else walk to the point and wait there while no enemy champion is near; an errand
+  blocks recalls and `free`, so ganks, the beast and the jungle leave the champion alone. A ping
+  of the player's makes a notice naming the allies who answer (`noticePing*`). Blue's AI calling a
+  retreat when outnumbered pushes a `danger` ping (shown only, no errand). The view: Z, N, C at
+  the cursor, Alt and a click (`attack`), or `pingButton(i)` (`PING_BUTTONS`, a column between
+  the upgrade panel and the minimap) to arm `pingArmed` for the next press on the map;
+  `drawPings` draws blue's pings in the world (a pulsing ring, still under reduced motion, and
+  `pingSign`), and the minimap rings them.
+- Death recap (LB17): `damage` takes a `how` (`HitHow`: `'attack'`, the default, an ability key or
+  `'spell'`; abilities pass their key through `abilityHit`, bolts and zones through `hitHowOf`
+  their `look`) and, for the player's champion, pushes each hit's health lost to `s.playerHits`
+  (kept for `RECAP.windowMs`). `kill` turns them into `s.recap` (`deathRecap`: summed by attacker
+  and `how`, all minions as one row with `src` -1, the biggest `RECAP.rows`). `drawRecap` shows it
+  under the notice while the player's champion is dead (not watching, not over the shop or
+  scoreboard), naming champions by first name and the rest by kind (`recapName`).
+- River drakes (LB18): `DRAKE`, `DRAKES`, `DRAKE_ORDER` and `DrakeElement` in `data.ts`; the drake
+  is a camp of kind `drake` (`CAMP_KINDS.drake`), spawned last in `createGame` (so other ids stay)
+  dead with `respawnAt` `DRAKE.firstAt`, its id in `s.drake`; `s.drakeElement` is the element of
+  the one asleep or awake, `s.drakeRounds` counts the slain. `kill` calls `slayDrake`: the next
+  element comes up, and below `DRAKE.soul` stacks the slayer's team pushes the element to
+  `s.drakeStacks[team]` and every one of its champions gets the summed `bonus`es (doubled at the
+  soul) as `Unit.drake`, which `buffSum` counts in with the buffs. Waking (in `updateUnit`) and each
+  slaying make a notice and a sound (`drakeWakes`, `drake`). `updateJungle` sends up to `DRAKE.ai`
+  free champions of a team without the soul at an awake drake before anything else. The view:
+  `drakeModel(element)` in `models.ts`, baked lazily per element (`bakeDrake`, `drakeKey`,
+  `DRAKE_CELL`); the pit is painted by `pit` in `map.ts` (shared with the beast's); the minimap dot
+  takes the element's colour and `drawBuffs` adds a chip per team with stacks.
+- Early gold (LB19): `FIRST_BLOOD` and `PLATING` in `data.ts`. `kill` pays the first champion
+  kill of the match (`s.firstBlood`) `FIRST_BLOOD.gold` more, with a notice and the `firstBlood`
+  sound. `createGame` gives each outer tower (the one of its team and lane farther from its Nexus)
+  `Unit.plates` = `PLATING.count`; `damage` calls `breakPlates` while `s.time < PLATING.until`,
+  which drops a plate for every share of health lost and splits `PLATING.gold` between the enemy
+  champions within `PLATING.share`. `tick` clears all plates at `PLATING.until` (`s.platesGone`,
+  with a notice). `drawBar` shows the plates as gold pips over a tower's bar.
+- Bodies, forest and paths (LB20): `game/terrain.ts` holds what walkers can't walk through.
+  The forest: everything that is not open ground (`openGround`: a lane within `LANE_WALK`, the
+  river, both bases, the clearings, pits, ruins and bushes, and `PATH_HALF` either side of a path)
+  is forest. `JUNGLE_PATHS` are written for the quarter between the top lane, the river and the
+  mid lane (`WEST_PATHS`, first-layout coordinates), turned over the mid lane for the bottom
+  lane's quarter (`turn`) and mirrored for red's. `TERRAIN` builds a 10 px grid of it and a
+  signed distance field (`signedField`, two exact distance transforms): `clearance(p)` is how far
+  `p` is from the forest, negative inside. It then flood-fills from the blue Nexus (`reached`) and
+  gives any place in `PLACES` (camps, bushes, ruins, pits, runes, ward spots) a champion could not
+  reach one straight extra path to the nearest reached cell; `PATHS` holds the written paths plus
+  those (none today). On top stand the solid circles, `OBSTACLES`: the ruins' pillars
+  (`ruinPieces`), the stones round both pits (`pitStones`), towers, inhibitors, Nexuses and
+  watchstones, sized by `SOLID`, in a 100 px grid. `SCENERY` (pines and rocks, art only) fills the
+  forest from 14 px in, so trees stand behind the walls and line the paths.
+  `moveToward` in `sim.ts` heads for `nextStop`: the goal itself when `clearLine` shows no forest in
+  between, else the next point of `route` (A* over a 25 px grid of cells the walker's `bodyOf` fits
+  in, then pulled tight with `clearLine`), kept per unit in `ROUTES` and found again when the goal
+  moves 40 px or every 2 s. A goal in the forest ends at the nearest cell that fits. It then takes
+  a `steer` step: straight on, or along the edge of the obstacle or forest in the way, on the
+  goal's side. After the units' turns `tick` calls `separate`: overlapping living champions and
+  minions are pushed apart by `BODY.give` of the overlap, camps and the beast push them off
+  themselves, and `settle` puts every walker back out of the forest (along the field's slope,
+  `outward`) and the obstacles. Dashes, blinks, knocks and pulls go through `place`, which settles
+  the landing. `commandMove` settles the clicked point too, and the player's champion stops when it
+  got no closer for `STUCK.ms` within `STUCK.near` of it (`moveStuckMs`, `lastMoveDist`), so a crowd
+  on the spot doesn't hold it walking. The forest stops walking only, not bolts or sight. In
+  `map.ts`, `forest` darkens the forest floor, `trails` paints the paths, `laneWalls` lays stone
+  blocks on the forest's edge within 34 px of a lane's walkable band (so the walls break where a
+  path comes out) and `scenery` the trees; the minimap draws `PATHS` as thin tan lines.
+- Day and night (LB21): `DAYNIGHT` in `data.ts`. `nightness(time)` in `sim.ts` is 0 by day, 1 at
+  full night and ramps over `DAYNIGHT.fade` at dusk and dawn; `sightOf` scales champion sight by it
+  down to `DAYNIGHT.sight`, so `viewers` (the rules' vision and the view's fog) both
+  follow it. `tick` flips `s.night` at half dark with a notice and the `nightfall` or `daybreak`
+  sound. The view lays a blue tint (`NIGHT_ALPHA`) over the world in `fogG`, under the fog, and
+  `drawSky` draws a sun or moon beside the clock. The first night falls at 2:50, after the
+  playthrough's first round.
+- Quick match (LB22): `QUICK` in `data.ts`, `MatchOptions.quick` and `GameState.quick` and
+  `lanes` (all three, or `QUICK.lanes`). `createGame` makes towers and inhibitors only on
+  `s.lanes`, with `QUICK.hp` times their health (the Nexuses too), `QUICK.allies` and
+  `QUICK.enemies` champions all on the open lane, and calls `openLanes` in `terrain.ts` so the
+  closed lanes' tower and inhibitor spots don't stand in the way. `spawnWave` sends minions only
+  down `s.lanes`, and `spawnMercs` takes the nearest open lane (`laneNear(p, lanes)`). On the pick
+  screen `MODE_PICK` switches it (`hoverMode` shows what each means), kept under the save key
+  `lane-brawl-quick` (`loadQuick`, `saveQuick` in `game/spellChoice.ts`); the two hint lines share
+  one text so the pick screen makes as many texts (and Math.random draws) as before. The minimap
+  draws closed lanes faint. Watched quick matches end in 4 to 18 minutes, most near 8 to 12.
+- Comeback and surrender (LB23): `COMEBACK` and `SURRENDER` in `data.ts`. `behind(s, team, gap)`
+  in `sim.ts` compares the teams' summed champion XP; `kill` pays a champion kill of a team behind
+  by `COMEBACK.gap` `COMEBACK.gold` and `COMEBACK.xp` more (a notice and the `comeback` sound for
+  the player), and `drawBuffs` shows a chip while blue is behind. `callSurrender` (the scoreboard's
+  `surrenderButton`, from `s.voteReadyAt`) counts the player's yes and each ally's `votesYes`
+  (behind by `COMEBACK.gap`, or `SURRENDER.structs` more towers and inhibitors lost); at
+  `SURRENDER.pass` the team gives up (`surrender`: `s.surrendered`, the phase and winner as if
+  the Nexus fell), else a notice, and the next vote waits `SURRENDER.cd`. `updateSurrender` lets
+  an AI team (red, both when watching) give up every `SURRENDER.cd` from `s.nextSurrender` when it
+  is `SURRENDER.aiGap` behind on XP and `SURRENDER.structs` behind on structures. The end panel
+  says who surrendered.
+- Match summary (LB25): `SUMMARY` in `data.ts`. `tick` calls `sampleWorth` every `SUMMARY.every`
+  (and `kill` of a Nexus and `surrender` once more at the end), which pushes both teams' `netWorth`
+  (gold plus the full `cost` of each held item) onto `s.history`. `mvpOf` picks the champion with
+  the best `SUMMARY` score. The end panel (`END_PANEL`, now 560x420) shows them in `drawSummary`:
+  the MVP line in its team's colour and a line per team in `WORTH_GRAPH`, scaled to the top value.
 - Victory and defeat panel with the match's objectives, last hits, best streak and beasts slain,
   and "Play again".
 
 Missing or rough:
 
-- No pathing or collisions: units overlap and walk straight lines.
-- No title screen of its own. The only save is class mastery (below).
+- Paths are found round the forest only; towers, pillars and stones are slid round one step at a
+  time (`steer`), which their spacing keeps clear of pockets.
+- No title screen of its own. The only saves are class mastery and the battle spell (below).
 - Bushes hide champions only, not minions. The camera follows the player's champion.
-- AI champions don't use bushes on purpose, and their wards go only to the fixed `WARD_SPOTS`.
+- AI champions use bushes only to wait in on a gank, and ward only the fixed `WARD_SPOTS` and bush
+  centres.
 - Balance is tuned with AI-only matches (every class within roughly 35% to 65% wins over 80
   matches); the player's own champion is not part of that.
 - Only the first round (see the playthrough) is covered by the test; the Warden is the only champion
@@ -286,7 +470,7 @@ File map (`src/`):
 - `scenes/skillFx.ts`: every ability's look (see "Skill looks" above): `drawSkill`, `skillMs`,
   `drawProjectile`, `drawZone` and `drawAura`, with small shape helpers. No game rules.
 - `scenes/layout.ts`: screen rectangles for the bars, the objective card, the streak chip, the
-  ability boxes, the upgrade panel and cards (`upgradeCard`), the shop, the minimap, the pick cards
+  ability boxes, the upgrade panel and cards (`upgradeCard`), the shop, the kill score and scoreboard (`SCORE_CHIP`, `SCORE_PANEL`), the minimap, the pick cards
   and the end panel, plus `VIEW` (the designed 960x540), `SCREEN` (the view actually shown),
   `FRAME` (the designed rectangle's corner in it), `fitLayout` and `FONT` (a system font stack).
   The rectangles are written for 960x540; `fitLayout(w, h)` moves them once at start for the view
@@ -341,10 +525,13 @@ File map (`src/`):
   the river (faceted water, banks and glints), clearings for the camps (a glowing ring for the
   brutes, bones for the wolves), watchstone islands, ruins, flowers and mushrooms and up to 620
   pines and rocks, from a fixed seed; then the beast's pit and the bushes (tall faceted grass).
+- `trophies/`: the trophy list (`index.ts`), its texts (`i18n/`) and the conditions (`check.ts`).
 - `game/names.ts`: `shortName`, a champion's first name from its full name.
+- `game/spellChoice.ts`: the player's battle spell and match kind, the save keys `lane-brawl-spell` (`loadSpell`, `saveSpell`) and `lane-brawl-quick` (`loadQuick`, `saveQuick`).
 - `game/mastery.ts`: class mastery, the save key `lane-brawl-mastery` (`loadMastery`, `recordWin`,
   `masteryRank`).
-- `game/data.ts`: plain data, with text keys for names and texts. `WORLD`, `LANES`, `BASE`, `TOWERS`, `RIVER`, `CAMPS`, `CAMP_KINDS`,
+- `game/terrain.ts`: the map's forest and paths (`JUNGLE_PATHS`, `PATHS`, `clearance`, `route`, `clearLine`), its obstacles (`SCENERY`, `OBSTACLES`, `SOLID`) and `steer`, `settle`, `blockedBy`; `art/map.ts` takes the lane and clearing helpers, the paths, the field and the scenery from it.
+- `game/data.ts`: plain data, with text keys for names and texts. `MAP_SCALE`, `at`, `WORLD`, `LANES`, `BASE`, `TOWERS`, `RIVER`, `CAMPS`, `CAMP_KINDS`,
   `PUPS`, `SIGHT`, `WATCHSTONES`, `WATCH`, `BUFFS`, `JUNGLE`, `KITE`, the balance constants (`TOWER`,
   `CAMP`, `MINION`, `KILL`, `XP_FOR_LEVEL`, respawn times), `CHAMPIONS` with their `AbilityDef`s,
   `ITEMS`, `ALLY_LANES`, `ENEMY_LANES`, `SIDE_COLOR`, and the loop's data: `OBJECTIVES`,
@@ -352,7 +539,7 @@ File map (`src/`):
   `ACTIVES`, `MAX_ITEMS`, `BEAST`, `BEAST_BUFF`, `ELDER`, `BEAST_CONTESTERS`, `INHIBITORS`, `INHIBITOR`,
   `SUPER_MINION`, `BUSHES` (with `bushAt`), `BUSH_REVEAL`, `REVEAL_MS`, `GANK` and `RETREAT`, and
   round 2's `WARD`, `WARD_SPOTS`, `WARD_AI`, `RECALL`, `BUYBACK`, `BOUNTY` (with `bountyOf`),
-  `AI_BUILDS` and `AI_BUILD_FOR`.
+  `AI_BUILDS` and `AI_BUILD_FOR`, `ASSIST`, `RUNE`, `RUNES` and `RUNE_ORDER`, `MERC`, and `SPELLS`, `spellById`, `aiSpellFor` and `SPELL_AI`.
 - `game/state.ts`: the types (`GameState`, `Unit`, `Projectile`, `Fx`, `Objective`,
   `UpgradeOffer`), `createGame`, `spawnWave`, `spawnChampion`, `spawnWard`, `refreshStats` (level
   and items into stats), `pathFor` (red walks lanes backwards), `laneNear` and small helpers. No
@@ -430,7 +617,7 @@ State model:
 - The upgrades' state: `beast`, `beastBuff`, `beastKills`, `contesters`, `nextGank`, `nextJungle`,
   `notices`; per AI champion `retreatUntil`, `gankTarget`, `gankUntil`, `jungleTarget`,
   `jungleUntil`; per champion `revealMs`, `aggroMs`, `activeCds`, and round 2's `killStreak`,
-  `wards`, `recallMs`, `lastRecallAt` and `buybackReadyAt`.
+  `wards`, `recallMs`, `lastRecallAt` and `buybackReadyAt`, and the scoreboard's `assists`, `cs` and `hurtBy`; the game's `runes`, `nextRune` and `runeRounds`.
 
 How it runs:
 
@@ -504,7 +691,15 @@ Effects (`sfx`), where they are raised:
 | `recall` / `recallHome` | the player starts a recall (`recall`) / arrives home (`finishRecall`) |
 | `respawn`, `buyBack` | the player's champion respawns (`updateUnit`) / buys back (`buyBack`) |
 | `wave` | a minion wave spawns (`tick`) |
+| `mercs` | a mercenary band hired (`kill`) |
+| `spell` | the player casts a battle spell (`castSpell`) |
+| `rune` / `runeTaken` | runes appear / a rune taken (the player's own, or one in view) (`updateRunes`) |
 | `watchstone`, `growl`, `beastSlain`, `brute` | a watchstone taken, the beast waking or turning elder, the beast slain, a brute's buff taken |
+| `ping` | a ping sent by the player (`sendPing`), or an ally's danger call on blue's side (`championPlan`) |
+| `drakeWakes` / `drake` | a drake wakes / is slain (`updateUnit`, `slayDrake`) |
+| `firstBlood`, `plate` | the first champion kill (`kill`), a tower plate breaks (`breakPlates`) |
+| `nightfall` / `daybreak` | night falls / day breaks (`tick`) |
+| `comeback`, `vote` | the player's kill pays a comeback bounty (`kill`), the player calls a surrender vote (`callSurrender`) |
 | `objective` / `objectiveMissed` | the player's objective done / missed (`updateObjective`) |
 
 Shared `ui` sounds: `click` for the Shop button, B and Play again; `coin` for a purchase;
@@ -545,7 +740,7 @@ Shared `ui` sounds: `click` for the Shop button, B and Play again; `coin` for a 
 - The seed in `addInitScript` is picked so the shuffle in `createGame` fields Harpooner, Tinker,
   Mage and Archer on blue and Stalker, Wolfkin, Bruin, Blade and Berserker on red, the roster the
   round was tuned with (about 2100 `Math.random` calls come before the shuffle in the browser).
-  Anything that adds or removes draws before the shuffle, or a sixteenth class, changes the roster:
+  Anything that adds or removes draws before the shuffle (a new text on the pick screen too: each Phaser text draws for its texture key), or a sixteenth class, changes the roster:
   pick a new seed by replaying the generator and the shuffle in node, or re-tune the round.
 - It asserts the first objective and its target (title key `objTowerMid`, so it passes in any
   language), the objective paid and the siege banner after
@@ -553,21 +748,22 @@ Shared `ui` sounds: `click` for the Shop button, B and Play again; `coin` for a 
   Wide Gatefall (`wide-slam`) kept from the card.
 - Round 2 stays out of the first round: the AI buys only a Healing Flask and a ward at 0:00 (its
   wards and recalls change nothing the test asserts), `GANK.firstAt` keeps bounty hunts past it,
-  and the player never recalls, wards or buys back.
+  and the player never recalls, wards or buys back. `SPELL_AI.from` keeps the AI's battle spells
+  past it too, and the player never presses G.
 - On the way to the tower the Warden waits out of its reach until a blue minion reaches it (and
   steps back out when none is left there, until the tower is under 200 health), and hits back (with
   Gatefall) at a red champion that comes within 240 px out of the tower's reach. It casts Gatefall on the camp too.
 - It saves `0-pick`, `1-shop`, `2-tower-down` and `3-upgrade` screenshots. `SWORD_ROW` is a point inside the Long
   Sword's card in the four-column shop (`shopRow(0)`, so the Long Sword stays first in `ITEMS`;
   the card is 74 px tall from y 86, so the click at y 146 lands in its lower half). The round ends near 40 s of game time, before the beast wakes (90 s) and the first gank
-  (100 s), so neither touches it; keep `BEAST.firstAt` and `GANK.firstAt` past it, and keep the
+  (100 s), so neither touches it, nor do the first runes (120 s); keep `BEAST.firstAt`, `GANK.firstAt` and `RUNE.firstAt` past it, and keep the
   bushes off the middle lane's paving and the path to the camp by the red mid tower. Copy them into
   `docs/screenshots/` as `playthrough-1-pick` to `playthrough-4-upgrade` when the look changes.
   `cover.png` (a copy of `new-cast.webp`), `new-cast.webp` (the shuffle steered with a fixed
   `Math.random` sequence so blue fields the five new classes), `ten-classes.webp`, `fog-of-war.webp`,
   `jungle-brute.webp`, `watchstone.webp`, `watch-ai.webp` (a `?watch` match at 8x with the log open), `skill-looks-1.webp` to
   `skill-looks-3.webp` (every ability's effect, five classes each), `aim-indicators.webp`,
-  `home-heal-and-dead-shop.webp`, `loop-objective.webp`, `loop-last-hit.webp` and
+  `home-heal-and-dead-shop.webp`, `scoreboard.webp` (a match run 7 minutes with blue's fifth on the AI, Tab held), `river-rune.webp` (run to 2:00, the Warden placed by the first spot), `merc-camp.webp` and `mercs-march.webp` (the Warden placed by blue's camp, then made strong to clear it), `pick-spell.webp` and `spell-button.webp` (the spell button pressed once, then a match run to 2:30 and Firebrand cast), `loop-objective.webp`, `loop-last-hit.webp` and
   `upgrade-*.webp` and `round2-*.webp` (the ward in the shop and planted by a bush, a recall, a
   bounty, the buy back button and the watch log of the AI shopping) and `german-pick.webp` (the pick
   screen with `?lang=de`, Grumm's card under the pointer) are staged docs shots (a scratch
@@ -629,6 +825,7 @@ Shared `ui` sounds: `click` for the Shop button, B and Play again; `coin` for a 
   `RETREAT` in `data.ts`. Move the pit with `BEAST.x`/`y`; `map.ts` paints it there.
 - **Add a bush**: add it to `BUSHES` (blue's half; `both` adds the mirror); `map.ts` paints it and
   keeps pines out of it.
+- **Tune the mercenaries**: `MERC` (spots, band size, power) and `CAMP_KINDS.merc` in `data.ts`.
 - **Add a camp kind**: add it to `CampKind` and `CAMP_KINDS`, a model and sheet (`models.ts`,
   `bake.ts`), its sprite and `headOf` height in `GameScene.ts`, its clearing in `map.ts`, and its
   gold to `CAMP_GOLD` in the test if the camp objective can pick it.

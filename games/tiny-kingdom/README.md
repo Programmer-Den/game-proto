@@ -56,7 +56,8 @@ three stars each. Run out of tiles or room and the kingdom is finished.
    buildings that already count and marks the open spots. Fulfilling it pays **+8 points and a
    crown** at once; crowns are counted in the banner and kept from kingdom to kingdom. A decree not
    fulfilled by the round's end lapses, and the next round brings a new one. Lakes and woods are
-   named from where they lie on the island (Eastmere, Westpool, Northwood, ...).
+   named from where they lie on the island (Eastmere, Westpool, Northwood, ...). A decree is only
+   asked when the board has room for it and the pouch holds the tiles it needs.
 7. **Royal gift**: the panel shows the two gifts on offer for reaching the goal ("Gift at 20: +2
    Towers or Windmill"). When the goal is reached, the board pauses on a card until you take one.
    Round 1 always offers +2 Towers or the Windmill; later rounds offer one new building you don't
@@ -91,7 +92,8 @@ three stars each. Run out of tiles or room and the kingdom is finished.
    as a bonus when you place it, and the preview shows a small "x2"; buildings already standing
    never change when the season does.
 15. **Islands** are random: two or three lakes, two or three woods and the castle scattered over
-    the grass, so every kingdom is a new puzzle. The island button opens the islands card, where you can type
+    the grass, so every kingdom is a new puzzle. Every island has a lake with room on its shore for
+    the first decree and room around the castle for its chain. The island button opens the islands card, where you can type
     any island number from 1 to 9999 to play it (share the number to share the puzzle), play the
     **island of the day** (the same island for everyone that day, with its own best score), or
     play the **campaign**.
@@ -106,6 +108,10 @@ three stars each. Run out of tiles or room and the kingdom is finished.
     While the last tile can still be undone, the button stays Undo, so a slip on the last grass
     cell can be taken back first. The castle then pays its bonus, and the best final score and the
     crowns are saved in the browser.
+19. **Trophies**: ten to earn across your kingdoms, listed behind the Trophies button on the start
+    and pause screens. A first decree, manor, market trade and all four gift buildings are bronze;
+    round 8, 40 buildings joined to the castle and 10 crowns in all are silver; a kingdom of 350
+    points, three stars on a campaign level and a star on every level are gold.
 
 ![Hovering a cell beside the castle: the house would score 1 from the forest and join the castle's chain](docs/screenshots/playthrough-1-preview.webp)
 
@@ -176,6 +182,10 @@ three stars each. Run out of tiles or room and the kingdom is finished.
 
 ![A campaign level finished with one star](docs/screenshots/campaign-over.webp)
 
+![A trophy earned: its toast at the top of the page](docs/screenshots/trophy-toast.webp)
+
+![The Trophies list on the pause screen](docs/screenshots/trophies.webp)
+
 The difficulty, set on the hub page's Settings, changes the round goals, 20% lower on Easy and 20% higher on Hard, and moves the campaign's star scores with what that does to a final score: 1% higher on Easy and 6% lower on Hard.
 
 ## Running locally
@@ -223,6 +233,8 @@ All paths are inside `games/tiny-kingdom/`.
 - `src/art/`: the wooden toy set, painted on canvases in code at startup: `wood.ts` the toolkit and
   painters, `textures.ts` every texture.
 - `src/ui/`: the button.
+- `src/trophies/`: the trophy list and texts (`index.ts`, `i18n/`), and `check.ts`, which awards
+  them from the game state.
 
 Changing a building's rule is its case in `cellParts` in `src/game/state.ts` and its line in
 `INFO` in `src/game/tiles.ts`.

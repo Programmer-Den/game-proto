@@ -37,6 +37,13 @@ chapter ends.
   boulder or cracked wall walks over and plants one. Old Sedge refills your pouch, and cut bushes
   and beaten foes sometimes drop a seed pod.
 - The journal line at the top right always says what to do next.
+- **Coins** drop from cut bushes now and then and from every beaten foe. Marla the baker sells a
+  hearty pie (one more heart) and light boots (a longer roll, sooner again) once you have the
+  blade; Old Sedge sells a bigger bellseed pouch (15 instead of 10) and a long vine (the hookvine
+  reaches much farther) once he has given you bellseeds. Talk to them to see their wares; tap a
+  price, or press 1 or 2, to buy.
+
+![Marla's wares](docs/screenshots/shop.webp)
 
 ![Taking the Old Blade from the chest by the shed](docs/screenshots/blade.webp)
 
@@ -65,6 +72,41 @@ chapter ends.
 ![The belfry's three bells](docs/screenshots/belfry.webp)
 
 ![Bramble Woods by lamplight](docs/screenshots/woods.webp)
+
+### After the end
+
+Once chapter two is told, the kingdom stays open, and there is more to do in it:
+
+- **Moonstone page.** **N**, or a tap on the moonstone counter, opens a page with each place's
+  moonstones, the found ones lit, so you know where to look again (but not where).
+- **Hourglass trials.** An hourglass now stands by the door of the shrine and of the belfry. Turn
+  it and every foe in that dungeon wakes again and its boss rises stronger: the Thornmother's bulbs
+  drop faster and her volleys come thicker, and the Bellwraith hunts faster and takes more hits. A
+  clock runs at the top until the boss falls, and the moonstone page keeps your best time. Leaving
+  the dungeon or falling ends the trial.
+
+![An hourglass trial in the Sunken Shrine, the clock running](docs/screenshots/trial.webp)
+
+![The moonstone page](docs/screenshots/moonstones.webp)
+
+### Foes that need your tools
+
+Most foes fall to the sword, but two don't:
+
+- **Shelled beetles** turn the blade with their shell. Flip one on its back with the hookvine or a
+  bellseed's burst, then strike before it rights itself.
+- **Lantern moths** fly too high for the sword and drop embers on you. Pull one down with the
+  hookvine, or burst a bellseed under it, and strike while it lies on the ground.
+
+![A lantern moth and a shelled beetle in Glimmer Fen](docs/screenshots/new-foes.webp)
+
+### Trophies
+
+Ten trophies, listed on the start and pause screens: the blade and both bosses, the first upgrade
+and all four, a beetle flipped and beaten, an hourglass trial, both trials under par, every
+moonstone, and one more that stays hidden until you earn it.
+
+![Bramblecrest's trophies on the pause screen](docs/screenshots/trophies.webp)
 
 ### Hearts and falls
 
@@ -106,14 +148,15 @@ the north gate, checking the quest, items, flags and save at each step. Run it w
 | --- | --- |
 | `src/main.ts` | Creates the game and hands it to the hub's `setupGame` and `setupScaling` |
 | `src/howToPlay.ts` | The How to play shown on the start and pause screens |
+| `src/trophies/` | The ten trophies, their texts and when each is earned |
 | `src/game/maps.ts` | The five maps as tile grids, with their people, chests, signs, exits, foes, posts, doors, blocks, plates, rooms and moonstones |
-| `src/game/state.ts` | The save: where the knight is, hearts, items, keys, moonstones, flags and the quest |
+| `src/game/state.ts` | The save: where the knight is, hearts, items, keys, moonstones, flags, the quest, the trials' best times, coins and upgrades, and what each upgrade costs |
 | `src/game/talk.ts` | What each person says, by where the quest stands |
 | `src/game/path.ts` | A* for tap-to-walk |
 | `src/art/paint.ts` | Every sprite, painted onto canvases in soft 3D |
 | `src/art/ground.ts` | Paints each map's ground into one texture |
 | `src/scenes/GameScene.ts` | The world: walking, the sword, the hookvine, bellseeds, foes, puzzles, the bosses and the story |
-| `src/scenes/foes.ts` | Foe stats, bellseed timings and the two bosses' timings |
+| `src/scenes/foes.ts` | Foe stats, bellseed timings and the two bosses' timings, and how much harder they are in a trial |
 | `src/scenes/light.ts` | The night: the dark, the lamp glow and the miniature haze |
-| `src/scenes/hud.ts` | Hearts, moonstones, keys, bellseeds, the journal line, dialog, touch buttons and the end card |
+| `src/scenes/hud.ts` | Hearts, moonstones, keys, bellseeds, the journal line, dialog, touch buttons, the trial's clock, the moonstone page, the shops and the end card |
 | `src/scenes/layout.ts` | The view, speeds, reaches and button positions |

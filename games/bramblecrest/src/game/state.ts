@@ -5,6 +5,7 @@
 import { byDifficulty } from '../../../../shared/settings';
 import { isMapId, type Facing, type ItemId, type MapId } from './maps';
 import type { TextKey } from '../i18n';
+import { formatNumber } from '../../../../shared/i18n';
 
 export const SAVE_KEY = 'bramblecrest-save';
 
@@ -13,12 +14,57 @@ export const START_HEARTS = byDifficulty(5, 3, 2);
 /** Moonstones hidden in the first chapter, and in the first two together. */
 export const CHAPTER_ONE_STONES = 8;
 export const MOONSTONES = 13;
-/** The most bellseeds the knight can carry. */
+/** The most bellseeds the knight can carry, and with Sedge's bigger pouch. */
 export const MAX_SEEDS = 10;
+export const BIG_POUCH = 15;
+
+/** Who sells upgrades: Marla in Mossford and Old Sedge in the fen. */
+export type Seller = 'baker' | 'hermit';
+export type UpgradeId = 'pie' | 'boots' | 'pouch' | 'vine';
+/**
+ * What coins buy, for good: a heart (`pie`), a longer, quicker roll (`boots`), a bigger bellseed
+ * pouch (`pouch`) and a longer hookvine (`vine`). `needs` is an item the knight must have first.
+ */
+export const UPGRADES: { id: UpgradeId; seller: Seller; cost: number; needs?: 'seeds' | 'hookvine' }[] = [
+  { id: 'pie', seller: 'baker', cost: 30 },
+  { id: 'boots', seller: 'baker', cost: 15 },
+  { id: 'pouch', seller: 'hermit', cost: 20, needs: 'seeds' },
+  { id: 'vine', seller: 'hermit', cost: 25, needs: 'hookvine' },
+];
+
+export function hasUpgrade(s: GameState, id: UpgradeId) {
+  return s.upgrades.includes(id);
+}
+
+/** How many bellseeds the knight can carry now. */
+export function maxSeeds(s: GameState) {
+  return hasUpgrade(s, 'pouch') ? BIG_POUCH : MAX_SEEDS;
+}
+
+/** Buys an upgrade if the knight has the coins; returns whether it was bought. */
+export function buy(s: GameState, id: UpgradeId) {
+  const u = UPGRADES.find((x) => x.id === id)!;
+  if (hasUpgrade(s, id) || s.coins < u.cost || (u.needs && !s.items[u.needs])) return false;
+  s.coins -= u.cost;
+  s.upgrades.push(id);
+  if (id === 'pie') {
+    s.maxHp += 2;
+    s.hp = s.maxHp;
+  } else if (id === 'pouch') s.seeds = BIG_POUCH;
+  return true;
+}
 
 /** The quest line of the first two chapters, in order. */
 export const QUESTS = ['start', 'blade', 'thorns', 'shrine', 'return', 'done', 'bell', 'belfry', 'home', 'end'] as const;
 export type Quest = (typeof QUESTS)[number];
+
+/** A time on the clock as m:ss.t, with the language's decimal mark. */
+export function clock(ms: number) {
+  const tenths = Math.floor(ms / 100);
+  const m = Math.floor(tenths / 600);
+  const sec = (tenths % 600) / 10;
+  return `${m}:${formatNumber(sec, { minimumIntegerDigits: 2, minimumFractionDigits: 1, maximumFractionDigits: 1 })}`;
+}
 
 /** The text the journal line shows for each step of the quest. */
 export const OBJECTIVES: Record<Quest, TextKey> = {
@@ -65,6 +111,11 @@ export interface GameState {
   falls: number;
   /** Foes beaten, for the chapter's end card. */
   beaten: number;
+  /** The best time of each dungeon's hourglass trial, in ms of play. */
+  trials: Partial<Record<MapId, number>>;
+  /** Coins from cut bushes and beaten foes, and the upgrades they bought. */
+  coins: number;
+  upgrades: UpgradeId[];
 }
 
 export function newState(): GameState {
@@ -85,6 +136,9 @@ export function newState(): GameState {
     quest: 'start',
     falls: 0,
     beaten: 0,
+    trials: {},
+    coins: 0,
+    upgrades: [],
   };
 }
 
@@ -109,7 +163,7 @@ export function give(s: GameState, item: ItemId) {
   else if (item === 'key') s.keys++;
   else if (item === 'seeds') {
     s.items.seeds = true;
-    s.seeds = MAX_SEEDS;
+    s.seeds = maxSeeds(s);
   }
   else if (item === 'heart') {
     s.maxHp += 2;

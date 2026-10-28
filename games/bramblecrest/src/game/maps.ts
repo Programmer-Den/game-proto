@@ -40,7 +40,7 @@ export type Theme = 'village' | 'woods' | 'fen' | 'shrine' | 'belfry';
 export const DUNGEONS: ReadonlySet<MapId> = new Set<MapId>(['shrine', 'belfry']);
 export type Facing = 'up' | 'down' | 'left' | 'right';
 export type PropKind = 'house' | 'shed' | 'well' | 'lamp' | 'statue' | 'arch' | 'hut' | 'brazier' | 'shroom' | 'bench' | 'rock' | 'tower' | 'bell' | 'candle';
-export type EnemyKind = 'slug' | 'moth' | 'thornling' | 'frog';
+export type EnemyKind = 'slug' | 'moth' | 'thornling' | 'frog' | 'beetle' | 'lantern';
 export type NpcId = 'elder' | 'pip' | 'baker' | 'cat' | 'hermit';
 
 export interface Prop {
@@ -76,8 +76,11 @@ export interface EnemySpawn { kind: EnemyKind; x: number; y: number; room?: stri
 export interface Post { x: number; y: number }
 /** A door across one or more tiles: `key` needs a small key, `bars` opens on a flag, `shut` closes while its room has foes. */
 export interface Door { id: string; x: number; y: number; w: number; h: number; kind: 'key' | 'bars' | 'shut'; flag?: string; room?: string }
-/** A moonstone: lying in the open, under a bush (shows once the bush is cut) or buried (a sword swing on the spot digs it up). */
-export interface Moonstone { id: string; x: number; y: number; hidden?: 'buried' }
+/**
+ * A moonstone: lying in the open, under a bush (shows once the bush is cut) or buried (a sword swing
+ * on the spot digs it up). `chapter` 2 marks the five that count once chapter two starts.
+ */
+export interface Moonstone { id: string; x: number; y: number; hidden?: 'buried'; chapter?: 2 }
 export interface Room { id: string; x: number; y: number; w: number; h: number }
 
 export type ItemId = 'sword' | 'hookvine' | 'key' | 'heart' | 'oil' | 'seeds';
@@ -108,6 +111,8 @@ export interface MapDef {
   boss?: { x: number; y: number };
   /** The fen's will-o'-wisp hops between these tiles. */
   wisp?: { x: number; y: number }[];
+  /** A dungeon's hourglass, by its entry: after chapter two it starts the trial (`GameScene.startTrial`). */
+  hourglass?: { x: number; y: number };
 }
 
 /** A small fixed-seed random number generator, so the maps are the same every time. */
@@ -214,7 +219,7 @@ function village(): MapDef {
   d.stones.push({ id: 'v-pond', x: 13, y: 21 }, { id: 'v-cat', x: -1, y: -1 });
   // A nook in the trees behind the shed, closed by a boulder.
   b.rect(33, 2, 5, 4, 'tree').rect(34, 3, 3, 2, 'grass').set(35, 5, 'boulder');
-  d.stones.push({ id: 'v-nook', x: 35, y: 3 });
+  d.stones.push({ id: 'v-nook', x: 35, y: 3, chapter: 2 });
   b.scatter('tree', 7, { x: 2, y: 2, w: 36, h: 22 }, 11, 'grass', 2);
   b.scatter('bush', 8, { x: 2, y: 2, w: 36, h: 22 }, 12);
   b.scatter('flowers', 30, { x: 2, y: 2, w: 36, h: 22 }, 13, 'grass', 0);
@@ -247,7 +252,7 @@ function woods(): MapDef {
   b.rect(16, 21, 3, 3, 'bush').set(17, 22, 'grass');
   // Past the river, a hollow in the trees with a boulder for a door.
   b.rect(2, 4, 5, 5, 'tree').rect(3, 5, 3, 3, 'grass').set(4, 8, 'boulder');
-  d.stones.push({ id: 'w-hollow', x: 4, y: 6 });
+  d.stones.push({ id: 'w-hollow', x: 4, y: 6, chapter: 2 });
   d.stones.push({ id: 'w-bush', x: 17, y: 22 });
   d.enemies.push(
     { kind: 'slug', x: 26, y: 23 }, { kind: 'slug', x: 30, y: 18 }, { kind: 'slug', x: 37, y: 15 }, { kind: 'slug', x: 19, y: 14 },
@@ -257,6 +262,8 @@ function woods(): MapDef {
   b.scatter('tree', 70, { x: 2, y: 2, w: 46, h: 28 }, 21, 'grass', 1);
   b.scatter('bush', 16, { x: 12, y: 2, w: 36, h: 28 }, 22);
   b.scatter('flowers', 24, { x: 2, y: 2, w: 46, h: 28 }, 23, 'grass', 0);
+  // Added after the scatter, so the trees and bushes it sows stay where they were.
+  d.enemies.push({ kind: 'beetle', x: 28, y: 25 }, { kind: 'beetle', x: 38, y: 13 }, { kind: 'lantern', x: 36, y: 6 });
   return d;
 }
 
@@ -283,6 +290,7 @@ function fen(): MapDef {
   b.prop('shroom', 14, 5).prop('shroom', 33, 4).prop('shroom', 21, 21).prop('shroom', 3, 7);
   b.scatter('tree', 18, { x: 2, y: 2, w: 32, h: 20 }, 32, 'grass', 1);
   b.scatter('flowers', 14, { x: 2, y: 2, w: 32, h: 20 }, 33, 'grass', 0);
+  d.enemies.push({ kind: 'beetle', x: 21, y: 16 }, { kind: 'lantern', x: 16, y: 10 });
   return d;
 }
 
@@ -316,12 +324,15 @@ function shrine(): MapDef {
   d.stones.push({ id: 's-alcove', x: 6, y: 22 }, { id: 's-boss', x: 21, y: 6 });
   // Behind the entry hall's east wall, a niche the builders walled up.
   b.rect(28, 43, 2, 3, 'floor').set(27, 44, 'crack');
-  d.stones.push({ id: 's-niche', x: 29, y: 44 });
+  d.stones.push({ id: 's-niche', x: 29, y: 44, chapter: 2 });
   d.signs.push({ x: 24, y: 46, text: t('signShrine') });
+  d.hourglass = { x: 18, y: 47 };
   d.enemies.push(
     { kind: 'thornling', x: 5, y: 47, room: 'key' }, { kind: 'slug', x: 9, y: 45, room: 'key' }, { kind: 'slug', x: 6, y: 44, room: 'key' },
     { kind: 'thornling', x: 26, y: 31, room: 'hall' }, { kind: 'moth', x: 18, y: 35, room: 'hall' },
     { kind: 'thornling', x: 39, y: 37, room: 'block' }, { kind: 'moth', x: 38, y: 21, room: 'vine' },
+    // Added later: new kinds go at the end, so the beaten flags (`foe-<i>`) of the first ones keep their index.
+    { kind: 'beetle', x: 22, y: 36, room: 'hall' }, { kind: 'lantern', x: 17, y: 18, room: 'pits' },
   );
   b.prop('brazier', 18, 43).prop('brazier', 25, 43).prop('brazier', 16, 30).prop('brazier', 27, 30).prop('brazier', 32, 30);
   b.prop('brazier', 39, 17).prop('brazier', 27, 17).prop('brazier', 10, 3).prop('brazier', 33, 3).prop('brazier', 4, 42);
@@ -352,7 +363,7 @@ function belfry(): MapDef {
   d.posts.push({ x: 25, y: 22 }, { x: 31, y: 22 });
   // A hollow behind the flooded room's far wall.
   b.rect(35, 23, 2, 2, 'floor').set(34, 24, 'crack');
-  d.stones.push({ id: 'b-hollow', x: 36, y: 24 }, { id: 'b-bell', x: 18, y: 6 });
+  d.stones.push({ id: 'b-hollow', x: 36, y: 24, chapter: 2 }, { id: 'b-bell', x: 18, y: 6, chapter: 2 });
   // Three bells to ring in the right order; the bars to the flooded room lift when they are.
   b.prop('bell', 4, 20, 1, 1, undefined, 0).prop('bell', 6, 22, 1, 1, undefined, 2).prop('bell', 8, 20, 1, 1, undefined, 1);
   d.doors.push(
@@ -361,6 +372,7 @@ function belfry(): MapDef {
     { id: 'boss-door', x: 17, y: 14, w: 2, h: 1, kind: 'shut', room: 'boss' },
     { id: 'bells-door', x: 12, y: 21, w: 1, h: 2, kind: 'shut', room: 'bells' },
   );
+  d.hourglass = { x: 14, y: 35 };
   d.chests.push({ id: 'belfry-key', x: 32, y: 22, item: 'key' }, { id: 'belfry-heart', x: 3, y: 25, item: 'heart' });
   d.signs.push(
     { x: 21, y: 32, text: t('signBells') },
@@ -371,6 +383,7 @@ function belfry(): MapDef {
     { kind: 'moth', x: 18, y: 22, room: 'hub' }, { kind: 'thornling', x: 21, y: 19, room: 'hub' },
     { kind: 'frog', x: 4, y: 24, room: 'bells' }, { kind: 'frog', x: 8, y: 25, room: 'bells' }, { kind: 'slug', x: 9, y: 19, room: 'bells' },
     { kind: 'frog', x: 32, y: 19, room: 'flood' }, { kind: 'moth', x: 28, y: 24, room: 'flood' },
+    { kind: 'beetle', x: 16, y: 24, room: 'hub' }, { kind: 'lantern', x: 32, y: 25, room: 'flood' },
   );
   b.prop('candle', 14, 31).prop('candle', 21, 31).prop('candle', 14, 19).prop('candle', 21, 25).prop('candle', 3, 19).prop('candle', 9, 19);
   b.prop('candle', 25, 19).prop('candle', 33, 26).prop('candle', 7, 4).prop('candle', 28, 4).prop('candle', 7, 12).prop('candle', 28, 12);
@@ -382,6 +395,8 @@ function belfry(): MapDef {
 }
 
 const BUILT: Record<MapId, () => MapDef> = { village, woods, fen, shrine, belfry };
+/** Every map, in the order the moonstone page lists them. */
+export const MAP_IDS = Object.keys(BUILT) as MapId[];
 
 /** Whether `id` names a map (a save from another version may not). */
 export function isMapId(id: unknown): id is MapId {

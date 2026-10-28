@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { ARENA, BUILD_RANGE, NODE_AMOUNT } from '../game/arena';
+import { checkTrophies } from '../trophies/check';
 import { DERELICT_KINDS, generateMap, localRandom, type MapLayout } from '../game/map';
 import { FACTIONS, type Role, type UnitId } from '../game/factions';
 import { CONTRACT_STEPS, FLAGSHIP_STEP, RANKS, contractOf, type Goal } from '../game/contracts';
@@ -232,6 +233,8 @@ export class GameScene extends Phaser.Scene {
   private beaconImg!: Phaser.GameObjects.Image;
   private beaconLabel!: Phaser.GameObjects.Text;
   private derelictLabels: Phaser.GameObjects.Text[] = [];
+  /** Each rival's own contract, under its status in the rivals panel. */
+  private rivalDeals: Phaser.GameObjects.Text[] = [];
   private rivalTexts: { name: Phaser.GameObjects.Text; status: Phaser.GameObjects.Text; b1: Phaser.GameObjects.Text; b2: Phaser.GameObjects.Text }[] = [];
   private rivalsHead!: Phaser.GameObjects.Text;
   private rivalsHint!: Phaser.GameObjects.Text;
@@ -443,6 +446,8 @@ export class GameScene extends Phaser.Scene {
       kept: t(st.nodeX - st.r, st.y + 64, 10, INK_CSS.mustard, false, 21).setWordWrapWidth(st.x + st.w - st.nodeX).setMaxLines(1),
       names: this.sectorNodes.map((n) => t(n.x, n.y + n.r + 3, 9, INK_CSS.cream, true, 21).setOrigin(0.5, 0)),
     };
+    this.rivalDeals = FACTIONS.slice(1).map((_, k) => t(RIVALS_PANEL.x + 24, RIVALS_PANEL.y + RIVALS_PANEL.head + k * RIVALS_PANEL.row + 49, 10, INK_CSS.rust, true, 22)
+      .setVisible(false));
     Math.random = random;
   }
 
@@ -583,6 +588,7 @@ export class GameScene extends Phaser.Scene {
     if (!this.picking) {
       // Watching, the battle runs once per step of the chosen speed, none while held.
       for (let i = watchSteps(); i > 0; i--) this.state.update(dt);
+      checkTrophies(this.state);
       this.selected = new Set([...this.selected].filter((id) => this.state.selectable(id)));
       this.clock += dt;
     }
@@ -1038,6 +1044,7 @@ export class GameScene extends Phaser.Scene {
     const show = this.rivalsOpen && !this.picking && !watching;
     this.rivalsHead.setVisible(show);
     this.rivalTexts.forEach((t) => [t.name, t.status, t.b1, t.b2].forEach((x) => x.setVisible(show)));
+    this.rivalDeals.forEach((x) => x.setVisible(show));
     this.rivalButtons = [];
     if (!show) return;
     const rp = RIVALS_PANEL;
@@ -1069,6 +1076,11 @@ export class GameScene extends Phaser.Scene {
       this.setText(t.name, tr(r.def.name));
       t.b1.setVisible(false);
       t.b2.setVisible(false);
+      const deal = r.deal;
+      const c = deal.goal ? contractOf(deal.goal) : null;
+      this.setText(this.rivalDeals[k], !r.alive ? '' : c
+        ? tr('rivalDeal', { rank: RANKS[deal.step], title: c.title(r.def), n: Math.floor(deal.progress), target: c.target })
+        : deal.step >= CONTRACT_STEPS ? tr('rivalDealsDone') : '');
       if (!r.alive) {
         this.setText(t.status, tr('fallen'));
         return;

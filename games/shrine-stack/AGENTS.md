@@ -16,7 +16,8 @@ favor. From tier 2 stones come heavy or light, each tier sets a trial and a ston
 reserve. From tier 3 the temple leans with every off-centre drop (too far and the tier topples), a
 chain of perfect drops grows the stone back, and each break picks the next tier's material. Tier 10
 is gilded (double favor) and finishing tier 12 crowns the shrine and wins; the player can then keep
-building into an endless, gusty sky.
+building into an endless, gusty sky, where every tenth tier is a sky altar (double favor and a
+blessing even when wobbly).
 
 Implemented today:
 
@@ -56,6 +57,14 @@ Implemented today:
 - Endless sky (SS4): `keepBuilding` after the crown sets `endless` and spawns the next stone; each
   stone then gets a `wind` from `gust` (chance `GUST_CHANCE`, strength `WIND_BASE` +
   `WIND_PER_TIER` per tier past 13, up to `WIND_MAX`) that pushes it sideways while it falls.
+- Sky altars: every `ALTAR_EVERY`th (10th) tier past `GOAL_TIER` (22, 32, ...; `isAltar`,
+  `nextAltar`) earns `ALTAR_MULT` (2) times the favor (in `gild`, like the gilded tier) and, when
+  finished, counts in `altars`, pushes an `altar` event and rolls `offer` and `curseOffer` even when
+  wobbly (`blessed` in `land`). The scene draws its stones cloud-silver (`ALTAR_STONE`, with a
+  silver line and two stars), trims it like a balanced tier on `altar` (with a `gong`), plays the
+  `gilded` part while it is built, titles the break `altarBlessing`, announces the tier when it
+  starts (`tierNotice`, `altarTierFavour`) and, in the sky, swaps the goal box's last line
+  (`goalNote`) for the next altar (`altarGoal`).
 - The temple leans (SS6): from `LEAN_FROM_TIER` (3) `land` adds each placed stone's offset from the
   one below to `lean` (+ right; a perfect drop adds 0). Past `LEAN_MAX` (60) `topple` removes the
   tier's stones placed so far (`inTier` of them), takes back the favor they earned (`tierFavor`,
@@ -102,13 +111,13 @@ Implemented today:
 Missing or rough:
 
 - The title, pause and sound buttons are the shared ones from `setupGame`. Only the best height persists; a reload starts a new temple.
-- The endless sky has no blessings or shop past what tiers give; gusts are the only new pressure.
+- Past tier 23 gusts stop growing (`WIND_MAX`); the sky altars are the only milestones after that.
 - A tap is ignored while a stone falls; a tap during the blessing choice lands on the dim.
 - The clouds stop about 16000 pixels up (`createBackdrop`), roughly 190 tiers.
 - `docs/screenshots/game-over.webp`, `gilded.webp`, `crowned.webp`, `wobbly-break.webp`,
   `shop-bought.webp`, `curse-taken.webp`, `stone-kinds.webp`, `endless-gust.webp`, `four-blessings.webp`,
   `material-pick.webp`, `reserve.webp`, `lean-meter.webp`, `toppled.webp`, `regrown.webp`,
-  `storm-gust.webp`, `crowned-blessing.webp`, `fill-ultrawide.webp`, `fill-tablet.webp` (the play scene filling a 2560x1080 and a 1024x768 screen) and `cover.png` (a copy of `gilded.webp`) are not produced by the test; refresh
+  `storm-gust.webp`, `crowned-blessing.webp`, `sky-altar.webp`, `sky-altar-blessing.webp`, `trophy-earned.webp`, `trophies.webp`, `fill-ultrawide.webp`, `fill-tablet.webp` (the play scene filling a 2560x1080 and a 1024x768 screen) and `cover.png` (a copy of `gilded.webp`) are not produced by the test; refresh
   them by hand (play several tiers in the dev build, or drive it with a Playwright script that taps
   like the test does) if the look changes.
 
@@ -132,7 +141,7 @@ File map (`src/`):
 - `game/state.ts`: the tuning constants (`TOWER_X`, `PLINTH_W`, `START_W`, `STONE_H`, `DROP_GAP`,
   `SWING`, `BASE_SPEED`, `TIER_SPEEDUP`, `CALM`, `GRAVITY`, `PERFECT_PX`, `STEADY_PX`, `BROAD_PX`,
   `STONES_PER_TIER`, `BALANCE`, `PERFECT_FAVOR`, `TIER_FAVOR`, `OFFER_SIZE`, `MIN_W`,
-  `REROLL_COST`, `GILDED_TIER`, `GILDED_MULT`, `GOAL_TIER`, `SLOW_MULT`, `WIDER_PX`,
+  `REROLL_COST`, `GILDED_TIER`, `GILDED_MULT`, `GOAL_TIER`, `ALTAR_EVERY`, `ALTAR_MULT`, `SLOW_MULT`, `WIDER_PX`,
   `KINDS_FROM_TIER`, `HEAVY_CHANCE`, `LIGHT_CHANCE`, `KIND_SPEED`, `HEAVY_CRACK`, `LIGHT_FAVOR`,
   `TRIALS_FROM_TIER`, `TRIAL_KEEP`, `TRIAL_FAVOR`, `CURSE_MULT`, `HASTE`, `BRITTLE_CRACK`,
   `GUST_CHANCE`, `WIND_BASE`, `WIND_PER_TIER`, `WIND_MAX`, `LEAN_FROM_TIER`, `LEAN_MAX`,
@@ -144,7 +153,7 @@ File map (`src/`):
   (`patronSpeed`, `speedFor`, `newGame`, `choosePatron`, `offerSize`, `blessingsFor`, `shopFor`,
   `stackHeight`, `topOf`, `curseNow`, `swingSpeed`, `perfectWindow`, `canSwap`, `swapReserve`,
   `tick`, `drop`, `canPickMaterial`, `chooseMaterial`, `chooseBlessing`, `canReroll`, `reroll`,
-  `canBuy`, `buy`, `toggleCurse`, `buildOn`, `keepBuilding`, `gild`, `materialMult`, `favorMult`,
+  `canBuy`, `buy`, `toggleCurse`, `buildOn`, `keepBuilding`, `isAltar`, `nextAltar`, `gild`, `materialMult`, `favorMult`,
   `stoneFavor`, `gusty`; `pickPatrons`, `spawn`, `gustFor`, `kindFor`, `gust`, `land`, `topple`,
   `pickOffer`, `pickCurse`, `widenTop` and `endBreak` are private). No Phaser; `speedFor` reads
   `byDifficulty` from `shared/settings.ts`.
@@ -157,6 +166,18 @@ File map (`src/`):
   (the three on buttons) and `PATRONS`/`PatronId`/`PATRON_INFO` (name, boon, bane, colour). Every
   name and text is a `TextKey` of `i18n/en.ts`, which the scene shows with `t`.
 - `game/save.ts`: `loadBest` and `saveBest`.
+- `trophies/`: the game's eight trophies (`shared/trophies.ts`). `index.ts` lists them (`trophies`:
+  id, tier, icon, `hidden` for the two sky altar ones) with their texts in `trophies/i18n/` (`en.ts`,
+  `de.ts` and `en-US.ts` for "favor": the name keyed by the id, what earns it by `<id>Text`), and
+  imports nothing else from the game, since the hub loads it for its trophy shelf. `main.ts` hands
+  `trophies` to `setupGame`, which lists them on the start and pause screens. `check.ts` holds each
+  trophy's condition on a `GameEvent` and the state after it (`EARNED`): First course (any `tier`),
+  Grown back (`regrown`), Bound by a curse (a `tier` with `cursed`), Leaf gold (`tier`
+  `GILDED_TIER`), Crowned shrine (`tier` `GOAL_TIER`), Flawless shrine (the same with
+  `balancedTiers === GOAL_TIER`), Altar in the clouds (`altar`) and Stairway of altars (`altar` with
+  `altars >= THREE_ALTARS`, 3). `GameScene.update` calls `checkTrophies(state, event)` for every
+  event it shows; nothing restores a run, so no award is quiet. A new trophy is an entry in
+  `index.ts`, its two texts in each language file and its condition in `EARNED`.
 - `scenes/GameScene.ts`: everything drawn, plus `setFitted`, `drawStone`, `materialColor`, `tierColor`,
   `blend`, `shade`, `seeded`, `pin` and `place` helpers and the `UiPart` type.
 - `scenes/layout.ts`: `VIEW`, `PLINTH_Y`, `TOP_SCREEN_Y`, `PANEL`, `CARDS`, `CARDS_FOUR`,
@@ -194,9 +215,9 @@ How it runs:
   offer, when favor reaches `CHEAPEST` or from `MATERIAL_FROM_TIER`. Then it spawns the next stone
   from the side opposite the last.
 - Events: the rules push `GameEvent`s (`placed` with a copy of the stone, its row and the favor it
-  earned, `missed` with the stone's tier, kind and material, `tier`,
-  `trial` (failed mid-tier, or passed with its favor), `rerolled`, `bought`, `toppled` (how many
-  stones, the lean and the favor lost), `regrown`, `swapped` (the kind now in hand), `patron`) onto
+  earned, `missed` with the stone's tier, kind and material, `tier` (balanced, and whether a curse
+  was in force), `trial` (failed mid-tier, or passed with its favor), `rerolled`, `bought`, `toppled` (how many
+  stones, the lean and the favor lost), `regrown`, `swapped` (the kind now in hand), `patron`, `altar`) onto
   `state.events`; the scene drains them each frame in `show`, which draws the new
   stone, debris, popups, glow, lanterns, the crown and banners, and on `toppled` sends the last
   stone views tumbling (`tumble`). Nothing else in the scene changes state.
@@ -249,13 +270,13 @@ State model (`GameState`): `phase` (`patron`, `swinging`, `falling`, `blessing`,
 `balancedTiers`, `favor`, `tierFavor`, `blessings` (in the order chosen) and `offer`, the blessing-driven
 `speed`, `perfectPx`, `favorPerStone` and `grace`, `dropped` (misses included), `lastDrop`, `best`,
 `nextKind`, `slow`, `bought`, `trial`, `curseOffer`, `cursed`, `curse` (`{ id, tier }`), `endless`,
-`wind`, `lean`, `chain`, `material`, `reserve` and `swapped`, `patronOffer` and `patron`, and
+`wind`, `altars`, `lean`, `chain`, `material`, `reserve` and `swapped`, `patronOffer` and `patron`, and
 `events`. `Stone` and `Moving` carry a `kind` and a `material`. Only
 `src/game/state.ts` mutates it. `moving` exists in every phase; it simply does not move outside
 `swinging`/`falling`.
 
-Persistence: one `localStorage` key, `shrine-stack-best`, holding the most tiers built in one
-temple. The scene writes it when a tier finishes and on game over. The hub's settings are read
+Persistence: `shrine-stack-best` in `localStorage` holds the most tiers built in one temple, and
+`shrine-stack-trophies` the trophies earned (`shared/trophies.ts`), each id with the time. The scene writes it when a tier finishes and on game over. The hub's settings are read
 from the shared `hub-settings` key, not from this game's save.
 
 Randomness and timing: `Math.random` is used only in the rules: `pickPatrons`, `pickOffer`,
@@ -289,8 +310,8 @@ the part each frame from the phase and switches only when it changes (the engine
 bar):
 
 - `calm` (8 bars): stacking (`swinging`/`falling`) on every tier but the gilded one.
-- `gilded` (4 bars, D major, busier beat): stacking on tier `GILDED_TIER`.
-- `sky` (4 bars, high and sparse): stacking in the endless sky.
+- `gilded` (4 bars, D major, busier beat): stacking on tier `GILDED_TIER` and on a sky altar.
+- `sky` (4 bars, high and sparse): stacking in the endless sky between altars.
 - `break` (4 bars, harp-like arpeggios over held notes): the patron pick, the breaks between tiers
   and the end panels.
 - Stings: `crown` in `crownTemple`, `fall` on the `missed` event that ends the run.
@@ -309,7 +330,7 @@ Effects, `sfx` (all from `GameScene`):
 | `rumble` + `tumble` | `toppled` |
 | `saved` / `crash` | `missed`, caught by Mason's Grace / not |
 | `swish` | `swapped` |
-| `gong` | `patron` |
+| `gong` | `patron`, `altar` |
 | `choir` | `onChosen` (a blessing taken) |
 | `shuffle` | `rerolled` |
 | `stone` | a material button that changed the pick |
@@ -345,8 +366,9 @@ Reroll or shop button that can't be used, and for the Swap button or R while sta
   ordinary limestone stones and no trial, lean or reserve on tier 1 (`KINDS_FROM_TIER`,
   `TRIALS_FROM_TIER`, `RESERVE_FROM_TIER` at 2, `LEAN_FROM_TIER`, `MATERIAL_FROM_TIER` at 3), each
   patron's first-round rule in `PATRON_RULES` (pace, favor per stone and per perfect drop, offer
-  size, shop items, perfect window), two patrons offered, the scene key `'Game'` and the save key
-  `shrine-stack-best`.
+  size, shop items, perfect window), two patrons offered, the scene key `'Game'`, the save key
+  `shrine-stack-best`, and `shrine-stack-trophies` holding only `firstTier` after the first tier
+  (a trophy a first round can earn goes into that assertion).
 - It saves `playthrough-0-patrons`, `-0-start`, `-1-first-stone`, `-2-blessing` and `-3-tier-2`
   screenshots; copy them into `docs/screenshots/` when the look changes.
 

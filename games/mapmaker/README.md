@@ -195,6 +195,28 @@ and the moon or sun button beside the panel's logo switches it, which the game r
 
 ![The harbor on the night sheet](docs/screenshots/dark-theme-harbor.webp)
 
+## Trophies
+
+Ten trophies, listed behind the Trophies button on the start and pause screens and counted on the
+hub's card:
+
+| Trophy | Tier | Earned by |
+| --- | --- | --- |
+| First chart | Bronze | Selling your first chart at the port |
+| Named on the map | Bronze | Charting a whole river, road or wood |
+| Cave finds | Bronze | Finding an artefact in a cave |
+| Better kit | Bronze | Buying your first upgrade |
+| Riddle solved | Silver | Digging up an isle's treasure |
+| Full purse | Silver | Having 300 coins at once |
+| First page | Silver | Charting an isle to its last tile |
+| Royal cartographer | Gold | Completing the Royal Atlas |
+| One step ahead (hidden) | Gold | Digging up the treasure on an isle the rival is charting |
+| Fully equipped (hidden) | Gold | Buying every upgrade to its last rank |
+
+![The Trophies list on the pause screen](docs/screenshots/trophy-list.webp)
+
+![A trophy earned while charting](docs/screenshots/trophy-toast.webp)
+
 ## Difficulty
 
 The hub's Difficulty setting changes the supplies of a voyage: 16 on Easy, 12 on Normal, 9 on Hard.
@@ -207,6 +229,8 @@ The hub's Difficulty setting changes the supplies of a voyage: 16 on Easy, 12 on
   lays out the board and the hands, buys and tracks the isle goal and the Royal Atlas, `state.ts`
   holds the state and numbers, `terrain.ts`, `kinds.ts`, `upgrades.ts` and `hands.ts` the tables,
   `save.ts` the save, the best and the theme.
+- `src/trophies/`: the trophies (`index.ts`), their texts (`i18n/`) and when each is earned
+  (`check.ts`).
 - `src/scenes/`: `BootScene` bakes the art, `GameScene` paints the island and draws the sheet,
   panel and overlays and takes the taps, `layout.ts` says where everything goes.
 - `src/art/`: the survey-sheet art, painted on canvases in code: `map.ts` (terrain, contours,

@@ -139,7 +139,8 @@ const en = {
 
   // Banners
   waveCleared: 'Wave {n} cleared!  +{sap} sap',
-  waveCalled: 'Wave {n} called early!  +{sap} sap',
+  waveCalled: 'Wave {n} called early!',
+  calledPending: '+{sap} sap once wave {n} is gone',
   compostBonus: ', +{n} compost',
   harvestBanner: { one: 'Harvest! {stars} with {n} leaf kept', other: 'Harvest! {stars} with {n} leaves kept' },
   bloomBanner: 'The Heartwood is in bloom: Thorn golem unlocked!',

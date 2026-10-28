@@ -7,15 +7,18 @@ import Phaser from 'phaser';
 import { HEROES, HERO_IDS, schemeOf, type HeroDef, type HeroId } from '../game/heroes';
 import { clock, type GameState } from '../game/state';
 import { CAPSTONES, FILLER, MAX_TIER, POOL_NAMES, UPGRADES, capstoneFor, crossoverFor } from '../game/upgrades';
-import { BOSSES, NODE_INFO, PLANETS, STAGES, TRADE, planetLabel, planetsAt, type NodeKind } from '../game/planets';
-import { chartOptions, priceOf } from '../game/voyage';
+import { BOSSES, NODE_INFO, PLANETS, STAGES, planetLabel, planetsAt, type NodeKind } from '../game/planets';
+import { chartOptions, priceOf, rerollPrice } from '../game/voyage';
 import { isUnlocked, type Progress } from '../game/save';
+import { HEAT_RULES, heatOpen } from '../game/heat';
+import { ARMOURY, nextPrice, perkAmount } from '../game/armoury';
+import { MUTATORS, WEEKLY_BONUS, type MutatorId } from '../game/weekly';
 import type { Vars } from '../../../../shared/i18n';
 import { t } from '../i18n';
 import { C, hex } from '../art/glow';
 import { portraitKey } from '../art/sprites';
 import {
-  AGAIN, CHART, CONTINUE, DEPTH, FIGHT, FONT, HERO_DETAIL, LEAVE, MAP, REROLL, SCREEN, UNLOCK, VIEW, chartRect, chartSpot, eventOptionRect, heroCardRect,
+  AGAIN, ARMOURY_BUTTON, BACK, CHART, MUTATOR_CARD, WEEKLY_BACK, WEEKLY_BUTTON, WEEKLY_START, armouryCardRect, CONTINUE, DEPTH, FIGHT, FONT, HEAT_DOWN, HEAT_ROW, HEAT_UP, HERO_DETAIL, LEAVE, MAP, REROLL, SCREEN, UNLOCK, VIEW, chartRect, chartSpot, eventOptionRect, heroCardRect,
   levelCardRect, mapNodeRect, mapNodeSpot, tradeCardRect, type Rect,
 } from '../scenes/layout';
 
@@ -136,15 +139,92 @@ function sideOf(hero: HeroDef) {
  * The hero select screen: twelve small cards (a hero still locked shows only a dark placeholder:
  * no art, name or colour, and never its deed) and the chosen hero's details with the Fight button.
  */
-export function heroSelect(p: Panel, progress: Progress, chosen: HeroId) {
+export function heroSelect(p: Panel, progress: Progress, chosen: HeroId, heat = 0, week = -1) {
   const scene = p.scene;
   p.dim(0.55);
   p.text(VIEW.w / 2, 12, 'RIFTBLADE', 32, '#9fd8ff', { bold: true, origin: [0.5, 0], glow: true });
   p.text(VIEW.w / 2, 54, t('selectSubtitle'), 14, C.muted, { origin: [0.5, 0] });
   HERO_IDS.forEach((id, i) => heroCard(p, scene, id, i, progress, id === chosen));
-  heroDetail(p, scene, chosen, progress);
+  heroDetail(p, scene, chosen, progress, heat);
   const best = progress.bestMs > 0 ? `${t('longestRun', { time: clock(progress.bestMs) })}  ·  ` : '';
   p.text(VIEW.w / 2, VIEW.h - 22, `${best}${t('selectHelp')}`, 13, C.muted, { origin: [0.5, 0.5] });
+  // The Armoury opens once a run has banked credits (a fresh save's screen stays as it was).
+  if (progress.bank > 0 || Object.keys(progress.armoury).length) {
+    p.frame(ARMOURY_BUTTON, ARMOURY_COLOR, '#1d1a10');
+    p.spots.push({ id: 'armoury', ...ARMOURY_BUTTON });
+    fit(p.text(ARMOURY_BUTTON.x + ARMOURY_BUTTON.w / 2, ARMOURY_BUTTON.y + ARMOURY_BUTTON.h / 2, t('armouryButton', { n: progress.bank }), 14, ARMOURY_COLOR, { bold: true, origin: [0.5, 0.5] }), ARMOURY_BUTTON.w - 16);
+  }
+  // The weekly run opens once a first run has ended.
+  if (progress.bestMs > 0) {
+    const won = progress.weekly?.week === week && progress.weekly.won;
+    p.frame(WEEKLY_BUTTON, WEEKLY_COLOR, '#101c2a');
+    p.spots.push({ id: 'weekly', ...WEEKLY_BUTTON });
+    fit(p.text(WEEKLY_BUTTON.x + WEEKLY_BUTTON.w / 2, WEEKLY_BUTTON.y + WEEKLY_BUTTON.h / 2, t(won ? 'weeklyButtonWon' : 'weeklyButton'), 14, WEEKLY_COLOR, { bold: true, origin: [0.5, 0.5] }), WEEKLY_BUTTON.w - 16);
+  }
+  return p;
+}
+
+const ARMOURY_COLOR = '#ffb347';
+const WEEKLY_COLOR = '#7fe3ff';
+
+/** The weekly run: the week's hero, its two mutators, how far it went this week, Start and Back. */
+export function weeklyPanel(p: Panel, progress: Progress, week: number, hero: HeroId, mutators: readonly MutatorId[]) {
+  const scene = p.scene;
+  p.dim(0.85);
+  stars(p, scene);
+  p.text(VIEW.w / 2, 30, t('weeklyTitle'), 30, WEEKLY_COLOR, { bold: true, origin: [0.5, 0], glow: true });
+  p.text(VIEW.w / 2, 72, t('weeklySubtitle', { n: week }), 13, C.muted, { origin: [0.5, 0], align: 'center', wrap: VIEW.w - 80 });
+  const sch = schemeOf(hero);
+  const hx = 220;
+  p.text(hx, MUTATOR_CARD.y, t('weeklyHero'), 13, C.muted, { origin: [0.5, 0] });
+  p.add(scene.add.image(hx, MUTATOR_CARD.y + 80, portraitKey(hero)).setScale(0.8), 2);
+  fit(p.text(hx, MUTATOR_CARD.y + 130, t(HEROES[hero].name), 19, sch.accent, { bold: true, origin: [0.5, 0] }), 300);
+  mutators.forEach((id, i) => {
+    const r = { x: MUTATOR_CARD.x + i * MUTATOR_CARD.gap, y: MUTATOR_CARD.y, w: MUTATOR_CARD.w, h: MUTATOR_CARD.h };
+    p.frame(r, WEEKLY_COLOR);
+    p.text(r.x + r.w / 2, r.y + 22, t(MUTATORS[id].name), 18, WEEKLY_COLOR, { bold: true, origin: [0.5, 0] });
+    p.text(r.x + r.w / 2, r.y + 58, t(MUTATORS[id].text), 14, C.text, { origin: [0.5, 0], align: 'center', wrap: r.w - 28 });
+  });
+  const mine = progress.weekly?.week === week ? progress.weekly : null;
+  const best = !mine ? t('weeklyBestNone') : mine.won ? t('weeklyWon') : t('weeklyBest', { n: mine.best, of: STAGES });
+  p.text(VIEW.w / 2, 330, best, 17, mine?.won ? C.elite : C.text, { bold: true, origin: [0.5, 0] });
+  if (!mine?.won) p.text(VIEW.w / 2, 360, t('weeklyReward', { n: WEEKLY_BONUS }), 14, C.muted, { origin: [0.5, 0] });
+  button(p, WEEKLY_BACK, 'back', t('armouryBack'), C.muted);
+  button(p, WEEKLY_START, 'start', t('weeklyStart'), WEEKLY_COLOR);
+  p.text(VIEW.w / 2, WEEKLY_START.y + WEEKLY_START.h + 16, t('weeklyHelp'), 12, C.muted, { origin: [0.5, 0] });
+  return p;
+}
+
+/** The Armoury: a card per piece with its rank and the next rank's price, and Back. */
+export function armouryPanel(p: Panel, progress: Progress) {
+  const scene = p.scene;
+  p.dim(0.85);
+  stars(p, scene);
+  p.text(VIEW.w / 2, 30, t('armouryTitle'), 30, ARMOURY_COLOR, { bold: true, origin: [0.5, 0], glow: true });
+  p.text(VIEW.w / 2, 72, t('armourySubtitle'), 13, C.muted, { origin: [0.5, 0], align: 'center', wrap: VIEW.w - 80 });
+  p.text(VIEW.w / 2, 112, t('armouryBank', { n: progress.bank }), 17, C.elite, { bold: true, origin: [0.5, 0] });
+  ARMOURY.forEach((def, i) => {
+    const r = armouryCardRect(i, ARMOURY.length);
+    const rank = progress.armoury[def.id] ?? 0;
+    const price = nextPrice(def.id, rank);
+    const afford = price !== null && progress.bank >= price;
+    p.frame(r, price === null ? C.elite : afford ? ARMOURY_COLOR : C.muted);
+    p.spots.push({ id: def.id, ...r });
+    const cx = r.x + r.w / 2;
+    p.text(r.x + 8, r.y + 7, String(i + 1), 12, C.muted);
+    fit(p.text(cx, r.y + 30, t(def.name), 17, C.text, { bold: true, origin: [0.5, 0] }), r.w - 16);
+    const g = p.add(scene.add.graphics(), 2);
+    const max = def.prices.length;
+    for (let k = 0; k < max; k++) {
+      const x = cx + (k - (max - 1) / 2) * 22;
+      g.fillStyle(hex(k < rank ? ARMOURY_COLOR : '#2a3550'), 1).fillCircle(x, r.y + 70, 7);
+    }
+    p.text(cx, r.y + 86, t('armRank', { n: rank, of: max }), 12, C.muted, { origin: [0.5, 0] });
+    p.text(cx, r.y + 112, t(def.text, { n: perkAmount(def.id, Math.max(1, price === null ? rank : rank + 1)) }), 13.5, C.text, { origin: [0.5, 0], align: 'center', wrap: r.w - 20 });
+    p.text(cx, r.y + r.h - 16, price === null ? t('armMaxed') : t('armPrice', { n: price }), 15, price === null ? C.elite : afford ? ARMOURY_COLOR : C.muted, { bold: true, origin: [0.5, 1] });
+  });
+  button(p, BACK, 'back', t('armouryBack'), ARMOURY_COLOR);
+  p.text(VIEW.w / 2, BACK.y + BACK.h + 16, t('armouryHelp'), 12, C.muted, { origin: [0.5, 0] });
   return p;
 }
 
@@ -177,12 +257,13 @@ function heroCard(p: Panel, scene: Phaser.Scene, id: HeroId, i: number, progress
   p.text(cx, r.y + 142, sideOf(hero), 11, sch.accent, { origin: [0.5, 0], align: 'center', wrap: r.w - 8 });
   const wins = progress.wins[id] ?? 0;
   const furthest = progress.furthest[id] ?? 0;
-  const status = wins > 0 ? t('wins', { n: wins }) : furthest > 0 ? t('reached', { n: furthest, of: STAGES }) : '';
+  const best = progress.heat[id] ?? 0;
+  const status = wins > 0 ? `${t('wins', { n: wins })}${best > 0 ? `  ·  ${t('cardHeat', { n: best })}` : ''}` : furthest > 0 ? t('reached', { n: furthest, of: STAGES }) : '';
   if (status) p.text(cx, r.y + r.h - 6, status, 10.5, wins > 0 ? C.elite : C.muted, { origin: [0.5, 1] });
 }
 
 /** The chosen hero in full: weapon, numbers, signature and paths; a locked one shows only its placeholder. */
-function heroDetail(p: Panel, scene: Phaser.Scene, id: HeroId, progress: Progress) {
+function heroDetail(p: Panel, scene: Phaser.Scene, id: HeroId, progress: Progress, heat: number) {
   const hero = HEROES[id];
   const sch = schemeOf(id);
   const r = HERO_DETAIL;
@@ -201,15 +282,46 @@ function heroDetail(p: Panel, scene: Phaser.Scene, id: HeroId, progress: Progres
   p.text(cx, r.y + 140, `${t(hero.weapon)}  ·  ${sideOf(hero)}`, 13, sch.accent, { origin: [0.5, 0] });
   p.text(cx, r.y + 160, t('heroStats', { hp: hero.maxHp, speed: hero.speed }), 12.5, C.muted, { origin: [0.5, 0] });
   // The lines flow down, since German runs longer.
-  let y = r.y + 182;
-  for (const [text, color] of [
+  const lines = [
     [t(hero.blurb), C.text],
     [t('signatureFull', { name: t(hero.signature.name), text: t(hero.signature.text) }), sch.accent],
     [t('pathsLine', { paths: hero.paths.map((pid) => t(UPGRADES[pid].name)).join(', ') }), C.text],
-  ]) y += p.text(left, y, text, 12.5, color, { wrap }).height + 6;
+  ].map(([text, color]) => p.text(left, 0, text, 12.5, color, { wrap }));
+  // With the heat row up, the lines shrink until they end above it.
+  const open = heatOpen(progress.heat[id]);
+  const bottom = open > 0 ? HEAT_ROW.y - 4 : FIGHT.y - 4;
+  for (let size = 12.5; ; size -= 0.5) {
+    let y = r.y + 182;
+    for (const line of lines) {
+      line.setFontSize(size).setY(y);
+      y += line.height + 6;
+    }
+    if (y - 6 <= bottom || size <= 10) break;
+  }
+  if (open > 0) heatRow(p, scene, heat, open, sch.accent);
   p.frame(FIGHT, sch.accent, '#14244a');
   p.spots.push({ id: 'fight', ...FIGHT });
   p.text(FIGHT.x + FIGHT.w / 2, FIGHT.y + FIGHT.h / 2, t('fightAs', { name: t(hero.short) }), 18, C.text, { bold: true, origin: [0.5, 0.5] });
+}
+
+/**
+ * The rift heat to fight at, from 0 to the highest open: the arrows step it down and up, and the
+ * line under it names the rule that heat adds (each heat keeps the rules below it).
+ */
+function heatRow(p: Panel, scene: Phaser.Scene, heat: number, open: number, accent: string) {
+  const g = p.add(scene.add.graphics(), 2);
+  const hot = heat > 0 ? '#ff7a3c' : C.muted;
+  g.fillStyle(hex('#0b1222'), 0.9).fillRoundedRect(HEAT_ROW.x, HEAT_ROW.y, HEAT_ROW.w, HEAT_ROW.h, 10);
+  g.lineStyle(2, hex(hot), 0.8).strokeRoundedRect(HEAT_ROW.x, HEAT_ROW.y, HEAT_ROW.w, HEAT_ROW.h, 10);
+  for (const [r, dir, on] of [[HEAT_DOWN, -1, heat > 0], [HEAT_UP, 1, heat < open]] as const) {
+    const cx = r.x + r.w / 2;
+    const cy = r.y + r.h / 2;
+    g.fillStyle(hex(on ? accent : C.muted), on ? 1 : 0.3).fillTriangle(cx + dir * 8, cy, cx - dir * 6, cy - 9, cx - dir * 6, cy + 9);
+    p.spots.push({ id: dir < 0 ? 'heat-down' : 'heat-up', ...r });
+  }
+  const cx = HEAT_ROW.x + HEAT_ROW.w / 2;
+  p.text(cx, HEAT_ROW.y + 4, t('heatLevel', { n: heat }), 14, hot, { bold: true, origin: [0.5, 0] });
+  fit(p.text(cx, HEAT_ROW.y + 23, t(HEAT_RULES[heat]), 11, C.text, { origin: [0.5, 0] }), HEAT_ROW.w - 84);
 }
 
 /** Shrinks a one-line text to fit a width. */
@@ -322,7 +434,7 @@ export function levelUp(p: Panel, s: GameState) {
 }
 
 /** The end of a run: won or fallen, with the numbers and a button to go again. */
-export function endScreen(p: Panel, s: GameState, progress: Progress) {
+export function endScreen(p: Panel, s: GameState, progress: Progress, banked = 0, bonus = 0) {
   p.dim(0.7);
   const won = s.phase === 'won';
   const color = won ? C.elite : C.danger;
@@ -335,6 +447,11 @@ export function endScreen(p: Panel, s: GameState, progress: Progress) {
   const lines = [
     t('runStats', { time: clock(s.runMs), level: s.level, kills: s.kills, elites: s.elitesKilled }),
     caps.length ? t('capstonesLine', { names: caps.join(', ') }) : '',
+    s.heat > 0 ? t('endHeat', { n: s.heat }) : '',
+    won && heatOpen(s.heat) > s.heat ? t('heatOpened', { n: s.heat + 1, hero: t(hero.short) }) : '',
+    s.week >= 0 ? t('weeklyEnd', { mutators: s.mutators.map((id) => t(MUTATORS[id].name)).join(' + ') }) : '',
+    banked > 0 ? t('banked', { n: banked }) : '',
+    bonus > 0 ? t('weeklyBonus', { n: bonus }) : '',
     t('longestRun', { time: clock(progress.bestMs) }),
   ].filter(Boolean);
   p.text(VIEW.w / 2, 226, lines.join('\n'), 15, C.muted, { origin: [0.5, 0], align: 'center' });
@@ -537,7 +654,8 @@ export function trader(p: Panel, s: GameState) {
     p.text(cx, r.y + r.h - 30, t('credits', { n: price }), 16, can ? NODE_INFO.trader.color : C.danger, { bold: true, origin: [0.5, 0] });
     p.text(r.x + 10, r.y + 8, String(i + 1), 12, C.muted);
   });
-  button(p, REROLL, 'reroll', t('reroll', { n: TRADE.reroll }), NODE_INFO.trader.color, s.credits >= TRADE.reroll);
+  const price = rerollPrice(s);
+  button(p, REROLL, 'reroll', price > 0 ? t('reroll', { n: price }) : t('rerollFree'), NODE_INFO.trader.color, s.credits >= price);
   button(p, LEAVE, 'leave', t('leave'), '#9fd8ff');
   return p;
 }

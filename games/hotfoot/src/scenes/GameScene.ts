@@ -46,6 +46,7 @@ import { t, type TextKey } from '../i18n';
 import { BoonCards } from '../ui/BoonCards';
 import { makeButton } from '../ui/Button';
 import { ACTION_BUTTONS, ARMOURY_PANEL, DARE_TAG, FONT, FRAME, GROUND_Y, HUD_SHIFT, MARGIN, RUNNER_X, STAGE_TITLE, STREAK_CHIP, TAG, TAP_SPLIT_Y, TRACK, UI_DEPTH, VIEW } from './layout';
+import { checkTrophies } from '../trophies/check';
 
 /** Longest simulated step, so a backgrounded tab doesn't jump the run forward. */
 const MAX_STEP_MS = 100;
@@ -235,6 +236,7 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     const phase = s.phase;
     tick(s, dt);
+    checkTrophies(s);
     this.clock += dt;
     if (s.phase !== phase && s.phase !== 'running') this.persist();
     this.cues.update(s);

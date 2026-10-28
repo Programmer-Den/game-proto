@@ -12,7 +12,8 @@ block, door, bush, bell, boulder, cracked wall or foe, then acts on it). The que
 shed), `thorns` (cut the thorns over the village's north gate), `shrine` (find and clear the Sunken
 Shrine), `return` (tell the elder), `done` (chapter one's end card; the elder then tells of the
 bell), `bell` (ask Old Sedge), `belfry` (he gives bellseeds; find and clear the Drowned Belfry),
-`home` (tell the elder) and `end` (chapter two's end card, then free roaming).
+`home` (tell the elder) and `end` (chapter two's end card, then the post-game: free roaming, the
+moonstone page and the hourglass trials).
 
 Implemented today:
 
@@ -33,6 +34,16 @@ Implemented today:
   spawn is where the knight came into the map, or, after a reload, where the game was last saved
   (`create` calls `enterMap` with `keepSpawn` false). A fall and an exit in the same frame start
   one fade only (`fadeTo` returns while `fading`).
+- Coins and upgrades. Cut bushes drop a coin now and then (after a heart or a pod didn't) and
+  every beaten foe drops one (`dropCoin`, picked up in `pickups`, `state.coins`). `UPGRADES` in
+  `state.ts` lists what they buy, each `seller`'s and for how much: Marla (`baker`) sells `pie` (one
+  more heart) and `boots` (`BOOTS` in `layout.ts`: a longer roll, `rollMs`, and a shorter cooldown);
+  Old Sedge (`hermit`) sells `pouch` (`BIG_POUCH` bellseeds, `maxSeeds`) and `vine` (`LONG_VINE`
+  times the hookvine's reach), each once its `needs` item is had. Talking to Marla once the blade is
+  back, or to Sedge once he gave bellseeds (after his refill too), ends with the `shop-baker` or
+  `shop-hermit` talk effect, `openShop`, which `Hud.showShop` draws; its buttons or 1 and 2 call
+  `buy` (`state.ts`), and a tap off them, Space or Esc closes it. Bought upgrades are in
+  `state.upgrades` (`hasUpgrade`). The HUD shows coins after the first one.
 - Items: the Old Blade, the Hookvine, lantern oil (a bigger lantern light), small keys and heart
   vessels, all from chests (`openChest`), plus hearts dropped by cut bushes.
 - Bellseeds (`items.seeds`, a count in `seeds` up to `MAX_SEEDS`): Old Sedge gives and refills
@@ -48,7 +59,16 @@ Implemented today:
   once the knight's whole feet box, `FEET`, is in the room, so a door never shuts on them), and
   pit crossings by hookvine posts.
 - Foes (`src/scenes/foes.ts`): slugs, moths (they fly over water and pits), thornlings (they
-  stand still and spit seeds) and frogs (they sit, then leap at the knight). Dungeon foes stay
+  stand still and spit seeds), frogs (they sit, then leap at the knight), shelled beetles and
+  lantern moths. The last two are `ARMOURED`: the sword only hurts them while `down`. The hookvine
+  or a burst calls `knockDown` (`DOWN_MS`; a beetle shows `beetle-back`, a lantern moth lands), and
+  until then a swing on a beetle only goes `tink` and a lantern moth, flying `LANTERN_LIFT` up, is
+  out of reach. Beetles walk like slugs; lantern moths keep `LANTERN_KEEP` from the knight, circle
+  and drop an `ember` (a `shoot` with that key) every `LANTERN_SHOT_MS`, carry a light, and never
+  hurt by touch. Down, both lie still and harmless. `hint` shows a teaching toast once a page load
+  (`shellHard`, `beetleFlipped`, `lanternDown`). New dungeon foes go at the end of the map's
+  `enemies`, so the beaten flags of the old ones keep their index; new outdoor ones go after the
+  scatter, so the trees and bushes it sows stay put. Dungeon foes stay
   beaten (`foe-<i>` flags in the shrine, `belfry-foe-<i>` in the belfry; `DUNGEONS` lists them).
 - The Thornmother: a ring no blade cuts, three bulbs raised one at a time (`BULB_*`), thorn volleys
   that speed up as bulbs fall (`VOLLEY_MS`) and summoned slugs (`SUMMON_MS`, by difficulty). A bulb
@@ -70,10 +90,43 @@ Implemented today:
   haze at the view's top and bottom edges for the miniature look. Lamps, windows, braziers,
   glowing mushrooms, candles, moonstones, seeds, bellseeds and the knight's lantern are
   lights, and `flashes` are short-lived ones (a burst, a ringing bell; none with reduce motion).
+- The post-game. The moonstone page (`toggleStones`, drawn by `Hud.showStones`): N or a tap on the
+  counters' plate (`Hud.plateAt`) opens it any time; it lists each map (`MAP_IDS`) with its stones
+  found and in all (chapter two's, `chapter: 2` in `maps.ts`, only once it starts) and, after
+  chapter two, each trial's best time. While it is open the game stands still (`Hud.covered`, like
+  the end card). The hourglass trials: each dungeon has an `hourglass` tile by its entry, shown and
+  solid once the quest reached `end`. Reading it (`hourglassAt`, `interactAt`) ends with the `trial`
+  talk effect, `startTrial`: `trial` is set and the map is built again, ignoring the beaten foes'
+  flags and the boss flag, so every foe, the ring and the boss come back. Its boss is harder by the
+  factors in `TRIAL` (`foes.ts`). `trial.ms` counts play time (not while talking, faded or covered)
+  and shows as the HUD's clock; beating the boss calls `trialWon` instead of the story's ending
+  (no flag, quest step, heart or stone) and keeps the best time in `state.trials[map]`. Leaving the
+  map (`enterMap` with another id) or a fall ends the trial with the `trialLost` toast.
 - The HUD (`src/scenes/hud.ts`): hearts, moonstones, keys (in a dungeon), bellseeds, the journal
   line (the quest's objective), place banners, toasts, the touch buttons, the floating touch stick,
-  the dialog box and the end card. The counters sit side by side, and a longer word (German
+  the dialog box, the trial's clock (top middle), the moonstone page and the end card. The counters sit side by side, and a longer word (German
   "Schlüssel") pushes the next one along and widens their plate.
+
+## Trophies
+
+`src/trophies/` holds the game's ten trophies (`shared/trophies.ts`). `index.ts` lists them
+(`trophies`: id, tier, icon, `hidden` for Unbroken) with their texts in `trophies/i18n/` (`en.ts`
+and `de.ts`: the name keyed by the id, what earns it by `<id>Text`), and imports nothing else from
+the game, since the hub loads it. `main.ts` hands `trophies` to `setupGame`. `check.ts` has each
+trophy's condition on the `GameState` and `checkTrophies(state)`, which `GameScene.update` calls
+every frame (the first call after a load is quiet, so a restored save earns its trophies without a
+toast), plus `awardNow` for one earned by an event. They are:
+
+- Bronze: `blade` (the Old Blade taken), `thornmother` (the `boss` flag), `firstUpgrade` (any
+  upgrade bought) and `bellyUp` (a beetle beaten, awarded in `hitFoe`, which only lands on a beetle
+  that is down).
+- Silver: `bellwraith` (the `wraith` flag), `allUpgrades` (all of `UPGRADES`) and `trial` (any
+  hourglass trial finished).
+- Gold: `swift` (both trials' best times under `PAR`: 2:30 in the shrine, 2:00 in the belfry),
+  `allStones` (all `MOONSTONES`) and the hidden `unbroken` (the quest at `end` with no fall).
+
+The playthrough earns `blade`. A new trophy goes in `index.ts`, its texts in both `i18n` files and
+its condition in `EARNED` (or an `awardNow` call where it happens); retune the trial pars in `PAR`.
 
 ## Sound
 
@@ -101,12 +154,16 @@ All in code through `shared/audio.ts` (no audio files), in `src/audio/`:
   `openDialog` and `nextLine`, pitched by a hash of the speaker's name), `bell` (`ringBell`, pitched
   G, C and E by the bell's `note` through `BELL_PITCH`, so the right tune is a falling chord; low
   for the Bellwraith's bell struck while down), `wrong` (the wrong bell), `hit` and `pop`
-  (`hitFoe`: only the knight hits foes), `hurt` (`hurt`), `wake` (after a fall), `spit` (a
+  (`hitFoe`: only the knight hits foes), `tink` (the sword on a beetle's shell), `thud`
+  (`knockDown`), `hurt` (`hurt`), `wake` (after a fall), `spit` (a
   thornling), `volley` (one per Thornmother volley), `twang` (`yank`), `squelch` (`hitBulb`),
   `rattle` and `clang` (the Bellwraith's drop and slam), `topple` (`tipBell`), `wail`
   (`hitWraith`), `wisp` (the wisp hops on) and `swell` (`checkExits`, walking into another map).
-- `ui('refuse')` for a locked or barred door, the thorny door, an empty chest and no bellseeds left;
-  `ui('click')` for the end card's buttons (`hud.ts`).
+- `ui('refuse')` for a locked or barred door, the thorny door, an empty chest, no bellseeds left and
+  the hourglass while its trial runs, and a shop's button that can't buy; `ui('coin')` for
+  a coin picked up and an upgrade bought;
+  `ui('click')` for the end card's buttons (`hud.ts`) and opening the moonstone page; the `swell` effect also
+  plays when an hourglass trial starts.
 - Nothing plays while a map is built or a save loads (`enterMap` only starts the music). There is
   no `?watch` mode, footsteps or ambience.
 
@@ -124,6 +181,7 @@ All in code through `shared/audio.ts` (no audio files), in `src/audio/`:
   laid out for 960x540 inside `viewFrame` with its shade over the whole view. At 960x540 nothing
   moves.
 - `src/audio/`: the songs and the sound table (see Sound).
+- `src/trophies/`: the trophies and when they are earned (see Trophies).
 - `src/howToPlay.ts`: the How to play text in British English and German, picked with `byLanguage`
   (US English uses the British one, since no word in it is spelled differently).
 - `src/i18n.ts` and `src/i18n/`: every text on screen (`shared/i18n.ts`). `i18n/en.ts` is the
@@ -158,14 +216,17 @@ All in code through `shared/audio.ts` (no audio files), in `src/audio/`:
 ### Save
 
 `bramblecrest-save` in localStorage: the whole `GameState` (map, position, facing, spawn, hearts,
-items, keys, moonstones, flags, quest, falls, foes beaten). It is written on a map change, on a
+items, keys, moonstones, flags, quest, falls, foes beaten, the trials' best times in ms, coins and
+upgrades). A trial
+under way is not saved. It is written on a map change, on a
 chest, cut thorns, a key door unlocked, a plate, broken rock, the bells, a moonstone, a quest step
 and each boss, all through `GameScene.persist`, which holds a save asked for while the hookvine
 pulls the knight (a bellseed bursting, a moonstone picked up) until they land on the post, so a
-reload never puts them or their spawn over water or a pit. Flags in use: `chest-<id>`, `door-<id>`, `gate-cut`, `woods-thorns`, `plate`,
+reload never puts them or their spawn over water or a pit. Trophies are saved apart, under `bramblecrest-trophies` (`shared/trophies.ts`), and outlive a
+new game. Flags in use: `chest-<id>`, `door-<id>`, `gate-cut`, `woods-thorns`, `plate`,
 `boss`, `foe-<i>`, `belfry-foe-<i>`, `broke-<map>-<x>-<y>`, `bells`, `wraith`, `cat-1` to `cat-3`,
 plus the flags of hidden places. `load` fills in fields a save from an older version lacks
-(`items.seeds`, `seeds`), and starts over when the saved `map` or `spawn` is not a map (`isMapId`)
+(`items.seeds`, `seeds`, `trials`, `coins`, `upgrades`), and starts over when the saved `map` or `spawn` is not a map (`isMapId`)
 or a position is not a number. Cutting the gate before bringing the blade back is fine: the
 elder's `quest-thorns` then moves the quest straight on to `shrine`.
 
@@ -180,7 +241,7 @@ elder's `quest-thorns` then moves the quest straight on to `shrine`.
 
 - `window.game.scene.getScene('Game')` gives `state` (the `GameState`), `dialog` (`{ speaker,
   lines, i }` or null), `route` (the steps left of a tap's walk, or null), `target`, `foes` and
-  `boss`, `wraith` and `bombs`; `spot('npc' | 'chest', id)` is where to tap a person or chest in the world and
+  `boss`, `wraith`, `bombs`, `trial` (`{ map, ms }` or null) and `hud` (`shopOpen`, `pageOpen`); `spot('npc' | 'chest', id)` is where to tap a person or chest in the world and
   `screenOf(x, y)` turns a world point into view pixels (allowing for the camera's zoom).
 - `e2e/playthrough.spec.ts` taps the elder, taps through her lines, taps the `blade` chest, taps
   the elder again, walks to the street below the gate (`STREET`) and taps the gate's thorns
@@ -211,6 +272,9 @@ elder's `quest-thorns` then moves the quest straight on to `shrine`.
   that move them on, and a `chapterEnd` case; raise `MOONSTONES` with the new stones.
 - **Hookvine posts** only catch along the knight's row or column, so pairs across a gap must share
   a row (or column).
+- **Add an upgrade**: its id in `UpgradeId` and a row in `UPGRADES` (seller, cost, needs), its
+  effect where the number it changes is used (or in `buy` for a one-off), and its name and
+  `<id>Text` in the `i18n/` files. A seller shows at most a few rows; 1 to 9 buy by place.
 - **Retune**: `src/scenes/layout.ts` (speeds, reaches, the lantern), `foes.ts` (foes and the boss)
   and `state.ts` (hearts).
 

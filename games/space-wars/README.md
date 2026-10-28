@@ -55,7 +55,10 @@ stripes and long exhaust flames, under a chocolate-and-mustard striped HUD with 
    is the building with the role "Barracks" under its name (the Solar Concord's is the Orbital
    Dock).
 3. **Units**: each faction has a fast scout, a gunship and a heavy, all trained at its Barracks. A
-   unit with no orders fires at any enemy in its sight. Select one to see its name and hit points
+   unit with no orders fires at any enemy in its sight. Ships fly round the rock fields rather than
+   over them, and a wing that bunches up drifts apart, so ships never sit on top of each other.
+
+   ![A wing of six Lancers sent across a rock field: it flew round the rocks and spread out where it arrived](docs/screenshots/pathing.webp) Select one to see its name and hit points
    on the command bar.
 4. **Contracts** give the battle its goals (below). After the first, the contract board offers two
    at a time over the map and you tap one. The current one is on the top bar and in the panel on
@@ -120,6 +123,16 @@ open, the board stands aside; the top bar still counts down.
 ![The contract board after the Barracks: Break the raid and Escort the convoy, each with its reward, rank perk and goal, the countdown above them](docs/screenshots/contract.webp)
 
 ![The convoy contract: three harvesters on a dashed trail toward the far field marked Convoy field](docs/screenshots/convoy.webp)
+
+**The rivals run contracts too.** From 1:30 each rival works through a chain of its own, ranks II
+to V, picked from Break the raid, Hold the Relay, Claim two derelicts, Raze an outpost and Topple a
+hub, for the same rewards and perks as yours. A rival plays to its contract: on a raid contract it
+sends its fleet out with two ships fewer than usual (and at a hub for Topple a hub), on Hold the
+Relay it keeps a ship on the beacon however far its hub is, and on Claim two derelicts it goes for
+stations anywhere. A contract it hasn't finished in 3 minutes is dropped for another. The rivals
+panel shows each rival's contract and progress, and the message line says when one finishes.
+
+![The rivals panel with each rival's own contract under its grudge, and the message line saying the Ferrox Hive finished Break the raid](docs/screenshots/rival-contracts.webp)
 
 ### The flagship
 
@@ -303,6 +316,24 @@ Freight's Salvage Yard still pays its own 8 crystal on top for enemy ships destr
 
 ![A Solar Concord fleet breaking a Ferrox raid: a +8 floats over the wreck and +16 flashes by the crystal count, while a Veil Syndicate picket holds the relay beacon](docs/screenshots/salvage.webp)
 
+### Trophies
+
+Nine trophies, listed under Trophies on the start and pause screens and counted on the hub's card:
+
+| Trophy | Tier | How to earn it |
+| --- | --- | --- |
+| Under contract | Bronze | Finish your first contract |
+| Signal found | Bronze | Capture the relay beacon |
+| Ceasefire | Bronze | Accept a truce from a rival |
+| Ace of the fleet | Silver | Have a ship of yours rank up to Ace (8 kills) |
+| Salvage baron | Silver | Hold all three derelict stations at once |
+| Pride of the fleet | Silver | Launch your flagship |
+| Last faction standing | Silver | Win a battle |
+| Ahead of the field | Gold | Finish all five contracts before any rival finishes its own chain |
+| Master of the sectors | Gold, hidden | Win the last sector of the campaign |
+
+![The Trophies list over the faction picker: Under contract and Signal found earned in the first round, the rest still locked](docs/screenshots/trophies.webp)
+
 ### The factions
 
 Each faction's ships and stations are low-poly 3D models, rendered at 16 headings so they turn
@@ -393,17 +424,20 @@ page).
 waits for the harvesters to bring in crystal, raises a Barracks beside the hub (which completes the
 first contract and pays its reward and perk), takes Break the raid off the contract board, trains three Lancers, box-selects them, takes the
 relay beacon (hidden in the fog at the start, so the test checks the wing finds it) until it pays, fights off the rival picket that comes to contest it and collects its
-salvage shard, then attacks the nearest enemy base. It pans the map with the arrow keys to reach
+salvage shard, then attacks the nearest enemy base. It checks that the first contract and the
+beacon earn their trophies. It pans the map with the arrow keys to reach
 what it taps. Run it with `npx playwright test --project space-wars`.
 
 ## Code layout
 
-- `src/main.ts`: creates the Phaser game and calls `setupGame`.
+- `src/main.ts`: creates the Phaser game and calls `setupGame` with the How to play and the trophies.
+- `src/trophies/`: the trophies (`index.ts`), their texts (`i18n/`) and the check that awards them (`check.ts`).
 - `src/game/factions.ts`: the five factions, their ship and building outlines and stats.
 - `src/game/contracts.ts`: the first contract, the contract board's pool, their rewards and perks, and how the board draws its two cards.
 - `src/game/campaign.ts`: the five campaign sectors and the saved campaign (sectors open, perks kept).
 - `src/game/fog.ts`: the fog of war's grid of explored and in-sight cells.
 - `src/game/research.ts`: the hull, weapons and engines research tracks.
+- `src/game/pathing.ts`: how ships find their way round the rock fields.
 - `src/game/map.ts`: random star maps: hub spots, crystal nodes, rock fields, nebulae, stars and
   derelict stations, and which node is the relay beacon.
 - `src/game/world.ts`: the battle (economy, expansions, production, research, orders, combat, mines

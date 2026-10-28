@@ -23,6 +23,7 @@ interface GameState {
   brewed: number;
   fired: number;
   bloomed: number;
+  bloomsFired: number;
   board: Tile[][];
 }
 interface Scene { state: GameState; busy: boolean; selected: Cell | null }
@@ -305,6 +306,16 @@ test('sells the first potion', async ({ page }, testInfo) => {
   expect(s.stars).toBe(s.orderStars);
   await play(1_000, async () => false);
   await snap('2-sold');
+  // The sale earns First tincture (src/trophies/), with Chain reaction for a Catalyst fired, In full
+  // bloom for a Bloom fired and Flawless for three stars, and nothing else yet.
+  const trophies = await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('tincture-tinker-trophies') ?? '{}')));
+  const expected = [
+    'firstSale',
+    ...(s.fired > 0 ? ['firstCatalyst'] : []),
+    ...(s.bloomsFired > 0 ? ['firstBloom'] : []),
+    ...(s.orderStars === 3 ? ['threeStars'] : []),
+  ];
+  expect(trophies.sort(), 'trophies earned in the first round').toEqual(expected.sort());
 
   const speed = gameMs / (Date.now() - startedAt);
   console.log(`Played ${Math.round(gameMs / 1000)}s of game time at ${speed.toFixed(1)}x (target ${SPEED}x).`);

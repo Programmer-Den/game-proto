@@ -209,6 +209,9 @@ test('plays the first jar of honey', async ({ page }, testInfo) => {
   expect(s).toMatchObject({ coins: HONEY_PRICE, jars: NO_JARS, wax: 1, sold: 1, spilled: 0, meadows: 0 });
   await wait(400);
   await snap('4-sold');
+  // The first jar sold earns the First jar trophy (src/trophies/), and nothing else yet.
+  const trophies = await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('beehive-baron-trophies') ?? '{}')));
+  expect(trophies, 'trophies earned in the first round').toEqual(['firstJar']);
 
   const speed = gameMs / (Date.now() - startedAt);
   console.log(`Played ${Math.round(gameMs / 1000)}s of game time at ${speed.toFixed(1)}x (target ${SPEED}x).`);

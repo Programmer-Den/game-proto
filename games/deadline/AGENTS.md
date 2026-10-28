@@ -54,7 +54,7 @@ upgrades. A run is the endless Open Road or a 10-wave operation, picked on the g
   picks it for the next run; any other tap calls `scene.restart()`. Taps count only once the
   screen has been up for `OVER_GRACE_MS` (600ms of game time, `overMs`), so a steering tap as the
   horde breaks through doesn't skip it.
-- **Persistence:** the Open Road's best wave, the art style, banked scrap, the starting crates
+- **Persistence:** the Open Road's best wave, the art style, the trophies earned, banked scrap, the starting crates
   bought for the next run, the outpost levels, the next operation and each operation's best (see
   Save keys). It also reads the hub's
   shared settings (the `hub-settings` key, see Hub settings below).
@@ -130,6 +130,17 @@ upgrades. A run is the endless Open Road or a 10-wave operation, picked on the g
   `loadKit`/`saveKit`, `loadOutpost`/`saveOutpost`, `loadOperation`/`saveOperation`,
   `loadOperationBests`/`saveOperationBests`, the `ArtStyle` type (`'comic' | 'nv'`) and the key
   names.
+- `src/trophies/`: the game's ten trophies (`shared/trophies.ts`). `index.ts` lists them
+  (`trophies`: id, tier, icon, `hidden` for Fortress) with their texts in `trophies/i18n/` (`en.ts`
+  and `de.ts`: the name keyed by the id, what earns it by `<id>Text`), and imports nothing else from
+  the game, since the hub loads it for its trophy shelf. `main.ts` hands `trophies` to `setupGame`,
+  which lists them on the start and pause screens. `check.ts` holds each trophy's condition on the
+  `GameState` (`EARNED`: the first wave cleared, a frenzy, `DRUM_KILLS` 5 kills from one drum, a
+  survivor saved, a perk, a boss beaten, `MAX_COMPANIONS` companions, an Open Road extraction, an
+  operation won, every outpost upgrade at `OUTPOST_MAX`) and `checkTrophies(state)`, which
+  `GameScene.update` calls every frame, game over included (the outpost is bought there). A new
+  trophy is an entry in `index.ts`, its two texts in each language file and its condition in
+  `EARNED`.
 - `src/game/pool.ts`: generic `Pool<T>` with `take`, `release`, `live` and `all`, to reuse sprites.
 - `src/art/paint.ts`: shared canvas tools (`bake`, `rng`, `circle`, `path`, colour helpers), `HI`
   (textures are painted at 2x on a screen that needs no scaling), `FULL_SCREEN` (layers painted at
@@ -386,6 +397,8 @@ imports it. Under browser automation it all does nothing, so the playthrough is 
 - `deadline-operation-best`: a JSON object of each operation's most waves cleared. Written by
   `recordOperation`.
 - All are read and written through `src/game/save.ts`, wrapped in try/catch.
+- `deadline-trophies`: the trophies earned (`shared/trophies.ts`, not `save.ts`), each id with the
+  time.
 
 ### Hub settings
 
@@ -494,7 +507,7 @@ imports it. Under browser automation it all does nothing, so the playthrough is 
   killed all it caught, `fallen` equals `kills`, the streak counts the blast's kills); then the
   first crate: it taps above it and waits to open it, checking `collected` and `stats`; it taps
   above the lowest enemy until the phase is `'break'` with 12 kills and `fallen` 12 of 12, 12 scrap
-  and `deadline-scrap` saved as 12; then wave
+  and `deadline-scrap` saved as 12, and `deadline-trophies` holding only `firstWave` (First night); then wave
   2 starts with best 2 saved and `fallen` 0, and the streak breaks.
 - Kept in sync by hand in `e2e/playthrough.spec.ts`: `VIEW`, `HERO_Y = 880`,
   `WAVE_1_ENEMIES = 12` (from `waveSize(1)`), `GRUNT_SCRAP` (`SCRAP.grunt`), `BASE_STATS`, `UPGRADED` (each upgrade applied once

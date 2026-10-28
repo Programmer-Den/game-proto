@@ -2,6 +2,7 @@
 // the guardian beast, towers, the Nexus, watchstones, pines and rocks. Each builder returns a fresh `Model` for one pose; `bake.ts` renders them into
 // sprite frames from eight directions. Units: one model unit is one screen pixel.
 
+import type { DrakeElement } from '../game/data';
 import { Model, RGB, Rx, Rz, S, T, box, chain, gem, ico, prism, rgb, slab, swing } from './lowpoly';
 
 export type PoseName = 'idle' | 'w0' | 'w1' | 'w2' | 'w3' | 'a0' | 'a1' | 'c0';
@@ -892,6 +893,35 @@ export function minionModel(team: TeamName, pose: PoseName): Model {
   return scaled(figure(kit, classPose('minion', pose)), 0.62);
 }
 
+/** A sellsword of a mercenary camp: a minion's build in tan cloth, a wide kettle hat and a broad blade, a little bigger. */
+export function mercModel(pose: PoseName): Model {
+  const cloth = rgb('#a08055');
+  const kit: Kit = {
+    cloth,
+    accent: LEATHER,
+    robe: false,
+    heavy: true,
+    head: (md) => {
+      prism(md, 7.5, 5.6, 1.4, 7.4, 7, DARK_STEEL, 0);
+      // The kettle hat's crown and its wide brim.
+      prism(md, 6, 4.8, 8.6, 12.4, 8, STEEL, 0);
+      prism(md, 10, 9.2, 7.4, 8.6, 10, DARK_STEEL, 0);
+    },
+    rightHand: (md) =>
+      md.at(grip(0.3), () => {
+        box(md, -1, -2, -1, 1, 3, 1, LEATHER);
+        box(md, -4, 3, -1.2, 4, 4.6, 1.2, GOLD);
+        slab(md, [[-2.6, 4.6], [2.6, 4.6], [2.2, 20], [0, 24], [-2.2, 20]], -0.7, 0.7, STEEL);
+      }),
+    leftHand: (md, arm) =>
+      md.at(chain(T(-1.5, 5, 3.4), upright(arm)), () => {
+        slab(md, [[-6, -8], [6, -8], [6, 6], [0, 10], [-6, 6]], 0, 2, LEATHER);
+        slab(md, [[-4, -6], [4, -6], [4, 4.5], [0, 7.5], [-4, 4.5]], 2, 3, cloth);
+      }),
+  };
+  return scaled(figure(kit, classPose('minion', pose)), 0.78);
+}
+
 /** Scales a finished model's points (a model's builder can't scale after the fact). */
 function scaled(md: Model, k: number): Model {
   const out = new Model();
@@ -1015,6 +1045,63 @@ export function bruteModel(kind: 'ember' | 'moss', pose: PoseName): Model {
     });
   });
   return scaled(md, 1.2);
+}
+
+/** A drake's colours by element: scales, dark scales and underside, and the glow of its eyes and spines. */
+const DRAKE_COLORS: Record<DrakeElement, [string, string, string]> = {
+  fire: ['#b8562e', '#6e2f1a', '#ffb347'],
+  stone: ['#8a7f6e', '#4f483d', '#e8d9a8'],
+  storm: ['#5a7fb8', '#2e4470', '#bfe3ff'],
+  tide: ['#3f9a92', '#205a55', '#9ff0e0'],
+};
+
+/**
+ * A river drake: a lean four-legged lizard with a long neck and tail, spines along its back and two
+ * raised wings, in its element's colours. Attack poses rear the head back, then snap it forward.
+ */
+export function drakeModel(element: DrakeElement, pose: PoseName): Model {
+  const md = new Model();
+  const [scale, dark, glow] = DRAKE_COLORS[element].map(rgb);
+  const k = pose[0] === 'w' ? WALK[Number(pose[1])] : 0;
+  const lunge = pose === 'a1' ? 5 : pose === 'a0' ? -2 : 0;
+  const neck = pose === 'a1' ? 0.45 : pose === 'a0' ? -0.35 : 0;
+  md.at(T(0, 0, lunge), () => {
+    for (const [x, z, ph] of [[-6, 9, 1], [6, 9, -1], [-6, -9, -1], [6, -9, 1]] as const) {
+      md.at(chain(T(x, 11, z), swing(k * ph * 0.7)), () => {
+        box(md, -2.4, -11, -2.4, 2.4, 0, 2.4, dark, 0.9);
+        box(md, -2.8, -11, -2.6, 2.8, -9.6, 3.6, dark);
+      });
+    }
+    // A long low body with a paler belly.
+    box(md, -7.5, 10, -12, 7.5, 21, 12, scale, 0.85);
+    box(md, -5.5, 9.4, -10, 5.5, 11, 10, dark);
+    // Spines down the back and on along the tail.
+    for (let i = 0; i < 5; i++) md.at(T(0, 21, 9 - i * 5), () => gem(md, 1.8, -0.5, 1.5, 6 - i * 0.6, 4, glow, 0.5));
+    md.at(chain(T(0, 16, -12), Rx(-1.2)), () => {
+      prism(md, 3.4, 1.2, 0, 16, 5, scale);
+      md.at(T(0, 16, 0), () => gem(md, 2.2, -1, 1, 6, 4, glow, 0.5));
+    });
+    // Two wings raised up and out from the shoulders.
+    for (const side of [-1, 1]) {
+      md.at(chain(T(side * 7, 20, 4), Rz(side * -0.55), Rx(-0.25)), () => {
+        slab(md, [[0, 0], [side * 3, 18], [side * 14, 22], [side * 12, 12], [side * 16, 8], [side * 8, 2]], -0.6, 0.6, dark);
+        slab(md, [[side * 2, 2], [side * 4, 15], [side * 11, 18], [side * 10, 10], [side * 7, 4]], 0.6, 1, glow, 0.25);
+      });
+    }
+    // The neck reaching up and forward, and a horned head with glowing eyes.
+    md.at(chain(T(0, 18, 11), Rx(0.7 - neck)), () => {
+      prism(md, 4, 3, 0, 13, 6, scale);
+      md.at(chain(T(0, 13, 0), Rx(-0.7 + neck * 1.6)), () => {
+        box(md, -4, -3, -2, 4, 3.5, 7, scale, 0.85);
+        box(md, -3, -3.6, 6, 3, 1, 11, dark, 0.9);
+        for (const side of [-1, 1]) {
+          box(md, side * 3 - 0.8, 1, 4.6, side * 3 + 0.8, 2.4, 5.4, glow, 1, 0.9);
+          md.at(chain(T(side * 2.5, 3, -1), Rx(-0.9), Rz(side * -0.3)), () => prism(md, 1.3, 0.2, 0, 7, 4, glow));
+        }
+      });
+    });
+  });
+  return scaled(md, 1.5);
 }
 
 /** A watchstone: a carved standing stone on a round step, crowned with a crystal in its team's colour (pale gold while untaken). */

@@ -1,4 +1,4 @@
-import { COLS, ROWS } from './rules';
+import { COLS, ROWS, type TowerKind } from './rules';
 
 /** A cell as [column, row]. */
 export type Cell = [number, number];
@@ -25,6 +25,10 @@ export interface MapDef {
   path?: Cell[];
   /** Cabbages in the patch, for a garden that sets its own. */
   lives?: number;
+  /** Starting gold, for a garden that sets its own (each gardener's). */
+  gold?: number;
+  /** The whole pouch of its Challenge, lent whether or not the shed has sold them yet. */
+  challenge: TowerKind[];
 }
 
 /** The cells of a line through `points`, each turn on a straight row or column. */
@@ -53,6 +57,7 @@ function block(x: number, y: number, w: number, h: number): Cell[] {
 export const MAPS: MapDef[] = [
   {
     id: 'meadow',
+    challenge: ['hedge', 'frost', 'cannon'],
     season: 'spring',
     gates: [[0, 2], [0, 8]],
     goal: [21, 5],
@@ -60,6 +65,7 @@ export const MAPS: MapDef[] = [
   },
   {
     id: 'orchard',
+    challenge: ['hedge', 'cannon', 'swallow'],
     season: 'spring',
     gates: [[0, 1], [0, 9]],
     goal: [21, 5],
@@ -67,6 +73,7 @@ export const MAPS: MapDef[] = [
   },
   {
     id: 'millpond',
+    challenge: ['hedge', 'frost', 'crossbow'],
     season: 'spring',
     gates: [[0, 5], [11, 0]],
     goal: [21, 10],
@@ -75,6 +82,7 @@ export const MAPS: MapDef[] = [
   },
   {
     id: 'brook',
+    challenge: ['hedge', 'whirligig', 'frost'],
     season: 'summer',
     gates: [[0, 2], [0, 8]],
     goal: [21, 5],
@@ -85,6 +93,7 @@ export const MAPS: MapDef[] = [
   },
   {
     id: 'warren',
+    challenge: ['hedge', 'crossbow', 'nettle'],
     season: 'summer',
     gates: [[0, 1], [0, 9], [0, 5]],
     goal: [21, 5],
@@ -92,6 +101,7 @@ export const MAPS: MapDef[] = [
   },
   {
     id: 'gravel',
+    challenge: ['whirligig', 'cannon', 'swallow'],
     season: 'summer',
     gates: [[0, 2], [0, 8]],
     goal: [21, 8],
@@ -101,6 +111,7 @@ export const MAPS: MapDef[] = [
   },
   {
     id: 'hillside',
+    challenge: ['hedge', 'crossbow', 'puffball'],
     season: 'autumn',
     gates: [[0, 4], [0, 9]],
     goal: [21, 1],
@@ -110,6 +121,7 @@ export const MAPS: MapDef[] = [
   },
   {
     id: 'crossroads',
+    challenge: ['hedge', 'crossbow', 'frost', 'swallow'],
     season: 'autumn',
     gates: [[0, 5], [21, 5], [11, 0], [11, 10]],
     goal: [11, 5],
@@ -118,6 +130,7 @@ export const MAPS: MapDef[] = [
   },
   {
     id: 'leafwalk',
+    challenge: ['crossbow', 'swallow', 'cannon'],
     season: 'autumn',
     gates: [[0, 1], [21, 5]],
     goal: [21, 9],
@@ -128,6 +141,7 @@ export const MAPS: MapDef[] = [
   },
   {
     id: 'icepond',
+    challenge: ['hedge', 'bonfire', 'bow'],
     season: 'winter',
     gates: [[0, 2], [0, 8], [11, 0]],
     goal: [21, 5],
@@ -137,14 +151,18 @@ export const MAPS: MapDef[] = [
   },
   {
     id: 'lastcabbage',
+    challenge: ['hedge', 'bow', 'whirligig'],
     season: 'winter',
     gates: [[0, 1], [0, 9], [0, 5], [7, 0], [7, 10], [14, 0]],
     goal: [21, 5],
     rocks: [[10, 3], [10, 7], [15, 5], [18, 2], [18, 8]],
     lives: 1,
+    // With one cabbage a single slip in the first waves loses the garden, so it starts richer.
+    gold: 130,
   },
   {
     id: 'snowpath',
+    challenge: ['sunglass', 'bonfire', 'bow'],
     season: 'winter',
     gates: [[0, 5], [11, 0]],
     goal: [21, 5],

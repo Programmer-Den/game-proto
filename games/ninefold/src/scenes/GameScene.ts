@@ -2,15 +2,16 @@ import Phaser from 'phaser';
 import { playMusic, playSting, ui } from '../../../../shared/audio';
 import { viewFrame, viewSize } from '../../../../shared/scaling';
 import { settings } from '../../../../shared/settings';
-import { LEVELS, RELIC_INFO, STYLES, STYLE_INFO, type Level, type RelicId, type StyleId } from '../game/catalog';
-import { loadProgress, saveProgress } from '../game/save';
+import { LEVELS, RELIC_INFO, STYLES, STYLE_INFO, TWIST_INFO, type Level, type RelicId, type StyleId } from '../game/catalog';
+import { loadBoard, loadProgress, saveBoard, saveProgress } from '../game/save';
 import {
-  canEnter, chooseStyle, digitsLeft, enter, erase, hint, isRight, newGame, select, startClassic, startDaily,
-  startDelve, takeRelic, tick, toggleNotes, toMenu, type GameState,
+  canEnter, canUndo, chooseStyle, clockLeft, dailyStreakNow, undoMove, digitsLeft, enter, erase, hasTwist, hint, isRight, newGame, select, startClassic,
+  startDaily, startDelve, takeRelic, tick, toggleNotes, toMenu, type FloorPlan, type GameState,
 } from '../game/state';
-import { boxOf, dailySeed } from '../game/sudoku';
+import { boxOf, dailySeed, peersOf, units, type Puzzle } from '../game/sudoku';
 import { SFX, SONG } from '../audio';
 import { t } from '../i18n';
+import { checkTrophies } from '../trophies/check';
 import { layoutFor, UI_DEPTH, WIDE, type Layout } from './layout';
 import { hex, THEMES, type Theme } from './themes';
 
@@ -20,6 +21,8 @@ type Part = Phaser.GameObjects.GameObject & { destroy(): void };
 
 /** The longest step the board's clock takes in one frame, so a stalled tab doesn't jump. */
 const MAX_STEP_MS = 100;
+/** A board in play is saved at least this often (game time), besides after every move. */
+const SAVE_EVERY_MS = 5_000;
 
 /**
  * Ninefold's only scene: the menu, the style picker, the board with its panel and the end cards,
@@ -54,6 +57,10 @@ export class GameScene extends Phaser.Scene {
   private padTexts: Phaser.GameObjects.Text[] = [];
   private flashes: { cells: number[]; age: number; color: number }[] = [];
   private lastTime = 0;
+  /** The puzzle on the board, its units and each cell's peers, worked out once per board. */
+  private shapeOf: { puzzle: Puzzle; units: number[][]; peers: number[][] } | null = null;
+  /** The board's clock when it was last saved, so a board left alone is saved every few seconds. */
+  private savedAt = 0;
 
   constructor() {
     super('Game');
@@ -62,6 +69,9 @@ export class GameScene extends Phaser.Scene {
   create() {
     this.fitView();
     this.state = newGame(loadProgress());
+    // A board left in play (or a relic offer between Delve floors) comes back where it stood.
+    loadBoard(this.state);
+    checkTrophies(this.state.progress);
     this.backdrop = this.add.graphics();
     this.boardG = this.add.graphics();
     this.flashG = this.add.graphics();
@@ -109,6 +119,10 @@ export class GameScene extends Phaser.Scene {
       this.buildLayer();
       this.dirty = true;
     }
+    if (this.dirty || Math.abs(this.state.timeMs - this.savedAt) > SAVE_EVERY_MS) {
+      saveBoard(this.state);
+      this.savedAt = this.state.timeMs;
+    }
     if (this.dirty) {
       this.dirty = false;
       this.drawBoard();
@@ -143,6 +157,7 @@ export class GameScene extends Phaser.Scene {
     else if (e.key === 'n' || e.key === 'N') this.onNotes();
     else if (e.key === 'Backspace' || e.key === 'Delete' || e.key === '0') this.onErase();
     else if (e.key === 'h' || e.key === 'H') this.onHint();
+    else if (e.key === 'u' || e.key === 'U' || e.key === 'z' || e.key === 'Z') this.onUndo();
     else if (e.key.startsWith('Arrow')) {
       const at = s.selected < 0 ? 0 : s.selected;
       let r = Math.floor(at / size);
@@ -178,6 +193,12 @@ export class GameScene extends Phaser.Scene {
     this.dirty = true;
   }
 
+  private onUndo() {
+    if (!canUndo(this.state) || !undoMove(this.state)) return ui('refuse');
+    SFX('erase');
+    this.dirty = true;
+  }
+
   private onHint() {
     if (!hint(this.state)) ui('refuse');
     this.dirty = true;
@@ -204,6 +225,19 @@ export class GameScene extends Phaser.Scene {
         case 'wrong':
           SFX(e.heart ? 'heart' : e.warded ? 'ward' : 'wrong');
           break;
+        case 'clock':
+          SFX('heart');
+          break;
+        case 'phoenix':
+          SFX('relic');
+          this.flashes.push({ cells: s.values.map((_, i) => i), age: 0, color: 0xf08a3c });
+          break;
+        case 'heal':
+          SFX('unlock');
+          break;
+        case 'gift':
+          SFX('hint');
+          break;
         case 'unit':
           SFX('unit');
           this.flashes.push({ cells: e.cells, age: 0, color: 0xffffff });
@@ -226,6 +260,7 @@ export class GameScene extends Phaser.Scene {
           break;
       }
     }
+    if (this.dirty) checkTrophies(s.progress);
     const part = this.screen !== 'board' ? 'menu' : s.mode === 'delve' ? 'delve' : 'calm';
     playMusic(SONG, part);
   }
@@ -359,25 +394,10 @@ export class GameScene extends Phaser.Scene {
     }
     const sel = s.selected;
     const selValue = sel >= 0 && isRight(s, sel) ? s.values[sel] : 0;
-    const peers = new Set<number>();
-    if (sel >= 0) {
-      const sr = Math.floor(sel / size);
-      const sc = sel % size;
-      for (let i = 0; i < size * size; i++) {
-        if (Math.floor(i / size) === sr || i % size === sc || boxOf(p, i) === boxOf(p, sel)) peers.add(i);
-      }
-    }
+    if (this.shapeOf?.puzzle !== p) this.shapeOf = { puzzle: p, units: units(p), peers: peersOf(p) };
+    const peers = new Set<number>(sel >= 0 ? this.shapeOf.peers[sel] : []);
     const done = new Set<number>();
-    const unitCells = (u: number) => {
-      const cells: number[] = [];
-      for (let i = 0; i < size * size; i++) {
-        const r = Math.floor(i / size);
-        const c = i % size;
-        if ((u < size && r === u) || (u >= size && u < 2 * size && c === u - size) || (u >= 2 * size && boxOf(p, i) === u - 2 * size)) cells.push(i);
-      }
-      return cells;
-    };
-    for (const u of s.doneUnits) for (const c of unitCells(u)) done.add(c);
+    for (const u of s.doneUnits) for (const c of this.shapeOf.units[u]) done.add(c);
     const fontSize = Math.round(cs * (size === 9 ? 0.62 : 0.56));
     for (let i = 0; i < size * size; i++) {
       const r = Math.floor(i / size);
@@ -400,6 +420,8 @@ export class GameScene extends Phaser.Scene {
         g.fillStyle(tint, alpha).fillRoundedRect(cx, cy, w, h, th.cellRadius);
       }
       if (th.boxes) g.fillStyle(0xffffff, 0.08).fillRect(cx, cy, w, h / 3);
+      // Parity: an even cell carries a round mark behind its digit.
+      if (p.even?.[i]) g.fillStyle(hex(th.note), 0.22).fillCircle(cx + w / 2, cy + h / 2, Math.min(w, h) * 0.4);
       // A wrong digit keeps its warning colour when picked; a ring in the selection colour marks it.
       if (wrong && i === sel) g.lineStyle(4, th.sel, 1).strokeRect(cx + 2, cy + 2, w - 4, h - 4);
       const v = s.values[i];
@@ -431,6 +453,12 @@ export class GameScene extends Phaser.Scene {
       }
       this.cellSpots.push({ cell: i, x: this.fx + x + c * cs + cs / 2, y: this.fy + y + r * cs + cs / 2, w: cs, h: cs });
     }
+    // Diagonal: both long diagonals are drawn as faint lines across the board.
+    if (p.diagonal) {
+      const B = this.L.board.size;
+      g.lineStyle(Math.max(2, th.thick), hex(th.accent), 0.35);
+      g.lineBetween(x + 4, y + 4, x + B - 4, y + B - 4).lineBetween(x + B - 4, y + 4, x + 4, y + B - 4);
+    }
     const left = digitsLeft(s);
     this.padTexts.forEach((pt, k) => {
       const d = k + 1;
@@ -447,13 +475,17 @@ export class GameScene extends Phaser.Scene {
     const pt = this.panelTexts;
     if (this.screen !== 'board' || !pt.clock) return;
     const secs = Math.floor(s.timeMs / 1000);
-    pt.clock.setText(`${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`);
+    if (hasTwist(s, 'clock')) {
+      // A Clock floor counts down to the next heart it takes.
+      const left = Math.ceil(clockLeft(s) / 1000);
+      pt.clock.setText(`⌛ ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`);
+    } else pt.clock.setText(`${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`);
     pt.status.setText(
       s.mode === 'delve'
         ? '♥'.repeat(Math.max(0, s.hearts)) + '♡'.repeat(Math.max(0, s.maxHearts - s.hearts))
         : t('mistakes', { n: s.mistakes }),
     );
-    pt.hint.setText(t('hintButton', { n: s.hintsLeft }));
+    pt.hint.setText(hasTwist(s, 'sealed') ? t('hintSealed') : t('hintButton', { n: s.hintsLeft }));
     pt.notes.setText(s.notesMode ? t('notesOn') : t('notesOff'));
     pt.relics?.setText(this.relicLine());
   }
@@ -471,7 +503,7 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     // The menu's daily button depends on today's date, so the menu is rebuilt when the date changes.
     const today = this.screen === 'menu' ? dailySeed(new Date()) : 0;
-    return `${this.screen}|${s.phase}|${s.progress.style}|${s.puzzle?.size ?? 0}|${s.relicOffer.join()}|${s.mode}|${today}`;
+    return `${this.screen}|${s.phase}|${s.progress.style}|${s.puzzle?.size ?? 0}|${s.floor}|${s.relicOffer.join()}|${s.mode}|${today}`;
   }
 
   private buildLayer() {
@@ -575,7 +607,9 @@ export class GameScene extends Phaser.Scene {
       ui('click');
       this.screen = 'styles';
     }, 18);
-    this.text(this.L.menu.stats.x, this.L.menu.stats.y, t('stats', { solved: p.solved, flawless: p.flawless }), 14);
+    const streak = dailyStreakNow(p, today);
+    const stats = t('stats', { solved: p.solved, flawless: p.flawless }) + (streak ? ` · ${t('streak', { n: streak })}` : '');
+    this.text(this.L.menu.stats.x, this.L.menu.stats.y, stats, 14);
   }
 
   private buildStyles() {
@@ -648,9 +682,10 @@ export class GameScene extends Phaser.Scene {
     if (dock) this.box(dock.x, dock.y, dock.w, dock.h, 5);
     const left = (x: number, y: number, content: string, size: number, color?: string) =>
       this.add_(this.add.text(x, y, content, { fontFamily: th.font, fontSize: `${size}px`, color: color ?? th.text, fontStyle: th.bold ? 'bold' : '' }).setOrigin(0, 0.5).setDepth(UI_DEPTH + 2));
-    const kicker = s.mode === 'delve' ? t('delve') : s.mode === 'daily' ? t('daily') : t('classic');
+    const twists = s.mode === 'delve' ? (s.plan?.twists ?? []).map((tw) => t(TWIST_INFO[tw].name)) : [];
+    const kicker = [s.mode === 'delve' ? t('delve') : s.mode === 'daily' ? t('daily') : t('classic'), ...twists].join(' · ');
     left(panel.x + 24, panel.y + rows.kicker, kicker.toUpperCase(), 13).setAlpha(0.75);
-    const heading = s.mode === 'delve' ? t('floor', { n: s.floor, size: p.size }) : t(s.level);
+    const heading = s.mode !== 'delve' ? t(s.level) : s.plan?.boss ? t('bossFloor', { n: s.floor }) : t('floor', { n: s.floor, size: p.size });
     const h1 = left(panel.x + 24, panel.y + rows.heading, heading, 28, th.accent);
     if (th.glow) h1.setShadow(0, 0, th.glow === 'auto' ? th.accent : th.glow, 10, false, true);
     this.button('menu', this.L.menuButton.x, this.L.menuButton.y, this.L.menuButton.w, this.L.menuButton.h, t('menu'), () => {
@@ -671,10 +706,12 @@ export class GameScene extends Phaser.Scene {
       count.setData('key', g);
       this.padTexts.push(count);
     }
-    const notes = this.button('notes', this.L.tools.xs[0], this.L.tools.y, this.L.tools.w, this.L.tools.h, '', () => this.onNotes(), 15);
+    const tool = this.L.tools;
+    const notes = this.button('notes', tool.xs[0], tool.y, tool.w, tool.h, '', () => this.onNotes(), tool.font);
     this.panelTexts.notes = notes.label;
-    this.button('erase', this.L.tools.xs[1], this.L.tools.y, this.L.tools.w, this.L.tools.h, t('erase'), () => this.onErase(), 15);
-    const hintButton = this.button('hint', this.L.tools.xs[2], this.L.tools.y, this.L.tools.w, this.L.tools.h, '', () => this.onHint(), 15);
+    this.button('erase', tool.xs[1], tool.y, tool.w, tool.h, t('erase'), () => this.onErase(), tool.font);
+    this.button('undo', tool.xs[2], tool.y, tool.w, tool.h, t('undo'), () => this.onUndo(), tool.font);
+    const hintButton = this.button('hint', tool.xs[3], tool.y, tool.w, tool.h, '', () => this.onHint(), tool.font);
     this.panelTexts.hint = hintButton.label;
     this.add_(this.add.text(this.L.keysHint.x, this.L.keysHint.y, t('keysHint'), { fontFamily: th.font, fontSize: '11px', color: th.text }).setOrigin(0.5).setDepth(UI_DEPTH + 2).setAlpha(0.6));
   }
@@ -727,8 +764,10 @@ export class GameScene extends Phaser.Scene {
     const th = this.theme;
     const box = this.L.relicBox;
     this.box(box.x, box.y, box.w, box.h, UI_DEPTH, undefined, Math.max(0.95, th.panelAlpha));
-    this.text(box.x + box.w / 2, box.title, t('floorCleared', { n: s.floor }), 30, th.accent);
-    this.text(box.x + box.w / 2, box.line, this.unlockedLine() || t('takeRelic'), 15, this.unlockedLine() ? th.accent : th.text, { wordWrap: { width: box.w - 40 } });
+    this.text(box.x + box.w / 2, box.title, s.plan?.boss ? t('bossCleared', { n: s.floor }) : t('floorCleared', { n: s.floor }), 30, th.accent);
+    const line = this.unlockedLine() || (s.plan?.boss ? `${t('heartsRestored')} ${t('takeRelic')}` : t('takeRelic'));
+    this.text(box.x + box.w / 2, box.line, line, 15, this.unlockedLine() ? th.accent : th.text, { wordWrap: { width: box.w - 40 } });
+    if (s.upcoming) this.text(box.x + box.w / 2, box.next, this.nextLine(s.upcoming), 14, th.text, { wordWrap: { width: box.w - 40 } });
     s.relicOffer.forEach((relic, k) => {
       const x = this.L.relicCards.xs[k];
       const y = this.L.relicCards.y;
@@ -750,7 +789,13 @@ export class GameScene extends Phaser.Scene {
     this.raise(from);
   }
 
-  /** A relic's emblem: a lantern, a heart-cut gem, an eye or a shield. */
+  /** What the next floor will be: its number and size, and each twist with its rule. */
+  private nextLine(plan: FloorPlan) {
+    const head = plan.boss ? t('nextBoss', { n: plan.floor }) : t('nextFloor', { n: plan.floor, size: plan.size });
+    return [head, ...plan.twists.map((tw) => `${t(TWIST_INFO[tw].name)}: ${t(TWIST_INFO[tw].rule)}`)].join(' ');
+  }
+
+  /** A relic's emblem: a lantern, a heart-cut gem, an eye, a shield, two eyes, a die, a feather, a sandglass, a ring or a keystone. */
   private drawRelicIcon(g: Phaser.GameObjects.Graphics, relic: RelicId, x: number, y: number, color: number) {
     g.fillStyle(color, 1).lineStyle(3, 0x000000, 0.5);
     switch (relic) {
@@ -769,6 +814,34 @@ export class GameScene extends Phaser.Scene {
         break;
       case 'ward':
         g.beginPath().moveTo(x - 18, y - 18).lineTo(x + 18, y - 18).lineTo(x + 16, y + 4).lineTo(x, y + 20).lineTo(x - 16, y + 4).closePath().fillPath().strokePath();
+        break;
+      case 'twin':
+        for (const dx of [-13, 13]) {
+          g.fillStyle(color, 1).fillEllipse(x + dx, y, 24, 16).strokeEllipse(x + dx, y, 24, 16);
+          g.fillStyle(0x2a1840, 1).fillCircle(x + dx, y, 5);
+        }
+        break;
+      case 'gambler':
+        g.fillRoundedRect(x - 18, y - 18, 36, 36, 7).strokeRoundedRect(x - 18, y - 18, 36, 36, 7);
+        g.fillStyle(0x2a2a2a, 1);
+        for (const [dx, dy] of [[-9, -9], [0, 0], [9, 9], [9, -9], [-9, 9]]) g.fillCircle(x + dx, y + dy, 3.5);
+        break;
+      case 'phoenix':
+        g.beginPath().moveTo(x - 6, y + 20).lineTo(x - 14, y - 4).lineTo(x - 2, y - 22).lineTo(x + 12, y - 8).lineTo(x + 8, y + 10).closePath().fillPath().strokePath();
+        g.lineStyle(2, 0xffe08a, 1).lineBetween(x - 6, y + 20, x + 2, y - 14);
+        break;
+      case 'sandglass':
+        g.fillTriangle(x - 14, y - 18, x + 14, y - 18, x, y).fillTriangle(x - 14, y + 18, x + 14, y + 18, x, y);
+        g.strokeTriangle(x - 14, y - 18, x + 14, y - 18, x, y).strokeTriangle(x - 14, y + 18, x + 14, y + 18, x, y);
+        g.fillStyle(0x6a4a20, 1).fillRect(x - 17, y - 21, 34, 4).fillRect(x - 17, y + 17, 34, 4);
+        break;
+      case 'vow':
+        g.lineStyle(7, color, 1).strokeCircle(x, y + 4, 14);
+        g.fillStyle(0xd8e0ea, 1).fillCircle(x, y - 12, 6);
+        break;
+      case 'keystone':
+        g.beginPath().moveTo(x - 18, y - 16).lineTo(x + 18, y - 16).lineTo(x + 10, y + 18).lineTo(x - 10, y + 18).closePath().fillPath().strokePath();
+        g.lineStyle(2, 0x000000, 0.35).lineBetween(x - 4, y - 16, x - 2, y + 18).lineBetween(x + 4, y - 16, x + 2, y + 18);
         break;
     }
   }

@@ -11,27 +11,35 @@ export interface Vec {
 }
 
 /** The map is a square. Everything on red's half is blue's turned 180 degrees round the middle. */
-export const WORLD = { w: 2800, h: 2800 };
+/**
+ * How much bigger the map is than it was first laid out: every spot below is written at the old
+ * 2800x2800 size and scaled by this with `at`, while widths (a lane's, the river's, a bush's) and
+ * ranges stay as they are.
+ */
+export const MAP_SCALE = 1.25;
+/** A spot on the map, written at the first layout's size. */
+export const at = (x: number, y: number): Vec => ({ x: x * MAP_SCALE, y: y * MAP_SCALE });
+export const WORLD = { w: 2800 * MAP_SCALE, h: 2800 * MAP_SCALE };
 /** A point turned 180 degrees round the middle of the map: where red's copy of a blue spot sits. */
 export const mirror = (p: Vec): Vec => ({ x: WORLD.w - p.x, y: WORLD.h - p.y });
 /** Blue spots and their red copies, in that order. */
 const both = <T extends Vec>(spots: T[]): T[] => [...spots, ...spots.map((p) => ({ ...p, ...mirror(p) }))];
 
 /** The two Nexuses: the blue team (the player's) bottom-left, the red team top-right. */
-export const BASE: Record<Team, Vec> = { blue: { x: 300, y: 2500 }, red: { x: 2500, y: 300 } };
+export const BASE: Record<Team, Vec> = { blue: at(300, 2500), red: at(2500, 300) };
 
 /** Each lane runs from the blue Nexus to the red one. Red walks the same lane backwards. */
 export const LANES: Record<LaneId, Vec[]> = {
-  top: [BASE.blue, { x: 300, y: 300 }, BASE.red],
+  top: [BASE.blue, at(300, 300), BASE.red],
   mid: [BASE.blue, BASE.red],
-  bottom: [BASE.blue, { x: 2500, y: 2500 }, BASE.red],
+  bottom: [BASE.blue, at(2500, 2500), BASE.red],
 };
 
 /**
  * The river runs from the top-left corner to the bottom-right one, across the middle lane, and
  * splits each team's jungle in two. It is only scenery: units cross it at full speed.
  */
-export const RIVER = { from: { x: 420, y: 420 }, to: { x: 2380, y: 2380 }, half: 62 };
+export const RIVER = { from: at(420, 420), to: at(2380, 2380), half: 62 };
 
 export interface TowerSpot {
   team: Team;
@@ -41,19 +49,19 @@ export interface TowerSpot {
 }
 /** Two towers per team on each lane, the blue ones closest to the blue Nexus. */
 export const TOWERS: TowerSpot[] = both<TowerSpot>([
-  { team: 'blue', lane: 'top', x: 300, y: 1950 },
-  { team: 'blue', lane: 'top', x: 300, y: 1300 },
-  { team: 'blue', lane: 'mid', x: 689, y: 2111 },
-  { team: 'blue', lane: 'mid', x: 1007, y: 1793 },
-  { team: 'blue', lane: 'bottom', x: 850, y: 2500 },
-  { team: 'blue', lane: 'bottom', x: 1500, y: 2500 },
+  { team: 'blue', lane: 'top', ...at(300, 1950) },
+  { team: 'blue', lane: 'top', ...at(300, 1300) },
+  { team: 'blue', lane: 'mid', ...at(689, 2111) },
+  { team: 'blue', lane: 'mid', ...at(1007, 1793) },
+  { team: 'blue', lane: 'bottom', ...at(850, 2500) },
+  { team: 'blue', lane: 'bottom', ...at(1500, 2500) },
 ]).map((t, i) => (i < 6 ? t : { ...t, team: 'red', lane: t.lane === 'top' ? 'bottom' : t.lane === 'bottom' ? 'top' : 'mid' }));
 
 // ---------------------------------------------------------------------------------------------
 // The jungle: neutral camps of three kinds in each of the four quarters between the lanes and the
 // river. Boars stand alone, wolves come as a pack, and the two brutes give their slayer a buff.
 
-export type CampKind = 'boar' | 'wolf' | 'pup' | 'ember' | 'moss';
+export type CampKind = 'boar' | 'wolf' | 'pup' | 'ember' | 'moss' | 'merc' | 'drake';
 export interface CampDef {
   kind: CampKind;
   name: TextKey;
@@ -75,19 +83,28 @@ export const CAMP_KINDS: Record<CampKind, CampDef> = {
   pup: { kind: 'pup', name: 'campPup', hp: 200, dmg: 12, attackMs: 900, range: 100, radius: 16, armor: 0, gold: 20, xp: 30, respawnMs: 60_000 },
   ember: { kind: 'ember', name: 'campEmber', hp: 1150, dmg: 40, attackMs: 1300, range: 150, radius: 30, armor: 8, gold: 100, xp: 170, respawnMs: 90_000, buff: 'ember' },
   moss: { kind: 'moss', name: 'campMoss', hp: 1150, dmg: 40, attackMs: 1300, range: 150, radius: 30, armor: 8, gold: 100, xp: 170, respawnMs: 90_000, buff: 'moss' },
+  drake: { kind: 'drake', name: 'campDrake', hp: 1700, dmg: 38, attackMs: 1300, range: 170, radius: 30, armor: 10, gold: 110, xp: 190, respawnMs: 150_000 },
+  merc: { kind: 'merc', name: 'campMerc', hp: 520, dmg: 26, attackMs: 1100, range: 110, radius: 18, armor: 6, gold: 45, xp: 70, respawnMs: 150_000 },
 };
+/**
+ * Mercenary camps (LB14): a band of `count` sellswords by the bottom lane on blue's half and by the
+ * top lane on red's (spawned after the champions, so every other unit keeps its id). The team whose
+ * champion fells the last of a band gets `count` mercenaries of its own at the camp, minions with
+ * `power` times a minion's health and damage, which march from there down the nearest lane.
+ */
+export const MERC = { spots: [at(2120, 2380), at(680, 420)] as Vec[], count: 3, spread: 40, power: 2.2 };
 export interface CampSpot extends Vec {
   /** The camp's kind: a wolf pack is an alpha and two pups. */
-  kind: 'boar' | 'wolf' | 'ember' | 'moss';
+  kind: 'boar' | 'wolf' | 'ember' | 'moss' | 'merc';
 }
 /** Six camps per team's half: blue's first, then their red copies. */
 export const CAMPS: CampSpot[] = both<CampSpot>([
-  { kind: 'ember', x: 640, y: 1300 },
-  { kind: 'boar', x: 900, y: 1520 },
-  { kind: 'wolf', x: 620, y: 1850 },
-  { kind: 'moss', x: 1500, y: 2160 },
-  { kind: 'boar', x: 1280, y: 1900 },
-  { kind: 'wolf', x: 950, y: 2180 },
+  { kind: 'ember', ...at(640, 1300) },
+  { kind: 'boar', ...at(900, 1520) },
+  { kind: 'wolf', ...at(620, 1850) },
+  { kind: 'moss', ...at(1500, 2160) },
+  { kind: 'boar', ...at(1280, 1900) },
+  { kind: 'wolf', ...at(950, 2180) },
 ]);
 /** Where a wolf pack's two pups stand, from the alpha. */
 export const PUPS: Vec[] = [
@@ -107,6 +124,8 @@ export const START_GOLD = 400;
 export const GOLD_PER_SEC = 1.5;
 /** Champion kills pay gold and XP to the killer. */
 export const KILL = { gold: 300, xp: 200 };
+/** An assist: an enemy champion that hurt the slain champion within `windowMs` of its death, but did not land the kill, gets `gold`. */
+export const ASSIST = { windowMs: 10_000, gold: 120 };
 /** XP needed to reach each level: index 0 is level 1. */
 export const XP_FOR_LEVEL = [0, 280, 660, 1140, 1720, 2600, 3700, 5000];
 export const MAX_LEVEL = XP_FOR_LEVEL.length;
@@ -129,9 +148,9 @@ export const SIGHT = { champion: 360, minion: 240, tower: 440, inhibitor: 260, n
  * champion near takes it after a few seconds, and then sees far around it.
  */
 export const WATCHSTONES: Vec[] = [
-  { x: 850, y: 850 },
-  { x: 1200, y: 1200 },
-  { x: 1600, y: 1600 },
+  at(850, 850),
+  at(1200, 1200),
+  at(1600, 1600),
 ];
 export const WATCH = { radius: 150, captureMs: 3000 };
 
@@ -760,13 +779,14 @@ export const ACTIVES: ActiveDef[] = [
 /**
  * Vision wards (LB6): a champion carries up to `carry` of them and plants one within `range` of
  * itself; it gives its team `SIGHT.ward` of sight there, bushes included, for `ms`, and dies to
- * `hits` hits of any kind. Its killer takes `gold`. The AI plants its wards at `WARD_SPOTS`.
+ * `hits` hits of any kind. Its killer takes `gold`. The AI plants its wards at `WARD_SPOTS`, and from
+ * `WARD_AI.bushesFrom` in the tall grass it passes too (LB26), so ambushes there are seen.
  */
 export const WARD = { carry: 2, range: 600, ms: 90_000, hits: 3, gold: 20, radius: 10 };
 /** Where the AI likes its wards: the beast's pit and the three river islands; a team wards a spot once at a time. */
-export const WARD_SPOTS: Vec[] = [{ x: 1950, y: 1950 }, { x: 850, y: 850 }, { x: 1200, y: 1200 }, { x: 1600, y: 1600 }];
+export const WARD_SPOTS: Vec[] = [at(1950, 1950), at(850, 850), at(1200, 1200), at(1600, 1600)];
 /** An AI champion's ward goes at a spot this close to it that has no live ward of its team within `taken` px. */
-export const WARD_AI = { reach: 600, taken: 320 };
+export const WARD_AI = { reach: 600, taken: 320, bushesFrom: 100_000 };
 
 /**
  * Recall (LB7): a champion channels `ms` standing still to go home to its Nexus. Taking damage,
@@ -813,6 +833,49 @@ export const AI_BUILD_FOR: Partial<Record<TextKey, keyof typeof AI_BUILDS>> = {
   roleController: 'caster',
 };
 
+/**
+ * Battle spells (LB15): every champion carries one, cast with G (or the top bar's button) on its own
+ * cooldown. The player picks theirs on the pick screen; an AI champion's comes from its role
+ * (`aiSpellFor`). `blink` jumps up to `range` toward the aim; `firebrand` hurts the enemy champion
+ * nearest the aim (within `range` of the caster and `aim` of the point) by `base` plus `perLevel` per
+ * level; `mend` heals the caster and the most hurt allied champion within `range` by as much;
+ * `barrier` shields the caster by as much for `ms`.
+ */
+export type SpellId = 'blink' | 'firebrand' | 'mend' | 'barrier' | 'teleport';
+export interface SpellDef {
+  id: SpellId;
+  name: TextKey;
+  desc: TextKey;
+  cd: number;
+  color: string;
+  range?: number;
+  aim?: number;
+  base?: number;
+  perLevel?: number;
+  ms?: number;
+}
+export const SPELLS: SpellDef[] = [
+  { id: 'blink', name: 'spellBlink', desc: 'spellBlinkDesc', cd: 120_000, color: '#9fd8ff', range: 260 },
+  { id: 'firebrand', name: 'spellFirebrand', desc: 'spellFirebrandDesc', cd: 90_000, color: '#ff8a3d', range: 450, aim: 200, base: 90, perLevel: 22 },
+  { id: 'mend', name: 'spellMend', desc: 'spellMendDesc', cd: 120_000, color: '#7fe08a', range: 420, base: 110, perLevel: 25 },
+  { id: 'barrier', name: 'spellBarrier', desc: 'spellBarrierDesc', cd: 100_000, color: '#cfe1ff', base: 140, perLevel: 30, ms: 2500 },
+  // Teleport (LB24): a channel of `ms` like a recall's, to the allied tower or minion nearest the
+  // cursor within `aim` of it; damage, a move or a cast breaks it (the cooldown is spent anyway).
+  { id: 'teleport', name: 'spellTeleport', desc: 'spellTeleportDesc', cd: 180_000, color: '#c79bff', aim: 600, ms: 3500 },
+];
+export const spellById = (id: SpellId) => SPELLS.find((sp) => sp.id === id)!;
+/** The spell an AI champion carries: tanks a barrier, supports a mend, other casters a blink, the rest a firebrand. */
+export function aiSpellFor(def: { role: TextKey }): SpellId {
+  if (def.role === 'roleSupport') return 'mend';
+  const build = AI_BUILD_FOR[def.role] ?? 'fighter';
+  return build === 'tank' ? 'barrier' : build === 'caster' ? 'blink' : 'firebrand';
+}
+/**
+ * How the AI uses its spell: from `from` (the lanes settle first, like `GANK.firstAt`), under `low`
+ * of its health with an enemy champion within `look`, or on a champion it can finish under `finish`.
+ */
+export const SPELL_AI = { from: 100_000, low: 0.35, look: 420, finish: 0.25 };
+
 /** How close a champion must stand to its Nexus to shop. */
 export const SHOP_RANGE = 700;
 /** A champion within `radius` of its own Nexus heals `share` of its health a second. */
@@ -820,6 +883,12 @@ export const FOUNTAIN = { radius: 420, share: 0.12 };
 
 /** Which lane each AI champion walks, in roster order without the player's champion. */
 export const ALLY_LANES: LaneId[] = ['top', 'mid', 'bottom', 'mid'];
+/**
+ * A quick match (LB22): three a side on the mid lane alone, with no towers, inhibitors or minions
+ * on the other two, for a match of about ten minutes. Its towers, inhibitors and Nexuses have `hp`
+ * times their health, so one lane takes about as long to break as three.
+ */
+export const QUICK = { lanes: ['mid'] as LaneId[], allies: 2, enemies: 3, hp: 2.5 };
 export const ENEMY_LANES: LaneId[] = ['top', 'mid', 'bottom', 'mid', 'top'];
 
 /** The colour of each side's rings, bolts and lines. */
@@ -1047,8 +1116,7 @@ export const LAST_HIT_LOOK = 140;
 // lanes, the same distance from both Nexuses. The team that slays it gets stronger minions for a while.
 
 export const BEAST = {
-  x: 1950,
-  y: 1950,
+  ...at(1950, 1950),
   hp: 3200,
   dmg: 48,
   attackMs: 1400,
@@ -1093,9 +1161,9 @@ export interface InhibitorSpot {
   y: number;
 }
 export const INHIBITORS: InhibitorSpot[] = both<InhibitorSpot>([
-  { team: 'blue', lane: 'top', x: 300, y: 2250 },
-  { team: 'blue', lane: 'mid', x: 477, y: 2323 },
-  { team: 'blue', lane: 'bottom', x: 550, y: 2500 },
+  { team: 'blue', lane: 'top', ...at(300, 2250) },
+  { team: 'blue', lane: 'mid', ...at(477, 2323) },
+  { team: 'blue', lane: 'bottom', ...at(550, 2500) },
 ]).map((t, i) => (i < 3 ? t : { ...t, team: 'red', lane: t.lane === 'top' ? 'bottom' : t.lane === 'bottom' ? 'top' : 'mid' }));
 export const INHIBITOR = { hp: 1600, radius: 24, gold: 120 };
 /** Super minions have this much more health and damage. */
@@ -1113,15 +1181,15 @@ export interface Bush {
 }
 /** Nine pairs, each mirrored under the map's 180-degree turn: by the lanes, in the jungle and on the river banks. */
 export const BUSHES: Bush[] = both<Bush>([
-  { x: 1150, y: 1450, rx: 78, ry: 48 },
-  { x: 1750, y: 2100, rx: 70, ry: 50 },
-  { x: 780, y: 1680, rx: 72, ry: 52 },
-  { x: 1120, y: 2050, rx: 72, ry: 52 },
-  { x: 440, y: 900, rx: 60, ry: 62 },
-  { x: 1900, y: 2360, rx: 70, ry: 50 },
-  { x: 520, y: 1100, rx: 60, ry: 60 },
-  { x: 1300, y: 2300, rx: 70, ry: 50 },
-  { x: 700, y: 980, rx: 70, ry: 50 },
+  { ...at(1150, 1450), rx: 78, ry: 48 },
+  { ...at(1750, 2100), rx: 70, ry: 50 },
+  { ...at(780, 1680), rx: 72, ry: 52 },
+  { ...at(1120, 2050), rx: 72, ry: 52 },
+  { ...at(440, 900), rx: 60, ry: 62 },
+  { ...at(1900, 2360), rx: 70, ry: 50 },
+  { ...at(520, 1100), rx: 60, ry: 60 },
+  { ...at(1300, 2300), rx: 70, ry: 50 },
+  { ...at(700, 980), rx: 70, ry: 50 },
 ]);
 /** An enemy this close sees into a bush, and through stealth. */
 export const BUSH_REVEAL = 90;
@@ -1137,8 +1205,123 @@ export function bushAt(p: Vec): number {
 // Team plans for the AI: now and then a champion leaves its lane to gang up on a weak enemy, takes a
 // jungle buff or a watchstone, and champions that are hurt or outnumbered fall back together.
 
-export const GANK = { firstAt: 100_000, every: 70_000, ms: 24_000, minHp: 0.6, from: 650 };
+export const GANK = { firstAt: 100_000, every: 70_000, ms: 24_000, minHp: 0.6, from: 650, night: 0.7 };
+/**
+ * Ambushes (LB26): a champion on a gank whose prey stands within `reach` of a bush, and is still
+ * farther than `strike` from it, slips into that bush first and waits there, hidden, for up to
+ * `waitMs` until the prey comes within `strike`; then it charges. At night ganks come `GANK.night`
+ * times as often.
+ */
+export const AMBUSH = { reach: 380, strike: 260, waitMs: 7000 };
 /** Each team sends a champion into the jungle for a buff or a watchstone this often, from `firstAt`. */
+/**
+ * River runes (LB13): every `every` ms from `firstAt` a rune appears at each of the two river
+ * `spots` (one replaces any not taken), the kinds taking turns by `RUNE_ORDER`. A champion that
+ * walks within `pick` takes it. The AI champion of a team nearest a rune within `aiReach`, with
+ * at least `aiMinHp` of its health and no enemy champion near, walks to it.
+ */
+export type RuneKind = 'might' | 'haste' | 'fortune' | 'mending';
+export const RUNES: Record<RuneKind, { name: TextKey; color: string; buff?: BuffDef; ms?: number; gold?: number; teamGold?: number }> = {
+  might: { name: 'runeMight', color: '#ff8a3d', buff: { dmg: 30 }, ms: 30_000 },
+  haste: { name: 'runeHaste', color: '#9fd8ff', buff: { speed: 40 }, ms: 25_000 },
+  fortune: { name: 'runeFortune', color: '#f2c14e', gold: 120, teamGold: 40 },
+  mending: { name: 'runeMending', color: '#7fe08a', buff: { regen: 25 }, ms: 20_000 },
+};
+export const RUNE_ORDER: RuneKind[] = ['might', 'haste', 'fortune', 'mending'];
+export const RUNE = {
+  spots: [at(1025, 1025), at(1775, 1775)] as Vec[],
+  firstAt: 120_000,
+  every: 120_000,
+  pick: 46,
+  aiReach: 750,
+  aiMinHp: 0.5,
+};
+
+/**
+ * Pings: the player marks a point (or an enemy on it) for the AI allies. `attack` sends the
+ * `answer` nearest free allies within `reach` there (to hit the enemy marked), `gather` calls the
+ * free allies within `near` of the point to wait there, and `danger` makes the allies within `near`
+ * fall back. Allies keep a ping's errand for `ms`; the marker shows for `showMs`. The player can
+ * ping again after `cd`; `pick` is how close to an enemy a ping must land to mark it.
+ */
+export type PingKind = 'attack' | 'gather' | 'danger';
+export const PING_KINDS: PingKind[] = ['attack', 'gather', 'danger'];
+export const PINGS: Record<PingKind, { name: TextKey; color: string }> = {
+  attack: { name: 'pingAttack', color: '#ff8a3d' },
+  gather: { name: 'pingGather', color: '#7fe08a' },
+  danger: { name: 'pingDanger', color: '#f2c14e' },
+};
+export const PING = { answer: 2, reach: 2200, near: 900, ms: 12_000, showMs: 4000, cd: 1200, pick: 60, minHp: 0.4 };
+
+/** The death recap counts the damage of the last `windowMs` before the player's champion fell, in at most `rows` rows. */
+export const RECAP = { windowMs: 10_000, rows: 4 };
+
+/**
+ * The river drake (LB18): one camp of kind `drake` in its own pit on the river, opposite the beast's
+ * (spawned last, so every other unit keeps its id). It sleeps until `firstAt`, then wakes again
+ * `CAMP_KINDS.drake.respawnMs` after it falls, each time of the next element in `DRAKE_ORDER`. Its
+ * slayer's team keeps one stack of that element for the rest of the match: every one of its
+ * champions gets the element's bonus per stack (`DRAKES`), and at `soul` stacks the soul doubles
+ * them all. The AI sends up to `ai` free champions with at least `aiMinHp` of their health for it.
+ */
+export type DrakeElement = 'fire' | 'stone' | 'storm' | 'tide';
+export const DRAKE_ORDER: DrakeElement[] = ['fire', 'stone', 'storm', 'tide'];
+export const DRAKES: Record<DrakeElement, { name: TextKey; color: string; bonus: BuffDef }> = {
+  fire: { name: 'drakeFire', color: '#ff8a3d', bonus: { dmg: 5 } },
+  stone: { name: 'drakeStone', color: '#e8d9a8', bonus: { armor: 6 } },
+  storm: { name: 'drakeStorm', color: '#9fd0ff', bonus: { speed: 6 } },
+  tide: { name: 'drakeTide', color: '#7fe8d6', bonus: { regen: 4 } },
+};
+export const DRAKE = { ...at(600, 600), firstAt: 150_000, soul: 4, ai: 2, aiMinHp: 0.6 };
+
+/**
+ * Early gold (LB19): the first champion kill of the match pays `FIRST_BLOOD.gold` on top. Until
+ * `PLATING.until` each team's outer tower on a lane wears `PLATING.count` plates, one per share of
+ * its health: each plate broken pays `PLATING.gold`, split between the enemy champions within
+ * `PLATING.share` of the tower. At `PLATING.until` the plates fall away.
+ */
+export const FIRST_BLOOD = { gold: 150 };
+export const PLATING = { count: 5, gold: 120, share: 700, until: 300_000 };
+
+/**
+ * Comeback help (LB23): a team whose champions have `gap` less XP between them than the other's is
+ * behind, and each enemy champion it slays pays `gold` and `xp` more.
+ */
+export const COMEBACK = { gap: 0.15, gold: 150, xp: 80 };
+/**
+ * Surrender (LB23): from `at` (`quickAt` in a quick match) the player can call a vote from the
+ * scoreboard, once every `cd`. Each ally votes yes when the team is behind (`COMEBACK.gap`) or has
+ * lost `structs` more towers and inhibitors than the other; it passes with `pass` of the team. An
+ * AI team (red, and blue too when watching) gives up when it is `aiGap` behind on XP and `structs`
+ * behind on structures, looked at every `cd`.
+ */
+export const SURRENDER = { at: 900_000, quickAt: 600_000, cd: 180_000, pass: 0.7, structs: 2, aiGap: 0.25 };
+
+/**
+ * The match summary (LB25): each team's net worth (gold in hand plus the full price of the items its
+ * champions hold) is noted every `every` ms for the end panel's graph, and the MVP is the champion
+ * with the best `kills * kill + assists * assist + cs * cs - deaths * death`.
+ */
+export const SUMMARY = { every: 20_000, kill: 3, assist: 1.5, cs: 0.05, death: 1 };
+
+/**
+ * Day and night (LB21): the match starts in the morning. Each day lasts `day` ms and each night
+ * `night`, with `fade` ms of dusk and of dawn at the ends of the night. At full night champions see
+ * only `sight` as far (minions, structures, watchstones and wards keep theirs), so the fog and the
+ * tall grass hide more. Less than 0.8 and watched matches end much sooner, as fewer fights are seen
+ * coming.
+ */
+export const DAYNIGHT = { day: 180_000, night: 90_000, fade: 10_000, sight: 0.8 };
+
+/**
+ * Bodies (LB20): how wide each kind of walker is to the solid things of the map (`game/terrain.ts`)
+ * and to other walkers. Camps by their own radius times `camp`. Overlapping walkers are pushed
+ * apart by `give` of the overlap each tick, so a crowd parts softly rather than at once.
+ */
+export const BODY = { champion: 14, minion: 9, camp: 0.6, beast: 30, give: 0.5 };
+/** The player's champion gives up on a spot it has got no closer to for `ms` once within `near` px of it. */
+export const STUCK = { ms: 500, near: 60 };
+
 export const JUNGLE = { firstAt: 120_000, every: 45_000, ms: 30_000, minHp: 0.6 };
 export const RETREAT = {
   /** Health ratio under which a champion with an enemy champion near falls back. */

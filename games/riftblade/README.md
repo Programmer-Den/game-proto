@@ -110,6 +110,87 @@ come faster.
 
 ![A swarm of wisps and an elite conductor on the Storm world](docs/screenshots/world-storm.webp)
 
+### Rift heat
+
+Once a hero has won a run, its detail panel on the hero select shows a **Heat** row above Fight:
+tap the arrows (or press Left and Right) to pick the rift heat of the next run, from 0 (the
+crusade as designed) up to one above the highest heat that hero has won at. Each heat keeps every
+rule below it and adds one:
+
+| Heat | Adds |
+| --- | --- |
+| 1 | Elites come twice as often (every 25 s after the first) |
+| 2 | Foes hit a quarter harder |
+| 3 | No rest stops on the star map |
+| 4 | Below a quarter of its health a boss goes into a frenzy: it attacks half again as fast and moves faster |
+| 5 | Foes and bosses have a quarter more health |
+
+Winning at a heat opens the next one for that hero, up to heat 5. The best heat won shows on the
+hero's card beside its wins, the HUD names the heat under way after the planet, and the end screen
+says which heat the run was at. Heat stacks with the difficulty setting.
+
+![The Heat row on the hero select](docs/screenshots/rift-heat.webp)
+
+### The Armoury
+
+At the end of every run, won or lost, its unspent credits go to the bank, plus 10 salvage for each
+world reached; the end screen says how much. Once anything is banked, an **Armoury** button shows
+at the top left of the hero select. There banked credits buy small lasting upgrades for every
+hero (tap a piece or press 1-5; Back or Enter returns):
+
+| Piece | Ranks | Each rank | Prices |
+| --- | --- | --- | --- |
+| Field Rations | 3 | +5% max health | 60, 120, 180 |
+| War Chest | 3 | +15 credits at the start of a run | 50, 100, 150 |
+| Lumen Lens | 2 | +10% shard pickup range | 80, 160 |
+| Field Briefing | 1 | A fourth card at the first level-up of a run (Elara already has four) | 150 |
+| Spare Reroll | 1 | The first reroll at each trader is free | 120 |
+
+Every piece maxed costs 1,170 credits, about a dozen runs. Credits kept for the bank are credits
+not spent at a trader, so each trader is a choice between this run and the next ones.
+
+![The Armoury](docs/screenshots/armoury.webp)
+
+### The weekly run
+
+Once a first run has ended, a **Weekly run** button shows at the top right of the hero select. It
+opens this week's run: one of your open heroes and two mutators, both picked from the week's
+number (weeks start on Monday, 00:00 UTC), with each world and star map seeded, so every attempt
+that week starts each world the same way. It is fought at heat 0 and without the Armoury. The
+panel shows how far you got this week; the first win of the week banks **100 credits** for the
+Armoury (on top of the run's own credits). Tap Start or press Enter; Back returns.
+
+| Mutator | Effect |
+| --- | --- |
+| Glass Cannon | +50% damage, -40% max health |
+| Swarm | Foes come 40% faster, with a quarter less health |
+| Haste | You and every foe move a quarter faster |
+| Vampire | Every kill heals 1 health; no regeneration |
+| Overcharged | Your signature recharges twice as fast |
+| Fragile Foes | Foes have half health but hit twice as hard |
+
+![The weekly run](docs/screenshots/weekly-run.webp)
+
+### Trophies
+
+Ten trophies, listed on the start and pause screens (Trophies) and counted on the hub's card.
+Each shows a toast once, when it is earned; a save from before trophies earns its own quietly.
+
+| Trophy | Tier | Earned by |
+| --- | --- | --- |
+| Crawler down | Bronze | Beating the boss of the Dune world |
+| Mastery | Bronze | Unlocking a capstone in a run |
+| A new face | Bronze | Unlocking a second hero |
+| Kitted out | Bronze | Buying your first piece in the Armoury |
+| Crusader | Silver | Winning the Rift Crusade with any hero |
+| Week in, week out | Silver | Winning a weekly run |
+| Running hot | Silver | Winning a run at rift heat 3 |
+| Into the furnace | Gold | Winning a run at rift heat 5 |
+| Fully stocked | Gold | Buying every rank of every piece in the Armoury |
+| The full roster | Gold | Unlocking all twelve heroes (hidden until earned) |
+
+![The trophy list](docs/screenshots/trophies.webp)
+
 ### The space map
 
 After the boss of the Dune world falls (and again after the second world's), the space map shows

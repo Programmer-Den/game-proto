@@ -26,8 +26,11 @@ const ALL_CODE = 'gh';
 const HASH = '#p=';
 /** The largest QR code shown; denser ones are hard to scan from a screen. */
 const MAX_VERSION = 25;
-/** Digits per frame of a loop, so each frame stays a version 20 code. */
-const FRAME_DIGITS = 1400;
+/**
+ * Digits per frame of a loop, so each frame, with its `gp:` header, stays within `MAX_VERSION`
+ * (2,350 digits fit one with the longest header) like a single code.
+ */
+const FRAME_DIGITS = 2300;
 /** The most frames a loop shows; more is quicker to copy and paste. */
 const MAX_FRAMES = 40;
 /** How long each frame shows, in ms, and with reduced motion. */

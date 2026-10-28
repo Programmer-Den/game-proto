@@ -19,7 +19,7 @@ const en: HowToPlay = {
     { input: '1, 2 or 3', action: 'Pick a power card when one is offered' },
   ],
   loop: [
-    'Pick a commander, a season, and whether the board has terrain tiles.',
+    'Pick a commander, a season (or this week’s), and whether the board has terrain tiles.',
     'Buy robots from the shop with your gold.',
     'Place them on your half of the board: tanks in front, shooters behind.',
     'Press FIGHT! and watch them battle on their own.',
@@ -34,6 +34,9 @@ const en: HowToPlay = {
     'Gilded robots in the shop count for two origins but never merge.',
     'Pick up a part to see what it would build on each robot before you bolt it on.',
     'On the Scrap Rat round, tap the rat to zap gold out of it before it escapes.',
+    'Five more commanders unlock through deeds, like a top-four finish or a 3-star robot; pick a locked one on the menu to see how.',
+    'Top-four finishes earn rank points; each new rank makes the rivals play a little harder.',
+    'The third season card is this week’s: its season and terrain change every Monday, and it keeps its own best place.',
   ],
 };
 
@@ -54,7 +57,7 @@ const de: HowToPlay = {
     { input: '1, 2 oder 3', action: 'Eine Machtkarte wählen, wenn eine angeboten wird' },
   ],
   loop: [
-    'Wähle einen Kommandanten, eine Saison und ob das Brett Geländefelder hat.',
+    'Wähle einen Kommandanten, eine Saison (oder die der Woche) und ob das Brett Geländefelder hat.',
     'Kaufe mit deinem Gold Roboter im Shop.',
     'Stelle sie auf deine Bretthälfte: Tanks nach vorn, Schützen nach hinten.',
     'Drücke KAMPF! und sieh zu, wie sie von selbst kämpfen.',
@@ -69,6 +72,9 @@ const de: HowToPlay = {
     'Vergoldete Roboter im Shop zählen für zwei Herkünfte, verschmelzen aber nie.',
     'Nimm ein Teil auf, um zu sehen, was es an jedem Roboter bauen würde, bevor du es anschraubst.',
     'Tippe in der Schrottratten-Runde die Ratte an, um Gold aus ihr zu schocken, bevor sie entkommt.',
+    'Fünf weitere Kommandanten schaltest du mit Taten frei, etwa einem Platz unter den ersten vier oder einem Roboter mit 3 Sternen; wähle im Menü einen gesperrten, um zu sehen, wie.',
+    'Plätze unter den ersten vier bringen Rangpunkte; jeder neue Rang lässt die Rivalen etwas härter spielen.',
+    'Die dritte Saisonkarte ist die der Woche: Saison und Gelände wechseln jeden Montag, und sie hat ihren eigenen besten Platz.',
   ],
 };
 

@@ -229,6 +229,25 @@ A buckler adds its price to a set order, before the set's 50% bonus.
 | 4 | Silver Buckler | 100 |
 | 5 | Golden Buckler | 240 |
 
+### Trophies
+
+Nine trophies, listed behind the Trophies button on the start and pause screens and counted on the
+hub's card. Each pops up at the top of the page once, when it is earned.
+
+| Tier | Trophy | Earned by |
+| --- | --- | --- |
+| Bronze | Open for trade | Selling your first sword |
+| Bronze | Masterwork | Striking a Masterwork in the last second of a hammer streak |
+| Bronze | Ringing anvils | Chaining five merges in one hammer streak |
+| Bronze | By royal appointment | Completing your first royal commission |
+| Silver | Busy counter | Selling 100 swords |
+| Silver | Renowned smithy | Raising the guild's reputation to the top |
+| Silver | Dragon bane | Forging a Dragonslayer |
+| Gold | The Crown Blade | Delivering the Crown Blade |
+| Gold | Smithing dynasty (hidden) | Founding a third new smithy after a win |
+
+![The trophy list on the pause screen](docs/screenshots/trophy-list.webp)
+
 ![Auto Forge, unlocked once Bellows is maxed, forging on its own](docs/screenshots/auto-forge-on.webp)
 
 The difficulty, set on the hub page's Settings, changes one thing: adventurers wait 50% longer on Easy and 30% less on Hard.

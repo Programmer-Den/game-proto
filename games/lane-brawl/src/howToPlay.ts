@@ -13,8 +13,11 @@ const en: HowToPlay = {
     { input: 'D, H, V, or their buttons', action: 'Dash, drink the Healing Flask, or plant a Vision Ward' },
     { input: 'T, or Recall', action: 'Channel 4 seconds, then return to your Nexus' },
     { input: 'B, or Shop (Esc closes it)', action: 'Open the shop and buy items' },
+    { input: 'G, or the spell button', action: 'Cast your battle spell (pick it on the champion screen)' },
     { input: 'X, or Buy back', action: 'While dead, pay to respawn at once (once every 2:30)' },
     { input: '1, 2 or 3, or click a card', action: 'Keep one of the upgrades a new level offers' },
+    { input: 'Hold Tab, or tap the kill score', action: 'Show the scoreboard of all ten champions' },
+    { input: 'Z, N or C at the cursor, or a ping button then the map (Alt and click: attack)', action: 'Ping attack, on my way or danger: allies come and fight, wait there for you or fall back' },
   ],
   loop: [
     'Pick a champion card to start the match.',
@@ -32,6 +35,14 @@ const en: HowToPlay = {
     'Wins with a champion raise its mastery, which adds a third upgrade card to its early levels.',
     'Tall grass hides you from enemies until you attack, and the fog hides what your team cannot see.',
     'Standing inside the ring round your own Nexus heals you quickly.',
+    'Clear the sellswords camped by a lane and they march down it for your team.',
+    'The first kill of the match pays extra, and until 5:00 hitting an outer tower breaks gold plates off it.',
+    'Short on time? Switch the pick screen to a quick match: three a side on one lane, about ten minutes.',
+    'A team that falls behind gets more for each kill, and from 15:00 the scoreboard lets you call a surrender vote.',
+    'At night everyone sees less far, so the tall grass is the place for an ambush.',
+    'From 2:30 a drake wakes in the river: each one your team slays gives all of you a lasting bonus, and the fourth doubles them.',
+    'From 2:00, every two minutes two runes appear on the river: walk over one for more damage, speed, healing or gold.',
+    'Stone walls line the lanes, and the jungle is forest you can only cross on its paths: walk through a gap in the wall. Click anywhere and your champion finds the way.',
   ],
 };
 
@@ -46,8 +57,11 @@ const de: HowToPlay = {
     { input: 'D, H, V oder ihre Tasten', action: 'Sprinten, den Heiltrank trinken oder einen Sichtwächter setzen' },
     { input: 'T oder Heimkehren', action: '4 Sekunden kanalisieren, dann zum Nexus zurückkehren' },
     { input: 'B oder Laden (Esc schließt ihn)', action: 'Den Laden öffnen und Gegenstände kaufen' },
+    { input: 'G oder die Zaubertaste', action: 'Deinen Kampfzauber wirken (gewählt auf der Championauswahl)' },
     { input: 'X oder Zurückkaufen', action: 'Im Tod sofort gegen Gold wiederkehren (alle 2:30 einmal)' },
     { input: '1, 2 oder 3, oder eine Karte anklicken', action: 'Eines der Upgrades einer neuen Stufe behalten' },
+    { input: 'Tab halten oder auf den Kill-Stand tippen', action: 'Die Punktetafel aller zehn Champions zeigen' },
+    { input: 'Z, N oder C am Zeiger, oder eine Signaltaste, dann die Karte (Alt und Klick: Angriff)', action: 'Signal Angriff, Bin unterwegs oder Gefahr: Verbündete kommen und kämpfen, warten dort auf dich oder ziehen sich zurück' },
   ],
   loop: [
     'Wähle eine Championkarte, um das Match zu beginnen.',
@@ -65,6 +79,14 @@ const de: HowToPlay = {
     'Siege mit einem Champion steigern seine Meisterschaft, die seinen frühen Stufen eine dritte Upgradekarte gibt.',
     'Hohes Gras verbirgt dich vor Feinden, bis du angreifst, und der Nebel verbirgt, was dein Team nicht sieht.',
     'Im Ring um deinen eigenen Nexus heilst du schnell.',
+    'Besiege die Söldner, die an einer Lane lagern, dann ziehen sie für dein Team die Lane hinunter.',
+    'Der erste Kill des Matches bringt mehr, und bis 5:00 brechen Treffer an äußeren Türmen Goldplatten ab.',
+    'Wenig Zeit? Stell auf dem Auswahlbildschirm ein schnelles Match ein: drei pro Seite auf einer Lane, etwa zehn Minuten.',
+    'Ein Team im Rückstand bekommt mehr für jeden Kill, und ab 15:00 kannst du in der Punktetafel eine Abstimmung zum Aufgeben starten.',
+    'Nachts sehen alle weniger weit, also ist das hohe Gras der Ort für einen Hinterhalt.',
+    'Ab 2:30 erwacht ein Drache im Fluss: Jeder, den dein Team erschlägt, gibt euch allen einen bleibenden Bonus, und der vierte verdoppelt sie.',
+    'Ab 2:00 erscheinen alle zwei Minuten zwei Runen am Fluss: Lauf über eine für mehr Schaden, Tempo, Heilung oder Gold.',
+    'Steinmauern säumen die Lanes, und den Dschungel durchquerst du nur auf seinen Pfaden: Geh durch eine Lücke in der Mauer. Klick irgendwohin, und dein Champion findet den Weg.',
   ],
 };
 

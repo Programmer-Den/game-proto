@@ -158,6 +158,7 @@ export class Battle {
   private nextId = 1;
   private occ = new Map<string, number>();
   private asBuffUntil: [number, number] = [0, 0];
+  private rallyUntil: [number, number] = [0, 0];
   private leapsDone = false;
   private sides: [SideSpec, SideSpec];
 
@@ -382,7 +383,8 @@ export class Battle {
   private attack(u: BUnit, target: BUnit) {
     const ranged = u.range > 1;
     const crit = Math.random() < u.crit;
-    let dmg = u.atk * u.dmgMul * (crit ? u.critDmg : 1);
+    const rally = this.time < this.rallyUntil[u.team] ? SKILL_POWER.rally.damage : 1;
+    let dmg = u.atk * u.dmgMul * rally * (crit ? u.critDmg : 1);
     if (u.cls === 'sniper') dmg *= 1 + traitValue(this.sides[u.team].traits, 'sniper') / 100;
     this.events.push({ t: 'attack', id: u.id, target: target.id, ranged });
     this.gainMana(u, MANA_PER_ATTACK + (u.sp.manaOnHit ?? 0), false);
@@ -575,18 +577,37 @@ export class Battle {
     if (!skill || this.skillUsed[team] || this.done) return false;
     this.skillUsed[team] = true;
     const allies = this.alive(team);
+    const foes = this.alive(team === 0 ? 1 : 0);
+    const src = allies[0] ?? null;
     if (skill === 'overclock') {
       this.asBuffUntil[team] = this.time + SKILL_POWER.overclock.seconds;
       this.events.push({ t: 'skill', team, skill });
     } else if (skill === 'bulwark') {
       this.events.push({ t: 'skill', team, skill });
       for (const a of allies) this.giveShield(a, SKILL_POWER.bulwark.shield, SKILL_POWER.bulwark.seconds);
+    } else if (skill === 'mend') {
+      this.events.push({ t: 'skill', team, skill });
+      for (const a of allies) this.heal(a, SKILL_POWER.mend.heal);
+    } else if (skill === 'surge') {
+      this.events.push({ t: 'skill', team, skill });
+      for (const a of allies) this.gainMana(a, a.maxMana, true);
+    } else if (skill === 'emp') {
+      this.events.push({ t: 'skill', team, skill });
+      for (const f of foes) {
+        f.mana = 0;
+        this.stun(f, SKILL_POWER.emp.stunS);
+      }
+    } else if (skill === 'rally') {
+      this.rallyUntil[team] = this.time + SKILL_POWER.rally.seconds;
+      this.events.push({ t: 'skill', team, skill });
+    } else if (skill === 'airstrike') {
+      this.events.push({ t: 'skill', team, skill });
+      for (const f of foes) this.hurt(f, SKILL_POWER.airstrike.damage * (1 - (f.sp.abilityResist ?? 0)), src, true, false, true);
     } else {
-      const foe = [...this.alive(team === 0 ? 1 : 0)].sort((a, b) => b.hp - a.hp)[0];
+      const foe = [...foes].sort((a, b) => b.hp - a.hp)[0];
       this.events.push({ t: 'skill', team, skill, target: foe?.id });
       if (foe) {
-        const src = allies[0] ?? foe;
-        this.hurt(foe, SKILL_POWER.zap.damage * (1 - (foe.sp.abilityResist ?? 0)), src.team === team ? src : null, true, false, true);
+        this.hurt(foe, SKILL_POWER.zap.damage * (1 - (foe.sp.abilityResist ?? 0)), src, true, false, true);
         this.stun(foe, SKILL_POWER.zap.stunS);
       }
     }

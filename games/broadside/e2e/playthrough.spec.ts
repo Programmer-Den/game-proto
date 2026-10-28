@@ -411,6 +411,9 @@ test('plays the first wave', async ({ page }, testInfo) => {
   s = await game.state();
   expect(s).toMatchObject({ phase: 'break', wave: 2 });
   expect(s.toSpawn.length).toBeGreaterThan(WAVE_1.length);
+  // Sinking the sloops earns the First blood trophy (src/trophies/), and nothing else yet.
+  const trophies = await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('broadside-trophies') ?? '{}')));
+  expect(trophies, 'trophies earned in the first round').toEqual(['firstSink']);
 
   const speed = gameMs / (Date.now() - startedAt);
   console.log(`Played ${Math.round(gameMs / 1000)}s of game time at ${speed.toFixed(1)}x (target ${SPEED}x).`);

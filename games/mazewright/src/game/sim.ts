@@ -285,7 +285,7 @@ export interface Fixed {
  * actions play out differently (a tower's, foe's or wave's numbers, a new rule): replays of another
  * version are dropped when they load, since they would no longer play out as they did.
  */
-export const REPLAY_VERSION = 4;
+export const REPLAY_VERSION = 5;
 
 /** A game kept to watch again: how it began, and every action taken in it. */
 export interface Replay extends Fixed {
@@ -333,8 +333,8 @@ export function newGame(mapId: string, calm = false, mode: Mode = 'classic', mas
     phase: 'build',
     wave: 0,
     paid: 0,
-    gold: mode === 'sandbox' ? SANDBOX_GOLD : START_GOLD,
-    gold2: !duo ? 0 : mode === 'sandbox' ? SANDBOX_GOLD : START_GOLD,
+    gold: mode === 'sandbox' ? SANDBOX_GOLD : (map.gold ?? START_GOLD),
+    gold2: !duo ? 0 : mode === 'sandbox' ? SANDBOX_GOLD : (map.gold ?? START_GOLD),
     duo,
     lives,
     maxLives: lives,
@@ -568,7 +568,7 @@ export const masterOpen = (g: Game | undefined, kind: TowerKind) => !g?.masters 
 /** Seeds a finished game pays, by its result; none in Sandbox. */
 export function seedsFor(g: Game) {
   if (g.mode === 'sandbox') return 0;
-  if (g.phase === 'won') return SEEDS.win + SEEDS.star * stars(g);
+  if (g.phase === 'won') return SEEDS.win + SEEDS.star * stars(g) + (g.mode === 'challenge' ? SEEDS.challenge : 0);
   return SEEDS.loss + Math.floor(Math.max(0, g.wave - 1) / SEEDS.waves);
 }
 
@@ -1333,6 +1333,25 @@ export function replayStep(g: Game, r: Replay, from: number) {
     else startWave(g);
   }
   return i;
+}
+
+/**
+ * A saved game played back quietly to the step it was saved at, `dt` a step, with each step's
+ * events handed to `events` and dropped: the same game as it was then, ready to go on.
+ */
+export function resumeGame(r: Replay, dt: number, events: (e: GameEvent[]) => void) {
+  const g = replayGame(r);
+  let i = 0;
+  while (g.steps < r.steps && !over(g)) {
+    i = replayStep(g, r, i);
+    step(g, dt);
+    events(g.events);
+    g.events.length = 0;
+  }
+  // The actions taken after its last step, in the break it was saved in.
+  replayStep(g, r, i);
+  g.events.length = 0;
+  return g;
 }
 
 /** What to keep of a finished game to watch it again. */

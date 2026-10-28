@@ -4,15 +4,16 @@ import { formatNumber } from '../../../../shared/i18n';
 import { viewFrame, viewSize } from '../../../../shared/scaling';
 import { settings } from '../../../../shared/settings';
 import { SFX, SONG } from '../audio';
-import { KIND_COLOR, MODES, RELIC_COLOR, type Mode, type RelicId } from '../game/catalog';
+import { CHARMS, KIND_COLOR, MODES, RELIC_COLOR, type Mode, type RelicId } from '../game/catalog';
 import { DEFS, KINDS, LEVELS, SKILLS, SKILL_OF, type KindId, type Level } from '../game/kinds';
 import type { Progress } from '../game/progress';
 import {
-  act, canHint, canUndo, dailyDone, draftPick, drag, hint, next, quit, skip, startRun, startSecondPlayer, takeRelic, tick, undo,
-  BLITZ_PENALTY_S, DUEL_FAIL_S, QUEUE, type Card, type Run,
+  act, canHint, canTakeOmen, canUndo, dailyDone, draftPick, drag, hint, holdsCharm, next, omenFor, takeOmen, quit, skip, startRun, startSecondPlayer, takeRelic, tick, undo,
+  BLITZ_PENALTY_S, DUEL_FAIL_S, PERIL_HEARTS, QUEUE, type Card, type Run,
 } from '../game/run';
-import { loadProgress, saveProgress } from '../game/save';
+import { clearRun, loadProgress, loadRun, saveProgress, saveRun } from '../game/save';
 import { t, type TextKey } from '../i18n';
+import { checkTrophies } from '../trophies/check';
 import { drawGlyph, drawKindIcon, drawRelic, trace } from './glyphs';
 import { layoutFor, UI_DEPTH, VIEW, WIDE, type Layout } from './layout';
 import { Painter } from './painter';
@@ -46,6 +47,8 @@ const tenthsText = (ms: number) => {
 export class GameScene extends Phaser.Scene {
   progress!: Progress;
   run: Run | null = null;
+  /** A run saved before the last reload, which the menu's Continue picks up. */
+  saved: Run | null = null;
   screen: 'menu' | 'practice' | 'records' | 'run' = 'menu';
   practiceLevel: Level = 0;
   /** Spots for the test: every tappable thing on screen by id, centred, in view pixels. */
@@ -64,6 +67,8 @@ export class GameScene extends Phaser.Scene {
   private clockKey = '';
   private dragging = false;
   private lastTime = 0;
+  /** Where the run in play stood when it was last saved: it is saved again when this changes. */
+  private saveKey = '';
 
   constructor() {
     super('Game');
@@ -71,6 +76,8 @@ export class GameScene extends Phaser.Scene {
 
   create() {
     this.progress = loadProgress();
+    this.saved = loadRun(this.progress);
+    checkTrophies(this.progress, this.saved, true);
     this.backdrop = this.add.graphics().setDepth(0);
     this.p = new Painter(this, UI_DEPTH);
     this.fitView();
@@ -103,6 +110,7 @@ export class GameScene extends Phaser.Scene {
       tick(run, dt);
       if (run.current?.card.kind === 'echo' && run.current.state.step !== step && step >= 0) SFX('turn');
       this.drain();
+      this.keepRun(run);
       const cur = run.current;
       const key = [run.phase, Math.floor((cur?.timeLeftMs ?? 0) / 100), Math.floor(run.clockMs / 100), cur?.card.kind === 'echo' ? Math.floor(cur.state.ms / 100) + cur.state.step * 100 : 0].join('|');
       if (key !== this.clockKey) (this.clockKey = key), (this.dirty = true);
@@ -212,6 +220,10 @@ export class GameScene extends Phaser.Scene {
   private start(mode: Mode, kind?: KindId) {
     if (mode === 'daily' && dailyDone(this.progress)) return ui('refuse');
     ui('click');
+    // A new run ends the saved one there, its bests and its run recorded as if it was left.
+    if (this.saved) quit(this.saved);
+    this.saved = null;
+    clearRun();
     resetUnjam();
     this.run = startRun(mode, this.progress, { kind, level: this.practiceLevel });
     this.screen = 'run';
@@ -224,12 +236,39 @@ export class GameScene extends Phaser.Scene {
     if (this.run) quit(this.run);
     this.run = null;
     this.screen = 'menu';
+    this.saveKey = '';
+    clearRun();
     saveProgress(this.progress);
+  }
+
+  /** Picks up the run saved before a reload where it was saved. */
+  private resume() {
+    if (!this.saved) return;
+    ui('click');
+    resetUnjam();
+    this.run = this.saved;
+    this.saved = null;
+    this.screen = 'run';
+  }
+
+  /**
+   * Saves the run (not Practice) each time it moves on: a puzzle dealt or ended, a draft or relic
+   * offer, the hand-over. An ended run is cleared, as its records are already saved.
+   */
+  private keepRun(run: Run) {
+    if (run.mode === 'practice') return;
+    const key = [run.phase, run.dealt, run.results.length, run.relics.length, run.player].join('|');
+    if (key === this.saveKey) return;
+    this.saveKey = key;
+    if (run.phase === 'over') clearRun();
+    else saveRun(run);
   }
 
   private drain() {
     const run = this.run!;
-    for (const e of run.events.splice(0)) {
+    const events = run.events.splice(0);
+    if (events.length) checkTrophies(this.progress, run);
+    for (const e of events) {
       this.dirty = true;
       switch (e.type) {
         case 'start':
@@ -251,6 +290,13 @@ export class GameScene extends Phaser.Scene {
           break;
         case 'relic':
           SFX('relic');
+          break;
+        case 'omen':
+          SFX('omen');
+          break;
+        case 'half':
+          SFX('solved');
+          saveProgress(this.progress);
           break;
         case 'over':
           playSting(SONG, 'over');
@@ -315,7 +361,10 @@ export class GameScene extends Phaser.Scene {
       p.text(x, y + h / 2 - 16, this.modeBest(mode), { size: 11, color: C.cyanText, wrap: w - 12 });
       p.hit(`mode-${mode}`, x - w / 2, y - h / 2, w, h, () => (mode === 'practice' ? (ui('click'), (this.screen = 'practice')) : this.start(mode)), !done);
     });
-    p.button('records', MENU.records.x, MENU.records.y, MENU.records.w, MENU.records.h, t('records'), () => {
+    const saved = this.saved;
+    const records = saved ? MENU.recordsAside : MENU.records;
+    if (saved) p.button('resume', MENU.resume.x, MENU.resume.y, MENU.resume.w, MENU.resume.h, t('resume', { mode: t(`${saved.mode}Name` as TextKey) }), () => this.resume(), { accent: true, size: 14 });
+    p.button('records', records.x, records.y, records.w, records.h, t('records'), () => {
       ui('click');
       this.screen = 'records';
     });
@@ -442,7 +491,9 @@ export class GameScene extends Phaser.Scene {
     const cur = run.current;
     const { stage: STAGE, tools: TOOLS } = this.L;
     this.drawTop(run);
-    p.frame(STAGE.x, STAGE.y, STAGE.w, STAGE.h);
+    // A boss in play is framed in rose.
+    const boss = !!(cur && run.phase === 'playing' && (cur.pair || cur.card.boss));
+    p.frame(STAGE.x, STAGE.y, STAGE.w, STAGE.h, boss ? { line: C.rose } : {});
     if (cur && run.phase !== 'draft' && run.phase !== 'relic' && run.phase !== 'handover') {
       const kind = cur.card.kind;
       this.heading(STAGE.x + STAGE.w / 2, STAGE.y + 28, t(`${kind}Name` as TextKey), 22);
@@ -452,7 +503,8 @@ export class GameScene extends Phaser.Scene {
       VIEWS[kind].draw(this.ctx());
       const def = DEFS[kind];
       p.button('undo', TOOLS.xs[0], TOOLS.y, TOOLS.w, TOOLS.h, t('undo'), () => undo(run) && SFX('tap'), { enabled: def.undo && canUndo(run) });
-      p.button('hint', TOOLS.xs[1], TOOLS.y, TOOLS.w, TOOLS.h, Number.isFinite(run.hints) ? t('hintButton', { n: run.hints }) : t('hint'), () => hint(run) || ui('refuse'), { enabled: canHint(run) });
+      const hintLabel = cur.freeHints > 0 ? t('hintFree') : Number.isFinite(run.hints) ? t('hintButton', { n: run.hints }) : t('hint');
+      p.button('hint', TOOLS.xs[1], TOOLS.y, TOOLS.w, TOOLS.h, hintLabel, () => hint(run) || ui('refuse'), { enabled: canHint(run) });
       p.button('skip', TOOLS.xs[2], TOOLS.y, TOOLS.w, TOOLS.h, run.mode === 'practice' ? t('newPuzzle') : t('skip'), () => skip(run), { enabled: run.phase === 'playing' });
     }
     this.drawSide(run);
@@ -500,19 +552,36 @@ export class GameScene extends Phaser.Scene {
       g.lineStyle(1, C.gold, 0.8).strokeRect(bx, by - 5, bw, 10);
       p.text(bx + bw + 10, by, timeText(cur.timeLeftMs), { size: 14, color: C.ink, ox: 0 });
     } else if (cur && run.mode === 'practice') p.text(bx + bw / 2, by, t('noClock'), { size: 13, color: C.inkDim });
+    // The omen on offer is a button with what it does under its name; once taken it stays as a label.
+    const OMEN = this.L.omen;
+    const offer = cur && canTakeOmen(run);
+    const omen = offer ? omenFor(cur.card) : run.phase === 'playing' ? cur?.omen : null;
+    if (omen) {
+      const ox = OMEN.x - OMEN.w / 2;
+      const oy = OMEN.y - OMEN.h / 2;
+      if (offer) g.fillStyle(C.key, 1).fillRect(ox, oy, OMEN.w, OMEN.h);
+      g.lineStyle(1.5, C.rose, offer ? 1 : 0.5).strokeRect(ox, oy, OMEN.w, OMEN.h);
+      const name = t(`${omen}Name` as TextKey);
+      p.text(OMEN.x, OMEN.y - 8, offer ? t('omenOffer', { name }) : t('omenTaken', { name }), { size: 13, color: offer ? C.goldText : C.roseText, bold: true, spacing: 1 });
+      p.text(OMEN.x, OMEN.y + 9, t(`${omen}Text` as TextKey), { size: 11, color: C.roseText });
+      if (offer) p.hit('omen', ox, oy, OMEN.w, OMEN.h, () => takeOmen(run));
+    }
     const LEAVE = this.L.leave;
     p.button('leave', LEAVE.x, LEAVE.y, LEAVE.w, LEAVE.h, t('leave'), () => this.toMenu(), { size: 13 });
   }
 
   private topLine(run: Run) {
+    const cur = run.current;
+    const boss = cur && run.phase === 'playing' && (cur.pair || cur.card.boss) ? ` · ${t('bossPart', { n: cur.pair ? 2 : 1 })}` : '';
     switch (run.mode) {
       case 'endless':
+        return t('puzzleN', { n: run.dealt }) + boss;
       case 'blitz':
         return t('puzzleN', { n: run.dealt });
       case 'daily':
         return t('cardN', { n: Math.min(run.results.length + 1, run.queue.length), of: run.queue.length });
       case 'draft':
-        return t('floorN', { n: run.solved + 1 });
+        return t('floorN', { n: run.solved + 1 }) + boss;
       case 'duel':
         return t('cardN', { n: Math.min(run.results.length - run.player * run.queue.length + 1, run.queue.length), of: run.queue.length });
       case 'practice':
@@ -564,8 +633,11 @@ export class GameScene extends Phaser.Scene {
         label(t('upNext'));
         run.queue.slice(0, QUEUE).forEach((card, i) => {
           const { top, h } = slot(i, QUEUE, 72);
-          this.smallCard(card, x, top, w, h, i === 0 ? t('nextLevel', { level: t(`level${card.level}` as TextKey) }) : t(`level${card.level}` as TextKey), i === 0);
+          const level = t(`level${card.level}` as TextKey);
+          const line = card.boss ? t('bossWith', { name: t(`${card.boss.kind}Name` as TextKey) }) : i === 0 ? t('nextLevel', { level }) : level;
+          this.smallCard(card, x, top, w, h, line, i === 0);
         });
+        if (run.mode === 'endless') this.relicRow(run, score.x, score.bottom - 122, score.w);
         scoreBox([
           [t('score'), formatNumber(run.score)],
           [t('streak'), `×${run.streak}`],
@@ -630,6 +702,13 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /** Endless: the relics bosses gave, a row of small emblems over the score box. */
+  private relicRow(run: Run, x: number, y: number, w: number) {
+    const relics = [...new Set(run.relics)];
+    const step = Math.min(30, Math.floor(w / Math.max(1, relics.length)));
+    relics.forEach((r, i) => drawRelic(this.p.g, r, x + 14 + i * step, y, RELIC_COLOR[r], 0.4));
+  }
+
   /** Dims the whole view and swallows taps under a card or banner. */
   private dim(alpha = 0.55) {
     const p = this.p;
@@ -648,8 +727,10 @@ export class GameScene extends Phaser.Scene {
     const by = Math.round(STAGE.y + STAGE.h / 2 - 72);
     p.hit('dim', STAGE.x, STAGE.y, STAGE.w, STAGE.h, practice ? () => {} : () => next(run));
     p.frame(bx, by, STAGE.w - 120, h, { alpha: 0.97, line: solved ? C.cyan : C.rose });
-    this.heading(bx + (STAGE.w - 120) / 2, by + 40, t(`res_${last.reason}` as TextKey), 26, solved ? C.cyanText : C.roseText);
-    const line = practice || run.mode === 'duel' ? t('timeLine', { time: timeText(last.ms) }) : solved ? t('pointsLine', { n: last.points }) : run.mode === 'endless' || run.mode === 'draft' ? t('heartLost') : run.mode === 'blitz' ? t('timeLost', { n: BLITZ_PENALTY_S }) : '';
+    this.heading(bx + (STAGE.w - 120) / 2, by + 40, last.boss && solved ? t('bossBeaten') : t(`res_${last.reason}` as TextKey), 26, solved ? C.cyanText : C.roseText);
+    const points = t('pointsLine', { n: last.points }) + (last.omen ? ` · ${t('omenLine')}` : '');
+    const heart = last.omen === 'peril' ? t('heartsLost', { n: PERIL_HEARTS }) : t('heartLost');
+    const line = practice || run.mode === 'duel' ? t('timeLine', { time: timeText(last.ms) }) : solved ? points : run.mode === 'endless' || run.mode === 'draft' ? heart : run.mode === 'blitz' ? t('timeLost', { n: BLITZ_PENALTY_S }) : '';
     p.text(bx + (STAGE.w - 120) / 2, by + 80, line, { size: 16, color: C.ink });
     if (practice) {
       p.button('next', bx + (STAGE.w - 120) / 2 - 95, by + 130, 170, 40, t('nextPuzzle'), () => (ui('click'), next(run)), { accent: true });
@@ -667,7 +748,7 @@ export class GameScene extends Phaser.Scene {
     items.forEach((item, i) => {
       const x = xs[i];
       const { y, w, h } = DEAL;
-      p.frame(x - w / 2, y - h / 2, w, h, { alpha: 0.98 });
+      p.frame(x - w / 2, y - h / 2, w, h, { alpha: 0.98, ...(item.card?.boss ? { line: C.rose } : {}) });
       p.text(x, y - h / 2 + 22, ROMAN[i], { size: 14, color: C.goldText, spacing: 2 });
       if (item.card) {
         const c = item.card;
@@ -675,7 +756,10 @@ export class GameScene extends Phaser.Scene {
         drawKindIcon(p.g, c.kind, x, y - 40, 58, KIND_COLOR[c.kind]);
         p.text(x, y + 26, t(`${c.kind}Name` as TextKey), { size: 18, color: C.goldText, bold: true, wrap: w - 20 });
         p.text(x, y + 54, `${ROMAN[c.level]} · ${t(`level${c.level}` as TextKey)}`, { size: 13, color: C.cyanText });
-        p.text(x, y + 80, t(SKILL_OF[c.kind]), { size: 12, color: C.inkDim });
+        // A boss names its second puzzle; a held charm marks the cards it helps.
+        if (c.boss) p.text(x, y + 80, t('bossWith', { name: t(`${c.boss.kind}Name` as TextKey) }), { size: 12, color: C.roseText, wrap: w - 16 });
+        else if (holdsCharm(this.run!, c.kind)) p.text(x, y + 80, `✦ ${t(`${CHARMS[c.kind]}Name` as TextKey)}`, { size: 12, color: C.cyanText, wrap: w - 16 });
+        else p.text(x, y + 80, t(SKILL_OF[c.kind]), { size: 12, color: C.inkDim });
       } else if (item.relic) {
         const r = item.relic;
         p.g.fillStyle(C.deep, 1).fillCircle(x, y - 40, 44);

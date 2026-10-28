@@ -38,7 +38,7 @@ const de: Translation<typeof en> = {
   objBell: 'Frag den alten Sedge im Glimmermoor nach der Glocke',
   objBelfry: 'Finde den Ertrunkenen Glockenturm im Glimmermoor',
   objHome: 'Sag der Ältesten Wren, dass die Glocke schweigt',
-  objEnd: 'Kapitel zwei ist geschafft. Erkunde weiter im Laternenlicht',
+  objEnd: 'Finde alle Mondsteine oder bezwinge die Sanduhren',
 
   // Pip
   pipNook1: 'Hinter dem Schuppen steckt ein Felsen zwischen den Bäumen fest.',
@@ -50,6 +50,7 @@ const de: Translation<typeof en> = {
   // Marla the baker
   bakerBread: 'Frisches Brot für die Nachtwache! Die Älteste Wren hat dich gesucht, Schätzchen.',
   bakerTrees1: 'Pass auf im Wald. Meine Mutter sagte, zwei der Bäume dort werfen nie einen Schatten.',
+  bakerShop: 'Münzen aus dem Wald, Schätzchen? Ich hab eine Pastete und ein Paar Stiefel für einen tapferen Ritter.',
   bakerTrees2: 'Geh einfach durch sie hindurch, sagte sie. Niemand hat ihr geglaubt.',
 
   // Biscuit the cat
@@ -66,6 +67,7 @@ const de: Translation<typeof en> = {
   hermitQuiet1: 'Die Glocke schweigt. Ich habe eine ganze Nacht durchgeschlafen, zum ersten Mal seit Jahren.',
   hermitQuiet2: 'Felsen rollen nicht von allein in Baumringe, weißt du. Westlich vom Fluss gibt es einen.',
   hermitRingers1: 'Die Glöckner, die den Turm bauten, haben eingemauert, was der Fluss nicht kriegen sollte.',
+  hermitShop: 'Münzen hast du? Dann geb ich dir einen größeren Beutel oder eine längere Ranke.',
   hermitRingers2: 'Hüte dich vor den Fröschen da unten. Die beißen.',
   hermitHello1: 'Hm. Ein Ritter, hier draußen? Heutzutage geht keiner mehr über den Fluss.',
   hermitHello2: 'Drei steinerne Wächter starren auf ein Stück Schlamm. Da grabe ich nie. Bringt Unglück, sag ich.',
@@ -91,6 +93,7 @@ const de: Translation<typeof en> = {
   elderHome2: 'Die Erbauer des Schreins haben auch ihre Fehler eingemauert, heißt es. Horch nach hohlem Stein nahe seiner Tür.',
   elderHome3: 'Ruh dich jetzt aus. Das Moor kann eine Nacht warten.',
   elderEnd: 'Die Nacht ist lang, und das Moor glimmt noch. Na los.',
+  elderTrials: 'Man sagt, die alten Sanduhren an den Türen von Schrein und Glockenturm leuchten wieder. Dreh eine um, wenn du dich traust.',
 
   // Chests and doors
   empty: 'Leer.',
@@ -122,6 +125,9 @@ const de: Translation<typeof en> = {
   bellsRight: 'Die Glocken klingen rein. Irgendwo knirschen Eisengitter nach oben.',
   noSeeds: 'Keine Glockensamen mehr. Schlag Büsche oder frag den alten Sedge.',
   barsOpen: 'Irgendwo knirschen Eisengitter nach oben.',
+  shellHard: 'Tink! Der Panzer ist zu hart. Dreh ihn erst um.',
+  beetleFlipped: 'Auf dem Rücken! Jetzt zuschlagen.',
+  lanternDown: 'Die Laternenmotte stürzt herab. Schlag zu!',
   wake: 'Du erwachst im Laternenlicht, ein wenig zerschrammt.',
   bulbDown: 'Die Knolle liegt am Boden. Schlag zu!',
   bellTipped: 'Die Glocke kippt um. Triff, was sich darin versteckt!',
@@ -148,6 +154,41 @@ const de: Translation<typeof en> = {
   keepExploring: 'Weiter erkunden',
   newGame: 'Neues Spiel',
 
+  // The hourglass trials
+  hourglassRead: 'Eine alte Sanduhr voll leuchtendem Sand. Dreh sie um, und jeder Feind hier erwacht wieder, und der Herr dieses Ortes erhebt sich stärker. Besiege ihn so schnell du kannst.',
+  hourglassBest: 'Deine Bestzeit hier: {time}.',
+  trialStart: 'Der Sand rinnt!',
+  trialBusy: 'Der Sand rinnt schon.',
+  trialLost: 'Der Sand steht still. Die Prüfung ist vorbei.',
+  trialDone: 'Prüfung geschafft in {time}!',
+  trialRecord: 'Eine neue Bestzeit!',
+  trialBestIs: 'Deine Bestzeit bleibt {time}.',
+
+  // The moonstone page
+  stonesTitle: 'Mondsteine',
+  stonesTotal: '{n} von {total} gefunden',
+  trialsTitle: 'Sanduhr-Prüfungen',
+  trialBest: '{place}: {time}',
+  trialNone: '{place}: noch nicht gelaufen',
+  closePage: 'Tippen oder N zum Schließen',
+
+  // The shops
+  shopTitle: 'Waren von {name}',
+  price: '{n} Münzen',
+  owned: 'Deins',
+  notYet: 'Noch nicht',
+  closeShop: 'Außerhalb tippen, Leertaste oder Esc zum Schließen',
+  tooPoor: 'Nicht genug Münzen.',
+  bought: 'Gekauft: {item}!',
+  pie: 'Herzhafte Pastete',
+  pieText: 'Ein Herz mehr, für immer.',
+  boots: 'Leichte Stiefel',
+  bootsText: 'Weiter rollen und früher wieder rollen.',
+  pouch: 'Größerer Beutel',
+  pouchText: '15 Glockensamen tragen statt 10.',
+  vine: 'Lange Ranke',
+  vineText: 'Die Hakenranke reicht viel weiter.',
+
   // HUD
   keys: 'Schlüssel {n}',
   seeds: 'Samen {n}',
@@ -155,6 +196,6 @@ const de: Translation<typeof en> = {
 };
 
 /** Names and bell sounds that stay as they are in German. */
-export const keepEnglish: (keyof typeof en)[] = ['pipName', 'bakerName', 'bellLow', 'bellMid'];
+export const keepEnglish: (keyof typeof en)[] = ['pipName', 'bakerName', 'bellLow', 'bellMid', 'trialBest'];
 
 export default de;

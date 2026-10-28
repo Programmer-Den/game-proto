@@ -8,6 +8,8 @@ import { collectAll, heal, lower, nextPick, pop, raise, refreshHealth, spawnElit
 import { FILLER, MAX_TIER, UPGRADES, UPGRADE_IDS, canOffer, rollChoices } from './upgrades';
 import { t } from '../i18n';
 import { checkDeeds } from './blades';
+import { hot } from './heat';
+import { reseed, weekSeed } from './weekly';
 import { CREDITS, LAST_STAGE, NODE_INFO, PLANETS, REST_HEAL, TRADE, arenaElites, planetsAt, type EventId, type NodeKind } from './planets';
 
 /** One frame of the game: the sim while a fight is on, then whatever follows a cleared fight. */
@@ -76,13 +78,15 @@ export function chooseWorld(s: GameState, index: number) {
   const planet = chartOptions(s)[index];
   if (planet === undefined) return;
   s.next = planet;
-  s.nodes = rollNodes();
+  // A weekly run's star map and the next world play out the same way each attempt.
+  if (s.week >= 0) reseed(weekSeed(s.week) + 7919 * (s.stage + 1) + 31 * planet);
+  s.nodes = rollNodes(hot(s.heat, 'noRest'));
   s.phase = 'map';
 }
 
-/** Two or three different nodes for the star map. */
-export function rollNodes(): NodeKind[] {
-  const kinds = Object.keys(NODE_INFO) as NodeKind[];
+/** Two or three different nodes for the star map (never a rest at rift heat 3 and up). */
+export function rollNodes(noRest = false): NodeKind[] {
+  const kinds = (Object.keys(NODE_INFO) as NodeKind[]).filter((k) => !noRest || k !== 'rest');
   const count = Math.random() < 0.5 ? 2 : 3;
   const out: NodeKind[] = [];
   while (out.length < count) out.push(kinds.splice(Math.floor(Math.random() * kinds.length), 1)[0]);
@@ -96,6 +100,7 @@ export function chooseNode(s: GameState, index: number) {
   if (!kind) return;
   if (kind === 'trader') {
     s.offers = rollOffers(s);
+    s.freeReroll = (s.perks.reroll ?? 0) > 0;
     s.phase = 'trader';
   } else if (kind === 'elite') startArena(s);
   else if (kind === 'rest') {
@@ -135,9 +140,13 @@ export function buy(s: GameState, index: number) {
   return true;
 }
 
+/** What a reroll costs now: nothing for the Armoury's Spare Reroll, once per trader. */
+export const rerollPrice = (s: GameState) => (s.freeReroll ? 0 : TRADE.reroll);
+
 export function reroll(s: GameState) {
-  if (s.phase !== 'trader' || s.credits < TRADE.reroll) return false;
-  s.credits -= TRADE.reroll;
+  if (s.phase !== 'trader' || s.credits < rerollPrice(s)) return false;
+  s.credits -= rerollPrice(s);
+  s.freeReroll = false;
   s.offers = rollOffers(s);
   return true;
 }
@@ -267,6 +276,7 @@ export function chooseEvent(s: GameState, index: number) {
 export function nextPlanet(s: GameState) {
   s.planet = s.next >= 0 ? s.next : chartOptions(s)[0];
   s.stage += 1;
+  if (s.week >= 0) reseed(weekSeed(s.week) + 7919 * s.stage + 31 * s.planet + 1);
   s.route.push(s.planet);
   s.next = -1;
   clearField(s);
