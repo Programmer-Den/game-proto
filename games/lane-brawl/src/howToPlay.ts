@@ -15,6 +15,7 @@ const en: HowToPlay = {
     { input: 'B, or Shop (Esc closes it)', action: 'Open the shop and buy items' },
     { input: 'X, or Buy back', action: 'While dead, pay to respawn at once (once every 2:30)' },
     { input: '1, 2 or 3, or click a card', action: 'Keep one of the upgrades a new level offers' },
+    { input: 'Hold Tab, or tap the kill score', action: 'Show the scoreboard of all ten champions' },
   ],
   loop: [
     'Pick a champion card to start the match.',
@@ -48,6 +49,7 @@ const de: HowToPlay = {
     { input: 'B oder Laden (Esc schließt ihn)', action: 'Den Laden öffnen und Gegenstände kaufen' },
     { input: 'X oder Zurückkaufen', action: 'Im Tod sofort gegen Gold wiederkehren (alle 2:30 einmal)' },
     { input: '1, 2 oder 3, oder eine Karte anklicken', action: 'Eines der Upgrades einer neuen Stufe behalten' },
+    { input: 'Tab halten oder auf den Kill-Stand tippen', action: 'Die Punktetafel aller zehn Champions zeigen' },
   ],
   loop: [
     'Wähle eine Championkarte, um das Match zu beginnen.',

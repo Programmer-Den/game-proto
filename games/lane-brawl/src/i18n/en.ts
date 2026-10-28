@@ -476,10 +476,21 @@ const en = {
   level: 'Lv {n}',
   respawnIn: 'Respawn in {n}s',
   classPassive: '{class} · {passive}',
-  scoreLine: 'K {kills}  D {deaths}  Last hits {lastHits}',
+  scoreLine: 'K/D/A {kills}/{deaths}/{assists}  Last hits {lastHits}',
   abilityLocked: 'Lv{n}',
   shop: 'Shop',
   buffTime: '{buff} {s}s',
+
+  // Scoreboard
+  scoreboard: 'Scoreboard',
+  scoreHint: 'Hold Tab, or tap the kill score',
+  scoreBlue: 'Blue · {kills}',
+  scoreRed: 'Red · {kills}',
+  scoreLevel: 'Level',
+  scoreKda: 'K / D / A',
+  scoreCs: 'Last hits',
+  scoreItems: 'Items',
+  scoreYou: '{name} (you)',
 
   // Upgrades
   chooseUpgrade: 'LEVEL {level} · CHOOSE AN UPGRADE',

@@ -97,6 +97,8 @@ import {
   PLAY_AGAIN,
   PORTRAIT,
   RECALL_BUTTON,
+  SCORE_CHIP,
+  SCORE_PANEL,
   SHOP_BUTTON,
   SHOP_PANEL,
   STREAK_CHIP,
@@ -305,7 +307,9 @@ export class GameScene extends Phaser.Scene {
   private fogG!: Phaser.GameObjects.Graphics;
   private fogMini!: Phaser.GameObjects.Graphics;
   private used = new Set<string>();
-  private keys!: Record<AbilityKey | 'B' | 'D' | 'H' | 'V' | 'T' | 'X' | 'ESC' | 'ONE' | 'TWO' | 'THREE', Phaser.Input.Keyboard.Key>;
+  private keys!: Record<AbilityKey | 'B' | 'D' | 'H' | 'V' | 'T' | 'X' | 'ESC' | 'ONE' | 'TWO' | 'THREE' | 'TAB', Phaser.Input.Keyboard.Key>;
+  /** The scoreboard, held open by Tab or opened by a tap on the kill score. */
+  private scoreTapped = false;
   /** The player's wins per class (`loadMastery`), read when the pick screen shows. */
   private mastery: Record<string, number> = {};
   /** Whether this match's win was counted toward mastery yet, and the class's wins after it. */
@@ -362,7 +366,7 @@ export class GameScene extends Phaser.Scene {
     this.fogG = this.add.graphics().setDepth(3.6);
     this.fogMini = this.add.graphics().setScrollFactor(0).setDepth(10.5);
 
-    this.keys = this.input.keyboard!.addKeys('Q,W,E,R,B,D,H,V,T,X,ESC,ONE,TWO,THREE') as typeof this.keys;
+    this.keys = this.input.keyboard!.addKeys('Q,W,E,R,B,D,H,V,T,X,ESC,ONE,TWO,THREE,TAB') as typeof this.keys;
     // Watching the AI, the keys play no champion.
     if (!watching) {
       // Holding an ability's key aims it (its range shows); letting go casts it at the cursor.
@@ -377,6 +381,7 @@ export class GameScene extends Phaser.Scene {
       this.keys.ESC.on('down', () => {
         this.aiming = null;
         this.setShop(false);
+        this.scoreTapped = false;
       });
       this.keys.ONE.on('down', () => this.pickUpgrade(0));
       this.keys.TWO.on('down', () => this.pickUpgrade(1));
@@ -506,7 +511,19 @@ export class GameScene extends Phaser.Scene {
   private toggleShop() {
     if (this.phase !== 'playing') return;
     ui('click');
+    this.scoreTapped = false;
     this.setShop(!this.shopOpen);
+  }
+
+  /** Whether the scoreboard shows: Tab held, or opened with a tap on the kill score. */
+  private get scoreOpen(): boolean {
+    return !!this.state && this.state.phase === 'playing' && (this.scoreTapped || !!this.keys?.TAB.isDown);
+  }
+
+  private toggleScore() {
+    ui('click');
+    this.scoreTapped = !this.scoreTapped;
+    if (this.scoreTapped) this.setShop(false);
   }
 
   private aim(key: AbilityKey) {
@@ -551,7 +568,7 @@ export class GameScene extends Phaser.Scene {
   /** The zones the pointer can press, rebuilt when the screen they belong to changes. */
   private refreshZones() {
     const offer = this.state?.upgradeOffers[0]?.options.length ?? 0;
-    const key = `${this.phase}|${this.shopOpen}|${offer}`;
+    const key = `${this.phase}|${this.shopOpen}|${offer}|${this.scoreOpen}`;
     if (key === this.zoneKey) return;
     this.zoneKey = key;
     this.zones = [];
@@ -569,14 +586,16 @@ export class GameScene extends Phaser.Scene {
     // The bars and the objective card block presses so a click on the HUD never walks the champion.
     this.zones.push({ ...TOP_BAR, run: noop }, { ...BOTTOM_BAR, run: noop });
     // The open shop hides the objective card, so the card only blocks while it shows.
-    if (!this.shopOpen) this.zones.push({ ...OBJECTIVE_CARD, run: noop });
+    if (!this.shopOpen && !this.scoreOpen) this.zones.push({ ...OBJECTIVE_CARD, run: noop });
+    this.zones.push({ ...SCORE_CHIP, run: () => this.toggleScore() });
     this.zones.push({ ...SHOP_BUTTON, run: () => this.toggleShop() });
     // One button in the top bar: Recall while alive, Buy back while dead.
     this.zones.push({ ...RECALL_BUTTON, run: () => (this.player()?.dead ? this.buyBack() : this.recall()) });
     ABILITY_KEYS.forEach((k, i) => this.zones.push({ ...abilityBox(i), run: () => this.castAtCursor(k) }));
     ACTIVES.forEach((a, i) => this.zones.push({ ...activeButton(i), run: () => this.activeAtCursor(a) }));
     for (let i = 0; i < offer; i++) this.zones.push({ ...upgradeCard(i, offer), run: () => this.pickUpgrade(i) });
-    if (this.shopOpen) {
+    if (this.scoreOpen) this.zones.push({ ...SCORE_PANEL, run: () => this.toggleScore() });
+    else if (this.shopOpen) {
       this.zones.push({ ...SHOP_PANEL, run: noop });
       ITEMS.forEach((item, i) => this.zones.push({ ...shopRow(i), run: () => this.buyItem(item.id) }));
     }
@@ -1364,15 +1383,61 @@ export class GameScene extends Phaser.Scene {
     // the HUD graphics, so they would stay lit through the panel's dimming.
     if (s.phase !== 'playing') return this.drawEnd(g, s);
     this.drawTopBar(g, s, me);
-    // The shop panel covers the objective card, so the card steps aside while it is open.
-    if (!this.shopOpen) {
+    // The shop panel and the scoreboard cover the objective card, so the card steps aside while one is open.
+    const score = this.scoreOpen;
+    if (!this.shopOpen && !score) {
       if (!watching) this.drawObjectiveCard(g, s);
       this.drawBuffs(g, s);
       this.drawNotice(g, s);
     }
     this.drawBottomBar(g, s, me);
     this.drawMinimap(g, s, me);
-    if (this.shopOpen) this.drawShop(g, me);
+    if (score) this.drawScoreboard(g, s);
+    else if (this.shopOpen) this.drawShop(g, me);
+  }
+
+  /** The scoreboard: every champion's level, kills, deaths and assists, last hits and items, by team. */
+  private drawScoreboard(g: Phaser.GameObjects.Graphics, s: GameState) {
+    const p = SCORE_PANEL;
+    this.panel(g, p.x, p.y, p.w, p.h, UI.slate);
+    g.fillStyle(col(UI.gold), 1).fillRect(p.x + 2, p.y + 2, p.w - 4, 3);
+    this.t('score-title', p.x + 16, p.y + 8, t('scoreboard'), 18, UI.gold, 'left', true);
+    this.t('score-hint', p.x + p.w - 16, p.y + 14, t('scoreHint'), 11, UI.dim, 'right');
+    const cols = { name: p.x + 26, level: p.x + 262, kda: p.x + 352, cs: p.x + 440, items: p.x + 494, state: p.x + 632 };
+    (['blue', 'red'] as const).forEach((team, ti) => {
+      const champs = s.units.filter((u) => u.kind === 'champion' && u.side === team);
+      const y0 = p.y + 40 + ti * 164;
+      const kills = champs.reduce((n, u) => n + u.kills, 0);
+      this.t(`score-team-${team}`, cols.name - 10, y0, t(team === 'blue' ? 'scoreBlue' : 'scoreRed', { kills: t('kills', { n: kills }) }), 12, SIDE_COLOR[team], 'left', true);
+      this.t(`score-hl-${team}`, cols.level, y0 + 1, t('scoreLevel'), 10, UI.muted, 'center');
+      this.t(`score-hk-${team}`, cols.kda, y0 + 1, t('scoreKda'), 10, UI.muted, 'center');
+      this.t(`score-hc-${team}`, cols.cs, y0 + 1, t('scoreCs'), 10, UI.muted, 'center');
+      this.t(`score-hi-${team}`, cols.items, y0 + 1, t('scoreItems'), 10, UI.muted);
+      champs.forEach((u, i) => {
+        const y = y0 + 20 + i * 27;
+        const me = u.id === s.player;
+        this.panel(g, p.x + 12, y, p.w - 24, 24, me ? '#3a4660' : UI.card);
+        g.fillStyle(col(u.champ!.color), 1).fillRect(p.x + 14, y + 2, 4, 20);
+        const name = `${shortName(u.name)} · ${t(u.champ!.name)}`;
+        this.t(`score-name-${u.id}`, cols.name, y + 5, me && !watching ? t('scoreYou', { name }) : name, 12, u.dead ? UI.muted : me ? UI.gold : UI.text, 'left', me);
+        this.t(`score-lv-${u.id}`, cols.level, y + 5, String(u.level), 12, UI.gold, 'center', true);
+        this.t(`score-kda-${u.id}`, cols.kda, y + 5, `${u.kills} / ${u.deaths} / ${u.assists}`, 12, UI.text, 'center', true);
+        this.t(`score-cs-${u.id}`, cols.cs, y + 5, String(u.cs), 12, UI.dim, 'center');
+        for (let k = 0; k < MAX_ITEMS; k++) {
+          const x = cols.items + k * 20, iy = y + 4;
+          g.fillStyle(col(UI.edge), 1).fillRect(x, iy, 17, 17);
+          g.fillStyle(col('#1d2330'), 1).fillRect(x + 1, iy + 1, 15, 15);
+          const item = ITEMS.find((it) => it.id === u.items[k]);
+          if (!item) continue;
+          const cx = x + 8.5, cy = iy + 8.5;
+          g.fillStyle(col(itemTint(item)), 1).fillPoints([new Phaser.Math.Vector2(cx, cy - 6), new Phaser.Math.Vector2(cx + 6, cy), new Phaser.Math.Vector2(cx, cy + 6), new Phaser.Math.Vector2(cx - 6, cy)], true);
+          if (item.from) g.lineStyle(1, col(UI.gold), 1).strokeRect(x + 1, iy + 1, 15, 15);
+        }
+        const bounty = bountyOf(u.killStreak);
+        const state = u.dead ? t('respawnIn', { n: Math.max(0, Math.ceil((u.respawnAt - s.time) / 1000)) }) : bounty ? t('bountyLabel', { gold: bounty }) : '';
+        this.t(`score-state-${u.id}`, cols.state, y + 6, state, 11, u.dead ? UI.red : UI.gold, 'left', true);
+      });
+    });
   }
 
   private drawTopBar(g: Phaser.GameObjects.Graphics, s: GameState, me: Unit) {
@@ -1393,6 +1458,14 @@ export class GameScene extends Phaser.Scene {
       this.t('streak', c.x + 22, c.y + 4, hot ? t('streakHot', { n: s.streak, pct: Math.round(STREAK.bonus * 100) }) : t('streak', { n: s.streak }), 11, hot ? UI.gold : UI.text, 'left', true);
     }
     if (!watching) this.drawRecallButton(g, s, me);
+    // The kill score, blue against red; a tap opens the scoreboard.
+    const kills = (team: Team) => s.units.reduce((n, u) => n + (u.kind === 'champion' && u.side === team ? u.kills : 0), 0);
+    const k = SCORE_CHIP;
+    g.fillStyle(col(UI.edge), 1).fillRect(k.x, k.y, k.w, k.h);
+    g.fillStyle(col(this.scoreOpen ? '#33405a' : '#1b212d'), 1).fillRect(k.x + 1, k.y + 1, k.w - 2, k.h - 2);
+    this.t('kills-blue', k.x + k.w / 2 - 7, k.y + 5, String(kills('blue')), 14, UI.blue, 'right', true);
+    this.t('kills-dash', k.x + k.w / 2, k.y + 5, ':', 14, UI.dim, 'center', true);
+    this.t('kills-red', k.x + k.w / 2 + 7, k.y + 5, String(kills('red')), 14, UI.red, 'left', true);
     const nexus = (team: Team) => s.units.find((u) => u.kind === 'nexus' && u.side === team)!;
     const pct = (u: Unit) => Math.max(0, Math.ceil((u.hp / u.maxHp) * 100));
     this.t('nexus-blue', 232, 9, t('blueNexus', { pct: pct(nexus('blue')) }), 14, UI.blue, 'left', true);
@@ -1541,7 +1614,7 @@ export class GameScene extends Phaser.Scene {
       if (item.from) g.lineStyle(1, col(UI.gold), 1).strokeRect(x + 1, y + 1, 15, 15);
     }
     this.t('dead', bx, P.y + 72, me.dead ? t('respawnIn', { n: Math.ceil((me.respawnAt - s.time) / 1000) }) : t('classPassive', { class: t(c.name), passive: t(c.passive.name) }), 11, me.dead ? UI.red : UI.dim, 'left', true);
-    this.t('lasthits', bx, P.y + 89, t('scoreLine', { kills: me.kills, deaths: me.deaths, lastHits: s.lastHits }), 10, UI.muted);
+    this.t('lasthits', bx, P.y + 89, t('scoreLine', { kills: me.kills, deaths: me.deaths, assists: me.assists, lastHits: s.lastHits }), 10, UI.muted);
     this.drawBuffStrip(g, me);
 
     // Q, W, E, R.

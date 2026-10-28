@@ -148,6 +148,12 @@ export interface Unit {
   hasteMs: number;
   kills: number;
   deaths: number;
+  /** Champion kills this champion helped with (`ASSIST`). */
+  assists: number;
+  /** Minions and jungle monsters this champion finished, for the scoreboard. */
+  cs: number;
+  /** Champions: the enemy champions that hurt it, by id, with the game time of their last hit. */
+  hurtBy: Record<number, number>;
   /** Champions slain since this champion last died; three or more put a bounty on it (`bountyOf`). */
   killStreak: number;
   /** Vision wards carried, planted with V (`WARD.carry` at most). */
@@ -424,6 +430,9 @@ export function blankUnit(
     hasteMs: 0,
     kills: 0,
     deaths: 0,
+    assists: 0,
+    cs: 0,
+    hurtBy: {},
     killStreak: 0,
     wards: 0,
     recallMs: 0,

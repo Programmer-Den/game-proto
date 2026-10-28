@@ -47,6 +47,9 @@ export function activeButton(i: number) {
 /** The recall button in the top bar, right of the clock; while the champion is dead it is the buy back button. */
 export const RECALL_BUTTON = { x: 530, y: 4, w: 118, h: 26 };
 
+/** The kill score in the top bar, left of the clock; a tap opens the scoreboard. */
+export const SCORE_CHIP = { x: 380, y: 4, w: 56, h: 26 };
+
 /** The shop panel, opened with the button or the B key: sixteen item cards in four columns. */
 export const SHOP_PANEL = { x: 100, y: 38, w: 760, h: 368 };
 const SHOP_COL_W = (SHOP_PANEL.w - 28 - 30) / 4;
@@ -55,6 +58,9 @@ export function shopRow(i: number) {
   const row = Math.floor(i / 4);
   return { x: SHOP_PANEL.x + 14 + col * (SHOP_COL_W + 10), y: SHOP_PANEL.y + 48 + row * 80, w: SHOP_COL_W, h: 74 };
 }
+
+/** The scoreboard, held open with Tab or opened from the kill score, over the same space as the shop. */
+export const SCORE_PANEL = { x: 100, y: 38, w: 760, h: 368 };
 
 /** The empowered-minion chips at the top right, under the top bar, one per team with the buff. */
 export function buffChip(i: number) {
@@ -97,6 +103,8 @@ export function fitLayout(w: number, h: number) {
   UPGRADE_PANEL.y = 420 + dy;
   Object.assign(MINIMAP, { x: 826 + dx, y: 420 + dy });
   RECALL_BUTTON.x = 530 + dx / 2;
+  SCORE_CHIP.x = 380 + dx / 2;
+  Object.assign(SCORE_PANEL, { x: 100 + dx / 2, y: 38 + dy / 2 });
   Object.assign(SHOP_PANEL, { x: 100 + dx / 2, y: 38 + dy / 2 });
   Object.assign(END_PANEL, { x: 280 + dx / 2, y: 150 + dy / 2 });
   Object.assign(PLAY_AGAIN, { x: 380 + dx / 2, y: 290 + dy / 2 });
