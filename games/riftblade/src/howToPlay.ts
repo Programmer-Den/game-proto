@@ -12,6 +12,7 @@ const en: HowToPlay = {
     { input: 'Tap a hero, or 1-9, 0, - and =; then Fight, or Enter', action: 'Choose a hero and start' },
     { input: 'Tap a card, or 1 / 2 / 3 (4 for a fourth card)', action: 'Choose an upgrade, the next planet, a star map node, an offer or an answer' },
     { input: 'The arrows by Heat, or Left / Right', action: 'Pick the rift heat, once the hero has won a run' },
+    { input: 'Armoury (top left), then a piece or 1-5', action: 'Buy lasting upgrades with banked credits; Back or Enter returns' },
     { input: 'Continue, Enter or Space', action: 'Go on after a new hero is unlocked' },
     { input: '4 / Enter at the trader', action: 'Reroll the offers / leave' },
   ],
@@ -34,6 +35,7 @@ const en: HowToPlay = {
     'From 1:00 each world sets three side objectives: one shared, the world\'s own and your hero\'s own. Follow the arrow and finish in time for credits, a level or a free upgrade.',
     'Foes now and then drop power-ups: a bomb for the whole screen, a magnet for every shard, a lure, overdrive, a shield, a freeze and credits. Walk over them.',
     'Win a run to open rift heat for that hero: each heat adds a rule (more elites, harder hits, no rest stops, frenzied bosses, tougher foes) and winning opens the next, up to heat 5.',
+    'Credits left at a run\'s end, plus salvage for each world reached, are banked for the Armoury: small lasting upgrades for every hero.',
   ],
 };
 
@@ -47,6 +49,7 @@ const de: HowToPlay = {
     { input: 'Einen Helden antippen, oder 1-9, 0, - und =; dann Kämpfen, oder Enter', action: 'Einen Helden wählen und loslegen' },
     { input: 'Karte antippen, oder 1 / 2 / 3 (4 für eine vierte Karte)', action: 'Ein Upgrade, den nächsten Planeten, einen Knoten der Sternenkarte, ein Angebot oder eine Antwort wählen' },
     { input: 'Die Pfeile bei Hitze, oder Links / Rechts', action: 'Die Rift-Hitze wählen, sobald der Held einen Lauf gewonnen hat' },
+    { input: 'Waffenkammer (oben links), dann ein Teil oder 1-5', action: 'Bleibende Upgrades mit eingelagerten Credits kaufen; Zurück oder Enter kehrt zurück' },
     { input: 'Weiter, Enter oder Leertaste', action: 'Nach einem neu freigeschalteten Helden weitermachen' },
     { input: '4 / Enter beim Händler', action: 'Angebote neu würfeln / gehen' },
   ],
@@ -69,6 +72,7 @@ const de: HowToPlay = {
     'Ab 1:00 stellt jede Welt drei Nebenziele: ein gemeinsames, eines der Welt und eines deines Helden. Folge dem Pfeil und schaff es rechtzeitig für Credits, eine Stufe oder ein freies Upgrade.',
     'Gegner lassen ab und zu Extras fallen: eine Bombe für den ganzen Bildschirm, einen Magneten für alle Splitter, einen Köder, Overdrive, einen Schild, Frost und Credits. Lauf darüber.',
     'Gewinne einen Lauf, um die Rift-Hitze für diesen Helden zu öffnen: jede Hitze fügt eine Regel hinzu (mehr Eliten, härtere Treffer, keine Rast, rasende Bosse, zähere Gegner), und ein Sieg öffnet die nächste, bis Hitze 5.',
+    'Credits, die am Ende eines Laufs übrig sind, und Bergegut für jede erreichte Welt kommen in die Waffenkammer: kleine bleibende Upgrades für alle Helden.',
   ],
 };
 

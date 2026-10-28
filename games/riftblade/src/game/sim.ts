@@ -23,6 +23,7 @@ import { ARENA_MS, BOG, BOSSES, CHAMPION, CREDITS, PLANETS, SIEGE, STRIKE, VENT,
 import { t as tr, type TextKey } from '../i18n';
 import { cancelObjective, objectives } from './objectives';
 import { HEAT, hot } from './heat';
+import { PERK, type ArmouryId } from './armoury';
 
 /** What the player is doing this frame: a move direction (length up to 1) and the signature key. */
 export interface Input {
@@ -62,17 +63,26 @@ export function prepare(s: GameState) {
 // ---------------------------------------------------------------------------------------------
 // Starting and choosing
 
+/** How a run starts besides its hero: its rift heat and the Armoury ranks bought. */
+export interface RunSetup {
+  heat?: number;
+  perks?: Partial<Record<ArmouryId, number>>;
+}
+
 /** Starts a run with the chosen hero, from a fresh state; `known` are the heroes unlocked before. */
-export function startRun(s: GameState, id: HeroId, known: HeroId[] = [], ringOut = 0, heat = 0) {
+export function startRun(s: GameState, id: HeroId, known: HeroId[] = [], ringOut = 0, setup: RunSetup = {}) {
   Object.assign(s, freshState());
   s.ringOut = ringOut;
-  s.heat = heat;
+  s.heat = setup.heat ?? 0;
+  s.perks = { ...setup.perks };
+  s.maxHpMod = 1 + PERK.rations * (s.perks.rations ?? 0);
+  s.credits = PERK.purse * (s.perks.purse ?? 0);
   const hero = HEROES[id];
   s.hero = id;
   s.known = [...known];
   s.phase = 'run';
   s.player = freshHero();
-  s.player.hp = s.player.maxHp = hero.maxHp;
+  s.player.hp = s.player.maxHp = Math.round(hero.maxHp * s.maxHpMod);
   s.player.r = hero.r ?? HERO_R;
   s.player.fireMs = 300;
   prepare(s);
@@ -98,7 +108,10 @@ export function nextPick(s: GameState) {
     s.choices = rewardChoices(s.hero!, s.ranks);
   } else if (s.pendingLevels > 0) {
     s.phase = 'levelup';
-    s.choices = rollChoices(s.hero!, s.ranks, cardCount(s.hero!));
+    // The Armoury's Field Briefing deals a fourth card at the run's first level-up.
+    const briefing = (s.perks.briefing ?? 0) > 0 && !s.briefed;
+    s.briefed ||= briefing;
+    s.choices = rollChoices(s.hero!, s.ranks, Math.min(4, cardCount(s.hero!) + (briefing ? 1 : 0)));
   } else {
     s.choices = null;
     s.phase = s.after;

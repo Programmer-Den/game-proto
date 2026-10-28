@@ -4,6 +4,7 @@ import { HEROES, isKnight, type HeroId } from './heroes';
 import { DRILLS, DRILL_STEPS, at, capstonesOf, crossoversOf } from './upgrades';
 import type { EventId, FoeKind, NodeKind } from './planets';
 import type { TextKey } from '../i18n';
+import { PERK, type ArmouryId } from './armoury';
 
 /** Each planet lasts this long before its boss comes, ms. */
 export const RUN_MS = 5 * 60_000;
@@ -441,6 +442,11 @@ export interface GameState {
   hero: HeroId | null;
   /** The run's rift heat, 0 (as designed) to `MAX_HEAT` (see `heat.ts`). */
   heat: number;
+  /** The Armoury ranks the run started with (see `armoury.ts`). */
+  perks: Partial<Record<ArmouryId, number>>;
+  /** Whether the Field Briefing's fourth card has been dealt, and whether this trader's reroll is free (Spare Reroll). */
+  briefed: boolean;
+  freeReroll: boolean;
   /**
    * The planet (an index into `PLANETS`: 0 Dune, 1 Swamp, 2 Ice, 3 Lava, then the later ones) and
    * the jump of the crusade it is (`stage`, 0 to 3), and whether this is the elite arena after it.
@@ -569,6 +575,9 @@ export function freshState(): GameState {
     phase: 'select',
     hero: null,
     heat: 0,
+    perks: {},
+    briefed: false,
+    freeReroll: false,
     planet: 0,
     stage: 0,
     route: [0],
@@ -708,7 +717,7 @@ export function statsOf(s: GameState): Stats {
   const stim = p.maxHp > 0 && p.hp < p.maxHp * 0.4 ? at([0.1, 0.15, 0.2, 0.25, 0.3], r('stim'), 0) : 0;
   return {
     speed: hero.speed * (1 + 0.08 * r('boots')) * k.speed * (1 + d.speed + stim),
-    pickup: PICKUP_R * (1 + 0.3 * r('magnet')) * (s.lureMs > 0 ? POWER.lure : 1),
+    pickup: PICKUP_R * (1 + 0.3 * r('magnet') + PERK.lens * (s.perks.lens ?? 0)) * (s.lureMs > 0 ? POWER.lure : 1),
     armour: 0.08 * r('armour') + k.armour + d.armour,
     maxHp: s.hero === 'triad' ? botMax(s) * botCount(s) : Math.round((hero.maxHp + 10 * r('armour') + k.hp + d.hp) * s.maxHpMod),
     regen: 0.5 * r('medpack') + k.regen + d.regen,
