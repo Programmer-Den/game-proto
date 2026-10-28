@@ -3,9 +3,9 @@ import { playMusic, playSting, ui } from '../../../../shared/audio';
 import { viewFrame, viewSize } from '../../../../shared/scaling';
 import { settings } from '../../../../shared/settings';
 import { LEVELS, RELIC_INFO, STYLES, STYLE_INFO, TWIST_INFO, type Level, type RelicId, type StyleId } from '../game/catalog';
-import { loadProgress, saveProgress } from '../game/save';
+import { loadBoard, loadProgress, saveBoard, saveProgress } from '../game/save';
 import {
-  canEnter, chooseStyle, clockLeft, digitsLeft, enter, erase, hasTwist, hint, isRight, newGame, select, startClassic,
+  canEnter, canUndo, chooseStyle, clockLeft, dailyStreakNow, undoMove, digitsLeft, enter, erase, hasTwist, hint, isRight, newGame, select, startClassic,
   startDaily, startDelve, takeRelic, tick, toggleNotes, toMenu, type FloorPlan, type GameState,
 } from '../game/state';
 import { boxOf, dailySeed, peersOf, units, type Puzzle } from '../game/sudoku';
@@ -20,6 +20,8 @@ type Part = Phaser.GameObjects.GameObject & { destroy(): void };
 
 /** The longest step the board's clock takes in one frame, so a stalled tab doesn't jump. */
 const MAX_STEP_MS = 100;
+/** A board in play is saved at least this often (game time), besides after every move. */
+const SAVE_EVERY_MS = 5_000;
 
 /**
  * Ninefold's only scene: the menu, the style picker, the board with its panel and the end cards,
@@ -56,6 +58,8 @@ export class GameScene extends Phaser.Scene {
   private lastTime = 0;
   /** The puzzle on the board, its units and each cell's peers, worked out once per board. */
   private shapeOf: { puzzle: Puzzle; units: number[][]; peers: number[][] } | null = null;
+  /** The board's clock when it was last saved, so a board left alone is saved every few seconds. */
+  private savedAt = 0;
 
   constructor() {
     super('Game');
@@ -64,6 +68,8 @@ export class GameScene extends Phaser.Scene {
   create() {
     this.fitView();
     this.state = newGame(loadProgress());
+    // A board left in play (or a relic offer between Delve floors) comes back where it stood.
+    loadBoard(this.state);
     this.backdrop = this.add.graphics();
     this.boardG = this.add.graphics();
     this.flashG = this.add.graphics();
@@ -111,6 +117,10 @@ export class GameScene extends Phaser.Scene {
       this.buildLayer();
       this.dirty = true;
     }
+    if (this.dirty || Math.abs(this.state.timeMs - this.savedAt) > SAVE_EVERY_MS) {
+      saveBoard(this.state);
+      this.savedAt = this.state.timeMs;
+    }
     if (this.dirty) {
       this.dirty = false;
       this.drawBoard();
@@ -145,6 +155,7 @@ export class GameScene extends Phaser.Scene {
     else if (e.key === 'n' || e.key === 'N') this.onNotes();
     else if (e.key === 'Backspace' || e.key === 'Delete' || e.key === '0') this.onErase();
     else if (e.key === 'h' || e.key === 'H') this.onHint();
+    else if (e.key === 'u' || e.key === 'U' || e.key === 'z' || e.key === 'Z') this.onUndo();
     else if (e.key.startsWith('Arrow')) {
       const at = s.selected < 0 ? 0 : s.selected;
       let r = Math.floor(at / size);
@@ -176,6 +187,12 @@ export class GameScene extends Phaser.Scene {
 
   private onErase() {
     if (!erase(this.state)) return ui('refuse');
+    SFX('erase');
+    this.dirty = true;
+  }
+
+  private onUndo() {
+    if (!canUndo(this.state) || !undoMove(this.state)) return ui('refuse');
     SFX('erase');
     this.dirty = true;
   }
@@ -587,7 +604,9 @@ export class GameScene extends Phaser.Scene {
       ui('click');
       this.screen = 'styles';
     }, 18);
-    this.text(this.L.menu.stats.x, this.L.menu.stats.y, t('stats', { solved: p.solved, flawless: p.flawless }), 14);
+    const streak = dailyStreakNow(p, today);
+    const stats = t('stats', { solved: p.solved, flawless: p.flawless }) + (streak ? ` · ${t('streak', { n: streak })}` : '');
+    this.text(this.L.menu.stats.x, this.L.menu.stats.y, stats, 14);
   }
 
   private buildStyles() {
@@ -684,10 +703,12 @@ export class GameScene extends Phaser.Scene {
       count.setData('key', g);
       this.padTexts.push(count);
     }
-    const notes = this.button('notes', this.L.tools.xs[0], this.L.tools.y, this.L.tools.w, this.L.tools.h, '', () => this.onNotes(), 15);
+    const tool = this.L.tools;
+    const notes = this.button('notes', tool.xs[0], tool.y, tool.w, tool.h, '', () => this.onNotes(), tool.font);
     this.panelTexts.notes = notes.label;
-    this.button('erase', this.L.tools.xs[1], this.L.tools.y, this.L.tools.w, this.L.tools.h, t('erase'), () => this.onErase(), 15);
-    const hintButton = this.button('hint', this.L.tools.xs[2], this.L.tools.y, this.L.tools.w, this.L.tools.h, '', () => this.onHint(), 15);
+    this.button('erase', tool.xs[1], tool.y, tool.w, tool.h, t('erase'), () => this.onErase(), tool.font);
+    this.button('undo', tool.xs[2], tool.y, tool.w, tool.h, t('undo'), () => this.onUndo(), tool.font);
+    const hintButton = this.button('hint', tool.xs[3], tool.y, tool.w, tool.h, '', () => this.onHint(), tool.font);
     this.panelTexts.hint = hintButton.label;
     this.add_(this.add.text(this.L.keysHint.x, this.L.keysHint.y, t('keysHint'), { fontFamily: th.font, fontSize: '11px', color: th.text }).setOrigin(0.5).setDepth(UI_DEPTH + 2).setAlpha(0.6));
   }

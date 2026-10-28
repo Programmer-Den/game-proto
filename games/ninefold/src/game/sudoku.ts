@@ -45,6 +45,14 @@ export function dailySeed(date: Date) {
   return date.getFullYear() * 10_000 + (date.getMonth() + 1) * 100 + date.getDate();
 }
 
+/** The daily seed of the day after the one given. */
+export function nextDay(seed: number) {
+  const y = Math.floor(seed / 10_000);
+  const m = Math.floor(seed / 100) % 100;
+  const d = seed % 100;
+  return dailySeed(new Date(y, m - 1, d + 1));
+}
+
 /** The box a cell is in, numbered row by row. */
 export function boxOf(shape: Shape, cell: number) {
   const r = Math.floor(cell / shape.size);
