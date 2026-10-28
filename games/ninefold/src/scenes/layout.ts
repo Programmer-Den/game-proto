@@ -42,8 +42,8 @@ export type Layout = {
   /** The end-of-board card and its buttons, by their centres. */
   end: Rect;
   endButtons: { xs: number[]; y: number; w: number; h: number };
-  /** The cleared-floor card (top-left), its title and line, and the relic cards by their centres. */
-  relicBox: Rect & { title: number; line: number };
+  /** The cleared-floor card (top-left), its title, its line, the next floor's line, and the relic cards by their centres. */
+  relicBox: Rect & { title: number; line: number; next: number };
   relicCards: { xs: number[]; y: number; w: number; h: number };
 };
 
@@ -72,8 +72,8 @@ export const WIDE: Layout = {
   back: { x: 90, y: 50, w: 120, h: 40 },
   end: { x: 480, y: 270, w: 460, h: 280 },
   endButtons: { xs: [380, 580], y: 360, w: 170, h: 46 },
-  relicBox: { x: 120, y: 70, w: 720, h: 420, title: 112, line: 150 },
-  relicCards: { xs: [270, 480, 690], y: 300, w: 190, h: 200 },
+  relicBox: { x: 120, y: 60, w: 720, h: 440, title: 98, line: 134, next: 176 },
+  relicCards: { xs: [270, 480, 690], y: 330, w: 190, h: 200 },
 };
 
 const TALL_PANEL = { x: 20, y: 20, w: 500, h: 152 };
@@ -102,8 +102,8 @@ export const TALL: Layout = {
   back: { x: 90, y: 50, w: 120, h: 40 },
   end: { x: 270, y: 480, w: 460, h: 300 },
   endButtons: { xs: [170, 370], y: 580, w: 180, h: 50 },
-  relicBox: { x: 20, y: 240, w: 500, h: 470, title: 292, line: 334 },
-  relicCards: { xs: [107, 270, 433], y: 530, w: 156, h: 260 },
+  relicBox: { x: 20, y: 220, w: 500, h: 510, title: 266, line: 306, next: 360 },
+  relicCards: { xs: [107, 270, 433], y: 560, w: 156, h: 260 },
 };
 
 /** The layout for a view of this size: upright views get `TALL`. */

@@ -69,6 +69,20 @@ const en = {
   seerText: 'Every floor starts with 2 more cells filled in.',
   wardName: 'Ward',
   wardText: 'The first mistake on each floor costs no heart.',
+  // Twists and boss floors
+  hintSealed: 'Sealed',
+  bossFloor: 'Floor {n} · Boss',
+  bossCleared: 'Boss floor {n} cleared! Hearts restored.',
+  nextFloor: 'Next: floor {n}, {size}×{size}.',
+  nextBoss: 'Next: floor {n}, a boss floor.',
+  diagonalName: 'Diagonal',
+  diagonalRule: 'both long diagonals hold each digit once too.',
+  parityName: 'Parity',
+  parityRule: 'marked cells hold even digits, the rest odd.',
+  clockName: 'Clock',
+  clockRule: 'a heart is lost every 3 minutes.',
+  sealedName: 'Sealed',
+  sealedRule: 'no hints here; clearing it gives one back.',
 };
 
 export default en;
