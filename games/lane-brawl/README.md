@@ -259,7 +259,7 @@ left, under bevelled slate panels.
     ![A red outer tower with one of its five plates broken](docs/screenshots/plates.webp)
 25. **Bodies**: champions and minions no longer stand in each other: a crowd parts, minions body
     block, and the jungle's pines and rocks, the ruins, the stones round the pits and every tower,
-    inhibitor and Nexus stand in the way, so units walk round them. A dash or blink that lands in
+    inhibitor and Nexus stand in the way (and, since item 30, the jungle's stone walls), so units walk round them. A dash or blink that lands in
     one comes out at its edge.
 26. **Day and night**: the match starts in the morning. Every three minutes night falls for a
     minute and a half: the map turns a deep blue, a moon replaces the sun by the clock, and
@@ -288,7 +288,13 @@ left, under bevelled slate panels.
     plus the price of every item held) over the match, noted every 20 seconds.
 
     ![The end panel after a defeat: the MVP and the net worth of both teams over 7:54](docs/screenshots/match-summary.webp)
-30. **Winning** destroys the red Nexus. Losing means your Nexus falls first.
+30. **Walls**: six low stone walls stand in each team's jungle, mirrored, short and straight with
+    both ends open. Units walk along one and round its nearer end, so a wall turns a chase: the
+    runner who knows the way round it gets ahead. Walls stop walking only: bolts, sight and
+    dashes go over them.
+
+    ![A stone wall in the jungle between a camp and the river drake's pit](docs/screenshots/walls.webp)
+31. **Winning** destroys the red Nexus. Losing means your Nexus falls first.
 
 Every ability has an animation of its own (a hammer that splits the ground, a meteor from the
 sky, a harpoon on its rope, a coil pylon arcing, a blood moon rising and so on), and so do bolts in

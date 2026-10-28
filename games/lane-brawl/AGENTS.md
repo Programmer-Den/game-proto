@@ -344,7 +344,13 @@ Implemented today:
 - Bodies and obstacles (LB20): `game/terrain.ts` holds the map's solid circles, `OBSTACLES`:
   pine trunks and rocks from `SCENERY` (placed by its own seeded random source, and painted from the
   same list by `scenery` in `map.ts`), the ruins' pillars (`ruinPieces`), the stones round both pits
-  (`pitStones`), towers, inhibitors, Nexuses and watchstones, sized by `SOLID`, in a 100 px grid.
+  (`pitStones`), the stone walls (`WALLS`, six blue ones and their mirrored copies), towers,
+  inhibitors, Nexuses and watchstones, sized by `SOLID`, in a 100 px grid. A wall is an `Obstacle`
+  with a `to` point: solid within `r` of the run from (x, y) to `to`, and `core` gives its nearest
+  point. `steer` slides along a wall toward the end that makes the shorter way to the goal, keeping
+  one way round while the goal is across it. `SCENERY` keeps 70 px clear of every wall, so a
+  champion fits between a wall and a pine. `wall` in `map.ts` paints them and the minimap draws
+  them as grey strokes. Walls stop walking only, not bolts, sight or dashes.
   `moveToward` takes a `steer` step (straight on, or along the edge of what is in the way, on the
   goal's side) for the walker's `bodyOf` (`BODY` in `data.ts`). After the units' turns `tick` calls
   `separate`: overlapping living champions and minions are pushed apart by `BODY.give` of the
@@ -495,7 +501,7 @@ File map (`src/`):
 - `game/spellChoice.ts`: the player's battle spell and match kind, the save keys `lane-brawl-spell` (`loadSpell`, `saveSpell`) and `lane-brawl-quick` (`loadQuick`, `saveQuick`).
 - `game/mastery.ts`: class mastery, the save key `lane-brawl-mastery` (`loadMastery`, `recordWin`,
   `masteryRank`).
-- `game/terrain.ts`: the map's obstacles (`SCENERY`, `OBSTACLES`, `SOLID`) and `steer`, `settle`, `blockedBy`; `art/map.ts` takes the lane and clearing helpers and the scenery from it.
+- `game/terrain.ts`: the map's obstacles (`SCENERY`, `WALLS`, `OBSTACLES`, `SOLID`) and `steer`, `settle`, `blockedBy`; `art/map.ts` takes the lane and clearing helpers and the scenery from it.
 - `game/data.ts`: plain data, with text keys for names and texts. `WORLD`, `LANES`, `BASE`, `TOWERS`, `RIVER`, `CAMPS`, `CAMP_KINDS`,
   `PUPS`, `SIGHT`, `WATCHSTONES`, `WATCH`, `BUFFS`, `JUNGLE`, `KITE`, the balance constants (`TOWER`,
   `CAMP`, `MINION`, `KILL`, `XP_FOR_LEVEL`, respawn times), `CHAMPIONS` with their `AbilityDef`s,

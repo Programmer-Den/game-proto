@@ -1,14 +1,14 @@
 // Paints the whole 2800x2800 map once at boot onto one canvas: faceted grass, the river with its
 // islands for the watchstones, flagstone lanes with stone kerbs, paved plazas round the Nexuses,
 // dirt clearings for the camps, the guardian beast's pit, patches of tall grass (the bushes), flowers,
-// mushrooms and old ruins, and low-poly pines and rocks rendered with the same renderer as the
+// mushrooms, old ruins and stone walls, and low-poly pines and rocks rendered with the same renderer as the
 // units. The same seed paints the same map every time.
 
 import Phaser from 'phaser';
 import { BASE, BEAST, BUSHES, DRAKE, Bush, CampSpot, LANES, RIVER, Team, Vec, WATCHSTONES, WORLD } from '../game/data';
 import { sharpRes } from '../../../../shared/scaling';
 import { render, seeded } from './lowpoly';
-import { CLEARINGS, LANE_HALF, RUINS, SCENERY, clearingR, laneDist, pitStones, riverDist, ruinPieces } from '../game/terrain';
+import { CLEARINGS, LANE_HALF, RUINS, SCENERY, SOLID, WALLS, Wall, clearingR, laneDist, pitStones, riverDist, ruinPieces } from '../game/terrain';
 import { TEAM_GLOW, pineModel, rockModel, ruinModel } from './models';
 
 export const MAP_KEY = 'lb-map';
@@ -424,6 +424,43 @@ function ruins(ctx: CanvasRenderingContext2D, c: Vec, rnd: () => number) {
   ruinPieces(c).forEach((p, i) => render(ctx, ruinModel(i), p.x, p.y, 1, { yaw: rnd() * 6 }));
 }
 
+/** A stone wall (`WALLS` in `game/terrain.ts`): a row of blocks, lit from the top left, as wide as it is solid. */
+function wall(ctx: CanvasRenderingContext2D, w: Wall, rnd: () => number) {
+  const len = Math.hypot(w.b.x - w.a.x, w.b.y - w.a.y);
+  const ang = Math.atan2(w.b.y - w.a.y, w.b.x - w.a.x);
+  const half = SOLID.wall;
+  ctx.save();
+  ctx.translate(w.a.x, w.a.y);
+  ctx.rotate(ang);
+  // Its shadow, toward the bottom right.
+  ctx.save();
+  ctx.rotate(-ang);
+  ctx.translate(9, 6);
+  ctx.rotate(ang);
+  ctx.fillStyle = 'rgba(20,40,20,0.32)';
+  ctx.beginPath();
+  ctx.roundRect(-half, -half, len + half * 2, half * 2, half);
+  ctx.fill();
+  ctx.restore();
+  // The face, then the blocks on top in two staggered courses.
+  ctx.fillStyle = '#5b5850';
+  ctx.beginPath();
+  ctx.roundRect(-half, -half + 4, len + half * 2, half * 2, 8);
+  ctx.fill();
+  for (let row = 0; row < 2; row++) {
+    const y = -half + row * half;
+    for (let x = -half + (row ? 0 : -11); x < len + half; x += 22) {
+      const x0 = Math.max(-half, x), x1 = Math.min(len + half, x + 21);
+      if (x1 - x0 < 4) continue;
+      ctx.fillStyle = shade(row ? '#8d897e' : '#a6a194', 0.88 + rnd() * 0.24);
+      ctx.fillRect(x0, y, x1 - x0, half - 1);
+    }
+  }
+  ctx.strokeStyle = 'rgba(40,38,34,0.6)';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(-half, -half, len + half * 2, half * 2);
+  ctx.restore();
+}
 
 /** A pit for the guardian beast or the river drake: a ring of dark flagstones round a sunken floor, with standing stones, glowing in `glow`. */
 function pit(ctx: CanvasRenderingContext2D, rnd: () => number, c: Vec, glow: string) {
@@ -541,6 +578,7 @@ export function paintMap(scene: Phaser.Scene) {
   plaza(ctx, 'red', rnd);
   kerbs(ctx, rnd);
   for (const b of BUSHES) bush(ctx, b, rnd);
+  for (const w of WALLS) wall(ctx, w, rnd);
   scenery(ctx);
   // A dark frame round the edge of the world.
   ctx.strokeStyle = 'rgba(15,28,18,0.85)';
