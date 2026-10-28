@@ -253,7 +253,11 @@ left, under bevelled slate panels.
     champions within 700 px. At 5:00 the plates fall away.
 
     ![A red outer tower with one of its five plates broken](docs/screenshots/plates.webp)
-25. **Winning** destroys the red Nexus. Losing means your Nexus falls first.
+25. **Bodies**: champions and minions no longer stand in each other: a crowd parts, minions body
+    block, and the jungle's pines and rocks, the ruins, the stones round the pits and every tower,
+    inhibitor and Nexus stand in the way, so units walk round them. A dash or blink that lands in
+    one comes out at its edge.
+26. **Winning** destroys the red Nexus. Losing means your Nexus falls first.
 
 Every ability has an animation of its own (a hammer that splits the ground, a meteor from the
 sky, a harpoon on its rope, a coil pylon arcing, a blood moon rising and so on), and so do bolts in
@@ -443,7 +447,7 @@ it.
   where everything sits on screen.
 - `src/game/`: the rules, free of Phaser: `data.ts` (map, river, camps, watchstones, sight,
   champions and their passives, items, objectives, upgrades, buffs, the beast, inhibitors, bushes
-  and AI plans), `names.ts` (the champions' short names), `mastery.ts` (saved wins per class), `state.ts` (types and a new match) and
+  and AI plans), `names.ts` (the champions' short names), `mastery.ts` (saved wins per class), `terrain.ts` (the solid things units walk round), `state.ts` (types and a new match) and
   `sim.ts` (the rules, vision and the AI).
 - `src/art/`: `lowpoly.ts` (the software renderer), `models.ts` (every low-poly model), `bake.ts`
   (renders the models into sprite sheets at start-up) and `map.ts` (paints the map).

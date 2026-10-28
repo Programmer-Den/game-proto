@@ -5,39 +5,20 @@
 // units. The same seed paints the same map every time.
 
 import Phaser from 'phaser';
-import { BASE, BEAST, BUSHES, DRAKE, Bush, CAMPS, CampSpot, LANES, MERC, RIVER, Team, Vec, WATCHSTONES, WORLD } from '../game/data';
+import { BASE, BEAST, BUSHES, DRAKE, Bush, CampSpot, LANES, RIVER, Team, Vec, WATCHSTONES, WORLD } from '../game/data';
 import { sharpRes } from '../../../../shared/scaling';
 import { render, seeded } from './lowpoly';
+import { CLEARINGS, LANE_HALF, RUINS, SCENERY, clearingR, laneDist, pitStones, riverDist, ruinPieces } from '../game/terrain';
 import { TEAM_GLOW, pineModel, rockModel, ruinModel } from './models';
 
 export const MAP_KEY = 'lb-map';
 /** Canvas pixels per world pixel in the map's texture: 1, or more on a big screen (see `sharpRes`). */
 export let MAP_RES = 1;
-/** Half the width of a lane's paving, in pixels. */
-const LANE_HALF = 50;
 
 function shade(hex: string, k: number) {
   const n = parseInt(hex.slice(1), 16);
   const f = (v: number) => Math.max(0, Math.min(255, Math.round(v * k)));
   return `rgb(${f((n >> 16) & 255)},${f((n >> 8) & 255)},${f(n & 255)})`;
-}
-
-/** The distance from a point to the nearest lane's centre line. */
-function laneDist(p: Vec): number {
-  let best = Infinity;
-  for (const lane of Object.values(LANES)) {
-    for (let i = 0; i < lane.length - 1; i++) best = Math.min(best, segDist(p, lane[i], lane[i + 1]));
-  }
-  return best;
-}
-/** The distance from a point to the river's centre line. */
-function riverDist(p: Vec): number {
-  return segDist(p, RIVER.from, RIVER.to);
-}
-function segDist(p: Vec, a: Vec, b: Vec) {
-  const dx = b.x - a.x, dy = b.y - a.y;
-  const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy)));
-  return Math.hypot(p.x - (a.x + dx * t), p.y - (a.y + dy * t));
 }
 
 function grass(ctx: CanvasRenderingContext2D, rnd: () => number) {
@@ -228,9 +209,6 @@ function plaza(ctx: CanvasRenderingContext2D, team: Team, rnd: () => number) {
 }
 
 /** How far a camp's clearing reaches, by kind: the brutes' are the widest. */
-/** Every camp's clearing: the jungle camps and the two mercenary camps. */
-const CLEARINGS: CampSpot[] = [...CAMPS, ...MERC.spots.map((p) => ({ ...p, kind: 'merc' as const }))];
-const clearingR = (c: CampSpot) => (c.kind === 'ember' || c.kind === 'moss' ? 128 : c.kind === 'wolf' ? 112 : 100);
 
 function clearing(ctx: CanvasRenderingContext2D, c: CampSpot, rnd: () => number) {
   const n = 11;
@@ -443,14 +421,9 @@ function ruins(ctx: CanvasRenderingContext2D, c: Vec, rnd: () => number) {
     ctx.fillStyle = shade('#a8a196', 0.8 + rnd() * 0.3);
     ctx.fillRect(x - 9, y - 6, 18, 12);
   }
-  for (let i = 0; i < 4; i++) {
-    const a = (i / 4) * Math.PI * 2 + 0.4;
-    render(ctx, ruinModel(i), c.x + Math.cos(a) * 52, c.y + Math.sin(a) * 32, 1, { yaw: rnd() * 6 });
-  }
+  ruinPieces(c).forEach((p, i) => render(ctx, ruinModel(i), p.x, p.y, 1, { yaw: rnd() * 6 }));
 }
 
-/** Where the ruins stand: one in each quarter of the jungle, mirrored. */
-const RUINS: Vec[] = [{ x: 560, y: 1560 }, { x: 1240, y: 2240 }, { x: 2240, y: 1240 }, { x: 1560, y: 560 }];
 
 /** A pit for the guardian beast or the river drake: a ring of dark flagstones round a sunken floor, with standing stones, glowing in `glow`. */
 function pit(ctx: CanvasRenderingContext2D, rnd: () => number, c: Vec, glow: string) {
@@ -479,10 +452,7 @@ function pit(ctx: CanvasRenderingContext2D, rnd: () => number, c: Vec, glow: str
   ctx.beginPath();
   ctx.ellipse(c.x, c.y, 70, 56, 0, 0, Math.PI * 2);
   ctx.stroke();
-  for (let i = 0; i < 8; i++) {
-    const a = (i / 8) * Math.PI * 2 + 0.2;
-    render(ctx, rockModel(7 + rnd() * 3, i % 3), c.x + Math.cos(a) * 126, c.y + Math.sin(a) * 101, 1, { yaw: rnd() * 6 });
-  }
+  pitStones(c).forEach((p, i) => render(ctx, rockModel(7 + rnd() * 3, i % 3), p.x, p.y, 1, { yaw: rnd() * 6 }));
 }
 
 /** A patch of tall grass: a dark bed with clumps of faceted blades, lighter at the tips. */
@@ -533,20 +503,9 @@ function bush(ctx: CanvasRenderingContext2D, b: Bush, rnd: () => number) {
   }
 }
 
-function scenery(ctx: CanvasRenderingContext2D, rnd: () => number) {
-  const things: { x: number; y: number; kind: 'pine' | 'rock'; s: number; v: number }[] = [];
-  for (let i = 0; i < 4000 && things.length < 620; i++) {
-    const p = { x: 20 + rnd() * (WORLD.w - 40), y: 30 + rnd() * (WORLD.h - 40) };
-    if (laneDist(p) < LANE_HALF + 48 || riverDist(p) < RIVER.half + 40) continue;
-    if (Math.hypot(p.x - BASE.blue.x, p.y - BASE.blue.y) < 290 || Math.hypot(p.x - BASE.red.x, p.y - BASE.red.y) < 290) continue;
-    if (CLEARINGS.some((c) => Math.hypot(p.x - c.x, p.y - c.y) < clearingR(c) + 50)) continue;
-    if (RUINS.some((c) => Math.hypot(p.x - c.x, p.y - c.y) < 110)) continue;
-    if (WATCHSTONES.some((c) => Math.hypot(p.x - c.x, p.y - c.y) < 140)) continue;
-    if (Math.hypot(p.x - BEAST.x, p.y - BEAST.y) < 175 || Math.hypot(p.x - DRAKE.x, p.y - DRAKE.y) < 175) continue;
-    if (BUSHES.some((b) => ((p.x - b.x) / (b.rx + 40)) ** 2 + ((p.y - b.y) / (b.ry + 40)) ** 2 < 1)) continue;
-    if (things.some((t) => Math.hypot(t.x - p.x, t.y - p.y) < 46)) continue;
-    things.push({ ...p, kind: rnd() < 0.85 ? 'pine' : 'rock', s: 0.8 + rnd() * 0.5, v: Math.floor(rnd() * 4) });
-  }
+function scenery(ctx: CanvasRenderingContext2D) {
+  // The same pines and rocks the units walk around (`SCENERY` in `game/terrain.ts`).
+  const things = [...SCENERY];
   things.sort((a, b) => a.y - b.y);
   for (const t of things) {
     // A soft shadow to the bottom right, away from the light.
@@ -582,7 +541,7 @@ export function paintMap(scene: Phaser.Scene) {
   plaza(ctx, 'red', rnd);
   kerbs(ctx, rnd);
   for (const b of BUSHES) bush(ctx, b, rnd);
-  scenery(ctx, rnd);
+  scenery(ctx);
   // A dark frame round the edge of the world.
   ctx.strokeStyle = 'rgba(15,28,18,0.85)';
   ctx.lineWidth = 8;

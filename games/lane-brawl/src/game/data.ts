@@ -1259,6 +1259,15 @@ export const DRAKE = { x: 600, y: 600, firstAt: 150_000, soul: 4, ai: 2, aiMinHp
 export const FIRST_BLOOD = { gold: 150 };
 export const PLATING = { count: 5, gold: 120, share: 700, until: 300_000 };
 
+/**
+ * Bodies (LB20): how wide each kind of walker is to the solid things of the map (`game/terrain.ts`)
+ * and to other walkers. Camps by their own radius times `camp`. Overlapping walkers are pushed
+ * apart by `give` of the overlap each tick, so a crowd parts softly rather than at once.
+ */
+export const BODY = { champion: 14, minion: 9, camp: 0.6, beast: 30, give: 0.5 };
+/** The player's champion gives up on a spot it has got no closer to for `ms` once within `near` px of it. */
+export const STUCK = { ms: 500, near: 60 };
+
 export const JUNGLE = { firstAt: 120_000, every: 45_000, ms: 30_000, minHp: 0.6 };
 export const RETREAT = {
   /** Health ratio under which a champion with an enemy champion near falls back. */
