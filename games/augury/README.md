@@ -84,6 +84,19 @@ Any answer that keeps the rules counts, not only the one the puzzle was made fro
 
 ![A draft: two cards to choose from](docs/screenshots/draft.webp)
 
+**Bosses**: every fifth puzzle of Endless and Draft is a boss, framed in rose: two puzzles of two
+kinds played back to back on one clock (four fifths of their two times added up). Beat both for
+double points and a relic pick, in Endless too (there without the Crystal Ball); a loss, skip or
+timeout in either half loses the boss. Up next and the draft cards say which puzzle follows.
+
+![A boss: its second half, Picture Grid after Tile Flip](docs/screenshots/boss.webp)
+
+**Omens**: in Endless and Draft, each puzzle offers an omen in the top bar until its first move or
+hint. Tempt it for double points: **Haste** halves the puzzle's time, **Silence** takes away Undo
+and hints, and **Peril** makes a loss cost two hearts (Memory Echo only offers Peril).
+
+![An omen on offer: Tempt Haste](docs/screenshots/omen.webp)
+
 **Points**: 100 per level (Novice 100 to Oracle 400), plus 2 for every second left, less 40 per
 hint (never below 20), times a streak bonus of 10% per puzzle solved in a row (up to double).
 **Records** keeps the puzzles solved of each kind, the fastest solve without hints at each level,

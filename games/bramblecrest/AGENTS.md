@@ -59,7 +59,16 @@ Implemented today:
   once the knight's whole feet box, `FEET`, is in the room, so a door never shuts on them), and
   pit crossings by hookvine posts.
 - Foes (`src/scenes/foes.ts`): slugs, moths (they fly over water and pits), thornlings (they
-  stand still and spit seeds) and frogs (they sit, then leap at the knight). Dungeon foes stay
+  stand still and spit seeds), frogs (they sit, then leap at the knight), shelled beetles and
+  lantern moths. The last two are `ARMOURED`: the sword only hurts them while `down`. The hookvine
+  or a burst calls `knockDown` (`DOWN_MS`; a beetle shows `beetle-back`, a lantern moth lands), and
+  until then a swing on a beetle only goes `tink` and a lantern moth, flying `LANTERN_LIFT` up, is
+  out of reach. Beetles walk like slugs; lantern moths keep `LANTERN_KEEP` from the knight, circle
+  and drop an `ember` (a `shoot` with that key) every `LANTERN_SHOT_MS`, carry a light, and never
+  hurt by touch. Down, both lie still and harmless. `hint` shows a teaching toast once a page load
+  (`shellHard`, `beetleFlipped`, `lanternDown`). New dungeon foes go at the end of the map's
+  `enemies`, so the beaten flags of the old ones keep their index; new outdoor ones go after the
+  scatter, so the trees and bushes it sows stay put. Dungeon foes stay
   beaten (`foe-<i>` flags in the shrine, `belfry-foe-<i>` in the belfry; `DUNGEONS` lists them).
 - The Thornmother: a ring no blade cuts, three bulbs raised one at a time (`BULB_*`), thorn volleys
   that speed up as bulbs fall (`VOLLEY_MS`) and summoned slugs (`SUMMON_MS`, by difficulty). A bulb
@@ -124,7 +133,8 @@ All in code through `shared/audio.ts` (no audio files), in `src/audio/`:
   `openDialog` and `nextLine`, pitched by a hash of the speaker's name), `bell` (`ringBell`, pitched
   G, C and E by the bell's `note` through `BELL_PITCH`, so the right tune is a falling chord; low
   for the Bellwraith's bell struck while down), `wrong` (the wrong bell), `hit` and `pop`
-  (`hitFoe`: only the knight hits foes), `hurt` (`hurt`), `wake` (after a fall), `spit` (a
+  (`hitFoe`: only the knight hits foes), `tink` (the sword on a beetle's shell), `thud`
+  (`knockDown`), `hurt` (`hurt`), `wake` (after a fall), `spit` (a
   thornling), `volley` (one per Thornmother volley), `twang` (`yank`), `squelch` (`hitBulb`),
   `rattle` and `clang` (the Bellwraith's drop and slam), `topple` (`tipBell`), `wail`
   (`hitWraith`), `wisp` (the wisp hops on) and `swell` (`checkExits`, walking into another map).

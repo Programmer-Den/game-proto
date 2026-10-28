@@ -179,6 +179,14 @@ const en = {
   warChestName: 'War Chest',
   warChestText: 'Gain a finished item now.',
 
+  // Rare power cards (from stage 4)
+  freeRollsName: 'Lucky Dice',
+  freeRollsText: 'Your first two rerolls every round are free.',
+  handToMouthName: 'Hand to Mouth',
+  handToMouthText: 'No more interest, but 6 gold every round however much you hold.',
+  gildedShopName: 'Gilded Shop',
+  gildedShopText: 'Gilded robots turn up in one shop slot in five, from level 1.',
+
   // Commander skills: name and what they do
   overclockSkill: 'Overclock',
   overclockText: 'Your robots attack 40% faster for 5 seconds.',
@@ -298,6 +306,8 @@ const en = {
   level: 'Lv {n}',
   xp: '{xp}/{need} xp',
   maxLevel: 'max',
+  rerollFree: 'Reroll free ({n})',
+  rareCard: 'RARE',
   reroll: 'Reroll {n}',
   buyXp: 'Buy XP {n}',
   sellFor: 'Sell for {n} (E)',

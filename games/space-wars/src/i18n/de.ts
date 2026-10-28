@@ -246,6 +246,7 @@ const de: Translation<typeof en> = {
   flagshipUnlocked: '. Flaggschiff freigeschaltet: baue {name} an deiner Basis',
   contractStarted: 'Vertrag {rank}: {brief}',
   contractFailed: 'Vertrag gescheitert: {why}. Wähle einen anderen vom Brett',
+  rivalDealDone: '{faction} hat {title} erfüllt: {perk}',
   convoyHunted: '{faction} schickt {n} Schiffe auf deinen Konvoi',
   pactRaids: 'Der Pakt greift an: jede rivalisierende Flotte kommt zu deiner Basis. Nächste Welle in {s} s',
   pactSigned: 'Letztes Gefecht: {who} schließen einen Pakt und greifen dich in {s} s gemeinsam an',
@@ -258,6 +259,8 @@ const de: Translation<typeof en> = {
   aiResearches: 'erforscht {track} {level}',
   aiAttacks: 'schickt {n} Schiffe gegen {building} ({faction})',
   aiClaimer: 'schickt ein Schiff, um das Wrack {derelict} zu besetzen',
+  aiDeal: 'nimmt Vertrag {rank} an: {title}',
+  aiDealDone: 'erfüllt {title}: {perk}',
   aiBuilds: 'baut {building}',
 
   // Top bar
@@ -350,6 +353,8 @@ const de: Translation<typeof en> = {
   rivalsHead: 'RIVALEN · Waffenruhe und Tribut · T schließt',
   rivalOffers: '{faction} bietet Waffenruhe · {s} s · drücke T',
   fallen: 'Gefallen',
+  rivalDeal: 'Vertrag {rank}: {title} · {n}/{target}',
+  rivalDealsDone: 'Vertragskette erfüllt',
   grudgeYou: 'Groll: auf dich',
   grudgeAt: 'Groll: auf {faction}',
   noGrudge: 'Noch kein Groll',

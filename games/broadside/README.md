@@ -288,6 +288,25 @@ Below them, "Patch the hull" repairs the ship for 10 gold and "Hire sailors" bri
 
 ![The harbor between waves](docs/screenshots/playthrough-4-harbor.webp)
 
+### Trophies
+
+Nine trophies, listed behind the Trophies button on the start and pause screens and counted on the
+hub's card. Each pops up at the top of the page once, when it is earned.
+
+| Tier | Trophy | Earned by |
+| --- | --- | --- |
+| Bronze | First blood | Sinking your first enemy ship |
+| Bronze | Prize crew | Boarding a crippled ship and taking her as a prize |
+| Bronze | On the books | Earning an Admiralty bounty |
+| Bronze | Safe harbour | Seeing a convoy safe to her island |
+| Silver | Sailing in company | Keeping a prize as a consort |
+| Silver | Strike the colours | Sinking or boarding a flagship |
+| Silver | Old salt | Clearing wave 10 |
+| Gold | Scourge of the haven | Sinking the admiral's flagship to win the campaign |
+| Gold | Terror of the seas (hidden) | Winning the campaign on Hard |
+
+![The trophy list on the pause screen](docs/screenshots/trophy-list.webp)
+
 The difficulty, set on the hub page's Settings, changes one thing: enemy ships and forts have 25% less health on Easy and 30% more on Hard.
 
 ## Running locally

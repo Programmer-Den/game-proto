@@ -6,9 +6,9 @@ import { settings } from '../../../../shared/settings';
 import { SFX, SONG } from '../audio';
 import { distances, route } from '../game/grid';
 import { cellIndex, cellOf, MAPS, SEASON_STARS, SEASONS, type MapDef, type Season } from '../game/maps';
-import { loadCalm, loadDuo, loadMode, loadPouch, loadRecords, loadReplays, loadShed, noteRecord, picksOf, pouchOf, saveCalm, saveDuo, saveMode, savePouch, saveReplay, saveShed, usable, type Records, type Replays, type Shed } from '../game/save';
+import { loadCalm, loadDuo, loadGame, loadMode, loadPouch, loadRecords, loadReplays, loadShed, noteRecord, picksOf, pouchOf, saveCalm, saveDuo, saveGame, saveMode, savePouch, saveReplay, saveShed, usable, type Records, type Replays, type SavedGame, type Shed } from '../game/save';
 import {
-  beamCells, bestFace, build, hedgeUnder, LAWN, openGates, reachOf, cabbagesLeft, canStartWave, masterOpen, seedsFor, stars, totalWaves, newGame, nextUpgrade, goldAt, sideOf, replayGame, replayOf, replayStep, sell, sellValue, setAim, startWave, step, towerAt, turn, upgrade, wouldBlock,
+  beamCells, bestFace, build, hedgeUnder, LAWN, openGates, reachOf, cabbagesLeft, canStartWave, masterOpen, seedsFor, stars, totalWaves, newGame, nextUpgrade, goldAt, sideOf, replayGame, replayOf, replayStep, resumeGame, sell, sellValue, setAim, startWave, step, towerAt, turn, upgrade, wouldBlock,
   type Game, type GameEvent, type Refusal, type Replay, type Tower,
 } from '../game/sim';
 import { DIRS } from '../game/grid';
@@ -89,6 +89,10 @@ export class GameScene extends Phaser.Scene {
   /** Each garden's latest win, and the one being watched (null while playing). */
   replays!: Replays;
   replay: Replay | null = null;
+  /** The game in play kept at its last break between waves, to go on with from the picker. */
+  saved: SavedGame | null = null;
+  /** The wave and actions last kept, so a break is saved once per change. */
+  private kept = '';
   /** Spots for the test: every button on screen by id, centred, in view pixels. */
   buttons: Record<string, Spot> = {};
   /** The grid's top-left corner and cell size in view pixels, for the test. */
@@ -143,6 +147,9 @@ export class GameScene extends Phaser.Scene {
     this.shed = loadShed(this.records);
     this.pouch = loadPouch(this.shed);
     this.replays = loadReplays();
+    this.saved = loadGame();
+    // The picker opens on the season of a game to go on with.
+    if (this.saved) this.season = MAPS.find((m) => m.id === this.saved!.map)!.season;
     this.lawnG = this.add.graphics().setDepth(DEPTH.lawn);
     this.boardG = this.add.graphics().setDepth(DEPTH.board);
     this.fxG = this.add.graphics().setDepth(DEPTH.fx);
@@ -183,6 +190,7 @@ export class GameScene extends Phaser.Scene {
         this.drain(g);
       }
       if (this.selected >= 0 && !towerAt(g, this.selected)) this.selected = -1;
+      this.keep(g);
     }
     for (const f of this.flashes) f.age += dt;
     for (const f of this.flashes) if (f.age >= f.life) f.label?.destroy();
@@ -196,6 +204,22 @@ export class GameScene extends Phaser.Scene {
     if (this.boardDirty) this.drawBoard();
     this.drawFx();
     this.drawHud();
+  }
+
+  /** Saves the game in a break between waves, whenever a wave or an action has come since the last save. */
+  private keep(g: Game) {
+    if (this.replay || g.phase !== 'build') return;
+    const key = `${g.map.id}:${g.wave}:${g.log.length}`;
+    if (key === this.kept) return;
+    this.kept = key;
+    this.saved = { ...replayOf(g), log: [...g.log], pouch: [...this.pouch], wave: g.wave };
+    saveGame(this.saved);
+  }
+
+  /** Drops the saved game: it is over, or another has started. */
+  private forget() {
+    this.saved = null;
+    saveGame(null);
   }
 
   private musicPart() {
@@ -355,6 +379,7 @@ export class GameScene extends Phaser.Scene {
         break;
       case 'won':
         playSting(SONG, 'win');
+        if (!this.replay) this.forget();
         if (g.mode !== 'sandbox' && !this.replay) {
           noteRecord(this.records, g.map.id, { wave: g.wave, won: true, stars: stars(g), time: Math.round(g.clock) });
           saveReplay(this.replays, replayOf(g));
@@ -363,6 +388,7 @@ export class GameScene extends Phaser.Scene {
         break;
       case 'lost':
         playSting(SONG, 'lose');
+        if (!this.replay) this.forget();
         this.note(g, g.wave - 1);
         this.earn(g);
         break;
@@ -546,9 +572,29 @@ export class GameScene extends Phaser.Scene {
     savePouch(this.pouch);
   }
 
-  /** Starts a game in `map`, or watches `replay` (at 2x). */
-  private start(map: MapDef, replay: Replay | null = null) {
-    this.state = replay ? replayGame(replay) : newGame(map.id, this.calm, this.mode, this.shed.masters, undefined, this.duo);
+  /** Starts a game in `map`, watches `replay` (at 2x), or goes on with the saved game. */
+  private start(map: MapDef, replay: Replay | null = null, resume = false) {
+    const saved = resume ? this.saved : null;
+    this.seen.clear();
+    this.rushing = false;
+    this.grabbed = false;
+    this.weathered = false;
+    if (saved) {
+      // Played back quietly to its break: the foes met, a stolen cabbage and the weather are told no more.
+      this.state = resumeGame(saved, STEP, (events) => {
+        for (const e of events) {
+          if (e.type === 'wave') for (const [k] of waveGroups(e.wave)) this.seen.add(k);
+          else if (e.type === 'grab') this.grabbed = true;
+          else if (e.type === 'wilt' || e.type === 'frozen') this.weathered = true;
+        }
+      });
+      this.pouch = pouchOf(saved.pouch, this.shed);
+      savePouch(this.pouch);
+      this.kept = `${map.id}:${this.state.wave}:${this.state.log.length}`;
+    } else {
+      this.state = replay ? replayGame(replay) : newGame(map.id, this.calm, this.mode, this.shed.masters, undefined, this.duo);
+      if (!replay) this.forget();
+    }
     this.replay = replay;
     this.ri = 0;
     this.earned = 0;
@@ -560,12 +606,9 @@ export class GameScene extends Phaser.Scene {
     this.speed = replay ? 2 : 1;
     this.acc = 0;
     this.clearFlashes();
-    this.seen.clear();
-    this.rushing = false;
-    this.grabbed = false;
-    this.weathered = false;
     this.banner = null;
-    if (this.state.duo && !replay) this.say(t('duoStart'));
+    if (saved && this.state.wave > 0) this.say(t('resumed', { n: this.state.wave }));
+    else if (this.state.duo && !replay) this.say(t('duoStart'));
     this.changed();
     this.drawLawn();
   }
@@ -1127,12 +1170,20 @@ export class GameScene extends Phaser.Scene {
         g.fillStyle(C.bar, 0.6);
         g.fillRoundedRect(x, y, CARDS.w, CARDS.h, 14);
         this.text(cx, y + CARDS.h - 22, t('seasonLocked', { n: SEASON_STARS[this.season], have: won }), 13, css(C.cream), 0.5);
-      } else this.text(cx, y + CARDS.h - 22, best, 13, css(C.gold), 0.5);
+      } else {
+        // Beside the button to go on with a game here, the record moves into the room left by it.
+        const resume = this.saved?.map === map.id;
+        const left = resume ? 84 : 0;
+        const right = this.replays[map.id] ? CARDS.w - 74 : CARDS.w;
+        this.text(resume ? x + (left + right) / 2 : cx, y + CARDS.h - 22, best, 13, css(C.gold), 0.5);
+      }
       this.hits.push({ x, y, w: CARDS.w, h: CARDS.h, onTap: () => (locked ? ui('refuse') : this.start(map)), enabled: true });
       this.buttons[`map-${map.id}`] = { x: cx, y: y + CARDS.h / 2, w: CARDS.w, h: CARDS.h };
       // The garden's latest win, to watch again: on top of the card, so it takes its own tap.
       const replay = this.replays[map.id];
       if (replay && !locked) this.button(`watch-${map.id}`, x + CARDS.w - 74, y + CARDS.h - 36, 64, 26, t('watch'), () => this.start(map, replay), { size: 12 });
+      // The game in play here, kept at its last break: go on with it (a tap on the card starts afresh).
+      if (this.saved?.map === map.id && !locked) this.button(`resume-${map.id}`, x + 10, y + CARDS.h - 36, 74, 26, t('resume', { n: this.saved.wave + 1 }), () => this.start(map, null, true), { size: 12, fill: C.gold });
     });
     // The way of play, at the top left; Calm or the wave timer, at the top right.
     const mw = 200;

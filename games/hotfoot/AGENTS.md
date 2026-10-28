@@ -93,6 +93,16 @@ in.
 - `src/audio/sound.ts`: the sound table `sfx` (`sounds` from `shared/audio.ts`) and the `SONG`
   with its parts (see Sound). `src/audio/cues.ts`: `SoundCues`, which plays them from what changed
   in the run each frame.
+- `src/trophies/`: the game's ten trophies (`shared/trophies.ts`). `index.ts` lists them
+  (`trophies`: id, tier, icon, `hidden` for Dragonslayer) with their texts in `trophies/i18n/`
+  (`en.ts`, `de.ts` and `en-US.ts` for "armory": the name keyed by the id, what earns it by
+  `<id>Text`), and imports nothing else from the game, since the hub loads it for its trophy shelf.
+  `main.ts` hands `trophies` to `setupGame`, which lists them on the start and pause screens.
+  `check.ts` holds each trophy's condition on the `GameState` (`EARNED`: the first checkpoint,
+  `STOMPS` 10 stomps in a run, a shrine used, a x5 streak, a boon pair, a dare met, a Gatekeeper
+  beaten, `DISTANCE` 1,000 m in a run, every armoury item full, the dragon beaten) and
+  `checkTrophies(state)`, which `GameScene.update` calls every frame after `tick`. A new trophy is an
+  entry in `index.ts`, its two texts in each language file and its condition in `EARNED`.
 - `src/main.ts`: creates the `Phaser.Game` (designed at 960x540, `Scale.FIT`, `pixelArt: false`) with `BootScene`
   then `GameScene`, calls `setupGame(game)` and `setupScaling(game, { fill: true })` (see Screen scaling), and puts
   `game` on `window` in dev builds.
@@ -362,7 +372,8 @@ in.
 `hotfoot-daily` (JSON `{ date, best }` of the last daily course run; a new date starts from 0) and
 `hotfoot-crown` (`'1'` once the dragon has been beaten; never removed). Read once in
 `GameScene.create` via `loadProgress`, written by `saveProgress`; every access is wrapped in
-try/catch. Nothing else is saved by the game; the hub's settings live under the shared `hub-settings`
+try/catch. `hotfoot-trophies` holds the trophies earned (`shared/trophies.ts`, each id with the time). Nothing
+else is saved by the game; the hub's settings live under the shared `hub-settings`
 key (see Hub settings).
 
 ### Randomness and timing
@@ -510,7 +521,7 @@ the stage), at most one sound of each kind a frame, so a row of coins or a volle
   `coinsFor` copy the rule: step 10, max x5), no shrine on stage 1 and a new run's streak of 0, two
   different choices matching the card order, that stage 1 runs on the road with no Gatekeeper, and
   that stage 2 is faster, on the Frozen Pass (`terrain: 'ice'`), laid out past 3200 and has one
-  unused shrine. The terrains past stage 2, the bosses, cursed boons, the roads (from the second
+  unused shrine, and that `hotfoot-trophies` then holds only `checkpoint` (First banner). The terrains past stage 2, the bosses, cursed boons, the roads (from the second
   checkpoint), the dare's reward and third card, the rockfall, the pairs, the armoury and the daily
   course are off its path on purpose; stage 2 carries a stomp dare the test never meets.
 - The test loads the game by its folder URL in `page.goto`, which must follow the folder name.

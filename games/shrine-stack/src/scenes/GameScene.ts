@@ -57,6 +57,7 @@ import {
   type GameState,
 } from '../game/state';
 import { makeButton } from '../ui/Button';
+import { checkTrophies } from '../trophies/check';
 import { playMusic, playSting, ui } from '../../../../shared/audio';
 import { bellPitch, sfx, SONG } from '../audio';
 import { viewFrame, viewSize } from '../../../../shared/scaling';
@@ -435,7 +436,10 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     tick(s, dt);
     if (s.phase === 'crowned') this.crownedMs += dt;
-    for (const e of s.events.splice(0)) this.show(e);
+    for (const e of s.events.splice(0)) {
+      this.show(e);
+      checkTrophies(s, e);
+    }
     this.updateSound();
 
     // The camera follows the temple's top up, easing so each new stone slides the view gently.

@@ -179,6 +179,14 @@ const de: Translation<typeof en> = {
   warChestName: 'Kriegskasse',
   warChestText: 'Erhalte jetzt einen fertigen Gegenstand.',
 
+  // Rare power cards (from stage 4)
+  freeRollsName: 'Glückswürfel',
+  freeRollsText: 'Die ersten zwei Mal Würfeln jede Runde sind gratis.',
+  handToMouthName: 'Von der Hand in den Mund',
+  handToMouthText: 'Keine Zinsen mehr, dafür jede Runde 6 Gold, egal wie viel du hast.',
+  gildedShopName: 'Goldener Shop',
+  gildedShopText: 'Vergoldete Roboter erscheinen in einem von fünf Shopplätzen, ab Stufe 1.',
+
   // Commander skills: name and what they do
   overclockSkill: 'Übertakten',
   overclockText: 'Deine Roboter greifen 5 Sekunden lang 40 % schneller an.',
@@ -298,6 +306,8 @@ const de: Translation<typeof en> = {
   level: 'St. {n}',
   xp: '{xp}/{need} XP',
   maxLevel: 'max.',
+  rerollFree: 'Gratis-Wurf ({n})',
+  rareCard: 'SELTEN',
   reroll: 'Würfeln {n}',
   buyXp: 'XP für {n}',
   sellFor: 'Verkauf {n} (E)',
