@@ -27,6 +27,7 @@ const de: Translation<typeof en> = {
   runsLine: { one: '{n} Durchgang gespielt', other: '{n} Durchgänge gespielt' },
   back: 'Zurück',
   leave: 'Beenden',
+  resume: 'Weiter: {mode}',
 
   nonogramName: 'Bildraster',
   nonogramRule: 'Fülle Felder so, dass jede Zeile und Spalte ihre Blöcke in Reihenfolge zeigt. Nochmal tippen markiert ein Feld als leer.',

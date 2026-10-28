@@ -26,6 +26,7 @@ It plays sideways or upright, and turns with the phone.
 | S and D, or Left and Right | Same or different (Memory Echo) |
 | Undo (U), Hint (H), Skip | Take back a move, use a hint, give the puzzle up |
 | Leave | Back to the menu (the run ends there, and its score and bests count) |
+| Continue | On the menu after a reload: picks the run up again (every mode but Practice) |
 
 ### The puzzles
 
