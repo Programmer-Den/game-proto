@@ -70,7 +70,7 @@ File map (`src/`):
 - `game/run.ts`: the tuning (`QUEUE`, `BETWEEN_MS`, `START_HINTS`, `startHearts`, `MAX_HEARTS`,
   `blitzSeconds`, `BLITZ_SOLVE_S`, `BLITZ_PENALTY_S`, `DAILY_LEVELS`, `DUEL_LEVELS`, `DUEL_FAIL_S`,
   `DUEL_HINT_S`, `RELIC_EVERY`, `RELIC_OFFER`, `DRAFT_MAX`, `HOURGLASS`, `CHARM_POINTS`,
-  `CHARM_ECHO_SLOW`, the points constants),
+  `CHARM_ECHO_SLOW`, `OMEN_POINTS`, `PERIL_HEARTS`, the points constants),
   `Card`, `Current`, `Result`, `Run`, `RunEvent`, and the actions (`startRun`, `act`, `drag`,
   `undo`, `hint`, `skip`, `quit`, `next`, `draftPick`, `takeRelic`, `startSecondPlayer`, `tick`,
   `canUndo`, `canHint`, `dailyDone`, `endlessLevel`, `holdsCharm`, `offerRelics`, and `makeCurrent`,
@@ -78,7 +78,11 @@ File map (`src/`):
   A charm gives its kind's puzzles one free hint (`freeHints`; `freeUsed` counts them, and they
   cost no points) and `CHARM_POINTS` times the points, and slows Memory Echo's cards
   (`CHARM_ECHO_SLOW`) instead of the hint. A relic offer (`offerRelics`) has one charm not yet held,
-  while any is left, and general relics for the rest. Only this file changes a `Run`; `act` and
+  while any is left, and general relics for the rest. Omens (`omenFor`, from the card's seed so
+  the deck deals as before; `canTakeOmen`, `takeOmen`): an Endless or Draft puzzle can take its
+  omen until its first move or hint (`touched`, set by `act` and `hint`); Haste halves its
+  `timeTotalMs`, Silence turns off `canUndo` and `canHint`, Peril makes `end` take
+  `PERIL_HEARTS`, and a solve pays `OMEN_POINTS` times. The `Result` keeps the `omen`. Only this file changes a `Run`; `act` and
   `drag` (a step of a drag, with no Undo step) are the only ways a move reaches a puzzle's state.
   `skip` in Practice deals a new puzzle of the same kind and level, with nothing recorded. `quit`
   (the Leave button) ends a run that is not over through `finish`, so its bests, the daily five's
@@ -87,7 +91,7 @@ File map (`src/`):
   deals at most `DRAFT_MAX` (3) cards, the deal layout's slots, so Crystal Ball is offered once;
   Blitz's queue is levelled again after every puzzle, so "Up next" shows the level that will be
   dealt, and Blitz ends where its clock runs out, without a result for the puzzle it cut off.
-- `game/catalog.ts`: `MODES`/`Mode`, `GENERAL_RELICS`, `CHARMS` (each kind's relic, its charm) with
+- `game/catalog.ts`: `OMENS`/`OmenId`, `MODES`/`Mode`, `GENERAL_RELICS`, `CHARMS` (each kind's relic, its charm) with
   `CharmId`, `CHARM_KIND` and `isCharm`, `RELICS`/`RelicId` (both kinds), `KIND_COLOR`,
   `RELIC_COLOR` (a charm takes its kind's colour).
 - `game/progress.ts`: `Progress`, `newProgress`, `recordResult`. `game/save.ts`: `loadProgress`,
@@ -102,7 +106,7 @@ File map (`src/`):
   `drawRelic` (a charm is its kind's icon in a ringed medallion), `trace`.
 - `scenes/theme.ts`: `FONT`, `C` (colours), `PALETTE`. `scenes/layout.ts`: the `Layout` type and its two values, `WIDE` (960x540) and
   `TALL` (540x960), with every spot in the frame (`top`, `leave`, `stage`, `board`, `tools`,
-  `side`, `menu` (with `resume` and `recordsAside` for when a run was saved), `practice`, `records`, `back`, `deal`, `end`, `endButtons`); `layoutFor(w, h)`,
+  `side`, `omen` (the omen's button in the top bar), `menu` (with `resume` and `recordsAside` for when a run was saved), `practice`, `records`, `back`, `deal`, `end`, `endButtons`); `layoutFor(w, h)`,
   `VIEW` (= `WIDE.view`, for `main.ts`) and `UI_DEPTH`.
 
 Shared code it imports: `shared/setupGame.ts`, `shared/scaling.ts` (`setupScaling`, `viewSize`,
@@ -138,7 +142,7 @@ How it runs:
 - Time: `update` takes `dt` from the frame time (capped at `MAX_STEP_MS`) and calls `tick`, which
   runs the puzzle's clock (`timeLeftMs`), Blitz's clock (`clockMs`), Memory Echo's own clock and the
   banner between puzzles (`betweenMs`; Practice waits for a tap).
-- Events: `RunEvent`s (`start`, `end`, `heart`, `hint`, `warn`, `relic`, `over`) are drained in
+- Events: `RunEvent`s (`start`, `end`, `heart`, `hint`, `warn`, `relic`, `omen`, `over`) are drained in
   `drain` for sound and saving.
 - Randomness: every card carries a seed, and its puzzle is made with `seeded(card.seed)`. Card seeds,
   kinds, draft offers and relic offers come from `Math.random`, except the daily five, whose kinds,
@@ -147,7 +151,7 @@ How it runs:
 
 State model (`Run`): `mode`, `phase`, `hearts`, `maxHearts`, `hints`, `score`, `streak`, `dealt`,
 `solved`, `current` (`card`, `state`, `timeLeftMs`, `timeTotalMs`, `elapsedMs`, `hintsUsed`, `freeHints`,
-`freeUsed`, `history`), `queue`, `results`, `last`, `betweenMs`, `clockMs`, `relics`, `relicOffer`,
+`freeUsed`, `omen`, `touched`, `history`), `queue`, `results`, `last`, `betweenMs`, `clockMs`, `relics`, `relicOffer`,
 `draftOffer`, `player`, `totals`, `duelSolved`, `day`, `progress`, `newBest` and `events`.
 
 Persistence: two `localStorage` keys. `augury-run` holds the run in play (every mode but Practice,
@@ -189,6 +193,7 @@ sting plays out).
 | `warn` | a `warn` event (each of a clock's last five seconds) |
 | `turn` | a Memory Echo card turned (`update`) |
 | `relic` | a `relic` event |
+| `omen` | an `omen` event (an omen taken) |
 
 Shared sounds: `ui('click')` on mode cards, menu buttons and picks, `ui('refuse')` for a disabled
 button (Undo with nothing to undo, Hint with none left or none that can help, a pad key before a
@@ -199,7 +204,7 @@ cell is picked, the daily five played today), and a Hint tap that finds nothing 
 - `src/main.ts` exposes `window.game` in dev builds. The test reads `game.scene.getScene('Game')`
   and its `run` (copied through JSON, without `events` and `progress`), `screen` and `buttons`
   (every spot on screen by id, centred, in view pixels: `mode-<mode>`, `records`, `back`,
-  `resume`, `level-<n>`, `kind-<kind>`, `undo`, `hint`, `skip`, `leave`, `cell-<i>`, `key-<n>` (0 is Clear),
+  `resume`, `omen`, `level-<n>`, `kind-<kind>`, `undo`, `hint`, `skip`, `leave`, `cell-<i>`, `key-<n>` (0 is Clear),
   `island-<i>`, `glyph-<i>`, `code-back`, `code-guess`, `block-<k>`, `echo-same`, `echo-diff`,
   `draft-<i>`, `relic-<i>`, `next`, `done`, `again`, `start2`, `dim`).
 - Inputs: it taps `mode-endless`, then solves whatever the seeded deck deals with real taps and

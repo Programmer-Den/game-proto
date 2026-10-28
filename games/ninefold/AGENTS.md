@@ -40,7 +40,14 @@ Implemented today:
   floor into `upcoming`, which the cleared-floor card names (`nextLine`) and `nextFloor` deals;
   `plan` is the floor in play. `hasTwist` tells whether a twist is on. Relics (`RELICS`): Lantern
   (+1 hint), Heartstone (+1 heart, up to `MAX_HEARTS`), Seer's Eye (`SEER_CELLS` more cells filled
-  at the start of each floor, per copy), Ward (first mistake each floor is free).
+  at the start of each floor, per copy), Ward (first mistake each floor is free), and six with a
+  trade-off: Twin Sight (`nextFloor` notes every empty cell's candidates; one less max heart; in
+  `UNIQUE_RELICS`, so it leaves the offers once held), Gambler's Die (`streak` of right digits pays
+  a hint every `GAMBLER_STREAK`, a `gift` event; a mistake that costs a heart costs one more),
+  Phoenix Feather (`loseHearts` burns one at no hearts for a `phoenix` event and one heart),
+  Sandglass (a floor cleared within `SANDGLASS_MS` heals a heart), Iron Vow (`VOW_HEARTS` more
+  hearts, every hint gone) and Keystone (`keyHealed`: the first finished box a floor heals a heart).
+  Every heart lost goes through `loseHearts` and every heart healed through `heal` (a `heal` event).
 - Both ways round: a wide view gets the `WIDE` layout (board left, panel with a 3x3 pad right) and an
   upright one the `TALL` layout (header panel, board, then a dock with one row of nine keys and the
   tools), and turning the phone mid-game lays everything out again.
@@ -111,7 +118,7 @@ How it runs:
 - Time: `update` takes `dt` from the frame time (capped at `MAX_STEP_MS`) and calls `tick`, which
   only runs the board's clock (`timeMs`) while playing. Nothing else is timed; the flashes age by
   `dt`.
-- Events: the rules push `GameEvent`s (`board`, `placed`, `wrong`, `clock`, `hint`, `unit`, `solved`,
+- Events: the rules push `GameEvent`s (`board`, `placed`, `wrong`, `clock`, `phoenix`, `heal`, `gift`, `hint`, `unit`, `solved`,
   `unlocked`, `relic`, `over`) onto `state.events`; `drain` plays their sounds, adds flashes, saves
   the progress and switches the screen to `board` when a board loads. It also picks the music part.
 - Redrawing: `currentKey` names what is on screen (screen, phase, style, board size, relic offer,
@@ -127,7 +134,7 @@ State model (`GameState`): `phase` (`menu`, `playing`, `solved`, `relic`, `over`
 (`classic`, `daily`, `delve`), `level`, `puzzle` (`size`, `boxW`, `boxH`, `solution`, `givens`),
 `values` (0 empty; may hold a wrong digit), `notes` (bit per digit), `selected` (-1 none),
 `notesMode`, `mistakes`, `hintsLeft`, `hintsUsed`, `timeMs`, `hearts`, `maxHearts`, `floor`,
-`plan` and `upcoming` (Delve `FloorPlan`s, null otherwise), `dailyDate` (the `dailySeed` a daily board was dealt for, 0 otherwise), `relics`, `relicOffer`, `warded`, `doneUnits` (indexes into `units`), `newStyles`, `progress` and
+`plan` and `upcoming` (Delve `FloorPlan`s, null otherwise), `dailyDate` (the `dailySeed` a daily board was dealt for, 0 otherwise), `relics`, `relicOffer`, `warded`, `streak`, `keyHealed`, `doneUnits` (indexes into `units`), `newStyles`, `progress` and
 `events`.
 
 Persistence: one `localStorage` key, `ninefold-progress`, holding `Progress` (`solved`, `flawless`,
@@ -168,7 +175,8 @@ part for the screen; the engine only switches when it changes.
 | `hint` | a `hint` event |
 | `unit` | a `unit` event (a row, column or box finished) |
 | `unlock` | an `unlocked` event, and picking a style |
-| `relic` | a `relic` event |
+| `relic` | a `relic` event, and a `phoenix` event |
+| `unlock` (heal) / `hint` (gift) | a `heal` event / a `gift` event |
 
 Shared sounds: `ui('click')` on menu and card buttons and the Notes toggle, `ui('refuse')` for a
 digit, Erase or Hint that can't be used, a disabled pad key and a locked style.
@@ -202,9 +210,9 @@ digit, Erase or Hint that can't be used, a disabled pad key and a locked style.
   rule where it applies (`sudoku.ts` for a board rule, `tick`, `hint` or `solved` otherwise), how
   the board or panel shows it in `GameScene`, and the README's twist table. A boss floor draws its
   two twists from the two lists in `planFloor`.
-- **Add a relic**: its id and `RELIC_INFO` in `catalog.ts`, its effect in `takeRelic`, `nextFloor`
-  or `enter`, an emblem in `drawRelicIcon`, a README row and a case in the test's `switch`. A fifth
-  relic still offers three.
+- **Add a relic**: its id and `RELIC_INFO` in `catalog.ts` (and `UNIQUE_RELICS` if it is held once), its effect in `takeRelic`, `nextFloor`,
+  `enter`, `afterFill`, `solved` or `loseHearts`, an emblem in `drawRelicIcon`, a README row and a case in the test's `switch`. More
+  relics still offer three.
 - **Retune**: the constants at the top of `state.ts`; mirror the first two `FLOORS` and the Normal
   hearts in the test.
 - **Board sizes**: `SHAPES` in `sudoku.ts`; the pad has nine keys, so boards go up to 9x9.

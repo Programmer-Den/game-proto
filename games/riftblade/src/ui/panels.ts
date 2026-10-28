@@ -7,16 +7,17 @@ import Phaser from 'phaser';
 import { HEROES, HERO_IDS, schemeOf, type HeroDef, type HeroId } from '../game/heroes';
 import { clock, type GameState } from '../game/state';
 import { CAPSTONES, FILLER, MAX_TIER, POOL_NAMES, UPGRADES, capstoneFor, crossoverFor } from '../game/upgrades';
-import { BOSSES, NODE_INFO, PLANETS, STAGES, TRADE, planetLabel, planetsAt, type NodeKind } from '../game/planets';
-import { chartOptions, priceOf } from '../game/voyage';
+import { BOSSES, NODE_INFO, PLANETS, STAGES, planetLabel, planetsAt, type NodeKind } from '../game/planets';
+import { chartOptions, priceOf, rerollPrice } from '../game/voyage';
 import { isUnlocked, type Progress } from '../game/save';
 import { HEAT_RULES, heatOpen } from '../game/heat';
+import { ARMOURY, nextPrice, perkAmount } from '../game/armoury';
 import type { Vars } from '../../../../shared/i18n';
 import { t } from '../i18n';
 import { C, hex } from '../art/glow';
 import { portraitKey } from '../art/sprites';
 import {
-  AGAIN, CHART, CONTINUE, DEPTH, FIGHT, FONT, HEAT_DOWN, HEAT_ROW, HEAT_UP, HERO_DETAIL, LEAVE, MAP, REROLL, SCREEN, UNLOCK, VIEW, chartRect, chartSpot, eventOptionRect, heroCardRect,
+  AGAIN, ARMOURY_BUTTON, BACK, CHART, armouryCardRect, CONTINUE, DEPTH, FIGHT, FONT, HEAT_DOWN, HEAT_ROW, HEAT_UP, HERO_DETAIL, LEAVE, MAP, REROLL, SCREEN, UNLOCK, VIEW, chartRect, chartSpot, eventOptionRect, heroCardRect,
   levelCardRect, mapNodeRect, mapNodeSpot, tradeCardRect, type Rect,
 } from '../scenes/layout';
 
@@ -146,6 +147,47 @@ export function heroSelect(p: Panel, progress: Progress, chosen: HeroId, heat = 
   heroDetail(p, scene, chosen, progress, heat);
   const best = progress.bestMs > 0 ? `${t('longestRun', { time: clock(progress.bestMs) })}  ·  ` : '';
   p.text(VIEW.w / 2, VIEW.h - 22, `${best}${t('selectHelp')}`, 13, C.muted, { origin: [0.5, 0.5] });
+  // The Armoury opens once a run has banked credits (a fresh save's screen stays as it was).
+  if (progress.bank > 0 || Object.keys(progress.armoury).length) {
+    p.frame(ARMOURY_BUTTON, ARMOURY_COLOR, '#1d1a10');
+    p.spots.push({ id: 'armoury', ...ARMOURY_BUTTON });
+    fit(p.text(ARMOURY_BUTTON.x + ARMOURY_BUTTON.w / 2, ARMOURY_BUTTON.y + ARMOURY_BUTTON.h / 2, t('armouryButton', { n: progress.bank }), 14, ARMOURY_COLOR, { bold: true, origin: [0.5, 0.5] }), ARMOURY_BUTTON.w - 16);
+  }
+  return p;
+}
+
+const ARMOURY_COLOR = '#ffb347';
+
+/** The Armoury: a card per piece with its rank and the next rank's price, and Back. */
+export function armouryPanel(p: Panel, progress: Progress) {
+  const scene = p.scene;
+  p.dim(0.85);
+  stars(p, scene);
+  p.text(VIEW.w / 2, 30, t('armouryTitle'), 30, ARMOURY_COLOR, { bold: true, origin: [0.5, 0], glow: true });
+  p.text(VIEW.w / 2, 72, t('armourySubtitle'), 13, C.muted, { origin: [0.5, 0], align: 'center', wrap: VIEW.w - 80 });
+  p.text(VIEW.w / 2, 112, t('armouryBank', { n: progress.bank }), 17, C.elite, { bold: true, origin: [0.5, 0] });
+  ARMOURY.forEach((def, i) => {
+    const r = armouryCardRect(i, ARMOURY.length);
+    const rank = progress.armoury[def.id] ?? 0;
+    const price = nextPrice(def.id, rank);
+    const afford = price !== null && progress.bank >= price;
+    p.frame(r, price === null ? C.elite : afford ? ARMOURY_COLOR : C.muted);
+    p.spots.push({ id: def.id, ...r });
+    const cx = r.x + r.w / 2;
+    p.text(r.x + 8, r.y + 7, String(i + 1), 12, C.muted);
+    fit(p.text(cx, r.y + 30, t(def.name), 17, C.text, { bold: true, origin: [0.5, 0] }), r.w - 16);
+    const g = p.add(scene.add.graphics(), 2);
+    const max = def.prices.length;
+    for (let k = 0; k < max; k++) {
+      const x = cx + (k - (max - 1) / 2) * 22;
+      g.fillStyle(hex(k < rank ? ARMOURY_COLOR : '#2a3550'), 1).fillCircle(x, r.y + 70, 7);
+    }
+    p.text(cx, r.y + 86, t('armRank', { n: rank, of: max }), 12, C.muted, { origin: [0.5, 0] });
+    p.text(cx, r.y + 112, t(def.text, { n: perkAmount(def.id, Math.max(1, price === null ? rank : rank + 1)) }), 13.5, C.text, { origin: [0.5, 0], align: 'center', wrap: r.w - 20 });
+    p.text(cx, r.y + r.h - 16, price === null ? t('armMaxed') : t('armPrice', { n: price }), 15, price === null ? C.elite : afford ? ARMOURY_COLOR : C.muted, { bold: true, origin: [0.5, 1] });
+  });
+  button(p, BACK, 'back', t('armouryBack'), ARMOURY_COLOR);
+  p.text(VIEW.w / 2, BACK.y + BACK.h + 16, t('armouryHelp'), 12, C.muted, { origin: [0.5, 0] });
   return p;
 }
 
@@ -355,7 +397,7 @@ export function levelUp(p: Panel, s: GameState) {
 }
 
 /** The end of a run: won or fallen, with the numbers and a button to go again. */
-export function endScreen(p: Panel, s: GameState, progress: Progress) {
+export function endScreen(p: Panel, s: GameState, progress: Progress, banked = 0) {
   p.dim(0.7);
   const won = s.phase === 'won';
   const color = won ? C.elite : C.danger;
@@ -370,6 +412,7 @@ export function endScreen(p: Panel, s: GameState, progress: Progress) {
     caps.length ? t('capstonesLine', { names: caps.join(', ') }) : '',
     s.heat > 0 ? t('endHeat', { n: s.heat }) : '',
     won && heatOpen(s.heat) > s.heat ? t('heatOpened', { n: s.heat + 1, hero: t(hero.short) }) : '',
+    banked > 0 ? t('banked', { n: banked }) : '',
     t('longestRun', { time: clock(progress.bestMs) }),
   ].filter(Boolean);
   p.text(VIEW.w / 2, 226, lines.join('\n'), 15, C.muted, { origin: [0.5, 0], align: 'center' });
@@ -572,7 +615,8 @@ export function trader(p: Panel, s: GameState) {
     p.text(cx, r.y + r.h - 30, t('credits', { n: price }), 16, can ? NODE_INFO.trader.color : C.danger, { bold: true, origin: [0.5, 0] });
     p.text(r.x + 10, r.y + 8, String(i + 1), 12, C.muted);
   });
-  button(p, REROLL, 'reroll', t('reroll', { n: TRADE.reroll }), NODE_INFO.trader.color, s.credits >= TRADE.reroll);
+  const price = rerollPrice(s);
+  button(p, REROLL, 'reroll', price > 0 ? t('reroll', { n: price }) : t('rerollFree'), NODE_INFO.trader.color, s.credits >= price);
   button(p, LEAVE, 'leave', t('leave'), '#9fd8ff');
   return p;
 }

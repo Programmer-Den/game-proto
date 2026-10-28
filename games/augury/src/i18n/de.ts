@@ -62,6 +62,15 @@ const de: Translation<typeof en> = {
   hint: 'Tipp',
   hintButton: 'Tipp · {n}',
   hintFree: 'Tipp · gratis',
+  omenOffer: '{name} wagen ×2',
+  omenTaken: '{name} ×2',
+  hasteName: 'Eile',
+  hasteText: 'halbe Zeit',
+  silenceName: 'Stille',
+  silenceText: 'ohne Zurück und Tipps',
+  perilName: 'Gefahr',
+  perilText: 'Verlust kostet zwei Herzen',
+  omenLine: 'Omen ×2',
   skip: 'Überspringen',
   newPuzzle: 'Neues Rätsel',
   clear: 'Leeren',
@@ -92,6 +101,7 @@ const de: Translation<typeof en> = {
   res_skip: 'Übersprungen',
   pointsLine: '+{n} Punkte',
   heartLost: 'Ein Herz ist verloren',
+  heartsLost: '{n} Herzen sind verloren',
   timeLost: '{n} Sekunden weniger auf der Uhr',
   timeLine: 'Zeit {time}',
   nextPuzzle: 'Nächstes Rätsel',
@@ -166,6 +176,6 @@ const de: Translation<typeof en> = {
   echoSaidDiff: 'Deine Antwort: anders',
 };
 
-export const keepEnglish: (keyof typeof en)[] = ['title', 'blitzName', 'level1'];
+export const keepEnglish: (keyof typeof en)[] = ['title', 'blitzName', 'level1', 'omenTaken', 'omenLine'];
 
 export default de;

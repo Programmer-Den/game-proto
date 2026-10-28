@@ -167,6 +167,21 @@ and pressed lettering on clay tags. It is all painted in code at startup; there 
     | Meadow | No hedges: the hedge seed is gone |
     | Forked Brook | Double crows: every crow comes with a twin |
     | Two Gates | Lean start: start with 30 sap instead of 60 |
+19. **Trophies.** Ten trophies, listed on the start and pause screens (Trophies) and counted on the
+    hub's card; a toast shows each one as it is earned:
+
+    | Trophy | Tier | Earned by |
+    | --- | --- | --- |
+    | Green thumb | bronze | clearing your first wave |
+    | Good neighbours | bronze | growing a moss golem beside a pebble or thorn golem |
+    | Fully grown | bronze | raising a golem to level 3 and picking its form |
+    | Bold call | bronze | calling a wave early and losing no leaf before its last pest is gone |
+    | In full bloom | silver | opening all five buds on the Heartwood |
+    | Queen squasher | silver | squashing a Queen Slug |
+    | First harvest | silver | reaching the harvest at wave 30 in any garden |
+    | Perfect harvest | gold | harvesting a garden with all ten leaves |
+    | Every garden | gold | harvesting all three gardens |
+    | Thorny laurel | gold, hidden | harvesting a thorny garden |
 
 ![A seed just planted, growing](docs/screenshots/playthrough-1-sprout.webp)
 
@@ -211,6 +226,8 @@ and pressed lettering on clay tags. It is all painted in code at startup; there 
 ![The garden picker with thorny variant tags under three-star gardens, one with its laurel](docs/screenshots/thorny-picker.webp)
 
 ![The thorny Meadow: the hedge seed is faded out and the wave tag counts to the laurel](docs/screenshots/thorny-meadow.webp)
+
+![The Trophies list on the start screen, five earned](docs/screenshots/trophies.webp)
 
 The difficulty, set on the hub page's Settings, changes one thing: pests have 25% less health on
 Easy and 30% more on Hard.

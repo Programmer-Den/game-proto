@@ -84,6 +84,12 @@ Any answer that keeps the rules counts, not only the one the puzzle was made fro
 
 ![A draft: two cards to choose from](docs/screenshots/draft.webp)
 
+**Omens**: in Endless and Draft, each puzzle offers an omen in the top bar until its first move or
+hint. Tempt it for double points: **Haste** halves the puzzle's time, **Silence** takes away Undo
+and hints, and **Peril** makes a loss cost two hearts (Memory Echo only offers Peril).
+
+![An omen on offer: Tempt Haste](docs/screenshots/omen.webp)
+
 **Points**: 100 per level (Novice 100 to Oracle 400), plus 2 for every second left, less 40 per
 hint (never below 20), times a streak bonus of 10% per puzzle solved in a row (up to double).
 **Records** keeps the puzzles solved of each kind, the fastest solve without hints at each level,

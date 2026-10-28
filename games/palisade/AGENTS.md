@@ -207,6 +207,18 @@ seconds without a tap.
   splits them.
 - `src/audio/`: `sfx.ts` (the sound table, `sfx(name)`) and `music.ts` (the songs `MARCH` and
   `BOSS_MARCH`), see Sound.
+- `src/trophies/`: the game's ten trophies (`shared/trophies.ts`). `index.ts` lists them
+  (`trophies`: id, tier, icon, `hidden` for A hero remembered and Through the fire) with their
+  texts in `trophies/i18n/` (`en.ts` and `de.ts`: the name keyed by the id, what earns it by
+  `<id>Text`), and imports nothing else from the game, since the hub loads it for its trophy shelf.
+  `main.ts` hands `trophies` to `setupGame`, which lists them on the start and pause screens.
+  `check.ts` holds each trophy's condition on the `GameState` (`EARNED`: a wave cleared, an Arrow
+  Rain in the air, a guard hired, a `STREAK` of 10, the Troll King's wave cleared, a relic set
+  complete, a hero retired, every skill learned (`offerable` empty), the siege lifted, a win at
+  Heat 3) and `checkTrophies(state)`, which `GameScene.update` calls every frame after the tick;
+  the first call after the page loads awards quietly, so a loaded hero earns theirs without a
+  toast. A new trophy is an entry in `index.ts`, its two texts in each language file and its
+  condition in `EARNED`.
 - `src/main.ts`: creates the `Phaser.Game` (960x540 from `VIEW`, `pixelArt: false`, FIT scaling)
   with `BootScene` and `GameScene`, calls `setupGame(game)` and `setupScaling(game, { fill: true })` (the view takes the screen's
   shape, see Screens), and puts
@@ -454,7 +466,7 @@ seconds without a tap.
 
 ### Persistence
 
-Five `localStorage` keys. `palisade-skill-book` holds a JSON array of the upgrade ids found
+Six `localStorage` keys. `palisade-skill-book` holds a JSON array of the upgrade ids found
 (offered on a level-up, or held), read by `loadFound` (unknown ids dropped) and written by
 `GameScene.discover` whenever one is new; "New hero" leaves it alone. `palisade-speed` holds the
 battle speed (`'1'` or `'2'`, through `loadSpeed`/`saveSpeed`) and `palisade-aim` the aim priority
@@ -469,6 +481,8 @@ checked one by one) and falls back to fresh on any error.
 with the legacy kept. The run itself (wave, foes,
 barricade, Arrow Rain and caltrops charge, streak, coins, guards, road, fortifications, repairs, omen) is never saved, so a reload
 starts at wave 1.
+`palisade-trophies` holds the trophies earned (`shared/trophies.ts`), each id with the time; "New
+hero" keeps them.
 
 ### Randomness and timing
 
@@ -594,6 +608,9 @@ nothing plays for it. The player's own taps play from `GameScene` and the panels
   and `.aim` (where Arrow Rain is being dragged, or null). It never writes to the game. Also there
   to read: `.aimKind`, `.caltropsSpot`, `.roadChoice.cards`, `.hirePanel.slot`,
   `.omenCard.buttons`, `.legacyPanel.cards` and `.startWave`.
+- **Trophies:** once wave 1 is cleared the test checks that `palisade-trophies` holds exactly
+  Holding the line and Cloud of arrows (the volley it looses); a trophy a first wave can reach in
+  another way changes that expectation.
 - **Inputs:** the test advances the clock, clicks the centre of a card, and drags Arrow Rain with
   `page.mouse` (down on `rainSpot`, three moves towards a foe with a step of game time after each,
   up), all scaled from the 960-wide view to the canvas box. It never opens the skill book (not part

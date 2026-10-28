@@ -56,7 +56,7 @@ column or box flashes and stays tinted.
 
 ![A Parity floor](docs/screenshots/parity-floor.webp)
 
-A cleared floor also offers three of four relics, each of which can be taken again:
+A cleared floor also offers three of ten relics. The last six give something and take something; Twin Sight is held once, every other relic can be taken again:
 
 | Relic | Effect |
 | --- | --- |
@@ -64,6 +64,16 @@ A cleared floor also offers three of four relics, each of which can be taken aga
 | Heartstone | One more heart, up to 5. |
 | Seer's Eye | Every floor starts with 2 more cells filled in. |
 | Ward | The first mistake on each floor costs no heart. |
+| Twin Sight | Every floor starts with each empty cell's candidates noted. One heart less. |
+| Gambler's Die | 8 right digits in a row give a hint; a mistake that costs a heart costs one more. |
+| Phoenix Feather | When the last heart goes, it burns and the run goes on with one heart. |
+| Sandglass | A floor cleared within 4 minutes heals a heart. |
+| Iron Vow | Two more hearts, up to 5, but every hint is gone. |
+| Keystone | The first box finished on each floor heals a heart. |
+
+![Relic cards with trade-offs](docs/screenshots/new-relics.webp)
+
+![More relic cards with trade-offs](docs/screenshots/new-relics-2.webp)
 
 ![Floor 1 cleared: three relics on offer](docs/screenshots/delve-relics.webp)
 

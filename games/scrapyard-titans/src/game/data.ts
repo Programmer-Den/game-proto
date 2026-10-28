@@ -494,6 +494,35 @@ export function stageDamage(stage: number) {
 }
 export const SURVIVOR_DAMAGE = [0, 1, 1, 2, 2, 3];
 
+// ---------------------------------------------------------------- rank ladder
+
+export interface RankDef {
+  name: TextKey;
+  /** What the rank changes for the rivals. */
+  text: TextKey;
+  /** Rank points needed. */
+  points: number;
+  /** Extra gold each rival gets a round. */
+  gold: number;
+  /** Rivals' shops roll as if they were this many levels higher. */
+  odds: number;
+  /** Rivals reroll for copies from this stage on, while they hold more than `rollAbove` gold. */
+  rollFrom: number;
+  rollAbove: number;
+}
+
+/** The saved rank ladder: points come from top-four finishes and never go down. Rust is the game as designed. */
+export const RANKS: RankDef[] = [
+  { name: 'rankRust', text: 'rankRustText', points: 0, gold: 0, odds: 0, rollFrom: 4, rollAbove: 50 },
+  { name: 'rankIron', text: 'rankIronText', points: 100, gold: 0, odds: 0, rollFrom: 3, rollAbove: 40 },
+  { name: 'rankSteel', text: 'rankSteelText', points: 250, gold: 1, odds: 0, rollFrom: 3, rollAbove: 36 },
+  { name: 'rankChrome', text: 'rankChromeText', points: 450, gold: 1, odds: 1, rollFrom: 3, rollAbove: 32 },
+  { name: 'rankTitan', text: 'rankTitanText', points: 700, gold: 2, odds: 1, rollFrom: 2, rollAbove: 28 },
+];
+
+/** Rank points by final place (index place; 1st to 4th score). */
+export const RANK_POINTS = [0, 50, 35, 25, 15, 0, 0, 0, 0];
+
 // ---------------------------------------------------------------- terrain
 
 export type TerrainId = 'oil' | 'charger' | 'plate' | 'furnace';

@@ -19,8 +19,11 @@ export const STYLE_INFO: Record<StyleId, { name: TextKey; goal: TextKey }> = {
   glass: { name: 'glassName', goal: 'glassGoal' },
 };
 
-/** The relics a cleared Delve floor offers, three at a time; each can be taken more than once. */
-export const RELICS = ['lantern', 'heartstone', 'seer', 'ward'] as const;
+/**
+ * The relics a cleared Delve floor offers, three at a time; each can be taken more than once,
+ * except those in `UNIQUE_RELICS`. The last six trade something away for what they give.
+ */
+export const RELICS = ['lantern', 'heartstone', 'seer', 'ward', 'twin', 'gambler', 'phoenix', 'sandglass', 'vow', 'keystone'] as const;
 export type RelicId = (typeof RELICS)[number];
 
 export const RELIC_INFO: Record<RelicId, { name: TextKey; text: TextKey; color: number }> = {
@@ -28,7 +31,16 @@ export const RELIC_INFO: Record<RelicId, { name: TextKey; text: TextKey; color: 
   heartstone: { name: 'heartstoneName', text: 'heartstoneText', color: 0xe2607a },
   seer: { name: 'seerName', text: 'seerText', color: 0x6fb7e8 },
   ward: { name: 'wardName', text: 'wardText', color: 0x8fcf7a },
+  twin: { name: 'twinName', text: 'twinText', color: 0xb58ce8 },
+  gambler: { name: 'gamblerName', text: 'gamblerText', color: 0xe8e0d0 },
+  phoenix: { name: 'phoenixName', text: 'phoenixText', color: 0xf08a3c },
+  sandglass: { name: 'sandglassName', text: 'sandglassText', color: 0xe0c27a },
+  vow: { name: 'vowName', text: 'vowText', color: 0x9aa4b4 },
+  keystone: { name: 'keystoneName', text: 'keystoneText', color: 0x5fc4b0 },
 };
+
+/** Relics a run holds at most once, so they leave the offers once taken. */
+export const UNIQUE_RELICS: readonly RelicId[] = ['twin'];
 
 /**
  * Delve twists, drawn from floor 4 on: Diagonal (both long diagonals hold each digit once),

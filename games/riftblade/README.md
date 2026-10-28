@@ -131,6 +131,26 @@ says which heat the run was at. Heat stacks with the difficulty setting.
 
 ![The Heat row on the hero select](docs/screenshots/rift-heat.webp)
 
+### The Armoury
+
+At the end of every run, won or lost, its unspent credits go to the bank, plus 10 salvage for each
+world reached; the end screen says how much. Once anything is banked, an **Armoury** button shows
+at the top left of the hero select. There banked credits buy small lasting upgrades for every
+hero (tap a piece or press 1-5; Back or Enter returns):
+
+| Piece | Ranks | Each rank | Prices |
+| --- | --- | --- | --- |
+| Field Rations | 3 | +5% max health | 60, 120, 180 |
+| War Chest | 3 | +15 credits at the start of a run | 50, 100, 150 |
+| Lumen Lens | 2 | +10% shard pickup range | 80, 160 |
+| Field Briefing | 1 | A fourth card at the first level-up of a run (Elara already has four) | 150 |
+| Spare Reroll | 1 | The first reroll at each trader is free | 120 |
+
+Every piece maxed costs 1,170 credits, about a dozen runs. Credits kept for the bank are credits
+not spent at a trader, so each trader is a choice between this run and the next ones.
+
+![The Armoury](docs/screenshots/armoury.webp)
+
 ### The space map
 
 After the boss of the Dune world falls (and again after the second world's), the space map shows
