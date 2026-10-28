@@ -83,6 +83,14 @@ a star map between them.
   and `spawnAt`, Haste in `statsOf` and `spawnAt`, Vampire in `kill` (and no regen), Fragile Foes
   in `spawnAt` and `hurtHero`. `recordWeekly` keeps the week's furthest jump and win in
   `progress.weekly`; the first win of a week banks `WEEKLY_BONUS`.
+- Trophies (`src/trophies/`, see `shared/trophies.ts`): ten, listed with `trophySet` in
+  `trophies/index.ts` (handed to `setupGame`), texts in `trophies/i18n/`. `trophies/check.ts`'s
+  `checkTrophies(state, progress)` runs every frame from `GameScene.update` and awards each one whose
+  condition holds (the first call of a page quietly): `firstBoss` (a stage past the Dune world or a
+  boss down, or a saved furthest jump of 2), `capstone` (one in the run), `newHero` (two heroes
+  open), `firstPiece` (any Armoury rank), `crusade` (any win), `weekly` (`progress.weekly.won`),
+  `heat3` and `heat5` (best heat won), `armouryFull` (every rank bought) and `allHeroes` (all twelve
+  open, hidden). The playthrough's first minute earns none.
 - Sound effects and music (see Sound below).
 - Not built yet: Watch AI.
 - No TODOs or FIXMEs in the code.
@@ -92,7 +100,7 @@ a star map between them.
 ### File map
 
 - `src/main.ts`: creates the `Phaser.Game` (960x540, `Scale.FIT`) with `BootScene` then
-  `GameScene`, calls `setupGame(game, { howToPlay })` and `setupScaling(game, { fill: true })` (the
+  `GameScene`, calls `setupGame(game, { howToPlay, trophies })` and `setupScaling(game, { fill: true })` (the
   view takes the screen's shape, 960x540 at the smallest, see Layout below), and puts `game` on
   `window` in dev builds.
 - `src/howToPlay.ts`: the How to play text in British English (which US English shares) and
@@ -104,6 +112,9 @@ a star map between them.
   in `heroes.ts`, `upgrades.ts`, `planets.ts` and the events is a `TextKey`, and every text on screen goes through `t` (in `sim.ts`, `blades.ts` and `squad.ts` it
   is imported as `tr`, since `t` is a common local name there). Floating texts are translated when
   they pop.
+- `src/trophies/index.ts` (`trophies`, imports nothing from the game so the hub can load it),
+  `src/trophies/check.ts` (`checkTrophies`, `EARNED`) and `src/trophies/i18n/` (`en.ts`, `de.ts`,
+  `en-US.ts` for Armory).
 - `src/game/heroes.ts`: `HeroId`, `HERO_IDS` (select order), `PoolId`, `HEROES` (weapon numbers,
   aim mode, `pools`, `extra` pool skills, signature, paths, blurb, `short` name for the Fight
   button, the `pathKind` line of their path cards, `r`, `armour` and `locked`)
@@ -360,6 +371,7 @@ saves load unchanged.
   `furthest` world is open (so saves from when Rook and Bram were free keep them), and the deeds
   of reaching a world (Kael, Veyl, Joren) also count from `furthest`. `GameScene` saves new
   `state.deeds` with `recordUnlocks` as they happen.
+- `riftblade-trophies`: the trophies earned (`shared/trophies.ts`), each id with the time.
 - `riftblade-run`: the run under way, the whole `GameState` as JSON (it is plain data; `Infinity`,
   as in `nextElite` and `objectiveAt`, is stored as the text `"Infinity"`). `loadRun` lays it over
   `freshState()` (and the hero over `freshHero()`), so fields added since take their fresh values;
@@ -512,6 +524,8 @@ free of audio) or from the scene's input handler.
 - **A new mutator**: add it to `MutatorId` and `MUTATORS`, its numbers to `MUT`, check
   `s.mutators.includes(id)` where it acts, its `mut_<id>` and `mut_<id>_text` texts and the
   README row. Adding one changes which mutators every later week picks.
+- **A new trophy**: add it to the list in `trophies/index.ts` (6 to 10 in all), its condition to
+  `EARNED` in `trophies/check.ts`, its name and `<id>Text` in `trophies/i18n/`, and the README row.
 - **A new power-up**: add it to `PowerUp`, `POWER_UPS` and `POWER.weights`, its effect in
   `powerUp` (sim.ts), its sign in `drawPowerUp` and `POWER_COLORS`, its `pu_<kind>` text, and the
   README row.
