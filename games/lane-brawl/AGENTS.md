@@ -207,6 +207,18 @@ Implemented today:
   `ultRank(level)`, with a notice for the player. Gold pips under an ability box count its upgrades
   and, on R, its ranks; the upgrade panel names what the next level brings. AI champions pick theirs
   on their own.
+- Trophies: `src/trophies/` holds the game's ten trophies (`shared/trophies.ts`), saved under
+  `lane-brawl-trophies`. `index.ts` lists them (`trophies`: id, tier, icon, `hidden` for
+  Untouchable and Jack of all trades) with their texts in `trophies/i18n/` (`en.ts` and `de.ts`:
+  the name keyed by the id, what earns it by `<id>Text`), and imports nothing else from the game,
+  since the hub loads it. `main.ts` hands `trophies` to `setupGame`. `check.ts` holds each
+  trophy's condition (`EARNED`): First takedown (the player's first champion kill), Siege breaker
+  (a red tower down), Drake hunter (blue's first drake), Short and sweet (a quick match won), On a
+  roll (`SPREE` 3 kills without dying), Beast tamer (blue slays the beast or the elder), Nexus down
+  (a full match won), Drake soul (blue's `DRAKE.soul` drakes), Untouchable (a win with no deaths)
+  and Jack of all trades (wins with `CLASSES` 5 classes in `lane-brawl-mastery`).
+  `checkTrophies(state, mastery)` runs every frame in `GameScene.update` unless watching, after
+  the end panel has counted a win. A new trophy goes in `index.ts`, both text files and `EARNED`.
 - Class mastery (#292): `mastery.ts` keeps the player's wins per class under the save key
   `lane-brawl-mastery` (`loadMastery`, `recordWin`; JSON `{ classId: wins }`, every read and write
   in try/catch). `masteryRank` turns wins into a rank by `MASTERY_WINS` (1, 2, 4, 6, 9 wins for
@@ -513,6 +525,7 @@ File map (`src/`):
   the river (faceted water, banks and glints), clearings for the camps (a glowing ring for the
   brutes, bones for the wolves), watchstone islands, ruins, flowers and mushrooms and up to 620
   pines and rocks, from a fixed seed; then the beast's pit and the bushes (tall faceted grass).
+- `trophies/`: the trophy list (`index.ts`), its texts (`i18n/`) and the conditions (`check.ts`).
 - `game/names.ts`: `shortName`, a champion's first name from its full name.
 - `game/spellChoice.ts`: the player's battle spell and match kind, the save keys `lane-brawl-spell` (`loadSpell`, `saveSpell`) and `lane-brawl-quick` (`loadQuick`, `saveQuick`).
 - `game/mastery.ts`: class mastery, the save key `lane-brawl-mastery` (`loadMastery`, `recordWin`,

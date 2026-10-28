@@ -21,6 +21,7 @@ const en = {
   dailyToday: 'Today: {n} points',
   dailyNew: 'New puzzles today',
   records: 'Records',
+  resume: 'Continue: {mode}',
   runsLine: { one: '{n} run played', other: '{n} runs played' },
   back: 'Back',
   leave: 'Leave',
