@@ -95,7 +95,7 @@ import {
 } from './data';
 import { DeathRecap, GameState, HitHow, ObjectiveTitle, RecapRow, SoundId, Unit, dist, getUnit, laneNear, levelFor, refreshStats, spawnMercs, spawnWard, spawnWave } from './state';
 import { shortName } from './names';
-import { settle, steer } from './terrain';
+import { clearLine, route, settle, steer } from './terrain';
 import { aiLog } from '../../../../shared/watch';
 import { english, t as text, type TextKey } from '../i18n';
 
@@ -2147,12 +2147,39 @@ function nearest(s: GameState, u: Unit, within: number, filter: (e: Unit) => boo
   return best;
 }
 
+/** Each walker's way round the forest to its goal: the goal it was found for, the points left and its age in ms. */
+const ROUTES = new WeakMap<Unit, { goal: Vec; pts: Vec[]; age: number }>();
+
+/**
+ * Where a walker heads next on its way to `goal`: straight there when nothing of the forest is in
+ * between, else the next point of a route along the jungle's paths, found again when the goal
+ * moves or every couple of seconds.
+ */
+function nextStop(u: Unit, goal: Vec, dt: number): Vec {
+  const body = bodyOf(u);
+  if (clearLine(u, goal, body)) {
+    ROUTES.delete(u);
+    return goal;
+  }
+  let r = ROUTES.get(u);
+  if (r) r.age += dt;
+  if (!r || dist(r.goal, goal) > 40 || r.age > 2000 || !r.pts.length) {
+    r = { goal: { x: goal.x, y: goal.y }, pts: route(u, goal, body), age: 0 };
+    ROUTES.set(u, r);
+  }
+  // Skip ahead past points already reached, or to the next one when it is in sight.
+  while (r.pts.length > 1 && (dist(u, r.pts[0]) < 8 || clearLine(u, r.pts[1], body))) r.pts.shift();
+  const last = r.pts.length === 1;
+  return last && dist(r.pts[0], goal) < 40 ? goal : r.pts[0];
+}
+
 function moveToward(u: Unit, goal: Vec, dt: number) {
-  const d = dist(u, goal);
+  if (dist(u, goal) < 0.5) return;
+  const stop = nextStop(u, goal, dt);
+  const d = dist(u, stop);
   if (d < 0.5) return;
   const step = Math.min(d, (speedOf(u) * dt) / 1000);
-  // Round the trees, rocks and structures in the way (`steer`), facing the way it walks.
-  const to = steer(u, goal, step, bodyOf(u));
+  const to = steer(u, stop, step, bodyOf(u));
   if (Math.abs(to.x - u.x) + Math.abs(to.y - u.y) > 1e-6) u.facing = Math.atan2(to.y - u.y, to.x - u.x);
   u.walk += Math.hypot(to.x - u.x, to.y - u.y);
   u.x = to.x;

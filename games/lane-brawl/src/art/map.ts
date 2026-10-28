@@ -8,7 +8,7 @@ import Phaser from 'phaser';
 import { BASE, BEAST, BUSHES, DRAKE, Bush, CampSpot, LANES, MAP_SCALE, RIVER, Team, Vec, WATCHSTONES, WORLD } from '../game/data';
 import { sharpRes } from '../../../../shared/scaling';
 import { render, seeded } from './lowpoly';
-import { CLEARINGS, LANE_HALF, RUINS, SCENERY, SOLID, WALLS, Wall, clearingR, laneDist, pitStones, riverDist, ruinPieces } from '../game/terrain';
+import { CLEARINGS, LANE_HALF, LANE_WALK, PATHS, PATH_HALF, RUINS, SCENERY, clearance, clearingR, laneDist, pitStones, riverDist, ruinPieces } from '../game/terrain';
 import { TEAM_GLOW, pineModel, rockModel, ruinModel } from './models';
 
 export const MAP_KEY = 'lb-map';
@@ -424,42 +424,71 @@ function ruins(ctx: CanvasRenderingContext2D, c: Vec, rnd: () => number) {
   ruinPieces(c).forEach((p, i) => render(ctx, ruinModel(i), p.x, p.y, 1, { yaw: rnd() * 6 }));
 }
 
-/** A stone wall (`WALLS` in `game/terrain.ts`): a row of blocks, lit from the top left, as wide as it is solid. */
-function wall(ctx: CanvasRenderingContext2D, w: Wall, rnd: () => number) {
-  const len = Math.hypot(w.b.x - w.a.x, w.b.y - w.a.y);
-  const ang = Math.atan2(w.b.y - w.a.y, w.b.x - w.a.x);
-  const half = SOLID.wall;
-  ctx.save();
-  ctx.translate(w.a.x, w.a.y);
-  ctx.rotate(ang);
-  // Its shadow, toward the bottom right.
-  ctx.save();
-  ctx.rotate(-ang);
-  ctx.translate(9, 6);
-  ctx.rotate(ang);
-  ctx.fillStyle = 'rgba(20,40,20,0.32)';
-  ctx.beginPath();
-  ctx.roundRect(-half, -half, len + half * 2, half * 2, half);
-  ctx.fill();
-  ctx.restore();
-  // The face, then the blocks on top in two staggered courses.
-  ctx.fillStyle = '#5b5850';
-  ctx.beginPath();
-  ctx.roundRect(-half, -half + 4, len + half * 2, half * 2, 8);
-  ctx.fill();
-  for (let row = 0; row < 2; row++) {
-    const y = -half + row * half;
-    for (let x = -half + (row ? 0 : -11); x < len + half; x += 22) {
-      const x0 = Math.max(-half, x), x1 = Math.min(len + half, x + 21);
-      if (x1 - x0 < 4) continue;
-      ctx.fillStyle = shade(row ? '#8d897e' : '#a6a194', 0.88 + rnd() * 0.24);
-      ctx.fillRect(x0, y, x1 - x0, half - 1);
+/** The forest floor: a darker, mossy green wherever the forest stands (`clearance` in `game/terrain.ts`), soft at its edge. */
+function forest(ctx: CanvasRenderingContext2D, rnd: () => number) {
+  const cell = 10;
+  const w = Math.ceil(WORLD.w / cell), h = Math.ceil(WORLD.h / cell);
+  const small = document.createElement('canvas');
+  small.width = w;
+  small.height = h;
+  const img = small.getContext('2d')!.createImageData(w, h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const c = clearance({ x: (x + 0.5) * cell, y: (y + 0.5) * cell });
+      // Darker the deeper in, so the forest's edge shades off into the open ground.
+      const deep = Math.min(1, Math.max(0, -c / 60));
+      const k = 1.18 - deep * 0.3 + (rnd() - 0.5) * 0.08;
+      const i = (y * w + x) * 4;
+      img.data[i] = 0x2c * k;
+      img.data[i + 1] = 0x4a * k;
+      img.data[i + 2] = 0x26 * k;
+      img.data[i + 3] = Math.max(0, Math.min(1, 0.5 - c / 10)) * 255;
     }
   }
-  ctx.strokeStyle = 'rgba(40,38,34,0.6)';
-  ctx.lineWidth = 1.5;
-  ctx.strokeRect(-half, -half, len + half * 2, half * 2);
-  ctx.restore();
+  small.getContext('2d')!.putImageData(img, 0, 0);
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(small, 0, 0, w * cell, h * cell);
+}
+
+/** The jungle's paths (`PATHS`): trodden earth with a lighter middle. */
+function trails(ctx: CanvasRenderingContext2D) {
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  for (const [w, colour] of [[PATH_HALF * 2 - 6, '#6f6440'], [PATH_HALF * 2 - 22, '#857a50']] as const) {
+    ctx.strokeStyle = colour;
+    ctx.lineWidth = w;
+    for (const l of PATHS) {
+      ctx.beginPath();
+      ctx.moveTo(l[0].x, l[0].y);
+      for (const p of l.slice(1)) ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+    }
+  }
+}
+
+/**
+ * The stone walls along the lanes: blocks on every bit of the forest's edge beside a lane, so the
+ * walls break off wherever a path goes into the jungle.
+ */
+function laneWalls(ctx: CanvasRenderingContext2D, rnd: () => number) {
+  const cell = 12;
+  const blocks: Vec[] = [];
+  for (let y = 0; y < WORLD.h; y += cell) {
+    for (let x = 0; x < WORLD.w; x += cell) {
+      const p = { x: x + cell / 2, y: y + cell / 2 };
+      const c = clearance(p);
+      if (c >= 0 || c < -22 || laneDist(p) > LANE_WALK + 34) continue;
+      blocks.push(p);
+    }
+  }
+  ctx.fillStyle = 'rgba(20,40,20,0.32)';
+  for (const p of blocks) ctx.fillRect(p.x - cell / 2 + 6, p.y - cell / 2 + 5, cell, cell);
+  ctx.fillStyle = '#5b5850';
+  for (const p of blocks) ctx.fillRect(p.x - cell / 2, p.y - cell / 2 + 3, cell, cell);
+  for (const p of blocks) {
+    ctx.fillStyle = shade('#a6a194', 0.82 + rnd() * 0.3);
+    ctx.fillRect(p.x - cell / 2 + 0.5, p.y - cell / 2, cell - 1, cell - 1.5);
+  }
 }
 
 /** A pit for the guardian beast or the river drake: a ring of dark flagstones round a sunken floor, with standing stones, glowing in `glow`. */
@@ -541,7 +570,7 @@ function bush(ctx: CanvasRenderingContext2D, b: Bush, rnd: () => number) {
 }
 
 function scenery(ctx: CanvasRenderingContext2D) {
-  // The same pines and rocks the units walk around (`SCENERY` in `game/terrain.ts`).
+  // The forest's pines and rocks (`SCENERY` in `game/terrain.ts`).
   const things = [...SCENERY];
   things.sort((a, b) => a.y - b.y);
   for (const t of things) {
@@ -567,6 +596,8 @@ export function paintMap(scene: Phaser.Scene) {
   const rnd = seeded(20261015);
   grass(ctx, rnd);
   flora(ctx, rnd);
+  forest(ctx, rnd);
+  trails(ctx);
   river(ctx, rnd);
   for (const c of CLEARINGS) clearing(ctx, c, rnd);
   for (const r of RUINS) ruins(ctx, r, rnd);
@@ -578,7 +609,7 @@ export function paintMap(scene: Phaser.Scene) {
   plaza(ctx, 'red', rnd);
   kerbs(ctx, rnd);
   for (const b of BUSHES) bush(ctx, b, rnd);
-  for (const w of WALLS) wall(ctx, w, rnd);
+  laneWalls(ctx, rnd);
   scenery(ctx);
   // A dark frame round the edge of the world.
   ctx.strokeStyle = 'rgba(15,28,18,0.85)';

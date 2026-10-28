@@ -22,9 +22,9 @@ Implemented today:
   champion's name, title, class, blurb and story perk, then their motive; with no card under the pointer, the
   setting in one line. Then one match.
 - Map (`WORLD` 3500x3500): every spot on it (Nexuses, lanes, towers, inhibitors, the river, camps,
-  watchstones, bushes, runes, ward spots, the beast's and the drake's pits, the ruins and walls) is
+  watchstones, bushes, runes, ward spots, the beast's and the drake's pits, the ruins and the jungle's paths) is
   written at the first 2800x2800 layout and scaled by `MAP_SCALE` (1.25) with `at` in `data.ts`.
-  Widths (a lane's, the river's, a bush's, a clearing's) and every range stay as they are, and the
+  Widths (a lane's, the river's, a bush's, a clearing's, a path's) and every range stay as they are, and the
   pines, rocks, grass tufts and flowers grow in number with the map's area. To resize the map,
   change `MAP_SCALE` and the two map points in the playthrough (`RED_MID_TOWER` and its walk goal).
   The blue Nexus at the bottom left, the red at the top right; top and
@@ -347,25 +347,35 @@ Implemented today:
   which drops a plate for every share of health lost and splits `PLATING.gold` between the enemy
   champions within `PLATING.share`. `tick` clears all plates at `PLATING.until` (`s.platesGone`,
   with a notice). `drawBar` shows the plates as gold pips over a tower's bar.
-- Bodies and obstacles (LB20): `game/terrain.ts` holds the map's solid circles, `OBSTACLES`:
-  pine trunks and rocks from `SCENERY` (placed by its own seeded random source, and painted from the
-  same list by `scenery` in `map.ts`), the ruins' pillars (`ruinPieces`), the stones round both pits
-  (`pitStones`), the stone walls (`WALLS`, six blue ones and their mirrored copies), towers,
-  inhibitors, Nexuses and watchstones, sized by `SOLID`, in a 100 px grid. A wall is an `Obstacle`
-  with a `to` point: solid within `r` of the run from (x, y) to `to`, and `core` gives its nearest
-  point. `steer` slides along a wall toward the end that makes the shorter way to the goal, keeping
-  one way round while the goal is across it. `SCENERY` keeps 70 px clear of every wall, so a
-  champion fits between a wall and a pine. `wall` in `map.ts` paints them and the minimap draws
-  them as grey strokes. Walls stop walking only, not bolts, sight or dashes.
-  `moveToward` takes a `steer` step (straight on, or along the edge of what is in the way, on the
-  goal's side) for the walker's `bodyOf` (`BODY` in `data.ts`). After the units' turns `tick` calls
-  `separate`: overlapping living champions and minions are pushed apart by `BODY.give` of the
-  overlap, camps and the beast push them off themselves, and `settle` puts every walker back out
-  of the obstacles. Dashes, blinks, knocks and pulls go through `place`, which settles the landing.
-  `commandMove` settles the clicked point too, and the player's champion stops when it got no
-  closer for `STUCK.ms` within `STUCK.near` of it (`moveStuckMs`, `lastMoveDist`), so a crowd on the
-  spot doesn't hold it walking. Trunks are narrow enough (`SOLID.trunk` plus a champion's body is
-  under half the 46 px the scenery keeps apart) that a champion passes between any two pines.
+- Bodies, forest and paths (LB20): `game/terrain.ts` holds what walkers can't walk through.
+  The forest: everything that is not open ground (`openGround`: a lane within `LANE_WALK`, the
+  river, both bases, the clearings, pits, ruins and bushes, and `PATH_HALF` either side of a path)
+  is forest. `JUNGLE_PATHS` are written for the quarter between the top lane, the river and the
+  mid lane (`WEST_PATHS`, first-layout coordinates), turned over the mid lane for the bottom
+  lane's quarter (`turn`) and mirrored for red's. `TERRAIN` builds a 10 px grid of it and a
+  signed distance field (`signedField`, two exact distance transforms): `clearance(p)` is how far
+  `p` is from the forest, negative inside. It then flood-fills from the blue Nexus (`reached`) and
+  gives any place in `PLACES` (camps, bushes, ruins, pits, runes, ward spots) a champion could not
+  reach one straight extra path to the nearest reached cell; `PATHS` holds the written paths plus
+  those (none today). On top stand the solid circles, `OBSTACLES`: the ruins' pillars
+  (`ruinPieces`), the stones round both pits (`pitStones`), towers, inhibitors, Nexuses and
+  watchstones, sized by `SOLID`, in a 100 px grid. `SCENERY` (pines and rocks, art only) fills the
+  forest from 14 px in, so trees stand behind the walls and line the paths.
+  `moveToward` in `sim.ts` heads for `nextStop`: the goal itself when `clearLine` shows no forest in
+  between, else the next point of `route` (A* over a 25 px grid of cells the walker's `bodyOf` fits
+  in, then pulled tight with `clearLine`), kept per unit in `ROUTES` and found again when the goal
+  moves 40 px or every 2 s. A goal in the forest ends at the nearest cell that fits. It then takes
+  a `steer` step: straight on, or along the edge of the obstacle or forest in the way, on the
+  goal's side. After the units' turns `tick` calls `separate`: overlapping living champions and
+  minions are pushed apart by `BODY.give` of the overlap, camps and the beast push them off
+  themselves, and `settle` puts every walker back out of the forest (along the field's slope,
+  `outward`) and the obstacles. Dashes, blinks, knocks and pulls go through `place`, which settles
+  the landing. `commandMove` settles the clicked point too, and the player's champion stops when it
+  got no closer for `STUCK.ms` within `STUCK.near` of it (`moveStuckMs`, `lastMoveDist`), so a crowd
+  on the spot doesn't hold it walking. The forest stops walking only, not bolts or sight. In
+  `map.ts`, `forest` darkens the forest floor, `trails` paints the paths, `laneWalls` lays stone
+  blocks on the forest's edge within 34 px of a lane's walkable band (so the walls break where a
+  path comes out) and `scenery` the trees; the minimap draws `PATHS` as thin tan lines.
 - Day and night (LB21): `DAYNIGHT` in `data.ts`. `nightness(time)` in `sim.ts` is 0 by day, 1 at
   full night and ramps over `DAYNIGHT.fade` at dusk and dawn; `sightOf` scales champion sight by it
   down to `DAYNIGHT.sight`, so `viewers` (the rules' vision and the view's fog) both
@@ -404,8 +414,8 @@ Implemented today:
 
 Missing or rough:
 
-- No path search: a walker slides round what is in its way one step at a time (`steer`), so a deep
-  pocket of obstacles could hold it; the jungle's spacing keeps such pockets out.
+- Paths are found round the forest only; towers, pillars and stones are slid round one step at a
+  time (`steer`), which their spacing keeps clear of pockets.
 - No title screen of its own. The only saves are class mastery and the battle spell (below).
 - Bushes hide champions only, not minions. The camera follows the player's champion.
 - AI champions use bushes only to wait in on a gank, and ward only the fixed `WARD_SPOTS` and bush
@@ -507,7 +517,7 @@ File map (`src/`):
 - `game/spellChoice.ts`: the player's battle spell and match kind, the save keys `lane-brawl-spell` (`loadSpell`, `saveSpell`) and `lane-brawl-quick` (`loadQuick`, `saveQuick`).
 - `game/mastery.ts`: class mastery, the save key `lane-brawl-mastery` (`loadMastery`, `recordWin`,
   `masteryRank`).
-- `game/terrain.ts`: the map's obstacles (`SCENERY`, `WALLS`, `OBSTACLES`, `SOLID`) and `steer`, `settle`, `blockedBy`; `art/map.ts` takes the lane and clearing helpers and the scenery from it.
+- `game/terrain.ts`: the map's forest and paths (`JUNGLE_PATHS`, `PATHS`, `clearance`, `route`, `clearLine`), its obstacles (`SCENERY`, `OBSTACLES`, `SOLID`) and `steer`, `settle`, `blockedBy`; `art/map.ts` takes the lane and clearing helpers, the paths, the field and the scenery from it.
 - `game/data.ts`: plain data, with text keys for names and texts. `MAP_SCALE`, `at`, `WORLD`, `LANES`, `BASE`, `TOWERS`, `RIVER`, `CAMPS`, `CAMP_KINDS`,
   `PUPS`, `SIGHT`, `WATCHSTONES`, `WATCH`, `BUFFS`, `JUNGLE`, `KITE`, the balance constants (`TOWER`,
   `CAMP`, `MINION`, `KILL`, `XP_FOR_LEVEL`, respawn times), `CHAMPIONS` with their `AbilityDef`s,

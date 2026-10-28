@@ -258,8 +258,8 @@ left, under bevelled slate panels.
 
     ![A red outer tower with one of its five plates broken](docs/screenshots/plates.webp)
 25. **Bodies**: champions and minions no longer stand in each other: a crowd parts, minions body
-    block, and the jungle's pines and rocks, the ruins, the stones round the pits and every tower,
-    inhibitor and Nexus stand in the way (and, since item 30, the jungle's stone walls), so units walk round them. A dash or blink that lands in
+    block, and the ruins, the stones round the pits and every tower, inhibitor and Nexus stand in
+    the way (and, since item 30, the jungle's forest), so units walk round them. A dash or blink that lands in
     one comes out at its edge.
 26. **Day and night**: the match starts in the morning. Every three minutes night falls for a
     minute and a half: the map turns a deep blue, a moon replaces the sun by the clock, and
@@ -288,12 +288,15 @@ left, under bevelled slate panels.
     plus the price of every item held) over the match, noted every 20 seconds.
 
     ![The end panel after a defeat: the MVP and the net worth of both teams over 7:54](docs/screenshots/match-summary.webp)
-30. **Walls**: six low stone walls stand in each team's jungle, mirrored, short and straight with
-    both ends open. Units walk along one and round its nearer end, so a wall turns a chase: the
-    runner who knows the way round it gets ahead. Walls stop walking only: bolts, sight and
-    dashes go over them.
+30. **Walls and jungle paths**: the jungle is thick forest that no one walks through. Low stone
+    walls line both sides of every lane, broken by gaps where the jungle's paths come out, and the
+    paths, the same in each quarter of the map, join the gaps to the camps, the tall grass, the
+    ruins, the pits and the river. Units find their way along them: click anywhere and your
+    champion takes the paths there (a click in the trees goes to the nearest open ground). The
+    minimap draws the paths as thin tan lines. The forest stops walking only: bolts and sight go
+    over it, and a dash or blink that lands in the trees comes out at their nearest edge.
 
-    ![A stone wall in the jungle between a camp and the river drake's pit](docs/screenshots/walls.webp)
+    ![A lane between its stone walls, with a gap where a jungle path comes out](docs/screenshots/walls.webp)
 31. **Winning** destroys the red Nexus. Losing means your Nexus falls first.
 
 Every ability has an animation of its own (a hammer that splits the ground, a meteor from the
