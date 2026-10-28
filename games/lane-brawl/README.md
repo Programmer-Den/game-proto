@@ -30,6 +30,7 @@ left, under bevelled slate panels.
 | Control | Action |
 | --- | --- |
 | Click a champion card | Pick your champion and start the match |
+| Click Battle spell on the pick screen | Pick the next battle spell to take into matches (kept for next time) |
 | Click the ground | Walk there |
 | Click an enemy | Walk to it and attack it until it dies or you stop it by clicking the ground |
 | Touch: put a finger down and drag | A steering stick appears where the finger went down and your champion walks the way you drag; it follows a finger that goes past its rim, and letting go stops the champion. A tap without dragging walks or attacks as a click does |
@@ -38,6 +39,7 @@ left, under bevelled slate panels.
 | D, H, or click their buttons | Use an item's active: D dashes toward the cursor (Phase Boots), H drinks the Healing Flask |
 | V, or click its button | Plant a Vision Ward at the cursor (within 600 px), if you carry one |
 | T, or Recall home in the top bar | Channel 4 seconds standing still, then appear at your Nexus; damage, moving, attacking or casting cancels it |
+| G, or the battle spell button in the top bar | Cast your battle spell at the cursor |
 | X, or Buy back in the top bar | While dead: pay to respawn at once (100 gold + 50 per level), once every 2:30 |
 | 1, 2 or 3, or click an upgrade card | Keep one of the upgrades a new level offers |
 | B, or Shop | Open or close the shop; buy an item by clicking it |
@@ -210,7 +212,19 @@ left, under bevelled slate panels.
 
     ![The mercenary camp by the bottom lane: three sellswords in tan with kettle hats by a fire pit and two tents](docs/screenshots/merc-camp.webp)
     ![Blue's hired mercenaries marching on the bottom lane, past their empty camp, into red's minions](docs/screenshots/mercs-march.webp)
-20. **Winning** destroys the red Nexus. Losing means your Nexus falls first.
+20. **Battle spells**: every champion carries one spell of its own, on a long cooldown, cast with G
+    or the button right of Recall in the top bar (it shows the time left while it cools down). Pick
+    yours with the Battle spell button under the champion cards, which steps through them (your
+    pick is kept for the next match): **Blink** jumps up to 260 px toward the cursor (every 2:00),
+    **Firebrand** burns the enemy champion nearest the cursor within 450 px for 90 + 22 per level
+    (every 1:30), **Mend** heals you and your most hurt ally within 420 px for 110 + 25 per level
+    (every 2:00) and **Barrier** shields you from 140 + 30 per level damage for 2.5 s (every 1:40).
+    AI champions carry one by role (tanks Barrier, supports Mend, other casters Blink, the rest
+    Firebrand) and, from 1:40, use it when low with an enemy near, or Firebrand to finish one.
+
+    ![The pick screen's Battle spell button set to Firebrand, with what it does shown above it](docs/screenshots/pick-spell.webp)
+    ![The Firebrand button in the top bar counting down 1:30, right of Recall home](docs/screenshots/spell-button.webp)
+21. **Winning** destroys the red Nexus. Losing means your Nexus falls first.
 
 Every ability has an animation of its own (a hammer that splits the ground, a meteor from the
 sky, a harpoon on its rope, a coil pylon arcing, a blood moon rising and so on), and so do bolts in

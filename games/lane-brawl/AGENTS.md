@@ -271,13 +271,29 @@ Implemented today:
   brutes. The sellsword is `mercModel` (`models.ts`, a minion's figure in tan with a kettle hat and
   a broad blade, scaled 0.78), baked as `MERC_KEY` in `MERC_CELL`; `map.ts` paints the camps'
   clearings (`CLEARINGS`) with a fire pit and two tents.
+- Battle spells (LB15): `SPELLS` (`blink`, `firebrand`, `mend`, `barrier`) in `data.ts`; every
+  champion has `Unit.spell` (from `aiSpellFor(role)` in `spawnChampion`; the player's from
+  `MatchOptions.spell` unless watching) and `spellCd`, counted down in `countDown`. `castSpell(s, u,
+  aim)` in `sim.ts` casts it: Blink moves like Phase Boots, Firebrand `damage`s (through `dealt`)
+  the visible enemy champion nearest the aim within `range` and `aim`, Mend heals the caster and the
+  most hurt ally within `range`, Barrier sets `shield`/`shieldMs`; amounts are `base + perLevel *
+  level`. `aiSpell` (called in `aiAct` before `championPlan`) uses it from `SPELL_AI.from` (100 s, so
+  the first round plays as tuned), when under `SPELL_AI.low` with an enemy champion within
+  `SPELL_AI.look` (Blink toward `fallbackPoint`), Mend also for a low ally, Firebrand on a champion
+  it can finish. The player casts with G or `SPELL_BUTTON` (`drawSpellButton`, right of the recall
+  button, filling as it cools down); the pick screen's `SPELL_PICK` button steps through the
+  spells (`nextSpell`), and hovering it shows the spell's name and text in the champion lines. The
+  pick is kept under the save key `lane-brawl-spell` (`game/spellChoice.ts`: `loadSpell`,
+  `saveSpell`, in try/catch). The pick button is one text, replacing a hint line, because every
+  Phaser text draws `Math.random` for its texture key and the playthrough's seeded roster depends
+  on how many draws come before the shuffle.
 - Victory and defeat panel with the match's objectives, last hits, best streak and beasts slain,
   and "Play again".
 
 Missing or rough:
 
 - No pathing or collisions: units overlap and walk straight lines.
-- No title screen of its own. The only save is class mastery (below).
+- No title screen of its own. The only saves are class mastery and the battle spell (below).
 - Bushes hide champions only, not minions. The camera follows the player's champion.
 - AI champions don't use bushes on purpose, and their wards go only to the fixed `WARD_SPOTS`.
 - Balance is tuned with AI-only matches (every class within roughly 35% to 65% wins over 80
@@ -374,6 +390,7 @@ File map (`src/`):
   brutes, bones for the wolves), watchstone islands, ruins, flowers and mushrooms and up to 620
   pines and rocks, from a fixed seed; then the beast's pit and the bushes (tall faceted grass).
 - `game/names.ts`: `shortName`, a champion's first name from its full name.
+- `game/spellChoice.ts`: the player's battle spell, the save key `lane-brawl-spell` (`loadSpell`, `saveSpell`).
 - `game/mastery.ts`: class mastery, the save key `lane-brawl-mastery` (`loadMastery`, `recordWin`,
   `masteryRank`).
 - `game/data.ts`: plain data, with text keys for names and texts. `WORLD`, `LANES`, `BASE`, `TOWERS`, `RIVER`, `CAMPS`, `CAMP_KINDS`,
@@ -384,7 +401,7 @@ File map (`src/`):
   `ACTIVES`, `MAX_ITEMS`, `BEAST`, `BEAST_BUFF`, `ELDER`, `BEAST_CONTESTERS`, `INHIBITORS`, `INHIBITOR`,
   `SUPER_MINION`, `BUSHES` (with `bushAt`), `BUSH_REVEAL`, `REVEAL_MS`, `GANK` and `RETREAT`, and
   round 2's `WARD`, `WARD_SPOTS`, `WARD_AI`, `RECALL`, `BUYBACK`, `BOUNTY` (with `bountyOf`),
-  `AI_BUILDS` and `AI_BUILD_FOR`, `ASSIST`, `RUNE`, `RUNES` and `RUNE_ORDER`, and `MERC`.
+  `AI_BUILDS` and `AI_BUILD_FOR`, `ASSIST`, `RUNE`, `RUNES` and `RUNE_ORDER`, `MERC`, and `SPELLS`, `spellById`, `aiSpellFor` and `SPELL_AI`.
 - `game/state.ts`: the types (`GameState`, `Unit`, `Projectile`, `Fx`, `Objective`,
   `UpgradeOffer`), `createGame`, `spawnWave`, `spawnChampion`, `spawnWard`, `refreshStats` (level
   and items into stats), `pathFor` (red walks lanes backwards), `laneNear` and small helpers. No
@@ -537,6 +554,7 @@ Effects (`sfx`), where they are raised:
 | `respawn`, `buyBack` | the player's champion respawns (`updateUnit`) / buys back (`buyBack`) |
 | `wave` | a minion wave spawns (`tick`) |
 | `mercs` | a mercenary band hired (`kill`) |
+| `spell` | the player casts a battle spell (`castSpell`) |
 | `rune` / `runeTaken` | runes appear / a rune taken (the player's own, or one in view) (`updateRunes`) |
 | `watchstone`, `growl`, `beastSlain`, `brute` | a watchstone taken, the beast waking or turning elder, the beast slain, a brute's buff taken |
 | `objective` / `objectiveMissed` | the player's objective done / missed (`updateObjective`) |
@@ -579,7 +597,7 @@ Shared `ui` sounds: `click` for the Shop button, B and Play again; `coin` for a 
 - The seed in `addInitScript` is picked so the shuffle in `createGame` fields Harpooner, Tinker,
   Mage and Archer on blue and Stalker, Wolfkin, Bruin, Blade and Berserker on red, the roster the
   round was tuned with (about 2100 `Math.random` calls come before the shuffle in the browser).
-  Anything that adds or removes draws before the shuffle, or a sixteenth class, changes the roster:
+  Anything that adds or removes draws before the shuffle (a new text on the pick screen too: each Phaser text draws for its texture key), or a sixteenth class, changes the roster:
   pick a new seed by replaying the generator and the shuffle in node, or re-tune the round.
 - It asserts the first objective and its target (title key `objTowerMid`, so it passes in any
   language), the objective paid and the siege banner after
@@ -587,7 +605,8 @@ Shared `ui` sounds: `click` for the Shop button, B and Play again; `coin` for a 
   Wide Gatefall (`wide-slam`) kept from the card.
 - Round 2 stays out of the first round: the AI buys only a Healing Flask and a ward at 0:00 (its
   wards and recalls change nothing the test asserts), `GANK.firstAt` keeps bounty hunts past it,
-  and the player never recalls, wards or buys back.
+  and the player never recalls, wards or buys back. `SPELL_AI.from` keeps the AI's battle spells
+  past it too, and the player never presses G.
 - On the way to the tower the Warden waits out of its reach until a blue minion reaches it (and
   steps back out when none is left there, until the tower is under 200 health), and hits back (with
   Gatefall) at a red champion that comes within 240 px out of the tower's reach. It casts Gatefall on the camp too.
@@ -601,7 +620,7 @@ Shared `ui` sounds: `click` for the Shop button, B and Play again; `coin` for a 
   `Math.random` sequence so blue fields the five new classes), `ten-classes.webp`, `fog-of-war.webp`,
   `jungle-brute.webp`, `watchstone.webp`, `watch-ai.webp` (a `?watch` match at 8x with the log open), `skill-looks-1.webp` to
   `skill-looks-3.webp` (every ability's effect, five classes each), `aim-indicators.webp`,
-  `home-heal-and-dead-shop.webp`, `scoreboard.webp` (a match run 7 minutes with blue's fifth on the AI, Tab held), `river-rune.webp` (run to 2:00, the Warden placed by the first spot), `merc-camp.webp` and `mercs-march.webp` (the Warden placed by blue's camp, then made strong to clear it), `loop-objective.webp`, `loop-last-hit.webp` and
+  `home-heal-and-dead-shop.webp`, `scoreboard.webp` (a match run 7 minutes with blue's fifth on the AI, Tab held), `river-rune.webp` (run to 2:00, the Warden placed by the first spot), `merc-camp.webp` and `mercs-march.webp` (the Warden placed by blue's camp, then made strong to clear it), `pick-spell.webp` and `spell-button.webp` (the spell button pressed once, then a match run to 2:30 and Firebrand cast), `loop-objective.webp`, `loop-last-hit.webp` and
   `upgrade-*.webp` and `round2-*.webp` (the ward in the shop and planted by a bush, a recall, a
   bounty, the buy back button and the watch log of the AI shopping) and `german-pick.webp` (the pick
   screen with `?lang=de`, Grumm's card under the pointer) are staged docs shots (a scratch

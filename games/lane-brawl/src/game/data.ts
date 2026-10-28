@@ -823,6 +823,46 @@ export const AI_BUILD_FOR: Partial<Record<TextKey, keyof typeof AI_BUILDS>> = {
   roleController: 'caster',
 };
 
+/**
+ * Battle spells (LB15): every champion carries one, cast with G (or the top bar's button) on its own
+ * cooldown. The player picks theirs on the pick screen; an AI champion's comes from its role
+ * (`aiSpellFor`). `blink` jumps up to `range` toward the aim; `firebrand` hurts the enemy champion
+ * nearest the aim (within `range` of the caster and `aim` of the point) by `base` plus `perLevel` per
+ * level; `mend` heals the caster and the most hurt allied champion within `range` by as much;
+ * `barrier` shields the caster by as much for `ms`.
+ */
+export type SpellId = 'blink' | 'firebrand' | 'mend' | 'barrier';
+export interface SpellDef {
+  id: SpellId;
+  name: TextKey;
+  desc: TextKey;
+  cd: number;
+  color: string;
+  range?: number;
+  aim?: number;
+  base?: number;
+  perLevel?: number;
+  ms?: number;
+}
+export const SPELLS: SpellDef[] = [
+  { id: 'blink', name: 'spellBlink', desc: 'spellBlinkDesc', cd: 120_000, color: '#9fd8ff', range: 260 },
+  { id: 'firebrand', name: 'spellFirebrand', desc: 'spellFirebrandDesc', cd: 90_000, color: '#ff8a3d', range: 450, aim: 200, base: 90, perLevel: 22 },
+  { id: 'mend', name: 'spellMend', desc: 'spellMendDesc', cd: 120_000, color: '#7fe08a', range: 420, base: 110, perLevel: 25 },
+  { id: 'barrier', name: 'spellBarrier', desc: 'spellBarrierDesc', cd: 100_000, color: '#cfe1ff', base: 140, perLevel: 30, ms: 2500 },
+];
+export const spellById = (id: SpellId) => SPELLS.find((sp) => sp.id === id)!;
+/** The spell an AI champion carries: tanks a barrier, supports a mend, other casters a blink, the rest a firebrand. */
+export function aiSpellFor(def: { role: TextKey }): SpellId {
+  if (def.role === 'roleSupport') return 'mend';
+  const build = AI_BUILD_FOR[def.role] ?? 'fighter';
+  return build === 'tank' ? 'barrier' : build === 'caster' ? 'blink' : 'firebrand';
+}
+/**
+ * How the AI uses its spell: from `from` (the lanes settle first, like `GANK.firstAt`), under `low`
+ * of its health with an enemy champion within `look`, or on a champion it can finish under `finish`.
+ */
+export const SPELL_AI = { from: 100_000, low: 0.35, look: 420, finish: 0.25 };
+
 /** How close a champion must stand to its Nexus to shop. */
 export const SHOP_RANGE = 700;
 /** A champion within `radius` of its own Nexus heals `share` of its health a second. */
