@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { ARENA, BUILD_RANGE, NODE_AMOUNT } from '../game/arena';
+import { checkTrophies } from '../trophies/check';
 import { DERELICT_KINDS, generateMap, localRandom, type MapLayout } from '../game/map';
 import { FACTIONS, type Role, type UnitId } from '../game/factions';
 import { CONTRACT_STEPS, FLAGSHIP_STEP, RANKS, contractOf, type Goal } from '../game/contracts';
@@ -587,6 +588,7 @@ export class GameScene extends Phaser.Scene {
     if (!this.picking) {
       // Watching, the battle runs once per step of the chosen speed, none while held.
       for (let i = watchSteps(); i > 0; i--) this.state.update(dt);
+      checkTrophies(this.state);
       this.selected = new Set([...this.selected].filter((id) => this.state.selectable(id)));
       this.clock += dt;
     }
