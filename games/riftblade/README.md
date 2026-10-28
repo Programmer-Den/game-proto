@@ -151,6 +151,26 @@ not spent at a trader, so each trader is a choice between this run and the next 
 
 ![The Armoury](docs/screenshots/armoury.webp)
 
+### The weekly run
+
+Once a first run has ended, a **Weekly run** button shows at the top right of the hero select. It
+opens this week's run: one of your open heroes and two mutators, both picked from the week's
+number (weeks start on Monday, 00:00 UTC), with each world and star map seeded, so every attempt
+that week starts each world the same way. It is fought at heat 0 and without the Armoury. The
+panel shows how far you got this week; the first win of the week banks **100 credits** for the
+Armoury (on top of the run's own credits). Tap Start or press Enter; Back returns.
+
+| Mutator | Effect |
+| --- | --- |
+| Glass Cannon | +50% damage, -40% max health |
+| Swarm | Foes come 40% faster, with a quarter less health |
+| Haste | You and every foe move a quarter faster |
+| Vampire | Every kill heals 1 health; no regeneration |
+| Overcharged | Your signature recharges twice as fast |
+| Fragile Foes | Foes have half health but hit twice as hard |
+
+![The weekly run](docs/screenshots/weekly-run.webp)
+
 ### The space map
 
 After the boss of the Dune world falls (and again after the second world's), the space map shows

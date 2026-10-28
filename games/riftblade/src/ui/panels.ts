@@ -12,12 +12,13 @@ import { chartOptions, priceOf, rerollPrice } from '../game/voyage';
 import { isUnlocked, type Progress } from '../game/save';
 import { HEAT_RULES, heatOpen } from '../game/heat';
 import { ARMOURY, nextPrice, perkAmount } from '../game/armoury';
+import { MUTATORS, WEEKLY_BONUS, type MutatorId } from '../game/weekly';
 import type { Vars } from '../../../../shared/i18n';
 import { t } from '../i18n';
 import { C, hex } from '../art/glow';
 import { portraitKey } from '../art/sprites';
 import {
-  AGAIN, ARMOURY_BUTTON, BACK, CHART, armouryCardRect, CONTINUE, DEPTH, FIGHT, FONT, HEAT_DOWN, HEAT_ROW, HEAT_UP, HERO_DETAIL, LEAVE, MAP, REROLL, SCREEN, UNLOCK, VIEW, chartRect, chartSpot, eventOptionRect, heroCardRect,
+  AGAIN, ARMOURY_BUTTON, BACK, CHART, MUTATOR_CARD, WEEKLY_BACK, WEEKLY_BUTTON, WEEKLY_START, armouryCardRect, CONTINUE, DEPTH, FIGHT, FONT, HEAT_DOWN, HEAT_ROW, HEAT_UP, HERO_DETAIL, LEAVE, MAP, REROLL, SCREEN, UNLOCK, VIEW, chartRect, chartSpot, eventOptionRect, heroCardRect,
   levelCardRect, mapNodeRect, mapNodeSpot, tradeCardRect, type Rect,
 } from '../scenes/layout';
 
@@ -138,7 +139,7 @@ function sideOf(hero: HeroDef) {
  * The hero select screen: twelve small cards (a hero still locked shows only a dark placeholder:
  * no art, name or colour, and never its deed) and the chosen hero's details with the Fight button.
  */
-export function heroSelect(p: Panel, progress: Progress, chosen: HeroId, heat = 0) {
+export function heroSelect(p: Panel, progress: Progress, chosen: HeroId, heat = 0, week = -1) {
   const scene = p.scene;
   p.dim(0.55);
   p.text(VIEW.w / 2, 12, 'RIFTBLADE', 32, '#9fd8ff', { bold: true, origin: [0.5, 0], glow: true });
@@ -153,10 +154,46 @@ export function heroSelect(p: Panel, progress: Progress, chosen: HeroId, heat = 
     p.spots.push({ id: 'armoury', ...ARMOURY_BUTTON });
     fit(p.text(ARMOURY_BUTTON.x + ARMOURY_BUTTON.w / 2, ARMOURY_BUTTON.y + ARMOURY_BUTTON.h / 2, t('armouryButton', { n: progress.bank }), 14, ARMOURY_COLOR, { bold: true, origin: [0.5, 0.5] }), ARMOURY_BUTTON.w - 16);
   }
+  // The weekly run opens once a first run has ended.
+  if (progress.bestMs > 0) {
+    const won = progress.weekly?.week === week && progress.weekly.won;
+    p.frame(WEEKLY_BUTTON, WEEKLY_COLOR, '#101c2a');
+    p.spots.push({ id: 'weekly', ...WEEKLY_BUTTON });
+    fit(p.text(WEEKLY_BUTTON.x + WEEKLY_BUTTON.w / 2, WEEKLY_BUTTON.y + WEEKLY_BUTTON.h / 2, t(won ? 'weeklyButtonWon' : 'weeklyButton'), 14, WEEKLY_COLOR, { bold: true, origin: [0.5, 0.5] }), WEEKLY_BUTTON.w - 16);
+  }
   return p;
 }
 
 const ARMOURY_COLOR = '#ffb347';
+const WEEKLY_COLOR = '#7fe3ff';
+
+/** The weekly run: the week's hero, its two mutators, how far it went this week, Start and Back. */
+export function weeklyPanel(p: Panel, progress: Progress, week: number, hero: HeroId, mutators: readonly MutatorId[]) {
+  const scene = p.scene;
+  p.dim(0.85);
+  stars(p, scene);
+  p.text(VIEW.w / 2, 30, t('weeklyTitle'), 30, WEEKLY_COLOR, { bold: true, origin: [0.5, 0], glow: true });
+  p.text(VIEW.w / 2, 72, t('weeklySubtitle', { n: week }), 13, C.muted, { origin: [0.5, 0], align: 'center', wrap: VIEW.w - 80 });
+  const sch = schemeOf(hero);
+  const hx = 220;
+  p.text(hx, MUTATOR_CARD.y, t('weeklyHero'), 13, C.muted, { origin: [0.5, 0] });
+  p.add(scene.add.image(hx, MUTATOR_CARD.y + 80, portraitKey(hero)).setScale(0.8), 2);
+  fit(p.text(hx, MUTATOR_CARD.y + 130, t(HEROES[hero].name), 19, sch.accent, { bold: true, origin: [0.5, 0] }), 300);
+  mutators.forEach((id, i) => {
+    const r = { x: MUTATOR_CARD.x + i * MUTATOR_CARD.gap, y: MUTATOR_CARD.y, w: MUTATOR_CARD.w, h: MUTATOR_CARD.h };
+    p.frame(r, WEEKLY_COLOR);
+    p.text(r.x + r.w / 2, r.y + 22, t(MUTATORS[id].name), 18, WEEKLY_COLOR, { bold: true, origin: [0.5, 0] });
+    p.text(r.x + r.w / 2, r.y + 58, t(MUTATORS[id].text), 14, C.text, { origin: [0.5, 0], align: 'center', wrap: r.w - 28 });
+  });
+  const mine = progress.weekly?.week === week ? progress.weekly : null;
+  const best = !mine ? t('weeklyBestNone') : mine.won ? t('weeklyWon') : t('weeklyBest', { n: mine.best, of: STAGES });
+  p.text(VIEW.w / 2, 330, best, 17, mine?.won ? C.elite : C.text, { bold: true, origin: [0.5, 0] });
+  if (!mine?.won) p.text(VIEW.w / 2, 360, t('weeklyReward', { n: WEEKLY_BONUS }), 14, C.muted, { origin: [0.5, 0] });
+  button(p, WEEKLY_BACK, 'back', t('armouryBack'), C.muted);
+  button(p, WEEKLY_START, 'start', t('weeklyStart'), WEEKLY_COLOR);
+  p.text(VIEW.w / 2, WEEKLY_START.y + WEEKLY_START.h + 16, t('weeklyHelp'), 12, C.muted, { origin: [0.5, 0] });
+  return p;
+}
 
 /** The Armoury: a card per piece with its rank and the next rank's price, and Back. */
 export function armouryPanel(p: Panel, progress: Progress) {
@@ -397,7 +434,7 @@ export function levelUp(p: Panel, s: GameState) {
 }
 
 /** The end of a run: won or fallen, with the numbers and a button to go again. */
-export function endScreen(p: Panel, s: GameState, progress: Progress, banked = 0) {
+export function endScreen(p: Panel, s: GameState, progress: Progress, banked = 0, bonus = 0) {
   p.dim(0.7);
   const won = s.phase === 'won';
   const color = won ? C.elite : C.danger;
@@ -412,7 +449,9 @@ export function endScreen(p: Panel, s: GameState, progress: Progress, banked = 0
     caps.length ? t('capstonesLine', { names: caps.join(', ') }) : '',
     s.heat > 0 ? t('endHeat', { n: s.heat }) : '',
     won && heatOpen(s.heat) > s.heat ? t('heatOpened', { n: s.heat + 1, hero: t(hero.short) }) : '',
+    s.week >= 0 ? t('weeklyEnd', { mutators: s.mutators.map((id) => t(MUTATORS[id].name)).join(' + ') }) : '',
     banked > 0 ? t('banked', { n: banked }) : '',
+    bonus > 0 ? t('weeklyBonus', { n: bonus }) : '',
     t('longestRun', { time: clock(progress.bestMs) }),
   ].filter(Boolean);
   p.text(VIEW.w / 2, 226, lines.join('\n'), 15, C.muted, { origin: [0.5, 0], align: 'center' });

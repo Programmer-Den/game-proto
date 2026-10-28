@@ -5,6 +5,7 @@ import { freshHero, freshState, type GameState, type Phase } from './state';
 import { UPGRADES } from './upgrades';
 import { MAX_HEAT } from './heat';
 import { ARMOURY_IDS, nextPrice, type ArmouryId } from './armoury';
+import { MUTATOR_IDS, WEEKLY_BONUS } from './weekly';
 
 export const SAVE_KEY = 'riftblade-progress';
 /**
@@ -32,6 +33,8 @@ export interface Progress {
   /** Credits banked for the Armoury, and the ranks bought there. Saves from before it have none. */
   bank: number;
   armoury: Partial<Record<ArmouryId, number>>;
+  /** The latest week a weekly run was played: its number, the furthest jump (1 to 4) and whether it was won. */
+  weekly: { week: number; best: number; won: boolean } | null;
 }
 
 /** A saved count per hero, keeping only known heroes with a finite number. */
@@ -64,6 +67,10 @@ export function loadProgress(): Progress {
       bestMs: typeof saved.bestMs === 'number' ? saved.bestMs : 0,
       wins,
       heat,
+      weekly:
+        typeof saved.weekly === 'object' && saved.weekly && Number.isInteger(saved.weekly.week) && typeof saved.weekly.best === 'number'
+          ? { week: saved.weekly.week, best: saved.weekly.best, won: saved.weekly.won === true }
+          : null,
       bank: typeof saved.bank === 'number' && Number.isFinite(saved.bank) ? Math.max(0, Math.floor(saved.bank)) : 0,
       armoury,
       furthest: perHero(saved.furthest),
@@ -71,7 +78,7 @@ export function loadProgress(): Progress {
       charted: Array.isArray(saved.charted) ? saved.charted.filter((id: unknown) => typeof id === 'string') : [],
     };
   } catch {
-    return { bestMs: 0, wins: {}, heat: {}, bank: 0, armoury: {}, furthest: {}, unlocked: [], charted: [] };
+    return { bestMs: 0, wins: {}, heat: {}, bank: 0, armoury: {}, weekly: null, furthest: {}, unlocked: [], charted: [] };
   }
 }
 
@@ -100,6 +107,20 @@ export function recordRun(hero: HeroId, ms: number, won: boolean, stage: number,
   for (const id of route) if (!progress.charted.includes(id)) progress.charted.push(id);
   saveProgress(progress);
   return progress;
+}
+
+/**
+ * Records a weekly run's end (`stage` the jump reached, 1 to 4); its first win of the week banks
+ * `WEEKLY_BONUS`. Returns the updated progress and the bonus banked.
+ */
+export function recordWeekly(week: number, stage: number, won: boolean): { progress: Progress; bonus: number } {
+  const progress = loadProgress();
+  const before = progress.weekly?.week === week ? progress.weekly : { week, best: 0, won: false };
+  const bonus = won && !before.won ? WEEKLY_BONUS : 0;
+  progress.weekly = { week, best: Math.max(before.best, stage), won: before.won || won };
+  progress.bank += bonus;
+  saveProgress(progress);
+  return { progress, bonus };
 }
 
 /** Buys the next rank of an Armoury piece with banked credits; the updated progress, or null if it can't. */
@@ -203,6 +224,7 @@ export function loadRun(): GameState | null {
     const known = (id: unknown) => typeof id === 'string' && id in UPGRADES;
     if (!Number.isInteger(s.stage) || s.stage < 0 || s.stage > LAST_STAGE) return null;
     if (!Number.isInteger(s.heat) || s.heat < 0 || s.heat > MAX_HEAT) return null;
+    if (!Number.isInteger(s.week) || !Array.isArray(s.mutators) || !s.mutators.every((m) => MUTATOR_IDS.includes(m))) return null;
     if (s.next !== -1 && !PLANETS[s.next]) return null;
     if (!Array.isArray(s.nodes) || !s.nodes.every((k) => k in NODE_INFO)) return null;
     if (!Array.isArray(s.offers) || !s.offers.every((id) => id === null || known(id))) return null;

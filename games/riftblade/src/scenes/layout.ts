@@ -61,6 +61,12 @@ export function armouryCardRect(i: number, n: number) {
 }
 export const BACK = { x: VIEW.w / 2 - 110, y: 430, w: 220, h: 50 };
 
+/** The hero select's Weekly run button (top right, after a first run) and the weekly panel's mutator cards and buttons. */
+export const WEEKLY_BUTTON = { x: VIEW.w - 214, y: 14, w: 200, h: 40 };
+export const MUTATOR_CARD = { x: 400, y: 140, w: 250, h: 150, gap: 270 };
+export const WEEKLY_START = { x: VIEW.w / 2 + 10, y: 430, w: 220, h: 50 };
+export const WEEKLY_BACK = { x: VIEW.w / 2 - 230, y: 430, w: 220, h: 50 };
+
 /** The new-hero panel shown mid-run, and its Continue button. */
 export const UNLOCK = { x: VIEW.w / 2 - 200, y: 96, w: 400, h: 340 };
 export const CONTINUE = { x: VIEW.w / 2 - 110, y: 362, w: 220, h: 48 };

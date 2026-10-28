@@ -9,6 +9,7 @@ import { FILLER, MAX_TIER, UPGRADES, UPGRADE_IDS, canOffer, rollChoices } from '
 import { t } from '../i18n';
 import { checkDeeds } from './blades';
 import { hot } from './heat';
+import { reseed, weekSeed } from './weekly';
 import { CREDITS, LAST_STAGE, NODE_INFO, PLANETS, REST_HEAL, TRADE, arenaElites, planetsAt, type EventId, type NodeKind } from './planets';
 
 /** One frame of the game: the sim while a fight is on, then whatever follows a cleared fight. */
@@ -77,6 +78,8 @@ export function chooseWorld(s: GameState, index: number) {
   const planet = chartOptions(s)[index];
   if (planet === undefined) return;
   s.next = planet;
+  // A weekly run's star map and the next world play out the same way each attempt.
+  if (s.week >= 0) reseed(weekSeed(s.week) + 7919 * (s.stage + 1) + 31 * planet);
   s.nodes = rollNodes(hot(s.heat, 'noRest'));
   s.phase = 'map';
 }
@@ -273,6 +276,7 @@ export function chooseEvent(s: GameState, index: number) {
 export function nextPlanet(s: GameState) {
   s.planet = s.next >= 0 ? s.next : chartOptions(s)[0];
   s.stage += 1;
+  if (s.week >= 0) reseed(weekSeed(s.week) + 7919 * s.stage + 31 * s.planet + 1);
   s.route.push(s.planet);
   s.next = -1;
   clearField(s);
