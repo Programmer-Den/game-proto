@@ -5,7 +5,7 @@ import { hasFlag, MAX_SEEDS, reached, type GameState } from './state';
 import { t } from '../i18n';
 
 /** What a talk does once its last line is read. */
-export type TalkEffect = 'quest-blade' | 'quest-thorns' | 'finish' | 'cat-pet' | 'cat-stone' | 'quest-bell' | 'seeds' | 'refill' | 'finish-two';
+export type TalkEffect = 'quest-blade' | 'quest-thorns' | 'finish' | 'cat-pet' | 'cat-stone' | 'quest-bell' | 'seeds' | 'refill' | 'finish-two' | 'trial';
 
 export interface Talk {
   lines: string[];
@@ -125,6 +125,6 @@ function elder(s: GameState): Talk {
         then: 'finish-two',
       };
     case 'end':
-      return { lines: [t('elderEnd')] };
+      return { lines: [t('elderEnd'), t('elderTrials')] };
   }
 }

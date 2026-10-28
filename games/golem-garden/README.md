@@ -128,9 +128,10 @@ and pressed lettering on clay tags. It is all painted in code at startup; there 
 
 13. **Speed.** The 1x button at the top right doubles the game's speed (2x) and back, at any time.
 14. **Call the next wave early.** Once every pest of the current wave has come onto the path, the
-    wave button turns into "Call wave N now, +15 early". Tapping it counts the current wave as done
-    at once (its clearing bonus and its bud) plus 15 sap, and the next wave starts coming in while
-    the last pests are still walking. Wave 30, the harvest, can't be called early: its stars wait for
+    wave button turns into "Call wave N now, +15 early". Tapping it starts the next wave coming in
+    while the last pests are still walking. The called wave counts as done once its last pest is
+    squashed or gets through: then it pays its clearing bonus plus 15 sap and opens its bud. Until
+    then a bite still costs a leaf, so a call early is a bet on golems that can hold both waves. Wave 30, the harvest, can't be called early: its stars wait for
     its last pest. Nor can a wave while its Queen Slug is on the path. The card above the button previews the next wave's pests,
     counted from the game's own wave list (in two rows once there are more than three kinds, with
     the Queen Slug named in its title), so you can weigh the sap against the crowd.
@@ -174,6 +175,8 @@ and pressed lettering on clay tags. It is all painted in code at startup; there 
 ![The Heartwood in full bloom, with Thorn golems planted and the Thorn golem's seed picked](docs/screenshots/heartwood-bloom.webp)
 
 ![Wave 2's last pests on the path, with the button offering to call wave 3 early and its preview](docs/screenshots/call-early.webp)
+
+![Wave 3 just called early: the banner says wave 2's 35 sap comes once its last beetles are gone](docs/screenshots/called-early.webp)
 
 ![Squashed pests leave splats and "+5" pops while sap droplets fly to the counter](docs/screenshots/sap-pops.webp)
 

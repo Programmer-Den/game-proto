@@ -64,10 +64,20 @@ export const AROUND = [...SIDES, [1, 1], [1, -1], [-1, 1], [-1, -1]] as const;
 /**
  * Lays out island number `island`, one string per row and one character per cell: '.' grass,
  * '~' lake, 'T' forest, 'C' the castle. The same number always gives the same island. Buildings
- * only go on grass.
+ * only go on grass. A layout that fails `fairIsland` is drawn again from the next seed, so every
+ * island has a shore for round 1's decree and a castle with room to build a chain from; the
+ * islands that pass on the first draw lie as they always did.
  */
 export function islandMap(island: number): string[] {
-  const rand = seeded(island);
+  for (let attempt = 0; ; attempt++) {
+    const map = layIsland(island + attempt * (ISLANDS + 1));
+    if (fairIsland(map) || attempt >= 20) return map;
+  }
+}
+
+/** One draw of an island from `seed`: lakes, woods, then the castle. */
+function layIsland(seed: number): string[] {
+  const rand = seeded(seed);
   const int = (n: number) => Math.floor(rand() * n);
   const { cols, rows } = MAP_SIZE;
   const map = Array.from({ length: rows }, () => Array<string>(cols).fill('.'));
@@ -95,6 +105,51 @@ export function islandMap(island: number): string[] {
   while (map[row][col] !== '.') [col, row] = [int(cols), int(rows)];
   map[row][col] = 'C';
   return map.map((cells) => cells.join(''));
+}
+
+/** How many grass cells the castle's chain could ever reach: the grass joined to it by shared edges. */
+const CASTLE_ROOM = 6;
+/** How many grass cells round 1's decree needs on one lake's shore (its ask, so it can be met). */
+const FIRST_SHORE = 3;
+
+/**
+ * Whether a layout can be played as designed: some lake has FIRST_SHORE grass cells on its shore
+ * (round 1's decree asks for that many farms there), and the castle is not walled in by lakes and
+ * woods, with at least CASTLE_ROOM grass cells joined to it so its chain can grow.
+ */
+export function fairIsland(map: string[]): boolean {
+  const at = (c: number, r: number) => map[r]?.[c];
+  const flood = (start: [number, number][], ok: (ch: string | undefined) => boolean) => {
+    const seen = new Set(start.map(([c, r]) => `${c},${r}`));
+    const todo = [...start];
+    const out: [number, number][] = [];
+    while (todo.length) {
+      const [c, r] = todo.pop()!;
+      out.push([c, r]);
+      for (const [dc, dr] of SIDES) {
+        const k = `${c + dc},${r + dr}`;
+        if (!seen.has(k) && ok(at(c + dc, r + dr))) {
+          seen.add(k);
+          todo.push([c + dc, r + dr]);
+        }
+      }
+    }
+    return out;
+  };
+  const cells = map.flatMap((row, r) => [...row].map((ch, c) => ({ ch, c, r })));
+  const castle = cells.find((x) => x.ch === 'C')!;
+  const room = flood([[castle.c, castle.r]], (ch) => ch === '.').length - 1;
+  if (room < CASTLE_ROOM) return false;
+  const seen = new Set<string>();
+  for (const { ch, c, r } of cells) {
+    if (ch !== '~' || seen.has(`${c},${r}`)) continue;
+    const lake = flood([[c, r]], (x) => x === '~');
+    lake.forEach(([lc, lr]) => seen.add(`${lc},${lr}`));
+    const shore = new Set<string>();
+    for (const [lc, lr] of lake) for (const [dc, dr] of SIDES) if (at(lc + dc, lr + dr) === '.') shore.add(`${lc + dc},${lr + dr}`);
+    if (shore.size >= FIRST_SHORE) return true;
+  }
+  return false;
 }
 
 /** A small seeded random generator (mulberry32), so an island number always lays out the same. */

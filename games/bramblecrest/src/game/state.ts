@@ -5,6 +5,7 @@
 import { byDifficulty } from '../../../../shared/settings';
 import { isMapId, type Facing, type ItemId, type MapId } from './maps';
 import type { TextKey } from '../i18n';
+import { formatNumber } from '../../../../shared/i18n';
 
 export const SAVE_KEY = 'bramblecrest-save';
 
@@ -19,6 +20,14 @@ export const MAX_SEEDS = 10;
 /** The quest line of the first two chapters, in order. */
 export const QUESTS = ['start', 'blade', 'thorns', 'shrine', 'return', 'done', 'bell', 'belfry', 'home', 'end'] as const;
 export type Quest = (typeof QUESTS)[number];
+
+/** A time on the clock as m:ss.t, with the language's decimal mark. */
+export function clock(ms: number) {
+  const tenths = Math.floor(ms / 100);
+  const m = Math.floor(tenths / 600);
+  const sec = (tenths % 600) / 10;
+  return `${m}:${formatNumber(sec, { minimumIntegerDigits: 2, minimumFractionDigits: 1, maximumFractionDigits: 1 })}`;
+}
 
 /** The text the journal line shows for each step of the quest. */
 export const OBJECTIVES: Record<Quest, TextKey> = {
@@ -65,6 +74,8 @@ export interface GameState {
   falls: number;
   /** Foes beaten, for the chapter's end card. */
   beaten: number;
+  /** The best time of each dungeon's hourglass trial, in ms of play. */
+  trials: Partial<Record<MapId, number>>;
 }
 
 export function newState(): GameState {
@@ -85,6 +96,7 @@ export function newState(): GameState {
     quest: 'start',
     falls: 0,
     beaten: 0,
+    trials: {},
   };
 }
 

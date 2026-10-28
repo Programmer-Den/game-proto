@@ -1,8 +1,10 @@
+import type { Pouch } from './state';
 import { AROUND, MAP_SIZE, SIDES, isHome, seeded, type Cell } from './tiles';
 
 // Royal decrees: each round's side goal, such as "3 farms on the shore of Eastmere". Fulfilling it
 // pays DECREE_BONUS points and a crown. Progress is always counted from the board, so undo and the
-// scene never have to track it.
+// scene never have to track it. A decree is only offered when the board has room for it and the
+// pouch holds the tiles it asks for, so every decree can be met.
 
 /** Points a fulfilled decree adds to the score. */
 export const DECREE_BONUS = 8;
@@ -134,15 +136,37 @@ export function decreeMarks(grid: Cell[][], decree: Decree): DecreeMarks {
 /** How many more a new decree asks for than the board already has. */
 const ASK = { shore: 3, wood: 2, watch: 3 };
 
-function makeDecree(grid: Cell[][], kind: DecreeKind, place: string, cells: At[]): Decree | null {
+/**
+ * The fewest houses a watch decree would still need: around a tower standing with room enough, or
+ * around a new one on a grass cell when the pouch holds a tower. Null when no tower could ever get
+ * ASK.watch homes around it.
+ */
+function watchShort(grid: Cell[][], pouch: Pouch): number | null {
+  let fewest: number | null = null;
+  grid.forEach((cells, row) =>
+    cells.forEach((cell, col) => {
+      if (cell !== 'tower' && !(cell === 'grass' && pouch.tower > 0)) return;
+      const around = AROUND.map(([dc, dr]) => grid[row + dr]?.[col + dc]);
+      const short = ASK.watch - around.filter(isHome).length;
+      if (around.filter((c) => c === 'grass').length >= short && (fewest === null || short < fewest)) fewest = short;
+    }),
+  );
+  return fewest;
+}
+
+function makeDecree(grid: Cell[][], pouch: Pouch, kind: DecreeKind, place: string, cells: At[]): Decree | null {
   const draft: Decree = { kind, place, cells, need: 0, done: false };
   const now = decreeMarks(grid, draft);
   if (kind === 'watch') {
-    // One tower with three houses around it; offered only while no tower has three yet.
-    if (now.have >= ASK.watch || !grid.some((cells) => cells.includes('grass'))) return null;
+    // One tower with three houses around it; offered only while no tower has three yet, and only
+    // when a tower has (or could have) room for them and the pouch holds the houses.
+    if (now.have >= ASK.watch) return null;
+    const short = watchShort(grid, pouch);
+    if (short === null || pouch.house < short) return null;
     return { ...draft, need: ASK.watch };
   }
-  if (now.spots.length < ASK[kind]) return null;
+  // Enough open spots on the edge, and the farms or houses to fill them in the pouch.
+  if (now.spots.length < ASK[kind] || pouch[kind === 'shore' ? 'farm' : 'house'] < ASK[kind]) return null;
   return { ...draft, need: now.have + ASK[kind] };
 }
 
@@ -150,14 +174,15 @@ function makeDecree(grid: Cell[][], kind: DecreeKind, place: string, cells: At[]
  * The decree for round `round` on the board as it stands when the round begins. Round 1 always
  * asks for farms on the shore of the lake with the most open shore; later rounds draw a kind and a
  * place from a generator seeded by island and round, never the same as `last` (the round before's).
+ * `pouch` is the tiles the round starts with; a decree it lacks the tiles for is never offered.
  * Null when nothing fits.
  */
-export function decreeFor(island: number, round: number, grid: Cell[][], last: Decree | null = null): Decree | null {
+export function decreeFor(island: number, round: number, grid: Cell[][], pouch: Pouch, last: Decree | null = null): Decree | null {
   const lakes = namedPlaces(grid, 'lake');
   if (round === 1) {
     const open = (cells: At[]) => edge(cells).filter(([c, r]) => grid[r][c] === 'grass').length;
     const lake = [...lakes].sort((a, b) => open(b.cells) - open(a.cells))[0];
-    const decree = lake && makeDecree(grid, 'shore', lake.name, lake.cells);
+    const decree = lake && makeDecree(grid, pouch, 'shore', lake.name, lake.cells);
     if (decree) return decree;
   }
   const rand = seeded(island * 31 + round * 7907);
@@ -172,13 +197,13 @@ export function decreeFor(island: number, round: number, grid: Cell[][], last: D
   for (const kind of shuffle<DecreeKind>(['shore', 'wood', 'watch'])) {
     if (kind === 'watch') {
       if (last?.kind === 'watch') continue;
-      const decree = makeDecree(grid, 'watch', '', []);
+      const decree = makeDecree(grid, pouch, 'watch', '', []);
       if (decree) return decree;
       continue;
     }
     for (const place of shuffle(kind === 'shore' ? [...lakes] : [...woods])) {
       if (last?.kind === kind && last.place === place.name) continue;
-      const decree = makeDecree(grid, kind, place.name, place.cells);
+      const decree = makeDecree(grid, pouch, kind, place.name, place.cells);
       if (decree) return decree;
     }
   }

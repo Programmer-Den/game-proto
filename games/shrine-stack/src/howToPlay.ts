@@ -41,7 +41,7 @@ const en: HowToPlay = {
     'From tier 3 off-centre drops make the temple lean, and past 60 pixels the tier topples, losing its favour, and starts over.',
     'From tier 3, three perfect drops in a row start growing the stone back.',
     'Ticking a curse before you choose a blessing doubles everything the next tier earns.',
-    'Tier 10 is gilded for double favour, and after the crown you can keep building into a windy sky.',
+    'Tier 10 is gilded for double favour, and after the crown you can keep building into a windy sky, where every tenth tier is a sky altar with double favour and a blessing.',
   ],
 };
 
@@ -94,7 +94,7 @@ const de: HowToPlay = {
     'Ab Ebene 3 neigen Würfe neben der Mitte den Tempel, und ab 60 Pixeln stürzt die Ebene ein, verliert ihre Gunst und beginnt von vorn.',
     'Ab Ebene 3 lassen drei perfekte Würfe in Folge den Stein wieder wachsen.',
     'Ein angekreuzter Fluch vor der Segenswahl verdoppelt alles, was die nächste Ebene bringt.',
-    'Ebene 10 ist vergoldet und bringt doppelte Gunst, und nach der Krone kannst du in einen windigen Himmel weiterbauen.',
+    'Ebene 10 ist vergoldet und bringt doppelte Gunst, und nach der Krone kannst du in einen windigen Himmel weiterbauen, wo jede zehnte Ebene ein Himmelsaltar mit doppelter Gunst und einem Segen ist.',
   ],
 };
 

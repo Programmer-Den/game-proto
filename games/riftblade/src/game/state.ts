@@ -136,6 +136,8 @@ export interface Enemy {
   aimX: number;
   aimY: number;
   phase2: boolean;
+  /** A boss's frenzy at heat 4 and up, below a quarter of its health (see `heat.ts`). */
+  phase3: boolean;
   /** Held in a knight's Grip: ms until it is crushed, and for how much. */
   gripMs: number;
   gripDmg: number;
@@ -437,6 +439,8 @@ export interface Hero {
 export interface GameState {
   phase: Phase;
   hero: HeroId | null;
+  /** The run's rift heat, 0 (as designed) to `MAX_HEAT` (see `heat.ts`). */
+  heat: number;
   /**
    * The planet (an index into `PLANETS`: 0 Dune, 1 Swamp, 2 Ice, 3 Lava, then the later ones) and
    * the jump of the crusade it is (`stage`, 0 to 3), and whether this is the elite arena after it.
@@ -564,6 +568,7 @@ export function freshState(): GameState {
   return {
     phase: 'select',
     hero: null,
+    heat: 0,
     planet: 0,
     stage: 0,
     route: [0],

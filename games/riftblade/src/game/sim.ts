@@ -22,6 +22,7 @@ import { ARENA_MS, BOG, BOSSES, CHAMPION, CREDITS, PLANETS, SIEGE, STRIKE, VENT,
 // `t` is a common local name here (targets, time), so the translator goes by `tr`.
 import { t as tr, type TextKey } from '../i18n';
 import { cancelObjective, objectives } from './objectives';
+import { HEAT, hot } from './heat';
 
 /** What the player is doing this frame: a move direction (length up to 1) and the signature key. */
 export interface Input {
@@ -62,9 +63,10 @@ export function prepare(s: GameState) {
 // Starting and choosing
 
 /** Starts a run with the chosen hero, from a fresh state; `known` are the heroes unlocked before. */
-export function startRun(s: GameState, id: HeroId, known: HeroId[] = [], ringOut = 0) {
+export function startRun(s: GameState, id: HeroId, known: HeroId[] = [], ringOut = 0, heat = 0) {
   Object.assign(s, freshState());
   s.ringOut = ringOut;
+  s.heat = heat;
   const hero = HEROES[id];
   s.hero = id;
   s.known = [...known];
@@ -352,6 +354,7 @@ function untouchable(s: GameState) {
 /** A hit on the hero; `x`, `y` say where it came from (Triad-77's nearest bot takes it). */
 function hurtHero(s: GameState, dmg: number, x?: number, y?: number) {
   if (untouchable(s) || s.phase !== 'run') return;
+  if (hot(s.heat, 'hurt')) dmg *= HEAT.hurt;
   const p = s.player;
   // The Barrier Emitter takes a hit when charged.
   const barrier = s.ranks.barrier ?? 0;
@@ -864,13 +867,13 @@ export function spawnAt(s: GameState, kind: EnemyKind, x: number, y: number, eli
   const spec = boss ?? ENEMY[kind];
   const t = s.time / 1000;
   const hpScale = boss ? DIFF.hp : DIFF.hp * planet.hp * (1 + t / 240);
-  const hp = spec.hp * hpScale * (elite ? ELITE.hp : 1);
+  const hp = spec.hp * hpScale * (elite ? ELITE.hp : 1) * (hot(s.heat, 'hp') && !isStructure(kind) ? HEAT.hp : 1);
   const speed = spec.speed * (boss ? 1 : 1 + t / 1200) * (elite ? ELITE.speed : 1) * (0.92 + Math.random() * 0.16);
   const e: Enemy = {
     id: s.nextId++, kind, elite, x, y, r: spec.r * (elite ? ELITE.size : 1), hp, maxHp: hp, speed,
     dmg: spec.dmg * (boss ? 1 : planet.dmg) * (elite ? 1.5 : 1), hitMs: 0, slowMs: 0, slowPct: 0, stunMs: 0, flashMs: 0, kx: 0, ky: 0,
     mode: 'walk', modeMs: 0, vx: 0, vy: 0, shellMs: BOSS.shellMs, spawnMs: BOSS.spawnMs, bashMs: 0,
-    slot: 0, facing: 0, guardMs: 0, aimX: 0, aimY: 0, phase2: false, gripMs: 0, gripDmg: 0, fleeMs: 0, charmMs: 0, orbitMs: 0,
+    slot: 0, facing: 0, guardMs: 0, aimX: 0, aimY: 0, phase2: false, phase3: false, gripMs: 0, gripDmg: 0, fleeMs: 0, charmMs: 0, orbitMs: 0,
   };
   if (kind === 'toad') e.shellMs = TOAD.spitMs * 0.5;
   else if (kind === 'walker') e.shellMs = WALKER.burstMs * 0.5;
@@ -1008,7 +1011,7 @@ function director(s: GameState, ms: number) {
     made += n;
   }
   if (s.time >= s.nextElite && !s.bossSpawned) {
-    s.nextElite += ELITE.every;
+    s.nextElite += ELITE.every / (hot(s.heat, 'elites') ? HEAT.elites : 1);
     spawnElite(s);
     pop(s, tr(planet.elite), '#ffe066');
   }
@@ -1366,10 +1369,16 @@ function bossAttacks(s: GameState, e: Enemy, ms: number, ux: number, uy: number,
   const power = spec.power;
   const enraged = e.hp < e.maxHp * BOSS.enragedAt;
   const base = Math.atan2(uy, ux);
-  e.shellMs -= ms;
-  e.spawnMs -= ms;
+  // Rift heat 4: low on health, a boss goes into a frenzy, attacking faster.
+  if (hot(s.heat, 'frenzy') && !e.phase3 && e.hp < e.maxHp * HEAT.frenzyAt) {
+    e.phase3 = true;
+    pop(s, tr('bossFrenzy', { name: tr(spec.name) }), '#ff5a3c');
+  }
+  const pace = e.phase3 ? HEAT.frenzy : 1;
+  e.shellMs -= ms * pace;
+  e.spawnMs -= ms * pace;
   if (id === 'grinder') {
-    if (enraged) e.speed = spec.speed * 1.45;
+    if (enraged) e.speed = spec.speed * 1.45 * (e.phase3 ? HEAT.frenzySpeed : 1);
     if (e.shellMs <= 0) {
       e.shellMs = BOSS.shellMs * (enraged ? 0.75 : 1);
       const n = BOSS.shells + (enraged ? 2 : 0);
@@ -1387,7 +1396,7 @@ function bossAttacks(s: GameState, e: Enemy, ms: number, ux: number, uy: number,
     return null;
   }
   if (id === 'bogmother') {
-    if (enraged) e.speed = spec.speed * 1.3;
+    if (enraged) e.speed = spec.speed * 1.3 * (e.phase3 ? HEAT.frenzySpeed : 1);
     if (e.shellMs <= 0) {
       e.shellMs = BOG.globMs * (enraged ? 0.75 : 1);
       const n = BOG.globs + (enraged ? 2 : 0);
@@ -1411,7 +1420,7 @@ function bossAttacks(s: GameState, e: Enemy, ms: number, ux: number, uy: number,
   }
   if (id === 'siege') {
     const crystal = spec !== BOSSES.siege;
-    if (enraged) e.speed = spec.speed * 1.25;
+    if (enraged) e.speed = spec.speed * 1.25 * (e.phase3 ? HEAT.frenzySpeed : 1);
     if (e.shellMs <= 0) {
       e.shellMs = SIEGE.volleyMs;
       for (let i = 0; i < 5; i++) shoot(s, e.x + ux * 50, e.y + uy * 50, base + (i - 2) * 0.16, WALKER.speed, WALKER.dmg * 1.4 * power, crystal ? 'splinter' : 'slug', 7);

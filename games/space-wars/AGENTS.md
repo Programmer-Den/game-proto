@@ -24,6 +24,17 @@ Implemented today:
   the lane from the player's start to the beacon. Retries that keep them clear draw on a local
   generator (`localRandom`), so the map takes the same count from `Math.random` however many
   retries, and the stars and the battle's own randomness repeat as before.
+- Pathing (`game/pathing.ts`, `World.pathing`, `steer`, `offRocks`, `spread`, `nudge`): every flight goes
+  through `approach`, which flies straight when `Pathing.clear` says the way is open and otherwise
+  follows `Pathing.route`, an A* path on a 20 px grid (`PATH_CELL`) round the rocks, heading for the
+  furthest waypoint in a straight line. A path is kept per ship (`World.routes`, a `WeakMap`) and
+  found again every `ROUTE_MS` (1 s) or once the destination moves a cell. A ship keeps its centre
+  `UNIT_RADIUS - ROCK_OVERLAP` (6 px) off a rock's edge (`offRocks` slides it off); rocks round its
+  destination (within `REACH`, 14 px, of its stop) are left out, so a node or target among the
+  rocks can still be reached, and a move order onto a rock stops at its edge. After the units act,
+  `spread` pushes warships (not harvesters or convoy ships) closer than `SPREAD` (18 px) apart at up
+  to `SPREAD_SPEED` (40 px/s); a ship on a move order holds its course and the other gives way, and
+  no push puts a ship over a rock. An idle ship left over a rock drifts off it. No `Math.random`.
 - Nebulae (`World.inNebula`, `Unit.nebula`, `updateCover`): a ship inside one flies at 70% speed
   (`NEBULA_SLOW`) and is hidden from an enemy faction (`hidden`) unless that faction has a ship
   within 70 px (`NEBULA_SPOT`), a building within 70 px of its edge or claimed sensors in range, or
@@ -253,12 +264,10 @@ Implemented today:
 
 Missing or rough:
 
-- No pathfinding (units move in straight lines and pass over rocks), no unit
-  collision and no save of a battle in progress (only the campaign is saved). No ambient hum under the music, and no per-faction music motif.
+- Pathing is round rocks only: ships still fly over buildings, nebulae and the derelicts, and
+  spread apart softly rather than colliding. No save of a battle in progress (only the campaign is saved). No ambient hum under the music, and no per-faction music motif.
 - No edge scrolling: the map scrolls with the keys, a two-finger drag or the minimap.
 - The rivals' Barracks and Turrets are placed at random within 60 to 150 px of their hub.
-- Ships of a type spawn on the same spot and stack (no collision), so a fresh wing looks like one
-  ship until it moves, unless a rally point fans it out.
 - The AI ignores contracts (beyond hunting a convoy and the survive raid) and sees through the fog
   (but not into nebulae). Rivals left alone wipe each other out fast: the centre faction usually
   falls first, until the last-stand pact turns the last two on the player.
@@ -310,6 +319,8 @@ File map (`src/`):
   `sectorText`. No Phaser.
 - `game/arena.ts`: `ARENA` (the 1600 by 1000 battlefield in world pixels), `START_POINTS` (the five
   fixed hub spots, player first), `NODE_AMOUNT`, `NODE_CLEARANCE` and `BUILD_RANGE`.
+- `game/pathing.ts`: `Pathing` (built from the map's rocks and a clearance: `over`, `clear`,
+  `route`), `PATH_CELL` and the `Rock` type. No Phaser, no `Math.random`.
 - `game/map.ts`: `generateMap(count, loose)` returns a `MapLayout` (homes, nodes, rocks, nebulae, stars,
   derelicts), `beaconNode` (which node is the relay beacon), `DerelictKind` and `DERELICT_KINDS`.
   Uses `Math.random`, plus `localRandom` (exported: the world's board and the scene use it too) for
@@ -410,7 +421,7 @@ How it runs:
 - `World.update` runs, in order: beams, wrecks and pops age; nebula cover is worked out
   (`updateCover`); buildings progress (construction, training, turret fire); derelicts claim, train
   and fire; units act (repair, harvesters `harvest`, others follow their order or acquire a
-  target, or a convoy harvester flies on); each rival's truce timers run and it `think`s once a second (including `contestBeacon`,
+  target, or a convoy harvester flies on) and warships spread apart (`spread`); each rival's truce timers run and it `think`s once a second (including `contestBeacon`,
   `contestDerelicts`, `considerTruce` and falling hurt ships back); the pact is signed or raids;
   dead entities are removed (kills, veteran credit, razes, pressure, shards and a lost flagship are
   recorded here, after mines go off); research, the flagship's build, the beacon, shards, the
@@ -591,6 +602,9 @@ Test hooks (read by `e2e/playthrough.spec.ts`):
   `updateCover`, `updateFog` or `train`.
 - **A new rivals-panel action**: a method on `World` (so the AI could use it too), a `RivalButton`
   action in `GameScene.drawRivals` and its case in `onDown`.
+- **Pathing numbers**: `ROCK_OVERLAP`, `ROUTE_MS`, `SPREAD`, `SPREAD_SPEED` and `REACH` at the top
+  of `game/world.ts`, `PATH_CELL` in `game/pathing.ts`. A wing flies to the beacon and the
+  playthrough's box selects the fresh wing, so check it still plays.
 - **Research or expansion numbers**: `game/research.ts` and the expansion constants in
   `game/world.ts`; the tooltips read them, so update the README's numbers.
 - **Anything the playthrough depends on** (button positions, the first-round numbers, the hub or

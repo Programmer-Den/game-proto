@@ -110,6 +110,27 @@ come faster.
 
 ![A swarm of wisps and an elite conductor on the Storm world](docs/screenshots/world-storm.webp)
 
+### Rift heat
+
+Once a hero has won a run, its detail panel on the hero select shows a **Heat** row above Fight:
+tap the arrows (or press Left and Right) to pick the rift heat of the next run, from 0 (the
+crusade as designed) up to one above the highest heat that hero has won at. Each heat keeps every
+rule below it and adds one:
+
+| Heat | Adds |
+| --- | --- |
+| 1 | Elites come twice as often (every 25 s after the first) |
+| 2 | Foes hit a quarter harder |
+| 3 | No rest stops on the star map |
+| 4 | Below a quarter of its health a boss goes into a frenzy: it attacks half again as fast and moves faster |
+| 5 | Foes and bosses have a quarter more health |
+
+Winning at a heat opens the next one for that hero, up to heat 5. The best heat won shows on the
+hero's card beside its wins, the HUD names the heat under way after the planet, and the end screen
+says which heat the run was at. Heat stacks with the difficulty setting.
+
+![The Heat row on the hero select](docs/screenshots/rift-heat.webp)
+
 ### The space map
 
 After the boss of the Dune world falls (and again after the second world's), the space map shows

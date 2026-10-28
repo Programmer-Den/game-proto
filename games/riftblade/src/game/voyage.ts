@@ -8,6 +8,7 @@ import { collectAll, heal, lower, nextPick, pop, raise, refreshHealth, spawnElit
 import { FILLER, MAX_TIER, UPGRADES, UPGRADE_IDS, canOffer, rollChoices } from './upgrades';
 import { t } from '../i18n';
 import { checkDeeds } from './blades';
+import { hot } from './heat';
 import { CREDITS, LAST_STAGE, NODE_INFO, PLANETS, REST_HEAL, TRADE, arenaElites, planetsAt, type EventId, type NodeKind } from './planets';
 
 /** One frame of the game: the sim while a fight is on, then whatever follows a cleared fight. */
@@ -76,13 +77,13 @@ export function chooseWorld(s: GameState, index: number) {
   const planet = chartOptions(s)[index];
   if (planet === undefined) return;
   s.next = planet;
-  s.nodes = rollNodes();
+  s.nodes = rollNodes(hot(s.heat, 'noRest'));
   s.phase = 'map';
 }
 
-/** Two or three different nodes for the star map. */
-export function rollNodes(): NodeKind[] {
-  const kinds = Object.keys(NODE_INFO) as NodeKind[];
+/** Two or three different nodes for the star map (never a rest at rift heat 3 and up). */
+export function rollNodes(noRest = false): NodeKind[] {
+  const kinds = (Object.keys(NODE_INFO) as NodeKind[]).filter((k) => !noRest || k !== 'rest');
   const count = Math.random() < 0.5 ? 2 : 3;
   const out: NodeKind[] = [];
   while (out.length < count) out.push(kinds.splice(Math.floor(Math.random() * kinds.length), 1)[0]);
