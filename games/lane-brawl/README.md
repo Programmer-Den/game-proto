@@ -247,7 +247,13 @@ left, under bevelled slate panels.
 
     ![A fire drake awake in its pit on the river](docs/screenshots/drake.webp)
     ![The chip for blue's two drakes, fire and stone](docs/screenshots/drake-stacks.webp)
-24. **Winning** destroys the red Nexus. Losing means your Nexus falls first.
+24. **Early gold**: the first champion kill of the match is **first blood** and pays 150 gold on
+    top. Until 5:00 each team's outer tower on every lane wears five **plates**, gold pips over its
+    bar: each fifth of its health it loses breaks one, worth 120 gold split between the enemy
+    champions within 700 px. At 5:00 the plates fall away.
+
+    ![A red outer tower with one of its five plates broken](docs/screenshots/plates.webp)
+25. **Winning** destroys the red Nexus. Losing means your Nexus falls first.
 
 Every ability has an animation of its own (a hammer that splits the ground, a meteor from the
 sky, a harpoon on its rope, a coil pylon arcing, a blood moon rising and so on), and so do bolts in

@@ -23,6 +23,8 @@ import {
   RUNE,
   RUNES,
   RUNE_ORDER,
+  PLATING,
+  FIRST_BLOOD,
   DRAKE,
   DRAKES,
   DRAKE_ORDER,
@@ -113,6 +115,11 @@ export function tick(s: GameState, dt: number) {
   updateGanks(s);
   updateJungle(s);
   updateRunes(s);
+  if (!s.platesGone && s.time >= PLATING.until) {
+    s.platesGone = true;
+    for (const u of s.units) u.plates = 0;
+    notice(s, text('noticePlatesGone'), '#f2c14e');
+  }
   if (s.pings.length && s.time - s.pings[0].at > PING.showMs) s.pings = s.pings.filter((p) => s.time - p.at <= PING.showMs);
   for (const u of [...s.units]) updateUnit(s, u, dt);
   updateProjectiles(s, dt);
@@ -774,6 +781,7 @@ export function damage(s: GameState, t: Unit, amount: number, sourceId: number, 
   }
   const lost = Math.min(Math.max(0, t.hp), rest);
   t.hp -= rest;
+  if (t.plates > 0 && s.time < PLATING.until) breakPlates(s, t);
   // The player's champion keeps what hurt it lately, for the death recap.
   if (t.id === s.player && lost > 0) {
     s.playerHits.push({ at: s.time, src: sourceId, how, amount: lost });
@@ -801,6 +809,24 @@ export function damage(s: GameState, t: Unit, amount: number, sourceId: number, 
   }
   if (t.hp <= 0) kill(s, t, sourceId);
   return lost;
+}
+
+/** An outer tower that lost a share of its health drops a plate for each, paying the enemy champions near it. */
+function breakPlates(s: GameState, t: Unit) {
+  const left = Math.max(0, Math.ceil((t.hp / t.maxHp) * PLATING.count - 1e-6));
+  while (t.plates > left) {
+    t.plates--;
+    const near = s.units.filter((c) => c.kind === 'champion' && !c.dead && c.side !== t.side && c.side !== 'neutral' && dist(c, t) <= PLATING.share);
+    s.fx.push({ kind: 'ring', x: t.x, y: t.y - 30, r: 40, color: '#f2c14e', ms: 400 });
+    if (!near.length) continue;
+    const gold = Math.round(PLATING.gold / near.length);
+    for (const c of near) {
+      c.gold += gold;
+      if (c.player) s.fx.push({ kind: 'coin', x: t.x, y: t.y - 40, gold, color: '#f2c14e', ms: 900 });
+    }
+    sound(s, 'plate', t, near.some((c) => c.player));
+    aiLog(near[0].side as Team, `breaks a plate off the ${t.lane} tower for ${gold} gold each`);
+  }
 }
 
 /** Which hit an ability's look (`${championId}.${key}`) stands for: the key, or a plain attack without one. */
@@ -1153,6 +1179,14 @@ function kill(s: GameState, t: Unit, killerId: number) {
         // Rook, the bounty hunter, gets more for a head with a price on it.
         const bounty = Math.round(bountyOf(streak) * (1 + (champKiller.champ?.perk?.bountyGold ?? 0) / 100));
         champKiller.gold += KILL.gold + bounty;
+        // The first kill of the match pays extra.
+        const first = !s.firstBlood;
+        if (first) {
+          s.firstBlood = true;
+          champKiller.gold += FIRST_BLOOD.gold;
+          sound(s, 'firstBlood', undefined, champKiller.player);
+          aiLog(champKiller.side as Team, `${shortName(champKiller.name)} draws first blood`);
+        }
         champKiller.kills++;
         champKiller.killStreak++;
         gainXp(s, champKiller, KILL.xp);
@@ -1164,6 +1198,7 @@ function kill(s: GameState, t: Unit, killerId: number) {
             ? text('noticeSlewYou', { killer: shortName(champKiller.name) })
             : text('noticeSlew', { killer: shortName(champKiller.name), victim: shortName(t.name) });
         notice(s, bounty ? text('noticeBountyClaimed', { line: slain, gold: bounty }) : slain, SIDE_COLOR[side]);
+        if (first) notice(s, text('noticeFirstBlood', { line: slain, gold: FIRST_BLOOD.gold }), '#f2c14e');
         // Three kills in a row put a price on the killer's head, and every kill after raises it.
         const price = bountyOf(champKiller.killStreak);
         if (price || bounty) sound(s, 'streak', undefined, champKiller.player);

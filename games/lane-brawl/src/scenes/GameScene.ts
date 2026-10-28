@@ -47,6 +47,7 @@ import {
   PING,
   PINGS,
   RECAP,
+  PLATING,
   CAMP_KINDS,
   DRAKE,
   DRAKES,
@@ -1336,6 +1337,14 @@ export class GameScene extends Phaser.Scene {
     g.fillStyle(col(fill), 1).fillRect(x, y, w * ratio, h);
     g.fillStyle(0xffffff, 0.25).fillRect(x, y, w * ratio, 1.5);
     if (u.shield > 0) g.fillStyle(0xd6efff, 1).fillRect(x, y - 3, Math.min(w, (u.shield / u.maxHp) * w), 2);
+    // An outer tower's plates, early on: gold pips over the bar, one per plate still on.
+    if (u.plates > 0) {
+      for (let i = 0; i < PLATING.count; i++) {
+        const px = x + (i + 0.5) * (w / PLATING.count) - 4;
+        g.fillStyle(col(UI.edge), 0.9).fillRect(px - 1, y - 7, 10, 5);
+        g.fillStyle(col(i < u.plates ? UI.gold : '#3a4256'), 1).fillRect(px, y - 6, 8, 3);
+      }
+    }
     if (u.kind === 'champion') {
       // The level in a small slate badge at the bar's left.
       g.fillStyle(col(UI.slateDark), 1).fillRect(x - 13, y - 3, 12, 12);

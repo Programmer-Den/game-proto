@@ -13,6 +13,7 @@ import {
   PingKind,
   DRAKE,
   DRAKE_ORDER,
+  PLATING,
   DrakeElement,
   AbilityKey,
   BASE,
@@ -152,6 +153,8 @@ export interface Unit {
   /** AI champions: the camp or watchstone it went into the jungle for, and until when. */
   jungleTarget: number | null;
   jungleUntil: number;
+  /** Outer towers: the plates still on it (`PLATING`), until they fall away. */
+  plates: number;
   /** Champions: the bonus of their team's drake stacks (`DRAKES`), counted in with the buffs; null with none. */
   drake: BuffDef | null;
   /** AI champions: the point a ping of the player's sent it to, the enemy marked there, and until when. */
@@ -261,7 +264,7 @@ export type SoundId =
   | 'burst' | 'bolt' | 'dash' | 'ally' | 'buff' | 'zone' | 'impact'
   | 'lastHit' | 'slain' | 'youDie' | 'streak' | 'crash' | 'nexus' | 'wardBreak'
   | 'levelUp' | 'flask' | 'blink' | 'ward' | 'recallHome' | 'respawn' | 'buyBack'
-  | 'wave' | 'watchstone' | 'rune' | 'runeTaken' | 'mercs' | 'spell' | 'ping' | 'drake' | 'drakeWakes' | 'growl' | 'beastSlain' | 'brute' | 'objective' | 'objectiveMissed';
+  | 'wave' | 'watchstone' | 'rune' | 'runeTaken' | 'mercs' | 'spell' | 'ping' | 'drake' | 'drakeWakes' | 'firstBlood' | 'plate' | 'growl' | 'beastSlain' | 'brute' | 'objective' | 'objectiveMissed';
 
 /**
  * A sound raised by the rules: at a point in the world (the view plays it only where blue sees and
@@ -354,6 +357,9 @@ export interface GameState {
   runes: ({ kind: RuneKind; x: number; y: number } | null)[];
   nextRune: number;
   runeRounds: number;
+  /** Whether the match's first champion kill has fallen, and whether the tower plates have fallen away. */
+  firstBlood: boolean;
+  platesGone: boolean;
   /** The river drake's unit id, its element now, how many have woken, and each team's stacks. */
   drake: number;
   drakeElement: DrakeElement;
@@ -488,6 +494,7 @@ export function blankUnit(
     gankUntil: 0,
     jungleTarget: null,
     jungleUntil: 0,
+    plates: 0,
     drake: null,
     pingGoal: null,
     pingTarget: null,
@@ -608,6 +615,8 @@ export function createGame(pick: ChampionDef, enemyDamage: number, opts: MatchOp
     runes: RUNE.spots.map(() => null),
     nextRune: RUNE.firstAt,
     runeRounds: 0,
+    firstBlood: false,
+    platesGone: false,
     drake: 0,
     drakeElement: DRAKE_ORDER[0],
     drakeRounds: 0,
@@ -643,6 +652,9 @@ export function createGame(pick: ChampionDef, enemyDamage: number, opts: MatchOp
         radius: TOWER.radius,
     });
     tower.lane = t.lane;
+    // The outer tower of a lane, the one farther from its Nexus, wears plates early on.
+    const twin = TOWERS.find((o) => o !== t && o.team === t.team && o.lane === t.lane);
+    if (twin && Math.hypot(t.x - BASE[t.team].x, t.y - BASE[t.team].y) > Math.hypot(twin.x - BASE[t.team].x, twin.y - BASE[t.team].y)) tower.plates = PLATING.count;
     s.units.push(tower);
   }
   for (const spot of INHIBITORS) {
