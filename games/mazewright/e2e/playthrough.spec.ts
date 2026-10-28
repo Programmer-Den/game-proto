@@ -2,7 +2,8 @@ import { expect, test, type Page } from '@playwright/test';
 
 // Plays the first wave on the Meadow with real inputs: picks the garden, drags a line of hedges
 // across the lawn, tries to plant the one tile that would close the last way through (and checks
-// it is refused), sets three bows by the gap, sends wave 1 and waits until every beetle is beaten.
+// it is refused), sets three bows by the gap, sends wave 1 and waits until every beetle is beaten,
+// which earns the first trophy.
 // Game state is only read, through the `game` object the dev build puts on window.
 
 interface State {
@@ -236,6 +237,10 @@ test('plays the first round', async ({ page }, testInfo) => {
   expect(s.foes).toBe(0);
   expect(s.gold).toBe(goldBefore + WAVE_1 * BEETLE_GOLD + WAVE_1_REWARD);
   await snap('playthrough-4-held');
+
+  // Holding wave 1 earns the First hedge row trophy (src/trophies/), and nothing else yet.
+  const trophies = await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('mazewright-trophies') ?? '{}')));
+  expect(trophies, 'trophies earned in the first round').toEqual(['firstHold']);
 
   expect(errors).toEqual([]);
   const seconds = gameMs / 1000;

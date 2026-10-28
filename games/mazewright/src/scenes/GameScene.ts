@@ -3,6 +3,7 @@ import { playMusic, playSting, ui } from '../../../../shared/audio';
 import { viewFrame, viewSize } from '../../../../shared/scaling';
 import { formatNumber } from '../../../../shared/i18n';
 import { settings } from '../../../../shared/settings';
+import { award } from '../../../../shared/trophies';
 import { SFX, SONG } from '../audio';
 import { distances, route } from '../game/grid';
 import { cellIndex, cellOf, MAPS, SEASON_STARS, SEASONS, type MapDef, type Season } from '../game/maps';
@@ -14,6 +15,7 @@ import {
 import { DIRS } from '../game/grid';
 import { aims, ALWAYS, FREE, harms, MASTER, masterSeeds, SLOT_SEEDS, towerSeeds, COLS, FOE, MODES, ROWS, SANDBOX_GOLD, GATE_WAVES, TOWER, TOWERS, waveGroups, WAVES, type FoeKind, type Mode, type TowerKind, type TrapKind } from '../game/rules';
 import { t, type TextKey } from '../i18n';
+import { trophies } from '../trophies';
 import * as art from './art';
 import { C } from './art';
 import { BACK_BUTTON, BAR_H, CARDS, CELL, CHIPS, DEPTH, GRID, PANEL, SPEED_BUTTON, TIP_X, TOOLS, VIEW, WAVE_BUTTON } from './layout';
@@ -25,6 +27,11 @@ type Hit = { x: number; y: number; w: number; h: number; onTap: () => void; enab
 type Tool = TowerKind | ToolMode | 'none';
 type ToolMode = 'upgrade' | 'sell';
 const isMode = (tool: Tool): tool is ToolMode => tool === 'upgrade' || tool === 'sell';
+
+/** Steps from a burrow to the cottage for The long way round. */
+const LONG_MAZE = 60;
+/** Waves held in Endless for The hedge that never ends. */
+const ENDLESS_WAVES = 30;
 
 /** The game runs in fixed steps of this many seconds, so it plays the same on every frame rate. */
 const STEP = 1 / 60;
@@ -150,6 +157,8 @@ export class GameScene extends Phaser.Scene {
     this.pouch = loadPouch(this.shed);
     this.replays = loadReplays();
     this.saved = loadGame();
+    // Trophies the records already earn, from before trophies or another device, come quietly.
+    this.recordTrophies(true);
     // The picker opens on the season of a game to go on with.
     if (this.saved) this.season = MAPS.find((m) => m.id === this.saved!.map)!.season;
     this.lawnG = this.add.graphics().setDepth(DEPTH.lawn);
@@ -248,6 +257,8 @@ export class GameScene extends Phaser.Scene {
     switch (e.type) {
       case 'built':
         SFX(e.kind === 'hedge' || TOWER[e.kind].trap ? 'plant' : 'build');
+        // A path garden's path is laid already, so only a maze of the player's own counts.
+        if (!g.map.path && Math.max(...g.gates.map((gate) => g.dist[gate])) >= LONG_MAZE) this.trophy('longMaze');
         this.goldNote(e.cell, -e.gold);
         this.changed();
         break;
@@ -256,6 +267,7 @@ export class GameScene extends Phaser.Scene {
         break;
       case 'upgraded':
         SFX('upgrade');
+        if (towerAt(g, e.cell)?.level === MASTER) this.trophy('master');
         this.goldNote(e.cell, -e.gold);
         this.changed();
         break;
@@ -377,15 +389,18 @@ export class GameScene extends Phaser.Scene {
       case 'cleared':
         SFX('cleared');
         if (g.phase !== 'won') this.say(t('cleared', { n: e.wave, gold: e.gold }));
+        this.trophy('firstHold');
         this.note(g, e.wave);
         break;
       case 'won':
         playSting(SONG, 'win');
         if (!this.replay) this.forget();
+        if (cabbagesLeft(g) >= g.maxLives) this.trophy('everyCabbage');
         if (g.mode !== 'sandbox' && !this.replay) {
           // A Challenge win earns the garden's challenge mark; its stars and time are a Classic record's.
           noteRecord(this.records, g.map.id, g.mode === 'challenge' ? { challenge: true } : { wave: g.wave, won: true, stars: stars(g), time: Math.round(g.clock) });
           saveReplay(this.replays, replayOf(g));
+          this.recordTrophies();
         }
         this.earn(g);
         break;
@@ -402,6 +417,27 @@ export class GameScene extends Phaser.Scene {
   private note(g: Game, waves: number) {
     if (g.mode === 'sandbox' || g.mode === 'challenge' || this.replay) return;
     noteRecord(this.records, g.map.id, g.mode === 'endless' ? { endless: waves } : { wave: waves });
+    this.recordTrophies();
+  }
+
+  /** Earns a trophy, unless a replay is only being watched. */
+  private trophy(id: string, quiet = false) {
+    if (!this.replay) award(trophies, id, { quiet });
+  }
+
+  /** The trophies the gardens' records earn: a win, Last Cabbage, the challenges, winter and Endless. */
+  private recordTrophies(quiet = false) {
+    const all = Object.values(this.records);
+    const stars = all.reduce((n, r) => n + r.stars + (r.challenge ? 1 : 0), 0);
+    const earned = {
+      firstWin: all.some((r) => r.won || r.challenge),
+      lastCabbage: this.records.lastcabbage.won || this.records.lastcabbage.challenge,
+      firstChallenge: all.some((r) => r.challenge),
+      allChallenges: all.every((r) => r.challenge),
+      winter: stars >= SEASON_STARS.winter,
+      endless: all.some((r) => r.endless >= ENDLESS_WAVES),
+    };
+    for (const [id, yes] of Object.entries(earned)) if (yes) this.trophy(id, quiet);
   }
 
   /** Pays a finished game's seeds into the potting shed. */
