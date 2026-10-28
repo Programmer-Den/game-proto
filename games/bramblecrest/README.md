@@ -66,6 +66,22 @@ chapter ends.
 
 ![Bramble Woods by lamplight](docs/screenshots/woods.webp)
 
+### After the end
+
+Once chapter two is told, the kingdom stays open, and there is more to do in it:
+
+- **Moonstone page.** **N**, or a tap on the moonstone counter, opens a page with each place's
+  moonstones, the found ones lit, so you know where to look again (but not where).
+- **Hourglass trials.** An hourglass now stands by the door of the shrine and of the belfry. Turn
+  it and every foe in that dungeon wakes again and its boss rises stronger: the Thornmother's bulbs
+  drop faster and her volleys come thicker, and the Bellwraith hunts faster and takes more hits. A
+  clock runs at the top until the boss falls, and the moonstone page keeps your best time. Leaving
+  the dungeon or falling ends the trial.
+
+![An hourglass trial in the Sunken Shrine, the clock running](docs/screenshots/trial.webp)
+
+![The moonstone page](docs/screenshots/moonstones.webp)
+
 ### Hearts and falls
 
 You have three hearts on Normal (five on Easy, two on Hard). Foes, thorn seeds, bursts and the
@@ -107,13 +123,13 @@ the north gate, checking the quest, items, flags and save at each step. Run it w
 | `src/main.ts` | Creates the game and hands it to the hub's `setupGame` and `setupScaling` |
 | `src/howToPlay.ts` | The How to play shown on the start and pause screens |
 | `src/game/maps.ts` | The five maps as tile grids, with their people, chests, signs, exits, foes, posts, doors, blocks, plates, rooms and moonstones |
-| `src/game/state.ts` | The save: where the knight is, hearts, items, keys, moonstones, flags and the quest |
+| `src/game/state.ts` | The save: where the knight is, hearts, items, keys, moonstones, flags, the quest and the trials' best times |
 | `src/game/talk.ts` | What each person says, by where the quest stands |
 | `src/game/path.ts` | A* for tap-to-walk |
 | `src/art/paint.ts` | Every sprite, painted onto canvases in soft 3D |
 | `src/art/ground.ts` | Paints each map's ground into one texture |
 | `src/scenes/GameScene.ts` | The world: walking, the sword, the hookvine, bellseeds, foes, puzzles, the bosses and the story |
-| `src/scenes/foes.ts` | Foe stats, bellseed timings and the two bosses' timings |
+| `src/scenes/foes.ts` | Foe stats, bellseed timings and the two bosses' timings, and how much harder they are in a trial |
 | `src/scenes/light.ts` | The night: the dark, the lamp glow and the miniature haze |
-| `src/scenes/hud.ts` | Hearts, moonstones, keys, bellseeds, the journal line, dialog, touch buttons and the end card |
+| `src/scenes/hud.ts` | Hearts, moonstones, keys, bellseeds, the journal line, dialog, touch buttons, the trial's clock, the moonstone page and the end card |
 | `src/scenes/layout.ts` | The view, speeds, reaches and button positions |
