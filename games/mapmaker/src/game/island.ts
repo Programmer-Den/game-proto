@@ -16,6 +16,8 @@ export interface Island {
   port: Point;
   riddle: Riddle | null;
   features: Feature[];
+  /** The seed it was rolled from: `makeIsland(number, seed)` rolls the same isle again, so a save keeps only this. */
+  seed: number;
 }
 
 /**
@@ -23,21 +25,37 @@ export interface Island {
  * high ground, forests and meadows elsewhere, rivers down to the sea, villages and ruins away from
  * the port and a road to the nearest village, finds hidden under some tiles and a treasure riddle.
  * Every tile starts under fog except the port on the south coast. Later islands have more
- * landmarks, and each kind of isle (`kindOf`) has its own mix.
+ * landmarks, and each kind of isle (`kindOf`) has its own mix. All of it comes from `seed`, so the
+ * same number and seed always roll the same isle (which is how a save rebuilds it).
  */
-export function makeIsland(number: number): Island {
+export function makeIsland(number: number, seed = newSeed()): Island {
   const kind = kindOf(number);
+  const random = seeded(seed);
   for (;;) {
-    const island = tryIsland(number, kind, KINDS[kind]);
-    if (island) return island;
+    const island = tryIsland(number, kind, KINDS[kind], random);
+    if (island) return { ...island, seed };
   }
 }
 
-function tryIsland(number: number, kind: IsleKind, k: KindInfo): Island | null {
+/** A fresh isle seed, a whole number below 2^32, from `Math.random` (which the playthrough seeds). */
+export const newSeed = () => Math.floor(Math.random() * 2 ** 32);
+
+/** A small seeded random in [0, 1) (mulberry32), so an isle rolls the same from the same seed. */
+function seeded(seed: number) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function tryIsland(number: number, kind: IsleKind, k: KindInfo, random: () => number): Omit<Island, 'seed'> | null {
   const { w, h } = GRID;
-  const heightNoise = valueNoise(k.cell);
-  const woodNoise = valueNoise(3);
-  const reliefNoise = valueNoise(3);
+  const heightNoise = valueNoise(k.cell, random);
+  const woodNoise = valueNoise(3, random);
+  const reliefNoise = valueNoise(3, random);
   const cx = (w - 1) / 2;
   const cy = (h - 1) / 2;
   const height = (x: number, y: number) => {
@@ -81,7 +99,7 @@ function tryIsland(number: number, kind: IsleKind, k: KindInfo): Island | null {
       let spots = biggest.filter((p) => on.includes(terrain[indexOf(p.x, p.y)]) && far(p, distance));
       if (spots.length === 0) spots = biggest.filter((p) => ['grass', 'forest', 'beach'].includes(terrain[indexOf(p.x, p.y)]) && far(p, 2));
       if (spots.length === 0) return;
-      const p = spots[Math.floor(Math.random() * spots.length)];
+      const p = spots[Math.floor(random() * spots.length)];
       terrain[indexOf(p.x, p.y)] = kind;
     }
   };
@@ -105,12 +123,12 @@ function tryIsland(number: number, kind: IsleKind, k: KindInfo): Island | null {
         }
       }
       if (spots.length === 0) break;
-      const p = spots[Math.floor(Math.random() * spots.length)];
+      const p = spots[Math.floor(random() * spots.length)];
       tiles[indexOf(p.x, p.y)].find = f.find;
     }
   }
 
-  return { kind, tiles, port: { x: port.x, y: port.y }, riddle: makeRiddle(tiles, port), features: findFeatures(terrain, number) };
+  return { kind, tiles, port: { x: port.x, y: port.y }, riddle: makeRiddle(tiles, port, random), features: findFeatures(terrain, number) };
 }
 
 // ---- Features: the rivers, roads and woods that pay a bonus once charted whole.
@@ -290,7 +308,7 @@ const MARK_ORDER = ['ruins', 'port', 'village', 'mountain'];
  * Picks a hidden tile and two or three clues that point at it and at no other tile you could dig
  * ("Two tiles west of a peak, by the water"). Null when no tile can be told apart.
  */
-function makeRiddle(tiles: Tile[], port: Point): Riddle | null {
+function makeRiddle(tiles: Tile[], port: Point, random: () => number): Riddle | null {
   const T = (x: number, y: number): Terrain => (inGrid(x, y) ? tiles[indexOf(x, y)].terrain : 'sea');
   const diggable: Point[] = [];
   for (let y = 0; y < GRID.h; y++) for (let x = 0; x < GRID.w; x++) if (T(x, y) !== 'sea' && T(x, y) !== 'port') diggable.push({ x, y });
@@ -298,7 +316,7 @@ function makeRiddle(tiles: Tile[], port: Point): Riddle | null {
     (p) => GROUND.includes(T(p.x, p.y) as Ground) && !tiles[indexOf(p.x, p.y)].find && Math.abs(p.x - port.x) + Math.abs(p.y - port.y) >= 4,
   );
   const by = (x: number, y: number, t: Terrain) => neighbours(x, y).some((n) => T(n.x, n.y) === t);
-  const start = spots.length ? Math.floor(Math.random() * spots.length) : 0;
+  const start = spots.length ? Math.floor(random() * spots.length) : 0;
   for (let k = 0; k < spots.length; k++) {
     const at = spots[(start + k) % spots.length];
     const ground = T(at.x, at.y) as Ground;
@@ -330,11 +348,11 @@ function makeRiddle(tiles: Tile[], port: Point): Riddle | null {
 }
 
 /** Smooth noise in [0, 1) over the grid: random values every `cell` tiles, blended between. */
-function valueNoise(cell: number) {
+function valueNoise(cell: number, random: () => number) {
   const { w, h } = GRID;
   const lw = Math.ceil(w / cell) + 2;
   const lh = Math.ceil(h / cell) + 2;
-  const lattice = Array.from({ length: lw * lh }, () => Math.random());
+  const lattice = Array.from({ length: lw * lh }, () => random());
   const at = (i: number, j: number) => lattice[j * lw + i];
   const smooth = (t: number) => t * t * (3 - 2 * t);
   const out: number[] = [];

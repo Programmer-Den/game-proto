@@ -184,6 +184,11 @@ export interface GameState {
   /** The island being charted, from 1; a new one comes once every tile you can reach is charted. */
   island: number;
   kind: IsleKind;
+  /**
+   * The seed the isle was rolled from (`makeIsland`), so a save keeps it instead of the tiles,
+   * port, features and riddle. Unset on an isle loaded from a save made before seeds, which saves in full.
+   */
+  seed?: number;
   /** Voyages made, from 1. */
   voyage: number;
   phase: Phase;
