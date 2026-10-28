@@ -212,6 +212,9 @@ test('plays the first round', async ({ page }, testInfo) => {
   await play(STEP_MS, async () => false);
   const saved = JSON.parse((await page.evaluate(() => localStorage.getItem('ninefold-progress')))!);
   expect(saved).toMatchObject({ solved: 1, bestFloor: 1, unlocked: ['paper', 'pixel'] });
+  // The first solve earns the First fill trophy (src/trophies/), and nothing else yet: it had a mistake.
+  const earned = await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('ninefold-trophies') ?? '{}')));
+  expect(earned, 'trophies earned in the first round').toEqual(['firstSolve']);
   await snap('3-relics');
 
   // Taking the first relic goes down to floor 2, a 6x6 board, with the relic's effect.
