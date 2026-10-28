@@ -1212,6 +1212,22 @@ export const RUNE = {
   aiMinHp: 0.5,
 };
 
+/**
+ * Pings: the player marks a point (or an enemy on it) for the AI allies. `attack` sends the
+ * `answer` nearest free allies within `reach` there (to hit the enemy marked), `gather` calls the
+ * free allies within `near` of the point to wait there, and `danger` makes the allies within `near`
+ * fall back. Allies keep a ping's errand for `ms`; the marker shows for `showMs`. The player can
+ * ping again after `cd`; `pick` is how close to an enemy a ping must land to mark it.
+ */
+export type PingKind = 'attack' | 'gather' | 'danger';
+export const PING_KINDS: PingKind[] = ['attack', 'gather', 'danger'];
+export const PINGS: Record<PingKind, { name: TextKey; color: string }> = {
+  attack: { name: 'pingAttack', color: '#ff8a3d' },
+  gather: { name: 'pingGather', color: '#7fe08a' },
+  danger: { name: 'pingDanger', color: '#f2c14e' },
+};
+export const PING = { answer: 2, reach: 2200, near: 900, ms: 12_000, showMs: 4000, cd: 1200, pick: 60, minHp: 0.4 };
+
 export const JUNGLE = { firstAt: 120_000, every: 45_000, ms: 30_000, minHp: 0.6 };
 export const RETREAT = {
   /** Health ratio under which a champion with an enemy champion near falls back. */
