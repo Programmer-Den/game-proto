@@ -11,7 +11,7 @@ import {
   act, canHint, canUndo, dailyDone, draftPick, drag, hint, next, quit, skip, startRun, startSecondPlayer, takeRelic, tick, undo,
   BLITZ_PENALTY_S, DUEL_FAIL_S, QUEUE, type Card, type Run,
 } from '../game/run';
-import { loadProgress, saveProgress } from '../game/save';
+import { clearRun, loadProgress, loadRun, saveProgress, saveRun } from '../game/save';
 import { t, type TextKey } from '../i18n';
 import { drawGlyph, drawKindIcon, drawRelic, trace } from './glyphs';
 import { layoutFor, UI_DEPTH, VIEW, WIDE, type Layout } from './layout';
@@ -46,6 +46,8 @@ const tenthsText = (ms: number) => {
 export class GameScene extends Phaser.Scene {
   progress!: Progress;
   run: Run | null = null;
+  /** A run saved before the last reload, which the menu's Continue picks up. */
+  saved: Run | null = null;
   screen: 'menu' | 'practice' | 'records' | 'run' = 'menu';
   practiceLevel: Level = 0;
   /** Spots for the test: every tappable thing on screen by id, centred, in view pixels. */
@@ -64,6 +66,8 @@ export class GameScene extends Phaser.Scene {
   private clockKey = '';
   private dragging = false;
   private lastTime = 0;
+  /** Where the run in play stood when it was last saved: it is saved again when this changes. */
+  private saveKey = '';
 
   constructor() {
     super('Game');
@@ -71,6 +75,7 @@ export class GameScene extends Phaser.Scene {
 
   create() {
     this.progress = loadProgress();
+    this.saved = loadRun(this.progress);
     this.backdrop = this.add.graphics().setDepth(0);
     this.p = new Painter(this, UI_DEPTH);
     this.fitView();
@@ -103,6 +108,7 @@ export class GameScene extends Phaser.Scene {
       tick(run, dt);
       if (run.current?.card.kind === 'echo' && run.current.state.step !== step && step >= 0) SFX('turn');
       this.drain();
+      this.keepRun(run);
       const cur = run.current;
       const key = [run.phase, Math.floor((cur?.timeLeftMs ?? 0) / 100), Math.floor(run.clockMs / 100), cur?.card.kind === 'echo' ? Math.floor(cur.state.ms / 100) + cur.state.step * 100 : 0].join('|');
       if (key !== this.clockKey) (this.clockKey = key), (this.dirty = true);
@@ -212,6 +218,10 @@ export class GameScene extends Phaser.Scene {
   private start(mode: Mode, kind?: KindId) {
     if (mode === 'daily' && dailyDone(this.progress)) return ui('refuse');
     ui('click');
+    // A new run ends the saved one there, its bests and its run recorded as if it was left.
+    if (this.saved) quit(this.saved);
+    this.saved = null;
+    clearRun();
     resetUnjam();
     this.run = startRun(mode, this.progress, { kind, level: this.practiceLevel });
     this.screen = 'run';
@@ -224,7 +234,32 @@ export class GameScene extends Phaser.Scene {
     if (this.run) quit(this.run);
     this.run = null;
     this.screen = 'menu';
+    this.saveKey = '';
+    clearRun();
     saveProgress(this.progress);
+  }
+
+  /** Picks up the run saved before a reload where it was saved. */
+  private resume() {
+    if (!this.saved) return;
+    ui('click');
+    resetUnjam();
+    this.run = this.saved;
+    this.saved = null;
+    this.screen = 'run';
+  }
+
+  /**
+   * Saves the run (not Practice) each time it moves on: a puzzle dealt or ended, a draft or relic
+   * offer, the hand-over. An ended run is cleared, as its records are already saved.
+   */
+  private keepRun(run: Run) {
+    if (run.mode === 'practice') return;
+    const key = [run.phase, run.dealt, run.results.length, run.relics.length, run.player].join('|');
+    if (key === this.saveKey) return;
+    this.saveKey = key;
+    if (run.phase === 'over') clearRun();
+    else saveRun(run);
   }
 
   private drain() {
@@ -315,7 +350,10 @@ export class GameScene extends Phaser.Scene {
       p.text(x, y + h / 2 - 16, this.modeBest(mode), { size: 11, color: C.cyanText, wrap: w - 12 });
       p.hit(`mode-${mode}`, x - w / 2, y - h / 2, w, h, () => (mode === 'practice' ? (ui('click'), (this.screen = 'practice')) : this.start(mode)), !done);
     });
-    p.button('records', MENU.records.x, MENU.records.y, MENU.records.w, MENU.records.h, t('records'), () => {
+    const saved = this.saved;
+    const records = saved ? MENU.recordsAside : MENU.records;
+    if (saved) p.button('resume', MENU.resume.x, MENU.resume.y, MENU.resume.w, MENU.resume.h, t('resume', { mode: t(`${saved.mode}Name` as TextKey) }), () => this.resume(), { accent: true, size: 14 });
+    p.button('records', records.x, records.y, records.w, records.h, t('records'), () => {
       ui('click');
       this.screen = 'records';
     });
