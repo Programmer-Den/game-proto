@@ -250,6 +250,17 @@ Implemented today:
   sits; it replaces the shop and hides the objective card, buffs and notice while it shows): per
   team, each champion's class colour, name and class, level, K / D / A, last hits, items and its
   respawn timer or bounty. The bottom bar's score line reads `K/D/A` plus the player's last hits.
+- River runes (LB13): `updateRunes` (in `tick`) fills `s.runes` (one per `RUNE.spots`, on the
+  river between the watchstones) every `RUNE.every` from `RUNE.firstAt`, the kinds by
+  `RUNE_ORDER[(s.runeRounds + i * 2) % 4]` (no `Math.random`), replacing any left, with a notice and
+  the `rune` sound. The first living champion within `RUNE.pick` takes one: `RUNES[kind]` gives a
+  `buff` for `ms` (its id is the rune's name key, so the buff strip names it) or `gold` plus
+  `teamGold` to each teammate, with a ring fx, the `runeTaken` sound and a notice (red's only when
+  blue sees the taker). In `championPlan`, after the lane fight check and before the beast,
+  `runeFor` sends an AI champion to a rune within `RUNE.aiReach` when it has `RUNE.aiMinHp` of its
+  health and no AI teammate is nearer. The view draws the stone rings always and a hovering hexagon
+  gem with the kind's mark (`drawRunes`, bobbing unless motion is reduced) and a minimap dot while
+  the spot is out of the fog.
 - Victory and defeat panel with the match's objectives, last hits, best streak and beasts slain,
   and "Play again".
 
@@ -363,7 +374,7 @@ File map (`src/`):
   `ACTIVES`, `MAX_ITEMS`, `BEAST`, `BEAST_BUFF`, `ELDER`, `BEAST_CONTESTERS`, `INHIBITORS`, `INHIBITOR`,
   `SUPER_MINION`, `BUSHES` (with `bushAt`), `BUSH_REVEAL`, `REVEAL_MS`, `GANK` and `RETREAT`, and
   round 2's `WARD`, `WARD_SPOTS`, `WARD_AI`, `RECALL`, `BUYBACK`, `BOUNTY` (with `bountyOf`),
-  `AI_BUILDS` and `AI_BUILD_FOR`, and `ASSIST`.
+  `AI_BUILDS` and `AI_BUILD_FOR`, `ASSIST`, and `RUNE`, `RUNES` and `RUNE_ORDER`.
 - `game/state.ts`: the types (`GameState`, `Unit`, `Projectile`, `Fx`, `Objective`,
   `UpgradeOffer`), `createGame`, `spawnWave`, `spawnChampion`, `spawnWard`, `refreshStats` (level
   and items into stats), `pathFor` (red walks lanes backwards), `laneNear` and small helpers. No
@@ -441,7 +452,7 @@ State model:
 - The upgrades' state: `beast`, `beastBuff`, `beastKills`, `contesters`, `nextGank`, `nextJungle`,
   `notices`; per AI champion `retreatUntil`, `gankTarget`, `gankUntil`, `jungleTarget`,
   `jungleUntil`; per champion `revealMs`, `aggroMs`, `activeCds`, and round 2's `killStreak`,
-  `wards`, `recallMs`, `lastRecallAt` and `buybackReadyAt`, and the scoreboard's `assists`, `cs` and `hurtBy`.
+  `wards`, `recallMs`, `lastRecallAt` and `buybackReadyAt`, and the scoreboard's `assists`, `cs` and `hurtBy`; the game's `runes`, `nextRune` and `runeRounds`.
 
 How it runs:
 
@@ -515,6 +526,7 @@ Effects (`sfx`), where they are raised:
 | `recall` / `recallHome` | the player starts a recall (`recall`) / arrives home (`finishRecall`) |
 | `respawn`, `buyBack` | the player's champion respawns (`updateUnit`) / buys back (`buyBack`) |
 | `wave` | a minion wave spawns (`tick`) |
+| `rune` / `runeTaken` | runes appear / a rune taken (the player's own, or one in view) (`updateRunes`) |
 | `watchstone`, `growl`, `beastSlain`, `brute` | a watchstone taken, the beast waking or turning elder, the beast slain, a brute's buff taken |
 | `objective` / `objectiveMissed` | the player's objective done / missed (`updateObjective`) |
 
@@ -571,14 +583,14 @@ Shared `ui` sounds: `click` for the Shop button, B and Play again; `coin` for a 
 - It saves `0-pick`, `1-shop`, `2-tower-down` and `3-upgrade` screenshots. `SWORD_ROW` is a point inside the Long
   Sword's card in the four-column shop (`shopRow(0)`, so the Long Sword stays first in `ITEMS`;
   the card is 74 px tall from y 86, so the click at y 146 lands in its lower half). The round ends near 40 s of game time, before the beast wakes (90 s) and the first gank
-  (100 s), so neither touches it; keep `BEAST.firstAt` and `GANK.firstAt` past it, and keep the
+  (100 s), so neither touches it, nor do the first runes (120 s); keep `BEAST.firstAt`, `GANK.firstAt` and `RUNE.firstAt` past it, and keep the
   bushes off the middle lane's paving and the path to the camp by the red mid tower. Copy them into
   `docs/screenshots/` as `playthrough-1-pick` to `playthrough-4-upgrade` when the look changes.
   `cover.png` (a copy of `new-cast.webp`), `new-cast.webp` (the shuffle steered with a fixed
   `Math.random` sequence so blue fields the five new classes), `ten-classes.webp`, `fog-of-war.webp`,
   `jungle-brute.webp`, `watchstone.webp`, `watch-ai.webp` (a `?watch` match at 8x with the log open), `skill-looks-1.webp` to
   `skill-looks-3.webp` (every ability's effect, five classes each), `aim-indicators.webp`,
-  `home-heal-and-dead-shop.webp`, `scoreboard.webp` (a match run 7 minutes with blue's fifth on the AI, Tab held), `loop-objective.webp`, `loop-last-hit.webp` and
+  `home-heal-and-dead-shop.webp`, `scoreboard.webp` (a match run 7 minutes with blue's fifth on the AI, Tab held), `river-rune.webp` (run to 2:00, the Warden placed by the first spot), `loop-objective.webp`, `loop-last-hit.webp` and
   `upgrade-*.webp` and `round2-*.webp` (the ward in the shop and planted by a bush, a recall, a
   bounty, the buy back button and the watch log of the AI shopping) and `german-pick.webp` (the pick
   screen with `?lang=de`, Grumm's card under the pointer) are staged docs shots (a scratch

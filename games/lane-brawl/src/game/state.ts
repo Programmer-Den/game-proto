@@ -5,6 +5,8 @@ import type { TextKey } from '../i18n';
 import {
   GANK,
   JUNGLE,
+  RUNE,
+  RuneKind,
   AbilityKey,
   BASE,
   BuffDef,
@@ -243,7 +245,7 @@ export type SoundId =
   | 'burst' | 'bolt' | 'dash' | 'ally' | 'buff' | 'zone' | 'impact'
   | 'lastHit' | 'slain' | 'youDie' | 'streak' | 'crash' | 'nexus' | 'wardBreak'
   | 'levelUp' | 'flask' | 'blink' | 'ward' | 'recallHome' | 'respawn' | 'buyBack'
-  | 'wave' | 'watchstone' | 'growl' | 'beastSlain' | 'brute' | 'objective' | 'objectiveMissed';
+  | 'wave' | 'watchstone' | 'rune' | 'runeTaken' | 'growl' | 'beastSlain' | 'brute' | 'objective' | 'objectiveMissed';
 
 /**
  * A sound raised by the rules: at a point in the world (the view plays it only where blue sees and
@@ -332,6 +334,10 @@ export interface GameState {
   /** When the AI next sends gankers, and next sends a champion into the jungle. */
   nextGank: number;
   nextJungle: number;
+  /** The rune at each of `RUNE.spots`, or null; when the next ones appear, and how many have so far. */
+  runes: ({ kind: RuneKind; x: number; y: number } | null)[];
+  nextRune: number;
+  runeRounds: number;
   /** Patches on the ground left by zone abilities. */
   zones: Zone[];
   /** Short messages for the player (the beast woke, an inhibitor fell), newest last. */
@@ -535,6 +541,9 @@ export function createGame(pick: ChampionDef, enemyDamage: number, opts: MatchOp
     contesters: [],
     nextGank: GANK.firstAt,
     nextJungle: JUNGLE.firstAt,
+    runes: RUNE.spots.map(() => null),
+    nextRune: RUNE.firstAt,
+    runeRounds: 0,
     zones: [],
     notices: [],
   };

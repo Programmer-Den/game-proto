@@ -376,6 +376,10 @@ const en = {
   // Jungle buffs
   buffEmber: 'Ember',
   buffMoss: 'Moss',
+  runeMight: 'Might',
+  runeHaste: 'Haste',
+  runeFortune: 'Fortune',
+  runeMending: 'Mending',
 
   // Jungle camps
   campBoar: 'Boar',
@@ -471,6 +475,10 @@ const en = {
   noticeBlueRoams: 'Your {name} roams to the {lane} lane',
   noticeWatchstoneBlue: 'Your team took a watchstone',
   noticeWatchstoneRed: 'Red took a watchstone',
+  noticeRunes: 'Runes appear in the river',
+  noticeRuneYou: 'You take the {rune} rune',
+  noticeRuneAlly: '{name} takes the {rune} rune',
+  noticeRuneRed: "Red's {name} takes the {rune} rune",
 
   // Bottom bar
   level: 'Lv {n}',
