@@ -63,7 +63,7 @@ and summer, autumn and winter open once 4, 10 and 18 stars are won across all ga
 | Spring | **Meadow** (open lawn), **Orchard** (rows of rocks), **Millpond** (a pond, a burrow at the top and the cottage in the corner) |
 | Summer | **Brook** (a brook with two fords and banks), **Warren** (three burrows), **Gravel Walk** (a path garden) |
 | Autumn | **Hillside** (a raised terrace), **Crossroads** (the cottage in the middle, four burrows), **Leaf Walk** (a winding path garden) |
-| Winter | **Ice Pond** (a frozen pond, three burrows), **Last Cabbage** (one cabbage, six burrows), **Snow Path** (a path garden with banks) |
+| Winter | **Ice Pond** (a frozen pond, three burrows), **Last Cabbage** (one cabbage, six burrows, 130 gold to start), **Snow Path** (a path garden with banks) |
 
 Rocks never move and nothing is planted on them. **Water** is the same for walkers, but moths fly
 over it and a sunglass beam shines across it. A tower on a raised **bank** (a lighter tile with a
