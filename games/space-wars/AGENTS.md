@@ -309,10 +309,20 @@ File map (`src/`):
   Every text on screen, the notices and problems `World` returns and the Watch AI log go through
   `t` (`tr` in `GameScene`, where `t` names the text helper in `create`); game logic compares ids
   and keys, never shown text.
+- `trophies/`: the game's trophies (`shared/trophies.ts`). `index.ts` lists them with `trophySet`
+  (it imports only its own texts, since the hub loads it), `i18n/en.ts` and `de.ts` hold the names
+  and `<id>Text`s, and `check.ts` has `checkTrophies(world)`, which `GameScene.update` calls every
+  frame after the battle steps: it awards each trophy whose condition (`EARNED`) holds, never while
+  watching. The trophies: `firstContract` (bronze, a contract done), `beacon` (bronze, the beacon
+  owned), `truce` (bronze, a rival under truce), `ace` (silver, a player ship with Ace's kills),
+  `derelicts` (silver, all three derelicts held), `flagship` (silver, the flagship out), `victory`
+  (silver, a battle won), `outpaced` (gold, all five contracts done while no rival's `deal.step`
+  has reached `CONTRACT_STEPS`) and `campaign` (gold, hidden: the last sector won). A battle never
+  replays time, so no award is quiet.
 - `audio.ts`: the game's sound (see "Sound" below): `SONG`, the `sfx` table, its `Sfx` names and
   `LASER_PITCH`. Only `GameScene` imports it.
 - `main.ts`: creates the `Phaser.Game` (960x540, `Phaser.Scale.FIT`, `pixelArt: false`) with
-  `GameScene`, calls `setupGame(game)` from `shared/setupGame.ts` and `setupScaling(game, { fill: true })` from
+  `GameScene`, calls `setupGame(game, { howToPlay, trophies })` from `shared/setupGame.ts` and `setupScaling(game, { fill: true })` from
   `shared/scaling.ts`, and in dev builds puts `game` on `window`. The canvas has `renderScale`
   canvas pixels per view pixel (see "Screen scaling" below).
 - `game/factions.ts`: the `FACTIONS` list (name, outpost name, colours, `tune` multipliers, the
@@ -520,7 +530,7 @@ follows or uses bounds (`scrollTo` clamps it), so it keeps the top-left origin r
 `e2e/screens.spec.ts` checks the game on five screens.
 
 Save keys: `space-wars-campaign` (`CAMPAIGN_KEY` in `game/campaign.ts`): the sector campaign, as
-`{ unlocked, kept }`. `loadCampaign` rounds `unlocked` to a whole sector and turns a `kept` goal
+`{ unlocked, kept }`, and `space-wars-trophies` (by `shared/trophies.ts`): the trophies earned. `loadCampaign` rounds `unlocked` to a whole sector and turns a `kept` goal
 the game no longer knows into `null`, so an old or hand-edited save still loads. Nothing else is kept between visits; the game reads the hub's settings
 (`byDifficulty`, `settings.reduceMotion`, the language through `shared/i18n.ts`) through `shared/`. The playthrough starts with empty
 storage, so it plays sector 1 with no kept perks.
@@ -540,6 +550,8 @@ Test hooks (read by `e2e/playthrough.spec.ts`):
   reward and perk, that the board offers two contracts with `kills` first, the beacon's capture and
   pay, and a kill and its salvage.
 - `scene.boardCards`: the board's cards; the test taps the `kills` card.
+- `localStorage['space-wars-trophies']`: the test checks the first round earns `firstContract` and
+  `beacon`, and nothing else.
 - `scene.selected`: the ids of the selected units; the test checks that its box selected the wing.
 - Not read by the test, but there: `scene.state.derelicts` (`perk`, `owner`, `claim`), `sides[i].deal`, `sides[i].truceMs`,
   `offerMs`, `grudge`, `flagship`, `units[i].kills`, `nebula`, `repairing`, `flagship`, `convoy`,

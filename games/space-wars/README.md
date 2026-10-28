@@ -316,6 +316,24 @@ Freight's Salvage Yard still pays its own 8 crystal on top for enemy ships destr
 
 ![A Solar Concord fleet breaking a Ferrox raid: a +8 floats over the wreck and +16 flashes by the crystal count, while a Veil Syndicate picket holds the relay beacon](docs/screenshots/salvage.webp)
 
+### Trophies
+
+Nine trophies, listed under Trophies on the start and pause screens and counted on the hub's card:
+
+| Trophy | Tier | How to earn it |
+| --- | --- | --- |
+| Under contract | Bronze | Finish your first contract |
+| Signal found | Bronze | Capture the relay beacon |
+| Ceasefire | Bronze | Accept a truce from a rival |
+| Ace of the fleet | Silver | Have a ship of yours rank up to Ace (8 kills) |
+| Salvage baron | Silver | Hold all three derelict stations at once |
+| Pride of the fleet | Silver | Launch your flagship |
+| Last faction standing | Silver | Win a battle |
+| Ahead of the field | Gold | Finish all five contracts before any rival finishes its own chain |
+| Master of the sectors | Gold, hidden | Win the last sector of the campaign |
+
+![The Trophies list over the faction picker: Under contract and Signal found earned in the first round, the rest still locked](docs/screenshots/trophies.webp)
+
 ### The factions
 
 Each faction's ships and stations are low-poly 3D models, rendered at 16 headings so they turn
@@ -406,12 +424,14 @@ page).
 waits for the harvesters to bring in crystal, raises a Barracks beside the hub (which completes the
 first contract and pays its reward and perk), takes Break the raid off the contract board, trains three Lancers, box-selects them, takes the
 relay beacon (hidden in the fog at the start, so the test checks the wing finds it) until it pays, fights off the rival picket that comes to contest it and collects its
-salvage shard, then attacks the nearest enemy base. It pans the map with the arrow keys to reach
+salvage shard, then attacks the nearest enemy base. It checks that the first contract and the
+beacon earn their trophies. It pans the map with the arrow keys to reach
 what it taps. Run it with `npx playwright test --project space-wars`.
 
 ## Code layout
 
-- `src/main.ts`: creates the Phaser game and calls `setupGame`.
+- `src/main.ts`: creates the Phaser game and calls `setupGame` with the How to play and the trophies.
+- `src/trophies/`: the trophies (`index.ts`), their texts (`i18n/`) and the check that awards them (`check.ts`).
 - `src/game/factions.ts`: the five factions, their ship and building outlines and stats.
 - `src/game/contracts.ts`: the first contract, the contract board's pool, their rewards and perks, and how the board draws its two cards.
 - `src/game/campaign.ts`: the five campaign sectors and the saved campaign (sectors open, perks kept).
