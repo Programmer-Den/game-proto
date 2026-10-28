@@ -47,6 +47,10 @@ export function heroCardRect(i: number) {
 }
 export const HERO_DETAIL = { x: 642, y: 84, w: 304, h: 400 };
 export const FIGHT = { x: 658, y: 416, w: 272, h: 50 };
+/** The rift heat row above Fight, shown once the hero has won: a lower and a higher arrow. */
+export const HEAT_ROW = { x: 658, y: 366, w: 272, h: 42 };
+export const HEAT_DOWN = { x: HEAT_ROW.x, y: HEAT_ROW.y + 3, w: 36, h: 36 };
+export const HEAT_UP = { x: HEAT_ROW.x + HEAT_ROW.w - 36, y: HEAT_ROW.y + 3, w: 36, h: 36 };
 
 /** The new-hero panel shown mid-run, and its Continue button. */
 export const UNLOCK = { x: VIEW.w / 2 - 200, y: 96, w: 400, h: 340 };

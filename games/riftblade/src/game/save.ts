@@ -3,6 +3,7 @@ import { HEROES, HERO_IDS, type HeroId } from './heroes';
 import { LAST_STAGE, NODE_INFO, PLANETS } from './planets';
 import { freshHero, freshState, type GameState, type Phase } from './state';
 import { UPGRADES } from './upgrades';
+import { MAX_HEAT } from './heat';
 
 export const SAVE_KEY = 'riftblade-progress';
 /**
@@ -22,6 +23,11 @@ export interface Progress {
   charted: string[];
   /** Heroes whose deed is done. Saves from before the knights have none. */
   unlocked: HeroId[];
+  /**
+   * The highest rift heat won at (0 to `MAX_HEAT`), by hero: the next one up is open. Saves from
+   * before rift heat count a hero's wins as heat 0.
+   */
+  heat: Partial<Record<HeroId, number>>;
 }
 
 /** A saved count per hero, keeping only known heroes with a finite number. */
@@ -37,15 +43,22 @@ const perHero = (v: unknown): Partial<Record<HeroId, number>> => {
 export function loadProgress(): Progress {
   try {
     const saved = JSON.parse(localStorage.getItem(SAVE_KEY) ?? '{}') ?? {};
+    const wins = perHero(saved.wins);
+    const heat = perHero(saved.heat);
+    for (const id of HERO_IDS) {
+      if (heat[id] !== undefined) heat[id] = Math.max(0, Math.min(MAX_HEAT, Math.floor(heat[id]!)));
+      else if ((wins[id] ?? 0) > 0) heat[id] = 0;
+    }
     return {
       bestMs: typeof saved.bestMs === 'number' ? saved.bestMs : 0,
-      wins: perHero(saved.wins),
+      wins,
+      heat,
       furthest: perHero(saved.furthest),
       unlocked: Array.isArray(saved.unlocked) ? saved.unlocked.filter((id: unknown) => HERO_IDS.includes(id as HeroId)) : [],
       charted: Array.isArray(saved.charted) ? saved.charted.filter((id: unknown) => typeof id === 'string') : [],
     };
   } catch {
-    return { bestMs: 0, wins: {}, furthest: {}, unlocked: [], charted: [] };
+    return { bestMs: 0, wins: {}, heat: {}, furthest: {}, unlocked: [], charted: [] };
   }
 }
 
@@ -58,13 +71,16 @@ export function saveProgress(progress: Progress) {
 }
 
 /**
- * Records a finished run (`stage` is the jump reached, 1 to 4, `route` the planets landed on) and
- * returns the updated progress.
+ * Records a finished run (`stage` is the jump reached, 1 to 4, `route` the planets landed on,
+ * `heat` its rift heat) and returns the updated progress.
  */
-export function recordRun(hero: HeroId, ms: number, won: boolean, stage: number, route: readonly string[] = []): Progress {
+export function recordRun(hero: HeroId, ms: number, won: boolean, stage: number, route: readonly string[] = [], heat = 0): Progress {
   const progress = loadProgress();
   progress.bestMs = Math.max(progress.bestMs, ms);
-  if (won) progress.wins[hero] = (progress.wins[hero] ?? 0) + 1;
+  if (won) {
+    progress.wins[hero] = (progress.wins[hero] ?? 0) + 1;
+    progress.heat[hero] = Math.max(progress.heat[hero] ?? 0, heat);
+  }
   progress.furthest[hero] = Math.max(progress.furthest[hero] ?? 0, stage);
   for (const id of route) if (!progress.charted.includes(id)) progress.charted.push(id);
   saveProgress(progress);
@@ -159,6 +175,7 @@ export function loadRun(): GameState | null {
     // The panels read these as they open, so a run they would throw on is dropped here.
     const known = (id: unknown) => typeof id === 'string' && id in UPGRADES;
     if (!Number.isInteger(s.stage) || s.stage < 0 || s.stage > LAST_STAGE) return null;
+    if (!Number.isInteger(s.heat) || s.heat < 0 || s.heat > MAX_HEAT) return null;
     if (s.next !== -1 && !PLANETS[s.next]) return null;
     if (!Array.isArray(s.nodes) || !s.nodes.every((k) => k in NODE_INFO)) return null;
     if (!Array.isArray(s.offers) || !s.offers.every((id) => id === null || known(id))) return null;
