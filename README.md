@@ -154,7 +154,7 @@ Every game also has a full screen button in its bottom left corner, and the **F*
 
 Every game shows a loading screen while its art is drawn, then waits on a start screen until **Start** is pressed (or Enter or Space). The pause button next to full screen, the **P** key or leaving the tab pauses it; Resume, P, Space or Esc play on, and the pause screen links back to all games. Both screens have a **How to play** button (or the **H** key) that shows the game's goal, its controls, how a round goes and a few tips; Back, H or Esc close it.
 
-Games with trophies (Apothecary so far) award bronze, silver and gold trophies for milestones, with a short toast and fanfare, and their start and pause screens list them under **Trophies**, earned or still to earn; hidden ones keep their name until earned. Each hub card shows how many of its game's trophies are earned (🏆 4/10), and the hub's **Trophies** button opens a shelf of every trophy earned on this device, by game. Trophies are saved with the game's progress (`shared/trophies.ts`), so they move with its progress file or code and go when its progress is deleted.
+Every game awards bronze, silver and gold trophies for milestones, with a short toast and fanfare, and their start and pause screens list them under **Trophies**, earned or still to earn; hidden ones keep their name until earned. Each hub card shows how many of its game's trophies are earned (🏆 4/10), and the hub's **Trophies** button opens a shelf of every trophy earned on this device, by game. Trophies are saved with the game's progress (`shared/trophies.ts`), so they move with its progress file or code and go when its progress is deleted.
 
 ## Watch AI
 
