@@ -178,6 +178,8 @@ in code on 2D canvases (no image files), with `pixelArt` off.
   the watch log. Names that are the same in German (the game's title, the Palisade) are in
   `keepEnglish` in `src/i18n/de.ts`.
 - Sound: effects and music made in code by `shared/audio.ts` (see Sound below).
+- Trophies (`src/trophies/`, `shared/trophies.ts`): ten, from Age II, a relic held, a raid repelled
+  and a third-rank veteran to wins against two rivals, on Hard and by Monument (see the file map).
 - Not implemented yet: saves.
 
 ## Architecture
@@ -194,6 +196,16 @@ in code on 2D canvases (no image files), with `pixelArt` off.
   in the hub's language; `TextKey` types the keys. Every text on screen, the sim's notices and the
   planner's watch log go through `t`, and a new one gets its German entry (and a US one if its
   spelling differs) in the same PR.
+- `src/trophies/`: the game's ten trophies (`shared/trophies.ts`). `index.ts` lists them
+  (`trophies`: id, tier, icon, `hidden` for Built to last) with their texts in `trophies/i18n/`
+  (`en.ts` and `de.ts`: the name keyed by the id, what earns it by `<id>Text`), and imports nothing
+  else from the game, since the hub loads it for its trophy shelf. `main.ts` hands `trophies` to
+  `setupGame`, which lists them on the start and pause screens. `check.ts` holds each trophy's
+  condition on the `GameState` (`EARNED`: Age II, a relic held, the raid deed, a soldier at the last
+  of `RANK_KILLS`, Age III, a champion alive, a win, a win in a three-way match, a win on Hard, a
+  win by Monument) and `checkTrophies(state)`, which `GameScene.update` calls every frame unless
+  watching. A new trophy is an entry in `index.ts`, its two texts in each language file and its
+  condition in `EARNED`.
 - `src/audio/sfx.ts`: the sound table (`sfx`), `src/audio/music.ts` the songs (`COLONY`, `RAID`). See
   Sound below.
 - `src/scenes/sound.ts`: `SoundCues`, which compares the sim with the last frame and plays what
@@ -452,7 +464,9 @@ only the raid horns, Monuments and falls of the rest.
 
 ## Save keys
 
-None: there is no save. Settings come from the hub (`shared/settings.ts`).
+There is no save of a match. Settings come from the hub (`shared/settings.ts`).
+
+- `colonizer-trophies`: the trophies earned (`shared/trophies.ts`), each id with the time.
 
 ## Testing hooks
 
@@ -479,6 +493,8 @@ None: there is no save. Settings come from the hub (`shared/settings.ts`).
 - The first round: harvest (asserts the `+10 wood` badge), a villager, a house, an Academy and Axes,
   another villager, then Age II (asserts the Age II deed and the open boon pick with its two cards),
   picks Harvest Rites, and checks that Age III can't be queued yet.
+  Age II earns the A new age trophy, and the test checks that `colonizer-trophies` then holds only
+  `ageTwo`; a trophy a first round can reach in another way changes that expectation.
 
 ## Making common changes
 

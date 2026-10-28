@@ -315,7 +315,14 @@ export class GameScene extends Phaser.Scene {
     tick(s, this.picker || s.offer.length ? 0 : dt * (s.fast ? FAST : 1));
     this.tickSounds(before);
     if (s.heart < heart) this.heartHit();
-    if (s.wave > wave) this.waveDone(wave, bloom, false);
+    // Waves called early that are done now, then a wave cleared.
+    let budsBefore = bloom;
+    for (const n of s.settled) {
+      this.waveDone(n, budsBefore, true);
+      budsBefore = Math.min(BLOOM_GOAL, budsBefore + 1);
+    }
+    s.settled = [];
+    if (s.wave > wave) this.waveDone(wave, budsBefore, false);
     // The music changes first, so a sting ducks the song that plays on under it.
     this.syncMusic();
     if (s.harvest && !harvest) {
@@ -621,12 +628,12 @@ export class GameScene extends Phaser.Scene {
     this.waveBg = this.add.image(WAVE_BUTTON.x, WAVE_BUTTON.y, 'btn-wave');
     this.waveBg.setInteractive({ useHandCursor: true }).on('pointerdown', () => {
       const s = this.state;
-      const { wave, bloom } = s;
+      const { wave } = s;
       const did = startWave(s);
       if (did === 'start') sfx('horn');
       else if (did === 'early') sfx('whistle');
       else ui('refuse');
-      if (did === 'early') this.waveDone(wave, bloom, true);
+      if (did === 'early') this.waveCalled(wave);
       else if (did === 'start' && s.wave % BOSS_EVERY === 0) this.announce([t('queenWave', { n: s.wave })]);
       this.refresh();
     });
@@ -1349,21 +1356,31 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  /** Wave `n` is done (cleared, or called early): the banner, and the Heartwood's bloom if it just filled. */
+  /** Wave `n` was called early: the banner says its sap waits for its last pests. */
+  private waveCalled(n: number) {
+    const s = this.state;
+    const lines = [t('waveCalled', { n: s.wave }), t('calledPending', { n, sap: waveBonus(n) + EARLY_BONUS })];
+    if (s.wave % BOSS_EVERY === 0) lines.push(t('queenComing'));
+    this.announce(lines);
+  }
+
+  /**
+   * Wave `n` is done (cleared, or called early and its last pests gone): the banner, and the
+   * Heartwood's bloom if it just filled.
+   */
   private waveDone(n: number, bloomBefore: number, early: boolean) {
     const s = this.state;
     const sap = waveBonus(n) + (early ? EARLY_BONUS : 0);
     const compost = s.compost ? t('compostBonus', { n: s.compost }) : '';
-    const lines = [(early ? t('waveCalled', { n: n + 1, sap }) : t('waveCleared', { n, sap })) + compost];
+    const lines = [t('waveCleared', { n, sap }) + compost];
     if (n === HARVEST_WAVE) lines.push(t('harvestBanner', { stars: this.starText(s.harvest), n: s.heart }));
-    if (s.bloom > bloomBefore) lines.push(s.bloom >= BLOOM_GOAL ? t('bloomBanner') : t('budBanner', { n: s.bloom, goal: BLOOM_GOAL }));
-    if (early && s.wave % BOSS_EVERY === 0) lines.push(t('queenComing'));
+    const buds = Math.min(BLOOM_GOAL, bloomBefore + 1);
+    if (buds > bloomBefore) lines.push(buds >= BLOOM_GOAL ? t('bloomBanner') : t('budBanner', { n: buds, goal: BLOOM_GOAL }));
     this.announce(lines);
-    // A natural clear jingles (a call early has just whistled); a bud chimes higher for each one
-    // open, and the full bloom rings a chord.
-    if (!early) sfx('cleared');
-    if (s.bloom >= BLOOM_GOAL && bloomBefore < BLOOM_GOAL) sfx('bloom');
-    else if (s.bloom > bloomBefore) sfx('bud', { pitch: [1, 9 / 8, 5 / 4, 3 / 2, 5 / 3][s.bloom - 1] ?? 1 });
+    // A clear jingles; a bud chimes higher for each one open, and the full bloom rings a chord.
+    sfx('cleared');
+    if (buds >= BLOOM_GOAL && bloomBefore < BLOOM_GOAL) sfx('bloom');
+    else if (buds > bloomBefore) sfx('bud', { pitch: [1, 9 / 8, 5 / 4, 3 / 2, 5 / 3][buds - 1] ?? 1 });
   }
 
   /** Shows the banner over the garden for a moment. */

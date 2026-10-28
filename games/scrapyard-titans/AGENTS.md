@@ -12,8 +12,16 @@ fake 3D, all painted in code at start-up; the only image files are the cover and
 
 Implemented today:
 
-- Menu: three commanders (`PLAYER_COMMANDERS`, each with one skill in `SKILLS`), two seasons
-  (`SETS`) and a terrain toggle, then START MATCH. The menu shows the saved stats.
+- Menu: eight commanders (`PLAYER_COMMANDERS`, each with one skill in `SKILLS`) as small cards,
+  with the picked one's skill (or, while locked, its unlock) spelled out under them, two seasons
+  (`SETS`) and a terrain toggle, then START MATCH (greyed out on a locked commander). The menu shows
+  the saved stats.
+- Commander unlocks (`progress.ts`): Grit, Sparks and Magna are open; the other five each have an
+  `unlock` deed (`DeedId`): `topFour` (Rosa, Patch-Up), `threeStar` (Volt, Power Surge),
+  `fullOrigin` (Hexa, EMP Blast: a won fight with an origin at 6), `maxLevel` (Ironside, Rally Cry)
+  and `champion` (Nova, Air Strike). `GameScene.noteDeeds` saves them: `planDeeds` every plan
+  tick, `fullOrigin` in `finishFight`, `topFour` and `champion` in `record`; a new unlock floats
+  "New commander" over the board and is listed on the end screen. Watched matches never count.
 - Seasons: each `SetDef` lists five origins; `rosterOf(set)` gives its 30 robots (six per origin,
   one per class, costs 1 to 5). Scrap Rush adds scrap tokens on wins (`SCRAP_TOKENS_PER_PART`),
   Overcharge gives every robot `OVERCHARGE_MANA` at the start of a fight. `UNITS` holds both
@@ -67,8 +75,8 @@ Implemented today:
 - Part preview: with a part or item selected or dragged, `buildPreview` tags each robot with
   `equipPreview(id, robot)` (the finished item, the part, or full), and the info panel lists the
   part's six recipes.
-- Stats (matches, wins, best place) saved under `scrapyard-titans-stats`; watched matches never
-  count.
+- Progress (matches, wins, best place and `deeds`) saved under `scrapyard-titans-stats`
+  (`progress.ts`, `loadProgress`/`saveProgress`); watched matches never count.
 
 Missing or rough:
 
@@ -94,6 +102,9 @@ File map (`src/`):
   just 3 in German, where the text says "Platz"). Every text on screen goes through `t`, and a new
   one gets its German entry (and a US one if its spelling differs) in the same PR. The watch
   panel's title and `aiLog` lines stay English, with the names inside them translated.
+- `progress.ts`: what lasts between matches (`Progress`: stats and deeds), `isUnlocked`,
+  `doDeeds` (saves new deeds, returns the commanders they unlock), `planDeeds`, `fullOrigin`. No
+  Phaser.
 - `audio.ts`: the songs (`PLAN_SONG`, `FIGHT_SONG`) and the sound table (`play`, typed `Sfx`); see
   Sound below.
 - `game/data.ts`: every rule and number (see above). Every name and text in its tables (robots,
@@ -145,7 +156,7 @@ Shared code it imports: `shared/audio.ts`, `shared/setupGame.ts`, `shared/scalin
   gives each rival `byDifficulty(-1, 0, 1)` gold a round. Keep the README rows in step.
 - Reduced motion: no camera shake on slams, no hit flash, no idle sway or orb bob, no avatar walk
   bounce or skill hop, and stun stars and the draft ring stand still instead of circling.
-- Watch AI (`?watch`): the scene starts a match at once with a random commander, season and
+- Watch AI (`?watch`): the scene starts a match at once with a random commander (any of the eight), season and
   terrain, seat 0 is AI-run (`human` false: `aiPlan` once, near the end of each plan phase, where the
   rivals plan in `beginPlan`; skill at 3 s;
   the taps and keys that act for the player, R, X, E, L, 1-3 and Space, do nothing: the shop cards,
@@ -208,7 +219,7 @@ greyed-out button or shop card (`button` pushes a refusal for them).
   `layout.ts` (`SHOP`, `BENCH`, `BUTTONS.fight`, `BOARD_VIEW`), the menu's START MATCH rect in
   `buildMenu`, `ECONOMY.startGold`, and round 1-1's monsters (`MONSTERS.mite`), which every 1-cost
   robot must beat alone.
-- Screenshots: `docs/screenshots/menu.webp` is the test's `0-menu`; `fight.webp` (also
+- Screenshots: `docs/screenshots/menu.webp` is from a scratch run with two deeds saved and a locked commander picked; `fight.webp` (also
   `cover.png`), `draft.webp` and `scrap-rat.webp` are from a scratch `?watch` run with the watch
   panel hidden; `scout.webp`, `part-preview.webp` and `damage-meter.webp` from a scratch run that
   plays round 1-1 with real clicks; `german-result.webp` is the test's `3-result` run with a
@@ -228,6 +239,10 @@ greyed-out button or shop card (`button` pushes a refusal for them).
   `origins` and, for a class, `CLASS_STATS` with an ability the sim handles in `battle.ts`.
 - **Add an item**: add a part to `PARTS`/`PART_DEFS` (every pair then needs a combo) or change a
   `combo` row; a new `Special` needs handling in `battle.ts`.
+- **Add a commander**: a row in `PLAYER_COMMANDERS` (name key, skill, colours, `unlock` deed), its
+  skill in `SkillId`, `SKILL_POWER` and `SKILLS`, handled in `Battle.useSkill` and drawn in
+  `consume`'s `skill` case; a new deed goes into `DeedId`, `DEEDS` in `progress.ts`, a
+  `<deed>Unlock` text and a `noteDeeds` call where it happens. The menu row holds eight cards.
 - **Add a power card**: add it to `AugmentId`, `AUGMENTS` and `AUGMENT_TASTE` in `ai.ts`, then
   apply it in `match.ts` (one-off) or `battle.ts` (in fights).
 - **Change rounds or damage**: `stageRounds`, `stageDamage`, `SURVIVOR_DAMAGE`.

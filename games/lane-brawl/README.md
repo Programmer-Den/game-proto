@@ -297,7 +297,11 @@ left, under bevelled slate panels.
     over it, and a dash or blink that lands in the trees comes out at their nearest edge.
 
     ![A lane between its stone walls, with a gap where a jungle path comes out](docs/screenshots/walls.webp)
-31. **Winning** destroys the red Nexus. Losing means your Nexus falls first.
+31. **Trophies**: ten trophies to earn, listed on the start and pause screens and on the hub:
+    a first takedown, a red tower down, a first drake, a quick match won, three kills without
+    dying, the guardian beast slain, a full match won and a drake soul, plus two hidden ones for
+    the long run. Each shows a toast the moment it is earned.
+32. **Winning** destroys the red Nexus. Losing means your Nexus falls first.
 
 Every ability has an animation of its own (a hammer that splits the ground, a meteor from the
 sky, a harpoon on its rope, a coil pylon arcing, a blood moon rising and so on), and so do bolts in

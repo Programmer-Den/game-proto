@@ -1,5 +1,5 @@
 import { byDifficulty } from '../../../../shared/settings';
-import { RELICS, STYLES, type Level, type RelicId, type StyleId } from './catalog';
+import { RELICS, STYLES, TWISTS, type Level, type RelicId, type StyleId, type Twist } from './catalog';
 import { dailySeed, makePuzzle, peersOf, seeded, SHAPES, shuffle, units, type Puzzle, type Random } from './sudoku';
 
 // Ninefold's rules: Classic (a daily puzzle and free play at three levels) and Delve (a run of
@@ -37,6 +37,48 @@ export const FLOORS: { size: 4 | 6 | 9; givens: number }[] = [
   { size: 9, givens: 28 },
 ];
 export const floorSpec = (floor: number) => FLOORS[Math.min(floor, FLOORS.length) - 1];
+/** Past the last row of `FLOORS`, a floor loses one more given every this many floors, down to `MIN_GIVENS`. */
+export const DEEPER_EVERY = 3;
+export const MIN_GIVENS = 24;
+/** Floors from this one draw a twist (`TWISTS`). */
+export const TWIST_FLOOR = 4;
+/** Every this many floors is a boss floor: two twists, fewer givens, and clearing it restores every heart. */
+export const BOSS_EVERY = 5;
+export const BOSS_GIVENS = 3;
+/** Givens a twist takes away, since its rule tells the solver more. */
+export const TWIST_GIVENS: Record<Twist, number> = { diagonal: 2, parity: 6, clock: 0, sealed: 0 };
+/** On a Clock floor a heart is lost every this much game time. */
+export const CLOCK_MS = 3 * 60_000;
+
+/** What a Delve floor will be: its board size, givens, twists and whether it is a boss floor. */
+export interface FloorPlan {
+  floor: number;
+  size: 4 | 6 | 9;
+  givens: number;
+  twists: Twist[];
+  boss: boolean;
+}
+
+/** Plans a floor. Floors before `TWIST_FLOOR` use no randomness, so the first floors deal as before. */
+export function planFloor(floor: number, random: Random): FloorPlan {
+  const spec = floorSpec(floor);
+  const deeper = Math.max(0, Math.floor((floor - FLOORS.length) / DEEPER_EVERY));
+  let givens = Math.max(MIN_GIVENS, spec.givens - deeper);
+  if (spec.size !== 9) givens = spec.givens;
+  const boss = floor % BOSS_EVERY === 0;
+  let twists: Twist[] = [];
+  if (floor >= TWIST_FLOOR) {
+    if (boss) {
+      // One twist on the board's rules and one that presses the player.
+      twists = [pick(['diagonal', 'parity'] as const, random), pick(['clock', 'sealed'] as const, random)];
+      givens -= BOSS_GIVENS;
+    } else twists = [pick(TWISTS, random)];
+  }
+  for (const tw of twists) givens -= TWIST_GIVENS[tw];
+  return { floor, size: spec.size, givens, twists, boss };
+}
+
+const pick = <T>(items: readonly T[], random: Random) => items[Math.floor(random() * items.length)];
 
 export type Mode = 'classic' | 'daily' | 'delve';
 export type Phase = 'menu' | 'playing' | 'solved' | 'relic' | 'over';
@@ -49,13 +91,15 @@ export interface Progress {
   hard: number;
   fast: number;
   bestFloor: number;
+  /** Delve boss floors cleared. */
+  bosses: number;
   /** The date (`dailySeed`) of the last daily puzzle solved. */
   daily: number;
   style: StyleId;
   unlocked: StyleId[];
 }
 
-export const newProgress = (): Progress => ({ solved: 0, flawless: 0, noHint: 0, hard: 0, fast: 0, bestFloor: 0, daily: 0, style: 'paper', unlocked: ['paper'] });
+export const newProgress = (): Progress => ({ solved: 0, flawless: 0, noHint: 0, hard: 0, fast: 0, bestFloor: 0, bosses: 0, daily: 0, style: 'paper', unlocked: ['paper'] });
 
 /** When each style unlocks, from the progress. Stained Glass waits for every other one. */
 export const UNLOCKS: Record<StyleId, (p: Progress) => boolean> = {
@@ -74,6 +118,7 @@ export type GameEvent =
   | { type: 'board' }
   | { type: 'placed'; cell: number }
   | { type: 'wrong'; cell: number; heart: boolean; warded: boolean }
+  | { type: 'clock' }
   | { type: 'unit'; cells: number[] }
   | { type: 'solved' }
   | { type: 'over' }
@@ -100,6 +145,10 @@ export interface GameState {
   hearts: number;
   maxHearts: number;
   floor: number;
+  /** The Delve floor in play (or, between floors, the one just cleared). */
+  plan: FloorPlan | null;
+  /** The next Delve floor, planned when a floor is cleared so its card can name it. */
+  upcoming: FloorPlan | null;
   /** The date (`dailySeed`) the daily board in play was dealt for, 0 for any other board. */
   dailyDate: number;
   relics: RelicId[];
@@ -117,7 +166,7 @@ export interface GameState {
 export function newGame(progress: Progress): GameState {
   return {
     phase: 'menu', mode: 'classic', level: 'easy', puzzle: null, values: [], notes: [], selected: -1, notesMode: false,
-    mistakes: 0, hintsLeft: 0, hintsUsed: 0, timeMs: 0, hearts: 0, maxHearts: 0, floor: 0, dailyDate: 0, relics: [], relicOffer: [],
+    mistakes: 0, hintsLeft: 0, hintsUsed: 0, timeMs: 0, hearts: 0, maxHearts: 0, floor: 0, plan: null, upcoming: null, dailyDate: 0, relics: [], relicOffer: [],
     warded: false, doneUnits: [], newStyles: [], progress, events: [],
   };
 }
@@ -143,6 +192,7 @@ export function startClassic(s: GameState, level: Level, random: Random = Math.r
   s.mode = 'classic';
   s.level = level;
   s.dailyDate = 0;
+  s.plan = s.upcoming = null;
   load(s, makePuzzle(SHAPES[9], CLASSIC_GIVENS[level], random));
   s.hintsLeft = classicHints();
 }
@@ -151,6 +201,7 @@ export function startClassic(s: GameState, level: Level, random: Random = Math.r
 export function startDaily(s: GameState, date: Date) {
   s.mode = 'daily';
   s.level = DAILY_LEVEL;
+  s.plan = s.upcoming = null;
   s.dailyDate = dailySeed(date);
   load(s, makePuzzle(SHAPES[9], CLASSIC_GIVENS[DAILY_LEVEL], seeded(s.dailyDate)));
   s.hintsLeft = classicHints();
@@ -164,14 +215,18 @@ export function startDelve(s: GameState) {
   s.relics = [];
   s.maxHearts = s.hearts = delveHearts();
   s.hintsLeft = DELVE_HINTS;
+  s.upcoming = planFloor(1, Math.random);
   nextFloor(s);
 }
 
 function nextFloor(s: GameState) {
-  s.floor++;
+  const plan = s.upcoming ?? planFloor(s.floor + 1, Math.random);
+  s.floor = plan.floor;
+  s.plan = plan;
+  s.upcoming = null;
   s.relicOffer = [];
-  const spec = floorSpec(s.floor);
-  load(s, makePuzzle(SHAPES[spec.size], spec.givens, Math.random));
+  const shape = { ...SHAPES[plan.size], ...(plan.twists.includes('diagonal') ? { diagonal: true } : {}) };
+  load(s, makePuzzle(shape, plan.givens, Math.random, plan.twists.includes('parity')));
   // Each Seer's Eye fills in a few cells, picked at random, before play starts.
   const seers = s.relics.filter((r) => r === 'seer').length * SEER_CELLS;
   const empty = s.values.flatMap((v, i) => (v ? [] : [i]));
@@ -243,13 +298,21 @@ export function enter(s: GameState, digit: number) {
     else (s.hearts--, (heart = true));
   }
   s.events.push({ type: 'wrong', cell, heart, warded });
-  if (s.mode === 'delve' && s.hearts <= 0) {
-    s.phase = 'over';
-    s.progress.bestFloor = Math.max(s.progress.bestFloor, s.floor - 1);
-    s.events.push({ type: 'over' });
-  }
+  if (s.mode === 'delve' && s.hearts <= 0) runOver(s);
   return true;
 }
+
+function runOver(s: GameState) {
+  s.phase = 'over';
+  s.progress.bestFloor = Math.max(s.progress.bestFloor, s.floor - 1);
+  s.events.push({ type: 'over' });
+}
+
+/** Whether a Delve twist is on the floor in play. */
+export const hasTwist = (s: GameState, twist: Twist) => s.mode === 'delve' && !!s.plan?.twists.includes(twist);
+
+/** Game time left on a Clock floor before the next heart is lost. */
+export const clockLeft = (s: GameState) => CLOCK_MS - (s.timeMs % CLOCK_MS);
 
 /** Clears a wrong digit from the selected cell, or, if it holds none, its notes; false if there was nothing to clear. */
 export function erase(s: GameState) {
@@ -264,7 +327,7 @@ export function erase(s: GameState) {
 /** Fills in the selected cell (or the first open one) with its digit, using up a hint. */
 export function hint(s: GameState) {
   const p = s.puzzle;
-  if (!p || s.phase !== 'playing' || s.hintsLeft <= 0) return false;
+  if (!p || s.phase !== 'playing' || s.hintsLeft <= 0 || hasTwist(s, 'sealed')) return false;
   const open = (c: number) => c >= 0 && !p.givens[c] && s.values[c] !== p.solution[c];
   const cell = open(s.selected) ? s.selected : s.values.findIndex((_, c) => open(c));
   if (cell < 0) return false;
@@ -302,6 +365,13 @@ function solved(s: GameState) {
   s.newStyles = unlock(p);
   for (const style of s.newStyles) s.events.push({ type: 'unlocked', style });
   if (s.mode === 'delve') {
+    // A Sealed floor pays back a hint, and a boss floor restores every heart.
+    if (hasTwist(s, 'sealed')) s.hintsLeft++;
+    if (s.plan?.boss) {
+      p.bosses++;
+      s.hearts = s.maxHearts;
+    }
+    s.upcoming = planFloor(s.floor + 1, Math.random);
     s.phase = 'relic';
     s.relicOffer = shuffle([...RELICS], Math.random).slice(0, RELIC_OFFER);
   } else s.phase = 'solved';
@@ -347,7 +417,14 @@ export function toMenu(s: GameState) {
 
 /** Moves the board's clock on while a board is being played. */
 export function tick(s: GameState, dt: number) {
-  if (s.phase === 'playing') s.timeMs += dt;
+  if (s.phase !== 'playing') return;
+  const before = Math.floor(s.timeMs / CLOCK_MS);
+  s.timeMs += dt;
+  if (hasTwist(s, 'clock') && Math.floor(s.timeMs / CLOCK_MS) > before) {
+    s.hearts--;
+    s.events.push({ type: 'clock' });
+    if (s.hearts <= 0) runOver(s);
+  }
 }
 
 /** Whether a cell is right: a given or a correct entry. */

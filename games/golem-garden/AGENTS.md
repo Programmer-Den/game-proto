@@ -74,12 +74,16 @@ Implemented today:
   (`state.spawned`). The garden tag, the harvest and the game-over screen show the picker (built
   afresh each time, with each garden's stars); a card plants that garden afresh (`saveGarden`,
   then `scene.restart`).
-- Heartwood bloom: each wave cleared or called early opens a bud (`state.bloom`, up to
+- Heartwood bloom: each wave cleared (or called early, once its last pests are gone) opens a bud (`state.bloom`, up to
   `BLOOM_GOAL` = 5), drawn on the tree and on the HUD tag; at 5 the Thorn golem unlocks. The bloom
   is saved and kept between gardens, so once full the Thorn golem stays unlocked.
 - Calling early: once a wave's queue is empty, the wave button reads "Call wave N now, +15 early";
-  `startWave` then finishes the current wave at once (bonus, bud, best) plus `EARLY_BONUS` and
-  starts the next. Not on `HARVEST_WAVE`: `canCallEarly` is false there, so the harvest
+  `startWave` then pushes the current wave onto `state.called` (with `queenSquashed`), moves to the
+  next wave and starts it. Each pest carries the `wave` it came with; once no pest of the oldest
+  called wave is left (squashed or through), `step` finishes it (`finishWave(s, n, queenSquashed)`:
+  bonus, compost, bud, best, boons) plus `EARLY_BONUS` and pushes it onto `state.settled`, which the
+  scene drains into the "Wave N cleared" banner. The call's own banner says the sap waits
+  (`calledPending`). Not on `HARVEST_WAVE`: `canCallEarly` is false there, so the harvest
   counts the leaves left once wave 30 is cleared, and the button reads "Harvest wave". Nor while
   a Queen Slug is on the path (`queenOnPath`): the button reads "squash the queen" until she is
   squashed or gets through.
@@ -127,8 +131,6 @@ Missing or rough:
   the first path cell's left half.
 - Pests on the same stretch can overlap; nothing spreads them out.
 - The hit flash is a fill tint, which the canvas renderer (used by the playthrough) does not draw.
-- Calling early counts the current wave as done even though its last pests are still walking:
-  they can still bite the Heartwood, but its bonus and bud are already paid.
 - Canvas `filter: blur` (the clay's soft shadows) is ignored by Safari, so shadows are hard there.
 - The longest hints (a level-3 golem's form, a target's blurb) wrap to three lines and run into
   the top of the wave button, in English as in German.
@@ -186,7 +188,7 @@ File map (`src/`):
   inside a sentence and `card` for a tall seed card's two lines, the hedge, forms, targets, boons and
   twists) is a `TextKey`, shown with `t`.
 - `game/state.ts`: `GameState`, `Golem` (with `form` and `target`), `Hedge`, `Pest`, `Shot`,
-  `Pop`, `Slime`, `SHOT_MS`, `newGame(best, bloom, garden, stars, thorny, laurels)`,
+  `Pop`, `Called`, `Slime`, `SHOT_MS`, `newGame(best, bloom, garden, stars, thorny, laurels)`,
   `gardenOf`, `totalStars`, `gardenOpen`, `thornyOpen`, `twistOf`, `boonCount`, `unlocked`, `seedCost`, `select`, `golemAt`, `hedgeAt`,
   `freeSoil`, `freePath`, `canPlant`, `plant`, `upgradeCost`, `picksForm`, `upgrade(s, g, form)`,
   `boonedStats`, `statsOf(s, g)`, `setTarget`, `nextTarget`, `uprootValue`, `uproot`, `canMove`, `move`, `neighbours`,
@@ -274,11 +276,13 @@ How it runs:
 State model (`GameState` in `src/game/state.ts`): `garden` (index into `GARDENS`), `wave` (being
 fought, or next while building), `phase` (`'build'`, `'wave'` or `'over'`), `heart`, `sap`,
 `selected` (a `SeedKind`), `golems` (each with `spent`, `form` and `target`), `hedges` (each with
-`hp` and `stops`), `pests` (each with `route` and `under`), `queue`, `spawned`,
+`hp` and `stops`), `pests` (each with `wave`, `route` and `under`), `queue`, `spawned`,
 `slime`, `fast`, `waveMs`, `waveHpScale`, `shots`, `kills`, `bloom` (0 to 5), `pops` (squashed
 pests not yet shown; the scene empties it every frame), `best`, `compost` (paid at the last wave's
 end), `stars` (per garden), `harvest` (this garden's, 0 before wave 30), `thorny`, `laurels` (per
-garden), `boons`, `sunRows`, `offer` (the boons to pick from, or empty), `queenSquashed`, `regrown` and `nextId`. Golem
+garden), `boons`, `sunRows`, `offer` (the boons to pick from, or empty), `queenSquashed`, `called` (waves
+called early whose last pests still walk), `settled` (called waves just finished; the scene empties
+it), `regrown` and `nextId`. Golem
 positions are cells; pest positions are `dist` pixels along their route. The open menu, its form
 mode and the golem being moved (`picked`, `formMenu`, `moving`) are the scene's, not the state's.
 
@@ -324,7 +328,7 @@ Heartwood falls.
 | `snap` | `tickSounds`: a hedge chewed through |
 | `bite` | `heartHit` |
 | `horn`, `whistle` / buzz | the wave button: `startWave` returned 'start', 'early' / null |
-| `cleared`, `bud` (higher per bud), `bloom` | `waveDone` (no jingle on a call early, which whistled) |
+| `cleared`, `bud` (higher per bud), `bloom` | `waveDone`: a wave cleared, or a called wave whose last pests are gone |
 | `rustle` + `chime` / buzz | `regrowLeaf` (the Heartwood's cell, the leaf tag) |
 | `boon` | a boon card taken |
 | `ui('click')` | opening a golem's menu, form-menu open and Back, Move chip, speed button, garden tag, garden and thorny cards, the picker's Back or Keep going |
@@ -425,7 +429,7 @@ Heartwood falls.
 - `tapCell` opens the menu whenever the cell has a golem, so planting never replaces one; with a
   menu open, a tap on another golem switches the menu to it, and a tap anywhere else only closes
   it. A seed card closes the menu, so the next tap on soil plants.
-- The scene saves `best` and `bloom` on any rise (in `refresh`, so an early call counts too);
+- The scene saves `best` and `bloom` on any rise (in `refresh`, so a called wave counts once it ends);
   `newGame` reads them back on restart.
 - Picking "furthest along" (`first` targeting) compares the share of each pest's route walked,
   since a forked garden's routes can differ in length.

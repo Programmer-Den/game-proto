@@ -2,13 +2,13 @@ import Phaser from 'phaser';
 import { playMusic, playSting, ui } from '../../../../shared/audio';
 import { viewFrame, viewSize } from '../../../../shared/scaling';
 import { settings } from '../../../../shared/settings';
-import { LEVELS, RELIC_INFO, STYLES, STYLE_INFO, type Level, type RelicId, type StyleId } from '../game/catalog';
+import { LEVELS, RELIC_INFO, STYLES, STYLE_INFO, TWIST_INFO, type Level, type RelicId, type StyleId } from '../game/catalog';
 import { loadProgress, saveProgress } from '../game/save';
 import {
-  canEnter, chooseStyle, digitsLeft, enter, erase, hint, isRight, newGame, select, startClassic, startDaily,
-  startDelve, takeRelic, tick, toggleNotes, toMenu, type GameState,
+  canEnter, chooseStyle, clockLeft, digitsLeft, enter, erase, hasTwist, hint, isRight, newGame, select, startClassic,
+  startDaily, startDelve, takeRelic, tick, toggleNotes, toMenu, type FloorPlan, type GameState,
 } from '../game/state';
-import { boxOf, dailySeed } from '../game/sudoku';
+import { boxOf, dailySeed, peersOf, units, type Puzzle } from '../game/sudoku';
 import { SFX, SONG } from '../audio';
 import { t } from '../i18n';
 import { layoutFor, UI_DEPTH, WIDE, type Layout } from './layout';
@@ -54,6 +54,8 @@ export class GameScene extends Phaser.Scene {
   private padTexts: Phaser.GameObjects.Text[] = [];
   private flashes: { cells: number[]; age: number; color: number }[] = [];
   private lastTime = 0;
+  /** The puzzle on the board, its units and each cell's peers, worked out once per board. */
+  private shapeOf: { puzzle: Puzzle; units: number[][]; peers: number[][] } | null = null;
 
   constructor() {
     super('Game');
@@ -203,6 +205,9 @@ export class GameScene extends Phaser.Scene {
           break;
         case 'wrong':
           SFX(e.heart ? 'heart' : e.warded ? 'ward' : 'wrong');
+          break;
+        case 'clock':
+          SFX('heart');
           break;
         case 'unit':
           SFX('unit');
@@ -359,25 +364,10 @@ export class GameScene extends Phaser.Scene {
     }
     const sel = s.selected;
     const selValue = sel >= 0 && isRight(s, sel) ? s.values[sel] : 0;
-    const peers = new Set<number>();
-    if (sel >= 0) {
-      const sr = Math.floor(sel / size);
-      const sc = sel % size;
-      for (let i = 0; i < size * size; i++) {
-        if (Math.floor(i / size) === sr || i % size === sc || boxOf(p, i) === boxOf(p, sel)) peers.add(i);
-      }
-    }
+    if (this.shapeOf?.puzzle !== p) this.shapeOf = { puzzle: p, units: units(p), peers: peersOf(p) };
+    const peers = new Set<number>(sel >= 0 ? this.shapeOf.peers[sel] : []);
     const done = new Set<number>();
-    const unitCells = (u: number) => {
-      const cells: number[] = [];
-      for (let i = 0; i < size * size; i++) {
-        const r = Math.floor(i / size);
-        const c = i % size;
-        if ((u < size && r === u) || (u >= size && u < 2 * size && c === u - size) || (u >= 2 * size && boxOf(p, i) === u - 2 * size)) cells.push(i);
-      }
-      return cells;
-    };
-    for (const u of s.doneUnits) for (const c of unitCells(u)) done.add(c);
+    for (const u of s.doneUnits) for (const c of this.shapeOf.units[u]) done.add(c);
     const fontSize = Math.round(cs * (size === 9 ? 0.62 : 0.56));
     for (let i = 0; i < size * size; i++) {
       const r = Math.floor(i / size);
@@ -400,6 +390,8 @@ export class GameScene extends Phaser.Scene {
         g.fillStyle(tint, alpha).fillRoundedRect(cx, cy, w, h, th.cellRadius);
       }
       if (th.boxes) g.fillStyle(0xffffff, 0.08).fillRect(cx, cy, w, h / 3);
+      // Parity: an even cell carries a round mark behind its digit.
+      if (p.even?.[i]) g.fillStyle(hex(th.note), 0.22).fillCircle(cx + w / 2, cy + h / 2, Math.min(w, h) * 0.4);
       // A wrong digit keeps its warning colour when picked; a ring in the selection colour marks it.
       if (wrong && i === sel) g.lineStyle(4, th.sel, 1).strokeRect(cx + 2, cy + 2, w - 4, h - 4);
       const v = s.values[i];
@@ -431,6 +423,12 @@ export class GameScene extends Phaser.Scene {
       }
       this.cellSpots.push({ cell: i, x: this.fx + x + c * cs + cs / 2, y: this.fy + y + r * cs + cs / 2, w: cs, h: cs });
     }
+    // Diagonal: both long diagonals are drawn as faint lines across the board.
+    if (p.diagonal) {
+      const B = this.L.board.size;
+      g.lineStyle(Math.max(2, th.thick), hex(th.accent), 0.35);
+      g.lineBetween(x + 4, y + 4, x + B - 4, y + B - 4).lineBetween(x + B - 4, y + 4, x + 4, y + B - 4);
+    }
     const left = digitsLeft(s);
     this.padTexts.forEach((pt, k) => {
       const d = k + 1;
@@ -447,13 +445,17 @@ export class GameScene extends Phaser.Scene {
     const pt = this.panelTexts;
     if (this.screen !== 'board' || !pt.clock) return;
     const secs = Math.floor(s.timeMs / 1000);
-    pt.clock.setText(`${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`);
+    if (hasTwist(s, 'clock')) {
+      // A Clock floor counts down to the next heart it takes.
+      const left = Math.ceil(clockLeft(s) / 1000);
+      pt.clock.setText(`⌛ ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`);
+    } else pt.clock.setText(`${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`);
     pt.status.setText(
       s.mode === 'delve'
         ? '♥'.repeat(Math.max(0, s.hearts)) + '♡'.repeat(Math.max(0, s.maxHearts - s.hearts))
         : t('mistakes', { n: s.mistakes }),
     );
-    pt.hint.setText(t('hintButton', { n: s.hintsLeft }));
+    pt.hint.setText(hasTwist(s, 'sealed') ? t('hintSealed') : t('hintButton', { n: s.hintsLeft }));
     pt.notes.setText(s.notesMode ? t('notesOn') : t('notesOff'));
     pt.relics?.setText(this.relicLine());
   }
@@ -471,7 +473,7 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     // The menu's daily button depends on today's date, so the menu is rebuilt when the date changes.
     const today = this.screen === 'menu' ? dailySeed(new Date()) : 0;
-    return `${this.screen}|${s.phase}|${s.progress.style}|${s.puzzle?.size ?? 0}|${s.relicOffer.join()}|${s.mode}|${today}`;
+    return `${this.screen}|${s.phase}|${s.progress.style}|${s.puzzle?.size ?? 0}|${s.floor}|${s.relicOffer.join()}|${s.mode}|${today}`;
   }
 
   private buildLayer() {
@@ -648,9 +650,10 @@ export class GameScene extends Phaser.Scene {
     if (dock) this.box(dock.x, dock.y, dock.w, dock.h, 5);
     const left = (x: number, y: number, content: string, size: number, color?: string) =>
       this.add_(this.add.text(x, y, content, { fontFamily: th.font, fontSize: `${size}px`, color: color ?? th.text, fontStyle: th.bold ? 'bold' : '' }).setOrigin(0, 0.5).setDepth(UI_DEPTH + 2));
-    const kicker = s.mode === 'delve' ? t('delve') : s.mode === 'daily' ? t('daily') : t('classic');
+    const twists = s.mode === 'delve' ? (s.plan?.twists ?? []).map((tw) => t(TWIST_INFO[tw].name)) : [];
+    const kicker = [s.mode === 'delve' ? t('delve') : s.mode === 'daily' ? t('daily') : t('classic'), ...twists].join(' · ');
     left(panel.x + 24, panel.y + rows.kicker, kicker.toUpperCase(), 13).setAlpha(0.75);
-    const heading = s.mode === 'delve' ? t('floor', { n: s.floor, size: p.size }) : t(s.level);
+    const heading = s.mode !== 'delve' ? t(s.level) : s.plan?.boss ? t('bossFloor', { n: s.floor }) : t('floor', { n: s.floor, size: p.size });
     const h1 = left(panel.x + 24, panel.y + rows.heading, heading, 28, th.accent);
     if (th.glow) h1.setShadow(0, 0, th.glow === 'auto' ? th.accent : th.glow, 10, false, true);
     this.button('menu', this.L.menuButton.x, this.L.menuButton.y, this.L.menuButton.w, this.L.menuButton.h, t('menu'), () => {
@@ -727,8 +730,9 @@ export class GameScene extends Phaser.Scene {
     const th = this.theme;
     const box = this.L.relicBox;
     this.box(box.x, box.y, box.w, box.h, UI_DEPTH, undefined, Math.max(0.95, th.panelAlpha));
-    this.text(box.x + box.w / 2, box.title, t('floorCleared', { n: s.floor }), 30, th.accent);
+    this.text(box.x + box.w / 2, box.title, s.plan?.boss ? t('bossCleared', { n: s.floor }) : t('floorCleared', { n: s.floor }), 30, th.accent);
     this.text(box.x + box.w / 2, box.line, this.unlockedLine() || t('takeRelic'), 15, this.unlockedLine() ? th.accent : th.text, { wordWrap: { width: box.w - 40 } });
+    if (s.upcoming) this.text(box.x + box.w / 2, box.next, this.nextLine(s.upcoming), 14, th.text, { wordWrap: { width: box.w - 40 } });
     s.relicOffer.forEach((relic, k) => {
       const x = this.L.relicCards.xs[k];
       const y = this.L.relicCards.y;
@@ -748,6 +752,12 @@ export class GameScene extends Phaser.Scene {
       this.buttons[`relic-${k}`] = { x: this.fx + x, y: this.fy + y, w, h };
     });
     this.raise(from);
+  }
+
+  /** What the next floor will be: its number and size, and each twist with its rule. */
+  private nextLine(plan: FloorPlan) {
+    const head = plan.boss ? t('nextBoss', { n: plan.floor }) : t('nextFloor', { n: plan.floor, size: plan.size });
+    return [head, ...plan.twists.map((tw) => `${t(TWIST_INFO[tw].name)}: ${t(TWIST_INFO[tw].rule)}`)].join(' ');
   }
 
   /** A relic's emblem: a lantern, a heart-cut gem, an eye or a shield. */

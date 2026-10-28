@@ -82,7 +82,10 @@ sky.
 15. **The endless sky**: after the crown, **Keep building** lifts the crown off, a break picks the
     first sky tier's stone (and a blessing, if tier 12 was balanced), and the temple climbs on. Gusts now push the falling stone sideways (the
     top of the screen and the streaks by the stone show which way and how hard), stronger the higher
-    you go (under the Storm Caller they just keep growing from tier 6). Aim upwind.
+    you go (under the Storm Caller they just keep growing from tier 6). Aim upwind. Every tenth tier
+    past the crown (22, 32, ...) is a **sky altar**: its stones are cloud-silver and earn double
+    favor, and finishing it offers a blessing even if it came out wobbly. The panel's goal box
+    names the next one.
 16. **The end** comes when a stone misses the temple. The most tiers built in one temple are saved
     in the browser.
 
@@ -145,6 +148,10 @@ Blessings can be taken more than once, and they add up.
 ![A gust on tier 6 under the Storm Caller](docs/screenshots/storm-gust.webp)
 
 ![A gust in the endless sky](docs/screenshots/endless-gust.webp)
+
+![Building the cloud-silver sky altar on tier 22](docs/screenshots/sky-altar.webp)
+
+![The sky altar's blessing](docs/screenshots/sky-altar-blessing.webp)
 
 ![The gilded tenth tier going up](docs/screenshots/gilded.webp)
 
