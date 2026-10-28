@@ -420,6 +420,11 @@ const en = {
 
   // Over units in the world
   bountyLabel: 'BOUNTY {gold}g',
+  spellTeleport: 'Teleport',
+  spellTeleportDesc: 'Channel 3.5 s, then appear by the allied tower or minion nearest the cursor. Every 3:00.',
+  teleportingLabel: 'Teleporting',
+  teleportingFor: 'Teleporting {s}s',
+  noticeTeleportLost: 'Teleport lost: its target fell',
   recallingLabel: 'Recalling',
   stunLabel: 'STUN',
   objectiveMarker: 'OBJECTIVE · +{gold}g',

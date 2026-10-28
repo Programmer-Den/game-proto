@@ -271,7 +271,7 @@ Implemented today:
   brutes. The sellsword is `mercModel` (`models.ts`, a minion's figure in tan with a kettle hat and
   a broad blade, scaled 0.78), baked as `MERC_KEY` in `MERC_CELL`; `map.ts` paints the camps'
   clearings (`CLEARINGS`) with a fire pit and two tents.
-- Battle spells (LB15): `SPELLS` (`blink`, `firebrand`, `mend`, `barrier`) in `data.ts`; every
+- Battle spells (LB15): `SPELLS` (`blink`, `firebrand`, `mend`, `barrier`, `teleport`) in `data.ts`; every
   champion has `Unit.spell` (from `aiSpellFor(role)` in `spawnChampion`; the player's from
   `MatchOptions.spell` unless watching) and `spellCd`, counted down in `countDown`. `castSpell(s, u,
   aim)` in `sim.ts` casts it: Blink moves like Phase Boots, Firebrand `damage`s (through `dealt`)
@@ -287,6 +287,13 @@ Implemented today:
   `saveSpell`, in try/catch). The pick button is one text, replacing a hint line, because every
   Phaser text draws `Math.random` for its texture key and the playthrough's seeded roster depends
   on how many draws come before the shuffle.
+- Teleport (LB24): the fifth spell rides on the recall channel. `castSpell` picks the allied tower
+  or minion `closest` to the aim within `aim`, and sets `recallMs` and `recallFull` to its `ms` and
+  `Unit.portTo` to that unit's id (a recall sets `recallFull` to `RECALL.ms` and `portTo` to 0), so
+  everything that breaks a recall breaks it too. When the channel runs out `finishRecall` hands it
+  to `finishTeleport`, which `place`s the champion `TELEPORT_GAP` from its target toward home, or
+  says the teleport is lost if the target has fallen. The bar under the champion and the recall
+  button take the spell's colour and read Teleporting. No AI champion carries it.
 - Pings (LB16): `PINGS`, `PING_KINDS` (`attack`, `gather`, `danger`) and `PING` in `data.ts`.
   `sendPing(s, u, kind, at)` in `sim.ts` (refused within `PING.cd` of the last, `s.lastPingAt`)
   pushes a `Ping` to `s.pings` (dropped after `PING.showMs` in `tick`) and gives the AI allies an

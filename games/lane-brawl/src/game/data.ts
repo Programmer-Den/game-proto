@@ -832,7 +832,7 @@ export const AI_BUILD_FOR: Partial<Record<TextKey, keyof typeof AI_BUILDS>> = {
  * level; `mend` heals the caster and the most hurt allied champion within `range` by as much;
  * `barrier` shields the caster by as much for `ms`.
  */
-export type SpellId = 'blink' | 'firebrand' | 'mend' | 'barrier';
+export type SpellId = 'blink' | 'firebrand' | 'mend' | 'barrier' | 'teleport';
 export interface SpellDef {
   id: SpellId;
   name: TextKey;
@@ -850,6 +850,9 @@ export const SPELLS: SpellDef[] = [
   { id: 'firebrand', name: 'spellFirebrand', desc: 'spellFirebrandDesc', cd: 90_000, color: '#ff8a3d', range: 450, aim: 200, base: 90, perLevel: 22 },
   { id: 'mend', name: 'spellMend', desc: 'spellMendDesc', cd: 120_000, color: '#7fe08a', range: 420, base: 110, perLevel: 25 },
   { id: 'barrier', name: 'spellBarrier', desc: 'spellBarrierDesc', cd: 100_000, color: '#cfe1ff', base: 140, perLevel: 30, ms: 2500 },
+  // Teleport (LB24): a channel of `ms` like a recall's, to the allied tower or minion nearest the
+  // cursor within `aim` of it; damage, a move or a cast breaks it (the cooldown is spent anyway).
+  { id: 'teleport', name: 'spellTeleport', desc: 'spellTeleportDesc', cd: 180_000, color: '#c79bff', aim: 600, ms: 3500 },
 ];
 export const spellById = (id: SpellId) => SPELLS.find((sp) => sp.id === id)!;
 /** The spell an AI champion carries: tanks a barrier, supports a mend, other casters a blink, the rest a firebrand. */

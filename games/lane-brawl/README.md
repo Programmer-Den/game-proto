@@ -218,12 +218,16 @@ left, under bevelled slate panels.
     pick is kept for the next match): **Blink** jumps up to 260 px toward the cursor (every 2:00),
     **Firebrand** burns the enemy champion nearest the cursor within 450 px for 90 + 22 per level
     (every 1:30), **Mend** heals you and your most hurt ally within 420 px for 110 + 25 per level
-    (every 2:00) and **Barrier** shields you from 140 + 30 per level damage for 2.5 s (every 1:40).
-    AI champions carry one by role (tanks Barrier, supports Mend, other casters Blink, the rest
+    (every 2:00), **Barrier** shields you from 140 + 30 per level damage for 2.5 s (every 1:40)
+    and **Teleport** channels 3.5 s like a recall, then puts you beside the allied tower or minion
+    nearest the cursor (within 600 px of it), on its side toward your Nexus (every 3:00). Damage, a
+    move or a cast breaks the channel, and if the minion dies first the teleport is lost; either
+    way the cooldown is spent. AI champions carry one by role (tanks Barrier, supports Mend, other casters Blink, the rest
     Firebrand) and, from 1:40, use it when low with an enemy near, or Firebrand to finish one.
 
     ![The pick screen's Battle spell button set to Firebrand, with what it does shown above it](docs/screenshots/pick-spell.webp)
     ![The Firebrand button in the top bar counting down 1:30, right of Recall home](docs/screenshots/spell-button.webp)
+    ![Teleporting from the Nexus to the top lane's outer tower, 0.6 s left](docs/screenshots/teleport.webp)
 21. **Pings**: Z pings **Attack** at the cursor (Alt and a click does too): the two nearest
     healthy allies drop what they do and come, and fight the enemy under the ping if there is one.
     N pings **On my way**: the allies within 900 px of the point wait there for you. C pings

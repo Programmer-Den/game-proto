@@ -187,6 +187,10 @@ export interface Unit {
   wards: number;
   /** Time left on a recall channel, in ms; 0 when not recalling. */
   recallMs: number;
+  /** How long the current channel lasts in all (a recall's or a teleport's), for its bar. */
+  recallFull: number;
+  /** A teleport's channel: the allied tower or minion it lands by (0 for a recall home). */
+  portTo: number;
   /** When this champion last started a recall (the AI spaces its trips home). */
   lastRecallAt: number;
   /** A buy back is allowed again from this game time. */
@@ -529,6 +533,8 @@ export function blankUnit(
     killStreak: 0,
     wards: 0,
     recallMs: 0,
+    recallFull: 0,
+    portTo: 0,
     lastRecallAt: -1e9,
     buybackReadyAt: 0,
   };
