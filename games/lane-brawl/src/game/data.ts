@@ -871,6 +871,12 @@ export const FOUNTAIN = { radius: 420, share: 0.12 };
 
 /** Which lane each AI champion walks, in roster order without the player's champion. */
 export const ALLY_LANES: LaneId[] = ['top', 'mid', 'bottom', 'mid'];
+/**
+ * A quick match (LB22): three a side on the mid lane alone, with no towers, inhibitors or minions
+ * on the other two, for a match of about ten minutes. Its towers, inhibitors and Nexuses have `hp`
+ * times their health, so one lane takes about as long to break as three.
+ */
+export const QUICK = { lanes: ['mid'] as LaneId[], allies: 2, enemies: 3, hp: 2.5 };
 export const ENEMY_LANES: LaneId[] = ['top', 'mid', 'bottom', 'mid', 'top'];
 
 /** The colour of each side's rings, bolts and lines. */

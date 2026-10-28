@@ -349,6 +349,16 @@ Implemented today:
   sound. The view lays a blue tint (`NIGHT_ALPHA`) over the world in `fogG`, under the fog, and
   `drawSky` draws a sun or moon beside the clock. The first night falls at 2:50, after the
   playthrough's first round.
+- Quick match (LB22): `QUICK` in `data.ts`, `MatchOptions.quick` and `GameState.quick` and
+  `lanes` (all three, or `QUICK.lanes`). `createGame` makes towers and inhibitors only on
+  `s.lanes`, with `QUICK.hp` times their health (the Nexuses too), `QUICK.allies` and
+  `QUICK.enemies` champions all on the open lane, and calls `openLanes` in `terrain.ts` so the
+  closed lanes' tower and inhibitor spots don't stand in the way. `spawnWave` sends minions only
+  down `s.lanes`, and `spawnMercs` takes the nearest open lane (`laneNear(p, lanes)`). On the pick
+  screen `MODE_PICK` switches it (`hoverMode` shows what each means), kept under the save key
+  `lane-brawl-quick` (`loadQuick`, `saveQuick` in `game/spellChoice.ts`); the two hint lines share
+  one text so the pick screen makes as many texts (and Math.random draws) as before. The minimap
+  draws closed lanes faint. Watched quick matches end in 5 to 16 minutes, most near 8 to 11.
 - Victory and defeat panel with the match's objectives, last hits, best streak and beasts slain,
   and "Play again".
 
@@ -453,7 +463,7 @@ File map (`src/`):
   brutes, bones for the wolves), watchstone islands, ruins, flowers and mushrooms and up to 620
   pines and rocks, from a fixed seed; then the beast's pit and the bushes (tall faceted grass).
 - `game/names.ts`: `shortName`, a champion's first name from its full name.
-- `game/spellChoice.ts`: the player's battle spell, the save key `lane-brawl-spell` (`loadSpell`, `saveSpell`).
+- `game/spellChoice.ts`: the player's battle spell and match kind, the save keys `lane-brawl-spell` (`loadSpell`, `saveSpell`) and `lane-brawl-quick` (`loadQuick`, `saveQuick`).
 - `game/mastery.ts`: class mastery, the save key `lane-brawl-mastery` (`loadMastery`, `recordWin`,
   `masteryRank`).
 - `game/terrain.ts`: the map's obstacles (`SCENERY`, `OBSTACLES`, `SOLID`) and `steer`, `settle`, `blockedBy`; `art/map.ts` takes the lane and clearing helpers and the scenery from it.

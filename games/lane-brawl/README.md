@@ -263,7 +263,14 @@ left, under bevelled slate panels.
     fog closes in and the tall grass is better for an ambush.
 
     ![Night over the mid lane](docs/screenshots/night.webp)
-27. **Winning** destroys the red Nexus. Losing means your Nexus falls first.
+27. **Quick match**: the button beside the battle spell on the pick screen switches between a full
+    match (five a side on three lanes) and a quick one: three a side on the mid lane alone, with no
+    towers, inhibitors or minions on the other two and sturdier structures (2.5 times their
+    health), for a match of about ten minutes. The jungle, runes, drakes and the beast are the same.
+    The game remembers the choice, and Watch AI plays it too.
+
+    ![The pick screen set to a quick match](docs/screenshots/quick-pick.webp)
+28. **Winning** destroys the red Nexus. Losing means your Nexus falls first.
 
 Every ability has an animation of its own (a hammer that splits the ground, a meteor from the
 sky, a harpoon on its rope, a coil pylon arcing, a blood moon rising and so on), and so do bolts in
@@ -423,7 +430,7 @@ A stunned champion or minion neither moves nor attacks. AI champions take upgrad
 ### Watch AI
 
 Add `?watch` to the game's URL (`/games/lane-brawl/?watch`) to skip the pick screen and let the AI
-play all ten champions, blue's with a random class, until a Nexus falls. The fog is lifted, the
+play every champion (ten, or six in a quick match), blue's with a random class, until a Nexus falls. The fog is lifted, the
 camera follows blue's champion, and the keys and clicks play nothing. The panel in the top right
 holds the match still, plays it from 1x to 8x (**[** and **]**) and opens a log (**L**) of each
 team's roams, jungle trips, retreats, upgrades, kills, towers and inhibitors. Objectives don't

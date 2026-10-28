@@ -48,7 +48,9 @@ import {
   PUPS,
   WATCHSTONES,
   WARD,
+  QUICK,
 } from './data';
+import { openLanes } from './terrain';
 
 export type Phase = 'pick' | 'playing' | 'won' | 'lost';
 export type UnitKind = 'champion' | 'minion' | 'tower' | 'nexus' | 'camp' | 'beast' | 'inhibitor' | 'watchstone' | 'ward';
@@ -363,6 +365,9 @@ export interface GameState {
   /** Whether the match's first champion kill has fallen, and whether the tower plates have fallen away. */
   firstBlood: boolean;
   platesGone: boolean;
+  /** Whether this is a quick match, and the lanes it plays on (all three, or `QUICK.lanes`). */
+  quick: boolean;
+  lanes: LaneId[];
   /** Whether it is night, past the middle of dusk (for the notices). */
   night: boolean;
   /** The river drake's unit id, its element now, how many have woken, and each team's stacks. */
@@ -578,6 +583,8 @@ export interface MatchOptions {
   mastery?: number;
   /** The player's battle spell; its role's when not given (and always when watching). */
   spell?: SpellId;
+  /** A quick match: three a side on one lane (`QUICK`). */
+  quick?: boolean;
 }
 
 /**
@@ -624,6 +631,8 @@ export function createGame(pick: ChampionDef, enemyDamage: number, opts: MatchOp
     runeRounds: 0,
     firstBlood: false,
     platesGone: false,
+    quick: !!opts.quick,
+    lanes: opts.quick ? QUICK.lanes : ['top', 'mid', 'bottom'],
     night: false,
     drake: 0,
     drakeElement: DRAKE_ORDER[0],
@@ -637,9 +646,10 @@ export function createGame(pick: ChampionDef, enemyDamage: number, opts: MatchOp
     notices: [],
   };
 
+  const structHp = opts.quick ? QUICK.hp : 1;
   for (const team of ['blue', 'red'] as Team[]) {
     const nexus = blankUnit(s, 'nexus', team, BASE[team].x, BASE[team].y, {
-      hp: NEXUS_HP,
+      hp: NEXUS_HP * structHp,
       dmg: 0,
       armor: 0,
       range: 0,
@@ -649,9 +659,11 @@ export function createGame(pick: ChampionDef, enemyDamage: number, opts: MatchOp
     });
     s.units.push(nexus);
   }
+  openLanes(s.lanes);
   for (const t of TOWERS) {
+    if (!s.lanes.includes(t.lane)) continue;
     const tower = blankUnit(s, 'tower', t.team, t.x, t.y, {
-        hp: TOWER.hp,
+        hp: TOWER.hp * structHp,
         dmg: TOWER.dmg,
         armor: 0,
         range: TOWER.range,
@@ -666,8 +678,9 @@ export function createGame(pick: ChampionDef, enemyDamage: number, opts: MatchOp
     s.units.push(tower);
   }
   for (const spot of INHIBITORS) {
+    if (!s.lanes.includes(spot.lane)) continue;
     const inhib = blankUnit(s, 'inhibitor', spot.team, spot.x, spot.y, {
-      hp: INHIBITOR.hp,
+      hp: INHIBITOR.hp * structHp,
       dmg: 0,
       armor: 0,
       range: 0,
@@ -721,14 +734,17 @@ export function createGame(pick: ChampionDef, enemyDamage: number, opts: MatchOp
   const blueAt = (i: number) => ({ x: BASE.blue.x + offsets[i].x, y: BASE.blue.y + offsets[i].y });
   const redAt = (i: number) => ({ x: BASE.red.x - offsets[i].x, y: BASE.red.y - offsets[i].y });
 
-  const player = spawnChampion(s, pick, 'blue', blueAt(0).x, blueAt(0).y, !opts.watch, opts.watch ? 'top' : null, pick.hero);
+  // A quick match has fewer a side, every one on its one lane.
+  const allies = opts.quick ? QUICK.allies : ALLY_LANES.length, enemies = opts.quick ? QUICK.enemies : ENEMY_LANES.length;
+  const laneOf = (lanes: LaneId[], i: number) => (opts.quick ? QUICK.lanes[i % QUICK.lanes.length] : lanes[i]);
+  const player = spawnChampion(s, pick, 'blue', blueAt(0).x, blueAt(0).y, !opts.watch, opts.watch ? laneOf(['top'], 0) : null, pick.hero);
   s.player = player.id;
   if (opts.spell && !opts.watch) player.spell = opts.spell;
-  others.slice(0, 4).forEach((def, i) => {
-    spawnChampion(s, def, 'blue', blueAt(i + 1).x, blueAt(i + 1).y, false, ALLY_LANES[i], def.hero);
+  others.slice(0, allies).forEach((def, i) => {
+    spawnChampion(s, def, 'blue', blueAt(i + 1).x, blueAt(i + 1).y, false, laneOf(ALLY_LANES, i), def.hero);
   });
-  others.slice(4, 9).forEach((def, i) => {
-    spawnChampion(s, def, 'red', redAt(i).x, redAt(i).y, false, ENEMY_LANES[i], def.hero);
+  others.slice(allies, allies + enemies).forEach((def, i) => {
+    spawnChampion(s, def, 'red', redAt(i).x, redAt(i).y, false, laneOf(ENEMY_LANES, i), def.hero);
   });
 
   // The mercenary camps, a band of sellswords each that fight as one.
@@ -756,7 +772,7 @@ export function createGame(pick: ChampionDef, enemyDamage: number, opts: MatchOp
  * the nearest stretch of the nearest lane and on down it. Returns the lane.
  */
 export function spawnMercs(s: GameState, team: Team, at: Vec): LaneId {
-  const lane = laneNear(at);
+  const lane = laneNear(at, s.lanes);
   const full = pathFor(lane, team);
   let seg = 0;
   let bestD = Infinity;
@@ -803,7 +819,7 @@ export function spawnCamp(s: GameState, kind: CampKind, x: number, y: number, gr
 /** Puts a wave of minions on each lane from both Nexuses. */
 export function spawnWave(s: GameState) {
   for (const team of ['blue', 'red'] as Team[]) {
-    for (const lane of ['top', 'mid', 'bottom'] as LaneId[]) {
+    for (const lane of s.lanes) {
       for (let i = 0; i < 3; i++) {
         const jitter = i * 12;
         const x = BASE[team].x + (team === 'blue' ? 1 : -1) * (30 + jitter);
@@ -846,10 +862,11 @@ export function dist(a: Vec, b: Vec): number {
 }
 
 /** The lane whose centre line runs nearest a point. */
-export function laneNear(p: Vec): LaneId {
-  let best: LaneId = 'mid';
+export function laneNear(p: Vec, lanes: LaneId[] = ['top', 'mid', 'bottom']): LaneId {
+  let best: LaneId = lanes[0];
   let bestD = Infinity;
-  for (const [id, pts] of Object.entries(LANES) as [LaneId, Vec[]][]) {
+  for (const id of lanes) {
+    const pts = LANES[id];
     for (let i = 0; i < pts.length - 1; i++) {
       const a = pts[i], b = pts[i + 1];
       const dx = b.x - a.x, dy = b.y - a.y;
