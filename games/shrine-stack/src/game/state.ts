@@ -7,7 +7,8 @@
 // tier 3 the temple leans with every off-centre drop (too far and the top tier topples), a chain of
 // perfect drops grows the stone back, and each break picks the next tier's material. Tier 10 is gilded
 // for double favor, and finishing tier 12 crowns the shrine and wins the run; after that the player
-// can keep building into the endless sky, where gusts push the falling stone. Every temple starts
+// can keep building into the endless sky, where gusts push the falling stone and every tenth tier
+// is a sky altar: double favor and a blessing whether it balanced or not. Every temple starts
 // under one of two patrons offered, whose rule holds for the whole run.
 
 import { byDifficulty } from '../../../../shared/settings';
@@ -67,6 +68,9 @@ export const GILDED_TIER = 10;
 export const GILDED_MULT = 2;
 /** Finishing this tier crowns the shrine and wins the run. */
 export const GOAL_TIER = 12;
+/** Sky altars: every `ALTAR_EVERY`th tier past the crown (22, 32, ...) earns `ALTAR_MULT` times the favor and offers a blessing even when wobbly. */
+export const ALTAR_EVERY = 10;
+export const ALTAR_MULT = 2;
 
 /** Slow drop: the stone in hand swings this much slower. Wider stone: the top stone grows this much. */
 export const SLOW_MULT = 0.5;
@@ -181,7 +185,8 @@ export type GameEvent =
   | { type: 'toppled'; count: number; lean: number; favor: number }
   | { type: 'regrown'; px: number }
   | { type: 'swapped'; kind: StoneKind }
-  | { type: 'patron'; patron: PatronId };
+  | { type: 'patron'; patron: PatronId }
+  | { type: 'altar'; tier: number };
 
 export interface GameState {
   phase: Phase;
@@ -224,6 +229,8 @@ export interface GameState {
   /** Building past the crown, and the gust on the stone in hand in pixels per second (+ pushes right). */
   endless: boolean;
   wind: number;
+  /** Sky altars finished this run. */
+  altars: number;
   /** How far the temple leans, in pixels (+ right): the offsets of its stones from the ones below, from `LEAN_FROM_TIER`. */
   lean: number;
   /** Perfect drops in a row. */
@@ -278,6 +285,7 @@ export function newGame(best = 0): GameState {
     curse: null,
     endless: false,
     wind: 0,
+    altars: 0,
     lean: 0,
     chain: 0,
     material: 'limestone',
@@ -545,7 +553,14 @@ function land(s: GameState) {
     s.lean = Math.trunc(s.lean * LEAN_SETTLE);
     s.speed = speedFor(s.tier, s.blessings.filter((b) => b === 'calm').length, s.patron);
     s.trial = s.tier >= TRIALS_FROM_TIER ? { id: TRIALS[Math.floor(Math.random() * TRIALS.length)], done: 0, failed: false } : null;
-    if (balanced) {
+    // A sky altar blesses the tier whether it balanced or not.
+    const altar = isAltar(done);
+    if (altar) {
+      s.altars++;
+      s.events.push({ type: 'altar', tier: done });
+    }
+    const blessed = balanced || altar;
+    if (blessed) {
       s.offer = pickOffer(s);
       s.curseOffer = pickCurse();
     }
@@ -554,7 +569,7 @@ function land(s: GameState) {
       s.phase = 'crowned';
       return;
     }
-    if (balanced) {
+    if (blessed) {
       s.phase = 'blessing';
     } else if (s.favor >= CHEAPEST || s.tier >= MATERIAL_FROM_TIER) {
       // A wobbly tier earns no blessing, but the break still opens when favor can buy something or
@@ -593,14 +608,20 @@ export function chooseMaterial(s: GameState, id: MaterialId) {
   return true;
 }
 
-/** How much a tier's favor is multiplied by: double on the gilded tier. */
-export const gild = (tier: number) => (tier === GILDED_TIER ? GILDED_MULT : 1);
+/** Whether a tier is a sky altar: every `ALTAR_EVERY`th tier past the crown. */
+export const isAltar = (tier: number) => tier > GOAL_TIER && (tier - GOAL_TIER) % ALTAR_EVERY === 0;
+
+/** The first sky altar at or above `tier`. */
+export const nextAltar = (tier: number) => GOAL_TIER + ALTAR_EVERY * Math.max(1, Math.ceil((tier - GOAL_TIER) / ALTAR_EVERY));
+
+/** How much a tier's favor is multiplied by: double on the gilded tier and on a sky altar. */
+export const gild = (tier: number) => (tier === GILDED_TIER ? GILDED_MULT : isAltar(tier) ? ALTAR_MULT : 1);
 
 /** What a material does to its tier's favor. */
 export const materialMult = (material: MaterialId) => (material === 'marble' ? MARBLE_MULT : material === 'sandstone' ? SANDSTONE_MULT : 1);
 
 /**
- * The gilded tier's multiplier, doubled again while a curse is in force on that tier, times the tier's
+ * The gilded tier's or a sky altar's multiplier, doubled again while a curse is in force on that tier, times the tier's
  * material (known only for the tier being built). Favor is rounded up after it.
  */
 export const favorMult = (s: GameState, tier: number) =>

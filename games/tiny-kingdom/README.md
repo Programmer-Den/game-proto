@@ -56,7 +56,8 @@ three stars each. Run out of tiles or room and the kingdom is finished.
    buildings that already count and marks the open spots. Fulfilling it pays **+8 points and a
    crown** at once; crowns are counted in the banner and kept from kingdom to kingdom. A decree not
    fulfilled by the round's end lapses, and the next round brings a new one. Lakes and woods are
-   named from where they lie on the island (Eastmere, Westpool, Northwood, ...).
+   named from where they lie on the island (Eastmere, Westpool, Northwood, ...). A decree is only
+   asked when the board has room for it and the pouch holds the tiles it needs.
 7. **Royal gift**: the panel shows the two gifts on offer for reaching the goal ("Gift at 20: +2
    Towers or Windmill"). When the goal is reached, the board pauses on a card until you take one.
    Round 1 always offers +2 Towers or the Windmill; later rounds offer one new building you don't
@@ -91,7 +92,8 @@ three stars each. Run out of tiles or room and the kingdom is finished.
    as a bonus when you place it, and the preview shows a small "x2"; buildings already standing
    never change when the season does.
 15. **Islands** are random: two or three lakes, two or three woods and the castle scattered over
-    the grass, so every kingdom is a new puzzle. The island button opens the islands card, where you can type
+    the grass, so every kingdom is a new puzzle. Every island has a lake with room on its shore for
+    the first decree and room around the castle for its chain. The island button opens the islands card, where you can type
     any island number from 1 to 9999 to play it (share the number to share the puzzle), play the
     **island of the day** (the same island for everyone that day, with its own best score), or
     play the **campaign**.

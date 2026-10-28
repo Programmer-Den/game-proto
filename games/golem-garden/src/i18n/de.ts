@@ -139,7 +139,8 @@ const de: Translation<typeof en> = {
 
   // Banners
   waveCleared: 'Welle {n} geschafft!  +{sap} Saft',
-  waveCalled: 'Welle {n} früher gerufen!  +{sap} Saft',
+  waveCalled: 'Welle {n} früher gerufen!',
+  calledPending: '+{sap} Saft, wenn Welle {n} weg ist',
   compostBonus: ', +{n} Kompost',
   harvestBanner: { one: 'Ernte! {stars} mit {n} Blatt', other: 'Ernte! {stars} mit {n} Blättern' },
   bloomBanner: 'Das Herzholz blüht: Dorngolem freigeschaltet!',
