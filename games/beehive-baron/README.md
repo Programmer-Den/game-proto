@@ -224,6 +224,26 @@ Every fair after the first asks for more and adds a class, a ladder after the en
 
 ![Gold at the fair: the Beehive Baron end card](docs/screenshots/fair-baron.webp)
 
+### Trophies
+
+Ten trophies, listed behind the Trophies button on the start and pause screens and counted on the
+hub's card. Each pops up at the top of the page once, when it is earned.
+
+| Tier | Trophy | Earned by |
+| --- | --- | --- |
+| Bronze | First jar | Selling your first jar of honey |
+| Bronze | Fields of purple | Opening the Lavender Field |
+| Bronze | Shoo! | Swatting a raiding wasp |
+| Bronze | Hired wings | Lending bees to the orchard |
+| Bronze | Old and golden | Ageing a cask of mead |
+| Silver | Long live the queen | Catching a swarm for a second hive |
+| Silver | Every meadow | Opening all three meadows |
+| Silver | Full shelves | Selling 100 jars |
+| Gold | Beehive Baron | Winning gold at the county fair |
+| Gold | Blue-ribbon keeper (hidden) | Winning gold at three county fairs |
+
+![The trophy list on the pause screen](docs/screenshots/trophy-list.webp)
+
 ### What the coins buy
 
 | Buy | Ranks | What it does |

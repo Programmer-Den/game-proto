@@ -118,7 +118,7 @@ export function newGame(best = 0, crowns = 0, island = randomIsland(), kingdom: 
     phase: 'playing',
     best,
     crowns,
-    decree: decreeFor(island, 1, grid),
+    decree: decreeFor(island, 1, grid, FIRST_POUCH),
     gifts: giftsFor(island, 1, []),
     giftsDue: 0,
     unlocked: [],
@@ -413,7 +413,7 @@ function settle(s: GameState, prior: Snapshot, at: { col: number; row: number },
     // The omen warned of strikes as the round begins, then the decree and the next omen are drawn on the board as it stands.
     if (s.omen) struck = strike(s.grid, s.omen);
     if (struck) s.score = boardScore(s.grid) + s.bonus;
-    s.decree = decreeFor(s.island, s.round, s.grid, s.decree);
+    s.decree = decreeFor(s.island, s.round, s.grid, s.pouch, s.decree);
     s.omen = omenFor(s.island, s.round, s.grid);
     s.phase = 'gift';
   }

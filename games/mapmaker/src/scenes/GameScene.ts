@@ -34,6 +34,7 @@ import {
 } from '../art/paint';
 import { SURVEYOR_ORIGIN } from '../art/surveyor';
 import { loadBest, loadGame, saveBest, saveGame, saveTheme } from '../game/save';
+import { checkTrophies } from '../trophies/check';
 import {
   artifactValue,
   atlasKinds,
@@ -361,6 +362,7 @@ export class GameScene extends Phaser.Scene {
     this.updatePanel();
     this.syncOverlay();
     this.syncMusic();
+    checkTrophies(this.state);
   }
 
   /** Plays the part for where the voyage stands: the isle's own, the rival's, or the harbor's. */

@@ -10,12 +10,13 @@ import { CAPSTONES, FILLER, MAX_TIER, POOL_NAMES, UPGRADES, capstoneFor, crossov
 import { BOSSES, NODE_INFO, PLANETS, STAGES, TRADE, planetLabel, planetsAt, type NodeKind } from '../game/planets';
 import { chartOptions, priceOf } from '../game/voyage';
 import { isUnlocked, type Progress } from '../game/save';
+import { HEAT_RULES, heatOpen } from '../game/heat';
 import type { Vars } from '../../../../shared/i18n';
 import { t } from '../i18n';
 import { C, hex } from '../art/glow';
 import { portraitKey } from '../art/sprites';
 import {
-  AGAIN, CHART, CONTINUE, DEPTH, FIGHT, FONT, HERO_DETAIL, LEAVE, MAP, REROLL, SCREEN, UNLOCK, VIEW, chartRect, chartSpot, eventOptionRect, heroCardRect,
+  AGAIN, CHART, CONTINUE, DEPTH, FIGHT, FONT, HEAT_DOWN, HEAT_ROW, HEAT_UP, HERO_DETAIL, LEAVE, MAP, REROLL, SCREEN, UNLOCK, VIEW, chartRect, chartSpot, eventOptionRect, heroCardRect,
   levelCardRect, mapNodeRect, mapNodeSpot, tradeCardRect, type Rect,
 } from '../scenes/layout';
 
@@ -136,13 +137,13 @@ function sideOf(hero: HeroDef) {
  * The hero select screen: twelve small cards (a hero still locked shows only a dark placeholder:
  * no art, name or colour, and never its deed) and the chosen hero's details with the Fight button.
  */
-export function heroSelect(p: Panel, progress: Progress, chosen: HeroId) {
+export function heroSelect(p: Panel, progress: Progress, chosen: HeroId, heat = 0) {
   const scene = p.scene;
   p.dim(0.55);
   p.text(VIEW.w / 2, 12, 'RIFTBLADE', 32, '#9fd8ff', { bold: true, origin: [0.5, 0], glow: true });
   p.text(VIEW.w / 2, 54, t('selectSubtitle'), 14, C.muted, { origin: [0.5, 0] });
   HERO_IDS.forEach((id, i) => heroCard(p, scene, id, i, progress, id === chosen));
-  heroDetail(p, scene, chosen, progress);
+  heroDetail(p, scene, chosen, progress, heat);
   const best = progress.bestMs > 0 ? `${t('longestRun', { time: clock(progress.bestMs) })}  ·  ` : '';
   p.text(VIEW.w / 2, VIEW.h - 22, `${best}${t('selectHelp')}`, 13, C.muted, { origin: [0.5, 0.5] });
   return p;
@@ -177,12 +178,13 @@ function heroCard(p: Panel, scene: Phaser.Scene, id: HeroId, i: number, progress
   p.text(cx, r.y + 142, sideOf(hero), 11, sch.accent, { origin: [0.5, 0], align: 'center', wrap: r.w - 8 });
   const wins = progress.wins[id] ?? 0;
   const furthest = progress.furthest[id] ?? 0;
-  const status = wins > 0 ? t('wins', { n: wins }) : furthest > 0 ? t('reached', { n: furthest, of: STAGES }) : '';
+  const best = progress.heat[id] ?? 0;
+  const status = wins > 0 ? `${t('wins', { n: wins })}${best > 0 ? `  ·  ${t('cardHeat', { n: best })}` : ''}` : furthest > 0 ? t('reached', { n: furthest, of: STAGES }) : '';
   if (status) p.text(cx, r.y + r.h - 6, status, 10.5, wins > 0 ? C.elite : C.muted, { origin: [0.5, 1] });
 }
 
 /** The chosen hero in full: weapon, numbers, signature and paths; a locked one shows only its placeholder. */
-function heroDetail(p: Panel, scene: Phaser.Scene, id: HeroId, progress: Progress) {
+function heroDetail(p: Panel, scene: Phaser.Scene, id: HeroId, progress: Progress, heat: number) {
   const hero = HEROES[id];
   const sch = schemeOf(id);
   const r = HERO_DETAIL;
@@ -201,15 +203,46 @@ function heroDetail(p: Panel, scene: Phaser.Scene, id: HeroId, progress: Progres
   p.text(cx, r.y + 140, `${t(hero.weapon)}  ·  ${sideOf(hero)}`, 13, sch.accent, { origin: [0.5, 0] });
   p.text(cx, r.y + 160, t('heroStats', { hp: hero.maxHp, speed: hero.speed }), 12.5, C.muted, { origin: [0.5, 0] });
   // The lines flow down, since German runs longer.
-  let y = r.y + 182;
-  for (const [text, color] of [
+  const lines = [
     [t(hero.blurb), C.text],
     [t('signatureFull', { name: t(hero.signature.name), text: t(hero.signature.text) }), sch.accent],
     [t('pathsLine', { paths: hero.paths.map((pid) => t(UPGRADES[pid].name)).join(', ') }), C.text],
-  ]) y += p.text(left, y, text, 12.5, color, { wrap }).height + 6;
+  ].map(([text, color]) => p.text(left, 0, text, 12.5, color, { wrap }));
+  // With the heat row up, the lines shrink until they end above it.
+  const open = heatOpen(progress.heat[id]);
+  const bottom = open > 0 ? HEAT_ROW.y - 4 : FIGHT.y - 4;
+  for (let size = 12.5; ; size -= 0.5) {
+    let y = r.y + 182;
+    for (const line of lines) {
+      line.setFontSize(size).setY(y);
+      y += line.height + 6;
+    }
+    if (y - 6 <= bottom || size <= 10) break;
+  }
+  if (open > 0) heatRow(p, scene, heat, open, sch.accent);
   p.frame(FIGHT, sch.accent, '#14244a');
   p.spots.push({ id: 'fight', ...FIGHT });
   p.text(FIGHT.x + FIGHT.w / 2, FIGHT.y + FIGHT.h / 2, t('fightAs', { name: t(hero.short) }), 18, C.text, { bold: true, origin: [0.5, 0.5] });
+}
+
+/**
+ * The rift heat to fight at, from 0 to the highest open: the arrows step it down and up, and the
+ * line under it names the rule that heat adds (each heat keeps the rules below it).
+ */
+function heatRow(p: Panel, scene: Phaser.Scene, heat: number, open: number, accent: string) {
+  const g = p.add(scene.add.graphics(), 2);
+  const hot = heat > 0 ? '#ff7a3c' : C.muted;
+  g.fillStyle(hex('#0b1222'), 0.9).fillRoundedRect(HEAT_ROW.x, HEAT_ROW.y, HEAT_ROW.w, HEAT_ROW.h, 10);
+  g.lineStyle(2, hex(hot), 0.8).strokeRoundedRect(HEAT_ROW.x, HEAT_ROW.y, HEAT_ROW.w, HEAT_ROW.h, 10);
+  for (const [r, dir, on] of [[HEAT_DOWN, -1, heat > 0], [HEAT_UP, 1, heat < open]] as const) {
+    const cx = r.x + r.w / 2;
+    const cy = r.y + r.h / 2;
+    g.fillStyle(hex(on ? accent : C.muted), on ? 1 : 0.3).fillTriangle(cx + dir * 8, cy, cx - dir * 6, cy - 9, cx - dir * 6, cy + 9);
+    p.spots.push({ id: dir < 0 ? 'heat-down' : 'heat-up', ...r });
+  }
+  const cx = HEAT_ROW.x + HEAT_ROW.w / 2;
+  p.text(cx, HEAT_ROW.y + 4, t('heatLevel', { n: heat }), 14, hot, { bold: true, origin: [0.5, 0] });
+  fit(p.text(cx, HEAT_ROW.y + 23, t(HEAT_RULES[heat]), 11, C.text, { origin: [0.5, 0] }), HEAT_ROW.w - 84);
 }
 
 /** Shrinks a one-line text to fit a width. */
@@ -335,6 +368,8 @@ export function endScreen(p: Panel, s: GameState, progress: Progress) {
   const lines = [
     t('runStats', { time: clock(s.runMs), level: s.level, kills: s.kills, elites: s.elitesKilled }),
     caps.length ? t('capstonesLine', { names: caps.join(', ') }) : '',
+    s.heat > 0 ? t('endHeat', { n: s.heat }) : '',
+    won && heatOpen(s.heat) > s.heat ? t('heatOpened', { n: s.heat + 1, hero: t(hero.short) }) : '',
     t('longestRun', { time: clock(progress.bestMs) }),
   ].filter(Boolean);
   p.text(VIEW.w / 2, 226, lines.join('\n'), 15, C.muted, { origin: [0.5, 0], align: 'center' });

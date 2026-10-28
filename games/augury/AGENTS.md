@@ -19,7 +19,7 @@ Implemented today:
   view under `scenes/views/`.
 - Modes (`MODES`): Endless Medley (`endless`), Daily Five (`daily`), Blitz, Draft Run (`draft`),
   Pass and Play (`duel`) and Practice, all in `game/run.ts`.
-- Screens (`screen`): `menu` (six mode cards and Records), `practice` (level buttons and nine
+- Screens (`screen`): `menu` (six mode cards, Records, and Continue when a run was saved), `practice` (level buttons and nine
   puzzle cards), `records` and `run`. A run's `phase` is `playing`, `between` (the result banner),
   `draft`, `relic`, `handover` (pass and play) or `over`.
 - Both ways round: a wide view gets the `WIDE` layout (the stage with a side panel at its right)
@@ -33,7 +33,8 @@ Implemented today:
 
 Missing or rough:
 
-- A run in play is not saved; a reload starts at the menu.
+- A reload during a puzzle deals that puzzle again from its start, with its full time (the run is
+  saved between puzzles, not move by move).
 - Puzzle levels are by size and settings, not by the solving steps a puzzle needs; Picture Grid,
   Calc Cages and Cross Sums may have more than one answer (any that keeps the rules counts).
 - Unjam makes its layouts by scattering blocks and searching (up to about half a second at
@@ -68,10 +69,16 @@ File map (`src/`):
   `echoAnswer`), each returning whether it made a move worth keeping for Undo.
 - `game/run.ts`: the tuning (`QUEUE`, `BETWEEN_MS`, `START_HINTS`, `startHearts`, `MAX_HEARTS`,
   `blitzSeconds`, `BLITZ_SOLVE_S`, `BLITZ_PENALTY_S`, `DAILY_LEVELS`, `DUEL_LEVELS`, `DUEL_FAIL_S`,
-  `DUEL_HINT_S`, `RELIC_EVERY`, `RELIC_OFFER`, `DRAFT_MAX`, `HOURGLASS`, the points constants),
+  `DUEL_HINT_S`, `RELIC_EVERY`, `RELIC_OFFER`, `DRAFT_MAX`, `HOURGLASS`, `CHARM_POINTS`,
+  `CHARM_ECHO_SLOW`, the points constants),
   `Card`, `Current`, `Result`, `Run`, `RunEvent`, and the actions (`startRun`, `act`, `drag`,
   `undo`, `hint`, `skip`, `quit`, `next`, `draftPick`, `takeRelic`, `startSecondPlayer`, `tick`,
-  `canUndo`, `canHint`, `dailyDone`, `endlessLevel`). Only this file changes a `Run`; `act` and
+  `canUndo`, `canHint`, `dailyDone`, `endlessLevel`, `holdsCharm`, `offerRelics`, and `makeCurrent`,
+  which makes a card's puzzle fresh with its time and its charm's help, for `deal` and `loadRun`).
+  A charm gives its kind's puzzles one free hint (`freeHints`; `freeUsed` counts them, and they
+  cost no points) and `CHARM_POINTS` times the points, and slows Memory Echo's cards
+  (`CHARM_ECHO_SLOW`) instead of the hint. A relic offer (`offerRelics`) has one charm not yet held,
+  while any is left, and general relics for the rest. Only this file changes a `Run`; `act` and
   `drag` (a step of a drag, with no Undo step) are the only ways a move reaches a puzzle's state.
   `skip` in Practice deals a new puzzle of the same kind and level, with nothing recorded. `quit`
   (the Leave button) ends a run that is not over through `finish`, so its bests, the daily five's
@@ -80,19 +87,22 @@ File map (`src/`):
   deals at most `DRAFT_MAX` (3) cards, the deal layout's slots, so Crystal Ball is offered once;
   Blitz's queue is levelled again after every puzzle, so "Up next" shows the level that will be
   dealt, and Blitz ends where its clock runs out, without a result for the puzzle it cut off.
-- `game/catalog.ts`: `MODES`/`Mode`, `RELICS`/`RelicId`, `KIND_COLOR`, `RELIC_COLOR`.
+- `game/catalog.ts`: `MODES`/`Mode`, `GENERAL_RELICS`, `CHARMS` (each kind's relic, its charm) with
+  `CharmId`, `CHARM_KIND` and `isCharm`, `RELICS`/`RelicId` (both kinds), `KIND_COLOR`,
+  `RELIC_COLOR` (a charm takes its kind's colour).
 - `game/progress.ts`: `Progress`, `newProgress`, `recordResult`. `game/save.ts`: `loadProgress`,
-  `saveProgress`.
+  `saveProgress`, and `saveRun`, `loadRun` (checks the saved run and deals its puzzle in play again
+  from its card) and `clearRun`.
 - `scenes/GameScene.ts`: every screen, input and event.
 - `scenes/painter.ts`: `Painter`, an immediate-mode drawer: per layer a Graphics and a text pool,
   plus `hits` (tappable spots); `frame` (a tarot frame), `button`, `text`, `hit`, `layer`.
 - `scenes/views/`: one `PuzzleView` per kind (`draw`, and `down`/`move`/`up` for the dragged ones),
   `types.ts` (`ViewCtx`, `fitGrid`), `pad.ts` (the number pad) and `index.ts` (`VIEWS`).
 - `scenes/glyphs.ts`: `drawGlyph` (the six glyphs Code Breaker and Memory Echo use), `drawKindIcon`,
-  `drawRelic`, `trace`.
+  `drawRelic` (a charm is its kind's icon in a ringed medallion), `trace`.
 - `scenes/theme.ts`: `FONT`, `C` (colours), `PALETTE`. `scenes/layout.ts`: the `Layout` type and its two values, `WIDE` (960x540) and
   `TALL` (540x960), with every spot in the frame (`top`, `leave`, `stage`, `board`, `tools`,
-  `side`, `menu`, `practice`, `records`, `back`, `deal`, `end`, `endButtons`); `layoutFor(w, h)`,
+  `side`, `menu` (with `resume` and `recordsAside` for when a run was saved), `practice`, `records`, `back`, `deal`, `end`, `endButtons`); `layoutFor(w, h)`,
   `VIEW` (= `WIDE.view`, for `main.ts`) and `UI_DEPTH`.
 
 Shared code it imports: `shared/setupGame.ts`, `shared/scaling.ts` (`setupScaling`, `viewSize`,
@@ -136,11 +146,16 @@ How it runs:
   `RandomDataGenerator` with a fixed seed.
 
 State model (`Run`): `mode`, `phase`, `hearts`, `maxHearts`, `hints`, `score`, `streak`, `dealt`,
-`solved`, `current` (`card`, `state`, `timeLeftMs`, `timeTotalMs`, `elapsedMs`, `hintsUsed`,
-`history`), `queue`, `results`, `last`, `betweenMs`, `clockMs`, `relics`, `relicOffer`,
+`solved`, `current` (`card`, `state`, `timeLeftMs`, `timeTotalMs`, `elapsedMs`, `hintsUsed`, `freeHints`,
+`freeUsed`, `history`), `queue`, `results`, `last`, `betweenMs`, `clockMs`, `relics`, `relicOffer`,
 `draftOffer`, `player`, `totals`, `duelSolved`, `day`, `progress`, `newBest` and `events`.
 
-Persistence: one `localStorage` key, `augury-progress`, holding `Progress`. It is written when a run
+Persistence: two `localStorage` keys. `augury-run` holds the run in play (every mode but Practice,
+without `progress` and `events`): `keepRun` saves it each time it moves on (a puzzle dealt or
+ended, a draft or relic offer, the hand-over), and clears it when the run is over or left. On load
+`loadRun` hands it to `saved`, and the menu's Continue (`resume`) picks it up; starting another run
+first ends the saved one through `quit`, so its bests and its run count. `augury-progress` holds
+`Progress`. It is written when a run
 starts (the daily five counts as played, and as a run, from its first card), after every puzzle
 (with the daily five's score so far and its best), when a run ends and when leaving to the menu, which ends the run and records
 it (`quit`). `loadProgress` keeps only known kinds and whole, non-negative numbers.
@@ -184,7 +199,7 @@ cell is picked, the daily five played today), and a Hint tap that finds nothing 
 - `src/main.ts` exposes `window.game` in dev builds. The test reads `game.scene.getScene('Game')`
   and its `run` (copied through JSON, without `events` and `progress`), `screen` and `buttons`
   (every spot on screen by id, centred, in view pixels: `mode-<mode>`, `records`, `back`,
-  `level-<n>`, `kind-<kind>`, `undo`, `hint`, `skip`, `leave`, `cell-<i>`, `key-<n>` (0 is Clear),
+  `resume`, `level-<n>`, `kind-<kind>`, `undo`, `hint`, `skip`, `leave`, `cell-<i>`, `key-<n>` (0 is Clear),
   `island-<i>`, `glyph-<i>`, `code-back`, `code-guess`, `block-<k>`, `echo-same`, `echo-diff`,
   `draft-<i>`, `relic-<i>`, `next`, `done`, `again`, `start2`, `dim`).
 - Inputs: it taps `mode-endless`, then solves whatever the seeded deck deals with real taps and
@@ -208,8 +223,8 @@ cell is picked, the daily five played today), and a Hint tap that finds nothing 
   upright; a seventh needs `menu.cards` laid out again in both layouts), its `START_HINTS`, its rules in `startRun`, `end`, `next` and
   `finish`, its side panel in `drawSide`, its top line in `topLine`, its icon in `modeIcon`, its
   `Name` and `Text` texts, and the README.
-- **Add a relic**: its id in `RELICS` and `RELIC_COLOR`, its effect in `takeRelic`, `timeFor` or
-  `offerDraft`, an emblem in `drawRelic`, its texts and the README row. A relic that does nothing
+- **Add a relic**: its id in `GENERAL_RELICS` and `RELIC_COLOR`, its effect in `takeRelic`,
+  `timeFor`, `makeCurrent` or `offerDraft`, an emblem in `drawRelic`, its texts and the README row. A relic that does nothing
   twice is left out of the offer in `next` once held, like Crystal Ball.
 - **Retune**: the constants at the top of `run.ts` and of each puzzle file (sizes and counts per
   level, `limit` seconds per level); mirror the Normal hearts and the first-round numbers in the

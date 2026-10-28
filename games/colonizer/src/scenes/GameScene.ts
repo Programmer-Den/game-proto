@@ -97,6 +97,7 @@ import { Effects } from './fx';
 import { DeedCard, Minimap, StatusCard, stitchEllipse, stitchLine, Toast, TopBar } from './hud';
 import { BOON, BUTTONS, H, PANEL_Y, SEL, TOP_H, W } from './layout';
 import { SoundCues } from './sound';
+import { checkTrophies } from '../trophies/check';
 import { sfx } from '../audio/sfx';
 import { COLONY } from '../audio/music';
 import { playSting, stopMusic, ui } from '../../../../shared/audio';
@@ -358,6 +359,7 @@ export class GameScene extends Phaser.Scene {
       for (const side of this.aiSides) think(this.state, dt, side);
     }
     if (watching) this.state.sight.fill(2);
+    else checkTrophies(this.state);
     this.scroll(dt);
     this.paintGround();
     this.syncSprites();

@@ -4,9 +4,9 @@
 import Phaser from 'phaser';
 import { paintAll, texScale } from '../art/paint';
 import { paintGround, groundKey } from '../art/ground';
-import { BREAKABLE, buildMap, centre, CUTTABLE, DUNGEONS, LOW, setTile, SOLID, TILE, tileAt, underBoulder, type Door, type Facing, type ItemId, type MapDef, type MapId, type NpcId, type Prop, type PropKind } from '../game/maps';
+import { BREAKABLE, buildMap, centre, CUTTABLE, DUNGEONS, LOW, MAP_IDS, setTile, SOLID, TILE, tileAt, underBoulder, type Door, type Facing, type ItemId, type MapDef, type MapId, type NpcId, type Prop, type PropKind } from '../game/maps';
 import { findPath, type Step } from '../game/path';
-import { advance, CHAPTER_ONE_STONES, clearSave, give, hasFlag, load, MAX_SEEDS, MOONSTONES, newState, save, setFlag, stonesToFind, type GameState } from '../game/state';
+import { advance, CHAPTER_ONE_STONES, clearSave, clock, give, hasFlag, load, MAX_SEEDS, MOONSTONES, newState, reached, save, setFlag, stonesToFind, type GameState } from '../game/state';
 import { talk, type TalkEffect } from '../game/talk';
 import { t, type TextKey } from '../i18n';
 import { settings } from '../../../../shared/settings';
@@ -18,7 +18,7 @@ import { Hud } from './hud';
 import { NightLight, type Light } from './light';
 import {
   BELL_DOWN_MS, BULB_DOWN_MS, BULB_EVERY_MS, BULB_HP, BULB_UP_MS, BURST_PX, DROP_MS, EXPOSED_MS, FOES, foeFree, FROG_LEAP_MS, FROG_WAIT_MS, FUSE_MS, HOVER_MS, HOVER_SPEED,
-  makeFoe, SEED_SPEED, SLAM_PX, SUMMON_MS, THORNLING_SHOT_MS, VOLLEY_MS, WRAITH_HP,
+  makeFoe, SEED_SPEED, SLAM_PX, SUMMON_MS, THORNLING_SHOT_MS, TRIAL, VOLLEY_MS, WRAITH_HP,
   type Bomb, type Boss, type Foe, type Seed, type Wraith,
 } from './foes';
 import {
@@ -64,7 +64,7 @@ type Target =
   | { kind: 'npc'; id: NpcId }
   | { kind: 'chest'; id: string }
   | { kind: 'sign'; i: number }
-  | { kind: 'cut' | 'dig' | 'block' | 'door' | 'ring' | 'plant'; tx: number; ty: number }
+  | { kind: 'cut' | 'dig' | 'block' | 'door' | 'ring' | 'plant' | 'hourglass'; tx: number; ty: number }
   | { kind: 'foe'; foe: Foe };
 
 interface Dialog {
@@ -87,6 +87,11 @@ export class GameScene extends Phaser.Scene {
   wraith: Wraith | null = null;
   /** Bellseeds planted and swelling. */
   bombs: Bomb[] = [];
+  /**
+   * The hourglass trial under way: its dungeon and the play time since it started. While it runs the
+   * dungeon's foes are back and its boss wakes again, harder (`TRIAL`); leaving or falling ends it.
+   */
+  trial: { map: MapId; ms: number } | null = null;
 
   private hud!: Hud;
   private night!: NightLight;
@@ -206,12 +211,17 @@ export class GameScene extends Phaser.Scene {
     this.swing = null;
 
     const s = this.state;
+    if (this.trial && this.trial.map !== id) {
+      this.trial = null;
+      this.hud.toast(t('trialLost'));
+    }
+    const trial = !!this.trial;
     const map = buildMap(id);
     this.map = map;
     // What the knight has already changed here.
     if (id === 'village' && hasFlag(s, 'gate-cut')) for (const i of [19, 20]) setTile(map, i, 3, 'path');
     if (id === 'woods' && hasFlag(s, 'woods-thorns')) for (const i of [42, 43]) setTile(map, i, 10, 'path');
-    if (id === 'shrine' && hasFlag(s, 'boss')) map.tiles = map.tiles.map((t) => (t === 'ring' ? 'floor' : t));
+    if (id === 'shrine' && hasFlag(s, 'boss') && !trial) map.tiles = map.tiles.map((t) => (t === 'ring' ? 'floor' : t));
     const broke = `broke-${id}-`;
     for (const f of s.flags)
       if (f.startsWith(broke)) {
@@ -305,12 +315,19 @@ export class GameScene extends Phaser.Scene {
       this.stoneSprites.set(st.id, img);
     }
     map.enemies.forEach((e, i) => {
-      if (DUNGEONS.has(id) && hasFlag(s, this.foeFlag(i))) return;
+      if (DUNGEONS.has(id) && hasFlag(s, this.foeFlag(i)) && !trial) return;
       const c = centre(e);
       this.spawnFoe(e.kind, c.x, c.y, i, e.room);
     });
-    if (id === 'shrine' && map.boss && !hasFlag(s, 'boss')) this.makeBoss(map.boss);
-    if (id === 'belfry' && map.boss && !hasFlag(s, 'wraith')) this.makeWraith(map.boss);
+    if (id === 'shrine' && map.boss && (!hasFlag(s, 'boss') || trial)) this.makeBoss(map.boss);
+    if (id === 'belfry' && map.boss && (!hasFlag(s, 'wraith') || trial)) this.makeWraith(map.boss);
+    // The hourglass by a dungeon's entry turns up once chapter two is done.
+    if (map.hourglass && reached(s, 'end')) {
+      const c = centre(map.hourglass);
+      this.addWorld(this.add.image(c.x, c.y + 14, 'hourglass').setOrigin(0.5, 45 / 48), c.y + 14);
+      this.glows.push({ x: c.x, y: c.y - 6, r: 70, col: [170, 220, 255], power: 0.7 });
+      this.block(map.hourglass.x, map.hourglass.y);
+    }
     if (map.wisp && !s.moonstones.includes('f-wisp')) {
       const c = centre(map.wisp[0]);
       const img = this.add.image(c.x, c.y, 'wisp');
@@ -462,8 +479,9 @@ export class GameScene extends Phaser.Scene {
   // ---------------------------------------------------------------- input
 
   private onKey(e: KeyboardEvent) {
-    if (this.hud.ended || this.fading) return;
     const code = e.code;
+    if (code === 'KeyN' || (this.hud.pageOpen && (code === 'Escape' || code === 'Space' || code === 'Enter'))) return this.toggleStones();
+    if (this.hud.covered || this.fading) return;
     if (this.dialog) {
       if (code === 'Space' || code === 'Enter' || code === 'KeyJ') this.nextLine();
       return;
@@ -475,11 +493,13 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onPointer(pointer: Phaser.Input.Pointer) {
-    if (this.hud.ended || this.fading) return;
+    if (this.hud.pageOpen) return this.toggleStones();
+    if (this.hud.covered || this.fading) return;
     if (this.dialog) {
       this.nextLine();
       return;
     }
+    if (this.hud.plateAt(viewPoint(pointer))) return this.toggleStones();
     const btn = this.hud.buttonAt(viewPoint(pointer), this.state);
     if (btn === 'sword') return this.act();
     if (btn === 'roll') return this.startRoll();
@@ -517,7 +537,7 @@ export class GameScene extends Phaser.Scene {
     const st = this.stick;
     if (!st || st.id !== pointer.id) return;
     this.stick = null;
-    if (!st.live && !this.dialog && !this.hud.ended && !this.fading) this.tapWorld(st.wx, st.wy);
+    if (!st.live && !this.dialog && !this.hud.covered && !this.fading) this.tapWorld(st.wx, st.wy);
   }
 
   /** Where a tap in the world sends the knight, and what they do there. */
@@ -537,6 +557,7 @@ export class GameScene extends Phaser.Scene {
     if (sign >= 0) return this.goTo({ kind: 'sign', i: sign }, tx, ty);
     if (this.blocks.some((b) => b.x === tx && b.y === ty)) return this.goTo({ kind: 'block', tx, ty }, tx, ty);
     if (this.closedDoors.has(ty * this.map.w + tx)) return this.goTo({ kind: 'door', tx, ty }, tx, ty);
+    if (this.hourglassAt(tx, ty)) return this.goTo({ kind: 'hourglass', tx, ty }, tx, ty);
     if (s.items.sword && this.bells.some((b) => b.x === tx && b.y === ty)) return this.goTo({ kind: 'ring', tx, ty }, tx, ty);
     if (s.items.seeds && BREAKABLE.has(tileAt(this.map, tx, ty))) return this.goTo({ kind: 'plant', tx, ty }, tx, ty);
     if (s.items.sword && CUTTABLE.has(tileAt(this.map, tx, ty))) return this.goTo({ kind: 'cut', tx, ty }, tx, ty);
@@ -629,6 +650,18 @@ export class GameScene extends Phaser.Scene {
       }
       return true;
     }
+    if (this.hourglassAt(tx, ty)) {
+      if (this.trial) {
+        ui('refuse');
+        this.hud.toast(t('trialBusy'));
+        return true;
+      }
+      const best = s.trials[this.map.id];
+      const lines = [t('hourglassRead')];
+      if (best !== undefined) lines.push(t('hourglassBest', { time: clock(best) }));
+      this.openDialog('', lines, 'trial');
+      return true;
+    }
     const sign = this.map.signs.find((g) => g.x === tx && g.y === ty);
     if (sign) {
       this.openDialog(t('sign'), [sign.text]);
@@ -656,6 +689,59 @@ export class GameScene extends Phaser.Scene {
       return true;
     }
     return false;
+  }
+
+  /** Whether the dungeon's hourglass stands on a tile (it is there only after chapter two). */
+  private hourglassAt(tx: number, ty: number) {
+    const h = this.map.hourglass;
+    return !!h && h.x === tx && h.y === ty && reached(this.state, 'end');
+  }
+
+  /** Turns the hourglass: the dungeon is built again with its foes and its boss back, and the clock runs. */
+  private startTrial() {
+    const s = this.state;
+    this.trial = { map: this.map.id, ms: 0 };
+    sfx('swell');
+    this.fadeTo(() => {
+      this.enterMap(s.map, s.x, s.y, s.facing, true);
+      this.hud.toast(t('trialStart'));
+    });
+  }
+
+  /** The trial's boss is down: the clock stops and a best time is kept. */
+  private trialWon() {
+    const s = this.state;
+    const ms = this.trial!.ms;
+    const id = this.map.id;
+    this.trial = null;
+    const best = s.trials[id];
+    const record = best === undefined || ms < best;
+    if (record) s.trials[id] = ms;
+    this.openDialog('', [t('trialDone', { time: clock(ms) }), record ? t('trialRecord') : t('trialBestIs', { time: clock(best!) })]);
+    this.persist();
+  }
+
+  /** Opens the moonstone page, or closes it. */
+  private toggleStones() {
+    if (this.hud.pageOpen) {
+      this.hud.closeStones();
+      return;
+    }
+    if (this.hud.covered || this.dialog) return;
+    const s = this.state;
+    const two = reached(s, 'bell');
+    const rows = MAP_IDS.map((id) => buildMap(id))
+      .map((m) => {
+        const ids = m.stones.filter((st) => two || st.chapter !== 2).map((st) => st.id);
+        return { name: m.name, found: ids.filter((i) => s.moonstones.includes(i)).length, total: ids.length };
+      })
+      .filter((r) => r.total > 0);
+    const trials = reached(s, 'end') ? (['shrine', 'belfry'] as const).map((id) => ({ place: t(id), ms: s.trials[id] })) : [];
+    ui('click');
+    this.route = null;
+    this.target = null;
+    this.stick = null;
+    this.hud.showStones(rows, trials);
   }
 
   private openChest(id: string, item: ItemId) {
@@ -743,6 +829,9 @@ export class GameScene extends Phaser.Scene {
         advance(s, 'end');
         this.chapterEnd(2);
         break;
+      case 'trial':
+        this.startTrial();
+        return;
     }
     this.persist();
   }
@@ -1088,7 +1177,8 @@ export class GameScene extends Phaser.Scene {
     const dt = Math.min(delta, 100);
     this.now += dt;
     const s = this.state;
-    if (!this.dialog && !this.hud.ended && !this.fading) {
+    if (!this.dialog && !this.hud.covered && !this.fading) {
+      if (this.trial) this.trial.ms += dt;
       this.swingCd = Math.max(0, this.swingCd - dt);
       this.rollCd = Math.max(0, this.rollCd - dt);
       this.invuln = Math.max(0, this.invuln - dt);
@@ -1107,7 +1197,7 @@ export class GameScene extends Phaser.Scene {
     this.flashes = this.flashes.filter((f) => (f.t -= dt) > 0);
     this.drawPlayer();
     this.drawWorld();
-    this.hud.update(dt, s, this.dialog ? { speaker: this.dialog.speaker, text: this.dialog.lines[this.dialog.i] } : null, DUNGEONS.has(this.map.id));
+    this.hud.update(dt, s, this.dialog ? { speaker: this.dialog.speaker, text: this.dialog.lines[this.dialog.i] } : null, DUNGEONS.has(this.map.id), this.trial?.ms ?? null);
     this.hud.drawStick(this.stick?.live ? this.stick : null);
   }
 
@@ -1334,11 +1424,13 @@ export class GameScene extends Phaser.Scene {
     s.falls++;
     s.hp = s.maxHp;
     const sp = s.spawn;
+    const lost = !!this.trial;
+    this.trial = null;
     playSting(STINGS, 'fall');
     this.fadeTo(() => {
       this.enterMap(sp.map, sp.x, sp.y, sp.facing, true);
       sfx('wake');
-      this.hud.toast(t('wake'));
+      this.hud.toast(t(lost ? 'trialLost' : 'wake'));
     });
   }
 
@@ -1592,12 +1684,13 @@ export class GameScene extends Phaser.Scene {
       f.alive = false;
       f.sprite.destroy();
     }
-    setFlag(s, 'boss');
-    advance(s, 'return');
     this.map.tiles = this.map.tiles.map((t) => (t === 'ring' ? 'floor' : t));
     // The ring's floor is painted anew; the ground picks up the new texture.
     paintGround(this, this.map);
     this.ground.setTexture(groundKey(this.map));
+    if (this.trial) return this.trialWon();
+    setFlag(s, 'boss');
+    advance(s, 'return');
     give(s, 'heart');
     const st = this.stoneSprites.get('s-boss');
     st?.setVisible(true);
@@ -1624,7 +1717,7 @@ export class GameScene extends Phaser.Scene {
       const next = boss.bulbs.find((b, i) => b.state === 'hidden' && i === (3 - left) % 3) ?? boss.bulbs.find((b) => b.state === 'hidden');
       if (next) {
         next.state = 'raised';
-        next.t = BULB_UP_MS;
+        next.t = BULB_UP_MS * (this.trial ? TRIAL.bulbUp : 1);
       }
       boss.raiseT = BULB_EVERY_MS;
     }
@@ -1643,18 +1736,19 @@ export class GameScene extends Phaser.Scene {
     }
     boss.volleyT -= dt;
     if (boss.volleyT <= 0) {
-      boss.volleyT = VOLLEY_MS[3 - left] ?? VOLLEY_MS[2];
+      boss.volleyT = (VOLLEY_MS[3 - left] ?? VOLLEY_MS[2]) * (this.trial ? TRIAL.volley : 1);
       sfx('volley');
       const turn = (this.now / 1000) % 1;
-      for (let i = 0; i < 8; i++) {
-        const a = ((i + turn) / 8) * Math.PI * 2;
+      const shots = this.trial ? TRIAL.volleyShots : 8;
+      for (let i = 0; i < shots; i++) {
+        const a = ((i + turn) / shots) * Math.PI * 2;
         this.shoot(boss.x + Math.cos(a) * 30, boss.y + Math.sin(a) * 20, Math.cos(a), Math.sin(a));
       }
     }
     boss.summonT -= dt;
     if (boss.summonT <= 0) {
-      boss.summonT = SUMMON_MS;
-      if (this.foes.filter((f) => f.alive && f.room === 'boss').length < 2) {
+      boss.summonT = SUMMON_MS * (this.trial ? TRIAL.summon : 1);
+      if (this.foes.filter((f) => f.alive && f.room === 'boss').length < (this.trial ? TRIAL.summoned : 2)) {
         const room = this.map.rooms.find((r) => r.id === 'boss')!;
         const side = Math.random() < 0.5 ? room.x + 2 : room.x + room.w - 3;
         const c = centre({ x: side, y: room.y + 2 + Math.floor(Math.random() * (room.h - 4)) });
@@ -1673,13 +1767,13 @@ export class GameScene extends Phaser.Scene {
     const ghost = this.add.image(x, y, 'wraith').setOrigin(0.5, 0.9).setScale(texScale('wraith')).setVisible(false);
     const bell = this.add.image(x, y, 'bigbell').setOrigin(0.5, 78 / 88).setScale(texScale('bigbell'));
     this.world.push(shadow, ghost, bell);
-    this.wraith = { x, y, lift: BELL_LIFT, state: 'hover', t: HOVER_MS, hp: WRAITH_HP, bell, ghost, shadow, summonT: SUMMON_MS, podT: 3000, awake: false };
+    this.wraith = { x, y, lift: BELL_LIFT, state: 'hover', t: HOVER_MS, hp: this.trial ? TRIAL.wraithHp : WRAITH_HP, bell, ghost, shadow, summonT: SUMMON_MS, podT: 3000, awake: false };
   }
 
   private tipBell() {
     const w = this.wraith!;
     w.state = 'tipped';
-    w.t = EXPOSED_MS;
+    w.t = EXPOSED_MS * (this.trial ? TRIAL.exposed : 1);
     sfx('topple');
     this.hud.toast(t('bellTipped'));
   }
@@ -1714,6 +1808,7 @@ export class GameScene extends Phaser.Scene {
         f.alive = false;
         f.sprite.destroy();
       }
+    if (this.trial) return this.trialWon();
     setFlag(s, 'wraith');
     advance(s, 'home');
     give(s, 'heart');
@@ -1743,7 +1838,7 @@ export class GameScene extends Phaser.Scene {
       const dx = s.x - w.x;
       const dy = s.y - w.y;
       const dist = Math.hypot(dx, dy);
-      const step = Math.min(dist, (HOVER_SPEED * dt) / 1000);
+      const step = Math.min(dist, (HOVER_SPEED * (this.trial ? TRIAL.hoverSpeed : 1) * dt) / 1000);
       if (dist > 1) {
         w.x = Phaser.Math.Clamp(w.x + (dx / dist) * step, (room.x + 1.5) * TILE, (room.x + room.w - 1.5) * TILE);
         w.y = Phaser.Math.Clamp(w.y + (dy / dist) * step, (room.y + 1.5) * TILE, (room.y + room.h - 0.5) * TILE);
@@ -1775,7 +1870,7 @@ export class GameScene extends Phaser.Scene {
       w.lift = BELL_LIFT * (1 - Math.max(0, w.t) / 600);
       if (w.t <= 0) {
         w.state = 'hover';
-        w.t = HOVER_MS;
+        w.t = HOVER_MS * (this.trial ? TRIAL.hover : 1);
       }
     }
     // The bell on the floor is in the way: the knight can't stand inside it.

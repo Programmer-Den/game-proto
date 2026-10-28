@@ -725,6 +725,45 @@ export function paintAll(scene: Phaser.Scene) {
     c.quadraticCurveTo(7, 2, 9, 11);
     c.fill();
   });
+  // The trial's hourglass: a wooden frame round two glass bulbs, the sand glowing like moonlight.
+  paint(scene, 'hourglass', 30, 48, (c) => {
+    shadow(c, 15, 45, 13, 4);
+    box(c, 2, 36, 26, 4, 5, '#6b4a30');
+    for (const x of [5, 25]) body(c, x, 8, 4, 30, '#7a5638', 0.2);
+    const glass = (top: boolean) => {
+      c.fillStyle = 'rgba(200,225,255,0.28)';
+      c.beginPath();
+      if (top) {
+        c.moveTo(7, 9);
+        c.quadraticCurveTo(15, 26, 15, 23);
+        c.quadraticCurveTo(15, 26, 23, 9);
+      } else {
+        c.moveTo(7, 36);
+        c.quadraticCurveTo(15, 19, 15, 23);
+        c.quadraticCurveTo(15, 19, 23, 36);
+      }
+      c.closePath();
+      c.fill();
+    };
+    glass(true);
+    glass(false);
+    glowDot(c, 15, 30, 12, 'rgba(170,220,255,0.55)');
+    c.fillStyle = '#cfe8ff';
+    c.beginPath();
+    c.moveTo(9, 12);
+    c.lineTo(21, 12);
+    c.lineTo(15, 20);
+    c.closePath();
+    c.fill();
+    c.beginPath();
+    c.moveTo(15, 28);
+    c.lineTo(22, 36);
+    c.lineTo(8, 36);
+    c.closePath();
+    c.fill();
+    c.fillRect(14.5, 20, 1, 8);
+    box(c, 2, 4, 26, 4, 5, '#6b4a30');
+  });
   paint(scene, 'tower', 128, 152, (c) => {
     shadow(c, 64, 146, 62, 8, 0.5);
     // Two leaning pillars and a broken arch over a dark door, with a small bell still hanging.

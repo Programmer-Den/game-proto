@@ -34,6 +34,7 @@ const en: HowToPlay = {
     'Gilded robots in the shop count for two origins but never merge.',
     'Pick up a part to see what it would build on each robot before you bolt it on.',
     'On the Scrap Rat round, tap the rat to zap gold out of it before it escapes.',
+    'Five more commanders unlock through deeds, like a top-four finish or a 3-star robot; pick a locked one on the menu to see how.',
   ],
 };
 
@@ -69,6 +70,7 @@ const de: HowToPlay = {
     'Vergoldete Roboter im Shop zählen für zwei Herkünfte, verschmelzen aber nie.',
     'Nimm ein Teil auf, um zu sehen, was es an jedem Roboter bauen würde, bevor du es anschraubst.',
     'Tippe in der Schrottratten-Runde die Ratte an, um Gold aus ihr zu schocken, bevor sie entkommt.',
+    'Fünf weitere Kommandanten schaltest du mit Taten frei, etwa einem Platz unter den ersten vier oder einem Roboter mit 3 Sternen; wähle im Menü einen gesperrten, um zu sehen, wie.',
   ],
 };
 

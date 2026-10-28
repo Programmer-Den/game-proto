@@ -285,7 +285,7 @@ export interface Fixed {
  * actions play out differently (a tower's, foe's or wave's numbers, a new rule): replays of another
  * version are dropped when they load, since they would no longer play out as they did.
  */
-export const REPLAY_VERSION = 4;
+export const REPLAY_VERSION = 5;
 
 /** A game kept to watch again: how it began, and every action taken in it. */
 export interface Replay extends Fixed {
@@ -333,8 +333,8 @@ export function newGame(mapId: string, calm = false, mode: Mode = 'classic', mas
     phase: 'build',
     wave: 0,
     paid: 0,
-    gold: mode === 'sandbox' ? SANDBOX_GOLD : START_GOLD,
-    gold2: !duo ? 0 : mode === 'sandbox' ? SANDBOX_GOLD : START_GOLD,
+    gold: mode === 'sandbox' ? SANDBOX_GOLD : (map.gold ?? START_GOLD),
+    gold2: !duo ? 0 : mode === 'sandbox' ? SANDBOX_GOLD : (map.gold ?? START_GOLD),
     duo,
     lives,
     maxLives: lives,

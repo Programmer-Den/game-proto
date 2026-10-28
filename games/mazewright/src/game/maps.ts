@@ -25,6 +25,8 @@ export interface MapDef {
   path?: Cell[];
   /** Cabbages in the patch, for a garden that sets its own. */
   lives?: number;
+  /** Starting gold, for a garden that sets its own (each gardener's). */
+  gold?: number;
 }
 
 /** The cells of a line through `points`, each turn on a straight row or column. */
@@ -142,6 +144,8 @@ export const MAPS: MapDef[] = [
     goal: [21, 5],
     rocks: [[10, 3], [10, 7], [15, 5], [18, 2], [18, 8]],
     lives: 1,
+    // With one cabbage a single slip in the first waves loses the garden, so it starts richer.
+    gold: 130,
   },
   {
     id: 'snowpath',

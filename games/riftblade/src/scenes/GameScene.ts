@@ -7,6 +7,7 @@ import { choose, inRingGap, phalanxSpots, prepare, shieldHalf, startRun, suppres
 import { bladeColor, dreadRadius, heroVariant, orbitBlades } from '../game/blades';
 import { bubble, rebuildTime } from '../game/squad';
 import { buy, chooseEvent, chooseNode, chooseWorld, chartOptions, frame, leave, nextPlanet, reroll } from '../game/voyage';
+import { heatOpen } from '../game/heat';
 import { ARENA_MS, BOSSES, CHAMPION, PLANETS, SIEGE, STRIKE, VENT, planetLabel } from '../game/planets';
 import { UPGRADES, MAX_TIER } from '../game/upgrades';
 import {
@@ -87,6 +88,8 @@ export class GameScene extends Phaser.Scene {
   private worldsBaked = false;
   /** The hero chosen on the select screen (kept between runs), and deeds already saved this run. */
   chosen: HeroId = 'tr9';
+  /** The rift heat picked on the select screen for each hero (the highest open until changed). */
+  private heatPick: Partial<Record<HeroId, number>> = {};
   private savedDeeds = 0;
   /** Heroes just unlocked, waiting to be shown (the game stands still while one is). */
   unlocking: HeroId[] = [];
@@ -179,6 +182,12 @@ export class GameScene extends Phaser.Scene {
         else if (i < 3) this.pickIndex(i);
       });
     });
+    // Left and right step the rift heat on the hero select.
+    for (const [key, dir] of [['LEFT', -1], ['RIGHT', 1], ['A', -1], ['D', 1]] as const) {
+      this.keys[key].on('down', () => {
+        if (this.state.phase === 'select' && !this.unlocking.length) this.stepHeat(dir);
+      });
+    }
     this.keys.ENTER.on('down', () => {
       if (this.unlocking.length) this.closeUnlock();
       else if (this.state.phase === 'won' || this.state.phase === 'lost') this.backToSelect();
@@ -269,6 +278,8 @@ export class GameScene extends Phaser.Scene {
     }
     if (s.phase === 'select') {
       if (spot.id === 'fight') this.begin(this.chosen);
+      else if (spot.id === 'heat-down') this.stepHeat(-1);
+      else if (spot.id === 'heat-up') this.stepHeat(1);
       else this.choose(spot.id as HeroId);
     }
     else if (s.phase === 'won' || s.phase === 'lost') this.backToSelect();
@@ -295,6 +306,25 @@ export class GameScene extends Phaser.Scene {
     if (isUnlocked(this.progress, id)) ui('click');
     else ui('refuse');
     this.chosen = id;
+  }
+
+  /** The rift heat the chosen hero would fight at: the one picked, else the highest open. */
+  private heatFor(id: HeroId) {
+    const open = isUnlocked(this.progress, id) ? heatOpen(this.progress.heat[id]) : 0;
+    return Math.min(open, this.heatPick[id] ?? open);
+  }
+
+  /** Steps the chosen hero's rift heat down or up, within what is open. */
+  private stepHeat(dir: -1 | 1) {
+    const id = this.chosen;
+    const open = isUnlocked(this.progress, id) ? heatOpen(this.progress.heat[id]) : 0;
+    const next = this.heatFor(id) + dir;
+    if (open === 0 || next < 0 || next > open) {
+      if (open > 0) ui('refuse');
+      return;
+    }
+    this.heatPick[id] = next;
+    ui('click');
   }
 
   private closeUnlock() {
@@ -351,7 +381,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     ui('click');
-    startRun(this.state, id, unlockedHeroes(this.progress), (Math.hypot(SCREEN.w, SCREEN.h) - Math.hypot(VIEW.w, VIEW.h)) / 2);
+    startRun(this.state, id, unlockedHeroes(this.progress), (Math.hypot(SCREEN.w, SCREEN.h) - Math.hypot(VIEW.w, VIEW.h)) / 2, this.heatFor(id));
     this.savedDeeds = 0;
     this.recorded = false;
     // A new run is first saved once its first world is cleared.
@@ -441,7 +471,7 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     if (this.unlocking.length) return `unlock|${this.unlocking[0]}`;
     if (s.phase === 'run') return 'run';
-    return [s.phase, this.chosen, s.choices?.join(), s.offers.join(), s.credits, s.event?.id, s.nodes.join(), s.rewardPicks].join('|');
+    return [s.phase, this.chosen, this.heatFor(this.chosen), s.choices?.join(), s.offers.join(), s.credits, s.event?.id, s.nodes.join(), s.rewardPicks].join('|');
   }
 
   /** Shows the panel for the phase the run is in. */
@@ -451,7 +481,7 @@ export class GameScene extends Phaser.Scene {
     this.panel = null;
     if ((s.phase === 'won' || s.phase === 'lost') && !this.recorded) {
       this.recorded = true;
-      this.progress = recordRun(s.hero!, s.runMs, s.phase === 'won', s.stage + 1, s.route.map((i) => PLANETS[i].id));
+      this.progress = recordRun(s.hero!, s.runMs, s.phase === 'won', s.stage + 1, s.route.map((i) => PLANETS[i].id), s.heat);
       clearRun();
     }
     // Every other panel saves the run as it opens, if it is between worlds (the maps, the trader,
@@ -465,7 +495,7 @@ export class GameScene extends Phaser.Scene {
       p.place(FRAME.x, FRAME.y);
     };
     if (this.unlocking.length) build((p) => unlockPanel(p, this.unlocking[0]));
-    else if (s.phase === 'select') build((p) => heroSelect(p, this.progress, this.chosen));
+    else if (s.phase === 'select') build((p) => heroSelect(p, this.progress, this.chosen, this.heatFor(this.chosen)));
     else if (s.phase === 'levelup') build((p) => levelUp(p, s));
     else if (s.phase === 'chart') build((p) => spaceMap(p, s, this.progress.charted));
     else if (s.phase === 'map') build((p) => starMap(p, s));
@@ -1161,7 +1191,8 @@ export class GameScene extends Phaser.Scene {
     if (s.arena) this.texts.timer.setText(clock(ARENA_MS - s.time)).setColor(C.elite);
     else this.texts.timer.setText(s.bossSpawned ? t('bossTimer') : clock(Math.min(s.time, RUN_MS))).setColor(s.bossSpawned ? C.boss : C.text);
     this.texts.level.setText(t('levelTag', { n: s.level }));
-    this.texts.planet.setText(s.arena ? t('eliteArena') : planetLabel(s.stage, s.planet)).setColor(s.arena ? C.elite : PLANETS[s.planet].ground.deco);
+    const where = s.arena ? t('eliteArena') : planetLabel(s.stage, s.planet);
+    this.texts.planet.setText(s.heat > 0 ? t('heatTag', { label: where, n: s.heat }) : where).setColor(s.arena ? C.elite : PLANETS[s.planet].ground.deco);
     this.texts.credits.setText(t('credits', { n: s.credits }));
     this.texts.boss.setVisible(!!boss);
     if (boss) {

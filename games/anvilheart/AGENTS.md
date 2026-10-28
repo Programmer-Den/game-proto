@@ -165,6 +165,8 @@ Implemented today:
   ranks, the Auto Forge switch, the forge mode and best buckler, the standing commission (level,
   made, grand), the open offer (`choosing`), guild stars, perks, the charter, its edict, reputation
   and `won` in `localStorage`.
+- Trophies (`src/trophies/`, `shared/trophies.ts`): nine, listed on the start and pause screens and
+  on the hub (see the file map). The first round earns Masterwork and Open for trade.
 
 Missing or rough:
 
@@ -234,6 +236,18 @@ File map (`src/`):
 - Every name, blurb and short line in these tables is a `TextKey` of `i18n/en.ts`, which the scene
   shows with `t`; game logic compares ids and tiers, never the texts.
 - `game/save.ts`: `loadProgress`, `saveProgress`, `clearProgress`.
+- `trophies/`: the game's nine trophies (`shared/trophies.ts`). `index.ts` lists them (`trophies`:
+  id, tier, icon, `hidden` for Smithing dynasty) with their texts in `trophies/i18n/` (`en.ts` and
+  `de.ts`: the name keyed by the id, what earns it by `<id>Text`), and imports nothing else from the
+  game, since the hub loads it for its trophy shelf. `main.ts` hands `trophies` to `setupGame`.
+  `check.ts` holds each trophy's condition (`EARNED`: first sword sold, a Masterwork merge (a
+  `merged` event with `master`), a streak of `LONG_STREAK` 5, the first guild star, 100 sold, full
+  reputation, `bestTier` at the Dragonslayer, the Crown Blade (`won` or a charter), and charter
+  `DYNASTY` 3) and `checkTrophies(state)`, which `GameScene.update` calls every frame after `tick`
+  and before `drawEvents` empties the events, so event conditions see the frame's events (pointer
+  actions push theirs between frames). The first call after the page loads awards quietly, so a
+  loaded save earns its trophies without a toast. A new trophy is an entry in `index.ts`, its two
+  texts in each language file and its condition in `EARNED`.
 - `scenes/BootScene.ts`: bakes all textures, then starts `Game`.
 - `scenes/GameScene.ts`: draws the smithy, turns pointer input into sim calls, animates events,
   saves, and offers `spots()` for the test.
@@ -355,6 +369,8 @@ won, no idle times, no open offer (its standing commission counts as the quick w
 0. `newShop` sizes `slots` by `anvilsOf` and drops anything `validItem` rejects. An old save's
 commission level keeps its meaning for the first three; an old level past them lands on the
 multi-Dragonslayer ones or the win.
+The trophies earned are a second key, `anvilheart-trophies` (`shared/trophies.ts`, each id with
+the time); neither "New smithy" nor a new charter touches it.
 
 Randomness and timing:
 
@@ -499,7 +515,9 @@ Effects (`sfx`, plus the shared `ui`):
   (the drag starts at `MASTER_MS + 9 * STEP_MS` left, since `play` moves in whole 192ms steps and a
   drag takes ten), making `2 + MASTER` with a streak of 2 and 10 coins; `coins` (32), `sold`,
   `walkedOff` and `reputation` (55) exact after selling it; and the streak back to 0 within
-  `STREAK_MS` + 1s with coins and the commission unchanged. It fails on any page error. The first
+  `STREAK_MS` + 1s with coins and the commission unchanged; `anvilheart-trophies` then holds exactly
+  `firstSale` and `masterwork`, so a trophy a first round can reach in another way changes that
+  expectation. It fails on any page error. The first
   round meets none of the later rules: no stars or edict (so prices are unchanged), no trait or set
   on the first order, a tier 2 sale (no returning hero), and under 20s of play (no rust).
 - Its screenshots are `0-forged`, `1-dragging`, `2-merged`, `3-masterwork`, `4-exact-fit` (the

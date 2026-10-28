@@ -150,6 +150,8 @@ Implemented today:
   season and years, the casks, the hives and queen, the fair entries, fairs and golds, the tired
   and wilted meadows and the last-seen time in
   `localStorage`.
+- Trophies (`src/trophies/`, `shared/trophies.ts`): ten, listed on the start and pause screens
+  and on the hub (see the file map). The first round earns First jar.
 
 Missing or rough:
 
@@ -219,6 +221,17 @@ File map (`src/`):
   `nextPrice`.
 - `game/save.ts`: `loadProgress` (checks every number, clamps ranks and meadows), `saveProgress`,
   `clearProgress`.
+- `trophies/`: the game's ten trophies (`shared/trophies.ts`). `index.ts` lists them (`trophies`:
+  id, tier, icon, `hidden` for Blue-ribbon keeper) with their texts in `trophies/i18n/` (`en.ts` and
+  `de.ts`: the name keyed by the id, what earns it by `<id>Text`), and imports nothing else from the
+  game, since the hub loads it for its trophy shelf. `main.ts` hands `trophies` to `setupGame`.
+  `check.ts` holds each trophy's condition (`EARNED`: first jar sold, the Lavender Field open, a
+  `swatted` event, a contract's bees lent, a ready cask, a second hive, every meadow open, 100 jars
+  sold, `baron`, and `THREE_GOLDS` fair golds) and `checkTrophies(state)`, which `GameScene.update`
+  calls every frame right after `tick` and before `drawEvents` empties the events (a swat pushes
+  its event between frames). The first call after the page loads is quiet, so a loaded save and the
+  away nectar earn theirs without a toast. A new trophy is an entry in `index.ts`, its two texts in
+  each language file and its condition in `EARNED`.
 - `scenes/BootScene.ts`: bakes all textures, then starts `Game`.
 - `scenes/GameScene.ts`: draws the hive (the comb shown, with the roof tabs), the wasps, the
   season tint, the casks, the market (with the meadows' strain), the order and contract cards, the
@@ -331,7 +344,8 @@ for a hive never saved (no away nectar then). Bee trips, `spilled`, wasps, order
 swarm, the market's clock and events are not saved. Saves from before the honey kinds load with
 `jars` as a number (taken as clover), cells without `type`/`kind` (honey cells of clover) and no
 `wax`/`forage`; saves from before the seasons have none of the new fields and start in spring with
-one hive; `loadProgress` and `cellOf` take care of that.
+one hive; `loadProgress` and `cellOf` take care of that. The trophies earned are a second key,
+`beehive-baron-trophies` (`shared/trophies.ts`, each id with the time), which "New hive" keeps.
 
 Randomness and timing:
 
@@ -449,7 +463,8 @@ only `GameScene` (and the refusal buzz in `ui/Button.ts`) plays them, so the sim
   at the start; the new cell equal to `emptyCell()` and filling with `kind` `clover`; the harvest
   giving `jars.clover` 1 and `wax` 1; and `coins` (15: a lone clover cell has no comb bonus and no
   market demand), `jars`, `wax`, `sold` exact after the sale, with `meadows` still 0. It fails on
-  any page error. It plays well inside the first spring, so no season touches it; keep
+  any page error. After the sale `beehive-baron-trophies` holds exactly `firstJar`, so a trophy a
+  first round can reach in another way changes that expectation. It plays well inside the first spring, so no season touches it; keep
   `SEASON_MS` well above the first round's length (about 15s of game time).
 - The test starts with empty storage, so `seen` is 0 and no away nectar is added. It owns the
   clock (`page.clock`), so `Date.now()` is controlled too.

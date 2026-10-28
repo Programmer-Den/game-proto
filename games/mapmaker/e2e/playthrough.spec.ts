@@ -410,6 +410,11 @@ test('plays the first voyage', async ({ page }, testInfo) => {
   expect(new Set(s.hands).size).toBe(HANDS_OFFERED);
   await play(500, async () => false);
   await snap('3-harbor');
+  // The sale earns the First chart trophy (src/trophies/), with Named on the map for a feature
+  // charted whole and Cave finds for an artefact, and nothing else yet.
+  const trophies = await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('mapmaker-trophies') ?? '{}')));
+  const expected = ['firstChart', ...(features.length ? ['firstFeature'] : []), ...(caves ? ['firstArtefact'] : [])];
+  expect(trophies.sort(), 'trophies earned in the first round').toEqual(expected.sort());
 
   // Setting sail starts the second voyage on the same island, with full supplies again.
   const charted = revealedCount(s);

@@ -26,6 +26,7 @@ It plays sideways or upright, and turns with the phone.
 | S and D, or Left and Right | Same or different (Memory Echo) |
 | Undo (U), Hint (H), Skip | Take back a move, use a hint, give the puzzle up |
 | Leave | Back to the menu (the run ends there, and its score and bests count) |
+| Continue | On the menu after a reload: picks the run up again (every mode but Practice) |
 
 ### The puzzles
 
@@ -57,8 +58,8 @@ Any answer that keeps the rules counts, not only the one the puzzle was made fro
 - **Blitz**: three minutes on one clock and no hearts. A solve gives back 10 to 25 seconds (more at
   higher levels), a skip or a loss takes 10. The level rises every two solves.
 - **Draft Run**: before each puzzle, choose one of the cards dealt. Every third solve offers three
-  relics, each of which can be taken again except the Crystal Ball (a draft deals three cards at
-  most):
+  relics: one charm (while any is left) and two of the others, each of which can be taken again
+  except the Crystal Ball (a draft deals three cards at most):
 
 | Relic | Effect |
 | --- | --- |
@@ -66,6 +67,15 @@ Any answer that keeps the rules counts, not only the one the puzzle was made fro
 | Heartstone | One more heart, up to 5. |
 | Hourglass | A quarter more time on every puzzle. |
 | Crystal Ball | One more card to choose from in every draft. |
+
+  Each puzzle kind has its own charm, taken once: Inkwell (Picture Grid), Bridgewright (Bridges),
+  Cipher Wheel (Code Breaker), Abacus (Calc Cages), Tally Stone (Cross Sums), Oiled Gear (Unjam),
+  Mirror Coin (Tile Flip), Silver Spool (Path Link) and Echo Shell (Memory Echo). Its kind's
+  puzzles come with a free hint, which costs no points, and pay half again the points; Memory Echo,
+  which has no hints, turns its cards a third slower instead. A draft card marks the charm it
+  is helped by, so the run leans towards the kinds you hold charms for.
+
+  ![A relic offer with a charm](docs/screenshots/charms.webp)
 
 - **Pass and Play**: two players take turns on the same three puzzles (Novice, Adept, Master). The
   lower total time wins; a skip or loss adds 30 seconds and a hint 15.

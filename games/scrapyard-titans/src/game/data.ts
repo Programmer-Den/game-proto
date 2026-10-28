@@ -304,7 +304,7 @@ export const AUGMENT_BY_ID: Record<string, AugmentDef> = Object.fromEntries(AUGM
 
 // ---------------------------------------------------------------- commanders
 
-export type SkillId = 'overclock' | 'zap' | 'bulwark';
+export type SkillId = 'overclock' | 'zap' | 'bulwark' | 'mend' | 'surge' | 'emp' | 'rally' | 'airstrike';
 
 export interface SkillDef {
   id: SkillId;
@@ -320,13 +320,34 @@ export const SKILL_POWER = {
   zap: { damage: 260, stunS: 1.5 },
   /** Shield on every ally and how long it lasts. */
   bulwark: { shield: 180, seconds: 5 },
+  /** Health given back to every ally. */
+  mend: { heal: 220 },
+  /** Every ally's charge is filled (no numbers). */
+  surge: {},
+  /** Every enemy loses its charge and is stunned this long. */
+  emp: { stunS: 0.8 },
+  /** Attack damage factor for allies and how long it lasts. */
+  rally: { damage: 1.35, seconds: 6 },
+  /** Damage to every enemy. */
+  airstrike: { damage: 140 },
 };
 
 export const SKILLS: Record<SkillId, SkillDef> = {
   overclock: { id: 'overclock', name: 'overclockSkill', text: 'overclockText' },
   zap: { id: 'zap', name: 'zapSkill', text: 'zapText' },
   bulwark: { id: 'bulwark', name: 'bulwarkSkill', text: 'bulwarkText' },
+  mend: { id: 'mend', name: 'mendSkill', text: 'mendText' },
+  surge: { id: 'surge', name: 'surgeSkill', text: 'surgeText' },
+  emp: { id: 'emp', name: 'empSkill', text: 'empText' },
+  rally: { id: 'rally', name: 'rallySkill', text: 'rallyText' },
+  airstrike: { id: 'airstrike', name: 'airstrikeSkill', text: 'airstrikeText' },
 };
+
+/**
+ * Deeds a commander's unlock asks for, saved once done (`progress.ts`): finish in the top four, a
+ * robot at three stars, a won fight with six robots of one origin, level 9, a won match.
+ */
+export type DeedId = 'topFour' | 'threeStar' | 'fullOrigin' | 'maxLevel' | 'champion';
 
 export interface CommanderDef {
   name: TextKey;
@@ -336,13 +357,20 @@ export interface CommanderDef {
   trim: number;
   /** Lines it calls out at the start and end of a fight (rivals only). */
   taunts: TextKey[];
+  /** The deed that unlocks it (player commanders only); open from the start without one. */
+  unlock?: DeedId;
 }
 
-/** The three commanders the player picks from. */
+/** The commanders the player picks from: three open from the start, five unlocked by deeds. */
 export const PLAYER_COMMANDERS: CommanderDef[] = [
   { name: 'grit', skill: 'overclock', color: 0xffb703, trim: 0x2b2d42, taunts: [] },
   { name: 'sparks', skill: 'zap', color: 0x7cf3ff, trim: 0x3a2a8a, taunts: [] },
   { name: 'magna', skill: 'bulwark', color: 0xe0566a, trim: 0xf2f2f2, taunts: [] },
+  { name: 'rosa', skill: 'mend', color: 0x4ccf6a, trim: 0xffffff, taunts: [], unlock: 'topFour' },
+  { name: 'volt', skill: 'surge', color: 0x5aa9ff, trim: 0xffd166, taunts: [], unlock: 'threeStar' },
+  { name: 'hexa', skill: 'emp', color: 0x9b5cff, trim: 0x39e58c, taunts: [], unlock: 'fullOrigin' },
+  { name: 'ironside', skill: 'rally', color: 0x8a8f9e, trim: 0xd9822b, taunts: [], unlock: 'maxLevel' },
+  { name: 'nova', skill: 'airstrike', color: 0xff8a2a, trim: 0x1a1030, taunts: [], unlock: 'champion' },
 ];
 
 /** The seven rivals, in seat order. */

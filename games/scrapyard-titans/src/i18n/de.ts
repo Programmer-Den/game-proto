@@ -186,11 +186,26 @@ const de: Translation<typeof en> = {
   zapText: 'Trifft den zähesten Gegner für 260 und betäubt ihn 1,5 Sekunden lang.',
   bulwarkSkill: 'Schrottwall',
   bulwarkText: 'Schirmt alle deine Roboter 5 Sekunden lang mit 180 ab.',
+  mendSkill: 'Flickwerk',
+  mendText: 'Repariert jeden deiner Roboter um 220.',
+  surgeSkill: 'Stromstoß',
+  surgeText: 'Füllt die Ladung all deiner Roboter, sodass sie sofort ihre Fähigkeiten nutzen.',
+  empSkill: 'EMP-Schlag',
+  empText: 'Entzieht jedem Gegner seine Ladung und betäubt ihn 0,8 Sekunden.',
+  rallySkill: 'Schlachtruf',
+  rallyText: 'Deine Roboter schlagen 6 Sekunden lang 35 % härter zu.',
+  airstrikeSkill: 'Luftschlag',
+  airstrikeText: 'Wirft eine Bombe auf jeden Gegner für 140 Schaden.',
 
   // Commanders, and the rivals' taunts
   grit: 'Vorarbeiter Grit',
   sparks: 'Sparks Malone',
   magna: 'Madame Magna',
+  rosa: 'Flick-Rosa',
+  volt: 'Volt-Vinzenz',
+  hexa: 'Hexa Byte',
+  ironside: 'Chefin Eisenseite',
+  nova: 'Nova Quinn',
   baronBolt: 'Baron Bolzen',
   baronBolt1: 'Schraub dich ab!',
   baronBolt2: 'Meine Bolzen sitzen fester.',
@@ -250,6 +265,14 @@ const de: Translation<typeof en> = {
   terrainOff: 'Geländefelder: Aus',
   terrainKinds: 'Öl, Ladefelder, Stahlplatten und Ofenroste',
   startMatch: 'PARTIE STARTEN',
+  lockedCommander: '{name} ({skill}) ist gesperrt',
+  topFourUnlock: 'Freischalten: eine Partie unter den ersten vier beenden.',
+  threeStarUnlock: 'Freischalten: einen Roboter auf drei Sterne bringen.',
+  fullOriginUnlock: 'Freischalten: einen Kampf mit sechs Robotern einer Herkunft auf dem Brett gewinnen.',
+  maxLevelUnlock: 'Freischalten: Stufe 9 erreichen.',
+  championUnlock: 'Freischalten: eine Partie gewinnen.',
+  unlockedCall: 'Neuer Kommandant: {name}!',
+  unlockedList: 'Neue Kommandanten: {names}',
   menuStats: 'Partien {played} · Siege {wins} · bester Platz {best}',
 
   // HUD
@@ -342,7 +365,7 @@ const de: Translation<typeof en> = {
 /** Texts that are the same in German. */
 export const keepEnglish: (keyof typeof en)[] = [
   'magnetTrait', 'neonTrait', 'hackerTrait', 'saboteurTrait', 'servoName', 'firewall', 'kernel', 'flicker', 'sparks', 'magna',
-  'tauntWin', 'title', 'skillCall',
+  'tauntWin', 'title', 'skillCall', 'hexa', 'nova',
 ];
 
 export default de;

@@ -79,8 +79,14 @@ terrain tiles. The plan phase lasts 30 seconds; when it runs out the fight start
 - **Power cards.** At rounds 2-1, 3-2 and 4-2 every commander picks one of three power cards
   (15 in all, like Thick Hull, Recycler or War Chest) that last the whole match.
 - **Commanders.** Foreman Grit (Overclock: robots attack 40% faster for 5 seconds), Sparks Malone
-  (Big Zap: zaps and stuns the toughest enemy) and Madame Magna (Scrap Wall: shields every robot).
-  The rivals use theirs on their own and call out a taunt at the start of a fight.
+  (Big Zap: zaps and stuns the toughest enemy) and Madame Magna (Scrap Wall: shields every robot)
+  are open from the start. Five more unlock through deeds, saved on the device: Patch Rosa
+  (Patch-Up: repairs every robot for 220) for a top-four finish, Volt Vance (Power Surge: fills
+  every robot's charge) for a 3-star robot, Hexa Byte (EMP Blast: drains and stuns every enemy) for
+  a won fight with six robots of one origin, Boss Ironside (Rally Cry: robots hit 35% harder for 6
+  seconds) for level 9 and Nova Quinn (Air Strike: 140 damage to every enemy) for a won match. A
+  locked commander's card says what unlocks it. The rivals use their skills on their own and call
+  out a taunt at the start of a fight.
 - **Draft rounds.** Robots carrying a part or item walk a ring in the middle of the board; the
   commanders pick one each, lowest health first.
 - **Seasons.** Season 1, Scrap Rush, has Magnet and Salvager robots, and every won fight earns a
@@ -103,6 +109,7 @@ shows your seat's fights on the board.
 | --- | --- |
 | `src/main.ts` | Creates the game and calls the hub's `setupGame` and `setupScaling` |
 | `src/howToPlay.ts` | The How to play screen's text |
+| `src/progress.ts` | What lasts between matches: stats and the deeds that unlock commanders |
 | `src/game/data.ts` | Every rule and number: robots, traits, parts, items, power cards, commanders, monsters, rounds, economy, terrain |
 | `src/game/battle.ts` | The fight sim on the 8x8 board, in fixed 50 ms steps, raising events for the view |
 | `src/game/match.ts` | The match: players, shops, buying, merging, items, rounds, pairings, damage, drafts |
@@ -114,7 +121,7 @@ shows your seat's fights on the board.
 
 ## Screenshots
 
-![The menu: three commanders, two seasons and the terrain toggle](docs/screenshots/menu.webp)
+![The menu: eight commanders (five locked until their deed is done), two seasons and the terrain toggle](docs/screenshots/menu.webp)
 
 ![A draft round: robots carrying parts on the board, picked lowest health first](docs/screenshots/draft.webp)
 

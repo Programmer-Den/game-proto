@@ -30,6 +30,21 @@ export const RELIC_INFO: Record<RelicId, { name: TextKey; text: TextKey; color: 
   ward: { name: 'wardName', text: 'wardText', color: 0x8fcf7a },
 };
 
+/**
+ * Delve twists, drawn from floor 4 on: Diagonal (both long diagonals hold each digit once),
+ * Parity (shaded cells hold even digits, the rest odd), Clock (a heart is lost every 3 minutes)
+ * and Sealed (no hints on the floor; clearing it gives one back).
+ */
+export const TWISTS = ['diagonal', 'parity', 'clock', 'sealed'] as const;
+export type Twist = (typeof TWISTS)[number];
+
+export const TWIST_INFO: Record<Twist, { name: TextKey; rule: TextKey }> = {
+  diagonal: { name: 'diagonalName', rule: 'diagonalRule' },
+  parity: { name: 'parityName', rule: 'parityRule' },
+  clock: { name: 'clockName', rule: 'clockRule' },
+  sealed: { name: 'sealedName', rule: 'sealedRule' },
+};
+
 /** Classic's three puzzle levels. */
 export const LEVELS = ['easy', 'normal', 'hard'] as const;
 export type Level = (typeof LEVELS)[number];
