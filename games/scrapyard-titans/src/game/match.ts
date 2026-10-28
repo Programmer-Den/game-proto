@@ -7,7 +7,7 @@
 import { byDifficulty } from '../../../../shared/settings';
 import type { TextKey } from '../i18n';
 import {
-  AUGMENTS, BENCH_SLOTS, RANKS, BOARD, ECONOMY, GILDED, ITEM_BENCH, LEVEL_XP, MAX_ITEMS, MAX_LEVEL, PARTS, PLAYER_COMMANDERS,
+  AUGMENTS, BENCH_SLOTS, RANKS, RARE, RARE_FROM_STAGE, BOARD, ECONOMY, GILDED, ITEM_BENCH, LEVEL_XP, MAX_ITEMS, MAX_LEVEL, PARTS, PLAYER_COMMANDERS,
   PLAYERS, RIVALS, SCRAP_TOKENS_PER_PART, SETS, SHOP_ODDS, SHOP_SLOTS, SURVIVOR_DAMAGE, TERRAIN_TILES, UNIT_BY_ID, comboOf,
   isPart, rosterOf, stageDamage, stageRounds,
   type AugmentId, type CommanderDef, type MonsterId, type OriginId, type PartId, type RoundDef, type SetId, type TerrainId,
@@ -69,6 +69,8 @@ export interface Player {
   /** Final place, 1 to 8, once out (or the winner). */
   place: number;
   scrapTokens: number;
+  /** Free rerolls left this round (the Lucky Dice card). */
+  freeRolls: number;
   /** The shop stays as it is at the next plan phase (a reroll unlocks it). */
   shopLocked: boolean;
   lastOpponent: number;
@@ -157,7 +159,7 @@ export function newMatch(opts: MatchOptions): Match {
     players.push({
       seat, name: seat === 0 ? 'you' : commander.name, commander, human: seat === 0 && !opts.watch,
       hp: seat === 0 ? startHp : 100, maxHp: seat === 0 ? startHp : 100, gold: ECONOMY.startGold, level: 1, xp: 0, board: {}, bench: Array(BENCH_SLOTS).fill(null),
-      shop: [], items: [], augments: [], augmentOffer: null, streak: 0, alive: true, place: 0, scrapTokens: 0, shopLocked: false, lastOpponent: -1, last: null,
+      shop: [], items: [], augments: [], augmentOffer: null, streak: 0, alive: true, place: 0, scrapTokens: 0, freeRolls: 0, shopLocked: false, lastOpponent: -1, last: null,
     });
   }
   const m: Match = {
@@ -205,12 +207,13 @@ export function rollShop(m: Match, p: Player) {
       roll -= odds[c];
     }
     const def = pick(roster.filter((d) => d.cost === cost));
-    const gilded = p.level >= GILDED.fromLevel && Math.random() < GILDED.chance ? pick(origins.filter((o) => o !== def.origin)) : null;
+    const gildedShop = p.augments.includes('gilded-shop');
+    const gilded = (gildedShop || p.level >= GILDED.fromLevel) && Math.random() < (gildedShop ? RARE.gildedChance : GILDED.chance) ? pick(origins.filter((o) => o !== def.origin)) : null;
     return { defId: def.id, gilded };
   });
 }
 
-export const rerollCost = (p: Player) => (p.augments.includes('recycler') ? 1 : ECONOMY.rerollCost);
+export const rerollCost = (p: Player) => (p.freeRolls > 0 ? 0 : p.augments.includes('recycler') ? 1 : ECONOMY.rerollCost);
 
 export function toggleShopLock(p: Player) {
   p.shopLocked = !p.shopLocked;
@@ -220,6 +223,7 @@ export function reroll(m: Match, p: Player): boolean {
   const cost = rerollCost(p);
   if (p.gold < cost) return false;
   p.gold -= cost;
+  if (p.freeRolls > 0) p.freeRolls--;
   p.shopLocked = false;
   rollShop(m, p);
   return true;
@@ -368,9 +372,11 @@ const randomFinished = () => comboOf(randomPart(), randomPart()).id;
 
 // ---------------------------------------------------------------- power cards
 
-function offerAugments(p: Player) {
+function offerAugments(m: Match, p: Player) {
   const left = AUGMENTS.filter((a) => !p.augments.includes(a.id));
-  p.augmentOffer = shuffle([...left]).slice(0, 3).map((a) => a.id);
+  const rare = m.stage >= RARE_FROM_STAGE ? shuffle(left.filter((a) => a.rare))[0] : undefined;
+  const common = shuffle(left.filter((a) => !a.rare)).slice(0, rare ? 2 : 3);
+  p.augmentOffer = [...common, ...(rare ? [rare] : [])].map((a) => a.id);
 }
 
 export function pickAugment(m: Match, p: Player, choice: number) {
@@ -384,6 +390,7 @@ export function pickAugment(m: Match, p: Player, choice: number) {
   } else if (id === 'overtime') p.gold += 14;
   else if (id === 'level-up') gainXp(p, 10);
   else if (id === 'war-chest') giveItem(p, randomFinished());
+  else if (id === 'free-rolls') p.freeRolls = RARE.freeRolls;
   else if (id === 'duplicator') {
     const best = allUnits(p).filter((o) => UNIT_BY_ID[o.defId].cost <= 2).sort((a, b) => b.star - a.star || UNIT_BY_ID[b.defId].cost - UNIT_BY_ID[a.defId].cost)[0];
     const defId = best?.defId ?? pick(rosterOf(m.opts.set).filter((d) => d.cost === 2)).id;
@@ -406,12 +413,15 @@ export function startPlan(m: Match, planS: number) {
     if (!first) {
       const interestCap = ECONOMY.interestCap + (p.augments.includes('gold-rush') ? 3 : 0);
       const streak = ECONOMY.streakBonus[Math.min(Math.abs(p.streak), ECONOMY.streakBonus.length - 1)];
-      p.gold += (m.stage === 1 ? ECONOMY.stageOneIncome : ECONOMY.baseIncome) + Math.min(Math.floor(p.gold / ECONOMY.interestPer), interestCap) + streak;
+      // Hand to Mouth trades interest for a flat sum.
+      const interest = p.augments.includes('hand-to-mouth') ? RARE.handToMouthGold : Math.min(Math.floor(p.gold / ECONOMY.interestPer), interestCap);
+      p.gold += (m.stage === 1 ? ECONOMY.stageOneIncome : ECONOMY.baseIncome) + interest + streak;
       if (p.seat !== 0) p.gold = Math.max(0, p.gold + byDifficulty(-1, 0, 1) + RANKS[m.opts.rank].gold);
       gainXp(p, ECONOMY.xpPerRound);
       if (!p.shopLocked) rollShop(m, p);
     }
-    if (m.round.augment) offerAugments(p);
+    p.freeRolls = p.augments.includes('free-rolls') ? RARE.freeRolls : 0;
+    if (m.round.augment) offerAugments(m, p);
   }
   m.terrain = {};
   if (m.opts.terrain && m.round.kind !== 'draft') {

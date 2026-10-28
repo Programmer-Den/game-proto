@@ -11,7 +11,7 @@ import {
   type Match, type Owned, type Player,
 } from './match';
 
-const AUGMENT_TASTE: AugmentId[] = ['thick-hull', 'rapid-fire', 'war-chest', 'hot-wiring', 'front-plates', 'big-battery', 'lucky-bolt', 'spare-parts', 'level-up', 'overtime', 'last-stand', 'duplicator', 'scrap-dividend', 'gold-rush', 'recycler'];
+const AUGMENT_TASTE: AugmentId[] = ['thick-hull', 'free-rolls', 'rapid-fire', 'gilded-shop', 'war-chest', 'hot-wiring', 'front-plates', 'big-battery', 'lucky-bolt', 'spare-parts', 'level-up', 'overtime', 'last-stand', 'duplicator', 'scrap-dividend', 'gold-rush', 'hand-to-mouth', 'recycler'];
 
 const value = (o: Owned) => unitCost(o) * 3 ** (o.star - 1) + o.items.length * 2;
 
