@@ -90,6 +90,10 @@ terrain tiles. The plan phase lasts 30 seconds; when it runs out the fight start
   seconds) for level 9 and Nova Quinn (Air Strike: 140 damage to every enemy) for a won match. A
   locked commander's card says what unlocks it. The rivals use their skills on their own and call
   out a taunt at the start of a fight.
+- **Weekly season.** The third season card is this week's: the date (weeks run Monday to Sunday,
+  UTC) picks one of the two seasons with or without terrain, in turn, so every combination comes
+  round once a month. The card shows the rules and this week's best place, which is saved apart from
+  the overall best.
 - **Rank ladder.** A saved rank that only goes up: a finish in the top four earns rank points (50,
   35, 25 or 15), and the rank sets how hard the rivals play. Rust (0 points) is the game as
   designed; Iron (100) rivals reroll for copies sooner, Steel (250) also get 1 more gold a round,
@@ -131,7 +135,7 @@ shows your seat's fights on the board.
 
 ## Screenshots
 
-![The menu: eight commanders (some locked until their deed is done), two seasons, the terrain toggle and the rank](docs/screenshots/menu.webp)
+![The menu: eight commanders (some locked until their deed is done), two seasons and the weekly one, the terrain toggle and the rank](docs/screenshots/menu.webp)
 
 ![A draft round: robots carrying parts on the board, picked lowest health first](docs/screenshots/draft.webp)
 

@@ -295,6 +295,13 @@ const en = {
   rankNext: ', {rank} at {points}',
   rankUp: 'Rank up: {rank}!',
   rankPoints: '+{n} rank points · {rank} ({points})',
+  weeklySeason: 'Week of {date}',
+  weeklyTerrain: 'terrain on',
+  weeklyNoTerrain: 'no terrain',
+  weeklyBest: 'Best this week: {place}',
+  weeklyUnplayed: 'Not played this week yet',
+  weeklySetsTerrain: 'The weekly season sets the terrain',
+  weeklyEnd: 'Weekly season: best this week {place}',
   menuStats: 'Matches {played} · wins {wins} · best place {best}',
 
   // HUD

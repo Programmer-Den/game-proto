@@ -295,6 +295,13 @@ const de: Translation<typeof en> = {
   rankNext: ', {rank} ab {points}',
   rankUp: 'Rangaufstieg: {rank}!',
   rankPoints: '+{n} Rangpunkte · {rank} ({points})',
+  weeklySeason: 'Woche ab {date}',
+  weeklyTerrain: 'mit Gelände',
+  weeklyNoTerrain: 'ohne Gelände',
+  weeklyBest: 'Bester Platz diese Woche: {place}',
+  weeklyUnplayed: 'Diese Woche noch nicht gespielt',
+  weeklySetsTerrain: 'Die Wochensaison legt das Gelände fest',
+  weeklyEnd: 'Wochensaison: bester Platz diese Woche {place}',
   menuStats: 'Partien {played} · Siege {wins} · bester Platz {best}',
 
   // HUD

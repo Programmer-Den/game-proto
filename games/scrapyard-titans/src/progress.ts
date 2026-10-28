@@ -1,9 +1,10 @@
 /**
  * What lasts between matches, saved under `scrapyard-titans-stats`: matches played, wins, the best
  * place, the deeds done, which unlock commanders (`CommanderDef.unlock`), and the rank points
- * (`RANKS`). Watched matches never count. No Phaser.
+ * (`RANKS`) and this week's best place in the weekly season. Watched matches never count. No
+ * Phaser.
  */
-import { MAX_LEVEL, PLAYER_COMMANDERS, RANKS, RANK_POINTS, TRAITS, type CommanderDef, type DeedId, type OriginId } from './game/data';
+import { MAX_LEVEL, PLAYER_COMMANDERS, RANKS, RANK_POINTS, TRAITS, WEEKLY_ROTATION, type CommanderDef, type DeedId, type OriginId } from './game/data';
 import { allUnits, boardUnits, countTraits, type Match } from './game/match';
 
 const STORE_KEY = 'scrapyard-titans-stats';
@@ -16,15 +17,18 @@ export interface Progress {
   deeds: DeedId[];
   /** Rank points, from top-four finishes; they never go down. */
   points: number;
+  /** The best place in the weekly season, for the week it was played (`weekOf`). */
+  weekly: { week: number; best: number } | null;
 }
 
 export function loadProgress(): Progress {
   try {
     const s = JSON.parse(localStorage.getItem(STORE_KEY) ?? '{}');
     const deeds = Array.isArray(s.deeds) ? DEEDS.filter((d) => s.deeds.includes(d)) : [];
-    return { played: Number(s.played) || 0, wins: Number(s.wins) || 0, best: Number(s.best) || 0, deeds, points: Math.max(0, Number(s.points) || 0) };
+    const weekly = s.weekly && Number.isFinite(s.weekly.week) && Number(s.weekly.best) > 0 ? { week: Number(s.weekly.week), best: Number(s.weekly.best) } : null;
+    return { played: Number(s.played) || 0, wins: Number(s.wins) || 0, best: Number(s.best) || 0, deeds, points: Math.max(0, Number(s.points) || 0), weekly };
   } catch {
-    return { played: 0, wins: 0, best: 0, deeds: [], points: 0 };
+    return { played: 0, wins: 0, best: 0, deeds: [], points: 0, weekly: null };
   }
 }
 
@@ -49,6 +53,25 @@ export function addRankPoints(p: Progress, place: number) {
   const gained = RANK_POINTS[place] ?? 0;
   p.points += gained;
   return { gained, before, after: rankOf(p.points) };
+}
+
+const WEEK_MS = 7 * 24 * 3600 * 1000;
+/** Monday 5 January 1970, the start of week 0, in UTC. */
+const FIRST_MONDAY = Date.UTC(1970, 0, 5);
+
+/** The number of the week (Monday to Sunday, UTC) a time falls in. */
+export const weekOf = (now: number) => Math.floor((now - FIRST_MONDAY) / WEEK_MS);
+/** The Monday a week starts on. */
+export const weekStart = (week: number) => FIRST_MONDAY + week * WEEK_MS;
+/** The weekly season's rules for a week. */
+export const weeklyRules = (week: number) => WEEKLY_ROTATION[((week % WEEKLY_ROTATION.length) + WEEKLY_ROTATION.length) % WEEKLY_ROTATION.length];
+/** This week's best weekly place, or 0 if it hasn't been played this week. */
+export const weeklyBest = (p: Progress, week: number) => (p.weekly?.week === week ? p.weekly.best : 0);
+
+/** Keeps a weekly match's place if it is this week's best. */
+export function recordWeekly(p: Progress, week: number, place: number) {
+  const best = weeklyBest(p, week);
+  p.weekly = { week, best: best ? Math.min(best, place) : place };
 }
 
 export const isUnlocked = (p: Progress, c: CommanderDef) => !c.unlock || p.deeds.includes(c.unlock);
