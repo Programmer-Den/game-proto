@@ -264,6 +264,9 @@ test('plays the first stage', async ({ page }, testInfo) => {
   s = await game.state();
   expect(s.distance, 'running again').toBeGreaterThan(STAGE_1.checkpointX + 200);
   await snap('2-stage-2');
+  // Reaching the first checkpoint earns the First banner trophy (src/trophies/), and nothing else yet.
+  const trophies = await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('hotfoot-trophies') ?? '{}')));
+  expect(trophies, 'trophies earned in the first round').toEqual(['checkpoint']);
 
   const speed = gameMs / (Date.now() - startedAt);
   console.log(`Played ${Math.round(gameMs / 1000)}s of game time at ${speed.toFixed(1)}x (target ${SPEED}x).`);
