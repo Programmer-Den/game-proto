@@ -1,11 +1,11 @@
-// Paints the whole 2800x2800 map once at boot onto one canvas: faceted grass, the river with its
+// Paints the whole 3500x3500 map once at boot onto one canvas: faceted grass, the river with its
 // islands for the watchstones, flagstone lanes with stone kerbs, paved plazas round the Nexuses,
 // dirt clearings for the camps, the guardian beast's pit, patches of tall grass (the bushes), flowers,
 // mushrooms, old ruins and stone walls, and low-poly pines and rocks rendered with the same renderer as the
 // units. The same seed paints the same map every time.
 
 import Phaser from 'phaser';
-import { BASE, BEAST, BUSHES, DRAKE, Bush, CampSpot, LANES, RIVER, Team, Vec, WATCHSTONES, WORLD } from '../game/data';
+import { BASE, BEAST, BUSHES, DRAKE, Bush, CampSpot, LANES, MAP_SCALE, RIVER, Team, Vec, WATCHSTONES, WORLD } from '../game/data';
 import { sharpRes } from '../../../../shared/scaling';
 import { render, seeded } from './lowpoly';
 import { CLEARINGS, LANE_HALF, RUINS, SCENERY, SOLID, WALLS, Wall, clearingR, laneDist, pitStones, riverDist, ruinPieces } from '../game/terrain';
@@ -62,7 +62,7 @@ function grass(ctx: CanvasRenderingContext2D, rnd: () => number) {
     }
   }
   // A few grass tufts: small pale triangles.
-  for (let i = 0; i < 1800; i++) {
+  for (let i = 0; i < 1800 * MAP_SCALE ** 2; i++) {
     const x = rnd() * WORLD.w, y = rnd() * WORLD.h;
     if (laneDist({ x, y }) < LANE_HALF + 12) continue;
     ctx.fillStyle = rnd() < 0.5 ? 'rgba(160,210,120,0.55)' : 'rgba(40,90,40,0.45)';
@@ -379,7 +379,7 @@ function island(ctx: CanvasRenderingContext2D, c: Vec, rnd: () => number) {
 /** Little things in the jungle: patches of flowers and rings of mushrooms. */
 function flora(ctx: CanvasRenderingContext2D, rnd: () => number) {
   const petals = ['#f2e3a0', '#e9a3c9', '#b9d6ff', '#ffffff', '#f6b26b'];
-  for (let i = 0; i < 160; i++) {
+  for (let i = 0; i < 160 * MAP_SCALE ** 2; i++) {
     const c = { x: 60 + rnd() * (WORLD.w - 120), y: 60 + rnd() * (WORLD.h - 120) };
     if (laneDist(c) < LANE_HALF + 30 || riverDist(c) < RIVER.half + 30) continue;
     if (rnd() < 0.8) {

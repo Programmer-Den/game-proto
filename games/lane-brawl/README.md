@@ -52,7 +52,7 @@ left, under bevelled slate panels.
 1. **Your team**: you and four allies drawn at random from the other fourteen classes; red gets
    five more of them. Allies walk a lane each and fight what they meet. Each champion's name shows
    over its health bar, and a notice says who slew whom.
-2. **The map** is a 2800 px square: the blue Nexus at the bottom left, the red at the top right,
+2. **The map** is a 3500 px square: the blue Nexus at the bottom left, the red at the top right,
    the top and bottom lanes along the edges and the middle lane on the diagonal. A river runs from
    the top left corner to the bottom right one, across the middle lane, and splits the jungle
    between the lanes into four quarters.
