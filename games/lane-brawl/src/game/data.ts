@@ -771,13 +771,14 @@ export const ACTIVES: ActiveDef[] = [
 /**
  * Vision wards (LB6): a champion carries up to `carry` of them and plants one within `range` of
  * itself; it gives its team `SIGHT.ward` of sight there, bushes included, for `ms`, and dies to
- * `hits` hits of any kind. Its killer takes `gold`. The AI plants its wards at `WARD_SPOTS`.
+ * `hits` hits of any kind. Its killer takes `gold`. The AI plants its wards at `WARD_SPOTS`, and from
+ * `WARD_AI.bushesFrom` in the tall grass it passes too (LB26), so ambushes there are seen.
  */
 export const WARD = { carry: 2, range: 600, ms: 90_000, hits: 3, gold: 20, radius: 10 };
 /** Where the AI likes its wards: the beast's pit and the three river islands; a team wards a spot once at a time. */
 export const WARD_SPOTS: Vec[] = [{ x: 1950, y: 1950 }, { x: 850, y: 850 }, { x: 1200, y: 1200 }, { x: 1600, y: 1600 }];
 /** An AI champion's ward goes at a spot this close to it that has no live ward of its team within `taken` px. */
-export const WARD_AI = { reach: 600, taken: 320 };
+export const WARD_AI = { reach: 600, taken: 320, bushesFrom: 100_000 };
 
 /**
  * Recall (LB7): a champion channels `ms` standing still to go home to its Nexus. Taking damage,
@@ -1197,7 +1198,14 @@ export function bushAt(p: Vec): number {
 // Team plans for the AI: now and then a champion leaves its lane to gang up on a weak enemy, takes a
 // jungle buff or a watchstone, and champions that are hurt or outnumbered fall back together.
 
-export const GANK = { firstAt: 100_000, every: 70_000, ms: 24_000, minHp: 0.6, from: 650 };
+export const GANK = { firstAt: 100_000, every: 70_000, ms: 24_000, minHp: 0.6, from: 650, night: 0.7 };
+/**
+ * Ambushes (LB26): a champion on a gank whose prey stands within `reach` of a bush, and is still
+ * farther than `strike` from it, slips into that bush first and waits there, hidden, for up to
+ * `waitMs` until the prey comes within `strike`; then it charges. At night ganks come `GANK.night`
+ * times as often.
+ */
+export const AMBUSH = { reach: 380, strike: 260, waitMs: 7000 };
 /** Each team sends a champion into the jungle for a buff or a watchstone this often, from `firstAt`. */
 /**
  * River runes (LB13): every `every` ms from `firstAt` a rune appears at each of the two river

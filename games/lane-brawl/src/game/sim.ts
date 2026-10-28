@@ -30,6 +30,8 @@ import {
   COMEBACK,
   SURRENDER,
   SUMMARY,
+  AMBUSH,
+  BUSHES,
   DRAKE,
   DRAKES,
   DRAKE_ORDER,
@@ -1500,9 +1502,23 @@ function championPlan(s: GameState, u: Unit, dt: number): boolean {
   }
   if (u.gankTarget !== null) {
     const prey = getUnit(s, u.gankTarget);
-    if (!prey || prey.dead || s.time >= u.gankUntil || hiddenFrom(s, u.side, prey)) u.gankTarget = null;
-    else {
+    if (!prey || prey.dead || s.time >= u.gankUntil || hiddenFrom(s, u.side, prey)) {
+      u.gankTarget = null;
+      u.ambushBush = -1;
+    } else {
       u.target = null;
+      // Lie in wait in the grass by the prey, and charge once it comes near.
+      const bush = ambushBush(s, u, prey);
+      if (bush >= 0) {
+        const b = BUSHES[bush];
+        if (bushAt(u) !== bush) moveToward(u, b, dt);
+        else if (u.ambushBush !== bush) {
+          u.ambushBush = bush;
+          u.ambushUntil = s.time + AMBUSH.waitMs;
+          aiLog(u.side, `${shortName(u.name)} lies in wait for ${shortName(prey.name)} in the tall grass`);
+        }
+        return true;
+      }
       moveToward(u, prey, dt);
       return true;
     }
@@ -1581,10 +1597,13 @@ function aiBuyBack(s: GameState, u: Unit) {
 /** An AI champion carrying a ward plants it at a spot it passes that its team has no ward at. */
 function aiWard(s: GameState, u: Unit) {
   if (u.wards <= 0 || u.recallMs > 0) return;
-  for (const spot of WARD_SPOTS) {
+  // The river spots, and later the tall grass on the way, so an ambush there is seen.
+  const spots = s.time >= WARD_AI.bushesFrom ? [...WARD_SPOTS, ...BUSHES] : WARD_SPOTS;
+  for (const spot of spots) {
     if (dist(u, spot) > WARD_AI.reach) continue;
     if (s.units.some((w) => w.kind === 'ward' && !w.dead && w.side === u.side && dist(w, spot) < WARD_AI.taken)) continue;
-    if (plantWard(s, u, spot)) aiLog(u.side, `${shortName(u.name)} wards ${spot.x === BEAST.x && spot.y === BEAST.y ? "the beast's pit" : 'the river'}`);
+    const where = !WARD_SPOTS.includes(spot) ? 'the tall grass' : spot.x === BEAST.x && spot.y === BEAST.y ? "the beast's pit" : 'the river';
+    if (plantWard(s, u, spot)) aiLog(u.side, `${shortName(u.name)} wards ${where}`);
     return;
   }
 }
@@ -1608,12 +1627,37 @@ function updateContesters(s: GameState) {
   s.contesters = next;
 }
 
+/**
+ * The bush a ganking champion should wait in for its prey (`AMBUSH`), or -1 to go straight at it:
+ * once it has waited its time, or the prey is within `AMBUSH.strike` of it, it charges.
+ */
+function ambushBush(s: GameState, u: Unit, prey: Unit): number {
+  if (u.ambushBush >= 0) {
+    const b = BUSHES[u.ambushBush];
+    if (s.time < u.ambushUntil && dist(prey, b) > AMBUSH.strike && dist(prey, b) <= AMBUSH.reach * 1.5) return u.ambushBush;
+    u.ambushUntil = Infinity;
+    return -1;
+  }
+  // Waited once already on this gank: no second ambush.
+  if (u.ambushUntil === Infinity) return -1;
+  if (dist(u, prey) <= AMBUSH.strike) return -1;
+  let best = -1, bestD = Infinity;
+  BUSHES.forEach((b, i) => {
+    const d = dist(prey, b);
+    if (d > AMBUSH.strike && d <= AMBUSH.reach && dist(u, b) < bestD && dist(u, b) < dist(u, prey)) {
+      best = i;
+      bestD = dist(u, b);
+    }
+  });
+  return best;
+}
+
 /** Now and then each team sends one AI champion from another lane to gang up on the weakest enemy. */
 function updateGanks(s: GameState) {
   if (s.time < s.nextGank) return;
   // While a champion carries a bounty, the hunts come twice as often.
   const hunted = s.units.some((u) => u.kind === 'champion' && !u.dead && bountyOf(u.killStreak) > 0);
-  s.nextGank = s.time + (hunted ? GANK.every / 2 : GANK.every);
+  s.nextGank = s.time + (hunted ? GANK.every / 2 : GANK.every) * (nightness(s.time) >= 0.5 ? GANK.night : 1);
   for (const team of TEAMS) {
     // The biggest bounty in sight first, then the weakest.
     const prey = s.units
@@ -1625,6 +1669,8 @@ function updateGanks(s: GameState) {
       .sort((a, b) => dist(a, prey) - dist(b, prey) || a.id - b.id)[0];
     if (!hunter) continue;
     hunter.gankTarget = prey.id;
+    hunter.ambushBush = -1;
+    hunter.ambushUntil = 0;
     hunter.gankUntil = s.time + GANK.ms;
     const lane = laneNear(prey);
     const price = bountyOf(prey.killStreak);
