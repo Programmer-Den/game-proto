@@ -1,4 +1,4 @@
-import { DEFAULTS, SETTINGS_KEY, SETTING_FIELDS, loadSettings, saveSettings, type Settings } from './settings';
+import { DEFAULTS, SETTING_FIELDS, loadSettings, saveSettings, type Settings } from './settings';
 import { language, setLanguage, t } from './i18n';
 import { previewVolume } from './audio';
 import { clearAllProgress } from './progress';
@@ -27,19 +27,12 @@ export function mountSettingsPanel(
   games: string[] = [],
   titleOf: (game: string) => string = (game) => game,
 ) {
+  // A game may have changed settings since (Mute, the volumes), so each change starts from what is
+  // saved, or, with storage blocked or full, from the choices made on this page (`loadSettings`
+  // keeps those).
   let current = loadSettings();
-  // A game may have changed settings since (Mute, the volumes), so start from what is saved, or,
-  // with storage blocked, from the choices made on this page.
-  const saved = () => {
-    try {
-      localStorage.getItem(SETTINGS_KEY);
-      return loadSettings();
-    } catch {
-      return current;
-    }
-  };
   const set = (patch: Partial<Settings>) => {
-    current = { ...saved(), ...patch };
+    current = { ...loadSettings(), ...patch };
     saveSettings(current);
     // Only a language choice switches the page, so a `?lang=` look survives other changes.
     if (patch.language && patch.language !== language()) setLanguage(patch.language);
@@ -174,7 +167,7 @@ export function mountSettingsPanel(
     const value = document.createElement('output');
     value.textContent = input.value;
     input.addEventListener('input', () => {
-      current = { ...saved(), [field.key]: Number(input.value) };
+      current = { ...loadSettings(), [field.key]: Number(input.value) };
       saveSettings(current);
       value.textContent = input.value;
     });
@@ -187,7 +180,7 @@ export function mountSettingsPanel(
   render();
   // Reads the settings again, for when the panel is shown after a game changed them.
   return () => {
-    current = saved();
+    current = loadSettings();
     render();
   };
 }

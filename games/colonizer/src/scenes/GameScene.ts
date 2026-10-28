@@ -344,6 +344,8 @@ export class GameScene extends Phaser.Scene {
     this.input.on('pointerdown', this.onPointerDown, this);
     this.input.on('pointermove', this.onPointerMove, this);
     this.input.on('pointerup', this.onPointerUp, this);
+    // A release off the canvas (past the window or over a corner button) still ends a drag.
+    this.input.on('pointerupoutside', this.onPointerUp, this);
     this.input.keyboard?.on('keydown', this.onKey, this);
     this.arrows = this.input.keyboard!.addKeys({ up: 'UP', down: 'DOWN', left: 'LEFT', right: 'RIGHT' }) as unknown as Record<'up' | 'down' | 'left' | 'right', Phaser.Input.Keyboard.Key>;
 
@@ -859,7 +861,8 @@ export class GameScene extends Phaser.Scene {
     const start = this.dragStart;
     this.dragStart = null;
     if (!start) return;
-    // A press starts only in the play area; a release over the top bar or panel selects up to its edge.
+    // A press starts only in the play area; a release over the top bar, panel or off the canvas selects up to its edge.
+    p.x = Math.min(Math.max(p.x, 0), W - 1);
     p.y = Math.min(Math.max(p.y, TOP_H), PANEL_Y - 1);
     const a = this.toWorld(start.x, start.y);
     const b = this.toWorld(p.x, p.y);

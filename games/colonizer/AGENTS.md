@@ -346,11 +346,11 @@ in code on 2D canvases (no image files), with `pixelArt` off.
   panel sits on the bottom edge (`PANEL_Y = H - 110`). The world simply shows more of itself; edge
   scrolling, the alert arrows and the end screens use `W` and `H`. The menu is laid out for 960x540
   and offset by `viewFrame(scene)`. At exactly 960x540 nothing moves.
-- Input: `pointerdown` and `pointerup` on the scene. Clicks on the minimap move the camera, on the
+- Input: `pointerdown` and `pointerup` (and `pointerupoutside`, a release off the canvas) on the scene. Clicks on the minimap move the camera, on the
   toast jump to the raid or alert it shows (`toastAt`; a plain notice lets the click through to the
   world), on an edge marker to its alert, and in the top bar, the deeds card or the panel are left to the HUD. A
-  click under 5 px is a click; otherwise it is a box select, whose release over the top bar or panel
-  is clamped to the play area's edge. Right click calls `commandAt`. A mouse scrolls the map within 6
+  click under 5 px is a click; otherwise it is a box select, whose release over the top bar, the panel
+  or off the canvas is clamped to the play area's edge. Right click calls `commandAt`. A mouse scrolls the map within 6
   px of the view's edges, the left and top edge themselves included, while it is over the canvas.
 - Placement: `placing` holds a building type. A click calls `tryPlace`, which centres the footprint
   on the tile under the cursor and sends the nearest selected villager to build it (with none

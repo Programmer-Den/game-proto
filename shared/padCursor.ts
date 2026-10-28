@@ -41,6 +41,8 @@ export function addPadCursor() {
   let heldA = false;
   let heldB = false;
   let target: Element | null = null;
+  /** The element the cursor is over, to send `mouseover` and `mouseout` as it moves, as a real mouse does. */
+  let over: Element | null = null;
 
   const show = (on: boolean) => {
     cursor.hidden = !on;
@@ -62,6 +64,15 @@ export function addPadCursor() {
       button,
       buttons,
     };
+    // Phaser only counts the pointer as over the canvas after a `mouseover` on it (`input.isOver`).
+    if (under !== over) {
+      const pointer = { ...init, pointerId: 1, pointerType: 'mouse', isPrimary: true };
+      over?.dispatchEvent(new PointerEvent('pointerout', { ...pointer, relatedTarget: under }));
+      over?.dispatchEvent(new MouseEvent('mouseout', { ...init, relatedTarget: under }));
+      under.dispatchEvent(new PointerEvent('pointerover', { ...pointer, relatedTarget: over }));
+      under.dispatchEvent(new MouseEvent('mouseover', { ...init, relatedTarget: over }));
+      over = under;
+    }
     under.dispatchEvent(new PointerEvent(`pointer${type}`, { ...init, pointerId: 1, pointerType: 'mouse', isPrimary: true }));
     under.dispatchEvent(new MouseEvent(`mouse${type}`, init));
     if (type === 'down') target = under;
@@ -140,6 +151,8 @@ export function addPadCursor() {
     if (!e.isTrusted || cursor.hidden) return;
     release();
     show(false);
+    // The real mouse sends its own `mouseover` from here; the cursor sends one again when it next moves.
+    over = null;
   };
   window.addEventListener('mousemove', hide, true);
   window.addEventListener('pointerdown', hide, true);

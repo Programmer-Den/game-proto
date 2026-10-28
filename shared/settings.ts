@@ -156,8 +156,12 @@ export const SETTING_FIELDS: readonly SettingField[] = [
 
 export const SETTINGS_KEY = 'hub-settings';
 
+/** The last settings that could not be saved (storage blocked or full), newer than what is stored. */
+let unsaved: Settings | undefined;
+
 /** Reads the settings, keeping only known keys with valid values. */
 export function loadSettings(): Settings {
+  if (unsaved) return { ...unsaved };
   let saved: Partial<Record<keyof Settings, unknown>> = {};
   try {
     saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}') ?? {};
@@ -199,8 +203,10 @@ export function updateSettings(patch: Partial<Settings>) {
 export function saveSettings(settings: Settings) {
   try {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    unsaved = undefined;
   } catch {
-    // Storage can be blocked (private mode); the settings last until the page closes.
+    // Storage can be blocked (private mode) or full; the settings last until the page closes.
+    unsaved = { ...settings };
   }
 }
 

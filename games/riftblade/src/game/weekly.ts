@@ -80,8 +80,9 @@ let position = -1;
 
 /**
  * The rules' random number: the weekly's seeded generator while one is on, else `Math.random`. Only
- * the rules draw on it, so Phaser, the sound and the drawing (which use `Math.random`) never shift a
- * weekly's sequence, and a normal run draws on `Math.random` in the same order as ever.
+ * the rules draw on it, so Phaser and the sound (which use `Math.random`) never shift a weekly's
+ * sequence, and a normal run draws on `Math.random` in the same order as ever. The drawing uses a
+ * hash, never `Math.random`, since in a normal run that is the rules' stream.
  */
 export const rand = () => (draw ? draw() : Math.random());
 

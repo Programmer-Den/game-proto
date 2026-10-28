@@ -86,7 +86,7 @@ a star map between them.
   `rand` back on `Math.random` at the run's end, Run again and any other run's start. Mutator
   effects (`MUT`): Glass Cannon and Overcharged in `statsOf` and `startRun`, Swarm in `director`
   and `spawnAt`, Haste in `statsOf` and `spawnAt`, Vampire in `kill` (and no regen), Fragile Foes
-  in `spawnAt` and `hurtHero`. `recordWeekly` keeps the week's furthest jump and win in
+  in `spawnAt` (bosses too) and `hurtHero`. `recordWeekly` keeps the week's furthest jump and win in
   `progress.weekly`; the first win of a week banks `WEEKLY_BONUS`.
 - Trophies (`src/trophies/`, see `shared/trophies.ts`): ten, listed with `trophySet` in
   `trophies/index.ts` (handed to `setupGame`), texts in `trophies/i18n/`. `trophies/check.ts`'s
