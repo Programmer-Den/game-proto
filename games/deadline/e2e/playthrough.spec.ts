@@ -291,6 +291,9 @@ test('plays the first wave', async ({ page }, testInfo) => {
   expect(s.scrap).toBe(WAVE_1_ENEMIES * GRUNT_SCRAP);
   expect(await page.evaluate(() => localStorage.getItem('deadline-scrap'))).toBe(String(WAVE_1_ENEMIES * GRUNT_SCRAP));
   await snap('6-cleared');
+  // Clearing wave 1 earns the First night trophy (src/trophies/), and nothing else yet.
+  const trophies = await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('deadline-trophies') ?? '{}')));
+  expect(trophies, 'trophies earned in the first round').toEqual(['firstWave']);
   s = await until('wave 2 started', (s) => s.wave === 2 && s.phase === 'wave', 5_000);
   // A new wave starts the strip again, and reaching it is a new best wave, saved.
   expect(s).toMatchObject({ best: 2, fallen: 0 });
