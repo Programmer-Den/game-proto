@@ -75,6 +75,7 @@ import { chamferPts, drawPanel, makeButton, textStyle } from '../ui/panel';
 import { t } from '../i18n';
 import { SkillBook } from '../ui/SkillBook';
 import { BattleSounds } from './BattleSounds';
+import { checkTrophies } from '../trophies/check';
 import { viewFrame } from '../../../../shared/scaling';
 import { AIM, BARRICADE, BARRICADE_BAR, BARRICADE_TIP_W, BOSS_BAR, CALTROPS, FORTIFY, GUARD_HIT, HEAT, HERO_FEET, HUD_HEIGHT, MARCH, OMEN_CHIP, RAIN, RAIN_HINT, REPAIR, ROAR_CHIP, SEEN, SPEED, STREAK, TRACK, UI_DEPTH, VIEW, XP_BAR, placeHud } from './layout';
 
@@ -297,6 +298,7 @@ export class GameScene extends Phaser.Scene {
       ticked = game;
     }
     this.sounds.play(s, ticked);
+    checkTrophies(s);
     if (s.phase !== phase || s.wave !== wave || s.levelUps !== levelUps || s.level !== level) saveProgress(progressOf(s));
     // A level-up or a fall drops Arrow Rain from the hand.
     if (s.choices || held(s) || this.skillBook.open || this.hirePanel.open || this.fortifyPanel.open) this.aim = null;
