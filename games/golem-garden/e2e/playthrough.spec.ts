@@ -215,6 +215,9 @@ test('plays the first wave', async ({ page }, testInfo) => {
     bloom: 1,
   });
   expect(await game.waveLabel()).toBe('Start wave 2');
+  // Clearing wave 1 earns the Green thumb trophy (src/trophies/), and nothing else yet.
+  const trophies = await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('golem-garden-trophies') ?? '{}')));
+  expect(trophies, 'trophies earned in the first round').toEqual(['firstWave']);
   await snap('3-cleared');
 
   const speed = gameMs / (Date.now() - startedAt);

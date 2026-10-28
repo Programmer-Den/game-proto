@@ -178,7 +178,7 @@ export interface Drop {
 export type GameEvent =
   | { type: 'placed'; drop: Drop; stone: Stone; row: number; cut: { x: number; w: number }[]; favor: number }
   | { type: 'missed'; drop: Drop; tier: number; kind: StoneKind; material: MaterialId }
-  | { type: 'tier'; tier: number; balanced: boolean }
+  | { type: 'tier'; tier: number; balanced: boolean; cursed: boolean }
   | { type: 'trial'; tier: number; passed: boolean; favor: number }
   | { type: 'rerolled' }
   | { type: 'bought'; item: ShopId }
@@ -530,7 +530,7 @@ function land(s: GameState) {
   if (s.inTier === STONES_PER_TIER) {
     const balanced = !s.wobbly;
     const done = s.tier;
-    s.events.push({ type: 'tier', tier: done, balanced });
+    s.events.push({ type: 'tier', tier: done, balanced, cursed: curseNow(s) !== null });
     if (trial && !trial.failed) {
       const bonus = Math.ceil(TRIAL_FAVOR * favorMult(s, done) * (s.material === 'basalt' ? BASALT_TRIAL_MULT : 1));
       s.favor += bonus;

@@ -258,6 +258,9 @@ test('plays the first round', async ({ page }, testInfo) => {
   expect(s).toMatchObject({ phase: 'blessing', tier: 2, inTier: 0, tiersBuilt: 1, balancedTiers: 1, best: 1, favor, lean: 0, material: 'limestone' });
   expect(new Set(s.offer).size).toBe(patron.offer);
   expect(await page.evaluate(() => localStorage.getItem('shrine-stack-best'))).toBe('1');
+  // The first tier earns the First course trophy (src/trophies/), and nothing else yet.
+  const trophies = await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('shrine-stack-trophies') ?? '{}')));
+  expect(trophies, 'trophies earned in the first round').toEqual(['firstTier']);
   // The stone does not swing while the blessing is being chosen, and a tap on the dim does nothing.
   const waiting = s.moving.x;
   await play(1_000, async () => false);

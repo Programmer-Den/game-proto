@@ -316,6 +316,10 @@ test('plays the first wave', async ({ page }, testInfo) => {
   expect(s.coins).toBe(3 * COINS.goblin + 3 * COINS.orc);
   expect(s.caltrops.charge).toBe(CALTROP_KILLS);
   expect(s.guards).toEqual([null, null]);
+  // Clearing the wave earns Holding the line, and the volley loosed earlier Cloud of arrows
+  // (src/trophies/), and nothing else yet.
+  const trophies = await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('palisade-trophies') ?? '{}')));
+  expect(trophies.sort(), 'trophies earned in the first round').toEqual(['firstRain', 'firstWave']);
   // Kills in quick succession built a streak, and its bonus is all the experience on top of the
   // foes' own.
   expect(s.streak.best, 'a kill streak of two or more').toBeGreaterThanOrEqual(2);

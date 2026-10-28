@@ -37,6 +37,13 @@ chapter ends.
   boulder or cracked wall walks over and plants one. Old Sedge refills your pouch, and cut bushes
   and beaten foes sometimes drop a seed pod.
 - The journal line at the top right always says what to do next.
+- **Coins** drop from cut bushes now and then and from every beaten foe. Marla the baker sells a
+  hearty pie (one more heart) and light boots (a longer roll, sooner again) once you have the
+  blade; Old Sedge sells a bigger bellseed pouch (15 instead of 10) and a long vine (the hookvine
+  reaches much farther) once he has given you bellseeds. Talk to them to see their wares; tap a
+  price, or press 1 or 2, to buy.
+
+![Marla's wares](docs/screenshots/shop.webp)
 
 ![Taking the Old Blade from the chest by the shed](docs/screenshots/blade.webp)
 
@@ -123,7 +130,7 @@ the north gate, checking the quest, items, flags and save at each step. Run it w
 | `src/main.ts` | Creates the game and hands it to the hub's `setupGame` and `setupScaling` |
 | `src/howToPlay.ts` | The How to play shown on the start and pause screens |
 | `src/game/maps.ts` | The five maps as tile grids, with their people, chests, signs, exits, foes, posts, doors, blocks, plates, rooms and moonstones |
-| `src/game/state.ts` | The save: where the knight is, hearts, items, keys, moonstones, flags, the quest and the trials' best times |
+| `src/game/state.ts` | The save: where the knight is, hearts, items, keys, moonstones, flags, the quest, the trials' best times, coins and upgrades, and what each upgrade costs |
 | `src/game/talk.ts` | What each person says, by where the quest stands |
 | `src/game/path.ts` | A* for tap-to-walk |
 | `src/art/paint.ts` | Every sprite, painted onto canvases in soft 3D |
@@ -131,5 +138,5 @@ the north gate, checking the quest, items, flags and save at each step. Run it w
 | `src/scenes/GameScene.ts` | The world: walking, the sword, the hookvine, bellseeds, foes, puzzles, the bosses and the story |
 | `src/scenes/foes.ts` | Foe stats, bellseed timings and the two bosses' timings, and how much harder they are in a trial |
 | `src/scenes/light.ts` | The night: the dark, the lamp glow and the miniature haze |
-| `src/scenes/hud.ts` | Hearts, moonstones, keys, bellseeds, the journal line, dialog, touch buttons, the trial's clock, the moonstone page and the end card |
+| `src/scenes/hud.ts` | Hearts, moonstones, keys, bellseeds, the journal line, dialog, touch buttons, the trial's clock, the moonstone page, the shops and the end card |
 | `src/scenes/layout.ts` | The view, speeds, reaches and button positions |

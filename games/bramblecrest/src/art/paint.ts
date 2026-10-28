@@ -688,6 +688,20 @@ export function paintAll(scene: Phaser.Scene) {
     seedPod(c, 10, 12, 6);
   });
   paint(scene, 'pickup-seed', 18, 18, (c) => seedPod(c, 9, 10, 4.5));
+  // A coin: a lit gold disc with a raised rim, dropped by cut bushes and beaten foes.
+  const coin = (c: Ctx, x: number, y: number, r: number) => {
+    ball(c, x, y, r, '#e0b040', r * 0.92);
+    c.strokeStyle = shade('#e0b040', -0.35);
+    c.lineWidth = 1;
+    c.beginPath();
+    c.arc(x, y, r * 0.6, 0, Math.PI * 2);
+    c.stroke();
+  };
+  paint(scene, 'pickup-coin', 16, 16, (c) => {
+    shadow(c, 8, 13, 6, 2);
+    coin(c, 8, 8, 5);
+  });
+  paint(scene, 'ui-coin', 18, 18, (c) => coin(c, 9, 9, 7));
   const bell = (key: string, r: number) =>
     paint(scene, key, 40, 48, (c) => {
       shadow(c, 20, 44, r + 4, 4, 0.45);

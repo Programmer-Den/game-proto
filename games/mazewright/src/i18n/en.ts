@@ -200,6 +200,8 @@ const en = {
   lostText: 'You held them off until wave {n}.',
   again: 'Play again',
   watchAgain: 'Watch again',
+  resume: '▶ Wave {n}',
+  resumed: 'Back in the garden: wave {n} held.',
   watch: 'Watch',
   replayLabel: 'Replay · {stars} · {t}',
 };

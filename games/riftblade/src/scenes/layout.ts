@@ -52,6 +52,15 @@ export const HEAT_ROW = { x: 658, y: 366, w: 272, h: 42 };
 export const HEAT_DOWN = { x: HEAT_ROW.x, y: HEAT_ROW.y + 3, w: 36, h: 36 };
 export const HEAT_UP = { x: HEAT_ROW.x + HEAT_ROW.w - 36, y: HEAT_ROW.y + 3, w: 36, h: 36 };
 
+/** The hero select's Armoury button (top left, once credits are banked) and the Armoury's cards and Back button. */
+export const ARMOURY_BUTTON = { x: 14, y: 14, w: 200, h: 40 };
+export const ARMOURY_CARD = { w: 172, h: 250, y: 150, gap: 182 };
+export function armouryCardRect(i: number, n: number) {
+  const cx = VIEW.w / 2 + (i - (n - 1) / 2) * ARMOURY_CARD.gap;
+  return { x: cx - ARMOURY_CARD.w / 2, y: ARMOURY_CARD.y, w: ARMOURY_CARD.w, h: ARMOURY_CARD.h };
+}
+export const BACK = { x: VIEW.w / 2 - 110, y: 430, w: 220, h: 50 };
+
 /** The new-hero panel shown mid-run, and its Continue button. */
 export const UNLOCK = { x: VIEW.w / 2 - 200, y: 96, w: 400, h: 340 };
 export const CONTINUE = { x: VIEW.w / 2 - 110, y: 362, w: 220, h: 48 };

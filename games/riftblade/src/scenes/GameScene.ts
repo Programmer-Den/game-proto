@@ -8,10 +8,11 @@ import { bladeColor, dreadRadius, heroVariant, orbitBlades } from '../game/blade
 import { bubble, rebuildTime } from '../game/squad';
 import { buy, chooseEvent, chooseNode, chooseWorld, chartOptions, frame, leave, nextPlanet, reroll } from '../game/voyage';
 import { heatOpen } from '../game/heat';
+import { ARMOURY, salvage, type ArmouryId } from '../game/armoury';
 import { ARENA_MS, BOSSES, CHAMPION, PLANETS, SIEGE, STRIKE, VENT, planetLabel } from '../game/planets';
 import { UPGRADES, MAX_TIER } from '../game/upgrades';
 import {
-  clearRun, isBetweenWorlds, isUnlocked, loadProgress, loadRun, recordCharted, recordRun, recordUnlocks, saveRun, unlockedHeroes, type Progress,
+  clearRun, isBetweenWorlds, isUnlocked, loadProgress, loadRun, buyArmoury, recordCharted, recordRun, recordUnlocks, saveRun, unlockedHeroes, type Progress,
 } from '../game/save';
 import { C, hex } from '../art/glow';
 import { heroKey } from '../art/sprites';
@@ -23,7 +24,7 @@ import { OBJ_COLOR, drawObjectiveGround, drawPowerUp, drawStructure, objectiveTa
 import { objectiveHint, objectiveName, OBJ_MISC } from '../game/objectives';
 import { SoundCues } from '../audio/cues';
 import { sfx } from '../audio/sfx';
-import { Panel, endScreen, eventPanel, heroSelect, levelUp, spaceMap, starMap, trader, unlockPanel } from '../ui/panels';
+import { Panel, armouryPanel, endScreen, eventPanel, heroSelect, levelUp, spaceMap, starMap, trader, unlockPanel } from '../ui/panels';
 import {
   BOSS_BAR, CENTER, CREDITS_TAG, OBJECTIVE_HUD, DEPTH, FONT, HP_BAR, KIT, LEVEL, PLANET_TAG, SIG_BUTTON, STICK, TIMER, SCREEN, FRAME, VIEW, XP_BAR, fitLayout, inside,
 } from './layout';
@@ -90,6 +91,9 @@ export class GameScene extends Phaser.Scene {
   chosen: HeroId = 'tr9';
   /** The rift heat picked on the select screen for each hero (the highest open until changed). */
   private heatPick: Partial<Record<HeroId, number>> = {};
+  /** Whether the Armoury is open over the hero select, and the credits the run that ended banked. */
+  armouryOpen = false;
+  private banked = 0;
   private savedDeeds = 0;
   /** Heroes just unlocked, waiting to be shown (the game stands still while one is). */
   unlocking: HeroId[] = [];
@@ -174,7 +178,9 @@ export class GameScene extends Phaser.Scene {
       this.keys[key].on('down', () => {
         const s = this.state;
         if (this.unlocking.length) return;
-        if (s.phase === 'select') {
+        if (s.phase === 'select' && this.armouryOpen) {
+          if (ARMOURY[i]) this.buyArmoury(ARMOURY[i].id);
+        } else if (s.phase === 'select') {
           if (HERO_IDS[i]) this.choose(HERO_IDS[i]);
         } else if (s.phase === 'levelup') {
           if (i < (s.choices?.length ?? 0)) this.pickIndex(i);
@@ -185,12 +191,13 @@ export class GameScene extends Phaser.Scene {
     // Left and right step the rift heat on the hero select.
     for (const [key, dir] of [['LEFT', -1], ['RIGHT', 1], ['A', -1], ['D', 1]] as const) {
       this.keys[key].on('down', () => {
-        if (this.state.phase === 'select' && !this.unlocking.length) this.stepHeat(dir);
+        if (this.state.phase === 'select' && !this.unlocking.length && !this.armouryOpen) this.stepHeat(dir);
       });
     }
     this.keys.ENTER.on('down', () => {
       if (this.unlocking.length) this.closeUnlock();
       else if (this.state.phase === 'won' || this.state.phase === 'lost') this.backToSelect();
+      else if (this.state.phase === 'select' && this.armouryOpen) this.closeArmoury();
       else if (this.state.phase === 'select') this.begin(this.chosen);
       else this.leave();
     });
@@ -276,8 +283,15 @@ export class GameScene extends Phaser.Scene {
       if (spot.id === 'continue') this.closeUnlock();
       return;
     }
-    if (s.phase === 'select') {
+    if (s.phase === 'select' && this.armouryOpen) {
+      if (spot.id === 'back') this.closeArmoury();
+      else this.buyArmoury(spot.id as ArmouryId);
+    } else if (s.phase === 'select') {
       if (spot.id === 'fight') this.begin(this.chosen);
+      else if (spot.id === 'armoury') {
+        this.armouryOpen = true;
+        ui('click');
+      }
       else if (spot.id === 'heat-down') this.stepHeat(-1);
       else if (spot.id === 'heat-up') this.stepHeat(1);
       else this.choose(spot.id as HeroId);
@@ -306,6 +320,22 @@ export class GameScene extends Phaser.Scene {
     if (isUnlocked(this.progress, id)) ui('click');
     else ui('refuse');
     this.chosen = id;
+  }
+
+  /** Buys the next rank of an Armoury piece, if the bank holds enough. */
+  private buyArmoury(id: ArmouryId) {
+    const progress = buyArmoury(id);
+    if (!progress) {
+      ui('refuse');
+      return;
+    }
+    this.progress = progress;
+    ui('coin');
+  }
+
+  private closeArmoury() {
+    this.armouryOpen = false;
+    ui('click');
   }
 
   /** The rift heat the chosen hero would fight at: the one picked, else the highest open. */
@@ -381,7 +411,10 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     ui('click');
-    startRun(this.state, id, unlockedHeroes(this.progress), (Math.hypot(SCREEN.w, SCREEN.h) - Math.hypot(VIEW.w, VIEW.h)) / 2, this.heatFor(id));
+    startRun(this.state, id, unlockedHeroes(this.progress), (Math.hypot(SCREEN.w, SCREEN.h) - Math.hypot(VIEW.w, VIEW.h)) / 2, {
+      heat: this.heatFor(id),
+      perks: this.progress.armoury,
+    });
     this.savedDeeds = 0;
     this.recorded = false;
     // A new run is first saved once its first world is cleared.
@@ -471,7 +504,8 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     if (this.unlocking.length) return `unlock|${this.unlocking[0]}`;
     if (s.phase === 'run') return 'run';
-    return [s.phase, this.chosen, this.heatFor(this.chosen), s.choices?.join(), s.offers.join(), s.credits, s.event?.id, s.nodes.join(), s.rewardPicks].join('|');
+    if (s.phase === 'select' && this.armouryOpen) return `armoury|${this.progress.bank}|${JSON.stringify(this.progress.armoury)}`;
+    return [s.phase, this.chosen, this.progress.bank, this.heatFor(this.chosen), s.choices?.join(), s.offers.join(), s.credits, s.event?.id, s.nodes.join(), s.rewardPicks].join('|');
   }
 
   /** Shows the panel for the phase the run is in. */
@@ -481,7 +515,8 @@ export class GameScene extends Phaser.Scene {
     this.panel = null;
     if ((s.phase === 'won' || s.phase === 'lost') && !this.recorded) {
       this.recorded = true;
-      this.progress = recordRun(s.hero!, s.runMs, s.phase === 'won', s.stage + 1, s.route.map((i) => PLANETS[i].id), s.heat);
+      this.banked = salvage(s.credits, s.stage + 1);
+      this.progress = recordRun(s.hero!, s.runMs, s.phase === 'won', s.stage + 1, s.route.map((i) => PLANETS[i].id), s.heat, this.banked);
       clearRun();
     }
     // Every other panel saves the run as it opens, if it is between worlds (the maps, the trader,
@@ -495,13 +530,14 @@ export class GameScene extends Phaser.Scene {
       p.place(FRAME.x, FRAME.y);
     };
     if (this.unlocking.length) build((p) => unlockPanel(p, this.unlocking[0]));
+    else if (s.phase === 'select' && this.armouryOpen) build((p) => armouryPanel(p, this.progress));
     else if (s.phase === 'select') build((p) => heroSelect(p, this.progress, this.chosen, this.heatFor(this.chosen)));
     else if (s.phase === 'levelup') build((p) => levelUp(p, s));
     else if (s.phase === 'chart') build((p) => spaceMap(p, s, this.progress.charted));
     else if (s.phase === 'map') build((p) => starMap(p, s));
     else if (s.phase === 'trader') build((p) => trader(p, s));
     else if (s.phase === 'event') build((p) => eventPanel(p, s));
-    else if (s.phase === 'won' || s.phase === 'lost') build((p) => endScreen(p, s, this.progress));
+    else if (s.phase === 'won' || s.phase === 'lost') build((p) => endScreen(p, s, this.progress, this.banked));
     this.shown = this.panelKey();
     this.walking = false;
     this.stick = null;

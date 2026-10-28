@@ -48,6 +48,7 @@ import {
 } from '../game/state';
 import { BUILDINGS, INFO, ISLANDS, randomIsland, type Building, type Special } from '../game/tiles';
 import { placeName, t } from '../i18n';
+import { checkTrophies } from '../trophies/check';
 import { makeButton } from '../ui/Button';
 import {
   BUTTON,
@@ -1335,6 +1336,7 @@ export class GameScene extends Phaser.Scene {
       const over = { score: s.score, island: String(s.island), round: s.round, n: s.placed, castle: s.castle, won };
       fit(this.gameOverText.setText(t('overText', over)), 500);
     }
+    checkTrophies(s);
   }
 
   /** A new kingdom on island `island`, chosen as `kingdom` says. */

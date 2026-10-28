@@ -37,6 +37,7 @@ import { makeButton } from '../ui/Button';
 import { HAVEN_WAVE } from '../game/waves';
 import { Harbor, type HarborAction } from '../ui/Harbor';
 import { fitWidth, pinToScreen } from '../ui/screen';
+import { checkTrophies } from '../trophies/check';
 import { SoundCues } from './soundCues';
 import { BANNER, BOUNTY, CONVOY, FIRE, FONT, HELM, HUD_HEIGHT, ORDER_CARD, OVER, SCUTTLE, UI_DEPTH, VIEW, WIND } from './layout';
 
@@ -219,6 +220,7 @@ export class GameScene extends Phaser.Scene {
     this.cues.before(s);
     this.readInput();
     tick(s, dt);
+    checkTrophies(s);
     this.cues.after(s, dt);
     if (s.phase !== phase && (s.phase === 'harbor' || s.phase === 'over' || s.phase === 'won')) saveBestWave(s.bestWave);
     if (s.phase !== phase && (s.phase === 'over' || s.phase === 'won')) {

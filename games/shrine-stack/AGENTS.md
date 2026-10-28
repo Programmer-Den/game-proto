@@ -117,7 +117,7 @@ Missing or rough:
 - `docs/screenshots/game-over.webp`, `gilded.webp`, `crowned.webp`, `wobbly-break.webp`,
   `shop-bought.webp`, `curse-taken.webp`, `stone-kinds.webp`, `endless-gust.webp`, `four-blessings.webp`,
   `material-pick.webp`, `reserve.webp`, `lean-meter.webp`, `toppled.webp`, `regrown.webp`,
-  `storm-gust.webp`, `crowned-blessing.webp`, `sky-altar.webp`, `sky-altar-blessing.webp`, `fill-ultrawide.webp`, `fill-tablet.webp` (the play scene filling a 2560x1080 and a 1024x768 screen) and `cover.png` (a copy of `gilded.webp`) are not produced by the test; refresh
+  `storm-gust.webp`, `crowned-blessing.webp`, `sky-altar.webp`, `sky-altar-blessing.webp`, `trophy-earned.webp`, `trophies.webp`, `fill-ultrawide.webp`, `fill-tablet.webp` (the play scene filling a 2560x1080 and a 1024x768 screen) and `cover.png` (a copy of `gilded.webp`) are not produced by the test; refresh
   them by hand (play several tiers in the dev build, or drive it with a Playwright script that taps
   like the test does) if the look changes.
 
@@ -166,6 +166,18 @@ File map (`src/`):
   (the three on buttons) and `PATRONS`/`PatronId`/`PATRON_INFO` (name, boon, bane, colour). Every
   name and text is a `TextKey` of `i18n/en.ts`, which the scene shows with `t`.
 - `game/save.ts`: `loadBest` and `saveBest`.
+- `trophies/`: the game's eight trophies (`shared/trophies.ts`). `index.ts` lists them (`trophies`:
+  id, tier, icon, `hidden` for the two sky altar ones) with their texts in `trophies/i18n/` (`en.ts`,
+  `de.ts` and `en-US.ts` for "favor": the name keyed by the id, what earns it by `<id>Text`), and
+  imports nothing else from the game, since the hub loads it for its trophy shelf. `main.ts` hands
+  `trophies` to `setupGame`, which lists them on the start and pause screens. `check.ts` holds each
+  trophy's condition on a `GameEvent` and the state after it (`EARNED`): First course (any `tier`),
+  Grown back (`regrown`), Bound by a curse (a `tier` with `cursed`), Leaf gold (`tier`
+  `GILDED_TIER`), Crowned shrine (`tier` `GOAL_TIER`), Flawless shrine (the same with
+  `balancedTiers === GOAL_TIER`), Altar in the clouds (`altar`) and Stairway of altars (`altar` with
+  `altars >= THREE_ALTARS`, 3). `GameScene.update` calls `checkTrophies(state, event)` for every
+  event it shows; nothing restores a run, so no award is quiet. A new trophy is an entry in
+  `index.ts`, its two texts in each language file and its condition in `EARNED`.
 - `scenes/GameScene.ts`: everything drawn, plus `setFitted`, `drawStone`, `materialColor`, `tierColor`,
   `blend`, `shade`, `seeded`, `pin` and `place` helpers and the `UiPart` type.
 - `scenes/layout.ts`: `VIEW`, `PLINTH_Y`, `TOP_SCREEN_Y`, `PANEL`, `CARDS`, `CARDS_FOUR`,
@@ -203,8 +215,8 @@ How it runs:
   offer, when favor reaches `CHEAPEST` or from `MATERIAL_FROM_TIER`. Then it spawns the next stone
   from the side opposite the last.
 - Events: the rules push `GameEvent`s (`placed` with a copy of the stone, its row and the favor it
-  earned, `missed` with the stone's tier, kind and material, `tier`,
-  `trial` (failed mid-tier, or passed with its favor), `rerolled`, `bought`, `toppled` (how many
+  earned, `missed` with the stone's tier, kind and material, `tier` (balanced, and whether a curse
+  was in force), `trial` (failed mid-tier, or passed with its favor), `rerolled`, `bought`, `toppled` (how many
   stones, the lean and the favor lost), `regrown`, `swapped` (the kind now in hand), `patron`, `altar`) onto
   `state.events`; the scene drains them each frame in `show`, which draws the new
   stone, debris, popups, glow, lanterns, the crown and banners, and on `toppled` sends the last
@@ -263,8 +275,8 @@ State model (`GameState`): `phase` (`patron`, `swinging`, `falling`, `blessing`,
 `src/game/state.ts` mutates it. `moving` exists in every phase; it simply does not move outside
 `swinging`/`falling`.
 
-Persistence: one `localStorage` key, `shrine-stack-best`, holding the most tiers built in one
-temple. The scene writes it when a tier finishes and on game over. The hub's settings are read
+Persistence: `shrine-stack-best` in `localStorage` holds the most tiers built in one temple, and
+`shrine-stack-trophies` the trophies earned (`shared/trophies.ts`), each id with the time. The scene writes it when a tier finishes and on game over. The hub's settings are read
 from the shared `hub-settings` key, not from this game's save.
 
 Randomness and timing: `Math.random` is used only in the rules: `pickPatrons`, `pickOffer`,
@@ -354,8 +366,9 @@ Reroll or shop button that can't be used, and for the Swap button or R while sta
   ordinary limestone stones and no trial, lean or reserve on tier 1 (`KINDS_FROM_TIER`,
   `TRIALS_FROM_TIER`, `RESERVE_FROM_TIER` at 2, `LEAN_FROM_TIER`, `MATERIAL_FROM_TIER` at 3), each
   patron's first-round rule in `PATRON_RULES` (pace, favor per stone and per perfect drop, offer
-  size, shop items, perfect window), two patrons offered, the scene key `'Game'` and the save key
-  `shrine-stack-best`.
+  size, shop items, perfect window), two patrons offered, the scene key `'Game'`, the save key
+  `shrine-stack-best`, and `shrine-stack-trophies` holding only `firstTier` after the first tier
+  (a trophy a first round can earn goes into that assertion).
 - It saves `playthrough-0-patrons`, `-0-start`, `-1-first-stone`, `-2-blessing` and `-3-tier-2`
   screenshots; copy them into `docs/screenshots/` when the look changes.
 

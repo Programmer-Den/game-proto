@@ -1335,6 +1335,25 @@ export function replayStep(g: Game, r: Replay, from: number) {
   return i;
 }
 
+/**
+ * A saved game played back quietly to the step it was saved at, `dt` a step, with each step's
+ * events handed to `events` and dropped: the same game as it was then, ready to go on.
+ */
+export function resumeGame(r: Replay, dt: number, events: (e: GameEvent[]) => void) {
+  const g = replayGame(r);
+  let i = 0;
+  while (g.steps < r.steps && !over(g)) {
+    i = replayStep(g, r, i);
+    step(g, dt);
+    events(g.events);
+    g.events.length = 0;
+  }
+  // The actions taken after its last step, in the break it was saved in.
+  replayStep(g, r, i);
+  g.events.length = 0;
+  return g;
+}
+
 /** What to keep of a finished game to watch it again. */
 export const replayOf = (g: Game): Replay => ({
   v: REPLAY_VERSION, map: g.map.id, calm: g.calm, duo: g.duo, mode: g.mode, masters: g.masters ? [...g.masters] : null, seed: g.seed, toughness: g.toughness, lives: g.maxLives,

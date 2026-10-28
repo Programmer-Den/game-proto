@@ -28,6 +28,7 @@ beetle already on the lawn) is refused with an orange no-entry ring.
 | Speed button, or F | Play at double speed |
 | One gardener / Two gardeners (garden picker) | Play alone, or two on one screen, each on their own half of the lawn |
 | Watch (on a garden card) | Watch your latest win in that garden again |
+| ▶ Wave (on a garden card) | Go on with the game you left there, from its last break between waves |
 | Gardens | Back to the garden picker |
 
 ![Upgrade mode: the Upgrade and Sell buttons after the tools, and a gold mark on each tower that can be upgraded](docs/screenshots/modes.webp)
@@ -113,6 +114,14 @@ that plays it back: every hedge, tower, upgrade and wave as you played it, at 2x
 the speed button (F). Nothing can be planted while it plays, and it changes no records or seeds.
 
 ![Watching a win on the Meadow again](docs/screenshots/replay.webp)
+
+**Going on later.** A game in play is saved in every break between waves. Close the page, or tap
+Gardens, and its garden's card gets a gold ▶ Wave button that takes you back to that break, with
+the maze, gold, cabbages and wave timer as they were. A wave left half-played starts again from the
+break before it. Tapping the card itself starts that garden afresh and drops the saved game, as does
+starting any other garden.
+
+![The Meadow's card with the button to go on with a game at wave 2](docs/screenshots/resume.webp)
 
 ### Towers
 
@@ -243,11 +252,12 @@ played, and is kept for the next game:
 - `src/game/maps.ts`: the twelve gardens and their seasons (burrows, cottage, rocks, water, banks, paths).
 - `src/game/grid.ts`: the walking field (steps from every tile to the cottage) and routes.
 - `src/game/sim.ts`: a game: building and the never-close rule, foes, shots, waves and events.
-- `src/game/save.ts`: the records per garden, the pouch, the way of play and the potting shed.
+- `src/game/save.ts`: the records per garden, the pouch, the way of play, the potting shed, replays and the game in play.
 - `src/scenes/GameScene.ts`: the garden picker and the game screen: input, drawing and the bars.
 - `src/scenes/art.ts`, `layout.ts`: the flat vector art and where things go.
 - `src/audio.ts`: music and sound effects.
 - `src/i18n/`: the texts in British English, US English and German; `src/howToPlay.ts`.
 - `e2e/playthrough.spec.ts`: plays the first wave.
+- `e2e/bot.ts`: a greedy bot that plays every garden in Node, to check the balance (not a test).
 
 Run it with `npm run dev` from the repo root and open `/games/mazewright/`.

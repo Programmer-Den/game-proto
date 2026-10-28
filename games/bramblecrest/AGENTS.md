@@ -34,6 +34,16 @@ Implemented today:
   spawn is where the knight came into the map, or, after a reload, where the game was last saved
   (`create` calls `enterMap` with `keepSpawn` false). A fall and an exit in the same frame start
   one fade only (`fadeTo` returns while `fading`).
+- Coins and upgrades. Cut bushes drop a coin now and then (after a heart or a pod didn't) and
+  every beaten foe drops one (`dropCoin`, picked up in `pickups`, `state.coins`). `UPGRADES` in
+  `state.ts` lists what they buy, each `seller`'s and for how much: Marla (`baker`) sells `pie` (one
+  more heart) and `boots` (`BOOTS` in `layout.ts`: a longer roll, `rollMs`, and a shorter cooldown);
+  Old Sedge (`hermit`) sells `pouch` (`BIG_POUCH` bellseeds, `maxSeeds`) and `vine` (`LONG_VINE`
+  times the hookvine's reach), each once its `needs` item is had. Talking to Marla once the blade is
+  back, or to Sedge once he gave bellseeds (after his refill too), ends with the `shop-baker` or
+  `shop-hermit` talk effect, `openShop`, which `Hud.showShop` draws; its buttons or 1 and 2 call
+  `buy` (`state.ts`), and a tap off them, Space or Esc closes it. Bought upgrades are in
+  `state.upgrades` (`hasUpgrade`). The HUD shows coins after the first one.
 - Items: the Old Blade, the Hookvine, lantern oil (a bigger lantern light), small keys and heart
   vessels, all from chests (`openChest`), plus hearts dropped by cut bushes.
 - Bellseeds (`items.seeds`, a count in `seeds` up to `MAX_SEEDS`): Old Sedge gives and refills
@@ -119,7 +129,8 @@ All in code through `shared/audio.ts` (no audio files), in `src/audio/`:
   `rattle` and `clang` (the Bellwraith's drop and slam), `topple` (`tipBell`), `wail`
   (`hitWraith`), `wisp` (the wisp hops on) and `swell` (`checkExits`, walking into another map).
 - `ui('refuse')` for a locked or barred door, the thorny door, an empty chest, no bellseeds left and
-  the hourglass while its trial runs;
+  the hourglass while its trial runs, and a shop's button that can't buy; `ui('coin')` for
+  a coin picked up and an upgrade bought;
   `ui('click')` for the end card's buttons (`hud.ts`) and opening the moonstone page; the `swell` effect also
   plays when an hourglass trial starts.
 - Nothing plays while a map is built or a save loads (`enterMap` only starts the music). There is
@@ -173,7 +184,8 @@ All in code through `shared/audio.ts` (no audio files), in `src/audio/`:
 ### Save
 
 `bramblecrest-save` in localStorage: the whole `GameState` (map, position, facing, spawn, hearts,
-items, keys, moonstones, flags, quest, falls, foes beaten, the trials' best times in ms). A trial
+items, keys, moonstones, flags, quest, falls, foes beaten, the trials' best times in ms, coins and
+upgrades). A trial
 under way is not saved. It is written on a map change, on a
 chest, cut thorns, a key door unlocked, a plate, broken rock, the bells, a moonstone, a quest step
 and each boss, all through `GameScene.persist`, which holds a save asked for while the hookvine
@@ -181,7 +193,7 @@ pulls the knight (a bellseed bursting, a moonstone picked up) until they land on
 reload never puts them or their spawn over water or a pit. Flags in use: `chest-<id>`, `door-<id>`, `gate-cut`, `woods-thorns`, `plate`,
 `boss`, `foe-<i>`, `belfry-foe-<i>`, `broke-<map>-<x>-<y>`, `bells`, `wraith`, `cat-1` to `cat-3`,
 plus the flags of hidden places. `load` fills in fields a save from an older version lacks
-(`items.seeds`, `seeds`, `trials`), and starts over when the saved `map` or `spawn` is not a map (`isMapId`)
+(`items.seeds`, `seeds`, `trials`, `coins`, `upgrades`), and starts over when the saved `map` or `spawn` is not a map (`isMapId`)
 or a position is not a number. Cutting the gate before bringing the blade back is fine: the
 elder's `quest-thorns` then moves the quest straight on to `shrine`.
 
@@ -196,7 +208,7 @@ elder's `quest-thorns` then moves the quest straight on to `shrine`.
 
 - `window.game.scene.getScene('Game')` gives `state` (the `GameState`), `dialog` (`{ speaker,
   lines, i }` or null), `route` (the steps left of a tap's walk, or null), `target`, `foes` and
-  `boss`, `wraith`, `bombs` and `trial` (`{ map, ms }` or null); `spot('npc' | 'chest', id)` is where to tap a person or chest in the world and
+  `boss`, `wraith`, `bombs`, `trial` (`{ map, ms }` or null) and `hud` (`shopOpen`, `pageOpen`); `spot('npc' | 'chest', id)` is where to tap a person or chest in the world and
   `screenOf(x, y)` turns a world point into view pixels (allowing for the camera's zoom).
 - `e2e/playthrough.spec.ts` taps the elder, taps through her lines, taps the `blade` chest, taps
   the elder again, walks to the street below the gate (`STREET`) and taps the gate's thorns
@@ -227,6 +239,9 @@ elder's `quest-thorns` then moves the quest straight on to `shrine`.
   that move them on, and a `chapterEnd` case; raise `MOONSTONES` with the new stones.
 - **Hookvine posts** only catch along the knight's row or column, so pairs across a gap must share
   a row (or column).
+- **Add an upgrade**: its id in `UpgradeId` and a row in `UPGRADES` (seller, cost, needs), its
+  effect where the number it changes is used (or in `buy` for a one-off), and its name and
+  `<id>Text` in the `i18n/` files. A seller shows at most a few rows; 1 to 9 buy by place.
 - **Retune**: `src/scenes/layout.ts` (speeds, reaches, the lantern), `foes.ts` (foes and the boss)
   and `state.ts` (hearts).
 

@@ -97,6 +97,7 @@ export function chooseNode(s: GameState, index: number) {
   if (!kind) return;
   if (kind === 'trader') {
     s.offers = rollOffers(s);
+    s.freeReroll = (s.perks.reroll ?? 0) > 0;
     s.phase = 'trader';
   } else if (kind === 'elite') startArena(s);
   else if (kind === 'rest') {
@@ -136,9 +137,13 @@ export function buy(s: GameState, index: number) {
   return true;
 }
 
+/** What a reroll costs now: nothing for the Armoury's Spare Reroll, once per trader. */
+export const rerollPrice = (s: GameState) => (s.freeReroll ? 0 : TRADE.reroll);
+
 export function reroll(s: GameState) {
-  if (s.phase !== 'trader' || s.credits < TRADE.reroll) return false;
-  s.credits -= TRADE.reroll;
+  if (s.phase !== 'trader' || s.credits < rerollPrice(s)) return false;
+  s.credits -= rerollPrice(s);
+  s.freeReroll = false;
   s.offers = rollOffers(s);
   return true;
 }
