@@ -19,6 +19,7 @@ styles, from Paper Cut-out to Stained Glass; the digits stay plain and easy to r
 | Number pad, or keys 1-9 | Write that digit in the picked cell |
 | Notes (N) | Switch to pencil marks: digits then toggle small notes in the cell |
 | Erase (Backspace) | Clear a wrong digit from the picked cell, or an empty cell's notes |
+| Undo (U or Z) | Take back the latest note, wrong digit or erase (a mistake still counts) |
 | Hint (H) | Fill in the picked cell, or the first open one |
 | Menu | Leave the board for the menu |
 
@@ -33,9 +34,17 @@ Picking a cell lights its row, column and box, and every cell holding the same d
 pad shows how many of each digit are still to place and greys out finished ones. A finished row,
 column or box flashes and stays tinted.
 
+A board in play is saved as you go (a Delve run with its relics, or its relic offer between
+floors, too), so closing the page and coming back goes on where you stood.
+
+![The tools row with Undo](docs/screenshots/undo.webp)
+
 ### Modes
 
-- **Daily puzzle**: a Normal 9x9 board picked by the date. The menu ticks it off once solved, until the next day.
+- **Daily puzzle**: a Normal 9x9 board picked by the date. The menu ticks it off once solved, until
+  the next day, and counts your **daily streak**: daily puzzles solved on days in a row.
+
+![The menu with a daily streak](docs/screenshots/streak-menu.webp)
 - **Classic**: a fresh 9x9 board at Easy (40 givens), Normal (32) or Hard (26), with 3 hints and no
   limit on mistakes. **Next puzzle** deals another at the same level.
 - **Delve**: floor 1 is a 4x4 board, floors 2 and 3 are 6x6 and from floor 4 every floor is a 9x9

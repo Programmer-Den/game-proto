@@ -49,7 +49,9 @@ const de: Translation<typeof en> = {
   notesOn: 'Notizen: an',
   notesOff: 'Notizen: aus',
   erase: 'Löschen',
-  keysHint: 'Tasten: 1-9, Pfeile, N Notizen, H Tipp, Rücktaste löscht',
+  undo: 'Zurück',
+  keysHint: 'Tasten: 1-9, Pfeile, N Notizen, H Tipp, U zurück, Rücktaste löscht',
+  streak: { one: 'Tagesserie: {n} Tag', other: 'Tagesserie: {n} Tage' },
   // End cards
   solved: 'Gelöst!',
   solvedLine: 'Zeit {time} · Fehler {mistakes} · Tipps {hints}',
