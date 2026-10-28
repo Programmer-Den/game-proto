@@ -1228,6 +1228,9 @@ export const PINGS: Record<PingKind, { name: TextKey; color: string }> = {
 };
 export const PING = { answer: 2, reach: 2200, near: 900, ms: 12_000, showMs: 4000, cd: 1200, pick: 60, minHp: 0.4 };
 
+/** The death recap counts the damage of the last `windowMs` before the player's champion fell, in at most `rows` rows. */
+export const RECAP = { windowMs: 10_000, rows: 4 };
+
 export const JUNGLE = { firstAt: 120_000, every: 45_000, ms: 30_000, minHp: 0.6 };
 export const RETREAT = {
   /** Health ratio under which a champion with an enemy champion near falls back. */

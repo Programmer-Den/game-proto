@@ -349,6 +349,9 @@ export interface GameState {
   runes: ({ kind: RuneKind; x: number; y: number } | null)[];
   nextRune: number;
   runeRounds: number;
+  /** What hurt the player's champion in the last `RECAP.windowMs`, and the recap of its last death (null before one). */
+  playerHits: { at: number; src: number; how: HitHow; amount: number }[];
+  recap: DeathRecap | null;
   /** Pings on the map (the player's, and blue's AI calling a retreat), newest last, and when the player last pinged. */
   pings: Ping[];
   lastPingAt: number;
@@ -364,6 +367,25 @@ export function spawnWard(s: GameState, side: Team, x: number, y: number): Unit 
   w.expiresAt = s.time + WARD.ms;
   s.units.push(w);
   return w;
+}
+
+/** How a hit landed: a plain attack (towers, minions and the beast too), an ability by its key, or a battle spell. */
+export type HitHow = AbilityKey | 'attack' | 'spell';
+
+/** One row of the death recap: an attacker (-1 for all minions together), how it hit, and the health it took. */
+export interface RecapRow {
+  src: number;
+  kind: Unit['kind'];
+  how: HitHow;
+  amount: number;
+}
+
+/** What killed the player's champion: the killer, the damage taken over `RECAP.windowMs` and its biggest parts. */
+export interface DeathRecap {
+  at: number;
+  killer: number;
+  total: number;
+  rows: RecapRow[];
 }
 
 /** A ping on the map: its kind, where, by which team and when. */
@@ -575,6 +597,8 @@ export function createGame(pick: ChampionDef, enemyDamage: number, opts: MatchOp
     runes: RUNE.spots.map(() => null),
     nextRune: RUNE.firstAt,
     runeRounds: 0,
+    playerHits: [],
+    recap: null,
     pings: [],
     lastPingAt: -Infinity,
     zones: [],

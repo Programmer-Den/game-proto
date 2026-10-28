@@ -232,7 +232,12 @@ left, under bevelled slate panels.
     and the ping shows on the map and the minimap. An ally calling a retreat shows a Danger ping too.
 
     ![An Attack ping on a red tower with two allies walking to it, and the ping buttons by the minimap](docs/screenshots/pings.webp)
-22. **Winning** destroys the red Nexus. Losing means your Nexus falls first.
+22. **Death recap**: while your champion is dead, a card under the top bar names who slew it and
+    the damage it took in its last 10 seconds, split by attacker and hit (attacks, each ability,
+    the battle spell; all minions together), the four biggest with a bar each.
+
+    ![The death recap: slain by Grumm, 790 damage in the last 10 s, in four rows](docs/screenshots/death-recap.webp)
+23. **Winning** destroys the red Nexus. Losing means your Nexus falls first.
 
 Every ability has an animation of its own (a hammer that splits the ground, a meteor from the
 sky, a harpoon on its rope, a coil pylon arcing, a blood moon rising and so on), and so do bolts in

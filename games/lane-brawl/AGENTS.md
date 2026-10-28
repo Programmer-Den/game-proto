@@ -303,6 +303,13 @@ Implemented today:
   the upgrade panel and the minimap) to arm `pingArmed` for the next press on the map;
   `drawPings` draws blue's pings in the world (a pulsing ring, still under reduced motion, and
   `pingSign`), and the minimap rings them.
+- Death recap (LB17): `damage` takes a `how` (`HitHow`: `'attack'`, the default, an ability key or
+  `'spell'`; abilities pass their key through `abilityHit`, bolts and zones through `hitHowOf`
+  their `look`) and, for the player's champion, pushes each hit's health lost to `s.playerHits`
+  (kept for `RECAP.windowMs`). `kill` turns them into `s.recap` (`deathRecap`: summed by attacker
+  and `how`, all minions as one row with `src` -1, the biggest `RECAP.rows`). `drawRecap` shows it
+  under the notice while the player's champion is dead (not watching, not over the shop or
+  scoreboard), naming champions by first name and the rest by kind (`recapName`).
 - Victory and defeat panel with the match's objectives, last hits, best streak and beasts slain,
   and "Play again".
 
