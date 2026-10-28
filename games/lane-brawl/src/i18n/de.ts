@@ -420,6 +420,11 @@ const de: Translation<typeof en> = {
 
   // Over units in the world
   bountyLabel: 'KOPFGELD {gold} G',
+  spellTeleport: 'Teleport',
+  spellTeleportDesc: '3,5 s kanalisieren, dann beim verbündeten Turm oder Vasallen am Zeiger erscheinen. Alle 3:00.',
+  teleportingLabel: 'Teleportiert',
+  teleportingFor: 'Teleport {s} s',
+  noticeTeleportLost: 'Teleport verloren: sein Ziel ist gefallen',
   recallingLabel: 'Kehrt heim',
   stunLabel: 'BETÄUBT',
   objectiveMarker: 'ZIEL · +{gold} G',
@@ -630,6 +635,7 @@ export default de;
 /** Texts that are the same in German: names, the game's title and texts made only of placeholders. */
 export const keepEnglish: (keyof typeof en)[] = [
   'spellReady',
+  'spellTeleport',
   'spellIn',
   'roleTank',
   'berserkerName',

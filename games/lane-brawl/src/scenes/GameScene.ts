@@ -31,7 +31,6 @@ import {
   WORLD,
   XP_FOR_LEVEL,
   MAX_ITEMS,
-  RECALL,
   SIGHT,
   WARD,
   WATCH,
@@ -1384,8 +1383,9 @@ export class GameScene extends Phaser.Scene {
       // The recall channel, filling under the bar.
       if (u.recallMs > 0) {
         g.fillStyle(col(UI.edge), 0.9).fillRect(x - 1, y + h + 2, w + 2, 5);
-        g.fillStyle(col('#9fd8ff'), 1).fillRect(x, y + h + 3, w * (1 - u.recallMs / RECALL.ms), 3);
-        this.t(`recall-${u.id}`, u.x, y + h + 7, t('recallingLabel'), 9, '#9fd8ff', 'center', true, true);
+        const port = u.portTo !== 0, color = port ? spellById('teleport').color : '#9fd8ff';
+        g.fillStyle(col(color), 1).fillRect(x, y + h + 3, w * (1 - u.recallMs / u.recallFull), 3);
+        this.t(`recall-${u.id}`, u.x, y + h + 7, t(port ? 'teleportingLabel' : 'recallingLabel'), 9, color, 'center', true, true);
       }
     }
     if (u.stunMs > 0) this.t(`stun-${u.id}`, u.x, y - (u.kind === 'champion' ? 28 : 16), t('stunLabel'), 9, UI.gold, 'center', true, true);
@@ -1710,8 +1710,9 @@ export class GameScene extends Phaser.Scene {
     }
     const on = me.recallMs > 0;
     this.panel(g, b.x, b.y, b.w, b.h, on ? '#2f4f6b' : '#33405a');
-    if (on) g.fillStyle(col('#9fd8ff'), 0.45).fillRect(b.x + 2, b.y + 2, (b.w - 4) * (1 - me.recallMs / RECALL.ms), b.h - 4);
-    this.t('recall', b.x + b.w / 2, b.y + 6, on ? t('recallingFor', { s: formatNumber(me.recallMs / 1000, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) }) : t('recallHome'), 11, on ? UI.text : UI.dim, 'center', true);
+    if (on) g.fillStyle(col(me.portTo ? spellById('teleport').color : '#9fd8ff'), 0.45).fillRect(b.x + 2, b.y + 2, (b.w - 4) * (1 - me.recallMs / me.recallFull), b.h - 4);
+    const secs = formatNumber(me.recallMs / 1000, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    this.t('recall', b.x + b.w / 2, b.y + 6, on ? t(me.portTo ? 'teleportingFor' : 'recallingFor', { s: secs }) : t('recallHome'), 11, on ? UI.text : UI.dim, 'center', true);
   }
 
   /** The battle spell: its colour, name and key while ready, the time left while it cools down. */

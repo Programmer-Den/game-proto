@@ -475,9 +475,22 @@ export function castSpell(s: GameState, u: Unit, aim: Vec): boolean {
       u.shieldMs = Math.max(u.shieldMs, def.ms ?? 0);
       s.fx.push({ kind: 'ring', x: u.x, y: u.y, r: 32, color: def.color, ms: 500 });
       break;
+    case 'teleport': {
+      const to = closest(
+        s.units.filter((a) => !a.dead && a.side === side && (a.kind === 'tower' || a.kind === 'minion') && dist(a, aim) <= (def.aim ?? 0)),
+        aim,
+      );
+      if (!to || u.recallMs > 0) return false;
+      u.recallMs = u.recallFull = def.ms ?? 0;
+      u.portTo = to.id;
+      u.moveTo = null;
+      u.target = null;
+      s.fx.push({ kind: 'ring', x: to.x, y: to.y, r: 50, color: def.color, ms: def.ms ?? 0 });
+      break;
+    }
   }
   u.spellCd = def.cd;
-  u.recallMs = 0;
+  if (def.id !== 'teleport') u.recallMs = 0;
   u.castMs = 300;
   if (u.id === s.player) sound(s, 'spell', u, true);
   if (!u.player) aiLog(side, `${shortName(u.name)} casts ${english(def.name)}`);
@@ -578,6 +591,8 @@ export function plantWard(s: GameState, u: Unit, aim: Vec): boolean {
 export function startRecall(s: GameState, u: Unit): boolean {
   if (s.phase !== 'playing' || u.dead || !u.champ || u.recallMs > 0 || u.stunMs > 0 || atFountain(u)) return false;
   u.recallMs = RECALL.ms;
+  u.recallFull = RECALL.ms;
+  u.portTo = 0;
   u.lastRecallAt = s.time;
   u.moveTo = null;
   u.target = null;
@@ -585,6 +600,7 @@ export function startRecall(s: GameState, u: Unit): boolean {
 }
 
 function finishRecall(s: GameState, u: Unit) {
+  if (u.portTo) return finishTeleport(s, u);
   s.fx.push({ kind: 'ring', x: u.x, y: u.y, r: 40, color: '#9fd8ff', ms: 500 });
   u.x = u.spawnX;
   u.y = u.spawnY;
@@ -595,6 +611,28 @@ function finishRecall(s: GameState, u: Unit) {
   if (u.id === s.player) sound(s, 'recallHome', u, true);
   if (!u.player) aiLog(u.side, `${shortName(u.name)} recalls home`);
 }
+
+/** A teleport goes through: the champion appears beside its tower or minion, on the side toward home. */
+function finishTeleport(s: GameState, u: Unit) {
+  const to = getUnit(s, u.portTo);
+  u.portTo = 0;
+  const color = spellById('teleport').color;
+  if (!to || to.dead) {
+    if (u.player) notice(s, text('noticeTeleportLost'), color);
+    return;
+  }
+  s.fx.push({ kind: 'ring', x: u.x, y: u.y, r: 40, color, ms: 500 });
+  const home = BASE[u.side as Team];
+  const d = Math.max(1, dist(to, home));
+  place(u, { x: to.x + ((home.x - to.x) / d) * TELEPORT_GAP, y: to.y + ((home.y - to.y) / d) * TELEPORT_GAP });
+  u.target = null;
+  u.moveTo = null;
+  s.fx.push({ kind: 'ring', x: u.x, y: u.y, r: 40, color, ms: 500 });
+  if (u.id === s.player) sound(s, 'recallHome', u, true);
+  if (!u.player) aiLog(u.side, `${shortName(u.name)} teleports to the ${laneNear(u)} lane`);
+}
+/** How far from its tower or minion a teleport lands, toward home. */
+const TELEPORT_GAP = 60;
 
 /** What a dead champion pays to respawn at once. */
 export function buybackCost(u: Unit): number {
