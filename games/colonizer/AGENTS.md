@@ -349,10 +349,14 @@ in code on 2D canvases (no image files), with `pixelArt` off.
 - Input: `pointerdown` and `pointerup` on the scene. Clicks on the minimap move the camera, on the
   toast jump to the raid or alert it shows (`toastAt`; a plain notice lets the click through to the
   world), on an edge marker to its alert, and in the top bar, the deeds card or the panel are left to the HUD. A
-  click under 5 px is a click; otherwise it is a box select. Right click calls `commandAt`.
+  click under 5 px is a click; otherwise it is a box select, whose release over the top bar or panel
+  is clamped to the play area's edge. Right click calls `commandAt`. A mouse scrolls the map within 6
+  px of the view's edges, the left and top edge themselves included, while it is over the canvas.
 - Placement: `placing` holds a building type. A click calls `tryPlace`, which centres the footprint
-  on the tile under the cursor and sends the nearest selected villager to build it. For the Palisade
-  the press records `wallStart` and the release calls `tryWall` with the dragged line; the ghost is a
+  on the tile under the cursor and sends the nearest selected villager to build it (with none
+  selected, the nearest own villager). For the Palisade
+  the press records `wallStart` and the release calls `tryWall` with the dragged line, which sends
+  every selected villager (with none selected, the one nearest the first stake); the ghost is a
   stitched square per stake. Ghosts sit above the fog.
 - A right click with production buildings selected and no units calls `plantRally` (`setRally` on
   each, or `clearRally` when the click is on one of them); so does a left click or tap in

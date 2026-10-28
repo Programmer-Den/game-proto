@@ -876,8 +876,12 @@ export class GameScene extends Phaser.Scene {
     this.moveAcid(dt);
     this.moveWalls(dt);
     // A rescue that opens the role pick holds the rest of the frame, so nothing (a companion crate
-    // shot open by this frame's bullets) can fill the squad under the pick.
-    if (this.moveSurvivors(dt)) return checkTrophies(this.state);
+    // shot open by this frame's bullets) can fill the squad under the pick. Its bullets go back to
+    // where they started the frame, so the stretch they would have flown is swept once play resumes.
+    if (this.moveSurvivors(dt)) {
+      this.rewindBullets();
+      return checkTrophies(this.state);
+    }
     this.hitTargets();
     this.tickFlamer(dt);
     this.tickFrenzy(dt);
@@ -1050,6 +1054,16 @@ export class GameScene extends Phaser.Scene {
       // A ricochet can fly downwards, so the bottom edge counts too.
       if (b.y < HUD_HEIGHT - 10 || b.y > FIELD.y + FIELD.h || b.x < FIELD.x || b.x > FIELD.x + FIELD.w) this.bullets.release(b);
       else b.sprite.setPosition(b.x, b.y);
+    }
+  }
+
+  /** Puts every bullet back where this frame's `moveBullets` found it, for a frame cut short. */
+  private rewindBullets() {
+    for (const b of this.bullets.all) {
+      if (!b.alive) continue;
+      b.x = b.prevX;
+      b.y = b.prevY;
+      b.sprite.setPosition(b.x, b.y);
     }
   }
 

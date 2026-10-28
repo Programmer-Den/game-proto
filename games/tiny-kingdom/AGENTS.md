@@ -591,7 +591,8 @@ valid island number. Hovering makes no sound. The game has no `?watch` mode.
   for that reason (`bonus` and `crowns` are not in the snapshot).
 - `state.best` is updated when the game ends but only written to storage by the scene;
   `start` keeps the higher of the stored and current best and crowns, so they survive blocked
-  storage.
+  storage. A finished daily's "today's best" (game over and the panel's bottom line) also counts
+  the kingdom's own score, since `saveDailyBest` fails silently then.
 - `previewPlacement` returns null when the kind is not in the hand (or can't go on that cell), so
   the hover outline shows but no ghost.
 - In the `'gift'` phase `round` and `goal` already show the next round; the card's title uses

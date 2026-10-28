@@ -107,6 +107,8 @@ export interface Seed {
   life: number;
   /** Height above the shot's ground point, where walls stop it. */
   lift: number;
+  /** How fast `lift` shrinks, px a second: an ember drops toward the knight's body, 14 px up. */
+  drop: number;
 }
 
 export type BulbState = 'hidden' | 'raised' | 'down' | 'gone';

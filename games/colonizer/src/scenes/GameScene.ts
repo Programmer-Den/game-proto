@@ -85,7 +85,7 @@ import {
   type SimEvent,
   type Unit,
 } from '../game/sim';
-import { think } from '../game/planner';
+import { nearestUnit, think } from '../game/planner';
 import { byDifficulty, settings } from '../../../../shared/settings';
 import { mountWatch, watching, watchSteps } from '../../../../shared/watch';
 import { t, type TextKey } from '../i18n';
@@ -692,8 +692,11 @@ export class GameScene extends Phaser.Scene {
     if (k.down.isDown) dy += 1;
     const pointer = this.input.activePointer;
     const p = viewPoint(pointer);
-    // Only a mouse scrolls at the edge: a finger's last tap leaves the pointer where it lifted.
-    if (pointer.isDown === false && !pointer.wasTouch && p.x > 0 && p.x < W && p.y > 0 && p.y < H) {
+    // Only a mouse scrolls at the edge: a finger's last tap leaves the pointer where it lifted. A mouse
+    // pushed against the screen's left or top edge sits at 0, so that counts; one that has left the
+    // canvas (`isOver`) or never moved (still at 0, 0) doesn't.
+    const mouse = !pointer.wasTouch && pointer.moveTime > 0 && this.game.input.isOver;
+    if (pointer.isDown === false && mouse && p.x >= 0 && p.x < W && p.y >= 0 && p.y < H) {
       if (p.x < 6) dx -= 1;
       if (p.x > W - 6) dx += 1;
       if (p.y < 6) dy -= 1;
@@ -829,6 +832,8 @@ export class GameScene extends Phaser.Scene {
   private onPointerMove(pointer: Phaser.Input.Pointer) {
     if (!this.dragStart || !pointer.isDown) return;
     const p = viewPoint(pointer);
+    // The box stops at the play area, like the select on release.
+    p.y = Math.min(Math.max(p.y, TOP_H), PANEL_Y - 1);
     const g = this.dragBox.clear();
     const v = this.cameras.main.worldView;
     const x0 = Math.min(this.dragStart.x, p.x) + v.x;
@@ -853,7 +858,9 @@ export class GameScene extends Phaser.Scene {
     }
     const start = this.dragStart;
     this.dragStart = null;
-    if (!start || p.y < TOP_H || p.y >= PANEL_Y) return;
+    if (!start) return;
+    // A press starts only in the play area; a release over the top bar or panel selects up to its edge.
+    p.y = Math.min(Math.max(p.y, TOP_H), PANEL_Y - 1);
     const a = this.toWorld(start.x, start.y);
     const b = this.toWorld(p.x, p.y);
     const moved = Math.hypot(p.x - start.x, p.y - start.y);
@@ -1000,7 +1007,7 @@ export class GameScene extends Phaser.Scene {
     if (id === null) return void ui('refuse');
     sfx('place');
     const builders = this.selectedUnits().filter((u) => UNITS[u.type].role === 'villager');
-    const builder = builders[0] ?? [...this.state.units.values()].find((u) => u.owner === PLAYER && UNITS[u.type].role === 'villager');
+    const builder = nearestUnit(builders.length > 0 ? builders : this.ownVillagers(), ox + def.w / 2, oy + def.h / 2);
     if (builder) issue(this.state, PLAYER, [builder.id], { t: 'build', b: id });
     if (!keep) this.placing = null;
   }
@@ -1014,10 +1021,17 @@ export class GameScene extends Phaser.Scene {
     }
     sfx('place');
     const builders = this.selectedUnits().filter((u) => UNITS[u.type].role === 'villager');
-    const crew = builders.length > 0 ? builders : [...this.state.units.values()].filter((u) => u.owner === PLAYER && UNITS[u.type].role === 'villager').slice(0, 1);
+    // With none selected, the villager nearest the first stake, where a crew of one starts.
+    const first = this.state.buildings.get(ids[0])!;
+    const nearest = nearestUnit(this.ownVillagers(), first.tx + 0.5, first.ty + 0.5);
+    const crew = builders.length > 0 ? builders : nearest ? [nearest] : [];
     // Each builder starts on its own piece; when done, each goes on to the next one nearby.
     crew.forEach((u, i) => issue(this.state, PLAYER, [u.id], { t: 'build', b: ids[Math.floor((i * ids.length) / crew.length)] }));
     if (!keep) this.placing = null;
+  }
+
+  private ownVillagers() {
+    return [...this.state.units.values()].filter((u) => u.owner === PLAYER && UNITS[u.type].role === 'villager');
   }
 
   private onKey(e: KeyboardEvent) {

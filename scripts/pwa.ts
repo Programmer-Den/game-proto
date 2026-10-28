@@ -73,8 +73,10 @@ export function pwa(games: string[]): Plugin {
       for (const file of walk(outDir).map((f) => relative(outDir, f).split('\\').join('/')).sort()) {
         files[`./${file}`] = createHash('sha256').update(readFileSync(join(outDir, file))).digest('hex').slice(0, 16);
       }
-      const version = createHash('sha256').update(JSON.stringify(files)).digest('hex').slice(0, 12);
-      const source = readFileSync(join(root, 'scripts/sw.js'), 'utf8')
+      // The worker's own code counts too, so a change to sw.js alone still gets a new cache.
+      const worker = readFileSync(join(root, 'scripts/sw.js'), 'utf8');
+      const version = createHash('sha256').update(JSON.stringify(files)).update(worker).digest('hex').slice(0, 12);
+      const source = worker
         .replace('__VERSION__', version)
         .replace('__FILES__', JSON.stringify(files));
       writeFileSync(join(outDir, 'sw.js'), source);

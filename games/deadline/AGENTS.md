@@ -265,7 +265,8 @@ upgrades. A run is the endless Open Road or a 10-wave operation, picked on the g
 - **Squad roles:** `state.roles` holds each companion's `Role`, in `squad` order; `addCompanions`
   fills any missing ones as Gunners. `rescue` (squad not full) saves the phase in `rolePrev` and
   moves to `'role'`, and `update` stops that frame right after `moveSurvivors`, so no crate opened
-  by the frame's bullets fills the squad under the pick; `showRoles` draws three cards (`roleCards`, keys 1/2/3) and `pickRole` adds
+  by the frame's bullets fills the squad under the pick (`rewindBullets` puts its bullets back where
+  the frame found them, so the stretch they skipped is hit-tested once play resumes); `showRoles` draws three cards (`roleCards`, keys 1/2/3) and `pickRole` adds
   the companion with that role and goes back to `rolePrev`. While the pick is up, `moveSurvivors`
   holds every other survivor. In `fire` a marksman only shoots every `MARKSMAN.every`th volley, at
   `toughestEnemy` (a bullet with `mult` and extra pierce), a grenadier's every `GRENADE.every`th
