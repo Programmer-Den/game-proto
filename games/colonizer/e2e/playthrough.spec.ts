@@ -268,6 +268,10 @@ test('plays a round of the game loop', async ({ page }, testInfo) => {
   await click(await hudButton('age3'));
   expect((await state()).buildings.find((b) => b.id === town.id)!.queue.map((q) => q.key), 'Age III is not queued yet').not.toContain('age3');
 
+  // Age II earns the A new age trophy (src/trophies/), and nothing else yet.
+  const trophies = await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('colonizer-trophies') ?? '{}')));
+  expect(trophies, 'trophies earned in the first round').toEqual(['ageTwo']);
+
   expect(errors, 'page errors').toEqual([]);
   const end = await state();
   expect(end.winner, 'no one has won yet').toBeNull();
