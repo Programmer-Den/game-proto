@@ -17,6 +17,7 @@ const en: HowToPlay = {
     { input: 'X, or Buy back', action: 'While dead, pay to respawn at once (once every 2:30)' },
     { input: '1, 2 or 3, or click a card', action: 'Keep one of the upgrades a new level offers' },
     { input: 'Hold Tab, or tap the kill score', action: 'Show the scoreboard of all ten champions' },
+    { input: 'Z, N or C at the cursor, or a ping button then the map (Alt and click: attack)', action: 'Ping attack, on my way or danger: allies come and fight, wait there for you or fall back' },
   ],
   loop: [
     'Pick a champion card to start the match.',
@@ -54,6 +55,7 @@ const de: HowToPlay = {
     { input: 'X oder Zurückkaufen', action: 'Im Tod sofort gegen Gold wiederkehren (alle 2:30 einmal)' },
     { input: '1, 2 oder 3, oder eine Karte anklicken', action: 'Eines der Upgrades einer neuen Stufe behalten' },
     { input: 'Tab halten oder auf den Kill-Stand tippen', action: 'Die Punktetafel aller zehn Champions zeigen' },
+    { input: 'Z, N oder C am Zeiger, oder eine Signaltaste, dann die Karte (Alt und Klick: Angriff)', action: 'Signal Angriff, Bin unterwegs oder Gefahr: Verbündete kommen und kämpfen, warten dort auf dich oder ziehen sich zurück' },
   ],
   loop: [
     'Wähle eine Championkarte, um das Match zu beginnen.',

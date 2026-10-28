@@ -44,11 +44,15 @@ import {
   bushAt,
   UpgradeDef,
   SIEGE,
+  PING,
+  PINGS,
+  PING_KINDS,
+  PingKind,
 } from '../game/data';
 import { Fx, GameState, ObjectiveTitle, Phase, Unit, createGame, dist, getUnit } from '../game/state';
 import { loadMastery, masteryRank, recordWin } from '../game/mastery';
 import { loadSpell, saveSpell } from '../game/spellChoice';
-import { abilityFor, atFountain, atShop, buy, buyBack, buybackCost, cast, castSpell, chooseUpgrade, commandAttack, commandMove, hiddenFrom, invulnerable, priceFor, startRecall, stealthed, tick, useActive, viewers } from '../game/sim';
+import { abilityFor, atFountain, atShop, buy, buyBack, buybackCost, cast, castSpell, chooseUpgrade, commandAttack, commandMove, hiddenFrom, invulnerable, priceFor, sendPing, startRecall, stealthed, tick, useActive, viewers } from '../game/sim';
 import { FxLayers, drawAura, drawProjectile, drawSkill, drawZone, skillMs } from './skillFx';
 import { shortName } from '../game/names';
 import { t, type TextKey } from '../i18n';
@@ -122,6 +126,7 @@ import {
   buffStrip,
   fitLayout,
   pickCard,
+  pingButton,
   shopRow,
   upgradeCard,
 } from './layout';
@@ -133,6 +138,8 @@ const STEP = 16;
  * drags before a touch steers instead of walking to where it landed, and how far ahead of the
  * champion (in world pixels) it walks for.
  */
+/** The keys for the pings, in `PING_KINDS` order. */
+const PING_KEYS = ['Z', 'N', 'C'] as const;
 const STICK = { r: 60, knob: 24, dead: 8, drag: 14, ahead: 60 };
 /** Red's units deal this much damage, by difficulty. */
 const ENEMY_DAMAGE = byDifficulty(0.8, 1, 1.25);
@@ -312,6 +319,8 @@ export class GameScene extends Phaser.Scene {
   private hoverPick = -1;
   /** Whether the pointer is on the pick screen's battle spell button. */
   private hoverSpell = false;
+  /** The ping a press of its button armed: the next press on the map places it. */
+  private pingArmed: PingKind | null = null;
   /** The battle spell the player takes into the next match (`loadSpell`). */
   private spell: SpellId = 'blink';
   /** The objective target's damage as blue last saw it, for the card while it is out of sight. */
@@ -321,7 +330,7 @@ export class GameScene extends Phaser.Scene {
   private fogG!: Phaser.GameObjects.Graphics;
   private fogMini!: Phaser.GameObjects.Graphics;
   private used = new Set<string>();
-  private keys!: Record<AbilityKey | 'B' | 'D' | 'H' | 'V' | 'T' | 'X' | 'G' | 'ESC' | 'ONE' | 'TWO' | 'THREE' | 'TAB', Phaser.Input.Keyboard.Key>;
+  private keys!: Record<AbilityKey | 'B' | 'D' | 'H' | 'V' | 'T' | 'X' | 'G' | 'Z' | 'N' | 'C' | 'ESC' | 'ONE' | 'TWO' | 'THREE' | 'TAB', Phaser.Input.Keyboard.Key>;
   /** The scoreboard, held open by Tab or opened by a tap on the kill score. */
   private scoreTapped = false;
   /** The player's wins per class (`loadMastery`), read when the pick screen shows. */
@@ -381,7 +390,7 @@ export class GameScene extends Phaser.Scene {
     this.fogG = this.add.graphics().setDepth(3.6);
     this.fogMini = this.add.graphics().setScrollFactor(0).setDepth(10.5);
 
-    this.keys = this.input.keyboard!.addKeys('Q,W,E,R,B,D,H,V,T,X,G,ESC,ONE,TWO,THREE,TAB') as typeof this.keys;
+    this.keys = this.input.keyboard!.addKeys('Q,W,E,R,B,D,H,V,T,X,G,Z,N,C,ESC,ONE,TWO,THREE,TAB') as typeof this.keys;
     // Watching the AI, the keys play no champion.
     if (!watching) {
       // Holding an ability's key aims it (its range shows); letting go casts it at the cursor.
@@ -394,8 +403,10 @@ export class GameScene extends Phaser.Scene {
       this.keys.T.on('down', () => this.recall());
       this.keys.X.on('down', () => this.buyBack());
       this.keys.G.on('down', () => this.spellAtCursor());
+      PING_KINDS.forEach((kind, i) => this.keys[PING_KEYS[i]].on('down', () => this.ping(kind, this.lastWorld)));
       this.keys.ESC.on('down', () => {
         this.aiming = null;
+        this.pingArmed = null;
         this.setShop(false);
         this.scoreTapped = false;
       });
@@ -577,6 +588,20 @@ export class GameScene extends Phaser.Scene {
     if (this.state && p && !castSpell(this.state, p, this.lastWorld)) ui('refuse');
   }
 
+  /** Z, N or C (or a ping button, then the map; Alt and a click for attack): a ping for the allies. */
+  private ping(kind: PingKind, at: Vec) {
+    this.pingArmed = null;
+    const p = this.player();
+    if (!this.state || !p) return;
+    if (!sendPing(this.state, p, kind, at)) ui('refuse');
+  }
+
+  /** A ping button arms its ping for the next press on the map, or drops it when pressed again. */
+  private armPing(kind: PingKind) {
+    ui('click');
+    this.pingArmed = this.pingArmed === kind ? null : kind;
+  }
+
   private pickUpgrade(choice: number) {
     if (this.state && this.phase === 'playing' && chooseUpgrade(this.state, choice)) sfx('upgrade');
   }
@@ -624,6 +649,7 @@ export class GameScene extends Phaser.Scene {
     // One button in the top bar: Recall while alive, Buy back while dead.
     this.zones.push({ ...RECALL_BUTTON, run: () => (this.player()?.dead ? this.buyBack() : this.recall()) });
     this.zones.push({ ...SPELL_BUTTON, run: () => this.spellAtCursor() });
+    PING_KINDS.forEach((kind, i) => this.zones.push({ ...pingButton(i), run: () => this.armPing(kind) }));
     ABILITY_KEYS.forEach((k, i) => this.zones.push({ ...abilityBox(i), run: () => this.castAtCursor(k) }));
     ACTIVES.forEach((a, i) => this.zones.push({ ...activeButton(i), run: () => this.activeAtCursor(a) }));
     for (let i = 0; i < offer; i++) this.zones.push({ ...upgradeCard(i, offer), run: () => this.pickUpgrade(i) });
@@ -670,6 +696,9 @@ export class GameScene extends Phaser.Scene {
     this.lastWorld = w;
     const me = this.player();
     if (!me) return;
+    // An armed ping, or Alt held, pings the point instead of walking there.
+    const alt = (pointer.event as MouseEvent | undefined)?.altKey;
+    if (this.pingArmed || alt) return this.ping(this.pingArmed ?? 'attack', w);
     let foe: Unit | null = null;
     let best = Infinity;
     for (const u of this.state.units) {
@@ -975,6 +1004,7 @@ export class GameScene extends Phaser.Scene {
         }
       }
       this.drawFx(top);
+      this.drawPings(top, s);
     }
     for (const [id, sp] of this.sprites) {
       if (seen.has(id)) continue;
@@ -982,6 +1012,41 @@ export class GameScene extends Phaser.Scene {
       sp.outline.destroy();
       sp.flash.destroy();
       this.sprites.delete(id);
+    }
+  }
+
+  /** Blue's pings on the map: a ring that pulses out from the point and the ping's sign over it. */
+  private drawPings(g: Phaser.GameObjects.Graphics, s: GameState) {
+    for (const p of s.pings) {
+      if (p.side !== 'blue') continue;
+      const age = s.time - p.at;
+      const color = PINGS[p.kind].color;
+      const fade = Math.min(1, (PING.showMs - age) / 500);
+      // Two pulses in the first two seconds; reduced motion holds one ring still.
+      const k = settings.reduceMotion ? 0.6 : (age % 1000) / 1000;
+      if (settings.reduceMotion || age < 2000) g.lineStyle(3, col(color), (1 - k) * fade).strokeCircle(p.x, p.y, 12 + k * 44);
+      g.lineStyle(2, col(color), 0.8 * fade).strokeEllipse(p.x, p.y, 34, 14);
+      this.pingSign(g, p.kind, p.x, p.y - 34, 14, color, fade);
+    }
+  }
+
+  /** A ping's sign: an arrow down for attack, a flag for gather, a warning triangle for danger. */
+  private pingSign(g: Phaser.GameObjects.Graphics, kind: PingKind, x: number, y: number, r: number, color: string, alpha: number) {
+    const v = (dx: number, dy: number) => new Phaser.Math.Vector2(x + dx * r, y + dy * r);
+    const c = col(color);
+    if (kind === 'attack') {
+      const arrow = [v(-0.3, -1), v(0.3, -1), v(0.3, 0), v(0.75, 0), v(0, 0.95), v(-0.75, 0), v(-0.3, 0)];
+      g.fillStyle(col(UI.edge), alpha).fillPoints(arrow.map((p) => new Phaser.Math.Vector2(x + (p.x - x) * 1.25, y + (p.y - y) * 1.25)), true);
+      g.fillStyle(c, alpha).fillPoints(arrow, true);
+    } else if (kind === 'gather') {
+      g.lineStyle(r * 0.32, col(UI.edge), alpha).lineBetween(x - r * 0.5, y + r, x - r * 0.5, y - r);
+      g.lineStyle(r * 0.16, 0xe8e8e8, alpha).lineBetween(x - r * 0.5, y + r, x - r * 0.5, y - r);
+      g.fillStyle(col(UI.edge), alpha).fillTriangle(x - r * 0.45, y - r * 1.1, x + r * 0.95, y - r * 0.5, x - r * 0.45, y + r * 0.1);
+      g.fillStyle(c, alpha).fillTriangle(x - r * 0.4, y - r * 0.95, x + r * 0.75, y - r * 0.5, x - r * 0.4, y - r * 0.05);
+    } else {
+      g.fillStyle(col(UI.edge), alpha).fillTriangle(x, y - r * 1.15, x + r * 1.15, y + r * 0.9, x - r * 1.15, y + r * 0.9);
+      g.fillStyle(c, alpha).fillTriangle(x, y - r * 0.9, x + r * 0.92, y + r * 0.75, x - r * 0.92, y + r * 0.75);
+      g.fillStyle(col(UI.edge), alpha).fillRect(x - r * 0.1, y - r * 0.4, r * 0.2, r * 0.65).fillCircle(x, y + r * 0.5, r * 0.12);
     }
   }
 
@@ -1663,9 +1728,22 @@ export class GameScene extends Phaser.Scene {
     this.t('notice', SCREEN.w / 2, y + 4, n.text, 12, UI.text, 'center', true, false, alpha);
   }
 
+  /** The ping buttons: each ping's sign and key; an armed one lights up until the map is pressed. */
+  private drawPingButtons(g: Phaser.GameObjects.Graphics) {
+    PING_KINDS.forEach((kind, i) => {
+      const b = pingButton(i);
+      const armed = this.pingArmed === kind;
+      if (armed) this.goldFrame(g, b.x, b.y, b.w, b.h, true);
+      else this.panel(g, b.x, b.y, b.w, b.h, UI.card);
+      this.pingSign(g, kind, b.x + b.w / 2 - 2, b.y + b.h / 2 - 2, 9, PINGS[kind].color, 1);
+      this.t(`ping-key-${i}`, b.x + b.w - 3, b.y + b.h - 12, PING_KEYS[i], 9, UI.dim, 'right', true);
+    });
+  }
+
   private drawBottomBar(g: Phaser.GameObjects.Graphics, s: GameState, me: Unit) {
     const c = me.champ!;
     this.panel(g, BOTTOM_BAR.x, BOTTOM_BAR.y, BOTTOM_BAR.w, BOTTOM_BAR.h);
+    if (!watching) this.drawPingButtons(g);
     // The champion: a portrait figure, name, level, health and experience.
     const P = PORTRAIT;
     this.panel(g, P.x, P.y, P.w, P.h, UI.card);
@@ -1929,6 +2007,12 @@ export class GameScene extends Phaser.Scene {
       g.fillStyle(col(UI.edge), 1).fillCircle(mx(r.x), my(r.y), 3.5);
       g.fillStyle(col(RUNES[r.kind].color), 1).fillCircle(mx(r.x), my(r.y), 2.5);
     });
+    // Blue's pings, as rings in their colour.
+    for (const p of s.pings) {
+      if (p.side !== 'blue') continue;
+      g.lineStyle(2, col(UI.edge), 1).strokeCircle(mx(p.x), my(p.y), 5);
+      g.lineStyle(1.5, col(PINGS[p.kind].color), 1).strokeCircle(mx(p.x), my(p.y), 5);
+    }
     // The view and the player.
     const v = this.viewRect();
     g.lineStyle(1, 0xffffff, 0.7).strokeRect(mx(v.x), my(v.y), SCREEN.w * k, SCREEN.h * k);

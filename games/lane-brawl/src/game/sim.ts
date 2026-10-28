@@ -23,6 +23,9 @@ import {
   RUNE,
   RUNES,
   RUNE_ORDER,
+  PING,
+  PINGS,
+  PingKind,
   MINION,
   RESPAWN_BASE_MS,
   RESPAWN_PER_LEVEL_MS,
@@ -106,6 +109,7 @@ export function tick(s: GameState, dt: number) {
   updateGanks(s);
   updateJungle(s);
   updateRunes(s);
+  if (s.pings.length && s.time - s.pings[0].at > PING.showMs) s.pings = s.pings.filter((p) => s.time - p.at <= PING.showMs);
   for (const u of [...s.units]) updateUnit(s, u, dt);
   updateProjectiles(s, dt);
   updateZones(s, dt);
@@ -482,6 +486,52 @@ function aiSpell(s: GameState, u: Unit) {
 }
 
 /** Plants one of a champion's wards within `WARD.range` of it, toward `aim`. */
+/**
+ * The player pings a point for the AI allies (see `PING`): `attack` sends the nearest free ones
+ * there, onto the enemy under the ping if there is one; `gather` has the free ones near it wait
+ * there; `danger` has the ones near it fall back. Returns the allies that answered, or null when
+ * the ping is refused (too soon after the last one, or the match is over).
+ */
+export function sendPing(s: GameState, u: Unit, kind: PingKind, at: Vec): Unit[] | null {
+  if (s.phase !== 'playing' || u.side === 'neutral' || s.time - s.lastPingAt < PING.cd) return null;
+  s.lastPingAt = s.time;
+  const side = u.side;
+  const p = clampWorld(at);
+  s.pings.push({ kind, x: p.x, y: p.y, side, at: s.time });
+  const allies = s.units.filter((a) => a !== u && a.kind === 'champion' && !a.player && !a.dead && a.side === side);
+  let answer: Unit[];
+  if (kind === 'danger') {
+    answer = allies.filter((a) => dist(a, p) <= PING.near);
+    for (const a of answer) {
+      a.retreatUntil = s.time + RETREAT.ms;
+      a.gankTarget = a.jungleTarget = a.pingGoal = a.pingTarget = null;
+    }
+  } else {
+    const foe = kind === 'attack'
+      ? closest(s.units.filter((e) => !e.dead && e.side !== side && e.kind !== 'ward' && e.kind !== 'watchstone' && !hiddenFrom(s, side, e) && dist(e, p) <= e.radius + PING.pick), p)
+      : null;
+    const ready = allies.filter((a) => a.recallMs <= 0 && a.hp >= a.maxHp * PING.minHp && s.time >= a.retreatUntil);
+    answer = kind === 'attack'
+      ? ready.filter((a) => dist(a, p) <= PING.reach).sort((a, b) => dist(a, p) - dist(b, p) || a.id - b.id).slice(0, PING.answer)
+      : ready.filter((a) => dist(a, p) <= PING.near);
+    for (const a of answer) {
+      a.pingGoal = { x: p.x, y: p.y };
+      a.pingTarget = foe ? foe.id : null;
+      a.pingUntil = s.time + PING.ms;
+      a.gankTarget = a.jungleTarget = null;
+    }
+    s.contesters = s.contesters.filter((id) => !answer.some((a) => a.id === id));
+  }
+  if (u.player) {
+    sound(s, 'ping', p, true);
+    const names = answer.map((a) => shortName(a.name)).join(', ');
+    const key: TextKey = !answer.length ? 'noticePingNobody' : kind === 'attack' ? 'noticePingAttack' : kind === 'gather' ? 'noticePingGather' : 'noticePingDanger';
+    notice(s, text(key, { names }), PINGS[kind].color);
+  }
+  aiLog(side, `${shortName(u.name)} pings ${english(PINGS[kind].name)}${answer.length ? `, ${answer.map((a) => shortName(a.name)).join(' and ')} answer` : ''}`);
+  return answer;
+}
+
 export function plantWard(s: GameState, u: Unit, aim: Vec): boolean {
   if (s.phase !== 'playing' || u.dead || u.wards <= 0 || u.side === 'neutral') return false;
   const at = towards(u, aim, WARD.range);
@@ -1206,6 +1256,11 @@ function championPlan(s: GameState, u: Unit, dt: number): boolean {
       // Hurt allies near by (or all of them, when outnumbered) fall back with it.
       u.retreatUntil = s.time + RETREAT.ms;
       if (outnumbered) aiLog(u.side, `${shortName(u.name)} calls a retreat, ${foes} against ${friends}`);
+      // On blue's side the call shows on the map, so the player sees the danger too.
+      if (outnumbered && u.side === 'blue' && !s.pings.some((p) => p.kind === 'danger' && dist(p, u) < PING.near && s.time - p.at < PING.showMs)) {
+        s.pings.push({ kind: 'danger', x: u.x, y: u.y, side: 'blue', at: s.time });
+        sound(s, 'ping', u);
+      }
       for (const a of s.units) {
         if (a === u || a.kind !== 'champion' || a.player || a.dead || a.side !== u.side || dist(a, u) > RETREAT.call) continue;
         if (outnumbered || a.hp < a.maxHp * 0.5) a.retreatUntil = s.time + RETREAT.ms;
@@ -1225,12 +1280,30 @@ function championPlan(s: GameState, u: Unit, dt: number): boolean {
     }
   }
   // Far from home with no enemy about, a champion that is low, or rich with something to buy, goes home.
-  if (s.time - u.lastRecallAt >= RECALL.aiEvery && !s.contesters.includes(u.id) && dist(u, home) > FOUNTAIN.radius + 300 && !foeNear(RECALL.aiLook)) {
+  if (s.time - u.lastRecallAt >= RECALL.aiEvery && u.pingGoal === null && !s.contesters.includes(u.id) && dist(u, home) > FOUNTAIN.radius + 300 && !foeNear(RECALL.aiLook)) {
     const low = u.hp < u.maxHp * RECALL.aiLow;
     const next = nextBuy(u);
     const rich = next !== null && u.gold >= Math.max(RECALL.rich, priceFor(u, next));
     if ((low || rich) && startRecall(s, u)) {
       aiLog(u.side, `${shortName(u.name)} recalls, ${low ? 'hurt' : `to buy the ${english(next!.name)}`}`);
+      return true;
+    }
+  }
+  // A ping's errand: hit the enemy it marked, else walk to its point and wait there.
+  if (u.pingGoal !== null) {
+    const mark = u.pingTarget !== null ? getUnit(s, u.pingTarget) : null;
+    if (s.time >= u.pingUntil || (u.pingTarget !== null && (!mark || mark.dead || hiddenFrom(s, u.side, mark)))) {
+      u.pingGoal = null;
+      u.pingTarget = null;
+    } else if (mark && !invulnerable(s, mark)) {
+      u.target = mark.id;
+      castAi(s, u, mark);
+      if (inRange(u, mark)) attack(s, u, mark);
+      else moveToward(u, mark, dt);
+      return true;
+    } else if (!foeNear(CHAMP_AGGRO)) {
+      u.target = null;
+      if (dist(u, u.pingGoal) > 60) moveToward(u, u.pingGoal, dt);
       return true;
     }
   }
@@ -1290,7 +1363,7 @@ function fallbackPoint(s: GameState, u: Unit): Vec {
 
 /** Whether an AI champion is free for a team plan: healthy, not falling back, not on another plan. */
 function free(s: GameState, u: Unit, minHp: number): boolean {
-  return u.kind === 'champion' && !u.player && !u.dead && u.recallMs <= 0 && u.hp >= u.maxHp * minHp && s.time >= u.retreatUntil && u.gankTarget === null && u.jungleTarget === null;
+  return u.kind === 'champion' && !u.player && !u.dead && u.recallMs <= 0 && u.hp >= u.maxHp * minHp && s.time >= u.retreatUntil && u.gankTarget === null && u.jungleTarget === null && u.pingGoal === null;
 }
 
 /** The next item on an AI champion's build that it doesn't own yet, or null when the build is done. */

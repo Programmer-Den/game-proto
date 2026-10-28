@@ -44,6 +44,12 @@ export function activeButton(i: number) {
   return { x: SHOP_BUTTON.x + i * 33, y: SHOP_BUTTON.y + 64, w: 30, h: 38 };
 }
 
+/** The three ping buttons (attack, gather, danger) in a column between the upgrade panel and the minimap. */
+export const PING_BUTTONS = { x: 786, y: 424, size: 32, gap: 2 };
+export function pingButton(i: number) {
+  return { x: PING_BUTTONS.x, y: PING_BUTTONS.y + i * (PING_BUTTONS.size + PING_BUTTONS.gap), w: PING_BUTTONS.size, h: PING_BUTTONS.size };
+}
+
 /** The recall button in the top bar, right of the clock; while the champion is dead it is the buy back button. */
 export const RECALL_BUTTON = { x: 530, y: 4, w: 118, h: 26 };
 
@@ -107,6 +113,7 @@ export function fitLayout(w: number, h: number) {
   ABILITY_BOX.y = 428 + dy;
   SHOP_BUTTON.y = 428 + dy;
   UPGRADE_PANEL.y = 420 + dy;
+  Object.assign(PING_BUTTONS, { x: 786 + dx, y: 424 + dy });
   Object.assign(MINIMAP, { x: 826 + dx, y: 420 + dy });
   RECALL_BUTTON.x = 530 + dx / 2;
   SCORE_CHIP.x = 380 + dx / 2;

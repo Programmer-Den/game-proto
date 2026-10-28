@@ -10,6 +10,7 @@ import {
   MERC,
   RUNE,
   RuneKind,
+  PingKind,
   AbilityKey,
   BASE,
   BuffDef,
@@ -148,6 +149,10 @@ export interface Unit {
   /** AI champions: the camp or watchstone it went into the jungle for, and until when. */
   jungleTarget: number | null;
   jungleUntil: number;
+  /** AI champions: the point a ping of the player's sent it to, the enemy marked there, and until when. */
+  pingGoal: Vec | null;
+  pingTarget: number | null;
+  pingUntil: number;
   /** Attacks made, for a passive that hits harder every few attacks. */
   attackCount: number;
   /** Time since the champion last attacked or cast, in ms (an ambush needs a lull). */
@@ -251,7 +256,7 @@ export type SoundId =
   | 'burst' | 'bolt' | 'dash' | 'ally' | 'buff' | 'zone' | 'impact'
   | 'lastHit' | 'slain' | 'youDie' | 'streak' | 'crash' | 'nexus' | 'wardBreak'
   | 'levelUp' | 'flask' | 'blink' | 'ward' | 'recallHome' | 'respawn' | 'buyBack'
-  | 'wave' | 'watchstone' | 'rune' | 'runeTaken' | 'mercs' | 'spell' | 'growl' | 'beastSlain' | 'brute' | 'objective' | 'objectiveMissed';
+  | 'wave' | 'watchstone' | 'rune' | 'runeTaken' | 'mercs' | 'spell' | 'ping' | 'growl' | 'beastSlain' | 'brute' | 'objective' | 'objectiveMissed';
 
 /**
  * A sound raised by the rules: at a point in the world (the view plays it only where blue sees and
@@ -344,6 +349,9 @@ export interface GameState {
   runes: ({ kind: RuneKind; x: number; y: number } | null)[];
   nextRune: number;
   runeRounds: number;
+  /** Pings on the map (the player's, and blue's AI calling a retreat), newest last, and when the player last pinged. */
+  pings: Ping[];
+  lastPingAt: number;
   /** Patches on the ground left by zone abilities. */
   zones: Zone[];
   /** Short messages for the player (the beast woke, an inhibitor fell), newest last. */
@@ -356,6 +364,15 @@ export function spawnWard(s: GameState, side: Team, x: number, y: number): Unit 
   w.expiresAt = s.time + WARD.ms;
   s.units.push(w);
   return w;
+}
+
+/** A ping on the map: its kind, where, by which team and when. */
+export interface Ping {
+  kind: PingKind;
+  x: number;
+  y: number;
+  side: Team;
+  at: number;
 }
 
 export interface Notice {
@@ -439,6 +456,9 @@ export function blankUnit(
     gankUntil: 0,
     jungleTarget: null,
     jungleUntil: 0,
+    pingGoal: null,
+    pingTarget: null,
+    pingUntil: 0,
     attackCount: 0,
     lullMs: 0,
     hasteMs: 0,
@@ -555,6 +575,8 @@ export function createGame(pick: ChampionDef, enemyDamage: number, opts: MatchOp
     runes: RUNE.spots.map(() => null),
     nextRune: RUNE.firstAt,
     runeRounds: 0,
+    pings: [],
+    lastPingAt: -Infinity,
     zones: [],
     notices: [],
   };

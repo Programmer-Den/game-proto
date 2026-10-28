@@ -287,6 +287,22 @@ Implemented today:
   `saveSpell`, in try/catch). The pick button is one text, replacing a hint line, because every
   Phaser text draws `Math.random` for its texture key and the playthrough's seeded roster depends
   on how many draws come before the shuffle.
+- Pings (LB16): `PINGS`, `PING_KINDS` (`attack`, `gather`, `danger`) and `PING` in `data.ts`.
+  `sendPing(s, u, kind, at)` in `sim.ts` (refused within `PING.cd` of the last, `s.lastPingAt`)
+  pushes a `Ping` to `s.pings` (dropped after `PING.showMs` in `tick`) and gives the AI allies an
+  errand: `attack` sends the `PING.answer` nearest ready allies within `PING.reach`, `gather` the
+  ready ones within `PING.near`, setting `Unit.pingGoal`, `pingTarget` (the visible enemy within
+  its radius plus `PING.pick` of the point, for `attack`) and `pingUntil` (`PING.ms`); `danger`
+  sets `retreatUntil` for the allies within `PING.near` and drops their plans. In `championPlan`
+  the errand comes after falling back and before runes: hit the marked enemy (unless it is
+  warded), else walk to the point and wait there while no enemy champion is near; an errand
+  blocks recalls and `free`, so ganks, the beast and the jungle leave the champion alone. A ping
+  of the player's makes a notice naming the allies who answer (`noticePing*`). Blue's AI calling a
+  retreat when outnumbered pushes a `danger` ping (shown only, no errand). The view: Z, N, C at
+  the cursor, Alt and a click (`attack`), or `pingButton(i)` (`PING_BUTTONS`, a column between
+  the upgrade panel and the minimap) to arm `pingArmed` for the next press on the map;
+  `drawPings` draws blue's pings in the world (a pulsing ring, still under reduced motion, and
+  `pingSign`), and the minimap rings them.
 - Victory and defeat panel with the match's objectives, last hits, best streak and beasts slain,
   and "Play again".
 

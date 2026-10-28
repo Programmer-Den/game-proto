@@ -224,7 +224,15 @@ left, under bevelled slate panels.
 
     ![The pick screen's Battle spell button set to Firebrand, with what it does shown above it](docs/screenshots/pick-spell.webp)
     ![The Firebrand button in the top bar counting down 1:30, right of Recall home](docs/screenshots/spell-button.webp)
-21. **Winning** destroys the red Nexus. Losing means your Nexus falls first.
+21. **Pings**: Z pings **Attack** at the cursor (Alt and a click does too): the two nearest
+    healthy allies drop what they do and come, and fight the enemy under the ping if there is one.
+    N pings **On my way**: the allies within 900 px of the point wait there for you. C pings
+    **Danger**: the allies near it fall back. On a phone, tap one of the three ping buttons left of
+    the minimap, then the map. Allies keep to a ping for 12 seconds, a notice names who answers,
+    and the ping shows on the map and the minimap. An ally calling a retreat shows a Danger ping too.
+
+    ![An Attack ping on a red tower with two allies walking to it, and the ping buttons by the minimap](docs/screenshots/pings.webp)
+22. **Winning** destroys the red Nexus. Losing means your Nexus falls first.
 
 Every ability has an animation of its own (a hammer that splits the ground, a meteor from the
 sky, a harpoon on its rope, a coil pylon arcing, a blood moon rising and so on), and so do bolts in
