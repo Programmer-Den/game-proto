@@ -57,6 +57,7 @@ import {
 } from '../game/data';
 import { Fx, GameState, ObjectiveTitle, Phase, Unit, createGame, dist, getUnit } from '../game/state';
 import { loadMastery, masteryRank, recordWin } from '../game/mastery';
+import { checkTrophies } from '../trophies/check';
 import { loadQuick, loadSpell, saveQuick, saveSpell } from '../game/spellChoice';
 import { abilityFor, atFountain, atShop, buy, buyBack, buybackCost, cast, castSpell, chooseUpgrade, commandAttack, commandMove, hiddenFrom, invulnerable, priceFor, sendPing, startRecall, stealthed, nightness, behind, callSurrender, mvpOf, tick, useActive, viewers } from '../game/sim';
 import { FxLayers, drawAura, drawProjectile, drawSkill, drawZone, skillMs } from './skillFx';
@@ -492,6 +493,7 @@ export class GameScene extends Phaser.Scene {
     if (s) this.collectFx(s, frameMs);
     if (s) this.playSounds(s);
     if (s) this.updateMusic(s);
+    if (s && !watching) checkTrophies(s, this.mastery);
     this.followPlayer(frameMs);
     // The camera moves under a still pointer, so the world point under it is read again each frame.
     if (this.pointerSeen) this.lastWorld = this.worldAt(this.input.activePointer);
