@@ -261,6 +261,16 @@ Implemented today:
   health and no AI teammate is nearer. The view draws the stone rings always and a hovering hexagon
   gem with the kind's mark (`drawRunes`, bobbing unless motion is reduced) and a minimap dot while
   the spot is out of the fog.
+- Mercenary camps (LB14): `MERC.spots` holds two camps (blue's half by the bottom lane, its mirror
+  by the top lane); `createGame` spawns `MERC.count` `'merc'` camps at each, one `group`, after the
+  champions so every older unit keeps its id. When `kill` fells the last living one of a group to a
+  champion, `spawnMercs` (`state.ts`) gives the slayer's team `MERC.count` minions at the camp
+  with `power` `MERC.power` (drawn as super minions), on a path from the camp to the end of the
+  nearest stretch of `laneNear`'s lane and on to the enemy Nexus, with a notice, a ring and the
+  `mercs` sound. `updateJungle` counts a band's leader on a team's own half as a goal alongside the
+  brutes. The sellsword is `mercModel` (`models.ts`, a minion's figure in tan with a kettle hat and
+  a broad blade, scaled 0.78), baked as `MERC_KEY` in `MERC_CELL`; `map.ts` paints the camps'
+  clearings (`CLEARINGS`) with a fire pit and two tents.
 - Victory and defeat panel with the match's objectives, last hits, best streak and beasts slain,
   and "Play again".
 
@@ -374,7 +384,7 @@ File map (`src/`):
   `ACTIVES`, `MAX_ITEMS`, `BEAST`, `BEAST_BUFF`, `ELDER`, `BEAST_CONTESTERS`, `INHIBITORS`, `INHIBITOR`,
   `SUPER_MINION`, `BUSHES` (with `bushAt`), `BUSH_REVEAL`, `REVEAL_MS`, `GANK` and `RETREAT`, and
   round 2's `WARD`, `WARD_SPOTS`, `WARD_AI`, `RECALL`, `BUYBACK`, `BOUNTY` (with `bountyOf`),
-  `AI_BUILDS` and `AI_BUILD_FOR`, `ASSIST`, and `RUNE`, `RUNES` and `RUNE_ORDER`.
+  `AI_BUILDS` and `AI_BUILD_FOR`, `ASSIST`, `RUNE`, `RUNES` and `RUNE_ORDER`, and `MERC`.
 - `game/state.ts`: the types (`GameState`, `Unit`, `Projectile`, `Fx`, `Objective`,
   `UpgradeOffer`), `createGame`, `spawnWave`, `spawnChampion`, `spawnWard`, `refreshStats` (level
   and items into stats), `pathFor` (red walks lanes backwards), `laneNear` and small helpers. No
@@ -526,6 +536,7 @@ Effects (`sfx`), where they are raised:
 | `recall` / `recallHome` | the player starts a recall (`recall`) / arrives home (`finishRecall`) |
 | `respawn`, `buyBack` | the player's champion respawns (`updateUnit`) / buys back (`buyBack`) |
 | `wave` | a minion wave spawns (`tick`) |
+| `mercs` | a mercenary band hired (`kill`) |
 | `rune` / `runeTaken` | runes appear / a rune taken (the player's own, or one in view) (`updateRunes`) |
 | `watchstone`, `growl`, `beastSlain`, `brute` | a watchstone taken, the beast waking or turning elder, the beast slain, a brute's buff taken |
 | `objective` / `objectiveMissed` | the player's objective done / missed (`updateObjective`) |
@@ -590,7 +601,7 @@ Shared `ui` sounds: `click` for the Shop button, B and Play again; `coin` for a 
   `Math.random` sequence so blue fields the five new classes), `ten-classes.webp`, `fog-of-war.webp`,
   `jungle-brute.webp`, `watchstone.webp`, `watch-ai.webp` (a `?watch` match at 8x with the log open), `skill-looks-1.webp` to
   `skill-looks-3.webp` (every ability's effect, five classes each), `aim-indicators.webp`,
-  `home-heal-and-dead-shop.webp`, `scoreboard.webp` (a match run 7 minutes with blue's fifth on the AI, Tab held), `river-rune.webp` (run to 2:00, the Warden placed by the first spot), `loop-objective.webp`, `loop-last-hit.webp` and
+  `home-heal-and-dead-shop.webp`, `scoreboard.webp` (a match run 7 minutes with blue's fifth on the AI, Tab held), `river-rune.webp` (run to 2:00, the Warden placed by the first spot), `merc-camp.webp` and `mercs-march.webp` (the Warden placed by blue's camp, then made strong to clear it), `loop-objective.webp`, `loop-last-hit.webp` and
   `upgrade-*.webp` and `round2-*.webp` (the ward in the shop and planted by a bush, a recall, a
   bounty, the buy back button and the watch log of the AI shopping) and `german-pick.webp` (the pick
   screen with `?lang=de`, Grumm's card under the pointer) are staged docs shots (a scratch
@@ -652,6 +663,7 @@ Shared `ui` sounds: `click` for the Shop button, B and Play again; `coin` for a 
   `RETREAT` in `data.ts`. Move the pit with `BEAST.x`/`y`; `map.ts` paints it there.
 - **Add a bush**: add it to `BUSHES` (blue's half; `both` adds the mirror); `map.ts` paints it and
   keeps pines out of it.
+- **Tune the mercenaries**: `MERC` (spots, band size, power) and `CAMP_KINDS.merc` in `data.ts`.
 - **Add a camp kind**: add it to `CampKind` and `CAMP_KINDS`, a model and sheet (`models.ts`,
   `bake.ts`), its sprite and `headOf` height in `GameScene.ts`, its clearing in `map.ts`, and its
   gold to `CAMP_GOLD` in the test if the camp objective can pick it.

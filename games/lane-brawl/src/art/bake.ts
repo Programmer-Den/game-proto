@@ -7,7 +7,7 @@
 import Phaser from 'phaser';
 import { sharpRes } from '../../../../shared/scaling';
 import { INK, INK_WIDTH, Model, render } from './lowpoly';
-import { POSES, PoseName, TeamName, beastModel, bruteModel, inhibitorModel, boarModel, championModel, coinModel, minionModel, nexusModel, rubbleModel, towerModel, watchstoneModel, wolfModel } from './models';
+import { POSES, PoseName, TeamName, beastModel, bruteModel, inhibitorModel, boarModel, championModel, coinModel, mercModel, minionModel, nexusModel, rubbleModel, towerModel, watchstoneModel, wolfModel } from './models';
 import { CHAMPIONS } from '../game/data';
 
 /**
@@ -28,6 +28,7 @@ export interface SheetInfo {
 
 export const CHAMP_CELL = { w: 76, h: 98, footY: 80 };
 export const MINION_CELL = { w: 48, h: 56, footY: 42 };
+export const MERC_CELL = { w: 58, h: 68, footY: 52 };
 export const BOAR_CELL = { w: 84, h: 72, footY: 44 };
 export const WOLF_CELL = { w: 80, h: 66, footY: 44 };
 export const BRUTE_CELL = { w: 104, h: 112, footY: 84 };
@@ -146,6 +147,7 @@ export const watchKey = (side: TeamName | 'neutral') => `lb-watch-${side}`;
 export const minionKey = (team: TeamName) => `lb-minion-${team}`;
 export const MINION_OUTLINE = 'lb-minion-outline';
 export const BOAR = 'lb-boar';
+export const MERC_KEY = 'lb-merc';
 export const towerKey = (team: TeamName) => `lb-tower-${team}`;
 export const nexusKey = (team: TeamName) => `lb-nexus-${team}`;
 export const RUBBLE = 'lb-rubble';
@@ -176,6 +178,7 @@ export function bakeUnits(scene: Phaser.Scene): number {
   }
   for (const side of ['neutral', ...TEAMS] as const) bake(scene, watchKey(side), WATCH_CELL, [{ name: 'idle', model: () => watchstoneModel(side), yaw: 0.3 }]);
   bake(scene, BOAR, BOAR_CELL, movingCells(boarModel));
+  bake(scene, MERC_KEY, MERC_CELL, movingCells(mercModel));
   bake(scene, WOLF, WOLF_CELL, movingCells(wolfModel));
   for (const kind of ['ember', 'moss'] as const) bake(scene, bruteKey(kind), BRUTE_CELL, movingCells((p) => bruteModel(kind, p)));
   bake(scene, BEAST_KEY, BEAST_CELL, movingCells(beastModel));

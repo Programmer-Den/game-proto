@@ -376,6 +376,7 @@ const de: Translation<typeof en> = {
   // Jungle buffs
   buffEmber: 'Glut',
   buffMoss: 'Moos',
+  campMerc: 'Söldner',
   runeMight: 'Macht',
   runeHaste: 'Eile',
   runeFortune: 'Glück',
@@ -474,6 +475,8 @@ const de: Translation<typeof en> = {
   noticeRedRoams: 'Rot: {name} zieht auf die {lane}',
   noticeBlueRoams: 'Blau: {name} zieht auf die {lane}',
   noticeWatchstoneBlue: 'Euer Team hat einen Wachstein eingenommen',
+  noticeMercsBlue: 'Deine Söldner ziehen auf die {lane}',
+  noticeMercsRed: 'Rot: Söldner ziehen auf die {lane}',
   noticeRunes: 'Im Fluss erscheinen Runen',
   noticeRuneYou: 'Du nimmst die {rune}-Rune',
   noticeRuneAlly: '{name} nimmt die {rune}-Rune',

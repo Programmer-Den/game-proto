@@ -5,6 +5,7 @@ import type { TextKey } from '../i18n';
 import {
   GANK,
   JUNGLE,
+  MERC,
   RUNE,
   RuneKind,
   AbilityKey,
@@ -245,7 +246,7 @@ export type SoundId =
   | 'burst' | 'bolt' | 'dash' | 'ally' | 'buff' | 'zone' | 'impact'
   | 'lastHit' | 'slain' | 'youDie' | 'streak' | 'crash' | 'nexus' | 'wardBreak'
   | 'levelUp' | 'flask' | 'blink' | 'ward' | 'recallHome' | 'respawn' | 'buyBack'
-  | 'wave' | 'watchstone' | 'rune' | 'runeTaken' | 'growl' | 'beastSlain' | 'brute' | 'objective' | 'objectiveMissed';
+  | 'wave' | 'watchstone' | 'rune' | 'runeTaken' | 'mercs' | 'growl' | 'beastSlain' | 'brute' | 'objective' | 'objectiveMissed';
 
 /**
  * A sound raised by the rules: at a point in the world (the view plays it only where blue sees and
@@ -638,7 +639,57 @@ export function createGame(pick: ChampionDef, enemyDamage: number, opts: MatchOp
     spawnChampion(s, def, 'red', redAt(i).x, redAt(i).y, false, ENEMY_LANES[i], def.hero);
   });
 
+  // The mercenary camps, a band of sellswords each that fight as one.
+  for (const m of MERC.spots) {
+    let lead: Unit | null = null;
+    for (let i = 0; i < MERC.count; i++) {
+      const a = (i / MERC.count) * Math.PI * 2;
+      const u = spawnCamp(s, 'merc', m.x + Math.cos(a) * MERC.spread, m.y + Math.sin(a) * MERC.spread * 0.7, lead?.id ?? 0);
+      u.facing = Math.atan2(WORLD.h / 2 - m.y, WORLD.w / 2 - m.x);
+      lead ??= u;
+    }
+  }
+
   return s;
+}
+
+/**
+ * A mercenary band won by `team`: `MERC.count` strong minions at a camp, which walk to the end of
+ * the nearest stretch of the nearest lane and on down it. Returns the lane.
+ */
+export function spawnMercs(s: GameState, team: Team, at: Vec): LaneId {
+  const lane = laneNear(at);
+  const full = pathFor(lane, team);
+  let seg = 0;
+  let bestD = Infinity;
+  for (let i = 0; i < full.length - 1; i++) {
+    const a = full[i], b = full[i + 1];
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const t = Math.max(0, Math.min(1, ((at.x - a.x) * dx + (at.y - a.y) * dy) / (dx * dx + dy * dy)));
+    const d = Math.hypot(at.x - (a.x + dx * t), at.y - (a.y + dy * t));
+    if (d < bestD) {
+      bestD = d;
+      seg = i;
+    }
+  }
+  const path = [{ x: at.x, y: at.y }, ...full.slice(seg + 1)];
+  for (let i = 0; i < MERC.count; i++) {
+    const m = blankUnit(s, 'minion', team, at.x + (i - 1) * 24, at.y + (i % 2) * 14, {
+      hp: MINION.hp * MERC.power,
+      dmg: MINION.dmg * MERC.power,
+      armor: 0,
+      range: MINION.range,
+      speed: MINION.speed,
+      attackMs: MINION.attackMs,
+      radius: MINION.radius,
+    });
+    m.path = path;
+    m.wp = 1;
+    m.lane = lane;
+    m.power = MERC.power;
+    s.units.push(m);
+  }
+  return lane;
 }
 
 /** A jungle monster of a kind at a spot; `group` is its pack's alpha (0 for itself). */

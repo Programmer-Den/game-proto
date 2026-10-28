@@ -892,6 +892,35 @@ export function minionModel(team: TeamName, pose: PoseName): Model {
   return scaled(figure(kit, classPose('minion', pose)), 0.62);
 }
 
+/** A sellsword of a mercenary camp: a minion's build in tan cloth, a wide kettle hat and a broad blade, a little bigger. */
+export function mercModel(pose: PoseName): Model {
+  const cloth = rgb('#a08055');
+  const kit: Kit = {
+    cloth,
+    accent: LEATHER,
+    robe: false,
+    heavy: true,
+    head: (md) => {
+      prism(md, 7.5, 5.6, 1.4, 7.4, 7, DARK_STEEL, 0);
+      // The kettle hat's crown and its wide brim.
+      prism(md, 6, 4.8, 8.6, 12.4, 8, STEEL, 0);
+      prism(md, 10, 9.2, 7.4, 8.6, 10, DARK_STEEL, 0);
+    },
+    rightHand: (md) =>
+      md.at(grip(0.3), () => {
+        box(md, -1, -2, -1, 1, 3, 1, LEATHER);
+        box(md, -4, 3, -1.2, 4, 4.6, 1.2, GOLD);
+        slab(md, [[-2.6, 4.6], [2.6, 4.6], [2.2, 20], [0, 24], [-2.2, 20]], -0.7, 0.7, STEEL);
+      }),
+    leftHand: (md, arm) =>
+      md.at(chain(T(-1.5, 5, 3.4), upright(arm)), () => {
+        slab(md, [[-6, -8], [6, -8], [6, 6], [0, 10], [-6, 6]], 0, 2, LEATHER);
+        slab(md, [[-4, -6], [4, -6], [4, 4.5], [0, 7.5], [-4, 4.5]], 2, 3, cloth);
+      }),
+  };
+  return scaled(figure(kit, classPose('minion', pose)), 0.78);
+}
+
 /** Scales a finished model's points (a model's builder can't scale after the fact). */
 function scaled(md: Model, k: number): Model {
   const out = new Model();

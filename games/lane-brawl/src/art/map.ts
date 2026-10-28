@@ -5,7 +5,7 @@
 // units. The same seed paints the same map every time.
 
 import Phaser from 'phaser';
-import { BASE, BEAST, BUSHES, Bush, CAMPS, CampSpot, LANES, RIVER, Team, Vec, WATCHSTONES, WORLD } from '../game/data';
+import { BASE, BEAST, BUSHES, Bush, CAMPS, CampSpot, LANES, MERC, RIVER, Team, Vec, WATCHSTONES, WORLD } from '../game/data';
 import { sharpRes } from '../../../../shared/scaling';
 import { render, seeded } from './lowpoly';
 import { TEAM_GLOW, pineModel, rockModel, ruinModel } from './models';
@@ -228,6 +228,8 @@ function plaza(ctx: CanvasRenderingContext2D, team: Team, rnd: () => number) {
 }
 
 /** How far a camp's clearing reaches, by kind: the brutes' are the widest. */
+/** Every camp's clearing: the jungle camps and the two mercenary camps. */
+const CLEARINGS: CampSpot[] = [...CAMPS, ...MERC.spots.map((p) => ({ ...p, kind: 'merc' as const }))];
 const clearingR = (c: CampSpot) => (c.kind === 'ember' || c.kind === 'moss' ? 128 : c.kind === 'wolf' ? 112 : 100);
 
 function clearing(ctx: CanvasRenderingContext2D, c: CampSpot, rnd: () => number) {
@@ -258,6 +260,33 @@ function clearing(ctx: CanvasRenderingContext2D, c: CampSpot, rnd: () => number)
     ctx.beginPath();
     ctx.ellipse(c.x, c.y + 6, 62, 40, 0, 0, Math.PI * 2);
     ctx.stroke();
+  } else if (c.kind === 'merc') {
+    // The sellswords' camp: a fire pit ringed with stones, and two tents behind it.
+    ctx.fillStyle = '#3a2a1c';
+    ctx.beginPath();
+    ctx.ellipse(c.x, c.y + 4, 16, 10, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,170,70,0.7)';
+    ctx.beginPath();
+    ctx.ellipse(c.x, c.y + 3, 8, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    for (const side of [-1, 1]) {
+      const tx = c.x + side * 58, ty = c.y - 52;
+      ctx.fillStyle = side < 0 ? '#c9b48a' : '#b39b6c';
+      ctx.beginPath();
+      ctx.moveTo(tx - 26, ty + 18);
+      ctx.lineTo(tx, ty - 16);
+      ctx.lineTo(tx + 26, ty + 18);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#5a4128';
+      ctx.beginPath();
+      ctx.moveTo(tx - 6, ty + 18);
+      ctx.lineTo(tx, ty + 2);
+      ctx.lineTo(tx + 6, ty + 18);
+      ctx.closePath();
+      ctx.fill();
+    }
   } else if (c.kind === 'wolf') {
     ctx.strokeStyle = 'rgba(236,228,206,0.85)';
     ctx.lineWidth = 2.5;
@@ -511,7 +540,7 @@ function scenery(ctx: CanvasRenderingContext2D, rnd: () => number) {
     const p = { x: 20 + rnd() * (WORLD.w - 40), y: 30 + rnd() * (WORLD.h - 40) };
     if (laneDist(p) < LANE_HALF + 48 || riverDist(p) < RIVER.half + 40) continue;
     if (Math.hypot(p.x - BASE.blue.x, p.y - BASE.blue.y) < 290 || Math.hypot(p.x - BASE.red.x, p.y - BASE.red.y) < 290) continue;
-    if (CAMPS.some((c) => Math.hypot(p.x - c.x, p.y - c.y) < clearingR(c) + 50)) continue;
+    if (CLEARINGS.some((c) => Math.hypot(p.x - c.x, p.y - c.y) < clearingR(c) + 50)) continue;
     if (RUINS.some((c) => Math.hypot(p.x - c.x, p.y - c.y) < 110)) continue;
     if (WATCHSTONES.some((c) => Math.hypot(p.x - c.x, p.y - c.y) < 140)) continue;
     if (Math.hypot(p.x - BEAST.x, p.y - BEAST.y) < 175) continue;
@@ -544,7 +573,7 @@ export function paintMap(scene: Phaser.Scene) {
   grass(ctx, rnd);
   flora(ctx, rnd);
   river(ctx, rnd);
-  for (const c of CAMPS) clearing(ctx, c, rnd);
+  for (const c of CLEARINGS) clearing(ctx, c, rnd);
   for (const r of RUINS) ruins(ctx, r, rnd);
   pit(ctx, rnd);
   for (const w of WATCHSTONES) island(ctx, w, rnd);

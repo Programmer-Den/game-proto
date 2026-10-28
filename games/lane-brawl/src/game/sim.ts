@@ -17,6 +17,7 @@ import {
   AI_ELIXIR,
   ASSIST,
   KILL,
+  MERC,
   RUNE,
   RUNES,
   RUNE_ORDER,
@@ -73,7 +74,7 @@ import {
   WARD_SPOTS,
   bountyOf,
 } from './data';
-import { GameState, ObjectiveTitle, SoundId, Unit, dist, getUnit, laneNear, levelFor, refreshStats, spawnWard, spawnWave } from './state';
+import { GameState, ObjectiveTitle, SoundId, Unit, dist, getUnit, laneNear, levelFor, refreshStats, spawnMercs, spawnWard, spawnWave } from './state';
 import { shortName } from './names';
 import { aiLog } from '../../../../shared/watch';
 import { english, t as text, type TextKey } from '../i18n';
@@ -875,6 +876,16 @@ function kill(s: GameState, t: Unit, killerId: number) {
           sound(s, 'brute', champKiller, champKiller.player);
           if (champKiller.side === 'blue') notice(s, champKiller.player ? text('noticeYouTakeBuff', { buff: text(b.name) }) : text('noticeTakesBuff', { name: shortName(champKiller.name), buff: text(b.name) }), b.color);
         }
+        // The last of a mercenary band down: it marches for the slayer's team.
+        if (t.campKind === 'merc' && champKiller.side !== 'neutral' && !s.units.some((m) => m.kind === 'camp' && !m.dead && m.group === t.group)) {
+          const team = champKiller.side;
+          const camp = MERC.spots.reduce((a, b) => (dist(a, t) <= dist(b, t) ? a : b));
+          const lane = spawnMercs(s, team, camp);
+          aiLog(team, `${shortName(champKiller.name)} hires the mercenaries, who march on the ${lane} lane`);
+          notice(s, text(team === 'blue' ? 'noticeMercsBlue' : 'noticeMercsRed', { lane: text(LANE_NAME[lane]) }), SIDE_COLOR[team]);
+          s.fx.push({ kind: 'ring', x: camp.x, y: camp.y, r: 80, color: SIDE_COLOR[team], ms: 700 });
+          sound(s, 'mercs', camp, champKiller.player);
+        }
       }
       break;
     }
@@ -1348,7 +1359,9 @@ function updateJungle(s: GameState) {
   for (const team of TEAMS) {
     const buffs = s.units.filter((u) => u.kind === 'camp' && !u.dead && (u.campKind === 'ember' || u.campKind === 'moss') && ownHalf(team, u));
     const stones = s.units.filter((u) => u.kind === 'watchstone' && u.side !== team);
-    const goals = buffs.length ? buffs : stones;
+    // A mercenary band on the team's own half is worth the trip as much as a buff.
+    const mercs = s.units.filter((u) => u.kind === 'camp' && !u.dead && u.campKind === 'merc' && u.group === u.id && ownHalf(team, u));
+    const goals = buffs.length || mercs.length ? [...buffs, ...mercs] : stones;
     let best: { u: Unit; goal: Unit; d: number } | null = null;
     for (const u of s.units) {
       if (u.side !== team || !free(s, u, JUNGLE.minHp) || s.contesters.includes(u.id)) continue;

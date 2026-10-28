@@ -56,6 +56,8 @@ import {
   INHIB_CELL,
   BOAR,
   BOAR_CELL,
+  MERC_CELL,
+  MERC_KEY,
   BRUTE_CELL,
   CHAMP_CELL,
   COIN,
@@ -1170,9 +1172,10 @@ export class GameScene extends Phaser.Scene {
       case 'camp': {
         const brute = u.campKind === 'ember' || u.campKind === 'moss';
         const wolf = u.campKind === 'wolf' || u.campKind === 'pup';
-        key = brute ? bruteKey(u.campKind as 'ember' | 'moss') : wolf ? WOLF : BOAR;
+        const merc = u.campKind === 'merc';
+        key = brute ? bruteKey(u.campKind as 'ember' | 'moss') : wolf ? WOLF : merc ? MERC_KEY : BOAR;
         frame = frameName(dirFor(u.facing), pose(10) === 'c0' ? 'idle' : pose(10));
-        cell = brute ? BRUTE_CELL : wolf ? WOLF_CELL : BOAR_CELL;
+        cell = brute ? BRUTE_CELL : wolf ? WOLF_CELL : merc ? MERC_CELL : BOAR_CELL;
         break;
       }
       case 'watchstone':
@@ -1852,7 +1855,7 @@ export class GameScene extends Phaser.Scene {
       } else if (u.kind === 'nexus') g.fillStyle(col(SIDE_COLOR[u.side as Team]), 1).fillCircle(mx(u.x), my(u.y), 5);
       else if (u.kind === 'champion') g.fillStyle(col(SIDE_COLOR[u.side as Team]), 1).fillCircle(mx(u.x), my(u.y), u.player ? 3.5 : 2.5);
       else if (u.kind === 'minion') g.fillStyle(col(SIDE_COLOR[u.side as Team]), 0.85).fillRect(mx(u.x) - 0.75, my(u.y) - 0.75, 1.5, 1.5);
-      else if (u.kind === 'camp' && u.campKind !== 'pup') g.fillStyle(col(u.campKind === 'ember' ? BUFFS.ember.color : u.campKind === 'moss' ? BUFFS.moss.color : SIDE_COLOR.neutral), 0.9).fillCircle(mx(u.x), my(u.y), 2);
+      else if (u.kind === 'camp' && u.campKind !== 'pup') g.fillStyle(col(u.campKind === 'ember' ? BUFFS.ember.color : u.campKind === 'moss' ? BUFFS.moss.color : u.campKind === 'merc' ? '#d8b878' : SIDE_COLOR.neutral), 0.9).fillCircle(mx(u.x), my(u.y), 2);
       else if (u.kind === 'ward') {
         const cx = mx(u.x), cy = my(u.y);
         g.fillStyle(col(UI.edge), 1).fillPoints([new Phaser.Math.Vector2(cx, cy - 4), new Phaser.Math.Vector2(cx + 3, cy), new Phaser.Math.Vector2(cx, cy + 4), new Phaser.Math.Vector2(cx - 3, cy)], true);

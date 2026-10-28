@@ -53,7 +53,7 @@ export const TOWERS: TowerSpot[] = both<TowerSpot>([
 // The jungle: neutral camps of three kinds in each of the four quarters between the lanes and the
 // river. Boars stand alone, wolves come as a pack, and the two brutes give their slayer a buff.
 
-export type CampKind = 'boar' | 'wolf' | 'pup' | 'ember' | 'moss';
+export type CampKind = 'boar' | 'wolf' | 'pup' | 'ember' | 'moss' | 'merc';
 export interface CampDef {
   kind: CampKind;
   name: TextKey;
@@ -75,10 +75,18 @@ export const CAMP_KINDS: Record<CampKind, CampDef> = {
   pup: { kind: 'pup', name: 'campPup', hp: 200, dmg: 12, attackMs: 900, range: 100, radius: 16, armor: 0, gold: 20, xp: 30, respawnMs: 60_000 },
   ember: { kind: 'ember', name: 'campEmber', hp: 1150, dmg: 40, attackMs: 1300, range: 150, radius: 30, armor: 8, gold: 100, xp: 170, respawnMs: 90_000, buff: 'ember' },
   moss: { kind: 'moss', name: 'campMoss', hp: 1150, dmg: 40, attackMs: 1300, range: 150, radius: 30, armor: 8, gold: 100, xp: 170, respawnMs: 90_000, buff: 'moss' },
+  merc: { kind: 'merc', name: 'campMerc', hp: 520, dmg: 26, attackMs: 1100, range: 110, radius: 18, armor: 6, gold: 45, xp: 70, respawnMs: 150_000 },
 };
+/**
+ * Mercenary camps (LB14): a band of `count` sellswords by the bottom lane on blue's half and by the
+ * top lane on red's (spawned after the champions, so every other unit keeps its id). The team whose
+ * champion fells the last of a band gets `count` mercenaries of its own at the camp, minions with
+ * `power` times a minion's health and damage, which march from there down the nearest lane.
+ */
+export const MERC = { spots: [{ x: 2120, y: 2380 }, { x: 680, y: 420 }] as Vec[], count: 3, spread: 40, power: 2.2 };
 export interface CampSpot extends Vec {
   /** The camp's kind: a wolf pack is an alpha and two pups. */
-  kind: 'boar' | 'wolf' | 'ember' | 'moss';
+  kind: 'boar' | 'wolf' | 'ember' | 'moss' | 'merc';
 }
 /** Six camps per team's half: blue's first, then their red copies. */
 export const CAMPS: CampSpot[] = both<CampSpot>([
