@@ -1,13 +1,13 @@
 import { expect, test, type Page } from '@playwright/test';
 
 // Loads a save in the old, whole shape and checks it plays on, then that the game writes it back
-// thin: upgrades, craftsmen and builds still at their start are left out and filled in on load.
+// thin: only what differs from a new game, filled back in on load.
 // The hub page stands in between visits, so the game's own save on leaving never overwrites the
 // save the test puts in.
 
 const KEY = 'apothecary-save';
 type Upgrades = Record<string, { level: number; paid: number }>;
-type Saved = { thin?: boolean; upgrades: Upgrades; craftsmen: Upgrades; belts: object; shade: { built: boolean }[] };
+type Saved = { thin?: number; upgrades: Upgrades; craftsmen?: Upgrades; belts?: object; shade: { built: boolean }[] };
 
 async function open(page: Page) {
   await page.goto('/games/apothecary/');
@@ -40,10 +40,10 @@ test('loads old saves and saves only what was touched', async ({ page }) => {
   await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
   const raw = await stored(page);
   const thin = JSON.parse(raw) as Saved;
-  expect(thin.thin).toBe(true);
-  expect(Object.keys(thin.upgrades).sort(), 'only the bought upgrades are saved').toEqual(['growth', 'research']);
-  expect(thin.craftsmen).toEqual({});
-  expect(thin.belts).toEqual({});
+  expect(thin.thin).toBe(2);
+  expect(thin.upgrades, 'only the levels bought are saved').toEqual({ growth: { level: 1 }, research: { level: 2 } });
+  expect(thin.craftsmen, 'craftsmen none of which are hired are left out').toBeUndefined();
+  expect(thin.belts).toBeUndefined();
   expect(raw.length, 'the thin save is shorter').toBeLessThan(JSON.stringify(old).length - 500);
 
   // In a thin save a missing upgrade is one never bought, so nothing is granted for it.
