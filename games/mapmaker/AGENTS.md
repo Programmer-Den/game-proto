@@ -83,7 +83,9 @@ voyages it took and a saved best, then Keep charting or New atlas.
   and `kindOf(island)` (green, archipelago, volcanic, jungle in turn).
 - `src/game/upgrades.ts`: `UpgradeId`, the `UPGRADES` table (name and text as `TextKey`s, costs), `UPGRADE_IDS`,
   `nextCost`.
-- `src/game/island.ts`: `makeIsland(number)` rolls an island of `kindOf(number)` (value noise for
+- `src/game/island.ts`: `makeIsland(number, seed?)` rolls an island of `kindOf(number)` from a
+  seed (`newSeed()` from `Math.random` when none is given; `seeded` is a mulberry32 that every roll
+  inside draws from, so the same number and seed roll the same isle, `seed` on the `Island`) (value noise for
   height, relief and woods), joins an archipelago's islets with sandbars (`joinIslets`), keeps the
   biggest landmass (four-way connected), rings it with beach, places the port, runs rivers from the
   high ground to the sea (`addRivers`), places villages, lays a road from the port to the nearest
@@ -279,8 +281,16 @@ voyages it took and a saved best, then Keep charting or New atlas.
 
 ### Persistence
 
-`localStorage` key `mapmaker-save` holds the whole `GameState` as JSON (the atlas included),
-written after every successful action and read once in `GameScene.create`. A save whose tile count
+`localStorage` key `mapmaker-save` holds the `GameState` as JSON (the atlas included),
+written after every successful action and read once in `GameScene.create`. `saveGame` packs it
+(`pack`): the isle is kept as its `seed`, without `kind`, `tiles`, `port` and `features`, with the
+charted tiles as `revealed` (one bit a tile, row by row, in base64) and the riddle as only its
+`known`, `found` and `rival` flags; `next` is kept as its seed alone. `loadGame` (`unpack`) rolls both
+isles again with `makeIsland(island, seed)` (and `island + 1` for `next`) and lays the bits and flags
+over them, which takes a save from about 11 KB to about 0.5 KB. So a change to `makeIsland`, `KINDS`
+or `FINDS` reshapes the isles of existing saves (the charted bits stay on the same grid squares). An
+isle loaded from a save made before seeds has no `seed` and keeps saving in full, as does an old
+`next` without one. A save whose tile count
 doesn't match `GRID` is ignored, saved supplies are clamped to `maxSupplies` (a save from an easier
 difficulty can hold more; this voyage's wrecks are allowed on top), and saves from before the isle
 goal get `milestones: 0`, `isleStart: voyage`, `atlas: []` and zeroed new chart fields. Saves from
@@ -297,8 +307,8 @@ shared `hub-settings` key.
 
 ### Randomness and timing
 
-- `Math.random` is used only in `src/game/island.ts` (noise lattices, landmark and find spots, the
-  riddle's first candidate tile) and in `rollCommission`, `rollBoard` and `rollHands` (called by
+- `Math.random` is used only in `newSeed` in `src/game/island.ts` (one draw per isle; the noise
+  lattices, landmark and find spots and the riddle's first candidate tile come from the seed) and in `rollCommission`, `rollBoard` and `rollHands` (called by
   `sellChart`; `returnToPort` also calls `makeIsland` for the next isle once this one is charted in full). Rivers, the road, features and their
   names, storms' targets, the rival's every move and the riddle's clues are worked out from the
   tiles, without randomness. The art uses `rng()` and a sine hash; place names come from the island number
@@ -438,9 +448,9 @@ has no audio imports.
 
 ## Gotchas
 
-- The island shape depends on the number of `Math.random` calls in `makeIsland`; changing them
+- The island shape depends on the draws `makeIsland` takes from its seeded random; changing them
   changes the seeded island the playthrough plays (it reads the state, so it adapts, but its
-  screenshots change).
+  screenshots change) and the isles of every seeded save.
 - `makeIsland` loops until an island has its kind's `minLand` land tiles; keep it reachable.
 - The first isle is always green; changing the green row of `KINDS` changes the playthrough's isle.
 - `findFeatures` draws no random numbers, so adding or renaming features never moves the seeded

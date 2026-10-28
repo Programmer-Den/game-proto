@@ -1,19 +1,23 @@
 import type { Theme } from '../art/paint';
 import en from '../i18n/en';
 import type { TextKey } from '../i18n';
-import { findFeatures } from './island';
-import { GRID, WRECK_SUPPLIES, indexOf, maxSupplies, type Clue, type GameState, type Ground, type Riddle } from './state';
+import { findFeatures, makeIsland } from './island';
+import { GRID, WRECK_SUPPLIES, indexOf, maxSupplies, type Clue, type GameState, type Ground, type Riddle, type Tile } from './state';
 
 // The whole game is saved after every successful action, so a
 // reload carries on where it left off. The best Royal Atlas (fewest voyages) is kept apart, so it
 // outlives a new game, and so is the sheet's theme.
+//
+// The isle is saved as its seed, which rolls it again on load (`makeIsland`), with the charted tiles
+// as a bitmask and only the riddle's flags; the next isle is saved as its seed alone. An isle from a
+// save made before seeds has none, and keeps saving in full.
 const KEY = 'mapmaker-save';
 const BEST_KEY = 'mapmaker-best';
 const THEME_KEY = 'mapmaker-theme';
 
 export function loadGame(): GameState | null {
   try {
-    const s = JSON.parse(localStorage.getItem(KEY) ?? 'null') as GameState | null;
+    const s = unpack(JSON.parse(localStorage.getItem(KEY) ?? 'null') as Stored | GameState | null);
     // A save from a different grid size or a broken one starts over.
     if (!s || !Array.isArray(s.tiles) || s.tiles.length !== GRID.w * GRID.h || !s.port || !s.phase) return null;
     // Supplies saved on an easier difficulty can exceed this one's maximum (plus this voyage's wrecks).
@@ -106,9 +110,58 @@ function oldClue(clue: Riddle['clues'][number] | string): Clue | null {
   return { kind: 'from', tiles, dir: m[2] as FromClue['dir'], mark: OLD_MARKS[m[3]] };
 }
 
+/** The save as kept: the isle as its seed, the charted tiles and the riddle's flags; the next isle as its seed. */
+type Stored = Omit<GameState, 'kind' | 'tiles' | 'port' | 'features' | 'riddle' | 'next'> & {
+  seed: number;
+  /** One bit a tile, row by row, set where it is charted, in base64. */
+  revealed: string;
+  riddle: Pick<Riddle, 'known' | 'found' | 'rival'> | null;
+  next: number | GameState['next'];
+};
+
+function pack(s: GameState): Stored | GameState {
+  const next = s.next?.seed !== undefined ? s.next.seed : s.next;
+  if (s.seed === undefined) return { ...s, next } as GameState;
+  const { kind: _kind, tiles, port: _port, features: _features, riddle, ...rest } = s;
+  const r = riddle && { known: riddle.known, found: riddle.found, ...(riddle.rival ? { rival: true } : {}) };
+  return { ...rest, seed: s.seed, revealed: bitmask(tiles), riddle: r, next };
+}
+
+/** Rolls a seeded save's isles again, and lays its charted tiles and riddle flags over them; a full save comes back as it is. */
+function unpack(saved: Stored | GameState | null): GameState | null {
+  if (!saved) return null;
+  if (typeof saved.next === 'number') saved.next = makeIsland(saved.island + 1, saved.next);
+  if (!('revealed' in saved) || typeof saved.seed !== 'number') return saved as GameState;
+  const { revealed, riddle, ...rest } = saved;
+  const isle = makeIsland(saved.island, saved.seed);
+  const open = unmask(revealed);
+  for (let i = 0; i < isle.tiles.length; i++) isle.tiles[i].revealed = open[i];
+  return {
+    ...(rest as Omit<Stored, 'revealed' | 'riddle'> & { next: GameState['next'] }),
+    kind: isle.kind,
+    tiles: isle.tiles,
+    port: isle.port,
+    features: isle.features,
+    riddle: isle.riddle && riddle && { ...isle.riddle, ...riddle },
+  };
+}
+
+function bitmask(tiles: Tile[]) {
+  const bytes = new Uint8Array(Math.ceil(tiles.length / 8));
+  tiles.forEach((t, i) => {
+    if (t.revealed) bytes[i >> 3] |= 1 << (i & 7);
+  });
+  return btoa(String.fromCharCode(...bytes));
+}
+
+function unmask(text: string) {
+  const bytes = Array.from(atob(text), (c) => c.charCodeAt(0));
+  return Array.from({ length: GRID.w * GRID.h }, (_, i) => ((bytes[i >> 3] ?? 0) >> (i & 7)) & 1).map(Boolean);
+}
+
 export function saveGame(s: GameState) {
   try {
-    localStorage.setItem(KEY, JSON.stringify(s));
+    localStorage.setItem(KEY, JSON.stringify(pack(s)));
   } catch {
     // Storage can be full or blocked (private mode); the game keeps running unsaved.
   }

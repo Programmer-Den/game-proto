@@ -47,10 +47,11 @@ const LONG_PAY = 1.5;
 
 /** A new game: the first island, the first voyage under way from its port. */
 export function newGame(): GameState {
-  const { kind, tiles, port, riddle, features } = makeIsland(1);
+  const { kind, tiles, port, riddle, features, seed } = makeIsland(1);
   const s: GameState = {
     island: 1,
     kind,
+    seed,
     voyage: 1,
     phase: 'survey',
     tiles,
@@ -564,9 +565,10 @@ export function setSail(s: GameState) {
   if (s.phase !== 'harbor') return false;
   if (islandCharted(s)) {
     s.island += 1;
-    const { kind, tiles, port, riddle, features } = s.next ?? makeIsland(s.island);
+    const { kind, tiles, port, riddle, features, seed } = s.next ?? makeIsland(s.island);
     s.next = null;
     s.kind = kind;
+    s.seed = seed;
     s.tiles = tiles;
     s.port = port;
     s.riddle = riddle;
