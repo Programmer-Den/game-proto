@@ -273,6 +273,20 @@ const de: Translation<typeof en> = {
   championUnlock: 'Freischalten: eine Partie gewinnen.',
   unlockedCall: 'Neuer Kommandant: {name}!',
   unlockedList: 'Neue Kommandanten: {names}',
+  rankRust: 'Rost',
+  rankIron: 'Eisen',
+  rankSteel: 'Stahl',
+  rankChrome: 'Chrom',
+  rankTitan: 'Titan',
+  rankRustText: 'Rivalen spielen wie vorgesehen',
+  rankIronText: 'Rivalen würfeln früher nach Kopien',
+  rankSteelText: 'Rivalen würfeln früher und bekommen 1 Gold mehr pro Runde',
+  rankChromeText: 'Rivalen finden auch teurere Roboter im Shop',
+  rankTitanText: 'Rivalen bekommen 2 Gold mehr pro Runde und würfeln ab Runde 2-1',
+  rankLine: 'Rang {rank} ({points} Punkte)',
+  rankNext: ', {rank} ab {points}',
+  rankUp: 'Rangaufstieg: {rank}!',
+  rankPoints: '+{n} Rangpunkte · {rank} ({points})',
   menuStats: 'Partien {played} · Siege {wins} · bester Platz {best}',
 
   // HUD
@@ -365,7 +379,7 @@ const de: Translation<typeof en> = {
 /** Texts that are the same in German. */
 export const keepEnglish: (keyof typeof en)[] = [
   'magnetTrait', 'neonTrait', 'hackerTrait', 'saboteurTrait', 'servoName', 'firewall', 'kernel', 'flicker', 'sparks', 'magna',
-  'tauntWin', 'title', 'skillCall', 'hexa', 'nova',
+  'tauntWin', 'title', 'skillCall', 'hexa', 'nova', 'rankTitan',
 ];
 
 export default de;
