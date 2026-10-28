@@ -40,7 +40,8 @@ carry orders between villages before their time runs out.
 - **Progression** is mostly within a game: coins, track, upgrades, depots and the round. The only
   meta progression is the best festival medal per difficulty and the boons it gives a new game.
 - **Persistence:** `wyrmrail-medals` (`src/game/medals.ts`) holds the best medal per difficulty,
-  as `{ easy?, normal?, hard? }` of `bronze`, `silver` or `gold`. Nothing else is saved; a reload
+  as `{ easy?, normal?, hard? }` of `bronze`, `silver` or `gold`, and `wyrmrail-trophies` the
+  trophies earned (`shared/trophies.ts`, each id with the time). Nothing else is saved; a reload
   starts a new game. It also reads the hub's shared settings (see Hub settings below).
 - **Rough edges you can see in the code:**
   - Auto-join (the default) joins every neighbour; the Plain toggle is the way round the junctions
@@ -65,6 +66,16 @@ File map (all under `src/` unless it starts with `shared/`):
   language; `TextKey` types the keys. Every text on screen goes through `t`, and a new one gets its
   German entry (and a US one if its spelling differs) in the same PR. Village names are names, not
   texts: they are ids too (`WORKSHOPS`, the `village-<name>` textures) and stay English.
+- `trophies/`: the game's ten trophies (`shared/trophies.ts`). `index.ts` lists them (`trophies`:
+  id, tier, icon, `hidden` for Golden festival) with their texts in `trophies/i18n/` (`en.ts` and
+  `de.ts`: the name keyed by the id, what earns it by `<id>Text`), and imports nothing else from
+  the game, since the hub loads it for its trophy shelf. `main.ts` hands `trophies` to
+  `setupGame`, which lists them on the start and pause screens. `check.ts` holds each trophy's
+  condition on the `GameState` (`EARNED`: first delivery, a switch laid, an upgrade, track on a
+  mountain (a tunnel), a village at `MOOD_MAX`, a depot, two wyrms, `BUSY_LINE` 25 deliveries in a
+  game, the festival won, a gold medal) and `checkTrophies(state)`, which `GameScene.update` calls
+  every frame after the tick. A game is never restored, so no award is quiet. A new trophy is an
+  entry in `index.ts`, its two texts in each language file and its condition in `EARNED`.
 - `main.ts`: creates the `Phaser.Game` (960x540 from `VIEW`, `Scale.FIT`, `pixelArt: false`) with
   `BootScene` then `GameScene`, calls `setupGame(game)` and `setupScaling(game, { fill: true })`
   from `shared/scaling.ts` (the view takes the screen's shape, see Screens below); in dev builds puts `game` on `window`.
@@ -395,6 +406,10 @@ starts the music again.
   (`MOOD_ROUND` and `DEPOT_ROUND` 2, the rest 3), so the playthrough never meets them; keep them
   there or give the test a step for them. The test never taps a village, and its browser has no
   saved medals, so no boon changes the first round.
+
+- Once the grain is delivered the test checks that `wyrmrail-trophies` holds exactly First
+  delivery and Points to set (the junction it lays); a trophy a first round can reach in another
+  way changes that expectation.
 
 ## Making common changes
 
