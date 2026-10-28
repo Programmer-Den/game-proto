@@ -57,7 +57,8 @@ export function clearRun() {
 }
 
 const PHASES = ['playing', 'between', 'draft', 'relic', 'handover'];
-const isCard = (c: any): c is Card => !!c && (KINDS as readonly string[]).includes(c.kind) && (LEVELS as readonly number[]).includes(c.level) && Number.isFinite(c.seed);
+const isCard = (c: any): c is Card =>
+  !!c && (KINDS as readonly string[]).includes(c.kind) && (LEVELS as readonly number[]).includes(c.level) && Number.isFinite(c.seed) && (c.boss === undefined || isCard(c.boss));
 
 /**
  * The saved run, or null for none (or a broken one, which is dropped). A puzzle in play is dealt
@@ -76,9 +77,11 @@ export function loadRun(progress: Progress): Run | null {
       Array.isArray(run.results) && run.results.every((r: any) => isCard(r?.card)) &&
       Array.isArray(run.draftOffer) && run.draftOffer.every(isCard) &&
       Array.isArray(run.relics) && [...run.relics, ...(run.relicOffer ?? [])].every((r: string) => (RELICS as readonly string[]).includes(r)) &&
-      (run.phase !== 'playing' || isCard(run.current?.card));
+      (run.phase !== 'playing' || isCard(run.current?.pair ?? run.current?.card));
     if (!ok) return clearRun(), null;
-    run.current = isCard(run.current?.card) ? makeCurrent(run, run.current.card) : null;
+    // A boss in play starts again from its first half.
+    const card = run.current?.pair ?? run.current?.card;
+    run.current = isCard(card) ? makeCurrent(run, card) : null;
     return { ...run, progress, events: [] };
   } catch {
     clearRun();

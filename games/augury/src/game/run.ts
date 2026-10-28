@@ -40,6 +40,14 @@ export const CHARM_ECHO_SLOW = 1.35;
 /** An omen taken: the points it pays, times, and the hearts a loss under Peril costs. */
 export const OMEN_POINTS = 2;
 export const PERIL_HEARTS = 2;
+/**
+ * Every `BOSS_EVERY`th puzzle of Endless and Draft is a boss: two puzzles of two kinds played back
+ * to back on one clock (`BOSS_TIME` times their two limits), worth `BOSS_POINTS` times the points
+ * and a relic pick.
+ */
+export const BOSS_EVERY = 5;
+export const BOSS_TIME = 0.8;
+export const BOSS_POINTS = 2;
 /** Points: per level, per second left, taken per hint (down to a floor), and the streak bonus. */
 export const POINTS_PER_LEVEL = 100;
 export const POINTS_PER_SECOND = 2;
@@ -53,6 +61,8 @@ export interface Card {
   kind: KindId;
   level: Level;
   seed: number;
+  /** A boss: the second puzzle, played straight after this one on the same clock. */
+  boss?: Card;
 }
 
 export interface Current {
@@ -70,6 +80,8 @@ export interface Current {
   /** The omen taken for this puzzle, or null, and whether a move or hint has been made yet. */
   omen: OmenId | null;
   touched: boolean;
+  /** The second half of a boss: the boss's card (whose first half is done), else null. */
+  pair: Card | null;
   /** Earlier states, for Undo. */
   history: string[];
 }
@@ -83,6 +95,8 @@ export interface Result {
   points: number;
   /** The omen it was played under. */
   omen?: OmenId;
+  /** A boss (`card` is its first half). */
+  boss?: boolean;
 }
 
 export type Phase = 'playing' | 'between' | 'draft' | 'relic' | 'handover' | 'over';
@@ -95,6 +109,7 @@ export type RunEvent =
   | { type: 'warn' }
   | { type: 'relic'; relic: RelicId }
   | { type: 'omen'; omen: OmenId }
+  | { type: 'half' }
   | { type: 'over' };
 
 export interface Run {
@@ -173,6 +188,20 @@ function randomCard(level: Level, not: KindId[] = []): Card {
   return { kind: kinds[Math.floor(Math.random() * kinds.length)], level, seed: newSeed() };
 }
 
+/** Whether the `n`th puzzle (from 0) of an Endless or Draft run is a boss. */
+export const isBossTurn = (n: number) => (n + 1) % BOSS_EVERY === 0;
+
+/** A random boss: two cards of two kinds other than `not`, at one level. */
+function bossCard(level: Level, not: KindId[] = []): Card {
+  const first = randomCard(level, not);
+  return { ...first, boss: randomCard(level, [...not, first.kind]) };
+}
+
+/** The `n`th card of an Endless run, of a kind other than `not`: a boss on a boss turn. */
+const endlessCard = (n: number, not: KindId[]) => (isBossTurn(n) ? bossCard : randomCard)(endlessLevel(n), not);
+/** The kind a card ends on, which the next card must not repeat. */
+const lastKind = (card: Card) => card.boss?.kind ?? card.kind;
+
 /** Starts a run of a mode. Practice needs its kind and level. */
 export function startRun(mode: Mode, progress: Progress, opts: { kind?: KindId; level?: Level; date?: Date } = {}): Run {
   const run = newRun(mode, progress);
@@ -181,8 +210,8 @@ export function startRun(mode: Mode, progress: Progress, opts: { kind?: KindId; 
     case 'blitz': {
       let last: KindId[] = [];
       for (let i = 0; i < QUEUE + 1; i++) {
-        const card = randomCard(mode === 'blitz' ? 0 : endlessLevel(i), last);
-        last = [card.kind];
+        const card = mode === 'blitz' ? randomCard(0, last) : endlessCard(i, last);
+        last = [lastKind(card)];
         run.queue.push(card);
       }
       deal(run, run.queue.shift()!);
@@ -218,7 +247,9 @@ export function startRun(mode: Mode, progress: Progress, opts: { kind?: KindId; 
 function timeFor(run: Run, card: Card) {
   if (run.mode === 'practice' || run.mode === 'blitz') return null;
   const hourglasses = run.relics.filter((r) => r === 'hourglass').length;
-  return DEFS[card.kind].limit[card.level] * 1000 * (1 + HOURGLASS * hourglasses);
+  const limit = (c: Card) => DEFS[c.kind].limit[c.level];
+  const seconds = card.boss ? (limit(card) + limit(card.boss)) * BOSS_TIME : limit(card);
+  return seconds * 1000 * (1 + HOURGLASS * hourglasses);
 }
 
 /** Whether the run holds the charm of a kind. */
@@ -230,7 +261,27 @@ export function makeCurrent(run: Run, card: Card): Current {
   const state = DEFS[card.kind].make(seeded(card.seed), card.level);
   const charm = holdsCharm(run, card.kind);
   if (charm && card.kind === 'echo') state.stepMs = Math.round(state.stepMs * CHARM_ECHO_SLOW);
-  return { card, state, timeLeftMs: time, timeTotalMs: time ?? 0, elapsedMs: 0, hintsUsed: 0, freeHints: charm && card.kind !== 'echo' ? 1 : 0, freeUsed: 0, omen: null, touched: false, history: [] };
+  return { card, state, timeLeftMs: time, timeTotalMs: time ?? 0, elapsedMs: 0, hintsUsed: 0, freeHints: charm && card.kind !== 'echo' ? 1 : 0, freeUsed: 0, omen: null, touched: false, pair: null, history: [] };
+}
+
+/** A boss's first half is solved: its second is dealt on the same clock, with its hints and omen. */
+function secondHalf(run: Run) {
+  const cur = run.current!;
+  const pair = cur.card;
+  recordResult(run.progress, pair.kind, pair.level, true, cur.elapsedMs, cur.hintsUsed);
+  const next = makeCurrent(run, pair.boss!);
+  run.current = {
+    ...next,
+    timeLeftMs: cur.timeLeftMs,
+    timeTotalMs: cur.timeTotalMs,
+    elapsedMs: cur.elapsedMs,
+    hintsUsed: cur.hintsUsed,
+    freeUsed: cur.freeUsed,
+    omen: cur.omen,
+    touched: true,
+    pair,
+  };
+  run.events.push({ type: 'half' }, { type: 'start', kind: next.card.kind });
 }
 
 /**
@@ -267,9 +318,11 @@ function deal(run: Run, card: Card) {
 function offerDraft(run: Run) {
   const level = endlessLevel(run.dealt);
   const count = 2 + run.relics.filter((r) => r === 'crystal').length;
-  const last = run.results.length ? [run.results[run.results.length - 1].card.kind] : [];
+  const last = run.results.length ? [lastKind(run.results[run.results.length - 1].card)] : [];
   const offer: Card[] = [];
-  for (let i = 0; i < Math.min(count, DRAFT_MAX); i++) offer.push(randomCard(level, [...last, ...offer.map((c) => c.kind)]));
+  // A boss turn deals only bosses to choose from.
+  const make = isBossTurn(run.dealt) ? bossCard : randomCard;
+  for (let i = 0; i < Math.min(count, DRAFT_MAX); i++) offer.push(make(level, [...last, ...offer.map((c) => c.kind)]));
   run.draftOffer = offer;
   run.phase = 'draft';
 }
@@ -291,7 +344,8 @@ export function takeRelic(run: Run, index: number) {
   if (relic === 'heartstone') run.hearts = Math.min(run.maxHearts, run.hearts + 1);
   run.relicOffer = [];
   run.events.push({ type: 'relic', relic });
-  offerDraft(run);
+  if (run.mode === 'draft') offerDraft(run);
+  else dealQueued(run);
   return true;
 }
 
@@ -363,7 +417,7 @@ export function skip(run: Run) {
 function check(run: Run) {
   const cur = run.current!;
   const def = DEFS[cur.card.kind];
-  if (def.solved(cur.state)) end(run, 'solved');
+  if (def.solved(cur.state)) cur.card.boss ? secondHalf(run) : end(run, 'solved');
   else if (def.failed?.(cur.state)) end(run, 'failed');
 }
 
@@ -372,14 +426,16 @@ function pointsFor(run: Run, cur: Current) {
   const afterHints = Math.max(MIN_POINTS, base - HINT_COST * (cur.hintsUsed - cur.freeUsed));
   const charm = holdsCharm(run, cur.card.kind) ? CHARM_POINTS : 1;
   const omen = cur.omen ? OMEN_POINTS : 1;
-  return Math.round(afterHints * charm * omen * (1 + STREAK_STEP * Math.min(run.streak, STREAK_CAP)));
+  const boss = cur.pair ? BOSS_POINTS : 1;
+  return Math.round(afterHints * charm * omen * boss * (1 + STREAK_STEP * Math.min(run.streak, STREAK_CAP)));
 }
 
 function end(run: Run, reason: EndReason) {
   const cur = run.current!;
   const solved = reason === 'solved';
   const points = solved && run.mode !== 'practice' && run.mode !== 'duel' ? pointsFor(run, cur) : 0;
-  const result: Result = { card: cur.card, reason, ms: cur.elapsedMs, points, ...(cur.omen ? { omen: cur.omen } : {}) };
+  const boss = cur.pair ?? (cur.card.boss ? cur.card : null);
+  const result: Result = { card: boss ?? cur.card, reason, ms: cur.elapsedMs, points, ...(cur.omen ? { omen: cur.omen } : {}), ...(boss ? { boss: true } : {}) };
   run.results.push(result);
   run.last = result;
   recordResult(run.progress, cur.card.kind, cur.card.level, solved, cur.elapsedMs, cur.hintsUsed);
@@ -420,10 +476,13 @@ export function next(run: Run) {
     case 'endless':
     case 'blitz': {
       if ((run.mode === 'endless' && run.hearts <= 0) || (run.mode === 'blitz' && run.clockMs <= 0)) return finish(run), true;
-      const card = run.queue.shift()!;
-      const after = run.queue[run.queue.length - 1]?.kind ?? card.kind;
-      run.queue.push(randomCard(run.mode === 'blitz' ? blitzLevel(run.solved) : endlessLevel(run.dealt + QUEUE), [after]));
-      deal(run, card);
+      // A boss beaten in Endless offers relics before the next card.
+      if (run.mode === 'endless' && run.last?.boss && run.last.reason === 'solved') {
+        run.relicOffer = offerRelics(run);
+        run.phase = 'relic';
+        return true;
+      }
+      dealQueued(run);
       return true;
     }
     case 'daily':
@@ -439,7 +498,7 @@ export function next(run: Run) {
     }
     case 'draft':
       if (run.hearts <= 0) return finish(run), true;
-      if (run.last?.reason === 'solved' && run.solved % RELIC_EVERY === 0) {
+      if (run.last?.reason === 'solved' && (run.solved % RELIC_EVERY === 0 || run.last.boss)) {
         run.relicOffer = offerRelics(run);
         run.phase = 'relic';
       } else offerDraft(run);
@@ -450,13 +509,22 @@ export function next(run: Run) {
   }
 }
 
+/** Deals the next card of an Endless or Blitz queue, and queues another. */
+function dealQueued(run: Run) {
+  const card = run.queue.shift()!;
+  const after = lastKind(run.queue[run.queue.length - 1] ?? card);
+  run.queue.push(run.mode === 'blitz' ? randomCard(blitzLevel(run.solved), [after]) : endlessCard(run.dealt + QUEUE, [after]));
+  deal(run, card);
+}
+
 /**
  * The relics offered: one charm the run doesn't hold yet (while any is left) and general relics
- * for the rest. A second Crystal Ball would do nothing (`DRAFT_MAX`), so it is offered once.
+ * for the rest. A second Crystal Ball would do nothing (`DRAFT_MAX`), so it is offered once, and
+ * never in Endless, which deals no drafts.
  */
 export function offerRelics(run: Run): RelicId[] {
   const charms = RELICS.filter((r) => isCharm(r) && !run.relics.includes(r));
-  const general = GENERAL_RELICS.filter((r) => r !== 'crystal' || !run.relics.includes('crystal'));
+  const general = GENERAL_RELICS.filter((r) => r !== 'crystal' || (run.mode === 'draft' && !run.relics.includes('crystal')));
   const offer: RelicId[] = shuffle(Math.random, charms).slice(0, 1);
   return [...shuffle(Math.random, [...general]).slice(0, RELIC_OFFER - offer.length), ...offer];
 }
