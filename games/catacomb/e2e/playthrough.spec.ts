@@ -253,6 +253,9 @@ test('plays the first room', async ({ page }, testInfo) => {
   expect(count(s.deck)).toEqual(count([...Object.entries(STARTER_DECK).flatMap(([id, n]) => Array(n).fill(id)), rewards[0].id]));
   await play(600, async () => false);
   await snap('3-next-room');
+  // The room cleared earns the Into the dark trophy (src/trophies/), and nothing else yet.
+  const trophies = await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('catacomb-trophies') ?? '{}')));
+  expect(trophies, 'trophies earned in the first round').toEqual(['firstFight']);
 
   const speed = gameMs / (Date.now() - startedAt);
   console.log(`Played ${Math.round(gameMs / 1000)}s of game time at ${speed.toFixed(1)}x (target ${SPEED}x).`);
