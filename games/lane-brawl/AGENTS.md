@@ -310,6 +310,18 @@ Implemented today:
   and `how`, all minions as one row with `src` -1, the biggest `RECAP.rows`). `drawRecap` shows it
   under the notice while the player's champion is dead (not watching, not over the shop or
   scoreboard), naming champions by first name and the rest by kind (`recapName`).
+- River drakes (LB18): `DRAKE`, `DRAKES`, `DRAKE_ORDER` and `DrakeElement` in `data.ts`; the drake
+  is a camp of kind `drake` (`CAMP_KINDS.drake`), spawned last in `createGame` (so other ids stay)
+  dead with `respawnAt` `DRAKE.firstAt`, its id in `s.drake`; `s.drakeElement` is the element of
+  the one asleep or awake, `s.drakeRounds` counts the slain. `kill` calls `slayDrake`: the next
+  element comes up, and below `DRAKE.soul` stacks the slayer's team pushes the element to
+  `s.drakeStacks[team]` and every one of its champions gets the summed `bonus`es (doubled at the
+  soul) as `Unit.drake`, which `buffSum` counts in with the buffs. Waking (in `updateUnit`) and each
+  slaying make a notice and a sound (`drakeWakes`, `drake`). `updateJungle` sends up to `DRAKE.ai`
+  free champions of a team without the soul at an awake drake before anything else. The view:
+  `drakeModel(element)` in `models.ts`, baked lazily per element (`bakeDrake`, `drakeKey`,
+  `DRAKE_CELL`); the pit is painted by `pit` in `map.ts` (shared with the beast's); the minimap dot
+  takes the element's colour and `drawBuffs` adds a chip per team with stacks.
 - Victory and defeat panel with the match's objectives, last hits, best streak and beasts slain,
   and "Play again".
 

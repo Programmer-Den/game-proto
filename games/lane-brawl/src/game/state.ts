@@ -11,6 +11,9 @@ import {
   RUNE,
   RuneKind,
   PingKind,
+  DRAKE,
+  DRAKE_ORDER,
+  DrakeElement,
   AbilityKey,
   BASE,
   BuffDef,
@@ -149,6 +152,8 @@ export interface Unit {
   /** AI champions: the camp or watchstone it went into the jungle for, and until when. */
   jungleTarget: number | null;
   jungleUntil: number;
+  /** Champions: the bonus of their team's drake stacks (`DRAKES`), counted in with the buffs; null with none. */
+  drake: BuffDef | null;
   /** AI champions: the point a ping of the player's sent it to, the enemy marked there, and until when. */
   pingGoal: Vec | null;
   pingTarget: number | null;
@@ -256,7 +261,7 @@ export type SoundId =
   | 'burst' | 'bolt' | 'dash' | 'ally' | 'buff' | 'zone' | 'impact'
   | 'lastHit' | 'slain' | 'youDie' | 'streak' | 'crash' | 'nexus' | 'wardBreak'
   | 'levelUp' | 'flask' | 'blink' | 'ward' | 'recallHome' | 'respawn' | 'buyBack'
-  | 'wave' | 'watchstone' | 'rune' | 'runeTaken' | 'mercs' | 'spell' | 'ping' | 'growl' | 'beastSlain' | 'brute' | 'objective' | 'objectiveMissed';
+  | 'wave' | 'watchstone' | 'rune' | 'runeTaken' | 'mercs' | 'spell' | 'ping' | 'drake' | 'drakeWakes' | 'growl' | 'beastSlain' | 'brute' | 'objective' | 'objectiveMissed';
 
 /**
  * A sound raised by the rules: at a point in the world (the view plays it only where blue sees and
@@ -349,6 +354,11 @@ export interface GameState {
   runes: ({ kind: RuneKind; x: number; y: number } | null)[];
   nextRune: number;
   runeRounds: number;
+  /** The river drake's unit id, its element now, how many have woken, and each team's stacks. */
+  drake: number;
+  drakeElement: DrakeElement;
+  drakeRounds: number;
+  drakeStacks: Record<Team, DrakeElement[]>;
   /** What hurt the player's champion in the last `RECAP.windowMs`, and the recap of its last death (null before one). */
   playerHits: { at: number; src: number; how: HitHow; amount: number }[];
   recap: DeathRecap | null;
@@ -478,6 +488,7 @@ export function blankUnit(
     gankUntil: 0,
     jungleTarget: null,
     jungleUntil: 0,
+    drake: null,
     pingGoal: null,
     pingTarget: null,
     pingUntil: 0,
@@ -597,6 +608,10 @@ export function createGame(pick: ChampionDef, enemyDamage: number, opts: MatchOp
     runes: RUNE.spots.map(() => null),
     nextRune: RUNE.firstAt,
     runeRounds: 0,
+    drake: 0,
+    drakeElement: DRAKE_ORDER[0],
+    drakeRounds: 0,
+    drakeStacks: { blue: [], red: [] },
     playerHits: [],
     recap: null,
     pings: [],
@@ -706,6 +721,12 @@ export function createGame(pick: ChampionDef, enemyDamage: number, opts: MatchOp
       lead ??= u;
     }
   }
+  // The river drake, asleep in its pit until `DRAKE.firstAt`.
+  const drake = spawnCamp(s, 'drake', DRAKE.x, DRAKE.y, 0);
+  drake.dead = true;
+  drake.respawnAt = DRAKE.firstAt;
+  drake.facing = Math.PI / 4;
+  s.drake = drake.id;
 
   return s;
 }

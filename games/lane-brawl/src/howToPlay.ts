@@ -36,6 +36,7 @@ const en: HowToPlay = {
     'Tall grass hides you from enemies until you attack, and the fog hides what your team cannot see.',
     'Standing inside the ring round your own Nexus heals you quickly.',
     'Clear the sellswords camped by a lane and they march down it for your team.',
+    'From 2:30 a drake wakes in the river: each one your team slays gives all of you a lasting bonus, and the fourth doubles them.',
     'From 2:00, every two minutes two runes appear on the river: walk over one for more damage, speed, healing or gold.',
   ],
 };
@@ -74,6 +75,7 @@ const de: HowToPlay = {
     'Hohes Gras verbirgt dich vor Feinden, bis du angreifst, und der Nebel verbirgt, was dein Team nicht sieht.',
     'Im Ring um deinen eigenen Nexus heilst du schnell.',
     'Besiege die Söldner, die an einer Lane lagern, dann ziehen sie für dein Team die Lane hinunter.',
+    'Ab 2:30 erwacht ein Drache im Fluss: Jeder, den dein Team erschlägt, gibt euch allen einen bleibenden Bonus, und der vierte verdoppelt sie.',
     'Ab 2:00 erscheinen alle zwei Minuten zwei Runen am Fluss: Lauf über eine für mehr Schaden, Tempo, Heilung oder Gold.',
   ],
 };

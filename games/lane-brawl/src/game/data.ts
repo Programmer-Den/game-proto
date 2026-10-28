@@ -53,7 +53,7 @@ export const TOWERS: TowerSpot[] = both<TowerSpot>([
 // The jungle: neutral camps of three kinds in each of the four quarters between the lanes and the
 // river. Boars stand alone, wolves come as a pack, and the two brutes give their slayer a buff.
 
-export type CampKind = 'boar' | 'wolf' | 'pup' | 'ember' | 'moss' | 'merc';
+export type CampKind = 'boar' | 'wolf' | 'pup' | 'ember' | 'moss' | 'merc' | 'drake';
 export interface CampDef {
   kind: CampKind;
   name: TextKey;
@@ -75,6 +75,7 @@ export const CAMP_KINDS: Record<CampKind, CampDef> = {
   pup: { kind: 'pup', name: 'campPup', hp: 200, dmg: 12, attackMs: 900, range: 100, radius: 16, armor: 0, gold: 20, xp: 30, respawnMs: 60_000 },
   ember: { kind: 'ember', name: 'campEmber', hp: 1150, dmg: 40, attackMs: 1300, range: 150, radius: 30, armor: 8, gold: 100, xp: 170, respawnMs: 90_000, buff: 'ember' },
   moss: { kind: 'moss', name: 'campMoss', hp: 1150, dmg: 40, attackMs: 1300, range: 150, radius: 30, armor: 8, gold: 100, xp: 170, respawnMs: 90_000, buff: 'moss' },
+  drake: { kind: 'drake', name: 'campDrake', hp: 1700, dmg: 38, attackMs: 1300, range: 170, radius: 30, armor: 10, gold: 110, xp: 190, respawnMs: 150_000 },
   merc: { kind: 'merc', name: 'campMerc', hp: 520, dmg: 26, attackMs: 1100, range: 110, radius: 18, armor: 6, gold: 45, xp: 70, respawnMs: 150_000 },
 };
 /**
@@ -1230,6 +1231,24 @@ export const PING = { answer: 2, reach: 2200, near: 900, ms: 12_000, showMs: 400
 
 /** The death recap counts the damage of the last `windowMs` before the player's champion fell, in at most `rows` rows. */
 export const RECAP = { windowMs: 10_000, rows: 4 };
+
+/**
+ * The river drake (LB18): one camp of kind `drake` in its own pit on the river, opposite the beast's
+ * (spawned last, so every other unit keeps its id). It sleeps until `firstAt`, then wakes again
+ * `CAMP_KINDS.drake.respawnMs` after it falls, each time of the next element in `DRAKE_ORDER`. Its
+ * slayer's team keeps one stack of that element for the rest of the match: every one of its
+ * champions gets the element's bonus per stack (`DRAKES`), and at `soul` stacks the soul doubles
+ * them all. The AI sends up to `ai` free champions with at least `aiMinHp` of their health for it.
+ */
+export type DrakeElement = 'fire' | 'stone' | 'storm' | 'tide';
+export const DRAKE_ORDER: DrakeElement[] = ['fire', 'stone', 'storm', 'tide'];
+export const DRAKES: Record<DrakeElement, { name: TextKey; color: string; bonus: BuffDef }> = {
+  fire: { name: 'drakeFire', color: '#ff8a3d', bonus: { dmg: 5 } },
+  stone: { name: 'drakeStone', color: '#e8d9a8', bonus: { armor: 6 } },
+  storm: { name: 'drakeStorm', color: '#9fd0ff', bonus: { speed: 6 } },
+  tide: { name: 'drakeTide', color: '#7fe8d6', bonus: { regen: 4 } },
+};
+export const DRAKE = { x: 600, y: 600, firstAt: 150_000, soul: 4, ai: 2, aiMinHp: 0.6 };
 
 export const JUNGLE = { firstAt: 120_000, every: 45_000, ms: 30_000, minHp: 0.6 };
 export const RETREAT = {

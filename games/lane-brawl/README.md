@@ -237,7 +237,17 @@ left, under bevelled slate panels.
     the battle spell; all minions together), the four biggest with a bar each.
 
     ![The death recap: slain by Grumm, 790 damage in the last 10 s, in four rows](docs/screenshots/death-recap.webp)
-23. **Winning** destroys the red Nexus. Losing means your Nexus falls first.
+23. **River drakes**: from 2:30 a drake wakes in its pit on the river at the top left, across the
+    map from the beast, and wakes again 2:30 after it falls. Each drake is of the next element:
+    **Fire** (+5% damage), **Stone** (+6 armor), **Storm** (+6% speed) and **Tide** (+4 health a
+    second). The team that slays one keeps its bonus for every one of its champions for the rest of
+    the match, and the bonuses stack. The fourth drake a team slays gives it the **drake soul**,
+    which doubles all of them; after that its drakes only pay gold. Chips at the top right show
+    each team's drakes. The AI sends two champions a side for an awake drake.
+
+    ![A fire drake awake in its pit on the river](docs/screenshots/drake.webp)
+    ![The chip for blue's two drakes, fire and stone](docs/screenshots/drake-stacks.webp)
+24. **Winning** destroys the red Nexus. Losing means your Nexus falls first.
 
 Every ability has an animation of its own (a hammer that splits the ground, a meteor from the
 sky, a harpoon on its rope, a coil pylon arcing, a blood moon rising and so on), and so do bolts in
