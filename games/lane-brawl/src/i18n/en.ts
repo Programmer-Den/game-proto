@@ -376,6 +376,7 @@ const en = {
   // Jungle buffs
   buffEmber: 'Ember',
   buffMoss: 'Moss',
+  campMerc: 'Sellswords',
   runeMight: 'Might',
   runeHaste: 'Haste',
   runeFortune: 'Fortune',
@@ -475,6 +476,8 @@ const en = {
   noticeBlueRoams: 'Your {name} roams to the {lane} lane',
   noticeWatchstoneBlue: 'Your team took a watchstone',
   noticeWatchstoneRed: 'Red took a watchstone',
+  noticeMercsBlue: 'Your mercenaries march on the {lane} lane',
+  noticeMercsRed: "Red's mercenaries march on the {lane} lane",
   noticeRunes: 'Runes appear in the river',
   noticeRuneYou: 'You take the {rune} rune',
   noticeRuneAlly: '{name} takes the {rune} rune',

@@ -200,7 +200,17 @@ left, under bevelled slate panels.
     rune, healthy and with no enemy near, walks over to take it.
 
     ![A Might rune hovering over its stone ring on the river, a sword mark on its orange gem](docs/screenshots/river-rune.webp)
-19. **Winning** destroys the red Nexus. Losing means your Nexus falls first.
+19. **Mercenary camps**: two camps of three sellswords sit by the lanes, one on blue's half by the
+    bottom lane and one on red's by the top lane, among their tents. They fight as one band like a
+    wolf pack (45 gold and 70 XP each to the champion that fells one). The team that fells the last
+    of a band hires it: three mercenaries of its own appear at the camp, minions with 2.2 times a
+    minion's health and damage (drawn big, with the gold ring of a super minion), and march from
+    there down the nearest lane. A notice names the lane. The camp comes back 2:30 after each
+    sellsword falls. AI junglers go for the band on their own half as readily as for a brute.
+
+    ![The mercenary camp by the bottom lane: three sellswords in tan with kettle hats by a fire pit and two tents](docs/screenshots/merc-camp.webp)
+    ![Blue's hired mercenaries marching on the bottom lane, past their empty camp, into red's minions](docs/screenshots/mercs-march.webp)
+20. **Winning** destroys the red Nexus. Losing means your Nexus falls first.
 
 Every ability has an animation of its own (a hammer that splits the ground, a meteor from the
 sky, a harpoon on its rope, a coil pylon arcing, a blood moon rising and so on), and so do bolts in
