@@ -274,12 +274,15 @@ export const ITEM_BENCH = 10;
 
 export type AugmentId =
   | 'spare-parts' | 'front-plates' | 'overtime' | 'hot-wiring' | 'level-up' | 'recycler' | 'thick-hull'
-  | 'rapid-fire' | 'last-stand' | 'lucky-bolt' | 'gold-rush' | 'duplicator' | 'scrap-dividend' | 'big-battery' | 'war-chest';
+  | 'rapid-fire' | 'last-stand' | 'lucky-bolt' | 'gold-rush' | 'duplicator' | 'scrap-dividend' | 'big-battery' | 'war-chest'
+  | 'free-rolls' | 'hand-to-mouth' | 'gilded-shop';
 
 export interface AugmentDef {
   id: AugmentId;
   name: TextKey;
   text: TextKey;
+  /** A rare card that changes the economy: offered only in the third slot from stage 4 on (`RARE_FROM_STAGE`). */
+  rare?: boolean;
 }
 
 export const AUGMENTS: AugmentDef[] = [
@@ -298,7 +301,15 @@ export const AUGMENTS: AugmentDef[] = [
   { id: 'scrap-dividend', name: 'scrapDividendName', text: 'scrapDividendText' },
   { id: 'big-battery', name: 'bigBatteryName', text: 'bigBatteryText' },
   { id: 'war-chest', name: 'warChestName', text: 'warChestText' },
+  { id: 'free-rolls', name: 'freeRollsName', text: 'freeRollsText', rare: true },
+  { id: 'hand-to-mouth', name: 'handToMouthName', text: 'handToMouthText', rare: true },
+  { id: 'gilded-shop', name: 'gildedShopName', text: 'gildedShopText', rare: true },
 ];
+
+/** From this stage on, a power card offer holds one rare card. */
+export const RARE_FROM_STAGE = 4;
+/** What the rare cards do: free rerolls each round; gold a round instead of interest; the gilded chance from level 1. */
+export const RARE = { freeRolls: 2, handToMouthGold: 6, gildedChance: 0.2 };
 
 export const AUGMENT_BY_ID: Record<string, AugmentDef> = Object.fromEntries(AUGMENTS.map((a) => [a.id, a]));
 
@@ -480,7 +491,7 @@ export function stageRounds(stage: number): RoundDef[] {
       { stage, index: 4, kind: 'draft' },
     ];
   }
-  const augmentAt = stage === 2 ? 1 : stage === 3 || stage === 4 ? 2 : 0;
+  const augmentAt = stage === 2 ? 1 : stage >= 3 && stage <= 5 ? 2 : 0;
   const last: RoundDef =
     stage === 2
       ? { stage, index: 7, kind: 'rat', monsters: ['rat'] }

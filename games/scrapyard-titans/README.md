@@ -76,8 +76,11 @@ terrain tiles. The plan phase lasts 30 seconds; when it runs out the fight start
   would build there, and the panel lists every recipe for that part.
 - **Damage meter.** After each fight the panel under the players list ranks your robots by the
   damage they dealt, and names the one that took the most.
-- **Power cards.** At rounds 2-1, 3-2 and 4-2 every commander picks one of three power cards
-  (15 in all, like Thick Hull, Recycler or War Chest) that last the whole match.
+- **Power cards.** At rounds 2-1, 3-2, 4-2 and 5-2 every commander picks one of three power cards
+  (15 in all, like Thick Hull, Recycler or War Chest) that last the whole match. From 4-2 on, the
+  third card is a rare one, gold-edged, that changes the economy: Lucky Dice (the first two rerolls
+  each round are free), Hand to Mouth (no interest, but 6 gold every round) or Gilded Shop (gilded
+  robots in one shop slot in five, from level 1).
 - **Commanders.** Foreman Grit (Overclock: robots attack 40% faster for 5 seconds), Sparks Malone
   (Big Zap: zaps and stuns the toughest enemy) and Madame Magna (Scrap Wall: shields every robot)
   are open from the start. Five more unlock through deeds, saved on the device: Patch Rosa
@@ -131,6 +134,8 @@ shows your seat's fights on the board.
 ![The menu: eight commanders (some locked until their deed is done), two seasons, the terrain toggle and the rank](docs/screenshots/menu.webp)
 
 ![A draft round: robots carrying parts on the board, picked lowest health first](docs/screenshots/draft.webp)
+
+![A power card offer at 4-2 with a gold-edged rare card, Lucky Dice, in the third slot](docs/screenshots/rare-card.webp)
 
 ![The Scrap Rat chase: the squad hunts the rat across the board](docs/screenshots/scrap-rat.webp)
 

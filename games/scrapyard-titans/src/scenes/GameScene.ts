@@ -1123,7 +1123,7 @@ export class GameScene extends Phaser.Scene {
     g.fillStyle(C.mana).fillRect(92, lb + 20, need ? (60 * me.xp) / need : 60, 5);
     this.txt(92, lb + 25, need ? t('xp', { xp: me.xp, need }) : t('maxLevel'), 9, C.dim);
     const planning = m.phase === 'plan';
-    this.button(g, BUTTONS.reroll, t('reroll', { n: rerollCost(me) }), () => this.doReroll(), { on: planning && me.human && me.gold >= rerollCost(me), size: 11 });
+    this.button(g, BUTTONS.reroll, me.freeRolls > 0 ? t('rerollFree', { n: me.freeRolls }) : t('reroll', { n: rerollCost(me) }), () => this.doReroll(), { on: planning && me.human && me.gold >= rerollCost(me), size: 11 });
     this.button(g, BUTTONS.xp, t('buyXp', { n: ECONOMY.xpCost }), () => this.doXp(), { on: planning && me.human && me.gold >= ECONOMY.xpCost && me.level < MAX_LEVEL, size: 11 });
     const selUnit = this.selected?.kind === 'unit' ? unitAt(me, this.selected.spot) : null;
     if (selUnit && planning) this.button(g, BUTTONS.sell, t('sellFor', { n: sellValue(selUnit) }), () => this.doSell(), { color: 0xffb703, size: 11 });
@@ -1332,11 +1332,14 @@ export class GameScene extends Phaser.Scene {
       me.augmentOffer.forEach((id, i) => {
         const a = AUGMENT_BY_ID[id];
         const r = { x: VIEW.w / 2 - 330 + i * 230, y: VIEW.fy + 130, w: 200, h: 250 };
-        g.fillStyle(0x1d1846, 1).fillRoundedRect(r.x, r.y, r.w, r.h, 14);
-        g.lineStyle(3, 0xff5cf0, 1).strokeRoundedRect(r.x, r.y, r.w, r.h, 14);
+        // A rare card is gold-edged and tagged.
+        const edge = a.rare ? 0xffd166 : 0xff5cf0;
+        g.fillStyle(a.rare ? 0x2a2140 : 0x1d1846, 1).fillRoundedRect(r.x, r.y, r.w, r.h, 14);
+        g.lineStyle(3, edge, 1).strokeRoundedRect(r.x, r.y, r.w, r.h, 14);
+        if (a.rare) say(r.x + r.w / 2, r.y + 22, t('rareCard'), 12, C.gold, { fontStyle: 'bold' }).setOrigin(0.5);
         g.lineStyle(1.5, C.cyan, 0.6).strokeRoundedRect(r.x + 8, r.y + 8, r.w - 16, r.h - 16, 10);
-        g.fillStyle(0xff5cf0, 0.18).fillCircle(r.x + r.w / 2, r.y + 80, 44);
-        say(r.x + r.w / 2, r.y + 80, `${i + 1}`, 40, '#ff5cf0', { fontStyle: 'bold' }).setOrigin(0.5);
+        g.fillStyle(edge, 0.18).fillCircle(r.x + r.w / 2, r.y + 80, 44);
+        say(r.x + r.w / 2, r.y + 80, `${i + 1}`, 40, a.rare ? C.gold : '#ff5cf0', { fontStyle: 'bold' }).setOrigin(0.5);
         say(r.x + r.w / 2, r.y + 150, t(a.name), 17, '#ffffff', { fontStyle: 'bold' }).setOrigin(0.5);
         say(r.x + r.w / 2, r.y + 180, t(a.text), 12, C.text, { align: 'center', wordWrap: { width: r.w - 30 } }).setOrigin(0.5, 0);
         this.overlayButtons.push({ ...r, run: () => this.doAugment(i) });

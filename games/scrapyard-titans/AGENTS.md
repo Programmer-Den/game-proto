@@ -38,8 +38,12 @@ Implemented today:
   `ITEM_BENCH` (10): every part or item a player gets (drops, sales, star-ups, drafts, power cards,
   scrap tokens) goes through `giveItem`, which scraps it when the bench is full. The scene then
   floats "Parts full" (`partsFull`) over an orb or the item bench instead of the item's name.
-- Power cards (`AUGMENTS`): offered at rounds with `augment` set (2-1, 3-2, 4-2) and picked with
-  `pickAugment`. Duplicator pays the robot's cost in gold instead when the bench is full. While
+- Power cards (`AUGMENTS`): offered at rounds with `augment` set (2-1, 3-2, 4-2, 5-2) and picked with
+  `pickAugment`. From `RARE_FROM_STAGE` (4) `offerAugments` puts a `rare` card in the third slot,
+  drawn gold-edged with a RARE tag: `free-rolls` (`Player.freeRolls`, reset to `RARE.freeRolls` in
+  `startPlan`, makes `rerollCost` 0 and the Reroll button read "Reroll free"), `hand-to-mouth`
+  (`startPlan` pays `RARE.handToMouthGold` instead of interest) and `gilded-shop` (`rollShop` uses
+  `RARE.gildedChance` from level 1). Duplicator pays the robot's cost in gold instead when the bench is full. While
   the card overlay is up, taps and keys other than 1-3 do nothing.
 - Rounds (`stageRounds`): stage 1 is three neutral rounds and a draft; later stages are
   pvp, pvp, pvp, draft, pvp, pvp, then a monster round (2-7 is the Scrap Rat, `RAT`).
@@ -231,7 +235,7 @@ greyed-out button or shop card (`button` pushes a refusal for them).
   `cover.png`), `draft.webp` and `scrap-rat.webp` are from a scratch `?watch` run with the watch
   panel hidden; `scout.webp`, `part-preview.webp` and `damage-meter.webp` from a scratch run that
   plays round 1-1 with real clicks; `german-result.webp` is the test's `3-result` run with a
-  `de-DE` browser locale; `fill-ultrawide.webp` (2560x1080) and `fill-tablet.webp` (1024x768)
+  `de-DE` browser locale; `rare-card.webp` is a scratch run's 4-2 offer (set from the dev console) with Lucky Dice in the third slot; `fill-ultrawide.webp` (2560x1080) and `fill-tablet.webp` (1024x768)
   show the plan phase on a wider and a taller view, from a scratch run.
 
 ## Making common changes
