@@ -1,6 +1,6 @@
 import { byDifficulty } from '../../../../shared/settings';
 import { RELICS, STYLES, TWISTS, UNIQUE_RELICS, type Level, type RelicId, type StyleId, type Twist } from './catalog';
-import { dailySeed, makePuzzle, peersOf, seeded, SHAPES, shuffle, units, type Puzzle, type Random } from './sudoku';
+import { dailySeed, makePuzzle, nextDay, peersOf, seeded, SHAPES, shuffle, units, type Puzzle, type Random } from './sudoku';
 
 // Ninefold's rules: Classic (a daily puzzle and free play at three levels) and Delve (a run of
 // ever bigger puzzles with hearts and relics), and the progress that unlocks the art styles.
@@ -101,11 +101,14 @@ export interface Progress {
   bosses: number;
   /** The date (`dailySeed`) of the last daily puzzle solved. */
   daily: number;
+  /** Daily puzzles solved on days in a row, ending with `daily`, and the longest such run. */
+  dailyStreak: number;
+  bestStreak: number;
   style: StyleId;
   unlocked: StyleId[];
 }
 
-export const newProgress = (): Progress => ({ solved: 0, flawless: 0, noHint: 0, hard: 0, fast: 0, bestFloor: 0, bosses: 0, daily: 0, style: 'paper', unlocked: ['paper'] });
+export const newProgress = (): Progress => ({ solved: 0, flawless: 0, noHint: 0, hard: 0, fast: 0, bestFloor: 0, bosses: 0, daily: 0, dailyStreak: 0, bestStreak: 0, style: 'paper', unlocked: ['paper'] });
 
 /** When each style unlocks, from the progress. Stained Glass waits for every other one. */
 export const UNLOCKS: Record<StyleId, (p: Progress) => boolean> = {
@@ -168,6 +171,8 @@ export interface GameState {
   streak: number;
   /** Hearts the Keystone has given back on this floor. */
   keyHealed: number;
+  /** What Undo can take back, newest last: a cell's digit and notes before a note, a wrong digit or an erase. */
+  undo: { cell: number; value: number; notes: number }[];
   /** Units (as indexes into `units`) already complete, so each one is celebrated once. */
   doneUnits: number[];
   /** Styles unlocked by the last board solved. */
@@ -180,7 +185,7 @@ export function newGame(progress: Progress): GameState {
   return {
     phase: 'menu', mode: 'classic', level: 'easy', puzzle: null, values: [], notes: [], selected: -1, notesMode: false,
     mistakes: 0, hintsLeft: 0, hintsUsed: 0, timeMs: 0, hearts: 0, maxHearts: 0, floor: 0, plan: null, upcoming: null, dailyDate: 0, relics: [], relicOffer: [],
-    warded: false, streak: 0, keyHealed: 0, doneUnits: [], newStyles: [], progress, events: [],
+    warded: false, streak: 0, keyHealed: 0, undo: [], doneUnits: [], newStyles: [], progress, events: [],
   };
 }
 
@@ -195,6 +200,7 @@ function load(s: GameState, puzzle: Puzzle) {
   s.timeMs = 0;
   s.warded = false;
   s.keyHealed = 0;
+  s.undo = [];
   s.newStyles = [];
   markDone(s);
   s.phase = 'playing';
@@ -325,6 +331,7 @@ export function enter(s: GameState, digit: number) {
   const cell = s.selected;
   if (s.notesMode) {
     if (s.values[cell]) return false;
+    remember(s, cell);
     s.notes[cell] ^= 1 << digit;
     return true;
   }
@@ -341,6 +348,7 @@ export function enter(s: GameState, digit: number) {
     return true;
   }
   if (s.values[cell] === digit) return false;
+  remember(s, cell);
   s.values[cell] = digit;
   s.mistakes++;
   s.streak = 0;
@@ -372,10 +380,45 @@ export const clockLeft = (s: GameState) => CLOCK_MS - (s.timeMs % CLOCK_MS);
 export function erase(s: GameState) {
   if (!canEnter(s)) return false;
   const cell = s.selected;
+  if (!s.values[cell] && !s.notes[cell]) return false;
+  remember(s, cell);
   if (s.values[cell]) s.values[cell] = 0;
-  else if (s.notes[cell]) s.notes[cell] = 0;
-  else return false;
+  else s.notes[cell] = 0;
   return true;
+}
+
+/** The most steps Undo keeps. */
+const UNDO_STEPS = 200;
+
+function remember(s: GameState, cell: number) {
+  s.undo.push({ cell, value: s.values[cell], notes: s.notes[cell] });
+  if (s.undo.length > UNDO_STEPS) s.undo.shift();
+}
+
+/** Whether Undo has a step to take back: one whose cell isn't right by now. */
+export const canUndo = (s: GameState) => s.phase === 'playing' && s.undo.some((u) => !isRight(s, u.cell));
+
+/**
+ * Takes back the latest note, wrong digit or erase, restoring that cell's digit and notes. A
+ * right digit stays (it is right), so steps on cells filled since are skipped; a mistake still
+ * counts and its heart stays lost.
+ */
+export function undoMove(s: GameState) {
+  if (s.phase !== 'playing') return false;
+  while (s.undo.length) {
+    const u = s.undo.pop()!;
+    if (isRight(s, u.cell)) continue;
+    s.values[u.cell] = u.value;
+    s.notes[u.cell] = u.notes;
+    s.selected = u.cell;
+    return true;
+  }
+  return false;
+}
+
+/** The daily streak as it stands today: kept while the last daily solved was today or yesterday. */
+export function dailyStreakNow(p: Progress, today: number) {
+  return p.daily === today || nextDay(p.daily) === today ? p.dailyStreak : 0;
 }
 
 /** Fills in the selected cell (or the first open one) with its digit, using up a hint. */
@@ -418,7 +461,11 @@ function solved(s: GameState) {
   if (s.hintsUsed === 0) p.noHint++;
   if ((s.mode === 'classic' && s.level === 'hard') || (s.mode === 'delve' && s.floor >= HARD_FLOOR)) p.hard++;
   if (s.puzzle!.size === 9 && s.timeMs <= FAST_MS) p.fast++;
-  if (s.mode === 'daily') p.daily = s.dailyDate;
+  if (s.mode === 'daily') {
+    p.dailyStreak = p.daily && nextDay(p.daily) === s.dailyDate ? p.dailyStreak + 1 : 1;
+    p.bestStreak = Math.max(p.bestStreak, p.dailyStreak);
+    p.daily = s.dailyDate;
+  }
   if (s.mode === 'delve') p.bestFloor = Math.max(p.bestFloor, s.floor);
   s.selected = -1;
   s.events.push({ type: 'solved' });

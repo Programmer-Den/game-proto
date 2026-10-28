@@ -26,6 +26,9 @@ Implemented today:
   toggles a bit per digit in `notes`. Hints fill the picked cell, or the first open one.
 - Finished rows, columns and boxes (`doneUnits`) flash once and stay tinted; picking a cell tints
   its peers and every cell with the same right digit.
+- The daily streak: `solved` counts `Progress.dailyStreak` up when the daily solved is the day after
+  the last one (`nextDay` in `sudoku.ts`), else starts it at 1, and keeps `bestStreak`; the menu's
+  stats line shows `dailyStreakNow` (0 once a day is missed).
 - Delve floors are planned by `planFloor` (a `FloorPlan`: floor, size, givens, twists, boss) from
   `FLOORS`; past its last row a floor loses a given every `DEEPER_EVERY` floors, down to
   `MIN_GIVENS`. From `TWIST_FLOOR` (4) each floor draws a twist (`TWISTS` in `catalog.ts`, each
@@ -57,10 +60,12 @@ Implemented today:
 
 Missing or rough:
 
-- A board in play is not saved; a reload starts at the menu.
-- The daily puzzle has no streak and no shared leaderboard; once solved, the menu ticks it off and
-  disables its button for today.
-- No undo; a right digit can't be taken back (it is right).
+- The daily puzzle has no shared leaderboard; once solved, the menu ticks it off and disables its
+  button for today.
+- Undo takes back notes, wrong digits and erases only; a right digit can't be taken back (it is
+  right), and an undone mistake still counts.
+- Leaving a board by Menu drops it (the save is cleared); only a closed or reloaded page comes back
+  to it.
 - Puzzle levels are by given count, not by the solving techniques they need.
 - `docs/screenshots/all-styles.webp`, `style-picker.webp`, `menu.webp`, `upright-board.webp` (a
   390x844 phone at 2x) and `cover.png` are not made by
@@ -127,18 +132,21 @@ How it runs:
   panel's clock, hearts, hints and notes label are set every frame in `updatePanel`.
 - Input: the scene's `pointerdown` picks a cell (only on the board while playing). Buttons are a
   `Graphics` and a text under an interactive `Zone` (`button`), which stops the event so it never
-  reaches the board; disabled ones play `ui('refuse')`. Keys: 1-9, arrows, N, H, Backspace/Delete/0.
+  reaches the board; disabled ones play `ui('refuse')`. Keys: 1-9, arrows, N, H, U or Z (undo), Backspace/Delete/0.
 - End cards sit above a dim zone that swallows taps (`dim`, `raise`).
 
 State model (`GameState`): `phase` (`menu`, `playing`, `solved`, `relic`, `over`), `mode`
 (`classic`, `daily`, `delve`), `level`, `puzzle` (`size`, `boxW`, `boxH`, `solution`, `givens`),
 `values` (0 empty; may hold a wrong digit), `notes` (bit per digit), `selected` (-1 none),
 `notesMode`, `mistakes`, `hintsLeft`, `hintsUsed`, `timeMs`, `hearts`, `maxHearts`, `floor`,
-`plan` and `upcoming` (Delve `FloorPlan`s, null otherwise), `dailyDate` (the `dailySeed` a daily board was dealt for, 0 otherwise), `relics`, `relicOffer`, `warded`, `streak`, `keyHealed`, `doneUnits` (indexes into `units`), `newStyles`, `progress` and
+`plan` and `upcoming` (Delve `FloorPlan`s, null otherwise), `dailyDate` (the `dailySeed` a daily board was dealt for, 0 otherwise), `relics`, `relicOffer`, `warded`, `streak`, `keyHealed`, `undo` (the cells' digits and notes before each note, wrong digit or erase; `undoMove` restores the newest whose cell isn't right, `canUndo`), `doneUnits` (indexes into `units`), `newStyles`, `progress` and
 `events`.
 
-Persistence: one `localStorage` key, `ninefold-progress`, holding `Progress` (`solved`, `flawless`,
-`noHint`, `hard`, `fast`, `bestFloor`, `bosses`, `daily`, `style`, `unlocked`). It is written when a board is
+Persistence: two `localStorage` keys. `ninefold-board` holds the board in play (`saveBoard`/`loadBoard`
+in `save.ts`: the `BOARD_FIELDS` of `GameState`, written by `update` whenever the scene is dirty and
+every `SAVE_EVERY_MS` of board time, and removed once the phase is neither `playing` nor `relic`);
+`create` restores it, straight onto the board or the relic offer. `ninefold-progress` holds `Progress` (`solved`, `flawless`,
+`noHint`, `hard`, `fast`, `bestFloor`, `bosses`, `daily`, `dailyStreak`, `bestStreak`, `style`, `unlocked`). It is written when a board is
 solved, a style unlocks, a Delve run ends or a style is picked. `loadProgress` keeps only known
 styles and re-checks `UNLOCKS`.
 
@@ -186,7 +194,7 @@ digit, Erase or Hint that can't be used, a disabled pad key and a locked style.
 - `src/main.ts` exposes `window.game` in dev builds. The test reads `game.scene.getScene('Game')`
   and its `state` (copied through JSON, without `events`), `screen`, `cellSpots` (`{ cell, x, y,
   w, h }` per cell of the board, in view pixels) and `buttons` (spots by id: `daily`, `easy`,
-  `normal`, `hard`, `delve`, `styles`, `menu`, `key-1`..`key-9`, `notes`, `erase`, `hint`,
+  `normal`, `hard`, `delve`, `styles`, `menu`, `key-1`..`key-9`, `notes`, `erase`, `undo`, `hint`,
   `relic-0`..`relic-2`, `next`, `done`, `again`, `back`, `style-<id>`).
 - Inputs: it taps `delve`, taps cells from `cellSpots` and pad keys from `buttons`, toggles
   `notes`, taps `erase` and `relic-0`. It never uses hints and stays on Delve floors 1 and 2.

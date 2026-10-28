@@ -90,7 +90,7 @@ export const BUTTONS: Button[] = [
 /** Where the message line and the contract panel start, right of the research column. */
 export let PANEL_X = RESEARCH_COLUMN.x + RESEARCH_COLUMN.w + 8;
 /** The rivals panel (truces and tribute), opened from the top bar's rivals or with T: its box on the map's top right, in view pixels. */
-export const RIVALS_PANEL = { x: VIEW.w - 326, y: TOP.h + 8, w: 318, head: 24, row: 52 };
+export const RIVALS_PANEL = { x: VIEW.w - 326, y: TOP.h + 8, w: 318, head: 24, row: 64 };
 /** The minimap: the whole battlefield at a tenth of its size, one pixel a fog cell, in the map's bottom-right corner. */
 export const MINIMAP = { x: VIEW.w - 168, y: BAR.y - 108, w: 160, h: 100 };
 /** The army count on the top bar: tapping it selects every warship. */

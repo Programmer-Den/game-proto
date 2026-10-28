@@ -89,6 +89,17 @@ Once chapter two is told, the kingdom stays open, and there is more to do in it:
 
 ![The moonstone page](docs/screenshots/moonstones.webp)
 
+### Foes that need your tools
+
+Most foes fall to the sword, but two don't:
+
+- **Shelled beetles** turn the blade with their shell. Flip one on its back with the hookvine or a
+  bellseed's burst, then strike before it rights itself.
+- **Lantern moths** fly too high for the sword and drop embers on you. Pull one down with the
+  hookvine, or burst a bellseed under it, and strike while it lies on the ground.
+
+![A lantern moth and a shelled beetle in Glimmer Fen](docs/screenshots/new-foes.webp)
+
 ### Hearts and falls
 
 You have three hearts on Normal (five on Easy, two on Hard). Foes, thorn seeds, bursts and the

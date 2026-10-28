@@ -5,6 +5,7 @@ import { VIEW } from './scenes/layout';
 import { setupScaling } from '../../../shared/scaling';
 import { setupGame } from '../../../shared/setupGame';
 import { howToPlay } from './howToPlay';
+import { trophies } from './trophies';
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
@@ -19,7 +20,7 @@ const game = new Phaser.Game({
   },
   scene: [BootScene, GameScene],
 });
-setupGame(game, { howToPlay });
+setupGame(game, { howToPlay, trophies });
 setupScaling(game, { fill: true });
 
 // Handy for poking at state from the browser console during development, and read by the

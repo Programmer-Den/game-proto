@@ -124,6 +124,16 @@ open, the board stands aside; the top bar still counts down.
 
 ![The convoy contract: three harvesters on a dashed trail toward the far field marked Convoy field](docs/screenshots/convoy.webp)
 
+**The rivals run contracts too.** From 1:30 each rival works through a chain of its own, ranks II
+to V, picked from Break the raid, Hold the Relay, Claim two derelicts, Raze an outpost and Topple a
+hub, for the same rewards and perks as yours. A rival plays to its contract: on a raid contract it
+sends its fleet out with two ships fewer than usual (and at a hub for Topple a hub), on Hold the
+Relay it keeps a ship on the beacon however far its hub is, and on Claim two derelicts it goes for
+stations anywhere. A contract it hasn't finished in 3 minutes is dropped for another. The rivals
+panel shows each rival's contract and progress, and the message line says when one finishes.
+
+![The rivals panel with each rival's own contract under its grudge, and the message line saying the Ferrox Hive finished Break the raid](docs/screenshots/rival-contracts.webp)
+
 ### The flagship
 
 The third contract done unlocks the Flagship button above the build row. Your flagship is your

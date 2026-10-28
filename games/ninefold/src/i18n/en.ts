@@ -49,7 +49,9 @@ const en = {
   notesOn: 'Notes: on',
   notesOff: 'Notes: off',
   erase: 'Erase',
-  keysHint: 'Keys: 1-9, arrows, N notes, H hint, Backspace erases',
+  undo: 'Undo',
+  keysHint: 'Keys: 1-9, arrows, N notes, H hint, U undo, Backspace erases',
+  streak: { one: 'Daily streak: {n} day', other: 'Daily streak: {n} days' },
   // End cards
   solved: 'Solved!',
   solvedLine: 'Time {time} · Mistakes {mistakes} · Hints {hints}',

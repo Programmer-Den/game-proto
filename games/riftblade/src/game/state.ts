@@ -5,6 +5,7 @@ import { DRILLS, DRILL_STEPS, at, capstonesOf, crossoversOf } from './upgrades';
 import type { EventId, FoeKind, NodeKind } from './planets';
 import type { TextKey } from '../i18n';
 import { PERK, type ArmouryId } from './armoury';
+import { MUT, type MutatorId } from './weekly';
 
 /** Each planet lasts this long before its boss comes, ms. */
 export const RUN_MS = 5 * 60_000;
@@ -447,6 +448,9 @@ export interface GameState {
   /** Whether the Field Briefing's fourth card has been dealt, and whether this trader's reroll is free (Spare Reroll). */
   briefed: boolean;
   freeReroll: boolean;
+  /** The weekly run's week (-1 for any other run) and its mutators (see `weekly.ts`). */
+  week: number;
+  mutators: MutatorId[];
   /**
    * The planet (an index into `PLANETS`: 0 Dune, 1 Swamp, 2 Ice, 3 Lava, then the later ones) and
    * the jump of the crusade it is (`stage`, 0 to 3), and whether this is the elite arena after it.
@@ -578,6 +582,8 @@ export function freshState(): GameState {
     perks: {},
     briefed: false,
     freeReroll: false,
+    week: -1,
+    mutators: [],
     planet: 0,
     stage: 0,
     route: [0],
@@ -715,16 +721,17 @@ export function statsOf(s: GameState): Stats {
   // Adrenal Stim: faster and harder while health is low.
   const p = s.player;
   const stim = p.maxHp > 0 && p.hp < p.maxHp * 0.4 ? at([0.1, 0.15, 0.2, 0.25, 0.3], r('stim'), 0) : 0;
+  const mut = (id: MutatorId) => s.mutators.includes(id);
   return {
-    speed: hero.speed * (1 + 0.08 * r('boots')) * k.speed * (1 + d.speed + stim),
+    speed: hero.speed * (1 + 0.08 * r('boots')) * k.speed * (1 + d.speed + stim) * (mut('haste') ? MUT.haste : 1),
     pickup: PICKUP_R * (1 + 0.3 * r('magnet') + PERK.lens * (s.perks.lens ?? 0)) * (s.lureMs > 0 ? POWER.lure : 1),
     armour: 0.08 * r('armour') + k.armour + d.armour,
     maxHp: s.hero === 'triad' ? botMax(s) * botCount(s) : Math.round((hero.maxHp + 10 * r('armour') + k.hp + d.hp) * s.maxHpMod),
-    regen: 0.5 * r('medpack') + k.regen + d.regen,
+    regen: mut('vampire') ? 0 : 0.5 * r('medpack') + k.regen + d.regen,
     cooldown: 1 - 0.07 * r('overclock'),
     damage:
       (1 + 0.1 * r('cell')) * (1 + at([0, 0.1, 0.1, 0.2, 0.2], r('overcharge'), 0)) * (1 + at([0, 0.25, 0.25, 0.25, 0.75], r('marksman'), 0)) * k.damage * q.damage *
-      (1 + d.damage) * (1 + stim),
+      (1 + d.damage) * (1 + stim) * (mut('glass') ? MUT.glassDmg : 1),
     xp: 1 + 0.1 * r('lens'),
     crit: 0.06 * r('chip') + k.crit + d.crit,
     fireRate: fireRate * overdrive,
@@ -735,7 +742,7 @@ export function statsOf(s: GameState): Stats {
     slowMs: r('stun') >= 3 ? 2000 : 1500,
     reach: k.reach,
     dodge: k.dodge,
-    sigCooldown: (1 - 0.07 * r('overclock')) * k.sig * q.sig * (1 - d.sig),
+    sigCooldown: (1 - 0.07 * r('overclock')) * k.sig * q.sig * (1 - d.sig) * (mut('overcharged') ? MUT.overcharged : 1),
     bossDmg: 1 + 0.1 * r('scanner'),
     execute: at([0.08, 0.1, 0.12, 0.15, 0.18], r('executioner'), 0),
     harvest: at([0.4, 0.6, 0.8, 1, 1.3], r('soul-harvest'), 0),

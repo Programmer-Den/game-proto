@@ -244,6 +244,7 @@ const en = {
   flagshipUnlocked: '. Flagship unlocked: build the {name} at your hub',
   contractStarted: 'Contract {rank}: {brief}',
   contractFailed: 'Contract failed: {why}. Pick another from the board',
+  rivalDealDone: 'The {faction} finished {title}: {perk}',
   convoyHunted: 'The {faction} sends {n} ships to hunt your convoy',
   pactRaids: 'The pact raids: every rival fleet is coming for your hub. Next wave in {s} s',
   pactSigned: 'Last stand: {who} sign a pact and raid you together in {s} s',
@@ -256,6 +257,8 @@ const en = {
   aiResearches: 'researches {track} {level}',
   aiAttacks: 'sends {n} ships at the {faction} {building}',
   aiClaimer: 'sends a ship to claim the derelict {derelict}',
+  aiDeal: 'takes contract {rank}: {title}',
+  aiDealDone: 'finishes {title}: {perk}',
   aiBuilds: 'builds a {building}',
 
   // Top bar
@@ -348,6 +351,8 @@ const en = {
   rivalsHead: 'RIVALS · truces and tribute · T closes',
   rivalOffers: '{faction} offers a truce · {s} s · press T',
   fallen: 'Fallen',
+  rivalDeal: 'Contract {rank}: {title} · {n}/{target}',
+  rivalDealsDone: 'Contract chain done',
   grudgeYou: 'Grudge: you',
   grudgeAt: 'Grudge: the {faction}',
   noGrudge: 'No grudge yet',
