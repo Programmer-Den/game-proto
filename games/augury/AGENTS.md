@@ -33,8 +33,8 @@ Implemented today:
 
 Missing or rough:
 
-- A reload during a puzzle deals that puzzle again from its start, with its full time (the run is
-  saved between puzzles, not move by move).
+- A reload during a puzzle deals that puzzle again from its start, with its full time, and a boss
+  from its first half (the run is saved between puzzles, not move by move).
 - Puzzle levels are by size and settings, not by the solving steps a puzzle needs; Picture Grid,
   Calc Cages and Cross Sums may have more than one answer (any that keeps the rules counts).
 - Unjam makes its layouts by scattering blocks and searching (up to about half a second at
@@ -70,7 +70,8 @@ File map (`src/`):
 - `game/run.ts`: the tuning (`QUEUE`, `BETWEEN_MS`, `START_HINTS`, `startHearts`, `MAX_HEARTS`,
   `blitzSeconds`, `BLITZ_SOLVE_S`, `BLITZ_PENALTY_S`, `DAILY_LEVELS`, `DUEL_LEVELS`, `DUEL_FAIL_S`,
   `DUEL_HINT_S`, `RELIC_EVERY`, `RELIC_OFFER`, `DRAFT_MAX`, `HOURGLASS`, `CHARM_POINTS`,
-  `CHARM_ECHO_SLOW`, `OMEN_POINTS`, `PERIL_HEARTS`, the points constants),
+  `CHARM_ECHO_SLOW`, `OMEN_POINTS`, `PERIL_HEARTS`, `BOSS_EVERY`, `BOSS_TIME`, `BOSS_POINTS`, the
+  points constants),
   `Card`, `Current`, `Result`, `Run`, `RunEvent`, and the actions (`startRun`, `act`, `drag`,
   `undo`, `hint`, `skip`, `quit`, `next`, `draftPick`, `takeRelic`, `startSecondPlayer`, `tick`,
   `canUndo`, `canHint`, `dailyDone`, `endlessLevel`, `holdsCharm`, `offerRelics`, and `makeCurrent`,
@@ -82,7 +83,16 @@ File map (`src/`):
   the deck deals as before; `canTakeOmen`, `takeOmen`): an Endless or Draft puzzle can take its
   omen until its first move or hint (`touched`, set by `act` and `hint`); Haste halves its
   `timeTotalMs`, Silence turns off `canUndo` and `canHint`, Peril makes `end` take
-  `PERIL_HEARTS`, and a solve pays `OMEN_POINTS` times. The `Result` keeps the `omen`. Only this file changes a `Run`; `act` and
+  `PERIL_HEARTS`, and a solve pays `OMEN_POINTS` times. The `Result` keeps the `omen`. Bosses:
+  every `BOSS_EVERY`th puzzle of Endless and Draft (`isBossTurn(n)`, by puzzles dealt) is a `Card`
+  with a `boss` (its second half, another kind); `endlessCard` queues them and `offerDraft` deals
+  only bosses on a boss turn. `timeFor` gives the pair one clock, and when the first half is
+  solved `check` calls `secondHalf`, which records it and deals the second as `current` with the
+  same clock, hints and omen and `pair` set to the boss card (events `half` and `start`). `end`
+  records the boss as one `Result` (`card` the boss, `boss: true`), paying `BOSS_POINTS` times;
+  a beaten boss offers relics (`next`; in Endless `takeRelic` then deals the next queued card
+  through `dealQueued`, and `offerRelics` leaves the Crystal Ball out). The next card never
+  repeats the kind a boss ends on (`lastKind`). Only this file changes a `Run`; `act` and
   `drag` (a step of a drag, with no Undo step) are the only ways a move reaches a puzzle's state.
   `skip` in Practice deals a new puzzle of the same kind and level, with nothing recorded. `quit`
   (the Leave button) ends a run that is not over through `finish`, so its bests, the daily five's
@@ -97,7 +107,8 @@ File map (`src/`):
 - `game/progress.ts`: `Progress`, `newProgress`, `recordResult`. `game/save.ts`: `loadProgress`,
   `saveProgress`, and `saveRun`, `loadRun` (checks the saved run and deals its puzzle in play again
   from its card) and `clearRun`.
-- `scenes/GameScene.ts`: every screen, input and event.
+- `scenes/GameScene.ts`: every screen, input and event. Endless shows the relics bosses gave as a
+  row of emblems over the score box (`relicRow`).
 - `scenes/painter.ts`: `Painter`, an immediate-mode drawer: per layer a Graphics and a text pool,
   plus `hits` (tappable spots); `frame` (a tarot frame), `button`, `text`, `hit`, `layer`.
 - `scenes/views/`: one `PuzzleView` per kind (`draw`, and `down`/`move`/`up` for the dragged ones),
@@ -142,7 +153,7 @@ How it runs:
 - Time: `update` takes `dt` from the frame time (capped at `MAX_STEP_MS`) and calls `tick`, which
   runs the puzzle's clock (`timeLeftMs`), Blitz's clock (`clockMs`), Memory Echo's own clock and the
   banner between puzzles (`betweenMs`; Practice waits for a tap).
-- Events: `RunEvent`s (`start`, `end`, `heart`, `hint`, `warn`, `relic`, `omen`, `over`) are drained in
+- Events: `RunEvent`s (`start`, `end`, `heart`, `hint`, `warn`, `relic`, `omen`, `half`, `over`) are drained in
   `drain` for sound and saving.
 - Randomness: every card carries a seed, and its puzzle is made with `seeded(card.seed)`. Card seeds,
   kinds, draft offers and relic offers come from `Math.random`, except the daily five, whose kinds,
@@ -151,7 +162,7 @@ How it runs:
 
 State model (`Run`): `mode`, `phase`, `hearts`, `maxHearts`, `hints`, `score`, `streak`, `dealt`,
 `solved`, `current` (`card`, `state`, `timeLeftMs`, `timeTotalMs`, `elapsedMs`, `hintsUsed`, `freeHints`,
-`freeUsed`, `omen`, `touched`, `history`), `queue`, `results`, `last`, `betweenMs`, `clockMs`, `relics`, `relicOffer`,
+`freeUsed`, `omen`, `touched`, `pair`, `history`), `queue`, `results`, `last`, `betweenMs`, `clockMs`, `relics`, `relicOffer`,
 `draftOffer`, `player`, `totals`, `duelSolved`, `day`, `progress`, `newBest` and `events`.
 
 Persistence: two `localStorage` keys. `augury-run` holds the run in play (every mode but Practice,
@@ -187,7 +198,7 @@ sting plays out).
 | `tap` | a cell, island or block picked (`ctx.tap`), and Undo |
 | `place` | a move made (`ctx.act`), or a Path Link drag that changed a path, once when it ends (`ctx.place`) |
 | `deal` | a `start` event |
-| `solved` / `lost` | an `end` event, solved / lost, skipped or out of time |
+| `solved` / `lost` | an `end` event, solved / lost, skipped or out of time; `solved` also for a `half` event (a boss's first half) |
 | `heart` | a `heart` event |
 | `hint` | a `hint` event |
 | `warn` | a `warn` event (each of a clock's last five seconds) |
@@ -214,6 +225,8 @@ cell is picked, the daily five played today), and a Hint tap that finds nothing 
   3 hearts on Normal, `QUEUE`, `BETWEEN_MS`, `POINTS_PER_LEVEL`, the first puzzle at level 0 with a
   clock, never the same kind twice in a row, Unjam's 6x6 board, every puzzle state's answer fields
   and every spot id above, the scene key `'Game'` and the save key `augury-progress`.
+- The playthrough deals four puzzles, so it never meets a boss (the fifth); keep `BOSS_EVERY` above
+  four, or give the test a boss step.
 - It saves `playthrough-0-menu`, `-1-first-puzzle`, `-2-solved` and `-3-third-puzzle`.
 
 ## Making common changes
