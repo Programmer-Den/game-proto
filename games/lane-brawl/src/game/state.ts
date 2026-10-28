@@ -267,7 +267,7 @@ export type SoundId =
   | 'burst' | 'bolt' | 'dash' | 'ally' | 'buff' | 'zone' | 'impact'
   | 'lastHit' | 'slain' | 'youDie' | 'streak' | 'crash' | 'nexus' | 'wardBreak'
   | 'levelUp' | 'flask' | 'blink' | 'ward' | 'recallHome' | 'respawn' | 'buyBack'
-  | 'wave' | 'watchstone' | 'rune' | 'runeTaken' | 'mercs' | 'spell' | 'ping' | 'drake' | 'drakeWakes' | 'firstBlood' | 'plate' | 'growl' | 'beastSlain' | 'brute' | 'objective' | 'objectiveMissed';
+  | 'wave' | 'watchstone' | 'rune' | 'runeTaken' | 'mercs' | 'spell' | 'ping' | 'drake' | 'drakeWakes' | 'firstBlood' | 'plate' | 'nightfall' | 'daybreak' | 'growl' | 'beastSlain' | 'brute' | 'objective' | 'objectiveMissed';
 
 /**
  * A sound raised by the rules: at a point in the world (the view plays it only where blue sees and
@@ -363,6 +363,8 @@ export interface GameState {
   /** Whether the match's first champion kill has fallen, and whether the tower plates have fallen away. */
   firstBlood: boolean;
   platesGone: boolean;
+  /** Whether it is night, past the middle of dusk (for the notices). */
+  night: boolean;
   /** The river drake's unit id, its element now, how many have woken, and each team's stacks. */
   drake: number;
   drakeElement: DrakeElement;
@@ -622,6 +624,7 @@ export function createGame(pick: ChampionDef, enemyDamage: number, opts: MatchOp
     runeRounds: 0,
     firstBlood: false,
     platesGone: false,
+    night: false,
     drake: 0,
     drakeElement: DRAKE_ORDER[0],
     drakeRounds: 0,

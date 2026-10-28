@@ -491,6 +491,8 @@ const en = {
   noticeRunes: 'Runes appear in the river',
   noticeFirstBlood: 'First blood! {line} (+{gold} gold)',
   noticePlatesGone: 'The tower plates fall away',
+  noticeNightfall: 'Night falls: everyone sees less far',
+  noticeDaybreak: 'Day breaks',
   noticeDrakeAwake: 'The {drake} wakes in the river',
   noticeDrakeBlue: 'Your team slew the {drake}: {n} of 4 for the drake soul',
   noticeDrakeRed: 'Red slew the {drake}: {n} of 4 for the drake soul',

@@ -1260,6 +1260,15 @@ export const FIRST_BLOOD = { gold: 150 };
 export const PLATING = { count: 5, gold: 120, share: 700, until: 300_000 };
 
 /**
+ * Day and night (LB21): the match starts in the morning. Each day lasts `day` ms and each night
+ * `night`, with `fade` ms of dusk and of dawn at the ends of the night. At full night champions see
+ * only `sight` as far (minions, structures, watchstones and wards keep theirs), so the fog and the
+ * tall grass hide more. Less than 0.8 and watched matches end much sooner, as fewer fights are seen
+ * coming.
+ */
+export const DAYNIGHT = { day: 180_000, night: 90_000, fade: 10_000, sight: 0.8 };
+
+/**
  * Bodies (LB20): how wide each kind of walker is to the solid things of the map (`game/terrain.ts`)
  * and to other walkers. Camps by their own radius times `camp`. Overlapping walkers are pushed
  * apart by `give` of the overlap each tick, so a crowd parts softly rather than at once.
