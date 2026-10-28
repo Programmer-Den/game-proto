@@ -94,6 +94,9 @@ import {
 } from '../game/state';
 import { t } from '../i18n';
 import { makeButton } from '../ui/Button';
+import { award } from '../../../../shared/trophies';
+import { trophies } from '../trophies';
+import { checkTrophies } from '../trophies/check';
 import {
   FONT,
   GARDEN_CARD,
@@ -314,10 +317,12 @@ export class GameScene extends Phaser.Scene {
     // hold the game still behind them.
     tick(s, this.picker || s.offer.length ? 0 : dt * (s.fast ? FAST : 1));
     this.tickSounds(before);
+    checkTrophies(s);
     if (s.heart < heart) this.heartHit();
     // Waves called early that are done now, then a wave cleared.
     let budsBefore = bloom;
-    for (const n of s.settled) {
+    for (const { wave: n, clean } of s.settled) {
+      if (clean) award(trophies, 'boldCall');
       this.waveDone(n, budsBefore, true);
       budsBefore = Math.min(BLOOM_GOAL, budsBefore + 1);
     }
