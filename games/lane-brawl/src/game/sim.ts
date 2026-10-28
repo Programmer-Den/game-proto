@@ -17,6 +17,9 @@ import {
   AI_ELIXIR,
   ASSIST,
   KILL,
+  RUNE,
+  RUNES,
+  RUNE_ORDER,
   MINION,
   RESPAWN_BASE_MS,
   RESPAWN_PER_LEVEL_MS,
@@ -99,6 +102,7 @@ export function tick(s: GameState, dt: number) {
   updateContesters(s);
   updateGanks(s);
   updateJungle(s);
+  updateRunes(s);
   for (const u of [...s.units]) updateUnit(s, u, dt);
   updateProjectiles(s, dt);
   updateZones(s, dt);
@@ -1138,6 +1142,12 @@ function championPlan(s: GameState, u: Unit, dt: number): boolean {
   }
   // An enemy champion in reach: the lane fight below handles it.
   if (foeNear(CHAMP_AGGRO)) return false;
+  const rune = runeFor(s, u);
+  if (rune) {
+    u.target = null;
+    moveToward(u, rune, dt);
+    return true;
+  }
   const beast = s.contesters.includes(u.id) ? getUnit(s, s.beast) : null;
   if (beast && !beast.dead) {
     u.target = beast.id;
@@ -1286,6 +1296,49 @@ function updateGanks(s: GameState) {
 /** Whether a point is on a team's half of the map (the river splits the halves). */
 function ownHalf(team: Team, p: Vec): boolean {
   return team === 'blue' ? p.y > p.x : p.y < p.x;
+}
+
+/** River runes: new ones every `RUNE.every`, taken by the first champion to reach one. */
+function updateRunes(s: GameState) {
+  if (s.time >= s.nextRune) {
+    s.nextRune = s.time + RUNE.every;
+    const round = s.runeRounds++;
+    s.runes = RUNE.spots.map((p, i) => ({ kind: RUNE_ORDER[(round + i * 2) % RUNE_ORDER.length], x: p.x, y: p.y }));
+    aiLog('blue', `runes appear: ${s.runes.map((r) => r!.kind).join(' and ')}`);
+    notice(s, text('noticeRunes'), '#9fd8ff');
+    sound(s, 'rune');
+  }
+  s.runes.forEach((r, i) => {
+    if (!r) return;
+    const taker = s.units.find((u) => u.kind === 'champion' && !u.dead && dist(u, r) <= RUNE.pick);
+    if (!taker) return;
+    s.runes[i] = null;
+    const def = RUNES[r.kind];
+    if (def.buff && def.ms) addBuff(taker, def.name, def.buff, def.ms, def.color);
+    if (def.gold) {
+      taker.gold += def.gold;
+      for (const a of s.units) if (a !== taker && a.kind === 'champion' && a.side === taker.side) a.gold += def.teamGold ?? 0;
+      if (taker.player) s.fx.push({ kind: 'coin', x: r.x, y: r.y, gold: def.gold, color: def.color, ms: 900 });
+    }
+    s.fx.push({ kind: 'ring', x: r.x, y: r.y, r: 50, color: def.color, ms: 600 });
+    sound(s, 'runeTaken', r, taker.player);
+    aiLog(taker.side as Team, `${shortName(taker.name)} takes the ${r.kind} rune`);
+    const rune = text(def.name);
+    if (taker.player) notice(s, text('noticeRuneYou', { rune }), def.color);
+    else if (taker.side === 'blue') notice(s, text('noticeRuneAlly', { name: shortName(taker.name), rune }), def.color);
+    else if (!hiddenFrom(s, 'blue', taker)) notice(s, text('noticeRuneRed', { name: shortName(taker.name), rune }), SIDE_COLOR.red);
+  });
+}
+
+/** The rune an AI champion goes for: one within reach that it is its team's nearest AI champion to. */
+function runeFor(s: GameState, u: Unit): Vec | null {
+  if (u.player || u.hp < u.maxHp * RUNE.aiMinHp) return null;
+  for (const r of s.runes) {
+    if (!r || dist(u, r) > RUNE.aiReach) continue;
+    const closer = s.units.some((a) => a !== u && a.kind === 'champion' && !a.player && !a.dead && a.side === u.side && dist(a, r) < dist(u, r));
+    if (!closer) return r;
+  }
+  return null;
 }
 
 /** Now and then each team sends one AI champion for a jungle buff on its half, or a watchstone it lacks. */

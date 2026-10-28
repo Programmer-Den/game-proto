@@ -376,6 +376,10 @@ const de: Translation<typeof en> = {
   // Jungle buffs
   buffEmber: 'Glut',
   buffMoss: 'Moos',
+  runeMight: 'Macht',
+  runeHaste: 'Eile',
+  runeFortune: 'Glück',
+  runeMending: 'Heilung',
 
   // Jungle camps
   campBoar: 'Keiler',
@@ -470,6 +474,10 @@ const de: Translation<typeof en> = {
   noticeRedRoams: 'Rot: {name} zieht auf die {lane}',
   noticeBlueRoams: 'Blau: {name} zieht auf die {lane}',
   noticeWatchstoneBlue: 'Euer Team hat einen Wachstein eingenommen',
+  noticeRunes: 'Im Fluss erscheinen Runen',
+  noticeRuneYou: 'Du nimmst die {rune}-Rune',
+  noticeRuneAlly: '{name} nimmt die {rune}-Rune',
+  noticeRuneRed: 'Rot: {name} nimmt die {rune}-Rune',
   noticeWatchstoneRed: 'Rot hat einen Wachstein eingenommen',
 
   // Bottom bar

@@ -1141,6 +1141,29 @@ export function bushAt(p: Vec): number {
 
 export const GANK = { firstAt: 100_000, every: 70_000, ms: 24_000, minHp: 0.6, from: 650 };
 /** Each team sends a champion into the jungle for a buff or a watchstone this often, from `firstAt`. */
+/**
+ * River runes (LB13): every `every` ms from `firstAt` a rune appears at each of the two river
+ * `spots` (one replaces any not taken), the kinds taking turns by `RUNE_ORDER`. A champion that
+ * walks within `pick` takes it. The AI champion of a team nearest a rune within `aiReach`, with
+ * at least `aiMinHp` of its health and no enemy champion near, walks to it.
+ */
+export type RuneKind = 'might' | 'haste' | 'fortune' | 'mending';
+export const RUNES: Record<RuneKind, { name: TextKey; color: string; buff?: BuffDef; ms?: number; gold?: number; teamGold?: number }> = {
+  might: { name: 'runeMight', color: '#ff8a3d', buff: { dmg: 30 }, ms: 30_000 },
+  haste: { name: 'runeHaste', color: '#9fd8ff', buff: { speed: 40 }, ms: 25_000 },
+  fortune: { name: 'runeFortune', color: '#f2c14e', gold: 120, teamGold: 40 },
+  mending: { name: 'runeMending', color: '#7fe08a', buff: { regen: 25 }, ms: 20_000 },
+};
+export const RUNE_ORDER: RuneKind[] = ['might', 'haste', 'fortune', 'mending'];
+export const RUNE = {
+  spots: [{ x: 1025, y: 1025 }, { x: 1775, y: 1775 }] as Vec[],
+  firstAt: 120_000,
+  every: 120_000,
+  pick: 46,
+  aiReach: 750,
+  aiMinHp: 0.5,
+};
+
 export const JUNGLE = { firstAt: 120_000, every: 45_000, ms: 30_000, minHp: 0.6 };
 export const RETREAT = {
   /** Health ratio under which a champion with an enemy champion near falls back. */

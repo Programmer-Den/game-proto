@@ -19,6 +19,8 @@ import {
   ItemDef,
   LANES,
   RIVER,
+  RUNE,
+  RUNES,
   MAX_LEVEL,
   SIDE_COLOR,
   STREAK,
@@ -910,6 +912,7 @@ export class GameScene extends Phaser.Scene {
       const me = this.player();
       const layers: FxLayers = { ground: g, top };
       this.drawFountains(g, s);
+      this.drawRunes(g, s);
       for (const z of s.zones) if (!this.fogged(z.x, z.y)) drawZone(layers, z, s.time, settings.reduceMotion);
       if (me) this.drawRanges(g, s, me);
       for (const u of s.units) {
@@ -949,6 +952,33 @@ export class GameScene extends Phaser.Scene {
       sp.flash.destroy();
       this.sprites.delete(id);
     }
+  }
+
+  /** The rune spots on the river: a stone ring, and a rune hovering over it while one waits there (if blue sees it). */
+  private drawRunes(g: Phaser.GameObjects.Graphics, s: GameState) {
+    RUNE.spots.forEach((p, i) => {
+      g.fillStyle(0x6f7a86, 0.9).fillEllipse(p.x, p.y + 5, 60, 28);
+      g.fillStyle(0x9aa6b2, 1).fillEllipse(p.x, p.y + 2, 54, 24);
+      g.lineStyle(1.5, col(UI.edge), 0.6).strokeEllipse(p.x, p.y + 2, 54, 24);
+      const r = s.runes[i];
+      if (!r || this.fogged(r.x, r.y)) return;
+      const def = RUNES[r.kind];
+      const c = col(def.color);
+      const bob = settings.reduceMotion ? 0 : Math.sin(s.time / 380 + i) * 3;
+      const y = p.y - 30 + bob;
+      g.fillStyle(c, 0.3).fillEllipse(p.x, p.y + 2, 46, 18);
+      g.fillStyle(c, 0.22).fillCircle(p.x, y, 24);
+      const gem = (rad: number) => pts2(Array.from({ length: 6 }, (_, k) => new Phaser.Math.Vector2(p.x + Math.cos((k * Math.PI) / 3 + Math.PI / 6) * rad, y + Math.sin((k * Math.PI) / 3 + Math.PI / 6) * rad)));
+      g.fillStyle(col(UI.edge), 1).fillPoints(gem(17), true);
+      g.fillStyle(c, 1).fillPoints(gem(14.5), true);
+      g.fillStyle(0xffffff, 0.45).fillTriangle(p.x, y - 14.5, p.x - 12.5, y - 7, p.x, y);
+      // The kind's mark on the gem: a blade, a wing, a coin or a leaf.
+      const ink = col('#1d2330');
+      if (r.kind === 'might') g.fillStyle(ink, 0.85).fillTriangle(p.x, y - 9, p.x - 3.5, y + 4, p.x + 3.5, y + 4).fillRect(p.x - 6, y + 4, 12, 3).fillRect(p.x - 1.5, y + 7, 3, 4);
+      else if (r.kind === 'haste') g.fillStyle(ink, 0.85).fillTriangle(p.x - 8, y - 6, p.x + 6, y, p.x - 8, y + 6).fillTriangle(p.x - 2, y - 6, p.x + 10, y, p.x - 2, y + 6);
+      else if (r.kind === 'fortune') g.lineStyle(2.5, ink, 0.85).strokeCircle(p.x, y, 6.5);
+      else g.fillStyle(ink, 0.85).fillEllipse(p.x, y, 7, 15);
+    });
   }
 
   /** The healing ground round each Nexus: a soft ring in the team's colour. */
@@ -1833,6 +1863,12 @@ export class GameScene extends Phaser.Scene {
         g.fillStyle(col(u.side === 'neutral' ? SIDE_COLOR.neutral : SIDE_COLOR[u.side]), 1).fillRect(cx - 2, cy - 2, 4, 4);
       }
     }
+    // Runes waiting on the river.
+    s.runes.forEach((r) => {
+      if (!r || this.fogged(r.x, r.y)) return;
+      g.fillStyle(col(UI.edge), 1).fillCircle(mx(r.x), my(r.y), 3.5);
+      g.fillStyle(col(RUNES[r.kind].color), 1).fillCircle(mx(r.x), my(r.y), 2.5);
+    });
     // The view and the player.
     const v = this.viewRect();
     g.lineStyle(1, 0xffffff, 0.7).strokeRect(mx(v.x), my(v.y), SCREEN.w * k, SCREEN.h * k);

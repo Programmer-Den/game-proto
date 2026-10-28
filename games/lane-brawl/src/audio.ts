@@ -119,6 +119,8 @@ export const sfx = sounds<SfxName>({
   buyBack: { wave: 'square', freq: 988, arp: [0, 5, 12], arpStep: 0.04, length: 0.2, volume: 0.28 },
   // The match around the player.
   wave: { wave: 'pulse25', freq: 220, arp: [0, 5], arpStep: 0.25, attack: 0.08, length: 0.55, volume: 0.16 },
+  rune: { wave: 'sine', freq: 1568, arp: [0, 5, 12], arpStep: 0.08, length: 0.4, volume: 0.22 },
+  runeTaken: { wave: 'triangle', freq: 784, to: 1568, length: 0.25, volume: 0.28 },
   watchstone: { wave: 'triangle', freq: 1175, arp: [0, 7], arpStep: 0.12, length: 0.6, volume: 0.3 },
   growl: { wave: 'sawtooth', freq: 110, to: 55, attack: 0.05, length: 0.7, volume: 0.28, gap: 500 },
   beastSlain: { wave: 'square', freq: 330, arp: [0, -5, -12], arpStep: 0.1, length: 0.5, volume: 0.28 },

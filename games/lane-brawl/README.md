@@ -191,7 +191,16 @@ left, under bevelled slate panels.
     lands the last blow.
 
     ![The scoreboard at 7:02: blue and red's five champions with level, kills, deaths and assists, last hits, items, respawn timers and bounties](docs/screenshots/scoreboard.webp)
-18. **Winning** destroys the red Nexus. Losing means your Nexus falls first.
+18. **River runes**: from 2:00, every two minutes a rune appears on each of the two stone rings on
+    the river (between the watchstones), replacing one nobody took. The first champion to walk over
+    it takes it: **Might** (30% more damage for 30 s), **Haste** (40% faster for 25 s),
+    **Mending** (25 health a second for 20 s) or **Fortune** (120 gold, and 40 to each teammate).
+    The kinds take turns, so the two rings always hold different ones. A notice says when they
+    appear and who takes one; the minimap shows the ones you can see. The AI champion nearest a
+    rune, healthy and with no enemy near, walks over to take it.
+
+    ![A Might rune hovering over its stone ring on the river, a sword mark on its orange gem](docs/screenshots/river-rune.webp)
+19. **Winning** destroys the red Nexus. Losing means your Nexus falls first.
 
 Every ability has an animation of its own (a hammer that splits the ground, a meteor from the
 sky, a harpoon on its rope, a coil pylon arcing, a blood moon rising and so on), and so do bolts in

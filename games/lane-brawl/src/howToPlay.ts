@@ -33,6 +33,7 @@ const en: HowToPlay = {
     'Wins with a champion raise its mastery, which adds a third upgrade card to its early levels.',
     'Tall grass hides you from enemies until you attack, and the fog hides what your team cannot see.',
     'Standing inside the ring round your own Nexus heals you quickly.',
+    'From 2:00, every two minutes two runes appear on the river: walk over one for more damage, speed, healing or gold.',
   ],
 };
 
@@ -67,6 +68,7 @@ const de: HowToPlay = {
     'Siege mit einem Champion steigern seine Meisterschaft, die seinen frühen Stufen eine dritte Upgradekarte gibt.',
     'Hohes Gras verbirgt dich vor Feinden, bis du angreifst, und der Nebel verbirgt, was dein Team nicht sieht.',
     'Im Ring um deinen eigenen Nexus heilst du schnell.',
+    'Ab 2:00 erscheinen alle zwei Minuten zwei Runen am Fluss: Lauf über eine für mehr Schaden, Tempo, Heilung oder Gold.',
   ],
 };
 
