@@ -50,8 +50,11 @@ Missing or rough:
 File map (`src/`):
 
 - `main.ts`: creates the `Phaser.Game` (960x540 from `VIEW`, `Phaser.Scale.FIT`) with `GameScene`,
-  calls `setupGame(game, { howToPlay })` and then `setupScaling(game, { fill: true, bothWays: true })`, and in dev
+  calls `setupGame(game, { howToPlay, trophies })` and then `setupScaling(game, { fill: true, bothWays: true })`, and in dev
   builds puts `game` on `window`.
+- `trophies/`: `index.ts` (the `trophies` set, imported by nothing else of the game's, as the hub
+  loads it), `check.ts` (`checkTrophies`, which awards each trophy whose condition holds in the
+  records or the run in play) and `i18n/` (`en.ts`, `de.ts`).
 - `howToPlay.ts`: the How to play text in English (also US English) and German.
 - `i18n.ts` and `i18n/`: the game's texts. `en.ts` is the British English source, `de.ts` the German
   (with `keepEnglish` for the title, Blitz and Adept) and `en-US.ts` empty. Text keys built from ids
@@ -165,7 +168,8 @@ State model (`Run`): `mode`, `phase`, `hearts`, `maxHearts`, `hints`, `score`, `
 `freeUsed`, `omen`, `touched`, `pair`, `history`), `queue`, `results`, `last`, `betweenMs`, `clockMs`, `relics`, `relicOffer`,
 `draftOffer`, `player`, `totals`, `duelSolved`, `day`, `progress`, `newBest` and `events`.
 
-Persistence: two `localStorage` keys. `augury-run` holds the run in play (every mode but Practice,
+Persistence: three `localStorage` keys. `augury-trophies` holds the trophies earned (written by
+`shared/trophies.ts`). `augury-run` holds the run in play (every mode but Practice,
 without `progress` and `events`): `keepRun` saves it each time it moves on (a puzzle dealt or
 ended, a draft or relic offer, the hand-over), and clears it when the run is over or left. On load
 `loadRun` hands it to `saved`, and the menu's Continue (`resume`) picks it up; starting another run
@@ -182,6 +186,26 @@ it (`quit`). `loadProgress` keeps only known kinds and whole, non-negative numbe
   Normal at 3 hearts (the playthrough expects it) and the README's and the root README's rows in
   sync.
 - `settings.reduceMotion` drops the glow on the menu title. Nothing shakes, flashes or blinks.
+
+## Trophies
+
+Ten trophies, in `src/trophies/` (texts in `trophies/i18n/`). `checkTrophies(progress, run)` runs
+quietly once on load (with the saved run, so records from before earn theirs without a toast) and
+then whenever `drain` finds events. Each condition reads the records (`Progress`) or the run in
+play:
+
+| Trophy | Tier | Earned by |
+| --- | --- | --- |
+| First sight (`firstSight`) | bronze | a puzzle solved (any mode) |
+| Tempting fate (`omen`) | bronze | a puzzle solved under an omen |
+| Lucky charm (`charm`) | bronze | a charm taken |
+| The full deck (`fullDeck`) | silver | every kind solved at least once |
+| Two in one (`boss`) | silver | a boss beaten |
+| Perfect day (`perfectDay`) | silver | all five of a Daily Five solved |
+| Oracle (`oracle`) | gold | an Oracle (level 3) puzzle solved without a hint |
+| Unbroken (`streak`) | gold | a streak of 10 in a run (not Practice) |
+| Charmed life (`charmed`) | gold | five charms held in one run |
+| Against the omens (`tempted`) | gold, hidden | a boss beaten under an omen |
 
 ## Sound
 
@@ -227,6 +251,7 @@ cell is picked, the daily five played today), and a Hint tap that finds nothing 
   and every spot id above, the scene key `'Game'` and the save key `augury-progress`.
 - The playthrough deals four puzzles, so it never meets a boss (the fifth); keep `BOSS_EVERY` above
   four, or give the test a boss step.
+- It checks that the first round earns First sight and nothing else (`augury-trophies`).
 - It saves `playthrough-0-menu`, `-1-first-puzzle`, `-2-solved` and `-3-third-puzzle`.
 
 ## Making common changes

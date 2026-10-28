@@ -97,6 +97,11 @@ and hints, and **Peril** makes a loss cost two hearts (Memory Echo only offers P
 
 ![An omen on offer: Tempt Haste](docs/screenshots/omen.webp)
 
+**Trophies**: ten to earn, from the first solve to a boss beaten under an omen, listed behind the
+Trophies button on the start and pause screens.
+
+![The Trophies list](docs/screenshots/trophies.webp)
+
 **Points**: 100 per level (Novice 100 to Oracle 400), plus 2 for every second left, less 40 per
 hint (never below 20), times a streak bonus of 10% per puzzle solved in a row (up to double).
 **Records** keeps the puzzles solved of each kind, the fastest solve without hints at each level,
