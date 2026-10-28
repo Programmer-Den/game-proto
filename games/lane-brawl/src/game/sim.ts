@@ -17,6 +17,8 @@ import {
   AI_ELIXIR,
   ASSIST,
   KILL,
+  SPELL_AI,
+  spellById,
   MERC,
   RUNE,
   RUNES,
@@ -400,6 +402,85 @@ export function useActive(s: GameState, u: Unit, id: ActiveId, aim: Vec): boolea
   return true;
 }
 
+/** Casts a champion's battle spell toward `aim`. Returns false if it can't now (cooldown, no target). */
+export function castSpell(s: GameState, u: Unit, aim: Vec): boolean {
+  if (s.phase !== 'playing' || u.dead || !u.champ || !u.spell || u.stunMs > 0 || u.spellCd > 0 || u.side === 'neutral') return false;
+  const def = spellById(u.spell);
+  const amount = (def.base ?? 0) + (def.perLevel ?? 0) * u.level;
+  const side = u.side;
+  switch (def.id) {
+    case 'blink': {
+      const to = towards(u, aim, def.range ?? 0);
+      s.fx.push({ kind: 'ring', x: u.x, y: u.y, r: 26, color: def.color, ms: 350 }, { kind: 'line', x: u.x, y: u.y, x2: to.x, y2: to.y, color: def.color, ms: 250 });
+      if (dist(u, to) > 1) u.facing = Math.atan2(to.y - u.y, to.x - u.x);
+      u.x = to.x;
+      u.y = to.y;
+      u.moveTo = null;
+      s.fx.push({ kind: 'ring', x: u.x, y: u.y, r: 26, color: def.color, ms: 350 });
+      break;
+    }
+    case 'firebrand': {
+      const foe = closest(
+        s.units.filter((e) => e.kind === 'champion' && !e.dead && e.side !== side && !hiddenFrom(s, side, e) && dist(e, u) <= (def.range ?? 0) && dist(e, aim) <= (def.aim ?? 0)),
+        aim,
+      );
+      if (!foe) return false;
+      damage(s, foe, dealt(s, u, amount), u.id);
+      u.facing = Math.atan2(foe.y - u.y, foe.x - u.x);
+      s.fx.push({ kind: 'line', x: u.x, y: u.y, x2: foe.x, y2: foe.y, color: def.color, ms: 300 }, { kind: 'ring', x: foe.x, y: foe.y, r: 36, color: def.color, ms: 500 });
+      break;
+    }
+    case 'mend': {
+      const hurt = s.units
+        .filter((a) => a !== u && a.kind === 'champion' && !a.dead && a.side === side && dist(a, u) <= (def.range ?? 0))
+        .sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];
+      for (const a of hurt ? [u, hurt] : [u]) {
+        a.hp = Math.min(a.maxHp, a.hp + amount);
+        s.fx.push({ kind: 'ring', x: a.x, y: a.y, r: 34, color: def.color, ms: 500 });
+      }
+      break;
+    }
+    case 'barrier':
+      u.shield = Math.max(u.shield, amount);
+      u.shieldMs = Math.max(u.shieldMs, def.ms ?? 0);
+      s.fx.push({ kind: 'ring', x: u.x, y: u.y, r: 32, color: def.color, ms: 500 });
+      break;
+  }
+  u.spellCd = def.cd;
+  u.recallMs = 0;
+  u.castMs = 300;
+  if (u.id === s.player) sound(s, 'spell', u, true);
+  if (!u.player) aiLog(side, `${shortName(u.name)} casts ${english(def.name)}`);
+  return true;
+}
+
+/** An AI champion's battle spell: a shield, heal or blink away when low with a foe near, a firebrand to finish one. */
+function aiSpell(s: GameState, u: Unit) {
+  if (!u.spell || u.spellCd > 0 || u.dead || s.time < SPELL_AI.from) return;
+  const foe = nearest(s, u, SPELL_AI.look, (e) => e.kind === 'champion');
+  if (!foe) return;
+  const low = u.hp < u.maxHp * SPELL_AI.low;
+  switch (u.spell) {
+    case 'blink':
+      if (low) castSpell(s, u, fallbackPoint(s, u));
+      break;
+    case 'barrier':
+      if (low) castSpell(s, u, u);
+      break;
+    case 'mend': {
+      const ally = s.units.some((a) => a !== u && a.kind === 'champion' && !a.dead && a.side === u.side && a.hp < a.maxHp * SPELL_AI.low && dist(a, u) <= (spellById('mend').range ?? 0));
+      if (low || ally) castSpell(s, u, u);
+      break;
+    }
+    case 'firebrand': {
+      const def = spellById('firebrand');
+      const prey = nearest(s, u, def.range ?? 0, (e) => e.kind === 'champion' && e.hp < Math.max(e.maxHp * SPELL_AI.finish, (def.base ?? 0) + (def.perLevel ?? 0) * u.level));
+      if (prey) castSpell(s, u, prey);
+      break;
+    }
+  }
+}
+
 /** Plants one of a champion's wards within `WARD.range` of it, toward `aim`. */
 export function plantWard(s: GameState, u: Unit, aim: Vec): boolean {
   if (s.phase !== 'playing' || u.dead || u.wards <= 0 || u.side === 'neutral') return false;
@@ -715,6 +796,7 @@ function countDown(u: Unit, dt: number) {
   if (!u.champ) return;
   for (const k of ABILITY_KEYS) u.cds[k] = Math.max(0, u.cds[k] - dt);
   for (const k of Object.keys(u.activeCds)) u.activeCds[k] = Math.max(0, u.activeCds[k] - dt);
+  u.spellCd = Math.max(0, u.spellCd - dt);
   u.revealMs = Math.max(0, u.revealMs - dt);
   u.aggroMs = Math.max(0, u.aggroMs - dt);
   u.aiCastMs = Math.max(0, u.aiCastMs - dt);
@@ -1066,6 +1148,7 @@ function aiAct(s: GameState, u: Unit, dt: number) {
     // A hurt champion drinks its flask, and one carrying a ward plants it at a spot it passes.
     if (u.hp < u.maxHp * 0.4) useActive(s, u, 'flask', u);
     aiWard(s, u);
+    aiSpell(s, u);
     if (championPlan(s, u, dt)) return;
   }
   const reach = u.kind === 'champion' ? CHAMP_AGGRO : MINION.aggro;

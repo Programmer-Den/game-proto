@@ -5,6 +5,8 @@ import type { TextKey } from '../i18n';
 import {
   GANK,
   JUNGLE,
+  SpellId,
+  aiSpellFor,
   MERC,
   RUNE,
   RuneKind,
@@ -135,6 +137,9 @@ export interface Unit {
   upgrades: string[];
   /** Cooldowns of item actives, by active id. */
   activeCds: Record<string, number>;
+  /** Champions: the battle spell carried (`SPELLS`) and the time left on its cooldown, in ms. */
+  spell: SpellId | null;
+  spellCd: number;
   /** AI champions: falling back until this game time. */
   retreatUntil: number;
   /** AI champions: the enemy champion it left its lane to gang up on, and until when. */
@@ -246,7 +251,7 @@ export type SoundId =
   | 'burst' | 'bolt' | 'dash' | 'ally' | 'buff' | 'zone' | 'impact'
   | 'lastHit' | 'slain' | 'youDie' | 'streak' | 'crash' | 'nexus' | 'wardBreak'
   | 'levelUp' | 'flask' | 'blink' | 'ward' | 'recallHome' | 'respawn' | 'buyBack'
-  | 'wave' | 'watchstone' | 'rune' | 'runeTaken' | 'mercs' | 'growl' | 'beastSlain' | 'brute' | 'objective' | 'objectiveMissed';
+  | 'wave' | 'watchstone' | 'rune' | 'runeTaken' | 'mercs' | 'spell' | 'growl' | 'beastSlain' | 'brute' | 'objective' | 'objectiveMissed';
 
 /**
  * A sound raised by the rules: at a point in the world (the view plays it only where blue sees and
@@ -427,6 +432,8 @@ export function blankUnit(
     cdFull: { Q: 1, W: 1, E: 1, R: 1 },
     upgrades: [],
     activeCds: {},
+    spell: null,
+    spellCd: 0,
     retreatUntil: 0,
     gankTarget: null,
     gankUntil: 0,
@@ -483,6 +490,7 @@ export function spawnChampion(s: GameState, def: ChampionDef, side: Team, x: num
   u.player = player;
   u.level = 1;
   u.gold = START_GOLD;
+  u.spell = aiSpellFor(def);
   if (lane) {
     u.path = pathFor(lane, side);
     u.wp = 1;
@@ -501,6 +509,8 @@ export interface MatchOptions {
   watch?: boolean;
   /** The player's mastery rank with the picked class (`masteryRank`), 0 when none. */
   mastery?: number;
+  /** The player's battle spell; its role's when not given (and always when watching). */
+  spell?: SpellId;
 }
 
 /**
@@ -632,6 +642,7 @@ export function createGame(pick: ChampionDef, enemyDamage: number, opts: MatchOp
 
   const player = spawnChampion(s, pick, 'blue', blueAt(0).x, blueAt(0).y, !opts.watch, opts.watch ? 'top' : null, pick.hero);
   s.player = player.id;
+  if (opts.spell && !opts.watch) player.spell = opts.spell;
   others.slice(0, 4).forEach((def, i) => {
     spawnChampion(s, def, 'blue', blueAt(i + 1).x, blueAt(i + 1).y, false, ALLY_LANES[i], def.hero);
   });

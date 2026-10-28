@@ -35,6 +35,9 @@ import {
   WARD,
   WATCH,
   bountyOf,
+  SPELLS,
+  SpellId,
+  spellById,
   upgradeById,
   ultRank,
   ULT_RANK_LEVELS,
@@ -44,7 +47,8 @@ import {
 } from '../game/data';
 import { Fx, GameState, ObjectiveTitle, Phase, Unit, createGame, dist, getUnit } from '../game/state';
 import { loadMastery, masteryRank, recordWin } from '../game/mastery';
-import { abilityFor, atFountain, atShop, buy, buyBack, buybackCost, cast, chooseUpgrade, commandAttack, commandMove, hiddenFrom, invulnerable, priceFor, startRecall, stealthed, tick, useActive, viewers } from '../game/sim';
+import { loadSpell, saveSpell } from '../game/spellChoice';
+import { abilityFor, atFountain, atShop, buy, buyBack, buybackCost, cast, castSpell, chooseUpgrade, commandAttack, commandMove, hiddenFrom, invulnerable, priceFor, startRecall, stealthed, tick, useActive, viewers } from '../game/sim';
 import { FxLayers, drawAura, drawProjectile, drawSkill, drawZone, skillMs } from './skillFx';
 import { shortName } from '../game/names';
 import { t, type TextKey } from '../i18n';
@@ -101,6 +105,8 @@ import {
   PLAY_AGAIN,
   PORTRAIT,
   RECALL_BUTTON,
+  SPELL_BUTTON,
+  SPELL_PICK,
   SCORE_CHIP,
   SCORE_PANEL,
   SHOP_BUTTON,
@@ -304,6 +310,10 @@ export class GameScene extends Phaser.Scene {
   private texts = new Map<string, Phaser.GameObjects.Text>();
   /** The pick card under the pointer, or -1. */
   private hoverPick = -1;
+  /** Whether the pointer is on the pick screen's battle spell button. */
+  private hoverSpell = false;
+  /** The battle spell the player takes into the next match (`loadSpell`). */
+  private spell: SpellId = 'blink';
   /** The objective target's damage as blue last saw it, for the card while it is out of sight. */
   private objSeen = { id: -1, progress: 0 };
   /** The fog of war: how much each cell is hidden from blue (0 clear, 1 hidden), and its images. */
@@ -311,7 +321,7 @@ export class GameScene extends Phaser.Scene {
   private fogG!: Phaser.GameObjects.Graphics;
   private fogMini!: Phaser.GameObjects.Graphics;
   private used = new Set<string>();
-  private keys!: Record<AbilityKey | 'B' | 'D' | 'H' | 'V' | 'T' | 'X' | 'ESC' | 'ONE' | 'TWO' | 'THREE' | 'TAB', Phaser.Input.Keyboard.Key>;
+  private keys!: Record<AbilityKey | 'B' | 'D' | 'H' | 'V' | 'T' | 'X' | 'G' | 'ESC' | 'ONE' | 'TWO' | 'THREE' | 'TAB', Phaser.Input.Keyboard.Key>;
   /** The scoreboard, held open by Tab or opened by a tap on the kill score. */
   private scoreTapped = false;
   /** The player's wins per class (`loadMastery`), read when the pick screen shows. */
@@ -337,6 +347,7 @@ export class GameScene extends Phaser.Scene {
     if (import.meta.env.DEV) console.info(`Lane Brawl art baked in ${Math.round(performance.now() - t0)} ms (units ${Math.round(unitsMs)} ms)`);
     this.paintPickBackdrop();
     this.mastery = loadMastery();
+    this.spell = loadSpell();
     // The world camera follows the champion; the HUD (scroll factor 0) gets a fixed camera.
     splitHudCamera(this);
     this.cameras.main.setBounds(0, 0, WORLD.w, WORLD.h);
@@ -370,7 +381,7 @@ export class GameScene extends Phaser.Scene {
     this.fogG = this.add.graphics().setDepth(3.6);
     this.fogMini = this.add.graphics().setScrollFactor(0).setDepth(10.5);
 
-    this.keys = this.input.keyboard!.addKeys('Q,W,E,R,B,D,H,V,T,X,ESC,ONE,TWO,THREE,TAB') as typeof this.keys;
+    this.keys = this.input.keyboard!.addKeys('Q,W,E,R,B,D,H,V,T,X,G,ESC,ONE,TWO,THREE,TAB') as typeof this.keys;
     // Watching the AI, the keys play no champion.
     if (!watching) {
       // Holding an ability's key aims it (its range shows); letting go casts it at the cursor.
@@ -382,6 +393,7 @@ export class GameScene extends Phaser.Scene {
       this.keys.B.on('down', () => this.toggleShop());
       this.keys.T.on('down', () => this.recall());
       this.keys.X.on('down', () => this.buyBack());
+      this.keys.G.on('down', () => this.spellAtCursor());
       this.keys.ESC.on('down', () => {
         this.aiming = null;
         this.setShop(false);
@@ -405,6 +417,8 @@ export class GameScene extends Phaser.Scene {
         const r = pickCard(i);
         return v.x >= r.x && v.x <= r.x + r.w && v.y >= r.y && v.y <= r.y + r.h;
       });
+      const sb = SPELL_PICK;
+      this.hoverSpell = this.phase === 'pick' && v.x >= sb.x && v.x <= sb.x + sb.w && v.y >= sb.y && v.y <= sb.y + sb.h;
     });
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => this.onPointerDown(p));
     // A second touch pointer, so one thumb can press an ability while the other steers.
@@ -468,7 +482,7 @@ export class GameScene extends Phaser.Scene {
 
   private startMatch(def: ChampionDef) {
     // Watching, neither side gets the difficulty's damage, so the match is even.
-    this.state = createGame(def, watching ? 1 : ENEMY_DAMAGE, { watch: watching, mastery: masteryRank(this.mastery[def.id] ?? 0) });
+    this.state = createGame(def, watching ? 1 : ENEMY_DAMAGE, { watch: watching, mastery: masteryRank(this.mastery[def.id] ?? 0), spell: this.spell });
     this.winCounted = null;
     // Each champion in the match gets its sheet in its team's colours, once.
     const ms = bakeChampions(
@@ -550,6 +564,19 @@ export class GameScene extends Phaser.Scene {
     if (this.state && p && !useActive(this.state, p, a.id, this.lastWorld)) ui('refuse');
   }
 
+  /** The pick screen's spell button: the next battle spell, kept for later matches. */
+  private nextSpell() {
+    ui('click');
+    this.spell = SPELLS[(SPELLS.findIndex((sp) => sp.id === this.spell) + 1) % SPELLS.length].id;
+    saveSpell(this.spell);
+  }
+
+  /** G: the battle spell, aimed at the cursor. */
+  private spellAtCursor() {
+    const p = this.player();
+    if (this.state && p && !castSpell(this.state, p, this.lastWorld)) ui('refuse');
+  }
+
   private pickUpgrade(choice: number) {
     if (this.state && this.phase === 'playing' && chooseUpgrade(this.state, choice)) sfx('upgrade');
   }
@@ -579,6 +606,7 @@ export class GameScene extends Phaser.Scene {
     const phase = this.phase;
     if (phase === 'pick') {
       CHAMPIONS.forEach((def, i) => this.zones.push({ ...pickCard(i), run: () => (sfx('pick'), this.startMatch(def)) }));
+      this.zones.push({ ...SPELL_PICK, run: () => this.nextSpell() });
       return;
     }
     if (phase === 'won' || phase === 'lost') {
@@ -595,6 +623,7 @@ export class GameScene extends Phaser.Scene {
     this.zones.push({ ...SHOP_BUTTON, run: () => this.toggleShop() });
     // One button in the top bar: Recall while alive, Buy back while dead.
     this.zones.push({ ...RECALL_BUTTON, run: () => (this.player()?.dead ? this.buyBack() : this.recall()) });
+    this.zones.push({ ...SPELL_BUTTON, run: () => this.spellAtCursor() });
     ABILITY_KEYS.forEach((k, i) => this.zones.push({ ...abilityBox(i), run: () => this.castAtCursor(k) }));
     ACTIVES.forEach((a, i) => this.zones.push({ ...activeButton(i), run: () => this.activeAtCursor(a) }));
     for (let i = 0; i < offer; i++) this.zones.push({ ...upgradeCard(i, offer), run: () => this.pickUpgrade(i) });
@@ -1401,12 +1430,26 @@ export class GameScene extends Phaser.Scene {
     });
     // The champion under the pointer: who they are and what they play like, then why they fight.
     const h = CHAMPIONS[this.hoverPick];
-    const line = h && t('pickBlurb', { hero: t(h.hero), title: t(h.title), class: t(h.name), blurb: t(h.blurb) });
-    this.t('pick-blurb', SCREEN.w / 2, FRAME.y + 444, h ? (h.perk ? t('pickPerk', { line, perk: t(h.perk.desc) }) : line) : t('pickPoint'), 12, h ? h.color : UI.muted, 'center', true);
-    this.t('pick-motive', SCREEN.w / 2, FRAME.y + 464, h ? t(h.motive) : t('pickSetting'), 12, h ? UI.text : UI.dim, 'center', true);
-    this.t('hint', SCREEN.w / 2, FRAME.y + 491, t('pickHint1'), 11, UI.dim, 'center');
-    this.t('hint2', SCREEN.w / 2, FRAME.y + 506, t('pickHint2'), 11, UI.dim, 'center');
-    this.t('hint3', SCREEN.w / 2, FRAME.y + 521, t('pickHint3'), 11, UI.dim, 'center');
+    // A spell chip under the pointer: its name and what it does, in the champion's two lines.
+    const hs = this.hoverSpell ? spellById(this.spell) : null;
+    if (hs) {
+      this.t('pick-blurb', SCREEN.w / 2, FRAME.y + 444, t(hs.name), 12, hs.color, 'center', true);
+      this.t('pick-motive', SCREEN.w / 2, FRAME.y + 464, t(hs.desc), 12, UI.text, 'center', true);
+    } else {
+      const line = h && t('pickBlurb', { hero: t(h.hero), title: t(h.title), class: t(h.name), blurb: t(h.blurb) });
+      this.t('pick-blurb', SCREEN.w / 2, FRAME.y + 444, h ? (h.perk ? t('pickPerk', { line, perk: t(h.perk.desc) }) : line) : t('pickPoint'), 12, h ? h.color : UI.muted, 'center', true);
+      this.t('pick-motive', SCREEN.w / 2, FRAME.y + 464, h ? t(h.motive) : t('pickSetting'), 12, h ? UI.text : UI.dim, 'center', true);
+    }
+    // The battle spell to take along, one button: a click picks the next. One text, like the line it
+    // replaced, so the pick screen makes as many texts (and Math.random draws) as before.
+    const sb = SPELL_PICK;
+    const chosen = spellById(this.spell);
+    this.panel(g, sb.x, sb.y, sb.w, sb.h, this.hoverSpell ? '#3a4660' : UI.card);
+    g.lineStyle(1.5, col(UI.goldDeep), 1).strokeRect(sb.x + 1, sb.y + 1, sb.w - 2, sb.h - 2);
+    g.fillStyle(col(chosen.color), 1).fillCircle(sb.x + 12, sb.y + sb.h / 2, 5);
+    this.t('pick-spell', sb.x + sb.w / 2 + 6, sb.y + 4, t('pickSpellLine', { spell: t(chosen.name) }), 10, UI.gold, 'center', true);
+    this.t('hint', SCREEN.w / 2, FRAME.y + 509, t('pickHint1'), 11, UI.dim, 'center');
+    this.t('hint2', SCREEN.w / 2, FRAME.y + 523, t('pickHint2'), 11, UI.dim, 'center');
   }
 
   private drawPlaying(g: Phaser.GameObjects.Graphics, s: GameState) {
@@ -1491,6 +1534,7 @@ export class GameScene extends Phaser.Scene {
       this.t('streak', c.x + 22, c.y + 4, hot ? t('streakHot', { n: s.streak, pct: Math.round(STREAK.bonus * 100) }) : t('streak', { n: s.streak }), 11, hot ? UI.gold : UI.text, 'left', true);
     }
     if (!watching) this.drawRecallButton(g, s, me);
+    if (!watching) this.drawSpellButton(g, me);
     // The kill score, blue against red; a tap opens the scoreboard.
     const kills = (team: Team) => s.units.reduce((n, u) => n + (u.kind === 'champion' && u.side === team ? u.kills : 0), 0);
     const k = SCORE_CHIP;
@@ -1527,6 +1571,19 @@ export class GameScene extends Phaser.Scene {
     this.panel(g, b.x, b.y, b.w, b.h, on ? '#2f4f6b' : '#33405a');
     if (on) g.fillStyle(col('#9fd8ff'), 0.45).fillRect(b.x + 2, b.y + 2, (b.w - 4) * (1 - me.recallMs / RECALL.ms), b.h - 4);
     this.t('recall', b.x + b.w / 2, b.y + 6, on ? t('recallingFor', { s: formatNumber(me.recallMs / 1000, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) }) : t('recallHome'), 11, on ? UI.text : UI.dim, 'center', true);
+  }
+
+  /** The battle spell: its colour, name and key while ready, the time left while it cools down. */
+  private drawSpellButton(g: Phaser.GameObjects.Graphics, me: Unit) {
+    if (!me.spell) return;
+    const b = SPELL_BUTTON;
+    const def = spellById(me.spell);
+    const ready = me.spellCd <= 0 && !me.dead;
+    this.panel(g, b.x, b.y, b.w, b.h, ready ? '#33405a' : '#262d3b');
+    if (me.spellCd > 0) g.fillStyle(col(def.color), 0.25).fillRect(b.x + 2, b.y + 2, (b.w - 4) * (1 - me.spellCd / def.cd), b.h - 4);
+    g.fillStyle(col(def.color), ready ? 1 : 0.45).fillCircle(b.x + 12, b.y + b.h / 2, 5);
+    const label = me.spellCd > 0 ? t('spellIn', { spell: t(def.name), time: clock(me.spellCd) }) : t('spellReady', { spell: t(def.name) });
+    this.t('spell', b.x + b.w / 2 + 8, b.y + 6, label, 11, ready ? UI.text : UI.muted, 'center', true);
   }
 
   private drawObjectiveCard(g: Phaser.GameObjects.Graphics, s: GameState) {

@@ -402,8 +402,16 @@ const en = {
   pickPoint: 'Point at a card to meet its champion.',
   pickSetting: 'Two banners, Dawn and Dusk, fight the Contest of Lanes for the Riftwell of Kessmoor.',
   pickHint1: 'Click a champion to start. Click the ground to walk, an enemy to attack. Q W E R cast at the cursor, D and H use item actives.',
-  pickHint2: 'B opens the shop at your Nexus, 1, 2 or 3 picks an upgrade, V plants a vision ward, T recalls home, X buys back while dead.',
-  pickHint3: 'You only see what your team sees. Slay the brutes for buffs, take the watchstones for sight, and the beast for stronger minions.',
+  pickHint2: 'B opens the shop at your Nexus, 1, 2 or 3 picks an upgrade, V plants a ward, T recalls, X buys back, G casts your battle spell.',
+  pickSpellLine: 'Battle spell: {spell} (click to change)',
+  spellBlink: 'Blink',
+  spellBlinkDesc: 'Jump up to 260 px toward the cursor. Every 2:00.',
+  spellFirebrand: 'Firebrand',
+  spellFirebrandDesc: 'Burn the enemy champion nearest the cursor for 90 + 22 per level. Every 1:30.',
+  spellMend: 'Mend',
+  spellMendDesc: 'Heal yourself and your most hurt ally near you for 110 + 25 per level. Every 2:00.',
+  spellBarrier: 'Barrier',
+  spellBarrierDesc: 'Shield yourself from 140 + 30 per level damage for 2.5 s. Every 1:40.',
 
   // Over units in the world
   bountyLabel: 'BOUNTY {gold}g',
@@ -421,6 +429,8 @@ const en = {
   buyBackIn: 'Buy back in {time}',
   recallingFor: 'Recalling {s}s',
   recallHome: 'Recall home [T]',
+  spellReady: '{spell} [G]',
+  spellIn: '{spell} {time}',
 
   // Objectives
   objTower: 'Topple the red tower',

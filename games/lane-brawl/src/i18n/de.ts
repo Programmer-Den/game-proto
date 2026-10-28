@@ -402,8 +402,16 @@ const de: Translation<typeof en> = {
   pickPoint: 'Zeige auf eine Karte, um ihren Champion kennenzulernen.',
   pickSetting: 'Zwei Banner, Morgen und Abend, tragen den Wettstreit der Lanes um den Rissquell von Kessmoor aus.',
   pickHint1: 'Klicke einen Champion an, um zu beginnen. Klicke auf den Boden zum Laufen, auf Feinde zum Angreifen. Q W E R zaubern am Zeiger, D und H nutzen Gegenstände.',
-  pickHint2: 'B öffnet den Laden am Nexus, 1, 2 oder 3 wählt ein Upgrade, V setzt einen Sichtwächter, T kehrt heim, X kauft dich tot zurück.',
-  pickHint3: 'Du siehst nur, was dein Team sieht. Erlege die Brocken für Buffs, nimm Wachsteine für Sicht und die Bestie für stärkere Vasallen.',
+  pickHint2: 'B öffnet den Laden, 1, 2 oder 3 wählt ein Upgrade, V setzt einen Wächter, T kehrt heim, X kauft zurück, G wirkt deinen Kampfzauber.',
+  pickSpellLine: 'Kampfzauber: {spell} (klicken zum Wechseln)',
+  spellBlink: 'Sprung',
+  spellBlinkDesc: 'Bis zu 260 px zum Zeiger springen. Alle 2:00.',
+  spellFirebrand: 'Brandmal',
+  spellFirebrandDesc: 'Den feindlichen Champion am Zeiger für 90 + 22 je Stufe verbrennen. Alle 1:30.',
+  spellMend: 'Linderung',
+  spellMendDesc: 'Dich und den verletztesten Verbündeten in der Nähe um 110 + 25 je Stufe heilen. Alle 2:00.',
+  spellBarrier: 'Barriere',
+  spellBarrierDesc: 'Dich 2,5 s lang vor 140 + 30 je Stufe Schaden schützen. Alle 1:40.',
 
   // Over units in the world
   bountyLabel: 'KOPFGELD {gold} G',
@@ -421,6 +429,8 @@ const de: Translation<typeof en> = {
   buyBackIn: 'Zurück in {time}',
   recallingFor: 'Heimkehr {s} s',
   recallHome: 'Heimkehren [T]',
+  spellReady: '{spell} [G]',
+  spellIn: '{spell} {time}',
 
   // Objectives
   objTower: 'Stürze den roten Turm',
@@ -573,6 +583,8 @@ export default de;
 
 /** Texts that are the same in German: names, the game's title and texts made only of placeholders. */
 export const keepEnglish: (keyof typeof en)[] = [
+  'spellReady',
+  'spellIn',
   'roleTank',
   'berserkerName',
   'wardenHero',

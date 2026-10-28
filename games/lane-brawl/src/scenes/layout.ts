@@ -47,6 +47,9 @@ export function activeButton(i: number) {
 /** The recall button in the top bar, right of the clock; while the champion is dead it is the buy back button. */
 export const RECALL_BUTTON = { x: 530, y: 4, w: 118, h: 26 };
 
+/** The battle spell's button in the top bar, right of the recall button. */
+export const SPELL_BUTTON = { x: 654, y: 4, w: 118, h: 26 };
+
 /** The kill score in the top bar, left of the clock; a tap opens the scoreboard. */
 export const SCORE_CHIP = { x: 380, y: 4, w: 56, h: 26 };
 
@@ -75,6 +78,9 @@ export function pickCard(i: number) {
   const row = Math.floor(i / 5);
   return { x: (SCREEN.w - total) / 2 + col * (PICK_CARD.w + PICK_CARD.gap), y: FRAME.y + PICK_CARD.y + row * (PICK_CARD.h + PICK_CARD.gap), w: PICK_CARD.w, h: PICK_CARD.h };
 }
+/** The battle spell button on the pick screen, under the champion cards: a click picks the next spell. */
+export const SPELL_PICK = { x: 340, y: 484, w: 280, h: 20 };
+
 /** The buffs the player's champion carries, as chips in a row above the portrait. */
 export function buffStrip(i: number) {
   return { x: 12 + i * 92, y: PORTRAIT.y - 32, w: 88, h: 18 };
@@ -104,6 +110,8 @@ export function fitLayout(w: number, h: number) {
   Object.assign(MINIMAP, { x: 826 + dx, y: 420 + dy });
   RECALL_BUTTON.x = 530 + dx / 2;
   SCORE_CHIP.x = 380 + dx / 2;
+  SPELL_BUTTON.x = 654 + dx / 2;
+  Object.assign(SPELL_PICK, { x: 340 + dx / 2, y: 484 + dy / 2 });
   Object.assign(SCORE_PANEL, { x: 100 + dx / 2, y: 38 + dy / 2 });
   Object.assign(SHOP_PANEL, { x: 100 + dx / 2, y: 38 + dy / 2 });
   Object.assign(END_PANEL, { x: 280 + dx / 2, y: 150 + dy / 2 });
