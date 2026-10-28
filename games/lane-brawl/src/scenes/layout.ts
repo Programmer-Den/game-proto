@@ -85,7 +85,9 @@ export function pickCard(i: number) {
   return { x: (SCREEN.w - total) / 2 + col * (PICK_CARD.w + PICK_CARD.gap), y: FRAME.y + PICK_CARD.y + row * (PICK_CARD.h + PICK_CARD.gap), w: PICK_CARD.w, h: PICK_CARD.h };
 }
 /** The battle spell button on the pick screen, under the champion cards: a click picks the next spell. */
-export const SPELL_PICK = { x: 340, y: 484, w: 280, h: 20 };
+export const SPELL_PICK = { x: 214, y: 484, w: 280, h: 20 };
+/** Beside it, the match kind: a click switches between a full and a quick match. */
+export const MODE_PICK = { x: 506, y: 484, w: 240, h: 20 };
 
 /** The buffs the player's champion carries, as chips in a row above the portrait. */
 export function buffStrip(i: number) {
@@ -118,7 +120,8 @@ export function fitLayout(w: number, h: number) {
   RECALL_BUTTON.x = 530 + dx / 2;
   SCORE_CHIP.x = 380 + dx / 2;
   SPELL_BUTTON.x = 654 + dx / 2;
-  Object.assign(SPELL_PICK, { x: 340 + dx / 2, y: 484 + dy / 2 });
+  Object.assign(SPELL_PICK, { x: 214 + dx / 2, y: 484 + dy / 2 });
+  Object.assign(MODE_PICK, { x: 506 + dx / 2, y: 484 + dy / 2 });
   Object.assign(SCORE_PANEL, { x: 100 + dx / 2, y: 38 + dy / 2 });
   Object.assign(SHOP_PANEL, { x: 100 + dx / 2, y: 38 + dy / 2 });
   Object.assign(END_PANEL, { x: 280 + dx / 2, y: 150 + dy / 2 });

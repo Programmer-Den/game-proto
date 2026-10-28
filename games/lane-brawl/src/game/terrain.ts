@@ -4,7 +4,7 @@
 // The map's art (`art/map.ts`) paints the scenery from the same `SCENERY` list, so what stands in
 // the way is what shows.
 
-import { BASE, BEAST, BUSHES, CAMPS, CampSpot, DRAKE, INHIBITORS, LANES, MERC, RIVER, TOWERS, Vec, WATCHSTONES, WORLD } from './data';
+import { BASE, BEAST, BUSHES, CAMPS, CampSpot, DRAKE, INHIBITORS, LaneId, LANES, MERC, RIVER, TOWERS, Vec, WATCHSTONES, WORLD } from './data';
 
 /** Half the width of a lane's paving, in pixels. */
 export const LANE_HALF = 50;
@@ -91,6 +91,8 @@ export interface Obstacle {
   x: number;
   y: number;
   r: number;
+  /** A tower's or inhibitor's lane: it only stands in the way while that lane is open (`openLanes`). */
+  lane?: LaneId;
 }
 
 /**
@@ -103,8 +105,8 @@ export const OBSTACLES: Obstacle[] = [
   ...SCENERY.map((t) => ({ x: t.x, y: t.y, r: t.kind === 'pine' ? SOLID.trunk : SOLID.rock * t.s })),
   ...RUINS.flatMap((c) => ruinPieces(c).map((p) => ({ ...p, r: SOLID.ruin }))),
   ...[BEAST, DRAKE].flatMap((c) => pitStones(c).map((p) => ({ ...p, r: SOLID.stone }))),
-  ...TOWERS.map((t) => ({ x: t.x, y: t.y, r: SOLID.tower })),
-  ...INHIBITORS.map((t) => ({ x: t.x, y: t.y, r: SOLID.inhibitor })),
+  ...TOWERS.map((t) => ({ x: t.x, y: t.y, r: SOLID.tower, lane: t.lane })),
+  ...INHIBITORS.map((t) => ({ x: t.x, y: t.y, r: SOLID.inhibitor, lane: t.lane })),
   ...[BASE.blue, BASE.red].map((b) => ({ x: b.x, y: b.y, r: SOLID.nexus })),
   ...WATCHSTONES.map((w) => ({ x: w.x, y: w.y, r: SOLID.watchstone })),
 ];
@@ -126,9 +128,16 @@ function near(x: number, y: number): Obstacle[] {
   return cx < 0 || cy < 0 || cx >= COLS ? [] : GRID[cy * COLS + cx] ?? [];
 }
 
+/** The lanes the match plays on: a quick match has no towers or inhibitors on the others. */
+let open = new Set<LaneId>(['top', 'mid', 'bottom']);
+/** Sets the lanes whose towers and inhibitors stand in the way, at the start of a match. */
+export function openLanes(lanes: LaneId[]) {
+  open = new Set(lanes);
+}
+
 /** The first obstacle a walker of radius `body` at (x, y) would stand in, if any. */
 export function blockedBy(x: number, y: number, body: number): Obstacle | null {
-  for (const o of near(x, y)) if ((x - o.x) ** 2 + (y - o.y) ** 2 < (o.r + body) ** 2) return o;
+  for (const o of near(x, y)) if ((!o.lane || open.has(o.lane)) && (x - o.x) ** 2 + (y - o.y) ** 2 < (o.r + body) ** 2) return o;
   return null;
 }
 

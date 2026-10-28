@@ -397,6 +397,7 @@ const de: Translation<typeof en> = {
   // Pick screen
   gameTitle: 'LANE BRAWL',
   pickSub: 'Wähle deinen Champion, von Rittern und Hexen bis zu Revolverhelden, Automaten und Bestien. Vier kämpfen mit dir, fünf gegen dich.',
+  pickSubQuick: 'Wähle deinen Champion, von Rittern und Hexen bis zu Revolverhelden, Automaten und Bestien. Zwei kämpfen mit dir, drei gegen dich.',
   pickBlurb: '{hero}, {title}. {class}: {blurb}.',
   pickPerk: '{line} {perk}.',
   pickPoint: 'Zeige auf eine Karte, um ihren Champion kennenzulernen.',
@@ -404,6 +405,10 @@ const de: Translation<typeof en> = {
   pickHint1: 'Klicke einen Champion an, um zu beginnen. Klicke auf den Boden zum Laufen, auf Feinde zum Angreifen. Q W E R zaubern am Zeiger, D und H nutzen Gegenstände.',
   pickHint2: 'B öffnet den Laden, 1, 2 oder 3 wählt ein Upgrade, V setzt einen Wächter, T kehrt heim, X kauft zurück, G wirkt deinen Kampfzauber.',
   pickSpellLine: 'Kampfzauber: {spell} (klicken zum Wechseln)',
+  pickModeFull: 'Match: voll, 5 pro Seite, 3 Lanes',
+  pickModeQuick: 'Match: schnell, 3 pro Seite, 1 Lane',
+  pickModeFullDesc: 'Die ganze Schlacht: drei Lanes mit Türmen, etwa 10 bis 15 Minuten. Klicken zum Wechseln.',
+  pickModeQuickDesc: 'Nur die mittlere Lane hat Türme und Vasallen. Etwa 10 Minuten. Klicken zum Wechseln.',
   spellBlink: 'Sprung',
   spellBlinkDesc: 'Bis zu 260 px zum Zeiger springen. Alle 2:00.',
   spellFirebrand: 'Brandmal',

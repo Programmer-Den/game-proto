@@ -397,6 +397,7 @@ const en = {
   // Pick screen
   gameTitle: 'LANE BRAWL',
   pickSub: 'Pick your champion, from knights and witches to gunslingers, automatons and beasts. Four join you; five fight you.',
+  pickSubQuick: 'Pick your champion, from knights and witches to gunslingers, automatons and beasts. Two join you; three fight you.',
   pickBlurb: '{hero}, {title}. {class}: {blurb}.',
   pickPerk: '{line} {perk}.',
   pickPoint: 'Point at a card to meet its champion.',
@@ -404,6 +405,10 @@ const en = {
   pickHint1: 'Click a champion to start. Click the ground to walk, an enemy to attack. Q W E R cast at the cursor, D and H use item actives.',
   pickHint2: 'B opens the shop at your Nexus, 1, 2 or 3 picks an upgrade, V plants a ward, T recalls, X buys back, G casts your battle spell.',
   pickSpellLine: 'Battle spell: {spell} (click to change)',
+  pickModeFull: 'Match: full, 5 a side on three lanes',
+  pickModeQuick: 'Match: quick, 3 a side on one lane',
+  pickModeFullDesc: 'The whole battle: three lanes of towers, about 10 to 15 minutes. Click to switch.',
+  pickModeQuickDesc: 'Only the mid lane has towers and minions. About 10 minutes. Click to switch.',
   spellBlink: 'Blink',
   spellBlinkDesc: 'Jump up to 260 px toward the cursor. Every 2:00.',
   spellFirebrand: 'Firebrand',

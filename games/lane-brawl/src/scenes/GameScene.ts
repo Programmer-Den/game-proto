@@ -27,6 +27,7 @@ import {
   Team,
   TOWERS,
   Vec,
+  LaneId,
   WORLD,
   XP_FOR_LEVEL,
   MAX_ITEMS,
@@ -56,7 +57,7 @@ import {
 } from '../game/data';
 import { Fx, GameState, ObjectiveTitle, Phase, Unit, createGame, dist, getUnit } from '../game/state';
 import { loadMastery, masteryRank, recordWin } from '../game/mastery';
-import { loadSpell, saveSpell } from '../game/spellChoice';
+import { loadQuick, loadSpell, saveQuick, saveSpell } from '../game/spellChoice';
 import { abilityFor, atFountain, atShop, buy, buyBack, buybackCost, cast, castSpell, chooseUpgrade, commandAttack, commandMove, hiddenFrom, invulnerable, priceFor, sendPing, startRecall, stealthed, nightness, tick, useActive, viewers } from '../game/sim';
 import { FxLayers, drawAura, drawProjectile, drawSkill, drawZone, skillMs } from './skillFx';
 import { shortName } from '../game/names';
@@ -119,6 +120,7 @@ import {
   RECALL_BUTTON,
   SPELL_BUTTON,
   SPELL_PICK,
+  MODE_PICK,
   SCORE_CHIP,
   SCORE_PANEL,
   SHOP_BUTTON,
@@ -333,6 +335,10 @@ export class GameScene extends Phaser.Scene {
   private pingArmed: PingKind | null = null;
   /** The battle spell the player takes into the next match (`loadSpell`). */
   private spell: SpellId = 'blink';
+  /** Whether the next match is a quick one (`loadQuick`). */
+  private quick = false;
+  /** Whether the pointer is over the match kind button on the pick screen. */
+  private hoverMode = false;
   /** The objective target's damage as blue last saw it, for the card while it is out of sight. */
   private objSeen = { id: -1, progress: 0 };
   /** The fog of war: how much each cell is hidden from blue (0 clear, 1 hidden), and its images. */
@@ -367,6 +373,7 @@ export class GameScene extends Phaser.Scene {
     this.paintPickBackdrop();
     this.mastery = loadMastery();
     this.spell = loadSpell();
+    this.quick = loadQuick();
     // The world camera follows the champion; the HUD (scroll factor 0) gets a fixed camera.
     splitHudCamera(this);
     this.cameras.main.setBounds(0, 0, WORLD.w, WORLD.h);
@@ -440,6 +447,8 @@ export class GameScene extends Phaser.Scene {
       });
       const sb = SPELL_PICK;
       this.hoverSpell = this.phase === 'pick' && v.x >= sb.x && v.x <= sb.x + sb.w && v.y >= sb.y && v.y <= sb.y + sb.h;
+      const mb = MODE_PICK;
+      this.hoverMode = this.phase === 'pick' && v.x >= mb.x && v.x <= mb.x + mb.w && v.y >= mb.y && v.y <= mb.y + mb.h;
     });
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => this.onPointerDown(p));
     // A second touch pointer, so one thumb can press an ability while the other steers.
@@ -503,7 +512,7 @@ export class GameScene extends Phaser.Scene {
 
   private startMatch(def: ChampionDef) {
     // Watching, neither side gets the difficulty's damage, so the match is even.
-    this.state = createGame(def, watching ? 1 : ENEMY_DAMAGE, { watch: watching, mastery: masteryRank(this.mastery[def.id] ?? 0), spell: this.spell });
+    this.state = createGame(def, watching ? 1 : ENEMY_DAMAGE, { watch: watching, mastery: masteryRank(this.mastery[def.id] ?? 0), spell: this.spell, quick: this.quick });
     this.winCounted = null;
     // Each champion in the match gets its sheet in its team's colours, once.
     const ms = bakeChampions(
@@ -642,6 +651,7 @@ export class GameScene extends Phaser.Scene {
     if (phase === 'pick') {
       CHAMPIONS.forEach((def, i) => this.zones.push({ ...pickCard(i), run: () => (sfx('pick'), this.startMatch(def)) }));
       this.zones.push({ ...SPELL_PICK, run: () => this.nextSpell() });
+      this.zones.push({ ...MODE_PICK, run: () => (ui('click'), (this.quick = !this.quick), saveQuick(this.quick)) });
       return;
     }
     if (phase === 'won' || phase === 'lost') {
@@ -1497,7 +1507,7 @@ export class GameScene extends Phaser.Scene {
 
   private drawPick(g: Phaser.GameObjects.Graphics) {
     this.t('title', SCREEN.w / 2, FRAME.y + 12, t('gameTitle'), 32, UI.gold, 'center', true);
-    this.t('sub', SCREEN.w / 2, FRAME.y + 52, t('pickSub'), 12, UI.dim, 'center');
+    this.t('sub', SCREEN.w / 2, FRAME.y + 52, t(this.quick ? 'pickSubQuick' : 'pickSub'), 12, UI.dim, 'center');
     CHAMPIONS.forEach((c, i) => {
       const r = pickCard(i);
       const hover = this.hoverPick === i;
@@ -1521,7 +1531,10 @@ export class GameScene extends Phaser.Scene {
     const h = CHAMPIONS[this.hoverPick];
     // A spell chip under the pointer: its name and what it does, in the champion's two lines.
     const hs = this.hoverSpell ? spellById(this.spell) : null;
-    if (hs) {
+    if (this.hoverMode) {
+      this.t('pick-blurb', SCREEN.w / 2, FRAME.y + 444, t(this.quick ? 'pickModeQuick' : 'pickModeFull'), 12, UI.gold, 'center', true);
+      this.t('pick-motive', SCREEN.w / 2, FRAME.y + 464, t(this.quick ? 'pickModeQuickDesc' : 'pickModeFullDesc'), 12, UI.text, 'center', true);
+    } else if (hs) {
       this.t('pick-blurb', SCREEN.w / 2, FRAME.y + 444, t(hs.name), 12, hs.color, 'center', true);
       this.t('pick-motive', SCREEN.w / 2, FRAME.y + 464, t(hs.desc), 12, UI.text, 'center', true);
     } else {
@@ -1537,8 +1550,14 @@ export class GameScene extends Phaser.Scene {
     g.lineStyle(1.5, col(UI.goldDeep), 1).strokeRect(sb.x + 1, sb.y + 1, sb.w - 2, sb.h - 2);
     g.fillStyle(col(chosen.color), 1).fillCircle(sb.x + 12, sb.y + sb.h / 2, 5);
     this.t('pick-spell', sb.x + sb.w / 2 + 6, sb.y + 4, t('pickSpellLine', { spell: t(chosen.name) }), 10, UI.gold, 'center', true);
-    this.t('hint', SCREEN.w / 2, FRAME.y + 509, t('pickHint1'), 11, UI.dim, 'center');
-    this.t('hint2', SCREEN.w / 2, FRAME.y + 523, t('pickHint2'), 11, UI.dim, 'center');
+    // The match kind, full or quick. The two hint lines share one text, so the pick screen still
+    // makes as many texts as before.
+    const mb = MODE_PICK;
+    this.panel(g, mb.x, mb.y, mb.w, mb.h, this.hoverMode ? '#3a4660' : UI.card);
+    g.lineStyle(1.5, col(UI.goldDeep), 1).strokeRect(mb.x + 1, mb.y + 1, mb.w - 2, mb.h - 2);
+    this.t('pick-mode', mb.x + mb.w / 2, mb.y + 4, t(this.quick ? 'pickModeQuick' : 'pickModeFull'), 10, UI.gold, 'center', true);
+    this.t('hint', SCREEN.w / 2, FRAME.y + 509, `${t('pickHint1')}\n${t('pickHint2')}`, 11, UI.dim, 'center');
+    this.texts.get('hint')?.setAlign('center').setLineSpacing(1);
   }
 
   private drawPlaying(g: Phaser.GameObjects.Graphics, s: GameState) {
@@ -2058,16 +2077,17 @@ export class GameScene extends Phaser.Scene {
     const my = (y: number) => m.y + y * k;
     g.fillStyle(col('#3f7a3a'), 1).fillRect(m.x, m.y, m.w, m.h);
     g.lineStyle(4, col('#3a7ea3'), 0.95).lineBetween(mx(RIVER.from.x), my(RIVER.from.y), mx(RIVER.to.x), my(RIVER.to.y));
-    g.lineStyle(3, col('#d2b483'), 0.95);
-    for (const lane of Object.values(LANES)) {
+    for (const [id, lane] of Object.entries(LANES) as [LaneId, Vec[]][]) {
+      // A quick match's closed lanes are faint.
+      g.lineStyle(3, col('#d2b483'), s.lanes.includes(id) ? 0.95 : 0.3);
       g.beginPath();
       g.moveTo(mx(lane[0].x), my(lane[0].y));
       for (const p of lane.slice(1)) g.lineTo(mx(p.x), my(p.y));
       g.strokePath();
     }
     for (const t of TOWERS) {
-      const dead = s.units.find((u) => u.kind === 'tower' && u.x === t.x && u.y === t.y)?.dead;
-      if (!dead) {
+      const tower = s.units.find((u) => u.kind === 'tower' && u.x === t.x && u.y === t.y);
+      if (tower && !tower.dead) {
         g.fillStyle(col(UI.edge), 1).fillRect(mx(t.x) - 3, my(t.y) - 3, 6, 6);
         g.fillStyle(col(SIDE_COLOR[t.team]), 1).fillRect(mx(t.x) - 2, my(t.y) - 2, 4, 4);
       }
