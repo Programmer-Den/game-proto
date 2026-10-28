@@ -14,6 +14,8 @@ const enUS: Partial<Translation<typeof en>> = {
   toppledFavourRight: 'Leaned too far right: -{n} favor',
   gildedFavour: 'x{mult} favor',
   gildedTierFavour: 'Tier {tier} is gilded: x{mult} favor',
+  altarFavour: 'x{mult} favor and a blessing',
+  altarTierFavour: 'Tier {tier} is a sky altar: x{mult} favor',
   cursedWith: 'Cursed with {curse}: x{mult} favor',
   spendFavour: 'Spend favor (you have {n})',
   takeCurse: 'Take a curse on tier {tier}: {curse}, {text}. Earn x{mult} favor.',
