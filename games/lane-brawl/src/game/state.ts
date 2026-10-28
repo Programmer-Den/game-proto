@@ -389,6 +389,8 @@ export interface GameState {
   /** When the AI teams next weigh giving up, and the team that gave up, if one did. */
   nextSurrender: number;
   surrendered: Team | null;
+  /** Each team's net worth over the match, every `SUMMARY.every` ms and at its end (`sampleWorth`). */
+  history: { t: number; blue: number; red: number }[];
   /** Pings on the map (the player's, and blue's AI calling a retreat), newest last, and when the player last pinged. */
   pings: Ping[];
   lastPingAt: number;
@@ -657,6 +659,7 @@ export function createGame(pick: ChampionDef, enemyDamage: number, opts: MatchOp
     vote: null,
     nextSurrender: opts.quick ? SURRENDER.quickAt : SURRENDER.at,
     surrendered: null,
+    history: [],
     pings: [],
     lastPingAt: -Infinity,
     zones: [],

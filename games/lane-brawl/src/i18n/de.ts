@@ -506,6 +506,10 @@ const de: Translation<typeof en> = {
   blueSurrendered: 'Dein Team hat aufgegeben',
   redSurrendered: 'Rot hat aufgegeben',
   blueSurrenderedWatch: 'Blau hat aufgegeben',
+  mvpLine: 'MVP: {name} · {class}, {k} / {d} / {a}',
+  worthTitle: 'Gesamtwert im Verlauf des Matches',
+  worthBlue: 'Blau {gold} Gold',
+  worthRed: 'Rot {gold} Gold',
   noticeNightfall: 'Die Nacht bricht an: Alle sehen weniger weit',
   noticeDaybreak: 'Der Tag bricht an',
   noticeDrakeAwake: 'Der {drake} erwacht im Fluss',
@@ -636,6 +640,7 @@ export default de;
 export const keepEnglish: (keyof typeof en)[] = [
   'spellReady',
   'spellTeleport',
+  'mvpLine',
   'spellIn',
   'roleTank',
   'berserkerName',

@@ -99,8 +99,10 @@ export function buffStrip(i: number) {
 }
 
 /** The panel and button shown when a match is won or lost. */
-export const END_PANEL = { x: 280, y: 150, w: 400, h: 200 };
-export const PLAY_AGAIN = { x: 380, y: 290, w: 200, h: 44 };
+export const END_PANEL = { x: 200, y: 60, w: 560, h: 420 };
+export const PLAY_AGAIN = { x: 380, y: 418, w: 200, h: 44 };
+/** The net worth graph on the end panel. */
+export const WORTH_GRAPH = { x: 228, y: 230, w: 504, h: 130 };
 
 /**
  * Lays the screen out for a view of `w` x `h` (at least 960x540), once at start. At 960x540 nothing
@@ -128,6 +130,7 @@ export function fitLayout(w: number, h: number) {
   Object.assign(MODE_PICK, { x: 506 + dx / 2, y: 484 + dy / 2 });
   Object.assign(SCORE_PANEL, { x: 100 + dx / 2, y: 38 + dy / 2 });
   Object.assign(SHOP_PANEL, { x: 100 + dx / 2, y: 38 + dy / 2 });
-  Object.assign(END_PANEL, { x: 280 + dx / 2, y: 150 + dy / 2 });
-  Object.assign(PLAY_AGAIN, { x: 380 + dx / 2, y: 290 + dy / 2 });
+  Object.assign(END_PANEL, { x: 200 + dx / 2, y: 60 + dy / 2 });
+  Object.assign(PLAY_AGAIN, { x: 380 + dx / 2, y: 418 + dy / 2 });
+  Object.assign(WORTH_GRAPH, { x: 228 + dx / 2, y: 230 + dy / 2 });
 }
