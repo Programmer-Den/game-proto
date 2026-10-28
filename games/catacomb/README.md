@@ -217,6 +217,25 @@ Rare cards come from treasure chests, elites, the merchant and the altar.
 
 ![Victory over the Hollow Queen at depth 1, with depth 2 opened](docs/screenshots/victory.webp)
 
+### Trophies
+
+Nine trophies, listed behind the Trophies button on the start and pause screens and counted on the
+hub's card. Each pops up at the top of the page once, when it is earned.
+
+| Tier | Trophy | Earned by |
+| --- | --- | --- |
+| Bronze | Into the dark | Winning your first fight |
+| Bronze | Tempered steel | Tempering a card |
+| Bronze | Elite slayer | Beating an elite foe |
+| Silver | Bones to dust | Beating the Bone King |
+| Silver | Relic hoard | Holding five relics in one run |
+| Silver | The hunt is over | Beating the Hollow Queen as the Hunter |
+| Gold | Queen of nothing | Beating the Hollow Queen |
+| Gold | Deeper still | Beating the Hollow Queen at depth 3 |
+| Gold | Bottomless (hidden) | Beating the Hollow Queen at depth 5 |
+
+![The trophy list on the pause screen](docs/screenshots/trophy-list.webp)
+
 The difficulty, set on the hub page's Settings, changes one thing: foes have 25% less health on Easy and 30% more on Hard.
 
 ## Running locally

@@ -40,7 +40,10 @@ with one more rule. The art is painterly: shapes and pixel grids drawn in code, 
 - **Persistence:** one key, `catacomb-best-depth` (`loadBestDepth`/`saveBestDepth` in
   `src/game/depth.ts`), the deepest depth unlocked. A new run defaults to it; the hero panel's
   `<` and `>` pick a lower one. A reload otherwise starts a new run. The game also reads the hub's
-  shared settings (see Hub settings below).
+  shared settings (see Hub settings below). The trophies earned are a second key,
+  `catacomb-trophies` (`shared/trophies.ts`, each id with the time).
+- **Trophies:** nine (`src/trophies/`, `shared/trophies.ts`), listed on the start and pause screens
+  and on the hub (see the file map). The first round earns Into the dark.
 - **Rough edges you can see in the code:**
   - Card faces show a card's own numbers, not what Whetstone, Weak or Vulnerable make of them; the
     foes' intents do show the real damage.
@@ -97,6 +100,17 @@ File map (all under `src/` unless it starts with `shared/`):
 - `game/depth.ts`: the depth ladder: `DEPTH_RULES` and `depthText(depth)` for the panels,
   `depthFoeHp(depth)`, `DEEP_REST_HEAL`, `DEPTH_CURSE`, and the save (`loadBestDepth`,
   `saveBestDepth`, key `catacomb-best-depth`).
+- `trophies/`: the game's nine trophies (`shared/trophies.ts`). `index.ts` lists them (`trophies`:
+  id, tier, icon, `hidden` for Bottomless) with their texts in `trophies/i18n/` (`en.ts` and
+  `de.ts`: the name keyed by the id, what earns it by `<id>Text`), and imports nothing else from the
+  game, since the hub loads it for its trophy shelf. `main.ts` hands `trophies` to `setupGame`.
+  `check.ts` holds each trophy's condition on the run in play (`EARNED`: a fight, elite or boss
+  room in `cleared`, a tempered card in the deck, an elite room in `cleared`, act 2, `RELIC_HOARD`
+  5 relics, and phase `won` as the Hunter, at any depth, at depth 3 and at depth 5) and
+  `checkTrophies(state)`, which `GameScene.update` calls every frame after `tick`. A run is never
+  saved, so nothing is earned on load and no award needs to be quiet. A room joins `cleared` only
+  when it is left, so Into the dark comes once the first reward is taken. A new trophy is an entry
+  in `index.ts`, its two texts in each language file and its condition in `EARNED`.
 - `game/enemies.ts`: `EnemyKind`, `StatusKind`, the `Intent` union (attack with an optional
   `apply` status, block, buff, debuff, and `curse`, which adds a curse card to the deck) and the
   `ENEMIES` table of health, `gold` and `moves` (the first is the opening move); whether a foe is an
@@ -298,7 +312,7 @@ Data tables (where to tune):
 - Keep the Catacomb row of the difficulty table in the root `README.md` (and the difficulty line
   in this game's `README.md`) in sync with the multipliers.
 - The shared settings live under the `hub-settings` storage key, owned by `shared/settings.ts`;
-  this game's own save is only `catacomb-best-depth`.
+  this game's own keys are `catacomb-best-depth` and `catacomb-trophies`.
 
 ## Sound
 
@@ -377,7 +391,9 @@ for the hero's own action, or from `Cues.hear` for something the run does on its
   flask), `ENERGY` (3), `HAND_SIZE` (5),
   `REWARD_CHOICES` (3, all different), the first room being a lone slime at `rooms[0]`, the run
   opening on the `hero` phase at depth 0, and the `KNIGHT_BUTTON`, `END_TURN` and `VIEW` positions. The test checks each slime turn against its shown `intent`,
-  that it opens with its first move and that it never repeats a move twice in a row. The test also expects the slime to fall in under eight turns without killing the hero.
+  that it opens with its first move and that it never repeats a move twice in a row. The test also expects the slime to fall in under eight turns without killing the hero, and
+  `catacomb-trophies` to hold exactly `firstFight` once the reward is taken (a trophy a first round
+  can reach in another way changes that expectation).
 - The first round must stay free of statuses, relics, powers and curses: the slime's moves apply
   none and the Knight's starter cards apply none, so the test's damage sums hold. The test never
   drinks the starting flask.
