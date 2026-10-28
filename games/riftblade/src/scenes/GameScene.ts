@@ -8,6 +8,7 @@ import { bladeColor, dreadRadius, heroVariant, orbitBlades } from '../game/blade
 import { bubble, rebuildTime } from '../game/squad';
 import { buy, chooseEvent, chooseNode, chooseWorld, chartOptions, frame, leave, nextPlanet, reroll } from '../game/voyage';
 import { heatOpen } from '../game/heat';
+import { checkTrophies } from '../trophies/check';
 import { ARMOURY, salvage, type ArmouryId } from '../game/armoury';
 import { reseed, unseed, weekOf, weekSeed, weeklyOf, type MutatorId } from '../game/weekly';
 import { ARENA_MS, BOSSES, CHAMPION, PLANETS, SIEGE, STRIKE, VENT, planetLabel } from '../game/planets';
@@ -528,6 +529,7 @@ export class GameScene extends Phaser.Scene {
     const here = this.state.hero ? PLANETS[this.state.planet].id : null;
     if (here && this.state.phase === 'run' && !this.progress.charted.includes(here)) this.progress = recordCharted(here);
     if (this.panelKey() !== this.shown) this.syncPanel();
+    checkTrophies(this.state, this.progress);
     this.draw();
   }
 

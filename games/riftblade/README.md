@@ -171,6 +171,26 @@ Armoury (on top of the run's own credits). Tap Start or press Enter; Back return
 
 ![The weekly run](docs/screenshots/weekly-run.webp)
 
+### Trophies
+
+Ten trophies, listed on the start and pause screens (Trophies) and counted on the hub's card.
+Each shows a toast once, when it is earned; a save from before trophies earns its own quietly.
+
+| Trophy | Tier | Earned by |
+| --- | --- | --- |
+| Crawler down | Bronze | Beating the boss of the Dune world |
+| Mastery | Bronze | Unlocking a capstone in a run |
+| A new face | Bronze | Unlocking a second hero |
+| Kitted out | Bronze | Buying your first piece in the Armoury |
+| Crusader | Silver | Winning the Rift Crusade with any hero |
+| Week in, week out | Silver | Winning a weekly run |
+| Running hot | Silver | Winning a run at rift heat 3 |
+| Into the furnace | Gold | Winning a run at rift heat 5 |
+| Fully stocked | Gold | Buying every rank of every piece in the Armoury |
+| The full roster | Gold | Unlocking all twelve heroes (hidden until earned) |
+
+![The trophy list](docs/screenshots/trophies.webp)
+
 ### The space map
 
 After the boss of the Dune world falls (and again after the second world's), the space map shows
