@@ -160,8 +160,9 @@ study, shade gardens and a mirrored second production line.
   `cycleSign`, `replantGarden`, `clearBlight`, `sellToWagon`, `cycleMarketPick`, `buyHerb`,
   `sellHerb`) and `harvest` each change
   state and return `Feedback` lines, already translated with `t`. Also `refining`, `hasRoom`, `doneByHand` and `isBlighted`.
-- `src/game/save.ts`: `loadState`, `saveState` (stamps `lastSeen` with `Date.now()`), `clearSave`
-  (key `apothecary-save`), and the `ontoOwnRuns`, `ontoColumns` and `ontoHeart` belt migrations.
+- `src/game/save.ts`: `loadState`, `saveState` (stamps `lastSeen` with `Date.now()` and writes
+  `thinSave`), `clearSave` (key `apothecary-save`), `grantLessons` (lessons an old save was already
+  using), and the `ontoOwnRuns`, `ontoColumns` and `ontoHeart` belt migrations.
 - `src/game/away.ts`: the autopilot. `catchUp(state, now, rand)` plays the time since `lastSeen`
   (capped at `AWAY_CAP_MS`, 2h; nothing under `AWAY_MIN_MS`, 60s) through `tick` in 500ms steps
   with nobody on a work spot and every customer at the counter, and returns an `AwaySummary`
@@ -633,14 +634,23 @@ brew's `out` may be `PANACEA`.
 
 ### Persistence
 
-- `apothecary-save`: the whole `GameState` (with `lastSeen` stamped by `saveState`), saved every `AUTOSAVE_MS` (3s), on tab hide and on
-  `pagehide` (not after "New game" is confirmed). `loadState` discards saves whose `version`
+- `apothecary-save`: the `GameState` (with `lastSeen` stamped by `saveState`), saved every `AUTOSAVE_MS` (3s), on tab hide and on
+  `pagehide` (not after "New game" is confirmed). It is saved thin (`thinSave`, marked `thin: true`)
+  to keep progress codes short: every entry of `upgrades`, `craftsmen`, `belts` and `expansion`
+  still at its start (`untouched`: only `0`, `false` or `[]` inside, so `{ level: 0, paid: 0 }` or
+  `{ built: false, paid: 0 }`) is left out, and so is each town shop's in `routes`, `counter`,
+  `outfitter`, `study`, `guild`, `recipes` and `line2`; the load's per-key merges fill them back in.
+  `loadState` discards saves whose `version`
   differs or that lack `plots`, shallow-merges top-level fields, merges `upgrades`, `craftsmen`,
-  `belts` and `priority` per key, appends new plots (or, when a saved plot's plant doesn't match
+  `belts`, `expansion` and `priority` per key, appends new plots (or, when a saved plot's plant doesn't match
   its garden, as in saves from three beds a garden, starts every plot fresh: `keepsPlots`) and
   drops orders without `pay`. `keepsPlots` now asks that every bed of a garden grows the same
   plant (a replanted garden switches all nine), not that it grows `GARDENS`' plant. A save without
-  `guild` counts as having joined if it bought or paid into any guild upgrade. A save from before
+  `guild` counts as having joined if it bought or paid into any guild upgrade. A save that isn't
+  thin, written before the study, gets `grantLessons`: a missing `research`, `craftOrder`,
+  `priceSigns` or `replant` is granted when the save already uses it (in a thin save a missing
+  upgrade is just one never bought). `e2e/save.spec.ts` loads an old whole save and checks the thin
+  one written back. A save from before
   `COLUMNS_LAYOUT` (5) first gets `ontoColumns`, which scales each belt item's `at` by its belt's
   new `BELT_MS` over the old `U_BELT_MS`, so it keeps its place along the shorter run; then a save
   from before `HEART_LAYOUT` (6) gets `ontoHeart`, which scales each belt item's `at` by `BELT_MS`
