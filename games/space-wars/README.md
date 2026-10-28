@@ -55,7 +55,10 @@ stripes and long exhaust flames, under a chocolate-and-mustard striped HUD with 
    is the building with the role "Barracks" under its name (the Solar Concord's is the Orbital
    Dock).
 3. **Units**: each faction has a fast scout, a gunship and a heavy, all trained at its Barracks. A
-   unit with no orders fires at any enemy in its sight. Select one to see its name and hit points
+   unit with no orders fires at any enemy in its sight. Ships fly round the rock fields rather than
+   over them, and a wing that bunches up drifts apart, so ships never sit on top of each other.
+
+   ![A wing of six Lancers sent across a rock field: it flew round the rocks and spread out where it arrived](docs/screenshots/pathing.webp) Select one to see its name and hit points
    on the command bar.
 4. **Contracts** give the battle its goals (below). After the first, the contract board offers two
    at a time over the map and you tap one. The current one is on the top bar and in the panel on
@@ -404,6 +407,7 @@ what it taps. Run it with `npx playwright test --project space-wars`.
 - `src/game/campaign.ts`: the five campaign sectors and the saved campaign (sectors open, perks kept).
 - `src/game/fog.ts`: the fog of war's grid of explored and in-sight cells.
 - `src/game/research.ts`: the hull, weapons and engines research tracks.
+- `src/game/pathing.ts`: how ships find their way round the rock fields.
 - `src/game/map.ts`: random star maps: hub spots, crystal nodes, rock fields, nebulae, stars and
   derelict stations, and which node is the relay beacon.
 - `src/game/world.ts`: the battle (economy, expansions, production, research, orders, combat, mines
