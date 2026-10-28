@@ -261,6 +261,23 @@ played, and is kept for the next game:
 | Last Cabbage | Hedge, Bow, Whirligig |
 | Snow Path | Sunglass, Bonfire, Bow |
 
+**Trophies.** Ten trophies, listed on the start and pause screens and on the hub:
+
+| Trophy | Tier | How |
+| --- | --- | --- |
+| First hedge row | Bronze | Hold off your first wave |
+| The long way round | Bronze | Make a burrow walk 60 steps to the cottage (not on a path garden) |
+| Safe for the season | Bronze | Hold off all 20 waves in a garden |
+| Master gardener | Bronze | Raise a tower to its master level |
+| Make do | Silver | Win a garden's Challenge |
+| Not one leaf lost | Silver | Win a garden with every cabbage still in the patch |
+| Into the snow | Silver | Win enough stars to open the winter gardens |
+| The last cabbage | Gold | Win Last Cabbage |
+| Every garden tamed | Gold | Win all twelve Challenges |
+| (hidden) | Gold | Hold 30 waves in Endless |
+
+![The First hedge row trophy, earned by holding wave 1](docs/screenshots/trophy.webp)
+
 **Difficulty** (hub setting): Easy gives 25 cabbages and foes 20% less health, Hard 10 cabbages and
 25% more health; Normal is 15 cabbages.
 

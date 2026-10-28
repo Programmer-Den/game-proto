@@ -122,6 +122,17 @@ Implemented today:
   won game one to three stars by `cabbagesLeft` (`STARS`) and four for a Swarm with none lost. The
   scene notes the records (`note`, `noteRecord` merges best of each; Sandbox keeps none) and the
   cards show stars and the best time, or the Endless best.
+- Trophies (`shared/trophies.ts`): `src/trophies/index.ts` lists the ten (`trophies`: id, tier,
+  icon, `hidden` for `endless`) with their texts in `trophies/i18n/` (`en.ts`, `de.ts`: the name
+  keyed by the id, what earns it by `<id>Text`), and imports nothing else from the game, since the
+  hub loads it. `main.ts` hands `trophies` to `setupGame`. The scene awards them with `trophy(id)`
+  (never while a replay is watched, and nothing while `resumeGame` plays a save back): `firstHold`
+  on `cleared`, `longMaze` on `built` once a burrow's `dist` reaches `LONG_MAZE` (60; not in a path
+  garden), `master` on `upgraded` to `MASTER`, `everyCabbage` on `won` with `cabbagesLeft` at
+  `maxLives`, and `recordTrophies` the ones the records earn (`firstWin`, `lastCabbage`,
+  `firstChallenge`, `allChallenges`, `winter` at `SEASON_STARS.winter` stars with challenges
+  counted, `endless` at `ENDLESS_WAVES` (30) in Endless) after each record and, quietly, in
+  `create`. The playthrough checks that wave 1 earns `firstHold` and nothing else.
 - Garden traps: `honey` and `snare` are pouch picks with `TowerDef.trap`. `build` puts them in
   `g.traps` (`Trap`), not `towers`: they never block, need no open way and may lie under foes
   (`canBuild`), and can't be upgraded or sold. `springTraps` (each `step`): a honey pot springs
@@ -198,7 +209,7 @@ Missing or rough:
   `mole.webp` and `cover.png` were taken by hand (a
   Playwright script that plants a maze and sends waves 8 and 9); `duo-replay.webp` (a
   two-gardener replay of the Meadow, both purses in the top bar) was made from a replay put in
-  storage; `challenge.webp` (the picker in Challenge, the Meadow's won) was taken
+  storage; `trophy.webp` (the First hedge row toast after wave 1) and `challenge.webp` (the picker in Challenge, the Meadow's won) was taken
   with a stored record; `resume.webp` (the Meadow's card with its ▶ Wave 2 button) was taken
   by a script that plays wave 1 and reloads; `refused.webp` is the
   playthrough's `playthrough-2-refused` shot. Refresh them when the look changes.
@@ -210,6 +221,7 @@ File map (`src/`):
 - `main.ts`: creates the `Phaser.Game` (960x540 from `VIEW`, `Phaser.Scale.FIT`) with `GameScene`,
   calls `setupGame(game, { howToPlay })` and then `setupScaling(game, { fill: true })`, and in dev
   builds puts `game` on `window`.
+- `trophies/`: the trophies and their texts (see Trophies above).
 - `howToPlay.ts`: the How to play text in English (also US English) and German.
 - `i18n.ts` and `i18n/`: the game's texts. `en.ts` is the British English source, `de.ts` the
   German (with `keepEnglish` for the title and Frost) and `en-US.ts` empty. Keys built from ids
@@ -271,7 +283,8 @@ stars, fastest win in seconds, the Endless best and whether its Challenge was wo
 `mazewright-calm` (`'1'` when waves wait for Start wave), `mazewright-duo` (`'1'` for two gardeners), `mazewright-mode` (the way of play) and
 `mazewright-shed` (seeds, `owned` towers, `masters` bought and extra `slots`) and
 `mazewright-replays` (per garden, the latest Classic or Swarm win as a `Replay`) and
-`mazewright-game-replays` (the game in play at its last break, a `SavedGame`); progress files carry
+`mazewright-game-replays` (the game in play at its last break, a `SavedGame`) and
+`mazewright-trophies` (the trophies earned, kept by `shared/trophies.ts`); progress files carry
 both, and progress codes leave them out as too big for a QR code (`shared/saveFile.ts` `fileOnly`
 skips keys ending in `-replays`).
 
@@ -318,6 +331,7 @@ motion holds the frost pulse and cannon boom rings at full size and the gold num
   burrows and the cottage free of rocks and water, the burrows able to reach the cottage, and a path
   garden's banks on its lawn), and its `${id}Name`/`${id}Text` texts (two lines on the card).
 - **The playthrough** plays the first wave on the Meadow with the default pouch: hedges in column 4 rows 0 to 9 (a drag),
-  a refused tap on (4, 10), bows at (3, 9), (5, 9) and (5, 7), then wave 1 (six beetles). A change to
+  a refused tap on (4, 10), bows at (3, 9), (5, 9) and (5, 7), then wave 1 (six beetles), which
+  earns the `firstHold` trophy and nothing else. A change to
   `START_GOLD`, the hedge or bow cost or numbers, the beetle or wave 1, `waveReward`, the Meadow's
   rocks, `GRID` or `CELL` goes with its update in `e2e/playthrough.spec.ts`.
