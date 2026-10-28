@@ -27,6 +27,8 @@ import {
   STUCK,
   PLATING,
   FIRST_BLOOD,
+  COMEBACK,
+  SURRENDER,
   DRAKE,
   DRAKES,
   DRAKE_ORDER,
@@ -124,6 +126,7 @@ export function tick(s: GameState, dt: number) {
     for (const u of s.units) u.plates = 0;
     notice(s, text('noticePlatesGone'), '#f2c14e');
   }
+  updateSurrender(s);
   const night = nightness(s.time) >= 0.5;
   if (night !== s.night) {
     s.night = night;
@@ -1189,6 +1192,17 @@ function kill(s: GameState, t: Unit, killerId: number) {
         // Rook, the bounty hunter, gets more for a head with a price on it.
         const bounty = Math.round(bountyOf(streak) * (1 + (champKiller.champ?.perk?.bountyGold ?? 0) / 100));
         champKiller.gold += KILL.gold + bounty;
+        // A team that is behind gets more for each kill, to climb back.
+        const comeback = behind(s, champKiller.side as Team, COMEBACK.gap);
+        if (comeback) {
+          champKiller.gold += COMEBACK.gold;
+          gainXp(s, champKiller, COMEBACK.xp);
+          aiLog(champKiller.side as Team, `${shortName(champKiller.name)} earns a comeback bounty`);
+          if (champKiller.player) {
+            notice(s, text('noticeComeback', { gold: COMEBACK.gold }), '#9fd8ff');
+            sound(s, 'comeback', undefined, true);
+          }
+        }
         // The first kill of the match pays extra.
         const first = !s.firstBlood;
         if (first) {
@@ -1702,6 +1716,61 @@ function updateWatchstones(s: GameState, dt: number) {
       sound(s, 'watchstone');
       aiLog(team, 'takes a watchstone');
     }
+  }
+}
+
+/** The XP of a team's champions together. */
+function teamXp(s: GameState, team: Team): number {
+  return s.units.reduce((n, u) => (u.kind === 'champion' && u.side === team ? n + u.xp : n), 0);
+}
+/** Whether a team's champions have `gap` (a share) less XP between them than the other team's. */
+export function behind(s: GameState, team: Team, gap: number): boolean {
+  return teamXp(s, team) < teamXp(s, team === 'blue' ? 'red' : 'blue') * (1 - gap);
+}
+/** How many more towers and inhibitors a team has lost than the other. */
+function structsBehind(s: GameState, team: Team): number {
+  let n = 0;
+  for (const u of s.units) if (u.dead && (u.kind === 'tower' || u.kind === 'inhibitor')) n += u.side === team ? 1 : -1;
+  return n;
+}
+/** Whether an AI champion votes to give up: its team is behind on XP or on structures. */
+function votesYes(s: GameState, team: Team): boolean {
+  return behind(s, team, COMEBACK.gap) || structsBehind(s, team) >= SURRENDER.structs;
+}
+
+/** A team gives up: the other wins, as if the Nexus fell. */
+function surrender(s: GameState, team: Team) {
+  s.surrendered = team;
+  s.phase = team === 'blue' ? 'lost' : 'won';
+  s.winner = team === 'blue' ? 'red' : 'blue';
+  aiLog(team, 'surrenders');
+  sound(s, 'nexus');
+}
+
+/**
+ * The player calls a surrender vote for blue. Returns false when it is too early or a vote was
+ * called lately. Each ally votes by `votesYes`; the player votes yes.
+ */
+export function callSurrender(s: GameState): boolean {
+  if (s.phase !== 'playing' || s.watch || s.time < s.voteReadyAt) return false;
+  const allies = s.units.filter((u) => u.kind === 'champion' && u.side === 'blue' && u.id !== s.player);
+  const yes = 1 + (votesYes(s, 'blue') ? allies.length : 0);
+  const of = allies.length + 1;
+  s.vote = { yes, of, at: s.time };
+  s.voteReadyAt = s.time + SURRENDER.cd;
+  sound(s, 'vote', undefined, true);
+  if (yes / of >= SURRENDER.pass) surrender(s, 'blue');
+  else notice(s, text('noticeVoteFails', { yes, of }), '#f2c14e');
+  return true;
+}
+
+/** From the surrender time on, every `SURRENDER.cd` each AI team that is far behind gives up. */
+function updateSurrender(s: GameState) {
+  if (s.time < s.nextSurrender) return;
+  s.nextSurrender = s.time + SURRENDER.cd;
+  for (const team of (s.watch ? TEAMS : ['red']) as Team[]) {
+    if (s.phase !== 'playing') return;
+    if (behind(s, team, SURRENDER.aiGap) && structsBehind(s, team) >= SURRENDER.structs) surrender(s, team);
   }
 }
 

@@ -358,7 +358,18 @@ Implemented today:
   screen `MODE_PICK` switches it (`hoverMode` shows what each means), kept under the save key
   `lane-brawl-quick` (`loadQuick`, `saveQuick` in `game/spellChoice.ts`); the two hint lines share
   one text so the pick screen makes as many texts (and Math.random draws) as before. The minimap
-  draws closed lanes faint. Watched quick matches end in 5 to 16 minutes, most near 8 to 11.
+  draws closed lanes faint. Watched quick matches end in 4 to 18 minutes, most near 8 to 12.
+- Comeback and surrender (LB23): `COMEBACK` and `SURRENDER` in `data.ts`. `behind(s, team, gap)`
+  in `sim.ts` compares the teams' summed champion XP; `kill` pays a champion kill of a team behind
+  by `COMEBACK.gap` `COMEBACK.gold` and `COMEBACK.xp` more (a notice and the `comeback` sound for
+  the player), and `drawBuffs` shows a chip while blue is behind. `callSurrender` (the scoreboard's
+  `surrenderButton`, from `s.voteReadyAt`) counts the player's yes and each ally's `votesYes`
+  (behind by `COMEBACK.gap`, or `SURRENDER.structs` more towers and inhibitors lost); at
+  `SURRENDER.pass` the team gives up (`surrender`: `s.surrendered`, the phase and winner as if
+  the Nexus fell), else a notice, and the next vote waits `SURRENDER.cd`. `updateSurrender` lets
+  an AI team (red, both when watching) give up every `SURRENDER.cd` from `s.nextSurrender` when it
+  is `SURRENDER.aiGap` behind on XP and `SURRENDER.structs` behind on structures. The end panel
+  says who surrendered.
 - Victory and defeat panel with the match's objectives, last hits, best streak and beasts slain,
   and "Play again".
 
@@ -635,6 +646,7 @@ Effects (`sfx`), where they are raised:
 | `drakeWakes` / `drake` | a drake wakes / is slain (`updateUnit`, `slayDrake`) |
 | `firstBlood`, `plate` | the first champion kill (`kill`), a tower plate breaks (`breakPlates`) |
 | `nightfall` / `daybreak` | night falls / day breaks (`tick`) |
+| `comeback`, `vote` | the player's kill pays a comeback bounty (`kill`), the player calls a surrender vote (`callSurrender`) |
 | `objective` / `objectiveMissed` | the player's objective done / missed (`updateObjective`) |
 
 Shared `ui` sounds: `click` for the Shop button, B and Play again; `coin` for a purchase;

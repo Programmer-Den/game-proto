@@ -52,13 +52,14 @@ import {
   CAMP_KINDS,
   DRAKE,
   DRAKES,
+  COMEBACK,
   PING_KINDS,
   PingKind,
 } from '../game/data';
 import { Fx, GameState, ObjectiveTitle, Phase, Unit, createGame, dist, getUnit } from '../game/state';
 import { loadMastery, masteryRank, recordWin } from '../game/mastery';
 import { loadQuick, loadSpell, saveQuick, saveSpell } from '../game/spellChoice';
-import { abilityFor, atFountain, atShop, buy, buyBack, buybackCost, cast, castSpell, chooseUpgrade, commandAttack, commandMove, hiddenFrom, invulnerable, priceFor, sendPing, startRecall, stealthed, nightness, tick, useActive, viewers } from '../game/sim';
+import { abilityFor, atFountain, atShop, buy, buyBack, buybackCost, cast, castSpell, chooseUpgrade, commandAttack, commandMove, hiddenFrom, invulnerable, priceFor, sendPing, startRecall, stealthed, nightness, behind, callSurrender, tick, useActive, viewers } from '../game/sim';
 import { FxLayers, drawAura, drawProjectile, drawSkill, drawZone, skillMs } from './skillFx';
 import { shortName } from '../game/names';
 import { t, type TextKey } from '../i18n';
@@ -123,6 +124,7 @@ import {
   MODE_PICK,
   SCORE_CHIP,
   SCORE_PANEL,
+  surrenderButton,
   SHOP_BUTTON,
   SHOP_PANEL,
   STREAK_CHIP,
@@ -568,6 +570,12 @@ export class GameScene extends Phaser.Scene {
     return !!this.state && this.state.phase === 'playing' && (this.scoreTapped || !!this.keys?.TAB.isDown);
   }
 
+  /** The scoreboard's Surrender: calls a vote for blue, or buzzes while it can't be called yet. */
+  private surrenderVote() {
+    if (this.state && callSurrender(this.state)) ui('click');
+    else ui('refuse');
+  }
+
   private toggleScore() {
     ui('click');
     this.scoreTapped = !this.scoreTapped;
@@ -673,7 +681,7 @@ export class GameScene extends Phaser.Scene {
     ABILITY_KEYS.forEach((k, i) => this.zones.push({ ...abilityBox(i), run: () => this.castAtCursor(k) }));
     ACTIVES.forEach((a, i) => this.zones.push({ ...activeButton(i), run: () => this.activeAtCursor(a) }));
     for (let i = 0; i < offer; i++) this.zones.push({ ...upgradeCard(i, offer), run: () => this.pickUpgrade(i) });
-    if (this.scoreOpen) this.zones.push({ ...SCORE_PANEL, run: () => this.toggleScore() });
+    if (this.scoreOpen) this.zones.push({ ...SCORE_PANEL, run: () => this.toggleScore() }, { ...surrenderButton(), run: () => this.surrenderVote() });
     else if (this.shopOpen) {
       this.zones.push({ ...SHOP_PANEL, run: noop });
       ITEMS.forEach((item, i) => this.zones.push({ ...shopRow(i), run: () => this.buyItem(item.id) }));
@@ -1588,6 +1596,14 @@ export class GameScene extends Phaser.Scene {
     g.fillStyle(col(UI.gold), 1).fillRect(p.x + 2, p.y + 2, p.w - 4, 3);
     this.t('score-title', p.x + 16, p.y + 8, t('scoreboard'), 18, UI.gold, 'left', true);
     this.t('score-hint', p.x + p.w - 16, p.y + 14, t('scoreHint'), 11, UI.dim, 'right');
+    if (!watching) {
+      // Surrender: when it may be called, else from when.
+      const b = surrenderButton();
+      const ready = s.time >= s.voteReadyAt;
+      this.panel(g, b.x, b.y, b.w, b.h, ready ? '#5a3a3a' : UI.card);
+      const label = ready ? t('surrenderCall') : s.vote ? t('surrenderAgainIn', { time: clock(s.voteReadyAt - s.time) }) : t('surrenderIn', { time: clock(s.voteReadyAt) });
+      this.t('score-surrender', b.x + b.w / 2, b.y + 5, label, 11, ready ? UI.text : UI.muted, 'center', true);
+    }
     const cols = { name: p.x + 26, level: p.x + 262, kda: p.x + 352, cs: p.x + 440, items: p.x + 494, state: p.x + 632 };
     (['blue', 'red'] as const).forEach((team, ti) => {
       const champs = s.units.filter((u) => u.kind === 'champion' && u.side === team);
@@ -1758,6 +1774,18 @@ export class GameScene extends Phaser.Scene {
       g.fillStyle(0xb98cff, 1).fillPoints([new Phaser.Math.Vector2(cx, cy - 7), new Phaser.Math.Vector2(cx + 5, cy), new Phaser.Math.Vector2(cx, cy + 7), new Phaser.Math.Vector2(cx - 5, cy)], true);
       g.fillStyle(0xffffff, 0.45).fillTriangle(cx, cy - 7, cx - 5, cy, cx, cy);
       this.t(`buff-${team}`, c.x + 24, c.y + 4, t(team === 'blue' ? 'minionsEmpoweredBlue' : 'minionsEmpoweredRed', { time: clock(left) }), 10, team === 'blue' ? UI.blue : UI.red, 'left', true);
+    }
+    // Comeback help: while blue is behind, its kills pay more.
+    if (!watching && behind(s, 'blue', COMEBACK.gap)) {
+      const c = buffChip(i++);
+      g.fillStyle(col(UI.edge), 1).fillRect(c.x - 1, c.y - 1, c.w + 2, c.h + 2);
+      g.fillStyle(col('#1f3346'), 1).fillRect(c.x, c.y, c.w, c.h);
+      g.lineStyle(1, col(SIDE_COLOR.blue), 1).strokeRect(c.x + 1, c.y + 1, c.w - 2, c.h - 2);
+      // An arrow climbing back up.
+      const cx = c.x + 12, cy = c.y + c.h / 2;
+      g.fillStyle(col('#9fd8ff'), 1).fillTriangle(cx, cy - 7, cx - 5, cy - 1, cx + 5, cy - 1);
+      g.fillRect(cx - 2, cy - 1, 4, 7);
+      this.t('comeback', c.x + 24, c.y + 4, t('comebackChip', { gold: COMEBACK.gold }), 10, '#9fd8ff', 'left', true);
     }
     // Each team's drake stacks: a gem per drake in its element's colour, and the soul once it has it.
     for (const team of ['blue', 'red'] as Team[]) {
@@ -2206,10 +2234,12 @@ export class GameScene extends Phaser.Scene {
     const won = s.winner === 'blue';
     if (watching) {
       this.t('end-title', SCREEN.w / 2, p.y + 22, t(won ? 'blueWins' : 'redWins'), 34, won ? SIDE_COLOR.blue : SIDE_COLOR.red, 'center', true);
-      this.t('end-sub', SCREEN.w / 2, p.y + 72, t(won ? 'redNexusFell' : 'blueNexusFell'), 13, UI.dim, 'center');
+      const why = s.surrendered ? (s.surrendered === 'red' ? 'redSurrendered' : 'blueSurrenderedWatch') : won ? 'redNexusFell' : 'blueNexusFell';
+      this.t('end-sub', SCREEN.w / 2, p.y + 72, t(why), 13, UI.dim, 'center');
     } else {
       this.t('end-title', SCREEN.w / 2, p.y + 22, t(won ? 'victory' : 'defeat'), 34, won ? UI.green : UI.red, 'center', true);
-      this.t('end-sub', SCREEN.w / 2, p.y + 72, t(won ? 'redNexusFell' : 'yourNexusFell'), 13, UI.dim, 'center');
+      const why = s.surrendered ? (s.surrendered === 'red' ? 'redSurrendered' : 'blueSurrendered') : won ? 'redNexusFell' : 'yourNexusFell';
+      this.t('end-sub', SCREEN.w / 2, p.y + 72, t(why), 13, UI.dim, 'center');
     }
     this.t('end-stats', SCREEN.w / 2, p.y + 94, t('endStats', { kills: t('kills', { n: this.player()?.kills ?? 0 }), deaths: t('deaths', { n: this.player()?.deaths ?? 0 }), objectives: s.objectivesDone, lastHits: s.lastHits, streak: s.bestStreak, beasts: s.beastKills.blue }), 11, UI.muted, 'center');
     // A win counts toward the class's mastery, once per match.
