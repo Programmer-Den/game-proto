@@ -528,7 +528,7 @@ study, shade gardens and a mirrored second production line.
   `BUNDLE_EVERY`th day from there (4, 7, 10, ...) splits the potions into a `bundle` of a second
   potion. `serveFromShelf` counts a sale while `contractWants` holds; `deliverForContract` keeps it
   once both parts are met. The card titles both parts and colours each part's pips.
-- Seasons: `brew` cures the plague once (`cured`, `curedDay`, `seals++`, `told: false`); `tick` starts
+- Seasons: `brew` cures the plague once (`cured`, `curedDay`, `seals++`, and `state.untoldCure` set to its season unless an earlier one is still untold); `tick` starts
   `plagueAt(0, 0, 0, season + 1)` `SEASON_GAP` days after `curedDay` (set on the spot for a cured
   save without it). `stagesFor(season)` gives the stages (`SEASON_STAGES` plus `SEASON_EXTRA` a
   season), and `plagueStage` takes any potion for a stage whose potion isn't `orderable`.
@@ -566,7 +566,7 @@ study, shade gardens and a mirrored second production line.
   at `PLAGUE_CARD` (under the town card, clear of the shelves when the doctor is at the counter)
   with notes for each change (starting from `plagueSaved`, the plague as loaded before `catchUp`
   played the time away, so a stage, relapse or cure while away is told too; back from the town or a shop it goes on from
-  the plague the card last saw, which it keeps in `plagueSaved`, so a cure brewed meanwhile still opens the win panel; `told: false`, saved from the cure until the card has told it and then deleted, does the same after a reload, and a cured save without it counts as told), and `showWin` opens the cure's panel, closed like the others by
+  the plague the card last saw, which it keeps in `plagueSaved`, so a cure brewed meanwhile still opens the win panel; `untoldCure`, saved from the cure until the card has told it and then deleted, does the same after a reload, even once the next season has begun, since it is kept on the state rather than the plague; a save's old `plague.told: false` loads as `untoldCure`, and a cured save without either counts as told), and `showWin` opens the cure's panel, closed like the others by
   `closePanels` (any tap).
 
 ### State model
@@ -590,7 +590,7 @@ save or load, 0 in a new game), `reputation` (0 to 100), `regulars` (`face`, `wa
 `marketPick` (the herb market's good to buy). `town` (`TownState`) holds the shops bought, the
 doctor's hands in town and the `districts`; `loadState` fills it through `normalizeTown`, which merges each shop, station
 and route per key and each district by index, so new shops, stations and districts load into old saves. The contract may have a `bundle` (`potion`, `need`,
-`made`); the plague may have `season`, `curedDay` and `told`. Each order also has `tip`, its full tip (`maxTip`
+`made`); the plague may have `season` and `curedDay`, and the state `untoldCure`. Each order also has `tip`, its full tip (`maxTip`
 of its size), and may have `asked`, `face`, `regular` and `rush`. `counter.shelf` and `carrying`
 can hold fine potions. A plot may be `blighted` with `blightMs`; a belt item may carry `run`; a
 brew's `out` may be `PANACEA`.

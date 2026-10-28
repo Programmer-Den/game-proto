@@ -1257,10 +1257,12 @@ export class GameScene extends Phaser.Scene {
     fit(this.islandText, ISLAND_BUTTON.w - 8);
     this.scoreText.setText(t('score', { n: s.score }));
     fit(this.goalText.setText(t('goal', { score: s.score, goal: s.goal, next: s.round + 1 })), GOAL_BAR.w - 8);
+    // A finished daily counts its own score, since saving it fails silently when storage is blocked.
+    const dailyBest = s.mode === 'daily' ? Math.max(loadDailyBest(s.day), s.phase === 'over' ? s.score : 0) : 0;
     if (s.mode === 'campaign') {
       const [one, two, three] = starScores(s.level);
       this.bestText.setText(t('starsAt', { one, two, three }));
-    } else if (s.mode === 'daily') this.bestText.setText(t('todaysBest', { n: loadDailyBest(s.day) }));
+    } else if (s.mode === 'daily') this.bestText.setText(t('todaysBest', { n: dailyBest }));
     else this.bestText.setText(t('bestScore', { n: s.best }));
 
     // The season strip.
@@ -1332,7 +1334,7 @@ export class GameScene extends Phaser.Scene {
         const stars = starsFor(s.level, s.score);
         const next = stars < 3 ? t('nextStarAt', { n: starScores(s.level)[stars] }) : '';
         won = t('overLevel', { level: s.level, n: stars, next, crowns: s.crowns });
-      } else if (s.mode === 'daily') won = t('overDaily', { best: loadDailyBest(s.day), crowns: s.crowns });
+      } else if (s.mode === 'daily') won = t('overDaily', { best: dailyBest, crowns: s.crowns });
       const over = { score: s.score, island: String(s.island), round: s.round, n: s.placed, castle: s.castle, won };
       fit(this.gameOverText.setText(t('overText', over)), 500);
     }

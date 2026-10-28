@@ -289,6 +289,11 @@ export interface GameState {
   rival: Rival;
   /** Town seals, one for each season's plague cured; each raises every potion's price. */
   seals: number;
+  /**
+   * The season of a cure the plague card has not told yet, the earliest if more came, so a cure brewed
+   * in the town is told after a reload too, even once the next season has begun; missing when told.
+   */
+  untoldCure?: number;
   /** The merchant wagon at the street door on a wagon day, or null before the first. */
   wagon: Wagon | null;
   /** What the herb market's buy marker sells. */
@@ -657,7 +662,7 @@ export interface Plague {
   season?: number;
   /** The day the town was cured; the next season's outbreak comes `SEASON_GAP` days later. */
   curedDay?: number;
-  /** False from the cure until the plague card has told it, so a cure brewed in the town is told after a reload too; missing means told. */
+  /** From saves before `GameState.untoldCure`: false from the cure until the plague card had told it. */
   told?: boolean;
 }
 export const PLAGUE_DAY = 5;

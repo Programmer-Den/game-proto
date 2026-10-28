@@ -600,9 +600,10 @@ mostly on the Dune world. Things learned while tuning:
   late on a busy machine), so each step is the same length.
 - The rules draw only through `rand()` (never `Math.random` directly, or a weekly run stops
   repeating); in a normal run it calls `Math.random`, so the playthrough's seeded `Math.random`
-  still makes its run repeat. Drawing and other cosmetics keep to `Math.random` or a hash (the
-  ground decoration uses its own hash), so drawing never shifts the seeded sequence the test relies
-  on. The Dune world's spawning draws in the same order as before the other planets came, so keep
+  still makes its run repeat. Drawing and other cosmetics use a hash (the ground decoration and the
+  bolts' kinks use their own), never `Math.random`: in a normal run `Math.random` is the rules'
+  stream, so a cosmetic draw would shift the seeded sequence the test relies on. Only a weekly run
+  is shielded, by its own generator. The Dune world's spawning draws in the same order as before the other planets came, so keep
   it that way.
 - Bosses are `kind: 'boss'` on every planet; which one it is comes from `PLANETS[state.planet].boss`.
   The boss's timers reuse `shellMs`, `spawnMs` and `modeMs` with a meaning per boss `mech` (see

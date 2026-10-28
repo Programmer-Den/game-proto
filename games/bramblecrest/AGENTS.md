@@ -64,7 +64,8 @@ Implemented today:
   or a burst calls `knockDown` (`DOWN_MS`; a beetle shows `beetle-back`, a lantern moth lands), and
   until then a swing on a beetle only goes `tink` and a lantern moth, flying `LANTERN_LIFT` up, is
   out of reach. Beetles walk like slugs; lantern moths keep `LANTERN_KEEP` from the knight, circle
-  and drop an `ember` (a `shoot` with that key) every `LANTERN_SHOT_MS`, carry a light, and never
+  and drop an `ember` (a `shoot` with that key) every `LANTERN_SHOT_MS`, which sinks from `LANTERN_LIFT` to the
+  knight's body on the way (the seed's `lift` and `drop`), so walls stop it at its ground point; carry a light, and never
   hurt by touch. Down, both lie still and harmless. `hint` shows a teaching toast once a page load
   (`shellHard`, `beetleFlipped`, `lanternDown`). New dungeon foes go at the end of the map's
   `enemies`, so the beaten flags of the old ones keep their index; new outdoor ones go after the

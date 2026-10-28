@@ -494,7 +494,7 @@ function brew(state: GameState, cauldron: Cauldron, brewing: Brew | null, ms: nu
     if (state.plague && !state.plague.cured) {
       state.plague.cured = true;
       state.plague.curedDay = state.contract.day;
-      state.plague.told = false;
+      state.untoldCure ??= state.plague.season ?? 0;
       state.seals = (state.seals ?? 0) + 1;
     }
   } else cauldron.output.push(current.out);

@@ -493,7 +493,8 @@ function startBuild(s: GameState, owner: number, type: BuildingId, spot: { tx: n
   return true;
 }
 
-function nearestUnit(list: Unit[], x: number, y: number): Unit | null {
+/** The unit of `list` nearest to (x, y), in tiles. */
+export function nearestUnit(list: Unit[], x: number, y: number): Unit | null {
   let best: Unit | null = null;
   for (const u of list) if (!best || Math.hypot(u.x - x, u.y - y) < Math.hypot(best.x - x, best.y - y)) best = u;
   return best;
