@@ -142,7 +142,7 @@ State model (`GameState`): `phase` (`menu`, `playing`, `solved`, `relic`, `over`
 `plan` and `upcoming` (Delve `FloorPlan`s, null otherwise), `dailyDate` (the `dailySeed` a daily board was dealt for, 0 otherwise), `relics`, `relicOffer`, `warded`, `streak`, `keyHealed`, `undo` (the cells' digits and notes before each note, wrong digit or erase; `undoMove` restores the newest whose cell isn't right, `canUndo`), `doneUnits` (indexes into `units`), `newStyles`, `progress` and
 `events`.
 
-Persistence: two `localStorage` keys. `ninefold-board` holds the board in play (`saveBoard`/`loadBoard`
+Persistence: two `localStorage` keys of its own (and `ninefold-trophies`, kept by `shared/trophies.ts`). `ninefold-board` holds the board in play (`saveBoard`/`loadBoard`
 in `save.ts`: the `BOARD_FIELDS` of `GameState`, written by `update` whenever the scene is dirty and
 every `SAVE_EVERY_MS` of board time, and removed once the phase is neither `playing` nor `relic`);
 `create` restores it, straight onto the board or the relic offer. `ninefold-progress` holds `Progress` (`solved`, `flawless`,
@@ -162,6 +162,18 @@ seed. All rule timing is game time from `tick`.
   sync.
 - `settings.reduceMotion` skips the finished-unit and solved flashes (`drawFlashes`). Nothing
   shakes or blinks.
+
+## Trophies
+
+`src/trophies/index.ts` lists nine (`trophySet('ninefold', ...)`, handed to `setupGame` in
+`main.ts`), with their texts in `src/trophies/i18n/` (`en.ts`, `de.ts`). `src/trophies/check.ts`
+awards each from `Progress` alone (`EARNED`): `firstSolve` (solved 1), `flawless`, `fast`, `streak3`
+and `streak7` (`bestStreak`), `firstBoss` (`bosses`), `floor10` and `floor20` (`bestFloor`) and
+`allStyles` (every style unlocked); `streak7` and `floor20` are hidden. `GameScene` calls
+`checkTrophies` once in `create` (quietly, for a saved progress) and in `drain` after any event.
+They are saved under `ninefold-trophies`. The playthrough checks that floor 1, solved with a
+mistake, earns only First fill. A new trophy needs its id in `index.ts`, its two texts in each
+`i18n` file, its condition in `EARNED`, and a README row.
 
 ## Sound
 
@@ -198,6 +210,7 @@ digit, Erase or Hint that can't be used, a disabled pad key and a locked style.
   `relic-0`..`relic-2`, `next`, `done`, `again`, `back`, `style-<id>`).
 - Inputs: it taps `delve`, taps cells from `cellSpots` and pad keys from `buttons`, toggles
   `notes`, taps `erase` and `relic-0`. It never uses hints and stays on Delve floors 1 and 2.
+- The playthrough also reads `ninefold-trophies` (only `firstSolve` after floor 1).
 - Mirrored in `e2e/playthrough.spec.ts`, so change them together: the `GameState` field names,
   `VIEW`, 3 hearts and `DELVE_HINTS` (1) on Normal, `FLOORS[0]` and `FLOORS[1]` (sizes and givens),
   `RELIC_OFFER`, `MAX_HEARTS`, `SEER_CELLS`, each relic's effect, Cosy Pixel unlocking on a first

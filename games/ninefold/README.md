@@ -111,6 +111,25 @@ mode, counts towards them:
 
 ![The same board in all nine styles](docs/screenshots/all-styles.webp)
 
+### Trophies
+
+Nine trophies (`src/trophies/`), listed under **Trophies** on the start and pause screens; the
+last two stay hidden until earned:
+
+| Trophy | Tier | Earned by |
+| --- | --- | --- |
+| First fill | Bronze | Solving your first puzzle, in any mode |
+| Clean slate | Bronze | Solving a puzzle with no mistakes |
+| Quick pencil | Bronze | Solving a 9x9 in under 10 minutes |
+| Three in a row | Silver | Solving the daily puzzle three days running |
+| Boss breaker | Silver | Clearing a Delve boss floor |
+| Deep digger | Silver | Clearing Delve floor 10 |
+| Full palette | Gold | Unlocking all nine styles |
+| A week of puzzles | Gold | Solving the daily puzzle seven days running |
+| Bottom of the well | Gold | Clearing Delve floor 20 |
+
+![A trophy earned on a boss floor](docs/screenshots/trophy-toast.webp)
+
 **Difficulty** (hub setting): Easy gives 5 hints a Classic board and 4 hearts a Delve run, Hard 2
 hints and 2 hearts; Normal is 3 and 3. The puzzles themselves don't change.
 

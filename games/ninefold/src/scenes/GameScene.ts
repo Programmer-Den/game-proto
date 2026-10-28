@@ -11,6 +11,7 @@ import {
 import { boxOf, dailySeed, peersOf, units, type Puzzle } from '../game/sudoku';
 import { SFX, SONG } from '../audio';
 import { t } from '../i18n';
+import { checkTrophies } from '../trophies/check';
 import { layoutFor, UI_DEPTH, WIDE, type Layout } from './layout';
 import { hex, THEMES, type Theme } from './themes';
 
@@ -70,6 +71,7 @@ export class GameScene extends Phaser.Scene {
     this.state = newGame(loadProgress());
     // A board left in play (or a relic offer between Delve floors) comes back where it stood.
     loadBoard(this.state);
+    checkTrophies(this.state.progress);
     this.backdrop = this.add.graphics();
     this.boardG = this.add.graphics();
     this.flashG = this.add.graphics();
@@ -258,6 +260,7 @@ export class GameScene extends Phaser.Scene {
           break;
       }
     }
+    if (this.dirty) checkTrophies(s.progress);
     const part = this.screen !== 'board' ? 'menu' : s.mode === 'delve' ? 'delve' : 'calm';
     playMusic(SONG, part);
   }
