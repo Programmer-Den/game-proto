@@ -10,7 +10,7 @@ export function loadProgress(): Progress {
   try {
     const saved = JSON.parse(localStorage.getItem(KEY) ?? 'null');
     if (saved && typeof saved === 'object') {
-      for (const key of ['solved', 'flawless', 'noHint', 'hard', 'fast', 'bestFloor', 'daily'] as const) {
+      for (const key of ['solved', 'flawless', 'noHint', 'hard', 'fast', 'bestFloor', 'bosses', 'daily'] as const) {
         if (Number.isFinite(saved[key])) p[key] = saved[key];
       }
       if (Array.isArray(saved.unlocked)) p.unlocked = STYLES.filter((s) => s === 'paper' || saved.unlocked.includes(s));
