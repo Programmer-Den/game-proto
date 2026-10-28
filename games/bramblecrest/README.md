@@ -100,6 +100,14 @@ Most foes fall to the sword, but two don't:
 
 ![A lantern moth and a shelled beetle in Glimmer Fen](docs/screenshots/new-foes.webp)
 
+### Trophies
+
+Ten trophies, listed on the start and pause screens: the blade and both bosses, the first upgrade
+and all four, a beetle flipped and beaten, an hourglass trial, both trials under par, every
+moonstone, and one more that stays hidden until you earn it.
+
+![Bramblecrest's trophies on the pause screen](docs/screenshots/trophies.webp)
+
 ### Hearts and falls
 
 You have three hearts on Normal (five on Easy, two on Hard). Foes, thorn seeds, bursts and the
@@ -140,6 +148,7 @@ the north gate, checking the quest, items, flags and save at each step. Run it w
 | --- | --- |
 | `src/main.ts` | Creates the game and hands it to the hub's `setupGame` and `setupScaling` |
 | `src/howToPlay.ts` | The How to play shown on the start and pause screens |
+| `src/trophies/` | The ten trophies, their texts and when each is earned |
 | `src/game/maps.ts` | The five maps as tile grids, with their people, chests, signs, exits, foes, posts, doors, blocks, plates, rooms and moonstones |
 | `src/game/state.ts` | The save: where the knight is, hearts, items, keys, moonstones, flags, the quest, the trials' best times, coins and upgrades, and what each upgrade costs |
 | `src/game/talk.ts` | What each person says, by where the quest stands |
