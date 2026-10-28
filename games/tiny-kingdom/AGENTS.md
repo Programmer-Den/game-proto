@@ -69,7 +69,13 @@ Implemented today:
   1 to `ISLANDS` (9999) with `Math.random`, and `islandMap` lays it out from that number with its
   own seeded generator: two or three lakes of 2 to 4 cells, then two or three woods of 1 to 3,
   each grown from a random grass cell, then the castle on a random grass cell. The same number
-  always gives the same island.
+  always gives the same island. `fairIsland` checks each layout: some lake needs 3 grass cells on
+  its shore (round 1's decree asks for 3 farms there) and the castle at least `CASTLE_ROOM` (6)
+  grass cells joined to it, so it is never walled in by lakes and woods. A layout that fails is
+  drawn again from the seed `island + attempt * (ISLANDS + 1)` (`layIsland`); 74 of the 9999 islands
+  are redrawn, none of the campaign's and not the playthrough's 1990, and every other island lies
+  as before. A greedy bot reaches round 1's goal on every island on Normal; on Hard it falls
+  short on 16, where a beam search (40 boards, merges included) still reaches it.
 - Islands card (`src/game/islands.ts`, `createIslandsCard` in the scene): opened by the island
   button on the panel's round line (`ISLAND_BUTTON`) or the game-over "Islands" button. It has
   the campaign's eight level plaques with their best stars (locked ones dimmed), a line with the
@@ -117,7 +123,10 @@ Implemented today:
   (farms beside a named lake), `wood` (houses beside a named wood) and `watch` (one tower with 3
   houses around it). For shore and wood, `need` is what the board already has plus `ASK` (3 farms,
   2 houses); a watch decree's `need` is a flat 3, offered only while no tower has 3 homes around
-  it, so a decree never starts fulfilled. Round 1 always asks for 3 more farms on the lake with
+  it, so a decree never starts fulfilled. A decree is also checked against the pouch the round
+  starts with (`decreeFor`'s `pouch`, the hand included): a shore or wood decree needs `ASK` farms
+  or houses in it, and a watch decree a tower standing or in the pouch with room for the missing
+  homes around it (`watchShort`) and that many houses, so every decree offered can be met. Round 1 always asks for 3 more farms on the lake with
   the most open shore; later rounds draw a kind and a place from a generator seeded by island and
   round, never repeating the last round's kind and place. Lakes and woods are named by
   `namedPlaces` from where their centre lies (North, South, East, West or Mid, plus mere / pool /
@@ -179,8 +188,8 @@ Missing or rough:
   human play; retune `LEVELS` if they feel off. The bot never trades or clears woods.
 - The castle bonus can be large on a crowded island (a greedy bot joins 40 to 50 buildings), since
   every building in one blob counts; the campaign's stars were set with it in.
-- Islands are not checked for winnability; decrees are only checked for enough open spots, not
-  for enough tiles in the pouch.
+- A decree only counts the tiles in the pouch when it is drawn, not the hands: an unlucky draw
+  or the player's own building on its spots can still leave it unmet.
 - The decree outline is drawn cell edge by cell edge (dashed, square corners), not as one rounded
   shape like the mockup.
 - `start` does not clear running score popups (it does stop the round banner).
@@ -236,7 +245,7 @@ File map (`src/`):
   `SPECIALS` (the four gift buildings), the `Building`, `Special`, `Structure` (a building or
   `'manor'`), `Terrain` (grass, lake, forest, castle) and `Cell` types, `INFO` (the `TextKey`s of
   each one's name, rule and count, such as "3 farms"), `isBuilding`, `isBuilt`, `scores`, `isHome`, `MAP_SIZE`, `ISLANDS`,
-  `SIDES`, `AROUND`, `islandMap` (lakes, woods, then the castle), `seeded` (mulberry32),
+  `SIDES`, `AROUND`, `islandMap` (lakes, woods, then the castle, redrawn until `fairIsland`), `seeded` (mulberry32),
   `randomIsland` and `startingGrid`.
 - `game/state.ts`: `GameState`, `Snapshot`, `Share`, `Preview`, `Placed`, `FIRST_POUCH`,
   `ROUND_POUCH`, `HAND`, `TRADE_GIVE`, `goalFor`, `season`, `newGame(best, crowns, island?,
