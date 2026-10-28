@@ -1,5 +1,5 @@
 import { byDifficulty } from '../../../../shared/settings';
-import { CHARMS, GENERAL_RELICS, RELICS, isCharm, type Mode, type RelicId } from './catalog';
+import { CHARMS, GENERAL_RELICS, OMENS, RELICS, isCharm, type Mode, type OmenId, type RelicId } from './catalog';
 import { DEFS, KINDS, type KindId, type Level } from './kinds';
 import { dailySeed, newSeed, seeded, shuffle } from './rng';
 import { newProgress, recordResult, type Progress } from './progress';
@@ -37,6 +37,9 @@ export const HOURGLASS = 0.25;
 /** A charm's kind: the points it pays, times, and how much slower Memory Echo turns its cards. */
 export const CHARM_POINTS = 1.5;
 export const CHARM_ECHO_SLOW = 1.35;
+/** An omen taken: the points it pays, times, and the hearts a loss under Peril costs. */
+export const OMEN_POINTS = 2;
+export const PERIL_HEARTS = 2;
 /** Points: per level, per second left, taken per hint (down to a floor), and the streak bonus. */
 export const POINTS_PER_LEVEL = 100;
 export const POINTS_PER_SECOND = 2;
@@ -64,6 +67,9 @@ export interface Current {
   /** Free hints left (a charm gives one), and how many of the hints used were free. */
   freeHints: number;
   freeUsed: number;
+  /** The omen taken for this puzzle, or null, and whether a move or hint has been made yet. */
+  omen: OmenId | null;
+  touched: boolean;
   /** Earlier states, for Undo. */
   history: string[];
 }
@@ -75,6 +81,8 @@ export interface Result {
   reason: EndReason;
   ms: number;
   points: number;
+  /** The omen it was played under. */
+  omen?: OmenId;
 }
 
 export type Phase = 'playing' | 'between' | 'draft' | 'relic' | 'handover' | 'over';
@@ -86,6 +94,7 @@ export type RunEvent =
   | { type: 'hint' }
   | { type: 'warn' }
   | { type: 'relic'; relic: RelicId }
+  | { type: 'omen'; omen: OmenId }
   | { type: 'over' };
 
 export interface Run {
@@ -221,7 +230,30 @@ export function makeCurrent(run: Run, card: Card): Current {
   const state = DEFS[card.kind].make(seeded(card.seed), card.level);
   const charm = holdsCharm(run, card.kind);
   if (charm && card.kind === 'echo') state.stepMs = Math.round(state.stepMs * CHARM_ECHO_SLOW);
-  return { card, state, timeLeftMs: time, timeTotalMs: time ?? 0, elapsedMs: 0, hintsUsed: 0, freeHints: charm && card.kind !== 'echo' ? 1 : 0, freeUsed: 0, history: [] };
+  return { card, state, timeLeftMs: time, timeTotalMs: time ?? 0, elapsedMs: 0, hintsUsed: 0, freeHints: charm && card.kind !== 'echo' ? 1 : 0, freeUsed: 0, omen: null, touched: false, history: [] };
+}
+
+/**
+ * The omen a card offers, from its seed (no draw from `Math.random`, so the deck deals as before):
+ * Memory Echo, with no hints, undo or clock of its own to cut, only offers Peril.
+ */
+export const omenFor = (card: Card): OmenId => (card.kind === 'echo' ? 'peril' : OMENS[(card.seed >>> 4) % OMENS.length]);
+
+/** Whether the puzzle in play can still take its omen: Endless or Draft, before its first move. */
+export const canTakeOmen = (run: Run) =>
+  run.phase === 'playing' && (run.mode === 'endless' || run.mode === 'draft') && !!run.current && !run.current.omen && !run.current.touched;
+
+/** Takes the puzzle's omen: Haste halves its time; Silence and Peril change Undo, hints and losses. */
+export function takeOmen(run: Run) {
+  const cur = run.current;
+  if (!canTakeOmen(run) || !cur) return false;
+  cur.omen = omenFor(cur.card);
+  if (cur.omen === 'haste' && cur.timeLeftMs !== null) {
+    cur.timeTotalMs = Math.round(cur.timeTotalMs / 2);
+    cur.timeLeftMs = Math.min(cur.timeLeftMs, cur.timeTotalMs);
+  }
+  run.events.push({ type: 'omen', omen: cur.omen });
+  return true;
 }
 
 /** Makes a card's puzzle and puts it in play. */
@@ -273,6 +305,7 @@ export function act(run: Run, change: (state: any) => boolean, before?: string) 
   // A drag that changes nothing at its start passes the state from before it began.
   before ??= JSON.stringify(cur.state);
   if (!change(cur.state)) return false;
+  cur.touched = true;
   if (DEFS[cur.card.kind].undo) cur.history.push(before);
   check(run);
   return true;
@@ -288,7 +321,7 @@ export function drag(run: Run, change: (state: any) => boolean) {
 }
 
 /** Whether Undo has a move to take back. */
-export const canUndo = (run: Run) => run.phase === 'playing' && !!run.current?.history.length;
+export const canUndo = (run: Run) => run.phase === 'playing' && !!run.current?.history.length && run.current.omen !== 'silence';
 
 export function undo(run: Run) {
   const cur = run.current;
@@ -299,7 +332,7 @@ export function undo(run: Run) {
 }
 
 export const canHint = (run: Run) =>
-  run.phase === 'playing' && !!run.current && (run.hints > 0 || run.current.freeHints > 0) && run.current.card.kind !== 'echo' && DEFS[run.current.card.kind].canHint?.(run.current.state) !== false;
+  run.phase === 'playing' && !!run.current && run.current.omen !== 'silence' && (run.hints > 0 || run.current.freeHints > 0) && run.current.card.kind !== 'echo' && DEFS[run.current.card.kind].canHint?.(run.current.state) !== false;
 
 export function hint(run: Run) {
   const cur = run.current;
@@ -310,6 +343,7 @@ export function hint(run: Run) {
   if (cur.freeHints > 0) cur.freeHints--, cur.freeUsed++;
   else run.hints--;
   cur.hintsUsed++;
+  cur.touched = true;
   run.events.push({ type: 'hint' });
   check(run);
   return true;
@@ -337,14 +371,15 @@ function pointsFor(run: Run, cur: Current) {
   const base = POINTS_PER_LEVEL * (cur.card.level + 1) + (cur.timeLeftMs ? Math.floor(cur.timeLeftMs / 1000) * POINTS_PER_SECOND : 0);
   const afterHints = Math.max(MIN_POINTS, base - HINT_COST * (cur.hintsUsed - cur.freeUsed));
   const charm = holdsCharm(run, cur.card.kind) ? CHARM_POINTS : 1;
-  return Math.round(afterHints * charm * (1 + STREAK_STEP * Math.min(run.streak, STREAK_CAP)));
+  const omen = cur.omen ? OMEN_POINTS : 1;
+  return Math.round(afterHints * charm * omen * (1 + STREAK_STEP * Math.min(run.streak, STREAK_CAP)));
 }
 
 function end(run: Run, reason: EndReason) {
   const cur = run.current!;
   const solved = reason === 'solved';
   const points = solved && run.mode !== 'practice' && run.mode !== 'duel' ? pointsFor(run, cur) : 0;
-  const result: Result = { card: cur.card, reason, ms: cur.elapsedMs, points };
+  const result: Result = { card: cur.card, reason, ms: cur.elapsedMs, points, ...(cur.omen ? { omen: cur.omen } : {}) };
   run.results.push(result);
   run.last = result;
   recordResult(run.progress, cur.card.kind, cur.card.level, solved, cur.elapsedMs, cur.hintsUsed);
@@ -361,7 +396,7 @@ function end(run: Run, reason: EndReason) {
   } else run.streak = 0;
   run.events.push({ type: 'end', reason, points });
   if (!solved && (run.mode === 'endless' || run.mode === 'draft')) {
-    run.hearts--;
+    run.hearts = Math.max(0, run.hearts - (cur.omen === 'peril' ? PERIL_HEARTS : 1));
     run.events.push({ type: 'heart' });
   }
   if (run.mode === 'blitz') {
