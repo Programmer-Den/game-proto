@@ -317,6 +317,9 @@ test('plays the first round', async ({ page }, testInfo) => {
     if (step.decree) {
       expect(s).toMatchObject({ bonus: DECREE_BONUS, crowns: 1 });
       expect(await page.evaluate(() => localStorage.getItem('tiny-kingdom-crowns')), 'the crown is saved').toBe('1');
+      // The crown earns the By royal decree trophy (src/trophies/), and nothing else yet.
+      const trophies = await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('tiny-kingdom-trophies') ?? '{}')));
+      expect(trophies, 'trophies earned in the first round').toEqual(['firstCrown']);
       await snap('2-decree');
     } else expect(s.decree?.done, 'decree not yet fulfilled').toBe(false);
   }

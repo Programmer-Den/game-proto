@@ -209,6 +209,16 @@ export class GameScene extends Phaser.Scene {
         case 'clock':
           SFX('heart');
           break;
+        case 'phoenix':
+          SFX('relic');
+          this.flashes.push({ cells: s.values.map((_, i) => i), age: 0, color: 0xf08a3c });
+          break;
+        case 'heal':
+          SFX('unlock');
+          break;
+        case 'gift':
+          SFX('hint');
+          break;
         case 'unit':
           SFX('unit');
           this.flashes.push({ cells: e.cells, age: 0, color: 0xffffff });
@@ -731,7 +741,8 @@ export class GameScene extends Phaser.Scene {
     const box = this.L.relicBox;
     this.box(box.x, box.y, box.w, box.h, UI_DEPTH, undefined, Math.max(0.95, th.panelAlpha));
     this.text(box.x + box.w / 2, box.title, s.plan?.boss ? t('bossCleared', { n: s.floor }) : t('floorCleared', { n: s.floor }), 30, th.accent);
-    this.text(box.x + box.w / 2, box.line, this.unlockedLine() || t('takeRelic'), 15, this.unlockedLine() ? th.accent : th.text, { wordWrap: { width: box.w - 40 } });
+    const line = this.unlockedLine() || (s.plan?.boss ? `${t('heartsRestored')} ${t('takeRelic')}` : t('takeRelic'));
+    this.text(box.x + box.w / 2, box.line, line, 15, this.unlockedLine() ? th.accent : th.text, { wordWrap: { width: box.w - 40 } });
     if (s.upcoming) this.text(box.x + box.w / 2, box.next, this.nextLine(s.upcoming), 14, th.text, { wordWrap: { width: box.w - 40 } });
     s.relicOffer.forEach((relic, k) => {
       const x = this.L.relicCards.xs[k];
@@ -760,7 +771,7 @@ export class GameScene extends Phaser.Scene {
     return [head, ...plan.twists.map((tw) => `${t(TWIST_INFO[tw].name)}: ${t(TWIST_INFO[tw].rule)}`)].join(' ');
   }
 
-  /** A relic's emblem: a lantern, a heart-cut gem, an eye or a shield. */
+  /** A relic's emblem: a lantern, a heart-cut gem, an eye, a shield, two eyes, a die, a feather, a sandglass, a ring or a keystone. */
   private drawRelicIcon(g: Phaser.GameObjects.Graphics, relic: RelicId, x: number, y: number, color: number) {
     g.fillStyle(color, 1).lineStyle(3, 0x000000, 0.5);
     switch (relic) {
@@ -779,6 +790,34 @@ export class GameScene extends Phaser.Scene {
         break;
       case 'ward':
         g.beginPath().moveTo(x - 18, y - 18).lineTo(x + 18, y - 18).lineTo(x + 16, y + 4).lineTo(x, y + 20).lineTo(x - 16, y + 4).closePath().fillPath().strokePath();
+        break;
+      case 'twin':
+        for (const dx of [-13, 13]) {
+          g.fillStyle(color, 1).fillEllipse(x + dx, y, 24, 16).strokeEllipse(x + dx, y, 24, 16);
+          g.fillStyle(0x2a1840, 1).fillCircle(x + dx, y, 5);
+        }
+        break;
+      case 'gambler':
+        g.fillRoundedRect(x - 18, y - 18, 36, 36, 7).strokeRoundedRect(x - 18, y - 18, 36, 36, 7);
+        g.fillStyle(0x2a2a2a, 1);
+        for (const [dx, dy] of [[-9, -9], [0, 0], [9, 9], [9, -9], [-9, 9]]) g.fillCircle(x + dx, y + dy, 3.5);
+        break;
+      case 'phoenix':
+        g.beginPath().moveTo(x - 6, y + 20).lineTo(x - 14, y - 4).lineTo(x - 2, y - 22).lineTo(x + 12, y - 8).lineTo(x + 8, y + 10).closePath().fillPath().strokePath();
+        g.lineStyle(2, 0xffe08a, 1).lineBetween(x - 6, y + 20, x + 2, y - 14);
+        break;
+      case 'sandglass':
+        g.fillTriangle(x - 14, y - 18, x + 14, y - 18, x, y).fillTriangle(x - 14, y + 18, x + 14, y + 18, x, y);
+        g.strokeTriangle(x - 14, y - 18, x + 14, y - 18, x, y).strokeTriangle(x - 14, y + 18, x + 14, y + 18, x, y);
+        g.fillStyle(0x6a4a20, 1).fillRect(x - 17, y - 21, 34, 4).fillRect(x - 17, y + 17, 34, 4);
+        break;
+      case 'vow':
+        g.lineStyle(7, color, 1).strokeCircle(x, y + 4, 14);
+        g.fillStyle(0xd8e0ea, 1).fillCircle(x, y - 12, 6);
+        break;
+      case 'keystone':
+        g.beginPath().moveTo(x - 18, y - 16).lineTo(x + 18, y - 16).lineTo(x + 10, y + 18).lineTo(x - 10, y + 18).closePath().fillPath().strokePath();
+        g.lineStyle(2, 0x000000, 0.35).lineBetween(x - 4, y - 16, x - 2, y + 18).lineBetween(x + 4, y - 16, x + 2, y + 18);
         break;
     }
   }

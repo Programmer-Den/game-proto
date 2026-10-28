@@ -179,6 +179,14 @@ const en = {
   warChestName: 'War Chest',
   warChestText: 'Gain a finished item now.',
 
+  // Rare power cards (from stage 4)
+  freeRollsName: 'Lucky Dice',
+  freeRollsText: 'Your first two rerolls every round are free.',
+  handToMouthName: 'Hand to Mouth',
+  handToMouthText: 'No more interest, but 6 gold every round however much you hold.',
+  gildedShopName: 'Gilded Shop',
+  gildedShopText: 'Gilded robots turn up in one shop slot in five, from level 1.',
+
   // Commander skills: name and what they do
   overclockSkill: 'Overclock',
   overclockText: 'Your robots attack 40% faster for 5 seconds.',
@@ -273,6 +281,20 @@ const en = {
   championUnlock: 'Unlock: win a match.',
   unlockedCall: 'New commander: {name}!',
   unlockedList: 'New commanders: {names}',
+  rankRust: 'Rust',
+  rankIron: 'Iron',
+  rankSteel: 'Steel',
+  rankChrome: 'Chrome',
+  rankTitan: 'Titan',
+  rankRustText: 'rivals play as designed',
+  rankIronText: 'rivals reroll for copies sooner',
+  rankSteelText: 'rivals reroll sooner and get 1 more gold a round',
+  rankChromeText: 'rivals also find pricier robots in their shops',
+  rankTitanText: 'rivals get 2 more gold a round and reroll from round 2-1',
+  rankLine: 'Rank {rank} ({points} points)',
+  rankNext: ', {rank} at {points}',
+  rankUp: 'Rank up: {rank}!',
+  rankPoints: '+{n} rank points · {rank} ({points})',
   menuStats: 'Matches {played} · wins {wins} · best place {best}',
 
   // HUD
@@ -284,6 +306,8 @@ const en = {
   level: 'Lv {n}',
   xp: '{xp}/{need} xp',
   maxLevel: 'max',
+  rerollFree: 'Reroll free ({n})',
+  rareCard: 'RARE',
   reroll: 'Reroll {n}',
   buyXp: 'Buy XP {n}',
   sellFor: 'Sell for {n} (E)',

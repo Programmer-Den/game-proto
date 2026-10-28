@@ -38,8 +38,12 @@ Implemented today:
   `ITEM_BENCH` (10): every part or item a player gets (drops, sales, star-ups, drafts, power cards,
   scrap tokens) goes through `giveItem`, which scraps it when the bench is full. The scene then
   floats "Parts full" (`partsFull`) over an orb or the item bench instead of the item's name.
-- Power cards (`AUGMENTS`): offered at rounds with `augment` set (2-1, 3-2, 4-2) and picked with
-  `pickAugment`. Duplicator pays the robot's cost in gold instead when the bench is full. While
+- Power cards (`AUGMENTS`): offered at rounds with `augment` set (2-1, 3-2, 4-2, 5-2) and picked with
+  `pickAugment`. From `RARE_FROM_STAGE` (4) `offerAugments` puts a `rare` card in the third slot,
+  drawn gold-edged with a RARE tag: `free-rolls` (`Player.freeRolls`, reset to `RARE.freeRolls` in
+  `startPlan`, makes `rerollCost` 0 and the Reroll button read "Reroll free"), `hand-to-mouth`
+  (`startPlan` pays `RARE.handToMouthGold` instead of interest) and `gilded-shop` (`rollShop` uses
+  `RARE.gildedChance` from level 1). Duplicator pays the robot's cost in gold instead when the bench is full. While
   the card overlay is up, taps and keys other than 1-3 do nothing.
 - Rounds (`stageRounds`): stage 1 is three neutral rounds and a draft; later stages are
   pvp, pvp, pvp, draft, pvp, pvp, then a monster round (2-7 is the Scrap Rat, `RAT`).
@@ -75,7 +79,14 @@ Implemented today:
 - Part preview: with a part or item selected or dragged, `buildPreview` tags each robot with
   `equipPreview(id, robot)` (the finished item, the part, or full), and the info panel lists the
   part's six recipes.
-- Progress (matches, wins, best place and `deeds`) saved under `scrapyard-titans-stats`
+- Rank ladder (`RANKS`, `RANK_POINTS` in `data.ts`): `Progress.points` grow by a top-four place in
+  `record` (`addRankPoints`) and never drop; `rankOf(points)` gives the rank, which `startMatch`
+  passes as `MatchOptions.rank` (0 under `?watch`). The rank gives each rival `gold` more a round
+  in `startPlan`, rolls the rivals' shops `odds` levels higher in `rollShop`, and lets `aiPlan`
+  reroll from stage `rollFrom` while holding more than `rollAbove` gold (seat 0 always uses Rust's).
+  Rank 0 plays exactly as before. The menu shows it under the stats, the end screen the points won
+  or the rank up.
+- Progress (matches, wins, best place, `deeds` and rank `points`) saved under `scrapyard-titans-stats`
   (`progress.ts`, `loadProgress`/`saveProgress`); watched matches never count.
 
 Missing or rough:
@@ -102,7 +113,8 @@ File map (`src/`):
   just 3 in German, where the text says "Platz"). Every text on screen goes through `t`, and a new
   one gets its German entry (and a US one if its spelling differs) in the same PR. The watch
   panel's title and `aiLog` lines stay English, with the names inside them translated.
-- `progress.ts`: what lasts between matches (`Progress`: stats and deeds), `isUnlocked`,
+- `progress.ts`: what lasts between matches (`Progress`: stats, deeds, rank points), `rankOf`,
+  `addRankPoints`, `isUnlocked`,
   `doDeeds` (saves new deeds, returns the commanders they unlock), `planDeeds`, `fullOrigin`. No
   Phaser.
 - `audio.ts`: the songs (`PLAN_SONG`, `FIGHT_SONG`) and the sound table (`play`, typed `Sfx`); see
@@ -219,11 +231,11 @@ greyed-out button or shop card (`button` pushes a refusal for them).
   `layout.ts` (`SHOP`, `BENCH`, `BUTTONS.fight`, `BOARD_VIEW`), the menu's START MATCH rect in
   `buildMenu`, `ECONOMY.startGold`, and round 1-1's monsters (`MONSTERS.mite`), which every 1-cost
   robot must beat alone.
-- Screenshots: `docs/screenshots/menu.webp` is from a scratch run with two deeds saved and a locked commander picked; `fight.webp` (also
+- Screenshots: `docs/screenshots/menu.webp` is from a scratch run with three deeds and 285 rank points saved; `fight.webp` (also
   `cover.png`), `draft.webp` and `scrap-rat.webp` are from a scratch `?watch` run with the watch
   panel hidden; `scout.webp`, `part-preview.webp` and `damage-meter.webp` from a scratch run that
   plays round 1-1 with real clicks; `german-result.webp` is the test's `3-result` run with a
-  `de-DE` browser locale; `fill-ultrawide.webp` (2560x1080) and `fill-tablet.webp` (1024x768)
+  `de-DE` browser locale; `rare-card.webp` is a scratch run's 4-2 offer (set from the dev console) with Lucky Dice in the third slot; `fill-ultrawide.webp` (2560x1080) and `fill-tablet.webp` (1024x768)
   show the plan phase on a wider and a taller view, from a scratch run.
 
 ## Making common changes
@@ -245,6 +257,8 @@ greyed-out button or shop card (`button` pushes a refusal for them).
   `<deed>Unlock` text and a `noteDeeds` call where it happens. The menu row holds eight cards.
 - **Add a power card**: add it to `AugmentId`, `AUGMENTS` and `AUGMENT_TASTE` in `ai.ts`, then
   apply it in `match.ts` (one-off) or `battle.ts` (in fights).
+- **Change the rank ladder**: a row in `RANKS` (with its name and text keys), the points in
+  `RANK_POINTS`; check the effect with the balance harness at each rank.
 - **Change rounds or damage**: `stageRounds`, `stageDamage`, `SURVIVOR_DAMAGE`.
 
 ## Gotchas

@@ -179,6 +179,14 @@ const de: Translation<typeof en> = {
   warChestName: 'Kriegskasse',
   warChestText: 'Erhalte jetzt einen fertigen Gegenstand.',
 
+  // Rare power cards (from stage 4)
+  freeRollsName: 'Glückswürfel',
+  freeRollsText: 'Die ersten zwei Mal Würfeln jede Runde sind gratis.',
+  handToMouthName: 'Von der Hand in den Mund',
+  handToMouthText: 'Keine Zinsen mehr, dafür jede Runde 6 Gold, egal wie viel du hast.',
+  gildedShopName: 'Goldener Shop',
+  gildedShopText: 'Vergoldete Roboter erscheinen in einem von fünf Shopplätzen, ab Stufe 1.',
+
   // Commander skills: name and what they do
   overclockSkill: 'Übertakten',
   overclockText: 'Deine Roboter greifen 5 Sekunden lang 40 % schneller an.',
@@ -273,6 +281,20 @@ const de: Translation<typeof en> = {
   championUnlock: 'Freischalten: eine Partie gewinnen.',
   unlockedCall: 'Neuer Kommandant: {name}!',
   unlockedList: 'Neue Kommandanten: {names}',
+  rankRust: 'Rost',
+  rankIron: 'Eisen',
+  rankSteel: 'Stahl',
+  rankChrome: 'Chrom',
+  rankTitan: 'Titan',
+  rankRustText: 'Rivalen spielen wie vorgesehen',
+  rankIronText: 'Rivalen würfeln früher nach Kopien',
+  rankSteelText: 'Rivalen würfeln früher und bekommen 1 Gold mehr pro Runde',
+  rankChromeText: 'Rivalen finden auch teurere Roboter im Shop',
+  rankTitanText: 'Rivalen bekommen 2 Gold mehr pro Runde und würfeln ab Runde 2-1',
+  rankLine: 'Rang {rank} ({points} Punkte)',
+  rankNext: ', {rank} ab {points}',
+  rankUp: 'Rangaufstieg: {rank}!',
+  rankPoints: '+{n} Rangpunkte · {rank} ({points})',
   menuStats: 'Partien {played} · Siege {wins} · bester Platz {best}',
 
   // HUD
@@ -284,6 +306,8 @@ const de: Translation<typeof en> = {
   level: 'St. {n}',
   xp: '{xp}/{need} XP',
   maxLevel: 'max.',
+  rerollFree: 'Gratis-Wurf ({n})',
+  rareCard: 'SELTEN',
   reroll: 'Würfeln {n}',
   buyXp: 'XP für {n}',
   sellFor: 'Verkauf {n} (E)',
@@ -365,7 +389,7 @@ const de: Translation<typeof en> = {
 /** Texts that are the same in German. */
 export const keepEnglish: (keyof typeof en)[] = [
   'magnetTrait', 'neonTrait', 'hackerTrait', 'saboteurTrait', 'servoName', 'firewall', 'kernel', 'flicker', 'sparks', 'magna',
-  'tauntWin', 'title', 'skillCall', 'hexa', 'nova',
+  'tauntWin', 'title', 'skillCall', 'hexa', 'nova', 'rankTitan',
 ];
 
 export default de;

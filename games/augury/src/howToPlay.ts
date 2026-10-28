@@ -21,6 +21,7 @@ const en: HowToPlay = {
   tips: [
     'Practice any puzzle with no clock first, and its hints are free.',
     'In a Draft Run every third solve offers a relic: a hint, a heart, more time, more cards to choose from, or a charm that helps one kind of puzzle.',
+    'Before your first move, tempt the omen in the top bar for double points: half the time, no undo or hints, or two hearts for a loss.',
     'The Daily Five is the same for everyone on the same day, and you get one try.',
     'Pass and Play deals both players the same three puzzles; skips and hints add time.',
   ],
@@ -46,6 +47,7 @@ const de: HowToPlay = {
   tips: [
     'Übe jedes Rätsel zuerst ohne Uhr, dort sind die Tipps frei.',
     'In der Kartenwahl bietet jedes dritte gelöste Rätsel ein Relikt: einen Tipp, ein Herz, mehr Zeit, mehr Karten zur Wahl oder einen Talisman, der einer Rätselart hilft.',
+    'Wage vor deinem ersten Zug das Omen oben für doppelte Punkte: halbe Zeit, kein Zurücknehmen und keine Tipps, oder zwei Herzen für einen Verlust.',
     'Die Tagesfünf ist am selben Tag für alle gleich, und du hast einen Versuch.',
     'Beim Weitergeben bekommen beide Spieler dieselben drei Rätsel; Überspringen und Tipps kosten Zeit.',
   ],

@@ -50,6 +50,7 @@ const de: Translation<typeof en> = {
   // Marla the baker
   bakerBread: 'Frisches Brot für die Nachtwache! Die Älteste Wren hat dich gesucht, Schätzchen.',
   bakerTrees1: 'Pass auf im Wald. Meine Mutter sagte, zwei der Bäume dort werfen nie einen Schatten.',
+  bakerShop: 'Münzen aus dem Wald, Schätzchen? Ich hab eine Pastete und ein Paar Stiefel für einen tapferen Ritter.',
   bakerTrees2: 'Geh einfach durch sie hindurch, sagte sie. Niemand hat ihr geglaubt.',
 
   // Biscuit the cat
@@ -66,6 +67,7 @@ const de: Translation<typeof en> = {
   hermitQuiet1: 'Die Glocke schweigt. Ich habe eine ganze Nacht durchgeschlafen, zum ersten Mal seit Jahren.',
   hermitQuiet2: 'Felsen rollen nicht von allein in Baumringe, weißt du. Westlich vom Fluss gibt es einen.',
   hermitRingers1: 'Die Glöckner, die den Turm bauten, haben eingemauert, was der Fluss nicht kriegen sollte.',
+  hermitShop: 'Münzen hast du? Dann geb ich dir einen größeren Beutel oder eine längere Ranke.',
   hermitRingers2: 'Hüte dich vor den Fröschen da unten. Die beißen.',
   hermitHello1: 'Hm. Ein Ritter, hier draußen? Heutzutage geht keiner mehr über den Fluss.',
   hermitHello2: 'Drei steinerne Wächter starren auf ein Stück Schlamm. Da grabe ich nie. Bringt Unglück, sag ich.',
@@ -166,6 +168,23 @@ const de: Translation<typeof en> = {
   trialBest: '{place}: {time}',
   trialNone: '{place}: noch nicht gelaufen',
   closePage: 'Tippen oder N zum Schließen',
+
+  // The shops
+  shopTitle: 'Waren von {name}',
+  price: '{n} Münzen',
+  owned: 'Deins',
+  notYet: 'Noch nicht',
+  closeShop: 'Außerhalb tippen, Leertaste oder Esc zum Schließen',
+  tooPoor: 'Nicht genug Münzen.',
+  bought: 'Gekauft: {item}!',
+  pie: 'Herzhafte Pastete',
+  pieText: 'Ein Herz mehr, für immer.',
+  boots: 'Leichte Stiefel',
+  bootsText: 'Weiter rollen und früher wieder rollen.',
+  pouch: 'Größerer Beutel',
+  pouchText: '15 Glockensamen tragen statt 10.',
+  vine: 'Lange Ranke',
+  vineText: 'Die Hakenranke reicht viel weiter.',
 
   // HUD
   keys: 'Schlüssel {n}',

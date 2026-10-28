@@ -5,13 +5,13 @@
  */
 import { aiLog } from '../../../../shared/watch';
 import { t } from '../i18n';
-import { BENCH_SLOTS, CLASS_STATS, ECONOMY, UNIT_BY_ID, type AugmentId } from './data';
+import { BENCH_SLOTS, CLASS_STATS, ECONOMY, RANKS, UNIT_BY_ID, type AugmentId } from './data';
 import {
   allUnits, boardUnits, buy, buyXp, countTraits, draftPick, equip, pickAugment, removeUnit, reroll, sell, unitCost,
   type Match, type Owned, type Player,
 } from './match';
 
-const AUGMENT_TASTE: AugmentId[] = ['thick-hull', 'rapid-fire', 'war-chest', 'hot-wiring', 'front-plates', 'big-battery', 'lucky-bolt', 'spare-parts', 'level-up', 'overtime', 'last-stand', 'duplicator', 'scrap-dividend', 'gold-rush', 'recycler'];
+const AUGMENT_TASTE: AugmentId[] = ['thick-hull', 'free-rolls', 'rapid-fire', 'gilded-shop', 'war-chest', 'hot-wiring', 'front-plates', 'big-battery', 'lucky-bolt', 'spare-parts', 'level-up', 'overtime', 'last-stand', 'duplicator', 'scrap-dividend', 'gold-rush', 'hand-to-mouth', 'recycler'];
 
 const value = (o: Owned) => unitCost(o) * 3 ** (o.star - 1) + o.items.length * 2;
 
@@ -48,7 +48,9 @@ export function aiPlan(m: Match, p: Player) {
   };
   shop();
   let rolls = 0;
-  while (m.stage >= 4 && p.gold > 50 + ECONOMY.rerollCost && rolls++ < 6 && reroll(m, p)) shop();
+  // The player's seat under `?watch` plays as designed; the rivals roll sooner at higher ranks.
+  const rank = RANKS[p.seat === 0 ? 0 : m.opts.rank];
+  while (m.stage >= rank.rollFrom && p.gold > rank.rollAbove + ECONOMY.rerollCost && rolls++ < 6 && reroll(m, p)) shop();
   // Clear a full bench of its weakest robot.
   const benched = p.bench.filter((b): b is Owned => !!b);
   if (benched.length >= BENCH_SLOTS - 1) {

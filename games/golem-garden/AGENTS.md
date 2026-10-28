@@ -116,8 +116,10 @@ Implemented today:
 - Sap pops: each squashed pest pushes a `Pop` onto `state.pops`; the scene drains them into a
   splat, a "+N" label and three droplets that arc to the sap counter, whose glow pulses as they
   land.
-- The most waves ever cleared, the bloom, each garden's stars and laurels, and the garden last
-  picked (and whether thorny) persist. Boons and regrown leaves last one garden.
+- Trophies: ten (see `src/trophies/` below), awarded by `checkTrophies` from the state every frame
+  and Bold call by the scene as a called wave ends clean (`Settled.clean`).
+- The most waves ever cleared, the bloom, each garden's stars and laurels, the trophies, and the
+  garden last picked (and whether thorny) persist. Boons and regrown leaves last one garden.
 
 Missing or rough:
 
@@ -137,7 +139,7 @@ Missing or rough:
 - The cover and the loop screenshots (`heartwood-bloom`, `call-early`, `sap-pops`, `golem-menu`,
   `golem-move`, `new-pests`, `queen-slug`, `garden-picker`, `forked-brook`, `two-gates`,
   `level-3-forms`, `targeting`, `hedge`, `compost`, `harvest`, `harvest-wave`, `boons`,
-  `regrow-leaf`, `thorny-picker`, `thorny-meadow`) were
+  `regrow-leaf`, `thorny-picker`, `thorny-meadow`, `trophies`) were
   staged through `window.game` with a scratch Playwright script against the dev server (set
   `state` fields and `localStorage` keys, push pests or pops, click cells and buttons, pause the
   scene); refresh them the same way.
@@ -188,7 +190,7 @@ File map (`src/`):
   inside a sentence and `card` for a tall seed card's two lines, the hedge, forms, targets, boons and
   twists) is a `TextKey`, shown with `t`.
 - `game/state.ts`: `GameState`, `Golem` (with `form` and `target`), `Hedge`, `Pest`, `Shot`,
-  `Pop`, `Called`, `Slime`, `SHOT_MS`, `newGame(best, bloom, garden, stars, thorny, laurels)`,
+  `Pop`, `Called`, `Settled`, `Slime`, `SHOT_MS`, `newGame(best, bloom, garden, stars, thorny, laurels)`,
   `gardenOf`, `totalStars`, `gardenOpen`, `thornyOpen`, `twistOf`, `boonCount`, `unlocked`, `seedCost`, `select`, `golemAt`, `hedgeAt`,
   `freeSoil`, `freePath`, `canPlant`, `plant`, `upgradeCost`, `picksForm`, `upgrade(s, g, form)`,
   `boonedStats`, `statsOf(s, g)`, `setTarget`, `nextTarget`, `uprootValue`, `uproot`, `canMove`, `move`, `neighbours`,
@@ -216,11 +218,24 @@ File map (`src/`):
   flowers sit on the tree. A garden's static scene over the table (garden slab, paths, soil beds,
   panel slab, preview pad) is its one `bg-<n>` texture, transparent where the table shows.
 - `ui/Button.ts`: `makeButton`, the clay button used by the garden picker's Back.
+- `trophies/`: the game's ten trophies (`shared/trophies.ts`). `index.ts` lists them (`trophies`:
+  id, tier, icon, `hidden` for Thorny laurel) with their texts in `trophies/i18n/` (`en.ts` and
+  `de.ts`: the name keyed by the id, what earns it by `<id>Text`), and imports nothing else from the
+  game, since the hub loads it for its trophy shelf. `main.ts` hands `trophies` to `setupGame`, which
+  lists them on the start and pause screens. `check.ts` holds each trophy's condition on the
+  `GameState` (`EARNED`: `firstWave` best at least 1, `combo` a grown golem with a combo, `form` a
+  golem with a form, `bloom` the full bloom, `queen` `queenSquashed`, `harvest` any star,
+  `perfectHarvest` three stars, `allGardens` a star in every garden, `laurel` any laurel) and
+  `checkTrophies(state)`, which `GameScene.update` calls after the tick; the first call after the
+  page loads awards quietly, so saved best, bloom, stars and laurels earn theirs without a toast.
+  `boldCall` is awarded in `update` for a `state.settled` entry whose `clean` is set (no leaf lost
+  between the call and the end; `Called.heart` keeps the leaves at the call). A new trophy is an
+  entry in `index.ts`, its two texts in each language file and its condition in `EARNED`.
 
 Shared code it imports (outside the game folder): `shared/setupGame.ts` (`setupGame`),
 `shared/scaling.ts` (`setupScaling`, `sharpRes`, `viewSize`, `viewFrame`), `shared/settings.ts` (`byDifficulty`,
-`settings`), `shared/i18n.ts` (`translator`, `byLanguage`, `formatNumber`) and `shared/audio.ts` (`sounds`, `ui`,
-`playMusic`, `playSting`).
+`settings`), `shared/i18n.ts` (`translator`, `byLanguage`, `formatNumber`), `shared/audio.ts` (`sounds`, `ui`,
+`playMusic`, `playSting`) and `shared/trophies.ts` (`trophySet`, `award`).
 
 Screens: `setupScaling` gives the canvas `renderScale` canvas pixels per game pixel (up to 4 on a
 4K screen) and zooms the one camera to match from its top-left. With `fill: true` the view takes
@@ -281,18 +296,19 @@ fought, or next while building), `phase` (`'build'`, `'wave'` or `'over'`), `hea
 pests not yet shown; the scene empties it every frame), `best`, `compost` (paid at the last wave's
 end), `stars` (per garden), `harvest` (this garden's, 0 before wave 30), `thorny`, `laurels` (per
 garden), `boons`, `sunRows`, `offer` (the boons to pick from, or empty), `queenSquashed`, `called` (waves
-called early whose last pests still walk), `settled` (called waves just finished; the scene empties
-it), `regrown` and `nextId`. Golem
+called early whose last pests still walk), `settled` (called waves just finished, each with `clean`; the scene
+empties it), `regrown` and `nextId`. Golem
 positions are cells; pest positions are `dist` pixels along their route. The open menu, its form
 mode and the golem being moved (`picked`, `formMenu`, `moving`) are the scene's, not the state's.
 
-Persistence: six `localStorage` keys, written by the scene: `golem-garden-best` (the most waves
+Persistence: seven `localStorage` keys, six written by the scene: `golem-garden-best` (the most waves
 ever cleared, when `state.best` rises), `golem-garden-bloom` (the Heartwood's bloom, when it rises;
 kept between gardens, so the Thorn golem stays unlocked once it blooms), `golem-garden-stars`
 (each garden's harvest stars, comma-separated in `GARDENS` order, when they change) and
 `golem-garden-garden` (the garden last picked, which a reload plants), `golem-garden-thorny` (1
 when that pick was its thorny variant) and `golem-garden-laurels` (each garden's laurel, 0 or 1,
-comma-separated, when one is won). The garden's golems, hedges, pests and boons are never saved.
+comma-separated, when one is won), and `golem-garden-trophies` (the trophies earned, each id with
+the time, written by `award` in `shared/trophies.ts`). The garden's golems, hedges, pests and boons are never saved.
 The hub's settings are read from the shared `hub-settings` key.
 
 Randomness and timing: no `Math.random`, `Date.now` or `performance.now`. Waves are fixed by
@@ -361,7 +377,9 @@ Heartwood falls.
   and bonus (`WAVE_1`), `EARLY_BONUS`, the wave button's labels, the cells it plants on (`PLANTS`,
   inside the path's bends) and a path cell (`PATH_CELL`). It also checks the thorn card picks
   nothing while locked, the early-call label once wave 1's queue is empty (it does not take it),
-  and `bloom` going from 0 to 1 when wave 1 is cleared. Moving the path, weakening the pebble
+  and `bloom` going from 0 to 1 when wave 1 is cleared, and that clearing it earns only the Green
+  thumb trophy (`golem-garden-trophies` holds just `firstWave`; a trophy a first round can reach in
+  another way, like a combo, would break that). Moving the path, weakening the pebble
   golem or toughening wave 1 can make the two golems miss a beetle; the test then fails on `heart`.
 - It saves `playthrough-0-start`, `-1-sprout`, `-2-wave` and `-3-cleared` screenshots; copy them
   into `docs/screenshots/` with the `playthrough-` prefix when the look changes.

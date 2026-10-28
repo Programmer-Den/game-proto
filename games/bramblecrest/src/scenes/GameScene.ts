@@ -6,7 +6,7 @@ import { paintAll, texScale } from '../art/paint';
 import { paintGround, groundKey } from '../art/ground';
 import { BREAKABLE, buildMap, centre, CUTTABLE, DUNGEONS, LOW, MAP_IDS, setTile, SOLID, TILE, tileAt, underBoulder, type Door, type Facing, type ItemId, type MapDef, type MapId, type NpcId, type Prop, type PropKind } from '../game/maps';
 import { findPath, type Step } from '../game/path';
-import { advance, CHAPTER_ONE_STONES, clearSave, clock, give, hasFlag, load, MAX_SEEDS, MOONSTONES, newState, reached, save, setFlag, stonesToFind, type GameState } from '../game/state';
+import { advance, buy, CHAPTER_ONE_STONES, clearSave, clock, give, hasFlag, hasUpgrade, load, maxSeeds, MOONSTONES, newState, reached, save, setFlag, stonesToFind, UPGRADES, type GameState, type Seller } from '../game/state';
 import { talk, type TalkEffect } from '../game/talk';
 import { t, type TextKey } from '../i18n';
 import { settings } from '../../../../shared/settings';
@@ -22,7 +22,7 @@ import {
   type Bomb, type Boss, type Foe, type Seed, type Wraith,
 } from './foes';
 import {
-  HURT_MS, LANTERN, LANTERN_OIL, PICKUP_PX, PLANT_REACH, PULL_SPEED, ROLL_COOLDOWN_MS, ROLL_MS, ROLL_SPEED, STICK, SWING_COOLDOWN_MS, SWING_MS, SWING_RADIUS, SWING_REACH, VINE_RANGE, VINE_SPEED,
+  BOOTS, HURT_MS, LANTERN, LONG_VINE, LANTERN_OIL, PICKUP_PX, PLANT_REACH, PULL_SPEED, ROLL_COOLDOWN_MS, ROLL_MS, ROLL_SPEED, STICK, SWING_COOLDOWN_MS, SWING_MS, SWING_RADIUS, SWING_REACH, VINE_RANGE, VINE_SPEED,
   WALK_SPEED,
 } from './layout';
 
@@ -107,6 +107,7 @@ export class GameScene extends Phaser.Scene {
   private seeds: Seed[] = [];
   private hearts: { x: number; y: number; sprite: Phaser.GameObjects.Image }[] = [];
   private pods: { x: number; y: number; sprite: Phaser.GameObjects.Image }[] = [];
+  private coins: { x: number; y: number; sprite: Phaser.GameObjects.Image }[] = [];
   private bells: { note: number; x: number; y: number; sprite: Phaser.GameObjects.Image }[] = [];
   /** The bells rung so far, in order, toward the belfry's tune. */
   private bellSeq: number[] = [];
@@ -182,10 +183,12 @@ export class GameScene extends Phaser.Scene {
     for (const s of this.seeds) s.sprite.destroy();
     for (const h of this.hearts) h.sprite.destroy();
     for (const p of this.pods) p.sprite.destroy();
+    for (const c of this.coins) c.sprite.destroy();
     for (const b of this.bombs) b.sprite.destroy();
     this.seeds = [];
     this.hearts = [];
     this.pods = [];
+    this.coins = [];
     this.bombs = [];
     this.bells = [];
     this.bellSeq = [];
@@ -480,6 +483,12 @@ export class GameScene extends Phaser.Scene {
 
   private onKey(e: KeyboardEvent) {
     const code = e.code;
+    if (this.hud.shopOpen) {
+      const i = Number(code.replace('Digit', '')) - 1;
+      if (code.startsWith('Digit') && i >= 0) this.hud.pressShop(i);
+      else if (code === 'Escape' || code === 'Space' || code === 'Enter' || code === 'KeyN') this.hud.closeShop();
+      return;
+    }
     if (code === 'KeyN' || (this.hud.pageOpen && (code === 'Escape' || code === 'Space' || code === 'Enter'))) return this.toggleStones();
     if (this.hud.covered || this.fading) return;
     if (this.dialog) {
@@ -494,6 +503,8 @@ export class GameScene extends Phaser.Scene {
 
   private onPointer(pointer: Phaser.Input.Pointer) {
     if (this.hud.pageOpen) return this.toggleStones();
+    // A tap off the shop's buttons closes it (a button stops the tap from getting here).
+    if (this.hud.shopOpen) return this.hud.closeShop();
     if (this.hud.covered || this.fading) return;
     if (this.dialog) {
       this.nextLine();
@@ -757,7 +768,7 @@ export class GameScene extends Phaser.Scene {
       key: t('foundKey'),
       heart: t('foundHeart'),
       oil: t('foundOil'),
-      seeds: t('foundSeeds', { n: MAX_SEEDS }),
+      seeds: t('foundSeeds', { n: s.seeds }),
     };
     this.openDialog('', [text[item]]);
     this.persist();
@@ -818,12 +829,19 @@ export class GameScene extends Phaser.Scene {
       case 'seeds':
         advance(s, 'belfry');
         give(s, 'seeds');
-        this.openDialog('', [t('gotSeeds', { n: MAX_SEEDS })]);
+        this.openDialog('', [t('gotSeeds', { n: s.seeds })]);
         break;
       case 'refill':
-        s.seeds = MAX_SEEDS;
+        s.seeds = maxSeeds(s);
         sfx('pod');
-        this.hud.toast(t('seedsRefilled', { n: MAX_SEEDS }));
+        this.hud.toast(t('seedsRefilled', { n: s.seeds }));
+        this.openShop('hermit');
+        break;
+      case 'shop-baker':
+        this.openShop('baker');
+        break;
+      case 'shop-hermit':
+        this.openShop('hermit');
         break;
       case 'finish-two':
         advance(s, 'end');
@@ -943,6 +961,7 @@ export class GameScene extends Phaser.Scene {
       this.persist();
     } else if (Math.random() < 0.2) this.dropHeart((tx + 0.5) * TILE, (ty + 0.5) * TILE);
     else if (s.items.seeds && Math.random() < 0.3) this.dropPod((tx + 0.5) * TILE, (ty + 0.5) * TILE);
+    else if (Math.random() < 0.4) this.dropCoin((tx + 0.5) * TILE, (ty + 0.5) * TILE);
   }
 
   private ringBell(bell: GameScene['bells'][number]) {
@@ -1101,10 +1120,15 @@ export class GameScene extends Phaser.Scene {
     const d = mv.x || mv.y ? mv : DIRS[s.facing];
     const len = Math.hypot(d.x, d.y) || 1;
     this.roll = { t: 0, dx: d.x / len, dy: d.y / len };
-    this.rollCd = ROLL_COOLDOWN_MS;
+    this.rollCd = ROLL_COOLDOWN_MS * (hasUpgrade(s, 'boots') ? BOOTS.cooldown : 1);
     sfx('roll');
     this.route = null;
     this.target = null;
+  }
+
+  /** How long a roll lasts: longer in Marla's boots. */
+  private rollMs() {
+    return ROLL_MS * (hasUpgrade(this.state, 'boots') ? BOOTS.roll : 1);
   }
 
   private fireVine() {
@@ -1139,6 +1163,36 @@ export class GameScene extends Phaser.Scene {
       this.hud.toast(t('barsOpen'));
       this.persist();
     }
+  }
+
+  private dropCoin(x: number, y: number) {
+    const sprite = this.add.image(x, y, 'pickup-coin').setScale(texScale('pickup-coin')).setDepth(y);
+    this.coins.push({ x, y, sprite });
+  }
+
+  /** Opens a seller's wares: each upgrade with its price, or that it is bought. */
+  private openShop(seller: Seller) {
+    const s = this.state;
+    const rows = UPGRADES.filter((u) => u.seller === seller).map((u) => ({
+      id: u.id,
+      cost: u.cost,
+      state: hasUpgrade(s, u.id) ? ('owned' as const) : u.needs && !s.items[u.needs] ? ('locked' as const) : ('buy' as const),
+    }));
+    this.route = null;
+    this.target = null;
+    this.stick = null;
+    this.hud.showShop(t(seller === 'baker' ? 'bakerName' : 'hermitName'), s.coins, rows, (id) => {
+      if (!buy(s, id)) {
+        ui('refuse');
+        this.hud.toast(t('tooPoor'));
+        return;
+      }
+      ui('coin');
+      this.hud.toast(t('bought', { item: t(id) }));
+      this.persist();
+      this.hud.closeShop();
+      this.openShop(seller);
+    });
   }
 
   private dropHeart(x: number, y: number) {
@@ -1211,7 +1265,7 @@ export class GameScene extends Phaser.Scene {
     if (this.roll) {
       this.roll.t += dt;
       this.tryMove(this.roll.dx * ROLL_SPEED * sec, this.roll.dy * ROLL_SPEED * sec);
-      if (this.roll.t >= ROLL_MS) this.roll = null;
+      if (this.roll.t >= this.rollMs()) this.roll = null;
       return;
     }
     if (this.hook?.phase === 'pull') return;
@@ -1400,7 +1454,7 @@ export class GameScene extends Phaser.Scene {
       const ty = Math.floor((h.y + 12) / TILE);
       const t = tileAt(this.map, tx, ty);
       const blocked = (SOLID.has(t) && !LOW.has(t)) || this.blockers.has(ty * this.map.w + tx) || this.closedDoors.has(ty * this.map.w + tx);
-      if (blocked || h.dist >= VINE_RANGE) h.phase = 'back';
+      if (blocked || h.dist >= VINE_RANGE * (hasUpgrade(s, 'vine') ? LONG_VINE : 1)) h.phase = 'back';
     }
   }
 
@@ -1469,9 +1523,16 @@ export class GameScene extends Phaser.Scene {
       h.sprite.destroy();
       return false;
     });
+    this.coins = this.coins.filter((c) => {
+      if (Math.hypot(c.x - s.x, c.y - s.y) > PICKUP_PX + 4) return true;
+      s.coins++;
+      ui('coin');
+      c.sprite.destroy();
+      return false;
+    });
     this.pods = this.pods.filter((p) => {
       if (Math.hypot(p.x - s.x, p.y - s.y) > PICKUP_PX + 4) return true;
-      s.seeds = Math.min(MAX_SEEDS, s.seeds + 1);
+      s.seeds = Math.min(maxSeeds(s), s.seeds + 1);
       sfx('pod');
       p.sprite.destroy();
       return false;
@@ -1510,8 +1571,10 @@ export class GameScene extends Phaser.Scene {
     this.puff(f.x, f.y - 10, f.kind === 'moth' ? 0xc8bce0 : 0x6a8a4a);
     f.sprite.destroy();
     if (DUNGEONS.has(this.map.id) && f.index >= 0) setFlag(this.state, this.foeFlag(f.index));
-    if (Math.random() < 0.3) this.dropHeart(f.x, f.y);
-    else if (this.state.items.seeds && Math.random() < 0.35) this.dropPod(f.x, f.y);
+    // Every foe leaves a coin, and sometimes a heart or a seed pod beside it.
+    this.dropCoin(f.x, f.y);
+    if (Math.random() < 0.3) this.dropHeart(f.x + 10, f.y + 4);
+    else if (this.state.items.seeds && Math.random() < 0.35) this.dropPod(f.x + 10, f.y + 4);
   }
 
   /** The flag that remembers a beaten dungeon foe (the shrine's kept their first name). */
@@ -1952,7 +2015,7 @@ export class GameScene extends Phaser.Scene {
     const bob = this.walkT > 0 && !settings.reduceMotion ? Math.abs(Math.sin(this.walkT / 90)) * 2 : 0;
     this.player.setPosition(s.x, s.y - bob).setDepth(s.y);
     let angle = 0;
-    if (this.roll && !settings.reduceMotion) angle = (this.roll.t / ROLL_MS) * 360 * (this.roll.dx < 0 ? -1 : 1);
+    if (this.roll && !settings.reduceMotion) angle = (this.roll.t / this.rollMs()) * 360 * (this.roll.dx < 0 ? -1 : 1);
     this.player.setAngle(angle);
     // Blink while it can't be hurt, or just fade a little with reduce motion on.
     const blink = this.invuln > 0 && (settings.reduceMotion ? true : Math.floor(this.invuln / 80) % 2 === 0);
@@ -2014,6 +2077,7 @@ export class GameScene extends Phaser.Scene {
     for (const sd of this.seeds) lights.push({ x: sd.x, y: sd.y, r: 24, col: [230, 120, 200], power: 0.5 });
     for (const b of this.bombs) lights.push({ x: b.x, y: b.y - 10, r: 46, col: [210, 255, 150], power: 0.7 });
     for (const p of this.pods) lights.push({ x: p.x, y: p.y, r: 30, col: [210, 255, 150], power: 0.5 });
+    for (const c of this.coins) lights.push({ x: c.x, y: c.y, r: 26, col: [255, 220, 120], power: 0.5 });
     const w = this.wraith;
     if (w) {
       lights.push({ x: w.x, y: w.y - w.lift - 30, r: 110, col: [150, 210, 255], power: 0.55 });

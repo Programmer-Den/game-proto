@@ -58,6 +58,17 @@ Implemented today:
   (`again`) and Gardens. Any new chance in the sim must use `rand(g)`, never `Math.random`, and any
   new player action must call `note`, or replays drift. Raise `REPLAY_VERSION` with any change that
   makes the same actions play out differently (balance numbers, rules).
+- Going on later: in every break between waves (`phase` `build`, not while watching) the scene's
+  `keep` saves the game as a `SavedGame` (`save.ts`: the `Replay` so far, plus the run's `pouch`
+  and its `wave`) under `mazewright-game-replays`, once per new wave or action. Its garden's card
+  then has a gold `resume-<garden>` button (▶ Wave n+1) at its bottom left, and the picker opens on
+  that garden's season. `start(map, null, true)` makes the game with `resumeGame` (`sim.ts`), which
+  plays the replay back to its step with nothing drawn or heard, and the scene notes the foes met,
+  a stolen cabbage and the weather from its events so their banners aren't shown again; the banner
+  `resumed` says which wave was held. A win or loss (`forget`) or starting any game afresh drops
+  it; leaving with Gardens keeps it, so a wave left half-played starts again from the break before.
+  Playing back a whole 20-wave game takes about a second in Node. A save of another
+  `REPLAY_VERSION` is dropped. Swarm has hardly any breaks, so it is seldom saved.
 - The pouch: under the garden cards, chips in two rows (`CHIPS.perRow`) for the thirteen towers and two traps besides `hedge` and `bow` (`ALWAYS`);
   up to `POUCH_PICKS` (4) are picked, saved, and make the run's tool bar (six buttons at most).
   `DEFAULT_POUCH` is today's four (hedge, bow, frost, cannon), which the playthrough uses.
@@ -164,7 +175,6 @@ Implemented today:
 
 Missing or rough:
 
-- A game in play is not saved; a reload starts at the garden picker.
 - No Watch AI mode, no upright layout (an upright phone gets the turn hint).
 - Balance is checked with `e2e/bot.ts`, a greedy bot run in Node (how to build and run it is at
   its top): hedges where they lengthen the routes most, towers where they cover most route, an
@@ -183,7 +193,8 @@ Missing or rough:
   `mole.webp` and `cover.png` were taken by hand (a
   Playwright script that plants a maze and sends waves 8 and 9); `duo-replay.webp` (a
   two-gardener replay of the Meadow, both purses in the top bar) was made from a replay put in
-  storage; `refused.webp` is the
+  storage; `resume.webp` (the Meadow's card with its ▶ Wave 2 button) was taken
+  by a script that plays wave 1 and reloads; `refused.webp` is the
   playthrough's `playthrough-2-refused` shot. Refresh them when the look changes.
 
 ## Architecture
@@ -214,7 +225,7 @@ File map (`src/`):
   neighbours), `nextStep` (a neighbour one step closer, keeping the heading on ties, then right,
   down, up, left), `route`, `UNREACHABLE`, `DIRS`.
 - `game/sim.ts`: `Game`, `Tower`, `Foe`, `Shot`, `GameEvent`, `Refusal` and the actions:
-  `newGame`, `replayGame`, `replayStep`, `replayOf` (with `Action`, `Fixed` and `Replay`), `sideOf`, `goldAt`, `canBuild`, `hedgeUnder`, `costOn`, `wouldBlock`, `build`, `nextUpgrade`, `upgrade`, `sellValue`, `sell`, `turn`, `setAim`,
+  `newGame`, `replayGame`, `replayStep`, `replayOf`, `resumeGame` (with `Action`, `Fixed` and `Replay`), `sideOf`, `goldAt`, `canBuild`, `hedgeUnder`, `costOn`, `wouldBlock`, `build`, `nextUpgrade`, `upgrade`, `sellValue`, `sell`, `turn`, `setAim`,
   `canStartWave`, `startWave`, `step`, `remaining`, `routeLength`, `towerAt`, and `beamCells`,
   `inCone` and `bestFace` for the towers that point one way, `reachOf` and `openGates`. Only this file
   changes a `Game`. `g.blocked` is 0 free (a path garden's path), 1 rock, 2 tower, 3 water, 4
@@ -233,7 +244,7 @@ File map (`src/`):
 - `game/save.ts`: `loadRecords`, `noteRecord`, `loadPouch`, `savePouch`, `pouchOf` (hedge and bow,
   then up to four more in tower order, traps included), `loadShed`/`saveShed`, `usable`, `picksOf`,
   `loadMode`/`saveMode`, `loadReplays` (only valid replays of this `REPLAY_VERSION`), `saveReplay`,
-  `loadCalm`/`saveCalm` and `loadDuo`/`saveDuo`.
+  `loadCalm`/`saveCalm`, `loadDuo`/`saveDuo` and `loadGame`/`saveGame` (`SavedGame`).
 - `scenes/layout.ts`: `VIEW`, `CELL` (40), `GRID` (the grid's corner in the 960x540 frame), the bar
   height, the tool, wave, speed and Gardens buttons, `TIP_X` (the tool's use in the top bar), the
   tower panel (taller with Turn), the garden cards, the pouch's `CHIPS` (two rows, above the corner buttons)
@@ -253,12 +264,14 @@ Save keys: `mazewright-best` (per garden, `GardenRecord`: best wave, whether it 
 stars, fastest win in seconds and the Endless best), `mazewright-pouch` (the towers picked),
 `mazewright-calm` (`'1'` when waves wait for Start wave), `mazewright-duo` (`'1'` for two gardeners), `mazewright-mode` (the way of play) and
 `mazewright-shed` (seeds, `owned` towers, `masters` bought and extra `slots`) and
-`mazewright-replays` (per garden, the latest Classic or Swarm win as a `Replay`; progress files
-carry it, progress codes leave it out as too big for a QR code).
+`mazewright-replays` (per garden, the latest Classic or Swarm win as a `Replay`) and
+`mazewright-game-replays` (the game in play at its last break, a `SavedGame`); progress files carry
+both, and progress codes leave them out as too big for a QR code (`shared/saveFile.ts` `fileOnly`
+skips keys ending in `-replays`).
 
 Test hooks (read by `e2e/playthrough.spec.ts` through `window.game.scene.getScene('Game')`):
 `screen`, `state` (the `Game`), `replay` (the `Replay` watched, or null), `pouch`, `buttons` (every button by id, centred, in view pixels:
-`map-<garden>` (the cards of the season shown, `season-<season>`), `watch-<garden>`, `duo`, `pouch-<tower>`, `tool-<tower>`, `tool2-<tower>` (two gardeners), `tool-upgrade`, `tool-sell`, `tool2-upgrade`, `tool2-sell`, `wave`, `speed`, `gardens`, `upgrade`, `sell`,
+`map-<garden>` (the cards of the season shown, `season-<season>`), `watch-<garden>`, `resume-<garden>`, `duo`, `pouch-<tower>`, `tool-<tower>`, `tool2-<tower>` (two gardeners), `tool-upgrade`, `tool-sell`, `tool2-upgrade`, `tool2-sell`, `wave`, `speed`, `gardens`, `upgrade`, `sell`,
 `turn`, `aim`, `again`) and `grid` (the grid's corner and cell size in view pixels).
 
 Difficulty: `startLives` (25, 15, 10) and `hpScale` (0.8, 1, 1.25) use `byDifficulty`. Reduced

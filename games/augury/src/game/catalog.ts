@@ -50,3 +50,10 @@ export const RELIC_COLOR: Record<RelicId, number> = {
   crystal: 0xb9a4ff,
   ...(Object.fromEntries(Object.entries(CHARMS).map(([k, c]) => [c, KIND_COLOR[k as KindId]])) as Record<CharmId, number>),
 };
+
+/**
+ * Omens a puzzle of Endless or Draft offers before its first move, for `OMEN_POINTS` times the
+ * points: half the time, no undo and no hints, or two hearts for a loss.
+ */
+export const OMENS = ['haste', 'silence', 'peril'] as const;
+export type OmenId = (typeof OMENS)[number];

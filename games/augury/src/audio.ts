@@ -77,4 +77,6 @@ export const SFX = sounds({
   turn: { wave: 'noise', freq: 3200, to: 1600, length: 0.07, volume: 0.1, gap: 60 },
   /** A relic taken. */
   relic: { wave: 'triangle', freq: 523, arp: [0, 7, 12, 19], arpStep: 0.07, length: 0.4, volume: 0.28 },
+  /** An omen taken: a low, falling minor chord. */
+  omen: { wave: 'square', freq: 220, arp: [0, 3, 7, -5], arpStep: 0.08, length: 0.45, volume: 0.18 },
 });

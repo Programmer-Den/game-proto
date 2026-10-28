@@ -274,12 +274,15 @@ export const ITEM_BENCH = 10;
 
 export type AugmentId =
   | 'spare-parts' | 'front-plates' | 'overtime' | 'hot-wiring' | 'level-up' | 'recycler' | 'thick-hull'
-  | 'rapid-fire' | 'last-stand' | 'lucky-bolt' | 'gold-rush' | 'duplicator' | 'scrap-dividend' | 'big-battery' | 'war-chest';
+  | 'rapid-fire' | 'last-stand' | 'lucky-bolt' | 'gold-rush' | 'duplicator' | 'scrap-dividend' | 'big-battery' | 'war-chest'
+  | 'free-rolls' | 'hand-to-mouth' | 'gilded-shop';
 
 export interface AugmentDef {
   id: AugmentId;
   name: TextKey;
   text: TextKey;
+  /** A rare card that changes the economy: offered only in the third slot from stage 4 on (`RARE_FROM_STAGE`). */
+  rare?: boolean;
 }
 
 export const AUGMENTS: AugmentDef[] = [
@@ -298,7 +301,15 @@ export const AUGMENTS: AugmentDef[] = [
   { id: 'scrap-dividend', name: 'scrapDividendName', text: 'scrapDividendText' },
   { id: 'big-battery', name: 'bigBatteryName', text: 'bigBatteryText' },
   { id: 'war-chest', name: 'warChestName', text: 'warChestText' },
+  { id: 'free-rolls', name: 'freeRollsName', text: 'freeRollsText', rare: true },
+  { id: 'hand-to-mouth', name: 'handToMouthName', text: 'handToMouthText', rare: true },
+  { id: 'gilded-shop', name: 'gildedShopName', text: 'gildedShopText', rare: true },
 ];
+
+/** From this stage on, a power card offer holds one rare card. */
+export const RARE_FROM_STAGE = 4;
+/** What the rare cards do: free rerolls each round; gold a round instead of interest; the gilded chance from level 1. */
+export const RARE = { freeRolls: 2, handToMouthGold: 6, gildedChance: 0.2 };
 
 export const AUGMENT_BY_ID: Record<string, AugmentDef> = Object.fromEntries(AUGMENTS.map((a) => [a.id, a]));
 
@@ -480,7 +491,7 @@ export function stageRounds(stage: number): RoundDef[] {
       { stage, index: 4, kind: 'draft' },
     ];
   }
-  const augmentAt = stage === 2 ? 1 : stage === 3 || stage === 4 ? 2 : 0;
+  const augmentAt = stage === 2 ? 1 : stage >= 3 && stage <= 5 ? 2 : 0;
   const last: RoundDef =
     stage === 2
       ? { stage, index: 7, kind: 'rat', monsters: ['rat'] }
@@ -493,6 +504,35 @@ export function stageDamage(stage: number) {
   return Math.min(3 + Math.max(0, stage - 2) * 3, 15);
 }
 export const SURVIVOR_DAMAGE = [0, 1, 1, 2, 2, 3];
+
+// ---------------------------------------------------------------- rank ladder
+
+export interface RankDef {
+  name: TextKey;
+  /** What the rank changes for the rivals. */
+  text: TextKey;
+  /** Rank points needed. */
+  points: number;
+  /** Extra gold each rival gets a round. */
+  gold: number;
+  /** Rivals' shops roll as if they were this many levels higher. */
+  odds: number;
+  /** Rivals reroll for copies from this stage on, while they hold more than `rollAbove` gold. */
+  rollFrom: number;
+  rollAbove: number;
+}
+
+/** The saved rank ladder: points come from top-four finishes and never go down. Rust is the game as designed. */
+export const RANKS: RankDef[] = [
+  { name: 'rankRust', text: 'rankRustText', points: 0, gold: 0, odds: 0, rollFrom: 4, rollAbove: 50 },
+  { name: 'rankIron', text: 'rankIronText', points: 100, gold: 0, odds: 0, rollFrom: 3, rollAbove: 40 },
+  { name: 'rankSteel', text: 'rankSteelText', points: 250, gold: 1, odds: 0, rollFrom: 3, rollAbove: 36 },
+  { name: 'rankChrome', text: 'rankChromeText', points: 450, gold: 1, odds: 1, rollFrom: 3, rollAbove: 32 },
+  { name: 'rankTitan', text: 'rankTitanText', points: 700, gold: 2, odds: 1, rollFrom: 2, rollAbove: 28 },
+];
+
+/** Rank points by final place (index place; 1st to 4th score). */
+export const RANK_POINTS = [0, 50, 35, 25, 15, 0, 0, 0, 0];
 
 // ---------------------------------------------------------------- terrain
 
