@@ -1,11 +1,11 @@
 // What each person says, by where the quest stands, and what talking to them does.
 
 import type { NpcId } from './maps';
-import { hasFlag, MAX_SEEDS, reached, type GameState } from './state';
+import { hasFlag, maxSeeds, reached, type GameState } from './state';
 import { t } from '../i18n';
 
 /** What a talk does once its last line is read. */
-export type TalkEffect = 'quest-blade' | 'quest-thorns' | 'finish' | 'cat-pet' | 'cat-stone' | 'quest-bell' | 'seeds' | 'refill' | 'finish-two' | 'trial';
+export type TalkEffect = 'quest-blade' | 'quest-thorns' | 'finish' | 'cat-pet' | 'cat-stone' | 'quest-bell' | 'seeds' | 'refill' | 'finish-two' | 'trial' | 'shop-baker' | 'shop-hermit';
 
 export interface Talk {
   lines: string[];
@@ -25,12 +25,10 @@ export function talk(id: NpcId, s: GameState): Talk {
           : [t('pipPond1'), t('pipPond2')],
       };
     case 'baker':
-      return {
-        lines:
-          s.quest === 'start' || s.quest === 'blade'
-            ? [t('bakerBread')]
-            : [t('bakerTrees1'), t('bakerTrees2')],
-      };
+      // Once the knight can cut bushes for coins, Marla sells her wares after the hint.
+      return s.quest === 'start' || s.quest === 'blade'
+        ? { lines: [t('bakerBread')] }
+        : { lines: [t('bakerTrees1'), t('bakerTrees2'), t('bakerShop')], then: 'shop-baker' };
     case 'cat': {
       if (hasFlag(s, 'cat-3')) return { lines: [t('catAsleep')] };
       if (hasFlag(s, 'cat-2')) return { lines: [t('catGift')], then: 'cat-stone' };
@@ -52,12 +50,12 @@ function hermit(s: GameState): Talk {
       ],
       then: 'seeds',
     };
+  // Once he has given bellseeds, Sedge refills them and then sells his wares.
   if (reached(s, 'belfry')) {
-    if (s.seeds < MAX_SEEDS) return { lines: [t('hermitRefill')], then: 'refill' };
+    if (s.seeds < maxSeeds(s)) return { lines: [t('hermitRefill')], then: 'refill' };
     return {
-      lines: reached(s, 'home')
-        ? [t('hermitQuiet1'), t('hermitQuiet2')]
-        : [t('hermitRingers1'), t('hermitRingers2')],
+      lines: [...(reached(s, 'home') ? [t('hermitQuiet1'), t('hermitQuiet2')] : [t('hermitRingers1'), t('hermitRingers2')]), t('hermitShop')],
+      then: 'shop-hermit',
     };
   }
   return {

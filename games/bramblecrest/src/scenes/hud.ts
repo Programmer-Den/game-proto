@@ -5,8 +5,9 @@
 
 import Phaser from 'phaser';
 import { texScale } from '../art/paint';
-import { clock, OBJECTIVES, stonesToFind, type GameState } from '../game/state';
+import { clock, OBJECTIVES, stonesToFind, type GameState, type UpgradeId } from '../game/state';
 import { t } from '../i18n';
+import { formatNumber } from '../../../../shared/i18n';
 import { ui } from '../../../../shared/audio';
 import { BUTTONS, STICK, VIEW } from './layout';
 import { viewFrame, viewSize } from '../../../../shared/scaling';
@@ -26,6 +27,11 @@ export class Hud {
   private stones: Phaser.GameObjects.Text;
   private keys: Phaser.GameObjects.Text;
   private seeds: Phaser.GameObjects.Text;
+  private coinIcon: Phaser.GameObjects.Image;
+  private coins: Phaser.GameObjects.Text;
+  /** A seller's wares, while they are open, and what pressing each row's button does. */
+  private shop: Phaser.GameObjects.Container | null = null;
+  private shopPress: (() => void)[] = [];
   private objective: Phaser.GameObjects.Text;
   private place: Phaser.GameObjects.Text;
   private toastText: Phaser.GameObjects.Text;
@@ -60,6 +66,8 @@ export class Hud {
     this.stones = fixed(add.text(36, 37, '', { fontFamily: FONT, fontSize: '16px', color: '#dff2ff' }));
     this.keys = fixed(add.text(108, 37, '', { fontFamily: FONT, fontSize: '16px', color: '#f0d890' }));
     this.seeds = fixed(add.text(178, 37, '', { fontFamily: FONT, fontSize: '16px', color: '#c8f0a0' }));
+    this.coinIcon = fixed(add.image(0, 46, 'ui-coin').setScale(texScale('ui-coin')));
+    this.coins = fixed(add.text(0, 37, '', { fontFamily: FONT, fontSize: '16px', color: '#f0d070' }));
     this.objective = fixed(
       add.text(this.vw - 12, 12, '', { fontFamily: FONT, fontSize: '15px', color: '#f3ead2', align: 'right', backgroundColor: 'rgba(10,14,36,0.55)', padding: { x: 10, y: 6 } }).setOrigin(1, 0),
     );
@@ -143,7 +151,14 @@ export class Hud {
     // The counters sit side by side, so a longer word (German Schlüssel) pushes the next one along.
     this.keys.x = Math.max(108, this.stones.x + this.stones.width + 16);
     this.seeds.x = this.keys.text ? Math.max(178, this.keys.x + this.keys.width + 16) : 178;
-    const plateW = Math.max(262, (this.seeds.text ? this.seeds.x + this.seeds.width : this.keys.x + this.keys.width) + 4);
+    // Coins show once the first is picked up, after the last counter shown.
+    const showCoins = s.coins > 0 || s.upgrades.length > 0;
+    this.coins.setText(showCoins ? formatNumber(s.coins) : '');
+    const last = this.seeds.text ? this.seeds.x + this.seeds.width : this.keys.text ? this.keys.x + this.keys.width : this.stones.x + this.stones.width;
+    const coinsX = Math.max(this.seeds.text ? 0 : 178, last + 16);
+    this.coinIcon.setVisible(showCoins).setX(coinsX + 9);
+    this.coins.setX(coinsX + 22);
+    const plateW = Math.max(262, (showCoins ? this.coins.x + this.coins.width : this.seeds.text ? this.seeds.x + this.seeds.width : this.keys.x + this.keys.width) + 4);
     if (plateW !== this.plateW) {
       this.plateW = plateW;
       this.plate.clear().fillStyle(0x0a0e24, 0.55).fillRoundedRect(8, 8, plateW, 52, 10);
@@ -171,9 +186,62 @@ export class Hud {
     }
   }
 
-  /** Whether the end card or the moonstone page covers the game, which then stands still. */
+  /** Whether the end card, the moonstone page or a shop covers the game, which then stands still. */
   get covered() {
-    return this.endCard !== null || this.page !== null;
+    return this.endCard !== null || this.page !== null || this.shop !== null;
+  }
+
+  get shopOpen() {
+    return this.shop !== null;
+  }
+
+  /**
+   * A seller's wares: each upgrade's name, what it does and a button with its price, or that it is
+   * bought or not yet of use. The rows' buttons, or 1 and 2 on the keyboard, buy.
+   */
+  showShop(seller: string, coins: number, rows: { id: UpgradeId; cost: number; state: 'buy' | 'owned' | 'locked' }[], onBuy: (id: UpgradeId) => void) {
+    const add = this.scene.add;
+    const f = viewFrame(this.scene);
+    const c = add.container(f.x, f.y).setScrollFactor(0).setDepth(DEPTH + 10);
+    const h = 150 + rows.length * 80;
+    const top = (VIEW.h - h) / 2;
+    const g = add.graphics();
+    g.fillStyle(0x05081a, 0.7).fillRect(-f.x, -f.y, this.vw, this.vh);
+    g.fillStyle(0x10163a, 0.95).fillRoundedRect(220, top, 520, h, 18);
+    g.lineStyle(2, 0xc8b070, 0.9).strokeRoundedRect(220, top, 520, h, 18);
+    c.add(g);
+    c.add(add.text(VIEW.w / 2, top + 30, t('shopTitle', { name: seller }), { fontFamily: FONT, fontSize: '26px', color: '#f0d890' }).setOrigin(0.5));
+    c.add(add.image(VIEW.w / 2 - 30, top + 64, 'ui-coin').setScale(texScale('ui-coin')));
+    c.add(add.text(VIEW.w / 2 - 16, top + 64, formatNumber(coins), { fontFamily: FONT, fontSize: '18px', color: '#f0d070' }).setOrigin(0, 0.5));
+    this.shopPress = [];
+    rows.forEach((r, i) => {
+      const y = top + 112 + i * 80;
+      c.add(add.text(250, y - 12, `${i + 1}. ${t(r.id)}`, { fontFamily: FONT, fontSize: '19px', color: '#f3ead2' }).setOrigin(0, 0.5));
+      c.add(add.text(250, y + 14, t(`${r.id}Text`), { fontFamily: FONT, fontSize: '14px', color: '#a8b0d0', wordWrap: { width: 330 } }).setOrigin(0, 0.5));
+      const label = r.state === 'owned' ? t('owned') : r.state === 'locked' ? t('notYet') : t('price', { n: r.cost });
+      const live = r.state === 'buy';
+      const b = add.text(650, y, label, { fontFamily: FONT, fontSize: '17px', color: '#10163a', backgroundColor: live ? '#f0d890' : '#6a6e86', padding: { x: 12, y: 6 } }).setOrigin(0.5);
+      const press = () => (live ? onBuy(r.id) : ui('refuse'));
+      b.setInteractive({ useHandCursor: true }).on('pointerdown', (_p: unknown, _x: unknown, _y: unknown, e: Phaser.Types.Input.EventData) => {
+        e.stopPropagation();
+        press();
+      });
+      c.add(b);
+      this.shopPress.push(press);
+    });
+    c.add(add.text(VIEW.w / 2, top + h - 24, t('closeShop'), { fontFamily: FONT, fontSize: '13px', color: '#a8b0d0' }).setOrigin(0.5));
+    this.shop = c;
+  }
+
+  /** Presses a shop row's button, by its place in the list. */
+  pressShop(i: number) {
+    this.shopPress[i]?.();
+  }
+
+  closeShop() {
+    this.shop?.destroy();
+    this.shop = null;
+    this.shopPress = [];
   }
 
   get pageOpen() {
