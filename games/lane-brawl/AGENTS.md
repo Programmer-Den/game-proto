@@ -231,7 +231,7 @@ Implemented today:
   frame, as the camera moves under it.
 - Player input: click the ground to walk, click an enemy to attack it, hold Q/W/E/R to aim and let go
   to cast at the cursor,
-  D/H use item actives at the cursor, B or the Shop button opens the shop, Esc closes it, 1, 2 and 3
+  D/H use item actives at the cursor, B or the Shop button opens the shop, Esc closes it (and the scoreboard), Tab held shows the scoreboard, 1, 2 and 3
   pick an upgrade (3 for mastery's third card). Clicking a watchstone walks to it rather than
   attacking it. Standing still auto-attacks the nearest enemy. The shop closes when a Nexus falls.
 - HUD (bevelled slate panels with gold trim, system font): gold with the streak chip, the Nexus
@@ -239,6 +239,17 @@ Implemented today:
   and a siege banner chip when it is up; at the bottom the champion's figure, health, XP, items,
   respawn timer and last hits, the four ability boxes with cooldowns, the shop button, the upgrade
   cards (or the upgrades taken) and a minimap.
+- Scoreboard and assists (LB12): `damage` notes in the victim's `hurtBy` (id to game time) every
+  enemy champion that hurts a champion; `kill` gives every one of them other than the slayer, hit
+  within `ASSIST.windowMs`, an assist (`Unit.assists`) and `ASSIST.gold`, whoever landed the blow
+  (a tower or minion too), then clears `hurtBy`; a player's assist pops a blue coin fx. `Unit.cs`
+  counts every champion's minion and camp kills (the player's own `s.lastHits` stays as it was, for
+  the streak and the end panel). The top bar shows the team kill score in `SCORE_CHIP`, left of the
+  clock; holding Tab (`keys.TAB`, also in watch mode) or tapping the chip (`scoreTapped`, closed by
+  another tap, Esc, the panel or the shop) shows `drawScoreboard` in `SCORE_PANEL` (where the shop
+  sits; it replaces the shop and hides the objective card, buffs and notice while it shows): per
+  team, each champion's class colour, name and class, level, K / D / A, last hits, items and its
+  respawn timer or bounty. The bottom bar's score line reads `K/D/A` plus the player's last hits.
 - Victory and defeat panel with the match's objectives, last hits, best streak and beasts slain,
   and "Play again".
 
@@ -286,7 +297,7 @@ File map (`src/`):
 - `scenes/skillFx.ts`: every ability's look (see "Skill looks" above): `drawSkill`, `skillMs`,
   `drawProjectile`, `drawZone` and `drawAura`, with small shape helpers. No game rules.
 - `scenes/layout.ts`: screen rectangles for the bars, the objective card, the streak chip, the
-  ability boxes, the upgrade panel and cards (`upgradeCard`), the shop, the minimap, the pick cards
+  ability boxes, the upgrade panel and cards (`upgradeCard`), the shop, the kill score and scoreboard (`SCORE_CHIP`, `SCORE_PANEL`), the minimap, the pick cards
   and the end panel, plus `VIEW` (the designed 960x540), `SCREEN` (the view actually shown),
   `FRAME` (the designed rectangle's corner in it), `fitLayout` and `FONT` (a system font stack).
   The rectangles are written for 960x540; `fitLayout(w, h)` moves them once at start for the view
@@ -352,7 +363,7 @@ File map (`src/`):
   `ACTIVES`, `MAX_ITEMS`, `BEAST`, `BEAST_BUFF`, `ELDER`, `BEAST_CONTESTERS`, `INHIBITORS`, `INHIBITOR`,
   `SUPER_MINION`, `BUSHES` (with `bushAt`), `BUSH_REVEAL`, `REVEAL_MS`, `GANK` and `RETREAT`, and
   round 2's `WARD`, `WARD_SPOTS`, `WARD_AI`, `RECALL`, `BUYBACK`, `BOUNTY` (with `bountyOf`),
-  `AI_BUILDS` and `AI_BUILD_FOR`.
+  `AI_BUILDS` and `AI_BUILD_FOR`, and `ASSIST`.
 - `game/state.ts`: the types (`GameState`, `Unit`, `Projectile`, `Fx`, `Objective`,
   `UpgradeOffer`), `createGame`, `spawnWave`, `spawnChampion`, `spawnWard`, `refreshStats` (level
   and items into stats), `pathFor` (red walks lanes backwards), `laneNear` and small helpers. No
@@ -430,7 +441,7 @@ State model:
 - The upgrades' state: `beast`, `beastBuff`, `beastKills`, `contesters`, `nextGank`, `nextJungle`,
   `notices`; per AI champion `retreatUntil`, `gankTarget`, `gankUntil`, `jungleTarget`,
   `jungleUntil`; per champion `revealMs`, `aggroMs`, `activeCds`, and round 2's `killStreak`,
-  `wards`, `recallMs`, `lastRecallAt` and `buybackReadyAt`.
+  `wards`, `recallMs`, `lastRecallAt` and `buybackReadyAt`, and the scoreboard's `assists`, `cs` and `hurtBy`.
 
 How it runs:
 
@@ -567,7 +578,7 @@ Shared `ui` sounds: `click` for the Shop button, B and Play again; `coin` for a 
   `Math.random` sequence so blue fields the five new classes), `ten-classes.webp`, `fog-of-war.webp`,
   `jungle-brute.webp`, `watchstone.webp`, `watch-ai.webp` (a `?watch` match at 8x with the log open), `skill-looks-1.webp` to
   `skill-looks-3.webp` (every ability's effect, five classes each), `aim-indicators.webp`,
-  `home-heal-and-dead-shop.webp`, `loop-objective.webp`, `loop-last-hit.webp` and
+  `home-heal-and-dead-shop.webp`, `scoreboard.webp` (a match run 7 minutes with blue's fifth on the AI, Tab held), `loop-objective.webp`, `loop-last-hit.webp` and
   `upgrade-*.webp` and `round2-*.webp` (the ward in the shop and planted by a bush, a recall, a
   bounty, the buy back button and the watch log of the AI shopping) and `german-pick.webp` (the pick
   screen with `?lang=de`, Grumm's card under the pointer) are staged docs shots (a scratch

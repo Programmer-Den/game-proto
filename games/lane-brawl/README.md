@@ -41,7 +41,8 @@ left, under bevelled slate panels.
 | X, or Buy back in the top bar | While dead: pay to respawn at once (100 gold + 50 per level), once every 2:30 |
 | 1, 2 or 3, or click an upgrade card | Keep one of the upgrades a new level offers |
 | B, or Shop | Open or close the shop; buy an item by clicking it |
-| Esc | Close the shop |
+| Tab (hold), or tap the kill score in the top bar | Show the scoreboard: every champion's level, kills, deaths and assists, last hits and items |
+| Esc | Close the shop or the scoreboard |
 | Play again | After a match: pick a champion again |
 
 ![The floating touch stick under a steering finger](docs/screenshots/touch-stick.webp)
@@ -182,7 +183,15 @@ left, under bevelled slate panels.
     notice names the streak. Whoever slays it takes the bounty on top of the kill's 300 gold, and
     the notice says so. The AI's roaming hunts go after the biggest bounty they can see, and come
     twice as often while anyone carries one. Dying ends the streak.
-17. **Winning** destroys the red Nexus. Losing means your Nexus falls first.
+17. **Scoreboard and assists**: the top bar keeps the kill score, blue against red, left of the
+    clock. Hold Tab (or tap the score) for the scoreboard: each champion's level, kills, deaths and
+    assists, last hits (minions and jungle monsters), items, and whether it is dead or carries a
+    bounty. Every enemy champion that hurt a slain champion in its last 10 seconds, other than the
+    slayer, gets an assist and 120 gold (a blue coin pops for yours), even when a tower or minion
+    lands the last blow.
+
+    ![The scoreboard at 7:02: blue and red's five champions with level, kills, deaths and assists, last hits, items, respawn timers and bounties](docs/screenshots/scoreboard.webp)
+18. **Winning** destroys the red Nexus. Losing means your Nexus falls first.
 
 Every ability has an animation of its own (a hammer that splits the ground, a meteor from the
 sky, a harpoon on its rope, a coil pylon arcing, a blood moon rising and so on), and so do bolts in
@@ -192,7 +201,7 @@ champion shows how far it attacks; hovering another champion shows its reach.
 The bars under the map show the Nexuses' health and your champion's health, experience, items and
 cooldowns, with the D, H and V buttons under the shop button and the Recall (or Buy back) button
 right of the clock; the portrait card shows your champion's
-name, class, passive and kills and deaths. Short notices under the top bar say when the beast
+name, class, passive, kills, deaths and assists. Short notices under the top bar say when the beast
 wakes or falls, an inhibitor falls, a watchstone is taken, a champion slays another, a champion
 roams to another lane, a bounty is set or claimed, you buy back or red destroys one of your wards.
 The minimap in the corner shows the river, every tower, inhibitor, Nexus,

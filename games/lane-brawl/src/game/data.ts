@@ -107,6 +107,8 @@ export const START_GOLD = 400;
 export const GOLD_PER_SEC = 1.5;
 /** Champion kills pay gold and XP to the killer. */
 export const KILL = { gold: 300, xp: 200 };
+/** An assist: an enemy champion that hurt the slain champion within `windowMs` of its death, but did not land the kill, gets `gold`. */
+export const ASSIST = { windowMs: 10_000, gold: 120 };
 /** XP needed to reach each level: index 0 is level 1. */
 export const XP_FOR_LEVEL = [0, 280, 660, 1140, 1720, 2600, 3700, 5000];
 export const MAX_LEVEL = XP_FOR_LEVEL.length;

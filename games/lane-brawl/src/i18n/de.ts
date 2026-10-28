@@ -476,10 +476,21 @@ const de: Translation<typeof en> = {
   level: 'St. {n}',
   respawnIn: 'Rückkehr in {n} s',
   classPassive: '{class} · {passive}',
-  scoreLine: 'K {kills}  T {deaths}  Letzte Treffer {lastHits}',
+  scoreLine: 'K/T/A {kills}/{deaths}/{assists}  Letzte Treffer {lastHits}',
   abilityLocked: 'St.{n}',
   shop: 'Laden',
   buffTime: '{buff} {s} s',
+
+  // Scoreboard
+  scoreboard: 'Punktetafel',
+  scoreHint: 'Tab halten oder auf den Kill-Stand tippen',
+  scoreBlue: 'Blau · {kills}',
+  scoreRed: 'Rot · {kills}',
+  scoreLevel: 'Stufe',
+  scoreKda: 'K / T / A',
+  scoreCs: 'Letzte Treffer',
+  scoreItems: 'Gegenstände',
+  scoreYou: '{name} (du)',
 
   // Upgrades
   chooseUpgrade: 'STUFE {level} · WÄHLE EIN UPGRADE',

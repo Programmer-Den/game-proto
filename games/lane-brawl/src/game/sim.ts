@@ -15,6 +15,7 @@ import {
   ELIXIR,
   ELIXIR_COLOR,
   AI_ELIXIR,
+  ASSIST,
   KILL,
   MINION,
   RESPAWN_BASE_MS,
@@ -644,7 +645,10 @@ export function damage(s: GameState, t: Unit, amount: number, sourceId: number):
   if (t.kind === 'champion') {
     t.recallMs = 0;
     const src = getUnit(s, sourceId);
-    if (src && src.kind === 'champion') src.aggroMs = TOWER.aggroMs;
+    if (src && src.kind === 'champion') {
+      src.aggroMs = TOWER.aggroMs;
+      if (src.side !== t.side) t.hurtBy[src.id] = s.time;
+    }
   }
   // A jungle monster that is hit wakes its whole pack.
   if (t.kind === 'camp') {
@@ -837,8 +841,12 @@ function kill(s: GameState, t: Unit, killerId: number) {
         champKiller.gold += gold;
         s.fx.push({ kind: 'coin', x: t.x, y: t.y, gold, color: '#f2c14e', ms: 900 });
         sound(s, 'lastHit', t, true);
+        champKiller.cs++;
       } else {
-        if (champKiller) champKiller.gold += MINION.gold;
+        if (champKiller) {
+          champKiller.gold += MINION.gold;
+          champKiller.cs++;
+        }
         // The minion the player could have finished fell to someone else: the streak breaks.
         if (s.lastHitMark === t.id) s.streak = 0;
       }
@@ -853,6 +861,7 @@ function kill(s: GameState, t: Unit, killerId: number) {
       t.respawnAt = s.time + def.respawnMs;
       if (champKiller) {
         champKiller.gold += def.gold;
+        champKiller.cs++;
         gainXp(s, champKiller, def.xp);
         // A brute's slayer carries its buff.
         if (def.buff) {
@@ -945,6 +954,15 @@ function kill(s: GameState, t: Unit, killerId: number) {
           notice(s, champKiller.player ? text('noticeYourStreak', { n: champKiller.killStreak, gold: price }) : text('noticeStreak', { name: shortName(champKiller.name), n: champKiller.killStreak, gold: price }), '#f2c14e');
         }
       }
+      // Every other enemy champion that hurt it lately gets an assist.
+      for (const [id, at] of Object.entries(t.hurtBy)) {
+        const helper = getUnit(s, Number(id));
+        if (!helper || helper === champKiller || helper.side === t.side || s.time - at > ASSIST.windowMs) continue;
+        helper.assists++;
+        helper.gold += ASSIST.gold;
+        if (helper.player) s.fx.push({ kind: 'coin', x: t.x, y: t.y - 24, gold: ASSIST.gold, color: '#9fd8ff', ms: 900 });
+      }
+      t.hurtBy = {};
       t.respawnAt = s.time + RESPAWN_BASE_MS + t.level * RESPAWN_PER_LEVEL_MS;
       s.fx.push({ kind: 'ring', x: t.x, y: t.y, r: 50, color: SIDE_COLOR[t.side], ms: 500 });
       if (t.player) sound(s, 'youDie', undefined, true);
