@@ -42,6 +42,7 @@ const en: HowToPlay = {
     'At night everyone sees less far, so the tall grass is the place for an ambush.',
     'From 2:30 a drake wakes in the river: each one your team slays gives all of you a lasting bonus, and the fourth doubles them.',
     'From 2:00, every two minutes two runes appear on the river: walk over one for more damage, speed, healing or gold.',
+    'Stone walls in the jungle block the way but not bolts or dashes: a dash or blink takes you over one.',
   ],
 };
 
@@ -85,6 +86,7 @@ const de: HowToPlay = {
     'Nachts sehen alle weniger weit, also ist das hohe Gras der Ort für einen Hinterhalt.',
     'Ab 2:30 erwacht ein Drache im Fluss: Jeder, den dein Team erschlägt, gibt euch allen einen bleibenden Bonus, und der vierte verdoppelt sie.',
     'Ab 2:00 erscheinen alle zwei Minuten zwei Runen am Fluss: Lauf über eine für mehr Schaden, Tempo, Heilung oder Gold.',
+    'Steinmauern im Dschungel versperren den Weg, aber keine Geschosse oder Sprünge: Ein Sprint oder Sprung bringt dich darüber.',
   ],
 };
 

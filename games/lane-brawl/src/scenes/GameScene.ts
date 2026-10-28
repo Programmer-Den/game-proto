@@ -103,6 +103,7 @@ import {
   watchKey,
 } from '../art/bake';
 import { MAP_KEY, MAP_RES, paintMap } from '../art/map';
+import { WALLS } from '../game/terrain';
 import { PoseName } from '../art/models';
 import { byDifficulty, settings } from '../../../../shared/settings';
 import { sharpRes, splitHudCamera, viewPoint, viewSize } from '../../../../shared/scaling';
@@ -2124,6 +2125,8 @@ export class GameScene extends Phaser.Scene {
     }
     // Bushes as dark patches, and the beast's pit.
     for (const b of BUSHES) g.fillStyle(col('#24481f'), 0.9).fillEllipse(mx(b.x), my(b.y), b.rx * 2 * k, b.ry * 2 * k);
+    // The stone walls, as grey strokes.
+    for (const w of WALLS) g.lineStyle(2.5, col('#9a958a'), 1).lineBetween(mx(w.a.x), my(w.a.y), mx(w.b.x), my(w.b.y));
     g.lineStyle(1, 0xb98cff, 0.6).strokeCircle(mx(BEAST.x), my(BEAST.y), 5);
     for (const u of s.units) {
       if (u.dead || this.hidden(s, u)) continue;

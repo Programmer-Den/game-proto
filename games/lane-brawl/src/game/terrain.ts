@@ -1,10 +1,11 @@
 // The solid things on the map that units walk around (LB20): the pines and rocks of the jungle, the
-// ruins, the standing stones round the two pits, and the towers, inhibitors, Nexuses and
-// watchstones. Each is a circle; `steer` slides a step round them and `settle` pushes a point out.
+// ruins, the standing stones round the two pits, the stone walls, and the towers, inhibitors,
+// Nexuses and watchstones. Each is a circle, or a wall's straight run with round ends;
+// `steer` slides a step round them and `settle` pushes a point out.
 // The map's art (`art/map.ts`) paints the scenery from the same `SCENERY` list, so what stands in
 // the way is what shows.
 
-import { BASE, BEAST, BUSHES, CAMPS, CampSpot, DRAKE, INHIBITORS, LaneId, LANES, MERC, RIVER, TOWERS, Vec, WATCHSTONES, WORLD } from './data';
+import { BASE, BEAST, BUSHES, CAMPS, CampSpot, DRAKE, INHIBITORS, LaneId, LANES, MERC, RIVER, TOWERS, Vec, WATCHSTONES, WORLD, mirror } from './data';
 
 /** Half the width of a lane's paving, in pixels. */
 export const LANE_HALF = 50;
@@ -47,6 +48,29 @@ export function pitStones(c: Vec): Vec[] {
   });
 }
 
+/** A stone wall in the jungle: a straight run from `a` to `b`. */
+export interface Wall {
+  a: Vec;
+  b: Vec;
+}
+/**
+ * Six walls in each team's jungle, mirrored: short and straight, with both ends open, off the
+ * lanes, the river, the clearings and the bushes, so a walker slides along one and round its end.
+ */
+export const WALLS: Wall[] = [
+  [1668, 1860, 1473, 1960],
+  [1763, 2321, 1571, 2399],
+  [602, 2028, 422, 2143],
+  [926, 1151, 862, 1350],
+  [471, 1389, 416, 1573],
+  [695, 2386, 919, 2386],
+].flatMap(([ax, ay, bx, by]) => {
+  const w = { a: { x: ax, y: ay }, b: { x: bx, y: by } };
+  return [w, { a: mirror(w.a), b: mirror(w.b) }];
+});
+/** The distance from a point to a wall's run. */
+export const wallDist = (p: Vec, w: Wall) => segDist(p, w.a, w.b);
+
 /** A small seeded random source, so the scenery is the same in every match and on every device. */
 function seeded(seed: number) {
   let t = seed >>> 0;
@@ -80,17 +104,19 @@ export const SCENERY: SceneryThing[] = (() => {
     if (WATCHSTONES.some((c) => Math.hypot(p.x - c.x, p.y - c.y) < 140)) continue;
     if (Math.hypot(p.x - BEAST.x, p.y - BEAST.y) < 175 || Math.hypot(p.x - DRAKE.x, p.y - DRAKE.y) < 175) continue;
     if (BUSHES.some((b) => ((p.x - b.x) / (b.rx + 40)) ** 2 + ((p.y - b.y) / (b.ry + 40)) ** 2 < 1)) continue;
+    if (WALLS.some((w) => wallDist(p, w) < 70)) continue;
     if (things.some((t) => Math.hypot(t.x - p.x, t.y - p.y) < 46)) continue;
     things.push({ ...p, kind: rnd() < 0.85 ? 'pine' : 'rock', s: 0.8 + rnd() * 0.5, v: Math.floor(rnd() * 4) });
   }
   return things;
 })();
 
-/** A solid circle on the map. */
+/** A solid circle on the map, or a wall: every point within `r` of the run from (x, y) to `to`. */
 export interface Obstacle {
   x: number;
   y: number;
   r: number;
+  to?: Vec;
   /** A tower's or inhibitor's lane: it only stands in the way while that lane is open (`openLanes`). */
   lane?: LaneId;
 }
@@ -99,7 +125,7 @@ export interface Obstacle {
  * How big each solid thing is to a walker: a pine by its trunk (narrow enough that champions pass
  * between any two), a rock by its size, the rest by their footprint.
  */
-export const SOLID = { trunk: 7, rock: 8, ruin: 12, stone: 9, tower: 22, inhibitor: 18, nexus: 44, watchstone: 12 };
+export const SOLID = { trunk: 7, rock: 8, ruin: 12, stone: 9, wall: 16, tower: 22, inhibitor: 18, nexus: 44, watchstone: 12 };
 
 export const OBSTACLES: Obstacle[] = [
   ...SCENERY.map((t) => ({ x: t.x, y: t.y, r: t.kind === 'pine' ? SOLID.trunk : SOLID.rock * t.s })),
@@ -109,7 +135,16 @@ export const OBSTACLES: Obstacle[] = [
   ...INHIBITORS.map((t) => ({ x: t.x, y: t.y, r: SOLID.inhibitor, lane: t.lane })),
   ...[BASE.blue, BASE.red].map((b) => ({ x: b.x, y: b.y, r: SOLID.nexus })),
   ...WATCHSTONES.map((w) => ({ x: w.x, y: w.y, r: SOLID.watchstone })),
+  ...WALLS.map((w) => ({ x: w.a.x, y: w.a.y, to: w.b, r: SOLID.wall })),
 ];
+
+/** The point of an obstacle nearest to (x, y): its centre, or the nearest point of a wall's run. */
+function core(o: Obstacle, x: number, y: number): Vec {
+  if (!o.to) return o;
+  const dx = o.to.x - o.x, dy = o.to.y - o.y;
+  const t = Math.max(0, Math.min(1, ((x - o.x) * dx + (y - o.y) * dy) / (dx * dx + dy * dy)));
+  return { x: o.x + dx * t, y: o.y + dy * t };
+}
 
 /** The obstacles by cell of a coarse grid, so a step only looks at the few near it. */
 const CELL = 100;
@@ -117,8 +152,10 @@ const COLS = Math.ceil(WORLD.w / CELL);
 const GRID: Obstacle[][] = Array.from({ length: COLS * Math.ceil(WORLD.h / CELL) }, () => []);
 for (const o of OBSTACLES) {
   const pad = o.r + 40;
-  for (let cy = Math.floor((o.y - pad) / CELL); cy <= Math.floor((o.y + pad) / CELL); cy++) {
-    for (let cx = Math.floor((o.x - pad) / CELL); cx <= Math.floor((o.x + pad) / CELL); cx++) {
+  const x1 = Math.min(o.x, o.to?.x ?? o.x), x2 = Math.max(o.x, o.to?.x ?? o.x);
+  const y1 = Math.min(o.y, o.to?.y ?? o.y), y2 = Math.max(o.y, o.to?.y ?? o.y);
+  for (let cy = Math.floor((y1 - pad) / CELL); cy <= Math.floor((y2 + pad) / CELL); cy++) {
+    for (let cx = Math.floor((x1 - pad) / CELL); cx <= Math.floor((x2 + pad) / CELL); cx++) {
       if (cx >= 0 && cy >= 0 && cx < COLS && cy * COLS + cx < GRID.length) GRID[cy * COLS + cx].push(o);
     }
   }
@@ -137,7 +174,11 @@ export function openLanes(lanes: LaneId[]) {
 
 /** The first obstacle a walker of radius `body` at (x, y) would stand in, if any. */
 export function blockedBy(x: number, y: number, body: number): Obstacle | null {
-  for (const o of near(x, y)) if ((!o.lane || open.has(o.lane)) && (x - o.x) ** 2 + (y - o.y) ** 2 < (o.r + body) ** 2) return o;
+  for (const o of near(x, y)) {
+    if (o.lane && !open.has(o.lane)) continue;
+    const c = core(o, x, y);
+    if ((x - c.x) ** 2 + (y - c.y) ** 2 < (o.r + body) ** 2) return o;
+  }
   return null;
 }
 
@@ -147,11 +188,12 @@ export function settle(p: Vec, body: number): Vec {
   for (let round = 0; round < 4; round++) {
     const o = blockedBy(x, y, body);
     if (!o) break;
-    const d = Math.hypot(x - o.x, y - o.y);
+    const c = core(o, x, y);
+    const d = Math.hypot(x - c.x, y - c.y);
     // Dead on the centre: out to the south; else straight out from it.
-    const ux = d < 1 ? 0 : (x - o.x) / d, uy = d < 1 ? 1 : (y - o.y) / d;
-    x = o.x + ux * (o.r + body + 0.5);
-    y = o.y + uy * (o.r + body + 0.5);
+    const ux = d < 1 ? 0 : (x - c.x) / d, uy = d < 1 ? 1 : (y - c.y) / d;
+    x = c.x + ux * (o.r + body + 0.5);
+    y = c.y + uy * (o.r + body + 0.5);
   }
   return { x: Math.max(0, Math.min(WORLD.w, x)), y: Math.max(0, Math.min(WORLD.h, y)) };
 }
@@ -166,11 +208,28 @@ export function steer(from: Vec, to: Vec, step: number, body: number): Vec {
   const ux = (to.x - from.x) / d, uy = (to.y - from.y) / d;
   const o = blockedBy(from.x + ux * step, from.y + uy * step, body);
   if (!o) return { x: from.x + ux * step, y: from.y + uy * step };
-  // Slide round the obstacle: along its edge, turning the way that keeps closest to the goal.
-  const nx = from.x - o.x, ny = from.y - o.y;
+  // Slide round the obstacle: along its edge, turning the way that keeps closest to the goal. With
+  // the goal across a wall, keep going round it one way, by the end that makes the shorter way.
+  const c = core(o, from.x, from.y);
+  const nx = from.x - c.x, ny = from.y - c.y;
   const nd = Math.hypot(nx, ny) || 1;
   let tx = -ny / nd, ty = nx / nd;
-  if (tx * ux + ty * uy < 0) {
+  let wrong = tx * ux + ty * uy < 0;
+  if (o.to) {
+    const a = { x: o.x, y: o.y }, b = o.to;
+    const side = (p: Vec) => Math.sign((b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x));
+    const mine = side(from);
+    if (mine !== 0 && mine !== side(to)) {
+      const viaA = Math.hypot(from.x - a.x, from.y - a.y) + Math.hypot(to.x - a.x, to.y - a.y);
+      const viaB = Math.hypot(from.x - b.x, from.y - b.y) + Math.hypot(to.x - b.x, to.y - b.y);
+      const [end, other] = viaA < viaB ? [a, b] : [b, a];
+      // Which way round heads for that end, seen from beside the run on this side.
+      const wx = b.x - a.x, wy = b.y - a.y;
+      const sx = -wy * mine, sy = wx * mine;
+      wrong = -sy * (end.x - other.x) + sx * (end.y - other.y) < 0;
+    }
+  }
+  if (wrong) {
     tx = -tx;
     ty = -ty;
   }
