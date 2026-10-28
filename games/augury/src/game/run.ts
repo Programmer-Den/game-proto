@@ -1,5 +1,5 @@
 import { byDifficulty } from '../../../../shared/settings';
-import { RELICS, type Mode, type RelicId } from './catalog';
+import { CHARMS, GENERAL_RELICS, RELICS, isCharm, type Mode, type RelicId } from './catalog';
 import { DEFS, KINDS, type KindId, type Level } from './kinds';
 import { dailySeed, newSeed, seeded, shuffle } from './rng';
 import { newProgress, recordResult, type Progress } from './progress';
@@ -34,6 +34,9 @@ export const RELIC_OFFER = 3;
 export const DRAFT_MAX = 3;
 /** Extra time per Hourglass, as a share of each puzzle's time. */
 export const HOURGLASS = 0.25;
+/** A charm's kind: the points it pays, times, and how much slower Memory Echo turns its cards. */
+export const CHARM_POINTS = 1.5;
+export const CHARM_ECHO_SLOW = 1.35;
 /** Points: per level, per second left, taken per hint (down to a floor), and the streak bonus. */
 export const POINTS_PER_LEVEL = 100;
 export const POINTS_PER_SECOND = 2;
@@ -58,6 +61,9 @@ export interface Current {
   timeTotalMs: number;
   elapsedMs: number;
   hintsUsed: number;
+  /** Free hints left (a charm gives one), and how many of the hints used were free. */
+  freeHints: number;
+  freeUsed: number;
   /** Earlier states, for Undo. */
   history: string[];
 }
@@ -206,10 +212,21 @@ function timeFor(run: Run, card: Card) {
   return DEFS[card.kind].limit[card.level] * 1000 * (1 + HOURGLASS * hourglasses);
 }
 
+/** Whether the run holds the charm of a kind. */
+export const holdsCharm = (run: Run, kind: KindId) => run.relics.includes(CHARMS[kind]);
+
+/** Makes a card's puzzle, fresh from its seed, with its time and its charm's help. */
+export function makeCurrent(run: Run, card: Card): Current {
+  const time = timeFor(run, card);
+  const state = DEFS[card.kind].make(seeded(card.seed), card.level);
+  const charm = holdsCharm(run, card.kind);
+  if (charm && card.kind === 'echo') state.stepMs = Math.round(state.stepMs * CHARM_ECHO_SLOW);
+  return { card, state, timeLeftMs: time, timeTotalMs: time ?? 0, elapsedMs: 0, hintsUsed: 0, freeHints: charm && card.kind !== 'echo' ? 1 : 0, freeUsed: 0, history: [] };
+}
+
 /** Makes a card's puzzle and puts it in play. */
 function deal(run: Run, card: Card) {
-  const time = timeFor(run, card);
-  run.current = { card, state: DEFS[card.kind].make(seeded(card.seed), card.level), timeLeftMs: time, timeTotalMs: time ?? 0, elapsedMs: 0, hintsUsed: 0, history: [] };
+  run.current = makeCurrent(run, card);
   run.dealt++;
   run.phase = 'playing';
   run.events.push({ type: 'start', kind: card.kind });
@@ -282,7 +299,7 @@ export function undo(run: Run) {
 }
 
 export const canHint = (run: Run) =>
-  run.phase === 'playing' && run.hints > 0 && !!run.current && run.current.card.kind !== 'echo' && DEFS[run.current.card.kind].canHint?.(run.current.state) !== false;
+  run.phase === 'playing' && !!run.current && (run.hints > 0 || run.current.freeHints > 0) && run.current.card.kind !== 'echo' && DEFS[run.current.card.kind].canHint?.(run.current.state) !== false;
 
 export function hint(run: Run) {
   const cur = run.current;
@@ -290,7 +307,8 @@ export function hint(run: Run) {
   const before = JSON.stringify(cur.state);
   if (!DEFS[cur.card.kind].hint(cur.state)) return false;
   if (DEFS[cur.card.kind].undo) cur.history.push(before);
-  run.hints--;
+  if (cur.freeHints > 0) cur.freeHints--, cur.freeUsed++;
+  else run.hints--;
   cur.hintsUsed++;
   run.events.push({ type: 'hint' });
   check(run);
@@ -317,8 +335,9 @@ function check(run: Run) {
 
 function pointsFor(run: Run, cur: Current) {
   const base = POINTS_PER_LEVEL * (cur.card.level + 1) + (cur.timeLeftMs ? Math.floor(cur.timeLeftMs / 1000) * POINTS_PER_SECOND : 0);
-  const afterHints = Math.max(MIN_POINTS, base - HINT_COST * cur.hintsUsed);
-  return Math.round(afterHints * (1 + STREAK_STEP * Math.min(run.streak, STREAK_CAP)));
+  const afterHints = Math.max(MIN_POINTS, base - HINT_COST * (cur.hintsUsed - cur.freeUsed));
+  const charm = holdsCharm(run, cur.card.kind) ? CHARM_POINTS : 1;
+  return Math.round(afterHints * charm * (1 + STREAK_STEP * Math.min(run.streak, STREAK_CAP)));
 }
 
 function end(run: Run, reason: EndReason) {
@@ -386,9 +405,7 @@ export function next(run: Run) {
     case 'draft':
       if (run.hearts <= 0) return finish(run), true;
       if (run.last?.reason === 'solved' && run.solved % RELIC_EVERY === 0) {
-        // A second Crystal Ball would do nothing (`DRAFT_MAX`), so it is offered once.
-        const relics = RELICS.filter((r) => r !== 'crystal' || !run.relics.includes('crystal'));
-        run.relicOffer = shuffle(Math.random, relics).slice(0, RELIC_OFFER);
+        run.relicOffer = offerRelics(run);
         run.phase = 'relic';
       } else offerDraft(run);
       return true;
@@ -396,6 +413,17 @@ export function next(run: Run) {
       deal(run, { ...run.current!.card, seed: newSeed() });
       return true;
   }
+}
+
+/**
+ * The relics offered: one charm the run doesn't hold yet (while any is left) and general relics
+ * for the rest. A second Crystal Ball would do nothing (`DRAFT_MAX`), so it is offered once.
+ */
+export function offerRelics(run: Run): RelicId[] {
+  const charms = RELICS.filter((r) => isCharm(r) && !run.relics.includes(r));
+  const general = GENERAL_RELICS.filter((r) => r !== 'crystal' || !run.relics.includes('crystal'));
+  const offer: RelicId[] = shuffle(Math.random, charms).slice(0, 1);
+  return [...shuffle(Math.random, [...general]).slice(0, RELIC_OFFER - offer.length), ...offer];
 }
 
 /** Pass and play: the second player starts on the same puzzles. */

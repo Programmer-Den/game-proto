@@ -1,4 +1,5 @@
 import type Phaser from 'phaser';
+import { CHARM_KIND, type CharmId } from '../game/catalog';
 import type { KindId } from '../game/kinds';
 import { C, PALETTE } from './theme';
 
@@ -136,6 +137,14 @@ export function drawRelic(g: G, relic: string, x: number, y: number, color: numb
   const X = (v: number) => x + v * k;
   const Y = (v: number) => y + v * k;
   g.fillStyle(color, 1).lineStyle(2, color, 1);
+  // A charm: its kind's icon in a ring with four studs, like a medallion.
+  const kind = CHARM_KIND[relic as CharmId];
+  if (kind) {
+    g.strokeCircle(x, y, 30 * k).strokeCircle(x, y, 25 * k);
+    for (const [dx, dy] of [[0, -30], [30, 0], [0, 30], [-30, 0]]) g.fillCircle(X(dx), Y(dy), 3 * k);
+    drawKindIcon(g, kind, x, y, 34 * k, color);
+    return;
+  }
   switch (relic) {
     case 'lantern':
       g.strokeRect(X(-14), Y(-16), 28 * k, 32 * k);
