@@ -1250,6 +1250,15 @@ export const DRAKES: Record<DrakeElement, { name: TextKey; color: string; bonus:
 };
 export const DRAKE = { x: 600, y: 600, firstAt: 150_000, soul: 4, ai: 2, aiMinHp: 0.6 };
 
+/**
+ * Early gold (LB19): the first champion kill of the match pays `FIRST_BLOOD.gold` on top. Until
+ * `PLATING.until` each team's outer tower on a lane wears `PLATING.count` plates, one per share of
+ * its health: each plate broken pays `PLATING.gold`, split between the enemy champions within
+ * `PLATING.share` of the tower. At `PLATING.until` the plates fall away.
+ */
+export const FIRST_BLOOD = { gold: 150 };
+export const PLATING = { count: 5, gold: 120, share: 700, until: 300_000 };
+
 export const JUNGLE = { firstAt: 120_000, every: 45_000, ms: 30_000, minHp: 0.6 };
 export const RETREAT = {
   /** Health ratio under which a champion with an enemy champion near falls back. */

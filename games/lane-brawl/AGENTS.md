@@ -322,6 +322,13 @@ Implemented today:
   `drakeModel(element)` in `models.ts`, baked lazily per element (`bakeDrake`, `drakeKey`,
   `DRAKE_CELL`); the pit is painted by `pit` in `map.ts` (shared with the beast's); the minimap dot
   takes the element's colour and `drawBuffs` adds a chip per team with stacks.
+- Early gold (LB19): `FIRST_BLOOD` and `PLATING` in `data.ts`. `kill` pays the first champion
+  kill of the match (`s.firstBlood`) `FIRST_BLOOD.gold` more, with a notice and the `firstBlood`
+  sound. `createGame` gives each outer tower (the one of its team and lane farther from its Nexus)
+  `Unit.plates` = `PLATING.count`; `damage` calls `breakPlates` while `s.time < PLATING.until`,
+  which drops a plate for every share of health lost and splits `PLATING.gold` between the enemy
+  champions within `PLATING.share`. `tick` clears all plates at `PLATING.until` (`s.platesGone`,
+  with a notice). `drawBar` shows the plates as gold pips over a tower's bar.
 - Victory and defeat panel with the match's objectives, last hits, best streak and beasts slain,
   and "Play again".
 
