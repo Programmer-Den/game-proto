@@ -113,7 +113,7 @@ and tries to link it to the repo (the run summary says if the link has to be mad
     images in PR descriptions and READMEs like any other image.
 - **Add a game** by creating `games/<name>/` with an `index.html` that loads `./src/main.ts`, a
   `README.md`, an `AGENTS.md` (current state and architecture) with a `CLAUDE.md` that imports it,
-  a `cover.png` (a 16:9 screenshot), a `src/howToPlay.ts` handed to `setupGame(game, { howToPlay })` and an `e2e/playthrough.spec.ts` that plays its first round,
+  a `cover.png` (a 16:9 screenshot), a `src/howToPlay.ts` and `src/trophies/` (see Trophies) handed to `setupGame(game, { howToPlay, trophies })` and an `e2e/playthrough.spec.ts` that plays its first round,
   and it is played by the shared `.github/workflows/playthrough.yml`, which finds every
   `games/<name>/e2e/playthrough.spec.ts` on its own, so a new game needs no workflow of its own. Give it a `favicon.svg` linked from its `index.html`: the orange bear from the hub's
   `favicon.svg` (same ears, head, dot eyes and muzzle, 32x32 viewBox) with one prop for the game,
@@ -214,9 +214,9 @@ and tries to link it to the repo (the run summary says if the link has to be mad
   Trophies list to the start and pause screens, and calls `award(trophies, id)` when one is earned:
   it saves it under `<game>-trophies`, shows a toast at the top of the page and plays the shared
   `ui('trophy')` fanfare, once. Pass `{ quiet: true }` while replaying time or restoring a save. Pick
-  milestones of a first hour and a few for long play, list them in the game's `AGENTS.md`, and
-  bring games over one per PR (`ls games/*/src/trophies/index.ts` lists the games that have them).
-  A playthrough may assert a trophy its first round earns.
+  milestones of a first hour and a few for long play and list them in the game's `AGENTS.md`. Every
+  game has them, so a new game brings its own. A playthrough may assert a trophy its first round
+  earns.
 - **Time played comes for free too.** `setupGame` adds up the time the game runs on this device
   (`shared/playTime.ts`, under `hub-playtime`), not on its start or pause screen, nor with the tab
   hidden or the turn-phone hint up, and the hub shows it on the card, beside the starred games
