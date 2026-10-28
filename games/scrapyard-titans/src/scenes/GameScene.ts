@@ -5,11 +5,11 @@ import { aiLog, mountWatch, watching, watchSteps } from '../../../../shared/watc
 import { playMusic, playSting, stopMusic, ui, type PlayOptions } from '../../../../shared/audio';
 import { FIGHT_SONG, PLAN_SONG, play, type Sfx } from '../audio';
 import {
-  AUGMENT_BY_ID, CLASS_STATS, COST_COLOR, DRAFT_PICK_S, ECONOMY, ITEM_BENCH, ITEMS, MAX_LEVEL, ORIGIN_COLOR, PLAN_S, PLAYER_COMMANDERS, RIVALS, SETS,
+  AUGMENT_BY_ID, CLASS_STATS, COST_COLOR, DRAFT_PICK_S, ECONOMY, ITEM_BENCH, ITEMS, MAX_LEVEL, ORIGIN_COLOR, PLAN_S, PLAYER_COMMANDERS, RANKS, RIVALS, SETS,
   PARTS, RAT, SCRAP_TOKENS_PER_PART, SKILLS, TERRAIN, TRAITS, UNIT_BY_ID, comboOf, isPart,
   type CommanderDef, type DeedId, type PartId, type SetId, type TraitId,
 } from '../game/data';
-import { doDeeds, fullOrigin, isUnlocked, loadProgress, planDeeds, saveProgress } from '../progress';
+import { addRankPoints, doDeeds, fullOrigin, isUnlocked, loadProgress, planDeeds, rankOf, saveProgress } from '../progress';
 import { STEP_S, traitValue, type BEvent } from '../game/battle';
 import {
   advance, boardCount, boardUnits, buy, buyXp, countTraits, draftPick, endFight, equip, equipPreview, matchOver, moveUnit, newDrops, newMatch,
@@ -166,6 +166,8 @@ export class GameScene extends Phaser.Scene {
   private progress = loadProgress();
   /** Commanders unlocked during this match, listed on the end screen. */
   private unlockedNow: CommanderDef[] = [];
+  /** The rank points the finished match won, for the end screen. */
+  private rankGain: { gained: number; before: number; after: number } | null = null;
   private recorded = false;
 
   constructor() {
@@ -215,9 +217,10 @@ export class GameScene extends Phaser.Scene {
     const commander = watching ? Math.floor(Math.random() * PLAYER_COMMANDERS.length) : this.menu.commander;
     const set = watching ? (Math.random() < 0.5 ? 'scrap' : 'neon') : this.menu.set;
     const terrain = watching ? Math.random() < 0.5 : this.menu.terrain;
-    this.state = newMatch({ set, commander, terrain, watch: watching });
+    this.state = newMatch({ set, commander, terrain, watch: watching, rank: watching ? 0 : rankOf(this.progress.points) });
     this.recorded = false;
     this.unlockedNow = [];
+    this.rankGain = null;
     this.avatar.setTexture(cmdKey(PLAYER_COMMANDERS[commander].name)).setVisible(true);
     this.avatarPos = { ...COMMANDER_HOME };
     this.orbs = [];
@@ -322,6 +325,7 @@ export class GameScene extends Phaser.Scene {
     this.progress.played++;
     if (place === 1) this.progress.wins++;
     this.progress.best = this.progress.best ? Math.min(this.progress.best, place) : place;
+    this.rankGain = addRankPoints(this.progress, place);
     saveProgress(this.progress);
     this.noteDeeds(place <= 4 ? (place === 1 ? ['topFour', 'champion'] : ['topFour']) : []);
   }
@@ -1342,6 +1346,11 @@ export class GameScene extends Phaser.Scene {
       const place = m.phase === 'won' ? 1 : me.place;
       say(VIEW.w / 2, VIEW.fy + 150, t(m.phase === 'won' ? 'won' : 'lost'), 34, m.phase === 'won' ? '#7cf3ff' : '#ff8a7a', { fontStyle: 'bold', stroke: INK, strokeThickness: 6 }).setOrigin(0.5);
       say(VIEW.w / 2, VIEW.fy + 200, t(watching ? 'seatFinished' : 'youFinished', { place: ordinal(place), round: roundLabel(m) }), 16, '#ffffff').setOrigin(0.5);
+      const rg = this.rankGain;
+      if (rg) {
+        const rankText = rg.after > rg.before ? t('rankUp', { rank: t(RANKS[rg.after].name) }) : t('rankPoints', { n: rg.gained, rank: t(RANKS[rg.after].name), points: this.progress.points });
+        say(VIEW.w / 2, VIEW.fy + 104, rankText, 15, rg.after > rg.before ? C.gold : C.text, { fontStyle: 'bold' }).setOrigin(0.5);
+      }
       if (this.unlockedNow.length) say(VIEW.w / 2, VIEW.fy + 248, t('unlockedList', { names: this.unlockedNow.map((c) => t(c.name)).join(', ') }), 12, C.gold, { fontStyle: 'bold' }).setOrigin(0.5);
       say(VIEW.w / 2, VIEW.fy + 228, t('endStats', { played: this.progress.played, wins: this.progress.wins, best: this.progress.best ? ordinal(this.progress.best) : '-' }), 12, C.dim).setOrigin(0.5);
       this.button(g, { x: VIEW.w / 2 - 90, y: VIEW.fy + 270, w: 180, h: 44 }, t(watching ? 'watchAnother' : 'playAgain'), () => {
@@ -1420,6 +1429,9 @@ export class GameScene extends Phaser.Scene {
       ui('click');
       this.startMatch();
     }, { list: this.overlayButtons, container: this.overlay, size: 16, color: 0xffb703, on: pickedOpen });
+    const rank = rankOf(this.progress.points);
+    const next = RANKS[rank + 1];
+    say(VIEW.w / 2, VIEW.fy + 466, `${t('rankLine', { rank: t(RANKS[rank].name), points: this.progress.points })}${next ? t('rankNext', { rank: t(next.name), points: next.points }) : ''} · ${t(RANKS[rank].text)}`, 11, C.gold).setOrigin(0.5);
     if (this.progress.played) say(VIEW.w / 2, VIEW.fy + 446, t('menuStats', { played: this.progress.played, wins: this.progress.wins, best: ordinal(this.progress.best) }), 11, C.dim).setOrigin(0.5);
   }
 
