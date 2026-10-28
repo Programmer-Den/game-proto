@@ -116,6 +116,8 @@ and the player chooses a ship.
   hub page.
 - **Persistence:** the best wave beaten, the banked medals and the ship chosen are saved. Each
   run starts fresh at wave 1, plus any starting upgrades bought with medals.
+- **Trophies:** nine (`src/trophies/`, `shared/trophies.ts`), listed on the start and pause
+  screens and on the hub (see the file map). The first round earns First blood.
 - **Sound:** music and sound effects, made in code (see "Sound" below).
 - **Rough or unused:** Enemy captains still run aground now and then (pushed by
   another ship or the player, or cornered at close range), far less often than before the
@@ -216,6 +218,17 @@ File map (all under `src/`, plus the shared files it imports):
   `FIRST_FORT_WAVE` and `fortsFor(wave)`.
 - `game/save.ts`: `loadBestWave`, `saveBestWave`, `loadMedals`, `saveMedals`, `loadHull` and
   `saveHull`.
+- `trophies/`: the game's nine trophies (`shared/trophies.ts`). `index.ts` lists them (`trophies`:
+  id, tier, icon, `hidden` for Terror of the seas) with their texts in `trophies/i18n/` (`en.ts`,
+  `de.ts` and `en-US.ts` for Safe harbor and Strike the colors: the name keyed by the id, what earns
+  it by `<id>Text`), and imports nothing else from the game, since the hub loads it for its trophy
+  shelf. `main.ts` hands `trophies` to `setupGame`. `check.ts` holds each trophy's condition on the
+  run in play (`EARNED`: a ship sunk, a prize taken, a bounty paid, a convoy arrived, a consort
+  kept, a flagship or the admiral in `waveSunk` (sunk or taken), the harbor after wave
+  `OLD_SALT_WAVE` 10, `won`, and `won` on Hard from `settings.difficulty`) and
+  `checkTrophies(state)`, which `GameScene.update` calls every frame after `tick`. A run is never
+  saved, so nothing is earned on load and no award needs to be quiet. A new trophy is an entry in
+  `index.ts`, its two texts in each language file and its condition in `EARNED`.
 - `art/art.ts`: the chart style. `SHIP_LOOKS` (size, masts, guns, sail and pennant colours for
   each hull the player can sail and each enemy kind, and `extra` for the fireship's burning
   pitch, the ketch's and Bomb Ketch's mortar and the flagships' gilded rail), `lookOf` (a ship's
@@ -375,6 +388,7 @@ left after the chosen boons. `broadside-ship` stores the `HullId` chosen last ("
 saves it; an unknown value loads as the Frigate). Reads and writes are wrapped in try/catch, and
 a stored number that is not finite and positive loads as 0 (rounded down otherwise); `loadHull`
 checks `Object.hasOwn(HULLS, id)`, so an inherited key like `constructor` is unknown too.
+`broadside-trophies` holds the trophies earned (`shared/trophies.ts`, each id with the time).
 
 Randomness and timing: `Math.random` is used in `spawn` (the angle at which an enemy appears), in
 `fire` (one call per shot, even for the player, whose spread is 0; grapeshot makes three per gun,
@@ -556,7 +570,9 @@ then a check in `SoundCues.after` (or a case in `effects` for a new effect kind)
   `UpgradeId` / `'sail'` / `load-<side>` / `draft-<perk>` (the harbor after wave 1 offers no
   course, so its button is still `sail`), the draft's cards being the only
   buttons listed while it is on offer, `bestWave` becoming 1 on reaching the harbor, wave 1
-  posting no bounty, and wave 2 having more ships than wave 1. Also `FIRST_WIND` (0, copied into
+  posting no bounty, wave 2 having more ships than wave 1, and `broadside-trophies` holding exactly
+  `firstSink` once wave 2 is under way (a trophy a first round can reach in another way changes
+  that expectation). Also `FIRST_WIND` (0, copied into
   the test), both sides starting loaded with round shot, the chain order overriding the loadout,
   and `nextShot` going from round to chain.
 
