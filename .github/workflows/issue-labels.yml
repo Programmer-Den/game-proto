@@ -3,7 +3,7 @@ name: Issue labels
 # Adds the game label to issues filed through the forms in .github/ISSUE_TEMPLATE,
 # from the answer to their Game dropdown. The forms set the type label themselves.
 # Then it adds the issue to "All feedback" and that game's Project with the status
-# Todo, and takes it off the old game's Project when the dropdown changed, using
+# Todo, and takes it off any other game's Project (left from an earlier answer), using
 # PROJECTS_TOKEN (a classic token with only the "project" scope): the Projects'
 # built-in Auto-add misses labels added by this workflow's own token.
 # Run it by hand with an issue number to file an older issue again.
@@ -49,9 +49,13 @@ jobs:
             core.setOutput('number', issue.number);
             const gameLabels = new Set(Object.values(games));
             const stale = issue.labels.map(l => l.name).filter(n => gameLabels.has(n) && n !== label);
-            core.setOutput('stale', JSON.stringify(stale));
             for (const name of stale) {
-              await github.rest.issues.removeLabel({ ...context.repo, issue_number: issue.number, name });
+              // A re-run replays the old payload, so the label may already be gone.
+              try {
+                await github.rest.issues.removeLabel({ ...context.repo, issue_number: issue.number, name });
+              } catch (e) {
+                if (e.status !== 404) throw e;
+              }
             }
             await github.rest.issues.addLabels({ ...context.repo, issue_number: issue.number, labels: [label] });
             console.log(`Labelled #${issue.number} with ${label}`);
@@ -68,16 +72,14 @@ jobs:
           LABEL: ${{ steps.label.outputs.label }}
           NODE_ID: ${{ steps.label.outputs.node_id }}
           NUMBER: ${{ steps.label.outputs.number }}
-          STALE: ${{ steps.label.outputs.stale }}
         with:
           github-token: ${{ secrets.PROJECTS_TOKEN }}
           script: |
             const wanted = JSON.parse(require('fs').readFileSync('.github/projects.json', 'utf8'));
             const titles = new Set(wanted.filter(p => p.label === null || p.label === process.env.LABEL).map(p => p.title));
             const issue = { node_id: process.env.NODE_ID, number: process.env.NUMBER };
-            // The Projects of the game labels just taken off (the Game dropdown changed).
-            const stale = JSON.parse(process.env.STALE || '[]');
-            const staleTitles = new Set(wanted.filter(p => p.label !== null && stale.includes(p.label)).map(p => p.title));
+            // Every other game's Project, worked out afresh so a re-run or a run by hand cleans up too.
+            const staleTitles = new Set(wanted.filter(p => p.label !== null && p.label !== process.env.LABEL).map(p => p.title));
 
             const { user } = await github.graphql(`
               query($owner: String!) {
@@ -122,15 +124,16 @@ jobs:
                 }`, { projectId: project.id, itemId: item.id, fieldId: project.field.id, optionId: todo.id });
             }
 
-            // Take the issue off the old game's Project, since its built-in workflows never remove it.
-            if (staleTitles.size) {
+            // Take the issue off any other game's Project, since their built-in workflows never remove it.
+            const staleIds = new Set(user.projectsV2.nodes.filter(p => staleTitles.has(p.title)).map(p => p.id));
+            if (staleIds.size) {
               const { node } = await github.graphql(`
                 query($id: ID!) {
                   node(id: $id) {
                     ... on Issue { projectItems(first: 50, includeArchived: true) { nodes { id project { id title } } } }
                   }
                 }`, { id: issue.node_id });
-              for (const item of node.projectItems.nodes.filter(i => staleTitles.has(i.project.title))) {
+              for (const item of node.projectItems.nodes.filter(i => staleIds.has(i.project.id))) {
                 await github.graphql(`
                   mutation($projectId: ID!, $itemId: ID!) {
                     deleteProjectV2Item(input: { projectId: $projectId, itemId: $itemId }) { deletedItemId }

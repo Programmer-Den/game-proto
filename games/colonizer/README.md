@@ -354,3 +354,27 @@ unit, tech, attack and relic run (**L**). A click on the end screen starts anoth
   trade carts, adds two rams to its army in Age II and trains its champion in Age III.
 - The Town Center and Watchtowers shoot hard enough to hold off a small raid on their own; a
   Watchtower costs 125 wood and 50 ore.
+
+## Code layout
+
+All paths are inside `games/colonizer/`. [AGENTS.md](AGENTS.md) has the details.
+
+- `src/main.ts`: creates the game, registers the scenes and calls `setupGame` and `setupScaling`.
+- `src/game/`: the rules in plain TypeScript with no Phaser dependency. `data.ts` has every
+  balance number and roster (factions, units, buildings, techs, deeds, boons, edges, map kinds,
+  temperaments, relics), `map.ts` draws the map, `sim.ts` runs the match (economy, production,
+  research, pathing, combat, raids and fog) and `planner.ts` is the AI.
+- `src/scenes/`: `BootScene` bakes the textures, `MenuScene` picks the map kind, rivals and faction, and
+  `GameScene` draws the match and wires clicks and keys to the rules. `hud.ts` has the top bar,
+  deeds card, horn toast and minimap, `fx.ts` the sparks, arrows and numbers, `layout.ts` says
+  where the HUD sits and `sound.ts` plays what changed in the sim.
+- `src/art/`: every texture in the Bayeux tapestry look, painted on 2D canvases at startup:
+  `stitch.ts` the embroidery kit, `figures.ts` the units, `scenery.ts` the buildings and land and
+  `ui.ts` the HUD.
+- `src/audio/`: the sound table (`sfx.ts`) and the songs (`music.ts`).
+- `src/i18n.ts` and `src/i18n/`: the game's texts in British English (`en.ts`), US English
+  (`en-US.ts`) and German (`de.ts`).
+- `src/howToPlay.ts`: the How to play screen's text.
+- `src/trophies/`: the ten trophies. `index.ts` lists them with their texts in `i18n/`, and
+  `check.ts` awards them from the match state each frame.
+- `e2e/playthrough.spec.ts`: the playthrough test.

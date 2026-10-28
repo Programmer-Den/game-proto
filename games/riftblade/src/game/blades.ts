@@ -2,13 +2,14 @@
  * The seven knights: their attacks, signature moves and paths, and the Blade, Current and Hollow
  * pools any knight can draw from. `sim.ts` calls in here each step for a knight (and never for a
  * soldier, so the soldiers' runs replay exactly as before). Pure state changes, randomness from
- * Math.random, like the rest of the rules.
+ * `rand`, like the rest of the rules.
  */
 import { t as tr } from '../i18n';
 import { HEROES, schemeOf, type HeroId } from './heroes';
 import { at } from './upgrades';
 import { fullTemper, onPlatform, type Ally, type Enemy, type GameState } from './state';
 import { addBomb, angleDiff, bolt, damage, explode, heal, knock, near, nearest, pop, ready, stats, swarmSpot } from './sim';
+import { rand } from './weekly';
 
 const rank = (s: GameState, id: string) => s.ranks[id] ?? 0;
 const cap = (s: GameState, id: string) => s.capstones.includes(id);
@@ -242,7 +243,7 @@ function spin(s: GameState) {
   const chance = at([0.1, 0.1, 0.2, 0.2, 0.25], pers, 0);
   const ms = at([6000, 9000, 9000, 9000, 12000], pers, 0);
   cut(s, p.x, p.y, R, 0, Math.PI, HEROES.corvin.damage, 120, (e) => {
-    if (pers > 0 && e.hp > 0 && !e.elite && e.kind !== 'boss' && Math.random() < chance) e.charmMs = ms;
+    if (pers > 0 && e.hp > 0 && !e.elite && e.kind !== 'boss' && rand() < chance) e.charmMs = ms;
   });
   slashFx(s, p.x, p.y, R, s.time / 120, Math.PI, bladeColor(s));
   return true;
@@ -557,7 +558,7 @@ export function knightAbilities(s: GameState, ms: number) {
       // Overload: lightning in every direction.
       const pool = nearest(s, p.x, p.y, 14, 320);
       for (let i = 0; i < 4 && pool.length; i++) {
-        const t = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
+        const t = pool.splice(Math.floor(rand() * pool.length), 1)[0];
         hit(s, t, 14);
         zapFx(s, [p.x, p.y, t.x, t.y], color, 140);
       }
@@ -565,7 +566,7 @@ export function knightAbilities(s: GameState, ms: number) {
     if (cap(s, 'tempest') && ready(s, 'tempest', 1000, ms)) {
       const pool = nearest(s, p.x, p.y, 30, 460);
       for (let i = 0; i < 6 && pool.length; i++) {
-        const t = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
+        const t = pool.splice(Math.floor(rand() * pool.length), 1)[0];
         hit(s, t, 30);
         zapFx(s, [t.x + 30, t.y - 260, t.x - 10, t.y - 120, t.x, t.y], color, 220);
       }
@@ -746,7 +747,7 @@ export function knightGuard(s: GameState, dist: number, reflect: (dmg: number, c
     return true;
   }
   const council = s.hero === 'joren' ? rank(s, 'council-seat') : 0;
-  if (council > 0 && dist < p.r + 8 && Math.random() < at([0.15, 0.15, 0.3, 0.3, 0.5], council, 0)) {
+  if (council > 0 && dist < p.r + 8 && rand() < at([0.15, 0.15, 0.3, 0.3, 0.5], council, 0)) {
     reflect(25 * (council >= 5 ? 2 : 1), 'joren');
     if (cross(s, 'royal-lightning')) {
       const t = nearest(s, p.x, p.y, 1, 260)[0];

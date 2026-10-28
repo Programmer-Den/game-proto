@@ -1,6 +1,6 @@
 /**
  * The rules of a run: moving, the heroes' weapons and signatures, every upgrade's effect, the
- * bots, pickups and level-ups. Pure state changes, no drawing; randomness comes from Math.random
+ * bots, pickups and level-ups. Pure state changes, no drawing; randomness comes from `rand`
  * and time from the `dt` the scene hands over, so a run replays exactly from the same inputs.
  */
 import { HEROES, isKnight, type HeroId } from './heroes';
@@ -24,7 +24,7 @@ import { t as tr, type TextKey } from '../i18n';
 import { cancelObjective, objectives } from './objectives';
 import { HEAT, hot } from './heat';
 import { PERK, type ArmouryId } from './armoury';
-import { MUT, reseed, weekSeed, type MutatorId } from './weekly';
+import { MUT, rand, reseed, weekSeed, type MutatorId } from './weekly';
 
 /** What the player is doing this frame: a move direction (length up to 1) and the signature key. */
 export interface Input {
@@ -68,7 +68,7 @@ export function prepare(s: GameState) {
 export interface RunSetup {
   heat?: number;
   perks?: Partial<Record<ArmouryId, number>>;
-  /** A weekly run: its week and mutators (`Math.random` is seeded for it). */
+  /** A weekly run: its week and mutators (`rand` is seeded for it). */
   week?: number;
   mutators?: MutatorId[];
 }
@@ -394,7 +394,7 @@ function hurtHero(s: GameState, dmg: number, x?: number, y?: number) {
   }
   if (knight) {
     // Foresight: a chance to dodge; a barrier takes what it can first.
-    if (st.dodge > 0 && Math.random() < st.dodge) {
+    if (st.dodge > 0 && rand() < st.dodge) {
       p.hurtMs = HURT_GRACE_MS / 2;
       return;
     }
@@ -494,7 +494,7 @@ export function volley(s: GameState, x: number, y: number, angle: number, dmg: n
   const spread = pellets > 1 ? hero.spread * (1 + 0.15 * extraPellets) : 0;
   for (let i = 0; i < pellets; i++) {
     const off = pellets > 1 ? -spread + (2 * spread * i) / (pellets - 1) : 0;
-    bolt(s, x, y, angle + off + (Math.random() * 2 - 1) * hero.jitter, dmg, o);
+    bolt(s, x, y, angle + off + (rand() * 2 - 1) * hero.jitter, dmg, o);
   }
   const scatter = s.ranks.scatter ?? 0;
   if (scatter > 0) {
@@ -691,7 +691,7 @@ function abilities(s: GameState, ms: number) {
   const thermal = r('thermal');
   if (thermal > 0 && ready(s, 'thermal', at([4000, 3600, 3200, 2800, 2400], thermal, 4000), ms)) {
     const pool = nearest(s, p.x, p.y, 8, 320);
-    const t = pool[Math.floor(Math.random() * pool.length)];
+    const t = pool[Math.floor(rand() * pool.length)];
     if (t) {
       addBomb(s, 'grenade', t.x, t.y, 600, at([55, 60, 70, 70, 85], thermal, 55), at([25, 32, 32, 45, 60], thermal, 25), {
         fromX: p.x, fromY: p.y, cluster: s.crossovers.includes('cluster-grenades') ? 3 : 0,
@@ -892,7 +892,7 @@ export function spawnAt(s: GameState, kind: EnemyKind, x: number, y: number, eli
   const mut = (id: MutatorId) => s.mutators.includes(id);
   const hp = spec.hp * hpScale * (elite ? ELITE.hp : 1) * (hot(s.heat, 'hp') && !isStructure(kind) ? HEAT.hp : 1) *
     (foe && mut('swarm') ? MUT.swarmHp : 1) * (foe && mut('fragile') ? MUT.fragileHp : 1);
-  const speed = spec.speed * (boss ? 1 : 1 + t / 1200) * (elite ? ELITE.speed : 1) * (0.92 + Math.random() * 0.16) * (mut('haste') ? MUT.haste : 1);
+  const speed = spec.speed * (boss ? 1 : 1 + t / 1200) * (elite ? ELITE.speed : 1) * (0.92 + rand() * 0.16) * (mut('haste') ? MUT.haste : 1);
   const e: Enemy = {
     id: s.nextId++, kind, elite, x, y, r: spec.r * (elite ? ELITE.size : 1), hp, maxHp: hp, speed,
     dmg: spec.dmg * (boss ? 1 : planet.dmg) * (elite ? 1.5 : 1), hitMs: 0, slowMs: 0, slowPct: 0, stunMs: 0, flashMs: 0, kx: 0, ky: 0,
@@ -911,8 +911,8 @@ export function spawnAt(s: GameState, kind: EnemyKind, x: number, y: number, eli
 }
 
 /** A point on the spawn ring around the hero, at `angle` or a random one. */
-export function ringPoint(s: GameState, angle = Math.random() * Math.PI * 2) {
-  const d = SPAWN_RING.min + s.ringOut + Math.random() * (SPAWN_RING.max - SPAWN_RING.min);
+export function ringPoint(s: GameState, angle = rand() * Math.PI * 2) {
+  const d = SPAWN_RING.min + s.ringOut + rand() * (SPAWN_RING.max - SPAWN_RING.min);
   return { x: s.player.x + Math.cos(angle) * d, y: s.player.y + Math.sin(angle) * d };
 }
 
@@ -927,18 +927,18 @@ export function spawnGroup(s: GameState, t: number, room: number) {
   const spot = ringPoint(s);
   if (id === 'dune') {
     const rollerChance = t < 35 ? 0 : Math.min(0.28, 0.08 + t / 900);
-    spawnAt(s, Math.random() < rollerChance ? 'rollerbomb' : 'clanker', spot.x, spot.y);
+    spawnAt(s, rand() < rollerChance ? 'rollerbomb' : 'clanker', spot.x, spot.y);
     return 1;
   }
-  const roll = Math.random();
+  const roll = rand();
   if (id === 'swamp') {
     if (roll < (t < 30 ? 0 : Math.min(0.22, 0.07 + t / 900))) {
       spawnAt(s, 'toad', spot.x, spot.y);
       return 1;
     }
     // Mire rats run in packs.
-    const n = Math.min(room, RATS.pack[0] + Math.floor(Math.random() * (RATS.pack[1] - RATS.pack[0] + 1)));
-    for (let i = 0; i < n; i++) spawnAt(s, 'mirerat', spot.x + (Math.random() - 0.5) * 50, spot.y + (Math.random() - 0.5) * 50);
+    const n = Math.min(room, RATS.pack[0] + Math.floor(rand() * (RATS.pack[1] - RATS.pack[0] + 1)));
+    for (let i = 0; i < n; i++) spawnAt(s, 'mirerat', spot.x + (rand() - 0.5) * 50, spot.y + (rand() - 0.5) * 50);
     return n;
   }
   if (id === 'ice') {
@@ -949,7 +949,7 @@ export function spawnGroup(s: GameState, t: number, room: number) {
     // A squad of line troopers, side by side across the way to the hero, firing together.
     const n = Math.min(room, LINE.squad);
     const a = Math.atan2(s.player.y - spot.y, s.player.x - spot.x);
-    const volley = LINE.volleyMs * (0.5 + Math.random() * 0.5);
+    const volley = LINE.volleyMs * (0.5 + rand() * 0.5);
     for (let i = 0; i < n; i++) {
       const slot = (i - (n - 1) / 2) * LINE.gap;
       const e = spawnAt(s, 'linetrooper', spot.x - Math.sin(a) * slot, spot.y + Math.cos(a) * slot);
@@ -965,7 +965,7 @@ export function spawnGroup(s: GameState, t: number, room: number) {
     }
     // Sporelings drift in clumps.
     const n = Math.min(room, SPORE.clump);
-    for (let i = 0; i < n; i++) spawnAt(s, 'sporeling', spot.x + (Math.random() - 0.5) * 44, spot.y + (Math.random() - 0.5) * 44);
+    for (let i = 0; i < n; i++) spawnAt(s, 'sporeling', spot.x + (rand() - 0.5) * 44, spot.y + (rand() - 0.5) * 44);
     return n;
   }
   if (id === 'scrap') {
@@ -985,7 +985,7 @@ export function spawnGroup(s: GameState, t: number, room: number) {
       return 1;
     }
     const n = Math.min(room, 2);
-    for (let i = 0; i < n; i++) spawnAt(s, 'shardling', spot.x + (Math.random() - 0.5) * 36, spot.y + (Math.random() - 0.5) * 36);
+    for (let i = 0; i < n; i++) spawnAt(s, 'shardling', spot.x + (rand() - 0.5) * 36, spot.y + (rand() - 0.5) * 36);
     return n;
   }
   if (id === 'storm') {
@@ -994,7 +994,7 @@ export function spawnGroup(s: GameState, t: number, room: number) {
       return 1;
     }
     const n = Math.min(room, 4);
-    for (let i = 0; i < n; i++) spawnAt(s, 'wisp', spot.x + (Math.random() - 0.5) * 60, spot.y + (Math.random() - 0.5) * 60);
+    for (let i = 0; i < n; i++) spawnAt(s, 'wisp', spot.x + (rand() - 0.5) * 60, spot.y + (rand() - 0.5) * 60);
     return n;
   }
   if (roll < (t < 35 ? 0 : Math.min(0.16, 0.05 + t / 1100))) {
@@ -1002,7 +1002,7 @@ export function spawnGroup(s: GameState, t: number, room: number) {
     return 1;
   }
   const n = Math.min(room, 3);
-  for (let i = 0; i < n; i++) spawnAt(s, 'acolyte', spot.x + (Math.random() - 0.5) * 40, spot.y + (Math.random() - 0.5) * 40);
+  for (let i = 0; i < n; i++) spawnAt(s, 'acolyte', spot.x + (rand() - 0.5) * 40, spot.y + (rand() - 0.5) * 40);
   return n;
 }
 
@@ -1011,8 +1011,8 @@ export function spawnElite(s: GameState, angle?: number) {
   const planet = PLANETS[s.planet];
   const spot = ringPoint(s, angle);
   let kind: FoeKind;
-  if (planet.id === 'dune') kind = s.time > 120_000 && Math.random() < 0.5 ? 'rollerbomb' : 'clanker';
-  else kind = planet.elites[Math.random() < 0.6 ? 0 : 1];
+  if (planet.id === 'dune') kind = s.time > 120_000 && rand() < 0.5 ? 'rollerbomb' : 'clanker';
+  else kind = planet.elites[rand() < 0.6 ? 0 : 1];
   return spawnAt(s, kind, spot.x, spot.y, true);
 }
 
@@ -1071,16 +1071,16 @@ function director(s: GameState, ms: number) {
   }
   // Lava vents: a warning glow near the hero, then an eruption.
   if (planet.id === 'lava' && s.time >= s.nextVent) {
-    s.nextVent = s.time + VENT.minMs + Math.random() * (VENT.maxMs - VENT.minMs);
-    const a = Math.random() * Math.PI * 2;
-    const d = 40 + Math.random() * 200;
+    s.nextVent = s.time + VENT.minMs + rand() * (VENT.maxMs - VENT.minMs);
+    const a = rand() * Math.PI * 2;
+    const d = 40 + rand() * 200;
     addHazard(s, 'vent', s.player.x + Math.cos(a) * d, s.player.y + Math.sin(a) * d, VENT.r, VENT.warnMs, 450, VENT.dmg);
   }
   // Lightning on the Storm world: a warning ring near the hero, then the strike.
   if (planet.id === 'storm' && s.time >= s.nextVent) {
-    s.nextVent = s.time + STRIKE.minMs + Math.random() * (STRIKE.maxMs - STRIKE.minMs);
-    const a = Math.random() * Math.PI * 2;
-    const d = 30 + Math.random() * 180;
+    s.nextVent = s.time + STRIKE.minMs + rand() * (STRIKE.maxMs - STRIKE.minMs);
+    const a = rand() * Math.PI * 2;
+    const d = 30 + rand() * 180;
     addHazard(s, 'strike', s.player.x + Math.cos(a) * d, s.player.y + Math.sin(a) * d, STRIKE.r, STRIKE.warnMs, 300, STRIKE.dmg * planet.dmg);
   }
 }
@@ -1152,7 +1152,7 @@ function moveEnemies(s: GameState, ms: number) {
     const dist = Math.hypot(dx, dy) || 1;
     // Left far behind: brought back round ahead of the hero.
     if (dist > LEASH && e.kind !== 'boss') {
-      const spot = ringPoint(s, p.facing + (Math.random() - 0.5) * 1.6);
+      const spot = ringPoint(s, p.facing + (rand() - 0.5) * 1.6);
       e.x = spot.x;
       e.y = spot.y;
       e.mode = 'walk';
@@ -1254,7 +1254,7 @@ function moveEnemies(s: GameState, ms: number) {
       e.shellMs -= ms;
       if (e.shellMs <= 0) {
         e.shellMs = LINE.volleyMs;
-        if (dist < LINE.range + 60 && !still) shoot(s, e.x, e.y, toHero + (Math.random() - 0.5) * 0.08, LINE.boltSpeed, LINE.dmg * harm, 'volley', 5);
+        if (dist < LINE.range + 60 && !still) shoot(s, e.x, e.y, toHero + (rand() - 0.5) * 0.08, LINE.boltSpeed, LINE.dmg * harm, 'volley', 5);
       }
     } else if (e.kind === 'walker') {
       e.shellMs -= ms;
@@ -1456,8 +1456,8 @@ function bossAttacks(s: GameState, e: Enemy, ms: number, ux: number, uy: number,
       const n = SIEGE.shells + (enraged ? 3 : 0);
       const p = s.player;
       for (let i = 0; i < n; i++) {
-        const a = Math.random() * Math.PI * 2;
-        const d = i === 0 ? 0 : 60 + Math.random() * 170;
+        const a = rand() * Math.PI * 2;
+        const d = i === 0 ? 0 : 60 + rand() * 170;
         addHazard(s, 'shell', p.x + Math.cos(a) * d, p.y + Math.sin(a) * d, SIEGE.shellR, SIEGE.warnMs + i * 90, 400, SIEGE.shellDmg * power);
       }
     }
@@ -1475,7 +1475,7 @@ function bossAttacks(s: GameState, e: Enemy, ms: number, ux: number, uy: number,
   }
   if (e.phase2 && e.spawnMs <= 0) {
     e.spawnMs = CHAMPION.ringMs;
-    addHazard(s, 'ring', e.x, e.y, 24, 0, (560 / CHAMPION.ringSpeed) * 1000, CHAMPION.ringDmg * power, Math.random() * Math.PI * 2);
+    addHazard(s, 'ring', e.x, e.y, 24, 0, (560 / CHAMPION.ringSpeed) * 1000, CHAMPION.ringDmg * power, rand() * Math.PI * 2);
   }
   if (e.mode === 'walk') {
     if (e.shellMs <= 0 && dist < 520) {
@@ -1541,7 +1541,7 @@ export function damage(s: GameState, e: Enemy, base: number, o: HitOpts = {}) {
   // Elara's Sharpshooter makes its own critical hits.
   const sure = squad ? squadCrit(s, e) : 1;
   if (sure > 1) dmg *= sure;
-  else if (o.crit || (!o.noCrit && st.crit > 0 && Math.random() < st.crit)) dmg *= 2;
+  else if (o.crit || (!o.noCrit && st.crit > 0 && rand() < st.crit)) dmg *= 2;
   e.hp -= dmg;
   e.flashMs = 90;
   s.hits += 1;
@@ -1604,7 +1604,7 @@ function kill(s: GameState, e: Enemy) {
       spawnAt(s, 'scrapper', e.x + Math.cos(a) * 18, e.y + Math.sin(a) * 18);
     }
   } else if (e.kind === 'shardling') {
-    const a0 = Math.random() * Math.PI * 2;
+    const a0 = rand() * Math.PI * 2;
     const harm = PLANETS[s.planet].dmg;
     for (let i = 0; i < SHARD.splinters; i++) shoot(s, e.x, e.y, a0 + (i / SHARD.splinters) * Math.PI * 2, SHARD.speed, SHARD.dmg * harm, 'splinter', 4, 900);
   }
@@ -1615,16 +1615,16 @@ function kill(s: GameState, e: Enemy) {
 /** Now and then a power-up, after a world's first minute (so the first minute's draws are as before). */
 function dropPowerUp(s: GameState, e: Enemy) {
   if (s.time < POWER.fromMs || s.arena) return;
-  if (Math.random() >= (e.elite ? POWER.eliteChance : POWER.chance)) return;
+  if (rand() >= (e.elite ? POWER.eliteChance : POWER.chance)) return;
   if (s.pickups.filter((k) => POWER_UPS.includes(k.kind as PowerUp)).length >= POWER.max) return;
-  let roll = Math.random() * POWER_UPS.reduce((n, k) => n + POWER.weights[k], 0);
+  let roll = rand() * POWER_UPS.reduce((n, k) => n + POWER.weights[k], 0);
   const kind = POWER_UPS.find((k) => (roll -= POWER.weights[k]) < 0) ?? 'bomb';
   s.pickups.push({ id: s.nextId++, kind, x: e.x - 16, y: e.y - 8, heal: 0, value: 0, ms: POWER.lifeMs });
 }
 
 function dropShard(s: GameState, x: number, y: number, value: number) {
   if (s.shards.length >= MAX_SHARDS) {
-    s.shards[Math.floor(Math.random() * s.shards.length)].value += value;
+    s.shards[Math.floor(rand() * s.shards.length)].value += value;
     return;
   }
   s.shards.push({ id: s.nextId++, x, y, value, pulled: false });
@@ -1723,7 +1723,7 @@ function moveBullets(s: GameState, ms: number) {
         b.bounced = true;
         const speed = Math.hypot(b.vx, b.vy);
         const next = st.seek ? nearest(s, b.x, b.y, 1, 240, b.hit)[0] : undefined;
-        const a = next ? Math.atan2(next.y - b.y, next.x - b.x) : Math.atan2(b.vy, b.vx) + Math.PI + (Math.random() - 0.5) * 2.4;
+        const a = next ? Math.atan2(next.y - b.y, next.x - b.x) : Math.atan2(b.vy, b.vx) + Math.PI + (rand() - 0.5) * 2.4;
         b.vx = Math.cos(a) * speed;
         b.vy = Math.sin(a) * speed;
         b.lifeMs = Math.max(b.lifeMs, 450);
@@ -1794,7 +1794,7 @@ function bombs(s: GameState, ms: number) {
   for (const b of due) {
     explode(s, b.x, b.y, b.r, b.dmg, b.kind === 'frag' || b.kind === 'grenade' ? BLAST.frag : b.kind === 'wreck' || b.kind === 'ship' ? BLAST.wreck : BLAST.hero);
     for (let i = 0; i < b.cluster; i++) {
-      const a = (i / b.cluster) * Math.PI * 2 + Math.random();
+      const a = (i / b.cluster) * Math.PI * 2 + rand();
       addBomb(s, 'bomblet', b.x + Math.cos(a) * 48, b.y + Math.sin(a) * 48, 260 + i * 60, 45, b.dmg * 0.5);
     }
     if (b.heal > 0) s.pickups.push({ id: s.nextId++, kind: 'medkit', x: b.x, y: b.y, heal: b.heal, value: 0 });
@@ -1962,7 +1962,7 @@ function openChest(s: GameState) {
     pop(s, tr('supplyChest', { n: 50 }), '#ffe066');
     return;
   }
-  const id = held[Math.floor(Math.random() * held.length)];
+  const id = held[Math.floor(rand() * held.length)];
   raise(s, id);
   pop(s, tr('chestPop', { name: tr(UPGRADES[id].name), n: s.ranks[id] }), '#ffe066');
 }

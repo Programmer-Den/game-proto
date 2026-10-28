@@ -186,6 +186,14 @@ export function addStartScreen(game: Phaser.Game, howToPlay?: HowToPlay, trophie
     (e) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const key = e.key.toLowerCase();
+      // Escape closes a sound menu opened by a tap, which holds no focus for its own handler.
+      const menu = openSoundMenu();
+      if (key === 'escape' && menu && !menu.contains(document.activeElement)) {
+        e.stopPropagation();
+        e.preventDefault();
+        toggleSoundMenu();
+        return;
+      }
       if (mode === 'playing') {
         if (key === PAUSE_KEY && !e.repeat) {
           e.stopPropagation();

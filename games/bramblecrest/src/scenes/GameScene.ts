@@ -485,6 +485,7 @@ export class GameScene extends Phaser.Scene {
   // ---------------------------------------------------------------- input
 
   private onKey(e: KeyboardEvent) {
+    if (e.repeat) return; // a held key acts once
     const code = e.code;
     if (this.hud.shopOpen) {
       const i = Number(code.replace('Digit', '')) - 1;
@@ -1674,7 +1675,7 @@ export class GameScene extends Phaser.Scene {
             f.t = LANTERN_SHOT_MS;
             sfx('spit', { pitch: 1.4 });
             // Aimed at the knight's body, 14 px above the feet, where an ember hits.
-            this.shoot(f.x, f.y - LANTERN_LIFT, dx / dist, (dy + LANTERN_LIFT - 14) / dist, 'ember');
+            this.shoot(f.x, f.y - LANTERN_LIFT, dx / dist, (dy + LANTERN_LIFT - 14) / dist, 'ember', LANTERN_LIFT);
           }
         } else {
           vx = f.home.x + Math.cos(this.now / 1100 + f.index) * 50 - f.x;
@@ -1720,12 +1721,13 @@ export class GameScene extends Phaser.Scene {
     return tx >= r.x && tx < r.x + r.w && ty >= r.y && ty < r.y + r.h;
   }
 
-  private shoot(x: number, y: number, dx: number, dy: number, key = 'seed') {
+  /** `lift` is how far above its ground point the shot flies; walls are checked at that ground. */
+  private shoot(x: number, y: number, dx: number, dy: number, key = 'seed', lift = 16) {
     const len = Math.hypot(dx, dy) || 1;
     dx /= len;
     dy /= len;
     const sprite = this.add.image(x, y, key).setScale(texScale(key));
-    this.seeds.push({ x, y, vx: dx * SEED_SPEED, vy: dy * SEED_SPEED, sprite, life: 4000 });
+    this.seeds.push({ x, y, vx: dx * SEED_SPEED, vy: dy * SEED_SPEED, sprite, life: 4000, lift });
   }
 
   private updateSeeds(dt: number) {
@@ -1735,7 +1737,7 @@ export class GameScene extends Phaser.Scene {
       sd.x += sd.vx * sec;
       sd.y += sd.vy * sec;
       sd.life -= dt;
-      const t = tileAt(this.map, Math.floor(sd.x / TILE), Math.floor((sd.y + 12) / TILE));
+      const t = tileAt(this.map, Math.floor(sd.x / TILE), Math.floor((sd.y + sd.lift - 4) / TILE));
       const gone = sd.life <= 0 || (SOLID.has(t) && !LOW.has(t));
       if (!gone && Math.hypot(sd.x - s.x, sd.y - (s.y - 14)) < 13) {
         this.hurt(1, sd);

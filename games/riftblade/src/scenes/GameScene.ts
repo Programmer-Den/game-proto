@@ -453,7 +453,7 @@ export class GameScene extends Phaser.Scene {
     }
     ui('click');
     unseed();
-    // A weekly run is fought at heat 0 without the Armoury, and seeds Math.random (`startRun`).
+    // A weekly run is fought at heat 0 without the Armoury, and seeds the rules' `rand` (`startRun`).
     const ringOut = (Math.hypot(SCREEN.w, SCREEN.h) - Math.hypot(VIEW.w, VIEW.h)) / 2;
     startRun(this.state, id, unlockedHeroes(this.progress), ringOut, weekly ?? { heat: this.heatFor(id), perks: this.progress.armoury });
     this.savedDeeds = 0;

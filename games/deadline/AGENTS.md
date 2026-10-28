@@ -138,8 +138,9 @@ upgrades. A run is the endless Open Road or a 10-wave operation, picked on the g
   `GameState` (`EARNED`: the first wave cleared, a frenzy, a survivor saved, a perk, a boss
   beaten, `MAX_COMPANIONS` companions, an Open Road extraction, an operation won, every outpost
   upgrade at `OUTPOST_MAX`) and `checkTrophies(state)`, which `GameScene.update` calls at the start
-  of every frame, game over included (the outpost is bought there), and again after the step, so a
-  trophy is saved in the frame that earns it. Big bang (`DRUM_KILLS` 5 kills from one drum) is
+  of every frame, game over included (the outpost is bought there), and again after the step (or
+  before the early return of a frame that ends in a game over or a rescue), so a trophy is saved
+  in the frame that earns it. Big bang (`DRUM_KILLS` 5 kills from one drum) is
   awarded by `checkBlast(killed)`, which `explode` calls for each drum. A new trophy is an entry in
   `index.ts`, its two texts in each language file and its condition in `EARNED`.
 - `src/game/pool.ts`: generic `Pool<T>` with `take`, `release`, `live` and `all`, to reuse sprites.

@@ -1,7 +1,7 @@
 /**
  * The Rift Crusade between the fights: what happens when a planet's boss (or the arena) falls, the
  * space map (which planet to jump to), the star map's nodes on the way (trader, elite arena, rest,
- * events) and the jump itself. Pure state changes like `sim.ts`; randomness from Math.random.
+ * events) and the jump itself. Pure state changes like `sim.ts`; randomness from `rand`.
  */
 import { ELITE, OBJECTIVE_AT, WAVES, statsOf, type EventState, type GameState } from './state';
 import { collectAll, heal, lower, nextPick, pop, raise, refreshHealth, spawnElite, tick, SHORT_LIVED, type Input } from './sim';
@@ -9,7 +9,7 @@ import { FILLER, MAX_TIER, UPGRADES, UPGRADE_IDS, canOffer, rollChoices } from '
 import { t } from '../i18n';
 import { checkDeeds } from './blades';
 import { hot } from './heat';
-import { reseed, weekSeed } from './weekly';
+import { rand, reseed, weekSeed } from './weekly';
 import { CREDITS, LAST_STAGE, NODE_INFO, PLANETS, REST_HEAL, TRADE, arenaElites, planetsAt, type EventId, type NodeKind } from './planets';
 
 /** One frame of the game: the sim while a fight is on, then whatever follows a cleared fight. */
@@ -87,9 +87,9 @@ export function chooseWorld(s: GameState, index: number) {
 /** Two or three different nodes for the star map (never a rest at rift heat 3 and up). */
 export function rollNodes(noRest = false): NodeKind[] {
   const kinds = (Object.keys(NODE_INFO) as NodeKind[]).filter((k) => !noRest || k !== 'rest');
-  const count = Math.random() < 0.5 ? 2 : 3;
+  const count = rand() < 0.5 ? 2 : 3;
   const out: NodeKind[] = [];
-  while (out.length < count) out.push(kinds.splice(Math.floor(Math.random() * kinds.length), 1)[0]);
+  while (out.length < count) out.push(kinds.splice(Math.floor(rand() * kinds.length), 1)[0]);
   return out;
 }
 
@@ -168,7 +168,7 @@ function startArena(s: GameState) {
   s.bossSpawned = false;
   s.phase = 'run';
   const n = arenaElites(s.stage);
-  const a0 = Math.random() * Math.PI * 2;
+  const a0 = rand() * Math.PI * 2;
   for (let i = 0; i < n; i++) spawnElite(s, a0 + (i / n) * Math.PI * 2);
   pop(s, t('arenaStart', { n }), '#ffe066');
 }
@@ -181,22 +181,22 @@ function shrinePair(s: GameState) {
   const abilities = Object.keys(s.ranks).filter((id) => UPGRADES[id].kind !== 'gear');
   const gains = abilities.filter((id) => s.ranks[id] <= MAX_TIER - 2);
   if (abilities.length < 2 || !gains.length) return null;
-  const gain = gains[Math.floor(Math.random() * gains.length)];
+  const gain = gains[Math.floor(rand() * gains.length)];
   const loses = abilities.filter((id) => id !== gain);
-  return { gain, lose: loses[Math.floor(Math.random() * loses.length)] };
+  return { gain, lose: loses[Math.floor(rand() * loses.length)] };
 }
 
 /** A gear piece the cache can give: a new one if a slot is free, else one held below tier 5. */
 function cacheGear(s: GameState) {
   const open = UPGRADE_IDS.filter((id) => UPGRADES[id].kind === 'gear' && canOffer(id, s.hero!, s.ranks));
-  return open.length ? open[Math.floor(Math.random() * open.length)] : null;
+  return open.length ? open[Math.floor(rand() * open.length)] : null;
 }
 
 export function rollEvent(s: GameState): EventState {
   const ids: EventId[] = ['bot', 'cache', 'well'];
   const pair = shrinePair(s);
   if (pair) ids.push('shrine');
-  const id = ids[Math.floor(Math.random() * ids.length)];
+  const id = ids[Math.floor(rand() * ids.length)];
   if (id === 'bot') {
     return {
       id, title: 'botTitle', text: 'botText',
