@@ -203,6 +203,8 @@ const de: Translation<typeof en> = {
   lostText: 'Du hast sie bis Welle {n} aufgehalten.',
   again: 'Nochmal spielen',
   watchAgain: 'Nochmal ansehen',
+  resume: '▶ Welle {n}',
+  resumed: 'Zurück im Garten: Welle {n} gehalten.',
   watch: 'Ansehen',
   replayLabel: 'Wiederholung · {stars} · {t}',
 };
