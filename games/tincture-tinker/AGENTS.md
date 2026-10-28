@@ -75,6 +75,17 @@ bottle green, serif italics), all painted in code on 2D canvases. It shares no c
   US English (the mould caption). `t(key, vars)` shows a text in the hub's language; `TextKey` types
   the keys. Every text on screen goes through `t`, numbers in texts are formatted for the language,
   and a new text gets its German entry (and a US one if its spelling differs) in the same PR.
+- `src/trophies/`: the game's ten trophies (`shared/trophies.ts`). `index.ts` lists them
+  (`trophies`: id, tier, icon, `hidden` for Fully fitted and Guild master) with their texts in
+  `trophies/i18n/` (`en.ts` and `de.ts`: the name keyed by the id, what earns it by `<id>Text`),
+  and imports nothing else from the game, since the hub loads it for its trophy shelf. `main.ts`
+  hands `trophies` to `setupGame`, which lists them on the start and pause screens. `check.ts`
+  holds each trophy's condition on the `GameState` (`EARNED`: first sale, a Catalyst fired
+  (`fired`), a Bloom fired (`bloomsFired`), a three-star sale, a workbench upgrade, the Master
+  Tinker rank, `FIFTY_SOLD` potions, every upgrade at its top level, `royal`, every seal) and
+  `checkTrophies(state)`, which `GameScene.update` calls every frame; the first call after the page
+  loads awards quietly, so a loaded save earns its trophies without a toast. A new trophy is an
+  entry in `index.ts`, its two texts in each language file and its condition in `EARNED`.
 - `src/main.ts`: creates the `Phaser.Game` (960x540, FIT scaling, `pixelArt: false`) with
   `BootScene` and `GameScene`, calls `setupGame(game)` and `setupScaling(game, { fill: true })` from
   `shared/scaling.ts` (the view takes the screen's shape, see Screens), and puts `game` on `window` in dev builds.
@@ -299,7 +310,8 @@ bottle green, serif italics), all painted in code on 2D canvases. It shares no c
 
 ### Persistence
 
-One key of its own, `tincture-tinker-progress`, holding the JSON `Progress`. `loadProgress` merges
+Two keys of its own. `tincture-tinker-trophies` holds the trophies earned (`shared/trophies.ts`),
+each id with the time. `tincture-tinker-progress` holds the JSON `Progress`. `loadProgress` merges
 it over `freshProgress()`, puts back the default of any field that is out of range (`order` and
 `stars` must be whole numbers, from 1 and 0; `coins` and `sold` finite numbers from 0; `pantry`
 keeps only known kinds with whole counts from 1, capped at `PANTRY_MAX`; `upgrades` only known
@@ -378,6 +390,10 @@ seals or rich orders existed load with their defaults. The hub's settings are st
   `busy` and `selected` from it as JSON. Keep those names and their meaning (`armed` and `sifting`
   are there too, for docs scripts).
 - It seeds `Math.random`, owns the clock (64ms frames) and forces the canvas renderer.
+- After the sale it checks that `tincture-tinker-trophies` holds First tincture, plus Chain
+  reaction, In full bloom and Flawless when the order fired a Catalyst, fired a Bloom or earned
+  three stars, and nothing else; a trophy a first order can reach in another way changes that
+  expectation.
 - Inputs are mouse clicks on cell centres, computed from its own copy of `VIEW` and `BOARD`
   (`x: 46, y: 46, cell: 56, size: 8`), and one click on the middle of Stir (`STIR`, from `TOOL`:
   `x: 560, y: 393, w: 80, h: 43`).
