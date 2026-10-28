@@ -13,6 +13,7 @@ const en: HowToPlay = {
     { input: 'Q, L or the vine button', action: 'Throw the hookvine (once found): pulls you to golden posts' },
     { input: 'B, X or the seed button', action: 'Plant a bellseed (once given): it bursts, breaking boulders and cracked walls' },
     { input: 'Space or a tap', action: 'Read on while someone is talking' },
+    { input: 'N or a tap on the moonstone counter', action: 'Open the moonstone page: what each place still hides' },
   ],
   loop: [
     'Talk to Elder Wren in the square: she sends you for the old blade.',
@@ -21,6 +22,7 @@ const en: HowToPlay = {
     'Find the Sunken Shrine, its key, its puzzle and the tool hidden inside.',
     'Face the Thornmother: pull her glowing bulbs down with the hookvine, then strike them.',
     'Chapter two: ask about the bell in the night, get bellseeds from the fen hermit and find the Drowned Belfry.',
+    'After the end: turn the hourglass by each dungeon door to race it again, its foes back and its boss stronger, for your best time.',
   ],
   tips: [
     'Your journal line, top right, always says what to do next.',
@@ -44,6 +46,7 @@ const de: HowToPlay = {
     { input: 'Q, L oder die Rankentaste', action: 'Die Hakenranke werfen (sobald gefunden): zieht dich zu goldenen Pfosten' },
     { input: 'B, X oder die Samentaste', action: 'Einen Glockensamen pflanzen (sobald erhalten): er platzt und bricht Felsbrocken und rissige Wände' },
     { input: 'Leertaste oder Tippen', action: 'Weiterlesen, während jemand spricht' },
+    { input: 'N oder Tippen auf den Mondsteinzähler', action: 'Die Mondsteinseite öffnen: was jeder Ort noch verbirgt' },
   ],
   loop: [
     'Sprich mit der Ältesten Wren auf dem Platz: Sie schickt dich nach der alten Klinge.',
@@ -52,6 +55,7 @@ const de: HowToPlay = {
     'Finde den Versunkenen Schrein, seinen Schlüssel, sein Rätsel und das Werkzeug darin.',
     'Stell dich der Dornenmutter: Zieh ihre leuchtenden Knollen mit der Hakenranke herunter und schlag dann zu.',
     'Kapitel zwei: Frag nach der Glocke in der Nacht, hol dir Glockensamen vom Einsiedler im Moor und finde den Ertrunkenen Glockenturm.',
+    'Nach dem Ende: Dreh die Sanduhr an jeder Verliestür und lauf es noch einmal, mit seinen Feinden zurück und seinem Herrn stärker, auf Bestzeit.',
   ],
   tips: [
     'Deine Tagebuchzeile oben rechts sagt immer, was als Nächstes zu tun ist.',

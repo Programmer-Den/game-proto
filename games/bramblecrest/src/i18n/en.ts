@@ -38,7 +38,7 @@ const en = {
   objBell: 'Ask Old Sedge in Glimmer Fen about the bell',
   objBelfry: 'Find the Drowned Belfry in Glimmer Fen',
   objHome: 'Tell Elder Wren the bell is quiet',
-  objEnd: 'Chapter two is done. Keep exploring by lamplight',
+  objEnd: "Find every moonstone, or race the dungeons' hourglasses",
 
   // Pip
   pipNook1: 'Behind the shed there is a rock stuck between the trees.',
@@ -91,6 +91,7 @@ const en = {
   elderHome2: 'The shrine builders walled up their mistakes too, I hear. Listen for hollow stone near its door.',
   elderHome3: 'Rest now. The fen will keep for another night.',
   elderEnd: 'The night is long, and the fen still glimmers. Off you go.',
+  elderTrials: 'They say the old hourglasses by the shrine and belfry doors glow again. Turn one, if you dare.',
 
   // Chests and doors
   empty: 'Empty.',
@@ -147,6 +148,24 @@ const en = {
   endTwoFew: 'The frogs sing over the drowned belfry. The night is quiet, for now.',
   keepExploring: 'Keep exploring',
   newGame: 'New game',
+
+  // The hourglass trials
+  hourglassRead: 'An old hourglass full of glowing sand. Turn it, and every foe here wakes again, and the master of this place rises stronger. Beat it as fast as you can.',
+  hourglassBest: 'Your best time here: {time}.',
+  trialStart: 'The sand runs!',
+  trialBusy: 'The sand is already running.',
+  trialLost: 'The sand stops. The trial is over.',
+  trialDone: 'Trial done in {time}!',
+  trialRecord: 'A new best time!',
+  trialBestIs: 'Your best is still {time}.',
+
+  // The moonstone page
+  stonesTitle: 'Moonstones',
+  stonesTotal: '{n} of {total} found',
+  trialsTitle: 'Hourglass trials',
+  trialBest: '{place}: {time}',
+  trialNone: '{place}: not run yet',
+  closePage: 'Tap or N to close',
 
   // HUD
   keys: 'Keys {n}',
