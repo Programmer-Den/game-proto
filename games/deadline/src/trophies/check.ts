@@ -6,12 +6,11 @@ import { trophies } from './index';
 /** Zombies one drum's blast has to kill for the Big bang trophy. */
 const DRUM_KILLS = 5;
 
-/** Whether each trophy's condition holds in the state. */
+/** Whether each trophy's condition holds in the state. Big bang (`drum`) is awarded by `checkBlast`. */
 const EARNED: Record<string, (state: GameState) => boolean> = {
   // A break or a supply drop follows a cleared wave, and a later wave needs one cleared.
   firstWave: (s) => s.wave > 1 || s.phase === 'break' || s.phase === 'supply',
   frenzy: (s) => s.frenzies > 0,
-  drum: (s) => (s.lastBlast?.killed ?? 0) >= DRUM_KILLS,
   survivor: (s) => s.survivorsSaved > 0,
   perk: (s) => s.perks.length > 0,
   // A boss wave cleared opens the supply drop, or ends an operation as a win.
@@ -22,7 +21,13 @@ const EARNED: Record<string, (state: GameState) => boolean> = {
   outpost: (s) => OUTPOST_KINDS.every((k) => s.outpost[k] >= OUTPOST_MAX),
 };
 
-/** Awards every trophy whose condition holds. `GameScene.update` calls it every frame. */
+/** Awards every trophy whose condition holds. `GameScene.update` calls it at the start and end of every frame. */
 export function checkTrophies(state: GameState) {
   for (const trophy of trophies.list) if (EARNED[trophy.id]?.(state)) award(trophies, trophy.id);
+}
+
+/** Awards Big bang for a drum blast that killed `DRUM_KILLS`. `GameScene.explode` calls it for each
+ * drum, since two drums blowing in one frame would leave only the second in `lastBlast`. */
+export function checkBlast(killed: number) {
+  if (killed >= DRUM_KILLS) award(trophies, 'drum');
 }

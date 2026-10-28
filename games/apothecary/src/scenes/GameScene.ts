@@ -376,8 +376,9 @@ export class GameScene extends Phaser.Scene {
   create(data?: { state?: GameState }) {
     // Back from the town the live state comes as scene data; otherwise the save is loaded.
     this.state = data?.state ?? loadState();
+    // Back from the town the card goes on from the plague it last saw, so a cure brewed there is told too.
     const saved = this.state.plague;
-    this.plagueSaved = saved ? { stage: saved.stage, relapses: saved.relapses, cured: saved.cured, season: saved.season ?? 0 } : null;
+    if (!data?.state) this.plagueSaved = saved ? { stage: saved.stage, relapses: saved.relapses, cured: saved.cured, season: saved.season ?? 0 } : null;
     // Play through the time away, before anything is drawn from the state.
     this.away = catchUp(this.state, Date.now());
     this.startingOver = false;
@@ -1481,7 +1482,7 @@ export class GameScene extends Phaser.Scene {
         say(t('sicknessSpreads'), false);
         if (loud) playSting(SONG, 'relapse');
       }
-      seen = { stage: plague.stage, relapses: plague.relapses, cured: plague.cured, season };
+      seen = this.plagueSaved = { stage: plague.stage, relapses: plague.relapses, cured: plague.cured, season };
       const stage = plagueStage(this.state);
       const key = `${season}:${plague.stage}:${plague.need}:${plague.made}:${plague.cured}:${this.state.seals}:${Math.ceil(plague.left / (DAY_MS / 4))}`;
       if (key === drawn) return;

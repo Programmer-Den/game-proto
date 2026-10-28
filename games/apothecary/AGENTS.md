@@ -561,11 +561,12 @@ study, shade gardens and a mirrored second production line.
 - Plague: `tick` starts it at `PLAGUE_DAY` (`plagueAt(0)`), counts the stage's `left` down and
   calls `relapse` at 0. `serveFromShelf` calls `deliverForPlague` for every potion sold; enough
   moves to the next stage, and past the last `panaceaUnlocked` holds. `startBrew` then brews the
-  Panacea first whenever `PANACEA_RECIPE.inputs` are in; `brew` sets `plague.cured` instead of
+  Panacea first whenever `PANACEA_RECIPE.inputs` are in and no pipe of either cauldron brews one already; `brew` sets `plague.cured` instead of
   putting it out, and `pickUpFromCauldron` never takes it out fine. `createPlague` draws the card
   at `PLAGUE_CARD` (under the town card, clear of the shelves when the doctor is at the counter)
   with notes for each change (starting from `plagueSaved`, the plague as loaded before `catchUp`
-  played the time away, so a stage, relapse or cure while away is told too), and `showWin` opens the cure's panel, closed like the others by
+  played the time away, so a stage, relapse or cure while away is told too; back from the town or a shop it goes on from
+  the plague the card last saw, which it keeps in `plagueSaved`, so a cure brewed meanwhile still opens the win panel), and `showWin` opens the cure's panel, closed like the others by
   `closePanels` (any tap).
 
 ### State model
@@ -625,7 +626,7 @@ brew's `out` may be `PANACEA`.
   fewest on the output pallets (`onPallet`), ties to the front of the queue. Work past the end of a plant,
   brew or served potion carries over to the next, so slow frame rates lose nothing.
 - `startBrew` (called by `brew` for either pipe) picks the recipe when work starts: the cauldron's priority potion if its inputs are
-  in and its pallet has room, otherwise the potion with the fewest on the cauldron's output pallets
+  in and its pallet has room (counting a potion the other pipe is still brewing as on it, so two pipes never overfill it), otherwise the potion with the fewest on the cauldron's output pallets
   and the shop's shelf together (a fine one counts as its plain potion); ties go in `RECIPES`
   order. A potion `BREW_LEAD` (6) or more ahead of the shortest `orderable` potion is skipped, so
   its ingredients wait for the short one. A priority never makes a station wait.
@@ -640,7 +641,7 @@ brew's `out` may be `PANACEA`.
   plus `createShop` for each shop the save has bought), object by object (`trimmed`; a list that
   differs is kept whole), with `version` and `layout` always kept and every timer rounded to a
   tenth of a second (`roundTimers`: numbers of 100 or more with a fraction; whole numbers stay
-  exact). `loadState` fills a thin save back in over the same baseline (`merged`) before anything
+  exact; the doctor's `player` position is rounded to a whole pixel instead). `loadState` fills a thin save back in over the same baseline (`merged`) before anything
   else, which also reads the first thin saves (`thin: true`, which left out only untouched upgrades,
   craftsmen, belts, builds and shop records). So a value still at its default when saved loads as
   today's default: changing a default in `createInitialState` or `createShop` changes it for such

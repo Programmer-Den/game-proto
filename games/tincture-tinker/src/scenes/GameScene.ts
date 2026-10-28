@@ -157,6 +157,7 @@ export class GameScene extends Phaser.Scene {
     this.createCaption();
     this.createResult();
     this.begin(startOrder(loadProgress()));
+    checkTrophies(this.state, true);
 
     // A tap on a button (a bench tool or the result card's) is the button's alone, not also a tap on the board.
     this.input.on('pointerdown', (p: Phaser.Input.Pointer, over: Phaser.GameObjects.GameObject[]) => {
@@ -173,7 +174,6 @@ export class GameScene extends Phaser.Scene {
     this.clock += dt;
     this.runQueue(dt);
     this.updateHint(dt);
-    checkTrophies(this.state);
   }
 
   // ---- Playing an order ----
@@ -537,6 +537,8 @@ export class GameScene extends Phaser.Scene {
       const what = s.current.stages ? t('royalUnfinished') : s.current.second ? t('twinUnfinished') : t('potionUnfinished', { potion: t(POTION_NAMES[s.current.potion]) });
       this.showResult(t('outOfMoves'), what, t('noStars'), [{ label: t('tryAgain'), act: () => this.begin(nextOrder(this.state)) }], 0);
     }
+    // Only now, with the move seen and a sale saved, so a trophy never runs ahead of the board.
+    checkTrophies(s);
   }
 
   private runQueue(dt: number) {
@@ -1086,6 +1088,7 @@ export class GameScene extends Phaser.Scene {
     if (!buyUpgrade(this.state, id)) return ui('refuse');
     ui('coin');
     saveProgress(progressOf(this.state));
+    checkTrophies(this.state);
     this.refresh();
     this.refreshBench();
   }

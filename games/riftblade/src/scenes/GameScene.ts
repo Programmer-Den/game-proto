@@ -10,7 +10,7 @@ import { buy, chooseEvent, chooseNode, chooseWorld, chartOptions, frame, leave, 
 import { heatOpen } from '../game/heat';
 import { checkTrophies } from '../trophies/check';
 import { ARMOURY, salvage, type ArmouryId } from '../game/armoury';
-import { reseed, unseed, weekOf, weekSeed, weeklyOf, type MutatorId } from '../game/weekly';
+import { reseed, rngAt, unseed, weekOf, weekSeed, weeklyOf, type MutatorId } from '../game/weekly';
 import { ARENA_MS, BOSSES, CHAMPION, PLANETS, SIEGE, STRIKE, VENT, planetLabel } from '../game/planets';
 import { UPGRADES, MAX_TIER } from '../game/upgrades';
 import {
@@ -259,6 +259,7 @@ export class GameScene extends Phaser.Scene {
 
   private saveRun() {
     if (!isResumable(this.state)) return;
+    this.state.rng = rngAt();
     saveRun(this.state);
     this.savedAt = this.state.runMs;
   }
@@ -275,7 +276,8 @@ export class GameScene extends Phaser.Scene {
     this.savedAt = s.runMs;
     this.hero.setTexture(heroKey(s.hero!, heroVariant(s))).setVisible(true);
     this.cues.resume(s);
-    if (s.week >= 0) reseed(weekSeed(s.week) + 7919 * s.stage + 17);
+    // A weekly run carries on with its generator where it stood (older saves reseed from the stage).
+    if (s.week >= 0) reseed(s.rng >= 0 ? s.rng : weekSeed(s.week) + 7919 * s.stage + 17);
   }
 
   // -------------------------------------------------------------------------------------------

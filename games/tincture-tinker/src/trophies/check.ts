@@ -24,14 +24,11 @@ const EARNED: Record<string, (s: GameState) => boolean> = {
   allSeals: (s) => s.seals >= EXAMS.length,
 };
 
-/** False until the first check of the page, which finds what a restored save earned. */
-let checked = false;
-
 /**
- * Awards every trophy whose condition holds. `GameScene.update` calls it every frame; the first
- * call after the page loads is quiet, so a loaded save earns its trophies without a toast.
+ * Awards every trophy whose condition holds. `GameScene` calls it once a move has played out and
+ * after a purchase, each right after saving, and quietly once a save is loaded, so a restored save
+ * earns its trophies without a toast.
  */
-export function checkTrophies(state: GameState) {
-  for (const trophy of trophies.list) if (EARNED[trophy.id]?.(state)) award(trophies, trophy.id, { quiet: !checked });
-  checked = true;
+export function checkTrophies(state: GameState, quiet = false) {
+  for (const trophy of trophies.list) if (EARNED[trophy.id]?.(state)) award(trophies, trophy.id, { quiet });
 }

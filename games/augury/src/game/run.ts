@@ -82,6 +82,9 @@ export interface Current {
   touched: boolean;
   /** The second half of a boss: the boss's card (whose first half is done), else null. */
   pair: Card | null;
+  /** The time and hints the first half of a boss took (0 otherwise), recorded with it when the boss ends. */
+  pairMs: number;
+  pairHints: number;
   /** Earlier states, for Undo. */
   history: string[];
 }
@@ -261,14 +264,13 @@ export function makeCurrent(run: Run, card: Card): Current {
   const state = DEFS[card.kind].make(seeded(card.seed), card.level);
   const charm = holdsCharm(run, card.kind);
   if (charm && card.kind === 'echo') state.stepMs = Math.round(state.stepMs * CHARM_ECHO_SLOW);
-  return { card, state, timeLeftMs: time, timeTotalMs: time ?? 0, elapsedMs: 0, hintsUsed: 0, freeHints: charm && card.kind !== 'echo' ? 1 : 0, freeUsed: 0, omen: null, touched: false, pair: null, history: [] };
+  return { card, state, timeLeftMs: time, timeTotalMs: time ?? 0, elapsedMs: 0, hintsUsed: 0, freeHints: charm && card.kind !== 'echo' ? 1 : 0, freeUsed: 0, omen: null, touched: false, pair: null, pairMs: 0, pairHints: 0, history: [] };
 }
 
 /** A boss's first half is solved: its second is dealt on the same clock, with its hints and omen. */
 function secondHalf(run: Run) {
   const cur = run.current!;
   const pair = cur.card;
-  recordResult(run.progress, pair.kind, pair.level, true, cur.elapsedMs, cur.hintsUsed);
   const next = makeCurrent(run, pair.boss!);
   run.current = {
     ...next,
@@ -280,6 +282,8 @@ function secondHalf(run: Run) {
     omen: cur.omen,
     touched: true,
     pair,
+    pairMs: cur.elapsedMs,
+    pairHints: cur.hintsUsed,
   };
   run.events.push({ type: 'half' }, { type: 'start', kind: next.card.kind });
 }
@@ -438,7 +442,10 @@ function end(run: Run, reason: EndReason) {
   const result: Result = { card: boss ?? cur.card, reason, ms: cur.elapsedMs, points, ...(cur.omen ? { omen: cur.omen } : {}), ...(boss ? { boss: true } : {}) };
   run.results.push(result);
   run.last = result;
-  recordResult(run.progress, cur.card.kind, cur.card.level, solved, cur.elapsedMs, cur.hintsUsed);
+  // A boss records its first half (solved) only now, so a reload in its second half, which deals
+  // the boss again from its first, never records that half twice; each half with its own time and hints.
+  if (cur.pair) recordResult(run.progress, cur.pair.kind, cur.pair.level, true, cur.pairMs, cur.pairHints);
+  recordResult(run.progress, cur.card.kind, cur.card.level, solved, cur.elapsedMs - cur.pairMs, cur.hintsUsed - cur.pairHints);
   run.score += points;
   // The day's score so far, and the daily best, so a reload or a crash keeps the points of the
   // cards played.

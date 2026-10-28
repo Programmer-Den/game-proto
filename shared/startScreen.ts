@@ -193,8 +193,8 @@ export function addStartScreen(game: Phaser.Game, howToPlay?: HowToPlay, trophie
         }
         return;
       }
-      // Full screen and sound still work from any screen.
-      if (key === 'f' || key === 'm') return;
+      // Full screen and sound still work from any screen, and the sound menu keeps its own keys.
+      if (key === 'f' || key === 'm' || openSoundMenu()?.contains(document.activeElement)) return;
       e.stopPropagation();
       if (e.repeat) return;
       if (mode === 'help' || mode === 'trophies') {

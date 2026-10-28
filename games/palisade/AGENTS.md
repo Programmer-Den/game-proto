@@ -212,10 +212,11 @@ seconds without a tap.
   texts in `trophies/i18n/` (`en.ts` and `de.ts`: the name keyed by the id, what earns it by
   `<id>Text`), and imports nothing else from the game, since the hub loads it for its trophy shelf.
   `main.ts` hands `trophies` to `setupGame`, which lists them on the start and pause screens.
-  `check.ts` holds each trophy's condition on the `GameState` (`EARNED`: a wave cleared, an Arrow
-  Rain in the air, a guard hired, a `STREAK` of 10, the Troll King's wave cleared, a relic set
+  `check.ts` holds each trophy's condition on the `GameState` (`EARNED`: a wave cleared, a guard hired, a `STREAK` of 10, the Troll King's wave cleared, a relic set
   complete, a hero retired, every skill learned (`offerable` empty), the siege lifted, a win at
-  Heat 3) and `checkTrophies(state)`, which `GameScene.update` calls every frame after the tick;
+  Heat 3; Cloud of arrows is not there but awarded by `GameScene.loose` when a volley is loosed,
+  since a long frame can land it within one tick) and `checkTrophies(state)`, which
+  `GameScene.update` calls every frame after the tick;
   the first call after the page loads awards quietly, so a loaded hero earns theirs without a
   toast. A new trophy is an entry in `index.ts`, its two texts in each language file and its
   condition in `EARNED`.

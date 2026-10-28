@@ -219,8 +219,9 @@ File map (`src/`):
   panel slab, preview pad) is its one `bg-<n>` texture, transparent where the table shows.
 - `ui/Button.ts`: `makeButton`, the clay button used by the garden picker's Back.
 - `trophies/`: the game's ten trophies (`shared/trophies.ts`). `index.ts` lists them (`trophies`:
-  id, tier, icon, `hidden` for Thorny laurel) with their texts in `trophies/i18n/` (`en.ts` and
-  `de.ts`: the name keyed by the id, what earns it by `<id>Text`), and imports nothing else from the
+  id, tier, icon, `hidden` for Thorny laurel) with their texts in `trophies/i18n/` (`en.ts`,
+  `de.ts` and `en-US.ts`, only "Good neighbors": the name keyed by the id, what earns it by
+  `<id>Text`), and imports nothing else from the
   game, since the hub loads it for its trophy shelf. `main.ts` hands `trophies` to `setupGame`, which
   lists them on the start and pause screens. `check.ts` holds each trophy's condition on the
   `GameState` (`EARNED`: `firstWave` best at least 1, `combo` a grown golem with a combo, `form` a
@@ -229,7 +230,8 @@ File map (`src/`):
   `checkTrophies(state)`, which `GameScene.update` calls after the tick; the first call after the
   page loads awards quietly, so saved best, bloom, stars and laurels earn theirs without a toast.
   `boldCall` is awarded in `update` for a `state.settled` entry whose `clean` is set (no leaf lost
-  between the call and the end; `Called.heart` keeps the leaves at the call). A new trophy is an
+  between the call and the end; `Called.lost` is set by any bite after the call, so a Leaf boon
+  taken in between doesn't hide it). A new trophy is an
   entry in `index.ts`, its two texts in each language file and its condition in `EARNED`.
 
 Shared code it imports (outside the game folder): `shared/setupGame.ts` (`setupGame`),

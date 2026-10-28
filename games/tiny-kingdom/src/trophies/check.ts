@@ -1,6 +1,6 @@
 import { award } from '../../../../shared/trophies';
 import { joinedCount } from '../game/castle';
-import { LEVELS } from '../game/islands';
+import { LEVELS, starsFor } from '../game/islands';
 import { loadStars } from '../game/save';
 import type { GameState } from '../game/state';
 import { SPECIALS } from '../game/tiles';
@@ -39,6 +39,9 @@ let checked = false;
  */
 export function checkTrophies(s: GameState) {
   const stars = loadStars();
+  // Fold in the kingdom just finished, so the stars count even when storage is blocked.
+  if (s.phase === 'over' && s.mode === 'campaign')
+    stars[s.level - 1] = Math.max(stars[s.level - 1] ?? 0, starsFor(s.level, s.score));
   for (const trophy of trophies.list) if (EARNED[trophy.id]?.(s, stars)) award(trophies, trophy.id, { quiet: !checked });
   checked = true;
 }

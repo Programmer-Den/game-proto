@@ -296,6 +296,26 @@ too once it reaches Age III.
 - A house adds population; the Town Center adds ten. Units in training and villagers sheltering
   count against the cap.
 
+## Trophies
+
+Ten trophies, listed behind the Trophies button on the start and pause screens and counted on the
+hub's card:
+
+| Trophy | Tier | Earned by |
+| --- | --- | --- |
+| A new age | Bronze | Reaching Age II |
+| Relic keeper | Bronze | Holding a relic |
+| Hold the line | Bronze | Repelling a raid on your town |
+| Battle-hardened | Silver | Raising a soldier to the third veteran rank |
+| Golden age | Silver | Reaching Age III |
+| Champion of the realm | Silver | Training your faction's champion |
+| Victory | Silver | Winning a match |
+| Last one standing | Gold | Winning a match against two rivals |
+| Iron will | Gold | Winning a match on Hard |
+| Built to last (hidden) | Gold | Winning a match with a Monument |
+
+![The Trophies list on the pause screen](docs/screenshots/trophy-list.webp)
+
 ## Difficulty
 
 | Easy | Normal | Hard |

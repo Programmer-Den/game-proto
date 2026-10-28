@@ -50,11 +50,15 @@ const isImage = (path) => /\.(png|jpe?g|gif|webp)$/i.test(path);
 const isScreenshot = (path) => /(^|\/)docs\/screenshots\//.test(path);
 const stem = (path) => path.replace(/\.[^./]+$/, '');
 
-const changes = execFileSync('git', ['diff', '--name-status', '--no-renames', base, 'HEAD'], { encoding: 'utf8' })
-  .split('\n')
-  .filter(Boolean)
-  .map((line) => line.split('\t'))
-  .filter(([, path]) => isImage(path));
+// Diff from the merge base (three dots), so changes main made since the branch was cut don't count.
+// -z prints each status and path as NUL-terminated fields and never quotes unusual path names.
+const fields = execFileSync('git', ['diff', '-z', '--name-status', '--no-renames', `${base}...HEAD`], {
+  encoding: 'utf8',
+}).split('\0');
+const changes = [];
+for (let i = 0; i + 1 < fields.length; i += 2) {
+  if (isImage(fields[i + 1])) changes.push([fields[i], fields[i + 1]]);
+}
 
 const errors = [];
 const deleted = new Set(changes.filter(([s]) => s === 'D').map(([, path]) => stem(path)));

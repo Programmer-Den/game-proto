@@ -164,7 +164,7 @@ export class GameScene extends Phaser.Scene {
     this.vine = this.add.graphics();
     this.hookTip = this.add.image(0, 0, 'hook').setScale(texScale('hook')).setVisible(false);
     const kb = this.input.keyboard!;
-    this.keys = kb.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,SPACE,ENTER,J,SHIFT,K,Q,E,L,B,X', false) as Record<string, Phaser.Input.Keyboard.Key>;
+    this.keys = kb.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,SPACE,ENTER,J,SHIFT,K,Q,E,L,B,X,N', false) as Record<string, Phaser.Input.Keyboard.Key>;
     kb.on('keydown', this.onKey, this);
     this.input.on('pointerdown', this.onPointer, this);
     this.input.on('pointermove', this.onPointerMove, this);
@@ -1673,7 +1673,8 @@ export class GameScene extends Phaser.Scene {
           if (f.t <= 0) {
             f.t = LANTERN_SHOT_MS;
             sfx('spit', { pitch: 1.4 });
-            this.shoot(f.x, f.y - LANTERN_LIFT, dx / dist, (dy + LANTERN_LIFT) / dist, 'ember');
+            // Aimed at the knight's body, 14 px above the feet, where an ember hits.
+            this.shoot(f.x, f.y - LANTERN_LIFT, dx / dist, (dy + LANTERN_LIFT - 14) / dist, 'ember');
           }
         } else {
           vx = f.home.x + Math.cos(this.now / 1100 + f.index) * 50 - f.x;

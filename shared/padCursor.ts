@@ -29,7 +29,9 @@ export function addPadCursor() {
   cursor.innerHTML =
     '<svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true">' +
     '<path d="M3 2l15 9-6.5 1.5L15 20l-3 1.5-3.5-7.5L3 19z" fill="#f3e9d2" stroke="#1b1410" stroke-width="1.5" stroke-linejoin="round"/></svg>';
-  document.body.append(cursor);
+  // Outside <body>, which `scaling.ts` turns for a phone held the wrong way, so the arrow is drawn
+  // at the screen point it taps.
+  document.documentElement.append(cursor);
 
   let x = innerWidth / 2;
   let y = innerHeight / 2;
@@ -93,8 +95,11 @@ export function addPadCursor() {
       // The square of the tilt past the dead zone: small moves for aiming, full speed at the rim.
       const ease = ((Math.min(tilt, 1) - DEAD_ZONE) / (1 - DEAD_ZONE)) ** 2;
       const speed = SPEED_PER_STEP * settings.cursorSpeed * Math.min(innerWidth, innerHeight) * ease;
-      x = Math.max(0, Math.min(innerWidth - 1, x + (left.x / tilt) * speed * dt));
-      y = Math.max(0, Math.min(innerHeight - 1, y + (left.y / tilt) * speed * dt));
+      // On a turned page (`scaling.ts`) the stick moves along the game's axes, turned onto the screen's.
+      const turned = Number(document.body.dataset.turned ?? 0);
+      const [dx, dy] = turned === 90 ? [-left.y, left.x] : turned === -90 ? [left.y, -left.x] : [left.x, left.y];
+      x = Math.max(0, Math.min(innerWidth - 1, x + (dx / tilt) * speed * dt));
+      y = Math.max(0, Math.min(innerHeight - 1, y + (dy / tilt) * speed * dt));
       show(true);
       send('move');
     }

@@ -20,10 +20,18 @@ const EARNED: Record<string, (state: GameState) => boolean> = {
   gatekeeper: (s) => s.bosses > 0,
   distance: (s) => metres(s.distance) >= DISTANCE,
   armoury: (s) => ARMOURY_IDS.every((id) => s.armoury[id] >= ARMOURY[id].prices.length),
-  dragon: (s) => s.dragonBeaten,
+  dragon: (s) => s.dragonBeaten || s.crown,
 };
 
-/** Awards every trophy whose condition holds. `GameScene.update` calls it every frame, after the tick. */
+/** False until the first check of the page, which finds what a restored save earned. */
+let checked = false;
+
+/**
+ * Awards every trophy whose condition holds. `GameScene.update` calls it every frame, after the
+ * tick; the first call after the page loads is quiet, so a loaded save earns its trophies without
+ * a toast.
+ */
 export function checkTrophies(state: GameState) {
-  for (const trophy of trophies.list) if (EARNED[trophy.id]?.(state)) award(trophies, trophy.id);
+  for (const trophy of trophies.list) if (EARNED[trophy.id]?.(state)) award(trophies, trophy.id, { quiet: !checked });
+  checked = true;
 }

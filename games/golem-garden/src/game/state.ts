@@ -103,8 +103,8 @@ export interface Called {
   wave: number;
   /** Its Queen Slug was squashed (only a Queen Slug wave whose queen is off the path can be called early). */
   queenSquashed: boolean;
-  /** The Heartwood's leaves when it was called. */
-  heart: number;
+  /** A pest got through to the Heartwood since the call (a leaf boon growing it back doesn't undo it). */
+  lost: boolean;
 }
 
 /** A wave called early that came to an end. */
@@ -491,7 +491,7 @@ export function startWave(s: GameState): 'start' | 'early' | null {
     return 'start';
   }
   if (!canCallEarly(s)) return null;
-  s.called.push({ wave: s.wave, queenSquashed: s.queenSquashed, heart: s.heart });
+  s.called.push({ wave: s.wave, queenSquashed: s.queenSquashed, lost: false });
   s.wave++;
   beginWave(s);
   return 'early';
@@ -577,6 +577,7 @@ function step(s: GameState, dt: number) {
     }
     if (gone(p)) {
       s.heart = Math.max(0, s.heart - info.bite);
+      for (const c of s.called) c.lost = true;
       p.hp = 0;
     }
   }
@@ -659,7 +660,7 @@ function step(s: GameState, dt: number) {
     const done = s.called.shift()!;
     finishWave(s, done.wave, done.queenSquashed);
     s.sap += EARLY_BONUS;
-    s.settled.push({ wave: done.wave, clean: s.heart >= done.heart });
+    s.settled.push({ wave: done.wave, clean: !done.lost });
   }
   if (s.phase === 'wave' && !s.queue.length && !s.pests.length) {
     finishWave(s, s.wave, s.queenSquashed);

@@ -210,6 +210,8 @@ export function loadRun(): GameState | null {
     if (!Number.isInteger(s.stage) || s.stage < 0 || s.stage > LAST_STAGE) return null;
     if (!Number.isInteger(s.heat) || s.heat < 0 || s.heat > MAX_HEAT) return null;
     if (!Number.isInteger(s.week) || !Array.isArray(s.mutators) || !s.mutators.every((m) => MUTATOR_IDS.includes(m))) return null;
+    // A position that isn't one falls back to reseeding from the stage (as saves from before it do).
+    if (!Number.isInteger(s.rng) || s.rng < 0 || s.rng > 0xffffffff) s.rng = -1;
     if (s.next !== -1 && !PLANETS[s.next]) return null;
     if (!Array.isArray(s.nodes) || !s.nodes.every((k) => k in NODE_INFO)) return null;
     if (!Array.isArray(s.offers) || !s.offers.every((id) => id === null || known(id))) return null;

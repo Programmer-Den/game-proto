@@ -96,16 +96,19 @@ export async function importProgress(file: Blob, kind: string, games: string[]):
 /**
  * Replaces the progress `kind` covers with the decrypted `payload` of a file or code. Returns `ok`,
  * or, changing nothing, `invalid` when it is of another kind, and `noSpace` when storage is full or
- * blocked (the progress there before is put back).
+ * blocked (the progress there before is put back). A code (`fromCode`) never carries the `fileOnly`
+ * keys, so it leaves this device's ones as they are.
  */
-export function writeProgress(payload: unknown, kind: string, games: string[]): 'ok' | 'invalid' | 'noSpace' {
+export function writeProgress(payload: unknown, kind: string, games: string[], fromCode = false): 'ok' | 'invalid' | 'noSpace' {
   const p = payload as { kind?: unknown; data?: unknown } | null;
   if (p?.kind !== kind || !p.data || typeof p.data !== 'object') return 'invalid';
   const entries = Object.entries(p.data).filter(
-    (entry): entry is [string, string] => typeof entry[1] === 'string' && belongs(entry[0], kind, games),
+    (entry): entry is [string, string] => typeof entry[1] === 'string' && belongs(entry[0], kind, games) && !(fromCode && fileOnly(entry[0])),
   );
   // Every key the import removes or writes, with its value before, to put back if a write fails.
-  const removed = kind === ALL ? [...games.flatMap(progressKeys), RECENT_KEY] : progressKeys(kind);
+  const removed = (kind === ALL ? [...games.flatMap(progressKeys), RECENT_KEY] : progressKeys(kind)).filter(
+    (k) => !(fromCode && fileOnly(k)),
+  );
   const before = new Map<string, string | null>();
   try {
     for (const k of [...removed, ...entries.map(([k]) => k)]) before.set(k, localStorage.getItem(k));

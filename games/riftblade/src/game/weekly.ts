@@ -51,11 +51,12 @@ export const weekOf = (now: number) => Math.floor((now - EPOCH) / WEEK_MS);
 /** A seed for the week's number. */
 export const weekSeed = (week: number) => (Math.imul(week + 1, 2654435761) ^ 0x5f3759df) >>> 0;
 
-/** A small seeded generator (mulberry32). */
-export function seeded(seed: number) {
+/** A small seeded generator (mulberry32); `onDraw` hears its position after each draw. */
+export function seeded(seed: number, onDraw?: (at: number) => void) {
   let a = seed >>> 0;
   return () => {
     a = (a + 0x6d2b79f5) >>> 0;
+    onDraw?.(a);
     let t = a;
     t = Math.imul(t ^ (t >>> 15), t | 1);
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
@@ -73,14 +74,20 @@ export function weeklyOf(week: number, open: readonly HeroId[]): { hero: HeroId;
 }
 
 const native = Math.random;
+/** Where the seeded `Math.random` stands (-1 while it is the page's own). */
+let position = -1;
 
 /**
  * Seeds `Math.random` for a weekly run's next stretch (a world, the maps after a boss), so it plays
- * out the same way each attempt; `unseed` puts back the generator there was before.
+ * out the same way each attempt; `unseed` puts back the generator there was before. A saved
+ * `rngAt()` passed back here carries on where the generator stood.
  */
 export function reseed(seed: number) {
-  Math.random = seeded(seed);
+  position = seed >>> 0;
+  Math.random = seeded(seed, (at) => (position = at));
 }
 export function unseed() {
   Math.random = native;
+  position = -1;
 }
+export const rngAt = () => position;

@@ -114,7 +114,7 @@ import {
   type ArtStyle,
 } from '../game/save';
 import { HUD_DEPTH, Hud, fireRate } from './Hud';
-import { checkTrophies } from '../trophies/check';
+import { checkBlast, checkTrophies } from '../trophies/check';
 // Text objects go by `t` in this scene, so the translator goes by `tr`.
 import { t as tr, type TextKey } from '../i18n';
 
@@ -882,6 +882,8 @@ export class GameScene extends Phaser.Scene {
     this.tickFrenzy(dt);
     this.ageEffects(dt);
     this.checkWave(dt);
+    // Again after the step, so a trophy its events earn is saved in the same frame.
+    checkTrophies(this.state);
     this.drawBars();
     this.updateHud();
     const second = Math.floor(this.runMs / 1000);
@@ -1594,6 +1596,7 @@ export class GameScene extends Phaser.Scene {
     }
     this.state.drumsBlown++;
     this.state.lastBlast = { caught: caught.length, killed };
+    checkBlast(killed);
     // The blast swells out, or with reduced motion just shows at full size and fades.
     this.effect('blast', d.x, d.y, settings.reduceMotion ? { life: 520, baseScale: 0.8 } : { life: 520, grow: 0.5, baseScale: 0.55 });
     if (this.style === 'comic') this.effect('sfx-boom', d.x, d.y - 40, { life: 700, grow: 0.2 });

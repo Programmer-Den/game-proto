@@ -296,7 +296,6 @@ export class GameScene extends Phaser.Scene {
           break;
         case 'half':
           SFX('solved');
-          saveProgress(this.progress);
           break;
         case 'over':
           playSting(SONG, 'over');

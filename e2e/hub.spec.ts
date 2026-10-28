@@ -854,15 +854,20 @@ test('hub progress codes', async ({ page }, testInfo) => {
   const allDialog = page.getByRole('dialog', { name: 'Progress code of every game' });
   paste = await allDialog.getByRole('textbox', { name: 'Progress code' }).inputValue();
   await allDialog.getByRole('button', { name: 'Done' }).click();
-  await page.evaluate(() => localStorage.clear());
+  // The code carries no replays or run under way, and keeps this device's own.
+  await page.evaluate(() => {
+    localStorage.clear();
+    localStorage.setItem('mazewright-replays', '{"local":{}}');
+    localStorage.setItem('riftblade-run', '{"phase":"local"}');
+  });
   const reloaded = page.waitForEvent('load');
   await settings.getByRole('button', { name: 'Paste code' }).click();
   await reloaded;
   expect(await stored('apothecary-save')).toBe('{"coins":42}');
   expect(await stored('palisade-best')).toBe('7');
   expect(await stored('palisade-pos')).toBe('{"x":815.07,"kind":"wall"}');
-  expect(await stored('mazewright-replays')).toBeNull();
-  expect(await stored('riftblade-run')).toBeNull();
+  expect(await stored('mazewright-replays')).toBe('{"local":{}}');
+  expect(await stored('riftblade-run')).toBe('{"phase":"local"}');
   expect(JSON.parse((await stored('hub-settings'))!).difficulty).toBe('hard');
 
   // A code made before codes were packed (format 1, Apothecary at 42 coins) still imports.

@@ -513,9 +513,11 @@ const BREW_LEAD = 6;
  * started, if any, for a pipe to work.
  */
 function startBrew(state: GameState, cauldron: Cauldron, first: PotionId | null = null): Brew | null {
+  // What the pipes are still brewing (a pipe's finished brew is out already), counted as made.
+  const under = (c: Cauldron) => [c.brewing, c.brewing2].filter((b): b is Brew => !!b && b.progress < b.ms).map((b) => b.out);
   // Once the plague's last stage is over, the town's cure comes before everything, the moment one of
-  // each refined good is in.
-  if (panaceaUnlocked(state)) {
+  // each refined good is in, unless a pipe already brews it.
+  if (panaceaUnlocked(state) && ![state.cauldron, state.cauldron2].some((c) => under(c).includes(PANACEA))) {
     const left = without(cauldron.contents, PANACEA_RECIPE.inputs);
     if (left) {
       cauldron.contents = left;
@@ -524,6 +526,7 @@ function startBrew(state: GameState, cauldron: Cauldron, first: PotionId | null 
   }
   // A fine potion counts as the potion it is. Counting the shelf too keeps one potion from piling up
   // there while another runs out, now that pixies empty the pallets as fast as they fill.
+  const brewing = under(cauldron).filter((out): out is PotionId => out !== PANACEA);
   const stock = [...cauldron.output, ...state.counter.shelf].map(plainOf);
   const have = new Map(RECIPES.map((r) => [r.out, onPallet(stock, r.out)]));
   // The priority potion goes first whenever its ingredients are in; the rest by fewest in stock.
@@ -532,7 +535,7 @@ function startBrew(state: GameState, cauldron: Cauldron, first: PotionId | null 
   // waits, so its ingredients go to the short one when they come in rather than into the pile.
   const shortest = Math.min(...orderable(state).map((p) => have.get(p) ?? 0));
   for (const recipe of byNeed) {
-    if (!researched(state, recipe.out) || !palletHasRoom(state, cauldron.output, recipe.out)) continue;
+    if (!researched(state, recipe.out) || !palletHasRoom(state, [...cauldron.output, ...brewing], recipe.out)) continue;
     if (recipe.out !== first && have.get(recipe.out)! >= shortest + BREW_LEAD) continue;
     const left = without(cauldron.contents, recipe.inputs);
     if (left) {
