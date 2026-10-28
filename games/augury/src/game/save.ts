@@ -1,8 +1,7 @@
 import { MODES, RELICS } from './catalog';
-import { DEFS, KINDS, LEVELS } from './kinds';
+import { KINDS, LEVELS } from './kinds';
 import { newProgress, type Progress } from './progress';
-import { seeded } from './rng';
-import type { Card, Run } from './run';
+import { makeCurrent, type Card, type Run } from './run';
 
 // Augury keeps two keys: the records (per kind and per mode) and the last daily five, and the run
 // in play (not Practice), saved whenever it moves on between puzzles.
@@ -79,14 +78,7 @@ export function loadRun(progress: Progress): Run | null {
       Array.isArray(run.relics) && [...run.relics, ...(run.relicOffer ?? [])].every((r: string) => (RELICS as readonly string[]).includes(r)) &&
       (run.phase !== 'playing' || isCard(run.current?.card));
     if (!ok) return clearRun(), null;
-    const cur = run.current;
-    if (cur && isCard(cur.card)) {
-      cur.state = DEFS[cur.card.kind as keyof typeof DEFS].make(seeded(cur.card.seed), cur.card.level);
-      cur.history = [];
-      cur.elapsedMs = 0;
-      cur.hintsUsed = 0;
-      cur.timeLeftMs = cur.timeLeftMs === null ? null : cur.timeTotalMs;
-    } else run.current = null;
+    run.current = isCard(run.current?.card) ? makeCurrent(run, run.current.card) : null;
     return { ...run, progress, events: [] };
   } catch {
     clearRun();
