@@ -63,6 +63,7 @@ import { ui } from '../../../../shared/audio';
 import { viewSize } from '../../../../shared/scaling';
 import { GameSounds } from '../audio/events';
 import { sfx } from '../audio/sounds';
+import { checkTrophies } from '../trophies/check';
 import {
   BOARD,
   BUTTONS,
@@ -293,6 +294,7 @@ export class GameScene extends Phaser.Scene {
     this.lastFrame = time;
     tick(this.state, dt);
     this.sounds.update(this.state);
+    checkTrophies(this.state);
     this.draw();
     // The corner buttons change with the window (a resize, full screen, the pause button appearing): keep the hint clear of them.
     if (time - this.hintCheck > HINT_CHECK_MS) {

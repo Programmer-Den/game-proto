@@ -222,6 +222,9 @@ test('plays the first round', async ({ page }, testInfo) => {
   expect(s.wyrms[0].at).toEqual(ASHFORD);
   expect(s).toMatchObject({ phase: 'play', coins: coins + FIRST_PAY, hearts: 3, round: 2, delivered: 0, totalDelivered: 1 });
   expect(s.wyrms[0].job).toBeNull();
+  // The junction earned Points to set and the delivery First delivery (src/trophies/), and nothing else.
+  const trophies = await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('wyrmrail-trophies') ?? '{}')));
+  expect(trophies.sort(), 'trophies earned in the first round').toEqual(['firstDelivery', 'firstSwitch']);
   await play(400, async () => false);
   await snap('3-delivered');
 

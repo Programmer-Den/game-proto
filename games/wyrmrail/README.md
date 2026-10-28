@@ -181,6 +181,28 @@ An order pays 10 coins plus 3 per tile between the two villages (as the crow fli
 The difficulty, set on the hub page's Settings, changes one thing: orders allow 50% more time on
 Easy and 30% less on Hard.
 
+## Trophies
+
+Ten trophies, listed behind the Trophies button on the start and pause screens and counted on the
+hub's card:
+
+| Trophy | Tier | Earned by |
+| --- | --- | --- |
+| First delivery | Bronze | Delivering your first order |
+| Points to set | Bronze | Laying a junction with a switch |
+| Stronger wings | Bronze | Buying your first upgrade |
+| Through the mountain | Bronze | Digging a tunnel |
+| Beloved wyrm | Silver | Cheering a village up to its best mood |
+| Goods in store | Silver | Buying a depot |
+| A pair of wyrms | Silver | Waking the second wyrm |
+| Busy line | Silver | Delivering 25 orders in one game |
+| Festival time | Gold | Winning the festival |
+| Golden festival (hidden) | Gold | Winning the festival with a gold medal |
+
+![The Trophies list on the pause screen](docs/screenshots/trophy-list.webp)
+
+![A trophy earned on the line](docs/screenshots/trophy-toast.webp)
+
 ## Running locally
 
 `npm run dev` at the repo root, then open `/games/wyrmrail/` (or pick Wyrmrail on the hub page).
@@ -220,4 +242,6 @@ All paths are inside `games/wyrmrail/`.
   isometric valley and the props standing on it (pines, mountains, the Roost, the villages and the
   festival bunting), `sprites.ts` the green and copper wyrms and their wagons and the pixel cargo and HUD icons, with helpers in
   `canvas.ts` and `pixelArt.ts`.
+- `src/trophies/`: the trophies (`index.ts`), their texts (`i18n/`) and when each is earned
+  (`check.ts`).
 - `src/ui/`: the buttons.
