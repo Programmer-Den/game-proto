@@ -1283,6 +1283,13 @@ export const COMEBACK = { gap: 0.15, gold: 150, xp: 80 };
 export const SURRENDER = { at: 900_000, quickAt: 600_000, cd: 180_000, pass: 0.7, structs: 2, aiGap: 0.25 };
 
 /**
+ * The match summary (LB25): each team's net worth (gold in hand plus the full price of the items its
+ * champions hold) is noted every `every` ms for the end panel's graph, and the MVP is the champion
+ * with the best `kills * kill + assists * assist + cs * cs - deaths * death`.
+ */
+export const SUMMARY = { every: 20_000, kill: 3, assist: 1.5, cs: 0.05, death: 1 };
+
+/**
  * Day and night (LB21): the match starts in the morning. Each day lasts `day` ms and each night
  * `night`, with `fade` ms of dusk and of dawn at the ends of the night. At full night champions see
  * only `sight` as far (minions, structures, watchstones and wards keep theirs), so the fog and the

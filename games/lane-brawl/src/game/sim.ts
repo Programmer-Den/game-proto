@@ -29,6 +29,7 @@ import {
   FIRST_BLOOD,
   COMEBACK,
   SURRENDER,
+  SUMMARY,
   DRAKE,
   DRAKES,
   DRAKE_ORDER,
@@ -127,6 +128,7 @@ export function tick(s: GameState, dt: number) {
     notice(s, text('noticePlatesGone'), '#f2c14e');
   }
   updateSurrender(s);
+  if (s.time >= s.history.length * SUMMARY.every) sampleWorth(s);
   const night = nightness(s.time) >= 0.5;
   if (night !== s.night) {
     s.night = night;
@@ -1217,6 +1219,7 @@ function kill(s: GameState, t: Unit, killerId: number) {
       sound(s, 'crash', t);
       break;
     case 'nexus':
+      sampleWorth(s);
       sound(s, 'nexus');
       s.phase = t.side === 'blue' ? 'lost' : 'won';
       s.winner = t.side === 'blue' ? 'red' : 'blue';
@@ -1776,8 +1779,31 @@ function votesYes(s: GameState, team: Team): boolean {
   return behind(s, team, COMEBACK.gap) || structsBehind(s, team) >= SURRENDER.structs;
 }
 
+/** A team's net worth: its champions' gold plus the full price of every item they hold. */
+export function netWorth(s: GameState, team: Team): number {
+  let n = 0;
+  for (const u of s.units) {
+    if (u.kind !== 'champion' || u.side !== team) continue;
+    n += u.gold;
+    for (const id of u.items) n += ITEMS.find((it) => it.id === id)?.cost ?? 0;
+  }
+  return Math.round(n);
+}
+/** Notes both teams' net worth now, for the end panel's graph. */
+function sampleWorth(s: GameState) {
+  s.history.push({ t: s.time, blue: netWorth(s, 'blue'), red: netWorth(s, 'red') });
+}
+/** The match's most valuable champion, on either team (`SUMMARY`). */
+export function mvpOf(s: GameState): Unit | null {
+  const score = (u: Unit) => u.kills * SUMMARY.kill + u.assists * SUMMARY.assist + u.cs * SUMMARY.cs - u.deaths * SUMMARY.death;
+  let best: Unit | null = null;
+  for (const u of s.units) if (u.kind === 'champion' && (!best || score(u) > score(best))) best = u;
+  return best;
+}
+
 /** A team gives up: the other wins, as if the Nexus fell. */
 function surrender(s: GameState, team: Team) {
+  sampleWorth(s);
   s.surrendered = team;
   s.phase = team === 'blue' ? 'lost' : 'won';
   s.winner = team === 'blue' ? 'red' : 'blue';

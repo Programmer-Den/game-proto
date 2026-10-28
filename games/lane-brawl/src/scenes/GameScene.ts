@@ -58,7 +58,7 @@ import {
 import { Fx, GameState, ObjectiveTitle, Phase, Unit, createGame, dist, getUnit } from '../game/state';
 import { loadMastery, masteryRank, recordWin } from '../game/mastery';
 import { loadQuick, loadSpell, saveQuick, saveSpell } from '../game/spellChoice';
-import { abilityFor, atFountain, atShop, buy, buyBack, buybackCost, cast, castSpell, chooseUpgrade, commandAttack, commandMove, hiddenFrom, invulnerable, priceFor, sendPing, startRecall, stealthed, nightness, behind, callSurrender, tick, useActive, viewers } from '../game/sim';
+import { abilityFor, atFountain, atShop, buy, buyBack, buybackCost, cast, castSpell, chooseUpgrade, commandAttack, commandMove, hiddenFrom, invulnerable, priceFor, sendPing, startRecall, stealthed, nightness, behind, callSurrender, mvpOf, tick, useActive, viewers } from '../game/sim';
 import { FxLayers, drawAura, drawProjectile, drawSkill, drawZone, skillMs } from './skillFx';
 import { shortName } from '../game/names';
 import { t, type TextKey } from '../i18n';
@@ -116,6 +116,7 @@ import {
   MINIMAP,
   OBJECTIVE_CARD,
   PLAY_AGAIN,
+  WORTH_GRAPH,
   PORTRAIT,
   RECALL_BUTTON,
   SPELL_BUTTON,
@@ -2227,6 +2228,39 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  /** The end panel's summary: the MVP, and both teams' net worth over the match as a graph. */
+  private drawSummary(g: Phaser.GameObjects.Graphics, s: GameState) {
+    const p = END_PANEL;
+    const mvp = mvpOf(s);
+    if (mvp?.champ) {
+      const line = t('mvpLine', { name: shortName(mvp.name), class: t(mvp.champ.name), k: mvp.kills, d: mvp.deaths, a: mvp.assists });
+      this.t('end-mvp', SCREEN.w / 2, p.y + 138, line, 13, SIDE_COLOR[mvp.side], 'center', true);
+    }
+    const r = WORTH_GRAPH;
+    this.t('worth-title', r.x, r.y - 18, t('worthTitle'), 11, UI.dim, 'left', true);
+    g.fillStyle(col(UI.edge), 1).fillRect(r.x - 1, r.y - 1, r.w + 2, r.h + 2);
+    g.fillStyle(col('#141a24'), 1).fillRect(r.x, r.y, r.w, r.h);
+    const h = s.history;
+    if (h.length < 2) return;
+    const end = h[h.length - 1];
+    const top = Math.max(1, ...h.map((e) => Math.max(e.blue, e.red)));
+    // Faint lines at each quarter of the top value.
+    for (let q = 1; q < 4; q++) g.lineStyle(1, col(UI.edge), 0.8).lineBetween(r.x, r.y + (r.h * q) / 4, r.x + r.w, r.y + (r.h * q) / 4);
+    const px = (e: { t: number }) => r.x + (e.t / end.t) * r.w;
+    const py = (v: number) => r.y + r.h - (v / top) * (r.h - 6);
+    for (const team of ['red', 'blue'] as Team[]) {
+      g.lineStyle(2, col(SIDE_COLOR[team]), 1);
+      g.beginPath();
+      g.moveTo(px(h[0]), py(h[0][team]));
+      for (const e of h.slice(1)) g.lineTo(px(e), py(e[team]));
+      g.strokePath();
+    }
+    this.t('worth-top', r.x + 4, r.y + 3, formatNumber(Math.round(top / 100) * 100), 9, UI.muted, 'left');
+    this.t('worth-end', r.x + r.w, r.y + r.h + 4, clock(end.t), 10, UI.muted, 'right');
+    this.t('worth-blue', r.x, r.y + r.h + 4, t('worthBlue', { gold: formatNumber(end.blue) }), 11, SIDE_COLOR.blue, 'left', true);
+    this.t('worth-red', r.x + 150, r.y + r.h + 4, t('worthRed', { gold: formatNumber(end.red) }), 11, SIDE_COLOR.red, 'left', true);
+  }
+
   private drawEnd(g: Phaser.GameObjects.Graphics, s: GameState) {
     g.fillStyle(0x000000, 0.6).fillRect(0, 0, SCREEN.w, SCREEN.h);
     const p = END_PANEL;
@@ -2257,6 +2291,7 @@ export class GameScene extends Phaser.Scene {
       const line = next ? t('masteryNext', { line: winsLine, rank: rank + 1, n: next }) : t('masteryFull', { line: winsLine });
       this.t('end-mastery', SCREEN.w / 2, p.y + 112, line, 11, UI.gold, 'center', true);
     }
+    this.drawSummary(g, s);
     this.panel(g, PLAY_AGAIN.x, PLAY_AGAIN.y, PLAY_AGAIN.w, PLAY_AGAIN.h, '#4a5876');
     this.t('again-label', PLAY_AGAIN.x + PLAY_AGAIN.w / 2, PLAY_AGAIN.y + 12, t(watching ? 'watchAnother' : 'playAgain'), 16, UI.text, 'center', true);
   }

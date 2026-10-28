@@ -377,6 +377,11 @@ Implemented today:
   an AI team (red, both when watching) give up every `SURRENDER.cd` from `s.nextSurrender` when it
   is `SURRENDER.aiGap` behind on XP and `SURRENDER.structs` behind on structures. The end panel
   says who surrendered.
+- Match summary (LB25): `SUMMARY` in `data.ts`. `tick` calls `sampleWorth` every `SUMMARY.every`
+  (and `kill` of a Nexus and `surrender` once more at the end), which pushes both teams' `netWorth`
+  (gold plus the full `cost` of each held item) onto `s.history`. `mvpOf` picks the champion with
+  the best `SUMMARY` score. The end panel (`END_PANEL`, now 560x420) shows them in `drawSummary`:
+  the MVP line in its team's colour and a line per team in `WORTH_GRAPH`, scaled to the top value.
 - Victory and defeat panel with the match's objectives, last hits, best streak and beasts slain,
   and "Play again".
 

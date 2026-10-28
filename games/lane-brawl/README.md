@@ -283,7 +283,12 @@ left, under bevelled slate panels.
     it is far behind on both.
 
     ![The scoreboard at 15:06 with the Surrender button in its header](docs/screenshots/surrender.webp)
-29. **Winning** destroys the red Nexus. Losing means your Nexus falls first.
+29. **Match summary**: the end panel names the match's MVP, the champion on either team with the
+    best kills, assists and last hits for its deaths, and draws both teams' net worth (gold in hand
+    plus the price of every item held) over the match, noted every 20 seconds.
+
+    ![The end panel after a defeat: the MVP and the net worth of both teams over 7:54](docs/screenshots/match-summary.webp)
+30. **Winning** destroys the red Nexus. Losing means your Nexus falls first.
 
 Every ability has an animation of its own (a hammer that splits the ground, a meteor from the
 sky, a harpoon on its rope, a coil pylon arcing, a blood moon rising and so on), and so do bolts in
