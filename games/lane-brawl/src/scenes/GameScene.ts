@@ -48,6 +48,8 @@ import {
   PINGS,
   RECAP,
   CAMP_KINDS,
+  DRAKE,
+  DRAKES,
   PING_KINDS,
   PingKind,
 } from '../game/data';
@@ -68,6 +70,9 @@ import {
   BOAR_CELL,
   MERC_CELL,
   MERC_KEY,
+  DRAKE_CELL,
+  drakeKey,
+  bakeDrake,
   BRUTE_CELL,
   CHAMP_CELL,
   COIN,
@@ -1269,9 +1274,12 @@ export class GameScene extends Phaser.Scene {
         const brute = u.campKind === 'ember' || u.campKind === 'moss';
         const wolf = u.campKind === 'wolf' || u.campKind === 'pup';
         const merc = u.campKind === 'merc';
-        key = brute ? bruteKey(u.campKind as 'ember' | 'moss') : wolf ? WOLF : merc ? MERC_KEY : BOAR;
+        const drake = u.campKind === 'drake';
+        // A drake's sheet is baked the first time a drake of its element shows.
+        if (drake) bakeDrake(this, s.drakeElement);
+        key = brute ? bruteKey(u.campKind as 'ember' | 'moss') : wolf ? WOLF : merc ? MERC_KEY : drake ? drakeKey(s.drakeElement) : BOAR;
         frame = frameName(dirFor(u.facing), pose(10) === 'c0' ? 'idle' : pose(10));
-        cell = brute ? BRUTE_CELL : wolf ? WOLF_CELL : merc ? MERC_CELL : BOAR_CELL;
+        cell = brute ? BRUTE_CELL : wolf ? WOLF_CELL : merc ? MERC_CELL : drake ? DRAKE_CELL : BOAR_CELL;
         break;
       }
       case 'watchstone':
@@ -1702,6 +1710,22 @@ export class GameScene extends Phaser.Scene {
       g.fillStyle(0xffffff, 0.45).fillTriangle(cx, cy - 7, cx - 5, cy, cx, cy);
       this.t(`buff-${team}`, c.x + 24, c.y + 4, t(team === 'blue' ? 'minionsEmpoweredBlue' : 'minionsEmpoweredRed', { time: clock(left) }), 10, team === 'blue' ? UI.blue : UI.red, 'left', true);
     }
+    // Each team's drake stacks: a gem per drake in its element's colour, and the soul once it has it.
+    for (const team of ['blue', 'red'] as Team[]) {
+      const stacks = s.drakeStacks[team];
+      if (!stacks.length) continue;
+      const c = buffChip(i++);
+      const soul = stacks.length >= DRAKE.soul;
+      g.fillStyle(col(UI.edge), 1).fillRect(c.x - 1, c.y - 1, c.w + 2, c.h + 2);
+      g.fillStyle(col(soul ? '#4a3a1c' : '#23303f'), 1).fillRect(c.x, c.y, c.w, c.h);
+      g.lineStyle(1, col(SIDE_COLOR[team]), 1).strokeRect(c.x + 1, c.y + 1, c.w - 2, c.h - 2);
+      stacks.forEach((e, k) => {
+        const cx = c.x + 10 + k * 11, cy = c.y + c.h / 2;
+        g.fillStyle(col(DRAKES[e].color), 1).fillPoints([new Phaser.Math.Vector2(cx, cy - 6), new Phaser.Math.Vector2(cx + 4, cy), new Phaser.Math.Vector2(cx, cy + 6), new Phaser.Math.Vector2(cx - 4, cy)], true);
+      });
+      const key = soul ? (team === 'blue' ? 'drakeSoulBlue' : 'drakeSoulRed') : team === 'blue' ? 'drakesBlue' : 'drakesRed';
+      this.t(`drakes-${team}`, c.x + 12 + stacks.length * 11, c.y + 4, t(key, { n: stacks.length }), 10, soul ? UI.gold : team === 'blue' ? UI.blue : UI.red, 'left', true);
+    }
     // The elder's blessing, in gold.
     for (const team of ['blue', 'red'] as Team[]) {
       const left = s.elderBuff[team] - s.time;
@@ -2033,7 +2057,7 @@ export class GameScene extends Phaser.Scene {
       } else if (u.kind === 'nexus') g.fillStyle(col(SIDE_COLOR[u.side as Team]), 1).fillCircle(mx(u.x), my(u.y), 5);
       else if (u.kind === 'champion') g.fillStyle(col(SIDE_COLOR[u.side as Team]), 1).fillCircle(mx(u.x), my(u.y), u.player ? 3.5 : 2.5);
       else if (u.kind === 'minion') g.fillStyle(col(SIDE_COLOR[u.side as Team]), 0.85).fillRect(mx(u.x) - 0.75, my(u.y) - 0.75, 1.5, 1.5);
-      else if (u.kind === 'camp' && u.campKind !== 'pup') g.fillStyle(col(u.campKind === 'ember' ? BUFFS.ember.color : u.campKind === 'moss' ? BUFFS.moss.color : u.campKind === 'merc' ? '#d8b878' : SIDE_COLOR.neutral), 0.9).fillCircle(mx(u.x), my(u.y), 2);
+      else if (u.kind === 'camp' && u.campKind !== 'pup') g.fillStyle(col(u.campKind === 'ember' ? BUFFS.ember.color : u.campKind === 'moss' ? BUFFS.moss.color : u.campKind === 'merc' ? '#d8b878' : u.campKind === 'drake' ? DRAKES[s.drakeElement].color : SIDE_COLOR.neutral), 0.9).fillCircle(mx(u.x), my(u.y), 2);
       else if (u.kind === 'ward') {
         const cx = mx(u.x), cy = my(u.y);
         g.fillStyle(col(UI.edge), 1).fillPoints([new Phaser.Math.Vector2(cx, cy - 4), new Phaser.Math.Vector2(cx + 3, cy), new Phaser.Math.Vector2(cx, cy + 4), new Phaser.Math.Vector2(cx - 3, cy)], true);

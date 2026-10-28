@@ -23,6 +23,9 @@ import {
   RUNE,
   RUNES,
   RUNE_ORDER,
+  DRAKE,
+  DRAKES,
+  DRAKE_ORDER,
   RECAP,
   PING,
   PINGS,
@@ -174,9 +177,9 @@ export function chooseUpgrade(s: GameState, choice: number): boolean {
 // ---------------------------------------------------------------------------------------------
 // Stats as buffs and passives change them.
 
-/** The sum of one field over a unit's buffs. */
+/** The sum of one field over a unit's buffs, its team's drake bonus counted in. */
 function buffSum(u: Unit, key: Exclude<keyof BuffDef, 'stealth'>): number {
-  let n = 0;
+  let n = u.drake?.[key] ?? 0;
   for (const b of u.buffs) n += b.def[key] ?? 0;
   return n;
 }
@@ -826,6 +829,35 @@ function deathRecap(s: GameState, killerId: number): DeathRecap {
   return { at: s.time, killer: killerId, total, rows: rows.slice(0, RECAP.rows) };
 }
 
+/**
+ * A champion slew the river drake: its team keeps a stack of the drake's element (until it has its
+ * soul), every champion of the team gets the new bonus, and the next drake is of the next element.
+ */
+function slayDrake(s: GameState, killer: Unit) {
+  const team = killer.side as Team;
+  const element = s.drakeElement;
+  const stacks = s.drakeStacks[team];
+  const def = DRAKES[element];
+  s.drakeRounds++;
+  s.drakeElement = DRAKE_ORDER[s.drakeRounds % DRAKE_ORDER.length];
+  if (stacks.length >= DRAKE.soul) {
+    aiLog(team, `${shortName(killer.name)} slays the ${english(def.name).toLowerCase()}`);
+    return;
+  }
+  stacks.push(element);
+  const soul = stacks.length >= DRAKE.soul;
+  const bonus: BuffDef = {};
+  for (const e of stacks) {
+    for (const [k, v] of Object.entries(DRAKES[e].bonus) as [keyof BuffDef, number][]) (bonus as Record<string, number>)[k] = ((bonus as Record<string, number>)[k] ?? 0) + v * (soul ? 2 : 1);
+  }
+  for (const c of s.units) if (c.kind === 'champion' && c.side === team) c.drake = bonus;
+  s.fx.push({ kind: 'ring', x: DRAKE.x, y: DRAKE.y, r: 90, color: def.color, ms: 800 });
+  sound(s, 'drake', DRAKE, killer.player);
+  aiLog(team, `${shortName(killer.name)} slays the ${english(def.name).toLowerCase()}${soul ? ', the team has its drake soul' : ''}`);
+  const vars = { drake: text(def.name), n: stacks.length };
+  notice(s, text(soul ? (team === 'blue' ? 'noticeSoulBlue' : 'noticeSoulRed') : team === 'blue' ? 'noticeDrakeBlue' : 'noticeDrakeRed', vars), def.color);
+}
+
 /** Whether a unit is a champion whose team has the elder's blessing now. */
 function elderBlessed(s: GameState, u: Unit | undefined | null): boolean {
   return !!u && u.kind === 'champion' && u.side !== 'neutral' && s.elderBuff[u.side] > s.time;
@@ -908,6 +940,11 @@ function updateUnit(s: GameState, u: Unit, dt: number) {
       if (u.kind === 'beast') {
         notice(s, text(s.beastElder ? 'noticeElderAwake' : 'noticeBeastAwake'), '#f2c14e');
         sound(s, 'growl');
+      }
+      if (u.id === s.drake) {
+        const def = DRAKES[s.drakeElement];
+        notice(s, text('noticeDrakeAwake', { drake: text(def.name) }), def.color);
+        sound(s, 'drakeWakes');
       }
       if (u.player) sound(s, 'respawn', undefined, true);
     } else if (u.kind === 'champion' && !u.player) {
@@ -1041,6 +1078,7 @@ function kill(s: GameState, t: Unit, killerId: number) {
           sound(s, 'brute', champKiller, champKiller.player);
           if (champKiller.side === 'blue') notice(s, champKiller.player ? text('noticeYouTakeBuff', { buff: text(b.name) }) : text('noticeTakesBuff', { name: shortName(champKiller.name), buff: text(b.name) }), b.color);
         }
+        if (t.campKind === 'drake' && champKiller.side !== 'neutral') slayDrake(s, champKiller);
         // The last of a mercenary band down: it marches for the slayer's team.
         if (t.campKind === 'merc' && champKiller.side !== 'neutral' && !s.units.some((m) => m.kind === 'camp' && !m.dead && m.group === t.group)) {
           const team = champKiller.side;
@@ -1545,7 +1583,23 @@ function runeFor(s: GameState, u: Unit): Vec | null {
 function updateJungle(s: GameState) {
   if (s.time < s.nextJungle) return;
   s.nextJungle = s.time + JUNGLE.every;
+  const drake = getUnit(s, s.drake);
   for (const team of TEAMS) {
+    // An awake drake draws a pair of champions from each team that can still stack it.
+    if (drake && !drake.dead && s.drakeStacks[team].length < DRAKE.soul) {
+      const hunters = s.units
+        .filter((u) => u.side === team && free(s, u, DRAKE.aiMinHp) && !s.contesters.includes(u.id))
+        .sort((a, b) => dist(a, drake) - dist(b, drake) || a.id - b.id)
+        .slice(0, DRAKE.ai);
+      for (const u of hunters) {
+        u.jungleTarget = drake.id;
+        u.jungleUntil = s.time + JUNGLE.ms;
+      }
+      if (hunters.length) {
+        aiLog(team, `${hunters.map((u) => shortName(u.name)).join(' and ')} go for the ${english(DRAKES[s.drakeElement].name).toLowerCase()}`);
+        continue;
+      }
+    }
     const buffs = s.units.filter((u) => u.kind === 'camp' && !u.dead && (u.campKind === 'ember' || u.campKind === 'moss') && ownHalf(team, u));
     const stones = s.units.filter((u) => u.kind === 'watchstone' && u.side !== team);
     // A mercenary band on the team's own half is worth the trip as much as a buff.

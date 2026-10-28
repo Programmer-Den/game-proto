@@ -5,7 +5,7 @@
 // units. The same seed paints the same map every time.
 
 import Phaser from 'phaser';
-import { BASE, BEAST, BUSHES, Bush, CAMPS, CampSpot, LANES, MERC, RIVER, Team, Vec, WATCHSTONES, WORLD } from '../game/data';
+import { BASE, BEAST, BUSHES, DRAKE, Bush, CAMPS, CampSpot, LANES, MERC, RIVER, Team, Vec, WATCHSTONES, WORLD } from '../game/data';
 import { sharpRes } from '../../../../shared/scaling';
 import { render, seeded } from './lowpoly';
 import { TEAM_GLOW, pineModel, rockModel, ruinModel } from './models';
@@ -452,9 +452,8 @@ function ruins(ctx: CanvasRenderingContext2D, c: Vec, rnd: () => number) {
 /** Where the ruins stand: one in each quarter of the jungle, mirrored. */
 const RUINS: Vec[] = [{ x: 560, y: 1560 }, { x: 1240, y: 2240 }, { x: 2240, y: 1240 }, { x: 1560, y: 560 }];
 
-/** The guardian beast's pit: a ring of dark flagstones round a sunken floor, with standing stones. */
-function pit(ctx: CanvasRenderingContext2D, rnd: () => number) {
-  const c = { x: BEAST.x, y: BEAST.y };
+/** A pit for the guardian beast or the river drake: a ring of dark flagstones round a sunken floor, with standing stones, glowing in `glow`. */
+function pit(ctx: CanvasRenderingContext2D, rnd: () => number, c: Vec, glow: string) {
   const n = 14;
   ctx.fillStyle = 'rgba(25,30,40,0.35)';
   ctx.beginPath();
@@ -474,8 +473,8 @@ function pit(ctx: CanvasRenderingContext2D, rnd: () => number) {
       ctx.stroke();
     }
   }
-  // A faint violet glow in the floor, the colour of the beast's crystals.
-  ctx.strokeStyle = 'rgba(185,140,255,0.45)';
+  // A faint glow in the floor, the colour of what sleeps there.
+  ctx.strokeStyle = glow;
   ctx.lineWidth = 4;
   ctx.beginPath();
   ctx.ellipse(c.x, c.y, 70, 56, 0, 0, Math.PI * 2);
@@ -543,7 +542,7 @@ function scenery(ctx: CanvasRenderingContext2D, rnd: () => number) {
     if (CLEARINGS.some((c) => Math.hypot(p.x - c.x, p.y - c.y) < clearingR(c) + 50)) continue;
     if (RUINS.some((c) => Math.hypot(p.x - c.x, p.y - c.y) < 110)) continue;
     if (WATCHSTONES.some((c) => Math.hypot(p.x - c.x, p.y - c.y) < 140)) continue;
-    if (Math.hypot(p.x - BEAST.x, p.y - BEAST.y) < 175) continue;
+    if (Math.hypot(p.x - BEAST.x, p.y - BEAST.y) < 175 || Math.hypot(p.x - DRAKE.x, p.y - DRAKE.y) < 175) continue;
     if (BUSHES.some((b) => ((p.x - b.x) / (b.rx + 40)) ** 2 + ((p.y - b.y) / (b.ry + 40)) ** 2 < 1)) continue;
     if (things.some((t) => Math.hypot(t.x - p.x, t.y - p.y) < 46)) continue;
     things.push({ ...p, kind: rnd() < 0.85 ? 'pine' : 'rock', s: 0.8 + rnd() * 0.5, v: Math.floor(rnd() * 4) });
@@ -575,7 +574,8 @@ export function paintMap(scene: Phaser.Scene) {
   river(ctx, rnd);
   for (const c of CLEARINGS) clearing(ctx, c, rnd);
   for (const r of RUINS) ruins(ctx, r, rnd);
-  pit(ctx, rnd);
+  pit(ctx, rnd, BEAST, 'rgba(185,140,255,0.45)');
+  pit(ctx, rnd, DRAKE, 'rgba(255,200,120,0.4)');
   for (const w of WATCHSTONES) island(ctx, w, rnd);
   lanes(ctx, rnd);
   plaza(ctx, 'blue', rnd);
