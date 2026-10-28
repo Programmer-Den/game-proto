@@ -314,8 +314,11 @@ Brutal Edge, Phase Boots and on), each starting with a Healing Flask they drink 
 and buy a Vision Ward whenever they have none. With the build done and gold to spare they drink an
 elixir before heading out (tanks the Iron Elixir, casters the Swift Elixir, the rest Wrath). They recall home when hurt with no enemy near, or
 with 900 gold and something to buy, and buy back when an enemy champion is at their Nexus.
-Every 70 seconds from 1:40, each team sends one healthy champion from another lane to gang up on
-the weakest enemy champion it can see. A champion that is low on health with an enemy champion
+Every 70 seconds from 1:40 (every 49 at night), each team sends one healthy champion from another
+lane to gang up on the weakest enemy champion it can see. When tall grass lies near its prey, the
+hunter slips into it first and waits there, hidden, for up to 7 seconds until the prey walks within
+260 px, then charges. From 1:40 the AI also wards the tall grass it passes as well as the river, so
+ambushes in it are seen. A champion that is low on health with an enemy champion
 near, or outnumbered by two, falls back to its nearest tower behind it, and its allies near by fall
 back with it (all of them when outnumbered, the hurt ones otherwise). Every 45 seconds from 2:00
 each team sends one healthy champion into the jungle for a brute's buff on its half, or else for a

@@ -153,6 +153,9 @@ export interface Unit {
   /** AI champions: the enemy champion it left its lane to gang up on, and until when. */
   gankTarget: number | null;
   gankUntil: number;
+  /** AI champions on a gank: the bush it lies in wait in (-1 for none), and until when it waits. */
+  ambushBush: number;
+  ambushUntil: number;
   /** AI champions: the camp or watchstone it went into the jungle for, and until when. */
   jungleTarget: number | null;
   jungleUntil: number;
@@ -515,6 +518,8 @@ export function blankUnit(
     retreatUntil: 0,
     gankTarget: null,
     gankUntil: 0,
+    ambushBush: -1,
+    ambushUntil: 0,
     jungleTarget: null,
     jungleUntil: 0,
     moveStuckMs: 0,

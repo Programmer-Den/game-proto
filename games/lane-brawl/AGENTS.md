@@ -95,8 +95,8 @@ Implemented today:
   within that sight. `damage` takes exactly one hit off a ward whatever the amount; projectiles and
   zones skip wards; `kill` pays `WARD.gold` to a champion killer and notices blue's losses. Dead and
   burnt-out wards are dropped each tick like dead minions. AI champions (`aiWard`) plant a carried
-  ward at the first `WARD_SPOTS` entry within `WARD_AI.reach` that has no live ward of their team
-  within `WARD_AI.taken`, and in `aiAct` knock down an enemy ward within 220 px when nothing else is
+  ward at the first `WARD_SPOTS` entry (and from `WARD_AI.bushesFrom` the first bush, LB26) within
+  `WARD_AI.reach` that has no live ward of their team within `WARD_AI.taken`, and in `aiAct` knock down an enemy ward within 220 px when nothing else is
   in reach. The view draws wards with the Graphics (`drawWard`: stake, gem eye, hit pips, and blue's
   sight ring), not a baked sheet, and as diamonds on the minimap.
 - Recall (LB7, round 2): `startRecall` sets `Unit.recallMs` to `RECALL.ms` (and `lastRecallAt`);
@@ -157,8 +157,13 @@ Implemented today:
   Before that, `championPlan` (LB3): fall back to the nearest own tower behind (`fallbackPoint`) for
   `RETREAT.ms` when low or outnumbered by two, calling allies near by with it; go for the beast if
   picked as one of its team's two `contesters` (`updateContesters`); walk to a `gankTarget` set by
-  `updateGanks` (every 70 s from 100 s, per team: the weakest visible enemy champion, hunted by the
-  nearest healthy AI champion more than 550 px away). AI champions take upgrades on level up
+  `updateGanks` (every 70 s from 100 s, `GANK.night` times that at night, per team: the weakest
+  visible enemy champion, hunted by the nearest healthy AI champion more than 550 px away). On the
+  way, `ambushBush` (LB26, `AMBUSH`) picks a bush within `AMBUSH.reach` of the prey but farther than
+  `AMBUSH.strike`, nearer the hunter than the prey is; the hunter walks into it and waits
+  (`Unit.ambushBush`, `ambushUntil`) until the prey comes within `AMBUSH.strike` or `AMBUSH.waitMs`
+  passes, then charges (once per gank: `ambushUntil` is set to Infinity, and `updateGanks` resets
+  both). AI champions take upgrades on level up
   (`aiRate` picks). AI champions with reach kite melee ones (`KITE`), cast an escape when they
   fall back, keep R for champions and the beast, and from 2:00 every `JUNGLE.every` each team sends
   one free champion for a brute's buff on its half or a watchstone it lacks (`updateJungle`).
@@ -391,7 +396,8 @@ Missing or rough:
   pocket of obstacles could hold it; the jungle's spacing keeps such pockets out.
 - No title screen of its own. The only saves are class mastery and the battle spell (below).
 - Bushes hide champions only, not minions. The camera follows the player's champion.
-- AI champions don't use bushes on purpose, and their wards go only to the fixed `WARD_SPOTS`.
+- AI champions use bushes only to wait in on a gank, and ward only the fixed `WARD_SPOTS` and bush
+  centres.
 - Balance is tuned with AI-only matches (every class within roughly 35% to 65% wins over 80
   matches); the player's own champion is not part of that.
 - Only the first round (see the playthrough) is covered by the test; the Warden is the only champion
