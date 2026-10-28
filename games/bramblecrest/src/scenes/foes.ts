@@ -1,4 +1,5 @@
-// The things that bite back: slugs, moths, thornlings and frogs, the thornlings' seeds, the
+// The things that bite back: slugs, moths, thornlings, frogs, shelled beetles and lantern moths, the
+// thornlings' seeds and the lantern moths' embers, the
 // Thornmother at the bottom of the shrine with her three bulbs, and the Bellwraith in the belfry.
 
 import Phaser from 'phaser';
@@ -22,7 +23,21 @@ export const FOES: Record<EnemyKind, FoeInfo> = {
   moth: { hp: 1, speed: 74, sees: 200, damage: 1, flies: true },
   thornling: { hp: 3, speed: 0, sees: 270, damage: 1 },
   frog: { hp: 2, speed: 150, sees: 180, damage: 1 },
+  beetle: { hp: 3, speed: 40, sees: 160, damage: 1 },
+  lantern: { hp: 2, speed: 64, sees: 220, damage: 1, flies: true },
 };
+
+/**
+ * Foes a plain sword swing can't hurt until something knocks them down: a beetle's shell turns the
+ * blade until the hookvine or a bellseed flips it, and a lantern moth flies above it until the
+ * hookvine or a bellseed brings it down. Down, they lie still for `DOWN_MS`.
+ */
+export const ARMOURED: ReadonlySet<EnemyKind> = new Set<EnemyKind>(['beetle', 'lantern']);
+export const DOWN_MS = 2600;
+/** A lantern moth flies this high, keeps this far from the knight, and drops an ember this often. */
+export const LANTERN_LIFT = 30;
+export const LANTERN_KEEP = 70;
+export const LANTERN_SHOT_MS = 2600;
 
 /** A frog sits still between leaps: how long, and how long a leap lasts. */
 export const FROG_WAIT_MS = 1100;
@@ -76,6 +91,8 @@ export interface Foe {
   room?: string;
   /** A frog's leap: time left in it. */
   leap: number;
+  /** An armoured foe knocked down (a beetle on its back, a lantern moth on the ground): time left. */
+  down: number;
   /** Its place in the map's list, for remembering shrine foes that are beaten. */
   index: number;
   alive: boolean;
@@ -125,9 +142,9 @@ export function foeFree(map: MapDef, extra: (tx: number, ty: number) => boolean,
 }
 
 export function makeFoe(scene: Phaser.Scene, kind: EnemyKind, x: number, y: number, index: number, room?: string): Foe {
-  const key = kind === 'moth' ? 'moth-a' : kind;
+  const key = kind === 'moth' ? 'moth-a' : kind === 'lantern' ? 'lantern-a' : kind;
   const sprite = scene.add.image(x, y, key).setOrigin(0.5, 0.85).setScale(texScale(key));
-  return { kind, x, y, hp: FOES[kind].hp, sprite, home: { x, y }, dir: { x: 0, y: 0 }, t: Math.random() * 1500, stun: 0, hurt: 0, room, leap: 0, index, alive: true };
+  return { kind, x, y, hp: FOES[kind].hp, sprite, home: { x, y }, dir: { x: 0, y: 0 }, t: Math.random() * 1500, stun: 0, hurt: 0, room, leap: 0, down: 0, index, alive: true };
 }
 
 /** The Bellwraith's bell: hovering after the knight, dropping, lying on the floor, tipped over to

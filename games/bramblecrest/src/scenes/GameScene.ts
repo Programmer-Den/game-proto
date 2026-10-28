@@ -17,7 +17,7 @@ import { BOSS, DEEP, STINGS, VILLAGE, WILDS } from '../audio/music';
 import { Hud } from './hud';
 import { NightLight, type Light } from './light';
 import {
-  BELL_DOWN_MS, BULB_DOWN_MS, BULB_EVERY_MS, BULB_HP, BULB_UP_MS, BURST_PX, DROP_MS, EXPOSED_MS, FOES, foeFree, FROG_LEAP_MS, FROG_WAIT_MS, FUSE_MS, HOVER_MS, HOVER_SPEED,
+  ARMOURED, BELL_DOWN_MS, BULB_DOWN_MS, DOWN_MS, LANTERN_KEEP, LANTERN_LIFT, LANTERN_SHOT_MS, BULB_EVERY_MS, BULB_HP, BULB_UP_MS, BURST_PX, DROP_MS, EXPOSED_MS, FOES, foeFree, FROG_LEAP_MS, FROG_WAIT_MS, FUSE_MS, HOVER_MS, HOVER_SPEED,
   makeFoe, SEED_SPEED, SLAM_PX, SUMMON_MS, THORNLING_SHOT_MS, TRIAL, VOLLEY_MS, WRAITH_HP,
   type Bomb, type Boss, type Foe, type Seed, type Wraith,
 } from './foes';
@@ -142,6 +142,8 @@ export class GameScene extends Phaser.Scene {
   private now = 0;
   /** Whether each door was shut last frame, so a room's door sounds as it slams or opens. */
   private doorWas = new Map<string, boolean>();
+  /** Hints already shown since the page opened, for the armoured foes (a shell turning the blade, one knocked down). */
+  private hinted = new Set<string>();
   /** When each bellseed's fuse ticks next, in ms left on its fuse. */
   private ticks = new WeakMap<Bomb, number>();
 
@@ -556,7 +558,7 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     const tx = Math.floor(wx / TILE);
     const ty = Math.floor(wy / TILE);
-    const foe = this.foes.find((f) => f.alive && Math.hypot(f.x - wx, f.y - 10 - wy) < 26);
+    const foe = this.foes.find((f) => f.alive && Math.hypot(f.x - wx, f.y - (f.kind === 'lantern' && f.down <= 0 ? LANTERN_LIFT + 6 : 10) - wy) < 26);
     if (foe && s.items.sword) return this.goTo({ kind: 'foe', foe }, Math.floor(foe.x / TILE), Math.floor(foe.y / TILE));
     for (const n of this.map.npcs) {
       const c = centre(n);
@@ -1074,6 +1076,7 @@ export class GameScene extends Phaser.Scene {
     for (const f of this.foes)
       if (f.alive && Math.hypot(f.x - x, f.y - y) < BURST_PX + 8) {
         const d = { x: Math.sign(f.x - x), y: Math.sign(f.y - y) };
+        if (ARMOURED.has(f.kind)) this.knockDown(f);
         this.hitFoe(f, d);
         f.hurt = 0;
         if (f.alive) this.hitFoe(f, d);
@@ -1445,7 +1448,8 @@ export class GameScene extends Phaser.Scene {
       }
       const foe = this.foes.find((f) => f.alive && Math.hypot(f.x - h.x, f.y - 10 - h.y) < 16);
       if (foe) {
-        foe.stun = 1600;
+        if (ARMOURED.has(foe.kind)) this.knockDown(foe);
+        else foe.stun = 1600;
         sfx('latch');
         h.phase = 'back';
         return;
@@ -1555,8 +1559,31 @@ export class GameScene extends Phaser.Scene {
     return f;
   }
 
+  /** The hookvine or a burst knocks an armoured foe down: a beetle flips over, a lantern moth falls. */
+  private knockDown(f: Foe) {
+    if (f.down <= 0) sfx('thud');
+    f.down = DOWN_MS;
+    f.leap = 0;
+    this.hint(f.kind === 'beetle' ? 'beetleFlipped' : 'lanternDown');
+  }
+
+  /** A toast that shows once since the page opened, to teach the armoured foes. */
+  private hint(key: 'beetleFlipped' | 'lanternDown' | 'shellHard') {
+    if (this.hinted.has(key)) return;
+    this.hinted.add(key);
+    this.hud.toast(t(key));
+  }
+
   private hitFoe(f: Foe, d: { x: number; y: number }) {
     if (f.hurt > 0) return;
+    // A beetle's shell turns the blade, and a lantern moth flies above it, until knocked down.
+    if (f.kind === 'beetle' && f.down <= 0) {
+      f.hurt = 250;
+      sfx('tink');
+      this.hint('shellHard');
+      return;
+    }
+    if (f.kind === 'lantern' && f.down <= 0) return;
     f.hp--;
     f.hurt = 250;
     // Only the knight hits foes (the sword and their own bellseeds), so every hit is theirs.
@@ -1568,7 +1595,7 @@ export class GameScene extends Phaser.Scene {
     if (f.hp > 0) return;
     f.alive = false;
     this.state.beaten++;
-    this.puff(f.x, f.y - 10, f.kind === 'moth' ? 0xc8bce0 : 0x6a8a4a);
+    this.puff(f.x, f.y - 10, f.kind === 'moth' ? 0xc8bce0 : f.kind === 'lantern' ? 0xf0c070 : f.kind === 'beetle' ? 0x3a7a8a : 0x6a8a4a);
     f.sprite.destroy();
     if (DUNGEONS.has(this.map.id) && f.index >= 0) setFlag(this.state, this.foeFlag(f.index));
     // Every foe leaves a coin, and sometimes a heart or a seed pod beside it.
@@ -1589,6 +1616,11 @@ export class GameScene extends Phaser.Scene {
       if (!f.alive) continue;
       const info = FOES[f.kind];
       f.hurt = Math.max(0, f.hurt - dt);
+      // Knocked down, it lies still and harmless until it rights itself.
+      if (f.down > 0) {
+        f.down -= dt;
+        continue;
+      }
       if (f.stun > 0) {
         f.stun -= dt;
         continue;
@@ -1600,7 +1632,7 @@ export class GameScene extends Phaser.Scene {
       f.t -= dt;
       let vx = 0;
       let vy = 0;
-      if (f.kind === 'slug') {
+      if (f.kind === 'slug' || f.kind === 'beetle') {
         if (sees) {
           vx = (dx / dist) * info.speed * 1.4;
           vy = (dy / dist) * info.speed * 1.4;
@@ -1623,6 +1655,26 @@ export class GameScene extends Phaser.Scene {
           const hy = f.home.y + Math.sin(this.now / 700 + f.index) * 30 - f.y;
           vx = hx;
           vy = hy;
+        }
+      } else if (f.kind === 'lantern') {
+        // It keeps its distance up high, circling, and drops embers at the knight.
+        if (sees) {
+          const k = (dist - LANTERN_KEEP) / dist;
+          vx = dx * k * 1.5 + (-dy / dist) * 40;
+          vy = dy * k * 1.5 + (dx / dist) * 40;
+          const v = Math.hypot(vx, vy);
+          if (v > info.speed) {
+            vx *= info.speed / v;
+            vy *= info.speed / v;
+          }
+          if (f.t <= 0) {
+            f.t = LANTERN_SHOT_MS;
+            sfx('spit', { pitch: 1.4 });
+            this.shoot(f.x, f.y - LANTERN_LIFT, dx / dist, (dy + LANTERN_LIFT) / dist, 'ember');
+          }
+        } else {
+          vx = f.home.x + Math.cos(this.now / 1100 + f.index) * 50 - f.x;
+          vy = f.home.y + Math.sin(this.now / 900 + f.index) * 36 - f.y;
         }
       } else if (f.kind === 'frog') {
         // A frog sits, then leaps: at the knight when it sees them, a short hop anywhere when not.
@@ -1650,7 +1702,8 @@ export class GameScene extends Phaser.Scene {
       if (foeFree(this.map, this.standing, f.x, ny, info.flies)) f.y = ny;
       else if (f.kind === 'frog') f.leap = 0;
       else f.t = 0;
-      if (Math.hypot(s.x - f.x, s.y - f.y) < 18) this.hurt(info.damage, f);
+      // A lantern moth flies too high to bump into.
+      if (f.kind !== 'lantern' && Math.hypot(s.x - f.x, s.y - f.y) < 18) this.hurt(info.damage, f);
     }
     this.foes = this.foes.filter((f) => f.alive);
   }
@@ -1663,8 +1716,11 @@ export class GameScene extends Phaser.Scene {
     return tx >= r.x && tx < r.x + r.w && ty >= r.y && ty < r.y + r.h;
   }
 
-  private shoot(x: number, y: number, dx: number, dy: number) {
-    const sprite = this.add.image(x, y, 'seed').setScale(texScale('seed'));
+  private shoot(x: number, y: number, dx: number, dy: number, key = 'seed') {
+    const len = Math.hypot(dx, dy) || 1;
+    dx /= len;
+    dy /= len;
+    const sprite = this.add.image(x, y, key).setScale(texScale(key));
     this.seeds.push({ x, y, vx: dx * SEED_SPEED, vy: dy * SEED_SPEED, sprite, life: 4000 });
   }
 
@@ -2050,13 +2106,22 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     for (const f of this.foes) {
       if (!f.alive) continue;
-      const key = f.kind === 'moth' ? (Math.floor(this.now / 120 + f.index) % 2 ? 'moth-a' : 'moth-b') : f.kind;
-      const lift = f.kind === 'moth' ? 12 : f.kind === 'frog' && f.leap > 0 ? Math.sin((1 - f.leap / FROG_LEAP_MS) * Math.PI) * 10 : 0;
+      const flap = Math.floor(this.now / 120 + f.index) % 2;
+      const key =
+        f.kind === 'moth' ? (flap ? 'moth-a' : 'moth-b')
+        : f.kind === 'lantern' ? (f.down > 0 || !flap ? 'lantern-b' : 'lantern-a')
+        : f.kind === 'beetle' && f.down > 0 ? 'beetle-back'
+        : f.kind;
+      const lift =
+        f.kind === 'moth' ? 12
+        : f.kind === 'lantern' ? (f.down > 0 ? 2 : LANTERN_LIFT + (settings.reduceMotion ? 0 : Math.sin(this.now / 300 + f.index) * 3))
+        : f.kind === 'frog' && f.leap > 0 ? Math.sin((1 - f.leap / FROG_LEAP_MS) * Math.PI) * 10
+        : 0;
       f.sprite.setTexture(key).setScale(texScale(key)).setPosition(f.x, f.y - lift).setDepth(f.y);
       f.sprite.setAlpha(f.stun > 0 ? 0.6 : 1);
       if (f.hurt > 0 && !settings.reduceMotion) f.sprite.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
       else f.sprite.clearTint().setTintMode(Phaser.TintModes.MULTIPLY);
-      if ((f.kind === 'slug' || f.kind === 'frog') && f.dir.x) f.sprite.setFlipX(f.kind === 'slug' ? s.x < f.x : f.dir.x < 0);
+      if ((f.kind === 'slug' || f.kind === 'beetle' || f.kind === 'frog') && f.dir.x) f.sprite.setFlipX(f.kind === 'frog' ? f.dir.x < 0 : s.x < f.x);
     }
     for (const [id, img] of this.stoneSprites) {
       const st = this.map.stones.find((x) => x.id === id);
@@ -2075,6 +2140,7 @@ export class GameScene extends Phaser.Scene {
       for (const b of this.boss.bulbs) if (b.state === 'raised' || b.state === 'down') lights.push({ x: b.x, y: b.y - 14, r: 80, col: [220, 255, 140], power: 0.8 });
     }
     for (const sd of this.seeds) lights.push({ x: sd.x, y: sd.y, r: 24, col: [230, 120, 200], power: 0.5 });
+    for (const f of this.foes) if (f.alive && f.kind === 'lantern') lights.push({ x: f.x, y: f.sprite.y - 8, r: 90, col: [255, 190, 110], power: 0.8 });
     for (const b of this.bombs) lights.push({ x: b.x, y: b.y - 10, r: 46, col: [210, 255, 150], power: 0.7 });
     for (const p of this.pods) lights.push({ x: p.x, y: p.y, r: 30, col: [210, 255, 150], power: 0.5 });
     for (const c of this.coins) lights.push({ x: c.x, y: c.y, r: 26, col: [255, 220, 120], power: 0.5 });

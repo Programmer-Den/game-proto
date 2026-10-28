@@ -40,7 +40,7 @@ export type Theme = 'village' | 'woods' | 'fen' | 'shrine' | 'belfry';
 export const DUNGEONS: ReadonlySet<MapId> = new Set<MapId>(['shrine', 'belfry']);
 export type Facing = 'up' | 'down' | 'left' | 'right';
 export type PropKind = 'house' | 'shed' | 'well' | 'lamp' | 'statue' | 'arch' | 'hut' | 'brazier' | 'shroom' | 'bench' | 'rock' | 'tower' | 'bell' | 'candle';
-export type EnemyKind = 'slug' | 'moth' | 'thornling' | 'frog';
+export type EnemyKind = 'slug' | 'moth' | 'thornling' | 'frog' | 'beetle' | 'lantern';
 export type NpcId = 'elder' | 'pip' | 'baker' | 'cat' | 'hermit';
 
 export interface Prop {
@@ -262,6 +262,8 @@ function woods(): MapDef {
   b.scatter('tree', 70, { x: 2, y: 2, w: 46, h: 28 }, 21, 'grass', 1);
   b.scatter('bush', 16, { x: 12, y: 2, w: 36, h: 28 }, 22);
   b.scatter('flowers', 24, { x: 2, y: 2, w: 46, h: 28 }, 23, 'grass', 0);
+  // Added after the scatter, so the trees and bushes it sows stay where they were.
+  d.enemies.push({ kind: 'beetle', x: 28, y: 25 }, { kind: 'beetle', x: 38, y: 13 }, { kind: 'lantern', x: 36, y: 6 });
   return d;
 }
 
@@ -288,6 +290,7 @@ function fen(): MapDef {
   b.prop('shroom', 14, 5).prop('shroom', 33, 4).prop('shroom', 21, 21).prop('shroom', 3, 7);
   b.scatter('tree', 18, { x: 2, y: 2, w: 32, h: 20 }, 32, 'grass', 1);
   b.scatter('flowers', 14, { x: 2, y: 2, w: 32, h: 20 }, 33, 'grass', 0);
+  d.enemies.push({ kind: 'beetle', x: 21, y: 16 }, { kind: 'lantern', x: 16, y: 10 });
   return d;
 }
 
@@ -328,6 +331,8 @@ function shrine(): MapDef {
     { kind: 'thornling', x: 5, y: 47, room: 'key' }, { kind: 'slug', x: 9, y: 45, room: 'key' }, { kind: 'slug', x: 6, y: 44, room: 'key' },
     { kind: 'thornling', x: 26, y: 31, room: 'hall' }, { kind: 'moth', x: 18, y: 35, room: 'hall' },
     { kind: 'thornling', x: 39, y: 37, room: 'block' }, { kind: 'moth', x: 38, y: 21, room: 'vine' },
+    // Added later: new kinds go at the end, so the beaten flags (`foe-<i>`) of the first ones keep their index.
+    { kind: 'beetle', x: 22, y: 36, room: 'hall' }, { kind: 'lantern', x: 17, y: 18, room: 'pits' },
   );
   b.prop('brazier', 18, 43).prop('brazier', 25, 43).prop('brazier', 16, 30).prop('brazier', 27, 30).prop('brazier', 32, 30);
   b.prop('brazier', 39, 17).prop('brazier', 27, 17).prop('brazier', 10, 3).prop('brazier', 33, 3).prop('brazier', 4, 42);
@@ -378,6 +383,7 @@ function belfry(): MapDef {
     { kind: 'moth', x: 18, y: 22, room: 'hub' }, { kind: 'thornling', x: 21, y: 19, room: 'hub' },
     { kind: 'frog', x: 4, y: 24, room: 'bells' }, { kind: 'frog', x: 8, y: 25, room: 'bells' }, { kind: 'slug', x: 9, y: 19, room: 'bells' },
     { kind: 'frog', x: 32, y: 19, room: 'flood' }, { kind: 'moth', x: 28, y: 24, room: 'flood' },
+    { kind: 'beetle', x: 16, y: 24, room: 'hub' }, { kind: 'lantern', x: 32, y: 25, room: 'flood' },
   );
   b.prop('candle', 14, 31).prop('candle', 21, 31).prop('candle', 14, 19).prop('candle', 21, 25).prop('candle', 3, 19).prop('candle', 9, 19);
   b.prop('candle', 25, 19).prop('candle', 33, 26).prop('candle', 7, 4).prop('candle', 28, 4).prop('candle', 7, 12).prop('candle', 28, 12);
