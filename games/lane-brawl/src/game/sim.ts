@@ -23,6 +23,8 @@ import {
   RUNE,
   RUNES,
   RUNE_ORDER,
+  BODY,
+  STUCK,
   PLATING,
   FIRST_BLOOD,
   DRAKE,
@@ -87,6 +89,7 @@ import {
 } from './data';
 import { DeathRecap, GameState, HitHow, ObjectiveTitle, RecapRow, SoundId, Unit, dist, getUnit, laneNear, levelFor, refreshStats, spawnMercs, spawnWard, spawnWave } from './state';
 import { shortName } from './names';
+import { settle, steer } from './terrain';
 import { aiLog } from '../../../../shared/watch';
 import { english, t as text, type TextKey } from '../i18n';
 
@@ -122,6 +125,7 @@ export function tick(s: GameState, dt: number) {
   }
   if (s.pings.length && s.time - s.pings[0].at > PING.showMs) s.pings = s.pings.filter((p) => s.time - p.at <= PING.showMs);
   for (const u of [...s.units]) updateUnit(s, u, dt);
+  separate(s);
   updateProjectiles(s, dt);
   updateZones(s, dt);
   // Dead minions and wards are gone for good; their slots are cleaned up here.
@@ -330,7 +334,10 @@ function updateLastHitMark(s: GameState) {
 export function commandMove(s: GameState, point: Vec) {
   const p = getUnit(s, s.player);
   if (!p || p.dead) return;
-  p.moveTo = { x: clampWorld(point).x, y: clampWorld(point).y };
+  // A point inside a rock or a tower is moved to the nearest spot a champion can stand on.
+  p.moveTo = settle(clampWorld(point), bodyOf(p));
+  p.moveStuckMs = 0;
+  p.lastMoveDist = Infinity;
   p.target = null;
   p.recallMs = 0;
 }
@@ -406,8 +413,7 @@ export function useActive(s: GameState, u: Unit, id: ActiveId, aim: Vec): boolea
     s.fx.push({ kind: 'line', x: u.x, y: u.y, x2: to.x, y2: to.y, color: '#7fb6ff', ms: 250 });
     if (u.id === s.player) sound(s, 'blink', u, true);
     if (dist(u, to) > 1) u.facing = Math.atan2(to.y - u.y, to.x - u.x);
-    u.x = to.x;
-    u.y = to.y;
+    place(u, to);
     u.moveTo = null;
   } else {
     u.hp = Math.min(u.maxHp, u.hp + (def.heal ?? 0));
@@ -428,8 +434,7 @@ export function castSpell(s: GameState, u: Unit, aim: Vec): boolean {
       const to = towards(u, aim, def.range ?? 0);
       s.fx.push({ kind: 'ring', x: u.x, y: u.y, r: 26, color: def.color, ms: 350 }, { kind: 'line', x: u.x, y: u.y, x2: to.x, y2: to.y, color: def.color, ms: 250 });
       if (dist(u, to) > 1) u.facing = Math.atan2(to.y - u.y, to.x - u.x);
-      u.x = to.x;
-      u.y = to.y;
+      place(u, to);
       u.moveTo = null;
       s.fx.push({ kind: 'ring', x: u.x, y: u.y, r: 26, color: def.color, ms: 350 });
       break;
@@ -655,8 +660,7 @@ export function cast(s: GameState, caster: Unit, key: AbilityKey, aim: Vec): boo
         if (ab.knock && !e.dead && (e.kind === 'champion' || e.kind === 'minion')) {
           const d = Math.max(dist(e, c), 1);
           const to = clampWorld({ x: e.x + ((e.x - c.x) / d) * ab.knock, y: e.y + ((e.y - c.y) / d) * ab.knock });
-          e.x = to.x;
-          e.y = to.y;
+          place(e, to);
         }
       }
       break;
@@ -697,8 +701,7 @@ export function cast(s: GameState, caster: Unit, key: AbilityKey, aim: Vec): boo
     case 'dash': {
       const to = towards(caster, aim, ab.range);
       shot(to, ab.radius ?? 0);
-      caster.x = to.x;
-      caster.y = to.y;
+      place(caster, to);
       if (ab.damage) {
         for (const e of [...s.units]) {
           if (e.dead || e.side === caster.side || !hittable(e) || dist(e, to) > (ab.radius ?? 0) + e.radius) continue;
@@ -1278,7 +1281,11 @@ function playerAct(s: GameState, u: Unit, dt: number) {
   // A recalling champion stands and waits; a click breaks the channel.
   if (u.recallMs > 0) return;
   if (u.moveTo) {
-    if (dist(u, u.moveTo) < 4) u.moveTo = null;
+    const d = dist(u, u.moveTo);
+    // Walkers can crowd the spot: a champion that gets no closer for a while near it stops there.
+    u.moveStuckMs = d > u.lastMoveDist - (speedOf(u) * dt) / 4000 ? u.moveStuckMs + dt : 0;
+    u.lastMoveDist = d;
+    if (d < 4 || (u.moveStuckMs > STUCK.ms && d < STUCK.near)) u.moveTo = null;
     else {
       moveToward(u, u.moveTo, dt);
       return;
@@ -1943,10 +1950,64 @@ function moveToward(u: Unit, goal: Vec, dt: number) {
   const d = dist(u, goal);
   if (d < 0.5) return;
   const step = Math.min(d, (speedOf(u) * dt) / 1000);
-  u.x += ((goal.x - u.x) / d) * step;
-  u.y += ((goal.y - u.y) / d) * step;
-  u.walk += step;
-  u.facing = Math.atan2(goal.y - u.y, goal.x - u.x);
+  // Round the trees, rocks and structures in the way (`steer`), facing the way it walks.
+  const to = steer(u, goal, step, bodyOf(u));
+  if (Math.abs(to.x - u.x) + Math.abs(to.y - u.y) > 1e-6) u.facing = Math.atan2(to.y - u.y, to.x - u.x);
+  u.walk += Math.hypot(to.x - u.x, to.y - u.y);
+  u.x = to.x;
+  u.y = to.y;
+}
+
+/** How wide a unit is to the things it walks round and to other walkers (0 for what never moves). */
+export function bodyOf(u: Unit): number {
+  return u.kind === 'champion' ? BODY.champion : u.kind === 'minion' ? BODY.minion : u.kind === 'camp' ? u.radius * BODY.camp : u.kind === 'beast' ? BODY.beast : 0;
+}
+
+/** Puts a unit that was moved at once (a dash, a blink, a knock, a pull) at the point, or at the nearest free spot by it. */
+function place(u: Unit, to: Vec) {
+  const p = settle(clampWorld(to), bodyOf(u));
+  u.x = p.x;
+  u.y = p.y;
+}
+
+/**
+ * Walkers don't stand in each other: each pair of living champions and minions that overlap is
+ * pushed apart, half each, and a camp or the beast pushes them off itself, never the other way.
+ */
+function separate(s: GameState) {
+  const walkers = s.units.filter((u) => !u.dead && (u.kind === 'champion' || u.kind === 'minion'));
+  const fixed = s.units.filter((u) => !u.dead && (u.kind === 'camp' || u.kind === 'beast'));
+  for (let i = 0; i < walkers.length; i++) {
+    const a = walkers[i];
+    const ra = bodyOf(a);
+    for (let j = i + 1; j < walkers.length; j++) {
+      const b = walkers[j];
+      const r = ra + bodyOf(b);
+      const dx = b.x - a.x, dy = b.y - a.y;
+      if (Math.abs(dx) >= r || Math.abs(dy) >= r) continue;
+      const d = Math.hypot(dx, dy);
+      if (d >= r) continue;
+      // Two on the very same spot part along a fixed slant, by id, so it plays the same every time.
+      const ux = d > 1e-3 ? dx / d : 0.6, uy = d > 1e-3 ? dy / d : 0.8;
+      const push = ((r - d) / 2) * BODY.give;
+      a.x -= ux * push;
+      a.y -= uy * push;
+      b.x += ux * push;
+      b.y += uy * push;
+    }
+    for (const f of fixed) {
+      const r = ra + bodyOf(f);
+      const d = dist(a, f);
+      if (d >= r || d < 1e-3) continue;
+      a.x = f.x + ((a.x - f.x) / d) * r;
+      a.y = f.y + ((a.y - f.y) / d) * r;
+    }
+  }
+  for (const u of walkers) {
+    const p = settle(u, bodyOf(u));
+    u.x = p.x;
+    u.y = p.y;
+  }
 }
 
 /** The next point on a lane walk; the last point is the enemy Nexus. */
@@ -1990,8 +2051,7 @@ function updateProjectiles(s: GameState, dt: number) {
         const d = Math.max(dist(owner, e), 1);
         const stop = owner.radius + e.radius + 20;
         if (!p.look) s.fx.push({ kind: 'line', x: owner.x, y: owner.y, x2: e.x, y2: e.y, color: p.color, ms: 300 });
-        e.x = owner.x + ((e.x - owner.x) / d) * stop;
-        e.y = owner.y + ((e.y - owner.y) / d) * stop;
+        place(e, { x: owner.x + ((e.x - owner.x) / d) * stop, y: owner.y + ((e.y - owner.y) / d) * stop });
       }
       if (!p.pierce) {
         p.left = 0;

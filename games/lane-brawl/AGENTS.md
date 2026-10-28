@@ -329,12 +329,26 @@ Implemented today:
   which drops a plate for every share of health lost and splits `PLATING.gold` between the enemy
   champions within `PLATING.share`. `tick` clears all plates at `PLATING.until` (`s.platesGone`,
   with a notice). `drawBar` shows the plates as gold pips over a tower's bar.
+- Bodies and obstacles (LB20): `game/terrain.ts` holds the map's solid circles, `OBSTACLES`:
+  pine trunks and rocks from `SCENERY` (placed by its own seeded random source, and painted from the
+  same list by `scenery` in `map.ts`), the ruins' pillars (`ruinPieces`), the stones round both pits
+  (`pitStones`), towers, inhibitors, Nexuses and watchstones, sized by `SOLID`, in a 100 px grid.
+  `moveToward` takes a `steer` step (straight on, or along the edge of what is in the way, on the
+  goal's side) for the walker's `bodyOf` (`BODY` in `data.ts`). After the units' turns `tick` calls
+  `separate`: overlapping living champions and minions are pushed apart by `BODY.give` of the
+  overlap, camps and the beast push them off themselves, and `settle` puts every walker back out
+  of the obstacles. Dashes, blinks, knocks and pulls go through `place`, which settles the landing.
+  `commandMove` settles the clicked point too, and the player's champion stops when it got no
+  closer for `STUCK.ms` within `STUCK.near` of it (`moveStuckMs`, `lastMoveDist`), so a crowd on the
+  spot doesn't hold it walking. Trunks are narrow enough (`SOLID.trunk` plus a champion's body is
+  under half the 46 px the scenery keeps apart) that a champion passes between any two pines.
 - Victory and defeat panel with the match's objectives, last hits, best streak and beasts slain,
   and "Play again".
 
 Missing or rough:
 
-- No pathing or collisions: units overlap and walk straight lines.
+- No path search: a walker slides round what is in its way one step at a time (`steer`), so a deep
+  pocket of obstacles could hold it; the jungle's spacing keeps such pockets out.
 - No title screen of its own. The only saves are class mastery and the battle spell (below).
 - Bushes hide champions only, not minions. The camera follows the player's champion.
 - AI champions don't use bushes on purpose, and their wards go only to the fixed `WARD_SPOTS`.
@@ -435,6 +449,7 @@ File map (`src/`):
 - `game/spellChoice.ts`: the player's battle spell, the save key `lane-brawl-spell` (`loadSpell`, `saveSpell`).
 - `game/mastery.ts`: class mastery, the save key `lane-brawl-mastery` (`loadMastery`, `recordWin`,
   `masteryRank`).
+- `game/terrain.ts`: the map's obstacles (`SCENERY`, `OBSTACLES`, `SOLID`) and `steer`, `settle`, `blockedBy`; `art/map.ts` takes the lane and clearing helpers and the scenery from it.
 - `game/data.ts`: plain data, with text keys for names and texts. `WORLD`, `LANES`, `BASE`, `TOWERS`, `RIVER`, `CAMPS`, `CAMP_KINDS`,
   `PUPS`, `SIGHT`, `WATCHSTONES`, `WATCH`, `BUFFS`, `JUNGLE`, `KITE`, the balance constants (`TOWER`,
   `CAMP`, `MINION`, `KILL`, `XP_FOR_LEVEL`, respawn times), `CHAMPIONS` with their `AbilityDef`s,

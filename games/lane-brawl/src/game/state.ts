@@ -153,6 +153,9 @@ export interface Unit {
   /** AI champions: the camp or watchstone it went into the jungle for, and until when. */
   jungleTarget: number | null;
   jungleUntil: number;
+  /** The player's champion: how long it has got no closer to its `moveTo`, and how far it was. */
+  moveStuckMs: number;
+  lastMoveDist: number;
   /** Outer towers: the plates still on it (`PLATING`), until they fall away. */
   plates: number;
   /** Champions: the bonus of their team's drake stacks (`DRAKES`), counted in with the buffs; null with none. */
@@ -494,6 +497,8 @@ export function blankUnit(
     gankUntil: 0,
     jungleTarget: null,
     jungleUntil: 0,
+    moveStuckMs: 0,
+    lastMoveDist: Infinity,
     plates: 0,
     drake: null,
     pingGoal: null,
