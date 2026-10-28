@@ -204,6 +204,21 @@ Implemented today:
   top bar's pill and the command bar's panel show the current contract or the board's countdown;
   the board itself is two cards over the map (`GameScene.boardCards`, `drawBoard`), hidden while the
   rivals panel is open.
+- Rival contracts (`Side.deal`, `Deal`, `World.updateDeals`, `dealScore`, `AI_DEAL_MS`, `AI_GOALS`,
+  `nearestEnemyHub`): from 90 s every AI side (slot 0 too when watching) works through a chain of
+  its own, board steps 1 to 4 (`deal.step`, ranks II to V), picking a goal from `AI_GOALS` (`kills`,
+  `hold`, `derelicts`, `razes`, `hubs`) open at that step and not done, with the world's `dealRng`
+  (a `localRandom` of its own, so neither the board's draws nor `Math.random` move). It counts in
+  `removeDead` (a kill, raze or main hub whose last hit was the side's), `updateBeacon` (seconds
+  held) and `updateDeals` (derelicts held now); met, it pays the reward and applies the perk to the
+  side's `perks` (which `unitStats` and the rest already read), and the player gets a notice
+  (`rivalDealDone`). One not met in `AI_DEAL_LIMIT_MS` (180 s) is dropped and picked again. A rival
+  plays to its contract: `kills`, `razes` and `hubs` attack with `AI_DEAL_EAGER` (2) ships fewer
+  (at least 2), `hubs` at the nearest main hub; `hold` keeps a picket on the beacon whatever its
+  rank in `contestBeacon`; `derelicts` claims stations at any reach with `AI_DEAL_CLAIM_ARMY` (2)
+  warships. The rivals panel shows each one's contract and progress (`GameScene.rivalDeals`,
+  `rivalDeal`, `rivalDealsDone`), and `updateDeals` logs `aiDeal` and `aiDealDone` to `aiLog`. The playthrough
+  ends before 90 s, so it plays as before.
 - Flagship (`Side.flagship`, `World.buildFlagship`, `updateFlagship`, `flagshipStats`, `Unit.flagship`,
   `Faction.flagship` in `game/factions.ts`): the third contract done (`FLAGSHIP_STEP`) turns the
   player's flagship from `locked` to `ready`. The Flagship button (`FLAGSHIP_BUTTON`, kind `command`)
@@ -268,7 +283,8 @@ Missing or rough:
   spread apart softly rather than colliding. No save of a battle in progress (only the campaign is saved). No ambient hum under the music, and no per-faction music motif.
 - No edge scrolling: the map scrolls with the keys, a two-finger drag or the minimap.
 - The rivals' Barracks and Turrets are placed at random within 60 to 150 px of their hub.
-- The AI ignores contracts (beyond hunting a convoy and the survive raid) and sees through the fog
+- The AI runs its own contracts but doesn't play against the player's (beyond hunting a convoy and
+  the survive raid), and never takes the convoy, nebula, lattice or survive contracts. It sees through the fog
   (but not into nebulae). Rivals left alone wipe each other out fast: the centre faction usually
   falls first, until the last-stand pact turns the last two on the player.
 - Only the player makes truces and pays tribute; rivals never make peace with each other. The AI
@@ -340,7 +356,7 @@ File map (`src/`):
   keys; `derelictText` fills in the numbers), `TRUCE_MS`,
   `TRUCE_TRIBUTE`, `OFFER_MS`, `BRIBE_COST`, `BRIBE_MS`), `RALLY_SPOTS`, the flagship, convoy and pact constants
   (`FLAGSHIP_COST`, `FLAGSHIP_MS`, `FLAGSHIP_HP`, `FLAGSHIP_DAMAGE`, `FLAGSHIP_SPEED`, `FLAGSHIP_RANGE`,
-  `CONVOY_SIZE`, `PACT_MS`, `PACT_WAVE_MS`), `flagshipStats` and the types `Beacon`, `Shard`, `Mine`,
+  `CONVOY_SIZE`, `PACT_MS`, `PACT_WAVE_MS`), the rival contract constants (`AI_DEAL_MS`, `AI_GOALS`), `flagshipStats` and the types `Beacon`, `Deal`, `Shard`, `Mine`,
   `Pop`, `Build`, `ContractState`, `Pact`, `WorldEvent`, `Struck`, `Cue`, `Derelict`, `SeenBuilding`. Fields `fog`, `known`, `mines`,
   `derelicts`, `contract`, `convoyTo`, `pact`, `sector`. Methods the scene and test use: `update(dt)`, `build`, `train`, `research`,
   `command`, `fallBack`, `setRally`, `clearRally`, `fleet`, `pickContract`, `currentContract`, `buildFlagship`, `abilityOf`, `acceptTruce`, `declineTruce`, `bribe`, `bribeTarget`, `selectableIn`,
@@ -425,7 +441,7 @@ How it runs:
   `contestDerelicts`, `considerTruce` and falling hurt ships back); the pact is signed or raids;
   dead entities are removed (kills, veteran credit, razes, pressure, shards and a lost flagship are
   recorded here, after mines go off); research, the flagship's build, the beacon, shards, the
-  contract (and board) and the fog update; the phase becomes `won` or `lost`.
+  contract (and board), the rivals' contracts (`updateDeals`) and the fog update; the phase becomes `won` or `lost`.
 - Boot bakes all sprites in `create` (320 ship frames and the rest); a new map only repaints the
   backdrop.
 - Time is simulated, not read from the clock: `elapsedMs` is game time, used for the AI grace and
@@ -525,7 +541,7 @@ Test hooks (read by `e2e/playthrough.spec.ts`):
   pay, and a kill and its salvage.
 - `scene.boardCards`: the board's cards; the test taps the `kills` card.
 - `scene.selected`: the ids of the selected units; the test checks that its box selected the wing.
-- Not read by the test, but there: `scene.state.derelicts` (`perk`, `owner`, `claim`), `sides[i].truceMs`,
+- Not read by the test, but there: `scene.state.derelicts` (`perk`, `owner`, `claim`), `sides[i].deal`, `sides[i].truceMs`,
   `offerMs`, `grudge`, `flagship`, `units[i].kills`, `nebula`, `repairing`, `flagship`, `convoy`,
   `state.pact`, `state.convoyTo`, `scene.rivalsOpen`, `keepCards`, `campaign`, `sector` and `sectorNodes`.
 - `scene.camera.scrollX` and `scrollY`: the map's scroll, which the test reads to see whether a pan
@@ -575,7 +591,8 @@ Test hooks (read by `e2e/playthrough.spec.ts`):
 - **A contract**: add or change an entry in `CONTRACT_POOL` (with the step it is offered `from`).
   A new `Goal` needs counting in `World` (`score` for events, or a check in `updateContract`),
   any rule for when it can't be played in `contractOpen`, any setup in `startContract`, and a new
-  perk field in `Perks` and `NO_PERKS` that a stat reads. `FIRST_CONTRACT` and the second board's
+  perk field in `Perks` and `NO_PERKS` that a stat reads. Add it to `AI_GOALS` in `game/world.ts` if the rivals
+  can play it too, with its counting in `dealScore` or `updateDeals`. `FIRST_CONTRACT` and the second board's
   `kills` card are part of the first round, so changing them means updating the playthrough.
 - **A flagship**: its name and ability are `flagship` on each faction in `game/factions.ts`; its
   scaling is the `FLAGSHIP_*` constants in `game/world.ts`. Abilities on units go through
