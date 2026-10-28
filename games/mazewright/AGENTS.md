@@ -111,6 +111,11 @@ Implemented today:
   keeps only `usable` towers. `loadShed` credits past records once, when the key is missing. The
   tool bar narrows its buttons when the pouch holds more than six.
 - Ways of play (`MODES`, `Game.mode`, picked by the `mode` button on the picker): `classic`,
+  `challenge` (Classic with the garden's own pouch, `MapDef.challenge`, lent whether bought or not:
+  the scene's `kit`, the run's tool bar, is it instead of `pouch`; the picker hides the pouch chips
+  and shows `challengeInfo`, and each card `challengePouch`; a win notes `GardenRecord.challenge`,
+  not stars or time, pays `SEEDS.challenge` more, and counts as a star for `SEASON_STARS`; the
+  cards in other ways mark it ✦; every challenge was won by `e2e/bot.ts` with that pouch),
   `swarm` (the wave timer at 0 whatever Calm says, `SWARM_GOLD` on kill and wave gold through
   `pay`), `endless` and `sandbox` (`totalWaves` is Infinity: `waveGroups` repeats waves 11 to 20
   bigger each round; sandbox starts with `SANDBOX_GOLD` and towers grow at once). `stars` gives a
@@ -193,7 +198,8 @@ Missing or rough:
   `mole.webp` and `cover.png` were taken by hand (a
   Playwright script that plants a maze and sends waves 8 and 9); `duo-replay.webp` (a
   two-gardener replay of the Meadow, both purses in the top bar) was made from a replay put in
-  storage; `resume.webp` (the Meadow's card with its ▶ Wave 2 button) was taken
+  storage; `challenge.webp` (the picker in Challenge, the Meadow's won) was taken
+  with a stored record; `resume.webp` (the Meadow's card with its ▶ Wave 2 button) was taken
   by a script that plays wave 1 and reloads; `refused.webp` is the
   playthrough's `playthrough-2-refused` shot. Refresh them when the look changes.
 
@@ -218,7 +224,7 @@ File map (`src/`):
   `TowerDef` carries the extra numbers of the towers that need them (`chain`/`jump`, `dot`/`dotFor`,
   `faces`/`cone`, `boost`, `apples`, `spinTo`/`spinUp`, `aim`), `DAMAGE_KINDS`, `SHELLS`,
   `shellFactor`, `HEAT`, `AIMS`, `aims`. No Phaser.
-- `game/maps.ts`: `MAPS` (`MapDef`: `id`, `season`, `gates`, `goal`, `rocks`, and optional `ponds`,
+- `game/maps.ts`: `MAPS` (`MapDef`: `id`, `season`, `gates`, `goal`, `rocks`, `challenge`, and optional `ponds`,
   `banks`, `path`, `lives`; `line` and `block` spell paths and ponds), `SEASONS`, `SEASON_STARS`,
   `cellIndex`, `cellOf`, `inGrid`. A cell index is `row * COLS + col`.
 - `game/grid.ts`: `distances` (breadth-first search out from the cottage over free cells, 4
@@ -261,7 +267,7 @@ File map (`src/`):
   `viewFrame`. Tools start 176 pixels in, clear of the corner buttons.
 
 Save keys: `mazewright-best` (per garden, `GardenRecord`: best wave, whether it was won, most
-stars, fastest win in seconds and the Endless best), `mazewright-pouch` (the towers picked),
+stars, fastest win in seconds, the Endless best and whether its Challenge was won), `mazewright-pouch` (the towers picked),
 `mazewright-calm` (`'1'` when waves wait for Start wave), `mazewright-duo` (`'1'` for two gardeners), `mazewright-mode` (the way of play) and
 `mazewright-shed` (seeds, `owned` towers, `masters` bought and extra `slots`) and
 `mazewright-replays` (per garden, the latest Classic or Swarm win as a `Replay`) and

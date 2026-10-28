@@ -24,8 +24,8 @@ export const FREE: TowerKind[] = ['hedge', 'bow', 'frost', 'cannon'];
 export const towerSeeds = (kind: TowerKind) => TOWER[kind].cost;
 export const masterSeeds = (kind: TowerKind) => TOWER[kind].cost * 2;
 export const SLOT_SEEDS = [60, 100];
-/** Seeds a game pays: a win `win` plus `star` a star, a loss `loss` plus one per `waves` waves held. */
-export const SEEDS = { win: 10, star: 5, loss: 2, waves: 4 };
+/** Seeds a game pays: a win `win` plus `star` a star (and `challenge` more for a Challenge), a loss `loss` plus one per `waves` waves held. */
+export const SEEDS = { win: 10, star: 5, loss: 2, waves: 4, challenge: 10 };
 
 /** What a tower's hits are made of: shells resist some kinds and crack under others. */
 export const DAMAGE_KINDS = ['sharp', 'blast', 'heat', 'spark', 'cold', 'poison'] as const;
@@ -263,11 +263,12 @@ export const hpScale = () => byDifficulty(0.8, 1, 1.25);
 export const waveReward = (wave: number) => 6 + wave;
 
 /**
- * Ways to play a garden: Classic (the 20 waves), Swarm (every wave the moment the last is out, for
+ * Ways to play a garden: Classic (the 20 waves), Challenge (the 20 waves with the garden's own
+ * pouch, `MapDef.challenge`, for its challenge mark), Swarm (every wave the moment the last is out, for
  * `SWARM_GOLD` times the gold and a fourth star), Endless (waves never stop) and Sandbox
  * (`SANDBOX_GOLD`, towers grow at once, endless waves, no records).
  */
-export const MODES = ['classic', 'swarm', 'endless', 'sandbox'] as const;
+export const MODES = ['classic', 'challenge', 'swarm', 'endless', 'sandbox'] as const;
 export type Mode = (typeof MODES)[number];
 export const SWARM_GOLD = 1.25;
 export const SANDBOX_GOLD = 10000;
