@@ -57,7 +57,7 @@ import {
 import { Fx, GameState, ObjectiveTitle, Phase, Unit, createGame, dist, getUnit } from '../game/state';
 import { loadMastery, masteryRank, recordWin } from '../game/mastery';
 import { loadSpell, saveSpell } from '../game/spellChoice';
-import { abilityFor, atFountain, atShop, buy, buyBack, buybackCost, cast, castSpell, chooseUpgrade, commandAttack, commandMove, hiddenFrom, invulnerable, priceFor, sendPing, startRecall, stealthed, tick, useActive, viewers } from '../game/sim';
+import { abilityFor, atFountain, atShop, buy, buyBack, buybackCost, cast, castSpell, chooseUpgrade, commandAttack, commandMove, hiddenFrom, invulnerable, priceFor, sendPing, startRecall, stealthed, nightness, tick, useActive, viewers } from '../game/sim';
 import { FxLayers, drawAura, drawProjectile, drawSkill, drawZone, skillMs } from './skillFx';
 import { shortName } from '../game/names';
 import { t, type TextKey } from '../i18n';
@@ -210,6 +210,8 @@ const FOG_ROWS = Math.ceil(WORLD.h / FOG_CELL);
 /** How dark the fog is where blue sees nothing (0..1), and the shades it is drawn in. */
 const FOG_ALPHA = 0.72;
 const FOG_STEPS = 10;
+/** How dark the blue of full night lies over the world (0..1). */
+const NIGHT_ALPHA = 0.42;
 
 const noop = () => undefined;
 
@@ -973,6 +975,9 @@ export class GameScene extends Phaser.Scene {
     if (s) {
       const step = 10;
       const x0 = Math.floor(v.x / step) * step, y0 = Math.floor(v.y / step) * step;
+      // Night: a deep blue dusk over the whole view, under the fog.
+      const dark = nightness(s.time);
+      if (dark > 0 && s.phase === 'playing') this.fogG.fillStyle(0x0b1638, NIGHT_ALPHA * dark).fillRect(v.x, v.y, v.w, v.h);
       this.paintFog(this.fogG, x0, y0, v.x + v.w - x0, v.y + v.h - y0, step, 0, 0, 1);
       if (s.phase === 'playing') this.paintFog(this.fogMini, 0, 0, WORLD.w, WORLD.h, FOG_CELL, MINIMAP.x, MINIMAP.y, MINIMAP.w / WORLD.w);
     }
@@ -1637,7 +1642,23 @@ export class GameScene extends Phaser.Scene {
     g.fillStyle(col('#1b212d'), 1).fillRect(SCREEN.w / 2 - 37, 4, 74, 26);
     const mins = Math.floor(s.time / 60000);
     const secs = Math.floor((s.time % 60000) / 1000);
-    this.t('clock', SCREEN.w / 2, 8, `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`, 16, UI.text, 'center', true);
+    this.drawSky(g, SCREEN.w / 2 - 28, 17, nightness(s.time));
+    this.t('clock', SCREEN.w / 2 + 5, 8, `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`, 16, UI.text, 'center', true);
+  }
+
+  /** A small sun by day and a crescent moon by night, at (x, y), beside the clock. */
+  private drawSky(g: Phaser.GameObjects.Graphics, x: number, y: number, dark: number) {
+    if (dark < 0.5) {
+      g.fillStyle(col('#f2c14e'), 1).fillCircle(x, y, 4);
+      g.lineStyle(1.5, col('#f2c14e'), 1);
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2;
+        g.lineBetween(x + Math.cos(a) * 6, y + Math.sin(a) * 6, x + Math.cos(a) * 8, y + Math.sin(a) * 8);
+      }
+    } else {
+      g.fillStyle(col('#cfd8ff'), 1).fillCircle(x, y, 6);
+      g.fillStyle(col('#1b212d'), 1).fillCircle(x + 3, y - 2, 5);
+    }
   }
 
   /** Recall home while alive (filling as it channels); while dead, buy back at a price, or when it is next allowed. */

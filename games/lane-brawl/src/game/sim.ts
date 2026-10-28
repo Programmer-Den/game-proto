@@ -40,6 +40,7 @@ import {
   SHOP_RANGE,
   FOUNTAIN,
   SIGHT,
+  DAYNIGHT,
   MAX_LEVEL,
   TOWER,
   Vec,
@@ -122,6 +123,12 @@ export function tick(s: GameState, dt: number) {
     s.platesGone = true;
     for (const u of s.units) u.plates = 0;
     notice(s, text('noticePlatesGone'), '#f2c14e');
+  }
+  const night = nightness(s.time) >= 0.5;
+  if (night !== s.night) {
+    s.night = night;
+    notice(s, text(night ? 'noticeNightfall' : 'noticeDaybreak'), night ? '#9fb4ff' : '#f2c14e');
+    sound(s, night ? 'nightfall' : 'daybreak');
   }
   if (s.pings.length && s.time - s.pings[0].at > PING.showMs) s.pings = s.pings.filter((p) => s.time - p.at <= PING.showMs);
   for (const u of [...s.units]) updateUnit(s, u, dt);
@@ -1698,10 +1705,24 @@ function updateWatchstones(s: GameState, dt: number) {
   }
 }
 
-/** How far a unit sees, or 0 if it gives its team no sight. */
-function sightOf(u: Unit): number {
+/**
+ * How dark it is at a time of the match: 0 by day, 1 at full night, in between at dusk and dawn
+ * (the last `DAYNIGHT.fade` of the day and of the night).
+ */
+export function nightness(time: number): number {
+  const { day, night, fade } = DAYNIGHT;
+  const p = time % (day + night);
+  if (p < day - fade) return 0;
+  if (p < day) return (p - (day - fade)) / fade;
+  if (p < day + night - fade) return 1;
+  return 1 - (p - (day + night - fade)) / fade;
+}
+
+/** How far a unit sees at `dark` (from `nightness`), or 0 if it gives its team no sight. */
+function sightOf(u: Unit, dark: number): number {
   switch (u.kind) {
     case 'champion':
+      return SIGHT.champion * (1 - (1 - DAYNIGHT.sight) * dark);
     case 'minion':
     case 'tower':
     case 'inhibitor':
@@ -1718,9 +1739,10 @@ function sightOf(u: Unit): number {
 /** The units that give a team sight, with how far each sees. */
 export function viewers(s: GameState, team: Team): { x: number; y: number; r: number }[] {
   const out: { x: number; y: number; r: number }[] = [];
+  const dark = nightness(s.time);
   for (const v of s.units) {
     if (v.dead || v.side !== team) continue;
-    const r = sightOf(v);
+    const r = sightOf(v, dark);
     if (r > 0) out.push({ x: v.x, y: v.y, r });
   }
   return out;

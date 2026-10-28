@@ -342,6 +342,13 @@ Implemented today:
   closer for `STUCK.ms` within `STUCK.near` of it (`moveStuckMs`, `lastMoveDist`), so a crowd on the
   spot doesn't hold it walking. Trunks are narrow enough (`SOLID.trunk` plus a champion's body is
   under half the 46 px the scenery keeps apart) that a champion passes between any two pines.
+- Day and night (LB21): `DAYNIGHT` in `data.ts`. `nightness(time)` in `sim.ts` is 0 by day, 1 at
+  full night and ramps over `DAYNIGHT.fade` at dusk and dawn; `sightOf` scales champion sight by it
+  down to `DAYNIGHT.sight`, so `viewers` (the rules' vision and the view's fog) both
+  follow it. `tick` flips `s.night` at half dark with a notice and the `nightfall` or `daybreak`
+  sound. The view lays a blue tint (`NIGHT_ALPHA`) over the world in `fogG`, under the fog, and
+  `drawSky` draws a sun or moon beside the clock. The first night falls at 2:50, after the
+  playthrough's first round.
 - Victory and defeat panel with the match's objectives, last hits, best streak and beasts slain,
   and "Play again".
 
@@ -614,6 +621,10 @@ Effects (`sfx`), where they are raised:
 | `spell` | the player casts a battle spell (`castSpell`) |
 | `rune` / `runeTaken` | runes appear / a rune taken (the player's own, or one in view) (`updateRunes`) |
 | `watchstone`, `growl`, `beastSlain`, `brute` | a watchstone taken, the beast waking or turning elder, the beast slain, a brute's buff taken |
+| `ping` | a ping sent by the player (`sendPing`), or an ally's danger call on blue's side (`championPlan`) |
+| `drakeWakes` / `drake` | a drake wakes / is slain (`updateUnit`, `slayDrake`) |
+| `firstBlood`, `plate` | the first champion kill (`kill`), a tower plate breaks (`breakPlates`) |
+| `nightfall` / `daybreak` | night falls / day breaks (`tick`) |
 | `objective` / `objectiveMissed` | the player's objective done / missed (`updateObjective`) |
 
 Shared `ui` sounds: `click` for the Shop button, B and Play again; `coin` for a purchase;

@@ -257,7 +257,13 @@ left, under bevelled slate panels.
     block, and the jungle's pines and rocks, the ruins, the stones round the pits and every tower,
     inhibitor and Nexus stand in the way, so units walk round them. A dash or blink that lands in
     one comes out at its edge.
-26. **Winning** destroys the red Nexus. Losing means your Nexus falls first.
+26. **Day and night**: the match starts in the morning. Every three minutes night falls for a
+    minute and a half: the map turns a deep blue, a moon replaces the sun by the clock, and
+    champions see only 80% as far (minions, towers, watchstones and wards see as before), so the
+    fog closes in and the tall grass is better for an ambush.
+
+    ![Night over the mid lane](docs/screenshots/night.webp)
+27. **Winning** destroys the red Nexus. Losing means your Nexus falls first.
 
 Every ability has an animation of its own (a hammer that splits the ground, a meteor from the
 sky, a harpoon on its rope, a coil pylon arcing, a blood moon rising and so on), and so do bolts in

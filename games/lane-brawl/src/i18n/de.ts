@@ -487,6 +487,8 @@ const de: Translation<typeof en> = {
   noticeWatchstoneBlue: 'Euer Team hat einen Wachstein eingenommen',
   noticeFirstBlood: 'Erstes Blut! {line} (+{gold} Gold)',
   noticePlatesGone: 'Die Turmplatten fallen ab',
+  noticeNightfall: 'Die Nacht bricht an: Alle sehen weniger weit',
+  noticeDaybreak: 'Der Tag bricht an',
   noticeDrakeAwake: 'Der {drake} erwacht im Fluss',
   noticeDrakeBlue: 'Dein Team erschlug den {drake}: {n} von 4 zur Drachenseele',
   noticeDrakeRed: 'Rot erschlug den {drake}: {n} von 4 zur Drachenseele',
