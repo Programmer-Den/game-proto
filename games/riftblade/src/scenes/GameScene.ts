@@ -10,7 +10,7 @@ import { buy, chooseEvent, chooseNode, chooseWorld, chartOptions, frame, leave, 
 import { ARENA_MS, BOSSES, CHAMPION, PLANETS, SIEGE, STRIKE, VENT, planetLabel } from '../game/planets';
 import { UPGRADES, MAX_TIER } from '../game/upgrades';
 import {
-  clearRun, isResumable, isUnlocked, loadProgress, loadRun, recordCharted, recordRun, recordUnlocks, saveRun, unlockedHeroes, type Progress,
+  clearRun, isBetweenWorlds, isUnlocked, loadProgress, loadRun, recordCharted, recordRun, recordUnlocks, saveRun, unlockedHeroes, type Progress,
 } from '../game/save';
 import { C, hex } from '../art/glow';
 import { heroKey } from '../art/sprites';
@@ -69,9 +69,6 @@ const HERO_LIKE: readonly GameState['allies'][number]['kind'][] = ['trooper', 'l
 /** The hero art's centre within its texture (see HERO_BOX in sprites.ts). */
 const HERO_ORIGIN = { x: 0.5, y: 52 / 120 };
 
-/** How often a run under way is saved while fighting, ms of run time (panels save as they open). */
-const RUN_SAVE_MS = 5000;
-
 /** Cheap repeatable noise for the ground's decorations (Math.random is left to the rules). */
 function hash(x: number, y: number, k = 0) {
   const n = Math.sin(x * 127.1 + y * 311.7 + k * 74.7) * 43758.5453;
@@ -97,8 +94,6 @@ export class GameScene extends Phaser.Scene {
   private recorded = false;
   /** Plays the run's sounds and music by watching the state frame to frame. */
   private cues = new SoundCues();
-  /** The run time of the last save of the run under way. */
-  private savedAt = 0;
 
   private ground!: Phaser.GameObjects.Graphics;
   private under!: Phaser.GameObjects.Graphics;
@@ -219,7 +214,7 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  /** Saves the run under way every few seconds and when the page is hidden or closed. */
+  /** Saves the run between worlds when the page is hidden or closed (panels save as they open). */
   private setUpSaving() {
     const save = () => this.saveRun();
     const onHide = () => {
@@ -234,9 +229,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private saveRun() {
-    if (!isResumable(this.state)) return;
+    if (!isBetweenWorlds(this.state)) return;
     saveRun(this.state);
-    this.savedAt = this.state.runMs;
   }
 
   /** Picks up a run saved when the game was closed, where it stood. */
@@ -248,7 +242,6 @@ export class GameScene extends Phaser.Scene {
     this.chosen = s.hero!;
     this.savedDeeds = s.deeds.length;
     this.recorded = false;
-    this.savedAt = s.runMs;
     this.hero.setTexture(heroKey(s.hero!, heroVariant(s))).setVisible(true);
     this.cues.resume(s);
   }
@@ -361,7 +354,8 @@ export class GameScene extends Phaser.Scene {
     startRun(this.state, id, unlockedHeroes(this.progress), (Math.hypot(SCREEN.w, SCREEN.h) - Math.hypot(VIEW.w, VIEW.h)) / 2);
     this.savedDeeds = 0;
     this.recorded = false;
-    this.saveRun();
+    // A new run is first saved once its first world is cleared.
+    clearRun();
     this.hero.setTexture(heroKey(id)).setVisible(true);
     this.walking = false;
     this.stick = null;
@@ -439,7 +433,6 @@ export class GameScene extends Phaser.Scene {
     const here = this.state.hero ? PLANETS[this.state.planet].id : null;
     if (here && this.state.phase === 'run' && !this.progress.charted.includes(here)) this.progress = recordCharted(here);
     if (this.panelKey() !== this.shown) this.syncPanel();
-    else if (this.state.phase === 'run' && this.state.runMs - this.savedAt >= RUN_SAVE_MS) this.saveRun();
     this.draw();
   }
 
@@ -461,7 +454,8 @@ export class GameScene extends Phaser.Scene {
       this.progress = recordRun(s.hero!, s.runMs, s.phase === 'won', s.stage + 1, s.route.map((i) => PLANETS[i].id));
       clearRun();
     }
-    // Every other panel (a level-up, the maps, the trader, an event) saves the run as it opens.
+    // Every other panel saves the run as it opens, if it is between worlds (the maps, the trader,
+    // an event, the cards after a clear).
     else this.saveRun();
     // The panel is kept before it is built, so one that throws half-built (a corrupt saved run) is
     // still destroyed by the next call.
