@@ -46,9 +46,10 @@ export interface ProgressPayload {
 
 /**
  * Whether storage `key` is too big for a progress code, so only files carry it: a game's saved
- * replays (`<game>-replays`), which would push the code past what a QR code holds.
+ * replays (`<game>-replays`) and a run under way (`<game>-run`, saved mid-fight), which would push
+ * the code past what a QR code holds. A code then moves only the lasting progress.
  */
-export const fileOnly = (key: string) => key.endsWith('-replays');
+export const fileOnly = (key: string) => key.endsWith('-replays') || key.endsWith('-run');
 
 /** The progress `kind` covers on this device, saved now; `forCode` leaves out the `fileOnly` keys. */
 export function progressPayload(kind: string, games: string[], forCode = false): ProgressPayload {

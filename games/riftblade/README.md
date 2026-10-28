@@ -347,6 +347,8 @@ nothing is left a Field Ration heals you.
 The longest run, the wins and the furthest world reached per hero, the heroes unlocked and the
 planets landed on are saved in the browser. So is the run under way: close the game mid-run (in a
 fight, at a level-up or between planets) and it picks up where it stood when you open it again.
+A progress code (QR code or link) moves only the lasting progress, not the run under way; a
+progress file moves both.
 
 ![A run picked up again after the game was closed mid-fight](docs/screenshots/resumed-run.webp)
 

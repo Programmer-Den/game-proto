@@ -316,7 +316,8 @@ saves load unchanged.
   `furthest` world is open (so saves from when Rook and Bram were free keep them), and the deeds
   of reaching a world (Kael, Veyl, Joren) also count from `furthest`. `GameScene` saves new
   `state.deeds` with `recordUnlocks` as they happen.
-- `riftblade-run`: the run under way, the whole `GameState` as JSON (it is plain data; `Infinity`,
+- `riftblade-run`: the run under way (left out of progress codes by the hub's `fileOnly`, so a
+  code moves only `riftblade-progress` and the trophies; files carry it), the whole `GameState` as JSON (it is plain data; `Infinity`,
   as in `nextElite` and `objectiveAt`, is stored as the text `"Infinity"`). `loadRun` lays it over
   `freshState()` (and the hero over `freshHero()`), so fields added since take their fresh values;
   one with an unknown hero, a phase it can't resume in, an unknown planet or `next`, a `stage`
