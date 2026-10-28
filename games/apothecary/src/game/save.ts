@@ -151,7 +151,10 @@ function merged(start: unknown, saved: unknown): unknown {
  * load decides on them, and `thin` tells `loadState` to fill the rest back in.
  */
 function thinSave(state: GameState) {
-  return { ...(roundTimers(trimmed(state, baseline(state))) as Json), version: state.version, layout: state.layout, thin: 2 };
+  const thin = roundTimers(trimmed(state, baseline(state))) as Json;
+  // The doctor's feet are pixels, not a timer: rounded to a whole pixel, not to the nearest 100.
+  if ('player' in thin) thin.player = { x: Math.round(state.player.x), y: Math.round(state.player.y) };
+  return { ...thin, version: state.version, layout: state.layout, thin: 2 };
 }
 
 /**

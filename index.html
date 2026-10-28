@@ -116,7 +116,6 @@
           <button type="button" class="close" id="close-settings" data-i18n-label="close" aria-label="Close">✕</button>
         </div>
       </dialog>
-      <!-- One game's settings, opened from the ⚙ on its card. -->
       <!-- The trophy shelf: every trophy earned on this device, by game (shared/trophies.ts). -->
       <dialog id="trophies" aria-labelledby="trophies-title">
         <div class="panel">
@@ -127,6 +126,7 @@
         </div>
       </dialog>
 
+      <!-- One game's settings, opened from the ⚙ on its card. -->
       <dialog id="game-settings" aria-labelledby="game-settings-title">
         <div class="panel">
           <h2 id="game-settings-title"></h2>
@@ -481,7 +481,13 @@
         }
       };
       // Coming back to the hub with the browser's back button shows it as it was, so look again.
-      window.addEventListener('pageshow', (e) => e.persisted && showBadges());
+      // That includes the trophies, time played and last played games the game just changed.
+      window.addEventListener('pageshow', (e) => {
+        if (!e.persisted) return;
+        showBadges();
+        showTrophies();
+        showRecent();
+      });
 
       // Each card gets a ⚙ that opens its game's own settings: delete just that game's progress, or play.
       const gameDialog = document.getElementById('game-settings');

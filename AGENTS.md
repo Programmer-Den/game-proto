@@ -200,7 +200,7 @@ and tries to link it to the repo (the run summary says if the link has to be mad
   with the game's prefix, and as a progress code, a QR code or copied link with the same data
   (`shared/progressCode.ts`, packed by `shared/pack.ts`, which rounds numbers to six significant
   digits, and scanned inside the hub with `shared/scanner.ts`) except keys too big
-  for a QR code (`fileOnly` in `saveFile.ts`: a game's `<game>-replays` and a run under way, `<game>-run`), which only the file carries.
+  for a QR code (`fileOnly` in `saveFile.ts`: a game's `<game>-replays` and a run under way, `<game>-run`), which only the file carries (importing a code leaves the device's own as they are).
 - **Play counts come for free.** `setupGame` also bumps the game's public play counter
   (`shared/playCount.ts`, keyed by the game's folder name) and the hub shows the count on its card,
   so a new game needs nothing for it. Tests never count: browser automation skips it.

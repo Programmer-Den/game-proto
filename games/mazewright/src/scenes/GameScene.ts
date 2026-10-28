@@ -399,7 +399,8 @@ export class GameScene extends Phaser.Scene {
         if (g.mode !== 'sandbox' && !this.replay) {
           // A Challenge win earns the garden's challenge mark; its stars and time are a Classic record's.
           noteRecord(this.records, g.map.id, g.mode === 'challenge' ? { challenge: true } : { wave: g.wave, won: true, stars: stars(g), time: Math.round(g.clock) });
-          saveReplay(this.replays, replayOf(g));
+          // A garden keeps one replay, its latest Classic or Swarm win, which a Challenge win leaves alone.
+          if (g.mode !== 'challenge') saveReplay(this.replays, replayOf(g));
           this.recordTrophies();
         }
         this.earn(g);
@@ -420,9 +421,9 @@ export class GameScene extends Phaser.Scene {
     this.recordTrophies();
   }
 
-  /** Earns a trophy, unless a replay is only being watched. */
+  /** Earns a trophy, unless a replay is only being watched or the game is a free Sandbox one. */
   private trophy(id: string, quiet = false) {
-    if (!this.replay) award(trophies, id, { quiet });
+    if (!this.replay && this.state?.mode !== 'sandbox') award(trophies, id, { quiet });
   }
 
   /** The trophies the gardens' records earn: a win, Last Cabbage, the challenges, winter and Endless. */

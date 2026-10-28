@@ -135,12 +135,13 @@ upgrades. A run is the endless Open Road or a 10-wave operation, picked on the g
   and `de.ts`: the name keyed by the id, what earns it by `<id>Text`), and imports nothing else from
   the game, since the hub loads it for its trophy shelf. `main.ts` hands `trophies` to `setupGame`,
   which lists them on the start and pause screens. `check.ts` holds each trophy's condition on the
-  `GameState` (`EARNED`: the first wave cleared, a frenzy, `DRUM_KILLS` 5 kills from one drum, a
-  survivor saved, a perk, a boss beaten, `MAX_COMPANIONS` companions, an Open Road extraction, an
-  operation won, every outpost upgrade at `OUTPOST_MAX`) and `checkTrophies(state)`, which
-  `GameScene.update` calls every frame, game over included (the outpost is bought there). A new
-  trophy is an entry in `index.ts`, its two texts in each language file and its condition in
-  `EARNED`.
+  `GameState` (`EARNED`: the first wave cleared, a frenzy, a survivor saved, a perk, a boss
+  beaten, `MAX_COMPANIONS` companions, an Open Road extraction, an operation won, every outpost
+  upgrade at `OUTPOST_MAX`) and `checkTrophies(state)`, which `GameScene.update` calls at the start
+  of every frame, game over included (the outpost is bought there), and again after the step, so a
+  trophy is saved in the frame that earns it. Big bang (`DRUM_KILLS` 5 kills from one drum) is
+  awarded by `checkBlast(killed)`, which `explode` calls for each drum. A new trophy is an entry in
+  `index.ts`, its two texts in each language file and its condition in `EARNED`.
 - `src/game/pool.ts`: generic `Pool<T>` with `take`, `release`, `live` and `all`, to reuse sprites.
 - `src/art/paint.ts`: shared canvas tools (`bake`, `rng`, `circle`, `path`, colour helpers), `HI`
   (textures are painted at 2x on a screen that needs no scaling), `FULL_SCREEN` (layers painted at

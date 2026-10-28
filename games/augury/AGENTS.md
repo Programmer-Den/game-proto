@@ -90,9 +90,11 @@ File map (`src/`):
   every `BOSS_EVERY`th puzzle of Endless and Draft (`isBossTurn(n)`, by puzzles dealt) is a `Card`
   with a `boss` (its second half, another kind); `endlessCard` queues them and `offerDraft` deals
   only bosses on a boss turn. `timeFor` gives the pair one clock, and when the first half is
-  solved `check` calls `secondHalf`, which records it and deals the second as `current` with the
-  same clock, hints and omen and `pair` set to the boss card (events `half` and `start`). `end`
-  records the boss as one `Result` (`card` the boss, `boss: true`), paying `BOSS_POINTS` times;
+  solved `check` calls `secondHalf`, which deals the second as `current` with the same clock,
+  hints and omen, `pair` set to the boss card and `pairMs`/`pairHints` the first half's time and
+  hints (events `half` and `start`). `end` records both halves in `Progress` (the first as solved,
+  each with its own time and hints, so a reload mid-boss never records the first twice) and the
+  boss as one `Result` (`card` the boss, `boss: true`), paying `BOSS_POINTS` times;
   a beaten boss offers relics (`next`; in Endless `takeRelic` then deals the next queued card
   through `dealQueued`, and `offerRelics` leaves the Crystal Ball out). The next card never
   repeats the kind a boss ends on (`lastKind`). Only this file changes a `Run`; `act` and
@@ -165,7 +167,7 @@ How it runs:
 
 State model (`Run`): `mode`, `phase`, `hearts`, `maxHearts`, `hints`, `score`, `streak`, `dealt`,
 `solved`, `current` (`card`, `state`, `timeLeftMs`, `timeTotalMs`, `elapsedMs`, `hintsUsed`, `freeHints`,
-`freeUsed`, `omen`, `touched`, `pair`, `history`), `queue`, `results`, `last`, `betweenMs`, `clockMs`, `relics`, `relicOffer`,
+`freeUsed`, `omen`, `touched`, `pair`, `pairMs`, `pairHints`, `history`), `queue`, `results`, `last`, `betweenMs`, `clockMs`, `relics`, `relicOffer`,
 `draftOffer`, `player`, `totals`, `duelSolved`, `day`, `progress`, `newBest` and `events`.
 
 Persistence: three `localStorage` keys. `augury-trophies` holds the trophies earned (written by

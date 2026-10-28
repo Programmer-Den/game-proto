@@ -77,7 +77,9 @@ a star map between them.
   numbers the week (Mondays 00:00 UTC from 2024), `weeklyOf(week, open heroes)` picks its hero and
   two of six `MUTATORS` with its own generator. The run (`state.week`, `state.mutators`) is fought
   at heat 0 without the Armoury; `reseed` swaps `Math.random` for a seeded one at the start, on the
-  space map's choice (`chooseWorld`), at each new planet (`nextPlanet`) and on resume, and
+  space map's choice (`chooseWorld`), at each new planet (`nextPlanet`) and on resume (from
+  `state.rng`, the generator's position `rngAt()` that `GameScene.saveRun` stores, so a run picked
+  up mid-fight draws on as it would have; older saves without it reseed from the stage), and
   `unseed` puts the page's own back at the run's end, Run again and any other run's start. Mutator
   effects (`MUT`): Glass Cannon and Overcharged in `statsOf` and `startRun`, Swarm in `director`
   and `spawnAt`, Haste in `statsOf` and `spawnAt`, Vampire in `kill` (and no regen), Fragile Foes
@@ -374,7 +376,8 @@ saves load unchanged.
   `freshState()` (and the hero over `freshHero()`), so fields added since take their fresh values;
   one with an unknown hero, a phase it can't resume in, an unknown planet or `next`, a `stage`
   outside the crusade, unknown `nodes`, `offers` or `choices`, a malformed `event`, or a list field of the state or
-  hero (`enemies`, `bullets`, `dashHit`, ...) that is not an array is dropped. Keep
+  hero (`enemies`, `bullets`, `dashHit`, ...) that is not an array is dropped (an `rng` that is not a
+  generator position becomes -1). Keep
   `GameState` plain data (no Maps, Sets, class instances or shared references), or teach
   `saveRun` and `loadRun` the new kind.
 

@@ -9,10 +9,9 @@ export const STREAK = 10;
 const FIRST_BOSS_WAVE = 10;
 const TOP_HEAT = 3;
 
-/** Whether each trophy's condition holds in the state. */
+/** Whether each trophy's condition holds in the state. Cloud of arrows is awarded by `GameScene.loose`. */
 const EARNED: Record<string, (s: GameState) => boolean> = {
   firstWave: (s) => s.bestWave >= 1,
-  firstRain: (s) => s.rain.volleys.length > 0,
   firstGuard: (s) => s.guards.some((g) => g !== null),
   streak: (s) => s.streak.best >= STREAK,
   firstBoss: (s) => s.bestWave >= FIRST_BOSS_WAVE,

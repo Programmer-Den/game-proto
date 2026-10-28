@@ -126,7 +126,7 @@ Implemented today:
   icon, `hidden` for `endless`) with their texts in `trophies/i18n/` (`en.ts`, `de.ts`: the name
   keyed by the id, what earns it by `<id>Text`), and imports nothing else from the game, since the
   hub loads it. `main.ts` hands `trophies` to `setupGame`. The scene awards them with `trophy(id)`
-  (never while a replay is watched, and nothing while `resumeGame` plays a save back): `firstHold`
+  (never while a replay is watched or in Sandbox, and nothing while `resumeGame` plays a save back): `firstHold`
   on `cleared`, `longMaze` on `built` once a burrow's `dist` reaches `LONG_MAZE` (60; not in a path
   garden), `master` on `upgraded` to `MASTER`, `everyCabbage` on `won` with `cabbagesLeft` at
   `maxLives`, and `recordTrophies` the ones the records earn (`firstWin`, `lastCabbage`,
@@ -219,7 +219,7 @@ Missing or rough:
 File map (`src/`):
 
 - `main.ts`: creates the `Phaser.Game` (960x540 from `VIEW`, `Phaser.Scale.FIT`) with `GameScene`,
-  calls `setupGame(game, { howToPlay })` and then `setupScaling(game, { fill: true })`, and in dev
+  calls `setupGame(game, { howToPlay, trophies })` and then `setupScaling(game, { fill: true })`, and in dev
   builds puts `game` on `window`.
 - `trophies/`: the trophies and their texts (see Trophies above).
 - `howToPlay.ts`: the How to play text in English (also US English) and German.
@@ -285,7 +285,7 @@ stars, fastest win in seconds, the Endless best and whether its Challenge was wo
 `mazewright-replays` (per garden, the latest Classic or Swarm win as a `Replay`) and
 `mazewright-game-replays` (the game in play at its last break, a `SavedGame`) and
 `mazewright-trophies` (the trophies earned, kept by `shared/trophies.ts`); progress files carry
-both, and progress codes leave them out as too big for a QR code (`shared/saveFile.ts` `fileOnly`
+both `-replays` keys, and progress codes leave them out as too big for a QR code (`shared/saveFile.ts` `fileOnly`
 skips keys ending in `-replays`).
 
 Test hooks (read by `e2e/playthrough.spec.ts` through `window.game.scene.getScene('Game')`):

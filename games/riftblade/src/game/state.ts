@@ -451,6 +451,8 @@ export interface GameState {
   /** The weekly run's week (-1 for any other run) and its mutators (see `weekly.ts`). */
   week: number;
   mutators: MutatorId[];
+  /** Where the weekly run's seeded `Math.random` stood when the run was saved (`rngAt`, -1 for none). */
+  rng: number;
   /**
    * The planet (an index into `PLANETS`: 0 Dune, 1 Swamp, 2 Ice, 3 Lava, then the later ones) and
    * the jump of the crusade it is (`stage`, 0 to 3), and whether this is the elite arena after it.
@@ -584,6 +586,7 @@ export function freshState(): GameState {
     freeReroll: false,
     week: -1,
     mutators: [],
+    rng: -1,
     planet: 0,
     stage: 0,
     route: [0],

@@ -8,7 +8,7 @@ import { pack, unpack } from './pack';
 /**
  * Progress codes: the same progress a file carries (`saveFile.ts`), as a link with the data in its
  * `#p=` part, to show as a QR code that another device's camera opens, or to copy and paste. It
- * leaves out what only files carry (`fileOnly`: saved replays and a run under way). The code is a format version byte,
+ * leaves out what only files carry (`fileOnly`: saved replays and a run under way), and an import keeps this device's ones. The code is a format version byte,
  * the two-letter kind (the game's code from `saveCodes.ts`, `gh` for every game), a 12-byte IV and the deflated payload sealed with AES-GCM, the first three bytes
  * included in the seal, so a code that was changed, cut short or is of another kind fails to
  * unseal. Its bytes are written as digits, 7 bytes to 17 digits, which the QR code's numeric mode
@@ -255,7 +255,7 @@ export async function askToImportCode(text: string, games: string[], titleOf: (g
   const date = Number.isNaN(saved.getTime()) ? '?' : formatDate(saved, { dateStyle: 'medium', timeStyle: 'short' });
   const all = code.kind === ALL;
   if (!confirm(all ? t('importCodeAllConfirm', { date }) : t('importCodeGameConfirm', { game: titleOf(code.kind), date }))) return;
-  const result = writeProgress(code.payload, code.kind, games);
+  const result = writeProgress(code.payload, code.kind, games, true);
   if (result !== 'ok') {
     alert(t(result === 'noSpace' ? 'importNoSpace' : 'importCodeFailed'));
     return;

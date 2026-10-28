@@ -204,6 +204,26 @@ stone joints, the lanterns have coloured-glass panes and the moths are lace-wing
 The difficulty, set on the hub page's Settings, changes one thing: lanterns burn 26 seconds on
 Easy and 16 on Hard, instead of 20. (A heavy moth's lanterns burn 50% longer on every setting.)
 
+### Trophies
+
+Ten trophies, listed behind the Trophies button on the start and pause screens and counted on the
+hub's card. Each pops up at the top of the page once, when it is earned.
+
+| Tier | Trophy | Earned by |
+| --- | --- | --- |
+| Bronze | Just in time | Refilling a lantern in a close call |
+| Bronze | First light | Keeping your first night |
+| Bronze | Shoo! | Chasing off a bat |
+| Bronze | Good neighbour | Answering a cottage window's call |
+| Silver | Strung together | Having a whole lantern chain lit at nightfall |
+| Silver | Night watch | Keeping five nights in one game |
+| Silver | On the move | Moving the keep to another district |
+| Gold | Great Festival | Keeping ten nights and reaching the Great Festival |
+| Gold | Tempting fate | Playing with four curses taken |
+| Gold | Keeper of the flame (hidden) | Keeping twenty nights in one game |
+
+![The trophy list on the pause screen](docs/screenshots/trophy-list.webp)
+
 ## Running locally
 
 `npm run dev` at the repo root, then open `/games/lanternkeep/` (or pick Lanternkeep on the hub
@@ -245,6 +265,8 @@ All paths are inside `games/lanternkeep/`.
   lanterns of every kind, moth, bat and owl puppets, mist, bunting, sky lanterns, plaques, icons),
   painted on 2D canvases at startup.
 - `src/ui/`: the button.
+- `src/trophies/`: the ten trophies. `index.ts` lists them with their texts in `i18n/`, and
+  `check.ts` awards them from the state each frame.
 
 Retuning a night is the constants at the top of `src/game/state.ts`; an upgrade is its row in
 `UPGRADES` there, a moth kind its row in `MOTH_KINDS`, an order its row in `ORDERS`, the gusts

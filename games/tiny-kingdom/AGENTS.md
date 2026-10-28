@@ -167,8 +167,9 @@ Implemented today:
   (all four `SPECIALS` in `unlocked`). Silver: `roundEight` (round 8 reached), `longChain` (40
   buildings joined to the castle at once, `joinedCount`) and `tenCrowns` (10 crowns in all). Gold:
   `bigKingdom` (a kingdom finished with 350), `threeStars` (three stars on a campaign level) and
-  `campaign` (hidden: a star on all eight levels), the last two read from `loadStars`. A greedy
-  player finishes with 210 to 340 and joins about 50, so the gold and silver numbers ask for more
+  `campaign` (hidden: a star on all eight levels), the last two read from `loadStars` with a
+  campaign kingdom just finished folded in, so they work with storage blocked. A greedy player
+  finishes with 210 to 340 and joins about 50, so the gold and silver numbers ask for more
   than it. `checkTrophies` in `trophies/check.ts` runs at the end of the scene's `refresh`, after
   every change; its first call on a page is quiet, so crowns and stars saved before trophies earn
   theirs without a toast. The playthrough's decree earns `firstCrown`.

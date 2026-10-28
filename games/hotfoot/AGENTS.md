@@ -81,7 +81,7 @@ in.
 
 - `src/howToPlay.ts`: the How to play screen's text (goal, controls, core loop and tips) in British
   English, US English (the same with "Armory", made by `us`) and German, picked with `byLanguage`
-  and handed to `setupGame(game, { howToPlay })` in `src/main.ts`; update every language when the
+  and handed to `setupGame(game, { howToPlay, trophies })` in `src/main.ts`; update every language when the
   controls or the first round change.
 - `src/i18n.ts` and `src/i18n/`: the game's texts (`shared/i18n.ts`). `i18n/en.ts` is the British
   English source, `i18n/de.ts` the German (with `keepEnglish` for the texts that stay the same) and
@@ -104,7 +104,7 @@ in.
   `checkTrophies(state)`, which `GameScene.update` calls every frame after `tick`. A new trophy is an
   entry in `index.ts`, its two texts in each language file and its condition in `EARNED`.
 - `src/main.ts`: creates the `Phaser.Game` (designed at 960x540, `Scale.FIT`, `pixelArt: false`) with `BootScene`
-  then `GameScene`, calls `setupGame(game)` and `setupScaling(game, { fill: true })` (see Screen scaling), and puts
+  then `GameScene`, calls `setupGame(game, { howToPlay, trophies })` and `setupScaling(game, { fill: true })` (see Screen scaling), and puts
   `game` on `window` in dev builds.
 - `src/game/state.ts`: `GameState` and its parts (`Trap`, `Ledge`, `Shrine`, `Boss` with its
   `BossKind`, `Rockfall`, `Dare`, `Coin`, `Effect`, `Runner`), the terrains (`Terrain`, `TERRAIN`
@@ -480,7 +480,7 @@ the stage), at most one sound of each kind a frame, so a row of coins or a volle
 
 ### Hub settings
 
-- `src/main.ts` calls `setupGame(game)` from `shared/setupGame.ts` right after creating the game.
+- `src/main.ts` calls `setupGame(game, { howToPlay, trophies })` from `shared/setupGame.ts` right after creating the game.
   It applies the frame cap, the FPS readout, reduced motion and full screen (camera shake and flash become
   no-ops; Hotfoot uses neither).
 - Difficulty scales one number: `START_HEARTS` in `src/game/state.ts` is

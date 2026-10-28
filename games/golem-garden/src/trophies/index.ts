@@ -1,5 +1,6 @@
 import { trophySet } from '../../../../shared/trophies';
 import en from './i18n/en';
+import enUS from './i18n/en-US';
 import de from './i18n/de';
 
 /**
@@ -20,5 +21,5 @@ export const trophies = trophySet(
     { id: 'allGardens', tier: 'gold', icon: '🗺️' },
     { id: 'laurel', tier: 'gold', icon: '🏅', hidden: true },
   ],
-  { en, de },
+  { en, 'en-US': enUS, de },
 );

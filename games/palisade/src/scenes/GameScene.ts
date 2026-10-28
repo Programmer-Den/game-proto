@@ -76,6 +76,8 @@ import { t } from '../i18n';
 import { SkillBook } from '../ui/SkillBook';
 import { BattleSounds } from './BattleSounds';
 import { checkTrophies } from '../trophies/check';
+import { trophies } from '../trophies';
+import { award } from '../../../../shared/trophies';
 import { viewFrame } from '../../../../shared/scaling';
 import { AIM, BARRICADE, BARRICADE_BAR, BARRICADE_TIP_W, BOSS_BAR, CALTROPS, FORTIFY, GUARD_HIT, HEAT, HERO_FEET, HUD_HEIGHT, MARCH, OMEN_CHIP, RAIN, RAIN_HINT, REPAIR, ROAR_CHIP, SEEN, SPEED, STREAK, TRACK, UI_DEPTH, VIEW, XP_BAR, placeHud } from './layout';
 
@@ -1089,8 +1091,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   private loose(x: number, y: number) {
-    if (loose(this.state, x, y)) sfx('rainLoose');
-    else ui('refuse');
+    // Cloud of arrows is awarded here: a long frame can land the volley within the same tick.
+    if (loose(this.state, x, y)) {
+      sfx('rainLoose');
+      award(trophies, 'firstRain');
+    } else ui('refuse');
   }
 
   private strew(x: number, y: number) {

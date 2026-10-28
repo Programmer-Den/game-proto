@@ -207,14 +207,15 @@ Implemented today:
 - Rival contracts (`Side.deal`, `Deal`, `World.updateDeals`, `dealScore`, `AI_DEAL_MS`, `AI_GOALS`,
   `nearestEnemyHub`): from 90 s every AI side (slot 0 too when watching) works through a chain of
   its own, board steps 1 to 4 (`deal.step`, ranks II to V), picking a goal from `AI_GOALS` (`kills`,
-  `hold`, `derelicts`, `razes`, `hubs`) open at that step and not done, with the world's `dealRng`
+  `hold`, `derelicts`, `razes`, `hubs`) open at that step and not done (`derelicts` only while it
+  holds fewer than two, like the board; it waits while that is all that is left), with the world's `dealRng`
   (a `localRandom` of its own, so neither the board's draws nor `Math.random` move). It counts in
   `removeDead` (a kill, raze or main hub whose last hit was the side's), `updateBeacon` (seconds
   held) and `updateDeals` (derelicts held now); met, it pays the reward and applies the perk to the
   side's `perks` (which `unitStats` and the rest already read), and the player gets a notice
   (`rivalDealDone`). One not met in `AI_DEAL_LIMIT_MS` (180 s) is dropped and picked again. A rival
   plays to its contract: `kills`, `razes` and `hubs` attack with `AI_DEAL_EAGER` (2) ships fewer
-  (at least 2), `hubs` at the nearest main hub; `hold` keeps a picket on the beacon whatever its
+  (at least 2), `hubs` at the nearest main hub (its grudge's while tribute holds it); `hold` keeps a picket on the beacon whatever its
   rank in `contestBeacon`; `derelicts` claims stations at any reach with `AI_DEAL_CLAIM_ARMY` (2)
   warships. The rivals panel shows each one's contract and progress (`GameScene.rivalDeals`,
   `rivalDeal`, `rivalDealsDone`), and `updateDeals` logs `aiDeal` and `aiDealDone` to `aiLog`. The playthrough

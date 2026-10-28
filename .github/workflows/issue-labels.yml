@@ -3,8 +3,9 @@ name: Issue labels
 # Adds the game label to issues filed through the forms in .github/ISSUE_TEMPLATE,
 # from the answer to their Game dropdown. The forms set the type label themselves.
 # Then it adds the issue to "All feedback" and that game's Project with the status
-# Todo, using PROJECTS_TOKEN (a classic token with only the "project" scope): the
-# Projects' built-in Auto-add misses labels added by this workflow's own token.
+# Todo, and takes it off the old game's Project when the dropdown changed, using
+# PROJECTS_TOKEN (a classic token with only the "project" scope): the Projects'
+# built-in Auto-add misses labels added by this workflow's own token.
 # Run it by hand with an issue number to file an older issue again.
 on:
   issues:
@@ -48,6 +49,7 @@ jobs:
             core.setOutput('number', issue.number);
             const gameLabels = new Set(Object.values(games));
             const stale = issue.labels.map(l => l.name).filter(n => gameLabels.has(n) && n !== label);
+            core.setOutput('stale', JSON.stringify(stale));
             for (const name of stale) {
               await github.rest.issues.removeLabel({ ...context.repo, issue_number: issue.number, name });
             }
@@ -66,12 +68,16 @@ jobs:
           LABEL: ${{ steps.label.outputs.label }}
           NODE_ID: ${{ steps.label.outputs.node_id }}
           NUMBER: ${{ steps.label.outputs.number }}
+          STALE: ${{ steps.label.outputs.stale }}
         with:
           github-token: ${{ secrets.PROJECTS_TOKEN }}
           script: |
             const wanted = JSON.parse(require('fs').readFileSync('.github/projects.json', 'utf8'));
             const titles = new Set(wanted.filter(p => p.label === null || p.label === process.env.LABEL).map(p => p.title));
             const issue = { node_id: process.env.NODE_ID, number: process.env.NUMBER };
+            // The Projects of the game labels just taken off (the Game dropdown changed).
+            const stale = JSON.parse(process.env.STALE || '[]');
+            const staleTitles = new Set(wanted.filter(p => p.label !== null && stale.includes(p.label)).map(p => p.title));
 
             const { user } = await github.graphql(`
               query($owner: String!) {
@@ -114,4 +120,21 @@ jobs:
                     value: { singleSelectOptionId: $optionId }
                   }) { projectV2Item { id } }
                 }`, { projectId: project.id, itemId: item.id, fieldId: project.field.id, optionId: todo.id });
+            }
+
+            // Take the issue off the old game's Project, since its built-in workflows never remove it.
+            if (staleTitles.size) {
+              const { node } = await github.graphql(`
+                query($id: ID!) {
+                  node(id: $id) {
+                    ... on Issue { projectItems(first: 50, includeArchived: true) { nodes { id project { id title } } } }
+                  }
+                }`, { id: issue.node_id });
+              for (const item of node.projectItems.nodes.filter(i => staleTitles.has(i.project.title))) {
+                await github.graphql(`
+                  mutation($projectId: ID!, $itemId: ID!) {
+                    deleteProjectV2Item(input: { projectId: $projectId, itemId: $itemId }) { deletedItemId }
+                  }`, { projectId: item.project.id, itemId: item.id });
+                console.log(`Removed #${issue.number} from ${item.project.title}`);
+              }
             }

@@ -354,7 +354,7 @@ export interface Side {
   attackMs: number;
   /** Rank perks from finished contracts: the player's, and a rival's from its own (`deal`). */
   perks: Perks;
-  /** A rival's own contract chain (see AI_DEAL_MS); the player's side keeps it empty. */
+  /** A rival's own contract chain (see AI_DEAL_MS); the player's side keeps it empty unless watching. */
   deal: Deal;
   /** The warship this rival has sent to contest the relay beacon, or -1. */
   picket: number;
@@ -1091,7 +1091,7 @@ export class World {
     this.updateFlagship(dt);
     this.updateBeacon(dt);
     this.updateShards(dt);
-    // Contracts are the player's; a watched battle gives nobody their perks.
+    // The player's own contracts; a watched battle runs every side's rival chain instead (updateDeals).
     if (!this.watch) this.updateContract(dt);
     this.updateDeals(dt);
     this.updateFog();
@@ -1837,8 +1837,9 @@ export class World {
     if (this.elapsedMs < AI_GRACE_MS || army.length < need || side.attackMs < AI_ATTACK_MS) return;
     side.attackMs = 0;
     const foe = side.grudge >= 0 && this.sides[side.grudge].alive && !this.atPeace(f, side.grudge) ? side.grudge : -1;
-    // A hub contract goes straight for the nearest main hub it may attack.
-    const target = (side.deal.goal === 'hubs' ? this.nearestEnemyHub(hub, f) : null) ?? this.nearestEnemyBuilding(hub, f, foe);
+    // A hub contract goes straight for the nearest main hub it may attack, the grudge's while tribute holds it.
+    const target = (side.deal.goal === 'hubs' ? this.nearestEnemyHub(hub, f, side.grudgeLockMs > 0 ? foe : -1) : null)
+      ?? this.nearestEnemyBuilding(hub, f, foe);
     if (!target) return;
     // The picket stays on the beacon, the claimer at its derelict, the hurt stay to repair and a few ships stay home; the rest go.
     const raid = army.filter((u) => u.id !== side.picket && u.id !== side.claimer && !u.repairing && u.hp >= u.maxHp * AI_FALL_BACK_HP)
@@ -1977,9 +1978,10 @@ export class World {
     }
   }
 
-  /** The nearest main hub of another faction not at peace with `faction`, or null. */
-  private nearestEnemyHub(from: Point, faction: number): Building | null {
-    const hubs = this.buildings.filter((b) => b.type === 'hub' && !b.expansion && b.faction !== faction && !this.atPeace(faction, b.faction));
+  /** The nearest main hub of another faction not at peace with `faction` (of `only` when it is given), or null. */
+  private nearestEnemyHub(from: Point, faction: number, only = -1): Building | null {
+    const hubs = this.buildings.filter((b) => b.type === 'hub' && !b.expansion && b.faction !== faction
+      && (only < 0 || b.faction === only) && !this.atPeace(faction, b.faction));
     return hubs.reduce<Building | null>((best, b) => (!best || dist(b, from) < dist(best, from) ? b : best), null);
   }
 
@@ -2242,9 +2244,12 @@ export class World {
       const deal = side.deal;
       if (!deal.goal) {
         if (deal.step >= CONTRACT_STEPS) continue;
-        const open = CONTRACT_POOL.filter((c) => AI_GOALS.includes(c.goal) && c.from <= deal.step && !deal.done.includes(c.goal));
+        const pool = CONTRACT_POOL.filter((c) => AI_GOALS.includes(c.goal) && c.from <= deal.step && !deal.done.includes(c.goal));
+        // Like the player's board, no derelicts contract for a side that already holds two.
+        const held = this.derelicts.filter((d) => d.owner === side.index).length;
+        const open = pool.filter((c) => c.goal !== 'derelicts' || held < 2);
         if (!open.length) {
-          deal.step = CONTRACT_STEPS;
+          if (!pool.length) deal.step = CONTRACT_STEPS;
           continue;
         }
         const c = open[Math.floor(this.dealRng() * open.length)];

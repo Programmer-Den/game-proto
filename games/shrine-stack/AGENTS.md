@@ -276,7 +276,9 @@ State model (`GameState`): `phase` (`patron`, `swinging`, `falling`, `blessing`,
 `swinging`/`falling`.
 
 Persistence: `shrine-stack-best` in `localStorage` holds the most tiers built in one temple, and
-`shrine-stack-trophies` the trophies earned (`shared/trophies.ts`), each id with the time. The scene writes it when a tier finishes and on game over. The hub's settings are read
+`shrine-stack-trophies` the trophies earned (`shared/trophies.ts`), each id with the time. The scene
+writes the best when a tier finishes and on game over; `award()` writes each trophy the moment it is
+earned, mid-tier too. The hub's settings are read
 from the shared `hub-settings` key, not from this game's save.
 
 Randomness and timing: `Math.random` is used only in the rules: `pickPatrons`, `pickOffer`,

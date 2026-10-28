@@ -83,8 +83,10 @@ bottle green, serif italics), all painted in code on 2D canvases. It shares no c
   holds each trophy's condition on the `GameState` (`EARNED`: first sale, a Catalyst fired
   (`fired`), a Bloom fired (`bloomsFired`), a three-star sale, a workbench upgrade, the Master
   Tinker rank, `FIFTY_SOLD` potions, every upgrade at its top level, `royal`, every seal) and
-  `checkTrophies(state)`, which `GameScene.update` calls every frame; the first call after the page
-  loads awards quietly, so a loaded save earns its trophies without a toast. A new trophy is an
+  `checkTrophies(state, quiet)`, which `GameScene` calls at the end of `settle()` (once a move has
+  played out and a sale is saved) and after a workbench upgrade is bought and saved, so a trophy
+  never shows before the board does; `create()` calls it quietly after loading, so a loaded save
+  earns its trophies without a toast. A new trophy is an
   entry in `index.ts`, its two texts in each language file and its condition in `EARNED`.
 - `src/main.ts`: creates the `Phaser.Game` (960x540, FIT scaling, `pixelArt: false`) with
   `BootScene` and `GameScene`, calls `setupGame(game)` and `setupScaling(game, { fill: true })` from
