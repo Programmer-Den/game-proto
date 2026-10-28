@@ -5,7 +5,7 @@
 // The map's art (`art/map.ts`) paints the scenery from the same `SCENERY` list, so what stands in
 // the way is what shows.
 
-import { BASE, BEAST, BUSHES, CAMPS, CampSpot, DRAKE, INHIBITORS, LaneId, LANES, MERC, RIVER, TOWERS, Vec, WATCHSTONES, WORLD, mirror } from './data';
+import { BASE, BEAST, BUSHES, CAMPS, CampSpot, DRAKE, INHIBITORS, LaneId, LANES, MAP_SCALE, MERC, RIVER, TOWERS, Vec, WATCHSTONES, WORLD, at, mirror } from './data';
 
 /** Half the width of a lane's paving, in pixels. */
 export const LANE_HALF = 50;
@@ -32,7 +32,7 @@ export function riverDist(p: Vec): number {
 export const CLEARINGS: CampSpot[] = [...CAMPS, ...MERC.spots.map((p) => ({ ...p, kind: 'merc' as const }))];
 export const clearingR = (c: CampSpot) => (c.kind === 'ember' || c.kind === 'moss' ? 128 : c.kind === 'wolf' ? 112 : 100);
 /** Where the ruins stand: one in each quarter of the jungle, mirrored. */
-export const RUINS: Vec[] = [{ x: 560, y: 1560 }, { x: 1240, y: 2240 }, { x: 2240, y: 1240 }, { x: 1560, y: 560 }];
+export const RUINS: Vec[] = [at(560, 1560), at(1240, 2240), at(2240, 1240), at(1560, 560)];
 /** The four broken pillars of a ruin, round its centre. */
 export function ruinPieces(c: Vec): Vec[] {
   return Array.from({ length: 4 }, (_, i) => {
@@ -65,7 +65,7 @@ export const WALLS: Wall[] = [
   [471, 1389, 416, 1573],
   [695, 2386, 919, 2386],
 ].flatMap(([ax, ay, bx, by]) => {
-  const w = { a: { x: ax, y: ay }, b: { x: bx, y: by } };
+  const w = { a: at(ax, ay), b: at(bx, by) };
   return [w, { a: mirror(w.a), b: mirror(w.b) }];
 });
 /** The distance from a point to a wall's run. */
@@ -95,7 +95,7 @@ export interface SceneryThing {
 export const SCENERY: SceneryThing[] = (() => {
   const rnd = seeded(20261028);
   const things: SceneryThing[] = [];
-  for (let i = 0; i < 4000 && things.length < 620; i++) {
+  for (let i = 0; i < 4000 * MAP_SCALE ** 2 && things.length < 620 * MAP_SCALE ** 2; i++) {
     const p = { x: 20 + rnd() * (WORLD.w - 40), y: 30 + rnd() * (WORLD.h - 40) };
     if (laneDist(p) < LANE_HALF + 48 || riverDist(p) < RIVER.half + 40) continue;
     if (Math.hypot(p.x - BASE.blue.x, p.y - BASE.blue.y) < 290 || Math.hypot(p.x - BASE.red.x, p.y - BASE.red.y) < 290) continue;

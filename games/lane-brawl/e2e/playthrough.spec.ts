@@ -59,7 +59,7 @@ const WARDEN_CARD = { x: 120, y: 133 };
 /** The Long Sword's row in the shop, opened from the B key. */
 const SWORD_ROW = { x: 202, y: 146 };
 /** The first red tower on the middle lane. */
-const RED_MID_TOWER = { x: 1793, y: 1007 };
+const RED_MID_TOWER = { x: 2241.25, y: 1258.75 };
 /** How far a tower shoots (data.ts TOWER.range). */
 const TOWER_REACH = 300;
 /** The gold each kind of camp pays its slayer (data.ts CAMP_KINDS). */
@@ -350,7 +350,7 @@ test('plays the first round', async ({ page }, testInfo) => {
       const foes = s.units.filter((u) => u.kind === 'minion' && u.side === 'red' && !u.dead);
       const near = foes.sort((a, b) => dist(p, a) - dist(p, b))[0];
       // Wait in reach of the nearest red minion, or walk up the middle lane toward the next wave.
-      const goal = near ?? { x: 2000, y: 800 };
+      const goal = near ?? { x: 2500, y: 1000 };
       if (dist(p, goal) > p.range + 40) await walkToward(p, goal);
     }
     await tick(STEP_MS);

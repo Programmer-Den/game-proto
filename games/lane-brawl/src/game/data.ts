@@ -11,27 +11,35 @@ export interface Vec {
 }
 
 /** The map is a square. Everything on red's half is blue's turned 180 degrees round the middle. */
-export const WORLD = { w: 2800, h: 2800 };
+/**
+ * How much bigger the map is than it was first laid out: every spot below is written at the old
+ * 2800x2800 size and scaled by this with `at`, while widths (a lane's, the river's, a bush's) and
+ * ranges stay as they are.
+ */
+export const MAP_SCALE = 1.25;
+/** A spot on the map, written at the first layout's size. */
+export const at = (x: number, y: number): Vec => ({ x: x * MAP_SCALE, y: y * MAP_SCALE });
+export const WORLD = { w: 2800 * MAP_SCALE, h: 2800 * MAP_SCALE };
 /** A point turned 180 degrees round the middle of the map: where red's copy of a blue spot sits. */
 export const mirror = (p: Vec): Vec => ({ x: WORLD.w - p.x, y: WORLD.h - p.y });
 /** Blue spots and their red copies, in that order. */
 const both = <T extends Vec>(spots: T[]): T[] => [...spots, ...spots.map((p) => ({ ...p, ...mirror(p) }))];
 
 /** The two Nexuses: the blue team (the player's) bottom-left, the red team top-right. */
-export const BASE: Record<Team, Vec> = { blue: { x: 300, y: 2500 }, red: { x: 2500, y: 300 } };
+export const BASE: Record<Team, Vec> = { blue: at(300, 2500), red: at(2500, 300) };
 
 /** Each lane runs from the blue Nexus to the red one. Red walks the same lane backwards. */
 export const LANES: Record<LaneId, Vec[]> = {
-  top: [BASE.blue, { x: 300, y: 300 }, BASE.red],
+  top: [BASE.blue, at(300, 300), BASE.red],
   mid: [BASE.blue, BASE.red],
-  bottom: [BASE.blue, { x: 2500, y: 2500 }, BASE.red],
+  bottom: [BASE.blue, at(2500, 2500), BASE.red],
 };
 
 /**
  * The river runs from the top-left corner to the bottom-right one, across the middle lane, and
  * splits each team's jungle in two. It is only scenery: units cross it at full speed.
  */
-export const RIVER = { from: { x: 420, y: 420 }, to: { x: 2380, y: 2380 }, half: 62 };
+export const RIVER = { from: at(420, 420), to: at(2380, 2380), half: 62 };
 
 export interface TowerSpot {
   team: Team;
@@ -41,12 +49,12 @@ export interface TowerSpot {
 }
 /** Two towers per team on each lane, the blue ones closest to the blue Nexus. */
 export const TOWERS: TowerSpot[] = both<TowerSpot>([
-  { team: 'blue', lane: 'top', x: 300, y: 1950 },
-  { team: 'blue', lane: 'top', x: 300, y: 1300 },
-  { team: 'blue', lane: 'mid', x: 689, y: 2111 },
-  { team: 'blue', lane: 'mid', x: 1007, y: 1793 },
-  { team: 'blue', lane: 'bottom', x: 850, y: 2500 },
-  { team: 'blue', lane: 'bottom', x: 1500, y: 2500 },
+  { team: 'blue', lane: 'top', ...at(300, 1950) },
+  { team: 'blue', lane: 'top', ...at(300, 1300) },
+  { team: 'blue', lane: 'mid', ...at(689, 2111) },
+  { team: 'blue', lane: 'mid', ...at(1007, 1793) },
+  { team: 'blue', lane: 'bottom', ...at(850, 2500) },
+  { team: 'blue', lane: 'bottom', ...at(1500, 2500) },
 ]).map((t, i) => (i < 6 ? t : { ...t, team: 'red', lane: t.lane === 'top' ? 'bottom' : t.lane === 'bottom' ? 'top' : 'mid' }));
 
 // ---------------------------------------------------------------------------------------------
@@ -84,19 +92,19 @@ export const CAMP_KINDS: Record<CampKind, CampDef> = {
  * champion fells the last of a band gets `count` mercenaries of its own at the camp, minions with
  * `power` times a minion's health and damage, which march from there down the nearest lane.
  */
-export const MERC = { spots: [{ x: 2120, y: 2380 }, { x: 680, y: 420 }] as Vec[], count: 3, spread: 40, power: 2.2 };
+export const MERC = { spots: [at(2120, 2380), at(680, 420)] as Vec[], count: 3, spread: 40, power: 2.2 };
 export interface CampSpot extends Vec {
   /** The camp's kind: a wolf pack is an alpha and two pups. */
   kind: 'boar' | 'wolf' | 'ember' | 'moss' | 'merc';
 }
 /** Six camps per team's half: blue's first, then their red copies. */
 export const CAMPS: CampSpot[] = both<CampSpot>([
-  { kind: 'ember', x: 640, y: 1300 },
-  { kind: 'boar', x: 900, y: 1520 },
-  { kind: 'wolf', x: 620, y: 1850 },
-  { kind: 'moss', x: 1500, y: 2160 },
-  { kind: 'boar', x: 1280, y: 1900 },
-  { kind: 'wolf', x: 950, y: 2180 },
+  { kind: 'ember', ...at(640, 1300) },
+  { kind: 'boar', ...at(900, 1520) },
+  { kind: 'wolf', ...at(620, 1850) },
+  { kind: 'moss', ...at(1500, 2160) },
+  { kind: 'boar', ...at(1280, 1900) },
+  { kind: 'wolf', ...at(950, 2180) },
 ]);
 /** Where a wolf pack's two pups stand, from the alpha. */
 export const PUPS: Vec[] = [
@@ -140,9 +148,9 @@ export const SIGHT = { champion: 360, minion: 240, tower: 440, inhibitor: 260, n
  * champion near takes it after a few seconds, and then sees far around it.
  */
 export const WATCHSTONES: Vec[] = [
-  { x: 850, y: 850 },
-  { x: 1200, y: 1200 },
-  { x: 1600, y: 1600 },
+  at(850, 850),
+  at(1200, 1200),
+  at(1600, 1600),
 ];
 export const WATCH = { radius: 150, captureMs: 3000 };
 
@@ -776,7 +784,7 @@ export const ACTIVES: ActiveDef[] = [
  */
 export const WARD = { carry: 2, range: 600, ms: 90_000, hits: 3, gold: 20, radius: 10 };
 /** Where the AI likes its wards: the beast's pit and the three river islands; a team wards a spot once at a time. */
-export const WARD_SPOTS: Vec[] = [{ x: 1950, y: 1950 }, { x: 850, y: 850 }, { x: 1200, y: 1200 }, { x: 1600, y: 1600 }];
+export const WARD_SPOTS: Vec[] = [at(1950, 1950), at(850, 850), at(1200, 1200), at(1600, 1600)];
 /** An AI champion's ward goes at a spot this close to it that has no live ward of its team within `taken` px. */
 export const WARD_AI = { reach: 600, taken: 320, bushesFrom: 100_000 };
 
@@ -1108,8 +1116,7 @@ export const LAST_HIT_LOOK = 140;
 // lanes, the same distance from both Nexuses. The team that slays it gets stronger minions for a while.
 
 export const BEAST = {
-  x: 1950,
-  y: 1950,
+  ...at(1950, 1950),
   hp: 3200,
   dmg: 48,
   attackMs: 1400,
@@ -1154,9 +1161,9 @@ export interface InhibitorSpot {
   y: number;
 }
 export const INHIBITORS: InhibitorSpot[] = both<InhibitorSpot>([
-  { team: 'blue', lane: 'top', x: 300, y: 2250 },
-  { team: 'blue', lane: 'mid', x: 477, y: 2323 },
-  { team: 'blue', lane: 'bottom', x: 550, y: 2500 },
+  { team: 'blue', lane: 'top', ...at(300, 2250) },
+  { team: 'blue', lane: 'mid', ...at(477, 2323) },
+  { team: 'blue', lane: 'bottom', ...at(550, 2500) },
 ]).map((t, i) => (i < 3 ? t : { ...t, team: 'red', lane: t.lane === 'top' ? 'bottom' : t.lane === 'bottom' ? 'top' : 'mid' }));
 export const INHIBITOR = { hp: 1600, radius: 24, gold: 120 };
 /** Super minions have this much more health and damage. */
@@ -1174,15 +1181,15 @@ export interface Bush {
 }
 /** Nine pairs, each mirrored under the map's 180-degree turn: by the lanes, in the jungle and on the river banks. */
 export const BUSHES: Bush[] = both<Bush>([
-  { x: 1150, y: 1450, rx: 78, ry: 48 },
-  { x: 1750, y: 2100, rx: 70, ry: 50 },
-  { x: 780, y: 1680, rx: 72, ry: 52 },
-  { x: 1120, y: 2050, rx: 72, ry: 52 },
-  { x: 440, y: 900, rx: 60, ry: 62 },
-  { x: 1900, y: 2360, rx: 70, ry: 50 },
-  { x: 520, y: 1100, rx: 60, ry: 60 },
-  { x: 1300, y: 2300, rx: 70, ry: 50 },
-  { x: 700, y: 980, rx: 70, ry: 50 },
+  { ...at(1150, 1450), rx: 78, ry: 48 },
+  { ...at(1750, 2100), rx: 70, ry: 50 },
+  { ...at(780, 1680), rx: 72, ry: 52 },
+  { ...at(1120, 2050), rx: 72, ry: 52 },
+  { ...at(440, 900), rx: 60, ry: 62 },
+  { ...at(1900, 2360), rx: 70, ry: 50 },
+  { ...at(520, 1100), rx: 60, ry: 60 },
+  { ...at(1300, 2300), rx: 70, ry: 50 },
+  { ...at(700, 980), rx: 70, ry: 50 },
 ]);
 /** An enemy this close sees into a bush, and through stealth. */
 export const BUSH_REVEAL = 90;
@@ -1222,7 +1229,7 @@ export const RUNES: Record<RuneKind, { name: TextKey; color: string; buff?: Buff
 };
 export const RUNE_ORDER: RuneKind[] = ['might', 'haste', 'fortune', 'mending'];
 export const RUNE = {
-  spots: [{ x: 1025, y: 1025 }, { x: 1775, y: 1775 }] as Vec[],
+  spots: [at(1025, 1025), at(1775, 1775)] as Vec[],
   firstAt: 120_000,
   every: 120_000,
   pick: 46,
@@ -1265,7 +1272,7 @@ export const DRAKES: Record<DrakeElement, { name: TextKey; color: string; bonus:
   storm: { name: 'drakeStorm', color: '#9fd0ff', bonus: { speed: 6 } },
   tide: { name: 'drakeTide', color: '#7fe8d6', bonus: { regen: 4 } },
 };
-export const DRAKE = { x: 600, y: 600, firstAt: 150_000, soul: 4, ai: 2, aiMinHp: 0.6 };
+export const DRAKE = { ...at(600, 600), firstAt: 150_000, soul: 4, ai: 2, aiMinHp: 0.6 };
 
 /**
  * Early gold (LB19): the first champion kill of the match pays `FIRST_BLOOD.gold` on top. Until

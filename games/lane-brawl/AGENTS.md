@@ -6,7 +6,7 @@ the game, per the root AGENTS.md.
 
 ## Current state
 
-Lane Brawl is a single-player MOBA on one 2800x2800 square map with three lanes, a river, towers,
+Lane Brawl is a single-player MOBA on one 3500x3500 square map with three lanes, a river, towers,
 inhibitors, minion waves, a jungle of twelve camps, watchstones, a guardian beast, tall grass, fog of
 war, two Nexuses, five champions a side and a shop. The player picks one of fifteen champion classes,
 from medieval fantasy to steampunk and beasts,
@@ -21,7 +21,13 @@ Implemented today:
   class and role, passive), two lines under them for the card under the pointer (`hoverPick`): the
   champion's name, title, class, blurb and story perk, then their motive; with no card under the pointer, the
   setting in one line. Then one match.
-- Map (`WORLD` 2800x2800): the blue Nexus at the bottom left, the red at the top right; top and
+- Map (`WORLD` 3500x3500): every spot on it (Nexuses, lanes, towers, inhibitors, the river, camps,
+  watchstones, bushes, runes, ward spots, the beast's and the drake's pits, the ruins and walls) is
+  written at the first 2800x2800 layout and scaled by `MAP_SCALE` (1.25) with `at` in `data.ts`.
+  Widths (a lane's, the river's, a bush's, a clearing's) and every range stay as they are, and the
+  pines, rocks, grass tufts and flowers grow in number with the map's area. To resize the map,
+  change `MAP_SCALE` and the two map points in the playthrough (`RED_MID_TOWER` and its walk goal).
+  The blue Nexus at the bottom left, the red at the top right; top and
   bottom lanes along the edges, the middle lane on the diagonal. Everything red is blue mirrored
   through the centre (`mirror`, `both` in `data.ts`), with top and bottom lanes swapped. Two towers
   per team per lane, an inhibitor per team per lane near its Nexus (`INHIBITORS`), the river
@@ -502,7 +508,7 @@ File map (`src/`):
 - `game/mastery.ts`: class mastery, the save key `lane-brawl-mastery` (`loadMastery`, `recordWin`,
   `masteryRank`).
 - `game/terrain.ts`: the map's obstacles (`SCENERY`, `WALLS`, `OBSTACLES`, `SOLID`) and `steer`, `settle`, `blockedBy`; `art/map.ts` takes the lane and clearing helpers and the scenery from it.
-- `game/data.ts`: plain data, with text keys for names and texts. `WORLD`, `LANES`, `BASE`, `TOWERS`, `RIVER`, `CAMPS`, `CAMP_KINDS`,
+- `game/data.ts`: plain data, with text keys for names and texts. `MAP_SCALE`, `at`, `WORLD`, `LANES`, `BASE`, `TOWERS`, `RIVER`, `CAMPS`, `CAMP_KINDS`,
   `PUPS`, `SIGHT`, `WATCHSTONES`, `WATCH`, `BUFFS`, `JUNGLE`, `KITE`, the balance constants (`TOWER`,
   `CAMP`, `MINION`, `KILL`, `XP_FOR_LEVEL`, respawn times), `CHAMPIONS` with their `AbilityDef`s,
   `ITEMS`, `ALLY_LANES`, `ENEMY_LANES`, `SIDE_COLOR`, and the loop's data: `OBJECTIVES`,
