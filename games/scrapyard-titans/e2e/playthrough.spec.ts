@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 // Plays the first round of a match with real inputs: starts a match with the first commander,
 // buys the first robot in the shop, taps it on the bench and then a tile on the board, presses
 // FIGHT and watches the robot beat round 1-1's two scrap mites. The win keeps the commander at
-// full health, drops a part and fills the damage meter, and round 1-2's plan phase starts. Game state is only read,
+// full health, drops a part, fills the damage meter and earns the First spark trophy, and round 1-2's plan phase starts. Game state is only read,
 // through the `game` object the dev build puts on window.
 
 interface Owned { uid: number; defId: string; star: number; items: string[] }
@@ -188,6 +188,9 @@ test('plays the first round', async ({ page }, testInfo) => {
   // The damage meter in the info panel credits the robot with the fight's damage.
   expect(s.meter.map((r) => r.defId), 'damage meter rows').toEqual([bought]);
   expect(s.meter[0].dealt, 'damage dealt').toBeGreaterThan(0);
+  // Winning the fight earns the First spark trophy (shared/trophies.ts saves it under the game's key).
+  const earned = await page.evaluate(() => JSON.parse(localStorage.getItem('scrapyard-titans-trophies') ?? '{}'));
+  expect(Object.keys(earned), 'First spark trophy').toContain('firstWin');
   await snap('3-result');
 
   // The next round's plan phase starts on its own, with the robot back on its tile.

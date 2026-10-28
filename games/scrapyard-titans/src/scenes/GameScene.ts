@@ -23,6 +23,8 @@ import {
 import { aiDraft, aiPickAugment, aiPlan } from '../game/ai';
 import { ordinal, t } from '../i18n';
 import { formatDate } from '../../../../shared/i18n';
+import { award } from '../../../../shared/trophies';
+import { trophies } from '../trophies';
 import { CMD_TEX, INK, UNIT_TEX, bakeAll, cmdKey, itemKey, monsterKey, textureRes, unitKey } from '../art/paint';
 import {
   BENCH, BUTTONS, COMMANDER_HOME, DRAFT_RING, INFO_PANEL, ITEMS_PANEL, PLAYERS_PANEL, RIVAL_HOME, SELL_ZONE, SHOP,
@@ -202,7 +204,16 @@ export class GameScene extends Phaser.Scene {
     this.input.on('pointerup', (p: Phaser.Input.Pointer) => this.onUp(p));
     this.input.keyboard?.on('keydown', (e: KeyboardEvent) => this.onKey(e));
     playMusic(PLAN_SONG, 'calm');
+    // Deeds done before the trophies came in earn theirs quietly.
+    if (!watching) this.awardProgress(true);
     if (watching) this.startMatch();
+  }
+
+  /** Awards the trophies the saved progress has earned: the deeds, every commander, the Titan rank. */
+  private awardProgress(quiet = false) {
+    for (const d of this.progress.deeds) award(trophies, d, { quiet });
+    if (PLAYER_COMMANDERS.every((c) => isUnlocked(this.progress, c))) award(trophies, 'allCommanders', { quiet });
+    if (rankOf(this.progress.points) === RANKS.length - 1) award(trophies, 'titanRank', { quiet });
   }
 
   /** Plays a sound effect; a watched match drops the small fight sounds and plays the rest softer. */
@@ -287,7 +298,10 @@ export class GameScene extends Phaser.Scene {
   private finishFight() {
     const m = this.state!;
     endFight(m);
-    if (player(m).human && m.result?.outcome === 'win' && fullOrigin(m)) this.noteDeeds(['fullOrigin']);
+    if (player(m).human && m.result?.outcome === 'win') {
+      award(trophies, 'firstWin');
+      if (fullOrigin(m)) this.noteDeeds(['fullOrigin']);
+    }
     for (const o of this.orbs) o.at = Math.min(o.at, this.t);
     const r = m.result;
     if (r) {
@@ -335,12 +349,16 @@ export class GameScene extends Phaser.Scene {
     if (this.state?.opts.weekly != null) recordWeekly(this.progress, this.state.opts.weekly, place);
     saveProgress(this.progress);
     this.noteDeeds(place <= 4 ? (place === 1 ? ['topFour', 'champion'] : ['topFour']) : []);
+    if (place === 1 && this.state?.opts.weekly != null) award(trophies, 'weeklyWin');
+    this.awardProgress();
   }
 
   /** Saves deeds the player has done and calls out the commanders they unlock. */
   private noteDeeds(deeds: DeedId[]) {
     if (watching || !deeds.length) return;
-    for (const c of doDeeds(this.progress, deeds)) {
+    const unlocked = doDeeds(this.progress, deeds);
+    this.awardProgress();
+    for (const c of unlocked) {
       this.unlockedNow.push(c);
       this.number({ x: VIEW.w / 2, y: VIEW.fy + 230, s: 1 }, t('unlockedCall', { name: t(c.name) }), '#ffd166', 18, 2.6);
       ui('coin');
@@ -1544,7 +1562,9 @@ export class GameScene extends Phaser.Scene {
 
   private doAugment(i: number) {
     const m = this.state!;
+    const id = player(m).augmentOffer?.[i];
     pickAugment(m, player(m), i);
+    if (id && AUGMENT_BY_ID[id].rare && player(m).human) award(trophies, 'rareCard');
     this.sfx('augment');
     this.dirty = true;
   }
