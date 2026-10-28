@@ -14,6 +14,8 @@ export type Layout = {
    * Blitz clock, the daily five or whose turn it is) and the puzzle's clock bar, by their centres
    * or left ends. */
   top: Rect & { title: Point; mid: Point; clock: Point & { w: number } };
+  /** The omen a puzzle offers, a button in the top bar by its centre. */
+  omen: Rect;
   /** The Leave button in the top bar, by its centre. */
   leave: Rect;
   /** The stage with the puzzle (top-left) and the board's area inside it. */
@@ -55,6 +57,7 @@ export type Layout = {
 export const WIDE: Layout = {
   view: { w: 960, h: 540 },
   top: { x: 24, y: 14, w: 912, h: 54, title: { x: 42, y: 41 }, mid: { x: 440, y: 41 }, clock: { x: 640, y: 41, w: 150 } },
+  omen: { x: 311, y: 41, w: 140, h: 42 },
   leave: { x: 892, y: 41, w: 70, h: 30 },
   stage: { x: 24, y: 80, w: 620, h: 404 },
   board: { x: 44, y: 146, w: 580, h: 330 },
@@ -92,6 +95,7 @@ export const WIDE: Layout = {
 export const TALL: Layout = {
   view: { w: 540, h: 960 },
   top: { x: 16, y: 14, w: 508, h: 96, title: { x: 34, y: 41 }, mid: { x: 110, y: 86 }, clock: { x: 230, y: 86, w: 210 } },
+  omen: { x: 340, y: 41, w: 160, h: 42 },
   leave: { x: 476, y: 41, w: 70, h: 30 },
   stage: { x: 16, y: 122, w: 508, h: 520 },
   board: { x: 26, y: 202, w: 488, h: 430 },

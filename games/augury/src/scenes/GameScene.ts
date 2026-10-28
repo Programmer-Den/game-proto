@@ -8,8 +8,8 @@ import { CHARMS, KIND_COLOR, MODES, RELIC_COLOR, type Mode, type RelicId } from 
 import { DEFS, KINDS, LEVELS, SKILLS, SKILL_OF, type KindId, type Level } from '../game/kinds';
 import type { Progress } from '../game/progress';
 import {
-  act, canHint, canUndo, dailyDone, draftPick, drag, hint, holdsCharm, next, quit, skip, startRun, startSecondPlayer, takeRelic, tick, undo,
-  BLITZ_PENALTY_S, DUEL_FAIL_S, QUEUE, type Card, type Run,
+  act, canHint, canTakeOmen, canUndo, dailyDone, draftPick, drag, hint, holdsCharm, next, omenFor, takeOmen, quit, skip, startRun, startSecondPlayer, takeRelic, tick, undo,
+  BLITZ_PENALTY_S, DUEL_FAIL_S, PERIL_HEARTS, QUEUE, type Card, type Run,
 } from '../game/run';
 import { clearRun, loadProgress, loadRun, saveProgress, saveRun } from '../game/save';
 import { t, type TextKey } from '../i18n';
@@ -287,6 +287,9 @@ export class GameScene extends Phaser.Scene {
         case 'relic':
           SFX('relic');
           break;
+        case 'omen':
+          SFX('omen');
+          break;
         case 'over':
           playSting(SONG, 'over');
           saveProgress(this.progress);
@@ -539,6 +542,20 @@ export class GameScene extends Phaser.Scene {
       g.lineStyle(1, C.gold, 0.8).strokeRect(bx, by - 5, bw, 10);
       p.text(bx + bw + 10, by, timeText(cur.timeLeftMs), { size: 14, color: C.ink, ox: 0 });
     } else if (cur && run.mode === 'practice') p.text(bx + bw / 2, by, t('noClock'), { size: 13, color: C.inkDim });
+    // The omen on offer is a button with what it does under its name; once taken it stays as a label.
+    const OMEN = this.L.omen;
+    const offer = cur && canTakeOmen(run);
+    const omen = offer ? omenFor(cur.card) : run.phase === 'playing' ? cur?.omen : null;
+    if (omen) {
+      const ox = OMEN.x - OMEN.w / 2;
+      const oy = OMEN.y - OMEN.h / 2;
+      if (offer) g.fillStyle(C.key, 1).fillRect(ox, oy, OMEN.w, OMEN.h);
+      g.lineStyle(1.5, C.rose, offer ? 1 : 0.5).strokeRect(ox, oy, OMEN.w, OMEN.h);
+      const name = t(`${omen}Name` as TextKey);
+      p.text(OMEN.x, OMEN.y - 8, offer ? t('omenOffer', { name }) : t('omenTaken', { name }), { size: 13, color: offer ? C.goldText : C.roseText, bold: true, spacing: 1 });
+      p.text(OMEN.x, OMEN.y + 9, t(`${omen}Text` as TextKey), { size: 11, color: C.roseText });
+      if (offer) p.hit('omen', ox, oy, OMEN.w, OMEN.h, () => takeOmen(run));
+    }
     const LEAVE = this.L.leave;
     p.button('leave', LEAVE.x, LEAVE.y, LEAVE.w, LEAVE.h, t('leave'), () => this.toMenu(), { size: 13 });
   }
@@ -688,7 +705,9 @@ export class GameScene extends Phaser.Scene {
     p.hit('dim', STAGE.x, STAGE.y, STAGE.w, STAGE.h, practice ? () => {} : () => next(run));
     p.frame(bx, by, STAGE.w - 120, h, { alpha: 0.97, line: solved ? C.cyan : C.rose });
     this.heading(bx + (STAGE.w - 120) / 2, by + 40, t(`res_${last.reason}` as TextKey), 26, solved ? C.cyanText : C.roseText);
-    const line = practice || run.mode === 'duel' ? t('timeLine', { time: timeText(last.ms) }) : solved ? t('pointsLine', { n: last.points }) : run.mode === 'endless' || run.mode === 'draft' ? t('heartLost') : run.mode === 'blitz' ? t('timeLost', { n: BLITZ_PENALTY_S }) : '';
+    const points = t('pointsLine', { n: last.points }) + (last.omen ? ` · ${t('omenLine')}` : '');
+    const heart = last.omen === 'peril' ? t('heartsLost', { n: PERIL_HEARTS }) : t('heartLost');
+    const line = practice || run.mode === 'duel' ? t('timeLine', { time: timeText(last.ms) }) : solved ? points : run.mode === 'endless' || run.mode === 'draft' ? heart : run.mode === 'blitz' ? t('timeLost', { n: BLITZ_PENALTY_S }) : '';
     p.text(bx + (STAGE.w - 120) / 2, by + 80, line, { size: 16, color: C.ink });
     if (practice) {
       p.button('next', bx + (STAGE.w - 120) / 2 - 95, by + 130, 170, 40, t('nextPuzzle'), () => (ui('click'), next(run)), { accent: true });
