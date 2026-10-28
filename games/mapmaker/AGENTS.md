@@ -66,8 +66,20 @@ voyages it took and a saved best, then Keep charting or New atlas.
   Every text on screen goes through `t`; the data tables name their texts by key.
 - `src/audio.ts`: the sound table `sfx` (`sounds` from `shared/audio.ts`) and the song `SONG`; see
   Sound below.
+- `src/trophies/`: the game's ten trophies (`shared/trophies.ts`). `index.ts` lists them
+  (`trophies`: id, tier, icon, `hidden` for One step ahead and Fully equipped) with their texts in
+  `trophies/i18n/` (`en.ts`, `de.ts` and `en-US.ts` for artifact: the name keyed by the id, what
+  earns it by `<id>Text`), and imports nothing else from the game, since the hub loads it for its
+  trophy shelf. `main.ts` hands `trophies` to `setupGame`, which lists them on the start and pause
+  screens. `check.ts` holds each trophy's condition on the `GameState` (`EARNED`: first chart sold,
+  a feature charted whole, a cave's artefact, first upgrade, the treasure dug up, `FULL_PURSE` 300
+  coins at once, the first atlas page, the Royal Atlas, the treasure dug up on an isle with a
+  rival, every upgrade at its last rank) and `checkTrophies(state)`, which `GameScene.update` calls
+  every frame; the first call after the page loads awards quietly, so a loaded save earns its
+  trophies without a toast. A new trophy is an entry in `index.ts`, its two texts in each language
+  file and its condition in `EARNED`.
 - `src/main.ts`: creates the `Phaser.Game` (960x540, `Scale.FIT`, smooth art) with `BootScene`
-  then `GameScene`, calls `setupGame(game)` and `setupScaling(game, { fill: true })`, and puts `game` on `window`
+  then `GameScene`, calls `setupGame(game, { howToPlay, trophies })` and `setupScaling(game, { fill: true })`, and puts `game` on `window`
   in dev builds.
 - `src/game/state.ts`: `GameState`, `Tile`, `Find`, `Riddle`, `Clue`, `Ground`, `Commission`, `Feature`, `Rival`,
   `Chart`, `Milestone`, `AtlasPage`, `Phase`, `Point`; `GRID`, `BASE_SUPPLIES`, `PROVISIONS_STEP`,
@@ -303,7 +315,8 @@ port rolls it at the sale). Saves from before the translations get their
 feature names turned into keys and their riddle clues into `Clue`s. `mapmaker-best` holds
 the fewest voyages a Royal Atlas took, kept across New atlas. `mapmaker-theme` holds `'light'` or
 `'dark'` once the theme button has been used; until then the device's preference decides. The hub's settings live under the
-shared `hub-settings` key.
+shared `hub-settings` key. `mapmaker-trophies` holds the trophies earned (`shared/trophies.ts`),
+each id with the time; New atlas keeps them.
 
 ### Randomness and timing
 
@@ -405,6 +418,9 @@ has no audio imports.
   milestones add up, that selling records the milestones and lays out a board (its first picked)
   and three hands, and that the second voyage keeps the charted tiles, the picked commission and
   no hand, and refills the supplies.
+- At the harbor the test checks that `mapmaker-trophies` holds First chart, plus Named on the map
+  when the voyage charted a feature whole and Cave finds when it found an artefact, and nothing
+  else; a trophy a first voyage can reach in another way changes that expectation.
 
 ## Making common changes
 

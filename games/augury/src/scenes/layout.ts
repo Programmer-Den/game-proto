@@ -30,6 +30,9 @@ export type Layout = {
     tagline: Point & { w: number };
     cards: { xs: number[]; ys: number[]; w: number; h: number };
     records: Rect;
+    /** With a saved run: the Continue button, and the Records button beside it. */
+    resume: Rect;
+    recordsAside: Rect;
     line: Point;
   };
   /** The practice picker: level buttons and the nine puzzle cards, by their centres. */
@@ -62,6 +65,8 @@ export const WIDE: Layout = {
     tagline: { x: 480, y: 108, w: 860 },
     cards: { xs: [107, 256, 405, 554, 703, 852], ys: [290], w: 136, h: 236 },
     records: { x: 480, y: 470, w: 180, h: 40 },
+    resume: { x: 365, y: 470, w: 270, h: 40 },
+    recordsAside: { x: 605, y: 470, w: 180, h: 40 },
     line: { x: 480, y: 510 },
   },
   practice: {
@@ -97,6 +102,8 @@ export const TALL: Layout = {
     tagline: { x: 270, y: 150, w: 480 },
     cards: { xs: [97, 270, 443], ys: [330, 584], w: 160, h: 236 },
     records: { x: 270, y: 760, w: 200, h: 44 },
+    resume: { x: 190, y: 760, w: 270, h: 44 },
+    recordsAside: { x: 420, y: 760, w: 140, h: 44 },
     line: { x: 270, y: 812 },
   },
   practice: {

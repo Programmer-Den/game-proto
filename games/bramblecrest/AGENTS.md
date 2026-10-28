@@ -12,7 +12,8 @@ block, door, bush, bell, boulder, cracked wall or foe, then acts on it). The que
 shed), `thorns` (cut the thorns over the village's north gate), `shrine` (find and clear the Sunken
 Shrine), `return` (tell the elder), `done` (chapter one's end card; the elder then tells of the
 bell), `bell` (ask Old Sedge), `belfry` (he gives bellseeds; find and clear the Drowned Belfry),
-`home` (tell the elder) and `end` (chapter two's end card, then free roaming).
+`home` (tell the elder) and `end` (chapter two's end card, then the post-game: free roaming, the
+moonstone page and the hourglass trials).
 
 Implemented today:
 
@@ -70,9 +71,21 @@ Implemented today:
   haze at the view's top and bottom edges for the miniature look. Lamps, windows, braziers,
   glowing mushrooms, candles, moonstones, seeds, bellseeds and the knight's lantern are
   lights, and `flashes` are short-lived ones (a burst, a ringing bell; none with reduce motion).
+- The post-game. The moonstone page (`toggleStones`, drawn by `Hud.showStones`): N or a tap on the
+  counters' plate (`Hud.plateAt`) opens it any time; it lists each map (`MAP_IDS`) with its stones
+  found and in all (chapter two's, `chapter: 2` in `maps.ts`, only once it starts) and, after
+  chapter two, each trial's best time. While it is open the game stands still (`Hud.covered`, like
+  the end card). The hourglass trials: each dungeon has an `hourglass` tile by its entry, shown and
+  solid once the quest reached `end`. Reading it (`hourglassAt`, `interactAt`) ends with the `trial`
+  talk effect, `startTrial`: `trial` is set and the map is built again, ignoring the beaten foes'
+  flags and the boss flag, so every foe, the ring and the boss come back. Its boss is harder by the
+  factors in `TRIAL` (`foes.ts`). `trial.ms` counts play time (not while talking, faded or covered)
+  and shows as the HUD's clock; beating the boss calls `trialWon` instead of the story's ending
+  (no flag, quest step, heart or stone) and keeps the best time in `state.trials[map]`. Leaving the
+  map (`enterMap` with another id) or a fall ends the trial with the `trialLost` toast.
 - The HUD (`src/scenes/hud.ts`): hearts, moonstones, keys (in a dungeon), bellseeds, the journal
   line (the quest's objective), place banners, toasts, the touch buttons, the floating touch stick,
-  the dialog box and the end card. The counters sit side by side, and a longer word (German
+  the dialog box, the trial's clock (top middle), the moonstone page and the end card. The counters sit side by side, and a longer word (German
   "Schlüssel") pushes the next one along and widens their plate.
 
 ## Sound
@@ -105,8 +118,10 @@ All in code through `shared/audio.ts` (no audio files), in `src/audio/`:
   thornling), `volley` (one per Thornmother volley), `twang` (`yank`), `squelch` (`hitBulb`),
   `rattle` and `clang` (the Bellwraith's drop and slam), `topple` (`tipBell`), `wail`
   (`hitWraith`), `wisp` (the wisp hops on) and `swell` (`checkExits`, walking into another map).
-- `ui('refuse')` for a locked or barred door, the thorny door, an empty chest and no bellseeds left;
-  `ui('click')` for the end card's buttons (`hud.ts`).
+- `ui('refuse')` for a locked or barred door, the thorny door, an empty chest, no bellseeds left and
+  the hourglass while its trial runs;
+  `ui('click')` for the end card's buttons (`hud.ts`) and opening the moonstone page; the `swell` effect also
+  plays when an hourglass trial starts.
 - Nothing plays while a map is built or a save loads (`enterMap` only starts the music). There is
   no `?watch` mode, footsteps or ambience.
 
@@ -158,14 +173,15 @@ All in code through `shared/audio.ts` (no audio files), in `src/audio/`:
 ### Save
 
 `bramblecrest-save` in localStorage: the whole `GameState` (map, position, facing, spawn, hearts,
-items, keys, moonstones, flags, quest, falls, foes beaten). It is written on a map change, on a
+items, keys, moonstones, flags, quest, falls, foes beaten, the trials' best times in ms). A trial
+under way is not saved. It is written on a map change, on a
 chest, cut thorns, a key door unlocked, a plate, broken rock, the bells, a moonstone, a quest step
 and each boss, all through `GameScene.persist`, which holds a save asked for while the hookvine
 pulls the knight (a bellseed bursting, a moonstone picked up) until they land on the post, so a
 reload never puts them or their spawn over water or a pit. Flags in use: `chest-<id>`, `door-<id>`, `gate-cut`, `woods-thorns`, `plate`,
 `boss`, `foe-<i>`, `belfry-foe-<i>`, `broke-<map>-<x>-<y>`, `bells`, `wraith`, `cat-1` to `cat-3`,
 plus the flags of hidden places. `load` fills in fields a save from an older version lacks
-(`items.seeds`, `seeds`), and starts over when the saved `map` or `spawn` is not a map (`isMapId`)
+(`items.seeds`, `seeds`, `trials`), and starts over when the saved `map` or `spawn` is not a map (`isMapId`)
 or a position is not a number. Cutting the gate before bringing the blade back is fine: the
 elder's `quest-thorns` then moves the quest straight on to `shrine`.
 
@@ -180,7 +196,7 @@ elder's `quest-thorns` then moves the quest straight on to `shrine`.
 
 - `window.game.scene.getScene('Game')` gives `state` (the `GameState`), `dialog` (`{ speaker,
   lines, i }` or null), `route` (the steps left of a tap's walk, or null), `target`, `foes` and
-  `boss`, `wraith` and `bombs`; `spot('npc' | 'chest', id)` is where to tap a person or chest in the world and
+  `boss`, `wraith`, `bombs` and `trial` (`{ map, ms }` or null); `spot('npc' | 'chest', id)` is where to tap a person or chest in the world and
   `screenOf(x, y)` turns a world point into view pixels (allowing for the camera's zoom).
 - `e2e/playthrough.spec.ts` taps the elder, taps through her lines, taps the `blade` chest, taps
   the elder again, walks to the street below the gate (`STREET`) and taps the gate's thorns

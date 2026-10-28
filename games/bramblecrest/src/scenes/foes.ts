@@ -54,6 +54,13 @@ export const SLAM_PX = 50;
 export const WRAITH_HP = 3;
 export const HOVER_SPEED = 85;
 
+/**
+ * The hourglass trial's harder bosses, as factors on the numbers above: the Thornmother's bulbs stay
+ * up less long, her volleys come faster and wider and she calls more slugs; the Bellwraith takes more
+ * hits, hunts faster and shows itself for less time.
+ */
+export const TRIAL = { bulbUp: 0.8, volley: 0.75, volleyShots: 12, summon: 0.75, summoned: 3, wraithHp: 5, hover: 0.7, hoverSpeed: 1.3, exposed: 0.8 };
+
 export interface Foe {
   kind: EnemyKind;
   x: number;

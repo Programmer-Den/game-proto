@@ -252,6 +252,9 @@ test('plays the first sale', async ({ page }, testInfo) => {
   expect(s.adventurers.some((a) => a.id === buyer.id)).toBe(false);
   await wait(400);
   await snap('5-sold');
+  // The Masterwork and the first sale earn their trophies (src/trophies/), and nothing else yet.
+  const trophies = await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('anvilheart-trophies') ?? '{}')));
+  expect(trophies.sort(), 'trophies earned in the first round').toEqual(['firstSale', 'masterwork']);
 
   // With no third merge the streak runs out, and the commission is still the first one.
   s = await until('the hammer streak runs out', (s) => s.streak === 0, STREAK_MS + 1_000);

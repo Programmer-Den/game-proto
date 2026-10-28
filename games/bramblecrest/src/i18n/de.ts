@@ -38,7 +38,7 @@ const de: Translation<typeof en> = {
   objBell: 'Frag den alten Sedge im Glimmermoor nach der Glocke',
   objBelfry: 'Finde den Ertrunkenen Glockenturm im Glimmermoor',
   objHome: 'Sag der Ältesten Wren, dass die Glocke schweigt',
-  objEnd: 'Kapitel zwei ist geschafft. Erkunde weiter im Laternenlicht',
+  objEnd: 'Finde alle Mondsteine oder bezwinge die Sanduhren',
 
   // Pip
   pipNook1: 'Hinter dem Schuppen steckt ein Felsen zwischen den Bäumen fest.',
@@ -91,6 +91,7 @@ const de: Translation<typeof en> = {
   elderHome2: 'Die Erbauer des Schreins haben auch ihre Fehler eingemauert, heißt es. Horch nach hohlem Stein nahe seiner Tür.',
   elderHome3: 'Ruh dich jetzt aus. Das Moor kann eine Nacht warten.',
   elderEnd: 'Die Nacht ist lang, und das Moor glimmt noch. Na los.',
+  elderTrials: 'Man sagt, die alten Sanduhren an den Türen von Schrein und Glockenturm leuchten wieder. Dreh eine um, wenn du dich traust.',
 
   // Chests and doors
   empty: 'Leer.',
@@ -148,6 +149,24 @@ const de: Translation<typeof en> = {
   keepExploring: 'Weiter erkunden',
   newGame: 'Neues Spiel',
 
+  // The hourglass trials
+  hourglassRead: 'Eine alte Sanduhr voll leuchtendem Sand. Dreh sie um, und jeder Feind hier erwacht wieder, und der Herr dieses Ortes erhebt sich stärker. Besiege ihn so schnell du kannst.',
+  hourglassBest: 'Deine Bestzeit hier: {time}.',
+  trialStart: 'Der Sand rinnt!',
+  trialBusy: 'Der Sand rinnt schon.',
+  trialLost: 'Der Sand steht still. Die Prüfung ist vorbei.',
+  trialDone: 'Prüfung geschafft in {time}!',
+  trialRecord: 'Eine neue Bestzeit!',
+  trialBestIs: 'Deine Bestzeit bleibt {time}.',
+
+  // The moonstone page
+  stonesTitle: 'Mondsteine',
+  stonesTotal: '{n} von {total} gefunden',
+  trialsTitle: 'Sanduhr-Prüfungen',
+  trialBest: '{place}: {time}',
+  trialNone: '{place}: noch nicht gelaufen',
+  closePage: 'Tippen oder N zum Schließen',
+
   // HUD
   keys: 'Schlüssel {n}',
   seeds: 'Samen {n}',
@@ -155,6 +174,6 @@ const de: Translation<typeof en> = {
 };
 
 /** Names and bell sounds that stay as they are in German. */
-export const keepEnglish: (keyof typeof en)[] = ['pipName', 'bakerName', 'bellLow', 'bellMid'];
+export const keepEnglish: (keyof typeof en)[] = ['pipName', 'bakerName', 'bellLow', 'bellMid', 'trialBest'];
 
 export default de;

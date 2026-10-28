@@ -62,6 +62,7 @@ import {
 import { MAX_TIER, swordOf } from '../game/swords';
 import { FORGE_UPGRADES, UPGRADES, locked, nextPrice, type UpgradeId } from '../game/upgrades';
 import { t, type TextKey } from '../i18n';
+import { checkTrophies } from '../trophies/check';
 import { Button } from '../ui/Button';
 import {
   BANNER,
@@ -351,6 +352,7 @@ export class GameScene extends Phaser.Scene {
     // Forging (the Forge button's or the Auto Forge's inside tick), rust dropping tiers, heroes
     // bringing swords back and walk-offs costing reputation are kept here.
     if (this.state.events.some((e) => e.kind === 'forged' || e.kind === 'rusted' || e.kind === 'returned' || e.kind === 'left')) this.save();
+    checkTrophies(this.state);
 
     this.drawSwords();
     this.drawVisitors();
