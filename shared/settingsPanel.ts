@@ -18,7 +18,8 @@ import { shareUpdates, updateNow } from './install';
  * shows the same as a QR code and takes a pasted or scanned code (`progressCode.ts`, `scanner.ts`,
  * `titleOf` naming a game whose code is pasted) and deletes the saves, calling `onChange` too, under
  * a line with the time played on this device over all the games (`playTime.ts`),
- * and the panel ends with Restore defaults and Done, which closes the dialog.
+ * and the panel ends with Restore defaults and Done, which closes the dialog. It returns a
+ * `refresh()` that reads the settings and the time played again, to call when the panel is shown.
  */
 export function mountSettingsPanel(
   root: HTMLElement,
@@ -28,7 +29,8 @@ export function mountSettingsPanel(
 ) {
   let current = loadSettings();
   const set = (patch: Partial<Settings>) => {
-    current = { ...current, ...patch };
+    // A game may have changed settings since (Mute, the volumes), so start from what is saved.
+    current = { ...loadSettings(), ...patch };
     saveSettings(current);
     if (current.language !== language()) setLanguage(current.language);
     shareUpdates(current.updates);
@@ -173,6 +175,11 @@ export function mountSettingsPanel(
   }
 
   render();
+  // Reads the settings again, for when the panel is shown after a game changed them.
+  return () => {
+    current = loadSettings();
+    render();
+  };
 }
 
 function action(id: string, onClick: () => void) {

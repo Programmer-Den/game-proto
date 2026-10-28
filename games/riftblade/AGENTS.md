@@ -76,11 +76,14 @@ a star map between them.
   Weekly run button (top right) that opens `weeklyPanel` (`GameScene.weeklyOpen`). `weekOf(now)`
   numbers the week (Mondays 00:00 UTC from 2024), `weeklyOf(week, open heroes)` picks its hero and
   two of six `MUTATORS` with its own generator. The run (`state.week`, `state.mutators`) is fought
-  at heat 0 without the Armoury; `reseed` swaps `Math.random` for a seeded one at the start, on the
-  space map's choice (`chooseWorld`), at each new planet (`nextPlanet`) and on resume (from
-  `state.rng`, the generator's position `rngAt()` that `GameScene.saveRun` stores, so a run picked
-  up mid-fight draws on as it would have; older saves without it reseed from the stage), and
-  `unseed` puts the page's own back at the run's end, Run again and any other run's start. Mutator
+  at heat 0 without the Armoury. Every rules draw goes through `rand()` (`weekly.ts`), which is
+  `Math.random()` in a normal run and the weekly's own seeded generator while one is on; the global
+  `Math.random` is never replaced, so Phaser's texture ids and the shared sound's draws never shift
+  a weekly's sequence. `reseed` seeds `rand` at the start, on the space map's choice
+  (`chooseWorld`), at each new planet (`nextPlanet`) and on resume (from `state.rng`, the
+  generator's position `rngAt()` that `GameScene.saveRun` stores, so a run picked up mid-fight
+  draws on as it would have; older saves without it reseed from the stage), and `unseed` puts
+  `rand` back on `Math.random` at the run's end, Run again and any other run's start. Mutator
   effects (`MUT`): Glass Cannon and Overcharged in `statsOf` and `startRun`, Swarm in `director`
   and `spawnAt`, Haste in `statsOf` and `spawnAt`, Vampire in `kill` (and no regen), Fragile Foes
   in `spawnAt` and `hurtHero`. `recordWeekly` keeps the week's furthest jump and win in
@@ -149,7 +152,8 @@ a star map between them.
   `ARMOURY_IDS`, `PERK` (each rank's numbers), `salvage` and `SALVAGE_PER_WORLD`, `perkAmount` (a
   card's `{n}`) and `nextPrice`. Imports nothing from the game but types.
 - `src/game/weekly.ts`: the weekly run: `MutatorId`, `MUTATORS`, `MUTATOR_IDS`, `MUT`,
-  `WEEKLY_BONUS`, `weekOf`, `weekSeed`, `seeded` (mulberry32), `weeklyOf`, `reseed` and `unseed`.
+  `WEEKLY_BONUS`, `weekOf`, `weekSeed`, `seeded` (mulberry32), `weeklyOf`, `rand` (the rules' random number), `reseed`, `unseed`
+  and `rngAt`.
   Imports nothing from the game but types.
 - `src/game/state.ts`: `GameState` and its parts (`Hero`, `Enemy`, `Bullet`, `Shard`, `Blast`,
   `Bomb`, `Fire`, `Ally`, `Pickup`, `Hazard`, `Pop`, `EventState`), the balance numbers (`RUN_MS`,
@@ -467,7 +471,7 @@ free of audio) or from the scene's input handler.
   A fresh browser has no saved run, so the playthrough starts on the hero select as before; saving
   draws no `Math.random`.
   Side objectives start at `OBJECTIVE_AT[0]` (1:00) and power-ups drop from `POWER.fromMs` (1:00),
-  neither calling Math.random before then, so they leave the playthrough's minute as it was. Keep
+  neither calling `rand` before then, so they leave the playthrough's minute as it was. Keep
   both at or after 1:00, or update the playthrough.
 
 ## Making common changes
@@ -594,9 +598,12 @@ mostly on the Dune world. Things learned while tuning:
   first minute then plays out differently and the playthrough needs a rerun.
 - The playthrough's animation frames sit on a fixed grid of 64 ms (the fake clock's timers can fire
   late on a busy machine), so each step is the same length.
-- The sim uses `Math.random` only for rules; the ground decoration uses its own hash, so drawing
-  never shifts the seeded sequence the test relies on. The Dune world's spawning calls
-  `Math.random` in the same order as before the other planets came, so keep it that way.
+- The rules draw only through `rand()` (never `Math.random` directly, or a weekly run stops
+  repeating); in a normal run it calls `Math.random`, so the playthrough's seeded `Math.random`
+  still makes its run repeat. Drawing and other cosmetics keep to `Math.random` or a hash (the
+  ground decoration uses its own hash), so drawing never shifts the seeded sequence the test relies
+  on. The Dune world's spawning draws in the same order as before the other planets came, so keep
+  it that way.
 - Bosses are `kind: 'boss'` on every planet; which one it is comes from `PLANETS[state.planet].boss`.
   The boss's timers reuse `shellMs`, `spawnMs` and `modeMs` with a meaning per boss `mech` (see
   `bossAttacks`).
@@ -607,7 +614,7 @@ mostly on the Dune world. Things learned while tuning:
   built from imported values).
 - The knights' random calls (crits, dodges, Persuasion) only happen when a knight is played (the
   same for Elara's and Triad-77's in `squad.ts`), and their pools are filtered out of a soldier's
-  card roll before `Math.random` is used, so a soldier's seeded playthrough plays exactly as before.
+  card roll before `rand` is used, so a soldier's seeded playthrough plays exactly as before.
 - `squad.ts` imports `sim.ts` like `blades.ts` does; the same rule about load-time values holds.
 - Triad-77's health lives in its bots: `p.hp` is recomputed from `state.bots` each step
   (`syncSquad`), so anything that changes it must go through `heal` or `hurtHero`.

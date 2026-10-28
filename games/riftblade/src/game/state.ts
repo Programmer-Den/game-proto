@@ -451,7 +451,7 @@ export interface GameState {
   /** The weekly run's week (-1 for any other run) and its mutators (see `weekly.ts`). */
   week: number;
   mutators: MutatorId[];
-  /** Where the weekly run's seeded `Math.random` stood when the run was saved (`rngAt`, -1 for none). */
+  /** Where the weekly run's seeded `rand` stood when the run was saved (`rngAt`, -1 for none). */
   rng: number;
   /**
    * The planet (an index into `PLANETS`: 0 Dune, 1 Swamp, 2 Ice, 3 Lava, then the later ones) and

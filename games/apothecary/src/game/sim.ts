@@ -494,11 +494,12 @@ function brew(state: GameState, cauldron: Cauldron, brewing: Brew | null, ms: nu
     if (state.plague && !state.plague.cured) {
       state.plague.cured = true;
       state.plague.curedDay = state.contract.day;
+      state.plague.told = false;
       state.seals = (state.seals ?? 0) + 1;
     }
   } else cauldron.output.push(current.out);
   // Work past the end of this brew goes on the next, if there is one.
-  const next = startBrew(state, cauldron, first);
+  const next = startBrew(state, cauldron, first, current);
   if (next) next.progress = current.progress - current.ms;
   return next;
 }
@@ -512,9 +513,10 @@ const BREW_LEAD = 6;
  * room for, so every potion keeps coming. Ties go in recipe order. Takes the ingredients out of the cauldron and returns the brew
  * started, if any, for a pipe to work.
  */
-function startBrew(state: GameState, cauldron: Cauldron, first: PotionId | null = null): Brew | null {
-  // What the pipes are still brewing (a pipe's finished brew is out already), counted as made.
-  const under = (c: Cauldron) => [c.brewing, c.brewing2].filter((b): b is Brew => !!b && b.progress < b.ms).map((b) => b.out);
+function startBrew(state: GameState, cauldron: Cauldron, first: PotionId | null = null, done: Brew | null = null): Brew | null {
+  // What the pipes are still brewing, counted as made: all but `done`, the brew just put out. A
+  // loaded brew whose saved progress was rounded up to its full time is still in its pipe.
+  const under = (c: Cauldron) => [c.brewing, c.brewing2].filter((b): b is Brew => !!b && b !== done).map((b) => b.out);
   // Once the plague's last stage is over, the town's cure comes before everything, the moment one of
   // each refined good is in, unless a pipe already brews it.
   if (panaceaUnlocked(state) && ![state.cauldron, state.cauldron2].some((c) => under(c).includes(PANACEA))) {

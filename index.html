@@ -657,7 +657,7 @@
       translate();
       const dialog = document.getElementById('settings');
       // Deleting all progress also empties Continue playing.
-      mountSettingsPanel(
+      const refreshSettings = mountSettingsPanel(
         dialog.querySelector('.panel'),
         () => {
           translate();
@@ -666,7 +666,13 @@
         cards.map(folder),
         titleOf,
       );
-      document.getElementById('open-settings').addEventListener('click', () => dialog.showModal());
+      // A game may have changed the settings since the page loaded (Mute, the volumes), so the
+      // panel reads them again each time it opens.
+      const openSettings = () => {
+        refreshSettings();
+        dialog.showModal();
+      };
+      document.getElementById('open-settings').addEventListener('click', openSettings);
 
       // Share: the hub's address as it is loaded (without a query, a hash or index.html), so the code
       // points to wherever the hub is hosted.
@@ -701,7 +707,7 @@
         if (button === 'x' && !open) document.activeElement?.closest('.game')?.querySelector('.game-gear')?.click();
         else if (button === 'start') {
           if (open === dialog) dialog.close();
-          else if (!open) dialog.showModal();
+          else if (!open) openSettings();
         } else if (button === 'b') open?.close();
         else if (isDirection(button)) moveFocus(open ?? document.body, button);
         else if (button === 'a') pressFocused(open ?? document.body);

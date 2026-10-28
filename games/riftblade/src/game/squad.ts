@@ -3,13 +3,14 @@
  * that calls in a bombardment, and four cards a level-up) and Triad-77 (three battle bots
  * moving as one unit, each shooting the foe nearest to it). Their weapons, signatures and paths. `sim.ts`
  * calls in here only for these two, so every other hero's run replays exactly as before. Pure
- * state changes, randomness from Math.random, like the rest of the rules.
+ * state changes, randomness from `rand`, like the rest of the rules.
  */
 import { t as tr } from '../i18n';
 import { HEROES } from './heroes';
 import { at } from './upgrades';
 import { botCount, botMax, type Ally, type Bullet, type Bot, type Enemy, type GameState } from './state';
 import { HURT_GRACE_MS, addBomb, bolt, damage, explode, heal, knock, near, nearest, pop, ready, stats, swarmSpot, volley } from './sim';
+import { rand } from './weekly';
 
 const rank = (s: GameState, id: string) => s.ranks[id] ?? 0;
 const cap = (s: GameState, id: string) => s.capstones.includes(id);
@@ -259,7 +260,7 @@ function triadVolley(s: GameState, fireMs: number, dmg: number, range: number) {
     d.aim = a;
     // Scatter Shot's side bolts come from the first bot only; with Crossfire from every one.
     if (i === 0 || cone) volley(s, d.x, d.y, a, dmg);
-    else bolt(s, d.x, d.y, a + (Math.random() * 2 - 1) * HEROES.triad.jitter, dmg);
+    else bolt(s, d.x, d.y, a + (rand() * 2 - 1) * HEROES.triad.jitter, dmg);
     if (rank(s, 'uplink') >= 5) bolt(s, d.x, d.y, a + 0.09, dmg * 0.6);
   });
 }
@@ -276,8 +277,8 @@ export function squadSignature(s: GameState) {
     s.flag = { x: p.x, y: p.y, ms, maxMs: ms };
     p.sigActiveMs = 600;
     for (let i = 0; i < AID.shells; i++) {
-      const a = Math.random() * Math.PI * 2;
-      const d = 30 + Math.random() * AID.spread;
+      const a = rand() * Math.PI * 2;
+      const d = 30 + rand() * AID.spread;
       addBomb(s, 'carpet', p.x + Math.cos(a) * d, p.y + Math.sin(a) * d, 500 + i * AID.every, AID.shellR, AID.shellDmg);
     }
     if (dip >= 2) confuse(s, p.x, p.y, cap(s, 'rallying-cry') ? 300 : BUBBLE.confuseR);

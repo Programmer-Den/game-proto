@@ -242,7 +242,7 @@ played, and is kept for the next game:
 | Challenge | The 20 waves with the garden's own pouch of two to four towers (lent even before the shed sells them), named on its card. A win earns the garden's ✦, which counts like a star for opening seasons, and 10 more seeds |
 | Swarm | The 20 waves, each sent the moment the last is all out, for a quarter more gold; won without losing a cabbage, it earns a fourth star |
 | Endless | Waves never stop: after wave 20, waves 11 to 20 come round again, bigger each time. The garden keeps the most waves held |
-| Sandbox | 10,000 gold, towers grow at once and waves never stop, with no records: a place to try mazes |
+| Sandbox | 10,000 gold, towers grow at once and waves never stop, with no records or trophies: a place to try mazes |
 
 ![The picker in Challenge: each card names its garden's pouch, and the Meadow's challenge is won](docs/screenshots/challenge.webp)
 
@@ -261,7 +261,7 @@ played, and is kept for the next game:
 | Last Cabbage | Hedge, Bow, Whirligig |
 | Snow Path | Sunglass, Bonfire, Bow |
 
-**Trophies.** Ten trophies, listed on the start and pause screens and on the hub:
+**Trophies.** Ten trophies, listed on the start and pause screens and on the hub. Sandbox earns none:
 
 | Trophy | Tier | How |
 | --- | --- | --- |

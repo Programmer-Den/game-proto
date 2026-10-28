@@ -73,21 +73,29 @@ export function weeklyOf(week: number, open: readonly HeroId[]): { hero: HeroId;
   return { hero, mutators };
 }
 
-const native = Math.random;
-/** Where the seeded `Math.random` stands (-1 while it is the page's own). */
+/** The weekly's seeded generator while one is on (null for the page's own `Math.random`). */
+let draw: (() => number) | null = null;
+/** Where the seeded generator stands (-1 while there is none). */
 let position = -1;
 
 /**
- * Seeds `Math.random` for a weekly run's next stretch (a world, the maps after a boss), so it plays
- * out the same way each attempt; `unseed` puts back the generator there was before. A saved
- * `rngAt()` passed back here carries on where the generator stood.
+ * The rules' random number: the weekly's seeded generator while one is on, else `Math.random`. Only
+ * the rules draw on it, so Phaser, the sound and the drawing (which use `Math.random`) never shift a
+ * weekly's sequence, and a normal run draws on `Math.random` in the same order as ever.
+ */
+export const rand = () => (draw ? draw() : Math.random());
+
+/**
+ * Seeds `rand` for a weekly run's next stretch (a world, the maps after a boss), so it plays out the
+ * same way each attempt; `unseed` puts `Math.random` back under it. A saved `rngAt()` passed back
+ * here carries on where the generator stood.
  */
 export function reseed(seed: number) {
   position = seed >>> 0;
-  Math.random = seeded(seed, (at) => (position = at));
+  draw = seeded(seed, (at) => (position = at));
 }
 export function unseed() {
-  Math.random = native;
+  draw = null;
   position = -1;
 }
 export const rngAt = () => position;

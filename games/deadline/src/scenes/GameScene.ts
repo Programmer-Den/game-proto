@@ -869,14 +869,15 @@ export class GameScene extends Phaser.Scene {
     this.fire(dt);
     this.moveBullets(dt);
     this.tickBoss(dt);
-    if (this.moveEnemies(dt)) return;
+    // A game over or a rescue ends the frame early, so each saves its trophies before returning.
+    if (this.moveEnemies(dt)) return checkTrophies(this.state);
     this.movePickups(dt);
     this.moveDrums(dt);
     this.moveAcid(dt);
     this.moveWalls(dt);
     // A rescue that opens the role pick holds the rest of the frame, so nothing (a companion crate
     // shot open by this frame's bullets) can fill the squad under the pick.
-    if (this.moveSurvivors(dt)) return;
+    if (this.moveSurvivors(dt)) return checkTrophies(this.state);
     this.hitTargets();
     this.tickFlamer(dt);
     this.tickFrenzy(dt);

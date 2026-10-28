@@ -105,6 +105,8 @@ export interface Seed {
   vy: number;
   sprite: Phaser.GameObjects.Image;
   life: number;
+  /** Height above the shot's ground point, where walls stop it. */
+  lift: number;
 }
 
 export type BulbState = 'hidden' | 'raised' | 'down' | 'gone';

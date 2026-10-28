@@ -168,7 +168,8 @@ Implemented today:
   buildings joined to the castle at once, `joinedCount`) and `tenCrowns` (10 crowns in all). Gold:
   `bigKingdom` (a kingdom finished with 350), `threeStars` (three stars on a campaign level) and
   `campaign` (hidden: a star on all eight levels), the last two read from `loadStars` with a
-  campaign kingdom just finished folded in, so they work with storage blocked. A greedy player
+  campaign kingdom just finished folded in, so `threeStars` also works with storage blocked
+  (`campaign` can't then: levels 2 to 8 open only from saved stars). A greedy player
   finishes with 210 to 340 and joins about 50, so the gold and silver numbers ask for more
   than it. `checkTrophies` in `trophies/check.ts` runs at the end of the scene's `refresh`, after
   every change; its first call on a page is quiet, so crowns and stars saved before trophies earn

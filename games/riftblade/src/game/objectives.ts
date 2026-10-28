@@ -2,7 +2,7 @@
  * Side objectives: three a world, one after the other (a shared one, the world's own and the
  * hero's own, see `OBJECTIVE_AT`), each with a time limit and a reward of credits, a level or a
  * free upgrade card. Called from `sim.ts` once a step; none in the arena or once the boss is up.
- * Randomness only through Math.random, and only from a world's first objective on (1:00), so a
+ * Randomness only through `rand`, and only from a world's first objective on (1:00), so a
  * world's first minute plays exactly as it did before objectives came.
  */
 import { t as tr, type TextKey } from '../i18n';
@@ -12,6 +12,7 @@ import {
   type GameState, type Objective, type ObjectiveId, type StructureKind,
 } from './state';
 import { addHazard, explode, gainXp, near, pop, spawnAt, spawnElite, spawnGroup } from './sim';
+import { rand } from './weekly';
 
 type Reward = { credits: number } | { level: true } | { card: true };
 
@@ -87,7 +88,7 @@ function pick(s: GameState): ObjectiveId {
     s.sharedSeen = [];
     pool = [...SHARED_OBJECTIVES];
   }
-  const id = pool[Math.floor(Math.random() * pool.length)];
+  const id = pool[Math.floor(rand() * pool.length)];
   s.sharedSeen.push(id);
   return id;
 }
@@ -98,7 +99,7 @@ function start(s: GameState) {
   s.objectiveAt = OBJECTIVE_AT[s.objectiveSlot] ?? Infinity;
   const spec = OBJ[id];
   const p = s.player;
-  const a = Math.random() * Math.PI * 2;
+  const a = rand() * Math.PI * 2;
   const o: Objective = {
     id, x: p.x, y: p.y, r: spec.r, ms: spec.ms, maxMs: spec.ms, done: 0, goal: spec.goal, base: 0, seen: 0,
     points: [], ward: null, toX: 0, toY: 0, tickMs: 0, ids: [],
@@ -133,7 +134,7 @@ function start(s: GameState) {
     case 'nests': {
       const n = spec.goal;
       for (let i = 0; i < n; i++) {
-        const q = around(s, a + (i / n) * Math.PI * 2, 300 + Math.random() * 140);
+        const q = around(s, a + (i / n) * Math.PI * 2, 300 + rand() * 140);
         o.ids.push(build(s, id === 'beacons' ? 'beacon' : 'nest', q.x, q.y).id);
       }
       break;
@@ -161,7 +162,7 @@ function start(s: GameState) {
     case 'salvage': {
       const n = id === 'recon' ? 4 : 3;
       for (let i = 0; i < n; i++) {
-        const q = around(s, a + (i / n) * Math.PI * 2 + (Math.random() - 0.5) * 0.6, (id === 'recon' ? 340 : 200) + Math.random() * 130);
+        const q = around(s, a + (i / n) * Math.PI * 2 + (rand() - 0.5) * 0.6, (id === 'recon' ? 340 : 200) + rand() * 130);
         o.points.push({ ...q, ms: 0 });
       }
       break;
@@ -259,7 +260,7 @@ function run(s: GameState, o: Objective, ms: number) {
         o.tickMs -= ms;
         if (o.tickMs <= 0) {
           o.tickMs = OBJ_MISC.nestMs;
-          for (const n of left) for (let i = 0; i < 2; i++) spawnAt(s, PLANETS[s.planet].swarm, n.x + (Math.random() - 0.5) * 40, n.y + 24);
+          for (const n of left) for (let i = 0; i < 2; i++) spawnAt(s, PLANETS[s.planet].swarm, n.x + (rand() - 0.5) * 40, n.y + 24);
         }
       }
       break;
@@ -300,8 +301,8 @@ function run(s: GameState, o: Objective, ms: number) {
         if (o.tickMs <= 0) {
           o.tickMs = OBJ_MISC.ventMs;
           const left = o.points.filter(open);
-          const q = left[Math.floor(Math.random() * left.length)];
-          if (q) addHazard(s, 'vent', q.x + (Math.random() - 0.5) * 120, q.y + (Math.random() - 0.5) * 120, 54, 1100, 450, 14);
+          const q = left[Math.floor(rand() * left.length)];
+          if (q) addHazard(s, 'vent', q.x + (rand() - 0.5) * 120, q.y + (rand() - 0.5) * 120, 54, 1100, 450, 14);
         }
       }
       break;

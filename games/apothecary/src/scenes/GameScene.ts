@@ -1462,13 +1462,14 @@ export class GameScene extends Phaser.Scene {
       }
       const season = plague.season ?? 0;
       const stages = stagesFor(season).length;
-      if (plague.cured && !seen?.cured) {
+      if (plague.cured && (!seen?.cured || plague.told === false)) {
         // The first cure is the game's ending; a later season's earns a town seal.
         if (season === 0) {
           say(t('panaceaBrewed'), true);
           this.showWin();
         } else say(t('seasonCured', { n: Math.round(SEAL_PRICE * 100) }), true);
         if (loud) playSting(SONG, 'win');
+        delete plague.told;
       } else if (seen && season > seen.season) {
         say(t('newSeason'), false);
         if (loud) playSting(SONG, 'relapse');

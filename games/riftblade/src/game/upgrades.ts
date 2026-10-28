@@ -6,6 +6,7 @@
  */
 import { HEROES, type HeroId, type PoolId } from './heroes';
 import type { TextKey } from '../i18n';
+import { rand } from './weekly';
 
 export type UpgradeKind = 'path' | 'pool' | 'gear';
 
@@ -526,7 +527,7 @@ export function rollChoices(hero: HeroId, ranks: Record<string, number>, count =
   const take = (pool: string[]) => {
     // Upgrades already held come up a little more often, so a build can be finished.
     const weights = pool.map((id) => ((ranks[id] ?? 0) > 0 ? 1.6 : 1));
-    let r = Math.random() * weights.reduce((a, b) => a + b, 0);
+    let r = rand() * weights.reduce((a, b) => a + b, 0);
     for (let i = 0; i < pool.length; i++) {
       r -= weights[i];
       if (r <= 0) return pool[i];
@@ -553,7 +554,7 @@ export const cardCount = (hero: HeroId) => (hero === 'elara' ? 4 : 3);
 export function rewardChoices(hero: HeroId, ranks: Record<string, number>): string[] {
   const held = Object.keys(ranks).filter((id) => ranks[id] < MAX_TIER);
   const picks: string[] = [];
-  while (picks.length < 3 && held.length) picks.push(held.splice(Math.floor(Math.random() * held.length), 1)[0]);
+  while (picks.length < 3 && held.length) picks.push(held.splice(Math.floor(rand() * held.length), 1)[0]);
   for (const id of rollChoices(hero, ranks)) {
     if (picks.length >= 3) break;
     if (!picks.includes(id) && (id !== FILLER.id || !picks.length)) picks.push(id);
