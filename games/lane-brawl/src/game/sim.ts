@@ -23,6 +23,7 @@ import {
   RUNE,
   RUNES,
   RUNE_ORDER,
+  RECAP,
   PING,
   PINGS,
   PingKind,
@@ -79,7 +80,7 @@ import {
   WARD_SPOTS,
   bountyOf,
 } from './data';
-import { GameState, ObjectiveTitle, SoundId, Unit, dist, getUnit, laneNear, levelFor, refreshStats, spawnMercs, spawnWard, spawnWave } from './state';
+import { DeathRecap, GameState, HitHow, ObjectiveTitle, RecapRow, SoundId, Unit, dist, getUnit, laneNear, levelFor, refreshStats, spawnMercs, spawnWard, spawnWave } from './state';
 import { shortName } from './names';
 import { aiLog } from '../../../../shared/watch';
 import { english, t as text, type TextKey } from '../i18n';
@@ -429,7 +430,7 @@ export function castSpell(s: GameState, u: Unit, aim: Vec): boolean {
         aim,
       );
       if (!foe) return false;
-      damage(s, foe, dealt(s, u, amount), u.id);
+      damage(s, foe, dealt(s, u, amount), u.id, 'spell');
       u.facing = Math.atan2(foe.y - u.y, foe.x - u.x);
       s.fx.push({ kind: 'line', x: u.x, y: u.y, x2: foe.x, y2: foe.y, color: def.color, ms: 300 }, { kind: 'ring', x: foe.x, y: foe.y, r: 36, color: def.color, ms: 500 });
       break;
@@ -604,8 +605,8 @@ function abilityDamage(s: GameState, caster: Unit, base: number): number {
 }
 
 /** Hurts an enemy with an ability: double damage below an execute threshold, then the stun and slow. */
-function abilityHit(s: GameState, caster: Unit, e: Unit, amount: number, ab: { stun?: number; slow?: number; executeBelow?: number }) {
-  if (amount > 0) damage(s, e, ab.executeBelow && e.hp < e.maxHp * ab.executeBelow ? amount * 2 : amount, caster.id);
+function abilityHit(s: GameState, caster: Unit, e: Unit, amount: number, ab: { stun?: number; slow?: number; executeBelow?: number }, how: HitHow) {
+  if (amount > 0) damage(s, e, ab.executeBelow && e.hp < e.maxHp * ab.executeBelow ? amount * 2 : amount, caster.id, how);
   if (e.kind === 'champion' || e.kind === 'minion') {
     if (ab.slow) e.slowMs = Math.max(e.slowMs, ab.slow);
     if (ab.stun) e.stunMs = Math.max(e.stunMs, ab.stun);
@@ -639,7 +640,7 @@ export function cast(s: GameState, caster: Unit, key: AbilityKey, aim: Vec): boo
       shot(c, r);
       for (const e of [...s.units]) {
         if (e.dead || e.side === caster.side || !hittable(e) || dist(e, c) > r + e.radius) continue;
-        abilityHit(s, caster, e, dmg, ab);
+        abilityHit(s, caster, e, dmg, ab, key);
         // A knock pushes champions and minions away from the centre.
         if (ab.knock && !e.dead && (e.kind === 'champion' || e.kind === 'minion')) {
           const d = Math.max(dist(e, c), 1);
@@ -691,7 +692,7 @@ export function cast(s: GameState, caster: Unit, key: AbilityKey, aim: Vec): boo
       if (ab.damage) {
         for (const e of [...s.units]) {
           if (e.dead || e.side === caster.side || !hittable(e) || dist(e, to) > (ab.radius ?? 0) + e.radius) continue;
-          abilityHit(s, caster, e, dmg, ab);
+          abilityHit(s, caster, e, dmg, ab, key);
         }
       }
       break;
@@ -743,7 +744,7 @@ function campSpares(s: GameState, sourceId: number, t: Unit): boolean {
 }
 
 /** Hurts a unit after its armor and any shield. A unit reduced to 0 health dies. Returns the health it lost. */
-export function damage(s: GameState, t: Unit, amount: number, sourceId: number): number {
+export function damage(s: GameState, t: Unit, amount: number, sourceId: number, how: HitHow = 'attack'): number {
   if (t.dead || amount <= 0 || !hittable(t) || invulnerable(s, t)) return 0;
   // A ward falls to a fixed number of hits, whatever they are.
   if (t.kind === 'ward') {
@@ -770,6 +771,11 @@ export function damage(s: GameState, t: Unit, amount: number, sourceId: number):
   }
   const lost = Math.min(Math.max(0, t.hp), rest);
   t.hp -= rest;
+  // The player's champion keeps what hurt it lately, for the death recap.
+  if (t.id === s.player && lost > 0) {
+    s.playerHits.push({ at: s.time, src: sourceId, how, amount: lost });
+    if (s.playerHits[0].at < s.time - RECAP.windowMs) s.playerHits = s.playerHits.filter((h) => h.at >= s.time - RECAP.windowMs);
+  }
   // ...and finish an enemy champion they leave nearly dead.
   if (blessed && t.kind === 'champion' && t.hp > 0 && t.hp < t.maxHp * ELDER.execute) {
     t.hp = 0;
@@ -792,6 +798,32 @@ export function damage(s: GameState, t: Unit, amount: number, sourceId: number):
   }
   if (t.hp <= 0) kill(s, t, sourceId);
   return lost;
+}
+
+/** Which hit an ability's look (`${championId}.${key}`) stands for: the key, or a plain attack without one. */
+function hitHowOf(look: string | undefined): HitHow {
+  const key = look?.split('.')[1];
+  return (ABILITY_KEYS as string[]).includes(key ?? '') ? (key as AbilityKey) : 'attack';
+}
+
+/**
+ * The death recap: what hurt the player's champion in its last `RECAP.windowMs`, summed by
+ * attacker and hit (all minions as one), the biggest first, at most `RECAP.rows` of them.
+ */
+function deathRecap(s: GameState, killerId: number): DeathRecap {
+  const rows: RecapRow[] = [];
+  for (const h of s.playerHits) {
+    if (h.at < s.time - RECAP.windowMs) continue;
+    const src = getUnit(s, h.src);
+    const minion = src?.kind === 'minion';
+    const row = rows.find((r) => (minion ? r.kind === 'minion' : r.src === h.src) && r.how === h.how);
+    if (row) row.amount += h.amount;
+    else rows.push({ src: minion ? -1 : h.src, kind: src?.kind ?? 'minion', how: h.how, amount: h.amount });
+  }
+  rows.sort((a, b) => b.amount - a.amount);
+  const total = rows.reduce((n, r) => n + r.amount, 0);
+  s.playerHits = [];
+  return { at: s.time, killer: killerId, total, rows: rows.slice(0, RECAP.rows) };
 }
 
 /** Whether a unit is a champion whose team has the elder's blessing now. */
@@ -965,6 +997,7 @@ function kill(s: GameState, t: Unit, killerId: number) {
   t.target = null;
   t.moveTo = null;
   t.buffs = t.buffs.filter((b) => b.elixir);
+  if (t.id === s.player) s.recap = deathRecap(s, killerId);
   const killer = getUnit(s, killerId);
   const champKiller = killer && killer.kind === 'champion' ? killer : null;
   switch (t.kind) {
@@ -1861,7 +1894,7 @@ function updateProjectiles(s: GameState, dt: number) {
         s.fx.push({ kind: 'skill', look: `${p.look}>hit`, x: e.x, y: e.y, x2: p.x, y2: p.y, r: 0, a: Math.atan2(p.vy, p.vx), color: p.color, ms: 400 });
         if (owner && owner.id === s.player) sound(s, 'impact', e, true);
       }
-      if (owner && owner.kind === 'champion') abilityHit(s, owner, e, p.damage, p);
+      if (owner && owner.kind === 'champion') abilityHit(s, owner, e, p.damage, p, hitHowOf(p.look));
       else damage(s, e, p.damage, p.owner);
       // A harpoon drags what it caught to the thrower.
       if (p.pull && owner && !e.dead && (e.kind === 'champion' || e.kind === 'minion')) {
@@ -1887,7 +1920,7 @@ function updateZones(s: GameState, dt: number) {
     for (const e of s.units) {
       if (e.dead || e.side === z.side || !hittable(e) || e.kind === 'tower' || e.kind === 'inhibitor' || e.kind === 'nexus' || e.kind === 'ward') continue;
       if ((e.x - z.x) ** 2 + (e.y - z.y) ** 2 > (z.r + e.radius) ** 2) continue;
-      damage(s, e, (z.dps * dt) / 1000, z.owner);
+      damage(s, e, (z.dps * dt) / 1000, z.owner, hitHowOf(z.look));
       if (z.slow && (e.kind === 'champion' || e.kind === 'minion')) e.slowMs = Math.max(e.slowMs, Math.min(z.slow, 400));
     }
   }

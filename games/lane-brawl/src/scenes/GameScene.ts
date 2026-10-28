@@ -46,6 +46,8 @@ import {
   SIEGE,
   PING,
   PINGS,
+  RECAP,
+  CAMP_KINDS,
   PING_KINDS,
   PingKind,
 } from '../game/data';
@@ -1530,6 +1532,7 @@ export class GameScene extends Phaser.Scene {
       if (!watching) this.drawObjectiveCard(g, s);
       this.drawBuffs(g, s);
       this.drawNotice(g, s);
+      if (!watching && me.dead) this.drawRecap(g, s);
     }
     this.drawBottomBar(g, s, me);
     this.drawMinimap(g, s, me);
@@ -1726,6 +1729,46 @@ export class GameScene extends Phaser.Scene {
     g.fillStyle(col(n.color), alpha).fillRect(x, y, 3, 22);
     g.fillStyle(col(n.color), alpha).fillRect(x + w - 3, y, 3, 22);
     this.t('notice', SCREEN.w / 2, y + 4, n.text, 12, UI.text, 'center', true, false, alpha);
+  }
+
+  /** Who a unit is in the death recap: a champion by its first name, anything else by what it is. */
+  private recapName(s: GameState, id: number, kind: Unit['kind']): string {
+    const u = id >= 0 ? getUnit(s, id) : undefined;
+    if (u?.kind === 'champion') return shortName(u.name);
+    if (u?.kind === 'camp' && u.campKind) return t(CAMP_KINDS[u.campKind].name);
+    const k = u?.kind ?? kind;
+    return t(k === 'tower' ? 'recapTower' : k === 'beast' ? 'recapBeast' : k === 'camp' ? 'recapCamp' : 'recapMinions');
+  }
+
+  /**
+   * The death recap, while the player's champion is dead: who slew it, the damage it took in its
+   * last seconds, and the biggest parts of it by attacker and hit, each with a bar.
+   */
+  private drawRecap(g: Phaser.GameObjects.Graphics, s: GameState) {
+    const r = s.recap;
+    if (!r) return;
+    const w = 330, x = SCREEN.w / 2 - w / 2, y = 72, h = 46 + r.rows.length * 24;
+    this.panel(g, x, y, w, h, UI.slate, 0.94);
+    g.fillStyle(col(UI.red), 1).fillRect(x + 2, y + 2, w - 4, 3);
+    const killer = getUnit(s, r.killer);
+    this.t('recap-title', x + 12, y + 9, t('recapTitle', { name: this.recapName(s, r.killer, killer?.kind ?? 'minion') }), 14, UI.text, 'left', true);
+    this.t('recap-total', x + w - 12, y + 11, t('recapTotal', { n: formatNumber(Math.round(r.total)), s: RECAP.windowMs / 1000 }), 10, UI.dim, 'right');
+    r.rows.forEach((row, i) => {
+      const ry = y + 34 + i * 24;
+      const src = row.src >= 0 ? getUnit(s, row.src) : undefined;
+      const side = src?.side ?? 'red';
+      const how =
+        row.how === 'attack' ? t('recapAttacks')
+        : row.how === 'spell' ? (src?.spell ? t(spellById(src.spell).name) : t('recapAttacks'))
+        : t(src ? abilityFor(src, row.how)?.name ?? 'recapAttacks' : 'recapAttacks');
+      const share = r.total > 0 ? row.amount / r.total : 0;
+      g.fillStyle(col(UI.edge), 1).fillRect(x + 10, ry, w - 20, 20);
+      g.fillStyle(col(UI.card), 1).fillRect(x + 11, ry + 1, w - 22, 18);
+      g.fillStyle(col(SIDE_COLOR[side]), 0.35).fillRect(x + 11, ry + 1, (w - 22) * share, 18);
+      g.fillStyle(col(SIDE_COLOR[side]), 1).fillRect(x + 11, ry + 1, 3, 18);
+      this.t(`recap-row-${i}`, x + 20, ry + 3, `${this.recapName(s, row.src, row.kind)} · ${how}`, 11, UI.text, 'left', true);
+      this.t(`recap-amt-${i}`, x + w - 18, ry + 3, formatNumber(Math.round(row.amount)), 11, UI.gold, 'right', true);
+    });
   }
 
   /** The ping buttons: each ping's sign and key; an armed one lights up until the map is pressed. */
