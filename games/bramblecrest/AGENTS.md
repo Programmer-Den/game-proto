@@ -107,6 +107,27 @@ Implemented today:
   the dialog box, the trial's clock (top middle), the moonstone page and the end card. The counters sit side by side, and a longer word (German
   "Schlüssel") pushes the next one along and widens their plate.
 
+## Trophies
+
+`src/trophies/` holds the game's ten trophies (`shared/trophies.ts`). `index.ts` lists them
+(`trophies`: id, tier, icon, `hidden` for Unbroken) with their texts in `trophies/i18n/` (`en.ts`
+and `de.ts`: the name keyed by the id, what earns it by `<id>Text`), and imports nothing else from
+the game, since the hub loads it. `main.ts` hands `trophies` to `setupGame`. `check.ts` has each
+trophy's condition on the `GameState` and `checkTrophies(state)`, which `GameScene.update` calls
+every frame (the first call after a load is quiet, so a restored save earns its trophies without a
+toast), plus `awardNow` for one earned by an event. They are:
+
+- Bronze: `blade` (the Old Blade taken), `thornmother` (the `boss` flag), `firstUpgrade` (any
+  upgrade bought) and `bellyUp` (a beetle beaten, awarded in `hitFoe`, which only lands on a beetle
+  that is down).
+- Silver: `bellwraith` (the `wraith` flag), `allUpgrades` (all of `UPGRADES`) and `trial` (any
+  hourglass trial finished).
+- Gold: `swift` (both trials' best times under `PAR`: 2:30 in the shrine, 2:00 in the belfry),
+  `allStones` (all `MOONSTONES`) and the hidden `unbroken` (the quest at `end` with no fall).
+
+The playthrough earns `blade`. A new trophy goes in `index.ts`, its texts in both `i18n` files and
+its condition in `EARNED` (or an `awardNow` call where it happens); retune the trial pars in `PAR`.
+
 ## Sound
 
 All in code through `shared/audio.ts` (no audio files), in `src/audio/`:
@@ -160,6 +181,7 @@ All in code through `shared/audio.ts` (no audio files), in `src/audio/`:
   laid out for 960x540 inside `viewFrame` with its shade over the whole view. At 960x540 nothing
   moves.
 - `src/audio/`: the songs and the sound table (see Sound).
+- `src/trophies/`: the trophies and when they are earned (see Trophies).
 - `src/howToPlay.ts`: the How to play text in British English and German, picked with `byLanguage`
   (US English uses the British one, since no word in it is spelled differently).
 - `src/i18n.ts` and `src/i18n/`: every text on screen (`shared/i18n.ts`). `i18n/en.ts` is the
@@ -200,7 +222,8 @@ under way is not saved. It is written on a map change, on a
 chest, cut thorns, a key door unlocked, a plate, broken rock, the bells, a moonstone, a quest step
 and each boss, all through `GameScene.persist`, which holds a save asked for while the hookvine
 pulls the knight (a bellseed bursting, a moonstone picked up) until they land on the post, so a
-reload never puts them or their spawn over water or a pit. Flags in use: `chest-<id>`, `door-<id>`, `gate-cut`, `woods-thorns`, `plate`,
+reload never puts them or their spawn over water or a pit. Trophies are saved apart, under `bramblecrest-trophies` (`shared/trophies.ts`), and outlive a
+new game. Flags in use: `chest-<id>`, `door-<id>`, `gate-cut`, `woods-thorns`, `plate`,
 `boss`, `foe-<i>`, `belfry-foe-<i>`, `broke-<map>-<x>-<y>`, `bells`, `wraith`, `cat-1` to `cat-3`,
 plus the flags of hidden places. `load` fills in fields a save from an older version lacks
 (`items.seeds`, `seeds`, `trials`, `coins`, `upgrades`), and starts over when the saved `map` or `spawn` is not a map (`isMapId`)

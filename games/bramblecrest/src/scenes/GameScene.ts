@@ -15,6 +15,7 @@ import { playMusic, playSting, ui } from '../../../../shared/audio';
 import { sfx } from '../audio/sounds';
 import { BOSS, DEEP, STINGS, VILLAGE, WILDS } from '../audio/music';
 import { Hud } from './hud';
+import { awardNow, checkTrophies } from '../trophies/check';
 import { NightLight, type Light } from './light';
 import {
   ARMOURED, BELL_DOWN_MS, BULB_DOWN_MS, DOWN_MS, LANTERN_KEEP, LANTERN_LIFT, LANTERN_SHOT_MS, BULB_EVERY_MS, BULB_HP, BULB_UP_MS, BURST_PX, DROP_MS, EXPOSED_MS, FOES, foeFree, FROG_LEAP_MS, FROG_WAIT_MS, FUSE_MS, HOVER_MS, HOVER_SPEED,
@@ -1251,6 +1252,7 @@ export class GameScene extends Phaser.Scene {
       this.updateDoors();
       this.checkExits();
     }
+    checkTrophies(s);
     this.flashes = this.flashes.filter((f) => (f.t -= dt) > 0);
     this.drawPlayer();
     this.drawWorld();
@@ -1595,6 +1597,7 @@ export class GameScene extends Phaser.Scene {
     if (f.hp > 0) return;
     f.alive = false;
     this.state.beaten++;
+    if (f.kind === 'beetle') awardNow('bellyUp');
     this.puff(f.x, f.y - 10, f.kind === 'moth' ? 0xc8bce0 : f.kind === 'lantern' ? 0xf0c070 : f.kind === 'beetle' ? 0x3a7a8a : 0x6a8a4a);
     f.sprite.destroy();
     if (DUNGEONS.has(this.map.id) && f.index >= 0) setFlag(this.state, this.foeFlag(f.index));
