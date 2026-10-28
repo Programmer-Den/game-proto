@@ -9,7 +9,9 @@ import {
   PARTS, RAT, SCRAP_TOKENS_PER_PART, SKILLS, TERRAIN, TRAITS, UNIT_BY_ID, comboOf, isPart,
   type CommanderDef, type DeedId, type PartId, type SetId, type TraitId,
 } from '../game/data';
-import { addRankPoints, doDeeds, fullOrigin, isUnlocked, loadProgress, planDeeds, rankOf, saveProgress } from '../progress';
+import {
+  addRankPoints, doDeeds, fullOrigin, isUnlocked, loadProgress, planDeeds, rankOf, recordWeekly, saveProgress, weekOf, weekStart, weeklyBest, weeklyRules,
+} from '../progress';
 import { STEP_S, traitValue, type BEvent } from '../game/battle';
 import {
   advance, boardCount, boardUnits, buy, buyXp, countTraits, draftPick, endFight, equip, equipPreview, matchOver, moveUnit, newDrops, newMatch,
@@ -20,6 +22,7 @@ import {
 } from '../game/match';
 import { aiDraft, aiPickAugment, aiPlan } from '../game/ai';
 import { ordinal, t } from '../i18n';
+import { formatDate } from '../../../../shared/i18n';
 import { CMD_TEX, INK, UNIT_TEX, bakeAll, cmdKey, itemKey, monsterKey, textureRes, unitKey } from '../art/paint';
 import {
   BENCH, BUTTONS, COMMANDER_HOME, DRAFT_RING, INFO_PANEL, ITEMS_PANEL, PLAYERS_PANEL, RIVAL_HOME, SELL_ZONE, SHOP,
@@ -115,7 +118,7 @@ export class GameScene extends Phaser.Scene {
   /** The match, or null on the menu. Read by the playthrough test. */
   state: Match | null = null;
   /** The menu's choices. */
-  menu = { commander: 0, set: 'scrap' as SetId, terrain: false };
+  menu = { commander: 0, set: 'scrap' as SetId | 'weekly', terrain: false };
   /** The fight's playback speed (1 or 2). */
   speed = 1;
   private t = 0;
@@ -215,9 +218,12 @@ export class GameScene extends Phaser.Scene {
 
   startMatch() {
     const commander = watching ? Math.floor(Math.random() * PLAYER_COMMANDERS.length) : this.menu.commander;
-    const set = watching ? (Math.random() < 0.5 ? 'scrap' : 'neon') : this.menu.set;
-    const terrain = watching ? Math.random() < 0.5 : this.menu.terrain;
-    this.state = newMatch({ set, commander, terrain, watch: watching, rank: watching ? 0 : rankOf(this.progress.points) });
+    // The weekly season takes its season and terrain from the date.
+    const week = !watching && this.menu.set === 'weekly' ? weekOf(Date.now()) : null;
+    const rules = week === null ? null : weeklyRules(week);
+    const set = rules ? rules.set : watching ? (Math.random() < 0.5 ? 'scrap' : 'neon') : (this.menu.set as SetId);
+    const terrain = rules ? rules.terrain : watching ? Math.random() < 0.5 : this.menu.terrain;
+    this.state = newMatch({ set, commander, terrain, watch: watching, rank: watching ? 0 : rankOf(this.progress.points), weekly: week });
     this.recorded = false;
     this.unlockedNow = [];
     this.rankGain = null;
@@ -326,6 +332,7 @@ export class GameScene extends Phaser.Scene {
     if (place === 1) this.progress.wins++;
     this.progress.best = this.progress.best ? Math.min(this.progress.best, place) : place;
     this.rankGain = addRankPoints(this.progress, place);
+    if (this.state?.opts.weekly != null) recordWeekly(this.progress, this.state.opts.weekly, place);
     saveProgress(this.progress);
     this.noteDeeds(place <= 4 ? (place === 1 ? ['topFour', 'champion'] : ['topFour']) : []);
   }
@@ -1354,6 +1361,7 @@ export class GameScene extends Phaser.Scene {
         const rankText = rg.after > rg.before ? t('rankUp', { rank: t(RANKS[rg.after].name) }) : t('rankPoints', { n: rg.gained, rank: t(RANKS[rg.after].name), points: this.progress.points });
         say(VIEW.w / 2, VIEW.fy + 104, rankText, 15, rg.after > rg.before ? C.gold : C.text, { fontStyle: 'bold' }).setOrigin(0.5);
       }
+      if (m.opts.weekly != null && !watching) say(VIEW.w / 2, VIEW.fy + 124, t('weeklyEnd', { place: ordinal(weeklyBest(this.progress, m.opts.weekly)) }), 13, C.gold).setOrigin(0.5);
       if (this.unlockedNow.length) say(VIEW.w / 2, VIEW.fy + 248, t('unlockedList', { names: this.unlockedNow.map((c) => t(c.name)).join(', ') }), 12, C.gold, { fontStyle: 'bold' }).setOrigin(0.5);
       say(VIEW.w / 2, VIEW.fy + 228, t('endStats', { played: this.progress.played, wins: this.progress.wins, best: this.progress.best ? ordinal(this.progress.best) : '-' }), 12, C.dim).setOrigin(0.5);
       this.button(g, { x: VIEW.w / 2 - 90, y: VIEW.fy + 270, w: 180, h: 44 }, t(watching ? 'watchAnother' : 'playAgain'), () => {
@@ -1405,25 +1413,42 @@ export class GameScene extends Phaser.Scene {
       say(VIEW.w / 2, VIEW.fy + 260, t(`${pickedC.unlock!}Unlock`), 11, C.gold, { align: 'center', wordWrap: { width: 640 } }).setOrigin(0.5, 0);
     }
     say(VIEW.w / 2, VIEW.fy + 296, t('season'), 13, C.gold, { fontStyle: 'bold' }).setOrigin(0.5);
-    SETS.forEach((s, i) => {
-      const r = { x: VIEW.w / 2 - 300 + i * 310, y: VIEW.fy + 312, w: 290, h: 58 };
-      const on = this.menu.set === s.id;
+    // The two seasons and this week's, three cards across.
+    const week = weekOf(Date.now());
+    const rules = weeklyRules(week);
+    const best = weeklyBest(this.progress, week);
+    const cards = [
+      ...SETS.map((s) => ({ id: s.id as SetId | 'weekly', name: t(s.name), blurb: t(s.blurb) })),
+      {
+        id: 'weekly' as const,
+        name: t('weeklySeason', { date: formatDate(weekStart(week), { day: 'numeric', month: 'short', timeZone: 'UTC' }) }),
+        blurb: `${t(SETS.find((s) => s.id === rules.set)!.name)}, ${t(rules.terrain ? 'weeklyTerrain' : 'weeklyNoTerrain')}\n${best ? t('weeklyBest', { place: ordinal(best) }) : t('weeklyUnplayed')}`,
+      },
+    ];
+    cards.forEach((c, i) => {
+      const r = { x: VIEW.w / 2 - 300 + i * 204, y: VIEW.fy + 312, w: 192, h: 62 };
+      const on = this.menu.set === c.id;
+      const color = c.id === 'weekly' ? 0xffd166 : C.cyan;
       g.fillStyle(on ? 0x2a2360 : C.panel, 0.95).fillRoundedRect(r.x, r.y, r.w, r.h, 10);
-      g.lineStyle(on ? 2.5 : 1.2, on ? C.cyan : C.panelLine, 1).strokeRoundedRect(r.x, r.y, r.w, r.h, 10);
-      say(r.x + 12, r.y + 8, t(s.name), 13, '#ffffff', { fontStyle: 'bold' });
-      say(r.x + 12, r.y + 28, t(s.blurb), 10, C.text, { wordWrap: { width: r.w - 24 } });
+      g.lineStyle(on ? 2.5 : 1.2, on ? color : C.panelLine, 1).strokeRoundedRect(r.x, r.y, r.w, r.h, 10);
+      say(r.x + 10, r.y + 6, c.name, 12, c.id === 'weekly' ? C.gold : '#ffffff', { fontStyle: 'bold' });
+      say(r.x + 10, r.y + 24, c.blurb, 9, C.text, { wordWrap: { width: r.w - 18 } });
       this.overlayButtons.push({ ...r, run: () => {
-        this.menu.set = s.id;
+        this.menu.set = c.id;
         ui('click');
         this.dirty = true;
       } });
     });
+    // The weekly season sets the terrain itself.
+    const weekly = this.menu.set === 'weekly';
+    const terrainOn = weekly ? rules.terrain : this.menu.terrain;
     const tr = { x: VIEW.w / 2 - 300, y: VIEW.fy + 384, w: 290, h: 40 };
-    g.fillStyle(this.menu.terrain ? 0x2a2360 : C.panel, 0.95).fillRoundedRect(tr.x, tr.y, tr.w, tr.h, 10);
-    g.lineStyle(this.menu.terrain ? 2.5 : 1.2, this.menu.terrain ? 0x39e58c : C.panelLine, 1).strokeRoundedRect(tr.x, tr.y, tr.w, tr.h, 10);
-    say(tr.x + 12, tr.y + 6, t(this.menu.terrain ? 'terrainOn' : 'terrainOff'), 13, '#ffffff', { fontStyle: 'bold' });
-    say(tr.x + 12, tr.y + 24, t('terrainKinds'), 9, C.dim);
+    g.fillStyle(terrainOn ? 0x2a2360 : C.panel, weekly ? 0.5 : 0.95).fillRoundedRect(tr.x, tr.y, tr.w, tr.h, 10);
+    g.lineStyle(terrainOn ? 2.5 : 1.2, terrainOn ? 0x39e58c : C.panelLine, weekly ? 0.4 : 1).strokeRoundedRect(tr.x, tr.y, tr.w, tr.h, 10);
+    say(tr.x + 12, tr.y + 6, t(terrainOn ? 'terrainOn' : 'terrainOff'), 13, weekly ? C.dim : '#ffffff', { fontStyle: 'bold' });
+    say(tr.x + 12, tr.y + 24, t(weekly ? 'weeklySetsTerrain' : 'terrainKinds'), 9, C.dim);
     this.overlayButtons.push({ ...tr, run: () => {
+      if (weekly) return ui('refuse');
       this.menu.terrain = !this.menu.terrain;
       ui('click');
       this.dirty = true;

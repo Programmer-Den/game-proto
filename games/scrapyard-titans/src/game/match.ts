@@ -110,6 +110,8 @@ export interface MatchOptions {
   watch: boolean;
   /** The player's saved rank (`RANKS`), which toughens the rivals; 0 plays as designed. */
   rank: number;
+  /** The week number of a weekly season match (`weekOf`), or null for a season picked on the menu. */
+  weekly: number | null;
 }
 
 export interface Match {

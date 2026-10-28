@@ -79,6 +79,11 @@ Implemented today:
 - Part preview: with a part or item selected or dragged, `buildPreview` tags each robot with
   `equipPreview(id, robot)` (the finished item, the part, or full), and the info panel lists the
   part's six recipes.
+- Weekly season: the menu's third season card (`menu.set` `'weekly'`). `weekOf(Date.now())` (UTC
+  weeks from Monday) picks `weeklyRules(week)` from `WEEKLY_ROTATION` (season and terrain), which
+  `startMatch` uses instead of the menu's (the terrain toggle is greyed out), and passes the week as
+  `MatchOptions.weekly`. `record` keeps the week's best place in `Progress.weekly` (`recordWeekly`);
+  the card and the end screen show it (`weeklyBest`). A new week starts unplayed.
 - Rank ladder (`RANKS`, `RANK_POINTS` in `data.ts`): `Progress.points` grow by a top-four place in
   `record` (`addRankPoints`) and never drop; `rankOf(points)` gives the rank, which `startMatch`
   passes as `MatchOptions.rank` (0 under `?watch`). The rank gives each rival `gold` more a round
@@ -86,7 +91,7 @@ Implemented today:
   reroll from stage `rollFrom` while holding more than `rollAbove` gold (seat 0 always uses Rust's).
   Rank 0 plays exactly as before. The menu shows it under the stats, the end screen the points won
   or the rank up.
-- Progress (matches, wins, best place, `deeds` and rank `points`) saved under `scrapyard-titans-stats`
+- Progress (matches, wins, best place, `deeds`, rank `points` and `weekly` best) saved under `scrapyard-titans-stats`
   (`progress.ts`, `loadProgress`/`saveProgress`); watched matches never count.
 
 Missing or rough:
@@ -95,7 +100,7 @@ Missing or rough:
 - AI rivals use a simple scored plan (`aiPlan`). Balance is checked with AI-only matches (see
   Gotchas); every origin's average place sits between about 4.0 and 4.9 of 8, and matches end
   around stages 5 and 6.
-- Seasons are picked on the menu; nothing rotates them.
+- Only the weekly season rotates; the two plain seasons are picked on the menu.
 
 ## Architecture
 
@@ -114,7 +119,7 @@ File map (`src/`):
   one gets its German entry (and a US one if its spelling differs) in the same PR. The watch
   panel's title and `aiLog` lines stay English, with the names inside them translated.
 - `progress.ts`: what lasts between matches (`Progress`: stats, deeds, rank points), `rankOf`,
-  `addRankPoints`, `isUnlocked`,
+  `addRankPoints`, `weekOf`, `weekStart`, `weeklyRules`, `weeklyBest`, `recordWeekly`, `isUnlocked`,
   `doDeeds` (saves new deeds, returns the commanders they unlock), `planDeeds`, `fullOrigin`. No
   Phaser.
 - `audio.ts`: the songs (`PLAN_SONG`, `FIGHT_SONG`) and the sound table (`play`, typed `Sfx`); see
@@ -231,7 +236,7 @@ greyed-out button or shop card (`button` pushes a refusal for them).
   `layout.ts` (`SHOP`, `BENCH`, `BUTTONS.fight`, `BOARD_VIEW`), the menu's START MATCH rect in
   `buildMenu`, `ECONOMY.startGold`, and round 1-1's monsters (`MONSTERS.mite`), which every 1-cost
   robot must beat alone.
-- Screenshots: `docs/screenshots/menu.webp` is from a scratch run with three deeds and 285 rank points saved; `fight.webp` (also
+- Screenshots: `docs/screenshots/menu.webp` is from a scratch run with three deeds, 285 rank points and a weekly best saved, the weekly season picked; `fight.webp` (also
   `cover.png`), `draft.webp` and `scrap-rat.webp` are from a scratch `?watch` run with the watch
   panel hidden; `scout.webp`, `part-preview.webp` and `damage-meter.webp` from a scratch run that
   plays round 1-1 with real clicks; `german-result.webp` is the test's `3-result` run with a

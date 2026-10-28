@@ -44,6 +44,14 @@ export const SETS: SetDef[] = [
   },
 ];
 
+/** The weekly season's rules, one a week in turn (`weekOf` in `progress.ts`): every season with and without terrain. */
+export const WEEKLY_ROTATION: { set: SetId; terrain: boolean }[] = [
+  { set: 'scrap', terrain: true },
+  { set: 'neon', terrain: false },
+  { set: 'scrap', terrain: false },
+  { set: 'neon', terrain: true },
+];
+
 /** Scrap tokens a Scrap Rush win pays, and how many build a part. */
 export const SCRAP_TOKENS_PER_PART = 3;
 /** Extra starting charge every robot gets in the Overcharge season. */
