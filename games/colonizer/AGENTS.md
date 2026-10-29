@@ -212,7 +212,9 @@ in code on 2D canvases (no image files), with `pixelArt` off.
   changed (new units, finished buildings, techs, ages, the bell, raids, camps, falls) and keeps
   the music on the right part.
 - `src/main.ts`: creates the `Phaser.Game` (960x540, FIT scaling filling the screen shape, `pixelArt: false`, linen
-  background), registers the three scenes, calls `setupGame(game)` from `shared/setupGame.ts` and
+  background), registers the three scenes, calls `setupGame(game)` from `shared/setupGame.ts` (with
+  `corner: 'top-right'`, so the shared full screen and pause buttons sit over the top bar's
+  decoration rather than the selection panel in the bottom left) and
   `setupScaling(game, { fill: true })` from `shared/scaling.ts`, and puts `game` on window in dev.
 - `src/game/data.ts`: every balance number and roster (names and texts are `TextKey`s, shown with `t`): `FACTIONS`, `UNITS` (cost, time, stats,
   trainer, `age`, `limit`, `gift`), `unitFor(faction, role)`, `isCivil`/`isSoldier`/`earnsRanks`,
