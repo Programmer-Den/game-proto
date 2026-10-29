@@ -265,7 +265,10 @@ seconds without a tap.
 - `src/scenes/BootScene.ts`: paints every texture, then starts `Game`.
 - `src/scenes/GameScene.ts`: owns the `GameState`, ticks it each frame, draws the battle (elite
   badges and labels, rocks, stunned guards), the HUD
-  (coins in the top bar, the heat chip, the "Chilled bow" chip), the wave track (named after the road), Arrow Rain (button, drag arc,
+  (coins in the top bar, the heat chip, the "Chilled bow" chip; `fitTopRight` moves the top bar's
+  right-hand counts left and shrinks them as their numbers grow, so they never run into each other
+  or the skill book button), the wave track (named after the road; `fitTrackTexts` shrinks its
+  title and note to fit side by side), Arrow Rain (button, drag arc,
   ring, falling volleys), the caltrops (button, drag arc, patches), the guard slots and guards, the
   fortifications on the field (`drawForts`), the aim toggle and the Fortify button
   (`drawAimToggle`), the streak chip, the relic chest panel, the victory panel (`createWon`) and
