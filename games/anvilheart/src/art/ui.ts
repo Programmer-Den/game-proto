@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { BANNER, BARREL, BOARD, DESK, DISCOVERED, ORDER, ROW_BOX, TAG, WIN } from '../scenes/layout';
+import { BANNER, BARREL, BOARD, DESK, DISCOVERED, ORDER, ROW_BOX, SCRAP, TAG, WIN } from '../scenes/layout';
 import { ART, PI, bake, ctx, diamond, glass, glow, glowFrame, label, lit, mix, panel, rect, reseed, ring, type Pt } from './glass';
 
 // The leaded-glass interface: buttons, the order cards, the fit tags, the commission banner, the
@@ -129,6 +129,10 @@ export function bakeUi(scene: Phaser.Scene, sizes: Record<ButtonStyle, { w: numb
   // The barrel's merge outline.
   bake(scene, 'frame-barrel', BARREL.w + gm, BARREL.h + gm, () => glowFrame(gm, gm, a(BARREL.w), a(BARREL.h), '#f0b830', 8));
 
+  // The scrap bin and the outline round it while something is held.
+  bake(scene, 'scrap', SCRAP.w, SCRAP.h, scrapBin);
+  bake(scene, 'frame-scrap', SCRAP.w + gm, SCRAP.h + gm, () => glowFrame(gm, gm, a(SCRAP.w), a(SCRAP.h), '#e0904a', 8));
+
   // The fifth row before it is bought: smoky glass over its panes.
   bake(scene, 'row-locked', ROW_BOX.w, ROW_BOX.h, () => {
     reseed(15);
@@ -149,6 +153,27 @@ export function bakeUi(scene: Phaser.Scene, sizes: Record<ButtonStyle, { w: numb
       glass([[w / 2 - 22, 84], [w / 2 - 18, 52], [w / 2, 68], [w / 2 + 18, 52], [w / 2 + 22, 84]], '#ffd36a', { lw: 3, flat: true });
     });
   }
+}
+
+/** An iron scrap pail with a broken blade and a bent hilt poking out of its dark mouth. */
+function scrapBin() {
+  reseed(18);
+  const w = a(SCRAP.w);
+  const h = a(SCRAP.h);
+  const top = 46;
+  glass([[w / 2 - 6, top + 4], [w / 2 + 14, 12], [w / 2 + 26, 18], [w / 2 + 10, top + 4]], '#9aa4b8', { lw: 3, flat: true });
+  glass([[w / 2 - 30, top + 2], [w / 2 - 40, 22], [w / 2 - 30, 18], [w / 2 - 20, top]], '#8a6a3a', { lw: 3, flat: true });
+  glass([[10, top], [w - 10, top], [w - 22, h - 6], [22, h - 6]], '#4a5266', { lw: 4 });
+  glass(rect(14, top + 30, w - 28, 10), '#6a7288', { lw: 3, flat: true });
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(w / 2, top, w / 2 - 10, 12, 0, 0, PI * 2);
+  ctx.fillStyle = '#1a1622';
+  ctx.fill();
+  ctx.lineWidth = 5;
+  ctx.strokeStyle = '#17131c';
+  ctx.stroke();
+  ctx.restore();
 }
 
 /** A barrel of leaded staves and iron bands, with dark quench water at its mouth; dim before it is bought. */

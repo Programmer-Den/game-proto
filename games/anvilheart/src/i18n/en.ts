@@ -107,6 +107,8 @@ const en = {
   gemSet: 'Gem set!',
   repaired: 'Repaired! +{n}c',
   rusted: 'Rusted down to a {sword}',
+  scrap: 'Scrap',
+  scrapped: 'Scrapped',
   heroBack: 'Back from the quest! +{n}c trophy',
   battered: 'A battered {sword}',
   newCharter: {

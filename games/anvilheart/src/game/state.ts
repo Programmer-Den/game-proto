@@ -185,6 +185,7 @@ export type GameEvent =
   | { kind: 'set'; slot: number }
   | { kind: 'repaired'; slot: number; tier: number; coins: number }
   | { kind: 'rusted'; slot: number; tier: number }
+  | { kind: 'scrapped'; slot: number }
   | { kind: 'streak'; slot: number; streak: number; coins: number }
   | { kind: 'delivered'; tier: number }
   | { kind: 'commission'; reward: number; won: boolean }

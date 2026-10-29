@@ -149,6 +149,10 @@ Implemented today:
   over the fifth row (`createRowCover`, which also carries the one-line instructions), the barrel
   by tapping it. The barrel (`state.barrel`, place `BARREL` = -1) is a place like an anvil: swords
   merge, swap, sell and deliver from it; the forge never fills it.
+- Scrap bin (`SCRAP` in `layout.ts`, above the barrel): a sword, buckler or gem dropped on it is
+  thrown away for nothing (`scrap` in `sim.ts`, a `scrapped` event with a "Scrapped" float and the
+  `scrap` sound), so a board full of items nobody wants never stalls. It glows while anything is
+  held (`scrapFrame`).
 - Anvilheart (tier 9, `MAX_TIER`): two Dragonslayers merge into it. Adventurers order up to
   `ORDER_TOP` (8) only.
 - Progression: `bestTier` raises the tier adventurers may ask for (and unlocks gems); upgrades Bellows (faster forge),
@@ -498,7 +502,7 @@ Effects (`sfx`, plus the shared `ui`):
   it matches `commission` with `toMatchObject`, so `grand` and the other new fields pass)
   and `spots()`, which returns the Forge button centre, each anvil's sword position (`slotCentre`
   minus `SWORD_LIFT`, all 20), each `deskCentre`, and the `banner`, `barrel` and fifth-row button
-  (`row`) and forge mode switch (`mode`) centres; `desks` follows `desksOf`. Positions therefore
+  (`row`), scrap bin (`scrap`) and forge mode switch (`mode`) centres; `desks` follows `desksOf`. Positions therefore
   follow `layout.ts`.
 - Inputs: mouse clicks on Forge and mouse drags (down, eight moves, up) from anvil to anvil and
   anvil to desk, mapped from the 960x540 view to the scaled canvas.

@@ -325,6 +325,14 @@ export function deliverable(s: GameState, item: number | null) {
   return tier === c.tier && (!c.gem || isGemmed(item));
 }
 
+/** Throws what lies at `from` (a sword, buckler or gem) into the scrap bin, for nothing, to free its place. */
+export function scrap(s: GameState, from: number) {
+  if (itemAt(s, from) === null || !placeable(s, from)) return false;
+  put(s, from, null);
+  s.events.push({ kind: 'scrapped', slot: from });
+  return true;
+}
+
 /**
  * Hands the sword at `from` to the crown, if the royal commission wants it. It leaves the board,
  * and once enough are delivered the commission pays its purse and a guild star, and the next one

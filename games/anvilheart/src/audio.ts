@@ -113,6 +113,8 @@ export const sfx = sounds({
   /** A battered sword repaired: a hammer tap (played twice). */
   tap: { wave: 'pulse25', freq: 1318, to: 1100, length: 0.05, volume: 0.22, gap: 60 },
   /** A sword rusts down a tier: a dull, detuned thud. */
+  /** Something thrown in the scrap bin: a low iron clatter. */
+  scrap: { wave: 'noise', freq: 900, to: 300, length: 0.22, volume: 0.3, gap: 120 },
   rust: { wave: 'triangle', freq: 120, to: 70, length: 0.28, volume: 0.45, gap: 200, vary: 0.04 },
   /** An exact fit sold: a ka-ching with the tip's sparkle (a plain sale plays the shared coin). */
   exact: { wave: 'square', freq: 1318, arp: [0, 4, 7, 12], arpStep: 0.045, length: 0.3, volume: 0.24, gap: 80 },

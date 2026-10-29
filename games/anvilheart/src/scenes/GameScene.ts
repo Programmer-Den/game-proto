@@ -31,6 +31,7 @@ import {
   tick,
   toggleAutoForge,
   toggleShieldMode,
+  scrap,
   touch,
 } from '../game/sim';
 import {
@@ -81,6 +82,7 @@ import {
   REPUTATION,
   ROW_BOX,
   ROW_BUTTON,
+  SCRAP,
   TAG,
   UI_DEPTH,
   UPGRADE_BUTTONS,
@@ -92,6 +94,7 @@ import {
   deskScale,
   discoveredCentre,
   onBanner,
+  onScrap,
   placeAt,
   slotCentre,
 } from './layout';
@@ -188,6 +191,8 @@ export class GameScene extends Phaser.Scene {
   private barrelPrice!: Phaser.GameObjects.Text;
   private barrelSword: Phaser.GameObjects.Image | null = null;
   private barrelFrame!: Phaser.GameObjects.Image;
+  /** The scrap bin and its outline while something is held. */
+  private scrapFrame!: Phaser.GameObjects.Image;
   private bannerFrame!: Phaser.GameObjects.Image;
   private repWord!: Phaser.GameObjects.Text;
   private win!: Phaser.GameObjects.Container;
@@ -257,6 +262,7 @@ export class GameScene extends Phaser.Scene {
       desks: [...Array(desksOf(this.state)).keys()].map((d) => at(deskCentre(d, desksOf(this.state)))),
       banner: { x: BANNER.x + BANNER.w / 2 - left, y: BANNER.y + BANNER.h / 2 },
       barrel: at(BARREL),
+      scrap: at(SCRAP),
       row: at(ROW_BUTTON),
       mode: at(MODE_BUTTON),
     };
@@ -294,6 +300,12 @@ export class GameScene extends Phaser.Scene {
     this.barrelFrame = this.image(BARREL.x, BARREL.y, 'frame-barrel').setDepth(6).setVisible(false);
     this.barrelPrice = this.add
       .text(BARREL.x, BARREL.y + 8, '', { ...textStyle(12.5, '#fff1d0', 3.5), align: 'center' })
+      .setOrigin(0.5)
+      .setDepth(7);
+    this.image(SCRAP.x, SCRAP.y, 'scrap').setDepth(4);
+    this.scrapFrame = this.image(SCRAP.x, SCRAP.y, 'frame-scrap').setDepth(6).setVisible(false);
+    this.add
+      .text(SCRAP.x, SCRAP.y + SCRAP.h / 2 + 2, t('scrap'), { ...textStyle(12, '#fff1d0', 3.5), align: 'center' })
       .setOrigin(0.5)
       .setDepth(7);
     this.createRowCover();
@@ -448,11 +460,12 @@ export class GameScene extends Phaser.Scene {
     const before = this.state.events.length;
     if (place !== null) done = drop(this.state, held.slot, place);
     else if (this.onBanner(p.worldX, p.worldY)) done = deliver(this.state, held.slot);
+    else if (onScrap(p.worldX, p.worldY)) done = scrap(this.state, held.slot);
     else if (buyer) done = sell(this.state, held.slot, buyer.id);
     if (done) this.save();
     // A move or swap clunks (a merge, gem or repair sounds in drawEvents); a sword the anvil, the
     // crown or the buyer won't take buzzes; one let go anywhere else goes back with a clunk.
-    const tried = place !== null ? place !== held.slot : this.onBanner(p.worldX, p.worldY) || !!buyer;
+    const tried = place !== null ? place !== held.slot : this.onBanner(p.worldX, p.worldY) || onScrap(p.worldX, p.worldY) || !!buyer;
     if (done ? place !== null && this.state.events.length === before : !tried) sfx('place');
     else if (!done) ui('refuse');
   }
@@ -580,6 +593,8 @@ export class GameScene extends Phaser.Scene {
       } else if (e.kind === 'rusted') {
         const at = this.placeSpot(e.slot);
         this.float(at.x, at.y - 20, t('rusted', { sword: t(swordOf(e.tier).name) }), '#e08a5a', 1800);
+      } else if (e.kind === 'scrapped') {
+        this.float(SCRAP.x, SCRAP.y - SCRAP.h / 2 - 8, t('scrapped'), '#d8d0e0');
       } else if (e.kind === 'returned') {
         const c = deskCentre(e.desk, desksOf(this.state));
         this.float(c.x, c.y + 24, t('heroBack', { n: e.trophy }), '#9ad0ff', 2000);
@@ -647,6 +662,9 @@ export class GameScene extends Phaser.Scene {
           break;
         case 'rusted':
           sfx('rust');
+          break;
+        case 'scrapped':
+          sfx('scrap');
           break;
         case 'sold':
           if (e.fit === 'exact') sfx('exact');
@@ -801,6 +819,7 @@ export class GameScene extends Phaser.Scene {
     this.mergeFrames.forEach((frame, slot) => frame.setVisible(joins(slot)).setAlpha(pulse));
     this.barrelFrame.setVisible(s.ranks.barrel > 0 && joins(BARREL_PLACE)).setAlpha(pulse);
     this.bannerFrame.setVisible(deliverable(s, item)).setAlpha(pulse);
+    this.scrapFrame.setVisible(item !== null).setAlpha(pulse);
     const buyers = new Set<number>();
     for (const a of s.adventurers) {
       const v = this.visitors.get(a.id);
