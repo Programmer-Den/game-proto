@@ -4,7 +4,7 @@ name: Project report
 # PR, number, state, title) and their Status, then every open issue and PR with
 # the Projects it is in, to the log and the run summary.
 # Started by hand. Uses PROJECTS_TOKEN (a classic token with only the "project"
-# scope), since the workflow token can't read user-owned Projects.
+# scope), since the workflow token can't read the owner's Projects.
 on:
   workflow_dispatch:
 
@@ -26,11 +26,11 @@ jobs:
           github-token: ${{ secrets.PROJECTS_TOKEN }}
           script: |
             const wanted = JSON.parse(require('fs').readFileSync('.github/projects.json', 'utf8')).map(p => p.title);
-            const { user } = await github.graphql(`
+            const { repositoryOwner: account } = await github.graphql(`
               query($owner: String!) {
-                user(login: $owner) { projectsV2(first: 100) { nodes { id number title public url } } }
+                repositoryOwner(login: $owner) { ... on ProjectV2Owner { projectsV2(first: 100) { nodes { id number title public url } } } }
               }`, { owner: context.repo.owner });
-            const byTitle = new Map(user.projectsV2.nodes.map(p => [p.title, p]));
+            const byTitle = new Map(account.projectsV2.nodes.map(p => [p.title, p]));
 
             let summary = '';
             for (const title of wanted) {

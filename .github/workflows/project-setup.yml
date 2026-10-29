@@ -6,7 +6,7 @@ name: Project setup
 # link each new Project to the repo, which may need more than the "project" scope;
 # if it can't, it says so and the Project is linked by hand.
 # Started by hand. Uses PROJECTS_TOKEN (a classic token with only the "project"
-# scope), since the workflow token can't create user-owned Projects. The
+# scope), since the workflow token can't create the owner's Projects. The
 # Project's Auto-add and "Item added to project" workflows can't be set from
 # outside, so they are still turned on by hand (see AGENTS.md).
 on:
@@ -31,12 +31,12 @@ jobs:
           script: |
             const wanted = JSON.parse(require('fs').readFileSync('.github/projects.json', 'utf8'));
             const { owner, repo } = context.repo;
-            const { user, repository } = await github.graphql(`
+            const { repositoryOwner: account, repository } = await github.graphql(`
               query($owner: String!, $repo: String!) {
-                user(login: $owner) { id projectsV2(first: 100) { nodes { title } } }
+                repositoryOwner(login: $owner) { id ... on ProjectV2Owner { projectsV2(first: 100) { nodes { title } } } }
                 repository(owner: $owner, name: $repo) { id }
               }`, { owner, repo });
-            const existing = new Set(user.projectsV2.nodes.map(p => p.title));
+            const existing = new Set(account.projectsV2.nodes.map(p => p.title));
 
             let summary = '';
             for (const p of wanted) {
@@ -44,7 +44,7 @@ jobs:
               const { createProjectV2 } = await github.graphql(`
                 mutation($ownerId: ID!, $title: String!) {
                   createProjectV2(input: { ownerId: $ownerId, title: $title }) { projectV2 { id url } }
-                }`, { ownerId: user.id, title: p.title });
+                }`, { ownerId: account.id, title: p.title });
               const { id, url } = createProjectV2.projectV2;
               await github.graphql(`
                 mutation($projectId: ID!, $shortDescription: String!, $readme: String!) {

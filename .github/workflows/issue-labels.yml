@@ -81,21 +81,23 @@ jobs:
             // Every other game's Project, worked out afresh so a re-run or a run by hand cleans up too.
             const staleTitles = new Set(wanted.filter(p => p.label !== null && p.label !== process.env.LABEL).map(p => p.title));
 
-            const { user } = await github.graphql(`
+            const { repositoryOwner: account } = await github.graphql(`
               query($owner: String!) {
-                user(login: $owner) {
-                  projectsV2(first: 100) {
-                    nodes {
-                      id title
-                      field(name: "Status") {
-                        ... on ProjectV2SingleSelectField { id options { id name } }
+                repositoryOwner(login: $owner) {
+                  ... on ProjectV2Owner {
+                    projectsV2(first: 100) {
+                      nodes {
+                        id title
+                        field(name: "Status") {
+                          ... on ProjectV2SingleSelectField { id options { id name } }
+                        }
                       }
                     }
                   }
                 }
               }`, { owner: context.repo.owner });
 
-            for (const project of user.projectsV2.nodes.filter(p => titles.has(p.title))) {
+            for (const project of account.projectsV2.nodes.filter(p => titles.has(p.title))) {
               // Adding an issue that is already in the Project returns its existing item.
               const { addProjectV2ItemById: { item } } = await github.graphql(`
                 mutation($projectId: ID!, $contentId: ID!) {
@@ -125,7 +127,7 @@ jobs:
             }
 
             // Take the issue off any other game's Project, since their built-in workflows never remove it.
-            const staleIds = new Set(user.projectsV2.nodes.filter(p => staleTitles.has(p.title)).map(p => p.id));
+            const staleIds = new Set(account.projectsV2.nodes.filter(p => staleTitles.has(p.title)).map(p => p.id));
             if (staleIds.size) {
               const { node } = await github.graphql(`
                 query($id: ID!) {
