@@ -23,7 +23,7 @@ export const MAP_VIEW = { x: 0, y: TOP.h, w: VIEW.w, h: BAR.y - TOP.h };
 /** The cover's lettering: a geometric sans, bold italic for headings. System fonts only. */
 export const FONT = '"Avenir Next", Futura, "Century Gothic", "Trebuchet MS", "Segoe UI", Inter, system-ui, sans-serif';
 
-export const BUTTON = { w: 112, h: 30 };
+export const BUTTON = { w: 107, h: 30 };
 
 export type ButtonKey = Role | UnitId | 'expansion' | Track | 'fallback' | 'flagship' | 'rally';
 
@@ -55,13 +55,13 @@ export interface Button {
   h: number;
 }
 
-const COLUMN = 115;
+const COLUMN = 110;
 /**
  * Where the build and train rows start: the bar's bottom-left corner is left clear for the shared
  * corner buttons (full screen, pause), which sit over the canvas there on a phone held
  * sideways and on a 16:9 screen.
  */
-export const GRID_X = 64;
+export const GRID_X = 84;
 const BUILD_ROW = 468;
 const TRAIN_ROW = 504;
 const BUILD_KEYS: Build[] = ['depot', 'barracks', 'turret', 'expansion'];
