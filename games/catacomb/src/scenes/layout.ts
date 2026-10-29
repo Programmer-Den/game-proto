@@ -12,7 +12,7 @@ export const FOE_FEET_Y = 330;
 export const HP_BAR = { w: 112, h: 18, dy: 8 };
 
 /** The hand, fanned along the bottom, by the cards' centres. */
-export const HAND = { x: 480, y: 450, w: 124, h: 172, gap: 130, span: 620 };
+export const HAND = { x: 480, y: 450, w: 124, h: 172, gap: 130, span: 540 };
 /** The energy orb, bottom left. */
 export const ENERGY_ORB = { x: 72, y: 430, r: 36 };
 /** The End turn button, narrower than other buttons so it stays inside the view's right edge. */
@@ -32,7 +32,7 @@ export const REST_BUTTONS = { dx: 182, w: 172 };
 /** A mystery room's two choices, one above the other. The hero choice uses the same two buttons. */
 export const EVENT_BUTTONS = { y: 324, gap: 52, w: 440 };
 /** On the hero panel: the two heroes standing either side (by their feet), and the depth row's arrows and label. */
-export const HERO_PANEL = { knightX: 280, hunterX: 680, feetY: 312, depthY: 216, depthDx: 90, rulesY: 256 };
+export const HERO_PANEL = { knightX: 280, hunterX: 680, feetY: 312, depthY: 216, depthDx: 90, rulesY: 270, rulesH: 58 };
 /** The flask slots down the left of a fight, by their centres. */
 export const FLASKS = { x: 60, y: 120, gap: 58, r: 24 };
 /** The powers in play, in a row under the flasks, left of the hero: one ring per kind (four at most), so the row ends clear of the hero. */
