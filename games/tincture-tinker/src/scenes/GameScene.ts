@@ -741,7 +741,12 @@ export class GameScene extends Phaser.Scene {
           : o.forbid
             ? t('forbidLine', { kind: t(KIND_NAMES[o.forbid]) })
             : '';
-    if (line) items.push(this.add.text(666, 196, line, ink(13, RUST, 'italic bold')).setOrigin(0, 0.5));
+    if (line) {
+      // A long line (a twin order's second potion, or a longer language) shrinks to stay inside the label.
+      const text = this.add.text(666, 196, line, ink(13, RUST, 'italic bold')).setOrigin(0, 0.5);
+      for (let size = 12; size >= 10 && text.width > PANEL.x + PANEL.w - 16 - 666; size--) text.setFontSize(size);
+      items.push(text);
+    }
     this.rows = Object.keys(o.needs) as Kind[];
     this.rowNeeds = { ...o.needs };
     const second = o.second ? Object.keys(o.second.needs) : [];
@@ -844,7 +849,11 @@ export class GameScene extends Phaser.Scene {
     this.rankCount.setText(next ? `${formatNumber(stars)}/${formatNumber(next.stars)}` : formatNumber(stars)).setX(barX + RIBBON.barW + 7);
     this.rankNext
       .setText(next ? t('nextRank', { rank: t(next.title) }) : t(this.state.royal ? 'guildSeals' : 'allRecipes'))
-      .setX(this.rankCount.x + this.rankCount.width + 9);
+      .setX(this.rankCount.x + this.rankCount.width + 9)
+      .setFontSize(10);
+    // The note shrinks to end inside the ribbon, before the guild seals once there are any.
+    const room = RIBBON.x + RIBBON.w - 12 - (this.state.royal ? EXAMS.length * 11 + 6 : 0) - this.rankNext.x;
+    for (let size = 9; size >= 7 && this.rankNext.width > room; size--) this.rankNext.setFontSize(size);
     // Once Royal Apothecary, a wax seal per guild examination, filled in as each is passed.
     if (!this.state.royal) return;
     const y = RIBBON.y + RIBBON.h / 2;
