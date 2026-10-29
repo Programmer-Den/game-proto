@@ -50,6 +50,16 @@ export function addPadCursor() {
   };
   // The start, pause and How to play screens and the sound menu take the controller instead.
   const active = () => !document.querySelector('.game-overlay:not([hidden])') && !openSoundMenu();
+  // Phaser only counts the pointer as over the canvas after a `mouseover` on it (`input.isOver`).
+  const hover = (under: Element, init: MouseEventInit) => {
+    if (under === over) return;
+    const pointer = { ...init, pointerId: 1, pointerType: 'mouse', isPrimary: true };
+    over?.dispatchEvent(new PointerEvent('pointerout', { ...pointer, relatedTarget: under }));
+    over?.dispatchEvent(new MouseEvent('mouseout', { ...init, relatedTarget: under }));
+    under.dispatchEvent(new PointerEvent('pointerover', { ...pointer, relatedTarget: over }));
+    under.dispatchEvent(new MouseEvent('mouseover', { ...init, relatedTarget: over }));
+    over = under;
+  };
   const send = (type: 'move' | 'down' | 'up', button = 0) => {
     const under = document.elementFromPoint(x, y) ?? document.body;
     const init: MouseEventInit = {
@@ -64,15 +74,7 @@ export function addPadCursor() {
       button,
       buttons,
     };
-    // Phaser only counts the pointer as over the canvas after a `mouseover` on it (`input.isOver`).
-    if (under !== over) {
-      const pointer = { ...init, pointerId: 1, pointerType: 'mouse', isPrimary: true };
-      over?.dispatchEvent(new PointerEvent('pointerout', { ...pointer, relatedTarget: under }));
-      over?.dispatchEvent(new MouseEvent('mouseout', { ...init, relatedTarget: under }));
-      under.dispatchEvent(new PointerEvent('pointerover', { ...pointer, relatedTarget: over }));
-      under.dispatchEvent(new MouseEvent('mouseover', { ...init, relatedTarget: over }));
-      over = under;
-    }
+    hover(under, init);
     under.dispatchEvent(new PointerEvent(`pointer${type}`, { ...init, pointerId: 1, pointerType: 'mouse', isPrimary: true }));
     under.dispatchEvent(new MouseEvent(`mouse${type}`, init));
     if (type === 'down') target = under;
@@ -148,12 +150,20 @@ export function addPadCursor() {
 
   // A real mouse or a finger takes over again.
   const hide = (e: Event) => {
-    if (!e.isTrusted || cursor.hidden) return;
+    if (!e.isTrusted) return;
+    // The real mouse may rest where the cursor last left (the browser sends no `mouseover` then), so hover it again.
+    if (e instanceof MouseEvent && e.target instanceof Element) {
+      hover(e.target, { bubbles: true, clientX: e.clientX, clientY: e.clientY });
+    }
+    if (cursor.hidden) return;
     release();
     show(false);
-    // The real mouse sends its own `mouseover` from here; the cursor sends one again when it next moves.
-    over = null;
   };
+  // The real mouse's own hovers, also while the cursor is hidden, so the cursor's next move hovers what it is over.
+  const seen = (e: Event) => {
+    if (e.isTrusted && e.target instanceof Element) over = e.target;
+  };
+  window.addEventListener('mouseover', seen, true);
   window.addEventListener('mousemove', hide, true);
   window.addEventListener('pointerdown', hide, true);
   window.addEventListener('resize', () => {
