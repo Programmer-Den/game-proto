@@ -320,7 +320,8 @@ export class GameScene extends Phaser.Scene {
     this.drawGuards();
     this.drawForts();
     this.drawAimToggle();
-    this.roadChoice.show(s.phase === 'break' ? s.roadChoices : null, s.roadMs);
+    // The road cards wait under a level-up, as their countdown does, so only one choice is up at a time.
+    this.roadChoice.show(s.phase === 'break' && !s.choices ? s.roadChoices : null, s.roadMs);
     const omen = s.phase === 'break' && s.omen && !s.omen.accepted && !s.choices && !this.hirePanel.open && !this.fortifyPanel.open ? s.omen.id : null;
     this.omenCard.show(omen, s.wave);
     this.levelUp.show(held(s) ? null : s.choices, s.ranks, s.level - s.levelUps + 1, s.levelUps, s.pickMs);
