@@ -487,7 +487,8 @@ scene. Under browser automation nothing plays, so the playthrough is unchanged.
   `requiredFor`; update the README and the test's constants.
 - **Add or change an order**: a row in `ORDERS` with its text's key (its `lit` lanterns must exist on every night it
   comes round on: night n has `lanternsFor(n)` lanterns). `GameScene.drawOrder` shows up to three
-  pips; a goal with more needs more `orderPips`. Night 1's order is mirrored in the test.
+  pips; a goal with more needs more `orderPips`. A long order text (a district's three lanterns named)
+  shrinks to 9px and then wraps onto a second line, with the pips moved down. Night 1's order is mirrored in the test.
 - **Retune gusts**: `gustsFor` and `GUST_WARN_MS` in `state.ts`; night 1's gust is in the test.
 - **Add an upgrade**: add its id to `UPGRADE_IDS`, its row to `UPGRADES` and `levels`, apply it in
   `stats` (or where it acts), and give `SHOP` a fourth row (the three rows of three are full).
