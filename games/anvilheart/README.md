@@ -31,6 +31,7 @@ Masterwork.
 | Tap the commission banner | Choose between the crown's two offers, or found a new smithy once the Crown Blade is in |
 | Drag a Rusty Dagger onto a battered sword | Repair it, for a bonus |
 | Drag a sword onto the quench barrel, once bought | Keep it there, off the anvils |
+| Drag anything onto the scrap bin above the barrel | Throw it away, for nothing, to free its anvil |
 | Tap the quench barrel or the fifth row's button | Buy it |
 | Tap the switch under the furnace, once shown | Forge bucklers instead of swords, or swords again |
 | Drag a buckler onto an adventurer with a set order | Hand it over; the set is paid once the sword follows |

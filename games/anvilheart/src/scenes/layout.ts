@@ -39,7 +39,10 @@ export const ROW_BOX = { x: BOARD.x, y: BOARD.y + GRID.rows * BOARD.cell, w: GRI
 export const ROW_BUTTON = { x: BOARD.x + (GRID.cols * BOARD.cell) / 2, y: ROW_BOX.y + 56, w: 250, h: 36 };
 /** The quench barrel beside the board, by its centre. */
 export const BARREL = { x: 636, y: 428, w: 72, h: 92 };
-export const slotCentre = (slot: number) => ({
+/** The scrap bin above the barrel, by its centre: a sword, buckler or gem dropped on it is thrown away. */
+export const SCRAP = { x: 636, y: 322, w: 64, h: 64 };
+export const onScrap = (x: number, y: number) => Math.abs(x - SCRAP.x) <= SCRAP.w / 2 && Math.abs(y - SCRAP.y) <= SCRAP.h / 2;
+export const slotCentre =(slot: number) => ({
   x: BOARD.x + (slot % GRID.cols) * BOARD.cell + BOARD.cell / 2,
   y: BOARD.y + Math.floor(slot / GRID.cols) * BOARD.cell + BOARD.cell / 2,
 });

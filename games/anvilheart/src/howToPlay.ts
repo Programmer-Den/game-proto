@@ -25,6 +25,7 @@ const en: HowToPlay = {
       action: 'Deliver it to the crown',
     },
     { input: 'Drag a gem onto a plain sword', action: 'Set the gem in it' },
+    { input: 'Drag anything onto the scrap bin', action: 'Throw it away to free its anvil' },
     {
       input: 'Tap the switch under the furnace',
       action: 'Forge bucklers instead of swords, once you have made a Knight\'s Blade',
@@ -82,6 +83,7 @@ const de: HowToPlay = {
       action: 'Es an die Krone liefern',
     },
     { input: 'Ein Juwel auf ein schlichtes Schwert ziehen', action: 'Das Juwel darin fassen' },
+    { input: 'Etwas auf den Schrotteimer ziehen', action: 'Es wegwerfen, um seinen Amboss freizumachen' },
     {
       input: 'Den Schalter unter dem Ofen tippen',
       action: 'Schilde statt Schwerter schmieden, sobald du eine Ritterklinge gemacht hast',

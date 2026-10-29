@@ -96,6 +96,8 @@ const de: Translation<typeof en> = {
   gemSet: 'Juwel gefasst!',
   repaired: 'Repariert! +{n} M',
   rusted: 'Verrostet zu: {sword}',
+  scrap: 'Schrott',
+  scrapped: 'Verschrottet',
   heroBack: 'Zurück vom Abenteuer! +{n} M Trophäe',
   battered: 'Ramponiert: {sword}',
   newCharter: {
