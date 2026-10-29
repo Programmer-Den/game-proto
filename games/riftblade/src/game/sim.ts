@@ -891,7 +891,9 @@ export function spawnAt(s: GameState, kind: EnemyKind, x: number, y: number, eli
   const foe = !boss && !isStructure(kind);
   const mut = (id: MutatorId) => s.mutators.includes(id);
   const hp = spec.hp * hpScale * (elite ? ELITE.hp : 1) * (hot(s.heat, 'hp') && !isStructure(kind) ? HEAT.hp : 1) *
-    (foe && mut('swarm') ? MUT.swarmHp : 1) * (foe && mut('fragile') ? MUT.fragileHp : 1);
+    (foe && mut('swarm') ? MUT.swarmHp : 1) *
+    // Fragile Foes halves bosses too, since their hits double like everyone's.
+    (!isStructure(kind) && mut('fragile') ? MUT.fragileHp : 1);
   const speed = spec.speed * (boss ? 1 : 1 + t / 1200) * (elite ? ELITE.speed : 1) * (0.92 + rand() * 0.16) * (mut('haste') ? MUT.haste : 1);
   const e: Enemy = {
     id: s.nextId++, kind, elite, x, y, r: spec.r * (elite ? ELITE.size : 1), hp, maxHp: hp, speed,

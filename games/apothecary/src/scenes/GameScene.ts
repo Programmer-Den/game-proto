@@ -1462,12 +1462,14 @@ export class GameScene extends Phaser.Scene {
       }
       const season = plague.season ?? 0;
       const stages = stagesFor(season).length;
-      const untold = this.state.untoldCure ?? (plague.cured && !seen?.cured ? season : undefined);
-      if (untold !== undefined) {
+      const untold =
+        this.state.untoldCure ??
+        (plague.cured && !seen?.cured ? { season, day: plague.curedDay ?? this.state.contract.day } : undefined);
+      if (untold) {
         // The first cure is the game's ending; a later season's earns a town seal.
-        if (untold === 0) {
+        if (untold.season === 0) {
           say(t('panaceaBrewed'), true);
-          this.showWin();
+          this.showWin(untold.day);
         } else say(t('seasonCured', { n: Math.round(SEAL_PRICE * 100) }), true);
         if (loud) playSting(SONG, 'win');
         delete this.state.untoldCure;
@@ -1528,7 +1530,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** The panel over the map once the town is cured: the win, and "Keep trading" to go on. */
-  private showWin() {
+  private showWin(day: number) {
     if (this.winPanel) return;
     const { width, height } = viewSize(this);
     const w = 380, h = 176;
@@ -1543,7 +1545,7 @@ export class GameScene extends Phaser.Scene {
       fit(this.add.image(0, -59, 'bell')),
       this.add.text(0, -31, t('townCured'), { ...HUD_TEXT, fontSize: '20px', color: '#7a4a10' }).setOrigin(0.5),
       this.add
-        .text(0, 10, t('winText', { day: this.state.contract.day }), { ...HUD_TEXT, fontSize: '13px', fontStyle: 'normal', align: 'center' })
+        .text(0, 10, t('winText', { day }), { ...HUD_TEXT, fontSize: '13px', fontStyle: 'normal', align: 'center' })
         .setOrigin(0.5),
       this.card(0, 65, 'button', cardTexture(this, 'button', 120, 28)),
       this.add.text(0, 65, t('keepTrading'), { ...HUD_TEXT, fontSize: '14px' }).setOrigin(0.5),

@@ -108,6 +108,13 @@ export function unlockAudio() {
 }
 
 let suspended = false;
+/**
+ * Whether sounds may play: a context just made still reads `suspended` in some browsers until it starts a moment
+ * later, and what is played meanwhile starts with it. One the browser holds back until a tap (a controller is not
+ * one) would play them all at once later, and the pause's suspend holds them back too.
+ */
+const playable = (c: AudioContext | null): c is AudioContext =>
+  !!c && !suspended && (c.state === 'running' || (c.state !== 'closed' && (navigator.userActivation?.hasBeenActive ?? true)));
 /** Stops every sound in place while a game is paused. */
 export function suspendAudio() {
   suspended = true;
@@ -144,7 +151,7 @@ export function sounds<K extends string>(defs: Record<K, SoundDef>) {
   const buffers = new Map<K, AudioBuffer>();
   const last = new Map<K, number>();
   return (name: K, options: PlayOptions = {}) => {
-    if (!ctx || ctx.state !== 'running' || volumes.muted || volumes.effects === 0) return;
+    if (!playable(ctx) || volumes.muted || volumes.effects === 0) return;
     const def = defs[name];
     const now = ctx.currentTime;
     if (now - (last.get(name) ?? -Infinity) < (def.gap ?? 40) / 1000 || active >= MAX_VOICES) return;
@@ -334,6 +341,8 @@ class Player {
   }
 
   private schedule() {
+    // After a stall longer than the lookahead, go on from now rather than play every missed step at once.
+    this.time = Math.max(this.time, this.context.currentTime);
     while (this.time < this.context.currentTime + LOOKAHEAD) {
       if (this.next && this.step % this.bar === 0) {
         this.part = this.next;
@@ -464,7 +473,7 @@ function startMusic(song: Song, part: string) {
 
 /** Plays a part once (a win, a game over), with the music lowered under it. */
 export function playSting(song: Song, part: string) {
-  if (!ctx || ctx.state !== 'running' || volumes.muted) return;
+  if (!playable(ctx) || volumes.muted) return;
   stings++;
   current?.player.duck(true);
   new Player(ctx, song, part, false, () => {

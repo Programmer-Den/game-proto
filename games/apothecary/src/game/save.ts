@@ -34,7 +34,15 @@ export function loadState(): GameState {
       town: normalizeTown(saved.town),
     };
     // A save from before `untoldCure` kept an untold cure on the plague.
-    if (state.plague?.told === false) state.untoldCure ??= state.plague.season ?? 0;
+    if (state.plague?.told === false) {
+      state.untoldCure ??= { season: state.plague.season ?? 0, day: state.plague.curedDay ?? state.contract.day };
+    }
+    // A save from before the cure's day was kept holds only its season.
+    const untold: unknown = state.untoldCure;
+    if (typeof untold === 'number') {
+      const day = state.plague && (state.plague.season ?? 0) === untold ? state.plague.curedDay : undefined;
+      state.untoldCure = { season: untold, day: day ?? state.contract.day };
+    }
     if (state.plague) delete state.plague.told;
     // A save from before the guild took members has already joined if it bought any guild upgrade.
     if (!saved.guild && GUILD_UPGRADES.some((id) => state.upgrades[id].level > 0 || state.upgrades[id].paid > 0)) {

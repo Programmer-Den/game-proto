@@ -221,7 +221,8 @@ study, shade gardens and a mirrored second production line.
   once the one before has houses, then a supply round every `SUPPLY_MS` through `supplyNeed`, which
   takes a good off a bought shop's shelf or a potion, plain first, off `state.counter.shelf`, and
   pays the price into that till: for a potion `potionPrice` times its sign's `SIGN_PAY` and
-  `FINE_BONUS` for a fine one, as a customer pays). Districts use no randomness. Marker actions (`buyShop`, `harvestBed`, `dropAtStation`,
+  `FINE_BONUS` for a fine one, and for a good its price with the counter, the guild boost, its
+  shelf's sign and `FINE_BONUS`, as a customer pays). Districts use no randomness. Marker actions (`buyShop`, `harvestBed`, `dropAtStation`,
   `pickUpFromStation`, `stockShopShelf`, `collectShopTill`, `tossGood`, `payStationLevel`,
   `payWorker`, `payCounterLevel`, `payShopkeeper`, `payRoute`, `payGear`, `payLesson`, `payRecipe`, `payLine2`, `payGuildJoin`, `payGuildUpgrade`,
   `cycleShopPriority`, `cycleShopSign`) return `Feedback` like the sim's. `nextRecipe` skips recipes
@@ -528,7 +529,7 @@ study, shade gardens and a mirrored second production line.
   `BUNDLE_EVERY`th day from there (4, 7, 10, ...) splits the potions into a `bundle` of a second
   potion. `serveFromShelf` counts a sale while `contractWants` holds; `deliverForContract` keeps it
   once both parts are met. The card titles both parts and colours each part's pips.
-- Seasons: `brew` cures the plague once (`cured`, `curedDay`, `seals++`, and `state.untoldCure` set to its season unless an earlier one is still untold); `tick` starts
+- Seasons: `brew` cures the plague once (`cured`, `curedDay`, `seals++`, and `state.untoldCure` set to its season and day unless an earlier one is still untold); `tick` starts
   `plagueAt(0, 0, 0, season + 1)` `SEASON_GAP` days after `curedDay` (set on the spot for a cured
   save without it). `stagesFor(season)` gives the stages (`SEASON_STAGES` plus `SEASON_EXTRA` a
   season), and `plagueStage` takes any potion for a stage whose potion isn't `orderable`.
@@ -566,7 +567,7 @@ study, shade gardens and a mirrored second production line.
   at `PLAGUE_CARD` (under the town card, clear of the shelves when the doctor is at the counter)
   with notes for each change (starting from `plagueSaved`, the plague as loaded before `catchUp`
   played the time away, so a stage, relapse or cure while away is told too; back from the town or a shop it goes on from
-  the plague the card last saw, which it keeps in `plagueSaved`, so a cure brewed meanwhile still opens the win panel; `untoldCure`, saved from the cure until the card has told it and then deleted, does the same after a reload, even once the next season has begun, since it is kept on the state rather than the plague; a save's old `plague.told: false` loads as `untoldCure`, and a cured save without either counts as told), and `showWin` opens the cure's panel, closed like the others by
+  the plague the card last saw, which it keeps in `plagueSaved`, so a cure brewed meanwhile still opens the win panel; `untoldCure`, saved from the cure until the card has told it and then deleted, does the same after a reload, even once the next season has begun, since it is kept on the state rather than the plague; a save's old `plague.told: false` loads as `untoldCure` with its `curedDay`, as does an `untoldCure` saved as a bare season number (the plague's `curedDay` when it is that season's, else the day of loading), and a cured save without either counts as told), and `showWin` opens the cure's panel with the day the cure was brewed, closed like the others by
   `closePanels` (any tap).
 
 ### State model

@@ -290,10 +290,10 @@ export interface GameState {
   /** Town seals, one for each season's plague cured; each raises every potion's price. */
   seals: number;
   /**
-   * The season of a cure the plague card has not told yet, the earliest if more came, so a cure brewed
-   * in the town is told after a reload too, even once the next season has begun; missing when told.
+   * The season and day of a cure the plague card has not told yet, the earliest if more came, so a cure
+   * brewed in the town is told after a reload too, even once the next season has begun; missing when told.
    */
-  untoldCure?: number;
+  untoldCure?: { season: number; day: number };
   /** The merchant wagon at the street door on a wagon day, or null before the first. */
   wagon: Wagon | null;
   /** What the herb market's buy marker sells. */
