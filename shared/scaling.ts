@@ -44,7 +44,8 @@ import { settings } from './settings';
  * than it is wide its designed size is turned round (960x540 becomes 540x960), no hint asks to turn
  * the phone, and turning the phone (or reshaping a window past square) turns the view again while
  * the game runs. `viewSize` and `viewFrame` follow, and the scale manager's `resize` event tells the
- * game's scenes to lay themselves out again; `isTurned()` says which way round the view is.
+ * game's scenes to lay themselves out again; `isTurned()` says which way round the view is. `renderScale`
+ * stays as it was picked, for the designed size, so it is enough both ways round.
  */
 
 /** Canvas pixels per game pixel; 1 until `setupScaling` runs. */
@@ -82,8 +83,10 @@ export function setupScaling(game: Phaser.Game, { fill = false, bothWays = false
     const design = turned ? { w: configured.h, h: configured.w } : configured;
     const view = fill ? fillView(design.w, design.h, game) : design;
     const canvasRenderer = game.config.renderType === Phaser.CANVAS || game.renderer?.type === Phaser.CANVAS;
-    // Picked once: turned the other way round later, the view keeps it, as do the cameras and texts made at it.
-    if (!picked) renderScale = pickRenderScale(view.w, view.h, canvasRenderer ? MAX_CANVAS_SCALE : MAX_SCALE);
+    // Picked once, so the cameras and texts made at it keep it. A game that turns picks it for its designed size, the
+    // smallest view either way round, so it is enough for both.
+    const pickFor = bothWays ? configured : view;
+    if (!picked) renderScale = pickRenderScale(pickFor.w, pickFor.h, canvasRenderer ? MAX_CANVAS_SCALE : MAX_SCALE);
     picked = true;
     if (bothWays || renderScale !== 1 || view !== configured) game.scale.setGameSize(view.w * renderScale, view.h * renderScale);
   };
