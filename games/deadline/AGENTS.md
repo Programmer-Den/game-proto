@@ -66,14 +66,10 @@ upgrades. A run is the endless Open Road or a 10-wave operation, picked on the g
     `HERO.minX..HERO.maxX`, so none stops out of every rifle's reach.
   - Supply drop picks, kit panel items, squad roles and the operation are not shown in the
     wide-screen backdrop.
-  - On a phone, where the game covers the screen, the shared corner buttons (full screen, sound,
-    pause) sit over the kit panel's bottom-left corner.
   - Night-vision textures are baked the first time that style is shown, a hitch of about 0.4s
     (measured in headless Chromium) on that first switch; later switches take a frame or so. On a
     big screen the textures are painted finer, and the first switch takes about twice as long.
   - Drums are not blocked by anything and can overlap crates; their labels then overlap too.
-  - The kit panel's last line runs past the panel when the perks and several supplies are all held
-    (in English too, longer in German).
   - Zombies ignore survivors: nothing but the squad's fire can kill one, and a survivor walks
     through sandbag walls.
   - A boss wave can draw a condition too; a blackout hides the boss until it is close (its bar at
@@ -108,7 +104,8 @@ upgrades. A run is the endless Open Road or a 10-wave operation, picked on the g
   flamethrower and medkit, the frenzy, effects, waves, the supply drop and extraction, style
   switching, bars, game over and its scrap shop.
 - `src/scenes/Hud.ts`: `Hud` (top bar, style switch, progress strip, the wave condition's chip,
-  frenzy meter, kit panel with the perks, the
+  frenzy meter, kit panel with the perks (its list wraps and the panel grows upward; both panels sit
+  clear above the shared corner buttons), the
   in-acid warning, drawn per style into one Graphics plus Text objects, redrawn only when its data
   changes), and the layout constants `STYLE_SWITCH`, `PROGRESS`, `CONDITION_CHIP`, `FRENZY_PANEL`,
   `KIT_PANEL`, `HUD_DEPTH`.
