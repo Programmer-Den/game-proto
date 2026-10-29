@@ -91,6 +91,7 @@ import { coins, t, type TextKey } from '../i18n';
 import { makeButton } from '../ui/Button';
 import {
   BOARD,
+  BUTTON,
   CAMP_BUTTON,
   FONT,
   HANDS_COLUMN,
@@ -1529,16 +1530,27 @@ export class GameScene extends Phaser.Scene {
     }
     // The atlas: one bound page per isle charted in full, toward the Royal Atlas.
     const ay = OVERLAY_BUTTON.y;
-    c.add(small(left, ay - 8, t('atlasHead')));
+    const head = small(left, ay - 8, t('atlasHead'));
+    c.add(head);
     const pages = s.atlas.length;
     if (pages === 0) {
       c.add(this.text(left, ay + 7, t('chartAnIsle'), { size: 9.5, weight: 500, color: SLATE }).setOrigin(0, 0.5));
     } else {
-      s.atlas.slice(-6).forEach((page, k) => c.add(this.add.image(left + 8 + k * 14, ay + 8, `atlas-${page.kind}`).setScale(1 / HI)));
       const shown = Math.min(pages, 6);
       const kinds = atlasKinds(s).size;
       const royal = s.royal ? t('royalBound') : t('kindsOf', { n: kinds, total: ROYAL_KINDS });
-      c.add(this.text(left + 4 + shown * 14, ay + 8, t('pages', { n: pages }) + royal, { size: 10, weight: 700 }).setOrigin(0, 0.5));
+      const count = this.text(left + 4 + shown * 14, ay + 8, t('pages', { n: pages }) + royal, { size: 10, weight: 700 }).setOrigin(0, 0.5);
+      c.add(count);
+      // Too long for the room beside the pages (the Royal Atlas bound), it goes under them, the head
+      // and the pages move up a line, and it shrinks to clear Set sail.
+      const room = OVERLAY_BUTTON.x - BUTTON.w / 2 - 8;
+      const up = count.x + count.width > room ? 16 : 0;
+      if (up) {
+        head.setY(ay - 8 - up);
+        count.setX(left);
+        for (let size = 9.5; size >= 7 && count.x + count.width > room; size -= 0.5) count.setFontSize(size);
+      }
+      s.atlas.slice(-6).forEach((page, k) => c.add(this.add.image(left + 8 + k * 14, ay + 8 - up, `atlas-${page.kind}`).setScale(1 / HI)));
     }
     const { pct } = isleProgress(s);
     c.add(small(right, ay - 8, t('isleHead', { n: s.island }), 1));
