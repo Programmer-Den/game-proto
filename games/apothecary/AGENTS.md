@@ -221,7 +221,8 @@ study, shade gardens and a mirrored second production line.
   once the one before has houses, then a supply round every `SUPPLY_MS` through `supplyNeed`, which
   takes a good off a bought shop's shelf or a potion, plain first, off `state.counter.shelf`, and
   pays the price into that till: for a potion `potionPrice` times its sign's `SIGN_PAY` and
-  `FINE_BONUS` for a fine one, as a customer pays). Districts use no randomness. Marker actions (`buyShop`, `harvestBed`, `dropAtStation`,
+  `FINE_BONUS` for a fine one, and for a good its price with the counter, the guild boost, its
+  shelf's sign and `FINE_BONUS`, as a customer pays). Districts use no randomness. Marker actions (`buyShop`, `harvestBed`, `dropAtStation`,
   `pickUpFromStation`, `stockShopShelf`, `collectShopTill`, `tossGood`, `payStationLevel`,
   `payWorker`, `payCounterLevel`, `payShopkeeper`, `payRoute`, `payGear`, `payLesson`, `payRecipe`, `payLine2`, `payGuildJoin`, `payGuildUpgrade`,
   `cycleShopPriority`, `cycleShopSign`) return `Feedback` like the sim's. `nextRecipe` skips recipes

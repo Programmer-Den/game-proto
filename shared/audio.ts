@@ -110,9 +110,11 @@ export function unlockAudio() {
 let suspended = false;
 /**
  * Whether sounds may play: a context just made still reads `suspended` in some browsers until it starts a moment
- * later, and what is played meanwhile starts with it; only the pause's suspend holds sounds back.
+ * later, and what is played meanwhile starts with it. One the browser holds back until a tap (a controller is not
+ * one) would play them all at once later, and the pause's suspend holds them back too.
  */
-const playable = (c: AudioContext | null): c is AudioContext => !!c && c.state !== 'closed' && !suspended;
+const playable = (c: AudioContext | null): c is AudioContext =>
+  !!c && !suspended && (c.state === 'running' || (c.state !== 'closed' && (navigator.userActivation?.hasBeenActive ?? true)));
 /** Stops every sound in place while a game is paused. */
 export function suspendAudio() {
   suspended = true;
@@ -339,6 +341,8 @@ class Player {
   }
 
   private schedule() {
+    // After a stall longer than the lookahead, go on from now rather than play every missed step at once.
+    this.time = Math.max(this.time, this.context.currentTime);
     while (this.time < this.context.currentTime + LOOKAHEAD) {
       if (this.next && this.step % this.bar === 0) {
         this.part = this.next;

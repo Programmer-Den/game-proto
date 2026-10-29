@@ -506,7 +506,9 @@ function supplyNeed(state: GameState, need: Need): boolean {
       const at = shop ? shelfIndex(shop.shelf, need, false) : -1;
       if (!shop || price === undefined || at < 0) continue;
       const [held] = shop.shelf.splice(at, 1);
-      shop.till += Math.round(price * (1 + COUNTER_PAY * shop.counter.level.level) * shopPriceBoost(shop) * (isFineGood(held) ? FINE_BONUS : 1));
+      // The shelf's sign scales the price and a fine one pays more, as for a customer.
+      const sign = SIGN_PAY[shopSignOf(shop, need)];
+      shop.till += Math.round(price * (1 + COUNTER_PAY * shop.counter.level.level) * shopPriceBoost(shop) * sign * (isFineGood(held) ? FINE_BONUS : 1));
       return true;
     }
     return false;

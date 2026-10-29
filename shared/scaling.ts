@@ -81,7 +81,14 @@ export function setupScaling(game: Phaser.Game, { fill = false, bothWays = false
     const design = turned ? { w: configured.h, h: configured.w } : configured;
     const view = fill ? fillView(design.w, design.h, game) : design;
     const canvasRenderer = game.config.renderType === Phaser.CANVAS || game.renderer?.type === Phaser.CANVAS;
+    const old = renderScale;
     renderScale = pickRenderScale(view.w, view.h, canvasRenderer ? MAX_CANVAS_SCALE : MAX_SCALE);
+    // Turned the other way round, the view may take another scale; the cameras already made follow it.
+    if (renderScale !== old) {
+      for (const scene of game.scene.getScenes(false)) {
+        for (const camera of scene.cameras?.cameras ?? []) camera.setZoom((camera.zoom / old) * renderScale);
+      }
+    }
     if (bothWays || renderScale !== 1 || view !== configured) game.scale.setGameSize(view.w * renderScale, view.h * renderScale);
   };
   // Phaser boots right away once the page has loaded, which it has when a module script runs.
