@@ -20,7 +20,7 @@ const game = new Phaser.Game({
   },
   scene: [BootScene, MenuScene, GameScene],
 });
-setupGame(game, { howToPlay, trophies });
+setupGame(game, { howToPlay, trophies, corner: 'top-right' });
 setupScaling(game, { fill: true });
 
 // Handy for poking at state from the browser console during development.
