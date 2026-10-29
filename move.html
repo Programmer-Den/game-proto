@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>Game hub</title>
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #1b1410;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- The redirect site at the site's old address opens this page with the player's saves (shared/move.ts). -->
+    <script type="module">
+      import { receiveMove } from './shared/move.ts';
+
+      receiveMove();
+    </script>
+  </body>
+</html>
