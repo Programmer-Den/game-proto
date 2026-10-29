@@ -40,7 +40,7 @@ export function loadState(): GameState {
     // A save from before the cure's day was kept holds only its season.
     const untold: unknown = state.untoldCure;
     if (typeof untold === 'number') {
-      const day = state.plague?.season === untold ? state.plague.curedDay : undefined;
+      const day = state.plague && (state.plague.season ?? 0) === untold ? state.plague.curedDay : undefined;
       state.untoldCure = { season: untold, day: day ?? state.contract.day };
     }
     if (state.plague) delete state.plague.told;

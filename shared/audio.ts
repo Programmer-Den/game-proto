@@ -108,6 +108,11 @@ export function unlockAudio() {
 }
 
 let suspended = false;
+/**
+ * Whether sounds may play: a context just made still reads `suspended` in some browsers until it starts a moment
+ * later, and what is played meanwhile starts with it; only the pause's suspend holds sounds back.
+ */
+const playable = (c: AudioContext | null): c is AudioContext => !!c && c.state !== 'closed' && !suspended;
 /** Stops every sound in place while a game is paused. */
 export function suspendAudio() {
   suspended = true;
@@ -144,7 +149,7 @@ export function sounds<K extends string>(defs: Record<K, SoundDef>) {
   const buffers = new Map<K, AudioBuffer>();
   const last = new Map<K, number>();
   return (name: K, options: PlayOptions = {}) => {
-    if (!ctx || ctx.state !== 'running' || volumes.muted || volumes.effects === 0) return;
+    if (!playable(ctx) || volumes.muted || volumes.effects === 0) return;
     const def = defs[name];
     const now = ctx.currentTime;
     if (now - (last.get(name) ?? -Infinity) < (def.gap ?? 40) / 1000 || active >= MAX_VOICES) return;
@@ -464,7 +469,7 @@ function startMusic(song: Song, part: string) {
 
 /** Plays a part once (a win, a game over), with the music lowered under it. */
 export function playSting(song: Song, part: string) {
-  if (!ctx || ctx.state !== 'running' || volumes.muted) return;
+  if (!playable(ctx) || volumes.muted) return;
   stings++;
   current?.player.duck(true);
   new Player(ctx, song, part, false, () => {

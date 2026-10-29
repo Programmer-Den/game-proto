@@ -164,6 +164,16 @@ export function addPadCursor() {
     if (e.isTrusted && e.target instanceof Element) over = e.target;
   };
   window.addEventListener('mouseover', seen, true);
+  // The real mouse left the page (no `mouseover` follows), so the cursor's next move hovers what it is over again.
+  window.addEventListener('mouseout', (e) => {
+    if (e.isTrusted && !e.relatedTarget) over = null;
+  }, true);
+  // A pad that drops mid-press sends no last frame, so let go of what it held.
+  window.addEventListener('gamepaddisconnected', () => {
+    if ([...navigator.getGamepads()].some((pad) => pad?.connected)) return;
+    release();
+    show(false);
+  });
   window.addEventListener('mousemove', hide, true);
   window.addEventListener('pointerdown', hide, true);
   window.addEventListener('resize', () => {

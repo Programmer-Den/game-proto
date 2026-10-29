@@ -566,7 +566,7 @@ study, shade gardens and a mirrored second production line.
   at `PLAGUE_CARD` (under the town card, clear of the shelves when the doctor is at the counter)
   with notes for each change (starting from `plagueSaved`, the plague as loaded before `catchUp`
   played the time away, so a stage, relapse or cure while away is told too; back from the town or a shop it goes on from
-  the plague the card last saw, which it keeps in `plagueSaved`, so a cure brewed meanwhile still opens the win panel; `untoldCure`, saved from the cure until the card has told it and then deleted, does the same after a reload, even once the next season has begun, since it is kept on the state rather than the plague; a save's old `plague.told: false` loads as `untoldCure` with its `curedDay`, and a cured save without either counts as told), and `showWin` opens the cure's panel with the day the cure was brewed, closed like the others by
+  the plague the card last saw, which it keeps in `plagueSaved`, so a cure brewed meanwhile still opens the win panel; `untoldCure`, saved from the cure until the card has told it and then deleted, does the same after a reload, even once the next season has begun, since it is kept on the state rather than the plague; a save's old `plague.told: false` loads as `untoldCure` with its `curedDay`, as does an `untoldCure` saved as a bare season number (the plague's `curedDay` when it is that season's, else the day of loading), and a cured save without either counts as told), and `showWin` opens the cure's panel with the day the cure was brewed, closed like the others by
   `closePanels` (any tap).
 
 ### State model
