@@ -15,7 +15,8 @@ Hollow skill pools), not against main, and its sound PR waits until that PR is m
 on its own, so it gets a new `range` kind in `SETTING_FIELDS` for the two sliders. Labels go in
 `shared/i18n/en.ts`, `de.ts` and, where the spelling differs, `en-US.ts`.
 
-**Sound button in every game.** A third corner button with a speaker icon goes next to the full
+**Sound button in every game.** (Since removed: the corner row now holds only full screen and
+pause, the pause screen has the volumes and Mute, and M still mutes on any screen.) A third corner button with a speaker icon goes next to the full
 screen and pause buttons (bottom left, added by `setupGame`, so every game gets it with no code of
 its own). A tap mutes or unmutes everything, and M does the same on a keyboard. The pause screen
 gets the Music and Effects sliders, so the volume can be set without leaving the game. Every

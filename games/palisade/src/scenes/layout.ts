@@ -9,7 +9,7 @@ export const HERO_FEET = { x: 66, y: 418 };
 export const BARRICADE = { x: 112, y: 250 };
 /**
  * The experience bar along the bottom, with the level at its left end. It starts right of the corner
- * buttons (full screen, sound, pause), which take the bottom left up to x 114 on a 960x540 window.
+ * buttons (full screen, pause), which take the bottom left up to x 114 on a 960x540 window.
  */
 export const XP_BAR = { x: 132, y: 514, w: 732, h: 16 };
 /** The 1x/2x speed switch, right of the experience bar, by its centre. */

@@ -110,7 +110,7 @@ Implemented today:
 
 Missing or rough:
 
-- The title, pause and sound buttons are the shared ones from `setupGame`. Only the best height persists; a reload starts a new temple.
+- The title and pause button are the shared ones from `setupGame`. Only the best height persists; a reload starts a new temple.
 - Past tier 23 gusts stop growing (`WIND_MAX`); the sky altars are the only milestones after that.
 - A tap is ignored while a stone falls; a tap during the blessing choice lands on the dim.
 - The clouds stop about 16000 pixels up (`createBackdrop`), roughly 190 tiers.

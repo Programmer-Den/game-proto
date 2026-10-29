@@ -587,7 +587,7 @@ nothing plays for it. The player's own taps play from `GameScene` and the panels
 
 - `src/main.ts` calls `setupGame(game)` from `shared/setupGame.ts` right after creating the game.
   It applies the frame cap (skipped animation frames count towards the next frame's `dt`), the FPS
-  readout, reduced motion for camera shake and flash, the corner buttons (full screen, sound, pause
+  readout, reduced motion for camera shake and flash, the corner buttons (full screen, pause
   in the bottom left, which is why the experience bar starts at x 132 with the level at its left
   end) and the shared start and pause screens. Palisade uses neither shake nor flash.
 - **Difficulty:** `byDifficulty` scales one number, foe health. `foeHp` in `src/game/waves.ts`

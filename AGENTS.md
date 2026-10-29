@@ -137,9 +137,12 @@ and tries to link it to the repo (the run summary says if the link has to be mad
   game's folder name (`<name>-...`), since every game shares the hub's origin and the hub's ⚙ on a
   card deletes a game's progress by that prefix (`shared/progress.ts`).
 - **Honour the hub's settings.** Every game calls `setupGame(game)` from `shared/setupGame.ts`
-  right after creating its `Phaser.Game`, which applies the frame cap, the FPS readout, reduced motion, full screen and the sound button, turns off the browser's right-click menu, and covers
+  right after creating its `Phaser.Game`, which applies the frame cap, the FPS readout, reduced motion, full screen and the M key, which mutes, turns off the browser's right-click menu, and covers
   the page with the shared loading, start and pause screens (`shared/startScreen.ts`): the game's
-  scenes stand paused until Start is pressed, and the pause button, P or leaving the tab pause them. A game
+  scenes stand paused until Start is pressed, and the pause button, P or leaving the tab pause them. The corner row of
+  buttons (full screen and pause, `shared/corner.ts`) sits in the bottom left; a game whose own buttons
+  sit there picks a free corner with `setupGame(game, { corner: 'top-right' })` (or `bottom-right`,
+  `top-left`). A game
   hands its How to play (`games/<name>/src/howToPlay.ts`, typed by `shared/howToPlay.ts`) to
   `setupGame(game, { howToPlay })`, and the start and pause screens show it behind a How to play
   button; a change to the game's goal, controls or core loop updates that file in the same PR. Each game also implements the difficulty itself: scale one or two of its own balance
@@ -149,7 +152,7 @@ and tries to link it to the repo (the run summary says if the link has to be mad
   `settings.reduceMotion` is on. A new setting goes into `shared/settings.ts` (its type, default and
   `SETTING_FIELDS` row, which the hub panel shows on its own) and then into every game.
 - **Play with a controller.** `shared/gamepad.ts` reads game controllers (standard layout) and
-  moves the focus on the hub and the shared start, pause and How to play screens and the sound menu
+  moves the focus on the hub and the shared start, pause and How to play screens
   (`moveFocus`, `pressFocused`), and `shared/padCursor.ts`, added by `setupGame`, steers a cursor
   over the game that sends real mouse and pointer events, so a game needs nothing of its own for it.
   The hub's Controller setting turns both off and Cursor speed sets the cursor's pace. Tests stand
@@ -160,10 +163,8 @@ and tries to link it to the repo (the run summary says if the link has to be mad
   (each with its own rate limit, at most 12 at once), `ui` has the shared `click`, `coin` and the
   `refuse` buzz that every game plays for an action it can't do, and `playMusic(song, part)`,
   `playSting` and `stopMusic` play chiptune written as note text (a `Song` with calm, battle, boss
-  and sting parts). `setupGame` adds the sound button (and the M key, which mutes) to the corner row
-  (`shared/corner.ts`: full screen, sound and pause, 12px plus the safe area from the edges); the
-  button opens the sound menu with the Music and Effects volumes and Mute, the pause screen sets the
-  same volumes, and the hub's settings hold them (`music`,
+  and sting parts). The pause screen has the Music and Effects volumes and Mute,
+  the M key mutes on any screen (`shared/corner.ts`), and the hub's settings hold them (`music`,
   `effects`, `muted`). Sound starts on the first tap or key press, and never under browser
   automation, so playthroughs run as before. A game plays one sound per volley rather than per
   bullet, only for what the player can see, only for the player's own actions where the AI shares

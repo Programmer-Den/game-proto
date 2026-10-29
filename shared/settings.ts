@@ -65,7 +65,7 @@ export interface Settings {
   music: number;
   /** How loud the sound effects play, 0 to 100. */
   effects: number;
-  /** Silences every sound; the sound button in each game's corner and the M key switch it. */
+  /** Silences every sound; the Mute button on each game's pause screen and the M key switch it. */
   muted: boolean;
   /** Hub only: shows a row of genres above the games to filter the cards by. */
   genreFilter: boolean;
@@ -195,7 +195,7 @@ function volume(value: unknown, fallback: number) {
   return typeof value === 'number' && value >= 0 && value <= 100 ? Math.round(value) : fallback;
 }
 
-/** Saves a change made inside a game (the sound button, the pause screen's volumes) on top of what is stored. */
+/** Saves a change made inside a game (the pause screen's volumes and Mute) on top of what is stored. */
 export function updateSettings(patch: Partial<Settings>) {
   saveSettings({ ...loadSettings(), ...patch });
 }

@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { settings } from './settings';
 import { t } from './i18n';
 import type { HowToPlay } from './howToPlay';
-import { cornerBar, openSoundMenu, toggleSoundMenu, volumeSliders } from './corner';
+import { cornerBar, muteButton, volumeSliders } from './corner';
 import { isDirection, moveFocus, onPadPress, pressFocused } from './gamepad';
 import { resumeAudio, suspendAudio, ui, unlockAudio } from './audio';
 import { mountInstallButton } from './install';
@@ -24,7 +24,8 @@ const HELP_KEY = 'h';
  *   stand paused until Start is pressed (or Enter or Space), so nothing happens unseen. Under
  *   browser automation it is skipped (see `skipStart`).
  * - Pause: a button next to full screen, the P key, or leaving the tab pauses every running scene
- *   and shows Resume, the music and effects volumes and a link back to all games.
+ *   and shows Resume, the music and effects volumes, a Mute button (also the M key, on any screen)
+ *   and a link back to all games.
  *   P, Enter, Space or Esc resume.
  * - How to play: when the game hands over its `howToPlay`, the start and pause screens get a How to
  *   play button (and the H key) that shows it in place of the card; Back, H or Esc go back.
@@ -34,7 +35,7 @@ const HELP_KEY = 'h';
  *   a Trophies button with the count earned, which lists them in place of the card; Back or Esc go back.
  * - Controller (`gamepad.ts`): Start pauses and resumes, the D-pad or left stick moves between the
  *   screen's buttons and sliders, A presses, B resumes from the pause screen and leaves How to play
- *   and Trophies, and Select opens the sound menu (on any screen, and while playing).
+ *   and Trophies.
  * While a screen is up, keys go to it and not to the game.
  */
 export function addStartScreen(game: Phaser.Game, howToPlay?: HowToPlay, trophies?: TrophySet): () => boolean {
@@ -64,7 +65,7 @@ export function addStartScreen(game: Phaser.Game, howToPlay?: HowToPlay, trophie
   const help = overlay.querySelector<HTMLElement>('.game-help-body');
   const trophyButton = overlay.querySelector<HTMLButtonElement>('.game-trophies-button');
   const trophyBody = overlay.querySelector<HTMLElement>('.game-trophies .game-panel-body');
-  overlay.querySelector('.game-overlay-volumes')!.append(...volumeSliders('pause'));
+  overlay.querySelector('.game-overlay-volumes')!.append(...volumeSliders('pause'), muteButton());
   // Install the game as an app of its own; opened with ?install (the Install on its hub card), the
   // button shows in every browser and stands out as the main button.
   const installButton = overlay.querySelector<HTMLButtonElement>('.game-install-button')!;
@@ -186,14 +187,6 @@ export function addStartScreen(game: Phaser.Game, howToPlay?: HowToPlay, trophie
     (e) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const key = e.key.toLowerCase();
-      // Escape closes a sound menu opened by a tap, which holds no focus for its own handler.
-      const menu = openSoundMenu();
-      if (key === 'escape' && menu && !menu.contains(document.activeElement)) {
-        e.stopPropagation();
-        e.preventDefault();
-        toggleSoundMenu();
-        return;
-      }
       if (mode === 'playing') {
         if (key === PAUSE_KEY && !e.repeat) {
           e.stopPropagation();
@@ -201,8 +194,8 @@ export function addStartScreen(game: Phaser.Game, howToPlay?: HowToPlay, trophie
         }
         return;
       }
-      // Full screen and sound still work from any screen, and the sound menu keeps its own keys.
-      if (key === 'f' || key === 'm' || openSoundMenu()?.contains(document.activeElement)) return;
+      // Full screen and mute still work from any screen.
+      if (key === 'f' || key === 'm') return;
       e.stopPropagation();
       if (e.repeat) return;
       if (mode === 'help' || mode === 'trophies') {
@@ -223,14 +216,6 @@ export function addStartScreen(game: Phaser.Game, howToPlay?: HowToPlay, trophie
     { capture: true },
   );
   onPadPress((button) => {
-    if (button === 'select') return toggleSoundMenu();
-    const menu = openSoundMenu();
-    if (menu) {
-      if (button === 'b') toggleSoundMenu();
-      else if (isDirection(button)) moveFocus(menu, button);
-      else if (button === 'a') pressFocused(menu);
-      return;
-    }
     if (mode === 'loading') return;
     if (mode === 'playing') {
       if (button === 'start') pause();
@@ -292,7 +277,6 @@ function helpHtml(howToPlay: HowToPlay) {
     ...howToPlay.controls,
     { input: t('pauseInput'), action: t('pauseAction') },
     { input: t('soundInput'), action: t('soundAction') },
-    { input: t('soundMenuInput'), action: t('soundMenuAction') },
     ...(document.fullscreenEnabled ? [{ input: t('fullScreenInput'), action: t('fullScreenAction') }] : []),
     ...(settings.controller
       ? [
@@ -359,6 +343,10 @@ function injectStyles() {
   width: 100%; font-size: 14px; text-align: left; }
 .game-overlay-volumes input { width: 100%; min-width: 120px; accent-color: #f0a830; }
 .game-overlay:not(.paused) .game-overlay-volumes { display: none; }
+.game-overlay-volumes .sound-mute { grid-column: 1 / -1; justify-self: center; padding: 6px 12px; font: 600 14px system-ui, sans-serif;
+  cursor: pointer; color: #f3e9d2; background: rgba(243, 233, 210, 0.08); border: 1px solid rgba(243, 233, 210, 0.35); border-radius: 4px; }
+.game-overlay-volumes .sound-mute:hover, .game-overlay-volumes .sound-mute:focus-visible { border-color: #f0a830; outline: none; }
+.game-overlay-volumes .sound-mute[aria-pressed="true"] { color: #1b1410; background: #f0a830; border-color: #f3e9d2; }
 .game-overlay-hint { font-size: 13px; opacity: 0.7; }
 .game-overlay-hint:empty { display: none; }
 .game-overlay-hub { font-size: 14px; color: #f3e9d2; }

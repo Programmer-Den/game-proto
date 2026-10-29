@@ -371,7 +371,7 @@ export class GameScene extends Phaser.Scene {
 
   /**
    * The shared corner buttons' footprint in view pixels, measured from the view's bottom-left, with
-   * the view shown as big as fits the page, plus a 4-pixel gap. The row (`shared/corner.ts`: three
+   * the view shown as big as fits the page, plus a 4-pixel gap. The row (`shared/corner.ts`: two
    * 30px buttons 6px apart, 12px from the edges) may not be on the page yet when the scene starts,
    * so its size is taken from there unless it is.
    */
@@ -383,7 +383,7 @@ export class GameScene extends Phaser.Scene {
     const left = (pw - w * k) / 2;
     const bottom = (ph + h * k) / 2;
     const row = document.querySelector('.game-corner')?.getBoundingClientRect();
-    const right = Math.max(12 + 3 * 30 + 2 * 6, row?.width ? row.right : 0);
+    const right = Math.max(12 + 2 * 30 + 6, row?.width ? row.right : 0);
     const top = Math.min(ph - 12 - 30, row?.width ? row.top : ph);
     return { w: (right - left) / k + 4, h: (bottom - top) / k + 4 };
   }

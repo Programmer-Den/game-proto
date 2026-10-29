@@ -3,7 +3,7 @@ export { GRID, cellCentre } from '../game/board';
 
 /**
  * The designed view. The HUD, board and panel fill its top 540 pixels; the 20 below them keep the
- * shared corner buttons (full screen, sound, pause, in the bottom left) off the board's bottom row.
+ * shared corner buttons (full screen and pause, in the bottom left) off the board's bottom row.
  */
 export const VIEW = { w: 960, h: 560 };
 /**

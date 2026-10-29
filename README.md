@@ -150,7 +150,7 @@ opened is kept on the device only, under `hub-seen` (`shared/gameDates.ts`).
 
 ![An Updated badge on a card](docs/screenshots/hub-badge.webp)
 
-Every game also has a full screen button in its bottom left corner, and the **F** key toggles full screen. Browsers that cannot take a page full screen, such as iPhones, don't show the button. Beside it, the speaker button opens the sound menu, with one volume for the music, one for the sound effects and a Mute button; the **M** key mutes every sound and turns it back on, and the pause screen sets the same volumes. The corner buttons keep 12px clear of the edges, plus a phone's safe area, so rounded corners never cut them.
+Every game also has a full screen button in a corner, the bottom left unless the game picks another to keep its own buttons clear, and the **F** key toggles full screen. Browsers that cannot take a page full screen, such as iPhones, don't show the button. The pause screen has one volume for the music, one for the sound effects and a Mute button, and the **M** key mutes every sound and turns it back on on any screen. The corner buttons keep 12px clear of the edges, plus a phone's safe area, so rounded corners never cut them.
 
 Every game shows a loading screen while its art is drawn, then waits on a start screen until **Start** is pressed (or Enter or Space). The pause button next to full screen, the **P** key or leaving the tab pauses it; Resume, P, Space or Esc play on, and the pause screen links back to all games. Both screens have a **How to play** button (or the **H** key) that shows the game's goal, its controls, how a round goes and a few tips; Back, H or Esc close it.
 
@@ -192,8 +192,7 @@ pressed on the page.
   open dialog), **A** presses, **B** closes the dialog, **X** opens the focused card's ⚙ and
   **Start** opens Settings, where left and right move a slider.
 - **Start and pause screens:** **Start** pauses and resumes, the D-pad and **A** pick the buttons and
-  volumes, **B** resumes from the pause screen and leaves How to play and Trophies (where up and down scroll), and
-  **Select** opens the sound menu on any screen.
+  volumes, and **B** resumes from the pause screen and leaves How to play and Trophies (where up and down scroll).
 - **In a game:** the left stick brings up a cursor over the game (`shared/padCursor.ts`), **A** taps
   and holds like the left mouse button, **B** is the right button and the right stick scrolls like a
   mouse wheel. It sends the same events a mouse would, so every game plays with it without code of

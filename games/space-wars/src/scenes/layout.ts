@@ -58,7 +58,7 @@ export interface Button {
 const COLUMN = 115;
 /**
  * Where the build and train rows start: the bar's bottom-left corner is left clear for the shared
- * corner buttons (full screen, sound, pause), which sit over the canvas there on a phone held
+ * corner buttons (full screen, pause), which sit over the canvas there on a phone held
  * sideways and on a 16:9 screen.
  */
 export const GRID_X = 64;
@@ -126,7 +126,7 @@ const base = {
  * rivals pin to it, the map's window takes the space between the bars, and the picker, sector strip
  * and perk cards stay centred in it.
  *
- * `corner` is the shared corner buttons' footprint (full screen, sound, pause) in view pixels from
+ * `corner` is the shared corner buttons' footprint (full screen, pause) in view pixels from
  * the view's bottom-left. A filled view no longer has page bars for them, so when they would cover
  * the build and train rows, a wider view moves the bar's left part right of them (`LEAD.x`), and a
  * taller one lifts the bar's contents over them (`LEAD.lift`, the bar growing to match). At the

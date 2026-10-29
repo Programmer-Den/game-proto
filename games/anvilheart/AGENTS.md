@@ -446,7 +446,7 @@ capped at `ORDER_TOP`) and the difficulty, reputation and Haggler multipliers on
 - Texts are drawn at `renderScale` by `shared/scaling.ts`; Graphics are sharp on their own.
 - `index.html` has the shared `100dvh` and `touch-action: none` styles. On a phone held upright the
   shared scaling turns the game to fill the screen. `e2e/screens.spec.ts` at the root opens the game on five screens.
-- The shared corner buttons (full screen, sound, pause) sit in the bottom left, 12 to 114 CSS
+- The shared corner buttons (full screen, pause) sit in the bottom left, 12 to 78 CSS
   pixels across and 12 to 42 up. The left column under the furnace (`COLUMN` in `layout.ts`: the
   mode switch, Forge button, heat bar and the three upgrade buttons, 34px tall with 12.5px
   captions) spans x 54 to 226 and ends at y 492, so it clears them on a 960x540 window, any larger
