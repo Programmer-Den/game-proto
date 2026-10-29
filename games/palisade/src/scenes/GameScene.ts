@@ -79,7 +79,7 @@ import { checkTrophies } from '../trophies/check';
 import { trophies } from '../trophies';
 import { award } from '../../../../shared/trophies';
 import { viewFrame } from '../../../../shared/scaling';
-import { AIM, BARRICADE, BARRICADE_BAR, BARRICADE_TIP_W, BOSS_BAR, CALTROPS, FORTIFY, GUARD_HIT, HEAT, HERO_FEET, HUD_HEIGHT, MARCH, OMEN_CHIP, RAIN, RAIN_HINT, REPAIR, ROAR_CHIP, SEEN, SPEED, STREAK, TRACK, UI_DEPTH, VIEW, XP_BAR, placeHud } from './layout';
+import { AIM, BARRICADE, BARRICADE_BAR, BARRICADE_TIP_W, BOSS_BAR, CALTROPS, FORTIFY, GUARD_HIT, HEAT, HERO_FEET, HUD_HEIGHT, MARCH, OMEN_CHIP, RAIN, RAIN_HINT, REPAIR, ROAR_CHIP, SEEN, SKILL_BOOK, SPEED, STREAK, TRACK, UI_DEPTH, VIEW, XP_BAR, placeHud } from './layout';
 
 /** Longest simulated step, so a backgrounded tab doesn't jump the battle forward. */
 const MAX_STEP_MS = 250;
@@ -190,6 +190,9 @@ export class GameScene extends Phaser.Scene {
   private guardFlash: number[] = [];
   private lastGuardCd: number[] = [];
   private coinsText!: Phaser.GameObjects.Text;
+  private coinIcon!: Phaser.GameObjects.Image;
+  private topKey = '';
+  private trackKey = '';
   private relicIcon2!: Phaser.GameObjects.Image;
   private relicSet!: Phaser.GameObjects.Text;
   private streakText!: Phaser.GameObjects.Text;
@@ -796,7 +799,7 @@ export class GameScene extends Phaser.Scene {
     this.createBarricadeTip();
     this.foesText = top(right + 612, '');
     this.slainText = top(right + 716, '');
-    fit(this.add.image(right + 796, SEEN.y + 19, 'hud-coin')).setDepth(UI_DEPTH + 1);
+    this.coinIcon = fit(this.add.image(right + 796, SEEN.y + 19, 'hud-coin')).setDepth(UI_DEPTH + 1);
     this.coinsText = top(right + 808, '', '#ffe07a');
     this.bestText = top(right + 944, '').setOrigin(1, 0.5);
     // The level rides the left end of the experience bar, clear of the corner buttons (full screen,
@@ -873,6 +876,7 @@ export class GameScene extends Phaser.Scene {
     this.slainText.setText(t('slain', { n: s.kills }));
     this.coinsText.setText(formatNumber(s.coins));
     this.bestText.setText(t('bestWave', { n: s.bestWave }));
+    this.fitTopRight();
 
     // Experience along the bottom: the blue fill, and a gold preview of the experience still
     // flying in as orbs.
@@ -964,6 +968,44 @@ export class GameScene extends Phaser.Scene {
     this.trackChest = fit(this.add.image(0, TRACK.markY, 'chest'), 0.62).setDepth(depth);
   }
 
+  /**
+   * Keeps the top bar's right-hand counts from running into each other once the numbers grow: each
+   * stays at its designed spot while it fits and moves left when the one after it needs the room,
+   * and the four shrink a size when they would reach the skill book button.
+   */
+  private fitTopRight() {
+    const texts = [this.foesText, this.slainText, this.coinsText, this.bestText];
+    const key = texts.map((x) => x.text).join('|');
+    if (key === this.topKey) return;
+    this.topKey = key;
+    const right = SEEN.x + SEEN.w - VIEW.w;
+    const room = SKILL_BOOK.button.x + SKILL_BOOK.button.w / 2 + 10;
+    for (const size of [14, 13, 12, 11]) {
+      for (const x of texts) x.setFontSize(size);
+      const best = right + 944 - this.bestText.width;
+      const coins = Math.min(right + 808, best - 12 - this.coinsText.width);
+      const slain = Math.min(right + 716, coins - 22 - this.slainText.width);
+      const foes = Math.min(right + 612, slain - 12 - this.foesText.width);
+      this.coinsText.setX(coins);
+      this.coinIcon.setX(coins - 12);
+      this.slainText.setX(slain);
+      this.foesText.setX(foes);
+      if (foes >= room) break;
+    }
+  }
+
+  /** Shrinks the track's title and note, as a long road's name runs into the note beside it. */
+  private fitTrackTexts() {
+    const key = `${this.trackTitle.text}|${this.trackNote.text}`;
+    if (key === this.trackKey) return;
+    this.trackKey = key;
+    for (let size = 12; size >= 9; size--) {
+      this.trackTitle.setFontSize(size);
+      this.trackNote.setFontSize(size - 1);
+      if (this.trackTitle.width + this.trackNote.width <= TRACK.w - 30) break;
+    }
+  }
+
   private drawTrack() {
     const s = this.state;
     // During the break after a boss, the road just finished stays up with its chest open.
@@ -987,6 +1029,7 @@ export class GameScene extends Phaser.Scene {
               ? t('trackBoss', { n: tr.last })
               : t('trackBossChest', { n: tr.last }),
     );
+    this.fitTrackTexts();
     const y = TRACK.markY;
     const x0 = TRACK.x + TRACK.markX;
     const at = (i: number) => x0 + (i - 1) * TRACK.step;
