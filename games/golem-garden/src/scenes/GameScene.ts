@@ -945,7 +945,12 @@ export class GameScene extends Phaser.Scene {
     this.hud.waveSub.setText(s.harvest ? t('harvested', { stars: this.starText(s.harvest) }) : t(s.thorny ? 'laurelAt' : 'harvestAt', { wave: HARVEST_WAVE }));
     this.hud.heart.setText(formatNumber(s.heart));
     this.hud.regrow.setVisible(canRegrow(s));
-    this.hud.sap.setText(formatNumber(s.sap));
+    const sap = formatNumber(s.sap);
+    if (sap !== this.hud.sap.text) {
+      // Thousands of sap shrink to stay on the sap tag, clear of the bloom tag beside it.
+      this.hud.sap.setFontSize(20).setText(sap);
+      for (let size = 19; size >= 11 && this.hud.sap.width > HUD.sap.x + HUD.sap.w - 6 - HUD.sap.text; size--) this.hud.sap.setFontSize(size);
+    }
     this.hud.best.setText(t('best', { n: s.best }));
     this.hud.stars.setText(`${totalStars(s)} ★`);
     const full = s.bloom >= BLOOM_GOAL;
