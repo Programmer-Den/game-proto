@@ -404,8 +404,9 @@ File map (`src/`):
   battlefield pixels, converted with `toWorld`.
 - `scenes/layout.ts`: `DESIGN` (960x540, the game's config size), `VIEW` (the view the HUD is laid
   out in), `GROW` and `LEAD` (see "Screen scaling"), `fitView`, `CONTRACT_PILL` (the top bar's contract pill), `TOP`, `BAR`, `MAP_VIEW` (the map's window on screen), `BUTTON`
-  (112 by 30), `GRID_X` (64: where the build and train rows start, leaving the bar's bottom-left
-  corner to the shared corner buttons), `BUTTONS` (each button's kind, `build`, `train` or `research`, key and top-left
+  (107 by 30, 110 apart), `GRID_X` (84: where the build and train rows start, leaving the bar's bottom-left
+  corner to the shared corner buttons, which end at x 78 on a 960x540 screen; a cost line too long
+  for its button shrinks to 8px), `BUTTONS` (each button's kind, `build`, `train` or `research`, key and top-left
   corner: four build buttons with Expansion last, four train buttons, and the research column),
   `RESEARCH_COLUMN`, `FALL_BACK_BUTTON` (kind `command`, key `fallback`, at the right of the message
   line), `FLAGSHIP_BUTTON` (kind `command`, key `flagship`, above the build row), `RALLY_BUTTON`

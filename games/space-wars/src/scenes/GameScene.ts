@@ -1503,7 +1503,7 @@ export class GameScene extends Phaser.Scene {
       if (caption.cost.text !== roleLine) {
         // A long role line (a big cost, or German) shrinks to stay inside the pill.
         caption.cost.setText(roleLine).setFontSize(10);
-        if (caption.cost.width > b.w - 35) caption.cost.setFontSize(9);
+        for (let size = 9; caption.cost.width > b.w - 35 && size >= 8; size--) caption.cost.setFontSize(size);
       }
       caption.name.setColor(affordable ? INK_CSS.chocolate : INK_CSS.creamDim);
     });
