@@ -230,6 +230,8 @@ export class GameScene extends Phaser.Scene {
   private moreJars!: Phaser.GameObjects.Text;
   private hint!: Phaser.GameObjects.Text;
   private clock = 0;
+  /** The room the stats had when last fitted, so they only refit when it or their text changes. */
+  private statsRoom = 0;
   private lastSave = 0;
   private lastFrame: number | null = null;
   /** True until the events of loading (the away nectar) are drained, which make no sound. */
@@ -1206,7 +1208,14 @@ export class GameScene extends Phaser.Scene {
     const out = s.bees.filter((b) => b.tripMs > 0).length;
     const lent = s.bees.filter((b) => b.lent).length;
     const bees = lent ? t('beesLent', { n: s.bees.length, out, lent }) : t('bees', { n: s.bees.length, out });
-    h.stats.setText(t('stats', { year: s.years + 1, season: t(season(s)), time: clockText(seasonLeft(s)), bees, sold: s.sold }));
+    const stats = t('stats', { year: s.years + 1, season: t(season(s)), time: clockText(seasonLeft(s)), bees, sold: s.sold });
+    const room = h.stats.x - (h.waxLabel.x + h.waxLabel.width) - 16;
+    if (stats !== h.stats.text || room !== this.statsRoom) {
+      // Big counts at the left squeeze the stats: they shrink to stay clear of the wax.
+      this.statsRoom = room;
+      h.stats.setFontSize(13.5).setText(stats);
+      for (let size = 13; size >= 9 && h.stats.width > room; size--) h.stats.setFontSize(size);
+    }
     this.hint.setText(this.awayLeft > 0 ? '' : this.hintText());
   }
 

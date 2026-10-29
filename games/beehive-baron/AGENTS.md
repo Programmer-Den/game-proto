@@ -81,7 +81,8 @@ Implemented today:
   the contract's `bees` to match).
   `years` counts the years come through; a `year` event marks each. The HUD stats show "Year N ·
   Season m:ss"; `SEASON_TINT` in `src/art/palette.ts` tints the scenery (a rectangle over it at
-  depth 0.5). A new hive starts at `seasonMs` 0.
+  depth 0.5). A new hive starts at `seasonMs` 0. The stats shrink (13.5px down to 9px) when big counts
+  of coins, honey and wax at the left would run into them.
 - Mead casks (`src/game/mead.ts`): the Mead cask shop button calls `cask`, which takes
   `CASK_JARS` (3) jars of `caskKind` (the kind with the most jars, the dearest on a tie) into a
   `Cask` (`kind`, `agingMs` from `CASK_MS`, 90s, `value`) in `casks`, up to `MAX_CASKS` (3). The
