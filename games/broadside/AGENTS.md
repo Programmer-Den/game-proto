@@ -111,7 +111,7 @@ and the player chooses a ship.
 - **Screens:** there is only `GameScene`. The wave banner, the captain's order card, the bounty
   line, the wind rose, the scuttle button, the harbor panel (ledger or prize draft) and the
   game-over panel (also the haven's end card) are overlays drawn on top of it. The start and pause
-  screens, the sound button and the P key come from `setupGame` (`shared/startScreen.ts`); the other
+  screens, the M key and the P key come from `setupGame` (`shared/startScreen.ts`); the other
   shared settings (difficulty, frame cap, FPS readout, reduced motion and full screen) are set on the
   hub page.
 - **Persistence:** the best wave beaten, the banked medals and the ship chosen are saved. Each
@@ -465,7 +465,7 @@ Data tables, where to tune:
   designed spot in `layout.ts` and a line in `fitLayout`. `e2e/screens.spec.ts` at the root opens
   the game on five screens.
   `setupGame` applies the frame cap, the FPS readout, reduced motion and full screen (camera shake
-  and flash become no-ops; this game uses neither), the sound button and the shared start and pause
+  and flash become no-ops; this game uses neither), the M key (mute) and the shared start and pause
   screens.
 - Difficulty scales one number: enemy hp (forts' too). `spawn` in `game/sim.ts` multiplies
   `ENEMIES[kind].hp * hpScale(wave)` by `byDifficulty(0.75, 1, 1.3)` (Easy 0.75, Normal 1, Hard

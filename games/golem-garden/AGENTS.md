@@ -243,7 +243,7 @@ Screens: `setupScaling` gives the canvas `renderScale` canvas pixels per game pi
 4K screen) and zooms the one camera to match from its top-left. With `fill: true` the view takes
 the screen's shape (960 to 1344 wide, 560 to 720 tall). Everything is still laid out for the
 designed 960x560 frame (`VIEW`; the HUD, board and panel fill its top 540 pixels, and the 20
-below keep the shared corner buttons, about 12 to 114 by 498 to 528 CSS pixels in a 960x540
+below keep the shared corner buttons, about 12 to 78 by 498 to 528 CSS pixels in a 960x540
 window, off the board's bottom row, whose cells end at y 512): `GameScene.create` takes `viewFrame(this)` as `frame`
 (moved by `clearCorner` when the buttons, which keep their CSS size, would still cover the board's
 bottom-left cell, as on a phone on its side: first up, as far as the view's top, then right, as far

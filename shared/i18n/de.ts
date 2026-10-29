@@ -176,13 +176,10 @@ const de: Translation<typeof en> = {
   fullScreenAction: 'Vollbild',
   soundOffButton: 'Stumm (M)',
   soundOnButton: 'Ton an (M)',
-  soundButton: 'Ton',
   soundInput: 'M',
   soundAction: 'Ton an oder aus',
-  soundMenuInput: 'Der Lautsprecherknopf',
-  soundMenuAction: 'Lautstärke von Musik und Effekten',
-  padInput: 'Controller: Start, Select',
-  padAction: 'Pause, und das Tonmenü öffnen',
+  padInput: 'Controller: Start',
+  padAction: 'Pause',
   padCursorInput: 'Controller: linker Stick, A, B',
   padCursorAction: 'Einen Zeiger über das Spiel bewegen, mit A tippen, mit B rechtsklicken',
   musicVolume: 'Musik',
@@ -244,4 +241,4 @@ const de: Translation<typeof en> = {
 export default de;
 
 /** Texts that are the same in German, so the translation check doesn't flag them. */
-export const keepEnglish: (keyof typeof en)[] = ['start', 'normal', 'trophyBronze', 'trophyGold', 'fpsReadout', 'pauseButton', 'pauseAction', 'genreAction', 'soundInput', 'sortName', 'settingController', 'padInput'];
+export const keepEnglish: (keyof typeof en)[] = ['start', 'normal', 'trophyBronze', 'trophyGold', 'fpsReadout', 'pauseButton', 'pauseAction', 'genreAction', 'soundInput', 'sortName', 'settingController', 'padInput', 'padAction'];

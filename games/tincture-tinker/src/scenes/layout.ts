@@ -17,7 +17,7 @@ export const PANTRY = { x: 906, y: 490 };
 export const TOOL = { x: 560, y: 393, w: 80, h: 43, gap: 88 };
 /**
  * The caption cartouche along the bottom, its right end under the order panel's: it grows to the
- * left, so even the longest caption stays clear of the corner buttons (full screen, sound, pause)
+ * left, so even the longest caption stays clear of the corner buttons (full screen, pause)
  * in the bottom left.
  */
 export const CAPTION = { right: 930, y: 514, h: 21 };

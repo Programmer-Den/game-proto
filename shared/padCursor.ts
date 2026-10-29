@@ -1,5 +1,4 @@
 import { settings } from './settings';
-import { openSoundMenu } from './corner';
 import { onPadFrame } from './gamepad';
 
 /** Below this the sticks count as at rest, since a stick seldom comes back to exactly 0. */
@@ -16,8 +15,8 @@ const SCROLL_SPEED = 900;
  * the right stick scrolls like a mouse wheel. It sends the mouse and pointer events a real mouse
  * would to whatever lies under it, so games keep reading `pointer.worldX/Y` as they do, and the
  * corner buttons work under it too. It shows once the stick moves or A or B is pressed, hides on the
- * first real mouse move or tap, and stays off while the start, pause or How to play screen or the
- * sound menu is up, which the controller moves around in instead. The hub's Controller setting turns
+ * first real mouse move or tap, and stays off while the start, pause or How to play screen is up,
+ * which the controller moves around in instead. The hub's Controller setting turns
  * it off and its Cursor speed sets how fast it goes.
  */
 export function addPadCursor() {
@@ -48,8 +47,8 @@ export function addPadCursor() {
     cursor.hidden = !on;
     if (on) cursor.style.transform = `translate(${x}px, ${y}px)`;
   };
-  // The start, pause and How to play screens and the sound menu take the controller instead.
-  const active = () => !document.querySelector('.game-overlay:not([hidden])') && !openSoundMenu();
+  // The start, pause and How to play screens take the controller instead.
+  const active = () => !document.querySelector('.game-overlay:not([hidden])');
   // Phaser only counts the pointer as over the canvas after a `mouseover` on it (`input.isOver`).
   const hover = (under: Element, init: MouseEventInit) => {
     if (under === over) return;

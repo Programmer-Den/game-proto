@@ -47,7 +47,7 @@ voyages it took and a saved best, then Keep charting or New atlas.
   the device's `prefers-color-scheme`; the moon or sun button beside the panel's logo switches it
   and saves the pick.
 - One scene does everything: no title screen, pause or menu of its own (only the theme button);
-  the shared start and pause screens and the sound button come from `setupGame`. Sound effects and
+  the shared start and pause screens (with the volumes and Mute) come from `setupGame`. Sound effects and
   music are made in code (see Sound below). The hub's shared settings apply; see Hub settings below.
 - No TODOs or FIXMEs in the code.
 

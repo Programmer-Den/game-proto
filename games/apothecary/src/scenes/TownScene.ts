@@ -26,7 +26,7 @@ import { checkTrophies } from '../trophies/check';
 const LOT = { w: 270, h: 150, gap: 24 };
 /** A district's card, and the gap above the row of them for its heading. */
 const DISTRICT = { w: 270, h: 140, above: 34 };
-/** Room kept free along the bottom for the corner buttons (full screen, sound, pause). */
+/** Room kept free along the bottom for the corner buttons (full screen, pause). */
 const CORNER_H = 50;
 const HOME = { w: 18, gap: 7 };
 const COLUMNS = 3;

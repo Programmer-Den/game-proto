@@ -895,7 +895,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Fits the hint into the bar beside the shared corner buttons (full screen, sound, pause; DOM
+   * Fits the hint into the bar beside the shared corner buttons (full screen and pause; DOM
    * elements in the bottom left, sized in CSS pixels): centred under the board while it clears
    * them, else centred in the room right of them, shrinking (German runs long) to fit there.
    */

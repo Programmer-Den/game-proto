@@ -10,7 +10,7 @@ export const HUD_HEIGHT = 40;
 export const FURNACE_WINDOW = { x: 80, y: 160, w: 100, h: 130 };
 /**
  * The column of buttons under the furnace (mode, Forge, heat bar, upgrades) spans x 54 to 226 and
- * ends at y 492, so it stays clear of the shared corner buttons (full screen, sound, pause) in the
+ * ends at y 492, so it stays clear of the shared corner buttons (full screen, pause) in the
  * bottom left on a 16:9 screen and on a sideways phone.
  */
 const COLUMN = { x: 140, w: 172 };

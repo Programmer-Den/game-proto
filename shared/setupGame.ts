@@ -6,7 +6,7 @@ import type { HowToPlay } from './howToPlay';
 import { countPlay, gameOf } from './playCount';
 import { markPlayed } from './progress';
 import { markSeen } from './gameDates';
-import { addSoundButton, cornerBar } from './corner';
+import { addMuteKey, cornerBar, setCorner, type Corner } from './corner';
 import { registerServiceWorker } from './install';
 import type { TrophySet } from './trophies';
 import { trackPlayTime } from './playTime';
@@ -18,8 +18,9 @@ const SLACK_MS = 1;
 /**
  * Applies the hub's settings that work the same in every game: the frame cap, the FPS readout and
  * reduced motion. Every game calls this right after creating its `Phaser.Game`. Full screen is
- * here too, as a button in the bottom left corner and the F key, in every game, and so is the sound
- * button beside it, which opens the sound menu, with the M key (`corner.ts`, which also lays out that row), and so are the
+ * here too, as a button in the corner row and the F key, in every game, and so is the M key, which
+ * mutes (`corner.ts`, which also lays out that row in the bottom left, or the `corner` a game picks
+ * to keep its own buttons clear), and so are the
  * loading, start and pause screens (`startScreen.ts`), with the game's How to play behind a button on
  * the start and pause screens when it passes `howToPlay` (`howToPlay.ts`), and its trophies behind a
  * Trophies button there when it passes `trophies` (`trophies.ts`). A controller moves around those
@@ -30,14 +31,15 @@ const SLACK_MS = 1;
  * offline (`install.ts`). The browser's right-click menu is turned off
  * on the whole page, so a right click or a long press never pops it up over the game.
  */
-export function setupGame(game: Phaser.Game, options: { howToPlay?: HowToPlay; trophies?: TrophySet } = {}) {
+export function setupGame(game: Phaser.Game, options: { howToPlay?: HowToPlay; trophies?: TrophySet; corner?: Corner } = {}) {
   setLanguage(language());
   document.addEventListener('contextmenu', (e) => e.preventDefault());
   capFrameRate(game, settings.fps);
   if (settings.showFps) showFps(game);
   if (settings.reduceMotion) reduceMotion();
+  if (options.corner) setCorner(options.corner);
   addFullscreen();
-  addSoundButton();
+  addMuteKey();
   const playing = addStartScreen(game, options.howToPlay, options.trophies);
   addPadCursor();
   countPlay();
@@ -51,7 +53,7 @@ export function setupGame(game: Phaser.Game, options: { howToPlay?: HowToPlay; t
 }
 
 /**
- * A button in the bottom left corner, and the F key, that take the page into full screen and back.
+ * A button in the corner row, and the F key, that take the page into full screen and back.
  * Browsers that cannot do full screen on the page (iPhones, for one) get neither.
  */
 function addFullscreen() {

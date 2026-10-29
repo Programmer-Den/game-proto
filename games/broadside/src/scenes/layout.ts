@@ -9,7 +9,7 @@ export const VIEW: { w: number; h: number } = { w: DESIGN.w, h: DESIGN.h };
 export const HUD_HEIGHT = 40;
 /**
  * The two helm buttons, held to turn: port (left) and starboard (right), by their centres. They sit
- * high enough to keep clear of the shared corner buttons (full screen, sound, pause) at the bottom left.
+ * high enough to keep clear of the shared corner buttons (full screen, pause) at the bottom left.
  */
 export const HELM = { port: { x: 86, y: 420 }, starboard: { x: 874, y: 420 }, r: 62 };
 /**
