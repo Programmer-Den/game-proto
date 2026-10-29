@@ -55,8 +55,6 @@ with one more rule. The art is painterly: shapes and pixel grids drawn in code, 
   - The card id `vampBite` is shown as "Leech".
   - A card face shows its own cost, not the one Doubt makes of it (`costOf` in `sim.ts`); the
     card simply dims when it can't be afforded.
-  - From depth 4 down, the hero panel's depth rules run up into the depth row's arrows (in every
-    language), since `panelText` is centred on `HERO_PANEL.rulesY` and grows both ways.
   - Flasks can only be drunk during a fight, on the hero's turn, so a Healing Flask can't be used
     on the map.
 

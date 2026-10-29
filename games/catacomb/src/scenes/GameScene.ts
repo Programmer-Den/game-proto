@@ -789,9 +789,15 @@ export class GameScene extends Phaser.Scene {
     this.depthText.setVisible(ladder).setText(t('depth', { n: s.depth }));
     this.depthButtons.forEach((b, i) => b.setVisible(ladder).setAlpha((i === 0 ? s.depth > 0 : s.depth < s.bestDepth) ? 1 : 0.4));
     this.panelText.setWordWrapWidth(heroes ? 300 : 520).setY(heroes ? HERO_PANEL.rulesY : VIEW.h / 2 - 26);
+    if (!heroes && this.panelText.style.fontSize !== '16px') this.panelText.setFontSize(16);
     if (heroes) {
       this.panelTitle.setText(t('chooseHero')).setColor('#e6c766');
-      this.panelText.setText(ladder ? depthText(s.depth) : s.bestDepth > 0 ? '' : t('openDepths'));
+      const rules = ladder ? depthText(s.depth) : s.bestDepth > 0 ? '' : t('openDepths');
+      if (rules !== this.panelText.text) {
+        // The rules grow with each depth: shrink them until they fit between the depth row and the buttons.
+        this.panelText.setFontSize(16).setText(rules);
+        for (let size = 15; size >= 11 && this.panelText.height > HERO_PANEL.rulesH; size--) this.panelText.setFontSize(size);
+      }
       this.choiceButtons.forEach((b, i) => {
         const h = HEROES[i === 0 ? 'knight' : 'hunter'];
         b.setVisible(true).setAlpha(1);
