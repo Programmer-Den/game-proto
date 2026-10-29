@@ -559,12 +559,13 @@ export class GameScene extends Phaser.Scene {
     fixed(this.add.text(PANEL.x + 18, goal + 6, t('goal', { tier: GOAL_TIER }), textStyle(14, '#f3c64e')));
     this.goalPips = fixed(this.add.graphics());
     this.goalNote = fixed(this.add.text(PANEL.x + 18, goal + 52, '', { fontFamily: FONT, fontSize: '12px', color: '#e9b949' }));
+    // The rules sit between the goal box and the corner buttons, which reach 42px up from the view's bottom.
     fixed(
-      this.add.text(PANEL.x + 16, PANEL.y + PANEL.h - 68, t('rules'), {
+      this.add.text(PANEL.x + 16, goal + 80, t('rules'), {
         fontFamily: FONT,
-        fontSize: '12px',
+        fontSize: '11px',
         color: '#a99cc0',
-        lineSpacing: 3,
+        lineSpacing: 1,
       }),
     );
   }
