@@ -325,6 +325,7 @@ works offline and fetches nothing from another site.
 ## Play online
 
 Every push to main builds the hub and its games and publishes them on GitHub Pages, at
-[chriszly.github.io/game-proto](https://chriszly.github.io/game-proto/), with the hub as the start
-page (`.github/workflows/deploy.yml`). Paths in the build are relative, so it works under the
-`/game-proto/` subpath.
+[programmer-den.github.io/game-proto](https://programmer-den.github.io/game-proto/), with the hub
+as the start page (`.github/workflows/deploy.yml`). The old address,
+`chriszly.github.io/game-proto/`, forwards there with the players' saves (`move-site/`). Paths in
+the build are relative, so it works under the `/game-proto/` subpath.

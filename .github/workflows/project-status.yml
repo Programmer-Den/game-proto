@@ -5,7 +5,7 @@ name: Project status
 # Project's built-in workflows (Auto-add, and "Item added to project" set to
 # Issue only, which gives them Todo). Needs the repo secret PROJECTS_TOKEN: a
 # classic token with only the "project" scope, since the workflow token can't
-# reach user-owned Projects. Without it the workflow does nothing.
+# reach the owner's Projects. Without it the workflow does nothing.
 #
 # pull_request_target runs this file from main with the secret, also for PRs
 # from forks. It never checks out or runs the PR's code; it only reads the
@@ -43,21 +43,23 @@ jobs:
             const labels = new Set(pr.labels.map(l => l.name));
             const titles = new Set(wanted.filter(p => p.label === null || labels.has(p.label)).map(p => p.title));
 
-            const { user } = await github.graphql(`
+            const { repositoryOwner: account } = await github.graphql(`
               query($owner: String!) {
-                user(login: $owner) {
-                  projectsV2(first: 100) {
-                    nodes {
-                      id title
-                      field(name: "Status") {
-                        ... on ProjectV2SingleSelectField { id options { id name } }
+                repositoryOwner(login: $owner) {
+                  ... on ProjectV2Owner {
+                    projectsV2(first: 100) {
+                      nodes {
+                        id title
+                        field(name: "Status") {
+                          ... on ProjectV2SingleSelectField { id options { id name } }
+                        }
                       }
                     }
                   }
                 }
               }`, { owner: context.repo.owner });
 
-            for (const project of user.projectsV2.nodes.filter(p => titles.has(p.title))) {
+            for (const project of account.projectsV2.nodes.filter(p => titles.has(p.title))) {
               const status = project.field;
               const inProgress = status?.options.find(o => o.name.toLowerCase() === 'in progress');
               if (!inProgress) {

@@ -1,10 +1,10 @@
 # Redirect site for the old address
 
-The hub moves from `chriszly.github.io/game-proto/` to `programmer-den.github.io/game-proto/` when
-the repo moves to the Programmer-Den organisation. GitHub Pages doesn't forward a moved site, and the
+The hub moved from `chriszly.github.io/game-proto/` to `programmer-den.github.io/game-proto/` when
+the repo moved to the Programmer-Den organisation. GitHub Pages doesn't forward a moved site, and the
 players' saves live in their browsers under the old address, so this redirect site takes the old
-address's place. It is kept here and pushed to an empty `game-proto` repo under Chriszly once the
-transfer is done.
+address's place. It is kept here and published from the `Chriszly/game-proto` repo, which was made
+new and empty after the transfer.
 
 ## What it does
 
@@ -29,13 +29,15 @@ transfer is done.
 
 ## Make and publish it
 
-1. Transfer `Chriszly/game-proto` to the organisation, then create an empty public
-   `Chriszly/game-proto` repo and turn on Pages for it (deploy from the `main` branch, root).
+The transfer is done: this repo is `Programmer-Den/game-proto`, and `Chriszly/game-proto` holds only
+the redirect site. To publish it again, for example after a game is added:
+
+1. Check that Pages is on for `Chriszly/game-proto` (deploy from the `main` branch, root).
 2. Check `newHome` in `config.json` (the hub's new address, ending in a slash) and `oldHome` (the
    old site's path).
 3. Run `node scripts/move-site.mjs`. It writes `dist-move/` with `index.html`, `404.html`, `sw.js`
    and `favicon.svg`, with the list of games filled in.
-4. Push the contents of `dist-move/` to the new `Chriszly/game-proto` repo's `main` branch.
+4. Push the contents of `dist-move/` to the `Chriszly/game-proto` repo's `main` branch.
 
 `e2e/hub.spec.ts` ("the old address forwards with its saves") checks the page and `move.html`
 together, with a made-up old address.

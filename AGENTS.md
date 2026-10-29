@@ -202,13 +202,14 @@ and tries to link it to the repo (the run summary says if the link has to be mad
   (`shared/progressCode.ts`, packed by `shared/pack.ts`, which rounds numbers to six significant
   digits, and scanned inside the hub with `shared/scanner.ts`) except keys too big
   for a QR code (`fileOnly` in `saveFile.ts`: a game's `<game>-replays` and a run under way, `<game>-run`), which only the file carries (importing a code leaves the device's own as they are).
-- **The site is moving.** The repo moves to the Programmer-Den organisation, and with it the site,
+- **The site has moved.** The repo moved to the Programmer-Den organisation, and with it the site,
   from `chriszly.github.io/game-proto/` to `programmer-den.github.io/game-proto/`. A redirect site
-  (`move-site/`, made by `node scripts/move-site.mjs`) then answers the old address. It forwards each
-  page to the same page at the new address and brings the saves kept there to `move.html`, which
-  takes them in with `shared/move.ts` without overwriting newer saves. Its service worker replaces
-  the old one so installed apps switch over (`move-site/README.md`). Keep every storage key prefixed
-  with the game's folder name or `hub-`, or it stays behind in a move.
+  (`move-site/`, made by `node scripts/move-site.mjs` and published from the `Chriszly/game-proto`
+  repo) answers the old address. It forwards each page to the same page at the new address and
+  brings the saves kept there to `move.html`, which takes them in with `shared/move.ts` without
+  overwriting newer saves. Its service worker replaces the old one so installed apps switch over
+  (`move-site/README.md`). Keep every storage key prefixed with the game's folder name or `hub-`, or
+  it stays behind in a move.
 - **Play counts come for free.** `setupGame` also bumps the game's public play counter
   (`shared/playCount.ts`, keyed by the game's folder name) and the hub shows the count on its card,
   so a new game needs nothing for it. Tests never count: browser automation skips it.
