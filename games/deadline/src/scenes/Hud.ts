@@ -18,10 +18,13 @@ export const HUD_DEPTH = 100;
 export const STYLE_SWITCH = { x: 432, y: 33, w: 98, h: 19 };
 /** The wave progress strip under the top bar. */
 export const PROGRESS = { x: 10, y: HUD_HEIGHT + 4, w: VIEW.w - 20, h: 20 };
-/** The frenzy meter, to the right of the squad. */
-export const FRENZY_PANEL = { x: 384, y: 884, w: 140, h: 50 };
-/** The kit panel, to the left of the squad; tapping it while holding sandbags readies a wall. */
-export const KIT_PANEL = { x: 16, y: 884, w: 140, h: 50 };
+/** The frenzy meter, to the right of the squad, its bottom clear of the shared corner buttons below it. */
+export const FRENZY_PANEL = { x: 384, y: 852, w: 140, h: 50 };
+/**
+ * The kit panel, to the left of the squad, over the shared corner buttons; tapping it while
+ * holding sandbags readies a wall. A long list of supplies wraps, and the panel grows upward.
+ */
+export const KIT_PANEL = { x: 16, y: 852, w: 140, h: 50 };
 /** The wave condition's chip, under the progress strip at the right; it drops below the boss bar while a boss is up. */
 export const CONDITION_CHIP = { x: VIEW.w - 10, y: HUD_HEIGHT + 32, h: 16, bossDrop: 20 };
 
@@ -37,7 +40,7 @@ function fitHud() {
   PROGRESS.w = FIELD.w - 20;
   KIT_PANEL.x = FIELD.x + 16;
   FRENZY_PANEL.x = right - 16 - FRENZY_PANEL.w;
-  KIT_PANEL.y = FRENZY_PANEL.y = FIELD.h - (VIEW.h - 884);
+  KIT_PANEL.y = FRENZY_PANEL.y = FIELD.h - (VIEW.h - 852);
   CONDITION_CHIP.x = right - 10;
 }
 
@@ -97,6 +100,8 @@ export class Hud {
   private drawn = '';
   /** Whether the kit panel is drawn; a hidden panel takes no taps. */
   private kitShown = false;
+  /** How far the kit panel has grown upward to hold a wrapped list. */
+  private kitGrown = 0;
 
   constructor(scene: Phaser.Scene) {
     fitHud();
@@ -121,7 +126,7 @@ export class Hud {
   /** Whether a tap at x, y lands on the kit panel (never while the panel is hidden). */
   onKit(x: number, y: number) {
     const k = KIT_PANEL;
-    return this.kitShown && x >= k.x - 4 && x <= k.x + k.w + 4 && y >= k.y - 4 && y <= k.y + k.h + 4;
+    return this.kitShown && x >= k.x - 4 && x <= k.x + k.w + 4 && y >= k.y - this.kitGrown - 4 && y <= k.y + k.h + 4;
   }
 
   setStyle(style: ArtStyle) {
@@ -171,16 +176,27 @@ export class Hud {
    * Hidden while the kit is empty. Also the warning that the hero stands in acid.
    */
   private drawKit(d: HudData, th: Theme) {
-    const g = this.g, t = this.t, k = KIT_PANEL, comic = this.style === 'comic';
+    const g = this.g, t = this.t, comic = this.style === 'comic';
     const list = [d.flames && tr('kitFlames', { n: d.flames }), d.medkits && tr('kitMedkits', { n: d.medkits }), d.pellets && tr('kitSpread', { n: d.pellets })].filter(Boolean).join(' · ');
     // The perks take the sandbag hint's line while there is no hint to show; with one, they join the supplies.
     const perks = d.perks.map((p) => tr(PERKS[p].label).toUpperCase()).join(' · ');
     const ready = d.sandbags > 0, hint = ready || d.placing;
-    const line2 = hint ? '' : perks, line3 = hint && perks ? [perks, list].filter(Boolean).join(' · ') : list;
+    // Perks too long for the hint's line join the list, which wraps.
+    const perksFit = !hint && this.font(t.kitHint, 8.5, '#c05a1a', th).setText(perks).width <= KIT_PANEL.w - 16;
+    const line2 = perksFit ? perks : '', line3 = perksFit ? list : [perks, list].filter(Boolean).join(' · ');
     const show = hint || list !== '' || perks !== '';
     this.kitShown = show;
     [t.kit, t.kitHint, t.kitList].forEach((o) => o.setVisible(show));
+    this.kitGrown = 0;
     if (show) {
+      // The list wraps inside the panel; each line past the first grows the panel upward.
+      const listFont = comic ? this.font(t.kitList, 8, '#5a4a6a', th) : this.font(t.kitList, 8.5, th.muted, th, { weight: 'normal' });
+      listFont.setWordWrapWidth(KIT_PANEL.w - 16).setText(line3).setOrigin(0, 0.5);
+      const lines = line3 ? t.kitList.getWrappedText().length : 1;
+      // With the hint's line empty, the list moves up into it.
+      const lineH = comic ? 10 : 11, up = hint || line2 ? 0 : 14, spread = (lines - 1) * lineH;
+      this.kitGrown = Math.max(0, spread - up);
+      const k = { ...KIT_PANEL, y: KIT_PANEL.y - this.kitGrown, h: KIT_PANEL.h + this.kitGrown };
       const bag = CRATE_COLORS.sandbag, title = ready ? tr(comic ? 'kitSandbags' : 'nvKitSandbags', { n: d.sandbags }) : tr(perks && !list ? 'kitPerks' : 'kit');
       if (comic) {
         this.caption(k.x, k.y, k.w, k.h, d.placing ? '#ffd23f' : '#fff8e8', th.ink, 2.2);
@@ -190,14 +206,14 @@ export class Hud {
         }
         this.font(t.kit, 12, th.ink, th).setText(title).setOrigin(0, 0.5).setPosition(k.x + 8, k.y + 13);
         this.font(t.kitHint, 8.5, d.placing ? th.warn : hint ? th.ink : '#c05a1a', th).setText(d.placing ? tr('kitPlacing') : ready ? tr('kitReady') : line2).setOrigin(0, 0.5).setPosition(k.x + 8, k.y + 28);
-        this.font(t.kitList, 8, '#5a4a6a', th).setText(line3).setOrigin(0, 0.5).setPosition(k.x + 8, k.y + 42);
+        t.kitList.setPosition(k.x + 8, k.y + 42 + spread / 2 - up);
       } else {
         g.fillStyle(num('#040c06'), 0.72).fillRoundedRect(k.x, k.y, k.w, k.h, 3);
         g.lineStyle(1, num(d.placing ? th.text : th.accent), 0.8).strokeRoundedRect(k.x, k.y, k.w, k.h, 3);
         if (ready) g.fillStyle(num(bag)).fillRect(k.x + k.w - 20, k.y + 8, 12, 6);
         this.font(t.kit, 11, th.accent, th, { glow: th.accent, weight: 'bold' }).setText(title).setOrigin(0, 0.5).setPosition(k.x + 8, k.y + 12);
         this.font(t.kitHint, 8.5, d.placing ? th.text : '#9fd8a4', th, { weight: 'normal' }).setText(d.placing ? tr('nvKitPlacing') : ready ? tr('nvKitReady') : line2).setOrigin(0, 0.5).setPosition(k.x + 8, k.y + 27);
-        this.font(t.kitList, 8.5, th.muted, th, { weight: 'normal' }).setText(line3).setOrigin(0, 0.5).setPosition(k.x + 8, k.y + 41);
+        t.kitList.setPosition(k.x + 8, k.y + 41 + spread / 2 - up);
       }
     }
     t.acid.setVisible(d.inAcid);
