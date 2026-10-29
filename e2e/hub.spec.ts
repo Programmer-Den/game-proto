@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { readFileSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 
 // The hub lists every game and each card opens its game.
 const GAMES = [
@@ -1071,4 +1072,79 @@ test('hub marks updated games until they are opened', async ({ page }, testInfo)
   await page.goto('/');
   await expect(card).toBeVisible();
   await expect(card.locator('.badge')).toHaveCount(0);
+});
+
+// After a move, the redirect site at the old address (scripts/move-site.mjs) forwards every old
+// address to the same page at the new one with the saves kept there, and move.html takes them in
+// without overwriting what was played at the new address (shared/move.ts). The old address is
+// played by a made-up site whose pages are the redirect site.
+test('the old address forwards with its saves', async ({ page }, testInfo) => {
+  const site = testInfo.outputPath('move-site');
+  execFileSync('node', ['scripts/move-site.mjs', 'http://localhost:5173/', site]);
+  await page.context().route('https://old.test/**', (route) => {
+    const { pathname } = new URL(route.request().url());
+    if (pathname === '/game-proto/favicon.svg') return route.fulfill({ path: `${site}/favicon.svg`, contentType: 'image/svg+xml' });
+    const file = pathname === '/game-proto/' ? 'index.html' : '404.html';
+    return route.fulfill({ status: file === 'index.html' ? 200 : 404, contentType: 'text/html', body: readFileSync(`${site}/${file}`, 'utf8') });
+  });
+  const oldSaves = {
+    'apothecary-save': '{"coins":5}',
+    'deadline-best': '42',
+    'colonizer-replays': '["r"]',
+    'hub-favourites': '["deadline"]',
+    'hub-playtime': '{"deadline":60000}',
+    'hub-settings': '{"language":"de"}',
+    'other-site': 'x',
+  };
+  // The installed app shows where to go instead of forwarding, since it keeps its own saves on some phones.
+  await page.addInitScript(() => {
+    if (location.host !== 'old.test') return;
+    const media = window.matchMedia.bind(window);
+    window.matchMedia = (q: string) => (q === '(display-mode: standalone)' ? ({ matches: true } as MediaQueryList) : media(q));
+  });
+  await page.goto('https://old.test/game-proto/games/deadline/?x=1');
+  await page.evaluate((saves) => {
+    localStorage.clear();
+    for (const [k, v] of Object.entries(saves)) localStorage.setItem(k, v);
+  }, oldSaves);
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Die Spielesammlung ist umgezogen' })).toBeVisible();
+  const link = await page.getByRole('link', { name: 'Neue Adresse öffnen' }).getAttribute('href');
+  expect(link).toMatch(/^http:\/\/localhost:5173\/move\.html#move=[\w-]+$/);
+  testInfo.attach('moved app', { body: await page.screenshot({ path: testInfo.outputPath('moved-app.png') }), contentType: 'image/png' });
+
+  // The new address already has Apothecary played and a favourite of its own.
+  await page.goto('/');
+  await page.evaluate(() => {
+    localStorage.clear();
+    localStorage.setItem('apothecary-save', '{"coins":99}');
+    localStorage.setItem('hub-favourites', '["apothecary"]');
+    localStorage.setItem('hub-playtime', '{"apothecary":1000}');
+  });
+  await page.goto(link!);
+  await expect(page).toHaveURL('http://localhost:5173/games/deadline/?x=1');
+  const saved = await page.evaluate(() => ({ ...localStorage }));
+  expect(saved['apothecary-save']).toBe('{"coins":99}');
+  expect(saved['deadline-best']).toBe('42');
+  expect(saved['colonizer-replays']).toBe('["r"]');
+  expect(saved['other-site']).toBeUndefined();
+  expect(JSON.parse(saved['hub-favourites'])).toEqual(['apothecary', 'deadline']);
+  expect(JSON.parse(saved['hub-playtime'])).toEqual({ apothecary: 1000, deadline: 60000 });
+  expect(saved['hub-settings']).toBe('{"language":"de"}');
+
+  // A browser tab forwards straight away, and a link that was changed only opens the hub.
+  await page.goto('https://old.test/game-proto/');
+  await page.evaluate(() => localStorage.setItem('hub-settings', '{"language":"en"}'));
+  const tab = await page.context().newPage();
+  await tab.goto('https://old.test/game-proto/games/apothecary/');
+  await expect(tab).toHaveURL('http://localhost:5173/games/apothecary/');
+  await tab.goto(`${link!.slice(0, -8)}AAAAAAAA`);
+  await expect(tab).toHaveURL('http://localhost:5173/');
+  // A handover can't send the player anywhere but the hub's own pages.
+  const target = await tab.evaluate(async () => {
+    const move = '/shared/move.ts';
+    const { moveTarget } = await import(move);
+    return [moveTarget('https://evil.test/', 'http://localhost:5173/'), moveTarget('games/augury/#p=1', 'http://localhost:5173/')];
+  });
+  expect(target).toEqual(['http://localhost:5173/', 'http://localhost:5173/games/augury/#p=1']);
 });

@@ -5,7 +5,8 @@ import { pwa } from './scripts/pwa';
 import { gameDates } from './scripts/gameDates';
 
 // The hub page and every game in games/<name>/index.html are built together into dist/, with
-// the hub at the root and each game under games/<name>/.
+// the hub at the root and each game under games/<name>/, plus move.html, which takes in the saves
+// from the site's old address after a move.
 const games = readdirSync(resolve(import.meta.dirname, 'games'), { withFileTypes: true })
   .filter((d) => d.isDirectory())
   .map((d) => d.name);
@@ -21,6 +22,8 @@ export default defineConfig({
     rollupOptions: {
       input: {
         hub: resolve(import.meta.dirname, 'index.html'),
+        // Takes in the saves from the site's old address after a move (shared/move.ts).
+        move: resolve(import.meta.dirname, 'move.html'),
         ...Object.fromEntries(games.map((g) => [g, resolve(import.meta.dirname, 'games', g, 'index.html')])),
       },
     },
