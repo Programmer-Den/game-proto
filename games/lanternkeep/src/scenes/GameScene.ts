@@ -966,7 +966,19 @@ export class GameScene extends Phaser.Scene {
   private drawOrder() {
     const s = this.state;
     const { goal, reward } = s.order;
-    this.orderText.setText(this.describeOrder(s.order));
+    const order = this.describeOrder(s.order);
+    if (order !== this.orderText.text) {
+      // A long order (three lanterns named) shrinks to stay clear of the reward badge, and at
+      // the last wraps onto a second line above the pips.
+      const room = ORDER.w - 82;
+      this.orderText.setWordWrapWidth(null).setLineSpacing(0).setFontSize(10.5).setText(order);
+      for (let size = 10; size >= 9 && this.orderText.width > room; size -= 0.5) this.orderText.setFontSize(size);
+      const wrap = this.orderText.width > room;
+      if (wrap) this.orderText.setWordWrapWidth(room).setLineSpacing(-2);
+      const pipY = this.orderAt.y + (wrap ? 49 : 45);
+      for (const pip of this.orderPips) pip.setY(pipY);
+      this.orderProgressText.setY(pipY);
+    }
     this.orderReward.setText(t('reward', { n: reward }));
     const { done, of } = orderProgress(s);
     this.orderPips.forEach((pip, k) => {
@@ -989,6 +1001,8 @@ export class GameScene extends Phaser.Scene {
     const need = required(s);
     this.litText.setText(t('lit', { lit, count: s.lanterns.length }));
     this.needText.setText(t('need', { n: need }));
+    // The lit count stands left of the need, however wide a two-digit need makes it.
+    this.litText.setX(Math.min(this.right - 76, this.needText.x - this.needText.width - 8));
     // setColor always redraws the text, so only set it when it changes.
     const litColour = lit >= need ? '#ffc870' : '#f4e2c8';
     if (this.litText.style.color !== litColour) this.litText.setColor(litColour);
