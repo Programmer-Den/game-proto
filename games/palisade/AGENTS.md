@@ -120,7 +120,8 @@ seconds without a tap.
   adds the set's bonus once (`rainDamage`, `critChance`, `repair`).
 - **Road choice:** clearing a boss wave also sets `roadChoices` (two of `ROAD_IDS` in `roads.ts`) and
   `roadMs`; the break's countdown waits while they are up (`RoadChoice` cards, under the relic
-  panel). `pickRoad` sets `road` for the next ten waves; after `AUTO_PICK_MS` one is taken at
+  panel), and the cards stay hidden while a level-up is up, whose pick comes first (their countdown
+  waits too, since `tick` runs no `step` while `choices` are up). `pickRoad` sets `road` for the next ten waves; after `AUTO_PICK_MS` one is taken at
   random. `roadEffects(road)` gives the twist's multipliers: foe health (`foeHp`), foe count
   (`waveFoes`), experience and coins (`removeDead`), foe speed (`moveEnemies`) and relics in the
   chest (`clearWave`). The first road (`road` null) changes nothing, and a new run starts there.
