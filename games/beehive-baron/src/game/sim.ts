@@ -1,7 +1,10 @@
 import { byDifficulty } from '../../../../shared/settings';
+import { BOOK_FROM, CITIES, GRADES, GRADE_COUNT, GRADE_MULT, SWING, type Ask } from './book';
+import { BREED_MAX, FAR_TRIP, HARDY_BEES, TRAITS, type Trait } from './breeds';
+import { ESTATE_HIVES, ORCHARD_WINTER_APPETITE, PLOT_BEES, RIVERSIDE_WINTER_APPETITE, plotOf } from './estate';
 import { CONTRACTS_FROM, CONTRACT_BEES, CONTRACT_COINS_PER_BEE, CONTRACT_GAP_MS, CONTRACT_MS, OFFER_MS } from './contracts';
 import { MEAD_POINTS, classesFor, fairGold, noEntries, type FairClass } from './fair';
-import { KINDS, type Kind } from './honey';
+import { HONEY, KINDS, type Kind } from './honey';
 import { REST_RATE, TIRE_MS, rested, unwilted } from './tired';
 import { CASK_JARS, CASK_MS, MAX_CASKS, MEAD_MULT } from './mead';
 import { MEADOWS } from './meadows';
@@ -16,6 +19,7 @@ import {
   SLOTS,
   TRIP_MS,
   atHome,
+  basePrice,
   beeCarry,
   broodPrice,
   cellPrice,
@@ -42,6 +46,7 @@ import {
   room,
   season,
   seasonNo,
+  stealMs,
   touching,
   withWax,
   type Bee,
@@ -50,16 +55,16 @@ import {
 } from './state';
 import { CATCH_PRICE, MAX_HIVES, SWARM_MS, type Queen } from './swarm';
 import { nextPrice, type UpgradeId } from './upgrades';
-import { WASPS_FROM, WASP_GAP, WASP_GAP_SPREAD, WASP_IN_MS, WASP_OUT_MS, WASP_STEAL_MS, type Wasp } from './wasps';
+import { WASPS_FROM, WASP_GAP, WASP_GAP_SPREAD, WASP_IN_MS, WASP_OUT_MS, type Wasp } from './wasps';
 
-/** A forager's trip time with the clover planted so far. Easier difficulties have the flowers closer. */
-export const tripMs = (s: GameState) => Math.round(TRIP_MS * Math.pow(0.8, s.ranks.clover) * byDifficulty(0.75, 1, 1.3));
+/** A forager's trip time with the clover planted so far, longer with the Far flyers bred in. Easier difficulties have the flowers closer. */
+export const tripMs = (s: GameState) => Math.round(TRIP_MS * Math.pow(0.8, s.ranks.clover) * (1 + FAR_TRIP * s.breeds.far) * byDifficulty(0.75, 1, 1.3));
 
 /**
  * Moves the hive on by `dt` milliseconds: the year turns, foragers fly and bring nectar home, full
  * cells ripen, brood cells hatch bees, casks age, the market moves, wasps raid, village orders and
- * orchard contracts come and go, a crowded hive swarms, in winter the bees eat, meadows tire and
- * rest, and with the Waggle Dance bees set off by themselves.
+ * orchard contracts come and go, a crowded hive swarms, the buyer's book opens, in winter the bees
+ * eat, meadows tire and rest, and with the Waggle Dance bees set off by themselves.
  */
 export function tick(s: GameState, dt: number) {
   // Sampled before the year turns, since a meadow that shuts or opens with the season moves the demand too.
@@ -91,6 +96,8 @@ export function tick(s: GameState, dt: number) {
   orders(s, dt);
   contracts(s, dt);
   swarm(s, dt);
+  // The buyer's book opens once `BOOK_FROM` jars are sold (a new season writes it again).
+  if (s.sold >= BOOK_FROM && s.book.length === 0) newBook(s);
   if (s.ranks.dance > 0) dance(s);
 }
 
@@ -114,6 +121,8 @@ function turn(s: GameState, dt: number) {
     s.eatIn = WINTER_EAT_MS;
     s.tired = rested();
     s.wilted = unwilted();
+    // The towns write new asks into the buyer's book, at the new season's prices.
+    if (s.sold >= BOOK_FROM) newBook(s);
   }
   if (!fair && fairOn(s)) s.events.push({ kind: 'fair-open' });
   if (fair && !fairOn(s)) closeFair(s);
@@ -122,10 +131,21 @@ function turn(s: GameState, dt: number) {
   s.eatIn -= dt;
   if (s.eatIn > 0) return;
   s.eatIn = WINTER_EAT_MS;
-  // One meal for every `BEES_PER_MEAL` bees (at least one), so a big hive needs a big larder; a Hardy queen's bees eat half.
-  const hardy = s.queen === 'hardy' ? s.bees.filter((b) => b.hive === 1).length : 0;
-  const meals = Math.ceil((s.bees.length - hardy) / BEES_PER_MEAL) + Math.ceil(hardy / (BEES_PER_MEAL * 2));
+  // One meal for every `BEES_PER_MEAL` bees (at least one, and more bees a meal when Frost-hardy is
+  // bred in), so a big hive needs a big larder; bees that eat less or more are counted apart.
+  const perMeal = BEES_PER_MEAL + HARDY_BEES * s.breeds.hardy;
+  const groups = new Map<number, number>();
+  for (const b of s.bees) groups.set(appetite(s, b), (groups.get(appetite(s, b)) ?? 0) + 1);
+  let meals = 0;
+  for (const [share, bees] of groups) meals += Math.ceil((bees * share) / perMeal);
   for (let n = Math.max(1, meals); n > 0; n--) eat(s);
+}
+
+/** How much a bee eats in winter: half for a Hardy queen's bees and Riverside Meadow's, double for Orchard Hollow's. */
+function appetite(s: GameState, b: Bee) {
+  if (b.hive === 1 && s.queen === 'hardy') return 0.5;
+  const plot = plotOf(b.hive)?.id;
+  return plot === 'orchard' ? ORCHARD_WINTER_APPETITE : plot === 'riverside' ? RIVERSIDE_WINTER_APPETITE : 1;
 }
 
 /**
@@ -203,7 +223,7 @@ function deliver(s: GameState, drops: number, kind: Kind) {
     s.events.push({ kind: 'nectar', slot });
     if (c.nectar === CELL_CAP) {
       c.phase = 'ripening';
-      c.ripenMs = ripenTime(s);
+      c.ripenMs = ripenTime(s, slot);
     }
   }
   if (drops > 0) {
@@ -315,6 +335,15 @@ export function sell(s: GameState) {
     }
   }
   for (const k of Object.keys(s.jars) as Kind[]) s.jars[k] = 0;
+  afterSale(s, wanted, fair);
+  return true;
+}
+
+/**
+ * After jars are sold: each meadow whose goal the new `sold` reaches unlocks, and the market and
+ * the fair follow it.
+ */
+function afterSale(s: GameState, wanted: Kind | null, fair: boolean) {
   while (s.meadows < MEADOWS.length && s.sold >= MEADOWS[s.meadows].need) {
     s.events.push({ kind: 'unlocked', meadow: s.meadows });
     s.meadows++;
@@ -323,7 +352,6 @@ export function sell(s: GameState) {
   if (now && now !== wanted) s.events.push({ kind: 'demand', honey: now });
   // The meadow that opens the fair can come during its last minute of summer, between two ticks.
   if (!fair && fairOn(s)) s.events.push({ kind: 'fair-open' });
-  return true;
 }
 
 /**
@@ -370,7 +398,7 @@ function raid(s: GameState, dt: number) {
       }
     } else if (w.phase === 'steal') {
       if (!ready) leave(w, 1);
-      else if (w.ms >= WASP_STEAL_MS) {
+      else if (w.ms >= stealMs(s)) {
         s.cells[w.slot] = emptyCell();
         s.events.push({ kind: 'stolen', slot: w.slot });
         leave(w, 1);
@@ -565,6 +593,11 @@ function enter(s: GameState, classes: FairClass[], score: number) {
   if (total < gold) return s.events.push({ kind: 'judged', total, gold });
   s.golds++;
   s.events.push({ kind: 'gold', total, golds: s.golds });
+  // Every gold breeds a trait into the queen line, while one is left to breed.
+  if (s.breedPending < TRAITS.reduce((n, k) => n + BREED_MAX - s.breeds[k], 0)) {
+    s.breedPending++;
+    s.events.push({ kind: 'breed-ready' });
+  }
   if (s.baron) return;
   s.baron = true;
   s.events.push({ kind: 'baron' });
@@ -575,4 +608,88 @@ function closeFair(s: GameState) {
   s.events.push({ kind: 'fair-closed', total: fairTotal(s), gold: fairGold(s.fairs), won: fairWon(s) });
   s.fairs++;
   s.fair = noEntries();
+}
+
+/**
+ * Buys the estate's next plot, once the fair's first gold is won and the swarm is caught: a hive
+ * with its own, empty comb and `PLOT_BEES` bees of its own, on a plot with its own season quirks.
+ */
+export function buyPlot(s: GameState) {
+  const plot = plotOf(s.hives);
+  if (!plot || s.golds < 1 || s.hives < MAX_HIVES || s.hives >= ESTATE_HIVES || s.coins < plot.price) return false;
+  s.coins -= plot.price;
+  const hive = s.hives++;
+  s.cells.push(...new Array<null>(SLOTS).fill(null));
+  for (let n = 0; n < PLOT_BEES; n++) s.bees.push({ id: s.nextId++, tripMs: 0, trip: 0, flower: 0, kind: s.forage, lent: false, hive });
+  s.events.push({ kind: 'plot', hive });
+  return true;
+}
+
+/** Breeds a trait into the queen line with a fair gold waiting to be spent: one more rank, up to `BREED_MAX`. */
+export function breed(s: GameState, trait: Trait) {
+  if (s.breedPending <= 0 || s.breeds[trait] >= BREED_MAX) return false;
+  s.breeds[trait]++;
+  s.breedPending--;
+  s.events.push({ kind: 'bred', trait, rank: s.breeds[trait] });
+  return true;
+}
+
+/** Cuts a capped cell's honey out as a piece of comb honey of its kind: no jar and no wax, for the buyer's book. */
+export function cutComb(s: GameState, slot: number) {
+  const c = s.cells[slot];
+  if (s.book.length === 0 || !isHoney(c) || c.phase !== 'capped') return false;
+  s.combs[c.kind ?? 'clover']++;
+  s.cells[slot] = emptyCell();
+  s.events.push({ kind: 'cut', slot });
+  return true;
+}
+
+/** Whether there are goods enough on hand for an ask: any jars for mixed, jars of its kind for pure, comb of its kind for comb. */
+export function canSupply(s: GameState, a: Ask) {
+  if (a.done) return false;
+  if (a.grade === 'mixed') return jarCount(s) >= a.count;
+  return (a.grade === 'pure' ? s.jars[a.kind] : s.combs[a.kind]) >= a.count;
+}
+
+/** Supplies an ask in the buyer's book: its goods go (mixed takes the cheapest jars first), it pays its price for each, and they count as sold. */
+export function supply(s: GameState, i: number) {
+  const a = s.book[i];
+  if (!a || !canSupply(s, a)) return false;
+  const fair = fairOn(s);
+  const wanted = demand(s);
+  if (a.grade === 'mixed') {
+    let left = a.count;
+    for (const k of EAT_ORDER) {
+      const take = Math.min(left, s.jars[k]);
+      s.jars[k] -= take;
+      left -= take;
+    }
+  } else if (a.grade === 'pure') s.jars[a.kind] -= a.count;
+  else s.combs[a.kind] -= a.count;
+  a.done = true;
+  const coins = a.count * a.price;
+  s.coins += coins;
+  s.sold += a.count;
+  s.events.push({ kind: 'supplied', ask: i, coins });
+  afterSale(s, wanted, fair);
+  return true;
+}
+
+/**
+ * The season's buyer's book: three towns, one asking for each grade, pure and comb honey of a kind
+ * whose meadow is unlocked, at a premium on what a jar is worth now, swung by the season.
+ */
+function newBook(s: GameState) {
+  const towns = [...CITIES.keys()];
+  const kinds = KINDS.filter((k) => s.meadows >= HONEY[k].meadows);
+  const pick = <T,>(list: T[]) => list[Math.floor(Math.random() * list.length)];
+  s.book = GRADES.map((grade) => {
+    const city = towns.splice(Math.floor(Math.random() * towns.length), 1)[0];
+    const kind: Kind = grade === 'mixed' ? 'clover' : pick(kinds);
+    const [least, most] = GRADE_COUNT[grade];
+    const count = least + Math.floor(Math.random() * (most - least + 1));
+    const swing = SWING[0] + Math.random() * (SWING[1] - SWING[0]);
+    return { city, grade, kind, count, price: Math.round(basePrice(s, kind) * GRADE_MULT[grade] * swing), done: false };
+  });
+  s.events.push({ kind: 'book' });
 }

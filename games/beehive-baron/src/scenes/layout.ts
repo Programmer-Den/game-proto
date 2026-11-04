@@ -59,14 +59,15 @@ export function cellAt(x: number, y: number) {
  * the bees fly in and out of.
  */
 export const HIVE = { x: 36, y: 46, w: 388, h: 336 };
-export const PLAQUE = { x: 300, y: 68, w: 156, h: 18 };
-/** The tabs on the roof that switch between the hives' combs once the swarm is caught, by hive. */
-export const HIVE_TAB = { w: 54, h: 18 };
-export const hiveTab = (hive: number) => ({ x: 100 + hive * (HIVE_TAB.w + 6), y: 68 });
+export const PLAQUE = { x: 324, y: 68, w: 148, h: 18 };
+/** The tabs on the roof that switch between the hives' combs once the swarm is caught, by hive: room for the estate's four, left of the plaque. */
+export const HIVE_TAB = { w: 44, h: 18 };
+export const hiveTab = (hive: number) => ({ x: 82 + hive * (HIVE_TAB.w + 4), y: 68 });
 export const ENTRANCE = { x: 233, y: 338 };
 /**
  * Where the bees at home rest: a hive's worth (`MAX_BEES`) side by side along the entrance, and a
- * second hive's on the landing board in front of them, so no bee ever sits over the comb.
+ * second hive's on the landing board in front of them, so no bee ever sits over the comb. With the
+ * estate's third and fourth hives, the rows show the pair of hives the comb shown belongs to.
  */
 export const homeSpot = (i: number) => ({ x: ENTRANCE.x - 132 + (i % MAX_BEES) * 24, y: ENTRANCE.y + 6 + Math.floor(i / MAX_BEES) * 24 });
 
@@ -116,6 +117,10 @@ export const AWAY = { x: 56, y: 384, w: 359, h: 38 };
  * meadow's foot, just above the button board, so the market under the hive stays in reach.
  */
 export const SWARM = { x: 530, y: 250, w: 410, h: 38 };
+/** The buyer's book chip on the near hill left of the button board, once the first jar is sold (tap it to open the book). */
+export const BOOK = { x: 432, y: 250, w: 92, h: 38 };
+/** The buyer's book card over everything, with a row per ask. */
+export const BOOK_CARD = { x: VIEW.w / 2, y: VIEW.h / 2, w: 470, h: 276 };
 /** The hint line for a new player, in the same place (it hides while the chip shows). */
 export const HINT = { x: 233, y: 403 };
 /**

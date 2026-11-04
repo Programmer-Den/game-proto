@@ -13,6 +13,7 @@ const en: HowToPlay = {
     { input: 'Shop buttons', action: 'Buy brood cells, mead casks and upgrades' },
     { input: 'Click or tap a honey on the market', action: 'Send the foragers to that meadow' },
     { input: 'Click or tap a wasp', action: 'Swat it away before it steals the honey' },
+    { input: "Buyer's book (on the hill)", action: 'Supply town buyers, or arm Cut comb honey and tap a capped cell' },
     { input: 'New hive (bottom right)', action: 'Start over from scratch, at once' },
   ],
   loop: [
@@ -32,6 +33,8 @@ const en: HowToPlay = {
     'A meadow foraged for a minute without a break wilts and gives half the nectar until the season turns: switch kinds on the market now and then.',
     'Catching the swarm lets you pick the second hive\'s queen: Gentle (no wasps on her comb), Hardy (eats half in winter) or Busy (+1 nectar a trip).',
     'Once every meadow is open, the county fair is held at the end of every summer: a cell scores 1 point per touching capped cell of its kind, and 14 points win the first gold. Each year after needs more and adds a class.',
+    "From 20 jars sold, the buyer's book pays a premium for mixed, pure and comb honey, with new buyers and prices every season.",
+    'Every gold at the fair breeds a trait into the queen line, kept from year to year, and after the first gold you can buy plots for a third and a fourth hive, each with its own season quirks.',
   ],
 };
 
@@ -47,6 +50,7 @@ const de: HowToPlay = {
     { input: 'Laden-Tasten', action: 'Brutzellen, Metfässer und Verbesserungen kaufen' },
     { input: 'Einen Honig auf dem Markt anklicken oder antippen', action: 'Die Sammlerinnen auf diese Wiese schicken' },
     { input: 'Eine Wespe anklicken oder antippen', action: 'Sie verscheuchen, bevor sie den Honig stiehlt' },
+    { input: 'Käuferbuch (auf dem Hügel)', action: 'Käufer aus der Stadt beliefern, oder Wabenhonig schneiden und eine verdeckelte Zelle antippen' },
     { input: 'Neuer Stock (unten rechts)', action: 'Sofort ganz von vorn beginnen' },
   ],
   loop: [
@@ -66,6 +70,8 @@ const de: HowToPlay = {
     'Eine Wiese, die eine Minute ohne Pause beflogen wird, welkt und gibt halb so viel Nektar, bis die Jahreszeit wechselt: Wechsle ab und zu die Sorte auf dem Markt.',
     'Fängst du den Schwarm ein, wählst du die Königin des zweiten Stocks: Sanft (keine Wespen auf ihrer Wabe), Zäh (isst im Winter halb so viel) oder Fleißig (+1 Nektar pro Flug).',
     'Sobald jede Wiese offen ist, findet am Ende jedes Sommers die Honigschau statt: Eine Zelle bringt 1 Punkt für jede angrenzende verdeckelte Zelle ihrer Sorte, und 14 Punkte gewinnen das erste Gold. Jedes Jahr danach braucht mehr und bringt eine Klasse dazu.',
+    'Ab 20 verkauften Gläsern zahlt das Käuferbuch einen Aufpreis für gemischten, reinen und Wabenhonig, mit neuen Käufern und Preisen in jeder Jahreszeit.',
+    'Jedes Gold bei der Honigschau züchtet eine Eigenschaft in die Königinnenlinie, die Jahr für Jahr bleibt, und nach dem ersten Gold kannst du Grund für einen dritten und vierten Stock kaufen, jeder mit eigenen Eigenheiten der Jahreszeiten.',
   ],
 };
 
