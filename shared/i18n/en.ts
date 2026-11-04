@@ -190,7 +190,7 @@ const en = {
   // Hub cards: each game's text and its cover's description
   apothecaryCard: 'Run a medieval apothecary as a plague doctor: grow herbs, refine them, brew potions and sell them.',
   apothecaryCover: 'The apothecary shop with a customer at the counter',
-  auguryCard: 'Nine kinds of brain puzzle dealt like tarot cards: an endless medley, a daily five, Blitz, draft runs with relics, pass and play, and practice.',
+  auguryCard: 'Eleven kinds of brain puzzle dealt like tarot cards: a journey of five temples, an endless medley, a daily five, Blitz, draft runs with relics, a weekly league, pass and play, and practice.',
   auguryCover: 'A path puzzle on a night-sky board framed in gold, with the next puzzles waiting as cards beside it',
   deadlineCard: 'Hold the bottom of the road against waves of zombies: move left and right, and shoot crates open for upgrades.',
   deadlineCover: 'A soldier behind sandbags shooting a zombie horde coming down a road',

@@ -5,7 +5,7 @@ import { expect, test, type Page } from '@playwright/test';
 // drags like a player's) and checks their points and the streak, then skips the third and checks
 // it costs a heart, and that the first solve earned its trophy. Game state is only read, through the `game` object the dev build puts on window.
 
-type KindId = 'nonogram' | 'bridges' | 'code' | 'calc' | 'sums' | 'unjam' | 'flip' | 'link' | 'echo';
+type KindId = 'nonogram' | 'bridges' | 'code' | 'calc' | 'sums' | 'unjam' | 'flip' | 'link' | 'slide' | 'series' | 'echo';
 interface Card {
   kind: KindId;
   level: number;
@@ -30,7 +30,7 @@ const HEARTS_NORMAL = 3;
 const QUEUE = 3;
 const BETWEEN_MS = 1200;
 const POINTS_PER_LEVEL = 100;
-const KINDS: KindId[] = ['nonogram', 'bridges', 'code', 'calc', 'sums', 'unjam', 'flip', 'link', 'echo'];
+const KINDS: KindId[] = ['nonogram', 'bridges', 'code', 'calc', 'sums', 'unjam', 'flip', 'link', 'slide', 'series', 'echo'];
 
 /** Game time per animation frame, every frame the same length. */
 const FRAME_MS = 64;
@@ -195,6 +195,18 @@ test('plays the first round', async ({ page }, testInfo) => {
           await page.mouse.up();
           await frame();
         }
+        break;
+      case 'slide':
+        // Slide the tile the gap came from, until every tile is home.
+        for (;;) {
+          const cur = (await game.run()).current;
+          if (cur?.card.kind !== 'slide' || (await game.run()).phase !== 'playing') break;
+          await press(`cell-${cur.state.trail[cur.state.trail.length - 1]}`);
+        }
+        break;
+      case 'series':
+        // Pick each row's answer among its options.
+        for (const row of s.rows as { answer: number; options: number[] }[]) await press(`option-${row.options.indexOf(row.answer)}`);
         break;
       case 'echo':
         // Answer every card from the back-th on: same when it matches the card that many steps back.

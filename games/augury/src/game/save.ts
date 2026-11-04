@@ -1,4 +1,5 @@
 import { MODES, RELICS } from './catalog';
+import { NODES } from './journey';
 import { KINDS, LEVELS } from './kinds';
 import { newProgress, type Progress } from './progress';
 import { makeCurrent, type Card, type Run } from './run';
@@ -24,6 +25,8 @@ export function loadProgress(): Progress {
     }
     for (const key of ['endless', 'blitz', 'daily', 'draft'] as const) p.best[key] = count(saved.best?.[key]);
     if (saved.daily && Number.isFinite(saved.daily.day)) p.daily = { day: saved.daily.day, score: count(saved.daily.score) };
+    if (saved.weekly && Number.isFinite(saved.weekly.week)) p.weekly = { week: saved.weekly.week, best: count(saved.weekly.best) };
+    if (Array.isArray(saved.journey)) p.journey = p.journey.map((_, i) => Math.min(3, count(saved.journey[i])));
     p.runs = count(saved.runs);
   } catch {
     // A broken or blocked save starts fresh.
@@ -73,6 +76,8 @@ export function loadRun(progress: Progress): Run | null {
       run.mode !== 'practice' &&
       PHASES.includes(run.phase) &&
       [run.hearts, run.hints, run.score, run.streak, run.dealt, run.solved, run.clockMs].every(Number.isFinite) &&
+      (run.mode !== 'weekly' || (Number.isFinite(run.week) && Number.isFinite(run.draws))) &&
+      (run.mode !== 'journey' || (Number.isInteger(run.node) && run.node >= 0 && run.node < NODES)) &&
       Array.isArray(run.queue) && run.queue.every(isCard) &&
       Array.isArray(run.results) && run.results.every((r: any) => isCard(r?.card)) &&
       Array.isArray(run.draftOffer) && run.draftOffer.every(isCard) &&

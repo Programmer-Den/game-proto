@@ -4,7 +4,7 @@ import type en from './en';
 /** Augury's texts in German. */
 const de: Translation<typeof en> = {
   title: 'Augury',
-  tagline: 'Neun Arten von Rätseln, ausgeteilt wie Karten aus einem Tarotdeck',
+  tagline: 'Elf Arten von Rätseln, ausgeteilt wie Karten aus einem Tarotdeck',
 
   endlessName: 'Endlose Mischung',
   endlessText: 'Zufällige Rätsel, eins nach dem anderen, bis dir die Herzen ausgehen.',
@@ -18,6 +18,35 @@ const de: Translation<typeof en> = {
   duelText: 'Zwei Spieler lösen nacheinander dieselben drei Rätsel; der Schnellere gewinnt.',
   practiceName: 'Üben',
   practiceText: 'Jedes Rätsel auf jeder Stufe, ohne Uhr und ohne Herzen.',
+  journeyName: 'Reise',
+  journeyText: 'Vierzig feste Rätsel in fünf Tempeln. Sammle Sterne, um den nächsten zu öffnen.',
+  weeklyName: 'Wochenliga',
+  weeklyText: 'Eine Kartenwahl für alle, die ganze Woche. Spiel sie so oft du willst.',
+  weeklyNew: 'Neu diese Woche',
+  weeklyBest: 'Diese Woche: {n} · {rank}',
+  weeklyRank: 'Rang: {rank}',
+  weeklyNext: 'nächster ab {n}',
+  novice: 'Novize',
+  adept: 'Adept',
+  mystic: 'Mystiker',
+  oracle: 'Orakel',
+  seer: 'Seher',
+  journeyTitle: 'Die Reise des Orakels',
+  temple0: 'Morgentempel',
+  temple1: 'Gezeitentempel',
+  temple2: 'Gluttempel',
+  temple3: 'Schleiertempel',
+  temple4: 'Sternentempel',
+  starsOf: '{n} von {of} ★',
+  templeLocked: 'Öffnet mit {n} ★ im {name}',
+  journeyRule: 'Jeder Schritt ist für alle dasselbe Rätsel. Löse es mit halber Zeit übrig für drei Sterne; ein bezahlter Tipp kostet einen. {n} Sterne in einem Tempel öffnen den nächsten.',
+  journeyLine: 'Tempel {temple} · Schritt {n} von {of}',
+  starsRule: 'Drei Sterne mit halber Zeit übrig, zwei mit einem Viertel. Jeder bezahlte Tipp kostet einen Stern.',
+  stepCleared: 'Schritt geschafft',
+  stepFailed: 'Diesmal nicht',
+  newStars: 'Mehr Sterne als zuvor!',
+  nextStep: 'Nächster Schritt',
+  map: 'Karte',
 
   bestScore: 'Bestwert {n}',
   bestSolved: 'Bestwert: {n} gelöst',
@@ -45,6 +74,10 @@ const de: Translation<typeof en> = {
   flipRule: 'Ein Tippen dreht ein Feld und seine vier Nachbarn um. Lösche alle Lichter.',
   linkName: 'Pfadfinder',
   linkRule: 'Ziehe, um jedes Paar gleicher Sterne zu verbinden. Die Pfade müssen jedes Feld füllen.',
+  slideName: 'Sternschieber',
+  slideRule: 'Tippe ein Feld neben der Lücke, um es zu schieben. Ordne die Felder, die Lücke zuletzt.',
+  seriesName: 'Sternreihen',
+  seriesRule: 'Jede Zahlenreihe folgt einer Regel. Wähle die Zahl, die als Nächstes kommt.',
   echoName: 'Gedächtnisecho',
   echoRule: 'Karten erscheinen nacheinander. Sag, ob jede der Karte einige Schritte zuvor gleicht.',
 
@@ -136,6 +169,10 @@ const de: Translation<typeof en> = {
   mirrorText: 'Lichterwende: je ein Gratis-Tipp und anderthalbfache Punkte.',
   spoolName: 'Silberspule',
   spoolText: 'Pfadfinder: je ein Gratis-Tipp und anderthalbfache Punkte.',
+  compassName: 'Messingkompass',
+  compassText: 'Sternschieber: je ein Gratis-Tipp und anderthalbfache Punkte.',
+  sextantName: 'Sextant',
+  sextantText: 'Sternreihen: je ein Gratis-Tipp und anderthalbfache Punkte.',
   shellName: 'Echomuschel',
   shellText: 'Gedächtnisecho: Karten wechseln langsamer, anderthalbfache Punkte.',
 
@@ -177,8 +214,11 @@ const de: Translation<typeof en> = {
   echoDiff: 'Anders',
   echoSaidSame: 'Deine Antwort: gleich',
   echoSaidDiff: 'Deine Antwort: anders',
+  slideHome: 'Felder am Platz',
+  slideMoves: 'Züge',
+  seriesWrong: { one: 'Noch {n} Fehlgriff frei', other: 'Noch {n} Fehlgriffe frei' },
 };
 
-export const keepEnglish: (keyof typeof en)[] = ['title', 'blitzName', 'level1', 'omenTaken', 'omenLine'];
+export const keepEnglish: (keyof typeof en)[] = ['title', 'blitzName', 'level1', 'omenTaken', 'omenLine', 'sextantName', 'adept'];
 
 export default de;

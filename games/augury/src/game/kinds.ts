@@ -8,6 +8,8 @@ import { calc } from './puzzles/calc';
 import { sums } from './puzzles/sums';
 import { echo } from './puzzles/echo';
 import { link } from './puzzles/link';
+import { slide } from './puzzles/slide';
+import { series } from './puzzles/series';
 
 /** The four levels a puzzle comes in, 0 the easiest. */
 export const LEVELS = [0, 1, 2, 3] as const;
@@ -38,7 +40,7 @@ export interface PuzzleDef<S = unknown> {
 }
 
 /** Every kind, in the order the practice screen lists them. */
-export const KINDS = ['nonogram', 'bridges', 'code', 'calc', 'sums', 'unjam', 'flip', 'link', 'echo'] as const;
+export const KINDS = ['nonogram', 'bridges', 'code', 'calc', 'sums', 'unjam', 'flip', 'link', 'slide', 'series', 'echo'] as const;
 export type KindId = (typeof KINDS)[number];
 
 /** The four skills the records sort the kinds into. */
@@ -54,7 +56,9 @@ export const SKILL_OF: Record<KindId, Skill> = {
   unjam: 'spatial',
   flip: 'spatial',
   link: 'spatial',
+  slide: 'spatial',
+  series: 'numbers',
   echo: 'memory',
 };
 
-export const DEFS: Record<KindId, PuzzleDef<any>> = { nonogram, code, unjam, bridges, flip, calc, sums, echo, link };
+export const DEFS: Record<KindId, PuzzleDef<any>> = { nonogram, code, unjam, bridges, flip, calc, sums, echo, link, slide, series };

@@ -30,14 +30,17 @@ export type Layout = {
   menu: {
     title: Point;
     tagline: Point & { w: number };
-    cards: { xs: number[]; ys: number[]; w: number; h: number };
+    /** Each card's lines by their offset from its centre: the numeral, icon, name, text and best. */
+    cards: { xs: number[]; ys: number[]; w: number; h: number; dy: { numeral: number; icon: number; name: number; text: number; best: number } };
     records: Rect;
     /** With a saved run: the Continue button, and the Records button beside it. */
     resume: Rect;
     recordsAside: Rect;
     line: Point;
   };
-  /** The practice picker: level buttons and the nine puzzle cards, by their centres. */
+  /** The journey map: a row per temple (its name at `label`, its steps from `x0`, `step` apart). */
+  journey: { title: Point; rows: number[]; label: { x: number; dy: number }; nodes: { x0: number; step: number; r: number; dy: number }; line: Point };
+  /** The practice picker: level buttons and the eleven puzzle cards, by their centres. */
   practice: {
     title: Point;
     levels: { xs: number[]; ys: number[]; w: number; h: number };
@@ -66,22 +69,29 @@ export const WIDE: Layout = {
   menu: {
     title: { x: 480, y: 64 },
     tagline: { x: 480, y: 108, w: 860 },
-    cards: { xs: [107, 256, 405, 554, 703, 852], ys: [290], w: 136, h: 236 },
-    records: { x: 480, y: 470, w: 180, h: 40 },
-    resume: { x: 365, y: 470, w: 270, h: 40 },
-    recordsAside: { x: 605, y: 470, w: 180, h: 40 },
-    line: { x: 480, y: 510 },
+    cards: { xs: [126, 362, 598, 834], ys: [218, 386], w: 222, h: 160, dy: { numeral: -64, icon: -32, name: 6, text: 36, best: 66 } },
+    records: { x: 480, y: 494, w: 180, h: 36 },
+    resume: { x: 365, y: 494, w: 270, h: 36 },
+    recordsAside: { x: 605, y: 494, w: 180, h: 36 },
+    line: { x: 480, y: 527 },
+  },
+  journey: {
+    title: { x: 480, y: 46 },
+    rows: [124, 206, 288, 370, 452],
+    label: { x: 40, dy: 0 },
+    nodes: { x0: 290, step: 88, r: 25, dy: -6 },
+    line: { x: 480, y: 516 },
   },
   practice: {
     title: { x: 480, y: 46 },
     levels: { xs: [264, 408, 552, 696], ys: [104], w: 132, h: 38 },
-    cards: { xs: [180, 480, 780], ys: [196, 318, 440], w: 284, h: 106 },
+    cards: { xs: [126, 362, 598, 834], ys: [190, 300, 410], w: 224, h: 100 },
   },
   records: {
     title: { x: 480, y: 46 },
     frame: { x: 36, y: 82, w: 888, h: 362 },
-    top: 104,
-    step: 34,
+    top: 102,
+    step: 28,
     cols: [60, 270, 400, 520, 620, 720, 820],
     skills: { x: 480, y: 466 },
     bests: { x: 480, y: 498, w: 880 },
@@ -104,22 +114,29 @@ export const TALL: Layout = {
   menu: {
     title: { x: 270, y: 96 },
     tagline: { x: 270, y: 150, w: 480 },
-    cards: { xs: [97, 270, 443], ys: [330, 584], w: 160, h: 236 },
-    records: { x: 270, y: 760, w: 200, h: 44 },
-    resume: { x: 190, y: 760, w: 270, h: 44 },
-    recordsAside: { x: 420, y: 760, w: 140, h: 44 },
-    line: { x: 270, y: 812 },
+    cards: { xs: [97, 270, 443], ys: [300, 486, 672], w: 164, h: 176, dy: { numeral: -70, icon: -38, name: 2, text: 36, best: 72 } },
+    records: { x: 270, y: 806, w: 200, h: 44 },
+    resume: { x: 190, y: 806, w: 270, h: 44 },
+    recordsAside: { x: 420, y: 806, w: 140, h: 44 },
+    line: { x: 270, y: 852 },
+  },
+  journey: {
+    title: { x: 270, y: 104 },
+    rows: [230, 362, 494, 626, 758],
+    label: { x: 30, dy: -50 },
+    nodes: { x0: 54, step: 62, r: 22, dy: 6 },
+    line: { x: 270, y: 862 },
   },
   practice: {
     title: { x: 300, y: 46 },
     levels: { xs: [140, 400], ys: [106, 152], w: 240, h: 38 },
-    cards: { xs: [140, 400], ys: [236, 348, 460, 572, 684], w: 250, h: 100 },
+    cards: { xs: [140, 400], ys: [230, 334, 438, 542, 646, 750], w: 250, h: 94 },
   },
   records: {
     title: { x: 300, y: 46 },
     frame: { x: 16, y: 92, w: 508, h: 470 },
     top: 118,
-    step: 46,
+    step: 38,
     cols: [30, -1, 196, 236, 296, 356, 416],
     skills: { x: 270, y: 600 },
     bests: { x: 270, y: 640, w: 480 },
