@@ -22,6 +22,10 @@ const de: Translation<typeof en> = {
   tempestCalled: 'Sturmbraut',
   merchantName: 'Handelsschiff',
   merchantCalled: 'Handelsschiff',
+  krakenName: 'Krake',
+  krakenCalled: 'Krake',
+  serpentName: 'Seeschlange',
+  serpentCalled: 'Seeschlange',
 
   // The player's ships: name and what she is like
   frigateName: 'Fregatte',
@@ -170,6 +174,15 @@ const de: Translation<typeof en> = {
   },
   flagshipSub: 'Das feindliche Flaggschiff ist gesichtet!',
   sailsSub: 'Feindliche Segel gesichtet!',
+  krakenSub: 'Unten regt sich etwas: ein Krake! Weiche den Armen aus, triff den Kopf',
+  serpentSub: 'Eine Seeschlange taucht auf! Weiche den Windungen aus, triff den Kopf',
+  nightSub: 'Die Nacht bricht an: Feinde zeigen sich nur durch Laternen und Mündungsfeuer',
+  raidersSub: {
+    one: 'Ein Plünderer jagt deine Ladung!',
+    other: '{n} Plünderer jagen deine Ladung!',
+  },
+  crewHold: 'Crew {crew}/{max}   Laderaum {hold}',
+  flareButton: 'Leuchtkugel (F)   noch {n}',
   bountyStanding: 'steht noch',
   bountyLost: 'verfehlt',
   bountyDone: 'erfüllt',
@@ -191,6 +204,17 @@ const de: Translation<typeof en> = {
   convoySafe: 'Geleit erreicht {island}: +{gold} Gold',
   convoyLost: 'Geleit verloren',
   wages: 'Heuer der Begleitschiffe: -{gold} Gold',
+  cargoSold: 'Ladung verkauft: +{gold} Gold',
+  krakenHung: 'Der Kopf des Kraken hängt an der Hafenmauer',
+  serpentHung: 'Der Kopf der Seeschlange hängt an der Hafenmauer',
+  beastWall: 'Hafenmauer: {kraken} Kraken, {serpent} Seeschlangen',
+  tradeRow: 'Handel   Laderaum {n}/{max}',
+  tradeDesc: 'Im nächsten Hafen teurer',
+  tradeGood: '{name} {gold}',
+  tradeSells: 'bringt {gold}',
+  rumName: 'Rum',
+  silkName: 'Seide',
+  spiceName: 'Gewürze',
   patchHull: 'Rumpf flicken',
   repairFull: 'Das Schiff ganz instand setzen',
   hullSound: 'Der Rumpf ist heil',
@@ -283,4 +307,4 @@ const de: Translation<typeof en> = {
 export default de;
 
 /** Texts that are the same in German. */
-export const keepEnglish: (keyof typeof en)[] = ['palmasIsland', 'morganIsland', 'windN', 'windS', 'windSW', 'windW', 'windNW', 'gold', 'crew', 'upgradeRank', 'loadSide', 'haskName'];
+export const keepEnglish: (keyof typeof en)[] = ['palmasIsland', 'morganIsland', 'windN', 'windS', 'windSW', 'windW', 'windNW', 'gold', 'crew', 'upgradeRank', 'loadSide', 'haskName', 'tradeGood', 'rumName'];

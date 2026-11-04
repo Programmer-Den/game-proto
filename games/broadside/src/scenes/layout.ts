@@ -19,8 +19,11 @@ export const HELM = { port: { x: 86, y: 420 }, starboard: { x: 874, y: 420 }, r:
 export const FIRE = { port: { x: 86, y: 286 }, starboard: { x: 874, y: 286 }, r: 44 };
 /** The captain's order card under the top bar, by its top-left corner. */
 export const ORDER_CARD = { x: 16, y: 50 };
-/** The harbor panel between waves, by its centre, with one row per thing to buy. */
-export const HARBOR = { x: 480, y: 272, w: 660, h: 510, rowW: 600, rowH: 34, firstRowY: 132, rowGap: 36, loadY: 440 };
+/**
+ * The harbor panel between waves, by its centre, with one row per thing to buy and, last, the
+ * trade row (`tradeLabelW` for its label, then one button per cargo).
+ */
+export const HARBOR = { x: 480, y: 272, w: 660, h: 510, rowW: 600, rowH: 31, firstRowY: 130, rowGap: 33, loadY: 446, tradeLabelW: 210 };
 /** The two sail buttons that replace "Set sail" when the harbor offers a choice of course, each `w` by `h`. */
 export const COURSE = { w: 292, h: 46, gap: 12 };
 /** The prize draft at the harbor: three (after a Hunter patrol four) cards side by side, centred, by the middle card's centre, each `w` by `h` and `gap` apart. */
@@ -35,6 +38,8 @@ export const BOUNTY = { x: 18, y: 128 };
 export const CONVOY = { x: 18, y: 146 };
 /** The button to scuttle a prize, under the bounty and the convoy, by its centre. */
 export const SCUTTLE = { x: 166, y: 184, w: 300, h: 36 };
+/** The flare button on night waves, at the foot of the screen in the middle, by its centre. */
+export const FLARE = { x: 480, y: 500, w: 210, h: 38 };
 export const BUTTON = { w: 200, h: 42 };
 /** The wave banner's title and the line under it, by their centres' heights. */
 export const BANNER = { title: 168, sub: 212 };
@@ -42,7 +47,7 @@ export const BANNER = { title: 168, sub: 212 };
 export const UI_DEPTH = 10_000;
 export const FONT = "Georgia, 'Times New Roman', Times, serif";
 
-const designed = structuredClone({ HELM, FIRE, HARBOR, DRAFT, OVER, WIND, BANNER });
+const designed = structuredClone({ HELM, FIRE, HARBOR, DRAFT, OVER, WIND, BANNER, FLARE });
 
 /**
  * Lays everything out for a view of `w` x `h` (`viewSize`, picked once when the game starts): the
@@ -62,6 +67,8 @@ export function fitLayout(w: number, h: number) {
     now.starboard.y = was.starboard.y + dy;
   }
   WIND.x = d.WIND.x + dx;
+  FLARE.x = d.FLARE.x + dx / 2;
+  FLARE.y = d.FLARE.y + dy;
   for (const [now, was] of [[HARBOR, d.HARBOR], [DRAFT, d.DRAFT], [OVER, d.OVER]] as const) {
     now.x = was.x + dx / 2;
     now.y = was.y + dy / 2;

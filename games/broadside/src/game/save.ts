@@ -1,5 +1,6 @@
-// The best wave reached, the Admiralty's medals, the ship last chosen, the captain's log and the
-// best Storm Reaches wave are kept; every run starts afresh at wave 1.
+// The best wave reached, the Admiralty's medals, the ship last chosen, the captain's log, the
+// best Storm Reaches wave and the harbor wall of sea beasts are kept; every run starts afresh at wave 1.
+import { BEAST_KINDS, emptyWall, type Wall } from './beasts';
 import { CAPTAIN_IDS, type CaptainId } from './captains';
 import { FIRST_HULL, HULLS, type HullId } from './hulls';
 
@@ -8,6 +9,7 @@ const MEDALS_KEY = 'broadside-medals';
 const HULL_KEY = 'broadside-ship';
 const LOG_KEY = 'broadside-log';
 const REACHES_KEY = 'broadside-reaches-best';
+const WALL_KEY = 'broadside-beasts';
 
 /** A stored count, or 0 for anything missing, hand-edited or broken. */
 function load(key: string) {
@@ -64,6 +66,30 @@ export function loadLog(): CaptainId[] {
 export function saveLog(log: CaptainId[]) {
   try {
     localStorage.setItem(LOG_KEY, JSON.stringify(log));
+  } catch {
+    // Unsaved, as above.
+  }
+}
+
+/** The harbor wall: how many of each sea beast were ever sunk. Anything missing or broken counts 0. */
+export function loadWall(): Wall {
+  const wall = emptyWall();
+  try {
+    const value: unknown = JSON.parse(localStorage.getItem(WALL_KEY) ?? '{}');
+    if (value && typeof value === 'object') {
+      for (const kind of BEAST_KINDS) {
+        const n = Number((value as Record<string, unknown>)[kind]);
+        wall[kind] = Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+      }
+    }
+  } catch {
+    // A broken record counts as an empty wall.
+  }
+  return wall;
+}
+export function saveWall(wall: Wall) {
+  try {
+    localStorage.setItem(WALL_KEY, JSON.stringify(wall));
   } catch {
     // Unsaved, as above.
   }

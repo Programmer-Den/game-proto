@@ -14,6 +14,8 @@ const en: HowToPlay = {
       action: 'Keep a perk, buy an upgrade, patch the hull, hire sailors or keep a prize as a consort',
     },
     { input: 'Tap Port or Starboard under the ledger', action: "Load that side's guns with the next kind of shot" },
+    { input: 'Tap Rum, Silk or Spice at the harbour', action: 'Buy a crate of cargo to sell dearer at the next port' },
+    { input: 'Tap Flare or F on a night wave', action: 'Light the whole sea for a few seconds (three flares a night)' },
     { input: 'Tap Set sail, or from wave 6 a course', action: 'Leave the harbour for the next wave: the Merchant lane or a Hunter patrol' },
     { input: 'Tap Daily voyage on the end card', action: "Sail today's voyage: the same ship, perks and sea for everyone, once a day" },
   ],
@@ -36,6 +38,9 @@ const en: HowToPlay = {
     'Medals from each run buy a head start for the next one on the "Sunk!" panel.',
     "Named captains sail from wave 4. One who runs for it comes back three waves later, sturdier and with a bounty: sink all five over any runs to fill the captain's log for the lasting Renown.",
     'In the Storm Reaches squalls swing the wind round (the wind rose shows the next one coming) and reefs tear 30 off a hull, so steer clear of the rocks.',
+    'Cargo sells for half again or more at the next port, but a full hold turns 30% slower and every two crates bring a raider hunting you.',
+    "From wave 9 a rare wave brings a sea serpent or a kraken: dodge the rings where its arms will rise, and fire when its head comes up beside you. Each one sunk hangs on the harbour wall.",
+    'Every fourth wave from wave 4 sails at night: you only see enemies by their lanterns and gun flashes, and your guns only train on what you can see, so fire a flare.',
   ],
 };
 
@@ -60,6 +65,8 @@ const de: HowToPlay = {
       action: 'Einen Vorteil behalten, eine Verbesserung kaufen, den Rumpf flicken, Seeleute anheuern oder eine Prise als Begleitschiff behalten',
     },
     { input: 'Backbord oder Steuerbord unter dem Hauptbuch tippen', action: 'Die Kanonen dieser Seite mit der nächsten Munition laden' },
+    { input: 'Im Hafen Rum, Seide oder Gewürze tippen', action: 'Eine Kiste Ladung kaufen, die im nächsten Hafen mehr einbringt' },
+    { input: 'In einer Nachtwelle Leuchtkugel oder F tippen', action: 'Die ganze See für ein paar Sekunden erhellen (drei Leuchtkugeln pro Nacht)' },
     { input: 'Segel setzen tippen, oder ab Welle 6 eine Route', action: 'Den Hafen zur nächsten Welle verlassen: die Handelsroute oder eine Jagdpatrouille' },
     { input: 'Auf der Endtafel Tagesfahrt tippen', action: 'Die heutige Fahrt segeln: dasselbe Schiff, dieselben Vorteile und dieselbe See für alle, einmal am Tag' },
   ],
@@ -82,6 +89,9 @@ const de: HowToPlay = {
     'Medaillen aus jedem Lauf kaufen auf der Tafel „Versenkt!“ einen Vorsprung für den nächsten.',
     'Ab Welle 4 segeln benannte Kapitäne. Wer flieht, kehrt drei Wellen später stärker und mit Kopfgeld zurück: versenke alle fünf, über beliebig viele Läufe, um das Logbuch zu füllen und dauerhaft Ruhm zu erlangen.',
     'In der Sturmsee drehen Böen den Wind (die Windrose zeigt die nächste schon an), und Riffe reißen 30 aus einem Rumpf, also halte dich von den Felsen fern.',
+    'Ladung bringt im nächsten Hafen die Hälfte mehr oder noch mehr ein, aber ein voller Laderaum wendet 30 % träger, und je zwei Kisten locken einen Plünderer an, der dich jagt.',
+    'Ab Welle 9 bringt eine seltene Welle eine Seeschlange oder einen Kraken: weiche den Ringen aus, wo seine Arme auftauchen, und feuere, wenn sein Kopf neben dir hochkommt. Jeder versenkte hängt an der Hafenmauer.',
+    'Jede vierte Welle ab Welle 4 segelt bei Nacht: Feinde siehst du nur an Laternen und Mündungsfeuer, und deine Kanonen zielen nur auf das, was du siehst, also schieß eine Leuchtkugel.',
   ],
 };
 

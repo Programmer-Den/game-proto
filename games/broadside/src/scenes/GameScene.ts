@@ -13,13 +13,16 @@ import { FIRST_HULL, HULL_IDS, HULLS, unlocked, type HullId } from '../game/hull
 import { ORDERS } from '../game/orders';
 import { PERKS, type PerkId } from '../game/perks';
 import { useRandom } from '../game/random';
-import { loadBestWave, loadHull, loadLog, loadMedals, loadReachesBest, saveBestWave, saveHull, saveLog, saveMedals, saveReachesBest } from '../game/save';
+import { loadBestWave, loadHull, loadLog, loadMedals, loadReachesBest, loadWall, saveBestWave, saveHull, saveLog, saveMedals, saveReachesBest, saveWall } from '../game/save';
+import { HEAD_MS, isBeast, TENTACLE_R } from '../game/beasts';
+import type { CargoId } from '../game/trade';
 import { DAILY_GAME, drawVoyage, voyageScore, wavesBeaten } from '../game/voyage';
 import { ENEMIES } from '../game/ships';
 import { SHOTS } from '../game/shot';
 import type { UpgradeId } from '../game/upgrades';
-import { boardable, boardMs, buy, canBoard, convoyShip, detourCourse, fortBounty, hire, keep, loadShot, pickPerk, repair, sailOn, scuttle, scuttleGold, setSail, SHELL_R, tick } from '../game/sim';
+import { afloat, boardable, boardMs, buy, canBoard, convoyShip, detourCourse, fireFlare, fortBounty, hire, keep, loadShot, pickPerk, repair, sailOn, scuttle, scuttleGold, seen as inSight, setSail, SHELL_R, tick, trade } from '../game/sim';
 import {
+  BREAK_MS,
   FORT,
   ISLANDS,
   loadedShot,
@@ -43,7 +46,7 @@ import { Harbor, type HarborAction } from '../ui/Harbor';
 import { fitWidth, pinToScreen } from '../ui/screen';
 import { checkTrophies } from '../trophies/check';
 import { SoundCues } from './soundCues';
-import { BANNER, BOUNTY, CONVOY, FIRE, FONT, HELM, HUD_HEIGHT, ORDER_CARD, OVER, SCUTTLE, UI_DEPTH, VIEW, WIND } from './layout';
+import { BANNER, BOUNTY, CONVOY, FIRE, FLARE, FONT, HELM, HUD_HEIGHT, ORDER_CARD, OVER, SCUTTLE, UI_DEPTH, VIEW, WIND } from './layout';
 
 /** Longest simulated step, so a backgrounded tab doesn't jump the battle forward. */
 const MAX_STEP_MS = 250;
@@ -61,6 +64,13 @@ const OCHRE = 0xc9902e;
 const WASH = 0xd6a03c;
 const RUST = 0x9a4a30;
 const GREEN = 0x3f6e48;
+const LANTERN = 0xf0c860;
+/** The dark of a night wave lies over the sea and the ships; a ship lit by her guns' flash, and the lights, go over it. */
+const NIGHT_DEPTH = 7.5;
+const LIT_DEPTH = 7.55;
+const GLOW_DEPTH = 7.8;
+/** A sea beast's head rises and sinks over this long at each end of its time up. */
+const RISE_MS = 300;
 
 const textStyle = (size: number, color = '#2b2118', fontStyle = 'normal', stroke?: string, strokeThickness = 0) => ({
   fontFamily: FONT,
@@ -160,7 +170,14 @@ export class GameScene extends Phaser.Scene {
   private boardLabel!: Phaser.GameObjects.Text;
   private scuttleButton!: Phaser.GameObjects.Container;
   private scuttleText!: Phaser.GameObjects.Text;
-  private keys!: Record<'left' | 'right' | 'a' | 'd' | 'q' | 'e', Phaser.Input.Keyboard.Key>;
+  private keys!: Record<'left' | 'right' | 'a' | 'd' | 'q' | 'e' | 'f', Phaser.Input.Keyboard.Key>;
+  /** A night wave's dark, the lanterns and flashes drawn over it, and the flare button (made on the first night, see `drawNight`). */
+  private night!: Phaser.GameObjects.Image;
+  private glow!: Phaser.GameObjects.Graphics;
+  private flareButton: Phaser.GameObjects.Container | null = null;
+  private flareText!: Phaser.GameObjects.Text;
+  /** How many sea beasts the saved harbor wall holds, so a new one is saved once. */
+  private savedWall = 0;
   /** Which control each pointer (finger or mouse) is holding down. */
   private held = new Map<number, Control>();
   /** A fire control pressed since the last frame, so even a tap shorter than a frame fires. */
@@ -184,6 +201,7 @@ export class GameScene extends Phaser.Scene {
     this.controlHits = [];
     this.lastFrame = null;
     this.dailyButton = null;
+    this.flareButton = null;
     this.commission = [];
     this.boonRows = [];
     this.shipRows = [];
@@ -197,9 +215,10 @@ export class GameScene extends Phaser.Scene {
     const voyage = rand ? drawVoyage(rand) : null;
     useRandom(rand);
     this.daily = loadDaily(DAILY_GAME);
-    const extras = { log: loadLog(), reachesBest: loadReachesBest(), daily: voyage ? { perks: voyage.perks } : undefined };
+    const extras = { log: loadLog(), reachesBest: loadReachesBest(), wall: loadWall(), daily: voyage ? { perks: voyage.perks } : undefined };
     this.state = newRun(best, voyage ? [] : (data?.boons ?? []), voyage?.hull ?? own, extras);
     this.savedLog = this.state.log.length;
+    this.savedWall = this.state.wall.kraken + this.state.wall.serpent;
     this.view = { x: this.state.player.x, y: this.state.player.y };
     this.lastPlayer = { ...this.view };
     this.cues = new SoundCues(this.state);
@@ -220,6 +239,8 @@ export class GameScene extends Phaser.Scene {
     this.convoyLabel = this.add.text(0, 0, '', textStyle(12, '#2f5a3a', 'bold italic', '#f6ecd2', 4)).setOrigin(0.5).setDepth(8);
     this.bars = this.add.graphics().setDepth(UI_DEPTH - 40);
     this.rain = this.add.graphics().setScrollFactor(0).setDepth(UI_DEPTH - 35);
+    this.night = this.add.image(0, 0, 'night').setOrigin(0).setScale(1 / SHEET_RES).setScrollFactor(0).setDepth(NIGHT_DEPTH).setVisible(false);
+    this.glow = this.add.graphics().setDepth(GLOW_DEPTH);
     this.add.image(0, 0, 'frame').setOrigin(0).setScale(1 / SHEET_RES).setScrollFactor(0).setDepth(UI_DEPTH - 30);
 
     this.createHud();
@@ -237,7 +258,9 @@ export class GameScene extends Phaser.Scene {
       d: kb.addKey(K.D),
       q: kb.addKey(K.Q),
       e: kb.addKey(K.E),
+      f: kb.addKey(K.F),
     };
+    this.keys.f.on('down', () => this.flare());
   }
 
   update(time: number) {
@@ -256,6 +279,11 @@ export class GameScene extends Phaser.Scene {
     if (s.log.length > this.savedLog) {
       saveLog(s.log);
       this.savedLog = s.log.length;
+    }
+    // So does a sea beast sunk, on the harbor wall.
+    if (s.wall.kraken + s.wall.serpent > this.savedWall) {
+      saveWall(s.wall);
+      this.savedWall = s.wall.kraken + s.wall.serpent;
     }
     // The daily voyage keeps no best wave and earns no medals: it keeps its score instead.
     if (s.phase !== phase && (s.phase === 'harbor' || s.phase === 'over' || s.phase === 'won') && !s.daily) {
@@ -281,6 +309,7 @@ export class GameScene extends Phaser.Scene {
     this.drawEffects();
     this.drawArcs();
     this.drawRain();
+    this.drawNight();
     this.drawHud();
     this.drawControls();
     this.drawScuttle();
@@ -341,7 +370,10 @@ export class GameScene extends Phaser.Scene {
     else if (id.startsWith('sail-')) done = setSail(s, id.slice('sail-'.length) as CourseId);
     else if (id === 'load-port' || id === 'load-starboard') done = loadShot(s, id === 'load-port' ? 'port' : 'starboard');
     else if (id.startsWith('draft-')) done = pickPerk(s, id.slice('draft-'.length) as PerkId);
-    else {
+    else if (id.startsWith('trade-')) {
+      spent = true;
+      done = trade(s, id.slice('trade-'.length) as CargoId);
+    } else {
       spent = true;
       if (id === 'keep') done = keep(s);
       else if (id === 'repair') done = repair(s);
@@ -366,11 +398,21 @@ export class GameScene extends Phaser.Scene {
       const roll = settings.reduceMotion ? 0 : Math.sin(this.clock / 420 + ship.id) * 0.03;
       const at = this.place(ship);
       sprite.setPosition(at.x, at.y).setRotation(ship.heading + roll);
+      // A sea beast shows only while its head is up, rising out of the water and sinking back.
+      if (isBeast(ship.kind)) {
+        const up = afloat(ship);
+        const rise = up ? Math.min(1, (HEAD_MS - ship.surfaceMs) / RISE_MS, ship.surfaceMs / RISE_MS) : 0;
+        sprite.setVisible(up).setAlpha(rise).setScale((0.75 + 0.25 * rise) / HI);
+        if (!up) continue;
+      }
+      // At night a ship lit by the flash of her own guns shows over the dark.
+      sprite.setDepth(s.night && ship.flashMs > 0 && ship.kind !== 'player' ? LIT_DEPTH : 4);
       // Reduce motion holds the hull still rather than flashing it on a hit.
       if (ship.hitMs > 0 && !settings.reduceMotion) sprite.setTint(0xffc090).setTintMode(Phaser.TintModes.MULTIPLY);
       else sprite.clearTint();
       const escort = s.escorts.includes(ship);
-      if (ship.kind !== 'player') this.drawHpBar(ship, escort);
+      // An enemy out of sight in the dark shows no hull bar.
+      if (ship.kind !== 'player' && (escort || inSight(s, ship))) this.drawHpBar(ship, escort);
       if (ship.slowMs > 0) this.drawSlowed(ship);
       if (ship.jamMs > 0) this.drawJammed(ship);
       if (escort) this.drawPrize(ship);
@@ -420,7 +462,7 @@ export class GameScene extends Phaser.Scene {
   /** An enemy's hull, as a little scale bar over it once it has been hit. */
   private drawHpBar(ship: Ship, escort: boolean) {
     // A prize's bar is always shown, in green; the flagships' too (the admiral's included), so they read as the big ones.
-    if (ship.hp >= ship.maxHp && !escort && ship.kind !== 'flagship' && ship.kind !== 'admiral' && ship.kind !== 'tempest' && !ship.captain) return;
+    if (ship.hp >= ship.maxHp && !escort && ship.kind !== 'flagship' && ship.kind !== 'admiral' && ship.kind !== 'tempest' && !isBeast(ship.kind) && !ship.captain) return;
     const at = this.place(ship);
     const x = Math.round(at.x - HP_BAR_W / 2);
     const y = Math.round(at.y - lookOf(ship, this.state.hull).length / 2 - 14);
@@ -519,7 +561,7 @@ export class GameScene extends Phaser.Scene {
       const text = e.escapeMs > 0 ? t('captainFlees', { name }) : gold ? t('captainWanted', { name, gold }) : name;
       const at = this.place(e);
       // Under the hull, clear of the hull bar and the boarding label over it.
-      label.setText(text).setPosition(at.x, at.y + lookOf(e, s.hull).length / 2 + 14);
+      label.setText(text).setPosition(at.x, at.y + lookOf(e, s.hull).length / 2 + 14).setVisible(inSight(s, e));
     }
     for (const [id, label] of this.captainLabels) {
       if (seen.has(id)) continue;
@@ -607,6 +649,8 @@ export class GameScene extends Phaser.Scene {
     if (sailing && this.clock - this.lastWake >= WAKE_EVERY_MS) {
       this.lastWake = this.clock;
       for (const ship of [s.player, ...s.enemies, ...s.escorts]) {
+        // A sea beast's head leaves no wake.
+        if (isBeast(ship.kind)) continue;
         const look = lookOf(ship, s.hull);
         const back = look.length * 0.45;
         this.wakes.push({
@@ -692,6 +736,22 @@ export class GameScene extends Phaser.Scene {
    */
   private drawShells() {
     const g = this.course;
+    // A sea beast's tentacle about to rise: dark water swirling in rings that close on the spot.
+    for (const arm of this.state.tentacles) {
+      const at = this.place(arm);
+      const t = 1 - arm.ms / arm.total;
+      g.fillStyle(0x1e3c3a, 0.1 + 0.25 * t).fillCircle(at.x, at.y, TENTACLE_R);
+      g.lineStyle(1.4, 0x1e3c3a, 0.85);
+      for (let k = 0; k < 3; k++) {
+        const r = TENTACLE_R * (1 - ((t + k / 3) % 1) * 0.8);
+        g.strokeEllipse(at.x, at.y, r * 2, r * 1.4);
+      }
+      g.lineStyle(1.6, RUST, 0.9);
+      for (let k = 0; k < 14; k++) {
+        const a = (k / 14) * Math.PI * 2;
+        g.beginPath().arc(at.x, at.y, TENTACLE_R, a, a + 0.24).strokePath();
+      }
+    }
     for (const shell of this.state.shells) {
       const at = this.place(shell);
       const t = 1 - shell.ms / shell.total;
@@ -833,6 +893,21 @@ export class GameScene extends Phaser.Scene {
         g.lineStyle(1, INK, 0.6 * (1 - age));
         g.strokeEllipse(e.x, e.y, 20 + age * 60, 10 + age * 30);
         g.strokeEllipse(e.x, e.y, 10 + age * 36, 5 + age * 18);
+      } else if (e.kind === 'tentacle') {
+        // An arm rising out of the sea and slapping down again, ringed with suckers.
+        const height = Math.sin(age * Math.PI);
+        const skin = e.ship === 'serpent' ? 0x5f8a6a : 0xa8604c;
+        const sway = settings.reduceMotion ? 0 : age * 2;
+        for (let k = 0; k <= 12; k++) {
+          const u = k / 12;
+          const x = e.x + Math.sin(u * 3 + sway) * 10 * u;
+          const y = e.y - u * 50 * height;
+          const r = (1 - u) * 7 + 1.5;
+          g.fillStyle(skin, 1).fillCircle(x, y, r);
+          g.lineStyle(1, INK, 0.9).strokeCircle(x, y, r);
+          if (k % 3 === 1) g.fillStyle(CREAM, 1).fillCircle(x - r * 0.4, y, 1.2);
+        }
+        g.lineStyle(1, INK, 0.6 * (1 - age)).strokeEllipse(e.x, e.y + 2, 30 + age * 20, 10 + age * 6);
       } else if (e.kind === 'coins' || e.kind === 'prize' || e.kind === 'escape') {
         floaters.add(e.id);
         let text = this.floaters.get(e.id);
@@ -945,6 +1020,85 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * A night wave: the dark over the sea (falling during the wave's banner, lifted while a flare
+   * burns), and over it each enemy's stern lantern, the flash of guns going off, a glint on each
+   * barrel of loot and the flare itself, hanging over where it was fired. The flare button shows
+   * how many are left. Firing arcs are drawn over the dark too, so the player can still aim.
+   */
+  private drawNight() {
+    const s = this.state;
+    const g = this.glow;
+    g.clear();
+    const sailing = s.phase === 'break' || s.phase === 'fighting';
+    const dark = sailing && s.night;
+    this.night.setVisible(dark);
+    this.arcs.setDepth(dark ? LIT_DEPTH + 0.01 : 2);
+    this.labels.setDepth(dark ? LIT_DEPTH + 0.02 : 7);
+    if (dark && !this.flareButton) this.createFlareButton();
+    this.flareButton?.setVisible(dark);
+    if (!dark) return;
+    this.flareText.setText(t('flareButton', { n: s.flares }));
+    this.flareButton!.setAlpha(s.flares > 0 ? 1 : 0.5);
+    // Dusk falls over the banner; a flare lifts the dark, which comes back over its last second.
+    const dusk = s.phase === 'break' ? 1 - s.breakMs / BREAK_MS : 1;
+    const flare = s.flareMs > 0 ? Math.max(0, 1 - s.flareMs / 1000) : 1;
+    this.night.setAlpha(Phaser.Math.Clamp(Math.min(dusk, 0.12 + 0.88 * flare), 0, 1));
+    for (const e of s.enemies) {
+      const look = lookOf(e, s.hull);
+      const at = this.place(e);
+      const lx = at.x - Math.cos(e.heading) * look.length * 0.45;
+      const ly = at.y - Math.sin(e.heading) * look.length * 0.45;
+      const flicker = settings.reduceMotion ? 1 : 0.85 + 0.15 * Math.sin(this.clock / 90 + e.id);
+      g.fillStyle(LANTERN, 0.3 * flicker).fillCircle(lx, ly, 14);
+      g.fillStyle(LANTERN, 0.5 * flicker).fillCircle(lx, ly, 6);
+      g.fillStyle(0xfff4c8, 1).fillCircle(lx, ly, 2.6);
+    }
+    for (const fx of s.effects) {
+      const at = this.place(fx);
+      const age = 1 - fx.ms / fx.total;
+      if (fx.kind === 'smoke' && age < 0.4) {
+        // A gun's flash, bright and brief.
+        const a = 1 - age / 0.4;
+        g.fillStyle(0xf8d878, 0.35 * a).fillCircle(at.x, at.y, 16);
+        g.fillStyle(0xfff4c8, 0.9 * a).fillCircle(at.x, at.y, 5);
+      } else if (fx.kind === 'flare') {
+        // The flare hangs high over the ship, swaying down on its little chute.
+        const drop = age * 40;
+        const fx2 = this.view.x + (settings.reduceMotion ? 0 : Math.sin(this.clock / 400) * 6);
+        const fy = this.view.y - 130 + drop;
+        const fade = Math.min(1, fx.ms / 1000);
+        g.lineStyle(0.8, INK, 0.6 * fade).lineBetween(fx2, fy - 6, fx2 - 7, fy - 16).lineBetween(fx2, fy - 6, fx2 + 7, fy - 16);
+        g.fillStyle(LANTERN, 0.3 * fade).fillCircle(fx2, fy, 26);
+        g.fillStyle(0xe07828, 0.9 * fade).fillCircle(fx2, fy, 7);
+        g.fillStyle(0xfff4c8, fade).fillCircle(fx2, fy, 4);
+        g.lineStyle(1.4, 0xe07828, 0.9 * fade);
+        for (let k = 0; k < 8; k++) {
+          const a = (k / 8) * Math.PI * 2;
+          g.lineBetween(fx2 + Math.cos(a) * 8, fy + Math.sin(a) * 8, fx2 + Math.cos(a) * 14, fy + Math.sin(a) * 14);
+        }
+      }
+    }
+    for (const l of s.loot) {
+      const at = this.place(l);
+      g.fillStyle(LANTERN, 0.8).fillCircle(at.x, at.y - 3, 1.8);
+    }
+  }
+
+  /** The flare button at the foot of the screen, made the first night (a text made at the start would change the first wave). */
+  private createFlareButton() {
+    const b = makeButton(this, FLARE.x, FLARE.y, '', () => this.flare(), FLARE.w, FLARE.h);
+    this.flareText = b.text.setFontSize(16);
+    this.flareButton = pinToScreen(b.button).setDepth(UI_DEPTH - 5);
+  }
+
+  /** Fires a flare (the button or F): the burst sounds through its effect, the buzz when none is left. */
+  private flare() {
+    const s = this.state;
+    if (!s.night || (s.phase !== 'fighting' && s.phase !== 'break')) return;
+    if (!fireFlare(s)) ui('refuse');
+  }
+
   private createHud() {
     this.add.image(0, 0, 'hud-bar').setOrigin(0).setScale(1 / HI).setScrollFactor(0).setDepth(UI_DEPTH);
     this.hud = this.add.graphics().setDepth(UI_DEPTH + 1).setScrollFactor(0);
@@ -1024,7 +1178,8 @@ export class GameScene extends Phaser.Scene {
     }
     this.goldText.setText(t('gold', { gold: s.gold }));
     const short = s.player.crew < s.player.maxCrew;
-    this.crewText.setText(t('crew', { crew: s.player.crew, max: s.player.maxCrew })).setColor(short ? '#9a4a30' : '#2b2118');
+    const crew = { crew: s.player.crew, max: s.player.maxCrew, hold: s.hold.length };
+    this.crewText.setText(t(s.hold.length ? 'crewHold' : 'crew', crew)).setColor(short ? '#9a4a30' : '#2b2118');
     const left = s.toSpawn.length + s.enemies.length;
     this.infoText.setText(s.daily ? t('infoDaily', { left, sunk: s.sunk, score: voyageScore(s) }) : t('info', { left, sunk: s.sunk, best: s.bestWave }));
 
@@ -1041,6 +1196,7 @@ export class GameScene extends Phaser.Scene {
     this.bannerTitle.setVisible(breaking).setText(title).setAlpha(fade);
     const flagship = s.toSpawn.includes('flagship') || s.enemies.some((e) => e.kind === 'flagship');
     const named = s.named[0];
+    const beast = [...s.toSpawn, ...s.enemies.map((e) => e.kind)].find((kind) => isBeast(kind));
     const escapes = named ? s.captains[named].escapes : 0;
     const sub =
       s.wave === HAVEN_WAVE ? t('havenSub')
@@ -1048,6 +1204,9 @@ export class GameScene extends Phaser.Scene {
       : s.daily && s.wave === 1 ? t('dailySub', { ship: t(HULLS[s.hull].name), perks: s.perks.map((id) => t(PERKS[id].name)).join(', ') })
       : reaches && reachWave(s.wave) === 1 ? t('reachesSub')
       : named ? (escapes ? t('captainBackSub', { name: t(CAPTAINS[named].name), gold: captainBounty(escapes) }) : t('captainSub', { name: t(CAPTAINS[named].name) }))
+      : beast ? t(beast === 'kraken' ? 'krakenSub' : 'serpentSub')
+      : s.raiders ? t('raidersSub', { n: s.raiders })
+      : s.night ? t('nightSub')
       : s.convoy ? t('convoySub', { island: t(ISLANDS[s.convoy.island].name), gold: s.convoy.cargo })
       : s.forts.length ? t('fortsSub', { n: s.forts.length, gold: fortBounty(s.wave) })
       : t(flagship ? 'flagshipSub' : 'sailsSub');
@@ -1151,7 +1310,8 @@ export class GameScene extends Phaser.Scene {
       g.fillStyle(color, 0.95).fillPoints(pts as Phaser.Math.Vector2[], true);
       g.lineStyle(1, INK, 1).strokePoints(pts as Phaser.Math.Vector2[], true);
     };
-    for (const e of this.state.enemies) mark(e, RUST);
+    // Never to a sea beast under the sea, nor at night to a ship out of sight.
+    for (const e of this.state.enemies) if (afloat(e) && inSight(this.state, e)) mark(e, RUST);
     for (const f of this.state.forts) mark(f, RUST);
     for (const e of this.state.escorts) mark(e, GREEN);
     if (this.state.convoy?.state === 'sailing') mark(ISLANDS[this.state.convoy.island], GREEN);
