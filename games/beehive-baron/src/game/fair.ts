@@ -6,12 +6,19 @@
 
 import { KINDS, type Kind } from './honey';
 
-/** What can be entered: a jar of each kind, then a cask of mead, then a jar from a cell filled this season. */
-export type FairClass = Kind | 'mead' | 'fresh';
-export const FAIR_CLASSES: FairClass[] = [...KINDS, 'mead', 'fresh'];
+/**
+ * What can be entered: a jar of each kind, then a cask of mead, then a jar from a cell filled this
+ * season, and a jar of rare honey from the garden while it has a rare bloom.
+ */
+export type FairClass = Kind | 'mead' | 'fresh' | 'rare';
+const LADDER: FairClass[] = [...KINDS, 'mead', 'fresh'];
+export const FAIR_CLASSES: FairClass[] = [...LADDER, 'rare'];
 
-/** The classes a fair judges, by how many fairs were held before it: mead joins at the second, fresh honey at the third. */
-export const classesFor = (fairs: number): FairClass[] => FAIR_CLASSES.slice(0, Math.min(FAIR_CLASSES.length, KINDS.length + fairs));
+/**
+ * The classes a fair judges, by how many fairs were held before it: mead joins at the second, fresh
+ * honey at the third, and rare honey whenever the garden has a rare bloom (`rare`).
+ */
+export const classesFor = (fairs: number, rare = false): FairClass[] => [...LADDER.slice(0, Math.min(LADDER.length, KINDS.length + fairs)), ...(rare ? (['rare'] as const) : [])];
 
 /** Points in all that win gold at the first fair, how many more each fair after it needs, and the most it ever needs. */
 export const FAIR_GOLD = 14;
@@ -26,4 +33,4 @@ export const MEAD_POINTS: Record<Kind, number> = { clover: 4, lavender: 5, heath
 
 /** The best entry of each class at this year's fair, as its points, or null while none is entered. */
 export type FairEntries = Record<FairClass, number | null>;
-export const noEntries = (): FairEntries => ({ clover: null, lavender: null, heather: null, mead: null, fresh: null });
+export const noEntries = (): FairEntries => ({ clover: null, lavender: null, heather: null, mead: null, fresh: null, rare: null });

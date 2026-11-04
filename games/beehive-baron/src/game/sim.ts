@@ -3,7 +3,10 @@ import { BOOK_FROM, CITIES, GRADES, GRADE_COUNT, GRADE_MULT, SWING, type Ask } f
 import { BREED_MAX, FAR_TRIP, HARDY_BEES, TRAITS, type Trait } from './breeds';
 import { ESTATE_HIVES, ORCHARD_WINTER_APPETITE, PLOT_BEES, RIVERSIDE_WINTER_APPETITE, plotOf } from './estate';
 import { CONTRACTS_FROM, CONTRACT_BEES, CONTRACT_COINS_PER_BEE, CONTRACT_GAP_MS, CONTRACT_MS, OFFER_MS } from './contracts';
-import { MEAD_POINTS, classesFor, fairGold, noEntries, type FairClass } from './fair';
+import { MEAD_POINTS, fairGold, noEntries, type FairClass } from './fair';
+import { BEDS, BED_PRICE, GARDEN_GOLDS, GARDEN_MS, RARES, RARE_CAP, RARE_KINDS, rarePairs, type Bloom } from './garden';
+import { WARE, WARES, WINTER_CANDLES, WORKSHOP_FROM, type Ware } from './workshop';
+import { WARRANT_GOLDS, royalAsk } from './warrant';
 import { HONEY, KINDS, type Kind } from './honey';
 import { REST_RATE, TIRE_MS, rested, unwilted } from './tired';
 import { CASK_JARS, CASK_MS, MAX_CASKS, MEAD_MULT } from './mead';
@@ -26,6 +29,7 @@ import {
   crowded,
   demand,
   emptyCell,
+  fairClasses,
   fairOn,
   fairTotal,
   fairWon,
@@ -42,6 +46,8 @@ import {
   openKinds,
   openLeft,
   fairScore,
+  rareCount,
+  rarePrice,
   ripenTime,
   room,
   season,
@@ -98,6 +104,9 @@ export function tick(s: GameState, dt: number) {
   swarm(s, dt);
   // The buyer's book opens once `BOOK_FROM` jars are sold (a new season writes it again).
   if (s.sold >= BOOK_FROM && s.book.length === 0) newBook(s);
+  // So do the church's and the manor's commissions, once the workshop opens.
+  if (s.sold >= WORKSHOP_FROM && s.commissions.length === 0) newCommissions(s);
+  garden(s, dt);
   if (s.ranks.dance > 0) dance(s);
 }
 
@@ -123,6 +132,8 @@ function turn(s: GameState, dt: number) {
     s.wilted = unwilted();
     // The towns write new asks into the buyer's book, at the new season's prices.
     if (s.sold >= BOOK_FROM) newBook(s);
+    if (s.sold >= WORKSHOP_FROM) newCommissions(s);
+    royal(s, now);
   }
   if (!fair && fairOn(s)) s.events.push({ kind: 'fair-open' });
   if (fair && !fairOn(s)) closeFair(s);
@@ -313,13 +324,15 @@ export function harvest(s: GameState, slot: number) {
 export function sell(s: GameState) {
   const fair = fairOn(s);
   const mead = meadReady(s);
-  const jars = jarCount(s) + mead.length * CASK_JARS;
+  const jars = jarCount(s) + rareCount(s) + mead.length * CASK_JARS;
   if (jars === 0) return false;
   // A meadow this sale unlocks opens a kind, which can start or move the demand between two ticks.
   const wanted = demand(s);
   let coins = 0;
   for (const k of Object.keys(s.jars) as Kind[]) coins += s.jars[k] * jarPrice(s, k);
+  for (const r of RARE_KINDS) coins += s.rare[r] * rarePrice(s, r);
   for (const c of mead) coins += c.value;
+  for (const r of RARE_KINDS) s.rare[r] = 0;
   s.casks = s.casks.filter((c) => c.agingMs > 0);
   s.events.push({ kind: 'sold', jars, coins });
   s.coins += coins;
@@ -566,7 +579,7 @@ export function enterFair(s: GameState, slot: number) {
   const c = s.cells[slot];
   if (!fairOn(s) || fairWon(s) || !isHoney(c) || c.phase !== 'capped') return false;
   const honey = c.kind ?? 'clover';
-  const fresh = classesFor(s.fairs).includes('fresh') && c.since === seasonNo(s);
+  const fresh = fairClasses(s).includes('fresh') && c.since === seasonNo(s);
   const score = fairScore(s, slot);
   s.wax++;
   s.cells[slot] = emptyCell();
@@ -577,7 +590,7 @@ export function enterFair(s: GameState, slot: number) {
 /** Enters a cask of ready mead in the fair (from the second fair on): it scores `MEAD_POINTS` for its honey. */
 export function enterMead(s: GameState, i: number) {
   const c = s.casks[i];
-  if (!fairOn(s) || fairWon(s) || !classesFor(s.fairs).includes('mead') || !c || c.agingMs > 0) return false;
+  if (!fairOn(s) || fairWon(s) || !fairClasses(s).includes('mead') || !c || c.agingMs > 0) return false;
   s.casks.splice(i, 1);
   enter(s, ['mead'], MEAD_POINTS[c.kind]);
   return true;
@@ -692,4 +705,107 @@ function newBook(s: GameState) {
     return { city, grade, kind, count, price: Math.round(basePrice(s, kind) * GRADE_MULT[grade] * swing), done: false };
   });
   s.events.push({ kind: 'book' });
+}
+
+/**
+ * The garden's rare pairs of beds each give a jar of their rare honey every `GARDEN_MS`, while the
+ * garden keeps fewer than `RARE_CAP`; nothing grows in winter.
+ */
+function garden(s: GameState, dt: number) {
+  const pairs = rarePairs(s.garden);
+  if (pairs.length === 0 || isWinter(s)) return;
+  s.gardenMs += dt;
+  if (s.gardenMs < GARDEN_MS) return;
+  s.gardenMs -= GARDEN_MS;
+  let jars = 0;
+  for (const p of pairs) {
+    if (rareCount(s) >= RARE_CAP) break;
+    s.rare[p.rare]++;
+    jars++;
+  }
+  if (jars > 0) s.events.push({ kind: 'bloomed', jars });
+}
+
+/** Plants a flower in a garden bed (or replants it with another), once the garden is open, for `BED_PRICE`. */
+export function plant(s: GameState, bed: number, bloom: Bloom) {
+  if (s.golds < GARDEN_GOLDS || bed < 0 || bed >= BEDS || s.garden[bed] === bloom || s.coins < BED_PRICE) return false;
+  s.coins -= BED_PRICE;
+  s.garden[bed] = bloom;
+  s.events.push({ kind: 'planted', bed, bloom });
+  return true;
+}
+
+/** Enters the best jar of rare honey kept in this year's fair's rare class (open while the garden has a rare bloom). */
+export function enterRare(s: GameState) {
+  if (!fairOn(s) || fairWon(s) || !fairClasses(s).includes('rare')) return false;
+  const best = [...RARE_KINDS].sort((a, b) => RARES[b].points - RARES[a].points).find((r) => s.rare[r] > 0);
+  if (!best) return false;
+  s.rare[best]--;
+  enter(s, ['rare'], RARES[best].points);
+  return true;
+}
+
+/** Makes a candle or a tin of polish in the workshop from its wax. */
+export function make(s: GameState, ware: Ware) {
+  if (s.sold < WORKSHOP_FROM || s.wax < WARE[ware].wax) return false;
+  s.wax -= WARE[ware].wax;
+  s.wares[ware]++;
+  s.events.push({ kind: 'made', ware });
+  return true;
+}
+
+/** Fills a commission from the church or the manor with goods made, for its price each (not counted as jars sold). */
+export function fulfil(s: GameState, i: number) {
+  const c = s.commissions[i];
+  if (!c || c.done || s.wares[c.ware] < c.count) return false;
+  s.wares[c.ware] -= c.count;
+  c.done = true;
+  const coins = c.count * c.price;
+  s.coins += coins;
+  s.events.push({ kind: 'fulfilled', ware: c.ware, coins });
+  return true;
+}
+
+/**
+ * The season's commissions: the church for candles and the manor for polish, priced from what a
+ * clover jar is worth before the market and swung by the season; candles fetch more in winter.
+ */
+function newCommissions(s: GameState) {
+  s.commissions = WARES.map((ware) => {
+    const [least, most] = WARE[ware].count;
+    const count = least + Math.floor(Math.random() * (most - least + 1));
+    const swing = SWING[0] + Math.random() * (SWING[1] - SWING[0]);
+    const winter = ware === 'candle' && isWinter(s) ? WINTER_CANDLES : 1;
+    return { ware, count, price: Math.round(basePrice(s, 'clover') * WARE[ware].mult * swing * winter), done: false };
+  });
+  s.events.push({ kind: 'commissions' });
+}
+
+/**
+ * The royal warrant as the season turns: from `WARRANT_GOLDS` golds the crown asks for a gift each
+ * autumn, and winter takes the warrant away if the gift was not given.
+ */
+function royal(s: GameState, now: string) {
+  if (now === 'autumn' && s.golds >= WARRANT_GOLDS) {
+    s.royal = royalAsk(s.years, s.warrant);
+    s.events.push({ kind: 'royal' });
+  } else if (now === 'winter' && s.royal) {
+    if (!s.royal.done && s.warrant > 0) s.events.push({ kind: 'warrant-lost' });
+    if (!s.royal.done) s.warrant = 0;
+    s.royal = null;
+  }
+}
+
+/** Whether there are goods enough for the crown's ask: pure jars or pieces of comb of its kind. */
+export const canGift = (s: GameState) => !!s.royal && !s.royal.done && (s.royal.grade === 'pure' ? s.jars : s.combs)[s.royal.kind] >= s.royal.count;
+
+/** Gives the crown its gift: the goods go for no coins, and the warrant is kept another year. */
+export function giveRoyal(s: GameState) {
+  const r = s.royal;
+  if (!r || !canGift(s)) return false;
+  (r.grade === 'pure' ? s.jars : s.combs)[r.kind] -= r.count;
+  r.done = true;
+  s.warrant++;
+  s.events.push({ kind: 'warranted', years: s.warrant });
+  return true;
 }

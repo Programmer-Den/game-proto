@@ -262,9 +262,74 @@ const de: Translation<typeof en> = {
   newAsks: 'Neue Käufer im Buch!',
   tapOutside: 'daneben tippen zum Schließen',
 
+
+  // The flower garden: its flowers, rare honeys and card
+  sunflower: 'Sonnenblume',
+  rare: 'Selten',
+  blossomHoney: 'Blütenzauber',
+  sunburstHoney: 'Sonnenglanz',
+  mountainHoney: 'Berghonig',
+  garden: 'Garten',
+  gardenTitle: 'Blumengarten',
+  plantBeds: 'Beete pflanzen',
+  rareJars: { one: '{n} seltenes Glas', other: '{n} seltene Gläser' },
+  rareKept: 'Seltener Honig: {what}',
+  noRareBloom: 'noch keine seltene Blüte',
+  gardenNext: 'nächste Gläser in {time}',
+  gardenWinter: 'ruht im Winter',
+  gardenFull: 'voll bei {n} Gläsern: verkaufe welche',
+  emptyBed: 'Leeres Beet',
+  plant: 'pflanzen: {price}',
+  replant: 'umpflanzen: {price}',
+  planted: 'gepflanzt',
+  enterRare: 'Seltenen Honig zur Schau',
+  rareScores: '{honey} bringt {n}',
+  noRareJar: 'kein seltener Honig',
+  rareClassNone: 'braucht eine seltene Blüte',
+  rareClassLater: 'wenn die Schau läuft',
+  fairWonShort: 'diese Schau ist gewonnen',
+  rareRecipes: 'Nebeneinander: Klee + Lavendel geben Blütenzauber, Klee + Sonnenblume Sonnenglanz, Lavendel + Heide Berghonig',
+  rarePrice: '{honey} {price}',
+  bedPlanted: '{bloom} gepflanzt',
+  rareGained: '+{n} seltener Honig',
+
+  // The candle workshop
+  workshop: 'Werkstatt',
+  workshopTitle: 'Kerzenwerkstatt',
+  workshopSub: 'Wachs {wax} · Kerzen {candles} · Politur {polish} · neue Aufträge in {time}',
+  waresMade: '{candles} Kerzen · {polish} Politur',
+  dipCandle: 'Eine Kerze ziehen',
+  mixPolish: 'Eine Dose Politur mischen',
+  waxCost: '{n} Wachs',
+  churchWants: { one: 'Die Kirche will {n} Kerze', other: 'Die Kirche will {n} Kerzen' },
+  manorWants: { one: 'Das Gut will {n} Dose Politur', other: 'Das Gut will {n} Dosen Politur' },
+  winterCandles: 'teuer im Winter',
+  delivered: 'geliefert',
+  noCommission: 'Kein Auftrag',
+  candleMade: '+1 Kerze',
+  polishMade: '+1 Dose Politur',
+  newCommissions: 'Neue Aufträge!',
+
+  // The royal warrant
+  royalWarrant: 'Hoflieferant',
+  warrantChip: 'gehalten · +{n}\u00a0%',
+  warrantNone: 'nicht verliehen',
+  giftWanted: 'Gabe gewünscht!',
+  warrantKept: { one: '{n} Jahr gehalten · jeder Preis +{pct}\u00a0%', other: '{n} Jahre gehalten · jeder Preis +{pct}\u00a0%' },
+  warrantNotHeld: 'Nicht verliehen: Gib der Krone ihre Herbstgabe, um ihn zu erhalten',
+  royalLater: 'Die Krone bittet im Herbst um ihre Gabe',
+  royalIn: 'in {time}',
+  crownAsks: 'Die Krone bittet um {what}',
+  giftNow: 'eine Gabe vor dem Winter, in {time} · tippen zum Geben',
+  giftHave: 'eine Gabe vor dem Winter, in {time} · du hast {n}',
+  giftGiven: 'gegeben: der Titel bleibt',
+  warrantNote: 'Jede Herbstgabe hält den Titel ein Jahr länger und hebt jeden Preis um {step}\u00a0%, bis {max}\u00a0%. Fehlt eine Gabe, ist er verloren. Wabenhonig schneidest du im Käuferbuch.',
+  royalCame: 'Die Krone bittet um eine Gabe Honig!',
+  warrantWon: { one: 'Hoflieferant gehalten: {n} Jahr', other: 'Hoflieferant gehalten: {n} Jahre' },
+  warrantLost: 'Keine Gabe: Der Titel als Hoflieferant ist verloren',
 };
 
 /** Texts that are the same in German: the game's name, the season Winter and texts made of other texts. */
-export const keepEnglish: (keyof typeof en)[] = ['title', 'winter', 'starred', 'rank', 'upgrade', 'breedRank'];
+export const keepEnglish: (keyof typeof en)[] = ['title', 'winter', 'starred', 'rank', 'upgrade', 'breedRank', 'rarePrice', 'royalIn'];
 
 export default de;

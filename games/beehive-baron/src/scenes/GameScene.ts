@@ -10,7 +10,7 @@ import { BOOK_FROM, CITIES, type Ask } from '../game/book';
 import { BREEDS, BREED_MAX, TRAITS } from '../game/breeds';
 import { CONTRACTS_FROM } from '../game/contracts';
 import { ESTATE_HIVES, plotOf } from '../game/estate';
-import { MEAD_POINTS, classesFor, fairGold } from '../game/fair';
+import { MEAD_POINTS, fairGold } from '../game/fair';
 import { HONEY, KINDS, type Kind } from '../game/honey';
 import { CASK_JARS, MAX_CASKS, MEAD_MULT } from '../game/mead';
 import { MEADOWS } from '../game/meadows';
@@ -52,6 +52,7 @@ import {
   combBonus,
   crowded,
   demand,
+  fairClasses,
   fairIn,
   fairOn,
   fairScore,
@@ -70,6 +71,7 @@ import {
   newHive,
   openKinds,
   progressOf,
+  rareCount,
   ripenTime,
   room,
   season,
@@ -88,11 +90,14 @@ import { WASP_IN_MS, WASP_OUT_MS, type Wasp } from '../game/wasps';
 import { t } from '../i18n';
 import { checkTrophies } from '../trophies/check';
 import { Button } from '../ui/Button';
+import { EstatePanels } from './EstatePanels';
 import {
   AWAY,
   BOOK,
   BOOK_CARD,
   CASK,
+  GARDEN,
+  WORKSHOP,
   COMB,
   CONTRACT,
   END_CARD,
@@ -211,6 +216,8 @@ export class GameScene extends Phaser.Scene {
   /** The buyer's book chip and the card it opens. */
   private bookChip!: { root: Phaser.GameObjects.Container; title: Phaser.GameObjects.Text; detail: Phaser.GameObjects.Text };
   private bookCard!: { root: Phaser.GameObjects.Container; title: Phaser.GameObjects.Text; sub: Phaser.GameObjects.Text; rows: Button[]; cut: Button };
+  /** The garden, workshop and royal warrant chips and their cards. */
+  private estate!: EstatePanels;
   private goalZone!: Phaser.GameObjects.Zone;
   private market!: {
     root: Phaser.GameObjects.Container;
@@ -311,6 +318,7 @@ export class GameScene extends Phaser.Scene {
       asks: this.bookCard.rows.map((b) => ({ x: b.root.x, y: b.root.y })),
       cut: { x: this.bookCard.cut.root.x, y: this.bookCard.cut.root.y },
       breeds: Object.fromEntries(TRAITS.map((k, i) => [k, { x: this.breedCard.buttons[i].root.x, y: this.breedCard.buttons[i].root.y }])),
+      ...this.estate.spots(),
     };
   }
 
@@ -398,6 +406,7 @@ export class GameScene extends Phaser.Scene {
     this.createReset();
     this.createPlot();
     this.createBook();
+    this.estate = new EstatePanels(this, () => this.state, (done) => this.act(done));
     this.createEnd();
     this.createQueenCard();
     this.createBreedCard();
@@ -454,6 +463,7 @@ export class GameScene extends Phaser.Scene {
     this.drawSwarm();
     this.drawPlot();
     this.drawBook();
+    this.estate.draw();
     this.drawQueenCard();
     this.drawEvents();
     this.drawGoal();
@@ -846,6 +856,22 @@ export class GameScene extends Phaser.Scene {
         this.float(BOOK.x + BOOK.w / 2, BOOK.y - 10, t('newAsks'), '#ffffff', 14, 2000);
       } else if (e.kind === 'supplied') {
         this.float(BOOK.x + BOOK.w / 2, BOOK.y - 10, t('coinsGained', { n: e.coins }), '#ffd25a', 15, 2000);
+      } else if (e.kind === 'planted') {
+        this.float(GARDEN.x + GARDEN.w / 2, GARDEN.y - 10, t('bedPlanted', { bloom: t(e.bloom) }), '#ffffff', 13, 1400);
+      } else if (e.kind === 'bloomed') {
+        this.float(GARDEN.x + GARDEN.w / 2, GARDEN.y - 10, t('rareGained', { n: e.jars }), '#ffd25a', 14, 2000);
+      } else if (e.kind === 'made') {
+        this.float(WORKSHOP.x + WORKSHOP.w / 2, WORKSHOP.y - 10, t(e.ware === 'candle' ? 'candleMade' : 'polishMade'), '#ffffff', 13, 1400);
+      } else if (e.kind === 'commissions') {
+        this.float(WORKSHOP.x + WORKSHOP.w / 2, WORKSHOP.y - 10, t('newCommissions'), '#ffffff', 13, 2000);
+      } else if (e.kind === 'fulfilled') {
+        this.float(WORKSHOP.x + WORKSHOP.w / 2, WORKSHOP.y - 10, t('coinsGained', { n: e.coins }), '#ffd25a', 15, 2000);
+      } else if (e.kind === 'royal') {
+        this.float(VIEW.w / 2, 200, t('royalCame'), '#ffd25a', 16, 3200);
+      } else if (e.kind === 'warranted') {
+        this.float(VIEW.w / 2, 200, t('warrantWon', { n: e.years }), '#ffd25a', 16, 3000);
+      } else if (e.kind === 'warrant-lost') {
+        this.float(VIEW.w / 2, 200, t('warrantLost'), '#ffd0b0', 16, 3000);
       } else if (e.kind === 'sold') {
         this.float(SELL_BUTTON.x, SELL_BUTTON.y - 34, t('coinsGained', { n: e.coins }), '#ffd25a');
       } else if (e.kind === 'unlocked') {
@@ -990,6 +1016,29 @@ export class GameScene extends Phaser.Scene {
           break;
         case 'breed-ready':
           break;
+        case 'planted':
+          sfx('build');
+          break;
+        case 'bloomed':
+          sfx('capped');
+          break;
+        case 'made':
+          sfx('casked');
+          break;
+        case 'commissions':
+        case 'royal':
+          // Both come as the season turns, with its chime.
+          if (!events.some((o) => o.kind === 'season')) sfx('ding');
+          break;
+        case 'fulfilled':
+          sfx('orderDone');
+          break;
+        case 'warranted':
+          playSting(SONG, 'gold');
+          break;
+        case 'warrant-lost':
+          sfx('sad');
+          break;
       }
     }
   }
@@ -1033,7 +1082,7 @@ export class GameScene extends Phaser.Scene {
               : nectar ? t('sendFor', { n: home, nectar }) : t('send', { n: home });
     const canSend = s.ranks.dance === 0 && home > 0 && room(s) > 0 && !isWinter(s);
     this.sendButton.set(sendCaption, canSend, true);
-    const jars = jarCount(s);
+    const jars = jarCount(s) + rareCount(s);
     const mead = meadReady(s).length;
     const what = [jars > 0 ? t('jars', { n: jars }) : '', mead > 0 ? t('meads', { n: mead }) : ''].filter(Boolean).join(' + ');
     this.sellButton.set(jars + mead === 0 ? t('noHoney') : t('sellWhat', { what, coins: shelfValue(s) }), jars + mead > 0, true);
@@ -1215,7 +1264,7 @@ export class GameScene extends Phaser.Scene {
       // The county honey fair, at the end of every summer: the best entry of each class, and a tap to enter the next.
       const total = fairTotal(s);
       const gold = fairGold(s.fairs);
-      const classes = classesFor(s.fairs);
+      const classes = fairClasses(s);
       const on = fairOn(s);
       const won = fairWon(s);
       const entries = classes.map((k) => `${t(k)} ${s.fair[k] ?? '–'}`).join(' · ');
@@ -1374,6 +1423,7 @@ export class GameScene extends Phaser.Scene {
       this.queenCard.root.setVisible(false);
       this.breedCard.root.setVisible(false);
       this.bookCard.root.setVisible(false);
+      this.estate.close();
     });
   }
 
@@ -1441,7 +1491,7 @@ export class GameScene extends Phaser.Scene {
     this.casks.forEach((c, i) => {
       const cask = s.casks[i];
       c.cask.setVisible(!!cask);
-      const entering = this.entering && classesFor(s.fairs).includes('mead');
+      const entering = this.entering && fairClasses(s).includes('mead');
       c.label.setText(cask ? (cask.agingMs > 0 ? clockText(cask.agingMs) : entering ? t('points', { n: MEAD_POINTS[cask.kind] }) : t('price', { n: cask.value })) : '');
       if (!cask) return;
       const at = caskSpot(i);

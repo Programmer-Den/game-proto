@@ -121,6 +121,16 @@ export const SWARM = { x: 530, y: 250, w: 410, h: 38 };
 export const BOOK = { x: 432, y: 250, w: 92, h: 38 };
 /** The buyer's book card over everything, with a row per ask. */
 export const BOOK_CARD = { x: VIEW.w / 2, y: VIEW.h / 2, w: 470, h: 276 };
+/**
+ * Under the book chip, in a column on the near hill left of the button board: the garden chip
+ * (after the first gold), the candle workshop's (from 50 jars sold) and the royal warrant's (after
+ * three golds). Each opens a card the size of the book's.
+ */
+export const GARDEN = { ...BOOK, y: 296 };
+export const WORKSHOP = { ...BOOK, y: 342 };
+export const WARRANT = { ...BOOK, y: 388 };
+/** The card those chips open, over everything: a little bigger than the book's, for the garden's beds. */
+export const ESTATE_CARD = { x: VIEW.w / 2, y: VIEW.h / 2, w: 520, h: 300 };
 /** The hint line for a new player, in the same place (it hides while the chip shows). */
 export const HINT = { x: 233, y: 403 };
 /**

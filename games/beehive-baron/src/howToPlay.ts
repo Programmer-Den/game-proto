@@ -14,6 +14,7 @@ const en: HowToPlay = {
     { input: 'Click or tap a honey on the market', action: 'Send the foragers to that meadow' },
     { input: 'Click or tap a wasp', action: 'Swat it away before it steals the honey' },
     { input: "Buyer's book (on the hill)", action: 'Supply town buyers, or arm Cut comb honey and tap a capped cell' },
+    { input: 'Garden, Workshop and Royal warrant (under the book)', action: 'Plant beds, make candles and polish, and give the crown its gift' },
     { input: 'New hive (bottom right)', action: 'Start over from scratch, at once' },
   ],
   loop: [
@@ -35,6 +36,9 @@ const en: HowToPlay = {
     'Once every meadow is open, the county fair is held at the end of every summer: a cell scores 1 point per touching capped cell of its kind, and 14 points win the first gold. Each year after needs more and adds a class.',
     "From 20 jars sold, the buyer's book pays a premium for mixed, pure and comb honey, with new buyers and prices every season.",
     'Every gold at the fair breeds a trait into the queen line, kept from year to year, and after the first gold you can buy plots for a third and a fourth hive, each with its own season quirks.',
+    'After the first gold, plant the garden: clover beside lavender, clover beside sunflower and lavender beside heather cross-pollinate into rare honeys that sell dear and score in the fair\'s Rare class.',
+    'From 50 jars sold, the candle workshop turns spare wax into candles and polish for the church\'s and the manor\'s commissions, new every season.',
+    'After three golds the crown asks for a gift of honey each autumn: give it before winter to keep the royal warrant, which raises every price 10% a year, up to 50%.',
   ],
 };
 
@@ -51,6 +55,7 @@ const de: HowToPlay = {
     { input: 'Einen Honig auf dem Markt anklicken oder antippen', action: 'Die Sammlerinnen auf diese Wiese schicken' },
     { input: 'Eine Wespe anklicken oder antippen', action: 'Sie verscheuchen, bevor sie den Honig stiehlt' },
     { input: 'Käuferbuch (auf dem Hügel)', action: 'Käufer aus der Stadt beliefern, oder Wabenhonig schneiden und eine verdeckelte Zelle antippen' },
+    { input: 'Garten, Werkstatt und Hoflieferant (unter dem Buch)', action: 'Beete pflanzen, Kerzen und Politur machen und der Krone ihre Gabe geben' },
     { input: 'Neuer Stock (unten rechts)', action: 'Sofort ganz von vorn beginnen' },
   ],
   loop: [
@@ -72,6 +77,9 @@ const de: HowToPlay = {
     'Sobald jede Wiese offen ist, findet am Ende jedes Sommers die Honigschau statt: Eine Zelle bringt 1 Punkt für jede angrenzende verdeckelte Zelle ihrer Sorte, und 14 Punkte gewinnen das erste Gold. Jedes Jahr danach braucht mehr und bringt eine Klasse dazu.',
     'Ab 20 verkauften Gläsern zahlt das Käuferbuch einen Aufpreis für gemischten, reinen und Wabenhonig, mit neuen Käufern und Preisen in jeder Jahreszeit.',
     'Jedes Gold bei der Honigschau züchtet eine Eigenschaft in die Königinnenlinie, die Jahr für Jahr bleibt, und nach dem ersten Gold kannst du Grund für einen dritten und vierten Stock kaufen, jeder mit eigenen Eigenheiten der Jahreszeiten.',
+    'Pflanze nach dem ersten Gold den Garten: Klee neben Lavendel, Klee neben Sonnenblume und Lavendel neben Heide bestäuben sich zu seltenem Honig, der teuer verkauft und in der Klasse Selten der Honigschau punktet.',
+    'Ab 50 verkauften Gläsern macht die Kerzenwerkstatt aus übrigem Wachs Kerzen und Politur für die Aufträge von Kirche und Gut, neu in jeder Jahreszeit.',
+    'Nach dreimal Gold bittet die Krone jeden Herbst um eine Gabe Honig: Gib sie vor dem Winter, um Hoflieferant zu bleiben, was jeden Preis um 10\u00a0% im Jahr hebt, bis 50\u00a0%.',
   ],
 };
 
