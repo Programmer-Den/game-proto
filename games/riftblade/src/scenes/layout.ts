@@ -47,6 +47,11 @@ export function heroCardRect(i: number) {
 }
 export const HERO_DETAIL = { x: 642, y: 84, w: 304, h: 400 };
 export const FIGHT = { x: 658, y: 416, w: 272, h: 50 };
+/** Once a boss rush is open, Fight makes room for its button beside it. */
+export const FIGHT_SHORT = { x: 658, y: 416, w: 178, h: 50 };
+export const RUSH_BUTTON = { x: 844, y: 416, w: 86, h: 50 };
+/** The hero's mastery row (once it has mastery XP), just above the Heat row or Fight; its colours toggle at the right. */
+export const MASTERY_ROW = { x: 658, w: 272, h: 24, colourW: 96 };
 /** The rift heat row above Fight, shown once the hero has won: a lower and a higher arrow. */
 export const HEAT_ROW = { x: 658, y: 366, w: 272, h: 42 };
 export const HEAT_DOWN = { x: HEAT_ROW.x, y: HEAT_ROW.y + 3, w: 36, h: 36 };
@@ -108,13 +113,16 @@ export function mapNodeSpot(i: number, n: number) {
 
 /** The space map: one column per jump, its planets stacked; the next jump's planets are cards to tap. */
 export const CHART = { cols: [130, 370, 610, 850], pitch: 130, w: 204, h: 124, r: 20 };
+/** A column of four planets: closer together, with lower cards (the disc beside the name). */
+export const CHART4 = { pitch: 106, w: 216, h: 98, r: 14 };
 /** The centre of planet `i` of `n` in column `col`. */
 export function chartSpot(col: number, i: number, n: number) {
-  return { x: CHART.cols[col], y: 290 + (i - (n - 1) / 2) * CHART.pitch };
+  return { x: CHART.cols[col], y: 290 + (i - (n - 1) / 2) * (n > 3 ? CHART4.pitch : CHART.pitch) };
 }
 /** The card around a planet of the next jump. */
 export function chartRect(col: number, i: number, n: number) {
   const c = chartSpot(col, i, n);
+  if (n > 3) return { x: c.x - CHART4.w / 2, y: c.y - CHART4.h / 2, w: CHART4.w, h: CHART4.h };
   return { x: c.x - CHART.w / 2, y: c.y - 46, w: CHART.w, h: CHART.h };
 }
 

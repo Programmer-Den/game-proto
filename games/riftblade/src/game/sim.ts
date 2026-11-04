@@ -5,9 +5,9 @@
  */
 import { HEROES, isKnight, type HeroId } from './heroes';
 import {
-  BOSS, DIFF, ELITE, EMBER, ENEMY, HERO_R, KNIGHT, LEASH, LINE, MAX_ENEMIES, MAX_SHARDS, RATS, ROLLER, RUN_MS,
+  BOSS, CRAB, DIFF, ELITE, EMBER, ENEMY, HERO_R, KNIGHT, LEASH, LINE, MAX_ENEMIES, MAX_SHARDS, RATS, ROLLER, RUN_MS, SENTINEL, SHADE, SQUID,
   POWER, POWER_UPS, SCRAP, SHARD, SPAWN_RING, SPORE, TOAD, WALKER, WISP, freshHero, freshState, isStructure, refreshUnlocks, statsOf, xpFor,
-  type AllyKind, type PowerUp, type BoltColor, type Bomb, type Bullet, type Enemy, type EnemyKind, type GameState, type Hazard, type Pickup, type Stats,
+  type AllyKind, type PowerUp, type BoltColor, type Bomb, type Bullet, type Enemy, type EnemyKind, type GameState, type Hazard, type Pickup, type Pillar, type Stats,
 } from './state';
 import {
   contactMod, crush, dashEnd, dashSweep, foeMod, healFactor, knightAbilities, knightAllies, knightAttack, knightGuard,
@@ -17,8 +17,10 @@ import {
   droneSpot, hurtFactor, moveSquadAlly, squadAbilities, squadAllies, squadAttack, squadBlock, squadCrit, squadHeal, squadHurt,
   squadKill, squadSignature, squadStart, syncSquad, turnedBonus,
 } from './squad';
-import { CAPSTONES, CROSSOVERS, FILLER, MAX_TIER, UPGRADES, at, cardCount, rewardChoices, rollChoices } from './upgrades';
-import { ARENA_MS, BOG, BOSSES, CHAMPION, CREDITS, PLANETS, SIEGE, STRIKE, VENT, type FoeKind } from './planets';
+import { CAPSTONES, CROSSOVERS, FILLER, MAX_TIER, UPGRADES, at, canOffer, cardCount, rewardChoices, rollChoices } from './upgrades';
+import { MASTERY, MASTERY_WEAPON } from './mastery';
+import { RUSH } from './rush';
+import { ARENA_MS, BOG, BOSSES, CHAMPION, CREDITS, PILLAR, PLANETS, SIEGE, STRIKE, TIDE, VENT, type FoeKind } from './planets';
 // `t` is a common local name here (targets, time), so the translator goes by `tr`.
 import { t as tr, type TextKey } from '../i18n';
 import { cancelObjective, objectives } from './objectives';
@@ -75,6 +77,9 @@ export interface RunSetup {
   /** A daily run: its day and seed (`dailySeed`); its mutator goes in `mutators`. */
   daily?: string;
   seed?: number;
+  /** The hero's mastery level (its starting weapon and perks; 0 or none for a weekly, daily or rush) and whether it wears its mastery colours. */
+  mastery?: number;
+  colour?: boolean;
 }
 
 /** Starts a run with the chosen hero, from a fresh state; `known` are the heroes unlocked before. */
@@ -88,7 +93,9 @@ export function startRun(s: GameState, id: HeroId, known: HeroId[] = [], ringOut
   s.daily = setup.daily ?? '';
   s.seed = setup.seed ?? (s.week >= 0 ? weekSeed(s.week) : -1);
   if (s.seed >= 0) reseed(s.seed);
-  s.maxHpMod = (1 + PERK.rations * (s.perks.rations ?? 0)) * (s.mutators.includes('glass') ? MUT.glassHp : 1);
+  s.mastery = setup.mastery ?? 0;
+  s.colour = setup.colour ?? false;
+  s.maxHpMod = (1 + PERK.rations * (s.perks.rations ?? 0)) * (s.mutators.includes('glass') ? MUT.glassHp : 1) * (s.mastery >= MASTERY.healthAt ? 1 + MASTERY.health : 1);
   s.credits = PERK.purse * (s.perks.purse ?? 0);
   const hero = HEROES[id];
   s.hero = id;
@@ -100,6 +107,9 @@ export function startRun(s: GameState, id: HeroId, known: HeroId[] = [], ringOut
   s.player.fireMs = 300;
   prepare(s);
   if (squad) squadStart(s);
+  // Mastery's second starting weapon: tier 1 of one of the hero's pool skills.
+  const weapon = MASTERY_WEAPON[id];
+  if (s.mastery >= MASTERY.weaponAt && canOffer(weapon, id, s.ranks)) raise(s, weapon);
 }
 
 /** Takes the card at `index` during a level-up (or a free pick won in the arena). */
@@ -210,6 +220,8 @@ function step(s: GameState, ms: number, input: Input) {
   bombs(s, ms);
   fires(s, dt);
   hazards(s, ms);
+  tides(s, ms);
+  ruins(s, ms);
   pickups(s, ms);
   s.enemies = s.enemies.filter((e) => e.hp > 0);
   // The arena ends when every elite has fallen, or when its minute is up.
@@ -344,6 +356,8 @@ function moveHero(s: GameState, ms: number, input: Input) {
     p.x += (input.mx / len) * k;
     p.y += (input.my / len) * k;
   }
+  // The Ruin world's fallen pillars stand in the way.
+  for (const pl of s.pillars) if (pl.warnMs <= 0) pushOut(p, pl);
   p.stillMs = p.moving ? 0 : p.stillMs + ms;
   p.sigMs = Math.max(0, p.sigMs - ms);
   p.sigActiveMs = Math.max(0, p.sigActiveMs - ms);
@@ -903,7 +917,9 @@ export function spawnAt(s: GameState, kind: EnemyKind, x: number, y: number, eli
     // Fragile Foes halves bosses too, since their hits double like everyone's.
     (!isStructure(kind) && mut('fragile') ? MUT.fragileHp : 1) *
     // The endless rift's later loops: tougher foes and bosses.
-    (!isStructure(kind) && s.loop > 0 ? loopHp(s.loop) : 1);
+    (!isStructure(kind) && s.loop > 0 ? loopHp(s.loop) : 1) *
+    // The boss rush's bosses come with half their health, for a kit that is not a full run's.
+    (boss && s.rush ? RUSH.bossHp : 1);
   const speed = spec.speed * (boss ? 1 : 1 + t / 1200) * (elite ? ELITE.speed : 1) * (0.92 + rand() * 0.16) * (mut('haste') ? MUT.haste : 1);
   const e: Enemy = {
     id: s.nextId++, kind, elite, x, y, r: spec.r * (elite ? ELITE.size : 1), hp, maxHp: hp, speed,
@@ -918,6 +934,8 @@ export function spawnAt(s: GameState, kind: EnemyKind, x: number, y: number, eli
   else if (kind === 'puffcap') e.shellMs = SPORE.puffMs * 0.5;
   else if (kind === 'prism') e.shellMs = SHARD.lanceMs * 0.5;
   else if (kind === 'conductor') e.shellMs = STRIKE.callMs * 0.5;
+  else if (kind === 'squid') e.shellMs = SQUID.inkMs * 0.5;
+  else if (kind === 'sentinel') e.shellMs = SENTINEL.slamMs * 0.4;
   s.enemies.push(e);
   return e;
 }
@@ -1009,6 +1027,25 @@ export function spawnGroup(s: GameState, t: number, room: number) {
     for (let i = 0; i < n; i++) spawnAt(s, 'wisp', spot.x + (rand() - 0.5) * 60, spot.y + (rand() - 0.5) * 60);
     return n;
   }
+  if (id === 'ocean') {
+    if (roll < (t < 30 ? 0 : Math.min(0.14, 0.05 + t / 1100))) {
+      spawnAt(s, 'squid', spot.x, spot.y);
+      return 1;
+    }
+    // Crabs come up out of the surf in threes.
+    const n = Math.min(room, CRAB.pack);
+    for (let i = 0; i < n; i++) spawnAt(s, 'crab', spot.x + (rand() - 0.5) * 40, spot.y + (rand() - 0.5) * 40);
+    return n;
+  }
+  if (id === 'ruin') {
+    if (roll < (t < 40 ? 0 : Math.min(0.11, 0.04 + t / 1400))) {
+      spawnAt(s, 'sentinel', spot.x, spot.y);
+      return 1;
+    }
+    const n = Math.min(room, SHADE.group);
+    for (let i = 0; i < n; i++) spawnAt(s, 'shade', spot.x + (rand() - 0.5) * 50, spot.y + (rand() - 0.5) * 50);
+    return n;
+  }
   if (roll < (t < 35 ? 0 : Math.min(0.16, 0.05 + t / 1100))) {
     spawnAt(s, 'knight', spot.x, spot.y);
     return 1;
@@ -1034,7 +1071,10 @@ function director(s: GameState, ms: number) {
   const living = s.enemies.length;
   // Once the boss is here, no more foes come: only those already on the field (and the boss's own) are left.
   const swarm = s.mutators.includes('swarm') ? MUT.swarmSpawn : 1;
-  if (!s.bossSpawned) s.spawnDebt += (spawnRate(t) * DIFF.spawn * planet.spawn * swarm * (s.arena ? 0.4 : 1) * ms) / 1000;
+  // The boss rush: only the boss, at once.
+  if (s.rush) {
+    if (!s.bossSpawned) spawnBoss(s);
+  } else if (!s.bossSpawned) s.spawnDebt += (spawnRate(t) * DIFF.spawn * planet.spawn * swarm * (s.arena ? 0.4 : 1) * ms) / 1000;
   let made = 0;
   while (!s.bossSpawned && s.spawnDebt >= 1) {
     s.spawnDebt -= 1;
@@ -1047,7 +1087,7 @@ function director(s: GameState, ms: number) {
     s.spawnDebt -= n - 1;
     made += n;
   }
-  if (s.time >= s.nextElite && !s.bossSpawned) {
+  if (s.time >= s.nextElite && !s.bossSpawned && !s.rush) {
     s.nextElite += ELITE.every / (hot(s.heat, 'elites') ? HEAT.elites : 1);
     spawnElite(s);
     pop(s, tr(planet.elite), '#ffe066');
@@ -1061,26 +1101,7 @@ function director(s: GameState, ms: number) {
     }
     pop(s, tr('surround'), '#ff8a6a');
   }
-  if (!s.bossSpawned && !s.arena && s.time >= RUN_MS) {
-    s.bossSpawned = true;
-    cancelObjective(s);
-    const spot = ringPoint(s, s.player.facing);
-    const e = spawnAt(s, 'boss', spot.x, spot.y);
-    const mech = BOSSES[planet.boss].mech;
-    if (mech === 'bogmother') {
-      e.shellMs = BOG.globMs;
-      e.spawnMs = BOG.spawnMs;
-      e.modeMs = BOG.poolMs;
-    } else if (mech === 'siege') {
-      e.shellMs = SIEGE.volleyMs;
-      e.spawnMs = SIEGE.barrageMs * 0.5;
-      e.modeMs = 0;
-    } else if (mech === 'champion') {
-      e.shellMs = CHAMPION.dashEvery;
-      e.spawnMs = CHAMPION.ringMs;
-    }
-    pop(s, tr(BOSSES[planet.boss].name), '#ff9a3c');
-  }
+  if (!s.bossSpawned && !s.arena && s.time >= RUN_MS) spawnBoss(s);
   // Lava vents: a warning glow near the hero, then an eruption.
   if (planet.id === 'lava' && s.time >= s.nextVent) {
     s.nextVent = s.time + VENT.minMs + rand() * (VENT.maxMs - VENT.minMs);
@@ -1095,6 +1116,136 @@ function director(s: GameState, ms: number) {
     const d = 30 + rand() * 180;
     addHazard(s, 'strike', s.player.x + Math.cos(a) * d, s.player.y + Math.sin(a) * d, STRIKE.r, STRIKE.warnMs, 300, STRIKE.dmg * planet.dmg);
   }
+}
+
+/** The planet's boss comes (at the end of its five minutes, or at once in the boss rush). */
+function spawnBoss(s: GameState) {
+  const planet = PLANETS[s.planet];
+  s.bossSpawned = true;
+  cancelObjective(s);
+  const spot = ringPoint(s, s.player.facing);
+  const e = spawnAt(s, 'boss', spot.x, spot.y);
+  const mech = BOSSES[planet.boss].mech;
+  if (mech === 'bogmother') {
+    e.shellMs = BOG.globMs;
+    e.spawnMs = BOG.spawnMs;
+    e.modeMs = BOG.poolMs;
+  } else if (mech === 'siege') {
+    e.shellMs = SIEGE.volleyMs;
+    e.spawnMs = SIEGE.barrageMs * 0.5;
+    e.modeMs = 0;
+  } else if (mech === 'champion') {
+    e.shellMs = CHAMPION.dashEvery;
+    e.spawnMs = CHAMPION.ringMs;
+  }
+  pop(s, tr(BOSSES[planet.boss].name), '#ff9a3c');
+}
+
+// ---------------------------------------------------------------------------------------------
+// The Ocean world's tide and the Ruin world's pillars
+
+/** Whether a point is under the tide (once it has come in). */
+export function underTide(s: GameState, x: number, y: number) {
+  const w = s.tide;
+  return !!w && w.warnMs <= 0 && (x - w.x) * Math.cos(w.angle) + (y - w.y) * Math.sin(w.angle) > 0;
+}
+
+/** The tide comes in over half the field every minute on the Ocean world, and slows the hero in it. */
+function tides(s: GameState, ms: number) {
+  if (PLANETS[s.planet].id !== 'ocean' || s.arena) return;
+  const w = s.tide;
+  if (!w) {
+    if (s.time < s.nextTide) return;
+    s.nextTide = s.time + TIDE.everyMs;
+    // The water lies one way of a line just behind the hero, so the dry side is a short run away.
+    const angle = rand() * Math.PI * 2;
+    const p = s.player;
+    s.tide = { x: p.x - Math.cos(angle) * TIDE.inset, y: p.y - Math.sin(angle) * TIDE.inset, angle, warnMs: TIDE.warnMs, ms: TIDE.ms };
+    pop(s, tr('tideComing'), '#7fe9ff');
+    return;
+  }
+  if (w.warnMs > 0) {
+    w.warnMs -= ms;
+    return;
+  }
+  w.ms -= ms;
+  if (w.ms <= 0) {
+    s.tide = null;
+    return;
+  }
+  const p = s.player;
+  if (underTide(s, p.x, p.y)) {
+    p.slowMs = Math.max(p.slowMs, 120);
+    p.slowPct = Math.max(p.slowPct, TIDE.slow);
+  }
+}
+
+/** How far a point is from a pillar's line. */
+export function pillarDist(pl: Pillar, x: number, y: number) {
+  const dx = pl.x2 - pl.x1;
+  const dy = pl.y2 - pl.y1;
+  const k = Math.max(0, Math.min(1, ((x - pl.x1) * dx + (y - pl.y1) * dy) / (dx * dx + dy * dy || 1)));
+  return Math.hypot(x - (pl.x1 + dx * k), y - (pl.y1 + dy * k));
+}
+
+/** Pushes a body out of a fallen pillar. */
+function pushOut(b: { x: number; y: number; r: number }, pl: Pillar) {
+  const dx = pl.x2 - pl.x1;
+  const dy = pl.y2 - pl.y1;
+  const k = Math.max(0, Math.min(1, ((b.x - pl.x1) * dx + (b.y - pl.y1) * dy) / (dx * dx + dy * dy || 1)));
+  const cx = pl.x1 + dx * k;
+  const cy = pl.y1 + dy * k;
+  const min = pl.r + b.r;
+  let ox = b.x - cx;
+  let oy = b.y - cy;
+  let d = Math.hypot(ox, oy);
+  if (d >= min) return;
+  if (d < 0.01) {
+    // Right on the line: out to the side.
+    const len = Math.hypot(dx, dy) || 1;
+    ox = -dy / len;
+    oy = dx / len;
+    d = 1;
+  }
+  b.x = cx + (ox / d) * min;
+  b.y = cy + (oy / d) * min;
+}
+
+/** On the Ruin world a pillar near the hero topples every few seconds and lies across the way a while. */
+function ruins(s: GameState, ms: number) {
+  if (!s.pillars.length && PLANETS[s.planet].id !== 'ruin') return;
+  const planet = PLANETS[s.planet];
+  const p = s.player;
+  if (planet.id === 'ruin' && !s.arena && s.time >= s.nextVent && s.pillars.length < PILLAR.max) {
+    s.nextVent = s.time + PILLAR.minMs + rand() * (PILLAR.maxMs - PILLAR.minMs);
+    const a = rand() * Math.PI * 2;
+    const d = 50 + rand() * 190;
+    const turn = rand() * Math.PI;
+    const cx = p.x + Math.cos(a) * d;
+    const cy = p.y + Math.sin(a) * d;
+    const hx = (Math.cos(turn) * PILLAR.len) / 2;
+    const hy = (Math.sin(turn) * PILLAR.len) / 2;
+    s.pillars.push({ id: s.nextId++, x1: cx - hx, y1: cy - hy, x2: cx + hx, y2: cy + hy, r: PILLAR.r, warnMs: PILLAR.warnMs, ms: PILLAR.lifeMs });
+  }
+  for (const pl of s.pillars) {
+    if (pl.warnMs > 0) {
+      pl.warnMs -= ms;
+      if (pl.warnMs > 0) continue;
+      // It lands: whatever is under it is hit.
+      if (pillarDist(pl, p.x, p.y) < pl.r + p.r) hurtHero(s, PILLAR.dmg * planet.dmg, (pl.x1 + pl.x2) / 2, (pl.y1 + pl.y2) / 2);
+      for (const e of s.enemies) {
+        if (e.hp > 0 && e.kind !== 'boss' && !isStructure(e.kind) && pillarDist(pl, e.x, e.y) < pl.r + e.r) damage(s, e, PILLAR.foeDmg * planet.hp, { noCrit: true });
+      }
+      for (let k = 0; k <= 2; k++) {
+        const x = pl.x1 + ((pl.x2 - pl.x1) * k) / 2;
+        const y = pl.y1 + ((pl.y2 - pl.y1) * k) / 2;
+        s.blasts.push({ id: s.nextId++, x, y, r: pl.r * 2.4, ms: 360, maxMs: 360, color: BLAST.stomp });
+      }
+      continue;
+    }
+    pl.ms -= ms;
+  }
+  s.pillars = s.pillars.filter((pl) => pl.warnMs > 0 || pl.ms > 0);
 }
 
 export function knock(e: Enemy, fromX: number, fromY: number, power: number) {
@@ -1175,7 +1326,9 @@ function moveEnemies(s: GameState, ms: number) {
     const still = e.stunMs > 0 && e.kind !== 'boss';
     // A boss never falls far behind: out past the view it comes on three times as fast.
     const catchUp = e.kind === 'boss' && dist > 480 && e.mode === 'walk' ? 3 : 1;
-    const speed = still ? 0 : e.speed * slow * catchUp;
+    // The sea's own foes swim faster in the tide.
+    const surf = s.tide && (e.kind === 'crab' || e.kind === 'squid') && underTide(s, e.x, e.y) ? TIDE.foeSpeed : 1;
+    const speed = still ? 0 : e.speed * slow * catchUp * surf;
     let vx = (dx / dist) * speed;
     let vy = (dy / dist) * speed;
     const toHero = Math.atan2(dy, dx);
@@ -1211,6 +1364,40 @@ function moveEnemies(s: GameState, ms: number) {
       const weave = Math.sin(s.time / 140 + e.id * 1.7) * WISP.weave * speed;
       vx += (-dy / dist) * weave;
       vy += (dx / dist) * weave;
+    } else if (e.kind === 'crab') {
+      // Crabs scuttle in bursts, a little sideways.
+      const beat = ((s.time + e.id * 137) % CRAB.burstMs) / CRAB.burstMs;
+      const k = beat < 0.65 ? 1.35 : CRAB.rest;
+      vx *= k;
+      vy *= k;
+      const side = (e.id % 2 ? 1 : -1) * 0.35 * speed * k;
+      vx += (-dy / dist) * side;
+      vy += (dx / dist) * side;
+    } else if (e.kind === 'squid') {
+      e.shellMs -= ms;
+      if (dist < SQUID.range) {
+        vx = vy = 0;
+        if (e.shellMs <= 0 && !still) {
+          // A fan of ink that slows what it hits.
+          e.shellMs = SQUID.inkMs;
+          const n = SQUID.inks + (e.elite ? 2 : 0);
+          for (let i = 0; i < n; i++) shoot(s, e.x, e.y, toHero + (i - (n - 1) / 2) * SQUID.spread, SQUID.speed, SQUID.dmg * harm, 'ink', 7);
+        }
+      }
+    } else if (e.kind === 'sentinel') {
+      e.shellMs -= ms;
+      if (e.mode === 'arm') {
+        vx = vy = 0;
+        e.modeMs -= ms;
+        if (e.modeMs <= 0) e.mode = 'walk';
+      } else if (dist < SENTINEL.trigger && e.shellMs <= 0 && !still) {
+        // It stops and slams the ground around it, after a warning.
+        e.shellMs = SENTINEL.slamMs;
+        e.mode = 'arm';
+        e.modeMs = SENTINEL.warnMs + 300;
+        addHazard(s, 'stomp', e.x, e.y, SENTINEL.r * (e.elite ? 1.3 : 1), SENTINEL.warnMs, 400, SENTINEL.dmg * harm);
+        vx = vy = 0;
+      }
     } else if (e.kind === 'puffcap') {
       e.shellMs -= ms;
       if (dist < SPORE.range) {
@@ -1323,6 +1510,17 @@ function moveEnemies(s: GameState, ms: number) {
     const fade = Math.exp(-7 * dt);
     e.kx *= fade;
     e.ky *= fade;
+    // Fallen pillars block every foe but the shades; a boss smashes through them.
+    if (s.pillars.length && e.kind !== 'shade') {
+      for (const pl of s.pillars) {
+        if (pl.warnMs > 0) continue;
+        if (e.kind !== 'boss') pushOut(e, pl);
+        else if (pillarDist(pl, e.x, e.y) < pl.r + e.r) {
+          pl.ms = 0;
+          s.blasts.push({ id: s.nextId++, x: (pl.x1 + pl.x2) / 2, y: (pl.y1 + pl.y2) / 2, r: 60, ms: 380, maxMs: 380, color: BLAST.stomp });
+        }
+      }
+    }
     // Keep apart from the bots around, so a swarm spreads into a crowd rather than a dot.
     if (e.kind !== 'boss') {
       const cx = Math.floor(e.x / CELL);
@@ -1420,7 +1618,7 @@ function bossAttacks(s: GameState, e: Enemy, ms: number, ux: number, uy: number,
       e.shellMs = BOSS.shellMs * (enraged ? 0.75 : 1);
       const n = BOSS.shells + (enraged ? 2 : 0);
       for (let i = 0; i < n; i++) {
-        shoot(s, e.x + ux * 50, e.y + uy * 50, base + (i - (n - 1) / 2) * 0.24, BOSS.shellSpeed, BOSS.shellDmg * power, 'shell', 7);
+        shoot(s, e.x + ux * 50, e.y + uy * 50, base + (i - (n - 1) / 2) * 0.24, BOSS.shellSpeed, BOSS.shellDmg * power, spec.bolt ?? 'shell', 7);
       }
     }
     if (e.spawnMs <= 0) {
@@ -1456,7 +1654,7 @@ function bossAttacks(s: GameState, e: Enemy, ms: number, ux: number, uy: number,
     return null;
   }
   if (id === 'siege') {
-    const crystal = spec !== BOSSES.siege;
+    const crystal = spec === BOSSES.colossus;
     if (enraged) e.speed = spec.speed * 1.25 * (e.phase3 ? HEAT.frenzySpeed : 1);
     if (e.shellMs <= 0) {
       e.shellMs = SIEGE.volleyMs;
@@ -1774,6 +1972,9 @@ function hostileBolt(s: GameState, b: Bullet, shield: number) {
       p.slowMs = TOAD.slowMs;
       p.slowPct = Math.max(p.slowPct, TOAD.slow);
       if (b.toad) s.globHits += 1;
+    } else if (b.color === 'ink' && !untouchable(s)) {
+      p.slowMs = Math.max(p.slowMs, SQUID.slowMs);
+      p.slowPct = Math.max(p.slowPct, SQUID.slow);
     }
     hurtHero(s, b.dmg, b.x - b.vx * 0.05, b.y - b.vy * 0.05);
     return false;
@@ -1955,6 +2156,8 @@ function powerUp(s: GameState, kind: PowerUp) {
 
 /** XP gained (times the hero's XP bonus, unless `raw`). */
 export function gainXp(s: GameState, value: number, raw = false) {
+  // The boss rush is fought with a set kit: no level-ups.
+  if (s.rush) return;
   s.xp += value * (raw ? 1 : st.xp);
   while (s.xp >= s.xpNext) {
     s.xp -= s.xpNext;

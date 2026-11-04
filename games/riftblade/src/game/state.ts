@@ -6,6 +6,7 @@ import type { EventId, FoeKind, NodeKind } from './planets';
 import type { TextKey } from '../i18n';
 import { PERK, type ArmouryId } from './armoury';
 import { MUT, type MutatorId } from './weekly';
+import { MASTERY } from './mastery';
 
 /** Each planet lasts this long before its boss comes, ms. */
 export const RUN_MS = 5 * 60_000;
@@ -67,6 +68,10 @@ export const ENEMY: Record<EnemyKind, EnemySpec> = {
   prism: { r: 15, hp: 50, speed: 42, dmg: 10, xp: 4 },
   wisp: { r: 8, hp: 7, speed: 100, dmg: 5, xp: 1 },
   conductor: { r: 14, hp: 46, speed: 46, dmg: 9, xp: 4 },
+  crab: { r: 10, hp: 11, speed: 70, dmg: 6, xp: 1 },
+  squid: { r: 14, hp: 38, speed: 44, dmg: 9, xp: 4 },
+  shade: { r: 10, hp: 10, speed: 66, dmg: 7, xp: 1 },
+  sentinel: { r: 17, hp: 72, speed: 34, dmg: 12, xp: 5 },
   boss: { r: 58, hp: 2600, speed: 42, dmg: 22, xp: 0 },
   beacon: { r: 16, hp: 110, speed: 0, dmg: 0, xp: 0 },
   nest: { r: 17, hp: 80, speed: 0, dmg: 0, xp: 0 },
@@ -96,6 +101,12 @@ export const SCRAP = { pack: 3, split: 3 };
 export const SHARD = { splinters: 3, speed: 210, dmg: 5, range: 290, lanceMs: 3200, lance: 4, lanceSpeed: 330, lanceDmg: 7 };
 /** Wisps weave hard as they come. */
 export const WISP = { weave: 1.1 };
+/** Crabs scuttle in bursts, in threes; a squid stops in range and squirts ink that slows a little (the Deep Kraken's too). */
+export const CRAB = { pack: 3, burstMs: 900, rest: 0.35 };
+export const SQUID = { range: 260, inkMs: 2800, inks: 3, spread: 0.18, speed: 190, dmg: 6, slow: 0.25, slowMs: 900 };
+/** Shades drift through the fallen pillars and flicker; a sentinel stops close and slams the ground. */
+export const SHADE = { group: 3 };
+export const SENTINEL = { trigger: 130, slamMs: 3600, warnMs: 800, r: 95, dmg: 14 };
 /** The Grinder Crawler's attacks. */
 export const BOSS = { shellMs: 3500, shells: 5, shellSpeed: 210, shellDmg: 12, spawnMs: 8000, adds: 5, enragedAt: 0.5, alone: 2 };
 
@@ -155,7 +166,7 @@ export interface Enemy {
  * or a mini rocket; or a hostile one: a bot shell, a slowing glob, a trooper's volley bolt or a
  * walker's slug.
  */
-export type BoltColor = HeroId | 'drone' | 'shell' | 'heavy' | 'rocket' | 'glob' | 'volley' | 'slug' | 'fallen' | 'spore' | 'splinter';
+export type BoltColor = HeroId | 'drone' | 'shell' | 'heavy' | 'rocket' | 'glob' | 'volley' | 'slug' | 'fallen' | 'spore' | 'splinter' | 'ink';
 
 export interface Bullet {
   id: number;
@@ -515,8 +526,24 @@ export interface GameState {
   nextElite: number;
   waves: number[];
   bossSpawned: boolean;
-  /** When the next lava vent erupts (Lava world) or lightning strikes (Storm world). */
+  /** When the next lava vent erupts (Lava world), lightning strikes (Storm world) or pillar falls (Ruin world). */
   nextVent: number;
+  /** The Ocean world's tide (null while the sea is out) and when it next comes in (planet time, ms). */
+  tide: Tide | null;
+  nextTide: number;
+  /** The Ruin world's pillars: falling (`warnMs` left) or lying across the way. */
+  pillars: Pillar[];
+  /**
+   * The boss rush (`rush.ts`): `rush` is on, `rushQueue` the planets whose bosses are still to come
+   * after this one, `rushTotal` how many bosses the rush has and `rushBeaten` how many fell.
+   */
+  rush: boolean;
+  rushQueue: number[];
+  rushTotal: number;
+  rushBeaten: number;
+  /** The hero's mastery level the run started with (0 for none: a weekly, daily or rush), and whether it wears its mastery colours. */
+  mastery: number;
+  colour: boolean;
   /** Credits to spend at a trader. */
   credits: number;
   /** The star map's nodes, the trader's offers (null once sold) and the event on offer. */
@@ -575,6 +602,29 @@ export interface GameState {
   bots: Bot[];
   formation: 'spread' | 'column';
   scrap: number;
+}
+
+/** The sea over half the field: the water's edge runs through `x`, `y`, and the water lies the way of `angle` from it. */
+export interface Tide {
+  x: number;
+  y: number;
+  angle: number;
+  /** Ms of warning left before it floods, then ms it stays. */
+  warnMs: number;
+  ms: number;
+}
+
+/** A pillar of the Ruin world, from `x1`, `y1` to `x2`, `y2`, `r` thick. */
+export interface Pillar {
+  id: number;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  r: number;
+  /** Ms until it lands (it hurts what is under it then), then ms it lies there. */
+  warnMs: number;
+  ms: number;
 }
 
 export function freshHero(): Hero {
@@ -641,6 +691,15 @@ export function freshState(): GameState {
     waves: [...WAVES],
     bossSpawned: false,
     nextVent: 0,
+    tide: null,
+    nextTide: 0,
+    pillars: [],
+    rush: false,
+    rushQueue: [],
+    rushTotal: 0,
+    rushBeaten: 0,
+    mastery: 0,
+    colour: false,
     credits: 0,
     nodes: [],
     offers: [],
@@ -754,7 +813,7 @@ export function statsOf(s: GameState): Stats {
     cooldown: 1 - 0.07 * r('overclock'),
     damage:
       (1 + 0.1 * r('cell')) * (1 + at([0, 0.1, 0.1, 0.2, 0.2], r('overcharge'), 0)) * (1 + at([0, 0.25, 0.25, 0.25, 0.75], r('marksman'), 0)) * k.damage * q.damage *
-      (1 + d.damage) * (1 + stim) * (mut('glass') ? MUT.glassDmg : 1),
+      (1 + d.damage) * (1 + stim) * (mut('glass') ? MUT.glassDmg : 1) * (s.mastery >= MASTERY.damageAt ? 1 + MASTERY.damage : 1),
     xp: 1 + 0.1 * r('lens'),
     crit: 0.06 * r('chip') + k.crit + d.crit,
     fireRate: fireRate * overdrive,
@@ -902,8 +961,8 @@ export type ObjectiveId =
   | 'quickdraw' | 'dropzone' | 'recon' | 'duel' | 'unbroken' | 'lift' | 'pilgrim' | 'storm' | 'bloodtrail' | 'monolith'
   | 'signal' | 'salvage';
 export const SHARED_OBJECTIVES: readonly ObjectiveId[] = ['defend', 'escort', 'beacons', 'zone'];
-/** Each planet's own objective, by planet index (Dune, Swamp, Ice, Lava, Spore, Scrap, Crystal, Storm). */
-export const WORLD_OBJECTIVES: readonly ObjectiveId[] = ['cache', 'nests', 'thaw', 'seal', 'nests', 'cache', 'cache', 'seal'];
+/** Each planet's own objective, by planet index (Dune, Swamp, Ice, Lava, Spore, Scrap, Crystal, Storm, Ocean, Ruin). */
+export const WORLD_OBJECTIVES: readonly ObjectiveId[] = ['cache', 'nests', 'thaw', 'seal', 'nests', 'cache', 'cache', 'seal', 'nests', 'cache'];
 export const HERO_OBJECTIVES: Record<HeroId, ObjectiveId> = {
   rook: 'quickdraw', tr9: 'dropzone', bram: 'recon', kael: 'duel', vharn: 'unbroken', oom: 'lift', corvin: 'pilgrim',
   veyl: 'storm', kresh: 'bloodtrail', joren: 'monolith', elara: 'signal', triad: 'salvage',

@@ -19,10 +19,12 @@ import { MUTATORS, WEEKLY_BONUS, type MutatorId } from '../game/weekly';
 import { formatDate, type Vars } from '../../../../shared/i18n';
 import { t } from '../i18n';
 import { C, hex } from '../art/glow';
-import { portraitKey } from '../art/sprites';
+import { bakeMastery, masteryPortraitKey, masteryScheme, portraitKey } from '../art/sprites';
+import { MASTERY, MASTERY_REWARDS, MAX_MASTERY, masteryLevel, masteryNext } from '../game/mastery';
+import { RUSH, rushPlanets } from '../game/rush';
 import {
-  AGAIN, AGAIN_SIDE, CODEX_BUTTON, CODEX_GRID, DAILY_BUTTON, ENDLESS_BUTTON, codexTabRect, ARMOURY_BUTTON, BACK, CHART, MUTATOR_CARD, WEEKLY_BACK, WEEKLY_BUTTON, WEEKLY_START, armouryCardRect, CONTINUE, DEPTH, FIGHT, FONT, HEAT_DOWN, HEAT_ROW, HEAT_UP, HERO_DETAIL, LEAVE, MAP, REROLL, SCREEN, UNLOCK, VIEW, chartRect, chartSpot, eventOptionRect, heroCardRect,
-  levelCardRect, mapNodeRect, mapNodeSpot, tradeCardRect, type Rect,
+  FIGHT_SHORT, MASTERY_ROW, RUSH_BUTTON, AGAIN, AGAIN_SIDE, CODEX_BUTTON, CODEX_GRID, DAILY_BUTTON, ENDLESS_BUTTON, codexTabRect, ARMOURY_BUTTON, BACK, CHART, MUTATOR_CARD, WEEKLY_BACK, WEEKLY_BUTTON, WEEKLY_START, armouryCardRect, CONTINUE, DEPTH, FIGHT, FONT, HEAT_DOWN, HEAT_ROW, HEAT_UP, HERO_DETAIL, LEAVE, MAP, REROLL, SCREEN, UNLOCK, VIEW, chartRect, chartSpot, eventOptionRect, heroCardRect,
+  CHART4, levelCardRect, mapNodeRect, mapNodeSpot, tradeCardRect, type Rect,
 } from '../scenes/layout';
 
 /** A tappable rectangle and what it stands for; a hero card whose deed is not done yet is `locked`. */
@@ -314,6 +316,17 @@ export function armouryPanel(p: Panel, progress: Progress) {
   return p;
 }
 
+/** Whether a hero wears its mastery colours: open at its mastery level and not switched back. */
+export const wearsColours = (progress: Progress, id: HeroId) =>
+  masteryLevel(progress.mastery[id]) >= MASTERY.colourAt && !progress.plain.includes(id);
+
+/** A hero's portrait key and accent as the select screen shows them (in its mastery colours when worn). */
+function looks(p: Panel, progress: Progress, id: HeroId) {
+  if (!wearsColours(progress, id)) return { portrait: portraitKey(id), accent: schemeOf(id).accent };
+  bakeMastery(p.scene, id);
+  return { portrait: masteryPortraitKey(id), accent: masteryScheme(id).accent };
+}
+
 /** The key that picks the hero card at `i`: 1-9 and 0, then - and =. */
 export const heroKeyLabel = (i: number) => (i < 10 ? String((i + 1) % 10) : i === 10 ? '-' : '=');
 
@@ -338,7 +351,7 @@ function heroCard(p: Panel, scene: Phaser.Scene, id: HeroId, i: number, progress
     p.add(scene.add.image(cx, r.y + r.h / 2 - 4, 'rb-locked'), 2);
     return;
   }
-  p.add(scene.add.image(cx, r.y + 62, portraitKey(id)).setScale(0.44), 2);
+  p.add(scene.add.image(cx, r.y + 62, looks(p, progress, id).portrait).setScale(0.44), 2);
   p.text(cx, r.y + 104, t(hero.name), 12.5, C.text, { bold: true, origin: [0.5, 0], align: 'center', wrap: r.w - 10 });
   p.text(cx, r.y + 142, sideOf(hero), 11, sch.accent, { origin: [0.5, 0], align: 'center', wrap: r.w - 8 });
   const wins = progress.wins[id] ?? 0;
@@ -363,7 +376,7 @@ function heroDetail(p: Panel, scene: Phaser.Scene, id: HeroId, progress: Progres
   p.frame(r, sch.accent);
   const left = r.x + 18;
   const wrap = r.w - 36;
-  p.add(scene.add.image(cx, r.y + 58, portraitKey(id)).setScale(0.8), 2);
+  p.add(scene.add.image(cx, r.y + 58, looks(p, progress, id).portrait).setScale(0.8), 2);
   fit(p.text(cx, r.y + 112, t(hero.name), 21, C.text, { bold: true, origin: [0.5, 0] }), r.w - 20);
   p.text(cx, r.y + 140, `${t(hero.weapon)}  ·  ${sideOf(hero)}`, 13, sch.accent, { origin: [0.5, 0] });
   p.text(cx, r.y + 160, t('heroStats', { hp: hero.maxHp, speed: hero.speed }), 12.5, C.muted, { origin: [0.5, 0] });
@@ -373,9 +386,11 @@ function heroDetail(p: Panel, scene: Phaser.Scene, id: HeroId, progress: Progres
     [t('signatureFull', { name: t(hero.signature.name), text: t(hero.signature.text) }), sch.accent],
     [t('pathsLine', { paths: hero.paths.map((pid) => t(UPGRADES[pid].name)).join(', ') }), C.text],
   ].map(([text, color]) => p.text(left, 0, text, 12.5, color, { wrap }));
-  // With the heat row up, the lines shrink until they end above it.
+  // With the heat row up (and the mastery row over it), the lines shrink until they end above it.
   const open = heatOpen(progress.heat[id]);
-  const bottom = open > 0 ? HEAT_ROW.y - 4 : FIGHT.y - 4;
+  const xp = progress.mastery[id] ?? 0;
+  const masteryY = (open > 0 ? HEAT_ROW.y : FIGHT.y) - MASTERY_ROW.h - 6;
+  const bottom = xp > 0 ? masteryY - 4 : open > 0 ? HEAT_ROW.y - 4 : FIGHT.y - 4;
   for (let size = 12.5; ; size -= 0.5) {
     let y = r.y + 182;
     for (const line of lines) {
@@ -385,9 +400,89 @@ function heroDetail(p: Panel, scene: Phaser.Scene, id: HeroId, progress: Progres
     if (y - 6 <= bottom || size <= 10) break;
   }
   if (open > 0) heatRow(p, scene, heat, open, sch.accent);
-  p.frame(FIGHT, sch.accent, '#14244a');
-  p.spots.push({ id: 'fight', ...FIGHT });
-  p.text(FIGHT.x + FIGHT.w / 2, FIGHT.y + FIGHT.h / 2, t('fightAs', { name: t(hero.short) }), 18, C.text, { bold: true, origin: [0.5, 0.5] });
+  if (xp > 0) masteryRow(p, progress, id, masteryY);
+  // Once a boss rush is open, its button sits beside Fight.
+  const rush = rushPlanets(progress.codex.seen).length >= RUSH.minBosses;
+  const fight = rush ? FIGHT_SHORT : FIGHT;
+  p.frame(fight, sch.accent, '#14244a');
+  p.spots.push({ id: 'fight', ...fight });
+  fit(p.text(fight.x + fight.w / 2, fight.y + fight.h / 2, t('fightAs', { name: t(hero.short) }), 18, C.text, { bold: true, origin: [0.5, 0.5] }), fight.w - 16);
+  if (rush) {
+    p.frame(RUSH_BUTTON, RUSH_COLOR, '#24120c');
+    p.spots.push({ id: 'rush', ...RUSH_BUTTON });
+    p.text(RUSH_BUTTON.x + RUSH_BUTTON.w / 2, RUSH_BUTTON.y + RUSH_BUTTON.h / 2, t('rushButton'), 13, RUSH_COLOR, { bold: true, origin: [0.5, 0.5], align: 'center', wrap: RUSH_BUTTON.w - 10 });
+  }
+}
+
+const RUSH_COLOR = '#ff9a3c';
+const MASTERY_COLOR = '#ffd36b';
+
+/** The hero's mastery: its level and XP toward the next, and from its colours' level a toggle between them and the usual ones. */
+function masteryRow(p: Panel, progress: Progress, id: HeroId, y: number) {
+  const xp = progress.mastery[id] ?? 0;
+  const level = masteryLevel(xp);
+  const next = masteryNext(xp);
+  const r = { x: MASTERY_ROW.x, y, w: MASTERY_ROW.w, h: MASTERY_ROW.h };
+  const g = p.add(p.scene.add.graphics(), 2);
+  g.fillStyle(hex('#0b1222'), 0.9).fillRoundedRect(r.x, r.y, r.w, r.h, 8);
+  // The bar toward the next level.
+  const from = MASTERY.levels[level - 1];
+  const k = next === null ? 1 : (xp - from) / (next - from);
+  g.fillStyle(hex(MASTERY_COLOR), 0.25).fillRoundedRect(r.x, r.y, Math.max(8, r.w * k), r.h, 8);
+  g.lineStyle(1.5, hex(MASTERY_COLOR), 0.7).strokeRoundedRect(r.x, r.y, r.w, r.h, 8);
+  const label = next === null ? t('masteryMax', { n: level }) : t('masteryLevel', { n: level, xp, next });
+  const colours = level >= MASTERY.colourAt;
+  fit(p.text(r.x + 10, r.y + r.h / 2, label, 12, MASTERY_COLOR, { bold: true, origin: [0, 0.5] }), r.w - 20 - (colours ? MASTERY_ROW.colourW : 0));
+  if (!colours) return;
+  const b = { x: r.x + r.w - MASTERY_ROW.colourW, y: r.y, w: MASTERY_ROW.colourW, h: r.h };
+  const on = wearsColours(progress, id);
+  p.spots.push({ id: 'colour', ...b });
+  g.fillStyle(hex(on ? masteryScheme(id).accent : schemeOf(id).accent), 1).fillCircle(b.x + 12, b.y + b.h / 2, 5);
+  fit(p.text(b.x + 22, b.y + b.h / 2, t(on ? 'masteryColours' : 'usualColours'), 11, C.text, { origin: [0, 0.5] }), b.w - 26);
+}
+
+/**
+ * The boss rush: every boss met so far, one after another with a set kit, for a best time. Shows
+ * the hero, the bosses in order, the best rush, Start and Back.
+ */
+export function rushPanel(p: Panel, progress: Progress, hero: HeroId) {
+  const scene = p.scene;
+  p.dim(0.85);
+  stars(p, scene);
+  p.text(VIEW.w / 2, 30, t('rushTitle'), 30, RUSH_COLOR, { bold: true, origin: [0.5, 0], glow: true });
+  p.text(VIEW.w / 2, 72, t('rushSubtitle', { level: RUSH.level, tier: RUSH.tiers }), 13, C.muted, { origin: [0.5, 0], align: 'center', wrap: VIEW.w - 80 });
+  const look = looks(p, progress, hero);
+  const hx = 200;
+  p.text(hx, MUTATOR_CARD.y, t('rushHero'), 13, C.muted, { origin: [0.5, 0] });
+  p.add(scene.add.image(hx, MUTATOR_CARD.y + 80, look.portrait).setScale(0.8), 2);
+  fit(p.text(hx, MUTATOR_CARD.y + 130, t(HEROES[hero].name), 19, look.accent, { bold: true, origin: [0.5, 0] }), 300);
+  const planets = rushPlanets(progress.codex.seen);
+  const half = Math.ceil(planets.length / 2);
+  planets.forEach((planet, i) => {
+    const def = PLANETS[planet];
+    const x = 400 + Math.floor(i / half) * 270;
+    const y = 130 + (i % half) * 34;
+    p.text(x, y, `${i + 1}.  ${t(BOSSES[def.boss].name)}`, 15, C.text, { bold: true });
+    p.text(x + 22, y + 18, t(def.name), 11, def.ground.deco);
+  });
+  const best = progress.rush;
+  p.text(VIEW.w / 2, 330, best ? t('rushBest', { n: best.bosses, time: clock(best.ms) }) : t('rushBestNone'), 17, best ? C.elite : C.text, { bold: true, origin: [0.5, 0] });
+  p.text(VIEW.w / 2, 360, t('rushRules'), 13, C.muted, { origin: [0.5, 0], align: 'center', wrap: VIEW.w - 120 });
+  button(p, WEEKLY_BACK, 'back', t('armouryBack'), C.muted);
+  button(p, WEEKLY_START, 'start', t('weeklyStart'), RUSH_COLOR);
+  p.text(VIEW.w / 2, WEEKLY_START.y + WEEKLY_START.h + 16, t('weeklyHelp'), 12, C.muted, { origin: [0.5, 0] });
+  return p;
+}
+
+/** The end screen's lines on the hero's mastery: the XP the run gave and any level it reached. */
+export function masteryLines(hero: HeroId, xp: number, before: number, after: number) {
+  if (xp <= 0) return [];
+  const lines = [t('masteryGain', { n: xp, hero: t(HEROES[hero].short), level: masteryLevel(after) })];
+  for (let level = masteryLevel(before) + 1; level <= Math.min(MAX_MASTERY, masteryLevel(after)); level++) {
+    const reward = MASTERY_REWARDS[level];
+    if (reward) lines.push(t('masteryUp', { n: level, reward: t(reward) }));
+  }
+  return lines;
 }
 
 /**
@@ -520,17 +615,18 @@ export function levelUp(p: Panel, s: GameState) {
 }
 
 /** The end of a run: won or fallen, with the numbers and a button to go again. */
-export function endScreen(p: Panel, s: GameState, progress: Progress, banked = 0, bonus = 0, daily: DailyRecord | null = null) {
+export function endScreen(p: Panel, s: GameState, progress: Progress, banked = 0, bonus = 0, daily: DailyRecord | null = null, extra: readonly string[] = []) {
   p.dim(0.7);
   const won = s.phase === 'won';
-  // A won crusade (not a weekly or daily) can go on into the endless rift.
-  const endless = won && s.seed < 0 && !s.daily && !s.endless;
+  // A won crusade (not a weekly, daily or boss rush) can go on into the endless rift.
+  const endless = won && s.seed < 0 && !s.daily && !s.endless && !s.rush;
   const color = won ? C.elite : C.danger;
   p.text(VIEW.w / 2, 120, t(won ? 'victory' : 'fallen'), 46, color, { bold: true, origin: [0.5, 0], glow: true });
   const hero = HEROES[s.hero!];
   const planet = PLANETS[s.planet];
   const vars = { hero: t(hero.name), planet: t(planet.name), n: s.stage + 1, of: stagesOf(s) };
-  p.text(VIEW.w / 2, 182, t(won ? BOSSES[planet.boss].beaten : s.arena ? 'fellArena' : 'fellOn', vars), 17, C.text, { origin: [0.5, 0] });
+  const line = s.rush ? (won ? 'rushWon' : 'rushFell') : won ? BOSSES[planet.boss].beaten : s.arena ? 'fellArena' : 'fellOn';
+  p.text(VIEW.w / 2, 182, t(line, { ...vars, boss: t(BOSSES[planet.boss].name), n: s.rushBeaten, of: s.rushTotal }), 17, C.text, { origin: [0.5, 0] });
   const caps = s.capstones.map((id) => t(CAPSTONES.find((c) => c.id === id)!.name));
   const lines = [
     t('runStats', { time: clock(s.runMs), level: s.level, kills: s.kills, elites: s.elitesKilled }),
@@ -542,7 +638,8 @@ export function endScreen(p: Panel, s: GameState, progress: Progress, banked = 0
     s.endless ? t('endlessEnd', { n: s.endlessCleared, best: progress.endless }) : '',
     banked > 0 ? t('banked', { n: banked }) : '',
     bonus > 0 ? t(s.daily ? 'dailyBonus' : 'weeklyBonus', { n: bonus }) : '',
-    t('longestRun', { time: clock(progress.bestMs) }),
+    ...extra,
+    s.rush ? '' : t('longestRun', { time: clock(progress.bestMs) }),
   ].filter(Boolean);
   p.text(VIEW.w / 2, 226, lines.join('\n'), 15, C.muted, { origin: [0.5, 0], align: 'center' });
   const again = endless ? AGAIN_SIDE : AGAIN;
@@ -706,10 +803,19 @@ export function spaceMap(p: Panel, s: GameState, charted: readonly string[]) {
     p.frame(r, def.ground.deco);
     p.spots.push({ id: def.id, ...r });
     const disc = p.add(scene.add.graphics(), 2);
+    const known = charted.includes(def.id);
+    if (options.length > 3) {
+      // Four to a column: the disc to the left of the name and faction, the hint below.
+      planetDisc(disc, r.x + 24, r.y + 26, CHART4.r, planet, false);
+      p.text(r.x + r.w - 8, r.y + 6, String(i + 1), 12, C.muted, { origin: [1, 0] });
+      fit(p.text(r.x + 46, r.y + 10, t(def.name), 15, C.text, { bold: true }), r.w - 66);
+      fit(p.text(r.x + 46, r.y + 30, known ? t(def.faction) : t('uncharted'), 11.5, known ? def.ground.deco : C.muted), r.w - 54);
+      p.text(c.x, r.y + 52, t(def.hint), 11, C.muted, { origin: [0.5, 0], align: 'center', wrap: r.w - 16 });
+      return;
+    }
     planetDisc(disc, c.x, c.y - 18, CHART.r, planet, false);
     p.text(r.x + 10, r.y + 8, String(i + 1), 12, C.muted);
     p.text(c.x, c.y + 8, t(def.name), 15, C.text, { bold: true, origin: [0.5, 0] });
-    const known = charted.includes(def.id);
     p.text(c.x, c.y + 27, known ? t(def.faction) : t('uncharted'), 11.5, known ? def.ground.deco : C.muted, { origin: [0.5, 0] });
     p.text(c.x, c.y + 43, t(def.hint), 11, C.muted, { origin: [0.5, 0], align: 'center', wrap: CHART.w - 16 });
   });

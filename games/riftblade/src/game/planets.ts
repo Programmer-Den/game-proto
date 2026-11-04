@@ -1,5 +1,5 @@
 /**
- * The Rift Crusade: four jumps across eight planets, each with its own faction, wave curve and boss.
+ * The Rift Crusade: four jumps across ten planets, each with its own faction, wave curve and boss.
  * A run starts on the Dune world and ends on the Lava world; between them the space map offers a
  * choice of planets at each jump (`stage`). Also the numbers of the star map between fights
  * (credits, the trader, the elite arena and the events). Names and texts are keys of `i18n/en.ts`,
@@ -7,15 +7,16 @@
  */
 import { t, type TextKey } from '../i18n';
 
-export type BossId = 'grinder' | 'bogmother' | 'siege' | 'champion' | 'sporequeen' | 'scrapking' | 'colossus' | 'stormherald';
+export type BossId = 'grinder' | 'bogmother' | 'siege' | 'champion' | 'sporequeen' | 'scrapking' | 'colossus' | 'stormherald' | 'kraken' | 'warden';
 /** How a boss fights: each later boss fights like one of the first four, in its own colours. */
 export type BossMech = 'grinder' | 'bogmother' | 'siege' | 'champion';
-export type PlanetId = 'dune' | 'swamp' | 'ice' | 'lava' | 'spore' | 'scrap' | 'crystal' | 'storm';
+export type PlanetId = 'dune' | 'swamp' | 'ice' | 'lava' | 'spore' | 'scrap' | 'crystal' | 'storm' | 'ocean' | 'ruin';
 
 /** The swarm kinds of each faction, besides the bosses. */
 export type FoeKind =
   | 'clanker' | 'rollerbomb' | 'mirerat' | 'toad' | 'linetrooper' | 'walker' | 'acolyte' | 'knight'
-  | 'sporeling' | 'puffcap' | 'scrapper' | 'hauler' | 'shardling' | 'prism' | 'wisp' | 'conductor';
+  | 'sporeling' | 'puffcap' | 'scrapper' | 'hauler' | 'shardling' | 'prism' | 'wisp' | 'conductor'
+  | 'crab' | 'squid' | 'shade' | 'sentinel';
 
 export interface PlanetDef {
   id: PlanetId;
@@ -82,6 +83,16 @@ export const PLANETS: readonly PlanetDef[] = [
     swarm: 'wisp', elites: ['conductor', 'wisp'], boss: 'stormherald', hint: 'stormHint',
     ground: { field: '#090c14', grid: '#ffe45c', deco: '#fff08a' },
   },
+  {
+    id: 'ocean', stage: 1, name: 'oceanName', faction: 'oceanFaction', foes: 'oceanFoes', elite: 'oceanElite', hp: 4, spawn: 1.25, dmg: 1.45,
+    swarm: 'crab', elites: ['squid', 'crab'], boss: 'kraken', hint: 'oceanHint',
+    ground: { field: '#04121c', grid: '#3cc8ff', deco: '#7fe9ff' },
+  },
+  {
+    id: 'ruin', stage: 2, name: 'ruinName', faction: 'ruinFaction', foes: 'ruinFoes', elite: 'ruinElite', hp: 7, spawn: 1.35, dmg: 1.75,
+    swarm: 'shade', elites: ['sentinel', 'shade'], boss: 'warden', hint: 'ruinHint',
+    ground: { field: '#0f0d0a', grid: '#d8c08a', deco: '#9fffc8' },
+  },
 ];
 
 /** The last jump: the Lava world, where the Hollow Champion waits. */
@@ -111,6 +122,8 @@ export interface BossDef {
   power: number;
   /** The foe it calls in (the Grinder's and the Bog Mother's way), if not the first boss's own. */
   adds?: FoeKind;
+  /** The look of its shots, if not its kind's own. */
+  bolt?: 'ink';
 }
 
 export const BOSSES: Record<BossId, BossDef> = {
@@ -126,6 +139,10 @@ export const BOSSES: Record<BossId, BossDef> = {
   },
   colossus: { name: 'colossusName', bar: 'colossusBar', beaten: 'colossusBeaten', r: 60, hp: 14500, speed: 34, dmg: 26, credits: 30, mech: 'siege', power: 1.05 },
   stormherald: { name: 'stormheraldName', bar: 'stormheraldBar', beaten: 'stormheraldBeaten', r: 30, hp: 15000, speed: 84, dmg: 20, credits: 30, mech: 'champion', power: 0.8 },
+  kraken: {
+    name: 'krakenName', bar: 'krakenBar', beaten: 'krakenBeaten', r: 60, hp: 16000, speed: 40, dmg: 23, credits: 30, mech: 'grinder', power: 1, adds: 'crab', bolt: 'ink',
+  },
+  warden: { name: 'wardenName', bar: 'wardenBar', beaten: 'wardenBeaten', r: 62, hp: 15000, speed: 30, dmg: 26, credits: 30, mech: 'siege', power: 1.05 },
 };
 
 /** The Bog Mother: globs, young and the bog pools she leaves. */
@@ -138,6 +155,19 @@ export const CHAMPION = { dashEvery: 3000, aimMs: 650, dashSpeed: 820, ringMs: 3
 export const VENT = { minMs: 5000, maxMs: 9000, warnMs: 1300, r: 70, dmg: 14, foeDmg: 40 };
 /** Lightning on the Storm world: a strike near the hero every so often, after a warning; conductors call them too. */
 export const STRIKE = { minMs: 4500, maxMs: 8000, warnMs: 1000, r: 48, dmg: 11, foeDmg: 30, callMs: 3600, callRange: 320 };
+
+/**
+ * The tide on the Ocean world: every `everyMs` (from `firstMs`) the sea comes in over half the
+ * field, after a warning: the water's edge runs through a line `inset` px behind the hero, and
+ * for `ms` the water slows the hero and speeds up the sea's own foes.
+ */
+export const TIDE = { firstMs: 40_000, everyMs: 60_000, warnMs: 3500, ms: 15_000, inset: 100, slow: 0.3, foeSpeed: 1.2 };
+/**
+ * Falling pillars on the Ruin world: every so often a pillar near the hero topples after a
+ * warning, hurting what it lands on, and then lies across the way for `lifeMs`, blocking the hero
+ * and every foe but the shades (and the Warden, who smashes through).
+ */
+export const PILLAR = { minMs: 6000, maxMs: 9500, warnMs: 1500, len: 190, r: 16, lifeMs: 24_000, dmg: 15, foeDmg: 40, max: 5 };
 
 /** Credits: dropped by elites, left by bosses, and paid for each planet cleared. */
 export const CREDITS = { elite: 6, clear: 12, arena: 20, arenaElite: 6 };

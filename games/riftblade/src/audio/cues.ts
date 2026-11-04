@@ -69,6 +69,8 @@ export class SoundCues {
   private boss = false;
   private bossFlash = 0;
   private warned = new Set<number>();
+  private landed = new Set<number>();
+  private tide = false;
   private flurries = 0;
   /** When Kresh's staff may whir again (run ms). */
   private whirAt = 0;
@@ -124,6 +126,8 @@ export class SoundCues {
     this.boss = !!boss;
     this.bossFlash = boss?.flashMs ?? 0;
     this.warned.clear();
+    this.landed = new Set(s.pillars.filter((pl) => pl.warnMs <= 0).map((pl) => pl.id));
+    this.tide = !!s.tide;
     this.hp = s.player.hp;
     this.hurtMs = s.player.hurtMs;
     this.barrier = s.player.barrier;
@@ -141,7 +145,7 @@ export class SoundCues {
     for (const b of s.bullets) {
       if (!fresh(b.id)) continue;
       if (!b.hostile) play(boltSound(b.color, b.spin));
-      else if (seen(b.x, b.y)) play(b.color === 'glob' || b.color === 'spore' ? 'glob' : b.color === 'volley' || b.color === 'slug' || b.color === 'splinter' ? 'enemyVolley' : 'enemyShot');
+      else if (seen(b.x, b.y)) play(b.color === 'glob' || b.color === 'spore' || b.color === 'ink' ? 'glob' : b.color === 'volley' || b.color === 'slug' || b.color === 'splinter' ? 'enemyVolley' : 'enemyShot');
     }
     const hero = s.hero ? HEROES[s.hero] : null;
     if (s.slashes.some((f) => fresh(f.id))) {
@@ -176,6 +180,15 @@ export class SoundCues {
       const sound = HAZARD_SOUND[h.kind];
       if (sound) play(sound);
     }
+    // The Ruin world's pillars: a warning as one starts to fall, a stomp as it lands.
+    for (const pl of s.pillars) {
+      if (fresh(pl.id)) play('warn');
+      else if (pl.warnMs <= 0 && !this.landed.has(pl.id)) play('stomp');
+    }
+    this.landed = new Set(s.pillars.filter((pl) => pl.warnMs <= 0).map((pl) => pl.id));
+    // The Ocean world's tide: the siren as it starts to come in.
+    if (s.tide && !this.tide) play('siren');
+    this.tide = !!s.tide;
     // The boss: a dull tick when it is hit.
     const boss = s.enemies.find((e) => e.kind === 'boss' && e.hp > 0);
     if (boss && boss.flashMs > this.bossFlash && seen(boss.x, boss.y)) play('bossHit');

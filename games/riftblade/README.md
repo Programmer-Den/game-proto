@@ -3,9 +3,9 @@
 A survivor-style auto-attack roguelike built with [Phaser 4](https://phaser.io), TypeScript and
 Vite, part of the [game hub](../../README.md).
 
-Pick a hero (blaster soldiers, blade knights, a rebel commander or a trio of battle bots) and fight the Rift Crusade across four of eight worlds: from the Dune world,
-the space map lets you choose your way through two of the Swamp, Spore, Scrap, Ice, Crystal and
-Storm worlds to the Lava world. On each you hold out for five minutes while its faction pours in from every side, then
+Pick a hero (blaster soldiers, blade knights, a rebel commander or a trio of battle bots) and fight the Rift Crusade across four of ten worlds: from the Dune world,
+the space map lets you choose your way through two of the Swamp, Spore, Scrap, Ocean, Ice,
+Crystal, Storm and Ruin worlds to the Lava world. On each you hold out for five minutes while its faction pours in from every side, then
 beat its boss. You only steer: your weapon fires (or your blade strikes) on its own. Shot-down foes drop lumen shards, and
 every level-up pauses the run on three upgrade cards (four for Elara Voss). Your hero, level and kit carry over from
 world to world, and between worlds a star map offers a trader, an elite fight, a rest or an event.
@@ -78,7 +78,7 @@ hero it shows as played (a world reached) or unlocked.
 ### The run: the Rift Crusade
 
 A run makes four jumps: it starts on the Dune world and ends on the Lava world, and after each of
-the first two bosses the space map lets you pick the next planet from three (see below). Each
+the first two bosses the space map lets you pick the next planet from four (see below). Each
 world lasts five minutes and ends with its boss; the clock starts again on each, and the HUD shows
 where you are (for example "2/4 Spore world") and your credits. Your hero, level, abilities and
 gear carry over. Each jump is tougher than the last: its foes have more health, hit harder and
@@ -101,6 +101,8 @@ come faster.
 | 2 Spore world | Mycelid Bloom (magenta and pink) | **Sporelings** drift in clumps and burst into spore clouds that slow you. **Puffcaps** stop in range and puff out rings of spores. | **The Spore Queen**: spits fans of spores, calls in sporelings and leaves spore pools that slow you |
 | 2 Scrap world | Scrap Horde (rust and copper) | **Scrappers** run in fast packs of three. **Haulers** are slow and tough, and fall apart into scrappers when broken. | **The Scrap King**: a welded crawler that fires heavy fans of shells and calls in scrappers, faster below half health |
 | 3 Crystal world | Shardborn (violet and aqua) | **Shardlings** come in pairs and burst into splinters that fly out. **Prisms** stop in range and fire lances of bolts in a line. | **The Prism Colossus**: splinter volleys, barrages that light up the ground before they land, and stomps when you get close |
+| 2 Ocean world | Tidebound (sea blue and foam) | **Crabs** scuttle in packs of three, in bursts with sideways steps. **Squids** stop in range and squirt fans of ink that slow you. Every minute from 0:40 **the tide** floods half the field after a warning: you wade slower in it while crabs and squids surf faster. | **The Deep Kraken**: fans of ink, calls in crabs, faster below half health |
+| 3 Ruin world | Stone Watch (sandstone and ghostly green) | **Shades** drift in groups of three and pass through stone. **Sentinels** stop when close, glow and slam the ground around them. **Pillars** fall near you after a marked line, hurt whatever is under them and block the way for a while. | **The Stone Warden**: shell volleys, barrages that light up the ground before they land, stomps when you get close, and it smashes pillars in its way |
 | 3 Storm world | Stormcallers (electric yellow) | **Wisps** weave fast. **Conductors** stop in range and call lightning down where you stand. **Lightning** strikes near you now and then, after a warning ring. | **The Storm Herald**: lightning dashes along a line it marks first; below half health it sends out rings of sparks with gaps |
 | 4 Lava world | Hollow cult (violet and ember) | **Ash acolytes** swarm and burst into embers that burn for a moment. **Fallen knights** block bolts from the front with a shield and dash at you; hit them while their guard is down. **Lava vents** glow, then erupt. | **The Hollow Champion**: fast blade dashes along a line it marks first; below half health it burns and sends out rings of fire with gaps to slip through |
 
@@ -109,6 +111,10 @@ come faster.
 ![Sporelings and an elite puffcap on the Spore world](docs/screenshots/world-spore.webp)
 
 ![A swarm of wisps and an elite conductor on the Storm world](docs/screenshots/world-storm.webp)
+
+![The tide floods half the field on the Ocean world, with the Deep Kraken](docs/screenshots/world-ocean.webp)
+
+![Fallen pillars and the Stone Warden's barrage on the Ruin world](docs/screenshots/world-ruin.webp)
 
 ### Rift heat
 
@@ -174,8 +180,8 @@ Armoury (on top of the run's own credits). Tap Start or press Enter; Back return
 ### The daily run
 
 From the same first run on, a **Daily run** button shows beside the weekly one. It opens today's
-run: three worlds (the Dune world, then one of Swamp, Spore and Scrap, then one of Ice, Crystal and
-Storm), one of your open heroes and one mutator, picked from the day, with each world and star map
+run: three worlds (the Dune world, then one of Swamp, Spore, Scrap and Ocean, then one of Ice,
+Crystal, Storm and Ruin), one of your open heroes and one mutator, picked from the day, with each world and star map
 seeded, so everyone playing that day meets the same run. It is fought at heat 0 and without the
 Armoury, and there is **one try a day**: starting it uses the day's try, even if you leave half
 way. It scores **1000 per boss beaten plus 1 per kill**; the panel and the end screen show today's
@@ -204,8 +210,8 @@ fills once, and a full page banks its credits for the Armoury:
 
 | Page | Entries | Pays |
 | --- | --- | --- |
-| Foes | 16 | 60 |
-| Bosses | 8 | 100 |
+| Foes | 20 | 60 |
+| Bosses | 10 | 100 |
 | Pool skills | 30 | 80 |
 | Gear | 12 | 50 |
 | Hero paths | 48 (every hero's four) | 150 |
@@ -213,6 +219,36 @@ fills once, and a full page banks its credits for the Armoury:
 Tap a page or press 1-5; Back or Enter returns. Entries not met yet show as `? ? ?`.
 
 ![The codex](docs/screenshots/codex.webp)
+
+### Hero mastery
+
+Every run gives its hero mastery XP: 40 for each boss beaten, 25 for every 100 foes downed and 100
+for winning the crusade (the endless rift counts its bosses; a boss rush gives none). Once a hero
+has some, its detail panel shows its mastery level and the XP to the next one. The end screen says
+how much the run gave. Each level opens something that lasts:
+
+| Level | XP | Opens |
+| --- | --- | --- |
+| 2 | 250 | Mastery colours: tap the colours toggle on the mastery row to wear them or the usual ones |
+| 3 | 700 | A second starting weapon, a pool skill that suits the hero |
+| 4 | 1400 | 8% more health |
+| 5 | 2400 | 8% more damage |
+
+Weekly and daily runs keep their rules: the hero wears its colours there, but starts without the
+weapon and perks.
+
+![The mastery row on the hero select, with the Boss rush button](docs/screenshots/mastery-rush.webp)
+
+### The boss rush
+
+Once two bosses are in the codex, a **Rush** button shows beside Fight. The boss rush fights every
+boss you have met, in the order of the crusade, back to back, with a set kit: level 12, every path
+at tier 3, the drill at tier 2 and full health. Each boss lands at once, with half its health, and
+only its own adds come; there are no elites, side objectives or level-ups. Between bosses you heal
+a little. The rush keeps your best: the most bosses beaten, then the fastest time. It banks no
+credits.
+
+![The boss rush panel](docs/screenshots/rush-panel.webp)
 
 ### Trophies
 
@@ -238,12 +274,12 @@ Each shows a toast once, when it is earned; a save from before trophies earns it
 
 After the boss of the Dune world falls (and again after the second world's), the space map shows
 the crusade's four jumps as columns of planets, with the route flown so far lit. Tap one of the
-next jump's three planets (or press 1, 2 or 3): each card shows its name, a line on what waits
+next jump's four planets (or press 1 to 4): each card shows its name, a line on what waits
 there and its faction, once you have landed on it in any run (until then it reads "Uncharted"; the
 planets landed on are saved in the browser). The Lava world is always the last jump. Then the star
 map comes, on the way to the planet you chose.
 
-![The space map: the route so far and the next jump's three planets](docs/screenshots/space-map.webp)
+![The space map: the route so far and the next jump's planets](docs/screenshots/space-map.webp)
 
 ### Side objectives
 
@@ -260,8 +296,8 @@ under way when the boss comes is called off.
 | Escort the stranded bot | Every world | Stay near the bot, which only rolls on while you are close, until it reaches its goal; foes touching it wear it down (60 s) | 30 credits |
 | Destroy the relay beacons | Every world | Break 3 beacons (45 s) | A level |
 | Survive the shrinking zone | Every world | Stay inside a zone that closes in for 30 s; 4 s outside fails it | 25 credits |
-| Raid the guarded cache | Dune, Scrap and Crystal worlds | Break the cache; an elite guards it (50 s) | 45 credits |
-| Purge the nests | Swamp and Spore worlds | Break 4 nests, which breed the world's swarm while they stand (50 s) | Upgrade card |
+| Raid the guarded cache | Dune, Scrap, Crystal and Ruin worlds | Break the cache; an elite guards it (50 s) | 45 credits |
+| Purge the nests | Swamp, Spore and Ocean worlds | Break 4 nests, which breed the world's swarm while they stand (50 s) | Upgrade card |
 | Thaw the frozen squad | Ice world | Stand by each of 3 frozen troopers for 1.5 s; each one freed fights beside you for 40 s (60 s) | A level |
 | Seal the vents | Lava and Storm worlds | Stand on each of 3 vents for 1.5 s while the open ones erupt (50 s) | Upgrade card |
 | Quick draw | Captain Rook | Down 70 foes (30 s) | 30 credits |
@@ -503,16 +539,17 @@ npx playwright test --project riftblade
   and which are locked), `blades.ts` (the knights' attacks, signatures and skills, and the unlock
   deeds), `squad.ts` (Elara Voss and Triad-77: weapons, signatures, paths and allies),
   `upgrades.ts` (paths, pool, gear, capstones, crossovers and the card roll), `planets.ts` (the
-  four worlds, their bosses and the star map's numbers), `state.ts` (the state and the numbers),
+  ten worlds, their bosses and the star map's numbers), `state.ts` (the state and the numbers),
   `sim.ts` (everything that happens in a fight), `voyage.ts` (between fights: the star map, trader,
   arena, events, the endless rift's loop and the next world), `objectives.ts` (the side
   objectives), `daily.ts` (the daily run), `endless.ts` (the endless rift's numbers), `codex.ts`
-  (the codex pages) and `save.ts`.
+  (the codex pages), `mastery.ts` (hero mastery), `rush.ts` (the boss rush) and `save.ts`.
 - `src/art/`: `glow.ts` (painting helpers), `sprites.ts` (the heroes, Scrap bots and pickups),
   `knights.ts` (the knights, their blades and allies), `squad.ts` (Elara, Triad-77, their allies,
   the drop pod and the locked placeholder) and
-  `factions.ts` (the later factions and their bosses), all painted at boot.
+  `factions.ts` (the later factions and their bosses), all painted at boot, and `worlds.ts` and
+  `realms.ts` (the space map's factions), painted once a run leaves the Dune world.
 - `src/scenes/`: `BootScene.ts`, `GameScene.ts` (input, camera and drawing), `objectiveArt.ts`
   (the objectives and power-ups, drawn in code) and `layout.ts`.
-- `src/ui/panels.ts`: the hero select, Armoury, codex, weekly and daily run, level-up, new hero,
+- `src/ui/panels.ts`: the hero select, Armoury, codex, weekly and daily run, boss rush, level-up, new hero,
   star map, trader, event and end screens.

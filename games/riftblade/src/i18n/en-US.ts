@@ -12,6 +12,10 @@ const enUS: Partial<Translation<typeof en>> = {
   banked: '+{n} credits banked for the Armory',
   dailySubtitle: '{day}: three worlds, the same hero, mutator and worlds for everyone today. One try a day, at heat 0, without the Armory.',
   codexSubtitle: 'Every foe, boss and card you meet fills a page. A full page pays credits into the Armory\'s bank, once.',
+  masteryColours: 'Mastery colors',
+  usualColours: 'Usual colors',
+  masteryColour: 'mastery colors to wear',
+  rushRules: 'No heat, Armory or mastery: the same kit for every try. Fewest seconds wins.',
   hollowRebirthText: 'Armored and slow: +60 health, -30% damage taken, double slash damage',
 };
 
