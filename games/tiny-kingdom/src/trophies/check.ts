@@ -20,7 +20,8 @@ const EARNED: Record<string, (s: GameState, stars: number[], puzzles: number[]) 
   firstCrown: (s) => s.crowns >= 1,
   firstManor: (s) => s.grid.some((cells) => cells.includes('manor')),
   firstTrade: (s) => s.tradedIn > 0,
-  allGifts: (s) => SPECIALS.every((b) => s.unlocked.includes(b)),
+  // A puzzle's set pouch puts its specials in `unlocked` without winning them, so puzzles don't count.
+  allGifts: (s) => !s.puzzle && SPECIALS.every((b) => s.unlocked.includes(b)),
   roundEight: (s) => s.round >= ROUND,
   longChain: (s) => joinedCount(s.grid, mine(s)) >= CHAIN,
   tenCrowns: (s) => s.crowns >= CROWNS,

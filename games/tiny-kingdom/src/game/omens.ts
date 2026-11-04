@@ -1,5 +1,5 @@
 import { namedPlaces, type At } from './decree';
-import { AROUND, SIDES, isHome, seeded, type Cell } from './tiles';
+import { AROUND, SIDES, WONDER_CELLS, isHome, isWonder, seeded, wonderAnchor, type Cell } from './tiles';
 
 // Omens: from round OMEN_FROM on, each round warns of what the next round brings, so there is a
 // round to prepare. A flood: a lake rises over a named shore cell (grass or a farm) when the next
@@ -64,12 +64,30 @@ export function omenFor(island: number, round: number, grid: Cell[][]): Omen | n
   return null;
 }
 
-/** Lets `omen` strike `grid` as its round begins. Null when nothing happened (the tower was no longer alone, or gone). */
+/**
+ * Lets `omen` strike `grid` as its round begins. Null when nothing happened (the tower was no longer
+ * alone, or gone). A flood on a wonder's cell takes the whole wonder: the cell becomes a lake and the
+ * other three grass, so no part of it is left to score as a wonder of its own.
+ */
 export function strike(grid: Cell[][], omen: Omen): Struck | null {
   const [col, row] = omen.at;
   if (omen.kind === 'flood') {
+    const cells: At[] = [omen.at];
+    const cell = grid[row][col];
+    if (isWonder(cell)) {
+      const anchor = WONDER_CELLS.map(([dc, dr]): At => [col - dc, row - dr]).find(
+        ([c, r]) => wonderAnchor(grid, c, r) && WONDER_CELLS.every(([dc, dr]) => grid[r + dr]?.[c + dc] === cell),
+      );
+      if (anchor)
+        for (const [dc, dr] of WONDER_CELLS) {
+          const [c, r] = [anchor[0] + dc, anchor[1] + dr];
+          if (c === col && r === row) continue;
+          grid[r][c] = 'grass';
+          cells.push([c, r]);
+        }
+    }
     grid[row][col] = 'lake';
-    return { kind: 'flood', cells: [omen.at] };
+    return { kind: 'flood', cells };
   }
   if (!lone(grid, col, row)) return null;
   grid[row][col] = 'grass';

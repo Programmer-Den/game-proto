@@ -56,7 +56,7 @@ The hub's **Settings** button opens the settings every game shares. They are sav
   | Apothecary | customers wait 50% longer | customers wait 30% less |
   | Deadline | zombies have 25% less health | zombies have 30% more health |
   | Palisade | foes have 25% less health | foes have 30% more health |
-  | Tiny Kingdom | round goals 20% lower, campaign stars 1% higher, puzzle stars 10% lower, the rival lord never builds to spite you | round goals 20% higher, campaign stars 6% lower, puzzle stars 5% higher, the rival lord weighs your losses like its own gains |
+  | Tiny Kingdom | round goals 20% lower, campaign stars 1% higher, puzzle stars 10% lower, the rival lord never builds to spite you | round goals 20% higher, campaign stars 6% lower, puzzle stars 5% higher (the third star unchanged), the rival lord weighs your losses like its own gains |
   | Hotfoot | 5 hearts | 2 hearts |
   | Anvilheart | adventurers wait 50% longer | adventurers wait 30% less |
   | Broadside | enemy ships and forts have 25% less health | enemy ships and forts have 30% more health |

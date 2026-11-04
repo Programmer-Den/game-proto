@@ -109,8 +109,14 @@ export const PUZZLES: Puzzle[] = [
   { island: 7481, pouch: { farm: 2, house: 2, tower: 1, windmill: 2, market: 1, harbor: 1, lumber: 3, temple: 3, road: 2 }, stars: [42, 49, 56] },
 ];
 
-/** The scores that earn one, two and three stars on puzzle `n` (1 and up) at the chosen difficulty: a little lower on Easy, higher on Hard. */
-export const puzzleStars = (n: number) => PUZZLES[n - 1].stars.map((s) => Math.round(s * byDifficulty(0.9, 1, 1.05))) as Puzzle['stars'];
+/**
+ * The scores that earn one, two and three stars on puzzle `n` (1 and up) at the chosen difficulty: a
+ * little lower on Easy, higher on Hard but never above the best score found, so three stars stay reachable.
+ */
+export const puzzleStars = (n: number) => {
+  const stars = PUZZLES[n - 1].stars;
+  return stars.map((s) => Math.min(Math.round(s * byDifficulty(0.9, 1, 1.05)), stars[2])) as Puzzle['stars'];
+};
 
 /** Stars a final score earns on puzzle `n` (1 and up): 0 to 3. */
 export const puzzleStarsFor = (n: number, score: number) => puzzleStars(n).filter((s) => score >= s).length;
