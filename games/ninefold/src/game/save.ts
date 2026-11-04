@@ -1,5 +1,5 @@
 import { STYLES } from './catalog';
-import { newProgress, unlock, type GameState, type Progress } from './state';
+import { GAUNTLET, newProgress, unlock, type GameState, type Progress } from './state';
 
 // Ninefold keeps two keys: the progress that unlocks the styles, with the style worn, and the
 // board in play (with a Delve run's relics, or its relic offer between floors), so a reload goes
@@ -13,15 +13,18 @@ const BOARD_FIELDS = [
   'timeMs', 'hearts', 'maxHearts', 'floor', 'plan', 'upcoming', 'dailyDate', 'relics', 'relicOffer', 'warded', 'streak',
   'keyHealed', 'undo', 'doneUnits',
 ] as const;
+/** Fields added later: a save from before them loads with their defaults from `newGame`. */
+const LATER_FIELDS = ['week', 'weekDay', 'ascent', 'ascended'] as const;
 
 export function loadProgress(): Progress {
   const p = newProgress();
   try {
     const saved = JSON.parse(localStorage.getItem(KEY) ?? 'null');
     if (saved && typeof saved === 'object') {
-      for (const key of ['solved', 'flawless', 'noHint', 'hard', 'fast', 'bestFloor', 'bosses', 'daily', 'dailyStreak', 'bestStreak'] as const) {
+      for (const key of ['solved', 'flawless', 'noHint', 'hard', 'fast', 'bestFloor', 'bosses', 'daily', 'dailyStreak', 'bestStreak', 'climbed', 'week', 'bestWeek'] as const) {
         if (Number.isFinite(saved[key])) p[key] = saved[key];
       }
+      if (Array.isArray(saved.weekScores) && saved.weekScores.length === GAUNTLET.length && saved.weekScores.every(Number.isFinite)) p.weekScores = saved.weekScores;
       if (Array.isArray(saved.unlocked)) p.unlocked = STYLES.filter((s) => s === 'paper' || saved.unlocked.includes(s));
       if (p.unlocked.includes(saved.style)) p.style = saved.style;
     }
@@ -44,7 +47,7 @@ export function saveProgress(p: Progress) {
 export function saveBoard(s: GameState) {
   try {
     if (s.phase === 'playing' || s.phase === 'relic') {
-      localStorage.setItem(BOARD_KEY, JSON.stringify(Object.fromEntries(BOARD_FIELDS.map((k) => [k, s[k]]))));
+      localStorage.setItem(BOARD_KEY, JSON.stringify(Object.fromEntries([...BOARD_FIELDS, ...LATER_FIELDS].map((k) => [k, s[k]]))));
     } else localStorage.removeItem(BOARD_KEY);
   } catch {
     // Storage can be full or blocked; the board just isn't kept.
@@ -62,6 +65,7 @@ export function loadBoard(s: GameState) {
       && BOARD_FIELDS.every((k) => k in saved);
     if (!ok) return false;
     Object.assign(s, Object.fromEntries(BOARD_FIELDS.map((k) => [k, saved[k]])));
+    for (const k of LATER_FIELDS) if (Number.isFinite(saved[k])) s[k] = saved[k];
     s.events.push({ type: 'board' });
     return true;
   } catch {

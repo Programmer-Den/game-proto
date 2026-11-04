@@ -12,8 +12,24 @@ const de: Translation<typeof en> = {
   easy: 'Leicht',
   normal: 'Mittel',
   hard: 'Schwer',
+  killer: 'Killer',
+  thermo: 'Thermo',
+  weekly: 'Wochenprüfung',
+  weeklyLine: 'Tag {day} von 7 · {total} Punkte',
+  weeklyDone: 'Heute gespielt · {total} Punkte',
+  weeklyHeading: 'Tag {day} von 7',
+  ascentTag: 'St. {n}',
   delve: 'Abstieg',
   delveBlurb: 'Eine Reihe immer größerer Rätsel, mit Herzen und Relikten.',
+  delveAscent: 'Abstieg · Stufe {n}',
+  ascentShort: 'Stufe {n}',
+  ascentLine: 'Stufe {n}: {rule}, dazu jede Regel darunter.',
+  ascentHearts: 'ein Herz weniger',
+  ascentHint: 'kein Tipp zu Beginn',
+  ascentGivens: 'auf jeder Ebene 2 Vorgaben weniger',
+  ascentNotes: 'keine Notizen',
+  ascentOffer: 'zwei Relikte zur Wahl statt drei',
+  ascentOpened: 'Stufe {n} ist offen: wähle sie im Menü neben Abstieg.',
   bestFloor: 'Tiefste Ebene: {n}',
   stylesButton: 'Stile ({n} von {of})',
   stats: 'Gelöst: {solved} · Fehlerfrei: {flawless}',
@@ -48,6 +64,7 @@ const de: Translation<typeof en> = {
   hintButton: 'Tipp · {n}',
   notesOn: 'Notizen: an',
   notesOff: 'Notizen: aus',
+  notesLocked: 'Keine Notizen',
   erase: 'Löschen',
   undo: 'Zurück',
   keysHint: 'Tasten: 1-9, Pfeile, N Notizen, H Tipp, U zurück, Rücktaste löscht',
@@ -57,6 +74,7 @@ const de: Translation<typeof en> = {
   solvedLine: 'Zeit {time} · Fehler {mistakes} · Tipps {hints}',
   unlocked: 'Neuer Stil freigeschaltet: {styles}',
   next: 'Nächstes Rätsel',
+  weeklyScore: 'Punkte {score} · Woche {total}',
   floorCleared: 'Ebene {n} geschafft',
   takeRelic: 'Nimm ein Relikt mit nach unten.',
   runOver: 'Keine Herzen mehr',
@@ -82,6 +100,8 @@ const de: Translation<typeof en> = {
   parityRule: 'markierte Felder enthalten gerade Ziffern, die anderen ungerade.',
   clockName: 'Uhr',
   clockRule: 'alle 3 Minuten geht ein Herz verloren.',
+  killerRule: 'jeder gestrichelte Käfig ergibt seine Summe, ohne doppelte Ziffer.',
+  thermoRule: 'die Ziffern steigen entlang jedes Thermometers, ab der Kugel.',
   sealedName: 'Versiegelt',
   sealedRule: 'keine Tipps hier; wer die Ebene schafft, bekommt einen zurück.',
   twinName: 'Zwillingsblick',
@@ -99,6 +119,6 @@ const de: Translation<typeof en> = {
   wardText: 'Der erste Fehler auf jeder Ebene kostet kein Herz.',
 };
 
-export const keepEnglish: (keyof typeof en)[] = ['title'];
+export const keepEnglish: (keyof typeof en)[] = ['title', 'killer', 'thermo'];
 
 export default de;
