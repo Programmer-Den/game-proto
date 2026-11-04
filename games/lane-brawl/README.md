@@ -3,7 +3,7 @@
 A single-player MOBA prototype built with [Phaser 4](https://phaser.io), TypeScript and Vite, part of
 the [game hub](../../README.md).
 
-You pick one of seventeen champions (two of them unlocked by mastery) and lead a team of five down three lanes of a big square map.
+You pick one of seventeen champions (two of them unlocked by mastery) and lead a team of five down the lanes of one of two big square maps, Kessmoor with three lanes or the Twin Rivers with two.
 The cast runs from medieval fantasy to steampunk: knights, archers and witches fight beside
 gunslingers, brass automatons, tinkers with lightning coils, wolf-folk and a great bear. Four
 allies walk the lanes with you, and five NPC champions on the red team fight you. Every champion is
@@ -499,6 +499,47 @@ the team's blue, in the match and on the portrait.
 
 ![A ranked win: promoted to Gold, its colours won, and the Alchemist unlocked by the mastery rank it brought](docs/screenshots/ranked-end.webp)
 
+### Pick and ban
+
+A ranked match starts with a draft on the pick screen. Your first click bans a champion (the card
+reads Your ban), and red bans one back; your next click picks your champion. The panel before the
+match then shows both bans and every pick in the order they fell: blue picks first, then red twice,
+blue twice and so on, ten picks in all, with your four allies drafted for you. Below Gold red bans
+and picks at random. From Gold up red bans the champion you have won most with and its first pick
+counters yours (an assassin for a marksman, a controller for a fighter, and so on); from Diamond
+every red pick counters the blue champion picked just before it. Back drops the draft and its bans.
+
+![The pick screen in a ranked draft: your ban and red's, with red's taking your best champion](docs/screenshots/pick-and-ban.webp)
+
+### Talent pages
+
+Wins with a champion open its talent page: mastery rank 1 opens the damage row, rank 2 the defence
+row and rank 3 the utility row. Picking a champion with a page open shows it before the match (on
+the same panel as a ranked draft), three cards a row, and one card from each open row comes along.
+The page is kept for each champion.
+
+| Row | Talents |
+| --- | --- |
+| Damage | Keen Edge (+6% damage), Quick Hands (+10% attack speed), Bloodthirst (heal 6% of attack damage) |
+| Defence | Thick Hide (+6 armour), Second Wind (+4 health a second), Stout Heart (+120 health) |
+| Utility | Fleet Foot (+6% walking speed), Focus (8% shorter cooldowns), Coin Purse (+150 starting gold) |
+
+![The panel before a ranked match: the draft with red's counter pick, and the talent page](docs/screenshots/draft-and-talents.webp)
+
+### The Twin Rivers
+
+The Map button on the pick screen switches full and ranked matches between Kessmoor, the first map,
+and the Twin Rivers (quick and event matches always play on Kessmoor). The Twin Rivers keep the top
+and bottom lanes; where the middle lane ran is jungle, with a path down the old riverbed past the
+watchstones, runes and both pits. Two rivers cut across the map either side of it, each crossing
+both lanes, so every lane has two fords. Each side has three camps in its home jungle behind its
+river and three between the rivers, and its towers, inhibitors and Nexus have 35% more health, as
+two lanes fall faster than three. From 3:00 and every three minutes after, the rivers flood for 30
+seconds (a notice and a chip warn ten seconds before): anyone wading in the water, minions too,
+walks at half speed, which holds up a wave at a ford. AI-only matches there end in 4 to 16 minutes.
+
+![The Twin Rivers in flood at a ford of the top lane, with the flood chip and both rivers on the minimap](docs/screenshots/twin-rivers-flood.webp)
+
 ### Event matches
 
 Set the Match button to event for a full match with the week's rule. The rules take turns each
@@ -548,6 +589,7 @@ it.
 - `src/game/`: the rules, free of Phaser: `data.ts` (map, river, camps, watchstones, sight,
   champions and their passives, items, objectives, upgrades, buffs, the beast, inhibitors, bushes
   and AI plans), `names.ts` (the champions' short names), `mastery.ts` (saved wins per class), `terrain.ts` (the solid things units walk round), `state.ts` (types and a new match) and
-  `sim.ts` (the rules, vision and the AI).
+  `sim.ts` (the rules, vision and the AI), plus `draft.ts` (ranked pick and ban), `talents.ts` (saved
+  talent pages) and `spellChoice.ts` (the saved spell, match kind and map).
 - `src/art/`: `lowpoly.ts` (the software renderer), `models.ts` (every low-poly model), `bake.ts`
   (renders the models into sprite sheets at start-up) and `map.ts` (paints the map).

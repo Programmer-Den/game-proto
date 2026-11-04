@@ -6,7 +6,7 @@
 // and watchstones. `steer` slides a step round both, `settle` pushes a point out, and `route`
 // finds a way along the paths. The map's art (`art/map.ts`) paints the same paths and walls.
 
-import { BASE, BEAST, BUSHES, CAMPS, CampSpot, DRAKE, INHIBITORS, LaneId, LANES, MAP_SCALE, MERC, RIVER, RUNE, TOWERS, Vec, WARD_SPOTS, WATCHSTONES, WORLD, at, mirror } from './data';
+import { BASE, BEAST, BUSHES, CAMPS, CampSpot, DRAKE, INHIBITORS, LaneId, LANES, MAP_ID, MAP_LANES, MAP_SCALE, MERC, MapId, RIVERS, RIVER_HALF, RUNE, TOWERS, Vec, WARD_SPOTS, WATCHSTONES, WORLD, at, mirror, setMapData } from './data';
 
 /** Half the width of a lane's paving, in pixels. */
 export const LANE_HALF = 50;
@@ -16,24 +16,32 @@ function segDist(p: Vec, a: Vec, b: Vec) {
   const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy)));
   return Math.hypot(p.x - (a.x + dx * t), p.y - (a.y + dy * t));
 }
-/** The distance from a point to the nearest lane's centre line. */
+/** The distance from a point to the nearest lane's centre line, of the map's lanes (`MAP_LANES`). */
 export function laneDist(p: Vec): number {
   let best = Infinity;
-  for (const lane of Object.values(LANES)) {
+  for (const id of MAP_LANES) {
+    const lane = LANES[id];
     for (let i = 0; i < lane.length - 1; i++) best = Math.min(best, segDist(p, lane[i], lane[i + 1]));
   }
   return best;
 }
-/** The distance from a point to the river's centre line. */
+/** The distance from a point to the nearest river's centre line. */
 export function riverDist(p: Vec): number {
-  return segDist(p, RIVER.from, RIVER.to);
+  let best = Infinity;
+  for (const r of RIVERS) best = Math.min(best, segDist(p, r.from, r.to));
+  return best;
 }
 
+const clearingsNow = () => [...CAMPS, ...MERC.spots.map((p) => ({ ...p, kind: 'merc' as const }))];
 /** Every camp's clearing: the jungle camps and the two mercenary camps. */
-export const CLEARINGS: CampSpot[] = [...CAMPS, ...MERC.spots.map((p) => ({ ...p, kind: 'merc' as const }))];
+export let CLEARINGS: CampSpot[] = clearingsNow();
 export const clearingR = (c: CampSpot) => (c.kind === 'ember' || c.kind === 'moss' ? 128 : c.kind === 'wolf' ? 112 : 100);
-/** Where the ruins stand: one in each quarter of the jungle, mirrored. */
-export const RUINS: Vec[] = [at(560, 1560), at(1240, 2240), at(2240, 1240), at(1560, 560)];
+/** Where the ruins stand: one in each quarter of Kessmoor's jungle, and two a side on the Twin Rivers, mirrored. */
+const RUINS_OF: Record<MapId, Vec[]> = {
+  classic: [at(560, 1560), at(1240, 2240), at(2240, 1240), at(1560, 560)],
+  twin: [at(600, 2050), at(1500, 1950), mirror(at(600, 2050)), mirror(at(1500, 1950))],
+};
+export let RUINS: Vec[] = RUINS_OF.classic;
 /** The four broken pillars of a ruin, round its centre. */
 export function ruinPieces(c: Vec): Vec[] {
   return Array.from({ length: 4 }, (_, i) => {
@@ -66,14 +74,33 @@ const WEST_PATHS: [number, number][][] = [
 ];
 /** A first-layout point turned over the middle lane, from the top lane's quarter to the bottom lane's. */
 const turn = ([x, y]: [number, number]): [number, number] => [2800 - y, 2800 - x];
-/** Every path on the map, as a line of points. */
-export const JUNGLE_PATHS: Vec[][] = [...WEST_PATHS, ...WEST_PATHS.map((l) => l.map(turn))]
-  .map((l) => l.map(([x, y]) => at(x, y)))
-  .flatMap((l) => [l, l.map(mirror)]);
+/**
+ * The Twin Rivers' paths on blue's side, mirrored for red's: the old riverbed down the middle from
+ * the drake's pit to the centre, past the watchstones and runes, ways across to the river from it,
+ * and through the home jungle to the camps, the bushes, the ruins, the lanes and the base.
+ */
+const TWIN_PATHS: [number, number][][] = [
+  [[600, 600], [850, 850], [1025, 1025], [1200, 1200], [1400, 1400]],
+  [[1200, 1200], [1050, 1350], [850, 1550]],
+  [[1400, 1400], [1250, 1550], [1050, 1750]],
+  [[1025, 1025], [850, 1100], [650, 1350]],
+  [[370, 900], [440, 900], [600, 1050], [850, 1100]],
+  [[1775, 1775], [1650, 2050], [1500, 1950], [1350, 2050]],
+  [[1775, 1775], [1850, 2200], [1850, 2470]],
+  [[850, 1550], [780, 1680], [560, 1800], [400, 1900]],
+  [[560, 1800], [600, 2050], [700, 2250]],
+  [[1050, 1750], [1120, 2050], [1250, 2280], [1350, 2440]],
+  [[1120, 2050], [900, 2050], [700, 2250], [450, 2400]],
+];
+/** Every path written for a map, as lines of points. */
+const JUNGLE_PATHS_OF: Record<MapId, Vec[][]> = {
+  classic: [...WEST_PATHS, ...WEST_PATHS.map((l) => l.map(turn))].map((l) => l.map(([x, y]) => at(x, y))).flatMap((l) => [l, l.map(mirror)]),
+  twin: TWIN_PATHS.map((l) => l.map(([x, y]) => at(x, y))).flatMap((l) => [l, l.map(mirror)]),
+};
 /** Half a path's width, and how far past a lane's paving and the river's water one can walk. */
 export const PATH_HALF = 44;
 export const LANE_WALK = LANE_HALF + 30;
-const RIVER_WALK = RIVER.half + 36;
+const RIVER_WALK = RIVER_HALF + 36;
 
 function pathDist(p: Vec, paths: Vec[][]): number {
   let best = Infinity;
@@ -81,7 +108,7 @@ function pathDist(p: Vec, paths: Vec[][]): number {
   return best;
 }
 /** The places off the lanes a walker must reach: camps, bushes, ruins, pits, runes and ward spots. */
-const PLACES: Vec[] = [...CLEARINGS, ...BUSHES, ...RUINS, BEAST, mirror(BEAST), DRAKE, mirror(DRAKE), ...RUNE.spots, ...WARD_SPOTS];
+const places = (): Vec[] => [...CLEARINGS, ...BUSHES, ...RUINS, BEAST, mirror(BEAST), DRAKE, mirror(DRAKE), ...RUNE.spots, ...WARD_SPOTS];
 
 /** Whether a point is open ground: a lane, the river, a base, a clearing, pit, ruin or bush, or a path. */
 function openGround(p: Vec, paths: Vec[][]): boolean {
@@ -180,8 +207,9 @@ function sample(field: Float32Array, x: number, y: number): number {
  * The paths, the forest and the clearance field. Any place a champion could not reach along the
  * written paths gets one more straight path to the nearest ground it can, so nothing is shut in.
  */
-const TERRAIN = (() => {
-  const paths = [...JUNGLE_PATHS];
+function buildTerrain() {
+  const paths = [...JUNGLE_PATHS_OF[MAP_ID]];
+  const PLACES = places();
   const build = () => {
     const solid = new Uint8Array(FW * FH);
     for (let y = 0; y < FH; y++) for (let x = 0; x < FW; x++) solid[y * FW + x] = openGround({ x: x * FIELD, y: y * FIELD }, paths) ? 0 : 1;
@@ -206,9 +234,10 @@ const TERRAIN = (() => {
     field = build();
   }
   return { paths, field };
-})();
+}
+let TERRAIN: { paths: Vec[][]; field: Float32Array } = { paths: [], field: new Float32Array(0) };
 /** Every path on the map, the written ones and any added to reach a shut-in place. */
-export const PATHS = TERRAIN.paths;
+export let PATHS: Vec[][] = [];
 /** How far a point is from the forest, in px (negative inside it). */
 export const clearance = (p: Vec) => sample(TERRAIN.field, p.x, p.y);
 /** Whether a point is in the forest, for the art. */
@@ -238,7 +267,7 @@ export interface SceneryThing {
  * The pines and rocks of the forest, close together, a little way in from its edge so they stand
  * behind the lane walls and line the paths. They are only art: the forest itself is what is solid.
  */
-export const SCENERY: SceneryThing[] = (() => {
+function buildScenery(): SceneryThing[] {
   const rnd = seeded(20261028);
   const things: SceneryThing[] = [];
   const cell = 60;
@@ -258,7 +287,8 @@ export const SCENERY: SceneryThing[] = (() => {
     taken.set(k, [...(taken.get(k) ?? []), t]);
   }
   return things;
-})();
+}
+export let SCENERY: SceneryThing[] = [];
 
 /** A solid circle on the map. */
 export interface Obstacle {
@@ -272,27 +302,58 @@ export interface Obstacle {
 /** How big each solid thing is to a walker, by its footprint. */
 export const SOLID = { ruin: 12, stone: 9, tower: 22, inhibitor: 18, nexus: 44, watchstone: 12 };
 
-export const OBSTACLES: Obstacle[] = [
+const buildObstacles = (): Obstacle[] => [
   ...RUINS.flatMap((c) => ruinPieces(c).map((p) => ({ ...p, r: SOLID.ruin }))),
   ...[BEAST, DRAKE].flatMap((c) => pitStones(c).map((p) => ({ ...p, r: SOLID.stone }))),
-  ...TOWERS.map((t) => ({ x: t.x, y: t.y, r: SOLID.tower, lane: t.lane })),
-  ...INHIBITORS.map((t) => ({ x: t.x, y: t.y, r: SOLID.inhibitor, lane: t.lane })),
+  ...TOWERS.filter((t) => MAP_LANES.includes(t.lane)).map((t) => ({ x: t.x, y: t.y, r: SOLID.tower, lane: t.lane })),
+  ...INHIBITORS.filter((t) => MAP_LANES.includes(t.lane)).map((t) => ({ x: t.x, y: t.y, r: SOLID.inhibitor, lane: t.lane })),
   ...[BASE.blue, BASE.red].map((b) => ({ x: b.x, y: b.y, r: SOLID.nexus })),
   ...WATCHSTONES.map((w) => ({ x: w.x, y: w.y, r: SOLID.watchstone })),
 ];
+export let OBSTACLES: Obstacle[] = [];
 
 /** The obstacles by cell of a coarse grid, so a step only looks at the few near it. */
 const CELL = 100;
 const COLS = Math.ceil(WORLD.w / CELL);
-const GRID: Obstacle[][] = Array.from({ length: COLS * Math.ceil(WORLD.h / CELL) }, () => []);
-for (const o of OBSTACLES) {
-  const pad = o.r + 40;
-  for (let cy = Math.floor((o.y - pad) / CELL); cy <= Math.floor((o.y + pad) / CELL); cy++) {
-    for (let cx = Math.floor((o.x - pad) / CELL); cx <= Math.floor((o.x + pad) / CELL); cx++) {
-      if (cx >= 0 && cy >= 0 && cx < COLS && cy * COLS + cx < GRID.length) GRID[cy * COLS + cx].push(o);
+function buildGrid(obstacles: Obstacle[]): Obstacle[][] {
+  const grid: Obstacle[][] = Array.from({ length: COLS * Math.ceil(WORLD.h / CELL) }, () => []);
+  for (const o of obstacles) {
+    const pad = o.r + 40;
+    for (let cy = Math.floor((o.y - pad) / CELL); cy <= Math.floor((o.y + pad) / CELL); cy++) {
+      for (let cx = Math.floor((o.x - pad) / CELL); cx <= Math.floor((o.x + pad) / CELL); cx++) {
+        if (cx >= 0 && cy >= 0 && cx < COLS && cy * COLS + cx < grid.length) grid[cy * COLS + cx].push(o);
+      }
     }
   }
+  return grid;
 }
+let GRID: Obstacle[][] = [];
+
+/** Each map's terrain, built the first time it is played (a few tens of ms) and kept. */
+const BUILT = new Map<MapId, { terrain: typeof TERRAIN; scenery: SceneryThing[]; obstacles: Obstacle[]; grid: Obstacle[][] }>();
+/**
+ * Plays on a map from now on: swaps in its data (`setMapData`) and its terrain, paths, scenery and
+ * obstacles. `createGame` calls it first; the art paints whichever map is in use.
+ */
+export function useMap(id: MapId) {
+  setMapData(id);
+  CLEARINGS = clearingsNow();
+  RUINS = RUINS_OF[id];
+  let b = BUILT.get(id);
+  if (!b) {
+    TERRAIN = buildTerrain();
+    const scenery = buildScenery();
+    const obstacles = buildObstacles();
+    b = { terrain: TERRAIN, scenery, obstacles, grid: buildGrid(obstacles) };
+    BUILT.set(id, b);
+  }
+  TERRAIN = b.terrain;
+  PATHS = b.terrain.paths;
+  SCENERY = b.scenery;
+  OBSTACLES = b.obstacles;
+  GRID = b.grid;
+}
+useMap('classic');
 function near(x: number, y: number): Obstacle[] {
   const cx = Math.floor(x / CELL), cy = Math.floor(y / CELL);
   return cx < 0 || cy < 0 || cx >= COLS ? [] : GRID[cy * COLS + cx] ?? [];

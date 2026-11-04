@@ -20,7 +20,7 @@ const en: HowToPlay = {
     { input: 'Z, N or C at the cursor, or a ping button then the map (Alt and click: attack)', action: 'Ping attack, on my way or danger: allies come and fight, wait there for you or fall back' },
   ],
   loop: [
-    'Pick a champion card to start the match.',
+    'Pick a champion card to start the match (with a talent page or a ranked draft first, once you have them).',
     'Walk down a lane and land last hits on red minions for gold.',
     'Fight red champions and complete the objective on the card under the top bar.',
     'Level up, pick an upgrade, and recall home to shop for items.',
@@ -46,6 +46,9 @@ const en: HowToPlay = {
     'Ranked matches climb a ladder from Bronze to Champion: a win adds a star, three stars move you up a tier, and red plays smarter at each one. Every tier you reach wins your champion a new outfit.',
     'Each week brings an event match with a rule of its own: all ten champions in mid, double gold, or sudden death at 12:00.',
     'Two more champions, the Falconer and the Alchemist, join once you earn mastery ranks with the others.',
+    'Wins with a champion open its talent page: before each match, pick one small bonus from each row its mastery has opened (damage, then defensive, then utility).',
+    'Ranked matches start with a draft: ban a champion, red bans one back, then the sides pick in turn. From Gold up red bans your best champion and picks to counter yours.',
+    'The map button picks Kessmoor or the Twin Rivers for full and ranked matches: two lanes, a jungle between them and two rivers that flood every three minutes and slow anyone wading.',
   ],
 };
 
@@ -67,7 +70,7 @@ const de: HowToPlay = {
     { input: 'Z, N oder C am Zeiger, oder eine Signaltaste, dann die Karte (Alt und Klick: Angriff)', action: 'Signal Angriff, Bin unterwegs oder Gefahr: Verbündete kommen und kämpfen, warten dort auf dich oder ziehen sich zurück' },
   ],
   loop: [
-    'Wähle eine Championkarte, um das Match zu beginnen.',
+    'Wähle eine Championkarte, um das Match zu beginnen (sobald du sie hast, erst mit Talentseite oder Ranglisten-Draft).',
     'Lauf eine Lane hinunter und lande letzte Treffer an roten Vasallen für Gold.',
     'Kämpfe gegen rote Champions und erfülle das Ziel auf der Karte unter der oberen Leiste.',
     'Steige auf, wähle ein Upgrade und kehre heim, um Gegenstände zu kaufen.',
@@ -93,6 +96,9 @@ const de: HowToPlay = {
     'Ranglistenmatches führen von Bronze bis Champion: Ein Sieg bringt einen Stern, drei Sterne eine Stufe höher, und Rot spielt auf jeder Stufe klüger. Jede erreichte Stufe schenkt deinem Champion ein neues Gewand.',
     'Jede Woche gibt es ein Ereignismatch mit eigener Regel: alle zehn Champions in der Mitte, doppeltes Gold oder plötzlicher Tod ab 12:00.',
     'Zwei weitere Champions, die Falknerin und die Alchemistin, kommen hinzu, sobald du Meisterränge mit den anderen sammelst.',
+    'Siege mit einem Champion öffnen seine Talentseite: Wähle vor jedem Match einen kleinen Bonus aus jeder Reihe, die seine Meisterschaft geöffnet hat (Schaden, dann Abwehr, dann Nutzen).',
+    'Ranglisten-Matches beginnen mit einem Draft: Banne einen Champion, Rot bannt einen zurück, dann wählen beide Seiten abwechselnd. Ab Gold bannt Rot deinen besten Champion und wählt gegen deinen.',
+    'Die Kartentaste wählt Kessmoor oder die Zwillingsflüsse für volle und Ranglisten-Matches: zwei Lanes, Dschungel dazwischen und zwei Flüsse, die alle drei Minuten über die Ufer treten und jeden beim Waten bremsen.',
   ],
 };
 

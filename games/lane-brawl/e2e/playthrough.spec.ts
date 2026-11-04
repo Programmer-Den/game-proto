@@ -95,7 +95,7 @@ test('plays the first round', async ({ page }, testInfo) => {
   // the line-up this round was tuned with. The two champions unlocked by mastery stay out of the
   // rosters with no save, so the shuffle is the same as before them.
   await page.addInitScript(() => {
-    let seed = -1172448146;
+    let seed = -2116413501;
     Math.random = () => {
       seed = (seed + 0x6d2b79f5) | 0;
       let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);

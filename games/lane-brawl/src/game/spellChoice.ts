@@ -1,7 +1,8 @@
-// The player's battle spell and match kind, kept between matches under the save keys
-// `lane-brawl-spell` and `lane-brawl-mode` (`lane-brawl-quick` before ranked and event matches).
+// The player's battle spell, match kind and map, kept between matches under the save keys
+// `lane-brawl-spell`, `lane-brawl-mode` (`lane-brawl-quick` before ranked and event matches) and
+// `lane-brawl-map`.
 
-import { SPELLS, SpellId } from './data';
+import { MAP_IDS, MapId, SPELLS, SpellId } from './data';
 
 const KEY = 'lane-brawl-spell';
 
@@ -64,5 +65,25 @@ export function saveMode(mode: MatchMode) {
     localStorage.setItem(MODE_KEY, mode);
   } catch {
     // Storage blocked: the pick lasts for this visit only.
+  }
+}
+
+const MAP_KEY = 'lane-brawl-map';
+
+/** The map the player picked (LB20), Kessmoor when none is saved. */
+export function loadMap(): MapId {
+  try {
+    const m = localStorage.getItem(MAP_KEY) as MapId | null;
+    return m && MAP_IDS.includes(m) ? m : 'classic';
+  } catch {
+    return 'classic';
+  }
+}
+
+export function saveMap(map: MapId) {
+  try {
+    localStorage.setItem(MAP_KEY, map);
+  } catch {
+    // Storage blocked: the pick holds until the page closes.
   }
 }

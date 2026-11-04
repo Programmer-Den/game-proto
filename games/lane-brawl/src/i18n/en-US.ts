@@ -9,6 +9,8 @@ const enUS: Partial<Translation<typeof en>> = {
   pickSkinTitle: 'Colors: {skin}, {n} of {of} won',
   pickSkinDesc: 'Each ranked tier you reach wins your champion its color. Click to change.',
   ladderSkin: '{line} New colors: {skin}.',
+  talentRowDefence: 'Defense',
+  talentThickHideDesc: '+6 armor',
 };
 
 export default enUS;

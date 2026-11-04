@@ -5,7 +5,7 @@
 // units. The same seed paints the same map every time.
 
 import Phaser from 'phaser';
-import { BASE, BEAST, BUSHES, DRAKE, Bush, CampSpot, LANES, MAP_SCALE, RIVER, Team, Vec, WATCHSTONES, WORLD } from '../game/data';
+import { BASE, BEAST, BUSHES, DRAKE, Bush, CampSpot, LANES, MAP_ID, MAP_LANES, MAP_SCALE, MapId, RIVERS, RIVER_HALF, RiverDef, Team, Vec, WATCHSTONES, WORLD } from '../game/data';
 import { sharpRes } from '../../../../shared/scaling';
 import { render, seeded } from './lowpoly';
 import { CLEARINGS, LANE_HALF, LANE_WALK, PATHS, PATH_HALF, RUINS, SCENERY, clearance, clearingR, laneDist, pitStones, riverDist, ruinPieces } from '../game/terrain';
@@ -78,7 +78,7 @@ function grass(ctx: CanvasRenderingContext2D, rnd: () => number) {
 /** The lane band as a clip path: a rectangle per segment and a disc at each joint. */
 function lanePath(ctx: CanvasRenderingContext2D, half: number) {
   ctx.beginPath();
-  for (const lane of Object.values(LANES)) {
+  for (const lane of MAP_LANES.map((id) => LANES[id])) {
     for (let i = 0; i < lane.length - 1; i++) {
       const a = lane[i], b = lane[i + 1];
       const len = Math.hypot(b.x - a.x, b.y - a.y);
@@ -109,7 +109,7 @@ function lanes(ctx: CanvasRenderingContext2D, rnd: () => number) {
   ctx.fill();
   ctx.clip();
   const stone = 30;
-  for (const lane of Object.values(LANES)) {
+  for (const lane of MAP_LANES.map((id) => LANES[id])) {
     for (let i = 0; i < lane.length - 1; i++) {
       const a = lane[i], b = lane[i + 1];
       const len = Math.hypot(b.x - a.x, b.y - a.y);
@@ -151,7 +151,7 @@ function lanes(ctx: CanvasRenderingContext2D, rnd: () => number) {
 
 function kerbs(ctx: CanvasRenderingContext2D, rnd: () => number) {
   const spots: Vec[] = [];
-  for (const lane of Object.values(LANES)) {
+  for (const lane of MAP_LANES.map((id) => LANES[id])) {
     for (let i = 0; i < lane.length - 1; i++) {
       const a = lane[i], b = lane[i + 1];
       const len = Math.hypot(b.x - a.x, b.y - a.y);
@@ -280,8 +280,8 @@ function clearing(ctx: CanvasRenderingContext2D, c: CampSpot, rnd: () => number)
 }
 
 /** The river: a band of faceted water with darker banks, widening into a pool at each end. */
-function river(ctx: CanvasRenderingContext2D, rnd: () => number) {
-  const a = RIVER.from, b = RIVER.to;
+function river(ctx: CanvasRenderingContext2D, rnd: () => number, r: RiverDef) {
+  const a = r.from, b = r.to;
   const len = Math.hypot(b.x - a.x, b.y - a.y);
   const ux = (b.x - a.x) / len, uy = (b.y - a.y) / len;
   const nx = -uy, ny = ux;
@@ -289,7 +289,7 @@ function river(ctx: CanvasRenderingContext2D, rnd: () => number) {
   const left: Vec[] = [], right: Vec[] = [];
   for (let u = 0; u <= len; u += step) {
     const wob = Math.sin(u / 170) * 14 + Math.sin(u / 61) * 5;
-    const w = RIVER.half + (rnd() - 0.5) * 10;
+    const w = RIVER_HALF + (rnd() - 0.5) * 10;
     const cx = a.x + ux * u + nx * wob, cy = a.y + uy * u + ny * wob;
     left.push({ x: cx + nx * w, y: cy + ny * w });
     right.push({ x: cx - nx * w, y: cy - ny * w });
@@ -320,7 +320,7 @@ function river(ctx: CanvasRenderingContext2D, rnd: () => number) {
   for (let y = y0; y < y1; y += cell) {
     for (let x = x0; x < x1; x += cell) {
       const d = riverDist({ x, y });
-      if (d > RIVER.half + 140) continue;
+      if (d > RIVER_HALF + 140) continue;
       const k = 0.92 + rnd() * 0.18 + Math.max(0, 0.18 - d / 400);
       for (const half of [0, 1]) {
         ctx.fillStyle = shade(half ? '#3f86ad' : '#3a7ea3', k);
@@ -345,7 +345,7 @@ function river(ctx: CanvasRenderingContext2D, rnd: () => number) {
   ctx.strokeStyle = 'rgba(214,240,255,0.5)';
   ctx.lineWidth = 2;
   for (let i = 0; i < 90; i++) {
-    const u = rnd() * len, v = (rnd() - 0.5) * RIVER.half * 1.4;
+    const u = rnd() * len, v = (rnd() - 0.5) * RIVER_HALF * 1.4;
     const x = a.x + ux * u + nx * v, y = a.y + uy * u + ny * v;
     ctx.beginPath();
     ctx.moveTo(x, y);
@@ -381,7 +381,7 @@ function flora(ctx: CanvasRenderingContext2D, rnd: () => number) {
   const petals = ['#f2e3a0', '#e9a3c9', '#b9d6ff', '#ffffff', '#f6b26b'];
   for (let i = 0; i < 160 * MAP_SCALE ** 2; i++) {
     const c = { x: 60 + rnd() * (WORLD.w - 120), y: 60 + rnd() * (WORLD.h - 120) };
-    if (laneDist(c) < LANE_HALF + 30 || riverDist(c) < RIVER.half + 30) continue;
+    if (laneDist(c) < LANE_HALF + 30 || riverDist(c) < RIVER_HALF + 30) continue;
     if (rnd() < 0.8) {
       const col = petals[Math.floor(rnd() * petals.length)];
       for (let j = 0; j < 9; j++) {
@@ -584,9 +584,17 @@ function scenery(ctx: CanvasRenderingContext2D) {
   }
 }
 
-/** Paints the map into a canvas texture once. */
+/** The map painted into `MAP_KEY` now, if any. */
+export let PAINTED: MapId | null = null;
+
+/**
+ * Paints the map in use (`useMap`) into a canvas texture, once; painting another map replaces it,
+ * so only one map's canvas is kept.
+ */
 export function paintMap(scene: Phaser.Scene) {
-  if (scene.textures.exists(MAP_KEY)) return;
+  if (scene.textures.exists(MAP_KEY) && PAINTED === MAP_ID) return;
+  if (scene.textures.exists(MAP_KEY)) scene.textures.remove(MAP_KEY);
+  PAINTED = MAP_ID;
   MAP_RES = sharpRes(WORLD.w, WORLD.h);
   const canvas = document.createElement('canvas');
   canvas.width = Math.round(WORLD.w * MAP_RES);
@@ -598,7 +606,7 @@ export function paintMap(scene: Phaser.Scene) {
   flora(ctx, rnd);
   forest(ctx, rnd);
   trails(ctx);
-  river(ctx, rnd);
+  for (const r of RIVERS) river(ctx, rnd, r);
   for (const c of CLEARINGS) clearing(ctx, c, rnd);
   for (const r of RUINS) ruins(ctx, r, rnd);
   pit(ctx, rnd, BEAST, 'rgba(185,140,255,0.45)');

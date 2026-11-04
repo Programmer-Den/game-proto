@@ -91,11 +91,24 @@ export function pickCard(i: number, n = 17) {
   return { x: (SCREEN.w - total) / 2 + col * (PICK_CARD.w + PICK_CARD.gap), y: FRAME.y + PICK_CARD.y + row * (PICK_CARD.h + PICK_CARD.gap), w: PICK_CARD.w, h: PICK_CARD.h };
 }
 /** The battle spell button on the pick screen, under the champion cards: a click picks the next spell. */
-export const SPELL_PICK = { x: 112, y: 484, w: 260, h: 20 };
+export const SPELL_PICK = { x: 40, y: 484, w: 220, h: 20 };
 /** Beside it, the match kind: a click steps through full, quick, ranked and the week's event. */
-export const MODE_PICK = { x: 380, y: 484, w: 280, h: 20 };
+export const MODE_PICK = { x: 266, y: 484, w: 240, h: 20 };
+/** Then the map (LB20): a click switches between Kessmoor and the Twin Rivers. */
+export const MAP_PICK = { x: 512, y: 484, w: 200, h: 20 };
 /** Then the champion's colours won on the ranked ladder: a click wears the next. */
-export const SKIN_PICK = { x: 668, y: 484, w: 180, h: 20 };
+export const SKIN_PICK = { x: 718, y: 484, w: 200, h: 20 };
+
+/**
+ * The panel before a match (LB18, LB19), over the pick screen: a ranked match's draft at the top,
+ * the talent page under it (three rows of three cards, from `top`), and Back and Fight.
+ */
+export const LOBBY = { x: 130, y: 52, w: 700, h: 440 };
+export function talentCard(row: number, i: number, top: number) {
+  return { x: LOBBY.x + 150 + i * 180, y: LOBBY.y + top + 22 + row * 47, w: 172, h: 42 };
+}
+export const LOBBY_BACK = { x: 150, y: 454, w: 150, h: 28 };
+export const LOBBY_FIGHT = { x: 660, y: 454, w: 150, h: 28 };
 
 /** The buffs the player's champion carries, as chips in a row above the portrait. */
 export function buffStrip(i: number) {
@@ -130,9 +143,13 @@ export function fitLayout(w: number, h: number) {
   RECALL_BUTTON.x = 530 + dx / 2;
   SCORE_CHIP.x = 380 + dx / 2;
   SPELL_BUTTON.x = 654 + dx / 2;
-  Object.assign(SPELL_PICK, { x: 112 + dx / 2, y: 484 + dy / 2 });
-  Object.assign(MODE_PICK, { x: 380 + dx / 2, y: 484 + dy / 2 });
-  Object.assign(SKIN_PICK, { x: 668 + dx / 2, y: 484 + dy / 2 });
+  Object.assign(SPELL_PICK, { x: 40 + dx / 2, y: 484 + dy / 2 });
+  Object.assign(MODE_PICK, { x: 266 + dx / 2, y: 484 + dy / 2 });
+  Object.assign(MAP_PICK, { x: 512 + dx / 2, y: 484 + dy / 2 });
+  Object.assign(SKIN_PICK, { x: 718 + dx / 2, y: 484 + dy / 2 });
+  Object.assign(LOBBY, { x: 130 + dx / 2, y: 52 + dy / 2 });
+  Object.assign(LOBBY_BACK, { x: 150 + dx / 2, y: 454 + dy / 2 });
+  Object.assign(LOBBY_FIGHT, { x: 660 + dx / 2, y: 454 + dy / 2 });
   Object.assign(SCORE_PANEL, { x: 100 + dx / 2, y: 38 + dy / 2 });
   Object.assign(SHOP_PANEL, { x: 100 + dx / 2, y: 38 + dy / 2 });
   Object.assign(END_PANEL, { x: 200 + dx / 2, y: 60 + dy / 2 });

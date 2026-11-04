@@ -125,6 +125,7 @@ export const sfx = sounds<SfxName>({
   comeback: { wave: 'triangle', freq: 523, arp: [0, 4, 7, 12], arpStep: 0.05, length: 0.3, volume: 0.26 },
   vote: { wave: 'square', freq: 330, arp: [0, 5], arpStep: 0.1, length: 0.25, volume: 0.22 },
   suddenDeath: { wave: 'sawtooth', freq: 220, arp: [0, -1, -5, -12], arpStep: 0.14, attack: 0.02, length: 0.8, volume: 0.24, gap: 1000 },
+  flood: { wave: 'sine', freq: 330, to: 110, attack: 0.15, length: 1.2, volume: 0.24, gap: 1000 },
   // The end panel: a ranked tier won, or a champion unlocked.
   promote: { wave: 'square', freq: 523, arp: [0, 4, 7, 12, 16, 19], arpStep: 0.07, length: 0.6, volume: 0.28, gap: 1000 },
   nightfall: { wave: 'triangle', freq: 392, to: 196, attack: 0.1, length: 0.9, volume: 0.2, gap: 1000 },
