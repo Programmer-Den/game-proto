@@ -2,15 +2,16 @@
 // the deeds card, the horn toast and the minimap. Each is a small class the GameScene updates every
 // frame; all of them are fixed to the screen (scroll factor 0).
 import Phaser from 'phaser';
-import { AGE3_DAMAGE, ARMY_DEED, BUILDINGS, DEEDS, EDGES, FACTIONS, MAP_SIZE, RELICS, RESOURCES, TEMPERAMENTS, TILE, type FactionId, type RelicId } from '../game/data';
+import { AGE3_DAMAGE, AGE4_DAMAGE, ARMY_DEED, BUILDINGS, DEEDS, DEEDS4, RANK_NAMES, VETERAN_RANK, FACTIONS, MAP_SIZE, RELICS, RESOURCES, TEMPERAMENTS, TILE, type FactionId, type RelicId } from '../game/data';
 import { DIRT, ROCK, WATER } from '../game/map';
-import { deedCount, monumentLeft, NEUTRAL, PLAYER, popCap, popUsed, type GameState, type Player } from '../game/sim';
+import { deed4Count, deedCount, monumentLeft, NEUTRAL, PLAYER, popCap, popUsed, rivalsOf, type GameState, type Player } from '../game/sim';
+import type { Scenario } from '../game/campaign';
 import { WOOL } from '../art/figures';
 import { hexNum, mix, SERIF, T } from '../art/stitch';
 import { settings } from '../../../../shared/settings';
 import { formatNumber } from '../../../../shared/i18n';
 import { t } from '../i18n';
-import { AGE_PIPS, DEED_CARD, MINI, STATUS_CARD, TOAST, TOP_RIGHT, TOP_SLOTS } from './layout';
+import { AGE_PIPS, DEED_CARD, MINI, MISSION_CARD, STATUS_CARD, TOAST, TOP_RIGHT, TOP_SLOTS } from './layout';
 
 const HUD_DEPTH = 9990;
 const ink = (size: number, color: string = T.ink, bold = true): Phaser.Types.GameObjects.Text.TextStyle => ({
@@ -30,6 +31,22 @@ export function stitchLine(g: Phaser.GameObjects.Graphics, x0: number, y0: numbe
     const a = i / n;
     const b = Math.min(1, (i + 0.8) / n);
     g.lineBetween(x0 + (x1 - x0) * a, y0 + (y1 - y0) * a, x0 + (x1 - x0) * b, y0 + (y1 - y0) * b);
+  }
+}
+
+/** A row of `of` stars centred at (x, y), the first `n` filled (in ochre unless told), the rest left as outlines. */
+export function stitchStars(g: Phaser.GameObjects.Graphics, x: number, y: number, n: number, r: number, of = 3, fill: string = T.ochre) {
+  const gap = r * 2.4;
+  for (let k = 0; k < of; k++) {
+    const cx = x + (k - (of - 1) / 2) * gap;
+    const pts: Phaser.Math.Vector2[] = [];
+    for (let i = 0; i < 10; i++) {
+      const a = -Math.PI / 2 + (i * Math.PI) / 5;
+      const rr = i % 2 ? r * 0.45 : r;
+      pts.push(new Phaser.Math.Vector2(cx + Math.cos(a) * rr, y + Math.sin(a) * rr));
+    }
+    if (k < n) g.fillStyle(hexNum(fill), 1).fillPoints(pts, true);
+    g.lineStyle(Math.max(0.8, r / 9), hexNum(T.ink), 1).strokePoints(pts, true);
   }
 }
 
@@ -65,7 +82,7 @@ export class TopBar {
     }
     fixed(scene.add.text(TOP_SLOTS.age, 15, t('ageLabel').toUpperCase(), ink(10)).setOrigin(0, 0.5), 2);
     this.pips = fixed(scene.add.graphics(), 2);
-    ['I', 'II', 'III'].forEach((p, k) => this.pipText.push(fixed(scene.add.text(AGE_PIPS.x + k * AGE_PIPS.gap, AGE_PIPS.y, p, ink(7, T.ink)).setOrigin(0.5, 0.5), 3)));
+    ['I', 'II', 'III', 'IV'].forEach((p, k) => this.pipText.push(fixed(scene.add.text(AGE_PIPS.x + k * AGE_PIPS.gap, AGE_PIPS.y, p, ink(7, T.ink)).setOrigin(0.5, 0.5), 3)));
     fixed(scene.add.image(TOP_SLOTS.clock + 8, 15, 'icon-clock'), 2);
     this.values.clock = fixed(scene.add.text(TOP_SLOTS.clock + 19, 15, '', ink(14)).setOrigin(0, 0.5), 2);
     fixed(scene.add.image(TOP_SLOTS.faction + 8, 15, `icon-banner-${faction}`), 2);
@@ -82,8 +99,8 @@ export class TopBar {
     this.values.clock!.setText(`${String(Math.floor(secs / 60)).padStart(2, '0')}:${String(secs % 60).padStart(2, '0')}`);
     // The age track: a pip per age, filled when reached; the next one fills as its deeds are done.
     const g = this.pips.clear();
-    const part = p.age === 1 ? 0 : p.age === 2 ? deedCount(p) / 3 : 1;
-    for (let k = 0; k < 3; k++) {
+    const part = p.age === 1 ? 0 : p.age === 2 ? deedCount(p) / 3 : p.age === 3 ? deed4Count(p) / 3 : 1;
+    for (let k = 0; k < 4; k++) {
       const x = AGE_PIPS.x + k * AGE_PIPS.gap;
       const done = k < p.age;
       g.fillStyle(hexNum(done ? T.ochre : T.card), 1).fillCircle(x, AGE_PIPS.y, AGE_PIPS.r);
@@ -107,7 +124,7 @@ export class TopBar {
   }
 }
 
-/** The deeds for Age III, as a stitched card under the top bar. */
+/** The deeds for Age III, and from Age III on those for Age IV, as a stitched card under the top bar. */
 export class DeedCard {
   private title: Phaser.GameObjects.Text;
   private count: Phaser.GameObjects.Text;
@@ -137,7 +154,15 @@ export class DeedCard {
     const g = this.g.clear();
     stitchLine(g, x + 4, y + 22, x + w - 4, y + 22, 0.8, hexNum(T.ochre));
     const raid = s.raid && s.raid.target === PLAYER ? s.raid : null;
-    const rows: { done: boolean; frac: number; sub: string }[] = [
+    // From Age III the card turns to the Age IV deeds: a relic, the champion, a Veteran.
+    const four = p.age >= 3;
+    DEEDS4.forEach((d, i) => this.rows[i].name.setText(t(four ? d.name : DEEDS[i].name, { n: ARMY_DEED, rank: t(RANK_NAMES[VETERAN_RANK - 1]) })));
+    const best = Math.max(0, ...[...s.units.values()].filter((u) => u.owner === PLAYER).map((u) => u.rank));
+    const rows: { done: boolean; frac: number; sub: string }[] = four ? [
+      { done: p.deeds4.relic, frac: -1, sub: t('noneYet') },
+      { done: p.deeds4.champion, frac: -1, sub: t('noneYet') },
+      { done: p.deeds4.veteran, frac: Math.min(1, best / VETERAN_RANK), sub: t('deedProgress', { n: Math.min(best, VETERAN_RANK), total: VETERAN_RANK }) },
+    ] : [
       { done: p.deeds.age2, frac: p.age >= 2 ? 1 : 0, sub: '' },
       { done: p.deeds.army >= ARMY_DEED, frac: Math.min(1, p.deeds.army / ARMY_DEED), sub: t('deedProgress', { n: Math.min(p.deeds.army, ARMY_DEED), total: ARMY_DEED }) },
       { done: p.deeds.raid, frac: raid ? raid.routed / raid.size : 0, sub: raid ? t('deedRouted', { n: raid.routed, total: raid.size }) : t('noneYet') },
@@ -155,24 +180,86 @@ export class DeedCard {
         g.strokePath();
       }
       this.rows[i].name.setColor(r.done ? '#5a5040' : T.ink);
-      this.rows[i].sub.setText(r.done || i === 0 ? '' : r.sub);
-      if (!r.done && i > 0) {
+      this.rows[i].sub.setText(r.done || (i === 0 && !four) ? '' : r.sub);
+      if (!r.done && (i > 0 || four) && r.frac >= 0) {
         stitchLine(g, x + 128, ry, x + 160, ry, 3, hexNum('#c8b890'));
         if (r.frac > 0) stitchLine(g, x + 128, ry, x + 128 + 32 * r.frac, ry, 3, hexNum(T.red));
       }
     });
-    const n = deedCount(p);
+    const n = four ? deed4Count(p) : deedCount(p);
     this.count.setText(`${n} / 3`);
-    if (p.age >= 3) {
-      this.title.setText(t('age3Reached').toUpperCase());
-      const dmg = { n: AGE3_DAMAGE };
-      this.foot.setText(p.edge ? t('age3FootEdge', { ...dmg, edge: t(EDGES[p.edge].name) }) : p.edgePending ? t('age3FootPick', dmg) : t('age3Foot', dmg));
-    } else if (n === 3) this.foot.setText(t('researchAge3'));
+    this.title.setText(t(four ? 'deeds4Title' : 'deedsTitle').toUpperCase());
+    if (p.age >= 4) {
+      this.title.setText(t('age4Reached').toUpperCase());
+      this.foot.setText(t('age4Foot', { n: AGE3_DAMAGE + AGE4_DAMAGE }));
+    } else if (four && n === 3) this.foot.setText(t('researchAge4'));
+    else if (four && p.edgePending) this.foot.setText(t('age3FootPick', { n: AGE3_DAMAGE }));
+    else if (four) this.foot.setText(t('thenAge4', { n: AGE4_DAMAGE }));
+    else if (n === 3) this.foot.setText(t('researchAge3'));
     else this.foot.setText(t('thenAge3', { n: AGE3_DAMAGE }));
   }
 
   contains(px: number, py: number) {
     return px >= DEED_CARD.x && px <= DEED_CARD.x + DEED_CARD.w && py >= DEED_CARD.y && py <= DEED_CARD.y + DEED_CARD.h;
+  }
+}
+
+/**
+ * A campaign scenario's card, at the top left under the top bar: its name, the goal and how far it
+ * has come (time left, trips home, the relic's hold, rivals left or the Wonder's progress).
+ */
+export class MissionCard {
+  private line: Phaser.GameObjects.Text;
+  private g: Phaser.GameObjects.Graphics;
+  /** The progress line on show, for the test and the screenshots. */
+  shown = '';
+
+  constructor(scene: Phaser.Scene, sc: Scenario) {
+    const { x, y, w } = MISSION_CARD;
+    fixed(scene.add.image(x - 2, y - 2, 'card-mission').setOrigin(0, 0), 0);
+    this.g = fixed(scene.add.graphics(), 1);
+    fixed(scene.add.text(x + 9, y + 12, t(sc.name).toUpperCase(), ink(11.5, T.red)).setOrigin(0, 0.5), 2);
+    fixed(scene.add.text(x + 9, y + 31, t(sc.goal), { ...ink(10, T.ink, false), wordWrap: { width: w - 18 } }).setOrigin(0, 0.5), 2);
+    this.line = fixed(scene.add.text(x + 9, y + MISSION_CARD.h - 11, '', { ...ink(10, T.indigo), fontStyle: 'bold italic' }).setOrigin(0, 0.5), 2);
+  }
+
+  update(s: GameState) {
+    const { x, y, w } = MISSION_CARD;
+    const m = s.mission!;
+    const g = this.g.clear();
+    stitchLine(g, x + 4, y + 22, x + w - 4, y + 22, 0.8, hexNum(T.ochre));
+    const clock = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, '0')}`;
+    const goal = m.goal;
+    let line = '';
+    let frac = 0;
+    if (goal.t === 'survive') {
+      line = t('missionSurvive', { time: clock(Math.max(0, goal.ms - s.time)) });
+      frac = s.time / goal.ms;
+    } else if (goal.t === 'escort') {
+      line = t('missionEscort', { n: m.trips, total: goal.trips });
+      frac = m.trips / goal.trips;
+    } else if (goal.t === 'hold') {
+      const held = m.heldSince === null ? 0 : s.time - m.heldSince;
+      line = m.heldSince === null ? t('missionNotHeld', { relic: t(RELICS[goal.relic].name) }) : t('missionHeld', { time: clock(held), total: clock(goal.ms) });
+      frac = held / goal.ms;
+    } else if (goal.t === 'conquest') {
+      line = t('missionRivals', { n: rivalsOf(s, PLAYER).length });
+    } else {
+      const wonder = [...s.buildings.values()].find((b) => b.owner === PLAYER && b.type === 'wonder');
+      const pct = wonder ? Math.floor((1 - wonder.buildLeft / BUILDINGS.wonder.time) * 100) : 0;
+      line = wonder ? t('missionWonder', { pct }) : t(s.players[PLAYER].age >= 4 ? 'missionWonderPlace' : 'missionWonderAge');
+      frac = pct / 100;
+    }
+    this.shown = line;
+    this.line.setText(line);
+    if (frac > 0) {
+      stitchLine(g, x + w - 52, y + MISSION_CARD.h - 11, x + w - 10, y + MISSION_CARD.h - 11, 3, hexNum('#c8b890'));
+      stitchLine(g, x + w - 52, y + MISSION_CARD.h - 11, x + w - 52 + 42 * Math.min(1, frac), y + MISSION_CARD.h - 11, 3, hexNum(T.green));
+    }
+  }
+
+  contains(px: number, py: number) {
+    return px >= MISSION_CARD.x && px <= MISSION_CARD.x + MISSION_CARD.w && py >= MISSION_CARD.y && py <= MISSION_CARD.y + MISSION_CARD.h;
   }
 }
 
@@ -414,7 +501,7 @@ export class Minimap {
     for (const p of s.posts) for (let j = 0; j < 2; j++) for (let i = 0; i < 2; i++) put(p.tx + i, p.ty + j, [122, 85, 48]);
     for (const b of s.buildings.values()) {
       // A Monument shows on every map once it is begun, as it does in the fog for everyone.
-      if (b.owner !== PLAYER && b.type !== 'monument' && s.sight[b.ty * MAP_SIZE + b.tx] === 0) continue;
+      if (b.owner !== PLAYER && b.type !== 'monument' && b.type !== 'wonder' && s.sight[b.ty * MAP_SIZE + b.tx] === 0) continue;
       const def = BUILDINGS[b.type];
       for (let j = 0; j < def.h; j++) for (let i = 0; i < def.w; i++) put(b.tx + i, b.ty + j, this.colours[b.owner]);
     }

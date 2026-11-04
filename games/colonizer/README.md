@@ -10,9 +10,11 @@ All of it is painted in code on 2D canvases; there are no image files.
 You pick one of three factions and play a skirmish on a 128 by 128 tile map against an AI opponent,
 which plays the next faction along, or against two AIs in a three-way match. The menu also picks the
 map kind: Lowlands, Lakes or Highlands. Gather wood, food and ore, put up buildings, research techs in
-the Academy and the Town Center, train villagers and armies, earn your way through three ages, and
-destroy the enemy Town Center to win, or raise a Monument in Age III and hold it for three minutes.
-Lose your own Town Center, or let the enemy's Monument stand, and the match is over.
+the Academy and the Town Center, train villagers and armies, earn your way through four ages, and
+destroy the enemy Town Center to win, raise a Monument in Age III and hold it for three minutes, or
+finish a Wonder in Age IV. Lose your own Town Center, or let the enemy's Monument stand or Wonder be
+finished, and the match is over. Besides the skirmish, the menu has a **campaign** of five scenarios,
+and every two wins with a faction **master** it, unlocking a second unique unit.
 
 ## Map kinds and rivals
 
@@ -105,7 +107,7 @@ charge with a lowered lance.
 
 ![Villagers at work around the Town Center: chopping, reaping, mining, building and carrying their loads](docs/screenshots/villagers-at-work.webp)
 
-## The three ages
+## The four ages
 
 - **Age I** is where every match starts.
 - **Age II** is researched at the Town Center (400 food, 200 wood). It unlocks Stirrups and Bodkin
@@ -120,6 +122,11 @@ charge with a lowered lance.
   **Age III edge**, a second one-time pick of two cards:
   - **Masonry**: buildings and walls have 30% more health, those already standing included.
   - **Muster**: soldiers train 25% faster.
+
+- **Age IV**, the Imperial age, takes three more deeds once you are in Age III; the deeds card turns
+  to them: **hold a relic**, **raise your champion** and get a soldier to rank II (**Veteran**).
+  Then the Town Center researches Age IV (800 food, 500 wood, 500 ore): every soldier deals 2 more
+  damage again (4 over Age II), and the **Wonder** opens (see below).
 
 The top bar shows the boon's icon and then the edge's (a stretch of stone or a war drum).
 
@@ -287,6 +294,51 @@ too once it reaches Age III.
 
 ![Victory: the Monument stood for three minutes](docs/screenshots/monument-victory.webp)
 
+## The Wonder
+
+Age IV adds a third way to win, on the second page of the build list: the **Wonder** (1000 wood, 800
+food, 800 ore, one only, a 4x4 cathedral). It wins **the moment it is finished**, but it is a long
+build (480 s of work) and only **four builders** can work on it at once, so it takes at least two
+minutes. Everyone sees it from the moment it is begun, the toast tells every side, and the AI sends its
+whole army at a rival's Wonder site, finished or not. The AI researches Age IV and builds a Wonder too
+once its deeds are done.
+
+![A Wonder going up at 65%, the deeds card at Age IV reached and The Wonder scenario's card at the top left](docs/screenshots/wonder.webp)
+
+## The campaign
+
+The menu's **Campaign** toggle swaps the map and rival rows for five scenarios, played in order: each
+win opens the next. Each has a fixed map (its own seed), its rivals' temperaments, a goal that wins
+besides the usual ones, and one new rule. A card at the top left of the match names the goal and how
+far it has come. A win earns a star, and each scenario has two more star goals; the best stars are kept.
+You still pick the faction on its card, so scenario wins count for faction mastery too.
+
+| Scenario | Map | Goal | New rule | Stars two and three |
+| --- | --- | --- | --- | --- |
+| 1. The Village Watch | Lowlands | Hold out 12 minutes with the Town Center standing | A Raider rival raids from minute 4, then every 90 s | No building lost; at most 12 units lost |
+| 2. The Ore Road | Lakes | Bring the supply cart home with ore three times | Brigands and Poachers hold both trading posts; if the cart falls, you lose | Within 15 minutes; at most 8 units lost |
+| 3. The Relic of Valor | Highlands | Hold the Relic of Valor 4 minutes in a row | The Warden rival starts in Age II | Within 25 minutes; no building lost |
+| 4. Last Town Standing | Lowlands | Be the last Town Center against two rivals | Nobody may build a Monument | Within 40 minutes; at most 40 units lost |
+| 5. The Wonder | Lakes | Reach Age IV and finish a Wonder | Every side starts in Age III with 2500 wood and food and 2000 ore (still no Monuments) | Within 35 minutes; no building lost |
+
+![The campaign on the menu: five scenarios with their stars, the fifth still locked, and each card's mastery line](docs/screenshots/campaign-menu.webp)
+
+![Victory in The Ore Road with two stars, the next scenario opened and the Harpooner unlocked](docs/screenshots/campaign-victory.webp)
+
+## Faction mastery
+
+Every match won with a faction, skirmish or scenario, counts towards its mastery. Two wins master it,
+and its own second unique unit then shows in its building's panel from Age II. The menu's cards show
+each faction's wins, and the end screen says how far it has come.
+
+| Faction | Unit | Trained at | What it does |
+| --- | --- | --- | --- |
+| Ember Legion | Torchbearer (60 food, 40 wood, 20 ore) | Barracks | Triple damage to buildings |
+| Tide Coven | Harpooner (50 food, 60 wood, 20 ore) | Archery Range | Range 6, 9 damage, double against cavalry |
+| Thorn Grove | Briar Warden (80 food, 50 wood, 30 ore) | Barracks | 150 health, slow and hard to bring down |
+
+![Ember Torchbearers burning the Tide Town Center: 18 damage a blow, three times a Militia's](docs/screenshots/torchbearers.webp)
+
 ## Economy and population
 
 - Wood comes from trees, food from berry bushes and farms, and ore from gold mines. The Tide Coven's
@@ -363,8 +415,10 @@ All paths are inside `games/colonizer/`. [AGENTS.md](AGENTS.md) has the details.
 - `src/game/`: the rules in plain TypeScript with no Phaser dependency. `data.ts` has every
   balance number and roster (factions, units, buildings, techs, deeds, boons, edges, map kinds,
   temperaments, relics), `map.ts` draws the map, `sim.ts` runs the match (economy, production,
-  research, pathing, combat, raids and fog) and `planner.ts` is the AI.
-- `src/scenes/`: `BootScene` bakes the textures, `MenuScene` picks the map kind, rivals and faction, and
+  research, pathing, combat, raids, fog and a scenario's goal), `planner.ts` is the AI and
+  `campaign.ts` lists the five scenarios and scores their stars.
+- `src/progress.ts`: the campaign's stars and the wins for faction mastery, kept in the browser.
+- `src/scenes/`: `BootScene` bakes the textures, `MenuScene` picks a skirmish's map kind and rivals or a campaign scenario, and the faction, and
   `GameScene` draws the match and wires clicks and keys to the rules. `hud.ts` has the top bar,
   deeds card, horn toast and minimap, `fx.ts` the sparks, arrows and numbers, `layout.ts` says
   where the HUD sits and `sound.ts` plays what changed in the sim.

@@ -18,6 +18,7 @@ import {
   TEMPERAMENTS,
   UNIQUE,
   UNITS,
+  WONDER_CREW,
   type BuildingId,
   type Resource,
   type Temperament,
@@ -115,7 +116,7 @@ function foeFor(s: GameState, side: number) {
   const raid = s.aiRaid[side];
   if (rivals.length === 0) return raid.foe;
   if (raid.goal && rivals.includes(raid.foe)) return raid.foe;
-  const monument = rivals.find((r) => [...s.buildings.values()].some((b) => b.owner === r && b.type === 'monument'));
+  const monument = rivals.find((r) => [...s.buildings.values()].some((b) => b.owner === r && (b.type === 'monument' || b.type === 'wonder')));
   return monument ?? rivals[raid.count % rivals.length];
 }
 
@@ -156,8 +157,9 @@ function plan(s: GameState) {
   for (const b of s.buildings.values()) {
     if (b.owner !== ME || b.built) continue;
     if (BUILDINGS[b.type].palisade && onWall) continue;
-    const working = [...s.units.values()].some((u) => u.owner === ME && u.order.t === 'build' && u.order.b === b.id);
-    if (working) continue;
+    // A Wonder gets its whole crew; anything else one builder.
+    const working = [...s.units.values()].filter((u) => u.owner === ME && u.order.t === 'build' && u.order.b === b.id).length;
+    if (working >= (b.type === 'wonder' ? WONDER_CREW : 1)) continue;
     const builder = nearestUnit(idleVillagers, b.tx, b.ty) ?? nearestVillager(s, ME, b.tx, b.ty);
     if (builder) act(() => (issue(s, ME, [builder.id], { t: 'build', b: b.id }), true));
   }
@@ -213,7 +215,7 @@ function plan(s: GameState) {
     const at = b.type === 'town' ? 'town' : 'academy';
     const tech = T.research.find((id) => {
       const def = TECHS[id];
-      const done = id === 'age2' ? p.age >= 2 : p.techs.includes(id);
+      const done = def.advance ? p.age >= def.advance : p.techs.includes(id);
       return def.at === at && !done && (!def.age2 || p.age >= 2) && affordable(p, def.cost);
     });
     if (tech && act(() => research(s, ME, b.id, tech))) log(t('logResearch', { tech: t(TECHS[tech].name) }));
@@ -260,10 +262,13 @@ function plan(s: GameState) {
   // Soldiers not in a fight: idle, or walking (a crowd at a rally flag can jostle on its way for good).
   const ready = army.filter((u) => u.order.t === 'idle' || u.order.t === 'move');
   const raid = s.aiRaid[ME];
-  const monument = [...s.buildings.values()].find((b) => b.owner === FOE && b.type === 'monument');
-  if (monument && monumentLeft(s, FOE) !== null && army.length > 0) {
+  // A rival's Wonder wins once finished, so even its site draws the rush.
+  const monument =
+    [...s.buildings.values()].find((b) => b.owner === FOE && b.type === 'wonder') ??
+    (monumentLeft(s, FOE) !== null ? [...s.buildings.values()].find((b) => b.owner === FOE && b.type === 'monument') : undefined);
+  if (monument && army.length > 0) {
     if (idleArmy.length > 0 && act(() => true)) {
-      const half = BUILDINGS.monument.w / 2;
+      const half = BUILDINGS[monument.type].w / 2;
       const ids = army.map((u) => u.id);
       issue(s, ME, ids, { t: 'attackMove', x: monument.tx + half, y: monument.ty + half });
       // The rush is a raid on the Monument, so `pressRaid` ends it (and the raid it records) once
@@ -272,7 +277,7 @@ function plan(s: GameState) {
         Object.assign(raid, { goal: { kind: 'town', x: monument.tx + half, y: monument.ty + half, b: monument.id, camp: null }, foe: FOE, party: ids, started: s.time, count: raid.count + 1 });
       }
       startRaid(s, ME, FOE, ids);
-      log(t('logMonumentRush', { n: army.length }));
+      log(t(monument.type === 'wonder' ? 'logWonderRush' : 'logMonumentRush', { n: army.length }));
     }
   } else if (raid.goal) {
     pressRaid(s, town);
@@ -321,7 +326,7 @@ function raidGoal(s: GameState): RaidGoal | null {
   const foeTown = [...s.buildings.values()].find((b) => b.owner === FOE && b.type === 'town');
   if (!mine || !foeTown) return null;
   const at = (b: Building, kind: RaidGoal['kind']): RaidGoal => ({ kind, x: b.tx + BUILDINGS[b.type].w / 2, y: b.ty + BUILDINGS[b.type].h / 2, b: b.id, camp: null });
-  const monument = [...s.buildings.values()].find((b) => b.owner === FOE && b.type === 'monument');
+  const monument = [...s.buildings.values()].find((b) => b.owner === FOE && (b.type === 'wonder' || b.type === 'monument'));
   if (monument) return at(monument, 'town');
   const raid = s.aiRaid[ME];
   if (raid.count + 1 >= RAID_TOWN_FROM || s.players[ME].age >= 3) return at(foeTown, 'town');
@@ -370,7 +375,7 @@ function pressRaid(s: GameState, town: Building) {
     // Every raider fallen is repelled by the sim already; one turned back by losses is repelled too.
     endRaid(s, ME, bled && !done);
     log(t(bled && !done ? 'logRaidBack' : done ? 'logRaidDone' : 'logRaidOff'));
-    Object.assign(raid, { goal: null, party: [], next: s.time + T.rest });
+    Object.assign(raid, { goal: null, party: [], next: s.time + (s.mission?.raids?.rest ?? T.rest) });
     return;
   }
   const idle = party.filter((u) => u.order.t === 'idle');

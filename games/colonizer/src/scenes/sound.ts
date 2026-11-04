@@ -74,6 +74,7 @@ export class SoundCues {
       if (!before) {
         const at = this.seen(b);
         placed.add(`${at.x},${at.y}`);
+        if (b.type === 'wonder') sfx('monument');
       }
       if (before && !before.built && b.built) {
         if (b.type === 'monument') sfx('monument');
@@ -133,7 +134,8 @@ export class SoundCues {
 
   private updateMusic(s: GameState) {
     if (s.winner !== null) return;
-    const monument = [...s.buildings.values()].some((b) => b.type === 'monument' && b.built && b.hp > 0);
+    // A standing Monument, or a Wonder going up, plays the solemn part.
+    const monument = [...s.buildings.values()].some((b) => b.hp > 0 && ((b.type === 'monument' && b.built) || b.type === 'wonder'));
     const age = s.players[PLAYER].age;
     const [song, part]: [Song, string] = this.raid?.mine ? [RAID, 'battle'] : monument ? [COLONY, 'monument'] : [COLONY, age >= 3 ? 'calm3' : age === 2 ? 'calm2' : 'calm'];
     const key = `${song === RAID ? 'raid' : 'colony'}:${part}`;

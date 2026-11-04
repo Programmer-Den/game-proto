@@ -333,6 +333,28 @@ const PAINT: Record<BuildingId, Painter> = {
     sp(c, [[x + w / 2 + 1, y - 21], [x + w / 2 + 20, y - 19], [x + w / 2 + 14, y - 15], [x + w / 2 + 20, y - 11], [x + w / 2 + 1, y - 12]], roof, { ang: 0, noCouch: true, lw: 0.6 });
     thread(c, [[x + w / 2 + 2, y - 16.5], [x + w / 2 + 15, y - 15.5]], trim, 0.9);
   },
+  wonder(c, x, y, w, h, roof, trim) {
+    // A great cathedral of the Imperial age: three stepped plinths, an arcaded hall between two
+    // towers, a high drum under a gold dome, and banners in the side's colours on every tower.
+    sr(c, x + 2, y + h - 12, w - 4, 9, T.buff, { ang: 0 });
+    sr(c, x + 8, y + h - 22, w - 16, 10, T.buff, { ang: 0 });
+    wall(c, x + 14, y + 44, x + w - 14, y + h - 22, 6);
+    for (let k = 0; k < 5; k++) arch(c, x + 22 + k * 18, y + 66, 10, 24, k === 2 ? T.red : k % 2 ? T.teal : T.indigo);
+    arch(c, x + w / 2 - 9, y + h - 48, 18, 26, T.ink);
+    tiles(c, x + 12, y + 30, x + w - 12, y + 46, roof);
+    for (const tx of [x + 2, x + w - 22]) {
+      sr(c, tx, y + 8, 20, h - 30, T.sage, { ang: 0 });
+      for (let k = 0; k < 3; k++) arch(c, tx + 6, y + 24 + k * 26, 8, 14, T.ink);
+      dome(c, tx + 10, y + 8, 10, T.ochre);
+      pennant(c, tx + 10, y - 4, trim);
+    }
+    sr(c, x + w / 2 - 16, y + 4, 32, 28, T.tan, { ang: 0 });
+    for (let k = 0; k < 3; k++) arch(c, x + w / 2 - 12 + k * 9, y + 12, 6, 14, T.indigo);
+    dome(c, x + w / 2, y + 4, 17, T.ochre);
+    for (const [dx, dy] of [[12, h - 7], [w - 12, h - 7], [w / 2, h - 7], [20, h - 17], [w - 20, h - 17]] as Pt[]) knot(c, x + dx, y + dy, 2.2, T.ochre);
+    thread(c, [[x + w / 2, y - 14], [x + w / 2, y - 20]], T.ink, 1);
+    sp(c, [[x + w / 2 + 1, y - 20], [x + w / 2 + 22, y - 18], [x + w / 2 + 16, y - 14], [x + w / 2 + 22, y - 10], [x + w / 2 + 1, y - 11]], roof, { ang: 0, noCouch: true, lw: 0.6 });
+  },
 };
 
 /** A building for one side, with its footprint's top-left at (0, BUILDING_TOP). */

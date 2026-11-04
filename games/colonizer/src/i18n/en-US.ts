@@ -14,6 +14,11 @@ const enUS: Partial<Translation<typeof en>> = {
   endFoeFallen: 'The enemy Town Center has fallen',
   watchBothFallen: "Both rivals' Town Centers have fallen",
   watchFallen: 'The {faction} Town Center has fallen',
+  researchAge4: 'Research Age IV at the Town Center',
+  scnWatchGoal: 'Hold out for 12 minutes, Town Center standing',
+  scnValour: 'The Relic of Valor',
+  scnValourGoal: 'Hold the Relic of Valor for 4 minutes in a row',
+  scnStandingGoal: 'Be the last Town Center standing against two rivals',
 };
 
 export default enUS;
