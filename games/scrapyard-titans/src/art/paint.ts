@@ -7,7 +7,7 @@
 import Phaser from 'phaser';
 import { sharpRes } from '../../../../shared/scaling';
 import {
-  ITEMS, MONSTERS, ORIGIN_COLOR, PLAYER_COMMANDERS, RIVALS, UNITS,
+  BOSSES, ITEMS, MONSTERS, ORIGIN_COLOR, PLAYER_COMMANDERS, RIVALS, UNITS,
   type ClassId, type CommanderDef, type MonsterId, type OriginId, type PartId, type UnitDef,
 } from '../game/data';
 
@@ -78,7 +78,7 @@ function glowDot(ctx: Ctx, x: number, y: number, r: number, color: string) {
 }
 
 const EYE: Record<OriginId, string> = {
-  heavy: '#ffd34d', drone: '#7cf3ff', sparker: '#7cf3ff', magnet: '#ffffff', salvager: '#ff9a3c', neon: '#ffffff', hacker: '#39e58c',
+  heavy: '#ffd34d', drone: '#7cf3ff', sparker: '#7cf3ff', magnet: '#ffffff', salvager: '#ff9a3c', neon: '#ffffff', hacker: '#39e58c', clockwork: '#ffe9a8',
 };
 
 /** A robot, standing on (0, 0), facing the viewer. */
@@ -154,6 +154,13 @@ function robot(ctx: Ctx, def: { origin: OriginId; cls: ClassId; cost: number }) 
     cel(ctx, rect(ctx, -half - 12, sh - 1, 34 + torsoW, 5, 2), dark, { split: half + 12 });
     cel(ctx, rect(ctx, -4, sh - 5, 8, 4, 1), metal, { line: 1.4, split: 2 });
     glowDot(ctx, -half - 10, sh + 1.5, 1.6, '#ff8a8a');
+  } else if (def.cls === 'bomber') {
+    // A stubby mortar on the shoulder, tilted up, with a round bomb ready in the other hand.
+    cel(ctx, poly(ctx, [half - 4, sh + 4, half + 4, sh - 14, half + 12, sh - 10, half + 4, sh + 8]), dark, { split: half + 4 });
+    cel(ctx, circle(ctx, half + 8, sh - 12, 3.4), 0x0a0818, { line: 1.2 });
+    cel(ctx, rect(ctx, -half - 6, sh, 6, 12, 3), base, { split: -half - 3 });
+    cel(ctx, circle(ctx, -half - 4, sh + 15, 5), 0x2b2d42, { split: -half - 2 });
+    glowDot(ctx, -half - 2, sh + 9, 1.5, '#ffb703');
   } else if (def.cls === 'saboteur') {
     cel(ctx, poly(ctx, [-half - 2, sh + 4, -half - 14, sh + 18, -half - 4, sh + 10]), metal, { split: -half - 8, line: 2 });
     cel(ctx, poly(ctx, [half - 2, sh + 4, half + 12, sh + 18, half + 2, sh + 10]), metal, { split: half + 6, line: 2 });
@@ -233,6 +240,29 @@ function robot(ctx: Ctx, def: { origin: OriginId; cls: ClassId; cost: number }) 
       glowDot(ctx, -3, hy - 7, 1.6, eye);
       glowDot(ctx, 3, hy - 7, 1.6, eye);
       break;
+    case 'clockwork': {
+      // A brass clock face with two hands and a wind-up key on top.
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(0, hy - 18);
+      ctx.lineTo(0, hy - 24);
+      ctx.stroke();
+      cel(ctx, () => { ctx.beginPath(); ctx.ellipse(-4, hy - 26, 4, 3, 0, 0, Math.PI * 2); ctx.ellipse(4, hy - 26, 4, 3, 0, 0, Math.PI * 2); }, base, { line: 1.6, split: 0 });
+      cel(ctx, circle(ctx, 0, hy - 9, 10), base, { split: 3 });
+      cel(ctx, circle(ctx, 0, hy - 9, 7), 0xfff3d6, { line: 1.4, shadow: 0.9 });
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(0, hy - 9);
+      ctx.lineTo(0, hy - 14);
+      ctx.moveTo(0, hy - 9);
+      ctx.lineTo(4, hy - 7);
+      ctx.stroke();
+      glowDot(ctx, -3.5, hy - 10, 1.2, eye);
+      glowDot(ctx, 3.5, hy - 10, 1.2, eye);
+      break;
+    }
     case 'hacker':
       cel(ctx, rect(ctx, -11, hy - 15, 22, 15, 2), 0x2b2d42, { split: 4, shadow: 0.8 });
       ctx.fillStyle = '#0d2a1d';
@@ -432,7 +462,7 @@ export function bakeAll(scene: Phaser.Scene) {
       monster(ctx, id);
     });
   }
-  for (const c of [...PLAYER_COMMANDERS, ...RIVALS]) {
+  for (const c of [...PLAYER_COMMANDERS, ...RIVALS, ...BOSSES]) {
     bake(scene, cmdKey(c.name), CMD_TEX.w, CMD_TEX.h, (ctx) => {
       ctx.translate(CMD_TEX.w / 2, CMD_TEX.footY);
       commander(ctx, c);

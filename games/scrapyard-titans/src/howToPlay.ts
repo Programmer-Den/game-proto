@@ -19,7 +19,7 @@ const en: HowToPlay = {
     { input: '1, 2 or 3', action: 'Pick a power card when one is offered' },
   ],
   loop: [
-    'Pick a commander, a season (or this week’s), and whether the board has terrain tiles.',
+    'Pick a commander, a season (or this week’s, or the next campaign lobby), and whether the board has terrain tiles.',
     'Buy robots from the shop with your gold.',
     'Place them on your half of the board: tanks in front, shooters behind.',
     'Press FIGHT! and watch them battle on their own.',
@@ -37,6 +37,9 @@ const en: HowToPlay = {
     'Five more commanders unlock through deeds, like a top-four finish or a 3-star robot; pick a locked one on the menu to see how.',
     'Top-four finishes earn rank points; each new rank makes the rivals play a little harder.',
     'The third season card is this week’s: its season and terrain change every Monday, and it keeps its own best place.',
+    'The junkyard campaign is ten fixed lobbies, with a boss commander in every third. Reach the lobby’s place (and outlast its bosses) to clear it; each one cleared adds a robot or part to the kit you start the later lobbies with.',
+    'Clockwork robots join every season’s shop: they wind up four seconds into a fight, and their two Bombers lob bombs that hit a whole cluster.',
+    'Win a match and its final board is saved: in later matches it comes back as a ghost in round 4-7, in place of the monsters.',
   ],
 };
 
@@ -57,7 +60,7 @@ const de: HowToPlay = {
     { input: '1, 2 oder 3', action: 'Eine Machtkarte wählen, wenn eine angeboten wird' },
   ],
   loop: [
-    'Wähle einen Kommandanten, eine Saison (oder die der Woche) und ob das Brett Geländefelder hat.',
+    'Wähle einen Kommandanten, eine Saison (oder die der Woche, oder die nächste Kampagnen-Lobby) und ob das Brett Geländefelder hat.',
     'Kaufe mit deinem Gold Roboter im Shop.',
     'Stelle sie auf deine Bretthälfte: Tanks nach vorn, Schützen nach hinten.',
     'Drücke KAMPF! und sieh zu, wie sie von selbst kämpfen.',
@@ -75,6 +78,9 @@ const de: HowToPlay = {
     'Fünf weitere Kommandanten schaltest du mit Taten frei, etwa einem Platz unter den ersten vier oder einem Roboter mit 3 Sternen; wähle im Menü einen gesperrten, um zu sehen, wie.',
     'Plätze unter den ersten vier bringen Rangpunkte; jeder neue Rang lässt die Rivalen etwas härter spielen.',
     'Die dritte Saisonkarte ist die der Woche: Saison und Gelände wechseln jeden Montag, und sie hat ihren eigenen besten Platz.',
+    'Die Schrottplatz-Kampagne hat zehn feste Lobbys, in jeder dritten wartet ein Boss. Erreiche den Platz der Lobby (und überlebe ihre Bosse), um sie zu schaffen; jede geschaffte legt einen Roboter oder ein Teil in das Startpaket der späteren Lobbys.',
+    'Uhrwerk-Roboter gibt es in jeder Saison im Shop: Vier Sekunden nach Kampfbeginn sind sie aufgezogen, und ihre zwei Bomber werfen Bomben, die einen ganzen Pulk treffen.',
+    'Gewinnst du ein Match, wird sein letztes Brett gespeichert: In späteren Matches kehrt es in Runde 4-7 als Geist zurück, statt der Monster.',
   ],
 };
 

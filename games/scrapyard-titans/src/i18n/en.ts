@@ -52,6 +52,10 @@ const en = {
   firewall: 'Firewall',
   trojan: 'Trojan',
   kernel: 'Kernel',
+  tickTock: 'Tick-Tock',
+  mainspring: 'Mainspring',
+  cuckoo: 'Cuckoo',
+  pendulum: 'Old Pendulum',
 
   // Class abilities
   guardianAbility: 'Plate Up: shields itself',
@@ -60,6 +64,7 @@ const en = {
   sniperAbility: 'Long Shot: a heavy round at the farthest enemy',
   saboteurAbility: 'Backstab: blinks to the weakest enemy and strikes',
   mechanicAbility: 'Patch Job: repairs and shields the most hurt ally',
+  bomberAbility: 'Lob Bomb: a bomb at the most crowded enemy that also hits the enemies next to it',
 
   // Traits: name and bonus, {v} is the bonus at each tier
   heavyTrait: 'Heavy',
@@ -88,6 +93,10 @@ const en = {
   saboteurTraitText: 'Saboteurs gain {v}% critical chance.',
   mechanicTrait: 'Mechanic',
   mechanicTraitText: 'All your robots repair {v} health a second.',
+  clockworkTrait: 'Clockwork',
+  clockworkTraitText: 'Four seconds in, Clockwork robots wind up and attack {v}% faster.',
+  bomberTrait: 'Bomber',
+  bomberTraitText: 'Bombers’ bombs deal {v}% more damage.',
 
   // Parts: name and bonus
   sawName: 'Buzzsaw',
@@ -243,6 +252,16 @@ const en = {
   tinpotTess2: 'Kaboom, maybe!',
   tinpotTess3: 'Oops, did I win?',
   tauntStart: 'Let’s brawl!',
+  // Campaign bosses: names and call-outs
+  foreman: 'The Foreman',
+  foreman1: 'Break’s over. Back to work!',
+  foreman2: 'Clock in, clock out, get crushed.',
+  scrapQueen: 'Scrap Queen',
+  scrapQueen1: 'Kneel before the heap!',
+  scrapQueen2: 'Every bolt here is mine.',
+  ironTyrant: 'Iron Tyrant',
+  ironTyrant1: 'The yard bows to iron.',
+  ironTyrant2: 'You climbed all this way to fall.',
   tauntWin: 'Ha!',
 
   // Monsters
@@ -380,7 +399,32 @@ const en = {
   // End of the match
   won: 'Last titan standing!',
   lost: 'Knocked out',
-  youFinished: 'You finished {place} of 8 after round {round}.',
+  youFinished: 'You finished {place} of {n} after round {round}.',
+  // The junkyard campaign
+  lobby1: 'Scrapyard Gate',
+  lobby2: 'Oil Flats',
+  lobby3: 'The Foreman’s Pit',
+  lobby4: 'Rust Hills',
+  lobby5: 'Furnace Row',
+  lobby6: 'Scrap Queen’s Court',
+  lobby7: 'Magnet Mile',
+  lobby8: 'Neon Night Market',
+  lobby9: 'Iron Tyrant’s Throne',
+  lobby10: 'The Titan Ladder',
+  campaignCard: 'Junkyard campaign · lobby {n} of 10: {name}',
+  campaignNext: '{sets} · {goal} · win: {reward} · your kit: {kit}',
+  campaignDone: 'Ladder climbed! Play the last lobby again · {sets}',
+  goalPlace: 'finish {place} or better',
+  goalBoss: '{place} or better and outlast the boss',
+  lobbySetsTerrain: 'The campaign lobby sets the terrain',
+  lobbyCleared: 'Lobby {n}, {name}, cleared! New in your kit: {reward}',
+  lobbyClearedAgain: 'Lobby {n}, {name}, cleared again!',
+  lobbyFailed: 'Lobby {n} not cleared: {goal}.',
+  // Squad replays
+  vsGhostSquad: 'vs your ghost squad',
+  ghostSquad: 'your ghost squad',
+  squadSaved: 'Squad saved: it comes back as a ghost in round {round}.',
+  squadsSaved: { one: '1 winning squad saved: one comes back as a ghost in round {round}', other: '{n} winning squads saved: one comes back as a ghost in round {round}' },
   seatFinished: 'Seat 1 finished {place} of 8 after round {round}.',
   endStats: 'Matches {played} · wins {wins} · best {best}',
   playAgain: 'Play again',

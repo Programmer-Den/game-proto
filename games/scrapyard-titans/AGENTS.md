@@ -14,18 +14,23 @@ Implemented today:
 
 - Menu: eight commanders (`PLAYER_COMMANDERS`, each with one skill in `SKILLS`) as small cards,
   with the picked one's skill (or, while locked, its unlock) spelled out under them, two seasons
-  (`SETS`) and a terrain toggle, then START MATCH (greyed out on a locked commander). The menu shows
-  the saved stats.
+  (`SETS`) and a terrain toggle, then START MATCH (greyed out on a locked commander), the
+  campaign card under them, and the saved stats, rank and saved squads at the bottom.
 - Commander unlocks (`progress.ts`): Grit, Sparks and Magna are open; the other five each have an
   `unlock` deed (`DeedId`): `topFour` (Rosa, Patch-Up), `threeStar` (Volt, Power Surge),
   `fullOrigin` (Hexa, EMP Blast: a won fight with an origin at 6), `maxLevel` (Ironside, Rally Cry)
   and `champion` (Nova, Air Strike). `GameScene.noteDeeds` saves them: `planDeeds` every plan
   tick, `fullOrigin` in `finishFight`, `topFour` and `champion` in `record`; a new unlock floats
   "New commander" over the board and is listed on the end screen. Watched matches never count.
-- Seasons: each `SetDef` lists five origins; `rosterOf(set)` gives its 30 robots (six per origin,
-  one per class, costs 1 to 5). Scrap Rush adds scrap tokens on wins (`SCRAP_TOKENS_PER_PART`),
-  Overcharge gives every robot `OVERCHARGE_MANA` at the start of a fight. `UNITS` holds both
-  seasons' 42 robots.
+- Seasons: each `SetDef` lists six origins; `rosterOf(set)` gives its 34 robots (six per origin,
+  one per class, costs 1 to 5, plus the four Clockwork robots, `CLOCKWORK`, in both seasons).
+  Scrap Rush adds scrap tokens on wins (`SCRAP_TOKENS_PER_PART`), Overcharge gives every robot
+  `OVERCHARGE_MANA` at the start of a fight. `UNITS` holds all 46 robots.
+- Clockwork and Bomber: the Clockwork origin (tiers 2/4) winds up once at `WIND_UP_S` into a
+  fight (`Battle.step` adds its trait value to `rampAs`). Its 2- and 4-cost robots are the only
+  Bombers, a seventh class (tier 2, more bomb damage) whose `bomb` ability lobs a shell at the
+  enemy with the most others next to it and hits them all, the neighbours by `BOMB_SPLASH`.
+  `paint.ts` draws the clock-face head and the Bomber's shoulder mortar.
 - Traits: `TRAITS` (origins tiered 2/4/6, classes 2/4), counted per distinct robot on the board
   (`countTraits`), read in the sim with `traitValue`.
 - Shop and economy (`ECONOMY`, `LEVEL_XP`, `SHOP_ODDS`): 5 cards, reroll, buy XP, interest,
@@ -94,6 +99,23 @@ Implemented today:
   `threeStar`, `fullOrigin`, `maxLevel`, `champion`), `allCommanders` when every commander is
   unlocked and `titanRank` at the top rank. `create` runs it quietly, so deeds saved before the
   trophies came in earn theirs without a toast.
+- Junkyard campaign (`CAMPAIGN`, `LobbyDef` in `data.ts`): ten fixed lobbies, each with its
+  season, terrain, rival `rank` and `seats` (indexes into `RIVALS`, or `b0` to `b2` for `BOSSES`),
+  a `goal` place and a `reward` (a robot of a shared origin, or a part). The menu's wide card
+  (`menu.set` `'campaign'`) plays `nextLobby(progress)`; `startMatch` passes `MatchOptions.lobby`,
+  the lobby's rank and `kit` (`campaignKit`: every cleared lobby's reward), and `newMatch` seats
+  `lobbyRivals(lobby)` (so a match can have 4 to 8 seats) and puts the kit on the bench and the
+  item bench. Bosses (`CommanderDef.boss`) get `BOSS.hp` health and `BOSS.gold` more a round in
+  `startPlan`. `record` checks `lobbyCleared` (the goal place or better, every boss out before the
+  player) and `clearLobby` moves `Progress.campaign` on; the end screen says cleared (with the new
+  kit piece) or what it asks for.
+- Squad replays: `record` saves the player's final board of a won match (`squadOf`, a
+  `SavedSquad`) with `saveSquad`, keeping the newest `GHOST.keep` under `scrapyard-titans-squads`
+  (`loadSquads` drops any that name a robot, item or card that no longer exists). `startMatch`
+  hands one at random (`pickSquad`) to `MatchOptions.ghost`; on round 4-7 (`GHOST`,
+  `isGhostRound`) `startFight` gives the player that squad (`ghostSide`, mirrored, with its
+  commander's skill and power cards) instead of the monsters, sets `Match.ghostSquad`, and a loss
+  costs `GHOST.lossDamage`. The rivals fight the monsters as usual. Never under `?watch`.
 - Rank ladder (`RANKS`, `RANK_POINTS` in `data.ts`): `Progress.points` grow by a top-four place in
   `record` (`addRankPoints`) and never drop; `rankOf(points)` gives the rank, which `startMatch`
   passes as `MatchOptions.rank` (0 under `?watch`). The rank gives each rival `gold` more a round
@@ -101,14 +123,14 @@ Implemented today:
   reroll from stage `rollFrom` while holding more than `rollAbove` gold (seat 0 always uses Rust's).
   Rank 0 plays exactly as before. The menu shows it under the stats, the end screen the points won
   or the rank up.
-- Progress (matches, wins, best place, `deeds`, rank `points` and `weekly` best) saved under `scrapyard-titans-stats`
+- Progress (matches, wins, best place, `deeds`, rank `points`, `weekly` best and `campaign` lobbies cleared) saved under `scrapyard-titans-stats`
   (`progress.ts`, `loadProgress`/`saveProgress`); watched matches never count.
 
 Missing or rough:
 
 - No pathing beyond one tile step at a time toward the target.
 - AI rivals use a simple scored plan (`aiPlan`). Balance is checked with AI-only matches (see
-  Gotchas); every origin's average place sits between about 4.0 and 4.9 of 8, and matches end
+  Gotchas); every origin's average place (Clockwork about 4.8) sits between about 4.0 and 4.9 of 8, and matches end
   around stages 5 and 6.
 - Only the weekly season rotates; the two plain seasons are picked on the menu.
 
@@ -128,10 +150,11 @@ File map (`src/`):
   just 3 in German, where the text says "Platz"). Every text on screen goes through `t`, and a new
   one gets its German entry (and a US one if its spelling differs) in the same PR. The watch
   panel's title and `aiLog` lines stay English, with the names inside them translated.
-- `progress.ts`: what lasts between matches (`Progress`: stats, deeds, rank points), `rankOf`,
-  `addRankPoints`, `weekOf`, `weekStart`, `weeklyRules`, `weeklyBest`, `recordWeekly`, `isUnlocked`,
-  `doDeeds` (saves new deeds, returns the commanders they unlock), `planDeeds`, `fullOrigin`. No
-  Phaser.
+- `progress.ts`: what lasts between matches (`Progress`: stats, deeds, rank points, campaign),
+  `rankOf`, `addRankPoints`, `weekOf`, `weekStart`, `weeklyRules`, `weeklyBest`, `recordWeekly`,
+  `isUnlocked`, `doDeeds` (saves new deeds, returns the commanders they unlock), `planDeeds`,
+  `fullOrigin`, the campaign's `nextLobby`, `campaignKit`, `lobbyCleared`, `clearLobby`, and the
+  saved squads' `loadSquads`, `saveSquad`, `pickSquad`. No Phaser.
 - `trophies/`: the game's trophies (see Current state).
 - `audio.ts`: the songs (`PLAN_SONG`, `FIGHT_SONG`) and the sound table (`play`, typed `Sfx`); see
   Sound below.
@@ -140,8 +163,8 @@ File map (`src/`):
   monsters, terrain) is a `TextKey` of `i18n/en.ts`, which the scene shows with `t`. No Phaser.
 - `game/battle.ts`: `Battle(a, b, terrain)` with `step()` (fixed `STEP_S` 0.05 s), `useSkill`,
   `zapRat`, `runToEnd`, and `events` (`BEvent`) the scene drains for animation. No Phaser.
-- `game/match.ts`: the `Match` and `Player` types (`Player.name` and `Match.taunt.text` are
-  `TextKey`s too) and every action: `newMatch`, `rollShop`, `reroll`, `buyXp`, `buy`, `sell`, `moveUnit`, `equip`, `giveItem`, `pickAugment`, `startPlan`,
+- `game/match.ts`: the `Match`, `Player` and `SavedSquad` types (`Player.name` and `Match.taunt.text` are
+  `TextKey`s too), `squadOf`, `isGhostRound` and every action: `newMatch`, `rollShop`, `reroll`, `buyXp`, `buy`, `sell`, `moveUnit`, `equip`, `giveItem`, `pickAugment`, `startPlan`,
   `startFight`, `endFight`, `advance`, `startDraft`, `draftPick`, `newDrops`, plus helpers. No
   Phaser. A board is a record keyed `"col,row"` (rows 4-7).
 - `game/ai.ts`: `aiPlan` (level, buy, sell, `arrange`, equip), `aiPickAugment`, `aiDraft`;
@@ -224,7 +247,7 @@ Sound table and where each plays:
 | `augment`, `draft` | `doAugment`; the player's draft pick in `onDown` and its timeout pick in `tickDraft` |
 | `punch`, `shot`, `shell`, `snipe` | `consume`: `attack` (melee only), `proj` by kind |
 | `hit`, `crit` | `consume`: `dmg` |
-| `castShield`, `castSlam`, `castBarrage`, `castSnipe`, `blink`, `castRepair` | `consume`: `cast` by ability (`CAST_SOUND`); `blink` also on `blink` |
+| `castShield`, `castSlam`, `castBarrage`, `castSnipe`, `blink`, `castRepair` | `consume`: `cast` by ability (`CAST_SOUND`, a Bomber's `bomb` plays `castBarrage`); `blink` also on `blink` |
 | `lightning`, `heal`, `shield`, `stun`, `dodge`, `revive`, `death`, `escape` | `consume`, the event of that name |
 | `skill` | `consume`: `skill` (the rival's at 0.6 volume) |
 | `zap` | `onDown`, the player's tap on the Scrap Rat |
@@ -251,7 +274,10 @@ greyed-out button or shop card (`button` pushes a refusal for them).
   `cover.png`), `draft.webp` and `scrap-rat.webp` are from a scratch `?watch` run with the watch
   panel hidden; `scout.webp`, `part-preview.webp` and `damage-meter.webp` from a scratch run that
   plays round 1-1 with real clicks; `german-result.webp` is the test's `3-result` run with a
-  `de-DE` browser locale; `trophies.webp` is the pause screen's Trophies list from a scratch run with five trophies saved; `rare-card.webp` is a scratch run's 4-2 offer (set from the dev console) with Lucky Dice in the third slot; `fill-ultrawide.webp` (2560x1080) and `fill-tablet.webp` (1024x768)
+  `de-DE` browser locale; `campaign.webp` (the menu with five lobbies cleared and a saved squad,
+  the campaign card picked), `boss-lobby.webp` (lobby 6 with a Clockwork board set from the dev
+  console) and `ghost-round.webp` (that board fighting a saved squad on round 4-7, set from the
+  console) are from a scratch run; `trophies.webp` is the pause screen's Trophies list from a scratch run with five trophies saved; `rare-card.webp` is a scratch run's 4-2 offer (set from the dev console) with Lucky Dice in the third slot; `fill-ultrawide.webp` (2560x1080) and `fill-tablet.webp` (1024x768)
   show the plan phase on a wider and a taller view, from a scratch run.
 
 ## Making common changes
@@ -262,15 +288,23 @@ greyed-out button or shop card (`button` pushes a refusal for them).
   buttons, the shop cards' trait lines and the players list are the tightest spots, so check a new
   text with `?lang=de`.
 - **Add a robot**: add it to `UNITS` with an origin of its season, a class and its name's key (in
-  the `i18n/` files); give its origin a head in `paint.ts` if the origin is new. Keep six per origin, one per class.
-- **Add an origin or class**: add it to the ids, `TRAITS`, `ORIGIN_COLOR` (origins), a season's
-  `origins` and, for a class, `CLASS_STATS` with an ability the sim handles in `battle.ts`.
+  the `i18n/` files); give its origin a head in `paint.ts` if the origin is new. Keep six per
+  origin, one per class (Clockwork, the shared extra origin, has four).
+- **Add an origin or class**: add it to the ids, `TRAITS`, `ORIGIN_COLOR` and `EYE` in
+  `paint.ts` (origins), a season's `origins` and, for a class, `CLASS_STATS` with an ability the
+  sim handles in `battle.ts`, its arms in `paint.ts` and its cast sound in `CAST_SOUND`.
 - **Add an item**: add a part to `PARTS`/`PART_DEFS` (every pair then needs a combo) or change a
   `combo` row; a new `Special` needs handling in `battle.ts`.
+- **Change the campaign**: a row in `CAMPAIGN` (name key `lobby<n>` in the `i18n/` files, the
+  menu's pips and `lobbyGoal` follow it); a new boss goes into `BOSSES` (name and taunt keys) and
+  is seated with `b<index>`. Keep the rewards to robots of origins both seasons share, or parts.
+  Check a change with the balance harness on `lobby` matches (the AI seat cleared about 17, 16, 12,
+  7, 10 and 4 of 30 tries at lobbies 1, 3, 5, 6, 9 and 10 when it came in).
 - **Add a commander**: a row in `PLAYER_COMMANDERS` (name key, skill, colours, `unlock` deed), its
   skill in `SkillId`, `SKILL_POWER` and `SKILLS`, handled in `Battle.useSkill` and drawn in
   `consume`'s `skill` case; a new deed goes into `DeedId`, `DEEDS` in `progress.ts`, a
-  `<deed>Unlock` text and a `noteDeeds` call where it happens. The menu row holds eight cards.
+  `<deed>Unlock` text and a `noteDeeds` call where it happens. The menu row holds eight cards. Bosses are drawn from
+  `BOSSES` too (`bakeAll`).
 - **Add a power card**: add it to `AugmentId`, `AUGMENTS` and `AUGMENT_TASTE` in `ai.ts`, then
   apply it in `match.ts` (one-off) or `battle.ts` (in fights).
 - **Change the rank ladder**: a row in `RANKS` (with its name and text keys), the points in
@@ -282,7 +316,9 @@ greyed-out button or shop card (`button` pushes a refusal for them).
 - Balance: a scratch harness bundles `src/game` with rolldown (`node_modules/.bin/rolldown`),
   stubs `location` and `localStorage`, and plays AI-only matches in node (`newMatch` with
   `watch: true`, then `startPlan`/`aiPlan`, `startFight` and `runToEnd`, `endFight`, `advance`,
-  drafts through `aiDraft`), recording each seat's place and main origin. Run one after changing a
+  drafts through `aiDraft`), recording each seat's place and main origin. Call
+  `m.battle?.runToEnd()` before `endFight`, since `startFight` leaves seat 0's fight for the scene
+  to play back. Run one after changing a
   trait, a class or `stageDamage`. `startFight` copes with seat 0 being out for this.
 - The bench slots are drawn on the board layer (`drawBoard`), under the benched robots; HUD
   graphics sit above every robot.
