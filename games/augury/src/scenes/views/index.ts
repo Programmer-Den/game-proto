@@ -6,6 +6,8 @@ import { echoView } from './echo';
 import { flipView } from './flip';
 import { linkView } from './link';
 import { nonogramView } from './nonogram';
+import { seriesView } from './series';
+import { slideView } from './slide';
 import { sumsView } from './sums';
 import type { PuzzleView } from './types';
 import { unjamView } from './unjam';
@@ -19,6 +21,8 @@ export const VIEWS: Record<KindId, PuzzleView> = {
   unjam: unjamView,
   flip: flipView,
   link: linkView,
+  slide: slideView,
+  series: seriesView,
   echo: echoView,
 };
 

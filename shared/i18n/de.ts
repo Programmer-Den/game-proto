@@ -190,7 +190,7 @@ const de: Translation<typeof en> = {
   // Hub cards: each game's text and its cover's description
   apothecaryCard: 'Führe als Pestdoktor eine mittelalterliche Apotheke: Kräuter anbauen, verarbeiten, Tränke brauen und verkaufen.',
   apothecaryCover: 'Die Apotheke mit einem Kunden an der Theke',
-  auguryCard: 'Neun Arten von Denkrätseln, ausgeteilt wie Tarotkarten: eine endlose Mischung, die Tagesfünf, Blitz, Kartenwahl mit Relikten, Weitergeben und Üben.',
+  auguryCard: 'Elf Arten von Denkrätseln, ausgeteilt wie Tarotkarten: eine Reise durch fünf Tempel, eine endlose Mischung, die Tagesfünf, Blitz, Kartenwahl mit Relikten, eine Wochenliga, Weitergeben und Üben.',
   auguryCover: 'Ein Pfadrätsel auf einem goldgerahmten Nachthimmel, daneben warten die nächsten Rätsel als Karten',
   deadlineCard: 'Halte das Ende der Straße gegen Zombiewellen: nach links und rechts laufen und Kisten für Verbesserungen aufschießen.',
   deadlineCover: 'Ein Soldat hinter Sandsäcken schießt auf eine Zombiehorde, die eine Straße herunterkommt',

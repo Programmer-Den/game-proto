@@ -6,21 +6,36 @@ the root AGENTS.md.
 
 ## Current state
 
-Augury is a collection of nine brain puzzles in an Arcane Tarot look (night-sky purple, thin gold
-frames, cyan for what is picked or done), played through six modes. Every puzzle is made in code
+Augury is a collection of eleven brain puzzles in an Arcane Tarot look (night-sky purple, thin gold
+frames, cyan for what is picked or done), played through eight modes. Every puzzle is made in code
 from a seed at one of four levels (0 Novice to 3 Oracle), and is solved when its rules hold, not
 only by the answer it was made from.
 
 Implemented today:
 
 - Puzzles (`KINDS`): Picture Grid (`nonogram`), Bridges, Code Breaker (`code`), Calc Cages
-  (`calc`), Cross Sums (`sums`), Unjam, Tile Flip (`flip`), Path Link (`link`) and Memory Echo
-  (`echo`), each in its own file under `game/puzzles/` with its maker, rules, moves and hint, and a
+  (`calc`), Cross Sums (`sums`), Unjam, Tile Flip (`flip`), Path Link (`link`), Star Slide (`slide`, a sliding-tile tray), Star
+  Series (`series`, three rows of numbers to continue) and Memory Echo (`echo`), each in its own file under `game/puzzles/` with its maker, rules, moves and hint, and a
   view under `scenes/views/`.
-- Modes (`MODES`): Endless Medley (`endless`), Daily Five (`daily`), Blitz, Draft Run (`draft`),
-  Pass and Play (`duel`) and Practice, all in `game/run.ts`.
-- Screens (`screen`): `menu` (six mode cards, Records, and Continue when a run was saved), `practice` (level buttons and nine
-  puzzle cards), `records` and `run`. A run's `phase` is `playing`, `between` (the result banner),
+- Modes (`MODES`): Journey (`journey`), Endless Medley (`endless`), Daily Five (`daily`), Blitz,
+  Draft Run (`draft`), Weekly League (`weekly`), Pass and Play (`duel`) and Practice, all in
+  `game/run.ts`.
+- Journey (`game/journey.ts`): forty set steps in five temples of eight (`TEMPLES`, `STEPS`,
+  `NODES`), each temple dealing its `TEMPLE_KINDS` in turn and ending in a boss of its first two;
+  `journeyCard(node)` is the same card for every player. A journey run is one card on its clock;
+  `end` gives it `stars` (`starsFor`: 3 with half its time left, 2 with a quarter, else 1, less one
+  per paid hint, at least 1) and `finish` keeps the best per step in `Progress.journey`. A step
+  opens once the step before it has a star, and a temple once the one before holds `TEMPLE_STARS`
+  (12 of 24) (`nodeOpen`, `templeOpen`).
+- Weekly League (`game/weekly.ts`): a Draft Run (`isDraft`, `hasHearts` in `catalog.ts`) whose
+  draws come from the week's seed (`weekOf`, weeks starting on Monday): `luck(run)` seeds each draw
+  on its own from `run.week` and `run.draws`, so card offers, card seeds and relic offers repeat for
+  every player and survive a reload. Played as often as wanted; `finish` keeps the week's best in
+  `Progress.weekly`, and `rankOf` gives its band (`RANKS`, from `RANK_AT`: Novice 0, Adept 1,000,
+  Mystic 3,000, Oracle 6,000, Seer 10,000).
+- Screens (`screen`): `menu` (eight mode cards, Records, and Continue when a run was saved),
+  `journey` (the map: a row of eight steps per temple, each with its kind's icon and stars),
+  `practice` (level buttons and eleven puzzle cards), `records` and `run`. A run's `phase` is `playing`, `between` (the result banner),
   `draft`, `relic`, `handover` (pass and play) or `over`.
 - Both ways round: a wide view gets the `WIDE` layout (the stage with a side panel at its right)
   and an upright one the `TALL` layout (the top bar in two rows, the stage, the tools, then the
@@ -28,8 +43,8 @@ Implemented today:
   everything out again. The puzzle views take their board's area from the layout and fit it either
   way.
 - Records (`Progress`): solves and losses per kind, the fastest hint-free solve per kind and level,
-  the best score of Endless, Blitz and the daily five, the most solves in a draft run and the last
-  daily played.
+  the best score of Endless, Blitz and the daily five, the most solves in a draft run, the last
+  daily played, the weekly league's week and best, and the journey's stars per step.
 
 Missing or rough:
 
@@ -69,7 +84,7 @@ File map (`src/`):
 - `game/puzzles/*.ts`: one per kind, no Phaser. Each exports its `PuzzleDef`, its state type and
   its move functions (`nonoTap`, `bridgesTap`, `codeAdd`/`codeBack`/`codeGuess`, `calcSelect`/
   `calcEnter`, `sumsSelect`/`sumsEnter`, `unjamMove`, `flipTap`, `linkStart`/`linkMove`/`linkEnd`,
-  `echoAnswer`), each returning whether it made a move worth keeping for Undo.
+  `echoAnswer`, `slideTap`, `seriesPick`), each returning whether it made a move worth keeping for Undo.
 - `game/run.ts`: the tuning (`QUEUE`, `BETWEEN_MS`, `START_HINTS`, `startHearts`, `MAX_HEARTS`,
   `blitzSeconds`, `BLITZ_SOLVE_S`, `BLITZ_PENALTY_S`, `DAILY_LEVELS`, `DUEL_LEVELS`, `DUEL_FAIL_S`,
   `DUEL_HINT_S`, `RELIC_EVERY`, `RELIC_OFFER`, `DRAFT_MAX`, `HOURGLASS`, `CHARM_POINTS`,
@@ -106,9 +121,10 @@ File map (`src/`):
   deals at most `DRAFT_MAX` (3) cards, the deal layout's slots, so Crystal Ball is offered once;
   Blitz's queue is levelled again after every puzzle, so "Up next" shows the level that will be
   dealt, and Blitz ends where its clock runs out, without a result for the puzzle it cut off.
-- `game/catalog.ts`: `OMENS`/`OmenId`, `MODES`/`Mode`, `GENERAL_RELICS`, `CHARMS` (each kind's relic, its charm) with
+- `game/catalog.ts`: `OMENS`/`OmenId`, `MODES`/`Mode`, `isDraft`, `hasHearts`, `GENERAL_RELICS`, `CHARMS` (each kind's relic, its charm) with
   `CharmId`, `CHARM_KIND` and `isCharm`, `RELICS`/`RelicId` (both kinds), `KIND_COLOR`,
   `RELIC_COLOR` (a charm takes its kind's colour).
+- `game/journey.ts` and `game/weekly.ts`: see Current state.
 - `game/progress.ts`: `Progress`, `newProgress`, `recordResult`. `game/save.ts`: `loadProgress`,
   `saveProgress`, and `saveRun`, `loadRun` (checks the saved run and deals its puzzle in play again
   from its card) and `clearRun`.
@@ -122,7 +138,7 @@ File map (`src/`):
   `drawRelic` (a charm is its kind's icon in a ringed medallion), `trace`.
 - `scenes/theme.ts`: `FONT`, `C` (colours), `PALETTE`. `scenes/layout.ts`: the `Layout` type and its two values, `WIDE` (960x540) and
   `TALL` (540x960), with every spot in the frame (`top`, `leave`, `stage`, `board`, `tools`,
-  `side`, `omen` (the omen's button in the top bar), `menu` (with `resume` and `recordsAside` for when a run was saved), `practice`, `records`, `back`, `deal`, `end`, `endButtons`); `layoutFor(w, h)`,
+  `side`, `omen` (the omen's button in the top bar), `menu` (with `resume` and `recordsAside` for when a run was saved, and each card's line offsets `cards.dy`), `journey`, `practice`, `records`, `back`, `deal`, `end`, `endButtons`); `layoutFor(w, h)`,
   `VIEW` (= `WIDE.view`, for `main.ts`) and `UI_DEPTH`.
 
 Shared code it imports: `shared/setupGame.ts`, `shared/scaling.ts` (`setupScaling`, `viewSize`,
@@ -162,13 +178,14 @@ How it runs:
   `drain` for sound and saving.
 - Randomness: every card carries a seed, and its puzzle is made with `seeded(card.seed)`. Card seeds,
   kinds, draft offers and relic offers come from `Math.random`, except the daily five, whose kinds,
-  levels and seeds come from `seeded(dailySeed(date))`. The backdrop uses Phaser's
+  levels and seeds come from `seeded(dailySeed(date))`, the weekly league (`luck(run)`) and the
+  journey (`journeyCard`). The backdrop uses Phaser's
   `RandomDataGenerator` with a fixed seed.
 
 State model (`Run`): `mode`, `phase`, `hearts`, `maxHearts`, `hints`, `score`, `streak`, `dealt`,
 `solved`, `current` (`card`, `state`, `timeLeftMs`, `timeTotalMs`, `elapsedMs`, `hintsUsed`, `freeHints`,
 `freeUsed`, `omen`, `touched`, `pair`, `pairMs`, `pairHints`, `history`), `queue`, `results`, `last`, `betweenMs`, `clockMs`, `relics`, `relicOffer`,
-`draftOffer`, `player`, `totals`, `duelSolved`, `day`, `progress`, `newBest` and `events`.
+`draftOffer`, `player`, `totals`, `duelSolved`, `day`, `week`, `draws`, `node`, `stars`, `progress`, `newBest` and `events`.
 
 Persistence: three `localStorage` keys. `augury-trophies` holds the trophies earned (written by
 `shared/trophies.ts`). `augury-run` holds the run in play (every mode but Practice,
@@ -183,7 +200,7 @@ it (`quit`). `loadProgress` keeps only known kinds and whole, non-negative numbe
 
 ### Hub settings
 
-- Difficulty scales two numbers: hearts in Endless and Draft, `startHearts` =
+- Difficulty scales two numbers: hearts in Endless, Draft and the weekly league, `startHearts` =
   `byDifficulty(4, 3, 2)`, and Blitz's clock, `blitzSeconds` = `byDifficulty(240, 180, 150)`. Keep
   Normal at 3 hearts (the playthrough expects it) and the README's and the root README's rows in
   sync.
@@ -241,12 +258,12 @@ cell is picked, the daily five played today), and a Hint tap that finds nothing 
 - `src/main.ts` exposes `window.game` in dev builds. The test reads `game.scene.getScene('Game')`
   and its `run` (copied through JSON, without `events` and `progress`), `screen` and `buttons`
   (every spot on screen by id, centred, in view pixels: `mode-<mode>`, `records`, `back`,
-  `resume`, `omen`, `level-<n>`, `kind-<kind>`, `undo`, `hint`, `skip`, `leave`, `cell-<i>`, `key-<n>` (0 is Clear),
+  `resume`, `omen`, `level-<n>`, `kind-<kind>`, `node-<i>` (a journey step), `next-step`, `option-<i>` (Star Series), `undo`, `hint`, `skip`, `leave`, `cell-<i>`, `key-<n>` (0 is Clear),
   `island-<i>`, `glyph-<i>`, `code-back`, `code-guess`, `block-<k>`, `echo-same`, `echo-diff`,
   `draft-<i>`, `relic-<i>`, `next`, `done`, `again`, `start2`, `dim`).
 - Inputs: it taps `mode-endless`, then solves whatever the seeded deck deals with real taps and
   drags, reading each puzzle's answer from its state (`picture`, `needed`, `answer`, `code`,
-  `solution`, `open`, `blocks`, `seq`/`step`/`back`/`answers`), and taps `skip`.
+  `solution`, `open`, `blocks`, `trail` (Star Slide), `rows` (Star Series), `seq`/`step`/`back`/`answers`), and taps `skip`.
 - Mirrored in `e2e/playthrough.spec.ts`, so change them together: the `Run` field names, `VIEW`,
   3 hearts on Normal, `QUEUE`, `BETWEEN_MS`, `POINTS_PER_LEVEL`, the first puzzle at level 0 with a
   clock, never the same kind twice in a row, Unjam's 6x6 board, every puzzle state's answer fields
@@ -261,11 +278,12 @@ cell is picked, the daily five played today), and a Hint tap that finds nothing 
 - **Add a puzzle kind**: a file in `game/puzzles/` exporting its `PuzzleDef` and moves, its id in
   `KINDS`, `SKILL_OF`, `DEFS` and `KIND_COLOR`, a view in `scenes/views/` added to `VIEWS`, an icon
   case in `drawKindIcon`, its `Name` and `Rule` texts in English and German, a README row, and a
-  case in the test's `solve` (the deck may deal it). Nine kinds fill the practice screen's 3x3
-  grid sideways and two columns upright; a tenth needs `practice.cards` laid out again in both
-  layouts.
-- **Add a mode**: its id in `MODES` (six fill the menu's row of cards, two rows of three
-  upright; a seventh needs `menu.cards` laid out again in both layouts), its `START_HINTS`, its rules in `startRun`, `end`, `next` and
+  case in the test's `solve` (the deck may deal it), and a temple in `TEMPLE_KINDS` if the journey
+  should teach it. Eleven kinds fill the practice screen's 4x3 grid sideways and two columns of six
+  upright; a thirteenth needs `practice.cards` laid out again in both layouts, and the records
+  table's `step` may need to shrink.
+- **Add a mode**: its id in `MODES` (eight fill the menu's two rows of four, three rows of three
+  upright; a ninth upright fits, a ninth sideways needs `menu.cards` laid out again), its `START_HINTS`, its rules in `startRun`, `end`, `next` and
   `finish`, its side panel in `drawSide`, its top line in `topLine`, its icon in `modeIcon`, its
   `Name` and `Text` texts, and the README.
 - **Add a relic**: its id in `GENERAL_RELICS` and `RELIC_COLOR`, its effect in `takeRelic`,

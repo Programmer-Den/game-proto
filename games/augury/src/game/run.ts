@@ -1,7 +1,9 @@
 import { byDifficulty } from '../../../../shared/settings';
-import { CHARMS, GENERAL_RELICS, OMENS, RELICS, isCharm, type Mode, type OmenId, type RelicId } from './catalog';
+import { CHARMS, GENERAL_RELICS, OMENS, RELICS, hasHearts, isCharm, isDraft, type Mode, type OmenId, type RelicId } from './catalog';
+import { journeyCard, starsFor } from './journey';
+import { weekOf } from './weekly';
 import { DEFS, KINDS, type KindId, type Level } from './kinds';
-import { dailySeed, newSeed, seeded, shuffle } from './rng';
+import { dailySeed, seeded, shuffle, type Rand } from './rng';
 import { newProgress, recordResult, type Progress } from './progress';
 
 // The rules of a run: which puzzle comes next, hearts, hints, clocks, score, draft picks and
@@ -13,7 +15,7 @@ export const QUEUE = 3;
 /** How long the result banner shows between puzzles. */
 export const BETWEEN_MS = 1200;
 /** Hints a run starts with, by mode (Practice has as many as it wants). */
-export const START_HINTS: Record<Mode, number> = { endless: 2, daily: 1, blitz: 1, draft: 1, duel: 3, practice: Infinity };
+export const START_HINTS: Record<Mode, number> = { journey: 1, endless: 2, daily: 1, blitz: 1, draft: 1, weekly: 1, duel: 3, practice: Infinity };
 /** Hearts in Endless and Draft. Keep Normal at 3: the playthrough expects it. */
 export const startHearts = () => byDifficulty(4, 3, 2);
 export const MAX_HEARTS = 5;
@@ -145,6 +147,12 @@ export interface Run {
   duelSolved: [number, number];
   /** Daily: the date's seed. */
   day: number;
+  /** Weekly league: the week's seed, and the draws made from it so far (each draw is seeded on its own, so a reload deals on as before). */
+  week: number;
+  draws: number;
+  /** Journey: the step played (-1 otherwise) and the stars it earned. */
+  node: number;
+  stars: number;
   progress: Progress;
   /** A new best this run set, for the end card. */
   newBest: boolean;
@@ -155,7 +163,7 @@ export function newRun(mode: Mode, progress: Progress = newProgress()): Run {
   return {
     mode,
     phase: 'playing',
-    hearts: mode === 'endless' || mode === 'draft' ? startHearts() : 0,
+    hearts: hasHearts(mode) ? startHearts() : 0,
     maxHearts: MAX_HEARTS,
     hints: START_HINTS[mode],
     score: 0,
@@ -175,6 +183,10 @@ export function newRun(mode: Mode, progress: Progress = newProgress()): Run {
     totals: [0, 0],
     duelSolved: [0, 0],
     day: 0,
+    week: 0,
+    draws: 0,
+    node: -1,
+    stars: 0,
     progress,
     newBest: false,
     events: [],
@@ -185,19 +197,25 @@ export function newRun(mode: Mode, progress: Progress = newProgress()): Run {
 export const endlessLevel = (n: number) => Math.min(3, Math.floor(n / 3)) as Level;
 const blitzLevel = (solved: number) => Math.min(3, Math.floor(solved / 2)) as Level;
 
+/** Where a run draws its luck: the week's seed for the weekly league, else `Math.random`. */
+export function luck(run: Run): Rand {
+  if (run.mode !== 'weekly') return Math.random;
+  return () => seeded(Math.imul(run.week, 1_000_003) + Math.imul(run.draws++, 7919))();
+}
+
 /** A random card of a kind other than `not`. */
-function randomCard(level: Level, not: KindId[] = []): Card {
+function randomCard(level: Level, not: KindId[] = [], rand: Rand = Math.random): Card {
   const kinds = KINDS.filter((k) => !not.includes(k));
-  return { kind: kinds[Math.floor(Math.random() * kinds.length)], level, seed: newSeed() };
+  return { kind: kinds[Math.floor(rand() * kinds.length)], level, seed: Math.floor(rand() * 2 ** 31) };
 }
 
 /** Whether the `n`th puzzle (from 0) of an Endless or Draft run is a boss. */
 export const isBossTurn = (n: number) => (n + 1) % BOSS_EVERY === 0;
 
 /** A random boss: two cards of two kinds other than `not`, at one level. */
-function bossCard(level: Level, not: KindId[] = []): Card {
-  const first = randomCard(level, not);
-  return { ...first, boss: randomCard(level, [...not, first.kind]) };
+function bossCard(level: Level, not: KindId[] = [], rand: Rand = Math.random): Card {
+  const first = randomCard(level, not, rand);
+  return { ...first, boss: randomCard(level, [...not, first.kind], rand) };
 }
 
 /** The `n`th card of an Endless run, of a kind other than `not`: a boss on a boss turn. */
@@ -206,7 +224,7 @@ const endlessCard = (n: number, not: KindId[]) => (isBossTurn(n) ? bossCard : ra
 const lastKind = (card: Card) => card.boss?.kind ?? card.kind;
 
 /** Starts a run of a mode. Practice needs its kind and level. */
-export function startRun(mode: Mode, progress: Progress, opts: { kind?: KindId; level?: Level; date?: Date } = {}): Run {
+export function startRun(mode: Mode, progress: Progress, opts: { kind?: KindId; level?: Level; date?: Date; node?: number } = {}): Run {
   const run = newRun(mode, progress);
   switch (mode) {
     case 'endless':
@@ -233,15 +251,24 @@ export function startRun(mode: Mode, progress: Progress, opts: { kind?: KindId; 
     }
     case 'duel': {
       const kinds = shuffle(Math.random, [...KINDS]).slice(0, DUEL_LEVELS.length);
-      run.queue = kinds.map((kind, i) => ({ kind, level: DUEL_LEVELS[i], seed: newSeed() }));
+      run.queue = kinds.map((kind, i) => ({ kind, level: DUEL_LEVELS[i], seed: Math.floor(Math.random() * 2 ** 31) }));
       deal(run, run.queue[0]);
       break;
     }
     case 'practice':
-      deal(run, { kind: opts.kind ?? 'nonogram', level: opts.level ?? 0, seed: newSeed() });
+      deal(run, { kind: opts.kind ?? 'nonogram', level: opts.level ?? 0, seed: Math.floor(Math.random() * 2 ** 31) });
+      break;
+    case 'weekly':
+      run.week = weekOf(opts.date ?? new Date());
+      offerDraft(run);
       break;
     case 'draft':
       offerDraft(run);
+      break;
+    case 'journey':
+      run.node = opts.node ?? 0;
+      run.queue = [journeyCard(run.node)];
+      deal(run, run.queue[0]);
       break;
   }
   return run;
@@ -296,7 +323,7 @@ export const omenFor = (card: Card): OmenId => (card.kind === 'echo' ? 'peril' :
 
 /** Whether the puzzle in play can still take its omen: Endless or Draft, before its first move. */
 export const canTakeOmen = (run: Run) =>
-  run.phase === 'playing' && (run.mode === 'endless' || run.mode === 'draft') && !!run.current && !run.current.omen && !run.current.touched;
+  run.phase === 'playing' && hasHearts(run.mode) && !!run.current && !run.current.omen && !run.current.touched;
 
 /** Takes the puzzle's omen: Haste halves its time; Silence and Peril change Undo, hints and losses. */
 export function takeOmen(run: Run) {
@@ -326,7 +353,8 @@ function offerDraft(run: Run) {
   const offer: Card[] = [];
   // A boss turn deals only bosses to choose from.
   const make = isBossTurn(run.dealt) ? bossCard : randomCard;
-  for (let i = 0; i < Math.min(count, DRAFT_MAX); i++) offer.push(make(level, [...last, ...offer.map((c) => c.kind)]));
+  const rand = luck(run);
+  for (let i = 0; i < Math.min(count, DRAFT_MAX); i++) offer.push(make(level, [...last, ...offer.map((c) => c.kind)], rand));
   run.draftOffer = offer;
   run.phase = 'draft';
 }
@@ -348,7 +376,7 @@ export function takeRelic(run: Run, index: number) {
   if (relic === 'heartstone') run.hearts = Math.min(run.maxHearts, run.hearts + 1);
   run.relicOffer = [];
   run.events.push({ type: 'relic', relic });
-  if (run.mode === 'draft') offerDraft(run);
+  if (isDraft(run.mode)) offerDraft(run);
   else dealQueued(run);
   return true;
 }
@@ -413,7 +441,7 @@ export function hint(run: Run) {
  */
 export function skip(run: Run) {
   if (run.phase !== 'playing' || !run.current) return false;
-  if (run.mode === 'practice') deal(run, { ...run.current.card, seed: newSeed() });
+  if (run.mode === 'practice') deal(run, { ...run.current.card, seed: Math.floor(Math.random() * 2 ** 31) });
   else end(run, 'skip');
   return true;
 }
@@ -453,12 +481,13 @@ function end(run: Run, reason: EndReason) {
     run.progress.daily = { day: run.day, score: run.score };
     if (run.score > run.progress.best.daily) (run.progress.best.daily = run.score), (run.newBest = true);
   }
+  if (run.mode === 'journey') run.stars = starsFor(solved, cur.timeTotalMs ? (cur.timeLeftMs ?? 0) / cur.timeTotalMs : 0, cur.hintsUsed - cur.freeUsed);
   if (solved) {
     run.solved++;
     run.streak++;
   } else run.streak = 0;
   run.events.push({ type: 'end', reason, points });
-  if (!solved && (run.mode === 'endless' || run.mode === 'draft')) {
+  if (!solved && hasHearts(run.mode)) {
     run.hearts = Math.max(0, run.hearts - (cur.omen === 'peril' ? PERIL_HEARTS : 1));
     run.events.push({ type: 'heart' });
   }
@@ -503,7 +532,10 @@ export function next(run: Run) {
       else finish(run);
       return true;
     }
+    case 'journey':
+      return finish(run), true;
     case 'draft':
+    case 'weekly':
       if (run.hearts <= 0) return finish(run), true;
       if (run.last?.reason === 'solved' && (run.solved % RELIC_EVERY === 0 || run.last.boss)) {
         run.relicOffer = offerRelics(run);
@@ -511,7 +543,7 @@ export function next(run: Run) {
       } else offerDraft(run);
       return true;
     case 'practice':
-      deal(run, { ...run.current!.card, seed: newSeed() });
+      deal(run, { ...run.current!.card, seed: Math.floor(Math.random() * 2 ** 31) });
       return true;
   }
 }
@@ -531,9 +563,10 @@ function dealQueued(run: Run) {
  */
 export function offerRelics(run: Run): RelicId[] {
   const charms = RELICS.filter((r) => isCharm(r) && !run.relics.includes(r));
-  const general = GENERAL_RELICS.filter((r) => r !== 'crystal' || (run.mode === 'draft' && !run.relics.includes('crystal')));
-  const offer: RelicId[] = shuffle(Math.random, charms).slice(0, 1);
-  return [...shuffle(Math.random, [...general]).slice(0, RELIC_OFFER - offer.length), ...offer];
+  const general = GENERAL_RELICS.filter((r) => r !== 'crystal' || (isDraft(run.mode) && !run.relics.includes('crystal')));
+  const rand = luck(run);
+  const offer: RelicId[] = shuffle(rand, charms).slice(0, 1);
+  return [...shuffle(rand, [...general]).slice(0, RELIC_OFFER - offer.length), ...offer];
 }
 
 /** Pass and play: the second player starts on the same puzzles. */
@@ -553,6 +586,15 @@ function finish(run: Run) {
     if (run.score > best[mode]) (best[mode] = run.score), (run.newBest = true);
   }
   if (mode === 'draft' && run.solved > best.draft) (best.draft = run.solved), (run.newBest = true);
+  if (mode === 'weekly') {
+    const week = run.progress.weekly?.week === run.week ? run.progress.weekly : { week: run.week, best: 0 };
+    if (run.score > week.best) (week.best = run.score), (run.newBest = true);
+    run.progress.weekly = week;
+  }
+  if (mode === 'journey' && run.node >= 0) {
+    const stars = run.progress.journey;
+    if (run.stars > (stars[run.node] ?? 0)) (stars[run.node] = run.stars), (run.newBest = true);
+  }
   // The daily five records its score and best after every card (`end`) and counts its run when it
   // starts, so a reload keeps them.
   if (mode !== 'daily') run.progress.runs++;
