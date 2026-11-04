@@ -30,8 +30,12 @@ const en: HowToPlay = {
     },
     { input: 'Next dusk', action: "Start the next night's dusk" },
     {
-      input: 'Keep going / New keep',
-      action: 'Play on after the Great Festival, or start again after a loss',
+      input: 'Keep going / Set sail / New keep',
+      action: 'Play on after the Great Festival or sail to the harbour, or start again after a loss',
+    },
+    {
+      input: 'Daily night',
+      action: "On the night panel or after a loss: play today's daily night, once a day",
     },
   ],
   loop: [
@@ -52,6 +56,9 @@ const en: HowToPlay = {
     'From night 6 a moth rests 6 seconds after its fourth flight of a dusk; Nectar shortens it.',
     'Lost a hearth? The Hearth card rekindles it between nights for 40, then 80, then 120 coins.',
     'From the tenth nightfall each curse you take makes the nights harder and every nightfall pay 25% more.',
+    'In the harbour the tide floods the low quay twice a dusk, and ships pay 6 coins if their lantern is lit when they arrive.',
+    'The Harbour Festival gives a boon you keep in every later game.',
+    'Moths grow traits from the flights they fly, kept from game to game: swift, frugal and gust-proof.',
   ],
 };
 
@@ -84,8 +91,12 @@ const de: HowToPlay = {
     },
     { input: 'Nächste Nacht', action: 'Die Dämmerung der nächsten Nacht beginnen' },
     {
-      input: 'Weiterspielen / Neue Burg',
-      action: 'Nach dem Großen Fest weiterspielen oder nach einer Niederlage neu beginnen',
+      input: 'Weiterspielen / In See stechen / Neue Burg',
+      action: 'Nach dem Großen Fest weiterspielen oder zum Hafen segeln, oder nach einer Niederlage neu beginnen',
+    },
+    {
+      input: 'Nacht des Tages',
+      action: 'Im Nachtfenster oder nach einer Niederlage: die heutige Nacht des Tages spielen, einmal am Tag',
     },
   ],
   loop: [
@@ -106,8 +117,13 @@ const de: HowToPlay = {
     'Ab Nacht 6 ruht eine Motte nach ihrem vierten Flug einer Dämmerung 6 Sekunden; Nektar verkürzt das.',
     'Ein Herdfeuer verloren? Die Herd-Karte entfacht es zwischen den Nächten für 40, dann 80, dann 120 Münzen.',
     'Ab dem zehnten Einbruch der Nacht macht jeder genommene Fluch die Nächte schwerer, und jede Nacht zahlt 25 % mehr.',
+    'Im Hafen überspült die Flut zweimal je Dämmerung den Kai, und Schiffe zahlen 6 Münzen, wenn ihre Laterne bei der Ankunft brennt.',
+    'Das Hafenfest schenkt eine Gunst, die du in jedem späteren Spiel behältst.',
+    'Motten bekommen durch ihre Flüge Eigenschaften, die von Spiel zu Spiel bleiben: flink, sparsam und windfest.',
   ],
 };
 
-/** US English spells every text the British way. */
-export const howToPlay: HowToPlay = byLanguage({ en, de });
+/** US English spells the harbour's texts the US way. */
+const enUS: HowToPlay = JSON.parse(JSON.stringify(en).replaceAll('harbour', 'harbor').replaceAll('Harbour', 'Harbor'));
+
+export const howToPlay: HowToPlay = byLanguage({ en, 'en-US': enUS, de });

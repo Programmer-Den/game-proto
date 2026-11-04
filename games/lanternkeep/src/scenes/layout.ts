@@ -28,7 +28,10 @@ export const GUST_TAG = { w: 132, h: 40 };
 export const CALL_TAG = { w: 150, h: 40 };
 /** The panel of a fifth nightfall's choice of district, centred on the view; the curses' panel is the same. */
 export const MOVE_PANEL = { w: 600, h: 330 };
-/** The district cards in that panel, by their centres, in the order of DISTRICT_IDS (two by two). */
+/**
+ * The district cards in that panel, by their centres, in the order of MOVE_IDS (two by two); the
+ * Harbour Festival's three boon cards use the first row and the middle of the second.
+ */
 export const MOVE_CARDS = { xs: [335, 625], ys: [236, 316], w: 280, h: 62 };
 /** Where the HUD shows the oil cask: its icon and the fills beside it. */
 export const CASK_HUD = { x: 296, y: 20 };

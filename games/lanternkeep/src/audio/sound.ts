@@ -40,6 +40,13 @@ export const sfx = sounds({
   callKept: { wave: 'triangle', freq: 659, arp: [0, 4, 7], arpStep: 0.07, length: 0.3, volume: 0.28, gap: 200 },
   /** A window's call ran out. */
   callLost: { wave: 'triangle', freq: 330, to: 220, length: 0.42, volume: 0.24, gap: 200 },
+  /** The harbour's tide is warned: a far-off swell; it rises with a wash over the quay (LK15). */
+  swellSea: { wave: 'noise', freq: 220, to: 520, length: 1.1, attack: 0.6, volume: 0.2, gap: 1000 },
+  wash: { wave: 'noise', freq: 700, to: 180, length: 0.9, attack: 0.08, volume: 0.3, gap: 1000 },
+  /** A ship comes in sight: a low horn. */
+  horn: { wave: 'triangle', freq: 147, arp: [0, 0, 5], arpStep: 0.25, length: 0.9, attack: 0.1, volume: 0.32, gap: 1000 },
+  /** A moth grows a trait (LK16): a bright rising bloom. */
+  bloom: { wave: 'triangle', freq: 880, arp: [0, 4, 7, 11, 14], arpStep: 0.06, length: 0.4, volume: 0.26, gap: 300 },
   /** A moth comes home tired and rests. */
   yawn: { wave: 'sine', freq: 660, to: 440, length: 0.2, volume: 0.18, gap: 200, vary: 0.05 },
   /** A moth swaps jars. */
