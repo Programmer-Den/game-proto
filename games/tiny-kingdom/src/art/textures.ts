@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
-import { BUTTON, DECREE, FEATS_BUTTON, GIFT_CARD, ISLAND_BUTTON, ISLANDS_CARD, PANEL, TILE_BUTTONS, TITLE, TRADE_CARD, TRAY, UNDO_BUTTON } from '../scenes/layout';
+import { BUTTON, DECREE, FEATS_BUTTON, GIFT_CARD, ISLAND_BUTTON, ISLANDS_CARD, PANEL, PUZZLES_CARD, TILE_BUTTONS, TITLE, TRADE_CARD, TRAY, UNDO_BUTTON } from '../scenes/layout';
 import { viewFrame, viewSize } from '../../../../shared/scaling';
-import { bake, setArtRes, ball, castle, circle, crown, ctx, grain, harbor, house, lighthouse, lumber, manor, market, orchard, peg, PI, reseed, rnd, rrect, stripes, T, temple, tile, tower, walnut, windmill } from './wood';
+import { bake, setArtRes, ball, castle, cathedral, circle, crown, ctx, gardens, grain, granary, harbor, house, lighthouse, lumber, manor, market, orchard, peg, PI, reseed, rnd, rrect, stripes, T, temple, tile, tower, walnut, windmill } from './wood';
+import { WONDERS, type Wonder } from '../game/tiles';
 import type { Skin } from '../game/feats';
 
 // Every texture the game uses, painted once at boot:
@@ -13,6 +14,10 @@ import type { Skin } from '../game/feats';
 // - `prop-<kind>` for every building but the farm and the road (house, tower, windmill, market,
 //   harbor, lumber, manor), for the forest and for the castle: what stands on a cell, 80x100 with
 //   the cell's centre at PROP_ORIGIN, so roofs and flags reach into the row above.
+// - `wonder-<kind>` for each wonder (cathedral, granary, gardens): one picture over its 2x2 block,
+//   WONDER_PROP in size with the block's middle at WONDER_MIDDLE; shown on the block's top left
+//   cell with WONDER_ORIGIN.
+// - `bead-rival`: the plum bead on each of a rival lord's buildings.
 // - `icon-<building>` and `icon-<building>-big`: icons for the gift chips and the gift card; `spot-farm`, `spot-house`: the decree's open
 //   spots; `tick`, `bead-on`, `bead-off`, `crown`, `count`, `star-on` and `star-off` (campaign stars).
 // - `plaque-<w>x<h>`, `plaque-<w>x<h>-sel`, `glow-<w>x<h>`: beech plaques for buttons;
@@ -25,6 +30,14 @@ const CELL = 128;
 export const PROP = { w: 80, h: 100 };
 export const PROP_ORIGIN = { x: 0.5, y: 0.68 };
 export const GRASS_VARIANTS = 4;
+/** A wonder's picture: its size, where the middle of its 2x2 block sits in it, and the origin that puts that middle on the block when the image stands at its top left cell's centre. */
+export const WONDER_PROP = { w: 150, h: 170 };
+const WONDER_MIDDLE = { x: 75, y: 104 };
+export const WONDER_ORIGIN = { x: (WONDER_MIDDLE.x - 32) / WONDER_PROP.w, y: (WONDER_MIDDLE.y - 32) / WONDER_PROP.h };
+/** The texture of wonder `kind`'s picture. */
+export const wonderKey = (kind: Wonder) => `wonder-${kind}`;
+/** The rival lord's paint: a plum. */
+export const PLUM = '#8e3b8c';
 
 /** The grass paint of each tile skin (`SKINS` in `game/feats.ts`); '' is the classic green. */
 export const SKIN_GREEN: Record<Skin, string> = {
@@ -310,6 +323,14 @@ export function bakeTextures(scene: Phaser.Scene) {
   for (const kind of PROPS) {
     bake(scene, `prop-${kind}`, PROP.w, PROP.h, () => prop(kind), PROP.w * PROP_ORIGIN.x, PROP.h * PROP_ORIGIN.y);
   }
+  for (const kind of WONDERS) {
+    const paint = { cathedral, granary, gardens }[kind];
+    bake(scene, wonderKey(kind), WONDER_PROP.w, WONDER_PROP.h, () => {
+      reseed(600 + kind.length);
+      paint(0, 0, 1);
+    }, WONDER_MIDDLE.x, WONDER_MIDDLE.y);
+  }
+  bake(scene, 'bead-rival', 15, 15, () => ball(0, 0, 13, PLUM), 7.5, 7.5);
   for (const kind of ICONS) {
     bake(scene, `icon-${kind}`, 24, 24, () => icon(kind), 12, 12);
     bake(scene, `icon-${kind}-big`, 44, 44, () => icon(kind, 1.75), 22, 22);
@@ -353,6 +374,8 @@ export function bakeTextures(scene: Phaser.Scene) {
   walnutBoard(scene, 520, 260);
   walnutBoard(scene, 700, 260);
   plaques(scene, FEATS_BUTTON.w, FEATS_BUTTON.h, 14);
+  plaques(scene, C.rival.w, C.rival.h, 14);
+  plaques(scene, PUZZLES_CARD.plaque.w, PUZZLES_CARD.plaque.h, 12);
 }
 
 /** The skin the board is painted in; '' for the classic set. */

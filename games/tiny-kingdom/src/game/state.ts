@@ -1,11 +1,35 @@
 import { byDifficulty } from '../../../../shared/settings';
-import { joinedCount } from './castle';
+import { joinedCount, type Owns } from './castle';
 import { DECREE_BONUS, decreeFor, decreeMarks, type Decree } from './decree';
 import { GIFT_INFO, giftsFor, newSpecial, type Gift } from './gifts';
-import type { Kingdom, Mode } from './islands';
+import { PUZZLES, puzzleStars, type Kingdom, type Mode } from './islands';
 import { omenFor, strike, type Omen, type Struck } from './omens';
 import { seasonBonus, seasonFor, type Season } from './seasons';
-import { AROUND, BUILDINGS, SIDES, isBuilding, isHome, nativeFor, nextIsland, randomIsland, scores, seaSides, seeded, startingGrid, type Building, type Cell, type Native, type Special } from './tiles';
+import {
+  AROUND,
+  BUILDINGS,
+  SIDES,
+  SPECIALS,
+  WONDER_AROUND,
+  WONDER_CELLS,
+  isBuilding,
+  isHome,
+  isWonder,
+  nativeFor,
+  nextIsland,
+  randomIsland,
+  scores,
+  seaSides,
+  seeded,
+  startingGrid,
+  wonderAnchor,
+  wonderFor,
+  type Building,
+  type Cell,
+  type Native,
+  type Special,
+  type Wonder,
+} from './tiles';
 
 // The rules in plain TypeScript, with no Phaser. The score is the whole board's score plus the
 // bonuses won (decrees and seasons): each building's points depend on its neighbours, so a
@@ -13,6 +37,29 @@ import { AROUND, BUILDINGS, SIDES, isBuilding, isHome, nativeFor, nextIsland, ra
 // one is placed and the others go back.
 
 export type Pouch = Record<Building, number>;
+
+/**
+ * The rival lord sharing the island (mode 'rival'): after each of the player's placements, clearings
+ * and merges it places one tile of its own, drawn from a pouch of its own. Its buildings score
+ * against every neighbour, the player's too, and the player's score against its; each side only
+ * counts its own buildings, and the castle's chain only runs along a side's own cells.
+ */
+export interface Rival {
+  /** Which cells hold the rival's buildings, by row, then column. */
+  cells: boolean[][];
+  pouch: Pouch;
+  /** How many hands the rival has drawn; with the island, it seeds the next. */
+  draws: number;
+  /** What the rival's buildings score plus its `bonus`, its castle bonus included once the kingdom is finished. */
+  score: number;
+  /** What the seasons added for the rival's buildings, as they do for the player's. */
+  bonus: number;
+  /** The rival's castle bonus, paid at the end like the player's; 0 before. */
+  castle: number;
+  placed: number;
+  /** The rival's last placement, for the board's mark. */
+  last: { col: number; row: number; kind: Building } | null;
+}
 
 export interface GameState {
   round: number;
@@ -36,6 +83,12 @@ export interface GameState {
   mode: Mode;
   /** The campaign level being played (1 and up), or 0 outside the campaign. */
   level: number;
+  /** The puzzle island being played (1 and up), or 0 outside the puzzles. */
+  puzzle: number;
+  /** The wonder this kingdom drew: it joins the pouch as round WONDER_ROUND begins. */
+  wonder: Wonder;
+  /** The rival lord sharing the island, or null outside mode 'rival'. */
+  rival: Rival | null;
   /** The island of the day's date (YYYY-MM-DD), or '' for any other kingdom. */
   day: string;
   /** The board by row, then column. */
@@ -87,12 +140,32 @@ export interface Snapshot {
   bonus: number;
   selected: Building | null;
   placed: number;
+  rival: Rival | null;
 }
 
 /** The first round's tiles. */
-export const FIRST_POUCH: Pouch = { farm: 4, house: 4, tower: 2, windmill: 0, market: 0, harbor: 0, lumber: 0, temple: 0, lighthouse: 0, orchard: 0, road: 1 };
+export const FIRST_POUCH: Pouch = { farm: 4, house: 4, tower: 2, windmill: 0, market: 0, harbor: 0, lumber: 0, temple: 0, lighthouse: 0, orchard: 0, cathedral: 0, granary: 0, gardens: 0, road: 1 };
 /** The tiles each later round adds to whatever is left. */
-export const ROUND_POUCH: Pouch = { farm: 3, house: 3, tower: 2, windmill: 0, market: 0, harbor: 0, lumber: 0, temple: 0, lighthouse: 0, orchard: 0, road: 1 };
+export const ROUND_POUCH: Pouch = { farm: 3, house: 3, tower: 2, windmill: 0, market: 0, harbor: 0, lumber: 0, temple: 0, lighthouse: 0, orchard: 0, cathedral: 0, granary: 0, gardens: 0, road: 1 };
+/** The round whose start puts the kingdom's wonder in the pouch. */
+export const WONDER_ROUND = 3;
+/** What a wonder is worth on its own, before what stands around it. */
+export const WONDER_BASE = 4;
+/** What each wonder scores per cell around it. */
+const WONDER_COUNT: Record<Wonder, (c: Cell) => number> = {
+  cathedral: (c) => (isHome(c) ? 3 : 0),
+  granary: (c) => (c === 'farm' ? 2 : c === 'windmill' ? 3 : 0),
+  gardens: (c) => (c === 'lake' || c === 'forest' ? 2 : c === 'temple' ? 3 : 0),
+};
+/**
+ * How much the rival lord weighs the points its placement takes from the player against its own:
+ * none on Easy (it only builds its own), half on Normal, as much as its own on Hard.
+ */
+const rivalSpite = () => byDifficulty(0, 0.5, 1);
+/** How many tiles the rival lord draws each turn to pick one from. */
+const RIVAL_HAND = 4;
+/** How much the rival weighs a building more joined to the castle (each pays +1 at the end). */
+const RIVAL_JOIN = 1;
 /** A chain island's own building: how many its first pouch holds, and how many each later round adds. */
 export const NATIVE_FIRST = 2;
 export const NATIVE_ROUND = 1;
@@ -121,16 +194,20 @@ export function newGame(best = 0, crowns = 0, island = randomIsland(), kingdom: 
   const link = kingdom.link ?? 1;
   const grid = startingGrid(island, link);
   const native = nativeFor(link);
-  const pouch = { ...FIRST_POUCH };
+  const puzzle = kingdom.mode === 'puzzle' ? (kingdom.puzzle ?? 1) : 0;
+  const pouch = puzzle ? emptyPouch() : { ...FIRST_POUCH };
+  if (puzzle) for (const b of BUILDINGS) pouch[b] = PUZZLES[puzzle - 1].pouch[b] ?? 0;
   if (native) pouch[native] += NATIVE_FIRST;
   let cargo = 0;
   for (const b of BUILDINGS) {
     pouch[b] += kingdom.cargo?.[b] ?? 0;
     cargo += kingdom.cargo?.[b] ?? 0;
   }
+  const rival: Rival | null =
+    kingdom.mode === 'rival' ? { cells: grid.map((cells) => cells.map(() => false)), pouch: { ...FIRST_POUCH }, draws: 0, score: 0, bonus: 0, castle: 0, placed: 0, last: null } : null;
   const s: GameState = {
     round: 1,
-    goal: goalFor(1),
+    goal: puzzle ? puzzleStars(puzzle)[2] : goalFor(1),
     score: 0,
     bonus: 0,
     pouch,
@@ -140,16 +217,19 @@ export function newGame(best = 0, crowns = 0, island = randomIsland(), kingdom: 
     island,
     mode: kingdom.mode,
     level: kingdom.level ?? 0,
+    puzzle,
+    wonder: wonderFor(island),
+    rival,
     day: kingdom.day ?? '',
     grid,
     placed: 0,
     phase: 'playing',
     best,
     crowns,
-    decree: decreeFor(island, 1, grid, pouch),
+    decree: puzzle ? null : decreeFor(island, 1, grid, pouch),
     gifts: giftsFor(island, 1, []),
     giftsDue: 0,
-    unlocked: [],
+    unlocked: puzzle ? SPECIALS.filter((b) => pouch[b] > 0) : [],
     omen: null,
     tradedIn: 0,
     castle: 0,
@@ -165,9 +245,17 @@ export function newGame(best = 0, crowns = 0, island = randomIsland(), kingdom: 
   return s;
 }
 
-/** Whether `kind` could go at (col, row) on `grid`, whatever the phase: on grass, a harbor by a lake or the sea, a lighthouse on the coast, a lumber camp by a forest. */
+/** A pouch with no tiles. */
+const emptyPouch = () => Object.fromEntries(BUILDINGS.map((b) => [b, 0])) as Pouch;
+
+/**
+ * Whether `kind` could go at (col, row) on `grid`, whatever the phase: on grass, a harbor by a lake
+ * or the sea, a lighthouse on the coast, a lumber camp by a forest, a wonder with (col, row) as the
+ * top left of four grass cells.
+ */
 function fits(grid: Cell[][], col: number, row: number, kind: Building) {
   if (grid[row]?.[col] !== 'grass') return false;
+  if (isWonder(kind)) return WONDER_CELLS.every(([dc, dr]) => grid[row + dr]?.[col + dc] === 'grass');
   if (kind === 'harbor') return beside(grid, col, row, 'lake') || seaSides(grid, col, row) > 0;
   if (kind === 'lighthouse') return seaSides(grid, col, row) > 0;
   if (kind === 'lumber') return beside(grid, col, row, 'forest');
@@ -238,6 +326,12 @@ export function cellParts(grid: Cell[][], col: number, row: number): { base: num
       if (pts) from.push({ col: col + dc, row: row + dr, pts });
     }
   };
+  if (isWonder(cell)) {
+    // A wonder's four cells share one building: its top left cell scores what stands around all of them.
+    if (!wonderAnchor(grid, col, row)) return { base: 0, from };
+    add(WONDER_AROUND, WONDER_COUNT[cell]);
+    return { base: WONDER_BASE, from };
+  }
   switch (cell) {
     case 'farm':
       add(SIDES, (c) => (c === 'lake' || c === 'windmill' ? 1 : 0));
@@ -298,11 +392,34 @@ export function cellScore(grid: Cell[][], col: number, row: number) {
   return from.reduce((t, s) => t + s.pts, base);
 }
 
-export function boardScore(grid: Cell[][]) {
+/** What the buildings on `grid` score; with `owns`, only one side's (see `Rival`). */
+export function boardScore(grid: Cell[][], owns?: Owns) {
   let total = 0;
-  grid.forEach((cells, row) => cells.forEach((_, col) => (total += cellScore(grid, col, row))));
+  grid.forEach((cells, row) => cells.forEach((_, col) => (!owns || owns(col, row)) && (total += cellScore(grid, col, row))));
   return total;
 }
+
+/** The player's own cells while a rival lord shares the island; undefined (every cell) otherwise. */
+export const mine = (s: GameState): Owns | undefined => (s.rival ? (col, row) => !s.rival!.cells[row][col] : undefined);
+/** The rival lord's cells. */
+const theirs = (r: Rival): Owns => (col, row) => r.cells[row][col];
+/** Whether the cell at (col, row) is the rival lord's. */
+export const rivalAt = (s: GameState, col: number, row: number) => !!s.rival?.cells[row]?.[col];
+
+/**
+ * The board as the player's decrees, merges and feats see it: with a rival lord, its buildings are
+ * left out (shown as open water, which none of them count). Without one, the board itself.
+ */
+export const ownGrid = (s: GameState): Cell[][] => (s.rival ? s.grid.map((cells, r) => cells.map((cell, c) => (s.rival!.cells[r][c] ? 'sea' : cell))) : s.grid);
+
+/** Puts `kind` on `grid` at (col, row): one cell, or a wonder's four. */
+function build(grid: Cell[][], col: number, row: number, kind: Building) {
+  if (isWonder(kind)) for (const [dc, dr] of WONDER_CELLS) grid[row + dr][col + dc] = kind;
+  else grid[row][col] = kind;
+}
+
+/** What the season adds for placing `kind` worth `pts`: nothing on a puzzle island, which has no seasons. */
+const seasonal = (s: GameState, kind: Building, pts: number) => (s.puzzle ? 0 : seasonBonus(season(s), kind, pts));
 
 const beside = (grid: Cell[][], col: number, row: number, cell: Cell) => SIDES.some(([dc, dr]) => grid[row + dr]?.[col + dc] === cell);
 
@@ -331,7 +448,8 @@ export interface Preview {
 export function previewPlacement(s: GameState, kind: Building, col: number, row: number): Preview | null {
   if (!canPlace(s, col, row, kind) || !inHand(s, kind)) return null;
   const grid = s.grid.map((cells) => [...cells]);
-  grid[row][col] = kind;
+  build(grid, col, row, kind);
+  const owns = mine(s);
   const own = cellParts(grid, col, row);
   const shares = new Map<string, Share>();
   const give = (c: number, r: number, pts: number) => {
@@ -344,14 +462,14 @@ export function previewPlacement(s: GameState, kind: Building, col: number, row:
   // Every other building whose worth changes: the eight around, and a temple further off when a tower goes up near it.
   grid.forEach((cells, r) =>
     cells.forEach((cell, c) => {
-      if ((c === col && r === row) || !isBuilding(cell)) return;
+      if ((c === col && r === row) || !isBuilding(cell) || (owns && !owns(c, r))) return;
       const change = cellScore(grid, c, r) - cellScore(s.grid, c, r);
       if (change) give(c, r, change);
     }),
   );
   const links = [...shares.values()].filter((l) => l.pts !== 0);
-  const bonus = seasonBonus(season(s), kind, cellScore(grid, col, row));
-  return { gained: boardScore(grid) - boardScore(s.grid) + bonus, base: own.base, links, season: bonus, joins: joinedCount(grid) - joinedCount(s.grid) };
+  const bonus = seasonal(s, kind, cellScore(grid, col, row));
+  return { gained: boardScore(grid, owns) - boardScore(s.grid, owns) + bonus, base: own.base, links, season: bonus, joins: joinedCount(grid, owns) - joinedCount(s.grid, owns) };
 }
 
 export function select(s: GameState, kind: Building) {
@@ -373,6 +491,8 @@ export interface Placed {
   season: number;
   /** What the pending omen did as the new round began, if it struck. */
   struck: Struck | null;
+  /** The rival lord's answer: where it built, what, and what its buildings gained. Null without a rival or when it could not build. */
+  rival: { col: number; row: number; kind: Building; gained: number } | null;
 }
 
 /** Whether the last placement can be taken back: once per round, and not one that began a round or fulfilled a decree. */
@@ -401,7 +521,11 @@ export const harbourCount = (grid: Cell[][]) => grid.reduce((n, cells) => n + ce
  * harbours pay their trade, and the best score is kept.
  */
 function end(s: GameState) {
-  s.castle = joinedCount(s.grid);
+  s.castle = joinedCount(s.grid, mine(s));
+  if (s.rival) {
+    s.rival.castle = joinedCount(s.grid, theirs(s.rival));
+    s.rival.score = boardScore(s.grid, theirs(s.rival)) + s.rival.bonus + s.rival.castle;
+  }
   s.trade = s.link > 1 ? TRADE_BONUS * harbourCount(s.grid) : 0;
   s.bonus += s.castle + s.trade;
   s.score += s.castle + s.trade;
@@ -412,7 +536,7 @@ function end(s: GameState) {
 /** Ends the kingdom when no tiles are left, or none can go anywhere and no merge or cleared wood would make room. */
 function checkEnd(s: GameState) {
   const tilesLeft = BUILDINGS.some((b) => s.pouch[b] > 0);
-  if (!tilesLeft || (!pouchPlayable(s) && !housesCanMerge(s.grid))) end(s);
+  if (!tilesLeft || (!pouchPlayable(s) && !housesCanMerge(ownGrid(s)))) end(s);
 }
 
 /**
@@ -434,48 +558,110 @@ const snapshot = (s: GameState): Snapshot => ({
   bonus: s.bonus,
   selected: s.selected,
   placed: s.placed,
+  rival: s.rival ? { ...s.rival, cells: s.rival.cells.map((cells) => [...cells]), pouch: { ...s.rival.pouch }, last: s.rival.last && { ...s.rival.last } } : null,
 });
+
+/**
+ * The rival lord's turn: it draws HAND tiles from its own pouch (seeded by the island and its
+ * draws) and places the one, on the cell, that gains it the most, counting the castle joins it
+ * would make and, by `rivalSpite`, the points it takes from the player. Its other tiles go back.
+ */
+function rivalTurn(s: GameState): Placed['rival'] {
+  const r = s.rival;
+  if (!r) return null;
+  const rand = seeded(s.island * 13 + r.draws * 7919 + 5);
+  r.draws++;
+  const bag = BUILDINGS.flatMap((b) => Array<Building>(r.pouch[b]).fill(b));
+  const hand: Building[] = [];
+  while (hand.length < RIVAL_HAND && bag.length) hand.push(bag.splice(Math.floor(rand() * bag.length), 1)[0]);
+  const owns = theirs(r);
+  const my = mine(s);
+  const before = boardScore(s.grid, owns);
+  const joins = joinedCount(s.grid, owns);
+  const mineBefore = boardScore(s.grid, my);
+  const spite = rivalSpite();
+  let best: { col: number; row: number; kind: Building; value: number } | null = null;
+  for (const kind of new Set(hand)) {
+    if (isWonder(kind)) continue;
+    for (let row = 0; row < s.grid.length; row++)
+      for (let col = 0; col < s.grid[row].length; col++) {
+        if (!fits(s.grid, col, row, kind)) continue;
+        const grid = s.grid.map((c) => [...c]);
+        grid[row][col] = kind;
+        r.cells[row][col] = true;
+        const value =
+          boardScore(grid, owns) - before + seasonal(s, kind, cellScore(grid, col, row)) + RIVAL_JOIN * (joinedCount(grid, owns) - joins) + spite * (mineBefore - boardScore(grid, my));
+        r.cells[row][col] = false;
+        if (!best || value > best.value) best = { col, row, kind, value };
+      }
+  }
+  if (!best) return null;
+  const { col, row, kind } = best as { col: number; row: number; kind: Building };
+  s.grid[row][col] = kind;
+  r.cells[row][col] = true;
+  r.pouch[kind]--;
+  r.placed++;
+  r.last = { col, row, kind };
+  const bonus = seasonal(s, kind, cellScore(s.grid, col, row));
+  r.bonus += bonus;
+  const was = r.score;
+  r.score = boardScore(s.grid, owns) + r.bonus;
+  return { col, row, kind, gained: r.score - was };
+}
 
 /**
  * Settles a change already made to the grid: popups, the season's bonus, the decree, rounds, undo
  * and the end. `prior` is the state before the change and `at` the cell that was built on.
  */
-function settle(s: GameState, prior: Snapshot, at: { col: number; row: number }, seasonal: number): Placed {
+function settle(s: GameState, prior: Snapshot, at: { col: number; row: number }, seasonPts: number): Placed {
+  // With a rival lord, it answers before the board is scored, so its building counts for the decree and the goal.
+  const rival = rivalTurn(s);
+  if (s.rival) s.rival.score = boardScore(s.grid, theirs(s.rival)) + s.rival.bonus;
+  const owns = mine(s);
   const changes: Placed['changes'] = [];
   s.grid.forEach((cells, r) =>
     cells.forEach((cell, c) => {
+      if (owns && !owns(c, r)) return;
       const main = c === at.col && r === at.row;
-      const gained = cellScore(s.grid, c, r) - cellScore(prior.grid, c, r) + (main ? seasonal : 0);
+      const gained = cellScore(s.grid, c, r) - cellScore(prior.grid, c, r) + (main ? seasonPts : 0);
       if ((isBuilding(cell) || isBuilding(prior.grid[r][c])) && (gained !== 0 || main)) changes.push({ col: c, row: r, gained });
     }),
   );
-  s.bonus += seasonal;
+  s.bonus += seasonPts;
 
   // The decree pays once, the first time the board fulfils it.
   let decree = false;
-  if (s.decree && !s.decree.done && decreeMarks(s.grid, s.decree).have >= s.decree.need) {
+  if (s.decree && !s.decree.done && decreeMarks(ownGrid(s), s.decree).have >= s.decree.need) {
     s.decree.done = true;
     s.bonus += DECREE_BONUS;
     s.crowns++;
     decree = true;
   }
-  s.score = boardScore(s.grid) + s.bonus;
+  s.score = boardScore(s.grid, owns) + s.bonus;
 
   let newRound = false;
   let struck: Struck | null = null;
-  while (s.score >= s.goal) {
+  // A puzzle island has no rounds: its pouch is all there is.
+  while (!s.puzzle && s.score >= s.goal) {
     s.round++;
     s.goal = goalFor(s.round);
     for (const b of BUILDINGS) s.pouch[b] += ROUND_POUCH[b];
     if (s.native) s.pouch[s.native] += NATIVE_ROUND;
+    if (s.round === WONDER_ROUND) s.pouch[s.wonder]++;
+    if (s.rival) for (const b of BUILDINGS) s.rival.pouch[b] += ROUND_POUCH[b];
     s.giftsDue++;
     newRound = true;
   }
   if (newRound) {
     // The omen warned of strikes as the round begins, then the decree and the next omen are drawn on the board as it stands.
     if (s.omen) struck = strike(s.grid, s.omen);
-    if (struck) s.score = boardScore(s.grid) + s.bonus;
-    s.decree = decreeFor(s.island, s.round, s.grid, s.pouch, s.decree);
+    if (struck && s.rival) {
+      const r = s.rival;
+      r.cells = r.cells.map((cells, row) => cells.map((on, col) => on && isBuilding(s.grid[row][col])));
+      r.score = boardScore(s.grid, theirs(r)) + r.bonus;
+    }
+    if (struck) s.score = boardScore(s.grid, owns) + s.bonus;
+    s.decree = decreeFor(s.island, s.round, ownGrid(s), s.pouch, s.decree);
     s.omen = omenFor(s.island, s.round, s.grid);
     s.phase = 'gift';
   }
@@ -483,9 +669,9 @@ function settle(s: GameState, prior: Snapshot, at: { col: number; row: number },
   s.undo = newRound || decree ? null : prior;
   // A goal reached carries on to its gift, even with the pouch empty, unless the island is full
   // and no two houses could merge, nor a lumber camp tile clear a wood, to make room.
-  if (s.phase === 'gift' && !s.grid.some((cells) => cells.includes('grass')) && !housesCanMerge(s.grid) && !canClearAny(s)) s.giftsDue = 0;
+  if (s.phase === 'gift' && !s.grid.some((cells) => cells.includes('grass')) && !housesCanMerge(ownGrid(s)) && !canClearAny(s)) s.giftsDue = 0;
   if (s.phase === 'playing' || s.giftsDue === 0) checkEnd(s);
-  return { gained: s.score - prior.score, changes, decree, newRound, season: seasonal, struck };
+  return { gained: s.score - prior.score, changes, decree, newRound, season: seasonPts, struck, rival };
 }
 
 /** Places the selected building at (col, row) and draws the next hand; null if it can't go there. */
@@ -493,10 +679,10 @@ export function place(s: GameState, col: number, row: number): Placed | null {
   const kind = s.selected;
   if (!kind || !canPlace(s, col, row, kind) || !inHand(s, kind)) return null;
   const prior = snapshot(s);
-  s.grid[row][col] = kind;
+  build(s.grid, col, row, kind);
   s.pouch[kind]--;
   s.placed++;
-  const placed = settle(s, prior, { col, row }, seasonBonus(season(s), kind, cellScore(s.grid, col, row)));
+  const placed = settle(s, prior, { col, row }, seasonal(s, kind, cellScore(s.grid, col, row)));
   drawHand(s);
   return placed;
 }
@@ -511,7 +697,7 @@ export function previewClear(s: GameState, col: number, row: number) {
   if (!canClear(s, col, row)) return null;
   const grid = s.grid.map((cells) => [...cells]);
   grid[row][col] = 'grass';
-  return boardScore(grid) - boardScore(s.grid);
+  return boardScore(grid, mine(s)) - boardScore(s.grid, mine(s));
 }
 
 /**
@@ -558,6 +744,7 @@ export function trade(s: GameState, give: Building, take: Special) {
 /** Whether the house at `from` can merge into the house beside it at `to`. */
 export function canMerge(s: GameState, from: { col: number; row: number }, to: { col: number; row: number }) {
   if (s.phase !== 'playing' || s.grid[from.row]?.[from.col] !== 'house' || s.grid[to.row]?.[to.col] !== 'house') return false;
+  if (rivalAt(s, from.col, from.row) || rivalAt(s, to.col, to.row)) return false;
   return Math.abs(from.col - to.col) + Math.abs(from.row - to.row) === 1;
 }
 
@@ -575,7 +762,7 @@ export function previewMerge(s: GameState, from: { col: number; row: number }, t
   const grid = s.grid.map((cells) => [...cells]);
   grid[to.row][to.col] = 'manor';
   grid[from.row][from.col] = 'grass';
-  return boardScore(grid) - boardScore(s.grid);
+  return boardScore(grid, mine(s)) - boardScore(s.grid, mine(s));
 }
 
 /**
@@ -598,6 +785,9 @@ export function chooseGift(s: GameState, gift: Gift) {
   if (s.phase !== 'gift' || s.giftsDue <= 0 || !s.gifts.includes(gift)) return false;
   const tiles = GIFT_INFO[gift].tiles;
   for (const b of BUILDINGS) s.pouch[b] += tiles[b] ?? 0;
+  // A rival lord takes the gift left over.
+  const other = GIFT_INFO[s.gifts[0] === gift ? s.gifts[1] : s.gifts[0]].tiles;
+  if (s.rival) for (const b of BUILDINGS) s.rival.pouch[b] += other[b] ?? 0;
   const won = newSpecial(gift);
   if (won && !s.unlocked.includes(won)) s.unlocked.push(won);
   s.giftsDue--;

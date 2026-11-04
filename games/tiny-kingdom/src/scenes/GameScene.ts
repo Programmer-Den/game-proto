@@ -2,15 +2,34 @@ import Phaser from 'phaser';
 import { playMusic, playSting, ui } from '../../../../shared/audio';
 import { settings } from '../../../../shared/settings';
 import { viewFrame, viewSize } from '../../../../shared/scaling';
-import { propKey, PROP_ORIGIN, skinTile, tileKey, useSkin } from '../art/textures';
+import { PLUM, propKey, PROP_ORIGIN, skinTile, tileKey, useSkin, WONDER_ORIGIN, wonderKey } from '../art/textures';
 import { addArt, RES } from '../art/wood';
 import { PLACE_PITCH, sfx, SONG } from '../audio';
 import { joinedCells, joinedCount } from '../game/castle';
 import { DECREE_BONUS, decreeMarks, decreeRegion, type At, type Decree } from '../game/decree';
 import { GIFT_INFO, type Gift } from '../game/gifts';
-import { dailyIsland, LEVELS, levelOpen, parseIsland, starScores, starsFor, today, type Kingdom } from '../game/islands';
+import { dailyIsland, LEVELS, levelOpen, parseIsland, PUZZLES, puzzleStars, puzzleStarsFor, starScores, starsFor, today, type Kingdom } from '../game/islands';
 import { FEATS, newFeats, SKINS, skinOpen, type Skin } from '../game/feats';
-import { loadBest, loadChain, loadCrowns, loadDailyBest, loadFeats, loadSkin, loadStars, saveBest, saveChain, saveCrowns, saveDailyBest, saveFeats, saveSkin, saveStars } from '../game/save';
+import {
+  loadBest,
+  loadChain,
+  loadCrowns,
+  loadDailyBest,
+  loadFeats,
+  loadPuzzleStars,
+  loadRivalWins,
+  loadSkin,
+  loadStars,
+  saveBest,
+  saveChain,
+  saveCrowns,
+  saveDailyBest,
+  saveFeats,
+  savePuzzleStars,
+  saveRivalWins,
+  saveSkin,
+  saveStars,
+} from '../game/save';
 import { OMEN_FROM, type Omen } from '../game/omens';
 import { SEASON_INFO } from '../game/seasons';
 import {
@@ -30,13 +49,16 @@ import {
   harbourCount,
   merge,
   mergeable,
+  mine,
   NATIVE_ROUND,
   newGame,
   nextKingdom,
+  ownGrid,
   place,
   previewClear,
   previewMerge,
   previewPlacement,
+  rivalAt,
   ROUND_POUCH,
   season,
   select,
@@ -46,11 +68,12 @@ import {
   tradeGives,
   tradeTakes,
   undo,
+  WONDER_ROUND,
   type GameState,
   type Placed,
   type Share,
 } from '../game/state';
-import { BUILDINGS, INFO, ISLANDS, randomIsland, type Building, type Special } from '../game/tiles';
+import { BUILDINGS, INFO, ISLANDS, isWonder, randomIsland, wonderAnchor, type Building, type Special } from '../game/tiles';
 import { placeName, t, type TextKey } from '../i18n';
 import { checkTrophies } from '../trophies/check';
 import { makeButton } from '../ui/Button';
@@ -71,6 +94,8 @@ import {
   OMEN,
   PANEL,
   POUCH_LINE,
+  PUZZLES_BUTTON,
+  PUZZLES_CARD,
   SEASON,
   TILE_BUTTONS,
   TITLE,
@@ -98,6 +123,8 @@ const NAVY = 0x27406e;
 const BLUE = 0x3b86d6;
 const CORAL = 0xe0785f;
 const TEAL = 0x2f9c95;
+/** The rival lord's paint, as a Graphics colour. */
+const PLUM_FILL = Number.parseInt(PLUM.slice(1), 16);
 
 /** Board depths: tiles, decree marks and the hover outline, props (by row), ghost, then links and labels. */
 const D = { tile: 1, outline: 2, spots: 2.5, prop: 3, ghost: 3.9, ticks: 4, links: 5, label: 6 };
@@ -228,6 +255,8 @@ export class GameScene extends Phaser.Scene {
   private code = '';
   /** The campaign's best stars per level, loaded when the card opens. */
   private stars: number[] = [];
+  /** Rival lords beaten, kept here too so the count shows when storage is blocked. */
+  private rivalWins = 0;
   /** The best score when this kingdom began, to tell a new best at its end. */
   private bestAtStart = 0;
   /** The kingdom feats won so far (ids), loaded at start and saved as each is won. */
@@ -237,6 +266,17 @@ export class GameScene extends Phaser.Scene {
   private featsCard!: Phaser.GameObjects.Container;
   private featRows: { bead: Phaser.GameObjects.Image; text: Phaser.GameObjects.Text; skin: Phaser.GameObjects.Text }[] = [];
   private swatches: { plaque: Phaser.GameObjects.Image; tile: Phaser.GameObjects.Image; name: Phaser.GameObjects.Text }[] = [];
+  private puzzlesCard!: Phaser.GameObjects.Container;
+  private puzzleParts: { plaque: Phaser.GameObjects.Image; num: Phaser.GameObjects.Text; stars: Phaser.GameObjects.Image[] }[] = [];
+  private puzzleInfo!: Phaser.GameObjects.Text;
+  private puzzleTotal!: Phaser.GameObjects.Text;
+  /** The puzzle islands' best stars, loaded when the puzzles card opens. */
+  private puzzleBest: number[] = [];
+  /** The game-over card's middle button: Sail on, or Try again on a puzzle or against a rival. */
+  private sailText!: Phaser.GameObjects.Text;
+  /** A plum bead on each of the rival lord's buildings. */
+  private rivalImages: Phaser.GameObjects.Image[] = [];
+  private rivalLabel!: Phaser.GameObjects.Text;
   private featToast!: Phaser.GameObjects.Container;
   private featToastText!: Phaser.GameObjects.Text;
 
@@ -263,6 +303,7 @@ export class GameScene extends Phaser.Scene {
     this.createGameOver();
     this.createIslandsCard();
     this.createFeatsCard();
+    this.createPuzzlesCard();
     const backdrop = addArt(this, 0, 0, 'walnut-440x96');
     this.bannerText = this.add.text(0, -2, '', style(15, CREAM, '900', { align: 'center', lineSpacing: 4 })).setOrigin(0.5);
     this.banner = this.add
@@ -307,6 +348,7 @@ export class GameScene extends Phaser.Scene {
     this.castleBadge = this.add.text(0, 0, '', style(10, CREAM, '900')).setOrigin(0.5).setDepth(D.label + 0.2).setVisible(false);
     this.omenLabel = this.add.text(0, 0, '', style(10, CREAM, '800')).setOrigin(0.5).setDepth(D.label).setVisible(false);
     this.mergeHint = this.add.text(0, 0, '', style(11, CREAM, '900')).setOrigin(0.5).setDepth(D.label + 0.2).setVisible(false);
+    this.rivalLabel = this.add.text(0, 0, '', style(10, CREAM, '900')).setOrigin(0.5).setDepth(D.label).setVisible(false);
 
     // One zone over the whole board: hovering previews, a tap places. A touch has no hover, so its
     // first tap on a cell previews and a second tap on the same cell places.
@@ -429,6 +471,8 @@ export class GameScene extends Phaser.Scene {
 
   /** A building's tile and what stands on it, scaled into a button. */
   private tileIcon(kind: Building, x: number, y: number, scale: number) {
+    // A wonder shows its whole picture, shrunk to a cell.
+    if (isWonder(kind)) return this.add.container(x, y, [addArt(this, 0, 6, wonderKey(kind)).setScale(0.5 / RES)]).setScale(scale);
     const parts: Phaser.GameObjects.Image[] = [addArt(this, 0, 0, tileKey(kind === 'farm' || kind === 'road' ? kind : 'plain', 0, 0))];
     const prop = propKey(kind);
     if (prop) parts.push(addArt(this, 0, 0, prop).setOrigin(PROP_ORIGIN.x, PROP_ORIGIN.y));
@@ -607,6 +651,7 @@ export class GameScene extends Phaser.Scene {
     });
     // Sailing on settles the next island of the chain, with this one's cargo.
     const sail = makeButton(this, VIEW.w / 2, by, t('sailOn'), () => this.sailOn());
+    this.sailText = sail.list[1] as Phaser.GameObjects.Text;
     const again = makeButton(this, VIEW.w / 2 + GAME_OVER.dx, by, t('newKingdom'), () => this.start(randomIsland()));
     for (const b of [islands, sail, again]) fit(b.list[1] as Phaser.GameObjects.Text, BUTTON.w - 14);
     this.gameOver = this.add.container(0, 0, [dim, panel, title, this.gameOverText, islands, sail, again]).setDepth(UI_DEPTH + 20).setVisible(false);
@@ -614,8 +659,12 @@ export class GameScene extends Phaser.Scene {
 
   /** Settles the next island of the chain once a kingdom is finished. */
   private sailOn() {
-    if (this.state.phase !== 'over') return;
-    const { island, kingdom } = nextKingdom(this.state);
+    const s = this.state;
+    if (s.phase !== 'over') return;
+    // A puzzle or a rival lord has no chain: the middle button plays it again.
+    if (s.mode === 'puzzle') return this.start(s.island, { mode: 'puzzle', puzzle: s.puzzle });
+    if (s.mode === 'rival') return this.start(s.island, { mode: 'rival' });
+    const { island, kingdom } = nextKingdom(s);
     this.start(island, kingdom);
   }
 
@@ -757,6 +806,11 @@ export class GameScene extends Phaser.Scene {
         this.openFeats();
       }),
       fit(this.add.text(FEATS_BUTTON.x, FEATS_BUTTON.y - 1, t('feats'), style(13, INK, '900')).setOrigin(0.5), FEATS_BUTTON.w - 8),
+      this.plaque(PUZZLES_BUTTON.x, PUZZLES_BUTTON.y, PUZZLES_BUTTON.w, PUZZLES_BUTTON.h, () => {
+        ui('click');
+        this.openPuzzles();
+      }),
+      fit(this.add.text(PUZZLES_BUTTON.x, PUZZLES_BUTTON.y - 1, t('puzzles'), style(13, INK, '900')).setOrigin(0.5), PUZZLES_BUTTON.w - 8),
     );
 
     // The campaign: one plaque per level with its number and stars.
@@ -787,6 +841,12 @@ export class GameScene extends Phaser.Scene {
     objects.push(this.dailyText);
     const R = C.random;
     objects.push(this.plaque(R.x, R.y, R.w, R.h, () => this.start(randomIsland())), this.add.text(R.x, R.y - 1, t('randomIsland'), style(15, INK, '900')).setOrigin(0.5));
+    // A random island shared with a rival lord.
+    const V = C.rival;
+    objects.push(
+      this.plaque(V.x, V.y, V.w, V.h, () => this.start(randomIsland(), { mode: 'rival' })),
+      fit(this.add.text(V.x, V.y - 1, t('rivalButton'), style(15, INK, '900')).setOrigin(0.5), V.w - 12),
+    );
 
     // The keypad for an island number.
     const K = C.key;
@@ -808,10 +868,11 @@ export class GameScene extends Phaser.Scene {
     this.islandsCard = this.add.container(0, 0, objects).setDepth(UI_DEPTH + 30).setVisible(false);
 
     this.input.keyboard?.on('keydown', (e: KeyboardEvent) => {
-      if (this.featsCard?.visible) {
+      for (const card of [this.featsCard, this.puzzlesCard]) {
+        if (!card?.visible) continue;
         if (e.key === 'Escape') {
           ui('click');
-          this.featsCard.setVisible(false);
+          card.setVisible(false);
         }
         return;
       }
@@ -870,6 +931,74 @@ export class GameScene extends Phaser.Scene {
   private closeIslands() {
     this.islandsCard.setVisible(false);
     this.featsCard.setVisible(false);
+    this.puzzlesCard.setVisible(false);
+  }
+
+  /** The puzzles card: a plaque per puzzle island with its best stars, ten to a row, the hovered one's line and the stars won in all. */
+  private createPuzzlesCard() {
+    const C = PUZZLES_CARD;
+    const left = C.x - C.w / 2;
+    const top = C.y - C.h / 2;
+    const close = ISLANDS_CARD.close;
+    const objects: Phaser.GameObjects.GameObject[] = [
+      this.dimmer(),
+      addArt(this, C.x, C.y, `walnut-${C.w}x${C.h}`),
+      this.add.text(left + 30, close.y, t('puzzlesTitle'), style(22, CREAM, '900', { shadow: { offsetX: 1, offsetY: 1.5, color: 'rgba(0,0,0,0.45)', fill: true } })).setOrigin(0, 0.5),
+      this.plaque(close.x, close.y, close.w, close.h, () => {
+        ui('click');
+        this.puzzlesCard.setVisible(false);
+      }),
+      fit(this.add.text(close.x, close.y - 1, t('close'), style(13, INK, '900')).setOrigin(0.5), close.w - 8),
+      fit(this.add.text(left + 30, top + 60, t('puzzlesSub'), style(11, LABEL, '700')).setOrigin(0, 0.5), C.w - 60),
+    ];
+    const P = C.plaque;
+    const perRow = 10;
+    const rowW = perRow * P.w + (perRow - 1) * P.gap;
+    PUZZLES.forEach((_, i) => {
+      const x = C.x - rowW / 2 + P.w / 2 + (i % perRow) * (P.w + P.gap);
+      const y = C.rowY + Math.floor(i / perRow) * C.rowH;
+      const plaque = this.plaque(x, y, P.w, P.h, () => this.playPuzzle(i + 1));
+      plaque.on('pointerover', () => this.showPuzzle(i + 1));
+      const num = this.add.text(x, y - 8, String(i + 1), style(18, INK, '900')).setOrigin(0.5);
+      const stars = [-1, 0, 1].map((k) => addArt(this, x + k * 13, y + 15, 'star-off').setScale(0.75 / RES));
+      objects.push(plaque, num, ...stars);
+      this.puzzleParts.push({ plaque, num, stars });
+    });
+    this.puzzleInfo = this.add.text(C.x, C.infoY, '', style(12, LABEL, '700')).setOrigin(0.5);
+    this.puzzleTotal = this.add.text(C.x, C.totalY, '', style(12, '#f2c33a', '900')).setOrigin(0.5);
+    objects.push(this.puzzleInfo, this.puzzleTotal);
+    this.puzzlesCard = this.add.container(0, 0, objects).setDepth(UI_DEPTH + 31).setVisible(false);
+  }
+
+  private openPuzzles() {
+    this.puzzleBest = loadPuzzleStars();
+    PUZZLES.forEach((_, i) => {
+      const p = this.puzzleParts[i];
+      const open = levelOpen(i + 1, this.puzzleBest);
+      p.plaque.setAlpha(open ? 1 : 0.45);
+      if (p.plaque.input) p.plaque.input.enabled = open;
+      p.num.setAlpha(open ? 1 : 0.45);
+      p.stars.forEach((star, k) => star.setTexture(k < (this.puzzleBest[i] ?? 0) ? 'star-on' : 'star-off').setAlpha(open ? 1 : 0.45));
+    });
+    const next = PUZZLES.findIndex((_, i) => levelOpen(i + 1, this.puzzleBest) && (this.puzzleBest[i] ?? 0) < 3);
+    this.showPuzzle(next < 0 ? 1 : next + 1);
+    const won = PUZZLES.reduce((n, _, i) => n + (this.puzzleBest[i] ?? 0), 0);
+    this.puzzleTotal.setText(t('puzzleTotal', { n: won, all: PUZZLES.length * 3 }));
+    this.puzzlesCard.setVisible(true);
+  }
+
+  /** The line under the puzzles: a puzzle's island, how many tiles its pouch holds and the scores its stars need. */
+  private showPuzzle(n: number) {
+    const [one, two, three] = puzzleStars(n);
+    const tiles = Object.values(PUZZLES[n - 1].pouch).reduce((a, b) => a + (b ?? 0), 0);
+    const lock = levelOpen(n, this.puzzleBest) ? '' : t('levelLocked');
+    this.puzzleInfo.setText(t('puzzleInfo', { n, island: String(PUZZLES[n - 1].island), tiles, one, two, three }) + lock);
+    fit(this.puzzleInfo, PUZZLES_CARD.w - 40);
+  }
+
+  private playPuzzle(n: number) {
+    if (!levelOpen(n, loadPuzzleStars())) return;
+    this.start(PUZZLES[n - 1].island, { mode: 'puzzle', puzzle: n });
   }
 
   /** The line under the levels: a level's island and the scores its stars need. */
@@ -951,6 +1080,7 @@ export class GameScene extends Phaser.Scene {
       placed = place(this.state, at.col, at.row);
       if (placed && kind) sfx('place', { pitch: PLACE_PITCH[kind] });
       else if (!placed) ui('refuse');
+      if (placed && kind && isWonder(kind)) this.later(140, () => sfx('bell'));
     } else sfx('select', { pitch: 0.8 }); // a second tap that cancels the merge
     if (placed) this.placedSounds(placed, from);
     if (placed) {
@@ -960,6 +1090,12 @@ export class GameScene extends Phaser.Scene {
       for (const change of placed.changes) this.popup(change.col, change.row, change.gained, change.col === at.col && change.row === at.row);
       if (placed.decree) this.decreePaid();
       if (placed.struck) for (const [c, r] of placed.struck.cells) this.popup(c, r, 0, true, t(placed.struck.kind === 'flood' ? 'flooded' : 'toppled'));
+      // The rival lord's answer: its tile goes down a moment later, with what its buildings gained.
+      const rival = placed.rival;
+      if (rival) this.later(260, () => {
+        sfx('rival');
+        this.popup(rival.col, rival.row, rival.gained, true, '', PLUM);
+      });
     }
     this.refresh();
     this.hoverAt(x, y);
@@ -986,6 +1122,15 @@ export class GameScene extends Phaser.Scene {
       const stars = loadStars();
       stars[s.level - 1] = Math.max(stars[s.level - 1] ?? 0, starsFor(s.level, s.score));
       saveStars(stars);
+    }
+    if (s.mode === 'puzzle') {
+      const stars = loadPuzzleStars();
+      stars[s.puzzle - 1] = Math.max(stars[s.puzzle - 1] ?? 0, puzzleStarsFor(s.puzzle, s.score));
+      savePuzzleStars(stars);
+    }
+    if (s.rival && s.score > s.rival.score) {
+      this.rivalWins = Math.max(this.rivalWins, loadRivalWins()) + 1;
+      saveRivalWins(this.rivalWins);
     }
     if (s.link > 1) {
       const best = loadChain();
@@ -1031,19 +1176,19 @@ export class GameScene extends Phaser.Scene {
     const ticks = Math.min(10, s.castle);
     for (let i = 0; i < ticks; i++) this.later(500 + i * 60, () => sfx('tick', { pitch: 1 + i * 0.03 }));
     let at = 600 + ticks * 60;
-    if (s.mode === 'campaign') {
-      const stars = starsFor(s.level, s.score);
+    if (s.mode === 'campaign' || s.mode === 'puzzle') {
+      const stars = s.mode === 'puzzle' ? puzzleStarsFor(s.puzzle, s.score) : starsFor(s.level, s.score);
       for (let i = 0; i < stars; i++) this.later(at + i * 260, () => sfx('star', { pitch: 2 ** ((i * 4) / 12) }));
       at += stars * 260;
     }
-    const best = s.score > this.bestAtStart;
+    const best = s.rival ? s.score > s.rival.score : s.score > this.bestAtStart;
     this.later(at, () => playSting(SONG, best ? 'best' : 'finished'));
   }
 
   /** A "+N" (or a word, such as an omen's "Flooded") that floats up from a cell and fades; it only fades with reduced motion. */
-  private popup(col: number, row: number, gained: number, main: boolean, word = '') {
+  private popup(col: number, row: number, gained: number, main: boolean, word = '', paint = '') {
     const { x, y } = cellCentre(col, row);
-    const color = word ? '#e0785f' : gained > 0 ? '#f2c33a' : gained < 0 ? '#e0785f' : '#f1d9b0';
+    const color = paint || (word ? '#e0785f' : gained > 0 ? '#f2c33a' : gained < 0 ? '#e0785f' : '#f1d9b0');
     const text = this.add
       .text(x, y - 8, word || `${gained >= 0 ? '+' : ''}${gained}`, style(word ? 15 : main ? 24 : 16, color, '900', { stroke: '#3a2414', strokeThickness: 4 }))
       .setOrigin(0.5)
@@ -1078,6 +1223,7 @@ export class GameScene extends Phaser.Scene {
       t('bannerGift', { gift: t(GIFT_INFO[gift].label) }),
     ];
     if (s.omen) lines.push(t('bannerOmen', { n: s.round + 1, omen: this.omenLine(s.omen, 'text') }));
+    if (s.round === WONDER_ROUND) lines.push(t('bannerWonder', { name: t(INFO[s.wonder].name) }));
     // The new season's part takes over at the next bar; an omen for the next round adds its motif.
     playMusic(SONG, season(s));
     if (s.omen) this.later(500, () => playSting(SONG, 'omen'));
@@ -1152,10 +1298,19 @@ export class GameScene extends Phaser.Scene {
       this.hint(cx, y + GRID.cell - 12, t(can ? 'tapToTrade' : this.state.tradedIn === this.state.round ? 'tradedThisRound' : 'noTrade'));
       return;
     }
+    // A rival lord's building: nothing of the player's can go there.
+    if (rivalAt(this.state, at.col, at.row)) {
+      box(at.col, at.row, PLUM_FILL);
+      this.hint(cx, y + GRID.cell - 12, t('rivalOwns'));
+      return;
+    }
     const ok = canPlace(this.state, at.col, at.row, kind);
-    g.lineStyle(3.5, ok && kind ? YELLOW : CORAL, 1).strokeRoundedRect(x + 1, y + 1, GRID.cell - 2, GRID.cell - 4, 8);
+    // A wonder takes the hovered cell as the top left of its 2x2 block.
+    const size = kind && isWonder(kind) ? 2 : 1;
+    g.lineStyle(3.5, ok && kind ? YELLOW : CORAL, 1).strokeRoundedRect(x + 1, y + 1, GRID.cell * size - 2, GRID.cell * size - 4, 8);
     if (!this.preview || !kind) return;
-    if (kind === 'farm' || kind === 'road') this.ghost.setTexture(`tile-${kind}`).setOrigin(0.5).setPosition(cx, cy).setAlpha(0.65);
+    if (isWonder(kind)) this.ghost.setTexture(wonderKey(kind)).setOrigin(WONDER_ORIGIN.x, WONDER_ORIGIN.y).setPosition(cx, cy).setAlpha(0.6);
+    else if (kind === 'farm' || kind === 'road') this.ghost.setTexture(`tile-${kind}`).setOrigin(0.5).setPosition(cx, cy).setAlpha(0.65);
     else this.ghost.setTexture(`prop-${kind}`).setOrigin(PROP_ORIGIN.x, PROP_ORIGIN.y).setPosition(cx, cy).setAlpha(0.6);
     this.ghost.setVisible(true);
 
@@ -1232,7 +1387,7 @@ export class GameScene extends Phaser.Scene {
     this.placeLabel.setVisible(false);
     for (const b of this.beads) b.setVisible(false);
     if (!d) {
-      this.decreeText.setText(t('noDecree'));
+      fit(this.decreeText.setText(s.puzzle ? t('puzzleDecree', { n: s.puzzle }) : t('noDecree')), this.crownsText.x - this.decreeText.x - 24);
       this.progressText.setText('');
       this.rewardTitle.setVisible(false);
       this.rewardText.setVisible(false);
@@ -1240,9 +1395,9 @@ export class GameScene extends Phaser.Scene {
     }
     this.rewardTitle.setVisible(true);
     fit(this.rewardText.setVisible(true).setText(t(d.done ? 'rewardPaid' : 'reward', { n: DECREE_BONUS })), this.crownsText.x - this.rewardText.x - 22);
-    const marks = decreeMarks(s.grid, d);
+    const marks = decreeMarks(ownGrid(s), d);
     const have = d.done ? d.need : Math.min(marks.have, d.need);
-    this.decreeText.setText(this.decreeLine(d));
+    this.decreeText.setScale(1).setText(this.decreeLine(d));
     let px = this.decreeText.x + this.decreeText.width + 16;
     if (d.need <= this.beads.length) {
       for (let i = 0; i < d.need; i++) this.beads[i].setTexture(i < have ? 'bead-on' : 'bead-off').setPosition(px + i * 18, this.beads[i].y).setVisible(true);
@@ -1306,8 +1461,29 @@ export class GameScene extends Phaser.Scene {
       const w = this.omenLabel.width + 12;
       g.fillStyle(CORAL, 1).fillRoundedRect(x + GRID.cell / 2 - w / 2, y + GRID.cell - 20, w, 16, 8);
     }
-    for (const [c, r] of joinedCells(s.grid)) {
+    for (const [c, r] of joinedCells(s.grid, mine(s))) {
       this.joinImages.push(addArt(this, GRID.x + c * GRID.cell + 11, GRID.y + r * GRID.cell + 11, 'bead-on').setScale(0.7 / RES).setDepth(D.ticks));
+    }
+    // The rival lord's buildings: a plum bead on each, and its last tile outlined in plum with its name.
+    for (const m of this.rivalImages) m.destroy();
+    this.rivalImages = [];
+    this.rivalLabel.setVisible(false);
+    const r = s.rival;
+    if (!r) return;
+    g.lineStyle(2.5, PLUM_FILL, 0.85);
+    r.cells.forEach((cells, row) =>
+      cells.forEach((on, col) => {
+        if (on) g.strokeRoundedRect(GRID.x + col * GRID.cell + 4, GRID.y + row * GRID.cell + 4, GRID.cell - 8, GRID.cell - 10, 8);
+        if (on) this.rivalImages.push(addArt(this, GRID.x + (col + 1) * GRID.cell - 11, GRID.y + row * GRID.cell + 11, 'bead-rival').setScale(0.8 / RES).setDepth(D.ticks));
+      }),
+    );
+    if (r.last && r.cells[r.last.row][r.last.col] && s.phase !== 'over') {
+      const x = GRID.x + r.last.col * GRID.cell;
+      const y = GRID.y + r.last.row * GRID.cell;
+      g.lineStyle(3, PLUM_FILL, 1).strokeRoundedRect(x + 2, y + 2, GRID.cell - 4, GRID.cell - 6, 8);
+      this.rivalLabel.setText(t('rivalLast', { name: t(INFO[r.last.kind].name) })).setPosition(x + GRID.cell / 2, y + GRID.cell - 12).setVisible(true);
+      const w = this.rivalLabel.width + 12;
+      g.fillStyle(PLUM_FILL, 1).fillRoundedRect(x + GRID.cell / 2 - w / 2, y + GRID.cell - 20, w, 16, 8);
     }
   }
 
@@ -1349,7 +1525,22 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     const choosing = s.phase === 'gift';
     const g = this.chips.clear();
-    const show = s.phase !== 'over';
+    const show = s.phase !== 'over' && !s.puzzle;
+    if (s.puzzle) {
+      // A puzzle has no gifts: the row shows the scores its stars need.
+      const [one, two, three] = puzzleStars(s.puzzle);
+      fit(this.giftLabel.setVisible(true).setText(t('starsAt', { one, two, three })), PANEL.x + PANEL.w - 12 - GIFT_ROW.x);
+      this.giftOr.setVisible(false);
+      for (const part of this.chipParts) {
+        part.icon.setVisible(false);
+        part.text.setVisible(false);
+        if (part.zone.input) part.zone.input.enabled = false;
+      }
+      this.giftCard.setVisible(false);
+      this.giftButtons = [];
+      return;
+    }
+    this.giftLabel.setScale(1);
     s.gifts.forEach((gift, i) => this.chipParts[i].text.setText(t(GIFT_INFO[gift].label)));
     const chipsW = this.chipParts.reduce((t, p) => t + 26 + p.text.width, 12 + this.giftOr.width);
     // The label shortens when two long gifts would run past the panel's edge.
@@ -1407,26 +1598,37 @@ export class GameScene extends Phaser.Scene {
       this.shownKinds = kinds.join();
       this.buildButtons(kinds);
     }
-    this.roundText.setText(t('round', { n: s.round }));
+    fit(this.roundText.setText(s.puzzle ? t('puzzleRound') : t('round', { n: s.round })), ISLAND_BUTTON.x - ISLAND_BUTTON.w / 2 - PANEL.x - 22);
     const island = String(s.island);
-    this.islandText.setText(
-      s.mode === 'campaign'
-        ? t('levelButton', { n: s.level })
-        : s.mode === 'daily'
-          ? t('dailyButton', { n: island })
-          : s.mode === 'chain'
-            ? t('chainButton', { n: island, link: s.link })
-            : t('islandButton', { n: island }),
-    );
+    const buttons: Partial<Record<GameState['mode'], string>> = {
+      campaign: t('levelButton', { n: s.level }),
+      daily: t('dailyButton', { n: island }),
+      chain: t('chainButton', { n: island, link: s.link }),
+      puzzle: t('puzzleButton', { n: s.puzzle }),
+      rival: t('rivalIsland', { n: island }),
+    };
+    this.islandText.setText(buttons[s.mode] ?? t('islandButton', { n: island }));
     fit(this.islandText, ISLAND_BUTTON.w - 8);
     this.scoreText.setText(t('score', { n: s.score }));
-    fit(this.goalText.setText(t('goal', { score: s.score, goal: s.goal, next: s.round + 1 })), GOAL_BAR.w - 8);
+    // A puzzle's goal bar runs to its next star.
+    const stars = s.puzzle ? puzzleStars(s.puzzle) : null;
+    const nextStar = stars ? stars.findIndex((n) => s.score < n) : -1;
+    const goalLine = !stars
+      ? t('goal', { score: s.score, goal: s.goal, next: s.round + 1 })
+      : nextStar < 0
+        ? t('puzzleAllStars', { score: s.score })
+        : t('puzzleGoal', { score: s.score, goal: stars[nextStar], n: nextStar + 1 });
+    fit(this.goalText.setText(goalLine), GOAL_BAR.w - 8);
     // A finished daily counts its own score, since saving it fails silently when storage is blocked.
     const dailyBest = s.mode === 'daily' ? Math.max(loadDailyBest(s.day), s.phase === 'over' ? s.score : 0) : 0;
     if (s.mode === 'campaign') {
       const [one, two, three] = starScores(s.level);
       this.bestText.setText(t('starsAt', { one, two, three }));
-    } else if (s.mode === 'daily') this.bestText.setText(t('todaysBest', { n: dailyBest }));
+    } else if (s.mode === 'puzzle') {
+      const best = Math.max(loadPuzzleStars()[s.puzzle - 1] ?? 0, s.phase === 'over' ? puzzleStarsFor(s.puzzle, s.score) : 0);
+      this.bestText.setText(t('puzzleBest', { n: best }));
+    } else if (s.rival) this.bestText.setText(t('rivalLine', { you: s.score, rival: s.rival.score }));
+    else if (s.mode === 'daily') this.bestText.setText(t('todaysBest', { n: dailyBest }));
     else if (s.mode === 'chain') this.bestText.setText(t('chainSoFar', { n: s.chainScore + (s.phase === 'over' ? s.score : 0) }));
     else this.bestText.setText(t('bestScore', { n: s.best }));
 
@@ -1437,13 +1639,15 @@ export class GameScene extends Phaser.Scene {
     this.seasonStrip.fillStyle(0x000000, 0.3).fillRoundedRect(S.x, S.y + 1.5, S.w, S.h, S.h / 2);
     this.seasonStrip.fillStyle(info.color, 1).fillRoundedRect(S.x, S.y, S.w, S.h, S.h / 2);
     this.seasonStrip.fillStyle(0xffffff, 0.16).fillRoundedRect(S.x + 1, S.y + 1, S.w - 2, S.h / 2, S.h / 4);
-    fit(this.seasonText.setText(`${t(info.name)}: ${t(info.short)}`), SEASON.w - 12);
+    fit(this.seasonText.setText(s.puzzle ? t('puzzleSeason') : `${t(info.name)}: ${t(info.short)}`), SEASON.w - 12);
 
     // The pouch line, the omen strip and the castle's count.
     // A no-break space keeps each count on one line ("2 mills", never "2" at a line's end).
     const left = BUILDINGS.filter((b) => s.pouch[b] > 0).map((b) => count(b, s.pouch[b]).replace(' ', '\u00a0'));
     const pouch = left.length ? t('pouch', { list: left.join(', ') }) : t('pouchEmpty');
-    this.pouchText.setText(canTrade(s) ? t('pouchTrade', { pouch }) : pouch);
+    // Until the wonder comes, the pouch line names it and its round.
+    const wonderSoon = !s.puzzle && s.round < WONDER_ROUND;
+    this.pouchText.setText(canTrade(s) ? t('pouchTrade', { pouch }) : wonderSoon ? t('pouchWonder', { pouch, n: WONDER_ROUND, name: t(INFO[s.wonder].name) }) : pouch);
     const O = OMEN;
     this.omenStrip.clear();
     const omenOn = !!s.omen && s.phase !== 'over';
@@ -1452,14 +1656,15 @@ export class GameScene extends Phaser.Scene {
       this.omenStrip.fillStyle(CORAL, 1).fillRoundedRect(O.x, O.y, O.w, O.h, O.h / 2);
       this.omenStrip.fillStyle(0xffffff, 0.16).fillRoundedRect(O.x + 1, O.y + 1, O.w - 2, O.h / 2, O.h / 4);
     }
-    this.omenText.setText(omenOn ? this.omenLine(s.omen!, 'short') : s.round < OMEN_FROM ? t('omensFrom', { n: OMEN_FROM }) : t('noOmen')).setColor(omenOn ? CREAM : LABEL);
+    this.omenText.setText(omenOn ? this.omenLine(s.omen!, 'short') : s.puzzle ? '' : s.round < OMEN_FROM ? t('omensFrom', { n: OMEN_FROM }) : t('noOmen')).setColor(omenOn ? CREAM : LABEL);
     fit(this.omenText, O.w - 12);
-    const joined = joinedCount(s.grid);
+    const joined = joinedCount(s.grid, mine(s));
     this.castleText.setText(s.phase === 'over' ? t('castlePaid', { n: s.castle }) : t('castleJoins', { n: joined }));
 
-    // The goal bar is a groove filled with green from the last round's goal to this one's.
-    const from = s.round === 1 ? 0 : goalFor(s.round - 1);
-    const fill = Phaser.Math.Clamp((s.score - from) / (s.goal - from), 0, 1);
+    // The goal bar is a groove filled with green from the last round's goal to this one's (on a puzzle, from the last star to the next).
+    const from = stars ? (nextStar > 0 ? stars[nextStar - 1] : 0) : s.round === 1 ? 0 : goalFor(s.round - 1);
+    const to = stars ? (nextStar < 0 ? 1 : stars[nextStar]) : s.goal;
+    const fill = stars && nextStar < 0 ? 1 : Phaser.Math.Clamp((s.score - from) / (to - from), 0, 1);
     const B = GOAL_BAR;
     const fw = Math.round((B.w - 4) * fill);
     this.bar.clear();
@@ -1482,7 +1687,7 @@ export class GameScene extends Phaser.Scene {
     const stuck = s.phase === 'playing' && !anyPlace(s) && !canUndo(s);
     const undoable = canUndo(s) || stuck;
     const usedHere = s.undoneIn === s.round;
-    const noRoom = housesCanMerge(s.grid) ? 'noRoom' : canClearAny(s) ? 'noRoomWood' : 'noRoomFinish';
+    const noRoom = housesCanMerge(ownGrid(s)) ? 'noRoom' : canClearAny(s) ? 'noRoomWood' : 'noRoomFinish';
     fit(this.undoText.setText(t(stuck ? noRoom : usedHere && !undoable ? 'undoUsed' : 'undo')), UNDO_BUTTON.w - 16);
     this.undoBg.setAlpha(undoable ? 1 : 0.5);
     this.undoText.setAlpha(undoable ? 1 : 0.5);
@@ -1499,6 +1704,14 @@ export class GameScene extends Phaser.Scene {
         const stars = starsFor(s.level, s.score);
         const next = stars < 3 ? t('nextStarAt', { n: starScores(s.level)[stars] }) : '';
         won = t('overLevel', { level: s.level, n: stars, next, crowns: s.crowns });
+      } else if (s.mode === 'puzzle') {
+        const n = puzzleStarsFor(s.puzzle, s.score);
+        const next = n < 3 ? t('nextStarAt', { n: puzzleStars(s.puzzle)[n] }) : '';
+        won = t('overPuzzle', { puzzle: s.puzzle, n, next, crowns: s.crowns });
+      } else if (s.rival) {
+        const r = s.rival;
+        const vs = { you: s.score, rival: r.score, castle: r.castle, wins: Math.max(this.rivalWins, loadRivalWins()) };
+        won = t(s.score > r.score ? 'overRivalWin' : s.score < r.score ? 'overRivalLose' : 'overRivalDraw', vs);
       } else if (s.mode === 'daily') won = t('overDaily', { best: dailyBest, crowns: s.crowns });
       else if (s.mode === 'chain') {
         const best = loadChain();
@@ -1509,6 +1722,7 @@ export class GameScene extends Phaser.Scene {
       const trade = s.link > 1 ? t('overTrade', { n: harbourCount(s.grid), trade: s.trade }) + '\n' : '';
       const over = { score: s.score, island: String(s.island), round: s.round, n: s.placed, castle: s.castle, won: trade + won };
       fit(this.gameOverText.setText(t('overText', over)), GAME_OVER.w - 30);
+      fit(this.sailText.setText(t(s.puzzle || s.rival ? 'tryAgain' : 'sailOn')), BUTTON.w - 14);
     }
     checkTrophies(s);
     this.checkFeats();
@@ -1532,6 +1746,15 @@ export class GameScene extends Phaser.Scene {
     this.drawHover(null);
     this.refresh();
     if (this.state.link > 1) this.announceChain();
+    if (this.state.rival) this.announceRival();
+  }
+
+  /** The banner as a kingdom shared with a rival lord begins: how its turns go. */
+  private announceRival() {
+    fit(this.bannerText.setText([t('bannerRival', { n: String(this.state.island) }), t('bannerRivalRule')]), 430);
+    this.banner.setAlpha(1);
+    this.tweens.killTweensOf(this.banner);
+    this.tweens.add({ targets: this.banner, alpha: 0, delay: BANNER_MS, duration: BANNER_MS / 2 });
   }
 
   /** The banner as a chain island is settled: which island of the chain, its own building and the cargo shipped. */
@@ -1548,12 +1771,21 @@ export class GameScene extends Phaser.Scene {
 
   /** Shows each cell's current tile and what stands on it. */
   private redrawCells() {
-    this.state.grid.forEach((cells, row) =>
+    const grid = this.state.grid;
+    grid.forEach((cells, row) =>
       cells.forEach((cell, col) => {
         this.tiles[row][col].setTexture(tileKey(cell, col, row));
+        const image = this.props[row][col];
+        // A wonder's one picture stands on its top left cell, drawn with its bottom row so the row below still overlaps it.
+        if (isWonder(cell)) {
+          const anchor = wonderAnchor(grid, col, row);
+          image.setVisible(anchor);
+          if (anchor) image.setTexture(wonderKey(cell)).setOrigin(WONDER_ORIGIN.x, WONDER_ORIGIN.y).setDepth(D.prop + (row + 1) * 0.01 + 0.005);
+          return;
+        }
         const prop = propKey(cell);
-        this.props[row][col].setVisible(!!prop);
-        if (prop) this.props[row][col].setTexture(prop);
+        image.setVisible(!!prop).setOrigin(PROP_ORIGIN.x, PROP_ORIGIN.y).setDepth(D.prop + row * 0.01);
+        if (prop) image.setTexture(prop);
       }),
     );
   }

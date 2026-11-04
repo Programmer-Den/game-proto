@@ -41,6 +41,7 @@ export const ISLANDS_CARD = {
   level: { y: 166, w: 62, h: 62, gap: 8 },
   daily: { x: 196, y: 302, w: 236, h: 72 },
   random: { x: 196, y: 384, w: 236, h: 48 },
+  rival: { x: 196, y: 440, w: 236, h: 44 },
   code: { x: 500, y: 282, w: 196, h: 34 },
   key: { x: 500, y: 328, w: 58, h: 34, gap: 6 },
   close: { x: 586, y: 82, w: 84, h: 28 },
@@ -48,6 +49,10 @@ export const ISLANDS_CARD = {
 
 /** The Feats button on the islands card's title line, left of Close, by its centre: opens the feats card. */
 export const FEATS_BUTTON = { x: 476, y: 82, w: 108, h: 28 };
+/** The Puzzles button on the islands card's title line, left of Feats, by its centre: opens the puzzles card. */
+export const PUZZLES_BUTTON = { x: 362, y: 82, w: 108, h: 28 };
+/** The puzzles card over the board: a plaque per puzzle island, ten to a row, the hovered one's line and the stars won. */
+export const PUZZLES_CARD = { x: 346, y: 270, w: 600, h: 432, plaque: { w: 50, h: 54, gap: 6 }, rowY: 156, rowH: 62, infoY: 352, totalY: 380 };
 /** The feats card over the board: a row per feat with the skin it unlocks, then a swatch per tile skin (the islands card's level plaques). */
 export const FEATS_CARD = { x: 346, y: 270, w: 600, h: 432, rowY: 138, rowH: 30, swatchY: 420 };
 /** The game-over card and its three buttons' centres, from its middle. */

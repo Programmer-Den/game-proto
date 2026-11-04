@@ -5,7 +5,7 @@ import type { TextKey } from '../i18n';
  * Every building the pouch holds, in the order of the panel's tile buttons. The first three are
  * there from the start; the rest are gifts, and each one's button shows once it is won.
  */
-export const BUILDINGS = ['farm', 'house', 'tower', 'windmill', 'market', 'harbor', 'lumber', 'temple', 'lighthouse', 'orchard', 'road'] as const;
+export const BUILDINGS = ['farm', 'house', 'tower', 'windmill', 'market', 'harbor', 'lumber', 'temple', 'lighthouse', 'orchard', 'cathedral', 'granary', 'gardens', 'road'] as const;
 export type Building = (typeof BUILDINGS)[number];
 /** The buildings won as gifts, in the order they join the panel. */
 export const SPECIALS = ['windmill', 'market', 'harbor', 'lumber', 'temple'] as const;
@@ -13,6 +13,43 @@ export type Special = (typeof SPECIALS)[number];
 /** The buildings found only on the islands of a chain after the first (see `chainMap`): each such island has one. */
 export const NATIVES = ['lighthouse', 'orchard'] as const;
 export type Native = (typeof NATIVES)[number];
+/**
+ * The wonders: 2x2 buildings that score big for what stands around them. Each kingdom draws one
+ * (`wonderFor`), which joins the pouch as round WONDER_ROUND begins. A wonder fills four cells of
+ * the grid with its kind; the top left one (`wonderAnchor`) holds all its points.
+ */
+export const WONDERS = ['cathedral', 'granary', 'gardens'] as const;
+export type Wonder = (typeof WONDERS)[number];
+export const isWonder = (cell: Cell | undefined): cell is Wonder => (WONDERS as readonly string[]).includes(cell as string);
+/** The four cells a wonder placed at (col, row) covers, as [dcol, drow] from its top left. */
+export const WONDER_CELLS = [
+  [0, 0],
+  [1, 0],
+  [0, 1],
+  [1, 1],
+] as const;
+/** The twelve cells around a wonder, as [dcol, drow] from its top left: what it scores. */
+export const WONDER_AROUND = [
+  [-1, -1],
+  [0, -1],
+  [1, -1],
+  [2, -1],
+  [-1, 0],
+  [2, 0],
+  [-1, 1],
+  [2, 1],
+  [-1, 2],
+  [0, 2],
+  [1, 2],
+  [2, 2],
+] as const;
+/** Whether (col, row) is the top left cell of a wonder, the one that scores it. */
+export const wonderAnchor = (grid: readonly (readonly Cell[])[], col: number, row: number) => {
+  const cell = grid[row]?.[col];
+  return isWonder(cell) && grid[row][col - 1] !== cell && grid[row - 1]?.[col] !== cell;
+};
+/** The wonder island `island`'s kingdoms draw: the same for every player. */
+export const wonderFor = (island: number): Wonder => WONDERS[Math.floor(seeded(island * 17 + 3)() * WONDERS.length)];
 /** Everything that can stand on a cell: the pouch's buildings, and the manor two houses merge into. */
 export type Structure = Building | 'manor';
 /** The land: grass to build on, lakes, woods, the island's castle, which stands from the start, and the sea cut into a chain island's shape. */
@@ -39,6 +76,9 @@ export const INFO: Record<Structure, BuildingInfo> = {
   temple: { name: 'templeName', rule: 'templeRule', count: 'templeCount' },
   lighthouse: { name: 'lighthouseName', rule: 'lighthouseRule', count: 'lighthouseCount' },
   orchard: { name: 'orchardName', rule: 'orchardRule', count: 'orchardCount' },
+  cathedral: { name: 'cathedralName', rule: 'cathedralRule', count: 'cathedralCount' },
+  granary: { name: 'granaryName', rule: 'granaryRule', count: 'granaryCount' },
+  gardens: { name: 'gardensName', rule: 'gardensRule', count: 'gardensCount' },
   road: { name: 'roadName', rule: 'roadRule', count: 'roadCount' },
   manor: { name: 'manorName', rule: 'manorRule', count: 'manorCount' },
 };

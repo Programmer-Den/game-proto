@@ -779,3 +779,161 @@ export function orchard(x: number, y: number, s = 1) {
   ctx.fillStyle = dark(T.beech, 0.15);
   ctx.fill();
 }
+
+// The wonders, each painted around the middle of its 2x2 block (128 art units a cell, so the block
+// spans -128..128 across and down).
+
+/** A cathedral: a long cream nave under a navy roof, a front tower with a tall spire and gold finial, a rose window and two round towers. */
+export function cathedral(x: number, y: number, s = 1) {
+  shadowBlob(x + 20 * s, y + 70 * s, 130 * s, 26 * s, 0.4);
+  tower(x - 86 * s, y + 6 * s, 1.05 * s);
+  // the nave
+  const w = 150 * s;
+  const h = 64 * s;
+  const d = 22 * s;
+  const x0 = x - w / 2 + 6 * s;
+  const y0 = y + 2 * s;
+  box(x0, y0, w, h, d, T.cream);
+  poly(
+    [
+      [x0 - 8 * s, y0 + 3 * s],
+      [x0 + w + 8 * s, y0 + 3 * s],
+      [x0 + w - 18 * s, y0 - 38 * s],
+      [x0 + 18 * s, y0 - 38 * s],
+    ],
+    T.navy,
+  );
+  poly(
+    [
+      [x0 + w + 8 * s, y0 + 3 * s],
+      [x0 + w + 8 * s + d, y0 + 3 * s - d * 0.8],
+      [x0 + w - 18 * s + d, y0 - 38 * s - d * 0.8],
+      [x0 + w - 18 * s, y0 - 38 * s],
+    ],
+    dark(T.navy, 0.3),
+  );
+  for (let i = 0; i < 4; i++) {
+    rrect(x0 + 52 * s + i * 24 * s, y0 + 14 * s, 11 * s, 26 * s, 5.5 * s);
+    ctx.fillStyle = T.yellow;
+    ctx.fill();
+  }
+  // the front tower and its spire
+  const tw = 44 * s;
+  const tx = x0 + 6 * s;
+  box(tx, y0 - 46 * s, tw, h + 46 * s, 14 * s, lit(T.cream, 0.1));
+  poly(
+    [
+      [tx - 4 * s, y0 - 44 * s],
+      [tx + tw + 4 * s, y0 - 44 * s],
+      [tx + tw / 2, y0 - 128 * s],
+    ],
+    T.navy,
+  );
+  poly(
+    [
+      [tx + tw + 4 * s, y0 - 44 * s],
+      [tx + tw + 4 * s + 12 * s, y0 - 54 * s],
+      [tx + tw / 2 + 6 * s, y0 - 132 * s],
+      [tx + tw / 2, y0 - 128 * s],
+    ],
+    dark(T.navy, 0.3),
+  );
+  ball(tx + tw / 2 + 2 * s, y0 - 132 * s, 6 * s, T.yellow);
+  circle(tx + tw / 2, y0 - 18 * s, 12 * s, T.yellow, dark(T.yellow, 0.35), 3 * s);
+  rrect(tx + tw / 2 - 10 * s, y0 + h - 30 * s, 20 * s, 30 * s, 9 * s);
+  ctx.fillStyle = T.navy;
+  ctx.fill();
+  tower(x + 92 * s, y + 20 * s, 0.9 * s);
+}
+
+/** A great barn: a wide red barn under a two-pitch roof, a cream-framed door, and hay stacks. */
+export function granary(x: number, y: number, s = 1) {
+  shadowBlob(x + 20 * s, y + 70 * s, 130 * s, 26 * s, 0.4);
+  const w = 156 * s;
+  const h = 70 * s;
+  const d = 24 * s;
+  const x0 = x - w / 2 - 6 * s;
+  const y0 = y - 6 * s;
+  box(x0, y0, w, h, d, T.red);
+  // the two-pitch roof: steep sides, a shallow top
+  const roof = [
+    [x0 - 10 * s, y0 + 4 * s],
+    [x0 + 14 * s, y0 - 40 * s],
+    [x0 + w / 2, y0 - 62 * s],
+    [x0 + w - 14 * s, y0 - 40 * s],
+    [x0 + w + 10 * s, y0 + 4 * s],
+  ];
+  poly(
+    [roof[4], [roof[4][0] + d, roof[4][1] - d * 0.8], [roof[3][0] + d, roof[3][1] - d * 0.8], [roof[2][0] + d, roof[2][1] - d * 0.8], roof[2], roof[3]],
+    dark(T.walnut, 0.2),
+  );
+  poly(roof, T.walnut);
+  // the door, framed in cream, with the cream bars of a barn door
+  const dx = x0 + w / 2 - 26 * s;
+  const dy = y0 + h - 50 * s;
+  rrect(dx, dy, 52 * s, 50 * s, 4 * s);
+  ctx.fillStyle = dark(T.red, 0.25);
+  ctx.fill();
+  ctx.strokeStyle = T.cream;
+  ctx.lineWidth = 5 * s;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(dx + 26 * s, dy);
+  ctx.lineTo(dx + 26 * s, dy + 50 * s);
+  ctx.stroke();
+  // the loft window
+  rrect(x0 + w / 2 - 12 * s, y0 - 30 * s, 24 * s, 20 * s, 4 * s);
+  ctx.fillStyle = T.yellow;
+  ctx.fill();
+  // hay stacks
+  for (const [hx, hy] of [
+    [x - 104 * s, y + 52 * s],
+    [x + 96 * s, y + 66 * s],
+  ]) {
+    ball(hx, hy, 20 * s, T.yellow);
+    stripes(hx - 14 * s, hy - 10 * s, 28 * s, 18 * s, 0.6 * s);
+  }
+}
+
+/** Royal gardens: hedged lawns round a blue fountain, four trimmed trees and flower beds. */
+export function gardens(x: number, y: number, s = 1) {
+  shadowBlob(x + 10 * s, y + 60 * s, 130 * s, 24 * s, 0.3);
+  // the hedges, a ring of rounded green blocks with a gap for each path
+  for (const [hx, hy, hw, hh] of [
+    [-112, -96, 84, 26],
+    [28, -96, 84, 26],
+    [-112, 72, 84, 26],
+    [28, 72, 84, 26],
+    [-118, -64, 26, 50],
+    [92, -64, 26, 50],
+    [-118, 18, 26, 50],
+    [92, 18, 26, 50],
+  ]) {
+    rrect(x + hx * s, y + hy * s, hw * s, hh * s, 12 * s);
+    ctx.fillStyle = dark(T.green, 0.22);
+    ctx.fill();
+    rrect(x + hx * s + 3 * s, y + hy * s + 2 * s, hw * s - 6 * s, hh * s / 2, 8 * s);
+    ctx.fillStyle = lit(T.green, 0.12);
+    ctx.fill();
+  }
+  // the paths and the fountain
+  ctx.fillStyle = '#d9c39a';
+  rrect(x - 14 * s, y - 100 * s, 28 * s, 200 * s, 8 * s);
+  ctx.fill();
+  rrect(x - 100 * s, y - 14 * s, 200 * s, 28 * s, 8 * s);
+  ctx.fill();
+  circle(x, y + 2 * s, 40 * s, T.cream, T.beechD, 3 * s);
+  circle(x, y + 2 * s, 30 * s, T.blue);
+  ball(x, y - 10 * s, 10 * s, lit(T.blue, 0.4));
+  ball(x, y - 26 * s, 5 * s, lit(T.blue, 0.6));
+  // flower beds and trimmed trees in the four lawns
+  for (const [fx, fy] of [
+    [-62, -50],
+    [62, -50],
+    [-62, 50],
+    [62, 50],
+  ]) {
+    for (let i = 0; i < 5; i++) ball(x + (fx + (i - 2) * 9) * s, y + (fy + 18) * s, 4.5 * s, i % 2 ? T.yellow : T.cream);
+    peg(x + fx * s, y + fy * s, 0.95 * s);
+  }
+}

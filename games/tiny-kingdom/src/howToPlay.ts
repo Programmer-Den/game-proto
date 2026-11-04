@@ -38,11 +38,11 @@ const en: HowToPlay = {
     },
     {
       input: 'Island button',
-      action: 'Pick a campaign level, the island of the day, or type an island number; Feats there shows the feats and tile skins',
+      action: 'Pick a campaign level, the island of the day, a rival lord or type an island number; Puzzles there opens the puzzle islands, Feats the feats and tile skins',
     },
     {
       input: 'Sail on',
-      action: 'Once a kingdom is finished, settle the next island of its chain',
+      action: 'Once a kingdom is finished, settle the next island of its chain (Try again on a puzzle or against a rival)',
     },
   ],
   loop: [
@@ -63,6 +63,9 @@ const en: HowToPlay = {
     'Harbours also go on the coast and score each side facing the sea; a temple scores more the further it stands from towers.',
     'Sail on after a kingdom to a neighbouring island with the sea cut into its shape and a building found only there. Your harbours ship tiles to it, and its harbours pay +2 each at the end.',
     'Kingdom feats, like a farm with 3 lakes beside it, unlock new paints for the tiles.',
+    'Round 3 brings your kingdom its wonder, a 2x2 building (a cathedral, a great barn or royal gardens) that scores big for what stands around it. Keep a 2x2 patch of grass free for it.',
+    'Face a rival lord: after each of your tiles it places one of its own. Its buildings and yours score off each other, and the higher score wins.',
+    'Puzzle islands give a fixed island and a set pouch, with no rounds or gifts: place it all for up to three stars.',
   ],
 };
 
@@ -112,11 +115,11 @@ const de: HowToPlay = {
     },
     {
       input: 'Insel-Taste',
-      action: 'Ein Kampagnenlevel, die Insel des Tages oder eine Inselnummer wählen; dort zeigt Taten die Taten und Plättchenfarben',
+      action: 'Ein Kampagnenlevel, die Insel des Tages, einen Rivalen oder eine Inselnummer wählen; dort öffnet Rätsel die Rätselinseln, Taten die Taten und Plättchenfarben',
     },
     {
       input: 'Weitersegeln',
-      action: 'Nach einem fertigen Königreich die nächste Insel seiner Kette besiedeln',
+      action: 'Nach einem fertigen Königreich die nächste Insel seiner Kette besiedeln (Noch einmal bei einem Rätsel oder gegen einen Rivalen)',
     },
   ],
   loop: [
@@ -137,6 +140,9 @@ const de: HowToPlay = {
     'Häfen stehen auch an der Küste und zählen jede Seite zum Meer; ein Tempel bringt mehr, je weiter er von Türmen steht.',
     'Segle nach einem Königreich weiter zu einer Nachbarinsel, in die das Meer schneidet, mit einem Gebäude, das es nur dort gibt. Deine Häfen schicken ihr Plättchen, und ihre Häfen bringen am Ende je +2.',
     'Taten des Königreichs, etwa ein Acker mit 3 Seen daneben, schalten neue Farben für die Plättchen frei.',
+    'Runde 3 bringt deinem Königreich sein Wunder, ein 2x2-Gebäude (eine Kathedrale, eine Große Scheune oder einen Königsgarten), das viel für alles ringsum bringt. Halte ihm ein 2x2-Stück Gras frei.',
+    'Gegen einen Rivalen: Nach jedem deiner Plättchen legt er eines von sich. Seine und deine Gebäude punkten aneinander, und die höhere Punktzahl gewinnt.',
+    'Rätselinseln geben eine feste Insel und einen festen Beutel, ohne Runden oder Geschenke: Lege alles für bis zu drei Sterne.',
   ],
 };
 
