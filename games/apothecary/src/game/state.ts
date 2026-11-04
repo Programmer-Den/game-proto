@@ -300,6 +300,10 @@ export interface GameState {
   marketPick: HerbId;
   /** The town's shops bought after the charter, and the doctor's hands in them (see `town.ts`). */
   town: TownState;
+  /** The crown's latest royal request (AP17), or null before the first. */
+  royal: RoyalRequest | null;
+  /** How long hired craftsmen have worked at each refining table and cauldron, for their mastery (AP16). */
+  mastery: Partial<Record<StationId, number>>;
 }
 
 /**
@@ -751,6 +755,50 @@ export const wagonFor = (state: GameState, day: number): Wagon | null => {
 export const wagonHere = (state: GameState) => !!state.wagon && !state.wagon.sold && state.wagon.left > 0 && state.wagon.day === state.contract.day;
 
 /**
+ * Royal requests (AP17): every `ROYAL_EVERY`th day from `ROYAL_DAY` a royal courier waits across
+ * the street for `ROYAL_DAYS` days, asking for `ROYAL_NEED` (and one more every two weeks) of up to
+ * three potions. A tap hands over what the shelf holds of them, and the last one handed over pays
+ * `ROYAL_PREMIUM` times their price and reputation. Missing it costs nothing but the purse.
+ */
+export interface RoyalRequest {
+  day: number;
+  /** The last day the courier waits, to dusk. */
+  until: number;
+  wants: { potion: PotionId; need: number; made: number }[];
+  reward: number;
+  done: boolean;
+}
+export const ROYAL_DAY = 7;
+export const ROYAL_EVERY = 7;
+export const ROYAL_DAYS = 3;
+export const ROYAL_NEED = 4;
+export const ROYAL_PREMIUM = 2.5;
+export const ROYAL_REPUTATION = 10;
+export const isRoyalDay = (day: number) => day >= ROYAL_DAY && day % ROYAL_EVERY === 0;
+/** The royal request for `day`: the same in every game, up to three different potions customers ask for. */
+export const royalFor = (state: GameState, day: number): RoyalRequest | null => {
+  const potions = orderable(state);
+  if (potions.length === 0) return null;
+  const need = ROYAL_NEED + Math.floor(day / 14);
+  const picked = [...new Set([0, 1, 2].map((k) => potions[(day * 5 + k * 3) % potions.length]))];
+  const wants = picked.map((potion) => ({ potion, need, made: 0 }));
+  const reward = Math.round(wants.reduce((sum, w) => sum + potionPrice(state, w.potion) * w.need, 0) * ROYAL_PREMIUM);
+  return { day, until: day + ROYAL_DAYS - 1, wants, reward, done: false };
+};
+/** Whether the royal courier waits across the street now. */
+export const royalHere = (state: GameState) => !!state.royal && !state.royal.done && state.contract.day >= state.royal.day && state.contract.day <= state.royal.until;
+
+/**
+ * Master craftsmen (AP16): hired craftsmen grow better at a refining table or cauldron the longer
+ * they work it: after `MASTERY_MS` of work (10, 30 and 90 minutes) the station works `MASTERY_SPEED`
+ * faster per level.
+ */
+export const MASTERY_MS = [600_000, 1_800_000, 5_400_000];
+export const MASTERY_SPEED = 0.15;
+export const masteryLevel = (state: GameState, id: StationId) => MASTERY_MS.filter((ms) => (state.mastery[id] ?? 0) >= ms).length;
+export const masterySpeed = (state: GameState, id: StationId) => (state.craftsmen[id].level > 0 ? 1 + MASTERY_SPEED * masteryLevel(state, id) : 1);
+
+/**
  * The herb market at the outfitter: the doctor buys plants and refined goods for coins, or sells
  * them, at prices that move with the day and the weather. Rain makes plants cheap and a drought
  * dear; refined goods follow at half the swing. It opens with the garden pixies.
@@ -907,6 +955,8 @@ export function createInitialState(): GameState {
     wagon: null,
     marketPick: 'flour',
     town: createTown(),
+    royal: null,
+    mastery: {},
   };
   state.contract = contractFor(state, 1, 0);
   return state;

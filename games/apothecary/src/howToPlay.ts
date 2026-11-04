@@ -45,6 +45,9 @@ const en: HowToPlay = {
     'Once the town is cured its Town map opens: buy a bakery and more shops, each ten times dearer than the last, and supply the whole town.',
     'Every town shop runs like the apothecary: tips, regulars and its own reputation, the weather, market-day crowds, the blight and a daily contract.',
     'The districts on the Town map buy from your shelves every half minute: keep them supplied and their homes grow from cottages into houses and on up to castles. Fill every district with castles and the town becomes a city.',
+    'Once the town is a city, tap the heading over its districts to found the next town down the road: fresh districts whose homes pay more, and a town seal more.',
+    'Every seventh day a royal courier waits on the green right of the guild for three days, asking for a few of up to three potions: tap it to hand over what the shelf holds, for a royal reward.',
+    'Hired craftsmen grow into masters the longer they work a refining table or cauldron: each star makes it work faster.',
   ],
 };
 
@@ -91,6 +94,9 @@ const de: HowToPlay = {
     'Ist die Stadt geheilt, öffnet sich ihr Stadtplan: kauf eine Bäckerei und weitere Läden, jeder zehnmal teurer als der letzte, und beliefere die ganze Stadt.',
     'Jeder Laden in der Stadt läuft wie die Apotheke: Trinkgeld, Stammkundschaft und ein eigener Ruf, das Wetter, Andrang an Markttagen, die Fäule und ein täglicher Auftrag.',
     'Die Viertel auf dem Stadtplan kaufen jede halbe Minute aus deinen Regalen: versorge sie, und ihre Hütten wachsen zu Häusern und weiter bis zu Burgen. Sind alle Viertel voller Burgen, wird die Stadt zur Großstadt.',
+    'Ist die Stadt eine Großstadt, tipp auf die Überschrift über ihren Vierteln, um die nächste Stadt die Straße hinab zu gründen: neue Viertel, deren Häuser mehr zahlen, und ein Stadtsiegel mehr.',
+    'Jeden siebten Tag wartet ein königlicher Bote drei Tage lang auf der Wiese rechts der Gilde und will einige von bis zu drei Tränken: tipp ihn an, um zu geben, was im Regal steht, für eine königliche Belohnung.',
+    'Angestellte Handwerker werden zu Meistern, je länger sie an einem Arbeitstisch oder Kessel arbeiten: Jeder Stern lässt ihn schneller arbeiten.',
   ],
 };
 

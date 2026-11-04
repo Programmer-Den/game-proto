@@ -1,7 +1,7 @@
 import { byDifficulty } from '../../../../shared/settings';
 import { t } from '../i18n';
 import { routeMs } from '../scenes/shopLayout';
-import { DISTRICTS, GROW_ROUNDS, HAPPY, HAPPY_PULL, HOME_TIERS, MAX_HOMES, START_HOMES, SUPPLY_MS, UNHAPPY, districtAsks, type DistrictState, type Need } from './districts';
+import { DISTRICTS, HAPPY, HAPPY_PULL, HOME_TIERS, MAX_HOMES, START_HOMES, SUPPLY_MS, UNHAPPY, cityPay, createDistricts, districtAsks, growRounds, townIsCity, townName, type DistrictState, type Need } from './districts';
 import { FINE, isFine, type PotionId } from './items';
 import type { Feedback } from './sim';
 import {
@@ -508,7 +508,7 @@ function supplyNeed(state: GameState, need: Need): boolean {
       const [held] = shop.shelf.splice(at, 1);
       // The shelf's sign scales the price and a fine one pays more, as for a customer.
       const sign = SIGN_PAY[shopSignOf(shop, need)];
-      shop.till += Math.round(price * (1 + COUNTER_PAY * shop.counter.level.level) * shopPriceBoost(shop) * sign * (isFineGood(held) ? FINE_BONUS : 1));
+      shop.till += Math.round(price * (1 + COUNTER_PAY * shop.counter.level.level) * shopPriceBoost(shop) * sign * (isFineGood(held) ? FINE_BONUS : 1) * cityPay(state.town.cities ?? 0));
       return true;
     }
     return false;
@@ -518,7 +518,7 @@ function supplyNeed(state: GameState, need: Need): boolean {
   if (at < 0) return false;
   const [held] = shelf.splice(at, 1);
   // The shelf's sign scales the price and a fine one pays more, as for a customer.
-  state.counter.till += Math.round(potionPrice(state, need) * SIGN_PAY[signOf(state, need)] * (isFine(held) ? FINE_BONUS : 1));
+  state.counter.till += Math.round(potionPrice(state, need) * SIGN_PAY[signOf(state, need)] * (isFine(held) ? FINE_BONUS : 1) * cityPay(state.town.cities ?? 0));
   return true;
 }
 
@@ -546,15 +546,29 @@ function runDistrict(state: GameState, d: DistrictState, i: number, dt: number) 
     if (d.happiness >= HAPPY) d.growth = Math.max(0, d.growth) + 1;
     else if (d.happiness <= UNHAPPY) d.growth = Math.min(0, d.growth) - 1;
     else d.growth = 0;
-    if (d.growth >= GROW_ROUNDS) {
+    const rounds = growRounds(state.town.cities ?? 0);
+    if (d.growth >= rounds) {
       d.growth = 0;
       if (d.homes < MAX_HOMES) d.homes++;
       else if (d.tier < HOME_TIERS.length - 1) d.tier++;
-    } else if (d.growth <= -GROW_ROUNDS) {
+    } else if (d.growth <= -rounds) {
       d.growth = 0;
       d.homes = Math.max(START_HOMES, d.homes - 1);
     }
   }
+}
+
+/**
+ * Founds the next town down the road once this one is a city: its districts start over from three
+ * cottages in Market Row, the shops stay, and the city made earns a town seal (raising every
+ * potion's price). Homes in later towns pay more and take longer to grow.
+ */
+export function foundNextTown(state: GameState): Feedback | null {
+  if (!townIsCity(state.town.districts)) return null;
+  state.town.cities = (state.town.cities ?? 0) + 1;
+  state.town.districts = createDistricts();
+  state.seals++;
+  return [t('townFounded', { town: t(townName(state.town.cities)!) })];
 }
 
 /** The districts open so far, with their defs. */
