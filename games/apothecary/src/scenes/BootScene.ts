@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { bakeAlchemy } from '../art/alchemy';
 import { bakeDoctor } from '../art/doctor';
 import { bakeGarden } from '../art/garden';
 import { bakeGround } from '../art/ground';
@@ -27,6 +28,7 @@ export class BootScene extends Phaser.Scene {
     bakeGround(this);
     bakeUi(this);
     bakeTown(this);
+    bakeAlchemy(this);
 
     this.scene.start('Game');
   }

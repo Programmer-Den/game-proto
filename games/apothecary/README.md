@@ -330,6 +330,34 @@ and each star makes the station work 15% faster.
 
 ![A master craftsman with two stars at the refining table](docs/screenshots/master-craftsman.webp)
 
+**The alchemy bench.** Once the study has taught all six recipes, an alchemy bench stands on the
+grass north of the first line's yard. Stand still on its green marker to put refined goods on it
+(up to 6 of each), then tap the bench: put two or three ingredients in the bowl and press Mix. Six
+potions wait to be discovered, each from its own mix (in any order), and the panel hints at each
+one ("A forest herb and something milled"). A right mix discovers its potion and puts it in the
+bench's book, where Make mixes it again from what is at hand; a wrong one makes a Murky Draught
+worth 3 coins. Bench potions are sold from the panel to the town's collectors for 45 to 170 coins
+(town seals raise them like every potion), and the Fever Cure and Plague Bane can instead be given
+to the town to end the plague's current stage at once.
+
+![The alchemy bench's panel: the bowl, the ingredients at hand and two potions discovered](docs/screenshots/alchemy-bench.webp)
+
+**Herb expeditions.** Every new potion needs a wild herb that only grows out of town. Hire a
+courier at the post beside the bench (400 coins, once), tap the post and send them to the forest
+(3 minutes, Silverleaf), the marsh (5 minutes, Bogbloom) or the mountains (8 minutes, Frostcap).
+The trip runs on game time, which the time away plays too, so the courier comes back with 3 of the
+herb even while the game is closed. The satchel holds up to 12 of each.
+
+![The alchemy bench and the courier's post north of the yard, the courier out in the mountains](docs/screenshots/courier-post.webp)
+
+**Shop decor.** Once you have joined the guild, tap Shop decor on the shop's front wall to buy
+decor for the street, each once and for good, each lifting the reputation a little when it goes up:
+a painted sign (200 coins, tips a quarter bigger), lanterns (450, customers wait a fifth longer),
+a herb arch over the path (900, regulars come back half again as often) and a fountain (1,800, a
+customer who walks off costs half the reputation).
+
+![The street with the painted sign, the fountain, the herb arch and the lanterns](docs/screenshots/shop-decor.webp)
+
 The **guild** in the market below the second line sells upgrades for the rest of the apothecary:
 growth makes every garden grow a quarter faster per level (20, then 40 coins), pixies fly half again
 as fast per level, carrying more goods a second (30, then 60), storage lets every pallet and shelf
@@ -610,5 +638,6 @@ All paths are inside `games/apothecary/`.
   input to the rules.
 - `src/art/`: all the art, painted in code on canvases at startup with the watercolour and ink
   helpers in `paint.ts` (no image files): the plague doctor, townsfolk, items, gardens, stations,
-  the study, shop shelves, pixies, floor markers, the ground and the parchment interface cards.
-- `src/ui/`: small reusable display pieces (icon rows, progress bars, pallets, shop shelves) and the recipe and settings panels.
+  the study, shop shelves, pixies, floor markers, the ground, the parchment interface cards, and the
+  alchemy bench, courier's post, wild herbs and shop decor (`alchemy.ts`).
+- `src/ui/`: small reusable display pieces (icon rows, progress bars, pallets, shop shelves), the recipe and settings panels and `Board`, the panel the bench, the courier's post and the decor board open.

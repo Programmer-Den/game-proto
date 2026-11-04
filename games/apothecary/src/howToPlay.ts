@@ -48,6 +48,9 @@ const en: HowToPlay = {
     'Once the town is a city, tap the heading over its districts to found the next town down the road: fresh districts whose homes pay more, and a town seal more.',
     'Every seventh day a royal courier waits on the green right of the guild for three days, asking for a few of up to three potions: tap it to hand over what the shelf holds, for a royal reward.',
     'Hired craftsmen grow into masters the longer they work a refining table or cauldron: each star makes it work faster.',
+    'Once the study has taught every recipe, the alchemy bench opens north of the yard: drop refined goods on it, tap it and mix two or three ingredients. The right mix discovers a new potion that sells well or cures a plague stage at once; a wrong one makes a cheap Murky Draught.',
+    "Hire a courier at the post beside the bench and send them to the forest, the marsh or the mountains: a few minutes later, even with the game closed, they bring back a rare wild herb for the bench.",
+    'Once you have joined the guild, tap Shop decor on the shop front to put up a painted sign, lanterns, a herb arch and a fountain: bigger tips, more patient customers, more regulars and walk-offs that cost less reputation.',
   ],
 };
 
@@ -97,6 +100,9 @@ const de: HowToPlay = {
     'Ist die Stadt eine Großstadt, tipp auf die Überschrift über ihren Vierteln, um die nächste Stadt die Straße hinab zu gründen: neue Viertel, deren Häuser mehr zahlen, und ein Stadtsiegel mehr.',
     'Jeden siebten Tag wartet ein königlicher Bote drei Tage lang auf der Wiese rechts der Gilde und will einige von bis zu drei Tränken: tipp ihn an, um zu geben, was im Regal steht, für eine königliche Belohnung.',
     'Angestellte Handwerker werden zu Meistern, je länger sie an einem Arbeitstisch oder Kessel arbeiten: Jeder Stern lässt ihn schneller arbeiten.',
+    'Hat die Studierstube jedes Rezept gelehrt, öffnet nördlich des Hofs der Alchemietisch: leg verarbeitete Waren darauf, tipp ihn an und misch zwei oder drei Zutaten. Die richtige Mischung entdeckt einen neuen Trank, der sich gut verkauft oder eine Seuchenstufe sofort heilt; eine falsche ergibt einen billigen Trüben Trank.',
+    'Stell am Posten neben dem Tisch einen Boten an und schick ihn in den Wald, ins Moor oder in die Berge: ein paar Minuten später, auch bei geschlossenem Spiel, bringt er ein seltenes wildes Kraut für den Tisch.',
+    'Bist du der Gilde beigetreten, tipp vorn am Laden auf Ladenschmuck, um ein bemaltes Schild, Laternen, einen Kräuterbogen und einen Brunnen aufzustellen: mehr Trinkgeld, geduldigere Kundschaft, mehr Stammkundschaft und weniger Rufverlust, wenn jemand geht.',
   ],
 };
 

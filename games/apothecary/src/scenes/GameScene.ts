@@ -135,6 +135,39 @@ import { Pallet } from '../ui/Pallet';
 import { Shelf } from '../ui/Shelf';
 import { RecipeBook } from '../ui/RecipeBook';
 import { Settings } from '../ui/Settings';
+import { Board, type BoardKit } from '../ui/Board';
+import { alchemyTexture } from '../art/alchemy';
+import {
+  BENCH_STOCK,
+  COURIER_COST,
+  DECOR,
+  DECOR_IDS,
+  MIXES,
+  MIX_MIN,
+  MURKY,
+  PLACES,
+  TRIPS,
+  WILD_HERBS,
+  addToMix,
+  alchemyName,
+  alchemyOpen,
+  brewedPrice,
+  buyDecor,
+  canCure,
+  clearMix,
+  decorOpen,
+  dropAtBench,
+  hasDecor,
+  hireCourier,
+  mixAgain,
+  mixNow,
+  onHand,
+  sellBrewed,
+  sendCourier,
+  useCure,
+  type Brewed,
+  type Ingredient,
+} from '../game/alchemy';
 import { ProgressBar } from '../ui/ProgressBar';
 import { COIN, itemName, potionCount, t, type TextKey } from '../i18n';
 import { coined } from '../ui/coins';
@@ -171,6 +204,9 @@ import {
   LINE2_BELTS,
   WAGON,
   ROYAL,
+  BENCH,
+  COURIER_POST,
+  DECOR_SPOTS,
   customerPosition,
   plotPosition,
   type StationMarkers,
@@ -360,6 +396,8 @@ export class GameScene extends Phaser.Scene {
   private recipes!: RecipeBook;
   /** The settings panel opened from the top bar: the hub's settings and a new game. */
   private settings!: Settings;
+  /** The alchemy bench's, the courier's post's and the decor board's panels (AP18 to AP20). */
+  private boards: Board[] = [];
   /** Set once a new game is confirmed, so nothing saves the old one before the scene restarts. */
   private startingOver = false;
   /** Per-frame view updates, each reading from `state`. */
@@ -423,6 +461,8 @@ export class GameScene extends Phaser.Scene {
     this.createWagon();
     this.createRoyal();
     this.createHerbMarket();
+    this.createAlchemy();
+    this.createDecor();
     this.createOrderStrip();
     this.views.push(addWeather(this, WORLD, WEATHER_DEPTH, () => this.state));
     this.createAwayChip();
@@ -524,9 +564,10 @@ export class GameScene extends Phaser.Scene {
 
   /** Closes any open panel; true if one was open, so the tap that closed it does nothing else. */
   private closePanels() {
-    const open = this.recipes.visible || this.settings.visible || !!this.winPanel;
+    const open = this.recipes.visible || this.settings.visible || !!this.winPanel || this.boards.some((b) => b.visible);
     this.recipes.toggle(false);
     this.settings.toggle(false);
+    for (const board of this.boards) board.toggle(false);
     this.winPanel?.destroy();
     this.winPanel = null;
     return open;
@@ -1749,6 +1790,221 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  /** A tappable world object that opens a board: the tap closes any open panel first, and opens this one only if none was. */
+  private opensBoard(target: Phaser.GameObjects.GameObject, board: Board) {
+    target.setInteractive({ useHandCursor: true }).on('pointerdown', (_p: Phaser.Input.Pointer, _x: number, _y: number, e: Phaser.Types.Input.EventData) => {
+      e.stopPropagation();
+      if (this.pinching()) return;
+      if (this.closePanels()) return;
+      ui('click');
+      board.toggle(true);
+    });
+  }
+
+  /** Shows feedback by the doctor and plays `name`, or the refuse buzz when there is none. */
+  private acted(feedback: Feedback | null, name: SfxName | 'coin' | 'click') {
+    if (!feedback) {
+      ui('refuse');
+      return;
+    }
+    if (name === 'coin' || name === 'click') ui(name);
+    else sfx(name);
+    this.showFeedback(feedback);
+  }
+
+  /**
+   * The alchemy bench (AP18) and the courier's post (AP19) on the grass north of the first line, once
+   * the study has taught every recipe. The bench's drop marker takes refined goods; a tap on the bench
+   * opens its panel to mix, make again, sell and cure. A tap on the post opens the courier's panel.
+   */
+  private createAlchemy() {
+    const open = () => alchemyOpen(this.state);
+    const style = { fontFamily: SERIF, fontSize: '12px', fontStyle: 'bold', color: INK, stroke: TEXT_HALO, strokeThickness: 3 };
+    const bench = new Board(this, UI_DEPTH + 1, 570, (kit) => this.drawBench(kit));
+    const courier = new Board(this, UI_DEPTH + 1, 420, (kit) => this.drawCourier(kit));
+    this.boards.push(bench, courier);
+    this.addMarker(BENCH.drop, 'pad-in', t('benchDrop'), () => this.sounded(dropAtBench(this.state), 'drop'), () => !open());
+    this.once(open, () => {
+      this.label(BENCH.label.x, BENCH.label.y, t('alchemyBench'));
+      this.opensBoard(this.addObstacle(BENCH.x, BENCH.y, 'alchemy-bench', 84, 16), bench);
+      const found = this.add.text(BENCH.x, BENCH.y + 34, '', style).setOrigin(0.5, 0).setDepth(BENCH.y + 0.2);
+      this.label(COURIER_POST.label.x, COURIER_POST.label.y, t('courierPost'));
+      this.opensBoard(this.addObstacle(COURIER_POST.x, COURIER_POST.y, 'courier-post', 14, 10), courier);
+      const runner = fit(this.add.image(COURIER_POST.home.x, COURIER_POST.home.y, customerTexture(5)).setOrigin(0.5, 1).setDepth(COURIER_POST.home.y));
+      const status = this.add.text(COURIER_POST.x, COURIER_POST.y + 40, '', style).setOrigin(0.5, 0).setDepth(COURIER_POST.y + 0.2);
+      let trips = this.state.alchemy.courier.trips;
+      let lastTrip = this.state.alchemy.courier.trip?.to;
+      let second = -1;
+      this.views.push(() => {
+        const lab = this.state.alchemy;
+        found.setText(t('benchFound', { n: lab.found.length, total: MIXES.length }));
+        const trip = lab.courier.trip;
+        runner.setVisible(lab.courier.hired && !trip);
+        status.setText(!lab.courier.hired ? t('courierTapHire') : trip ? t('courierBackIn', { time: clock(trip.left) }) : t('courierTapSend'));
+        // Back from a trip: say what came home.
+        if (lab.courier.trips > trips) {
+          ui('coin');
+          const last = lastTrip ?? 'forest';
+          this.showFeedback([t('courierBack', { n: TRIPS[last].brings, herb: alchemyName(TRIPS[last].herb) })]);
+          bench.refresh();
+        }
+        trips = lab.courier.trips;
+        if (trip) lastTrip = trip.to;
+        // The courier's panel counts the trip down.
+        const now = Math.ceil((trip?.left ?? 0) / 1000);
+        if (now !== second) {
+          second = now;
+          courier.refresh();
+        }
+      });
+    });
+  }
+
+  /** The bench's panel: the bowl and what can go in it, then every potion to discover, found or hinted. */
+  private drawBench(kit: BoardKit) {
+    const state = this.state;
+    const lab = state.alchemy;
+    const w = kit.width;
+    kit.heading(t('alchemyBench'));
+    kit.text(16, t('inTheBowl'), { bold: true });
+    if (lab.mix.length === 0) kit.text(110, t('bowlEmpty'), { italic: true, size: 12, color: '#6a5440' });
+    lab.mix.forEach((id, k) => kit.icon(118 + k * 26, alchemyTexture(id)));
+    kit.button(w - 112, t('mixButton'), () => {
+      const result = mixNow(state);
+      if (result) this.acted(result.feedback, result.found ? 'upgrade' : 'bubble');
+    }, lab.mix.length >= MIX_MIN, 56);
+    kit.button(w - 46, t('clearButton'), () => clearMix(state), lab.mix.length > 0, 56);
+    kit.next(30);
+    // What can go in the bowl: refined goods dropped on the bench, wild herbs from the courier.
+    const rows: Ingredient[][] = [REFINED, [...WILD_HERBS]];
+    for (const row of rows) {
+      row.forEach((id, k) => {
+        const x = 24 + k * 182;
+        const n = onHand(state, id);
+        kit.icon(x, alchemyTexture(id), 1.25, n > 0 ? 1 : 0.4);
+        kit.text(x + 14, `${alchemyName(id)} ×${n}`, { size: 12, color: n > 0 ? INK : '#8a7a68' });
+        kit.button(x + 160, '+', () => addToMix(state, id), n > 0 && lab.mix.length < 3, 24);
+      });
+      kit.next();
+    }
+    kit.text(16, t('benchHint', { n: BENCH_STOCK }), { italic: true, size: 11, color: '#6a5440' });
+    kit.next(24);
+    kit.heading(t('discoveries', { n: lab.found.length, total: MIXES.length }));
+    for (const mix of MIXES) {
+      const known = lab.found.includes(mix.id);
+      const have = lab.rack[mix.id] ?? 0;
+      if (!known) {
+        kit.icon(24, 'alchemy-murkyDraught', 1.25, 0.25);
+        kit.text(40, '???', { bold: true, color: '#8a7a68' });
+        kit.text(96, t(`${mix.id}Hint`), { italic: true, size: 12, color: '#6a5440' });
+        kit.next();
+        continue;
+      }
+      mix.inputs.forEach((id, k) => kit.icon(18 + k * 20, alchemyTexture(id), 1));
+      kit.icon(84, alchemyTexture(mix.id));
+      kit.text(98, t(mix.id), { bold: true, size: 12 });
+      kit.text(228, mix.cures ? t('curesStage') : t('coinPrice', { n: brewedPrice(state, mix.id) }), { size: 11, color: '#7a4a10' });
+      kit.text(w - 196, `×${have}`, { bold: true, right: true });
+      kit.button(w - 164, t('makeButton'), () => this.acted(mixAgain(state, mix.id), 'bubble'), true, 50);
+      kit.button(w - 104, t('sellButton'), () => this.acted(sellBrewed(state, mix.id), 'cascade'), have > 0, 62);
+      if (mix.cures) kit.button(w - 44, t('cureButton'), () => this.acted(useCure(state, mix.id), 'plagueUp'), have > 0 && canCure(state), 44);
+      kit.next();
+    }
+    const murky = lab.rack[MURKY] ?? 0;
+    if (murky > 0) {
+      kit.icon(84, alchemyTexture(MURKY));
+      kit.text(98, alchemyName(MURKY), { bold: true, size: 12 });
+      kit.text(228, t('coinPrice', { n: brewedPrice(state, MURKY as Brewed) }), { size: 11, color: '#7a4a10' });
+      kit.text(w - 196, `×${murky}`, { bold: true, right: true });
+      kit.button(w - 104, t('sellButton'), () => this.acted(sellBrewed(state, MURKY), 'cascade'), true, 62);
+      kit.next();
+    }
+  }
+
+  /** The courier's panel: hire them, then send them out to one of three places for its wild herb. */
+  private drawCourier(kit: BoardKit) {
+    const state = this.state;
+    const courier = state.alchemy.courier;
+    const w = kit.width;
+    kit.heading(t('courierPost'));
+    if (!courier.hired) {
+      kit.text(w / 2, t('courierPitch'), { size: 12, centre: true });
+      kit.next();
+      kit.text(w / 2 - 20, t('coinPrice', { n: COURIER_COST }), { bold: true, right: true });
+      kit.button(w / 2 + 30, t('hireButton'), () => this.acted(hireCourier(state), 'upgrade'), state.coins >= COURIER_COST, 56);
+      kit.next(30);
+      return;
+    }
+    const trip = courier.trip;
+    kit.text(w / 2, trip ? t('courierAway', { place: t(trip.to), time: clock(trip.left) }) : t('courierHome'), { italic: true, size: 12, centre: true });
+    kit.next();
+    for (const place of PLACES) {
+      const { herb, ms, brings } = TRIPS[place];
+      kit.icon(24, alchemyTexture(herb));
+      kit.text(40, t(place), { bold: true });
+      kit.text(140, t('tripLine', { n: brings, herb: alchemyName(herb), min: ms / 60_000 }), { size: 12 });
+      kit.button(w - 40, t('sendButton'), () => this.acted(sendCourier(state, place), 'click'), !trip, 56);
+      kit.next(28);
+    }
+    kit.text(16, t('satchel'), { bold: true });
+    WILD_HERBS.forEach((herb, k) => {
+      kit.icon(100 + k * 90, alchemyTexture(herb));
+      kit.text(114 + k * 90, `×${state.alchemy.wild[herb] ?? 0}`, { size: 12 });
+    });
+    kit.next();
+  }
+
+  /**
+   * The shop decor (AP20): once the guild is joined, a decor board on the shop's front wall opens a
+   * panel to buy a painted sign, lanterns, a herb arch and a fountain, each drawn on the street once
+   * bought.
+   */
+  private createDecor() {
+    const board = new Board(this, UI_DEPTH + 1, 460, (kit) => this.drawDecor(kit));
+    this.boards.push(board);
+    const { board: at } = DECOR_SPOTS;
+    const name = this.add
+      .text(at.x, at.y, t('shopDecor'), { fontFamily: SERIF, fontSize: '13px', fontStyle: 'bold', color: INK })
+      .setOrigin(0.5)
+      .setDepth(-900);
+    const card = this.card(at.x, at.y, 'sign', signTexture(this, name.width + 16)).setDepth(-910);
+    this.opensBoard(card, board);
+    const pieces = {
+      paintedSign: [DECOR_SPOTS.paintedSign],
+      lanterns: DECOR_SPOTS.lanterns,
+      herbArch: [DECOR_SPOTS.herbArch],
+      fountain: [DECOR_SPOTS.fountain],
+    };
+    const images = DECOR_IDS.flatMap((id) =>
+      pieces[id].map((p) => ({ id, image: fit(this.add.image(p.x, p.y, `decor-${id}`).setOrigin(0.5, 1).setDepth(p.y)).setVisible(false) })),
+    );
+    let drawn = '';
+    this.views.push(() => {
+      const key = `${decorOpen(this.state)}:${this.state.decor.join()}`;
+      if (key === drawn) return;
+      drawn = key;
+      name.setVisible(decorOpen(this.state));
+      card.setVisible(decorOpen(this.state));
+      for (const { id, image } of images) image.setVisible(hasDecor(this.state, id));
+    });
+  }
+
+  private drawDecor(kit: BoardKit) {
+    const state = this.state;
+    const w = kit.width;
+    kit.heading(t('shopDecor'));
+    for (const id of DECOR_IDS) {
+      kit.text(16, t(id), { bold: true });
+      kit.text(120, t(`${id}Text`), { size: 12 });
+      if (hasDecor(state, id)) kit.text(w - 16, t('decorUp'), { italic: true, size: 12, right: true, color: '#2f6a1a' });
+      else {
+        kit.text(w - 78, t('coinPrice', { n: DECOR[id].cost }), { bold: true, size: 12, right: true });
+        kit.button(w - 40, t('buyButton'), () => this.acted(buyDecor(state, id), 'upgrade'), state.coins >= DECOR[id].cost, 48);
+      }
+      kit.next(28);
+    }
+  }
+
   /**
    * The town card under the top bar, right of the contract: today's weather from the almanac and what
    * it does, the street's reputation as a bar, and tomorrow's weather, or on a market day how its
@@ -2567,3 +2823,9 @@ function walkTowards(obj: Phaser.GameObjects.Image, to: Point, step: number, lea
 function bubbleWidth(n: number) {
   return 11 + n * BUBBLE.icon;
 }
+
+/** A time left as minutes and seconds, such as 2:05. */
+const clock = (ms: number) => {
+  const s = Math.max(0, Math.ceil(ms / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+};

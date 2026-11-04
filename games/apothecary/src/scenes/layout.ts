@@ -192,6 +192,26 @@ export const WAGON = { x: 950, y: 820, want: { x: 950, y: 728 }, left: { x: 950,
  */
 export const ROYAL = { x: 1562, y: 840, title: 740, wants: 760, left: 780 };
 /**
+ * The alchemy bench (AP18) on the grass north of the first line's yard, its label above it and the
+ * marker where the doctor drops refined goods on it to its right; a tap on the bench opens it.
+ */
+export const BENCH = { x: 330, y: 150, label: { x: 330, y: 108 }, drop: { x: 430, y: 150 } };
+/** The courier's post (AP19) on the same grass, right of the bench: its foot, its label and where the courier waits at home. */
+export const COURIER_POST = { x: 560, y: 160, label: { x: 560, y: 108 }, home: { x: 598, y: 166 } };
+/**
+ * The shop decor (AP20) on the street in front of the shop: the tappable decor board on the front
+ * wall right of the street door, the painted sign on its post right of the street path with the
+ * fountain beside it (both above the merchant wagon's lines), the herb arch over the path and the
+ * lanterns either side of it further down. Each spot is the piece's feet.
+ */
+export const DECOR_SPOTS = {
+  board: { x: SHOP.x + SHOP.w - 52, y: SHOP.y + SHOP.h },
+  paintedSign: { x: 898, y: 718 },
+  fountain: { x: 960, y: 718 },
+  herbArch: { x: 840, y: 744 },
+  lanterns: [{ x: 800, y: 832 }, { x: 880, y: 832 }],
+};
+/**
  * The herb market below the outfitter: its stall, the marker to sell plants and refined goods, the
  * marker to buy the good its tappable sign shows, and that sign above the buy marker.
  */
