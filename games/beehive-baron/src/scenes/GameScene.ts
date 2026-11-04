@@ -6,14 +6,40 @@ import { BEE_TEX, WASP_TEX } from '../art/bees';
 import { SONG, sfx, type SoundName } from '../audio';
 import { LIVE, SEASON_TINT } from '../art/palette';
 import { CARD_PAD, FLOWER_TEX, JAR_TEX, meadowOrigin } from '../art/scenery';
+import { BOOK_FROM, CITIES, type Ask } from '../game/book';
+import { BREEDS, BREED_MAX, TRAITS } from '../game/breeds';
 import { CONTRACTS_FROM } from '../game/contracts';
+import { ESTATE_HIVES, plotOf } from '../game/estate';
 import { MEAD_POINTS, classesFor, fairGold } from '../game/fair';
 import { HONEY, KINDS, type Kind } from '../game/honey';
 import { CASK_JARS, MAX_CASKS, MEAD_MULT } from '../game/mead';
 import { MEADOWS } from '../game/meadows';
 import { ORDERS_FROM } from '../game/orders';
 import { clearProgress, loadProgress, saveProgress } from '../game/save';
-import { acceptContract, build, buildBrood, buy, canPay, cask, caskKind, catchSwarm, enterFair, enterMead, forage, gatherAway, harvest, send, sell, swat, tick } from '../game/sim';
+import {
+  acceptContract,
+  breed,
+  build,
+  buildBrood,
+  buy,
+  buyPlot,
+  canPay,
+  canSupply,
+  cask,
+  caskKind,
+  catchSwarm,
+  cutComb,
+  enterFair,
+  enterMead,
+  forage,
+  gatherAway,
+  harvest,
+  send,
+  sell,
+  supply,
+  swat,
+  tick,
+} from '../game/sim';
 import {
   AWAY_CAP,
   BROOD_MS,
@@ -50,19 +76,22 @@ import {
   seasonLeft,
   sharedEdges,
   shelfValue,
+  stealMs,
   withWax,
   type Bee,
   type GameState,
 } from '../game/state';
-import { CATCH_PRICE, QUEENS, QUEEN_IDS, SWARM_MS } from '../game/swarm';
+import { CATCH_PRICE, MAX_HIVES, QUEENS, QUEEN_IDS, SWARM_MS } from '../game/swarm';
 import { TIRE_MS } from '../game/tired';
 import { UPGRADES, nextPrice, type UpgradeId } from '../game/upgrades';
-import { WASP_IN_MS, WASP_OUT_MS, WASP_STEAL_MS, type Wasp } from '../game/wasps';
+import { WASP_IN_MS, WASP_OUT_MS, type Wasp } from '../game/wasps';
 import { t } from '../i18n';
 import { checkTrophies } from '../trophies/check';
 import { Button } from '../ui/Button';
 import {
   AWAY,
+  BOOK,
+  BOOK_CARD,
   CASK,
   COMB,
   CONTRACT,
@@ -158,7 +187,9 @@ export class GameScene extends Phaser.Scene {
   private placing = false;
   /** Whether the next tap on a capped cell enters its honey in the fair (the fair card arms it). */
   private entering = false;
-  /** The hive whose comb is shown (0 or 1); the tabs on the roof switch it. */
+  /** Whether the next tap on a capped cell cuts it into comb honey for the buyer's book (the book's Cut comb button arms it). */
+  private cutting = false;
+  /** The hive whose comb is shown (0 to 3); the tabs on the roof switch it. */
   private hive = 0;
   private tabs: { root: Phaser.GameObjects.Container; card: Phaser.GameObjects.Image; label: Phaser.GameObjects.Text }[] = [];
   private seasonTint!: Phaser.GameObjects.Rectangle;
@@ -173,6 +204,13 @@ export class GameScene extends Phaser.Scene {
   private endCard!: { root: Phaser.GameObjects.Container; detail: Phaser.GameObjects.Text };
   /** The card that asks which queen the caught swarm gets, over everything. */
   private queenCard!: { root: Phaser.GameObjects.Container; buttons: Button[] };
+  /** The card that breeds a trait into the queen line after a fair's gold. */
+  private breedCard!: { root: Phaser.GameObjects.Container; sub: Phaser.GameObjects.Text; buttons: Button[] };
+  /** The chip that buys the estate's next plot, in the swarm chip's place. */
+  private plot!: { root: Phaser.GameObjects.Container; text: Phaser.GameObjects.Text; detail: Phaser.GameObjects.Text };
+  /** The buyer's book chip and the card it opens. */
+  private bookChip!: { root: Phaser.GameObjects.Container; title: Phaser.GameObjects.Text; detail: Phaser.GameObjects.Text };
+  private bookCard!: { root: Phaser.GameObjects.Container; title: Phaser.GameObjects.Text; sub: Phaser.GameObjects.Text; rows: Button[]; cut: Button };
   private goalZone!: Phaser.GameObjects.Zone;
   private market!: {
     root: Phaser.GameObjects.Container;
@@ -249,7 +287,8 @@ export class GameScene extends Phaser.Scene {
    * Where the controls are on screen, so the playthrough test can tap like a player: the Send and
    * Sell buttons, each comb cell (of the comb shown), each shop button (in `SHOP` order), each
    * market entry (by kind), each wasp now in the air (by id), the order and contract cards, the
-   * swarm chip, the goal (or fair) card and the hive tabs.
+   * swarm chip, the goal (or fair) card, the hive tabs, the plot chip, the buyer's book chip, its
+   * rows and Cut comb button (while the book card is open) and the breed card's buttons by trait.
    */
   spots() {
     return {
@@ -266,7 +305,12 @@ export class GameScene extends Phaser.Scene {
       contract: { x: CONTRACT.x, y: CONTRACT.y },
       swarm: { x: SWARM.x + SWARM.w / 2, y: SWARM.y + SWARM.h / 2 },
       goal: { x: GOAL.x + GOAL.w / 2, y: GOAL.y + GOAL.h / 2 },
-      tabs: [0, 1].map(hiveTab),
+      tabs: [...Array(ESTATE_HIVES).keys()].map(hiveTab),
+      plot: { x: SWARM.x + SWARM.w / 2, y: SWARM.y + SWARM.h / 2 },
+      book: { x: BOOK.x + BOOK.w / 2, y: BOOK.y + BOOK.h / 2 },
+      asks: this.bookCard.rows.map((b) => ({ x: b.root.x, y: b.root.y })),
+      cut: { x: this.bookCard.cut.root.x, y: this.bookCard.cut.root.y },
+      breeds: Object.fromEntries(TRAITS.map((k, i) => [k, { x: this.breedCard.buttons[i].root.x, y: this.breedCard.buttons[i].root.y }])),
     };
   }
 
@@ -276,6 +320,7 @@ export class GameScene extends Phaser.Scene {
     this.waspAt.clear();
     this.placing = false;
     this.entering = false;
+    this.cutting = false;
     this.hive = 0;
     this.tabs = [];
     this.casks = [];
@@ -340,7 +385,7 @@ export class GameScene extends Phaser.Scene {
     SHOP.forEach((item, i) => {
       const at = shopSpot(i);
       const onClick = () =>
-        item === 'brood' ? ((this.placing = !this.placing), ui('click')) : item === 'cask' ? this.act(cask(this.state)) : this.act(buy(this.state, item), 'buy');
+        item === 'brood' ? ((this.placing = !this.placing), (this.cutting = false), ui('click')) : item === 'cask' ? this.act(cask(this.state)) : this.act(buy(this.state, item), 'buy');
       this.shopButtons.set(item, new Button(this, at.x, at.y, SHOP_BUTTONS.w, SHOP_BUTTONS.h, onClick));
     });
     this.createOrder();
@@ -351,8 +396,11 @@ export class GameScene extends Phaser.Scene {
     this.createSwarm();
     this.createHud();
     this.createReset();
+    this.createPlot();
+    this.createBook();
     this.createEnd();
     this.createQueenCard();
+    this.createBreedCard();
 
     // Nectar the bees gathered while the page was closed, capped; save at once so a reload does not count it twice.
     const gained = progress.seen > 0 ? gatherAway(this.state, Date.now() - progress.seen) : 0;
@@ -404,6 +452,8 @@ export class GameScene extends Phaser.Scene {
     this.drawOrder();
     this.drawContract();
     this.drawSwarm();
+    this.drawPlot();
+    this.drawBook();
     this.drawQueenCard();
     this.drawEvents();
     this.drawGoal();
@@ -457,6 +507,11 @@ export class GameScene extends Phaser.Scene {
     const slot = this.hive * SLOTS + local;
     const cell = this.state.cells[slot];
     if (cell !== null) {
+      if (this.cutting) {
+        if (!cutComb(this.state, slot)) return ui('refuse');
+        this.cutting = false;
+        return this.save();
+      }
       if (!this.entering) return this.act(harvest(this.state, slot));
       if (!enterFair(this.state, slot)) return ui('refuse');
       this.entering = false;
@@ -511,7 +566,7 @@ export class GameScene extends Phaser.Scene {
         image.setTexture(`cell-ripe-${kind}`);
         // A cream arc goes round as the nectar ripens into honey.
         // Clamped: a cell that started ripening before the Heather Moor sped it up has more time left than `ripenTime` now.
-        const done = Phaser.Math.Clamp(1 - cell.ripenMs / ripenTime(s), 0, 1);
+        const done = Phaser.Math.Clamp(1 - cell.ripenMs / ripenTime(s, slot), 0, 1);
         g.lineStyle(3.5, LIVE.ripenArc, 0.95).beginPath().arc(c.x, c.y, 12, -Math.PI / 2, -Math.PI / 2 + done * Math.PI * 2).strokePath();
       } else {
         image.setTexture(`cell-capped-${kind}`);
@@ -521,14 +576,26 @@ export class GameScene extends Phaser.Scene {
           label.setText(t('points', { n: fairScore(s, slot) }));
           if (label.style.color !== '#1f4a18') label.setColor('#1f4a18');
           label.setAlpha(1);
+        } else if (this.cutting) {
+          // While Cut comb is armed, each capped cell is outlined to cut.
+          g.lineStyle(3, LIVE.fairPick, pulse).strokePoints(hexPoints(slot, 3), true);
+          label.setText(t('cutTag'));
+          if (label.style.color !== '#1f4a18') label.setColor('#1f4a18');
+          label.setAlpha(1);
         } else g.lineStyle(2, LIVE.cappedRim, pulse).strokePoints(hexPoints(slot, 3), true);
       }
     }
 
     // Every edge two built cells share glows gold: each one adds a coin to every jar sold.
     for (const [a, b] of sharedEdges(s)) if (hiveOf(a) === this.hive) this.glowLine(sharedEdge(a, b), LIVE.edgeGlow, LIVE.edge, LIVE.edgeCore);
-    const queen = this.hive === 1 && s.queen ? t(QUEENS[s.queen].name) : null;
-    this.plaque.setText(queen ? t('queenBonus', { queen, n: combBonus(s) }) : t('combBonus', { n: combBonus(s) }));
+    // The plaque names the swarm's queen or the plot while their comb is shown, shrinking to fit.
+    const plot = plotOf(this.hive);
+    const name = this.hive === 1 && s.queen ? t(QUEENS[s.queen].name) : plot ? t(plot.name) : null;
+    const plaque = name ? t('queenBonus', { queen: name, n: combBonus(s) }) : t('combBonus', { n: combBonus(s) });
+    if (plaque !== this.plaque.text) {
+      this.plaque.setFontSize(11).setText(plaque);
+      for (let size = 10.5; size >= 8 && this.plaque.width > PLAQUE.w - 8; size -= 0.5) this.plaque.setFontSize(size);
+    }
 
     // The build preview: the edges the new cell would share light up green.
     this.preview.setVisible(preview !== null);
@@ -548,7 +615,7 @@ export class GameScene extends Phaser.Scene {
       const c = cellCentre(w.slot);
       const [bx, by, bw, bh] = [c.x - 22, c.y - COMB.r - 2, 44, 6];
       g.fillStyle(LIVE.stealTrack, 0.85).fillRoundedRect(bx - 1, by - 1, bw + 2, bh + 2, 3);
-      g.fillStyle(LIVE.stealBar, 1).fillRoundedRect(bx, by, Math.max(bh, bw * (1 - w.ms / WASP_STEAL_MS)), bh, 3);
+      g.fillStyle(LIVE.stealBar, 1).fillRoundedRect(bx, by, Math.max(bh, bw * (1 - w.ms / stealMs(s))), bh, 3);
     }
   }
 
@@ -585,7 +652,12 @@ export class GameScene extends Phaser.Scene {
     }
     this.trails.clear();
     const flap = settings.reduceMotion ? 0 : Math.floor(this.clock / 60) % 2;
-    this.state.bees.forEach((bee, i) => {
+    // The rows at the entrance hold two hives' bees: the pair the comb shown belongs to.
+    const pair = Math.floor(this.hive / 2);
+    let row = 0;
+    this.state.bees.forEach((bee) => {
+      // Its place in the rows: every bee of the pair keeps one, out or home.
+      const at = Math.floor(bee.hive / 2) === pair ? row++ : -1;
       let sprite = this.bees.get(bee.id);
       if (!sprite) {
         sprite = this.add.image(0, 0, 'bee-0').setOrigin(BEE_TEX.cx / BEE_TEX.w, BEE_TEX.cy / BEE_TEX.h).setDepth(50);
@@ -594,7 +666,8 @@ export class GameScene extends Phaser.Scene {
       // A bee lent to the orchard is away from the hive, out of sight.
       sprite.setVisible(!bee.lent);
       if (bee.tripMs === 0) {
-        const h = homeSpot(i);
+        if (at < 0) return sprite.setVisible(false);
+        const h = homeSpot(at);
         sprite.setPosition(h.x, h.y).setFlipX(false).setTexture('bee-0');
         return;
       }
@@ -757,6 +830,22 @@ export class GameScene extends Phaser.Scene {
         this.float(MARKET.x + MARKET.w / 2, MARKET.y - 8, t('wilted', { meadow: t(`${e.honey}Meadow`) }), '#ffd0b0', 14, 2600);
       } else if (e.kind === 'baron') {
         this.showEnd();
+      } else if (e.kind === 'breed-ready') {
+        // The Baron's end card comes first; the breed card follows when it is closed.
+        if (!this.endCard.root.visible && !events.some((o) => o.kind === 'baron')) this.breedCard.root.setVisible(true);
+      } else if (e.kind === 'bred') {
+        this.float(VIEW.w / 2, 170, t('bred', { name: t(BREEDS[e.trait].name), n: e.rank }), '#ffd25a', 16, 2600);
+      } else if (e.kind === 'plot') {
+        this.hive = e.hive;
+        const plot = plotOf(e.hive);
+        if (plot) this.float(HIVE.x + HIVE.w / 2, HIVE.y + 70, t('plotBought', { plot: t(plot.name), quirk: t(plot.quirk) }), '#ffffff', 15, 3000);
+      } else if (e.kind === 'cut') {
+        const c = cellCentre(e.slot);
+        this.float(c.x, c.y, t('combCut'), '#ffd25a', 14);
+      } else if (e.kind === 'book') {
+        this.float(BOOK.x + BOOK.w / 2, BOOK.y - 10, t('newAsks'), '#ffffff', 14, 2000);
+      } else if (e.kind === 'supplied') {
+        this.float(BOOK.x + BOOK.w / 2, BOOK.y - 10, t('coinsGained', { n: e.coins }), '#ffd25a', 15, 2000);
       } else if (e.kind === 'sold') {
         this.float(SELL_BUTTON.x, SELL_BUTTON.y - 34, t('coinsGained', { n: e.coins }), '#ffd25a');
       } else if (e.kind === 'unlocked') {
@@ -882,6 +971,24 @@ export class GameScene extends Phaser.Scene {
           break;
         case 'fair-closed':
           // Autumn comes in the same step, and its chime closes the fair.
+          break;
+        case 'plot':
+          sfx('caught');
+          break;
+        case 'bred':
+          sfx('buy');
+          break;
+        case 'cut':
+          sfx('harvest');
+          break;
+        case 'book':
+          // A new season's book comes with the season's chime.
+          if (!events.some((o) => o.kind === 'season')) sfx('ding');
+          break;
+        case 'supplied':
+          sfx('orderDone');
+          break;
+        case 'breed-ready':
           break;
       }
     }
@@ -1079,7 +1186,13 @@ export class GameScene extends Phaser.Scene {
     // Once every meadow is open the card is the fair's: a tap arms entering a capped cell's honey.
     this.goalZone = this.add.zone(x, y, GOAL.w, GOAL.h).setOrigin(0).setDepth(21);
     this.goalZone.on('pointerdown', () => {
-      if (!fairOn(this.state) || fairWon(this.state)) return;
+      if (!fairOn(this.state) || fairWon(this.state)) {
+        // Between entries, a gold still waiting to breed a trait opens the breed card.
+        if (this.state.breedPending <= 0) return;
+        ui('click');
+        return this.breedCard.root.setVisible(true);
+      }
+      this.cutting = false;
       this.entering = !this.entering;
       ui('click');
     });
@@ -1114,12 +1227,18 @@ export class GameScene extends Phaser.Scene {
         .setText(this.entering ? '' : won ? t('pointsTotal', { n: total ?? 0 }) : on ? t('fairLeft', { time: clockText(seasonLeft(s)), gold }) : t('lateSummer', { time: clockText(fairIn(s)) }))
         .setX(g.title.x + g.title.width + 10);
       g.count.setText('').setX(GOAL.x + 38);
+      const breeding = s.breedPending > 0 && (!on || won);
       g.blurb
-        .setText(on ? `${entries}${won ? golds : ` · ${t('tapToEnter')}`}` : `${t('goldAt', { gold })} · ${classes.map((k) => t(k)).join(', ')}${golds}`)
+        .setText(
+          breeding
+            ? t('tapToBreed', { n: s.breedPending })
+            : on ? `${entries}${won ? golds : ` · ${t('tapToEnter')}`}` : `${t('goldAt', { gold })} · ${classes.map((k) => t(k)).join(', ')}${golds}`,
+        )
         .setX(GOAL.x + 38);
+      if (breeding) g.bar.lineStyle(2.5, LIVE.fairPick, 0.9).strokeRoundedRect(GOAL.x + 2, GOAL.y + 2, GOAL.w - 4, GOAL.h - 4, 8);
       if (this.entering) g.bar.lineStyle(2.5, LIVE.fairPick, 0.9).strokeRoundedRect(GOAL.x + 2, GOAL.y + 2, GOAL.w - 4, GOAL.h - 4, 8);
       if (!this.goalZone.input) this.goalZone.setInteractive({ useHandCursor: true });
-      if (this.goalZone.input) this.goalZone.input.cursor = on && !won ? 'pointer' : 'default';
+      if (this.goalZone.input) this.goalZone.input.cursor = (on && !won) || breeding ? 'pointer' : 'default';
     } else {
       g.title.setText(t('goalSold', { n: next.need }));
       g.unlocks.setText(t('unlocks', { meadow: t(next.name) })).setX(g.title.x + g.title.width + 10);
@@ -1247,11 +1366,14 @@ export class GameScene extends Phaser.Scene {
       this.waspAt.clear();
       this.placing = false;
       this.entering = false;
+      this.cutting = false;
       this.hive = 0;
       this.state = newHive(freshProgress());
       this.showAway(0);
       this.endCard.root.setVisible(false);
       this.queenCard.root.setVisible(false);
+      this.breedCard.root.setVisible(false);
+      this.bookCard.root.setVisible(false);
     });
   }
 
@@ -1261,17 +1383,18 @@ export class GameScene extends Phaser.Scene {
     this.seasonTint.setFillStyle(t.colour, t.alpha);
   }
 
-  /** The tabs on the roof that switch between the hives' combs, shown once there are two. */
+  /** The tabs on the roof that switch between the hives' combs, shown once there are two, one per hive kept. */
   private createTabs() {
-    for (const hive of [0, 1]) {
+    for (let hive = 0; hive < ESTATE_HIVES; hive++) {
       const at = hiveTab(hive);
       const card = this.add.image(0, 0, 'hive-tab-on');
-      const label = this.add.text(0, -1, t('hive', { n: hive + 1 }), textStyle(10.5, '#7a4410', '800')).setOrigin(0.5);
+      const label = this.add.text(0, -1, t('hive', { n: hive + 1 }), textStyle(10, '#7a4410', '800')).setOrigin(0.5);
       const zone = this.add.zone(0, 0, HIVE_TAB.w, HIVE_TAB.h).setInteractive({ useHandCursor: true });
       zone.on('pointerdown', () => {
         if (this.hive !== hive) ui('click');
         this.hive = hive;
         this.placing = false;
+        this.cutting = false;
       });
       const root = this.add.container(at.x, at.y, [card, label, zone]).setDepth(1.5).setVisible(false);
       this.tabs.push({ root, card, label });
@@ -1281,7 +1404,7 @@ export class GameScene extends Phaser.Scene {
   private drawTabs() {
     const s = this.state;
     this.tabs.forEach((tab, hive) => {
-      tab.root.setVisible(s.hives > 1);
+      tab.root.setVisible(s.hives > 1 && hive < s.hives);
       const on = hive === this.hive;
       const key = on ? 'hive-tab-on' : 'hive-tab-off';
       if (tab.card.texture.key !== key) tab.card.setTexture(key);
@@ -1410,6 +1533,8 @@ export class GameScene extends Phaser.Scene {
       target.on('pointerdown', () => {
         ui('click');
         root.setVisible(false);
+        // The gold that made the Baron breeds a trait too.
+        if (this.state.breedPending > 0) this.breedCard.root.setVisible(true);
       });
     this.endCard = { root, detail };
   }
@@ -1447,5 +1572,136 @@ export class GameScene extends Phaser.Scene {
 
   private drawQueenCard() {
     for (const b of this.queenCard.buttons) b.root.setVisible(this.queenCard.root.visible);
+    const s = this.state;
+    const open = this.breedCard.root.visible && s.breedPending > 0;
+    if (this.breedCard.root.visible && !open) this.breedCard.root.setVisible(false);
+    this.breedCard.sub.setText(t('breedSub', { n: s.breedPending }));
+    TRAITS.forEach((trait, i) => {
+      const b = this.breedCard.buttons[i];
+      const rank = s.breeds[trait];
+      const name = t('breedRank', { name: t(BREEDS[trait].name), n: rank, max: BREED_MAX });
+      b.set(`${name}\n${t(rank >= BREED_MAX ? 'breedMaxed' : BREEDS[trait].blurb)}`, rank < BREED_MAX);
+      b.root.setVisible(open);
+    });
+  }
+
+  /** The card that opens after a fair's gold: three traits to breed into the queen line, each a button; a tap beside them waits. */
+  private createBreedCard() {
+    const shade = this.add.rectangle(0, 0, VIEW.w * 2, VIEW.h * 2, 0x2a1808, 0.45).setInteractive();
+    const card = this.add.image(0, 0, 'queen-card').setInteractive();
+    const title = this.add.text(0, -END_CARD.h / 2 + 34, t('breedTitle'), textStyle(19, '#4a2c10', '900')).setOrigin(0.5);
+    const sub = this.add.text(0, -END_CARD.h / 2 + 58, '', textStyle(10.5, '#6a4a28', '700')).setOrigin(0.5);
+    const more = this.add.text(0, END_CARD.h / 2 - 20, t('breedLater'), textStyle(10.5, '#8a6a40', '600')).setOrigin(0.5);
+    const root = this.add.container(END_CARD.x, END_CARD.y, [shade, card, title, sub, more]).setDepth(UI_DEPTH + 5).setVisible(false);
+    shade.on('pointerdown', () => {
+      ui('click');
+      root.setVisible(false);
+    });
+    const buttons = TRAITS.map((trait, i) => {
+      const b = new Button(this, END_CARD.x + (i - 1) * 134, END_CARD.y + 18, 130, 56, () => this.act(breed(this.state, trait)));
+      b.root.setDepth(UI_DEPTH + 6).setVisible(false);
+      return b;
+    });
+    this.breedCard = { root, sub, buttons };
+  }
+
+  /** The chip that buys the estate's next plot: in the swarm chip's place once the fair's first gold is won and two hives are kept. */
+  private createPlot() {
+    const text = this.add.text(12, 12, '', textStyle(12.5, '#fff1cc', '900')).setOrigin(0, 0.5);
+    const detail = this.add.text(12, 27, '', textStyle(10, '#ffe0b0', '700')).setOrigin(0, 0.5);
+    const card = this.add.image(-CARD_PAD, -CARD_PAD, 'swarm-chip').setOrigin(0).setInteractive({ useHandCursor: true });
+    card.on('pointerdown', () => this.act(buyPlot(this.state)));
+    const root = this.add.container(SWARM.x, SWARM.y, [card, text, detail]).setDepth(UI_DEPTH - 1).setVisible(false);
+    this.plot = { root, text, detail };
+  }
+
+  private drawPlot() {
+    const s = this.state;
+    const plot = plotOf(s.hives);
+    const on = !!plot && s.golds >= 1 && s.hives >= MAX_HIVES && s.hives < ESTATE_HIVES;
+    this.plot.root.setVisible(on);
+    if (!on || !plot) return;
+    this.plot.text.setText(t('buyPlot', { plot: t(plot.name), n: s.hives + 1, price: t('price', { n: plot.price }) }));
+    this.plot.detail.setText(t(plot.quirk));
+    this.plot.root.setAlpha(s.coins >= plot.price ? 1 : 0.8);
+  }
+
+  /** The buyer's book: a chip on the near hill (the asks still open), and the card it opens with a row per ask and the Cut comb button. */
+  private createBook() {
+    const card = this.add.image(-CARD_PAD, -CARD_PAD, 'book-chip').setOrigin(0).setInteractive({ useHandCursor: true });
+    const title = this.add.text(8, 12, t('buyersBook'), textStyle(11.5, '#4a2c10', '900')).setOrigin(0, 0.5);
+    const detail = this.add.text(8, 27, '', textStyle(10, '#6a4a28', '700')).setOrigin(0, 0.5);
+    const root = this.add.container(BOOK.x, BOOK.y, [card, title, detail]).setDepth(UI_DEPTH - 1).setVisible(false);
+    card.on('pointerdown', () => {
+      ui('click');
+      // While Cut comb is armed, the chip stops it; else it opens the book.
+      if (this.cutting) return (this.cutting = false);
+      if (this.state.book.length === 0) return;
+      this.bookCard.root.setVisible(true);
+    });
+    this.bookChip = { root, title, detail };
+
+    const shade = this.add.rectangle(0, 0, VIEW.w * 2, VIEW.h * 2, 0x2a1808, 0.45).setInteractive();
+    const big = this.add.image(0, 0, 'book-card').setInteractive();
+    const head = this.add.text(0, -BOOK_CARD.h / 2 + 30, '', textStyle(18, '#4a2c10', '900')).setOrigin(0.5);
+    const sub = this.add.text(0, -BOOK_CARD.h / 2 + 52, '', textStyle(10.5, '#6a4a28', '700')).setOrigin(0.5);
+    const close = this.add.text(BOOK_CARD.w / 2 - 22, BOOK_CARD.h / 2 - 34, t('tapOutside'), textStyle(10.5, '#8a6a40', '600')).setOrigin(1, 0.5);
+    const book = this.add.container(BOOK_CARD.x, BOOK_CARD.y, [shade, big, head, sub, close]).setDepth(UI_DEPTH + 5).setVisible(false);
+    shade.on('pointerdown', () => {
+      ui('click');
+      book.setVisible(false);
+    });
+    const rows = [0, 1, 2].map((i) => {
+      const b = new Button(this, BOOK_CARD.x, BOOK_CARD.y - 40 + i * 46, BOOK_CARD.w - 50, 40, () => this.act(supply(this.state, i)));
+      b.root.setDepth(UI_DEPTH + 6).setVisible(false);
+      return b;
+    });
+    const cut = new Button(this, BOOK_CARD.x - 95, BOOK_CARD.y + BOOK_CARD.h / 2 - 34, 240, 36, () => {
+      ui('click');
+      this.entering = false;
+      this.placing = false;
+      this.cutting = true;
+      book.setVisible(false);
+    });
+    cut.root.setDepth(UI_DEPTH + 6).setVisible(false);
+    this.bookCard = { root: book, title: head, sub, rows, cut };
+  }
+
+  /** What an ask wants, as a line of text. */
+  private askText(a: Ask) {
+    const kind = t(a.kind);
+    return a.grade === 'mixed' ? t('askMixed', { n: a.count }) : a.grade === 'pure' ? t('askPure', { n: a.count, kind }) : t('askComb', { n: a.count, kind });
+  }
+
+  private drawBook() {
+    const s = this.state;
+    const c = this.bookChip;
+    c.root.setVisible(s.sold > 0);
+    const open = s.book.filter((a) => !a.done).length;
+    c.root.setAlpha(s.book.length === 0 ? 0.75 : 1);
+    c.detail.setText(this.cutting ? t('cutting') : s.book.length === 0 ? t('bookFrom', { n: BOOK_FROM }) : t('asksOpen', { n: open }));
+    const colour = this.cutting ? '#2f7a24' : s.book.some((a) => canSupply(s, a)) ? '#a85a10' : '#6a4a28';
+    if (c.detail.style.color !== colour) c.detail.setColor(colour);
+    if (this.cutting && (s.book.length === 0 || !s.cells.some((x) => x?.type === 'honey' && x.phase === 'capped'))) this.cutting = false;
+
+    const b = this.bookCard;
+    const shown = b.root.visible && s.book.length > 0;
+    if (b.root.visible && !shown) b.root.setVisible(false);
+    b.cut.root.setVisible(shown);
+    b.rows.forEach((row, i) => row.root.setVisible(shown && i < s.book.length));
+    if (!shown) return;
+    b.title.setText(t('bookTitle', { season: t(season(s)) }));
+    const combs = KINDS.filter((k) => s.combs[k] > 0).map((k) => `${formatNumber(s.combs[k])} ${t(k)}`);
+    const comb = combs.length ? combs.join(', ') : t('noComb');
+    b.sub.setText(t('bookSub', { time: clockText(seasonLeft(s)), comb }));
+    s.book.forEach((a, i) => {
+      const have = a.grade === 'mixed' ? jarCount(s) : a.grade === 'pure' ? s.jars[a.kind] : s.combs[a.kind];
+      const head = t('askLine', { city: t(CITIES[a.city]), what: this.askText(a) });
+      const price = t('price', { n: a.price });
+      const detail = a.done ? t('supplied') : canSupply(s, a) ? t('askPay', { price, total: t('price', { n: a.price * a.count }) }) : t('askHave', { price, n: have });
+      b.rows[i].set(`${head}\n${detail}`, canSupply(s, a));
+    });
+    const capped = s.cells.some((x) => x?.type === 'honey' && x.phase === 'capped');
+    b.cut.set(`${t('cutComb')}\n${t(capped ? 'cutBlurb' : 'cutNone')}`, capped);
   }
 }

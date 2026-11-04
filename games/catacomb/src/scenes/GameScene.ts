@@ -13,7 +13,7 @@ import { canBeTempered, card, cardName, describePower, kindOf, tempered, type Ca
 import { depthText } from '../game/depth';
 import { ENEMIES, type StatusKind } from '../game/enemies';
 import { FLASKS, FLASK_SLOTS } from '../game/flasks';
-import { HEROES } from '../game/heroes';
+import { HEROES, HERO_IDS, heroUnlocked } from '../game/heroes';
 import { COLUMNS, ENTRANCE, reachable } from '../game/map';
 import { RELICS, relicText, type RelicId } from '../game/relics';
 import { t, type TextKey } from '../i18n';
@@ -27,15 +27,18 @@ import {
   canBuyRemoval,
   canChoose,
   canPlay,
+  canStartDaily,
   canRemove,
   canTemper,
   canUseFlask,
   chooseEvent,
   chooseHero,
+  dailyHero,
   descend,
   endTurn,
   eventHere,
   foeHit,
+  lastAct,
   leaveShop,
   newRun,
   playCard,
@@ -43,6 +46,7 @@ import {
   rest,
   restHeal,
   setDepth,
+  startDailyRun,
   takeReward,
   temperCard,
   tick,
@@ -208,6 +212,8 @@ export class GameScene extends Phaser.Scene {
   private rewardTitle!: Phaser.GameObjects.Text;
   private rewardKey = '';
   private panel!: Phaser.GameObjects.Container;
+  /** The panel's box: taller for the hero choice than for the other panels. */
+  private panelBox!: Phaser.GameObjects.Rectangle;
   private panelTitle!: Phaser.GameObjects.Text;
   private panelText!: Phaser.GameObjects.Text;
   private panelButton!: Phaser.GameObjects.Container;
@@ -215,10 +221,13 @@ export class GameScene extends Phaser.Scene {
   /** The campfire's other choices, next to Rest. */
   private temperButton!: Phaser.GameObjects.Container;
   private removeButton!: Phaser.GameObjects.Container;
-  /** A mystery room's two choices, and the hero choice's two heroes. */
+  /** A mystery room's two choices. */
   private choiceButtons: Phaser.GameObjects.Container[] = [];
-  /** On the hero panel: the two heroes, the depth's arrows and label. */
+  /** On the hero panel: the three heroes with a button and a caption each, the daily crypt's button, the depth's arrows and label. */
   private heroPics: Phaser.GameObjects.Image[] = [];
+  private heroButtons: Phaser.GameObjects.Container[] = [];
+  private heroCaptions: Phaser.GameObjects.Text[] = [];
+  private dailyButton!: Phaser.GameObjects.Container;
   private depthButtons: Phaser.GameObjects.Container[] = [];
   private depthText!: Phaser.GameObjects.Text;
   /** The deck laid out to pick a card to burn, temper or sell. */
@@ -746,7 +755,7 @@ export class GameScene extends Phaser.Scene {
 
   private createPanel() {
     const dim = this.dimmer(0.7);
-    const box = this.add.rectangle(VIEW.w / 2, VIEW.h / 2, 580, 290, 0x2a2632).setStrokeStyle(4, 0x7a7288);
+    const box = (this.panelBox = this.add.rectangle(VIEW.w / 2, VIEW.h / 2, 580, 290, 0x2a2632).setStrokeStyle(4, 0x7a7288));
     this.panelTitle = this.add.text(VIEW.w / 2, VIEW.h / 2 - 100, '', textStyle(30)).setOrigin(0.5);
     this.panelText = this.add
       .text(VIEW.w / 2, VIEW.h / 2 - 26, '', { fontFamily: FONT, fontSize: '16px', color: '#f1e3c6', align: 'center', wordWrap: { width: 520 } })
@@ -754,18 +763,22 @@ export class GameScene extends Phaser.Scene {
     this.panelButton = makeButton(this, PANEL_BUTTON.x, PANEL_BUTTON.y, t('continue'), () => this.panelAction());
     this.temperButton = makeButton(this, PANEL_BUTTON.x, PANEL_BUTTON.y, t('temperButton'), () => this.act(canTemper(this.state), 'click') && (this.picking = 'temper'), REST_BUTTONS.w);
     this.removeButton = makeButton(this, PANEL_BUTTON.x + REST_BUTTONS.dx, PANEL_BUTTON.y, t('removeButton'), () => this.act(canRemove(this.state), 'click') && (this.picking = 'burn'), REST_BUTTONS.w);
-    // The two choices of a mystery room double as the hero choice before the first room.
     this.choiceButtons = [0, 1].map((i) =>
-      makeButton(this, VIEW.w / 2, EVENT_BUTTONS.y + i * EVENT_BUTTONS.gap, '', () => (this.state.phase === 'hero' ? this.act(chooseHero(this.state, i === 0 ? 'knight' : 'hunter'), 'select') : this.act(chooseEvent(this.state, i), 'mystery')), EVENT_BUTTONS.w),
+      makeButton(this, VIEW.w / 2, EVENT_BUTTONS.y + i * EVENT_BUTTONS.gap, '', () => this.act(chooseEvent(this.state, i), 'mystery'), EVENT_BUTTONS.w),
     );
-    this.heroPics = [
-      artImage(this, HERO_PANEL.knightX, HERO_PANEL.feetY, heroTexture('knight')).setOrigin(0.5, 1),
-      artImage(this, HERO_PANEL.hunterX, HERO_PANEL.feetY, heroTexture('hunter')).setOrigin(0.5, 1),
-    ];
+    // The hero choice: each hero standing over their button, with what they bring under it.
+    this.heroPics = HERO_IDS.map((id, i) => artImage(this, HERO_PANEL.xs[i], HERO_PANEL.feetY, heroTexture(id)).setOrigin(0.5, 1));
+    this.heroButtons = HERO_IDS.map((id, i) => makeButton(this, HERO_PANEL.xs[i], HERO_PANEL.buttonY, '', () => this.act(chooseHero(this.state, id), 'select'), HERO_PANEL.buttonW));
+    this.heroCaptions = HERO_IDS.map((_, i) =>
+      this.add
+        .text(HERO_PANEL.xs[i], HERO_PANEL.captionY, '', { fontFamily: FONT, fontSize: '13px', color: '#d8c7a6', align: 'center', wordWrap: { width: HERO_PANEL.buttonW + 8 } })
+        .setOrigin(0.5, 0),
+    );
+    this.dailyButton = makeButton(this, VIEW.w / 2, HERO_PANEL.dailyY, '', () => this.act(startDailyRun(this.state), 'select'), HERO_PANEL.dailyW);
     this.depthButtons = [-1, 1].map((d) => makeButton(this, VIEW.w / 2 + d * HERO_PANEL.depthDx, HERO_PANEL.depthY, d < 0 ? '<' : '>', () => this.act(setDepth(this.state, this.state.depth + d), 'ratchet'), 44));
     this.depthText = this.add.text(VIEW.w / 2, HERO_PANEL.depthY, '', textStyle(20, '#e6c766')).setOrigin(0.5);
     this.panel = this.add
-      .container(this.fx, this.fy, [dim, box, this.panelTitle, this.panelText, this.panelButton, this.temperButton, this.removeButton, ...this.choiceButtons, ...this.heroPics, ...this.depthButtons, this.depthText])
+      .container(this.fx, this.fy, [dim, box, this.panelTitle, this.panelText, this.panelButton, this.temperButton, this.removeButton, ...this.choiceButtons, ...this.heroPics, ...this.heroButtons, ...this.heroCaptions, this.dailyButton, ...this.depthButtons, this.depthText])
       .setDepth(UI_DEPTH + 20)
       .setVisible(false);
   }
@@ -784,25 +797,38 @@ export class GameScene extends Phaser.Scene {
     this.panelButton.setVisible(!ev && !heroes);
     this.temperButton.setVisible(camp).setAlpha(canTemper(s) ? 1 : 0.45);
     this.removeButton.setVisible(camp).setAlpha(canRemove(s) ? 1 : 0.45);
-    for (const pic of this.heroPics) pic.setVisible(heroes);
+    for (const item of [...this.heroPics, ...this.heroButtons, ...this.heroCaptions, this.dailyButton]) item.setVisible(heroes);
+    if (heroes) for (const b of this.choiceButtons) b.setVisible(false);
     const ladder = heroes && s.bestDepth > 0;
     this.depthText.setVisible(ladder).setText(t('depth', { n: s.depth }));
     this.depthButtons.forEach((b, i) => b.setVisible(ladder).setAlpha((i === 0 ? s.depth > 0 : s.depth < s.bestDepth) ? 1 : 0.4));
-    this.panelText.setWordWrapWidth(heroes ? 300 : 520).setY(heroes ? HERO_PANEL.rulesY : VIEW.h / 2 - 26);
+    this.panelBox.setSize(heroes ? HERO_PANEL.box.w : 580, heroes ? HERO_PANEL.box.h : 290).setOrigin(0.5);
+    this.panelTitle.setY(heroes ? HERO_PANEL.titleY : VIEW.h / 2 - 100);
+    this.panelText.setWordWrapWidth(520).setY(heroes ? HERO_PANEL.rulesY : VIEW.h / 2 - 26);
     if (!heroes && this.panelText.style.fontSize !== '16px') this.panelText.setFontSize(16);
     if (heroes) {
       this.panelTitle.setText(t('chooseHero')).setColor('#e6c766');
       const rules = ladder ? depthText(s.depth) : s.bestDepth > 0 ? '' : t('openDepths');
       if (rules !== this.panelText.text) {
-        // The rules grow with each depth: shrink them until they fit between the depth row and the buttons.
+        // The rules grow with each depth: shrink them until they fit between the depth row and the heroes.
         this.panelText.setFontSize(16).setText(rules);
         for (let size = 15; size >= 11 && this.panelText.height > HERO_PANEL.rulesH; size--) this.panelText.setFontSize(size);
       }
-      this.choiceButtons.forEach((b, i) => {
-        const h = HEROES[i === 0 ? 'knight' : 'hunter'];
-        b.setVisible(true).setAlpha(1);
-        (b.list[1] as Phaser.GameObjects.Text).setText(`${t(h.name)}: ${t(h.text, { hp: h.hp })}`);
+      HERO_IDS.forEach((id, i) => {
+        const h = HEROES[id];
+        const open = heroUnlocked(s.heroWins, id);
+        // A locked hero stands as a dark shape, with what unlocks them under the button.
+        if (open) this.heroPics[i].clearTint().setAlpha(1);
+        else this.heroPics[i].setTint(0x000000).setTintMode(Phaser.TintModes.FILL).setAlpha(0.35);
+        this.heroButtons[i].setAlpha(open ? 1 : 0.45);
+        (this.heroButtons[i].list[1] as Phaser.GameObjects.Text).setText(open ? t(h.name) : t('locked'));
+        this.heroCaptions[i].setText(open ? t(h.text, { hp: h.hp }) : t('hexerLocked'));
       });
+      const r = s.dailyRecord;
+      // Once today's try is used (even left half way), the button shows its score instead.
+      const daily = r.played ? t('dailyDone', { score: r.score ?? 0, best: r.best }) : t('dailyButton', { hero: t(HEROES[dailyHero()].name) });
+      (this.dailyButton.list[1] as Phaser.GameObjects.Text).setText(daily);
+      this.dailyButton.setAlpha(canStartDaily(s) ? 1 : 0.45);
       return;
     }
     this.panelButton.setX(camp ? PANEL_BUTTON.x - REST_BUTTONS.dx : PANEL_BUTTON.x);
@@ -822,20 +848,29 @@ export class GameScene extends Phaser.Scene {
       caption.setText(t('restButton', { n: restHeal(s) }));
       this.panelAction = () => this.act(rest(this.state), 'rest');
     } else if (s.phase === 'descend') {
-      this.panelTitle.setText(t('boneKingFalls')).setColor('#e6c766');
-      this.panelText.setText(t('stairDown', { notice: s.notice }));
-      caption.setText(t('descend'));
+      // The Bone King's fall leads down to the Tombs; from depth 3 the Hollow Queen's leads up the Bone Spire.
+      const spire = s.act >= 2;
+      this.panelTitle.setText(t(spire ? 'hollowQueenFalls' : 'boneKingFalls')).setColor('#e6c766');
+      this.panelText.setText(t(spire ? 'spireUp' : 'stairDown', { notice: s.notice }));
+      caption.setText(t(spire ? 'climb' : 'descend'));
       this.panelAction = () => this.act(descend(this.state), 'descend');
     } else {
       const won = s.phase === 'won';
       const where = s.at === null ? 1 : s.rooms[s.at].col + 1;
-      this.panelTitle.setText(t(won ? 'hollowQueenFalls' : 'fallen')).setColor(won ? '#e6c766' : '#e0584f');
+      this.panelTitle.setText(t(won ? (lastAct(s) > 2 ? 'marrowTyrantFalls' : 'hollowQueenFalls') : 'fallen')).setColor(won ? '#e6c766' : '#e0584f');
       const deep = s.depth > 0 ? t('atDepth', { n: s.depth }) : '';
-      this.panelText.setText(
-        won
-          ? t('wonText', { deep, hp: s.hp, gold: s.gold, deck: s.deck.length, next: s.depth + 1, rules: depthText(s.depth + 1) })
-          : t('fellText', { act: actName(s), deep, room: where, rooms: COLUMNS, deck: s.deck.length }),
-      );
+      if (s.daily) {
+        // The daily crypt ends with its score, the best and the days in a row.
+        const r = s.dailyRecord;
+        const score = { score: s.dailyScore ?? 0, best: r.best, streak: t('dailyStreak', { n: r.streak }) };
+        this.panelText.setText(won ? t('dailyWon', { hp: s.hp, ...score }) : t('dailyFell', { act: actName(s), room: where, rooms: COLUMNS, ...score }));
+      } else {
+        this.panelText.setText(
+          won
+            ? t('wonText', { deep, hp: s.hp, gold: s.gold, deck: s.deck.length, next: s.depth + 1, rules: depthText(s.depth + 1) })
+            : t('fellText', { act: actName(s), deep, room: where, rooms: COLUMNS, deck: s.deck.length }),
+        );
+      }
       caption.setText(t('delveAgain'));
       this.panelAction = () => {
         ui('click');
@@ -972,7 +1007,7 @@ export class GameScene extends Phaser.Scene {
     const names: Record<string, TextKey> = { rest: 'campfireRoom', treasure: 'treasureRoom', shop: 'merchantRoom', event: 'mysteryRoom' };
     const name = room?.foes ? room.foes.map((k) => t(ENEMIES[k].name)).reduce((a, b) => t('and', { a, b })) : t(room ? names[room.kind] : 'entrance');
     const where = s.phase === 'map' || s.phase === 'walk' || s.phase === 'hero' ? '' : name;
-    const deep = s.depth > 0 ? `${t('depth', { n: s.depth })}   ` : '';
+    const deep = s.daily ? `${t('dailyBar')}   ` : s.depth > 0 ? `${t('depth', { n: s.depth })}   ` : '';
     const bar = `${deep}${actName(s)}   ${t('roomOf', { n: depth, rooms: COLUMNS })}`;
     const barKey = `${bar}   ${where}|${s.relics.length}`;
     if (barKey !== this.barKey) {

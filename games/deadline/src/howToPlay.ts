@@ -2,7 +2,7 @@ import type { HowToPlay } from '../../../shared/howToPlay';
 import { byLanguage } from '../../../shared/i18n';
 
 const en: HowToPlay = {
-  goal: 'Hold the road against the zombie horde for as many waves as you can, or win a 10-wave operation. The run ends when a zombie reaches your sandbags.',
+  goal: 'Hold the road against the zombie horde for as many waves as you can, or win the towns down the road one by one, up to the evacuation. The run ends when a zombie reaches your sandbags.',
   controls: [
     {
       input: 'Tap or drag anywhere, or A / D / arrow keys',
@@ -20,7 +20,8 @@ const en: HowToPlay = {
       action: 'Buy it with scrap for the next run; tap again to refund',
     },
     { input: 'Tap an outpost upgrade after game over', action: 'Buy its next level with scrap, for every run to come' },
-    { input: 'Tap an operation after game over', action: 'Pick the next run: the Open Road or a 10-wave operation' },
+    { input: 'Tap a card or a town after game over', action: 'Pick the next run: the Open Road, the daily stand or a town on the road map' },
+    { input: 'Tap a veteran after game over', action: 'Pick up to two veterans to start the next run in your squad' },
     { input: 'Tap anywhere else after game over', action: 'Start again from wave 1' },
   ],
   loop: [
@@ -39,6 +40,9 @@ const en: HowToPlay = {
     'A survivor who joins picks a role: Gunner, Grenadier (a grenade every fourth volley) or Marksman (a heavy shot at the toughest zombie).',
     'From wave 8 the horde answers your strongest stat: armoured brutes stop pierce, riot shields blunt fire rate, flank spitters test a wide squad.',
     'Every kill banks scrap, which buys starting crates for your next run and lasting outpost upgrades.',
+    'Winning a town opens the next one on the road map and pays a bounty the first time; each town has its own twist, like fog or only two lanes.',
+    'Survivors who join and live through a won run become veterans: they keep their role, rank up with every win and hit harder.',
+    'The daily stand is the same 10 waves for everyone today, with no starting crates, outpost or veterans, and one try a day.',
   ],
 };
 
@@ -52,7 +56,7 @@ const enUS: HowToPlay = {
 };
 
 const de: HowToPlay = {
-  goal: 'Halte die Straße so viele Wellen wie möglich gegen die Zombiehorde, oder gewinne eine Operation über 10 Wellen. Der Lauf endet, wenn ein Zombie deine Sandsäcke erreicht.',
+  goal: 'Halte die Straße so viele Wellen wie möglich gegen die Zombiehorde, oder gewinne die Städte entlang der Straße eine nach der anderen, bis zur Evakuierung. Der Lauf endet, wenn ein Zombie deine Sandsäcke erreicht.',
   controls: [
     {
       input: 'Irgendwo tippen oder ziehen, oder A / D / Pfeiltasten',
@@ -70,7 +74,8 @@ const de: HowToPlay = {
       action: 'Sie mit Schrott für den nächsten Lauf kaufen; nochmal tippen erstattet sie',
     },
     { input: 'Nach dem Spielende einen Außenposten-Ausbau antippen', action: 'Seine nächste Stufe mit Schrott kaufen, für alle kommenden Läufe' },
-    { input: 'Nach dem Spielende eine Operation antippen', action: 'Den nächsten Lauf wählen: die Offene Straße oder eine Operation über 10 Wellen' },
+    { input: 'Nach dem Spielende eine Karte oder Stadt antippen', action: 'Den nächsten Lauf wählen: die Offene Straße, den Tageskampf oder eine Stadt auf der Karte' },
+    { input: 'Nach dem Spielende einen Veteranen antippen', action: 'Bis zu zwei Veteranen wählen, die den nächsten Lauf in deinem Trupp beginnen' },
     { input: 'Nach dem Spielende woanders tippen', action: 'Neu ab Welle 1 beginnen' },
   ],
   loop: [
@@ -89,6 +94,9 @@ const de: HowToPlay = {
     'Ein neuer Überlebender wählt eine Rolle: Schütze, Grenadier (jede vierte Salve eine Granate) oder Scharfschütze (ein schwerer Schuss auf den zähesten Zombie).',
     'Ab Welle 8 antwortet die Horde auf deinen stärksten Wert: gepanzerte Brecher stoppen Durchschlag, Krawallschilde bremsen die Feuerrate, Flankenspucker prüfen einen breiten Trupp.',
     'Jeder Kill bringt Schrott, der Startkisten für den nächsten Lauf und dauerhafte Außenposten-Ausbauten kauft.',
+    'Ein Sieg in einer Stadt öffnet die nächste auf der Karte und bringt beim ersten Mal ein Kopfgeld; jede Stadt hat ihre eigene Wendung, etwa Nebel oder nur zwei Spuren.',
+    'Überlebende, die dazukommen und einen gewonnenen Lauf überstehen, werden Veteranen: Sie behalten ihre Rolle, steigen mit jedem Sieg im Rang und treffen härter.',
+    'Der Tageskampf sind heute für alle dieselben 10 Wellen, ohne Startkisten, Außenposten oder Veteranen, mit einem Versuch am Tag.',
   ],
 };
 

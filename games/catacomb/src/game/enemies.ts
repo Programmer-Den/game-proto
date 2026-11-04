@@ -18,7 +18,13 @@ export type EnemyKind =
   | 'spider'
   | 'mummy'
   | 'gargoyle'
-  | 'hollowQueen';
+  | 'hollowQueen'
+  | 'boneArcher'
+  | 'shade'
+  | 'marrowBat'
+  | 'ossuary'
+  | 'bellRinger'
+  | 'marrowTyrant';
 
 /** Weak: deals a quarter less attack damage. Vulnerable: takes half as much again. Poison: loses that much health each turn, then one less. */
 export type StatusKind = 'weak' | 'vulnerable' | 'poison';
@@ -135,6 +141,50 @@ export const ENEMIES: Record<EnemyKind, EnemyType> = {
       { kind: 'attack', damage: 6, hits: 3, apply: { status: 'vulnerable', amount: 1 } },
       { kind: 'block', block: 15 },
       { kind: 'buff', strength: 3 },
+    ],
+  },
+  // The Bone Spire, act three, reached only from depth 3.
+  boneArcher: {
+    name: 'boneArcherFoe',
+    hp: 30,
+    gold: 16,
+    moves: [{ kind: 'attack', damage: 5, hits: 2 }, { kind: 'attack', damage: 9, apply: { status: 'vulnerable', amount: 1 } }, { kind: 'block', block: 8 }],
+  },
+  shade: {
+    name: 'shadeFoe',
+    hp: 26,
+    gold: 15,
+    moves: [{ kind: 'debuff', status: 'weak', amount: 2 }, { kind: 'attack', damage: 7, apply: { status: 'poison', amount: 3 } }, { kind: 'attack', damage: 4, hits: 3 }],
+  },
+  marrowBat: {
+    name: 'marrowBatFoe',
+    hp: 16,
+    gold: 9,
+    moves: [{ kind: 'attack', damage: 3, hits: 3 }, { kind: 'attack', damage: 5, apply: { status: 'weak', amount: 1 } }],
+  },
+  ossuary: {
+    name: 'ossuaryFoe',
+    hp: 52,
+    gold: 20,
+    moves: [{ kind: 'block', block: 12 }, { kind: 'attack', damage: 15 }, { kind: 'buff', strength: 3 }],
+  },
+  bellRinger: {
+    name: 'bellRingerFoe',
+    hp: 90,
+    gold: 55,
+    moves: [{ kind: 'debuff', status: 'vulnerable', amount: 2 }, { kind: 'attack', damage: 18 }, { kind: 'attack', damage: 6, hits: 3 }, { kind: 'curse', curse: 'doubt' }, { kind: 'block', block: 14 }],
+  },
+  marrowTyrant: {
+    name: 'marrowTyrantFoe',
+    hp: 170,
+    gold: 120,
+    moves: [
+      { kind: 'buff', strength: 3 },
+      { kind: 'attack', damage: 18 },
+      { kind: 'attack', damage: 7, hits: 3, apply: { status: 'vulnerable', amount: 1 } },
+      { kind: 'block', block: 20 },
+      { kind: 'curse', curse: 'wound' },
+      { kind: 'debuff', status: 'poison', amount: 5 },
     ],
   },
 };

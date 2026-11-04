@@ -18,6 +18,8 @@ const de: Translation<typeof en> = {
   flagshipCalled: 'Flaggschiff',
   admiralName: 'Flaggschiff des Admirals',
   admiralCalled: 'Flaggschiff des Admirals',
+  tempestName: 'Die Sturmbraut',
+  tempestCalled: 'Sturmbraut',
   merchantName: 'Handelsschiff',
   merchantCalled: 'Handelsschiff',
 
@@ -219,8 +221,8 @@ const de: Translation<typeof en> = {
   sunkTitle: 'Versenkt!',
   wonTitle: 'Der Hafen ist geschleift!',
   wonText:
-    'Das Flaggschiff des Admirals sank in Welle {wave}: der Feldzug ist gewonnen.\n{sunk} Schiffe versenkt, {taken} als Prise genommen und {gold} Gold erbeutet.\nSegle weiter durch die Wellen danach, oder beginne neu bei Welle 1.',
-  sunkText: 'Dein Schiff sank in Welle {wave}.\n{sunk} Schiffe versenkt, {taken} als Prise genommen und {gold} Gold erbeutet.\nBeste geschlagene Welle: {best}.',
+    'Das Flaggschiff des Admirals sank in Welle {wave}: der Feldzug ist gewonnen, und die Sturmsee liegt voraus.\n{sunk} Schiffe versenkt, {taken} als Prise genommen und {gold} Gold erbeutet.',
+  sunkText: 'Dein Schiff sank in Welle {wave}.\n{sunk} Schiffe versenkt, {taken} als Prise genommen und {gold} Gold erbeutet.',
   medals: {
     one: 'Die Admiralität verleiht dir {n} Medaille ({left} auszugeben).\nWähle ein Schiff und Startverbesserungen für deinen nächsten Lauf:',
     other: 'Die Admiralität verleiht dir {n} Medaillen ({left} auszugeben).\nWähle ein Schiff und Startverbesserungen für deinen nächsten Lauf:',
@@ -231,9 +233,54 @@ const de: Translation<typeof en> = {
   medalCost: '{n} Medaillen',
   sailAgain: 'Erneut auslaufen',
   sailOn: 'Weitersegeln',
+
+  // The captain's log: five named enemy captains
+  marenName: 'Maren Schwarzwasser',
+  haskName: 'Gentleman Hask',
+  tullName: 'Einauge Tull',
+  corraName: 'Witwe Corra',
+  anselName: 'Ansel Salzkiefer',
+  captainSub: 'Kapitänin {name} segelt mit: versenke sie fürs Logbuch!',
+  captainBackSub: '{name} ist zurück, mit {gold} Gold Kopfgeld!',
+  captainWanted: 'Gesucht: {name}, {gold} Gold',
+  captainFlees: '{name} flieht!',
+  captainSunk: '{name} versenkt: Logbuch {n} von {total}',
+  captainSunkPaid: '{name} versenkt für {gold} Gold: Logbuch {n} von {total}',
+  captainEscaped: '{name} entkam: zurück in Welle {wave}',
+  logLine: 'Logbuch: {n} von {total} versenkt',
+  logFull: 'Logbuch voll: Ruhm (Entern ab einem Viertel des Rumpfs)',
+  recordLine: 'Beste geschlagene Welle: {best}   ❦   {log}',
+  recordReaches: 'Rekord {best}   ❦   Sturmsee {reach} von {total}   ❦   {log}',
+
+  // The Storm Reaches
+  reachHud: 'See {wave}',
+  reachesTitle: 'Sturmsee: Welle {wave}',
+  reachesCourse: 'Sturmsee {wave}: {course}',
+  reachesSub: 'Böen drehen den Wind, und Riffe lauern!',
+  tempestTitle: 'Das Auge des Sturms',
+  tempestSub: 'Die Sturmbraut ist gesichtet: versenke sie, um die See zu beruhigen!',
+  squallComing: 'Bö! Wind aus {point}',
+  squallBlowing: 'Bö aus {point}',
+  reachesHarborTitle: 'Hafen: Sturmsee-Welle {wave} geschlagen',
+  calmTitle: 'Die Sturmsee ist beruhigt!',
+  calmText: 'Die Sturmbraut sank in Welle {wave}: die Sturmsee gehört dir.\n{sunk} Schiffe versenkt, {taken} als Prise genommen und {gold} Gold erbeutet.',
+  sailReaches: 'Zur Sturmsee',
+
+  // The daily voyage
+  dailyButton: 'Tagesfahrt',
+  dailyDone: 'Heute: {score}',
+  dailyUsed: 'Heute gesegelt',
+  dailySub: 'Tagesfahrt: {ship}, mit {perks}',
+  infoDaily: 'Feinde {left}   ❦   Versenkt {sunk}   ❦   Punkte {score}',
+  dailyTitle: 'Die Tagesfahrt ist vorbei',
+  dailyText: {
+    one: '{score} Punkte: {waves} Wellen geschlagen und {gold} Gold erbeutet.\nBestwert {best}   ❦   {n} Tag in Folge. Morgen sticht eine neue Fahrt in See.',
+    other: '{score} Punkte: {waves} Wellen geschlagen und {gold} Gold erbeutet.\nBestwert {best}   ❦   {n} Tage in Folge. Morgen sticht eine neue Fahrt in See.',
+  },
+  dailyMedals: 'Keine Medaillen auf der Tagesfahrt ({left} auszugeben).\nWähle ein Schiff und Startverbesserungen für deinen nächsten Lauf:',
 };
 
 export default de;
 
 /** Texts that are the same in German. */
-export const keepEnglish: (keyof typeof en)[] = ['palmasIsland', 'morganIsland', 'windN', 'windS', 'windSW', 'windW', 'windNW', 'gold', 'crew', 'upgradeRank', 'loadSide'];
+export const keepEnglish: (keyof typeof en)[] = ['palmasIsland', 'morganIsland', 'windN', 'windS', 'windSW', 'windW', 'windNW', 'gold', 'crew', 'upgradeRank', 'loadSide', 'haskName'];

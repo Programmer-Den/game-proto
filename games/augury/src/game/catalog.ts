@@ -1,8 +1,13 @@
 import type { KindId } from './kinds';
 
 /** The modes, in the order the menu deals them as cards. */
-export const MODES = ['endless', 'daily', 'blitz', 'draft', 'duel', 'practice'] as const;
+export const MODES = ['journey', 'endless', 'daily', 'blitz', 'draft', 'weekly', 'duel', 'practice'] as const;
 export type Mode = (typeof MODES)[number];
+
+/** Modes that play by the Draft Run's rules: hearts, a pick of cards, relics and omens. */
+export const isDraft = (mode: Mode) => mode === 'draft' || mode === 'weekly';
+/** Modes with hearts and omens: Endless and the two drafts. */
+export const hasHearts = (mode: Mode) => mode === 'endless' || isDraft(mode);
 
 /** The relics a draft run offers after every few puzzles; each can be taken again. */
 export const GENERAL_RELICS = ['lantern', 'heartstone', 'hourglass', 'crystal'] as const;
@@ -21,6 +26,8 @@ export const CHARMS = {
   unjam: 'gear',
   flip: 'mirror',
   link: 'spool',
+  slide: 'compass',
+  series: 'sextant',
   echo: 'shell',
 } as const satisfies Record<KindId, string>;
 export type CharmId = (typeof CHARMS)[KindId];
@@ -40,6 +47,8 @@ export const KIND_COLOR: Record<KindId, number> = {
   unjam: 0xffb36b,
   flip: 0x7fb8ff,
   link: 0xe6a4ff,
+  slide: 0x9fd8c8,
+  series: 0xffc6a0,
   echo: 0xfff0a8,
 };
 

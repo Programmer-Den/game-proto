@@ -88,7 +88,7 @@ export class SoundCues {
   /** Calm between waves and in harbor, the jig while fighting, its heavy part once a flagship sails. */
   private updateMusic(s: GameState) {
     let want = '';
-    if (s.phase === 'fighting') want = s.enemies.some((e) => e.kind === 'flagship' || e.kind === 'admiral') ? 'boss' : 'battle';
+    if (s.phase === 'fighting') want = s.enemies.some((e) => e.kind === 'flagship' || e.kind === 'admiral' || e.kind === 'tempest') ? 'boss' : 'battle';
     else if (s.phase !== 'over') want = 'calm';
     if (want === this.music) return;
     this.music = want;
@@ -164,6 +164,9 @@ export class SoundCues {
           break;
         case 'escape':
           heard.add('escape');
+          break;
+        case 'squall':
+          heard.add('squall');
           break;
       }
     }

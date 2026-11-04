@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { CELL_CAP, FLOWERS } from '../game/state';
 import { MEADOWS } from '../game/meadows';
-import { viewEdges, AWAY, BOARD, CASK, COMB, CONTRACT, END_CARD, FAR_RIDGE, FLOWER_GROUND, GOAL, HIVE, HIVE_TAB, MARKET, MEADOW_SPOTS, ORDER, PLAQUE, MEADOW_TAG, SWARM, farY, flowerSpot } from '../scenes/layout';
+import { viewEdges, AWAY, BOARD, BOOK, BOOK_CARD, CASK, COMB, CONTRACT, END_CARD, FAR_RIDGE, FLOWER_GROUND, GOAL, HIVE, HIVE_TAB, MARKET, MEADOW_SPOTS, ORDER, PLAQUE, MEADOW_TAG, SWARM, farY, flowerSpot } from '../scenes/layout';
 import { KINDS } from '../game/honey';
 import { BROOD_CARD, CARD, KIND_CARD, MEADOW_CARD, MEAD_CARD, NOTE_CARD, ORCHARD_CARD, PETALS, WAX_CARD } from './palette';
 
@@ -390,10 +390,16 @@ function bakeCards(scene: Phaser.Scene) {
   // The swarm chip over the meadow, just above the button board, a warm card to tap while the swarm gathers.
   card('swarm-chip', SWARM.w, SWARM.h, (ctx) => cut(ctx, rr(0, 0, SWARM.w, SWARM.h, 8), CARD.roof, { depth: 4 }));
   // The end card, a big cream card with a gold rosette, when the fair makes the player the Baron.
-  const bigCard = (ctx: CanvasRenderingContext2D) => {
-    cut(ctx, rr(0, 0, END_CARD.w, END_CARD.h, 14), CARD.goal, { depth: 6 });
-    outline(ctx, rr(8, 8, END_CARD.w - 16, END_CARD.h - 16, 10), NOTE_CARD.edge, 1.5, [5, 4]);
+  const bigCard = (ctx: CanvasRenderingContext2D, w = END_CARD.w, h = END_CARD.h) => {
+    cut(ctx, rr(0, 0, w, h, 14), CARD.goal, { depth: 6 });
+    outline(ctx, rr(8, 8, w - 16, h - 16, 10), NOTE_CARD.edge, 1.5, [5, 4]);
   };
+  // The buyer's book: a cream chip with a stitched edge, and the big card that lists the asks.
+  card('book-chip', BOOK.w, BOOK.h, (ctx) => {
+    cut(ctx, rr(0, 0, BOOK.w, BOOK.h, 8), CARD.goal, { depth: 4 });
+    outline(ctx, rr(4, 4, BOOK.w - 8, BOOK.h - 8, 6), NOTE_CARD.edge, 1, [4, 3]);
+  });
+  card('book-card', BOOK_CARD.w, BOOK_CARD.h, (ctx) => bigCard(ctx, BOOK_CARD.w, BOOK_CARD.h));
   // The queen card is the end card without the gold rosette.
   card('queen-card', END_CARD.w, END_CARD.h, bigCard);
   card('end-card', END_CARD.w, END_CARD.h, (ctx) => {

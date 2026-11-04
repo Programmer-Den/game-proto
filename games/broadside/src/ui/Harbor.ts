@@ -3,6 +3,7 @@ import { locale } from '../../../../shared/i18n';
 import { renderScale } from '../../../../shared/scaling';
 import { SHEET_RES } from '../art/art';
 import { BOUNTIES } from '../game/bounties';
+import { CAPTAIN_IDS, CAPTAINS } from '../game/captains';
 import { CONSORT_MAX, consortWage } from '../game/consorts';
 import { COURSE_IDS, COURSES, coursesFor, HUNTER_CARDS, type CourseId } from '../game/courses';
 import { HULLS } from '../game/hulls';
@@ -11,6 +12,7 @@ import { ENEMIES, type EnemyKind } from '../game/ships';
 import { keepBlocked, keepCost } from '../game/sim';
 import { SHOTS } from '../game/shot';
 import { ISLANDS, rank, type GameState, type Side } from '../game/state';
+import { inReaches, reachWave } from '../game/waves';
 import { costOf, HIRE, REPAIR_COST, UPGRADE_IDS, UPGRADES, type UpgradeId } from '../game/upgrades';
 import { COURSE, DRAFT, FONT, HARBOR, UI_DEPTH, VIEW } from '../scenes/layout';
 import { t } from '../i18n';
@@ -200,7 +202,7 @@ export class Harbor {
     this.sail.button.setVisible(!choose);
     for (const c of this.courses) c.button.setVisible(choose);
     this.buttons = [...this.ledgerButtons, ...(choose ? this.courses.map((c) => c.hit) : [this.sail.hit])];
-    this.title.setText(t('harborTitle', { wave: s.wave }));
+    this.title.setText(inReaches(s.wave) ? t('reachesHarborTitle', { wave: reachWave(s.wave) }) : t('harborTitle', { wave: s.wave }));
     this.gold.setText(t('harborGold', { gold: s.gold, hp: Math.ceil(s.player.hp), max: s.player.maxHp, crew: s.player.crew, maxCrew: s.player.maxCrew }));
     const held = s.perks.filter((id, i) => s.perks.indexOf(id) === i).map((id) => `${t(PERKS[id].name)}${perkRank(s.perks, id) > 1 ? ' II' : ''}`);
     this.perks.setText(held.length ? t('perksHeld', { perks: held.join(', ') }) : t('noPerks'));
@@ -213,6 +215,12 @@ export class Harbor {
     }
     if (s.convoy) news.push(s.convoy.state === 'arrived' ? t('convoySafe', { island: t(ISLANDS[s.convoy.island].name), gold: s.convoy.cargo }) : t('convoyLost'));
     if (s.wages) news.push(t('wages', { gold: s.wages }));
+    // The named captains who sailed this wave: sunk into the log, or got away to come back.
+    for (const { id, fate, gold } of s.waveCaptains) {
+      const name = t(CAPTAINS[id].name);
+      if (fate === 'escaped') news.push(t('captainEscaped', { name, wave: s.captains[id].due }));
+      else news.push(t(gold ? 'captainSunkPaid' : 'captainSunk', { name, gold, n: s.log.length, total: CAPTAIN_IDS.length }));
+    }
     fitWidth(this.bounty.setText(news.join('   ❦   ')), HARBOR.w - 40);
     for (const row of this.rows) {
       if (row.id === 'repair') {

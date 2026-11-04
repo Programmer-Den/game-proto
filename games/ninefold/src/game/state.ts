@@ -1,13 +1,16 @@
 import { byDifficulty } from '../../../../shared/settings';
-import { RELICS, STYLES, TWISTS, UNIQUE_RELICS, type Level, type RelicId, type StyleId, type Twist } from './catalog';
-import { dailySeed, makePuzzle, nextDay, peersOf, seeded, SHAPES, shuffle, units, type Puzzle, type Random } from './sudoku';
+import { BOARD_TWISTS, MAX_ASCENT, PRESSING_TWISTS, RELICS, STYLES, TWISTS, UNIQUE_RELICS, type Level, type RelicId, type StyleId, type Twist } from './catalog';
+import { dailySeed, makePuzzle, nextDay, peersOf, seeded, SHAPES, shuffle, units, type Extra, type Puzzle, type Random } from './sudoku';
 
-// Ninefold's rules: Classic (a daily puzzle and free play at three levels) and Delve (a run of
-// ever bigger puzzles with hearts and relics), and the progress that unlocks the art styles.
+// Ninefold's rules: Classic (a daily puzzle, the weekly gauntlet and free play at five levels) and
+// Delve (a run of ever bigger puzzles with hearts and relics, at up to five ascensions), and the
+// progress that unlocks the art styles.
 // The scene calls the actions below and reads `GameState`; nothing here knows about Phaser.
 
 /** Givens on a Classic 9x9 board at each level. */
-export const CLASSIC_GIVENS: Record<Level, number> = { easy: 40, normal: 32, hard: 26 };
+export const CLASSIC_GIVENS: Record<Level, number> = { easy: 40, normal: 32, hard: 26, killer: 16, thermo: 24 };
+/** The extra rule a Classic level's boards carry. */
+export const LEVEL_EXTRA: Partial<Record<Level, Extra>> = { killer: 'killer', thermo: 'thermo' };
 /** The daily puzzle is a Normal board. */
 export const DAILY_LEVEL: Level = 'normal';
 /** Hints a Classic board starts with (hub difficulty: Easy, Normal, Hard). */
@@ -52,9 +55,47 @@ export const TWIST_FLOOR = 4;
 export const BOSS_EVERY = 5;
 export const BOSS_GIVENS = 3;
 /** Givens a twist takes away, since its rule tells the solver more. */
-export const TWIST_GIVENS: Record<Twist, number> = { diagonal: 2, parity: 6, clock: 0, sealed: 0 };
+export const TWIST_GIVENS: Record<Twist, number> = { diagonal: 2, parity: 6, killer: 14, thermo: 6, clock: 0, sealed: 0 };
 /** On a Clock floor a heart is lost every this much game time. */
 export const CLOCK_MS = 3 * 60_000;
+/** Clearing this Delve floor at the highest ascension open opens the next one. */
+export const ASCEND_FLOOR = 10;
+/** Givens every floor loses from Ascension 3. */
+export const ASCENT_GIVENS = 2;
+/** The ascension each rule starts at (`ASCENSION_RULES` in `catalog.ts`). */
+export const ASCENT = { hearts: 1, hint: 2, givens: 3, notes: 4, offer: 5 } as const;
+
+/**
+ * The weekly gauntlet: one 9x9 board for each day of the week, Monday first, the same for every
+ * player that week. Each scores once, on the day it is dealt, and the week's scores add up.
+ */
+export const GAUNTLET: { givens: number; twist?: (typeof BOARD_TWISTS)[number] }[] = [
+  { givens: 40 },
+  { givens: 30, twist: 'diagonal' },
+  { givens: 24, twist: 'thermo' },
+  { givens: 26, twist: 'parity' },
+  { givens: 16, twist: 'killer' },
+  { givens: 26 },
+  { givens: 12, twist: 'killer' },
+];
+/** A gauntlet board's score: this much, less per mistake, per hint and per second taken, but at least the floor. */
+export const GAUNTLET_SCORE = { base: 1000, mistake: 100, hint: 150, perSecond: 1 / 6, floor: 100 };
+
+/** A gauntlet board's score from its mistakes, hints and time. */
+export function gauntletScore(mistakes: number, hints: number, timeMs: number) {
+  const g = GAUNTLET_SCORE;
+  return Math.max(g.floor, Math.round(g.base - g.mistake * mistakes - g.hint * hints - g.perSecond * Math.floor(timeMs / 1000)));
+}
+
+/** The day of the week, Monday 0 to Sunday 6. */
+export const weekDay = (date: Date) => (date.getDay() + 6) % 7;
+/** The week's seed: the `dailySeed` of its Monday. */
+export const weekSeed = (date: Date) => dailySeed(new Date(date.getFullYear(), date.getMonth(), date.getDate() - weekDay(date)));
+
+/** This week's gauntlet scores as they stand on a date: -1 for a day not played. */
+export function weekScores(p: Progress, date: Date) {
+  return p.week === weekSeed(date) ? p.weekScores : GAUNTLET.map(() => -1);
+}
 
 /** What a Delve floor will be: its board size, givens, twists and whether it is a boss floor. */
 export interface FloorPlan {
@@ -66,17 +107,18 @@ export interface FloorPlan {
 }
 
 /** Plans a floor. Floors before `TWIST_FLOOR` use no randomness, so the first floors deal as before. */
-export function planFloor(floor: number, random: Random): FloorPlan {
+export function planFloor(floor: number, random: Random, ascent = 0): FloorPlan {
   const spec = floorSpec(floor);
   const deeper = Math.max(0, Math.floor((floor - FLOORS.length) / DEEPER_EVERY));
   let givens = Math.max(MIN_GIVENS, spec.givens - deeper);
   if (spec.size !== 9) givens = spec.givens;
+  if (ascent >= ASCENT.givens) givens -= ASCENT_GIVENS;
   const boss = floor % BOSS_EVERY === 0;
   let twists: Twist[] = [];
   if (floor >= TWIST_FLOOR) {
     if (boss) {
       // One twist on the board's rules and one that presses the player.
-      twists = [pick(['diagonal', 'parity'] as const, random), pick(['clock', 'sealed'] as const, random)];
+      twists = [pick(BOARD_TWISTS, random), pick(PRESSING_TWISTS, random)];
       givens -= BOSS_GIVENS;
     } else twists = [pick(TWISTS, random)];
   }
@@ -86,7 +128,7 @@ export function planFloor(floor: number, random: Random): FloorPlan {
 
 const pick = <T>(items: readonly T[], random: Random) => items[Math.floor(random() * items.length)];
 
-export type Mode = 'classic' | 'daily' | 'delve';
+export type Mode = 'classic' | 'daily' | 'weekly' | 'delve';
 export type Phase = 'menu' | 'playing' | 'solved' | 'relic' | 'over';
 
 /** What a player has done across every board, saved by `save.ts`. */
@@ -104,11 +146,20 @@ export interface Progress {
   /** Daily puzzles solved on days in a row, ending with `daily`, and the longest such run. */
   dailyStreak: number;
   bestStreak: number;
+  /** One more than the highest ascension whose floor `ASCEND_FLOOR` was cleared (0: none yet). */
+  climbed: number;
+  /** The week (`weekSeed`) `weekScores` are for, each day's gauntlet score (-1 not played), and the best week's total. */
+  week: number;
+  weekScores: number[];
+  bestWeek: number;
   style: StyleId;
   unlocked: StyleId[];
 }
 
-export const newProgress = (): Progress => ({ solved: 0, flawless: 0, noHint: 0, hard: 0, fast: 0, bestFloor: 0, bosses: 0, daily: 0, dailyStreak: 0, bestStreak: 0, style: 'paper', unlocked: ['paper'] });
+export const newProgress = (): Progress => ({ solved: 0, flawless: 0, noHint: 0, hard: 0, fast: 0, bestFloor: 0, bosses: 0, daily: 0, dailyStreak: 0, bestStreak: 0, climbed: 0, week: 0, weekScores: GAUNTLET.map(() => -1), bestWeek: 0, style: 'paper', unlocked: ['paper'] });
+
+/** The highest Delve ascension open. */
+export const ascensionOpen = (p: Progress) => Math.min(MAX_ASCENT, p.climbed);
 
 /** When each style unlocks, from the progress. Stained Glass waits for every other one. */
 export const UNLOCKS: Record<StyleId, (p: Progress) => boolean> = {
@@ -133,6 +184,7 @@ export type GameEvent =
   | { type: 'gift' }
   | { type: 'unit'; cells: number[] }
   | { type: 'solved' }
+  | { type: 'ascended'; ascent: number }
   | { type: 'over' }
   | { type: 'unlocked'; style: StyleId }
   | { type: 'relic'; relic: RelicId }
@@ -163,6 +215,15 @@ export interface GameState {
   upcoming: FloorPlan | null;
   /** The date (`dailySeed`) the daily board in play was dealt for, 0 for any other board. */
   dailyDate: number;
+  /** The gauntlet board in play: its week (`weekSeed`) and day (Monday 0). */
+  week: number;
+  weekDay: number;
+  /** The last gauntlet board's score, and the week's total with it. */
+  score: number;
+  weekTotal: number;
+  /** The Delve run's ascension (0 for none), and the one its last cleared floor opened (0 if none). */
+  ascent: number;
+  ascended: number;
   relics: RelicId[];
   relicOffer: RelicId[];
   /** The Ward has caught a mistake on this floor already. */
@@ -184,7 +245,7 @@ export interface GameState {
 export function newGame(progress: Progress): GameState {
   return {
     phase: 'menu', mode: 'classic', level: 'easy', puzzle: null, values: [], notes: [], selected: -1, notesMode: false,
-    mistakes: 0, hintsLeft: 0, hintsUsed: 0, timeMs: 0, hearts: 0, maxHearts: 0, floor: 0, plan: null, upcoming: null, dailyDate: 0, relics: [], relicOffer: [],
+    mistakes: 0, hintsLeft: 0, hintsUsed: 0, timeMs: 0, hearts: 0, maxHearts: 0, floor: 0, plan: null, upcoming: null, dailyDate: 0, week: 0, weekDay: 0, score: 0, weekTotal: 0, ascent: 0, ascended: 0, relics: [], relicOffer: [],
     warded: false, streak: 0, keyHealed: 0, undo: [], doneUnits: [], newStyles: [], progress, events: [],
   };
 }
@@ -213,7 +274,7 @@ export function startClassic(s: GameState, level: Level, random: Random = Math.r
   s.level = level;
   s.dailyDate = 0;
   s.plan = s.upcoming = null;
-  load(s, makePuzzle(SHAPES[9], CLASSIC_GIVENS[level], random));
+  load(s, makePuzzle(SHAPES[9], CLASSIC_GIVENS[level], random, LEVEL_EXTRA[level]));
   s.hintsLeft = classicHints();
 }
 
@@ -227,27 +288,58 @@ export function startDaily(s: GameState, date: Date) {
   s.hintsLeft = classicHints();
 }
 
-/** Starts a Delve run on floor 1. */
-export function startDelve(s: GameState) {
+/**
+ * Starts today's gauntlet board, if it hasn't been played: the same board for everyone on that
+ * day of that week. Starting it uses up the day's try, scored 0 until it is solved.
+ */
+export function startWeekly(s: GameState, date: Date) {
+  const p = s.progress;
+  const day = weekDay(date);
+  if (weekScores(p, date)[day] >= 0) return false;
+  if (p.week !== weekSeed(date)) {
+    p.week = weekSeed(date);
+    p.weekScores = GAUNTLET.map(() => -1);
+  }
+  p.weekScores[day] = 0;
+  const g = GAUNTLET[day];
+  s.mode = 'weekly';
+  s.level = 'normal';
+  s.plan = s.upcoming = null;
+  s.dailyDate = 0;
+  s.week = p.week;
+  s.weekDay = day;
+  const shape = { ...SHAPES[9], ...(g.twist === 'diagonal' ? { diagonal: true } : {}) };
+  load(s, makePuzzle(shape, g.givens, seeded(p.week * 10 + day), extraOf(g.twist ? [g.twist] : [])));
+  s.hintsLeft = classicHints();
+  return true;
+}
+
+/** The extra board rule among a floor's twists, if any. */
+const extraOf = (twists: readonly Twist[]): Extra | undefined => twists.find((tw): tw is Extra => tw === 'parity' || tw === 'killer' || tw === 'thermo');
+
+/** Starts a Delve run on floor 1, at an ascension that is open (0 for none). */
+export function startDelve(s: GameState, ascent = 0) {
   s.mode = 'delve';
   s.dailyDate = 0;
   s.floor = 0;
   s.relics = [];
   s.streak = 0;
-  s.maxHearts = s.hearts = delveHearts();
-  s.hintsLeft = DELVE_HINTS;
-  s.upcoming = planFloor(1, Math.random);
+  s.ascent = Math.max(0, Math.min(ascent, ascensionOpen(s.progress)));
+  s.ascended = 0;
+  s.maxHearts = s.hearts = Math.max(1, delveHearts() - (s.ascent >= ASCENT.hearts ? 1 : 0));
+  s.hintsLeft = s.ascent >= ASCENT.hint ? 0 : DELVE_HINTS;
+  s.upcoming = planFloor(1, Math.random, s.ascent);
   nextFloor(s);
 }
 
 function nextFloor(s: GameState) {
-  const plan = s.upcoming ?? planFloor(s.floor + 1, Math.random);
+  const plan = s.upcoming ?? planFloor(s.floor + 1, Math.random, s.ascent);
   s.floor = plan.floor;
   s.plan = plan;
   s.upcoming = null;
   s.relicOffer = [];
   const shape = { ...SHAPES[plan.size], ...(plan.twists.includes('diagonal') ? { diagonal: true } : {}) };
-  load(s, makePuzzle(shape, plan.givens, Math.random, plan.twists.includes('parity')));
+  load(s, makePuzzle(shape, plan.givens, Math.random, extraOf(plan.twists)));
   // Each Seer's Eye fills in a few cells, picked at random, before play starts.
   const seers = s.relics.filter((r) => r === 'seer').length * SEER_CELLS;
   const empty = s.values.flatMap((v, i) => (v ? [] : [i]));
@@ -302,8 +394,14 @@ export function select(s: GameState, cell: number) {
   s.selected = cell;
 }
 
+/** Whether notes are locked: a Delve run at Ascension 4 or higher. */
+export const notesLocked = (s: GameState) => s.mode === 'delve' && s.ascent >= ASCENT.notes;
+
+/** Switches notes mode; false when notes are locked. */
 export function toggleNotes(s: GameState) {
-  if (s.phase === 'playing') s.notesMode = !s.notesMode;
+  if (s.phase !== 'playing' || notesLocked(s)) return false;
+  s.notesMode = !s.notesMode;
+  return true;
 }
 
 /** Whether the selected cell can take a digit: empty, or holding a wrong one. */
@@ -466,7 +564,24 @@ function solved(s: GameState) {
     p.bestStreak = Math.max(p.bestStreak, p.dailyStreak);
     p.daily = s.dailyDate;
   }
+  if (s.mode === 'weekly') {
+    s.score = gauntletScore(s.mistakes, s.hintsUsed, s.timeMs);
+    // A board finished after its week ended still counts for its own week, if that is the one kept.
+    if (p.week === s.week) {
+      p.weekScores[s.weekDay] = s.score;
+      s.weekTotal = p.weekScores.reduce((t, v) => t + Math.max(0, v), 0);
+      p.bestWeek = Math.max(p.bestWeek, s.weekTotal);
+    } else s.weekTotal = s.score;
+  }
   if (s.mode === 'delve') p.bestFloor = Math.max(p.bestFloor, s.floor);
+  s.ascended = 0;
+  if (s.mode === 'delve' && s.floor === ASCEND_FLOOR && s.ascent >= p.climbed) {
+    p.climbed = s.ascent + 1;
+    if (p.climbed <= MAX_ASCENT) {
+      s.ascended = p.climbed;
+      s.events.push({ type: 'ascended', ascent: p.climbed });
+    }
+  }
   s.selected = -1;
   s.events.push({ type: 'solved' });
   s.newStyles = unlock(p);
@@ -479,10 +594,11 @@ function solved(s: GameState) {
       s.hearts = s.maxHearts;
     }
     if (s.timeMs <= SANDGLASS_MS) heal(s, count(s, 'sandglass'));
-    s.upcoming = planFloor(s.floor + 1, Math.random);
+    s.upcoming = planFloor(s.floor + 1, Math.random, s.ascent);
     s.phase = 'relic';
-    const pool = RELICS.filter((r) => !(UNIQUE_RELICS.includes(r) && s.relics.includes(r)));
-    s.relicOffer = shuffle(pool, Math.random).slice(0, RELIC_OFFER);
+    // Twin Sight's notes are no use once notes are locked.
+    const pool = RELICS.filter((r) => !(UNIQUE_RELICS.includes(r) && s.relics.includes(r)) && !(r === 'twin' && notesLocked(s)));
+    s.relicOffer = shuffle(pool, Math.random).slice(0, s.ascent >= ASCENT.offer ? RELIC_OFFER - 1 : RELIC_OFFER);
   } else s.phase = 'solved';
 }
 

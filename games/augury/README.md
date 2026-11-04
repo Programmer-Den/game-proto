@@ -3,11 +3,11 @@
 A collection of brain puzzles built with [Phaser 4](https://phaser.io), TypeScript and Vite, part of
 the [game hub](../../README.md).
 
-Nine kinds of puzzle, dealt like cards from an arcane tarot deck: logic, numbers, spatial thinking
+Eleven kinds of puzzle, dealt like cards from an arcane tarot deck: logic, numbers, spatial thinking
 and memory. Every puzzle is made in code from a seed, so they never run out, and each kind comes at
-four levels, from Novice to Oracle. Play an endless medley of random puzzles, the same five puzzles
+four levels, from Novice to Oracle. Walk a journey of forty set puzzles through five temples, play an endless medley of random puzzles, the same five puzzles
 as everyone else today, a race against the clock, a draft run where you pick the next card and
-gather relics, a pass-and-play match for two, or practise any puzzle with no clock.
+gather relics, the same draft run as everyone else this week in the weekly league, a pass-and-play match for two, or practise any puzzle with no clock.
 
 ![Endless Medley: a Path Link puzzle with the next three cards up next](cover.png)
 
@@ -19,7 +19,7 @@ It plays sideways or upright, and turns with the phone.
 
 | Control | Action |
 | --- | --- |
-| Tap or click | Fill a cell, pick an island, flip a tile, press a pad key or a glyph |
+| Tap or click | Fill a cell, pick an island, flip or slide a tile, press a pad key, a glyph or a number |
 | Drag | Slide a block (Unjam) or draw a path (Path Link) |
 | Keys 1-9, Backspace | Write or clear a number (Calc Cages, Cross Sums); pick a glyph (Code Breaker) |
 | Enter | Make the guess (Code Breaker) |
@@ -40,15 +40,28 @@ It plays sideways or upright, and turns with the phone.
 | Unjam | Spatial | Slide blocks along their length (drag them, or tap one and then a free cell in its line) to free the gold block through the gap. |
 | Tile Flip | Spatial | A tap flips a tile and its four neighbours; put every light out. |
 | Path Link | Spatial | Drag to join each pair of matching stars; the paths fill every cell and never cross. |
+| Star Slide | Spatial | Tap a tile beside the gap to slide it in. Put the tiles in order, 1 first and the gap last (3x3 up to Adept, 4x4 from Master). |
+| Star Series | Numbers | Three rows of numbers, each following a rule (steps, two steps in turn, growing steps, doubling or tripling, and at Oracle the sum of the two before, squares, or double and add). Pick the number that comes next from four; a third wrong pick loses the puzzle, and a hint strikes out a wrong option. |
 | Memory Echo | Memory | Cards turn up one at a time; say whether each is the same as the one 1, 2 or 3 steps back. Three in four must be right. |
 
 Any answer that keeps the rules counts, not only the one the puzzle was made from.
 
-![All nine puzzles](docs/screenshots/puzzles.webp)
+![Nine of the puzzles](docs/screenshots/puzzles.webp)
+
+![Star Slide](docs/screenshots/star-slide.webp)
+
+![Star Series](docs/screenshots/star-series.webp)
 
 ### Modes
 
-![The menu: six mode cards](docs/screenshots/menu.webp)
+![The menu: eight mode cards](docs/screenshots/menu.webp)
+
+- **Journey**: forty set puzzles, the same for everyone, in five temples of eight steps. Each
+  temple teaches two or three kinds and ends in a boss. A step solved with half its time left earns
+  three stars, with a quarter two, else one, and every paid hint costs a star. Each step opens the
+  next, and 12 of a temple's 24 stars open the next temple. One hint per step.
+
+  ![The journey's map of five temples](docs/screenshots/journey.webp)
 
 - **Endless Medley**: random puzzles one after another, never the same kind twice in a row, three
   more always showing as Up next. Every three puzzles the level goes up. Each puzzle has its own
@@ -70,12 +83,20 @@ Any answer that keeps the rules counts, not only the one the puzzle was made fro
 
   Each puzzle kind has its own charm, taken once: Inkwell (Picture Grid), Bridgewright (Bridges),
   Cipher Wheel (Code Breaker), Abacus (Calc Cages), Tally Stone (Cross Sums), Oiled Gear (Unjam),
-  Mirror Coin (Tile Flip), Silver Spool (Path Link) and Echo Shell (Memory Echo). Its kind's
+  Mirror Coin (Tile Flip), Silver Spool (Path Link), Brass Compass (Star Slide), Sextant (Star
+  Series) and Echo Shell (Memory Echo). Its kind's
   puzzles come with a free hint, which costs no points, and pay half again the points; Memory Echo,
   which has no hints, turns its cards a third slower instead. A draft card marks the charm it
   is helped by, so the run leans towards the kinds you hold charms for.
 
   ![A relic offer with a charm](docs/screenshots/charms.webp)
+
+- **Weekly League**: a Draft Run dealt from the week's seed, so every player gets the same cards
+  and relic offers all week (Monday to Sunday). Play it as often as you like; the menu keeps the
+  week's best and its rank: Novice, Adept (1,000 points), Mystic (3,000), Oracle (6,000) and Seer
+  (10,000).
+
+  ![The weekly league's end card with its rank](docs/screenshots/weekly-rank.webp)
 
 - **Pass and Play**: two players take turns on the same three puzzles (Novice, Adept, Master). The
   lower total time wins; a skip or loss adds 30 seconds and a hint 15.
@@ -84,14 +105,14 @@ Any answer that keeps the rules counts, not only the one the puzzle was made fro
 
 ![A draft: two cards to choose from](docs/screenshots/draft.webp)
 
-**Bosses**: every fifth puzzle of Endless and Draft is a boss, framed in rose: two puzzles of two
+**Bosses**: every fifth puzzle of Endless and Draft (and the weekly league) is a boss, framed in rose: two puzzles of two
 kinds played back to back on one clock (four fifths of their two times added up). Beat both for
 double points and a relic pick, in Endless too (there without the Crystal Ball); a loss, skip or
 timeout in either half loses the boss. Up next and the draft cards say which puzzle follows.
 
 ![A boss: its second half, Picture Grid after Tile Flip](docs/screenshots/boss.webp)
 
-**Omens**: in Endless and Draft, each puzzle offers an omen in the top bar until its first move or
+**Omens**: in Endless and the drafts, each puzzle offers an omen in the top bar until its first move or
 hint. Tempt it for double points: **Haste** halves the puzzle's time, **Silence** takes away Undo
 and hints, and **Peril** makes a loss cost two hearts (Memory Echo only offers Peril).
 
@@ -107,17 +128,20 @@ hint (never below 20), times a streak bonus of 10% per puzzle solved in a row (u
 **Records** keeps the puzzles solved of each kind, the fastest solve without hints at each level,
 and the best score of each mode.
 
-**Difficulty** (hub setting): Easy gives 4 hearts in Endless and Draft and 4 minutes of Blitz, Hard
+**Difficulty** (hub setting): Easy gives 4 hearts in Endless and the drafts and 4 minutes of Blitz, Hard
 2 hearts and 2½ minutes; Normal is 3 hearts and 3 minutes. The puzzles themselves don't change.
 
 ## Code layout
 
-- `src/game/puzzles/`: the nine puzzles, each making itself from a seed and level, with its rules,
-  moves and hint (`nonogram`, `bridges`, `code`, `calc`, `sums`, `unjam`, `flip`, `link`, `echo`).
+- `src/game/puzzles/`: the eleven puzzles, each making itself from a seed and level, with its rules,
+  moves and hint (`nonogram`, `bridges`, `code`, `calc`, `sums`, `unjam`, `flip`, `link`, `slide`,
+  `series`, `echo`).
 - `src/game/kinds.ts`: the puzzle kinds, their skills and the `PuzzleDef` they share.
-- `src/game/run.ts`: the six modes: dealing, hearts, hints, clocks, points, drafts and relics.
+- `src/game/journey.ts`, `src/game/weekly.ts`: the journey's steps and stars, the weekly league's
+  week and ranks.
+- `src/game/run.ts`: the eight modes: dealing, hearts, hints, clocks, points, drafts and relics.
 - `src/game/progress.ts`, `src/game/save.ts`: the records and their save.
-- `src/scenes/GameScene.ts`: the menu, practice picker, records and the run screen.
+- `src/scenes/GameScene.ts`: the menu, journey map, practice picker, records and the run screen.
 - `src/scenes/views/`: how each puzzle is drawn and played.
 - `src/scenes/painter.ts`, `glyphs.ts`, `theme.ts`, `layout.ts`: drawing, emblems, colours and
   positions.

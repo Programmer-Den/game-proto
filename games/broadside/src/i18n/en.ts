@@ -18,6 +18,8 @@ const en = {
   flagshipCalled: 'flagship',
   admiralName: "Admiral's flagship",
   admiralCalled: "admiral's flagship",
+  tempestName: 'The Tempest',
+  tempestCalled: 'Tempest',
   merchantName: 'Merchantman',
   merchantCalled: 'merchantman',
 
@@ -219,8 +221,8 @@ const en = {
   sunkTitle: 'Sunk!',
   wonTitle: 'The haven is razed!',
   wonText:
-    "The admiral's flagship went down on wave {wave}: the campaign is won.\n{sunk} ships sunk, {taken} taken as prizes and {gold} gold plundered.\nSail on through the waves beyond, or sail again from wave 1.",
-  sunkText: 'Your ship went down on wave {wave}.\n{sunk} ships sunk, {taken} taken as prizes and {gold} gold plundered.\nBest wave beaten: {best}.',
+    "The admiral's flagship went down on wave {wave}: the campaign is won, and the Storm Reaches lie ahead.\n{sunk} ships sunk, {taken} taken as prizes and {gold} gold plundered.",
+  sunkText: 'Your ship went down on wave {wave}.\n{sunk} ships sunk, {taken} taken as prizes and {gold} gold plundered.',
   medals: {
     one: 'The Admiralty awards you {n} medal ({left} to spend).\nChoose a ship and starting upgrades for your next run:',
     other: 'The Admiralty awards you {n} medals ({left} to spend).\nChoose a ship and starting upgrades for your next run:',
@@ -231,6 +233,51 @@ const en = {
   medalCost: '{n} medals',
   sailAgain: 'Sail again',
   sailOn: 'Sail on',
+
+  // The captain's log: five named enemy captains
+  marenName: 'Maren Blackwater',
+  haskName: 'Gentleman Hask',
+  tullName: 'One-Eye Tull',
+  corraName: 'Widow Corra',
+  anselName: 'Ansel Saltjaw',
+  captainSub: 'Captain {name} sails with them: sink her for the log!',
+  captainBackSub: '{name} is back, with {gold} gold on her head!',
+  captainWanted: 'Wanted: {name}, {gold} gold',
+  captainFlees: '{name} runs for it!',
+  captainSunk: '{name} sunk: log {n} of {total}',
+  captainSunkPaid: '{name} sunk for {gold} gold: log {n} of {total}',
+  captainEscaped: '{name} got away: back on wave {wave}',
+  logLine: "Captain's log: {n} of {total} sunk",
+  logFull: "Captain's log filled: Renown (board at a quarter of the hull)",
+  recordLine: 'Best wave beaten: {best}   ❦   {log}',
+  recordReaches: 'Best wave {best}   ❦   Storm Reaches {reach} of {total}   ❦   {log}',
+
+  // The Storm Reaches
+  reachHud: 'Reach {wave}',
+  reachesTitle: 'Storm Reaches: wave {wave}',
+  reachesCourse: 'Storm Reaches {wave}: {course}',
+  reachesSub: 'Squalls swing the wind round, and reefs lie in wait!',
+  tempestTitle: 'The eye of the storm',
+  tempestSub: 'The Tempest is sighted: sink her to calm the Reaches!',
+  squallComing: 'Squall! Wind from {point}',
+  squallBlowing: 'Squall from {point}',
+  reachesHarborTitle: 'Harbour: Reaches wave {wave} beaten',
+  calmTitle: 'The Reaches are calmed!',
+  calmText: 'The Tempest went down on wave {wave}: the Storm Reaches are yours.\n{sunk} ships sunk, {taken} taken as prizes and {gold} gold plundered.',
+  sailReaches: 'Storm Reaches',
+
+  // The daily voyage
+  dailyButton: 'Daily voyage',
+  dailyDone: 'Today: {score}',
+  dailyUsed: 'Sailed today',
+  dailySub: 'Daily voyage: the {ship}, with {perks}',
+  infoDaily: 'Ships left {left}   ❦   Sunk {sunk}   ❦   Score {score}',
+  dailyTitle: 'The daily voyage is over',
+  dailyText: {
+    one: 'Score {score}: {waves} waves beaten and {gold} gold plundered.\nBest {best}   ❦   {n} day in a row. A new voyage sails tomorrow.',
+    other: 'Score {score}: {waves} waves beaten and {gold} gold plundered.\nBest {best}   ❦   {n} days in a row. A new voyage sails tomorrow.',
+  },
+  dailyMedals: 'No medals on the daily voyage ({left} to spend).\nChoose a ship and starting upgrades for your next run:',
 };
 
 export default en;

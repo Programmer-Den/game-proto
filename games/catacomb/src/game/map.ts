@@ -1,6 +1,7 @@
 import type { TextKey } from '../i18n';
 import type { EnemyKind } from './enemies';
-import { EVENT_IDS, type EventId } from './events';
+import type { EventId } from './events';
+import { random } from './rng';
 
 // The dungeon of each act: rooms in seven columns from the entrance on the left to the act's boss
 // on the right. Every column between holds two or three rooms, and from each room the paths lead
@@ -23,8 +24,10 @@ export interface Room {
 
 /** How many columns of rooms an act has, the boss's included. */
 export const COLUMNS = 7;
-/** How many acts a run has. */
+/** How many acts a run has: two, and a third (the Bone Spire) from SPIRE_DEPTH down (see `lastAct` in sim.ts). */
 export const ACTS = 2;
+/** The depth from which the Hollow Queen's fall leads up the Bone Spire, a third act. */
+export const SPIRE_DEPTH = 3;
 
 const colX = (col: number) => 110 + col * 130;
 const MID = 290;
@@ -39,6 +42,8 @@ interface ActFoes {
   late: EnemyKind[][];
   elites: EnemyKind[][];
   boss: EnemyKind;
+  /** The mystery rooms its map draws from. */
+  events: EventId[];
 }
 
 /** The foes each act's rooms can hold. Act one always opens on a lone slime. */
@@ -50,6 +55,7 @@ export const ACT_FOES: ActFoes[] = [
     late: [['cultist', 'rat'], ['skeleton', 'cultist'], ['rat', 'rat', 'slime'], ['skeleton', 'rat'], ['slime', 'slime']],
     elites: [['graveKnight'], ['bogWitch']],
     boss: 'boneKing',
+    events: ['altar', 'shrine', 'chest', 'pool'],
   },
   {
     name: 'tombsAct',
@@ -58,6 +64,16 @@ export const ACT_FOES: ActFoes[] = [
     late: [['mummy'], ['ghoul', 'spider'], ['wraith', 'wraith'], ['mummy', 'spider'], ['ghoul', 'wraith']],
     elites: [['gargoyle'], ['bogWitch', 'spider']],
     boss: 'hollowQueen',
+    events: ['altar', 'shrine', 'chest', 'pool'],
+  },
+  {
+    name: 'spireAct',
+    first: ['boneArcher'],
+    early: [['marrowBat', 'marrowBat'], ['shade'], ['boneArcher', 'marrowBat'], ['ossuary']],
+    late: [['ossuary', 'shade'], ['boneArcher', 'boneArcher'], ['shade', 'marrowBat', 'marrowBat'], ['ossuary', 'boneArcher'], ['shade', 'shade']],
+    elites: [['bellRinger'], ['ossuary', 'shade', 'marrowBat']],
+    boss: 'marrowTyrant',
+    events: ['brazier', 'reliquary', 'altar', 'pool'],
   },
 ];
 
@@ -71,7 +87,7 @@ const COLUMN_KINDS: { must: RoomKind; extra: RoomKind[] }[] = [
 ];
 
 /**
- * A new map for an act, drawn with Math.random: a lone fight (in act one, always a slime), five
+ * A new map for an act, drawn with `random` (Math.random outside the daily): a lone fight (in act one, always a slime), five
  * columns of two or three rooms each, and the boss. Every column has its own kind of room that is
  * always there (an event, a campfire, a treasure chest, a merchant) and one or two drawn from a
  * few others, in random rows. Each room leads to the rooms facing it in the next column, sometimes
@@ -79,7 +95,7 @@ const COLUMN_KINDS: { must: RoomKind; extra: RoomKind[] }[] = [
  */
 export function makeMap(act = 1): Room[] {
   const foes = ACT_FOES[act - 1];
-  const rnd = (n: number) => Math.floor(Math.random() * n);
+  const rnd = (n: number) => Math.floor(random() * n);
   const bag = <T>(items: T[]) => {
     let left: T[] = [];
     return () => {
@@ -90,7 +106,7 @@ export function makeMap(act = 1): Room[] {
   const early = bag(foes.early);
   const late = bag(foes.late);
   const elite = bag(foes.elites);
-  const event = bag(EVENT_IDS);
+  const event = bag(foes.events);
 
   const columns: RoomKind[][] = [['fight']];
   for (const { must, extra } of COLUMN_KINDS) {

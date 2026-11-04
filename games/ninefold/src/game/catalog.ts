@@ -44,19 +44,34 @@ export const UNIQUE_RELICS: readonly RelicId[] = ['twin'];
 
 /**
  * Delve twists, drawn from floor 4 on: Diagonal (both long diagonals hold each digit once),
- * Parity (shaded cells hold even digits, the rest odd), Clock (a heart is lost every 3 minutes)
- * and Sealed (no hints on the floor; clearing it gives one back).
+ * Parity (shaded cells hold even digits, the rest odd), Killer (dashed cages add up to their
+ * sums), Thermo (digits rise along each thermometer from its bulb), Clock (a heart is lost every
+ * 3 minutes) and Sealed (no hints on the floor; clearing it gives one back). The first four
+ * change the board's rules (`BOARD_TWISTS`), the last two press the player.
  */
-export const TWISTS = ['diagonal', 'parity', 'clock', 'sealed'] as const;
+export const TWISTS = ['diagonal', 'parity', 'killer', 'thermo', 'clock', 'sealed'] as const;
 export type Twist = (typeof TWISTS)[number];
 
 export const TWIST_INFO: Record<Twist, { name: TextKey; rule: TextKey }> = {
   diagonal: { name: 'diagonalName', rule: 'diagonalRule' },
   parity: { name: 'parityName', rule: 'parityRule' },
   clock: { name: 'clockName', rule: 'clockRule' },
+  killer: { name: 'killer', rule: 'killerRule' },
+  thermo: { name: 'thermo', rule: 'thermoRule' },
   sealed: { name: 'sealedName', rule: 'sealedRule' },
 };
 
-/** Classic's three puzzle levels. */
-export const LEVELS = ['easy', 'normal', 'hard'] as const;
+export const BOARD_TWISTS = ['diagonal', 'parity', 'killer', 'thermo'] as const satisfies readonly Twist[];
+export const PRESSING_TWISTS = ['clock', 'sealed'] as const satisfies readonly Twist[];
+
+/**
+ * Delve ascensions: clearing floor `ASCEND_FLOOR` at one opens the next, up to five. Each adds
+ * one rule to those below it: one heart fewer, no starting hint, fewer givens, no notes, and two
+ * relics offered instead of three.
+ */
+export const ASCENSION_RULES = ['ascentHearts', 'ascentHint', 'ascentGivens', 'ascentNotes', 'ascentOffer'] as const satisfies readonly TextKey[];
+export const MAX_ASCENT = ASCENSION_RULES.length;
+
+/** Classic's puzzle levels: three by givens, then a Killer and a Thermo board. */
+export const LEVELS = ['easy', 'normal', 'hard', 'killer', 'thermo'] as const;
 export type Level = (typeof LEVELS)[number];

@@ -1,5 +1,8 @@
+import { random } from './random';
 import { byDifficulty } from '../../../../shared/settings';
 import { bountyMet, bountyPay, drawBounty } from './bounties';
+import { CAPTAIN_HP, CAPTAIN_IDS, captainBounty, CAPTAINS, FLEE_HP, FLEE_MS, FLEE_SPEED, RENOWN_BOARD_HP, RETURN_HP, RETURN_WAVES } from './captains';
+import { FIRST_SQUALL, REEF_CLEAR, REEF_DAMAGE, REEF_R, REEFS, SQUALL_EVERY, SQUALL_MS, SQUALL_WARN, TEMPEST_CALLS, TEMPEST_MEDALS } from './storm';
 import { CONSORT_MAX, consortWage } from './consorts';
 import { CONVOY_ARRIVE, CONVOY_FAR, CONVOY_SAIL, convoyCargo, isConvoyWave } from './convoy';
 import { coursesFor, ESCAPE_MS, HUNTER_CARDS, MERCHANT_LOOT, type CourseId } from './courses';
@@ -53,7 +56,7 @@ import {
 } from './state';
 import { medalsFor } from './admiralty';
 import { costOf, HIRE, REPAIR_COST, type UpgradeId } from './upgrades';
-import { fortsFor, HAVEN_WAVE, hpScale, waveShips } from './waves';
+import { fortsFor, HAVEN_WAVE, hpScale, inReaches, reachWave, TEMPEST_WAVE, waveShips } from './waves';
 
 /** Time between enemy ships coming over the horizon. */
 const SPAWN_MS = 2500;
@@ -147,17 +150,22 @@ export function tick(s: GameState, dt: number) {
     // Nothing to shoot at yet: the guns can't be aimed until the wave comes.
     s.charge = { port: null, starboard: null };
     runAground(s, s.player);
+    strikeReefs(s, s.player);
     playerSunk(s);
     return;
   }
 
   s.waveMs += dt;
+  weather(s, dt);
   spawn(s, dt);
   for (const e of s.enemies) sailEnemy(s, e, dt);
   for (const e of s.escorts) sailEscort(s, e, dt);
   escape(s, dt);
   separate(s);
-  for (const ship of [s.player, ...s.enemies, ...s.escorts]) runAground(s, ship);
+  for (const ship of [s.player, ...s.enemies, ...s.escorts]) {
+    runAground(s, ship);
+    strikeReefs(s, ship);
+  }
   board(s, dt);
   aimBroadsides(s, dt);
   ownMortar(s, dt);
@@ -167,6 +175,7 @@ export function tick(s: GameState, dt: number) {
   moveBalls(s, dt);
   landShells(s, dt);
   ram(s);
+  tempestCalls(s);
 
   // A fireship sunk blows up and may take others down with it, so keep sinking until none are left.
   for (let down = s.enemies.filter((e) => e.hp <= 0); down.length; down = s.enemies.filter((e) => e.hp <= 0)) {
@@ -189,14 +198,16 @@ export function tick(s: GameState, dt: number) {
     for (const l of s.loot) haulIn(s, l);
     s.loot = [];
     reachHarbor(s);
-    // The pirate haven razed and the admiral sunk: the campaign is won, though the waves go on.
-    if (s.wave === HAVEN_WAVE && !s.won) {
+    // The pirate haven razed and the admiral sunk: the campaign is won, and the Storm Reaches lie
+    // ahead. The Tempest sunk at their end calms them, and the waves go on beyond.
+    if ((s.wave === HAVEN_WAVE && !s.won) || s.wave === TEMPEST_WAVE) {
       s.won = true;
       s.phase = 'won';
       // Bank only the waves' medals: `playerSunk` subtracts this from its own wave count, which
-      // never includes `WIN_MEDALS`.
-      s.medalsBanked = medalsFor(s.wave, s.bestBefore);
-      s.medals = s.medalsBanked + WIN_MEDALS;
+      // never includes `WIN_MEDALS` or `TEMPEST_MEDALS`.
+      const banked = medalsFor(s.wave, s.bestBefore);
+      s.medals = banked - s.medalsBanked + (s.wave === TEMPEST_WAVE ? TEMPEST_MEDALS : WIN_MEDALS);
+      s.medalsBanked = banked;
     }
   }
 }
@@ -262,6 +273,72 @@ function runAground(s: GameState, ship: Ship) {
 }
 
 /**
+ * A ship that strikes a reef in the Storm Reaches is thrown back off it like off a beach, but the
+ * rocks tear her hull far worse: `REEF_DAMAGE`, at most once every `AGROUND_MS`. Enemy captains keep
+ * no lookout for reefs, so a careless one can wreck herself on them.
+ */
+function strikeReefs(s: GameState, ship: Ship) {
+  for (const reef of s.reefs) {
+    const { dx, dy } = offset(reef, ship);
+    const reach = reef.r + radiusOf(ship) * 0.6;
+    const d = Math.hypot(dx, dy);
+    if (d >= reach) continue;
+    const nx = d ? dx / d : 1;
+    const ny = d ? dy / d : 0;
+    ship.x = reef.x + nx * reach;
+    ship.y = reef.y + ny * reach;
+    wrapPoint(ship);
+    const vx = Math.cos(ship.heading);
+    const vy = Math.sin(ship.heading);
+    const into = vx * nx + vy * ny;
+    if (into < 0) ship.heading = Math.atan2(vy - 2 * into * ny, vx - 2 * into * nx);
+    if (ship.agroundMs > 0) continue;
+    hurt(s, ship, REEF_DAMAGE);
+    if (ship === s.player) s.waveAground++;
+    ship.agroundMs = AGROUND_MS;
+    effect(s, 'hit', wrapCoord(ship.x - nx * reach * 0.5, WORLD.w), wrapCoord(ship.y - ny * reach * 0.5, WORLD.h), 400);
+  }
+}
+
+/**
+ * The Storm Reaches' squalls: every `SQUALL_EVERY` of fighting one comes up, seen `SQUALL_WARN`
+ * ahead (`squallTo`, the wind it brings, two or three points round from the wind now), then the
+ * wind swings round to it and rain falls for `SQUALL_MS`. Uses random() twice per squall.
+ */
+function weather(s: GameState, dt: number) {
+  s.squallBlowMs = Math.max(0, s.squallBlowMs - dt);
+  if (!inReaches(s.wave)) return;
+  s.squallMs -= dt;
+  if (s.squallMs <= SQUALL_WARN && s.squallTo === null) {
+    const points = (random() < 0.5 ? -1 : 1) * (2 + Math.floor(random() * 2));
+    s.squallTo = wrap(s.wind + (points * Math.PI) / 4);
+  }
+  if (s.squallMs > 0) return;
+  s.wind = s.squallTo ?? s.wind;
+  s.squallTo = null;
+  s.squallBlowMs = SQUALL_MS;
+  s.squallMs = SQUALL_EVERY;
+  effect(s, 'squall', s.player.x, s.player.y, SQUALL_MS);
+}
+
+/** The Tempest calls a squall down at once each time her hull falls past one of `TEMPEST_CALLS`. */
+function tempestCalls(s: GameState) {
+  const tempest = s.enemies.find((e) => e.kind === 'tempest' && e.hp > 0);
+  if (!tempest || s.tempestCalls >= TEMPEST_CALLS.length || tempest.hp > tempest.maxHp * TEMPEST_CALLS[s.tempestCalls]) return;
+  s.tempestCalls++;
+  s.squallMs = Math.min(s.squallMs, SQUALL_WARN);
+}
+
+/** Whether a spot is clear of every island's beach (grown by `room`) and every reef (by `room` too). */
+function clearSea(s: GameState, p: { x: number; y: number }, room: number) {
+  const islands = ISLANDS.every((i) => {
+    const { dx, dy } = offset(i, p);
+    return Math.hypot(dx / (i.rx + room), dy / (i.ry + room)) >= 1;
+  });
+  return islands && s.reefs.every((r) => distance(r, p) >= r.r + room);
+}
+
+/**
  * Turns a ship toward `heading` at up to `turn` radians a second, then sails it forward, over the
  * edge of the sea and back in on the other side if it gets there.
  */
@@ -279,37 +356,66 @@ function spawn(s: GameState, dt: number) {
   if (s.spawnMs > 0 || s.toSpawn.length === 0) return;
   s.spawnMs = SPAWN_MS;
   const kind = s.toSpawn.shift()!;
-  let angle = Math.random() * Math.PI * 2;
+  let angle = random() * Math.PI * 2;
   let x = 0;
   let y = 0;
   // Never on top of an island: further round the horizon until the sea is clear.
   for (let k = 0; k < 12; k++) {
     x = wrapCoord(s.player.x + Math.cos(angle) * SPAWN_DISTANCE, WORLD.w);
     y = wrapCoord(s.player.y + Math.sin(angle) * SPAWN_DISTANCE, WORLD.h);
-    const clear = ISLANDS.every((i) => {
-      const { dx, dy } = offset(i, { x, y });
-      return Math.hypot(dx / (i.rx + 60), dy / (i.ry + 60)) >= 1;
-    });
-    if (clear) break;
+    if (clearSea(s, { x, y }, 60)) break;
     angle += 0.5;
   }
   const type = ENEMIES[kind];
   const hp = Math.round(type.hp * hpScale(s.wave) * byDifficulty(0.75, 1, 1.3));
   const ship = newShip(s.nextId++, kind, x, y, bearing({ x, y }, s.player), hp, type.radius, type.crew);
   if (type.role === 'merchant') ship.escapeMs = ESCAPE_MS;
+  // The first ship of a named captain's kind due this wave is hers: sturdier, and more so each time she got away.
+  const named = s.named.find((id) => CAPTAINS[id].kind === kind);
+  if (named) {
+    const run = s.captains[named];
+    ship.captain = named;
+    ship.maxHp = ship.hp = Math.round(hp * CAPTAIN_HP * (1 + RETURN_HP * run.escapes));
+    run.state = 'sailing';
+    s.named = s.named.filter((id) => id !== named);
+  }
   s.enemies.push(ship);
 }
 
-/** Merchantmen on the Merchant lane that run long enough get clean away, with no loot. */
+/**
+ * Merchantmen on the Merchant lane that run long enough get clean away, with no loot. So does a
+ * named captain who runs (from `FLEE_HP` of her hull) for `FLEE_MS`: she comes back `RETURN_WAVES`
+ * later, sturdier and with a bounty on her head.
+ */
 function escape(s: GameState, dt: number) {
   for (const e of s.enemies) {
-    if (ENEMIES[e.kind as EnemyKind].role !== 'merchant' || e.hp <= 0) continue;
+    if (e.hp <= 0) continue;
+    if (e.captain && e.escapeMs === 0 && e.hp <= e.maxHp * FLEE_HP) e.escapeMs = FLEE_MS;
+    if (ENEMIES[e.kind as EnemyKind].role !== 'merchant' && !(e.captain && e.escapeMs > 0)) continue;
     e.escapeMs -= dt;
     if (e.escapeMs > 0) continue;
     s.enemies = s.enemies.filter((o) => o !== e);
     effect(s, 'escape', e.x, e.y, 1400);
+    if (e.captain) {
+      const run = s.captains[e.captain];
+      run.state = 'escaped';
+      run.escapes++;
+      run.due = s.wave + RETURN_WAVES;
+      s.waveCaptains.push({ id: e.captain, fate: 'escaped', gold: 0 });
+    }
     return escape(s, 0);
   }
+}
+
+/** A named captain sunk or taken: her bounty (if she ever got away) comes aboard, and the lasting log holds her. */
+function logCaptain(s: GameState, e: Ship) {
+  if (!e.captain) return;
+  const run = s.captains[e.captain];
+  run.state = 'sunk';
+  const gold = captainBounty(run.escapes);
+  if (gold) haulIn(s, { id: 0, x: e.x, y: e.y, gold, ms: 0 });
+  if (!s.log.includes(e.captain)) s.log.push(e.captain);
+  s.waveCaptains.push({ id: e.captain, fate: 'sunk', gold });
 }
 
 /** The wave's convoy merchantman, while she is at sea. */
@@ -327,8 +433,8 @@ function arrive(s: GameState) {
   haulIn(s, { id: 0, x: ship.x, y: ship.y, gold: s.convoy.cargo, ms: 0 });
 }
 
-/** An enemy ship crippled enough to board and take: under a fifth of its hull. Fireships burn instead. */
-export const boardable = (e: Ship) => e.kind !== 'player' && e.kind !== 'fireship' && e.hp > 0 && e.hp <= e.maxHp * BOARD_HP;
+/** An enemy ship crippled enough to board and take: under a fifth of its hull (a quarter with Renown). Fireships burn instead. */
+export const boardable = (e: Ship, renown = false) => e.kind !== 'player' && e.kind !== 'fireship' && e.hp > 0 && e.hp <= e.maxHp * (renown ? RENOWN_BOARD_HP : BOARD_HP);
 
 /**
  * How fast an enemy ship (or a prize) sails right now on its heading: with or against the wind,
@@ -337,7 +443,9 @@ export const boardable = (e: Ship) => e.kind !== 'player' && e.kind !== 'fireshi
 export function speedOf(s: GameState, e: Ship) {
   let speed = ENEMIES[e.kind as keyof typeof ENEMIES].speed * windSpeed(s.wind, e.heading);
   if (e.slowMs > 0) speed *= SHOTS.chain.slow ?? 1;
-  if (boardable(e)) speed *= CRIPPLED;
+  if (boardable(e, s.renown)) speed *= CRIPPLED;
+  // A named captain running for it crowds on sail.
+  if (e.captain && e.escapeMs > 0) speed *= FLEE_SPEED;
   // The convoy is laden with her cargo.
   if (s.convoy?.id === e.id) speed *= CONVOY_SAIL;
   return speed;
@@ -379,7 +487,9 @@ function captain(s: GameState, e: Ship, target: Ship, dt: number) {
       want = round.heading;
     }
   };
-  if (type.role === 'fireship') close();
+  // A named captain running for it sails straight away from the player.
+  if (e.captain && e.escapeMs > 0) want = b + Math.PI;
+  else if (type.role === 'fireship') close();
   // A merchantman carries no guns and runs from the player.
   else if (type.role === 'merchant') want = b + Math.PI;
   else if (type.role === 'mortar') {
@@ -748,7 +858,7 @@ function escortBroadsides(s: GameState, dt: number) {
 /**
  * A mortar ketch lobs a shell at `target` whenever loaded and in range: it marks the spot where the
  * shell will land (where the target will be if it holds its course), and the shell comes down there
- * `SHELL_MS` later. Its one mortar reloads on the port side's timer. Uses Math.random twice.
+ * `SHELL_MS` later. Its one mortar reloads on the port side's timer. Uses random() twice.
  */
 function mortar(s: GameState, e: Ship, target: Ship, targetSpeed: number, dt: number) {
   const type = ENEMIES[e.kind as keyof typeof ENEMIES];
@@ -758,11 +868,11 @@ function mortar(s: GameState, e: Ship, target: Ship, targetSpeed: number, dt: nu
   e.reload.port = type.reloadMs;
 }
 
-/** Lobs a shell at where `target` will be in `SHELL_MS` if it holds its course, off by up to `spread`. Uses Math.random twice. */
+/** Lobs a shell at where `target` will be in `SHELL_MS` if it holds its course, off by up to `spread`. Uses random() twice. */
 function lobAt(s: GameState, from: { x: number; y: number }, target: Ship, targetSpeed: number, damage: number, spread: number) {
   const lead = (targetSpeed * SHELL_MS) / 1000;
-  const a = Math.random() * Math.PI * 2;
-  const r = Math.random() * spread;
+  const a = random() * Math.PI * 2;
+  const r = random() * spread;
   const x = wrapCoord(target.x + Math.cos(target.heading) * lead + Math.cos(a) * r, WORLD.w);
   const y = wrapCoord(target.y + Math.sin(target.heading) * lead + Math.sin(a) * r, WORLD.h);
   lob(s, from, x, y, damage);
@@ -774,7 +884,7 @@ function lob(s: GameState, from: { x: number; y: number }, x: number, y: number,
   effect(s, 'smoke', from.x, from.y, 800, { heading: bearing(from, { x, y }) });
 }
 
-/** Shore forts shell the player whenever loaded and in range, as a mortar ketch does. Uses Math.random twice per shell. */
+/** Shore forts shell the player whenever loaded and in range, as a mortar ketch does. Uses random() twice per shell. */
 function fortsFire(s: GameState, dt: number) {
   const player = s.player;
   const playerSpeed = stats(s).speed * windSpeed(s.wind, player.heading);
@@ -877,7 +987,7 @@ function fire(
     const x = wrapCoord(ship.x + Math.cos(ship.heading) * along + Math.cos(out) * r * 0.6, WORLD.w);
     const y = wrapCoord(ship.y + Math.sin(ship.heading) * along + Math.sin(out) * r * 0.6, WORLD.h);
     for (let k = 0; k < pellets; k++) {
-      const dir = aim + (k - (pellets - 1) / 2) * PELLET_FAN + (Math.random() * 2 - 1) * spread;
+      const dir = aim + (k - (pellets - 1) / 2) * PELLET_FAN + (random() * 2 - 1) * spread;
       s.balls.push({
         id: s.nextId++,
         x,
@@ -948,6 +1058,7 @@ function sink(s: GameState, e: Ship) {
   effect(s, 'sink', e.x, e.y, 1400, { heading: e.heading, ship: kind });
   s.loot.push({ id: s.nextId++, x: e.x, y: e.y, gold: lootOf(s, kind), ms: LOOT_MS });
   if (kind === 'fireship') blast(s, e.x, e.y, FIRE_BLAST, ENEMIES.fireship.damage);
+  logCaptain(s, e);
   // Not for a player sunk this same tick: salvage can't raise a wreck.
   if (hasPerk(s, 'salvage') && s.player.hp > 0) s.player.hp = Math.min(s.player.maxHp, s.player.hp + perkValue(s, 'salvage', SALVAGE_HULL, 0));
 }
@@ -969,7 +1080,7 @@ function board(s: GameState, dt: number) {
   const player = s.player;
   for (const e of [...s.enemies]) {
     const gap = distance(player, e) - radiusOf(player) - radiusOf(e);
-    e.boardMs = boardable(e) && canBoard(s, e) && gap < BOARD_REACH ? e.boardMs + dt : 0;
+    e.boardMs = boardable(e, s.renown) && canBoard(s, e) && gap < BOARD_REACH ? e.boardMs + dt : 0;
     if (e.boardMs < boardMs(s)) continue;
     s.enemies = s.enemies.filter((o) => o !== e);
     e.hp = Math.max(e.hp, Math.ceil(e.maxHp / 2));
@@ -977,7 +1088,9 @@ function board(s: GameState, dt: number) {
     e.slowMs = 0;
     e.jamMs = 0;
     e.detour = null;
+    e.escapeMs = 0;
     e.reload = { port: 1000, starboard: 1000 };
+    logCaptain(s, e);
     e.crew = prizeCrew(s, e);
     player.crew -= e.crew;
     s.escorts.push(e);
@@ -1083,6 +1196,7 @@ function reachHarbor(s: GameState) {
   // The crew has the whole harbor to reload; consorts and enemies set out loaded too.
   s.player.reload = { port: 0, starboard: 0 };
   s.bestWave = Math.max(s.bestWave, s.wave);
+  if (inReaches(s.wave)) s.reachesBest = Math.max(s.reachesBest, reachWave(s.wave));
   const max = stats(s).maxHp;
   s.player.hp = Math.min(max, s.player.hp + Math.round(max * HARBOR_PATCH));
   s.helm = 0;
@@ -1092,7 +1206,8 @@ function reachHarbor(s: GameState) {
   } else s.bountyPaid = null;
   // The prize draft: the first wave's is fixed, later ones draw from the perks not yet taken (or
   // their second rank), with a card more after a Hunter patrol.
-  s.draft = s.wave === 1 ? [...FIRST_DRAFT] : drawDraft(s.perks, DRAFT_SIZE + (s.course === 'hunter' ? HUNTER_CARDS : 0));
+  // The daily voyage draws its first draft too, from its own seeded sea.
+  s.draft = s.wave === 1 && !s.daily ? [...FIRST_DRAFT] : drawDraft(s.perks, DRAFT_SIZE + (s.course === 'hunter' ? HUNTER_CARDS : 0));
 }
 
 /** Takes one perk of the draft on offer at the harbor; false if it is not on offer. */
@@ -1184,9 +1299,20 @@ export function setSail(s: GameState, course: CourseId | null = null) {
   s.wave++;
   s.course = course;
   s.toSpawn = waveShips(s.wave, course);
+  // The named captains due this wave come in among the fleet.
+  s.named = CAPTAIN_IDS.filter((id) => {
+    const run = s.captains[id];
+    return (run.state === 'waiting' || run.state === 'escaped') && run.due === s.wave;
+  });
+  s.named.forEach((id, i) => s.toSpawn.splice(Math.min(s.toSpawn.length, 1 + 2 * i), 0, CAPTAINS[id].kind));
+  s.waveCaptains = [];
+  s.tempestCalls = 0;
+  s.squallMs = FIRST_SQUALL;
+  s.squallTo = null;
+  s.squallBlowMs = 0;
   s.order = drawOrder(s.order);
   // A new wind for the wave, from one of the eight main points of the compass.
-  s.wind = Math.floor(Math.random() * 8) * (Math.PI / 4);
+  s.wind = Math.floor(random() * 8) * (Math.PI / 4);
   s.bounty = drawBounty(s.wave, s.bounty);
   s.waveLoot = 0;
   s.waveDamage = 0;
@@ -1196,24 +1322,34 @@ export function setSail(s: GameState, course: CourseId | null = null) {
   s.waveSunk = [];
   s.mortarMs = perkValue(s, 'mortar', OWN_MORTAR.reloadMs, 0);
   s.forts = [];
-  // Forts on islands drawn at random, never two on one. Uses Math.random once per fort.
+  // Forts on islands drawn at random, never two on one. Uses random() once per fort.
   const islands = ISLANDS.map((_, i) => i);
   for (let k = 0; k < fortsFor(s.wave) && islands.length; k++) {
-    const island = islands.splice(Math.floor(Math.random() * islands.length), 1)[0];
+    const island = islands.splice(Math.floor(random() * islands.length), 1)[0];
     const { x, y } = ISLANDS[island];
     const hp = Math.round(FORT.hp * hpScale(s.wave) * byDifficulty(0.75, 1, 1.3));
     s.forts.push({ id: s.nextId++, island, x, y, hp, maxHp: hp, reload: FORT.reloadMs / 2, hitMs: 0 });
   }
   // The consorts set out in line astern of the player.
+  // Reefs out in the Storm Reaches, laid clear of the player, the beaches and each other. Uses random() twice per try.
+  s.reefs = [];
+  for (let k = 0; k < REEFS && inReaches(s.wave); k++) {
+    for (let tries = 0; tries < 20; tries++) {
+      const at = { x: random() * WORLD.w, y: random() * WORLD.h };
+      if (distance(at, s.player) < REEF_CLEAR.player || !clearSea(s, at, REEF_CLEAR.island) || s.reefs.some((r) => distance(r, at) < REEF_CLEAR.reef)) continue;
+      s.reefs.push({ id: s.nextId++, x: at.x, y: at.y, r: REEF_R });
+      break;
+    }
+  }
   s.escorts = s.consorts;
   s.consorts = [];
   s.moored = [];
   s.escorts.forEach((e, i) => station(s, e, i + 1));
   s.convoy = null;
   if (isConvoyWave(s.wave)) {
-    // Her island is drawn from those far enough off to make a passage of it. Uses Math.random once.
+    // Her island is drawn from those far enough off to make a passage of it. Uses random() once.
     const far = ISLANDS.map((_, i) => i).filter((i) => distance(s.player, ISLANDS[i]) >= CONVOY_FAR);
-    const island = far.length ? far[Math.floor(Math.random() * far.length)] : 0;
+    const island = far.length ? far[Math.floor(random() * far.length)] : 0;
     const type = ENEMIES.merchant;
     const ship = newShip(s.nextId++, 'merchant', s.player.x, s.player.y, s.player.heading, Math.round(type.hp * hpScale(s.wave)), type.radius, type.crew);
     station(s, ship, s.escorts.length + 1);

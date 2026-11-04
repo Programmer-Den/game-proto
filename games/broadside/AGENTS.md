@@ -17,8 +17,11 @@ kind of shot. From wave 6 islands carry shore forts and the harbor offers two co
 wave (Merchant lane or Hunter patrol); from wave 7 every third wave is a convoy wave, a merchantman
 to see safe to an island. Prizes can be kept as consorts that sail on from wave to wave, and late
 drafts offer a perk's second rank. Wave 20 is the pirate haven, whose admiral's
-flagship wins the campaign when sunk. Between runs, the Admiralty's medals buy starting upgrades
-and the player chooses a ship.
+flagship wins the campaign when sunk, and opens the Storm Reaches: 20 more waves with squalls
+that swing the wind, reefs and the Tempest at the end. Five named captains sail on their own
+waves, run when beaten and come back with a bounty; sinking all five over any runs fills the
+lasting captain's log for Renown. Between runs, the Admiralty's medals buy starting upgrades and
+the player chooses a ship, or sails the day's seeded daily voyage from the end card.
 
 - **Implemented:** endless waves (sloops from wave 1, brigs and fireships from wave 3, mortar
   ketches from wave 4, galleons from wave 5, a flagship last in every fifth wave, the admiral's
@@ -108,15 +111,51 @@ and the player chooses a ship.
   the east. Ships, balls and loot all wrap, and every distance and bearing takes the shortest way
   round. Islands have collision: any ship, player or enemy, that sails onto an island's beach is
   pushed off, glances away and takes `AGROUND_DAMAGE`.
+- **Storm Reaches** (`src/game/storm.ts`, and `REACHES_WAVES`, `TEMPEST_WAVE` 40, `inReaches`,
+  `reachWave` and `REACHES_FLEET` in `waves.ts`): every wave after `HAVEN_WAVE` is out in the
+  Reaches. The end card's "Sail on" button reads "Storm Reaches" until wave `TEMPEST_WAVE` and
+  calls `sailOn` as before. `waveShips` sizes a Reaches fleet as home wave `REACHES_FLEET +
+  reachWave / 2` (bosses on the real wave: a flagship every fifth, the `tempest` on 40), and
+  `hpScale` keeps growing with the real wave. Squalls (`weather`, called from `tick` while
+  fighting): `squallMs` counts down from `FIRST_SQUALL`, at `SQUALL_WARN` it draws `squallTo` (two
+  or three points round), at 0 the wind swings to it, `squallBlowMs` runs `SQUALL_MS` and a `squall`
+  effect is left at the player; `setSail` resets them. Reefs (`GameState.reefs`, `Reef`): `setSail`
+  lays `REEFS` of them (`REEF_CLEAR` from the player, beaches and each other, through `clearSea`,
+  which `spawn` uses too), and `strikeReefs` (after `runAground`, for every ship, and the player in
+  `break`) glances a ship off and `hurt`s her `REEF_DAMAGE` on the `agroundMs` cooldown; enemies
+  never steer round them. The Tempest (`ENEMIES.tempest`, look `extra: 'storm'`): `tempestCalls`
+  brings the next squall to `SQUALL_WARN` as her hull falls past each `TEMPEST_CALLS` share
+  (`GameState.tempestCalls`). Beating wave `TEMPEST_WAVE` sets phase `won` again, with
+  `TEMPEST_MEDALS`; `reachHarbor` keeps `reachesBest` (the best Reaches wave), which the scene saves.
+- **Captain's log** (`src/game/captains.ts`): `CAPTAINS` names five captains, each with a ship
+  kind and first wave. `GameState.captains` (`newCaptains`) tracks each in the run (`waiting`,
+  `sailing`, `escaped`, `sunk`, `due`, `escapes`). `setSail` puts those due into `named` and their
+  kind into `toSpawn`; `spawn` makes the first ship of that kind hers (`Ship.captain`, hull times
+  `CAPTAIN_HP` and `1 + RETURN_HP * escapes`). `escape` starts her running at `FLEE_HP` (`escapeMs`
+  = `FLEE_MS`; `captain` steers her away, `speedOf` adds `FLEE_SPEED`) and lets her go when it runs
+  out (`escaped`, `due` = wave + `RETURN_WAVES`). `sink` and `board` call `logCaptain`: her
+  `captainBounty` comes aboard, she goes into `GameState.log` (the lasting log, which the scene
+  saves) and into `waveCaptains` for the harbor's news. `renown` (`logFull` at `newRun`, never on
+  the daily) makes `boardable(e, s.renown)` take `RENOWN_BOARD_HP` instead of `BOARD_HP`.
+- **Daily voyage** (`src/game/voyage.ts`, `shared/daily.ts`): the end card's daily button (made
+  the first time the card shows, see "Randomness") calls `startDaily` and restarts the scene with
+  `{ daily: true }`; `create` takes `dailyRand('broadside')`, draws the ship and `VOYAGE_PERKS`
+  perks with `drawVoyage`, hands the same source to `useRandom` (`src/game/random.ts`) so the
+  whole run is seeded, and calls `newRun(..., { daily: { perks } })`, which sets `daily` and the
+  perks (no boons, no Renown). The first draft is drawn rather than `FIRST_DRAFT`. On phase `over`
+  or `won` the scene calls `finishDaily` with `voyageScore` (`WAVE_POINTS` a wave beaten plus
+  `plundered`), banks no medals and saves no best wave; the end card hides "Sail on" (the daily
+  ends at the haven) and shows the score, best and streak.
 - **Screens:** there is only `GameScene`. The wave banner, the captain's order card, the bounty
   line, the wind rose, the scuttle button, the harbor panel (ledger or prize draft) and the
   game-over panel (also the haven's end card) are overlays drawn on top of it. The start and pause
   screens, the M key and the P key come from `setupGame` (`shared/startScreen.ts`); the other
   shared settings (difficulty, frame cap, FPS readout, reduced motion and full screen) are set on the
   hub page.
-- **Persistence:** the best wave beaten, the banked medals and the ship chosen are saved. Each
+- **Persistence:** the best wave beaten, the banked medals, the ship chosen, the captain's log, the
+  best Storm Reaches wave and the daily voyage's record are saved. Each
   run starts fresh at wave 1, plus any starting upgrades bought with medals.
-- **Trophies:** nine (`src/trophies/`, `shared/trophies.ts`), listed on the start and pause
+- **Trophies:** ten (`src/trophies/`, `shared/trophies.ts`), listed on the start and pause
   screens and on the hub (see the file map). The first round earns First blood.
 - **Sound:** music and sound effects, made in code (see "Sound" below).
 - **Rough or unused:** Enemy captains still run aground now and then (pushed by
@@ -216,16 +255,26 @@ File map (all under `src/`, plus the shared files it imports):
 - `game/upgrades.ts`: the `UPGRADES` table, `UPGRADE_IDS`, `costOf`, `REPAIR_COST` and `HIRE`.
 - `game/waves.ts`: `waveShips(wave, course)` (which ships come, in order, on the course chosen), `hpScale(wave)`, `HAVEN_WAVE`,
   `FIRST_FORT_WAVE` and `fortsFor(wave)`.
-- `game/save.ts`: `loadBestWave`, `saveBestWave`, `loadMedals`, `saveMedals`, `loadHull` and
-  `saveHull`.
-- `trophies/`: the game's nine trophies (`shared/trophies.ts`). `index.ts` lists them (`trophies`:
+- `game/save.ts`: `loadBestWave`, `saveBestWave`, `loadMedals`, `saveMedals`, `loadHull`,
+  `saveHull`, `loadLog`, `saveLog`, `loadReachesBest` and `saveReachesBest`.
+- `game/captains.ts`: `CaptainId`, the `CAPTAINS` table (name, ship kind, first wave),
+  `CAPTAIN_IDS`, `CAPTAIN_HP`, `RETURN_HP`, `FLEE_HP`, `FLEE_MS`, `FLEE_SPEED`, `RETURN_WAVES`,
+  `CAPTAIN_BOUNTY`, `captainBounty`, `RENOWN_BOARD_HP`, `CaptainRun`, `newCaptains` and `logFull`.
+- `game/storm.ts`: the Storm Reaches' weather and waters: `SQUALL_EVERY`, `SQUALL_WARN`,
+  `SQUALL_MS`, `FIRST_SQUALL`, `REEFS`, `REEF_R`, `REEF_DAMAGE`, `REEF_CLEAR`, `TEMPEST_MEDALS`,
+  `TEMPEST_CALLS` and `Reef`.
+- `game/voyage.ts`: the daily voyage: `DAILY_GAME`, `VOYAGE_PERKS`, `WAVE_POINTS`, `drawVoyage`,
+  `wavesBeaten` and `voyageScore`.
+- `game/random.ts`: `random()`, the rules' only source of randomness, and `useRandom(rand?)`,
+  which the scene points at the daily's seeded source or back at `Math.random`.
+- `trophies/`: the game's ten trophies (`shared/trophies.ts`). `index.ts` lists them (`trophies`:
   id, tier, icon, `hidden` for Terror of the seas) with their texts in `trophies/i18n/` (`en.ts`,
   `de.ts` and `en-US.ts` for Safe harbor and Strike the colors: the name keyed by the id, what earns
   it by `<id>Text`), and imports nothing else from the game, since the hub loads it for its trophy
   shelf. `main.ts` hands `trophies` to `setupGame`. `check.ts` holds each trophy's condition on the
   run in play (`EARNED`: a ship sunk, a prize taken, a bounty paid, a convoy arrived, a consort
   kept, a flagship or the admiral in `waveSunk` (sunk or taken), the harbor after wave
-  `OLD_SALT_WAVE` 10, `won`, and `won` on Hard from `settings.difficulty`) and
+  `OLD_SALT_WAVE` 10, `won`, the `tempest` in `waveSunk`, and `won` on Hard from `settings.difficulty`) and
   `checkTrophies(state)`, which `GameScene.update` calls every frame after `tick`. A run is never
   saved, so nothing is earned on load and no award needs to be quiet. A new trophy is an entry in
   `index.ts`, its two texts in each language file and its condition in `EARNED`.
@@ -265,7 +314,8 @@ File map (all under `src/`, plus the shared files it imports):
 How it runs:
 
 - **Boot:** `BootScene.create` paints every texture (there are no asset files), then starts
-  `GameScene`. `GameScene.create` builds a fresh `newRun(loadBestWave(), boons, hull)` (the hull
+  `GameScene`. `GameScene.create` builds a fresh `newRun(loadBestWave(), boons, hull, extras)`
+  (with the saved log and Reaches best, and on a daily voyage its perks and ship) (the hull
   from `data`, else `loadHull()` if the best wave unlocks it, else the Frigate), the HUD, the
   order card, the controls, the scuttle button, the `Harbor` and the game-over container. "Sail
   again" saves the medals left and the ship chosen and calls `scene.restart({ boons, hull })`,
@@ -277,8 +327,8 @@ How it runs:
   second.
 - **Phases:** `GameState.phase` is one of `break` (wave banner for `BREAK_MS`; the player can sail
   but nothing spawns or fires, and `charge` is held at null), `fighting`, `harbor`, `over` or
-  `won` (the haven's end card, which shares the game-over container; "Sail on" returns to
-  `harbor`). `tick` returns early in `harbor`, `over` and `won`, after ageing effects. The harbor
+  `won` (the end card after the haven or the Tempest, which shares the game-over container; its
+  "Storm Reaches" or "Sail on" button returns to `harbor`). `tick` returns early in `harbor`, `over` and `won`, after ageing effects. The harbor
   opens once `toSpawn` and `enemies` are both empty (forts don't count) and no convoy is still
   `sailing`; on that tick every
   barrel left in `loot` goes through `haulIn` (gold, `plundered`, `waveLoot` and a `coins`
@@ -357,14 +407,16 @@ State model (`src/game/state.ts`):
   `taken` (prizes this run), `ranks` (upgrade ranks, absent means 0), `perks` and `draft`
   (`PerkId`s), `mortarMs`, `bounty` (`BountyId` or null) and `bountyPaid` (the last harbor's pay,
   null before any), the wave's trackers (`waveLoot`, `waveDamage`, `waveAground`, `wavePrizes`,
-  `waveMs`, `waveSunk`), `won`, `medalsBanked`, `bestWave`, `bestBefore`, `medals` and `nextId`.
+  `waveMs`, `waveSunk`), `won`, `medalsBanked`, `bestWave`, `bestBefore`, `medals`, the captain's
+  log (`captains`, `named`, `log`, `renown`, `waveCaptains`), `daily`, the Storm Reaches
+  (`squallMs`, `squallTo`, `squallBlowMs`, `reefs`, `reachesBest`, `tempestCalls`) and `nextId`.
 - `Ship` has a heading in radians (0 is east, positive is clockwise on screen), `hp`/`maxHp`,
   `radius`, `crew`/`maxCrew`, per-side `reload` timers, `hitMs`, `agroundMs` (the cooldown
   before an island can damage it again), `slowMs` (chain shot) and `jamMs` (grapeshot), which
   `tick` counts down for every ship in every phase, so a ship hit just before the game ends
   doesn't stay tinted behind the panel; `boardMs` (time the player has been alongside); and
   `detour` (enemies and escorts); `escapeMs` (a fleeing merchantman's time left, else 0) and
-  `kept` (a consort). The player is always id 1 with kind `player`. A prize keeps its
+  `kept` (a consort) and `captain` (a named captain's `CaptainId`, else null). The player is always id 1 with kind `player`. A prize keeps its
   id, so its sprite carries over from the enemy it was. A `Fort` has its `island` index,
   position, `hp`/`maxHp`, `reload` and `hitMs`.
 - `Ball` carries its velocity, remaining `ms`, `damage`, `fromPlayer` (fired by the player or a
@@ -389,18 +441,27 @@ saves it; an unknown value loads as the Frigate). Reads and writes are wrapped i
 a stored number that is not finite and positive loads as 0 (rounded down otherwise); `loadHull`
 checks `Object.hasOwn(HULLS, id)`, so an inherited key like `constructor` is unknown too.
 `broadside-trophies` holds the trophies earned (`shared/trophies.ts`, each id with the time).
+`broadside-log` holds the captain's log as a JSON array of `CaptainId`s (unknown ids dropped on
+load), saved by the scene the frame one is added, even on the daily voyage.
+`broadside-reaches-best` holds the best Storm Reaches wave beaten, saved like the best wave.
+`broadside-daily` is the daily voyage's record (`shared/daily.ts`). The daily voyage saves no best
+wave, Reaches best or medals.
 
-Randomness and timing: `Math.random` is used in `spawn` (the angle at which an enemy appears), in
+Randomness and timing: every random number in `game/` comes from `random()` in `random.ts`, which
+calls `Math.random` (so the playthrough's seeding works) except on the daily voyage, where it
+draws from the day's seeded source. It is used in `spawn` (the angle at which an enemy appears), in
 `fire` (one call per shot, even for the player, whose spread is 0; grapeshot makes three per gun,
 and from wave 3 brigs and bigger ships fire it up close), in `lobAt` (two per shell: ketches,
 forts and the player's own mortar; the Bomb Ketch's mortar calls `lob` directly, with no spread),
 and once each in `setSail` for `drawOrder`, the wind, `drawBounty`, each fort's island and a convoy's
-island, and in `reachHarbor` for `drawDraft` (once per card), never before wave 1 is beaten, which is why the
+island, and in `reachHarbor` for `drawDraft` (once per card), in `weather` (twice a squall) and
+`setSail` for the reefs (twice per try), the last two only in the Storm Reaches, never before wave 1 is beaten, which is why the
 first order, wind and draft are fixed and wave 1 has no bounty, forts or grapeshot from enemies.
 Adding guns or shots therefore shifts the random sequence the test relies on. So does adding a
 Phaser `Text` (each takes a UUID from `Math.random` when created), so a new text object in
 `GameScene` or `Harbor` makes the playthrough's first wave play out differently, though just as
-repeatably.
+repeatably. That is why the end card's daily button is made the first time the card shows, and
+the captains' name labels as their ships appear.
 The art uses its own seeded generator (`rng` in `art.ts`), never `Math.random`. All timing comes
 from `update`'s `time`. There is no `Date` or `setTimeout` in the game.
 
@@ -415,6 +476,9 @@ Data tables, where to tune:
 - Wind: `WIND_SPEED` (0.18), `WIND_REACH` (0.25) and `FIRST_WIND` in `state.ts`.
 - Boarding: `BOARD_HP` (0.2), `BOARD_REACH` (28) and `BOARD_MS` (1200) in `state.ts`; `CRIPPLED`,
   `ESCORT_HUNT` and `ESCORT_STATION` at the top of `sim.ts`. Scuttling pays 2x loot (`scuttle`).
+- Captain's log: `CAPTAINS` and its numbers in `captains.ts`. Storm Reaches: squalls, reefs and the
+  Tempest's numbers in `storm.ts`, `REACHES_WAVES` and `REACHES_FLEET` in `waves.ts`, the Tempest in
+  `ENEMIES`. Daily voyage: `VOYAGE_PERKS` and `WAVE_POINTS` in `voyage.ts`.
 - Fireship and mortar: `FIRE_BLAST`, `SHELL_MS`, `SHELL_R` and `SHELL_SPREAD` at the top of
   `sim.ts`; their damage is `ENEMIES[kind].damage`.
 - Admiralty: `BOONS` and `BEST_BONUS` in `admiralty.ts`; `WIN_MEDALS` in `state.ts`.
@@ -499,7 +563,7 @@ measures), square lead, pulse "accordion" harmony, triangle bass and noise drums
 | --- | --- | --- |
 | `HARBOR_SONG` `calm` | 66 (dotted quarters) | from `create`, the `break` before each wave and the harbor; again after the win |
 | `BATTLE_SONG` `battle` | 112 | the `fighting` phase |
-| `BATTLE_SONG` `boss` | 112 | while a `flagship` or the `admiral` is among `enemies` (switches at the next bar) |
+| `BATTLE_SONG` `boss` | 112 | while a `flagship`, the `admiral` or the `tempest` is among `enemies` (switches at the next bar) |
 | `STINGS` `wave` | 100 | `break` turns to `fighting`: drum roll and horn |
 | `STINGS` `harbor` | 100 | the harbor opens (not on "Sail on" from the end card) |
 | `STINGS` `win` | 100 | phase `won` (the haven razed) |
@@ -528,6 +592,7 @@ Effects (`sfx` in `audio.ts`, and the shared `ui` sounds), and where `SoundCues`
 | `bell` | the convoy turning `arrived` |
 | `pipe` | an enemy id not seen before (a sail on the horizon), once a frame |
 | `creak` | the helm put over from 0 while sailing |
+| `squall` | a new `squall` effect: the wind swinging round in a Storm Reaches squall |
 
 `GameScene` plays the shared `ui` sounds for its buttons: `harborAction` plays `coin` for a
 purchase (upgrade, repair, hire, keep), `click` for a choice (perk, loading, sail) and `refuse`
@@ -634,6 +699,9 @@ then a check in `SoundCues.after` (or a case in `effects` for a new effect kind)
 
 ## Gotchas
 
+- `boardable(e, renown)` takes `s.renown`: pass it everywhere, or Renown's earlier boarding shows
+  in one place and not another. A named captain's ship keeps `captain` after she is taken, but
+  `board` zeroes her `escapeMs`, so as a prize she no longer runs.
 - The harbor dims rows that cannot be afforded, but every row stays clickable. `buy` and `repair`
   enforce the rules and quietly return false.
 - `ENEMIES[e.kind as keyof typeof ENEMIES]` casts appear throughout `sim.ts`. Never pass the player

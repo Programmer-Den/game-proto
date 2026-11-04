@@ -18,7 +18,7 @@ a bounty each wave, a side goal that pays half the wave's loot on top. From wave
 carry shore forts that shell you, and the harbor charts two courses for the next wave; from wave 7
 every third wave sends a merchantman with you to see safe to an island. A prize can be kept as a
 consort that sails on with you from wave to wave, and late drafts offer the second rank of a perk; wave 20 is the pirate haven, three forts and the admiral's
-flagship, and sinking her wins the campaign. When your ship goes down, the Admiralty awards
+flagship, and sinking her wins the campaign and opens the Storm Reaches, 20 waves of squalls and reefs ending with the Tempest. Five named enemy captains sail in their own waves, run when beaten and come back with a bounty; sinking all five over any runs fills the captain's log. Once a day the end card offers the daily voyage, the same seeded run for everyone. When your ship goes down, the Admiralty awards
 medals that buy a head start for the next run, which can sail a different ship.
 
 ![Holding the starboard guns: the arc is washed in ochre and the charge fills its rim and the ring
@@ -38,7 +38,8 @@ round the held button, while a brig steers round the island on a dotted course](
 | **Set sail**, or from wave 6 **Merchant lane** or **Hunter patrol** | Leave the harbor for the next wave, on the course chosen |
 | Tap **Scuttle the prize** (under the bounty) | Sink your newest prize for twice its loot |
 | Tap a ship and rows on the "Sunk!" panel, then **Sail again** | Choose the ship for the next run and spend the Admiralty's medals on starting upgrades |
-| **Sail on** (once the haven is razed) | Keep the run going through the waves beyond |
+| **Storm Reaches** (once the haven is razed), later **Sail on** | Sail the run on into the Storm Reaches, and after the Tempest through the waves beyond |
+| **Daily voyage** on the end card | Sail today's seeded voyage, once a day |
 
 On a phone, one thumb can hold a wheel while the other holds a fire control.
 
@@ -164,8 +165,8 @@ On a phone, one thumb can hold a wheel while the other holds a fire control.
    wave straight into the hold. Forts are optional: the wave is beaten once its ships are sunk.
 17. **The pirate haven.** Wave 20 brings three forts and the admiral's flagship, the biggest ship
    afloat (five guns a side, 300 gold). Sinking her wins the campaign: the end card awards the
-   medals and offers **Sail on**, which puts into harbor and carries the run on through the waves
-   beyond (the forts and flagships keep coming), or **Sail again** from wave 1.
+   medals and offers **Storm Reaches**, which puts into harbor and carries the run on into the
+   Storm Reaches (see below), or **Sail again** from wave 1.
 18. **Choose your ship.** The "Sunk!" panel picks the ship for the next run; the first run always
    sails the Frigate, and the choice is kept in the browser. Each has its own crew, and a hull
    upgrade adds 30 to any of them.
@@ -198,6 +199,36 @@ On a phone, one thumb can hold a wheel while the other holds a fire control.
    round other islands on her own; the enemy's sloops and fireships hunt her instead of you. If
    she gets there she pays her cargo (90 gold plus 6 a wave) straight into the hold; sunk, it is
    lost. The wave isn't over until she arrives or is sunk.
+22. **The Storm Reaches.** Razing the haven opens a second sea: the end card's **Storm Reaches**
+   sails the same ship on into 20 more waves (shown as "Reach 1" to "Reach 20" in the top bar).
+   Their fleets start the size of a home wave 10 and grow slowly, while hulls go on growing every
+   wave. Every 20 seconds of fighting (the first after 12) a squall comes up: three seconds ahead
+   the wind rose shows the wind it brings as a dotted line and reads "Squall! Wind from ...", then
+   the wind swings two or three points round and rain sweeps the screen for six seconds. Four reefs
+   lie on the sea each wave, dark rocks ringed with breakers: striking one throws a ship back off
+   it like a beach but tears 30 off her hull, and enemy captains keep no lookout for them, so a
+   careless one can wreck herself. Reach 20 brings the Tempest, the storm-lord's man-of-war with
+   grey sails, five guns a side and the toughest hull at sea, who calls a squall down at once as
+   her hull falls past two thirds and again past one third. Sinking her calms the Reaches, adds 8
+   medals and lets the run sail on beyond. The best Reaches wave beaten is kept apart from the best
+   wave and shown on the end card.
+23. **The captain's log.** Five named enemy captains sail on their own waves (Maren Blackwater on
+   wave 4, Gentleman Hask on 7, One-Eye Tull on 9, Widow Corra on 12 and Ansel Saltjaw on 15), each
+   in a ship half again as sturdy as others of her kind, her name written under it and her hull
+   bar always shown. Once her hull is down to 35% she runs for it, a fifth faster, and if she is
+   still afloat nine seconds later she gets away. She comes back three waves later, 30% sturdier
+   again for each escape and with 40 gold on her head for each ("Wanted: Widow Corra, 40 gold").
+   Sinking or boarding a named captain writes her into the log, which is kept between runs; the
+   harbor's news says who was sunk or got away, and the end card how full the log is. Once all
+   five are in it, every run after starts with **Renown**: enemy crews strike sooner, so a ship
+   can be boarded at a quarter of her hull instead of a fifth.
+24. **The daily voyage.** The end card's **Daily voyage** sails today's voyage, the same for every
+   player on the same day and once a day: a set ship (any of the three, unlocked or not) with
+   three perks already taken, and the same orders, winds, bounties and drafts for everyone. It
+   ends when the ship goes down or at the haven, and scores 100 points a wave beaten plus every
+   gold plundered (the score so far stands in the top bar). It earns no medals and keeps no best
+   wave; the end card shows the score, the best and the days in a row, and the button reads
+   "Today" with the score until tomorrow.
 
 ![From wave 6 the harbor charts two courses, and a brig prize can be kept as a consort](docs/screenshots/harbor-courses.webp)
 
@@ -221,7 +252,15 @@ On a phone, one thumb can hold a wheel while the other holds a fire control.
 
 ![The admiral's flagship](docs/screenshots/haven.webp)
 
-![The haven razed: the campaign won, with Sail on](docs/screenshots/haven-won.webp)
+![The haven razed: the campaign won, with the Daily voyage, Sail again and Storm Reaches buttons](docs/screenshots/haven-won.webp)
+
+![The Storm Reaches: a squall's rain sweeping the chart, the wind swung round to the north-east, and reefs ringed with breakers](docs/screenshots/storm-reaches.webp)
+
+![Reach 20: the Tempest under grey sails, calling a squall down as her hull falls, the wind rose showing the wind it brings](docs/screenshots/tempest.webp)
+
+![The captain's log: Gentleman Hask running for it, crippled, and Widow Corra back with a bounty on her head](docs/screenshots/captains-log.webp)
+
+![The end of a daily voyage: the score, the best and the days in a row](docs/screenshots/daily-voyage.webp)
 
 ![The harbor's ledger with the sailors to hire and a Bomb Ketch's mortar side](docs/screenshots/harbor-hire.webp)
 
@@ -269,9 +308,10 @@ astern came over the edge after the ship](docs/screenshots/wrap-around.webp)
 | Mortar ketch | wave 4 | Keeps its distance and lobs a shell every few seconds; a rust ring marks where it will land, two seconds later, where you'd be holding your course. 20 damage to any ship under it. 30 gold |
 | Flagship | every fifth wave | Comes last, four guns a side and the toughest hull, its hull bar always shown, 150 gold; loads grapeshot up close |
 | Admiral's flagship | wave 20 | The haven's last ship: five guns a side, 440 hull, 300 gold. Sinking her wins the campaign |
+| The Tempest | Reach 20 (wave 40) | The Storm Reaches' last ship: five guns a side, 520 hull before the waves' growth, 400 gold. Calls a squall down at two thirds and one third of her hull; sinking her calms the Reaches |
 | Merchantman | Merchant lane waves | No guns; runs from you and gets away after 30 seconds. 40 gold (doubled on the lane). Also the convoy you escort |
 
-Every wave brings one more sloop than the last, and enemy hulls (and forts) get 12% tougher each wave.
+Every wave brings one more sloop than the last (out in the Storm Reaches, one more every second wave), and enemy hulls (and forts) get 12% tougher each wave. A named captain's ship is a brig, galleon or mortar ketch half again as sturdy.
 
 ### Upgrades
 
@@ -290,7 +330,7 @@ Below them, "Patch the hull" repairs the ship for 10 gold and "Hire sailors" bri
 
 ### Trophies
 
-Nine trophies, listed behind the Trophies button on the start and pause screens and counted on the
+Ten trophies, listed behind the Trophies button on the start and pause screens and counted on the
 hub's card. Each pops up at the top of the page once, when it is earned.
 
 | Tier | Trophy | Earned by |
@@ -303,6 +343,7 @@ hub's card. Each pops up at the top of the page once, when it is earned.
 | Silver | Strike the colours | Sinking or boarding a flagship |
 | Silver | Old salt | Clearing wave 10 |
 | Gold | Scourge of the haven | Sinking the admiral's flagship to win the campaign |
+| Gold | Eye of the storm (hidden) | Sinking the Tempest at the end of the Storm Reaches |
 | Gold | Terror of the seas (hidden) | Winning the campaign on Hard |
 
 ![The trophy list on the pause screen](docs/screenshots/trophy-list.webp)
@@ -347,7 +388,10 @@ All paths are inside `games/broadside/`.
   player's ship from its hull, the upgrades bought, the perks and the wave's order, `sim.ts`
   sails the ships (enemy captains plan their way round islands), charges and fires the
   broadsides, shells from forts and mortars, boards prizes, keeps the crew and runs the harbor,
-  and `save.ts` keeps the best wave, the medals and the ship chosen.
+  `captains.ts` (the captain's log), `storm.ts` (the Storm Reaches' squalls and reefs) and
+  `voyage.ts` (the daily voyage's ship, perks and score) hold the loop's later goals, `random.ts`
+  is the one source of the rules' randomness (seeded on the daily voyage), and `save.ts` keeps the
+  best wave, the medals, the ship chosen, the captain's log and the best Storm Reaches wave.
 - `src/scenes/`: `BootScene` paints the textures, `GameScene` draws the chart, follows the ship
   with the camera across the wrapping sea and wires the helm wheels, fire controls and keys to the
   rules, `soundCues.ts` turns what each frame changed into sound and music, `layout.ts` says

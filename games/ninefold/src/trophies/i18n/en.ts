@@ -21,6 +21,8 @@ const en = {
   streak7Text: 'Solve the daily puzzle seven days running.',
   floor20: 'Bottom of the well',
   floor20Text: 'Clear Delve floor 20.',
+  ascent5: 'Summit of the deep',
+  ascent5Text: 'Clear Delve floor 10 at Ascension 5.',
 };
 
 export default en;

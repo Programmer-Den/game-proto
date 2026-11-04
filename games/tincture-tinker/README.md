@@ -28,6 +28,9 @@ before the moves run out and the potion sells, for coins and one to three stars.
 | Workbench, then Buy | After an order: spend coins on a lasting upgrade |
 | Herbalist, then Buy | After an order: spend coins to stock the pantry |
 | Guild examination | Once Royal Apothecary: sit the next examination |
+| Journey map, then a town | After the first sale: play that town's order on its own board |
+| Daily order | On the journey map: today's order, one try a day |
+| Endless orders | On the journey map, once every guild seal is earned: start a run |
 
 1. **Swaps** only count when they make a match. A swap that doesn't slides back and costs no move.
 2. **Matches** of three or more in a row or column, across or down, are gathered. Only the
@@ -107,12 +110,28 @@ before the moves run out and the potion sells, for coins and one to three stars.
    moves bonus and adds a wax seal to the ribbon; selling it short of the stars, or running out of
    moves, pays nothing, and it can be tried again or left for the orders. Examinations leave the
    orders, the stars and the pantry as they were.
-15. **Hints**: after a few idle seconds, two tiles that would match swell and settle (with the hub's
+15. **Journey map**: from the first sale on, the result card links to a map of eight towns along a
+   road. Each town sends one order on a board of its own shape: dark green walls stand where no tile
+   goes, nothing matches through them and tiles fall past them. Its board starts the same on every
+   try, with the town's own jars, resin and mould. A town is sold for one to three stars, the best
+   is kept under its picture on the map and every star it gives for the first time pays 20 coins.
+   The first town is always open; each one after it opens once the town before has a star. Towns
+   leave the orders, the stars and the pantry as they were.
+16. **Daily order**: the journey map's Daily order is the same for every player on the same day: a
+   recipe, a town's board shape and a few blockers, the board and every tile that drops in drawn
+   from the day's seed. There is one try a day (starting it uses it up), and the map and the result
+   card show the day's stars, the best and how many days in a row were played.
+17. **Endless orders**: once every guild examination is passed, the journey map starts an endless
+   run: one order after another, each asking for 2 more of every ingredient, with a move fewer
+   every second order and more blockers. Each sale pays and offers the next order; running out of
+   moves ends the run. The longest run is kept as the best streak.
+18. **Hints**: after a few idle seconds, two tiles that would match swell and settle (with the hub's
    reduced motion on, they hold still, a little larger).
-16. If the board is left with no move to make, its tiles are shuffled.
+19. If the board is left with no move to make, its tiles are shuffled.
 
 Progress (the next order, coins, potions sold, stars, the pantry, the workbench upgrades, the
-royal title, the guild seals and a rich pick) is saved in the browser, after each sale, each tool,
+royal title, the guild seals, a rich pick, each town's stars and the best endless run) is saved in
+the browser, with the daily order's record beside it, after each sale, each tool,
 upgrade or ingredient bought and each pick of the next order.
 
 ![A match being gathered](docs/screenshots/playthrough-1-match.webp)
@@ -194,6 +213,32 @@ Two Blooms swapped together clear the 5x5 around them:
 
 ![Mixed specials](docs/screenshots/mixed-specials.webp)
 
+The journey map: eight towns, each drawn as its board's shape, with the stars won so far, and the
+daily order and endless orders below:
+
+![The journey map](docs/screenshots/journey-map.webp)
+
+Saltmere's order on its hourglass board: tiles fall past the green walls:
+
+![A town's board](docs/screenshots/town-board.webp)
+
+The daily order borrows a town's shape (here Gloamwick's ring):
+
+![The daily order](docs/screenshots/daily-order.webp)
+
+### Towns
+
+| Town | Board | Potion | Needs | Moves | Jars, resin, mould |
+| --- | --- | --- | --- | --- | --- |
+| 1 Fernbrook | corners cut | Healing Draught | 11 ember salt, 11 sage | 14 | none |
+| 2 Millhollow | a 2x2 well in the middle | Sleeping Tonic | 12 moonpetal, 11 wheat | 15 | 2, 0, 0 |
+| 3 Saltmere | an hourglass | Mandrake Tincture | 11 mandrake, 10 sage, 8 ember salt | 17 | 2, 2, 0 |
+| 4 Thistlecombe | a diamond | Golden Elixir | 12 wheat, 11 ember salt, 10 moonpetal | 19 | 0, 3, 0 |
+| 5 Ashby Wold | four pairs of posts | Amber Cordial | 13 wheat, 12 mandrake, 11 ember salt | 16 | 3, 2, 1 |
+| 6 Larkspur Ford | a river across | Moonlit Philter | 14 moonpetal, 13 mandrake, 11 sage | 22 | 2, 3, 2 |
+| 7 Gloamwick | a ring of walls | Starlight Elixir | 13 moonpetal, 12 sage, 11 wheat | 21 | 3, 3, 2 |
+| 8 Briarcross | notched edges | Philosopher's Draught | 16 ember salt, 15 moonpetal, 14 mandrake | 19 | 4, 4, 3 |
+
 ### Guild examinations
 
 | Exam | Potion | Needs | Moves | Stars | Jars, resin, mould | Pays |
@@ -234,7 +279,7 @@ The favicon is the hub's bear with three potions lined up: a match of three.
 
 ![The favicon](docs/screenshots/favicon.webp)
 
-The difficulty, set on the hub page's Settings, changes one thing: each order (and each guild examination) gives 5 more moves on Easy and 3 fewer on Hard.
+The difficulty, set on the hub page's Settings, changes one thing: each order (and each guild examination, town, daily order and endless order) gives 5 more moves on Easy and 3 fewer on Hard.
 
 ## Trophies
 
@@ -287,7 +332,8 @@ All paths are inside `games/tincture-tinker/`.
 
 - `src/game/`: the rules in plain TypeScript with no Phaser dependency. `kinds.ts` lists the
   ingredients, `orders.ts` the potion orders, the recipes ranks unlock, royal commissions and twin
-  orders (rich ones too), `exams.ts` the guild examinations, `ranks.ts` the stars and ranks,
+  orders (rich ones too), `exams.ts` the guild examinations, `towns.ts` the journey map's towns and the daily order,
+  `endless.ts` endless runs, `ranks.ts` the stars and ranks,
   `upgrades.ts` the workbench, `board.ts` finds runs,
   matches and moves, lets tiles fall, shuffles, places jars, resin and mould and lets mould creep,
   `state.ts` holds the order being played, the pantry and the herbalist, `sim.ts` plays a swap out step by step

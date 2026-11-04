@@ -12,8 +12,10 @@ and every fifth wave ends with a boss that fights back and leaves a supply drop 
 20 that drop also offers a way out. If a zombie
 reaches the sandbags in front of the soldier, it's game over. Your best wave is kept, so every run
 has a record to beat, and every kill banks scrap that buys a head start for the next run and
-lasting upgrades for your outpost. Instead of the endless road, a run can also be a 10-wave
-operation with its own rules and medals.
+lasting upgrades for your outpost. Instead of the endless road, a run can also be a
+10-wave stand in a town down the road, each with its own twist, opening the next one up to the
+evacuation, or the daily stand, the same for everyone that day. Survivors who live through a won
+run stay on as veterans for the runs to come.
 
 ![The comic style at wave 4, with its comic panels beside the road](docs/screenshots/style-comic.webp)
 
@@ -189,14 +191,34 @@ and the fuel drum's blast doesn't swell.
   | Veteran | Start each run with a companion (a Gunner) | 120, 220, 340 |
 
   ![The game over screen with the scrap shop, the outpost and the operations in both styles](docs/screenshots/scrap-shop.webp)
-- **Operations**: the game over screen also picks what the next run is, and keeps that pick. The
-  **Open Road** is the endless run with extraction. An operation is 10 waves under fixed rules,
-  won by clearing wave 10 (its scrap is paid twice over): **Hospital** sends two survivors a wave
-  from wave 1 and no fuel drums; **Lights Out** makes every wave a blackout. Each operation keeps
-  its own best (waves cleared, shown in the top bar) and the medal it earns: Bronze for 5 waves
-  cleared, Silver for 8, Gold for all 10.
+- **The road map**: the game over screen also picks what the next run is, and keeps that pick:
+  the endless **Open Road** with extraction, today's **Daily Stand**, or a town on the road map.
+  Each town is a 10-wave stand under its own twist, won by clearing wave 10 (its scrap is paid
+  twice over, plus a bounty the first time), and winning it opens the next town down the road:
 
-  ![Hospital won with a Gold medal](docs/screenshots/operations.webp)
+  | Town | Twist | First-win bounty |
+  | --- | --- | --- |
+  | Hospital | Two survivors a wave from wave 1, no fuel drums | 60 |
+  | Lights Out | Every wave a blackout | 90 |
+  | Fogbank | Fog: zombies only show on the lower part of the road | 120 |
+  | Two Bridges | A wreck blocks the middle lane: the horde comes down the two outer lanes | 160 |
+  | Evacuation | A condition can come from wave 1, and two survivors a wave from wave 2 | 250 |
+
+  Each town keeps its own best (waves cleared, shown in the top bar) and the medal it earns:
+  Bronze for 5 waves cleared, Silver for 8, Gold for all 10.
+
+  ![The road map with two towns won, the daily stand and the veterans](docs/screenshots/operations.webp)
+  ![Fogbank: the fog hides the far road](docs/screenshots/fogbank.webp)
+  ![Two Bridges: a wreck blocks the middle lane](docs/screenshots/two-bridges.webp)
+- **Veterans**: a survivor who joins the squad gets a call sign, and once they live through a won
+  run (a town, or an Open Road extraction) they stay on the roster with their role at rank 1. On the
+  game over screen, tap up to two veterans to start the next run in the squad; every win they live
+  through ranks them up (up to three stars), and each rank adds 20% to their damage. The roster
+  holds six; a new veteran past that takes the place of a rank 1 one.
+- **Daily Stand**: the same 10 waves for every player on the same day (the crates, conditions,
+  supply drops and the horde's answers all come from the day's seed), with no starting crates,
+  outpost upgrades or veterans, and one try a day. Its score is the run's scrap plus 100 for each
+  wave cleared; the card keeps today's score, the best and the days in a row.
 
   ![A boss on wave 5 against a full squad of nine](docs/screenshots/boss.webp)
   ![The same boss through the night-vision feed](docs/screenshots/boss-night-vision.webp)
@@ -211,12 +233,13 @@ Deadline follows the hub's Language setting: every text in the game, How to play
 
 - `src/game/rules.ts`: the numbers and rules: enemy stats, upgrades and their perks, fuel drums,
   the frenzy, wave plans and conditions, the horde adapting, the bosses and their moves, survivors
-  and squad roles, sandbag walls, the supply drop, extraction, scrap, the outpost and operations.
+  and squad roles, sandbag walls, the supply drop, extraction, scrap, the outpost, the towns on the
+  road map, the daily stand and the veterans.
   No drawing; its names and texts are keys of `src/i18n/en.ts`.
 - `src/i18n.ts` and `src/i18n/`: the game's texts in British English (`en.ts`), German (`de.ts`)
   and US spelling (`en-US.ts`, only what differs). `src/howToPlay.ts` has How to play in all three.
 - `src/game/save.ts`: the saved best wave, art style, banked scrap, starting crates, outpost
-  upgrades, the next operation and each operation's best.
+  upgrades, the next operation, each operation's best and the roster of veterans.
 - `src/game/pool.ts`: reuses sprites for enemies, bullets, crates, drums and effects, so a big horde
   doesn't create and destroy objects every frame.
 - `src/art/`: both art styles, painted on canvases in code (no image files): `comic.ts`,

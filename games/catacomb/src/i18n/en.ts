@@ -30,12 +30,21 @@ const en = {
   rustCard: 'Rust',
   woundCard: 'Wound',
   doubtCard: 'Doubt',
+  hexBoltCard: 'Hex Bolt',
+  evilEyeCard: 'Evil Eye',
+  soulDrainCard: 'Soul Drain',
+  hexWardCard: 'Hex Ward',
+  blightCard: 'Blight',
+  hexStormCard: 'Hex Storm',
+  maledictionCard: 'Malediction',
 
   // Cards: rules, built from these parts
   deal: 'Deal {damage}.',
   dealHits: 'Deal {damage} x{hits}.',
   dealAll: 'Deal {damage} to all foes.',
   dealHitsAll: 'Deal {damage} x{hits} to all foes.',
+  dealHexed: 'Deal {damage}, +{n} if it has a status.',
+  dealHexedAll: 'Deal {damage} to all, +{n} to each with a status.',
   apply: 'Apply {statuses}.',
   applyAll: 'Apply {statuses} to all foes.',
   and: '{a} and {b}',
@@ -48,6 +57,7 @@ const en = {
   thornsPower: 'Deal {n} back to any foe that hits you.',
   ragePower: 'Gain {n} Strength at the start of each turn.',
   splashPower: 'Poison on one foe splashes half onto the rest.',
+  hexPower: 'Apply {n} Weak to all foes at the start of each turn.',
   curseLead: 'Curse. Unplayable.',
   rustCurse: 'It only clogs your hand.',
   woundCurse: 'Lose {n} health when drawn.',
@@ -72,16 +82,27 @@ const en = {
   mummyFoe: 'Mummy',
   gargoyleFoe: 'Gargoyle',
   hollowQueenFoe: 'Hollow Queen',
+  boneArcherFoe: 'Bone Archer',
+  shadeFoe: 'Shade',
+  marrowBatFoe: 'Marrow Bat',
+  ossuaryFoe: 'Ossuary Golem',
+  bellRingerFoe: 'Bell Ringer',
+  marrowTyrantFoe: 'Marrow Tyrant',
 
   // Acts
   cryptAct: 'The Crypt',
   tombsAct: 'The Sunken Tombs',
+  spireAct: 'The Bone Spire',
 
   // Heroes
   knightName: 'Knight',
   knightText: 'sword and shield, {hp} health',
   hunterName: 'Hunter',
   hunterText: 'venom knives and dodges, {hp} health',
+  hexerName: 'Hexer',
+  hexerText: 'curses and hex bolts, {hp} health',
+  hexerLocked: 'Beat depth 2 as the Knight and as the Hunter to unlock',
+  locked: 'Locked',
 
   // Flasks
   healFlask: 'Healing Flask',
@@ -128,11 +149,19 @@ const en = {
   poolText: 'The water is cold and strangely clear.',
   poolDrink: 'Drink (heal {n})',
   poolBathe: 'Bathe (-{n} health, temper a random card)',
+  brazierTitle: 'A bone brazier',
+  brazierText: 'Pale fire burns in a bowl of skulls, hungry for something.',
+  brazierFeed: 'Feed it (a curse leaves your deck)',
+  brazierWarm: 'Warm your hands (heal {n})',
+  reliquaryTitle: "A saint's reliquary",
+  reliquaryText: 'Behind dusty glass lies a finger bone wrapped in gold.',
+  reliquaryPray: 'Pray (+{n} max health)',
+  reliquaryBreak: 'Break the glass (a relic, -{n} health)',
 
   // Depths
   depthFoes: 'Foes have 20% more health',
   depthRest: 'Campfires heal only 15%',
-  depthWound: 'The deck starts with a Wound curse',
+  depthWound: 'The deck starts with a Wound curse, and the Bone Spire rises beyond the Hollow Queen',
   depthMore: 'Foes have 20% more health again, and again each depth down',
   depthNone: 'The dungeon as it was',
 
@@ -156,6 +185,8 @@ const en = {
   healed: 'Healed {n}',
   waterTempers: 'The water tempers {name}',
   nothingHappens: 'Nothing happens',
+  brazierBurns: 'The fire eats your {curse}',
+  reliquaryBlesses: 'You feel sturdier: +{n} max health',
 
   // The map
   enterHint: 'Tap a room to enter the dungeon',
@@ -202,11 +233,20 @@ const en = {
   stairDown: '{notice}\nA stair winds down into the dark.',
   descend: 'Descend',
   hollowQueenFalls: 'The Hollow Queen falls!',
+  spireUp: '{notice}\nBeyond her throne a spire of bone climbs into the dark.',
+  climb: 'Climb',
+  marrowTyrantFalls: 'The Marrow Tyrant falls!',
   fallen: 'You have fallen',
   atDepth: ' at depth {n}',
   wonText: 'You cleared the dungeon{deep} with {hp} health left, {gold} gold and a deck of {deck} cards.\nDepth {next} is open: {rules}',
   fellText: 'You fell in {act}{deep}, room {room} of {rooms}, with a deck of {deck} cards.',
   delveAgain: 'Delve again',
+  dailyButton: 'Daily crypt: the {hero} today',
+  dailyDone: "Today's daily crypt: {score} (best {best})",
+  dailyStreak: { one: '{n} day in a row', other: '{n} days in a row' },
+  dailyWon: 'You cleared the daily crypt with {hp} health left.\nScore {score}, best {best}, {streak}. A new crypt opens tomorrow.',
+  dailyFell: 'You fell in {act}, room {room} of {rooms}.\nScore {score}, best {best}, {streak}. A new crypt opens tomorrow.',
+  dailyBar: 'Daily crypt',
 
   // The card picker
   burnPick: 'Burn a card: it leaves your deck for good',

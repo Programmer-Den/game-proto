@@ -340,6 +340,18 @@ const de: Translation<typeof en> = {
   gardenLocked: 'Lerne in der Studierstube ein Rezept, um es zu bepflanzen',
   castleCount: { one: '{n} Burg', other: '{n} Burgen' },
   townCity: 'Jedes Viertel ist voller Burgen: Die Stadt ist eine Großstadt!',
+  townCityNext: 'Die Stadt ist eine Großstadt! Hier tippen, um {town} zu gründen',
+  townFounded: '{town} gegründet: ein Stadtsiegel mehr',
+  districtsOf: 'Viertel von {town}',
+  marshgate: 'Moorgatt',
+  highcrag: 'Hochfels',
+  saltmere: 'Salzsee',
+  royalAsks: 'Königlicher Auftrag: +{n}{coin}',
+  royalWaits: { one: 'Zum Übergeben tippen, fährt am Abend', other: 'Zum Übergeben tippen, fährt in {n} Tagen' },
+  royalDone: 'Königlicher Auftrag erfüllt: +{n}{coin}',
+  royalGiven: { one: '{n} Trank dem Boten gegeben', other: '{n} Tränke dem Boten gegeben' },
+  royalNone: 'Im Regal ist nichts, was die Krone will',
+  master: { one: 'Meister ★', other: 'Meister {stars}' },
 };
 
 /** Texts that read the same in German. */

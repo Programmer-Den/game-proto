@@ -5,7 +5,8 @@ import { UPGRADE_ORDER, UPGRADES } from './upgrades';
 
 // Only the progress between orders is saved: which order is next, the coins, potions sold, stars,
 // the pantry, the workbench upgrades, whether the tinker is Royal Apothecary, the guild seals and
-// whether the next order was picked rich.
+// whether the next order was picked rich, the stars of every town on the journey map and the best
+// endless streak. The daily order keeps its own record under `tincture-tinker-daily` (shared/daily.ts).
 const KEY = 'tincture-tinker-progress';
 
 export function loadProgress(): Progress {
@@ -37,6 +38,10 @@ export function loadProgress(): Progress {
     saved.seals = Math.min(saved.seals, EXAMS.length);
     // The first order is never rich.
     saved.rich = saved.rich === true && saved.order > 1;
+    // A town's best stars, 0 to 3; a save from before the journey map starts it fresh.
+    const towns: unknown[] = Array.isArray(saved.towns) ? saved.towns : [];
+    saved.towns = fresh.towns.map((_, i) => (ok(towns[i], 0) && Number.isInteger(towns[i]) ? Math.min(towns[i] as number, 3) : 0));
+    if (!ok(saved.endless, 0) || !Number.isInteger(saved.endless)) saved.endless = fresh.endless;
     return saved;
   } catch {
     return fresh;

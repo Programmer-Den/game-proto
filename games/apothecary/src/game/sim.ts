@@ -68,6 +68,11 @@ import {
   inFineWindow,
   isMarketDay,
   nudgeReputation,
+  isRoyalDay,
+  masterySpeed,
+  royalFor,
+  royalHere,
+  ROYAL_REPUTATION,
   orderable,
   researched,
   studied,
@@ -168,8 +173,10 @@ export function tick(
 
   for (const id of REFINERS) {
     const refiner = state[id];
-    const speed = dt * speedAt(state.upgrades[id].level);
+    const speed = dt * speedAt(state.upgrades[id].level) * masterySpeed(state, id);
     const next = refining(state, refiner, state.priority[id]);
+    // Hired craftsmen at work grow towards mastery.
+    if (state.craftsmen[id].level > 0 && (next >= 0 || refiner.second)) state.mastery[id] = (state.mastery[id] ?? 0) + dt;
     // Each pair of hands works its own pipe at the same speed: the first the front of the queue, a
     // second craftsman's a plant of its own (see `refineSecond`).
     if (crew(state, id, workingAt) > 0 && next >= 0) {
@@ -198,7 +205,8 @@ export function tick(
   for (const id of CAULDRONS) {
     const cauldron = state[id];
     if (crew(state, id, workingAt) === 0) continue;
-    const speed = dt * speedAt(state.upgrades[id].level);
+    const speed = dt * speedAt(state.upgrades[id].level) * masterySpeed(state, id);
+    if (state.craftsmen[id].level > 0 && (cauldron.brewing || cauldron.brewing2)) state.mastery[id] = (state.mastery[id] ?? 0) + dt;
     // The first pipe, then a second craftsman's: each brews on its own at the same speed.
     cauldron.brewing = brew(state, cauldron, cauldron.brewing, speed, state.priority[id]);
     if (secondPipe(state, id)) cauldron.brewing2 = brew(state, cauldron, cauldron.brewing2 ?? null, speed, state.priority[id]);
@@ -239,6 +247,8 @@ export function tick(
   // On a wagon day, the merchant wagon pulls up at the street door mid-morning and waits a while.
   if (isWagonDay(day) && state.wagon?.day !== day && state.contract.dayLeft <= DAY_MS * WAGON_ARRIVES) state.wagon = wagonFor(state, day);
   if (state.wagon && state.wagon.left > 0) state.wagon.left -= dt;
+  // Every so many days the crown's courier comes with a royal request.
+  if (isRoyalDay(day) && state.royal?.day !== day) state.royal = royalFor(state, day);
   const stage = plagueStage(state);
   if (stage) {
     state.plague!.left -= dt;
@@ -1021,6 +1031,34 @@ export function sellToWagon(state: GameState): Feedback | null {
   const coins = wagon.crate * wagon.pay;
   state.coins += coins;
   return [t('crateSold', { n: coins })];
+}
+
+/**
+ * Hands the royal courier what the shelf holds of the potions it asks for, plain ones first. Once
+ * every potion is in, the crown pays its reward and the street thinks better of the shop.
+ */
+export function deliverToRoyal(state: GameState): Feedback | null {
+  const royal = state.royal;
+  if (!royal || !royalHere(state)) return null;
+  const { shelf } = state.counter;
+  let given = 0;
+  for (const want of royal.wants) {
+    while (want.made < want.need) {
+      const plain = shelf.indexOf(want.potion);
+      const at = plain >= 0 ? plain : shelf.indexOf(FINE[want.potion]);
+      if (at < 0) break;
+      shelf.splice(at, 1);
+      want.made++;
+      given++;
+    }
+  }
+  if (royal.wants.every((w) => w.made >= w.need)) {
+    royal.done = true;
+    state.coins += royal.reward;
+    nudgeReputation(state, ROYAL_REPUTATION);
+    return [t('royalDone', { n: royal.reward })];
+  }
+  return given > 0 ? [t('royalGiven', { n: given })] : [t('royalNone')];
 }
 
 /** Moves the herb market's buy marker on to the next good. */

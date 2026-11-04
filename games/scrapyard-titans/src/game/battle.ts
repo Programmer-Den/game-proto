@@ -8,8 +8,8 @@
  * Side 0 holds rows 4 to 7 (the bottom half on screen), side 1 rows 0 to 3.
  */
 import {
-  BIG_ABILITY_COST, BOARD, CLASS_STATS, COST_SCALE, FIGHT_LIMIT_S, ITEMS, MONSTERS, OVERCHARGE_MANA,
-  RAT, SKILL_POWER, STAR_POWER, STAR_STAT, TRAITS, UNIT_BY_ID,
+  BIG_ABILITY_COST, BOARD, BOMB_SPLASH, CLASS_STATS, COST_SCALE, FIGHT_LIMIT_S, ITEMS, MONSTERS, OVERCHARGE_MANA,
+  RAT, SKILL_POWER, STAR_POWER, STAR_STAT, TRAITS, UNIT_BY_ID, WIND_UP_S,
   type AbilityKind, type AugmentId, type ClassId, type MonsterId, type OriginId, type SetId, type SkillId, type Special,
   type TerrainId, type TraitId,
 } from './data';
@@ -160,6 +160,7 @@ export class Battle {
   private asBuffUntil: [number, number] = [0, 0];
   private rallyUntil: [number, number] = [0, 0];
   private leapsDone = false;
+  private woundUp = false;
   private sides: [SideSpec, SideSpec];
 
   constructor(a: SideSpec, b: SideSpec, terrain: Map<string, TerrainId> = new Map()) {
@@ -262,6 +263,11 @@ export class Battle {
     if (!this.leapsDone && this.time >= 0.25) {
       this.leapsDone = true;
       for (const u of this.units) if (u.alive && u.cls === 'saboteur') this.leapBehind(u);
+    }
+    // Clockwork robots wind up once, a few seconds in.
+    if (!this.woundUp && this.time >= WIND_UP_S) {
+      this.woundUp = true;
+      for (const u of this.units) if (u.alive && u.origins.includes('clockwork')) u.rampAs += traitValue(this.sides[u.team].traits, 'clockwork') / 100;
     }
     for (const p of [...this.projectiles]) {
       if (p.at > this.time) continue;
@@ -528,6 +534,19 @@ export class Battle {
           this.blinkNear(u, weak);
           this.hit(u, weak, dmg, true, crit);
           if (u.big) this.stun(weak, 1.2);
+        }
+        break;
+      }
+      case 'bomb': {
+        // Lobbed at the enemy with the most others around it; they all take a share when it lands.
+        const crowd = (e: BUnit) => enemies.filter((o) => o !== e && cheb(o, e) <= 1).length;
+        const target = [...enemies].sort((a, b) => crowd(b) - crowd(a) || dist2(u, a) - dist2(u, b))[0];
+        if (!target) break;
+        const boom = dmg * (1 + traitValue(this.sides[u.team].traits, 'bomber') / 100);
+        const dur = 0.5;
+        this.events.push({ t: 'proj', from: u.id, to: target.id, kind: 'shell', dur, crit });
+        for (const e of enemies) if (e === target || cheb(e, target) <= 1) {
+          this.projectiles.push({ from: u.id, to: e.id, dmg: e === target ? boom : boom * BOMB_SPLASH, ability: true, crit, at: this.time + dur });
         }
         break;
       }

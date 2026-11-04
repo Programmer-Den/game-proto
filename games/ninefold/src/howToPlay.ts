@@ -13,7 +13,7 @@ const en: HowToPlay = {
     { input: 'Menu', action: 'Leave the board for the menu' },
   ],
   loop: [
-    'Pick the daily puzzle, a Classic level or a Delve run.',
+    'Pick the daily puzzle, the weekly gauntlet, a Classic level or a Delve run.',
     'Pick a cell and write a digit; a right one stays, a wrong one shows in red and counts a mistake.',
     'Finish every row, column and box to solve the board.',
     'In Delve a mistake costs a heart; a cleared floor offers three relics, and the next floor is bigger.',
@@ -22,7 +22,10 @@ const en: HowToPlay = {
   tips: [
     'Picking a digit highlights every place it already stands, and the pad shows how many of each are left.',
     'Delve starts on a 4×4 board, then 6×6, then 9×9 floors with fewer and fewer givens.',
-    'From floor 4 each Delve floor has a twist (Diagonal, Parity, Clock or Sealed), and every 5th is a boss floor with two; beating one restores your hearts.',
+    'From floor 4 each Delve floor has a twist (Diagonal, Parity, Killer, Thermo, Clock or Sealed), and every 5th is a boss floor with two; beating one restores your hearts.',
+    'Killer boards have dashed cages whose digits add up to the small sum in the corner, with no digit twice; on Thermo boards digits rise along each line from its round bulb.',
+    'Clear Delve floor 10 to open Ascension 1, a harder Delve with one rule more; each ascension cleared opens the next, up to 5. Pick one with the arrows beside Delve.',
+    'The weekly gauntlet has one board a day, Monday to Sunday, the same for everyone. Each scores once, on its day: fewer mistakes, hints and seconds score more, and the week adds up.',
     'The daily puzzle is the same for everyone on the same day; solve it on days in a row for a daily streak.',
     'A board in play is saved as you go, so you can close the page and carry on later.',
     'Hard puzzles, flawless solves and fast solves each unlock a style of their own.',
@@ -41,7 +44,7 @@ const de: HowToPlay = {
     { input: 'Menü', action: 'Das Rätsel verlassen und zum Menü gehen' },
   ],
   loop: [
-    'Wähle das Tagesrätsel, eine klassische Stufe oder einen Abstieg.',
+    'Wähle das Tagesrätsel, die Wochenprüfung, eine klassische Stufe oder einen Abstieg.',
     'Wähle ein Feld und schreibe eine Ziffer; eine richtige bleibt, eine falsche wird rot und zählt als Fehler.',
     'Vervollständige jede Zeile, Spalte und jedes Kästchen, um das Rätsel zu lösen.',
     'Im Abstieg kostet ein Fehler ein Herz; eine geschaffte Ebene bietet drei Relikte, und die nächste ist größer.',
@@ -50,7 +53,10 @@ const de: HowToPlay = {
   tips: [
     'Eine gewählte Ziffer leuchtet überall dort auf, wo sie schon steht, und das Ziffernfeld zeigt, wie viele noch fehlen.',
     'Der Abstieg beginnt auf einem 4×4-Feld, dann 6×6, dann 9×9-Ebenen mit immer weniger Vorgaben.',
-    'Ab Ebene 4 hat jede Ebene eine Wendung (Diagonale, Gerade, Uhr oder Versiegelt), und jede 5. ist eine Bossebene mit zweien; wer sie schafft, bekommt alle Herzen zurück.',
+    'Ab Ebene 4 hat jede Ebene eine Wendung (Diagonale, Gerade, Killer, Thermo, Uhr oder Versiegelt), und jede 5. ist eine Bossebene mit zweien; wer sie schafft, bekommt alle Herzen zurück.',
+    'Killer-Rätsel haben gestrichelte Käfige, deren Ziffern die kleine Summe in der Ecke ergeben, ohne doppelte Ziffer; bei Thermo steigen die Ziffern entlang jeder Linie ab der runden Kugel.',
+    'Schaffe Ebene 10 des Abstiegs, um Stufe 1 zu öffnen, einen schwereren Abstieg mit einer Regel mehr; jede geschaffte Stufe öffnet die nächste, bis 5. Wähle sie mit den Pfeilen neben Abstieg.',
+    'Die Wochenprüfung hat ein Rätsel pro Tag, Montag bis Sonntag, für alle gleich. Jedes zählt einmal, an seinem Tag: weniger Fehler, Tipps und Sekunden geben mehr Punkte, und die Woche wird zusammengezählt.',
     'Das Tagesrätsel ist am selben Tag für alle gleich; löse es an aufeinanderfolgenden Tagen für eine Tagesserie.',
     'Ein laufendes Rätsel wird laufend gespeichert, du kannst die Seite schließen und später weitermachen.',
     'Schwere Rätsel, fehlerfreie und schnelle Lösungen schalten jeweils einen eigenen Stil frei.',

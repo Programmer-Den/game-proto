@@ -4,7 +4,9 @@ import { formatNumber } from '../../../../shared/i18n';
 import { viewFrame, viewSize } from '../../../../shared/scaling';
 import { settings } from '../../../../shared/settings';
 import { SFX, SONG } from '../audio';
-import { CHARMS, KIND_COLOR, MODES, RELIC_COLOR, type Mode, type RelicId } from '../game/catalog';
+import { CHARMS, KIND_COLOR, MODES, RELIC_COLOR, hasHearts, type Mode, type RelicId } from '../game/catalog';
+import { NODES, STEPS, TEMPLES, TEMPLE_STARS, isBossNode, journeyCard, nodeOpen, templeOpen, templeStars, totalStars } from '../game/journey';
+import { nextRankAt, rankOf, weekOf } from '../game/weekly';
 import { DEFS, KINDS, LEVELS, SKILLS, SKILL_OF, type KindId, type Level } from '../game/kinds';
 import type { Progress } from '../game/progress';
 import {
@@ -49,7 +51,7 @@ export class GameScene extends Phaser.Scene {
   run: Run | null = null;
   /** A run saved before the last reload, which the menu's Continue picks up. */
   saved: Run | null = null;
-  screen: 'menu' | 'practice' | 'records' | 'run' = 'menu';
+  screen: 'menu' | 'journey' | 'practice' | 'records' | 'run' = 'menu';
   practiceLevel: Level = 0;
   /** Spots for the test: every tappable thing on screen by id, centred, in view pixels. */
   buttons: Record<string, Spot> = {};
@@ -217,7 +219,7 @@ export class GameScene extends Phaser.Scene {
   // -------------------------------------------------------------------------------------------
   // Runs and events
 
-  private start(mode: Mode, kind?: KindId) {
+  private start(mode: Mode, kind?: KindId, node?: number) {
     if (mode === 'daily' && dailyDone(this.progress)) return ui('refuse');
     ui('click');
     // A new run ends the saved one there, its bests and its run recorded as if it was left.
@@ -225,17 +227,17 @@ export class GameScene extends Phaser.Scene {
     this.saved = null;
     clearRun();
     resetUnjam();
-    this.run = startRun(mode, this.progress, { kind, level: this.practiceLevel });
+    this.run = startRun(mode, this.progress, { kind, level: this.practiceLevel, node });
     this.screen = 'run';
     saveProgress(this.progress);
   }
 
-  private toMenu() {
+  private toMenu(screen: 'menu' | 'journey' = 'menu') {
     ui('click');
     // Leaving mid-run ends the run: its bests, the daily five's score and the run are recorded.
     if (this.run) quit(this.run);
     this.run = null;
-    this.screen = 'menu';
+    this.screen = screen;
     this.saveKey = '';
     clearRun();
     saveProgress(this.progress);
@@ -324,6 +326,7 @@ export class GameScene extends Phaser.Scene {
     p.begin();
     if (this.screen === 'menu') this.drawMenu();
     else if (this.screen === 'practice') this.drawPractice();
+    else if (this.screen === 'journey') this.drawJourney();
     else if (this.screen === 'records') this.drawRecords();
     else this.drawRun();
     p.end();
@@ -347,18 +350,21 @@ export class GameScene extends Phaser.Scene {
     const MENU = this.L.menu;
     this.heading(MENU.title.x, MENU.title.y, t('title'), 54, C.goldText, settings.reduceMotion ? undefined : C.goldText);
     p.text(MENU.tagline.x, MENU.tagline.y, t('tagline'), { size: 16, color: C.inkDim, wrap: MENU.tagline.w });
-    const { xs, ys, w, h } = MENU.cards;
+    const { xs, ys, w, h, dy } = MENU.cards;
     MODES.forEach((mode, k) => {
       const x = xs[k % xs.length];
       const y = ys[Math.floor(k / xs.length)];
       const done = mode === 'daily' && dailyDone(prog);
       p.frame(x - w / 2, y - h / 2, w, h, { alpha: done ? 0.6 : C.panelAlpha });
-      p.text(x, y - h / 2 + 20, ROMAN[k], { size: 15, color: C.goldText, spacing: 2 });
-      this.modeIcon(mode, x, y - 46, done);
-      p.text(x, y + 8, t(`${mode}Name` as TextKey), { size: 16, color: C.goldText, bold: true, wrap: w - 16 });
-      p.text(x, y + 52, t(`${mode}Text` as TextKey), { size: 11, color: C.inkDim, wrap: w - 18 });
-      p.text(x, y + h / 2 - 16, this.modeBest(mode), { size: 11, color: C.cyanText, wrap: w - 12 });
-      p.hit(`mode-${mode}`, x - w / 2, y - h / 2, w, h, () => (mode === 'practice' ? (ui('click'), (this.screen = 'practice')) : this.start(mode)), !done);
+      p.text(x, y + dy.numeral, ROMAN[k], { size: 13, color: C.goldText, spacing: 2 });
+      this.modeIcon(mode, x, y + dy.icon, done);
+      p.text(x, y + dy.name, t(`${mode}Name` as TextKey), { size: 16, color: C.goldText, bold: true, wrap: w - 16 });
+      p.text(x, y + dy.text, t(`${mode}Text` as TextKey), { size: 11, color: C.inkDim, wrap: w - 18 });
+      p.text(x, y + dy.best, this.modeBest(mode), { size: 11, color: C.cyanText, wrap: w - 12 });
+      // Practice and the journey open a screen to pick from; the other modes start a run.
+      const open = () =>
+        mode === 'practice' || mode === 'journey' ? (ui('click'), (this.screen = mode)) : this.start(mode);
+      p.hit(`mode-${mode}`, x - w / 2, y - h / 2, w, h, open, !done);
     });
     const saved = this.saved;
     const records = saved ? MENU.recordsAside : MENU.records;
@@ -380,6 +386,13 @@ export class GameScene extends Phaser.Scene {
         return b.draft ? t('bestSolved', { n: b.draft }) : '';
       case 'daily':
         return dailyDone(this.progress) ? t('dailyToday', { n: formatNumber(this.progress.daily!.score) }) : t('dailyNew');
+      case 'journey':
+        return t('starsOf', { n: totalStars(this.progress.journey), of: NODES * 3 });
+      case 'weekly': {
+        const week = this.progress.weekly;
+        if (week?.week !== weekOf() || !week.best) return t('weeklyNew');
+        return t('weeklyBest', { n: formatNumber(week.best), rank: t(rankOf(week.best)) });
+      }
       default:
         return '';
     }
@@ -418,7 +431,59 @@ export class GameScene extends Phaser.Scene {
       case 'practice':
         drawGlyph(g, 5, x, y, 44, a);
         break;
+      case 'journey':
+        // A temple: a roof, four columns and a step.
+        g.fillTriangle(x - 24, y - 10, x + 24, y - 10, x, y - 24);
+        for (const dx of [-18, -6, 6, 18]) g.fillRect(x + dx - 2.5, y - 7, 5, 20);
+        g.fillRect(x - 26, y + 14, 52, 5);
+        break;
+      case 'weekly':
+        // A laurel ring of seven stars round the sun.
+        for (let i = 0; i < 7; i++) {
+          const an = (i * 2 * Math.PI) / 7 - Math.PI / 2;
+          g.fillCircle(x + Math.cos(an) * 20, y + Math.sin(an) * 20, 3);
+        }
+        drawGlyph(g, 0, x, y, 24, a);
+        break;
     }
+  }
+
+  /** The journey's map: five temples of eight steps, each step a card with its stars. */
+  private drawJourney() {
+    const p = this.p;
+    const g = p.g;
+    const stars = this.progress.journey;
+    const J = this.L.journey;
+    this.back(() => {
+      ui('click');
+      this.screen = 'menu';
+    });
+    this.heading(J.title.x, J.title.y, t('journeyTitle'), 26);
+    for (let temple = 0; temple < TEMPLES; temple++) {
+      const y = J.rows[temple];
+      const open = templeOpen(stars, temple);
+      const name = t(`temple${temple}` as TextKey);
+      p.text(J.label.x, y + J.label.dy - 10, name, { size: 15, color: open ? C.goldText : C.inkDim, bold: true, ox: 0 });
+      const line = open ? t('starsOf', { n: templeStars(stars, temple), of: STEPS * 3 }) : t('templeLocked', { n: TEMPLE_STARS, name: t(`temple${temple - 1}` as TextKey) });
+      p.text(J.label.x, y + J.label.dy + 10, line, { size: 11, color: open ? C.cyanText : C.inkDim, ox: 0 });
+      for (let step = 0; step < STEPS; step++) {
+        const node = temple * STEPS + step;
+        const x = J.nodes.x0 + step * J.nodes.step;
+        const cy = y + J.nodes.dy;
+        const card = journeyCard(node);
+        const can = nodeOpen(stars, node);
+        const boss = isBossNode(node);
+        const r = J.nodes.r;
+        g.fillStyle(C.deep, can ? 1 : 0.6).fillCircle(x, cy, r);
+        g.lineStyle(boss ? 2.5 : 1.5, boss ? C.rose : stars[node] ? C.cyan : C.gold, can ? 1 : 0.35).strokeCircle(x, cy, r);
+        if (step) g.lineStyle(1, C.gold, 0.35).lineBetween(x - J.nodes.step + r, cy, x - r, cy);
+        if (can) drawKindIcon(g, card.kind, x, cy, r * 1.2, KIND_COLOR[card.kind]);
+        else p.text(x, cy, ROMAN[card.level], { size: 12, color: C.inkDim });
+        p.text(x, cy + r + 9, '★'.repeat(stars[node]) + '☆'.repeat(3 - stars[node]), { size: 11, color: stars[node] ? C.goldText : C.inkDim, alpha: can ? 1 : 0.4 });
+        p.hit(`node-${node}`, x - r, cy - r, 2 * r, 2 * r, () => this.start('journey', undefined, node), can);
+      }
+    }
+    p.text(J.line.x, J.line.y, t('journeyRule', { n: TEMPLE_STARS }), { size: 12, color: C.inkDim, wrap: this.L.view.w - 60 });
   }
 
   private drawPractice() {
@@ -526,7 +591,7 @@ export class GameScene extends Phaser.Scene {
     // The middle: hearts, the Blitz clock, the daily five or whose turn it is.
     const mid = TOP.mid.x;
     cy = TOP.mid.y;
-    if (run.mode === 'endless' || run.mode === 'draft') {
+    if (hasHearts(run.mode)) {
       const hearts = '♥'.repeat(Math.max(0, run.hearts));
       p.text(mid, cy, hearts || '♡', { size: 22, color: C.roseText, spacing: 3 });
     } else if (run.mode === 'blitz') {
@@ -538,6 +603,9 @@ export class GameScene extends Phaser.Scene {
         g.fillStyle(res ? (res.reason === 'solved' ? C.cyan : C.rose) : i === run.results.length ? C.goldBright : C.deep, 1).fillRect(x - 7, cy - 7, 14, 14);
         g.lineStyle(1, C.gold, 1).strokeRect(x - 7, cy - 7, 14, 14);
       });
+    } else if (run.mode === 'journey') {
+      const best = this.progress.journey[run.node] ?? 0;
+      p.text(mid, cy, '★'.repeat(best) + '☆'.repeat(3 - best), { size: 20, color: C.goldText, spacing: 2 });
     } else if (run.mode === 'duel') {
       p.text(mid, cy, t('playerN', { n: run.player + 1 }), { size: 20, color: run.player ? C.cyanText : C.goldText, bold: true });
     }
@@ -580,7 +648,10 @@ export class GameScene extends Phaser.Scene {
       case 'daily':
         return t('cardN', { n: Math.min(run.results.length + 1, run.queue.length), of: run.queue.length });
       case 'draft':
+      case 'weekly':
         return t('floorN', { n: run.solved + 1 }) + boss;
+      case 'journey':
+        return t('journeyLine', { temple: ROMAN[Math.floor(run.node / STEPS)], n: (run.node % STEPS) + 1, of: STEPS });
       case 'duel':
         return t('cardN', { n: Math.min(run.results.length - run.player * run.queue.length + 1, run.queue.length), of: run.queue.length });
       case 'practice':
@@ -653,7 +724,17 @@ export class GameScene extends Phaser.Scene {
         });
         scoreBox([[t('score'), formatNumber(run.score)]]);
         break;
-      case 'draft': {
+      case 'journey': {
+        const card = run.queue[0];
+        label(t(`temple${Math.floor(run.node / STEPS)}` as TextKey));
+        const line = card.boss ? t('bossWith', { name: t(`${card.boss.kind}Name` as TextKey) }) : `${ROMAN[card.level]} · ${t(`level${card.level}` as TextKey)}`;
+        this.smallCard(card, x, y + 24, w, 62, line);
+        p.text(x + 4, y + 120, t('starsRule'), { size: 13, color: C.inkDim, ox: 0, wrap: w - 8, align: 'left' });
+        scoreBox([[t('score'), formatNumber(run.score)]]);
+        break;
+      }
+      case 'draft':
+      case 'weekly': {
         label(t('relicsTitle'));
         const counts = new Map<RelicId, number>();
         for (const r of run.relics) counts.set(r, (counts.get(r) ?? 0) + 1);
@@ -729,7 +810,7 @@ export class GameScene extends Phaser.Scene {
     this.heading(bx + (STAGE.w - 120) / 2, by + 40, last.boss && solved ? t('bossBeaten') : t(`res_${last.reason}` as TextKey), 26, solved ? C.cyanText : C.roseText);
     const points = t('pointsLine', { n: last.points }) + (last.omen ? ` · ${t('omenLine')}` : '');
     const heart = last.omen === 'peril' ? t('heartsLost', { n: PERIL_HEARTS }) : t('heartLost');
-    const line = practice || run.mode === 'duel' ? t('timeLine', { time: timeText(last.ms) }) : solved ? points : run.mode === 'endless' || run.mode === 'draft' ? heart : run.mode === 'blitz' ? t('timeLost', { n: BLITZ_PENALTY_S }) : '';
+    const line = practice || run.mode === 'duel' ? t('timeLine', { time: timeText(last.ms) }) : solved ? points : hasHearts(run.mode) ? heart : run.mode === 'blitz' ? t('timeLost', { n: BLITZ_PENALTY_S }) : '';
     p.text(bx + (STAGE.w - 120) / 2, by + 80, line, { size: 16, color: C.ink });
     if (practice) {
       p.button('next', bx + (STAGE.w - 120) / 2 - 95, by + 130, 170, 40, t('nextPuzzle'), () => (ui('click'), next(run)), { accent: true });
@@ -793,14 +874,32 @@ export class GameScene extends Phaser.Scene {
       title = a === b ? t('duelTie') : t('duelWin', { n: a < b ? 1 : 2 });
       for (const pl of [0, 1]) lines.push(t('duelLine', { n: pl + 1, time: tenthsText(run.totals[pl]), solved: run.duelSolved[pl] }));
       lines.push(t('duelRule', { n: DUEL_FAIL_S }));
+    } else if (run.mode === 'journey') {
+      title = run.stars ? t('stepCleared') : t('stepFailed');
+      lines.push('★'.repeat(run.stars) + '☆'.repeat(3 - run.stars));
+      lines.push(t('overScore', { n: formatNumber(run.score) }));
+      if (run.newBest) lines.push(t('newStars'));
     } else {
       title = run.mode === 'blitz' ? t('blitzOver') : run.mode === 'daily' ? t('dailyOver') : t('runOver');
       lines.push(t('overScore', { n: formatNumber(run.score) }));
       lines.push(t('overSolved', { n: run.solved, of: run.results.length }));
+      if (run.mode === 'weekly') {
+        const best = run.progress.weekly?.best ?? run.score;
+        const at = nextRankAt(best);
+        lines.push(t('weeklyRank', { rank: t(rankOf(best)) }) + (at === null ? '' : ` · ${t('weeklyNext', { n: formatNumber(at) })}`));
+      }
       if (run.newBest) lines.push(t('newBest'));
     }
     this.heading(END.x, END.y - 120, title, 28);
-    lines.forEach((line, i) => p.text(END.x, END.y - 66 + i * 30, line, { size: i === 0 ? 20 : 16, color: line === t('newBest') ? C.cyanText : C.ink, wrap: END.w - 60 }));
+    const cyan = [t('newBest'), t('newStars')];
+    lines.forEach((line, i) => p.text(END.x, END.y - 66 + i * 30, line, { size: i === 0 ? 20 : 16, color: cyan.includes(line) ? C.cyanText : i === 0 && run.mode === 'journey' ? C.goldText : C.ink, wrap: END.w - 60 }));
+    if (run.mode === 'journey') {
+      const nextNode = run.node + 1;
+      const onward = run.stars > 0 && nodeOpen(run.progress.journey, nextNode);
+      p.button(onward ? 'next-step' : 'again', END_BUTTONS.xs[0], END_BUTTONS.y, END_BUTTONS.w, END_BUTTONS.h, onward ? t('nextStep') : t('again'), () => this.start('journey', undefined, onward ? nextNode : run.node), { accent: true });
+      p.button('done', END_BUTTONS.xs[1], END_BUTTONS.y, END_BUTTONS.w, END_BUTTONS.h, t('map'), () => this.toMenu('journey'));
+      return;
+    }
     const again = run.mode !== 'daily';
     if (again) p.button('again', END_BUTTONS.xs[0], END_BUTTONS.y, END_BUTTONS.w, END_BUTTONS.h, t('again'), () => this.start(run.mode), { accent: true });
     p.button('done', again ? END_BUTTONS.xs[1] : END.x, END_BUTTONS.y, END_BUTTONS.w, END_BUTTONS.h, t('menu'), () => this.toMenu());

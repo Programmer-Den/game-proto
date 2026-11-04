@@ -2,7 +2,7 @@
 
 import type { TextKey } from '../i18n';
 
-export type EnemyKind = 'sloop' | 'brig' | 'galleon' | 'fireship' | 'ketch' | 'flagship' | 'admiral' | 'merchant';
+export type EnemyKind = 'sloop' | 'brig' | 'galleon' | 'fireship' | 'ketch' | 'flagship' | 'admiral' | 'tempest' | 'merchant';
 
 export interface ShipType {
   name: TextKey;
@@ -41,6 +41,8 @@ export const ENEMIES: Record<EnemyKind, ShipType> = {
   ketch: { name: 'ketchName', called: 'ketchCalled', hp: 45, radius: 22, speed: 52, turn: 0.9, guns: 0, damage: 20, reloadMs: 4200, range: 380, loot: 30, role: 'mortar', crew: 10 },
   flagship: { name: 'flagshipName', called: 'flagshipCalled', hp: 300, radius: 38, speed: 42, turn: 0.55, guns: 4, damage: 9, reloadMs: 3000, range: 280, loot: 150, crew: 32, grape: true },
   admiral: { name: 'admiralName', called: 'admiralCalled', hp: 440, radius: 40, speed: 40, turn: 0.5, guns: 5, damage: 10, reloadMs: 2800, range: 290, loot: 300, crew: 40, grape: true },
+  // The storm-lord's man-of-war at the end of the Storm Reaches: she calls squalls down as she is hurt.
+  tempest: { name: 'tempestName', called: 'tempestCalled', hp: 520, radius: 42, speed: 44, turn: 0.55, guns: 5, damage: 11, reloadMs: 2600, range: 300, loot: 400, crew: 44, grape: true },
   merchant: { name: 'merchantName', called: 'merchantCalled', hp: 50, radius: 24, speed: 74, turn: 0.9, guns: 0, damage: 0, reloadMs: 0, range: 0, loot: 40, role: 'merchant', crew: 10 },
 };
 

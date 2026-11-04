@@ -1,7 +1,8 @@
 import type { BaseId, CardId } from './cards';
 import type { EnemyKind, Intent, StatusKind } from './enemies';
 import type { FlaskId } from './flasks';
-import type { HeroId } from './heroes';
+import type { DailyRecord } from '../../../../shared/daily';
+import type { HeroId, HeroWins } from './heroes';
 import type { Room } from './map';
 import type { RelicId } from './relics';
 
@@ -153,6 +154,14 @@ export interface GameState {
   depth: number;
   /** The deepest depth unlocked so far, saved in the browser. */
   bestDepth: number;
+  /** The deepest depth each hero has beaten, saved in the browser; it unlocks the Hexer. */
+  heroWins: HeroWins;
+  /** The day (`YYYY-MM-DD`) when this run is that day's daily crypt, or null for a run of one's own. */
+  daily: string | null;
+  /** Today's daily crypt as saved: whether it was tried, its score, the best and the streak. */
+  dailyRecord: DailyRecord;
+  /** The daily's score once it ends, null before. */
+  dailyScore: number | null;
   /** The flasks held, up to FLASK_SLOTS. */
   flasks: FlaskId[];
   /** Which act the hero is in, from 1. */

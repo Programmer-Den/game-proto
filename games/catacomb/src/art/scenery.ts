@@ -39,6 +39,9 @@ export function bakeScenery(scene: Phaser.Scene) {
   // The second act, the Sunken Tombs, is the same stone washed in a cold, drowned green.
   addTexture(scene, 'room-bg-2', washed(crypt, '#6fa496'), res);
   addTexture(scene, 'map-bg-2', washed(flagstones, '#6fa496'), res);
+  // The third act, the Bone Spire, in a pale, dusty violet.
+  addTexture(scene, 'room-bg-3', washed(crypt, '#c4b4d8'), res);
+  addTexture(scene, 'map-bg-3', washed(flagstones, '#c4b4d8'), res);
 }
 
 /** The backdrop for an act. */

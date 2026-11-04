@@ -337,6 +337,19 @@ const en = {
   gardenLocked: 'Learn a recipe at the study to plant it',
   castleCount: { one: '{n} castle', other: '{n} castles' },
   townCity: 'Every district is full of castles: the town is a city!',
+  // Next towns, royal requests and master craftsmen
+  townCityNext: 'The town is a city! Tap here to found {town} down the road',
+  townFounded: '{town} founded: a town seal more',
+  districtsOf: 'Districts of {town}',
+  marshgate: 'Marshgate',
+  highcrag: 'Highcrag',
+  saltmere: 'Saltmere',
+  royalAsks: 'Royal request: +{n}{coin}',
+  royalWaits: { one: 'Tap to hand over, leaves at dusk', other: 'Tap to hand over, leaves in {n} days' },
+  royalDone: 'Royal request filled: +{n}{coin}',
+  royalGiven: { one: 'Handed {n} potion to the courier', other: 'Handed {n} potions to the courier' },
+  royalNone: 'The shelf holds none the crown wants',
+  master: { one: 'Master ★', other: 'Master {stars}' },
 };
 
 export default en;

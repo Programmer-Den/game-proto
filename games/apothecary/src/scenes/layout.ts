@@ -187,6 +187,11 @@ export const RIVAL = { x: 740, y: 800, sign: { x: 740, y: 724 }, offer: { x: 740
  */
 export const WAGON = { x: 950, y: 820, want: { x: 950, y: 728 }, left: { x: 950, y: 746 } };
 /**
+ * The royal courier's stop on the green right of the guild (AP17), clear of its markers: its feet, and the lines
+ * above it with the reward, the potions it wants and how long it waits.
+ */
+export const ROYAL = { x: 1562, y: 840, title: 740, wants: 760, left: 780 };
+/**
  * The herb market below the outfitter: its stall, the marker to sell plants and refined goods, the
  * marker to buy the good its tappable sign shows, and that sign above the buy marker.
  */

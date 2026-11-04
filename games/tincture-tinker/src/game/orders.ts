@@ -1,5 +1,6 @@
 import { byDifficulty } from '../../../../shared/settings';
 import type { TextKey } from '../i18n';
+import type { Cell } from './board';
 import { KINDS, type Kind } from './kinds';
 
 // The potion orders, one after another. Each asks for so many of a few ingredients within a number
@@ -63,12 +64,20 @@ export interface Order {
   rich?: Risk;
   /** A guild examination: its index in `EXAMS` (see exams.ts) and the stars it must be sold with. */
   exam?: { index: number; stars: number };
+  /** The walls of a town's board shape (see towns.ts): cells with no tile, which tiles fall past. */
+  holes?: Cell[];
+  /** A town on the journey map: its index in `TOWNS` (see towns.ts). */
+  town?: { index: number };
+  /** An order of an endless run, after the guild examinations: its place in the run, from 1. */
+  endless?: number;
+  /** The daily order: the day it is for and the town whose board shape it borrows. */
+  daily?: { day: string; town: number };
 }
 
 /** What a rich order risks: fewer moves, or more jars, resin and mould. */
 export type Risk = 'moves' | 'blockers';
 
-type Recipe = Omit<Order, 'number' | 'jars' | 'resin' | 'mould'>;
+export type Recipe = Omit<Order, 'number' | 'jars' | 'resin' | 'mould'>;
 
 /** Coins for each move left when an order is filled. */
 export const MOVE_BONUS = 5;
@@ -115,6 +124,9 @@ export const RANK_RECIPES: Partial<Record<PotionId, Recipe>> = {
   starlightElixir: { potion: 'starlightElixir', needs: { moonpetal: 16, sage: 14, wheat: 12 }, moves: 19, price: 75 },
   philosophersDraught: { potion: 'philosophersDraught', needs: { ember: 18, moonpetal: 16, mandrake: 16 }, moves: 22, price: 100 },
 };
+
+/** Every recipe there is, the five orders' and the three a rank unlocks: the daily order and endless runs draw on them all. */
+export const ALL_RECIPES: Recipe[] = [...ORDERS, ...Object.values(RANK_RECIPES)];
 
 /** True on the orders that are royal commissions (5, 10, 15...). */
 export const isRoyal = (number: number) => number % ROYAL_EVERY === 0;

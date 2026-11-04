@@ -123,6 +123,18 @@ export function drawKindIcon(g: G, kind: KindId, x: number, y: number, size: num
       g.lineStyle(3 * s, color, 1).beginPath().moveTo(X(7), Y(7)).lineTo(X(27), Y(7)).lineTo(X(27), Y(17)).lineTo(X(7), Y(17)).lineTo(X(7), Y(27)).lineTo(X(27), Y(27)).strokePath();
       g.fillCircle(X(7), Y(7), 4 * s).fillCircle(X(27), Y(27), 4 * s);
       break;
+    case 'slide':
+      // A 3x3 tray with one gap and an arrow into it.
+      for (let r = 0; r < 3; r++) {
+        for (let c = 0; c < 3; c++) if (r * 3 + c !== 8) g.fillRect(X(3 + c * 10), Y(3 + r * 10), 8 * s, 8 * s);
+      }
+      g.strokeRect(X(23), Y(23), 8 * s, 8 * s);
+      break;
+    case 'series':
+      // Three rising bars and a question mark of a dot and a ring.
+      g.fillRect(X(3), Y(21), 6 * s, 10 * s).fillRect(X(11), Y(15), 6 * s, 16 * s).fillRect(X(19), Y(9), 6 * s, 22 * s);
+      g.strokeRect(X(27), Y(3), 5 * s, 28 * s);
+      break;
     case 'echo':
       g.fillRect(X(4), Y(8), 12 * s, 18 * s);
       g.strokeRect(X(18), Y(8), 12 * s, 18 * s);
