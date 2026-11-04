@@ -13,7 +13,9 @@ onto the horde, and charges Caltrops, a patch of spikes dragged onto the road; k
 hire a spearman or a mage onto the barricade, or buy a fortification in the break; kills in quick
 succession build a streak that gives more experience; every level-up pauses the battle on three
 upgrades to pick from; after each boss the hero picks the next road; and beating the third boss on
-wave 30 lifts the siege, which wins the run and unlocks the next heat.
+wave 30 lifts the siege, which wins the run, unlocks the next heat and opens a second map, the
+frozen pass. A hero who retires opens a second class, the mage, and the daily siege is one seeded
+run a day, the same for everyone.
 
 ![A wave coming on](docs/screenshots/playthrough-0-battle.webp)
 
@@ -101,7 +103,7 @@ skill book lists the relics of a full set in green with its bonus above them.
 Beating the third boss, the Frost Giant on wave 30, **lifts the siege**: the run is won, with a
 victory panel over the relic chest. "Keep fighting" goes on to wave 31 and beyond on the same
 heat, with a boss every tenth wave as before; "Heat N" starts a new run at the next heat, from wave
-1 with the hero kept. Each heat adds a rule on top of the lower ones, and the game-over panel's
+1 with the hero kept; "To the frozen pass" marches on to the second map (see below). Each heat adds a rule on top of the lower ones, and the game-over panel's
 "Next run at" row starts the next run at any heat unlocked so far. A chip beside the wave track
 shows the heat the run is on.
 
@@ -111,9 +113,29 @@ shows the heat the run is on.
 | Heat 2 | Every boss has one more health bar |
 | Heat 3 | The barricade mends half as much after a wave and from Mend the Barricade |
 
-![The siege is lifted](docs/screenshots/siege-lifted.webp)
+![The siege is lifted, with the way on to the frozen pass](docs/screenshots/siege-lifted.webp)
 ![A new run at Heat 1](docs/screenshots/heat-1.webp)
-![The game-over panel with the heats and the forced march](docs/screenshots/game-over-heats.webp)
+![The game-over panel with the map, the heats, the forced march, the hero's class and the daily siege](docs/screenshots/game-over-heats.webp)
+
+### The frozen pass
+
+Lifting the siege opens a second map. The victory panel's "To the frozen pass" button marches the
+same hero on to wave 1 of the **frozen pass** (at the same heat), and after a fall the game-over
+panel's "Map" row picks the vale or the pass for the next run. The pass is the vale under snow: its
+own 30 waves, with foes as tough as ten waves further on in the vale, and every kill paying 25%
+more experience and coins. Its roads end with the Frost Giant (wave 10), the Troll King (wave 20)
+and its own last boss, the **Yeti Chieftain** (wave 30). Clearing its wave 30 wins the pass, with
+the same victory panel and the next heat unlocked; the best wave on the pass is kept apart from the
+vale's, and the forced march there counts it. A chip by the Repair button says the run is on the
+pass.
+
+| Foe | From | What it does |
+| --- | --- | --- |
+| Frost Wolf | pass wave 1 | Runs in at more than twice an orc's pace, in packs that grow every wave |
+| Ice Wisp | pass wave 3 | Flies over the barricade like a harpy, and is made of frost: burning and chill do nothing to it |
+| Yeti Chieftain | pass wave 30 | The pass's boss, made of frost too. Every 10s it howls: every hired guard is stunned for 4s and the hero shoots at 60% of the pace for 4s |
+
+![Wave 30 of the frozen pass: frost wolves, ice wisps and the Yeti Chieftain](docs/screenshots/frozen-pass.webp)
 
 ### Forced march
 
@@ -144,7 +166,34 @@ The relic card names a relic rolled when the panel opens; the other two can be k
 
 Legacies are saved with the hero and survive "New hero".
 
-![Retiring the hero: three legacies to keep](docs/screenshots/retire-legacy.webp)
+![Retiring the hero: three legacies to keep, and the next hero's class](docs/screenshots/retire-legacy.webp)
+
+### The mage
+
+The first legacy opens a second hero class. The retire panel's "The next hero" row picks the
+**ranger** or the **mage** for the next hero, and once a hero has retired the game-over panel's
+"Hero" button picks the class for "New hero". The mage stands where the ranger stands but casts a
+violet bolt every 1.4s instead of shooting: it hits for 15, bursts over the foes round it for 35%
+of that, and is magic, so a shield bearer's shield doesn't stop it (armour still counts). The mage
+has a skill tree of its own (below), shares the barricade, guard, caltrops and Arrow Rain skills
+with the ranger, and has a skill book of its own. A hero keeps their class; a new class means a new
+hero.
+
+![The mage hero casting violet bolts](docs/screenshots/mage-hero.webp)
+![The mage's skill book](docs/screenshots/mage-skill-book.webp)
+
+### Daily siege
+
+The game-over panel's **Daily siege** button starts today's daily: one try a day, the same run for
+every player. A fresh ranger (level 1, no upgrades, legacy or heat) starts on wave 1 of the vale
+with two relics, and the day's seed sets every road taken after a boss, every omen offered and
+every relic in the chests, instead of the hero picking or the game rolling them. There is no
+victory panel: the daily fights on until the hero falls, and the score is the waves cleared. The
+panel then shows the score, the best daily and the days in a row, and "Back to your hero" returns
+to the hero's own run, which the daily never touches. Starting it uses up the day's try, even if it
+is left half way.
+
+![The daily siege's score](docs/screenshots/daily-siege.webp)
 
 ### Road choice
 
@@ -340,6 +389,28 @@ stronger for as long as the waves keep coming.
 ![After every skill is learned: the base skills, with no cap](docs/screenshots/base-skills-no-cap.webp)
 ![Three of the newer skills on a level-up](docs/screenshots/new-skills-level-up.webp)
 
+The table above is the ranger's. The mage learns these instead of the ranger's bow, fire, frost,
+powder, lightning and hard-hitting skills, and shares Stout Timber, Battle Lore, Cloudburst, Barbed
+Caltrops, Spiked Stakes, Bounty Hunter, Drill Sergeant and the fillers. Once every skill is
+learned, the mage's base skills with no cap are Focus, Potency and Stout Timber.
+
+| Mage skill | Ranks | What it does |
+| --- | --- | --- |
+| Focus | 5, then no cap | Cast 20% faster |
+| Potency | 5, then no cap | Bolts (and Arrow Rain) deal 25% more damage |
+| Twin Bolt | 2 | One more bolt per cast, each at a different foe |
+| Chain Spark | 3 | Bolts leap on to one more foe nearby |
+| Wide Burst | 3 | Bolt bursts are wider and hit harder |
+| Ember Bolt | 1 | Bolts set foes ablaze for 3s |
+| Inferno | 3 | Burning deals 50% more (after Ember Bolt) |
+| Frostbolt | 1 | Bolts chill foes, slowing them by 35% |
+| Glacial Bolt | 3 | Chill slows 10% more and lasts longer (after Frostbolt) |
+| Fire Orb | 1 | A fire orb every 3s at the thickest crowd, which explodes |
+| Orb Mastery | 3 | Fire orbs come 15% sooner and hit 40% harder (after Fire Orb) |
+| Tempest | 1 | Lightning every 3.5s that leaps between 3 foes, through armour |
+| Arc Lightning | 3 | Lightning leaps to one more foe and hits 25% harder (after Tempest) |
+| Hex of Ruin | 3 | Bolts and Arrow Rain deal 30% more damage to bosses |
+
 The skill book (its button in the top bar shows how many skills are found, such as "Skill book
 8/28") has a page for every upgrade and filler, one theme a row: the bow, harder hits, fire, chill
 and slow, powder and lightning, the barricade and guards, then Battle Lore and the fillers. The pages start as empty placeholders, and each fills in the
@@ -417,7 +488,9 @@ npx playwright test --project palisade
 
 All paths are inside `games/palisade/`.
 
-- `src/game/`: the rules in plain TypeScript with no Phaser dependency. `enemies.ts`,
+- `src/game/`: the rules in plain TypeScript with no Phaser dependency. `frontier.ts` (the maps:
+  the vale and the frozen pass), `hero.ts` (the classes: the ranger and the mage), `daily.ts` (the
+  daily siege's plan for the day), `enemies.ts`,
   `upgrades.ts`, `relics.ts` (with the relic sets), `guards.ts`, `roads.ts`, `forts.ts` (the
   fortifications and paid repairs), `elites.ts` (the traits), `omens.ts` (the omens), `march.ts` (the forced
   march's starts), `legacy.ts` (the legacies), `bosses.ts` (the bosses' moves), `heat.ts` (the heats
@@ -430,8 +503,8 @@ All paths are inside `games/palisade/`.
   track, Arrow Rain, the caltrops and the guard slots and wires taps and drags to the rules, `layout.ts` says where things are
   drawn.
 - `src/art/`: all the low-poly art, painted in code on canvases at startup: `lowpoly.ts` has the
-  toolkit (faceted parts lit from the top left, soft shadows), `characters.ts` the ranger, the foes,
-  the bosses, the hired guards and the missiles, `scenery.ts` the battlefield, the HUD bars and the barricade (which
+  toolkit (faceted parts lit from the top left, soft shadows), `characters.ts` the ranger, the mage hero, the foes,
+  the bosses, the hired guards and the missiles, `scenery.ts` the battlefield (and the frozen pass under snow), the HUD bars and the barricade (which
   breaks up in stages), and `icons.ts` the upgrade and relic icons, the chest, the boss marks,
   the Arrow Rain and caltrops buttons, the coin and the road icons.
 - `src/trophies/`: the trophies (`index.ts`), their texts (`i18n/`) and when each is earned

@@ -65,7 +65,8 @@ export class BattleSounds {
     const launched = new Set(s.missiles.filter((m) => fresh(m.id)).map((m) => m.kind));
     if (launched.has('arrow')) sfx('bow');
     if (launched.has('fireball') || launched.has('rock')) sfx('whoosh');
-    if (launched.has('magic')) sfx('magic');
+    // The hired mage's bolt and the mage hero's cast share the arcane sound.
+    if (launched.has('magic') || launched.has('spell')) sfx('magic');
     // Arrows that are gone hit something, unless the wave ended or the run did and cleared them.
     if (s.phase === b.phase && s.wave === b.wave) {
       const still = new Set(s.missiles.map((m) => m.id));
@@ -105,7 +106,7 @@ export class BattleSounds {
     if (kinds.has('heal')) sfx('heal');
     if (kinds.has('rockHit')) sfx('thud');
     if (kinds.has('call')) sfx('horn', { pitch: 1.33 });
-    if (kinds.has('roar')) sfx('roar');
+    if (kinds.has('roar') || kinds.has('howl')) sfx('roar');
     if (kinds.has('rain')) sfx('rainLand');
     if (kinds.has('autoPick')) sfx('pick');
 

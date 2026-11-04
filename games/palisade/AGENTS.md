@@ -28,6 +28,50 @@ seconds without a tap.
   `bossBars` (so in `foeHp` too), Heat 3 halves `stats().repair` and `stats().mend`. `stats` takes
   `heat`, so it is a `Pick` of `ranks`, `relics` and `heat`. The game-over panel has a "Next run
   at" row of heat buttons (`restartAt`), and a chip beside the wave track shows `heat` when above 0.
+- **New frontiers** (`frontier.ts`, `state.frontier`, a `FrontierId`): the vale and, once the siege
+  is lifted (`canFrontier`: `heatUnlocked > 0`), the frozen pass. `FRONTIERS` gives each map its
+  `bosses` (the pass: Frost Giant, Troll King, then the Yeti Chieftain, `chieftain`), `hpWaves`
+  (`foeHp` scales by `hpScale(wave + hpWaves)`, 10 on the pass) and `reward` (1.25 on the pass, on
+  every kill's coins and experience in `removeDead`). `waveFoes(wave, road, frontier)` adds frost
+  wolves (`wolf`) from the pass's wave 1 and ice wisps (`wisp`, `flying`) from wave 3, never in the
+  vale; `bossOf` and `waveTrack` take the map too. A foe with `cold` (the wisp and the Chieftain)
+  shrugs off burning and chill (`ignite`, `chill`). The Chieftain's move (`bossMoves`) is a howl
+  every `HOWL_MS`: every hired guard's `stunMs` is set to `STUN_MS` and `roarMs` to `ROAR_SLOW_MS`
+  (a `howl` effect). `clearWave` keeps the pass's best in `passBest` (`bestOn(state, frontier)`
+  reads either map's best, which `canMarch` uses) and, on its wave 30, sets `passWon` as well as
+  `won`. The victory panel's "To the frozen pass" (`wonPass`, hidden on the pass) calls `marchOn`
+  (`startHeat` on the pass at the same heat, counting the run); the game-over panel's "Map" row
+  (`drawMapPicks`) sets `GameScene.nextFrontier`, which "Fight again" (`fightAgain(state, start,
+  frontier)`) and the heat buttons use. `BootScene` bakes `background-pass` (`drawWinter` in
+  `scenery.ts` over the vale), which `drawHero` swaps in; a chip at `FRONTIER_CHIP` names the pass.
+- **Hero classes** (`hero.ts`, `state.hero`, a `HeroClass`): the ranger and the mage, open once a
+  hero has retired (`canClass`: `legacy.retired > 0`). The mage's upgrades are in `UPGRADES` with
+  `hero: 'mage'` (the ranger's own carry `hero: 'ranger'`; the rest are shared), after every other
+  entry so the ranger's random picks are as before. `offerable` filters by `learns(id, hero)`,
+  `rollChoices` falls back to `baseSkills(hero)` (`MAGE_BASE_SKILLS`: Focus, Potency, Stout
+  Timber), and the skill book shows `bookOrder(hero)` (`MAGE_BOOK_ORDER`). `stats` adds each mage
+  skill to the ranger stat it matches (Focus to `shotMs`, Potency to `damage`, Twin Bolt to
+  `arrows`, Ember Bolt and Inferno to `burn`, Frostbolt and Glacial Bolt to `chill`, Fire Orb and
+  Orb Mastery to `fireball`, Tempest and Arc Lightning to `storm`, Hex of Ruin to `bossDamage`),
+  and for the mage uses `MAGE_CAST_MS` and `MAGE_DAMAGE`, a `burst` of `MAGE_BURST` (wider with
+  Wide Burst) and `chain` (Chain Spark). `shoot` launches `spell` missiles for the mage (`pierce`
+  holds the chain's leaps); `spellHit` hurts through shields (armour counts), burns, chills and
+  bursts (an `arcane` effect), and the bolt leaps to the nearest unstruck foe within `LEAP_RANGE`
+  while it has leaps. `retire(state, id, relic, hero)` makes the next hero of `LegacyPanel.hero`
+  (the panel's "The next hero" row), and "New hero" uses `GameScene.nextHero` (the "Hero" button
+  over it, `toggleHero`). The scene shows `heroTexture(hero)` (`hero-mage`: the guard mage's rig in
+  violet at the hero's size) and the `spell-bolt` texture.
+- **Daily siege** (`daily.ts`, `state.daily`, with `shared/daily.ts` under `palisade-daily`): the
+  game-over panel's "Daily siege" button (`GameScene.startDaily`, refused once today's try is
+  `played`) calls `startDaily` and `dailyRun(dailyPlan(dailyRand('palisade', day), day), aim)`: a
+  fresh ranger with the plan's two `relics`. With `state.daily` set, `clearWave` takes each boss's
+  chest from `plan.chests`, sets `road` from `plan.roads` (no road choice) and the omen from
+  `plan.omens` (through `planned`), never sets `phase` to `'won'` and unlocks nothing; `canRetire`
+  is false; `GameScene.saveHero` saves nothing. When it falls, `GameScene.update` calls
+  `finishDaily` once with the waves cleared (`wave - 1`), and the game-over panel (`drawGameOver`)
+  hides the hero's rows (`heroOnly`) and shows the score with "Back to your hero" (`leaveDaily`,
+  which loads the saved hero again). The plan uses only the day's seeded random source, never
+  `Math.random`; the daily's crits, spawn spots and level-up cards still use `Math.random`.
 - **Elite foes** (`elites.ts`): from `ELITE_FROM_WAVE` (4) `spawn` rolls `eliteChance(wave)` per
   non-boss foe and a trait from `TRAIT_IDS` (two `Math.random` calls, only from wave 4, so the
   first waves' random sequence is unchanged). An elite has `ELITE_HP` times the health and gives
@@ -175,7 +219,8 @@ seconds without a tap.
   top bar, with the relics and full sets along its bottom), the relic chest panel and the road
   cards (`RoadChoice`, both during the break after a boss), the omen card (`OmenCard`, in the
   breaks from wave 4), the hire panel (`HirePanel`), the game-over panel with "Fight again", "New
-  hero" and "Retire", the heat row and the "Start at" row, and the legacy cards (`LegacyPanel`).
+  hero" (with the "Hero" class button over it) and "Retire", the "Map" row, the heat row, the "Start at" row
+  and the "Daily siege" button, and the legacy cards (`LegacyPanel`, with "The next hero" row).
   There is no title or menu screen.
 - **Rough edges seen in the code:**
   - The save holds no version, so there is no migration path (relics are merged over
@@ -230,11 +275,11 @@ seconds without a tap.
     `Guard`, `Forts`), field geometry (`FIELD`, `SPAWN_X`, `BOW`, `HERO_FRONT`, `BARRICADE_FRONT`,
     `GUARD_SLOTS`, `BASE_GUARD_SLOTS`), `xpToNext`, `stats` (all upgrade, relic, set and heat effects), `streakBonus`,
     `STREAK_MS`, `RAIN_KILLS`, `CALTROP_KILLS`, `rainNeed`, `newRun`, `Progress`, `progressOf`,
-    `freshForts`, `offerable`.
+    `freshForts`, `offerable`, `bestOn`.
   - `sim.ts`: `tick` (the battle and the auto-pick countdown), `held`, `pick`, `offer`, `rollChoices`,
     `reoffer`, `pickRoad`, `fightAgain`, `startHeat`, `keepFighting`, `loose` (Arrow Rain), `strew`
     (caltrops), `hire`, `train`, `fortify`, `canFortify`, `canBuyFort`, `repair`, `canRepair`,
-    `decideOmen`, `canRetire`, `retire`, `rollLegacyRelic`, `setAim`,
+    `decideOmen`, `canRetire`, `retire`, `rollLegacyRelic`, `setAim`, `marchOn`, `dailyRun`,
     `crowdSpot`, `inRing`, `rainRingOf`, `AUTO_PICK_MS`, `RAIN_FALL_MS`, `RAIN_RING`, `CALTROP_PATCH`,
     `CALTROP_WAVES`, `MAX_PATCHES`, `SHIELD_BLOCK`, and the private steps: spawning (elites), shooting, guards (stuns), missiles
     (rocks), boss moves, volleys, damage, foe movement (caltrops, healing, the stake line, the oil pot), kills (coins, streak, charges, experience, splitting),
@@ -251,9 +296,13 @@ seconds without a tap.
     `nextAim`, `sortTargets`.
   - `enemies.ts`: the `ENEMIES` table of wave 1 stats per `EnemyKind` (with `coins` and the
     `flying`, `shield` and `healer` flags), the three bosses included.
-  - `upgrades.ts`: the `UPGRADES` table, `UpgradeId`, `Icon`, `UPGRADE_IDS`, `BOOK_ORDER` (the
-    skill book's order only; the level-up's random picks follow `UPGRADE_IDS`), `FILLERS`,
-    `BASE_SKILLS` and `PURSE_COINS`.
+  - `upgrades.ts`: the `UPGRADES` table, `UpgradeId`, `Icon`, `UPGRADE_IDS`, `BOOK_ORDER` and
+    `MAGE_BOOK_ORDER` (each class's skill book order only, picked by `bookOrder`; the level-up's
+    random picks follow `UPGRADE_IDS`), `FILLERS`, `BASE_SKILLS`, `MAGE_BASE_SKILLS`, `baseSkills`,
+    `learns` and `PURSE_COINS`.
+  - `frontier.ts`: `FrontierId`, `FRONTIERS`, `FRONTIER_IDS`, `canFrontier`. `hero.ts`:
+    `HeroClass`, `HERO_CLASSES`, `HEROES`, `canClass`, `MAGE_CAST_MS`, `MAGE_DAMAGE`, `MAGE_BURST`.
+    `daily.ts`: `DAILY_GAME`, `DAILY_RELICS`, `DailyPlan`, `dailyPlan`, `planned`.
   - `relics.ts`: the `RELICS` table, `RelicId`, `RELIC_IDS`, `SETS`, `SetId`, `SET_IDS`,
     `setRelics` and `setComplete`.
   - `guards.ts`: the `GUARDS` table, `GuardKind`, `GUARD_KINDS`, `MAX_GUARD_LEVEL`, `trainCost`,
@@ -280,7 +329,7 @@ seconds without a tap.
   state before and after each `tick` (see Sound).
 - `src/scenes/layout.ts`: screen positions (`HERO_FEET`, `BARRICADE`, `XP_BAR`, `BOSS_BAR`,
   `TRACK`, `RAIN`, `CALTROPS`, `AIM`, `FORTIFY` (with its panel's size), `REPAIR`, `OMEN`,
-  `OMEN_CHIP`, `LEGACY`, `MARCH`, `HEAT`, `ROAR_CHIP`,
+  `OMEN_CHIP`, `LEGACY`, `MARCH`, `HEAT`, `FRONTIER_CHIP`, `ROAR_CHIP`,
   `GUARD_HIT`, `HIRE`, `ROAD_CARDS`, `RAIN_HINT`, `STREAK`, `CARDS`,
   `COUNTDOWN`, `AUTO_TOGGLE`, `SKILL_BOOK`, `SPEED`, `BUTTON`, `BARRICADE_BAR`, `BARRICADE_TIP_W`),
   `HUD_HEIGHT`, `UI_DEPTH`, `FONT` (a system font stack), and `SEEN` (the part of the world the
@@ -417,13 +466,15 @@ seconds without a tap.
 
 - `GameState` (`src/game/state.ts`) has two halves. The progress fields (`level`, `xp`, `ranks`,
   `levelUps`, `bestWave`, `runs`, `relics`, `mastered`, `heat`, `heatUnlocked`, `legacy` (`relics`,
-  `slot`, `rain`, `retired`), and `choices`, the cards up for a pending level-up) form `Progress`. The run fields are `wave`, `phase`
+  `slot`, `rain`, `retired`), `hero`, `frontier`, `passBest`, `passWon`, and `choices`, the cards
+  up for a pending level-up) form `Progress`. The run fields are `wave`, `phase`
   (`'break' | 'fighting' | 'over' | 'won'`), `breakMs`, `toSpawn`, `spawnMs`, `barricade`, `enemies`,
   `missiles`, `effects`, `cooldown`, `pickMs` (time left to pick before the auto-pick),
   `kills`, `rain` (`charge`, `need`, `volleys`), `caltrops` (`charge`, `need`, `patches`), `coins`,
   `guards`, `road`, `roadChoices`, `roadMs`, `streak` (`count`, `ms` left, `best`, `bonusXp`),
   `relicFound` (a list, or null), `aimMode`, `roarMs`, `forts` (`stakeHp`, `oil`, `lookout`,
-  `boughtWave`, `queued`), `won`, `repairs`, `omen` (`id`, `accepted`, or null) and `nextId`.
+  `boughtWave`, `queued`), `daily` (the day's plan, or null), `won`, `repairs`, `omen` (`id`,
+  `accepted`, or null) and `nextId`.
 - `Enemy` holds its position, `hp`/`maxHp`, boss `bars`, slow and burn timers, `attacking`,
   `hitMs`, `castMs` (a shaman's healing timer, a boss's move timer), `trait` (an elite's, or null)
   and `moved` (the Ogre Warlord's call). `Missile` is an arrow, a fireball, a mage's
@@ -432,8 +483,8 @@ seconds without a tap.
   `Volley` is an Arrow Rain volley in the air (`x`, `y`, `ms` until it lands). `Effect` is a
   short-lived visual with `ms`/`total`; `xp` and `orb` carry `amount` (the kill's experience) and
   `xp` its `streak`; `autoPick` carries the `upgrade` the countdown took.
-- Hero stats are never stored. `stats(state)` derives them from `ranks`, `relics`, `heat` and
-  `legacy` (only Quick Arrow Rain, read when present) each time.
+- Hero stats are never stored. `stats(state)` derives them from `ranks`, `relics`, `heat`, `hero`
+  and `legacy` (only Quick Arrow Rain, read when present) each time.
   `pick` counts the fillers (`mend`, `purse`, `wind`) in `ranks` too (for the skill book); `stats`
   ignores them and `offerable` never offers one, so their ranks change nothing else.
   `rollChoices` fills the cards no upgrade is left for with `FILLERS`: `mend` with two upgrades
@@ -471,7 +522,8 @@ seconds without a tap.
 
 ### Persistence
 
-Six `localStorage` keys. `palisade-skill-book` holds a JSON array of the upgrade ids found
+Seven `localStorage` keys. `palisade-daily` is the shared daily's record (`shared/daily.ts`: today's
+try, score, best and streak); the daily siege's hero is never saved. `palisade-skill-book` holds a JSON array of the upgrade ids found
 (offered on a level-up, or held), read by `loadFound` (unknown ids dropped) and written by
 `GameScene.discover` whenever one is new; "New hero" leaves it alone. `palisade-speed` holds the
 battle speed (`'1'` or `'2'`, through `loadSpeed`/`saveSpeed`) and `palisade-aim` the aim priority
@@ -481,7 +533,8 @@ them alone. `palisade-progress` holds JSON of `Progress`, relics, `heat`, `heatU
 `choices` included. `loadProgress` merges it over
 `freshProgress()` (dropping unknown upgrade and relic ids, and `choices` unless they are three known
 upgrades with a level-up pending; an older save gets heat 0 and no legacy, and the legacy's fields are
-checked one by one) and falls back to fresh on any error.
+checked one by one; `hero` is the mage only with a hero retired, `frontier` the pass only with a heat
+unlocked, so an older save is a ranger in the vale) and falls back to fresh on any error.
 "New hero" (on its confirming second tap) calls `clearProgress`, which also drops the relics and the heats, then saves a fresh hero
 with the legacy kept. The run itself (wave, foes,
 barricade, Arrow Rain and caltrops charge, streak, coins, guards, road, fortifications, repairs, omen) is never saved, so a reload
@@ -498,7 +551,9 @@ hero" keeps them.
   relic chest and the two roads offered in `clearWave` (only on boss waves), the road auto-pick
   in `step` (only when its countdown runs out), the Troll King's choice of guard in `bossMoves`
   (only on its waves, with a guard hired), the omen in `clearWave` (only when the next wave is 4 or
-  more) and `rollLegacyRelic` (only when the retire panel opens). In `waves.ts`: `waveFoes` (shuffle). Arrow Rain,
+  more; on the daily siege the plan's instead) and `rollLegacyRelic` (only when the retire panel
+  opens); the mage's `spellHit` rolls its crit like `arrowHit`, and the daily siege's relic chests
+  and roads come from its plan rather than `Math.random`. In `waves.ts`: `waveFoes` (shuffle). Arrow Rain,
   the caltrops, guards, shamans, the other boss moves, splitting, the fortifications and the streak use none. Art uses
   its own `seeded` generator, and the scene scatters a volley's shafts with a hash of its id, so
   neither touches the sequence.
@@ -612,7 +667,10 @@ nothing plays for it. The player's own taps play from `GameScene` and the panels
   the current wave: `first`, `last`, `boss`, `step`), `.rainSpot` (the Arrow Rain button's centre)
   and `.aim` (where Arrow Rain is being dragged, or null). It never writes to the game. Also there
   to read: `.aimKind`, `.caltropsSpot`, `.roadChoice.cards`, `.hirePanel.slot`,
-  `.omenCard.buttons`, `.legacyPanel.cards` and `.startWave`.
+  `.omenCard.buttons`, `.legacyPanel.cards` (and `.legacyPanel.hero`), `.startWave`,
+  `.nextFrontier` and `.nextHero`. The playthrough plays a fresh ranger in the vale and never opens
+  the daily siege: a fresh hero is a ranger (`hero`), the vale (`frontier`) and no `daily`, and the
+  mage's upgrades are filtered out of the ranger's offers without changing their random sequence.
 - **Trophies:** once wave 1 is cleared the test checks that `palisade-trophies` holds exactly
   Holding the line and Cloud of arrows (the volley it looses); a trophy a first wave can reach in
   another way changes that expectation.
@@ -713,6 +771,15 @@ nothing plays for it. The player's own taps play from `GameScene` and the panels
 - **Add a heat rule:** add its text keys to `HEAT_RULES` and `HEAT_UNLOCKED` (with the texts in
   `src/i18n/`) and a field to `heatRules` in `src/game/heat.ts`,
   raise `MAX_HEAT`, read the field where it acts, and add a row to the README's heat table.
+- **Add a map:** add its id to `FrontierId` and `FRONTIERS` in `src/game/frontier.ts` (its bosses,
+  `hpWaves` and `reward`, and when it opens in `canFrontier`), its own foes in `waveFoes`, its best
+  wave alongside `passBest` (and in `bestOn`, `clearWave` and `loadProgress`), a background in
+  `bakeScenery` picked in `drawHero`, its name in `src/i18n/` and a README section.
+- **Add a hero class:** add its id to `HeroClass` and `HEROES` in `src/game/hero.ts` (and when it
+  opens in `canClass`), its upgrades in `UPGRADES` with `hero: '<id>'` (at the end of the table),
+  its base skills and book order in `upgrades.ts` (`baseSkills`, `bookOrder`), its stats in `stats`,
+  its attack in `shoot`, a rig baked in `bakeCharacters` and named by `heroTexture`, and a README
+  section and skill table.
 - **Add a foe:**
   1. Extend `EnemyKind` and `ENEMIES` (with its `coins`), and `SCALE` in `src/art/characters.ts`.
   2. Add its rig to `RIGS` (parts in local units, feet at 0,0, facing left) and bake it in
@@ -762,3 +829,6 @@ nothing plays for it. The player's own taps play from `GameScene` and the panels
   `GameScene.track` is always the current wave's.
 - Storage is shared with the other games on the hub's origin. Keep any new key prefixed
   `palisade-`.
+- Three bests: `bestWave` is the vale's, `passBest` the frozen pass's; the daily siege's best is in
+  `palisade-daily`. Read a map's best with `bestOn`, never `bestWave` alone, where the map matters
+  (the forced march, the top bar's "Best wave").

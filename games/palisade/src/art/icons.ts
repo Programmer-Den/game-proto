@@ -73,7 +73,67 @@ function bolt(ctx: Ctx, x: number, y: number, s: number) {
   poly(ctx, [pts[0], pts[1], pts[2]], '#ffffff');
 }
 
+/** The mage hero's violet bolt: a gem with a fading trail, from a to the right. */
+function spellBolt(ctx: Ctx, x: number, y: number, s: number) {
+  ctx.save();
+  ctx.shadowColor = '#c08aff';
+  ctx.shadowBlur = 8;
+  for (let i = 0; i < 3; i++) {
+    ctx.globalAlpha = 0.8 - i * 0.22;
+    poly(ctx, ngon(x - (10 + i * 8) * s, y, (6 - i) * s, (5 - i) * s, 4, 0.5), '#c08aff');
+  }
+  ctx.globalAlpha = 1;
+  gem(ctx, x, y, 9 * s, 6, 0.3, '#5a2a9a', '#f0dcff');
+  ctx.restore();
+}
+
 const ICONS: Record<Icon, (ctx: Ctx) => void> = {
+  // The mage hero's skills: a staff with a violet stone (Focus), a glowing rune (Potency), two bolts
+  // (Twin Bolt), a bolt leaping between foes (Chain Spark), a violet starburst (Wide Burst) and a
+  // cracked skull mark (Hex of Ruin).
+  staff: (ctx) => {
+    line(ctx, [[14, 52], [36, 12]], '#93653a', 4);
+    poly(ctx, [[30, 14], [36, 6], [42, 14], [36, 20]], '#e5b53a');
+    ctx.save();
+    ctx.shadowColor = '#c08aff';
+    ctx.shadowBlur = 10;
+    gem(ctx, 38, 10, 8, 6, 0.2, '#5a2a9a', '#f0dcff');
+    ctx.restore();
+  },
+  rune: (ctx) => {
+    facet(ctx, ngon(28, 28, 22, 22, 6, Math.PI / 6), '#3d2a70', { k: 1.3 });
+    ctx.save();
+    ctx.shadowColor = '#d6a8ff';
+    ctx.shadowBlur = 8;
+    line(ctx, [[20, 14], [28, 42], [36, 14]], '#e8d4ff', 3);
+    line(ctx, [[18, 28], [38, 28]], '#e8d4ff', 3);
+    ctx.restore();
+  },
+  twin: (ctx) => {
+    spellBolt(ctx, 40, 18, 1);
+    spellBolt(ctx, 40, 38, 1);
+  },
+  chain: (ctx) => {
+    for (const [x, y] of [[12, 42], [44, 40]] as Pt[]) facet(ctx, ngon(x, y, 7, 10, 6), '#8a5a32', { k: 1.3 });
+    ctx.save();
+    ctx.shadowColor = '#c08aff';
+    ctx.shadowBlur = 8;
+    line(ctx, [[12, 32], [20, 16], [28, 26], [36, 12], [44, 30]], '#e8d4ff', 2.5);
+    ctx.restore();
+    spellBolt(ctx, 30, 26, 0.6);
+  },
+  nova: (ctx) => {
+    const star = ngon(28, 28, 24, 24, 16, 0).map((p, i) => (i % 2 ? ([28 + (p[0] - 28) * 0.55, 28 + (p[1] - 28) * 0.55] as Pt) : p));
+    poly(ctx, star, '#9a6ad8');
+    poly(ctx, star.map((p) => [28 + (p[0] - 28) * 0.55, 28 + (p[1] - 28) * 0.55] as Pt), '#e8d4ff');
+  },
+  hex: (ctx) => {
+    facet(ctx, [[12, 26], [16, 10], [28, 4], [40, 10], [44, 26], [38, 36], [38, 46], [18, 46], [18, 36]], '#e8e2d8', { k: 1.3 });
+    poly(ctx, ngon(21, 25, 5, 6, 6), '#5a2a9a');
+    poly(ctx, ngon(35, 25, 5, 6, 6), '#5a2a9a');
+    line(ctx, [[28, 4], [26, 14], [31, 20]], '#5a2a9a', 2);
+    for (const x of [23, 28, 33]) line(ctx, [[x, 40], [x, 46]], '#7a6a5a', 1.5);
+  },
   bow: (ctx) => {
     const t: Pt = [20, 6];
     const g: Pt = [34, 28];
@@ -300,7 +360,7 @@ export function bakeIcons(scene: Phaser.Scene) {
     });
   }
   // The boss marks at the end of the wave track: a hexagon with the boss's headgear.
-  const marks: Record<'troll' | 'ogre' | 'giant', [string, string, (ctx: Ctx) => void]> = {
+  const marks: Record<'troll' | 'ogre' | 'giant' | 'chieftain', [string, string, (ctx: Ctx) => void]> = {
     troll: ['#5b2f66', '#c25bd1', (ctx) => poly(ctx, [[9, 26], [8, 13], [15, 19], [20, 9], [25, 19], [32, 13], [31, 26]], '#ffd36a')],
     ogre: ['#4a3a2a', '#d08a4a', (ctx) => {
       poly(ctx, [[10, 26], [12, 16], [20, 12], [28, 16], [30, 26]], '#aab2bc');
@@ -308,6 +368,12 @@ export function bakeIcons(scene: Phaser.Scene) {
       poly(ctx, [[28, 16], [35, 8], [31, 6], [25, 14]], '#efe5c9');
     }],
     giant: ['#24486a', '#7fbde6', (ctx) => poly(ctx, [[9, 26], [7, 10], [14, 18], [20, 5], [26, 18], [33, 10], [31, 26]], '#e8f8ff')],
+    // The Yeti Chieftain's horns over a crown of ice.
+    chieftain: ['#3a4a62', '#e4ebf2', (ctx) => {
+      poly(ctx, [[12, 26], [12, 16], [20, 10], [28, 16], [28, 26]], '#8fd0f4');
+      poly(ctx, [[12, 18], [4, 6], [9, 7], [15, 15]], '#efe5c9');
+      poly(ctx, [[28, 18], [36, 6], [31, 7], [25, 15]], '#efe5c9');
+    }],
   };
   for (const [kind, [fill, edge, draw]] of Object.entries(marks)) {
     paint(scene, bossNodeTexture(kind as EnemyKind), 40, 40, (ctx) => {

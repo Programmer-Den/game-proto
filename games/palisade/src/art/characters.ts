@@ -17,6 +17,7 @@ const PAL: Record<string, string> = {
   tower: '#3b5578', harpy: '#7a6a9a', harpyD: '#564a74', harpyW: '#9a8ab8', harpyF: '#d8b8a0', hair: '#3a2a4a',
   robe: '#6a3e7a', robeD: '#4a2a58', gemG: '#5ad07a', teal: '#3a8a8a', blue: '#3a5f9a', mrobe: '#2f6f7a', mrobeD: '#22525c',
   beard: '#e8e2d8', arcane: '#6fe0d0',
+  fur: '#c8d4e0', furD: '#8e9cb0', furL: '#eef3f8', ice: '#a8dcf8', iceD: '#6aaee0',
 };
 
 const RIGS: Record<'hero' | 'goblin' | 'orc' | 'knight' | 'bearer' | 'shaman' | 'spear' | 'mage', Rig> = {
@@ -155,11 +156,13 @@ const RIGS: Record<'hero' | 'goblin' | 'orc' | 'knight' | 'bearer' | 'shaman' | 
  * The three bosses share one hulking body: a pot belly, long arms, a small head with tusks, and
  * each their own colours, headgear and weapon.
  */
-function bossRig(kind: 'troll' | 'ogre' | 'giant'): { rig: Rig; pal: Record<string, string> } {
+function bossRig(kind: 'troll' | 'ogre' | 'giant' | 'chieftain'): { rig: Rig; pal: Record<string, string> } {
   const pal = {
     troll: { skin: '#6f9a4a', skinD: '#4f7434', hide: '#6a4a2c', gear: '#e5b53a', gearD: '#b8862c', weapon: '#7a5230', tip: '#9aa4ae' },
     ogre: { skin: '#c08a5c', skinD: '#94643e', hide: '#4a3a5a', gear: '#7d8590', gearD: '#555c66', weapon: '#6a4426', tip: '#d8e0e8' },
     giant: { skin: '#8fb6d8', skinD: '#6488ac', hide: '#e8eef4', gear: '#c8ecff', gearD: '#7fbde6', weapon: '#a9dcf4', tip: '#ffffff' },
+    // The frozen pass's Yeti Chieftain: white fur, a horned head with a crown of ice, an ice-spiked club.
+    chieftain: { skin: '#e4ebf2', skinD: '#b4c2d2', hide: '#5a6c88', gear: '#8fd0f4', gearD: '#4f8fc0', weapon: '#7a8ca4', tip: '#d8f4ff' },
   }[kind];
   const body: Rig = [
     { m: 'skinD', p: [[6, 0], [28, 0], [26, -42], [8, -42]] },
@@ -180,7 +183,14 @@ function bossRig(kind: 'troll' | 'ogre' | 'giant'): { rig: Rig; pal: Record<stri
           { m: 'gear', p: [[-24, -140], [-26, -160], [-16, -150], [-7, -165], [2, -150], [11, -160], [11, -140]] },
           { m: 'gemP', c: [-7, -146], r: 3.5 },
         ]
-      : kind === 'ogre'
+      : kind === 'chieftain'
+        ? [
+            { m: 'bone', p: [[-26, -134], [-48, -158], [-40, -132]] },
+            { m: 'bone', p: [[8, -134], [26, -160], [18, -130]] },
+            { m: 'gear', p: [[-22, -140], [-20, -158], [-12, -146], [-6, -164], [0, -146], [6, -156], [8, -140]] },
+            { m: 'gearD', p: [[-6, -164], [0, -146], [-6, -143]] },
+          ]
+        : kind === 'ogre'
         ? [
             { m: 'gear', p: [[-28, -128], [-24, -148], [-8, -156], [8, -150], [16, -130]] },
             { m: 'bone', p: [[-24, -146], [-40, -160], [-36, -170], [-22, -152]] },
@@ -234,9 +244,48 @@ function harpyRig(frame: number): Rig {
   ];
 }
 
+/**
+ * The frozen pass's frost wolf, on four legs: a pale grey coat, a long snout and a bushy tail. Its
+ * legs (below the hips, y -44) step in the walk frames like any foe's.
+ */
+const WOLF: Rig = [
+  { m: 'furD', p: [[20, 0], [28, 0], [28, -26], [20, -28]] },
+  { m: 'furD', p: [[-22, 0], [-14, 0], [-14, -28], [-22, -28]] },
+  { m: 'furD', p: [[28, -36], [54, -50], [50, -40], [30, -30]] },
+  { m: 'fur', p: [[-28, -26], [32, -24], [34, -46], [-22, -52]] },
+  { m: 'furL', p: [[-20, -24], [22, -24], [20, -30], [-18, -32]] },
+  { m: 'fur', p: [[12, 0], [22, 0], [24, -28], [14, -30]] },
+  { m: 'fur', p: [[-30, 0], [-20, 0], [-18, -30], [-28, -30]] },
+  { m: 'fur', p: [[-46, -52], [-32, -64], [-18, -60], [-12, -46], [-26, -40]] },
+  { m: 'furL', p: [[-60, -46], [-44, -54], [-38, -44], [-54, -40]] },
+  { m: 'furD', p: [[-34, -60], [-32, -74], [-24, -62]] },
+  { m: 'eyeD', p: [[-62, -48], [-57, -48], [-57, -44], [-62, -44]] },
+  { m: 'eye', p: [[-41, -55], [-36, -55], [-36, -51], [-41, -51]] },
+];
+
+/**
+ * The ice wisp flies like a harpy: a shard of glowing ice with a trailing swirl, which sways
+ * between its two frames instead of stepping.
+ */
+function wispRig(frame: number): Rig {
+  const tail: Rig =
+    frame === 0
+      ? [{ m: 'iceD', p: [[6, -26], [30, -14], [42, -26], [18, -38]] }]
+      : [{ m: 'iceD', p: [[6, -30], [34, -40], [44, -24], [16, -22]] }];
+  return [
+    ...tail,
+    { m: 'ice', p: [[-16, -40], [0, -66], [16, -42], [2, -14]] },
+    { m: 'furL', p: [[-10, -42], [0, -58], [4, -42], [0, -24]] },
+    { m: 'arcane', c: [0, -42], r: 7 },
+    { m: 'eyeD', p: [[-9, -50], [-5, -50], [-5, -46], [-9, -46]] },
+    { m: 'eyeD', p: [[1, -50], [5, -50], [5, -46], [1, -46]] },
+  ];
+}
+
 /** How big each figure is drawn: view pixels per rig unit. */
 const SCALE: Record<'hero' | 'spear' | 'mage' | EnemyKind, number> = {
-  hero: 0.5, spear: 0.44, mage: 0.44, goblin: 0.61, orc: 0.57, knight: 0.55, harpy: 0.6, bearer: 0.57, shaman: 0.61, troll: 0.78, ogre: 0.8, giant: 0.84,
+  hero: 0.5, spear: 0.44, mage: 0.44, goblin: 0.61, orc: 0.57, knight: 0.55, harpy: 0.6, bearer: 0.57, shaman: 0.61, wolf: 0.6, wisp: 0.62,
+  troll: 0.78, ogre: 0.8, giant: 0.84, chieftain: 0.86,
 };
 
 /** Where a figure's feet are in its texture (as an origin) and how tall it stands, in view pixels. */
@@ -250,15 +299,21 @@ export const FIGURES: Partial<Record<string, Figure>> = {};
 export const foeTexture = (kind: EnemyKind, frame: number) => `foe-${kind}-${frame}`;
 export const guardTexture = (kind: 'spear' | 'mage') => `guard-${kind}`;
 
+/** The hero's texture for a class: the ranger with a bow, or the mage hero in violet robes. */
+export const heroTexture = (hero: 'ranger' | 'mage') => (hero === 'mage' ? 'hero-mage' : 'hero');
+
 export function bakeCharacters(scene: Phaser.Scene) {
   bakeFigure(scene, 'hero', RIGS.hero, PAL, SCALE.hero, drawBow);
+  bakeFigure(scene, 'hero-mage', RIGS.mage, { ...PAL, mrobe: '#5a3f9a', mrobeD: '#3d2a70', arcane: '#d6a8ff' }, SCALE.hero);
+  for (const frame of [0, 1]) bakeFigure(scene, foeTexture('wolf', frame), stride(WOLF, frame), PAL, SCALE.wolf);
+  for (const frame of [0, 1]) bakeFigure(scene, foeTexture('wisp', frame), wispRig(frame), { ...PAL, arcane: '#e8fbff' }, SCALE.wisp, undefined, false);
   for (const kind of ['goblin', 'orc', 'knight', 'bearer', 'shaman'] as const) {
     for (const frame of [0, 1]) bakeFigure(scene, foeTexture(kind, frame), stride(RIGS[kind], frame), PAL, SCALE[kind]);
   }
   // The harpy flies: no shadow at its feet (the scene casts one on the road below it).
   for (const frame of [0, 1]) bakeFigure(scene, foeTexture('harpy', frame), harpyRig(frame), PAL, SCALE.harpy, undefined, false);
   for (const kind of ['spear', 'mage'] as const) bakeFigure(scene, guardTexture(kind), RIGS[kind], PAL, SCALE[kind]);
-  for (const kind of ['troll', 'ogre', 'giant'] as const) {
+  for (const kind of ['troll', 'ogre', 'giant', 'chieftain'] as const) {
     const { rig, pal } = bossRig(kind);
     for (const frame of [0, 1]) bakeFigure(scene, foeTexture(kind, frame), stride(rig, frame), pal, SCALE[kind]);
   }
@@ -392,6 +447,18 @@ export function bakeMissiles(scene: Phaser.Scene) {
     }
     ctx.globalAlpha = 1;
     gem(ctx, 0, 0, 8, 6, 0.3, '#22767a', '#c8fff6');
+  });
+  // The mage hero's bolt: a violet gem with a fading trail.
+  paint(scene, 'spell-bolt', 44, 26, (ctx) => {
+    ctx.translate(30, 13);
+    ctx.shadowColor = '#c08aff';
+    ctx.shadowBlur = 12;
+    for (let i = 0; i < 3; i++) {
+      ctx.globalAlpha = 0.7 - i * 0.2;
+      poly(ctx, ngon(-9 - i * 8, 0, 6 - i, 5 - i, 4, 0.5), '#c08aff');
+    }
+    ctx.globalAlpha = 1;
+    gem(ctx, 0, 0, 9, 6, 0.3, '#5a2a9a', '#f0dcff');
   });
   // A faceted shard for death puffs and splinters of the Arrow Rain landing.
   paint(scene, 'shard', 16, 14, (ctx) => facet(ctx, ngon(8, 7, 7, 6, 5, 0.4), '#d8d2c8', { edge: false }));

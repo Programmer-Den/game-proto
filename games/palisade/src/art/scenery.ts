@@ -26,6 +26,14 @@ export function bakeScenery(scene: Phaser.Scene, w = 960, h = 540, frame = { x: 
     ctx.translate(frame.x * 2, frame.y * 2);
     drawBackground(ctx, { l: -frame.x * 2, r: (w - frame.x) * 2, t: -frame.y * 2, b: (h - frame.y) * 2 });
   });
+  // The frozen pass: the same scene under snow, graded cold and blue, with drifts on the road.
+  paint(scene, 'background-pass', w, h, (ctx) => {
+    ctx.scale(0.5, 0.5);
+    ctx.translate(frame.x * 2, frame.y * 2);
+    const E = { l: -frame.x * 2, r: (w - frame.x) * 2, t: -frame.y * 2, b: (h - frame.y) * 2 };
+    drawBackground(ctx, E);
+    drawWinter(ctx, E);
+  });
   paint(scene, 'hud-top', w, 42, (ctx) => {
     ctx.scale(0.5, 0.5);
     slateBar(ctx, 0, 80, 'bottom', w * 2);
@@ -41,6 +49,47 @@ export function bakeScenery(scene: Phaser.Scene, w = 960, h = 540, frame = { x: 
       drawBarricade(ctx, stage);
     });
   }
+}
+
+/**
+ * Turns the vale into the frozen pass: the colours drained and cooled, a pale haze, snow drifts
+ * lying over the verge and the road, and flakes in the air (the scene adds none that move).
+ */
+function drawWinter(ctx: CanvasRenderingContext2D, E: Extent) {
+  const all = () => ctx.fillRect(E.l, E.t, E.r - E.l, E.b - E.t);
+  ctx.save();
+  ctx.globalCompositeOperation = 'saturation';
+  ctx.fillStyle = 'rgba(128,128,128,0.75)';
+  all();
+  ctx.globalCompositeOperation = 'multiply';
+  ctx.fillStyle = '#c4d8f0';
+  all();
+  ctx.globalCompositeOperation = 'screen';
+  ctx.fillStyle = 'rgba(70,90,120,0.45)';
+  all();
+  ctx.restore();
+  // Drifts: soft white heaps along the far verge, over the road and along the near edge.
+  const rnd = seeded(77);
+  ctx.save();
+  for (let i = 0; i < 90; i++) {
+    const x = E.l + rnd() * (E.r - E.l);
+    const band = rnd();
+    const y = band < 0.35 ? 540 + rnd() * 50 : band < 0.8 ? 600 + rnd() * 360 : 960 + rnd() * 80;
+    const rx = 40 + rnd() * 110;
+    ctx.globalAlpha = band < 0.35 || band >= 0.8 ? 0.75 : 0.32;
+    poly(ctx, ngon(x, y, rx, rx * 0.22, 9, rnd()), '#f4f8fc');
+    ctx.globalAlpha *= 0.6;
+    poly(ctx, ngon(x + rx * 0.2, y + rx * 0.06, rx * 0.7, rx * 0.12, 7, rnd()), '#c8d8ea');
+  }
+  // Flakes in the air.
+  ctx.globalAlpha = 0.8;
+  for (let i = 0; i < 260; i++) {
+    const x = E.l + rnd() * (E.r - E.l);
+    const y = E.t + rnd() * (E.b - E.t);
+    const r = 1.5 + rnd() * 3;
+    poly(ctx, ngon(x, y, r, r, 5, rnd()), '#ffffff');
+  }
+  ctx.restore();
 }
 
 /** A slate bar with faceted bevels and a gold trim on its inner edge. */

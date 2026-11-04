@@ -34,7 +34,11 @@ export function loadProgress(): Progress {
       rain: kept.rain === true,
       retired: typeof kept.retired === 'number' ? kept.retired : 0,
     };
-    return { ...fresh, ...saved, ranks, relics, legacy, choices };
+    // The class and the frozen pass came later still: an older save is a ranger in the vale.
+    const hero: Progress['hero'] = saved.hero === 'mage' && legacy.retired > 0 ? 'mage' : 'ranger';
+    const frontier: Progress['frontier'] = saved.frontier === 'pass' && (saved.heatUnlocked ?? 0) > 0 ? 'pass' : 'vale';
+    const passBest = typeof saved.passBest === 'number' && Number.isFinite(saved.passBest) ? Math.max(0, saved.passBest) : 0;
+    return { ...fresh, ...saved, ranks, relics, legacy, hero, frontier, passBest, passWon: saved.passWon === true, choices };
   } catch {
     return fresh;
   }
