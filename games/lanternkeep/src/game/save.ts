@@ -1,6 +1,6 @@
-import { BOON_IDS, type BoonId } from './state';
+import { BOON_IDS, BUILDING_IDS, type BoonId, type Village } from './state';
 
-// The most nights kept, the best peril multiplier, the moths' flights and the harbour's boon are saved;
+// The most nights kept, the best peril multiplier, the moths' flights, the harbour's boon and the village are saved;
 // every game starts at the first dusk.
 const KEY = 'lanternkeep-best';
 const PERIL_KEY = 'lanternkeep-best-peril';
@@ -58,3 +58,18 @@ export function loadBoon(): BoonId | null {
   }
 }
 export const saveBoon = (boon: BoonId) => save(BOON_KEY, boon);
+
+const VILLAGE_KEY = 'lanternkeep-village';
+
+/** The village below the keep (LK18): its houses and buildings, kept from game to game. */
+export function loadVillage(): Village {
+  try {
+    const value = JSON.parse(localStorage.getItem(VILLAGE_KEY) ?? '{}') as { houses?: unknown; built?: unknown };
+    const houses = typeof value.houses === 'number' && Number.isFinite(value.houses) && value.houses > 0 ? Math.floor(value.houses) : 0;
+    const built = Array.isArray(value.built) ? BUILDING_IDS.filter((id) => (value.built as unknown[]).includes(id)) : [];
+    return { houses, built };
+  } catch {
+    return { houses: 0, built: [] };
+  }
+}
+export const saveVillage = (village: Village) => save(VILLAGE_KEY, JSON.stringify(village));

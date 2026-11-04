@@ -19,6 +19,7 @@ export interface Snapshot {
   call: boolean;
   tide: 'none' | 'warned' | 'risen';
   ship: boolean;
+  avalanche: boolean;
 }
 
 export function snapshot(s: GameState): Snapshot {
@@ -31,6 +32,7 @@ export function snapshot(s: GameState): Snapshot {
     call: !!s.call,
     tide: !s.tide ? 'none' : s.tide.risen ? 'risen' : 'warned',
     ship: !!s.ship,
+    avalanche: !!s.avalanche,
   };
 }
 
@@ -41,6 +43,7 @@ export function snapshot(s: GameState): Snapshot {
  */
 export function frameSounds(before: Snapshot, s: GameState, events: GameEvent[]) {
   let fizzle = false;
+  let slide = false;
   const darkened = new Set<number>();
   const dried = new Set<number>();
   for (const e of events) {
@@ -97,6 +100,20 @@ export function frameSounds(before: Snapshot, s: GameState, events: GameEvent[])
       case 'trait':
         sfx('bloom');
         break;
+      case 'avalanche':
+        slide = true;
+        if (e.shielded) sfx('ting');
+        else if (before.lit[e.lantern]) {
+          darkened.add(e.lantern);
+          fizzle = true;
+        } else darkened.add(e.lantern);
+        break;
+      case 'pilgrim':
+        if (e.warned) {
+          sfx('peal');
+          ui('coin');
+        } else sfx('callLost');
+        break;
     }
   }
   // A lantern a moth just finished lighting or refilling (not one it left as it was, the cask dry).
@@ -125,6 +142,8 @@ export function frameSounds(before: Snapshot, s: GameState, events: GameEvent[])
   if (before.tide === 'none' && tide === 'warned') sfx('swellSea');
   if (before.tide !== 'risen' && tide === 'risen') sfx('wash');
   if (!before.ship && s.ship) sfx('horn');
+  if (!before.avalanche && s.avalanche) sfx('crack');
+  if (slide) sfx('slide');
   if (s.moths.some((m, i) => m.task === 'rest' && before.moths[i]?.task !== 'rest')) sfx('yawn');
 }
 

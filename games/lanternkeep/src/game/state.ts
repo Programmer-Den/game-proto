@@ -1,7 +1,7 @@
 import { byDifficulty } from '../../../../shared/settings';
 import type { TextKey } from '../i18n';
 import { VIEW } from '../scenes/layout';
-import { DISTRICTS, type DistrictId, JARS, LANTERN_SPOTS, MOVE_IDS, mothRest, SHIP_GUIDES } from './places';
+import { BELL_TOWERS, DISTRICTS, type DistrictId, JARS, LANTERN_SPOTS, MOVE_IDS, mothRest, SHIP_GUIDES } from './places';
 
 // The rules in plain TypeScript, with no Phaser. Each night begins with a dusk: tap a lantern and
 // an idle moth flies from the jar to light it, then flies home. A lit lantern burns its oil and
@@ -20,6 +20,10 @@ import { DISTRICTS, type DistrictId, JARS, LANTERN_SPOTS, MOVE_IDS, mothRest, SH
 // to a harbour town with tides and ships and a festival of its own, which gives a boon kept for
 // every later game (LK15); the moths of the jar grow traits from the flights they fly, kept from
 // game to game (LK16); and a daily night gives everyone the same seeded dusk once a day (LK17).
+// Every night kept adds a house to a village below the keep, kept from game to game, whose smithy,
+// chandler and chapel give lasting perks (LK18); the nights turn through the seasons, with long
+// snowy winter dusks and short stormy summer ones (LK19); and the Great Festival can send the keep
+// up to a mountain monastery, where avalanches bury the low path and its bells warn pilgrims (LK20).
 
 export const UPGRADE_IDS = ['wick', 'oil', 'moths', 'wings', 'firefly', 'nectar', 'jar'] as const;
 export type UpgradeId = (typeof UPGRADE_IDS)[number];
@@ -125,6 +129,68 @@ function flew(s: GameState, m: Moth) {
  */
 export const DAILY_NIGHTS = [6, 7, 8, 9, 10, 11, 12];
 export const DAILY_LEVELS: Record<UpgradeId, number> = { wick: 1, oil: 1, moths: 1, wings: 1, firefly: 1, nectar: 1, jar: 0 };
+
+/**
+ * A village that grows (LK18): every night kept adds a house below the keep, kept from game to
+ * game. Between nights coins build each of BUILDINGS once the village has its `houses`, and a
+ * building lasts for every later game: the smithy makes a cask fill cost SMITHY_CASK_COST, the
+ * chandler adds a spare moth to the jar, and the chapel spares the first hearth a game would lose.
+ */
+export const BUILDINGS = {
+  smithy: { name: 'smithyName', blurb: 'smithyBlurb', cost: 60, houses: 3 },
+  chandler: { name: 'chandlerName', blurb: 'chandlerBlurb', cost: 90, houses: 6 },
+  chapel: { name: 'chapelHouseName', blurb: 'chapelHouseBlurb', cost: 120, houses: 10 },
+} as const satisfies Record<string, { name: TextKey; blurb: TextKey; cost: number; houses: number }>;
+export type BuildingId = keyof typeof BUILDINGS;
+export const BUILDING_IDS = Object.keys(BUILDINGS) as BuildingId[];
+export const SMITHY_CASK_COST = 2;
+/** The village: its houses (one a night kept, in any game) and the buildings built. */
+export interface Village {
+  houses: number;
+  built: BuildingId[];
+}
+/** True when the village has building `id`. */
+export const hasBuilt = (s: GameState, id: BuildingId) => s.village.built.includes(id);
+
+/**
+ * Seasons (LK19): the nights turn through SEASON_IDS, SEASON_NIGHTS each, from spring on night 1.
+ * Summer dusks are SUMMER_DUSK_MS short and half of its nights are stormy; autumn's are foggy as
+ * often; winter dusks are WINTER_DUSK_MS long, but snow slows the moths to SNOW_SPEED.
+ */
+export const SEASONS = {
+  spring: { name: 'springName', blurb: 'springBlurb' },
+  summer: { name: 'summerName', blurb: 'summerBlurb' },
+  autumn: { name: 'autumnName', blurb: 'autumnBlurb' },
+  winter: { name: 'winterName', blurb: 'winterBlurb' },
+} as const satisfies Record<string, { name: TextKey; blurb: TextKey }>;
+export type SeasonId = keyof typeof SEASONS;
+export const SEASON_IDS = Object.keys(SEASONS) as SeasonId[];
+export const SEASON_NIGHTS = 3;
+export const SUMMER_DUSK_MS = 36_000;
+export const WINTER_DUSK_MS = 54_000;
+export const SNOW_SPEED = 0.85;
+/** The share of summer nights drawn stormy and of autumn nights drawn foggy, before the usual draw. */
+export const SEASON_KIND = 0.5;
+/** The season of night `night`. */
+export const seasonOf = (night: number): SeasonId => SEASON_IDS[Math.floor((night - 1) / SEASON_NIGHTS) % SEASON_IDS.length];
+/** How long the dusk of night `night` lasts: short in summer, long in winter. */
+export const duskFor = (night: number) => {
+  const season = seasonOf(night);
+  return season === 'summer' ? SUMMER_DUSK_MS : season === 'winter' ? WINTER_DUSK_MS : DUSK_MS;
+};
+
+/**
+ * A third keep (LK20): the mountain monastery, climbed to from the Great Festival. At
+ * AVALANCHE_TIMES (dusk left), warned AVALANCHE_WARN_MS before, an avalanche buries its lowest row
+ * (the pilgrims' path): each lantern there with no moth on it goes dark under the snow, and a moth
+ * sent to it digs DIG_MS before it lights. Each warning brings a pilgrim up the path, and a moth
+ * that lights or refills the named bell tower (BELL_TOWERS) before the snow comes warns them, for
+ * PILGRIM_PAY. Ten nights kept there hold the Mountain Festival, which gives a boon like the harbour's.
+ */
+export const AVALANCHE_TIMES = [30_000, 12_000];
+export const AVALANCHE_WARN_MS = 8_000;
+export const DIG_MS = 2_000;
+export const PILGRIM_PAY = 6;
 
 /**
  * Pick your peril (LK11): every nightfall before a night from PERIL_NIGHT offers two curses drawn
@@ -299,7 +365,10 @@ function drawsFill(s: GameState, m: Moth) {
  * sent to shield it is no wasted refill (sent with no spare fill it guards without drawing one).
  * A bat is no reason: a moth on its lantern does not stop it, chasing it does.
  */
-export const mayTap = (s: GameState, i: number, except?: Moth) => !flooded(s, i) && (!s.lanterns[i].lit || threatened(s, i) || caskSpare(s, except));
+export const mayTap = (s: GameState, i: number, except?: Moth) =>
+  !flooded(s, i) && (!s.lanterns[i].lit || threatened(s, i) || pilgrimBell(s) === i || caskSpare(s, except));
+/** The bell tower a pilgrim needs rung now (LK20), or -1. */
+export const pilgrimBell = (s: GameState) => (s.avalanche && !s.avalanche.rung ? s.avalanche.bell : -1);
 /** True while the harbour's tide is up over lantern `i`: it is dark and can't be lit. */
 export const flooded = (s: GameState, i: number) => !!s.tide?.risen && s.tide.lanterns.includes(i);
 
@@ -334,7 +403,13 @@ export const FEAST_PAY = 2;
 /** The extra gusts of a stormy night, as dusk left. */
 export const STORM_GUSTS = [28_000, 16_000];
 /** Draws the kind of night `night`: clear on the first, any kind (clear too) after. */
-export const drawKind = (night: number): NightKind => (night === 1 ? 'clear' : NIGHT_KIND_IDS[Math.floor(Math.random() * NIGHT_KIND_IDS.length)]);
+export function drawKind(night: number): NightKind {
+  if (night === 1) return 'clear';
+  // Summer brings storms and autumn fog half the time; the rest are drawn as usual.
+  const season = seasonOf(night);
+  if ((season === 'summer' || season === 'autumn') && Math.random() < SEASON_KIND) return season === 'summer' ? 'storm' : 'fog';
+  return NIGHT_KIND_IDS[Math.floor(Math.random() * NIGHT_KIND_IDS.length)];
+}
 
 /** How fast a bat flies, in pixels per second; it flees at BAT_FLEE times that. */
 export const BAT_SPEED = 55;
@@ -419,6 +494,8 @@ export interface Lantern {
   claimed: boolean;
   /** Lit or refilled by a gust-proof moth (LK16): the next gust passes it by. */
   sheltered: boolean;
+  /** Under an avalanche's snow (LK20): a moth digs DIG_MS before it lights it. */
+  buried: boolean;
 }
 
 export interface Moth {
@@ -503,6 +580,17 @@ export interface Ship {
   msLeft: number;
 }
 
+/** An avalanche on the monastery's low path (LK20), warned for its lowest row, with the bell tower a pilgrim needs rung. */
+export interface Avalanche {
+  y: number;
+  lanterns: number[];
+  /** When the snow comes down, as dusk left. */
+  atMs: number;
+  /** The bell tower to ring for the pilgrim on the path, and whether a moth has rung it. */
+  bell: number;
+  rung: boolean;
+}
+
 /** Something that just happened, for the scene to show; it empties the list every frame. */
 export type GameEvent =
   | { type: 'closeCall'; lantern: number; coins: number }
@@ -522,7 +610,11 @@ export type GameEvent =
   /** A ship arrived: guided in by its lit lantern (`coins` paid), or turned away. */
   | { type: 'ship'; lantern: number; guided: boolean; coins: number }
   /** Moth `moth` gained a trait from the flights it has flown. */
-  | { type: 'trait'; moth: number; trait: TraitId };
+  | { type: 'trait'; moth: number; trait: TraitId }
+  /** An avalanche came down on a lantern of the low path: buried it, or a moth sitting on it kept it. */
+  | { type: 'avalanche'; lantern: number; shielded: boolean }
+  /** A bell tower was rung in time for a pilgrim (`coins` paid), or the snow came first. */
+  | { type: 'pilgrim'; lantern: number; warned: boolean; coins: number };
 
 /** What nightfall counted, shown until the next dusk. */
 export interface NightReport {
@@ -628,12 +720,26 @@ export interface GameState {
   flown: number[];
   /** True on a daily night (LK17): one seeded dusk, nothing carried in or out. */
   daily: boolean;
+  /** How long this dusk lasts (LK19: by the season). */
+  duskMax: number;
+  /** The village below the keep (LK18), kept from game to game; whether the chapel has spared a hearth this game, and did tonight. */
+  village: Village;
+  chapelUsed: boolean;
+  spared: boolean;
+  /** True once the keep has climbed to the monastery (LK20); its nights kept and its festival. */
+  climbed: boolean;
+  mountainKept: number;
+  mountainFestival: boolean;
+  /** The avalanches still to come this dusk, the one warned, and the pilgrims warned this dusk. */
+  avalancheTimes: number[];
+  avalanche: Avalanche | null;
+  pilgrimsWarned: number;
 }
 
 /** Moth count, flight speed, wick time and burn time with the bought upgrades. */
 export function stats(s: GameState) {
   return {
-    moths: BASE_MOTHS + s.levels.moths,
+    moths: BASE_MOTHS + s.levels.moths + (hasBuilt(s, 'chandler') ? 1 : 0),
     fireflies: s.levels.firefly,
     speed: BASE_SPEED * (1 + 0.2 * s.levels.wings),
     lightMs: Math.round(BASE_LIGHT_MS * 0.75 ** s.levels.wick),
@@ -642,15 +748,17 @@ export function stats(s: GameState) {
 }
 
 /** How fast moth `m` flies, in pixels per second. */
-export const mothSpeed = (s: GameState, m: Moth) => stats(s).speed * MOTH_KINDS[m.kind].speed * (hasTrait(s, m, 'swift') ? SWIFT_SPEED : 1);
-/** How long moth `m` takes to catch a wick, in milliseconds: none at all on a candle. */
+export const mothSpeed = (s: GameState, m: Moth) =>
+  stats(s).speed * MOTH_KINDS[m.kind].speed * (hasTrait(s, m, 'swift') ? SWIFT_SPEED : 1) * (seasonOf(s.night) === 'winter' ? SNOW_SPEED : 1);
+/** How long moth `m` takes to catch a wick, in milliseconds: none at all on a candle, DIG_MS more under snow. */
 export const mothLightMs = (s: GameState, m: Moth) =>
-  Math.round(stats(s).lightMs * MOTH_KINDS[m.kind].wick * LANTERN_KINDS[s.lanterns[m.target]?.kind ?? 'plain'].wick * WET_WICK ** s.curses.wet);
+  Math.round(stats(s).lightMs * MOTH_KINDS[m.kind].wick * LANTERN_KINDS[s.lanterns[m.target]?.kind ?? 'plain'].wick * WET_WICK ** s.curses.wet) +
+  (s.lanterns[m.target]?.buried ? DIG_MS : 0);
 
 function makeLanterns(night: number, district: DistrictId): Lantern[] {
   const count = lanternsFor(night);
   const kinds = lanternKindsFor(night, count);
-  return DISTRICTS[district].spots.slice(0, count).map(({ x, y }, i) => ({ x, y, kind: kinds[i], lit: false, oilMs: 0, oilMaxMs: 0, claimed: false, sheltered: false }));
+  return DISTRICTS[district].spots.slice(0, count).map(({ x, y }, i) => ({ x, y, kind: kinds[i], lit: false, oilMs: 0, oilMaxMs: 0, claimed: false, sheltered: false, buried: false }));
 }
 
 /** The jar moth `i` rests at. */
@@ -683,10 +791,11 @@ function makeMoths(s: GameState) {
   s.moths.forEach((m, i) => Object.assign(m, restOf(s, i)));
 }
 
-/** What a new game carries in from earlier ones: the moths' flights (LK16) and the harbour's boon (LK15). */
+/** What a new game carries in from earlier ones: the moths' flights (LK16), the harbour's boon (LK15) and the village (LK18). */
 export interface Carried {
   flown?: readonly number[];
   boon?: BoonId | null;
+  village?: Village;
 }
 
 /** Gives the game boon `id`: the purse's coins now, the bigger cask filled, or a free Firefly level. */
@@ -749,8 +858,19 @@ export function newGame(best = 0, bestPeril = 1, carried: Carried = {}): GameSta
     shipsGuided: 0,
     boon: null,
     breeds: true,
-    flown: Array.from({ length: BASE_MOTHS + UPGRADES.moths.costs.length }, (_, i) => Math.max(0, Math.floor(carried.flown?.[i] ?? 0))),
+    // A place for every moth the jar can hold: the bought ones and the chandler's spare.
+    flown: Array.from({ length: BASE_MOTHS + UPGRADES.moths.costs.length + 1 }, (_, i) => Math.max(0, Math.floor(carried.flown?.[i] ?? 0))),
     daily: false,
+    duskMax: DUSK_MS,
+    village: { houses: carried.village?.houses ?? 0, built: [...(carried.village?.built ?? [])] },
+    chapelUsed: false,
+    spared: false,
+    climbed: false,
+    mountainKept: 0,
+    mountainFestival: false,
+    avalancheTimes: [],
+    avalanche: null,
+    pilgrimsWarned: 0,
   };
   if (carried.boon) applyBoon(s, carried.boon);
   makeMoths(s);
@@ -766,6 +886,7 @@ export function dailyNight(rand: () => number, best = 0, bestPeril = 1): GameSta
   const s = newGame(best, bestPeril);
   s.daily = true;
   s.breeds = false;
+  s.village = { houses: 0, built: [] };
   s.night = pick(DAILY_NIGHTS);
   s.district = s.nextDistrict = pick(MOVE_IDS);
   s.kind = s.nextKind = pick(NIGHT_KIND_IDS);
@@ -879,7 +1000,7 @@ function flyTo(m: { x: number; y: number }, x: number, y: number, step: number) 
 const sitting = (s: GameState, i: number) => s.moths.some((m) => m.target === i && (m.task === 'lighting' || m.task === 'guard'));
 
 /** True while a gust or the owl is coming for lantern `i`, so a moth that lights it stays to guard it. */
-export const threatened = (s: GameState, i: number) => s.gust?.target === i || !!s.owl?.lanterns.includes(i);
+export const threatened = (s: GameState, i: number) => s.gust?.target === i || !!s.owl?.lanterns.includes(i) || !!s.avalanche?.lanterns.includes(i);
 
 /** The lantern a gust warned now goes for: the lit one with the most oil left, or -1 if none is lit. */
 function gustTarget(s: GameState, except = -1) {
@@ -1133,6 +1254,45 @@ export function shipX(s: GameState, ship: Ship) {
   return from + (to - from) * (1 - Math.max(0, ship.msLeft) / SHIP_MS);
 }
 
+/**
+ * The monastery's avalanches (LK20): warned AVALANCHE_WARN_MS before for its lowest row, with a
+ * pilgrim on the path asking for a bell tower to be rung; when the snow comes down, each lantern of
+ * the row with no moth on it is buried.
+ */
+function avalanches(s: GameState) {
+  if (!s.avalanche && s.avalancheTimes.length && s.duskMs <= s.avalancheTimes[0] + AVALANCHE_WARN_MS) {
+    const atMs = s.avalancheTimes.shift()!;
+    const all = rows(s);
+    const low = all[all.length - 1];
+    const bell = BELL_TOWERS[(AVALANCHE_TIMES.length - s.avalancheTimes.length - 1) % BELL_TOWERS.length];
+    if (low) s.avalanche = { y: low.y, lanterns: low.lanterns, atMs, bell, rung: false };
+  }
+  const a = s.avalanche;
+  if (!a || s.duskMs > a.atMs) return;
+  if (!a.rung) s.events.push({ type: 'pilgrim', lantern: a.bell, warned: false, coins: 0 });
+  for (const i of a.lanterns) {
+    const l = s.lanterns[i];
+    const shielded = sitting(s, i);
+    s.events.push({ type: 'avalanche', lantern: i, shielded });
+    if (shielded) continue;
+    l.lit = false;
+    l.oilMs = 0;
+    l.buried = true;
+  }
+  s.avalanche = null;
+  releaseGuards(s);
+}
+
+/** A moth has just finished at lantern `i`: the bell tower a pilgrim needs is rung. */
+function ringBell(s: GameState, i: number) {
+  const a = s.avalanche;
+  if (!a || a.rung || a.bell !== i) return;
+  a.rung = true;
+  s.coins += PILGRIM_PAY;
+  s.pilgrimsWarned++;
+  s.events.push({ type: 'pilgrim', lantern: i, warned: true, coins: PILGRIM_PAY });
+}
+
 /** Advances dusk by `dt` milliseconds: oil burns, moths fly and light, gusts blow, and night falls at the end. */
 export function tick(s: GameState, dt: number) {
   if (s.phase !== 'dusk') return;
@@ -1176,6 +1336,7 @@ export function tick(s: GameState, dt: number) {
           if (!lantern.lit) lantern.sheltered = proof;
           else if (proof) lantern.sheltered = true;
           lantern.lit = true;
+          lantern.buried = false;
           if (adds) {
             lantern.oilMs = fill;
             lantern.oilMaxMs = fill;
@@ -1189,6 +1350,8 @@ export function tick(s: GameState, dt: number) {
           }
           answerCall(s, m.target);
         }
+        // A bell rung for a pilgrim counts even when the cask was dry.
+        ringBell(s, m.target);
         // On the lantern a gust or the owl is coming for, the moth stays to shield it.
         if (threatened(s, m.target)) m.task = 'guard';
         else {
@@ -1239,6 +1402,7 @@ export function tick(s: GameState, dt: number) {
   raiders(s, dt);
   windows(s, dt);
   ships(s, dt);
+  avalanches(s);
   // A moth that has just come home takes the oldest queued tap.
   for (const moth of s.moths) {
     if (moth.task !== 'idle' || s.queue.length === 0) continue;
@@ -1266,6 +1430,9 @@ function nightfall(s: GameState) {
   const earned = Math.round((lanternPayTotal * (s.kind === 'feast' ? FEAST_PAY : 1) + (orderMet ? s.order.reward : 0)) * perilMult(s));
   const lostHearth = lit < need;
   s.queue = [];
+  s.avalanche = null;
+  s.avalancheTimes = [];
+  s.spared = false;
   s.tide = null;
   s.tideTimes = [];
   s.ship = null;
@@ -1286,22 +1453,30 @@ function nightfall(s: GameState) {
     s.phase = 'daily';
     return;
   }
-  if (lostHearth) s.lives--;
+  // The village's chapel spares the first hearth a game would lose.
+  if (lostHearth && hasBuilt(s, 'chapel') && !s.chapelUsed) {
+    s.chapelUsed = true;
+    s.spared = true;
+  } else if (lostHearth) s.lives--;
   else {
     s.kept++;
+    s.village.houses++;
     if (s.district === 'harbour') s.harbourKept++;
+    if (s.district === 'monastery') s.mountainKept++;
   }
   s.best = Math.max(s.best, s.kept);
   const festival = !s.festival && s.kept >= FESTIVAL_NIGHTS && s.lives > 0;
   if (festival) s.festival = true;
   const harbourFestival = !s.harbourFestival && s.harbourKept >= FESTIVAL_NIGHTS && s.lives > 0;
   if (harbourFestival) s.harbourFestival = true;
-  s.report = { lit, count, required: need, earned, lostHearth, orderMet, chains, festival: festival || harbourFestival };
+  const mountainFestival = !s.mountainFestival && s.mountainKept >= FESTIVAL_NIGHTS && s.lives > 0;
+  if (mountainFestival) s.mountainFestival = true;
+  s.report = { lit, count, required: need, earned, lostHearth, orderMet, chains, festival: festival || harbourFestival || mountainFestival };
   s.nextKind = drawKind(s.night + 1);
-  // Once the keep has sailed it stays in the harbour.
-  s.moveDue = s.lives > 0 && s.night % MOVE_EVERY === 0 && !s.sailed;
+  // Once the keep has sailed or climbed it stays in the harbour or the monastery.
+  s.moveDue = s.lives > 0 && s.night % MOVE_EVERY === 0 && !s.sailed && !s.climbed;
   s.offer = s.lives > 0 && s.night + 1 >= PERIL_NIGHT ? drawOffer() : [];
-  s.phase = s.lives <= 0 ? 'over' : festival ? 'festival' : harbourFestival ? 'boon' : afterPanels(s);
+  s.phase = s.lives <= 0 ? 'over' : festival ? 'festival' : harbourFestival || mountainFestival ? 'boon' : afterPanels(s);
 }
 
 /** The panel after the festival's: the choice of district if due, then the curses if offered, then the night panel. */
@@ -1316,9 +1491,19 @@ export function carryOn(s: GameState) {
 
 /** Sails from the Great Festival to the harbour (LK15), which the keep stands in from the next dusk on. */
 export function sail(s: GameState) {
-  if (s.phase !== 'festival' || s.sailed) return false;
+  if (s.phase !== 'festival' || s.sailed || s.climbed) return false;
   s.sailed = true;
   s.nextDistrict = 'harbour';
+  s.moveDue = false;
+  s.phase = afterPanels(s);
+  return true;
+}
+
+/** Climbs from the Great Festival to the mountain monastery (LK20), which the keep stands in from the next dusk on. */
+export function climb(s: GameState) {
+  if (s.phase !== 'festival' || s.sailed || s.climbed) return false;
+  s.climbed = true;
+  s.nextDistrict = 'monastery';
   s.moveDue = false;
   s.phase = afterPanels(s);
   return true;
@@ -1383,11 +1568,26 @@ export function rekindle(s: GameState) {
   return true;
 }
 
-/** Puts one fill of oil in the cask between nights, for CASK_COST; false when it is full or the coins are short. */
+/** What a fill of the cask costs: less with the village's smithy. */
+export const caskCost = (s: GameState) => (hasBuilt(s, 'smithy') ? SMITHY_CASK_COST : CASK_COST);
+
+/** Puts one fill of oil in the cask between nights, for caskCost; false when it is full or the coins are short. */
 export function topUp(s: GameState) {
-  if (s.phase !== 'night' || s.cask >= caskMax(s) || s.coins < CASK_COST) return false;
-  s.coins -= CASK_COST;
+  if (s.phase !== 'night' || s.cask >= caskMax(s) || s.coins < caskCost(s)) return false;
+  s.coins -= caskCost(s);
   s.cask++;
+  return true;
+}
+
+/** The cost of building `id` in the village now, or null when it is built or the village is too small for it. */
+export const buildCost = (s: GameState, id: BuildingId) => (hasBuilt(s, id) || s.village.houses < BUILDINGS[id].houses ? null : BUILDINGS[id].cost);
+
+/** Builds `id` in the village between nights (LK18): it lasts for every later game. False when it is built, the village is too small or the coins are short. */
+export function build(s: GameState, id: BuildingId) {
+  const cost = buildCost(s, id);
+  if (s.phase !== 'night' || s.daily || cost === null || s.coins < cost) return false;
+  s.coins -= cost;
+  s.village.built.push(id);
   return true;
 }
 
@@ -1404,7 +1604,8 @@ export function nextDusk(s: GameState) {
 /** Sets up a dusk of night `s.night` in `s.district`, of kind `s.kind`. */
 function startDusk(s: GameState) {
   s.phase = 'dusk';
-  s.duskMs = DUSK_MS;
+  s.duskMax = duskFor(s.night);
+  s.duskMs = s.duskMax;
   s.lanterns = makeLanterns(s.night, s.district);
   makeMoths(s);
   s.queue = [];
@@ -1428,4 +1629,8 @@ function startDusk(s: GameState) {
   s.shipTimes = tide ? [...SHIP_TIMES] : [];
   s.ship = null;
   s.shipsGuided = 0;
+  const snow = districtOf(s).rule === 'avalanche';
+  s.avalancheTimes = snow ? [...AVALANCHE_TIMES] : [];
+  s.avalanche = null;
+  s.pilgrimsWarned = 0;
 }

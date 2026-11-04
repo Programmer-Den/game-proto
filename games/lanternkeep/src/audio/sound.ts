@@ -45,6 +45,10 @@ export const sfx = sounds({
   wash: { wave: 'noise', freq: 700, to: 180, length: 0.9, attack: 0.08, volume: 0.3, gap: 1000 },
   /** A ship comes in sight: a low horn. */
   horn: { wave: 'triangle', freq: 147, arp: [0, 0, 5], arpStep: 0.25, length: 0.9, attack: 0.1, volume: 0.32, gap: 1000 },
+  /** The monastery (LK20): an avalanche warned, the snow coming down, and a bell rung for a pilgrim. */
+  crack: { wave: 'noise', freq: 2400, to: 500, length: 0.35, attack: 0.01, volume: 0.26, gap: 1000 },
+  slide: { wave: 'noise', freq: 500, to: 90, length: 1.2, attack: 0.15, volume: 0.32, gap: 1000 },
+  peal: { wave: 'triangle', freq: 988, arp: [0, 7, 12, 7], arpStep: 0.12, length: 0.7, volume: 0.28, gap: 300 },
   /** A moth grows a trait (LK16): a bright rising bloom. */
   bloom: { wave: 'triangle', freq: 880, arp: [0, 4, 7, 11, 14], arpStep: 0.06, length: 0.4, volume: 0.26, gap: 300 },
   /** A moth comes home tired and rests. */
