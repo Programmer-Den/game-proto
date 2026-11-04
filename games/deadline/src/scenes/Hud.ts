@@ -1,11 +1,11 @@
 import Phaser from 'phaser';
-import { ADAPTS, CONDITIONS, HUD_HEIGHT, PERKS, VIEW, type Adapt, type Condition, type Perk, type Stats } from '../game/rules';
+import { ADAPTS, CONDITIONS, HUD_HEIGHT, LEADERS, PERKS, VIEW, type Adapt, type Condition, type LeaderKind, type Perk, type Stats } from '../game/rules';
 import type { ArtStyle } from '../game/save';
 import { formatNumber } from '../../../../shared/i18n';
 // `t` names this HUD's Text objects here, so the translator goes by `tr`.
 import { t as tr, type TextKey } from '../i18n';
 import { FIELD, GEOM, num, tex } from '../art/paint';
-import { ACID_COLOR, CRATE_COLORS, THEMES, UPGRADE_COLORS, type Theme } from '../art/theme';
+import { ACID_COLOR, CRATE_COLORS, LEADER_COLORS, THEMES, UPGRADE_COLORS, type Theme } from '../art/theme';
 
 // The HUD: the top bar (wave, best wave, kills, stats and the art style switch), the wave progress
 // strip under it, the frenzy meter beside the squad, and the kit panel on the squad's other side
@@ -25,6 +25,11 @@ export const FRENZY_PANEL = { x: 384, y: 852, w: 140, h: 50 };
  * holding sandbags readies a wall. A long list of supplies wraps, and the panel grows upward.
  */
 export const KIT_PANEL = { x: 16, y: 852, w: 140, h: 50 };
+/**
+ * The squad leader's button: a round button on the road's right shoulder above the frenzy meter,
+ * out of the lanes, with its active's name (or the seconds left to wait) under it. `x`, `y` is its centre.
+ */
+export const LEADER_BUTTON = { x: 514, y: 796, r: 23 };
 /** The wave condition's chip, under the progress strip at the right; it drops below the boss bar while a boss is up. */
 export const CONDITION_CHIP = { x: VIEW.w - 10, y: HUD_HEIGHT + 32, h: 16, bossDrop: 20 };
 
@@ -42,6 +47,8 @@ function fitHud() {
   FRENZY_PANEL.x = right - 16 - FRENZY_PANEL.w;
   KIT_PANEL.y = FRENZY_PANEL.y = FIELD.h - (VIEW.h - 852);
   CONDITION_CHIP.x = right - 10;
+  LEADER_BUTTON.x = right - 26;
+  LEADER_BUTTON.y = FIELD.h - (VIEW.h - 796);
 }
 
 export interface HudData {
@@ -80,6 +87,8 @@ export interface HudData {
   adapt: Adapt | null;
   /** The operation being played (null on the Open Road): its best chip reads waves cleared out of `waves`. */
   operation: { label: TextKey; waves: number } | null;
+  /** The squad leader of this run (null for none): its active's cooldown filled 0..1, and the whole seconds left. */
+  leader: { kind: LeaderKind; fill: number; secs: number } | null;
 }
 
 type Text = Phaser.GameObjects.Text;
@@ -91,7 +100,7 @@ export class Hud {
   private bar: Phaser.GameObjects.Image;
   private g: Phaser.GameObjects.Graphics;
   private t: Record<
-    'wave' | 'kills' | 'best' | 'comic' | 'nv' | 'count' | 'note' | 'frenzy' | 'streak' | 'hint' | 'kit' | 'kitHint' | 'kitList' | 'acid' | 'condition',
+    'wave' | 'kills' | 'best' | 'comic' | 'nv' | 'count' | 'note' | 'frenzy' | 'streak' | 'hint' | 'kit' | 'kitHint' | 'kitList' | 'acid' | 'condition' | 'leader',
     Text
   >;
   private statLabels: Text[];
@@ -102,6 +111,8 @@ export class Hud {
   private kitShown = false;
   /** How far the kit panel has grown upward to hold a wrapped list. */
   private kitGrown = 0;
+  /** Whether the leader's button is drawn. */
+  private leaderShown = false;
 
   constructor(scene: Phaser.Scene) {
     fitHud();
@@ -111,7 +122,7 @@ export class Hud {
     this.t = {
       wave: text(), kills: text(), best: text(), comic: text(), nv: text(),
       count: text(), note: text(), frenzy: text(), streak: text(), hint: text(),
-      kit: text(), kitHint: text(), kitList: text(), acid: text(), condition: text(),
+      kit: text(), kitHint: text(), kitList: text(), acid: text(), condition: text(), leader: text(),
     };
     this.statLabels = [text(), text(), text(), text()];
     this.statValues = [text(), text(), text(), text()];
@@ -127,6 +138,11 @@ export class Hud {
   onKit(x: number, y: number) {
     const k = KIT_PANEL;
     return this.kitShown && x >= k.x - 4 && x <= k.x + k.w + 4 && y >= k.y - this.kitGrown - 4 && y <= k.y + k.h + 4;
+  }
+
+  /** Whether a tap at x, y lands on the squad leader's button (never while there is no leader). */
+  onLeader(x: number, y: number) {
+    return this.leaderShown && Math.hypot(x - LEADER_BUTTON.x, y - LEADER_BUTTON.y) <= LEADER_BUTTON.r + 6;
   }
 
   setStyle(style: ArtStyle) {
@@ -147,6 +163,59 @@ export class Hud {
     else this.drawNv(d, th);
     this.drawKit(d, th);
     this.drawCondition(d, th);
+    this.drawLeader(d, th);
+  }
+
+  /**
+   * The squad leader's button: the leader's colour and sign (the Sergeant's chevrons, the Medic's
+   * green cross, the Scout's flare), dimmed under a shade that shrinks as the cooldown runs out.
+   */
+  private drawLeader(d: HudData, th: Theme) {
+    const l = d.leader, t = this.t.leader;
+    this.leaderShown = !!l;
+    t.setVisible(!!l);
+    if (!l) return;
+    const g = this.g, comic = this.style === 'comic', { x, y, r } = LEADER_BUTTON, ready = l.fill >= 1;
+    const col = LEADER_COLORS[l.kind], line = num(comic ? th.ink : th.accent);
+    if (comic) g.fillStyle(num(th.ink)).fillCircle(x + 3, y + 3, r);
+    g.fillStyle(num(comic ? '#fff8e8' : '#040c06'), comic ? 1 : 0.8).fillCircle(x, y, r);
+    // The leader's sign.
+    const sign = num(comic || ready ? col : th.muted);
+    g.lineStyle(comic ? 1.6 : 1, line);
+    if (l.kind === 'sergeant') {
+      for (const dy of [-8, 0, 8]) {
+        const pts = [x - 11, y + dy + 4, x, y + dy - 4, x + 11, y + dy + 4, x + 11, y + dy + 9, x, y + dy + 1, x - 11, y + dy + 9];
+        g.fillStyle(sign).fillPoints(this.points(pts), true);
+        if (comic) g.strokePoints(this.points(pts), true);
+      }
+    } else if (l.kind === 'medic') {
+      // A green cross, never a red one.
+      g.fillStyle(sign).fillRect(x - 4, y - 12, 8, 24).fillRect(x - 12, y - 4, 24, 8);
+      if (comic) g.strokePoints(this.points([x - 4, y - 12, x + 4, y - 12, x + 4, y - 4, x + 12, y - 4, x + 12, y + 4, x + 4, y + 4, x + 4, y + 12, x - 4, y + 12, x - 4, y + 4, x - 12, y + 4, x - 12, y - 4, x - 4, y - 4]), true);
+    } else {
+      this.star(x, y - 2, 5, 12, comic || ready ? col : th.muted, comic ? th.ink : th.accent);
+      g.lineStyle(2, sign).lineBetween(x, y + 8, x - 3, y + 16);
+    }
+    // The cooldown: a shade over the part of the button still to fill, from the bottom up.
+    if (!ready) {
+      const h = 2 * r * (1 - l.fill);
+      g.fillStyle(num(comic ? '#15121a' : '#000000'), comic ? 0.45 : 0.55);
+      g.fillRect(x - r * 0.72, y - r * 0.72, r * 1.44, Math.min(r * 1.44, h * 0.72));
+    }
+    g.lineStyle(comic ? 2.4 : 1.4, ready ? num(comic ? th.ink : col) : line, ready || comic ? 1 : 0.6).strokeCircle(x, y, r);
+    if (!comic && ready) g.lineStyle(1, num(col), 0.5).strokeCircle(x, y, r + 3);
+    const label = ready ? tr(LEADERS[l.kind].ability).toUpperCase() : tr('leaderWait', { n: l.secs });
+    if (comic) this.font(t, 9, ready ? th.ink : '#5a4a6a', th).setStroke('#fff8e8', 3);
+    else this.font(t, 8.5, ready ? col : th.muted, th, { glow: ready ? col : th.muted, weight: 'bold' });
+    t.setText(label).setOrigin(0.5).setScale(1).setPosition(x, y + r + 9);
+    t.setScale(Math.min(1, 54 / t.width));
+  }
+
+  /** A flat list of x, y pairs as points for a polygon. */
+  private points(xy: number[]) {
+    const pts: Phaser.Math.Vector2[] = [];
+    for (let i = 0; i < xy.length; i += 2) pts.push(new Phaser.Math.Vector2(xy[i], xy[i + 1]));
+    return pts;
   }
 
   /** The wave's condition on a chip under the progress strip (none when the wave is clear). */

@@ -319,6 +319,29 @@ function drum(ctx: Ctx) {
   ctx.fill();
 }
 
+/** The escort bus from above: a long, cool roof with a warm engine at the back and headlamps that bloom. */
+function bus(ctx: Ctx) {
+  shade(ctx, 2, 2, 30, 58, 0.45);
+  for (const wy of [-34, 36]) for (const wx of [-28, 24]) box(ctx, wx, wy - 8, 4, 16, 0.12, 1);
+  box(ctx, -25, -57, 50, 114, 0.46, 7);
+  box(ctx, -19, -53, 38, 12, 0.18, 3);
+  box(ctx, -23, -37, 5, 86, 0.26, 1);
+  box(ctx, 18, -37, 5, 86, 0.26, 1);
+  for (const hy of [-24, 4]) box(ctx, -8, hy, 16, 12, 0.56, 2);
+  // The engine at the back runs warm.
+  vol(ctx, 0, 42, 16, 9, 0.72, 0.1);
+  ctx.save();
+  ctx.shadowColor = '#fff';
+  ctx.shadowBlur = 8;
+  for (const hx of [-17, 17]) {
+    ctx.beginPath();
+    ctx.arc(hx, -56, 3.2, 0, TAU);
+    ctx.fillStyle = '#fff';
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
 /** A spitter: its acid sac is warm, so it glows bright under the jaw. */
 function spitter(ctx: Ctx) {
   shade(ctx, 0, 19, 12, 4);
@@ -597,6 +620,7 @@ export function bakeNightVision(scene: Phaser.Scene) {
     bake(scene, key(`label-${kind}`), GEOM.label, (c) => crateLabel(c, kind));
   }
   nvBake(scene, 'drum', GEOM.drum, drum, {}, (c) => brackets(c, -17, -17, 34, 34, AMB, 5));
+  nvBake(scene, 'bus', GEOM.bus, bus, {}, (c) => brackets(c, -30, -61, 60, 120, AMB, 9));
   nvBake(scene, 'bullet', GEOM.bullet, (c) => {
     const gr = c.createLinearGradient(0, -4, 0, 26);
     gr.addColorStop(0, '#fff');

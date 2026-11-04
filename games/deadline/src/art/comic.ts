@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { CRATES, CRATE_KINDS, DRUM, HUD_HEIGHT, REACH_Y, SUPPLY_KINDS, VIEW, type CrateKind, type SupplyKind } from '../game/rules';
 import { t } from '../i18n';
 import { FIELD, GEOM, TAU, bake, circle, lit, path, rng, tex, type Ctx, type Pt } from './paint';
-import { ACID_COLOR, COMIC, CRATE_COLORS } from './theme';
+import { ACID_COLOR, BUS_COLOR, COMIC, CRATE_COLORS } from './theme';
 
 // Deadline as a pulp horror comic: inked outlines, flat colours, halftone dots on the side away
 // from the light (top left), and lettered sound effects. Every texture is painted on a canvas.
@@ -372,6 +372,24 @@ function drum(ctx: Ctx) {
   ink(ctx, P(ctx, [[x - 3, y + 11], [x + 3, y + 11], [x + 3.5, y + 8], [x + 1, y + 9], [x, y + 5.5], [x - 1.5, y + 8.5], [x - 3.5, y + 7]]), '#e8402a', { sh: 0, lw: 0.8 });
 }
 
+/** The escort towns' bus from above, driving up the road: yellow, roof hatches, lit headlamps at the front. */
+function bus(ctx: Ctx) {
+  ctx.fillStyle = 'rgba(10,8,20,0.45)';
+  ctx.fillRect(-22, -52, 52, 112);
+  for (const wy of [-34, 36]) for (const wx of [-28, 24]) ink(ctx, R(ctx, wx, wy - 8, 4, 16, 1), INK, { sh: 0, lw: 1 });
+  ink(ctx, R(ctx, -25, -57, 50, 114, 7), BUS_COLOR, { sh: 3.2 });
+  // The windscreen at the front, the dark strips of the side windows and a black bumper at the back.
+  ink(ctx, R(ctx, -19, -53, 38, 12, 3), '#8ad0f0', { sh: 0, lw: 1.4 });
+  ink(ctx, R(ctx, -23, -37, 5, 86, 1), '#3a3448', { sh: 0, lw: 1 });
+  ink(ctx, R(ctx, 18, -37, 5, 86, 1), '#3a3448', { sh: 0, lw: 1 });
+  ink(ctx, R(ctx, -22, 50, 44, 5, 1), INK, { sh: 0, lw: 1 });
+  for (const hy of [-24, 4, 30]) ink(ctx, R(ctx, -8, hy, 16, 12, 2), '#f6efd8', { sh: 0, lw: 1.2 });
+  ctx.fillStyle = INK;
+  ctx.fillRect(-12, -2, 24, 3);
+  circle(ctx, -17, -56, 3.2, '#fff8c0', INK, 1.2);
+  circle(ctx, 17, -56, 3.2, '#fff8c0', INK, 1.2);
+}
+
 /** A spitter: a hunched walker with a swollen acid sac under its jaw, drooling green. */
 function spitter(ctx: Ctx) {
   const skin = '#a8b84a', shirt = '#6a5a7a', pants = '#3e3a52';
@@ -712,6 +730,7 @@ export function bakeComic(scene: Phaser.Scene) {
     bake(scene, key(`label-${kind}`), GEOM.label, (c) => crateLabel(c, kind));
   }
   bake(scene, key('drum'), GEOM.drum, drum);
+  bake(scene, key('bus'), GEOM.bus, bus);
   bake(scene, key('bullet'), GEOM.bullet, bullet);
   bake(scene, key('muzzle'), GEOM.muzzle, (c) => {
     burst(c, 0, 2, 4, 10, 6, '#fff3a0', { lw: 1.2, rot: -Math.PI / 2 });

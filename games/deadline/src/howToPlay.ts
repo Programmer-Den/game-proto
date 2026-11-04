@@ -14,6 +14,7 @@ const en: HowToPlay = {
     },
     { input: 'Tap a card, or 1 / 2 / 3', action: 'Pick a supply after a boss, or the role of a survivor who joins' },
     { input: 'Tap the wide card, or 4', action: 'Extract and end the run as a win, from wave 20' },
+    { input: 'The leader button on the right, or Q', action: "Use your squad leader's active: an airstrike, a patch-up or a flare" },
     { input: 'COMIC / NV switch, or V', action: 'Switch between the comic and night-vision art styles' },
     {
       input: 'Tap a starting crate after game over',
@@ -21,6 +22,8 @@ const en: HowToPlay = {
     },
     { input: 'Tap an outpost upgrade after game over', action: 'Buy its next level with scrap, for every run to come' },
     { input: 'Tap a card or a town after game over', action: 'Pick the next run: the Open Road, the daily stand or a town on the road map' },
+    { input: 'Tap the wide button after game over', action: 'Turn to the page with the squad leaders, the zombie codex and the veterans' },
+    { input: 'Tap a leader after game over', action: 'Pick the squad leader for the next run; tap again to go without one' },
     { input: 'Tap a veteran after game over', action: 'Pick up to two veterans to start the next run in your squad' },
     { input: 'Tap anywhere else after game over', action: 'Start again from wave 1' },
   ],
@@ -43,6 +46,9 @@ const en: HowToPlay = {
     'Winning a town opens the next one on the road map and pays a bounty the first time; each town has its own twist, like fog or only two lanes.',
     'Survivors who join and live through a won run become veterans: they keep their role, rank up with every win and hit harder.',
     'The daily stand is the same 10 waves for everyone today, with no starting crates, outpost or veterans, and one try a day.',
+    'A squad leader leads every run you pick them for: the Sergeant calls an airstrike on your lane, the Medic throws back the zombies at the sandbags, the Scout lights the road with a flare. Each levels up with the waves they clear, for a shorter wait and a stronger active.',
+    'Win the Hospital to open the escort route: a bus drives up the middle lane every wave and has to reach the far end. Zombies stop it and bite it, so keep its lane clear; lose the bus and you lose the run.',
+    'Every kill fills a page of the zombie codex. A full page makes every hit on that kind 15% stronger, for good (not on the daily stand).',
   ],
 };
 
@@ -68,6 +74,7 @@ const de: HowToPlay = {
     },
     { input: 'Eine Karte antippen, oder 1 / 2 / 3', action: 'Nach einem Boss Nachschub wählen, oder die Rolle eines Überlebenden, der dazukommt' },
     { input: 'Die breite Karte antippen, oder 4', action: 'Ab Welle 20 abziehen und den Lauf als Sieg beenden' },
+    { input: 'Der Anführer-Knopf rechts, oder Q', action: 'Die Fähigkeit deines Anführers nutzen: Luftangriff, Notversorgung oder Leuchtkugel' },
     { input: 'Schalter COMIC / NACHT, oder V', action: 'Zwischen Comic- und Nachtsicht-Grafik wechseln' },
     {
       input: 'Nach dem Spielende eine Startkiste antippen',
@@ -75,6 +82,8 @@ const de: HowToPlay = {
     },
     { input: 'Nach dem Spielende einen Außenposten-Ausbau antippen', action: 'Seine nächste Stufe mit Schrott kaufen, für alle kommenden Läufe' },
     { input: 'Nach dem Spielende eine Karte oder Stadt antippen', action: 'Den nächsten Lauf wählen: die Offene Straße, den Tageskampf oder eine Stadt auf der Karte' },
+    { input: 'Nach dem Spielende den breiten Knopf antippen', action: 'Zur Seite mit den Anführern, dem Zombie-Codex und den Veteranen blättern' },
+    { input: 'Nach dem Spielende einen Anführer antippen', action: 'Den Anführer für den nächsten Lauf wählen; nochmal tippen geht ohne' },
     { input: 'Nach dem Spielende einen Veteranen antippen', action: 'Bis zu zwei Veteranen wählen, die den nächsten Lauf in deinem Trupp beginnen' },
     { input: 'Nach dem Spielende woanders tippen', action: 'Neu ab Welle 1 beginnen' },
   ],
@@ -97,6 +106,9 @@ const de: HowToPlay = {
     'Ein Sieg in einer Stadt öffnet die nächste auf der Karte und bringt beim ersten Mal ein Kopfgeld; jede Stadt hat ihre eigene Wendung, etwa Nebel oder nur zwei Spuren.',
     'Überlebende, die dazukommen und einen gewonnenen Lauf überstehen, werden Veteranen: Sie behalten ihre Rolle, steigen mit jedem Sieg im Rang und treffen härter.',
     'Der Tageskampf sind heute für alle dieselben 10 Wellen, ohne Startkisten, Außenposten oder Veteranen, mit einem Versuch am Tag.',
+    'Ein Anführer führt jeden Lauf, für den du ihn wählst: der Feldwebel ruft einen Luftangriff auf deine Spur, der Feldarzt wirft die Zombies an den Sandsäcken zurück, der Späher erhellt die Straße mit einer Leuchtkugel. Jeder steigt mit den Wellen, die er schafft, im Rang: kürzere Wartezeit, stärkere Fähigkeit.',
+    'Gewinne das Krankenhaus, um die Geleitroute zu öffnen: Jede Welle fährt ein Bus die mittlere Spur hinauf und muss das Ende erreichen. Zombies halten ihn auf und beißen ihn, also halte seine Spur frei; geht der Bus verloren, ist der Lauf verloren.',
+    'Jeder Kill füllt eine Seite des Zombie-Codex. Eine volle Seite macht jeden Treffer auf diese Art für immer 15 % stärker (nicht im Tageskampf).',
   ],
 };
 

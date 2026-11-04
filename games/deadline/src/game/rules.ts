@@ -297,9 +297,11 @@ export const MARKSMAN = { every: 3, mult: 3, pierce: 2 };
  * - drums: whether fuel drums roll down at all;
  * - condition: the condition every wave has (null: drawn as usual from `conditionFrom`, wave 6);
  * - lanes: the lanes the horde comes down (every lane when left out): the rest are blocked by a wreck;
- * - bounty: the scrap the first win pays on top.
+ * - bounty: the scrap the first win pays on top;
+ * - escort: a bus rolls up the middle lane every wave and has to reach the far end (see `BUS`);
+ * - after: the town whose win opens this one, for a town off the main road (the escort route).
  */
-export type OperationKind = 'road' | 'hospital' | 'lightsout' | 'fogbank' | 'bridges' | 'evac' | 'daily';
+export type OperationKind = 'road' | 'hospital' | 'lightsout' | 'fogbank' | 'bridges' | 'evac' | 'depot' | 'convoy' | 'daily';
 export interface Operation {
   label: TextKey;
   detail: TextKey;
@@ -311,6 +313,8 @@ export interface Operation {
   conditionFrom?: number;
   lanes?: number[];
   bounty?: number;
+  escort?: boolean;
+  after?: OperationKind;
 }
 export const OPERATIONS: Record<OperationKind, Operation> = {
   road: { label: 'opRoad', detail: 'opRoadDetail', waves: null, survivors: 1, survivorsFrom: SURVIVOR.fromWave, drums: true, condition: null },
@@ -319,25 +323,51 @@ export const OPERATIONS: Record<OperationKind, Operation> = {
   fogbank: { label: 'opFogbank', detail: 'opFogbankDetail', waves: 10, survivors: 1, survivorsFrom: SURVIVOR.fromWave, drums: true, condition: 'fog', bounty: 120 },
   bridges: { label: 'opBridges', detail: 'opBridgesDetail', waves: 10, survivors: 1, survivorsFrom: SURVIVOR.fromWave, drums: true, condition: null, lanes: [0, 2], bounty: 160 },
   evac: { label: 'opEvac', detail: 'opEvacDetail', waves: 10, survivors: 2, survivorsFrom: 2, drums: true, condition: null, conditionFrom: 1, bounty: 250 },
+  depot: { label: 'opDepot', detail: 'opDepotDetail', waves: 10, survivors: 1, survivorsFrom: SURVIVOR.fromWave, drums: true, condition: null, escort: true, after: 'hospital', bounty: 140 },
+  convoy: { label: 'opConvoy', detail: 'opConvoyDetail', waves: 10, survivors: 1, survivorsFrom: SURVIVOR.fromWave, drums: true, condition: null, conditionFrom: 1, escort: true, after: 'depot', bounty: 220 },
   daily: { label: 'opDaily', detail: 'opDailyDetail', waves: 10, survivors: 1, survivorsFrom: SURVIVOR.fromWave, drums: true, condition: null },
 };
 export const OPERATION_KINDS = Object.keys(OPERATIONS) as OperationKind[];
 export const OPERATION_BONUS = 2;
 /** The road map: the towns in the order they open, ending in the evacuation. */
 export const TOWNS: OperationKind[] = ['hospital', 'lightsout', 'fogbank', 'bridges', 'evac'];
-export const isTown = (kind: OperationKind) => TOWNS.includes(kind);
+/** The escort route, a branch off the road map opened by the Hospital: a bus to bring through every wave. */
+export const ESCORTS: OperationKind[] = ['depot', 'convoy'];
+export const isTown = (kind: OperationKind) => TOWNS.includes(kind) || ESCORTS.includes(kind);
 /**
  * Whether a town on the road map can be picked: the first always, the others once the town before
- * them is won (or once they have been played, so a save from before the road map keeps them).
+ * them (or the one named by `after`) is won, or once they have been played, so a save from before
+ * the road map keeps them.
  */
 export function townOpen(kind: OperationKind, bests: Record<OperationKind, number>) {
+  const after = OPERATIONS[kind].after;
+  if (after) return bests[after] >= (OPERATIONS[after].waves ?? 0) || bests[kind] > 0;
   const i = TOWNS.indexOf(kind);
   if (i < 0) return true;
   const prev = TOWNS[i - 1];
   return i === 0 || bests[prev] >= (OPERATIONS[prev].waves ?? 0) || bests[kind] > 0;
 }
-/** The town a win opens next, or null after the evacuation (or off the road map). */
-export const nextTown = (kind: OperationKind) => (isTown(kind) ? (TOWNS[TOWNS.indexOf(kind) + 1] ?? null) : null);
+/** The towns a win opens: the next one down the main road and any escort town that branches off it. */
+export function nextTowns(kind: OperationKind): OperationKind[] {
+  const main = TOWNS.includes(kind) ? TOWNS[TOWNS.indexOf(kind) + 1] : undefined;
+  return [...(main ? [main] : []), ...ESCORTS.filter((k) => OPERATIONS[k].after === kind)];
+}
+/** The town the next run goes to after a win: the next one on its own road (null after the last). */
+export const nextTown = (kind: OperationKind) => {
+  const road = ESCORTS.includes(kind) ? ESCORTS : TOWNS;
+  return isTown(kind) ? (road[road.indexOf(kind) + 1] ?? null) : null;
+};
+
+/**
+ * The escort towns' bus: it starts at `startY` in the middle lane each wave and drives up at
+ * `speed` to `endY`, the far end, where it gets through and pays `scrap`. A zombie that touches it
+ * holds it still and bites `bite` hit points a second (a brute twice that, a boss `bossBite`), and
+ * zombies within `lure` px above it go for it instead of their lane's sandbags. The wave isn't
+ * cleared until the bus is through; if its `hp` runs out the run is lost.
+ */
+export const BUS = { w: 56, h: 116, startY: REACH_Y - 76, endY: HUD_HEIGHT + 90, speed: 30, hp: 100, bite: 8, bossBite: 30, lure: 170, scrap: 25 };
+export const busBite = (kind: EnemyKind) => (isBoss(kind) ? BUS.bossBite : kind === 'brute' ? BUS.bite * 2 : BUS.bite);
+
 /**
  * Where a zombie planned at x comes in when only `lanes` are open: a blocked lane's zombie moves
  * across to the nearest open lane, keeping its place in that lane. No draws.
@@ -403,6 +433,54 @@ export function promote(roster: Veteran[], brought: number[], recruits: { name: 
   }
   return next;
 }
+/**
+ * Squad leaders: one picked on the game over screen leads the next run (not the daily) with an
+ * active, used from its button and then cooling down for `leaderCooldown`; the first use is ready
+ * `LEADER.firstMs` into the run.
+ * - Sergeant: an airstrike on the hero's lane after `AIRSTRIKE.warnMs`, hitting every zombie in it
+ *   past shields;
+ * - Medic: a patch-up that throws back every zombie within `PATCH.reach` of the sandbags and mends
+ *   the bus in an escort town;
+ * - Scout: a flare that lights the whole road for `FLARE.ms` (lifting blackout and fog), marks where
+ *   the rest of the wave comes in and lists it, and makes every hit land `FLARE.spotted` times.
+ * Each leader earns xp for every wave cleared in a run they led, and levels up at `LEADER.levels`:
+ * each level past the first cuts the cooldown by `cooldownCut` and strengthens the active.
+ */
+export type LeaderKind = 'sergeant' | 'medic' | 'scout';
+export const LEADERS: Record<LeaderKind, { label: TextKey; ability: TextKey; detail: TextKey; cooldownMs: number }> = {
+  sergeant: { label: 'leaderSergeant', ability: 'leaderSergeantAbility', detail: 'leaderSergeantDetail', cooldownMs: 28000 },
+  medic: { label: 'leaderMedic', ability: 'leaderMedicAbility', detail: 'leaderMedicDetail', cooldownMs: 34000 },
+  scout: { label: 'leaderScout', ability: 'leaderScoutAbility', detail: 'leaderScoutDetail', cooldownMs: 30000 },
+};
+export const LEADER_KINDS = Object.keys(LEADERS) as LeaderKind[];
+export const LEADER = { levels: [0, 6, 16, 32, 56], firstMs: 8000, cooldownCut: 0.08 };
+export const LEADER_MAX = LEADER.levels.length;
+/** A leader's level (1 to `LEADER_MAX`) for the xp earned, and the xp the next level needs (null at the top). */
+export const leaderLevel = (xp: number) => LEADER.levels.filter((t) => xp >= t).length;
+export const nextLevelXp = (xp: number) => LEADER.levels.find((t) => t > xp) ?? null;
+export const leaderCooldown = (kind: LeaderKind, level: number) => Math.round(LEADERS[kind].cooldownMs * (1 - LEADER.cooldownCut * (level - 1)));
+export const AIRSTRIKE = { warnMs: 900, damage: (wave: number, level: number) => Math.round((12 + 6 * wave) * (1 + 0.15 * (level - 1))) };
+export const PATCH = { reach: 160, push: (level: number) => 180 + 20 * level, bus: (level: number) => 30 + 10 * level };
+export const FLARE = { ms: (level: number) => 5000 + 1000 * (level - 1), spotted: 1.25 };
+
+/**
+ * The zombie codex: every kill of a kind fills its page, kept for good. A full page (`pages`) makes
+ * every hit on that kind land `bonus` times, in every run but the daily.
+ */
+export const CODEX_KINDS: EnemyKind[] = ['grunt', 'runner', 'brute', 'spitter', 'crawler', 'riot', 'boss', 'brood', 'bloater'];
+export const CODEX: { pages: Record<EnemyKind, number>; bonus: number } = {
+  pages: { grunt: 200, runner: 120, brute: 60, spitter: 50, crawler: 150, riot: 40, boss: 3, brood: 3, bloater: 3 },
+  bonus: 1.15,
+};
+export type Codex = Record<EnemyKind, number>;
+export const EMPTY_CODEX = Object.fromEntries(CODEX_KINDS.map((k) => [k, 0])) as Codex;
+export const codexFull = (codex: Codex, kind: EnemyKind) => codex[kind] >= CODEX.pages[kind];
+/** Each kind's name on its codex page and in the scout's flare. */
+export const KIND_NAMES: Record<EnemyKind, TextKey> = {
+  grunt: 'kindGrunt', runner: 'kindRunner', brute: 'kindBrute', spitter: 'kindSpitter', crawler: 'kindCrawler', riot: 'kindRiot',
+  boss: 'bossBehemoth', brood: 'bossBrood', bloater: 'bossBloater',
+};
+
 /** The medals an operation's best earns: waves cleared out of its 10. */
 export const MEDALS: { label: TextKey; cleared: number }[] = [
   { label: 'medalGold', cleared: 10 },
