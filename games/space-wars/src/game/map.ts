@@ -1,4 +1,4 @@
-import { ARENA, NODE_AMOUNT, START_POINTS } from './arena';
+import { ARENA, NODE_AMOUNT, startPoints } from './arena';
 
 export interface Point {
   x: number;
@@ -22,6 +22,31 @@ export interface MapLayout {
   derelicts: (Point & { kind: DerelictKind })[];
   /** A hand-made map's relay beacon (an index into `nodes`); a random map leaves it to `beaconNode`. */
   beacon?: number;
+  /** Wormhole pairs: a ship that flies into one mouth comes out of the other (`wormholes`). None on most maps. */
+  wormholes?: Wormhole[];
+}
+
+/** Two linked mouths: a warship that flies into either comes out of the other. */
+export interface Wormhole {
+  a: Point;
+  b: Point;
+}
+
+/** How far a wormhole's mouths sit in from the battlefield's corners. */
+const WORMHOLE_INSET = 110;
+
+/**
+ * The wormholes for the battlefield as it is now: two pairs, each linking a corner with the far
+ * corner, behind the four corner starts, so a fleet can strike the back of a base across the map.
+ * Fixed spots, with no Math.random, so adding them leaves a map's randomness as it was.
+ */
+export function wormholes(): Wormhole[] {
+  const x0 = ARENA.x + WORMHOLE_INSET, x1 = ARENA.x + ARENA.w - WORMHOLE_INSET;
+  const y0 = ARENA.y + WORMHOLE_INSET, y1 = ARENA.y + ARENA.h - WORMHOLE_INSET;
+  return [
+    { a: { x: x0, y: y1 }, b: { x: x1, y: y0 } },
+    { a: { x: x0, y: y0 }, b: { x: x1, y: y1 } },
+  ];
 }
 
 /** Where the relay beacon goes: the loose crystal node nearest this share of the way from the player's start to the map's centre. */
@@ -95,7 +120,7 @@ export function beaconNode(homes: Point[], nodes: Point[]): number {
 
 /** Each faction's hub sits at its fixed start point, nudged a little at random. */
 function placeHomes(count: number): Point[] {
-  return START_POINTS.slice(0, count).map((p) => ({
+  return startPoints().slice(0, count).map((p) => ({
     x: p.x + (Math.random() * 2 - 1) * JITTER,
     y: p.y + (Math.random() * 2 - 1) * JITTER,
   }));

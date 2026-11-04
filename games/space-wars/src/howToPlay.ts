@@ -7,6 +7,9 @@ const en: HowToPlay = {
     { input: 'Tap a faction card', action: 'Pick the faction you command before the battle' },
     { input: 'Tap an open sector under the cards', action: 'Pick the campaign sector to fight in' },
     { input: 'The Galaxy, Scenarios and Tech tabs', action: 'Conquer a star map, play a hand-made scenario, or spend salvage on lasting tech' },
+    { input: 'The Skirmish tab and its options', action: 'Fight a battle of your own: free for all or teams, a small, standard or large map, the starting crystal and wormholes' },
+    { input: 'The admiral pill beside the tabs', action: 'Pick an admiral (or none) to command your fleet in the next battles' },
+    { input: 'Admiral button, or G', action: "Use your admiral's active: a shield wall, a hyperspace jump (then tap the map) or a crystal windfall" },
     { input: 'Tap a card on the contract board', action: 'Take that contract as your next goal' },
     { input: 'Tap a ship, or drag a box over ships', action: 'Select your combat ships' },
     { input: 'The army count on the top bar, or Q', action: 'Select every warship you have' },
@@ -43,6 +46,9 @@ const en: HowToPlay = {
     'A ship with 3 kills becomes a Veteran and with 8 an Ace, hitting harder each time.',
     'Ships repair slowly beside a hub, outpost or Depot.',
     'Rivals hold off for about a minute and a quarter, then attack whoever last hit them.',
+    'An admiral gives your fleet an aura all battle and an active with a cooldown, and ranks up from battle to battle (1 experience a battle, 3 a win), which makes both stronger.',
+    'Wormholes link far corners of the map: a ship that flies into one comes out of the other, and ships take them on their own when that way is shorter. Rivals use them too, so watch the back of your base.',
+    'In a teams skirmish you and the top-left start fight the two starts on the right, with the centre alone. Your ally shares its sight; win once every other hub has fallen.',
   ],
 };
 
@@ -51,7 +57,7 @@ const enUS: HowToPlay = {
   goal: en.goal,
   controls: en.controls.map((c) => ({ input: c.input, action: c.action.replace(/Centre/g, 'Center') })),
   loop: en.loop,
-  tips: en.tips,
+  tips: en.tips.map((tip) => tip.replace(/centre/g, 'center')),
 };
 
 const de: HowToPlay = {
@@ -60,6 +66,9 @@ const de: HowToPlay = {
     { input: 'Eine Fraktionskarte antippen', action: 'Vor der Schlacht die Fraktion wählen, die du führst' },
     { input: 'Einen offenen Sektor unter den Karten antippen', action: 'Den Feldzugssektor wählen, in dem du kämpfst' },
     { input: 'Die Reiter Galaxis, Szenarien und Technik', action: 'Eine Sternkarte erobern, ein Szenario spielen oder Bergegut für bleibende Technik ausgeben' },
+    { input: 'Der Reiter Gefecht und seine Optionen', action: 'Eine eigene Schlacht schlagen: jeder gegen jeden oder Teams, kleine, normale oder große Karte, Startkristall und Wurmlöcher' },
+    { input: 'Die Admiralstaste neben den Reitern', action: 'Einen Admiral (oder keinen) für die nächsten Schlachten wählen' },
+    { input: 'Admiralstaste oder G', action: 'Die Fähigkeit deines Admirals einsetzen: Schildwall, Hypersprung (dann auf die Karte tippen) oder Geldsegen' },
     { input: 'Eine Karte auf dem Vertragsbrett antippen', action: 'Diesen Vertrag als nächstes Ziel annehmen' },
     { input: 'Ein Schiff antippen oder einen Rahmen über Schiffe ziehen', action: 'Deine Kampfschiffe wählen' },
     { input: 'Die Flottenzahl in der oberen Leiste oder Q', action: 'Alle deine Kriegsschiffe wählen' },
@@ -96,6 +105,9 @@ const de: HowToPlay = {
     'Ein Schiff mit 3 Abschüssen wird Veteran, mit 8 ein Ass, und trifft jedes Mal härter.',
     'Schiffe reparieren sich langsam neben einer Basis, einem Außenposten oder Lager.',
     'Rivalen halten sich etwa eineinviertel Minuten zurück und greifen dann den an, der sie zuletzt getroffen hat.',
+    'Ein Admiral gibt deiner Flotte die ganze Schlacht eine Aura und eine Fähigkeit mit Abklingzeit und steigt von Schlacht zu Schlacht im Rang (1 Erfahrung je Schlacht, 3 je Sieg), was beides stärker macht.',
+    'Wurmlöcher verbinden ferne Ecken der Karte: ein Schiff, das in eines fliegt, kommt aus dem anderen heraus, und Schiffe nehmen sie von selbst, wenn der Weg kürzer ist. Rivalen nutzen sie auch, also sichere den Rücken deiner Basis.',
+    'In einem Team-Gefecht kämpfen du und der Start oben links gegen die beiden Starts rechts, die Mitte allein. Dein Verbündeter teilt seine Sicht; du gewinnst, sobald jede andere Basis gefallen ist.',
   ],
 };
 

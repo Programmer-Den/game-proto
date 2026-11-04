@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
-import { ARENA, BUILD_RANGE, NODE_AMOUNT } from '../game/arena';
+import { ARENA, BUILD_RANGE, NODE_AMOUNT, setArena } from '../game/arena';
 import { checkTrophies, galaxyWon } from '../trophies/check';
-import { DERELICT_KINDS, generateMap, localRandom, type MapLayout } from '../game/map';
+import { DERELICT_KINDS, generateMap, localRandom, wormholes, type MapLayout } from '../game/map';
 import { FACTIONS, type Role, type UnitId } from '../game/factions';
 import { CONTRACT_STEPS, FLAGSHIP_STEP, RANKS, contractOf, type Goal } from '../game/contracts';
 import { SECTORS, keptFor, loadCampaign, saveCampaign, sectorText, winSector, type Campaign } from '../game/campaign';
@@ -11,13 +11,15 @@ import {
 import {
   CARRIER_DEPART_MS, CARRIER_ROUTE, DOCK_RADIUS, RELAY_HOLD, SCENARIOS, SURVIVE_MS, loadScenarios, scenarioOf, winScenario, type ScenarioBest, type ScenarioId,
 } from '../game/scenarios';
+import { admiralAt, admiralOf, admiralRank, admiralServed, loadAdmirals, nextAdmiral, saveAdmirals, type Admirals } from '../game/admirals';
+import { SKIRMISH_OPTIONS, START_CRYSTALS, loadSkirmish, saveSkirmish, stepSkirmish, type Skirmish, type SkirmishOption } from '../game/skirmish';
 import { BRANCHES, TECHS, bankSalvage, buyTech, loadTech, saveTech, techFor, techProblem, WIN_SALVAGE, type TechId, type TechTree } from '../game/tech';
 import {
   BEACON_PAY, BEACON_RADIUS, BRIBE_COST, BRIBE_MS, DERELICT_DEFS, DERELICT_RADIUS, EXPANSION_GAP, FLAGSHIP_MS, PLAYER, POP_MS, SENSOR_RANGE, TRUCE_MS,
-  TRUCE_TRIBUTE, VETERAN_NAMES, World, buildInfo, type BattleSetup, flagshipStats, researchCost, unitStats, type Build, type Building, type Cue, type Derelict, type Effect, type SeenBuilding, type Struck,
+  TRUCE_TRIBUTE, VETERAN_NAMES, WORMHOLE_MOUTH, World, buildInfo, type BattleSetup, flagshipStats, researchCost, unitStats, type Build, type Building, type Cue, type Derelict, type Effect, type SeenBuilding, type Struck,
 } from '../game/world';
 import {
-  buildingLines, derelictLines, expansionLines, factionLines, fallBackLines, flagshipLines, rallyLines, researchLines, unitLines,
+  admiralLines, buildingLines, derelictLines, expansionLines, factionLines, fallBackLines, flagshipLines, rallyLines, researchLines, unitLines,
 } from '../game/describe';
 import { FOG_CELL, FOG_COLS, FOG_ROWS } from '../game/fog';
 import { RESEARCH_LEVELS, RESEARCH_MS, TRACK_DEFS, type Track } from '../game/research';
@@ -34,7 +36,7 @@ import { mountWatch, watching, watchSteps } from '../../../../shared/watch';
 import { renderScale, viewPoint, viewSize } from '../../../../shared/scaling';
 // `tr` is the game's translator (`t` in the other files): `t` names the scene's text helpers here.
 import { t as tr } from '../i18n';
-import { ARMY_TAB, BAR, BOARD, BUTTONS, CONTRACT_PILL, FONT, GRID_X, GROW, KEEP, LEAD, MAP_VIEW, MINIMAP, PANEL_X, PICK_TABS, RIVALS_PANEL, RIVALS_TAB, ROLE_LABEL, SECTOR_STRIP, TOP, VIEW, fitView, type Button } from './layout';
+import { ADMIRAL_PILL, ARMY_TAB, BAR, BOARD, BUTTONS, CONTRACT_PILL, FONT, GRID_X, GROW, KEEP, LEAD, MAP_VIEW, MINIMAP, PANEL_X, PICK_TABS, RIVALS_PANEL, RIVALS_TAB, ROLE_LABEL, SECTOR_STRIP, TOP, VIEW, fitView, type Button } from './layout';
 
 // Game time for one step at most, so a hidden tab doesn't jump the battle ahead.
 const MAX_STEP_MS = 100;
@@ -110,8 +112,10 @@ const CUE_SOUND: Record<Exclude<Cue, 'hubFalls'>, Sfx> = {
   built: 'built', warpIn: 'warpIn', researchDone: 'upgrade', rankUp: 'upgrade', contractStarted: 'stamp',
   contractDone: 'contractDone', contractFailed: 'contractFailed', won: 'won', lost: 'lost', truceOffered: 'truceOffered',
   truceMade: 'truceMade', truceBroken: 'truceBroken', tribute: 'tribute', klaxon: 'klaxon', flagshipReady: 'flagshipReady',
-  flagshipLaunched: 'flagshipLaunch', flagshipLost: 'flagshipLost',
+  flagshipLaunched: 'flagshipLaunch', flagshipLost: 'flagshipLost', admiralReady: 'flagshipReady',
 };
+/** The two wormhole pairs' colours. */
+const WORMHOLE_COLORS = [0x5fe0d0, 0xe58cff];
 const ALERT_COLOR = 0xff5a2c;
 /** How close to the rally flag a tap in rally mode takes it down, in battlefield pixels. */
 const RALLY_GRAB = 22;
@@ -139,10 +143,10 @@ interface Drag {
 }
 
 /** The picker's tabs: the sector campaign, galaxy conquest, scenario battles and the tech tree. */
-export type PickMode = 'sectors' | 'galaxy' | 'scenario' | 'tech';
-const PICK_MODES: readonly PickMode[] = ['sectors', 'galaxy', 'scenario', 'tech'];
-const MODE_NAME: Record<PickMode, 'tabSectors' | 'tabGalaxy' | 'tabScenarios' | 'tabTech'> = {
-  sectors: 'tabSectors', galaxy: 'tabGalaxy', scenario: 'tabScenarios', tech: 'tabTech',
+export type PickMode = 'sectors' | 'galaxy' | 'scenario' | 'skirmish' | 'tech';
+const PICK_MODES: readonly PickMode[] = ['sectors', 'galaxy', 'scenario', 'skirmish', 'tech'];
+const MODE_NAME: Record<PickMode, 'tabSectors' | 'tabGalaxy' | 'tabScenarios' | 'tabSkirmish' | 'tabTech'> = {
+  sectors: 'tabSectors', galaxy: 'tabGalaxy', scenario: 'tabScenarios', skirmish: 'tabSkirmish', tech: 'tabTech',
 };
 
 interface Box {
@@ -244,6 +248,13 @@ export class GameScene extends Phaser.Scene {
   /** The scenario the next scenario battle plays, and the best time of each one won. */
   scenario: ScenarioId = 'escort';
   scenarioBest: ScenarioBest = loadScenarios();
+  /** The admiral picked for the next battle and every admiral's experience, from the browser's storage. */
+  admirals: Admirals = loadAdmirals();
+  /** Whether the next tap on the map is the Navigator's hyperspace jump (the admiral button or G). */
+  jumpMode = false;
+  /** The skirmish tab's options, from the browser's storage, and their chips on the strip, in view pixels. */
+  skirmish: Skirmish = loadSkirmish();
+  skirmishChips: (Box & { option: SkirmishOption })[] = [];
   /** What the end overlay says after a galaxy or scenario battle. */
   private outcome = '';
   /** The last pointer position, in view pixels. */
@@ -313,6 +324,8 @@ export class GameScene extends Phaser.Scene {
   private scenarioBanner!: Phaser.GameObjects.Text;
   private dockLabel!: Phaser.GameObjects.Text;
   private captions!: { name: Phaser.GameObjects.Text; cost: Phaser.GameObjects.Text; icon: Phaser.GameObjects.Image }[];
+  private admiralText!: Phaser.GameObjects.Text;
+  private skirmishTexts: Phaser.GameObjects.Text[] = [];
 
   constructor() {
     super('Game');
@@ -450,7 +463,7 @@ export class GameScene extends Phaser.Scene {
       };
     // Captions are kept by their button's index in BUTTONS. The Flagship and Rally buttons get theirs
     // with the board's texts below.
-    const late = (b: Button) => b.key === 'flagship' || b.key === 'rally';
+    const late = (b: Button) => b.key === 'flagship' || b.key === 'rally' || b.key === 'admiral';
     this.captions = [];
     BUTTONS.forEach((b, i) => { if (!late(b)) this.captions[i] = caption(b); });
     this.drawChrome();
@@ -470,6 +483,8 @@ export class GameScene extends Phaser.Scene {
     this.input.keyboard!.on('keydown-SPACE', () => playing() && this.jumpToAlert());
     // Q selects every warship.
     this.input.keyboard!.on('keydown-Q', () => playing() && this.selectFleet());
+    // G uses the admiral's active.
+    this.input.keyboard!.on('keydown-G', () => playing() && this.state.admiral && this.press(BUTTONS.find((b) => b.key === 'admiral')!));
     this.newGame(true);
     // Every Phaser text draws from Math.random for its texture's key, and the map and the AI draw from
     // it too: these are made on a generator of their own, so a seeded battle plays as it did before them.
@@ -481,7 +496,8 @@ export class GameScene extends Phaser.Scene {
       ? this.textures.get(MINI_KEY) as Phaser.Textures.CanvasTexture
       : this.textures.createCanvas(MINI_KEY, FOG_COLS, FOG_ROWS)!;
     this.miniData = this.miniTex.context.createImageData(FOG_COLS, FOG_ROWS);
-    this.miniImage = this.onUi(this.add.image(MINIMAP.x, MINIMAP.y, MINI_KEY).setOrigin(0).setDisplaySize(MINIMAP.w, MINIMAP.h).setDepth(13));
+    this.miniImage = this.onUi(this.add.image(MINIMAP.x, MINIMAP.y, MINI_KEY).setOrigin(0).setDepth(13));
+    this.fitMinimap();
     this.miniGfx = this.onUi(this.add.graphics().setDepth(14));
     // The contract board: a header over two cards at the map's top while the next contract is picked.
     this.boardHead = t(VIEW.w / 2, BOARD.y, 11, INK_CSS.mustard, true, 22).setOrigin(0.5, 0).setStroke(INK_CSS.chocolate, 4);
@@ -521,6 +537,13 @@ export class GameScene extends Phaser.Scene {
       .setDepth(DEPTH.label).setVisible(false).setText(tr('dockLabel')));
     this.rivalDeals = FACTIONS.slice(1).map((_, k) => t(RIVALS_PANEL.x + 24, RIVALS_PANEL.y + RIVALS_PANEL.head + k * RIVALS_PANEL.row + 49, 10, INK_CSS.rust, true, 22)
       .setVisible(false));
+    // The admiral pill beside the picker's tabs, and the skirmish options' chips on the strip.
+    this.admiralText = t(ADMIRAL_PILL.x + ADMIRAL_PILL.w / 2, ADMIRAL_PILL.y + ADMIRAL_PILL.h / 2, 11, INK_CSS.chocolate, true, 21).setOrigin(0.5);
+    const optW = 128;
+    this.skirmishChips = SKIRMISH_OPTIONS.map((option, k) => ({
+      x: st.x + st.w - 14 - (2 - (k % 2)) * (optW + 8) + 8, y: st.y + 12 + Math.floor(k / 2) * 32, w: optW, h: 26, option,
+    }));
+    this.skirmishTexts = this.skirmishChips.map((c) => t(c.x + c.w / 2, c.y + c.h / 2, 10, INK_CSS.chocolate, true, 21).setOrigin(0.5));
     Math.random = random;
   }
 
@@ -585,8 +608,18 @@ export class GameScene extends Phaser.Scene {
    * crystal of the current sector (in galaxy conquest, of its tier).
    */
   private makeMap() {
+    // A skirmish has its own map size (and crystal fields to match) and its wormholes; galaxy
+    // battles and campaign sectors past the first have wormholes too.
+    const skirmish = this.mode === 'skirmish' && !watching;
+    setArena(skirmish ? this.skirmish.size : 'standard');
+    const area = (ARENA.w * ARENA.h) / (1600 * 1000);
     this.layout = this.mode === 'scenario' ? scenarioOf(this.scenario).layout()
-      : generateMap(FACTIONS.length, SECTORS[this.mode === 'galaxy' && this.galaxy ? galaxyTier(this.galaxy) : this.sector].loose);
+      : generateMap(FACTIONS.length, skirmish ? Math.round(SECTORS[0].loose * area)
+        : SECTORS[this.mode === 'galaxy' && this.galaxy ? galaxyTier(this.galaxy) : this.sector].loose);
+    if (!watching && (skirmish ? this.skirmish.wormholes : this.mode === 'galaxy' || (this.mode === 'sectors' && this.sector > 0))) {
+      this.layout.wormholes = wormholes();
+    }
+    if (this.miniImage) this.fitMinimap();
     this.picking = true;
     this.state = new World(this.layout);
     const res = bakeBackdrop(this, this.layout);
@@ -598,16 +631,23 @@ export class GameScene extends Phaser.Scene {
   private startBattle(faction: number) {
     const tech = techFor(this.tech, FACTIONS[faction].name);
     const g = this.galaxy;
+    const pick = this.admirals.pick;
+    const admiral = pick ? { id: pick, rank: admiralRank(this.admirals.xp[pick]) } : undefined;
     if (watching) this.state = new World(this.layout, faction, true);
-    else if (this.mode === 'galaxy' && g && this.target >= 0) {
+    else if (this.mode === 'skirmish') {
+      const sk = this.skirmish;
+      this.state = new World(this.layout, faction, false, 0, [], {
+        mode: 'skirmish', tech, admiral, skirmish: { teams: sk.teams === 'teams', crystal: START_CRYSTALS[sk.crystal] },
+      });
+    } else if (this.mode === 'galaxy' && g && this.target >= 0) {
       const defender = g.owners[this.target];
-      const setup: BattleSetup = { mode: 'galaxy', tech, defender: { faction: defender, crystal: DEFENDER_CRYSTAL * held(g, defender) }, absent: outOfGalaxy(g) };
+      const setup: BattleSetup = { mode: 'galaxy', tech, admiral, defender: { faction: defender, crystal: DEFENDER_CRYSTAL * held(g, defender) }, absent: outOfGalaxy(g) };
       this.state = new World(this.layout, faction, false, galaxyTier(g), [], setup);
       this.battleTarget = this.target;
     } else if (this.mode === 'scenario') {
-      this.state = new World(this.layout, faction, false, 0, [], { mode: 'scenario', scenario: this.scenario, tech });
+      this.state = new World(this.layout, faction, false, 0, [], { mode: 'scenario', scenario: this.scenario, tech, admiral });
     } else {
-      this.state = new World(this.layout, faction, false, this.sector, keptFor(this.campaign, this.sector), { tech });
+      this.state = new World(this.layout, faction, false, this.sector, keptFor(this.campaign, this.sector), { tech, admiral });
     }
     this.picking = false;
     if (watching) {
@@ -617,6 +657,10 @@ export class GameScene extends Phaser.Scene {
     this.reset();
     if (this.state.mode === 'galaxy') this.message = tr('galaxyBattle', { name: tr(GALAXY[this.battleTarget].name) });
     if (this.state.scenario) this.message = tr(scenarioOf(this.state.scenario).brief, { s: RELAY_HOLD });
+    if (this.state.teams) {
+      const ally = this.state.sides.find((x) => this.state.allyOfPlayer(x.index));
+      if (ally) this.message = tr('teamsBattle', { faction: tr(ally.def.name) });
+    }
   }
 
   /**
@@ -629,6 +673,14 @@ export class GameScene extends Phaser.Scene {
     this.tech = bankSalvage(this.tech, s.salvaged, won);
     saveTech(this.tech);
     this.message = tr('salvageBanked', { n: Math.round(s.salvaged) + (won ? WIN_SALVAGE : 0), total: this.tech.salvage });
+    // The admiral in command gains experience, and a new rank shows on the end overlay's line.
+    if (s.admiral) {
+      const before = admiralRank(this.admirals.xp[s.admiral.id]);
+      this.admirals = admiralServed(this.admirals, s.admiral.id, won);
+      saveAdmirals(this.admirals);
+      const after = admiralRank(this.admirals.xp[s.admiral.id]);
+      if (after > before) this.message += ` ${tr('admiralRankUp', { name: tr(admiralOf(s.admiral.id).name), rank: after })}`;
+    }
     if (s.mode === 'galaxy' && this.galaxy && this.battleTarget >= 0) {
       const target = this.battleTarget;
       const defender = FACTIONS[this.galaxy.owners[target]];
@@ -668,6 +720,7 @@ export class GameScene extends Phaser.Scene {
     this.selected.clear();
     this.placing = null;
     this.rallyMode = false;
+    this.jumpMode = false;
     this.alerts = [];
     this.edgeMarks = [];
     this.endPhase = 'playing';
@@ -954,6 +1007,8 @@ export class GameScene extends Phaser.Scene {
     }
     this.drawFog();
     this.drawNebulae();
+    this.drawWormholes();
+    this.drawBulwark();
     this.drawBeacon();
     this.drawDerelicts();
     this.drawMines();
@@ -978,6 +1033,13 @@ export class GameScene extends Phaser.Scene {
     this.drawKeep();
     this.drawMinimap();
     this.drawPicker();
+  }
+
+  /** The minimap shows the fog grid's part that the battlefield covers (a skirmish's map size changes it), stretched over its box. */
+  private fitMinimap() {
+    const cols = Math.ceil(ARENA.w / FOG_CELL);
+    const rows = Math.ceil(ARENA.h / FOG_CELL);
+    this.miniImage.setCrop(0, 0, cols, rows).setScale(MINIMAP.w / cols, MINIMAP.h / rows);
   }
 
   /** Where a view pixel on the minimap is on the battlefield. */
@@ -1019,6 +1081,13 @@ export class GameScene extends Phaser.Scene {
       const q = at(n);
       g.fillRect(q.x - 0.75, q.y - 0.75, 1.5, 1.5);
     }
+    s.wormholes.forEach((w, k) => {
+      g.lineStyle(1.5, WORMHOLE_COLORS[k % WORMHOLE_COLORS.length], 1);
+      for (const m of [w.a, w.b]) {
+        const q = at(m);
+        g.strokeCircle(q.x, q.y, 2.5);
+      }
+    });
     if (s.watch || s.fog.knows(s.beacon)) {
       const q = at(s.beacon);
       g.lineStyle(1, s.beacon.owner >= 0 ? s.sides[s.beacon.owner].def.color : INK.cream, 1);
@@ -1127,6 +1196,48 @@ export class GameScene extends Phaser.Scene {
     for (const n of this.layout.nebulae) dashedCircle(this.underGfx, n.x, n.y, n.r, 40, held ? INK.mustard : INK.cream, held ? 0.5 : 0.14, held ? 2 : 1.5);
   }
 
+  /** While the Warden's shield wall holds, a pale cyan shell round each of the player's warships. */
+  private drawBulwark() {
+    const a = this.state.admiral;
+    if (!a || a.id !== 'warden' || a.activeMs <= 0) return;
+    const g = this.gfx;
+    for (const u of this.state.units) {
+      if (u.faction !== PLAYER || u.type === 'harvester') continue;
+      const r = u.type === 'heavy' ? 24 : 16;
+      g.fillStyle(0x9ff0ff, 0.14);
+      g.fillCircle(u.x, u.y, r);
+      g.lineStyle(2.5, 0x9ff0ff, 0.9);
+      g.strokeCircle(u.x, u.y, r);
+    }
+  }
+
+  /**
+   * The wormholes: each mouth a dark well in its pair's colour with a turning dashed rim (still with
+   * reduced motion), drawn under the fog like the nebulae.
+   */
+  private drawWormholes() {
+    const g = this.underGfx;
+    const turn = settings.reduceMotion ? 0 : this.clock / 900;
+    this.state.wormholes.forEach((w, k) => {
+      const color = WORMHOLE_COLORS[k % WORMHOLE_COLORS.length];
+      for (const m of [w.a, w.b]) {
+        g.fillStyle(0x07030d, 0.85);
+        g.fillCircle(m.x, m.y, WORMHOLE_MOUTH + 6);
+        g.fillStyle(color, 0.22);
+        g.fillCircle(m.x, m.y, WORMHOLE_MOUTH + 14);
+        g.lineStyle(2, color, 0.9);
+        for (let i = 0; i < 6; i++) {
+          const a0 = turn + (i * Math.PI) / 3;
+          g.beginPath();
+          g.arc(m.x, m.y, WORMHOLE_MOUTH + 10, a0, a0 + 0.7);
+          g.strokePath();
+        }
+        g.lineStyle(1.5, color, 0.6);
+        g.strokeCircle(m.x, m.y, WORMHOLE_MOUTH);
+      }
+    });
+  }
+
   /**
    * Derelict stations, once found: a dark steel wheel with a broken rim, a ring in the owner's
    * colour, the claim arc, its sensor reach for the player, and a label with what it gives.
@@ -1228,6 +1339,10 @@ export class GameScene extends Phaser.Scene {
         : deal.step >= CONTRACT_STEPS ? tr('rivalDealsDone') : '');
       if (!r.alive) {
         this.setText(t.status, tr('fallen'));
+        return;
+      }
+      if (s.allyOfPlayer(r.index)) {
+        this.setText(t.status, tr('allyStatus'));
         return;
       }
       const grudge = r.grudge === PLAYER ? tr('grudgeYou') : r.grudge >= 0 ? tr('grudgeAt', { faction: tr(s.sides[r.grudge].def.name) }) : tr('noGrudge');
@@ -1615,7 +1730,13 @@ export class GameScene extends Phaser.Scene {
   /** Each button: a cream pill with the ship or building, its name, role and crystal cost. */
   private drawBar() {
     const g = this.uiGfx;
+    const admiral = this.state.admiral;
+    this.panel.build.setVisible(!admiral);
+    this.captions.forEach((c, i) => {
+      if (BUTTONS[i].key === 'admiral') [c.name, c.cost].forEach((x) => x.setVisible(!!admiral));
+    });
     BUTTONS.forEach((b, i) => {
+      if (b.key === 'admiral' && !admiral) return;
       if (b.kind === 'research') {
         this.drawResearchButton(b, i);
         return;
@@ -1710,6 +1831,10 @@ export class GameScene extends Phaser.Scene {
       this.drawRallyButton(b, i);
       return;
     }
+    if (b.key === 'admiral') {
+      this.drawAdmiralButton(b, i);
+      return;
+    }
     const on = flagship ? flag.state === 'ready' && side.crystal >= flagshipStats(side).cost || flag.state === 'building' : this.selected.size > 0;
     const round = b.h / 2;
     g.fillStyle(0x000000, 0.35);
@@ -1760,11 +1885,42 @@ export class GameScene extends Phaser.Scene {
     caption.name.setColor(this.rallyMode || set ? INK_CSS.chocolate : INK_CSS.cocoa);
   }
 
+  /**
+   * The admiral's pill: the active's name with the rank's stars, mustard while the jump waits for its
+   * tap or Bulwark holds, cream when ready, dim with the seconds left while it cools down.
+   */
+  private drawAdmiralButton(b: Button, i: number) {
+    const a = this.state.admiral!;
+    const g = this.uiGfx;
+    const ready = a.readyMs <= 0;
+    const hot = this.jumpMode || a.activeMs > 0;
+    const round = b.h / 2;
+    g.fillStyle(0x000000, 0.35);
+    g.fillRoundedRect(b.x + 2, b.y + 3, b.w, b.h, round);
+    g.fillStyle(hot ? INK.mustard : ready ? INK.cream : INK.creamDim, 1);
+    g.fillRoundedRect(b.x, b.y, b.w, b.h, round);
+    if (!ready && !hot) {
+      const cd = admiralAt(admiralOf(a.id), a.rank).cooldownMs;
+      g.fillStyle(INK.cream, 1);
+      g.fillRoundedRect(b.x, b.y, Math.max(b.h, b.w * (1 - a.readyMs / cd)), b.h, round);
+    }
+    g.fillStyle(INK.tangerine, 1);
+    g.fillRect(b.x + 4, b.y + 5, 2, b.h - 10);
+    g.lineStyle(1.5, hot ? INK.tangerine : INK.cocoa, 1);
+    g.strokeRoundedRect(b.x, b.y, b.w, b.h, round);
+    const caption = this.captions[i];
+    const name = tr(admiralOf(a.id).active);
+    this.setText(caption.name, this.jumpMode ? tr('jumpTap') : ready || hot ? `${name} · G` : tr('seconds', { n: Math.ceil(a.readyMs / 1000) }));
+    this.setText(caption.cost, '');
+    caption.name.setColor(ready || hot ? INK_CSS.chocolate : INK_CSS.cocoa);
+  }
+
   /** Describes the command button under the pointer: its name, role, cost and stats. */
   private drawTip() {
     const b = this.picking
       ? undefined
-      : BUTTONS.find((btn) => this.pointer.x >= btn.x && this.pointer.x < btn.x + btn.w && this.pointer.y >= btn.y && this.pointer.y < btn.y + btn.h);
+      : BUTTONS.find((btn) => (btn.key !== 'admiral' || this.state.admiral)
+        && this.pointer.x >= btn.x && this.pointer.x < btn.x + btn.w && this.pointer.y >= btn.y && this.pointer.y < btn.y + btn.h);
     if (!b) {
       this.tip.setVisible(false);
       return;
@@ -1774,6 +1930,7 @@ export class GameScene extends Phaser.Scene {
     const lines = b.kind === 'research' ? researchLines(side, b.key as Track)
       : b.key === 'flagship' ? flagshipLines(side)
       : b.key === 'rally' ? rallyLines()
+      : b.key === 'admiral' ? (this.state.admiral ? admiralLines(this.state.admiral.id, this.state.admiral.rank) : [])
       : b.kind === 'command' ? fallBackLines()
       : b.key === 'expansion' ? expansionLines(side)
       : b.kind === 'build' ? buildingLines(side, b.key as Role) : unitLines(side, b.key as UnitId);
@@ -1789,6 +1946,10 @@ export class GameScene extends Phaser.Scene {
     if (b.kind === 'research') return { name: tr(TRACK_DEFS[b.key as Track].name), cost: researchCost(side, b.key as Track) };
     if (b.key === 'flagship') return { name: flagshipStats(side).name, cost: flagshipStats(side).cost };
     if (b.key === 'rally') return { name: tr('rallyName'), cost: 0 };
+    if (b.key === 'admiral') {
+      const a = this.state.admiral;
+      return { name: a ? tr('admiralRanked', { name: tr(admiralOf(a.id).name), rank: a.rank }) : '', cost: 0 };
+    }
     if (b.kind === 'command') return { name: tr('fallBackName'), cost: 0 };
     if (b.kind === 'build') {
       const stats = buildInfo(side, b.key as Build);
@@ -1874,8 +2035,10 @@ export class GameScene extends Phaser.Scene {
     const side = s.sides[PLAYER];
     let line = this.message;
     if (this.picking) {
-      line = this.mode === 'galaxy' ? tr(this.galaxy ? 'hintGalaxy' : 'hintGalaxyStart')
-        : this.mode === 'scenario' ? tr('hintScenario') : this.mode === 'tech' ? tr('hintTech') : tr('hintPick');
+      // A message on the picker (the admiral just picked) shows until the map changes.
+      line = this.message || (this.mode === 'galaxy' ? tr(this.galaxy ? 'hintGalaxy' : 'hintGalaxyStart')
+        : this.mode === 'scenario' ? tr('hintScenario') : this.mode === 'tech' ? tr('hintTech')
+        : this.mode === 'skirmish' ? tr('hintSkirmish') : tr('hintPick'));
     } else if (this.placing === 'expansion') {
       line = tr('hintPlaceOutpost', { name: buildInfo(side, 'expansion').name });
     } else if (this.placing) {
@@ -2101,9 +2264,11 @@ export class GameScene extends Phaser.Scene {
   /** The faction picker: a dark veil over the map, the mode tabs and a cream card for each faction (or the galaxy's map, or the tech tree). */
   private drawPicker() {
     const show = this.picking;
-    const cards = show && (this.mode === 'sectors' || this.mode === 'scenario' || (this.mode === 'galaxy' && !this.galaxy));
+    const cards = show && (this.mode === 'sectors' || this.mode === 'scenario' || this.mode === 'skirmish' || (this.mode === 'galaxy' && !this.galaxy));
     const tabs = show && !watching;
     this.pickTitle.setVisible(show);
+    this.admiralText.setVisible(tabs && this.mode !== 'tech');
+    this.skirmishTexts.forEach((x) => x.setVisible(tabs && this.mode === 'skirmish'));
     this.pickTexts.forEach((t) => {
       t.name.setVisible(cards);
       t.body.setVisible(cards);
@@ -2132,9 +2297,17 @@ export class GameScene extends Phaser.Scene {
       if (this.mode === 'sectors') this.drawSectors();
       else if (this.mode === 'galaxy') this.drawGalaxy();
       else if (this.mode === 'scenario') this.drawScenarios();
+      else if (this.mode === 'skirmish') this.drawSkirmish();
       else this.drawTech();
+      if (this.mode !== 'tech') this.drawAdmiralPill();
     }
-    this.setText(this.pickTitle, tr(this.mode === 'tech' ? 'techHead' : this.mode === 'galaxy' && this.galaxy ? 'galaxyHead' : 'chooseFaction'));
+    const title = tr(this.mode === 'tech' ? 'techHead' : this.mode === 'galaxy' && this.galaxy ? 'galaxyHead' : 'chooseFaction');
+    if (this.pickTitle.text !== title) {
+      // The title shrinks to stay clear of the admiral pill (German runs longer).
+      this.pickTitle.setText(title).setFontSize(20);
+      const room = this.pickTitle.x - (ADMIRAL_PILL.x + ADMIRAL_PILL.w + 10);
+      for (let size = 19; this.pickTitle.width > room && size >= 12; size--) this.pickTitle.setFontSize(size);
+    }
     if (!cards) return;
     for (const c of this.pickCards) {
       const def = FACTIONS[c.faction];
@@ -2188,6 +2361,56 @@ export class GameScene extends Phaser.Scene {
       g.strokeCircle(n.x, n.y, k === this.sector ? n.r + 3 : n.r);
       this.setText(t.names[k], tr('sectorNode', { n: k + 1, name: tr(SECTORS[k].name) }));
       t.names[k].setColor(open ? INK_CSS.cream : INK_CSS.creamDim);
+    });
+  }
+
+  /**
+   * The admiral pill beside the tabs: the admiral picked for the next battle with its rank (cream),
+   * or none (dim). A tap picks the next one.
+   */
+  private drawAdmiralPill() {
+    const g = this.pickGfx;
+    const b = ADMIRAL_PILL;
+    const pick = this.admirals.pick;
+    g.fillStyle(0x000000, 0.35);
+    g.fillRoundedRect(b.x + 2, b.y + 3, b.w, b.h, b.h / 2);
+    g.fillStyle(pick ? INK.cream : INK.creamDim, 1);
+    g.fillRoundedRect(b.x, b.y, b.w, b.h, b.h / 2);
+    g.lineStyle(1.5, pick ? INK.tangerine : INK.cocoa, 1);
+    g.strokeRoundedRect(b.x, b.y, b.w, b.h, b.h / 2);
+    const text = pick ? tr('admiralRanked', { name: tr(admiralOf(pick).name), rank: admiralRank(this.admirals.xp[pick]) }) : tr('admiralNone');
+    if (this.admiralText.text !== text) {
+      this.admiralText.setText(text).setFontSize(11);
+      for (let size = 10; this.admiralText.width > b.w - 12 && size >= 8; size--) this.admiralText.setFontSize(size);
+    }
+  }
+
+  /**
+   * The skirmish on the picker's strip: what the battle will be, and four chips (teams, map size,
+   * starting crystal and wormholes) that a tap steps through.
+   */
+  private drawSkirmish() {
+    const g = this.pickGfx;
+    const t = this.sectorTexts;
+    const sk = this.skirmish;
+    this.drawStrip(true);
+    const st = SECTOR_STRIP;
+    const w = st.w - 300;
+    if (t.body.style.wordWrapWidth !== w) t.body.setWordWrapWidth(w);
+    if (t.kept.style.wordWrapWidth !== w) t.kept.setWordWrapWidth(w);
+    this.setText(t.title, tr('skirmishTitle'));
+    this.setText(t.body, tr(sk.teams === 'teams' ? 'skirmishTeamsText' : 'skirmishFreeText'));
+    this.setText(t.kept, tr('skirmishHow'));
+    const value = (o: SkirmishOption) => o === 'teams' ? tr(sk.teams === 'teams' ? 'optTeams' : 'optFree')
+      : o === 'size' ? tr(sk.size === 'small' ? 'optSmall' : sk.size === 'large' ? 'optLarge' : 'optStandard')
+      : o === 'crystal' ? tr('optCrystal', { n: START_CRYSTALS[sk.crystal] })
+      : tr(sk.wormholes ? 'optWormholes' : 'optNoWormholes');
+    this.skirmishChips.forEach((c, k) => {
+      g.fillStyle(INK.cream, 1);
+      g.fillRoundedRect(c.x, c.y, c.w, c.h, c.h / 2);
+      g.lineStyle(1.5, INK.tangerine, 1);
+      g.strokeRoundedRect(c.x, c.y, c.w, c.h, c.h / 2);
+      this.setText(this.skirmishTexts[k], value(c.option));
     });
   }
 
@@ -2407,12 +2630,31 @@ export class GameScene extends Phaser.Scene {
         if (tab.mode !== this.mode) this.pickMode(tab.mode);
         return;
       }
+      if (this.mode !== 'tech' && inside(ADMIRAL_PILL)) {
+        ui('click');
+        this.admirals = nextAdmiral(this.admirals);
+        saveAdmirals(this.admirals);
+        const pick = this.admirals.pick;
+        this.message = pick ? admiralLines(pick, admiralRank(this.admirals.xp[pick])).join(' ') : tr('admiralNoneText');
+        return;
+      }
       if (this.mode === 'galaxy') return this.tapGalaxy(p, inside);
       if (this.mode === 'tech') return this.tapTech(inside);
       const card = this.pickCards.find(inside);
       if (card) {
         ui('click');
         this.startBattle(card.faction);
+        return;
+      }
+      if (this.mode === 'skirmish') {
+        const chip = this.skirmishChips.find(inside);
+        if (chip) {
+          ui('click');
+          this.skirmish = stepSkirmish(this.skirmish, chip.option);
+          saveSkirmish(this.skirmish);
+          // The map size and the wormholes are the map's, so they make a fresh one.
+          if (chip.option === 'size' || chip.option === 'wormholes') this.makeMap();
+        }
         return;
       }
       if (this.mode === 'scenario') {
@@ -2437,6 +2679,7 @@ export class GameScene extends Phaser.Scene {
     if (pointer.rightButtonDown()) {
       this.placing = null;
       this.rallyMode = false;
+      this.jumpMode = false;
       this.selected.clear();
       this.rivalsOpen = false;
       return;
@@ -2481,7 +2724,7 @@ export class GameScene extends Phaser.Scene {
       if (p.x >= rp.x && p.x < rp.x + rp.w && p.y >= rp.y && p.y < rp.y + h) return;
     }
     if (p.y >= BAR.y) {
-      const b = BUTTONS.find((btn) => p.x >= btn.x && p.x < btn.x + btn.w && p.y >= btn.y && p.y < btn.y + btn.h);
+      const b = BUTTONS.find((btn) => (btn.key !== 'admiral' || this.state.admiral) && p.x >= btn.x && p.x < btn.x + btn.w && p.y >= btn.y && p.y < btn.y + btn.h);
       if (b) this.press(b);
       return;
     }
@@ -2490,6 +2733,16 @@ export class GameScene extends Phaser.Scene {
     const mark = this.edgeMarks.find((m) => Math.hypot(m.x - p.x, m.y - p.y) <= 16);
     if (mark) {
       this.jumpToAlert(mark.alert);
+      return;
+    }
+    if (this.jumpMode) {
+      const at = this.toWorld(p.x, p.y);
+      this.jumpMode = false;
+      const reason = this.state.useAdmiral([...this.selected], at.x, at.y);
+      if (reason) {
+        this.message = reason;
+        ui('refuse');
+      } else sfx('whoosh');
       return;
     }
     if (this.rallyMode) {
@@ -2652,7 +2905,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     const bc = this.state.beacon;
-    const attack = !!hit && hit.faction !== PLAYER;
+    const attack = !!hit && hit.faction !== PLAYER && !this.state.allyOfPlayer(hit.faction);
     sfx(attack ? 'attack' : 'move');
     this.message = attack
       ? tr('attacking')
@@ -2662,8 +2915,28 @@ export class GameScene extends Phaser.Scene {
   /** A press on a command bar button: arm a building, or queue a unit. */
   private press(b: Button) {
     const { name, cost } = this.buttonInfo(b);
+    if (b.key === 'admiral') {
+      const a = this.state.admiral;
+      if (!a) return;
+      if (a.id === 'navigator' && (this.jumpMode || a.readyMs <= 0)) {
+        // The jump waits for a tap on the map; pressing again calls it off.
+        this.jumpMode = !this.jumpMode;
+        this.rallyMode = false;
+        this.placing = null;
+        if (this.jumpMode) this.message = this.selected.size ? tr('jumpHow') : tr('jumpNoShips');
+        ui('click');
+        return;
+      }
+      const reason = this.state.useAdmiral();
+      if (reason) {
+        this.message = reason;
+        ui('refuse');
+      } else if (a.id === 'warden') sfx('upgrade');
+      return;
+    }
     if (b.key === 'rally') {
       this.rallyMode = !this.rallyMode;
+      this.jumpMode = false;
       this.placing = null;
       if (this.rallyMode) this.message = tr('rallyHow');
       ui('click');
