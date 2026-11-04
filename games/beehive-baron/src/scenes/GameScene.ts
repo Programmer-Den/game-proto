@@ -756,8 +756,8 @@ export class GameScene extends Phaser.Scene {
     if (!this.hushed) this.playEvents(events);
     this.hushed = false;
     for (const e of events) {
-      // A cell's flourish shows only on its own comb; a hive in the background caps and hatches unseen.
-      const cellEvent = e.kind === 'built' || e.kind === 'capped' || e.kind === 'harvested' || e.kind === 'hatched';
+      // A cell's flourish shows only on its own comb; a hive in the background caps, hatches and is robbed unseen.
+      const cellEvent = e.kind === 'built' || e.kind === 'capped' || e.kind === 'harvested' || e.kind === 'hatched' || e.kind === 'stolen';
       if (cellEvent && hiveOf(e.slot) !== this.hive) continue;
       if (e.kind === 'built' || e.kind === 'capped') {
         const c = cellCentre(e.slot);
@@ -786,6 +786,7 @@ export class GameScene extends Phaser.Scene {
         this.float(c.x, c.y - 10, t('stolen'), '#ffc890', 14, 1600);
       } else if (e.kind === 'swatted' || e.kind === 'guarded') {
         const w = this.state.wasps.find((w) => w.id === e.id);
+        if (w && hiveOf(w.slot) !== this.hive) continue;
         const at = w ? this.waspSpot(w) : { x: HIVE.x + HIVE.w / 2, y: HIVE.y + 70 };
         this.float(at.x, at.y - 18, t(e.kind === 'swatted' ? 'swat' : 'chasedOff'), '#ffffff', 14);
       } else if (e.kind === 'order') {

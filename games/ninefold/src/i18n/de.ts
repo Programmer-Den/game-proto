@@ -60,7 +60,7 @@ const de: Translation<typeof en> = {
   glassName: 'Buntglas',
   glassGoal: 'Schalte alle Stile davor frei',
   almanacName: 'Almanach',
-  almanacGoal: 'Stemple jeden Tag eines Monats im Kalender',
+  almanacGoal: 'Stemple jeden Tag eines Monats',
   // Board
   menu: 'Menü',
   floor: 'Ebene {n} · {size}×{size}',
