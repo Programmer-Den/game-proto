@@ -9,7 +9,8 @@ import Phaser from 'phaser';
 import { HEROES, HERO_IDS, isKnight, schemeOf, type HeroId, type HeroScheme } from '../game/heroes';
 import { C, beam, glow, outline, paint, shade, shape, type Ctx } from './glow';
 import { drawKnight } from './knights';
-import { drawSquadHero, rebel } from './squad';
+import { bot, drawSquadHero, rebel } from './squad';
+import { MASTERY_COLOURS } from '../game/mastery';
 
 /** How big a hero is drawn in play (their art is laid out at 1 for the portraits). */
 export const HERO_SCALE = 0.46;
@@ -107,6 +108,31 @@ export function drawHero(ctx: Ctx, id: HeroId, x: number, y: number, z: number, 
 /** The texture key of a hero's in-play sprite (in scheme `variant`) and portrait. */
 export const heroKey = (id: HeroId, variant = 0) => (variant ? `rb-hero-${id}-${variant}` : `rb-hero-${id}`);
 export const portraitKey = (id: HeroId) => `rb-portrait-${id}`;
+
+/** The texture keys of a hero (and Triad-77's bots) in its mastery colours, and its portrait. */
+export const masteryKey = (id: HeroId) => `rb-hero-${id}-mastery`;
+export const masteryPortraitKey = (id: HeroId) => `rb-portrait-${id}-mastery`;
+export const MASTERY_BOT = 'rb-bot-mastery';
+
+/** A hero's mastery colours as a scheme (its bolts keep their colour). */
+export const masteryScheme = (id: HeroId): HeroScheme => ({ name: 'Mastery', ...MASTERY_COLOURS[id], bolt: schemeOf(id).bolt });
+
+/**
+ * Paints a hero in its mastery colours, the first time they are shown (not at boot: Phaser draws
+ * on Math.random for every texture's id, and a fresh save's seeded first minute must stay as it was).
+ */
+export function bakeMastery(scene: Phaser.Scene, id: HeroId) {
+  if (scene.textures.exists(masteryKey(id))) return;
+  const sch = masteryScheme(id);
+  bakeHero(scene, masteryKey(id), id, HERO_SCALE, HERO_BOX, false, sch);
+  bakeHero(scene, masteryPortraitKey(id), id, 1, PORTRAIT_BOX, true, sch);
+  if (id === 'triad') {
+    paint(scene, MASTERY_BOT, 34, 40, (ctx) => {
+      ctx.scale(0.5, 0.5);
+      bot(ctx, 30, 44, 0.5, sch);
+    });
+  }
+}
 
 function bakeHero(scene: Phaser.Scene, key: string, id: HeroId, scale: number, box: typeof HERO_BOX, bolts: boolean, sch = schemeOf(id)) {
   paint(scene, key, box.w * scale, box.h * scale, (ctx) => {

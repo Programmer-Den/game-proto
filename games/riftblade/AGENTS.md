@@ -7,9 +7,9 @@ as any change to the game.
 ## Current state
 
 A survivor-style auto-attack roguelike, landscape 960x540. A run is the Rift Crusade: four jumps
-of five minutes each, every one ending in its boss: the Dune world, then one of Swamp, Spore and
-Scrap, then one of Ice, Crystal and Storm (each picked on the space map), then the Lava world, with
-a star map between them.
+of five minutes each, every one ending in its boss: the Dune world, then one of Swamp, Spore, Scrap and
+Ocean, then one of Ice, Crystal, Storm and Ruin (each picked on the space map), then the Lava
+world, with a star map between them. A boss rush and hero mastery come on top.
 
 - Implemented: a hero select screen with twelve heroes in a 6x2 grid and a detail panel with a
   Fight button: three soldiers (Captain Rook, Legionary TR-9, Corporal Bram-17), seven blade
@@ -33,7 +33,7 @@ a star map between them.
   screen's edge and two HUD lines under the clock; rewards are credits, a level or a free card.
   None in the arena; the boss calls one off. Power-ups (bomb, magnet, lure, overdrive, shield,
   freeze, credit cache) drop from foes after a world's first minute.
-- Eight factions. The first four: Scrap bots (Clankers, Rollerbombs; the Grinder Crawler), wild beasts (mire rat
+- Ten factions. The first four: Scrap bots (Clankers, Rollerbombs; the Grinder Crawler), wild beasts (mire rat
   packs, spitter toads with slowing globs; the Bog Mother with globs, young and bog pools), the
   Iron Dominion (line trooper squads firing volleys, walker gunners; the Siege Walker with volleys,
   artillery barrages behind ground warnings and stomps) and the Hollow cult (ash acolytes that
@@ -46,9 +46,22 @@ a star map between them.
   (shardlings that burst into splinters, prisms firing lances; the Prism Colossus fights like the
   Siege Walker) and the Stormcallers (weaving wisps, conductors calling lightning on the hero,
   lightning strikes; the Storm Herald fights like the Hollow Champion with sparks). Each later boss
-  is its own `BossId` with `mech` (whose attacks), `power` (its shots' strength) and `adds`.
+  is its own `BossId` with `mech` (whose attacks), `power` (its shots' strength), `adds` and
+  `bolt` (its shells' look). The Ocean and Ruin worlds (`art/realms.ts`): the Tidebound (crabs in
+  packs of three moving in bursts with sideways steps, squids firing fans of ink that slow (`SQUID`);
+  the Deep Kraken fights like the Grinder Crawler with ink and crabs) and the Stone Watch (shades
+  in groups of three that pass through pillars, sentinels that arm and slam the ground around them
+  (`SENTINEL`, a `stomp` hazard); the Stone Warden fights like the Siege Walker without the
+  splinters, which only the Prism Colossus fires). Each world has its own hazard: on the Ocean world
+  the tide (`TIDE`, `tides` in `sim.ts`, `state.tide` and `nextTide`) floods half the field every
+  minute from 0:40, after a warning: a half-plane through the hero at a random angle, `underTide`;
+  the hero wades at `1 - TIDE.slow`, crabs and squids surf at `TIDE.foeSpeed` (not the boss), and a
+  `siren` plays. On the Ruin world pillars (`PILLAR`, `ruins`, `state.pillars`, scheduled on
+  `nextVent`) fall near the hero after a marked line, hurt the hero and the foes under them, block
+  the way for `lifeMs` (the hero and every foe but shades are pushed out with `pushOut`, a boss
+  smashes them) and play `warn` then `stomp`.
 - Between planets: collecting what is left, credits, the space map (the next planet, from the
-  next stage's three; the Lava world last), the star map with 2-3 nodes (trader, elite
+  next stage's four; the Lava world last), the star map with 2-3 nodes (trader, elite
   arena, rest, event; four events), free arena picks, the escort bot. The hero, level, kit and
   allies carry over; the clock resets per planet. Victory after the Lava boss; the end screen
   names the planet reached. Saved longest run, wins, best rift heat and furthest jump per hero, the heroes
@@ -111,7 +124,7 @@ a star map between them.
   `won` false and nothing banked, then `recordEndless` keeps the best in `progress.endless` and
   banks `ENDLESS_SALVAGE` per world cleared. The HUD tag adds "rift loop n"; `nextStage` and the
   space map's `route` (the last `stage + 1` planets) keep the maps right on later loops.
-- The codex (`codex.ts`): `CODEX_PAGES` (foes 16, bosses 8, pool skills 30, gear 12, hero paths 48,
+- The codex (`codex.ts`): `CODEX_PAGES` (foes 20, bosses 10, pool skills 30, gear 12, hero paths 48,
   each with its pay) of entries `foe:<kind>`, `boss:<id>` and `card:<upgrade id>`.
   `GameScene.recordCodex` runs every frame of a run: `codexNew` lists what the state shows that
   `codexKnown` (the save's entries) lacks (foes and the boss on the field, the cards on offer and
@@ -128,6 +141,26 @@ a star map between them.
   `heat3` and `heat5` (best heat won), `armouryFull` (every rank bought) and `allHeroes` (all twelve
   open, hidden). The playthrough's first minute earns none. There are ten, the most a game may
   have, so the daily, the endless rift and the codex brought none.
+- Hero mastery (`mastery.ts`): every run gives its hero mastery XP (`masteryXp`: `perBoss` a
+  boss beaten, `perKills` per 100 kills, `win` for a won crusade; the endless rift counts its bosses,
+  a rush and a daily's win bonus give none), kept in `progress.mastery` (`recordRun`'s last
+  argument) and shown on the end screen (`masteryLines`) and, once above 0, on the hero's detail
+  panel as a level row (`MASTERY_ROW`). Levels (`MASTERY.levels`, 5 at most): 2 the mastery colours
+  (`MASTERY_COLOURS`, baked lazily by `bakeMastery` into `masteryKey` / `masteryPortraitKey`; the
+  row's `colour` spot toggles them, `progress.plain` lists heroes that wear their usual ones,
+  `state.colour` holds the run's choice, Triad-77's bots use `MASTERY_BOT`), 3 a second starting
+  weapon (`MASTERY_WEAPON`, given in `startRun` when `canOffer` allows), 4 8% more health and 5 8%
+  more damage (`statsOf`, from `state.mastery`). Weekly and daily runs take the colours only.
+- The boss rush (`rush.ts`, `startRush` and `rushLand` in `voyage.ts`): once two bosses are in the
+  codex, a Rush button (`RUSH_BUTTON`, beside a shorter Fight at `FIGHT_SHORT`) opens `rushPanel`
+  (`GameScene.rushOpen`). It fights the boss of every planet whose boss the codex has seen
+  (`rushPlanets`, in stage order) back to back with a set kit: level `RUSH.level`, every path at
+  tier `RUSH.tiers`, the drill at `RUSH.drill`, full health. Each boss lands at once with half its
+  health (`RUSH.bossHp`) and nothing else spawns but its adds; no elites, objectives, XP or deeds.
+  Between bosses `afterClear` heals `RUSH.heal` and lands the next (`state.rushQueue`,
+  `rushBeaten`, `rushTotal`, `rush`). The HUD shows the run's time. At its end `recordRush` keeps
+  the best in `progress.rush` (`beatsRush`: more bosses, then a faster time); nothing is banked, and
+  no endless rift.
 - Sound effects and music (see Sound below).
 - Not built yet: Watch AI.
 - No TODOs or FIXMEs in the code.
@@ -262,14 +295,17 @@ a star map between them.
   `nest`, `cache`, `monolith`: `StructureKind`, `isStructure`) are foes that `moveEnemies` pins
   in place (`aimX`/`aimY`), `knock` skips and `kill` breaks without a kill, shard or drop;
   frozen troopers thawed become `thawed` allies (40 s, short-lived).
+- `src/game/mastery.ts`: `MASTERY`, `MAX_MASTERY`, `masteryLevel`, `masteryNext`, `masteryXp`,
+  `MASTERY_WEAPON`, `MASTERY_REWARDS` (the level lines' text keys) and `MASTERY_COLOURS`.
+- `src/game/rush.ts`: `RUSH`, `rushPlanets(seen)`, `RushRecord` and `beatsRush`.
 - `src/game/voyage.ts`: between fights. `frame` (tick, then `afterClear` and `nextPlanet` for the
   passing phases), `afterClear` (collect, credits, arena reward, the space map or victory),
   `chartOptions` and `chooseWorld` (the space map: sets `state.next` and rolls the nodes), `rollNodes`,
-  `chooseNode`, `enterEndless`, `loopBack` and `nextStage` (the endless rift), the trader (`priceOf`, `buy`, `reroll`, `leave`), the arena (`startArena`),
+  `chooseNode`, `startRush` and `rushLand` (the boss rush), `enterEndless`, `loopBack` and `nextStage` (the endless rift), the trader (`priceOf`, `buy`, `reroll`, `leave`), the arena (`startArena`),
   events (`rollEvent`, `chooseEvent`) and `nextPlanet` (to `state.next`, `stage` + 1, onto
   `state.route`).
 - `src/game/save.ts`: `SAVE_KEY`, `loadProgress`, `saveProgress`, `recordRun`, `recordCharted`, `recordUnlocks`,
-  `buyArmoury`, `recordWeekly`, `recordEndless`, `bankCredits`, `recordCodex`, `isUnlocked` ((TR-9, a deed done, a hero the save shows as played, or the old world deeds) and
+  `buyArmoury`, `recordWeekly`, `recordEndless`, `recordRush`, `togglePlain`, `bankCredits`, `recordCodex`, `isUnlocked` ((TR-9, a deed done, a hero the save shows as played, or the old world deeds) and
   `unlockedHeroes`; the run under way: `RUN_KEY`, `isResumable`, `saveRun`, `loadRun` and
   `clearRun`.
 - `src/audio/music.ts`: the songs (`PLANET_SONGS`, `MENU_SONG`, `STINGS`); `src/audio/sfx.ts`: the
@@ -287,6 +323,9 @@ a star map between them.
   each with `-elite`), bosses (`rb-boss-sporequeen`, `-scrapking`, `-colossus`, `-stormherald`) and
   bolts (`rb-bolt-spore`, `rb-bolt-splinter`). `GameScene.draw` calls it the first time a run gets
   past the Dune world (the space map or another planet), not at boot (see Gotchas).
+- `src/art/realms.ts`: `bakeRealms` paints the Ocean and Ruin worlds' foes (`rb-crab`, `rb-squid`,
+  `rb-shade`, `rb-sentinel`, each with `-elite`), bosses (`rb-boss-kraken`, `rb-boss-warden`) and
+  `rb-bolt-ink`, called beside `bakeWorlds`.
 - `src/art/sprites.ts`: `bakeSprites` paints the first textures (keys start `rb-`): the heroes
   (`heroKey`, `portraitKey`, drawn by `drawHero` from the scheme), `rb-trooper`, `rb-brother`,
   `rb-legionary` (TR-9's Drop Squad troopers), `rb-commando`, `rb-medic` (Elara's rebels, drawn by
@@ -403,8 +442,8 @@ The foes and Triad-77's units are called bots everywhere (texts, ids, textures s
 saves load unchanged.
 
 - `riftblade-progress`: `{ bestMs, wins: { [heroId]: count }, heat: { [heroId]: best heat won 0-5 }, bank: credits, armoury: { [ArmouryId]: rank }, weekly: { week, best, won } | null, endless: best worlds cleared, codex: { seen: entry ids, paid: page ids }, furthest: { [heroId]: jump 1-4 },
-  unlocked: HeroId[], charted: PlanetId[] }`. `bestMs` is the whole run's time (`runMs`). Older saves without
-  `furthest` load with `{}`, without `bank` or `armoury` with 0 and `{}` (unknown pieces dropped), without `weekly` with null, without `endless` with 0, without `codex` with nothing seen (unknown entries and pages dropped), without `heat` with heat 0 for every hero with a win, without `unlocked` or `charted` with `[]`; unknown ids are dropped, and
+  unlocked: HeroId[], charted: PlanetId[], mastery: { [heroId]: XP }, plain: HeroId[] (heroes in their usual colours), rush: { bosses, ms } | null }`. `bestMs` is the whole run's time (`runMs`). Older saves without
+  `furthest` load with `{}`, without `bank` or `armoury` with 0 and `{}` (unknown pieces dropped), without `weekly` with null, without `endless` with 0, without `codex` with nothing seen (unknown entries and pages dropped), without `heat` with heat 0 for every hero with a win, without `unlocked` or `charted` with `[]`, without `mastery`, `plain` or `rush` with `{}`, `[]` and null; unknown ids are dropped, and
   so are `wins` and `furthest` values that are not finite numbers.
   `charted` gets a planet the first frame a run is on it (`recordCharted` in `GameScene.update`) and
   the route at the run's end (`recordRun`). A hero with a
@@ -417,7 +456,7 @@ saves load unchanged.
   code moves only `riftblade-progress` and the trophies; files carry it), the whole `GameState` as JSON (it is plain data; `Infinity`,
   as in `nextElite` and `objectiveAt`, is stored as the text `"Infinity"`). `loadRun` lays it over
   `freshState()` (and the hero over `freshHero()`), so fields added since take their fresh values;
-  one with an unknown hero, a phase it can't resume in, a `daily`, `endless`, `loop`, `endlessCleared` or `seed` of the wrong kind, an unknown planet or `next`, a `stage`
+  one with an unknown hero, a phase it can't resume in, a `daily`, `endless`, `loop`, `endlessCleared`, `seed`, `rush`, `rushQueue`, `mastery`, `colour`, `tide` or `pillars` of the wrong kind, an unknown planet or `next`, a `stage`
   outside the crusade, unknown `nodes`, `offers` or `choices`, a malformed `event`, or a list field of the state or
   hero (`enemies`, `bullets`, `dashHit`, ...) that is not an array is dropped (an `rng` that is not a
   generator position becomes -1). Keep
@@ -445,8 +484,8 @@ Enemy bolts, blasts and hazards play only on screen. The scene plays the input s
 **Music** (`music.ts`): one song per planet, Dune in D minor (152 BPM), Swamp in E minor swung
 (150, three steps a beat, via `swing`), Ice in B minor sparse (156), Lava in C minor heavy
 (160), Spore in A minor drifting (132, triangle lead), Scrap in G minor clanking (168), Crystal in
-F# minor with chiming arpeggios (144, sine lead) and Storm in E minor driving (172, sawtooth
-lead). Each has its own `calm` part, and `tense`, `boss` and `pad` written once in D minor and moved
+F# minor with chiming arpeggios (144, sine lead) Storm in E minor driving (172, sawtooth
+lead), Ocean in G minor swung (three steps a beat) and Ruin in D Phrygian (112). Each has its own `calm` part, and `tense`, `boss` and `pad` written once in D minor and moved
 into its key (`transpose`). `MENU_SONG` (90 BPM) has `select`, `map` and `shop`. `SoundCues.pickMusic`:
 hero select `select`; a fight `calm`, `tense` for 25 s after a ring wave (ended by a new planet) and in the elite arena,
 `boss` while a boss lives; level-up cards mid-fight `pad`, between planets `map`; star map and
@@ -472,9 +511,10 @@ the arena is won), `unlock` (a new hero), `win`, `lose`.
   `ui('coin')` for credits gained.
 - `levelUp` (into the cards), `card` (a pick), `capstone`, `crossover`.
 - `eliteHorn`, `siren` (ring wave), hazards `warn` (vent, shell, lightning strike), `stomp`, `fireRing`
-  (also the Storm Herald's sparks), `glob` (bog pool, toad globs and spore puffs; a sporeling's
+  (also the Storm Herald's sparks), `glob` (bog pool, toad globs, spore puffs and ink; a sporeling's
   cloud is silent), `enemyShot`, `enemyVolley` (volley, slug and splinter bolts), `bossStab`,
-  `bossDown`.
+  `bossDown`. On the Ruin world a new pillar plays `warn` and its landing `stomp`; the tide
+  coming in plays `siren`.
 - Between fights: `node` (space map and star map), `ui('coin')` / `ui('refuse')` (trader buy), `reroll` /
   `ui('refuse')`, `event`, `warp` (on to a new planet or the arena), `ui('click')` for the hero
   cards, Fight, Leave, Continue and Run again, `ui('refuse')` for a locked hero.
@@ -493,13 +533,13 @@ free of audio) or from the scene's input handler.
   banked), `weekly` the Weekly run button (once a run has ended); in the Armoury (`.armouryOpen`)
   the spots are the `ArmouryId`s and `back`, in the weekly panel (`.weeklyOpen`) `start` and
   `back`, in the daily panel (`.dailyOpen`) `start` and `back`, in the codex (`.codexOpen`)
-  `page-<CodexPageId>` and `back`; `daily` and `codex` are the select screen's buttons and `endless`
+  `page-<CodexPageId>` and `back`, in the boss rush panel (`.rushOpen`) `start` and `back`; `rush` (once two bosses are met) and `colour` (mastery level 2) are select-screen spots, as are `daily` and `codex` are the select screen's buttons and `endless`
   the won end screen's. `state.week` and `state.mutators` are the weekly run's, `state.daily` and
   `state.seed` the daily's, `state.endless`, `state.loop` and `state.endlessCleared` the endless rift's. `.chosen` is the hero picked on the select screen
   (TR-9 at first), `.unlocking` the heroes waiting to be shown. `state.heat` is the run's heat.
 - The hero is always at `CENTER` (480, 270 at 960x540: the middle of the view) on screen;
   `SIG_BUTTON` is at (890, 470) at 960x540, 70 px in from the bottom right corner.
-- The Heat row and the Armoury, Codex, Daily and Weekly run buttons, like every new select-screen element, only shows once a hero has won: a Phaser
+- The Heat row, the mastery row, the Rush button and the Armoury, Codex, Daily and Weekly run buttons, like every new select-screen element, only shows once a hero has won: a Phaser
   text made at boot shifts the seeded sequence (see Gotchas), so a fresh save's select screen
   must make the same texts as before (a fresh save has no wins, nothing banked, nothing in the
   codex and no run ended). The codex records during the playthrough's run (no `rand` draws), so a
@@ -583,7 +623,7 @@ free of audio) or from the scene's input handler.
 - **A new event**: add its id to `EventId`, its title, text and options (as `TextKey`s, with the
   texts in `i18n/`) in `rollEvent` and its effect in `chooseEvent` (voyage.ts).
 - **A new planet or boss**: add a `PlanetId` and a `PLANETS` row at the end (with its `stage`; the
-  space map lays each stage out as a column of up to three), a `BossId` in `BOSSES` (a `mech` to
+  space map lays each stage out as a column of up to four, `CHART4` packing a fourth), a `BossId` in `BOSSES` (a `mech` to
   reuse an attack set in `bossAttacks`, or a new one) and texture `rb-boss-<id>`, its ground cell
   in `GameScene.drawGround`, its song in `PLANET_SONGS`, its world objective in
   `WORLD_OBJECTIVES`, its texts (name, faction, foes, elite, hint, the boss's name, bar and
@@ -642,8 +682,8 @@ mostly on the Dune world. Things learned while tuning:
   Phaser text makes a texture too, and one more at boot shifted the playthrough's seeded minute.
 - Phaser draws on `Math.random` for the id of every texture it makes, so baking more textures at
   boot shifts the seeded sequence the playthrough's run starts with (Rook's run then sees other
-  bots and cards; the rules are unchanged). That is why `bakeWorlds` waits until a run leaves the
-  Dune world. Adding upgrades to a pool TR-9 draws from shifts his card rolls the same way; the
+  bots and cards; the rules are unchanged). That is why `bakeWorlds` and `bakeRealms` wait until a run leaves the
+  Dune world (or a rush starts), and `bakeMastery` until a hero in mastery colours is shown. Adding upgrades to a pool TR-9 draws from shifts his card rolls the same way; the
   first minute then plays out differently and the playthrough needs a rerun.
 - The playthrough's animation frames sit on a fixed grid of 64 ms (the fake clock's timers can fire
   late on a busy machine), so each step is the same length.

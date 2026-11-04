@@ -3,7 +3,7 @@ import { byLanguage } from '../../../shared/i18n';
 
 /** British English, which US English shares: nothing in it is spelled differently. */
 const en: HowToPlay = {
-  goal: 'Fight across four worlds: from the Dune world, choose your way on the space map through two of six more, to the Lava world. Survive five minutes on each, then beat its boss. Beat the Hollow Champion on the Lava world to win. The run ends when your health runs out.',
+  goal: 'Fight across four worlds: from the Dune world, choose your way on the space map through two of eight more, to the Lava world. Survive five minutes on each, then beat its boss. Beat the Hollow Champion on the Lava world to win. The run ends when your health runs out.',
   controls: [
     { input: 'WASD / arrow keys, or hold the mouse on the field', action: 'Walk (toward where you hold)' },
     { input: 'Touch: put a finger down anywhere and drag', action: 'A steering stick appears under it; walk the way you drag' },
@@ -17,6 +17,8 @@ const en: HowToPlay = {
     { input: 'Daily run (top right), then Start or Enter', action: 'Play today\'s seeded three-world run, once a day' },
     { input: 'Codex (top left), then a page or 1-5', action: 'See the foes, bosses and cards met so far; Back or Enter returns' },
     { input: 'Endless rift, or Space, after a win', action: 'Go on through the worlds again, tougher each loop' },
+    { input: 'Boss rush (beside Fight), then Start or Enter', action: 'Fight every boss met so far back to back with a set kit, for a best time' },
+    { input: 'The colours button on the mastery row', action: 'Switch the hero between its mastery colours and its usual ones' },
     { input: 'Continue, Enter or Space', action: 'Go on after a new hero is unlocked' },
     { input: '4 / Enter at the trader', action: 'Reroll the offers / leave' },
   ],
@@ -44,11 +46,14 @@ const en: HowToPlay = {
     'Each day has its own daily run: three worlds with a set hero and one mutator, the same for everyone, one try a day. It scores 1000 per boss and 1 per kill, and a win banks 40 credits.',
     'After a won crusade, the endless rift takes you back to the Dune world with your kit: each loop the foes are tougher. It scores the worlds you clear.',
     'Every foe, boss and card you meet goes into the codex. Fill a page for credits in the Armoury\'s bank.',
+    'On the Ocean world the tide floods half the field every minute: it slows you and speeds up the crabs and squids, so make for the dry side when the siren sounds. On the Ruin world pillars topple near you: step off their shadow, then use the fallen columns as walls (shades drift through them).',
+    'Every run gives its hero mastery XP for the bosses beaten, the kills and a win. Mastery 2 opens the hero\'s mastery colours, 3 a second starting weapon, 4 and 5 a little more health and damage in every run.',
+    'Once you have met two bosses, Boss rush opens beside Fight: every boss met so far, one after the other, at level 12 with each path at tier 3, no level-ups and a little healing between them.',
   ],
 };
 
 const de: HowToPlay = {
-  goal: 'Kämpfe dich durch vier Welten: von der Wüstenwelt wählst du auf der Raumkarte deinen Weg durch zwei von sechs weiteren bis zur Lavawelt. Überlebe auf jeder fünf Minuten und besiege dann ihren Boss. Besiege den Hohlen Champion auf der Lavawelt, um zu gewinnen. Der Lauf endet, wenn deine Gesundheit aufgebraucht ist.',
+  goal: 'Kämpfe dich durch vier Welten: von der Wüstenwelt wählst du auf der Raumkarte deinen Weg durch zwei von acht weiteren bis zur Lavawelt. Überlebe auf jeder fünf Minuten und besiege dann ihren Boss. Besiege den Hohlen Champion auf der Lavawelt, um zu gewinnen. Der Lauf endet, wenn deine Gesundheit aufgebraucht ist.',
   controls: [
     { input: 'WASD / Pfeiltasten, oder die Maus auf dem Feld halten', action: 'Laufen (dorthin, wo du hältst)' },
     { input: 'Touch: einen Finger irgendwo aufsetzen und ziehen', action: 'Darunter erscheint ein Steuerknüppel; lauf in die Richtung, in die du ziehst' },
@@ -62,6 +67,8 @@ const de: HowToPlay = {
     { input: 'Tageslauf (oben rechts), dann Los oder Enter', action: 'Den Lauf des Tages über drei Welten spielen, einmal am Tag' },
     { input: 'Kodex (oben links), dann eine Seite oder 1-5', action: 'Die bisher getroffenen Gegner, Bosse und Karten ansehen; Zurück oder Enter kehrt zurück' },
     { input: 'Endloser Riss, oder Leertaste, nach einem Sieg', action: 'Noch einmal durch die Welten, mit jeder Runde härter' },
+    { input: 'Boss-Ansturm (neben Kämpfen), dann Los oder Enter', action: 'Jeden bisher getroffenen Boss nacheinander mit fester Ausrüstung bekämpfen, auf Bestzeit' },
+    { input: 'Der Farbknopf in der Meisterschaftszeile', action: 'Den Helden zwischen Meisterfarben und üblichen Farben umschalten' },
     { input: 'Weiter, Enter oder Leertaste', action: 'Nach einem neu freigeschalteten Helden weitermachen' },
     { input: '4 / Enter beim Händler', action: 'Angebote neu würfeln / gehen' },
   ],
@@ -89,6 +96,9 @@ const de: HowToPlay = {
     'Jeder Tag hat seinen eigenen Tageslauf: drei Welten mit festem Helden und einem Mutator, für alle gleich, ein Versuch am Tag. Er zählt 1000 Punkte je Boss und 1 je Abschuss, und ein Sieg lagert 40 Credits ein.',
     'Nach einem gewonnenen Kreuzzug führt dich der endlose Riss mit deiner Ausrüstung zurück zur Wüstenwelt: mit jeder Runde werden die Gegner zäher. Gezählt werden die geschafften Welten.',
     'Jeder Gegner, Boss und jede Karte, die dir begegnet, kommt in den Kodex. Füll eine Seite für Credits in der Kasse der Waffenkammer.',
+    'Auf der Ozeanwelt überspült die Flut jede Minute das halbe Feld: sie bremst dich und macht Krabben und Kalmare schneller, also lauf aufs Trockene, wenn die Sirene ertönt. Auf der Ruinenwelt stürzen Säulen in deiner Nähe: tritt aus ihrem Schatten und nutze die liegenden Säulen dann als Mauern (Schatten gleiten hindurch).',
+    'Jeder Lauf gibt seinem Helden Meisterschafts-EP für besiegte Bosse, Abschüsse und einen Sieg. Meisterschaft 2 öffnet die Meisterfarben des Helden, 3 eine zweite Startwaffe, 4 und 5 etwas mehr Leben und Schaden in jedem Lauf.',
+    'Sobald du zwei Bossen begegnet bist, öffnet sich neben Kämpfen der Boss-Ansturm: jeder bisher getroffene Boss nacheinander, auf Stufe 12 mit jedem Pfad auf Rang 3, ohne Aufstieg und mit etwas Heilung zwischen ihnen.',
   ],
 };
 

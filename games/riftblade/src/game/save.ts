@@ -7,6 +7,7 @@ import { MAX_HEAT } from './heat';
 import { ARMOURY_IDS, nextPrice, type ArmouryId } from './armoury';
 import { MUTATOR_IDS, WEEKLY_BONUS, weekSeed } from './weekly';
 import { CODEX_ENTRIES, CODEX_PAGES, pageDone, type CodexPageId } from './codex';
+import { beatsRush, type RushRecord } from './rush';
 
 export const SAVE_KEY = 'riftblade-progress';
 /** The run under way, so closing the game mid-run and opening it again carries on with it. */
@@ -37,6 +38,11 @@ export interface Progress {
   endless: number;
   /** The codex: every foe, boss and card seen (`codex.ts` ids), and the full pages already paid for. */
   codex: { seen: string[]; paid: CodexPageId[] };
+  /** Mastery XP by hero (see `mastery.ts`), and the heroes set to their usual colours rather than their mastery ones. */
+  mastery: Partial<Record<HeroId, number>>;
+  plain: HeroId[];
+  /** The best boss rush: the most bosses beaten in one and the fastest time for that many (null before any). */
+  rush: RushRecord | null;
 }
 
 /** A saved count per hero, keeping only known heroes with a finite number. */
@@ -83,9 +89,18 @@ export function loadProgress(): Progress {
       },
       unlocked: Array.isArray(saved.unlocked) ? saved.unlocked.filter((id: unknown) => HERO_IDS.includes(id as HeroId)) : [],
       charted: Array.isArray(saved.charted) ? saved.charted.filter((id: unknown) => typeof id === 'string') : [],
+      mastery: Object.fromEntries(Object.entries(perHero(saved.mastery)).filter(([, n]) => n! > 0).map(([id, n]) => [id, Math.floor(n!)])),
+      plain: Array.isArray(saved.plain) ? saved.plain.filter((id: unknown) => HERO_IDS.includes(id as HeroId)) : [],
+      rush:
+        typeof saved.rush === 'object' && saved.rush && Number.isInteger(saved.rush.bosses) && saved.rush.bosses > 0 && typeof saved.rush.ms === 'number' && Number.isFinite(saved.rush.ms)
+          ? { bosses: saved.rush.bosses, ms: saved.rush.ms }
+          : null,
     };
   } catch {
-    return { bestMs: 0, wins: {}, heat: {}, bank: 0, armoury: {}, weekly: null, endless: 0, codex: { seen: [], paid: [] }, furthest: {}, unlocked: [], charted: [] };
+    return {
+      bestMs: 0, wins: {}, heat: {}, bank: 0, armoury: {}, weekly: null, endless: 0, codex: { seen: [], paid: [] }, furthest: {}, unlocked: [], charted: [],
+      mastery: {}, plain: [], rush: null,
+    };
   }
 }
 
@@ -99,12 +114,13 @@ export function saveProgress(progress: Progress) {
 
 /**
  * Records a finished run (`stage` is the jump reached, 1 to 4, `route` the planets landed on,
- * `heat` its rift heat, `banked` the credits it adds to the Armoury's bank) and returns the
- * updated progress.
+ * `heat` its rift heat, `banked` the credits it adds to the Armoury's bank, `xp` the hero's
+ * mastery XP) and returns the updated progress.
  */
-export function recordRun(hero: HeroId, ms: number, won: boolean, stage: number, route: readonly string[] = [], heat = 0, banked = 0): Progress {
+export function recordRun(hero: HeroId, ms: number, won: boolean, stage: number, route: readonly string[] = [], heat = 0, banked = 0, xp = 0): Progress {
   const progress = loadProgress();
   progress.bank += banked;
+  if (xp > 0) progress.mastery[hero] = (progress.mastery[hero] ?? 0) + xp;
   progress.bestMs = Math.max(progress.bestMs, ms);
   if (won) {
     progress.wins[hero] = (progress.wins[hero] ?? 0) + 1;
@@ -135,6 +151,25 @@ export function recordEndless(cleared: number, credits = 0): Progress {
   const progress = loadProgress();
   progress.endless = Math.max(progress.endless, cleared);
   progress.bank += credits;
+  saveProgress(progress);
+  return progress;
+}
+
+/** Records a finished boss rush (`bosses` beaten in `ms`), keeping the best; the updated progress and whether it is a new best. */
+export function recordRush(bosses: number, ms: number): { progress: Progress; best: boolean } {
+  const progress = loadProgress();
+  const best = beatsRush(progress.rush, bosses, ms);
+  if (best) {
+    progress.rush = { bosses, ms };
+    saveProgress(progress);
+  }
+  return { progress, best };
+}
+
+/** Switches a hero between its mastery colours and its usual ones; the updated progress. */
+export function togglePlain(hero: HeroId): Progress {
+  const progress = loadProgress();
+  progress.plain = progress.plain.includes(hero) ? progress.plain.filter((id) => id !== hero) : [...progress.plain, hero];
   saveProgress(progress);
   return progress;
 }
@@ -268,6 +303,10 @@ export function loadRun(): GameState | null {
     if (!Array.isArray(s.offers) || !s.offers.every((id) => id === null || known(id))) return null;
     if (s.choices !== null && (!Array.isArray(s.choices) || !s.choices.every(known))) return null;
     if (s.event !== null && (typeof s.event !== 'object' || !Array.isArray(s.event.options))) return null;
+    if (typeof s.rush !== 'boolean' || !s.rushQueue.every((i) => Number.isInteger(i) && PLANETS[i])) return null;
+    if (!Number.isInteger(s.rushTotal) || !Number.isInteger(s.rushBeaten) || !Number.isInteger(s.mastery) || typeof s.colour !== 'boolean') return null;
+    if (s.tide !== null && (typeof s.tide !== 'object' || typeof s.tide.angle !== 'number')) return null;
+    if (!s.pillars.every((pl) => typeof pl === 'object' && pl && typeof pl.x1 === 'number')) return null;
     return s;
   } catch {
     return null;

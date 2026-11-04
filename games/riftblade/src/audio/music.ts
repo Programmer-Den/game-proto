@@ -3,7 +3,8 @@ import type { Part, Song } from '../../../../shared/audio';
 /**
  * Riftblade's music: space-opera chiptune, one song per planet (Dune in D minor, Swamp in E minor
  * with a swing, Ice in B minor and sparse, Lava in C minor and heavy, Spore in A minor and drifting,
- * Scrap in G minor and clanking, Crystal in F# minor and chiming, Storm in E minor and driving), a slow song for the hero
+ * Scrap in G minor and clanking, Crystal in F# minor and chiming, Storm in E minor and driving,
+ * Ocean in G minor rolling in threes, Ruin in D Phrygian and solemn), a slow song for the hero
  * select, the star map and the trader, and the stings. Each planet's song has a `calm` part of its
  * own, and `tense` (ring waves, the elite arena), `boss` and `pad` (the level-up cards) parts
  * written once in D minor and moved into the planet's key. The bars below are eighth notes, eight
@@ -259,8 +260,57 @@ const STORM: Song = {
   },
 };
 
-/** One song per planet, by planet index (Dune, Swamp, Ice, Lava, Spore, Scrap, Crystal, Storm). */
-export const PLANET_SONGS: readonly Song[] = [DUNE, SWAMP, ICE, LAVA, SPORE, SCRAP, CRYSTAL, STORM];
+const OCEAN_SHARED = shared(5);
+/** Ocean world, G minor: a rolling swell in threes, like waves on the shore. */
+const OCEAN: Song = {
+  bpm: 126,
+  steps: 3,
+  waves: { lead: 'triangle' },
+  mix: { lead: 0.15 },
+  parts: {
+    calm: {
+      lead:
+        'g4 . bb4 d5 . c5 | bb4 . a4 g4 . . | f4 . a4 c5 . bb4 | a4 . . - - - | ' +
+        'eb5 . d5 c5 . bb4 | c5 . bb4 a4 . f4 | g4 . a4 bb4 . a4 | g4 . . - - -',
+      harmony:
+        'd4 - - bb3 - - | d4 - - g3 - - | c4 - - f3 - - | c4 - - f3 - - | ' +
+        'g3 - - eb4 - - | f3 - - c4 - - | d4 - - f#3 - - | d4 - - g3 - -',
+      bass:
+        'g1 . . d2 . . | g1 . . d2 . . | f1 . . c2 . . | f1 . . c2 . . | ' +
+        'eb1 . . bb1 . . | f1 . . c2 . . | d2 . . a1 . . | g1 . . . . .',
+      drums: 'k - - h - s | k - h - s -',
+    },
+    tense: swung(OCEAN_SHARED.tense),
+    boss: swung(OCEAN_SHARED.boss),
+    pad: swung(OCEAN_SHARED.pad),
+  },
+};
+
+/** Ruin world, D Phrygian: a slow, solemn march with a temple drum. */
+const RUIN: Song = {
+  bpm: 112,
+  steps: 2,
+  waves: { lead: 'pulse25' },
+  mix: { lead: 0.12, bass: 0.3 },
+  parts: {
+    calm: {
+      lead:
+        'd5 . . . eb5 . d5 . | c5 . bb4 . a4 . . . | bb4 . a4 . g4 . a4 . | d4 . . . - - - - | ' +
+        'f5 . . . eb5 . d5 . | eb5 . d5 . c5 . bb4 . | a4 . bb4 . a4 . g4 eb4 | d4 . . . - - - -',
+      harmony:
+        'a3 - - - bb3 - - - | g3 - - - f3 - - - | g3 - - - eb3 - - - | f#3 - - - a3 - - - | ' +
+        'a3 - - - g3 - - - | g3 - - - eb3 - - - | f3 - - - eb3 - - - | f#3 - - - a3 - - -',
+      bass:
+        'd2 . . . d2 . . . | c2 . . . c2 . . . | bb1 . . . eb2 . . . | d2 . . . d1 . . . | ' +
+        'd2 . . . d2 . . . | c2 . . . c2 . . . | bb1 . . . eb2 . . . | d2 . . . d1 . . .',
+      drums: 'k - - - s - - - | k - k - s - h h',
+    },
+    ...shared(0),
+  },
+};
+
+/** One song per planet, by planet index (Dune, Swamp, Ice, Lava, Spore, Scrap, Crystal, Storm, Ocean, Ruin). */
+export const PLANET_SONGS: readonly Song[] = [DUNE, SWAMP, ICE, LAVA, SPORE, SCRAP, CRYSTAL, STORM, OCEAN, RUIN];
 
 // ---------------------------------------------------------------------------------------------
 // Between fights

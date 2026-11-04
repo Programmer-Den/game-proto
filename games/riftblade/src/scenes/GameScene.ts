@@ -6,7 +6,9 @@ import { HERO_R, POWER_UPS, RUN_MS, clock, freshState, isStructure, statsOf, typ
 import { choose, inRingGap, phalanxSpots, prepare, shieldHalf, startRun, suppressorHalf, suppressorLength } from '../game/sim';
 import { bladeColor, dreadRadius, heroVariant, orbitBlades } from '../game/blades';
 import { bubble, rebuildTime } from '../game/squad';
-import { buy, chooseEvent, chooseNode, chooseWorld, chartOptions, enterEndless, frame, leave, nextPlanet, reroll } from '../game/voyage';
+import { buy, chooseEvent, chooseNode, chooseWorld, chartOptions, enterEndless, frame, leave, nextPlanet, reroll, startRush } from '../game/voyage';
+import { masteryLevel, masteryXp } from '../game/mastery';
+import { RUSH, rushPlanets } from '../game/rush';
 import { DAILY, DAILY_GAME, dailyOf, dailyScore, dailySeed, stagesOf } from '../game/daily';
 import { finishDaily, loadDaily, startDaily, type DailyRecord } from '../../../../shared/daily';
 import { CODEX_PAGES, codexNew, type CodexPageId } from '../game/codex';
@@ -15,22 +17,23 @@ import { heatOpen } from '../game/heat';
 import { checkTrophies } from '../trophies/check';
 import { ARMOURY, salvage, type ArmouryId } from '../game/armoury';
 import { reseed, rngAt, unseed, weekOf, weeklyOf, type MutatorId } from '../game/weekly';
-import { ARENA_MS, BOSSES, CHAMPION, PLANETS, SIEGE, STRIKE, VENT, planetLabel } from '../game/planets';
+import { ARENA_MS, BOSSES, CHAMPION, PILLAR, PLANETS, SIEGE, STRIKE, TIDE, VENT, planetLabel } from '../game/planets';
 import { UPGRADES, MAX_TIER } from '../game/upgrades';
 import {
-  bankCredits, clearRun, isResumable, isUnlocked, loadProgress, loadRun, buyArmoury, recordCharted, recordCodex, recordEndless, recordRun, recordWeekly, recordUnlocks, saveRun, unlockedHeroes, type Progress,
+  bankCredits, clearRun, isResumable, isUnlocked, loadProgress, loadRun, buyArmoury, recordCharted, recordCodex, recordEndless, recordRun, recordRush, recordWeekly, recordUnlocks, saveRun, togglePlain, unlockedHeroes, type Progress,
 } from '../game/save';
 import { C, hex } from '../art/glow';
-import { heroKey } from '../art/sprites';
+import { MASTERY_BOT, bakeMastery, heroKey, masteryKey } from '../art/sprites';
 import { t } from '../i18n';
 import { bladeKey } from '../art/knights';
 import { bakeWorlds } from '../art/worlds';
+import { bakeRealms } from '../art/realms';
 import { ui } from '../../../../shared/audio';
 import { OBJ_COLOR, drawObjectiveGround, drawPowerUp, drawStructure, objectiveTarget } from './objectiveArt';
 import { objectiveHint, objectiveName, OBJ_MISC } from '../game/objectives';
 import { SoundCues } from '../audio/cues';
 import { sfx } from '../audio/sfx';
-import { Panel, armouryPanel, codexPanel, dailyPanel, weeklyPanel, endScreen, eventPanel, heroSelect, levelUp, spaceMap, starMap, trader, unlockPanel } from '../ui/panels';
+import { Panel, armouryPanel, codexPanel, dailyPanel, weeklyPanel, endScreen, eventPanel, heroSelect, levelUp, masteryLines, rushPanel, spaceMap, starMap, trader, unlockPanel, wearsColours } from '../ui/panels';
 import {
   BOSS_BAR, CENTER, CREDITS_TAG, OBJECTIVE_HUD, DEPTH, FONT, HP_BAR, KIT, LEVEL, PLANET_TAG, SIG_BUTTON, STICK, TIMER, SCREEN, FRAME, VIEW, XP_BAR, fitLayout, inside,
 } from './layout';
@@ -110,6 +113,9 @@ export class GameScene extends Phaser.Scene {
   /** Whether the daily run's panel is open, and today's daily record (read as the panel opens and a daily ends). */
   dailyOpen = false;
   private daily: DailyRecord = loadDaily(DAILY_GAME);
+  /** Whether the boss rush's panel is open, and the end screen's extra lines (mastery, the rush's result). */
+  rushOpen = false;
+  private endLines: string[] = [];
   /** Whether the codex is open over the hero select, and the page it shows. */
   codexOpen = false;
   codexPage: CodexPageId = 'foes';
@@ -202,7 +208,7 @@ export class GameScene extends Phaser.Scene {
       this.keys[key].on('down', () => {
         const s = this.state;
         if (this.unlocking.length) return;
-        if (s.phase === 'select' && (this.weeklyOpen || this.dailyOpen)) return;
+        if (s.phase === 'select' && (this.weeklyOpen || this.dailyOpen || this.rushOpen)) return;
         if (s.phase === 'select' && this.codexOpen) {
           if (CODEX_PAGES[i]) this.openPage(CODEX_PAGES[i].id);
         } else if (s.phase === 'select' && this.armouryOpen) {
@@ -211,6 +217,8 @@ export class GameScene extends Phaser.Scene {
           if (HERO_IDS[i]) this.choose(HERO_IDS[i]);
         } else if (s.phase === 'levelup') {
           if (i < (s.choices?.length ?? 0)) this.pickIndex(i);
+        } else if (s.phase === 'chart') {
+          if (i < chartOptions(s).length) this.pickIndex(i);
         } else if (i === 3) this.reroll();
         else if (i < 3) this.pickIndex(i);
       });
@@ -228,6 +236,7 @@ export class GameScene extends Phaser.Scene {
       else if (this.state.phase === 'select' && this.codexOpen) this.closeCodex();
       else if (this.state.phase === 'select' && this.weeklyOpen) this.beginWeekly();
       else if (this.state.phase === 'select' && this.dailyOpen) this.beginDaily();
+      else if (this.state.phase === 'select' && this.rushOpen) this.beginRush();
       else if (this.state.phase === 'select') this.begin(this.chosen);
       else this.leave();
     });
@@ -291,7 +300,7 @@ export class GameScene extends Phaser.Scene {
     this.savedDeeds = s.deeds.length;
     this.recorded = false;
     this.savedAt = s.runMs;
-    this.hero.setTexture(heroKey(s.hero!, heroVariant(s))).setVisible(true);
+    this.hero.setTexture(this.lookOf(s)).setVisible(true);
     this.cues.resume(s);
     // A weekly run carries on with its generator where it stood (older saves reseed from the stage).
     if (s.seed >= 0) reseed(s.rng >= 0 ? s.rng : s.seed + 7919 * s.stage + 17);
@@ -330,6 +339,12 @@ export class GameScene extends Phaser.Scene {
         this.dailyOpen = false;
         ui('click');
       }
+    } else if (s.phase === 'select' && this.rushOpen) {
+      if (spot.id === 'start') this.beginRush();
+      else if (spot.id === 'back') {
+        this.rushOpen = false;
+        ui('click');
+      }
     } else if (s.phase === 'select' && this.codexOpen) {
       if (spot.id === 'back') this.closeCodex();
       else if (spot.id.startsWith('page-')) this.openPage(spot.id.slice(5) as CodexPageId);
@@ -351,6 +366,12 @@ export class GameScene extends Phaser.Scene {
         ui('click');
       } else if (spot.id === 'codex') {
         this.codexOpen = true;
+        ui('click');
+      } else if (spot.id === 'rush') {
+        this.rushOpen = true;
+        ui('click');
+      } else if (spot.id === 'colour') {
+        this.progress = togglePlain(this.chosen);
         ui('click');
       }
       else if (spot.id === 'heat-down') this.stepHeat(-1);
@@ -397,9 +418,36 @@ export class GameScene extends Phaser.Scene {
     this.begin(hero, { week: this.week, mutators });
   }
 
-  /** Whether a panel (the Armoury, codex, weekly or daily run) is open over the hero select. */
+  /** Whether a panel (the Armoury, codex, weekly or daily run, or boss rush) is open over the hero select. */
   private overSelect() {
-    return this.armouryOpen || this.codexOpen || this.weeklyOpen || this.dailyOpen;
+    return this.armouryOpen || this.codexOpen || this.weeklyOpen || this.dailyOpen || this.rushOpen;
+  }
+
+  /** Starts a boss rush with the chosen hero against every boss met so far. */
+  private beginRush() {
+    const id = this.chosen;
+    const planets = rushPlanets(this.progress.codex.seen);
+    if (!isUnlocked(this.progress, id) || planets.length < RUSH.minBosses) {
+      ui('refuse');
+      return;
+    }
+    ui('click');
+    unseed();
+    this.rushOpen = false;
+    const ringOut = (Math.hypot(SCREEN.w, SCREEN.h) - Math.hypot(VIEW.w, VIEW.h)) / 2;
+    startRush(this.state, id, planets, unlockedHeroes(this.progress), ringOut, wearsColours(this.progress, id));
+    this.started();
+  }
+
+  /** What every run start shares: nothing saved or recorded yet, the hero on the field, no input held. */
+  private started() {
+    this.savedDeeds = 0;
+    this.recorded = false;
+    this.saveRun();
+    this.hero.setTexture(this.lookOf(this.state)).setVisible(true);
+    this.walking = false;
+    this.stick = null;
+    this.sigQueued = false;
   }
 
   /** Today's hero and mutator, from the heroes open now. */
@@ -532,16 +580,12 @@ export class GameScene extends Phaser.Scene {
     }
     ui('click');
     unseed();
-    // A weekly or daily run is fought at heat 0 without the Armoury, and seeds the rules' `rand` (`startRun`).
+    // A weekly or daily run is fought at heat 0 without the Armoury or mastery, and seeds the rules' `rand` (`startRun`).
     const ringOut = (Math.hypot(SCREEN.w, SCREEN.h) - Math.hypot(VIEW.w, VIEW.h)) / 2;
-    startRun(this.state, id, unlockedHeroes(this.progress), ringOut, seeded ?? { heat: this.heatFor(id), perks: this.progress.armoury });
-    this.savedDeeds = 0;
-    this.recorded = false;
-    this.saveRun();
-    this.hero.setTexture(heroKey(id)).setVisible(true);
-    this.walking = false;
-    this.stick = null;
-    this.sigQueued = false;
+    const colour = wearsColours(this.progress, id);
+    const setup = seeded ? { ...seeded, colour } : { heat: this.heatFor(id), perks: this.progress.armoury, mastery: masteryLevel(this.progress.mastery[id]), colour };
+    startRun(this.state, id, unlockedHeroes(this.progress), ringOut, setup);
+    this.started();
   }
 
   private backToSelect() {
@@ -650,7 +694,8 @@ export class GameScene extends Phaser.Scene {
     if (s.phase === 'select' && this.armouryOpen) return `armoury|${this.progress.bank}|${JSON.stringify(this.progress.armoury)}`;
     if (s.phase === 'select' && this.dailyOpen) return `daily|${JSON.stringify(this.daily)}`;
     if (s.phase === 'select' && this.codexOpen) return `codex|${this.codexPage}|${this.progress.codex.seen.length}`;
-    return [s.phase, this.chosen, this.progress.bank, this.heatFor(this.chosen), s.choices?.join(), s.offers.join(), s.credits, s.event?.id, s.nodes.join(), s.rewardPicks].join('|');
+    if (s.phase === 'select' && this.rushOpen) return `rush|${this.chosen}|${JSON.stringify(this.progress.rush)}`;
+    return [s.phase, this.chosen, this.progress.plain.join(), this.progress.bank, this.heatFor(this.chosen), s.choices?.join(), s.offers.join(), s.credits, s.event?.id, s.nodes.join(), s.rewardPicks].join('|');
   }
 
   /** Shows the panel for the phase the run is in. */
@@ -663,15 +708,29 @@ export class GameScene extends Phaser.Scene {
       this.bonus = 0;
       unseed();
       const route = s.route.map((i) => PLANETS[i].id);
-      if (s.endless) {
-        // The endless rift's end: the win already banked the credits, so only its salvage now.
+      const won = s.phase === 'won';
+      const before = loadProgress().mastery[s.hero!] ?? 0;
+      let xp = 0;
+      this.endLines = [];
+      if (s.rush) {
+        // A boss rush records only its result: no run, credits, mastery or charted planets.
+        this.banked = 0;
+        const { best } = recordRush(s.rushBeaten, s.runMs);
+        this.endLines.push(t('rushEnd', { n: s.rushBeaten, of: s.rushTotal, time: clock(s.runMs) }));
+        if (best) this.endLines.push(t('rushNewBest'));
+      } else if (s.endless) {
+        // The endless rift's end: the win already banked the credits (and its mastery), so only its salvage now.
         this.banked = ENDLESS_SALVAGE * s.endlessCleared;
-        recordRun(s.hero!, s.runMs, false, s.stage + 1, route, s.heat);
+        xp = masteryXp(s.endlessCleared, 0, false);
+        recordRun(s.hero!, s.runMs, false, s.stage + 1, route, s.heat, 0, xp);
         recordEndless(s.endlessCleared, this.banked);
       } else {
         this.banked = salvage(s.credits, s.stage + 1);
+        // Bosses beaten: every jump before this one, and this one's when won (or its arena was reached).
+        const bosses = s.stage + (won || s.arena ? 1 : 0);
+        xp = masteryXp(bosses, s.kills, won && !s.daily);
         // A daily's three worlds are not a won crusade.
-        this.progress = recordRun(s.hero!, s.runMs, s.phase === 'won' && !s.daily, s.stage + 1, route, s.heat, this.banked);
+        this.progress = recordRun(s.hero!, s.runMs, won && !s.daily, s.stage + 1, route, s.heat, this.banked, xp);
         if (s.week >= 0) this.bonus = recordWeekly(s.week, s.stage + 1, s.phase === 'won').bonus;
         if (s.daily) {
           const first = loadDaily(DAILY_GAME, s.daily).score === null;
@@ -683,6 +742,7 @@ export class GameScene extends Phaser.Scene {
         }
       }
       this.progress = loadProgress();
+      this.endLines.push(...masteryLines(s.hero!, xp, before, before + xp));
       clearRun();
     }
     // Every other panel (a level-up, the maps, the trader, an event) saves the run as it opens.
@@ -699,13 +759,14 @@ export class GameScene extends Phaser.Scene {
     else if (s.phase === 'select' && this.armouryOpen) build((p) => armouryPanel(p, this.progress));
     else if (s.phase === 'select' && this.dailyOpen) build((p) => dailyPanel(p, this.daily, this.dailyRun().hero, this.dailyRun().mutators));
     else if (s.phase === 'select' && this.codexOpen) build((p) => codexPanel(p, this.progress, this.codexPage));
+    else if (s.phase === 'select' && this.rushOpen) build((p) => rushPanel(p, this.progress, this.chosen));
     else if (s.phase === 'select') build((p) => heroSelect(p, this.progress, this.chosen, this.heatFor(this.chosen), this.week, this.progress.bestMs > 0 ? loadDaily(DAILY_GAME) : null));
     else if (s.phase === 'levelup') build((p) => levelUp(p, s));
     else if (s.phase === 'chart') build((p) => spaceMap(p, s, this.progress.charted));
     else if (s.phase === 'map') build((p) => starMap(p, s));
     else if (s.phase === 'trader') build((p) => trader(p, s));
     else if (s.phase === 'event') build((p) => eventPanel(p, s));
-    else if (s.phase === 'won' || s.phase === 'lost') build((p) => endScreen(p, s, this.progress, this.banked, this.bonus, s.daily ? this.daily : null));
+    else if (s.phase === 'won' || s.phase === 'lost') build((p) => endScreen(p, s, this.progress, this.banked, this.bonus, s.daily ? this.daily : null, this.endLines));
     this.shown = this.panelKey();
     this.walking = false;
     this.stick = null;
@@ -719,6 +780,7 @@ export class GameScene extends Phaser.Scene {
     // (the playthrough's) stay as they were.
     if (!this.worldsBaked && s.hero && (s.phase === 'chart' || s.planet !== 0)) {
       bakeWorlds(this);
+      bakeRealms(this);
       this.worldsBaked = true;
     }
     const cam = this.cameras.main;
@@ -763,6 +825,8 @@ export class GameScene extends Phaser.Scene {
         else if (def.id === 'scrap') this.scrapCell(g, gx, gy, bx, by, cell, deco);
         else if (def.id === 'crystal') this.crystalCell(g, gx, gy, bx, by, cell, deco);
         else if (def.id === 'storm') this.stormCell(g, gx, gy, bx, by, cell, deco);
+        else if (def.id === 'ocean') this.oceanCell(g, gx, gy, bx, by, cell, deco);
+        else if (def.id === 'ruin') this.ruinCell(g, gx, gy, bx, by, cell, deco);
         else this.duneCell(g, gx, gy, bx, by, cell, deco);
       }
     }
@@ -957,6 +1021,62 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  private oceanCell(g: Phaser.GameObjects.Graphics, gx: number, gy: number, bx: number, by: number, cell: number, deco: number) {
+    // Wet sand banks, rippling lines of foam and shells.
+    for (let k = 0; k < 2; k++) {
+      if (hash(gx, gy, k + 700) < 0.4) continue;
+      const x = bx + hash(gx, gy, k + 701) * cell;
+      const y = by + hash(gx, gy, k + 704) * cell;
+      const r = 26 + hash(gx, gy, k + 707) * 34;
+      g.fillStyle(0x0b2a3a, 0.6);
+      this.blob(g, gx, gy, x, y, r, 0.5, k + 710);
+      g.fillPath();
+    }
+    for (let k = 0; k < 3; k++) {
+      const sx = bx + hash(gx, gy, k + 720) * cell * 0.7;
+      const sy = by + hash(gx, gy, k + 723) * cell;
+      const len = 60 + hash(gx, gy, k + 726) * 90;
+      g.lineStyle(1.5, deco, 0.12 + hash(gx, gy, k + 729) * 0.06);
+      g.beginPath();
+      for (let i = 0; i <= 10; i++) {
+        const x = sx + (len * i) / 10;
+        const y = sy + Math.sin((i / 10) * Math.PI * 3 + k) * 4;
+        if (i === 0) g.moveTo(x, y);
+        else g.lineTo(x, y);
+      }
+      g.strokePath();
+    }
+    g.fillStyle(0xe8fdff, 0.2);
+    for (let k = 0; k < 6; k++) g.fillCircle(bx + hash(gx, gy, k + 740) * cell, by + hash(gx, gy, k + 750) * cell, 1.3);
+  }
+
+  private ruinCell(g: Phaser.GameObjects.Graphics, gx: number, gy: number, bx: number, by: number, cell: number, deco: number) {
+    // Paving slabs half buried in sand, column stumps, and a glowing rune now and then.
+    const stone = 0xd8c08a;
+    for (let k = 0; k < 3; k++) {
+      if (hash(gx, gy, k + 800) < 0.35) continue;
+      const x = bx + hash(gx, gy, k + 801) * cell;
+      const y = by + hash(gx, gy, k + 804) * cell;
+      const w = 26 + hash(gx, gy, k + 807) * 26;
+      g.fillStyle(0x1e1910, 0.7).fillRect(x, y, w, w * 0.6);
+      g.lineStyle(1.2, stone, 0.18).strokeRect(x, y, w, w * 0.6);
+    }
+    if (hash(gx, gy, 820) > 0.5) {
+      const x = bx + hash(gx, gy, 821) * cell;
+      const y = by + hash(gx, gy, 822) * cell;
+      g.fillStyle(0x2a2216, 0.85).fillCircle(x, y, 12);
+      g.lineStyle(2, stone, 0.3).strokeCircle(x, y, 12);
+      g.lineStyle(1, stone, 0.2).strokeCircle(x, y, 7);
+    }
+    if (hash(gx, gy, 830) > 0.7) {
+      const x = bx + hash(gx, gy, 831) * cell;
+      const y = by + hash(gx, gy, 832) * cell;
+      g.lineStyle(1.5, deco, 0.3).strokeTriangle(x, y - 7, x + 6, y + 4, x - 6, y + 4);
+    }
+    g.fillStyle(stone, 0.12);
+    for (let k = 0; k < 7; k++) g.fillCircle(bx + hash(gx, gy, k + 840) * cell, by + hash(gx, gy, k + 850) * cell, 1.2);
+  }
+
   /** The Dune world: amber dune ridges, sand specks and the odd rock. */
   private duneCell(g: Phaser.GameObjects.Graphics, gx: number, gy: number, bx: number, by: number, cell: number, dune: number) {
     // Two dune ridges per cell, as gentle waves.
@@ -1036,6 +1156,8 @@ export class GameScene extends Phaser.Scene {
         u.fillStyle(color, 0.08 + 0.16 * prog).fillCircle(h.x, h.y, h.r * prog);
       }
     }
+    this.drawTide(s, still);
+    this.drawPillars(s, still);
     // The side objective: its zone, spots, structures and the pilgrim; power-ups on the ground.
     drawObjectiveGround(u, s, still);
     for (const e of s.enemies) if (isStructure(e.kind)) drawStructure(u, e, s.time, still);
@@ -1126,9 +1248,11 @@ export class GameScene extends Phaser.Scene {
       else if (e.kind === 'rollerbomb') key = `rb-roller${e.elite ? '-elite' : ''}${e.mode !== 'walk' ? '-armed' : ''}`;
       const im = en.next(key, e.x, e.y);
       const toHero = Math.atan2(p.y - e.y, p.x - e.x);
-      if (e.kind === 'boss' && (bossId === 'grinder' || bossId === 'siege' || bossId === 'scrapking')) im.setRotation(toHero);
+      if (e.kind === 'boss' && (bossId === 'grinder' || bossId === 'siege' || bossId === 'scrapking' || bossId === 'kraken' || bossId === 'warden')) im.setRotation(toHero);
       else if (e.kind === 'rollerbomb' && e.mode === 'rush' && !still) im.setRotation(s.time / 80);
       else if (e.kind !== 'clanker' && e.kind !== 'rollerbomb') im.setFlipX(Math.cos(e.kind === 'knight' ? e.facing : toHero) < 0);
+      // Shades flicker (held steady with reduced motion).
+      if (e.kind === 'shade') im.setAlpha(still ? 0.75 : 0.55 + 0.35 * Math.abs(Math.sin(s.time / 260 + e.id)));
       if (e.flashMs > 0 && !still) im.setScale(1.15);
       if (e.stunMs > 0) im.setAlpha(0.6);
       // Held in a Grip: lifted off the ground.
@@ -1162,7 +1286,7 @@ export class GameScene extends Phaser.Scene {
       this.hero.setVisible(false);
       for (const d of s.bots) {
         this.pools.pickups.next('rb-shadow', d.x, d.y + 15).setScale(0.55);
-        const im = al.next(d.hp > 0 ? 'rb-bot' : 'rb-bot-down', d.x, d.y + (d.hp > 0 ? bob : 0));
+        const im = al.next(d.hp > 0 ? (s.colour ? MASTERY_BOT : 'rb-bot') : 'rb-bot-down', d.x, d.y + (d.hp > 0 ? bob : 0));
         im.setFlipX(Math.cos(d.aim) < 0);
         if (d.hp <= 0) {
           const k = Math.max(0, Math.min(1, 1 - d.rebuildMs / rebuildTime(s)));
@@ -1173,7 +1297,7 @@ export class GameScene extends Phaser.Scene {
       // The hero, on its shadow.
       this.pools.pickups.next('rb-shadow', p.x, p.y + 27);
       const face = p.moving ? p.facing : p.aim;
-      const look = heroKey(s.hero!, heroVariant(s));
+      const look = this.lookOf(s);
       if (this.hero.texture.key !== look) this.hero.setTexture(look);
       this.hero.setVisible(true).setPosition(p.x, p.y + bob).setFlipX(Math.cos(face) < 0).setAlpha(p.dashMs > 0 ? 0.6 : 1);
     }
@@ -1267,6 +1391,102 @@ export class GameScene extends Phaser.Scene {
       t.setPosition(p.x, p.y - 44 - i * 20 - (still ? 0 : age * 0.012)).setAlpha(Math.min(1, pop.ms / 400));
     });
     for (let i = pops.length; i < this.popTexts.length; i++) this.popTexts[i].setVisible(false);
+  }
+
+  /** The hero's texture: its mastery colours when worn (not Kael's Fallen look), else its scheme. */
+  private lookOf(s: GameState) {
+    const variant = heroVariant(s);
+    if (!s.colour || variant) return heroKey(s.hero!, variant);
+    bakeMastery(this, s.hero!);
+    return masteryKey(s.hero!);
+  }
+
+  /** The Ocean world's tide: the water over its half of the view, its edge lit; while it comes in, the edge alone, filling. */
+  private drawTide(s: GameState, still: boolean) {
+    const w = s.tide;
+    if (!w) return;
+    const u = this.under;
+    const cx = s.player.x;
+    const cy = s.player.y;
+    const x0 = cx - SCREEN.w / 2 - 60;
+    const x1 = cx + SCREEN.w / 2 + 60;
+    const y0 = cy - SCREEN.h / 2 - 60;
+    const y1 = cy + SCREEN.h / 2 + 60;
+    const nx = Math.cos(w.angle);
+    const ny = Math.sin(w.angle);
+    const side = (x: number, y: number) => (x - w.x) * nx + (y - w.y) * ny;
+    // The view's rectangle cut by the water's edge (one pass of Sutherland-Hodgman).
+    const rect = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+    const wet: number[][] = [];
+    rect.forEach((a, i) => {
+      const b = rect[(i + 1) % 4];
+      const da = side(a[0], a[1]);
+      const db = side(b[0], b[1]);
+      if (da > 0) wet.push(a);
+      if (da > 0 !== db > 0) {
+        const k = da / (da - db);
+        wet.push([a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k]);
+      }
+    });
+    // The edge line across the view.
+    const len = SCREEN.w + SCREEN.h;
+    const ex = -ny;
+    const ey = nx;
+    const along = (cx - w.x) * ex + (cy - w.y) * ey;
+    const lx = w.x + ex * along;
+    const ly = w.y + ey * along;
+    const coming = w.warnMs > 0;
+    const k = coming ? 1 - w.warnMs / TIDE.warnMs : Math.min(1, w.ms / 1500);
+    if (wet.length >= 3) {
+      u.fillStyle(0x0a4a6a, (coming ? 0.08 + 0.12 * k : 0.32 * k));
+      u.beginPath();
+      wet.forEach(([x, y], i) => (i === 0 ? u.moveTo(x, y) : u.lineTo(x, y)));
+      u.closePath();
+      u.fillPath();
+    }
+    // Foam along the edge: a bright line, and ripples a little way into the water.
+    const pulse = still || !coming ? 1 : 0.6 + 0.4 * Math.abs(Math.sin(s.time / 180));
+    u.lineStyle(coming ? 2 : 3, 0xe8fdff, (coming ? 0.3 + 0.5 * k : 0.7 * k) * pulse);
+    u.lineBetween(lx - ex * len, ly - ey * len, lx + ex * len, ly + ey * len);
+    if (!coming) {
+      for (let i = 1; i <= 3; i++) {
+        const off = i * 46 + (still ? 0 : (s.time / 30) % 46);
+        u.lineStyle(1.5, 0x7fe9ff, 0.18 * k);
+        u.lineBetween(lx + nx * off - ex * len, ly + ny * off - ey * len, lx + nx * off + ex * len, ly + ny * off + ey * len);
+      }
+    }
+  }
+
+  /** The Ruin world's pillars: a shadow that darkens while one falls, then the column lying across the way. */
+  private drawPillars(s: GameState, still: boolean) {
+    const u = this.under;
+    for (const pl of s.pillars) {
+      if (pl.warnMs > 0) {
+        const k = Math.max(0, Math.min(1, 1 - pl.warnMs / PILLAR.warnMs));
+        u.lineStyle(pl.r * 2, 0x000000, 0.15 + 0.3 * k).lineBetween(pl.x1, pl.y1, pl.x2, pl.y2);
+        const pulse = still ? 1 : 0.7 + 0.3 * Math.abs(Math.sin(s.time / 120));
+        u.lineStyle(2, 0xd8c08a, (0.35 + 0.5 * k) * pulse);
+        u.strokeCircle(pl.x1, pl.y1, pl.r).strokeCircle(pl.x2, pl.y2, pl.r);
+        const nx = -(pl.y2 - pl.y1) / PILLAR.len;
+        const ny = (pl.x2 - pl.x1) / PILLAR.len;
+        for (const side of [-1, 1]) {
+          u.lineBetween(pl.x1 + nx * pl.r * side, pl.y1 + ny * pl.r * side, pl.x2 + nx * pl.r * side, pl.y2 + ny * pl.r * side);
+        }
+        continue;
+      }
+      const fade = Math.min(1, pl.ms / 1200);
+      u.lineStyle(pl.r * 2 + 4, 0x120e08, 0.9 * fade).lineBetween(pl.x1, pl.y1, pl.x2, pl.y2);
+      u.lineStyle(pl.r * 2 - 4, 0x4a3d26, fade).lineBetween(pl.x1, pl.y1, pl.x2, pl.y2);
+      u.lineStyle(3, 0xd8c08a, 0.55 * fade).lineBetween(pl.x1, pl.y1, pl.x2, pl.y2);
+      // The fluting rings along the column, and its two ends.
+      for (let i = 1; i < 6; i++) {
+        const x = pl.x1 + ((pl.x2 - pl.x1) * i) / 6;
+        const y = pl.y1 + ((pl.y2 - pl.y1) * i) / 6;
+        u.fillStyle(0xd8c08a, 0.35 * fade).fillCircle(x, y, 2.5);
+      }
+      u.fillStyle(0x2a2216, fade).fillCircle(pl.x1, pl.y1, pl.r + 2).fillCircle(pl.x2, pl.y2, pl.r + 2);
+      u.lineStyle(2, 0xd8c08a, 0.6 * fade).strokeCircle(pl.x1, pl.y1, pl.r + 2).strokeCircle(pl.x2, pl.y2, pl.r + 2);
+    }
   }
 
   /** The knights' blades in the air: orbits, swings, lightning, grips, marks, the barrier and Kresh's legs. */
@@ -1393,9 +1613,10 @@ export class GameScene extends Phaser.Scene {
     // Clock and level.
     const boss = s.enemies.find((e) => e.kind === 'boss');
     if (s.arena) this.texts.timer.setText(clock(ARENA_MS - s.time)).setColor(C.elite);
+    else if (s.rush) this.texts.timer.setText(clock(s.runMs)).setColor(C.boss);
     else this.texts.timer.setText(s.bossSpawned ? t('bossTimer') : clock(Math.min(s.time, RUN_MS))).setColor(s.bossSpawned ? C.boss : C.text);
     this.texts.level.setText(t('levelTag', { n: s.level }));
-    const where = s.arena ? t('eliteArena') : planetLabel(s.stage, s.planet, stagesOf(s));
+    const where = s.arena ? t('eliteArena') : s.rush ? t('rushTag', { n: s.rushBeaten + 1, of: s.rushTotal, planet: t(PLANETS[s.planet].name) }) : planetLabel(s.stage, s.planet, stagesOf(s));
     const tag = s.week >= 0 ? t('weeklyTag', { label: where }) : s.daily ? t('dailyTag', { label: where }) :
       s.endless && s.loop > 0 ? t('endlessTag', { label: where, n: s.loop }) : s.heat > 0 ? t('heatTag', { label: where, n: s.heat }) : where;
     this.texts.planet.setText(tag).setColor(s.arena ? C.elite : PLANETS[s.planet].ground.deco);

@@ -15,6 +15,7 @@ export type CodexPageId = 'foes' | 'bosses' | 'skills' | 'gear' | 'paths';
 const FOES: readonly FoeKind[] = [
   'clanker', 'rollerbomb', 'mirerat', 'toad', 'linetrooper', 'walker', 'acolyte', 'knight',
   'sporeling', 'puffcap', 'scrapper', 'hauler', 'shardling', 'prism', 'wisp', 'conductor',
+  'crab', 'squid', 'shade', 'sentinel',
 ];
 
 export interface CodexEntry {

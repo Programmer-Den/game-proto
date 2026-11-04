@@ -3,22 +3,25 @@
  * space map (which planet to jump to), the star map's nodes on the way (trader, elite arena, rest,
  * events) and the jump itself. Pure state changes like `sim.ts`; randomness from `rand`.
  */
-import { ELITE, OBJECTIVE_AT, WAVES, statsOf, type EventState, type GameState } from './state';
-import { collectAll, heal, lower, nextPick, pop, raise, refreshHealth, spawnElite, tick, SHORT_LIVED, type Input } from './sim';
-import { FILLER, MAX_TIER, UPGRADES, UPGRADE_IDS, canOffer, rollChoices } from './upgrades';
+import { ELITE, OBJECTIVE_AT, WAVES, statsOf, xpFor, type EventState, type GameState } from './state';
+import { collectAll, heal, lower, nextPick, pop, raise, refreshHealth, spawnElite, startRun, tick, SHORT_LIVED, type Input } from './sim';
+import { DRILLS, FILLER, MAX_TIER, UPGRADES, UPGRADE_IDS, canOffer, rollChoices } from './upgrades';
+import { HEROES, type HeroId } from './heroes';
+import { RUSH } from './rush';
 import { t } from '../i18n';
 import { checkDeeds } from './blades';
 import { hot } from './heat';
 import { rand, reseed } from './weekly';
 import { lastStage } from './daily';
-import { CREDITS, LAST_STAGE, NODE_INFO, PLANETS, REST_HEAL, TRADE, arenaElites, planetsAt, type EventId, type NodeKind } from './planets';
+import { CREDITS, LAST_STAGE, NODE_INFO, PLANETS, REST_HEAL, TIDE, TRADE, arenaElites, planetsAt, type EventId, type NodeKind } from './planets';
 
 /** One frame of the game: the sim while a fight is on, then whatever follows a cleared fight. */
 export function frame(s: GameState, dtMs: number, input: Input) {
   tick(s, dtMs, input);
   if (s.phase === 'cleared') afterClear(s);
   if (s.phase === 'travel') nextPlanet(s);
-  if (s.hero) checkDeeds(s);
+  // The boss rush unlocks no heroes.
+  if (s.hero && !s.rush) checkDeeds(s);
 }
 
 /** Empties the field between fights (the hero, their kit and allies stay). */
@@ -42,12 +45,26 @@ function clearField(s: GameState) {
   s.allies = s.allies.filter((a) => !SHORT_LIVED.includes(a.kind));
   s.objective = null;
   s.lureMs = s.overdriveMs = s.shieldHits = 0;
+  s.tide = null;
+  s.pillars = [];
 }
 
 /** A boss (or the arena) has fallen: take what is lying about, then the cards, the map or the win. */
 export function afterClear(s: GameState) {
   collectAll(s);
   clearField(s);
+  if (s.rush) {
+    // The boss rush: on to the next boss at once, a little healed, or won after the last.
+    s.rushBeaten += 1;
+    const next = s.rushQueue.shift();
+    if (next === undefined) {
+      s.phase = 'won';
+      return;
+    }
+    heal(s, RUSH.heal * s.player.maxHp);
+    rushLand(s, next);
+    return;
+  }
   if (s.arena) {
     s.arena = false;
     if (s.arenaWon) {
@@ -86,11 +103,53 @@ function loopBack(s: GameState) {
  * level-ups still owed first, then the star map back to the Dune world, where the next loop begins.
  */
 export function enterEndless(s: GameState) {
-  if (s.phase !== 'won' || s.endless || s.seed >= 0 || s.daily) return false;
+  if (s.phase !== 'won' || s.endless || s.seed >= 0 || s.daily || s.rush) return false;
   s.endless = true;
   loopBack(s);
   nextPick(s);
   return true;
+}
+
+/**
+ * Starts a boss rush with `hero` against the bosses of `planets` (in order, from `rushPlanets`):
+ * no heat, Armoury or mastery, and the set kit (`RUSH`): the hero's three paths and its drill a few
+ * tiers up, at a set level.
+ */
+export function startRush(s: GameState, hero: HeroId, planets: readonly number[], known: HeroId[] = [], ringOut = 0, colour = false) {
+  if (!planets.length) return false;
+  startRun(s, hero, known, ringOut, { colour });
+  for (const id of HEROES[hero].paths) for (let k = 0; k < RUSH.tiers; k++) raise(s, id);
+  for (let k = 0; k < RUSH.drill; k++) raise(s, DRILLS[hero].id);
+  s.level = RUSH.level;
+  s.xpNext = xpFor(RUSH.level);
+  s.player.hp = s.player.maxHp;
+  s.pops = [];
+  s.rush = true;
+  s.rushTotal = planets.length;
+  s.rushBeaten = 0;
+  s.rushQueue = planets.slice(1);
+  s.route = [];
+  rushLand(s, planets[0]);
+  return true;
+}
+
+/** Lands on the next boss rush planet: no swarm, no objectives, the boss at once. */
+function rushLand(s: GameState, planet: number) {
+  clearField(s);
+  s.planet = planet;
+  s.stage = PLANETS[planet].stage;
+  s.route.push(planet);
+  s.time = 0;
+  s.waves = [];
+  s.nextElite = Infinity;
+  s.nextVent = RUSH.firstPillarMs;
+  s.nextTide = RUSH.firstTideMs;
+  s.objectiveAt = Infinity;
+  s.bossSpawned = false;
+  s.arena = false;
+  s.phase = 'run';
+  s.after = 'run';
+  pop(s, t('rushPop', { n: s.rushBeaten + 1, of: s.rushTotal, planet: t(PLANETS[planet].name) }), '#ff9a3c');
 }
 
 /** The jump after this one (the endless rift wraps from the last back to the first). */
@@ -316,6 +375,7 @@ export function nextPlanet(s: GameState) {
   s.waves = [...WAVES];
   s.nextElite = ELITE.first;
   s.nextVent = 8000;
+  s.nextTide = TIDE.firstMs;
   s.bossSpawned = false;
   s.arena = false;
   s.globHits = 0;
