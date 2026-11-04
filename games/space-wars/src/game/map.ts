@@ -20,6 +20,8 @@ export interface MapLayout {
   nebulae: (Point & { r: number; color: number })[];
   stars: (Point & { a: number })[];
   derelicts: (Point & { kind: DerelictKind })[];
+  /** A hand-made map's relay beacon (an index into `nodes`); a random map leaves it to `beaconNode`. */
+  beacon?: number;
 }
 
 /** Where the relay beacon goes: the loose crystal node nearest this share of the way from the player's start to the map's centre. */

@@ -1,13 +1,20 @@
 import Phaser from 'phaser';
 import { ARENA, BUILD_RANGE, NODE_AMOUNT } from '../game/arena';
-import { checkTrophies } from '../trophies/check';
+import { checkTrophies, galaxyWon } from '../trophies/check';
 import { DERELICT_KINDS, generateMap, localRandom, type MapLayout } from '../game/map';
 import { FACTIONS, type Role, type UnitId } from '../game/factions';
 import { CONTRACT_STEPS, FLAGSHIP_STEP, RANKS, contractOf, type Goal } from '../game/contracts';
 import { SECTORS, keptFor, loadCampaign, saveCampaign, sectorText, winSector, type Campaign } from '../game/campaign';
 import {
+  DEFENDER_CRYSTAL, GALAXY, LANES, afterBattle, conquered, galaxyTier, held, loadGalaxy, newGalaxy, outOfGalaxy, saveGalaxy, targets, type Galaxy,
+} from '../game/galaxy';
+import {
+  CARRIER_DEPART_MS, CARRIER_ROUTE, DOCK_RADIUS, RELAY_HOLD, SCENARIOS, SURVIVE_MS, loadScenarios, scenarioOf, winScenario, type ScenarioBest, type ScenarioId,
+} from '../game/scenarios';
+import { BRANCHES, TECHS, bankSalvage, buyTech, loadTech, saveTech, techFor, techProblem, WIN_SALVAGE, type TechId, type TechTree } from '../game/tech';
+import {
   BEACON_PAY, BEACON_RADIUS, BRIBE_COST, BRIBE_MS, DERELICT_DEFS, DERELICT_RADIUS, EXPANSION_GAP, FLAGSHIP_MS, PLAYER, POP_MS, SENSOR_RANGE, TRUCE_MS,
-  TRUCE_TRIBUTE, VETERAN_NAMES, World, buildInfo, flagshipStats, researchCost, unitStats, type Build, type Building, type Cue, type Derelict, type Effect, type SeenBuilding, type Struck,
+  TRUCE_TRIBUTE, VETERAN_NAMES, World, buildInfo, type BattleSetup, flagshipStats, researchCost, unitStats, type Build, type Building, type Cue, type Derelict, type Effect, type SeenBuilding, type Struck,
 } from '../game/world';
 import {
   buildingLines, derelictLines, expansionLines, factionLines, fallBackLines, flagshipLines, rallyLines, researchLines, unitLines,
@@ -27,7 +34,7 @@ import { mountWatch, watching, watchSteps } from '../../../../shared/watch';
 import { renderScale, viewPoint, viewSize } from '../../../../shared/scaling';
 // `tr` is the game's translator (`t` in the other files): `t` names the scene's text helpers here.
 import { t as tr } from '../i18n';
-import { ARMY_TAB, BAR, BOARD, BUTTONS, CONTRACT_PILL, FONT, GRID_X, GROW, KEEP, LEAD, MAP_VIEW, MINIMAP, PANEL_X, RIVALS_PANEL, RIVALS_TAB, ROLE_LABEL, SECTOR_STRIP, TOP, VIEW, fitView, type Button } from './layout';
+import { ARMY_TAB, BAR, BOARD, BUTTONS, CONTRACT_PILL, FONT, GRID_X, GROW, KEEP, LEAD, MAP_VIEW, MINIMAP, PANEL_X, PICK_TABS, RIVALS_PANEL, RIVALS_TAB, ROLE_LABEL, SECTOR_STRIP, TOP, VIEW, fitView, type Button } from './layout';
 
 // Game time for one step at most, so a hidden tab doesn't jump the battle ahead.
 const MAX_STEP_MS = 100;
@@ -131,6 +138,20 @@ interface Drag {
   y1: number;
 }
 
+/** The picker's tabs: the sector campaign, galaxy conquest, scenario battles and the tech tree. */
+export type PickMode = 'sectors' | 'galaxy' | 'scenario' | 'tech';
+const PICK_MODES: readonly PickMode[] = ['sectors', 'galaxy', 'scenario', 'tech'];
+const MODE_NAME: Record<PickMode, 'tabSectors' | 'tabGalaxy' | 'tabScenarios' | 'tabTech'> = {
+  sectors: 'tabSectors', galaxy: 'tabGalaxy', scenario: 'tabScenarios', tech: 'tabTech',
+};
+
+interface Box {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 /** A button on the rivals panel: answer a truce offer, or pay tribute to turn a rival. */
 interface RivalButton {
   x: number;
@@ -200,6 +221,31 @@ export class GameScene extends Phaser.Scene {
   sector = 0;
   /** The picker's sector nodes, in view pixels. */
   sectorNodes: { x: number; y: number; r: number; sector: number }[] = [];
+  /** The picker's open tab. */
+  mode: PickMode = 'sectors';
+  /** The picker's tabs, in view pixels. */
+  modeTabs: (Box & { mode: PickMode })[] = [];
+  /** Galaxy conquest under way, from the browser's storage, or null. */
+  galaxy: Galaxy | null = loadGalaxy();
+  /** The galaxy sector picked to attack next, or -1; and the one the battle under way is for. */
+  target = -1;
+  private battleTarget = -1;
+  /** The galaxy's star map nodes, in view pixels. */
+  galaxyNodes: { x: number; y: number; r: number; sector: number }[] = [];
+  /** The galaxy strip's Attack and New galaxy buttons, as last drawn. */
+  galaxyButtons: (Box & { action: 'attack' | 'abandon' })[] = [];
+  private abandonArmed = false;
+  /** The tech tree's bank and what each faction has bought. */
+  tech: TechTree = loadTech();
+  /** The faction the tech tab shows (an index into FACTIONS), its faction chips and its tech cards, in view pixels. */
+  techFaction = 0;
+  techChips: (Box & { faction: number })[] = [];
+  techCards: (Box & { id: TechId })[] = [];
+  /** The scenario the next scenario battle plays, and the best time of each one won. */
+  scenario: ScenarioId = 'escort';
+  scenarioBest: ScenarioBest = loadScenarios();
+  /** What the end overlay says after a galaxy or scenario battle. */
+  private outcome = '';
   /** The last pointer position, in view pixels. */
   private pointer = { x: 0, y: 0 };
   private drag: Drag | null = null;
@@ -259,6 +305,13 @@ export class GameScene extends Phaser.Scene {
   private pactBanner!: Phaser.GameObjects.Text;
   private convoyLabel!: Phaser.GameObjects.Text;
   private sectorTexts!: { title: Phaser.GameObjects.Text; body: Phaser.GameObjects.Text; kept: Phaser.GameObjects.Text; names: Phaser.GameObjects.Text[] };
+  private tabTexts: Phaser.GameObjects.Text[] = [];
+  private galaxyNames: Phaser.GameObjects.Text[] = [];
+  private galaxyButtonTexts: Phaser.GameObjects.Text[] = [];
+  private techChipTexts: Phaser.GameObjects.Text[] = [];
+  private techTexts: { title: Phaser.GameObjects.Text; sub: Phaser.GameObjects.Text }[] = [];
+  private scenarioBanner!: Phaser.GameObjects.Text;
+  private dockLabel!: Phaser.GameObjects.Text;
   private captions!: { name: Phaser.GameObjects.Text; cost: Phaser.GameObjects.Text; icon: Phaser.GameObjects.Image }[];
 
   constructor() {
@@ -278,6 +331,14 @@ export class GameScene extends Phaser.Scene {
       faction,
     }));
     this.sectorNodes = SECTORS.map((_, sector) => ({ x: SECTOR_STRIP.nodeX + sector * SECTOR_STRIP.nodeStep, y: SECTOR_STRIP.nodeY, r: SECTOR_STRIP.r, sector }));
+    this.modeTabs = PICK_MODES.map((mode, k) => ({ x: PICK_TABS.x + k * (PICK_TABS.w + PICK_TABS.gap), y: PICK_TABS.y, w: PICK_TABS.w, h: PICK_TABS.h, mode }));
+    // The galaxy's star map and the tech tree take the cards' place.
+    const area = this.cardArea();
+    this.galaxyNodes = GALAXY.map((g, sector) => ({ x: area.x + 30 + g.x * (area.w - 60), y: area.y + 16 + g.y * (area.h - 56), r: 14, sector }));
+    const chipW = (area.w - 4 * 8) / 5;
+    this.techChips = FACTIONS.map((_, faction) => ({ x: area.x + faction * (chipW + 8), y: area.y, w: chipW, h: 28, faction }));
+    const techW = (area.w - 2 * 10) / 3;
+    this.techCards = TECHS.map((tech) => ({ x: area.x + tech.branch * (techW + 10), y: area.y + 40 + tech.tier * 104, w: techW, h: 96, id: tech.id }));
     bakeAll(this);
     // The map scrolls in its own camera; the bars and the text sit on a second one that never moves.
     this.camera = this.cameras.main;
@@ -344,7 +405,7 @@ export class GameScene extends Phaser.Scene {
     // Tooltips: the hover label names a unit or building on the map; the tip describes a command button.
     this.tip = t(0, 0, 11, INK_CSS.chocolate, false, 25).setOrigin(0, 1).setPadding(7, 5, 7, 5).setBackgroundColor(INK_CSS.cream)
       .setWordWrapWidth(300).setVisible(false);
-    this.pickTitle = t(VIEW.w / 2, MAP_VIEW.y + 18 + GROW.dy / 2, 22, INK_CSS.mustard, true, 21).setOrigin(0.5, 0).setText(tr('chooseFaction'))
+    this.pickTitle = t(VIEW.w - 16 - GROW.dx / 2, MAP_VIEW.y + 16 + GROW.dy / 2, 20, INK_CSS.mustard, true, 21).setOrigin(1, 0).setText(tr('chooseFaction'))
       .setStroke(INK_CSS.chocolate, 5);
     // The rivals panel: a header, a row per rival with its stance and up to two buttons, and a hint while an offer is open.
     const rp = RIVALS_PANEL;
@@ -446,6 +507,18 @@ export class GameScene extends Phaser.Scene {
       kept: t(st.nodeX - st.r, st.y + 64, 10, INK_CSS.mustard, false, 21).setWordWrapWidth(st.x + st.w - st.nodeX).setMaxLines(1),
       names: this.sectorNodes.map((n) => t(n.x, n.y + n.r + 3, 9, INK_CSS.cream, true, 21).setOrigin(0.5, 0)),
     };
+    // The picker's tabs, the galaxy's star map and strip buttons, the tech tree and the scenario's banner and dock.
+    this.tabTexts = this.modeTabs.map((b) => t(b.x + b.w / 2, b.y + b.h / 2, 11, INK_CSS.chocolate, true, 21).setOrigin(0.5).setText(tr(MODE_NAME[b.mode])));
+    this.galaxyNames = this.galaxyNodes.map((n) => t(n.x, n.y + n.r + 3, 9, INK_CSS.cream, true, 21).setOrigin(0.5, 0).setText(tr(GALAXY[n.sector].name)));
+    this.galaxyButtonTexts = [0, 1].map(() => t(0, 0, 11, INK_CSS.chocolate, true, 21).setOrigin(0.5));
+    this.techChipTexts = this.techChips.map((c) => t(c.x + c.w / 2, c.y + c.h / 2, 11, INK_CSS.cream, true, 21).setOrigin(0.5).setText(tr(FACTIONS[c.faction].name)));
+    this.techTexts = this.techCards.map((c) => ({
+      title: t(c.x + 16, c.y + 8, 12, INK_CSS.chocolate, true, 21).setWordWrapWidth(c.w - 24).setMaxLines(1),
+      sub: t(c.x + 16, c.y + 28, 10, INK_CSS.cocoa, false, 21).setWordWrapWidth(c.w - 24).setMaxLines(4).setLineSpacing(1),
+    }));
+    this.scenarioBanner = t(8, TOP.h + 8, 11, INK_CSS.chocolate, true, 22).setPadding(8, 4, 8, 4).setBackgroundColor(INK_CSS.mustard).setVisible(false);
+    this.dockLabel = this.onMap(this.text(0, 0, 10, INK_CSS.chocolate, true).setBackgroundColor(INK_CSS.mustard).setPadding(6, 3, 6, 3)
+      .setDepth(DEPTH.label).setVisible(false).setText(tr('dockLabel')));
     this.rivalDeals = FACTIONS.slice(1).map((_, k) => t(RIVALS_PANEL.x + 24, RIVALS_PANEL.y + RIVALS_PANEL.head + k * RIVALS_PANEL.row + 49, 10, INK_CSS.rust, true, 22)
       .setVisible(false));
     Math.random = random;
@@ -470,6 +543,13 @@ export class GameScene extends Phaser.Scene {
     return { w: (right - left) / k, h: (bottom - top) / k + 4 };
   }
 
+  /** The picker's cards' area, which the galaxy's star map and the tech tree take over, in view pixels. */
+  private cardArea(): Box {
+    const first = this.pickCards[0];
+    const last = this.pickCards[this.pickCards.length - 1];
+    return { x: first.x, y: first.y, w: last.x + last.w - first.x, h: CARD_H };
+  }
+
   private text(x: number, y: number, size: number, color: string, bold = false) {
     return this.add.text(x, y, '', { fontFamily: FONT, fontSize: `${size}px`, color, fontStyle: bold ? 'italic bold' : '' });
   }
@@ -492,15 +572,21 @@ export class GameScene extends Phaser.Scene {
    * same sector again; the map has that sector's crystal. Watching always plays the first sector.
    */
   private newGame(furthest: boolean) {
-    this.sector = watching ? 0 : furthest ? this.campaign.unlocked - 1 : Math.min(this.sector, this.campaign.unlocked - 1);
+    if (watching || this.mode === 'sectors') {
+      this.sector = watching ? 0 : furthest ? this.campaign.unlocked - 1 : Math.min(this.sector, this.campaign.unlocked - 1);
+    }
     this.makeMap();
     // Watch mode (`?watch`) skips the picker: a random faction takes the first slot and the AI plays all five.
     if (watching) this.startBattle(Math.floor(Math.random() * FACTIONS.length));
   }
 
-  /** A fresh map for the current sector, under the picker. */
+  /**
+   * A fresh map under the picker: the chosen scenario's hand-made one, or a random map with the
+   * crystal of the current sector (in galaxy conquest, of its tier).
+   */
   private makeMap() {
-    this.layout = generateMap(FACTIONS.length, SECTORS[this.sector].loose);
+    this.layout = this.mode === 'scenario' ? scenarioOf(this.scenario).layout()
+      : generateMap(FACTIONS.length, SECTORS[this.mode === 'galaxy' && this.galaxy ? galaxyTier(this.galaxy) : this.sector].loose);
     this.picking = true;
     this.state = new World(this.layout);
     const res = bakeBackdrop(this, this.layout);
@@ -510,15 +596,70 @@ export class GameScene extends Phaser.Scene {
 
   /** Starts the battle with the chosen faction under the player's command, in the chosen sector with the campaign's kept perks. */
   private startBattle(faction: number) {
-    this.state = watching
-      ? new World(this.layout, faction, true)
-      : new World(this.layout, faction, false, this.sector, keptFor(this.campaign, this.sector));
+    const tech = techFor(this.tech, FACTIONS[faction].name);
+    const g = this.galaxy;
+    if (watching) this.state = new World(this.layout, faction, true);
+    else if (this.mode === 'galaxy' && g && this.target >= 0) {
+      const defender = g.owners[this.target];
+      const setup: BattleSetup = { mode: 'galaxy', tech, defender: { faction: defender, crystal: DEFENDER_CRYSTAL * held(g, defender) }, absent: outOfGalaxy(g) };
+      this.state = new World(this.layout, faction, false, galaxyTier(g), [], setup);
+      this.battleTarget = this.target;
+    } else if (this.mode === 'scenario') {
+      this.state = new World(this.layout, faction, false, 0, [], { mode: 'scenario', scenario: this.scenario, tech });
+    } else {
+      this.state = new World(this.layout, faction, false, this.sector, keptFor(this.campaign, this.sector), { tech });
+    }
     this.picking = false;
     if (watching) {
       const sides = Object.fromEntries(this.state.sides.map((s) => [String(s.index), { name: tr(s.def.name), color: `#${s.def.color.toString(16).padStart(6, '0')}` }]));
       mountWatch({ sides, time: () => this.state.elapsedMs });
     }
     this.reset();
+    if (this.state.mode === 'galaxy') this.message = tr('galaxyBattle', { name: tr(GALAXY[this.battleTarget].name) });
+    if (this.state.scenario) this.message = tr(scenarioOf(this.state.scenario).brief, { s: RELAY_HOLD });
+  }
+
+  /**
+   * A battle is over (not watching): its salvage goes to the tech tree's bank, a galaxy battle takes
+   * or loses a sector, and a scenario won keeps its best time. The end overlay says what happened.
+   */
+  private battleOver() {
+    const s = this.state;
+    const won = s.phase === 'won';
+    this.tech = bankSalvage(this.tech, s.salvaged, won);
+    saveTech(this.tech);
+    this.message = tr('salvageBanked', { n: Math.round(s.salvaged) + (won ? WIN_SALVAGE : 0), total: this.tech.salvage });
+    if (s.mode === 'galaxy' && this.galaxy && this.battleTarget >= 0) {
+      const target = this.battleTarget;
+      const defender = FACTIONS[this.galaxy.owners[target]];
+      const { galaxy, lost } = afterBattle(this.galaxy, target, won);
+      if (conquered(galaxy)) {
+        this.outcome = tr('galaxyConquered');
+        this.galaxy = null;
+        galaxyWon();
+      } else if (held(galaxy) === 0) {
+        this.outcome = tr('galaxyLost');
+        this.galaxy = null;
+      } else {
+        this.galaxy = galaxy;
+        this.outcome = won ? tr('sectorTaken', { name: tr(GALAXY[target].name) })
+          : tr('sectorLost', { faction: tr(defender.name), name: tr(GALAXY[lost].name) });
+      }
+      saveGalaxy(this.galaxy);
+      this.target = -1;
+      this.battleTarget = -1;
+    } else if (s.scenario) {
+      const name = tr(scenarioOf(s.scenario).name);
+      if (won) this.scenarioBest = winScenario(this.scenarioBest, s.scenario, s.elapsedMs);
+      this.outcome = won ? tr('scenarioWon', { name, time: this.clockText(s.elapsedMs) })
+        : tr('scenarioLost', { name, why: tr(s.scenarioLost ?? 'hubLost') });
+    }
+  }
+
+  /** A time in minutes and seconds, like the top bar's clock. */
+  private clockText(ms: number) {
+    const sec = Math.max(0, Math.ceil(ms / 1000));
+    return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
   }
 
   private reset() {
@@ -539,6 +680,8 @@ export class GameScene extends Phaser.Scene {
     this.flash = { amount: 0, ms: 0 };
     this.boardCards = [];
     this.keepCards = [];
+    this.outcome = '';
+    this.abandonArmed = false;
     for (const s of this.ships.values()) {
       s.ship.destroy();
       s.flame.destroy();
@@ -685,6 +828,7 @@ export class GameScene extends Phaser.Scene {
     if (!this.picking && s.phase !== this.endPhase) {
       this.endPhase = s.phase;
       if (s.phase !== 'playing') {
+        if (!s.watch) this.battleOver();
         stopMusic();
         this.musicPart = '';
         playSting(SONG, s.watch ? 'end' : s.phase === 'won' ? 'win' : 'lose');
@@ -830,6 +974,7 @@ export class GameScene extends Phaser.Scene {
     this.drawBoard();
     this.drawPact();
     this.drawConvoy();
+    this.drawScenario();
     this.drawKeep();
     this.drawMinimap();
     this.drawPicker();
@@ -1442,10 +1587,10 @@ export class GameScene extends Phaser.Scene {
     if (target.kind === 'unit') {
       const u = this.state.unit(target.id)!;
       const rank = this.state.rankOf(u);
-      const name = tr(u.flagship ? side.def.flagship.name : side.def.units[u.type].name);
+      const name = u.carrier ? tr('carrierName') : tr(u.flagship ? side.def.flagship.name : side.def.units[u.type].name);
       const hp = tr('hp', { hp: Math.ceil(u.hp), max: u.maxHp });
       const head = `${name} · ${rank ? `${tr(VETERAN_NAMES[rank - 1])} ${'★'.repeat(rank)} · ` : ''}${tr(ROLE_LABEL[u.flagship ? 'flagship' : u.type])} · ${hp}`;
-      text = [head, ...(u.flagship ? flagshipLines(side) : unitLines(side, u.type))].join('\n');
+      text = [head, ...(u.carrier ? [tr('carrierLine')] : u.flagship ? flagshipLines(side) : unitLines(side, u.type))].join('\n');
       at = u;
     } else {
       // A rival building under the fog shows as last seen (even one fallen since): its owner, name and role then, not its hit points now.
@@ -1729,7 +1874,8 @@ export class GameScene extends Phaser.Scene {
     const side = s.sides[PLAYER];
     let line = this.message;
     if (this.picking) {
-      line = tr('hintPick');
+      line = this.mode === 'galaxy' ? tr(this.galaxy ? 'hintGalaxy' : 'hintGalaxyStart')
+        : this.mode === 'scenario' ? tr('hintScenario') : this.mode === 'tech' ? tr('hintTech') : tr('hintPick');
     } else if (this.placing === 'expansion') {
       line = tr('hintPlaceOutpost', { name: buildInfo(side, 'expansion').name });
     } else if (this.placing) {
@@ -1803,9 +1949,10 @@ export class GameScene extends Phaser.Scene {
 
     const end = s.watch && s.phase === 'won'
       ? tr('watchWins', { faction: s.sides[s.winner] ? tr(s.sides[s.winner].def.name).toUpperCase() : tr('nobody') })
+      : s.phase !== 'playing' && s.mode !== 'sectors' ? this.outcome
       : s.phase === 'won' ? this.victoryText() : s.phase === 'lost' ? tr('defeat', { n: s.sector + 1 }) : '';
     this.setText(this.overlay, end);
-    this.overlay.setVisible(end !== '').setFontSize(this.keepCards.length ? 34 : 44)
+    this.overlay.setVisible(end !== '').setFontSize(this.keepCards.length ? 34 : s.mode !== 'sectors' ? 32 : 44)
       .setY(this.keepCards.length ? KEEP.y - 70 : MAP_VIEW.y + MAP_VIEW.h / 2);
   }
 
@@ -1821,7 +1968,7 @@ export class GameScene extends Phaser.Scene {
   /** The perks the player can keep after a campaign victory: one per contract done this battle. */
   private keepable(): Goal[] {
     const s = this.state;
-    return s.phase === 'won' && !s.watch ? [...new Set(s.contract.done)] : [];
+    return s.phase === 'won' && !s.watch && s.mode === 'sectors' ? [...new Set(s.contract.done)] : [];
   }
 
   /** After a campaign victory, a card for each perk earned this battle; tapping one keeps it. */
@@ -1894,7 +2041,7 @@ export class GameScene extends Phaser.Scene {
   private drawPact() {
     const pact = this.state.pact;
     const show = !!pact && !this.picking && this.state.phase === 'playing';
-    this.pactBanner.setVisible(show);
+    this.pactBanner.setVisible(show).setY(TOP.h + (this.state.scenario ? 34 : 8));
     if (!show) return;
     const sec = Math.ceil(pact.ms / 1000);
     this.setText(this.pactBanner, tr(pact.waves ? 'pactBannerNext' : 'pactBanner', { time: `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}` }));
@@ -1916,22 +2063,79 @@ export class GameScene extends Phaser.Scene {
     this.convoyLabel.setPosition(to.x + 22, to.y + 18);
   }
 
-  /** The faction picker: a dark veil over the map and a cream card for each faction. */
+  /**
+   * A scenario's banner on the map's top left (the carrier's leg and hull, the time left to hold
+   * out, or the beacon's hold times), and for the escort the carrier's route and the dock.
+   */
+  private drawScenario() {
+    const s = this.state;
+    const id = s.scenario;
+    const show = !!id && !this.picking && s.phase === 'playing';
+    this.scenarioBanner.setVisible(show);
+    this.dockLabel.setVisible(show && id === 'escort');
+    if (!show) return;
+    if (id === 'escort') {
+      const c = s.unit(s.carrier);
+      const dock = CARRIER_ROUTE[CARRIER_ROUTE.length - 1];
+      const g = this.underGfx;
+      dashedCircle(g, dock.x, dock.y, DOCK_RADIUS, 20, INK.mustard, 0.95, 2);
+      this.dockLabel.setPosition(dock.x - 60, dock.y + DOCK_RADIUS - 4);
+      if (c) {
+        const rest = [c, ...CARRIER_ROUTE.slice(s.scenarioHeld[0])];
+        g.lineStyle(1.5, INK.mustard, 0.5);
+        for (let k = 1; k < rest.length; k++) g.lineBetween(rest[k - 1].x, rest[k - 1].y, rest[k].x, rest[k].y);
+        dashedCircle(g, c.x, c.y, 24, 12, INK.mustard, 0.9, 2);
+        const hull = Math.round((c.hp / c.maxHp) * 100);
+        this.setText(this.scenarioBanner, s.elapsedMs < CARRIER_DEPART_MS
+          ? tr('carrierWaits', { time: this.clockText(CARRIER_DEPART_MS - s.elapsedMs), hull })
+          : tr('carrierFlies', { n: Math.min(CARRIER_ROUTE.length, s.scenarioHeld[0] + 1), total: CARRIER_ROUTE.length, hull }));
+      }
+    } else if (id === 'survive') {
+      this.setText(this.scenarioBanner, tr('surviveBanner', { time: this.clockText(SURVIVE_MS - s.elapsedMs) }));
+    } else {
+      const rival = Math.max(...s.scenarioHeld.filter((_, i) => i !== PLAYER));
+      this.setText(this.scenarioBanner, tr('relayBanner', { n: Math.floor(s.scenarioHeld[PLAYER]), rival: Math.floor(rival), target: RELAY_HOLD }));
+    }
+  }
+
+  /** The faction picker: a dark veil over the map, the mode tabs and a cream card for each faction (or the galaxy's map, or the tech tree). */
   private drawPicker() {
     const show = this.picking;
+    const cards = show && (this.mode === 'sectors' || this.mode === 'scenario' || (this.mode === 'galaxy' && !this.galaxy));
+    const tabs = show && !watching;
     this.pickTitle.setVisible(show);
     this.pickTexts.forEach((t) => {
-      t.name.setVisible(show);
-      t.body.setVisible(show);
+      t.name.setVisible(cards);
+      t.body.setVisible(cards);
     });
-    this.pickImages.forEach((i) => i.setVisible(show));
+    this.pickImages.forEach((i) => i.setVisible(cards));
+    this.tabTexts.forEach((x) => x.setVisible(tabs));
     const st = this.sectorTexts;
-    [st.title, st.body, st.kept, ...st.names].forEach((x) => x.setVisible(show && !watching));
+    [st.title, st.body, st.kept].forEach((x) => x.setVisible(tabs));
+    st.names.forEach((x, k) => x.setVisible(tabs && (this.mode === 'sectors' || (this.mode === 'scenario' && k < SCENARIOS.length))));
+    const map = tabs && this.mode === 'galaxy' && !!this.galaxy;
+    this.galaxyNames.forEach((x) => x.setVisible(map));
+    this.galaxyButtonTexts.forEach((x) => x.setVisible(map));
+    if (!map) this.galaxyButtons = [];
+    const tree = tabs && this.mode === 'tech';
+    this.techChipTexts.forEach((x) => x.setVisible(tree));
+    this.techTexts.forEach((x) => {
+      x.title.setVisible(tree);
+      x.sub.setVisible(tree);
+    });
     if (!show) return;
     const g = this.pickGfx;
     g.fillStyle(0x140a1c, 0.72);
     g.fillRect(MAP_VIEW.x, MAP_VIEW.y, MAP_VIEW.w, MAP_VIEW.h);
-    if (!watching) this.drawSectors();
+    if (!watching) {
+      this.drawTabs();
+      if (this.mode === 'sectors') this.drawSectors();
+      else if (this.mode === 'galaxy') this.drawGalaxy();
+      else if (this.mode === 'scenario') this.drawScenarios();
+      else this.drawTech();
+    }
+    this.setText(this.pickTitle, tr(this.mode === 'tech' ? 'techHead' : this.mode === 'galaxy' && this.galaxy ? 'galaxyHead' : 'chooseFaction'));
+    if (!cards) return;
     for (const c of this.pickCards) {
       const def = FACTIONS[c.faction];
       g.fillStyle(0x000000, 0.4);
@@ -1957,13 +2161,9 @@ export class GameScene extends Phaser.Scene {
    */
   private drawSectors() {
     const g = this.pickGfx;
-    const st = SECTOR_STRIP;
     const t = this.sectorTexts;
     const c = this.campaign;
-    g.fillStyle(INK.chocolate, 0.92);
-    g.fillRoundedRect(st.x, st.y, st.w, st.h, 10);
-    g.lineStyle(1.5, INK.mustard, 0.8);
-    g.strokeRoundedRect(st.x, st.y, st.w, st.h, 10);
+    this.drawStrip(false);
     const sector = SECTORS[this.sector];
     this.setText(t.title, tr('sectorTitle', { n: this.sector + 1, name: tr(sector.name).toUpperCase() }));
     this.setText(t.body, sectorText(sector));
@@ -1991,6 +2191,177 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  /** The picker's mode tabs: cream pills, the open one mustard. */
+  private drawTabs() {
+    const g = this.pickGfx;
+    for (const b of this.modeTabs) {
+      const on = b.mode === this.mode;
+      g.fillStyle(0x000000, 0.35);
+      g.fillRoundedRect(b.x + 2, b.y + 3, b.w, b.h, b.h / 2);
+      g.fillStyle(on ? INK.mustard : INK.cream, 1);
+      g.fillRoundedRect(b.x, b.y, b.w, b.h, b.h / 2);
+      g.lineStyle(on ? 2.5 : 1.5, on ? INK.tangerine : INK.cocoa, 1);
+      g.strokeRoundedRect(b.x, b.y, b.w, b.h, b.h / 2);
+    }
+  }
+
+  /** The strip under the cards: its box, and the texts' wrap width (wider where it has no node chain). */
+  private drawStrip(wide: boolean) {
+    const g = this.pickGfx;
+    const st = SECTOR_STRIP;
+    g.fillStyle(INK.chocolate, 0.92);
+    g.fillRoundedRect(st.x, st.y, st.w, st.h, 10);
+    g.lineStyle(1.5, INK.mustard, 0.8);
+    g.strokeRoundedRect(st.x, st.y, st.w, st.h, 10);
+    const t = this.sectorTexts;
+    const w = wide ? st.w - 200 : st.nodeX - st.x - 44;
+    if (t.body.style.wordWrapWidth !== w) t.body.setWordWrapWidth(w);
+    t.kept.setX(wide ? st.x + 14 : st.nodeX - st.r);
+    if (t.kept.style.wordWrapWidth !== (wide ? w : st.x + st.w - st.nodeX)) t.kept.setWordWrapWidth(wide ? w : st.x + st.w - st.nodeX);
+  }
+
+  /**
+   * Galaxy conquest on the picker. With none under way, the cards pick the faction to start one
+   * with. Under way, the star map takes the cards' place: each sector in its holder's colour, the
+   * player's ringed in cream, those the player can attack in dashed mustard and the one picked in
+   * tangerine; the strip names it, with Attack and New galaxy buttons.
+   */
+  private drawGalaxy() {
+    const st = SECTOR_STRIP;
+    const t = this.sectorTexts;
+    const gx = this.galaxy;
+    this.drawStrip(true);
+    if (!gx) {
+      this.setText(t.title, tr('galaxyTitle'));
+      this.setText(t.body, tr('galaxyIntro'));
+      this.setText(t.kept, tr('galaxyPick'));
+      return;
+    }
+    const g = this.pickGfx;
+    const area = this.cardArea();
+    g.fillStyle(0x0d0716, 0.85);
+    g.fillRoundedRect(area.x, area.y, area.w, area.h, 12);
+    g.lineStyle(1.5, INK.cocoa, 1);
+    g.strokeRoundedRect(area.x, area.y, area.w, area.h, 12);
+    const open = targets(gx);
+    for (const [a, b] of LANES) {
+      const na = this.galaxyNodes[a];
+      const nb = this.galaxyNodes[b];
+      const front = (gx.owners[a] === gx.faction) !== (gx.owners[b] === gx.faction) && (gx.owners[a] === gx.faction || gx.owners[b] === gx.faction);
+      g.lineStyle(front ? 2.5 : 1.5, front ? INK.mustard : INK.cocoa, front ? 0.9 : 0.8);
+      g.lineBetween(na.x, na.y, nb.x, nb.y);
+    }
+    for (const n of this.galaxyNodes) {
+      const owner = gx.owners[n.sector];
+      const mine = owner === gx.faction;
+      g.fillStyle(FACTIONS[owner].color, 1);
+      g.fillCircle(n.x, n.y, n.r);
+      g.lineStyle(mine ? 3 : 1.5, mine ? INK.cream : INK.chocolate, 1);
+      g.strokeCircle(n.x, n.y, n.r);
+      if (n.sector === this.target) {
+        g.lineStyle(3, INK.tangerine, 1);
+        g.strokeCircle(n.x, n.y, n.r + 5);
+      } else if (open.includes(n.sector)) dashedCircle(g, n.x, n.y, n.r + 5, 10, INK.mustard, 0.9, 1.5);
+      this.galaxyNames[n.sector].setColor(mine ? INK_CSS.mustard : INK_CSS.cream);
+    }
+    const mine = held(gx);
+    if (this.target >= 0) {
+      const owner = FACTIONS[gx.owners[this.target]];
+      this.setText(t.title, tr('galaxyTarget', { name: tr(GALAXY[this.target].name).toUpperCase(), faction: tr(owner.name) }));
+      this.setText(t.body, tr('galaxyTargetText', { faction: tr(owner.name), n: DEFENDER_CRYSTAL * held(gx, gx.owners[this.target]), tier: galaxyTier(gx) + 1 }));
+    } else {
+      this.setText(t.title, tr('galaxyHeld', { faction: tr(FACTIONS[gx.faction].name).toUpperCase(), n: mine, total: GALAXY.length }));
+      this.setText(t.body, tr('galaxyPickTarget', { n: open.length }));
+    }
+    this.setText(t.kept, gx.news ? tr('galaxyNews', { faction: tr(FACTIONS[gx.news.faction].name), name: tr(GALAXY[gx.news.sector].name) })
+      : tr('galaxyBattles', { n: gx.battles }));
+    // The strip's buttons: Attack (once a sector is picked) and New galaxy (tapped twice).
+    const bx = st.x + st.w - 160;
+    this.galaxyButtons = [
+      { x: bx, y: st.y + 10, w: 146, h: 28, action: 'attack' },
+      { x: bx, y: st.y + 46, w: 146, h: 26, action: 'abandon' },
+    ];
+    this.galaxyButtons.forEach((b, k) => {
+      const live = b.action === 'abandon' || this.target >= 0;
+      const hot = b.action === 'attack' ? INK.mustard : this.abandonArmed ? INK.tangerine : INK.cream;
+      g.fillStyle(live ? hot : INK.cocoa, 1);
+      g.fillRoundedRect(b.x, b.y, b.w, b.h, b.h / 2);
+      g.lineStyle(1.5, INK.chocolate, 1);
+      g.strokeRoundedRect(b.x, b.y, b.w, b.h, b.h / 2);
+      const text = this.galaxyButtonTexts[k];
+      text.setPosition(b.x + b.w / 2, b.y + b.h / 2);
+      this.setText(text, b.action === 'attack' ? tr('galaxyAttack') : tr(this.abandonArmed ? 'galaxyAbandonSure' : 'galaxyAbandon'));
+    });
+  }
+
+  /** The scenarios on the picker's strip: the chosen one's name, goal and best time, and a node for each. */
+  private drawScenarios() {
+    const g = this.pickGfx;
+    const t = this.sectorTexts;
+    this.drawStrip(false);
+    const sc = scenarioOf(this.scenario);
+    const best = this.scenarioBest[this.scenario];
+    this.setText(t.title, tr('scenarioTitle', { name: tr(sc.name).toUpperCase() }));
+    this.setText(t.body, tr(sc.brief, { s: RELAY_HOLD }));
+    this.setText(t.kept, best ? tr('scenarioBest', { time: this.clockText(best) }) : tr('scenarioNone'));
+    const nodes = this.sectorNodes.slice(0, SCENARIOS.length);
+    g.lineStyle(3, INK.cocoa, 1);
+    g.lineBetween(nodes[0].x, nodes[0].y, nodes[nodes.length - 1].x, nodes[0].y);
+    nodes.forEach((n, k) => {
+      const id = SCENARIOS[k].id;
+      const on = id === this.scenario;
+      g.fillStyle(this.scenarioBest[id] ? INK.mustard : INK.cream, 1);
+      g.fillCircle(n.x, n.y, n.r);
+      g.lineStyle(on ? 3 : 1.5, on ? INK.tangerine : INK.chocolate, 1);
+      g.strokeCircle(n.x, n.y, on ? n.r + 3 : n.r);
+      this.setText(t.names[k], tr(SCENARIOS[k].name));
+      t.names[k].setColor(INK_CSS.cream);
+    });
+  }
+
+  /**
+   * The tech tree on the picker: a chip per faction along the top (the chosen one mustard), then
+   * that faction's six techs, a column per branch with its second tier under its first. A bought
+   * tech is mustard, one that can be bought cream, the rest dim. The strip shows the bank.
+   */
+  private drawTech() {
+    const g = this.pickGfx;
+    const t = this.sectorTexts;
+    this.drawStrip(true);
+    const def = FACTIONS[this.techFaction];
+    const have = techFor(this.tech, def.name);
+    this.setText(t.title, tr('techTitle', { n: this.tech.salvage }));
+    this.setText(t.body, tr('techIntro'));
+    this.setText(t.kept, tr('techFor', { faction: tr(def.name), n: have.length, total: TECHS.length }));
+    for (const c of this.techChips) {
+      const on = c.faction === this.techFaction;
+      g.fillStyle(on ? INK.mustard : INK.chocolate, 1);
+      g.fillRoundedRect(c.x, c.y, c.w, c.h, c.h / 2);
+      g.lineStyle(on ? 2.5 : 1.5, on ? INK.tangerine : INK.mustard, 1);
+      g.strokeRoundedRect(c.x, c.y, c.w, c.h, c.h / 2);
+      g.fillStyle(FACTIONS[c.faction].color, 1);
+      g.fillCircle(c.x + 14, c.y + c.h / 2, 5);
+      this.techChipTexts[c.faction].setColor(on ? INK_CSS.chocolate : INK_CSS.cream);
+    }
+    this.techCards.forEach((c, k) => {
+      const tech = TECHS[k];
+      const problem = techProblem(this.tech, def.name, tech.id);
+      const fill = problem === 'owned' ? INK.mustard : problem === null ? INK.cream : INK.creamDim;
+      g.fillStyle(0x000000, 0.4);
+      g.fillRoundedRect(c.x + 3, c.y + 4, c.w, c.h, 10);
+      g.fillStyle(fill, 1);
+      g.fillRoundedRect(c.x, c.y, c.w, c.h, 10);
+      g.fillStyle(problem === 'owned' ? INK.green : INK.tangerine, 1);
+      g.fillRect(c.x + 6, c.y + 8, 3, c.h - 16);
+      g.lineStyle(2, problem === null ? INK.tangerine : INK.cocoa, 1);
+      g.strokeRoundedRect(c.x, c.y, c.w, c.h, 10);
+      const state = problem === 'owned' ? tr('techOwned') : problem === 'locked' ? tr('techLocked', { name: tr(TECHS.find((o) => o.branch === tech.branch && o.tier === 0)!.name) })
+        : tr('techCost', { n: tech.cost });
+      this.setText(this.techTexts[k].title, tr('techCard', { branch: tr(BRANCHES[tech.branch]), tier: RANKS[tech.tier], name: tr(tech.name) }));
+      this.setText(this.techTexts[k].sub, `${tr(tech.text)}\n${state}`);
+    });
+  }
+
   /** The midpoint of the two fingers down on the screen, in view pixels, or null unless two are down. */
   private twoFingers() {
     const down = [this.input.pointer1, this.input.pointer2].filter((t) => t?.isDown);
@@ -2011,7 +2382,7 @@ export class GameScene extends Phaser.Scene {
     const inside = (r: { x: number; y: number; w: number; h: number }) => p.x >= r.x && p.x < r.x + r.w && p.y >= r.y && p.y < r.y + r.h;
     if (this.state.phase !== 'playing') {
       // A campaign victory keeps the tapped perk and opens the next sector; with nothing to keep any tap goes on.
-      if (this.state.phase === 'won' && !watching) {
+      if (this.state.phase === 'won' && !watching && this.state.mode === 'sectors') {
         const keep = this.keepCards.find(inside);
         if (this.keepCards.length && !keep) return;
         this.campaign = winSector(this.campaign, this.state.sector, keep?.goal ?? null);
@@ -2031,10 +2402,27 @@ export class GameScene extends Phaser.Scene {
     // Watching, the AI gives every order; the map still pans.
     if (watching) return;
     if (this.picking) {
+      const tab = this.modeTabs.find(inside);
+      if (tab) {
+        if (tab.mode !== this.mode) this.pickMode(tab.mode);
+        return;
+      }
+      if (this.mode === 'galaxy') return this.tapGalaxy(p, inside);
+      if (this.mode === 'tech') return this.tapTech(inside);
       const card = this.pickCards.find(inside);
       if (card) {
         ui('click');
         this.startBattle(card.faction);
+        return;
+      }
+      if (this.mode === 'scenario') {
+        const at = this.sectorNodes.slice(0, SCENARIOS.length).findIndex((n) => Math.hypot(p.x - n.x, p.y - n.y) <= n.r + 6);
+        if (at >= 0 && SCENARIOS[at].id !== this.scenario) {
+          ui('click');
+          this.scenario = SCENARIOS[at].id;
+          this.makeMap();
+        }
+        return;
       }
       // An open sector's node picks where the next battle is fought, on a map of its own.
       const node = this.sectorNodes.find((n) => Math.hypot(p.x - n.x, p.y - n.y) <= n.r + 6);
@@ -2133,6 +2521,71 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     this.drag = { x0: p.x, y0: p.y, x1: p.x, y1: p.y };
+  }
+
+  /** Opens a tab of the picker; the map under it is made afresh for the battle that tab plays. */
+  private pickMode(mode: PickMode) {
+    ui('click');
+    this.mode = mode;
+    this.target = -1;
+    this.abandonArmed = false;
+    if (mode !== 'tech') this.newGame(true);
+  }
+
+  /** A tap on the galaxy tab: a faction card starts a galaxy; then a sector to attack, Attack or New galaxy. */
+  private tapGalaxy(p: { x: number; y: number }, inside: (r: Box) => boolean) {
+    const gx = this.galaxy;
+    if (!gx) {
+      const card = this.pickCards.find(inside);
+      if (!card) return;
+      ui('click');
+      this.galaxy = newGalaxy(card.faction);
+      saveGalaxy(this.galaxy);
+      this.makeMap();
+      return;
+    }
+    const button = this.galaxyButtons.find(inside);
+    if (button?.action === 'attack') {
+      if (this.target < 0) return ui('refuse');
+      ui('click');
+      this.startBattle(gx.faction);
+      return;
+    }
+    if (button?.action === 'abandon') {
+      ui('click');
+      if (!this.abandonArmed) {
+        this.abandonArmed = true;
+        return;
+      }
+      this.galaxy = null;
+      saveGalaxy(null);
+      this.target = -1;
+      this.abandonArmed = false;
+      return;
+    }
+    const node = this.galaxyNodes.find((n) => Math.hypot(p.x - n.x, p.y - n.y) <= n.r + 6);
+    if (!node) return;
+    if (!targets(gx).includes(node.sector)) return ui('refuse');
+    ui('click');
+    this.target = node.sector;
+    this.abandonArmed = false;
+  }
+
+  /** A tap on the tech tab: a faction chip shows its tree, a tech card buys it. */
+  private tapTech(inside: (r: Box) => boolean) {
+    const chip = this.techChips.find(inside);
+    if (chip) {
+      ui('click');
+      this.techFaction = chip.faction;
+      return;
+    }
+    const card = this.techCards.find(inside);
+    if (!card) return;
+    const faction = FACTIONS[this.techFaction].name;
+    if (techProblem(this.tech, faction, card.id)) return ui('refuse');
+    this.tech = buyTech(this.tech, faction, card.id);
+    saveTech(this.tech);
+    ui('coin');
   }
 
   private onMove(pointer: Phaser.Input.Pointer) {

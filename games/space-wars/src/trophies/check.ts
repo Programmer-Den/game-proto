@@ -15,8 +15,13 @@ const EARNED: Record<string, (w: World) => boolean> = {
   flagship: (w) => w.sides[PLAYER].flagship.state === 'out',
   victory: (w) => w.phase === 'won',
   outpaced: (w) => w.contract.done.length >= CONTRACT_STEPS && w.sides.every((s) => s.index === PLAYER || s.deal.step < CONTRACT_STEPS),
-  campaign: (w) => w.phase === 'won' && w.sector === SECTORS.length - 1,
+  campaign: (w) => w.phase === 'won' && w.mode === 'sectors' && w.sector === SECTORS.length - 1,
 };
+
+/** Galaxy conquest is won (every sector held): the scene calls it once, when the battle that took the last sector ends. */
+export function galaxyWon() {
+  award(trophies, 'galaxy');
+}
 
 /** Awards every trophy whose condition holds; the scene calls it every frame of a battle, never while watching. */
 export function checkTrophies(w: World) {

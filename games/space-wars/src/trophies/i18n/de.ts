@@ -21,6 +21,8 @@ const de: Translation<typeof en> = {
   outpacedText: 'Erfülle alle fünf Verträge, bevor ein Rivale seine Kette erfüllt.',
   campaign: 'Herr der Sektoren',
   campaignText: 'Gewinne den letzten Sektor der Kampagne.',
+  galaxy: 'Galaxie erobert',
+  galaxyText: 'Erobere jeden Sektor einer Galaxie.',
 };
 
 export default de;
