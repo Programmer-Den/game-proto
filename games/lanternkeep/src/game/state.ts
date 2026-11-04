@@ -1604,12 +1604,19 @@ export function nextDusk(s: GameState) {
 }
 
 /**
- * Warned event times (dusk left, latest first) moved earlier where a short dusk would start inside
- * their warning: each comes at least `warnMs` + 1 s before the dusk's start and after the one before
- * it, so a summer dusk keeps every gust, still warned. A dusk long enough for them leaves them as they are.
+ * A gust is warned only while a lantern is lit, so a fitted first gust's warning begins as far into
+ * the dusk as a spring dusk's first one does (6 s), time for the moths to light a lantern.
  */
-function fitTimes(times: number[], warnMs: number, duskMax: number) {
-  let latest = duskMax - warnMs - 1_000;
+const GUST_LEAD_MS = DUSK_MS - 34_000 - GUST_WARN_MS;
+
+/**
+ * Warned event times (dusk left, latest first) moved later where a short dusk would start inside
+ * their warning: each comes at most `duskMax` - `warnMs` - `leadMs` of dusk left (its warning begins
+ * `leadMs` into the dusk), and at least `warnMs` + 1 s after the one before it, so a summer dusk
+ * keeps every gust, still warned. A dusk long enough for them leaves them as they are.
+ */
+function fitTimes(times: number[], warnMs: number, duskMax: number, leadMs = 1_000) {
+  let latest = duskMax - warnMs - leadMs;
   return times.map((at) => {
     const fitted = Math.min(at, latest);
     latest = fitted - warnMs - 1_000;
@@ -1627,7 +1634,7 @@ function startDusk(s: GameState) {
   s.queue = [];
   s.report = null;
   s.order = orderFor(s.night);
-  s.gusts = fitTimes(gustsFor(s.night, s.kind), GUST_WARN_MS, s.duskMax);
+  s.gusts = fitTimes(gustsFor(s.night, s.kind), GUST_WARN_MS, s.duskMax, GUST_LEAD_MS);
   s.batTimes = batsFor(s.night, s.curses.bats);
   s.bats = [];
   s.chased = 0;

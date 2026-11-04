@@ -324,7 +324,7 @@ export class RaceScene extends Phaser.Scene {
     } else {
       const s = this.sides[w].state;
       this.endTitle.setText(t(w === 0 ? 'raceWinLeft' : 'raceWinRight'));
-      this.endText.setText(s.phase === 'crowned' ? t('raceCrowned', { tiers: s.tiersBuilt }) : t('raceLast', { n: s.tiersBuilt }));
+      this.endText.setText(s.phase === 'crowned' ? t('raceCrowned', { tiers: s.tiersBuilt }) : t('raceLast', { n: this.sides[1 - w].state.tiersBuilt }));
     }
     for (const part of this.endParts) part.setVisible(true);
   }

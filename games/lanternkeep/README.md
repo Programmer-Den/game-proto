@@ -76,8 +76,9 @@ stone joints, the lanterns have coloured-glass panes and the moths are lace-wing
    (a pale blue ring) until the gust has passed, then flies home. Otherwise the lantern goes dark.
    Night 1 has one gust (34 seconds before nightfall), nights 2 and 3 two (also 22), and every
    night after three (also 10). A summer dusk is too short to warn a gust at 34 seconds, so its
-   gusts come a little later and every one is still warned (30, 22 and 10; a summer storm's 30,
-   24, 18, 12 and 6). With no lantern lit, the wind passes harmlessly.
+   gusts come a little later and every one is still warned, the first 6 seconds into the dusk as in
+   spring (25, 19 and 10; a summer storm's 25, 19, 13, 7 and 1). With no lantern lit, the wind
+   passes harmlessly.
 7. **Close calls**: a lit lantern with under 15% of its oil left shows an orange ring and a
    "Save it +2c" tag. A moth that reaches it before it goes dark refills it as a close call and
    pays 2 coins at once ("+2c close call!", with a flare of sparks).

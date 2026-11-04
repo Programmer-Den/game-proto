@@ -243,9 +243,10 @@ Implemented today:
   event time (gusts, calls, bats, the owl, tides, ships) stays a time of dusk left, so a summer
   dusk starts with the 37 s call already due and a winter dusk has a quiet first stretch; only the
   warned gusts, tides and avalanches go through `fitTimes` in `startDusk`, which moves a time whose
-  warning would begin before the dusk does so that the warning begins 1 s into it, and keeps each
-  later one at least its warning and 1 s after the one before (a summer dusk's gusts come at 30, 22 and 10 s left, a summer storm's at 30,
-  24, 18, 12 and 6, the harbour's first tide at 30 and the monastery's first avalanche at 27).
+  warning would begin before the dusk does so that the warning begins 1 s into it (a gust's 6 s,
+  `GUST_LEAD_MS`, as on a spring dusk, since a gust is only warned while a lantern is lit), and keeps each
+  later one at least its warning and 1 s after the one before (a summer dusk's gusts come at 25, 19 and 10 s left, a summer storm's at 25,
+  19, 13, 7 and 1, the harbour's first tide at 30 and the monastery's first avalanche at 27).
 - A third keep (LK20): the Great Festival's panel (now `panel-move` size with three 180-wide
   buttons, `makeButton(..., narrow)` and the `btn-180` textures) has "Climb" (`climbButton`,
   `climb(s)`) right of "Set sail"; `sail` and `climb` exclude each other. It sets `climbed` and
