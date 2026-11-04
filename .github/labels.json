@@ -138,6 +138,11 @@
     "description": "Game: Mazewright"
   },
   {
+    "name": "stonemate",
+    "color": "5b7a99",
+    "description": "Game: Stonemate"
+  },
+  {
     "name": "hub",
     "color": "5b7a99",
     "description": "Game: The hub page and its settings",

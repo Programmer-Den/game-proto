@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <title>Stonemate</title>
+  <circle cx="7" cy="9" r="5" fill="#e37100"/>
+  <circle cx="25" cy="9" r="5" fill="#e37100"/>
+  <circle cx="7" cy="9" r="2.4" fill="#ffb787"/>
+  <circle cx="25" cy="9" r="2.4" fill="#ffb787"/>
+  <ellipse cx="16" cy="19.5" rx="13" ry="12" fill="#e37100"/>
+  <path d="M8.5 9 L7.5 2.5 L11.5 5.5 L14 1 L16 5 L18 1 L20.5 5.5 L24.5 2.5 L23.5 9 Z" fill="#e8e4da" stroke="#6d6a63" stroke-width="0.8" stroke-linejoin="round"/>
+  <circle cx="16" cy="6.8" r="1.1" fill="#ffb84d"/>
+  <circle cx="10.5" cy="17.5" r="2.3" fill="#0d1117"/>
+  <circle cx="21.5" cy="17.5" r="2.3" fill="#0d1117"/>
+  <circle cx="11.3" cy="16.7" r="0.8" fill="#ffffff"/>
+  <circle cx="22.3" cy="16.7" r="0.8" fill="#ffffff"/>
+  <ellipse cx="16" cy="24" rx="4.6" ry="3.3" fill="#ffdcc7"/>
+  <ellipse cx="16" cy="23" rx="2.2" ry="1.4" fill="#311300"/>
+</svg>

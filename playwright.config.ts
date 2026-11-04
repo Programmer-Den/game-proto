@@ -47,6 +47,7 @@ export default defineConfig({
     { name: 'ninefold', testDir: 'games/ninefold/e2e' },
     { name: 'augury', testDir: 'games/augury/e2e' },
     { name: 'mazewright', testDir: 'games/mazewright/e2e' },
+    { name: 'stonemate', testDir: 'games/stonemate/e2e' },
   ],
   webServer: {
     command: 'npm run dev -- --port 5173 --strictPort',

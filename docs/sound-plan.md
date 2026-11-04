@@ -627,6 +627,13 @@ beaten foe, a low buzz for a foe that gets in, a horn per wave, a fanfare for a 
 chewing scratch for the mole; a refused placement plays the shared `refuse` buzz. One sound per
 shot, rate-limited, so a full maze never turns into noise.
 
+### Stonemate
+**Done.** See the Sound section of `games/stonemate/AGENTS.md`: a slow hall tune in D minor (`calm`)
+for the menu and the capture gallery, a tenser `battle` part during a game, and `win` and `lose`
+stings. The capture scenes play stone and rune effects: a step for each shuffle, a stomp, a slam, a
+sword chop, cracking, shattering and tumbling rubble, a rune bolt, a beam and a clash, and a low
+gong for check. A tap while the Stone AI is thinking plays the shared `refuse` buzz.
+
 ### Ninefold
 Number-placement puzzle in nine art styles; calm, tidy, a music box on a desk.
 

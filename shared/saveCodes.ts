@@ -25,6 +25,7 @@ export const SAVE_CODES: Record<string, string> = {
   'scrapyard-titans': 'st',
   'shrine-stack': 'ss',
   'space-wars': 'sw',
+  stonemate: 'sm',
   'tincture-tinker': 'tt',
   'tiny-kingdom': 'tk',
   wyrmrail: 'wr',
