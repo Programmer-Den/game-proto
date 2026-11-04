@@ -10,7 +10,10 @@ until the Waggle Dance sends the bees out on their own. The year turns through f
 winter the bees stay home and eat honey; casks age jars into mead, a farmer borrows idle bees for
 the orchard, a crowded hive swarms into a second one under a queen you pick, meadows foraged
 without a break wilt, and the county honey fair, held every late summer, is the ending: its first
-gold makes you the Beehive Baron, and each year after asks for more.
+gold makes you the Beehive Baron, and each year after asks for more. Town buyers in a buyer's book
+pay a premium for mixed, pure and comb honey; each fair gold breeds a trait into the queen line;
+and after the first gold the Baron can buy plots for a third and a fourth hive, an apiary estate
+whose plots each have their own season quirks.
 
 ![A hive with every meadow open: clover, lavender and heather cells, two brood cells, the market board under the hive, a village order on the board and wax in the HUD](docs/screenshots/upgrades-overview.webp)
 
@@ -27,7 +30,7 @@ gold makes you the Beehive Baron, and each year after asks for more.
    comb bonus, plus 5 once the Sunflower Ridge is open; other kinds and the market change that.
 5. **The hive is kept**: the comb, coins, jars, wax, bees, upgrades, unlocked meadows, where
    the bees forage, the season and the bees' next winter meal, the casks, the hives and the queen, the fair entries and fairs held,
-   the tired meadows and the bees lent to the orchard are saved in the browser. Bees out foraging come home when the page reloads, and
+   the tired meadows, the traits bred in, the comb honey, this season's buyer's book and the bees lent to the orchard are saved in the browser. Bees out foraging come home when the page reloads, and
    wasps, the market's timer, village orders, contract offers and a gathering swarm start afresh. **New hive**, in the bottom
    right corner, starts over.
 
@@ -97,6 +100,27 @@ minutes, for example "Order: 4 Heather". Every jar of that kind you sell counts,
 order is sold it pays a premium of 8 coins per jar on top of the jars' price. A lapsed order pays
 nothing, and a new one comes 20 seconds after the last ends. Lavender is only ordered while its
 field stays open at least another minute, and its order lapses when autumn shuts the field.
+
+### The buyer's book
+
+From 20 jars sold, the **Buyer's book** chip on the hill left of the button board opens a book of
+three town buyers, one for each grade of honey, written anew every season at that season's
+prices. Each pays a premium on what a jar is worth before the market's demand (its price, the
+Sunflower Ridge and the comb bonus), swung up or down by the season (85% to 125%):
+
+| Grade | Asks for | Price |
+| --- | --- | --- |
+| Mixed | 6 to 8 jars of any honey (the cheapest jars go first) | 1.25 times a clover jar |
+| Pure | 3 to 5 jars of one kind | 1.6 times a jar of that kind |
+| Comb honey | 2 or 3 pieces of comb of one kind | 2.4 times a jar of that kind |
+
+Tap a buyer's row to supply it once you have the goods; each buyer is supplied once a season, and
+what they take counts as jars sold. **Cut comb honey** in the book arms the next tap on a capped
+cell to cut its honey out whole as a piece of comb: no jar and no wax, kept until a buyer asks for
+it (the book lists what you have). The chip counts the asks still open and turns orange when you
+can supply one.
+
+![The buyer's book: a mixed, a pure and a comb honey buyer, with the Cut comb honey button](docs/screenshots/buyers-book.webp)
 
 ### Wasp raids
 
@@ -224,6 +248,39 @@ Every fair after the first asks for more and adds a class, a ladder after the en
 
 ![Gold at the fair: the Beehive Baron end card](docs/screenshots/fair-baron.webp)
 
+### Bee breeds
+
+Every gold at the fair breeds a trait into the queen line: a card opens after the gold (after the
+Baron's end card the first time) with three traits, and each pick adds a rank, up to 3. The traits
+help every bee of every hive and are kept from year to year. Close the card to pick later: the
+fair card says a trait waits, and a tap on it opens the card again.
+
+| Trait | Each rank |
+| --- | --- |
+| Far flyers | +1 nectar a trip, but every trip takes 15% longer |
+| Wasp wardens | A raiding wasp takes 50% longer to steal a cell, more time to swat it |
+| Frost-hardy | 2 more bees share each winter meal (4 at first) |
+
+![After a gold: breed a trait into the queen line](docs/screenshots/breed-card.webp)
+
+### The apiary estate
+
+Once the fair's first gold is won and the swarm is caught, a chip over the meadow's foot offers a
+plot for a third hive, then a fourth. Each comes with its own empty comb (its first cell free), 2
+bees of its own and room for 12 more, and a roof tab; the plaque names the plot while its comb is
+shown. The hives share the market, the shelf and the coins, and each plot lies in a meadow region
+with its own season quirks:
+
+| Plot | Price | Season quirks |
+| --- | --- | --- |
+| Orchard Hollow (hive 3) | 500 coins | Its bees bring 2 more nectar a trip in spring, but eat twice as much in winter |
+| Riverside Meadow (hive 4) | 900 coins | Its honey ripens twice as fast in summer, and its bees eat half in winter |
+
+The rows of bees at the entrance show the pair of hives whose comb is shown (hives 1 and 2, or 3
+and 4).
+
+![The estate's third hive on Orchard Hollow, with its roof tab and plaque, and the plot chip offering the fourth](docs/screenshots/estate.webp)
+
 ### Trophies
 
 Ten trophies, listed behind the Trophies button on the start and pause screens and counted on the
@@ -256,6 +313,7 @@ hub's card. Each pops up at the top of the page once, when it is earned.
 | Guard Bees | 1 (150 coins) | Every wasp is driven off as it lands, before it steals anything |
 | Mead cask | up to 3 at a time, 3 jars of one kind each | Mead worth 1.5 to 1.8 times the jars, 90 seconds later |
 | Catch the swarm | once (180 coins), when the hive is crowded | A second hive with its own comb, room for 12 more bees and a queen of your pick |
+| Estate plot | twice (500, then 900 coins), after the first gold with two hives | A third, then a fourth hive with its own comb, 2 bees and room for 12 more, on a plot with its own season quirks |
 
 The difficulty, set on the hub page's Settings, changes one thing: foraging trips take 25% less
 time on Easy and 30% more on Hard.
@@ -288,10 +346,10 @@ All paths are inside `games/beehive-baron/`.
 - `src/game/`: the rules in plain TypeScript with no Phaser dependency. `state.ts` holds the hive,
   its numbers, prices and the comb bonus, `sim.ts` builds, forages, ripens, hatches, harvests,
   sells, buys, turns the seasons, runs the market, wasp raids, village orders, orchard contracts,
-  casks, swarms, tired meadows and the fair and adds the nectar gathered while away, `honey.ts` is
+  casks, swarms, tired meadows, the fair, the buyer's book, bee breeds and the estate's plots and adds the nectar gathered while away, `honey.ts` is
   the kinds of honey, `meadows.ts` the chain of goals, `upgrades.ts` the upgrade table, `wasps.ts`,
-  `orders.ts`, `seasons.ts`, `mead.ts`, `swarm.ts` (and the queens), `contracts.ts`, `tired.ts` and
-  `fair.ts` their numbers, and `save.ts`
+  `orders.ts`, `seasons.ts`, `mead.ts`, `swarm.ts` (and the queens), `contracts.ts`, `tired.ts`,
+  `fair.ts`, `book.ts` (the buyer's book), `breeds.ts` (the traits) and `estate.ts` (the plots) their numbers, and `save.ts`
   keeps the hive.
 - `src/scenes/`: `BootScene` bakes textures, `GameScene` draws the hive and turns taps into rules
   calls, `layout.ts` says where things are drawn.
