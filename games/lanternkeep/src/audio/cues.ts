@@ -17,6 +17,8 @@ export interface Snapshot {
   owl: 'none' | 'warned' | 'flying';
   bats: number[];
   call: boolean;
+  tide: 'none' | 'warned' | 'risen';
+  ship: boolean;
 }
 
 export function snapshot(s: GameState): Snapshot {
@@ -27,6 +29,8 @@ export function snapshot(s: GameState): Snapshot {
     owl: !s.owl ? 'none' : s.owl.x === null ? 'warned' : 'flying',
     bats: s.bats.map((b) => b.id),
     call: !!s.call,
+    tide: !s.tide ? 'none' : s.tide.risen ? 'risen' : 'warned',
+    ship: !!s.ship,
   };
 }
 
@@ -80,6 +84,19 @@ export function frameSounds(before: Snapshot, s: GameState, events: GameEvent[])
           ui('coin');
         } else sfx('callLost');
         break;
+      case 'ship':
+        if (e.guided) {
+          sfx('callKept');
+          ui('coin');
+        } else sfx('callLost');
+        break;
+      case 'tide':
+        darkened.add(e.lantern);
+        fizzle = true;
+        break;
+      case 'trait':
+        sfx('bloom');
+        break;
     }
   }
   // A lantern a moth just finished lighting or refilling (not one it left as it was, the cask dry).
@@ -104,6 +121,10 @@ export function frameSounds(before: Snapshot, s: GameState, events: GameEvent[])
   if (before.owl !== 'flying' && owl === 'flying') sfx('sweep');
   if (s.bats.some((b) => b.task === 'fly' && !before.bats.includes(b.id))) sfx('squeak');
   if (!before.call && s.call) sfx('chime');
+  const tide = !s.tide ? 'none' : s.tide.risen ? 'risen' : 'warned';
+  if (before.tide === 'none' && tide === 'warned') sfx('swellSea');
+  if (before.tide !== 'risen' && tide === 'risen') sfx('wash');
+  if (!before.ship && s.ship) sfx('horn');
   if (s.moths.some((m, i) => m.task === 'rest' && before.moths[i]?.task !== 'rest')) sfx('yawn');
 }
 

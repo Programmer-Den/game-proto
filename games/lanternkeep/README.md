@@ -35,7 +35,9 @@ stone joints, the lanterns have coloured-glass panes and the moths are lace-wing
 | Tap or click a district | At a fifth nightfall: move the keep there (or stay) |
 | Tap or click a curse | At a nightfall from the tenth: take it (or press Go on to take none) |
 | Next dusk | Between nights: start the next night's dusk |
-| Keep going | After the Great Festival: play on |
+| Keep going / Set sail | After the Great Festival: play on here, or sail to the harbour |
+| Tap or click a boon | At the Harbour Festival: keep it for this and every later game |
+| Daily night | On the night panel or after the game ends: play today's daily night |
 | New keep | After the game ends: start again |
 
 1. **Dusk lasts 45 seconds.** The bar at the top empties as the sun sinks.
@@ -142,6 +144,34 @@ stone joints, the lanterns have coloured-glass panes and the moths are lace-wing
     - **Restless bats**: one more bat comes every night.
     - **Thin oil**: oil burns 25% faster.
     - **Watchful lord**: one more lantern must burn at nightfall to keep the hearths.
+23. **The harbour, a second keep**: the Great Festival's panel offers "Set sail" beside "Keep
+    going". The keep then moves to a harbour town from the next dusk and stays there (no more
+    moving between districts), with its own ten spots, chains and two dangers:
+    - **The tide**: 32 and 14 seconds before nightfall the sea floods the low quay (the bottom
+      row of three lanterns), warned five seconds before by a wavy line and a countdown. For
+      seven seconds those lanterns are dark and can't be lit; moths on their way there turn home.
+    - **Ships**: 40 and 24 seconds before nightfall a ship sails in, first for the lighthouse,
+      then for the harbour master's lamp (a teal ring marks it). If that lantern is lit when the
+      ship arrives 12 seconds later it pays 6 coins ("ship guided home!"); dark, it turns away.
+    Keep ten nights in the harbour for the **Harbour Festival**, which offers three boons. The one
+    you pick lasts the rest of the game and every later game, in both keeps (a later Harbour
+    Festival can swap it):
+    - **Merchant's purse**: every game starts with 30 coins.
+    - **Harbour cask**: the cask holds two more fills (8) and starts full.
+    - **Pilot firefly**: every game starts with a free Firefly level.
+24. **Moth breeds**: every moth of the jar (not a firefly) remembers the flights it has ever
+    flown, from game to game, by its place in the jar. At 25, 75 and 150 flights it grows a
+    trait, shown as a coloured dot under it and a popup:
+    - **Swift** (gold dot): flies 20% faster.
+    - **Frugal** (orange dot): its fills give 25% more oil.
+    - **Gust-proof** (pale blue dot): a lantern it lights or refills shrugs off the next gust.
+    The first moth grows swift first, the second frugal, the third gust-proof, and so on round.
+25. **Daily night**: once a day, the "Daily night" link on the night panel (or the button after
+    the game ends) plays one seeded dusk, the same for every player that day: a night from 6 to
+    12 in one of the four first-keep districts, a kind of night, two curses, a level of every
+    upgrade but the Jar and a full cask, with no traits or boon. Your game waits and comes back
+    after it. The score is the coins at nightfall (halved if too few lanterns burn); today's
+    score, the best and the days in a row are kept. One try a day: leaving it half way uses it.
 
 ![The first lantern lit](docs/screenshots/playthrough-1-first-lantern.webp)
 
@@ -184,6 +214,14 @@ stone joints, the lanterns have coloured-glass panes and the moths are lace-wing
 ![Night 6: three tired moths resting, two of them at the second jar by the east wall](docs/screenshots/loop-tired-moths.webp)
 
 ![Night 10 falls: Restless bats taken, Watchful lord still offered](docs/screenshots/loop-peril.webp)
+
+![The harbour: the tide up over the low quay and a ship sailing in for the lighthouse](docs/screenshots/loop-harbour.webp)
+
+![The Harbour Festival's three boons](docs/screenshots/loop-harbour-festival.webp)
+
+![Moths in the jar with their trait dots, one just grown swift](docs/screenshots/loop-moth-breeds.webp)
+
+![The end of a daily night: today's score, the best and the streak](docs/screenshots/loop-daily-night.webp)
 
 ### Upgrades
 
@@ -255,8 +293,9 @@ All paths are inside `games/lanternkeep/`.
 - `src/game/`: the rules in plain TypeScript with no Phaser dependency. `state.ts` has dusk, moths,
   oil, gusts, close calls, the herald's orders, kinds of night, bats, chains, window calls, the
   cask, kinds of lantern, the Great Owl, nightfall, the Great Festival, the move between
-  districts and the upgrades, `places.ts` the districts (where their lanterns and chains are) and
-  the jar, and `save.ts` the best score.
+  districts, the harbour's tide and ships, the boons, the moths' traits, the daily night and the
+  upgrades, `places.ts` the districts and the harbour (where their lanterns and chains are) and
+  the jar, and `save.ts` the best score, the moths' flights and the boon.
 - `src/scenes/`: `BootScene` bakes textures, `GameScene` draws the screen, the district's
   scenery, lanterns, chains, moths, bats, the owl, the order card and night-kind plaque, mist,
   bunting and rain, gust, owl and window plaques, close-call tags, HUD and panels and wires taps
@@ -273,4 +312,6 @@ Retuning a night is the constants at the top of `src/game/state.ts`; an upgrade 
 `gustsFor` and `GUST_WARN_MS`, a kind of night its row in `NIGHT_KINDS`, the bats `batsFor` and
 `BAT_SPEED`, a kind of lantern its row in `LANTERN_KINDS`, the owl `OWL_AT_MS` and `OWL_EVERY`,
 the window calls `callsFor` and `CALL_MS`, the cask `CASK_START` and `CASK_MAX`, and a district
-(its spots, chains and rule) its entry in `DISTRICTS` in `places.ts`.
+(its spots, chains and rule) its entry in `DISTRICTS` in `places.ts`, the tide `TIDE_TIMES` and
+`TIDE_MS`, the ships `SHIP_TIMES`, `SHIP_MS` and `SHIP_PAY`, a boon its row in `BOONS`, the
+traits `TRAIT_FLIGHTS`, and the daily `DAILY_NIGHTS` and `DAILY_LEVELS`.

@@ -1,7 +1,7 @@
 import { byDifficulty } from '../../../../shared/settings';
 import type { TextKey } from '../i18n';
 import { VIEW } from '../scenes/layout';
-import { DISTRICTS, type DistrictId, JARS, LANTERN_SPOTS, mothRest } from './places';
+import { DISTRICTS, type DistrictId, JARS, LANTERN_SPOTS, MOVE_IDS, mothRest, SHIP_GUIDES } from './places';
 
 // The rules in plain TypeScript, with no Phaser. Each night begins with a dusk: tap a lantern and
 // an idle moth flies from the jar to light it, then flies home. A lit lantern burns its oil and
@@ -16,7 +16,10 @@ import { DISTRICTS, type DistrictId, JARS, LANTERN_SPOTS, mothRest } from './pla
 // beacon, a candle or a bell, every fifth night the Great Owl sweeps a row of lanterns, and at
 // every fifth nightfall the keep can move to another district with its own spots and rule. Late
 // nights add tired moths (from the sixth), a second jar to buy, lost hearths to rekindle and, from
-// the tenth nightfall, curses to pick that raise the pay.
+// the tenth nightfall, curses to pick that raise the pay. After the Great Festival the keep can sail
+// to a harbour town with tides and ships and a festival of its own, which gives a boon kept for
+// every later game (LK15); the moths of the jar grow traits from the flights they fly, kept from
+// game to game (LK16); and a daily night gives everyone the same seeded dusk once a day (LK17).
 
 export const UPGRADE_IDS = ['wick', 'oil', 'moths', 'wings', 'firefly', 'nectar', 'jar'] as const;
 export type UpgradeId = (typeof UPGRADE_IDS)[number];
@@ -54,6 +57,74 @@ export const restMs = (s: GameState) => Math.max(0, TIRED_MS - NECTAR_MS * s.lev
 export const HEARTH_COSTS = [40, 80, 120] as const;
 /** The price of rekindling a hearth now, or null when none is out or all three rekindles are spent. */
 export const hearthCost = (s: GameState) => (s.lives < LIVES ? (HEARTH_COSTS[s.rekindled] ?? null) : null);
+
+/**
+ * A second keep (LK15): the harbour's tide floods its lowest row of lanterns at TIDE_TIMES (dusk
+ * left), warned TIDE_WARN_MS before, for TIDE_MS: the lanterns there go dark and can't be lit
+ * until it ebbs. Ships come at SHIP_TIMES and take SHIP_MS to sail in; one whose guiding lantern
+ * (SHIP_GUIDES) is lit when it arrives pays SHIP_PAY.
+ */
+export const TIDE_TIMES = [32_000, 14_000];
+export const TIDE_WARN_MS = 5_000;
+export const TIDE_MS = 7_000;
+export const SHIP_TIMES = [40_000, 24_000];
+export const SHIP_MS = 12_000;
+export const SHIP_PAY = 6;
+/** Where ships sail across the screen, as a height in view pixels. */
+export const SHIP_Y = 262;
+
+/**
+ * The boons of the Harbour Festival (LK15): the one picked lasts the rest of the game and every
+ * later game, in either keep. A purse of BOON_COINS at the first dusk, a cask BOON_CASK fills
+ * bigger that starts full, or a free Firefly level.
+ */
+export const BOONS = {
+  purse: { name: 'purseName', blurb: 'purseBlurb' },
+  cask: { name: 'bigCaskName', blurb: 'bigCaskBlurb' },
+  pilot: { name: 'pilotName', blurb: 'pilotBlurb' },
+} as const satisfies Record<string, { name: TextKey; blurb: TextKey }>;
+export type BoonId = keyof typeof BOONS;
+export const BOON_IDS = Object.keys(BOONS) as BoonId[];
+export const BOON_COINS = 30;
+export const BOON_CASK = 2;
+
+/**
+ * Moth breeds (LK16): each moth of the jar (not a firefly) counts the flights it has ever flown,
+ * kept from game to game by its place in the jar, and gains a trait at each of TRAIT_FLIGHTS, in
+ * TRAIT_IDS order starting from its place. Swift flies SWIFT_SPEED faster, frugal fills
+ * FRUGAL_OIL more oil, and a lantern a gust-proof moth lit or refilled shrugs off the next gust.
+ */
+export const TRAIT_IDS = ['swift', 'frugal', 'gustproof'] as const;
+export type TraitId = (typeof TRAIT_IDS)[number];
+export const TRAIT_FLIGHTS = [25, 75, 150] as const;
+export const SWIFT_SPEED = 1.2;
+export const FRUGAL_OIL = 1.25;
+/** The traits of moth `i`, gained so far; none on a firefly or on a daily night. */
+export function traitsOf(s: GameState, i: number): TraitId[] {
+  const m = s.moths[i];
+  if (!s.breeds || !m || m.kind === 'firefly') return [];
+  const n = TRAIT_FLIGHTS.filter((f) => (s.flown[i] ?? 0) >= f).length;
+  return Array.from({ length: n }, (_, k) => TRAIT_IDS[(i + k) % TRAIT_IDS.length]);
+}
+const hasTrait = (s: GameState, m: Moth, trait: TraitId) => traitsOf(s, s.moths.indexOf(m)).includes(trait);
+/** Counts a flight out of the jar: for tired moths, and for the moth's breed, which may gain a trait. */
+function flew(s: GameState, m: Moth) {
+  m.flights++;
+  const i = s.moths.indexOf(m);
+  if (!s.breeds || m.kind === 'firefly') return;
+  const had = traitsOf(s, i).length;
+  s.flown[i] = (s.flown[i] ?? 0) + 1;
+  const now = traitsOf(s, i);
+  if (now.length > had) s.events.push({ type: 'trait', moth: i, trait: now[now.length - 1] });
+}
+
+/**
+ * The daily night (LK17): one seeded dusk, the same for every player on the same day, on one of
+ * DAILY_NIGHTS in a keep district with a kind of night and two curses, with DAILY_LEVELS bought and
+ * a full cask. The score is the coins at nightfall, halved if too few lanterns burn.
+ */
+export const DAILY_NIGHTS = [6, 7, 8, 9, 10, 11, 12];
+export const DAILY_LEVELS: Record<UpgradeId, number> = { wick: 1, oil: 1, moths: 1, wings: 1, firefly: 1, nectar: 1, jar: 0 };
 
 /**
  * Pick your peril (LK11): every nightfall before a night from PERIL_NIGHT offers two curses drawn
@@ -197,6 +268,8 @@ export const CASK_MAX = 6;
 export const CASK_COST = 3;
 /** True once refills draw on the cask. */
 export const usesCask = (s: GameState) => s.night >= CASK_NIGHT;
+/** The fills the cask holds: more with the harbour's cask boon. */
+export const caskMax = (s: GameState) => CASK_MAX + (s.boon === 'cask' ? BOON_CASK : 0);
 /**
  * True when a refill can be sent now: before CASK_NIGHT always, after it while the cask holds a
  * fill that no moth (other than `except`) already flying to or refilling a lit lantern has
@@ -210,7 +283,8 @@ export function caskSpare(s: GameState, except?: Moth) {
   return s.cask - reserved > 0;
 }
 /** The oil a fill by moth `m` gives lantern `l`, in milliseconds of burning. */
-const mothFill = (s: GameState, m: Moth, l: Lantern) => stats(s).burnMs * MOTH_KINDS[m.kind].oil * LANTERN_KINDS[l.kind].oil;
+const mothFill = (s: GameState, m: Moth, l: Lantern) =>
+  stats(s).burnMs * MOTH_KINDS[m.kind].oil * LANTERN_KINDS[l.kind].oil * (hasTrait(s, m, 'frugal') ? FRUGAL_OIL : 1);
 /**
  * True when a refill by moth `m` of its lantern would draw a fill from the cask: the lantern is lit
  * and the fill adds oil (a guard tap on a full lantern adds none).
@@ -225,7 +299,9 @@ function drawsFill(s: GameState, m: Moth) {
  * sent to shield it is no wasted refill (sent with no spare fill it guards without drawing one).
  * A bat is no reason: a moth on its lantern does not stop it, chasing it does.
  */
-export const mayTap = (s: GameState, i: number, except?: Moth) => !s.lanterns[i].lit || threatened(s, i) || caskSpare(s, except);
+export const mayTap = (s: GameState, i: number, except?: Moth) => !flooded(s, i) && (!s.lanterns[i].lit || threatened(s, i) || caskSpare(s, except));
+/** True while the harbour's tide is up over lantern `i`: it is dark and can't be lit. */
+export const flooded = (s: GameState, i: number) => !!s.tide?.risen && s.tide.lanterns.includes(i);
 
 /** Districts (LK10): at every MOVE_EVERY nightfalls the keep can move to another district. */
 export const MOVE_EVERY = 5;
@@ -341,6 +417,8 @@ export interface Lantern {
   oilMaxMs: number;
   /** True while a moth is on its way to it or lighting it, so a second tap sends no other moth. */
   claimed: boolean;
+  /** Lit or refilled by a gust-proof moth (LK16): the next gust passes it by. */
+  sheltered: boolean;
 }
 
 export interface Moth {
@@ -408,6 +486,23 @@ export interface Call {
   msLeft: number;
 }
 
+/** The harbour's tide, warned for its lowest row of lanterns, then up over them for TIDE_MS. */
+export interface Tide {
+  y: number;
+  lanterns: number[];
+  /** When it rises, as dusk left; it ebbs TIDE_MS later. */
+  atMs: number;
+  risen: boolean;
+}
+
+/** A ship sailing in to the harbour, asking for lantern `guide` to be lit when it arrives. */
+export interface Ship {
+  guide: number;
+  fromLeft: boolean;
+  /** Time left before it arrives. */
+  msLeft: number;
+}
+
 /** Something that just happened, for the scene to show; it empties the list every frame. */
 export type GameEvent =
   | { type: 'closeCall'; lantern: number; coins: number }
@@ -421,7 +516,13 @@ export type GameEvent =
   /** A window's call was answered in time (`coins` paid) or ran out. */
   | { type: 'call'; lantern: number; kept: boolean; coins: number }
   /** A moth came to refill a lantern and found the cask dry. */
-  | { type: 'dry'; lantern: number };
+  | { type: 'dry'; lantern: number }
+  /** The harbour's tide rose over a lit lantern and put it out. */
+  | { type: 'tide'; lantern: number }
+  /** A ship arrived: guided in by its lit lantern (`coins` paid), or turned away. */
+  | { type: 'ship'; lantern: number; guided: boolean; coins: number }
+  /** Moth `moth` gained a trait from the flights it has flown. */
+  | { type: 'trait'; moth: number; trait: TraitId };
 
 /** What nightfall counted, shown until the next dusk. */
 export interface NightReport {
@@ -443,9 +544,10 @@ export interface GameState {
   /**
    * `festival` is the night the Great Festival is reached: its panel shows before the night
    * panel. `move` is a fifth nightfall's choice of district and `peril` the curses offered from
-   * PERIL_NIGHT, shown in that order before the night panel too.
+   * PERIL_NIGHT, shown in that order before the night panel too. `boon` is the Harbour
+   * Festival's choice of boon, and `daily` the end of a daily night.
    */
-  phase: 'dusk' | 'night' | 'festival' | 'move' | 'peril' | 'over';
+  phase: 'dusk' | 'night' | 'festival' | 'move' | 'peril' | 'boon' | 'daily' | 'over';
   /** Dusk left before night falls, in milliseconds. */
   duskMs: number;
   coins: number;
@@ -509,6 +611,23 @@ export interface GameState {
   paidMult: number;
   /** The best pay multiplier reached in any game, saved in the browser. */
   bestPeril: number;
+  /** True once the keep has sailed to the harbour (LK15); the harbour's nights kept and its festival. */
+  sailed: boolean;
+  harbourKept: number;
+  harbourFestival: boolean;
+  /** The tide's times still to come this dusk and the one warned or up; ships to come, the one sailing in, and those guided this dusk. */
+  tideTimes: number[];
+  tide: Tide | null;
+  shipTimes: number[];
+  ship: Ship | null;
+  shipsGuided: number;
+  /** The Harbour Festival's boon, kept for every later game, or null. */
+  boon: BoonId | null;
+  /** True when moths grow traits (LK16), with the flights each place in the jar has ever flown. */
+  breeds: boolean;
+  flown: number[];
+  /** True on a daily night (LK17): one seeded dusk, nothing carried in or out. */
+  daily: boolean;
 }
 
 /** Moth count, flight speed, wick time and burn time with the bought upgrades. */
@@ -523,7 +642,7 @@ export function stats(s: GameState) {
 }
 
 /** How fast moth `m` flies, in pixels per second. */
-export const mothSpeed = (s: GameState, m: Moth) => stats(s).speed * MOTH_KINDS[m.kind].speed;
+export const mothSpeed = (s: GameState, m: Moth) => stats(s).speed * MOTH_KINDS[m.kind].speed * (hasTrait(s, m, 'swift') ? SWIFT_SPEED : 1);
 /** How long moth `m` takes to catch a wick, in milliseconds: none at all on a candle. */
 export const mothLightMs = (s: GameState, m: Moth) =>
   Math.round(stats(s).lightMs * MOTH_KINDS[m.kind].wick * LANTERN_KINDS[s.lanterns[m.target]?.kind ?? 'plain'].wick * WET_WICK ** s.curses.wet);
@@ -531,7 +650,7 @@ export const mothLightMs = (s: GameState, m: Moth) =>
 function makeLanterns(night: number, district: DistrictId): Lantern[] {
   const count = lanternsFor(night);
   const kinds = lanternKindsFor(night, count);
-  return DISTRICTS[district].spots.slice(0, count).map(({ x, y }, i) => ({ x, y, kind: kinds[i], lit: false, oilMs: 0, oilMaxMs: 0, claimed: false }));
+  return DISTRICTS[district].spots.slice(0, count).map(({ x, y }, i) => ({ x, y, kind: kinds[i], lit: false, oilMs: 0, oilMaxMs: 0, claimed: false, sheltered: false }));
 }
 
 /** The jar moth `i` rests at. */
@@ -564,7 +683,21 @@ function makeMoths(s: GameState) {
   s.moths.forEach((m, i) => Object.assign(m, restOf(s, i)));
 }
 
-export function newGame(best = 0, bestPeril = 1): GameState {
+/** What a new game carries in from earlier ones: the moths' flights (LK16) and the harbour's boon (LK15). */
+export interface Carried {
+  flown?: readonly number[];
+  boon?: BoonId | null;
+}
+
+/** Gives the game boon `id`: the purse's coins now, the bigger cask filled, or a free Firefly level. */
+function applyBoon(s: GameState, id: BoonId) {
+  s.boon = id;
+  if (id === 'purse') s.coins += BOON_COINS;
+  else if (id === 'cask') s.cask = caskMax(s);
+  else s.levels.firefly = Math.min(UPGRADES.firefly.costs.length, s.levels.firefly + 1);
+}
+
+export function newGame(best = 0, bestPeril = 1, carried: Carried = {}): GameState {
   const s: GameState = {
     night: 1,
     phase: 'dusk',
@@ -606,8 +739,42 @@ export function newGame(best = 0, bestPeril = 1): GameState {
     offer: [],
     paidMult: 1,
     bestPeril,
+    sailed: false,
+    harbourKept: 0,
+    harbourFestival: false,
+    tideTimes: [],
+    tide: null,
+    shipTimes: [],
+    ship: null,
+    shipsGuided: 0,
+    boon: null,
+    breeds: true,
+    flown: Array.from({ length: BASE_MOTHS + UPGRADES.moths.costs.length }, (_, i) => Math.max(0, Math.floor(carried.flown?.[i] ?? 0))),
+    daily: false,
   };
+  if (carried.boon) applyBoon(s, carried.boon);
   makeMoths(s);
+  return s;
+}
+
+/**
+ * Today's daily night (LK17) from the day's random source `rand`: a night, a district, a kind and
+ * two curses drawn in that order, with DAILY_LEVELS bought, a full cask and no traits or boon.
+ */
+export function dailyNight(rand: () => number, best = 0, bestPeril = 1): GameState {
+  const pick = <T>(xs: readonly T[]) => xs[Math.floor(rand() * xs.length)];
+  const s = newGame(best, bestPeril);
+  s.daily = true;
+  s.breeds = false;
+  s.night = pick(DAILY_NIGHTS);
+  s.district = s.nextDistrict = pick(MOVE_IDS);
+  s.kind = s.nextKind = pick(NIGHT_KIND_IDS);
+  const ids = [...CURSE_IDS];
+  s.curses[ids.splice(Math.floor(rand() * ids.length), 1)[0]]++;
+  s.curses[pick(ids)]++;
+  s.levels = { ...DAILY_LEVELS };
+  s.cask = CASK_MAX;
+  startDusk(s);
   return s;
 }
 
@@ -617,7 +784,7 @@ export function newGame(best = 0, bestPeril = 1): GameState {
  */
 function dispatch(s: GameState, moth: Moth, i: number, hops = moth.kind === 'firefly' ? FIREFLY_LANTERNS - 1 : 0) {
   // Leaving the jar is a flight; a firefly flying on from its first lantern is the same one.
-  if (moth.task === 'idle') moth.flights++;
+  if (moth.task === 'idle') flew(s, moth);
   moth.task = 'out';
   moth.target = i;
   // Whether it reserves a cask fill is settled now, so no reservation appears mid-flight.
@@ -636,7 +803,7 @@ function nextHop(s: GameState, m: Moth) {
   let bestD = Infinity;
   s.lanterns.forEach((l, i) => {
     const d = Math.hypot(l.x - m.x, l.y - m.y);
-    if (!l.lit && !l.claimed && d < bestD) {
+    if (!l.lit && !l.claimed && !flooded(s, i) && d < bestD) {
       best = i;
       bestD = d;
     }
@@ -677,7 +844,7 @@ export function chase(s: GameState, id: number) {
   if (!moth) return false;
   moth.task = 'chase';
   moth.bat = id;
-  moth.flights++;
+  flew(s, moth);
   return true;
 }
 
@@ -786,7 +953,10 @@ function releaseGuards(s: GameState) {
 /** Blows out lantern `i` unless a moth sits on it; the gust's event says which. */
 function blow(s: GameState, i: number) {
   const lantern = s.lanterns[i];
-  const shielded = sitting(s, i);
+  // A lantern a gust-proof moth lit shrugs off one gust.
+  const sheltered = lantern.lit && lantern.sheltered && !sitting(s, i);
+  if (sheltered) lantern.sheltered = false;
+  const shielded = sitting(s, i) || sheltered;
   // A lantern that went dark before the gust came, with no moth on it, has nothing to blow out.
   if (!lantern.lit && !shielded) return;
   if (shielded) s.shields++;
@@ -869,7 +1039,7 @@ function callTarget(s: GameState) {
   for (let k = 0; k < n; k++) {
     const i = (start + k) % n;
     const l = s.lanterns[i];
-    if (!l.lit && !l.claimed && !s.queue.includes(i)) return i;
+    if (!l.lit && !l.claimed && !s.queue.includes(i) && !flooded(s, i)) return i;
   }
   // With every fill spoken for, a lit lantern could not be refilled, so no window calls for one.
   if (!caskSpare(s)) return -1;
@@ -903,6 +1073,64 @@ function answerCall(s: GameState, i: number) {
   s.callsKept++;
   s.events.push({ type: 'call', lantern: i, kept: true, coins });
   s.call = null;
+}
+
+/** The harbour's tide: warned TIDE_WARN_MS before for its lowest row, it rises over it and puts its lanterns out, then ebbs after TIDE_MS. */
+function tides(s: GameState) {
+  if (!s.tide && s.tideTimes.length && s.duskMs <= s.tideTimes[0] + TIDE_WARN_MS) {
+    const atMs = s.tideTimes.shift()!;
+    const all = rows(s);
+    const low = all[all.length - 1];
+    if (low) s.tide = { y: low.y, lanterns: low.lanterns, atMs, risen: false };
+  }
+  const tide = s.tide;
+  if (!tide) return;
+  if (!tide.risen && s.duskMs <= tide.atMs) {
+    tide.risen = true;
+    for (const i of tide.lanterns) {
+      const l = s.lanterns[i];
+      if (l.lit) s.events.push({ type: 'tide', lantern: i });
+      l.lit = false;
+      l.oilMs = 0;
+    }
+    // Moths on their way to or sitting on a flooded lantern turn home, and its queued taps are dropped.
+    for (const m of s.moths) {
+      if (tide.lanterns.includes(m.target) && (m.task === 'out' || m.task === 'lighting' || m.task === 'guard')) {
+        m.reserved = false;
+        m.closeCall = false;
+        release(m, s);
+      }
+    }
+    s.queue = s.queue.filter((i) => !tide.lanterns.includes(i));
+  }
+  if (tide.risen && s.duskMs <= tide.atMs - TIDE_MS) s.tide = null;
+}
+
+/** Ships sail in at their times; one whose guiding lantern is lit when it arrives pays SHIP_PAY. */
+function ships(s: GameState, dt: number) {
+  if (!s.ship && s.shipTimes.length && s.duskMs <= s.shipTimes[0]) {
+    s.shipTimes.shift();
+    const guide = SHIP_GUIDES[(SHIP_TIMES.length - s.shipTimes.length - 1) % SHIP_GUIDES.length];
+    s.ship = { guide, fromLeft: s.lanterns[guide].x > VIEW.w / 2, msLeft: SHIP_MS };
+  }
+  const ship = s.ship;
+  if (!ship) return;
+  ship.msLeft -= dt;
+  if (ship.msLeft > 0) return;
+  const guided = s.lanterns[ship.guide].lit;
+  const coins = guided ? SHIP_PAY : 0;
+  s.coins += coins;
+  if (guided) s.shipsGuided++;
+  s.events.push({ type: 'ship', lantern: ship.guide, guided, coins });
+  s.ship = null;
+}
+
+/** Where ship `ship` is: sailing from beyond its edge to beside its guiding lantern. */
+export function shipX(s: GameState, ship: Ship) {
+  const guide = s.lanterns[ship.guide];
+  const from = ship.fromLeft ? -70 : VIEW.w + 70;
+  const to = guide.x + (ship.fromLeft ? -110 : 110);
+  return from + (to - from) * (1 - Math.max(0, ship.msLeft) / SHIP_MS);
 }
 
 /** Advances dusk by `dt` milliseconds: oil burns, moths fly and light, gusts blow, and night falls at the end. */
@@ -943,6 +1171,10 @@ export function tick(s: GameState, dt: number) {
           m.closeCall = false;
         } else {
           if (refill) s.cask--;
+          // A gust-proof moth's lantern shrugs off the next gust; another moth lighting it afresh doesn't.
+          const proof = hasTrait(s, m, 'gustproof');
+          if (!lantern.lit) lantern.sheltered = proof;
+          else if (proof) lantern.sheltered = true;
           lantern.lit = true;
           if (adds) {
             lantern.oilMs = fill;
@@ -1002,9 +1234,11 @@ export function tick(s: GameState, dt: number) {
     }
   });
   wind(s);
+  tides(s);
   greatOwl(s, dt);
   raiders(s, dt);
   windows(s, dt);
+  ships(s, dt);
   // A moth that has just come home takes the oldest queued tap.
   for (const moth of s.moths) {
     if (moth.task !== 'idle' || s.queue.length === 0) continue;
@@ -1032,6 +1266,10 @@ function nightfall(s: GameState) {
   const earned = Math.round((lanternPayTotal * (s.kind === 'feast' ? FEAST_PAY : 1) + (orderMet ? s.order.reward : 0)) * perilMult(s));
   const lostHearth = lit < need;
   s.queue = [];
+  s.tide = null;
+  s.tideTimes = [];
+  s.ship = null;
+  s.shipTimes = [];
   s.gust = null;
   s.gusts = [];
   s.batTimes = [];
@@ -1041,16 +1279,29 @@ function nightfall(s: GameState) {
   s.call = null;
   s.callTimes = [];
   s.coins += earned;
+  if (s.daily) {
+    // The daily's one dusk ends here: its score is the coins, halved if too few lanterns burn.
+    if (lostHearth) s.coins = Math.floor(s.coins / 2);
+    s.report = { lit, count, required: need, earned, lostHearth, orderMet, chains, festival: false };
+    s.phase = 'daily';
+    return;
+  }
   if (lostHearth) s.lives--;
-  else s.kept++;
+  else {
+    s.kept++;
+    if (s.district === 'harbour') s.harbourKept++;
+  }
   s.best = Math.max(s.best, s.kept);
   const festival = !s.festival && s.kept >= FESTIVAL_NIGHTS && s.lives > 0;
   if (festival) s.festival = true;
-  s.report = { lit, count, required: need, earned, lostHearth, orderMet, chains, festival };
+  const harbourFestival = !s.harbourFestival && s.harbourKept >= FESTIVAL_NIGHTS && s.lives > 0;
+  if (harbourFestival) s.harbourFestival = true;
+  s.report = { lit, count, required: need, earned, lostHearth, orderMet, chains, festival: festival || harbourFestival };
   s.nextKind = drawKind(s.night + 1);
-  s.moveDue = s.lives > 0 && s.night % MOVE_EVERY === 0;
+  // Once the keep has sailed it stays in the harbour.
+  s.moveDue = s.lives > 0 && s.night % MOVE_EVERY === 0 && !s.sailed;
   s.offer = s.lives > 0 && s.night + 1 >= PERIL_NIGHT ? drawOffer() : [];
-  s.phase = s.lives <= 0 ? 'over' : festival ? 'festival' : afterPanels(s);
+  s.phase = s.lives <= 0 ? 'over' : festival ? 'festival' : harbourFestival ? 'boon' : afterPanels(s);
 }
 
 /** The panel after the festival's: the choice of district if due, then the curses if offered, then the night panel. */
@@ -1059,6 +1310,24 @@ const afterPanels = (s: GameState): GameState['phase'] => (s.moveDue ? 'move' : 
 /** Leaves the Great Festival's panel for the choice of district or the night panel; the nights go on. */
 export function carryOn(s: GameState) {
   if (s.phase !== 'festival') return false;
+  s.phase = afterPanels(s);
+  return true;
+}
+
+/** Sails from the Great Festival to the harbour (LK15), which the keep stands in from the next dusk on. */
+export function sail(s: GameState) {
+  if (s.phase !== 'festival' || s.sailed) return false;
+  s.sailed = true;
+  s.nextDistrict = 'harbour';
+  s.moveDue = false;
+  s.phase = afterPanels(s);
+  return true;
+}
+
+/** Takes boon `id` at the Harbour Festival: it starts now and in every later game. */
+export function takeBoon(s: GameState, id: BoonId) {
+  if (s.phase !== 'boon') return false;
+  applyBoon(s, id);
   s.phase = afterPanels(s);
   return true;
 }
@@ -1116,7 +1385,7 @@ export function rekindle(s: GameState) {
 
 /** Puts one fill of oil in the cask between nights, for CASK_COST; false when it is full or the coins are short. */
 export function topUp(s: GameState) {
-  if (s.phase !== 'night' || s.cask >= CASK_MAX || s.coins < CASK_COST) return false;
+  if (s.phase !== 'night' || s.cask >= caskMax(s) || s.coins < CASK_COST) return false;
   s.coins -= CASK_COST;
   s.cask++;
   return true;
@@ -1126,15 +1395,21 @@ export function topUp(s: GameState) {
 export function nextDusk(s: GameState) {
   if (s.phase !== 'night') return false;
   s.night++;
+  s.district = s.nextDistrict;
+  s.kind = s.nextKind;
+  startDusk(s);
+  return true;
+}
+
+/** Sets up a dusk of night `s.night` in `s.district`, of kind `s.kind`. */
+function startDusk(s: GameState) {
   s.phase = 'dusk';
   s.duskMs = DUSK_MS;
-  s.district = s.nextDistrict;
   s.lanterns = makeLanterns(s.night, s.district);
   makeMoths(s);
   s.queue = [];
   s.report = null;
   s.order = orderFor(s.night);
-  s.kind = s.nextKind;
   s.gusts = gustsFor(s.night, s.kind);
   s.batTimes = batsFor(s.night, s.curses.bats);
   s.bats = [];
@@ -1147,5 +1422,10 @@ export function nextDusk(s: GameState) {
   s.callTimes = callsFor(s.night);
   s.call = null;
   s.callsKept = 0;
-  return true;
+  const tide = districtOf(s).rule === 'tide';
+  s.tideTimes = tide ? [...TIDE_TIMES] : [];
+  s.tide = null;
+  s.shipTimes = tide ? [...SHIP_TIMES] : [];
+  s.ship = null;
+  s.shipsGuided = 0;
 }

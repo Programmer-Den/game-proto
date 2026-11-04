@@ -2,12 +2,26 @@ import Phaser from 'phaser';
 import { formatNumber, language } from '../../../../shared/i18n';
 import { settings } from '../../../../shared/settings';
 import { BACK_RES, bakeScenery, DUSK, FX, FY, HUD_RES, INK, INK_HEX, lampOriginY, PAD, RES, SCREENS } from '../art/puppet';
-import { DISTRICT_IDS, DISTRICTS, type DistrictId, JARS, LANTERN_SPOTS } from '../game/places';
-import { loadBest, loadBestPeril, saveBest, saveBestPeril } from '../game/save';
+import { dailyRand, finishDaily, loadDaily, startDaily, type DailyRecord } from '../../../../shared/daily';
+import { DISTRICTS, type DistrictId, JARS, LANTERN_SPOTS, MOVE_IDS } from '../game/places';
+import { loadBest, loadBestPeril, loadBoon, loadFlown, saveBest, saveBestPeril, saveBoon, saveFlown } from '../game/save';
 import {
+  BOON_IDS,
+  BOONS,
   CASK_COST,
-  CASK_MAX,
+  caskMax,
   CASK_NIGHT,
+  dailyNight,
+  flooded,
+  sail,
+  SHIP_PAY,
+  SHIP_Y,
+  shipX,
+  TIDE_MS,
+  takeBoon,
+  traitsOf,
+  type BoonId,
+  type TraitId,
   callPay,
   CHAIN_BONUS,
   chainLit,
@@ -95,6 +109,16 @@ const PANEL_DELAY_MS = 1500;
  */
 const edgeFade = (x: number, margin: number) => Phaser.Math.Clamp(Math.min(x + margin, VIEW.w + margin - x) / margin, 0, 1);
 
+/** The game's name for its daily record (`shared/daily.ts`, `lanternkeep-daily`). */
+const GAME = 'lanternkeep';
+
+/** Each trait's dot under a moth that has it, and the popup when one is gained (LK16). */
+const TRAIT_LOOK: Record<TraitId, { color: number; popup: TextKey }> = {
+  swift: { color: 0xffe890, popup: 'swiftPopup' },
+  frugal: { color: 0xffa860, popup: 'frugalPopup' },
+  gustproof: { color: 0xbcd4ff, popup: 'gustproofPopup' },
+};
+
 /** A pay multiplier with two decimals, like 1.25 (1,25 in German). */
 const mult2 = (n: number) => formatNumber(n, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -140,8 +164,28 @@ export class GameScene extends Phaser.Scene {
   goOnButton: ButtonSpot = { x: VIEW.w / 2, y: VIEW.h / 2 + 115, w: 200, h: 40 };
   /** The night panel's "Next dusk" button; read by the playthrough test. */
   nextButton: ButtonSpot = { x: NEXT_BUTTON.x, y: NEXT_BUTTON.y, w: 200, h: 40 };
-  /** The Great Festival panel's "Keep going" button, for tests that play ten nights. */
-  carryOnButton: ButtonSpot = { x: VIEW.w / 2, y: VIEW.h / 2 + 76, w: 200, h: 40 };
+  /** The Great Festival panel's "Keep going" and "Set sail" buttons, for tests that play ten nights. */
+  carryOnButton: ButtonSpot = { x: VIEW.w / 2 - 110, y: VIEW.h / 2 + 76, w: 200, h: 40 };
+  sailButton: ButtonSpot = { x: VIEW.w / 2 + 110, y: VIEW.h / 2 + 76, w: 200, h: 40 };
+  /** The Harbour Festival's boon cards, by id. */
+  boonButtons: (ButtonSpot & { id: BoonId })[] = [];
+  /** The night panel's "Daily night" link and the daily's "Back to my keep" button. */
+  dailyButton: ButtonSpot = { x: NIGHT_PANEL.x + NIGHT_PANEL.w / 2 - 92, y: NEXT_BUTTON.y, w: 150, h: 34 };
+  backButton: ButtonSpot = { x: VIEW.w / 2, y: VIEW.h / 2 + 76, w: 200, h: 40 };
+  /** The game put aside while a daily night is played, given back after it. */
+  private run: GameState | null = null;
+  /** Today's daily record, read when the scene starts and after each daily. */
+  private dailyRecord!: DailyRecord;
+  private dailyLink!: Phaser.GameObjects.Text;
+  private dailyPanel!: Phaser.GameObjects.Container;
+  private dailyText!: Phaser.GameObjects.Text;
+  private boonPanel!: Phaser.GameObjects.Container;
+  private boonNotes = new Map<BoonId, Phaser.GameObjects.Text>();
+  /** The harbour's water (LK15) and the ship sailing in, with its label. */
+  private water!: Phaser.GameObjects.Graphics;
+  private tideLabel!: Phaser.GameObjects.Text;
+  private ship!: Phaser.GameObjects.Image;
+  private shipLabel!: Phaser.GameObjects.Text;
   private clock = 0;
   /** When night fell, on the scene's clock. */
   private nightAt = 0;
@@ -246,7 +290,8 @@ export class GameScene extends Phaser.Scene {
     this.bottom = VIEW.h + FY;
     this.orderAt = { x: ORDER.x - FX, y: ORDER.y - FY };
     this.kindAt = { x: KIND_TAG.x + FX, y: KIND_TAG.y - FY };
-    this.state = newGame(loadBest(), loadBestPeril());
+    this.state = this.freshGame();
+    this.dailyRecord = loadDaily(GAME);
     this.createWorld();
     this.createOrderCard();
     this.createKindTag();
@@ -259,7 +304,14 @@ export class GameScene extends Phaser.Scene {
     this.createPerilPanel();
     this.createGameOver();
     this.createFestival();
+    this.createBoonPanel();
+    this.createDailyPanel();
     updateMusic(this.state, true);
+  }
+
+  /** A new game, with the moths' flights and the harbour's boon carried in from earlier games. */
+  private freshGame() {
+    return newGame(loadBest(), loadBestPeril(), { flown: loadFlown(), boon: loadBoon() });
   }
 
   /** A tap on lantern `i`: a moth flutters off, or the tap queues with a pip; a lost tap buzzes. */
@@ -330,6 +382,10 @@ export class GameScene extends Phaser.Scene {
     this.marks = this.add.graphics().setDepth(6);
     this.trails = this.add.graphics().setDepth(6);
     this.batMarks = this.add.graphics().setDepth(6.2);
+    this.water = this.add.graphics().setDepth(5.5);
+    this.tideLabel = this.label(0, 0, '', { size: 12.5, bold: true, color: '#cfe8ff', stroke: true }).setOrigin(0.5).setDepth(8.5).setVisible(false);
+    this.ship = this.sprite(-200, SHIP_Y, 'ship').setDepth(7.1).setVisible(false);
+    this.shipLabel = this.label(0, 0, '', { size: 11, bold: true, color: '#ffe6b0', stroke: true }).setOrigin(0.5).setDepth(8.5).setVisible(false);
   }
 
   private createKindTag() {
@@ -438,6 +494,14 @@ export class GameScene extends Phaser.Scene {
       parts.push(bg, name, level, blurb, cost, hit);
     });
     parts.push(makeButton(this, NEXT_BUTTON.x, NEXT_BUTTON.y, t('nextDusk'), () => this.answer(nextDusk(this.state), 'evening')));
+    // The daily night's link, right of "Next dusk": the run waits while it is played.
+    const d = this.dailyButton;
+    this.dailyLink = this.label(d.x, d.y, '', { size: 12.5, bold: true, color: '#d8c8ff', glow: true }).setOrigin(0.5);
+    const dailyHit = this.add
+      .zone(d.x, d.y, d.w, d.h)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', () => this.openDaily());
+    parts.push(this.dailyLink, dailyHit);
     this.nightPanel = this.add.container(0, 0, parts).setDepth(UI_DEPTH + 10).setVisible(false);
   }
 
@@ -454,7 +518,7 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setAlign('center');
     const parts: Phaser.GameObjects.GameObject[] = [dim, panel, this.moveTitle, sub];
-    DISTRICT_IDS.forEach((id, i) => {
+    MOVE_IDS.forEach((id, i) => {
       const bx = MOVE_CARDS.xs[i % 2];
       const by = MOVE_CARDS.ys[Math.floor(i / 2)];
       const left = bx - MOVE_CARDS.w / 2;
@@ -522,8 +586,9 @@ export class GameScene extends Phaser.Scene {
     const panel = this.add.image(cx - SMALL_PANEL.w / 2 - PAD, cy - SMALL_PANEL.h / 2 - PAD, 'panel-small').setOrigin(0).setScale(1 / RES);
     const title = this.label(cx, cy - 76, t('keepDark'), { size: 28, bold: true, color: '#ffc870', glow: true }).setOrigin(0.5);
     this.gameOverText = this.label(cx, cy - 10, '', { size: 16 }).setOrigin(0.5).setAlign('center');
-    const again = makeButton(this, cx, cy + 72, t('newKeep'), () => this.restart());
-    this.gameOver = this.add.container(0, 0, [dim, panel, title, this.gameOverText, again]).setDepth(UI_DEPTH + 20).setVisible(false);
+    const again = makeButton(this, cx - 110, cy + 72, t('newKeep'), () => this.restart());
+    const daily = makeButton(this, cx + 110, cy + 72, t('dailyNight'), () => this.openDaily(cx + 110, cy + 40));
+    this.gameOver = this.add.container(0, 0, [dim, panel, title, this.gameOverText, again, daily]).setDepth(UI_DEPTH + 20).setVisible(false);
   }
 
   /** The Great Festival's panel, with paper sky lanterns rising behind it. */
@@ -541,10 +606,102 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setAlign('center');
     const go = makeButton(this, this.carryOnButton.x, this.carryOnButton.y, t('keepGoing'), () => this.answer(carryOn(this.state)));
+    const sailOff = makeButton(this, this.sailButton.x, this.sailButton.y, t('setSail'), () => this.answer(sail(this.state), 'rumble'));
     this.festival = this.add
-      .container(0, 0, [dim, ...this.skyLanterns, panel, title, text, go])
+      .container(0, 0, [dim, ...this.skyLanterns, panel, title, text, go, sailOff])
       .setDepth(UI_DEPTH + 15)
       .setVisible(false);
+  }
+
+  /** The Harbour Festival (LK15): three boons, one to keep for every later game. */
+  private createBoonPanel() {
+    const cx = VIEW.w / 2;
+    const cy = VIEW.h / 2;
+    const dim = this.dim(0.35);
+    const panel = this.add.image(cx - MOVE_PANEL.w / 2 - PAD, cy - MOVE_PANEL.h / 2 - PAD, 'panel-move').setOrigin(0).setScale(1 / RES);
+    const title = this.label(cx, cy - MOVE_PANEL.h / 2 + 32, t('harbourFestivalTitle'), { size: 26, bold: true, color: '#ffc870', glow: true }).setOrigin(0.5);
+    const sub = this.label(cx, cy - MOVE_PANEL.h / 2 + 68, t('boonSub', { n: FESTIVAL_NIGHTS }), { size: 12.5 })
+      .setOrigin(0.5)
+      .setAlign('center');
+    const parts: Phaser.GameObjects.GameObject[] = [dim, panel, title, sub];
+    const spots = [
+      { x: MOVE_CARDS.xs[0], y: MOVE_CARDS.ys[0] },
+      { x: MOVE_CARDS.xs[1], y: MOVE_CARDS.ys[0] },
+      { x: cx, y: MOVE_CARDS.ys[1] },
+    ];
+    BOON_IDS.forEach((id, i) => {
+      const { x: bx, y: by } = spots[i];
+      const left = bx - MOVE_CARDS.w / 2;
+      const top = by - MOVE_CARDS.h / 2;
+      const bg = this.add.image(left - PAD, top - PAD, 'card-wide-on').setOrigin(0).setScale(1 / RES);
+      const name = this.label(left + 14, top + 6, t(BOONS[id].name), { size: 16, bold: true, color: '#ffc870', glow: true });
+      const note = this.label(left + MOVE_CARDS.w - 14, top + 10, '', { size: 11, color: '#b8a8c8' }).setOrigin(1, 0);
+      const blurb = this.label(left + 14, top + 30, t(BOONS[id].blurb), { size: 11.5, color: '#e0cfb4' }).setWordWrapWidth(MOVE_CARDS.w - 28);
+      const hit = this.add
+        .zone(bx, by, MOVE_CARDS.w, MOVE_CARDS.h)
+        .setInteractive({ useHandCursor: true })
+        .on('pointerdown', () => {
+          const taken = takeBoon(this.state, id);
+          if (taken) saveBoon(id);
+          this.answer(taken, 'swell');
+        });
+      this.boonNotes.set(id, note);
+      this.boonButtons.push({ id, x: bx, y: by, w: MOVE_CARDS.w, h: MOVE_CARDS.h });
+      parts.push(bg, name, note, blurb, hit);
+    });
+    parts.push(this.label(cx, cy + MOVE_PANEL.h / 2 - 24, t('boonHint'), { size: 11, color: '#c9a882' }).setOrigin(0.5));
+    this.boonPanel = this.add.container(0, 0, parts).setDepth(UI_DEPTH + 15).setVisible(false);
+  }
+
+  /** The end of a daily night (LK17): today's score, the best and the streak, and the way back. */
+  private createDailyPanel() {
+    const cx = VIEW.w / 2;
+    const cy = VIEW.h / 2;
+    const dim = this.dim(0.45);
+    const panel = this.add.image(cx - SMALL_PANEL.w / 2 - PAD, cy - SMALL_PANEL.h / 2 - PAD, 'panel-small').setOrigin(0).setScale(1 / RES);
+    const title = this.label(cx, cy - 78, t('dailyNight'), { size: 28, bold: true, color: '#d8c8ff', glow: true }).setOrigin(0.5);
+    this.dailyText = this.label(cx, cy - 12, '', { size: 15 }).setOrigin(0.5).setAlign('center');
+    const back = makeButton(this, this.backButton.x, this.backButton.y, t('backToKeep'), () => this.leaveDaily());
+    this.dailyPanel = this.add.container(0, 0, [dim, panel, title, this.dailyText, back]).setDepth(UI_DEPTH + 20).setVisible(false);
+  }
+
+  /**
+   * Starts today's daily night, putting the game aside (from the night panel or the game over).
+   * Once today's try is used it floats today's record at (`x`, `y`) instead.
+   */
+  private openDaily(x = this.dailyButton.x, y = this.dailyButton.y - 30) {
+    this.dailyRecord = loadDaily(GAME);
+    if (this.dailyRecord.played || this.state.daily) {
+      ui('refuse');
+      this.popup(x, y, this.dailyLine(), '#d8c8ff', 13, UI_DEPTH + 30);
+      return;
+    }
+    ui('click');
+    this.dailyRecord = startDaily(GAME);
+    this.run = this.state;
+    this.state = dailyNight(dailyRand(GAME), loadBest(), loadBestPeril());
+    this.lastFrame = null;
+    updateMusic(this.state, true);
+    // Today's two curses, named as the dusk begins.
+    const curses = (Object.keys(CURSES) as CurseId[]).filter((id) => this.state.curses[id] > 0).map((id) => t(CURSES[id].name));
+    this.popup(VIEW.w / 2, 210, t('dailyCurses', { curses: curses.join(' + ') }), '#d8c8ff', 15);
+  }
+
+  /** Back from the daily's end to the game put aside, or a new one. */
+  private leaveDaily() {
+    if (this.state.phase !== 'daily') return;
+    ui('click');
+    this.state = this.run ?? this.freshGame();
+    this.run = null;
+    updateMusic(this.state, true);
+  }
+
+  /** Today's daily, in a line: not yet played, started but left, or its score with the best and streak. */
+  private dailyLine() {
+    const r = this.dailyRecord;
+    if (!r.played) return t('dailyNight');
+    if (r.score === null) return t('dailyLeft');
+    return t('dailyDone', { score: r.score, best: r.best, n: r.streak });
   }
 
   update(time: number) {
@@ -557,16 +714,20 @@ export class GameScene extends Phaser.Scene {
     const phase = s.phase;
     const before = phase === 'dusk' ? snapshot(s) : null;
     tick(s, dt);
-    checkTrophies(s);
+    // A daily night earns no trophies: it starts mid-game with upgrades it didn't buy.
+    if (!s.daily) checkTrophies(s);
     const events = s.events.splice(0);
     if (before) frameSounds(before, s, events);
     for (const e of events) this.showEvent(e);
     if (s.phase !== phase) {
       saveBest(s.best);
+      if (s.breeds) saveFlown(s.flown);
       this.nightAt = this.clock;
       this.payout();
       nightfallSounds(s, (ms, fn) => this.time.delayedCall(ms, fn));
     }
+    // The daily's score is kept once its nightfall has been scored (finishDaily keeps only the first).
+    if (s.phase === 'daily' && this.dailyRecord.score === null) this.dailyRecord = finishDaily(GAME, s.coins);
     updateMusic(s);
     this.drawScreen();
     this.drawDistrict();
@@ -576,6 +737,7 @@ export class GameScene extends Phaser.Scene {
     this.drawGust();
     this.drawOwl();
     this.drawCall();
+    this.drawHarbour();
     this.drawMoths();
     this.drawBats();
     this.drawOrder();
@@ -702,7 +864,8 @@ export class GameScene extends Phaser.Scene {
       else if (queued >= 0) {
         this.holes(g, x, y, 23, 1, 0xffb040, 1.8);
         g.fillStyle(INK_HEX).fillCircle(x + 20, y - 22, 7);
-      } else if (!lantern.lit && !lantern.claimed && s.phase === 'dusk') this.holes(g, x, y, 23, 0, 0xffffff, 1.3);
+      } else if (flooded(s, i)) this.holes(g, x, y, 23, 1, 0x7ab8e0, 1.3);
+      else if (!lantern.lit && !lantern.claimed && s.phase === 'dusk') this.holes(g, x, y, 23, 0, 0xffffff, 1.3);
       this.queueBadge(i, queued);
       // A nearly dry lantern with no moth on its way: a refill now is a close call.
       // With the cask dry (or every fill spoken for) no refill can be sent, so nothing invites one.
@@ -795,7 +958,7 @@ export class GameScene extends Phaser.Scene {
     const secs = Math.max(1, Math.ceil((s.duskMs - gust.atMs) / 1000));
     this.gustTitle.setText(t('gustIn', { n: secs }));
     const shielded = s.moths.some((m) => m.target === gust.target && (m.task === 'lighting' || m.task === 'guard'));
-    this.gustNote.setText(t(shielded ? 'gustShielding' : 'gustShield'));
+    this.gustNote.setText(t(shielded ? 'gustShielding' : T.sheltered ? 'gustSheltered' : 'gustShield'));
     // The plaque's pointer, a sliver of card reaching to the lantern.
     const px = tx + (fromRight ? 30 : GUST_TAG.w - 30);
     p.fillStyle(INK_HEX).fillTriangle(px - 6, ty + GUST_TAG.h - 1, px + 6, ty + GUST_TAG.h - 1, T.x + 14 * dir, T.y - 26);
@@ -863,6 +1026,51 @@ export class GameScene extends Phaser.Scene {
     this.callNote.setText(t('windowNote', { n: callPay(s) }));
   }
 
+  /**
+   * The harbour (LK15): the tide's warning (a wavy line under its row and a countdown), the water
+   * up over the low quay, and a ship sailing in with a ring on the lantern it needs lit.
+   */
+  private drawHarbour() {
+    const s = this.state;
+    const g = this.water.clear();
+    const still = settings.reduceMotion;
+    const tide = s.phase === 'dusk' ? s.tide : null;
+    this.tideLabel.setVisible(!!tide);
+    if (tide) {
+      const wave = (top: number, alpha: number) => {
+        const pts: Phaser.Math.Vector2[] = [];
+        for (let x = this.left; x <= this.right + 12; x += 12) pts.push(new Phaser.Math.Vector2(x, top + Math.sin(x / 26 + (still ? 0 : this.clock / 400)) * 3));
+        return { pts, alpha };
+      };
+      if (!tide.risen) {
+        const { pts } = wave(tide.y + 30, 1);
+        g.lineStyle(1.6, 0x9ad8ff, 0.8).strokePoints(pts);
+        this.tideLabel.setPosition(VIEW.w / 2, tide.y + 52).setText(t('tideIn', { n: Math.max(1, Math.ceil((s.duskMs - tide.atMs) / 1000)) }));
+      } else {
+        // The water rises over half a second and falls again as the tide ebbs.
+        const up = Phaser.Math.Clamp((tide.atMs - s.duskMs) / 500, 0, 1);
+        const down = Phaser.Math.Clamp((s.duskMs - (tide.atMs - TIDE_MS)) / 500, 0, 1);
+        const top = this.bottom - (this.bottom - (tide.y - 14)) * Math.min(up, down);
+        const { pts } = wave(top, 1);
+        g.fillStyle(0x3a6a98, 0.55).fillPoints([...pts, new Phaser.Math.Vector2(this.right + 12, this.bottom), new Phaser.Math.Vector2(this.left, this.bottom)], true);
+        g.lineStyle(1.8, 0xcfe8ff, 0.8).strokePoints(pts);
+        this.tideLabel.setPosition(VIEW.w / 2, tide.y + 52).setText(t('tideUp', { n: Math.max(1, Math.ceil((s.duskMs - (tide.atMs - TIDE_MS)) / 1000)) }));
+      }
+    }
+    const ship = s.phase === 'dusk' ? s.ship : null;
+    this.ship.setVisible(!!ship);
+    this.shipLabel.setVisible(!!ship);
+    if (!ship) return;
+    const x = shipX(s, ship);
+    const bob = still ? 0 : Math.sin(this.clock / 300) * 2.5;
+    this.ship.setPosition(x, SHIP_Y + bob).setFlipX(!ship.fromLeft).setAlpha(edgeFade(x, 70));
+    const guide = s.lanterns[ship.guide];
+    const spot = DISTRICTS[s.district].spots[ship.guide];
+    this.shipLabel.setPosition(Phaser.Math.Clamp(x, this.left + 110, this.right - 110), SHIP_Y - 50).setText(t('shipComing', { n: Math.max(1, Math.ceil(ship.msLeft / 1000)), spot: t(spot.name), coins: SHIP_PAY }));
+    const pulse = still ? 1 : 0.7 + 0.3 * Math.sin(this.clock / 150);
+    this.marks.lineStyle(2, 0x9ad8e8, 0.9 * pulse).strokeCircle(guide.x, guide.y, 33);
+  }
+
   private drawMoths() {
     const s = this.state;
     while (this.moths.length < s.moths.length) {
@@ -902,6 +1110,8 @@ export class GameScene extends Phaser.Scene {
       const swappable = twoJars && m.task === 'idle' && s.phase === 'dusk';
       parts.hit.setPosition(swappable ? m.x : -200, swappable ? m.y : -200);
       parts.nap.setVisible(m.task === 'rest');
+      // A dot under the moth for each trait it has grown.
+      traitsOf(s, i).forEach((trait, k, all) => trail.fillStyle(TRAIT_LOOK[trait].color, 0.95).fillCircle(m.x + (k - (all.length - 1) / 2) * 6, m.y + 15 + bob, 2));
       if (m.task === 'rest') {
         // A lilac ring fills as it rests, under a "zz" countdown.
         this.holes(trail, m.x, m.y, 17, 1 - m.restMs / Math.max(1, restMs(s)), 0xd8c8ff, 1.4);
@@ -1031,6 +1241,24 @@ export class GameScene extends Phaser.Scene {
     this.festival.setVisible(s.phase === 'festival' && this.panelOpen);
     this.movePanel.setVisible(s.phase === 'move' && this.panelOpen);
     this.perilPanel.setVisible(s.phase === 'peril' && this.panelOpen);
+    this.boonPanel.setVisible(s.phase === 'boon' && this.panelOpen);
+    this.dailyPanel.setVisible(s.phase === 'daily' && this.panelOpen);
+    if (s.phase === 'boon') for (const [id, note] of this.boonNotes) note.setText(id === s.boon ? t('yourBoon') : '');
+    if (s.phase === 'daily' && s.report) {
+      const r = s.report;
+      this.dailyText.setText(
+        t('dailyEnd', {
+          district: t(DISTRICTS[s.district].name),
+          kind: t(NIGHT_KINDS[s.kind].name),
+          lit: r.lit,
+          count: r.count,
+          score: s.coins,
+          halved: r.lostHearth ? t('dailyHalved') : '',
+          best: this.dailyRecord.best,
+          n: this.dailyRecord.streak,
+        }),
+      );
+    }
     if (s.phase === 'peril') {
       this.perilTitle.setText(t('perilTitle', { n: s.night }));
       // A taken card stays where it was, greyed, until the panel closes.
@@ -1070,11 +1298,21 @@ export class GameScene extends Phaser.Scene {
       const order = r.orderMet ? t('orderKeptLine', { n: Math.round(s.order.reward * s.paidMult) }) : t('orderMissedLine');
       const chains = r.chains ? t('chainsLit', { n: r.chains, coins: Math.round(r.chains * CHAIN_BONUS * mult * s.paidMult) }) : '';
       const peril = s.paidMult > 1 ? t('cursesPaid', { mult: mult2(s.paidMult) }) : '';
-      const during = [s.closeCalls ? t('closeCallsEarned', { n: s.closeCalls * closeCallPay(s) }) : '', s.callsKept ? t('windowsEarned', { n: s.callsKept * callPay(s) }) : '']
+      const during = [
+        s.closeCalls ? t('closeCallsEarned', { n: s.closeCalls * closeCallPay(s) }) : '',
+        s.callsKept ? t('windowsEarned', { n: s.callsKept * callPay(s) }) : '',
+        s.shipsGuided ? t('shipsEarned', { n: s.shipsGuided * SHIP_PAY }) : '',
+      ]
         .filter(Boolean)
         .join(', ');
       const feast = mult > 1 ? t('feastDouble') : '';
-      const goal = s.festival ? t('festivalHeldGoal') : t('festivalGoal', { kept: s.kept, of: FESTIVAL_NIGHTS });
+      const goal = s.sailed
+        ? s.harbourFestival
+          ? t('harbourHeldGoal')
+          : t('harbourGoal', { kept: s.harbourKept, of: FESTIVAL_NIGHTS })
+        : s.festival
+          ? t('festivalHeldGoal')
+          : t('festivalGoal', { kept: s.kept, of: FESTIVAL_NIGHTS });
       const next = NIGHT_KINDS[s.nextKind];
       const where = s.nextDistrict !== s.district ? t('nextWhere', { district: t(DISTRICTS[s.nextDistrict].name) }) : '';
       // English lowers the rule's first letter inside the brackets; German nouns keep their capital.
@@ -1087,13 +1325,14 @@ export class GameScene extends Phaser.Scene {
         goal,
         t('nextNight', { kind: t(next.name), where, blurb: language() === 'de' ? blurb : blurb[0].toLowerCase() + blurb.slice(1) }),
       ]);
+      this.dailyLink.setText(this.dailyLine());
       for (const [id, parts] of this.shop) {
-        const cost = id === 'cask' ? (s.cask >= CASK_MAX ? null : CASK_COST) : id === 'hearth' ? hearthCost(s) : nextCost(s, id);
+        const cost = id === 'cask' ? (s.cask >= caskMax(s) ? null : CASK_COST) : id === 'hearth' ? hearthCost(s) : nextCost(s, id);
         const affordable = cost !== null && s.coins >= cost;
         parts.bg.setTexture(affordable ? 'card-on' : 'card-off');
         parts.level.setText(
           id === 'cask'
-            ? t('caskLevel', { n: s.cask, max: CASK_MAX })
+            ? t('caskLevel', { n: s.cask, max: caskMax(s) })
             : id === 'hearth'
               ? t('hearthLevel', { n: s.lives, max: LIVES })
               : id === 'jar'
@@ -1114,8 +1353,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** Lettering that floats up and fades; reduce motion keeps it still and only fades it. */
-  private popup(x: number, y: number, text: string, color: string, size = 13) {
-    const lettering = this.label(x, y, text, { size, bold: true, color, stroke: true, glow: true }).setOrigin(0.5).setDepth(UI_DEPTH - 1);
+  private popup(x: number, y: number, text: string, color: string, size = 13, depth = UI_DEPTH - 1) {
+    const lettering = this.label(x, y, text, { size, bold: true, color, stroke: true, glow: true }).setOrigin(0.5).setDepth(depth);
     const rise = settings.reduceMotion ? 0 : 34;
     this.tweens.add({ targets: lettering, y: y - rise, alpha: 0, duration: POPUP_MS, delay: 300, ease: 'Quad.easeIn', onComplete: () => lettering.destroy() });
   }
@@ -1123,6 +1362,11 @@ export class GameScene extends Phaser.Scene {
   private showEvent(e: GameEvent) {
     if (e.type === 'chased') {
       this.popup(e.x, e.y - 26, t('chasedOff'), '#dbe8ff');
+      return;
+    }
+    if (e.type === 'trait') {
+      const m = this.state.moths[e.moth];
+      if (m) this.popup(m.x, m.y - 30, t(TRAIT_LOOK[e.trait].popup), '#fff0c0', 12);
       return;
     }
     const l = this.state.lanterns[e.lantern];
@@ -1135,6 +1379,10 @@ export class GameScene extends Phaser.Scene {
       this.popup(l.x, l.y - 40, e.kept ? t('windowLit', { n: e.coins }) : t('windowDarkens'), e.kept ? '#ffd890' : '#b8a8c8');
     } else if (e.type === 'dry') {
       this.popup(l.x, l.y - 40, t('caskDry'), '#ff9a6a');
+    } else if (e.type === 'tide') {
+      this.popup(l.x, l.y - 40, t('flooded'), '#cfe8ff');
+    } else if (e.type === 'ship') {
+      this.popup(l.x, l.y - 40, e.guided ? t('shipGuided', { n: e.coins }) : t('shipTurned'), e.guided ? '#9ad8e8' : '#b8a8c8');
     } else if (e.type === 'closeCall') {
       // A flare of light and sparks round the saved lantern.
       const flare = this.add.image(l.x, l.y, 'glow-pale').setBlendMode(Phaser.BlendModes.ADD).setScale(1.1).setDepth(4);
@@ -1184,7 +1432,7 @@ export class GameScene extends Phaser.Scene {
 
   private restart() {
     ui('click');
-    this.state = newGame(loadBest(), loadBestPeril());
+    this.state = this.freshGame();
     updateMusic(this.state, true);
   }
 }

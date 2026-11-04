@@ -410,6 +410,66 @@ const SCENERY: Record<DistrictId, Scenery> = {
       gateway(440, 520, 408);
     },
   },
+  // The harbour (LK15): the harbour master's house, a lighthouse, a signal mast over the harbour
+  // hall, two breakwaters with a net loft and a chandler's, and a low slipway the tide floods.
+  harbour: {
+    card(spots) {
+      r(40, 320, 380, GROUND - 320 + 2);
+      r(540, 320, 380, GROUND - 320 + 2);
+      // Round bollards along the breakwaters.
+      for (const x of merlonXs(40, 920, 308, spots)) {
+        if (x > 408 && x < 540) continue;
+        ctx.moveTo(x + 2, 322);
+        ctx.lineTo(x + 2, 312);
+        ctx.arc(x + 6, 312, 4, PI, 0);
+        ctx.lineTo(x + 10, 322);
+        ctx.closePath();
+      }
+      // The harbour master's house, gabled.
+      ctx.moveTo(110, 230);
+      ctx.lineTo(150, 200);
+      ctx.lineTo(190, 230);
+      ctx.lineTo(190, GROUND);
+      ctx.lineTo(110, GROUND);
+      ctx.closePath();
+      // The lighthouse, tapering, with its gallery.
+      ctx.moveTo(800, 166);
+      ctx.lineTo(840, 166);
+      ctx.lineTo(852, GROUND);
+      ctx.lineTo(788, GROUND);
+      ctx.closePath();
+      r(790, 160, 60, 8);
+      // The harbour hall and its signal mast with a yard.
+      r(400, 250, 160, GROUND - 250);
+      r(394, 252, 172, 6);
+      r(477, 128, 6, 124);
+      r(446, 152, 68, 4);
+    },
+    trim() {
+      // The lighthouse lamp room and its beam, the house's windows and the hall's porthole.
+      cut([[800, 178], [840, 178], [840, 198], [800, 198]], '#ffe6a0');
+      glow(820, 188, 34, '#ffd080', 0.6);
+      for (const y of [260, 340, 420]) arch(144, y, 12, 26);
+      for (let y = 214; y < 470; y += 22) poly([[813, y], [827, y], [828, y + 3], [812, y + 3]], 'rgba(240,150,90,0.3)');
+      cut([[480, 270], [490, 280], [480, 290], [470, 280]], '#9ad8e8');
+      joints({ x: 400, y: 250, w: 160 }, 40);
+      // Signal flags on the yard.
+      for (const [x, gel] of [[452, '#ff9a8a'], [500, '#ffd890']] as const) {
+        ctx.save();
+        ctx.globalAlpha = 0.8;
+        poly([[x, 156], [x + 10, 156], [x + 5, 168]], gel);
+        ctx.restore();
+      }
+      // The slipway: an opening down to the water, its posts and the low quay's lattice.
+      gateway(330, 630, 408);
+      for (const x of [360, 480, 600]) poly([[x - 5, 408], [x + 5, 408], [x + 5, 500], [x - 5, 500]], INK);
+      // Waves cut along the foot of the breakwaters, with sea-green gel.
+      for (let x = 50; x < 910; x += 34) {
+        if (x > 320 && x < 640) continue;
+        cut([[x, 470], [x + 8, 464], [x + 16, 470], [x + 8, 467]], '#9ad8c8');
+      }
+    },
+  },
 };
 
 /** The district's scenery as one black cut card, with light through its cuts and the jar at the gate. */
@@ -695,6 +755,31 @@ function paintOwl(up: boolean) {
     dot(side * 4.5, -8, 1.6, INK);
   }
   poly([[-1.5, -4], [1.5, -4], [0, -0.5]], '#ffd8a0');
+}
+
+/**
+ * A ship sailing in to the harbour (LK15), a cut-card puppet centred on (0, 0) facing right: a hull
+ * with portholes, two masts with gel sails lit from behind and a lantern at the bow.
+ */
+function paintShip() {
+  ctx.save();
+  ctx.shadowColor = 'rgba(200,220,255,0.8)';
+  ctx.shadowBlur = 4 * RES;
+  poly([[-44, 12], [44, 12], [34, 28], [-38, 28]], INK);
+  ctx.restore();
+  poly([[-44, 12], [44, 12], [34, 28], [-38, 28]], INK);
+  for (const x of [-24, -8, 8, 24]) cut([[x - 2.5, 18], [x + 2.5, 18], [x + 2.5, 22], [x - 2.5, 22]], '#ffd890');
+  for (const [mx, top] of [[-14, -34], [14, -28]] as const) {
+    poly([[mx - 1.5, top], [mx + 1.5, top], [mx + 1.5, 12], [mx - 1.5, 12]], INK);
+    ctx.save();
+    ctx.globalAlpha = 0.75;
+    poly([[mx - 14, top + 6], [mx + 14, top + 6], [mx + 12, 6], [mx - 12, 6]], '#f4e2c8');
+    ctx.restore();
+    poly([[mx - 15, top + 4], [mx + 15, top + 4], [mx + 15, top + 7], [mx - 15, top + 7]], INK);
+  }
+  poly([[44, 12], [56, 4], [57, 6], [46, 14]], INK);
+  glow(52, 2, 9, '#ffc060', 0.9);
+  dot(52, 2, 2.4, '#ffe0a0');
 }
 
 /** The owl warning plaque, with a pair of owl eyes. */
@@ -1070,6 +1155,7 @@ export function bakeTextures(scene: Phaser.Scene) {
   bake(scene, 'bat-down', 56, 40, () => paintBat(false), 28, 20);
   bake(scene, 'owl-up', 120, 70, () => paintOwl(true), 60, 36);
   bake(scene, 'owl-down', 120, 70, () => paintOwl(false), 60, 36);
+  bake(scene, 'ship', 124, 76, paintShip, 62, 40);
   bake(scene, 'cask-full', 30, 30, () => paintCask(true), 15, 15);
   bake(scene, 'cask-empty', 30, 30, () => paintCask(false), 15, 15);
   bake(scene, 'sky-lantern', 56, 56, paintSkyLantern, 28, 28);

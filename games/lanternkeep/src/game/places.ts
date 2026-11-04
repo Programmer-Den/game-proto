@@ -31,13 +31,14 @@ export interface Chain {
  * order nights add them (the first night of a game uses the first five of the keep), its chains
  * and its rule. `rule` is applied in state.ts: `seawind` makes each gust blow out a second lantern,
  * `vespers` pays more a lantern but asks for three lanterns in four, `trade` doubles close calls
- * and window calls but burns oil faster, and `none` changes nothing.
+ * and window calls but burns oil faster, `tide` (the harbour's, LK15) floods the low quay and
+ * brings ships to guide in, and `none` changes nothing.
  */
 export interface District {
   name: TextKey;
   /** The rule, in a line for the panel. */
   blurb: TextKey;
-  rule: 'none' | 'seawind' | 'vespers' | 'trade';
+  rule: 'none' | 'seawind' | 'vespers' | 'trade' | 'tide';
   spots: readonly Spot[];
   chains: readonly Chain[];
 }
@@ -135,9 +136,41 @@ export const DISTRICTS = {
       { name: 'Arch', lanterns: [3, 9, 4] },
     ],
   },
+  /**
+   * The harbour town (LK15), the second keep: sailed to from the Great Festival, never one of the
+   * fifth nightfall's choices. Its low quay (7, 8, 9) is the row the tide floods; ships are guided
+   * in by the lighthouse (1) and the harbour master's lamp (0).
+   */
+  harbour: {
+    name: 'harbourName',
+    blurb: 'harbourBlurb',
+    rule: 'tide',
+    spots: [
+      { x: 150, y: 184, name: 'spotHarbourMaster' },
+      { x: 820, y: 150, name: 'spotLighthouse' },
+      { x: 480, y: 112, name: 'spotSignalMast' },
+      { x: 300, y: 304, name: 'spotNetLoft' },
+      { x: 660, y: 304, name: 'spotChandler' },
+      { x: 60, y: 304, name: 'spotWestBreakwater' },
+      { x: 900, y: 304, name: 'spotEastBreakwater' },
+      { x: 360, y: 392, name: 'spotWestSlip' },
+      { x: 600, y: 392, name: 'spotEastSlip' },
+      { x: 480, y: 392, name: 'spotSlipway' },
+    ],
+    chains: [
+      { name: 'Net loft', lanterns: [5, 3, 7] },
+      { name: 'Chandler', lanterns: [8, 4, 6] },
+      { name: 'Signals', lanterns: [0, 2, 1] },
+      { name: 'Slipway', lanterns: [7, 9, 8] },
+    ],
+  },
 } as const satisfies Record<string, District>;
 export type DistrictId = keyof typeof DISTRICTS;
 export const DISTRICT_IDS = Object.keys(DISTRICTS) as DistrictId[];
+/** The districts of the first keep, offered at a fifth nightfall (the harbour is sailed to instead). */
+export const MOVE_IDS: readonly DistrictId[] = ['keep', 'docks', 'chapel', 'market'];
+/** The lanterns that guide the harbour's ships in, in the order ships ask for them. */
+export const SHIP_GUIDES = [1, 0] as const;
 
 /** The keep's lantern spots, where every game starts: the first night uses the first five. */
 export const LANTERN_SPOTS: readonly Spot[] = DISTRICTS.keep.spots;
