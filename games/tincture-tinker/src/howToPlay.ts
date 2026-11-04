@@ -19,8 +19,8 @@ const en: HowToPlay = {
       action: 'After an order: retry it, buy lasting upgrades, or stock the pantry',
     },
     {
-      input: 'Tap Journey map, then a town, Daily order or Endless orders',
-      action: "After a sale: a town's own board, today's order, or a run of orders after the examinations",
+      input: "Tap Journey map, then a town, its guest's medallion, Daily, Weekly or Endless orders",
+      action: "After a sale: a town's own board, its guest, today's order, the week's order, or a run of orders",
     },
   ],
   loop: [
@@ -41,7 +41,10 @@ const en: HowToPlay = {
     'Every fifth order is a royal commission: three potions in a row on one board.',
     'Once Royal Apothecary, pass guild examinations on fixed boards to fill the ribbon with seals.',
     "Each town on the journey map has a board of its own shape: tiles fall past its walls. A town's first star opens the next.",
+    'Each town grows a rare ingredient found nowhere else; its order and its guest ask for it.',
+    "A town's first star brings a guest with a rule: the witch turns a tile to a toad each move, the knight gives ten moves, the miser pays only for cascades.",
     'The daily order is the same for everyone each day, with one try; endless orders open once every seal is earned.',
+    "The weekly order keeps one board all week: play it as often as you like, every match scores and each cascade step counts once more.",
   ],
 };
 
@@ -72,8 +75,8 @@ const de: HowToPlay = {
       action: 'Nach einem Auftrag: ihn wiederholen, dauerhafte Verbesserungen kaufen oder den Vorrat auffüllen',
     },
     {
-      input: 'Reisekarte antippen, dann eine Stadt, Tagesauftrag oder Endlose Aufträge',
-      action: 'Nach einem Verkauf: das eigene Brett einer Stadt, der Auftrag von heute oder eine Serie nach den Prüfungen',
+      input: 'Reisekarte antippen, dann eine Stadt, das Medaillon ihres Gasts, Tages-, Wochen- oder Endlose Aufträge',
+      action: 'Nach einem Verkauf: das eigene Brett einer Stadt, ihr Gast, der Auftrag von heute, der Wochenauftrag oder eine Serie',
     },
   ],
   loop: [
@@ -94,7 +97,10 @@ const de: HowToPlay = {
     'Jeder fünfte Auftrag ist ein königlicher Auftrag: drei Tränke nacheinander auf einem Brett.',
     'Als Hofapotheker bestehst du Gildenprüfungen auf festen Brettern und füllst das Band mit Siegeln.',
     'Jede Stadt auf der Reisekarte hat ein Brett in eigener Form: Felder fallen an ihren Mauern vorbei. Der erste Stern einer Stadt öffnet die nächste.',
+    'Jede Stadt hat eine seltene Zutat, die es nur dort gibt; ihr Auftrag und ihr Gast verlangen sie.',
+    'Der erste Stern einer Stadt bringt einen Gast mit eigener Regel: Die Hexe macht jeden Zug ein Feld zur Kröte, der Ritter gibt zehn Züge, der Geizhals zahlt nur für Kettenreaktionen.',
     'Der Tagesauftrag ist jeden Tag für alle gleich, mit einem Versuch; endlose Aufträge öffnen, wenn jedes Siegel verdient ist.',
+    'Der Wochenauftrag behält eine Woche lang dasselbe Brett: Spiel ihn, so oft du willst; jeder Treffer zählt, jede Stufe einer Kettenreaktion einmal mehr.',
   ],
 };
 

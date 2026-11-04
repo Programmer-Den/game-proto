@@ -49,9 +49,20 @@ bottle green, serif italics), all painted in code on 2D canvases. It shares no c
   the first star; a daily order on the map (`shared/daily.ts`: today's recipe, a town's shape and
   blockers, the board and every refill drawn from the day's seed, one try a day, best and streak);
   and endless orders on the map once every seal is earned (a run of orders growing by 2 of each need
-  and losing a move every second order, until one fails; the best run is kept).
+  and losing a move every second order, until one fails; the best run is kept). Each town grows a
+  rare ingredient (`RARES`, one per town: brook fern, mill honey, salt pearls, thistledown, wold
+  acorns, larkspur, glowcaps, brambleberries) that drops in on its boards beside the five everyday
+  ones and is asked for by its order and its guest. A town's first star brings its guest (a
+  medallion on the map; `guests.ts`): an order on the town's board with a rule, the witch (a
+  plain tile turns into a toad after every move: stuck, never matches, a match next to it turns it
+  back; at most `TOAD_MAX`), the knight (ten moves) or the miser (only cascade steps count towards
+  the needs), sold for 1-3 stars, the best kept, `GUEST_STAR_COINS` per new star. A weekly order on
+  the map (`weekly.ts`): one seeded board all week (order, board and refills from the week's seed),
+  played as often as you like, never sold: its moves are played out and it scores each gathered
+  ingredient of its recipe times the cascade depth (1 for the swap's own match), stars at
+  `WEEKLY_STARS`, no bench tools, the week's best and tries kept.
 - **Progression:** `order`, `coins`, `sold`, `stars`, `pantry`, `upgrades`, `royal`, `seals`,
-  `rich`, `towns` and `endless` carry over. Coins buy bench tools, workbench upgrades and pantry ingredients; stars set
+  `rich`, `towns`, `endless` and `guests` carry over. Coins buy bench tools, workbench upgrades and pantry ingredients; stars set
   the rank (`src/game/ranks.ts`), and each rank's recipe joins the round of orders. The game has an
   ending (the crown's last order) but does not stop there: the guild examinations follow, and after
   them endless runs; the journey map's towns and the daily order sit beside the round from the
@@ -64,8 +75,8 @@ bottle green, serif italics), all painted in code on 2D canvases. It shares no c
 - **Persistence:** progress is saved when an order sells, whenever a bench tool, a workbench
   upgrade or a pantry ingredient is bought and when the next order is picked. The
   board and moves left are not saved, so a reload restarts the current order on a fresh board (with
-  the coins already spent gone); a reload during a guild examination, a town, an endless run or the
-  daily order goes back to the orders (the daily's try stays used, an endless run's best stays).
+  the coins already spent gone); a reload during a guild examination, a town, a guest, an endless
+  run, the daily or the weekly order goes back to the orders (the daily's try stays used, an endless run's best stays).
 - **Rough edges:** tiles fall past a resin-held tile (hopping over its cell) rather than piling on
   it. A shuffle that gives up returns a fresh board without jars, resin or mould (a town's walls stay). Tiles falling past a town's walls hop over them like resin, hidden behind the wall while they pass. Unlocking a recipe lengthens the round, so the potion for a given order number can shift after a
   rank-up, and a royal commission's stages come from the round too. The caption shows one tip at a
@@ -102,11 +113,14 @@ bottle green, serif italics), all painted in code on 2D canvases. It shares no c
 - `src/main.ts`: creates the `Phaser.Game` (960x540, FIT scaling, `pixelArt: false`) with
   `BootScene` and `GameScene`, calls `setupGame(game)` and `setupScaling(game, { fill: true })` from
   `shared/scaling.ts` (the view takes the screen's shape, see Screens), and puts `game` on `window` in dev builds.
-- `src/game/kinds.ts`: `KINDS`, the `Kind` type, `KIND_NAMES` and `KIND_COUNTS` (each kind's name
-  and its count in a sentence, "3 wheat", as `TextKey`s) and `randomKind(rand?)`.
+- `src/game/kinds.ts`: `KINDS` (the five everyday ingredients), `RARES` (the towns' rare ones, in
+  `TOWNS` order), `ALL_KINDS`, the `Kind`, `BaseKind` and `RareKind` types, `KIND_NAMES` and
+  `KIND_COUNTS` (each kind's name and its count in a sentence, "3 wheat", as `TextKey`s), `isRare`
+  and `randomKind(rand?, pool?)` (from `KINDS` unless a pool is given).
 - `src/game/orders.ts`: `PotionId`, `POTION_NAMES` (`TextKey`s, the same as the ids), `Needs`, `Stage`, the `Order` type (with
   `rush`, `forbid`, `jars`, `resin`, `mould`, `stages`, `last`, `second`, `rich`, `exam`, `holes`,
-  `town`, `endless`, `daily`), `Recipe`, `Risk`,
+  `town`, `endless`, `daily`, `rare`, `guest`, `weekly`), `GuestRule`, `poolOf(order)` (the kinds that drop in:
+  `KINDS`, plus the order's `rare`), `Recipe`, `Risk`,
   the `ORDERS` table,
   `RANK_RECIPES` (the three unlockable recipes), `MOVE_BONUS`, the per-round growth
   (`ROUND_NEEDS`, `ROUND_PRICE`), `RUSH_MOVES`, `RUSH_COINS`, the royal and twin numbers
@@ -120,10 +134,18 @@ bottle green, serif italics), all painted in code on 2D canvases. It shares no c
 - `src/game/exams.ts`: the `Exam` type, the `EXAMS` table, `seeded` (a mulberry32 generator),
   `examSeed(index)` and `examOrder(index, number)`, which turns an examination into an `Order` with
   `exam` set (and the difficulty's moves).
-- `src/game/towns.ts`: the `Town` type (name `TextKey`, potion, needs, moves, blockers, `shape`: eight
+- `src/game/towns.ts`: the `Town` type (name `TextKey`, potion, needs, `rare`, moves, blockers, `shape`: eight
   strings of `.` and `#`), `TOWNS`, `TOWN_STAR_COINS`, `townSeed(index)`, `townOpen(towns, index)`,
   `townOrder(index, number)` (an `Order` with `town` and `holes`), `DAILY_COINS` and
   `dailyOrder(rand, day, number)` (an `Order` with `daily` and a town's `holes`, drawn from `rand`).
+- `src/game/guests.ts`: the `Guest` type, `GUESTS` (one per town, in `TOWNS` order), `GUEST_TEXTS`
+  (each rule's name, label line and caption keys), `GUEST_STAR_COINS`, `TOAD_MAX`, `guestSeed(index)`,
+  `guestOpen(towns, index)` and `guestOrder(index, number)` (an `Order` with `guest`, the town's
+  `holes` and `rare`).
+- `src/game/weekly.ts`: `WEEKLY_MOVES`, `WEEKLY_STARS`, `weekOf(day)` (the Monday of its week),
+  `weeklyRand(week)`, `weeklyStars(score)`, `weeklyOrder(rand, week, number)` (an `Order` with
+  `weekly` and a town's `holes`, drawn from `rand`), and the record under `tincture-tinker-weekly`:
+  `WeeklyRecord`, `loadWeekly(week)` and `finishWeekly(week, score)`.
 - `src/game/endless.ts`: `ENDLESS_NEEDS`, `ENDLESS_SLOWER` and `endlessOrder(step, number)` (an
   `Order` with `endless`, cycling through `ALL_RECIPES`).
 - `src/game/ranks.ts`: `STARS_3`, `STARS_2`, `starsFor(movesLeft)`, the `RANKS` table (titles as
@@ -134,27 +156,31 @@ bottle green, serif italics), all painted in code on 2D canvases. It shares no c
   `mould`, `hole`), `Cell` and `Run` types and pure board logic: `matchKind`, `stuck`, `special`, `swapped`,
   `findRuns`, `findMatches`, `matchesAt`, `swapWorks`, `validMoves`, `collapse`, `freshBoard`,
   `layBoard` (a fresh board with walls cut, `freshBoard` itself with none), `holesOf(shape)`,
-  `shuffle`, `addBlockers`, `neighbours`, `spreadMould`, `adjacent`, `inBoard`.
+  `shuffle`, `addBlockers`, `neighbours`, `spreadMould`, `turnToad`, `adjacent`, `inBoard`. A
+  `Tile` can also be a `toad`.
 - `src/game/state.ts`: `Progress`, `GameState`, `GAME` (the daily's game name), `PANTRY_MAX`,
   `HERB_COST`, `freshProgress`, `progressOf`, `heldPantry`, `examOpen`, `endlessOpen`, `buyHerb`,
   `standingOf`, `startOrder(progress, exam?)` (which also places the Bloom starter's Bloom and draws
   on the pantry, or lays an examination's seeded board), `startTown`, `startEndless`,
-  `startDailyOrder` (all through `startAside`, which lays the board from a `rand` with the order's
+  `startDailyOrder`, `startGuest`, `startWeeklyOrder` (all through `startAside`, which lays the board from a `rand` with the order's
   walls cut, no Bloom starter and no pantry, and for the daily keeps `rand` on the state for the
-  refills), `tileMaker` (new tiles from `s.rand`, Math.random when unset), `wanted`, `filled(s, needs?)`, `firstNeeds`, `drawPantry`, `stockPantry`.
+  refills; the weekly order too), `tileMaker` (new tiles from the order's `poolOf`, drawn from `s.rand`, Math.random when unset), `wanted`, `filled(s, needs?)`, `firstNeeds`, `drawPantry`, `stockPantry`.
 - `src/game/sim.ts`: `trySwap` (plays a swap out to completion through `resolve` and returns its
   `Step`s, brewing and firing specials, opening jars, melting resin and scrubbing mould in `gather`,
   then letting mould creep), `CATALYST_RUN`, the bench tools (`Tool`, `TOOLS` with price, name and tip, `TOOL_ORDER`,
-  `STIR_MOVES`, `canUse`, `stir`, `sift`, `pestle`, `funnel`), `nextOrder`, `nextExam`, `nextTown`,
-  `nextEndless` and `nextDaily`.
+  `STIR_MOVES`, `canUse` (never on the weekly order), `stir`, `sift`, `pestle`, `funnel`), `nextOrder`, `nextExam`, `nextTown`,
+  `nextEndless`, `nextDaily`, `nextGuest` and `nextWeekly`.
 - `src/game/save.ts`: `loadProgress` and `saveProgress` in `localStorage`.
 - `src/scenes/BootScene.ts`: calls `bakeTextures`, then starts `Game`.
 - `src/scenes/GameScene.ts`: draws everything, handles input and the tool buttons, animates steps
   and sifts, shows hints, the rank ribbon, the order's twist, stage or second-customer line, the
   caption, the pantry, the notes over the board (a served customer, a new stage), the result card
   (with its pair of buttons and its links), the workbench card, the herbalist card and the journey
-  map card (`createMap`, `openMap`, `refreshMap`, `townAt`), and the result cards of the towns, the
-  daily and endless runs (`showAsideSold`, `showAsideFailed`).
+  map card (`createMap`, `openMap`, `refreshMap`, `townAt`; a guest's medallion on each town with a
+  star, and the Daily, Weekly and Endless orders buttons), and the result cards of the towns, the
+  guests, the daily and weekly orders and endless runs (`showAsideSold`, `showAsideFailed`). On
+  the weekly order the label's second price line is the live score (`scoreText`, updated in
+  `refreshMoves`) and the stars under the moves follow `weeklyStars`.
 - `src/scenes/layout.ts`: `VIEW`, `BOARD`, `TRAY`, `RIBBON`, `PANEL`, `NEEDS` (with `twinY` and
   `twinRow` for a twin order's four rows), `PANTRY`, `TOOL`, `CAPTION`, `BUTTON`, `UI_DEPTH`,
   `SERIF`, `cellX`, `cellY`. It matches the approved mockup at half its 1920x1080 size.
@@ -163,9 +189,11 @@ bottle green, serif italics), all painted in code on 2D canvases. It shares no c
   up to 4 on a big screen, from `sharpRes` of the larger of the designed size and `viewSize`; the same for every texture), `shown(image, scale)` (sizes
   an image to `scale` times its texture's view size by setting its scale to `scale / RES`), the inks (`SEPIA`, `GOLD`,
   `CREAM`, `BOTTLE`...), shape helpers (`poly`, `rrect`, `whip`, `cornerOrn`, `doubleRule`,
-  `goldStar`, `coin`) and `ingredient(kind, x, y, s)`, the five ingredient silhouettes.
+  `goldStar`, `coin`) and `ingredient(kind, x, y, s)`, the thirteen ingredient silhouettes (five
+  everyday, eight rare).
 - `src/art/textures.ts`: `bakeTextures` and the texture keys: `wall` (the bottle-green wall with its lily
-  pattern and gold rules, painted at `viewSize` so it covers the whole view), `hole` (a town's wall:
+  pattern and gold rules, painted at `viewSize` so it covers the whole view), `toad` (a tile the witch
+  cursed), `guest-<rule>` (a guest's medallion, `guestTexture`), `hole` (a town's wall:
   a bottle-green inlay with a gold rim over a cell), `map-card` (the journey map's 440x440 card), `table` (the static
   960x540 layout over it: tray and cells, ribbon band, order label with its crest and "Bench tools"
   heading, painted in the hub's language at boot like the tool names), `kind-<kind>`, `catalyst-<kind>` (sunburst halo), `bloom-<kind>` (rose petal
@@ -289,6 +317,26 @@ bottle green, serif italics), all painted in code on 2D canvases. It shares no c
   one. `layBoard` cuts walls into a `freshBoard` (retrying until a move is left), and `shuffle`'s
   fallback board keeps the walls where they were. The scene draws a wall as the `hole` texture at
   `DEPTH.hole`, over the tiles that fall behind it.
+- **Rare ingredients:** a town's order and its guest carry `rare`; `poolOf` adds it to `KINDS` for
+  every tile that drops in (`tileMaker`, and `startAside`'s first board), so it comes up as often as
+  each everyday kind. `freshBoard`'s and `sift`'s rerolls stay with the everyday kinds. `got` has a
+  count for every kind in `ALL_KINDS`. Rare kinds never reach the pantry (only the round's orders
+  stock or draw on it) and the herbalist sells only `KINDS`.
+- **Town guests:** the map shows `guestTexture(rule)` on a town's corner once `guestOpen`, with a
+  zone over it that starts `nextGuest`. `resolve` sells a guest like a town (`GUEST_STAR_COINS` per
+  star above `guests[index]`, which it raises). The witch: `trySwap` calls `turnToad` after the
+  mould step, which turns a random plain tile into a `toad` while fewer than `TOAD_MAX` are on the
+  board, as a last step with `spread` and `toad` (the scene swells it and plays `croak`). A toad is
+  `stuck` and `matchKind` null; `gather`'s scrub loop turns it back like mould (in `scrubbed`). The
+  knight is only the guest's `moves` (10). The miser: `gather` takes the round's `depth` (0 for
+  the swap's or tool's own match), and with `depth` 0 counts nothing and gives the step empty
+  `needs`, so its tiles pop instead of flying to the label.
+- **Weekly order:** `weekOf(today())` names the week; the map's Weekly order starts
+  `nextWeekly(week)` (no limit on tries). `resolve` never sells it on `filled`: once `moves` reaches
+  0 it is `sold` with `orderStars = weeklyStars(score)` and no coins. `gather` adds the wanted
+  ingredients it counted times `depth + 1` to `score`. `settle` calls `finishWeekly` (keeping the
+  best before it in `weeklyBefore` for the "new best" line), and the result card offers Play again
+  or Back to orders.
 - **Journey map:** `refreshLinks` adds the Journey map link once `sold > 0`. `openMap` hides the
   result card and shows the map card: each town's picture of its shape (from `holesOf`), name and
   best stars at `townAt(i)` (four along the top, four back along the bottom) on a dotted road, a
@@ -330,7 +378,7 @@ bottle green, serif italics), all painted in code on 2D canvases. It shares no c
 ### State model
 
 - `Progress` (`order`, `coins`, `sold`, `stars`, `pantry`, `upgrades`, `royal`, `seals`, `rich`,
-  `towns`, `endless`) is what is saved and carried between orders.
+  `towns`, `endless`, `guests`) is what is saved and carried between orders.
 - `GameState` extends it with `current` (the `Order` from `orderFor`, whose `potion` and `needs`
   follow the stage on a royal commission), `got` (per-kind counts for this order or stage),
   `moves`, `phase` (`play`, `sold`, `failed`), `earned`, `orderStars` (0 until sold), `brewed` and
@@ -338,7 +386,7 @@ bottle green, serif italics), all painted in code on 2D canvases. It shares no c
   `scrubbed` (mould), `penalties` (moves lost to the forbidden kind; `fired`, `bloomsFired`, `opened`,
   `melted`, `scrubbed` and `penalties` are only kept for debugging and the test's log), `stage`, `served`,
   `speedBonus`, `fromPantry`, `toPantry`, `startPantry`, `passed` (an examination sold with its
-  stars), `board`, `nextId` and `rand` (the daily's seeded source for new tiles; a function, so it
+  stars), `score` (the weekly order's), `toads` (made by the witch this order, for debugging), `board`, `nextId` and `rand` (the daily's seeded source for new tiles; a function, so it
   is never saved and drops out of the test's JSON copy).
 - `Board` is `Tile[][]`, rows from the top. Each `Tile` has a unique `id` from `nextId`, which
   restarts at 1 for every order; the scene relies on ids to track sprites through falls. A brewed
@@ -358,7 +406,8 @@ bottle green, serif italics), all painted in code on 2D canvases. It shares no c
 
 ### Persistence
 
-Three keys of its own. `tincture-tinker-daily` holds the daily order's record (`shared/daily.ts`:
+Four keys of its own. `tincture-tinker-weekly` holds the weekly order's record (`weekly.ts`: the
+week's Monday, its best score and tries; a new week starts over). `tincture-tinker-daily` holds the daily order's record (`shared/daily.ts`:
 today's try, its stars, the best and the days in a row). `tincture-tinker-trophies` holds the trophies earned (`shared/trophies.ts`),
 each id with the time. `tincture-tinker-progress` holds the JSON `Progress`. `loadProgress` merges
 it over `freshProgress()`, puts back the default of any field that is out of range (`order` and
@@ -366,9 +415,9 @@ it over `freshProgress()`, puts back the default of any field that is out of ran
 keeps only known kinds with whole counts from 1, capped at `PANTRY_MAX`; `upgrades` only known
 ids with whole levels capped at their top; `royal` must be exactly `true`; `seals` a whole number
 from 0, capped at `EXAMS.length`; `rich` exactly `true` and only from order 2; `towns` one whole number from 0 to 3 per town, 0 where
-missing; `endless` a whole number from 0) and falls back to a
+missing; `guests` the same per town's guest; `endless` a whole number from 0) and falls back to a
 fresh start on any error. Saves from before stars, the pantry, the workbench, the royal title, the
-seals, rich orders, the towns or endless runs existed load with their defaults. The hub's settings are stored separately under `hub-settings`.
+seals, rich orders, the towns, endless runs or the guests existed load with their defaults. The hub's settings are stored separately under `hub-settings`.
 
 ### Randomness and timing
 
@@ -378,7 +427,9 @@ seals, rich orders, the towns or endless runs existed load with their defaults. 
   examination's or a town's starting board comes from its own `seeded` generator instead, passed to
   `randomKind`, `layBoard` and `addBlockers` as `rand`. The daily order draws its recipe, shape,
   blockers, board and refills (through `s.rand` in `tileMaker`) from `dailyRand(GAME, day)`; its
-  shuffles, mould and Sift rerolls still use `Math.random`. An endless run's boards use `Math.random`. The order and number of calls decide the board the seeded test sees; a brewed Catalyst
+  shuffles, mould and Sift rerolls still use `Math.random`. The weekly order does the same from
+  `weeklyRand(week)`. A guest's starting board comes from `seeded(guestSeed(index))`; the witch's
+  toads use `Math.random`. An endless run's boards use `Math.random`. The order and number of calls decide the board the seeded test sees; a brewed Catalyst
   means one fewer new tile, and a fired row more. Phaser's `Text` objects also take one call each
   (their canvas texture's key), see Gotchas.
 - Animation and hint timing use only the `time` argument of `update`; the hint swell, the mould
@@ -398,6 +449,8 @@ seals, rich orders, the towns or endless runs existed load with their defaults. 
   `src/game/state.ts`. Rich orders: `RICH_*` and `riskFor` in `src/game/orders.ts`. Guild
   examinations: `EXAMS` in `src/game/exams.ts`. Towns and their shapes, star coins and the daily
   order's mix: `TOWNS`, `TOWN_STAR_COINS`, `DAILY_COINS`, `dailyOrder` in `src/game/towns.ts`.
+  Town guests: `GUESTS`, `GUEST_STAR_COINS`, `TOAD_MAX` in `src/game/guests.ts`. The weekly order:
+  `WEEKLY_MOVES`, `WEEKLY_STARS` and `weeklyOrder` in `src/game/weekly.ts`.
   Endless runs' growth: `src/game/endless.ts`.
 - Ingredient kinds and names: `src/game/kinds.ts`. Board size: `ROWS`, `COLS` in
   `src/game/board.ts`.
@@ -417,7 +470,7 @@ seals, rich orders, the towns or endless runs existed load with their defaults. 
   no-ops; this game uses neither).
 - Difficulty scales one number: the moves of every order. `orderFor` in `src/game/orders.ts` adds
   `byDifficulty(5, 0, -3)` to the order's `moves` (before a rush order's cut, never below 5), so Easy gives 5 more, Normal the table's value
-  and Hard 3 fewer. `examOrder`, `townOrder`, `dailyOrder` and `endlessOrder` do the same. `ORDERS`,
+  and Hard 3 fewer. `examOrder`, `townOrder`, `guestOrder`, `dailyOrder`, `weeklyOrder` and `endlessOrder` do the same. `ORDERS`,
   `RANK_RECIPES` and `EXAMS` themselves are unchanged.
 - `settings.reduceMotion` is read in `GameScene`: the hint tiles hold a fixed larger scale instead
   of swelling, a fired Catalyst's row band holds steady instead of blinking, brewed Catalysts don't
@@ -469,7 +522,8 @@ seals, rich orders, the towns or endless runs existed load with their defaults. 
   `VIEW` and `BOARD` with `src/scenes/layout.ts` and `ROWS`/`COLS`; the `Kind`, `Tile` and
   `GameState` shapes declared at the top of the test; the game's URL path in the test's `page.goto`.
 - Bench tools, the workbench, the herbalist, rich orders, guild examinations, the journey map,
-  towns and their walls, the daily order, endless runs, mixed specials,
+  towns and their walls, rare ingredients, town guests and toads, the daily and weekly orders,
+  endless runs, mixed specials,
   ranks above Apprentice, blockers, mould, twists, royal commissions, twin orders and the pantry
   stay out of the playthrough (purchases are not part of the first
   round, and order 1 has no blockers or twist and starts with an empty pantry; what its sale puts
@@ -489,7 +543,7 @@ triangle lead, a thin `pulse12` arpeggio and a triangle bass. It is written at `
 | Part | When |
 | --- | --- |
 | `calm` | every order (sixteen bars, no drums) |
-| `royal` | a royal commission, a guild examination or an endless order: a statelier waltz with soft kick and hats |
+| `royal` | a royal commission, a guild examination, a town guest or an endless order: a statelier waltz with soft kick and hats |
 | `tense` | three moves or fewer left while playing: D minor, running eighths and busier hats |
 | `sold1`, `sold2`, `sold3` (stings) | a potion sold (`showSold`): a cadence and one chime per star |
 | `rank` (sting) | a sale that reaches a new rank, or a guild examination passed |
@@ -508,13 +562,14 @@ triangle lead, a thin `pulse12` arpeggio and a triangle bass. It is written at `
 | `fire` / `burst` | a fired row, column or Bloom square / a 5x5 of two Blooms |
 | `cork`, `sizzle`, `scrub` | a jar opened, resin melted, mould scrubbed in the step |
 | `spread` | mould creeping onto a tile (the `spread` step) |
+| `croak` | the witch turning a tile into a toad (a `spread` step with `toad`) |
 | `penalty` | a swap whose own match had the forbidden kind (`penalised`) |
 | `shuffle` | a step whose board was shuffled |
 | `served` / `stage` | a twin order's customer served / a royal commission's next stage |
 | `stir`, `sift`, `pestle`, `funnel` | the bench tools, when they act (`useTool`, `siftRow`, `usePestle`, `pickFunnel`) |
 | `stamp` | a guild seal won (`showSold`) |
 | `hint` | the idle hint appearing (`updateHint`) |
-| `ui('click')` | a tool picked up or put down, the result card's buttons and links, Back, a town, Daily order or Endless orders on the map |
+| `ui('click')` | a tool picked up or put down, the result card's buttons and links, Back, a town, a guest's medallion, Daily, Weekly or Endless orders on the map |
 | `ui('coin')` | a workbench upgrade or a herb bought |
 | `ui('refuse')` | a swap with a jar, resin or mould tile, a tool that can't be used or afforded, a Pestle or Funnel tap that can't act, a Sift that can't reroll (or a row with nothing to reroll), an upgrade not affordable, a town not open yet, the Daily order already played today, Endless orders before every seal |
 
@@ -556,6 +611,13 @@ triangle lead, a thin `pulse12` arpeggio and a triangle bass. It is written at `
 - **Add or retune a guild examination:** an entry in `EXAMS` in `src/game/exams.ts` (moves are
   Normal's). Its board follows from `examSeed(index)`, so inserting one changes the boards of
   those after it. The ribbon has room for about ten seals; update the README's table.
+- **Add or retune a town guest:** an entry in `GUESTS` in `src/game/guests.ts` (one per town, its
+  needs the town's rare ingredient and an everyday one, moves Normal's) and the README's table. A
+  new rule needs a `GuestRule`, its texts in `GUEST_TEXTS` and `src/i18n/`, a medallion in
+  `paintGuest` and its effect in `sim.ts`.
+- **Add a rare ingredient:** add it to `RARES` (one per town, in `TOWNS` order), `KIND_NAMES`,
+  `KIND_COUNTS` and its texts, a shape in `shapes` and colours in `COL` in `src/art/nouveau.ts`, and
+  name it as the town's `rare`.
 - **Add an ingredient kind:** add it to `KINDS`, `KIND_NAMES` and `KIND_COUNTS` in `src/game/kinds.ts` (with its texts in
   `src/i18n/`), its shape
   in `shapes` and colours in `COL` in `src/art/nouveau.ts`, and the `Kind` type in

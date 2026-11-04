@@ -29,7 +29,9 @@ before the moves run out and the potion sells, for coins and one to three stars.
 | Herbalist, then Buy | After an order: spend coins to stock the pantry |
 | Guild examination | Once Royal Apothecary: sit the next examination |
 | Journey map, then a town | After the first sale: play that town's order on its own board |
+| A guest's medallion | On the journey map, on a town with a star: play that town's guest |
 | Daily order | On the journey map: today's order, one try a day |
+| Weekly order | On the journey map: the week's order, as often as you like |
 | Endless orders | On the journey map, once every guild seal is earned: start a run |
 
 1. **Swaps** only count when they make a match. A swap that doesn't slides back and costs no move.
@@ -116,22 +118,41 @@ before the moves run out and the potion sells, for coins and one to three stars.
    try, with the town's own jars, resin and mould. A town is sold for one to three stars, the best
    is kept under its picture on the map and every star it gives for the first time pays 20 coins.
    The first town is always open; each one after it opens once the town before has a star. Towns
-   leave the orders, the stars and the pantry as they were.
+   leave the orders, the stars and the pantry as they were. Each town also grows a **rare
+   ingredient** found nowhere else (brook fern, mill honey, salt pearls, thistledown, wold acorns,
+   larkspur, glowcaps and brambleberries): it drops in on the town's boards beside the five
+   everyday ones, and the town's order and its guest ask for it. Rare ingredients never go into the
+   pantry.
+16. **Town guests**: a town's first star brings a demanding guest, shown as a medallion on the
+   town's corner of the map. A guest's order is played on the town's board, asks for its rare
+   ingredient and one everyday one, and comes with a rule: **the witch** turns a tile into a toad
+   after every move (a toad never matches or moves, and a match next to it turns it back; at most
+   six at once), **the knight** wants it all in ten moves, and **the miser** pays only for cascades
+   (what a swap's own match gathers doesn't count, only what falls into place after it). A guest
+   is sold for one to three stars like a town, the best kept (a star beside the medallion once
+   served), and every star given for the first time pays 30 coins.
 16. **Daily order**: the journey map's Daily order is the same for every player on the same day: a
    recipe, a town's board shape and a few blockers, the board and every tile that drops in drawn
    from the day's seed. There is one try a day (starting it uses it up), and the map and the result
    card show the day's stars, the best and how many days in a row were played.
-17. **Endless orders**: once every guild examination is passed, the journey map starts an endless
+18. **Weekly order**: the journey map's Weekly order keeps one board for the whole week (from
+   Monday), the same for every player: a recipe, a town's board shape, a few jars and resin, and
+   every tile that drops in drawn from the week's seed. It never sells: its 20 moves are played out
+   and it scores every ingredient of its recipe gathered, each cascade step counting once more than
+   the one before (the swap's own match once, the first cascade twice...). 50, 100 and 150 points
+   earn one, two and three stars. Bench tools can't be used on it. Play it as often as you like:
+   the week's best score and number of tries are kept.
+19. **Endless orders**: once every guild examination is passed, the journey map starts an endless
    run: one order after another, each asking for 2 more of every ingredient, with a move fewer
    every second order and more blockers. Each sale pays and offers the next order; running out of
    moves ends the run. The longest run is kept as the best streak.
-18. **Hints**: after a few idle seconds, two tiles that would match swell and settle (with the hub's
+20. **Hints**: after a few idle seconds, two tiles that would match swell and settle (with the hub's
    reduced motion on, they hold still, a little larger).
-19. If the board is left with no move to make, its tiles are shuffled.
+21. If the board is left with no move to make, its tiles are shuffled.
 
 Progress (the next order, coins, potions sold, stars, the pantry, the workbench upgrades, the
-royal title, the guild seals, a rich pick, each town's stars and the best endless run) is saved in
-the browser, with the daily order's record beside it, after each sale, each tool,
+royal title, the guild seals, a rich pick, each town's and each guest's stars and the best endless
+run) is saved in the browser, with the daily and weekly orders' records beside it, after each sale, each tool,
 upgrade or ingredient bought and each pick of the next order.
 
 ![A match being gathered](docs/screenshots/playthrough-1-match.webp)
@@ -213,12 +234,13 @@ Two Blooms swapped together clear the 5x5 around them:
 
 ![Mixed specials](docs/screenshots/mixed-specials.webp)
 
-The journey map: eight towns, each drawn as its board's shape, with the stars won so far, and the
-daily order and endless orders below:
+The journey map: eight towns, each drawn as its board's shape, with the stars won so far and a
+guest's medallion on every town with a star, and the daily, weekly and endless orders below:
 
 ![The journey map](docs/screenshots/journey-map.webp)
 
-Saltmere's order on its hourglass board: tiles fall past the green walls:
+Saltmere's order on its hourglass board, asking for its rare salt pearls: tiles fall past the green
+walls:
 
 ![A town's board](docs/screenshots/town-board.webp)
 
@@ -226,18 +248,41 @@ The daily order borrows a town's shape (here Gloamwick's ring):
 
 ![The daily order](docs/screenshots/daily-order.webp)
 
+The witch of Millhollow, five moves in: the toads she made hold their tiles until a match beside
+them turns them back:
+
+![The witch's toads](docs/screenshots/guest-witch.webp)
+
+The weekly order: the score and the week's best on the label, with the next star's score under the
+moves:
+
+![The weekly order](docs/screenshots/weekly-order.webp)
+
 ### Towns
 
 | Town | Board | Potion | Needs | Moves | Jars, resin, mould |
 | --- | --- | --- | --- | --- | --- |
-| 1 Fernbrook | corners cut | Healing Draught | 11 ember salt, 11 sage | 14 | none |
-| 2 Millhollow | a 2x2 well in the middle | Sleeping Tonic | 12 moonpetal, 11 wheat | 15 | 2, 0, 0 |
-| 3 Saltmere | an hourglass | Mandrake Tincture | 11 mandrake, 10 sage, 8 ember salt | 17 | 2, 2, 0 |
-| 4 Thistlecombe | a diamond | Golden Elixir | 12 wheat, 11 ember salt, 10 moonpetal | 19 | 0, 3, 0 |
-| 5 Ashby Wold | four pairs of posts | Amber Cordial | 13 wheat, 12 mandrake, 11 ember salt | 16 | 3, 2, 1 |
-| 6 Larkspur Ford | a river across | Moonlit Philter | 14 moonpetal, 13 mandrake, 11 sage | 22 | 2, 3, 2 |
-| 7 Gloamwick | a ring of walls | Starlight Elixir | 13 moonpetal, 12 sage, 11 wheat | 21 | 3, 3, 2 |
-| 8 Briarcross | notched edges | Philosopher's Draught | 16 ember salt, 15 moonpetal, 14 mandrake | 19 | 4, 4, 3 |
+| 1 Fernbrook | corners cut | Healing Draught | 10 ember salt, 10 sage, 6 brook fern | 16 | none |
+| 2 Millhollow | a 2x2 well in the middle | Sleeping Tonic | 11 moonpetal, 10 wheat, 7 mill honey | 17 | 2, 0, 0 |
+| 3 Saltmere | an hourglass | Mandrake Tincture | 10 mandrake, 9 sage, 7 salt pearls | 18 | 2, 2, 0 |
+| 4 Thistlecombe | a diamond | Golden Elixir | 11 wheat, 10 ember salt, 8 thistledown | 20 | 0, 3, 0 |
+| 5 Ashby Wold | four pairs of posts | Amber Cordial | 12 wheat, 11 mandrake, 8 wold acorns | 17 | 3, 2, 1 |
+| 6 Larkspur Ford | a river across | Moonlit Philter | 13 moonpetal, 12 mandrake, 9 larkspur | 23 | 2, 3, 2 |
+| 7 Gloamwick | a ring of walls | Starlight Elixir | 12 moonpetal, 11 sage, 9 glowcaps | 22 | 3, 3, 2 |
+| 8 Briarcross | notched edges | Philosopher's Draught | 15 ember salt, 14 moonpetal, 10 brambleberries | 20 | 4, 4, 3 |
+
+### Town guests
+
+| Town | Guest | Rule | Needs | Moves | Jars, resin |
+| --- | --- | --- | --- | --- | --- |
+| 1 Fernbrook | the knight | everything in ten moves | 6 brook fern, 7 sage | 10 | none |
+| 2 Millhollow | the witch | a tile turns to a toad each move | 8 mill honey, 9 moonpetal | 16 | none |
+| 3 Saltmere | the miser | only cascades pay | 5 salt pearls, 5 mandrake | 20 | 1, 0 |
+| 4 Thistlecombe | the knight | everything in ten moves | 6 thistledown, 6 wheat | 10 | 0, 1 |
+| 5 Ashby Wold | the witch | a tile turns to a toad each move | 9 wold acorns, 10 ember salt | 17 | 1, 1 |
+| 6 Larkspur Ford | the miser | only cascades pay | 5 larkspur, 6 mandrake | 22 | 1, 1 |
+| 7 Gloamwick | the knight | everything in ten moves | 7 glowcaps, 8 sage | 10 | 1, 1 |
+| 8 Briarcross | the witch | a tile turns to a toad each move | 10 brambleberries, 11 ember salt | 18 | 2, 2 |
 
 ### Guild examinations
 
@@ -279,7 +324,7 @@ The favicon is the hub's bear with three potions lined up: a match of three.
 
 ![The favicon](docs/screenshots/favicon.webp)
 
-The difficulty, set on the hub page's Settings, changes one thing: each order (and each guild examination, town, daily order and endless order) gives 5 more moves on Easy and 3 fewer on Hard.
+The difficulty, set on the hub page's Settings, changes one thing: each order (and each guild examination, town, town guest, daily, weekly and endless order) gives 5 more moves on Easy and 3 fewer on Hard.
 
 ## Trophies
 
@@ -332,10 +377,10 @@ All paths are inside `games/tincture-tinker/`.
 
 - `src/game/`: the rules in plain TypeScript with no Phaser dependency. `kinds.ts` lists the
   ingredients, `orders.ts` the potion orders, the recipes ranks unlock, royal commissions and twin
-  orders (rich ones too), `exams.ts` the guild examinations, `towns.ts` the journey map's towns and the daily order,
+  orders (rich ones too), `exams.ts` the guild examinations, `towns.ts` the journey map's towns (and their rare ingredients) and the daily order, `guests.ts` the town guests, `weekly.ts` the weekly order and its record,
   `endless.ts` endless runs, `ranks.ts` the stars and ranks,
   `upgrades.ts` the workbench, `board.ts` finds runs,
-  matches and moves, lets tiles fall, shuffles, places jars, resin and mould and lets mould creep,
+  matches and moves, lets tiles fall, shuffles, places jars, resin and mould, lets mould creep and turns tiles into toads,
   `state.ts` holds the order being played, the pantry and the herbalist, `sim.ts` plays a swap out step by step
   (Catalysts, Blooms, jars, resin, mould, stages and customers included) and runs the bench tools,
   and `save.ts` keeps the progress.

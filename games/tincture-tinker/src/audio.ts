@@ -111,6 +111,8 @@ export const sfx = sounds({
   scrub: { wave: 'noise', freq: 1600, to: 2800, arp: [0, 7, 0, 7], arpStep: 0.04, length: 0.17, volume: 0.2 },
   /** Mould creeps onto a tile: a squelchy wobble. */
   spread: { wave: 'triangle', freq: 175, to: 120, arp: [0, 3, 0, 3, 0], arpStep: 0.04, length: 0.2, volume: 0.36 },
+  /** A town's witch turns a tile into a toad: a low two-note croak. */
+  croak: { wave: 'square', freq: 110, to: 90, arp: [0, 5, 0], arpStep: 0.06, length: 0.22, volume: 0.22 },
   /** The forbidden ingredient matched: a move lost. */
   penalty: { wave: 'sawtooth', freq: 140, to: 118, length: 0.22, volume: 0.18, gap: 300 },
   /** No move left, so the board shuffles: a rattling sweep. */

@@ -2,17 +2,22 @@ import type { Rand } from '../../../../shared/daily';
 import { byDifficulty } from '../../../../shared/settings';
 import type { TextKey } from '../i18n';
 import { holesOf } from './board';
+import type { RareKind } from './kinds';
 import { ALL_RECIPES, type Needs, type Order, type PotionId } from './orders';
 
 // The journey map: towns along a road, each sending one order on a board of its own shape (walls
 // where no tile goes) with its own blockers. A town is sold for one to three stars, the best kept,
-// and the next town opens once it has a star. The daily order borrows a town's shape.
+// and the next town opens once it has a star. Each town grows one rare ingredient only found there,
+// which its order and its guest ask for (see guests.ts). The daily order borrows a town's shape.
 
 export interface Town {
   /** Its name, a key of `i18n/en.ts`. */
   name: TextKey;
   potion: PotionId;
+  /** What the town's order needs: everyday ingredients and the town's rare one. */
   needs: Needs;
+  /** The ingredient only found in this town: it drops in on its boards (and its guest's) beside the five everyday ones. */
+  rare: RareKind;
   moves: number;
   jars: number;
   resin: number;
@@ -25,8 +30,9 @@ export const TOWNS: Town[] = [
   {
     name: 'townFernbrook',
     potion: 'healingDraught',
-    needs: { ember: 11, sage: 11 },
-    moves: 14,
+    needs: { ember: 10, sage: 10, fern: 6 },
+    rare: 'fern',
+    moves: 16,
     jars: 0,
     resin: 0,
     mould: 0,
@@ -35,8 +41,9 @@ export const TOWNS: Town[] = [
   {
     name: 'townMillhollow',
     potion: 'sleepingTonic',
-    needs: { moonpetal: 12, wheat: 11 },
-    moves: 15,
+    needs: { moonpetal: 11, wheat: 10, honey: 7 },
+    rare: 'honey',
+    moves: 17,
     jars: 2,
     resin: 0,
     mould: 0,
@@ -45,8 +52,9 @@ export const TOWNS: Town[] = [
   {
     name: 'townSaltmere',
     potion: 'mandrakeTincture',
-    needs: { mandrake: 11, sage: 10, ember: 8 },
-    moves: 17,
+    needs: { mandrake: 10, sage: 9, pearl: 7 },
+    rare: 'pearl',
+    moves: 18,
     jars: 2,
     resin: 2,
     mould: 0,
@@ -55,8 +63,9 @@ export const TOWNS: Town[] = [
   {
     name: 'townThistlecombe',
     potion: 'goldenElixir',
-    needs: { wheat: 12, ember: 11, moonpetal: 10 },
-    moves: 19,
+    needs: { wheat: 11, ember: 10, thistle: 8 },
+    rare: 'thistle',
+    moves: 20,
     jars: 0,
     resin: 3,
     mould: 0,
@@ -65,8 +74,9 @@ export const TOWNS: Town[] = [
   {
     name: 'townAshbyWold',
     potion: 'amberCordial',
-    needs: { wheat: 13, mandrake: 12, ember: 11 },
-    moves: 16,
+    needs: { wheat: 12, mandrake: 11, acorn: 8 },
+    rare: 'acorn',
+    moves: 17,
     jars: 3,
     resin: 2,
     mould: 1,
@@ -75,8 +85,9 @@ export const TOWNS: Town[] = [
   {
     name: 'townLarkspurFord',
     potion: 'moonlitPhilter',
-    needs: { moonpetal: 14, mandrake: 13, sage: 11 },
-    moves: 22,
+    needs: { moonpetal: 13, mandrake: 12, larkspur: 9 },
+    rare: 'larkspur',
+    moves: 23,
     jars: 2,
     resin: 3,
     mould: 2,
@@ -85,8 +96,9 @@ export const TOWNS: Town[] = [
   {
     name: 'townGloamwick',
     potion: 'starlightElixir',
-    needs: { moonpetal: 13, sage: 12, wheat: 11 },
-    moves: 21,
+    needs: { moonpetal: 12, sage: 11, glowcap: 9 },
+    rare: 'glowcap',
+    moves: 22,
     jars: 3,
     resin: 3,
     mould: 2,
@@ -95,8 +107,9 @@ export const TOWNS: Town[] = [
   {
     name: 'townBriarcross',
     potion: 'philosophersDraught',
-    needs: { ember: 16, moonpetal: 15, mandrake: 14 },
-    moves: 19,
+    needs: { ember: 15, moonpetal: 14, bramble: 10 },
+    rare: 'bramble',
+    moves: 20,
     jars: 4,
     resin: 4,
     mould: 3,
@@ -126,6 +139,7 @@ export function townOrder(index: number, number: number): Order {
     resin: town.resin,
     mould: town.mould,
     holes: holesOf(town.shape),
+    rare: town.rare,
     town: { index },
   };
 }

@@ -15,6 +15,24 @@ const en = {
   moonpetalName: 'Moonpetal',
   moonpetalCount: { one: '{n} moonpetal', other: '{n} moonpetal' },
 
+  // Rare ingredients: one only found in each town on the journey map
+  fernName: 'Brook Fern',
+  fernCount: { one: '{n} brook fern', other: '{n} brook fern' },
+  honeyName: 'Mill Honey',
+  honeyCount: { one: '{n} mill honey', other: '{n} mill honey' },
+  pearlName: 'Salt Pearl',
+  pearlCount: { one: '{n} salt pearl', other: '{n} salt pearls' },
+  thistleName: 'Thistledown',
+  thistleCount: { one: '{n} thistledown', other: '{n} thistledown' },
+  acornName: 'Wold Acorn',
+  acornCount: { one: '{n} wold acorn', other: '{n} wold acorns' },
+  larkspurName: 'Larkspur',
+  larkspurCount: { one: '{n} larkspur', other: '{n} larkspur' },
+  glowcapName: 'Glowcap',
+  glowcapCount: { one: '{n} glowcap', other: '{n} glowcaps' },
+  brambleName: 'Brambleberry',
+  brambleCount: { one: '{n} brambleberry', other: '{n} brambleberries' },
+
   // Potions
   healingDraught: 'Healing Draught',
   sleepingTonic: 'Sleeping Tonic',
@@ -171,7 +189,7 @@ const en = {
   townStarsWon: { one: 'A new star: +{coins} coins', other: '{n} new stars: +{coins} coins' },
   townNoNew: { one: 'No new star: the best is still {n} star', other: 'No new star: the best is still {n} stars' },
   townOpened: 'The road opens to {town}',
-  captionMap: 'Each town pays {coins} coins for every new star, and a star opens the next town on the road',
+  captionMap: 'Each town pays {coins} coins for every new star, and a star opens the next town and its guest',
   captionTown: "A town's own board: tiles fall past its green walls, and nothing matches through them",
   dailyTitle: 'Daily order',
   dailyLine: "Today's board, from {town}",
@@ -193,6 +211,37 @@ const en = {
   runOverText: { one: '{n} order sold in a row', other: '{n} orders sold in a row' },
   bestStreak: { one: 'Best run: {n} order', other: 'Best run: {n} orders' },
   captionEndless: 'An endless run: every order asks for more with fewer moves, until one runs out',
+  captionTownRare: 'Only {town} grows {kind}: it drops in here beside the others, and tiles fall past the green walls',
+
+  // Town guests, once a town has a star
+  guestWitch: 'The witch',
+  guestKnight: 'The knight',
+  guestMiser: 'The miser',
+  guestTitle: '{guest} of {town}',
+  witchLine: 'Turns a tile to a toad every move',
+  knightLine: 'Wants it all in {n} moves',
+  miserLine: 'Pays only for cascades',
+  captionWitch: 'The witch turns a tile into a toad after every move; a match next to a toad turns it back',
+  captionKnight: 'The knight wants it all in {n} moves: no time to dawdle',
+  captionMiser: "The miser only counts what cascades gather: a swap's own match pays nothing",
+  guestServed: '{guest} of {town} is pleased!',
+  guestWaits: '{guest} now waits in {town} on the journey map',
+  guestStars: { one: '{n} of {max} guest star', other: '{n} of {max} guest stars' },
+
+  // The weekly order
+  weeklyTitle: 'Weekly order',
+  weeklyLine: "This week's board, from {town}",
+  weeklyScore: 'Score: {n}',
+  weeklyBest: 'Best this week: {n}',
+  weeklyDone: 'Weekly order played!',
+  weeklyScored: 'A score of {n}',
+  weeklyNewBest: 'A new best for the week!',
+  weeklyRecord: { one: 'Best this week: {best}, from {n} try', other: 'Best this week: {best}, from {n} tries' },
+  weeklyNote: { one: 'Best this week: {best}; {n} try', other: 'Best this week: {best}; {n} tries' },
+  weeklyNext: 'Next star at a score of {n}',
+  weeklyAllStars: 'Every star earned',
+  playAgain: 'Play again',
+  captionWeekly: "This week's board, the same for everyone: every match scores, each cascade step once more. No bench tools",
 };
 
 export default en;

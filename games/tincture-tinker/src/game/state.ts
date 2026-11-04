@@ -2,11 +2,13 @@ import { dailyRand } from '../../../../shared/daily';
 import { addBlockers, freshBoard, layBoard, stuck, type Board, type Cell, type Tile } from './board';
 import { endlessOrder } from './endless';
 import { EXAMS, examOrder, examSeed, seeded } from './exams';
-import { KINDS, randomKind, type Kind } from './kinds';
-import { orderFor, type Needs, type Order, type PotionId } from './orders';
+import { guestOrder, guestSeed } from './guests';
+import { ALL_KINDS, randomKind, type Kind } from './kinds';
+import { orderFor, poolOf, type Needs, type Order, type PotionId } from './orders';
 import { unlockedRecipes } from './ranks';
 import { dailyOrder, TOWNS, townOrder, townSeed } from './towns';
 import { freshUpgrades, type Upgrades } from './upgrades';
+import { weeklyOrder, weeklyRand } from './weekly';
 
 /** What carries over between orders, and is saved. */
 export interface Progress {
@@ -31,6 +33,8 @@ export interface Progress {
   towns: number[];
   /** The longest endless run so far: orders sold in a row (see endless.ts). */
   endless: number;
+  /** The best stars each town's guest was sold with, 0 for one not sold yet (see guests.ts). */
+  guests: number[];
 }
 
 /** The game's name for the shared daily (`shared/daily.ts`): its record is kept under `tincture-tinker-daily`. */
@@ -72,6 +76,10 @@ export interface GameState extends Progress {
   startPantry: Needs;
   /** On a guild examination, whether the sale earned the stars it asked for. */
   passed: boolean;
+  /** On the weekly order, the score so far: its ingredients gathered, each cascade step counting once more. */
+  score: number;
+  /** Toads the witch made this order (a guest's rule; see guests.ts). */
+  toads: number;
   board: Board;
   nextId: number;
   /** Where new tiles' kinds come from on the daily order (today's seeded source); Math.random otherwise. Never saved. */
@@ -83,9 +91,9 @@ export const PANTRY_MAX = 5;
 /** What the herbalist charges for one ingredient put in the pantry between orders. */
 export const HERB_COST = 8;
 
-export const freshProgress = (): Progress => ({ order: 1, coins: 0, sold: 0, stars: 0, pantry: {}, upgrades: freshUpgrades(), royal: false, seals: 0, rich: false, towns: TOWNS.map(() => 0), endless: 0 });
+export const freshProgress = (): Progress => ({ order: 1, coins: 0, sold: 0, stars: 0, pantry: {}, upgrades: freshUpgrades(), royal: false, seals: 0, rich: false, towns: TOWNS.map(() => 0), endless: 0, guests: TOWNS.map(() => 0) });
 /** The progress to save or carry on with. Until the order sells, its pantry draws are given back. */
-export const progressOf = ({ order, coins, sold, stars, pantry, startPantry, phase, upgrades, royal, seals, rich, towns, endless }: GameState): Progress => ({
+export const progressOf = ({ order, coins, sold, stars, pantry, startPantry, phase, upgrades, royal, seals, rich, towns, endless, guests }: GameState): Progress => ({
   order,
   coins,
   sold,
@@ -97,6 +105,7 @@ export const progressOf = ({ order, coins, sold, stars, pantry, startPantry, pha
   rich,
   towns: [...towns],
   endless,
+  guests: [...guests],
 });
 
 /** The pantry as it stands between orders: after a sale what it holds, otherwise what the order found. */
@@ -119,7 +128,8 @@ export function buyHerb(s: GameState, kind: Kind): boolean {
   return true;
 }
 
-export const tileMaker = (s: GameState) => (): Tile => ({ id: s.nextId++, kind: randomKind(s.rand) });
+/** New tiles for the board: from the order's pool (a town's rare ingredient too), drawn from `s.rand` when set. */
+export const tileMaker = (s: GameState) => (): Tile => ({ id: s.nextId++, kind: randomKind(s.rand, poolOf(s.current)) });
 
 /** The orders' view of the progress: the recipes unlocked, the workbench's moves, the royal title and a rich pick. */
 export const standingOf = (p: Progress) => ({ unlocked: unlockedRecipes(p.stars), extraMoves: p.upgrades.hands, royal: p.royal, rich: p.rich });
@@ -148,6 +158,14 @@ export function startDailyOrder(progress: Progress, day: string): GameState {
   return startAside(progress, dailyOrder(rand, day, progress.order), rand, true);
 }
 
+/** Town `index`'s guest on the town's board shape, laid from the guest's own seed. */
+export const startGuest = (progress: Progress, index: number) => startAside(progress, guestOrder(index, progress.order), seeded(guestSeed(index)));
+/** The week's order: the order, its board and every tile that drops in come from the week's seed. */
+export function startWeeklyOrder(progress: Progress, week: string): GameState {
+  const rand = weeklyRand(week);
+  return startAside(progress, weeklyOrder(rand, week, progress.order), rand, true);
+}
+
 /**
  * An order outside the round (an examination, a town, an endless run's or the daily) on a board laid
  * from `rand`, with walls cut where the order has `holes`: no Bloom starter and no pantry. With
@@ -156,7 +174,7 @@ export function startDailyOrder(progress: Progress, day: string): GameState {
 function startAside(progress: Progress, current: Order, rand: () => number = Math.random, refills = false): GameState {
   const s = blankState(progress, current);
   if (refills) s.rand = rand;
-  const make = () => ({ id: s.nextId++, kind: randomKind(rand) });
+  const make = () => ({ id: s.nextId++, kind: randomKind(rand, poolOf(current)) });
   s.board = addBlockers(layBoard(make, current.holes ?? [], rand), current.jars, current.resin, current.mould, rand);
   return s;
 }
@@ -168,8 +186,9 @@ function blankState(progress: Progress, current: Order): GameState {
     pantry: { ...progress.pantry },
     upgrades: { ...progress.upgrades },
     towns: [...progress.towns],
+    guests: [...progress.guests],
     current,
-    got: Object.fromEntries(KINDS.map((k) => [k, 0])) as Record<Kind, number>,
+    got: Object.fromEntries(ALL_KINDS.map((k) => [k, 0])) as Record<Kind, number>,
     moves: current.moves,
     phase: 'play',
     earned: 0,
@@ -189,6 +208,8 @@ function blankState(progress: Progress, current: Order): GameState {
     toPantry: {},
     startPantry: { ...progress.pantry },
     passed: false,
+    score: 0,
+    toads: 0,
     board: [],
     nextId: 1,
   };
