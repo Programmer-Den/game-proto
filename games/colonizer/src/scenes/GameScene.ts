@@ -10,6 +10,9 @@ import {
   EDGES,
   FACTION_IDS,
   FACTIONS,
+  MASTERY_WINS,
+  WONDER_CREW,
+  eliteFor,
   MAP_KIND_IDS,
   HEAL_RANGE,
   MAP_SIZE,
@@ -49,7 +52,9 @@ import {
   chooseBoon,
   chooseEdge,
   createGame,
+  ageKey,
   deedsDone,
+  deeds4Done,
   entityAt,
   explored,
   figureTall,
@@ -94,7 +99,9 @@ import { BUILDING_TOP, CAMP_TOP, CHUNK, paintChunk, TREE_TOP } from '../art/scen
 import { hexNum, SERIF, T } from '../art/stitch';
 import { buildingKey, figKey, relicKey, TREE_VARIANTS } from './BootScene';
 import { Effects } from './fx';
-import { DeedCard, Minimap, StatusCard, stitchEllipse, stitchLine, Toast, TopBar } from './hud';
+import { DeedCard, Minimap, MissionCard, StatusCard, stitchEllipse, stitchLine, stitchStars, Toast, TopBar } from './hud';
+import { scenarioById, SCENARIOS, starsFor, withSeed, type Scenario } from '../game/campaign';
+import { addWin, loadMastery, mastered, saveStars } from '../progress';
 import { BOON, BUTTONS, H, PANEL_Y, SEL, TOP_H, W } from './layout';
 import { SoundCues } from './sound';
 import { checkTrophies } from '../trophies/check';
@@ -176,6 +183,12 @@ export class GameScene extends Phaser.Scene {
   /** The second AI's faction in a three-way match, or null. */
   private rival2: FactionId | null = null;
   private kind: MapKind = 'lowlands';
+  /** The campaign scenario being played, or null in a skirmish. */
+  scenario: Scenario | null = null;
+  /** A scenario's card at the top left. */
+  private missionCard: MissionCard | null = null;
+  /** What the end screen said beyond Victory or Defeat (stars, mastery), for the test and the screenshots. */
+  endLines: string[] = [];
   /** The sides the planner plays: the AI, the second AI, and the player's side when watching. */
   private aiSides: number[] = [];
   private unitSprites = new Map<number, Phaser.GameObjects.Image>();
@@ -237,11 +250,19 @@ export class GameScene extends Phaser.Scene {
     super('Game');
   }
 
-  init(data: { faction?: FactionId; aiFaction?: FactionId; rival2?: FactionId | null; kind?: MapKind }) {
+  init(data: { faction?: FactionId; aiFaction?: FactionId; rival2?: FactionId | null; kind?: MapKind; scenario?: string }) {
     this.faction = data.faction ?? 'ember';
     this.aiFaction = data.aiFaction ?? 'tide';
     this.rival2 = data.rival2 ?? null;
     this.kind = data.kind ?? 'lowlands';
+    // A campaign scenario fixes the map kind and the number of rivals.
+    this.scenario = watching ? null : scenarioById(data.scenario ?? '');
+    if (this.scenario) {
+      this.kind = this.scenario.kind;
+      this.rival2 = this.scenario.rivals.length > 1 ? (data.rival2 ?? FACTION_IDS.find((f) => f !== this.faction && f !== this.aiFaction)!) : null;
+    }
+    this.missionCard = null;
+    this.endLines = [];
     if (watching) {
       // Watch mode skips the menu: two different factions, picked at random, both played by the AI,
       // on a map kind picked at random, and every other match a three-way one with the third faction.
@@ -292,18 +313,21 @@ export class GameScene extends Phaser.Scene {
   }
 
   create() {
-    const map = generateMap(this.kind, this.rival2 ? 3 : 2);
+    const sc = this.scenario;
+    // A scenario's map comes from its own seed, so it is the same every time it is played.
+    const map = sc ? withSeed(sc.seed, () => generateMap(this.kind, this.rival2 ? 3 : 2)) : generateMap(this.kind, this.rival2 ? 3 : 2);
     this.terrain = map.terrain;
     // The difficulty sets how fast the AIs gather; Normal is the game as designed. Watching, every
-    // side gathers alike. Each AI side draws its temperament for the match.
+    // side gathers alike. Each AI side draws its temperament for the match (a scenario sets them).
     const mul = watching ? 1 : byDifficulty(0.75, 1, 1.25);
-    const temper = () => TEMPERAMENT_IDS[Math.floor(Math.random() * TEMPERAMENT_IDS.length)];
+    const temper = (k: number) => sc?.rivals[k] ?? TEMPERAMENT_IDS[Math.floor(Math.random() * TEMPERAMENT_IDS.length)];
     const sides = [
-      { faction: this.faction, gatherMul: 1, temperament: watching ? temper() : null },
-      { faction: this.aiFaction, gatherMul: mul, temperament: temper() },
-      ...(this.rival2 ? [{ faction: this.rival2, gatherMul: mul, temperament: temper() }] : []),
+      // Faction mastery unlocks the player's second unique unit.
+      { faction: this.faction, gatherMul: 1, temperament: watching ? temper(-1) : null, elite: !watching && mastered(this.faction) },
+      { faction: this.aiFaction, gatherMul: mul, temperament: temper(0) },
+      ...(this.rival2 ? [{ faction: this.rival2, gatherMul: mul, temperament: temper(1) }] : []),
     ];
-    this.state = createGame(sides, map, watching);
+    this.state = createGame(sides, map, watching, sc?.mission ?? null);
     this.cues = new SoundCues(this.state, watching);
     const side = (k: number) => {
       const p = this.state.players[k];
@@ -374,6 +398,7 @@ export class GameScene extends Phaser.Scene {
     this.top.update(this.state);
     this.deeds.update(this.state);
     this.status.update(this.state);
+    this.missionCard?.update(this.state);
     this.mini.update(this.state, dt, this.cameras.main.worldView, this.alerts);
     this.renderAlerts();
     this.renderToast();
@@ -782,7 +807,7 @@ export class GameScene extends Phaser.Scene {
     // A marker at the edge of the view jumps to the attack it points at.
     const mark = this.edgeMarks.find((m) => Math.hypot(m.x - p.x, m.y - p.y) <= 14);
     if (mark) return void this.jumpTo(mark.alert.x, mark.alert.y);
-    if (p.y < TOP_H || p.y >= PANEL_Y || this.deeds.contains(p.x, p.y) || this.status.contains(p.x, p.y)) return;
+    if (p.y < TOP_H || p.y >= PANEL_Y || this.deeds.contains(p.x, p.y) || this.status.contains(p.x, p.y) || this.missionCard?.contains(p.x, p.y)) return;
     // Watching, a click only selects, to see what a unit is doing; the AI gives every order.
     if (watching && p.rightButtonDown()) return;
     const w = this.toWorld(p.x, p.y);
@@ -1085,6 +1110,7 @@ export class GameScene extends Phaser.Scene {
     this.top = new TopBar(this, this.faction);
     this.deeds = new DeedCard(this);
     this.status = new StatusCard(this, this.state);
+    if (this.scenario) this.missionCard = new MissionCard(this, this.scenario);
     this.toast = new Toast(this);
     this.edgeG = this.add.graphics().setScrollFactor(0).setDepth(9980);
     this.mini = new Minimap(this, this.terrain, this.state);
@@ -1241,6 +1267,8 @@ export class GameScene extends Phaser.Scene {
       if (def.gift === 'sight') lines.push(t('giftSight'));
       if (def.gift === 'heal') lines.push(t('giftHeal'));
       if (def.role === 'siege') lines.push(t('ramInfo'));
+      if (def.elite) lines.push(t(`${def.name}Info` as TextKey));
+      if (this.state.mission?.cart === u.id) lines.push(t('supplyCartInfo'));
       if (inAura(this.state, u) && def.gift !== 'aura') lines.push(t('inAura'));
       lines.push(doing(u));
       this.info(76, 26, lines.join('\n'));
@@ -1267,6 +1295,7 @@ export class GameScene extends Phaser.Scene {
       const unique = (Object.keys(UNIQUE) as FactionId[]).find((f) => UNIQUE[f] === b.type);
       if (unique && !head) lines.push(t(UNIQUE_EFFECT[unique]));
       if (b.type === 'monument' && b.built) lines.push(t('monumentInfo'));
+      if (b.type === 'wonder') lines.push(t('wonderInfo', { n: WONDER_CREW }));
       if (b.type === 'gate' && b.built) lines.push(t('gateInfo'));
       if (def.shelter && b.built) lines.push(b.garrison.length > 0 ? t('garrisonInside', { n: b.garrison.length }) : t('shelters', { n: def.shelter }));
       if (def.market && b.built && !head) lines.push(t('marketInfo'));
@@ -1379,7 +1408,7 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     const p = s.players[PLAYER];
     const out: Action[] = [];
-    const ageName = (age: 2 | 3) => t(age === 3 ? 'age3' : 'age2');
+    const ageName = (age: 2 | 3 | 4) => t(ageKey(age));
     if (this.placing) return [{ id: 'cancel', name: t('cancel'), sub: '', enabled: true, run: () => void (this.placing = null) }];
     if (this.rallyMode) return [{ id: 'cancel', name: t('cancel'), sub: '', enabled: true, run: () => void (this.rallyMode = false) }];
     if (this.buildMenu) {
@@ -1417,8 +1446,10 @@ export class GameScene extends Phaser.Scene {
     const b = this.selectedBuilding();
     if (b && b.built) {
       const def = BUILDINGS[b.type];
-      for (const role of def.trains ?? []) {
-        const unit = unitFor(this.faction, role);
+      // Each role's unit, and the faction's second unique unit after its own once mastery unlocks it.
+      const elite = p.elite ? eliteFor(this.faction) : null;
+      const trains = (def.trains ?? []).flatMap((role) => [unitFor(this.faction, role), ...(elite?.role === role && elite.trainer === b.type ? [elite] : [])]);
+      for (const unit of trains) {
         const cost = unitCost(s, PLAYER, unit);
         const tooEarly = unit.age !== undefined && p.age < unit.age;
         const atLimit = unit.limit !== undefined && unitCount(s, PLAYER, unit.id) >= unit.limit;
@@ -1472,9 +1503,9 @@ export class GameScene extends Phaser.Scene {
         const flags = this.rallyBuildings();
         out.push({ id: 'rally', name: t('rallyFlag'), sub: t(flags.some((x) => x.rally) ? 'rallyMoveSub' : 'rallySetSub'), enabled: true, run: () => void (this.rallyMode = true) });
       }
-      if (b.type === 'town' && p.age < 3) {
-        const next = p.age === 1 ? TECHS.age2 : TECHS.age3;
-        const ready = p.age === 1 || deedsDone(p);
+      if (b.type === 'town' && p.age < 4) {
+        const next = p.age === 1 ? TECHS.age2 : p.age === 2 ? TECHS.age3 : TECHS.age4;
+        const ready = p.age === 1 || (p.age === 2 ? deedsDone(p) : deeds4Done(p));
         out.push({
           id: next.id,
           name: t(next.name),
@@ -1482,7 +1513,7 @@ export class GameScene extends Phaser.Scene {
           enabled: ready && affordable(p, next.cost) && !b.queue.some((q) => q.key === next.id),
           run: () => {
             if (research(this.state, PLAYER, b.id, next.id)) return queued();
-            say(this.state, t(p.age === 2 ? 'deedsFirst' : 'cantAdvance'));
+            say(this.state, t(p.age >= 2 ? 'deedsFirst' : 'cantAdvance'));
             return refused();
           },
         });
@@ -1536,16 +1567,55 @@ export class GameScene extends Phaser.Scene {
     }
     const won = this.state.winner === PLAYER;
     playSting(COLONY, won ? 'win' : 'lose');
-    const bg = this.add.rectangle(W / 2, H / 2, W, H, hexNum(T.linen), 0.72).setScrollFactor(0);
-    const card = this.add.image(W / 2, H / 2, 'card-end').setScrollFactor(0);
-    const title = this.add.text(W / 2, H / 2 + -25, t(won ? 'victory' : 'defeat').toUpperCase(), { ...text(44, won ? T.green : T.red, true) }).setOrigin(0.5).setScrollFactor(0);
+    const by = this.state.winBy;
     const how =
-      this.state.winBy === 'monument'
+      by === 'monument'
         ? t(won ? 'endMonumentOwn' : 'endMonumentFoe')
-        : t(won ? (this.rival2 ? 'endBothFallen' : 'endFoeFallen') : 'townFallen');
-    const why = this.add.text(W / 2, H / 2 + 14, how, { ...text(15, T.ink), fontStyle: 'italic' }).setOrigin(0.5).setScrollFactor(0);
-    const sub = this.add.text(W / 2, H / 2 + 42, t('endAgain'), text(14, T.faded)).setOrigin(0.5).setScrollFactor(0);
-    this.endPanel = this.add.container(0, 0, [bg, card, title, why, sub]).setScrollFactor(0).setDepth(11000);
+        : by === 'wonder'
+          ? t(won ? 'endWonderOwn' : 'endWonderFoe')
+          : by === 'goal' && this.scenario
+            ? t(this.scenario.goal)
+            : by === 'cart'
+              ? t('endCartLost')
+              : t(won ? (this.rival2 ? 'endBothFallen' : 'endFoeFallen') : 'townFallen');
+    // The lines under it: a scenario's stars and what it opens, and how far faction mastery has come.
+    const lines: string[] = [];
+    const sc = this.scenario;
+    let stars = -1;
+    if (sc) {
+      stars = starsFor(this.state, sc);
+      const best = saveStars(sc.id, stars);
+      const next = SCENARIOS[SCENARIOS.indexOf(sc) + 1];
+      lines.push(won ? (next ? t('endOpens', { name: t(next.name) }) : t('endCampaignWon')) : t('endTryAgain'));
+      if (best > stars) lines.push(t('endBestStars', { n: best }));
+    }
+    if (won) {
+      const wins = addWin(this.faction);
+      const unit = t(eliteFor(this.faction).name);
+      if (wins === MASTERY_WINS) lines.push(t('endMastered', { unit }));
+      else if (wins < MASTERY_WINS) lines.push(t('endMastery', { n: wins, total: MASTERY_WINS, unit }));
+    } else if (!mastered(this.faction, loadMastery())) lines.push(t('endMastery', { n: loadMastery()[this.faction], total: MASTERY_WINS, unit: t(eliteFor(this.faction).name) }));
+    this.endLines = [...(stars >= 0 ? [`${stars}/3`] : []), ...lines];
+    const rows = (stars >= 0 ? 1 : 0) + lines.length;
+    const top = H / 2 - 25 - rows * 11;
+    const bg = this.add.rectangle(W / 2, H / 2, W, H, hexNum(T.linen), 0.72).setScrollFactor(0);
+    const card = this.add.image(W / 2, H / 2, rows > 0 ? 'card-end-tall' : 'card-end').setScrollFactor(0);
+    const title = this.add.text(W / 2, top, t(won ? 'victory' : 'defeat').toUpperCase(), { ...text(44, won ? T.green : T.red, true) }).setOrigin(0.5).setScrollFactor(0);
+    const parts: Phaser.GameObjects.GameObject[] = [bg, card, title];
+    parts.push(this.add.text(W / 2, top + 39, how, { ...text(15, T.ink), fontStyle: 'italic' }).setOrigin(0.5).setScrollFactor(0));
+    let y = top + 64;
+    if (stars >= 0) {
+      const g = this.add.graphics().setScrollFactor(0);
+      stitchStars(g, W / 2, y, stars, 11);
+      parts.push(g);
+      y += 26;
+    }
+    for (const line of lines) {
+      parts.push(this.add.text(W / 2, y, line, text(13.5, T.indigo, true)).setOrigin(0.5).setScrollFactor(0));
+      y += 20;
+    }
+    parts.push(this.add.text(W / 2, y + 6, t(sc ? 'endCampaign' : 'endAgain'), text(14, T.faded)).setOrigin(0.5).setScrollFactor(0));
+    this.endPanel = this.add.container(0, 0, parts).setScrollFactor(0).setDepth(11000);
   }
   /** The end of a watched match: which faction won and how, and a click starts another. */
   private showWatchEnd() {
@@ -1554,7 +1624,7 @@ export class GameScene extends Phaser.Scene {
     const bg = this.add.rectangle(W / 2, H / 2, W, H, hexNum(T.linen), 0.72).setScrollFactor(0);
     const card = this.add.image(W / 2, H / 2, 'card-end').setScrollFactor(0);
     const title = this.add.text(W / 2, H / 2 + -25, t('watchWins', { faction: t(FACTIONS[winner].name) }).toUpperCase(), { ...text(34, WOOL[winner].cloth, true) }).setOrigin(0.5).setScrollFactor(0);
-    const how = this.state.winBy === 'monument' ? t('watchMonument') : this.rival2 ? t('watchBothFallen') : t('watchFallen', { faction: t(FACTIONS[loser].name) });
+    const how = this.state.winBy === 'monument' ? t('watchMonument') : this.state.winBy === 'wonder' ? t('watchWonder') : this.rival2 ? t('watchBothFallen') : t('watchFallen', { faction: t(FACTIONS[loser].name) });
     const why = this.add.text(W / 2, H / 2 + 14, how, { ...text(15, T.ink), fontStyle: 'italic' }).setOrigin(0.5).setScrollFactor(0);
     const sub = this.add.text(W / 2, H / 2 + 42, t('watchAgain'), text(14, T.faded)).setOrigin(0.5).setScrollFactor(0);
     this.endPanel = this.add.container(0, 0, [bg, card, title, why, sub]).setScrollFactor(0).setDepth(11000);

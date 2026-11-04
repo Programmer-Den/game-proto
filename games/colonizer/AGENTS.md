@@ -14,14 +14,15 @@ point-symmetric, so both sides start the same. It is
 drawn as the Bayeux tapestry: wool laid-and-couched work and stem-stitch outlines on linen, painted
 in code on 2D canvases (no image files), with `pixelArt` off.
 
-- Implemented: a menu that picks the map kind, one or two AI rivals and the faction (the AI plays
+- Implemented: a menu that picks a skirmish's map kind and one or two AI rivals, or a campaign
+  scenario (the Skirmish / Campaign toggle), and the faction (the AI plays
   the next one along, the second AI the one after), fog of war (unseen,
   explored and in sight), click, Shift and box selection, control groups (1 to 9, Ctrl to set),
   right-click commands (attack, gather, build, walk; on a touch screen a tap gives them, `tapOrder`), attack-move (A), stop (S), build placement with
   a green or red ghost, a bottom panel with the selection, buttons for training, research and the
   build list, and a minimap; a top bar with resources, population, a three-pip age track, the match
-  clock, the faction, the chosen boon and Age III edge; and an end screen with Victory or Defeat and a click back
-  to the menu.
+  clock, the faction, the chosen boon and Age III edge; and an end screen with Victory or Defeat (with a
+  scenario's stars and the faction's mastery) and a click back to the menu.
 - Animation: every unit has a few baked frames per pose (see `src/art/figures.ts`), flipped for
   left-facing. Villagers: idle, walk, carry wood, food or ore, chop, reap, mine and build. Soldiers:
   idle, walk (riders gallop) and a three-frame attack (sword, club or spear blow, bow draw and loose,
@@ -96,6 +97,38 @@ in code on 2D canvases (no image files), with `pixelArt` off.
 - Techs (`TECHS`): Axes, Baskets and Picks (+25% wood, food and ore gathering), Ironworks (+2 melee
   damage), Fletching (+2 ranged damage), Age II and Age III (at the Town Center), Bodkin (+2 ranged
   damage, Age II) and Stirrups (+20% move speed for cavalry, Age II).
+- Age IV and the Wonder: once in Age III the deeds card turns to `DEEDS4` (`Player.deeds4`, kept
+  by `updateDeeds` from Age III on and never lost: a relic held, the faction's champion alive, a
+  soldier at `VETERAN_RANK`); with all three (`deeds4Done`) the Town Center researches `age4`, which
+  gives `AGE4_DAMAGE` on top of `AGE3_DAMAGE` in `ownBonus` and opens the `wonder` (`age: 4`, on the
+  build list's second page). A Wonder wins the moment it is finished (`finish`, `winBy: 'wonder'`);
+  at most `WONDER_CREW` builders work on it a tick (`Building.crew`/`crewAt`), so 480 s of work takes
+  at least two minutes. Everyone sees it (`seenBuilding`, the minimap) and hears of its site
+  (`placeBuilding` says so). The planner researches `age4` last, builds a Wonder at the end of every
+  temperament's plan with its whole crew, and rushes a rival's Wonder site like a standing Monument.
+- Faction mastery (`src/progress.ts`, `colonizer-mastery`): every match the player wins counts a win
+  for their faction (`addWin`, in `GameScene.showEnd`); `MASTERY_WINS` (2) master it. A mastered
+  faction's side gets `SideSetup.elite`, so `Player.elite` lets `train` take its second unique unit
+  (`elite: true` on the def, `eliteFor(faction)`): the Ember Torchbearer (melee, Barracks,
+  `vsBuildings` 3 in `strike`), the Tide Harpooner (ranged, Archery Range, `vsCavalry` 2) and the
+  Thorn Briar Warden (melee, Barracks, 150 hp). Each shares a role with its faction's own unit, so
+  `unitFor` skips elites; the panel adds the elite's button after its role's unit. The AI never trains
+  them. The menu's cards show each faction's wins (`masteryLine`, `masteryDone`).
+- The campaign (`src/game/campaign.ts`, `src/progress.ts`, `colonizer-campaign`): `SCENARIOS` lists
+  five, each with a map kind and `seed` (the map is drawn under `withSeed`, so it is the same every
+  time), the rivals' temperaments (two for a three-way scenario), a `MissionSetup` and two
+  `StarCheck`s. `createGame(sides, map, toLast, mission)` keeps it as `GameState.mission` and
+  `startMission` applies its start (`startAge` for every side or `rivalAge` for the rivals, with the
+  picks open and Age III's deeds done; `startRes`; the escort's supply cart, `Mission.cart`; guards at
+  both trading posts, `guardPosts`); `raids` overrides the rivals' first raid (in `createGame`) and
+  rest (in the planner); `noMonument` makes `notAllowed` refuse the Monument. `missionOver` (in
+  `checkWinner`) ends the match for a goal: `survive` (time), `escort` (`Mission.trips`, counted when
+  the cart drops ore; the cart falling loses, `winBy: 'cart'`), `hold` (`heldSince`), while
+  `conquest` and `wonder` use the usual wins. Every usual win still counts. `starsFor` scores a win (1
+  plus each `StarCheck` met: `time`, `losses` from `Player.lost`, `intact` from `Player.razed`),
+  `saveStars` keeps the best, and `scenarioOpen` opens a scenario once the one before is won. The
+  scene shows a `MissionCard` (hud.ts) at the top left; the menu draws each tile's stars with
+  `stitchStars`.
 - Ages: Age II opens the one-time boon pick (`BOONS`: Shieldwall, own melee units take 20% less
   damage; Harvest Rites, farms gather 20% faster). Age III needs the three deeds (`DEEDS`: reach
   Age II, 14 soldiers alive at once, repel a raid) before it can be researched, gives every
@@ -180,7 +213,7 @@ in code on 2D canvases (no image files), with `pixelArt` off.
 - Sound: effects and music made in code by `shared/audio.ts` (see Sound below).
 - Trophies (`src/trophies/`, `shared/trophies.ts`): ten, from Age II, a relic held, a raid repelled
   and a third-rank veteran to wins against two rivals, on Hard and by Monument (see the file map).
-- Not implemented yet: saves.
+- Not implemented yet: saves of a match (the campaign's stars and the mastery wins are kept).
 
 ## Architecture
 
@@ -196,6 +229,11 @@ in code on 2D canvases (no image files), with `pixelArt` off.
   in the hub's language; `TextKey` types the keys. Every text on screen, the sim's notices and the
   planner's watch log go through `t`, and a new one gets its German entry (and a US one if its
   spelling differs) in the same PR.
+- `src/game/campaign.ts`: the campaign's `SCENARIOS` (name, goal and rule texts, map kind, seed,
+  rivals' temperaments, `mission`, two `stars`), `starsFor`/`starEarned`/`starText`, and
+  `withSeed`/`seededRandom`, which run the map generator on a scenario's seed and put `Math.random` back.
+- `src/progress.ts`: what is kept between matches: `loadStars`, `saveStars` and `scenarioOpen`
+  (`colonizer-campaign`), and `loadMastery`, `addWin` and `mastered` (`colonizer-mastery`).
 - `src/trophies/`: the game's ten trophies (`shared/trophies.ts`). `index.ts` lists them
   (`trophies`: id, tier, icon, `hidden` for Built to last) with their texts in `trophies/i18n/`
   (`en.ts` and `de.ts`: the name keyed by the id, what earns it by `<id>Text`), and imports nothing
@@ -217,10 +255,11 @@ in code on 2D canvases (no image files), with `pixelArt` off.
   decoration rather than the selection panel in the bottom left) and
   `setupScaling(game, { fill: true })` from `shared/scaling.ts`, and puts `game` on window in dev.
 - `src/game/data.ts`: every balance number and roster (names and texts are `TextKey`s, shown with `t`): `FACTIONS`, `UNITS` (cost, time, stats,
-  trainer, `age`, `limit`, `gift`), `unitFor(faction, role)`, `isCivil`/`isSoldier`/`earnsRanks`,
-  `BUILDINGS`, `BUILD_ORDER`, `TECHS` (with `advance: 2 | 3` on
+  trainer, `age`, `limit`, `gift`, `elite`, `vsBuildings`), `unitFor(faction, role)` (never an
+  elite), `eliteFor(faction)`, `MASTERY_WINS`, `isCivil`/`isSoldier`/`earnsRanks`,
+  `BUILDINGS` (the `wonder` and `WONDER_CREW` among them), `BUILD_ORDER`, `TECHS` (with `advance: 2 | 3 | 4` on
   the age techs), `GATHER_MS`, `CARRY`, `START`, `START_VILLAGERS`, `DEEDS`, `ARMY_DEED`,
-  `AGE3_DAMAGE`, `BOONS`, `SHIELDWALL_TAKEN`, `HARVEST_RITES`, `EDGES`, `MASONRY_HP`, `MUSTER_SPEED`,
+  `AGE3_DAMAGE`, `DEEDS4`, `VETERAN_RANK`, `AGE4_DAMAGE`, `BOONS`, `SHIELDWALL_TAKEN`, `HARVEST_RITES`, `EDGES`, `MASONRY_HP`, `MUSTER_SPEED`,
   `MAP_KINDS`, `TEMPERAMENTS`, `BUILD_MORE`, `UNIQUE`,
   `UNIQUE_EFFECT` (what each faction's building does), the Forge, Dock and Grove numbers, `UNIT_GAP`, `RELICS` and their bonuses,
   `CLAIM_RANGE`, `LEASH`, the bell (`BELL_RANGE`, `GARRISON_ARROW`), the ranks (`RANK_KILLS`,
@@ -234,7 +273,8 @@ in code on 2D canvases (no image files), with `pixelArt` off.
   Center corners of a two-side match, `THIRD_START` the second AI's.
 - `src/game/sim.ts`: the rules, free of Phaser. `createGame` builds the state, `tick` advances it,
   `issue` gives unit orders, `placeBuilding`, `canPlace`, `train` and `research` queue things,
-  `chooseBoon` takes the Age II boon, `chooseEdge` the Age III edge, `buildingHp` reads a building's
+  `chooseBoon` takes the Age II boon, `chooseEdge` the Age III edge, `deed4Count`/`deeds4Done` read
+  the Age IV deeds, `ageKey` names an age, `buildingHp` reads a building's
   full health, `startRaid` records a raid (its `from` is a compass `TextKey`), `notAllowed` says why a
   building can't be placed at all (a translated text, or null), `unitCost` applies the Forge, `placeWall`/`wallLine` lay a palisade,
   `ringBell`/`releaseBell` run the garrison, `trade`/`marketPrice` the Market, `maxHp`, `unitCount`,
@@ -286,13 +326,16 @@ in code on 2D canvases (no image files), with `pixelArt` off.
   `icon-<kind>`, `icon-banner-<faction>`, `topbar`, `panel`, `btn-on|off|hot`, `card-*`, `backdrop`,
   `rally-flag`, `camp-cache-<res>`, `camp-relic-<relic>-<faction|none>` (`relicKey`) and
   `fig-wild-brigand`/`fig-wild-poacher`.
-- `src/scenes/MenuScene.ts`: the three faction cards, each with its three soldiers and its own
-  building, and two rows of toggles (`MENU_OPTS`: map kind, one or two AIs, kept in the module's
-  `options` for the session). Clicking a card starts `Game` with that faction, the AI's, the second
-  AI's (or null) and the map kind.
+- `src/scenes/MenuScene.ts`: the three faction cards, each with its three soldiers, its own
+  building and its mastery line, the Skirmish / Campaign toggle (`MENU_MODE`), and below the cards
+  either two rows of toggles (`MENU_OPTS`: map kind, one or two AIs) or the five scenario tiles with
+  their stars (`MENU_SCENARIOS`; a locked one refuses), all kept in the module's `options` for the
+  session. Clicking a card starts `Game` with that faction, the AI's, the second AI's (or null) and
+  the map kind, or the scenario's id (`scenario`), which fixes the map kind and the rivals.
 - `src/scenes/GameScene.ts`: the match: state, ground chunks, sprites and their animation frames,
   fog and needle, rings and health threads, input, the panel (selection, buttons, boon cards).
-- `src/scenes/hud.ts`: `TopBar`, `DeedCard`, `StatusCard` (relics held, the Rivals row with each
+- `src/scenes/hud.ts`: `TopBar` (four age pips), `DeedCard` (the Age III deeds, then from Age III
+  the Age IV ones), `MissionCard` (a scenario's name, goal and progress), `stitchStars`, `StatusCard` (relics held, the Rivals row with each
   rival's banner and temperament or `?`, and the Monument count),
   `Toast` and `Minimap` (camps, neutral units and every Monument, each side in its colour, and a `?`
   over every rival corner not yet seen), plus `stitchLine` and
@@ -306,8 +349,9 @@ in code on 2D canvases (no image files), with `pixelArt` off.
   and `Unit.rank` are the veteran ranks, `Unit.pulse` a champion's heal timer. Orders also include
   `garrison` (a villager running to a shelter) and `trade` (a cart heading for a post); `Unit.site` is
   the building site a villager left for the bell.
-- `Player.age` is 1, 2 or 3; `Player.deeds` is `{ age2, army, raid }` (`army` is the most soldiers
-  alive at once); `Player.boon` and `Player.boonPending`, `Player.edge` and `Player.edgePending`,
+- `Player.age` is 1 to 4; `Player.deeds` is `{ age2, army, raid }` (`army` is the most soldiers
+  alive at once), `Player.deeds4` `{ relic, champion, veteran }`; `Player.lost` and `razed` count
+  units and buildings (not palisade pieces) lost, `Player.elite` the mastery unlock; `Player.boon` and `Player.boonPending`, `Player.edge` and `Player.edgePending`,
   `Player.temperament`, `Player.scouted` and `Player.out`; `Player.bell` (the bell is ringing) and
   `Player.rates` (the Market's wood and food rates).
 - `GameState.raid` (`Raid | null`), `raids` and `repelled` counters, `assault` (per AI side, by
@@ -322,7 +366,9 @@ in code on 2D canvases (no image files), with `pixelArt` off.
   and `started`; the planner's memory, which changes no rule.
 - `Building.rally`, `doneAt`, `workMs` (the Dock's and Grove's timer) and `garrison` (the
   sheltering villagers, as whole `Unit`s taken out of `units`); `Unit.post` (a guard's post);
-  `GameState.gates`, `camps`, `posts` and `winBy`.
+  `GameState.gates`, `camps`, `posts`, `winBy` (`town`, `monument`, `wonder`, `goal` or `cart`) and
+  `mission` (a scenario's `MissionSetup` plus `cart`, `trips` and `heldSince`, or null);
+  `Building.crew`/`crewAt` (a Wonder's builders this tick).
 
 ### How it runs
 
@@ -435,7 +481,7 @@ Songs (`src/audio/music.ts`):
 - `COLONY`, a medieval dance in D Dorian at 96 beats a minute, three steps a beat (12/8), square
   lead, pulse second voice, triangle drone. Parts: `calm` (Age I, the lead alone), `calm2` (Age II,
   a second voice and fuller drums), `calm3` (Age III, D Mixolydian, busier drums), `monument` (slow
-  and solemn, while any finished Monument stands), and the stings `age` (Age II or III reached),
+  and solemn, while any finished Monument stands or any Wonder is going up), and the stings `age` (Age II or III reached),
   `win`, `lose` and `end` (a watched match, open fifths). The menu and a new match start `calm`.
 - `RAID`, `battle` at 132 beats a minute: a horn call over driving octaves and war drums, while a
   raid on the player is under way (any raid when watching).
@@ -459,7 +505,7 @@ Sound table (`src/audio/sfx.ts`), and where each plays (in `GameScene` unless no
 - `flag`, `flagDown`: `plantRally` plants or takes down rally flags.
 - `raidHorn`, `repelled`: a raid on the player starts, or is repelled (`SoundCues`).
 - `cache`, `relicGain`, `relicLost`: the player takes a cache, holds a relic or loses one (`SoundCues`).
-- `monument`: anyone's Monument finished (`SoundCues`).
+- `monument`: anyone's Monument finished, or anyone's Wonder begun (`SoundCues`).
 - `crumble`: a building falls on screen, a Town Centre included (`SoundCues`; not a palisade piece a
   new gate replaces).
 - Shared: `ui('click')` for the other panel buttons and the menu, `ui('coin')` for a Market trade,
@@ -473,6 +519,8 @@ only the raid horns, Monuments and falls of the rest.
 There is no save of a match. Settings come from the hub (`shared/settings.ts`).
 
 - `colonizer-trophies`: the trophies earned (`shared/trophies.ts`), each id with the time.
+- `colonizer-campaign`: the best stars (0 to 3) per scenario id (`src/progress.ts`).
+- `colonizer-mastery`: the wins with each faction, by faction id (`src/progress.ts`).
 
 ## Testing hooks
 
@@ -488,7 +536,10 @@ There is no save of a match. Settings come from the hub (`shared/settings.ts`).
   `status.temperaments` (each rival's temperament as the card shows it, translated, `?` until scouted),
   `cameras.main.worldView.x/y` (not `scrollX/Y`, which differ once `renderScale` zooms the
   camera), and `toScreen(tx, ty)`. `e2e/screens.spec.ts` at the root opens the game on five screens. `state.camps` lists the camps with `holder`, `state.posts` the trading posts,
-  and each building's `garrison` the villagers inside it.
+  and each building's `garrison` the villagers inside it. In a scenario, `scenario` is its
+  `Scenario`, `state.mission` its progress, `missionCard.shown` the card's progress line, and
+  `endLines` what the end screen said under its title (`2/3` for the stars, then the lines, translated).
+  The menu takes `scenario` (an id) in its start data.
 - The playthrough runs in British English, the default language, and plays the same in German
   (`?lang=de`), since it finds buttons by `id`.
 - Inputs are canvas clicks (left and right), so the test drives the real controls. It never writes
@@ -541,6 +592,13 @@ There is no save of a match. Settings come from the hub (`shared/settings.ts`).
 - Add a faction: add it to `FACTIONS` and `FACTION_IDS`, its colours to `WOOL`, its three units to
   `UNITS` (one each for melee, ranged and cavalry), its own building to `BUILDINGS` (with `faction`),
   `UNIQUE` and `UNIQUE_EFFECT` (with its texts in the `i18n/` files), and the menu shows a card for it (re-space the cards for four).
+- Add a scenario: add it to `SCENARIOS` in `src/game/campaign.ts` (its name, goal and rule texts in
+  the `i18n/` files, a map kind, a new seed, the rivals' temperaments, a `mission` and two `stars`) and
+  re-space `MENU_SCENARIOS` for a sixth tile. A new kind of goal is a `Goal` in sim.ts, a branch in
+  `missionOver` and a line in `MissionCard.update`; a new rule a `MissionSetup` field read where it
+  applies.
+- Add a faction's second unique unit: a `UNITS` entry with `elite: true`, sharing a role its
+  faction's trainer trains, plus a figure (`kindOf`) and an `<name>Info` text; `eliteFor` finds it.
 - Add a relic: add it to `RELICS`, apply it in the sim behind `holds`, give it a sign in `bakeRelic`
   and an icon in `RELIC_ICON` (hud.ts), and put a camp for it in `CAMP_PLAN` (mirrored pairs keep
   the map fair).
@@ -549,6 +607,8 @@ There is no save of a match. Settings come from the hub (`shared/settings.ts`).
 
 - `src/game/sim.ts` and `map.ts` import nothing from Phaser, so keep them free of it; the scene
   does all drawing.
+- A scenario draws its map inside `withSeed`, which swaps `Math.random` only for `generateMap`; the
+  temperaments come from the scenario, so nothing else in a scenario changes the seeded sequence.
 - Never call `Math.random` in the art: the playthrough seeds it and the map is generated after the
   textures are baked. Use `reseed`/`rnd` from `stitch.ts`.
 - A `Map` is not JSON. The test reads `state.units` and `state.buildings` as arrays, not as maps.

@@ -4,7 +4,7 @@ import { BUILDINGS, FACTION_IDS, RELICS, UNITS, type BuildingId, type FactionId,
 import { bakeFigureSheet, FRAME, WOOL } from '../art/figures';
 import { bakeBuilding, bakeBush, bakeCache, bakeFogPattern, bakeMine, bakeNeedle, bakePost, bakeRallyFlag, bakeRelic, bakeTree } from '../art/scenery';
 import { bakeBackdrop, bakeButton, bakeCard, bakeIcon, bakePanel, bakeTopBar, type IconKind } from '../art/ui';
-import { BOON, DEED_CARD, fitLayout, MENU_OPTS, STATUS_CARD, TOAST } from './layout';
+import { BOON, DEED_CARD, fitLayout, MENU_MODE, MENU_OPTS, MENU_SCENARIOS, MISSION_CARD, STATUS_CARD, TOAST } from './layout';
 import { viewSize } from '../../../../shared/scaling';
 import { T } from '../art/stitch';
 
@@ -63,6 +63,9 @@ export class BootScene extends Phaser.Scene {
     this.bake('panel', bakePanel());
     for (const s of ['on', 'off', 'hot'] as const) this.bake(`btn-${s}`, bakeButton(s));
     for (const s of ['on', 'off', 'hot'] as const) this.bake(`opt-${s}`, bakeButton(s, MENU_OPTS.w, MENU_OPTS.h));
+    for (const s of ['on', 'off', 'hot'] as const) this.bake(`mode-${s}`, bakeButton(s, MENU_MODE.w, MENU_OPTS.h));
+    for (const s of ['on', 'off', 'hot'] as const) this.bake(`scn-${s}`, bakeButton(s, MENU_SCENARIOS.w, MENU_SCENARIOS.h));
+    this.bake('card-mission', bakeCard(MISSION_CARD.w, MISSION_CARD.h, { lw: 1.1 }));
     this.bake('card-deeds', bakeCard(DEED_CARD.w, DEED_CARD.h, { lw: 1.1 }));
     this.bake('card-status', bakeCard(STATUS_CARD.w, STATUS_CARD.h, { lw: 1.1 }));
     this.bake('card-status-tall', bakeCard(STATUS_CARD.w, STATUS_CARD.hMonument, { lw: 1.1 }));
@@ -73,6 +76,7 @@ export class BootScene extends Phaser.Scene {
     this.bake('card-faction', bakeCard(280, 230));
     this.bake('card-faction-hot', bakeCard(280, 230, { fill: '#f3e2b0', lw: 1.4, hot: true }));
     this.bake('card-end', bakeCard(420, 170, { lw: 1.4 }));
+    this.bake('card-end-tall', bakeCard(440, 250, { lw: 1.4 }));
     this.bake('backdrop', bakeBackdrop());
     // Watch mode (`?watch`) goes straight to a match between two AIs.
     this.scene.start(watching ? 'Game' : 'Menu');

@@ -28,7 +28,7 @@ export const SOLDIER_POSES = { idle: 1, walk: 4, attack: 3 } as const;
 export const CART_POSES = { idle: 1, walk: 4 } as const;
 export type Pose = keyof typeof VILLAGER_POSES;
 
-type Kind = 'villager' | 'sword' | 'club' | 'spear' | 'bow' | 'longbow' | 'sling' | 'lance' | 'horsespear' | 'horseaxe' | 'cart' | 'ram' | 'warlord' | 'seer' | 'druid';
+type Kind = 'villager' | 'sword' | 'club' | 'spear' | 'bow' | 'longbow' | 'sling' | 'lance' | 'horsespear' | 'horseaxe' | 'cart' | 'ram' | 'warlord' | 'seer' | 'druid' | 'torch' | 'harpoon' | 'warden';
 
 /** Which figure a unit type is drawn as. */
 function kindOf(type: string, role: Role): Kind {
@@ -42,6 +42,7 @@ function kindOf(type: string, role: Role): Kind {
     knight: 'lance', rider: 'horsespear', stalker: 'horseaxe',
     brigand: 'club', poacher: 'bow',
     warlord: 'warlord', seer: 'seer', druid: 'druid',
+    torchbearer: 'torch', harpooner: 'harpoon', warden: 'warden',
   };
   return kinds[name] ?? 'sword';
 }
@@ -162,6 +163,24 @@ function tool(c: Ctx, kind: string, hx: number, hy: number, ang: number) {
     const [tx, ty] = along(hx, hy, ang, 12);
     knot(c, tx, ty, 2.2, T.ochre);
     thread(c, [across(tx, ty, ang, -2.5), across(tx, ty, ang, 2.5)], T.ochre, 1);
+    return;
+  }
+  if (kind === 'torch') {
+    // A torch: a short haft with a flame of ochre and orange wool at its head.
+    thread(c, [along(hx, hy, ang, -3), along(hx, hy, ang, 10)], T.brown, 1.6);
+    const [tx, ty] = along(hx, hy, ang, 12);
+    se(c, tx, ty - 1.5, 3.2, 4.4, T.ochre, { noCouch: true, lw: 0.5 });
+    se(c, tx, ty - 0.5, 1.7, 2.6, '#e0763a', { noCouch: true, lw: 0.3 });
+    return;
+  }
+  if (kind === 'harpoon') {
+    // A harpoon: a spear with two barbs and a coil of line at the butt.
+    thread(c, [along(hx, hy, ang, -10), along(hx, hy, ang, 20)], T.brown, 1.1);
+    const [tx, ty] = along(hx, hy, ang, 20);
+    sp(c, [across(tx, ty, ang, -1.4), across(tx, ty, ang, 1.4), along(tx, ty, ang, 5)], T.grey, { noCouch: true, lw: 0.6 });
+    for (const d of [-1, 1]) thread(c, [along(tx, ty, ang, 1), across(...along(tx, ty, ang, -2), ang, d * 2.6)], T.grey, 0.8);
+    const [bx, by] = along(hx, hy, ang, -10);
+    thread(c, [[bx, by], [bx - 2, by + 3], [bx + 1, by + 5], [bx - 1, by + 7]], T.tan, 0.7);
     return;
   }
   if (kind === 'spear' || kind === 'lance') {
@@ -350,9 +369,9 @@ function footman(c: Ctx, w: (typeof WOOL)[Side], kind: Kind, pose: string, f: nu
   const stride = walking ? WALK[f] : 0;
   const y = y0 + (walking ? BOB[f] : 0);
   const attack = pose === 'attack';
-  const mail = kind === 'sword' || kind === 'spear' || kind === 'warlord';
+  const mail = kind === 'sword' || kind === 'spear' || kind === 'warlord' || kind === 'warden';
   const robed = kind === 'seer' || kind === 'druid';
-  const wide = kind === 'club' || kind === 'warlord' ? 1.5 : robed ? 1 : 0;
+  const wide = kind === 'club' || kind === 'warlord' || kind === 'warden' ? 1.5 : robed ? 1 : 0;
   // Each weapon's hand and angle: resting, then the three attack frames.
   const HANDS: Record<string, { rest: Frame; hit: Frame[] }> = {
     sword: { rest: { stride: 0, bob: 0, lean: 0, hand: [4, -18], ang: -1.1 }, hit: [{ stride: 0.4, bob: 0, lean: -1, hand: [2, -27], ang: -2.4 }, { stride: 0.6, bob: 0, lean: 1, hand: [8, -23], ang: -0.4 }, { stride: 0.8, bob: 0, lean: 2, hand: [10, -16], ang: 0.6 }] },
@@ -362,13 +381,13 @@ function footman(c: Ctx, w: (typeof WOOL)[Side], kind: Kind, pose: string, f: nu
     sling: { rest: { stride: 0, bob: 0, lean: 0, hand: [4, -19], ang: 1.2 }, hit: [{ stride: 0.3, bob: 0, lean: -1, hand: [3, -28], ang: 0 }, { stride: 0.5, bob: 0, lean: 0, hand: [6, -29], ang: 0 }, { stride: 0.8, bob: 0, lean: 1.5, hand: [10, -22], ang: 0 }] },
     staff: { rest: { stride: 0, bob: 0, lean: 0, hand: [5, -18], ang: -1.5 }, hit: [{ stride: 0.3, bob: 0, lean: -1, hand: [3, -24], ang: -2.3 }, { stride: 0.5, bob: 0, lean: 0.5, hand: [7, -22], ang: -1 }, { stride: 0.8, bob: 0, lean: 1.5, hand: [10, -18], ang: -0.2 }] },
   };
-  const hk = kind === 'longbow' ? 'bow' : kind === 'warlord' ? 'sword' : robed ? 'staff' : kind;
+  const hk = kind === 'longbow' ? 'bow' : kind === 'warlord' ? 'sword' : robed ? 'staff' : kind === 'torch' || kind === 'warden' ? 'club' : kind === 'harpoon' ? 'spear' : kind;
   const fr = attack ? HANDS[hk].hit[f] : HANDS[hk].rest;
   const lean = fr.lean;
   legs(c, x, y, T.buff, attack ? fr.stride : stride);
   if (kind === 'bow' || kind === 'longbow') thread(c, [[x - 3, y - 24], [x - 5, y - 14]], T.ochre, 2); // quiver
   body(c, x, y, w.cloth, lean, mail, wide);
-  const hood = kind === 'bow' ? T.green : kind === 'longbow' ? T.sage : kind === 'sling' ? T.teal : kind === 'club' ? T.brown : kind === 'seer' ? T.indigo : kind === 'druid' ? T.green : null;
+  const hood = kind === 'bow' ? T.green : kind === 'longbow' ? T.sage : kind === 'sling' ? T.teal : kind === 'club' ? T.brown : kind === 'seer' ? T.indigo : kind === 'druid' ? T.green : kind === 'harpoon' ? T.teal : kind === 'torch' ? T.brown : null;
   if (robed) {
     // A champion's long robe over the legs, hemmed in the side's trim.
     sp(c, [[x - 6.5 + lean * 0.5, y - 11], [x + 6.5 + lean * 0.5, y - 11], [x + 8, y - 1], [x - 8, y - 1]], w.cloth, { ang: Math.PI / 2, sp: 1.1 });
@@ -383,6 +402,11 @@ function footman(c: Ctx, w: (typeof WOOL)[Side], kind: Kind, pose: string, f: nu
   if (kind === 'seer') {
     // A third eye of gold on the hood.
     knot(c, x + lean, y - 30, 1.3, T.ochre);
+  }
+  if (kind === 'warden') {
+    // A crown of briars on the helm.
+    for (let k = -2; k <= 2; k++) thread(c, [[x + lean + k * 1.8, y - 31], [x + lean + k * 2.4, y - 35]], T.green, 0.9);
+    thread(c, [[x + lean - 4.5, y - 31.5], [x + lean + 4.5, y - 31.5]], T.bark, 1);
   }
   if (kind === 'druid') {
     // Antlers of twig.
@@ -415,8 +439,8 @@ function footman(c: Ctx, w: (typeof WOOL)[Side], kind: Kind, pose: string, f: nu
     return;
   }
   arm(c, sx, sy, hx, hy, w.cloth);
-  tool(c, robed ? 'staff' : kind === 'warlord' ? 'sword' : kind, hx, hy, fr.ang);
-  if (kind === 'sword' || kind === 'spear' || kind === 'warlord') kite(c, x - 3.5 + lean * 0.5, y, kind === 'warlord' ? T.ochre : w.trim, kind === 'warlord' ? w.cloth : w.boss);
+  tool(c, robed ? 'staff' : kind === 'warlord' ? 'sword' : kind === 'warden' ? 'club' : kind, hx, hy, fr.ang);
+  if (kind === 'sword' || kind === 'spear' || kind === 'warlord' || kind === 'warden') kite(c, x - 3.5 + lean * 0.5, y, kind === 'warlord' ? T.ochre : w.trim, kind === 'warlord' ? w.cloth : w.boss);
 }
 
 function rider(c: Ctx, w: (typeof WOOL)[Side], kind: Kind, pose: string, f: number, x: number, y0: number) {

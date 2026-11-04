@@ -2,7 +2,7 @@ import type { HowToPlay } from '../../../shared/howToPlay';
 import { byLanguage } from '../../../shared/i18n';
 
 const en: HowToPlay = {
-  goal: 'Destroy the enemy Town Centre (both of them in a three-way match), or hold a Monument for three minutes. If your own Town Centre falls, you lose.',
+  goal: 'Destroy the enemy Town Centre (both of them in a three-way match), hold a Monument for three minutes, or finish a Wonder in Age IV. If your own Town Centre falls, you lose. The campaign has five scenarios, each with its own goal.',
   controls: [
     { input: 'Left click, or drag a box', action: 'Select units or a building; Shift adds to the selection' },
     { input: 'Right click', action: 'Gather, build, attack or walk; with buildings selected, set their rally flag (on the building, take it down)' },
@@ -22,6 +22,7 @@ const en: HowToPlay = {
     'Build houses for population, then train more villagers and soldiers.',
     'Research Age II at the Town Centre and pick your boon.',
     'Complete the three deeds to reach Age III, pick its edge, then march on the enemy Town Centre.',
+    'In Age III, hold a relic, raise your champion and get a soldier to Veteran to reach Age IV and build a Wonder.',
   ],
   tips: [
     'Villagers carry ten at a time to the Town Centre, or to a Lumber or Mining Camp.',
@@ -33,6 +34,9 @@ const en: HowToPlay = {
     'Soldiers earn ranks from kills, adding health and damage.',
     'Rams break buildings and walls but cannot hurt units, so give them an escort.',
     'Each faction has its own building, shown last on the first page of the build list.',
+    'Two wins with a faction master it: its card then trains a second unique unit (Torchbearer, Harpooner or Briar Warden).',
+    'A Wonder wins the moment it is finished, but only four builders can work on it at once, and every rival sees it.',
+    'In the campaign, each win opens the next scenario; beat its two star goals for three stars.',
   ],
 };
 
@@ -46,7 +50,7 @@ const enUS: HowToPlay = {
 };
 
 const de: HowToPlay = {
-  goal: 'Zerstöre das feindliche Stadtzentrum (beide in einem Spiel zu dritt) oder halte ein Denkmal drei Minuten lang. Fällt dein eigenes Stadtzentrum, verlierst du.',
+  goal: 'Zerstöre das feindliche Stadtzentrum (beide in einem Spiel zu dritt), halte ein Denkmal drei Minuten lang oder vollende in Zeitalter IV ein Weltwunder. Fällt dein eigenes Stadtzentrum, verlierst du. Der Feldzug hat fünf Szenarien mit je eigenem Ziel.',
   controls: [
     { input: 'Linksklick oder Rahmen ziehen', action: 'Einheiten oder ein Gebäude wählen; Umschalt fügt zur Auswahl hinzu' },
     { input: 'Rechtsklick', action: 'Sammeln, bauen, angreifen oder laufen; mit gewählten Gebäuden ihre Sammelflagge setzen (aufs Gebäude: einholen)' },
@@ -66,6 +70,7 @@ const de: HowToPlay = {
     'Baue Häuser für mehr Bevölkerung, dann bilde weitere Dorfbewohner und Soldaten aus.',
     'Erforsche Zeitalter II im Stadtzentrum und wähle deine Gabe.',
     'Vollbringe die drei Taten für Zeitalter III, wähle dessen Vorzug und zieh dann gegen das feindliche Stadtzentrum.',
+    'Halte in Zeitalter III ein Relikt, bilde deinen Helden aus und bring einen Soldaten auf Altgedient, um Zeitalter IV zu erreichen und ein Weltwunder zu bauen.',
   ],
   tips: [
     'Dorfbewohner tragen je zehn zum Stadtzentrum oder zu einem Holz- oder Erzlager.',
@@ -77,6 +82,9 @@ const de: HowToPlay = {
     'Soldaten steigen durch Siege im Rang auf und gewinnen Leben und Schaden.',
     'Rammböcke zerschlagen Gebäude und Mauern, können Einheiten aber nichts tun, also gib ihnen Geleitschutz.',
     'Jedes Volk hat ein eigenes Gebäude, als letztes auf der ersten Seite der Bauliste.',
+    'Zwei Siege mit einem Volk meistern es: Dann bildet es eine zweite eigene Einheit aus (Fackelträger, Harpunier oder Dornwächter).',
+    'Ein Weltwunder gewinnt, sobald es fertig ist, aber nur vier Bauleute können zugleich daran arbeiten, und jeder Rivale sieht es.',
+    'Im Feldzug öffnet jeder Sieg das nächste Szenario; erfüll seine zwei Sternziele für drei Sterne.',
   ],
 };
 

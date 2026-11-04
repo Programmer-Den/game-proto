@@ -3,7 +3,10 @@
 // `research`; `tick` moves everything forward.
 import {
   AGE3_DAMAGE,
+  AGE4_DAMAGE,
   ARMY_DEED,
+  VETERAN_RANK,
+  WONDER_CREW,
   AURA_DMG,
   AURA_RANGE,
   BELL_RANGE,
@@ -191,6 +194,9 @@ export interface Building {
   workMs: number;
   /** Villagers sheltering inside since the bell rang; each adds an arrow to the building's volleys. */
   garrison: Unit[];
+  /** Builders who worked on it at game time `crewAt` (a Wonder takes at most WONDER_CREW at once). */
+  crew: number;
+  crewAt: number;
 }
 
 /** A neutral camp: a cache to take once, or a relic to hold. Its guards are units of NEUTRAL. */
@@ -214,11 +220,13 @@ export interface Player {
   faction: FactionId;
   res: Record<Resource, number>;
   techs: string[];
-  age: 1 | 2 | 3;
+  age: 1 | 2 | 3 | 4;
   /** Multiplies how fast a player gathers; the AI's depends on difficulty. */
   gatherMul: number;
   /** Progress on the deeds for Age III: Age II reached, most soldiers alive at once, a raid repelled. */
   deeds: { age2: boolean; army: number; raid: boolean };
+  /** Progress on the deeds for Age IV (DEEDS4), counted from Age III: a relic held, the champion raised, a soldier at VETERAN_RANK. */
+  deeds4: { relic: boolean; champion: boolean; veteran: boolean };
   /** The Age II boon, once picked; `boonPending` while the pick is open. */
   boon: BoonId | null;
   boonPending: boolean;
@@ -235,6 +243,11 @@ export interface Player {
   scouted: boolean;
   /** This side's Town Center fell in a three-way match: it is out, and everything of it is gone. */
   out: boolean;
+  /** Units and buildings (not palisade pieces) this side has lost, for a scenario's stars. */
+  lost: number;
+  razed: number;
+  /** Faction mastery has unlocked this side's second unique unit (`eliteFor`). */
+  elite: boolean;
 }
 
 /** One side of a match: its faction, how fast it gathers (the difficulty, for the AI) and its temperament. */
@@ -242,6 +255,45 @@ export interface SideSetup {
   faction: FactionId;
   gatherMul: number;
   temperament: TemperamentId | null;
+  /** The faction's second unique unit is unlocked (faction mastery). */
+  elite?: boolean;
+}
+
+/**
+ * A campaign scenario's goal, besides the usual wins: hold out until `ms` with the Town Center
+ * standing, bring the supply cart home with ore `trips` times, hold a relic for `ms` in a row, be the
+ * last side standing, or finish a Wonder.
+ */
+export type Goal =
+  | { t: 'survive'; ms: number }
+  | { t: 'escort'; trips: number }
+  | { t: 'hold'; relic: RelicId; ms: number }
+  | { t: 'conquest' }
+  | { t: 'wonder' };
+
+/** What `createGame` needs for a scenario: its goal and its one new rule. */
+export interface MissionSetup {
+  goal: Goal;
+  /** Nobody may build a Monument. */
+  noMonument?: boolean;
+  /** Wild guards hold the trading posts. */
+  guardPosts?: boolean;
+  /** Every side starts in this age, with these resources (its Age II and III picks open). */
+  startAge?: 2 | 3;
+  startRes?: Partial<Record<Resource, number>>;
+  /** Only the rivals start in this age. */
+  rivalAge?: 2 | 3;
+  /** The rivals' first raid and the rest between raids, instead of their temperaments'. */
+  raids?: { first: number; rest: number };
+}
+
+/** A scenario under way: its setup, and how far the goal has come. */
+export interface Mission extends MissionSetup {
+  /** The supply cart to escort (an escort goal), and its trips home with ore. */
+  cart: number | null;
+  trips: number;
+  /** When the player last took the goal's relic, while they hold it. */
+  heldSince: number | null;
 }
 
 export interface GameState {
@@ -280,8 +332,13 @@ export interface GameState {
   /** Play on until one side is left, even after the player's side falls (watch mode). */
   toLast: boolean;
   events: SimEvent[];
-  /** How the match was won: the enemy Town Center fell, or a Monument stood long enough. */
-  winBy: 'town' | 'monument' | null;
+  /**
+   * How the match was won: the enemy Town Center fell, a Monument stood long enough, a Wonder was
+   * finished, a scenario's goal was reached (`goal`) or its supply cart fell (`cart`, a loss).
+   */
+  winBy: 'town' | 'monument' | 'wonder' | 'goal' | 'cart' | null;
+  /** The campaign scenario being played, or null in a skirmish. */
+  mission: Mission | null;
 }
 
 export type Command =
@@ -307,7 +364,7 @@ export const SIDES = [PLAYER, AI, AI2] as const;
  * AI) on `map`, whose `starts` has a corner for each. An AI side's `gatherMul` is the difficulty's
  * number; 1 is the game as designed.
  */
-export function createGame(sides: SideSetup[], map: MapData, toLast = false): GameState {
+export function createGame(sides: SideSetup[], map: MapData, toLast = false, mission: MissionSetup | null = null): GameState {
   const player = (id: number, side: SideSetup): Player => ({
     id,
     faction: side.faction,
@@ -316,6 +373,7 @@ export function createGame(sides: SideSetup[], map: MapData, toLast = false): Ga
     age: 1,
     gatherMul: side.gatherMul,
     deeds: { age2: false, army: 0, raid: false },
+    deeds4: { relic: false, champion: false, veteran: false },
     boon: null,
     boonPending: false,
     bell: false,
@@ -325,6 +383,9 @@ export function createGame(sides: SideSetup[], map: MapData, toLast = false): Ga
     temperament: side.temperament,
     scouted: false,
     out: false,
+    lost: 0,
+    razed: 0,
+    elite: side.elite ?? false,
   });
   // The camp guards' side. Its faction is only a placeholder: wild units have their own colours.
   const wild = { ...player(NEUTRAL, sides[0]), res: { wood: 0, food: 0, ore: 0 }, temperament: null };
@@ -348,7 +409,7 @@ export function createGame(sides: SideSetup[], map: MapData, toLast = false): Ga
     noticeMs: 0,
     aiClock: players.map(() => 0),
     // Each side's first raid waits for its temperament's time gate.
-    aiRaid: players.map((p) => ({ next: TEMPERAMENTS[p.temperament ?? 'builder'].firstRaid, foe: p.id === PLAYER ? AI : PLAYER, count: 0, goal: null, party: [], started: 0 })),
+    aiRaid: players.map((p) => ({ next: mission?.raids?.first ?? TEMPERAMENTS[p.temperament ?? 'builder'].firstRaid, foe: p.id === PLAYER ? AI : PLAYER, count: 0, goal: null, party: [], started: 0 })),
     raid: null,
     raids: 0,
     repelled: 0,
@@ -356,6 +417,7 @@ export function createGame(sides: SideSetup[], map: MapData, toLast = false): Ga
     toLast,
     events: [],
     winBy: null,
+    mission: mission ? { ...mission, cart: null, trips: 0, heldSince: null } : null,
   };
   for (const n of map.nodes) s.nodes.set(n.id, n);
   // Node ids come from the map, so units and buildings count on from the largest of them.
@@ -392,9 +454,47 @@ export function createGame(sides: SideSetup[], map: MapData, toLast = false): Ga
       }
     }
   });
+  if (s.mission) startMission(s, s.mission, map);
   updateSight(s);
   return s;
 }
+
+/**
+ * A scenario's start: every side's (or only the rivals') age with its picks open, the resources, the
+ * supply cart beside the player's Town Center and the guards at the trading posts.
+ */
+function startMission(s: GameState, m: Mission, map: MapData) {
+  for (const p of s.players) {
+    if (p.id === NEUTRAL) continue;
+    const age = p.id === PLAYER ? m.startAge : (m.rivalAge ?? m.startAge);
+    if (age) {
+      p.age = age;
+      p.boonPending = true;
+      if (age === 3) {
+        p.edgePending = true;
+        p.deeds = { age2: true, army: ARMY_DEED, raid: true };
+      }
+    }
+    if (m.startRes) Object.assign(p.res, m.startRes);
+  }
+  if (m.goal.t === 'escort') {
+    const town = [...s.buildings.values()].find((b) => b.owner === PLAYER && b.type === 'town');
+    const cart = town && spawnUnit(s, PLAYER, 'cart', town);
+    if (cart) m.cart = cart.id;
+  }
+  if (m.guardPosts) {
+    for (const post of map.posts) {
+      const spots = ringAround(s, post.tx, post.ty, 2, 2);
+      POST_GUARDS.forEach((type, i) => {
+        const at = spots[Math.floor((i * spots.length) / POST_GUARDS.length)];
+        if (!at) return;
+        spawnAt(s, NEUTRAL, type, at.x, at.y).post = { x: at.x, y: at.y };
+      });
+    }
+  }
+}
+/** The guards at each trading post when a scenario puts brigands on the road. */
+const POST_GUARDS = ['wild-brigand', 'wild-brigand', 'wild-brigand', 'wild-poacher', 'wild-poacher'];
 
 // ---------------------------------------------------------------- helpers
 
@@ -438,7 +538,8 @@ export function notAllowed(s: GameState, owner: number, type: BuildingId): strin
   const def = BUILDINGS[type];
   const p = s.players[owner];
   if (def.faction && def.faction !== p.faction) return t('notYourFaction');
-  if (def.age && p.age < def.age) return t('needsAge', { age: t(def.age === 3 ? 'age3' : 'age2') });
+  if (type === 'monument' && s.mission?.noMonument) return t('noMonumentHere');
+  if (def.age && p.age < def.age) return t('needsAge', { age: t(ageKey(def.age)) });
   if (def.limit !== undefined) {
     let n = 0;
     for (const b of s.buildings.values()) if (b.owner === owner && b.type === type) n++;
@@ -446,6 +547,9 @@ export function notAllowed(s: GameState, owner: number, type: BuildingId): strin
   }
   return null;
 }
+
+/** The text key naming an age. */
+export const ageKey = (age: 2 | 3 | 4): TextKey => (age === 4 ? 'age4' : age === 3 ? 'age3' : 'age2');
 
 function footprint(e: Unit | Building | Node): { x0: number; y0: number; x1: number; y1: number } {
   if ('kind' in e) return { x0: e.tx, y0: e.ty, x1: e.tx + e.w, y1: e.ty + e.h };
@@ -594,9 +698,9 @@ export function explored(s: GameState, x: number, y: number) {
   return inMap(x, y) && s.sight[idx(x, y)] >= 1;
 }
 
-/** Whether the player knows of a building: their own, a Monument (seen by everyone) or one on explored land. */
+/** Whether the player knows of a building: their own, a Monument or Wonder (seen by everyone) or one on explored land. */
 export function seenBuilding(s: GameState, b: Building) {
-  return b.owner === PLAYER || b.type === 'monument' || explored(s, b.tx, b.ty);
+  return b.owner === PLAYER || b.type === 'monument' || b.type === 'wonder' || explored(s, b.tx, b.ty);
 }
 
 // ---------------------------------------------------------------- map state
@@ -618,6 +722,8 @@ function addBuilding(s: GameState, owner: number, type: BuildingId, tx: number, 
     doneAt: built ? s.time : -1,
     workMs: 0,
     garrison: [],
+    crew: 0,
+    crewAt: -1,
   };
   s.buildings.set(b.id, b);
   return b;
@@ -893,6 +999,8 @@ export function placeBuilding(s: GameState, owner: number, type: BuildingId, tx:
     }
   }
   rebuildSolid(s);
+  // Everyone hears of a Wonder's site: it wins once finished.
+  if (type === 'wonder') say(s, owner === PLAYER ? t('wonderBegunOwn') : t('wonderBegunFoe', { faction: t(FACTIONS[p.faction].name) }));
   return b.id;
 }
 
@@ -975,6 +1083,7 @@ export function train(s: GameState, owner: number, bid: number, type: string): b
   const p = s.players[owner];
   if (def.age && p.age < def.age) return false;
   if (def.faction !== 'neutral' && def.faction !== p.faction) return false;
+  if (def.elite && !p.elite) return false;
   if (def.limit !== undefined && unitCount(s, owner, type) >= def.limit) return false;
   const cost = unitCost(s, owner, def);
   if (!affordable(p, cost) || popUsed(s, owner) + 1 > popCap(s, owner)) return false;
@@ -992,6 +1101,7 @@ export function research(s: GameState, owner: number, bid: number, techId: strin
   if (tech.age2 && p.age < 2) return false;
   if (tech.advance && p.age !== tech.advance - 1) return false;
   if (tech.advance === 3 && !deedsDone(p)) return false;
+  if (tech.advance === 4 && !deeds4Done(p)) return false;
   if (p.techs.includes(techId) || techQueued(s, owner, techId)) return false;
   if (!affordable(p, tech.cost)) return false;
   pay(p, tech.cost);
@@ -1010,6 +1120,11 @@ export function deedCount(p: Player) {
   return (p.deeds.age2 ? 1 : 0) + (p.deeds.army >= ARMY_DEED ? 1 : 0) + (p.deeds.raid ? 1 : 0);
 }
 export const deedsDone = (p: Player) => deedCount(p) === 3;
+/** How many of the three Age IV deeds a player has done. */
+export function deed4Count(p: Player) {
+  return (p.deeds4.relic ? 1 : 0) + (p.deeds4.champion ? 1 : 0) + (p.deeds4.veteran ? 1 : 0);
+}
+export const deeds4Done = (p: Player) => deed4Count(p) === 3;
 
 /** Takes the Age II boon a player was offered. */
 export function chooseBoon(s: GameState, owner: number, boon: BoonId): boolean {
@@ -1259,6 +1374,17 @@ function updateDeeds(s: GameState) {
     if (p.id === NEUTRAL || p.out) continue;
     if (p.age >= 2) p.deeds.age2 = true;
     p.deeds.army = Math.max(p.deeds.army, soldierCount(s, p.id));
+    // The Age IV deeds count from Age III on.
+    if (p.age < 3) continue;
+    const d = p.deeds4;
+    if (!d.relic && s.camps.some((c) => c.relic && c.holder === p.id)) d.relic = true;
+    if (!d.champion || !d.veteran) {
+      for (const u of s.units.values()) {
+        if (u.owner !== p.id || u.hp <= 0) continue;
+        if (UNITS[u.type].role === 'champion') d.champion = true;
+        if (u.rank >= VETERAN_RANK) d.veteran = true;
+      }
+    }
   }
 }
 
@@ -1334,6 +1460,7 @@ function updateBuilding(s: GameState, b: Building, dt: number) {
       // Reaching Age II opens the one-time boon pick, and Age III the pick of an edge.
       if (advance === 2 && !p.boon) p.boonPending = true;
       if (advance === 3 && !p.edge) p.edgePending = true;
+      if (advance === 4) say(s, b.owner === PLAYER ? t('age4Own') : t('age4Foe', { faction: t(FACTIONS[p.faction].name) }));
     } else p.techs.push(head.key);
     return;
   }
@@ -1505,6 +1632,8 @@ function cartUpdate(s: GameState, u: Unit, def: UnitDef, dt: number) {
       u.path = [];
       s.players[u.owner].res.ore += u.amount;
       if (u.amount > 0) emit(s, { t: 'drop', x: u.x, y: u.y, res: 'ore', n: u.amount, owner: u.owner });
+      // The scenario's supply cart is home with its ore.
+      if (u.amount > 0 && s.mission?.cart === u.id) s.mission.trips++;
       u.amount = 0;
       u.carry = null;
       u.order = { t: 'trade' };
@@ -1665,6 +1794,14 @@ function villagerUpdate(s: GameState, u: Unit, def: UnitDef, dt: number) {
       u.path = [];
       u.act = 'build';
       faceTo(u, centre(f).x);
+      // A Wonder takes at most WONDER_CREW builders a tick; the rest stand by at the site.
+      if (b.type === 'wonder') {
+        if (b.crewAt !== s.time) {
+          b.crewAt = s.time;
+          b.crew = 0;
+        }
+        if (++b.crew > WONDER_CREW) return;
+      }
       b.buildLeft -= dt;
       b.hp = Math.min(buildingHp(s, b), b.hp + (buildingHp(s, b) * dt) / BUILDINGS[b.type].time);
       if (b.buildLeft <= 0) {
@@ -1764,6 +1901,11 @@ function finish(s: GameState, b: Building) {
   b.doneAt = s.time;
   if (b.type === 'gate') rebuildSolid(s);
   if (b.type === 'monument') say(s, b.owner === PLAYER ? t('monumentStandsOwn') : t('monumentStandsFoe'));
+  // A finished Wonder wins the match at once.
+  if (b.type === 'wonder' && s.winner === null) {
+    s.winner = b.owner;
+    s.winBy = 'wonder';
+  }
 }
 
 function nearestUnbuilt(s: GameState, owner: number, x: number, y: number, range: number): Building | null {
@@ -1873,6 +2015,7 @@ function strike(s: GameState, u: Unit, def: UnitDef, target: Unit | Building) {
   if (def.role === 'siege' && 'order' in target) return;
   let dmg = def.dmg + ownBonus(s, u, def);
   if (def.vsCavalry && 'order' in target && UNITS[target.type].role === 'cavalry') dmg *= def.vsCavalry;
+  if (def.vsBuildings && !('order' in target)) dmg *= def.vsBuildings;
   dmg = takenBy(s, target, dmg);
   const alive = target.hp > 0;
   target.hp -= dmg;
@@ -1903,6 +2046,7 @@ function ownBonus(s: GameState, u: Unit, def: UnitDef) {
   if (def.role === 'ranged' && techs.includes('fletching')) bonus += 2;
   if (def.role === 'ranged' && techs.includes('bodkin')) bonus += 2;
   if (isSoldier(def.role) && s.players[u.owner].age >= 3) bonus += AGE3_DAMAGE;
+  if (isSoldier(def.role) && s.players[u.owner].age >= 4) bonus += AGE4_DAMAGE;
   if (isSoldier(def.role) && holds(s, u.owner, 'valor')) bonus += RELIC_DAMAGE;
   bonus += u.rank * RANK_DMG;
   // The Warlord's aura: own soldiers close to it hit harder (not the Warlord itself).
@@ -1921,10 +2065,12 @@ function reap(s: GameState) {
   for (const u of [...s.units.values()]) {
     if (u.hp > 0) continue;
     s.units.delete(u.id);
+    s.players[u.owner].lost++;
     changed = true;
   }
   for (const b of [...s.buildings.values()]) {
     if (b.hp > 0) continue;
+    if (!BUILDINGS[b.type].palisade) s.players[b.owner].razed++;
     // A fallen shelter spills its garrison out; whoever finds no room is lost with it.
     if (b.garrison.length > 0) ungarrison(s, b);
     s.buildings.delete(b.id);
@@ -1959,6 +2105,7 @@ function checkWinner(s: GameState) {
     say(s, p.id === PLAYER ? t('townFallen') : t('sideFallen', { faction: t(FACTIONS[p.faction].name) }));
   }
   if (fallen.length > 0) reap(s);
+  if (s.mission && missionOver(s, s.mission)) return;
   // A Monument that has stood MONUMENT_MS since it was finished wins the match for its owner.
   for (const b of s.buildings.values()) {
     if (b.type === 'monument' && b.built && b.hp > 0 && s.time - b.doneAt >= MONUMENT_MS) {
@@ -1967,6 +2114,27 @@ function checkWinner(s: GameState) {
       return;
     }
   }
+}
+
+/** Ends the match when a scenario's goal is reached, or its supply cart has fallen. */
+function missionOver(s: GameState, m: Mission) {
+  const end = (winner: number, by: 'goal' | 'cart') => {
+    s.winner = winner;
+    s.winBy = by;
+    return true;
+  };
+  const g = m.goal;
+  if (g.t === 'survive' && s.time >= g.ms) return end(PLAYER, 'goal');
+  if (g.t === 'escort') {
+    if (m.trips >= g.trips) return end(PLAYER, 'goal');
+    if (m.cart !== null && !s.units.has(m.cart)) return end(rivalsOf(s, PLAYER)[0] ?? AI, 'cart');
+  }
+  if (g.t === 'hold') {
+    if (!holds(s, PLAYER, g.relic)) m.heldSince = null;
+    else if (m.heldSince === null) m.heldSince = s.time;
+    else if (s.time - m.heldSince >= g.ms) return end(PLAYER, 'goal');
+  }
+  return false;
 }
 
 /** Time left, in ms, before a side's standing Monument wins, or null if it has none finished. */

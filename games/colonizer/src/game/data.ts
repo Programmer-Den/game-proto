@@ -82,7 +82,8 @@ export type BuildingId =
   | 'wall'
   | 'gate'
   | 'market'
-  | 'monument';
+  | 'monument'
+  | 'wonder';
 
 export interface UnitDef {
   id: string;
@@ -101,8 +102,12 @@ export interface UnitDef {
   trainer: BuildingId;
   /** Extra damage against cavalry, for units that counter riders. */
   vsCavalry?: number;
+  /** Damage against buildings is multiplied by this (the Torchbearer). */
+  vsBuildings?: number;
   /** The age a player needs before training it. */
   age?: 2 | 3;
+  /** A faction's second unique unit, unlocked by faction mastery (MASTERY_WINS wins with it). */
+  elite?: boolean;
   /** At most this many alive or in training per player (the champion). */
   limit?: number;
   /** A champion's gift: a damage aura for nearby soldiers, far sight, or healing nearby units. */
@@ -174,6 +179,22 @@ export const UNITS: Record<string, UnitDef> = {
     id: 'thorn-druid', faction: 'thorn', role: 'champion', name: 'druid',
     cost: { food: 200, ore: 150 }, time: 30000, hp: 130, dmg: 5, range: 1, speed: 2.1, sight: 7, cooldown: 1200, trainer: 'town', age: 3, limit: 1, gift: 'heal',
   },
+  // Each faction's second unique unit (Age II), unlocked by MASTERY_WINS wins with the faction. Each
+  // shares a role with a unit of its faction, so `unitFor` keeps finding the first; `eliteFor` finds it.
+  'ember-torchbearer': {
+    id: 'ember-torchbearer', faction: 'ember', role: 'melee', name: 'torchbearer',
+    cost: { food: 60, wood: 40, ore: 20 }, time: 11000, hp: 65, dmg: 6, range: 1, speed: 2.1, sight: 5, cooldown: 1100, trainer: 'barracks', age: 2, elite: true,
+    vsBuildings: 3,
+  },
+  'tide-harpooner': {
+    id: 'tide-harpooner', faction: 'tide', role: 'ranged', name: 'harpooner',
+    cost: { food: 50, wood: 60, ore: 20 }, time: 12000, hp: 45, dmg: 9, range: 6, speed: 2, sight: 7, cooldown: 1600, trainer: 'range', age: 2, elite: true,
+    vsCavalry: 2,
+  },
+  'thorn-warden': {
+    id: 'thorn-warden', faction: 'thorn', role: 'melee', name: 'briarWarden',
+    cost: { food: 80, wood: 50, ore: 30 }, time: 14000, hp: 150, dmg: 7, range: 1, speed: 1.6, sight: 5, cooldown: 1300, trainer: 'barracks', age: 2, elite: true,
+  },
   // The guards of the neutral camps (see CAMPS); nobody trains them.
   'wild-brigand': {
     id: 'wild-brigand', faction: 'wild', role: 'melee', name: 'brigand',
@@ -185,9 +206,16 @@ export const UNITS: Record<string, UnitDef> = {
   },
 };
 
+/** Faction mastery: this many wins with a faction unlock its second unique unit (`eliteFor`). */
+export const MASTERY_WINS = 2;
+/** A faction's second unique unit, unlocked by mastery. */
+export function eliteFor(faction: FactionId): UnitDef {
+  return Object.values(UNITS).find((u) => u.faction === faction && u.elite)!;
+}
+
 /** The unit a faction trains for each role; villagers, carts and rams are shared by every faction. */
 export function unitFor(faction: FactionId, role: Role): UnitDef {
-  const def = Object.values(UNITS).find((u) => (u.faction === faction || u.faction === 'neutral') && u.role === role);
+  const def = Object.values(UNITS).find((u) => (u.faction === faction || u.faction === 'neutral') && u.role === role && !u.elite);
   if (!def) throw new Error(`no ${role} for ${faction}`);
   return def;
 }
@@ -215,7 +243,7 @@ export interface BuildingDef {
   /** Only this faction can build it: each faction has one unique building. */
   faction?: FactionId;
   /** The age a player needs before placing it. */
-  age?: 2 | 3;
+  age?: 2 | 3 | 4;
   /** Must touch water (the Dock). */
   shore?: boolean;
   /** At most this many per player. */
@@ -246,7 +274,11 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
   gate: { id: 'gate', name: 'gate', cost: { wood: 25 }, time: 8000, w: 1, h: 1, hp: 450, sight: 2, palisade: true },
   market: { id: 'market', name: 'market', cost: { wood: 150, food: 50 }, time: 35000, w: 3, h: 3, hp: 600, sight: 4, age: 2, limit: 1, drops: ['ore'], trains: ['cart'], market: true },
   monument: { id: 'monument', name: 'monument', cost: { wood: 500, food: 300, ore: 400 }, time: 90000, w: 3, h: 3, hp: 2500, sight: 5, age: 3, limit: 1 },
+  // Age IV: finishing it wins at once, but only WONDER_CREW builders can work on it at a time.
+  wonder: { id: 'wonder', name: 'wonder', cost: { wood: 1000, food: 800, ore: 800 }, time: 480000, w: 4, h: 4, hp: 4000, sight: 6, age: 4, limit: 1 },
 };
+/** Builders who can work on a Wonder at once; more stand by. 480 s of work takes four of them two minutes. */
+export const WONDER_CREW = 4;
 
 /** Whether a building takes a rally flag: it trains something besides trade carts, which set off trading at once. */
 export function takesRally(type: BuildingId) {
@@ -256,7 +288,7 @@ export function takesRally(type: BuildingId) {
 /** The build list's first page; the faction's own building comes after these. */
 export const BUILD_ORDER: BuildingId[] = ['house', 'farm', 'lumber', 'mine', 'barracks', 'range', 'stable', 'academy', 'watchtower'];
 /** The build list's second page. */
-export const BUILD_MORE: BuildingId[] = ['wall', 'gate', 'market', 'monument'];
+export const BUILD_MORE: BuildingId[] = ['wall', 'gate', 'market', 'monument', 'wonder'];
 /** Each faction's unique building. */
 export const UNIQUE: Record<FactionId, BuildingId> = { ember: 'forge', tide: 'dock', thorn: 'grove' };
 /** What each unique building does, for the menu and the panel. */
@@ -280,8 +312,8 @@ export interface TechDef {
   time: number;
   /** Needs Age II first. */
   age2?: boolean;
-  /** An age advance: Age II needs nothing more, Age III also needs the three deeds (DEEDS). */
-  advance?: 2 | 3;
+  /** An age advance: Age II needs nothing more, Age III the three deeds (DEEDS), Age IV the three more (DEEDS4). */
+  advance?: 2 | 3 | 4;
 }
 
 export const TECHS: Record<string, TechDef> = {
@@ -292,6 +324,7 @@ export const TECHS: Record<string, TechDef> = {
   fletching: { id: 'fletching', name: 'fletching', at: 'academy', cost: { food: 100, wood: 100 }, time: 35000 },
   age2: { id: 'age2', name: 'age2', at: 'town', cost: { food: 400, wood: 200 }, time: 50000, advance: 2 },
   age3: { id: 'age3', name: 'age3', at: 'town', cost: { food: 500, wood: 300, ore: 200 }, time: 60000, advance: 3 },
+  age4: { id: 'age4', name: 'age4', at: 'town', cost: { food: 800, wood: 500, ore: 500 }, time: 70000, advance: 4 },
   stirrups: { id: 'stirrups', name: 'stirrups', at: 'academy', cost: { ore: 100, food: 100 }, time: 40000, age2: true },
   bodkin: { id: 'bodkin', name: 'bodkin', at: 'academy', cost: { wood: 150, ore: 50 }, time: 40000, age2: true },
 };
@@ -317,6 +350,21 @@ export type DeedId = (typeof DEEDS)[number]['id'];
 export const ARMY_DEED = 14;
 /** What Age III gives: extra damage for every soldier. */
 export const AGE3_DAMAGE = 2;
+
+/**
+ * Age IV, the Imperial age, takes three more deeds once in Age III: hold a relic, raise the
+ * faction's champion and have a soldier reach VETERAN_RANK. The sim keeps them in `Player.deeds4`.
+ */
+export const DEEDS4 = [
+  { id: 'relic', name: 'deedRelic' },
+  { id: 'champion', name: 'deedChampion' },
+  { id: 'veteran', name: 'deedVeteran' },
+] as const satisfies readonly { id: string; name: TextKey }[];
+export type Deed4Id = (typeof DEEDS4)[number]['id'];
+/** The rank a soldier must reach for the veteran deed (rank II, Veteran). */
+export const VETERAN_RANK = 2;
+/** What Age IV gives on top of Age III: more damage for every soldier, and the Wonder. */
+export const AGE4_DAMAGE = 2;
 
 /** The one-time pick offered when a player reaches Age II. */
 export const BOONS = {
@@ -465,24 +513,24 @@ export const TEMPERAMENTS: Record<Temperament['id'], Temperament> = {
     id: 'raider', name: 'raiderName', text: 'raiderText',
     firstRaid: 360000, rest: 120000, army: 8, party: 6,
     roles: ['cavalry', 'melee', 'siege', 'champion', 'ranged'],
-    plan: ['farm', 'lumber', 'mine', 'barracks', 'stable', 'unique', 'academy', 'range', 'market', 'watchtower', 'monument'],
-    research: ['axes', 'baskets', 'age2', 'stirrups', 'ironworks', 'picks', 'fletching', 'bodkin', 'age3'],
+    plan: ['farm', 'lumber', 'mine', 'barracks', 'stable', 'unique', 'academy', 'range', 'market', 'watchtower', 'monument', 'wonder'],
+    research: ['axes', 'baskets', 'age2', 'stirrups', 'ironworks', 'picks', 'fletching', 'bodkin', 'age3', 'age4'],
     towers: 1, wall: null, boon: 'shieldwall', edge: 'muster',
   },
   builder: {
     id: 'builder', name: 'builderName', text: 'builderText',
     firstRaid: 840000, rest: 240000, army: 20, party: 14,
     roles: ['siege', 'melee', 'ranged', 'cavalry', 'champion'],
-    plan: ['monument', 'farm', 'lumber', 'mine', 'unique', 'academy', 'barracks', 'range', 'stable', 'market', 'watchtower'],
-    research: ['axes', 'baskets', 'picks', 'age2', 'ironworks', 'fletching', 'bodkin', 'stirrups', 'age3'],
+    plan: ['monument', 'farm', 'lumber', 'mine', 'unique', 'academy', 'barracks', 'range', 'stable', 'market', 'watchtower', 'wonder'],
+    research: ['axes', 'baskets', 'picks', 'age2', 'ironworks', 'fletching', 'bodkin', 'stirrups', 'age3', 'age4'],
     towers: 1, wall: { age: 2, half: 4 }, boon: 'shieldwall', edge: 'masonry',
   },
   warden: {
     id: 'warden', name: 'wardenName', text: 'wardenText',
     firstRaid: 720000, rest: 180000, army: 14, party: 10,
     roles: ['ranged', 'melee', 'siege', 'cavalry', 'champion'],
-    plan: ['farm', 'lumber', 'mine', 'barracks', 'watchtower', 'academy', 'unique', 'range', 'stable', 'market', 'monument'],
-    research: ['axes', 'baskets', 'fletching', 'age2', 'bodkin', 'ironworks', 'picks', 'stirrups', 'age3'],
+    plan: ['farm', 'lumber', 'mine', 'barracks', 'watchtower', 'academy', 'unique', 'range', 'stable', 'market', 'monument', 'wonder'],
+    research: ['axes', 'baskets', 'fletching', 'age2', 'bodkin', 'ironworks', 'picks', 'stirrups', 'age3', 'age4'],
     towers: 3, wall: { age: 1, half: 6 }, boon: 'harvest', edge: 'masonry',
   },
 };
