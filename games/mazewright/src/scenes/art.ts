@@ -50,6 +50,7 @@ export const FOE_COLOUR: Record<FoeKind, number> = {
   ember: 0x9c3b1c,
   earwig: 0x6e4126,
   queen: 0x5b2a7a,
+  glowworm: 0x55603a,
 };
 
 const shadow = (g: G, draw: () => void) => {
@@ -157,7 +158,7 @@ export function tower(g: G, kind: TowerKind, x: number, y: number, level: number
   g.fillCircle(x - 2, y - 3, 9);
   g.save();
   g.translateCanvas(x, y);
-  if (kind !== 'frost' && kind !== 'beehive' && kind !== 'apple' && kind !== 'puffball' && kind !== 'nettle' && kind !== 'toadstool') g.rotateCanvas(aim);
+  if (kind !== 'frost' && kind !== 'beehive' && kind !== 'apple' && kind !== 'puffball' && kind !== 'nettle' && kind !== 'toadstool' && kind !== 'lantern') g.rotateCanvas(aim);
   if (kind === 'storm') {
     // A copper rod with a charged ball on top.
     g.fillStyle(0xb06a35, alpha);
@@ -264,6 +265,17 @@ export function tower(g: G, kind: TowerKind, x: number, y: number, level: number
     g.fillStyle(0xf3e6d0, alpha);
     g.fillCircle(-2.5, -1.5, 1.3);
     g.fillCircle(2.5, -0.5, 1.1);
+  } else if (kind === 'lantern') {
+    // A warm lantern on a post: a dark frame round glowing glass, and a ring of light.
+    g.fillStyle(0xffd24a, 0.3 * alpha);
+    g.fillCircle(0, -1, 12);
+    g.fillStyle(0x2f2a24, alpha);
+    g.fillRoundedRect(-6, -9, 12, 16, 3);
+    g.fillTriangle(-7, -9, 0, -14, 7, -9);
+    g.fillStyle(0xffe27a, alpha);
+    g.fillRoundedRect(-4, -7, 8, 11, 2);
+    g.fillStyle(0xfff6d0, alpha);
+    g.fillCircle(0, -2, 2.2);
   } else if (kind === 'bow') {
     g.lineStyle(2.6, C.wood, alpha);
     g.beginPath();
@@ -394,7 +406,13 @@ export function foe(g: G, kind: FoeKind, x: number, y: number, angle: number, si
   else if (kind === 'mole') mole(g, x, y, angle, size);
   else if (kind === 'woodlouse') woodlouse(g, x, y, angle, size);
   else if (kind === 'snail') snail(g, x, y, angle, size);
-  else beetle(g, kind, x, y, angle, size, ails.chilled);
+  else {
+    if (kind === 'glowworm') {
+      g.fillStyle(0xd9ff7a, 0.25);
+      g.fillCircle(x, y, size * 1.9);
+    }
+    beetle(g, kind, x, y, angle, size, ails.chilled);
+  }
   if (ails.king) crown(g, x, y - size - 4, Math.max(6, size * 0.5));
   if (ails.heat > 0.05) {
     // A warm glow that turns bright once the foe is fully heated.
@@ -452,6 +470,11 @@ function beetle(g: G, kind: FoeKind, x: number, y: number, angle: number, size: 
     for (const k of [-0.45, 0, 0.45]) g.lineBetween(k * r, -r * 0.8, k * r, r * 0.8);
     g.lineStyle(2.4, 0x1d1d22, 1);
     g.lineBetween(r * 1.1, 0, r * 1.9, 0);
+  }
+  if (kind === 'glowworm') {
+    // A glowing tail: it lights itself up at night.
+    g.fillStyle(0xd9ff7a, 1);
+    g.fillEllipse(-r * 0.55, 0, r * 0.9, r * 1.2);
   }
   if (kind === 'queen') {
     g.fillStyle(C.gold, 1);

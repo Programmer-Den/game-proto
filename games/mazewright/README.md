@@ -23,7 +23,9 @@ beetle already on the lawn) is refused with an orange no-entry ring.
 | Sell button, or S | Sell mode: every tower you tap or drag over is sold at once (for its whole price if it was planted since the last wave, else 70%), to clear a lot of the maze quickly; tap Sell again to go back |
 | A tower tool on a hedge | Plant the tower in the hedge's place, for its cost less what the hedge sells for (the route doesn't change) |
 | Start wave, or Space | Send the next wave; once the last one is all out, send the next early for 5 gold |
-| Way of play (garden picker, top left) | Classic, Challenge, Swarm, Endless or Sandbox, for every garden |
+| Way of play (garden picker, top left) | Classic, Challenge, Swarm, Endless, Night or Sandbox, for every garden |
+| Versus (garden picker) | Two gardeners on one screen, each with a garden of their own |
+| Maze code (top bar, one gardener) | Copy the maze in play as a short code; Plant code on the picker plants one in Sandbox |
 | Wave timer / Calm (garden picker) | After wave 1 the next wave comes by itself 20 seconds after the last is all out; Calm waits for Start wave |
 | Speed button, or F | Play at double speed |
 | One gardener / Two gardeners (garden picker) | Play alone, or two on one screen, each on their own half of the lawn |
@@ -277,9 +279,32 @@ played, and is kept for the next game:
 | Challenge | The 20 waves with the garden's own pouch of two to four towers (lent even before the shed sells them), named on its card. A win earns the garden's ✦, which counts like a star for opening seasons, and 10 more seeds |
 | Swarm | The 20 waves, each sent the moment the last is all out, for a quarter more gold; won without losing a cabbage, it earns a fourth star |
 | Endless | Waves never stop: after wave 20, waves 11 to 20 come round again, bigger each time. The garden keeps the most waves held |
-| Sandbox | 10,000 gold, towers grow at once and waves never stop, with no records or trophies: a place to try mazes |
+| Night | The 20 waves in the dark: towers see only the foes in a lantern's light, and the tool bar adds the Lantern (15 gold, light 2.5 cells, 3.2 and 4 at levels 2 and 3, no master level; it blocks like a tower and may take a hedge's place). A group of glow-worms leads every wave, three more one every third wave, and they glow, so every tower sees them. A win earns the garden's ☾ and 10 more seeds, keeps no stars or replay |
+| Sandbox | 10,000 gold, towers grow at once and waves never stop, with no records or trophies: a place to try mazes. Plant code plants a shared maze (below) |
 
 ![The picker in Challenge: each card names its garden's pouch, and the Meadow's challenge is won](docs/screenshots/challenge.webp)
+
+![The night garden: dark but for a lantern's light by the bows, a lit beetle ringed, and glow-worms glowing on their own](docs/screenshots/night.webp)
+
+**Versus.** The Versus button under the gardeners plays two gardeners on one screen, each on a
+garden of their own: the lawn is fenced down the middle, with a burrow at each outer edge and a
+cottage each by the fence. Each has their own gold, tools and 10 cabbages, and both get every wave,
+which never stops. Every foe a gardener beats (but not one sent over) comes out of the other's
+burrow a moment and a half later, at full health; held waves pay each gardener in full. The first
+to lose every cabbage loses (both on the same moment is a draw), and Rematch plays again. Versus
+keeps no records, pays no seeds and earns no trophies.
+
+![Versus: two gardens fenced apart, each with its own cottage, cabbages and gold](docs/screenshots/versus.webp)
+
+**Maze codes.** With one gardener, the Maze code button in the top bar copies the maze in play as
+a short code (`meadow.QAAAEAAA….E-EF…`: the garden, the hedges as bits, then three characters for
+each tower with its level; traps are left out), or shows it to copy where the clipboard is shut. In
+Sandbox, Plant code on the garden picker asks for a code and starts a Sandbox game in its garden
+with the maze planted, telling how many of its pieces fit.
+
+![The garden picker in Sandbox: Versus at the left, Plant code at the right](docs/screenshots/maze-code.webp)
+
+![A maze planted from a code in a new Sandbox game](docs/screenshots/planted.webp)
 
 | Garden | Challenge pouch |
 | --- | --- |
@@ -297,7 +322,7 @@ played, and is kept for the next game:
 | Snow Path | Sunglass, Bonfire, Bow |
 | Greenhouse | Hedge, Frost, Crossbow |
 
-**Trophies.** Ten trophies, listed on the start and pause screens and on the hub. Sandbox earns none:
+**Trophies.** Ten trophies, listed on the start and pause screens and on the hub. Sandbox and Versus earn none:
 
 | Trophy | Tier | How |
 | --- | --- | --- |
@@ -322,6 +347,7 @@ played, and is kept for the next game:
 - `src/game/rules.ts`: the grid size, towers, foes, waves and tuning numbers.
 - `src/game/maps.ts`: the thirteen gardens and their seasons (burrows, cottage, rocks, water, banks, paths, glass, sprinklers).
 - `src/game/daily.ts`: the daily maze's garden and pouch, made from the day's seed.
+- `src/game/code.ts`: maze codes, to copy a maze and plant it again.
 - `src/game/grid.ts`: the walking field (steps from every tile to the cottage) and routes.
 - `src/game/sim.ts`: a game: building and the never-close rule, foes, shots, waves and events.
 - `src/game/save.ts`: the records per garden, the pouch, the way of play, the potting shed (with the gardener), replays and the game in play.

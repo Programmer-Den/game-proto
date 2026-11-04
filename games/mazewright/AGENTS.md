@@ -70,6 +70,44 @@ Implemented today:
   `frostFor` (4). A `stopped` tower neither reloads, grows nor fires; events `wilt` and `frozen`,
   drawn with `art.wilted` and `art.frozen`, and the first of them each game gets a banner
   (`wiltFirst`, `frostFirst`). Spring and autumn have no weather.
+- Versus (`Extra.versus`, `g.versus`, always with `duo`): the picker's `versus` button (under
+  `duo`) runs `startVersus`, a Classic game on `VERSUS_MAP` (`maps.ts`, not in `MAPS`: a burrow at
+  each outer edge, a cottage each by the middle, mirrored rocks; `MapDef.goal2` is the right
+  cottage). Each half is a garden of its own: `half` walls off the other half for the walking
+  fields, so `refield` makes `dist` (left) and `dist2` (right, `fieldOf`, `goalOf`), and `homeDist`
+  and honey fields per side; `gateSide` gives a burrow's (and its foes') side, and `open`,
+  `wouldBlock`, `routesWith`, `remaining`, `moveFoe`, `grab`, `roll` (`Loose.side`) and
+  `cabbagesLeft(g, side)` use it. Each side has `VERSUS.lives` (10) cabbages (`lives`, `lives2`),
+  toughness has no `DUO_TOUGHNESS`, `share` pays each the whole, `openGates` is every burrow and
+  `totalWaves` Infinity. `beginWave` sends every spawn out of both burrows; a beaten `sendable` foe
+  (one from a wave's spawn, not a split or egg, and not `Spawn.sent`) is `send`-ed: a sent spawn at
+  the other burrow `VERSUS.delay` (1.5) seconds later, sorted into `spawns` (event `sent`, sound
+  `send`). When a side has no cabbages left the phase is `won` with `g.winner` (0 left, 1 right, -1
+  a draw). The scene draws a fence instead of the dashed line, both cottages, the right side's
+  cabbages by its gold, and an end panel with `versusLeft`/`versusRight`/`versusDraw` and Rematch
+  (`again`); a versus game is never kept, notes no records, pays no seeds and earns no trophies.
+- The night garden (`night` in `MODES`): `waveGroups(n, true)` leads every wave with
+  `NIGHT.worms` (3) glow-worms (`glowworm`, one more every `NIGHT.wormsEvery` (3) waves), and the
+  kit (`kitFor`) adds the `lantern`, which is in `ALL_TOWERS` but not `TOWERS`, so it is never in a
+  pouch, the shed or a daily. A lantern blocks like a tower (it may take a hedge's place), shoots
+  nothing, goes up to level 3 (`nextUpgrade`, no master level) and lights `TOWER.lantern.light`
+  (2.5, 3.2, 4; `lightOf`) round it once grown. Each `step` sets `g.lit` (`litFoes`: the foes a
+  lantern's light reaches, plus every glow-worm) before the towers fire, and `fire`'s `reaches`
+  skips any foe not in it (`isLit`); by day `g.lit` is null. The scene's `drawNight` paints the dark
+  on `nightG` (`DEPTH.night`, over the foes, under the bars) in half-cell squares fading out inside
+  each grown lantern's light, draws the glow-worms again over it, and rings each lit foe;
+  `drawReach` shows a lantern's light. A Night win notes `GardenRecord.night` (the card's ☾, and
+  `nightWon`/`nightOpen` in Night), pays `NIGHT.seeds` (10) more and keeps no replay; a loss notes
+  nothing. The banner `nightStart` tells the rule.
+- Maze codes (`game/code.ts`): `mazeCode(g)` is `<garden>.<hedges>.<towers>`, the hedges one bit a
+  cell in base64url with trailing `A`s cut, and each other tower three base64url characters (cell,
+  its number in `KINDS`, level; traps left out); `readCode` gives the garden and the towers, hedges
+  first, or null. With one gardener the top bar's `code` button (left of Gardens, `CODE_BUTTON`)
+  runs `copyCode`: the clipboard, or a `prompt` with the code where it is shut, then the banner
+  `codeCopied`. In Sandbox the picker's `plant` button (under the shed) runs `plantCode`: a
+  `prompt` for a code, then a new Sandbox game in its garden where each tower is `build`-ed and
+  `upgrade`-d like the player's own actions (so a kept game plays it back), what doesn't fit left
+  out, and the banner `codePlanted`; a bad code shows `codeBad` on the button for 3 seconds.
 - Two gardeners (`duo`, the `duo` button under the way of play, saved): `newGame(..., fixed, duo)`
   gives `g.duo`, a second purse `g.gold2` (`g.gold` is the left or only gardener's) and foes
   `DUO_TOUGHNESS` (1.3) times tougher. `sideOf(g, cell)` is 0 for the left half (`COLS / 2`
@@ -147,7 +185,7 @@ Implemented today:
   keeps only `usable` towers. `loadShed` credits past records once, when the key is missing. The
   tool bar narrows its buttons when the pouch holds more than six.
 - Ways of play (`MODES`, `Game.mode`, picked by the `mode` button on the picker; the daily maze is
-  a Classic game with `g.daily`): `classic`,
+  a Classic game with `g.daily`, a versus match one with `g.versus`): `classic`, `night` (above),
   `challenge` (Classic with the garden's own pouch, `MapDef.challenge`, lent whether bought or not:
   the scene's `kit`, the run's tool bar, is it instead of `pouch`; the picker hides the pouch chips
   and shows `challengeInfo`, and each card `challengePouch`; a win notes `GardenRecord.challenge`,
@@ -163,7 +201,7 @@ Implemented today:
   icon, `hidden` for `endless`) with their texts in `trophies/i18n/` (`en.ts`, `de.ts`: the name
   keyed by the id, what earns it by `<id>Text`), and imports nothing else from the game, since the
   hub loads it. `main.ts` hands `trophies` to `setupGame`. The scene awards them with `trophy(id)`
-  (never while a replay is watched or in Sandbox, and nothing while `resumeGame` plays a save back): `firstHold`
+  (never while a replay is watched, in Sandbox or in Versus, and nothing while `resumeGame` plays a save back): `firstHold`
   on `cleared`, `longMaze` on `built` once a burrow's `dist` reaches `LONG_MAZE` (60; not in a path
   garden), `master` on `upgraded` to `MASTER`, `everyCabbage` on `won` with `cabbagesLeft` at
   `maxLives`, and `recordTrophies` the ones the records earn (`firstWin`, `lastCabbage`,
@@ -244,6 +282,10 @@ Missing or rough:
   crossbow, cannon, bow, whirligig and puffball do most, the storm rod, bonfire and beehive less
   but need bunched foes, a straight corridor or neighbours to shine, and the sunglass needs a
   corridor in line with it. A tower's balance is a first pass.
+- `docs/screenshots/versus.webp` (a versus match in wave 1), `night.webp` (the Meadow at night,
+  a lantern by the bows), `maze-code.webp` (the picker in Sandbox with Versus and Plant code) and
+  `planted.webp` (a maze planted from a code) were taken by a Playwright script that plants with
+  real taps, copies the code and plants it with the prompt answered.
 - `docs/screenshots/gardens.webp` (the picker on its greenhouse tab, with the pouch and the daily button), `greenhouse.webp` (the greenhouse in wave 1, towers on both sides of the glass), `gardener.webp` (the Meadow with the gardener's tool picked) and `daily.webp` (a daily maze's first moment, its banner and lent pouch) were taken by a Playwright script with stored records and shed, `path.webp` (Gravel Walk), `ponds.webp` (Ice Pond, towers on its banks), `wilt.webp` (Brook, a wilted cannon), `frost.webp` (Ice Pond, a frozen frost tower), `towers.webp`, `aim.webp`, `kings.webp`, `cabbages.webp`, `grow.webp`, `master.webp`, `traps.webp`, `shed.webp` (the shed's cards with their info lines, and the gardener's row), `modes.webp` (upgrade mode and its gold marks), `hedge-swap.webp` (a bow hovered over a hedge), `no-tool.webp` (the tool put away), `gold-notes.webp` (the notes over a planting, an upgrade and a sale), `refund.webp` (a growing bow's panel, selling for all it cost), `maze.webp`,
   `mole.webp` and `cover.png` were taken by hand (a
   Playwright script that plants a maze and sends waves 8 and 9); `duo-replay.webp` (a
@@ -279,13 +321,15 @@ File map (`src/`):
   `banks`, `path`, `glass`, `sprinklers`, `lives`; `line` and `block` spell paths and ponds), `SEASONS`, `SEASON_STARS`,
   `cellIndex`, `cellOf`, `inGrid`. A cell index is `row * COLS + col`.
 - `game/daily.ts`: `dailyPlan`, the daily maze's garden, pouch and seed from a random source.
+- `game/code.ts`: `mazeCode` and `readCode`, maze codes (see above).
 - `game/grid.ts`: `distances` (breadth-first search out from the cottage over free cells, 4
   neighbours), `nextStep` (a neighbour one step closer, keeping the heading on ties, then right,
   down, up, left), `route`, `UNREACHABLE`, `DIRS`.
 - `game/sim.ts`: `Game`, `Tower`, `Foe`, `Shot`, `GameEvent`, `Refusal` and the actions:
   `newGame`, `replayGame`, `replayStep`, `replayOf`, `resumeGame` (with `Action`, `Fixed` and `Replay`), `sideOf`, `goldAt`, `canBuild`, `hedgeUnder`, `costOn`, `wouldBlock`, `build`, `nextUpgrade`, `upgrade`, `sellValue`, `sell`, `turn`, `setAim`,
   `canStartWave`, `startWave`, `step`, `remaining`, `routeLength`, `towerAt`, `totalWaves`, `dailyScore`, `sees`, the gardener's `walk`, `lift`, `liftable`, `liftReady` and `heroBoost`, and `beamCells`,
-  `inCone` and `bestFace` for the towers that point one way, `reachOf` and `openGates`. Only this file
+  `inCone` and `bestFace` for the towers that point one way, `reachOf`, `openGates`, versus's `gateSide`, `fieldOf`, `goalOf` and
+  `routesWith` (each burrow's route now, or with one more cell planted), and the night's `lightOf` and `isLit`. Only this file
   changes a `Game`. `g.blocked` is 0 free (a path garden's path), 1 rock, 2 tower, 3 water, 4
   (`LAWN`) a path garden's lawn, 5 (`GLASS`) a glass pane, 6 a sprinkler; `g.ground` is the same without towers (selling puts it back), and
   `g.banks` marks banks. `g.dist` (and `homeDist`, one per burrow) is made again whenever a cell
@@ -320,7 +364,7 @@ File map (`src/`):
   `viewFrame`. Tools start 176 pixels in, clear of the corner buttons.
 
 Save keys: `mazewright-best` (per garden, `GardenRecord`: best wave, whether it was won, most
-stars, fastest win in seconds, the Endless best and whether its Challenge was won), `mazewright-pouch` (the towers picked),
+stars, fastest win in seconds, the Endless best and whether its Challenge and its Night were won), `mazewright-pouch` (the towers picked),
 `mazewright-calm` (`'1'` when waves wait for Start wave), `mazewright-duo` (`'1'` for two gardeners), `mazewright-mode` (the way of play) and
 `mazewright-shed` (seeds, `owned` towers, `masters` bought and extra `slots`) and
 `mazewright-replays` (per garden, the latest Classic or Swarm win as a `Replay`) and
@@ -332,7 +376,7 @@ skips keys ending in `-replays`).
 
 Test hooks (read by `e2e/playthrough.spec.ts` through `window.game.scene.getScene('Game')`):
 `screen`, `state` (the `Game`), `replay` (the `Replay` watched, or null), `pouch`, `buttons` (every button by id, centred, in view pixels:
-`map-<garden>` (the cards of the season shown, `season-<season>`), `daily`, `watch-<garden>`, `resume-<garden>`, `duo`, `pouch-<tower>`, `tool-<tower>`, `tool2-<tower>` (two gardeners), `tool-upgrade`, `tool-sell`, `tool2-upgrade`, `tool2-sell`, `tool-hero`, `wave`, `speed`, `gardens`, `upgrade`, `sell`,
+`map-<garden>` (the cards of the season shown, `season-<season>`), `daily`, `versus`, `plant` (Sandbox only), `code`, `watch-<garden>`, `resume-<garden>`, `duo`, `pouch-<tower>`, `tool-<tower>`, `tool2-<tower>` (two gardeners), `tool-upgrade`, `tool-sell`, `tool2-upgrade`, `tool2-sell`, `tool-hero`, `wave`, `speed`, `gardens`, `upgrade`, `sell`,
 `turn`, `aim`, `again`) and `grid` (the grid's corner and cell size in view pixels).
 
 Difficulty: `startLives` (25, 15, 10) and `hpScale` (0.8, 1, 1.25) use `byDifficulty`. Reduced
@@ -359,6 +403,7 @@ motion holds the frost pulse and cannon boom rings at full size and the gold num
 | `chew` | a mole starts chewing, and the hedge is gone |
 | `wilt`, `freeze` | summer wilts a tower, winter frost freezes one (`wilt`, `frozen`) |
 | `step`, `lift` | the gardener sets off walking, and lifts a foe back to its burrow (`lifted`) |
+| `send` | versus: a beaten foe is sent on to the other burrow (`sent`) |
 | shared `refuse` | a refused placement, a disabled button, Start wave while a wave is still coming out |
 | shared `click` | every button |
 
@@ -370,6 +415,11 @@ motion holds the frost pulse and cannon boom rings at full size and the gold num
   `CHIPS.perRow`.
 - **A foe**: add it to `FOES` and `FOE`, its look in `art.foe` (beetle-shaped foes in `beetle`), its colour in `FOE_COLOUR`, its
   `new_${kind}` text, and put it in `WAVES`.
+- **Versus or the night**: the numbers are `VERSUS` and `NIGHT` in `rules.ts`, the lawn
+  `VERSUS_MAP` in `maps.ts` (keep it mirrored, a burrow and a cottage in each half), the lantern
+  `TOWER.lantern`. A new tower kind that only one way of play brings goes in `ALL_TOWERS` after
+  `TOWERS`. Any new kind also goes at the end of `KINDS` in `code.ts`, which numbers them for maze
+  codes (never reorder it, or old codes plant other towers).
 - **A garden**: add a `MapDef` to `MAPS` with its season (three a season fill `CARDS.xs`, a season with one garden puts it in the middle; keep the
   burrows and the cottage free of rocks and water, the burrows able to reach the cottage, and a path
   garden's banks on its lawn), and its `${id}Name`/`${id}Text` texts (two lines on the card).

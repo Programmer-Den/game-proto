@@ -7,8 +7,11 @@ import { byDifficulty } from '../../../../shared/settings';
 export const COLS = 22;
 export const ROWS = 11;
 
+/** The towers and traps of the pouch and the potting shed. */
 export const TOWERS = ['hedge', 'bow', 'frost', 'cannon', 'storm', 'crossbow', 'bonfire', 'puffball', 'sunglass', 'beehive', 'apple', 'whirligig', 'swallow', 'nettle', 'toadstool', 'honey', 'snare'] as const;
-export type TowerKind = (typeof TOWERS)[number];
+/** Every kind that can be planted: the pouch's, and the lantern, which only the night garden brings (never in a pouch or the shed). */
+export const ALL_TOWERS = [...TOWERS, 'lantern'] as const;
+export type TowerKind = (typeof ALL_TOWERS)[number];
 
 /** The pouch: the towers a run can plant. Hedge and bow are always in it, with up to four more. */
 export const ALWAYS: TowerKind[] = ['hedge', 'bow'];
@@ -93,6 +96,8 @@ export interface TowerDef {
   shrink?: number;
   /** A one-use garden trap (honey pot, bramble snare): it lies on the lawn and never blocks. */
   trap?: boolean;
+  /** Lantern: how far its light reaches in the night garden, by level. */
+  light?: [number, number, number];
 }
 
 export const TOWER: Record<TowerKind, TowerDef> = {
@@ -113,6 +118,7 @@ export const TOWER: Record<TowerKind, TowerDef> = {
   toadstool: { cost: 30, hits: 'poison', range: 2.5, damage: [0, 0, 0], reload: [4, 3.5, 3], air: false, shrink: 0.75, aim: 'strongest' },
   honey: { cost: 20, hits: 'blast', range: 2.5, damage: [0, 0, 0], reload: [1, 1, 1], air: false, trap: true },
   snare: { cost: 15, hits: 'sharp', range: 0, damage: [0, 0, 0], reload: [1, 1, 1], air: false, trap: true },
+  lantern: { cost: 15, hits: 'sharp', range: 0, damage: [0, 0, 0], reload: [1, 1, 1], air: false, light: [2.5, 3.2, 4] },
 };
 export type TrapKind = 'honey' | 'snare';
 /**
@@ -146,7 +152,7 @@ export type ShotKind = keyof typeof SHOT_SPEED;
 /** Puffball spores jump from a poisoned foe to ground foes this close, once a second. */
 export const SPREAD = { reach: 0.9, every: 1 };
 
-export const FOES = ['beetle', 'ladybird', 'stag', 'moth', 'mole', 'weevil', 'woodlouse', 'snail', 'ember', 'earwig', 'queen'] as const;
+export const FOES = ['beetle', 'ladybird', 'stag', 'moth', 'mole', 'weevil', 'woodlouse', 'snail', 'ember', 'earwig', 'queen', 'glowworm'] as const;
 export type FoeKind = (typeof FOES)[number];
 
 export interface FoeDef {
@@ -184,6 +190,8 @@ export const FOE: Record<FoeKind, FoeDef> = {
   ember: { hp: 45, speed: 1.5, gold: 3, lives: 1, gap: 1, shell: 'ember', size: 0.22 },
   earwig: { hp: 60, speed: 3, gold: 4, lives: 1, gap: 0.8, size: 0.2 },
   queen: { hp: 600, speed: 0.8, gold: 40, lives: 5, gap: 2, size: 0.42 },
+  /** Only in the night garden: it glows, so towers always see it. */
+  glowworm: { hp: 26, speed: 1.7, gold: 2, lives: 1, gap: 0.9, size: 0.2 },
 };
 
 /** Seconds a mole chews before the hedge is gone. */
@@ -265,10 +273,11 @@ export const waveReward = (wave: number) => 6 + wave;
 /**
  * Ways to play a garden: Classic (the 20 waves), Challenge (the 20 waves with the garden's own
  * pouch, `MapDef.challenge`, for its challenge mark), Swarm (every wave the moment the last is out, for
- * `SWARM_GOLD` times the gold and a fourth star), Endless (waves never stop) and Sandbox
- * (`SANDBOX_GOLD`, towers grow at once, endless waves, no records).
+ * `SWARM_GOLD` times the gold and a fourth star), Endless (waves never stop), Night (the 20 waves in
+ * the dark: towers see only foes lit by lanterns, and glow-worms come too, for its night mark) and
+ * Sandbox (`SANDBOX_GOLD`, towers grow at once, endless waves, no records).
  */
-export const MODES = ['classic', 'challenge', 'swarm', 'endless', 'sandbox'] as const;
+export const MODES = ['classic', 'challenge', 'swarm', 'endless', 'night', 'sandbox'] as const;
 export type Mode = (typeof MODES)[number];
 export const SWARM_GOLD = 1.25;
 export const SANDBOX_GOLD = 10000;
@@ -280,8 +289,9 @@ export const DUO_TOUGHNESS = 1.3;
 /** Stars for a win: three with at least `three` of the cabbages kept, two with `two`, else one. */
 export const STARS = { three: 0.9, two: 0.5 };
 
-/** The groups of wave `n` (from 1): the table, and past it waves 11 to 20 again, bigger each round. */
-export function waveGroups(n: number): Group[] {
+/** The groups of wave `n` (from 1): the table, and past it waves 11 to 20 again, bigger each round; at night a group of glow-worms leads each wave. */
+export function waveGroups(n: number, night = false): Group[] {
+  if (night) return [['glowworm', NIGHT.worms + Math.floor(n / NIGHT.wormsEvery)], ...waveGroups(n)];
   if (n <= WAVES.length) return WAVES[n - 1];
   const past = n - WAVES.length - 1;
   const round = Math.floor(past / 10) + 1;
@@ -309,3 +319,13 @@ export const SKILL = { thumb: { seeds: 40, boost: 0.5 }, boots: { seeds: 30, spe
 
 /** The daily maze: `waves` waves on Normal with `lives` cabbages and `rocks` more rocks; a win scores `perCabbage` a cabbage kept plus the gold left, a loss `perWave` a wave held. */
 export const DAILY = { waves: 12, lives: 15, rocks: 4, perCabbage: 100, perWave: 10 };
+
+/** The night garden: glow-worms leading each wave (`worms`, one more every `wormsEvery` waves), and the extra seeds a night win pays. */
+export const NIGHT = { worms: 3, wormsEvery: 3, seeds: 10 };
+
+/**
+ * Versus: two gardeners, each on their own half of a lawn of their own (`VERSUS_MAP`), each with
+ * `lives` cabbages and the usual gold. Both get every wave; a foe one beats (not one sent over) comes
+ * out of the other's burrow `delay` seconds later, and the first to lose every cabbage loses.
+ */
+export const VERSUS = { lives: 10, delay: 1.5 };

@@ -125,6 +125,8 @@ export const SFX = sounds({
   step: { wave: 'noise', freq: 1200, to: 600, length: 0.06, volume: 0.08, gap: 120 },
   /** The gardener lifts a foe back into its burrow. */
   lift: { wave: 'triangle', freq: 330, to: 880, length: 0.22, volume: 0.18, gap: 200 },
+  /** Versus: a beaten foe is sent on to the other gardener's burrow. */
+  send: { wave: 'sine', freq: 600, to: 1500, length: 0.14, volume: 0.1, gap: 180 },
   /** A mole starts chewing, and a hedge gone. */
   chew: { wave: 'noise', freq: 900, to: 300, length: 0.22, volume: 0.18, gap: 200 },
 });
