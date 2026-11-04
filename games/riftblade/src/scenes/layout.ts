@@ -52,8 +52,13 @@ export const HEAT_ROW = { x: 658, y: 366, w: 272, h: 42 };
 export const HEAT_DOWN = { x: HEAT_ROW.x, y: HEAT_ROW.y + 3, w: 36, h: 36 };
 export const HEAT_UP = { x: HEAT_ROW.x + HEAT_ROW.w - 36, y: HEAT_ROW.y + 3, w: 36, h: 36 };
 
-/** The hero select's Armoury button (top left, once credits are banked) and the Armoury's cards and Back button. */
-export const ARMOURY_BUTTON = { x: 14, y: 14, w: 200, h: 40 };
+/**
+ * The hero select's top buttons, each shown once it has something: the Armoury and the Codex top
+ * left, the Daily and Weekly runs top right (the title sits between them). The Armoury's cards and
+ * Back button follow.
+ */
+export const ARMOURY_BUTTON = { x: 14, y: 14, w: 170, h: 40 };
+export const CODEX_BUTTON = { x: 192, y: 14, w: 170, h: 40 };
 export const ARMOURY_CARD = { w: 172, h: 250, y: 150, gap: 182 };
 export function armouryCardRect(i: number, n: number) {
   const cx = VIEW.w / 2 + (i - (n - 1) / 2) * ARMOURY_CARD.gap;
@@ -62,10 +67,19 @@ export function armouryCardRect(i: number, n: number) {
 export const BACK = { x: VIEW.w / 2 - 110, y: 430, w: 220, h: 50 };
 
 /** The hero select's Weekly run button (top right, after a first run) and the weekly panel's mutator cards and buttons. */
-export const WEEKLY_BUTTON = { x: VIEW.w - 214, y: 14, w: 200, h: 40 };
+export const WEEKLY_BUTTON = { x: VIEW.w - 184, y: 14, w: 170, h: 40 };
+export const DAILY_BUTTON = { x: VIEW.w - 362, y: 14, w: 170, h: 40 };
 export const MUTATOR_CARD = { x: 400, y: 140, w: 250, h: 150, gap: 270 };
 export const WEEKLY_START = { x: VIEW.w / 2 + 10, y: 430, w: 220, h: 50 };
 export const WEEKLY_BACK = { x: VIEW.w / 2 - 230, y: 430, w: 220, h: 50 };
+
+/** The codex: a tab per page, its entries in four columns below. */
+export const CODEX_TAB = { y: 104, w: 172, h: 54, gap: 180 };
+export function codexTabRect(i: number, n: number) {
+  const cx = VIEW.w / 2 + (i - (n - 1) / 2) * CODEX_TAB.gap;
+  return { x: cx - CODEX_TAB.w / 2, y: CODEX_TAB.y, w: CODEX_TAB.w, h: CODEX_TAB.h };
+}
+export const CODEX_GRID = { x: 70, y: 176, col: 214, row: 18.5, cols: 4 };
 
 /** The new-hero panel shown mid-run, and its Continue button. */
 export const UNLOCK = { x: VIEW.w / 2 - 200, y: 96, w: 400, h: 340 };
@@ -118,8 +132,10 @@ export function eventOptionRect(i: number) {
   return { x: VIEW.w / 2 - 300, y: 290 + i * 92, w: 600, h: 76 };
 }
 
-/** The end screen's "Run again" button. */
+/** The end screen's "Run again" button, and beside it after a won crusade the endless rift's. */
 export const AGAIN = { x: VIEW.w / 2 - 110, y: 380, w: 220, h: 50 };
+export const AGAIN_SIDE = { x: VIEW.w / 2 + 10, y: 380, w: 220, h: 50 };
+export const ENDLESS_BUTTON = { x: VIEW.w / 2 - 230, y: 380, w: 220, h: 50 };
 
 /**
  * Fits the layout to a view of `w` x `h` with the designed frame at `fx`, `fy`: the XP bar spans

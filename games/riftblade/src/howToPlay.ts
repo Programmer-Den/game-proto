@@ -14,6 +14,9 @@ const en: HowToPlay = {
     { input: 'The arrows by Heat, or Left / Right', action: 'Pick the rift heat, once the hero has won a run' },
     { input: 'Armoury (top left), then a piece or 1-5', action: 'Buy lasting upgrades with banked credits; Back or Enter returns' },
     { input: 'Weekly run (top right), then Start or Enter', action: 'Play this week\'s seeded run with its hero and two mutators' },
+    { input: 'Daily run (top right), then Start or Enter', action: 'Play today\'s seeded three-world run, once a day' },
+    { input: 'Codex (top left), then a page or 1-5', action: 'See the foes, bosses and cards met so far; Back or Enter returns' },
+    { input: 'Endless rift, or Space, after a win', action: 'Go on through the worlds again, tougher each loop' },
     { input: 'Continue, Enter or Space', action: 'Go on after a new hero is unlocked' },
     { input: '4 / Enter at the trader', action: 'Reroll the offers / leave' },
   ],
@@ -38,6 +41,9 @@ const en: HowToPlay = {
     'Win a run to open rift heat for that hero: each heat adds a rule (more elites, harder hits, no rest stops, frenzied bosses, tougher foes) and winning opens the next, up to heat 5.',
     'Credits left at a run\'s end, plus salvage for each world reached, are banked for the Armoury: small lasting upgrades for every hero.',
     'Each week has its own weekly run: a set hero, two mutators and the same worlds all week. Its first win of the week banks 100 credits.',
+    'Each day has its own daily run: three worlds with a set hero and one mutator, the same for everyone, one try a day. It scores 1000 per boss and 1 per kill, and a win banks 40 credits.',
+    'After a won crusade, the endless rift takes you back to the Dune world with your kit: each loop the foes are tougher. It scores the worlds you clear.',
+    'Every foe, boss and card you meet goes into the codex. Fill a page for credits in the Armoury\'s bank.',
   ],
 };
 
@@ -53,6 +59,9 @@ const de: HowToPlay = {
     { input: 'Die Pfeile bei Hitze, oder Links / Rechts', action: 'Die Rift-Hitze wählen, sobald der Held einen Lauf gewonnen hat' },
     { input: 'Waffenkammer (oben links), dann ein Teil oder 1-5', action: 'Bleibende Upgrades mit eingelagerten Credits kaufen; Zurück oder Enter kehrt zurück' },
     { input: 'Wochenlauf (oben rechts), dann Los oder Enter', action: 'Den Lauf dieser Woche mit seinem Helden und zwei Mutatoren spielen' },
+    { input: 'Tageslauf (oben rechts), dann Los oder Enter', action: 'Den Lauf des Tages über drei Welten spielen, einmal am Tag' },
+    { input: 'Kodex (oben links), dann eine Seite oder 1-5', action: 'Die bisher getroffenen Gegner, Bosse und Karten ansehen; Zurück oder Enter kehrt zurück' },
+    { input: 'Endloser Riss, oder Leertaste, nach einem Sieg', action: 'Noch einmal durch die Welten, mit jeder Runde härter' },
     { input: 'Weiter, Enter oder Leertaste', action: 'Nach einem neu freigeschalteten Helden weitermachen' },
     { input: '4 / Enter beim Händler', action: 'Angebote neu würfeln / gehen' },
   ],
@@ -77,6 +86,9 @@ const de: HowToPlay = {
     'Gewinne einen Lauf, um die Rift-Hitze für diesen Helden zu öffnen: jede Hitze fügt eine Regel hinzu (mehr Eliten, härtere Treffer, keine Rast, rasende Bosse, zähere Gegner), und ein Sieg öffnet die nächste, bis Hitze 5.',
     'Credits, die am Ende eines Laufs übrig sind, und Bergegut für jede erreichte Welt kommen in die Waffenkammer: kleine bleibende Upgrades für alle Helden.',
     'Jede Woche hat ihren eigenen Wochenlauf: einen festen Helden, zwei Mutatoren und die ganze Woche dieselben Welten. Sein erster Sieg der Woche lagert 100 Credits ein.',
+    'Jeder Tag hat seinen eigenen Tageslauf: drei Welten mit festem Helden und einem Mutator, für alle gleich, ein Versuch am Tag. Er zählt 1000 Punkte je Boss und 1 je Abschuss, und ein Sieg lagert 40 Credits ein.',
+    'Nach einem gewonnenen Kreuzzug führt dich der endlose Riss mit deiner Ausrüstung zurück zur Wüstenwelt: mit jeder Runde werden die Gegner zäher. Gezählt werden die geschafften Welten.',
+    'Jeder Gegner, Boss und jede Karte, die dir begegnet, kommt in den Kodex. Füll eine Seite für Credits in der Kasse der Waffenkammer.',
   ],
 };
 

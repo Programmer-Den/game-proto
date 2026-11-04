@@ -453,6 +453,21 @@ export interface GameState {
   mutators: MutatorId[];
   /** Where the weekly run's seeded `rand` stood when the run was saved (`rngAt`, -1 for none). */
   rng: number;
+  /** The daily run's day (`YYYY-MM-DD`, '' for any other run; see `daily.ts`): three worlds, not four. */
+  daily: string;
+  /**
+   * The seed of a weekly or daily run's `rand` (`weekSeed` or `dailySeed`), -1 for a normal run:
+   * each stretch of the run reseeds from it (see `weekly.ts`).
+   */
+  seed: number;
+  /**
+   * The endless rift (`voyage.ts`, `enterEndless`), after a won crusade: the run goes on through
+   * looping worlds, `loop` counting the loops begun past the first (each makes foes tougher), and
+   * `endlessCleared` the worlds cleared since, its score.
+   */
+  endless: boolean;
+  loop: number;
+  endlessCleared: number;
   /**
    * The planet (an index into `PLANETS`: 0 Dune, 1 Swamp, 2 Ice, 3 Lava, then the later ones) and
    * the jump of the crusade it is (`stage`, 0 to 3), and whether this is the elite arena after it.
@@ -587,6 +602,11 @@ export function freshState(): GameState {
     week: -1,
     mutators: [],
     rng: -1,
+    daily: '',
+    seed: -1,
+    endless: false,
+    loop: 0,
+    endlessCleared: 0,
     planet: 0,
     stage: 0,
     route: [0],

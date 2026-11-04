@@ -171,6 +171,49 @@ Armoury (on top of the run's own credits). Tap Start or press Enter; Back return
 
 ![The weekly run](docs/screenshots/weekly-run.webp)
 
+### The daily run
+
+From the same first run on, a **Daily run** button shows beside the weekly one. It opens today's
+run: three worlds (the Dune world, then one of Swamp, Spore and Scrap, then one of Ice, Crystal and
+Storm), one of your open heroes and one mutator, picked from the day, with each world and star map
+seeded, so everyone playing that day meets the same run. It is fought at heat 0 and without the
+Armoury, and there is **one try a day**: starting it uses the day's try, even if you leave half
+way. It scores **1000 per boss beaten plus 1 per kill**; the panel and the end screen show today's
+score, your best and how many days in a row you have played. Winning it banks **40 credits** for
+the Armoury. A daily win is not a won crusade, so it opens no rift heat.
+
+![The daily run](docs/screenshots/daily-run.webp)
+
+### The endless rift
+
+After a won crusade (not a weekly or daily run) the victory screen offers the **Endless rift**
+beside Run again (or press Space). The run goes on with the same hero, level and kit: the star map
+leads from the Lava world back to the Dune world, and the four jumps start over, each loop with
+foes and bosses **+40% health and +25% damage** on top of the one before (loop 1 is the first
+after the win). Its score is the worlds cleared after the win; the end screen shows it with your
+best, and each one banks **15 salvage** (the credits left at the win were banked already).
+
+![The endless rift on the victory screen](docs/screenshots/endless-rift.webp)
+
+### The codex
+
+Every foe, boss and card you meet goes into the codex, kept across runs: a foe or boss once it is
+on the field, a card once it is dealt on a level-up, offered by a trader or held. Once anything is
+in it, a **Codex** button shows at the top left of the hero select, beside the Armoury. Each page
+fills once, and a full page banks its credits for the Armoury:
+
+| Page | Entries | Pays |
+| --- | --- | --- |
+| Foes | 16 | 60 |
+| Bosses | 8 | 100 |
+| Pool skills | 30 | 80 |
+| Gear | 12 | 50 |
+| Hero paths | 48 (every hero's four) | 150 |
+
+Tap a page or press 1-5; Back or Enter returns. Entries not met yet show as `? ? ?`.
+
+![The codex](docs/screenshots/codex.webp)
+
 ### Trophies
 
 Ten trophies, listed on the start and pause screens (Trophies) and counted on the hub's card.
@@ -462,11 +505,14 @@ npx playwright test --project riftblade
   `upgrades.ts` (paths, pool, gear, capstones, crossovers and the card roll), `planets.ts` (the
   four worlds, their bosses and the star map's numbers), `state.ts` (the state and the numbers),
   `sim.ts` (everything that happens in a fight), `voyage.ts` (between fights: the star map, trader,
-  arena, events and the next world), `objectives.ts` (the side objectives) and `save.ts`.
+  arena, events, the endless rift's loop and the next world), `objectives.ts` (the side
+  objectives), `daily.ts` (the daily run), `endless.ts` (the endless rift's numbers), `codex.ts`
+  (the codex pages) and `save.ts`.
 - `src/art/`: `glow.ts` (painting helpers), `sprites.ts` (the heroes, Scrap bots and pickups),
   `knights.ts` (the knights, their blades and allies), `squad.ts` (Elara, Triad-77, their allies,
   the drop pod and the locked placeholder) and
   `factions.ts` (the later factions and their bosses), all painted at boot.
 - `src/scenes/`: `BootScene.ts`, `GameScene.ts` (input, camera and drawing), `objectiveArt.ts`
   (the objectives and power-ups, drawn in code) and `layout.ts`.
-- `src/ui/panels.ts`: the hero select, level-up, new hero, star map, trader, event and end screens.
+- `src/ui/panels.ts`: the hero select, Armoury, codex, weekly and daily run, level-up, new hero,
+  star map, trader, event and end screens.
