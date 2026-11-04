@@ -100,7 +100,11 @@ export const sfx = sounds({
   storm: { wave: 'noise', freq: 140, to: 35, attack: 0.01, length: 0.85, volume: 0.45 },
   /** The castle's joined buildings tallied at the end. */
   tick: { wave: 'square', freq: 1760, length: 0.025, volume: 0.12, gap: 30 },
-  /** A campaign star won at the end, played rising for each star. */
+  /** The rival lord sets down its tile: a low, dull knock. */
+  rival: { wave: 'triangle', freq: 260, to: 140, length: 0.12, volume: 0.4, vary: 0.03 },
+  /** A wonder built: a deep bell. */
+  bell: { wave: 'sine', freq: 392, arp: [0, 7, 12], arpStep: 0.09, length: 0.9, volume: 0.3, attack: 0.004 },
+  /** A campaign or puzzle star won at the end, played rising for each star. */
   star: { wave: 'sine', freq: 1568, length: 0.32, volume: 0.28, attack: 0.003, gap: 30 },
 });
 
@@ -116,5 +120,8 @@ export const PLACE_PITCH: Record<Building, number> = {
   temple: 1.15,
   lighthouse: 1.25,
   orchard: 0.9,
+  cathedral: 0.6,
+  granary: 0.65,
+  gardens: 0.7,
   road: 0.75,
 };

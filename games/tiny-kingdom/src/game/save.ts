@@ -1,6 +1,6 @@
 // The best final score, the crowns won from decrees, the island of the day's best, the
-// campaign's stars, the best island chain, the feats won and the tile skin picked are saved; the
-// board is never saved.
+// campaign's and the puzzle islands' stars, the rival lords beaten, the best island chain, the feats
+// won and the tile skin picked are saved; the board is never saved.
 const BEST_KEY = 'tiny-kingdom-best';
 const CROWNS_KEY = 'tiny-kingdom-crowns';
 const DAILY_KEY = 'tiny-kingdom-daily';
@@ -84,3 +84,21 @@ export const saveFeats = (feats: string[]) => save(FEATS_KEY, JSON.stringify(fea
 /** The tile skin picked on the feats card, or '' for the painted classic set. */
 export const loadSkin = () => read(SKIN_KEY) ?? '';
 export const saveSkin = (skin: string) => save(SKIN_KEY, skin);
+
+const PUZZLES_KEY = 'tiny-kingdom-puzzles';
+const RIVALS_KEY = 'tiny-kingdom-rivals';
+
+/** The best stars won on each puzzle island, by puzzle index. */
+export function loadPuzzleStars(): number[] {
+  try {
+    const saved = JSON.parse(read(PUZZLES_KEY) ?? '[]');
+    return Array.isArray(saved) ? saved.map((n) => Math.max(0, Math.min(3, Number(n) || 0))) : [];
+  } catch {
+    return [];
+  }
+}
+export const savePuzzleStars = (stars: number[]) => save(PUZZLES_KEY, JSON.stringify(stars));
+
+/** How many rival lords have been beaten. */
+export const loadRivalWins = () => load(RIVALS_KEY);
+export const saveRivalWins = (wins: number) => save(RIVALS_KEY, String(wins));

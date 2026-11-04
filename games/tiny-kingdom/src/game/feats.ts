@@ -1,10 +1,11 @@
 import type { TextKey } from '../i18n';
-import { cellParts, templeWorth, type GameState } from './state';
+import { cellParts, ownGrid, templeWorth, type GameState } from './state';
 import { AROUND, SIDES, scores, type Cell } from './tiles';
 
 // Kingdom feats: goals on the board that last from kingdom to kingdom, each unlocking a tile skin
 // (a paint for the grass, picked on the feats card). They are checked after every change, from the
-// board as it stands, and saved once won (`tiny-kingdom-feats`).
+// board as it stands (the player's own buildings, when a rival lord shares it), and saved once
+// won (`tiny-kingdom-feats`).
 
 /** The tile skins, in the order of the feats card's swatches: '' is the classic paint, the rest are won by a feat. */
 export const SKINS = ['', 'spring', 'autumn', 'heather', 'snow', 'sand', 'moss', 'dusk'] as const;
@@ -28,17 +29,17 @@ const near = (grid: Cell[][], col: number, row: number, dirs: readonly (readonly
   dirs.filter(([dc, dr]) => count(grid[row + dr]?.[col + dc])).length;
 
 export const FEATS: Feat[] = [
-  { id: 'lakeFarm', text: 'featLakeFarm', skin: 'spring', done: (s) => any(s.grid, 'farm', (c, r) => near(s.grid, c, r, SIDES, (x) => x === 'lake') >= 3) },
-  { id: 'tallWatch', text: 'featTallWatch', skin: 'autumn', done: (s) => any(s.grid, 'tower', (c, r) => cellParts(s.grid, c, r).from.length >= 6) },
-  { id: 'richManor', text: 'featRichManor', skin: 'heather', done: (s) => any(s.grid, 'manor', (c, r) => near(s.grid, c, r, SIDES, (x) => x === 'farm') >= 3) },
-  { id: 'quietTemple', text: 'featQuietTemple', skin: 'snow', done: (s) => any(s.grid, 'temple', (c, r) => templeWorth(s.grid, c, r) >= 4 && s.grid.some((cells) => cells.includes('tower'))) },
+  { id: 'lakeFarm', text: 'featLakeFarm', skin: 'spring', done: (s) => any(ownGrid(s), 'farm', (c, r) => near(ownGrid(s), c, r, SIDES, (x) => x === 'lake') >= 3) },
+  { id: 'tallWatch', text: 'featTallWatch', skin: 'autumn', done: (s) => any(ownGrid(s), 'tower', (c, r) => cellParts(ownGrid(s), c, r).from.length >= 6) },
+  { id: 'richManor', text: 'featRichManor', skin: 'heather', done: (s) => any(ownGrid(s), 'manor', (c, r) => near(ownGrid(s), c, r, SIDES, (x) => x === 'farm') >= 3) },
+  { id: 'quietTemple', text: 'featQuietTemple', skin: 'snow', done: (s) => any(ownGrid(s), 'temple', (c, r) => templeWorth(ownGrid(s), c, r) >= 4 && ownGrid(s).some((cells) => cells.includes('tower'))) },
   {
     id: 'busyMarket',
     text: 'featBusyMarket',
     skin: 'sand',
-    done: (s) => any(s.grid, 'market', (c, r) => new Set(AROUND.map(([dc, dr]) => s.grid[r + dr]?.[c + dc]).filter(scores)).size >= 5),
+    done: (s) => any(ownGrid(s), 'market', (c, r) => new Set(AROUND.map(([dc, dr]) => ownGrid(s)[r + dr]?.[c + dc]).filter(scores)).size >= 5),
   },
-  { id: 'harbourLight', text: 'featHarbourLight', skin: 'moss', done: (s) => any(s.grid, 'lighthouse', (c, r) => near(s.grid, c, r, AROUND, (x) => x === 'harbor') >= 2) },
+  { id: 'harbourLight', text: 'featHarbourLight', skin: 'moss', done: (s) => any(ownGrid(s), 'lighthouse', (c, r) => near(ownGrid(s), c, r, AROUND, (x) => x === 'harbor') >= 2) },
   { id: 'thirdIsle', text: 'featThirdIsle', skin: 'dusk', done: (s) => s.link >= 3 },
 ];
 

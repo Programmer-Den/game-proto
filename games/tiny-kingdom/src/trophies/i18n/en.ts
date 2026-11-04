@@ -20,7 +20,7 @@ const en = {
   bigKingdom: 'Golden age',
   bigKingdomText: 'Finish a kingdom with 350 points.',
   threeStars: 'Star of the realm',
-  threeStarsText: 'Win three stars on a campaign level.',
+  threeStarsText: 'Win three stars on a campaign level or a puzzle island.',
   campaign: 'Ruler of the isles',
   campaignText: 'Win a star on all eight campaign levels.',
 };

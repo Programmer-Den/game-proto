@@ -18,10 +18,58 @@ Reaching the round's goal refills the pouch, raises the goal and offers a choice
 island is random, typed in by its number, the island of the day, or one of eight campaign levels
 scored with stars. A finished kingdom can sail on to the next island of its chain, cut into by the
 sea, with a building found only there (lighthouse or orchard), cargo from the last island's harbours
-and a trade bonus for its own. Seven kingdom feats unlock tile skins.
+and a trade bonus for its own. Seven kingdom feats unlock tile skins. Round 3 puts the kingdom's
+wonder (a 2x2 building) in the pouch, a rival lord can share a random island, and thirty puzzle
+islands give a set pouch to score for three stars.
 
 Implemented today:
 
+- Wonders (`WONDERS`, `isWonder`, `WONDER_CELLS`, `WONDER_AROUND`, `wonderAnchor`, `wonderFor` in
+  `tiles.ts`; `WONDER_ROUND`, `WONDER_BASE`, `WONDER_COUNT`, `build` in `state.ts`): `cathedral`,
+  `granary` (the Great barn) and `gardens` (the Royal gardens) are `BUILDINGS` (before `road`), 0
+  in every pouch. `newGame` sets `state.wonder = wonderFor(island)`; `settle` adds one to the pouch
+  as round `WONDER_ROUND` (3) begins (never on a puzzle island). A wonder fills four cells: `fits`
+  wants the cell and the three right of and below it on grass, `build` writes the kind into all
+  four. Only the top left cell (`wonderAnchor`: no same kind left of or above it, so only one of a
+  kind may stand) scores: `WONDER_BASE` (4) plus `WONDER_COUNT[kind]` for each of the twelve
+  `WONDER_AROUND` cells (cathedral 3 per home; barn 2 per farm, 3 per windmill; gardens 2 per lake
+  or forest, 3 per temple). `joinedCount` counts it once. The scene draws one picture
+  (`wonder-<kind>`, `WONDER_ORIGIN`) on the anchor's prop image at the bottom row's depth and none on
+  the other three cells (`redrawCells`); the hover draws a 2x2 outline and the picture as the ghost;
+  the tile button shows the picture shrunk (`tileIcon`). Placing one rings `bell`. The pouch line
+  names the wonder until round 3 (`pouchWonder`) and the round banner announces it.
+- The rival lord (`Rival`, `rivalTurn`, `mine`, `rivalAt`, `ownGrid` in `state.ts`): mode `'rival'`
+  (the islands card's **Face a rival lord**, a random island) gives `state.rival` its own `cells`
+  mask, `pouch` (`FIRST_POUCH`, then `ROUND_POUCH` each round and the gift the player leaves in
+  `chooseGift`), `draws`, `score`, `bonus`, `castle`, `placed` and `last`. `settle` first calls
+  `rivalTurn`, so it answers every placement, clearing and merge before the board is scored: it
+  draws `RIVAL_HAND` (4) tiles from its pouch (seeded by island and its draws) and places the one,
+  on the cell, with the best own gain + season bonus + castle joins (`RIVAL_JOIN`) + `rivalSpite()`
+  (`byDifficulty(0, 0.5, 1)`) times the points it takes from the player; it never places a wonder.
+  Scoring stays per cell over the whole grid, so neighbours of either side count, but
+  `boardScore(grid, owns)` and `joinedCount(grid, owns)` (`Owns` in `castle.ts`) sum one side's
+  cells, and the castle's chain only runs along a side's own cells. The player's decree marks,
+  decree draws, merges (`canMerge` refuses a rival house; `housesCanMerge(ownGrid(s))`) and feats
+  read `ownGrid(s)`, the board with rival cells as `'sea'`. `end` pays the rival its castle bonus.
+  `Placed.rival` carries its move for a plum popup and the `rival` knock; `refreshBoardMarks`
+  frames each rival cell in plum with a `bead-rival` and names its last tile (`rivalLast`), the
+  hover marks a rival cell (`rivalOwns`), the panel's bottom line reads `rivalLine`, the game over
+  `overRivalWin`/`Lose`/`Draw`, and a win adds to `tiny-kingdom-rivals`. A greedy player (the
+  campaign's bot) beats it on 64% of islands on Easy, 41% on Normal and 40% on Hard.
+- Puzzle islands (`Puzzle`, `PUZZLES`, `puzzleStars`, `puzzleStarsFor` in `islands.ts`): thirty
+  fixed islands with a set `pouch` and `stars`. Mode `'puzzle'` with `state.puzzle` (1 to 30):
+  `newGame` fills the pouch from the puzzle only, sets no decree, puts the pouch's specials in
+  `unlocked` (for trades) and `goal` to the three-star score; `settle` begins no rounds and
+  `seasonal` adds no season bonus, so there are no gifts, omens or wonders beyond the pouch. The
+  castle still pays at the end. The islands card's **Puzzles** button (`PUZZLES_BUTTON`) opens the
+  puzzles card (`createPuzzlesCard`, `PUZZLES_CARD`: ten plaques a row with their best stars, the
+  hovered one's line, the stars won); `levelOpen` gates each on a star on the one before. The panel
+  reads "Set pouch", "Puzzle N", the goal bar runs to the next star (`puzzleGoal`), the gift row
+  shows the star scores, the decree sign `puzzleDecree`; the game over's middle button is Try again.
+  Best stars save under `tiny-kingdom-puzzles`. The stars were set by a scratch script with the
+  game's own hands: one at 85% of the greedy bot's score, two at it, three at the best of a 40-wide
+  beam search (placements only), so three stars can always be won; `puzzleStars` scales them by
+  `byDifficulty(0.9, 1, 1.05)`.
 - The coast (`seaSides` in `tiles.ts`): a cell's sides off the board or on a `'sea'` cell face the
   sea. The harbour `fits` beside a lake or the sea and scores its sea sides in its `base` (so the
   neighbour links still add up); the lighthouse only fits on the coast.
@@ -197,7 +245,8 @@ Implemented today:
   `firstManor` (a manor on the board), `firstTrade` (a market trade, `tradedIn > 0`) and `allGifts`
   (all five `SPECIALS` in `unlocked`). Silver: `roundEight` (round 8 reached), `longChain` (40
   buildings joined to the castle at once, `joinedCount`) and `tenCrowns` (10 crowns in all). Gold:
-  `bigKingdom` (a kingdom finished with 350), `threeStars` (three stars on a campaign level) and
+  `bigKingdom` (a kingdom finished with 350), `threeStars` (three stars on a campaign level or a
+  puzzle island, `loadPuzzleStars` with a finished puzzle folded in) and
   `campaign` (hidden: a star on all eight levels), the last two read from `loadStars` with a
   campaign kingdom just finished folded in, so `threeStars` also works with storage blocked
   (`campaign` can't then: levels 2 to 8 open only from saved stars). A greedy player
@@ -226,6 +275,11 @@ Implemented today:
 
 Missing or rough:
 
+- The puzzles' star scores and the rival's balance come from bots, not human play: a person who
+  merges and plans ahead beats the rival more often and can pass the three-star scores. Retune
+  `PUZZLES`, `RIVAL_HAND` and `rivalSpite` if they feel off. The rival never merges, clears woods,
+  trades or builds a wonder, and its castle bonus is small since the player usually builds by the
+  castle first.
 - No title screen or menu. The sound has not had a listen on real speakers yet; retune `src/audio.ts` by ear.
 - The campaign's star scores were set before harbours scored the coast and the temple joined the
   gifts, so they may now be a little easy; retune `LEVELS` from a greedy run if so.
@@ -251,7 +305,10 @@ Missing or rough:
   `islands-card`, `no-room`, `campaign-over`, `castle-preview`, `road-chain`, `omen-flood`,
   `omen-struck`, `trade-card` and `clear-wood`: boards set up with `state.ts` imported in the
   page (greedy moves or hand-placed tiles, then `scene.state = s; scene.redrawCells();
-  scene.refresh()`), then real hovers, taps and keys. The cover, the island shots, `windmill`,
+  scene.refresh()`), then real hovers, taps and keys. `wonder-preview`, `rival-lord` and
+  `puzzles-card` were taken with a scratch script that starts puzzle 25, a rival kingdom on island
+  1990 and the puzzles card through the scene's `start` and `openPuzzles`, plays greedy moves with
+  `state.ts` imported in the page and the scene's `tapAt`, then hovers for real. The cover, the island shots, `windmill`,
   `new-buildings`, the season, manor and islands-card shots predate the hand, the castle and the
   omen strip, so their panels look older.
 - `chain-island`, `temple-preview`, `chain-over` and `feats-card` were taken the same way: island
@@ -292,32 +349,38 @@ File map (`src/`):
   (`refreshBoardMarks`), popups and panel in `refresh`; saves at game over (`gameEnded`).
 - `scenes/layout.ts`: `VIEW`, `GRID`, `TRAY`, `DECREE`, `PANEL`, `TITLE`, `ISLAND_BUTTON`,
   `GOAL_BAR`, `GIFT_ROW`, `SEASON`, `TILE_BUTTONS` (three 60px slots), `POUCH_LINE`, `OMEN`,
-  `UNDO_BUTTON`, `GIFT_CARD`, `TRADE_CARD`, `BUTTON`, `ISLANDS_CARD`, `FEATS_BUTTON`, `FEATS_CARD`,
+  `UNDO_BUTTON`, `GIFT_CARD`, `TRADE_CARD`, `BUTTON`, `ISLANDS_CARD` (with the rival button),
+  `FEATS_BUTTON`, `FEATS_CARD`, `PUZZLES_BUTTON`, `PUZZLES_CARD`,
   `GAME_OVER` (the 700x260 card and its three buttons), `UI_DEPTH`, `FONT` and `cellCentre`.
 - `game/tiles.ts`: `BUILDINGS` (farm, house, tower, windmill, market, harbor, lumber, temple,
   lighthouse, orchard, road), `SPECIALS` (the five gift buildings), `NATIVES` (the chain islands'
   own buildings), the `Building`, `Special`, `Native`, `Structure` (a building or `'manor'`),
   `Terrain` (grass, lake, forest, castle, sea) and `Cell` types, `seaSides`, `nextIsland`,
-  `nativeFor`, `chainMap`, `INFO` (the `TextKey`s of
+  `nativeFor`, `chainMap`, the wonders (`WONDERS`, `Wonder`, `isWonder`, `WONDER_CELLS`,
+  `WONDER_AROUND`, `wonderAnchor`, `wonderFor`), `INFO` (the `TextKey`s of
   each one's name, rule and count, such as "3 farms"), `isBuilding`, `isBuilt`, `scores`, `isHome`, `MAP_SIZE`, `ISLANDS`,
   `SIDES`, `AROUND`, `islandMap` (lakes, woods, then the castle, redrawn until `fairIsland`), `seeded` (mulberry32),
   `randomIsland` and `startingGrid`.
-- `game/state.ts`: `GameState`, `Snapshot`, `Share`, `Preview`, `Placed`, `FIRST_POUCH`,
+- `game/state.ts`: `GameState`, `Rival`, `Snapshot`, `Share`, `Preview`, `Placed`, `FIRST_POUCH`,
+  `WONDER_ROUND`, `WONDER_BASE`, `mine`, `rivalAt`, `ownGrid`,
   `ROUND_POUCH`, `HAND`, `TRADE_GIVE`, `NATIVE_FIRST`, `NATIVE_ROUND`, `TRADE_BONUS`, `CARGO_MAX`,
   `TEMPLE_MAX`, `templeWorth`, `harbourCount`, `nextKingdom`, `goalFor`, `season`, `newGame(best, crowns, island?,
   kingdom?)`, `inHand`, `cellParts`, `cellScore`, `boardScore`, `canPlace(s, col, row, kind?)`,
   `previewPlacement`, `select`, `place`, `canClear`, `previewClear`, `clear`,
   `canTrade`, `tradeGives`, `tradeTakes`, `trade`, `canClearAny`, `canMerge`, `mergeable`, `previewMerge`, `merge`, `anyPlace`,
-  `finish`, `canUndo`, `undo`, `chooseGift`, `shownKinds` and `handCount`; `settle` is the shared
+  `finish`, `canUndo`, `undo`, `chooseGift`, `shownKinds` and `handCount`; `rivalTurn` is the rival
+  lord's move, `build` puts a tile (or a wonder's four cells) down; `settle` is the shared
   tail of `place`, `clear` and `merge`, `drawHand` draws the next hand, `keepHandPlayable` redraws
   a stuck one after a merge or gift, `playable` and `pouchPlayable` tell whether a tile has a use
   (room, or a wood to clear), `housesCanMerge` (exported for the undo button's label) checks for a merge whatever the phase and
   `end` finishes the kingdom. No Phaser; `goalFor` reads `byDifficulty` from `shared/settings.ts`.
 - `game/omens.ts`: `OMEN_FROM`, `OmenKind`, `Omen`, `Struck`, `omenFor` and `strike`.
-- `game/castle.ts`: `castleAt`, `joinedCells` and `joinedCount`.
+- `game/castle.ts`: `Owns`, `castleAt`, `joinedCells` and `joinedCount` (both take an optional `Owns`
+  to walk one side's cells).
 - `game/seasons.ts`: `SEASONS`, `Season`, `SEASON_INFO` (name, rule and short rule as `TextKey`s,
   doubled buildings, colour), `seasonFor` and `seasonBonus`.
-- `game/islands.ts`: `Mode`, `Kingdom`, `Level`, `LEVELS`, `starScores` (reads `byDifficulty`), `starsFor`, `levelOpen`, `today`,
+- `game/islands.ts`: `Mode`, `Kingdom`, `Level`, `LEVELS`, `starScores` (reads `byDifficulty`), `starsFor`, `levelOpen`,
+  `Puzzle`, `PUZZLES`, `puzzleStars`, `puzzleStarsFor`, `today`,
   `dailyIsland` and `parseIsland`.
 - `game/decree.ts`: `DECREE_BONUS`, `Decree`, `DecreeMarks`, `At`, `regions`, `namedPlaces`,
   `decreeRegion`, `decreeMarks` and `decreeFor`.
@@ -325,7 +388,8 @@ File map (`src/`):
   `giftsFor` and `newSpecial`.
 - `game/save.ts`: `loadBest`, `saveBest`, `loadCrowns`, `saveCrowns`, `loadDailyBest`,
   `saveDailyBest`, `loadStars`, `saveStars`, `loadChain`, `saveChain` (`BestChain`), `loadFeats`,
-  `saveFeats`, `loadSkin` and `saveSkin`.
+  `saveFeats`, `loadSkin`, `saveSkin`, `loadPuzzleStars`, `savePuzzleStars`, `loadRivalWins` and
+  `saveRivalWins`.
 - `game/feats.ts`: `SKINS`, `Skin`, `Feat`, `FEATS`, `newFeats` and `skinOpen`.
 - `art/wood.ts`: the toolkit: `RES` and `setArtRes` (texture pixels per view pixel, from
   `sharpRes`), `bake` (a canvas `RES` times its view size, painted in art units, added with
@@ -334,13 +398,15 @@ File map (`src/`):
   `circle`, `grain`, `tile` (a painted block), `walnut`, `shadowBlob`, `ball`, the palette `T`, the
   seeded `rnd` / `reseed`, and the painters `peg`, `house`, `tower`, `windmill`, `stripes` and
   `crown`, ported from the mockup's `woodtoy.js`, plus `manor`, `market`, `harbor`, `lumber`,
-  `temple`, `lighthouse` and `orchard` in the same style.
+  `temple`, `lighthouse` and `orchard` in the same style, and the wonders `cathedral`, `granary` and
+  `gardens`, painted around the middle of their 2x2 block.
 - `art/textures.ts`: `bakeTextures` (every texture, listed at the top of the file), `PROP` and
   `PROP_ORIGIN` (where a prop's cell centre sits), `tileKey(cell, col, row)` (grass picks one of
   `GRASS_VARIANTS` flower variants by position; lakes, farms and roads have tiles of their own;
   buildings, woods and the castle stand on `tile-plain`) and `propKey(cell)` (`prop-castle` among
   them; `castle` in `wood.ts` paints it), `tile-sea` (open water, no block), and the skins:
-  `SKIN_GREEN`, `skinTile` and `useSkin` (see Kingdom feats above). The table, the decree sign, the tray, the panel and the title plaque are the one
+  `SKIN_GREEN`, `skinTile` and `useSkin` (see Kingdom feats above), the wonders' pictures
+  (`WONDER_PROP`, `WONDER_ORIGIN`, `wonderKey`), `PLUM` and `bead-rival`. The table, the decree sign, the tray, the panel and the title plaque are the one
   `bg` texture.
 - `ui/Button.ts`: `makeButton`, the beech plaque button used by the game-over overlay.
 - `trophies/index.ts`: the trophy list (`trophySet`), loaded by the hub too, so it imports nothing
@@ -402,6 +468,8 @@ State model (`GameState` in `src/game/state.ts`):
   building or null), `chainScore` (the chain's islands before this one), `cargo` (tiles shipped
   here) and `trade` (paid at the end, 0 before). None changes on a placement, so none is in
   `Snapshot`.
+- `puzzle` (0 outside the puzzles), `wonder` (the kingdom's wonder) and `rival` (`Rival | null`,
+  in `Snapshot` too, so an undo takes the rival's answer back with the tile; `snapshot` copies it).
 - `island`, `mode`, `level` (0 outside the campaign), `day` ('' unless daily), `round`, `goal`,
   `placed`, `phase` (`'playing'`, `'gift'` or `'over'`) and `best`. The season is not stored:
   `season(s)` derives it from `round`.
@@ -422,14 +490,16 @@ State model (`GameState` in `src/game/state.ts`):
 Persistence: `tiny-kingdom-best` (the best final score, written at game over),
 `tiny-kingdom-crowns` (crowns won, written whenever a decree pays), `tiny-kingdom-daily`
 (`{ day, best }`, the island of the day's best, replaced when a new day's game ends) and
-`tiny-kingdom-stars` (a JSON array of the best stars per campaign level, 0 to 3) and
+`tiny-kingdom-stars` (a JSON array of the best stars per campaign level, 0 to 3),
+`tiny-kingdom-puzzles` (the same for the puzzle islands), `tiny-kingdom-rivals` (rival lords
+beaten) and
 `tiny-kingdom-trophies` (the trophies earned, written by `award`), `tiny-kingdom-chain`
 (`{ links, total }`, the longest chain finished, written at game over), `tiny-kingdom-feats` (a
 JSON array of the feat ids won) and `tiny-kingdom-skin` (the skin picked, '' for classic). Board and round
 are never saved. The hub's settings are read from the shared `hub-settings` key.
 
 Randomness and timing: `randomIsland` makes the game's only `Math.random` call, once per random
-kingdom; the island, its hands, its decrees, its omens and its gifts all follow from that number
+kingdom; the island, its hands, its wonder, the rival's hands, its decrees, its omens and its gifts all follow from that number
 (`seeded`). The only
 date read is `today()` (`new Date()`) when the islands card opens or the daily island starts. The
 game calls no `Date.now` or `performance.now`. The art uses its own seeded `rnd`, so textures are
@@ -472,7 +542,9 @@ Data tables:
   16, 36, 60, 88, ... on Easy, 20, 45, 75, 110, ... on Normal and 24, 54, 90, 132, ... on Hard.
   The campaign's star scores follow with `starScores` (`byDifficulty(1.01, 1, 0.94)`, measured from
   the greedy bot's mean final score over 300 islands), since stars save the same on every
-  difficulty. Pouches, scoring, decrees, gifts and seasons do not change.
+  difficulty. The puzzles' stars follow `byDifficulty(0.9, 1, 1.05)` (`puzzleStars`), and the rival
+  lord's spite `byDifficulty(0, 0.5, 1)` (`rivalSpite`). Pouches, scoring, decrees, gifts and
+  seasons do not change.
 - `settings.reduceMotion`: the score popups and the decree's "+8" only fade in place (no rise or
   fall), and the crown count does not bump. The round banner only fades. Nothing blinks.
 - Keep Normal exactly as designed: the playthrough runs on Normal and expects goals 20 and 45.
@@ -516,7 +588,9 @@ Effects (`sfx`), and where they play:
 | `goal` | the placement reached the goal (`placed.newRound`) |
 | `gift` | a gift taken (`takeGift`) |
 | `tick` | at the end of a kingdom (`endSounds`, from `gameEnded`), one per building the castle joined, at most ten |
-| `star` | at the end of a campaign kingdom, one rising chime per star won |
+| `star` | at the end of a campaign or puzzle kingdom, one rising chime per star won |
+| `bell` | a wonder placed, 140ms after its tok |
+| `rival` | the rival lord's tile, 260ms after the player's, with its plum popup |
 
 A feat won plays the shared `ui('coin')`; the Feats button, its Close and a skin picked play
 `ui('click')`, a locked skin `ui('refuse')`. Sail on starts a kingdom, so it clicks like New
@@ -541,7 +615,8 @@ valid island number. Hovering makes no sound. The game has no `?watch` mode.
   mouse over cells to check `preview`, and clicks cell centres, scaling view pixels by the canvas
   bounding box. It reads `localStorage['tiny-kingdom-crowns']` to check the crown is saved, and
   `localStorage['tiny-kingdom-trophies']` to check the decree earned `firstCrown` and nothing else.
-- The test mirrors these, so change them together: the `GameState` shape, `GRID`, `VIEW`,
+- The test mirrors these, so change them together: the `GameState` shape (it expects `puzzle` 0
+  and `rival` null), `GRID`, `VIEW`,
   `islandMap` (as `ISLAND` and `MAP`, the castle included), `FIRST_POUCH`, `ROUND_POUCH`, `HAND`,
   the goals 20 and 45 (`GOALS`), `DECREE_BONUS`, round 1's decree (`FIRST_DECREE`: kind `shore`,
   place `Eastmere`, need 3; round 2's must differ in kind or place, compared by those ids, never by
@@ -606,6 +681,15 @@ valid island number. Hovering makes no sound. The game has no `?watch` mode.
 - **Add or change a trophy**: its row in `trophies/index.ts`, its name and `<id>Text` in every
   `trophies/i18n/` file and its condition in `EARNED` (`trophies/check.ts`); a trophy the first
   round earns changes the playthrough's trophy check.
+- **Add a wonder**: add it to `WONDERS` and `BUILDINGS` (before `road`), `INFO` and its texts, its
+  count in `WONDER_COUNT`, a painter in `wood.ts` and its line in `bakeTextures`, its pitch in
+  `PLACE_PITCH`, and the test's `Building` type and pouches. `wonderFor` picks among `WONDERS`, so
+  islands may draw a different wonder after one is added.
+- **Add or retune a puzzle island**: a row in `PUZZLES` (island, pouch, stars). Set its stars from
+  a greedy run and a beam search with the game's own hands, as the others were (see Puzzle
+  islands above); the card fits thirty plaques in three rows.
+- **Retune the rival lord**: `RIVAL_HAND`, `RIVAL_JOIN`, `rivalSpite` and what `settle` and
+  `chooseGift` add to its pouch; check a greedy player's win rate over a hundred islands.
 - **Add a chain island building**: add it to `BUILDINGS` (before `road`) and `NATIVES`, then as
   under Add a building; `nativeFor` cycles through `NATIVES`.
 - **Add a feat or a skin**: a row in `FEATS` (its text in the `i18n/` files as `feat<Id>`) and, for
@@ -660,5 +744,10 @@ valid island number. Hovering makes no sound. The game has no `?watch` mode.
   castle (and their names) and a first island (link 1) lies exactly as before.
 - `previewPlacement` returns null when the kind is not in the hand (or can't go on that cell), so
   the hover outline shows but no ghost.
+- A wonder's four cells all hold its kind, and only `wonderAnchor` scores: never place two of a kind
+  side by side (the pouch holds one).
+- With a rival lord, anything the player owns reads `mine(s)` or `ownGrid(s)`, never `s.grid` alone
+  (scores, the castle's chain, decrees, merges, feats); a cell's `rival.cells` flag is only kept on
+  built cells (`settle` clears it where an omen struck).
 - In the `'gift'` phase `round` and `goal` already show the next round; the card's title uses
   `round - giftsDue` for the round whose goal was reached.

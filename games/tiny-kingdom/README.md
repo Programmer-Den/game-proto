@@ -18,7 +18,10 @@ island's number, try the island of the day, or work through the eight-island cam
 three stars each. Run out of tiles or room and the kingdom is finished; then sail on to the next
 island of a chain, cut into by the sea, with a building found only there, the cargo your harbors
 ship and a trade bonus for its own. Kingdom feats, such as a farm with three lakes beside it, unlock
-new paints for the tiles.
+new paints for the tiles. Round 3 brings each kingdom its wonder, a 2x2 cathedral, great barn or
+royal gardens that scores big for what stands around it. A rival lord can share an island with you,
+placing a tile of its own after each of yours, and thirty puzzle islands give a set pouch to score
+for up to three stars.
 
 ![A kingdom in round 3: the decree's lake outlined, a house previewed with its neighbour links](cover.png)
 
@@ -35,9 +38,10 @@ new paints for the tiles.
 | Tap a market | Open the market trade: give two tiles of one kind for one gift building, once a round |
 | Tap a gift | When the round's goal is reached: take one of the two gifts |
 | Undo last tile | Take back the last placement, clearing or merge; once per round |
-| Island button (next to the round) | Open the islands card: campaign levels, the island of the day, a random island, or type a number (keypad or keyboard digits, Enter to play, Esc to close) |
+| Island button (next to the round) | Open the islands card: campaign levels, the island of the day, a random island, a rival lord, or type a number (keypad or keyboard digits, Enter to play, Esc to close) |
+| Puzzles (on the islands card) | Open the puzzle islands and play one that is open |
 | Feats (on the islands card) | Open the kingdom feats and pick a tile skin won by one |
-| Sail on | After the game ends: settle the next island of this kingdom's chain |
+| Sail on | After the game ends: settle the next island of this kingdom's chain (Try again on a puzzle island or against a rival lord) |
 | New kingdom | After the game ends: start again on a new random island |
 
 1. **Buildings go on grass.** Lakes and forests stay as they are, but buildings score from them.
@@ -119,7 +123,7 @@ new paints for the tiles.
 19. **Trophies**: ten to earn across your kingdoms, listed behind the Trophies button on the start
     and pause screens. A first decree, manor, market trade and all five gift buildings are bronze;
     round 8, 40 buildings joined to the castle and 10 crowns in all are silver; a kingdom of 350
-    points, three stars on a campaign level and a star on every level are gold.
+    points, three stars on a campaign level or a puzzle island and a star on every level are gold.
 20. **Island chains**: when a kingdom is finished, **Sail on** settles the next island of its
     chain (the same chain for every player who starts from the same island). From the second
     island on, the sea cuts into the island's shape (two corners and a bay), so it has more coast
@@ -135,6 +139,26 @@ new paints for the tiles.
     different buildings around it, a lighthouse with 2 harbors around it, and sailing on to the
     third island of a chain. A board at the top of the tray names a feat when it is won; the
     **Feats** button on the islands card lists them and picks the skin, which is kept.
+22. **Wonders**: each kingdom draws one wonder from its island's number (the pouch line names it
+    until then), and it joins the pouch as **round 3** begins: a 2x2 building placed with the
+    hovered cell as its top left, on four grass cells. It is worth 4 and scores big for the twelve
+    cells around its block: the **cathedral** 3 per house or manor, the **great barn** 2 per farm
+    and 3 per windmill, the **royal gardens** 2 per lake or forest and 3 per temple. It joins the
+    castle's chain like any building (and counts once for its bonus).
+23. **A rival lord**: **Face a rival lord** on the islands card starts a random island shared with
+    one. After each of your tiles, clearings and merges it places one tile of its own, picked from
+    four drawn from its own pouch (it gets the same round tiles as you, the gift you leave and the
+    season's double points). Its buildings carry a plum frame and bead, and its last tile is marked
+    with its name. Every building scores from all its neighbours, the rival's too, but each side only
+    counts its own; your decrees, merges, feats and the castle's chain only count your own buildings,
+    and the rival's own chain to the castle pays it at the end. The higher final score wins, and the
+    rival lords beaten are saved. On Normal it weighs the points it takes from you at half its own,
+    on Easy not at all and on Hard as much as its own.
+24. **Puzzle islands**: thirty fixed islands, each with a set pouch (from eight farms and houses to
+    seventeen tiles with gift buildings and a wonder) and three star scores. No rounds, gifts,
+    decrees, omens or seasons: place the whole pouch, the castle pays its bonus and the final score
+    earns up to three stars, shown on the puzzles card. A star opens the next puzzle, and the best
+    stars are saved. The goal bar runs to the next star.
 
 ![Hovering a cell beside the castle: the house would score 1 from the forest and join the castle's chain](docs/screenshots/playthrough-1-preview.webp)
 
@@ -152,6 +176,9 @@ new paints for the tiles.
 | Harbor (a gift) | Only on a lake's shore or the coast: 2 per lake, 1 per side facing the sea and 1 per house or manor beside it |
 | Lumber camp (a gift) | Only beside a forest: 2 per forest beside it; and each house beside it scores 1 more. Spend one to clear a wood beside a camp |
 | Temple (a gift) | 1 per cell between it and the nearest tower (diagonal steps count as one), up to 4; 4 with no tower |
+| Cathedral (a wonder, 2x2) | 4, plus 3 per house or manor among the twelve cells around its block |
+| Great barn (a wonder, 2x2) | 4, plus 2 per farm and 3 per windmill around its block |
+| Royal gardens (a wonder, 2x2) | 4, plus 2 per lake or forest and 3 per temple around its block |
 | Lighthouse (chain islands only) | Only on the coast: 1 per side facing the sea and 2 per harbor around it |
 | Orchard (chain islands only) | 1 per farm, forest or windmill around it |
 | Road | Nothing; it runs the castle's chain on |
@@ -218,11 +245,19 @@ new paints for the tiles.
 
 ![A campaign level finished with one star](docs/screenshots/campaign-over.webp)
 
+### Wonders, the rival lord and puzzle islands
+
+![A wonder previewed: the royal gardens' 2x2 block, with each lake and wood around it linking +2](docs/screenshots/wonder-preview.webp)
+
+![A rival lord shares the island: its buildings framed in plum, its last tile named, and both scores at the bottom of the panel](docs/screenshots/rival-lord.webp)
+
+![The puzzles card: thirty puzzle islands with their best stars, the next one's star scores under them](docs/screenshots/puzzles-card.webp)
+
 ![A trophy earned: its toast at the top of the page](docs/screenshots/trophy-toast.webp)
 
 ![The Trophies list on the pause screen](docs/screenshots/trophies.webp)
 
-The difficulty, set on the hub page's Settings, changes the round goals, 20% lower on Easy and 20% higher on Hard, and moves the campaign's star scores with what that does to a final score: 1% higher on Easy and 6% lower on Hard.
+The difficulty, set on the hub page's Settings, changes the round goals, 20% lower on Easy and 20% higher on Hard, and moves the campaign's star scores with what that does to a final score: 1% higher on Easy and 6% lower on Hard. The puzzle islands' star scores are 10% lower on Easy and 5% higher on Hard, and the rival lord ignores the points it could take from you on Easy and weighs them as much as its own on Hard (half on Normal).
 
 ## Running locally
 
@@ -261,11 +296,13 @@ All paths are inside `games/tiny-kingdom/`.
   buildings and the random island generator (with the castle), `state.ts` the scoring, previews,
   the hand, rounds, placing, clearing woods, trades, merging and gifts taken, `decree.ts` the royal
   decrees and the lake and wood names, `omens.ts` the omens, `castle.ts` the castle's chain,
-  `gifts.ts` the gifts, `seasons.ts` the seasons, `islands.ts` the campaign, the island of the day
-  and typed island numbers, `feats.ts` the kingdom feats and tile skins, and `save.ts` the best
-  score, the crowns, the daily best, the stars, the best chain, the feats and the skin.
+  `gifts.ts` the gifts, `seasons.ts` the seasons, `islands.ts` the campaign, the puzzle islands,
+  the island of the day and typed island numbers, `feats.ts` the kingdom feats and tile skins, and
+  `save.ts` the best score, the crowns, the daily best, the stars, the puzzle stars, the rival lords
+  beaten, the best chain, the feats and the skin. The rival lord's turn and the wonders' scoring are
+  in `state.ts`.
 - `src/scenes/`: `BootScene` paints the textures, `GameScene` draws the board, the decree banner,
-  the side panel, the trade card and the islands card and wires taps to the rules, `layout.ts`
+  the side panel, the trade card, the islands card and the puzzles card and wires taps to the rules, `layout.ts`
   says where things are drawn.
 - `src/art/`: the wooden toy set, painted on canvases in code at startup: `wood.ts` the toolkit and
   painters, `textures.ts` every texture.

@@ -20,7 +20,7 @@ const de: Translation<typeof en> = {
   bigKingdom: 'Goldenes Zeitalter',
   bigKingdomText: 'Beende ein Königreich mit 350 Punkten.',
   threeStars: 'Stern des Reiches',
-  threeStarsText: 'Gewinne drei Sterne auf einer Kampagnenstufe.',
+  threeStarsText: 'Gewinne drei Sterne auf einer Kampagnenstufe oder einer Rätselinsel.',
   campaign: 'Herrscher der Inseln',
   campaignText: 'Gewinne einen Stern auf allen acht Kampagnenstufen.',
 };
