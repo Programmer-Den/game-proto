@@ -227,6 +227,12 @@ Masterwork.
 
 ![The daily forge's shift is over: today's coins, the best and the days in a row](docs/screenshots/daily-forge.webp)
 
+![Three tourney knights at the counter: a gemmed Golden Claymore held over one would ride 1st, with the tourney, apprentice and ore cart panes beside the board](docs/screenshots/tourney-knights.webp)
+
+![The ore cart is here: starmetal bought, so the forge lays Steel Swords, and silver still for sale](docs/screenshots/ore-cart.webp)
+
+![The apprentice merges two Rusty Daggers by themselves](docs/screenshots/apprentice-merge.webp)
+
 ![Dragging a dagger onto its twin](docs/screenshots/playthrough-1-dragging.webp)
 
 ### Swords
