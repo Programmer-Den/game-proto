@@ -62,13 +62,22 @@ export const MENU_CARDS = { x: 126, dx: 236, y: 300, w: 224, h: 230 };
 
 /**
  * Fits the HUD to a view of `w` x `h` game pixels: the right-hand pieces follow the right edge, the
- * toast stays centred and the panel sits on the bottom edge. Called once, before any HUD is drawn.
+ * toast stays centred and the panel sits on the bottom edge. `corner` is how far down (in game
+ * pixels) the shared corner buttons reach in the top right: where they would cover the deeds card's
+ * title and count (a small screen), the deeds and status cards move down below them. Called once,
+ * before any HUD is drawn.
  */
 let fitted = false;
-export function fitLayout(w: number, h: number) {
+export function fitLayout(w: number, h: number, corner = 0) {
   if (fitted) return;
   fitted = true;
   const dx = w - 960;
+  // The deeds card's title row starts 6 px into the card; above that only its border lies under the
+  // buttons, as at 960x540 on a desktop (half a pixel spare for rounding). Below, the title row moves
+  // to 2 px under them.
+  const dy = corner > DEED_CARD.y + 6.5 ? Math.ceil(corner + 2 - (DEED_CARD.y + 6)) : 0;
+  DEED_CARD.y += dy;
+  STATUS_CARD.y += dy;
   W = w;
   H = h;
   PANEL_Y = h - 110;

@@ -56,13 +56,13 @@ The hub's **Settings** button opens the settings every game shares. They are sav
   | Apothecary | customers wait 50% longer | customers wait 30% less |
   | Deadline | zombies have 25% less health | zombies have 30% more health |
   | Palisade | foes have 25% less health | foes have 30% more health |
-  | Tiny Kingdom | round goals 20% lower, campaign stars 1% higher, puzzle stars 10% lower, the rival lord never builds to spite you | round goals 20% higher, campaign stars 6% lower, puzzle stars 5% higher, the rival lord weighs your losses like its own gains |
+  | Tiny Kingdom | round goals 20% lower, campaign stars 1% higher, puzzle stars 10% lower, the rival lord never builds to spite you | round goals 20% higher, campaign stars 6% lower, puzzle stars 5% higher (the third star unchanged), the rival lord weighs your losses like its own gains |
   | Hotfoot | 5 hearts | 2 hearts |
   | Anvilheart | adventurers wait 50% longer | adventurers wait 30% less |
   | Broadside | enemy ships and forts have 25% less health | enemy ships and forts have 30% more health |
   | Lane Brawl | red's champions, minions and towers deal 20% less damage | red's champions, minions and towers deal 25% more damage |
   | Scrapyard Titans | your commander has 130 health and rivals get 1 gold less a round | your commander has 80 health and rivals get 1 gold more a round |
-  | TinctureTinker | 5 more moves per order | 3 fewer moves per order |
+  | TinctureTinker | 5 more moves per order | 3 fewer moves per order (a knight guest keeps all ten) |
   | Catacomb | foes have 25% less health | foes have 30% more health |
   | Golem Garden | pests have 25% less health | pests have 30% more health |
   | Beehive Baron | foraging trips 25% shorter | foraging trips 30% longer |
@@ -208,7 +208,7 @@ pressed on the page.
 - `games/<name>/`: one game, with its own `index.html`, `src/`, `e2e/` playthrough test, `docs/`
   screenshots and `README.md`. Games don't import from each other.
 - `shared/`: the settings every game shares (`settings.ts`), the hub's Settings panel
-  (`settingsPanel.ts`), `audio.ts`, the sound effects and music made in code, `corner.ts`, the corner buttons, `gamepad.ts` and `padCursor.ts`, the controller and its cursor (see Controllers), `setupGame.ts`, which each game calls to apply the frame cap, the FPS readout, reduced motion, full screen and the sound button
+  (`settingsPanel.ts`), `audio.ts`, the sound effects and music made in code, `corner.ts`, the corner buttons, `gamepad.ts` and `padCursor.ts`, the controller and its cursor (see Controllers), `setupGame.ts`, which each game calls to apply the frame cap, the FPS readout, reduced motion, full screen and the M key
   and to add the loading, start and pause screens (`startScreen.ts`) with the game's How to play (`howToPlay.ts`), `watch.ts`, the Watch AI panel and its `?watch` flag,
   `trophies.ts`, the trophies, their toast and the hub's trophy shelf, `playCount.ts`, the play counters (see Play counts), `progress.ts`, each game's saved progress and the recently played games, `gameDates.ts`, the Last updated line and the New and Updated badges, `playTime.ts` and `favourites.ts`, the time played and the starred games (see above), `saveFile.ts` and `saveCodes.ts`, the progress files (see Progress files), `progressCode.ts` and `scanner.ts`, the progress codes and their camera scanner (see Progress codes), `install.ts`, the installable apps (see Install as an app), `i18n.ts` with the shared texts in `i18n/`, the translations and number and date formats (see Language), and `scaling.ts`, which keeps a game sharp from a phone to a 4K screen (`grep -l setupScaling games/*/src/main.ts` lists the games that use it).
 - `e2e/hub.spec.ts`: checks that the hub lists every game, that each card opens it, and that the

@@ -133,7 +133,9 @@ terrain tiles. The plan phase lasts 30 seconds; when it runs out the fight start
   matches one of them comes back as a ghost in round 4-7, in place of the monsters: beat it for the
   round's usual drops, or lose 6 health.
 - **Rank ladder.** A saved rank that only goes up: a finish in the top four earns rank points (50,
-  35, 25 or 15), and the rank sets how hard the rivals play. Rust (0 points) is the game as
+  35, 25 or 15; in a smaller campaign lobby your place counts as in a lobby of eight, so 2nd of 4
+  is 4th and last is 8th, which also goes for Podium bound, Patch Rosa and your best place), and
+  the rank sets how hard the rivals play. Rust (0 points) is the game as
   designed; Iron (100) rivals reroll for copies sooner, Steel (250) also get 1 more gold a round,
   Chrome (450) also find pricier robots in their shops, and Titan (700) get 2 more gold a round and
   reroll from round 2-1. The menu shows the rank and the next one, the end screen the points won.

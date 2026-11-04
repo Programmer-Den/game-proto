@@ -153,7 +153,7 @@ function step(state: GameState, dt: number) {
   shoot(state, s, dt);
   guardsAct(state, s, dt);
   houndsAct(state, s, dt);
-  engineAct(state, dt);
+  engineAct(state, s, dt);
   moveMissiles(state, s, dt);
   bossMoves(state, dt);
   moveEnemies(state, s, dt);
@@ -338,7 +338,7 @@ function houndsAct(state: GameState, s: Stats, dt: number) {
  * first foe of its aim, through every foe on its line; the catapult lobs a stone at the back ranks
  * (or the thickest crowd) on the road, where the foe will be when it lands.
  */
-function engineAct(state: GameState, dt: number) {
+function engineAct(state: GameState, s: Stats, dt: number) {
   const engine = state.engine;
   if (!engine) return;
   engine.cd = Math.max(0, engine.cd - dt);
@@ -367,7 +367,7 @@ function engineAct(state: GameState, dt: number) {
     if (foes.length === 0) return;
     const crowd = (e: Enemy) => foes.filter((o) => Math.hypot(o.x - e.x, o.y - e.y) < es.radius).length;
     const foe = engine.aim === 'back' ? foes[foes.length - 1] : foes.reduce((best, e) => (crowd(e) > crowd(best) ? e : best), foes[0]);
-    const lead = foe.attacking ? 0 : (ENEMIES[foe.kind].speed * (foe.slowMs > 0 ? 1 - foe.slow : 1) * STONE_FLIGHT_MS) / 1000;
+    const lead = foe.attacking ? 0 : (ENEMIES[foe.kind].speed * paceOf(state, s, foe) * STONE_FLIGHT_MS) / 1000;
     const from = { x: ENGINE_SPOT.x, y: ENGINE_SPOT.y - 24 };
     const to = { x: Math.round(Math.max(BARRICADE_FRONT + 40, foe.x - lead)), y: Math.round(foe.y) };
     const speed = Math.hypot(to.x - from.x, to.y - from.y) / (STONE_FLIGHT_MS / 1000);
@@ -671,9 +671,8 @@ function moveEnemies(state: GameState, s: Stats, dt: number) {
     // Caltrops slow and prick every foe walking on them; flyers pass over.
     const pricked = !type.flying && onCaltrops(state, e);
     if (pricked) e.hp -= (s.damage * s.caltropDps * dt) / 1000;
-    // An Enraged elite below half health walks and hits faster.
-    const rage = e.trait === 'enraged' && e.hp < e.maxHp / 2 ? ENRAGE_PACE : 1;
-    const pace = (e.slowMs > 0 ? 1 - e.slow : 1) * (pricked ? 1 - s.caltropSlow : 1) * roadSpeed * rage;
+    const rage = rageOf(e);
+    const pace = paceOf(state, s, e);
     if (e.slowMs > 0) {
       e.slowMs = Math.max(0, e.slowMs - dt);
       if (e.slowMs === 0) e.slow = 0;
@@ -785,6 +784,18 @@ function landRock(state: GameState, to: { x: number; y: number }, slot: number |
   const guard = slot === undefined ? null : state.guards[slot];
   if (guard) guard.stunMs = STUN_MS;
   else state.barricade.hp = Math.max(0, state.barricade.hp - ROCK_DAMAGE);
+}
+
+/** An Enraged elite below half health walks and hits faster. */
+const rageOf = (e: Enemy) => (e.trait === 'enraged' && e.hp < e.maxHp / 2 ? ENRAGE_PACE : 1);
+
+/**
+ * How much faster (or slower) than its kind's pace a foe walks and hacks right now: chill,
+ * caltrops (flyers pass over), a Golden Road and Rich Plunder, and an Enraged elite's rage.
+ */
+function paceOf(state: GameState, s: Stats, e: Enemy) {
+  const pricked = !ENEMIES[e.kind].flying && onCaltrops(state, e);
+  return (e.slowMs > 0 ? 1 - e.slow : 1) * (pricked ? 1 - s.caltropSlow : 1) * (roadEffects(state.road).speed * omenEffects(state.omen).speed) * rageOf(e);
 }
 
 /** Whether a foe stands on a patch of caltrops. */

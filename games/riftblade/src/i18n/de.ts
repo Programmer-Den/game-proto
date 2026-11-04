@@ -1043,7 +1043,7 @@ const de: Translation<typeof en> = {
   dailyButton: 'Tageslauf',
   dailyButtonDone: 'Tageslauf  ·  gespielt',
   dailyTitle: 'TAGESLAUF',
-  dailySubtitle: '{day}: drei Welten, heute für alle derselbe Held, derselbe Mutator und dieselben Welten. Ein Versuch am Tag, auf Hitze 0, ohne die Waffenkammer.',
+  dailySubtitle: '{day}: drei Welten, heute für alle derselbe Mutator und dieselben Welten, dazu ein Held aus denen, die du offen hast. Ein Versuch am Tag, auf Hitze 0, ohne die Waffenkammer.',
   dailyHero: 'Held des Tages',
   dailyNotYet: 'Heute noch nicht versucht',
   dailyUnderway: 'Der Versuch von heute läuft',
@@ -1255,9 +1255,10 @@ const de: Translation<typeof en> = {
   rushPop: 'Boss {n}/{of}: {planet}',
   rushTag: 'Boss-Ansturm {n}/{of}  ·  {planet}',
   rushWon: '{hero} hat jeden Boss besiegt: {n} von {of}.',
-  rushFell: '{hero} ist {boss} nach {n} von {of} Bossen erlegen.',
+  rushFell: '{boss} hat den Ansturm beendet: {hero} ist nach {n} von {of} Bossen gefallen.',
   rushEnd: 'Boss-Ansturm: {n}/{of} Bosse in {time}',
   rushNewBest: 'Neuer Bestwert im Ansturm!',
+  dailyWon: '{boss} ist zerschlagen. {hero} hat alle drei Welten des Tages befreit.',
 };
 
 /** Texts that are the same in German. */

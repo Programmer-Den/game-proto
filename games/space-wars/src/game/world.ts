@@ -803,9 +803,12 @@ export class World {
     return this.buildings.filter((b) => b.faction === faction && b.type === 'hub' && (!done || b.done));
   }
 
-  /** Whether the player sees a unit now: its own, or a rival's in sight and not hidden (cloaked or in a nebula). Watching, every ship shows. */
+  /**
+   * Whether the player sees a unit now: its own or its ally's, or a rival's in sight and not hidden
+   * (cloaked or in a nebula; `hidden` counts the ally's spotting too). Watching, every ship shows.
+   */
   seesUnit(u: Unit) {
-    return u.faction === PLAYER || this.watch || (this.fog.sees(u) && !this.hidden(u, PLAYER));
+    return u.faction === PLAYER || this.allyOfPlayer(u.faction) || this.watch || (this.fog.sees(u) && !this.hidden(u, PLAYER));
   }
 
   /** Whether a point is inside a nebula. */
@@ -1079,12 +1082,12 @@ export class World {
     return null;
   }
 
-  /** The faction a bribed rival turns on: the living faction nearest its hub, other than the player and itself. */
+  /** The faction a bribed rival turns on: the living faction nearest its hub, other than the player, itself and its allies (its teammates, or every rival in `survive`). */
   bribeTarget(faction: number): Side | null {
     const hub = this.hubOf(faction);
     if (!hub || this.pact) return null;
     return this.sides
-      .filter((s) => s.alive && s.index !== faction && s.index !== PLAYER && this.hubOf(s.index))
+      .filter((s) => s.alive && s.index !== faction && s.index !== PLAYER && !this.atPeace(faction, s.index) && this.hubOf(s.index))
       .reduce<Side | null>((best, s) => (!best || dist(this.hubOf(s.index)!, hub) < dist(this.hubOf(best.index)!, hub) ? s : best), null);
   }
 
@@ -1424,12 +1427,17 @@ export class World {
 
   /**
    * Whether `e` is hidden from `faction`: a cloaked unit that has not fired lately, or a ship in a
-   * nebula that has not fired lately and that none of `faction`'s ships, buildings or sensors is close to.
+   * nebula that has not fired lately and that none of `faction`'s ships, buildings or sensors is close
+   * to (in a teams skirmish, nor its teammates').
    */
   hidden(e: Unit | Building, faction: number) {
     if (e.faction === faction || e.kind !== 'unit' || e.revealMs > 0) return false;
     if (this.abilityOf(e)?.kind === 'cloak') return true;
-    return e.nebula && !this.spotted.get(e.id)?.has(faction);
+    if (!e.nebula) return false;
+    const by = this.spotted.get(e.id);
+    if (!by) return true;
+    const teams = this.teams;
+    return !by.has(faction) && !(teams && [...by].some((f) => teams[f] === teams[faction]));
   }
 
   /**
@@ -1759,7 +1767,7 @@ export class World {
     }
   }
 
-  /** Stamps the player's sight into the fog: its ships, its buildings and claimed sensors. */
+  /** Stamps the player's sight into the fog: its ships, its buildings and claimed sensors (and its ally's). */
   private stampFog() {
     const fog = this.fog;
     fog.clear();
@@ -1774,7 +1782,7 @@ export class World {
       if (!mine(b.faction)) continue;
       fog.stamp(b.x, b.y, b.type === 'hub' ? HUB_VISION : buildingStats(this.sides[b.faction], b.type).radius + BUILDING_VISION);
     }
-    for (const d of this.derelicts) if (d.perk === 'sensors' && d.owner === PLAYER) fog.stamp(d.x, d.y, SENSOR_RANGE);
+    for (const d of this.derelicts) if (d.perk === 'sensors' && d.owner >= 0 && mine(d.owner)) fog.stamp(d.x, d.y, SENSOR_RANGE);
   }
 
   /** The share of a shot that reaches a player ship while the Warden's Bulwark holds: half. */
@@ -1821,7 +1829,7 @@ export class World {
         const spot = k === 0 ? { x: 0, y: 0 } : { x: Math.cos(k * 2.4) * JUMP_SPREAD, y: Math.sin(k * 2.4) * JUMP_SPREAD };
         u.x = Math.min(ARENA.x + ARENA.w - 8, Math.max(ARENA.x + 8, to.x + spot.x));
         u.y = Math.min(ARENA.y + ARENA.h - 8, Math.max(ARENA.y + 8, to.y + spot.y));
-        this.offRocks(u, u.x, u.y, 0);
+        this.offRocks(u, -1, -1, 0);
         this.routes.delete(u);
         u.order = null;
       });

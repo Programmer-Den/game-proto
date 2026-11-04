@@ -705,7 +705,7 @@ export class GameScene extends Phaser.Scene {
       if (won) this.scenarioBest = winScenario(this.scenarioBest, s.scenario, s.elapsedMs);
       this.outcome = won ? tr('scenarioWon', { name, time: this.clockText(s.elapsedMs) })
         : tr('scenarioLost', { name, why: tr(s.scenarioLost ?? 'hubLost') });
-    }
+    } else if (s.mode === 'skirmish') this.outcome = tr(won ? 'skirmishWon' : 'skirmishLost');
   }
 
   /** A time in minutes and seconds, like the top bar's clock. */
@@ -1378,7 +1378,14 @@ export class GameScene extends Phaser.Scene {
     const d = this.fogData.data;
     const [r, g, b] = FOG_RGB;
     const alpha = this.fogAlpha;
-    for (let i = 0; i < alpha.length; i++) alpha[i] = fog.visible[i] ? 0 : fog.explored[i] ? FOG_EXPLORED : FOG_UNEXPLORED;
+    // Cells past a smaller battlefield copy its rim, so the blur holds the edge there as on the largest.
+    for (let row = 0; row < FOG_ROWS; row++) {
+      const from = Math.min(row, fog.rows - 1) * FOG_COLS;
+      for (let col = 0; col < FOG_COLS; col++) {
+        const j = from + Math.min(col, fog.cols - 1);
+        alpha[row * FOG_COLS + col] = fog.visible[j] ? 0 : fog.explored[j] ? FOG_EXPLORED : FOG_UNEXPLORED;
+      }
+    }
     blur(alpha, this.fogTmp, FOG_COLS, FOG_ROWS, FOG_BLUR);
     for (let i = 0; i < alpha.length; i++) {
       d[i * 4] = r;

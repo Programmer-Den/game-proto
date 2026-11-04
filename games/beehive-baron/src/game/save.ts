@@ -8,14 +8,14 @@ import { MEADOWS } from './meadows';
 import { WINTER_EAT_MS, YEAR_MS } from './seasons';
 import { freshProgress, type Progress } from './state';
 import { FAIR_CLASSES } from './fair';
-import { BEDS, BLOOMS, RARE_CAP, RARE_KINDS, type Bloom } from './garden';
+import { BEDS, BLOOMS, RARE_CAP, RARE_KINDS, rarePairs, type Bloom } from './garden';
 import { WARES, type Commission, type Ware } from './workshop';
 import type { RoyalAsk } from './warrant';
 import { QUEEN_IDS, type Queen } from './swarm';
 import { UPGRADES, UPGRADE_IDS } from './upgrades';
 
 // The comb, the coins, the jars, the wax, the bees, the upgrades, the meadows unlocked, where the
-// bees forage, the season and years, the time to the bees' next winter meal, the casks, the hives and the queen, the fair entries and fairs held,
+// bees forage, the season and years, the time to the bees' next winter meal, the casks, the hives and the queen, the fair entries, its classes and fairs held,
 // the tired meadows, the traits bred in, the comb honey cut, this season's buyer's book, the garden and its rare honey, the
 // workshop's goods and commissions, the royal warrant and the crown's ask, the bees lent to the orchard and when the hive was last seen are saved; bees out foraging come home on load, and
 // wasps, the market, village orders, contract offers and a swarm start afresh.
@@ -28,6 +28,7 @@ export function loadProgress(): Progress {
     if (!raw) return fresh;
     const saved = JSON.parse(raw) as Partial<Progress>;
     const num = (v: unknown, fallback: number) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.floor(v) : fallback);
+    const garden = [...Array(BEDS).keys()].map((i) => (BLOOMS.includes(saved.garden?.[i] as Bloom) ? (saved.garden?.[i] as Bloom) : null));
     return {
       coins: num(saved.coins, fresh.coins),
       cells: Array.isArray(saved.cells) ? saved.cells : fresh.cells,
@@ -60,6 +61,8 @@ export function loadProgress(): Progress {
       fairs: num(saved.fairs, saved.baron === true ? 1 : 0),
       golds: num(saved.golds, saved.baron === true ? 1 : 0),
       baron: saved.baron === true,
+      // Saves from before the fair's classes were held take the garden's rare bloom as it stands.
+      fairRare: typeof saved.fairRare === 'boolean' ? saved.fairRare : rarePairs(garden).length > 0,
       tired: Object.fromEntries(KINDS.map((k) => [k, num(saved.tired?.[k], 0)])) as Progress['tired'],
       wilted: Object.fromEntries(KINDS.map((k) => [k, saved.wilted?.[k] === true])) as Progress['wilted'],
       breeds: Object.fromEntries(TRAITS.map((k) => [k, Math.min(BREED_MAX, num(saved.breeds?.[k], 0))])) as Progress['breeds'],
@@ -70,7 +73,7 @@ export function loadProgress(): Progress {
           ? [{ city: Math.min(CITIES.length - 1, num(a.city, 0)), grade: a.grade as Grade, kind: a.kind as Kind, count: num(a.count, 1), price: num(a.price, 0), done: a.done === true }]
           : [],
       ).slice(0, GRADES.length),
-      garden: [...Array(BEDS).keys()].map((i) => (BLOOMS.includes(saved.garden?.[i] as Bloom) ? (saved.garden?.[i] as Bloom) : null)),
+      garden,
       rare: Object.fromEntries(RARE_KINDS.map((r) => [r, Math.min(RARE_CAP, num(saved.rare?.[r], 0))])) as Progress['rare'],
       wares: Object.fromEntries(WARES.map((w) => [w, num(saved.wares?.[w], 0)])) as Progress['wares'],
       commissions: (Array.isArray(saved.commissions) ? saved.commissions : []).flatMap((c: Partial<Commission>) =>

@@ -6,14 +6,16 @@ import { trophies } from './index';
 
 /** Whether the player has won the match in the state. */
 const won = (s: GameState) => s.winner === PLAYER;
+/** Whether the player reached an age in play, not by a scenario starting them in it. */
+const reached = (s: GameState, age: number) => s.players[PLAYER].age >= age && (s.mission?.startAge ?? 1) < age;
 
 /** Whether each trophy's condition holds in the state. */
 const EARNED: Record<string, (state: GameState) => boolean> = {
-  ageTwo: (s) => s.players[PLAYER].age >= 2,
+  ageTwo: (s) => reached(s, 2),
   relic: (s) => s.camps.some((c) => c.relic && c.holder === PLAYER),
   repel: (s) => s.players[PLAYER].deeds.raid,
   veteran: (s) => [...s.units.values()].some((u) => u.owner === PLAYER && u.rank >= RANK_KILLS.length),
-  ageThree: (s) => s.players[PLAYER].age >= 3,
+  ageThree: (s) => reached(s, 3),
   champion: (s) => [...s.units.values()].some((u) => u.owner === PLAYER && UNITS[u.type].role === 'champion'),
   victory: won,
   threeWay: (s) => won(s) && threeWay(s),

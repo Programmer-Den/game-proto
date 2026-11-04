@@ -2,7 +2,9 @@
  * A daily challenge: the same seeded run for every player on the same day, one try a day, with
  * today's score and the best ever kept on this device. A game keeps its record under
  * `<game>-daily` (so it goes with the game's progress), seeds its run with `dailyRand(game)` and
- * calls `startDaily` when the run begins and `finishDaily` with the score when it ends.
+ * calls `startDaily` when the run begins and `finishDaily` with the score when it ends. A finish
+ * with no day closes the try that was started, under the day it was started on, so a run that
+ * crosses midnight still counts for the day it began.
  *
  * Hotfoot, Augury, Ninefold and Tiny Kingdom keep their own older dailies.
  */
@@ -57,15 +59,26 @@ function yesterday(day: string) {
   return today(new Date(y, m - 1, d - 1));
 }
 
-/** The game's daily record, rolled over to `day`: a new day clears `played` and `score`. */
-export function loadDaily(game: string, day = today()): DailyRecord {
-  let saved: Partial<DailyRecord> = {};
+/** The game's daily record as saved, not rolled over. */
+function stored(game: string): Partial<DailyRecord> {
   try {
     const value: unknown = JSON.parse(localStorage.getItem(key(game)) ?? '{}');
-    if (value && typeof value === 'object' && !Array.isArray(value)) saved = value as Partial<DailyRecord>;
+    if (value && typeof value === 'object' && !Array.isArray(value)) return value as Partial<DailyRecord>;
   } catch {
     // A broken or blocked record starts over.
   }
+  return {};
+}
+
+/** The day of a try that was started and not yet finished, if there is one. */
+function startedDay(game: string) {
+  const s = stored(game);
+  return s.played === true && s.score === null && typeof s.day === 'string' ? s.day : undefined;
+}
+
+/** The game's daily record, rolled over to `day`: a new day clears `played` and `score`. */
+export function loadDaily(game: string, day = today()): DailyRecord {
+  const saved = stored(game);
   const best = typeof saved.best === 'number' && Number.isFinite(saved.best) ? saved.best : 0;
   const last = typeof saved.last === 'string' ? saved.last : null;
   const alive = last === day || last === yesterday(day);
@@ -96,8 +109,11 @@ export function startDaily(game: string, day = today()): DailyRecord {
   return record;
 }
 
-/** Ends today's try with `score`, raising the best and the streak. Only the first finish counts. */
-export function finishDaily(game: string, score: number, day = today()): DailyRecord {
+/**
+ * Ends the started try with `score`, raising the best and the streak. Only the first finish counts.
+ * With no `day` it closes the try under the day it was started on (today if none is open).
+ */
+export function finishDaily(game: string, score: number, day = startedDay(game) ?? today()): DailyRecord {
   const record = loadDaily(game, day);
   if (record.score !== null) return record;
   const streak = record.last === yesterday(day) ? record.streak + 1 : record.last === day ? record.streak : 1;

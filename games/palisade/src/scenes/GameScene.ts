@@ -175,6 +175,8 @@ export class GameScene extends Phaser.Scene {
   private engineSprite!: Phaser.GameObjects.Image;
   private engineLabel!: Phaser.GameObjects.Text;
   private lastEngineCd = 0;
+  /** The texture the engine was last fitted to, so the first engine of either kind is fitted too. */
+  private engineKey = '';
   private houndSprites = new Map<number, Phaser.GameObjects.Image>();
   private fortLabel!: Phaser.GameObjects.Text;
   private won!: Phaser.GameObjects.Container;
@@ -418,7 +420,7 @@ export class GameScene extends Phaser.Scene {
           t(pass ? (s.heat > 0 ? 'passWonHeat' : 'passWon') : s.heat > 0 ? 'wonHeat' : 'won', vars),
           t(next <= MAX_HEAT ? HEAT_UNLOCKED[next - 1] : 'wonAll'),
           ...(pass ? [] : [t('passOpen')]),
-          t('endlessOpen', { n: s.endlessBest[s.frontier] }),
+          s.endlessBest[s.frontier] > 0 ? t('endlessOpen', { n: s.endlessBest[s.frontier] }) : t('endlessOpenNew'),
         ].join('\n\n'),
       );
       this.wonNext.setVisible(next <= MAX_HEAT);
@@ -1393,9 +1395,10 @@ export class GameScene extends Phaser.Scene {
     eg.clear();
     drawPanel(eg, E.x - E.w / 2, E.y - E.h / 2, E.w, E.h, { c: 5, fill: shop ? SLATE.light : 0x1e222c, alpha: 0.95, edge: shop ? GOLD.light : GOLD.dark, lw: shop ? 2 : 1.5 });
     if (shop) eg.fillStyle(GOLD.light, 0.1 + 0.15 * this.pulse(900)).fillPoints(chamferPts(E.x - E.w / 2, E.y - E.h / 2, E.w, E.h, 5), true);
-    // The endless siege's chip, with this map's best endless wave.
+    // The endless siege's chip, with this map's best endless wave once there is one.
     const endless = s.endless && !held(s);
-    this.endlessText.setVisible(endless).setText(t('endlessChip', { n: s.endlessBest[s.frontier] }));
+    const endlessBest = s.endlessBest[s.frontier];
+    this.endlessText.setVisible(endless).setText(endlessBest > 0 ? t('endlessChip', { n: endlessBest }) : t('endlessChipNew'));
     if (endless) drawPanel(g, ENDLESS_CHIP.x - ENDLESS_CHIP.w / 2, ENDLESS_CHIP.y - ENDLESS_CHIP.h / 2, ENDLESS_CHIP.w, ENDLESS_CHIP.h, { c: 5, fill: 0x3a2414, alpha: 0.95, edge: 0xff9b3a, lw: 1.5 });
     // The accepted omen's chip, over the ranger, until its wave is cleared.
     const omen = s.omen?.accepted && !held(s) ? s.omen.id : null;
@@ -1472,7 +1475,8 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     const key = engineTexture(engine.kind);
-    if (this.engineSprite.texture.key !== key) {
+    if (this.engineKey !== key) {
+      this.engineKey = key;
       const fig = FIGURES[key]!;
       fit(this.engineSprite.setTexture(key)).setOrigin(fig.originX, fig.originY);
     }
@@ -1856,12 +1860,18 @@ export class GameScene extends Phaser.Scene {
     const best = bestOn(s, s.frontier);
     const fallen = t(s.heat > 0 ? 'fallenHeat' : 'fallen', { wave: s.wave, heat: s.heat, kills: s.kills, streak: s.streak.best, best, level: s.level });
     // After the endless siege, this map's best endless wave too.
-    this.gameOverText.setText(s.endless ? `${fallen}\n${t('endlessFallen', { best: s.endlessBest[s.frontier] })}` : fallen);
-    // A new hero's class: the mage once a hero has retired.
+    const endlessBest = s.endlessBest[s.frontier];
+    this.gameOverText.setText(s.endless ? `${fallen}\n${endlessBest > 0 ? t('endlessFallen', { best: endlessBest }) : t('endlessFallenNew')}` : fallen);
+    // A new hero's class: the mage once a hero has retired, with how to open the warden under it until then.
     if (!canClass(s.legacy, this.nextHero)) this.nextHero = 'ranger';
     const mage = canClass(s.legacy, 'mage');
+    const wardenShut = mage && !canClass(s.legacy, 'warden');
+    const pick = t('heroPick', { name: t(HEROES[this.nextHero].name) });
     this.heroPick.setAlpha(mage ? 1 : 0.55);
-    this.heroPickText.setText(mage ? t('heroPick', { name: t(HEROES[this.nextHero].name) }) : t('heroPickLocked')).setFontSize(mage ? 11 : 9);
+    this.heroPickText
+      .setText(!mage ? t('heroPickLocked') : wardenShut ? `${pick}\n${t('wardenLocked')}` : pick)
+      .setFontSize(mage && !wardenShut ? 11 : 9)
+      .setAlign('center');
     // Today's daily siege: tappable until today's try is used.
     const record = loadDaily(DAILY_GAME);
     this.dailyButton.setAlpha(record.played ? 0.5 : 1);

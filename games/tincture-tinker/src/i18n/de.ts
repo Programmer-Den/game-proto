@@ -194,7 +194,8 @@ const de: Translation<typeof en> = {
   dailyTitle: 'Tagesauftrag',
   dailyLine: 'Das Brett von heute, aus {town}',
   dailySold: 'Tagesauftrag verkauft!',
-  dailyRecord: { one: 'Bester Tag: {best} Sterne, {n} Tag in Folge', other: 'Bester Tag: {best} Sterne, {n} Tage in Folge' },
+  dailyBest: { one: 'Bester Tag: {n} Stern', other: 'Bester Tag: {n} Sterne' },
+  dailyStreak: { one: '{n} Tag in Folge', other: '{n} Tage in Folge' },
   dailyPlayed: { one: 'Heute: {n} Stern. Morgen wieder', other: 'Heute: {n} Sterne. Morgen wieder' },
   dailyUsed: 'Der Versuch von heute ist verbraucht. Morgen wieder',
   dailyNew: { one: 'Ein Versuch heute; {n} Tag in Folge', other: 'Ein Versuch heute; {n} Tage in Folge' },
@@ -241,7 +242,7 @@ const de: Translation<typeof en> = {
   weeklyNext: 'Nächster Stern ab {n} Punkten',
   weeklyAllStars: 'Alle Sterne verdient',
   playAgain: 'Noch einmal',
-  captionWeekly: 'Das Brett dieser Woche, für alle gleich: Jeder Treffer zählt, jede Stufe einer Kettenreaktion einmal mehr. Keine Werkzeuge',
+  captionWeekly: 'Das Brett dieser Woche, für alle gleich: Die Zutaten auf dem Etikett zählen, jede Stufe einer Kettenreaktion einmal mehr. Keine Werkzeuge',
 };
 
 export default de;

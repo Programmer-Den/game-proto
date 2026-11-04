@@ -38,7 +38,7 @@ Implemented today:
   cracked ice crossed on the hookvine, and the Gloamwing's hall behind a key door).
   The Tidewrack Coast (`coast`, sand and sea, east of the fen through a gap two `rock` props close
   until the quest reaches `coast`): Nell the fisher (`fisher`) by her hut and campfire, an inlet
-  that cuts the map in two until the windmill is turned (its `drain` rect becomes path, flag
+  that cuts the map in two until the windmill is turned (pines, `COAST_PINES` in `maps.ts`, close its west end) (its `drain` rect becomes path, flag
   `drained`, the map's `millFlag`), islets reached by hookvine posts with the `horn` chest, and the
   Sea Cave's mouth. The Sea Cave (`grotto`, laid out like the belfry): entry, hub, a wind room whose
   two pinwheels (`millFlag` `gusts`) lift the `grotto-bars`, a tide room crossed on the hookvine
@@ -88,8 +88,10 @@ Implemented today:
   fish for (`MapDef.fish`; `fishable`): act or tap facing such water with no foe near
   (`startFishing`). A bobber waits `FISH_WAIT_MS`, then bites for `BITE_MS` (`updateFishing`); act
   or tap then (`reel`) to catch the map's fish into the creel (`state.fish`, at most `FISH_MAX`
-  each); too early or late it gets away. Walking, being hurt or another tool ends it
-  (`endFishing`). Campfires (`campfire` props in the village, fen, peaks and coast) open
+  each); too early or late it gets away. Walking, rolling or being hurt ends it (`endFishing`); the
+  hookvine, bellseeds and the horn wait until the line is in. Water on a map with no `fish`
+  (`fishless`) answers act or a tap with the `fishNone` toast (`noFish`), except on the
+  Brinewyrm's pool while it is about (`brinePool`), so a swing or tap at it there still reaches it. Campfires (`campfire` props in the village, fen, peaks and coast) open
   `openCook`, a `Hud.showShop` card of `MEALS` (`state.ts`): each takes two of one fish, `cook`
   eats it and heals fully. One meal at a time (`state.meal`) until the next fall (`endMeal`):
   `stew` one more heart (`maxHp` + 2), `skewer` a faster roll (`SKEWER`), `chowder` a longer
@@ -98,7 +100,8 @@ Implemented today:
   `state.bestiary` and toasts when a page fills (`PAGE_AT` of a kind) and when a family's every page
   is full (`familyDone`). A full family (crawlers: slug, beetle, crab; moths: moth, lantern moth,
   shade; wild things: thornling, frog, gull) drops one more coin from each of its foes. It is the
-  journal's second page (`showBestiary`, turned with the page button, ← → or Tab).
+  journal's second page (`showBestiary`, turned with the page button, ← → or Tab; `onKey` stops
+  Tab's default so the browser's focus stays off the corner buttons).
 - Belfry puzzles: three bell props (`note` 0 to 2) rung with the sword in `BELL_ORDER`; a wrong
   bell starts over, the right tune sets `bells`, which lifts the bars to the flooded room.
 - Shrine puzzles: a key door, a pushable block onto a pressure plate that lifts iron bars (a block
@@ -332,7 +335,11 @@ fields a save from an older version lacks (`items.seeds`, `items.moonlantern`, `
 `items.rod`, `seeds`, `trials`, `coins`, `upgrades`, `requests`, `cycle`, `fish`, `meal`,
 `bestiary`); an old save at `end` meets chapter three's start at the elder, one at `final` meets
 chapter four's, and starts over when the saved `map` or `spawn` is not a map (`isMapId`)
-or a position is not a number. Cutting the gate before bringing the blade back is fine: the
+or a position is not a number. `migrateCoast` keeps saves from before the coast's pines playable (they could walk
+round the inlet's west end): a knight or spawn on `COAST_PINES` goes back to their spawn (or in
+from the fen, `COAST_FROM_FEN`), and a save without `drained` whose knight or spawn is in the
+`grotto` or on the coast above row 8 gets `drained` and `mill-coast-24-9`, since it already
+crossed the inlet. Cutting the gate before bringing the blade back is fine: the
 elder's `quest-thorns` then moves the quest straight on to `shrine`.
 
 ### Hub settings

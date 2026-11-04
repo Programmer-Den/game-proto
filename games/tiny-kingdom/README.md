@@ -89,7 +89,7 @@ for up to three stars.
 11. **Omens**: from round 3, the strip above the undo button (and the round banner) warns of what
     the next round brings, and the board marks the cell with a coral box. A **flood**: a named
     lake rises over a marked shore cell (grass or a farm) when the next round begins, whatever
-    stands there. A **storm**: the marked tower, which has no house around it, falls when the
+    stands there (a wonder built over it is lost whole). A **storm**: the marked tower, which has no house around it, falls when the
     next round begins, unless a house stands by it by then. A round to prepare.
 12. **Clear a wood**: pick the lumber camp and tap a wood beside a lumber camp already standing.
     The wood becomes grass and the camp tile is spent: the camp and the houses beside the wood
@@ -150,7 +150,7 @@ for up to three stars.
     four drawn from its own pouch (it gets the same round tiles as you, the gift you leave and the
     season's double points). Its buildings carry a plum frame and bead, and its last tile is marked
     with its name. Every building scores from all its neighbours, the rival's too, but each side only
-    counts its own; your decrees, merges, feats and the castle's chain only count your own buildings,
+    counts its own; your decrees, merges, feats, trades, clearings and the castle's chain only count your own buildings,
     and the rival's own chain to the castle pays it at the end. The higher final score wins, and the
     rival lords beaten are saved. On Normal it weighs the points it takes from you at half its own,
     on Easy not at all and on Hard as much as its own.
@@ -257,7 +257,7 @@ for up to three stars.
 
 ![The Trophies list on the pause screen](docs/screenshots/trophies.webp)
 
-The difficulty, set on the hub page's Settings, changes the round goals, 20% lower on Easy and 20% higher on Hard, and moves the campaign's star scores with what that does to a final score: 1% higher on Easy and 6% lower on Hard. The puzzle islands' star scores are 10% lower on Easy and 5% higher on Hard, and the rival lord ignores the points it could take from you on Easy and weighs them as much as its own on Hard (half on Normal).
+The difficulty, set on the hub page's Settings, changes the round goals, 20% lower on Easy and 20% higher on Hard, and moves the campaign's star scores with what that does to a final score: 1% higher on Easy and 6% lower on Hard. The puzzle islands' star scores are 10% lower on Easy and 5% higher on Hard (but never above the three-star score, so three stars stay reachable), and the rival lord ignores the points it could take from you on Easy and weighs them as much as its own on Hard (half on Normal).
 
 ## Running locally
 

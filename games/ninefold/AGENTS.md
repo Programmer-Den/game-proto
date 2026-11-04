@@ -33,7 +33,7 @@ Implemented today:
   unique with the extra rule. Killer boards with 10 givens take about 10 ms. Three more rules:
   `Puzzle.arrows` (Arrow: `makeArrows` draws up to eight circles, each with an arrow of 2 to 4 cells
   stepping beside or diagonal, whose digits add up to the circle's; `allowed` keeps an arrow's sum
-  within reach of its circle), `Puzzle.dots` (Kropki: `makeDots` puts a dot between every two
+  within reach of its circle, or of the board's size while the circle is open), `Puzzle.dots` (Kropki: `makeDots` puts a dot between every two
   side-by-side cells one apart (white) or one double the other (black; 1-2 gets black), and two
   cells without a dot are neither, checked by `dotFits`) and `Puzzle.sandwich` (Sandwich:
   `makeSandwich` sums each row's and column's digits between its 1 and its highest digit;
@@ -47,7 +47,11 @@ Implemented today:
   diagonals, so boards with an extra rule often end there) and `hintAt`; the panel's relics row names
   it for `HINT_NOTE_MS`. `explain` looks for a hidden single, then a naked single, and when there is
   neither applies one elimination (naked pair, pointing pair, X-wing) to the candidates and looks
-  again; the step's `technique` is the hardest it used.
+  again. For a picked cell (`only`) it places the singles it finds elsewhere on the way, as a
+  player would, until one lands on that cell. Each deduction records what it removed and what it
+  relied on, and the step keeps in `used` only those its single needed (walking back, so an
+  elimination that set up a needed one counts too); the step's `technique` is the hardest of them
+  and the single.
 - The technique school (`lessons.ts`): `LESSONS` are four 6x6 boards (hidden single, naked pair,
   pointing pair, X-wing) stopped where that technique is the way on, found once by `explain` from
   seeded boards and kept as digit strings, with the `marks` that show the technique and the `target`
@@ -64,7 +68,7 @@ Implemented today:
 - Entering: a right digit is filled in for good and clears that digit from its peers' notes; a
   wrong one stays (shown in `wrong`/`wrongBg`), counts a mistake, and in Delve costs a heart unless
   a Ward catches the floor's first. Erase clears a wrong digit, or an empty cell's notes. Notes mode
-  toggles a bit per digit in `notes`. Hints fill the picked cell, or the first open one.
+  toggles a bit per digit in `notes`. Hints: see above.
 - Finished rows, columns and boxes (`doneUnits`) flash once and stay tinted; picking a cell tints
   its peers and every cell with the same right digit.
 - The daily streak: `solved` counts `Progress.dailyStreak` up when the daily solved is the day after
@@ -198,7 +202,7 @@ How it runs:
   only runs the board's clock (`timeMs`) while playing. Nothing else is timed; the flashes age by
   `dt`.
 - Events: the rules push `GameEvent`s (`board`, `placed`, `wrong`, `clock`, `phoenix`, `heal`, `gift`, `hint`, `unit`, `solved`, `ascended`,
-  `unlocked`, `relic`, `over`) onto `state.events`; `drain` plays their sounds, adds flashes, saves
+  `unlocked`, `relic`, `over`, `learned`) onto `state.events`; `drain` plays their sounds, adds flashes, saves
   the progress and switches the screen to `board` when a board loads. It also picks the music part.
 - Redrawing: `currentKey` names what is on screen (screen, phase, style, board size, relic offer,
   mode, floor, the menu's ascension pick, and today's date on the menu); when it changes `buildLayer` destroys `parts` and rebuilds the screen or card. The board
@@ -219,8 +223,8 @@ How it runs:
   panel's kicker names the mode, the ascension (`ascentTag`) and the twists, and shrinks to stay
   clear of the Menu button.
 
-State model (`GameState`): `phase` (`menu`, `playing`, `solved`, `relic`, `over`), `mode`
-(`classic`, `daily`, `weekly`, `delve`), `level`, `puzzle` (`size`, `boxW`, `boxH`, `solution`, `givens`, and `even`, `cages` or `thermos`), `week` and `weekDay` (the gauntlet board in play), `score` and `weekTotal` (its result), `ascent` and `ascended`,
+State model (`GameState`): `phase` (`menu`, `lesson`, `playing`, `solved`, `relic`, `over`), `mode`
+(`classic`, `daily`, `weekly`, `delve`, `lesson`), `level`, `puzzle` (`size`, `boxW`, `boxH`, `diagonal`, `solution`, `givens`, and `even`, `cages`, `thermos`, `arrows`, `dots` or `sandwich`), `week` and `weekDay` (the gauntlet board in play), `score` and `weekTotal` (its result), `ascent` and `ascended`,
 `values` (0 empty; may hold a wrong digit), `notes` (bit per digit), `selected` (-1 none),
 `notesMode`, `mistakes`, `hintsLeft`, `hintsUsed`, `timeMs`, `hearts`, `maxHearts`, `floor`,
 `plan` and `upcoming` (Delve `FloorPlan`s, null otherwise), `dailyDate` (the `dailySeed` a daily board was dealt for, 0 otherwise), `relics`, `relicOffer`, `warded`, `streak`, `keyHealed`, `lesson`, `hintNote`, `hintAt`, `undo` (the cells' digits and notes before each note, wrong digit or erase; `undoMove` restores the newest whose cell isn't right, `canUndo`), `doneUnits` (indexes into `units`), `newStyles`, `progress` and
@@ -230,8 +234,9 @@ Persistence: two `localStorage` keys of its own (and `ninefold-trophies`, kept b
 in `save.ts`: the `BOARD_FIELDS` of `GameState` plus `LATER_FIELDS` (`week`, `weekDay`, `ascent`, `ascended`, which a save from before them may lack and then load as their defaults), written by `update` whenever the scene is dirty and
 every `SAVE_EVERY_MS` of board time, and removed once the phase is neither `playing` nor `relic`, or the board is a lesson);
 `create` restores it, straight onto the board or the relic offer. `ninefold-progress` holds `Progress` (`solved`, `flawless`,
-`noHint`, `hard`, `fast`, `bestFloor`, `bosses`, `daily`, `dailyStreak`, `bestStreak`, `climbed`, `week`, `weekScores` (seven numbers, -1 not played), `bestWeek`, `dailyDays`, `lessons`, `style`, `unlocked`; a save from before `dailyDays` gets its `daily` stamped). It is written when a board is
-solved or a gauntlet board starts (that uses up the day's try), a style unlocks, a Delve run ends or a style is picked. `loadProgress` keeps only known
+`noHint`, `hard`, `fast`, `bestFloor`, `bosses`, `daily`, `dailyStreak`, `bestStreak`, `climbed`, `week`, `weekScores` (seven numbers, -1 not played), `bestWeek`, `dailyDays`, `lessons`, `style`, `unlocked`; a save from before `dailyDays` gets its `daily` stamped, and one
+from before ascensions with `bestFloor` at `ASCEND_FLOOR` or deeper gets `climbed` 1). It is written when a board is
+solved or a gauntlet board starts (that uses up the day's try), a style unlocks, a lesson is learned or an ascension opens, a Delve run ends or a style is picked. `loadProgress` keeps only known
 styles and re-checks `UNLOCKS`.
 
 Randomness and timing: `makePuzzle` and the relic offer use `Math.random`, except the daily puzzle,

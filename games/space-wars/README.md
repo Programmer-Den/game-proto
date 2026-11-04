@@ -226,7 +226,7 @@ saved for next time, and a tap on one steps it on:
 
 | Option | Choices |
 | --- | --- |
-| Teams | Free for all, or teams: you and the top-left start against the two starts on the right, with the centre on its own. Your ally fights beside you (its ships and buildings can't be attacked, and it leaves the relay beacon to you), shares its sight, and you win once every hub but yours and your ally's has fallen. The rivals never sign the last-stand pact in a teams skirmish |
+| Teams | Free for all, or teams: you and the top-left start against the two starts on the right, with the centre on its own. Your ally fights beside you (its ships and buildings can't be attacked, and it leaves the relay beacon to you), shares its sight (you see its ships wherever they are, and enemies in a nebula that it spots), and you win once every hub but yours and your ally's has fallen. The rivals never sign the last-stand pact in a teams skirmish |
 | Map size | Small (1360 by 850), standard (1600 by 1000) or large (1920 by 1200); the start points and the number of loose crystal fields scale with it |
 | Starting crystal | 60, 120 or 300 for every faction |
 | Wormholes | On or off (below) |
@@ -377,7 +377,8 @@ and a hint names it. Open the rivals panel (tap the rivals, or T) and accept for
 and 40 crystal of tribute, or decline. Under a truce neither side's ships, turrets or mines fire on
 the other, and the rival raids someone else; ordering an attack on it breaks the truce. The panel
 also shows each rival's grudge, and for 60 crystal of **tribute** turns that grudge onto the living
-faction nearest it, held there for 60 seconds whatever hits it, its ships already on their way to
+faction nearest it (never one of its own allies, so there is no tribute in Hold out, where the
+rivals are all allies), held there for 60 seconds whatever hits it, its ships already on their way to
 you turning on that faction's hub instead.
 
 ![The rivals panel: the Ferrox Hive offering a truce with Accept and Decline, a truce with the Iron Dominion under way, and tribute buttons for the Veil Syndicate and Nomad Freight](docs/screenshots/truce.webp)

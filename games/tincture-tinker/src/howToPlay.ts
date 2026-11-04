@@ -44,7 +44,7 @@ const en: HowToPlay = {
     'Each town grows a rare ingredient found nowhere else; its order and its guest ask for it.',
     "A town's first star brings a guest with a rule: the witch turns a tile to a toad each move, the knight gives ten moves, the miser pays only for cascades.",
     'The daily order is the same for everyone each day, with one try; endless orders open once every seal is earned.',
-    "The weekly order keeps one board all week: play it as often as you like, every match scores and each cascade step counts once more.",
+    "The weekly order keeps one board all week: play it as often as you like; the label's ingredients score, each cascade step once more.",
   ],
 };
 
@@ -100,7 +100,7 @@ const de: HowToPlay = {
     'Jede Stadt hat eine seltene Zutat, die es nur dort gibt; ihr Auftrag und ihr Gast verlangen sie.',
     'Der erste Stern einer Stadt bringt einen Gast mit eigener Regel: Die Hexe macht jeden Zug ein Feld zur Kröte, der Ritter gibt zehn Züge, der Geizhals zahlt nur für Kettenreaktionen.',
     'Der Tagesauftrag ist jeden Tag für alle gleich, mit einem Versuch; endlose Aufträge öffnen, wenn jedes Siegel verdient ist.',
-    'Der Wochenauftrag behält eine Woche lang dasselbe Brett: Spiel ihn, so oft du willst; jeder Treffer zählt, jede Stufe einer Kettenreaktion einmal mehr.',
+    'Der Wochenauftrag behält eine Woche lang dasselbe Brett: Spiel ihn, so oft du willst; die Zutaten auf dem Etikett zählen, jede Stufe einer Kettenreaktion einmal mehr.',
   ],
 };
 

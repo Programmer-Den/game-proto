@@ -78,6 +78,7 @@ export function newRun(atlas: GameState, run: Run): GameState {
     wonders: [],
     landing: null,
     guide: 0,
+    stores: 0,
     trade: null,
     traded: [],
     run,

@@ -411,6 +411,9 @@ hub's card:
 | Iron will | Gold | Winning a match on Hard |
 | Built to last (hidden) | Gold | Winning a match with a Monument |
 
+A campaign scenario that starts you in Age III gives neither age trophy: they count only for an age
+reached in play.
+
 ![The Trophies list on the pause screen](docs/screenshots/trophy-list.webp)
 
 ## Difficulty

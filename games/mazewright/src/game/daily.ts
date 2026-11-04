@@ -21,7 +21,8 @@ export function dailyPlan(rand: () => number): DailyPlan {
   const blocked = new Uint8Array(COLS * ROWS);
   if (base.path) blocked.fill(1);
   for (const c of [...(base.path ?? []), base.goal, ...base.gates]) blocked[cellIndex(c)] = 0;
-  for (const c of [...base.rocks, ...(base.ponds ?? []), ...(base.glass ?? []), ...(base.sprinklers ?? [])]) blocked[cellIndex(c)] = 1;
+  // Rocks, ponds, glass and sprinklers are 2, so a path garden's lawn (1) leaves them out.
+  for (const c of [...base.rocks, ...(base.ponds ?? []), ...(base.glass ?? []), ...(base.sprinklers ?? [])]) blocked[cellIndex(c)] = 2;
   const near = (c: Cell) => [base.goal, ...base.gates].some(([x, y]) => Math.abs(x - c[0]) <= 2 && Math.abs(y - c[1]) <= 2);
   const rocks: Cell[] = [...base.rocks];
   // A path garden's extra rocks go on its lawn, where they only take room from the towers.

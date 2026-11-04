@@ -68,9 +68,10 @@
       // The progress files' key text (shared/saveFile.ts) and what seals a move to it.
       var KEY_TEXT = 'game-proto progress file, v1';
       var SEAL = 'game-proto move';
-      // Longer links than this may not open in every browser, so saved replays and a run under
-      // way are left behind, as progress codes do, and with still too much nothing is carried.
-      var MAX_LINK = 1500000;
+      // Longer links than this may not open in every browser (Firefox refuses any address over
+      // 1 MiB), so saved replays and a run under way are left behind, as progress codes do, and
+      // with still too much nothing is carried.
+      var MAX_LINK = 1000000;
 
       var TEXTS = {
         en: {
@@ -208,7 +209,11 @@
         else if (navigator.onLine === false) show(text.offline, link);
         else {
           show(text.tab, link);
-          location.replace(link);
+          try {
+            location.replace(link);
+          } catch (e) {
+            // The browser refused the link; the page's buttons stay usable.
+          }
         }
       });
     </script>

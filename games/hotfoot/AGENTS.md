@@ -182,7 +182,8 @@ in.
   `done`) and `starsOf`.
 - `src/game/weekly.ts`: `weekOf` (a date's ISO week, `YYYY-Www`), `weeklyKey` (`weekly:YYYY-Www`, the
   run's seed key) and `weeklyBoons` (the week's two boons, drawn from its own seed among the boons
-  that can be sold).
+  that can be sold; the second is drawn again while it would complete a pair with the first, so
+  the `pair` trophy never comes free).
 - `src/game/armoury.ts`: the `ARMOURY` table (name and text as `TextKey`s, price per level), `ARMOURY_EACH` (what a
   level adds), `noArmoury` and `nextPrice`.
 - `src/game/course.ts`: `buildStage` lays out a stage's pieces (`Piece`: each trap kind, `ledge`
@@ -376,7 +377,8 @@ in.
   them alike. `GameScene.freshRun(mode, challenge)` builds each kind: the weekly road with
   `weeklyBoons` at rank 1 and the week's best, a challenge with `challenge` set and its stage.
   A challenge's `tick` ends at its banner (`challenge.done`, phase `over`), and `hurt` banks nothing
-  on a challenge. The Courses panel (`createCourses`, `drawCourses`) starts them with `restart`;
+  and keeps no best distance on a challenge; `drawHud` leaves the best and the run track's best
+  text empty there. The Courses panel (`createCourses`, `drawCourses`) starts them with `restart`;
   the Companions panel (`createPets`, `drawPets`) buys with `buyPet` and sets
   `progress.pets.with` (`choosePet`).
 - The companions in `tick`: after the foes move, a hound (`stats().bark`) marks each trap whose left

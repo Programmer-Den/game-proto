@@ -182,7 +182,9 @@ and pressed lettering on clay tags. It is all painted in code at startup; there 
     | Rich compost | compost pays up to 15 sap more |
 
     Wave 10, 30, 50 and on offer the first three, wave 20, 40 and on the last three. The thorny
-    Meadow, which has no hedges, offers Long moss in place of Thick hedges.
+    Meadow and a weekly garden with No hedges, where no hedge can be planted, offer Long moss in
+    place of Thick hedges, and a weekly garden with Only Moss and Thorn offers Sunny row in place of
+    Sharp rocks.
 17. **Regrow a leaf.** Between waves, tap the Heartwood (or the leaf tag, which shows a green plus
     when you can) to grow back a lost leaf: 25 sap for the first in a garden, 25 more for each one
     after. Three stars need all 10 leaves at the harvest, so they are now a sap trade-off.
@@ -214,7 +216,7 @@ and pressed lettering on clay tags. It is all painted in code at startup; there 
 
 21. **Daily plot.** The Daily plot button in the garden picker plants today's daily plot, the same
     for every player on the same day: a seeded garden (in its thorny variant on some days) whose
-    three golem seeds each grow into one set form at level 3 (shown on the seed cards), with the
+    five golem seeds each grow into one set form at level 3 (shown on the seed cards), with the
     Thorn golem open from the start and no grafts. Hold 15 waves; the score is 10 points a wave
     cleared and 5 a leaf kept at the end (the last wave can't be called early). There is one try a
     day, which starting uses up (leaving half way scores what you had); the button then shows
@@ -228,9 +230,9 @@ and pressed lettering on clay tags. It is all painted in code at startup; there 
 
     | Twist | What it does |
     | --- | --- |
-    | Only Moss and Thorn | the Pebble, Fungus and Bell seeds are faded out |
+    | Only Moss and Thorn | the Pebble, Fungus and Bell seeds are faded out; Sunny row is offered in place of the Sharp rocks boon |
     | Double pests | every pest but the Queen Slug comes with a twin, 0.35s behind |
-    | No hedges | the hedge seed is faded out |
+    | No hedges | the hedge seed is faded out; Long moss is offered in place of the Thick hedges boon |
 
     The weekly garden earns no stars, laurels or wild record; wave 30 is just another wave there.
 23. **Your own plots.** The other three cards are your plots. An empty one opens the garden editor:

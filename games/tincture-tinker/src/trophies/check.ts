@@ -15,7 +15,8 @@ const EARNED: Record<string, (s: GameState) => boolean> = {
   firstSale: (s) => s.sold >= 1,
   firstCatalyst: (s) => s.fired > 0,
   firstBloom: (s) => s.bloomsFired > 0,
-  threeStars: (s) => s.phase === 'sold' && s.orderStars === 3,
+  // The weekly order's moves are played out, never sold, so its stars don't count.
+  threeStars: (s) => s.phase === 'sold' && s.orderStars === 3 && !s.current.weekly,
   firstUpgrade: (s) => UPGRADE_ORDER.some((id) => s.upgrades[id] > 0),
   master: (s) => s.stars >= MASTER_STARS,
   fiftySold: (s) => s.sold >= FIFTY_SOLD,

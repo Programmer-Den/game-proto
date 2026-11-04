@@ -115,7 +115,10 @@ Implemented today:
   streak instead; otherwise it saves, calls `startDaily('anvilheart')` and swaps `state` for
   `dailyShop(dailyRand('anvilheart'))`: a fresh first smithy with the barrel, the edict picked by the
   day's seed, `daily` `{ ms: DAILY_MS (10 min), earned }`, and `useRandom` pointing every random
-  roll in `sim.ts` at the seeded source. `sell` and `deliver` add to `daily.earned`. `save()` does
+  roll in `sim.ts` at the seeded source. Forges, visitors and returns share that one stream, so
+  only the start (edict, first order, seed) is the same for everyone; later orders and Fine Ore
+  follow how often the player forges and sells, which the texts (`dailyStart`, the How to play tip,
+  the README) say. `sell` and `deliver` add to `daily.earned`. `save()` does
   nothing while `daily` is set, and "New smithy" refuses. When `ms` reaches 0 `tick` pushes
   `dailyEnd` once and then stands still (`forge` too); the scene calls `finishDaily` and shows the
   end window (`dailyWindow`, `win-panel`), whose "Back to my smithy" (`leaveDaily`) resets
@@ -383,10 +386,11 @@ How it runs:
   background's mosaic is computed pixel by pixel once at boot.
 - Tick: `GameScene.update(time)` takes `dt` from the frame timestamp (clamped to `MAX_STEP_MS`,
   250ms), adds it to `clock`, and, unless a window is open (`windowOpen`: the win, offer, perk, edict, hall or daily end
-  window, so nothing waits out its patience behind one), calls `tick(state, dt)`, which cools the forge, forges when
+  window, so nothing waits out its patience behind one), calls `tick(state, dt)`, which cools the forge,
   brings heroes back, forges when `autoForging`, drains the hammer streak and patience (a walk-off
   costs reputation and gives a held half set back), rusts idle swords and brings adventurers. If that (or the Forge button since the last
-  frame) pushed a `forged`, `rusted`, `returned` or `left` event the scene saves. Then it draws,
+  frame) pushed a `forged`, `rusted`, `returned`, `left`, `apprenticed`, `tourney` or `rivalDay` (a
+  rival day's end, which pays its prize) event the scene saves. Then it draws,
   ending with `drawChooser` (which hides the offer window once a choice is made), `drawEdicts` and
   `playPart`.
 - Input: pointers are read through `pointer.worldX/worldY` (game pixels; `pointer.x/y` are canvas

@@ -77,10 +77,12 @@ export class GameSounds {
     const taken = now.rivalTaken - was.rivalTaken;
     late -= delivered + taken;
     if (taken > 0) sfx('rival');
-    else if (was.rivalClaim !== null && now.rivalClaim === null && now.orders.has(was.rivalClaim)) sfx('beatRival');
+    // Beaten only when the wyrm was sent for the order, not when the festival closes the rival or a cut line drops the claim.
+    else if (was.rivalClaim !== null && now.rivalClaim === null && (now.orders.get(was.rivalClaim) ?? 'waiting') !== 'waiting') sfx('beatRival');
     if (now.towns > was.towns) sfx('grow');
     if (delivered > 0) sfx('deliver');
-    if (late > 0) sfx('late');
+    // Goods back in a warehouse's store left the board with no heart lost: no buzz.
+    if (late > 0 && now.hearts < was.hearts) sfx('late');
     if (was.hearts - now.hearts > Math.max(0, late)) sfx('faith');
     else if (late <= 0 && now.moods.some((m, i) => m < was.moods[i])) sfx('sour');
 

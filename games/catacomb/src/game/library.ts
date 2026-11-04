@@ -1,4 +1,4 @@
-import { baseOf, isCurse, type BaseId, type CardId } from './cards';
+import { CARDS, baseOf, isCurse, type BaseId, type CardId } from './cards';
 import { HERO_IDS, type HeroId } from './heroes';
 
 // Each hero's library: every card that hero has ever added to a deck (a reward or a purchase), kept
@@ -13,6 +13,9 @@ export type Library = Record<HeroId, BaseId[]>;
 
 const KEY = 'catacomb-library';
 
+/** A card id this build knows and a library may hold: an id from another version (a progress code from a newer build) or a curse is dropped. */
+const known = (c: unknown): c is BaseId => typeof c === 'string' && Object.hasOwn(CARDS, c) && !isCurse(c as BaseId);
+
 export function loadLibrary(): Library {
   const lib = Object.fromEntries(HERO_IDS.map((id) => [id, [] as BaseId[]])) as Library;
   try {
@@ -20,7 +23,7 @@ export function loadLibrary(): Library {
     if (saved && typeof saved === 'object') {
       for (const id of HERO_IDS) {
         const cards = (saved as Record<string, unknown>)[id];
-        if (Array.isArray(cards)) lib[id] = [...new Set(cards.filter((c): c is BaseId => typeof c === 'string'))];
+        if (Array.isArray(cards)) lib[id] = [...new Set(cards.filter(known))];
       }
     }
   } catch {

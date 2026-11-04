@@ -182,9 +182,11 @@ Armoury (on top of the run's own credits). Tap Start or press Enter; Back return
 From the same first run on, a **Daily run** button shows beside the weekly one. It opens today's
 run: three worlds (the Dune world, then one of Swamp, Spore, Scrap and Ocean, then one of Ice,
 Crystal, Storm and Ruin), one of your open heroes and one mutator, picked from the day, with each world and star map
-seeded, so everyone playing that day meets the same run. It is fought at heat 0 and without the
+seeded, so everyone playing that day meets the same worlds and mutator (the hero can differ, as
+it comes from the heroes each player has open). It is fought at heat 0 and without the
 Armoury, and there is **one try a day**: starting it uses the day's try, even if you leave half
-way. It scores **1000 per boss beaten plus 1 per kill**; the panel and the end screen show today's
+way. It scores **1000 per boss beaten plus 1 per kill** (falling in an elite arena still counts the
+boss beaten before it); the panel and the end screen show today's
 score, your best and how many days in a row you have played. Winning it banks **40 credits** for
 the Armoury. A daily win is not a won crusade, so it opens no rift heat.
 
@@ -193,11 +195,12 @@ the Armoury. A daily win is not a won crusade, so it opens no rift heat.
 ### The endless rift
 
 After a won crusade (not a weekly or daily run) the victory screen offers the **Endless rift**
-beside Run again (or press Space). The run goes on with the same hero, level and kit: the star map
+beside Run again (or press Space, a moment after the screen opens). The run goes on with the same
+hero, level and kit, but no credits (the ones left at the win were banked with its salvage): the star map
 leads from the Lava world back to the Dune world, and the four jumps start over, each loop with
 foes and bosses **+40% health and +25% damage** on top of the one before (loop 1 is the first
 after the win). Its score is the worlds cleared after the win; the end screen shows it with your
-best, and each one banks **15 salvage** (the credits left at the win were banked already).
+best, and each one banks **15 salvage**.
 
 ![The endless rift on the victory screen](docs/screenshots/endless-rift.webp)
 

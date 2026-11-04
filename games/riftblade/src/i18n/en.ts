@@ -1045,7 +1045,7 @@ const en = {
   dailyButton: 'Daily run',
   dailyButtonDone: 'Daily run  ·  played',
   dailyTitle: 'DAILY RUN',
-  dailySubtitle: '{day}: three worlds, the same hero, mutator and worlds for everyone today. One try a day, at heat 0, without the Armoury.',
+  dailySubtitle: '{day}: three worlds, the same mutator and worlds for everyone today, and a hero drawn from those you have open. One try a day, at heat 0, without the Armoury.',
   dailyHero: "Today's hero",
   dailyNotYet: 'Not tried today yet',
   dailyUnderway: "Today's try is under way",
@@ -1259,9 +1259,10 @@ const en = {
   rushPop: 'Boss {n}/{of}: {planet}',
   rushTag: 'Boss rush {n}/{of}  ·  {planet}',
   rushWon: '{hero} beat every boss: {n} of {of}.',
-  rushFell: '{hero} fell to {boss} after {n} of {of} bosses.',
+  rushFell: '{boss} ended the rush: {hero} fell after {n} of {of} bosses.',
   rushEnd: 'Boss rush: {n}/{of} bosses in {time}',
   rushNewBest: 'A new best boss rush!',
+  dailyWon: '{boss} is broken. {hero} cleared all three of today\'s worlds.',
 };
 
 export default en;

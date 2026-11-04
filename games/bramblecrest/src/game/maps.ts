@@ -7,6 +7,8 @@
 import { t } from '../i18n';
 
 export const TILE = 32;
+/** The corners of the knight's feet box, offset from their position. */
+export const FEET: [number, number][] = [[-8, -6], [8, -6], [-8, 4], [8, 4]];
 
 export type Tile =
   | 'grass'
@@ -536,6 +538,9 @@ function caverns(): MapDef {
   return d;
 }
 
+/** The pines west of the coast's inlet (added after the first coast saves: `load` moves a knight saved on them). */
+export const COAST_PINES = { x: 2, y: 6, w: 10, h: 2 };
+
 function coast(): MapDef {
   const b = new Builder('coast', t('coast'), 'coast', 44, 28, 0.8, 'grass');
   const d = b.def;
@@ -573,6 +578,8 @@ function coast(): MapDef {
   b.scatter('tree', 10, { x: 2, y: 2, w: 10, h: 4 }, 51, 'grass', 1);
   b.scatter('tree', 14, { x: 2, y: 16, w: 26, h: 8 }, 52, 'grass', 1);
   b.scatter('reeds', 30, { x: 2, y: 8, w: 30, h: 16 }, 53, 'grass', 0);
+  // Pines close the strip west of the inlet, so the only way north is over the drained channel.
+  b.rect(COAST_PINES.x, COAST_PINES.y, COAST_PINES.w, COAST_PINES.h, 'tree');
   d.enemies.push(
     { kind: 'crab', x: 14, y: 19 }, { kind: 'crab', x: 25, y: 20 }, { kind: 'crab', x: 29, y: 11 },
     { kind: 'gull', x: 9, y: 20 }, { kind: 'gull', x: 26, y: 17 }, { kind: 'gull', x: 23, y: 3 },

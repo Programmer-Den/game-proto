@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { dailyRand, finishDaily, loadDaily, startDaily } from '../../../../shared/daily';
+import { dailyRand, finishDaily, loadDaily, startDaily, today } from '../../../../shared/daily';
 import { formatNumber, t as sharedText } from '../../../../shared/i18n';
 import { settings } from '../../../../shared/settings';
 import { t, type TextKey } from '../i18n';
@@ -274,8 +274,12 @@ export class GameScene extends Phaser.Scene {
   private moultKey = '';
   /** The daily valley's link in the sky over the valley before the first track (WR17), or its tag while it is played. */
   private dailyLink!: Phaser.GameObjects.Text;
-  /** Whether today's daily valley has been tried already, read once when the scene starts. */
+  /** Whether today's daily valley has been tried already, read when the scene starts and again after midnight. */
   private dailyPlayed = false;
+  /** Today's daily score, once today's try is used (0 for a try left half way). */
+  private dailyScore = 0;
+  /** The day `dailyPlayed` and `dailyScore` were read for, so the link rolls over at midnight. */
+  private dailyDay = '';
   /** The end panel's buttons: fly on keeping an upgrade, play again and the daily valley. */
   private endButtons!: Phaser.GameObjects.Container;
 
@@ -296,7 +300,10 @@ export class GameScene extends Phaser.Scene {
     const journey = data.journey ?? {};
     // Today's try is used up as soon as it starts, so leaving it half way still counts.
     if (journey.daily) startDaily(GAME);
-    this.dailyPlayed = loadDaily(GAME).played;
+    const daily = loadDaily(GAME);
+    this.dailyPlayed = daily.played;
+    this.dailyScore = daily.score ?? 0;
+    this.dailyDay = daily.day;
     this.state = journey.daily ? newGame(null, journey, dailyRand(GAME)) : newGame(loadMedals()[settings.difficulty] ?? null, journey);
     this.mode = 'auto';
     this.lastLaid = null;
@@ -616,13 +623,25 @@ export class GameScene extends Phaser.Scene {
     return !s.daily && !this.dailyPlayed && s.leg === 1 && s.phase === 'play' && s.round === 1 && !s.track.length;
   }
 
-  /** The daily link's text: the link while it is open, the tag while the daily valley is played, else nothing. */
+  /**
+   * The daily link's text: the link while it is open, the tag while the daily valley is played, today's
+   * score in its place once today's try is used, else nothing.
+   */
   private drawDailyLink() {
     const s = this.state;
-    const text = s.daily ? t('dailyTag') : this.dailyOpen() ? t('dailyLink') : '';
+    // After midnight a fresh valley reads the record again, so yesterday's score isn't shown as today's.
+    if (!s.daily && this.dailyDay !== today()) {
+      const daily = loadDaily(GAME);
+      this.dailyPlayed = daily.played;
+      this.dailyScore = daily.score ?? 0;
+      this.dailyDay = daily.day;
+    }
+    const open = this.dailyOpen();
+    const done = !s.daily && this.dailyPlayed && s.leg === 1 && s.phase === 'play' && s.round === 1 && !s.track.length;
+    const text = s.daily ? t('dailyTag') : open ? t('dailyLink') : done ? t('dailyDone', { n: this.dailyScore }) : '';
     if (this.dailyLink.text !== text) this.dailyLink.setText(text);
-    this.dailyLink.setVisible(!!text).setColor(s.daily ? '#9bd8f0' : '#f3c64e');
-    if (this.dailyLink.input) this.dailyLink.input.enabled = !s.daily && !!text;
+    this.dailyLink.setVisible(!!text).setColor(s.daily ? '#9bd8f0' : done ? '#d8c7a6' : '#f3c64e');
+    if (this.dailyLink.input) this.dailyLink.input.enabled = open;
   }
 
   /**

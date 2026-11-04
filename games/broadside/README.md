@@ -194,7 +194,7 @@ On a phone, one thumb can hold a wheel while the other holds a fire control.
    loot (a brig 13 gold) and is patched again; one
    the purse can't pay is paid off and sold. You can keep two at once, and scuttling one sinks
    her for double loot as with any prize.
-21. **Convoy waves.** From wave 7, every third wave (7, 10, 13, 16, 19 and on, never the haven)
+21. **Convoy waves.** From wave 7, every third wave (7, 10, 13, 16, 19 and on, never the haven or the Tempest)
    a laden merchantman sets out astern of you for an island at least 500 away, named on the
    wave's banner and a green line under the order card, and a dashed green ring marks where she
    must reach; a green arrow points to it when off screen. She sails slower than you and steers
@@ -219,7 +219,8 @@ On a phone, one thumb can hold a wheel while the other holds a fire control.
    in a ship half again as sturdy as others of her kind, her name written under it and her hull
    bar always shown. Once her hull is down to 35% she runs for it, a fifth faster, and if she is
    still afloat nine seconds later she gets away. She comes back three waves later, 30% sturdier
-   again for each escape and with 40 gold on her head for each ("Wanted: Widow Corra, 40 gold").
+   again for each escape and with 40 gold on her head for each ("Wanted: Widow Corra, 40 gold" on
+   the wave's banner, which on a night or beast wave tells of the dark or the beast instead).
    Sinking or boarding a named captain writes her into the log, which is kept between runs; the
    harbor's news says who was sunk or got away, and the end card how full the log is. Once all
    five are in it, every run after starts with **Renown**: enemy crews strike sooner, so a ship
@@ -253,7 +254,7 @@ On a phone, one thumb can hold a wheel while the other holds a fire control.
    moment, the flash of her guns; her hull bar, name and the arrows at the screen's edge show only
    while you can see her. Your crews only train their guns on a ship they can see (within your
    lanterns' light, lit by her own guns' flash, or under a flare), otherwise they fire straight
-   out. Three flares a night (the **Flare** button or F) each light the whole sea for six seconds.
+   out; your mortar and your prizes hold their fire and don't hunt a ship you can't see. Three flares a night (the **Flare** button or F) each light the whole sea for six seconds.
 
 ![From wave 6 the harbor charts two courses, and a brig prize can be kept as a consort](docs/screenshots/harbor-courses.webp)
 

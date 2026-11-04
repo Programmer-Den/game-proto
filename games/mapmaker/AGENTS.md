@@ -251,14 +251,16 @@ stands next to it (`snowHides`), lookouts see only the tiles beside them, and fr
     "−2" or "FREE" under it when the cost isn't 1, grey when the supplies can't pay; the one under
     the pointer is solid with a cost pill, which also names the feature the tile would finish,
     from `featureAt`, and the sloop's landing; on a winter isle a station `snowHides` shows `?`, is
-    drawn as affordable while any supply is left, and its pill says "under snow"), and once the
+    drawn as affordable while any supply is left, or with none left when it costs nothing (as
+    `canAfford` and `survey` have it), and its pill says "under snow"), and once the
     riddle is known a dashed dig square and
     pill on charted ground under the pointer. Cost labels come from a reused pool of texts.
-  - `syncMarks` keeps an image per map mark (finds on charted tiles, storms, camps, dug tiles, the
+  - `syncMarks` keeps an image (the rumour's a container with its caption) per map mark (finds on charted tiles, storms, camps, dug tiles, the
     wonder once seen,
     the treasure chest for the player's own find, a dug mark on the riddle's tile once charted when
     the rival dug it, the rival's claims, the sloop off its landing while surveying, the rumour's
-    gold ring on the wonder's tile until it is seen) and adds or removes them as the state changes.
+    gold ring on the wonder's tile, captioned "wonder?" (`rumourHint`) like the compass roses, until
+    it is seen) and adds or removes them as the state changes.
   - `agePopups` floats the value chips of ordinary surveys and the notices.
   - `ageSweep` plays a lookout's viewshed: the dotted ring grows over `RING_MS`, a chip appears on
     each tile as the ring passes, from `GATHER_AT` the chips fly into the magenta tally ("VIEWSHED
@@ -365,6 +367,9 @@ stands next to it (`snowHides`), lookouts see only the tiles beside them, and fr
   `landingSpot`, which draws nothing random.
 - `guide` counts the surveys a village's guide still makes free: `costOf` is 0 while it is above 0,
   and `survey` counts it down on a tile whose `groundCost` is above 0. `returnToPort` clears it.
+- `stores` is what a village's stores added to this voyage's supplies (`TRADE_STORES`, else 0):
+  `setSail` sets it, `returnToPort` clears it, and `load` allows it on top of `maxSupplies`, so a
+  reload mid-voyage keeps the traded supplies.
 - `trade` is the trade picked at the harbor for the next voyage (`pickTrade`; `canTrade` needs a
   village left in `tradeVillages`, and a rumour an unseen, unmarked wonder or a new isle coming),
   and `traded` the villages on this isle that have traded (reset on a new isle). `setSail` pushes
@@ -392,7 +397,8 @@ or `FINDS` reshapes the isles of existing saves (the charted bits stay on the sa
 isle loaded from a save made before seeds has no `seed` and keeps saving in full, as does an old
 `next` without one. A save whose tile count
 doesn't match `GRID` is ignored, saved supplies are clamped to `maxSupplies` (a save from an easier
-difficulty can hold more; this voyage's wrecks are allowed on top), and saves from before the isle
+difficulty can hold more; this voyage's wrecks and a village's `stores`, 0 for a save from before
+them, are allowed on top), and saves from before the isle
 goal get `milestones: 0`, `isleStart: voyage`, `atlas: []` and zeroed new chart fields. Saves from
 before isle kinds and finds get `kind: 'green'` (atlas pages too), no camps, storms, dug tiles or
 riddle, and zero artifacts and treasure. Saves from before features, the board, hands, the rival

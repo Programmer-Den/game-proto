@@ -127,9 +127,11 @@ Implemented today:
   was squashed (`state.queenSquashed`, set in `step`'s kill loop, cleared as a wave begins) sets
   `state.offer` to `boonOffer(wave / BOSS_EVERY, twistOf(s))`, three of `BOONS` (the first three
   (Long moss, Sunny row, New growth), then the last three (Thick hedges, Sharp rocks, Rich
-  compost), in turn; in the thorny Meadow, where no hedge can be planted, Long moss stands in for
-  Thick hedges). The scene holds the game still (ticks by 0) while `offer` is set and shows
-  `showBoons` (after the harvest picker closes, when both come at wave 30); a card calls
+  compost), in turn; under the 'hedges' twist (the thorny Meadow, a weekly garden), where no hedge
+  can be planted, Long moss stands in for Thick hedges, and under the weekly 'seeds' twist, where no
+  pebble golem can be planted, Sunny row stands in for Sharp rocks). The scene holds the game still (ticks by 0) while `offer` is set and shows
+  `showBoons` (once no overlay is up, `overlayOpen`: after the harvest picker, and any plots, editor
+  or grafts screen opened from it, closes, when both come at wave 30); a card calls
   `takeBoon`, which pushes it onto `state.boons` (a boon taken twice counts twice, `boonCount`).
   Long moss, Sharp rocks and Sunny row fold into `boonedStats`/`statsOf(s, g)`; Sunny row records
   `sunRow(s)` (the row with most grown golems, or with none grown the row with most golems
@@ -263,8 +265,8 @@ File map (`src/`):
   `weekOf`, `weeklyGarden` and `PLOT`. Every name and blurb in the catalogues (golems, with `lower` for
   inside a sentence, the hedge, forms, targets, boons and
   twists) is a `TextKey`, shown with `t`.
-- `game/state.ts`: `GameState`, `Golem` (with `form` and `target`), `Hedge`, `Pest` (with `stunMs`
-  and `stunGuardMs`), `Spores`, `Shot` (with `ring`),
+- `game/state.ts`: `GameState`, `Golem` (with `form` and `target`), `Hedge`, `Pest` (with `stunMs`,
+  `stunGuardMs` and `hits`), `Spores`, `Shot` (with `ring`),
   `Pop`, `Called`, `Settled`, `Slime`, `SHOT_MS`, `RING_MS`, `Extras`, `newGame(best, bloom, garden, stars, thorny, laurels, extras)`
   (`extras`: `wild`, `grafts`, `daily`, `weekly`, `plot`; it picks the first open golem seed),
   `ordinary`, `gardenOf`, `totalStars`, `gardenOpen`, `thornyOpen`, `twistOf`, `boonCount`, `barred`, `unlocked`, `seedCost(s, kind)`, `formsFor`,
@@ -401,7 +403,10 @@ The hub's settings are read from the shared `hub-settings` key.
 
 Randomness and timing: no `Math.random`, `Date.now` or `performance.now`. Waves are fixed by
 `waveFor`; art uses the seeded `rnd` in `art/clay.ts`; the daily plot is drawn from `dailyRand`
-(seeded by the date, read only when the Daily plot button is pressed). Game time is only the frame timestamps
+(seeded by the date, read when the Daily plot button is pressed). The weekly garden and the
+picker's Plots note read the day through `today()` (`shared/daily.ts`) too: `create` when a weekly
+garden starts (`weeklyGarden(weekOf(today()))`), and `plotsButton` and `showPlots` when the picker
+or the plots overlay opens; never during play. Game time is only the frame timestamps
 Phaser passes to `update`; the pops' tweens run on Phaser's clock and are cosmetic.
 
 ### Sound
@@ -427,7 +432,7 @@ Heartwood falls (`harvest3` instead when a daily plot ends with leaves left).
 | `raise` (higher per level), `form` / buzz | `menuTap`: Raise, a form chip; refused for lack of sap |
 | `aim`, `move`, `uproot` + `ui('coin')` | `menuTap` (Aim, Uproot), `tapCell` (the move landing); buzz when refused |
 | `pebble`, `moss`, `thorn`, `fungus`, `bell` | `tickSounds`: new shots (a bell's ring), one per golem kind a frame (70ms gap, so 2x speed doesn't double them) |
-| `clink` | `tickSounds`: an armoured pest (snail) lost health |
+| `clink` | `tickSounds`: an armoured pest (snail) took a golem's hit (`Pest.hits` rose; spore damage doesn't clink) |
 | `squash` + `sap` | `tickSounds`: `state.pops` not empty |
 | `caw`, `dig`, `groan` | `tickSounds`: a crow, mole or Queen Slug came in |
 | `snap` | `tickSounds`: a hedge chewed through |

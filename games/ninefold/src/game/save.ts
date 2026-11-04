@@ -1,6 +1,6 @@
 import { STYLES } from './catalog';
 import { TECHNIQUES } from './techniques';
-import { GAUNTLET, newProgress, unlock, type GameState, type Progress } from './state';
+import { ASCEND_FLOOR, GAUNTLET, newProgress, unlock, type GameState, type Progress } from './state';
 
 // Ninefold keeps two keys: the progress that unlocks the styles (with the style worn, the
 // calendar's stamps and the school's), and the board in play (with a Delve run's relics, or its
@@ -36,6 +36,8 @@ export function loadProgress(): Progress {
   }
   // A save from before the calendar stamps the last daily it solved.
   if (p.daily && !p.dailyDays.includes(p.daily)) p.dailyDays = [...p.dailyDays, p.daily].sort((a, b) => a - b);
+  // A save from before ascensions that cleared floor `ASCEND_FLOOR` has Ascension 1 open.
+  if (p.bestFloor >= ASCEND_FLOOR && p.climbed < 1) p.climbed = 1;
   unlock(p);
   return p;
 }

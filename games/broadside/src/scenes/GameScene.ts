@@ -1203,10 +1203,12 @@ export class GameScene extends Phaser.Scene {
       : s.wave === TEMPEST_WAVE ? t('tempestSub')
       : s.daily && s.wave === 1 ? t('dailySub', { ship: t(HULLS[s.hull].name), perks: s.perks.map((id) => t(PERKS[id].name)).join(', ') })
       : reaches && reachWave(s.wave) === 1 ? t('reachesSub')
-      : named ? (escapes ? t('captainBackSub', { name: t(CAPTAINS[named].name), gold: captainBounty(escapes) }) : t('captainSub', { name: t(CAPTAINS[named].name) }))
+      // A beast or the dark explains what the player is about to meet, so it comes before a named
+      // captain (who sails on the first night and the first beast wave, and is named under her ship).
       : beast ? t(beast === 'kraken' ? 'krakenSub' : 'serpentSub')
-      : s.raiders ? t('raidersSub', { n: s.raiders })
       : s.night ? t('nightSub')
+      : named ? (escapes ? t('captainBackSub', { name: t(CAPTAINS[named].name), gold: captainBounty(escapes) }) : t('captainSub', { name: t(CAPTAINS[named].name) }))
+      : s.raiders ? t('raidersSub', { n: s.raiders })
       : s.convoy ? t('convoySub', { island: t(ISLANDS[s.convoy.island].name), gold: s.convoy.cargo })
       : s.forts.length ? t('fortsSub', { n: s.forts.length, gold: fortBounty(s.wave) })
       : t(flagship ? 'flagshipSub' : 'sailsSub');
@@ -1450,7 +1452,8 @@ export class GameScene extends Phaser.Scene {
       const y = OVER.shipY;
       const bg = this.add.rectangle(x, y, OVER.shipW, 36, CREAM, 0.9).setStrokeStyle(1.5, INK);
       bg.setInteractive({ useHandCursor: true }).on('pointerdown', () => {
-        const open = unlocked(id, this.state.bestWave);
+        // The daily keeps no best wave, so its ships stay as the saved best wave left them.
+        const open = unlocked(id, this.state.daily ? this.state.bestBefore : this.state.bestWave);
         if (open) this.nextHull = id;
         ui(open ? 'click' : 'refuse');
       });
@@ -1548,8 +1551,10 @@ export class GameScene extends Phaser.Scene {
     this.dailyButton!.setAlpha(this.daily.played ? 0.6 : 1);
     const left = this.medalBank - costOfBoons(this.commission);
     this.medalText.setText(s.daily ? t('dailyMedals', { left }) : t('medals', { n: s.medals, left }));
+    // The daily keeps no best wave, so it unlocks no ship.
+    const unlockBest = s.daily ? s.bestBefore : s.bestWave;
     for (const row of this.shipRows) {
-      const open = unlocked(row.id, s.bestWave);
+      const open = unlocked(row.id, unlockBest);
       const chosen = this.nextHull === row.id;
       fitWidth(row.desc.setText(open ? t(HULLS[row.id].desc) : t('unlockAt', { wave: HULLS[row.id].unlockWave })), OVER.shipW - 8);
       row.bg.setFillStyle(chosen ? 0xebd29a : CREAM, 0.95).setStrokeStyle(chosen ? 2.5 : 1.5, INK).setAlpha(open ? 1 : 0.5);

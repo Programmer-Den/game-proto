@@ -111,12 +111,18 @@ world, with a star map between them. A boss rush and hero mastery come on top.
   day) and `state.seed` (`dailySeed(day)`). It is three worlds: `lastStage(s)` (`DAILY_LAST_STAGE`
   = 2) ends it in `afterClear`, and `stagesOf(s)` gives the HUD's, the end screen's and the space
   map's jump count (the space map draws three columns). At its end `GameScene.syncPanel` calls
-  `finishDaily` with `dailyScore` (1000 per boss beaten plus kills); the first finish of a won daily
+  `finishDaily` with `dailyScore` (1000 per boss beaten plus kills; a run lost in the arena counts
+  that world's boss, as the mastery count does); the first finish of a won daily
   banks `DAILY.bonus` (`bankCredits`). A daily win is not recorded as a crusade win (no `wins`, no
-  heat).
+  heat), so `endScreen` shows no "heat opened" line for it (nor for a boss rush), and its line is
+  `dailyWon` (three worlds), not the last boss's `beaten`. The worlds and mutator are the same for
+  every player; the hero comes from this save's open heroes, so it can differ, and the daily panel
+  and How to play say so.
 - The endless rift (`endless.ts`, `enterEndless` in `voyage.ts`): the end screen of a won normal run
   (no seed, no daily) shows an Endless rift button (`ENDLESS_BUTTON`, beside Run again at
-  `AGAIN_SIDE`; Space too). It sets `state.endless`, and `loopBack` sends the star map from the Lava
+  `AGAIN_SIDE`; Space too, once 800 ms have passed since the run ended, `GameScene.endAt`, so a
+  signature press as the last boss falls doesn't go on). It sets `state.endless`, empties
+  `state.credits` (the win banked them with its salvage), and `loopBack` sends the star map from the Lava
   world back to the Dune world (`next` 0, `after` `map`, owed cards first); `nextPlanet` wraps
   `stage` past `LAST_STAGE` to 0 and counts `state.loop`. From loop 1, `spawnAt` gives every foe and
   boss `loopHp(loop)` health and `hurtHero` takes `loopDmg(loop)` (`ENDLESS`). Every boss cleared in
@@ -453,7 +459,7 @@ saves load unchanged.
 - `riftblade-daily`: the daily run's record (`shared/daily.ts`: today's try, score, best, streak).
 - `riftblade-trophies`: the trophies earned (`shared/trophies.ts`), each id with the time.
 - `riftblade-run`: the run under way (left out of progress codes by the hub's `fileOnly`, so a
-  code moves only `riftblade-progress` and the trophies; files carry it), the whole `GameState` as JSON (it is plain data; `Infinity`,
+  code moves `riftblade-progress`, `riftblade-daily` and the trophies; files carry it), the whole `GameState` as JSON (it is plain data; `Infinity`,
   as in `nextElite` and `objectiveAt`, is stored as the text `"Infinity"`). `loadRun` lays it over
   `freshState()` (and the hero over `freshHero()`), so fields added since take their fresh values;
   one with an unknown hero, a phase it can't resume in, a `daily`, `endless`, `loop`, `endlessCleared`, `seed`, `rush`, `rushQueue`, `mastery`, `colour`, `tide` or `pillars` of the wrong kind, an unknown planet or `next`, a `stage`

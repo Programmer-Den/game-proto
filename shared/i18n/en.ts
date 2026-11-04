@@ -140,7 +140,7 @@ const en = {
   settingEffects: 'Sound effects',
   settingEffectsHint: 'How loud clicks, hits, coins and the other sounds play.',
   settingMuted: 'Mute all sound',
-  settingMutedHint: 'Silences every game. The speaker button in a game\'s corner and the M key switch it too.',
+  settingMutedHint: 'Silences every game. The M key and the pause screen\'s Mute button switch it too.',
 
   // Loading, start, pause and How to play screens
   loading: 'Loading',
@@ -190,7 +190,7 @@ const en = {
   // Hub cards: each game's text and its cover's description
   apothecaryCard: 'Run a medieval apothecary as a plague doctor: grow herbs, refine them, brew potions and sell them.',
   apothecaryCover: 'The apothecary shop with a customer at the counter',
-  auguryCard: 'Eleven kinds of brain puzzle dealt like tarot cards: a journey of five temples, an endless medley, a daily five, Blitz, draft runs with relics, a weekly league, pass and play, and practice.',
+  auguryCard: 'Thirteen kinds of brain puzzle dealt like tarot cards: a journey of five temples, an endless medley, a daily five, Blitz, draft runs with relics, a weekly league, pass and play, and practice.',
   auguryCover: 'A path puzzle on a night-sky board framed in gold, with the next puzzles waiting as cards beside it',
   deadlineCard: 'Hold the bottom of the road against waves of zombies: move left and right, and shoot crates open for upgrades.',
   deadlineCover: 'A soldier behind sandbags shooting a zombie horde coming down a road',
@@ -220,7 +220,7 @@ const en = {
   mapmakerCover: 'A bear surveyor charting a fog-covered island tile by tile',
   mazewrightCard: 'Plant hedges and towers on an open lawn to build the maze the beetles must walk, but never close the last way through.',
   mazewrightCover: 'A hedge maze on a garden lawn, with stone towers in the hedges and beetles walking a dotted route to a cottage',
-  ninefoldCard: 'Solve number puzzles in nine unlockable art styles: a daily puzzle, Classic boards at three levels, and Delve, a run of ever bigger boards with hearts and relics.',
+  ninefoldCard: 'Solve number puzzles in ten unlockable art styles: a daily puzzle, a weekly gauntlet, Classic boards at eight levels, and Delve, a run of ever bigger boards with hearts and relics.',
   ninefoldCover: 'A number puzzle board on layered paper, with a few digits written in and one cell picked',
   lanternkeepCard: "Send moths from their jar to light the castle's lanterns before night falls, and spend the coins on wicks, oil and more moths.",
   lanternkeepCover: 'A castle at nightfall with glowing lanterns on its towers and moths flying between them',

@@ -151,7 +151,7 @@ seeded valley once a day.
     (and a button on the end panel) starts today's daily valley: the same seeded valley, of any
     kind, for every player on the same day, one try a day, with no medal boons and no flying on.
     Its score is the orders delivered when it ends, kept with the best score and the days in a row
-    (`wyrmrail-daily`).
+    (`wyrmrail-daily`). Once today's try is used, the corner shows today's score instead.
 22. **Villages that grow**, from round 2: a village that gets 4 deliveries in time grows into a
     **town**, with a stone tower behind its cottages and its name in gold. A town's orders pay 30%
     more, and about a third of them are its **wares** (a gift-tied crate), which pay 40% more again
@@ -169,7 +169,7 @@ seeded valley once a day.
     though you can lay your own track on one for three times the usual price. Now and then the
     rival goes after the best-paying waiting order between two villages it reaches (a plum bar and
     "Rival racing!" on the card): send the wyrm for it within 9 seconds, or the rival takes it off
-    the board. A lost order costs no heart, only the pay.
+    the board. Cut the rival's line to one of the two villages and it gives up the race. A lost order costs no heart, only the pay.
 
 ![Laying track](docs/screenshots/playthrough-1-track.webp)
 

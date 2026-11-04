@@ -43,8 +43,9 @@ Implemented today:
   (`practiceNext`). Endless deals kinds by `weakWeights` (one share more per mastery level below the
   best kind's) through `randomCard`'s `weights`, which draws one number either way, so a fresh save
   (all alike) deals exactly as an even pick; Blitz, the drafts and the weekly league stay even.
-- The daily five's ghost: `run.marks` gets [time into the run, score] after each card; when the
-  daily best rises, `Progress.ghost` takes a copy. `startRun` copies the ghost into `run.ghost`, so
+- The daily five's ghost: `run.marks` gets [time into the run, score] after each card; once the
+  daily best rises (`run.newBest`), `Progress.ghost` takes a copy after every card of the run, so it
+  keeps the cards that scored nothing too. `startRun` copies the ghost into `run.ghost`, so
   the run races the best from before it, and the side panel (`drawGhost`, at `side.ghost`) shows the
   score `ghostAt(run.ghost, runTime(run))` gives as a faint bar under the player's own. A best
   set before the ghost existed has none (the panel says so).
@@ -74,8 +75,6 @@ Missing or rough:
   Oracle); `TRIES`, `MAX_STATES` and `TARGET_MOVES` in `puzzles/unjam.ts` trade speed for depth.
 - The journey's temples teach the first eleven kinds only; Pipe Turn and Mirror Maze come from the
   other modes (adding them to `TEMPLE_KINDS` would change steps players have already starred).
-- The hub card's text (`auguryCard` in `shared/i18n/`) still says eleven kinds; changing it plays
-  every game in CI, so it waits for a PR that touches `shared/` anyway.
 - No translations of the glyph names (there are none on screen); the How to play names the modes.
 - `docs/screenshots/menu.webp`, `puzzles.webp`, `draft.webp`, `upright.webp` (a 390x844 phone at
   2x), `pipe-turn.webp`, `mirror-maze.webp`, `mastery.webp`, `daily-ghost.webp` and `cover.png` are not made by the
@@ -132,10 +131,12 @@ File map (`src/`):
   hints and omen, `pair` set to the boss card and `pairMs`/`pairHints` the first half's time and
   hints (events `half` and `start`). `end` records both halves in `Progress` (the first as solved,
   each with its own time and hints, so a reload mid-boss never records the first twice) and the
-  boss as one `Result` (`card` the boss, `boss: true`), paying `BOSS_POINTS` times;
+  boss as one `Result` (`card` the boss, `boss: true`, `half` the half it ended on), paying `BOSS_POINTS` times;
   a beaten boss offers relics (`next`; in Endless `takeRelic` then deals the next queued card
   through `dealQueued`, and `offerRelics` leaves the Crystal Ball out). The next card never
-  repeats the kind a boss ends on (`lastKind`). Only this file changes a `Run`; `act` and
+  repeats the kind a boss ends on (`lastKind`; the draft's offer reads `half`, so a boss lost in its
+  first half bars that half's kind. Endless deals its queue ahead, so there a boss lost in its first
+  half bars the second's). Only this file changes a `Run`; `act` and
   `drag` (a step of a drag, with no Undo step) are the only ways a move reaches a puzzle's state.
   `skip` in Practice deals a new puzzle of the same kind and level, with nothing recorded. `quit`
   (the Leave button) ends a run that is not over through `finish`, so its bests, the daily five's

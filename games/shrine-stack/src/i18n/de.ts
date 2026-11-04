@@ -224,9 +224,10 @@ const de: Translation<typeof en> = {
   raceWinLeft: 'Der linke Tempel gewinnt!',
   raceWinRight: 'Der rechte Tempel gewinnt!',
   raceDraw: 'Beide Tempel fielen zugleich',
+  raceBothCrowned: 'Beide Tempel zugleich gekrönt',
   raceDrawText: 'Unentschieden: noch ein Rennen?',
   raceCrowned: 'Zuerst gekrönt, mit {tiers} Ebenen.',
-  raceLast: 'Der andere Tempel fiel zuerst, bei {tiers} Ebenen.',
+  raceLast: { one: 'Der andere Tempel fiel zuerst, bei {n} Ebene.', other: 'Der andere Tempel fiel zuerst, bei {n} Ebenen.' },
   raceAgain: 'Neues Rennen',
   raceBack: 'Zurück',
 };

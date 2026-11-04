@@ -1071,7 +1071,7 @@ export class GameScene extends Phaser.Scene {
     } else if (!from && canClear(this.state, at.col, at.row)) {
       placed = clear(this.state, at.col, at.row);
       if (placed) sfx('chop');
-    } else if (!from && this.state.grid[at.row][at.col] === 'market' && canTrade(this.state)) {
+    } else if (!from && this.state.grid[at.row][at.col] === 'market' && !rivalAt(this.state, at.col, at.row) && canTrade(this.state)) {
       ui('click');
       this.openTrade();
       return;
@@ -1291,17 +1291,17 @@ export class GameScene extends Phaser.Scene {
       this.hint(cx, y + GRID.cell - 12, t('clearWood'));
       return;
     }
+    // A rival lord's building (its market too): nothing of the player's can go there.
+    if (rivalAt(this.state, at.col, at.row)) {
+      box(at.col, at.row, PLUM_FILL);
+      this.hint(cx, y + GRID.cell - 12, t('rivalOwns'));
+      return;
+    }
     // A market: a tap opens the trade card while a trade can be made this round.
     if (this.state.grid[at.row][at.col] === 'market') {
       const can = canTrade(this.state);
       box(at.col, at.row, can ? TEAL : CORAL);
       this.hint(cx, y + GRID.cell - 12, t(can ? 'tapToTrade' : this.state.tradedIn === this.state.round ? 'tradedThisRound' : 'noTrade'));
-      return;
-    }
-    // A rival lord's building: nothing of the player's can go there.
-    if (rivalAt(this.state, at.col, at.row)) {
-      box(at.col, at.row, PLUM_FILL);
-      this.hint(cx, y + GRID.cell - 12, t('rivalOwns'));
       return;
     }
     const ok = canPlace(this.state, at.col, at.row, kind);

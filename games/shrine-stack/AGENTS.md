@@ -166,8 +166,10 @@ Implemented today:
   `makeRace`) makes two such states from one random seed (so both get the same stones and trials),
   draws each in a container scaled by `SCALE` in its half of the view (scrolled down as it grows,
   `follow`), drops with a tap on that half or A/L, and `judge`s each frame: the first `crowned` wins,
-  one `over` loses to the other, both at once is a draw. Its end panel has Race again
-  (`scene.restart`) and Back (`scene.start('Game')`). It keeps no save and awards no trophies.
+  one `over` loses to the other, two crowns or two misses in the same frame are a draw. It adds a
+  second touch pointer (`addPointer`), so both players can tap at once. Its end panel has Race
+  again (`scene.restart`) and Back (`scene.start('Game', {})`, with empty data so a village build's
+  `{ village: true }` isn't reused). It keeps no save and awards no trophies.
 - The game ends on a miss (a stone keeping less than `MIN_W`) unless Mason's Grace catches it; a
   caught stone still marks the tier `wobbly` and fails its trial (with a `trial` event), then is
   replayed.

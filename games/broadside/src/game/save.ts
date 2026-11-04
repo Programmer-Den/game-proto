@@ -3,6 +3,7 @@
 import { BEAST_KINDS, emptyWall, type Wall } from './beasts';
 import { CAPTAIN_IDS, type CaptainId } from './captains';
 import { FIRST_HULL, HULLS, type HullId } from './hulls';
+import { REACHES_WAVES } from './waves';
 
 const KEY = 'broadside-best-wave';
 const MEDALS_KEY = 'broadside-medals';
@@ -32,7 +33,8 @@ function save(key: string, n: number) {
 export const loadBestWave = () => load(KEY);
 export const saveBestWave = (wave: number) => save(KEY, wave);
 export const loadMedals = () => load(MEDALS_KEY);
-export const loadReachesBest = () => load(REACHES_KEY);
+/** The best Storm Reaches wave, at most their last (a record saved past it after sailing on reads as the Tempest's). */
+export const loadReachesBest = () => Math.min(REACHES_WAVES, load(REACHES_KEY));
 export const saveReachesBest = (wave: number) => save(REACHES_KEY, wave);
 export const saveMedals = (medals: number) => save(MEDALS_KEY, medals);
 

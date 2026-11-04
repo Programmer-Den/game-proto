@@ -59,7 +59,7 @@ import { DIVE_MS, FIRST_DIVE_MS, HEAD_MS, isBeast, type BeastKind, SURFACE_AT, T
 import { FLARE_MS, FLARES, FLASH_MS, isNightWave, NIGHT_SIGHT } from './night';
 import { cargoPrice, cargoSale, HOLD_MAX, RAIDER_BRIG_WAVE, raidersFor, type CargoId } from './trade';
 import { costOf, HIRE, REPAIR_COST, type UpgradeId } from './upgrades';
-import { fortsFor, HAVEN_WAVE, hpScale, inReaches, reachWave, TEMPEST_WAVE, waveShips } from './waves';
+import { fortsFor, HAVEN_WAVE, hpScale, inReaches, reachWave, REACHES_WAVES, TEMPEST_WAVE, waveShips } from './waves';
 
 /** Time between enemy ships coming over the horizon. */
 const SPAWN_MS = 2500;
@@ -549,11 +549,11 @@ function sailConvoy(s: GameState, e: Ship, to: number, dt: number) {
   steer(e, fend(e, want, to), type.turn, speedOf(s, e) * shorten, dt);
 }
 
-/** The enemy ship afloat nearest `from`, within `within`. */
+/** The enemy ship afloat nearest `from`, within `within`, that the player's crews can see (`seen`, so at night only one lit). */
 function nearestFoe(s: GameState, from: { x: number; y: number }, within: number) {
   let best: Ship | null = null;
   for (const e of s.enemies) {
-    if (!afloat(e) || distance(from, e) >= within) continue;
+    if (!afloat(e) || !seen(s, e) || distance(from, e) >= within) continue;
     if (!best || distance(from, e) < distance(from, best)) best = e;
   }
   return best;
@@ -863,7 +863,7 @@ function escortBroadsides(s: GameState, dt: number) {
     for (const side of SIDES) {
       e.reload[side] = Math.max(0, e.reload[side] - reloadStep(e, dt * pace));
       if (e.reload[side] > 0) continue;
-      const target = s.enemies.find((t) => afloat(t) && distance(e, t) < type.range && sideFacing(e, t) === side);
+      const target = s.enemies.find((t) => afloat(t) && seen(s, t) && distance(e, t) < type.range && sideFacing(e, t) === side);
       if (!target) continue;
       fire(s, e, side, target, speedOf(s, target), type.guns, type.damage, type.range, ENEMY_SPREAD, 'round', 1, 1, true);
       e.reload[side] = type.reloadMs;
@@ -1320,7 +1320,7 @@ function reachHarbor(s: GameState) {
   // The crew has the whole harbor to reload; consorts and enemies set out loaded too.
   s.player.reload = { port: 0, starboard: 0 };
   s.bestWave = Math.max(s.bestWave, s.wave);
-  if (inReaches(s.wave)) s.reachesBest = Math.max(s.reachesBest, reachWave(s.wave));
+  if (inReaches(s.wave)) s.reachesBest = Math.max(s.reachesBest, Math.min(REACHES_WAVES, reachWave(s.wave)));
   const max = stats(s).maxHp;
   s.player.hp = Math.min(max, s.player.hp + Math.round(max * HARBOR_PATCH));
   s.helm = 0;

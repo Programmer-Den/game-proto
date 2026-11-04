@@ -50,8 +50,9 @@ chapter ends.
   turns windmills and pinwheels.
 - **Fishing.** A fishing rod waits in a chest by Mossford's pond. Face water and press Space, J or
   the sword button (or tap the water) to cast; when the float dips, press again (or tap) to pull.
-  Perch bite in the village pond, eels in the woods' river and the fen, bream off the coast. Your
-  creel holds five of each.
+  Perch bite in the village pond, eels in the woods' river and the fen, bream off the coast;
+  nothing bites in the dungeons' water. Walking or rolling away pulls the line in. Your creel holds
+  five of each.
 - **Cooking.** At a campfire (in Mossford, by Sedge's hut, by Tam's and by Nell's) cook two fish
   into a meal that lasts until you next fall: perch stew (one more heart), eel skewers (a faster
   roll, sooner again) or bream chowder (the hookvine reaches farther). One meal at a time.

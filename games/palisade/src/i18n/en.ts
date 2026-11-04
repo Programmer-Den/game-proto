@@ -407,6 +407,9 @@ const en = {
   endlessOpen: 'Endless siege: hold on past wave 30 as every wave grows stronger. Best here: wave {n}.',
   endlessChip: 'Endless, best {n}',
   endlessFallen: 'Endless siege on this map: best wave {best}.',
+  endlessOpenNew: 'Endless siege: hold on past wave 30 as every wave grows stronger.',
+  endlessChipNew: 'Endless siege',
+  endlessFallenNew: 'Endless siege on this map: no wave past 30 cleared yet.',
 };
 
 export default en;
