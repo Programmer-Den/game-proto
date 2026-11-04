@@ -2,10 +2,12 @@ import { byDifficulty } from '../../../../shared/settings';
 import { t as tr } from '../i18n';
 import {
   CARGO_NAMES,
+  LOCAL_GOODS,
   ROOST,
-  TRACK_COST,
+  VALLEY_KINDS,
   WORKSHOPS,
   generateValley,
+  terrainCost,
   key,
   manhattan,
   neighbours,
@@ -20,7 +22,21 @@ import {
   BANNER_MS,
   BASE_SPEED,
   BOONS,
+  CANYON_HAZARDS,
+  CHARMING_GAP,
   CHARTERS,
+  COLD_HUNGER,
+  FRUGAL_HUNGER,
+  HAZARD_TEXT,
+  KIND_TEXT,
+  LOCAL_PAY,
+  MOULT_OFFER,
+  MOULT_ROUNDS,
+  NIMBLE_TIME,
+  TRAITS,
+  TRAIT_SPEED,
+  TRAIT_TEXT,
+  kindOfLeg,
   CHARTER_ROUND,
   COURIER_COST,
   DEPOT_COST,
@@ -74,9 +90,11 @@ import {
   roundGoal,
   type Charter,
   type GameState,
+  type HazardKind,
   type Job,
   type Medal,
   type Order,
+  type Trait,
   type Upgrade,
   type Wyrm,
 } from './state';
@@ -91,9 +109,27 @@ export const boonNames = (m: Medal) => MEDALS.slice(0, MEDALS.indexOf(m) + 1).ma
 /** Whether a medal's boons apply: `boon` (the best medal on this difficulty) is it or a better one. */
 export const hasBoon = (s: GameState, m: Medal) => s.boon !== null && MEDALS.indexOf(s.boon) >= MEDALS.indexOf(m);
 
-/** A new game; `boon` is the best festival medal won on this difficulty, whose boons it starts with. */
-export function newGame(boon: Medal | null = null): GameState {
-  const valley = generateValley();
+/** Where a game stands in a chain of valleys: which valley, the upgrade kept and the traits, and whether it is the daily valley. */
+export interface Journey {
+  leg: number;
+  kept: { upgrade: Upgrade; level: number } | null;
+  traits: Trait[];
+  daily: boolean;
+}
+
+/**
+ * A new game; `boon` is the best festival medal won on this difficulty, whose boons the first
+ * valley starts with. `journey` carries a chain of valleys on (WR15): the next valley's kind, the
+ * one upgrade kept and the moults' traits. The daily valley (WR17) is picked with `rand`, today's
+ * seed, and has no boons.
+ */
+export function newGame(boon: Medal | null = null, journey: Partial<Journey> = {}, rand: () => number = Math.random): GameState {
+  const leg = journey.leg ?? 1;
+  const daily = journey.daily ?? false;
+  const kind = daily ? VALLEY_KINDS[Math.floor(rand() * VALLEY_KINDS.length)] : kindOfLeg(leg);
+  const valley = generateValley(rand, kind);
+  if (daily || leg > 1) boon = null;
+  const kept = journey.kept ?? null;
   const s: GameState = {
     phase: 'play',
     valley,
@@ -116,21 +152,32 @@ export function newGame(boon: Medal | null = null): GameState {
     charter: null,
     charterOffer: null,
     depots: [],
+    leg,
+    kept,
+    traits: [...(journey.traits ?? [])],
+    moultOffer: null,
+    daily,
     boon,
     festivalMs: 0,
     medal: null,
     wyrms: [newWyrm()],
     upgrades: { wings: 0, hoard: 0, second: 0 },
     orderTimerMs: ORDER_EVERY_MS,
-    banner: {
-      text: tr('startBanner') + (boon ? '\n' + tr('medalBoons', { boons: boonNames(boon).join(', ') }) : ''),
-      ms: BANNER_MS * (boon ? 2 : 1.5),
-    },
+    banner: null,
     pops: [],
     nextId: 1,
   };
   if (hasBoon(s, 'bronze')) s.coins += HEAD_START_COINS;
   if (hasBoon(s, 'silver')) s.upgrades.wings = 1;
+  // The upgrade kept from the last valley, at its level there: a kept second wyrm flies on too.
+  if (kept) s.upgrades[kept.upgrade] = Math.max(s.upgrades[kept.upgrade], kept.level);
+  if (s.upgrades.second) s.wyrms.push(newWyrm());
+  const [a, b] = valley.villages;
+  const lines = [tr('startBanner', { a: a.name, b: b.name })];
+  if (daily || leg > 1) lines.unshift(tr(daily ? 'dailyBanner' : 'valleyBanner', { n: leg, valley: tr(KIND_TEXT[kind].name) }), tr(KIND_TEXT[kind].intro));
+  if (kept) lines.push(tr('keptBanner', { upgrade: tr(UPGRADE_NAMES[kept.upgrade]) }));
+  if (boon) lines.push(tr('medalBoons', { boons: boonNames(boon).join(', ') }));
+  s.banner = { text: lines.join('\n'), ms: BANNER_MS * (lines.length > 1 ? 2 : 1.5) };
   // The first order is always grain from Millbrook to Ashford.
   addOrder(s, 0, 1);
   return s;
@@ -146,7 +193,19 @@ export const openVillages = (s: GameState) => villages(s).filter((v) => v.round 
 export const festivalHost = (s: GameState) => villages(s).length - 1;
 
 /** The workshop of a village, if it has one. */
-export const workshopOf = (v: Village) => WORKSHOPS[v.name] ?? null;
+export const workshopOf = (v: Village) => WORKSHOPS[v.id] ?? null;
+
+/** Each upgrade's name, as a key of `i18n/en.ts`, for the upgrade kept on a flight to the next valley. */
+export const UPGRADE_NAMES = { wings: 'wingsName', hoard: 'hoardName', second: 'secondName' } as const;
+
+/** Whether the wyrms have a trait from a moult. */
+export const hasTrait = (s: GameState, t: Trait) => s.traits.includes(t);
+
+/** How many orders a wyrm carries at once: one a wagon, and a third wagon from a moult. */
+export const wagons = (s: GameState) => WAGONS + (hasTrait(s, 'wagon') ? 1 : 0);
+
+/** The game waits for a pick: a moult's traits or the round's charters are on offer. */
+export const choosing = (s: GameState) => !!(s.charterOffer || s.moultOffer);
 
 /** A station: the Roost or a village that has joined the line. */
 function isStation(s: GameState, t: Tile) {
@@ -167,12 +226,12 @@ export function trackCost(s: GameState, t: Tile): number | null {
   if (sameTile(t, ROOST) || villages(s).some((v) => sameTile(v, t))) return null;
   // Track grows from the line: next to track, the Roost or an open village.
   if (!neighbours(t).some((n) => onLine(s, n))) return null;
-  return Math.max(1, Math.round(TRACK_COST[terrain] * (s.charter?.track ?? 1)));
+  return Math.max(1, Math.round(terrainCost(s.valley.kind, terrain) * (s.charter?.track ?? 1)));
 }
 
 export function canBuild(s: GameState, t: Tile) {
   const cost = trackCost(s, t);
-  return s.phase === 'play' && !s.charterOffer && cost !== null && cost <= s.coins;
+  return s.phase === 'play' && !choosing(s) && cost !== null && cost <= s.coins;
 }
 
 /**
@@ -213,7 +272,7 @@ const tileOf = (k: string): Tile => {
 
 /** Track can be taken up for half its cost, unless the wyrm stands on it or is about to cross it. */
 export function canRemove(s: GameState, t: Tile) {
-  if (s.phase !== 'play' || s.charterOffer || !s.track.includes(key(t))) return false;
+  if (s.phase !== 'play' || choosing(s) || !s.track.includes(key(t))) return false;
   return s.wyrms.every((w) => !sameTile(w.at, t) && !w.path.some((p) => sameTile(p, t)));
 }
 
@@ -257,7 +316,7 @@ function syncSwitches(s: GameState, newest?: Tile) {
 /** Throws the switch on a junction: it is set against the next of its arms. */
 export function throwSwitch(s: GameState, t: Tile) {
   const closed = s.switches[key(t)];
-  if (s.phase !== 'play' || s.charterOffer || !closed) return false;
+  if (s.phase !== 'play' || choosing(s) || !closed) return false;
   const a = arms(s, t).map(key);
   s.switches[key(t)] = a[(a.indexOf(closed) + 1) % a.length];
   return true;
@@ -362,7 +421,13 @@ export function buyUpgrade(s: GameState, u: Upgrade) {
 
 /** A wyrm's speed in tiles a second: Swift wings make it faster, an empty belly slower. */
 export const wyrmSpeed = (s: GameState, w: Wyrm) =>
-  (BASE_SPEED + WINGS_SPEED * s.upgrades.wings) * (w.food <= 0 ? STARVING_SLOWDOWN : 1);
+  (BASE_SPEED + WINGS_SPEED * s.upgrades.wings + (hasTrait(s, 'swift') ? TRAIT_SPEED : 0)) * (w.food <= 0 ? STARVING_SLOWDOWN : 1);
+
+/** What each tile costs a wyrm's belly: more in the snowy valley's cold, less once it has moulted Frugal. */
+const foodPerTile = (s: GameState) => FOOD_PER_TILE * (s.valley.kind === 'snow' ? COLD_HUNGER : 1) * (hasTrait(s, 'frugal') ? FRUGAL_HUNGER : 1);
+
+/** Loading and throwing a switch take half as long once the wyrm has moulted Nimble. */
+const nimble = (s: GameState, ms: number) => ms * (hasTrait(s, 'nimble') ? NIMBLE_TIME : 1);
 
 /** What delivering an order pays, with the Golden hoard. */
 export const orderPay = (s: GameState, o: Order) => Math.round(o.pay * (1 + HOARD_BONUS * s.upgrades.hoard));
@@ -381,10 +446,20 @@ function jobTarget(s: GameState, job: Job): Tile | null {
 /** Picks one of the two charters on offer for the round; the game goes on. */
 export function pickCharter(s: GameState, i: number) {
   const charter = s.charterOffer?.[i];
-  if (s.phase !== 'play' || !charter) return false;
+  if (s.phase !== 'play' || s.moultOffer || !charter) return false;
   s.charter = charter;
   s.charterOffer = null;
   s.banner = { text: tr('charterBanner', { name: tr(charter.name) }), ms: BANNER_MS };
+  return true;
+}
+
+/** Picks one of the traits a moult offers (WR16): the wyrms keep it for the game and the valleys after it. */
+export function pickMoult(s: GameState, i: number) {
+  const trait = s.moultOffer?.[i];
+  if (s.phase !== 'play' || !trait) return false;
+  s.traits.push(trait);
+  s.moultOffer = null;
+  s.banner = { text: tr('moultBanner', { name: tr(TRAIT_TEXT[trait].name) }), ms: BANNER_MS };
   return true;
 }
 
@@ -397,7 +472,7 @@ export const depotLocked = (s: GameState) => s.round < DEPOT_ROUND;
 /** Whether a depot can go at village `v`: an open village without one, once depots are unlocked and paid for. */
 export function canBuyDepot(s: GameState, v: number) {
   return (
-    s.phase === 'play' && !s.charterOffer && !depotLocked(s) && openIndexes(s).includes(v) && !s.depots.includes(v) && depotCost(s) <= s.coins
+    s.phase === 'play' && !choosing(s) && !depotLocked(s) && openIndexes(s).includes(v) && !s.depots.includes(v) && depotCost(s) <= s.coins
   );
 }
 
@@ -433,7 +508,7 @@ function courierFor(s: GameState, v: number) {
 
 /** Whether a courier call can go to village `v`: moods count, it isn't delighted already, the gifts are paid for, and a free wyrm can reach it. */
 export function canSendCourier(s: GameState, v: number) {
-  if (s.phase !== 'play' || s.charterOffer || s.round < MOOD_ROUND || s.coins < COURIER_COST) return false;
+  if (s.phase !== 'play' || choosing(s) || s.round < MOOD_ROUND || s.coins < COURIER_COST) return false;
   if (!openIndexes(s).includes(v) || s.moods[v] >= MOOD_MAX) return false;
   if (s.wyrms.some((w) => w.job?.leg === 'visit' && w.job.village === v)) return false;
   return courierFor(s, v) !== null;
@@ -455,12 +530,12 @@ export function sendCourier(s: GameState, v: number) {
 /** A charter's pay for this cargo, times the usual: its `pay` for every cargo, or only for its own. */
 const charterPay = (s: GameState, cargo: Cargo) => (s.charter && (!s.charter.cargo || s.charter.cargo === cargo) ? s.charter.pay : 1);
 
-/** Moves the game on by `dt` milliseconds of game time. The game waits while a charter is on offer. */
+/** Moves the game on by `dt` milliseconds of game time. The game waits while a charter or a moult is on offer. */
 export function tick(s: GameState, dt: number) {
   for (const p of s.pops) p.ms -= dt;
   s.pops = s.pops.filter((p) => p.ms > 0);
   if (s.banner && (s.banner.ms -= dt) <= 0) s.banner = null;
-  if (s.phase !== 'play' || s.charterOffer) return;
+  if (s.phase !== 'play' || choosing(s)) return;
 
   if (s.orders.length < MAX_ORDERS && (s.orderTimerMs -= dt * (s.charter?.orders ?? 1)) <= 0) {
     s.orderTimerMs = ORDER_EVERY_MS;
@@ -499,7 +574,7 @@ function cheer(s: GameState, v: number, by: number) {
 function tickMoods(s: GameState, dt: number) {
   if (s.round < MOOD_ROUND || s.round === FESTIVAL_ROUND) return;
   const open = openIndexes(s);
-  const gap = MOOD_GAP_MS + MOOD_GAP_PER_VILLAGE_MS * open.length;
+  const gap = (MOOD_GAP_MS + MOOD_GAP_PER_VILLAGE_MS * open.length) * (hasTrait(s, 'charming') ? CHARMING_GAP : 1);
   for (const v of open) {
     if ((s.idleMs[v] += dt) < gap) continue;
     s.idleMs[v] = 0;
@@ -509,13 +584,22 @@ function tickMoods(s: GameState, dt: number) {
   }
 }
 
-/** The track a washout (a bridge) or a rockfall (track beside a mountain, not a tunnel through one) could take. */
-function hazardKind(s: GameState, t: Tile): 'washout' | 'rockfall' | null {
+/**
+ * The hazard that could take the track on `t`, by the valley's kind: a washout (a bridge) or a
+ * rockfall (track beside a mountain, not a tunnel through one) in the meadow and the canyon; an
+ * avalanche beside a mountain in the snowy valley, whose frozen river takes no bridge; a washout
+ * or a sinkhole (track on the bank beside the water) in the marsh.
+ */
+export function hazardKind(s: GameState, t: Tile): HazardKind | null {
   const terrain = terrainAt(s.valley, t);
-  if (terrain === 'river') return 'washout';
+  const kind = s.valley.kind;
+  if (terrain === 'river') return kind === 'snow' ? null : 'washout';
   // A tunnel runs inside the mountain, safe from the stones coming down its sides.
   if (terrain === 'mountain') return null;
-  return neighbours(t).some((n) => terrainAt(s.valley, n) === 'mountain') ? 'rockfall' : null;
+  const beside = (x: string) => neighbours(t).some((n) => terrainAt(s.valley, n) === x);
+  if (kind === 'marsh') return beside('river') ? 'sinkhole' : null;
+  if (!beside('mountain')) return null;
+  return kind === 'snow' ? 'avalanche' : 'rockfall';
 }
 
 /** From `HAZARD_ROUND`, a washout or a rockfall is warned every so often and takes a tile's track when its time is up. */
@@ -526,17 +610,14 @@ function tickHazard(s: GameState, dt: number) {
     return;
   }
   if ((s.hazardTimerMs -= dt) > 0) return;
-  s.hazardTimerMs = HAZARD_EVERY_MS;
+  s.hazardTimerMs = HAZARD_EVERY_MS * (s.valley.kind === 'canyon' ? CANYON_HAZARDS : 1);
   // Never under a wyrm: one standing there could be cut off from every way off the tile.
   const spots = s.track.map(tileOf).filter((t) => hazardKind(s, t) && !s.wyrms.some((w) => sameTile(w.at, t)));
   if (!spots.length) return;
   const tile = spots[Math.floor(Math.random() * spots.length)];
   const kind = hazardKind(s, tile)!;
   s.hazard = { tile, kind, ms: HAZARD_WARN_MS };
-  s.banner = {
-    text: tr(kind === 'washout' ? 'washoutWarning' : 'rockfallWarning'),
-    ms: BANNER_MS,
-  };
+  s.banner = { text: tr(HAZARD_TEXT[kind].warning), ms: BANNER_MS };
 }
 
 /** The hazard takes its tile's track, once no wyrm is on it or about to cross it; the wyrms heading over it stop short and think again. */
@@ -557,7 +638,7 @@ function strikeHazard(s: GameState) {
   s.track = s.track.filter((k) => k !== key(h.tile));
   delete s.paid[key(h.tile)];
   syncSwitches(s);
-  pop(s, tr(h.kind === 'washout' ? 'washedOut' : 'rockfall'), h.tile, '#f08a6a');
+  pop(s, tr(HAZARD_TEXT[h.kind].pop), h.tile, '#f08a6a');
   for (const w of s.wyrms) {
     const i = w.path.findIndex((t) => sameTile(t, h.tile));
     if (i < 0) continue;
@@ -624,7 +705,7 @@ function moveWyrm(s: GameState, i: number, dt: number) {
       w.from = w.at;
       w.at = w.path.shift()!;
       w.progress -= 1;
-      if (!s.charter?.fed) w.food = Math.max(0, w.food - FOOD_PER_TILE);
+      if (!s.charter?.fed) w.food = Math.max(0, w.food - foodPerTile(s));
       // On every tile it looks again at the switches ahead, so a switch thrown on the fly steers it.
       const target = w.job && w.path.length ? jobTarget(s, w.job) : null;
       if (target) w.path = planRoute(s, w, target) ?? w.path;
@@ -641,7 +722,7 @@ function moveWyrm(s: GameState, i: number, dt: number) {
 /** The switch ahead is set against the wyrm and no open way is left: it stops on the junction to throw it. */
 function stopForSwitch(s: GameState, w: Wyrm) {
   w.progress = 0;
-  w.switchMs = SWITCH_MS;
+  w.switchMs = nimble(s, SWITCH_MS);
   pop(s, tr('switchPop'), w.at, '#f0c070');
 }
 
@@ -683,7 +764,7 @@ function nextStop(s: GameState, i: number) {
   const carrying = s.orders.filter((o) => o.status === 'carrying' && o.wyrm === i);
   const stops: { order: Order; leg: 'pickup' | 'drop' }[] = carrying.map((order) => ({ order, leg: 'drop' }));
   // Passengers take both wagons: a wyrm fetches them only when empty, and loads nothing else with them.
-  if (carrying.length < WAGONS && !carrying.some(isPassengers)) {
+  if (carrying.length < wagons(s) && !carrying.some(isPassengers)) {
     for (const id of s.queue) {
       const order = s.orders.find((o) => o.id === id);
       if (order && !(isPassengers(order) && carrying.length)) stops.push({ order, leg: 'pickup' });
@@ -731,7 +812,7 @@ function arrive(s: GameState, i: number) {
       return;
     }
     o.status = 'loading';
-    w.loadMs = LOAD_MS;
+    w.loadMs = nimble(s, LOAD_MS);
     return;
   }
   // Delivered, in time: the village is visited and cheered.
@@ -784,6 +865,13 @@ function nextRound(s: GameState) {
   if (joining) s.idleMs[villages(s).indexOf(joining)] = 0;
   s.charter = null;
   if (s.round >= CHARTER_ROUND) s.charterOffer = offerCharters(s);
+  // A moult: the wyrm sheds its skin and the player picks a lasting trait, before the round's charter.
+  const lacking = TRAITS.filter((t) => !hasTrait(s, t));
+  if (MOULT_ROUNDS.includes(s.round) && lacking.length) {
+    const offer: Trait[] = [];
+    while (offer.length < MOULT_OFFER && lacking.length) offer.push(lacking.splice(Math.floor(Math.random() * lacking.length), 1)[0]);
+    s.moultOffer = offer;
+  }
   s.banner = {
     text:
       s.round === FESTIVAL_ROUND
@@ -846,7 +934,8 @@ function addOrder(s: GameState, from: number, to: number, made = false, passenge
   const charter = s.charter;
   const time = (mood < 0 ? MOOD_RUSH : 1) * (passengers ? PASSENGER_TIME : 1) * (charter?.time ?? 1);
   const totalMs = Math.round((DEADLINE_BASE_MS + DEADLINE_PER_TILE_MS * dist) * byDifficulty(1.5, 1, 0.7) * time);
-  const pay = (made ? WORKSHOP_PAY : 1) * MOOD_PAY[Math.max(0, mood)] * (passengers ? PASSENGER_PAY : 1) * charterPay(s, cargo);
+  const local = cargo === LOCAL_GOODS[s.valley.kind] ? LOCAL_PAY : 1;
+  const pay = local * (made ? WORKSHOP_PAY : 1) * MOOD_PAY[Math.max(0, mood)] * (passengers ? PASSENGER_PAY : 1) * charterPay(s, cargo);
   s.orders.push({
     id: s.nextId++,
     cargo,

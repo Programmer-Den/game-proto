@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { COLS, ROWS, VILLAGE_NAMES, type Terrain, type Valley } from '../game/map';
+import { COLS, ROWS, VILLAGE_NAMES, type Terrain, type Valley, type ValleyKind } from '../game/map';
 import { BOARD, ISO, iso } from '../scenes/layout';
 import { bakeCanvas, mix, poly, shadow, type Ctx, type Pt } from './canvas';
 import { seeded } from './pixelArt';
@@ -32,11 +32,12 @@ export const ROOFS: Record<string, [string, string]> = {
 export function bakeValley(scene: Phaser.Scene, valley: Valley) {
   bakeCanvas(scene, 'valley', BOARD.w, BOARD.h, (ctx) => {
     ctx.translate(-BOARD.x, -BOARD.y);
-    backdrop(ctx);
+    const look = LOOKS[valley.kind];
+    backdrop(ctx, look);
     for (let s = 0; s < COLS + ROWS - 1; s++) {
       for (let c = 0; c < COLS; c++) {
         const r = s - c;
-        if (r >= 0 && r < ROWS) block(ctx, c, r, valley.terrain[r][c]);
+        if (r >= 0 && r < ROWS) block(ctx, c, r, valley.terrain[r][c], look);
       }
     }
   });
@@ -46,6 +47,7 @@ export function bakeValley(scene: Phaser.Scene, valley: Valley) {
 export function bakeProps(scene: Phaser.Scene) {
   prop(scene, 'forest', forest);
   prop(scene, 'peak', mountain);
+  prop(scene, 'mesa', mesa);
   prop(scene, 'roost', roost);
   for (const name of VILLAGE_NAMES) prop(scene, `village-${name}`, (ctx, L) => village(ctx, L, ROOFS[name] ?? ['#c0b090', '#a09070']));
   prop(scene, 'bunting', bunting);
@@ -62,11 +64,11 @@ function prop(scene: Phaser.Scene, key: string, draw: (ctx: Ctx, L: Local) => vo
   bakeCanvas(scene, key, PROP.w, PROP.h, (ctx) => draw(ctx, L));
 }
 
-function backdrop(ctx: Ctx) {
+function backdrop(ctx: Ctx, look: Look) {
   const rnd = seeded(7);
   const g = ctx.createLinearGradient(0, BOARD.y, 0, BOARD.y + BOARD.h);
-  g.addColorStop(0, '#9fcfe0');
-  g.addColorStop(1, '#d9ead0');
+  g.addColorStop(0, look.sky[0]);
+  g.addColorStop(1, look.sky[1]);
   ctx.fillStyle = g;
   ctx.fillRect(BOARD.x, BOARD.y, BOARD.w, BOARD.h);
   ctx.fillStyle = 'rgba(255,255,255,0.35)';
@@ -90,11 +92,82 @@ function backdrop(ctx: Ctx) {
   ctx.fill();
 }
 
-const GRASS = ['#82c45c', '#7bbd56', '#88c962'];
-const FOREST = ['#6eae4f', '#68a84a', '#73b354'];
+/** How each kind of valley looks (WR15): its sky, its ground, its earth, its water and its tufts. */
+interface Look {
+  sky: [string, string];
+  grass: string[];
+  forest: string[];
+  lip: string;
+  earth: [string, string];
+  rock: string;
+  bed: string;
+  /** The river bed's lip, under its front edges. */
+  bank: string;
+  water: [string, string, string];
+  ripple: string;
+  tuft: string;
+}
+
+const LOOKS: Record<ValleyKind, Look> = {
+  meadow: {
+    sky: ['#9fcfe0', '#d9ead0'],
+    grass: ['#82c45c', '#7bbd56', '#88c962'],
+    forest: ['#6eae4f', '#68a84a', '#73b354'],
+    lip: '#5f9c40',
+    earth: ['#9a6a43', '#7b5133'],
+    rock: '#9fa08e',
+    bed: '#e2cd95',
+    bank: '#c9b47c',
+    water: ['#3c8ad2', '#4a98de', '#2f74b8'],
+    ripple: 'rgba(200,232,255,0.75)',
+    tuft: 'rgba(70,130,45,0.65)',
+  },
+  // Snow over everything, and the river frozen to pale ice.
+  snow: {
+    sky: ['#b8cde0', '#eef2f6'],
+    grass: ['#eef3f8', '#e6edf4', '#f4f7fa'],
+    forest: ['#dfe8ef', '#d8e2ea', '#e4ecf2'],
+    lip: '#b8c8d6',
+    earth: ['#8a7a70', '#6e5f58'],
+    rock: '#c8ccd8',
+    bed: '#d8e4ee',
+    bank: '#bccbd8',
+    water: ['#a8d0ea', '#c4e2f4', '#94c0e0'],
+    ripple: 'rgba(255,255,255,0.9)',
+    tuft: 'rgba(150,170,190,0.6)',
+  },
+  // Dull olive ground under a grey sky, with brown peaty water.
+  marsh: {
+    sky: ['#a8b8b0', '#d4dccc'],
+    grass: ['#7f9a52', '#76914b', '#86a058'],
+    forest: ['#6a8646', '#647f42', '#6f8c4a'],
+    lip: '#5a6e3a',
+    earth: ['#6e5a3c', '#54442c'],
+    rock: '#8e9080',
+    bed: '#9a8a5a',
+    bank: '#82744a',
+    water: ['#4f6e5a', '#5c7c64', '#42604e'],
+    ripple: 'rgba(200,220,190,0.6)',
+    tuft: 'rgba(60,80,40,0.7)',
+  },
+  // Red sand under a hot sky, the river deep in its gorge.
+  canyon: {
+    sky: ['#f0c890', '#f8e6c8'],
+    grass: ['#dca46a', '#d49c62', '#e2ac72'],
+    forest: ['#c8a060', '#c09858', '#cea666'],
+    lip: '#b8784a',
+    earth: ['#a8563a', '#86402a'],
+    rock: '#c07a58',
+    bed: '#8a4a32',
+    bank: '#743c28',
+    water: ['#3c7ac2', '#4a88ce', '#2f68a8'],
+    ripple: 'rgba(200,232,255,0.6)',
+    tuft: 'rgba(150,100,50,0.6)',
+  },
+};
 
 /** One tile: its top, and the earth under its front faces. */
-function block(ctx: Ctx, c: number, r: number, t: Terrain) {
+function block(ctx: Ctx, c: number, r: number, t: Terrain, look: Look) {
   const rnd = seeded(c * 31 + r * 7 + 1);
   const drop = t === 'river' ? RIVER_DROP : 0;
   const D = ISO.depth;
@@ -103,9 +176,9 @@ function block(ctx: Ctx, c: number, r: number, t: Terrain) {
   const B = iso(c + 1, r + 1, -drop);
   const L = iso(c, r + 1, -drop);
   const down = (p: Pt, d: number) => ({ x: p.x, y: p.y + d });
-  const lip = t === 'river' ? '#c9b47c' : '#5f9c40';
-  poly(ctx, [L, B, down(B, D - drop), down(L, D - drop)], '#9a6a43');
-  poly(ctx, [B, R, down(R, D - drop), down(B, D - drop)], '#7b5133');
+  const lip = t === 'river' ? look.bank : look.lip;
+  poly(ctx, [L, B, down(B, D - drop), down(L, D - drop)], look.earth[0]);
+  poly(ctx, [B, R, down(R, D - drop), down(B, D - drop)], look.earth[1]);
   poly(ctx, [L, B, down(B, 4), down(L, 4)], t === 'river' ? lip : mix(lip, '#ffffff', 0.05));
   poly(ctx, [B, R, down(R, 4), down(B, 4)], t === 'river' ? lip : mix(lip, '#000000', 0.15));
   ctx.strokeStyle = 'rgba(90,55,30,0.55)';
@@ -118,18 +191,18 @@ function block(ctx: Ctx, c: number, r: number, t: Terrain) {
     ctx.stroke();
   }
   const pick = (arr: string[]) => arr[(c * 7 + r * 13) % arr.length];
-  const top = t === 'forest' ? pick(FOREST) : t === 'mountain' ? '#9fa08e' : t === 'river' ? '#e2cd95' : pick(GRASS);
+  const top = t === 'forest' ? pick(look.forest) : t === 'mountain' ? look.rock : t === 'river' ? look.bed : pick(look.grass);
   poly(ctx, [T, R, B, L], top);
   if (t === 'river') {
     const z = -drop - 1;
     const a = iso(c + 0.12, r, z);
     const b = iso(c + 0.88, r, z);
     const wg = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
-    wg.addColorStop(0, '#3c8ad2');
-    wg.addColorStop(0.5, '#4a98de');
-    wg.addColorStop(1, '#2f74b8');
+    wg.addColorStop(0, look.water[0]);
+    wg.addColorStop(0.5, look.water[1]);
+    wg.addColorStop(1, look.water[2]);
     poly(ctx, [a, b, iso(c + 0.88, r + 1, z), iso(c + 0.12, r + 1, z)], wg);
-    ctx.strokeStyle = 'rgba(200,232,255,0.75)';
+    ctx.strokeStyle = look.ripple;
     ctx.lineWidth = 1.5;
     ctx.lineCap = 'round';
     for (let i = 0; i < 3; i++) {
@@ -143,7 +216,7 @@ function block(ctx: Ctx, c: number, r: number, t: Terrain) {
       ctx.stroke();
     }
   } else if (t !== 'mountain') {
-    ctx.strokeStyle = 'rgba(70,130,45,0.65)';
+    ctx.strokeStyle = look.tuft;
     ctx.lineWidth = 1;
     for (let i = 0; i < 4; i++) {
       const p = iso(c + 0.15 + rnd() * 0.7, r + 0.15 + rnd() * 0.7);
@@ -200,6 +273,29 @@ function mountain(ctx: Ctx, L: Local) {
   poly(ctx, [A, at(Lf, 0.34), at(B, 0.3)], '#ffffff');
   poly(ctx, [A, at(B, 0.3), at(R, 0.36)], '#d8dce8');
   poly(ctx, [A, at(T, 0.3), at(Lf, 0.34)], '#eef0f6');
+}
+
+/** A canyon's mountain (WR15): a flat-topped mesa of banded red rock, with no snow. */
+function mesa(ctx: Ctx, L: Local) {
+  const h = 46;
+  const foot = [L(0.08, 0.08), L(0.92, 0.08), L(0.92, 0.92), L(0.08, 0.92)];
+  const top = [L(0.26, 0.26, h), L(0.74, 0.26, h), L(0.74, 0.74, h), L(0.26, 0.74, h)];
+  poly(ctx, [foot[0], foot[1], top[1], top[0]], '#b0603e');
+  poly(ctx, [foot[0], foot[3], top[3], top[0]], '#c8724a');
+  poly(ctx, [foot[3], foot[2], top[2], top[3]], '#d88a5a');
+  poly(ctx, [foot[2], foot[1], top[1], top[2]], '#9a4e32');
+  poly(ctx, top, '#e8a070');
+  // Bands of paler rock round its sides.
+  for (const f of [0.35, 0.65]) {
+    const at = (a: Pt, b: Pt) => ({ x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f });
+    ctx.strokeStyle = 'rgba(250,210,160,0.45)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    const pts = [at(foot[0], top[0]), at(foot[3], top[3]), at(foot[2], top[2]), at(foot[1], top[1])];
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (const p of pts.slice(1)) ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+  }
 }
 
 /** A cottage on the tile's back half, from `du` along the columns. */

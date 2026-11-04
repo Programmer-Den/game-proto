@@ -9,11 +9,32 @@ export const ROWS = 7;
 
 export type Terrain = 'grass' | 'forest' | 'river' | 'mountain';
 
+/**
+ * The kinds of valley the wyrm flies through (WR15): the green meadow it starts in, then a chain of
+ * snowy, marsh and canyon valleys, each with its own ground, hazards and local goods.
+ */
+export const VALLEY_KINDS = ['meadow', 'snow', 'marsh', 'canyon'] as const;
+export type ValleyKind = (typeof VALLEY_KINDS)[number];
+
 /** What a piece of track costs on each terrain; a river needs a bridge and a mountain a tunnel (WR12). */
 export const TRACK_COST: Record<Terrain, number> = { grass: 2, forest: 4, river: 6, mountain: 20 };
 
+/** What a valley kind changes about track prices: an ice bridge over a frozen river is cheap, a bridge over a gorge dear. */
+export const KIND_COST: Record<ValleyKind, Partial<Record<Terrain, number>>> = {
+  meadow: {},
+  snow: { river: 3 },
+  marsh: {},
+  canyon: { river: 10 },
+};
+
+/** A track tile's price on a terrain in a kind of valley, before any charter. */
+export const terrainCost = (kind: ValleyKind, t: Terrain) => KIND_COST[kind][t] ?? TRACK_COST[t];
+
 /** Goods a village sends, and the better goods its workshops make from them. */
-export type Cargo = 'grain' | 'tools' | 'timber' | 'ore' | 'fish' | 'flour' | 'planks' | 'iron' | 'passengers';
+export type Cargo = 'grain' | 'tools' | 'timber' | 'ore' | 'fish' | 'flour' | 'planks' | 'iron' | 'wool' | 'peat' | 'salt' | 'passengers';
+
+/** The local goods of each valley kind after the meadow, sent by the villages that send fish in the meadow (WR15). */
+export const LOCAL_GOODS: Record<ValleyKind, Cargo | null> = { meadow: null, snow: 'wool', marsh: 'peat', canyon: 'salt' };
 
 export interface Tile {
   c: number;
@@ -21,6 +42,9 @@ export interface Tile {
 }
 
 export interface Village extends Tile {
+  /** The village's place in the line-up, the same in every valley: its art and its workshop go by it. */
+  id: string;
+  /** Its name in this valley (the id in the meadow). */
   name: string;
   /** What the village sends down the line. */
   cargo: Cargo;
@@ -30,6 +54,7 @@ export interface Village extends Tile {
 
 /** A valley: its terrain, row by row, and where each village stands in it. */
 export interface Valley {
+  kind: ValleyKind;
   terrain: Terrain[][];
   villages: Village[];
 }
@@ -41,7 +66,7 @@ export const ROOST: Tile = { c: 1, r: 3 };
  * The villages, in the order they join the line. The first two always stand where the first round
  * expects them; the others get a place in each new valley.
  */
-const VILLAGE_LIST: (Omit<Village, 'c' | 'r'> & Partial<Tile>)[] = [
+const VILLAGE_LIST: (Omit<Village, 'c' | 'r' | 'id'> & Partial<Tile>)[] = [
   { name: 'Millbrook', cargo: 'grain', c: 4, r: 1, round: 1 },
   { name: 'Ashford', cargo: 'tools', c: 4, r: 5, round: 1 },
   { name: 'Fernhollow', cargo: 'timber', round: 2 },
@@ -54,6 +79,21 @@ const VILLAGE_LIST: (Omit<Village, 'c' | 'r'> & Partial<Tile>)[] = [
 ];
 export const VILLAGE_NAMES = VILLAGE_LIST.map((v) => v.name);
 
+/** The villages' names in each valley kind after the meadow, in the same order as `VILLAGE_LIST`. */
+const KIND_NAMES: Record<ValleyKind, string[]> = {
+  meadow: VILLAGE_NAMES,
+  snow: ['Frostmill', 'Icehold', 'Pinecold', 'Whitecrag', 'Rimewater', 'Snowbury', 'Hailmoor', 'Sleetby', 'Wintercross'],
+  marsh: ['Reedmill', 'Mossford', 'Fenhollow', 'Mirestone', 'Eelmere', 'Rushby', 'Bogmoor', 'Mistle', 'Marshcross'],
+  canyon: ['Dustmill', 'Redford', 'Sandhollow', 'Cragreach', 'Saltpan', 'Mesaby', 'Duneholm', 'Gulchwater', 'Rimcross'],
+};
+
+/** How each kind of valley is laid out: mountains (and from which column), forests and bog pools. */
+const KIND_SHAPE: Record<ValleyKind, { mountains: [number, number]; mountainCol: number; forests: [number, number]; pools: number }> = {
+  meadow: { mountains: [4, 3], mountainCol: 8, forests: [9, 5], pools: 0 },
+  snow: { mountains: [7, 3], mountainCol: 6, forests: [6, 4], pools: 0 },
+  marsh: { mountains: [0, 1], mountainCol: 8, forests: [7, 4], pools: 6 },
+  canyon: { mountains: [8, 3], mountainCol: 5, forests: [0, 2], pools: 0 },
+};
 /** Villages with a workshop: it turns one cargo brought to it into a better one, which it sends on. */
 export const WORKSHOPS: Record<string, { kind: string; takes: Cargo; makes: Cargo }> = {
   Ashford: { kind: 'forge', takes: 'ore', makes: 'iron' },
@@ -67,6 +107,9 @@ export const CARGO_NAMES: Record<Cargo, { name: TextKey; lower: TextKey }> = {
   tools: { name: 'tools', lower: 'toolsLower' },
   timber: { name: 'timber', lower: 'timberLower' },
   ore: { name: 'ore', lower: 'oreLower' },
+  wool: { name: 'wool', lower: 'woolLower' },
+  peat: { name: 'peat', lower: 'peatLower' },
+  salt: { name: 'salt', lower: 'saltLower' },
   fish: { name: 'fish', lower: 'fishLower' },
   flour: { name: 'flour', lower: 'flourLower' },
   planks: { name: 'planks', lower: 'planksLower' },
@@ -97,18 +140,21 @@ export const terrainAt = (valley: Valley, t: Tile) => valley.terrain[t.r][t.c];
 const isHome = (t: Tile) => t.c >= 2 && t.c <= 4 && t.r >= 1 && t.r <= 5;
 
 /**
- * A new valley, picked with `rand` (Math.random in the game): a river winding down the middle
- * that the line has to bridge, a few mountains in the east, scattered forest, and a place for each
- * village that joins after the first round, spread apart and all reachable from the Roost.
+ * A new valley of a kind, picked with `rand` (Math.random in the game, today's seed for the daily
+ * valley): a river winding down the middle that the line has to bridge, a few mountains in the
+ * east, scattered forest, and a place for each village that joins after the first round, spread
+ * apart and all reachable from the Roost. A snowy valley has more mountains, a marsh bog pools and
+ * no mountains to speak of, a canyon mountains on both sides of its gorge and hardly a tree.
  */
-export function generateValley(rand: () => number = Math.random): Valley {
+export function generateValley(rand: () => number = Math.random, kind: ValleyKind = 'meadow'): Valley {
   for (;;) {
-    const valley = tryValley(rand);
+    const valley = tryValley(rand, kind);
     if (valley) return valley;
   }
 }
 
-function tryValley(rand: () => number): Valley | null {
+function tryValley(rand: () => number, kind: ValleyKind): Valley | null {
+  const shape = KIND_SHAPE[kind];
   const pick = <T>(list: T[]) => list[Math.floor(rand() * list.length)];
   const terrain: Terrain[][] = Array.from({ length: ROWS }, () => Array<Terrain>(COLS).fill('grass'));
   // The river: one tile a row, stepping a column east or west now and then, between columns 6 and 8.
@@ -125,20 +171,26 @@ function tryValley(rand: () => number): Valley | null {
   const all: Tile[] = [];
   for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) all.push({ c, r });
   const free = (t: Tile) => terrain[t.r][t.c] === 'grass' && !isHome(t) && !sameTile(t, ROOST);
-  // Mountains east of the river, and forest anywhere off the first round's ground.
-  const mountains = 4 + Math.floor(rand() * 3);
+  // Mountains east of the river, bog pools in a marsh, and forest anywhere off the first round's ground.
+  const mountains = shape.mountains[0] + Math.floor(rand() * shape.mountains[1]);
   for (let i = 0; i < mountains; i++) {
-    const t = pick(all.filter((t) => t.c >= 8 && free(t)));
+    const t = pick(all.filter((t) => t.c >= shape.mountainCol && free(t)));
     terrain[t.r][t.c] = 'mountain';
   }
-  const forests = 9 + Math.floor(rand() * 5);
+  for (let i = 0; i < shape.pools; i++) {
+    const t = pick(all.filter(free));
+    terrain[t.r][t.c] = 'river';
+  }
+  const forests = shape.forests[0] + Math.floor(rand() * shape.forests[1]);
   for (let i = 0; i < forests; i++) {
     const t = pick(all.filter(free));
     terrain[t.r][t.c] = 'forest';
   }
   // The villages that join later: on land, three or more tiles from the Roost and every other village.
   const villages: Village[] = [];
-  for (const v of VILLAGE_LIST) {
+  const local = LOCAL_GOODS[kind];
+  for (const [i, entry] of VILLAGE_LIST.entries()) {
+    const v = { ...entry, id: entry.name, name: KIND_NAMES[kind][i], cargo: local && entry.cargo === 'fish' ? local : entry.cargo };
     if (v.c !== undefined && v.r !== undefined) {
       villages.push({ ...v, c: v.c, r: v.r });
       continue;
@@ -165,5 +217,5 @@ function tryValley(rand: () => number): Valley | null {
       queue.push(n);
     }
   }
-  return villages.every((v) => seen.has(key(v))) ? { terrain, villages } : null;
+  return villages.every((v) => seen.has(key(v))) ? { kind, terrain, villages } : null;
 }

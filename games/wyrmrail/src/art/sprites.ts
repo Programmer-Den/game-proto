@@ -251,6 +251,9 @@ const CARGO_ICONS: Record<Cargo, string[]> = {
   flour: ['..b.b..', '...b...', '.nnnnn.', 'nnnnnnn', 'nnnNnnn', 'nnNNNnn', '.nnnnn.'],
   planks: ['.......', 'WWWWWWW', 'wwwwwwD', 'DDDDDDD', 'WWWWWWW', 'wwwwwwD', 'DDDDDDD'],
   iron: ['..III..', '.IiiiI.', 'kkkkkkk', '.......', '.IIIII.', 'IiiiiiI', 'kkkkkkk'],
+  wool: ['.......', '.nNnNn.', 'nNnnnNn', 'nnNnNnn', 'NnnNnnN', '.nNnnN.', '..x.x..'],
+  peat: ['.......', '.bbbbb.', '.DbDbD.', 'bbbbbbb', 'DbDbDbD', 'bbbbbbb', '.DDDDD.'],
+  salt: ['...I...', '..IcI..', '..III..', '.ttttt.', 'tnnnnnt', 'tnnnnnt', '.ttttt.'],
   passengers: ['.s...s.', 'sss.sss', '.s...s.', 'hhh.ddd', 'hhh.ddd', '.hh.dd.', '.h...d.'],
 };
 

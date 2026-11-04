@@ -36,13 +36,23 @@ carry orders between villages before their time runs out.
   for 20 coins, safe from rockfalls, with the wyrm hidden inside; courier calls (WR13) from round
   2, a tap on a village sending a free wyrm with gifts that cheer it; festival medals (WR14), the
   won festival graded by time and hearts, the best per difficulty saved and unlocking boons for
-  the next game.
-- **Progression** is mostly within a game: coins, track, upgrades, depots and the round. The only
-  meta progression is the best festival medal per difficulty and the boons it gives a new game.
+  the next game; a chain of valleys (WR15): after a won festival the end panel's Keep buttons fly
+  the wyrm on to the next valley (snowy, marsh, canyon, then round again) keeping one upgrade and
+  the traits, each kind with its own ground and sky, village names, track prices, hazards
+  (avalanches, sinkholes, more rockfalls) and local goods (wool, peat, salt) paying more; moults
+  (WR16) at the start of rounds 4 and 7, three trait cards (of five) to pick a lasting trait from
+  while the game waits, among them a third wagon; the daily valley (WR17), today's seeded valley
+  of any kind for everyone, one try a day, started from a link in the board's top left corner
+  before the first track or from the end panel, scored by deliveries.
+- **Progression** is mostly within a game: coins, track, upgrades, depots and the round, and
+  across a chain of valleys the traits and one kept upgrade. The only meta progression is the best
+  festival medal per difficulty and the boons it gives a new game, and the daily valley's record.
 - **Persistence:** `wyrmrail-medals` (`src/game/medals.ts`) holds the best medal per difficulty,
   as `{ easy?, normal?, hard? }` of `bronze`, `silver` or `gold`, and `wyrmrail-trophies` the
-  trophies earned (`shared/trophies.ts`, each id with the time). Nothing else is saved; a reload
-  starts a new game. It also reads the hub's shared settings (see Hub settings below).
+  trophies earned (`shared/trophies.ts`, each id with the time), and `wyrmrail-daily` the daily
+  valley's record (`shared/daily.ts`: today's try and score, the best and the days in a row).
+  Nothing else is saved; a reload starts a new game in the first valley, and a chain of valleys
+  lives only in the scene's restart data. It also reads the hub's shared settings (see Hub settings below).
 - **Rough edges you can see in the code:**
   - Auto-join (the default) joins every neighbour; the Plain toggle is the way round the junctions
     it makes, but a cut can't be joined later except by taking the track up and laying it again.
@@ -51,6 +61,10 @@ carry orders between villages before their time runs out.
   - A hungry wyrm only turns home when it picks its next stop, so a long trip can still empty it.
   - The order cards and the upgrade buttons stay tappable behind the game over and festival
     panels (the sim refuses the actions once `phase` is not `play`).
+  - The daily valley seeds only the valley and its kind; orders, hazards, charters and moults
+    still come from `Math.random`, so two players' runs part ways after the start. It plays on
+    the hub's difficulty.
+  - The traits show nowhere during play but in the banner when picked; the end panel lists them.
 
 ## Architecture
 
@@ -79,9 +93,14 @@ File map (all under `src/` unless it starts with `shared/`):
 - `main.ts`: creates the `Phaser.Game` (960x540 from `VIEW`, `Scale.FIT`, `pixelArt: false`) with
   `BootScene` then `GameScene`, calls `setupGame(game)` and `setupScaling(game, { fill: true })`
   from `shared/scaling.ts` (the view takes the screen's shape, see Screens below); in dev builds puts `game` on `window`.
-- `game/map.ts`: `COLS`, `ROWS`, `Terrain`, `TRACK_COST` (mountain is the tunnel price), `Cargo` (goods and `passengers`),
-  `CARGO_NAMES` (each cargo's name and in-sentence word as `TextKey`s), `Tile`, `Village`, `Valley`, `ROOST`, `VILLAGE_NAMES`, `WORKSHOPS`,
-  `generateValley`, `terrainAt`, and the tile helpers `key`, `sameTile`, `manhattan`, `opposite`,
+- `game/map.ts`: `COLS`, `ROWS`, `Terrain`, `VALLEY_KINDS` and `ValleyKind` (`meadow`, `snow`,
+  `marsh`, `canyon`), `TRACK_COST` (mountain is the tunnel price), `KIND_COST` and `terrainCost`
+  (a kind's own prices: snow's ice bridge 3, canyon's gorge bridge 10), `Cargo` (goods, the local
+  `wool`, `peat` and `salt`, and `passengers`), `LOCAL_GOODS` (each kind's), `CARGO_NAMES` (each
+  cargo's name and in-sentence word as `TextKey`s), `Tile`, `Village` (`id`, the meadow name its
+  art and workshop go by, and `name`, its name in this valley's kind from `KIND_NAMES`), `Valley`
+  (with its `kind`), `ROOST`, `VILLAGE_NAMES`, `WORKSHOPS`, `generateValley(rand, kind)` (shaped
+  by `KIND_SHAPE`: mountains and from which column, forests and bog pools), `terrainAt`, and the tile helpers `key`, `sameTile`, `manhattan`, `opposite`,
   `inGrid`, `neighbours`.
 - `game/state.ts`: tuning constants (including `WAGONS`, `SWITCH_MS`, the belly's `FOOD_PER_TILE`,
   `HUNGRY`, `EAT_MS`, `STARVING_SLOWDOWN`, `JUNCTION_WAIT_MS`, `WORKSHOP_PAY`, `WORKSHOP_CHANCE`,
@@ -90,7 +109,11 @@ File map (all under `src/` unless it starts with `shared/`):
   `HAZARD_EVERY_MS`, `HAZARD_WARN_MS`, `CHARTER_ROUND`, the passengers' `PASSENGER_ROUND`,
   `PASSENGER_CHANCE`, `PASSENGER_PAY`, `PASSENGER_TIME`, the depots' `DEPOT_ROUND`, `DEPOT_COST`,
   `DEPOT_STEP`, `DEPOT_WAIT`, the courier's `COURIER_COST`, the medals' `GOLD_MS`, `SILVER_MS`,
-  `HEAD_START_COINS`, `EARLY_RISER_ROUNDS`), the charter table `CHARTERS` (name and text as
+  `HEAD_START_COINS`, `EARLY_RISER_ROUNDS`, the chain's `LOCAL_PAY`, `COLD_HUNGER`,
+  `CANYON_HAZARDS`, the moults' `MOULT_ROUNDS`, `MOULT_OFFER`, `TRAIT_SPEED`, `FRUGAL_HUNGER`,
+  `NIMBLE_TIME`, `CHARMING_GAP`), `CHAIN_KINDS` and `kindOfLeg` (the kind of each valley in a
+  chain), `KIND_TEXT` (each kind's name and arrival line), `TRAITS`, `Trait` and `TRAIT_TEXT`,
+  `HazardKind` and `HAZARD_TEXT` (each hazard's warning, pop and hint), the charter table `CHARTERS` (name and text as
   `TextKey`s, the text's `{cargo}` filled in by the scene), `MEDALS`, `BOONS` (names as `TextKey`s),
   `roundGoal`, `isPassengers`, `Charter`, `Hazard`, `Order`, `OrderStatus`, `Job`, `Medal`, `Wyrm`,
   `Pop`, `Upgrade`, `GameState`.
@@ -102,21 +125,31 @@ File map (all under `src/` unless it starts with `shared/`):
   `upgradeCost`, `buyUpgrade`, `secondWyrmRound`, `wyrmSpeed`, `orderPay` (pay with the Golden
   hoard, shown on the cards and paid on delivery), `jobOrder`, `pickCharter`, `depotCost`,
   `depotLocked`, `canBuyDepot`, `buyDepot`, `villageAt`, `canSendCourier`, `sendCourier`,
-  `festivalMedal`, `hasBoon`, `boonNames`, `moodOf`, `tick`. No Phaser import. Banners and pops are
+  `festivalMedal`, `hasBoon`, `boonNames`, `moodOf`, `tick`, and for the chain, the moults and the
+  daily `Journey`, `UPGRADE_NAMES`, `hasTrait`, `wagons`, `choosing` (a charter or a moult is on
+  offer), `hazardKind`, `pickMoult`. No Phaser import. Banners and pops are
   translated with `t` (imported as `tr`, since `t` is a tile there) when they are made.
 - `scenes/BootScene.ts`: bakes the props and sprites (`bakeProps`, `bakeSprites`), then starts
   `Game`.
-- `scenes/GameScene.ts`: bakes this game's `valley` texture (`bakeValley`), draws the valley, the
+- `scenes/GameScene.ts`: `create(data)` takes `{ journey }` from `scene.restart` (the next valley
+  of a chain, or `{ daily: true }`; Play again passes `{ journey: {} }`, since a restart without
+  data keeps the last), starts today's daily try with `startDaily` and seeds its valley with
+  `dailyRand('wyrmrail')`; bakes this game's `valley` texture (`bakeValley`), draws the valley, the
   props (pines, peaks, Roost, villages, workshop signs, depot sheds, festival bunting), track,
   switches, crossing plates and tunnel mouths, build hints, the hazard's mark, each wyrm's planned route, cargo markers, the
   villages' mood faces, the wyrms (`WyrmView` each), pops, HUD (with the bellies and the round's
   charter), the orders and upgrades panel (with the Depot, Remove and Plain toggles), the banner, the
-  charter cards and the game over or festival panel (with the medal, which it saves), and wires
+  charter cards, the moult's trait cards (`drawMoult`, over the charter cards, which wait under
+  them), the daily link or tag (`drawDailyLink`) and the game over or festival panel (`openEnd`,
+  once: the medal, which it saves outside the daily, the traits, the Keep or Fly on buttons, Play
+  again and the Daily valley button while today's try is unused; the daily's score through
+  `finishDaily`), and wires
   input to sim functions. Exposes `state` and `orderSpots`.
 - `scenes/layout.ts`: `VIEW` (the designed 960x540), `BOARD` and `DESIGN_BOARD`, `placeBoard`, the
   isometric projection (`ISO`, `iso`, `tileCenter`, `tileAt`, `groundDepth`), the panel, order
-  card, button and charter card positions, `HINT_BOTTOM`,
-  `SEGMENT_GAPS` (where the wyrm's parts ride behind the head) and depths.
+  card, button, charter card, `MOULT_CARD`, `END_BUTTON` and `DAILY_LINK` positions, `HINT_BOTTOM`,
+  `SEGMENT_GAPS` (where the wyrm's parts ride behind the head: three coils and three wagons, the
+  third shown only with the Third wagon trait) and depths.
 - `audio/sounds.ts`: the sound table `sfx` (`shared/audio.ts`'s `sounds`) and the song `SONG`
   (see Sound below).
 - `audio/events.ts`: `GameSounds`, which the scene makes in `create` and updates after every
@@ -132,8 +165,10 @@ File map (all under `src/` unless it starts with `shared/`):
   generator for art noise (a copy of Catacomb's; games don't share code). Only the icons are pixel
   art now.
 - `art/valley.ts`: `bakeValley` (the `valley` texture for a `Valley`: sky, the valley's shadow
-  and every tile as a block, river tiles `RIVER_DROP` lower) and `bakeProps`, the props, each the
-  size of `PROP` with the tile's middle at (`PROP.x`, `PROP.y`): `forest`, `peak`, `roost`,
+  and every tile as a block, river tiles `RIVER_DROP` lower, coloured by the kind's `LOOKS` entry:
+  snow and ice, an olive marsh with peaty water, red canyon sand) and `bakeProps`, the props, each the
+  size of `PROP` with the tile's middle at (`PROP.x`, `PROP.y`): `forest`, `peak`, `mesa` (a
+  canyon's mountain), `roost`,
   `village-<name>` (roofs in `ROOFS`) and `bunting`.
 - `art/sprites.ts`: the wyrm in the isometric style, `wyrm-head`, `wyrm-coil-0` to `-2`,
   `wyrm-wings`, the copper second wyrm's `wyrm2-*` (the same drawing through `toCopper`),
@@ -233,7 +268,9 @@ State model (`src/game/state.ts`):
   keys), `moods` and `idleMs` (by village index), `hazard` and `hazardTimerMs`, `charter` and
   `charterOffer`, `depots` (village indexes), `boon` (the medal the game started with),
   `festivalMs` and `medal`, `wyrms`, `upgrades` (`wings`, `hoard`, `second`), `orderTimerMs`,
-  `banner`, `pops`, `nextId`.
+  `banner`, `pops`, `nextId`, and for the chain, the moults and the daily `leg` (1 for the first
+  valley), `kept` (the upgrade kept from the last valley and its level), `traits`, `moultOffer`
+  and `daily`.
 - `Order.from` and `.to` index into `valley.villages`. `Order.status` runs `waiting` -> `queued`
   (sent; a wyrm is on its way or will be) -> `loading` -> `carrying` -> removed on delivery. A
   late order is removed in any status. `Order.wyrm` is the index of the wyrm that set off for it
@@ -302,6 +339,23 @@ State model (`src/game/state.ts`):
   eating or at a switch, no order of its own); the nearest one along the line gets a `visit` job.
   `arrive` resets the village's `idleMs` and cheers it by one. A hazard drops the visit, gifts
   and all.
+- A chain of valleys (WR15): `newGame(boon, journey, rand)` makes the valley of
+  `kindOfLeg(journey.leg)` (the meadow first), applies the medal boons only to a first valley that
+  is not the daily, sets the kept upgrade at its level (a kept second wyrm wakes at once) and keeps
+  the traits. The arrival banner names the valley and its intro, the first two villages, the kept
+  upgrade and the boons. A kind changes `trackCost` (`terrainCost`), `hazardKind` (the meadow and
+  the canyon: washouts and rockfalls; the snowy valley: avalanches beside mountains and no
+  washouts; the marsh: washouts and sinkholes on the bank tiles beside water), the hazard timer
+  (`CANYON_HAZARDS` in the canyon), the belly (`COLD_HUNGER` in the snow) and `addOrder`'s pay
+  (`LOCAL_PAY` for the kind's `LOCAL_GOODS`, sent by the villages that send fish in the meadow).
+- Moults (WR16): `nextRound` into a round of `MOULT_ROUNDS` sets `moultOffer` to up to
+  `MOULT_OFFER` traits the wyrms lack (random), if any are left; `tick` waits while `choosing`, and
+  `pickCharter` refuses while a moult is on offer. `pickMoult` adds the trait. `hasTrait` applies
+  them: `wyrmSpeed` (`swift`), `wagons` (`wagon`, used by `nextStop`), `foodPerTile` (`frugal`),
+  `nimble` for `LOAD_MS` and `SWITCH_MS` (`nimble`) and `tickMoods`'s gap (`charming`).
+- The daily valley (WR17): `newGame(null, { daily: true }, dailyRand('wyrmrail'))` picks the kind
+  and the valley with today's seed (the kind first). It has no boons and no flying on, saves no
+  medal, and its end panel shows `finishDaily`'s record.
 - Only `src/game/sim.ts` mutates state. The scene only reads it and calls sim functions.
 - Invariants: a station (the Roost or an open village) is on the line without track; track can't
   be laid on a station or a locked village's tile; track can't be removed from `wyrm.at` or any
@@ -311,9 +365,12 @@ State model (`src/game/state.ts`):
 
 Randomness and timing:
 
-- `Math.random` is used in `generateValley` (the valley, in `newGame`), `randomOrder` (which
-  villages a new order joins, and whether it is passengers), `makeGoods` (where a workshop's goods
-  go), `tickHazard` (which tile) and `offerCharters` (which two, and the cargo) in `src/game/`. The
+- `Math.random` is used in `generateValley` (the valley, in `newGame`, except the daily's, which
+  gets today's seeded `rand`), `randomOrder` (which villages a new order joins, and whether it is
+  passengers), `makeGoods` (where a workshop's goods go), `tickHazard` (which tile),
+  `offerCharters` (which two, and the cargo) and `nextRound` (a moult's traits) in `src/game/`. A
+  meadow's `generateValley` draws exactly the numbers it always did, so the test's seeded valley
+  stays the same. The
   first order is fixed (`addOrder(s, 0, 1)` in `newGame`). The test seeds `Math.random`, so its
   valley is the same every run.
 - Art noise uses `seeded` from `src/art/pixelArt.ts`, not `Math.random`.
@@ -349,7 +406,7 @@ Data tables (where to tune):
 All sound comes from `shared/audio.ts` (no files, silent under browser automation). The sim has no
 audio import: the scene plays the player's own taps where it calls the sim, and `GameSounds`
 (`src/audio/events.ts`) plays what `tick` did by comparing the state with the last frame's
-(`Snapshot`: phase, round, hearts, deliveries, the charter offer, the hazard, moods, order statuses
+(`Snapshot`: phase, round, hearts, deliveries, the charter or moult offer, the hazard, moods, order statuses
 and each wyrm's eating, switch stop and courier visit). A restart makes a new `GameSounds`, which
 starts the music again.
 
@@ -370,8 +427,10 @@ starts the music again.
   `load` when goods are aboard, `deliver` for a delivery, `late` for an order out of time, `faith`
   for a heart lost to a village at rock bottom, `sour` for a village souring, `munch` when a wyrm
   eats, `switchStop` when a wyrm stops to throw a switch, `warn` for a hazard warned, `splash` or
-  `rumble` when a washout or rockfall strikes (none when it blows over and the track stays), `gifts` when a courier's visit ends, `round` for a
-  new round and `charter` when the charter cards appear.
+  `rumble` when a washout or sinkhole, or a rockfall or avalanche, strikes (none when it blows over and the track stays), `gifts` when a courier's visit ends, `round` for a
+  new round and `charter` when the charter or moult cards appear (the music's `charter` part
+  plays while either waits). The scene plays `stamp` for a trait picked, and `ui('click')` and
+  `roar` for flying on.
 
 ## Testing hooks
 
@@ -398,14 +457,16 @@ starts the music again.
   `remove-track.webp`, `game-over.webp`, `new-valley-1.webp`, `new-valley-2.webp`, `steering.webp`,
   `workshops-two-wyrms.webp`, `festival.webp`, `festival-won.webp`, `moods.webp`, `washout.webp`,
   `plain-track.webp`, `charter.webp`, `passengers.webp`, `depot-courier.webp`, `tunnel.webp`,
-  `festival-medal.webp`, `german-round.webp` (round 5 with `?lang=de`), `fill-ultrawide.webp` and
+  `festival-medal.webp`, `valley-chain.webp` (the snowy valley, the marsh, the canyon and the fly-on
+  panel, four shots in one), `moult.webp`, `daily-valley.webp`, `german-round.webp` (round 5 with `?lang=de`), `fill-ultrawide.webp` and
 `fill-tablet.webp` (the first screen at 2560x1080 and 1024x768) and `cover.png` are not made by
   the test: play the dev build and capture them by hand (a script can set up later rounds through
   the dev server's `/games/wyrmrail/src/game/sim.ts` module, the same instance the game uses).
 - Moods, courier calls, depots, hazards, charters and passengers all start after round 1
   (`MOOD_ROUND` and `DEPOT_ROUND` 2, the rest 3), so the playthrough never meets them; keep them
   there or give the test a step for them. The test never taps a village, and its browser has no
-  saved medals, so no boon changes the first round.
+  saved medals, so no boon changes the first round. It never taps the daily link (which only
+  shows on the first valley before any track) and never reaches a moult or a won festival.
 
 - Once the grain is delivered the test checks that `wyrmrail-trophies` holds exactly First
   delivery and Points to set (the junction it lays); a trophy a first round can reach in another
@@ -422,12 +483,12 @@ starts the music again.
 
 - **Add a village:** add an entry to `VILLAGE_LIST` in `src/game/map.ts` with its `round` (no
   place: `generateValley` finds one; more villages may need a smaller spacing), and give it roof
-  colours in `ROOFS` in `src/art/valley.ts` (the texture is `village-<name>`). The last village is
+  colours in `ROOFS` in `src/art/valley.ts` (the texture is `village-<id>`), and a name in each `KIND_NAMES` list. The last village is
   the festival's host. A new cargo needs a `Cargo` member, a `CARGO_NAMES` entry (with its two
   texts in the `i18n/` files) and an icon in
   `CARGO_ICONS` (typed by `Cargo`, so the build fails until you do). Update the README's village
   table. Keep the first two as Millbrook and Ashford at their places or update the test.
-- **Add a workshop:** add the village's name to `WORKSHOPS` with what it `takes` and `makes`
+- **Add a workshop:** add the village's id (its meadow name) to `WORKSHOPS` with what it `takes` and `makes`
   (a new cargo as above), and its row in the README's village table.
 - **Change the valley:** edit `generateValley`; keep the first round's block (`isHome`) grass and
   every village reachable (it retries until they are).
@@ -445,6 +506,13 @@ starts the music again.
 - **Add a medal boon:** a new medal tier needs a `MEDALS` entry, its name in the `i18n/` files
   and a `BOONS` row (with the boon's name there too); apply its boon
   in `newGame` (or where it matters, through `hasBoon`) and add it to the README's medal list.
+- **Add a valley kind:** add it to `VALLEY_KINDS`, give it `KIND_COST`, `LOCAL_GOODS` (a new
+  cargo as above), `KIND_NAMES` and `KIND_SHAPE` rows in `src/game/map.ts`, a `LOOKS` row in
+  `src/art/valley.ts`, a `KIND_TEXT` row (two texts in each language) and a place in
+  `CHAIN_KINDS` in `state.ts`, and its hazards in `hazardKind` (a new `HazardKind` needs a
+  `HAZARD_TEXT` row and its sound in `GameSounds`); then its paragraph in the README.
+- **Add a trait:** add it to `TRAITS` and `TRAIT_TEXT` (two texts in each language), apply it with
+  `hasTrait` where it matters in `sim.ts`, and add its row to the README's traits table.
 - **Add a charter:** add an entry to `CHARTERS` in `src/game/state.ts` with its name and text in
   the `i18n/` files (a new effect needs a field
   on `Charter` and a check where it applies in `sim.ts`) and its line in the README.

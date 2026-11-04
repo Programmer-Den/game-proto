@@ -1,17 +1,20 @@
 import Phaser from 'phaser';
+import { dailyRand, finishDaily, loadDaily, startDaily } from '../../../../shared/daily';
 import { formatNumber, t as sharedText } from '../../../../shared/i18n';
 import { settings } from '../../../../shared/settings';
 import { t, type TextKey } from '../i18n';
-import { CARGO_NAMES, COLS, ROOST, ROWS, inGrid, key, terrainAt, type Tile } from '../game/map';
+import { CARGO_NAMES, COLS, ROOST, ROWS, inGrid, key, terrainAt, terrainCost, type Tile } from '../game/map';
 import {
   arms,
   boonNames,
   buildTrack,
   buyDepot,
   buyUpgrade,
+  UPGRADE_NAMES,
   canBuyDepot,
   canRemove,
   canSendCourier,
+  choosing,
   depotCost,
   depotLocked,
   dispatch,
@@ -24,6 +27,7 @@ import {
   openVillages,
   orderPay,
   pickCharter,
+  pickMoult,
   removeTrack,
   routable,
   secondWyrmRound,
@@ -35,7 +39,9 @@ import {
   upgradeLocked,
   villageAt,
   villages,
+  wagons,
   workshopOf,
+  type Journey,
 } from '../game/sim';
 import { saveMedal, loadMedals } from '../game/medals';
 import {
@@ -43,11 +49,16 @@ import {
   DEPOT_ROUND,
   FESTIVAL_GOAL,
   FESTIVAL_ROUND,
+  HAZARD_TEXT,
   HUNGRY,
+  KIND_TEXT,
   MOOD_PAY,
   MOOD_ROUND,
   POP_MS,
+  TRAIT_TEXT,
+  UPGRADE_COSTS,
   isPassengers,
+  kindOfLeg,
   roundGoal,
   type GameState,
   type Order,
@@ -68,13 +79,15 @@ import {
   BOARD,
   BUTTONS,
   CHARTER_CARD,
+  DAILY_LINK,
   DESIGN_BOARD,
+  END_BUTTON,
+  MOULT_CARD,
   FONT,
   HINT_BOTTOM,
   HUD_HEIGHT,
   ORDER_CARD,
   PANEL,
-  PANEL_BUTTON,
   SEGMENT_GAPS,
   UI_DEPTH,
   UPGRADES_Y,
@@ -96,6 +109,9 @@ const HINT_CHECK_MS = 500;
 
 /** The tok of new track by terrain: a bridge sounds hollow, a tunnel deep. */
 const TOK_PITCH: Record<ReturnType<typeof terrainAt>, number> = { grass: 1, forest: 0.88, river: 0.72, mountain: 0.6 };
+
+/** The name the daily valley keeps its record under (`wyrmrail-daily`, `shared/daily.ts`). */
+const GAME = 'wyrmrail';
 
 /** Longest simulated step, so a backgrounded tab doesn't jump the game forward. */
 const MAX_STEP_MS = 250;
@@ -221,6 +237,17 @@ export class GameScene extends Phaser.Scene {
   private charterTitle!: Phaser.GameObjects.Text;
   private charterCards: { name: Phaser.GameObjects.Text; text: Phaser.GameObjects.Text }[] = [];
   private charterKey = '';
+  /** A moult's traits to choose from, over the board (WR16). */
+  private moultLayer!: Phaser.GameObjects.Container;
+  private moultTitle!: Phaser.GameObjects.Text;
+  private moultCards: { bg: Phaser.GameObjects.Rectangle; name: Phaser.GameObjects.Text; text: Phaser.GameObjects.Text }[] = [];
+  private moultKey = '';
+  /** The daily valley's link in the sky over the valley before the first track (WR17), or its tag while it is played. */
+  private dailyLink!: Phaser.GameObjects.Text;
+  /** Whether today's daily valley has been tried already, read once when the scene starts. */
+  private dailyPlayed = false;
+  /** The end panel's buttons: fly on keeping an upgrade, play again and the daily valley. */
+  private endButtons!: Phaser.GameObjects.Container;
 
   private banner!: Phaser.GameObjects.Container;
   private bannerText!: Phaser.GameObjects.Text;
@@ -234,8 +261,13 @@ export class GameScene extends Phaser.Scene {
     super('Game');
   }
 
-  create() {
-    this.state = newGame(loadMedals()[settings.difficulty] ?? null);
+  /** `journey` carries a chain of valleys on (WR15), or starts today's daily valley (WR17). */
+  create(data: { journey?: Partial<Journey> } = {}) {
+    const journey = data.journey ?? {};
+    // Today's try is used up as soon as it starts, so leaving it half way still counts.
+    if (journey.daily) startDaily(GAME);
+    this.dailyPlayed = loadDaily(GAME).played;
+    this.state = journey.daily ? newGame(null, journey, dailyRand(GAME)) : newGame(loadMedals()[settings.difficulty] ?? null, journey);
     this.mode = 'auto';
     this.lastLaid = null;
     this.pressedVillage = null;
@@ -247,6 +279,8 @@ export class GameScene extends Phaser.Scene {
     this.moodKey = '';
     this.charterKey = '';
     this.charterCards = [];
+    this.moultKey = '';
+    this.moultCards = [];
     this.stations = [];
     this.pines.clear();
     this.markers = [];
@@ -314,8 +348,8 @@ export class GameScene extends Phaser.Scene {
     const onBoard = p.worldX >= BOARD.x && p.worldX < BOARD.x + BOARD.w && p.worldY >= BOARD.y && p.worldY < BOARD.y + BOARD.h;
     // A press on a village that slides off the board or the grid is no courier call.
     if (!onBoard || !inGrid(t)) return void (this.pressedVillage = null);
-    // The game waits for a charter pick: a tap on the shaded board around the cards does nothing.
-    if (this.state.phase !== 'play' || this.state.charterOffer) return void (this.pressedVillage = null);
+    // The game waits for a charter or moult pick: a tap on the shaded board around the cards does nothing.
+    if (this.state.phase !== 'play' || choosing(this.state)) return void (this.pressedVillage = null);
     if (!down && (this.dragTile === null || this.dragTile === key(t))) return;
     this.dragTile = key(t);
     if (down) this.dragLaid = 0;
@@ -358,7 +392,8 @@ export class GameScene extends Phaser.Scene {
       for (let c = 0; c < COLS; c++) {
         const terrain = terrainAt(this.state.valley, { c, r });
         if (terrain === 'forest') this.pines.set(key({ c, r }), this.addProp({ c, r }, 'forest'));
-        if (terrain === 'mountain') this.addProp({ c, r }, 'peak');
+        // A canyon's mountains are red mesas.
+        if (terrain === 'mountain') this.addProp({ c, r }, this.state.valley.kind === 'canyon' ? 'mesa' : 'peak');
       }
     }
   }
@@ -377,7 +412,7 @@ export class GameScene extends Phaser.Scene {
     add(ROOST, 'roost', t('roost'), 1);
     for (const v of villages(this.state)) {
       const shop = workshopOf(v);
-      add(v, `village-${v.name}`, v.name, v.round);
+      add(v, `village-${v.id}`, v.name, v.round);
       if (!shop) continue;
       // A workshop shows what it takes and what it makes, under its name.
       const { x, y } = tileCenter(v);
@@ -405,9 +440,10 @@ export class GameScene extends Phaser.Scene {
     for (let i = 0; i <= tail; i++) trail.push({ x: x - i * 0.45, y: y - i * 0.22 });
     const part = (texture: string) => fit(this.add.image(0, 0, texture).setOrigin(PART_ORIGIN.x, PART_ORIGIN.y));
     return {
-      segments: [part(`${prefix}-head`), part(`${prefix}-coil-0`), part(`${prefix}-coil-1`), part(`${prefix}-coil-2`), part('wagon-v'), part('wagon-v')],
+      // Three wagons: the third shows once a moult has given the wyrms one.
+      segments: [part(`${prefix}-head`), part(`${prefix}-coil-0`), part(`${prefix}-coil-1`), part(`${prefix}-coil-2`), part('wagon-v'), part('wagon-v'), part('wagon-v')],
       wings: part(`${prefix}-wings`),
-      wagonCargo: [0, 1].map(() => fit(this.add.image(0, 0, 'cargo-grain'), 0.7).setVisible(false)),
+      wagonCargo: [0, 1, 2].map(() => fit(this.add.image(0, 0, 'cargo-grain'), 0.7).setVisible(false)),
       trail,
       headAngle: 0,
     };
@@ -469,20 +505,17 @@ export class GameScene extends Phaser.Scene {
   private createOverlays() {
     const mid = { x: BOARD.x + BOARD.w / 2, y: BOARD.y + 36 };
     // The game over panel and the charter cards were laid out for the designed board; they sit in the middle of a bigger one.
-    const cx = (BOARD.w - DESIGN_BOARD.w) / 2;
     const cy = Math.round((BOARD.h - DESIGN_BOARD.h) / 2);
-    this.bannerText = this.add.text(0, 0, '', textStyle(18, '#f3c64e')).setOrigin(0.5);
+    // A valley's arrival banner runs long: it wraps inside the board.
+    this.bannerText = this.add.text(0, 0, '', { ...textStyle(18, '#f3c64e'), align: 'center', wordWrap: { width: BOARD.w - 80 } }).setOrigin(0.5);
     const box = this.add.rectangle(0, 0, 10, 40, 0x1d1a14, 0.8).setStrokeStyle(2, 0xc9a040);
     this.banner = this.add.container(mid.x, mid.y, [box, this.bannerText]).setDepth(UI_DEPTH + 3).setVisible(false);
     this.bannerBox = box;
 
     const shade = this.add.rectangle(0, 0, BOARD.w, BOARD.h, 0x0e0a08, 0.7).setOrigin(0);
     this.overText = this.add.text(BOARD.w / 2, 220 - BOARD.y + cy, '', { ...textStyle(20), align: 'center' }).setOrigin(0.5);
-    const restart = makeButton(this, PANEL_BUTTON.x + cx, PANEL_BUTTON.y - BOARD.y + cy, 160, 44, t('playAgain'), () => {
-      ui('click');
-      this.scene.restart();
-    });
-    this.overLayer = this.add.container(BOARD.x, BOARD.y, [shade, this.overText, restart.container]).setDepth(UI_DEPTH + 4).setVisible(false);
+    this.endButtons = this.add.container(0, 0);
+    this.overLayer = this.add.container(BOARD.x, BOARD.y, [shade, this.overText, this.endButtons]).setDepth(UI_DEPTH + 4).setVisible(false);
 
     // The round's charter: two cards over the board, the game waiting until one is tapped.
     const charterShade = this.add.rectangle(0, 0, BOARD.w, BOARD.h, 0x0e0a08, 0.6).setOrigin(0);
@@ -501,6 +534,125 @@ export class GameScene extends Phaser.Scene {
       parts.push(bg, name, text);
     }
     this.charterLayer = this.add.container(BOARD.x, BOARD.y, parts).setDepth(UI_DEPTH + 4).setVisible(false);
+
+    // A moult: up to three trait cards over the board, the game waiting until one is tapped.
+    const moultShade = this.add.rectangle(0, 0, BOARD.w, BOARD.h, 0x0e0a08, 0.6).setOrigin(0);
+    this.moultTitle = this.add.text(BOARD.w / 2, MOULT_CARD.y + cy - MOULT_CARD.h / 2 - 44, '', { ...textStyle(19, '#9be883'), align: 'center' }).setOrigin(0.5);
+    const moultParts: Phaser.GameObjects.GameObject[] = [moultShade, this.moultTitle];
+    for (const i of [0, 1, 2]) {
+      const bg = this.add.rectangle(0, MOULT_CARD.y + cy, MOULT_CARD.w, MOULT_CARD.h, 0x24361f).setStrokeStyle(3, 0x7bc85a);
+      bg.setInteractive({ useHandCursor: true })
+        .on('pointerover', () => bg.setFillStyle(0x34502c))
+        .on('pointerout', () => bg.setFillStyle(0x24361f))
+        .on('pointerdown', () => pickMoult(this.state, i) && sfx('stamp'));
+      const name = this.add.text(0, MOULT_CARD.y + cy - 36, '', textStyle(16, '#9be883')).setOrigin(0.5);
+      const text = this.add.text(0, MOULT_CARD.y + cy + 10, '', { ...textStyle(13, '#f3e9d2'), align: 'center', wordWrap: { width: MOULT_CARD.w - 24 } }).setOrigin(0.5);
+      this.moultCards.push({ bg, name, text });
+      moultParts.push(bg, name, text);
+    }
+    this.moultLayer = this.add.container(BOARD.x, BOARD.y, moultParts).setDepth(UI_DEPTH + 5).setVisible(false);
+
+    // The daily valley: a link in the sky before the first track is laid, a tag while it is played.
+    this.dailyLink = this.add
+      .text(BOARD.x + DAILY_LINK.x, BOARD.y + DAILY_LINK.y, '', textStyle(14, '#f3c64e'))
+      .setDepth(UI_DEPTH - 1)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', () => {
+        if (!this.dailyOpen()) return;
+        ui('click');
+        this.scene.restart({ journey: { daily: true } });
+      });
+  }
+
+  /** Whether the daily valley's link can start today's try: a fresh first valley that hasn't laid track, with today's try unused. */
+  private dailyOpen() {
+    const s = this.state;
+    return !s.daily && !this.dailyPlayed && s.leg === 1 && s.phase === 'play' && s.round === 1 && !s.track.length;
+  }
+
+  /** The daily link's text: the link while it is open, the tag while the daily valley is played, else nothing. */
+  private drawDailyLink() {
+    const s = this.state;
+    const text = s.daily ? t('dailyTag') : this.dailyOpen() ? t('dailyLink') : '';
+    if (this.dailyLink.text !== text) this.dailyLink.setText(text);
+    this.dailyLink.setVisible(!!text).setColor(s.daily ? '#9bd8f0' : '#f3c64e');
+    if (this.dailyLink.input) this.dailyLink.input.enabled = !s.daily && !!text;
+  }
+
+  /**
+   * Fills the end panel once the game is over or the festival won: the text, and its buttons. A won
+   * festival offers to fly on to the next valley keeping one upgrade (WR15); the daily valley keeps
+   * its score instead (WR17); and a game that isn't the daily offers today's daily valley if it is unused.
+   */
+  private openEnd() {
+    const s = this.state;
+    const lines: string[] = [];
+    if (s.leg > 1 || s.daily) lines.push(t(s.daily ? 'dailyBanner' : 'valleyBanner', { n: s.leg, valley: t(KIND_TEXT[s.valley.kind].name) }));
+    if (s.phase === 'over') lines.push(t('gameOver', { round: s.round, n: s.totalDelivered }));
+    else {
+      const host = villages(s)[festivalHost(s)].name;
+      const medal = s.medal ?? 'bronze';
+      lines.push(t('festivalWon', { village: host, n: s.totalDelivered, hearts: s.hearts }), t('medalLine', { medal: t(medal), time: clock(s.festivalMs) }));
+      // The best medal on this difficulty is kept, and its boons start the next game; the daily valley is a game apart.
+      if (!s.daily) {
+        const best = this.medalSaved ? medal : saveMedal(settings.difficulty, medal);
+        this.medalSaved = true;
+        lines.push(t('bestLine', { level: sharedText(settings.difficulty), best: t(best) }), t('nextGame', { boons: boonNames(best).join(', ') }));
+      }
+    }
+    if (s.traits.length) lines.push(t('traitsLine', { traits: s.traits.map((tr) => t(TRAIT_TEXT[tr].name)).join(', ') }));
+    const owned = (Object.keys(UPGRADE_COSTS) as Upgrade[]).filter((u) => s.upgrades[u] > 0);
+    const flying = s.phase === 'won' && !s.daily;
+    if (flying) lines.push(t(owned.length ? 'flyOnLine' : 'flyOnPlain', { valley: t(KIND_TEXT[kindOfLeg(s.leg + 1)].name) }));
+    if (s.daily) {
+      const day = finishDaily(GAME, s.totalDelivered);
+      lines.push('', t('dailyResult', { n: day.score ?? s.totalDelivered, best: day.best, streak: t('dailyStreak', { n: day.streak }) }));
+    }
+    const cy = Math.round((BOARD.h - DESIGN_BOARD.h) / 2);
+    const rows = flying ? 2 : 1;
+    this.overText.setText(lines.join('\n')).setFontSize(lines.length > 6 ? 16 : lines.length > 4 ? 18 : 20);
+    const top = END_BUTTON.y - BOARD.y + cy - (rows - 1) * END_BUTTON.step;
+    this.overText.setY(top - END_BUTTON.h / 2 - 14 - this.overText.height / 2);
+    this.endButtons.removeAll(true);
+    const row = (y: number, buttons: [string, () => void][]) => {
+      const w = END_BUTTON.w;
+      buttons.forEach(([caption, onClick], i) => {
+        const x = BOARD.w / 2 + (i - (buttons.length - 1) / 2) * (w + END_BUTTON.gap);
+        this.endButtons.add(makeButton(this, x, y, w, END_BUTTON.h, caption, onClick).container);
+      });
+    };
+    const fly = (kept: Journey['kept']) => () => {
+      ui('click');
+      sfx('roar');
+      this.scene.restart({ journey: { leg: s.leg + 1, kept, traits: s.traits } });
+    };
+    if (flying) {
+      row(
+        top,
+        owned.length
+          ? owned.map((u) => [t('keepUpgrade', { upgrade: t(UPGRADE_NAMES[u]) + (u === 'second' ? '' : ` ${s.upgrades[u]}`) }), fly({ upgrade: u, level: s.upgrades[u] })])
+          : [[t('flyOn'), fly(null)]],
+      );
+    }
+    const again: [string, () => void][] = [
+      [
+        t('playAgain'),
+        () => {
+          ui('click');
+          this.scene.restart({ journey: {} });
+        },
+      ],
+    ];
+    if (!s.daily && !loadDaily(GAME).played) {
+      again.push([
+        t('dailyButton'),
+        () => {
+          ui('click');
+          this.scene.restart({ journey: { daily: true } });
+        },
+      ]);
+    }
+    row(top + (rows - 1) * END_BUTTON.step, again);
   }
 
   private draw() {
@@ -526,36 +678,44 @@ export class GameScene extends Phaser.Scene {
     if (s.banner) {
       this.bannerText.setText(s.banner.text);
       this.bannerBox.setSize(this.bannerText.width + 32, this.bannerText.height + 16).setOrigin(0.5);
+      // A banner of several lines grows down from where a one-line banner sits, clear of the HUD.
+      this.banner.setY(BOARD.y + 36 + Math.max(0, this.bannerBox.height - 40) / 2);
     }
-    this.banner.setVisible(!!s.banner);
-    if (s.phase === 'over' && !this.overLayer.visible) {
-      this.overText.setText(t('gameOver', { round: s.round, n: s.totalDelivered }));
-    }
-    if (s.phase === 'won' && !this.overLayer.visible) {
-      const host = villages(s)[festivalHost(s)].name;
-      const medal = s.medal ?? 'bronze';
-      // The best medal on this difficulty is kept, and its boons start the next game.
-      const best = this.medalSaved ? medal : saveMedal(settings.difficulty, medal);
-      this.medalSaved = true;
-      this.overText.setText(
-        [
-          t('festivalWon', { village: host, n: s.totalDelivered, hearts: s.hearts }),
-          '',
-          t('medalLine', { medal: t(medal), time: clock(s.festivalMs) }),
-          t('bestLine', { level: sharedText(settings.difficulty), best: t(best) }),
-          t('nextGame', { boons: boonNames(best).join(', ') }),
-        ].join('\n'),
-      );
-    }
+    this.banner.setVisible(!!s.banner && s.phase === 'play');
+    if (s.phase !== 'play' && !this.overLayer.visible) this.openEnd();
     this.overLayer.setVisible(s.phase !== 'play');
     this.drawCharters();
+    this.drawMoult();
+    this.drawDailyLink();
+  }
+
+  /** The traits a moult offers, while the player has yet to pick one. */
+  private drawMoult() {
+    const s = this.state;
+    const offer = s.moultOffer;
+    this.moultLayer.setVisible(!!offer && s.phase === 'play');
+    if (!offer) return;
+    const k = `${s.leg}|${s.round}|${offer.join(';')}`;
+    if (k === this.moultKey) return;
+    this.moultKey = k;
+    this.moultTitle.setText(t('pickMoult', { round: s.round }));
+    this.moultCards.forEach((card, i) => {
+      const trait = offer[i];
+      const x = BOARD.w / 2 + (i - (offer.length - 1) / 2) * (MOULT_CARD.w + MOULT_CARD.gap);
+      for (const o of [card.bg, card.name, card.text]) o.setX(x).setVisible(!!trait);
+      card.bg.input!.enabled = !!trait;
+      if (!trait) return;
+      card.name.setText(t(TRAIT_TEXT[trait].name));
+      card.text.setText(t(TRAIT_TEXT[trait].text));
+    });
   }
 
   /** The two charters on offer at a round's start, while the player has yet to pick one. */
   private drawCharters() {
     const s = this.state;
     const offer = s.charterOffer;
-    this.charterLayer.setVisible(!!offer && s.phase === 'play');
+    // A moult comes first: the charter cards wait under its cards.
+    this.charterLayer.setVisible(!!offer && !s.moultOffer && s.phase === 'play');
     if (!offer) return;
     const k = `${s.round}|${offer.map((c) => c.id + (c.cargo ?? '')).join(';')}`;
     if (k === this.charterKey) return;
@@ -784,10 +944,11 @@ export class GameScene extends Phaser.Scene {
       trail.unshift({ x: head.x + ((last.x - head.x) * (i - 1)) / step, y: head.y + ((last.y - head.y) * (i - 1)) / step });
     }
     trail.length = Math.min(trail.length, SEGMENT_GAPS[SEGMENT_GAPS.length - 1] + 2);
+    const shown = 4 + wagons(s);
     segments.forEach((seg, i) => {
       const gap = SEGMENT_GAPS[i];
       const p = i === 0 ? head : trail[Math.min(gap, trail.length - 1)];
-      seg.setPosition(p.x, p.y).setDepth(groundDepth(p.y) + (i === 0 ? 0.5 : 0)).setVisible(!this.inTunnel(p.x, p.y));
+      seg.setPosition(p.x, p.y).setDepth(groundDepth(p.y) + (i === 0 ? 0.5 : 0)).setVisible(i < shown && !this.inTunnel(p.x, p.y));
       // The head is drawn in profile: it looks the way the wyrm is going across the screen.
       if (i === 0 && w.path.length && Math.abs(b.x - a.x) > 0.5) seg.setFlipX(b.x < a.x);
       if (i < 4) return;
@@ -883,12 +1044,12 @@ export class GameScene extends Phaser.Scene {
           : this.mode === 'depot'
             ? t('hintDepot', { cost: depotCost(s) })
             : s.hazard
-              ? t(s.hazard.kind === 'washout' ? 'hintWashout' : 'hintRockfall')
+              ? t(HAZARD_TEXT[s.hazard.kind].hint)
               : s.round >= MOOD_ROUND && openVillages(s).some((v) => moodOf(s, villages(s).indexOf(v)) < 0 && canSendCourier(s, villages(s).indexOf(v)))
                 ? t('hintCourier', { cost: COURIER_COST })
                 : Object.keys(s.switches).length
                   ? t('hintSwitch')
-                  : t('hintBuild');
+                  : t('hintBuild', { bridge: terrainCost(s.valley.kind, 'river') });
     if (text === this.hint.text) return;
     this.hint.setText(text);
     this.placeHint();

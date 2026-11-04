@@ -9,9 +9,17 @@ village's goods to another before the order runs out of time. Where the line bra
 decide which way the wyrm goes. Keep it fed at the Roost, bring goods to the workshops that make
 better ones, keep the villages in good cheer, build depots and tunnels, wake a second wyrm late in
 the game, and after the eighth village finish with the festival and its medal. Every game is played
-in a new valley.
+in a new valley, a won festival flies the wyrm on to the next one (snowy, marsh, canyon) with one
+upgrade kept, its moults grow lasting traits along the way, and the daily valley gives everyone the
+same seeded valley once a day.
 
 ![The valley at the start](docs/screenshots/playthrough-0-valley.webp)
+
+![The snowy valley, the marsh and the canyon, and flying on after a won festival](docs/screenshots/valley-chain.webp)
+
+![The wyrm moults: three traits to choose from](docs/screenshots/moult.webp)
+
+![The daily valley's score, best and days in a row](docs/screenshots/daily-valley.webp)
 
 ## How to play
 
@@ -26,6 +34,9 @@ in a new valley.
 | Plain | Toggle: lay track that joins only the piece it continues, and crossings |
 | A charter card | Pick the round's charter (from round 3) |
 | Swift wings, Golden hoard, Second wyrm | Buy an upgrade |
+| A trait card | Pick the wyrm's trait when it moults (rounds 4 and 7) |
+| Keep ... (after a won festival) | Fly on to the next valley, keeping that upgrade |
+| Daily valley (top left of the first valley, or on the end panel) | Play today's daily valley |
 
 1. **The valley** is new every game: a river winds down the middle, mountains rise in the east,
    forest is scattered about and the villages that join after the first round get new places. The
@@ -115,6 +126,30 @@ in a new valley.
     difficulty its boon and the boons below it: bronze a *Head start* (25 more coins), silver a
     *Swift start* (Swift wings 1 from the start) and gold an *Early riser* (the second wyrm from
     round 3).
+19. **A chain of valleys**: after a won festival the wyrm can fly on to a new valley. The end panel
+    has a Keep button for each upgrade bought (Swift wings or Golden hoard at their level, or the
+    second wyrm), or Fly on when there is none: the next valley starts at round 1 with 40 coins,
+    three hearts and that one upgrade, and the wyrm's traits. The valleys go snowy, marsh, canyon
+    and round again, each with its own village names, ground and sky:
+    - **The snowy valley**: the river is frozen, so ice bridges cost 3 and never wash out, but
+      avalanches take track beside the mountains (more of them, from further west), and the cold
+      makes the wyrms eat 40% more. Rimewater and Sleetby send wool.
+    - **The marsh**: bog pools all over and no mountains; washouts take bridges and sinkholes
+      take track on the banks beside the water. Eelmere and Mistle send peat.
+    - **The canyon**: red mesas on both sides of the gorge and hardly a tree; a bridge costs 10 and
+      rockfalls come every 21 seconds. Saltpan and Gulchwater send salt.
+    A valley's local goods pay 30% more. Each valley's festival earns a medal like the first.
+20. **Moults**: at the start of rounds 4 and 7 the wyrm moults, and the game waits while you pick
+    one of three traits it lacks (before the round's charter). A trait lasts for the game and the
+    valleys after it: *Swift scales* (0.5 tiles a second faster), *Third wagon* (a third wagon, so
+    three orders at once, and passengers fill all three), *Small appetite* (40% less food a tile),
+    *Nimble claws* (loading and throwing a switch take half the time) and *Warm breath* (villages
+    wait half as long again before they sour). With all five, the wyrm stops moulting.
+21. **The daily valley**: before the first track is laid, *Daily valley >* in the top left corner
+    (and a button on the end panel) starts today's daily valley: the same seeded valley, of any
+    kind, for every player on the same day, one try a day, with no medal boons and no flying on.
+    Its score is the orders delivered when it ends, kept with the best score and the days in a row
+    (`wyrmrail-daily`).
 
 ![Laying track](docs/screenshots/playthrough-1-track.webp)
 
@@ -134,6 +169,8 @@ in a new valley.
 | Wyndle | Fish | Round 7 | |
 | Kettlecross | Tools | Round 8 | |
 
+In the later valleys the villages have other names but the same places in the line-up, goods and
+workshops, except that the two fish villages send the valley's local goods instead.
 An order pays 10 coins plus 3 per tile between the two villages (as the crow flies), and allows
 20 seconds plus 5 per tile.
 
@@ -145,6 +182,16 @@ An order pays 10 coins plus 3 per tile between the two villages (as the crow fli
 | Golden hoard | 3 | 40, 80, 140 | Every order pays 25% more |
 | Second wyrm | 1 | 150, from round 5 | A second, copper wyrm joins the line |
 | Depot | One per village | 60, then 30 more each, from round 2 | Goods at that village wait at half speed and load at once |
+
+### Traits
+
+| Trait | Effect |
+| --- | --- |
+| Swift scales | The wyrms fly 0.5 tiles a second faster |
+| Third wagon | Each wyrm carries three orders at once |
+| Small appetite | The wyrms eat 40% less a tile |
+| Nimble claws | Loading and throwing a switch take half the time |
+| Warm breath | Villages wait half as long again before they sour |
 
 ![Depots by Ashford and Fernhollow, a courier call cheering Stonereach, and two tunnel mouths](docs/screenshots/depot-courier.webp)
 
@@ -234,8 +281,9 @@ All paths are inside `games/wyrmrail/`.
   their workshops), `state.ts` the tuning numbers and the shape of a game, and `sim.ts` moves it
   on: laying and removing track (plain or joined, crossings), switches, routes along it, orders,
   the wyrms' trips and meals, workshops, village moods, washouts and rockfalls, round charters,
-  passengers, upgrades, rounds and the festival. The valley, new orders, hazards and charters are
-  picked with `Math.random`.
+  passengers, upgrades, rounds and the festival, the chain of valleys, moults and the daily valley.
+  The valley, new orders, hazards, charters and moults are picked with `Math.random`; the daily
+  valley with today's seed (`shared/daily.ts`).
 - `src/scenes/`: `BootScene` bakes textures, `GameScene` draws the valley, the track, the wyrm,
   the HUD and the panel and wires taps to the rules, `layout.ts` says where things are drawn.
 - `src/art/`: all the art, drawn in code and baked into textures at startup. `valley.ts` paints the
