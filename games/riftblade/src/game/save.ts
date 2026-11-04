@@ -5,7 +5,8 @@ import { freshHero, freshState, type GameState, type Phase } from './state';
 import { UPGRADES } from './upgrades';
 import { MAX_HEAT } from './heat';
 import { ARMOURY_IDS, nextPrice, type ArmouryId } from './armoury';
-import { MUTATOR_IDS, WEEKLY_BONUS } from './weekly';
+import { MUTATOR_IDS, WEEKLY_BONUS, weekSeed } from './weekly';
+import { CODEX_ENTRIES, CODEX_PAGES, pageDone, type CodexPageId } from './codex';
 
 export const SAVE_KEY = 'riftblade-progress';
 /** The run under way, so closing the game mid-run and opening it again carries on with it. */
@@ -32,6 +33,10 @@ export interface Progress {
   armoury: Partial<Record<ArmouryId, number>>;
   /** The latest week a weekly run was played: its number, the furthest jump (1 to 4) and whether it was won. */
   weekly: { week: number; best: number; won: boolean } | null;
+  /** The most worlds cleared in the endless rift after a win (0 before any). */
+  endless: number;
+  /** The codex: every foe, boss and card seen (`codex.ts` ids), and the full pages already paid for. */
+  codex: { seen: string[]; paid: CodexPageId[] };
 }
 
 /** A saved count per hero, keeping only known heroes with a finite number. */
@@ -71,11 +76,16 @@ export function loadProgress(): Progress {
       bank: typeof saved.bank === 'number' && Number.isFinite(saved.bank) ? Math.max(0, Math.floor(saved.bank)) : 0,
       armoury,
       furthest: perHero(saved.furthest),
+      endless: Number.isInteger(saved.endless) && saved.endless > 0 ? saved.endless : 0,
+      codex: {
+        seen: Array.isArray(saved.codex?.seen) ? saved.codex.seen.filter((id: unknown) => CODEX_ENTRIES.has(id as string)) : [],
+        paid: Array.isArray(saved.codex?.paid) ? saved.codex.paid.filter((id: unknown) => CODEX_PAGES.some((pg) => pg.id === id)) : [],
+      },
       unlocked: Array.isArray(saved.unlocked) ? saved.unlocked.filter((id: unknown) => HERO_IDS.includes(id as HeroId)) : [],
       charted: Array.isArray(saved.charted) ? saved.charted.filter((id: unknown) => typeof id === 'string') : [],
     };
   } catch {
-    return { bestMs: 0, wins: {}, heat: {}, bank: 0, armoury: {}, weekly: null, furthest: {}, unlocked: [], charted: [] };
+    return { bestMs: 0, wins: {}, heat: {}, bank: 0, armoury: {}, weekly: null, endless: 0, codex: { seen: [], paid: [] }, furthest: {}, unlocked: [], charted: [] };
   }
 }
 
@@ -118,6 +128,42 @@ export function recordWeekly(week: number, stage: number, won: boolean): { progr
   progress.bank += bonus;
   saveProgress(progress);
   return { progress, bonus };
+}
+
+/** Records the worlds an endless rift cleared (keeping the best) and banks `credits`; the updated progress. */
+export function recordEndless(cleared: number, credits = 0): Progress {
+  const progress = loadProgress();
+  progress.endless = Math.max(progress.endless, cleared);
+  progress.bank += credits;
+  saveProgress(progress);
+  return progress;
+}
+
+/** Banks credits for the Armoury (a daily's first win); the updated progress. */
+export function bankCredits(credits: number): Progress {
+  const progress = loadProgress();
+  progress.bank += credits;
+  saveProgress(progress);
+  return progress;
+}
+
+/**
+ * Adds codex entries seen in a run; every page this fills for the first time pays its credits into
+ * the bank. Returns the updated progress and the pages just paid for.
+ */
+export function recordCodex(ids: readonly string[]): { progress: Progress; paid: CodexPageId[] } {
+  const progress = loadProgress();
+  for (const id of ids) if (CODEX_ENTRIES.has(id) && !progress.codex.seen.includes(id)) progress.codex.seen.push(id);
+  const seen = new Set(progress.codex.seen);
+  const paid: CodexPageId[] = [];
+  for (const page of CODEX_PAGES) {
+    if (progress.codex.paid.includes(page.id) || !pageDone(page, seen)) continue;
+    progress.codex.paid.push(page.id);
+    progress.bank += page.pay;
+    paid.push(page.id);
+  }
+  saveProgress(progress);
+  return { progress, paid };
 }
 
 /** Buys the next rank of an Armoury piece with banked credits; the updated progress, or null if it can't. */
@@ -210,6 +256,11 @@ export function loadRun(): GameState | null {
     if (!Number.isInteger(s.stage) || s.stage < 0 || s.stage > LAST_STAGE) return null;
     if (!Number.isInteger(s.heat) || s.heat < 0 || s.heat > MAX_HEAT) return null;
     if (!Number.isInteger(s.week) || !Array.isArray(s.mutators) || !s.mutators.every((m) => MUTATOR_IDS.includes(m))) return null;
+    if (typeof s.daily !== 'string' || typeof s.endless !== 'boolean' || !Number.isInteger(s.loop) || s.loop < 0) return null;
+    if (!Number.isInteger(s.endlessCleared) || s.endlessCleared < 0) return null;
+    // A weekly run saved before runs kept their seed reseeds from its week.
+    if (!Number.isInteger(s.seed) || s.seed < -1 || s.seed > 0xffffffff) return null;
+    if (s.week >= 0 && s.seed < 0) s.seed = weekSeed(s.week);
     // A position that isn't one falls back to reseeding from the stage (as saves from before it do).
     if (!Number.isInteger(s.rng) || s.rng < 0 || s.rng > 0xffffffff) s.rng = -1;
     if (s.next !== -1 && !PLANETS[s.next]) return null;

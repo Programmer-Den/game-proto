@@ -9,7 +9,8 @@ import { FILLER, MAX_TIER, UPGRADES, UPGRADE_IDS, canOffer, rollChoices } from '
 import { t } from '../i18n';
 import { checkDeeds } from './blades';
 import { hot } from './heat';
-import { rand, reseed, weekSeed } from './weekly';
+import { rand, reseed } from './weekly';
+import { lastStage } from './daily';
 import { CREDITS, LAST_STAGE, NODE_INFO, PLANETS, REST_HEAL, TRADE, arenaElites, planetsAt, type EventId, type NodeKind } from './planets';
 
 /** One frame of the game: the sim while a fight is on, then whatever follows a cleared fight. */
@@ -60,14 +61,40 @@ export function afterClear(s: GameState) {
     s.credits += CREDITS.clear;
     // Master Oom's deed: the Swamp world cleared with few hits from toad globs.
     if (s.planet === 1 && s.globHits <= 5) s.cleanSwamp = true;
-    if (s.stage >= LAST_STAGE) {
-      s.phase = 'won';
-      return;
-    }
-    s.after = 'chart';
+    if (s.endless) s.endlessCleared += 1;
+    if (s.stage >= lastStage(s)) {
+      if (!s.endless) {
+        s.phase = 'won';
+        return;
+      }
+      // The endless rift loops: from the Lava world the star map leads back to the Dune world.
+      loopBack(s);
+    } else s.after = 'chart';
   }
   nextPick(s);
 }
+
+/** The star map from the last world back to the Dune world, the next loop of the endless rift. */
+function loopBack(s: GameState) {
+  s.next = planetsAt(0)[0];
+  s.nodes = rollNodes(hot(s.heat, 'noRest'));
+  s.after = 'map';
+}
+
+/**
+ * Goes on into the endless rift from a won crusade (a normal run only: not a weekly or daily): the
+ * level-ups still owed first, then the star map back to the Dune world, where the next loop begins.
+ */
+export function enterEndless(s: GameState) {
+  if (s.phase !== 'won' || s.endless || s.seed >= 0 || s.daily) return false;
+  s.endless = true;
+  loopBack(s);
+  nextPick(s);
+  return true;
+}
+
+/** The jump after this one (the endless rift wraps from the last back to the first). */
+export const nextStage = (s: GameState) => (s.stage >= LAST_STAGE ? 0 : s.stage + 1);
 
 /** The planets the space map offers for the next jump (indices into `PLANETS`). */
 export const chartOptions = (s: GameState) => planetsAt(s.stage + 1);
@@ -79,7 +106,7 @@ export function chooseWorld(s: GameState, index: number) {
   if (planet === undefined) return;
   s.next = planet;
   // A weekly run's star map and the next world play out the same way each attempt.
-  if (s.week >= 0) reseed(weekSeed(s.week) + 7919 * (s.stage + 1) + 31 * planet);
+  if (s.seed >= 0) reseed(s.seed + 7919 * (s.stage + 1) + 31 * planet);
   s.nodes = rollNodes(hot(s.heat, 'noRest'));
   s.phase = 'map';
 }
@@ -276,7 +303,12 @@ export function chooseEvent(s: GameState, index: number) {
 export function nextPlanet(s: GameState) {
   s.planet = s.next >= 0 ? s.next : chartOptions(s)[0];
   s.stage += 1;
-  if (s.week >= 0) reseed(weekSeed(s.week) + 7919 * s.stage + 31 * s.planet + 1);
+  // The endless rift: past the Lava world the next loop starts on the Dune world, tougher.
+  if (s.stage > LAST_STAGE) {
+    s.stage = 0;
+    s.loop += 1;
+  }
+  if (s.seed >= 0) reseed(s.seed + 7919 * s.stage + 31 * s.planet + 1);
   s.route.push(s.planet);
   s.next = -1;
   clearField(s);

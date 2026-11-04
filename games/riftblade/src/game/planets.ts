@@ -93,7 +93,7 @@ export const STAGES = LAST_STAGE + 1;
 export const planetsAt = (stage: number) => PLANETS.flatMap((p, i) => (p.stage === stage ? [i] : []));
 
 /** "2/4 Swamp world": the jump and the planet. */
-export const planetLabel = (stage: number, i: number) => t('planetLabel', { n: stage + 1, of: STAGES, planet: t(PLANETS[i].name) });
+export const planetLabel = (stage: number, i: number, of = STAGES) => t('planetLabel', { n: stage + 1, of, planet: t(PLANETS[i].name) });
 
 export interface BossDef {
   /** Its name ("The Grinder Crawler"), the boss bar's label and the end screen's line when it falls last. */

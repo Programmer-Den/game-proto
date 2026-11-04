@@ -8,17 +8,20 @@ import { HEROES, HERO_IDS, schemeOf, type HeroDef, type HeroId } from '../game/h
 import { clock, type GameState } from '../game/state';
 import { CAPSTONES, FILLER, MAX_TIER, POOL_NAMES, UPGRADES, capstoneFor, crossoverFor } from '../game/upgrades';
 import { BOSSES, NODE_INFO, PLANETS, STAGES, planetLabel, planetsAt, type NodeKind } from '../game/planets';
-import { chartOptions, priceOf, rerollPrice } from '../game/voyage';
+import { chartOptions, nextStage, priceOf, rerollPrice } from '../game/voyage';
+import { DAILY, stagesOf } from '../game/daily';
+import { CODEX_PAGES, pageCount, type CodexPageId } from '../game/codex';
+import type { DailyRecord } from '../../../../shared/daily';
 import { isUnlocked, type Progress } from '../game/save';
 import { HEAT_RULES, heatOpen } from '../game/heat';
 import { ARMOURY, nextPrice, perkAmount } from '../game/armoury';
 import { MUTATORS, WEEKLY_BONUS, type MutatorId } from '../game/weekly';
-import type { Vars } from '../../../../shared/i18n';
+import { formatDate, type Vars } from '../../../../shared/i18n';
 import { t } from '../i18n';
 import { C, hex } from '../art/glow';
 import { portraitKey } from '../art/sprites';
 import {
-  AGAIN, ARMOURY_BUTTON, BACK, CHART, MUTATOR_CARD, WEEKLY_BACK, WEEKLY_BUTTON, WEEKLY_START, armouryCardRect, CONTINUE, DEPTH, FIGHT, FONT, HEAT_DOWN, HEAT_ROW, HEAT_UP, HERO_DETAIL, LEAVE, MAP, REROLL, SCREEN, UNLOCK, VIEW, chartRect, chartSpot, eventOptionRect, heroCardRect,
+  AGAIN, AGAIN_SIDE, CODEX_BUTTON, CODEX_GRID, DAILY_BUTTON, ENDLESS_BUTTON, codexTabRect, ARMOURY_BUTTON, BACK, CHART, MUTATOR_CARD, WEEKLY_BACK, WEEKLY_BUTTON, WEEKLY_START, armouryCardRect, CONTINUE, DEPTH, FIGHT, FONT, HEAT_DOWN, HEAT_ROW, HEAT_UP, HERO_DETAIL, LEAVE, MAP, REROLL, SCREEN, UNLOCK, VIEW, chartRect, chartSpot, eventOptionRect, heroCardRect,
   levelCardRect, mapNodeRect, mapNodeSpot, tradeCardRect, type Rect,
 } from '../scenes/layout';
 
@@ -139,7 +142,7 @@ function sideOf(hero: HeroDef) {
  * The hero select screen: twelve small cards (a hero still locked shows only a dark placeholder:
  * no art, name or colour, and never its deed) and the chosen hero's details with the Fight button.
  */
-export function heroSelect(p: Panel, progress: Progress, chosen: HeroId, heat = 0, week = -1) {
+export function heroSelect(p: Panel, progress: Progress, chosen: HeroId, heat = 0, week = -1, daily: DailyRecord | null = null) {
   const scene = p.scene;
   p.dim(0.55);
   p.text(VIEW.w / 2, 12, 'RIFTBLADE', 32, '#9fd8ff', { bold: true, origin: [0.5, 0], glow: true });
@@ -160,7 +163,90 @@ export function heroSelect(p: Panel, progress: Progress, chosen: HeroId, heat = 
     p.frame(WEEKLY_BUTTON, WEEKLY_COLOR, '#101c2a');
     p.spots.push({ id: 'weekly', ...WEEKLY_BUTTON });
     fit(p.text(WEEKLY_BUTTON.x + WEEKLY_BUTTON.w / 2, WEEKLY_BUTTON.y + WEEKLY_BUTTON.h / 2, t(won ? 'weeklyButtonWon' : 'weeklyButton'), 14, WEEKLY_COLOR, { bold: true, origin: [0.5, 0.5] }), WEEKLY_BUTTON.w - 16);
+    // The daily run beside it, from the same first run on.
+    p.frame(DAILY_BUTTON, DAILY_COLOR, '#1a1028');
+    p.spots.push({ id: 'daily', ...DAILY_BUTTON });
+    const label = daily?.played ? t('dailyButtonDone') : t('dailyButton');
+    fit(p.text(DAILY_BUTTON.x + DAILY_BUTTON.w / 2, DAILY_BUTTON.y + DAILY_BUTTON.h / 2, label, 14, DAILY_COLOR, { bold: true, origin: [0.5, 0.5] }), DAILY_BUTTON.w - 16);
   }
+  // The codex opens once a run has met anything.
+  if (progress.codex.seen.length) {
+    p.frame(CODEX_BUTTON, CODEX_COLOR, '#0f2018');
+    p.spots.push({ id: 'codex', ...CODEX_BUTTON });
+    const seen = new Set(progress.codex.seen);
+    const done = CODEX_PAGES.filter((pg) => pageCount(pg, seen) === pg.entries.length).length;
+    fit(p.text(CODEX_BUTTON.x + CODEX_BUTTON.w / 2, CODEX_BUTTON.y + CODEX_BUTTON.h / 2, t('codexButton', { n: done, of: CODEX_PAGES.length }), 14, CODEX_COLOR, { bold: true, origin: [0.5, 0.5] }), CODEX_BUTTON.w - 16);
+  }
+  return p;
+}
+
+const DAILY_COLOR = '#d7a2ff';
+const CODEX_COLOR = '#7dffa0';
+
+/** The daily run: today's hero and mutator, today's score, the best and the streak, Start and Back. */
+export function dailyPanel(p: Panel, record: DailyRecord, hero: HeroId, mutators: readonly MutatorId[]) {
+  const scene = p.scene;
+  p.dim(0.85);
+  stars(p, scene);
+  p.text(VIEW.w / 2, 30, t('dailyTitle'), 30, DAILY_COLOR, { bold: true, origin: [0.5, 0], glow: true });
+  p.text(VIEW.w / 2, 72, t('dailySubtitle', { day: dayLabel(record.day) }), 13, C.muted, { origin: [0.5, 0], align: 'center', wrap: VIEW.w - 80 });
+  const sch = schemeOf(hero);
+  const hx = 300;
+  p.text(hx, MUTATOR_CARD.y, t('dailyHero'), 13, C.muted, { origin: [0.5, 0] });
+  p.add(scene.add.image(hx, MUTATOR_CARD.y + 80, portraitKey(hero)).setScale(0.8), 2);
+  fit(p.text(hx, MUTATOR_CARD.y + 130, t(HEROES[hero].name), 19, sch.accent, { bold: true, origin: [0.5, 0] }), 300);
+  mutators.forEach((id) => {
+    const r = { x: 520, y: MUTATOR_CARD.y, w: MUTATOR_CARD.w, h: MUTATOR_CARD.h };
+    p.frame(r, DAILY_COLOR);
+    p.text(r.x + r.w / 2, r.y + 22, t(MUTATORS[id].name), 18, DAILY_COLOR, { bold: true, origin: [0.5, 0] });
+    p.text(r.x + r.w / 2, r.y + 58, t(MUTATORS[id].text), 14, C.text, { origin: [0.5, 0], align: 'center', wrap: r.w - 28 });
+  });
+  const today = record.score !== null ? t('dailyScore', { n: record.score }) : record.played ? t('dailyUnderway') : t('dailyNotYet');
+  p.text(VIEW.w / 2, 322, today, 17, record.played ? C.elite : C.text, { bold: true, origin: [0.5, 0] });
+  const best = [record.best > 0 ? t('dailyBest', { n: record.best }) : '', record.streak > 0 ? t('dailyStreak', { n: record.streak }) : ''].filter(Boolean).join('  ·  ');
+  p.text(VIEW.w / 2, 352, best || t('dailyReward', { n: DAILY.bonus }), 14, C.muted, { origin: [0.5, 0] });
+  if (best) p.text(VIEW.w / 2, 374, t('dailyReward', { n: DAILY.bonus }), 13, C.muted, { origin: [0.5, 0] });
+  button(p, WEEKLY_BACK, 'back', t('armouryBack'), C.muted);
+  button(p, WEEKLY_START, 'start', t(record.played ? 'dailyPlayed' : 'weeklyStart'), DAILY_COLOR, !record.played);
+  p.text(VIEW.w / 2, WEEKLY_START.y + WEEKLY_START.h + 16, t(record.played ? 'dailyHelpDone' : 'weeklyHelp'), 12, C.muted, { origin: [0.5, 0] });
+  return p;
+}
+
+/** A daily's day (`YYYY-MM-DD`) in the player's language. */
+function dayLabel(day: string) {
+  const [y, m, d] = day.split('-').map(Number);
+  return formatDate(new Date(y, m - 1, d), { dateStyle: 'long' });
+}
+
+/** The codex: a tab per page (with its count, and its pay until full), the open page's entries and Back. */
+export function codexPanel(p: Panel, progress: Progress, open: CodexPageId) {
+  const scene = p.scene;
+  p.dim(0.88);
+  stars(p, scene);
+  p.text(VIEW.w / 2, 26, t('codexTitle'), 30, CODEX_COLOR, { bold: true, origin: [0.5, 0], glow: true });
+  p.text(VIEW.w / 2, 66, t('codexSubtitle'), 13, C.muted, { origin: [0.5, 0], align: 'center', wrap: VIEW.w - 80 });
+  const seen = new Set(progress.codex.seen);
+  CODEX_PAGES.forEach((pg, i) => {
+    const r = codexTabRect(i, CODEX_PAGES.length);
+    const n = pageCount(pg, seen);
+    const full = n === pg.entries.length;
+    p.frame(r, pg.id === open ? CODEX_COLOR : full ? C.elite : C.muted, pg.id === open ? '#12261c' : C.panel);
+    p.spots.push({ id: `page-${pg.id}`, ...r });
+    p.text(r.x + 8, r.y + 5, String(i + 1), 11, C.muted);
+    fit(p.text(r.x + r.w / 2, r.y + 17, t(pg.name), 15, pg.id === open ? C.text : C.muted, { bold: true, origin: [0.5, 0.5] }), r.w - 30);
+    const line = full ? t('codexPaid') : t('codexCount', { n, of: pg.entries.length, pay: pg.pay });
+    fit(p.text(r.x + r.w / 2, r.y + 38, line, 12, full ? C.elite : C.muted, { origin: [0.5, 0.5] }), r.w - 12);
+  });
+  const page = CODEX_PAGES.find((pg) => pg.id === open) ?? CODEX_PAGES[0];
+  const rows = Math.ceil(page.entries.length / CODEX_GRID.cols);
+  page.entries.forEach((e, i) => {
+    const col = Math.floor(i / rows);
+    const row = i % rows;
+    const known = seen.has(e.id);
+    fit(p.text(CODEX_GRID.x + col * CODEX_GRID.col, CODEX_GRID.y + row * CODEX_GRID.row, known ? t(e.name) : '? ? ?', 13, known ? C.text : '#3d4a66', { bold: known }), CODEX_GRID.col - 14);
+  });
+  button(p, BACK, 'back', t('armouryBack'), CODEX_COLOR);
+  p.text(VIEW.w / 2, BACK.y + BACK.h + 16, t('codexHelp'), 12, C.muted, { origin: [0.5, 0] });
   return p;
 }
 
@@ -434,14 +520,16 @@ export function levelUp(p: Panel, s: GameState) {
 }
 
 /** The end of a run: won or fallen, with the numbers and a button to go again. */
-export function endScreen(p: Panel, s: GameState, progress: Progress, banked = 0, bonus = 0) {
+export function endScreen(p: Panel, s: GameState, progress: Progress, banked = 0, bonus = 0, daily: DailyRecord | null = null) {
   p.dim(0.7);
   const won = s.phase === 'won';
+  // A won crusade (not a weekly or daily) can go on into the endless rift.
+  const endless = won && s.seed < 0 && !s.daily && !s.endless;
   const color = won ? C.elite : C.danger;
   p.text(VIEW.w / 2, 120, t(won ? 'victory' : 'fallen'), 46, color, { bold: true, origin: [0.5, 0], glow: true });
   const hero = HEROES[s.hero!];
   const planet = PLANETS[s.planet];
-  const vars = { hero: t(hero.name), planet: t(planet.name), n: s.stage + 1, of: STAGES };
+  const vars = { hero: t(hero.name), planet: t(planet.name), n: s.stage + 1, of: stagesOf(s) };
   p.text(VIEW.w / 2, 182, t(won ? BOSSES[planet.boss].beaten : s.arena ? 'fellArena' : 'fellOn', vars), 17, C.text, { origin: [0.5, 0] });
   const caps = s.capstones.map((id) => t(CAPSTONES.find((c) => c.id === id)!.name));
   const lines = [
@@ -450,17 +538,27 @@ export function endScreen(p: Panel, s: GameState, progress: Progress, banked = 0
     s.heat > 0 ? t('endHeat', { n: s.heat }) : '',
     won && heatOpen(s.heat) > s.heat ? t('heatOpened', { n: s.heat + 1, hero: t(hero.short) }) : '',
     s.week >= 0 ? t('weeklyEnd', { mutators: s.mutators.map((id) => t(MUTATORS[id].name)).join(' + ') }) : '',
+    s.daily && daily?.score != null ? t('dailyEnd', { n: daily.score, best: daily.best }) : '',
+    s.endless ? t('endlessEnd', { n: s.endlessCleared, best: progress.endless }) : '',
     banked > 0 ? t('banked', { n: banked }) : '',
-    bonus > 0 ? t('weeklyBonus', { n: bonus }) : '',
+    bonus > 0 ? t(s.daily ? 'dailyBonus' : 'weeklyBonus', { n: bonus }) : '',
     t('longestRun', { time: clock(progress.bestMs) }),
   ].filter(Boolean);
   p.text(VIEW.w / 2, 226, lines.join('\n'), 15, C.muted, { origin: [0.5, 0], align: 'center' });
-  p.frame(AGAIN, color);
-  p.spots.push({ id: 'again', ...AGAIN });
-  p.text(AGAIN.x + AGAIN.w / 2, AGAIN.y + AGAIN.h / 2, t('runAgain'), 19, C.text, { bold: true, origin: [0.5, 0.5] });
-  p.text(VIEW.w / 2, AGAIN.y + AGAIN.h + 20, t('orEnter'), 12, C.muted, { origin: [0.5, 0] });
+  const again = endless ? AGAIN_SIDE : AGAIN;
+  if (endless) {
+    p.frame(ENDLESS_BUTTON, ENDLESS_COLOR, '#1d0f24');
+    p.spots.push({ id: 'endless', ...ENDLESS_BUTTON });
+    fit(p.text(ENDLESS_BUTTON.x + ENDLESS_BUTTON.w / 2, ENDLESS_BUTTON.y + ENDLESS_BUTTON.h / 2, t('endlessButton'), 19, ENDLESS_COLOR, { bold: true, origin: [0.5, 0.5] }), ENDLESS_BUTTON.w - 16);
+  }
+  p.frame(again, color);
+  p.spots.push({ id: 'again', ...again });
+  p.text(again.x + again.w / 2, again.y + again.h / 2, t('runAgain'), 19, C.text, { bold: true, origin: [0.5, 0.5] });
+  p.text(VIEW.w / 2, AGAIN.y + AGAIN.h + 20, t(endless ? 'endlessHelp' : 'orEnter'), 12, C.muted, { origin: [0.5, 0], align: 'center' });
   return p;
 }
+
+const ENDLESS_COLOR = '#ff7de9';
 
 /** A faint field of stars over the whole view behind the map, from a fixed pattern. */
 function stars(p: Panel, scene: Phaser.Scene) {
@@ -531,7 +629,7 @@ export function starMap(p: Panel, s: GameState) {
   planetDisc(g, MAP.from.x, MAP.from.y, 50, s.planet, true);
   planetDisc(g, MAP.to.x, MAP.to.y, 60, next, false);
   p.text(MAP.from.x, MAP.from.y + 64, t('planetCleared', { planet: t(PLANETS[s.planet].name) }), 13, C.muted, { origin: [0.5, 0], align: 'center' });
-  p.text(MAP.to.x, MAP.to.y + 74, t('nextPlanet', { planet: planetLabel(s.stage + 1, next) }), 14, C.text, { bold: true, origin: [0.5, 0], align: 'center' });
+  p.text(MAP.to.x, MAP.to.y + 74, t('nextPlanet', { planet: planetLabel(nextStage(s), next, stagesOf(s)) }), 14, C.text, { bold: true, origin: [0.5, 0], align: 'center' });
   p.text(MAP.to.x, MAP.to.y + 94, t(PLANETS[next].faction), 12.5, PLANETS[next].ground.deco, { origin: [0.5, 0] });
   s.nodes.forEach((kind, i) => {
     const info = NODE_INFO[kind];
@@ -559,6 +657,9 @@ export function spaceMap(p: Panel, s: GameState, charted: readonly string[]) {
   p.dim(0.92);
   stars(p, scene);
   const options = chartOptions(s);
+  // The jumps of this run (three for a daily), and the planets landed on in this loop of it.
+  const stages = stagesOf(s);
+  const route = s.route.slice(-(s.stage + 1));
   p.text(VIEW.w / 2, 26, t('spaceMap'), 30, '#9fd8ff', { bold: true, origin: [0.5, 0], glow: true });
   p.text(VIEW.w / 2, 64, t('spaceMapSubtitle', { planet: t(PLANETS[s.planet].name), keys: options.map((_, i) => i + 1).join(', ') }), 14, C.muted, { origin: [0.5, 0] });
   const g = p.add(scene.add.graphics(), 1);
@@ -568,12 +669,12 @@ export function spaceMap(p: Panel, s: GameState, charted: readonly string[]) {
     return chartSpot(col, list.indexOf(planet), list.length);
   };
   // Lanes between every planet of one jump and the next; the route flown so far, and the jumps on offer, lit.
-  for (let col = 0; col < STAGES - 1; col++) {
+  for (let col = 0; col < stages - 1; col++) {
     for (const a of planetsAt(col)) {
       for (const b of planetsAt(col + 1)) {
         const from = spotOf(a);
         const to = spotOf(b);
-        const flown = s.route[col] === a && s.route[col + 1] === b;
+        const flown = route[col] === a && route[col + 1] === b;
         const offered = col === s.stage && a === s.planet;
         g.lineStyle(flown ? 3 : 1.5, flown ? 0x9fd8ff : offered ? hex(PLANETS[b].ground.deco) : 0x8ea0c4, flown ? 0.85 : offered ? 0.5 : 0.12);
         g.lineBetween(from.x, from.y, to.x, to.y);
@@ -581,13 +682,13 @@ export function spaceMap(p: Panel, s: GameState, charted: readonly string[]) {
     }
   }
   // Every planet: the ones behind and ahead as small discs, the one the hero is on ringed.
-  for (let col = 0; col < STAGES; col++) {
+  for (let col = 0; col < stages; col++) {
     const list = planetsAt(col);
     list.forEach((planet, i) => {
       if (col === s.stage + 1) return;
       const c = chartSpot(col, i, list.length);
       const past = col <= s.stage;
-      const visited = s.route[col] === planet;
+      const visited = route[col] === planet;
       const r = visited ? CHART.r : 18;
       planetDisc(g, c.x, c.y, r, planet, !visited);
       if (planet === s.planet) g.lineStyle(2, 0x9fd8ff, 0.9).strokeCircle(c.x, c.y, r + 8);

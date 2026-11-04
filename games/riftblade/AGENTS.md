@@ -87,7 +87,38 @@ a star map between them.
   effects (`MUT`): Glass Cannon and Overcharged in `statsOf` and `startRun`, Swarm in `director`
   and `spawnAt`, Haste in `statsOf` and `spawnAt`, Vampire in `kill` (and no regen), Fragile Foes
   in `spawnAt` (bosses too) and `hurtHero`. `recordWeekly` keeps the week's furthest jump and win in
-  `progress.weekly`; the first win of a week banks `WEEKLY_BONUS`.
+  `progress.weekly`; the first win of a week banks `WEEKLY_BONUS`. A weekly or daily run keeps its
+  seed in `state.seed` (`weekSeed(week)` or `dailySeed(day)`, -1 for a normal run), and every
+  reseed adds to it (`s.seed + 7919 * stage + ...`), so the weekly draws as it did before the daily
+  came; `loadRun` gives a weekly saved without a seed `weekSeed(week)`.
+- The daily run (`daily.ts`, using `shared/daily.ts`): from the same first run on, a Daily run
+  button beside the weekly one opens `dailyPanel` (`GameScene.dailyOpen`). `dailyOf(day, open
+  heroes)` picks its hero and one mutator with `dailyRand`; `beginDaily` refuses once today's try is
+  used, else calls `startDaily` and starts at heat 0 without the Armoury with `state.daily` (the
+  day) and `state.seed` (`dailySeed(day)`). It is three worlds: `lastStage(s)` (`DAILY_LAST_STAGE`
+  = 2) ends it in `afterClear`, and `stagesOf(s)` gives the HUD's, the end screen's and the space
+  map's jump count (the space map draws three columns). At its end `GameScene.syncPanel` calls
+  `finishDaily` with `dailyScore` (1000 per boss beaten plus kills); the first finish of a won daily
+  banks `DAILY.bonus` (`bankCredits`). A daily win is not recorded as a crusade win (no `wins`, no
+  heat).
+- The endless rift (`endless.ts`, `enterEndless` in `voyage.ts`): the end screen of a won normal run
+  (no seed, no daily) shows an Endless rift button (`ENDLESS_BUTTON`, beside Run again at
+  `AGAIN_SIDE`; Space too). It sets `state.endless`, and `loopBack` sends the star map from the Lava
+  world back to the Dune world (`next` 0, `after` `map`, owed cards first); `nextPlanet` wraps
+  `stage` past `LAST_STAGE` to 0 and counts `state.loop`. From loop 1, `spawnAt` gives every foe and
+  boss `loopHp(loop)` health and `hurtHero` takes `loopDmg(loop)` (`ENDLESS`). Every boss cleared in
+  it adds to `state.endlessCleared`. At its end the win is not recorded again: `recordRun` with
+  `won` false and nothing banked, then `recordEndless` keeps the best in `progress.endless` and
+  banks `ENDLESS_SALVAGE` per world cleared. The HUD tag adds "rift loop n"; `nextStage` and the
+  space map's `route` (the last `stage + 1` planets) keep the maps right on later loops.
+- The codex (`codex.ts`): `CODEX_PAGES` (foes 16, bosses 8, pool skills 30, gear 12, hero paths 48,
+  each with its pay) of entries `foe:<kind>`, `boss:<id>` and `card:<upgrade id>`.
+  `GameScene.recordCodex` runs every frame of a run: `codexNew` lists what the state shows that
+  `codexKnown` (the save's entries) lacks (foes and the boss on the field, the cards on offer and
+  the ones held; it reads the state only, never `rand`), and `recordCodex` (save.ts) adds them to
+  `progress.codex.seen` and pays every page filled for the first time into the bank
+  (`progress.codex.paid`), said by a floating text. Once anything is seen, a Codex button (top left,
+  beside the Armoury) opens `codexPanel` (`GameScene.codexOpen`, the page in `codexPage`).
 - Trophies (`src/trophies/`, see `shared/trophies.ts`): ten, listed with `trophySet` in
   `trophies/index.ts` (handed to `setupGame`), texts in `trophies/i18n/`. `trophies/check.ts`'s
   `checkTrophies(state, progress)` runs every frame from `GameScene.update` and awards each one whose
@@ -95,7 +126,8 @@ a star map between them.
   boss down, or a saved furthest jump of 2), `capstone` (one in the run), `newHero` (two heroes
   open), `firstPiece` (any Armoury rank), `crusade` (any win), `weekly` (`progress.weekly.won`),
   `heat3` and `heat5` (best heat won), `armouryFull` (every rank bought) and `allHeroes` (all twelve
-  open, hidden). The playthrough's first minute earns none.
+  open, hidden). The playthrough's first minute earns none. There are ten, the most a game may
+  have, so the daily, the endless rift and the codex brought none.
 - Sound effects and music (see Sound below).
 - Not built yet: Watch AI.
 - No TODOs or FIXMEs in the code.
@@ -151,6 +183,12 @@ a star map between them.
 - `src/game/armoury.ts`: the Armoury: `ArmouryId`, `ARMOURY` (name, text, rank prices),
   `ARMOURY_IDS`, `PERK` (each rank's numbers), `salvage` and `SALVAGE_PER_WORLD`, `perkAmount` (a
   card's `{n}`) and `nextPrice`. Imports nothing from the game but types.
+- `src/game/daily.ts`: the daily run: `DAILY_GAME`, `DAILY_LAST_STAGE`, `DAILY` (score per boss,
+  bonus), `dailyOf`, `dailySeed`, `lastStage(s)`, `stagesOf(s)` and `dailyScore`. Imports nothing
+  from the game but tables and types.
+- `src/game/endless.ts`: the endless rift's numbers: `ENDLESS`, `ENDLESS_SALVAGE`, `loopHp`, `loopDmg`.
+- `src/game/codex.ts`: `CodexPageId`, `CODEX_PAGES`, `CODEX_ENTRIES`, `pageDone`, `pageCount` and
+  `codexNew`.
 - `src/game/weekly.ts`: the weekly run: `MutatorId`, `MUTATORS`, `MUTATOR_IDS`, `MUT`,
   `WEEKLY_BONUS`, `weekOf`, `weekSeed`, `seeded` (mulberry32), `weeklyOf`, `rand` (the rules' random number), `reseed`, `unseed`
   and `rngAt`.
@@ -227,11 +265,11 @@ a star map between them.
 - `src/game/voyage.ts`: between fights. `frame` (tick, then `afterClear` and `nextPlanet` for the
   passing phases), `afterClear` (collect, credits, arena reward, the space map or victory),
   `chartOptions` and `chooseWorld` (the space map: sets `state.next` and rolls the nodes), `rollNodes`,
-  `chooseNode`, the trader (`priceOf`, `buy`, `reroll`, `leave`), the arena (`startArena`),
+  `chooseNode`, `enterEndless`, `loopBack` and `nextStage` (the endless rift), the trader (`priceOf`, `buy`, `reroll`, `leave`), the arena (`startArena`),
   events (`rollEvent`, `chooseEvent`) and `nextPlanet` (to `state.next`, `stage` + 1, onto
   `state.route`).
 - `src/game/save.ts`: `SAVE_KEY`, `loadProgress`, `saveProgress`, `recordRun`, `recordCharted`, `recordUnlocks`,
-  `buyArmoury`, `recordWeekly`, `isUnlocked` ((TR-9, a deed done, a hero the save shows as played, or the old world deeds) and
+  `buyArmoury`, `recordWeekly`, `recordEndless`, `bankCredits`, `recordCodex`, `isUnlocked` ((TR-9, a deed done, a hero the save shows as played, or the old world deeds) and
   `unlockedHeroes`; the run under way: `RUN_KEY`, `isResumable`, `saveRun`, `loadRun` and
   `clearRun`.
 - `src/audio/music.ts`: the songs (`PLANET_SONGS`, `MENU_SONG`, `STINGS`); `src/audio/sfx.ts`: the
@@ -266,9 +304,9 @@ a star map between them.
   the designed rectangle sits in it), `fitLayout`, `CENTER`, HUD places (`XP_BAR`, `HP_BAR`, `KIT`, `TIMER`,
   `LEVEL`, `PLANET_TAG`, `CREDITS_TAG`, `BOSS_BAR`, `OBJECTIVE_HUD`, `SIG_BUTTON`, `STICK`), card rectangles
   (`heroCardRect` for the 6x2 grid, `HEAT_ROW`, `HEAT_DOWN` and `HEAT_UP` for the Heat row, `ARMOURY_BUTTON`, `armouryCardRect` and
-  `BACK` for the Armoury, `WEEKLY_BUTTON`, `MUTATOR_CARD`, `WEEKLY_START` and `WEEKLY_BACK` for the weekly run, `levelCardRect` with `LEVEL_CARD4` for four cards, `UNLOCK` and
+  `BACK` for the Armoury, `CODEX_BUTTON`, `codexTabRect` and `CODEX_GRID` for the codex, `DAILY_BUTTON` for the daily run, `WEEKLY_BUTTON`, `MUTATOR_CARD`, `WEEKLY_START` and `WEEKLY_BACK` for the weekly run, `levelCardRect` with `LEVEL_CARD4` for four cards, `UNLOCK` and
   `CONTINUE` for the new hero panel, `CHART`, `chartSpot` / `chartRect` (the space map), `mapNodeRect` / `mapNodeSpot`, `tradeCardRect`, `REROLL`,
-  `LEAVE`, `eventOptionRect`, `AGAIN`), `DEPTH`, `inside`.
+  `LEAVE`, `eventOptionRect`, `AGAIN`, and `ENDLESS_BUTTON` with `AGAIN_SIDE` after a win), `DEPTH`, `inside`.
 - `src/scenes/objectiveArt.ts`: the objectives and power-ups, drawn in code on the graphics
   layers (no baked textures, so boot's Math.random draws are unchanged): `drawObjectiveGround`
   (zones, spots, the escort's goal, the pilgrim, the duel's mark), `drawStructure`, `drawPowerUp`
@@ -286,7 +324,7 @@ a star map between them.
   `Panel` it is handed: `heroSelect` (12 cards from
   `heroCardRect`, keyed by `heroKeyLabel`, and the detail panel `HERO_DETAIL` with the `FIGHT`
   button, and the Heat row (`heatRow`) once the hero has won, the detail lines shrinking to end
-  above it; a locked hero shows only `rb-locked`), `armouryPanel` (the Armoury, see Current state), `weeklyPanel` (the weekly run), `unlockPanel` (the new hero, with a `continue`
+  above it; a locked hero shows only `rb-locked`), `armouryPanel` (the Armoury, see Current state), `weeklyPanel` (the weekly run), `dailyPanel` (the daily run), `codexPanel` (the codex), `unlockPanel` (the new hero, with a `continue`
   spot), `levelUp` (also the arena's and an objective's reward, titled by `state.after`; three or four cards whose lines flow down; pool labels
   from `POOL_NAMES`, `linkIcon` for crossovers), `spaceMap` (the four jumps as columns, lanes, the
   route lit, the next jump's planets as cards with spot ids = `PlanetId`; a faction shows once
@@ -364,21 +402,22 @@ The foes and Triad-77's units are called bots everywhere (texts, ids, textures s
 `state.bots`); they went by another name before, but no save key or stored id ever held it, so old
 saves load unchanged.
 
-- `riftblade-progress`: `{ bestMs, wins: { [heroId]: count }, heat: { [heroId]: best heat won 0-5 }, bank: credits, armoury: { [ArmouryId]: rank }, weekly: { week, best, won } | null, furthest: { [heroId]: jump 1-4 },
+- `riftblade-progress`: `{ bestMs, wins: { [heroId]: count }, heat: { [heroId]: best heat won 0-5 }, bank: credits, armoury: { [ArmouryId]: rank }, weekly: { week, best, won } | null, endless: best worlds cleared, codex: { seen: entry ids, paid: page ids }, furthest: { [heroId]: jump 1-4 },
   unlocked: HeroId[], charted: PlanetId[] }`. `bestMs` is the whole run's time (`runMs`). Older saves without
-  `furthest` load with `{}`, without `bank` or `armoury` with 0 and `{}` (unknown pieces dropped), without `weekly` with null, without `heat` with heat 0 for every hero with a win, without `unlocked` or `charted` with `[]`; unknown ids are dropped, and
+  `furthest` load with `{}`, without `bank` or `armoury` with 0 and `{}` (unknown pieces dropped), without `weekly` with null, without `endless` with 0, without `codex` with nothing seen (unknown entries and pages dropped), without `heat` with heat 0 for every hero with a win, without `unlocked` or `charted` with `[]`; unknown ids are dropped, and
   so are `wins` and `furthest` values that are not finite numbers.
   `charted` gets a planet the first frame a run is on it (`recordCharted` in `GameScene.update`) and
   the route at the run's end (`recordRun`). A hero with a
   `furthest` world is open (so saves from when Rook and Bram were free keep them), and the deeds
   of reaching a world (Kael, Veyl, Joren) also count from `furthest`. `GameScene` saves new
   `state.deeds` with `recordUnlocks` as they happen.
+- `riftblade-daily`: the daily run's record (`shared/daily.ts`: today's try, score, best, streak).
 - `riftblade-trophies`: the trophies earned (`shared/trophies.ts`), each id with the time.
 - `riftblade-run`: the run under way (left out of progress codes by the hub's `fileOnly`, so a
   code moves only `riftblade-progress` and the trophies; files carry it), the whole `GameState` as JSON (it is plain data; `Infinity`,
   as in `nextElite` and `objectiveAt`, is stored as the text `"Infinity"`). `loadRun` lays it over
   `freshState()` (and the hero over `freshHero()`), so fields added since take their fresh values;
-  one with an unknown hero, a phase it can't resume in, an unknown planet or `next`, a `stage`
+  one with an unknown hero, a phase it can't resume in, a `daily`, `endless`, `loop`, `endlessCleared` or `seed` of the wrong kind, an unknown planet or `next`, a `stage`
   outside the crusade, unknown `nodes`, `offers` or `choices`, a malformed `event`, or a list field of the state or
   hero (`enemies`, `bullets`, `dashHit`, ...) that is not an array is dropped (an `rng` that is not a
   generator position becomes -1). Keep
@@ -453,13 +492,18 @@ free of audio) or from the scene's input handler.
   arrows (only once the chosen hero has won), `armoury` the Armoury button (once credits are
   banked), `weekly` the Weekly run button (once a run has ended); in the Armoury (`.armouryOpen`)
   the spots are the `ArmouryId`s and `back`, in the weekly panel (`.weeklyOpen`) `start` and
-  `back`. `state.week` and `state.mutators` are the weekly run's. `.chosen` is the hero picked on the select screen
+  `back`, in the daily panel (`.dailyOpen`) `start` and `back`, in the codex (`.codexOpen`)
+  `page-<CodexPageId>` and `back`; `daily` and `codex` are the select screen's buttons and `endless`
+  the won end screen's. `state.week` and `state.mutators` are the weekly run's, `state.daily` and
+  `state.seed` the daily's, `state.endless`, `state.loop` and `state.endlessCleared` the endless rift's. `.chosen` is the hero picked on the select screen
   (TR-9 at first), `.unlocking` the heroes waiting to be shown. `state.heat` is the run's heat.
 - The hero is always at `CENTER` (480, 270 at 960x540: the middle of the view) on screen;
   `SIG_BUTTON` is at (890, 470) at 960x540, 70 px in from the bottom right corner.
-- The Heat row and the Armoury and Weekly run buttons, like every new select-screen element, only shows once a hero has won: a Phaser
+- The Heat row and the Armoury, Codex, Daily and Weekly run buttons, like every new select-screen element, only shows once a hero has won: a Phaser
   text made at boot shifts the seeded sequence (see Gotchas), so a fresh save's select screen
-  must make the same texts as before (a fresh save has no wins, nothing banked and no run ended).
+  must make the same texts as before (a fresh save has no wins, nothing banked, nothing in the
+  codex and no run ended). The codex records during the playthrough's run (no `rand` draws), so a
+  later page load would show its button.
 - The playthrough (`e2e/playthrough.spec.ts`) checks the twelve cards (all but TR-9 locked on a
   fresh save), waits out Phaser's start-up easing on the select screen (140 frames; its first 120
   steps are cut short, so a run started during them would play differently depending on load
@@ -526,6 +570,11 @@ free of audio) or from the scene's input handler.
 - **A new mutator**: add it to `MutatorId` and `MUTATORS`, its numbers to `MUT`, check
   `s.mutators.includes(id)` where it acts, its `mut_<id>` and `mut_<id>_text` texts and the
   README row. Adding one changes which mutators every later week picks.
+- **A new codex page or entry**: a page goes in `CODEX_PAGES` (with `codexX` text and pay; the
+  panel lays out five tabs, so more need a narrower `CODEX_TAB`), and `codexNew` must see its
+  entries in the state. A new foe kind joins `FOES` in `codex.ts` with a `foe_<kind>` text; new
+  bosses and upgrades join their pages on their own (filling an old full page again pays nothing).
+  Update the README's codex table.
 - **A new trophy**: add it to the list in `trophies/index.ts` (6 to 10 in all), its condition to
   `EARNED` in `trophies/check.ts`, its name and `<id>Text` in `trophies/i18n/`, and the README row.
 - **A new power-up**: add it to `PowerUp`, `POWER_UPS` and `POWER.weights`, its effect in

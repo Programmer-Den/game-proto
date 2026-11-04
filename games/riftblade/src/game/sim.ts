@@ -24,6 +24,7 @@ import { t as tr, type TextKey } from '../i18n';
 import { cancelObjective, objectives } from './objectives';
 import { HEAT, hot } from './heat';
 import { PERK, type ArmouryId } from './armoury';
+import { loopDmg, loopHp } from './endless';
 import { MUT, rand, reseed, weekSeed, type MutatorId } from './weekly';
 
 /** What the player is doing this frame: a move direction (length up to 1) and the signature key. */
@@ -71,6 +72,9 @@ export interface RunSetup {
   /** A weekly run: its week and mutators (`rand` is seeded for it). */
   week?: number;
   mutators?: MutatorId[];
+  /** A daily run: its day and seed (`dailySeed`); its mutator goes in `mutators`. */
+  daily?: string;
+  seed?: number;
 }
 
 /** Starts a run with the chosen hero, from a fresh state; `known` are the heroes unlocked before. */
@@ -81,7 +85,9 @@ export function startRun(s: GameState, id: HeroId, known: HeroId[] = [], ringOut
   s.perks = { ...setup.perks };
   s.week = setup.week ?? -1;
   s.mutators = [...(setup.mutators ?? [])];
-  if (s.week >= 0) reseed(weekSeed(s.week));
+  s.daily = setup.daily ?? '';
+  s.seed = setup.seed ?? (s.week >= 0 ? weekSeed(s.week) : -1);
+  if (s.seed >= 0) reseed(s.seed);
   s.maxHpMod = (1 + PERK.rations * (s.perks.rations ?? 0)) * (s.mutators.includes('glass') ? MUT.glassHp : 1);
   s.credits = PERK.purse * (s.perks.purse ?? 0);
   const hero = HEROES[id];
@@ -376,6 +382,8 @@ function hurtHero(s: GameState, dmg: number, x?: number, y?: number) {
   if (untouchable(s) || s.phase !== 'run') return;
   if (hot(s.heat, 'hurt')) dmg *= HEAT.hurt;
   if (s.mutators.includes('fragile')) dmg *= MUT.fragileHurt;
+  // The endless rift's later loops hit harder.
+  if (s.loop > 0) dmg *= loopDmg(s.loop);
   const p = s.player;
   // The Barrier Emitter takes a hit when charged.
   const barrier = s.ranks.barrier ?? 0;
@@ -893,7 +901,9 @@ export function spawnAt(s: GameState, kind: EnemyKind, x: number, y: number, eli
   const hp = spec.hp * hpScale * (elite ? ELITE.hp : 1) * (hot(s.heat, 'hp') && !isStructure(kind) ? HEAT.hp : 1) *
     (foe && mut('swarm') ? MUT.swarmHp : 1) *
     // Fragile Foes halves bosses too, since their hits double like everyone's.
-    (!isStructure(kind) && mut('fragile') ? MUT.fragileHp : 1);
+    (!isStructure(kind) && mut('fragile') ? MUT.fragileHp : 1) *
+    // The endless rift's later loops: tougher foes and bosses.
+    (!isStructure(kind) && s.loop > 0 ? loopHp(s.loop) : 1);
   const speed = spec.speed * (boss ? 1 : 1 + t / 1200) * (elite ? ELITE.speed : 1) * (0.92 + rand() * 0.16) * (mut('haste') ? MUT.haste : 1);
   const e: Enemy = {
     id: s.nextId++, kind, elite, x, y, r: spec.r * (elite ? ELITE.size : 1), hp, maxHp: hp, speed,

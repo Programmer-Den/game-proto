@@ -10,6 +10,8 @@ const enUS: Partial<Translation<typeof en>> = {
   armouryButton: 'Armory  ·  {n} credits',
   armouryTitle: 'ARMORY',
   banked: '+{n} credits banked for the Armory',
+  dailySubtitle: '{day}: three worlds, the same hero, mutator and worlds for everyone today. One try a day, at heat 0, without the Armory.',
+  codexSubtitle: 'Every foe, boss and card you meet fills a page. A full page pays credits into the Armory\'s bank, once.',
   hollowRebirthText: 'Armored and slow: +60 health, -30% damage taken, double slash damage',
 };
 
