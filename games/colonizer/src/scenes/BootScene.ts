@@ -4,7 +4,7 @@ import { BUILDINGS, FACTION_IDS, RELICS, UNITS, type BuildingId, type FactionId,
 import { bakeFigureSheet, FRAME, WOOL } from '../art/figures';
 import { bakeBuilding, bakeBush, bakeCache, bakeFogPattern, bakeMine, bakeNeedle, bakePost, bakeRallyFlag, bakeRelic, bakeTree } from '../art/scenery';
 import { bakeBackdrop, bakeButton, bakeCard, bakeIcon, bakePanel, bakeTopBar, type IconKind } from '../art/ui';
-import { BOON, DEED_CARD, fitLayout, MENU_MODE, MENU_OPTS, MENU_SCENARIOS, MISSION_CARD, STATUS_CARD, TOAST } from './layout';
+import { BOON, DEED_CARD, fitLayout, MENU_CARDS, MENU_MODE, MENU_OPTS, MENU_SCENARIOS, MISSION_CARD, STATUS_CARD, TOAST } from './layout';
 import { viewSize } from '../../../../shared/scaling';
 import { T } from '../art/stitch';
 
@@ -73,8 +73,8 @@ export class BootScene extends Phaser.Scene {
     this.bake('card-boon', bakeCard(BOON.w, BOON.h));
     this.bake('card-boon-hot', bakeCard(BOON.w, BOON.h, { fill: '#f3e2b0', lw: 1.4, hot: true }));
     this.bake('card-pop', bakeCard(56, 18, { pill: true }));
-    this.bake('card-faction', bakeCard(280, 230));
-    this.bake('card-faction-hot', bakeCard(280, 230, { fill: '#f3e2b0', lw: 1.4, hot: true }));
+    this.bake('card-faction', bakeCard(MENU_CARDS.w, MENU_CARDS.h));
+    this.bake('card-faction-hot', bakeCard(MENU_CARDS.w, MENU_CARDS.h, { fill: '#f3e2b0', lw: 1.4, hot: true }));
     this.bake('card-end', bakeCard(420, 170, { lw: 1.4 }));
     this.bake('card-end-tall', bakeCard(440, 250, { lw: 1.4 }));
     this.bake('backdrop', bakeBackdrop());

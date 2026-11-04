@@ -10,7 +10,7 @@ import { canvas, knot, mix, outline, P, reseed, se, sp, T, thread, type Ctx, typ
 export const FRAME = 64;
 export const FEET = { x: 32, y: 56 };
 
-/** Each side that draws figures: the three factions, and the wild guards of the neutral camps. */
+/** Each side that draws figures: the four factions, and the wild guards of the neutral camps. */
 export type Side = FactionId | 'wild';
 
 /** The wool colours of each side: tunic, shield, helm, horse and mane. */
@@ -18,23 +18,27 @@ export const WOOL: Record<Side, { cloth: string; trim: string; helm: string; bos
   ember: { cloth: T.red, trim: T.ochre, helm: T.indigo, boss: T.red, horse: T.buff, mane: T.red, smock: T.sage },
   tide: { cloth: T.indigo, trim: T.teal, helm: T.ochre, boss: T.ochre, horse: T.teal, mane: T.ochre, smock: T.sage },
   thorn: { cloth: T.green, trim: T.ochre, helm: T.brown, boss: T.green, horse: T.sage, mane: T.ochre, smock: T.tan },
+  steppe: { cloth: T.plum, trim: T.ochre, helm: T.tan, boss: T.ochre, horse: T.tan, mane: T.ink, smock: T.buff },
   wild: { cloth: T.brown, trim: T.grey, helm: T.grey, boss: T.ink, horse: T.tan, mane: T.ink, smock: T.tan },
 };
 
 /** The poses and how many frames each has. Villagers have every pose; soldiers idle, walk and attack. */
 export const VILLAGER_POSES = { idle: 1, walk: 4, 'carry-wood': 4, 'carry-food': 4, 'carry-ore': 4, chop: 3, reap: 3, mine: 3, build: 3 } as const;
 export const SOLDIER_POSES = { idle: 1, walk: 4, attack: 3 } as const;
-/** A trade cart only stands and rolls. */
+/** A trade cart, a wagon and a transport only stand and roll (or sail). */
 export const CART_POSES = { idle: 1, walk: 4 } as const;
 export type Pose = keyof typeof VILLAGER_POSES;
 
-type Kind = 'villager' | 'sword' | 'club' | 'spear' | 'bow' | 'longbow' | 'sling' | 'lance' | 'horsespear' | 'horseaxe' | 'cart' | 'ram' | 'warlord' | 'seer' | 'druid' | 'torch' | 'harpoon' | 'warden';
+type Kind =
+  | 'villager' | 'sword' | 'club' | 'spear' | 'bow' | 'longbow' | 'sling' | 'lance' | 'horsespear' | 'horseaxe' | 'cart' | 'ram'
+  | 'warlord' | 'seer' | 'druid' | 'torch' | 'harpoon' | 'warden' | 'axe' | 'chieftain' | 'horsebow' | 'wagon' | 'transport' | 'warship';
 
 /** Which figure a unit type is drawn as. */
 function kindOf(type: string, role: Role): Kind {
   if (role === 'villager') return 'villager';
   if (role === 'cart') return 'cart';
   if (role === 'siege') return 'ram';
+  if (role === 'wagon' || role === 'transport' || role === 'warship') return role;
   const name = type.split('-')[1];
   const kinds: Record<string, Kind> = {
     militia: 'sword', spearman: 'spear', brute: 'club',
@@ -43,6 +47,7 @@ function kindOf(type: string, role: Role): Kind {
     brigand: 'club', poacher: 'bow',
     warlord: 'warlord', seer: 'seer', druid: 'druid',
     torchbearer: 'torch', harpooner: 'harpoon', warden: 'warden',
+    clansman: 'axe', bowman: 'bow', outrider: 'horsespear', chieftain: 'chieftain', horsebow: 'horsebow',
   };
   return kinds[name] ?? 'sword';
 }
@@ -257,7 +262,9 @@ export function drawFigure(c: Ctx, type: string, role: Role, faction: Side, pose
   if (kind === 'villager') return villager(c, w, pose, f, x, y);
   if (kind === 'cart') return cart(c, w, pose, f, x, y);
   if (kind === 'ram') return ram(c, w, pose, f, x, y);
-  if (kind === 'lance' || kind === 'horsespear' || kind === 'horseaxe') return rider(c, w, kind, pose, f, x, y);
+  if (kind === 'wagon') return wagon(c, w, pose, f, x, y);
+  if (kind === 'transport' || kind === 'warship') return ship(c, w, kind, pose, f, x, y);
+  if (kind === 'lance' || kind === 'horsespear' || kind === 'horseaxe' || kind === 'horsebow') return rider(c, w, kind, pose, f, x, y);
   return footman(c, w, kind, pose, f, x, y);
 }
 
@@ -286,6 +293,79 @@ function cart(c: Ctx, w: (typeof WOOL)[Side], pose: string, f: number, x: number
   wheel(c, bx - 1, by - 5, 5.5, turn);
   thread(c, [[bx + 9, by - 10], [x + 3, y - 15]], T.brown, 1.3);
   villager(c, w, rolling ? 'walk' : 'idle', f, x, y);
+}
+
+/** A Steppe Horde wagon: a packed felt tent on a two-wheeled cart, drawn by a villager. */
+function wagon(c: Ctx, w: (typeof WOOL)[Side], pose: string, f: number, x: number, y: number) {
+  const rolling = pose === 'walk';
+  const turn = rolling ? (f * Math.PI) / 4 : 0;
+  const bx = x - 15;
+  const by = y - (rolling ? BOB[f] * 0.5 : 0);
+  sp(c, [[bx - 12, by - 13], [bx + 10, by - 13], [bx + 9, by - 7], [bx - 11, by - 7]], '#a0703a', { ang: 0, lw: 0.7 });
+  // The rolled felt, domed, bound with ropes in the side's colour, and the lattice poles sticking out.
+  se(c, bx - 1, by - 18, 11, 7, T.buff, { ang: 0, lw: 0.7 });
+  for (const dx of [-6, 0, 6]) thread(c, [[bx + dx, by - 24.5], [bx + dx - 1, by - 12]], w.cloth, 1.2);
+  for (let k = 0; k < 3; k++) thread(c, [[bx - 9 + k * 2, by - 22 - k], [bx - 16 + k * 2, by - 26 - k]], T.brown, 0.9);
+  wheel(c, bx - 1, by - 5, 5.5, turn);
+  thread(c, [[bx + 10, by - 10], [x + 3, y - 15]], T.brown, 1.3);
+  villager(c, w, rolling ? 'walk' : 'idle', f, x, y);
+}
+
+/**
+ * A ship in the Bayeux way, on a strip of waves: a long hull with a curled prow and stern and a striped
+ * sail. A transport rides deep with sacks and passengers' heads; a warship has shields along its side
+ * and a stone thrower on deck whose arm swings over in the attack frames.
+ */
+function ship(c: Ctx, w: (typeof WOOL)[Side], kind: 'transport' | 'warship', pose: string, f: number, x: number, y0: number) {
+  const y = y0 + (pose === 'walk' ? [0, -0.8, 0, 0.8][f] : 0);
+  const x0 = x - 26;
+  const x1 = x + 24;
+  // Waves under the hull.
+  c.save();
+  c.strokeStyle = T.teal;
+  c.lineWidth = 1;
+  for (let b = 0; b < 2; b++) {
+    c.beginPath();
+    for (let xx = x0 - 2; xx <= x1 + 2; xx += 2) c.lineTo(xx, y0 - 1 + b * 3 + Math.sin(xx / 3 + f + b) * 1);
+    c.stroke();
+  }
+  c.restore();
+  // The hull, with its curled prow and stern.
+  sp(c, [[x0, y - 13], [x1, y - 13], [x1 - 6, y - 3], [x0 + 6, y - 3]], kind === 'warship' ? T.brown : '#a0703a', { ang: 0, lw: 0.8 });
+  thread(c, [[x0 + 4, y - 8], [x1 - 4, y - 8]], mix(T.brown, '#000000', 0.3), 0.6);
+  thread(c, [[x1, y - 13], [x1 + 4, y - 20], [x1 + 1, y - 23], [x1 - 1, y - 21]], w.cloth, 1.6);
+  thread(c, [[x0, y - 13], [x0 - 3, y - 19], [x0, y - 21]], w.cloth, 1.4);
+  // The mast and striped sail.
+  thread(c, [[x - 2, y - 13], [x - 2, y - 46]], T.brown, 1.3);
+  thread(c, [[x - 13, y - 44], [x + 9, y - 44]], T.brown, 1);
+  sp(c, [[x - 12, y - 43], [x + 8, y - 43], [x + 10, y - 22], [x - 14, y - 22]], w.cloth, { ang: Math.PI / 2, lw: 0.7 });
+  for (const sx of [-8, -2, 4]) thread(c, [[x + sx, y - 42.5], [x + sx + 1.5, y - 22.5]], w.trim, 1.6);
+  if (kind === 'transport') {
+    // Sacks and the heads of passengers over the gunwale.
+    for (const dx of [-18, 12, 17]) {
+      se(c, x + dx, y - 15, 3.6, 3, T.tan, { noCouch: true, lw: 0.5 });
+      knot(c, x + dx, y - 16, 0.7, T.ochre);
+    }
+    for (const dx of [-12, -7, 6]) {
+      se(c, x + dx, y - 16, 2.4, 2.6, T.skin, { noCouch: true, lw: 0.5 });
+      sp(c, [[x + dx - 2.6, y - 17], [x + dx + 2.6, y - 17], [x + dx, y - 20.5]], w.helm, { noCouch: true, lw: 0.4 });
+    }
+    return;
+  }
+  // A warship: kite shields along the side, and the stone thrower at the stern.
+  for (let k = 0; k < 5; k++) {
+    const sx = x0 + 9 + k * 8.5;
+    sp(c, [[sx - 3, y - 15], [sx + 3, y - 15], [sx + 3, y - 11], [sx, y - 7], [sx - 3, y - 11]], k % 2 ? w.trim : w.cloth, { ang: Math.PI / 2, noCouch: true, lw: 0.5 });
+    knot(c, sx, y - 12, 0.8, w.boss);
+  }
+  const px = x0 + 10;
+  const py = y - 17;
+  thread(c, [[px - 4, y - 13], [px, py], [px + 4, y - 13]], T.bark, 1.4);
+  const ang = pose === 'attack' ? [-2.5, -1.7, -0.7][f] : -2.6;
+  const ex = px + Math.cos(ang) * 13;
+  const ey = py + Math.sin(ang) * 13;
+  thread(c, [[px, py], [ex, ey]], T.bark, 1.5);
+  if (pose !== 'attack' || f < 2) knot(c, ex, ey, 1.8, T.grey);
 }
 
 /** A siege ram: a slung log under a gabled roof on four wheels, pushed by two crewmen. */
@@ -371,7 +451,7 @@ function footman(c: Ctx, w: (typeof WOOL)[Side], kind: Kind, pose: string, f: nu
   const attack = pose === 'attack';
   const mail = kind === 'sword' || kind === 'spear' || kind === 'warlord' || kind === 'warden';
   const robed = kind === 'seer' || kind === 'druid';
-  const wide = kind === 'club' || kind === 'warlord' || kind === 'warden' ? 1.5 : robed ? 1 : 0;
+  const wide = kind === 'club' || kind === 'warlord' || kind === 'warden' || kind === 'chieftain' ? 1.5 : robed ? 1 : 0;
   // Each weapon's hand and angle: resting, then the three attack frames.
   const HANDS: Record<string, { rest: Frame; hit: Frame[] }> = {
     sword: { rest: { stride: 0, bob: 0, lean: 0, hand: [4, -18], ang: -1.1 }, hit: [{ stride: 0.4, bob: 0, lean: -1, hand: [2, -27], ang: -2.4 }, { stride: 0.6, bob: 0, lean: 1, hand: [8, -23], ang: -0.4 }, { stride: 0.8, bob: 0, lean: 2, hand: [10, -16], ang: 0.6 }] },
@@ -381,13 +461,13 @@ function footman(c: Ctx, w: (typeof WOOL)[Side], kind: Kind, pose: string, f: nu
     sling: { rest: { stride: 0, bob: 0, lean: 0, hand: [4, -19], ang: 1.2 }, hit: [{ stride: 0.3, bob: 0, lean: -1, hand: [3, -28], ang: 0 }, { stride: 0.5, bob: 0, lean: 0, hand: [6, -29], ang: 0 }, { stride: 0.8, bob: 0, lean: 1.5, hand: [10, -22], ang: 0 }] },
     staff: { rest: { stride: 0, bob: 0, lean: 0, hand: [5, -18], ang: -1.5 }, hit: [{ stride: 0.3, bob: 0, lean: -1, hand: [3, -24], ang: -2.3 }, { stride: 0.5, bob: 0, lean: 0.5, hand: [7, -22], ang: -1 }, { stride: 0.8, bob: 0, lean: 1.5, hand: [10, -18], ang: -0.2 }] },
   };
-  const hk = kind === 'longbow' ? 'bow' : kind === 'warlord' ? 'sword' : robed ? 'staff' : kind === 'torch' || kind === 'warden' ? 'club' : kind === 'harpoon' ? 'spear' : kind;
+  const hk = kind === 'longbow' ? 'bow' : kind === 'warlord' ? 'sword' : robed ? 'staff' : kind === 'torch' || kind === 'warden' || kind === 'axe' ? 'club' : kind === 'harpoon' || kind === 'chieftain' ? 'spear' : kind;
   const fr = attack ? HANDS[hk].hit[f] : HANDS[hk].rest;
   const lean = fr.lean;
   legs(c, x, y, T.buff, attack ? fr.stride : stride);
   if (kind === 'bow' || kind === 'longbow') thread(c, [[x - 3, y - 24], [x - 5, y - 14]], T.ochre, 2); // quiver
   body(c, x, y, w.cloth, lean, mail, wide);
-  const hood = kind === 'bow' ? T.green : kind === 'longbow' ? T.sage : kind === 'sling' ? T.teal : kind === 'club' ? T.brown : kind === 'seer' ? T.indigo : kind === 'druid' ? T.green : kind === 'harpoon' ? T.teal : kind === 'torch' ? T.brown : null;
+  const hood = kind === 'bow' ? T.green : kind === 'longbow' ? T.sage : kind === 'sling' ? T.teal : kind === 'club' ? T.brown : kind === 'seer' ? T.indigo : kind === 'druid' ? T.green : kind === 'harpoon' ? T.teal : kind === 'torch' ? T.brown : kind === 'axe' ? T.tan : null;
   if (robed) {
     // A champion's long robe over the legs, hemmed in the side's trim.
     sp(c, [[x - 6.5 + lean * 0.5, y - 11], [x + 6.5 + lean * 0.5, y - 11], [x + 8, y - 1], [x - 8, y - 1]], w.cloth, { ang: Math.PI / 2, sp: 1.1 });
@@ -407,6 +487,12 @@ function footman(c: Ctx, w: (typeof WOOL)[Side], kind: Kind, pose: string, f: nu
     // A crown of briars on the helm.
     for (let k = -2; k <= 2; k++) thread(c, [[x + lean + k * 1.8, y - 31], [x + lean + k * 2.4, y - 35]], T.green, 0.9);
     thread(c, [[x + lean - 4.5, y - 31.5], [x + lean + 4.5, y - 31.5]], T.bark, 1);
+  }
+  if (kind === 'chieftain') {
+    // A tall fur hat with a band of gold and a plume of horsehair.
+    sp(c, [[x + lean - 4, y - 28], [x + lean + 4, y - 28], [x + lean + 2.5, y - 36], [x + lean - 2.5, y - 36]], T.tan, { ang: Math.PI / 2, noCouch: true, lw: 0.7 });
+    thread(c, [[x + lean - 4, y - 29], [x + lean + 4, y - 29]], T.ochre, 1.2);
+    thread(c, [[x + lean, y - 36], [x + lean - 3, y - 40], [x + lean - 7, y - 39]], T.ink, 1.2);
   }
   if (kind === 'druid') {
     // Antlers of twig.
@@ -439,7 +525,13 @@ function footman(c: Ctx, w: (typeof WOOL)[Side], kind: Kind, pose: string, f: nu
     return;
   }
   arm(c, sx, sy, hx, hy, w.cloth);
-  tool(c, robed ? 'staff' : kind === 'warlord' ? 'sword' : kind === 'warden' ? 'club' : kind, hx, hy, fr.ang);
+  tool(c, robed ? 'staff' : kind === 'warlord' ? 'sword' : kind === 'warden' ? 'club' : kind === 'chieftain' ? 'spear' : kind, hx, hy, fr.ang);
+  if (kind === 'chieftain') {
+    // A horsetail standard tied below the spearhead.
+    const [tx, ty] = along(hx, hy, fr.ang, 18);
+    thread(c, [[tx, ty], [tx - 3, ty + 4], [tx - 2, ty + 8]], T.ink, 1.6);
+    knot(c, tx, ty, 1.2, T.ochre);
+  }
   if (kind === 'sword' || kind === 'spear' || kind === 'warlord' || kind === 'warden') kite(c, x - 3.5 + lean * 0.5, y, kind === 'warlord' ? T.ochre : w.trim, kind === 'warlord' ? w.cloth : w.boss);
 }
 
@@ -469,6 +561,13 @@ function rider(c: Ctx, w: (typeof WOOL)[Side], kind: Kind, pose: string, f: numb
   const hx = x + hand[0];
   const hy = ry + hand[1];
   arm(c, x + 1, ry - 28, hx, hy, w.cloth);
+  if (kind === 'horsebow') {
+    // A short bow drawn from the saddle; the arrow is loosed in the last frame.
+    const pull = pose === 'attack' ? [hx - 5, hx - 7, null][f] : hx - 3;
+    bow(c, hx + 3, hy, 7.5, pull, pose !== 'attack' || f < 2);
+    kite(c, x - 4, ry - 9, w.trim, w.boss);
+    return;
+  }
   if (kind === 'horseaxe') {
     // A short war axe: raised, swinging, striking.
     const axeAng = pose === 'attack' ? [-2.3, -0.9, 0.5][f] : -1.3;
@@ -479,7 +578,7 @@ function rider(c: Ctx, w: (typeof WOOL)[Side], kind: Kind, pose: string, f: numb
 
 /** The frames a unit has, in sheet order, as [pose, index]. */
 export function framesFor(role: Role): [string, number][] {
-  const poses = role === 'villager' ? VILLAGER_POSES : role === 'cart' ? CART_POSES : SOLDIER_POSES;
+  const poses = role === 'villager' ? VILLAGER_POSES : role === 'cart' || role === 'wagon' || role === 'transport' ? CART_POSES : SOLDIER_POSES;
   const out: [string, number][] = [];
   for (const [pose, n] of Object.entries(poses)) for (let i = 0; i < n; i++) out.push([pose, i]);
   return out;

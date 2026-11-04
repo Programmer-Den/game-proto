@@ -2,7 +2,7 @@
 // linen ground with its lakes, ridges and grass tufts, and the fog of unworked linen with the needle
 // still at its edge.
 import { BUILDINGS, BUILDING_TOP, MAP_SIZE, TILE, type BuildingId, type FactionId } from '../game/data';
-import { DIRT, ROCK, WATER } from '../game/map';
+import { DIRT, ROCK, SHALLOW, WATER } from '../game/map';
 import { WOOL } from './figures';
 import { canvas, knot, linen, mix, outline, P, PI, reseed, rnd, rr, se, sew, sp, sr, T, thread, type Ctx, type Pt } from './stitch';
 
@@ -333,6 +333,59 @@ const PAINT: Record<BuildingId, Painter> = {
     sp(c, [[x + w / 2 + 1, y - 21], [x + w / 2 + 20, y - 19], [x + w / 2 + 14, y - 15], [x + w / 2 + 20, y - 11], [x + w / 2 + 1, y - 12]], roof, { ang: 0, noCouch: true, lw: 0.6 });
     thread(c, [[x + w / 2 + 2, y - 16.5], [x + w / 2 + 15, y - 15.5]], trim, 0.9);
   },
+  harbour(c, x, y, w, h, roof, trim) {
+    // A harbour: a stone quay along the front, a boathouse with its arch, a crane with a hanging
+    // bale, and a ship moored alongside with its striped sail furled.
+    sr(c, x + 2, y + h - 18, w - 4, 14, T.grey, { ang: 0 });
+    for (let k = 1; k < 6; k++) thread(c, [[x + 2 + k * 15, y + h - 18], [x + 2 + k * 15, y + h - 4]], mix(T.grey, '#000000', 0.3), 0.6);
+    wall(c, x + 8, y + 40, x + 54, y + h - 18, 2);
+    arch(c, x + 20, y + 50, 22, h - 68, T.indigo);
+    tiles(c, x + 4, y + 18, x + 58, y + 42, roof);
+    pennant(c, x + 31, y + 16, trim);
+    // The crane: a post, a jib and a bale on its rope.
+    thread(c, [[x + w - 14, y + h - 18], [x + w - 14, y + 14]], T.bark, 2);
+    thread(c, [[x + w - 16, y + 16], [x + w - 34, y + 30]], T.bark, 1.6);
+    thread(c, [[x + w - 33, y + 30], [x + w - 33, y + 48]], T.ink, 0.6);
+    se(c, x + w - 33, y + 52, 4.5, 4, T.tan, { noCouch: true, lw: 0.6 });
+    // The moored ship's hull in front of the quay.
+    sp(c, [[x + 6, y + h - 12], [x + w - 4, y + h - 12], [x + w - 10, y + h - 2], [x + 12, y + h - 2]], T.brown, { ang: 0, lw: 0.7 });
+    thread(c, [[x + w - 4, y + h - 12], [x + w, y + h - 18], [x + w - 3, y + h - 20]], roof, 1.4);
+    for (let k = 0; k < 4; k++) sp(c, [[x + 22 + k * 14, y + h - 13], [x + 28 + k * 14, y + h - 13], [x + 28 + k * 14, y + h - 9], [x + 25 + k * 14, y + h - 6], [x + 22 + k * 14, y + h - 9]], k % 2 ? trim : roof, { ang: PI / 2, noCouch: true, lw: 0.4 });
+  },
+  yurt(c, x, y, w, h, roof, trim) {
+    // A felt tent of the steppe: a round wall of felt with lattice lines, a domed roof bound with
+    // ropes in the side's colour, a painted door and a crown with smoke above it.
+    sr(c, x + 6, y + 26, w - 12, h - 30, T.buff, { ang: 0 });
+    c.save();
+    c.strokeStyle = mix(T.buff, '#000000', 0.25);
+    c.lineWidth = 0.6;
+    for (let k = 0; k < 7; k++) {
+      c.beginPath();
+      c.moveTo(x + 8 + k * 8, y + 28);
+      c.lineTo(x + 14 + k * 8, y + h - 6);
+      c.moveTo(x + 14 + k * 8, y + 28);
+      c.lineTo(x + 8 + k * 8, y + h - 6);
+      c.stroke();
+    }
+    c.restore();
+    sew(
+      c,
+      (cc) => {
+        cc.beginPath();
+        cc.moveTo(x + 2, y + 28);
+        cc.quadraticCurveTo(x + w / 2, y - 6, x + w - 2, y + 28);
+        cc.closePath();
+      },
+      T.buff,
+      { bb: [x + 2, y + 4, x + w - 2, y + 28], ang: 0.3 },
+    );
+    for (const dx of [-16, 0, 16]) thread(c, [[x + w / 2 + dx * 0.4, y + 8], [x + w / 2 + dx, y + 28]], roof, 1.4);
+    thread(c, [[x + 3, y + 27], [x + w - 3, y + 27]], roof, 1.6);
+    sr(c, x + w / 2 - 7, y + 38, 14, h - 42, roof, { ang: PI / 2, noCouch: true });
+    for (const dy of [44, 52]) thread(c, [[x + w / 2 - 5, y + dy], [x + w / 2 + 5, y + dy]], trim, 1);
+    se(c, x + w / 2, y + 9, 5, 2.5, T.brown, { noCouch: true, lw: 0.6 });
+    for (const [dx, dy, r] of [[2, -1, 2.4], [5, -6, 1.9]] as [number, number, number][]) se(c, x + w / 2 + dx, y + dy, r, r * 0.8, '#cfc6b0', { noCouch: true, lw: 0.4 });
+  },
   wonder(c, x, y, w, h, roof, trim) {
     // A great cathedral of the Imperial age: three stepped plinths, an arcaded hall between two
     // towers, a high drum under a gold dome, and banners in the side's colours on every tower.
@@ -626,7 +679,18 @@ export function paintChunk(terrain: Uint8Array, cx: number, cy: number) {
       const k = at(tx, ty);
       const x = i * TILE;
       const y = j * TILE;
-      if (k === WATER) {
+      if (k === SHALLOW) {
+        // A ford: pale shallows over sand, with a few ripples, wadeable and sailable.
+        sr(c, x - 0.5, y - 0.5, TILE + 1, TILE + 1, mix(T.teal, T.buff, 0.35), { line: false, ang: 0, noCouch: true });
+        c.strokeStyle = mix(T.teal, '#ffffff', 0.35);
+        c.lineWidth = 0.8;
+        for (let b = 0; b < 2; b++) {
+          c.beginPath();
+          for (let xx = 4; xx <= TILE - 4; xx += 2) c.lineTo(x + xx, y + 10 + b * 12 + Math.sin((tx * TILE + xx) / 3 + b) * 1);
+          c.stroke();
+        }
+        if (rnd() < 0.3) knot(c, x + rr(6, 26), y + rr(6, 26), 1, T.tan);
+      } else if (k === WATER) {
         // The Bayeux sea: a laid field of blue with wavy teal bands, stitched shut where it meets land.
         sr(c, x - 0.5, y - 0.5, TILE + 1, TILE + 1, T.indigo, { line: false, ang: 0, noCouch: true });
         c.strokeStyle = T.teal;
@@ -638,7 +702,7 @@ export function paintChunk(terrain: Uint8Array, cx: number, cy: number) {
         }
         const edge = (nx: number, ny: number, a: Pt, b: Pt) => {
           const n = at(nx, ny);
-          if (n !== WATER && n !== -1) thread(c, [a, b], T.ink, 1.1);
+          if (n !== WATER && n !== SHALLOW && n !== -1) thread(c, [a, b], T.ink, 1.1);
         };
         edge(tx, ty - 1, [x, y + 0.6], [x + TILE, y + 0.6]);
         edge(tx, ty + 1, [x, y + TILE - 0.6], [x + TILE, y + TILE - 0.6]);

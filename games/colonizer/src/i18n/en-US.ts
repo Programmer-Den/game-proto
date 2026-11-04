@@ -19,6 +19,10 @@ const enUS: Partial<Translation<typeof en>> = {
   scnValour: 'The Relic of Valor',
   scnValourGoal: 'Hold the Relic of Valor for 4 minutes in a row',
   scnStandingGoal: 'Be the last Town Center standing against two rivals',
+  harbour: 'Harbor',
+  harbourShore: 'A Harbor must stand on the shore',
+  islandsText: 'islands linked by fords: Harbors, transports and warships',
+  talkUnknown: 'Temperament unknown: scout its Town Center',
 };
 
 export default enUS;

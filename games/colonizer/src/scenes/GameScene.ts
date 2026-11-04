@@ -28,7 +28,11 @@ import {
   UNIQUE_EFFECT,
   UNITS,
   isCivil,
+  isNaval,
   isSoldier,
+  STRIDE_RANGE,
+  TRANSPORT_CAP,
+  TRIBUTE,
   unitFor,
   type BoonId,
   type BuildingId,
@@ -45,9 +49,18 @@ import {
   NEUTRAL,
   PLAYER,
   affordable,
+  atPeace,
   campAt,
   campSpots,
+  canPack,
   canPlace,
+  dropCargo,
+  isShip,
+  offer,
+  packUp,
+  pitch,
+  seaAt,
+  threeWay,
   buildingHp,
   chooseBoon,
   chooseEdge,
@@ -177,6 +190,8 @@ export class GameScene extends Phaser.Scene {
   alerts: Alert[] = [];
   /** The next click on the map plants the selected buildings' rally flags. */
   rallyMode = false;
+  /** The rival the panel is holding talks with (a three-way match), or null. */
+  talkTo: number | null = null;
 
   private faction!: FactionId;
   private aiFaction!: FactionId;
@@ -279,6 +294,7 @@ export class GameScene extends Phaser.Scene {
     this.placing = null;
     this.attackMode = false;
     this.rallyMode = false;
+    this.talkTo = null;
     this.buildMenu = false;
     this.buildPage = 0;
     this.panelSelection = '';
@@ -652,6 +668,7 @@ export class GameScene extends Phaser.Scene {
       // A champion's gift shows as a faint ring: ochre for the Warlord's aura, green for the Druid's healing.
       if (def.gift === 'aura') stitchEllipse(g, u.x * TILE, u.y * TILE, AURA_RANGE * TILE, AURA_RANGE * TILE * 0.6, 1.2, ochre, 0.45);
       if (def.gift === 'heal') stitchEllipse(g, u.x * TILE, u.y * TILE, HEAL_RANGE * TILE, HEAL_RANGE * TILE * 0.6, 1.2, hexNum(T.green), 0.45);
+      if (def.gift === 'stride') stitchEllipse(g, u.x * TILE, u.y * TILE, STRIDE_RANGE * TILE, STRIDE_RANGE * TILE * 0.6, 1.2, hexNum(T.teal), 0.5);
       // Veteran chevrons over the head, one per rank.
       for (let k = 0; k < u.rank; k++) {
         const cx = u.x * TILE - 4 + k * 4;
@@ -736,6 +753,7 @@ export class GameScene extends Phaser.Scene {
 
   private selectOwn(ids: number[]) {
     this.selected.clear();
+    this.talkTo = null;
     for (const id of ids) {
       const u = this.state.units.get(id);
       const b = this.state.buildings.get(id);
@@ -807,6 +825,19 @@ export class GameScene extends Phaser.Scene {
     // A marker at the edge of the view jumps to the attack it points at.
     const mark = this.edgeMarks.find((m) => Math.hypot(m.x - p.x, m.y - p.y) <= 14);
     if (mark) return void this.jumpTo(mark.alert.x, mark.alert.y);
+    // A rival's banner on the status card opens talks with it (diplomacy, in a three-way match).
+    const rival = !watching && !p.rightButtonDown() ? this.status.rivalAt(p.x, p.y) : null;
+    if (rival !== null) {
+      if (!threeWay(this.state)) return void say(this.state, t('talkOnlyThree'));
+      if (this.state.players[rival].out) return void ui('refuse');
+      this.selectOwn([]);
+      this.talkTo = rival;
+      this.placing = null;
+      this.attackMode = false;
+      this.rallyMode = false;
+      sfx('select');
+      return;
+    }
     if (p.y < TOP_H || p.y >= PANEL_Y || this.deeds.contains(p.x, p.y) || this.status.contains(p.x, p.y) || this.missionCard?.contains(p.x, p.y)) return;
     // Watching, a click only selects, to see what a unit is doing; the AI gives every order.
     if (watching && p.rightButtonDown()) return;
@@ -942,7 +973,10 @@ export class GameScene extends Phaser.Scene {
     const farm = !!ownBuilding && !!BUILDINGS[ownBuilding.type].farm;
     if (this.selectedUnits().length > 0) {
       const work = !!ownBuilding && (!ownBuilding.built || farm) && this.selectedUnits().some((u) => UNITS[u.type].role === 'villager');
-      if (own && !work) return false;
+      // A tap on one's own transport with land units selected sends them aboard.
+      const ship = own && hit.kind === 'unit' ? this.state.units.get(hit.id) : undefined;
+      const board = !!ship && UNITS[ship.type].role === 'transport' && this.selectedUnits().some((u) => !isShip(u));
+      if (own && !work && !board) return false;
       this.commandAt(tx, ty);
       return true;
     }
@@ -960,11 +994,22 @@ export class GameScene extends Phaser.Scene {
     return t('campRelic', { relic: t(r.name), effect: t(r.text), by: t(by) });
   }
 
-  /** A right click: attack, gather, build, or walk, depending on what is under it. */
+  /** A right click: attack, gather, build, or walk, depending on what is under it; ships sail, land and fight at sea. */
   private commandAt(tx: number, ty: number) {
-    const units = this.selectedUnits();
-    if (units.length === 0) return;
+    const all = this.selectedUnits();
+    if (all.length === 0) return;
     sfx('order');
+    const ships = all.filter((u) => isShip(u));
+    const units = all.filter((u) => !isShip(u));
+    if (ships.length > 0) this.shipsTo(ships, tx, ty, units.length > 0);
+    if (units.length === 0) return;
+    // On one's own transport: go aboard.
+    const own = entityAt(this.state, tx, ty, PLAYER, PLAYER, true);
+    const ship = own?.kind === 'unit' && own.owner === PLAYER ? this.state.units.get(own.id) : undefined;
+    if (ship && UNITS[ship.type].role === 'transport') {
+      issue(this.state, PLAYER, units.map((u) => u.id), { t: 'board', ship: ship.id });
+      return;
+    }
     const camp = campAt(this.state, tx, ty, true);
     if (camp) {
       // To a camp: stand round it, close enough to take it once its guards are down.
@@ -978,7 +1023,8 @@ export class GameScene extends Phaser.Scene {
     }
     const hit = entityAt(this.state, tx, ty, undefined, PLAYER, true);
     const villagers = units.filter((u) => UNITS[u.type].role === 'villager');
-    const carts = units.filter((u) => UNITS[u.type].role === 'cart');
+    // Carts and wagons take the walking orders.
+    const carts = units.filter((u) => UNITS[u.type].role === 'cart' || UNITS[u.type].role === 'wagon');
     const army = units.filter((u) => isSoldier(UNITS[u.type].role));
     if (postAt(this.state, tx, ty, true)) {
       // To a trading post: carts set off trading, everyone else walks there.
@@ -1013,6 +1059,29 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  /**
+   * Ships ordered to a point: warships attack an enemy there, and on the water every ship sails there;
+   * on land a transport sails to the shore and puts its cargo ashore (unless land units are being
+   * sent aboard it with the same click), and a warship sails to the water beside it.
+   */
+  private shipsTo(ships: Unit[], tx: number, ty: number, boarding: boolean) {
+    const hit = entityAt(this.state, tx, ty, undefined, PLAYER, true);
+    const warships = ships.filter((u) => UNITS[u.type].role === 'warship');
+    const transports = ships.filter((u) => UNITS[u.type].role === 'transport');
+    if (hit && hit.kind !== 'node' && hit.owner !== PLAYER) {
+      issue(this.state, PLAYER, warships.map((u) => u.id), { t: 'attack', target: hit.id });
+      issue(this.state, PLAYER, transports.map((u) => u.id), { t: 'move', x: tx, y: ty });
+      return;
+    }
+    const water = seaAt(this.state, Math.floor(tx), Math.floor(ty));
+    ships.forEach((u, i) => {
+      const land = UNITS[u.type].role === 'transport' && !water && !boarding;
+      const ox = water ? (i % 3) - 1 : 0;
+      const oy = water ? Math.floor(i / 3) - 1 : 0;
+      issue(this.state, PLAYER, [u.id], land ? { t: 'unload', x: tx, y: ty } : { t: 'move', x: tx + ox, y: ty + oy });
+    });
+  }
+
   private tryPlace(type: BuildingId, tx: number, ty: number, keep: boolean) {
     const def = BUILDINGS[type];
     const ox = Math.floor(tx) - Math.floor(def.w / 2);
@@ -1028,7 +1097,7 @@ export class GameScene extends Phaser.Scene {
       return void ui('refuse');
     }
     if (!canPlace(this.state, type, ox, oy, PLAYER)) {
-      say(this.state, t(def.shore ? 'dockShore' : 'cantBuild'));
+      say(this.state, t(type === 'harbour' ? 'harbourShore' : def.shore ? 'dockShore' : 'cantBuild'));
       return void ui('refuse');
     }
     const id = placeBuilding(this.state, PLAYER, type, ox, oy);
@@ -1229,7 +1298,7 @@ export class GameScene extends Phaser.Scene {
           ? t('placeWall', { n: BUILDINGS.wall.cost.wood ?? 0 })
           : this.placing === 'gate'
             ? t('placeGate')
-            : this.placing === 'dock'
+            : this.placing === 'dock' || this.placing === 'harbour'
               ? t('placeDock')
               : this.placing
                 ? t('placeAny')
@@ -1237,6 +1306,7 @@ export class GameScene extends Phaser.Scene {
       this.info(2, 24, how);
       return;
     }
+    if (this.talkTo !== null) return this.renderTalks(this.talkTo);
     const units = this.selectedUnits();
     if (units.length > 1) {
       this.selTitle.setText(t('unitsTitle', { n: units.length }).toUpperCase());
@@ -1262,11 +1332,15 @@ export class GameScene extends Phaser.Scene {
       const lines = [t('health', { hp: Math.ceil(u.hp), max: maxHp(u) })];
       if (u.carry && u.amount > 0) lines.push(t('carrying', { n: u.amount, res: t(u.carry) }));
       if (u.rank > 0) lines.push(t('rankLine', { rank: t(RANK_NAMES[u.rank - 1]), numeral: ['I', 'II', 'III'][u.rank - 1], n: u.kills }));
-      else if (def.role !== 'villager' && def.role !== 'cart' && def.role !== 'siege') lines.push(t('killsLine', { n: u.kills, at: RANK_KILLS[0] }));
+      else if (!isCivil(def.role) && def.role !== 'siege') lines.push(t('killsLine', { n: u.kills, at: RANK_KILLS[0] }));
       if (def.gift === 'aura') lines.push(t('giftAura', { n: AURA_DMG }));
       if (def.gift === 'sight') lines.push(t('giftSight'));
       if (def.gift === 'heal') lines.push(t('giftHeal'));
+      if (def.gift === 'stride') lines.push(t('giftStride'));
       if (def.role === 'siege') lines.push(t('ramInfo'));
+      if (def.role === 'transport') lines.push(u.cargo.length > 0 ? t('aboard', { n: u.cargo.length, max: TRANSPORT_CAP }) : t('transportInfo', { n: TRANSPORT_CAP }));
+      if (def.role === 'warship') lines.push(t('warshipInfo'));
+      if (u.packed) lines.push(t('wagonInfo', { building: t(BUILDINGS[u.packed.type].name) }));
       if (def.elite) lines.push(t(`${def.name}Info` as TextKey));
       if (this.state.mission?.cart === u.id) lines.push(t('supplyCartInfo'));
       if (inAura(this.state, u) && def.gift !== 'aura') lines.push(t('inAura'));
@@ -1299,12 +1373,36 @@ export class GameScene extends Phaser.Scene {
       if (b.type === 'gate' && b.built) lines.push(t('gateInfo'));
       if (def.shelter && b.built) lines.push(b.garrison.length > 0 ? t('garrisonInside', { n: b.garrison.length }) : t('shelters', { n: def.shelter }));
       if (def.market && b.built && !head) lines.push(t('marketInfo'));
+      if (def.naval && b.built && !head) lines.push(t('harbourInfo'));
+      if (canPack(this.state, b) && b.type !== 'yurt') lines.push(t('packInfo'));
       if (takesRally(b.type) && b.built && !head) lines.push(t(b.rally ? 'rallyMove' : 'rallyHint'));
       this.info(84, 24, lines.join('\n'));
       return;
     }
     this.selTitle.setText(t('nothingSelected').toUpperCase());
-    this.info(2, 24, t('nothingHint'));
+    this.info(2, 24, threeWay(this.state) ? `${t('nothingHint')}\n${t('talkHint')}` : t('nothingHint'));
+  }
+
+  /** Talks with a rival: its name, temperament once scouted, goodwill and the pact under way. */
+  private renderTalks(ai: number) {
+    const s = this.state;
+    const p = s.players[ai];
+    const pact = s.pacts[ai];
+    const faction = t(FACTIONS[p.faction].name);
+    this.selTitle.setText(t('talkTitle', { faction }).toUpperCase());
+    this.selBig.setTexture(`icon-banner-${p.faction}`).setOrigin(0.5, 0.5).setScale(2).setPosition(SEL.x + 26, SEL.y + 52).setVisible(true);
+    const other = s.players.find((o) => o.id !== PLAYER && o.id !== ai && o.id !== NEUTRAL);
+    const left = (until: number) => Math.ceil((until - s.time) / 1000);
+    const lines = [
+      p.scouted && p.temperament ? t('talkTemper', { temper: t(TEMPERAMENTS[p.temperament].name) }) : t('talkUnknown'),
+      t('talkMood', { n: pact.mood }),
+      pact.allyUntil > s.time && other
+        ? t('talkAlly', { faction: t(FACTIONS[other.faction].name), s: left(pact.allyUntil) })
+        : pact.truceUntil > s.time
+          ? t('talkTruce', { s: left(pact.truceUntil) })
+          : t('talkWar'),
+    ];
+    this.info(56, 24, lines.join('\n'));
   }
 
   /** The selection's lines, `dx` right of the panel's left edge, wrapped before the buttons. */
@@ -1394,7 +1492,9 @@ export class GameScene extends Phaser.Scene {
     const rates = `${p.rates.wood.toFixed(2)}/${p.rates.food.toFixed(2)}`;
     const champion = unitCount(this.state, PLAYER, unitFor(this.faction, 'champion').id);
     const pop = `${popUsed(this.state, PLAYER)}/${popCap(this.state, PLAYER)}`;
-    return [...this.selected].join(',') + `|${b?.built}|${pop}|${this.buildMenu}|${this.buildPage}|${this.placing}|${this.attackMode}|${this.rallyMode}|${this.rallyBuildings().map((x) => (x.rally ? 1 : 0)).join('')}|${q}|${p.techs.join(',')}|${p.age}|${p.boonPending}|${p.edgePending}|${deedsDone(p)}|${this.resourceKey()}|${own}|${hasBuilt(this.state, PLAYER, 'forge')}|${p.bell}|${rates}|${champion}`;
+    const talks = this.talkTo !== null ? `${this.talkTo}:${atPeace(this.state, PLAYER, this.talkTo)}:${this.state.pacts[this.talkTo].allyUntil > this.state.time}` : '';
+    const cargo = this.selectedUnits().map((u) => u.cargo.length).join('');
+    return [...this.selected].join(',') + `|${talks}|${cargo}|${b?.built}|${pop}|${this.buildMenu}|${this.buildPage}|${this.placing}|${this.attackMode}|${this.rallyMode}|${this.rallyBuildings().map((x) => (x.rally ? 1 : 0)).join('')}|${q}|${p.techs.join(',')}|${p.age}|${p.boonPending}|${p.edgePending}|${deedsDone(p)}|${this.resourceKey()}|${own}|${hasBuilt(this.state, PLAYER, 'forge')}|${p.bell}|${rates}|${champion}`;
   }
 
   private resourceKey() {
@@ -1433,11 +1533,31 @@ export class GameScene extends Phaser.Scene {
       out.push({ id: 'back', name: t('back'), sub: '', enabled: true, run: () => void (this.buildPage === 1 ? (this.buildPage = 0) : (this.buildMenu = false)) });
       return out;
     }
+    if (this.talkTo !== null) return this.talkActions(this.talkTo);
     const units = this.selectedUnits();
     const villagers = units.filter((u) => UNITS[u.type].role === 'villager');
     const carts = units.filter((u) => UNITS[u.type].role === 'cart');
     const army = units.filter((u) => isSoldier(UNITS[u.type].role));
+    const transports = units.filter((u) => UNITS[u.type].role === 'transport');
+    const wagons = units.filter((u) => u.packed);
     if (villagers.length > 0) out.push({ id: 'build', name: t('build'), sub: '', enabled: true, run: () => void (this.buildMenu = true) });
+    if (transports.length > 0) {
+      const aboard = transports.reduce((n, u) => n + u.cargo.length, 0);
+      out.push({ id: 'unload', name: t('unload'), sub: t('unloadSub', { n: aboard }), enabled: aboard > 0, run: () => (transports.reduce((n, u) => n + dropCargo(this.state, u), 0) > 0 ? order(true) : (say(this.state, t('noLanding')), refused())) });
+    }
+    if (wagons.length > 0) {
+      out.push({
+        id: 'pitch',
+        name: t('pitchCamp'),
+        sub: t('pitchSub'),
+        enabled: true,
+        run: () => {
+          if (wagons.filter((u) => pitch(this.state, PLAYER, u.id) !== null).length > 0) return void sfx('place');
+          say(this.state, t('pitchFailed'));
+          return refused();
+        },
+      });
+    }
     if (carts.length > 0) out.push({ id: 'trade', name: t('trade'), sub: '', enabled: true, run: () => order(issue(this.state, PLAYER, carts.map((u) => u.id), { t: 'trade' })) });
     if (army.length > 0) {
       out.push({ id: 'attack', name: t('attack'), sub: '', enabled: true, run: () => void (this.attackMode = true) });
@@ -1499,6 +1619,20 @@ export class GameScene extends Phaser.Scene {
           });
         }
       }
+      if (canPack(s, b)) {
+        out.push({
+          id: 'pack',
+          name: t('packUp'),
+          sub: t('packSub'),
+          enabled: true,
+          run: () => {
+            const wagon = packUp(this.state, PLAYER, b.id);
+            if (wagon === null) return refused();
+            this.selectOwn([wagon]);
+            return order(true);
+          },
+        });
+      }
       if (takesRally(b.type)) {
         const flags = this.rallyBuildings();
         out.push({ id: 'rally', name: t('rallyFlag'), sub: t(flags.some((x) => x.rally) ? 'rallyMoveSub' : 'rallySetSub'), enabled: true, run: () => void (this.rallyMode = true) });
@@ -1519,6 +1653,22 @@ export class GameScene extends Phaser.Scene {
         });
       }
     }
+    return out;
+  }
+
+  /** The talks' buttons: a truce, a tribute, an alliance against the other AI, and Back. */
+  private talkActions(ai: number): Action[] {
+    const s = this.state;
+    const me = s.players[PLAYER];
+    const other = s.players.find((o) => o.id !== PLAYER && o.id !== ai && o.id !== NEUTRAL && !o.out);
+    const peace = atPeace(s, PLAYER, ai);
+    const ask = (what: 'truce' | 'tribute' | 'ally') => (offer(this.state, ai, what) ? queued() : refused());
+    const out: Action[] = [
+      { id: 'truce', name: t('offerTruce'), sub: '', enabled: !peace, run: () => ask('truce') },
+      { id: 'tribute', name: t('offerTribute'), sub: costText(TRIBUTE), enabled: affordable(me, TRIBUTE), run: () => (offer(this.state, ai, 'tribute') ? coin(true) : refused()) },
+    ];
+    if (other) out.push({ id: 'ally', name: t('offerAlly'), sub: t('allySub', { faction: t(FACTIONS[other.faction].name) }), enabled: s.pacts[ai].allyUntil <= s.time, run: () => ask('ally') });
+    out.push({ id: 'back', name: t('back'), sub: '', enabled: true, run: () => void (this.talkTo = null) });
     return out;
   }
 
@@ -1680,6 +1830,9 @@ function doing(u: Unit) {
   if (u.act === 'build') return t('building');
   if (u.act === 'fight') return t('fighting');
   if (u.order.t === 'garrison') return t('sheltering');
+  if (u.order.t === 'board') return t('boarding');
+  if (u.packed && u.act === 'walk') return t('packing');
+  if (isNaval(UNITS[u.type].role) && u.act === 'walk') return t('sailing');
   if (u.order.t === 'trade') return t('driving');
   if (u.order.t === 'return') return t(UNITS[u.type].role === 'cart' ? 'bringingOre' : 'carryingHome');
   if (u.act === 'walk') return t('walking');

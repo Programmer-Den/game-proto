@@ -152,8 +152,8 @@ test('plays a round of the game loop', async ({ page }, testInfo) => {
   const snap = async (name: string) =>
     testInfo.attach(name, { body: await page.screenshot({ path: testInfo.outputPath(`${name}.png`) }), contentType: 'image/png' });
 
-  // Pick Ember Legion on the menu: the card's left-hand edge, at (170, 300) in game space.
-  await click({ x: box.x + 170 * scale, y: box.y + 300 * scale });
+  // Pick Ember Legion on the menu: the first card's middle, at (126, 300) in game space.
+  await click({ x: box.x + 126 * scale, y: box.y + 300 * scale });
   expect(
     await play(5_000, () =>
       page.evaluate(() => (window as any).game.scene.getScene('Game')?.sys.isActive() === true).catch(() => false),

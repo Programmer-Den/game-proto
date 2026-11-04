@@ -57,6 +57,8 @@ export const MENU_OPTS = { y: 438, w: 96, h: 24, gap: 6, kindX: 152, rivalsX: 64
 /** The menu's mode toggle (skirmish or campaign) over the cards, and the campaign's five scenario tiles in the option rows' place. */
 export const MENU_MODE = { y: 156, w: 120, gap: 8 };
 export const MENU_SCENARIOS = { y: 438, w: 150, h: 34, gap: 8 };
+/** The menu's faction cards: one per faction in a row, the first's middle at x, each dx further on. */
+export const MENU_CARDS = { x: 126, dx: 236, y: 300, w: 224, h: 230 };
 
 /**
  * Fits the HUD to a view of `w` x `h` game pixels: the right-hand pieces follow the right edge, the
