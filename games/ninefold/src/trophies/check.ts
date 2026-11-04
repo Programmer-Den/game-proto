@@ -14,6 +14,8 @@ const EARNED: Record<string, (p: Progress) => boolean> = {
   allStyles: (p) => STYLES.every((s) => p.unlocked.includes(s)),
   streak7: (p) => p.bestStreak >= 7,
   floor20: (p) => p.bestFloor >= 20,
+  // Floor 10 cleared at Ascension 5 (`climbed` is one more than the highest ascension cleared).
+  ascent5: (p) => p.climbed >= 6,
 };
 
 /** False until the first check of the page, which finds what a saved progress already earned. */

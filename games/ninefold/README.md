@@ -4,8 +4,10 @@ A number-placement puzzle built with [Phaser 4](https://phaser.io), TypeScript a
 [game hub](../../README.md).
 
 Fill the board so every row, column and box holds each digit once. Play the daily puzzle (the same
-board for everyone that day), Classic boards at three levels, or **Delve**: a run of ever bigger
-boards where every mistake costs a heart and each cleared floor offers a relic. Every puzzle is
+board for everyone that day), the **weekly gauntlet** (a board a day, scored over the week), Classic
+boards at five levels (Killer and Thermo among them), or **Delve**: a run of ever bigger boards where
+every mistake costs a heart and each cleared floor offers a relic, with five harder **ascensions**
+to climb. Every puzzle is
 made in code with exactly one solution, so they never run out. Solving boards unlocks nine art
 styles, from Paper Cut-out to Stained Glass; the digits stay plain and easy to read in all of them.
 
@@ -45,8 +47,20 @@ floors, too), so closing the page and coming back goes on where you stood.
   the next day, and counts your **daily streak**: daily puzzles solved on days in a row.
 
 ![The menu with a daily streak](docs/screenshots/streak-menu.webp)
-- **Classic**: a fresh 9x9 board at Easy (40 givens), Normal (32) or Hard (26), with 3 hints and no
-  limit on mistakes. **Next puzzle** deals another at the same level.
+- **Weekly gauntlet**: seven 9x9 boards, one for each day from Monday to Sunday, the same for
+  everyone that week: Monday a plain 40-given board, Tuesday Diagonal, Wednesday Thermo, Thursday
+  Parity, Friday Killer, Saturday a Hard board and Sunday a Killer with only 12 givens. Today's
+  board can be started once (leaving it scores 0) and scores 1000, less 100 a mistake, 150 a hint
+  and 1 every 6 seconds (at least 100). The menu shows the day and the week's total so far.
+
+![A weekly gauntlet board on Thermo day](docs/screenshots/weekly-board.webp)
+- **Classic**: a fresh 9x9 board at Easy (40 givens), Normal (32) or Hard (26), or a **Killer**
+  board (16 givens, with cages) or a **Thermo** board (24 givens, with thermometers), with 3 hints
+  and no limit on mistakes. **Next puzzle** deals another at the same level.
+
+![A Killer board: dashed cages with their sums](docs/screenshots/killer-board.webp)
+
+![A Thermo board: digits rise from each bulb](docs/screenshots/thermo-board.webp)
 - **Delve**: floor 1 is a 4x4 board, floors 2 and 3 are 6x6 and from floor 4 every floor is a 9x9
   with fewer givens (past floor 6, one fewer every 3 floors, down to 24). The run starts with 3
   hearts and 1 hint; a mistake costs a heart, and at none the run ends. From floor 4 each floor
@@ -58,8 +72,13 @@ floors, too), so closing the page and coming back goes on where you stood.
 | --- | --- |
 | Diagonal | Both long diagonals hold each digit once too (2 fewer givens). |
 | Parity | Marked cells hold even digits, the rest odd (6 fewer givens). |
+| Killer | Dashed cages: their digits add up to the small sum in the corner, with no digit twice (14 fewer givens). |
+| Thermo | Digits rise along each thermometer, from its round bulb to its tip (6 fewer givens). |
 | Clock | A heart is lost every 3 minutes on the floor; the clock counts down to it. |
 | Sealed | No hints on the floor; clearing it gives one back. |
+
+A boss floor draws its board twist from Diagonal, Parity, Killer and Thermo, and its pressing one
+from Clock and Sealed.
 
 ![A boss floor: Diagonal and Clock](docs/screenshots/boss-floor.webp)
 
@@ -88,6 +107,23 @@ A cleared floor also offers three of ten relics. The last six give something and
 
 ![A cleared floor's card naming the boss floor ahead](docs/screenshots/next-floor.webp)
 
+#### Ascensions
+
+Clearing Delve floor 10 opens **Ascension 1**, a harder Delve; clearing floor 10 at the highest
+ascension open opens the next, up to Ascension 5. The arrows either side of Delve on the menu pick
+where the next run starts, and the menu names the newest rule. Each ascension keeps every rule below
+it:
+
+| Ascension | Adds |
+| --- | --- |
+| 1 | One heart fewer at the start |
+| 2 | No hint at the start |
+| 3 | 2 fewer givens on every floor |
+| 4 | No notes (Twin Sight leaves the offers) |
+| 5 | Two relics to choose from, not three |
+
+![Floor 10 cleared: Ascension 1 opens](docs/screenshots/ascension-opened.webp)
+
 ![The menu](docs/screenshots/menu.webp)
 
 ### Styles
@@ -113,8 +149,8 @@ mode, counts towards them:
 
 ### Trophies
 
-Nine trophies (`src/trophies/`), listed under **Trophies** on the start and pause screens; the
-last two stay hidden until earned:
+Ten trophies (`src/trophies/`), listed under **Trophies** on the start and pause screens; the
+last three stay hidden until earned:
 
 | Trophy | Tier | Earned by |
 | --- | --- | --- |
@@ -127,6 +163,7 @@ last two stay hidden until earned:
 | Full palette | Gold | Unlocking all nine styles |
 | A week of puzzles | Gold | Solving the daily puzzle seven days running |
 | Bottom of the well | Gold | Clearing Delve floor 20 |
+| Summit of the deep | Gold | Clearing Delve floor 10 at Ascension 5 |
 
 ![A trophy earned on a boss floor](docs/screenshots/trophy-toast.webp)
 
@@ -135,9 +172,11 @@ hints and 2 hearts; Normal is 3 and 3. The puzzles themselves don't change.
 
 ## Code layout
 
-- `src/game/sudoku.ts`: making and solving 4x4, 6x6 and 9x9 boards with one solution.
-- `src/game/state.ts`: the rules of both modes, hints, relics and style unlocks.
-- `src/game/catalog.ts`: the styles, relics and Classic levels.
+- `src/game/sudoku.ts`: making and solving 4x4, 6x6 and 9x9 boards with one solution, with Killer
+  cages, Thermometer lines and Parity marks.
+- `src/game/state.ts`: the rules of every mode, the weekly gauntlet, ascensions, hints, relics and
+  style unlocks.
+- `src/game/catalog.ts`: the styles, relics, twists, ascensions and Classic levels.
 - `src/game/save.ts`: the saved progress.
 - `src/scenes/GameScene.ts`: the menu, style picker, board, panel and end cards.
 - `src/scenes/layout.ts`: where everything sits, sideways and upright.

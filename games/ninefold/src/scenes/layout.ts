@@ -30,8 +30,14 @@ export type Layout = {
     title: Point;
     box: Rect;
     daily: Rect;
-    levels: { xs: number[]; y: number; w: number; h: number };
+    weekly: Rect;
+    /** The caption size of the daily and weekly buttons. */
+    topFont: number;
+    levels: { xs: number[]; y: number; w: number; h: number; font: number };
     delve: Rect;
+    /** The buttons either side of Delve that pick its ascension, by their centres. */
+    ascentDown: Rect;
+    ascentUp: Rect;
     styles: Rect;
     stats: Point;
   };
@@ -61,9 +67,13 @@ export const WIDE: Layout = {
   menu: {
     title: { x: 480, y: 62 },
     box: { x: 120, y: 132, w: 720, h: 384 },
-    daily: { x: 480, y: 186, w: 330, h: 54 },
-    levels: { xs: [312, 480, 648], y: 270, w: 156, h: 54 },
+    daily: { x: 310, y: 186, w: 300, h: 56 },
+    weekly: { x: 650, y: 186, w: 300, h: 56 },
+    topFont: 18,
+    levels: { xs: [232, 356, 480, 604, 728], y: 270, w: 116, h: 54, font: 18 },
     delve: { x: 480, y: 352, w: 330, h: 54 },
+    ascentDown: { x: 282, y: 352, w: 50, h: 54 },
+    ascentUp: { x: 678, y: 352, w: 50, h: 54 },
     styles: { x: 480, y: 430, w: 330, h: 50 },
     stats: { x: 480, y: 490 },
   },
@@ -91,9 +101,13 @@ export const TALL: Layout = {
   menu: {
     title: { x: 270, y: 110 },
     box: { x: 40, y: 220, w: 460, h: 560 },
-    daily: { x: 270, y: 290, w: 380, h: 60 },
-    levels: { xs: [143, 270, 397], y: 410, w: 118, h: 58 },
-    delve: { x: 270, y: 530, w: 380, h: 60 },
+    daily: { x: 157, y: 290, w: 214, h: 66 },
+    weekly: { x: 383, y: 290, w: 214, h: 66 },
+    topFont: 15,
+    levels: { xs: [94, 182, 270, 358, 446], y: 410, w: 82, h: 58, font: 15 },
+    delve: { x: 270, y: 530, w: 300, h: 60 },
+    ascentDown: { x: 84, y: 530, w: 52, h: 60 },
+    ascentUp: { x: 456, y: 530, w: 52, h: 60 },
     styles: { x: 270, y: 660, w: 380, h: 56 },
     stats: { x: 270, y: 740 },
   },
