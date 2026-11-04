@@ -43,7 +43,11 @@ carry orders between villages before their time runs out.
   (WR16) at the start of rounds 4 and 7, three trait cards (of five) to pick a lasting trait from
   while the game waits, among them a third wagon; the daily valley (WR17), today's seeded valley
   of any kind for everyone, one try a day, started from a link in the board's top left corner
-  before the first track or from the end panel, scored by deliveries.
+  before the first track or from the end panel, scored by deliveries; villages that grow (WR18) from round 2, a village with `GROW_AT` deliveries in
+  time becoming a town that pays more, sends wares and can build a warehouse; night rounds (WR19),
+  rounds 5 and 8, where unlit track slows the wyrm and lamps bought from round 3 light the way; a
+  rival line (WR20) from round 3 to the festival, laying its own track and racing the wyrm for
+  waiting orders.
 - **Progression** is mostly within a game: coins, track, upgrades, depots and the round, and
   across a chain of valleys the traits and one kept upgrade. The only meta progression is the best
   festival medal per difficulty and the boons it gives a new game, and the daily valley's record.
@@ -65,6 +69,12 @@ carry orders between villages before their time runs out.
     still come from `Math.random`, so two players' runs part ways after the start. It plays on
     the hub's difficulty.
   - The traits show nowhere during play but in the banner when picked; the end panel lists them.
+  - The rival's track blocks the tiles it takes; the only way through is laying over a tile for
+    `RIVAL_BUYOUT` times the price. It can wall in a village the player hasn't reached yet.
+  - The night's darkness is drawn per floor tile, so a tall prop on a lit tile reaching over an
+    unlit one is shaded where it overlaps.
+  - A town's only station upgrade is the warehouse; a second platform from the idea list is not
+    built.
 
 ## Architecture
 
@@ -111,11 +121,14 @@ File map (all under `src/` unless it starts with `shared/`):
   `DEPOT_STEP`, `DEPOT_WAIT`, the courier's `COURIER_COST`, the medals' `GOLD_MS`, `SILVER_MS`,
   `HEAD_START_COINS`, `EARLY_RISER_ROUNDS`, the chain's `LOCAL_PAY`, `COLD_HUNGER`,
   `CANYON_HAZARDS`, the moults' `MOULT_ROUNDS`, `MOULT_OFFER`, `TRAIT_SPEED`, `FRUGAL_HUNGER`,
-  `NIMBLE_TIME`, `CHARMING_GAP`), `CHAIN_KINDS` and `kindOfLeg` (the kind of each valley in a
+  `NIMBLE_TIME`, `CHARMING_GAP`, the towns' `TOWN_ROUND`, `GROW_AT`, `TOWN_PAY`,
+  `WARES_CHANCE`, `WARES_PAY`, `WAREHOUSE_COST`, the nights' `NIGHT_ROUNDS`, `LAMP_ROUND`,
+  `LAMP_COST`, `DARK_SLOWDOWN`, the rival's `RIVAL_ROUND`, `RIVAL_BUILD_MS`, `RIVAL_CLAIM_MS`,
+  `RIVAL_REST_MS`, `RIVAL_BUYOUT`), `CHAIN_KINDS` and `kindOfLeg` (the kind of each valley in a
   chain), `KIND_TEXT` (each kind's name and arrival line), `TRAITS`, `Trait` and `TRAIT_TEXT`,
   `HazardKind` and `HAZARD_TEXT` (each hazard's warning, pop and hint), the charter table `CHARTERS` (name and text as
   `TextKey`s, the text's `{cargo}` filled in by the scene), `MEDALS`, `BOONS` (names as `TextKey`s),
-  `roundGoal`, `isPassengers`, `Charter`, `Hazard`, `Order`, `OrderStatus`, `Job`, `Medal`, `Wyrm`,
+  `roundGoal`, `isPassengers`, `Charter`, `Hazard`, `Rival`, `Order`, `OrderStatus`, `Job`, `Medal`, `Wyrm`,
   `Pop`, `Upgrade`, `GameState`.
 - `game/medals.ts`: `MEDALS_KEY`, `loadMedals` and `saveMedal` (keeps the better medal), the only
   browser storage the game touches.
@@ -127,7 +140,8 @@ File map (all under `src/` unless it starts with `shared/`):
   `depotLocked`, `canBuyDepot`, `buyDepot`, `villageAt`, `canSendCourier`, `sendCourier`,
   `festivalMedal`, `hasBoon`, `boonNames`, `moodOf`, `tick`, and for the chain, the moults and the
   daily `Journey`, `UPGRADE_NAMES`, `hasTrait`, `wagons`, `choosing` (a charter or a moult is on
-  offer), `hazardKind`, `pickMoult`. No Phaser import. Banners and pops are
+  offer), `hazardKind`, `pickMoult`, and for towns, nights and the rival `isNight`, `isLit`,
+  `canBuyLamp`, `buyLamp`, `canBuyWarehouse`, `buyWarehouse`, `rivalServes`, `rivalFlyovers`. No Phaser import. Banners and pops are
   translated with `t` (imported as `tr`, since `t` is a tile there) when they are made.
 - `scenes/BootScene.ts`: bakes the props and sprites (`bakeProps`, `bakeSprites`), then starts
   `Game`.
@@ -137,7 +151,8 @@ File map (all under `src/` unless it starts with `shared/`):
   `dailyRand('wyrmrail')`; bakes this game's `valley` texture (`bakeValley`), draws the valley, the
   props (pines, peaks, Roost, villages, workshop signs, depot sheds, festival bunting), track,
   switches, crossing plates and tunnel mouths, build hints, the hazard's mark, each wyrm's planned route, cargo markers, the
-  villages' mood faces, the wyrms (`WyrmView` each), pops, HUD (with the bellies and the round's
+  villages' mood faces, the town towers and warehouse icons, lamp posts, the rival's track,
+  flyovers and yard (`drawRival`, with the rails), the night (`drawNight`), the wyrms (`WyrmView` each), pops, HUD (with the bellies and the round's
   charter), the orders and upgrades panel (with the Depot, Remove and Plain toggles), the banner, the
   charter cards, the moult's trait cards (`drawMoult`, over the charter cards, which wait under
   them), the daily link or tag (`drawDailyLink`) and the game over or festival panel (`openEnd`,
@@ -169,12 +184,13 @@ File map (all under `src/` unless it starts with `shared/`):
   snow and ice, an olive marsh with peaty water, red canyon sand) and `bakeProps`, the props, each the
   size of `PROP` with the tile's middle at (`PROP.x`, `PROP.y`): `forest`, `peak`, `mesa` (a
   canyon's mountain), `roost`,
-  `village-<name>` (roofs in `ROOFS`) and `bunting`.
+  `village-<name>` (roofs in `ROOFS`), `bunting` and `town` (a grown town's tower).
 - `art/sprites.ts`: the wyrm in the isometric style, `wyrm-head`, `wyrm-coil-0` to `-2`,
   `wyrm-wings`, the copper second wyrm's `wyrm2-*` (the same drawing through `toCopper`),
   `wagon-u` and `wagon-v` (lengthwise along the columns or the rows), each `PART` sized with its
   ground point at `PART_ORIGIN`; and the pixel icons `cargo-<cargo>` (`cargo-passengers` among
-  them), `coin`, `heart`, `heart-empty`, `food`, `depot`.
+  them, and `cargo-wares`, a town's crate), `coin`, `heart`, `heart-empty`, `food`, `depot`,
+  `warehouse`.
 - `shared/settings.ts` and `shared/setupGame.ts` (repo root, shared by every game): the hub's
   settings, `byDifficulty` and `setupGame`. `sim.ts` imports `byDifficulty`, `GameScene.ts`
   imports `settings`. `shared/i18n.ts` gives `translator`, `byLanguage`, `formatNumber` and the
@@ -230,8 +246,11 @@ How it runs:
   track or a station already there, so a drag that starts on the line continues from it), or `removeTrack` while
   Remove is on; a `pointerdown` on a junction calls `throwSwitch` instead. Dragging acts once per
   new tile. A `pointerdown` on an open village remembers it (`pressedVillage`), a move to another
-  tile, off the board or off the grid forgets it, and the `pointerup` calls `sendCourier` for it. In `depot` mode a tap on a
-  village calls `buyDepot` (and goes back to `auto` once bought); the Depot button toggles it (and refuses to turn it on while `depotLocked`, in round 1). While the charter cards are up (`charterOffer`), a tap on the board does nothing. Order cards call `dispatch`; the upgrade buttons `buyUpgrade`; the charter cards
+  tile, off the board or off the grid forgets it, and the `pointerup` calls `sendCourier` for it.
+  A `pointerdown` on a track tile that is not a junction remembers it the same way
+  (`pressedTrack`), and the `pointerup` calls `buyLamp` for it (refused quietly before
+  `LAMP_ROUND` or on a tile that has a lamp). In `depot` mode a tap on a
+  village calls `buyDepot`, or `buyWarehouse` when it has a depot (and goes back to `auto` once bought); the Depot button toggles it (and refuses to turn it on while `depotLocked`, in round 1). While the charter cards are up (`charterOffer`), a tap on the board does nothing. Order cards call `dispatch`; the upgrade buttons `buyUpgrade`; the charter cards
   `pickCharter`; Remove, Plain and Depot set the scene's `mode` (`auto`, `plain`, `remove` or `depot`), which
   lives in the scene, not the state. Sim functions check the phase and return false when the
   action is not allowed; `canBuild`, `canRemove` and `throwSwitch` also refuse while
@@ -266,7 +285,9 @@ State model (`src/game/state.ts`):
   fetch yet), `switches` (junction key to the key of the arm its switch is set against), `cuts`
   ("c,r|c,r" pairs of neighbouring line tiles not joined, lower key first), `crossings` (tile
   keys), `moods` and `idleMs` (by village index), `hazard` and `hazardTimerMs`, `charter` and
-  `charterOffer`, `depots` (village indexes), `boon` (the medal the game started with),
+  `charterOffer`, `depots` (village indexes), `growth` (deliveries in time to each village),
+  `towns` and `warehouses` (village indexes), `lamps` (tile keys), `rival` (`Rival`: `yard`,
+  `track` keys, `buildMs`, `claim` of an order id and time left, `restMs`, `taken`), `boon` (the medal the game started with),
   `festivalMs` and `medal`, `wyrms`, `upgrades` (`wings`, `hoard`, `second`), `orderTimerMs`,
   `banner`, `pops`, `nextId`, and for the chain, the moults and the daily `leg` (1 for the first
   valley), `kept` (the upgrade kept from the last valley and its level), `traits`, `moultOffer`
@@ -356,6 +377,29 @@ State model (`src/game/state.ts`):
 - The daily valley (WR17): `newGame(null, { daily: true }, dailyRand('wyrmrail'))` picks the kind
   and the valley with today's seed (the kind first). It has no boons and no flying on, saves no
   medal, and its end panel shows `finishDaily`'s record.
+- Towns (from `TOWN_ROUND`): `arrive` calls `grow` for each delivery, which counts `growth` and
+  makes the village a town at `GROW_AT` (with a banner). `addOrder` pays `TOWN_PAY` times for an
+  order from a town; `randomOrder` makes a town's order `wares` with `WARES_CHANCE` (only when
+  the sender is a town, so no extra `Math.random` call before), paying `WARES_PAY` more.
+  `buyWarehouse` needs a town with a depot and `WAREHOUSE_COST`; `failOrder` drops an order from a
+  warehouse town that is not `carrying` without a heart or a soured village ("Back in store").
+- Nights: `isNight` is a round in `NIGHT_ROUNDS`. `isLit` is a station, or a tile with a lamp on
+  it or beside it. `wyrmSpeed` is times `DARK_SLOWDOWN` at night while `path[0]` is unlit.
+  `buyLamp` needs `LAMP_ROUND`, a track tile without a lamp and `LAMP_COST`; `removeTrack` and a
+  hazard's strike drop the tile's lamp. `roundNews` adds the lamps' and the night's lines to the
+  round's banner and again to the charter's (the charter cards hide the first).
+- The rival (from `RIVAL_ROUND`): `nextRound` makes it once with `newRival`, its yard the free
+  grass tile whose line could reach the most open villages (`rivalReach`), then the farthest from
+  the Roost (none if it reaches fewer than two). `rivalFree` is open ground (not a mountain, the
+  wyrm's track, a village tile of any round, the Roost, the yard or the hazard). `rivalSteps` goes
+  to free neighbours and straight over a tile of the wyrm's track to the one beyond (a flyover);
+  `rivalNetwork` is what joins the yard that way and `rivalServes` the open villages next to it.
+  `tickRival` (not in the festival) lays a tile every `RIVAL_BUILD_MS` towards the nearest open
+  village it doesn't serve (`rivalBuild`, a BFS), and, after `RIVAL_REST_MS`, claims the
+  best-paying `waiting` order between two served villages for `RIVAL_CLAIM_MS`: dispatched first,
+  the claim ends ("Beat the rival!"); else the order leaves the board, with no heart lost, and
+  `taken` counts it. `trackCost` refuses the yard and charges `RIVAL_BUYOUT` times on a rival
+  tile, which `buildTrack` takes from the rival.
 - Only `src/game/sim.ts` mutates state. The scene only reads it and calls sim functions.
 - Invariants: a station (the Roost or an open village) is on the line without track; track can't
   be laid on a station or a locked village's tile; track can't be removed from `wyrm.at` or any
@@ -367,7 +411,7 @@ Randomness and timing:
 
 - `Math.random` is used in `generateValley` (the valley, in `newGame`, except the daily's, which
   gets today's seeded `rand`), `randomOrder` (which villages a new order joins, and whether it is
-  passengers), `makeGoods` (where a workshop's goods go), `tickHazard` (which tile),
+  passengers, and a town's wares), `makeGoods` (where a workshop's goods go), `tickHazard` (which tile),
   `offerCharters` (which two, and the cargo) and `nextRound` (a moult's traits) in `src/game/`. A
   meadow's `generateValley` draws exactly the numbers it always did, so the test's seeded valley
   stays the same. The
@@ -419,7 +463,7 @@ starts the music again.
 - **Scene (player's actions, `GameScene`):** `tok` per track tile laid (pitched by terrain with
   `TOK_PITCH`, rising along a drag), `untok` and `ui('coin')` for track taken up, `switch` for a
   switch thrown, `send` for an order card sent, `buy` for an upgrade or a depot (`roar` too for the
-  second wyrm), `courier` for a courier call, `stamp` for a charter picked, `ui('click')` for the
+  second wyrm), `courier` for a courier call, `stamp` for a charter picked, `lamp` for a lamp hung, `ui('click')` for the
   Remove, Plain and Depot toggles and Play again, and `ui('refuse')` for every refused tap (a tap,
   not each tile of a drag, and none on the board once the game is over or while the charter cards are up): track that can't go there, nothing to remove, a depot that can't be bought, an order card that can't
   be sent, an upgrade not affordable or locked, and a courier call that can't go (from round 2).
@@ -430,7 +474,9 @@ starts the music again.
   `rumble` when a washout or sinkhole, or a rockfall or avalanche, strikes (none when it blows over and the track stays), `gifts` when a courier's visit ends, `round` for a
   new round and `charter` when the charter or moult cards appear (the music's `charter` part
   plays while either waits). The scene plays `stamp` for a trait picked, and `ui('click')` and
-  `roar` for flying on.
+  `roar` for flying on. `grow` plays when a village grows into a town, `rival` when the rival
+  takes an order (not counted as late) and `beatRival` when the wyrm is sent for an order the
+  rival was after.
 
 ## Testing hooks
 
@@ -458,12 +504,14 @@ starts the music again.
   `workshops-two-wyrms.webp`, `festival.webp`, `festival-won.webp`, `moods.webp`, `washout.webp`,
   `plain-track.webp`, `charter.webp`, `passengers.webp`, `depot-courier.webp`, `tunnel.webp`,
   `festival-medal.webp`, `valley-chain.webp` (the snowy valley, the marsh, the canyon and the fly-on
-  panel, four shots in one), `moult.webp`, `daily-valley.webp`, `german-round.webp` (round 5 with `?lang=de`), `fill-ultrawide.webp` and
+  panel, four shots in one), `moult.webp`, `daily-valley.webp`, `towns.webp` (towns, wares and a warehouse), `night.webp` (a night
+  round with lamps), `rival.webp` (the rival line racing for an order), `german-round.webp` (round 5 with `?lang=de`), `fill-ultrawide.webp` and
 `fill-tablet.webp` (the first screen at 2560x1080 and 1024x768) and `cover.png` are not made by
   the test: play the dev build and capture them by hand (a script can set up later rounds through
   the dev server's `/games/wyrmrail/src/game/sim.ts` module, the same instance the game uses).
-- Moods, courier calls, depots, hazards, charters and passengers all start after round 1
-  (`MOOD_ROUND` and `DEPOT_ROUND` 2, the rest 3), so the playthrough never meets them; keep them
+- Moods, courier calls, depots, towns, hazards, charters, passengers, lamps, the rival and nights
+  all start after round 1 (`MOOD_ROUND`, `DEPOT_ROUND` and `TOWN_ROUND` 2, `NIGHT_ROUNDS` from 5,
+  the rest 3), so the playthrough never meets them; keep them
   there or give the test a step for them. The test never taps a village, and its browser has no
   saved medals, so no boon changes the first round. It never taps the daily link (which only
   shows on the first valley before any track) and never reaches a moult or a won festival.
@@ -513,6 +561,9 @@ starts the music again.
   `HAZARD_TEXT` row and its sound in `GameSounds`); then its paragraph in the README.
 - **Add a trait:** add it to `TRAITS` and `TRAIT_TEXT` (two texts in each language), apply it with
   `hasTrait` where it matters in `sim.ts`, and add its row to the README's traits table.
+- **Tune towns, nights or the rival:** their constants in `src/game/state.ts` (see the State
+  model above); a night round is a number in `NIGHT_ROUNDS`, and a new station upgrade for towns
+  goes next to `buyWarehouse` (bought from the Depot mode's tap) with its icon by the label.
 - **Add a charter:** add an entry to `CHARTERS` in `src/game/state.ts` with its name and text in
   the `i18n/` files (a new effect needs a field
   on `Charter` and a check where it applies in `sim.ts`) and its line in the README.
@@ -545,4 +596,6 @@ starts the music again.
   `lastFrame` carries over.
 - `tileCenter` positions of villages change every game; anything placed by a village (labels,
   workshop signs, bunting) is created in `create` from `state.valley`.
+- Don't give a graphics object `BlendModes.ADD` over the board: under WebGL it kept the night's
+  translucent darkness below it from drawing at all. The lights are drawn with the normal blend.
 - Never use a red cross in any art (root `AGENTS.md`). The hearts are red hearts, not crosses.
