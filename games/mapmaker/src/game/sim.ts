@@ -7,13 +7,17 @@ import {
   CAMP_REACH,
   DIG_COST,
   GRID,
+  LANDING_MIN,
   RIVAL_FROM,
   RIVAL_PACE,
   RIVAL_STEPS,
   ROYAL_KINDS,
+  TRADE_GUIDE,
+  TRADE_STORES,
   TREASURE_VALUE,
   WRECK_SUPPLIES,
   indexOf,
+  isWinter,
   inkBonus,
   maxSupplies,
   MILESTONES,
@@ -28,6 +32,7 @@ import {
   type Point,
   type Rival,
   type Tile,
+  type Trade,
 } from './state';
 import { CHART_ORDER, TERRAIN, type Terrain } from './terrain';
 import { nextCost, type UpgradeId } from './upgrades';
@@ -83,6 +88,10 @@ export function newGame(): GameState {
     next: null,
     wonder: placeWonder(tiles, 1, kind),
     wonders: [],
+    landing: null,
+    guide: 0,
+    trade: null,
+    traded: [],
   };
   s.supplies = maxSupplies(s);
   s.commission = rollCommission(fogged(s.tiles));
@@ -91,6 +100,7 @@ export function newGame(): GameState {
 
 const dist = (a: Point, b: Point) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
 const has = (list: Point[], x: number, y: number) => list.some((p) => p.x === x && p.y === y);
+const isLanding = (s: GameState, x: number, y: number) => !!s.landing && s.landing.x === x && s.landing.y === y;
 
 /** Land, or sea beside land: the tiles that count toward the isle and that a camp can reach. */
 function isChartable(s: GameState, x: number, y: number) {
@@ -100,8 +110,8 @@ function isChartable(s: GameState, x: number, y: number) {
 
 /**
  * A fogged tile can be surveyed from a charted land tile next to it (sea leads nowhere, unless a
- * Boatman is aboard), or from a base camp up to `CAMP_REACH` steps away; never while a storm sits
- * on it.
+ * Boatman is aboard), from a base camp up to `CAMP_REACH` steps away, or when it is the coastal
+ * sloop's landing; never while a storm sits on it.
  */
 export function canSurvey(s: GameState, x: number, y: number) {
   const tile = tileAt(s, x, y);
@@ -111,7 +121,7 @@ export function canSurvey(s: GameState, x: number, y: number) {
     const t = tileAt(s, n.x, n.y)!;
     return t.revealed && (t.terrain !== 'sea' || bySea);
   });
-  return beside || (isChartable(s, x, y) && s.camps.some((c) => dist(c, { x, y }) <= CAMP_REACH));
+  return beside || isLanding(s, x, y) || (isChartable(s, x, y) && s.camps.some((c) => dist(c, { x, y }) <= CAMP_REACH));
 }
 
 /** Every tile that can be surveyed now, whatever it costs. */
@@ -123,24 +133,43 @@ export function frontier(s: GameState): Point[] {
 
 /**
  * Supplies it costs to survey a tile: 2 for forests and peaks, nothing for rivers and roads. A
- * Woodsman makes forests 1, a Climber peaks 1, and a Boatman the sea free.
+ * Woodsman makes forests 1, a Climber peaks 1, and a Boatman the sea free; a frozen river on a
+ * winter isle costs 1. While a village's guide is aboard, every survey is free.
  */
 export function costOf(s: GameState, x: number, y: number) {
+  return s.guide > 0 ? 0 : groundCost(s, x, y);
+}
+
+/** What a tile costs to survey, guide or not. */
+function groundCost(s: GameState, x: number, y: number) {
   const t = tileAt(s, x, y)!.terrain;
   if (t === 'forest' && s.hand === 'woodsman') return 1;
   if (t === 'mountain' && s.hand === 'climber') return 1;
   if (t === 'sea' && s.hand === 'boatman') return 0;
+  if (t === 'river' && isWinter(s.island)) return 1;
   return TERRAIN[t].cost;
+}
+
+/**
+ * On a winter isle, snow hides what a fogged tile costs until the surveyor stands next to it (the
+ * eight tiles round them). A guide knows the way, so nothing is hidden while one is aboard.
+ */
+export function snowHides(s: GameState, x: number, y: number) {
+  return isWinter(s.island) && s.guide === 0 && Math.max(Math.abs(x - s.surveyor.x), Math.abs(y - s.surveyor.y)) > 1;
 }
 
 /** True while a survey can still be paid for. */
 export const canAfford = (s: GameState, p: Point) => costOf(s, p.x, p.y) <= s.supplies;
 
-/** How far and in what shape the surveyor sees from a tile, with the Spyglass and a Climber. */
+/**
+ * How far and in what shape the surveyor sees from a tile, with the Spyglass and a Climber. On a
+ * winter isle the snow lets a lookout see only the tiles beside it.
+ */
 export function sightOf(s: GameState, terrain: Terrain) {
   const info = TERRAIN[terrain];
   const extra = rankOf(s, 'spyglass') + (s.hand === 'climber' ? 1 : 0);
-  return { range: info.sight > 0 ? info.sight + extra : 0, shape: info.shape };
+  const range = info.sight > 0 ? info.sight + extra : 0;
+  return { range: isWinter(s.island) ? Math.min(range, 1) : range, shape: info.shape };
 }
 
 /**
@@ -155,6 +184,8 @@ export function sightOf(s: GameState, terrain: Terrain) {
 export function survey(s: GameState, x: number, y: number): { settled: Point[]; passed: Point[]; wonder: boolean } | false {
   if (s.phase !== 'survey' || !canSurvey(s, x, y) || !canAfford(s, { x, y })) return false;
   s.supplies -= costOf(s, x, y);
+  // The guide spends one of their surveys on any tile that would have cost something.
+  if (s.guide > 0 && groundCost(s, x, y) > 0) s.guide -= 1;
   const tile = tileAt(s, x, y)!;
   const storms: Point[] = [];
   reveal(s, x, y, storms);
@@ -217,6 +248,7 @@ function reveal(s: GameState, x: number, y: number, storms: Point[]) {
   if (!tile || tile.revealed) return;
   tile.revealed = true;
   s.surveyed.push({ x, y });
+  if (isLanding(s, x, y)) s.landing = null;
   if (tile.terrain === 'ruins' && s.riddle) s.riddle.known = true;
   if (tile.find === 'wreck') s.supplies += WRECK_SUPPLIES;
   if (tile.find === 'cave') s.artifacts += 1;
@@ -365,6 +397,8 @@ export function returnToPort(s: GameState) {
   s.chart = chartOf(s);
   s.phase = 'chart';
   s.storms = [];
+  s.landing = null;
+  s.guide = 0;
   // Once this isle is charted in full (storms cleared, so they hide nothing), the next one is
   // rolled now, so the chart can tell whether a long commission carries over to it, and the sale
   // lays the board out for it.
@@ -571,6 +605,11 @@ export const islandCharted = (s: GameState) => frontier(s).length === 0;
  */
 export function setSail(s: GameState) {
   if (s.phase !== 'harbor' || s.run) return false;
+  // The village trade picked at the harbour: the first village yet to trade gives it.
+  const villages = tradeVillages(s);
+  const trade = s.trade && villages.length ? s.trade : null;
+  if (trade) s.traded.push(villages[0]);
+  s.trade = null;
   if (islandCharted(s)) {
     s.island += 1;
     const { kind, tiles, port, riddle, features, seed } = s.next ?? makeIsland(s.island);
@@ -584,17 +623,78 @@ export function setSail(s: GameState) {
     s.wonder = placeWonder(tiles, s.island, kind);
     s.camps = [];
     s.dug = [];
+    s.traded = [];
     s.milestones = 0;
     s.isleStart = s.voyage + 1;
     s.rival = landRival(s);
   }
   s.voyage += 1;
   s.surveyor = { ...s.port };
-  s.supplies = maxSupplies(s);
+  s.supplies = maxSupplies(s) + (trade === 'stores' ? TRADE_STORES : 0);
+  s.guide = trade === 'guide' ? TRADE_GUIDE : 0;
+  if (trade === 'rumour' && s.wonder && !s.wonder.seen) s.wonder.rumour = true;
+  s.landing = rankOf(s, 'sloop') > 0 ? landingSpot(s) : null;
   // Only a save from before the next isle was rolled at the sale can sail with no commission the
   // fog could fill; it gets a one-voyage one, as the first voyage does.
   if (!s.commission) s.commission = rollCommission(fogged(s.tiles));
   s.phase = 'survey';
+  return true;
+}
+
+/**
+ * Where the coastal sloop lands: the fogged coast tile (land beside the sea, not the port, no storm
+ * on it) farthest from every charted tile, at least `LANDING_MIN` steps away, the first in reading
+ * order on a tie; null when the far side is charted already.
+ */
+export function landingSpot(s: GameState): Point | null {
+  const charted: Point[] = [];
+  for (let y = 0; y < GRID.h; y++) for (let x = 0; x < GRID.w; x++) if (tileAt(s, x, y)!.revealed) charted.push({ x, y });
+  let best: Point | null = null;
+  let far = LANDING_MIN - 1;
+  for (let y = 0; y < GRID.h; y++) {
+    for (let x = 0; x < GRID.w; x++) {
+      const t = tileAt(s, x, y)!;
+      if (t.revealed || t.terrain === 'sea' || t.terrain === 'port' || has(s.storms, x, y)) continue;
+      if (!neighbours(x, y).some((n) => tileAt(s, n.x, n.y)!.terrain === 'sea')) continue;
+      const near = Math.min(...charted.map((c) => dist(c, { x, y })));
+      if (near > far) {
+        far = near;
+        best = { x, y };
+      }
+    }
+  }
+  return best;
+}
+
+// ---- Village trade (MM15).
+
+/** The charted villages on this isle that have not traded yet: each trades once. */
+export function tradeVillages(s: GameState): Point[] {
+  const out: Point[] = [];
+  for (let y = 0; y < GRID.h; y++) {
+    for (let x = 0; x < GRID.w; x++) {
+      const t = tileAt(s, x, y)!;
+      if (t.revealed && t.terrain === 'village' && !has(s.traded, x, y)) out.push({ x, y });
+    }
+  }
+  return out;
+}
+
+/**
+ * Whether a trade can be picked at the harbour: a village is left to trade, and a rumour needs a
+ * wonder still unseen and unmarked (or a new isle coming, whose wonder it will mark).
+ */
+export function canTrade(s: GameState, trade: Trade) {
+  if (s.phase !== 'harbor' || s.run || tradeVillages(s).length === 0) return false;
+  if (trade !== 'rumour' || islandCharted(s)) return true;
+  return !!s.wonder && !s.wonder.seen && !s.wonder.rumour;
+}
+
+/** Picks a trade for the next voyage, or puts it back (null); the village gives it when the voyage sets sail. */
+export function pickTrade(s: GameState, trade: Trade | null) {
+  if (trade && !canTrade(s, trade)) return false;
+  if (s.phase !== 'harbor') return false;
+  s.trade = trade;
   return true;
 }
 

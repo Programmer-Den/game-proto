@@ -48,6 +48,28 @@ export const RIVAL_PACE = 2;
 export const RIVAL_STEPS = 3;
 /** The kinds of isle the Royal Atlas needs one page of each. */
 export const ROYAL_KINDS = 4;
+/**
+ * Winter isles (MM16): from the fifth isle on, every third isle is under snow. Snow hides a survey
+ * station's cost until the surveyor stands next to it, lookouts see only the tiles beside them, and
+ * frozen rivers cost a supply like any other ground.
+ */
+export const WINTER_FROM = 5;
+export const isWinter = (island: number) => island >= WINTER_FROM && (island - WINTER_FROM) % 3 === 0;
+/**
+ * The coastal sloop (MM14) lands on a fogged coast tile at least this many steps from every charted
+ * tile, so there is a far side worth a second landing.
+ */
+export const LANDING_MIN = 3;
+/** Village trade (MM15): the stores a village gives, and the surveys its guide makes free. */
+export const TRADE_STORES = 4;
+export const TRADE_GUIDE = 3;
+
+/**
+ * What a charted village gives for a copy of your chart, on the next voyage: stores (+supplies), a
+ * guide (the first surveys free) or a rumour (the isle's wonder marked through the fog).
+ */
+export type Trade = 'stores' | 'guide' | 'rumour';
+export const TRADES: Trade[] = ['stores', 'guide', 'rumour'];
 
 /**
  * A voyage away from the atlas, on an isle of its own with one fixed budget of supplies and no
@@ -247,6 +269,13 @@ export interface GameState {
   wonder: Wonder | null;
   /** The wonder gallery: the first wonder of each kind seen, and the isle it was seen on. */
   wonders: { kind: WonderKind; island: number }[];
+  /** The coastal sloop's landing for this voyage: a fogged coast tile that can be surveyed like any beside charted ground. */
+  landing: Point | null;
+  /** Surveys a village's guide still makes free on this voyage. */
+  guide: number;
+  /** The trade picked at the harbour for the next voyage, and the villages on this isle that have traded. */
+  trade: Trade | null;
+  traded: Point[];
   /** Set on an expedition or the daily isle, which are played apart from the atlas. */
   run?: Run;
 }

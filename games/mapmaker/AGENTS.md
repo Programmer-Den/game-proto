@@ -20,7 +20,7 @@ at the port (half for tiles the rival charted first), plus feature bonuses, a co
 artifacts and treasure, plus 3 coins for each unused supply (capped at what the tiles pay), plus any
 isle milestones reached (50%: +20, 75%: +40, 100%: an atlas page). The harbor lays out a
 commission board (up to three, one of them long, over two or three voyages) and three of four hands
-(free, for the next voyage: Woodsman, Climber, Naturalist, Boatman) and sells four upgrades, then
+(free, for the next voyage: Woodsman, Climber, Naturalist, Boatman) and sells five upgrades, then
 Set sail starts the next voyage; once nothing more can be surveyed, the next voyage goes to a new
 island, of the next kind (green, archipelago, volcanic, jungle). From the third isle a rival
 surveyor charts one tile for every two surveys, heading for ruins and high ground, and can dig the
@@ -36,15 +36,26 @@ fixed far isles with one budget of supplies for the whole isle (30 on Normal) an
 scored by the share charted, with a best per isle. Both are a run: a `GameState` of its own (`run`
 set) played while the atlas waits at the harbor, and neither touches the atlas's coins or isle.
 
+Round 4 (MM14 to MM16) adds three more. The Coastal Sloop, a fifth upgrade (one rank, 120 coins),
+opens a second landing every voyage (and expedition): the fogged coast tile farthest from every
+charted tile, at least `LANDING_MIN` steps out, which can be surveyed like a tile beside charted
+ground. Village trade: every charted village trades once for a copy of the chart; at the harbor the
+player picks one trade for the next voyage (stores: +`TRADE_STORES` supplies, a guide: the first
+`TRADE_GUIDE` surveys that would cost something are free and snow hides nothing, a rumour: the
+wonder's tile is marked through the fog), which the first untraded village gives on Set sail. Winter
+isles: from `WINTER_FROM` (isle 5) every third isle (`isWinter`, by isle number, whatever its kind,
+the daily and far isles included) lies under snow: a station's cost shows `?` until the surveyor
+stands next to it (`snowHides`), lookouts see only the tiles beside them, and frozen rivers cost 1.
+
 - Implemented: island generation in four kinds (with rivers, a road, finds and a riddle),
   surveying with a walking surveyor and per-terrain costs, lookouts (hills and peaks) with the
   viewshed tally, sea as a dead end, finds (wrecks, caves, storms), base camps, the treasure riddle
   and digging, charts with per-terrain rows, artifacts and treasure, features that pay once charted
   whole, the commission board with long commissions, hands for a voyage, sell-back of unused
   supplies, the isle completion goal with milestones and the atlas (pages coloured by isle kind),
-  the rival surveyor, the Royal Atlas ending with a saved best, the harbor with four upgrades, new
+  the rival surveyor, the Royal Atlas ending with a saved best, the harbor with five upgrades, new
   islands, a full save after every action, hidden wonders and the wonder gallery, the daily isle and
-  expeditions to the far isles.
+  expeditions to the far isles, the coastal sloop's landing, village trade and winter isles.
 - Art style: a survey sheet on a drafting table. Charted ground has hypsometric tints, contour
   lines, hillshade, black map symbols and italic place names; uncharted ground is blank gridded
   paper with a dashed survey limit; rivers are blue lines and roads cased ink lines; finds, storms,
@@ -84,7 +95,7 @@ set) played while the atlas waits at the harbor, and neither touches the atlas's
   screens. `check.ts` holds each trophy's condition on the `GameState` (`EARNED`: first chart sold,
   a feature charted whole, a cave's artefact, first upgrade, the treasure dug up, `FULL_PURSE` 300
   coins at once, the first atlas page, the Royal Atlas, the treasure dug up on an isle with a
-  rival, every upgrade at its last rank) and `checkTrophies(state)`, which `GameScene.update` calls
+  rival, every upgrade at its last rank, the Coastal Sloop included) and `checkTrophies(state)`, which `GameScene.update` calls
   every frame; the first call after the page loads awards quietly, so a loaded save earns its
   trophies without a toast. A new trophy is an entry in `index.ts`, its two texts in each language
   file and its condition in `EARNED`.
@@ -92,10 +103,11 @@ set) played while the atlas waits at the harbor, and neither touches the atlas's
   then `GameScene`, calls `setupGame(game, { howToPlay, trophies })` and `setupScaling(game, { fill: true })`, and puts `game` on `window`
   in dev builds.
 - `src/game/state.ts`: `GameState`, `Tile`, `Find`, `Riddle`, `Clue`, `Ground`, `Commission`, `Feature`, `Rival`,
-  `Chart`, `Milestone`, `AtlasPage`, `Phase`, `Point`; `GRID`, `BASE_SUPPLIES`, `PROVISIONS_STEP`,
+  `Chart`, `Milestone`, `AtlasPage`, `Phase`, `Point`, `Trade`; `GRID`, `BASE_SUPPLIES`, `PROVISIONS_STEP`,
   `INK_STEP`, `SELL_BACK`, `WRECK_SUPPLIES`, `ARTIFACT_VALUE`, `CAMP_COST`, `CAMP_REACH`,
   `DIG_COST`, `TREASURE_VALUE`, `FEATURE_BONUS`, `WOOD_MIN`, `RIVAL_FROM`, `RIVAL_PACE`,
-  `RIVAL_STEPS`, `ROYAL_KINDS`, `MILESTONES`; helpers `rankOf`, `maxSupplies`, `inkBonus`,
+  `RIVAL_STEPS`, `ROYAL_KINDS`, `MILESTONES`, `WINTER_FROM`, `LANDING_MIN`, `TRADE_STORES`,
+  `TRADE_GUIDE`, `TRADES`; helpers `rankOf`, `maxSupplies`, `inkBonus`, `isWinter`,
   `indexOf`, `inGrid`, `tileAt`, `neighbours`.
 - `src/game/wonders.ts`: `WonderKind`, the `WONDERS` table (name and line as `TextKey`s, the isle
   kind, the ground it hides under and what must lie beside it), `WONDER_IDS` (the gallery's order),
@@ -107,8 +119,8 @@ set) played while the atlas waits at the harbor, and neither touches the atlas's
   `EXPEDITION_SUPPLIES` (`byDifficulty(40, 30, 24)`), `DAILY_SUPPLIES` (18), `DAILY_GAME`
   (`mapmaker`, for `shared/daily.ts`), `dailyIsle(day)` (number 5 to 8 and a seed from
   `dailyRand`), `newRun(atlas, run)` (the run's `GameState`: the isle with only the port charted, the
-  run's supplies, no commission, hand, rival or wonder; an expedition takes the atlas's `ranks`, the
-  daily none), `expedition(far)` and `dailyRun(day)`.
+  run's supplies, no commission, hand, rival or wonder; an expedition takes the atlas's `ranks`, and
+  with the sloop its `landingSpot`, the daily none), `expedition(far)` and `dailyRun(day)`.
 - `src/game/hands.ts`: `Hand`, the `HANDS` table (name and card text as `TextKey`s), `HAND_IDS`, `HANDS_OFFERED`.
 - `src/game/terrain.ts`: `Terrain`, the `TERRAIN` table (name and tile count as `TextKey`s, value, cost, sight, shape),
   `CHART_ORDER`, `isLandmark`.
@@ -127,13 +139,15 @@ set) played while the atlas waits at the harbor, and neither touches the atlas's
   tile and the fewest `Clue`s that pick it out among every tile you could dig, landmark clues tried
   in `TILES_ORDER`, `DIR_ORDER` and `MARK_ORDER`) and finds the features (`findFeatures`: each
   four-way stretch of river, road or forest, named from `RIVER_NAMES`, `ROAD_NAMES` and
-  `WOOD_NAMES`, keys of `i18n/en.ts`, by the island number, in reading order).
-- `src/game/sim.ts`: the rules. `newGame`, `canSurvey`, `frontier`, `costOf`, `canAfford`,
-  `sightOf`, `survey`, `canAct`, `canCamp`, `pitchCamp`, `diggable`, `dig`, `claimed`,
+  `WOOD_NAMES`, keys of `i18n/en.ts`, by the island number, in reading order). Winter changes no
+  draw: it is a rule and a paint over the same isle.
+- `src/game/sim.ts`: the rules. `newGame`, `canSurvey`, `frontier`, `costOf` (and the private
+  `groundCost`, the cost without a guide), `snowHides`, `canAfford`, `sightOf`, `survey`, `canAct`, `canCamp`, `pitchCamp`, `diggable`, `dig`, `claimed`,
   `valueOf`, `returnToPort`, `featuresDone`, `featureAt`, `artifactValue`, `chartOf`,
   `sellBackOf`, `chartable`, `isleProgress`, `milestonesDue`, `atlasKinds`, `royalComplete`,
   `sellChart`, `carriesOver`, `closeAtlas`, `pickCommission`, `isPicked`, `hire`, `buy`, `islandCharted`,
-  `setSail`, `runScore` (a run's score: the chart's total on the daily isle, the isle's percent on an
+  `setSail`, `landingSpot` (the sloop's landing), `tradeVillages`, `canTrade`, `pickTrade`,
+  `runScore` (a run's score: the chart's total on the daily isle, the isle's percent on an
   expedition), and the private `reveal` (turns up finds), `landRival` and `rivalTurn`, `fogged`,
   `rollCommission` and `rollBoard` with the `COMMISSIONS` table, and `rollHands`.
 - `src/game/save.ts`: `loadRun` and `clearRun` for a run under way, `loadExpeditions` and
@@ -148,10 +162,11 @@ set) played while the atlas waits at the harbor, and neither touches the atlas's
   textures, draws the sheet, survey stations with their costs, the map marks, surveyor and rival,
   value chips and notices, the viewshed, the side panel (with the riddle box and the Camp button)
   and the chart, Royal Atlas and harbor overlays, the run's end (`showRunChart`), the far isles
-  (`showExpeditions`) and the wonder gallery (`showWonders`); exposes `spots`. `commissionText`, `voyagesLeft`
+  (`showExpeditions`), the wonder gallery (`showWonders`) and the village trade page (`showTrade`),
+  and the Set sail notices (`sailNotices`); exposes `spots`. `commissionText`, `voyagesLeft`
   and `clueText` put commissions and riddle clues into words.
 - `src/scenes/layout.ts`: screen constants (`VIEW`, `MAP`, `PANEL`, `CAMP_BUTTON`, `RETURN_BUTTON`, `OVERLAY`,
-  `OVERLAY_BUTTON`, `SHOP`, `HANDS_COLUMN`, `BOARD`, `BUTTON`, `SMALL_BUTTON`, `UI_DEPTH`, `FONT`) and `tileCentre`.
+  `OVERLAY_BUTTON`, `SHOP`, `HANDS_COLUMN`, `TRADE_CARD`, `BOARD`, `BUTTON`, `SMALL_BUTTON`, `UI_DEPTH`, `FONT`) and `tileCentre`.
 - `src/ui/Button.ts`: `makeButton`, a flat ink button with an optional size, disabled look (a tap
   on a disabled one plays `ui('refuse')`) and left-aligned caption; a caption too wide for its
   button is squeezed to fit.
@@ -164,8 +179,10 @@ set) played while the atlas waits at the harbor, and neither touches the atlas's
   set by `sharpenArt`), `bake` (paint a canvas and add it as a texture),
   `rng`, `hex` and drawing helpers.
 - `src/art/map.ts`: `paintTerrain` (tints, hillshade, contours by marching squares, coastline,
-  rivers, roads and symbols for the whole island), `paintFog` (blank paper over uncharted tiles, translated UNSURVEYED lettering
-  and the dashed survey limit), `placeNames` (village, ruin, bay and harbour names and peak
+  rivers, roads and symbols for the whole island; with `winter` the land is blended toward `SNOW`
+  by `SNOW_COVER` and the rivers are drawn in `ICE` with a broken white line), `paintFog` (blank paper over uncharted tiles, translated UNSURVEYED lettering
+  and the dashed survey limit; with `winter`, pale blue six-armed snowflakes on about every other
+  fogged tile, placed by a hash), `placeNames` (village, ruin, bay and harbour names and peak
   heights, picked from the island number and tile spots, and every wood's and river's feature
   name; villages keep their names in every language, the rest are translated) and `nameColor`, `tintOf` (a flat colour per terrain for the live chart and swatches, per
   theme) and `TERRAINS`, the per-theme `BANDS`, `FOREST_TINT`, `ROAD_FILL`, `CONTOUR` and `SHINE`,
@@ -176,7 +193,9 @@ set) played while the atlas waits at the harbor, and neither touches the atlas's
 - `src/art/icons.ts`: `icon-<upgrade>`, `hand-<hand>`, `swatch-<terrain>`, `landmark-hint` (the
   compass rose), `logo`, `atlas-<kind>` and `atlas-empty`, and the `MARKS`: `find-wreck`,
   `find-cave`, `artifact`, `storm`, `camp`, `dug`, `treasure`, `claim` (the rival's pennant) and
-  `riddle`; and `wonder-<kind>` (32 px, a picture in a gold ring, from `WONDER_ICONS`) and
+  `riddle`, `sloop` (the sloop off its landing, also `icon-sloop`), `rumour` (a dashed gold ring
+  with a question mark), `trade-guide` and `trade-rumour` (the stores trade uses `icon-provisions`);
+  and `wonder-<kind>` (32 px, a picture in a gold ring, from `WONDER_ICONS`) and
   `wonder-unseen` (the gallery's empty frame).
 - `shared/setupGame.ts`, `shared/settings.ts` and `shared/i18n.ts` (outside the game folder): the
   hub's settings. `main.ts` imports `setupGame`; `state.ts` imports `byDifficulty`; `GameScene`
@@ -201,10 +220,12 @@ set) played while the atlas waits at the harbor, and neither touches the atlas's
   Buttons call `pitchCamp`, `returnToPort`, `sellChart` (then `saveBest` when the Royal Atlas
   page opens; it returns whether the voyages set a new best, which the page shows, kept in
   `newBest`, so a reload or a tie shows the best instead), `closeAtlas`, `newGame` (New atlas), `pickCommission` and `hire` (the harbor's
-  `card`s), `buy` and `setSail`. Every successful action calls `saveGame`. The harbor's heading row
+  `card`s), `buy`, `pickTrade` (on the trade page) and `setSail`, which then calls `sailNotices`
+  (the trade taken, winter on a new isle, the sloop's landing). Every successful action calls `saveGame`. The harbor's heading row
   (`headButton`, `HEAD_BUTTON`) holds Daily isle (disabled once today's try is used, then showing
   today's score), Wonders and Expeditions, which set `sheetView` to open the gallery or the far isles
-  over the harbor (Back clears it).
+  over the harbor (Back clears it). The Village trade card under the hands (`TRADE_CARD`, shown once
+  `tradeVillages` holds one) sets `sheetView` to `'trade'`, the trade page.
 - Runs: Daily isle and an expedition's Set out call `startRun` (the daily calls `startDaily` first,
   so leaving half way still uses the day's try): the atlas moves to `atlasState`, `state` becomes
   `newRun(...)`, and every scene path (taps, Camp, Return to port, the theme switch, which hands
@@ -229,17 +250,21 @@ set) played while the atlas waits at the harbor, and neither touches the atlas's
   - `drawGlow` draws a magenta survey station on every `frontier` tile (dashed square, triangle,
     "−2" or "FREE" under it when the cost isn't 1, grey when the supplies can't pay; the one under
     the pointer is solid with a cost pill, which also names the feature the tile would finish,
-    from `featureAt`), and once the riddle is known a dashed dig square and
+    from `featureAt`, and the sloop's landing; on a winter isle a station `snowHides` shows `?`, is
+    drawn as affordable while any supply is left, and its pill says "under snow"), and once the
+    riddle is known a dashed dig square and
     pill on charted ground under the pointer. Cost labels come from a reused pool of texts.
   - `syncMarks` keeps an image per map mark (finds on charted tiles, storms, camps, dug tiles, the
     wonder once seen,
     the treasure chest for the player's own find, a dug mark on the riddle's tile once charted when
-    the rival dug it, the rival's claims) and adds or removes them as the state changes.
+    the rival dug it, the rival's claims, the sloop off its landing while surveying, the rumour's
+    gold ring on the wonder's tile until it is seen) and adds or removes them as the state changes.
   - `agePopups` floats the value chips of ordinary surveys and the notices.
   - `ageSweep` plays a lookout's viewshed: the dotted ring grows over `RING_MS`, a chip appears on
     each tile as the ring passes, from `GATHER_AT` the chips fly into the magenta tally ("VIEWSHED
     n tiles +v") which counts up, and everything fades after `HOLD_MS`.
-  - `updatePanel` refreshes the texts (the header names the hand aboard) and redraws the panel
+  - `updatePanel` refreshes the texts (the header names the hand aboard, the guide's free surveys
+    left and "in winter" after the isle kind) and redraws the panel
     graphics: supply pips with the unused bracket (pips past the maximum, from wrecks, in magenta),
     the live chart (15x11 at 3 px, fresh tiles magenta for `FRESH_MS`), the commission progress
     (swatches up to four tiles, in words beyond, with the voyages left of a long one), the riddle
@@ -334,6 +359,20 @@ set) played while the atlas waits at the harbor, and neither touches the atlas's
   after its reveals and returns `wonder: true` when it came into sight, which the scene announces.
   `wonders` is the gallery: `{ kind, island }` for the first of each kind seen; it is kept by the
   atlas for good (New atlas starts it over). Wonders pay nothing.
+- `landing` is the coastal sloop's landing for this voyage (null without the sloop, or when no
+  coast tile is far enough): `canSurvey` takes it as surveyable, `reveal` clears it once charted,
+  `returnToPort` clears it, and `setSail` (and `newRun` for an expedition) sets it from
+  `landingSpot`, which draws nothing random.
+- `guide` counts the surveys a village's guide still makes free: `costOf` is 0 while it is above 0,
+  and `survey` counts it down on a tile whose `groundCost` is above 0. `returnToPort` clears it.
+- `trade` is the trade picked at the harbor for the next voyage (`pickTrade`; `canTrade` needs a
+  village left in `tradeVillages`, and a rumour an unseen, unmarked wonder or a new isle coming),
+  and `traded` the villages on this isle that have traded (reset on a new isle). `setSail` pushes
+  the first untraded village onto `traded`, clears `trade`, and applies it after the new isle (if
+  any) is set: `TRADE_STORES` on top of the supplies, `guide = TRADE_GUIDE`, or `wonder.rumour`.
+- Winter is not stored: `isWinter(island)` is read by `costOf` (rivers 1), `sightOf` (range at most
+  1), `snowHides` (cost hidden unless the station is within one tile of the surveyor, eight-way,
+  and no guide is aboard) and the painters.
 - `run` (a run only): `{ mode: 'expedition', far, supplies }` or `{ mode: 'daily', day, supplies }`.
   `maxSupplies` is `run.supplies`; `milestonesDue` is empty; `returnToPort` rolls no next isle;
   `sellChart` and `setSail` refuse it.
@@ -369,6 +408,7 @@ each id with the time; New atlas keeps them. `mapmaker-run` holds a run under wa
 atlas; only a progress file carries it, `fileOnly` in `shared/saveFile.ts`), cleared when it ends.
 `mapmaker-daily` is the daily isle's record (`shared/daily.ts`: today's try and score, the best and
 the streak). `mapmaker-expeditions` is the far isles' best percents, a list in `FAR_ISLES` order.
+Saves from before round 4 get `landing: null`, `guide: 0`, `trade: null` and `traded: []`.
 Saves from before the wonders get their isle's wonder placed on load (seen at once if already in
 sight, filling the gallery) and an empty gallery.
 
@@ -378,7 +418,7 @@ sight, filling the gallery) and an empty gallery.
   lattices, landmark and find spots and the riddle's first candidate tile come from the seed) and in `rollCommission`, `rollBoard` and `rollHands` (called by
   `sellChart`; `returnToPort` also calls `makeIsland` for the next isle once this one is charted in full). Rivers, the road, features and their
   names, storms' targets, the rival's every move and the riddle's clues are worked out from the
-  tiles, without randomness. The wonder's tile comes from the island number by a hash. The daily
+  tiles, without randomness, and so are the sloop's landing and the village trades. The wonder's tile comes from the island number by a hash. The daily
   isle's number and seed come from `dailyRand('mapmaker')` (the day), the far isles' are fixed. The art uses `rng()` and a sine hash; place names come from the island number
   and tile spots.
 - Animation time comes only from the `time` argument of `GameScene.update`. No timers or tweens.
@@ -387,7 +427,7 @@ sight, filling the gallery) and an empty gallery.
 
 - `src/game/terrain.ts`: tile values, survey costs, lookout sight and shape.
 - `src/game/kinds.ts`: each isle kind's terrain mix and atlas colour.
-- `src/game/upgrades.ts`: upgrade costs and text keys.
+- `src/game/upgrades.ts`: upgrade costs and text keys (five, the Coastal Sloop last).
 - `src/game/hands.ts`: the hands' names and card texts (as keys).
 - `src/game/wonders.ts`: the wonders, their isle kinds and their ground.
 - `src/game/runs.ts`: the far isles and the run supplies.
@@ -395,13 +435,14 @@ sight, filling the gallery) and an empty gallery.
 - `src/game/state.ts`: `GRID`, `BASE_SUPPLIES`, `PROVISIONS_STEP`, `INK_STEP`, `SELL_BACK`,
   `WRECK_SUPPLIES`, `ARTIFACT_VALUE`, `CAMP_COST`, `CAMP_REACH`, `DIG_COST`, `TREASURE_VALUE`,
   `FEATURE_BONUS`, `WOOD_MIN`, `RIVAL_FROM`, `RIVAL_PACE`, `RIVAL_STEPS`, `ROYAL_KINDS`,
-  `MILESTONES`.
+  `MILESTONES`, `WINTER_FROM`, `LANDING_MIN`, `TRADE_STORES`, `TRADE_GUIDE`.
 - `src/game/island.ts`: `FINDS` (how many of each, on what, how far from the port), landmark
   counts per island, the riddle's clue tables and order (`DIRS`, `MARKS`, `GROUND`, `TILES_ORDER`, `DIR_ORDER`,
   `MARK_ORDER`), the feature name keys
   (`RIVER_NAMES`, `ROAD_NAMES`, `WOOD_NAMES`).
 - `src/game/sim.ts`: `COMMISSIONS`, `BOARD_SIZE`, `LONG_PAY`.
-- `src/art/map.ts`: terrain heights (`ELEV`), tint bands (`BANDS`), name lists.
+- `src/art/map.ts`: terrain heights (`ELEV`), tint bands (`BANDS`), name lists, the winter `SNOW`,
+  `SNOW_COVER` and `ICE`.
 
 ### Sound
 
@@ -432,7 +473,8 @@ has no audio imports.
   - `swell` and `horn` when a run sets out; `coins` on Back to the harbor at its end.
   - `coins` on Sell chart, plus `milestone` when the chart pays a milestone without binding a page.
   - `buy` for an upgrade, `hire` for a hand taken aboard (`ui('click')` for one left ashore),
-    `flip` for a commission picked, `ui('click')` for the theme button, Keep charting and New
+    `flip` for a commission picked, `hire` for a village trade taken (`ui('click')` for one put back
+    and for the Village trade card), `ui('click')` for the theme button, Keep charting and New
     atlas. A tap on a disabled button (Camp, an upgrade too dear) plays `ui('refuse')`.
 
 ### Hub settings
@@ -461,7 +503,8 @@ has no audio imports.
 - `e2e/playthrough.spec.ts` reads `game.scene.getScene('Game')`: its `state` (JSON-copied) and
   `spots` (button centres by name: `return`, `camp`, `theme`, `sell`, `sail`, `buy-<upgrade>`,
   `hire-<hand>`, `pick-<n>` for the board's rows, `keep` and `newAtlas` on the Royal Atlas page,
-  `daily`, `wonders` and `expeditions` in the harbor's heading row, `far-<n>` and `back` on the far
+  `daily`, `wonders` and `expeditions` in the harbor's heading row, `trade` (the Village trade card,
+  once a village is charted) and `trade-<stores|guide|rumour>` with `back` on the trade page, `far-<n>` and `back` on the far
   isles, `back` on the gallery, `finish` at a run's end).
 - It seeds `Math.random`, owns the clock with 64 ms frames, and blocks WebGL so Phaser uses canvas.
 - It taps tile centres (from `MAP` 24,64 and 40px tiles) of `frontier` tiles the supplies can pay
@@ -503,8 +546,12 @@ has no audio imports.
 - Add an isle kind: add it to `IsleKind` and `KINDS` in `kinds.ts` (its name and Set sail caption in
   the `i18n/` files) and to `ORDER` there; the atlas icon is baked from `KINDS` on its own.
 - Add an upgrade: add it to `UpgradeId` and `UPGRADES`, draw `icon-<id>` in `UPGRADE_ICONS` in
-  `icons.ts`, apply it where it acts (`state.ts` helpers or `sim.ts`). Four rows fill the harbor's
-  left column; a fifth needs `SHOP`, `BOARD` and `OVERLAY` in `layout.ts` adjusted.
+  `icons.ts`, apply it where it acts (`state.ts` helpers or `sim.ts`). Five rows (40 px apart) fill
+  the harbor's left column; a sixth needs `SHOP`, `BOARD` and `OVERLAY` in `layout.ts` adjusted.
+- Change a village trade: `Trade` and `TRADES` in `state.ts`, its effect in `setSail`, its name in
+  `TRADE_NAMES` and its text in `showTrade` (`GameScene.ts`), its icon (`tradeIcon`, `MARKS`).
+- Change winter: `WINTER_FROM` and `isWinter` in `state.ts` (a change moves winter onto other isles
+  of existing saves, the daily and far isles too), its rules in `costOf`, `sightOf` and `snowHides`.
 - Add a hand: add it to `Hand` and `HANDS` in `hands.ts` (name and card text of about 26 characters
   in the `i18n/` files), draw
   `hand-<id>` in `HAND_ICONS` in `icons.ts`, apply it in `sim.ts` (`costOf`, `sightOf`,
