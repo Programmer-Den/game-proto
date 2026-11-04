@@ -1,5 +1,5 @@
 import type { TextKey } from '../i18n';
-import type { Cargo, Tile, Valley } from './map';
+import type { Cargo, Tile, Valley, ValleyKind } from './map';
 
 // Tuning numbers and the shape of a game. The rules that move it on are in sim.ts.
 
@@ -83,6 +83,44 @@ export const SILVER_MS = 240_000;
 export const EARLY_RISER_ROUNDS = 2;
 /** The coins the bronze medal's Head start boon adds to the start. */
 export const HEAD_START_COINS = 25;
+/** A chain of valleys (WR15): what a valley's local goods pay, times the usual. */
+export const LOCAL_PAY = 1.3;
+/** How much more a wyrm eats per tile in the snowy valley's cold. */
+export const COLD_HUNGER = 1.4;
+/** How often a canyon's rockfalls come, times the usual. */
+export const CANYON_HAZARDS = 0.6;
+/** The kind of each valley after the first, in turn: snowy, marsh, canyon, then round again. */
+export const CHAIN_KINDS: ValleyKind[] = ['snow', 'marsh', 'canyon'];
+/** The valley kind of the `leg`th valley of a chain (1 is the meadow). */
+export const kindOfLeg = (leg: number): ValleyKind => (leg <= 1 ? 'meadow' : CHAIN_KINDS[(leg - 2) % CHAIN_KINDS.length]);
+/** Each valley kind's name, its banner line on arriving and its hazard, as keys of `i18n/en.ts`. */
+export const KIND_TEXT: Record<ValleyKind, { name: TextKey; intro: TextKey }> = {
+  meadow: { name: 'meadowName', intro: 'meadowIntro' },
+  snow: { name: 'snowName', intro: 'snowIntro' },
+  marsh: { name: 'marshName', intro: 'marshIntro' },
+  canyon: { name: 'canyonName', intro: 'canyonIntro' },
+};
+
+/** Moults (WR16): the rounds the wyrm moults at the start of, offering this many of the traits it lacks. */
+export const MOULT_ROUNDS = [4, 7];
+export const MOULT_OFFER = 3;
+/** The lasting traits a moult can give the wyrms, for the rest of the game and the valleys after it. */
+export const TRAITS = ['swift', 'wagon', 'frugal', 'nimble', 'charming'] as const;
+export type Trait = (typeof TRAITS)[number];
+/** Each trait's name and card text, as keys of `i18n/en.ts`. */
+export const TRAIT_TEXT: Record<Trait, { name: TextKey; text: TextKey }> = {
+  swift: { name: 'traitSwift', text: 'traitSwiftText' },
+  wagon: { name: 'traitWagon', text: 'traitWagonText' },
+  frugal: { name: 'traitFrugal', text: 'traitFrugalText' },
+  nimble: { name: 'traitNimble', text: 'traitNimbleText' },
+  charming: { name: 'traitCharming', text: 'traitCharmingText' },
+};
+/** Swift's added speed in tiles a second, Frugal's appetite, Nimble's load and switch time and Charming's patience, times the usual. */
+export const TRAIT_SPEED = 0.5;
+export const FRUGAL_HUNGER = 0.6;
+export const NIMBLE_TIME = 0.5;
+export const CHARMING_GAP = 1.5;
+
 /** How long a banner and a floating number stay on screen. */
 export const BANNER_MS = 2_800;
 export const POP_MS = 1_200;
@@ -120,9 +158,19 @@ export const CHARTERS: Charter[] = [
 ];
 
 /** A washout (a bridge) or a rockfall (track under a mountain) about to take a tile's track. */
+/** The kinds of hazard: a meadow's washouts and rockfalls, a snowy valley's avalanches and a marsh's sinkholes. */
+export type HazardKind = 'washout' | 'rockfall' | 'avalanche' | 'sinkhole';
+/** Each hazard's warning banner, its pop when it strikes and its hint, as keys of `i18n/en.ts`. */
+export const HAZARD_TEXT: Record<HazardKind, { warning: TextKey; pop: TextKey; hint: TextKey }> = {
+  washout: { warning: 'washoutWarning', pop: 'washedOut', hint: 'hintWashout' },
+  rockfall: { warning: 'rockfallWarning', pop: 'rockfall', hint: 'hintRockfall' },
+  avalanche: { warning: 'avalancheWarning', pop: 'avalanche', hint: 'hintAvalanche' },
+  sinkhole: { warning: 'sinkholeWarning', pop: 'sinkhole', hint: 'hintSinkhole' },
+};
+
 export interface Hazard {
   tile: Tile;
-  kind: 'washout' | 'rockfall';
+  kind: HazardKind;
   /** Time left before it hits. */
   ms: number;
 }
@@ -232,6 +280,16 @@ export interface GameState {
   charterOffer: Charter[] | null;
   /** The villages with a depot, by index. */
   depots: number[];
+  /** Which valley of the chain this is (1 is the first, the meadow) (WR15). */
+  leg: number;
+  /** The upgrade kept from the last valley, if any, at the level it had there. */
+  kept: { upgrade: Upgrade; level: number } | null;
+  /** The wyrms' lasting traits from their moults (WR16), kept through the chain. */
+  traits: Trait[];
+  /** The traits a moult offers while the player has yet to pick (the game waits). */
+  moultOffer: Trait[] | null;
+  /** Today's daily valley (WR17): the same seeded valley for everyone, with no boons and no chain. */
+  daily: boolean;
   /** The best medal on this difficulty when the game began: its boons and the ones below it apply. */
   boon: Medal | null;
   /** Game time spent in the festival so far, and the medal it earned once won. */

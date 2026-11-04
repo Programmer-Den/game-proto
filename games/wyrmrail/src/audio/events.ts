@@ -21,7 +21,8 @@ const snapshot = (s: GameState): Snapshot => ({
   round: s.round,
   hearts: s.hearts,
   totalDelivered: s.totalDelivered,
-  charterOffer: !!s.charterOffer,
+  // A moult's cards wait like the charter's.
+  charterOffer: !!(s.charterOffer || s.moultOffer),
   hazard: s.hazard,
   moods: [...s.moods],
   orders: new Map(s.orders.map((o) => [o.id, o.status])),
@@ -30,7 +31,7 @@ const snapshot = (s: GameState): Snapshot => ({
 
 /** The part of the song the game calls for now. */
 function partFor(s: GameState) {
-  if (s.charterOffer) return 'charter';
+  if (s.charterOffer || s.moultOffer) return 'charter';
   if (s.round === FESTIVAL_ROUND) return 'festival';
   if (s.hazard || s.orders.some((o) => o.timeLeftMs < o.totalMs * 0.25)) return 'busy';
   return s.charter ? 'travel' : 'calm';
@@ -81,7 +82,7 @@ export class GameSounds {
 
     if (now.hazard && !was.hazard) sfx('warn');
     // A hazard that blew over (a wyrm stranded on its tile) took no track: no splash or rumble.
-    if (!now.hazard && was.hazard && !s.track.includes(key(was.hazard.tile))) sfx(was.hazard.kind === 'washout' ? 'splash' : 'rumble');
+    if (!now.hazard && was.hazard && !s.track.includes(key(was.hazard.tile))) sfx(was.hazard.kind === 'washout' || was.hazard.kind === 'sinkhole' ? 'splash' : 'rumble');
     // The gifts: a courier's visit ended, and not because a hazard dropped it.
     else if (now.wyrms.some((w, i) => was.wyrms[i]?.visiting && !w.visiting)) sfx('gifts');
 

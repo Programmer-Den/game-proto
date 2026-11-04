@@ -15,6 +15,9 @@ const en: HowToPlay = {
     { input: 'Upgrade buttons', action: 'Buy Swift wings, Golden hoard or a Second wyrm' },
     { input: 'Depot, then a village', action: 'Build a depot there: its goods wait at half speed and load at once' },
     { input: 'A charter card', action: 'Pick the rules for the round (from round 3)' },
+    { input: 'A trait card', action: 'Pick a lasting trait when the wyrm moults (rounds 4 and 7)' },
+    { input: 'Keep, after a won festival', action: 'Fly on to the next valley with that upgrade' },
+    { input: 'Daily valley', action: "Play today's valley, the same for everyone (one try a day)" },
   ],
   loop: [
     'Lay track from the Roost to Millbrook and Ashford.',
@@ -32,6 +35,8 @@ const en: HowToPlay = {
     'From round 3, washouts and rockfalls can take a bridge or mountainside track; tunnels are safe.',
     'Round 9 is the festival at Kettlecross: ten deliveries win the game.',
     'The festival earns a medal for its time and hearts left; your best medal gives the next game a boon.',
+    'After a won festival, fly on to a snowy valley, a marsh or a canyon, each with its own hazards and goods.',
+    'The wyrm keeps its moulted traits in every valley it flies on to.',
   ],
 };
 
@@ -49,6 +54,9 @@ const de: HowToPlay = {
     { input: 'Ausbau-Tasten', action: 'Flinke Flügel, Goldhort oder einen zweiten Lindwurm kaufen' },
     { input: 'Depot, dann ein Dorf', action: 'Dort ein Depot bauen: Waren warten halb so schnell und laden sofort' },
     { input: 'Eine Freibriefkarte', action: 'Die Regeln der Runde wählen (ab Runde 3)' },
+    { input: 'Eine Gabenkarte', action: 'Eine bleibende Gabe wählen, wenn sich der Lindwurm häutet (Runden 4 und 7)' },
+    { input: 'Behalten, nach einem gewonnenen Fest', action: 'Mit diesem Ausbau ins nächste Tal fliegen' },
+    { input: 'Tagestal', action: 'Das Tal des Tages spielen, für alle gleich (ein Versuch am Tag)' },
   ],
   loop: [
     'Lege Gleise vom Horst nach Millbrook und Ashford.',
@@ -66,6 +74,8 @@ const de: HowToPlay = {
     'Ab Runde 3 können Fluten und Steinschläge Gleise auf Brücken und an Berghängen zerstören; Tunnel sind sicher.',
     'Runde 9 ist das Fest in Kettlecross: zehn Lieferungen gewinnen das Spiel.',
     'Das Fest bringt eine Medaille für Zeit und übrige Herzen; deine beste Medaille gibt dem nächsten Spiel einen Bonus.',
+    'Nach einem gewonnenen Fest geht es weiter in ein Schneetal, ein Moor oder eine Schlucht, jedes mit eigenen Gefahren und Waren.',
+    'Der Lindwurm behält seine Gaben aus jeder Häutung in jedem Tal, in das er weiterfliegt.',
   ],
 };
 

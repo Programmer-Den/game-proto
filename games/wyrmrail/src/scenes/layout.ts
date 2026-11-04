@@ -67,11 +67,15 @@ export const BUTTONS = { wings: 377, hoard: 411, second: 445, depot: 479, remove
 export const CHARTER_CARD = { y: 250, w: 300, h: 110, gap: 20 };
 /** The hint line, up from the view's bottom edge. */
 export const HINT_BOTTOM = 22;
-/** The button on the game over panel, in the designed board (centred in a bigger one). */
-export const PANEL_BUTTON = { x: 384, y: 330 };
+/** The end panel's buttons, in the designed view (centred in a bigger board): the last row's centre line, each button's size, the room between two and between rows. */
+export const END_BUTTON = { y: 330, w: 200, h: 44, gap: 12, step: 54 };
+/** A moult's trait cards on the board, side by side, by their centres (WR16). */
+export const MOULT_CARD = { y: 250, w: 220, h: 120, gap: 16 };
+/** The daily valley's link in the board's top left corner (WR17). */
+export const DAILY_LINK = { x: 14, y: 10 };
 
-/** How far behind the head each of the wyrm's parts rides along the track, in pixels: three coils, then two wagons. */
-export const SEGMENT_GAPS = [0, 17, 31, 44, 68, 96];
+/** How far behind the head each of the wyrm's parts rides along the track, in pixels: three coils, then two wagons and the third a moult can give it. */
+export const SEGMENT_GAPS = [0, 17, 31, 44, 68, 96, 124];
 
 export const UI_DEPTH = 10_000;
 export const FONT = 'monospace';
