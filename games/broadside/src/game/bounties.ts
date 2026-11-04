@@ -1,6 +1,7 @@
 // The Admiralty's bounties: from wave 2, one optional side goal per wave that pays a share of the
 // wave's loot on top when it is met.
 
+import { random } from './random';
 import type { Vars } from '../../../../shared/i18n';
 import type { TextKey } from '../i18n';
 import { isConvoyWave } from './convoy';
@@ -51,11 +52,11 @@ export const BOUNTY_IDS = Object.keys(BOUNTIES) as BountyId[];
 /** The first wave the Admiralty posts a bounty for. */
 export const FIRST_BOUNTY_WAVE = 2;
 
-/** A bounty for `wave`, never the same as the last. Uses Math.random once. */
+/** A bounty for `wave`, never the same as the last. Uses random() once. */
 export function drawBounty(wave: number, last: BountyId | null): BountyId | null {
   if (wave < FIRST_BOUNTY_WAVE) return null;
   const choices = BOUNTY_IDS.filter((id) => id !== last && (BOUNTIES[id].offered?.(wave) ?? true));
-  return choices[Math.floor(Math.random() * choices.length)];
+  return choices[Math.floor(random() * choices.length)];
 }
 
 /** Whether the wave's bounty stands as things are: a `keep` bounty not yet lost, or a `do` bounty done. */

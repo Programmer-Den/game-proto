@@ -1,16 +1,20 @@
 import Phaser from 'phaser';
 import { settings } from '../../../../shared/settings';
+import { dailyRand, finishDaily, loadDaily, startDaily, type DailyRecord } from '../../../../shared/daily';
 import { ui } from '../../../../shared/audio';
 import { HI, lookOf, SEA_RES, SHEET_RES } from '../art/art';
 import { renderScale } from '../../../../shared/scaling';
 import { BOON_IDS, BOONS, costOfBoons, type BoonId } from '../game/admiralty';
 import { BOUNTIES, bountyMet, bountyPay } from '../game/bounties';
+import { CAPTAIN_IDS, captainBounty, CAPTAINS, logFull } from '../game/captains';
 import { CONVOY_ARRIVE } from '../game/convoy';
 import { COURSES, type CourseId } from '../game/courses';
 import { FIRST_HULL, HULL_IDS, HULLS, unlocked, type HullId } from '../game/hulls';
 import { ORDERS } from '../game/orders';
-import type { PerkId } from '../game/perks';
-import { loadBestWave, loadHull, loadMedals, saveBestWave, saveHull, saveMedals } from '../game/save';
+import { PERKS, type PerkId } from '../game/perks';
+import { useRandom } from '../game/random';
+import { loadBestWave, loadHull, loadLog, loadMedals, loadReachesBest, saveBestWave, saveHull, saveLog, saveMedals, saveReachesBest } from '../game/save';
+import { DAILY_GAME, drawVoyage, voyageScore, wavesBeaten } from '../game/voyage';
 import { ENEMIES } from '../game/ships';
 import { SHOTS } from '../game/shot';
 import type { UpgradeId } from '../game/upgrades';
@@ -34,7 +38,7 @@ import {
 } from '../game/state';
 import { t } from '../i18n';
 import { makeButton } from '../ui/Button';
-import { HAVEN_WAVE } from '../game/waves';
+import { HAVEN_WAVE, inReaches, REACHES_WAVES, reachWave, TEMPEST_WAVE } from '../game/waves';
 import { Harbor, type HarborAction } from '../ui/Harbor';
 import { fitWidth, pinToScreen } from '../ui/screen';
 import { checkTrophies } from '../trophies/check';
@@ -48,6 +52,8 @@ const WAKE_EVERY_MS = 90;
 const WAKE_MS = 1400;
 const HP_BAR_W = 40;
 const SIDES: Side[] = ['port', 'starboard'];
+/** The width of each button along the foot of the end card: the daily voyage, Sail again and Sail on. */
+const OVER_BUTTON_W = 180;
 
 const INK = 0x2b2118;
 const CREAM = 0xf6ecd2;
@@ -79,6 +85,19 @@ export class GameScene extends Phaser.Scene {
   private loot = new Map<number, { barrel: Phaser.GameObjects.Image; label: Phaser.GameObjects.Text }>();
   private sinking = new Map<number, Phaser.GameObjects.Image>();
   private floaters = new Map<number, Phaser.GameObjects.Text>();
+  /** The name over each named captain's ship. */
+  private captainLabels = new Map<number, Phaser.GameObjects.Text>();
+  /** The Storm Reaches' reefs, drawn on the sea, and a squall's rain, drawn over the screen. */
+  private reefLines!: Phaser.GameObjects.Graphics;
+  private rain!: Phaser.GameObjects.Graphics;
+  /** How much of the captain's log is saved, so a captain sunk is saved once. */
+  private savedLog = 0;
+  /** Today's daily voyage on this device: whether it was sailed and its score. */
+  private daily!: DailyRecord;
+  /** The end card's daily voyage button, made the first time the card shows (see `createDailyButton`). */
+  private dailyButton: Phaser.GameObjects.Container | null = null;
+  private dailyText!: Phaser.GameObjects.Text;
+  private sailOnText!: Phaser.GameObjects.Text;
   private wakes: { x: number; y: number; heading: number; ms: number; size: number }[] = [];
   /** Four copies of the sea in a square, moved so they always cover the screen. */
   private sea: Phaser.GameObjects.Image[] = [];
@@ -156,22 +175,31 @@ export class GameScene extends Phaser.Scene {
     super('Game');
   }
 
-  create(data?: { boons?: BoonId[]; hull?: HullId }) {
-    for (const map of [this.ships, this.forts, this.balls, this.sinking, this.floaters]) map.clear();
+  create(data?: { boons?: BoonId[]; hull?: HullId; daily?: boolean }) {
+    for (const map of [this.ships, this.forts, this.balls, this.sinking, this.floaters, this.captainLabels]) map.clear();
     this.loot.clear();
     this.wakes = [];
     this.held.clear();
     this.tapped = { port: false, starboard: false };
     this.controlHits = [];
     this.lastFrame = null;
+    this.dailyButton = null;
     this.commission = [];
     this.boonRows = [];
     this.shipRows = [];
     // A fresh page sails the ship chosen last, if the best wave still unlocks it.
     const best = loadBestWave();
-    const hull = data?.hull ?? (unlocked(loadHull(), best) ? loadHull() : FIRST_HULL);
-    this.nextHull = hull;
-    this.state = newRun(best, data?.boons ?? [], hull);
+    const own = data?.hull ?? (unlocked(loadHull(), best) ? loadHull() : FIRST_HULL);
+    this.nextHull = own;
+    // The daily voyage draws its ship, its perks and then the whole run from the day's seeded sea;
+    // any other run draws from Math.random.
+    const rand = data?.daily ? dailyRand(DAILY_GAME) : undefined;
+    const voyage = rand ? drawVoyage(rand) : null;
+    useRandom(rand);
+    this.daily = loadDaily(DAILY_GAME);
+    const extras = { log: loadLog(), reachesBest: loadReachesBest(), daily: voyage ? { perks: voyage.perks } : undefined };
+    this.state = newRun(best, voyage ? [] : (data?.boons ?? []), voyage?.hull ?? own, extras);
+    this.savedLog = this.state.log.length;
     this.view = { x: this.state.player.x, y: this.state.player.y };
     this.lastPlayer = { ...this.view };
     this.cues = new SoundCues(this.state);
@@ -181,6 +209,7 @@ export class GameScene extends Phaser.Scene {
     // Images rather than a tile sprite, so the sea is painted as finely as the screen needs.
     this.sea = [0, 1, 2, 3].map(() => this.add.image(0, 0, 'sea').setOrigin(0).setScale(1 / SEA_RES));
     this.arcs = this.add.graphics().setDepth(2);
+    this.reefLines = this.add.graphics().setDepth(2.2);
     this.course = this.add.graphics().setDepth(2.5);
     this.wakeLines = this.add.graphics().setDepth(3);
     this.fx = this.add.graphics().setDepth(5);
@@ -190,6 +219,7 @@ export class GameScene extends Phaser.Scene {
     this.boardLabel = this.add.text(0, 0, '', textStyle(13, '#6a4410', 'bold italic', '#f6ecd2', 4)).setOrigin(0.5).setDepth(8);
     this.convoyLabel = this.add.text(0, 0, '', textStyle(12, '#2f5a3a', 'bold italic', '#f6ecd2', 4)).setOrigin(0.5).setDepth(8);
     this.bars = this.add.graphics().setDepth(UI_DEPTH - 40);
+    this.rain = this.add.graphics().setScrollFactor(0).setDepth(UI_DEPTH - 35);
     this.add.image(0, 0, 'frame').setOrigin(0).setScale(1 / SHEET_RES).setScrollFactor(0).setDepth(UI_DEPTH - 30);
 
     this.createHud();
@@ -222,23 +252,35 @@ export class GameScene extends Phaser.Scene {
     tick(s, dt);
     checkTrophies(s);
     this.cues.after(s, dt);
-    if (s.phase !== phase && (s.phase === 'harbor' || s.phase === 'over' || s.phase === 'won')) saveBestWave(s.bestWave);
+    // A captain sunk goes into the lasting log at once, even on the daily voyage.
+    if (s.log.length > this.savedLog) {
+      saveLog(s.log);
+      this.savedLog = s.log.length;
+    }
+    // The daily voyage keeps no best wave and earns no medals: it keeps its score instead.
+    if (s.phase !== phase && (s.phase === 'harbor' || s.phase === 'over' || s.phase === 'won') && !s.daily) {
+      saveBestWave(s.bestWave);
+      if (s.reachesBest > loadReachesBest()) saveReachesBest(s.reachesBest);
+    }
     if (s.phase !== phase && (s.phase === 'over' || s.phase === 'won')) {
-      this.medalBank = loadMedals() + s.medals;
+      this.medalBank = loadMedals() + (s.daily ? 0 : s.medals);
       saveMedals(this.medalBank);
       this.commission = [];
+      if (s.daily) this.daily = finishDaily(DAILY_GAME, voyageScore(s));
     }
     this.clock += dt;
 
     this.followPlayer();
     this.placeSea();
     this.drawWakes(dt);
+    this.drawReefs();
     this.drawCourses();
     this.drawShips();
     this.drawBalls();
     this.drawLoot();
     this.drawEffects();
     this.drawArcs();
+    this.drawRain();
     this.drawHud();
     this.drawControls();
     this.drawScuttle();
@@ -335,6 +377,7 @@ export class GameScene extends Phaser.Scene {
     }
     this.drawBoarding();
     this.drawConvoy();
+    this.drawCaptains();
     for (const [id, sprite] of this.ships) {
       if (seen.has(id)) continue;
       sprite.destroy();
@@ -377,7 +420,7 @@ export class GameScene extends Phaser.Scene {
   /** An enemy's hull, as a little scale bar over it once it has been hit. */
   private drawHpBar(ship: Ship, escort: boolean) {
     // A prize's bar is always shown, in green; the flagships' too (the admiral's included), so they read as the big ones.
-    if (ship.hp >= ship.maxHp && !escort && ship.kind !== 'flagship' && ship.kind !== 'admiral') return;
+    if (ship.hp >= ship.maxHp && !escort && ship.kind !== 'flagship' && ship.kind !== 'admiral' && ship.kind !== 'tempest' && !ship.captain) return;
     const at = this.place(ship);
     const x = Math.round(at.x - HP_BAR_W / 2);
     const y = Math.round(at.y - lookOf(ship, this.state.hull).length / 2 - 14);
@@ -438,7 +481,7 @@ export class GameScene extends Phaser.Scene {
     let nearest: Ship | null = null;
     let best = Infinity;
     for (const e of s.enemies) {
-      if (!boardable(e)) continue;
+      if (!boardable(e, s.renown)) continue;
       const at = this.place(e);
       const r = radiusOf(e) + 16;
       g.lineStyle(2, OCHRE, 0.95);
@@ -457,6 +500,80 @@ export class GameScene extends Phaser.Scene {
     const at = this.place(nearest);
     const label = t(nearest.boardMs > 0 ? 'boarding' : canBoard(s, nearest) ? 'crippled' : 'crippledFewCrew');
     this.boardLabel.setText(label).setPosition(at.x, at.y - radiusOf(nearest) - 36).setVisible(true);
+  }
+
+  /** The name over each named captain's ship: wanted with her bounty once she has got away, and running when she flees. */
+  private drawCaptains() {
+    const s = this.state;
+    const seen = new Set<number>();
+    for (const e of s.enemies) {
+      if (!e.captain) continue;
+      seen.add(e.id);
+      let label = this.captainLabels.get(e.id);
+      if (!label) {
+        label = this.add.text(0, 0, '', textStyle(13, '#7a2a1a', 'bold italic', '#f6ecd2', 4)).setOrigin(0.5).setDepth(8);
+        this.captainLabels.set(e.id, label);
+      }
+      const name = t(CAPTAINS[e.captain].name);
+      const gold = captainBounty(s.captains[e.captain].escapes);
+      const text = e.escapeMs > 0 ? t('captainFlees', { name }) : gold ? t('captainWanted', { name, gold }) : name;
+      const at = this.place(e);
+      // Under the hull, clear of the hull bar and the boarding label over it.
+      label.setText(text).setPosition(at.x, at.y + lookOf(e, s.hull).length / 2 + 14);
+    }
+    for (const [id, label] of this.captainLabels) {
+      if (seen.has(id)) continue;
+      label.destroy();
+      this.captainLabels.delete(id);
+    }
+  }
+
+  /** The Storm Reaches' reefs: dark rocks awash, ringed with breakers (which roll in and out, held still with reduce motion). */
+  private drawReefs() {
+    const s = this.state;
+    const g = this.reefLines;
+    g.clear();
+    if (s.phase !== 'fighting' && s.phase !== 'break') return;
+    for (const reef of s.reefs) {
+      const at = this.place(reef);
+      const swell = settings.reduceMotion ? 0.5 : (Math.sin(this.clock / 500 + reef.id) + 1) / 2;
+      g.fillStyle(0xf6ecd2, 0.55).fillCircle(at.x, at.y, reef.r + 10 + swell * 4);
+      g.lineStyle(1, INK, 0.55);
+      for (let k = 0; k < 20; k++) {
+        const a = (k / 20) * Math.PI * 2;
+        const r = reef.r + 8 + swell * 4;
+        g.beginPath().arc(at.x, at.y, r, a, a + 0.16).strokePath();
+      }
+      // A cluster of rocks, the same for each reef every frame.
+      const rocks: [number, number, number][] = [[0, 0, 0.55], [0.45, 0.25, 0.38], [-0.4, 0.3, 0.34], [0.1, -0.45, 0.36], [-0.35, -0.3, 0.28]];
+      for (const [dx, dy, r] of rocks) {
+        g.fillStyle(0x4a3c30, 1).fillCircle(at.x + dx * reef.r, at.y + dy * reef.r, r * reef.r);
+        g.lineStyle(1, INK, 1).strokeCircle(at.x + dx * reef.r, at.y + dy * reef.r, r * reef.r);
+      }
+      // The chart's cross-hatched danger mark round the rocks.
+      g.lineStyle(1.2, RUST, 0.85).strokeCircle(at.x, at.y, reef.r + 2);
+    }
+  }
+
+  /** A squall's rain: grey streaks slanting with the new wind across the screen, faded out in its last second (and held still with reduce motion). */
+  private drawRain() {
+    const s = this.state;
+    const g = this.rain;
+    g.clear();
+    const sailing = s.phase === 'fighting' || s.phase === 'break';
+    if (!sailing || s.squallBlowMs <= 0) return;
+    const fade = Math.min(1, s.squallBlowMs / 1000);
+    g.fillStyle(0x5a6a70, 0.12 * fade).fillRect(0, 0, VIEW.w, VIEW.h);
+    const dx = Math.cos(s.wind) * 10 + 4;
+    const dy = Math.sin(s.wind) * 10 + 14;
+    const fall = settings.reduceMotion ? 0 : this.clock / 2;
+    g.lineStyle(1, 0x3a4a52, 0.45 * fade);
+    for (let k = 0; k < 90; k++) {
+      // Spread with a fixed scatter, never Math.random, and swept along with the clock.
+      const x = (((k * 137.5 + fall * (dx / 14)) % VIEW.w) + VIEW.w) % VIEW.w;
+      const y = (((k * 71.3 + fall) % VIEW.h) + VIEW.h) % VIEW.h;
+      g.lineBetween(x, y, x + dx, y + dy);
+    }
   }
 
   /**
@@ -883,7 +1000,7 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     const g = this.hud;
     g.clear();
-    this.waveText.setText(t('wave', { wave: s.wave }));
+    this.waveText.setText(inReaches(s.wave) ? t('reachHud', { wave: reachWave(s.wave) }) : t('wave', { wave: s.wave }));
 
     // The hull as a scale bar, and under it how loaded each broadside is.
     const hx = 168;
@@ -908,14 +1025,29 @@ export class GameScene extends Phaser.Scene {
     this.goldText.setText(t('gold', { gold: s.gold }));
     const short = s.player.crew < s.player.maxCrew;
     this.crewText.setText(t('crew', { crew: s.player.crew, max: s.player.maxCrew })).setColor(short ? '#9a4a30' : '#2b2118');
-    this.infoText.setText(t('info', { left: s.toSpawn.length + s.enemies.length, sunk: s.sunk, best: s.bestWave }));
+    const left = s.toSpawn.length + s.enemies.length;
+    this.infoText.setText(s.daily ? t('infoDaily', { left, sunk: s.sunk, score: voyageScore(s) }) : t('info', { left, sunk: s.sunk, best: s.bestWave }));
 
     const breaking = s.phase === 'break';
     const fade = breaking ? Math.min(1, s.breakMs / 500) : 0;
-    this.bannerTitle.setVisible(breaking).setText(s.wave === HAVEN_WAVE ? t('havenTitle') : s.course ? t('waveCourse', { wave: s.wave, course: t(COURSES[s.course].name) }) : t('wave', { wave: s.wave })).setAlpha(fade);
+    const reaches = inReaches(s.wave);
+    const course = s.course ? t(COURSES[s.course].name) : '';
+    const title =
+      s.wave === HAVEN_WAVE ? t('havenTitle')
+      : s.wave === TEMPEST_WAVE ? t('tempestTitle')
+      : reaches ? (course ? t('reachesCourse', { wave: reachWave(s.wave), course }) : t('reachesTitle', { wave: reachWave(s.wave) }))
+      : course ? t('waveCourse', { wave: s.wave, course })
+      : t('wave', { wave: s.wave });
+    this.bannerTitle.setVisible(breaking).setText(title).setAlpha(fade);
     const flagship = s.toSpawn.includes('flagship') || s.enemies.some((e) => e.kind === 'flagship');
+    const named = s.named[0];
+    const escapes = named ? s.captains[named].escapes : 0;
     const sub =
       s.wave === HAVEN_WAVE ? t('havenSub')
+      : s.wave === TEMPEST_WAVE ? t('tempestSub')
+      : s.daily && s.wave === 1 ? t('dailySub', { ship: t(HULLS[s.hull].name), perks: s.perks.map((id) => t(PERKS[id].name)).join(', ') })
+      : reaches && reachWave(s.wave) === 1 ? t('reachesSub')
+      : named ? (escapes ? t('captainBackSub', { name: t(CAPTAINS[named].name), gold: captainBounty(escapes) }) : t('captainSub', { name: t(CAPTAINS[named].name) }))
       : s.convoy ? t('convoySub', { island: t(ISLANDS[s.convoy.island].name), gold: s.convoy.cargo })
       : s.forts.length ? t('fortsSub', { n: s.forts.length, gold: fortBounty(s.wave) })
       : t(flagship ? 'flagshipSub' : 'sailsSub');
@@ -956,11 +1088,26 @@ export class GameScene extends Phaser.Scene {
   private drawWind(sailing: boolean) {
     const s = this.state;
     this.windRose.setVisible(sailing);
-    this.windText.setVisible(sailing).setText(t('windFrom', { point: t(windFrom(s.wind)) }));
+    // A squall seen coming names the wind it brings; one blowing says so.
+    const wind =
+      s.squallTo !== null ? t('squallComing', { point: t(windFrom(s.squallTo)) })
+      : s.squallBlowMs > 0 ? t('squallBlowing', { point: t(windFrom(s.wind)) })
+      : t('windFrom', { point: t(windFrom(s.wind)) });
+    this.windText.setVisible(sailing).setText(wind).setColor(s.squallTo !== null || s.squallBlowMs > 0 ? '#2f4a58' : '#2b2118');
+    // A squall's longer line is kept inside the right edge.
+    this.windText.setX(Math.min(WIND.x, VIEW.w - 14 - this.windText.width / 2));
     if (!sailing) return;
     const g = this.hud;
     const { x, y } = WIND;
     const r = WIND.r - 9;
+    if (s.squallTo !== null) {
+      // The squall's wind, dotted, where the arrow will swing to.
+      const sx = Math.cos(s.squallTo);
+      const sy = Math.sin(s.squallTo);
+      g.fillStyle(0x2f4a58, 1);
+      for (let d = -r; d <= r; d += 5) g.fillCircle(x + sx * d, y + sy * d, 1.4);
+      g.fillCircle(x + sx * r, y + sy * r, 3.2);
+    }
     const cx = Math.cos(s.wind);
     const cy = Math.sin(s.wind);
     const tip = { x: x + cx * r, y: y + cy * r };
@@ -1169,14 +1316,16 @@ export class GameScene extends Phaser.Scene {
       saveMedals(this.medalBank - costOfBoons(this.commission));
       saveHull(this.nextHull);
       this.scene.restart({ boons: this.commission, hull: this.nextHull });
-    });
+    }, OVER_BUTTON_W);
     this.againButton = again.button;
-    // After razing the haven, the run can go on through the waves beyond instead.
-    const on = makeButton(this, OVER.x - 110, top + OVER.h - 32, t('sailOn'), () => {
+    // After razing the haven, the run can go on into the Storm Reaches instead (and after the
+    // Tempest, through the waves beyond).
+    const on = makeButton(this, OVER.x + OVER_BUTTON_W + 16, top + OVER.h - 32, t('sailReaches'), () => {
       ui('click');
       sailOn(this.state);
-    });
+    }, OVER_BUTTON_W);
     this.sailOnButton = on.button;
+    this.sailOnText = on.text;
     parts.push(again.button, on.button);
     this.gameOver = pinToScreen(this.add.container(0, 0, parts))
       .setDepth(UI_DEPTH + 20)
@@ -1191,19 +1340,54 @@ export class GameScene extends Phaser.Scene {
     ui('click');
   }
 
+  /**
+   * Today's daily voyage, once a day: the medals and the ship chosen wait for the next run of your
+   * own. Made the first time the end card shows rather than in `create`, because every Phaser text
+   * draws on Math.random as it is made, and one more at the start would change the first wave the
+   * playthrough plays.
+   */
+  private createDailyButton() {
+    const daily = makeButton(this, OVER.x, OVER.y + OVER.h / 2 - 32, t('dailyButton'), () => {
+      if (this.daily.played) return ui('refuse');
+      ui('click');
+      saveMedals(this.medalBank);
+      this.daily = startDaily(DAILY_GAME);
+      this.scene.restart({ daily: true, hull: this.nextHull });
+    }, OVER_BUTTON_W);
+    this.dailyButton = daily.button;
+    this.dailyText = daily.text;
+    this.gameOver.add(daily.button);
+    pinToScreen(daily.button);
+  }
+
   private drawGameOver() {
     const s = this.state;
+    if (!this.dailyButton) this.createDailyButton();
     const won = s.phase === 'won';
-    this.gameOverTitle.setText(t(won ? 'wonTitle' : 'sunkTitle'));
-    this.gameOverText.setText(
-      won
-        ? t('wonText', { wave: s.wave, sunk: s.sunk, taken: s.taken, gold: s.plundered })
-        : t('sunkText', { wave: s.wave, sunk: s.sunk, taken: s.taken, gold: s.plundered, best: s.bestWave }),
-    );
-    this.sailOnButton.setVisible(won);
-    this.againButton.setX(won ? OVER.x + 110 : OVER.x);
+    const calmed = won && s.wave === TEMPEST_WAVE;
+    const run = { wave: s.wave, sunk: s.sunk, taken: s.taken, gold: s.plundered };
+    // The log's line, and the best Storm Reaches wave once one is beaten.
+    const log = logFull(s.log) ? t('logFull') : t('logLine', { n: CAPTAIN_IDS.filter((id) => s.log.includes(id)).length, total: CAPTAIN_IDS.length });
+    const best = Math.max(s.reachesBest, loadReachesBest());
+    const record = best ? t('recordReaches', { best: s.bestWave, reach: best, total: REACHES_WAVES, log }) : t('recordLine', { best: s.bestWave, log });
+    if (s.daily) {
+      const score = this.daily.score ?? voyageScore(s);
+      this.gameOverTitle.setText(t('dailyTitle'));
+      this.gameOverText.setText(`${t('dailyText', { score, waves: Math.max(0, wavesBeaten(s)), gold: s.plundered, best: this.daily.best, n: this.daily.streak })}\n${log}`);
+    } else {
+      this.gameOverTitle.setText(t(calmed ? 'calmTitle' : won ? 'wonTitle' : 'sunkTitle'));
+      this.gameOverText.setText(`${t(calmed ? 'calmText' : won ? 'wonText' : 'sunkText', run)}\n${record}`);
+    }
+    // The daily voyage ends at the haven: there is no sailing on.
+    const onward = won && !s.daily;
+    this.sailOnButton.setVisible(onward);
+    this.sailOnText.setText(t(s.wave >= TEMPEST_WAVE ? 'sailOn' : 'sailReaches'));
+    this.againButton.setX(onward ? OVER.x : OVER.x + (OVER_BUTTON_W + 16) / 2);
+    this.dailyButton!.setX(onward ? OVER.x - OVER_BUTTON_W - 16 : OVER.x - (OVER_BUTTON_W + 16) / 2);
+    this.dailyText.setText(this.daily.score !== null ? t('dailyDone', { score: this.daily.score }) : this.daily.played ? t('dailyUsed') : t('dailyButton'));
+    this.dailyButton!.setAlpha(this.daily.played ? 0.6 : 1);
     const left = this.medalBank - costOfBoons(this.commission);
-    this.medalText.setText(t('medals', { n: s.medals, left }));
+    this.medalText.setText(s.daily ? t('dailyMedals', { left }) : t('medals', { n: s.medals, left }));
     for (const row of this.shipRows) {
       const open = unlocked(row.id, s.bestWave);
       const chosen = this.nextHull === row.id;

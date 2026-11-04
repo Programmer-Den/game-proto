@@ -19,6 +19,8 @@ const de: Translation<typeof en> = {
   waveTenText: 'Überstehe Welle 10.',
   admiral: 'Geißel des Piratenhafens',
   admiralText: 'Versenke das Flaggschiff des Admirals und gewinne den Feldzug.',
+  tempest: 'Auge des Sturms',
+  tempestText: 'Versenke die Sturmbraut am Ende der Sturmsee.',
   hardAdmiral: 'Schrecken der Meere',
   hardAdmiralText: 'Gewinne den Feldzug auf Schwer.',
 };

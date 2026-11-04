@@ -16,6 +16,7 @@ const EARNED: Record<string, (state: GameState) => boolean> = {
   flagship: (s) => s.waveSunk.includes('flagship') || s.waveSunk.includes('admiral'),
   waveTen: (s) => s.phase === 'harbor' && s.wave >= OLD_SALT_WAVE,
   admiral: (s) => s.won,
+  tempest: (s) => s.waveSunk.includes('tempest'),
   hardAdmiral: (s) => s.won && settings.difficulty === 'hard',
 };
 

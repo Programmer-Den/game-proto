@@ -1,5 +1,6 @@
 // The captain's orders: one bonus for a whole wave, named on a card under the top bar.
 
+import { random } from './random';
 import type { TextKey } from '../i18n';
 import type { ShotKind } from './shot';
 
@@ -30,8 +31,8 @@ export const ORDERS: Record<OrderId, Order> = {
 
 export const ORDER_IDS = Object.keys(ORDERS) as OrderId[];
 
-/** A new order for the next wave, never the same as the last one. Uses Math.random once. */
+/** A new order for the next wave, never the same as the last one. Uses random() once. */
 export function drawOrder(last: OrderId): OrderId {
   const choices = ORDER_IDS.filter((id) => id !== last);
-  return choices[Math.floor(Math.random() * choices.length)];
+  return choices[Math.floor(random() * choices.length)];
 }

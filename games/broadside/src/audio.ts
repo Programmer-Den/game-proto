@@ -167,6 +167,8 @@ export const sfx = sounds({
   bell: { wave: 'sine', freq: 1320, arp: [0, 0, 0], arpStep: 0.2, length: 0.6, volume: 0.3, gap: 600 },
   /** A sail on the horizon: the bosun's pipe. */
   pipe: { wave: 'pulse12', freq: 1175, to: 1480, arp: [0, 5], arpStep: 0.12, length: 0.24, volume: 0.13, gap: 500 },
+  /** A squall in the Storm Reaches: the wind swings round with a rush of rain. */
+  squall: { wave: 'noise', freq: 1200, to: 260, length: 1.4, attack: 0.35, volume: 0.32, gap: 1500 },
   /** The helm put over: a creak of the tiller ropes. */
   creak: { wave: 'sawtooth', freq: 210, to: 160, length: 0.14, attack: 0.03, volume: 0.1, vary: 0.1, gap: 350 },
 });
