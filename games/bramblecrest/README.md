@@ -8,7 +8,8 @@ Elder Wren has a job for you: fetch your grandfather's old blade, cut the gate f
 what grows the thorns. Beyond the gate lie Bramble Woods, a misty fen across the river and a shrine
 sunk deep in the roots, with a new tool inside that opens more of the world. In the second chapter
 a bell starts tolling under the fen at midnight, and the hermit's bellseeds open the way down to
-it. Everything is drawn as a soft 3D miniature by moonlight: lamp glow, glowing mushrooms, fog and a
+it. In the third, a cold light burns on the Hollow Peaks north of the woods, and only an old
+lantern that shows hidden ways leads to it. Everything is drawn as a soft 3D miniature by moonlight: lamp glow, glowing mushrooms, fog and a
 tilt-shift haze.
 
 The kingdom keeps secrets. Moonstones are hidden on every map, and most of them are not lying in
@@ -67,6 +68,35 @@ chapter ends.
    blade when something knocks it over.
 5. Tell the elder the bell is quiet.
 
+### Chapter three: the Hollow Peaks
+
+1. Ask Elder Wren about the cold light on the peaks. The rockfall on the pass north of the woods
+   has cleared.
+2. Tam the goatherd lives up there. The old watchers' lookout east of his hut, sealed by a boulder,
+   still holds their lamp: the **Moonlantern**.
+3. A chasm cuts the peaks in two. Its bridge is there, but only the Moonlantern's light shows it,
+   and only a few steps around you: feel your way across, and mind the branches that lead
+   elsewhere.
+4. The Glass Caverns lie past it: cracked ice, another hidden bridge, a gap for the hookvine, and
+   shades that only show in your light.
+5. Face the **Gloamwing**. It circles high over its hall shedding frost, then marks your spot with
+   its shadow and dives. Right after a dive it hangs low: catch it with the hookvine, pull it down
+   and strike.
+6. Tell the elder the peaks are dark again.
+
+![The Moonlantern showing the hidden bridge over the chasm on the Hollow Peaks](docs/screenshots/peaks-bridge.webp)
+
+![The Gloamwing circling its hall in the Glass Caverns](docs/screenshots/gloamwing.webp)
+
+### Requests
+
+Once the first chapter is told, people start asking for small favours, and the journal keeps track
+of them. Bring them what they lost and each pays you back: Marla wants three fen lilies (a heart),
+Pip his toy boat that drifted across the river (a whetstone: your sword reaches farther), Elder
+Wren three glowcaps for the lamp oil (a deep purse: foes drop two coins), Old Sedge his spectacles,
+lost in the belfry (a moon charm: you stay safe longer after a hit) and Tam three goat bells
+scattered over the peaks (a heart). Their things only show once they have asked.
+
 ![A bellseed planted at the boulders by the old bell tower](docs/screenshots/bellseed.webp)
 
 ![The belfry's three bells](docs/screenshots/belfry.webp)
@@ -77,17 +107,26 @@ chapter ends.
 
 Once chapter two is told, the kingdom stays open, and there is more to do in it:
 
-- **Moonstone page.** **N**, or a tap on the moonstone counter, opens a page with each place's
-  moonstones, the found ones lit, so you know where to look again (but not where).
-- **Hourglass trials.** An hourglass now stands by the door of the shrine and of the belfry. Turn
-  it and every foe in that dungeon wakes again and its boss rises stronger: the Thornmother's bulbs
-  drop faster and her volleys come thicker, and the Bellwraith hunts faster and takes more hits. A
-  clock runs at the top until the boss falls, and the moonstone page keeps your best time. Leaving
-  the dungeon or falling ends the trial.
+- **Journal.** **N**, or a tap on the moonstone counter, opens the journal: each place's
+  moonstones, the found ones lit, so you know where to look again (but not where), the requests
+  you took and how far along they are, and your best trial times.
+- **Hourglass trials.** An hourglass now stands by the door of the shrine and of the belfry, and of
+  the caverns once the Gloamwing is beaten. Turn it and every foe in that dungeon wakes again and
+  its boss rises stronger: the Thornmother's bulbs drop faster and her volleys come thicker, the
+  Bellwraith hunts faster and takes more hits, and the Gloamwing dives sooner and takes more hits.
+  A clock runs at the top until the boss falls, and the journal keeps your best time. Leaving the
+  dungeon or falling ends the trial.
+- **New game+.** After chapter three, the end card (or Elder Wren, any time after) offers to begin
+  again from the first night. You keep your tools, upgrades, coins and the requests you finished;
+  every foe has half as many hearts again, moves faster and hits twice as hard, the bosses fight as
+  in a trial, and the moonstones are buried in new places. Look for their glimmer in your lantern's
+  light and swing to dig them up. Each new game+ moves them again.
 
 ![An hourglass trial in the Sunken Shrine, the clock running](docs/screenshots/trial.webp)
 
-![The moonstone page](docs/screenshots/moonstones.webp)
+![The journal: moonstones, requests and trial times](docs/screenshots/moonstones.webp)
+
+![A moved moonstone glimmering in new game+](docs/screenshots/new-game-plus.webp)
 
 ### Foes that need your tools
 
@@ -102,22 +141,23 @@ Most foes fall to the sword, but two don't:
 
 ### Trophies
 
-Ten trophies, listed on the start and pause screens: the blade and both bosses, the first upgrade
-and all four, a beetle flipped and beaten, an hourglass trial, both trials under par, every
-moonstone, and one more that stays hidden until you earn it.
+Ten trophies, listed on the start and pause screens: the blade and the first two bosses, the first
+upgrade and all four, a beetle flipped and beaten, an hourglass trial, the shrine and belfry trials
+under par, every moonstone, and one more that stays hidden until you earn it.
 
 ![Bramblecrest's trophies on the pause screen](docs/screenshots/trophies.webp)
 
 ### Hearts and falls
 
 You have three hearts on Normal (five on Easy, two on Hard). Foes, thorn seeds, bursts and the
-bosses cost half a heart a hit, and the Bellwraith's bell a whole heart if it lands on you. Cut bushes now and then drop a heart, and heart vessels add one for good.
+bosses cost half a heart a hit, and the Bellwraith's bell or the Gloamwing's dive a whole heart if
+it lands on you. Cut bushes now and then drop a heart, and heart vessels add one for good.
 Fall and you wake where you last came in, healed; nothing is lost.
 
 ### Secrets
 
-There are eight moonstones in chapter one, and five more turn up once chapter two starts. A few
-hints, and no more:
+There are eight moonstones in chapter one, five more turn up once chapter two starts and four more
+in chapter three. A few hints, and no more:
 
 - Listen to the people of Mossford, and to anyone you meet past the river.
 - Not every tree casts a shadow.
@@ -126,6 +166,7 @@ hints, and no more:
 - Be kind to animals. More than once.
 - A rock that sits where no rock should is worth a second look.
 - Builders hide what they don't want found, and ringers what they don't want drowned.
+- A bridge nobody can see may have more than one end.
 
 ![The Thornmother in the shrine's deepest hall](docs/screenshots/thornmother.webp)
 
@@ -149,14 +190,15 @@ the north gate, checking the quest, items, flags and save at each step. Run it w
 | `src/main.ts` | Creates the game and hands it to the hub's `setupGame` and `setupScaling` |
 | `src/howToPlay.ts` | The How to play shown on the start and pause screens |
 | `src/trophies/` | The ten trophies, their texts and when each is earned |
-| `src/game/maps.ts` | The five maps as tile grids, with their people, chests, signs, exits, foes, posts, doors, blocks, plates, rooms and moonstones |
-| `src/game/state.ts` | The save: where the knight is, hearts, items, keys, moonstones, flags, the quest, the trials' best times, coins and upgrades, and what each upgrade costs |
+| `src/game/maps.ts` | The seven maps as tile grids, with their people, chests, signs, exits, foes, posts, doors, blocks, plates, rooms, moonstones and the requests' things |
+| `src/game/state.ts` | The save: where the knight is, hearts, items, keys, moonstones, flags, the quest, the trials' best times, coins, upgrades, requests and the new game+ cycle, and what each upgrade and request gives |
+| `src/game/plus.ts` | Where new game+ buries the moonstones |
 | `src/game/talk.ts` | What each person says, by where the quest stands |
 | `src/game/path.ts` | A* for tap-to-walk |
 | `src/art/paint.ts` | Every sprite, painted onto canvases in soft 3D |
 | `src/art/ground.ts` | Paints each map's ground into one texture |
-| `src/scenes/GameScene.ts` | The world: walking, the sword, the hookvine, bellseeds, foes, puzzles, the bosses and the story |
-| `src/scenes/foes.ts` | Foe stats, bellseed timings and the two bosses' timings, and how much harder they are in a trial |
+| `src/scenes/GameScene.ts` | The world: walking, the sword, the hookvine, bellseeds, the Moonlantern, foes, puzzles, the bosses, requests, new game+ and the story |
+| `src/scenes/foes.ts` | Foe stats, bellseed timings and the three bosses' timings, and how much harder they are in a trial and in new game+ |
 | `src/scenes/light.ts` | The night: the dark, the lamp glow and the miniature haze |
-| `src/scenes/hud.ts` | Hearts, moonstones, keys, bellseeds, the journal line, dialog, touch buttons, the trial's clock, the moonstone page, the shops and the end card |
+| `src/scenes/hud.ts` | Hearts, moonstones, keys, bellseeds, the journal line, dialog, touch buttons, the trial's clock, the journal page, the shops and the end and new game+ cards |
 | `src/scenes/layout.ts` | The view, speeds, reaches and button positions |

@@ -78,6 +78,12 @@ export const sfx = sounds({
   wail: { wave: 'sine', freq: 760, to: 300, length: 0.7, attack: 0.04, volume: 0.32, gap: 300, vary: 0.04 },
   /** The wisp hops on ahead. */
   wisp: { wave: 'sine', freq: 1100, to: 1700, length: 0.25, attack: 0.03, volume: 0.18, gap: 300 },
+  /** A villager's lost thing picked up. */
+  find: { wave: 'triangle', freq: 988, arp: [0, 4, 7], arpStep: 0.06, length: 0.3, volume: 0.28, gap: 150 },
+  /** The Gloamwing dives. */
+  swoop: { wave: 'noise', freq: 3000, to: 400, length: 0.4, volume: 0.32, gap: 300 },
+  /** The Gloamwing struck while it lies on the floor. */
+  screech: { wave: 'sawtooth', freq: 1400, to: 500, length: 0.45, attack: 0.02, volume: 0.2, gap: 300, vary: 0.05 },
   /** Walking into another map. */
   swell: { wave: 'sine', freq: 220, to: 440, length: 0.6, attack: 0.3, volume: 0.2, gap: 400 },
 });

@@ -1,6 +1,6 @@
-// The places of the first two chapters, built in code from rectangles and lines on a grid of
-// TILE-pixel tiles: Mossford (the village), Bramble Woods, Glimmer Fen, the Sunken Shrine and the
-// Drowned Belfry.
+// The places of the three chapters, built in code from rectangles and lines on a grid of
+// TILE-pixel tiles: Mossford (the village), Bramble Woods, Glimmer Fen, the Sunken Shrine, the
+// Drowned Belfry, the Hollow Peaks and the Glass Caverns.
 // Everything that is not ground (houses, lamps, people, foes, chests, posts) is listed beside the
 // tiles. Tile coordinates count from the map's top-left corner.
 
@@ -23,25 +23,36 @@ export type Tile =
   | 'pit'
   | 'ring'
   | 'boulder'
-  | 'crack';
+  | 'crack'
+  | 'veil';
 
-/** Tiles nothing walks through. `faketree` looks like a tree but is walkable (a secret way). */
-export const SOLID: ReadonlySet<Tile> = new Set<Tile>(['tree', 'bush', 'thorns', 'water', 'wall', 'pit', 'ring', 'boulder', 'crack']);
+/**
+ * Tiles nothing walks through. `faketree` looks like a tree but is walkable (a secret way). `veil`
+ * is a hidden bridge over a chasm: a pit to everyone but a knight carrying the Moonlantern, who can
+ * walk it where its light falls (`GameScene.solidTile`).
+ */
+export const SOLID: ReadonlySet<Tile> = new Set<Tile>(['tree', 'bush', 'thorns', 'water', 'wall', 'pit', 'ring', 'boulder', 'crack', 'veil']);
 /** Solid tiles the hookvine flies over. */
-export const LOW: ReadonlySet<Tile> = new Set<Tile>(['water', 'pit', 'bush', 'ring']);
+export const LOW: ReadonlySet<Tile> = new Set<Tile>(['water', 'pit', 'bush', 'ring', 'veil']);
 /** Tiles the sword clears. */
 export const CUTTABLE: ReadonlySet<Tile> = new Set<Tile>(['bush', 'thorns']);
 /** Tiles a bursting bellseed breaks: boulders outdoors and cracked walls indoors. */
 export const BREAKABLE: ReadonlySet<Tile> = new Set<Tile>(['boulder', 'crack']);
 
-export type MapId = 'village' | 'woods' | 'fen' | 'shrine' | 'belfry';
-export type Theme = 'village' | 'woods' | 'fen' | 'shrine' | 'belfry';
+export type MapId = 'village' | 'woods' | 'fen' | 'shrine' | 'belfry' | 'peaks' | 'caverns';
+export type Theme = MapId;
 /** Indoor maps: walls and floors, keys and shut doors, and foes that stay beaten. */
-export const DUNGEONS: ReadonlySet<MapId> = new Set<MapId>(['shrine', 'belfry']);
+export const DUNGEONS: ReadonlySet<MapId> = new Set<MapId>(['shrine', 'belfry', 'caverns']);
+/** Each dungeon's boss, by the flag that beating it sets. */
+export const BOSS_FLAG: Partial<Record<MapId, string>> = { shrine: 'boss', belfry: 'wraith', caverns: 'gloam' };
+/** Moonstones that only show once a boss is beaten, and the flag that beats it. */
+export const AFTER_BOSS: Record<string, string> = { 's-boss': 'boss', 'b-bell': 'wraith', 'c-boss': 'gloam' };
 export type Facing = 'up' | 'down' | 'left' | 'right';
-export type PropKind = 'house' | 'shed' | 'well' | 'lamp' | 'statue' | 'arch' | 'hut' | 'brazier' | 'shroom' | 'bench' | 'rock' | 'tower' | 'bell' | 'candle';
-export type EnemyKind = 'slug' | 'moth' | 'thornling' | 'frog' | 'beetle' | 'lantern';
-export type NpcId = 'elder' | 'pip' | 'baker' | 'cat' | 'hermit';
+export type PropKind = 'house' | 'shed' | 'well' | 'lamp' | 'statue' | 'arch' | 'hut' | 'brazier' | 'shroom' | 'bench' | 'rock' | 'tower' | 'bell' | 'candle' | 'cave' | 'crystal';
+export type EnemyKind = 'slug' | 'moth' | 'thornling' | 'frog' | 'beetle' | 'lantern' | 'shade';
+export type NpcId = 'elder' | 'pip' | 'baker' | 'cat' | 'hermit' | 'herder';
+/** The villagers' requests (`REQUESTS` in `state.ts`). */
+export type RequestId = 'lilies' | 'boat' | 'glowcaps' | 'specs' | 'goatbells';
 
 export interface Prop {
   kind: PropKind;
@@ -71,6 +82,8 @@ export interface Exit {
   facing: Facing;
   /** A flag that must be set before the way opens. */
   flag?: string;
+  /** A quest step the story must have reached first (a new game+ knight has the tools early). */
+  quest?: 'belfry' | 'peaks';
 }
 export interface EnemySpawn { kind: EnemyKind; x: number; y: number; room?: string }
 export interface Post { x: number; y: number }
@@ -78,12 +91,16 @@ export interface Post { x: number; y: number }
 export interface Door { id: string; x: number; y: number; w: number; h: number; kind: 'key' | 'bars' | 'shut'; flag?: string; room?: string }
 /**
  * A moonstone: lying in the open, under a bush (shows once the bush is cut) or buried (a sword swing
- * on the spot digs it up). `chapter` 2 marks the five that count once chapter two starts.
+ * on the spot digs it up). `chapter` 2 marks the five that count once chapter two starts, 3 the four
+ * of chapter three. `glimmer` marks a stone a new game+ moved (`plus.ts`): buried, it glimmers in
+ * the knight's light.
  */
-export interface Moonstone { id: string; x: number; y: number; hidden?: 'buried'; chapter?: 2 }
+export interface Moonstone { id: string; x: number; y: number; hidden?: 'buried'; chapter?: 2 | 3; glimmer?: boolean }
+/** A thing a villager asked for, lying somewhere until the request is taken and it is picked up. */
+export interface Find { req: RequestId; x: number; y: number }
 export interface Room { id: string; x: number; y: number; w: number; h: number }
 
-export type ItemId = 'sword' | 'hookvine' | 'key' | 'heart' | 'oil' | 'seeds';
+export type ItemId = 'sword' | 'hookvine' | 'key' | 'heart' | 'oil' | 'seeds' | 'moonlantern';
 
 export interface MapDef {
   id: MapId;
@@ -103,15 +120,16 @@ export interface MapDef {
   posts: Post[];
   doors: Door[];
   stones: Moonstone[];
+  finds: Find[];
   rooms: Room[];
   /** Push blocks and the plate one of them opens. */
   blocks: { x: number; y: number }[];
   plates: { x: number; y: number; flag: string }[];
-  /** The boss arena's middle, in tiles: the Thornmother's in the shrine, the Bellwraith's in the belfry. */
+  /** The boss arena's middle, in tiles: the Thornmother's in the shrine, the Bellwraith's in the belfry, the Gloamwing's in the caverns. */
   boss?: { x: number; y: number };
   /** The fen's will-o'-wisp hops between these tiles. */
   wisp?: { x: number; y: number }[];
-  /** A dungeon's hourglass, by its entry: after chapter two it starts the trial (`GameScene.startTrial`). */
+  /** A dungeon's hourglass, by its entry: once chapter two is done and its boss beaten, it starts the trial (`GameScene.startTrial`). */
   hourglass?: { x: number; y: number };
 }
 
@@ -129,7 +147,7 @@ class Builder {
     this.def = {
       id, name, theme, w, h, dark,
       tiles: new Array<Tile>(w * h).fill(ground),
-      props: [], npcs: [], chests: [], signs: [], exits: [], enemies: [], posts: [], doors: [], stones: [], rooms: [], blocks: [], plates: [],
+      props: [], npcs: [], chests: [], signs: [], exits: [], enemies: [], posts: [], doors: [], stones: [], finds: [], rooms: [], blocks: [], plates: [],
     };
   }
   set(x: number, y: number, t: Tile) {
@@ -178,7 +196,7 @@ class Builder {
     const at = (p: { x: number; y: number }) => Math.abs(p.x - x) <= 1 && Math.abs(p.y - y) <= 1;
     return (
       d.props.some((p) => x >= p.x - 1 && x <= p.x + p.w && y >= p.y - 1 && y <= p.y + p.h) ||
-      [...d.npcs, ...d.chests, ...d.signs, ...d.posts, ...d.stones, ...d.enemies].some(at)
+      [...d.npcs, ...d.chests, ...d.signs, ...d.posts, ...d.stones, ...d.finds, ...d.enemies].some(at)
     );
   }
   prop(kind: PropKind, x: number, y: number, w = 1, h = 1, facing?: Facing, note?: number) {
@@ -264,6 +282,12 @@ function woods(): MapDef {
   b.scatter('flowers', 24, { x: 2, y: 2, w: 46, h: 28 }, 23, 'grass', 0);
   // Added after the scatter, so the trees and bushes it sows stay where they were.
   d.enemies.push({ kind: 'beetle', x: 28, y: 25 }, { kind: 'beetle', x: 38, y: 13 }, { kind: 'lantern', x: 36, y: 6 });
+  // Chapter three: the pass north to the Hollow Peaks, cut after the scatter too. Fallen rock
+  // closes it until the story gets there (`GameScene.enterMap`).
+  b.rect(24, 0, 2, 9, 'path').rect(26, 7, 16, 2, 'path').set(27, 4, 'grass');
+  d.exits.push({ x: 24, y: 0, w: 2, h: 1, to: 'peaks', tx: 19, ty: 27, facing: 'up', quest: 'peaks' });
+  d.signs.push({ x: 27, y: 4, text: t('signPass') });
+  d.finds.push({ req: 'boat', x: 5, y: 24 }, { req: 'glowcaps', x: 35, y: 5 }, { req: 'glowcaps', x: 5, y: 11 });
   return d;
 }
 
@@ -277,7 +301,7 @@ function fen(): MapDef {
   b.rect(30, 4, 2, 8, 'path').set(30, 5, 'boulder').set(31, 5, 'boulder');
   b.rect(29, 4, 1, 2, 'tree').rect(32, 4, 1, 2, 'tree');
   b.prop('tower', 29, 1, 4, 3);
-  d.exits.push({ x: 30, y: 4, w: 2, h: 1, to: 'belfry', tx: 17, ty: 37, facing: 'up' });
+  d.exits.push({ x: 30, y: 4, w: 2, h: 1, to: 'belfry', tx: 17, ty: 37, facing: 'up', quest: 'belfry' });
   b.scatter('reeds', 40, { x: 2, y: 2, w: 32, h: 20 }, 31, 'grass', 0);
   b.prop('hut', 6, 4, 4, 3);
   // Three statues point at one spot; a swing there digs up what they guard.
@@ -291,6 +315,7 @@ function fen(): MapDef {
   b.scatter('tree', 18, { x: 2, y: 2, w: 32, h: 20 }, 32, 'grass', 1);
   b.scatter('flowers', 14, { x: 2, y: 2, w: 32, h: 20 }, 33, 'grass', 0);
   d.enemies.push({ kind: 'beetle', x: 21, y: 16 }, { kind: 'lantern', x: 16, y: 10 });
+  d.finds.push({ req: 'lilies', x: 20, y: 7 }, { req: 'lilies', x: 30, y: 19 }, { req: 'lilies', x: 3, y: 15 }, { req: 'glowcaps', x: 14, y: 4 });
   return d;
 }
 
@@ -391,10 +416,104 @@ function belfry(): MapDef {
   b.prop('brazier', 9, 8).prop('brazier', 26, 8);
   d.boss = { x: 18, y: 8 };
   d.exits.push({ x: 17, y: 39, w: 2, h: 1, to: 'fen', tx: 30, ty: 6, facing: 'down' });
+  d.finds.push({ req: 'specs', x: 33, y: 19 });
   return d;
 }
 
-const BUILT: Record<MapId, () => MapDef> = { village, woods, fen, shrine, belfry };
+/** A hidden bridge over a chasm, from a tile on, one step (u, d, l or r) at a time. */
+function bridge(b: Builder, x: number, y: number, steps: string) {
+  b.set(x, y, 'veil');
+  for (const s of steps) {
+    if (s === 'u') y--;
+    else if (s === 'd') y++;
+    else if (s === 'l') x--;
+    else if (s === 'r') x++;
+    b.set(x, y, 'veil');
+  }
+}
+
+function peaks(): MapDef {
+  const b = new Builder('peaks', t('peaks'), 'peaks', 40, 30, 0.84, 'grass');
+  const d = b.def;
+  b.border('tree', 2);
+  // The path up from the woods, across to Tam's hut and east to the watchers' lookout.
+  b.rect(19, 13, 2, 17, 'path').rect(8, 20, 27, 2, 'path').rect(32, 19, 3, 1, 'path');
+  b.prop('hut', 5, 15, 4, 3).prop('lamp', 12, 18).prop('lamp', 22, 22);
+  d.npcs.push({ id: 'herder', name: t('herderName'), x: 11, y: 18 });
+  // The lookout: old walls round a flagstone floor, its door sealed by a boulder.
+  b.rect(31, 14, 6, 5, 'wall').rect(32, 15, 4, 3, 'floor').set(34, 18, 'boulder');
+  d.chests.push({ id: 'moonlantern', x: 33, y: 15, item: 'moonlantern' });
+  d.signs.push({ x: 36, y: 20, text: t('signLookout') });
+  // The chasm across the peaks, and the bridge only the Moonlantern shows, with branches that lead
+  // nowhere, and one that is worth it.
+  b.rect(2, 9, 36, 4, 'pit');
+  bridge(b, 19, 12, 'ulllulu');
+  bridge(b, 19, 11, 'rrrrur');
+  bridge(b, 16, 10, 'lll');
+  d.stones.push({ id: 'p-veil', x: 24, y: 10, chapter: 3 });
+  // North of the chasm: the mouth of the Glass Caverns under the tallest peak.
+  b.rect(16, 2, 6, 3, 'path').rect(15, 5, 6, 4, 'path');
+  b.prop('cave', 17, 1, 4, 3).prop('crystal', 16, 4).prop('crystal', 21, 4);
+  d.exits.push(
+    { x: 18, y: 4, w: 2, h: 1, to: 'caverns', tx: 19, ty: 41, facing: 'up' },
+    { x: 19, y: 29, w: 2, h: 1, to: 'woods', tx: 24, ty: 1, facing: 'down' },
+  );
+  // A ring of pines past the chasm, one of them not really there.
+  b.rect(3, 3, 5, 5, 'tree').rect(4, 4, 3, 3, 'grass').set(5, 7, 'faketree');
+  d.stones.push({ id: 'p-nook', x: 5, y: 5, chapter: 3 });
+  b.prop('rock', 28, 25).prop('rock', 9, 25).prop('shroom', 26, 16).prop('shroom', 14, 5).prop('shroom', 32, 4);
+  d.enemies.push(
+    { kind: 'slug', x: 27, y: 17 }, { kind: 'moth', x: 25, y: 24 }, { kind: 'beetle', x: 14, y: 24 },
+    { kind: 'shade', x: 26, y: 6 }, { kind: 'shade', x: 10, y: 5 }, { kind: 'lantern', x: 31, y: 6 },
+  );
+  b.scatter('tree', 36, { x: 2, y: 13, w: 36, h: 15 }, 41, 'grass', 1);
+  b.scatter('tree', 10, { x: 8, y: 2, w: 30, h: 6 }, 42, 'grass', 1);
+  b.scatter('flowers', 10, { x: 2, y: 13, w: 36, h: 15 }, 43, 'grass', 0);
+  d.finds.push({ req: 'goatbells', x: 4, y: 26 }, { req: 'goatbells', x: 36, y: 24 }, { req: 'goatbells', x: 29, y: 6 });
+  return d;
+}
+
+function caverns(): MapDef {
+  const b = new Builder('caverns', t('caverns'), 'caverns', 40, 44, 0.92, 'wall');
+  const d = b.def;
+  b.room('entry', 15, 34, 10, 8).room('hub', 14, 22, 12, 9).room('chasm', 2, 20, 10, 12).room('ledges', 28, 20, 10, 12).room('boss', 6, 3, 28, 13);
+  // Corridors: down to the peaks, entry to hub, hub west to the chasm, east to the ledges, north to the hall.
+  b.rect(19, 42, 2, 2, 'floor').rect(19, 31, 2, 3, 'floor').rect(12, 25, 2, 2, 'floor').rect(26, 25, 2, 2, 'floor').rect(19, 16, 2, 6, 'floor');
+  // The way east is walled with cracked ice.
+  b.set(26, 25, 'crack').set(26, 26, 'crack');
+  // The chasm room: a dark gap with a hidden bridge to the key, and a branch to something else.
+  b.rect(4, 20, 6, 12, 'pit');
+  bridge(b, 9, 26, 'lulluluul');
+  bridge(b, 8, 26, 'ddlld');
+  d.stones.push({ id: 'c-veil', x: 6, y: 29, chapter: 3 });
+  d.chests.push({ id: 'caverns-key', x: 2, y: 21, item: 'key' });
+  // The ledges: a gap crossed on the hookvine, a heart on the far side.
+  b.rect(31, 20, 4, 12, 'pit');
+  d.posts.push({ x: 30, y: 26 }, { x: 35, y: 26 });
+  d.chests.push({ id: 'caverns-heart', x: 36, y: 22, item: 'heart' });
+  d.doors.push(
+    { id: 'caverns-north', x: 19, y: 18, w: 2, h: 1, kind: 'key' },
+    { id: 'boss-door', x: 19, y: 16, w: 2, h: 1, kind: 'shut', room: 'boss' },
+    { id: 'chasm-door', x: 13, y: 25, w: 1, h: 2, kind: 'shut', room: 'chasm' },
+  );
+  d.hourglass = { x: 16, y: 39 };
+  d.signs.push({ x: 23, y: 35, text: t('signIce') });
+  d.enemies.push(
+    { kind: 'shade', x: 17, y: 36, room: 'entry' }, { kind: 'frog', x: 22, y: 38, room: 'entry' },
+    { kind: 'beetle', x: 16, y: 24, room: 'hub' }, { kind: 'shade', x: 23, y: 27, room: 'hub' }, { kind: 'frog', x: 18, y: 28, room: 'hub' },
+    { kind: 'shade', x: 3, y: 30, room: 'chasm' }, { kind: 'shade', x: 10, y: 22, room: 'chasm' },
+    { kind: 'frog', x: 29, y: 22, room: 'ledges' }, { kind: 'lantern', x: 36, y: 29, room: 'ledges' },
+  );
+  b.prop('crystal', 15, 35).prop('crystal', 24, 35).prop('crystal', 14, 22).prop('crystal', 25, 30).prop('crystal', 2, 31).prop('crystal', 11, 20);
+  b.prop('crystal', 28, 31).prop('crystal', 37, 20).prop('crystal', 7, 4).prop('crystal', 32, 4).prop('crystal', 7, 14).prop('crystal', 32, 14);
+  // The Gloamwing's hall, the coldest and darkest place in the kingdom.
+  d.boss = { x: 20, y: 10 };
+  d.stones.push({ id: 'c-boss', x: 20, y: 6, chapter: 3 });
+  d.exits.push({ x: 19, y: 43, w: 2, h: 1, to: 'peaks', tx: 18, ty: 5, facing: 'down' });
+  return d;
+}
+
+const BUILT: Record<MapId, () => MapDef> = { village, woods, fen, shrine, belfry, peaks, caverns };
 /** Every map, in the order the moonstone page lists them. */
 export const MAP_IDS = Object.keys(BUILT) as MapId[];
 

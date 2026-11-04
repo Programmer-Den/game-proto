@@ -127,6 +127,30 @@ export function paintAll(scene: Phaser.Scene) {
   tree('tree', '#3f7f46');
   tree('tree-b', '#4a8a3c');
   tree('tree-fen', '#3d7a6c', true);
+  // The peaks grow dark pines with snow on every tier.
+  paint(scene, 'tree-pine', 56, 72, (c) => {
+    shadow(c, 30, 64, 22, 7, 0.45);
+    body(c, 28, 50, 8, 16, '#5a3e2a', 0.2);
+    for (const [y, w] of [[50, 24], [36, 19], [22, 13]] as const) {
+      const g = c.createLinearGradient(28 - w, 0, 28 + w, 0);
+      g.addColorStop(0, '#3a6a54');
+      g.addColorStop(1, '#1e3e34');
+      c.fillStyle = g;
+      c.beginPath();
+      c.moveTo(28, y - 22);
+      c.lineTo(28 + w, y);
+      c.lineTo(28 - w, y);
+      c.closePath();
+      c.fill();
+      c.fillStyle = '#e8f0fa';
+      c.beginPath();
+      c.moveTo(28, y - 22);
+      c.lineTo(28 + w * 0.45, y - 12);
+      c.quadraticCurveTo(28, y - 9, 28 - w * 0.5, y - 11);
+      c.closePath();
+      c.fill();
+    }
+  });
 
   paint(scene, 'bush', 34, 30, (c) => {
     shadow(c, 17, 25, 15, 5);
@@ -484,6 +508,19 @@ export function paintAll(scene: Phaser.Scene) {
     c.fillStyle = '#ffe2a0';
     c.fillRect(25, 26, 6, 7);
     glowDot(c, 28, 29, 8, 'rgba(255,220,140,0.8)');
+  });
+  // Tam the goatherd: a woolly hat and a crook.
+  person('herder', '#8a5a3a', '#f0c8a0', '#e8e0d4', (c) => {
+    ball(c, 16, 6, 7, '#c86a4a', 5);
+    ball(c, 16, 2, 3, '#f0e8e0');
+    c.strokeStyle = '#7a5638';
+    c.lineWidth = 2.5;
+    c.lineCap = 'round';
+    c.beginPath();
+    c.moveTo(4, 42);
+    c.lineTo(4, 12);
+    c.quadraticCurveTo(4, 5, 9, 6);
+    c.stroke();
   });
   paint(scene, 'cat', 28, 24, (c) => {
     shadow(c, 14, 21, 11, 3);
@@ -950,6 +987,224 @@ export function paintAll(scene: Phaser.Scene) {
     c.fill();
   });
   paint(scene, 'bell-shadow', 80, 28, (c) => shadow(c, 40, 14, 38, 12, 0.7));
+
+  // Chapter three: the cave mouth, ice crystals, the hidden bridges' stones, shades and the Gloamwing.
+  paint(scene, 'cave', 128, 104, (c) => {
+    shadow(c, 64, 98, 62, 8, 0.5);
+    ball(c, 64, 60, 62, '#6a7488', 44);
+    ball(c, 30, 40, 26, '#7a8498', 22);
+    ball(c, 98, 44, 24, '#5e6878', 20);
+    c.fillStyle = '#e8f0fa';
+    for (const [x, y, r] of [[30, 22, 14], [98, 26, 12], [64, 18, 18]] as const) {
+      c.beginPath();
+      c.ellipse(x, y, r, r * 0.45, 0, Math.PI, 0);
+      c.fill();
+    }
+    c.fillStyle = '#05070e';
+    c.beginPath();
+    c.moveTo(34, 104);
+    c.lineTo(36, 70);
+    c.quadraticCurveTo(64, 40, 92, 70);
+    c.lineTo(94, 104);
+    c.fill();
+    glowDot(c, 64, 82, 22, 'rgba(160,210,255,0.45)');
+    c.fillStyle = 'rgba(190,230,255,0.85)';
+    for (const x of [44, 56, 70, 82]) {
+      c.beginPath();
+      c.moveTo(x - 3, 62 + Math.abs(x - 64) * 0.4);
+      c.lineTo(x, 74 + Math.abs(x - 64) * 0.3);
+      c.lineTo(x + 3, 62 + Math.abs(x - 64) * 0.4);
+      c.fill();
+    }
+  });
+  paint(scene, 'crystal', 20, 30, (c) => {
+    shadow(c, 10, 28, 8, 2.5);
+    glowDot(c, 10, 14, 10, 'rgba(150,210,255,0.6)');
+    for (const [x, h, col] of [[6, 16, '#8ac0e8'], [14, 18, '#a8d8f8'], [10, 24, '#cfeaff']] as const) {
+      c.fillStyle = col;
+      c.beginPath();
+      c.moveTo(x - 3, 27);
+      c.lineTo(x - 3, 27 - h * 0.7);
+      c.lineTo(x, 27 - h);
+      c.lineTo(x + 3, 27 - h * 0.7);
+      c.lineTo(x + 3, 27);
+      c.fill();
+    }
+  });
+  paint(scene, 'veil-stone', 32, 32, (c) => {
+    glowDot(c, 16, 16, 18, 'rgba(170,210,255,0.35)');
+    c.fillStyle = 'rgba(200,225,255,0.75)';
+    c.beginPath();
+    c.roundRect(3, 3, 26, 26, 6);
+    c.fill();
+    c.strokeStyle = 'rgba(120,160,220,0.9)';
+    c.lineWidth = 1.5;
+    c.beginPath();
+    c.moveTo(6, 16);
+    c.lineTo(26, 16);
+    c.moveTo(16, 4);
+    c.lineTo(16, 16);
+    c.stroke();
+  });
+  const shadeFoe = (key: string, up: boolean) =>
+    paint(scene, key, 34, 30, (c) => {
+      glowDot(c, 17, 14, 16, 'rgba(20,24,50,0.7)');
+      for (const s of [-1, 1]) {
+        c.fillStyle = 'rgba(30,34,64,0.9)';
+        c.beginPath();
+        c.ellipse(17 + s * 9, up ? 10 : 15, 9, up ? 7 : 5, s * (up ? -0.6 : 0.3), 0, Math.PI * 2);
+        c.fill();
+      }
+      ball(c, 17, 14, 7, '#252a4a');
+      c.fillStyle = '#d8e8ff';
+      c.fillRect(13, 12, 2.5, 2.5);
+      c.fillRect(19, 12, 2.5, 2.5);
+    });
+  shadeFoe('shade', true);
+  shadeFoe('shade-b', false);
+  paint(scene, 'shard', 12, 12, (c) => {
+    glowDot(c, 6, 6, 6, 'rgba(170,220,255,0.7)');
+    c.fillStyle = '#e8f6ff';
+    c.beginPath();
+    c.moveTo(6, 1);
+    c.lineTo(9, 6);
+    c.lineTo(6, 11);
+    c.lineTo(3, 6);
+    c.fill();
+  });
+  paint(scene, 'gloam', 132, 92, (c) => {
+    glowDot(c, 66, 46, 50, 'rgba(60,70,140,0.45)');
+    for (const s of [-1, 1]) {
+      const g = c.createLinearGradient(66, 0, 66 + s * 62, 0);
+      g.addColorStop(0, '#3e4480');
+      g.addColorStop(1, '#1c1f46');
+      c.fillStyle = g;
+      c.beginPath();
+      c.moveTo(66, 30);
+      c.quadraticCurveTo(66 + s * 40, -4, 66 + s * 64, 20);
+      c.quadraticCurveTo(66 + s * 50, 48, 66 + s * 14, 50);
+      c.quadraticCurveTo(66 + s * 44, 62, 66 + s * 40, 88);
+      c.quadraticCurveTo(66 + s * 16, 80, 66, 56);
+      c.fill();
+      // Pale eye spots on each wing.
+      glowDot(c, 66 + s * 36, 24, 9, 'rgba(200,220,255,0.8)');
+      ball(c, 66 + s * 36, 24, 4, '#e8f0ff');
+      glowDot(c, 66 + s * 30, 68, 6, 'rgba(170,200,255,0.6)');
+    }
+    body(c, 66, 22, 14, 44, '#2c3164', 0.5);
+    c.fillStyle = '#cfe0ff';
+    c.fillRect(61, 28, 3, 3);
+    c.fillRect(68, 28, 3, 3);
+    c.strokeStyle = '#2a2e58';
+    c.lineWidth = 2;
+    c.beginPath();
+    c.moveTo(62, 22);
+    c.quadraticCurveTo(56, 8, 48, 6);
+    c.moveTo(70, 22);
+    c.quadraticCurveTo(76, 8, 84, 6);
+    c.stroke();
+  });
+  paint(scene, 'glimmer', 20, 14, (c) => {
+    glowDot(c, 10, 7, 9, 'rgba(190,220,255,0.6)');
+    c.fillStyle = '#f0f8ff';
+    for (const [x, y, r] of [[10, 7, 2.4], [4, 9, 1.3], [16, 5, 1.5]] as const) {
+      c.beginPath();
+      c.moveTo(x, y - r * 2);
+      c.lineTo(x + r * 0.5, y);
+      c.lineTo(x, y + r * 2);
+      c.lineTo(x - r * 0.5, y);
+      c.fill();
+      c.beginPath();
+      c.moveTo(x - r * 2, y);
+      c.lineTo(x, y + r * 0.5);
+      c.lineTo(x + r * 2, y);
+      c.lineTo(x, y - r * 0.5);
+      c.fill();
+    }
+  });
+
+  // The villagers' lost things.
+  paint(scene, 'find-lilies', 20, 20, (c) => {
+    shadow(c, 10, 18, 8, 2.5);
+    c.fillStyle = '#4a8a4a';
+    c.beginPath();
+    c.ellipse(10, 15, 9, 3.5, 0, 0, Math.PI * 2);
+    c.fill();
+    glowDot(c, 10, 9, 9, 'rgba(255,255,240,0.6)');
+    c.fillStyle = '#f8f8f0';
+    for (const a of [-0.9, 0, 0.9]) {
+      c.save();
+      c.translate(10, 12);
+      c.rotate(a);
+      c.beginPath();
+      c.ellipse(0, -5, 2.6, 5.5, 0, 0, Math.PI * 2);
+      c.fill();
+      c.restore();
+    }
+    ball(c, 10, 11, 1.8, '#f0d070');
+  });
+  paint(scene, 'find-boat', 24, 18, (c) => {
+    shadow(c, 12, 16, 10, 2.5);
+    c.fillStyle = '#b06a3a';
+    c.beginPath();
+    c.moveTo(2, 10);
+    c.lineTo(22, 10);
+    c.lineTo(18, 15);
+    c.lineTo(6, 15);
+    c.closePath();
+    c.fill();
+    c.fillStyle = '#6a4a30';
+    c.fillRect(11, 1, 1.5, 9);
+    c.fillStyle = '#f0ece0';
+    c.beginPath();
+    c.moveTo(12.5, 1);
+    c.lineTo(19, 8);
+    c.lineTo(12.5, 8);
+    c.fill();
+  });
+  paint(scene, 'find-glowcaps', 18, 18, (c) => {
+    shadow(c, 9, 16, 7, 2);
+    glowDot(c, 9, 8, 9, 'rgba(120,230,255,0.6)');
+    body(c, 9, 9, 4, 7, '#e8e0d0', 0.3);
+    ball(c, 9, 8, 7, '#6ad0f0', 4);
+  });
+  paint(scene, 'find-specs', 22, 14, (c) => {
+    shadow(c, 11, 12, 9, 2);
+    c.strokeStyle = '#d8b060';
+    c.lineWidth = 1.8;
+    c.beginPath();
+    c.arc(6, 7, 4, 0, Math.PI * 2);
+    c.moveTo(20, 7);
+    c.arc(16, 7, 4, 0, Math.PI * 2);
+    c.moveTo(10, 7);
+    c.quadraticCurveTo(11, 5, 12, 7);
+    c.stroke();
+    c.fillStyle = 'rgba(200,230,255,0.5)';
+    c.beginPath();
+    c.arc(6, 7, 3, 0, Math.PI * 2);
+    c.arc(16, 7, 3, 0, Math.PI * 2);
+    c.fill();
+  });
+  paint(scene, 'find-goatbells', 18, 20, (c) => {
+    shadow(c, 9, 18, 7, 2);
+    c.strokeStyle = '#a04a3a';
+    c.lineWidth = 2;
+    c.beginPath();
+    c.arc(9, 6, 4, Math.PI, 0);
+    c.stroke();
+    const g = c.createLinearGradient(3, 0, 15, 0);
+    g.addColorStop(0, '#f8d878');
+    g.addColorStop(1, '#a87830');
+    c.fillStyle = g;
+    c.beginPath();
+    c.moveTo(5, 6);
+    c.quadraticCurveTo(4, 12, 2, 16);
+    c.lineTo(16, 16);
+    c.quadraticCurveTo(14, 12, 13, 6);
+    c.closePath();
+    c.fill();
+    ball(c, 9, 16, 1.8, '#6a4a20');
+  });
 
   // The HUD's icons and the touch buttons.
   const icon = (key: string, draw: (c: Ctx) => void) => paint(scene, key, 22, 20, draw);

@@ -3,7 +3,7 @@
 // whenever the knight changes place or the quest moves on.
 
 import { byDifficulty } from '../../../../shared/settings';
-import { isMapId, type Facing, type ItemId, type MapId } from './maps';
+import { isMapId, type Facing, type ItemId, type MapId, type NpcId, type RequestId } from './maps';
 import type { TextKey } from '../i18n';
 import { formatNumber } from '../../../../shared/i18n';
 
@@ -11,16 +11,18 @@ export const SAVE_KEY = 'bramblecrest-save';
 
 /** Health is counted in half hearts. */
 export const START_HEARTS = byDifficulty(5, 3, 2);
-/** Moonstones hidden in the first chapter, and in the first two together. */
+/** Moonstones hidden in the first chapter, in the first two together, and in all three. */
 export const CHAPTER_ONE_STONES = 8;
-export const MOONSTONES = 13;
+export const CHAPTER_TWO_STONES = 13;
+export const MOONSTONES = 17;
 /** The most bellseeds the knight can carry, and with Sedge's bigger pouch. */
 export const MAX_SEEDS = 10;
 export const BIG_POUCH = 15;
 
 /** Who sells upgrades: Marla in Mossford and Old Sedge in the fen. */
 export type Seller = 'baker' | 'hermit';
-export type UpgradeId = 'pie' | 'boots' | 'pouch' | 'vine';
+/** What coins buy (`UPGRADES`), and what the villagers give for their requests (`REQUESTS`). */
+export type UpgradeId = 'pie' | 'boots' | 'pouch' | 'vine' | 'whetstone' | 'pockets' | 'charm';
 /**
  * What coins buy, for good: a heart (`pie`), a longer, quicker roll (`boots`), a bigger bellseed
  * pouch (`pouch`) and a longer hookvine (`vine`). `needs` is an item the knight must have first.
@@ -54,8 +56,27 @@ export function buy(s: GameState, id: UpgradeId) {
   return true;
 }
 
-/** The quest line of the first two chapters, in order. */
-export const QUESTS = ['start', 'blade', 'thorns', 'shrine', 'return', 'done', 'bell', 'belfry', 'home', 'end'] as const;
+/**
+ * The villagers' requests: who asks, how many of the thing they want lie about (the map's `finds`),
+ * from which step of the story they ask, and what they give. `heart` is a heart vessel; the rest
+ * are kept in `upgrades`: the whetstone (a longer sword reach), a deep purse (two coins a foe) and
+ * a moon charm (longer safe after a hit).
+ */
+export const REQUESTS: { id: RequestId; giver: NpcId; count: number; from: Quest; reward: 'heart' | 'whetstone' | 'pockets' | 'charm' }[] = [
+  { id: 'lilies', giver: 'baker', count: 3, from: 'done', reward: 'heart' },
+  { id: 'boat', giver: 'pip', count: 1, from: 'done', reward: 'whetstone' },
+  { id: 'glowcaps', giver: 'elder', count: 3, from: 'bell', reward: 'pockets' },
+  { id: 'specs', giver: 'hermit', count: 1, from: 'home', reward: 'charm' },
+  { id: 'goatbells', giver: 'herder', count: 3, from: 'peaks', reward: 'heart' },
+];
+
+/** How many of a request's things the knight has picked up (flags `find-<request>-<i>`). */
+export function found(s: GameState, id: RequestId) {
+  return s.flags.filter((f) => f.startsWith(`find-${id}-`)).length;
+}
+
+/** The quest line of the three chapters, in order. */
+export const QUESTS = ['start', 'blade', 'thorns', 'shrine', 'return', 'done', 'bell', 'belfry', 'home', 'end', 'peaks', 'caverns', 'homeward', 'final'] as const;
 export type Quest = (typeof QUESTS)[number];
 
 /** A time on the clock as m:ss.t, with the language's decimal mark. */
@@ -78,6 +99,10 @@ export const OBJECTIVES: Record<Quest, TextKey> = {
   belfry: 'objBelfry',
   home: 'objHome',
   end: 'objEnd',
+  peaks: 'objPeaks',
+  caverns: 'objCaverns',
+  homeward: 'objHomeward',
+  final: 'objFinal',
 };
 
 /** Whether the quest has reached `q`. */
@@ -85,9 +110,14 @@ export function reached(s: GameState, q: Quest) {
   return QUESTS.indexOf(s.quest) >= QUESTS.indexOf(q);
 }
 
-/** How many moonstones there are to find so far: the second chapter's show up once it starts. */
+/** How many moonstones there are to find so far: each chapter's show up once it starts. */
 export function stonesToFind(s: GameState) {
-  return reached(s, 'bell') ? MOONSTONES : CHAPTER_ONE_STONES;
+  return reached(s, 'peaks') ? MOONSTONES : reached(s, 'bell') ? CHAPTER_TWO_STONES : CHAPTER_ONE_STONES;
+}
+
+/** Whether a moonstone of a chapter counts yet. */
+export function stoneCounts(s: GameState, chapter?: 2 | 3) {
+  return chapter === 3 ? reached(s, 'peaks') : chapter === 2 ? reached(s, 'bell') : true;
 }
 
 export interface GameState {
@@ -100,7 +130,7 @@ export interface GameState {
   spawn: { map: MapId; x: number; y: number; facing: Facing };
   hp: number;
   maxHp: number;
-  items: { sword: boolean; hookvine: boolean; oil: boolean; seeds: boolean };
+  items: { sword: boolean; hookvine: boolean; oil: boolean; seeds: boolean; moonlantern: boolean };
   keys: number;
   /** Bellseeds carried. */
   seeds: number;
@@ -116,6 +146,10 @@ export interface GameState {
   /** Coins from cut bushes and beaten foes, and the upgrades they bought. */
   coins: number;
   upgrades: UpgradeId[];
+  /** The villagers' requests taken and done. */
+  requests: Partial<Record<RequestId, 'taken' | 'done'>>;
+  /** How many times new game+ began again: 0 on a first run. */
+  cycle: number;
 }
 
 export function newState(): GameState {
@@ -128,7 +162,7 @@ export function newState(): GameState {
     spawn,
     hp: START_HEARTS * 2,
     maxHp: START_HEARTS * 2,
-    items: { sword: false, hookvine: false, oil: false, seeds: false },
+    items: { sword: false, hookvine: false, oil: false, seeds: false, moonlantern: false },
     keys: 0,
     seeds: 0,
     moonstones: [],
@@ -139,7 +173,37 @@ export function newState(): GameState {
     trials: {},
     coins: 0,
     upgrades: [],
+    requests: {},
+    cycle: 0,
   };
+}
+
+/**
+ * New game+: the story starts over from the first night, one cycle on, keeping the tools, the
+ * upgrades, the coins, the requests done and the trials' best times. Hearts start again, with the
+ * pie's and the requests' hearts kept.
+ */
+export function newPlus(old: GameState): GameState {
+  const s = newState();
+  s.items = { ...old.items };
+  s.upgrades = [...old.upgrades];
+  s.coins = old.coins;
+  s.requests = { ...old.requests };
+  s.trials = { ...old.trials };
+  s.cycle = old.cycle + 1;
+  const hearts = (hasUpgrade(s, 'pie') ? 1 : 0) + REQUESTS.filter((r) => r.reward === 'heart' && s.requests[r.id] === 'done').length;
+  s.maxHp += hearts * 2;
+  s.hp = s.maxHp;
+  s.seeds = s.items.seeds ? maxSeeds(s) : 0;
+  return s;
+}
+
+/** Hands in a request: marks it done and gives its reward. */
+export function reward(s: GameState, id: RequestId) {
+  const r = REQUESTS.find((x) => x.id === id)!;
+  s.requests[id] = 'done';
+  if (r.reward === 'heart') give(s, 'heart');
+  else if (!hasUpgrade(s, r.reward)) s.upgrades.push(r.reward);
 }
 
 export function hasFlag(s: GameState, flag: string) {
@@ -160,6 +224,7 @@ export function give(s: GameState, item: ItemId) {
   if (item === 'sword') s.items.sword = true;
   else if (item === 'hookvine') s.items.hookvine = true;
   else if (item === 'oil') s.items.oil = true;
+  else if (item === 'moonlantern') s.items.moonlantern = true;
   else if (item === 'key') s.keys++;
   else if (item === 'seeds') {
     s.items.seeds = true;

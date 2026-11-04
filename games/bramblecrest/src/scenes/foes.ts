@@ -1,6 +1,6 @@
-// The things that bite back: slugs, moths, thornlings, frogs, shelled beetles and lantern moths, the
-// thornlings' seeds and the lantern moths' embers, the
-// Thornmother at the bottom of the shrine with her three bulbs, and the Bellwraith in the belfry.
+// The things that bite back: slugs, moths, thornlings, frogs, shelled beetles, lantern moths and
+// shades, the thornlings' seeds and the lantern moths' embers, the Thornmother at the bottom of the
+// shrine with her three bulbs, the Bellwraith in the belfry and the Gloamwing in the Glass Caverns.
 
 import Phaser from 'phaser';
 import { texScale } from '../art/paint';
@@ -25,7 +25,17 @@ export const FOES: Record<EnemyKind, FoeInfo> = {
   frog: { hp: 2, speed: 150, sees: 180, damage: 1 },
   beetle: { hp: 3, speed: 40, sees: 160, damage: 1 },
   lantern: { hp: 2, speed: 64, sees: 220, damage: 1, flies: true },
+  shade: { hp: 2, speed: 60, sees: 190, damage: 1, flies: true },
 };
+
+/** A shade is all but invisible outside the knight's light: this far from them it starts to show. */
+export const SHADE_SEEN_PX = 130;
+
+/**
+ * New game+: every foe has this many times its hearts (rounded up) and speed, and a touch costs
+ * this many times as much. The bosses fight as hard as in an hourglass trial (`TRIAL`).
+ */
+export const PLUS = { hp: 1.5, speed: 1.15, damage: 2 };
 
 /**
  * Foes a plain sword swing can't hurt until something knocks them down: a beetle's shell turns the
@@ -74,7 +84,34 @@ export const HOVER_SPEED = 85;
  * up less long, her volleys come faster and wider and she calls more slugs; the Bellwraith takes more
  * hits, hunts faster and shows itself for less time.
  */
-export const TRIAL = { bulbUp: 0.8, volley: 0.75, volleyShots: 12, summon: 0.75, summoned: 3, wraithHp: 5, hover: 0.7, hoverSpeed: 1.3, exposed: 0.8 };
+export const TRIAL = { bulbUp: 0.8, volley: 0.75, volleyShots: 12, summon: 0.75, summoned: 3, wraithHp: 5, hover: 0.7, hoverSpeed: 1.3, exposed: 0.8, gloamHp: 6, gloamCircle: 0.7, gloamLow: 0.75 };
+
+/**
+ * The Gloamwing, a moth of the dark itself: it circles high over its hall (`GLOAM.circleMs`) and
+ * sheds rings of frost shards, then marks the knight's spot with its shadow (`markMs`) and dives
+ * on it (`diveMs`, `hitPx`). After a dive it hangs low for `lowMs`, where the hookvine can catch it
+ * and pull it down for `downMs`; one sword hit then sends it back up. `hp` hits beat it.
+ */
+export const GLOAM = { hp: 4, lift: 52, circleMs: 4200, markMs: 900, diveMs: 380, lowMs: 1700, downMs: 3000, riseMs: 600, ring: 120, turn: 0.9, shotMs: 2600, shots: 10, hitPx: 34 };
+export type GloamState = 'circle' | 'mark' | 'dive' | 'low' | 'down' | 'rise';
+export interface Gloam {
+  x: number;
+  y: number;
+  lift: number;
+  state: GloamState;
+  t: number;
+  hp: number;
+  /** Where it circles round, its angle on the circle, and the spot a dive goes for. */
+  home: { x: number; y: number };
+  angle: number;
+  mark: { x: number; y: number };
+  from: { x: number; y: number };
+  sprite: Phaser.GameObjects.Image;
+  shadow: Phaser.GameObjects.Image;
+  shotT: number;
+  summonT: number;
+  awake: boolean;
+}
 
 export interface Foe {
   kind: EnemyKind;

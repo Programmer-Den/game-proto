@@ -186,7 +186,7 @@ export class Hud {
     }
   }
 
-  /** Whether the end card, the moonstone page or a shop covers the game, which then stands still. */
+  /** Whether a card, the journal page or a shop covers the game, which then stands still. */
   get covered() {
     return this.endCard !== null || this.page !== null || this.shop !== null;
   }
@@ -249,36 +249,56 @@ export class Hud {
   }
 
   /**
-   * The moonstone page: each map's moonstones, found ones lit, so the player knows where to look
-   * again without being told where; then the best time of each hourglass trial once they open.
+   * The journal page: on the left each map's moonstones, found ones lit, so the player knows where
+   * to look again without being told where; on the right the villagers' requests taken and done,
+   * then the best time of each hourglass trial once they open. `plus` names the new game+ cycle.
    */
-  showStones(rows: { name: string; found: number; total: number }[], trials: { place: string; ms?: number }[]) {
+  showStones(
+    rows: { name: string; found: number; total: number }[],
+    trials: { place: string; ms?: number }[],
+    requests: { text: string; state: string; done: boolean }[],
+    plus: string,
+  ) {
     const add = this.scene.add;
     const f = viewFrame(this.scene);
     const c = add.container(f.x, f.y).setScrollFactor(0).setDepth(DEPTH + 10);
-    const h = 150 + rows.length * 40 + (trials.length ? 40 + trials.length * 28 : 0);
+    const left = rows.length * 34;
+    const right = 30 + Math.max(1, requests.length) * 26 + (trials.length ? 44 + trials.length * 26 : 0);
+    const h = 140 + Math.max(left, right);
     const top = (VIEW.h - h) / 2;
     const g = add.graphics();
     g.fillStyle(0x05081a, 0.7).fillRect(-f.x, -f.y, this.vw, this.vh);
-    g.fillStyle(0x10163a, 0.95).fillRoundedRect(250, top, 460, h, 18);
-    g.lineStyle(2, 0xc8b070, 0.9).strokeRoundedRect(250, top, 460, h, 18);
+    g.fillStyle(0x10163a, 0.95).fillRoundedRect(100, top, 760, h, 18);
+    g.lineStyle(2, 0xc8b070, 0.9).strokeRoundedRect(100, top, 760, h, 18);
+    g.lineStyle(1, 0xc8b070, 0.35).lineBetween(480, top + 84, 480, top + h - 44);
     c.add(g);
     const found = rows.reduce((n, r) => n + r.found, 0);
     const total = rows.reduce((n, r) => n + r.total, 0);
-    c.add(add.text(VIEW.w / 2, top + 30, t('stonesTitle'), { fontFamily: FONT, fontSize: '26px', color: '#f0d890' }).setOrigin(0.5));
-    c.add(add.text(VIEW.w / 2, top + 62, t('stonesTotal', { n: found, total }), { fontFamily: FONT, fontSize: '16px', color: '#a8b0d0' }).setOrigin(0.5));
+    const stones = t('stonesTotal', { n: found, total });
+    c.add(add.text(VIEW.w / 2, top + 30, t('journalTitle'), { fontFamily: FONT, fontSize: '26px', color: '#f0d890' }).setOrigin(0.5));
+    c.add(add.text(VIEW.w / 2, top + 62, plus ? t('stonesPlus', { stones, plus }) : stones, { fontFamily: FONT, fontSize: '16px', color: '#a8b0d0' }).setOrigin(0.5));
     rows.forEach((r, i) => {
-      const y = top + 104 + i * 40;
-      c.add(add.text(280, y, r.name, { fontFamily: FONT, fontSize: '19px', color: r.found === r.total ? '#dff2ff' : '#f3ead2' }).setOrigin(0, 0.5));
+      const y = top + 104 + i * 34;
+      c.add(add.text(128, y, r.name, { fontFamily: FONT, fontSize: '18px', color: r.found === r.total ? '#dff2ff' : '#f3ead2' }).setOrigin(0, 0.5));
       for (let k = 0; k < r.total; k++)
-        c.add(add.image(560 + k * 30, y, 'moonstone').setScale(texScale('moonstone') * 1.2).setAlpha(k < r.found ? 1 : 0.22));
+        c.add(add.image(388 + k * 28, y, 'moonstone').setScale(texScale('moonstone') * 1.15).setAlpha(k < r.found ? 1 : 0.22));
     });
-    const y = top + 104 + rows.length * 40;
+    let y = top + 104;
+    c.add(add.text(670, y, t('requestsTitle'), { fontFamily: FONT, fontSize: '19px', color: '#f0d890' }).setOrigin(0.5));
+    y += 30;
+    if (!requests.length) c.add(add.text(670, y, t('requestsNone'), { fontFamily: FONT, fontSize: '14px', color: '#a8b0d0', align: 'center', wordWrap: { width: 340 } }).setOrigin(0.5));
+    requests.forEach((r, i) => {
+      const ry = y + i * 26;
+      const col = r.done ? '#cfe8ff' : '#f3ead2';
+      c.add(add.text(508, ry, r.text, { fontFamily: FONT, fontSize: '15px', color: col }).setOrigin(0, 0.5));
+      c.add(add.text(836, ry, r.state, { fontFamily: FONT, fontSize: '15px', color: r.done ? '#9ad86a' : '#f0d070' }).setOrigin(1, 0.5));
+    });
+    y += Math.max(1, requests.length) * 26 + 18;
     if (trials.length) {
-      c.add(add.text(VIEW.w / 2, y + 4, t('trialsTitle'), { fontFamily: FONT, fontSize: '19px', color: '#f0d890' }).setOrigin(0.5));
+      c.add(add.text(670, y, t('trialsTitle'), { fontFamily: FONT, fontSize: '19px', color: '#f0d890' }).setOrigin(0.5));
       trials.forEach((tr, i) => {
         const text = tr.ms === undefined ? t('trialNone', { place: tr.place }) : t('trialBest', { place: tr.place, time: clock(tr.ms) });
-        c.add(add.text(VIEW.w / 2, y + 36 + i * 28, text, { fontFamily: FONT, fontSize: '17px', color: '#cfe8ff' }).setOrigin(0.5));
+        c.add(add.text(670, y + 30 + i * 26, text, { fontFamily: FONT, fontSize: '16px', color: '#cfe8ff' }).setOrigin(0.5));
       });
     }
     c.add(add.text(VIEW.w / 2, top + h - 24, t('closePage'), { fontFamily: FONT, fontSize: '13px', color: '#a8b0d0' }).setOrigin(0.5));
@@ -290,8 +310,11 @@ export class Hud {
     this.page = null;
   }
 
-  /** The chapter's end card, with how the night went and two ways on: keep exploring (it just closes) or a new game. */
-  showEnd(title: string, lines: string[], onNew: () => void) {
+  /**
+   * A card over the game: a chapter's end, with how the night went and the ways on (keep exploring
+   * just closes it, a new game, and after the last chapter new game+), or the new game+ offer.
+   */
+  showEnd(title: string, lines: string[], buttons: { label: string; fn?: () => void }[]) {
     const add = this.scene.add;
     // The card is laid out for 960x540 and sits in the middle of the view, its shade over all of it.
     const f = viewFrame(this.scene);
@@ -303,8 +326,9 @@ export class Hud {
     c.add(g);
     c.add(add.text(VIEW.w / 2, 130, title, { fontFamily: FONT, fontSize: '28px', color: '#f0d890' }).setOrigin(0.5));
     c.add(add.text(VIEW.w / 2, 250, lines.join('\n\n'), { fontFamily: FONT, fontSize: '18px', color: '#f3ead2', align: 'center', wordWrap: { width: 520 } }).setOrigin(0.5));
+    const three = buttons.length > 2;
     const button = (x: number, label: string, fn?: () => void) => {
-      const b = add.text(x, 400, label, { fontFamily: FONT, fontSize: '20px', color: '#10163a', backgroundColor: '#f0d890', padding: { x: 16, y: 8 } }).setOrigin(0.5);
+      const b = add.text(x, 400, label, { fontFamily: FONT, fontSize: three ? '18px' : '20px', color: '#10163a', backgroundColor: '#f0d890', padding: { x: three ? 12 : 16, y: 8 } }).setOrigin(0.5);
       b.setInteractive({ useHandCursor: true }).on('pointerdown', (_p: unknown, _x: unknown, _y: unknown, e: Phaser.Types.Input.EventData) => {
         e.stopPropagation();
         ui('click');
@@ -314,8 +338,8 @@ export class Hud {
       });
       c.add(b);
     };
-    button(370, t('keepExploring'));
-    button(590, t('newGame'), onNew);
+    const xs = three ? [290, 480, 670] : [370, 590];
+    buttons.forEach((b, i) => button(xs[i], b.label, b.fn));
     this.endCard = c;
   }
 }
