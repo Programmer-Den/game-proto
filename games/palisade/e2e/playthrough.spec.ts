@@ -269,6 +269,8 @@ test('plays the first wave', async ({ page }, testInfo) => {
   expect(s.ranks).toEqual({ [choice]: 1 });
   expect(s.choices).toBeNull();
   expect(s.levelUps).toBe(0);
+  // Bounty Hunter, if that was the card, pays a coin more for every kill from here on.
+  const killsAtPick = s.kills;
 
   // Kills charge Arrow Rain. Once it is ready, drag it from its button above the ranger onto a
   // foe, along the dashed arc to the gold ring, and let go.
@@ -312,8 +314,9 @@ test('plays the first wave', async ({ page }, testInfo) => {
   }
   expect(s).toMatchObject({ phase: 'break', bestWave: 1, kills: 6, relics: {}, relicFound: null });
   expect(s.barricade.hp).toBeGreaterThan(0);
-  // Every kill paid its coins and charged the caltrops; nothing was bought.
-  expect(s.coins).toBe(3 * COINS.goblin + 3 * COINS.orc);
+  // Every kill paid its coins (and Bounty Hunter's after it was taken) and charged the caltrops;
+  // nothing was bought.
+  expect(s.coins).toBe(3 * COINS.goblin + 3 * COINS.orc + (s.ranks.bounty ?? 0) * (s.kills - killsAtPick));
   expect(s.caltrops.charge).toBe(CALTROP_KILLS);
   expect(s.guards).toEqual([null, null]);
   // Clearing the wave earns Holding the line, and the volley loosed earlier Cloud of arrows

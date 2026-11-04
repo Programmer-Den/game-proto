@@ -44,8 +44,9 @@ seconds without a tap.
   (`drawMapPicks`) sets `GameScene.nextFrontier`, which "Fight again" (`fightAgain(state, start,
   frontier)`) and the heat buttons use. `BootScene` bakes `background-pass` (`drawWinter` in
   `scenery.ts` over the vale), which `drawHero` swaps in; a chip at `FRONTIER_CHIP` names the pass.
-- **Hero classes** (`hero.ts`, `state.hero`, a `HeroClass`): the ranger and the mage, open once a
-  hero has retired (`canClass`: `legacy.retired > 0`). The mage's upgrades are in `UPGRADES` with
+- **Hero classes** (`hero.ts`, `state.hero`, a `HeroClass`): the ranger, the mage, open once a
+  hero has retired, and the warden, open after two retirements (`canClass`: `legacy.retired >=
+  RETIRED_FOR[hero]`). The mage's upgrades are in `UPGRADES` with
   `hero: 'mage'` (the ranger's own carry `hero: 'ranger'`; the rest are shared), after every other
   entry so the ranger's random picks are as before. `offerable` filters by `learns(id, hero)`,
   `rollChoices` falls back to `baseSkills(hero)` (`MAGE_BASE_SKILLS`: Focus, Potency, Stout
@@ -61,6 +62,40 @@ seconds without a tap.
   (the panel's "The next hero" row), and "New hero" uses `GameScene.nextHero` (the "Hero" button
   over it, `toggleHero`). The scene shows `heroTexture(hero)` (`hero-mage`: the guard mage's rig in
   violet at the hero's size) and the `spell-bolt` texture.
+- **The warden** (`hero: 'warden'`): the warden's upgrades come after the mage's in `UPGRADES`
+  (`hero: 'warden'`: bash, vigil, reach, shove, daze, bane, bulwark, fangs, hold, pack), so neither
+  other class's random picks change; `WARDEN_BASE_SKILLS` (Vigilance, Heavy Shield, Stout Timber)
+  and `WARDEN_BOOK_ORDER`. `stats` sets `slam` (`reach`, `push`, `daze`) and `hound` (`count`,
+  `share`, `slow`, `ms`) only for the warden, uses `WARDEN_SLAM_MS` and `WARDEN_DAMAGE` (Vigilance
+  and Heavy Shield add to `shotMs` and `damage`, Giant's Bane to `bossDamage`) and `hack` (Bulwark,
+  which `moveEnemies` multiplies a foe's hack by). `shoot` calls `slam` instead of firing: every
+  seen foe within `BARRICADE_FRONT + reach` takes the hit with armour, is pushed back `push` (a
+  boss a third as far), stops hacking and is dazed (a `slam` effect). `houndsAct` keeps
+  `state.hounds` (a `Hound` each: `x`, `y`, `target`, `cd`, `face`) at `hound.count`: each hound
+  runs at `HOUND_SPEED` to the walking foe nearest the barricade that is not flying nor the other
+  hound's, bites every `HOUND_MS` for `share` of the slam's damage and slows it (a `bite` effect),
+  and goes back to its spot in `HOUND_HOMES` when there is none. The scene shows `hero-warden`
+  and the `hound-N` frames (`drawHounds`, called from `drawHero`).
+- **Siege engines** (`engines.ts`, `state.engine`, an `Engine` or null): the "Siege engine" button
+  at `ENGINE` (lit while something can be built or bought) opens `EnginePanel`. `buildEngine(state,
+  kind)` builds a ballista or a catapult once per run, only in a break (`canBuild`), for
+  `ENGINES[kind].cost`; `upgradeEngine(state, id)` buys a rank of one of its two `upgrades` (up to
+  `ENGINE_RANKS`, `engineUpgradeCost(rank)`) in a break; `cycleEngineAim` steps through its `aims`
+  any time. `engineStats(engine, wave)` grows the damage by 15% of the base per wave and adds the
+  upgrades. `engineAct` (in `step`, after `houndsAct`) waits while the barricade is at 0: the
+  ballista launches a `lance` missile from `ENGINE_SPOT` at the aim's target that flies straight
+  at `LANCE_SPEED` and hits every foe it passes once, through shields (armour counts); the catapult
+  launches a `stone` on the arc a Troll King's rock flies, at the back-most (or crowded) foe that is
+  not flying and is further than `BARRICADE_FRONT + 40`, leading it by `STONE_FLIGHT_MS`;
+  `landStone` hurts every foe within `radius`, with armour, and Pitch Pots ignites them. The scene
+  draws `engine-<kind>` (`drawEngine`) on the wall, moves the lookout aside while one stands, and
+  dims it with the "Wall down" label while it is idle.
+- **Endless siege** (`endless.ts`, `state.endless`): "Endless siege" on the victory panel
+  (`keepFighting`) sets `endless`. `endlessRules(endless, wave)` gives `hp` (`ENDLESS_GROWTH` to the
+  power of the waves past `WIN_WAVE`, in `hpOf`) and `elites` (`ENDLESS_ELITES` a wave past it, added
+  to the elite roll's chance). `clearWave` keeps the best endless wave per map in
+  `endlessBest[frontier]` (`Progress`). The chip at `ENDLESS_CHIP` shows it while `endless`, the
+  victory panel (`endlessOpen`) and the game-over panel after an endless run (`endlessFallen`) name it.
 - **Daily siege** (`daily.ts`, `state.daily`, with `shared/daily.ts` under `palisade-daily`): the
   game-over panel's "Daily siege" button (`GameScene.startDaily`, refused once today's try is
   `played`) calls `startDaily` and `dailyRun(dailyPlan(dailyRand('palisade', day), day), aim)`: a
@@ -297,11 +332,16 @@ seconds without a tap.
   - `enemies.ts`: the `ENEMIES` table of wave 1 stats per `EnemyKind` (with `coins` and the
     `flying`, `shield` and `healer` flags), the three bosses included.
   - `upgrades.ts`: the `UPGRADES` table, `UpgradeId`, `Icon`, `UPGRADE_IDS`, `BOOK_ORDER` and
-    `MAGE_BOOK_ORDER` (each class's skill book order only, picked by `bookOrder`; the level-up's
-    random picks follow `UPGRADE_IDS`), `FILLERS`, `BASE_SKILLS`, `MAGE_BASE_SKILLS`, `baseSkills`,
+    `MAGE_BOOK_ORDER` and `WARDEN_BOOK_ORDER` (each class's skill book order only, picked by `bookOrder`; the level-up's
+    random picks follow `UPGRADE_IDS`), `FILLERS`, `BASE_SKILLS`, `MAGE_BASE_SKILLS`,
+    `WARDEN_BASE_SKILLS`, `baseSkills`,
     `learns` and `PURSE_COINS`.
   - `frontier.ts`: `FrontierId`, `FRONTIERS`, `FRONTIER_IDS`, `canFrontier`. `hero.ts`:
-    `HeroClass`, `HERO_CLASSES`, `HEROES`, `canClass`, `MAGE_CAST_MS`, `MAGE_DAMAGE`, `MAGE_BURST`.
+    `HeroClass`, `HERO_CLASSES`, `HEROES`, `RETIRED_FOR`, `canClass`, `MAGE_CAST_MS`, `MAGE_DAMAGE`,
+    `MAGE_BURST`, the warden's `WARDEN_*` and the hound's `HOUND_*` numbers. `engines.ts`:
+    `EngineKind`, `ENGINES`, `ENGINE_KINDS`, `ENGINE_UPGRADES`, `ENGINE_AIMS`, `ENGINE_RANKS`,
+    `engineUpgradeCost`, `Engine`, `ENGINE_SPOT`, `engineRank`, `engineStats`, `nextEngineAim`.
+    `endless.ts`: `ENDLESS_GROWTH`, `ENDLESS_ELITES`, `endlessWaves`, `endlessRules`.
     `daily.ts`: `DAILY_GAME`, `DAILY_RELICS`, `DailyPlan`, `dailyPlan`, `planned`.
   - `relics.ts`: the `RELICS` table, `RelicId`, `RELIC_IDS`, `SETS`, `SetId`, `SET_IDS`,
     `setRelics` and `setComplete`.
@@ -350,6 +390,11 @@ seconds without a tap.
   fortification in `FORT_IDS` (a little picture, its text, what is held and a Buy button with its
   cost, greyed out when the coins are short or this break's one is bought) and a dim backdrop that
   closes it. `open` tells the scene to hold everything still.
+- `src/ui/EnginePanel.ts`: the panel the Siege engine button opens, built like `FortifyPanel`:
+  with no engine a row per `ENGINE_KINDS` (picture, text, Build button with its cost), with one an
+  aim toggle and a row per upgrade (rank and a Buy button with its cost), all refused with a buzz
+  when greyed out; a note under the title says what can be done now. `buttons` records each
+  button's id and centre.
 - `src/ui/OmenCard.ts`: the omen card at `OMEN` during a break: "Omen for wave N: name", its text,
   the experience it pays and Accept and Refuse (`buttons` holds their spots), calling back with
   the choice.
@@ -434,13 +479,15 @@ seconds without a tap.
   slots are apart, so the third slot's does not cover the others); the scene holds the battle while it is open and
   closes it on a level-up or a fall, and a tap beside the panel (not on it) closes it. A tap on the Fortify button (always shown; not after a fall or during a level-up) opens
   `FortifyPanel`, which calls `GameScene.fortify`; the scene holds the battle while it is open and
-  closes it on a level-up or a fall, and a tap beside the panel (not on it) closes it. A tap on the Repair button calls `repair`, and Accept or Refuse
+  closes it on a level-up or a fall, and a tap beside the panel (not on it) closes it. The Siege
+  engine button opens `EnginePanel` the same way (`GameScene.shopOpen` is true while either is
+  open), which calls `buildEngine`, `upgradeEngine` and `cycleEngineAim`. A tap on the Repair button calls `repair`, and Accept or Refuse
   on the omen card `decideOmen`. A tap on the aim toggle (or T) calls `cycleAim`. A tap on a road card calls `pickRoad`. "Fight again" calls
   `restart`, "New hero" arms itself on the first tap (`armNewHero`: its caption becomes "Sure? Tap
   again" and `newHeroNote` says what is lost; any other tap on the panel or leaving it disarms it)
   and calls `restart` on the second, the heat buttons on the game-over panel and "Heat N" on the victory panel call
   `restartAt`, a "Start at" button sets `startWave`, "Retire" calls `openRetire` and a legacy card
-  `GameScene.retire`, and "Keep fighting" calls `keepFighting`. The "Skill book" button opens `SkillBook`; Back or a tap beside the book closes it.
+  `GameScene.retire`, and "Endless siege" calls `keepFighting`. The "Skill book" button opens `SkillBook`; Back or a tap beside the book closes it.
   While it is open `GameScene.update` skips `tick` and its `clock`, so the battle, effects and the
   auto-pick countdown all wait. The button sits above the level-up overlay (depth `UI_DEPTH + 15`)
   so it works while choosing, and hides after a fall. Shooting is automatic. A dimming rectangle
@@ -466,7 +513,7 @@ seconds without a tap.
 
 - `GameState` (`src/game/state.ts`) has two halves. The progress fields (`level`, `xp`, `ranks`,
   `levelUps`, `bestWave`, `runs`, `relics`, `mastered`, `heat`, `heatUnlocked`, `legacy` (`relics`,
-  `slot`, `rain`, `retired`), `hero`, `frontier`, `passBest`, `passWon`, and `choices`, the cards
+  `slot`, `rain`, `retired`), `hero`, `frontier`, `passBest`, `passWon`, `endlessBest`, and `choices`, the cards
   up for a pending level-up) form `Progress`. The run fields are `wave`, `phase`
   (`'break' | 'fighting' | 'over' | 'won'`), `breakMs`, `toSpawn`, `spawnMs`, `barricade`, `enemies`,
   `missiles`, `effects`, `cooldown`, `pickMs` (time left to pick before the auto-pick),
@@ -533,11 +580,13 @@ them alone. `palisade-progress` holds JSON of `Progress`, relics, `heat`, `heatU
 `choices` included. `loadProgress` merges it over
 `freshProgress()` (dropping unknown upgrade and relic ids, and `choices` unless they are three known
 upgrades with a level-up pending; an older save gets heat 0 and no legacy, and the legacy's fields are
-checked one by one; `hero` is the mage only with a hero retired, `frontier` the pass only with a heat
+checked one by one; `hero` is the mage or the warden only when `canClass` allows it, `endlessBest`
+is read per map and defaults to 0, `frontier` the pass only with a heat
 unlocked, so an older save is a ranger in the vale) and falls back to fresh on any error.
 "New hero" (on its confirming second tap) calls `clearProgress`, which also drops the relics and the heats, then saves a fresh hero
 with the legacy kept. The run itself (wave, foes,
-barricade, Arrow Rain and caltrops charge, streak, coins, guards, road, fortifications, repairs, omen) is never saved, so a reload
+barricade, Arrow Rain and caltrops charge, streak, coins, guards, road, fortifications, repairs, omen,
+siege engine, hounds, endless) is never saved, so a reload
 starts at wave 1.
 `palisade-trophies` holds the trophies earned (`shared/trophies.ts`), each id with the time; "New
 hero" keeps them.
@@ -556,7 +605,11 @@ hero" keeps them.
   and roads come from its plan rather than `Math.random`. In `waves.ts`: `waveFoes` (shuffle). Arrow Rain,
   the caltrops, guards, shamans, the other boss moves, splitting, the fortifications and the streak use none. Art uses
   its own `seeded` generator, and the scene scatters a volley's shafts with a hash of its id, so
-  neither touches the sequence.
+  neither touches the sequence. The siege engines, the warden's slam and the hounds use none.
+- **Every Phaser Text object takes 31 `Math.random` calls** (a UUID for its texture key), so a new
+  `Text` made in `GameScene.create` (or before the first level-up) shifts the seeded sequence and
+  can change the first card the playthrough taps (the siege engine button and the endless chip did,
+  from Frost to Bounty Hunter).
 - Time comes only from Phaser's frame timestamp in `GameScene.update`. There are no timers or
   `Date.now`.
 
@@ -621,8 +674,9 @@ nothing plays for it. The player's own taps play from `GameScene` and the panels
   and only calls `playMusic` when it changes. The 2x speed switch leaves the tempo alone.
 - **Effects** (`src/audio/sfx.ts`, at most one of each per frame), from `BattleSounds.play`:
   `bow` (any arrows launched: one per volley), `hit` (an arrow gone mid-field), `crit`, `clank`
-  (`block`), `blast`, `boom` (`fireblast`: fireball, oil pot), `whoosh` (a fireball or a Troll King's
-  rock thrown), `magic` (a mage's bolt), `arcane`, `zap` (`bolt`), `stab`, `heal`, `thud`
+  (`block`), `blast`, `boom` (`fireblast`: fireball, oil pot), `whoosh` (a fireball, a Troll King's
+  rock or a catapult's stone thrown), `twang` (a ballista's bolt), `slam` (the warden's slam),
+  `bite` (a hound's bite), `magic` (a mage's bolt), `arcane`, `zap` (`bolt`), `stab`, `heal`, `thud`
   (`rockHit`), `horn` (a wave starts; higher for the Ogre Warlord's `call`), `roar`, `pop` (a
   `death`, lower for bigger foes) or `bossDown`, `split`, `xp` (pitched up with the streak),
   `rainLand` (`rain`), `pick` (`autoPick`), `ready` (Arrow Rain or the caltrops just charged),
@@ -631,7 +685,7 @@ nothing plays for it. The player's own taps play from `GameScene` and the panels
   chest). Effects at or right of a Night wave's `sight` stay silent, the same line past which the scene hides them.
 - **The player's taps:** `rainLoose` and `caltrops` when `loose`/`strew` succeed (drag, R, Space,
   C), `pick` for a card, a road or a legacy, `build` with `ui('coin')` for `hire`, `train`,
-  `fortify` and `repair`, `omen` for an accepted omen, `ui('click')` for every `makeButton`, the aim
+  `fortify`, `repair`, `buildEngine` and `upgradeEngine`, `omen` for an accepted omen, `ui('click')` for every `makeButton`, the aim
   toggle, the speed switch, the Fortify button, a guard slot, the skill book button, the
   auto-pick checkbox and a "Start at" pick. `ui('refuse')` for every refused action: a tap on an
   uncharged Arrow Rain or caltrops button (or R, Space, C), letting go off the road, a repair or
@@ -667,7 +721,7 @@ nothing plays for it. The player's own taps play from `GameScene` and the panels
   the current wave: `first`, `last`, `boss`, `step`), `.rainSpot` (the Arrow Rain button's centre)
   and `.aim` (where Arrow Rain is being dragged, or null). It never writes to the game. Also there
   to read: `.aimKind`, `.caltropsSpot`, `.roadChoice.cards`, `.hirePanel.slot`,
-  `.omenCard.buttons`, `.legacyPanel.cards` (and `.legacyPanel.hero`), `.startWave`,
+  `.omenCard.buttons`, `.enginePanel.buttons`, `.legacyPanel.cards` (and `.legacyPanel.hero`), `.startWave`,
   `.nextFrontier` and `.nextHero`. The playthrough plays a fresh ranger in the vale and never opens
   the daily siege: a fresh hero is a ranger (`hero`), the vale (`frontier`) and no `daily`, and the
   mage's upgrades are filtered out of the ranger's offers without changing their random sequence.
@@ -706,7 +760,8 @@ nothing plays for it. The player's own taps play from `GameScene` and the panels
     charge, leaves one volley at the release point, and once it lands there is a `rain` effect,
     the foe it was dropped on is gone and kills went up.
   - At most two more level-ups in wave 1, then wave 2 in `'break'` with `bestWave` 1, 6 kills, no
-    relic, the barricade above 0, 9 coins, the caltrops charged (6), no guards, a best streak of 2
+    relic, the barricade above 0, 9 coins (plus Bounty Hunter's coin for each kill after the card
+    was tapped, when that is the card; with today's seed it is), the caltrops charged (6), no guards, a best streak of 2
     or more with `bonusXp` above 0, earned experience equal to 18 plus `bonusXp`, and the track on
     step 2.
 - **Mirrored in the test:** `VIEW`, each foe's `xp`, the goblin's and orc's `coins`, `xpToNext`,
@@ -775,6 +830,9 @@ nothing plays for it. The player's own taps play from `GameScene` and the panels
   `hpWaves` and `reward`, and when it opens in `canFrontier`), its own foes in `waveFoes`, its best
   wave alongside `passBest` (and in `bestOn`, `clearWave` and `loadProgress`), a background in
   `bakeScenery` picked in `drawHero`, its name in `src/i18n/` and a README section.
+- **Add an engine upgrade or aim:** an entry in `ENGINE_UPGRADES` or `ENGINE_AIMS` and the kind's
+  `upgrades` or `aims` in `ENGINES`, its effect in `engineStats` or `engineAct`, its texts in
+  `src/i18n/` and the README's engine table.
 - **Add a hero class:** add its id to `HeroClass` and `HEROES` in `src/game/hero.ts` (and when it
   opens in `canClass`), its upgrades in `UPGRADES` with `hero: '<id>'` (at the end of the table),
   its base skills and book order in `upgrades.ts` (`baseSkills`, `bookOrder`), its stats in `stats`,
@@ -829,6 +887,6 @@ nothing plays for it. The player's own taps play from `GameScene` and the panels
   `GameScene.track` is always the current wave's.
 - Storage is shared with the other games on the hub's origin. Keep any new key prefixed
   `palisade-`.
-- Three bests: `bestWave` is the vale's, `passBest` the frozen pass's; the daily siege's best is in
+- Three bests: `bestWave` is the vale's, `passBest` the frozen pass's, `endlessBest` each map's best endless wave; the daily siege's best is in
   `palisade-daily`. Read a map's best with `bestOn`, never `bestWave` alone, where the map matters
   (the forced march, the top bar's "Best wave").

@@ -1,7 +1,8 @@
 import type { AimMode } from './aim';
 import type { DailyPlan } from './daily';
 import type { FrontierId } from './frontier';
-import { MAGE_BURST, MAGE_CAST_MS, MAGE_DAMAGE, type HeroClass } from './hero';
+import type { Engine } from './engines';
+import { HOUND_BITE, HOUND_HOLD, HOUND_HOMES, MAGE_BURST, MAGE_CAST_MS, MAGE_DAMAGE, WARDEN_DAMAGE, WARDEN_PUSH, WARDEN_REACH, WARDEN_SLAM_MS, type HeroClass } from './hero';
 import type { Trait } from './elites';
 import type { EnemyKind } from './enemies';
 import type { FortId } from './forts';
@@ -69,9 +70,10 @@ export interface Enemy {
 
 /**
  * The ranger's arrows and fireballs, the mage hero's `spell` bolts (and fire orbs, which fly as
- * fireballs), the hired mage's arcane bolts and the Troll King's rocks.
+ * fireballs), the hired mage's arcane bolts, the Troll King's rocks and the siege engines' shots:
+ * the ballista's `lance`, which flies straight on through every foe, and the catapult's `stone`.
  */
-export type MissileKind = 'arrow' | 'spell' | 'fireball' | 'magic' | 'rock';
+export type MissileKind = 'arrow' | 'spell' | 'fireball' | 'magic' | 'rock' | 'lance' | 'stone';
 
 export interface Missile {
   id: number;
@@ -86,9 +88,12 @@ export interface Missile {
   hit: number[];
   /** How many more foes an arrow passes through, or a spell leaps on to. */
   pierce: number;
-  /** Arcane bolts: the damage of their burst. */
+  /** Arcane bolts, lances and stones: the damage they deal. */
   damage?: number;
-  /** Rocks: where they were thrown from and come down, and the guard slot they are thrown at (none when no guard is hired). */
+  /** Stones: how wide they crush, and the burning of a pitch pot. */
+  radius?: number;
+  burn?: { dps: number; ms: number } | null;
+  /** Rocks and stones: where they were thrown from and come down, and the guard slot a rock is thrown at (none when no guard is hired). */
   from?: { x: number; y: number };
   to?: { x: number; y: number };
   slot?: number;
@@ -99,10 +104,12 @@ export interface Missile {
  * and for each kill an "+N XP" pop (`xp`) and the experience orbs flying into the bar (`orb`). Also
  * an arrow glancing off a shield (`block`), a shaman's healing (`heal`, with the healed foes in
  * `points`), a spearman's thrust (`stab`, from the guard to the foe) and an arcane burst (`arcane`).
+ * The warden's shield slam (`slam`, across the barricade's face with `radius` its reach) and a
+ * hound's bite (`bite`).
  */
 export interface Effect {
   id: number;
-  kind: 'blast' | 'fireblast' | 'bolt' | 'death' | 'crit' | 'rain' | 'xp' | 'orb' | 'block' | 'heal' | 'stab' | 'arcane' | 'rockHit' | 'call' | 'roar' | 'howl' | 'split' | 'autoPick';
+  kind: 'blast' | 'fireblast' | 'bolt' | 'death' | 'crit' | 'rain' | 'xp' | 'orb' | 'block' | 'heal' | 'stab' | 'arcane' | 'rockHit' | 'call' | 'roar' | 'howl' | 'split' | 'autoPick' | 'slam' | 'bite';
   x: number;
   y: number;
   /** Blast radius, or the lightning's path (the healed foes, the thrust's two ends). */
@@ -146,6 +153,19 @@ export interface Guard {
   level: number;
   cd: number;
   stunMs: number;
+}
+
+/**
+ * The warden's hound: where it is, the foe it runs at (null to go home), the time to its next bite
+ * and which way it faces (1 right, towards the foes; -1 left, going home).
+ */
+export interface Hound {
+  id: number;
+  x: number;
+  y: number;
+  target: number | null;
+  cd: number;
+  face: 1 | -1;
 }
 
 /** The fortifications bought in the breaks: see forts.ts. */
@@ -194,6 +214,8 @@ export interface GameState {
   /** The highest wave cleared on the frozen pass, and whether its wave 30 has been cleared (the pass won). */
   passBest: number;
   passWon: boolean;
+  /** The best wave cleared on each map in the endless siege past wave 30 (see endless.ts), 0 for none. */
+  endlessBest: Record<FrontierId, number>;
 
   // This run.
   wave: number;
@@ -249,6 +271,12 @@ export interface GameState {
   repairs: number;
   /** The omen named for the coming (or current) wave, and whether it was accepted; null for none. */
   omen: { id: OmenId; accepted: boolean } | null;
+  /** The siege engine built on the barricade this run (see engines.ts), or null. */
+  engine: Engine | null;
+  /** The warden's hounds (none for the other classes). */
+  hounds: Hound[];
+  /** Whether this run went on past the lifted siege into the endless siege (see endless.ts). */
+  endless: boolean;
   nextId: number;
 }
 
@@ -274,13 +302,14 @@ export function stats(state: Pick<GameState, 'ranks' | 'relics' | 'heat'> & Part
   // The mage's skills work like the ranger's that match them (a hero only ever has one class's), so
   // each stat adds both: Focus to Swift Draw, Ember Bolt to Fire Arrows, and so on.
   const mage = state.hero === 'mage';
+  const warden = state.hero === 'warden';
   const deep = r('deepFreeze') + r('glacier');
   const pyro = r('pyromancy') + r('orbMastery');
   const fork = r('forked') + r('arc');
   return {
     /** Milliseconds between two shots of the bow (or casts of the mage's bolt). */
-    shotMs: (mage ? MAGE_CAST_MS : 1_000) / (1 + 0.2 * (r('swift') + r('focus'))) / (1 + 0.1 * relic('drum')),
-    damage: (mage ? MAGE_DAMAGE : 10) * (1 + 0.25 * (r('sharp') + r('potency'))) * (1 + 0.15 * relic('feather')),
+    shotMs: (mage ? MAGE_CAST_MS : warden ? WARDEN_SLAM_MS : 1_000) / (1 + 0.2 * (r('swift') + r('focus') + r('vigil'))) / (1 + 0.1 * relic('drum')),
+    damage: (mage ? MAGE_DAMAGE : warden ? WARDEN_DAMAGE : 10) * (1 + 0.25 * (r('sharp') + r('potency') + r('bash'))) * (1 + 0.15 * relic('feather')),
     arrows: 1 + r('volley') + r('twin'),
     pierce: r('pierce'),
     /** Chain Spark: how many more foes a mage's bolt leaps on to. */
@@ -311,7 +340,7 @@ export function stats(state: Pick<GameState, 'ranks' | 'relics' | 'heat'> & Part
     /** Finishing Shot: arrows deal double damage to a foe below this share of its health. */
     finisher: 0.15 * r('finisher'),
     /** Giant Slayer: arrows and Arrow Rain deal this many times their damage to a boss. */
-    bossDamage: 1 + 0.3 * (r('slayer') + r('hex')),
+    bossDamage: 1 + 0.3 * (r('slayer') + r('hex') + r('bane')),
     /** Cloudburst: how many times wider (and taller) Arrow Rain's ring is. */
     rainRing: 1 + 0.15 * r('cloudburst'),
     /** Caltrops: the share foes on them are slowed by, and how many times an arrow's damage they take a second. */
@@ -323,6 +352,15 @@ export function stats(state: Pick<GameState, 'ranks' | 'relics' | 'heat'> & Part
     bounty: r('bounty'),
     /** Drill Sergeant: how many times faster hired guards attack. */
     guardSpeed: 1 + 0.2 * r('drill'),
+    /**
+     * The warden's shield slam: how far past the barricade's face it reaches, how far it shoves foes
+     * back (a third as far for a boss) and the daze it leaves (Daze); null for the other classes.
+     */
+    slam: warden ? { reach: WARDEN_REACH + 20 * r('reach'), push: WARDEN_PUSH + 14 * r('shove'), daze: r('daze') ? { slow: 0.5, ms: 400 * r('daze') } : null } : null,
+    /** The warden's hounds: how many, the bite's share of a slam's hit and how long it holds a foe; null for the other classes. */
+    hound: warden ? { count: Math.min(HOUND_HOMES.length, 1 + r('pack')), share: HOUND_BITE * (1 + 0.4 * r('fangs')), slow: HOUND_HOLD.slow, ms: HOUND_HOLD.ms + 350 * r('hold') } : null,
+    /** Bulwark: foes hack at the barricade and the stake line this many times as fast. */
+    hack: 1 - 0.1 * r('bulwark'),
   };
 }
 
@@ -334,7 +372,7 @@ export const rainNeed = (wave: number, s: Stats) => Math.max(2, Math.round((RAIN
 /** The hero's level and upgrades, kept from one run to the next. */
 export type Progress = Pick<
   GameState,
-  'level' | 'xp' | 'ranks' | 'levelUps' | 'bestWave' | 'runs' | 'relics' | 'mastered' | 'heat' | 'heatUnlocked' | 'legacy' | 'hero' | 'frontier' | 'passBest' | 'passWon' | 'choices'
+  'level' | 'xp' | 'ranks' | 'levelUps' | 'bestWave' | 'runs' | 'relics' | 'mastered' | 'heat' | 'heatUnlocked' | 'legacy' | 'hero' | 'frontier' | 'passBest' | 'passWon' | 'endlessBest' | 'choices'
 >;
 
 /** A hero from scratch, of this class, with what retired heroes left: their first relics among the relics. */
@@ -343,7 +381,7 @@ export function freshProgress(legacy: Legacy = freshLegacy(), hero: HeroClass = 
   for (const id of legacy.relics) relics[id] = (relics[id] ?? 0) + 1;
   return {
     level: 1, xp: 0, ranks: {}, levelUps: 0, bestWave: 0, runs: 0, relics, mastered: false, heat: 0, heatUnlocked: 0, legacy,
-    hero, frontier: 'vale', passBest: 0, passWon: false, choices: null,
+    hero, frontier: 'vale', passBest: 0, passWon: false, endlessBest: { vale: 0, pass: 0 }, choices: null,
   };
 }
 
@@ -363,6 +401,7 @@ export function newRun(progress: Progress, aimMode: AimMode = 'nearest', start =
     ...progress,
     ranks: { ...progress.ranks },
     relics: { ...progress.relics },
+    endlessBest: { ...progress.endlessBest },
     legacy: { ...progress.legacy, relics: [...progress.legacy.relics] },
     wave: start,
     phase: 'break',
@@ -392,17 +431,20 @@ export function newRun(progress: Progress, aimMode: AimMode = 'nearest', start =
     won: false,
     repairs: 0,
     omen: null,
+    engine: null,
+    hounds: [],
+    endless: false,
     daily,
     nextId: 1,
   };
 }
 
 export function progressOf(state: GameState): Progress {
-  const { level, xp, ranks, levelUps, bestWave, runs, relics, mastered, heat, heatUnlocked, legacy, hero, frontier, passBest, passWon, choices } = state;
+  const { level, xp, ranks, levelUps, bestWave, runs, relics, mastered, heat, heatUnlocked, legacy, hero, frontier, passBest, passWon, endlessBest, choices } = state;
   // The cards up for a pending level-up are kept too, so a reload shows the same three.
   return {
     level, xp, ranks: { ...ranks }, levelUps, bestWave, runs, relics: { ...relics }, mastered, heat, heatUnlocked,
-    legacy: { ...legacy, relics: [...legacy.relics] }, hero, frontier, passBest, passWon, choices: choices && [...choices],
+    legacy: { ...legacy, relics: [...legacy.relics] }, hero, frontier, passBest, passWon, endlessBest: { ...endlessBest }, choices: choices && [...choices],
   };
 }
 

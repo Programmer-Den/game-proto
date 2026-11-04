@@ -3,11 +3,12 @@ import Phaser from 'phaser';
 import { ui } from '../../../../shared/audio';
 import { formatNumber } from '../../../../shared/i18n';
 import { sfx } from '../audio/sfx';
-import { FIGURES, foeTexture, guardTexture, heroTexture } from '../art/characters';
+import { FIGURES, engineTexture, foeTexture, guardTexture, heroTexture, houndTexture } from '../art/characters';
 import { dailyRand, finishDaily, loadDaily, startDaily, today } from '../../../../shared/daily';
 import { DAILY_GAME, dailyPlan } from '../game/daily';
 import { FRONTIERS, FRONTIER_IDS, canFrontier, type FrontierId } from '../game/frontier';
-import { HEROES, canClass, type HeroClass } from '../game/hero';
+import { HEROES, HERO_CLASSES, canClass, type HeroClass } from '../game/hero';
+import { ENGINE_SPOT, ENGINES } from '../game/engines';
 import { bossNodeTexture, relicTexture } from '../art/icons';
 import { fit } from '../art/lowpoly';
 import { BAR, BOSS_BARS, FIRE, GOLD, SLATE, STORM, XP } from '../art/palette';
@@ -27,7 +28,11 @@ import {
   CALTROP_PATCH,
   RAIN_FALL_MS,
   RAIN_RING,
+  buildEngine,
+  canBuild,
   canBuyFort,
+  canUpgradeEngine,
+  cycleEngineAim,
   canFortify,
   canRepair,
   canRetire,
@@ -54,6 +59,7 @@ import {
   strew,
   tick,
   train,
+  upgradeEngine,
 } from '../game/sim';
 import {
   BARRICADE_FRONT,
@@ -72,6 +78,7 @@ import {
 } from '../game/state';
 import { FILLERS, UPGRADES, type UpgradeId } from '../game/upgrades';
 import { isBossWave, waveTrack } from '../game/waves';
+import { EnginePanel } from '../ui/EnginePanel';
 import { FortifyPanel } from '../ui/FortifyPanel';
 import { HirePanel } from '../ui/HirePanel';
 import { LegacyPanel } from '../ui/LegacyPanel';
@@ -86,7 +93,7 @@ import { checkTrophies } from '../trophies/check';
 import { trophies } from '../trophies';
 import { award } from '../../../../shared/trophies';
 import { viewFrame } from '../../../../shared/scaling';
-import { AIM, BARRICADE, BARRICADE_BAR, BARRICADE_TIP_W, BOSS_BAR, CALTROPS, FORTIFY, FRONTIER_CHIP, GUARD_HIT, HEAT, HERO_FEET, HUD_HEIGHT, MARCH, OMEN_CHIP, RAIN, RAIN_HINT, REPAIR, ROAR_CHIP, SEEN, SKILL_BOOK, SPEED, STREAK, TRACK, UI_DEPTH, VIEW, XP_BAR, placeHud } from './layout';
+import { AIM, BARRICADE, ENDLESS_CHIP, ENGINE, BARRICADE_BAR, BARRICADE_TIP_W, BOSS_BAR, CALTROPS, FORTIFY, FRONTIER_CHIP, GUARD_HIT, HEAT, HERO_FEET, HUD_HEIGHT, MARCH, OMEN_CHIP, RAIN, RAIN_HINT, REPAIR, ROAR_CHIP, SEEN, SKILL_BOOK, SPEED, STREAK, TRACK, UI_DEPTH, VIEW, XP_BAR, placeHud } from './layout';
 
 /** Longest simulated step, so a backgrounded tab doesn't jump the battle forward. */
 const MAX_STEP_MS = 250;
@@ -128,6 +135,13 @@ export class GameScene extends Phaser.Scene {
   hirePanel!: HirePanel;
   /** The panel the "Fortify" button opens during a break. */
   fortifyPanel!: FortifyPanel;
+  /** The panel the "Siege engine" button opens. */
+  enginePanel!: EnginePanel;
+
+  /** Whether the fortify or the engine panel is open; the battle holds still while either is. */
+  private get shopOpen() {
+    return !!(this.fortifyPanel?.open || this.enginePanel?.open);
+  }
   /** The omen card during a break from wave 4. */
   omenCard!: OmenCard;
   /** The legacy cards when the hero retires. */
@@ -155,6 +169,13 @@ export class GameScene extends Phaser.Scene {
   private heatText!: Phaser.GameObjects.Text;
   private roarText!: Phaser.GameObjects.Text;
   private fortG!: Phaser.GameObjects.Graphics;
+  private engineBg!: Phaser.GameObjects.Graphics;
+  private engineText!: Phaser.GameObjects.Text;
+  private endlessText!: Phaser.GameObjects.Text;
+  private engineSprite!: Phaser.GameObjects.Image;
+  private engineLabel!: Phaser.GameObjects.Text;
+  private lastEngineCd = 0;
+  private houndSprites = new Map<number, Phaser.GameObjects.Image>();
   private fortLabel!: Phaser.GameObjects.Text;
   private won!: Phaser.GameObjects.Container;
   private wonText!: Phaser.GameObjects.Text;
@@ -256,6 +277,7 @@ export class GameScene extends Phaser.Scene {
     this.pops.clear();
     this.rainArrows.clear();
     this.caltropPieces.clear();
+    this.houndSprites.clear();
     this.aim = null;
     this.eliteLabels.clear();
     const progress = loadProgress();
@@ -296,6 +318,22 @@ export class GameScene extends Phaser.Scene {
       (slot) => this.train(slot),
     );
     this.fortifyPanel = new FortifyPanel(this, (id) => this.fortify(id));
+    this.enginePanel = new EnginePanel(
+      this,
+      (kind) => {
+        this.bought(buildEngine(this.state, kind));
+        this.showEngine();
+      },
+      (id) => {
+        this.bought(upgradeEngine(this.state, id));
+        this.showEngine();
+      },
+      () => {
+        ui('click');
+        cycleEngineAim(this.state);
+        this.showEngine();
+      },
+    );
     this.omenCard = new OmenCard(this, (accept) => {
       if (decideOmen(this.state, accept) && accept) sfx('omen');
     });
@@ -320,9 +358,10 @@ export class GameScene extends Phaser.Scene {
     // fortify panel is open.
     if (s.choices || held(s)) this.hirePanel.close();
     if (s.choices || held(s)) this.fortifyPanel.close();
+    if (s.choices || held(s)) this.enginePanel.close();
     this.sounds.mark(s);
     let ticked = 0;
-    if (!this.skillBook.open && !this.hirePanel.open && !this.fortifyPanel.open) {
+    if (!this.skillBook.open && !this.hirePanel.open && !this.shopOpen) {
       // The battle plays at the chosen speed; the level-up's and the road choice's auto-pick
       // countdowns and the break with an undecided omen card stay in real seconds.
       const realTime = s.choices || s.roadChoices || (s.phase === 'break' && s.omen && !s.omen.accepted);
@@ -340,7 +379,7 @@ export class GameScene extends Phaser.Scene {
       finishDaily(DAILY_GAME, s.wave - 1, s.daily.day);
     }
     // A level-up or a fall drops Arrow Rain from the hand.
-    if (s.choices || held(s) || this.skillBook.open || this.hirePanel.open || this.fortifyPanel.open) this.aim = null;
+    if (s.choices || held(s) || this.skillBook.open || this.hirePanel.open || this.shopOpen) this.aim = null;
 
     this.track = waveTrack(s.wave, s.frontier);
     this.drawFoes();
@@ -356,7 +395,7 @@ export class GameScene extends Phaser.Scene {
     this.drawAimToggle();
     // The road cards wait under a level-up, as their countdown does, so only one choice is up at a time.
     this.roadChoice.show(s.phase === 'break' && !s.choices ? s.roadChoices : null, s.roadMs);
-    const omen = s.phase === 'break' && s.omen && !s.omen.accepted && !s.choices && !this.hirePanel.open && !this.fortifyPanel.open ? s.omen.id : null;
+    const omen = s.phase === 'break' && s.omen && !s.omen.accepted && !s.choices && !this.hirePanel.open && !this.shopOpen ? s.omen.id : null;
     this.omenCard.show(omen, s.wave);
     this.levelUp.show(held(s) ? null : s.choices, s.ranks, s.level - s.levelUps + 1, s.levelUps, s.pickMs);
     this.discover();
@@ -379,6 +418,7 @@ export class GameScene extends Phaser.Scene {
           t(pass ? (s.heat > 0 ? 'passWonHeat' : 'passWon') : s.heat > 0 ? 'wonHeat' : 'won', vars),
           t(next <= MAX_HEAT ? HEAT_UNLOCKED[next - 1] : 'wonAll'),
           ...(pass ? [] : [t('passOpen')]),
+          t('endlessOpen', { n: s.endlessBest[s.frontier] }),
         ].join('\n\n'),
       );
       this.wonNext.setVisible(next <= MAX_HEAT);
@@ -421,6 +461,12 @@ export class GameScene extends Phaser.Scene {
     ui('coin');
   }
 
+  /** Redraws the engine panel with the engine, the coins and whether it is a break. */
+  private showEngine() {
+    const s = this.state;
+    this.enginePanel.show(s.engine, s.coins, canBuild(s));
+  }
+
   private hire(slot: number, kind: GuardKind) {
     const done = hire(this.state, slot, kind);
     this.bought(done);
@@ -441,7 +487,7 @@ export class GameScene extends Phaser.Scene {
 
   /** Cycles the aim priority, and keeps it for the next run and the next visit. */
   private cycleAim() {
-    if (this.skillBook.open || this.hirePanel.open || this.fortifyPanel.open) return;
+    if (this.skillBook.open || this.hirePanel.open || this.shopOpen) return;
     setAim(this.state, nextAim(this.state.aimMode));
     saveAim(this.state.aimMode);
     ui('click');
@@ -570,21 +616,24 @@ export class GameScene extends Phaser.Scene {
       seen.add(m.id);
       let sprite = this.missiles.get(m.id);
       if (!sprite) {
-        const key = m.kind === 'arrow' ? arrowKey : m.kind === 'spell' ? 'spell-bolt' : m.kind === 'magic' ? 'magic-bolt' : m.kind === 'rock' ? 'rock' : 'fireball';
-        sprite = fit(this.add.image(m.x, m.y, key)).setDepth(UI_DEPTH - 40);
+        const key = m.kind === 'arrow' ? arrowKey : m.kind === 'spell' ? 'spell-bolt' : m.kind === 'magic' ? 'magic-bolt' : m.kind === 'rock' || m.kind === 'stone' ? 'rock' : m.kind === 'lance' ? 'lance' : 'fireball';
+        sprite = fit(this.add.image(m.x, m.y, key), m.kind === 'stone' ? 1.25 : m.kind === 'lance' ? 1.4 : 1).setDepth(UI_DEPTH - 40);
+        if (m.kind === 'lance') sprite.setOrigin(46 / 64, 0.5);
         if (m.kind === 'arrow' || m.kind === 'spell') sprite.setOrigin(30 / 44, 0.5);
         else if (m.kind === 'magic') sprite.setOrigin(28 / 40, 0.5);
         else if (m.kind === 'fireball') sprite.setOrigin(34 / 48, 0.5);
         this.missiles.set(m.id, sprite);
       }
-      if (m.kind === 'rock') {
-        // A rock tumbles along a high arc over the foes, with its shadow on the road.
+      if (m.kind === 'rock' || m.kind === 'stone') {
+        // A rock (or a catapult's stone) tumbles along a high arc over the foes, with its shadow on the road.
         const total = Math.max(1, Math.hypot(m.to!.x - m.from!.x, m.to!.y - m.from!.y));
         const u = Phaser.Math.Clamp(1 - Math.hypot(m.to!.x - m.x, m.to!.y - m.y) / total, 0, 1);
-        const lift = Math.sin(u * Math.PI) * 110;
+        const lift = Math.sin(u * Math.PI) * (m.kind === 'stone' ? 150 : 110);
         this.fx.fillStyle(0x2a1808, 0.2).fillEllipse(m.x, m.y + 10, 24, 8);
         sprite.setPosition(m.x, m.y - lift).setRotation(m.x * 0.05);
-      } else sprite.setPosition(m.x, m.y).setRotation(Math.atan2(m.vy, m.vx));
+      } else {
+        sprite.setPosition(m.x, m.y).setRotation(Math.atan2(m.vy, m.vx));
+      }
     }
     for (const [id, sprite] of this.missiles) {
       if (seen.has(id)) continue;
@@ -600,6 +649,12 @@ export class GameScene extends Phaser.Scene {
     glow.clear();
     const seen = new Set<number>();
     let inFlight = 0;
+    // The ballista's lances leave a pale streak behind them.
+    for (const m of this.state.missiles) {
+      if (m.kind !== 'lance') continue;
+      const a = Math.atan2(m.vy, m.vx);
+      glow.lineStyle(4, 0xfff2c4, 0.4).lineBetween(m.x - Math.cos(a) * 130, m.y - Math.sin(a) * 130, m.x - Math.cos(a) * 62, m.y - Math.sin(a) * 62);
+    }
     // Nothing in the dark of a Night wave shows: no puff or pop from a kill by a blast's edge or a
     // volley, no spark, burst or healing mote over a hidden foe.
     const sight = omenEffects(this.state.omen).sight;
@@ -700,6 +755,22 @@ export class GameScene extends Phaser.Scene {
           const u = Math.max(0, life - k * 0.18);
           const r = (e.radius ?? 220) * u;
           glow.lineStyle(4, 0xe8f8ff, 0.7 * (1 - u)).strokeEllipse(e.x - r * 0.5, e.y + 20, r * 2.2, r * 1.1);
+        }
+      } else if (e.kind === 'slam') {
+        // The warden's shield slam: a green-gold wave rolls out from the barricade's face.
+        const r = e.radius ?? 60;
+        const x = e.x + r * 0.2 + r * 0.8 * life;
+        glow.lineStyle(6, 0x8ff0a8, 0.7 * (1 - life)).strokeEllipse(x, e.y, 26 + 30 * life, 150);
+        glow.lineStyle(2, GOLD.light, 0.8 * (1 - life)).strokeEllipse(x - 6, e.y, 16 + 20 * life, 110);
+      } else if (e.kind === 'bite') {
+        // A hound's bite: two rows of fangs snapping shut.
+        const gap = 9 * (1 - Math.min(1, life * 2.5));
+        for (const side of [-1, 1]) {
+          for (let k = -1; k <= 1; k++) {
+            const fx = e.x + k * 6;
+            const fy = e.y + side * gap;
+            g.fillStyle(0xfff8e8, 1 - life).fillTriangle(fx - 3, fy, fx + 3, fy, fx, fy - side * 6);
+          }
         }
       } else if (e.kind === 'split') {
         // A Splitting foe falls apart: green shards burst sideways.
@@ -828,6 +899,7 @@ export class GameScene extends Phaser.Scene {
       const fig = FIGURES[key]!;
       fit(this.hero.setTexture(key)).setOrigin(fig.originX, fig.originY);
     }
+    this.drawHounds();
     const bg = this.state.frontier === 'pass' ? 'background-pass' : 'background';
     if (this.background.texture.key !== bg) fit(this.background.setTexture(bg));
     // The bow kicks back a little with each shot.
@@ -838,6 +910,29 @@ export class GameScene extends Phaser.Scene {
     const barricade = this.state.barricade;
     const health = barricade.hp / barricade.max;
     fit(this.barricade.setTexture(barricade.hp <= 0 ? 'barricade-3' : health > 0.66 ? 'barricade-0' : health > 0.33 ? 'barricade-1' : 'barricade-2'));
+  }
+
+  /** The warden's hounds: running in two frames, facing where they go (the art faces left). */
+  private drawHounds() {
+    const seen = new Set<number>();
+    for (const d of this.state.hounds) {
+      seen.add(d.id);
+      let sprite = this.houndSprites.get(d.id);
+      if (!sprite) {
+        sprite = this.add.image(d.x, d.y, houndTexture(0));
+        this.houndSprites.set(d.id, sprite);
+      }
+      const home = this.state.enemies.length === 0 || d.target === null;
+      const frame = home && Math.abs(sprite.x - d.x) < 0.5 ? 0 : Math.floor(this.clock / 140 + d.id) % 2;
+      const key = houndTexture(frame);
+      const fig = FIGURES[key]!;
+      fit(sprite.setTexture(key)).setOrigin(fig.originX, fig.originY).setFlipX(d.face === 1).setPosition(d.x, d.y).setDepth(d.y);
+    }
+    for (const [id, sprite] of this.houndSprites) {
+      if (seen.has(id)) continue;
+      sprite.destroy();
+      this.houndSprites.delete(id);
+    }
   }
 
   // ---- The HUD: top bar, experience bar, banners and the boss's bars.
@@ -972,7 +1067,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     // The wave's banner during the break before it.
-    const breaking = s.phase === 'break' && !s.choices && !s.relicFound && !s.roadChoices && !this.hirePanel.open && !this.fortifyPanel.open;
+    const breaking = s.phase === 'break' && !s.choices && !s.relicFound && !s.roadChoices && !this.hirePanel.open && !this.shopOpen;
     this.banner
       .setVisible(breaking)
       .setText(isBossWave(s.wave) ? t('bossComes', { n: s.wave, boss: t(ENEMIES[this.track.boss].name) }) : t('wave', { n: s.wave }))
@@ -1244,9 +1339,23 @@ export class GameScene extends Phaser.Scene {
       .setDepth(UI_DEPTH - 4)
       .setInteractive({ useHandCursor: true })
       .on('pointerdown', () => {
-        if (this.aim || this.skillBook.open || this.hirePanel.open || this.fortifyPanel.open) return;
+        if (this.aim || this.skillBook.open || this.hirePanel.open || this.shopOpen) return;
         this.bought(repair(this.state));
       });
+    // The siege engine, right of the aim toggle: lit in a break while something can be built or bought.
+    this.engineBg = this.add.graphics().setDepth(UI_DEPTH - 6);
+    this.engineText = this.add.text(ENGINE.x, ENGINE.y, '', textStyle(12, '#ffe7a0')).setOrigin(0.5).setDepth(UI_DEPTH - 5);
+    this.add
+      .zone(ENGINE.x, ENGINE.y, ENGINE.w, ENGINE.h)
+      .setDepth(UI_DEPTH - 4)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', () => {
+        const s = this.state;
+        if (held(s) || s.choices || this.aim || this.skillBook.open || this.hirePanel.open || this.shopOpen) return;
+        ui('click');
+        this.showEngine();
+      });
+    this.endlessText = this.add.text(ENDLESS_CHIP.x, ENDLESS_CHIP.y, '', textStyle(11, '#ffcf8a')).setOrigin(0.5).setDepth(UI_DEPTH - 4);
     this.omenText = this.add.text(OMEN_CHIP.x, OMEN_CHIP.y, '', textStyle(10, '#e6ccff')).setOrigin(0.5).setDepth(UI_DEPTH - 5);
     this.heatText = this.add.text(HEAT.x, HEAT.y, '', textStyle(11, '#ffb08a')).setOrigin(0.5).setDepth(UI_DEPTH - 4);
     this.frontierText = this.add.text(FRONTIER_CHIP.x, FRONTIER_CHIP.y, '', textStyle(11, '#d8f0ff')).setOrigin(0.5).setDepth(UI_DEPTH - 4);
@@ -1275,6 +1384,19 @@ export class GameScene extends Phaser.Scene {
     const fix = canRepair(s);
     this.repairText.setColor(fix ? '#ffe7a0' : '#9aa0ac').setText(t('repair', { n: repairCost(s.repairs) }));
     drawPanel(rg, REPAIR.x - REPAIR.w / 2, REPAIR.y - REPAIR.h / 2, REPAIR.w, REPAIR.h, { c: 5, fill: fix ? SLATE.light : 0x1e222c, alpha: 0.95, edge: fix ? GOLD.light : 0x4a5060, lw: fix ? 2 : 1 });
+    // The siege engine button: its name once built; lit in a break while one can be built or upgraded.
+    const engine = s.engine;
+    const shop = canBuild(s) && (engine ? ENGINES[engine.kind].upgrades.some((id) => canUpgradeEngine(s, id)) : Object.values(ENGINES).some((e) => s.coins >= e.cost));
+    this.engineText.setColor(shop ? '#ffe7a0' : '#c9c3b6').setText(engine ? t(ENGINES[engine.kind].name) : t('engineButton'));
+    const E = ENGINE;
+    const eg = this.engineBg;
+    eg.clear();
+    drawPanel(eg, E.x - E.w / 2, E.y - E.h / 2, E.w, E.h, { c: 5, fill: shop ? SLATE.light : 0x1e222c, alpha: 0.95, edge: shop ? GOLD.light : GOLD.dark, lw: shop ? 2 : 1.5 });
+    if (shop) eg.fillStyle(GOLD.light, 0.1 + 0.15 * this.pulse(900)).fillPoints(chamferPts(E.x - E.w / 2, E.y - E.h / 2, E.w, E.h, 5), true);
+    // The endless siege's chip, with this map's best endless wave.
+    const endless = s.endless && !held(s);
+    this.endlessText.setVisible(endless).setText(t('endlessChip', { n: s.endlessBest[s.frontier] }));
+    if (endless) drawPanel(g, ENDLESS_CHIP.x - ENDLESS_CHIP.w / 2, ENDLESS_CHIP.y - ENDLESS_CHIP.h / 2, ENDLESS_CHIP.w, ENDLESS_CHIP.h, { c: 5, fill: 0x3a2414, alpha: 0.95, edge: 0xff9b3a, lw: 1.5 });
     // The accepted omen's chip, over the ranger, until its wave is cleared.
     const omen = s.omen?.accepted && !held(s) ? s.omen.id : null;
     this.omenText.setVisible(!!omen).setText(omen ? t('omenChip', { omen: t(OMENS[omen].name) }) : '');
@@ -1296,6 +1418,8 @@ export class GameScene extends Phaser.Scene {
   private createForts() {
     this.fortG = this.add.graphics().setDepth(2);
     this.fortLabel = this.add.text(BARRICADE.x + 70, BARRICADE.y - 4, '', textStyle(10, '#ffe7a0', 2)).setOrigin(0.5, 1).setDepth(UI_DEPTH - 7);
+    this.engineSprite = this.add.image(ENGINE_SPOT.x, ENGINE_SPOT.y, 'engine-ballista').setVisible(false).setDepth(ENGINE_SPOT.y);
+    this.engineLabel = this.add.text(ENGINE_SPOT.x, ENGINE_SPOT.y - 52, '', textStyle(10, '#ff9a7a', 2)).setOrigin(0.5, 1).setDepth(UI_DEPTH - 7);
   }
 
   /** The stake line behind the barricade, the oil pot on top of it and the lookout's banner. */
@@ -1328,9 +1452,10 @@ export class GameScene extends Phaser.Scene {
       g.fillStyle(FIRE.mid).fillTriangle(x - 3, y - 10, x + 3, y - 10, x, y - 10 - 10 * flick);
       g.fillStyle(FIRE.light).fillTriangle(x - 1.5, y - 10, x + 1.5, y - 10, x, y - 16 * flick);
     }
+    this.drawEngine();
     if (f.lookout > 0) {
-      // The lookout's post and pennant on the barricade.
-      const x = BARRICADE.x + 40;
+      // The lookout's post and pennant on the barricade, further left while an engine stands there.
+      const x = BARRICADE.x + (this.state.engine ? 18 : 40);
       const y = BARRICADE.y + 8;
       g.fillStyle(0x6a4424).fillRect(x - 2, y - 26, 4, 34);
       g.fillStyle(GOLD.mid).fillTriangle(x + 2, y - 26, x + 20 + 2 * this.pulse(600), y - 21, x + 2, y - 15);
@@ -1338,14 +1463,35 @@ export class GameScene extends Phaser.Scene {
     this.fortLabel.setText(f.lookout > 0 ? t('lookoutLeft', { n: f.lookout }) : '');
   }
 
+  /** The siege engine on the barricade: kicking back with each shot, idle (and dim) while the barricade is down. */
+  private drawEngine() {
+    const engine = this.state.engine;
+    this.engineSprite.setVisible(!!engine);
+    if (!engine) {
+      this.engineLabel.setText('');
+      return;
+    }
+    const key = engineTexture(engine.kind);
+    if (this.engineSprite.texture.key !== key) {
+      const fig = FIGURES[key]!;
+      fit(this.engineSprite.setTexture(key)).setOrigin(fig.originX, fig.originY);
+    }
+    if (engine.cd > this.lastEngineCd) this.engineSprite.setX(ENGINE_SPOT.x - 4);
+    else this.engineSprite.setX(Math.min(ENGINE_SPOT.x, this.engineSprite.x + 0.4));
+    this.lastEngineCd = engine.cd;
+    const idle = this.state.barricade.hp <= 0;
+    this.engineSprite.setAlpha(idle ? 0.55 : 1);
+    this.engineLabel.setText(idle && !held(this.state) ? t('engineIdle') : '');
+  }
+
   private caltropsReady() {
     const s = this.state;
-    return s.caltrops.charge >= s.caltrops.need && !s.choices && !held(s) && !this.skillBook.open && !this.hirePanel?.open && !this.fortifyPanel?.open;
+    return s.caltrops.charge >= s.caltrops.need && !s.choices && !held(s) && !this.skillBook.open && !this.hirePanel?.open && !this.shopOpen;
   }
 
   private rainReady() {
     const s = this.state;
-    return s.rain.charge >= s.rain.need && !s.choices && !held(s) && !this.skillBook.open && !this.hirePanel?.open && !this.fortifyPanel?.open;
+    return s.rain.charge >= s.rain.need && !s.choices && !held(s) && !this.skillBook.open && !this.hirePanel?.open && !this.shopOpen;
   }
 
   /** Whether a release here looses the volley: on the road in front of the barricade. */
@@ -1537,7 +1683,7 @@ export class GameScene extends Phaser.Scene {
         .setInteractive({ useHandCursor: true })
         .on('pointerdown', () => {
           const s = this.state;
-          if (i >= s.guards.length || s.choices || held(s) || this.aim || this.fortifyPanel.open) return;
+          if (i >= s.guards.length || s.choices || held(s) || this.aim || this.shopOpen) return;
           ui('click');
           this.hirePanel.show(i, s.guards[i], s.coins);
         });
@@ -1708,9 +1854,9 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     const best = bestOn(s, s.frontier);
-    this.gameOverText.setText(
-      t(s.heat > 0 ? 'fallenHeat' : 'fallen', { wave: s.wave, heat: s.heat, kills: s.kills, streak: s.streak.best, best, level: s.level }),
-    );
+    const fallen = t(s.heat > 0 ? 'fallenHeat' : 'fallen', { wave: s.wave, heat: s.heat, kills: s.kills, streak: s.streak.best, best, level: s.level });
+    // After the endless siege, this map's best endless wave too.
+    this.gameOverText.setText(s.endless ? `${fallen}\n${t('endlessFallen', { best: s.endlessBest[s.frontier] })}` : fallen);
     // A new hero's class: the mage once a hero has retired.
     if (!canClass(s.legacy, this.nextHero)) this.nextHero = 'ranger';
     const mage = canClass(s.legacy, 'mage');
@@ -1739,11 +1885,12 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  /** Switches a new hero's class, once the mage is open. */
+  /** Switches a new hero's class to the next one open (the mage after a retirement, the warden after two). */
   private toggleHero() {
     this.armNewHero(false);
-    if (!canClass(this.state.legacy, 'mage')) return ui('refuse');
-    this.nextHero = this.nextHero === 'mage' ? 'ranger' : 'mage';
+    const open = HERO_CLASSES.filter((h) => canClass(this.state.legacy, h));
+    if (open.length < 2) return ui('refuse');
+    this.nextHero = open[(open.indexOf(this.nextHero) + 1) % open.length];
   }
 
   /** Starts today's daily siege, if today's try is not used yet: a fresh ranger on the day's set run. */
@@ -1835,9 +1982,10 @@ export class GameScene extends Phaser.Scene {
     const panel = this.add.graphics();
     drawPanel(panel, VIEW.w / 2 - 300, VIEW.h / 2 - 190, 600, 380, { c: 18, fill: SLATE.mid, alpha: 1, lw: 3 });
     this.wonTitle = this.add.text(VIEW.w / 2, VIEW.h / 2 - 155, t('wonTitle'), textStyle(30, '#ffcf4a', 5)).setOrigin(0.5);
+    // Its lines hang from under the title, so a longer language grows down towards the buttons, not into the title.
     this.wonText = this.add
-      .text(VIEW.w / 2, VIEW.h / 2 - 40, '', { ...textStyle(14, '#e9e4d8'), fontStyle: 'normal', align: 'center', wordWrap: { width: 540 } })
-      .setOrigin(0.5);
+      .text(VIEW.w / 2, VIEW.h / 2 - 128, '', { ...textStyle(13, '#e9e4d8'), fontStyle: 'normal', align: 'center', wordWrap: { width: 540 } })
+      .setOrigin(0.5, 0);
     // New frontiers: the hero marches on to the frozen pass (not shown once it is won there).
     this.wonPass = makeButton(this, VIEW.w / 2, VIEW.h / 2 + 88, 260, 36, t('toPass'), () => this.marchOn());
     const on = makeButton(this, VIEW.w / 2 - 195, VIEW.h / 2 + 142, 170, 40, t('keepFighting'), () => keepFighting(this.state));
@@ -1911,7 +2059,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private clearSprites() {
-    for (const sprite of [...this.foes.values(), ...this.missiles.values(), ...this.eliteLabels.values(), ...[...this.caltropPieces.values()].flat()]) sprite.destroy();
+    for (const sprite of [...this.foes.values(), ...this.missiles.values(), ...this.eliteLabels.values(), ...this.houndSprites.values(), ...[...this.caltropPieces.values()].flat()]) sprite.destroy();
+    this.houndSprites.clear();
     this.foes.clear();
     this.missiles.clear();
     this.eliteLabels.clear();

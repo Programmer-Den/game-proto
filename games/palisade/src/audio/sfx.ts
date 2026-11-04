@@ -66,6 +66,12 @@ export const sfx = sounds({
   heal: { wave: 'sine', freq: 600, to: 1000, arp: [0, 4, 7], arpStep: 0.08, length: 0.3, volume: 0.15, gap: 300 },
   /** A wave cleared: a short fanfare. */
   cleared: { wave: 'pulse25', freq: 440, arp: [0, 4, 7, 12], arpStep: 0.09, length: 0.5, volume: 0.26, gap: 500 },
+  /** The ballista loosing its lance: a deep twang. */
+  twang: { wave: 'triangle', freq: 220, to: 90, length: 0.22, volume: 0.3, gap: 200, vary: 0.05 },
+  /** The warden's shield slam: a heavy, low knock. */
+  slam: { wave: 'noise', freq: 380, to: 90, length: 0.18, volume: 0.34, gap: 160, vary: 0.08 },
+  /** A hound's bite: a short snap. */
+  bite: { wave: 'square', freq: 760, to: 260, length: 0.06, volume: 0.18, gap: 120, vary: 0.1 },
   /** A relic from the chest: a sparkle. */
   relic: { wave: 'pulse12', freq: 1568, arp: [0, 4, 7, 12, 16, 19], arpStep: 0.05, length: 0.36, volume: 0.18, gap: 400 },
 });

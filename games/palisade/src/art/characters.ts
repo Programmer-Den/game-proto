@@ -18,9 +18,31 @@ const PAL: Record<string, string> = {
   robe: '#6a3e7a', robeD: '#4a2a58', gemG: '#5ad07a', teal: '#3a8a8a', blue: '#3a5f9a', mrobe: '#2f6f7a', mrobeD: '#22525c',
   beard: '#e8e2d8', arcane: '#6fe0d0',
   fur: '#c8d4e0', furD: '#8e9cb0', furL: '#eef3f8', ice: '#a8dcf8', iceD: '#6aaee0',
+  wshield: '#2f7a4a',
 };
 
-const RIGS: Record<'hero' | 'goblin' | 'orc' | 'knight' | 'bearer' | 'shaman' | 'spear' | 'mage', Rig> = {
+const RIGS: Record<'hero' | 'goblin' | 'orc' | 'knight' | 'bearer' | 'shaman' | 'spear' | 'mage' | 'warden', Rig> = {
+  // The warden hero, facing right: in plate under a green tabard, a mace raised behind and a green
+  // kite shield held out in front.
+  warden: [
+    { m: 'cloakD', p: [[-28, -30], [-8, -24], [-6, -98], [-24, -94]] },
+    { m: 'wood', p: [[-10, -78], [-4, -82], [-26, -128], [-31, -125]] },
+    { m: 'steel', c: [-30, -132], r: 9 },
+    { m: 'boot', p: [[-17, 0], [-2, 0], [-2, -11], [-15, -11]] },
+    { m: 'boot', p: [[4, 0], [20, 0], [17, -11], [4, -11]] },
+    { m: 'plate', p: [[-15, -10], [-3, -10], [-3, -42], [-15, -42]] },
+    { m: 'plate', p: [[4, -10], [16, -10], [15, -42], [4, -42]] },
+    { m: 'plateL', p: [[-19, -38], [19, -38], [17, -88], [-17, -90]] },
+    { m: 'cloak', p: [[-10, -40], [10, -40], [9, -84], [-9, -84]] },
+    { m: 'belt', p: [[-18, -48], [18, -48], [18, -55], [-18, -55]] },
+    { m: 'face', p: [[-6, -88], [-6, -108], [8, -108], [12, -98], [8, -88]] },
+    { m: 'steel', p: [[-12, -100], [-10, -118], [6, -122], [15, -106], [13, -100]] },
+    { m: 'eyeD', p: [[4, -102], [8, -102], [8, -98], [4, -98]] },
+    { m: 'plateL', p: [[-8, -82], [-2, -84], [-18, -100], [-24, -96]] },
+    { m: 'wshield', p: [[12, -100], [40, -100], [42, -64], [26, -30], [10, -64]] },
+    { m: 'gold', p: [[12, -100], [40, -100], [40, -95], [12, -95]] },
+    { m: 'gold', c: [26, -70], r: 6 },
+  ],
   goblin: [
     { m: 'skinD', p: [[3, 0], [11, 0], [10, -22], [3, -22]] },
     { m: 'skinD', p: [[14, -44], [20, -42], [22, -26], [16, -24]] },
@@ -282,6 +304,31 @@ function wispRig(frame: number): Rig {
   ];
 }
 
+/**
+ * The siege engines on the barricade, facing right: the ballista, a great crossbow on a stand with
+ * a bolt laid on, and the catapult, a wheeled frame with its arm thrown back and a stone in the cup.
+ */
+const BALLISTA: Rig = [
+  { m: 'wood', p: [[-30, 0], [30, 0], [28, -10], [-28, -10]] },
+  { m: 'wood', p: [[-6, -10], [6, -10], [4, -40], [-4, -40]] },
+  { m: 'iron', p: [[28, -50], [33, -48], [18, -82], [13, -80]] },
+  { m: 'iron', p: [[28, -40], [33, -42], [18, -10], [13, -12]] },
+  { m: 'wood', p: [[-36, -48], [40, -50], [40, -40], [-36, -38]] },
+  { m: 'gold', p: [[24, -51], [32, -51], [32, -39], [24, -39]] },
+  { m: 'steel', p: [[-24, -52], [44, -54], [44, -50], [-24, -48]] },
+  { m: 'steel', p: [[44, -58], [60, -52], [44, -46]] },
+];
+const CATAPULT: Rig = [
+  { m: 'wood', p: [[-34, -6], [34, -6], [32, -16], [-32, -16]] },
+  { m: 'iron', c: [-22, -8], r: 9 },
+  { m: 'iron', c: [22, -8], r: 9 },
+  { m: 'wood', p: [[-4, -16], [8, -16], [6, -50], [-2, -50]] },
+  { m: 'gold', p: [[-8, -50], [12, -50], [12, -55], [-8, -55]] },
+  { m: 'wood', p: [[0, -50], [6, -46], [-34, -70], [-38, -76]] },
+  { m: 'leather', p: [[-48, -76], [-30, -78], [-32, -68], [-46, -66]] },
+  { m: 'iron', c: [-39, -81], r: 7 },
+];
+
 /** How big each figure is drawn: view pixels per rig unit. */
 const SCALE: Record<'hero' | 'spear' | 'mage' | EnemyKind, number> = {
   hero: 0.5, spear: 0.44, mage: 0.44, goblin: 0.61, orc: 0.57, knight: 0.55, harpy: 0.6, bearer: 0.57, shaman: 0.61, wolf: 0.6, wisp: 0.62,
@@ -299,12 +346,21 @@ export const FIGURES: Partial<Record<string, Figure>> = {};
 export const foeTexture = (kind: EnemyKind, frame: number) => `foe-${kind}-${frame}`;
 export const guardTexture = (kind: 'spear' | 'mage') => `guard-${kind}`;
 
-/** The hero's texture for a class: the ranger with a bow, or the mage hero in violet robes. */
-export const heroTexture = (hero: 'ranger' | 'mage') => (hero === 'mage' ? 'hero-mage' : 'hero');
+/** The hero's texture for a class: the ranger with a bow, the mage hero in violet robes, or the warden with shield and mace. */
+export const heroTexture = (hero: 'ranger' | 'mage' | 'warden') => (hero === 'mage' ? 'hero-mage' : hero === 'warden' ? 'hero-warden' : 'hero');
+/** The warden's hound, in its two running frames (facing left, like the frost wolf it is drawn from). */
+export const houndTexture = (frame: number) => `hound-${frame}`;
+/** A siege engine on the barricade. */
+export const engineTexture = (kind: 'ballista' | 'catapult') => `engine-${kind}`;
 
 export function bakeCharacters(scene: Phaser.Scene) {
   bakeFigure(scene, 'hero', RIGS.hero, PAL, SCALE.hero, drawBow);
   bakeFigure(scene, 'hero-mage', RIGS.mage, { ...PAL, mrobe: '#5a3f9a', mrobeD: '#3d2a70', arcane: '#d6a8ff' }, SCALE.hero);
+  bakeFigure(scene, 'hero-warden', RIGS.warden, PAL, SCALE.hero);
+  // The hound is the frost wolf's body in a brown coat, smaller.
+  for (const frame of [0, 1]) bakeFigure(scene, houndTexture(frame), stride(WOLF, frame), { ...PAL, fur: '#9a6a3c', furD: '#6e4826', furL: '#c89a68' }, 0.5);
+  bakeFigure(scene, engineTexture('ballista'), BALLISTA, PAL, 0.7);
+  bakeFigure(scene, engineTexture('catapult'), CATAPULT, PAL, 0.7);
   for (const frame of [0, 1]) bakeFigure(scene, foeTexture('wolf', frame), stride(WOLF, frame), PAL, SCALE.wolf);
   for (const frame of [0, 1]) bakeFigure(scene, foeTexture('wisp', frame), wispRig(frame), { ...PAL, arcane: '#e8fbff' }, SCALE.wisp, undefined, false);
   for (const kind of ['goblin', 'orc', 'knight', 'bearer', 'shaman'] as const) {
@@ -421,6 +477,15 @@ export function bakeMissiles(scene: Phaser.Scene) {
     ctx.globalAlpha = 1;
     gem(ctx, 0, 0, 20, 8, 0.2, '#e8541c', '#ffe08a');
     poly(ctx, ngon(-5, -5, 7, 7, 5), '#fff4c8');
+  });
+  // The ballista's lance: a long iron-tipped bolt with wooden flights.
+  paint(scene, 'lance', 64, 16, (ctx) => {
+    ctx.translate(46, 8);
+    poly(ctx, rect(-42, -2, 46, 4), '#93653a');
+    poly(ctx, [[-40, -1], [-46, -7], [-32, -2]], '#c99260');
+    poly(ctx, [[-40, 1], [-46, 7], [-32, 2]], '#6e4826');
+    poly(ctx, [[2, -6], [16, 0], [2, 6]], '#d8e0e8');
+    poly(ctx, [[2, 0], [16, 0], [2, 6]], '#8e98a4');
   });
   // The Troll King's rock: a grey faceted lump.
   paint(scene, 'rock', 30, 26, (ctx) => {

@@ -1,4 +1,5 @@
 import { AIM_MODES, type AimMode } from './aim';
+import { canClass } from './hero';
 import { freshLegacy, type Legacy } from './legacy';
 import { freshProgress, type Progress } from './state';
 import { RELICS } from './relics';
@@ -35,10 +36,13 @@ export function loadProgress(): Progress {
       retired: typeof kept.retired === 'number' ? kept.retired : 0,
     };
     // The class and the frozen pass came later still: an older save is a ranger in the vale.
-    const hero: Progress['hero'] = saved.hero === 'mage' && legacy.retired > 0 ? 'mage' : 'ranger';
+    const hero: Progress['hero'] = (saved.hero === 'mage' || saved.hero === 'warden') && canClass(legacy, saved.hero) ? saved.hero : 'ranger';
     const frontier: Progress['frontier'] = saved.frontier === 'pass' && (saved.heatUnlocked ?? 0) > 0 ? 'pass' : 'vale';
     const passBest = typeof saved.passBest === 'number' && Number.isFinite(saved.passBest) ? Math.max(0, saved.passBest) : 0;
-    return { ...fresh, ...saved, ranks, relics, legacy, hero, frontier, passBest, passWon: saved.passWon === true, choices };
+    // The endless siege's bests came later still: an older save has none.
+    const best = (n: unknown) => (typeof n === 'number' && Number.isFinite(n) ? Math.max(0, n) : 0);
+    const endlessBest = { vale: best(saved.endlessBest?.vale), pass: best(saved.endlessBest?.pass) };
+    return { ...fresh, ...saved, ranks, relics, legacy, hero, frontier, passBest, passWon: saved.passWon === true, endlessBest, choices };
   } catch {
     return fresh;
   }

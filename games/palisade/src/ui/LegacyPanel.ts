@@ -6,7 +6,7 @@ import { fit } from '../art/lowpoly';
 import { GOLD, SLATE } from '../art/palette';
 import { LEGACY, SEEN, UI_DEPTH, VIEW } from '../scenes/layout';
 import { LEGACIES, LEGACY_IDS, canKeep, type Legacy, type LegacyId } from '../game/legacy';
-import { HEROES, HERO_CLASSES, type HeroClass } from '../game/hero';
+import { HEROES, HERO_CLASSES, canClass, type HeroClass } from '../game/hero';
 import { RELICS, type RelicId } from '../game/relics';
 import { drawPanel, makeButton, textStyle } from './panel';
 import { t } from '../i18n';
@@ -30,8 +30,10 @@ export class LegacyPanel {
   private keptText: Phaser.GameObjects.Text;
   private heroButtons: { bg: Phaser.GameObjects.Graphics; text: Phaser.GameObjects.Text; id: HeroClass }[] = [];
   cards: LegacySpot[] = [];
-  /** The class the next hero is: retiring opens the mage, so both are on offer here. */
+  /** The class the next hero is: retiring opens the mage (and a second retirement the warden). */
   hero: HeroClass = 'ranger';
+  /** Heroes retired once this one has: the classes open to the next hero. */
+  private retired = 1;
 
   constructor(
     private scene: Phaser.Scene,
@@ -53,6 +55,7 @@ export class LegacyPanel {
       const bg = scene.add.graphics();
       const text = scene.add.text(x, 430, t(HEROES[id].name), textStyle(12, '#ffe7a0')).setOrigin(0.5);
       const zone = scene.add.zone(x, 430, 110, 26).setInteractive({ useHandCursor: true }).on('pointerdown', () => {
+        if (!canClass({ retired: this.retired }, id)) return ui('refuse');
         ui('click');
         this.hero = id;
         this.drawHeroes();
@@ -73,20 +76,22 @@ export class LegacyPanel {
     this.root.setVisible(false);
   }
 
-  /** The class buttons: the picked one lit gold. */
+  /** The class buttons: the picked one lit gold, one not open yet (the warden before a second retirement) dim. */
   private drawHeroes() {
     for (const { bg, text, id } of this.heroButtons) {
       const on = id === this.hero;
+      const open = canClass({ retired: this.retired }, id);
       bg.clear();
-      drawPanel(bg, text.x - 55, 430 - 13, 110, 26, { c: 5, fill: on ? GOLD.mid : SLATE.light, alpha: 1, edge: GOLD.mid, lw: 1.5 });
-      text.setColor(on ? '#2b2010' : '#ffe7a0');
+      drawPanel(bg, text.x - 55, 430 - 13, 110, 26, { c: 5, fill: on ? GOLD.mid : open ? SLATE.light : SLATE.panel, alpha: 1, edge: open ? GOLD.mid : 0x4a5060, lw: 1.5 });
+      text.setColor(on ? '#2b2010' : open ? '#ffe7a0' : '#7a8294');
     }
   }
 
   /** Opens the panel with what earlier heroes left, the relic the first card would keep and the next hero's class. */
   show(legacy: Legacy, relic: RelicId, hero: HeroClass = 'ranger') {
     this.root.setVisible(true);
-    this.hero = hero;
+    this.retired = legacy.retired + 1;
+    this.hero = canClass({ retired: this.retired }, hero) ? hero : 'ranger';
     this.drawHeroes();
     this.body.removeAll(true);
     this.cards = [];

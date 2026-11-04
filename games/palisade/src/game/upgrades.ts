@@ -47,7 +47,17 @@ export type UpgradeId =
   | 'orbMastery'
   | 'tempest'
   | 'arc'
-  | 'hex';
+  | 'hex'
+  | 'bash'
+  | 'vigil'
+  | 'reach'
+  | 'shove'
+  | 'daze'
+  | 'bane'
+  | 'bulwark'
+  | 'fangs'
+  | 'hold'
+  | 'pack';
 
 export type Icon =
   | 'bow'
@@ -78,7 +88,11 @@ export type Icon =
   | 'twin'
   | 'chain'
   | 'nova'
-  | 'hex';
+  | 'hex'
+  | 'shield'
+  | 'mace'
+  | 'shove'
+  | 'hound';
 
 export interface Upgrade {
   name: TextKey;
@@ -138,6 +152,17 @@ export const UPGRADES: Record<UpgradeId, Upgrade> = {
   tempest: { name: 'tempestName', text: 'tempestText', maxRank: 1, icon: 'storm', hero: 'mage' },
   arc: { name: 'arcName', text: 'arcText', maxRank: 3, icon: 'storm', requires: 'tempest', hero: 'mage' },
   hex: { name: 'hexName', text: 'hexText', maxRank: 3, icon: 'hex', hero: 'mage' },
+  // The warden's own skills, after the mage's so neither class's random picks change.
+  bash: { name: 'bashName', text: 'bashText', maxRank: 5, icon: 'shield', hero: 'warden' },
+  vigil: { name: 'vigilName', text: 'vigilText', maxRank: 5, icon: 'mace', hero: 'warden' },
+  reach: { name: 'reachName', text: 'reachText', maxRank: 3, icon: 'pierce', hero: 'warden' },
+  shove: { name: 'shoveName', text: 'shoveText', maxRank: 3, icon: 'shove', hero: 'warden' },
+  daze: { name: 'dazeName', text: 'dazeText', maxRank: 3, icon: 'nova', hero: 'warden' },
+  bane: { name: 'baneName', text: 'baneText', maxRank: 3, icon: 'slayer', hero: 'warden' },
+  bulwark: { name: 'bulwarkName', text: 'bulwarkText', maxRank: 3, icon: 'barricade', hero: 'warden' },
+  fangs: { name: 'fangsName', text: 'fangsText', maxRank: 3, icon: 'hound', hero: 'warden' },
+  hold: { name: 'holdName', text: 'holdText', maxRank: 3, icon: 'hound', hero: 'warden' },
+  pack: { name: 'packName', text: 'packText', maxRank: 1, icon: 'hound', requires: 'fangs', hero: 'warden' },
 };
 
 /** The fillers: Mend fills the one empty card with two upgrades left, War Chest and Second Wind the two with one left. */
@@ -149,8 +174,10 @@ export const FILLERS: UpgradeId[] = ['mend', 'purse', 'wind'];
 export const BASE_SKILLS: UpgradeId[] = ['swift', 'sharp', 'timber'];
 /** The mage's base skills, offered the same way once the mage has learned every skill. */
 export const MAGE_BASE_SKILLS: UpgradeId[] = ['focus', 'potency', 'timber'];
+/** The warden's base skills, offered the same way once the warden has learned every skill. */
+export const WARDEN_BASE_SKILLS: UpgradeId[] = ['vigil', 'bash', 'timber'];
 /** A class's base skills. */
-export const baseSkills = (hero: HeroClass = 'ranger') => (hero === 'mage' ? MAGE_BASE_SKILLS : BASE_SKILLS);
+export const baseSkills = (hero: HeroClass = 'ranger') => (hero === 'mage' ? MAGE_BASE_SKILLS : hero === 'warden' ? WARDEN_BASE_SKILLS : BASE_SKILLS);
 /** Whether a hero of this class learns this upgrade. */
 export const learns = (id: UpgradeId, hero: HeroClass = 'ranger') => (UPGRADES[id].hero ?? hero) === hero;
 /** Coins a War Chest gives. */
@@ -186,5 +213,17 @@ export const MAGE_BOOK_ORDER: UpgradeId[] = [
   'lore', 'mend', 'purse', 'wind',
 ];
 
+/**
+ * The warden's skill book: the shield, the slam's reach and shove, the hound, the barricade and
+ * guards, then experience and the fillers.
+ */
+export const WARDEN_BOOK_ORDER: UpgradeId[] = [
+  'bash', 'vigil', 'reach', 'shove',
+  'daze', 'bane', 'bulwark', 'cloudburst',
+  'fangs', 'hold', 'pack', 'barbs',
+  'timber', 'stakes', 'drill', 'bounty',
+  'lore', 'mend', 'purse', 'wind',
+];
+
 /** A class's skill book. */
-export const bookOrder = (hero: HeroClass = 'ranger') => (hero === 'mage' ? MAGE_BOOK_ORDER : BOOK_ORDER);
+export const bookOrder = (hero: HeroClass = 'ranger') => (hero === 'mage' ? MAGE_BOOK_ORDER : hero === 'warden' ? WARDEN_BOOK_ORDER : BOOK_ORDER);
