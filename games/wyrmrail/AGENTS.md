@@ -155,7 +155,8 @@ File map (all under `src/` unless it starts with `shared/`):
   flyovers and yard (`drawRival`, with the rails), the night (`drawNight`), the wyrms (`WyrmView` each), pops, HUD (with the bellies and the round's
   charter), the orders and upgrades panel (with the Depot, Remove and Plain toggles), the banner, the
   charter cards, the moult's trait cards (`drawMoult`, over the charter cards, which wait under
-  them), the daily link or tag (`drawDailyLink`) and the game over or festival panel (`openEnd`,
+  them), the daily link or tag (`drawDailyLink`; once today's try is used, `dailyDone` with today's
+  score in the link's place on a fresh first valley, not tappable) and the game over or festival panel (`openEnd`,
   once: the medal, which it saves outside the daily, the traits, the Keep or Fly on buttons, Play
   again and the Daily valley button while today's try is unused; the daily's score through
   `finishDaily`), and wires
@@ -286,7 +287,8 @@ State model (`src/game/state.ts`):
   ("c,r|c,r" pairs of neighbouring line tiles not joined, lower key first), `crossings` (tile
   keys), `moods` and `idleMs` (by village index), `hazard` and `hazardTimerMs`, `charter` and
   `charterOffer`, `depots` (village indexes), `growth` (deliveries in time to each village),
-  `towns` and `warehouses` (village indexes), `lamps` (tile keys), `rival` (`Rival`: `yard`,
+  `towns` and `warehouses` (village indexes), `lamps` (tile keys), `grewTown` (a village that grew
+  with its round's last delivery, for the next round's news until the charter is picked), `rival` (`Rival`: `yard`,
   `track` keys, `buildMs`, `claim` of an order id and time left, `restMs`, `taken`), `boon` (the medal the game started with),
   `festivalMs` and `medal`, `wyrms`, `upgrades` (`wings`, `hoard`, `second`), `orderTimerMs`,
   `banner`, `pops`, `nextId`, and for the chain, the moults and the daily `leg` (1 for the first
@@ -378,7 +380,9 @@ State model (`src/game/state.ts`):
   and the valley with today's seed (the kind first). It has no boons and no flying on, saves no
   medal, and its end panel shows `finishDaily`'s record.
 - Towns (from `TOWN_ROUND`): `arrive` calls `grow` for each delivery, which counts `growth` and
-  makes the village a town at `GROW_AT` (with a banner). `addOrder` pays `TOWN_PAY` times for an
+  makes the village a town at `GROW_AT` (with a banner; when that delivery also ends the round,
+  `grewTown` puts the line in `roundNews`, under the round's and the charter's banner, and the
+  festival win drops it). `addOrder` pays `TOWN_PAY` times for an
   order from a town; `randomOrder` makes a town's order `wares` with `WARES_CHANCE` (only when
   the sender is a town, so no extra `Math.random` call before), paying `WARES_PAY` more.
   `buyWarehouse` needs a town with a depot and `WAREHOUSE_COST`; `failOrder` drops an order from a
@@ -386,7 +390,7 @@ State model (`src/game/state.ts`):
 - Nights: `isNight` is a round in `NIGHT_ROUNDS`. `isLit` is a station, or a tile with a lamp on
   it or beside it. `wyrmSpeed` is times `DARK_SLOWDOWN` at night while `path[0]` is unlit.
   `buyLamp` needs `LAMP_ROUND`, a track tile without a lamp and `LAMP_COST`; `removeTrack` and a
-  hazard's strike drop the tile's lamp. `roundNews` adds the lamps' and the night's lines to the
+  hazard's strike drop the tile's lamp. `roundNews` adds a new town's, the lamps' and the night's lines to the
   round's banner and again to the charter's (the charter cards hide the first).
 - The rival (from `RIVAL_ROUND`): `nextRound` makes it once with `newRival`, its yard the free
   grass tile whose line could reach the most open villages (`rivalReach`), then the farthest from
@@ -397,7 +401,8 @@ State model (`src/game/state.ts`):
   `tickRival` (not in the festival) lays a tile every `RIVAL_BUILD_MS` towards the nearest open
   village it doesn't serve (`rivalBuild`, a BFS), and, after `RIVAL_REST_MS`, claims the
   best-paying `waiting` order between two served villages for `RIVAL_CLAIM_MS`: dispatched first,
-  the claim ends ("Beat the rival!"); else the order leaves the board, with no heart lost, and
+  the claim ends ("Beat the rival!"); a claim whose ends the rival no longer serves (a rival tile
+  bought out cut its line) ends quietly; else the order leaves the board, with no heart lost, and
   `taken` counts it. `trackCost` refuses the yard and charges `RIVAL_BUYOUT` times on a rival
   tile, which `buildTrack` takes from the rival.
 - Only `src/game/sim.ts` mutates state. The scene only reads it and calls sim functions.
@@ -468,7 +473,7 @@ starts the music again.
   not each tile of a drag, and none on the board once the game is over or while the charter cards are up): track that can't go there, nothing to remove, a depot that can't be bought, an order card that can't
   be sent, an upgrade not affordable or locked, and a courier call that can't go (from round 2).
 - **`GameSounds` (the sim's doing):** `order` for a new order (`workshop` for a workshop's goods),
-  `load` when goods are aboard, `deliver` for a delivery, `late` for an order out of time, `faith`
+  `load` when goods are aboard, `deliver` for a delivery, `late` for an order out of time with a heart lost (not for goods back in a warehouse's store), `faith`
   for a heart lost to a village at rock bottom, `sour` for a village souring, `munch` when a wyrm
   eats, `switchStop` when a wyrm stops to throw a switch, `warn` for a hazard warned, `splash` or
   `rumble` when a washout or sinkhole, or a rockfall or avalanche, strikes (none when it blows over and the track stays), `gifts` when a courier's visit ends, `round` for a
@@ -476,7 +481,7 @@ starts the music again.
   plays while either waits). The scene plays `stamp` for a trait picked, and `ui('click')` and
   `roar` for flying on. `grow` plays when a village grows into a town, `rival` when the rival
   takes an order (not counted as late) and `beatRival` when the wyrm is sent for an order the
-  rival was after.
+  rival was after (not when the festival or a cut line ends the claim).
 
 ## Testing hooks
 
