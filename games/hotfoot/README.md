@@ -20,9 +20,11 @@ together unlock a hidden bonus. From the second checkpoint the knight also picks
 bold High Road or the safer Low Road, and from stage 2 a herald sets a dare on each stage that pays
 coins and a third boon card. Every seventh stage a rockfall rolls in behind the knight, and at
 1500 m the dragon of the Dragon's Keep waits to be beaten for a lasting crown, after which the run
-goes on harder. Coins are banked when the knight falls, and buy back the boon you missed at the last
-checkpoint or lasting upgrades in the armoury. A daily course, the same for everyone on the day,
-keeps its own best distance.
+goes on harder, beyond the Keep along the Sky Road of gusts and falling clouds. Coins are banked when
+the knight falls, and buy back the boon you missed at the last checkpoint, lasting upgrades in the
+armoury, or a second knight to run as: the squire or the heavy knight. Your best run plays back as a
+faint ghost beside you, to race. A daily course, the same for everyone on the day, keeps its own
+best distance.
 
 ![The knight leaping a flame on stage 3, a wayside shrine and a goblin ahead](cover.png)
 
@@ -143,9 +145,32 @@ buttons in the bottom right of the margin do the same while the knight runs.
    lasting **crown** (worn on the knight's helm in every run after, and named on the game-over
    panel) and the stage's banner a little way on. **The run then goes on harder**: 60 px/s faster
    from that moment and on every stage after, with obstacles 50 px closer together.
+22. **Beyond the Keep: the Sky Road.** Every ordinary stage after the dragon runs on the Sky Road,
+   among the clouds (a Gatekeeper still bars the road on every fifth stage). There are no stone
+   ledges, pits or fire vents there. Instead the road breaks into **gaps in the clouds**, 560 to
+   680 px wide, too wide for one jump: a cloud floats over each one, so jump onto it and leap off
+   again, since half a second after you land it gives way and falls, taking you with it if you are
+   still on it. And every 4.2 seconds a **gust** blows at the knight's back for 1.3 seconds (streaks
+   of wind gather first): the knight runs 30% faster and floats in the air, with only 70% of the
+   pull, so a jump in a gust can clear a whole gap. The tag reads "Gust!" while it blows.
+23. **A second knight**: the armoury's Knights row unlocks two more knights with banked coins, and
+   chooses who runs the ordinary runs from then on (the daily course is always the knight's). Each
+   keeps their own best distance and their own ghost.
+
+   | Knight | Price | What sets them apart |
+   | --- | --- | --- |
+   | Knight | - | The knight everyone starts with |
+   | Squire | 120 | Jumps again in the air (three jumps with Second Leap), but has a heart fewer (2 on Normal) |
+   | Heavy knight | 160 | Smashes the goblins and bats he runs into (each counts as a stomp and drops its coin), but jumps 20% lower |
+
+24. **The ghost runner**: the best ordinary run of each knight is kept, and on every ordinary run
+   after it plays back as a faint, pale ghost of that knight, where that run was after as long a time
+   running, jumping and sliding where it did. A pale ring on the run track marks it too. It goes once
+   its run has ended; outrun it and the game-over panel says your ghost will run this one next time.
 
    The best distance, the banked coins, any boon bought, the armoury, the day's best on the
-   daily course and the crown are saved between runs.
+   daily course, the crown, the knights unlocked and chosen with their bests, and each knight's
+   ghost are saved between runs.
 
 ![A streak at x3: the chip, a "+3" pop and the trail of gold stars](docs/screenshots/streak.webp)
 
@@ -199,6 +224,10 @@ buttons in the bottom right of the margin do the same while the knight runs.
 
 ![The dragon beaten: the crown on the knight's helm](docs/screenshots/crowned.webp)
 
+![The heavy knight leaps off a cloud over a gap on the Sky Road as a gust blows](docs/screenshots/sky-road.webp)
+
+![The ghost of the best run leaps a flame behind the knight](docs/screenshots/ghost-runner.webp)
+
 ### Boons and the coin shop
 
 | Boon | Ranks | What it does |
@@ -228,7 +257,7 @@ buttons in the bottom right of the margin do the same while the knight runs.
 
 ![After a fall: the shop, the armoury and the daily course](docs/screenshots/game-over.webp)
 
-![The armoury](docs/screenshots/armoury.webp)
+![The armoury, with its Knights row](docs/screenshots/armoury.webp)
 
 **The coin shop.** Coins collected in a run are banked when the knight falls. On the game-over panel,
 the boon you missed at the last checkpoint (a card you did not tap, one that can be sold if there is one) is for sale for 30 coins. Buy
@@ -240,7 +269,7 @@ The difficulty, set on the hub page's Settings, changes one thing: the knight st
 With Reduce motion on, the knight fades instead of blinking after a hit, the shield ring holds still,
 the coin pops stay where they appear instead of rising, the streak's trail of stars is not drawn,
 the Gatekeeper fades instead of flashing when stomped, and the snow, gusts, boulders, rockfall dust,
-fire vents, dragon fire and bats hold still.
+fire vents, dragon fire and bats hold still, and a cloud about to fall doesn't tremble.
 
 ## Running locally
 
@@ -274,18 +303,21 @@ All paths are inside `games/hotfoot/`.
   `course.ts` lays out each stage's traps, foes, ledges, coins and shrine by its road, its dare
   and its rockfall (or the Gatekeeper or the dragon), `boons.ts` is the table of boons (cursed ones
   too), `pairs.ts` the boon pairs, `boss.ts` moves the Gatekeeper and the dragon and their throws,
-  `armoury.ts` is the table of lasting upgrades, `sim.ts` moves the run on (foes, ledges, stomps,
-  the ground's rules, the bosses, the rockfall, the dares, the pairs' bonuses, the coin streak and
-  shrines included), jumps, slides, takes boons and roads and sells the missed boon and the
-  armoury's levels, and `save.ts` keeps the best distance, the banked coins, any boon bought, the
-  armoury, the daily course's best and the crown.
+  `armoury.ts` is the table of lasting upgrades, `knights.ts` the knights to run as, `ghost.ts`
+  records the run and plays back the ghost, `sim.ts` moves the run on (foes, ledges, stomps,
+  the ground's rules, the Sky Road's gusts and clouds, the bosses, the rockfall, the dares, the
+  pairs' bonuses, the coin streak and shrines included), jumps, slides, takes boons and roads and
+  sells the missed boon, the armoury's levels and the knights, and `save.ts` keeps the best
+  distance, the banked coins, any boon bought, the armoury, the daily course's best, the crown,
+  the knights and the ghosts.
 - `src/scenes/`: `BootScene` bakes textures, `GameScene` draws the run and wires taps and keys to
   the rules, `layout.ts` says where things are drawn.
 - `src/art/`: all the art, painted in code on 2D canvases at startup, in the manner of an
   illuminated manuscript: flat colours with ink outlines, white highlights and gold leaf, using the
   helpers and pigments in `ink.ts`. `scenery.ts` paints the vellum page and its margin, the sky,
-  crags and trees, the road on each ground, the ledges, the traps, the coins, the checkpoint
-  banner, the wayside shrine and the miniature's frame; `knight.ts` the knight's poses; `foes.ts`
+  crags and trees (and the cloud banks beyond the Keep), the road on each ground, the gaps in the
+  clouds and the clouds over them, the ledges, the traps, the coins, the checkpoint
+  banner, the wayside shrine and the miniature's frame; `knight.ts` the poses of each knight; `foes.ts`
   the goblin, bat, Gatekeeper and its barrel and axe, the dragon and its fire and tail lash, and
   the rockfall's boulder; `icons.ts` the boon, road and armoury icons and hearts; `hud.ts` the top
   band, the illuminated initial, the streak chip, the run track's strip, the stage's tag, the

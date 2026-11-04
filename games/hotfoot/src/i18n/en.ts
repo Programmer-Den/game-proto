@@ -48,6 +48,14 @@ const en = {
   purseName: "Squire's Purse",
   purseText: 'Start every run with 10 more coins',
 
+  // The knights: name and what sets each apart
+  knightName: 'Knight',
+  knightText: 'Steady in all things: the knight you start with',
+  squireName: 'Squire',
+  squireText: 'Jumps again in the air, but has a heart fewer',
+  heavyName: 'Heavy knight',
+  heavyText: 'Smashes the goblins and bats he runs into, but jumps lower',
+
   // Roads: name, short name for the tag, card text and the stage title's line
   highName: 'The High Road',
   highShort: 'High Road',
@@ -68,6 +76,8 @@ const en = {
   marshRule: 'The mire drags at the boots: jumps are lower',
   windName: 'The Windy Pass',
   windRule: 'A headwind pushes every jump back',
+  skyName: 'The Sky Road',
+  skyRule: 'Gusts carry you on; clouds give way under you',
 
   // Bosses
   gateName: 'The Gatekeeper',
@@ -116,6 +126,7 @@ const en = {
   trackNewBest: 'New best!',
   daily: 'Daily',
   rockfall: 'Rockfall!',
+  gustTag: 'Gust!',
 
   // The stage's title
   stageTitle: 'Stage {n}: {name}',
@@ -150,6 +161,8 @@ const en = {
   dragonDown: 'The dragon is beaten!',
   bestDaily: 'Best on the daily course of {date}: {n} m.',
   bestRun: 'Best run: {n} m.',
+  bestKnight: 'Best as the {knight}: {n} m.',
+  ghostSaved: 'Your ghost will run this one.',
   crowned: "Crowned at the Dragon's Keep.",
   boons: 'Boons: {boons}',
   boonsNone: 'none',
@@ -172,6 +185,10 @@ const en = {
   level: 'Level {n} of {max}',
   forge: 'Forge for {n} coins',
   fullyForged: 'Fully forged',
+  knightsTitle: 'Knights',
+  unlock: 'Unlock for {n}',
+  ride: 'Choose',
+  riding: 'Chosen',
   back: 'Back',
 
   // The rubric under the road
@@ -206,6 +223,9 @@ const en = {
   captionIce: 'Here the knight skateth over the frozen pass.',
   captionMarsh: 'Here the knight wadeth through the fen.',
   captionWind: 'Here the knight leaneth into the wind.',
+  captionSky: 'Here the knight runneth upon the clouds beyond the Keep.',
+  captionCloud: 'Here the knight leapeth upon a cloud, and off it ere it falleth.',
+  captionGust: 'Here a gust beareth the knight onward.',
   captionPastDragon: 'Here the knight passeth the fallen dragon, and weareth the crown.',
   captionPastGate: 'Here the knight passeth the fallen Gatekeeper.',
 };

@@ -56,6 +56,17 @@ in.
   which throws fire on the road and tail lashes at head height; three stomps beat it for 60 coins
   and the lasting crown, saved and drawn on the knight's helm; the run then goes on 60 px/s faster
   with gaps 50 px tighter).
+- Round 3 loop extensions: **the Sky Road beyond the Keep** (once the dragon is beaten every
+  ordinary stage runs on terrain `'sky'`: cloud banks instead of crags and trees, a cloud road, no
+  ledges, steps, pits or fire vents but `cloud` pieces, a gap in the clouds 560 to 680 px wide with
+  a cloud floating over it that falls away `CLOUD.sink` ms after the knight lands on it, and a
+  `GUST` at the knight's back for 1.3 s of every 4.2 s: 1.3x speed and 0.7x gravity), **a second
+  knight** (`knights.ts`: the squire, an extra air jump and a heart fewer, and the heavy knight,
+  who smashes the goblins and bats he runs into and jumps 20% lower; unlocked for 120 and 160
+  banked coins in the armoury's Knights row, which also chooses who runs the ordinary runs; each
+  keeps their own best and ghost; a daily course is always the knight's) and **the ghost runner**
+  (`ghost.ts`: each knight's best ordinary run is recorded every 100 ms of running and plays back
+  as a faint pale ghost of that knight, with a ring on the run track).
 - The art is an illuminated manuscript: a gothic miniature on vellum, painted on 2D canvases
   (`src/art/ink.ts`): a lapis-and-madder diapered sky with a gold-leaf moon, crags and a pink
   castle, lollipop trees, a turf road, ink outlines with white highlights, gold-leaf coins, a lapis
@@ -135,6 +146,14 @@ in.
 - `src/game/pairs.ts`: the `PAIRS` table (`PairId`, name, the two boons, text, and the `pop` words
   shown when the pair is made, all `TextKey`s but the boons), `pairsOf` (the
   pairs completed by a run's ranks) and `pairFor` (a boon's pair and partner, for the card hint).
+- `src/game/knights.ts`: the knights (`KnightId`: `knight`, `squire`, `heavy`), `KNIGHTS` (name
+  and text as `TextKey`s, the unlock price), `KNIGHT_IDS` and `KNIGHT_EACH` (extra jumps, hearts,
+  jump height share, `smash`), read by `stats`.
+- `src/game/ghost.ts`: the ghost runner. `GHOST` (a sample every 100 ms, at most 18000), `Ghost`
+  (`m` reached and `at`, flat triples of x, h and sliding), `record` (adds the samples due while
+  running), `ghostOf` (the finished run as a ghost if it went further than the old one) and
+  `ghostAt` (the ghost's x, h and pose after a time running, or null past its end). Pure; the scene
+  records and draws it.
 - `src/game/armoury.ts`: the `ARMOURY` table (name and text as `TextKey`s, price per level), `ARMOURY_EACH` (what a
   level adds), `noArmoury` and `nextPrice`.
 - `src/game/course.ts`: `buildStage` lays out a stage's pieces (`Piece`: each trap kind, `ledge`
@@ -150,7 +169,8 @@ in.
   `cursed`), `BOON_IDS`,
   `forSale` and `CURSE` (from which stage, how often).
 - `src/game/save.ts`: `loadProgress` and `saveProgress` (best distance, banked coins, the bought
-  boon, the armoury, the daily best, the crown).
+  boon, the armoury, the daily best, the crown, the knights: unlocked, chosen and the squire's and
+  heavy knight's bests), `loadGhosts` and `saveGhosts` (each knight's ghost).
 - `src/scenes/BootScene.ts`: fits the layout to the view (`fitLayout(viewSize)`), bakes every texture, then starts `Game`.
 - `src/scenes/GameScene.ts`: owns the `GameState`, wires input, ticks the sim and draws everything.
 - `src/scenes/layout.ts`: screen constants, laid out for the designed view (`DESIGN`, `DESIGN_GROUND_Y`) and
@@ -170,6 +190,12 @@ in.
   `textures.addCanvas`, marked with that resolution), `tileAt` (scrolls a tile sprite of a painted
   texture in shown pixels), `poly`, `circle`, `oval`, `hl` (a white highlight), `gold` (a gold-leaf
   gradient), `star6`, `heartPath`, `bezant` (a gold coin) and `shade`.
+- The Sky Road's art in `src/art/scenery.ts`: `far-sky` and `near-sky` (cloud banks, swapped in for
+  `far` and `near` by `drawWorld` on the sky), `ground-sky` (a flat-topped cloud band, so a gap's
+  art covers it whole), `pit-560`, `pit-620`, `pit-680` (the gaps, from `SKY_GAPS` in
+  `course.ts`) and `cloud-440`, `cloud-500`, `cloud-560` (the clouds over them, `CLOUD_TOP` px from
+  their walking top to the texture's top, `CLOUD_DEPTH` below), drawn at depth 2.5 by `drawCloud`,
+  trembling while about to fall (still with reduced motion).
 - `src/art/scenery.ts`: the vellum `page` (stains, acanthus scrollwork, snail), `sky` (diaper,
   sunset clouds, stars, moon), `far` (crags and a castle), `near` (trees and a tower), the road
   strips `ground`, `ground-ice`, `ground-marsh` and `ground-wind` (`GROUNDS`), spikes, pits, the hanging log (`blade`), fire vent, `ledge` (pink ashlar),
@@ -180,8 +206,9 @@ in.
   the dragon (`dragon-ready`, `dragon-breathe`, `dragon-tired`, `DRAGON_ART`; `BOSS_ART` maps a
   `BossKind` to its art), facing left, their thrown `barrel`, `axe`, `fire-0`/`fire-1` and `tail`,
   and the rockfall's `boulder`.
-- `src/art/knight.ts`: the knight's poses (`KnightPose`), painted as `knight-<pose>`, and
-  `KNIGHT_FEET` (texture sizes and where the feet are).
+- `src/art/knight.ts`: the knights' poses (`KnightPose`), painted for each knight by its `LOOKS`
+  (surcoat, helm, a plume or the heavy knight's gold crest) as `<knight>-<pose>` (`knight-run0`,
+  `squire-jump`, `heavy-slide`...), and `KNIGHT_FEET` (texture sizes and where the feet are).
 - `src/art/icons.ts`: one 64x64 icon per boon (`iconTexture`), per road (`roadIcon`), the
   armoury's (`armouryIcon`: the purse's own, Iron Heart and Lodestone Charm reuse Hearty Ale's and
   Lodestone's), and the HUD's `heart-full` and `heart-empty`.
@@ -208,14 +235,19 @@ in.
   once per frame (no fixed substeps) and advances its own `clock`, used only for animation.
 - `tick` order: age effects; stop unless `phase === 'running'`; add `dt` to `time`; move awake
   foes (`moveFoes`); while a boss stands, push `checkpointX` to at least its `holdBack` ahead;
-  move `distance` (at `WIND.air` of the speed when airborne on wind; clamped to `checkpointX`) and
-  the rockfall with it (plus `ROCK.creep`); move the boss (`moveBoss`); if the feet are now below
+  move `distance` (at `WIND.air` of the speed when airborne on wind and `GUST.speed` while a gust
+  blows on the sky; clamped to `checkpointX`) and the rockfall with it (plus `ROCK.creep`); move the
+  boss (`moveBoss`); move the clouds (`moveClouds`: count a stood-on cloud's `sinkMs` down, then let
+  it fall, carrying the knight standing on it, and drop it at the road); if the feet are now below
   the floor (`floorAt` under the knight's box), that is a ledge's side: hurt (`'wall'`, unless
   unhurtable or less than `STEP_UP` short) and snap onto its top; apply gravity (halved while
-  falling with Falcon's Glide) and land on the floor (on ice, a landing starts a skid, and the
-  rockfall gains `ROCK.skid`); stomp a foe landed on; stomp or bump the boss (`bossContact`);
+  falling with Falcon's Glide, and to `GUST.lift` while a gust blows) and land on the floor (on ice,
+  a landing starts a skid, and the rockfall gains `ROCK.skid`); a landing on a cloud starts its
+  `sinkMs`; stomp a foe landed on; stomp or bump the boss (`bossContact`);
   refill jumps when grounded; count down slide, hurt and skid (a jump queued during the skid fires
-  as it ends, in the air too if the knight walked off a ledge meanwhile); check one trap hit (a pit
+  as it ends, in the air too if the knight walked off a ledge meanwhile); check one trap hit (the
+  heavy knight's `smash` knocks out a goblin or bat it touches instead, through `knockOut`, as a
+  stomp does; a pit only takes a knight on the road, `h` 0, never one on a cloud over it; a pit
   even while unhurtable: the fall and the throw-out happen, marked by a `fall` puff, but cost nothing); let the rockfall gain `ROCK.hit` if a hit landed this tick, and
   if it has reached the knight's back, hurt (`'rock'`) and drop it `ROCK.start` behind (a knight
   still unhurtable is only kept at their heels); visit a shrine slid into; collect or pull coins;
@@ -294,11 +326,18 @@ in.
   sparkle trail (`trail`) is a short list of course points the knight passed, laid every 45 ms of
   the scene's clock while the multiplier is x2 or more. The knight is one image whose texture and
   origin change by pose. `BoonCards.show` rebuilds only when the choices change.
+- The ghost: after `tick`, on an ordinary run, `record(samples, state)` adds the samples due; when
+  the phase turns `over`, `keepGhost` keeps them with `ghostOf` and `saveGhosts` if the run went
+  further than this knight's ghost. `drawGhost` places the `ghost` image (depth 4.9, `GHOST_LOOK`
+  alpha and tint) with `ghostAt(ghost, state.time)` and its pose, and `drawHud` rings its place on
+  the run track. Only `state.time` is used, so a checkpoint's rest keeps it in step.
 - Saving (`persist`) happens in `update` whenever the phase changes away from `running` (checkpoint
   or fall), on each run's start (`create` and `restart`) and when a boon or armoury level is
   bought. `GameScene` keeps the loaded `Progress`; `persist` copies the run's bank, pending boon and
-  armoury into it, and its best into `progress.best` or, on a daily run, `progress.daily`.
-  `freshRun(daily)` builds the next run from it, chasing the daily best when the date matches.
+  armoury and unlocked knights into it, and its best into `progress.best` (the knight),
+  `progress.knights.best` (the squire or heavy knight) or, on a daily run, `progress.daily`.
+  `freshRun(daily)` builds the next run from it with `progress.knights.ride` (the knight on a daily
+  course), chasing that knight's best or the daily best when the date matches.
 
 ### State model
 
@@ -314,8 +353,10 @@ in.
   `RUNNER_X + x - distance` (`GameScene.sx`), screen y is `GROUND_Y - h`.
 - `Runner`: `h`, `vh`, `slideMs`, `slideQueued` (slide on landing after an air drop), `jumps` left,
   `hurtMs` (invulnerable time), `skidMs` and `jumpQueued` (the ice skid).
-- `terrain` is `terrainOf(stage)`, set by `freshState` and `nextStage` (`'road'` on any boss
-  stage). `road` is the stage's road (null on stages 1 and 2 and boss stages) and `roads` the two
+- `terrain` is `terrainOf(stage, dragonBeaten)`, set by `freshState` and `nextStage` (`'road'` on
+  any boss stage, `'sky'` on every ordinary stage after the dragon). `gustOf(state)` is the Sky
+  Road's gust by `time` (`calm`, `warn`, `blow`; always `calm` elsewhere). `knight` is who runs this
+  run and `knights` the knights unlocked (kept between runs). `road` is the stage's road (null on stages 1 and 2 and boss stages) and `roads` the two
   on offer. `dare` is the stage's dare (null on stage 1 and boss stages), `rockfall` its rockfall
   (null elsewhere). `boss` is the Gatekeeper or the dragon on its stage (null otherwise, and once
   beaten and left behind); `bosses` counts Gatekeepers beaten, `dragonBeaten` says the dragon is
@@ -330,6 +371,8 @@ in.
   screen. A bat is placed so it meets the knight where its piece was laid out, from the stage's
   speed. A stomped foe is removed from `traps` and counted in `stomps`.
 - `ledges: Ledge[]` (`x`, `w`, `h`): raised ground. Steps are two touching ledges, 48 then 80 high.
+  A `cloud` ledge floats `CLOUD.h` (44) over a Sky Road gap (a `pit` of a `SKY_GAPS` width), 60 px in
+  from each edge; `sinkMs` is set once stood on and `fallV` once it falls; it is removed at `h` 0.
 - `time` is ms spent running this run; fire vents burn by it (`FLAMES`: lit 800 of every 1800 ms,
   sputtering for the 300 before).
 - `shrines: Shrine[]` (`x`, `w` 46, `used` once it gave a heart, `tried` once slid into without
@@ -370,7 +413,10 @@ in.
 `hotfoot-start` (the boon bought for the next run; removed once a run starts with it),
 `hotfoot-armoury` (JSON levels per armoury item, clamped to each item's levels on load) and
 `hotfoot-daily` (JSON `{ date, best }` of the last daily course run; a new date starts from 0) and
-`hotfoot-crown` (`'1'` once the dragon has been beaten; never removed). Read once in
+`hotfoot-crown` (`'1'` once the dragon has been beaten; never removed), `hotfoot-knights` (JSON
+`{ unlocked, ride, best }`: the knights unlocked, who runs the next ordinary run, and the squire's
+and heavy knight's bests in metres) and `hotfoot-replays` (JSON of each knight's ghost, `{ m, at }`;
+the `-replays` suffix keeps it out of a progress code, so only a progress file carries it). Read once in
 `GameScene.create` via `loadProgress`, written by `saveProgress`; every access is wrapped in
 try/catch. `hotfoot-trophies` holds the trophies earned (`shared/trophies.ts`, each id with the time). Nothing
 else is saved by the game; the hub's settings live under the shared `hub-settings`
@@ -396,7 +442,8 @@ key (see Hub settings).
 
 ### Data tables
 
-- `src/game/state.ts`: `RUNNER` box, `GRAVITY`, `JUMP_V`, `DROP_V`, `SLIDE_MS`, `HURT_MS`,
+- `src/game/state.ts`: `GUST` (cycle 4200, blow 1300, warn 700, speed 1.3, lift 0.7), `CLOUD` (h 44,
+  sink 500, fall 1400), `RUNNER` box, `GRAVITY`, `JUMP_V`, `DROP_V`, `SLIDE_MS`, `HURT_MS`,
   `START_HEARTS`, `COIN_REACH`, `STAGE_LEN`, `LEAD_IN`, `BOON_PRICE`, `STREAK` (step 10, max 5),
   `ROAD` (from stage 3, +2 streak cap and -40 px gaps on the High Road, +40 px on the Low Road),
   `DARE` (from stage 2, reward 20, kinds and goals), `ROCK` (every 7th stage, start 240, creep 10,
@@ -410,6 +457,8 @@ key (see Hub settings).
 - `src/game/pairs.ts`: `PAIRS`; and in `src/game/sim.ts` `GLIDE` (0.5 of gravity), `HOARD` (2
   more coins) and `BULWARK_REACH` (220 px).
 - `src/game/armoury.ts`: `ARMOURY` (prices per level) and `ARMOURY_EACH`.
+- `src/game/knights.ts`: `KNIGHTS` (prices 120 and 160) and `KNIGHT_EACH`; `src/game/ghost.ts`:
+  `GHOST`; `src/game/course.ts`: `SKY_GAPS` and `CLOUD_INSET`, and the sky's pool in `piecesOf`.
 - `src/game/course.ts`: `CLEAR_BEFORE_CHECKPOINT`, `gapsOf`, `piecesOf` (the pool and its weights
   per stage: fire vents and bats from stage 2, steps, tall ledges and a second goblin entry from
   stage 3, a third goblin and second bat on the High Road), `OPENING`, `GOBLIN` (width, beat, speed
@@ -462,7 +511,7 @@ the stage), at most one sound of each kind a frame, so a row of coins or a volle
 - **Song** (`SONG`): 150 BPM in D Mixolydian, a square lead, a pulse counter-melody, a triangle bass
   galloping long-short-short and noise drums. Loops by `partOf(state)`: `road` (the old road, eight
   bars), `ice` (high, sparkling staccato), `fen` (low and murky, half time), `wind` (long airy notes
-  over quick arpeggios), `boss` (the Gatekeeper and the dragon while they stand), `rockfall` (the
+  over quick arpeggios), `sky` (the Sky Road: a soaring lead in D Lydian over bright arpeggios), `boss` (the Gatekeeper and the dragon while they stand), `rockfall` (the
   road's tune over a driving bass) and `camp` (calm, at a checkpoint and on the game-over panel).
   Stings: `lose` (the knight falls) and `crown` (the dragon beaten).
 - **Effects** (`sfx`), and where they play: `jump` (a jump, at 1.35x pitch for an air jump, also the
@@ -474,9 +523,10 @@ the stage), at most one sound of each kind a frame, so a row of coins or a volle
   `dare` (the `dareMetPop` pop), `pair` (a pair's pop), `throw` / `roll` (a new axe or tail lash /
   barrel or fire), `bossHit` (the boss's hp drops), `bossDown` (the `gateBeaten` pop), `rock` (the
   rockfall catches the knight and falls back), `checkpoint` (the phase turns `checkpoint`), `pick`
-  (a boon or road taken), `horn` (a new stage starts), `again` (Run again or Daily course). Shared
+  (a boon or road taken), `horn` (a new stage starts), `gust` (a gust starts blowing on the Sky Road), `sink` (a
+  cloud starts to fall), `again` (Run again or Daily course). Shared
   sounds: `ui('refuse')` for a shrine's refusal and a refused purchase, `ui('coin')` for a boon or
-  armoury level bought, `ui('click')` for Armoury and Back.
+  armoury level bought, `ui('click')` for Armoury, Back and choosing an unlocked knight (`ui('coin')` for unlocking one).
 
 ### Hub settings
 
@@ -493,7 +543,7 @@ the stage), at most one sound of each kind a frame, so a row of coins or a volle
   the streak's sparkle trail is not drawn, the Gatekeeper's flash after a stomp is held at 0.6
   alpha, the snow and wind streaks, the dragon's tail lash bob, the boulders' roll and the
   rockfall's dust are drawn still, the lit fire vents and the dragon's rolling fire keep one frame
-  (`flames-lit0`, `fire-0`) instead of flickering, and the bats keep one wing frame with no bob.
+  (`flames-lit0`, `fire-0`) instead of flickering, and the bats keep one wing frame with no bob, and a cloud about to fall doesn't tremble.
 - Normal must stay exactly as designed: the playthrough runs on Normal and its `STAGE_1` expects 3
   hearts.
 - Keep the README's difficulty line (5 hearts on Easy, 2 on Hard) in sync with `byDifficulty`.
@@ -591,6 +641,12 @@ the stage), at most one sound of each kind a frame, so a row of coins or a volle
 - Tune the streak or the shrine: `STREAK` and `SHRINE` in `state.ts`; the test's `STREAK` copy and
   the README's rules must follow. Moving the shrine to stage 1 puts it on the playthrough's path:
   the test would then need to handle it (it is harmless, so only the assertions change).
+- Add a knight: a `KnightId`, a `KNIGHTS` entry (its texts in the `i18n/` files) and a `KNIGHT_EACH`
+  row in `knights.ts` (or a new number there, applied in `stats`), its colours in `LOOKS` in
+  `knight.ts`, and a cell x in `ARMOURY_PANEL.knightX` (three fit the panel).
+- Tune the Sky Road: `GUST` and `CLOUD` in `state.ts`, `SKY_GAPS`, `CLOUD_INSET` and the sky's pool
+  in `course.ts`. A new gap width needs its `pit-<w>` (`skyGaps`) and `cloud-<w - 120>` (`clouds`)
+  baked in `scenery.ts`, which both follow `SKY_GAPS`.
 - Change the run track: `trackOf` in `state.ts` (the numbers) and the track part of `drawHud` and
   `TRACK` in `layout.ts` (the drawing).
 
@@ -642,4 +698,11 @@ the stage), at most one sound of each kind a frame, so a row of coins or a volle
 - An ordinary run never draws from the daily seed, and a daily run never touches `Math.random` in
   the course or the boon offers; keep new course randomness on `rand(s)`.
 - Hearts in the HUD are created up to `maxHearts` and never destroyed; extra ones are hidden.
+- A Sky Road gap is a `pit` too: `touches` only lets a pit take a knight at `h` 0, so a knight on
+  the cloud over it is safe, and the caption tells a gap (`w >= SKY_GAPS[0]`) from a pit by width.
+  The ground on the sky is flat-topped so the gap's art hides it; keep it so.
+- A gust changes the knight's pace, so, like the Windy Pass, a bat on the Sky Road can arrive a
+  little early.
+- The ghost samples by `state.time`, so a change to how fast the knight runs makes old ghosts drift
+  from the course; they still replay, they only no longer match it.
 - Healing art uses green (`C.heal`). Never draw a red cross (root `AGENTS.md`).

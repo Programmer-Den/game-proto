@@ -3,15 +3,18 @@ import { ARMOURY_EACH, nextPrice, noArmoury, type Armoury, type ArmouryId } from
 import { BOONS, BOON_IDS, CURSE, forSale, type BoonId } from './boons';
 import { MISSILES, bossOf, bossStands, moveBoss } from './boss';
 import { buildStage, nextStage, roadChoiceDue } from './course';
+import { KNIGHTS, type KnightId } from './knights';
 import { PAIRS, pairsOf } from './pairs';
 import {
   AWAKE,
   BOON_PRICE,
+  CLOUD,
   COIN_REACH,
   DARE,
   DROP_V,
   FOES,
   GRAVITY,
+  GUST,
   ICE,
   ROCK,
   RUNNER,
@@ -21,6 +24,7 @@ import {
   flameOf,
   floorAt,
   freshState,
+  gustOf,
   metres,
   rand,
   seedOf,
@@ -43,8 +47,9 @@ import {
 // a lasting crown; the run then goes on harder), a rockfall chases the knight on every seventh
 // stage, the herald's dare is kept or lost, boon pairs give their hidden bonuses, and each
 // checkpoint stops the run on a choice of two boons (three after a met dare), sometimes a cursed
-// one, and then, from stage 3, of the next road. Between runs the bank buys the missed boon or the
-// armoury's lasting upgrades.
+// one, and then, from stage 3, of the next road. Beyond the dragon the Sky Road's gusts carry the
+// knight on and its clouds fall away once stood on, and the heavy knight smashes the foes he runs
+// into. Between runs the bank buys the missed boon, the armoury's lasting upgrades or a knight.
 
 /** A pulled coin's speed towards the knight. */
 const PULL_SPEED = 700;
@@ -71,6 +76,9 @@ export interface Carry {
   armoury: Armoury;
   /** The lasting crown from the Dragon's Keep. */
   crown: boolean;
+  /** Who rides this run (a daily course always takes the knight), and the knights unlocked. */
+  knight: KnightId;
+  knights: KnightId[];
 }
 
 /**
@@ -79,8 +87,11 @@ export interface Carry {
  * daily course starts bare, so every player runs it alike; the bought boon waits for the next
  * ordinary run.
  */
-export function newRun({ best, bank, pending, armoury, crown }: Carry = { best: 0, bank: 0, pending: null, armoury: noArmoury(), crown: false }, daily: string | null = null): GameState {
-  const s = freshState(best, bank, armoury, daily, crown);
+export function newRun(
+  { best, bank, pending, armoury, crown, knight, knights }: Carry = { best: 0, bank: 0, pending: null, armoury: noArmoury(), crown: false, knight: 'knight', knights: ['knight'] },
+  daily: string | null = null,
+): GameState {
+  const s = freshState(best, bank, armoury, daily, crown, daily ? 'knight' : knight, knights);
   if (daily) s.pending = pending;
   else if (pending) s.ranks[pending] = 1;
   const st = stats(s);
@@ -135,8 +146,8 @@ export function runnerBox(s: GameState) {
 function touches(s: GameState, t: Trap) {
   const box = runnerBox(s);
   if (t.kind === 'pit') {
-    // The knight falls in when standing over the middle of the pit.
-    return grounded(s) && s.distance > t.x + 8 && s.distance < t.x + t.w - 8;
+    // The knight falls in when standing on the road over the middle of the pit (not on a cloud over it).
+    return grounded(s) && s.runner.h <= 0 && s.distance > t.x + 8 && s.distance < t.x + t.w - 8;
   }
   if (t.kind === 'flames' && flameOf(s, t) !== 'lit') return false;
   const span = TRAP_SPAN[t.kind];
@@ -172,6 +183,19 @@ function stomp(s: GameState, prevH: number) {
   });
   if (!foe) return;
   const st = stats(s);
+  const top = knockOut(s, foe);
+  r.h = Math.max(r.h, top);
+  r.vh = st.jumpV * STOMP_BOUNCE;
+  r.jumps = st.jumps;
+  r.slideMs = 0;
+  r.slideQueued = false;
+}
+
+/**
+ * A goblin or bat knocked out, by a stomp or by the heavy knight running into it: it counts as a
+ * stomp, drops a coin (more with Goblin's Hoard) and leaves a puff. Returns the height of its top.
+ */
+function knockOut(s: GameState, foe: Trap) {
   const top = foe.h + TRAP_SPAN[foe.kind as Exclude<TrapKind, 'pit'>].hi;
   s.traps = s.traps.filter((t) => t !== foe);
   s.stomps += 1;
@@ -179,12 +203,30 @@ function stomp(s: GameState, prevH: number) {
   gainCoin(s, foe.x + foe.w / 2, top);
   effect(s, 'stomp', foe.x + foe.w / 2, top, 450);
   // Goblin's Hoard: the foe bursts into more coins, which fly to the knight.
-  if (st.hoard) for (let i = 0; i < HOARD; i++) s.course.push({ id: s.nextId++, x: foe.x + foe.w / 2 + (i ? 30 : -30), h: top + 30, pulled: true });
-  r.h = Math.max(r.h, top);
-  r.vh = st.jumpV * STOMP_BOUNCE;
-  r.jumps = st.jumps;
-  r.slideMs = 0;
-  r.slideQueued = false;
+  if (stats(s).hoard) for (let i = 0; i < HOARD; i++) s.course.push({ id: s.nextId++, x: foe.x + foe.w / 2 + (i ? 30 : -30), h: top + 30, pulled: true });
+  return top;
+}
+
+/**
+ * The Sky Road's clouds: one the knight has landed on holds for `CLOUD.sink` ms, then falls away
+ * faster and faster, carrying the knight down with it if they are still on it. A cloud that has
+ * fallen to the road is gone, leaving the gap under it open.
+ */
+function moveClouds(s: GameState, sec: number) {
+  const r = s.runner;
+  const box = { x0: s.distance - RUNNER.w / 2, x1: s.distance + RUNNER.w / 2 };
+  for (const l of s.ledges) {
+    if (!l.cloud || l.sinkMs === undefined) continue;
+    if (l.sinkMs > 0) {
+      l.sinkMs = Math.max(0, l.sinkMs - sec * 1000);
+      continue;
+    }
+    const on = box.x1 > l.x && box.x0 < l.x + l.w && Math.abs(r.h - l.h) < 0.5 && r.vh <= 0;
+    l.fallV = (l.fallV ?? 0) + CLOUD.fall * sec;
+    l.h = Math.max(0, l.h - l.fallV * sec);
+    if (on) r.h = Math.max(l.h, floorAt({ ledges: s.ledges.filter((o) => o !== l) }, box.x0, box.x1));
+  }
+  s.ledges = s.ledges.filter((l) => !l.cloud || l.h > 0);
 }
 
 function effect(s: GameState, kind: GameState['effects'][number]['kind'], x: number, h: number, total: number, text?: TextKey, n?: number) {
@@ -304,8 +346,10 @@ export function tick(s: GameState, dt: number) {
   // The checkpoint stays out of reach while the boss stands.
   if (s.boss && bossStands(s)) s.checkpointX = Math.max(s.checkpointX, Math.round(s.distance + bossOf(s.boss).holdBack));
 
-  // In the windy pass a headwind slows the knight while they are off the ground.
-  const pace = s.terrain === 'wind' && !grounded(s) ? WIND.air : 1;
+  // In the windy pass a headwind slows the knight while they are off the ground; on the Sky Road a
+  // gust at their back speeds them on.
+  const gust = gustOf(s) === 'blow';
+  const pace = (s.terrain === 'wind' && !grounded(s) ? WIND.air : 1) * (gust ? GUST.speed : 1);
   const from = s.distance;
   s.distance = Math.min(s.checkpointX, s.distance + s.speed * pace * sec);
   // The rockfall keeps the knight's pace and creeps up a little; hits and skids let it gain.
@@ -313,6 +357,7 @@ export function tick(s: GameState, dt: number) {
   if (rock) rock.x += s.distance - from + ROCK.creep * sec;
   const hitsBefore = s.hits;
   moveBoss(s, dt);
+  moveClouds(s, sec);
   // Running into the side of a ledge hurts, and the knight scrambles up onto it. A jump that only
   // just falls short climbs up unhurt.
   const floor = floorOf(s);
@@ -325,8 +370,8 @@ export function tick(s: GameState, dt: number) {
   }
   const prevH = r.h;
   if (r.h > floor || r.vh > 0) {
-    // Falcon's Glide: the knight falls at half the pull.
-    r.vh -= GRAVITY * (r.vh < 0 && st.glide ? GLIDE : 1) * sec;
+    // Falcon's Glide: the knight falls at half the pull. A gust lets the knight float.
+    r.vh -= GRAVITY * (r.vh < 0 && st.glide ? GLIDE : 1) * (gust ? GUST.lift : 1) * sec;
     r.h += r.vh * sec;
     if (r.h <= floor) {
       r.h = floor;
@@ -340,6 +385,12 @@ export function tick(s: GameState, dt: number) {
         effect(s, 'skid', s.distance, floor, ICE.skidMs + 120);
         if (rock) rock.x += ROCK.skid;
       }
+    }
+  }
+  // Landing on a cloud starts it sinking.
+  if (r.vh <= 0) {
+    for (const l of s.ledges) {
+      if (l.cloud && l.sinkMs === undefined && Math.abs(r.h - l.h) < 0.5 && s.distance + RUNNER.w / 2 > l.x && s.distance - RUNNER.w / 2 < l.x + l.w) l.sinkMs = CLOUD.sink;
     }
   }
   stomp(s, prevH);
@@ -362,7 +413,9 @@ export function tick(s: GameState, dt: number) {
   // so nothing holds the knight up over one.
   if (s.phase === 'running') {
     const hit = s.traps.find((t) => (t.kind === 'pit' || r.hurtMs <= 0) && touches(s, t));
-    if (hit) hurt(s, hit.kind);
+    // The heavy knight smashes a goblin or bat he runs into.
+    if (hit && st.smash && FOES.includes(hit.kind)) knockOut(s, hit);
+    else if (hit) hurt(s, hit.kind);
     if (s.phase !== 'running') return;
   }
   if (rock && s.phase === 'running') {
@@ -548,5 +601,14 @@ export function buyArmoury(s: GameState, id: ArmouryId) {
   if (s.phase !== 'over' || price === null || s.bank < price) return false;
   s.bank -= price;
   s.armoury[id] += 1;
+  return true;
+}
+
+/** At the game-over screen, unlocks a knight with banked coins, to ride from the next run on. */
+export function buyKnight(s: GameState, id: KnightId) {
+  const price = KNIGHTS[id].price;
+  if (s.phase !== 'over' || s.knights.includes(id) || s.bank < price) return false;
+  s.bank -= price;
+  s.knights.push(id);
   return true;
 }

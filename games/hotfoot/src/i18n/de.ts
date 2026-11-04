@@ -48,6 +48,14 @@ const de: Translation<typeof en> = {
   purseName: 'Knappenbeutel',
   purseText: 'Beginne jeden Lauf mit 10 Münzen mehr',
 
+  // The knights: name and what sets each apart
+  knightName: 'Ritter',
+  knightText: 'In allem beständig: der Ritter, mit dem du beginnst',
+  squireName: 'Knappe',
+  squireText: 'Springt in der Luft erneut, hat aber ein Herz weniger',
+  heavyName: 'Schwerer Ritter',
+  heavyText: 'Zermalmt Kobolde und Fledermäuse, in die er läuft, springt aber niedriger',
+
   // Roads: name, short name for the tag, card text and the stage title's line
   highName: 'Der Höhenweg',
   highShort: 'Höhenweg',
@@ -68,6 +76,8 @@ const de: Translation<typeof en> = {
   marshRule: 'Der Sumpf zieht an den Stiefeln: Sprünge sind niedriger',
   windName: 'Der Windpass',
   windRule: 'Gegenwind drückt jeden Sprung zurück',
+  skyName: 'Die Himmelsstraße',
+  skyRule: 'Böen tragen dich voran; Wolken geben unter dir nach',
 
   // Bosses
   gateName: 'Der Torwächter',
@@ -116,6 +126,7 @@ const de: Translation<typeof en> = {
   trackNewBest: 'Rekord!',
   daily: 'Tageslauf',
   rockfall: 'Steinschlag!',
+  gustTag: 'Böe!',
 
   // The stage's title
   stageTitle: 'Etappe {n}: {name}',
@@ -150,6 +161,8 @@ const de: Translation<typeof en> = {
   dragonDown: 'Der Drache ist besiegt!',
   bestDaily: 'Rekord auf der Tagesstrecke vom {date}: {n} m.',
   bestRun: 'Bester Lauf: {n} m.',
+  bestKnight: 'Bester Lauf als {knight}: {n} m.',
+  ghostSaved: 'Dein Geist läuft diesen Lauf mit.',
   crowned: 'Gekrönt in der Drachenfeste.',
   boons: 'Gaben: {boons}',
   boonsNone: 'keine',
@@ -172,6 +185,10 @@ const de: Translation<typeof en> = {
   level: 'Stufe {n} von {max}',
   forge: 'Für {n} schmieden',
   fullyForged: 'Fertig geschmiedet',
+  knightsTitle: 'Ritter',
+  unlock: 'Freischalten: {n}',
+  ride: 'Wählen',
+  riding: 'Gewählt',
   back: 'Zurück',
 
   // The rubric under the road
@@ -206,6 +223,9 @@ const de: Translation<typeof en> = {
   captionIce: 'Hier gleitet der Ritter über den Frostpass.',
   captionMarsh: 'Hier watet der Ritter durch das Moor.',
   captionWind: 'Hier stemmt sich der Ritter gegen den Wind.',
+  captionSky: 'Hier läuft der Ritter über die Wolken jenseits der Feste.',
+  captionCloud: 'Hier springt der Ritter auf eine Wolke, und herab, ehe sie fällt.',
+  captionGust: 'Hier trägt eine Böe den Ritter voran.',
   captionPastDragon: 'Hier ziehet der Ritter am gefallenen Drachen vorbei und träget die Krone.',
   captionPastGate: 'Hier ziehet der Ritter am gefallenen Torwächter vorbei.',
 };
