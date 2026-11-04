@@ -51,6 +51,7 @@ export function bakeProps(scene: Phaser.Scene) {
   prop(scene, 'roost', roost);
   for (const name of VILLAGE_NAMES) prop(scene, `village-${name}`, (ctx, L) => village(ctx, L, ROOFS[name] ?? ['#c0b090', '#a09070']));
   prop(scene, 'bunting', bunting);
+  prop(scene, 'town', town);
 }
 
 /** The size of a prop's texture, and where the middle of its tile is in it. */
@@ -384,4 +385,29 @@ function bunting(ctx: Ctx, L: Local) {
     const q = top((i + 1.4) / 8);
     poly(ctx, [p, q, { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 + 9 }], colours[i % colours.length], '#4a3a2a', 0.6);
   }
+}
+
+/** A grown town (WR18): a stone tower with a slate spire and a gold pennant, rising behind the cottages. */
+function town(ctx: Ctx, L: Local) {
+  const u0 = 0.38;
+  const u1 = 0.6;
+  const v0 = 0.0;
+  const v1 = 0.2;
+  const h = 62 * K;
+  const ink = '#4a4250';
+  const c = L((u0 + u1) / 2, (v0 + v1) / 2);
+  shadow(ctx, c.x + 6, c.y + 3, 14, 6, 0.28);
+  poly(ctx, [L(u0, v1, 0), L(u1, v1, 0), L(u1, v1, h), L(u0, v1, h)], '#c8c2b4', ink, 1);
+  poly(ctx, [L(u1, v1, 0), L(u1, v0, 0), L(u1, v0, h), L(u1, v1, h)], '#a29c90', ink, 1);
+  // Windows, lit gold.
+  for (const z of [18, 38]) {
+    poly(ctx, [L(u0 + 0.08, v1, z * K), L(u0 + 0.14, v1, z * K), L(u0 + 0.14, v1, (z + 10) * K), L(u0 + 0.08, v1, (z + 10) * K)], '#f2c14e');
+    poly(ctx, [L(u1, v0 + 0.07, z * K), L(u1, v0 + 0.13, z * K), L(u1, v0 + 0.13, (z + 10) * K), L(u1, v0 + 0.07, (z + 10) * K)], '#d8a83a');
+  }
+  const top = L((u0 + u1) / 2, (v0 + v1) / 2, h + 34 * K);
+  poly(ctx, [L(u0 - 0.02, v1 + 0.02, h), L(u1 + 0.02, v1 + 0.02, h), top], '#5a6278', ink, 1);
+  poly(ctx, [L(u1 + 0.02, v1 + 0.02, h), L(u1 + 0.02, v0 - 0.02, h), top], '#454c60', ink, 1);
+  ctx.fillStyle = '#4a3a2a';
+  ctx.fillRect(top.x - 0.75, top.y - 16 * K, 1.5, 16 * K);
+  poly(ctx, [{ x: top.x + 0.75, y: top.y - 16 * K }, { x: top.x + 13 * K, y: top.y - 12 * K }, { x: top.x + 0.75, y: top.y - 8 * K }], '#f2c14e', '#8a6a20', 0.6);
 }

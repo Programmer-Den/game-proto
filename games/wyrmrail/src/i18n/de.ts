@@ -26,6 +26,8 @@ const de: Translation<typeof en> = {
   planksLower: 'Bretter',
   iron: 'Eisen',
   ironLower: 'Eisen',
+  wares: 'Stadtwaren',
+  waresLower: 'Stadtwaren',
   passengers: 'Fahrgäste',
   passengersLower: 'Fahrgäste',
 
@@ -67,6 +69,10 @@ const de: Translation<typeof en> = {
   festivalBanner: 'Fest in {village}: bring {n} Ladungen hin!',
   roundJoins: 'Runde {round}: {village} kommt an die Strecke',
   roundBanner: 'Runde {round}',
+  townBanner: '{village} wächst zur Stadt: größere Aufträge und Stadtwaren!',
+  rivalBanner: 'Eine fremde Bahn baut im Tal und macht dir die Aufträge streitig',
+  lampsBanner: 'Gleise antippen, um eine Laterne aufzuhängen: Nachtrunden kommen',
+  nightBanner: 'Es wird Nacht: dunkle Gleise bremsen den Lindwurm',
 
   // Floating texts over the valley
   depotPop: 'Depot -{n}',
@@ -81,6 +87,11 @@ const de: Translation<typeof en> = {
   munch: 'Mampf!',
   gifts: 'Geschenke!',
   late: '{cargo} zu spät!',
+  lampPop: 'Laterne -{n}',
+  warehousePop: 'Lagerhaus -{n}',
+  backInStore: 'Zurück ins Lager',
+  beatRival: 'Vor der Konkurrenz!',
+  rivalTook: 'Konkurrenz holt {cargo}',
 
   // The valley and the panel
   roost: 'Horst',
@@ -121,6 +132,7 @@ const de: Translation<typeof en> = {
   route: '{from} → {to}',
   rushOrder: 'Eilauftrag',
   morePay: '+{n} % Lohn',
+  rivalRace: 'Konkurrenz!',
 
   // The HUD: the round and what each wyrm is doing
   festivalProgress: 'Fest: {n}/{goal} geliefert',
@@ -143,6 +155,9 @@ const de: Translation<typeof en> = {
   hintRemove: 'Gleise antippen baut sie für die halben Kosten ab. Abbauen erneut zum Bauen.',
   hintPlain: 'Schlichte Gleise schließen nur ans Stück davor an. Vier Seiten ergeben eine Kreuzung.',
   hintDepot: 'Dorf antippen für ein Depot ({cost} M): Waren warten halb so schnell, laden sofort.',
+  hintWarehouse: 'Dorf antippen für ein Depot ({cost} M), Stadt mit Depot für ein Lagerhaus ({warehouse} M).',
+  hintNight: 'Nacht: unbeleuchtete Gleise bremsen den Lindwurm. Gleis antippen für eine Laterne ({cost} M).',
+  hintRival: 'Die Konkurrenz holt Aufträge zwischen Dörfern an ihrer Bahn: schick den Lindwurm zuerst.',
   hintWashout: 'Eine Flut kommt: lege einen Umweg oder baue die Gleise danach neu.',
   hintRockfall: 'Ein Steinschlag kommt: lege einen Umweg oder baue die Gleise danach neu.',
   hintCourier: 'Ein Dorf schmollt: antippen schickt einen freien Lindwurm mit Geschenken ({cost} M).',

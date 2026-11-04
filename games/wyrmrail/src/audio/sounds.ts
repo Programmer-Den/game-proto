@@ -51,6 +51,14 @@ export const sfx = sounds({
   courier: { wave: 'sine', freq: 1400, to: 2000, attack: 0.02, length: 0.26, volume: 0.24, gap: 150 },
   /** The courier's gifts delivered: a happy chime. */
   gifts: { wave: 'sine', freq: 1047, arp: [0, 4, 7, 12], arpStep: 0.06, length: 0.36, volume: 0.25, gap: 200 },
+  /** A lamp hung on the track: a soft glassy ting. */
+  lamp: { wave: 'sine', freq: 1760, to: 1700, attack: 0.004, length: 0.22, volume: 0.2, gap: 80 },
+  /** A village grows into a town: a bright peal of bells. */
+  grow: { wave: 'sine', freq: 784, arp: [0, 7, 12, 16, 19], arpStep: 0.07, length: 0.55, volume: 0.26, gap: 500 },
+  /** The rival takes an order off the board: a low, smug horn. */
+  rival: { wave: 'sawtooth', freq: 220, to: 180, arp: [0, -5], arpStep: 0.14, length: 0.34, volume: 0.16, gap: 300 },
+  /** The wyrm was sent before the rival could take the order: a quick whoosh up. */
+  beatRival: { wave: 'pulse25', freq: 660, to: 1320, length: 0.12, volume: 0.2, gap: 200 },
 });
 
 export type Sfx = Parameters<typeof sfx>[0];

@@ -7,11 +7,12 @@ A green wyrm sleeps in the Roost at the edge of a floating valley, drawn in isom
 track from the Roost to the villages, then send the wyrm along it, pulling two wagons, to carry each
 village's goods to another before the order runs out of time. Where the line branches, the switches
 decide which way the wyrm goes. Keep it fed at the Roost, bring goods to the workshops that make
-better ones, keep the villages in good cheer, build depots and tunnels, wake a second wyrm late in
-the game, and after the eighth village finish with the festival and its medal. Every game is played
-in a new valley, a won festival flies the wyrm on to the next one (snowy, marsh, canyon) with one
-upgrade kept, its moults grow lasting traits along the way, and the daily valley gives everyone the
-same seeded valley once a day.
+better ones, keep the villages in good cheer, grow them into towns, build depots and tunnels, light
+the line for night rounds, race a rival company for orders, wake a second wyrm late in the game, and
+after the eighth village finish with the festival and its medal. Every game is played in a new
+valley, a won festival flies the wyrm on to the next one (snowy, marsh, canyon) with one upgrade
+kept, its moults grow lasting traits along the way, and the daily valley gives everyone the same
+seeded valley once a day.
 
 ![The valley at the start](docs/screenshots/playthrough-0-valley.webp)
 
@@ -29,7 +30,8 @@ same seeded valley once a day.
 | Tap an order | Send the wyrm to fetch and deliver it |
 | Tap a junction | Throw its switch |
 | Tap a village | Courier call: send a free wyrm with gifts (from round 2) |
-| Depot, then a village | Build a depot there (from round 2) |
+| Depot, then a village | Build a depot there (from round 2), or a warehouse in a town with a depot |
+| Tap track (not a junction) | Hang a lamp there, 4 coins (from round 3) |
 | Remove | Toggle: tap track to take it up for half what it cost |
 | Plain | Toggle: lay track that joins only the piece it continues, and crossings |
 | A charter card | Pick the round's charter (from round 3) |
@@ -150,6 +152,24 @@ same seeded valley once a day.
     kind, for every player on the same day, one try a day, with no medal boons and no flying on.
     Its score is the orders delivered when it ends, kept with the best score and the days in a row
     (`wyrmrail-daily`).
+22. **Villages that grow**, from round 2: a village that gets 4 deliveries in time grows into a
+    **town**, with a stone tower behind its cottages and its name in gold. A town's orders pay 30%
+    more, and about a third of them are its **wares** (a gift-tied crate), which pay 40% more again
+    and can go anywhere on the line. A town with a depot can build a **warehouse** for 50 coins
+    (Depot, then tap the town): goods still waiting there that run out of time go back in store,
+    costing no heart and souring nobody.
+23. **Night rounds**: rounds 5 and 8 fly at night. The valley darkens, and the wyrm flies at half
+    speed over unlit track. The Roost and the villages light their own tiles, and from round 3 a
+    tap on a piece of track (not a junction) hangs a **lamp** there for 4 coins, which lights it and
+    the tiles beside it from then on. Lamps go with their track.
+24. **A rival line**, from round 3 until the festival: a rival company sets up a plum yard where it
+    can reach the most villages, far from the Roost, and lays a tile of its own track every 5
+    seconds towards the nearest open village it doesn't reach yet. Its track never joins the
+    wyrm's: it bridges straight over the wyrm's line on flyovers, and it blocks the tiles it takes,
+    though you can lay your own track on one for three times the usual price. Now and then the
+    rival goes after the best-paying waiting order between two villages it reaches (a plum bar and
+    "Rival racing!" on the card): send the wyrm for it within 9 seconds, or the rival takes it off
+    the board. A lost order costs no heart, only the pay.
 
 ![Laying track](docs/screenshots/playthrough-1-track.webp)
 
@@ -182,6 +202,14 @@ An order pays 10 coins plus 3 per tile between the two villages (as the crow fli
 | Golden hoard | 3 | 40, 80, 140 | Every order pays 25% more |
 | Second wyrm | 1 | 150, from round 5 | A second, copper wyrm joins the line |
 | Depot | One per village | 60, then 30 more each, from round 2 | Goods at that village wait at half speed and load at once |
+| Warehouse | One per town with a depot | 50 | Goods waiting there that run late go back in store, costing no heart |
+| Lamp | One per track tile | 4, from round 3 | Lights its tile and the tiles beside it in night rounds |
+
+![Millbrook and Fernhollow grown into towns, with towers, warehouses and an order of wares](docs/screenshots/towns.webp)
+
+![A night round: lamps on the line light their tiles, the rest of the valley is dark](docs/screenshots/night.webp)
+
+![The rival line's plum track and yard on a night round, racing the wyrm for an order of timber](docs/screenshots/rival.webp)
 
 ### Traits
 

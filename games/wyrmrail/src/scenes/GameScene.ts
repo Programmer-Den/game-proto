@@ -9,8 +9,14 @@ import {
   boonNames,
   buildTrack,
   buyDepot,
+  buyLamp,
   buyUpgrade,
   UPGRADE_NAMES,
+  buyWarehouse,
+  canBuyWarehouse,
+  isLit,
+  rivalFlyovers,
+  isNight,
   canBuyDepot,
   canRemove,
   canSendCourier,
@@ -52,6 +58,10 @@ import {
   HAZARD_TEXT,
   HUNGRY,
   KIND_TEXT,
+  LAMP_COST,
+  LAMP_ROUND,
+  RIVAL_CLAIM_MS,
+  WAREHOUSE_COST,
   MOOD_PAY,
   MOOD_ROUND,
   POP_MS,
@@ -165,6 +175,12 @@ const MOOD_LOOKS: { color: number; mouth: number }[] = [
 /** How taps on the valley act: laying track that joins its neighbours, plain track, taking track up, or building a depot at a village. */
 type Mode = 'auto' | 'plain' | 'remove' | 'depot';
 
+/** A tile from a track key (`c,r`). */
+const tileOfKey = (k: string): Tile => {
+  const [c, r] = k.split(',').map(Number);
+  return { c, r };
+};
+
 /** Minutes and seconds of game time, like 2:05. */
 const clock = (ms: number) => `${Math.floor(ms / 60_000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}`;
 
@@ -181,6 +197,8 @@ export class GameScene extends Phaser.Scene {
   private lastLaid: Tile | null = null;
   /** The village a tap went down on, for a courier call when it comes up there without dragging off. */
   private pressedVillage: number | null = null;
+  /** The track tile a tap went down on, for a lamp when it comes up there without dragging off. */
+  private pressedTrack: Tile | null = null;
   /** Whether this game's festival medal has been saved. */
   private medalSaved = false;
   /** Plays what the sim did each frame, and the music. */
@@ -192,7 +210,19 @@ export class GameScene extends Phaser.Scene {
   private rails!: Phaser.GameObjects.Graphics;
   private trackKey = '';
   /** The Roost and the villages, each with its name and, for a workshop, a sign of what it makes. */
-  private stations: { sprite: Phaser.GameObjects.Image; label: Phaser.GameObjects.Text; sign?: Phaser.GameObjects.Container; round: number }[] = [];
+  private stations: {
+    sprite: Phaser.GameObjects.Image;
+    label: Phaser.GameObjects.Text;
+    sign?: Phaser.GameObjects.Container;
+    /** A village's tower once it has grown into a town, and its warehouse's icon. */
+    tower?: Phaser.GameObjects.Image;
+    warehouse?: Phaser.GameObjects.Image;
+    round: number;
+  }[] = [];
+  /** Night (WR19): the dark over the valley, and the glow of the lamps, the stations and the wyrms' heads in it. */
+  private dark!: Phaser.GameObjects.Graphics;
+  private darkKey = '';
+  private glow!: Phaser.GameObjects.Graphics;
   /** Each village's mood, as a face by its name, from round `MOOD_ROUND`. */
   private moodLayer!: Phaser.GameObjects.Graphics;
   private moodKey = '';
@@ -271,6 +301,7 @@ export class GameScene extends Phaser.Scene {
     this.mode = 'auto';
     this.lastLaid = null;
     this.pressedVillage = null;
+    this.pressedTrack = null;
     this.medalSaved = false;
     this.depotIcons = [];
     this.portals = [];
@@ -302,6 +333,9 @@ export class GameScene extends Phaser.Scene {
     this.createScenery();
     this.createStations();
     this.moodLayer = this.add.graphics().setDepth(UI_DEPTH - 2);
+    this.dark = this.add.graphics().setDepth(UI_DEPTH - 4);
+    this.darkKey = '';
+    this.glow = this.add.graphics().setDepth(UI_DEPTH - 3);
     this.hazardMark = this.add.text(0, 0, '!', textStyle(26, '#f0a050')).setOrigin(0.5, 1).setDepth(UI_DEPTH - 1).setVisible(false);
     this.wyrmViews.push(this.createWyrm('wyrm'));
     this.createHud();
@@ -319,6 +353,12 @@ export class GameScene extends Phaser.Scene {
         else if (this.state.round >= MOOD_ROUND && this.state.phase === 'play') ui('refuse');
       }
       this.pressedVillage = null;
+      // A tap on track that didn't drag off it hangs a lamp there, once lamps are sold.
+      if (this.pressedTrack) {
+        if (buyLamp(this.state, this.pressedTrack)) sfx('lamp');
+        else if (this.state.round >= LAMP_ROUND && this.state.phase === 'play' && !this.state.lamps.includes(key(this.pressedTrack))) ui('refuse');
+      }
+      this.pressedTrack = null;
     });
     this.draw();
   }
@@ -347,18 +387,20 @@ export class GameScene extends Phaser.Scene {
     const t = tileAt(p.worldX, p.worldY);
     const onBoard = p.worldX >= BOARD.x && p.worldX < BOARD.x + BOARD.w && p.worldY >= BOARD.y && p.worldY < BOARD.y + BOARD.h;
     // A press on a village that slides off the board or the grid is no courier call.
-    if (!onBoard || !inGrid(t)) return void (this.pressedVillage = null);
+    if (!onBoard || !inGrid(t)) return void (this.pressedVillage = this.pressedTrack = null);
     // The game waits for a charter or moult pick: a tap on the shaded board around the cards does nothing.
-    if (this.state.phase !== 'play' || choosing(this.state)) return void (this.pressedVillage = null);
+    if (this.state.phase !== 'play' || choosing(this.state)) return void (this.pressedVillage = this.pressedTrack = null);
     if (!down && (this.dragTile === null || this.dragTile === key(t))) return;
     this.dragTile = key(t);
     if (down) this.dragLaid = 0;
     const s = this.state;
     const village = villageAt(s, t);
     this.pressedVillage = down && this.mode !== 'remove' && this.mode !== 'depot' ? village : null;
+    this.pressedTrack = down && this.mode !== 'remove' && this.mode !== 'depot' && s.track.includes(key(t)) && !s.switches[key(t)] ? t : null;
     if (this.mode === 'depot') {
       if (!down) return;
-      if (village !== null && buyDepot(s, village)) {
+      // A tap on a village builds its depot; on a town with a depot, its warehouse.
+      if (village !== null && (buyDepot(s, village) || buyWarehouse(s, village))) {
         this.mode = 'auto';
         sfx('buy');
       } else ui('refuse');
@@ -407,6 +449,10 @@ export class GameScene extends Phaser.Scene {
       this.stations.push({ sprite, label, round });
       if (texture !== 'roost') {
         this.depotIcons.push(fit(this.add.image(x - label.width / 2 - 10, y + 15, 'depot')).setDepth(UI_DEPTH - 2).setVisible(false));
+        const st = this.stations[this.stations.length - 1];
+        // The town's tower stands behind the cottages.
+        st.tower = this.addProp(t, 'town').setDepth(sprite.depth - 1).setVisible(false);
+        st.warehouse = fit(this.add.image(x - label.width / 2 - 26, y + 15, 'warehouse')).setDepth(UI_DEPTH - 2).setVisible(false);
       }
     };
     add(ROOST, 'roost', t('roost'), 1);
@@ -665,12 +711,18 @@ export class GameScene extends Phaser.Scene {
       st.sign?.setVisible(st.round <= s.round);
     }
     this.depotIcons.forEach((icon, i) => icon.setVisible(s.depots.includes(i)));
+    this.stations.slice(1).forEach((st, i) => {
+      st.tower!.setVisible(s.towns.includes(i));
+      st.warehouse!.setVisible(s.warehouses.includes(i));
+      st.label.setColor(s.towns.includes(i) ? '#f3c64e' : '#f3e9d2');
+    });
     this.bunting.setVisible(s.round === FESTIVAL_ROUND);
     this.drawMoods();
     this.drawHazard();
     this.drawMarkers();
     while (this.wyrmViews.length < s.wyrms.length) this.wyrmViews.push(this.createWyrm('wyrm2'));
     s.wyrms.forEach((w, i) => this.drawWyrm(w, i, this.wyrmViews[i]));
+    this.drawNight();
     this.drawPops();
     this.drawHud();
     this.drawHintLine();
@@ -767,7 +819,7 @@ export class GameScene extends Phaser.Scene {
   /** Redraws the rails when the track, the switches or the open villages change. */
   private drawTrack() {
     const s = this.state;
-    const k = `${s.track.join(';')}|${s.round}|${Object.entries(s.switches).join(';')}|${s.cuts.join(';')}|${s.crossings.join(';')}|${s.hazard ? key(s.hazard.tile) : ''}`;
+    const k = `${s.track.join(';')}|${s.round}|${Object.entries(s.switches).join(';')}|${s.cuts.join(';')}|${s.crossings.join(';')}|${s.hazard ? key(s.hazard.tile) : ''}|${s.lamps.join(';')}|${s.rival ? s.rival.track.join(';') : ''}`;
     if (k === this.trackKey) return;
     this.trackKey = k;
     for (const [tile, pines] of this.pines) pines.setVisible(!s.track.includes(tile));
@@ -837,8 +889,95 @@ export class GameScene extends Phaser.Scene {
           g.lineStyle(4, 0xe8823a).lineBetween(foot.x, foot.y - 15, foot.x + 10, foot.y - 30);
           g.fillStyle(0xf2c14e).fillCircle(foot.x + 10, foot.y - 30, 4);
         }
+        if (pass === 'switches' && s.lamps.includes(key(here))) {
+          // A lamp post on the tile's left corner.
+          const foot = iso(c + 0.14, r + 0.86);
+          g.fillStyle(0x1d1a14, 0.25).fillEllipse(foot.x + 3, foot.y + 1, 10, 4);
+          g.fillStyle(0x3a3a44).fillRect(foot.x - 1.5, foot.y - 26, 3, 26);
+          g.fillStyle(0x3a3a44).fillRect(foot.x - 4, foot.y - 32, 8, 7);
+          g.fillStyle(0xffe08a).fillRect(foot.x - 2.5, foot.y - 31, 5, 5);
+        }
       }
     }
+    this.drawRival(g);
+  }
+
+  /** The rival line (WR20): its track in plum, joined only to itself, its flyovers over the wyrm's line and its yard's shed. */
+  private drawRival(g: Phaser.GameObjects.Graphics) {
+    const r = this.state.rival;
+    if (!r) return;
+    const flyovers = rivalFlyovers(this.state).map(key);
+    const own = (t: Tile) => r.track.includes(key(t)) || (t.c === r.yard.c && t.r === r.yard.r) || flyovers.includes(key(t));
+    for (const pass of ['bed', 'rails'] as const) {
+      for (const k of [key(r.yard), ...r.track, ...flyovers]) {
+        const over = flyovers.includes(k);
+        const [c, rr] = k.split(',').map(Number);
+        for (const n of [{ c: c + 1, r: rr }, { c: c - 1, r: rr }, { c, r: rr + 1 }, { c, r: rr - 1 }]) {
+          if (!own(n)) continue;
+          // A flyover only runs straight across, to the rival tiles on either side.
+          if (over && !r.track.includes(key(n)) && !(n.c === r.yard.c && n.r === r.yard.r)) continue;
+          const dc = n.c - c;
+          const dr = n.r - rr;
+          // A flyover's deck rides high over the wyrm's rails.
+          const lift = over ? 12 : 0;
+          const at = (t: number, side: number, z = 0) => {
+            const p = iso(c + 0.5 + dc * 0.5 * t + Math.abs(dr) * side, rr + 0.5 + dr * 0.5 * t + Math.abs(dc) * side, z + lift);
+            return new Phaser.Math.Vector2(p.x, p.y);
+          };
+          if (pass === 'bed') {
+            g.fillStyle(over ? 0x3a2e46 : 0x5a4a66).fillPoints([at(0, -0.2), at(1, -0.2), at(1, 0.2), at(0, 0.2)], true);
+            if (over) for (const side of [-0.18, 0.18]) g.lineStyle(2, 0x3a2e46).lineBetween(at(0.3, side).x, at(0.3, side).y, at(0.3, side).x, at(0.3, side).y + lift);
+          } else for (const side of [-0.1, 0.1]) g.lineStyle(1.8, 0xc7a0e8).lineBetween(at(0, side, 1).x, at(0, side, 1).y, at(1, side, 1).x, at(1, side, 1).y);
+        }
+      }
+    }
+    // The yard: a plum shed with a pennant.
+    const { c, r: rr } = r.yard;
+    const pt = (u: number, v: number, z = 0) => {
+      const p = iso(c + u, rr + v, z);
+      return new Phaser.Math.Vector2(p.x, p.y);
+    };
+    g.fillStyle(0x1d1a14, 0.25).fillEllipse(pt(0.5, 0.5).x + 4, pt(0.5, 0.5).y + 2, 40, 16);
+    g.fillStyle(0x8a6aa0).fillPoints([pt(0.25, 0.75), pt(0.75, 0.75), pt(0.75, 0.75, 22), pt(0.25, 0.75, 22)], true);
+    g.fillStyle(0x6a4e80).fillPoints([pt(0.75, 0.75), pt(0.75, 0.25), pt(0.75, 0.25, 22), pt(0.75, 0.75, 22)], true);
+    g.fillStyle(0x4a3460).fillPoints([pt(0.2, 0.8, 22), pt(0.8, 0.8, 22), pt(0.8, 0.5, 36), pt(0.2, 0.5, 36)], true);
+    g.fillStyle(0x3a2850).fillPoints([pt(0.8, 0.8, 22), pt(0.8, 0.2, 22), pt(0.8, 0.5, 36)], true);
+    g.fillStyle(0x2a2030).fillPoints([pt(0.4, 0.75), pt(0.6, 0.75), pt(0.6, 0.75, 14), pt(0.4, 0.75, 14)], true);
+  }
+
+  /**
+   * Night (WR19): the valley darkens, and the tiles the lamps and the stations light stay brighter,
+   * so the player sees which track slows the wyrm. Lamps and the wyrms' heads glow.
+   */
+  private drawNight() {
+    const s = this.state;
+    const night = isNight(s) && s.phase === 'play';
+    const k = night ? `${s.round}|${s.lamps.join(';')}` : '';
+    if (k !== this.darkKey) {
+      this.darkKey = k;
+      const d = this.dark.clear();
+      if (night) {
+        d.fillStyle(0x0c1430, 0.45).fillRect(BOARD.x, BOARD.y, BOARD.w, BOARD.h);
+        for (let r = 0; r < ROWS; r++) {
+          for (let c = 0; c < COLS; c++) {
+            if (isLit(s, { c, r })) continue;
+            const pts = [iso(c, r), iso(c + 1, r), iso(c + 1, r + 1), iso(c, r + 1)].map((p) => new Phaser.Math.Vector2(p.x, p.y));
+            d.fillStyle(0x0c1430, 0.35).fillPoints(pts, true);
+          }
+        }
+      }
+    }
+    const g = this.glow.clear();
+    if (!night) return;
+    const light = (x: number, y: number, r: number) => {
+      for (const [f, a] of [[1, 0.12], [0.6, 0.2], [0.3, 0.45]]) g.fillStyle(0xffd27a, a).fillCircle(x, y, r * f);
+    };
+    for (const lamp of s.lamps) {
+      const [c, r] = lamp.split(',').map(Number);
+      const foot = iso(c + 0.14, r + 0.86);
+      light(foot.x, foot.y - 28, 14);
+    }
+    for (const v of this.wyrmViews.slice(0, s.wyrms.length)) if (v.segments[0].visible) light(v.segments[0].x, v.segments[0].y - 14, 10);
   }
 
   /** A dark tunnel mouth on each side of a mountain the track runs through, in front of the peak. */
@@ -882,7 +1021,7 @@ export class GameScene extends Phaser.Scene {
         }
         if (this.mode === 'depot') {
           const v = villageAt(s, t);
-          if (v !== null && canBuyDepot(s, v)) g.lineStyle(2.5, 0xf3c64e, 0.95).strokePoints(diamond(c, r), true);
+          if (v !== null && (canBuyDepot(s, v) || canBuyWarehouse(s, v))) g.lineStyle(2.5, 0xf3c64e, 0.95).strokePoints(diamond(c, r), true);
           continue;
         }
         const cost = trackCost(s, t);
@@ -1042,8 +1181,14 @@ export class GameScene extends Phaser.Scene {
         : this.mode === 'plain'
           ? t('hintPlain')
           : this.mode === 'depot'
-            ? t('hintDepot', { cost: depotCost(s) })
-            : s.hazard
+            ? s.towns.length
+              ? t('hintWarehouse', { cost: depotCost(s), warehouse: WAREHOUSE_COST })
+              : t('hintDepot', { cost: depotCost(s) })
+            : isNight(s) && s.track.some((k) => !isLit(s, tileOfKey(k)))
+              ? t('hintNight', { cost: LAMP_COST })
+              : s.rival?.claim
+                ? t('hintRival')
+                : s.hazard
               ? t(HAZARD_TEXT[s.hazard.kind].hint)
               : s.round >= MOOD_ROUND && openVillages(s).some((v) => moodOf(s, villages(s).indexOf(v)) < 0 && canSendCourier(s, villages(s).indexOf(v)))
                 ? t('hintCourier', { cost: COURIER_COST })
@@ -1083,7 +1228,7 @@ export class GameScene extends Phaser.Scene {
 
   private drawPanel() {
     const s = this.state;
-    const k = `${s.upgrades.hoard}|${s.wyrms.length}|` + s.orders.map((o) => `${o.id}:${o.status}:${routable(s, o)}`).join(';');
+    const k = `${s.upgrades.hoard}|${s.wyrms.length}|${s.rival?.claim?.order ?? ''}|` + s.orders.map((o) => `${o.id}:${o.status}:${routable(s, o)}`).join(';');
     if (k !== this.cardKey) {
       this.cardKey = k;
       for (const c of this.cards) c.destroy();
@@ -1099,6 +1244,13 @@ export class GameScene extends Phaser.Scene {
       const blink = f < 0.25 && !settings.reduceMotion && Math.floor(this.time.now / 250) % 2 === 0;
       g.fillStyle(0x1d1a14).fillRect(PANEL.x - PANEL.w / 2 + 8, y, PANEL.w - 16, 5);
       g.fillStyle(color, blink ? 0.4 : 1).fillRect(PANEL.x - PANEL.w / 2 + 8, y, (PANEL.w - 16) * f, 5);
+      // The rival's race for it: a plum bar along the card's top, running out as the rival closes in.
+      const claim = s.rival?.claim;
+      if (claim?.order === o.id) {
+        const top = y + 9 - ORDER_CARD.h + 3;
+        g.fillStyle(0x1d1a14).fillRect(PANEL.x - PANEL.w / 2 + 2, top, PANEL.w - 4, 4);
+        g.fillStyle(0xc7a0e8).fillRect(PANEL.x - PANEL.w / 2 + 2, top, ((PANEL.w - 4) * Math.max(0, claim.ms)) / RIVAL_CLAIM_MS, 4);
+      }
     });
 
     const wings = upgradeCost(s, 'wings');
@@ -1137,7 +1289,9 @@ export class GameScene extends Phaser.Scene {
     const title = this.add.text(left + 28, -26, t(CARGO_NAMES[o.cargo].name), textStyle(14, o.made ? '#f3c64e' : isPassengers(o) ? '#9bd8f0' : '#f3e9d2'));
     const pay = this.add.text(PANEL.w / 2 - 8, -26, t('coins', { n: orderPay(s, o) }), textStyle(14, '#f3c64e')).setOrigin(1, 0);
     const route = this.add.text(left, -8, t('route', { from: vs[o.from].name, to: vs[o.to].name }), textStyle(11, '#d8c7a6'));
-    const status = this.add.text(left, 5, t(ok ? STATUS_TEXT[o.status] : 'noTrack'), textStyle(11, ok ? '#c9e8c0' : '#a8957a'));
+    // An order the rival is after says so where its status goes.
+    const raced = s.rival?.claim?.order === o.id;
+    const status = this.add.text(left, 5, t(raced ? 'rivalRace' : ok ? STATUS_TEXT[o.status] : 'noTrack'), textStyle(11, raced ? '#c7a0e8' : ok ? '#c9e8c0' : '#a8957a'));
     // What the sending village's mood did to the order when it was made: a sulking village wants it fast, a happy one pays more.
     const mood = o.mood;
     const tag = this.add
