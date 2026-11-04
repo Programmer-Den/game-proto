@@ -188,11 +188,11 @@ buttons in the bottom right of the margin do the same while the knight runs.
    further off (as with a rank of Lodestone) so a good leap can take a whole arc. Each pays up to
    three stars: reaching the banner, reaching it without a hit, and reaching it with every coin on
    the course. The panel shows the stars won on each; **every star of all ten wins the gold boots**,
-   worn by every knight in every run after. A challenge course banks no coins, and "Try again" on
-   its panel runs it again.
+   worn by every knight in every run after. A challenge course banks no coins and shows no best
+   distance (its stars are its score), and "Try again" on its panel runs it again.
 27. **The weekly road**: "Weekly road" in the Courses panel starts a run drawn from the week's seed
    (ISO weeks, from Monday), the same for everyone all week, that starts with two set boons named on
-   the panel. Run it as often as you like; it starts bare otherwise, like the daily course, and
+   the panel (never the two halves of a pair). Run it as often as you like; it starts bare otherwise, like the daily course, and
    keeps the week's best distance, shown on the panel and on the game-over panel. The tag reads
    "Weekly" while it runs.
 
