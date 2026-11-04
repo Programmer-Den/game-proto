@@ -1,10 +1,12 @@
 import { BOONS, type BoonId } from './admiralty';
 import type { BountyId } from './bounties';
+import { logFull, newCaptains, type CaptainId, type CaptainRun } from './captains';
 import { FIRST_HULL, HULLS, type HullId } from './hulls';
 import { ORDERS, type OrderId } from './orders';
 import type { CourseId } from './courses';
 import { perkRank, SWIVEL_ARC, type PerkId } from './perks';
 import type { EnemyKind } from './ships';
+import { FIRST_SQUALL, type Reef } from './storm';
 import { SHOTS, type ShotKind } from './shot';
 import type { UpgradeId } from './upgrades';
 import { waveShips } from './waves';
@@ -148,6 +150,8 @@ export interface Ship {
   escapeMs: number;
   /** A prize kept at the harbor as a consort: she sails on into the next waves and draws a wage. */
   kept: boolean;
+  /** One of the captain's log's named captains, who sails this ship (null for every other). */
+  captain: CaptainId | null;
 }
 
 export interface Ball {
@@ -210,7 +214,8 @@ export interface Loot {
 
 export interface Effect {
   id: number;
-  kind: 'splash' | 'smoke' | 'hit' | 'sink' | 'coins' | 'blast' | 'prize' | 'escape';
+  /** `squall` marks the wind swinging round in a Storm Reaches squall, at the player. */
+  kind: 'splash' | 'smoke' | 'hit' | 'sink' | 'coins' | 'blast' | 'prize' | 'escape' | 'squall';
   x: number;
   y: number;
   ms: number;
@@ -305,7 +310,37 @@ export interface GameState {
   bestBefore: number;
   /** Medals the Admiralty awards this run, set when it ends. */
   medals: number;
+  /** The captain's log's named captains in this run: who is still to sail, at sea, got away or sunk. */
+  captains: Record<CaptainId, CaptainRun>;
+  /** The named captains due this wave and not yet over the horizon. */
+  named: CaptainId[];
+  /** The lasting log: every captain ever sunk or taken (saved by the scene as it grows). */
+  log: CaptainId[];
+  /** Renown, the log's lasting perk: the log was full as the run began (never on the daily voyage). */
+  renown: boolean;
+  /** What became of the named captains who sailed this wave, for the harbor's news. */
+  waveCaptains: { id: CaptainId; fate: 'sunk' | 'escaped'; gold: number }[];
+  /** A daily voyage: seeded, with a set ship and perks, no medals and no best wave kept. */
+  daily: boolean;
+  /** The Storm Reaches: fighting time to the next squall, the wind it will bring once seen coming (else null), and time its rain still falls. */
+  squallMs: number;
+  squallTo: number | null;
+  squallBlowMs: number;
+  /** The wave's reefs (only in the Storm Reaches). */
+  reefs: Reef[];
+  /** The best Storm Reaches wave ever beaten, which the scene saves. */
+  reachesBest: number;
+  /** How many squalls the Tempest has called down as her hull fell. */
+  tempestCalls: number;
   nextId: number;
+}
+
+/** What a run carries in besides the best wave, boons and hull: the lasting log, the Reaches' best and a daily voyage's perks. */
+export interface RunExtras {
+  log?: CaptainId[];
+  reachesBest?: number;
+  /** Set for a daily voyage: the perks it starts with. */
+  daily?: { perks: PerkId[] };
 }
 
 export const rank = (s: GameState, id: UpgradeId) => s.ranks[id] ?? 0;
@@ -341,7 +376,7 @@ export const crewPace = (ship: Ship) => Math.max(CREW_PACE_MIN, ship.crew / ship
 export const reachOf = (range: number, charge: number) => range * (REACH_MIN + (1 - REACH_MIN) * charge);
 
 export function newShip(id: number, kind: Ship['kind'], x: number, y: number, heading: number, hp: number, radius: number, crew: number): Ship {
-  return { id, kind, x, y, heading, hp, maxHp: hp, reload: { port: 0, starboard: 0 }, hitMs: 0, agroundMs: 0, slowMs: 0, jamMs: 0, boardMs: 0, radius, crew, maxCrew: crew, detour: null, escapeMs: 0, kept: false };
+  return { id, kind, x, y, heading, hp, maxHp: hp, reload: { port: 0, starboard: 0 }, hitMs: 0, agroundMs: 0, slowMs: 0, jamMs: 0, boardMs: 0, radius, crew, maxCrew: crew, detour: null, escapeMs: 0, kept: false, captain: null };
 }
 
 /** The shot one side fires this wave: what the captain's order loads, or else what was loaded at the harbor. */
@@ -356,7 +391,7 @@ export const FIRST_ORDER: OrderId = 'chain';
  * A new run; `boons` are the Admiralty's starting upgrades, bought with medals between runs, and
  * `hull` the ship chosen (the Frigate on a first run).
  */
-export function newRun(bestWave = 0, boons: BoonId[] = [], hull: HullId = FIRST_HULL): GameState {
+export function newRun(bestWave = 0, boons: BoonId[] = [], hull: HullId = FIRST_HULL, extras: RunExtras = {}): GameState {
   const ship = HULLS[hull];
   const s: GameState = {
     phase: 'break',
@@ -406,8 +441,21 @@ export function newRun(bestWave = 0, boons: BoonId[] = [], hull: HullId = FIRST_
     bestWave,
     bestBefore: bestWave,
     medals: 0,
+    captains: newCaptains(),
+    named: [],
+    log: [...(extras.log ?? [])],
+    renown: !extras.daily && logFull(extras.log ?? []),
+    waveCaptains: [],
+    daily: !!extras.daily,
+    squallMs: FIRST_SQUALL,
+    squallTo: null,
+    squallBlowMs: 0,
+    reefs: [],
+    reachesBest: extras.reachesBest ?? 0,
+    tempestCalls: 0,
     nextId: 2,
   };
+  if (extras.daily) s.perks = [...extras.daily.perks];
   for (const id of boons) {
     const boon = BOONS[id];
     s.gold += boon.gold ?? 0;

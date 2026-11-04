@@ -43,9 +43,9 @@ interface ShipLook {
   /**
    * Something only this ship carries: a fireship's deck stacked with burning pitch, a ketch's
    * mortar on the foredeck, the flagship's gilded rail and stern lanterns, or a merchantman's
-   * cargo lashed on deck.
+   * cargo lashed on deck, or the Tempest's silvered rail and storm lanterns.
    */
-  extra?: 'fire' | 'mortar' | 'flagship' | 'cargo';
+  extra?: 'fire' | 'mortar' | 'flagship' | 'cargo' | 'storm';
 }
 
 export const SHIP_LOOKS: Record<HullId | EnemyKind, ShipLook> = {
@@ -60,6 +60,7 @@ export const SHIP_LOOKS: Record<HullId | EnemyKind, ShipLook> = {
   ketch: { length: 60, beam: 24, masts: [-0.02, -0.28], guns: 0, sail: '#efe0bc', flag: 'rgba(80,110,60,0.9)', extra: 'mortar' },
   flagship: { length: 104, beam: 38, masts: [0.28, 0.06, -0.16, -0.34], guns: 4, sail: '#f4e4b8', flag: 'rgba(110,50,120,0.95)', extra: 'flagship' },
   admiral: { length: 114, beam: 42, masts: [0.3, 0.08, -0.14, -0.34], guns: 5, sail: '#efd9a0', flag: 'rgba(200,150,30,0.98)', extra: 'flagship' },
+  tempest: { length: 118, beam: 44, masts: [0.3, 0.08, -0.14, -0.34], guns: 5, sail: '#a9b3b5', flag: 'rgba(40,96,110,0.98)', extra: 'storm' },
   merchant: { length: 74, beam: 31, masts: [0.16, -0.2], guns: 0, sail: '#efe4c8', flag: 'rgba(50,120,110,0.95)', extra: 'cargo' },
 };
 
@@ -433,6 +434,12 @@ function bakeShip(scene: Phaser.Scene, kind: keyof typeof SHIP_LOOKS) {
       // A gilded rail round the deck and a lantern on each quarter.
       poly(ctx, P([[0.3, 0.3], [0.08, 0.36], [-0.28, 0.33], [-0.42, 0.24], [-0.42, -0.24], [-0.28, -0.33], [0.08, -0.36], [0.3, -0.3], [0.4, 0]]), null, OCHRE, 1.4);
       for (const side of [-1, 1]) circle(ctx, -0.47 * L, side * 0.3 * B, 2.6, '#f0c860', INK, 0.8);
+    }
+    if (look.extra === 'storm') {
+      // A silvered rail round the deck and a pale storm lantern on each quarter and at the bow.
+      poly(ctx, P([[0.3, 0.3], [0.08, 0.36], [-0.28, 0.33], [-0.42, 0.24], [-0.42, -0.24], [-0.28, -0.33], [0.08, -0.36], [0.3, -0.3], [0.4, 0]]), null, '#5f7a80', 1.6);
+      for (const side of [-1, 1]) circle(ctx, -0.47 * L, side * 0.3 * B, 2.8, '#cfe6ea', INK, 0.8);
+      circle(ctx, 0.46 * L, 0, 2.4, '#cfe6ea', INK, 0.8);
     }
     if (look.extra === 'mortar') {
       // A squat mortar on a round bed on the foredeck.

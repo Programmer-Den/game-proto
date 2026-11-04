@@ -18,6 +18,7 @@ export const trophies = trophySet(
     { id: 'flagship', tier: 'silver', icon: '🚩' },
     { id: 'waveTen', tier: 'silver', icon: '🌊' },
     { id: 'admiral', tier: 'gold', icon: '👑' },
+    { id: 'tempest', tier: 'gold', icon: '🌀', hidden: true },
     { id: 'hardAdmiral', tier: 'gold', icon: '🌟', hidden: true },
   ],
   { en, 'en-US': enUS, de },

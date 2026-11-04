@@ -19,6 +19,8 @@ const en = {
   waveTenText: 'Clear wave 10.',
   admiral: 'Scourge of the haven',
   admiralText: "Sink the admiral's flagship and win the campaign.",
+  tempest: 'Eye of the storm',
+  tempestText: 'Sink the Tempest at the end of the Storm Reaches.',
   hardAdmiral: 'Terror of the seas',
   hardAdmiralText: 'Win the campaign on Hard.',
 };

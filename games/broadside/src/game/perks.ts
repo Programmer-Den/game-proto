@@ -1,6 +1,7 @@
 // The prize draft: after each wave the harbor offers three perks, and one is kept for the run.
 // Once few new perks are left, a draft also offers the second rank of a perk already held.
 
+import { random } from './random';
 import type { TextKey } from '../i18n';
 
 export type PerkId = 'ricochet' | 'salvage' | 'gunners' | 'mortar' | 'grapnels' | 'swivels' | 'carronades';
@@ -39,12 +40,12 @@ export const perkRank = (taken: PerkId[], id: PerkId) => taken.filter((t) => t =
 
 /**
  * Up to `size` perks in a random order: new ones first, and, once fewer new ones are left than
- * the draft has cards, the second rank of perks already held to fill it. Uses Math.random once per pick.
+ * the draft has cards, the second rank of perks already held to fill it. Uses random() once per pick.
  */
 export function drawDraft(taken: PerkId[], size = DRAFT_SIZE): PerkId[] {
   const draft: PerkId[] = [];
   const pick = (left: PerkId[]) => {
-    while (left.length && draft.length < size) draft.push(left.splice(Math.floor(Math.random() * left.length), 1)[0]);
+    while (left.length && draft.length < size) draft.push(left.splice(Math.floor(random() * left.length), 1)[0]);
   };
   pick(PERK_IDS.filter((id) => perkRank(taken, id) === 0));
   pick(PERK_IDS.filter((id) => perkRank(taken, id) > 0 && perkRank(taken, id) < MAX_PERK_RANK));
