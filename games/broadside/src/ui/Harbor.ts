@@ -14,12 +14,14 @@ import { SHOTS } from '../game/shot';
 import { ISLANDS, rank, type GameState, type Side } from '../game/state';
 import { inReaches, reachWave } from '../game/waves';
 import { costOf, HIRE, REPAIR_COST, UPGRADE_IDS, UPGRADES, type UpgradeId } from '../game/upgrades';
+import { BEAST_KINDS } from '../game/beasts';
+import { CARGO, CARGO_IDS, cargoPrice, cargoSale, HOLD_MAX, type CargoId } from '../game/trade';
 import { COURSE, DRAFT, FONT, HARBOR, UI_DEPTH, VIEW } from '../scenes/layout';
 import { t } from '../i18n';
 import { makeButton } from './Button';
 import { fitWidth, pinToScreen } from './screen';
 
-export type HarborAction = UpgradeId | 'repair' | 'hire' | 'keep' | 'sail' | `sail-${CourseId}` | `load-${Side}` | `draft-${PerkId}`;
+export type HarborAction = UpgradeId | 'repair' | 'hire' | 'keep' | 'sail' | `sail-${CourseId}` | `load-${Side}` | `draft-${PerkId}` | `trade-${CargoId}`;
 export interface HarborButton {
   id: HarborAction;
   x: number;
@@ -84,8 +86,22 @@ export class Harbor {
   private rows: Row[] = [];
   /** The two loading buttons, one per side, each with what that side is loaded with. */
   private loads: { side: Side; name: Phaser.GameObjects.Text; desc: Phaser.GameObjects.Text; swap: Phaser.GameObjects.Text }[] = [];
+  /**
+   * The trade row, made the first time the harbor opens (see
+   * `makeTrade`): every Phaser text draws on Math.random as it is made, and more at the start would
+   * change the first wave the playthrough plays.
+   */
+  private trade: {
+    name: Phaser.GameObjects.Text;
+    desc: Phaser.GameObjects.Text;
+    goods: { id: CargoId; bg: Phaser.GameObjects.Rectangle; name: Phaser.GameObjects.Text; sells: Phaser.GameObjects.Text }[];
+  } | null = null;
+  private scene: Phaser.Scene;
+  private onAction: (id: HarborAction) => void;
 
   constructor(scene: Phaser.Scene, onAction: (id: HarborAction) => void) {
+    this.scene = scene;
+    this.onAction = onAction;
     const dim = scene.add.rectangle(VIEW.w / 2, VIEW.h / 2, VIEW.w, VIEW.h, 0x3a2a18, 0.45).setInteractive();
     const panel = scene.add.image(HARBOR.x, HARBOR.y, 'panel-harbor').setScale(1 / SHEET_RES);
     const top = HARBOR.y - HARBOR.h / 2;
@@ -105,8 +121,8 @@ export class Harbor {
         .on('pointerover', () => bg.setFillStyle(ROW_LIT, 0.95))
         .on('pointerout', () => bg.setFillStyle(ROW, 0.9))
         .on('pointerdown', () => onAction(id));
-      const name = scene.add.text(left + 14, y - 9, '', style(16, '#2b2118', 'bold')).setOrigin(0, 0.5);
-      const desc = scene.add.text(left + 14, y + 10, '', style(12, '#5a4a38', 'italic')).setOrigin(0, 0.5);
+      const name = scene.add.text(left + 14, y - 8, '', style(15, '#2b2118', 'bold')).setOrigin(0, 0.5);
+      const desc = scene.add.text(left + 14, y + 8, '', style(11, '#5a4a38', 'italic')).setOrigin(0, 0.5);
       const cost = scene.add.text(left + HARBOR.rowW - 14, y, '', style(17, '#6a4410', 'bold italic')).setOrigin(1, 0.5);
       this.rows.push({ id, bg, name, desc, cost });
       this.ledgerButtons.push({ id, x: HARBOR.x, y, w: HARBOR.rowW, h: HARBOR.rowH });
@@ -175,7 +191,41 @@ export class Harbor {
     this.draftContainer = pinToScreen(scene.add.container(0, 0, draftParts)).setDepth(UI_DEPTH + 10).setVisible(false);
   }
 
+  /**
+   * The trade row under the ledger's last row: a label with the hold, then a button per cargo
+   * that buys a crate at this harbor's price and says what it fetches at the next port.
+   */
+  private makeTrade() {
+    const scene = this.scene;
+    const y = HARBOR.firstRowY + (UPGRADE_IDS.length + 3) * HARBOR.rowGap;
+    const left = HARBOR.x - HARBOR.rowW / 2;
+    const labelBg = scene.add.rectangle(left + HARBOR.tradeLabelW / 2, y, HARBOR.tradeLabelW, HARBOR.rowH, ROW, 0.6).setStrokeStyle(1, INK, 0.6);
+    const name = scene.add.text(left + 12, y - 8, '', style(15, '#2b2118', 'bold')).setOrigin(0, 0.5);
+    const desc = scene.add.text(left + 12, y + 8, t('tradeDesc'), style(10, '#5a4a38', 'italic')).setOrigin(0, 0.5);
+    fitWidth(desc, HARBOR.tradeLabelW - 16);
+    const parts: Phaser.GameObjects.GameObject[] = [labelBg, name, desc];
+    const gap = 6;
+    const goodW = (HARBOR.rowW - HARBOR.tradeLabelW - gap * CARGO_IDS.length) / CARGO_IDS.length;
+    const goods = CARGO_IDS.map((id, i) => {
+      const x = left + HARBOR.tradeLabelW + gap + goodW / 2 + i * (goodW + gap);
+      const bg = scene.add.rectangle(x, y, goodW, HARBOR.rowH, ROW, 0.9).setStrokeStyle(1.5, INK);
+      bg.setInteractive({ useHandCursor: true })
+        .on('pointerover', () => bg.setFillStyle(ROW_LIT, 0.95))
+        .on('pointerout', () => bg.setFillStyle(ROW, 0.9))
+        .on('pointerdown', () => this.onAction(`trade-${id}`));
+      const label = scene.add.text(x, y - 7, '', style(14, '#2b2118', 'bold')).setOrigin(0.5);
+      const sells = scene.add.text(x, y + 9, '', style(11, '#6a4410', 'italic')).setOrigin(0.5);
+      this.ledgerButtons.push({ id: `trade-${id}`, x, y, w: goodW, h: HARBOR.rowH });
+      parts.push(bg, label, sells);
+      return { id, bg, name: label, sells };
+    });
+    this.container.add(parts);
+    pinToScreen(this.container);
+    this.trade = { name, desc, goods };
+  }
+
   show(s: GameState | null) {
+    if (s && !this.trade) this.makeTrade();
     const drafting = !!s && s.draft.length > 0;
     this.container.setVisible(!!s && !drafting);
     this.draftContainer.setVisible(drafting);
@@ -205,7 +255,9 @@ export class Harbor {
     this.title.setText(inReaches(s.wave) ? t('reachesHarborTitle', { wave: reachWave(s.wave) }) : t('harborTitle', { wave: s.wave }));
     this.gold.setText(t('harborGold', { gold: s.gold, hp: Math.ceil(s.player.hp), max: s.player.maxHp, crew: s.player.crew, maxCrew: s.player.maxCrew }));
     const held = s.perks.filter((id, i) => s.perks.indexOf(id) === i).map((id) => `${t(PERKS[id].name)}${perkRank(s.perks, id) > 1 ? ' II' : ''}`);
-    this.perks.setText(held.length ? t('perksHeld', { perks: held.join(', ') }) : t('noPerks'));
+    // The harbor wall, once a sea beast has been sunk, after the perks.
+    const wall = s.wall.kraken + s.wall.serpent ? `   ❦   ${t('beastWall', { kraken: s.wall.kraken, serpent: s.wall.serpent })}` : '';
+    fitWidth(this.perks.setText((held.length ? t('perksHeld', { perks: held.join(', ') }) : t('noPerks')) + wall), HARBOR.w - 40);
     const news: string[] = [];
     if (s.bounty) {
       // In the middle of the sentence, so with a small first letter.
@@ -215,6 +267,8 @@ export class Harbor {
     }
     if (s.convoy) news.push(s.convoy.state === 'arrived' ? t('convoySafe', { island: t(ISLANDS[s.convoy.island].name), gold: s.convoy.cargo }) : t('convoyLost'));
     if (s.wages) news.push(t('wages', { gold: s.wages }));
+    if (s.cargoSold) news.push(t('cargoSold', { gold: s.cargoSold }));
+    for (const beast of BEAST_KINDS) if (s.waveSunk.includes(beast)) news.push(t(beast === 'kraken' ? 'krakenHung' : 'serpentHung'));
     // The named captains who sailed this wave: sunk into the log, or got away to come back.
     for (const { id, fate, gold } of s.waveCaptains) {
       const name = t(CAPTAINS[id].name);
@@ -271,6 +325,14 @@ export class Harbor {
       load.name.setText(t('loadSide', { side, shot: t(mortar ? 'mortar' : shot.name) }));
       load.desc.setText(t(mortar ? 'mortarLoad' : shot.desc));
       load.swap.setVisible(!mortar);
+    }
+    const trade = this.trade!;
+    trade.name.setText(t('tradeRow', { n: s.hold.length, max: HOLD_MAX }));
+    for (const good of trade.goods) {
+      const price = cargoPrice(good.id, s.wave);
+      good.name.setText(t('tradeGood', { name: t(CARGO[good.id].name), gold: price }));
+      good.sells.setText(t('tradeSells', { gold: cargoSale(good.id, price) }));
+      good.bg.setAlpha(s.hold.length < HOLD_MAX && s.gold >= price ? 1 : 0.5);
     }
   }
 }

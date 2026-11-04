@@ -1,4 +1,5 @@
 import { BOONS, type BoonId } from './admiralty';
+import { emptyWall, type Tentacle, type Wall } from './beasts';
 import type { BountyId } from './bounties';
 import { logFull, newCaptains, type CaptainId, type CaptainRun } from './captains';
 import { FIRST_HULL, HULLS, type HullId } from './hulls';
@@ -8,6 +9,7 @@ import { perkRank, SWIVEL_ARC, type PerkId } from './perks';
 import type { EnemyKind } from './ships';
 import { FIRST_SQUALL, type Reef } from './storm';
 import { SHOTS, type ShotKind } from './shot';
+import { HOLD_MAX, HOLD_TURN, type Crate } from './trade';
 import type { UpgradeId } from './upgrades';
 import { waveShips } from './waves';
 import type { TextKey } from '../i18n';
@@ -152,6 +154,11 @@ export interface Ship {
   kept: boolean;
   /** One of the captain's log's named captains, who sails this ship (null for every other). */
   captain: CaptainId | null;
+  /** A sea beast: time its head is still up (0 while it is under), and time until it next comes up. */
+  surfaceMs: number;
+  diveMs: number;
+  /** Time the flash of this ship's guns still lights her up at night. */
+  flashMs: number;
 }
 
 export interface Ball {
@@ -215,7 +222,7 @@ export interface Loot {
 export interface Effect {
   id: number;
   /** `squall` marks the wind swinging round in a Storm Reaches squall, at the player. */
-  kind: 'splash' | 'smoke' | 'hit' | 'sink' | 'coins' | 'blast' | 'prize' | 'escape' | 'squall';
+  kind: 'splash' | 'smoke' | 'hit' | 'sink' | 'coins' | 'blast' | 'prize' | 'escape' | 'squall' | 'tentacle' | 'flare';
   x: number;
   y: number;
   ms: number;
@@ -332,6 +339,17 @@ export interface GameState {
   reachesBest: number;
   /** How many squalls the Tempest has called down as her hull fell. */
   tempestCalls: number;
+  /** Trade: the crates in the hold, what the last harbor paid for the cargo sold (null for none) and the raiders it drew this wave. */
+  hold: Crate[];
+  cargoSold: number | null;
+  raiders: number;
+  /** A sea beast's tentacles about to rise, and the lasting harbor wall of beasts sunk (which the scene saves). */
+  tentacles: Tentacle[];
+  wall: Wall;
+  /** A night wave: flares left aboard, and how long the one fired last still lights the sea. */
+  night: boolean;
+  flares: number;
+  flareMs: number;
   nextId: number;
 }
 
@@ -339,6 +357,8 @@ export interface GameState {
 export interface RunExtras {
   log?: CaptainId[];
   reachesBest?: number;
+  /** The harbor wall of sea beasts sunk. */
+  wall?: Wall;
   /** Set for a daily voyage: the perks it starts with. */
   daily?: { perks: PerkId[] };
 }
@@ -356,10 +376,12 @@ export function stats(s: GameState) {
   const hull = HULLS[s.hull];
   const order = ORDERS[s.order];
   const sails = (1 + 0.12 * rank(s, 'sails')) * (order.sails ?? 1);
+  // A loaded hold makes her slower to come about.
+  const laden = 1 - (HOLD_TURN * s.hold.length) / HOLD_MAX;
   return {
     maxHp: hull.hp + 30 * rank(s, 'hull'),
     speed: hull.speed * sails,
-    turn: hull.turn * sails,
+    turn: hull.turn * sails * laden,
     guns: hull.guns + rank(s, 'guns'),
     damage: hull.damage * (1 + 0.25 * rank(s, 'shot')) * (order.damage ?? 1),
     reloadMs: hull.reloadMs * Math.pow(0.85, rank(s, 'crew')) * (order.reload ?? 1),
@@ -376,7 +398,7 @@ export const crewPace = (ship: Ship) => Math.max(CREW_PACE_MIN, ship.crew / ship
 export const reachOf = (range: number, charge: number) => range * (REACH_MIN + (1 - REACH_MIN) * charge);
 
 export function newShip(id: number, kind: Ship['kind'], x: number, y: number, heading: number, hp: number, radius: number, crew: number): Ship {
-  return { id, kind, x, y, heading, hp, maxHp: hp, reload: { port: 0, starboard: 0 }, hitMs: 0, agroundMs: 0, slowMs: 0, jamMs: 0, boardMs: 0, radius, crew, maxCrew: crew, detour: null, escapeMs: 0, kept: false, captain: null };
+  return { id, kind, x, y, heading, hp, maxHp: hp, reload: { port: 0, starboard: 0 }, hitMs: 0, agroundMs: 0, slowMs: 0, jamMs: 0, boardMs: 0, radius, crew, maxCrew: crew, detour: null, escapeMs: 0, kept: false, captain: null, surfaceMs: 0, diveMs: 0, flashMs: 0 };
 }
 
 /** The shot one side fires this wave: what the captain's order loads, or else what was loaded at the harbor. */
@@ -453,6 +475,14 @@ export function newRun(bestWave = 0, boons: BoonId[] = [], hull: HullId = FIRST_
     reefs: [],
     reachesBest: extras.reachesBest ?? 0,
     tempestCalls: 0,
+    hold: [],
+    cargoSold: null,
+    raiders: 0,
+    tentacles: [],
+    wall: { ...emptyWall(), ...extras.wall },
+    night: false,
+    flares: 0,
+    flareMs: 0,
     nextId: 2,
   };
   if (extras.daily) s.perks = [...extras.daily.perks];

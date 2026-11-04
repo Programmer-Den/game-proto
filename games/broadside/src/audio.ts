@@ -169,6 +169,12 @@ export const sfx = sounds({
   pipe: { wave: 'pulse12', freq: 1175, to: 1480, arp: [0, 5], arpStep: 0.12, length: 0.24, volume: 0.13, gap: 500 },
   /** A squall in the Storm Reaches: the wind swings round with a rush of rain. */
   squall: { wave: 'noise', freq: 1200, to: 260, length: 1.4, attack: 0.35, volume: 0.32, gap: 1500 },
+  /** A sea beast's tentacle slapping up out of the sea. */
+  slap: { wave: 'noise', freq: 900, to: 120, length: 0.4, attack: 0.04, volume: 0.42, vary: 0.1, gap: 200 },
+  /** A sea beast's head breaking the surface: a low groan. */
+  roar: { wave: 'sawtooth', freq: 70, to: 46, length: 0.8, attack: 0.12, volume: 0.32, gap: 800 },
+  /** A flare going up on a night wave: a hiss rising to a pop. */
+  flare: { wave: 'noise', freq: 1800, to: 5200, length: 0.5, attack: 0.05, volume: 0.22, gap: 400 },
   /** The helm put over: a creak of the tiller ropes. */
   creak: { wave: 'sawtooth', freq: 210, to: 160, length: 0.14, attack: 0.03, volume: 0.1, vary: 0.1, gap: 350 },
 });

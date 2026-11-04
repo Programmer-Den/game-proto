@@ -2,7 +2,7 @@
 
 import type { TextKey } from '../i18n';
 
-export type EnemyKind = 'sloop' | 'brig' | 'galleon' | 'fireship' | 'ketch' | 'flagship' | 'admiral' | 'tempest' | 'merchant';
+export type EnemyKind = 'sloop' | 'brig' | 'galleon' | 'fireship' | 'ketch' | 'flagship' | 'admiral' | 'tempest' | 'merchant' | 'kraken' | 'serpent';
 
 export interface ShipType {
   name: TextKey;
@@ -24,9 +24,11 @@ export interface ShipType {
    * How it fights, when not with broadsides: a fireship sails straight at you and blows up on
    * touching (or when sunk); a mortar ketch keeps its distance and lobs shells (`damage` each,
    * every `reloadMs`, up to `range` away) that land where it marked; a merchantman carries no guns
-   * and runs from the player (on the Merchant lane), or sails for her island (a convoy).
+   * and runs from the player (on the Merchant lane), or sails for her island (a convoy). A sea
+   * beast (`beasts.ts`) never sails: it stays under, raising a tentacle (`damage`) every
+   * `reloadMs` near the player, and only shows its head now and then.
    */
-  role?: 'fireship' | 'mortar' | 'merchant';
+  role?: 'fireship' | 'mortar' | 'merchant' | 'beast';
   /** Sailors aboard with a full crew; a prize needs half of them from the player's crew. */
   crew: number;
   /** Loads grapeshot when within `GRAPE_RANGE` of its target, which kills sailors on a hit. */
@@ -43,6 +45,9 @@ export const ENEMIES: Record<EnemyKind, ShipType> = {
   admiral: { name: 'admiralName', called: 'admiralCalled', hp: 440, radius: 40, speed: 40, turn: 0.5, guns: 5, damage: 10, reloadMs: 2800, range: 290, loot: 300, crew: 40, grape: true },
   // The storm-lord's man-of-war at the end of the Storm Reaches: she calls squalls down as she is hurt.
   tempest: { name: 'tempestName', called: 'tempestCalled', hp: 520, radius: 42, speed: 44, turn: 0.55, guns: 5, damage: 11, reloadMs: 2600, range: 300, loot: 400, crew: 44, grape: true },
+  // Sea beasts, on a rare wave (`beastFor`): no guns, no sails and no crew to board.
+  kraken: { name: 'krakenName', called: 'krakenCalled', hp: 120, radius: 30, speed: 0, turn: 1, guns: 0, damage: 14, reloadMs: 1500, range: 0, loot: 150, role: 'beast', crew: 1 },
+  serpent: { name: 'serpentName', called: 'serpentCalled', hp: 90, radius: 26, speed: 0, turn: 1, guns: 0, damage: 12, reloadMs: 1200, range: 0, loot: 120, role: 'beast', crew: 1 },
   merchant: { name: 'merchantName', called: 'merchantCalled', hp: 50, radius: 24, speed: 74, turn: 0.9, guns: 0, damage: 0, reloadMs: 0, range: 0, loot: 40, role: 'merchant', crew: 10 },
 };
 

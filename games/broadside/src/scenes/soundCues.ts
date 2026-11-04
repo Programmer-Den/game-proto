@@ -1,6 +1,8 @@
 import { playMusic, playSting, stopMusic, ui } from '../../../../shared/audio';
 import { BATTLE_SONG, HARBOR_SONG, sfx, STINGS, type SoundName } from '../audio';
+import { isBeast } from '../game/beasts';
 import { HULLS } from '../game/hulls';
+import { afloat } from '../game/sim';
 import { loadedShot, offset, radiusOf, stats, type GameState, type Side } from '../game/state';
 import { VIEW } from './layout';
 
@@ -30,6 +32,8 @@ export class SoundCues {
   private lastEffect: number;
   private enemies = new Set<number>();
   private whistled = new Set<number>();
+  /** The sea beasts whose heads are up, so each rising groans once. */
+  private surfaced = new Set<number>();
   private music = '';
   private clock = 0;
   /** Booms still to come from a broadside, by when (on `clock`). */
@@ -69,6 +73,7 @@ export class SoundCues {
     this.effects(s);
     this.shells(s);
     this.spawned(s);
+    this.beasts(s);
     const convoy = s.convoy?.state ?? null;
     if (convoy !== this.convoy && this.convoy === 'sailing') sfx(convoy === 'arrived' ? 'bell' : 'escape');
   }
@@ -88,7 +93,7 @@ export class SoundCues {
   /** Calm between waves and in harbor, the jig while fighting, its heavy part once a flagship sails. */
   private updateMusic(s: GameState) {
     let want = '';
-    if (s.phase === 'fighting') want = s.enemies.some((e) => e.kind === 'flagship' || e.kind === 'admiral' || e.kind === 'tempest') ? 'boss' : 'battle';
+    if (s.phase === 'fighting') want = s.enemies.some((e) => e.kind === 'flagship' || e.kind === 'admiral' || e.kind === 'tempest' || isBeast(e.kind)) ? 'boss' : 'battle';
     else if (s.phase !== 'over') want = 'calm';
     if (want === this.music) return;
     this.music = want;
@@ -168,6 +173,12 @@ export class SoundCues {
         case 'squall':
           heard.add('squall');
           break;
+        case 'tentacle':
+          heard.add('slap');
+          break;
+        case 'flare':
+          heard.add('flare');
+          break;
       }
     }
     this.lastEffect = newest;
@@ -188,6 +199,17 @@ export class SoundCues {
       sfx('whistle');
     }
     if (!s.shells.length) this.whistled.clear();
+  }
+
+  /** A sea beast's groan each time its head breaks the surface. */
+  private beasts(s: GameState) {
+    for (const e of s.enemies) {
+      if (!isBeast(e.kind)) continue;
+      const up = afloat(e);
+      if (up && !this.surfaced.has(e.id)) sfx('roar');
+      if (up) this.surfaced.add(e.id);
+      else this.surfaced.delete(e.id);
+    }
   }
 
   /** The bosun's pipe for each sail that comes over the horizon. */
