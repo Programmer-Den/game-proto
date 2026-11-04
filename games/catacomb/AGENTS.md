@@ -6,19 +6,38 @@ root `AGENTS.md` asks.
 
 ## Current state
 
-Catacomb is a small dungeon deckbuilder. A hero (the Knight, the Hunter or the unlockable Hexer)
+Catacomb is a small dungeon deckbuilder. A hero (the Knight, the Hunter, or the unlockable Hexer and Alchemist)
 walks two maps, the Crypt and the Sunken Tombs, each laid out anew for each run, through fights,
 elites, campfires, treasure chests, merchants and mystery rooms to the Bone King and then the
 Hollow Queen, fighting with a deck of cards and three flasks; from depth 3 a third map, the Bone
 Spire, leads on to the Marrow Tyrant. Beating the last boss opens the next depth, a harder run
-with one more rule. A daily crypt sends everyone out on the same seeded run once a day. The art is painterly: shapes and pixel grids drawn in code, repainted with brush strokes.
+with one more rule. A daily crypt sends everyone out on the same seeded run once a day, and a
+weekly crypt all week with more elites and no campfires, as often as you like. Each hero keeps a
+library of every card they have added to a deck, and can start a run with up to three of them
+swapped in for starting cards. The art is painterly: shapes and pixel grids drawn in code, repainted with brush strokes.
 
 - **Implemented:** a hero choice before the first room (`phase` `hero`; `HEROES` in
   `src/game/heroes.ts`: the Knight is the original game, the Hunter has 40 health and a deck of
   Venom Knives and Dodges, the Hexer has 44 health, Hex Bolts that deal `hexed` more to a foe with
   any status (`hexed(e)` in `sim.ts`), an Evil Eye and five cards of their own (`hero: 'hexer'` on a
   `Card`, in rewards and wares only for them, `poolFor`), and is unlocked once the Knight and the
-  Hunter have each won at depth 2 or deeper, `heroUnlocked` over `state.heroWins`), a depth ladder
+  Hunter have each won at depth 2 or deeper, `heroUnlocked` over `state.heroWins`; the Alchemist
+  has 42 health, two Fire Tonics and two Iron Tonics, four cards of their own (`hero: 'alchemist'`)
+  and is unlocked once any hero has won at `ALCHEMIST_UNLOCK_DEPTH` (3), that is beaten the Bone
+  Spire), tonics (`tonic` on a `Card`: the moment two of the same tonic are in hand,
+  `combineTonics` in `sim.ts` makes them one strong tonic in the first one's place, tempered if
+  either was, and counts `fight.brewed`; it runs after every draw and every brew; `brew` on a card
+  puts a tonic into the hand for the fight; the strong tonics never reach a deck), each hero's
+  library (`src/game/library.ts`, `state.library`: `takeReward` and `buyCard` add the card through
+  `gainCard`; `chooseHero` opens phase `library` when the hero's library holds a card, where
+  `swapIn`, `swapBack`, `setOutFromLibrary` and `backToHeroes` act on the first
+  `HEROES[hero].deck.length` cards of the deck, at most `LIBRARY_SWAPS` (3), one copy of each
+  library card, kept in `state.swaps`), a weekly crypt (`startWeeklyRun`: the week's hero from
+  `weeklyHero`, depth 0, Normal, maps made with `WEEKLY_MUTATORS` from `src/game/weekly.ts` (no
+  campfires: `rest` rooms become fights; more elites: fights from the fourth column on become
+  elites), drawn from `weeklyRand(week)`, the offers seeded by the room like the daily's; tried as
+  often as you like, its tries and best score kept under `catacomb-weekly`, a new week starts
+  over), a depth ladder
   (`state.depth`, `src/game/depth.ts`: the last boss's fall unlocks `depth + 1`, saved as
   `bestDepth`; depth 1 gives foes 20% more health, depth 2 cuts rests to 15%, depth 3 starts the
   deck with a Wound and adds the Bone Spire, each depth past 3 adds 20% foe health again), a third
@@ -48,11 +67,15 @@ with one more rule. A daily crypt sends everyone out on the same seeded run once
 - **Progression** within a run: the deck grows by rewards, purchases and curses, shrinks at a
   campfire or the merchant, cards (not curses) can be tempered once each, gold, relics and flasks are kept until
   the run ends, and health carries over between rooms and acts. Across runs, the best depth
-  unlocked, each hero's deepest win (the Hexer's unlock) and the daily record carry over.
+  unlocked, each hero's deepest win (the Hexer's and the Alchemist's unlocks), each hero's library,
+the daily record and the week's best carry over.
 - **Persistence:** `catacomb-best-depth` (`loadBestDepth`/`saveBestDepth` in
   `src/game/depth.ts`), the deepest depth unlocked. A new run defaults to it; the hero panel's
   `<` and `>` pick a lower one. `catacomb-heroes` (`loadHeroWins`/`saveHeroWins` in
   `src/game/heroes.ts`): each hero's deepest won depth, -1 for none, which unlocks the Hexer.
+  `catacomb-library` (`loadLibrary`/`addToLibrary` in `src/game/library.ts`): each hero's library,
+  the base ids of the cards they have added to a deck. `catacomb-weekly` (`loadWeekly`/`saveWeekly`
+  in `src/game/weekly.ts`): this week's Monday, its best score and its tries.
   `catacomb-daily` (`shared/daily.ts`): today's daily try, its score, the best and the streak. A
   reload otherwise starts a new run. The game also reads the hub's shared settings (see Hub
   settings below). The trophies earned are `catacomb-trophies` (`shared/trophies.ts`, each id with
@@ -68,8 +91,12 @@ with one more rule. A daily crypt sends everyone out on the same seeded run once
   - The second and third acts' backdrops are the first act's with a green or pale violet wash
     (`washed` in `src/art/scenery.ts`), not drawn on their own, and the Bone Spire plays the
     Tombs' music.
-  - The daily crypt's hero is only ever the Knight or the Hunter, and a try left half way (a
-    reload) scores 0.
+  - The daily and weekly crypts' hero is only ever the Knight or the Hunter, and a daily try left
+    half way (a reload) scores 0; a weekly try left half way only counts as a try.
+  - Ten trophies is the most a game may list, so the Alchemist, the library and the weekly crypt
+    earn none of their own.
+  - The library shows every card in up to two rows of 13; a hero who has found more than 26 kinds
+    of card would run off the bottom (the game has 27 a hero can find).
   - The card id `vampBite` is shown as "Leech".
   - A card face shows its own cost, not the one Doubt makes of it (`costOf` in `sim.ts`); the
     card simply dims when it can't be afforded.
@@ -104,7 +131,8 @@ File map (all under `src/` unless it starts with `shared/`):
   `CardId` (a `BaseId`, or `BaseId+` once tempered), `card(id)` (the rules, with `up` applied to a
   tempered id; its `name` is a `TextKey`), `cardName(id)` (the shown name, with a '+' once tempered), `isTempered`, `baseOf`, `tempered`, `isCurse`, `canBeTempered` (not yet tempered and
   not a curse: the campfire picker, `temperRandom` and the pool's Bathe use it), `STARTER_DECK` (the Knight's),
-  `HUNTER_DECK` and `HEXER_DECK`, the `COMMON` and `RARE` pools (derived from `rarity`; curses and
+  `HUNTER_DECK`, `HEXER_DECK` and `ALCHEMIST_DECK`, `tonic` and `brew` on a card and `tonicOf(a, b)`
+  (what two tonics make, or null), the `COMMON` and `RARE` pools (derived from `rarity`; curses and
   cards with a `hero` are in neither), `poolFor(hero, rarity)` (those plus the hero's own cards),
   `hexed` on a card (extra damage per hit to a foe with any status), `HEX_WEAK` (Malediction's `hex` power),
   the power and curse constants (`POWER_BLOCK`, `POWER_STRENGTH`, `THORNS`, `WOUND_HURT`,
@@ -112,8 +140,14 @@ File map (all under `src/` unless it starts with `shared/`):
   `describe` (card text, built from the `deal`, `apply`, `gainBlock` and other parts in `i18n/`),
   `describePower` (a power's text without "Power.", for its tip in play) and `kindOf` (attack, skill, power or curse).
 - `game/heroes.ts`: `HeroId`, `HEROES` (name, health, deck, starting flask, caption; the caption's
-  `{hp}` is the hero's health), `HERO_IDS` (the panel's order), `HEXER_UNLOCK_DEPTH`, `HeroWins`,
+  `{hp}` is the hero's health), `HERO_IDS` (the panel's order), `HEXER_UNLOCK_DEPTH`,
+  `ALCHEMIST_UNLOCK_DEPTH`, `HeroWins`,
   `loadHeroWins`/`saveHeroWins` (key `catacomb-heroes`) and `heroUnlocked`.
+- `game/library.ts`: `LIBRARY_SWAPS`, `Library` (base ids by hero), `loadLibrary` and
+  `addToLibrary` (key `catacomb-library`; never a curse, once per card).
+- `game/weekly.ts`: `Mutators` and `WEEKLY_MUTATORS` (read by `makeMap`), `weekOf(day)` (the
+  week's Monday), `weeklyRand(week)`, `WeeklyRecord` and `loadWeekly`/`saveWeekly` (key
+  `catacomb-weekly`).
 - `game/rng.ts`: `random()` (every random draw of the rules: `Math.random`, read at each call, or
   the source set by `setRandom`), `withRandom` (a source for one draw) and `keyedRand` (a seeded
   source for a daily key).
@@ -149,22 +183,24 @@ File map (all under `src/` unless it starts with `shared/`):
 - `game/map.ts`: `RoomKind`, `Room` (kind, column, screen x/y, `next` links, foes, event),
   `COLUMNS` (7), `ACTS` (2, the acts of a run before the Bone Spire), `SPIRE_DEPTH` (3), `ACT_FOES` (each act's name, first fight, early, late and elite foe
   groups, boss and mystery rooms; three acts), `COLUMN_KINDS` (what each middle column holds), `makeMap(act)`, `ENTRANCE` and
-  `reachable(rooms, at)`.
+  `reachable(rooms, at)`. `makeMap(act, mutators)` applies the weekly crypt's mutators after the
+  same draws.
 - `game/state.ts`: tuning constants (including `MIN_DECK`, the prices, `SHOP_CARDS`,
   `SHOP_RELICS`, `SHOP_FLASKS`, `WEAK_MULT` and `VULNERABLE_MULT`), `Phase`, `Status` and
   `noStatus`, `Ware`, `Shop` (cards, relics, flasks, removal), `Enemy` (with its `intent` and
   `status`), `Fight` (with the hero's `status`, `strength`, the `powers` in play, the cards
   `played` this turn, the cards `drawn` this fight, `wasVulnerable` and the `gold` its foes drop), `Pop`, `GameState` (with `hero`, `depth`,
-  `bestDepth`, `heroWins`, `daily`, `dailyRecord`, `dailyScore`, `flasks` and `flaskWon`).
-- `game/sim.ts`: all rules. `newRun`, `chooseHero`, `setDepth`, `canStartDaily`, `startDailyRun`,
-  `dailyHero`, `dailyScore`, `lastAct`, `hexed`, `walkTo`, `playCard`, `canPlay`,
+  `bestDepth`, `heroWins`, `daily`, `dailyRecord`, `weekly`, `weeklyRecord`, `dailyScore`, `library`, `swaps`, `flasks` and `flaskWon`).
+- `game/sim.ts`: all rules. `newRun`, `chooseHero`, `canSwap`, `swapIn`, `swapBack`,
+  `setOutFromLibrary`, `backToHeroes`, `setDepth`, `canStartDaily`, `startDailyRun`, `dailyHero`,
+  `startWeeklyRun`, `weeklyHero`, `dailyScore` (the daily's and the weekly's), `lastAct`, `hexed`, `walkTo`, `playCard`, `canPlay`,
   `costOf` (a card's cost in hand, with Doubt), `canUseFlask`, `useFlask`, `heroHit` and `foeHit`
   (damage after relics, strength and statuses), `endTurn`, `takeReward`, `descend`, `rest`,
   `restShare`, `restHeal`, `canRemove`, `removeCard`, `canTemper`, `temperCard`, `buyCard`,
   `buyRelic`, `canBuyFlask`, `buyFlask`, `canBuyRemoval`, `buyRemoval`, `leaveShop`, `canChoose`,
   `chooseEvent`, `eventHere`, `hasRelic`, `actName`, `tick`, `shuffle`; private `act`
   (a foe's go, poison first), `endRound` (after the foes' turn), `winFight`, `grantRelic`,
-  `grantFlask`, `setOut` (a hero's health, deck and flask), `offerDraw` (a daily's offers from the room's seed), `endRun` (saves the daily's score, or the depth and the hero's win), `curse` (a curse card into the deck and the discard pile), `applyPoison` (Venom
+  `grantFlask`, `setOut` (a hero's health, deck and flask), `gainCard` (a reward or purchase into the deck and the library), `combineTonics`, `seedKey` (the daily's or the weekly's key), `offerDraw` (a seeded run's offers from the room's seed), `endRun` (saves the daily's or the weekly's score, or the depth and the hero's win), `curse` (a curse card into the deck and the discard pile), `applyPoison` (Venom
   Gland and Venom Veil), `powerCount` (the copies of a power in play; Thorns and Venom Veil add
   their effect once per copy, like Bulwark and Battle Rage in `startTurn`), `makeShop` and `nextIntent`. No Phaser import.
 - `scenes/BootScene.ts`: reads the screen's resolution (`setArtRes`), bakes every texture
@@ -173,16 +209,18 @@ File map (all under `src/` unless it starts with `shared/`):
   act brings a new map), fight (with a `StatusRow` over each fighter, the flask slots in
   `flaskLayer` and the powers in play in `powerLayer`, one ring per power kind with a `×n` count when copies
   stack), reward overlay, the merchant (`shopLayer`,
-  with the flasks under the cards), panel (hero choice in a taller `panelBox` with the depth row,
-  three heroes over their `heroButtons` and `heroCaptions`, a locked one dark, and the
-  `dailyButton` under the box; campfire, mystery room, descent or climb, defeat and victory, with
-  the daily's score at a daily's end), the card picker (`pickLayer`, shown while `picking` is `burn`,
+  with the flasks under the cards), panel (hero choice in a wider, taller `panelBox` with the depth row,
+  four heroes over their `heroButtons` and `heroCaptions`, a locked one dark with its unlock from
+  `LOCKED`, and the `dailyButton` and `weeklyButton` side by side under the box; campfire, mystery room, descent or climb, defeat and victory, with
+  the daily's or the weekly's score at its end), the library (`libraryLayer`, shown in phase
+  `library`: the deck along the top and the hero's library under it, `librarySel` the starting
+  card picked, rebuilt when `libraryKey` changes), the card picker (`pickLayer`, shown while `picking` is `burn`,
   `temper` or `sell`), floating numbers (the hero's over the map token while the map shows) and HUD (gold and relic icons, with a tip that flasks and
   powers reuse), and wires taps to sim functions. The hero's and the map token's textures follow
   `state.hero`. Exposes `state`, `hand` and `rewards`.
 - `scenes/layout.ts`: screen positions and sizes for the fight, hand, reward, buttons, campfire
   buttons (`REST_BUTTONS`), event choices (`EVENT_BUTTONS`), the hero
-  panel (`HERO_PANEL`: its box, title, depth row, rules, the heroes' places, buttons and captions, the daily button), the flask slots (`FLASKS`), the powers in play
+  panel (`HERO_PANEL`: its box, title, depth row, rules, the four heroes' places, buttons and captions, the daily and weekly buttons), the library (`LIBRARY`), the flask slots (`FLASKS`), the powers in play
   (`POWERS`), the card picker (`PICKER`), the merchant (`SHOP`, with `flasks`), the top bar (`HUD`)
   and statuses (`STATUS_GAP`), and `FONT` (a serif).
 - `ui/CardView.ts`: `makeCard`, a card face container: an ink edge (`bg`, the part that takes
@@ -200,10 +238,10 @@ File map (all under `src/` unless it starts with `shared/`):
   pictures are drawn at their own size, `paint` widens brushes, grain and the cutout's blur to
   match, `addTexture` remembers each key's `res`, and `artImage` shows a texture scaled back to its
   own size.
-- `art/characters.ts`: the knight (`KNIGHT`), the hunter (`HUNTER`), the hexer (`HEXER`) and slime (`SLIME`) drawn as
+- `art/characters.ts`: the knight (`KNIGHT`), the hunter (`HUNTER`), the hexer (`HEXER`), the alchemist (`ALCHEMIST`) and slime (`SLIME`) drawn as
   shapes at twice their size, and grids for the other foes (`FOES` keyed by `EnemyKind`); textures
   `hero-<hero>` and `hero-token-<hero>` (`heroTexture(hero, token)`), `foe-<kind>`.
-- `art/icons.ts`: `CARD_ICONS` keyed by `Icon`, `INTENTS` (with `curse`), `STATUSES`,
+- `art/icons.ts`: `CARD_ICONS` keyed by `Icon` (the tonics' vials from `tonic(dark, light)`), `INTENTS` (with `curse`), `STATUSES`,
   `RELIC_ICONS`, `FLASK_ICONS` (one bottle grid recoloured per flask), `COIN`, room icons keyed by
   `RoomKind`, all through `bakePainted`; textures `card-<icon>`, `intent-<kind>`, `status-<kind>`,
   `relic-<id>` and `relic-big-<id>` (`relicIcon`), `flask-<id>` (`flaskIcon`), `room-<kind>`,
@@ -225,8 +263,9 @@ How it runs:
   asset files. Painting is the slow part of boot (the two backdrops most, which is why they stop
   at `BACKDROP_RES`; each step up in `res` costs about as much again). `GameScene.create` calls `newRun` and creates every layer once.
   `newRun` resets `random` to Math.random, reads the saved best depth, heroes' wins and daily
-  record and opens on the `hero` phase; `chooseHero` (or `startDailyRun`) sets the health, deck
-  and flask (and depth 3's Wound) and goes to the map.
+  record, the library and the week's record and opens on the `hero` phase; `chooseHero` (or
+  `startDailyRun`, `startWeeklyRun`) sets the health, deck and flask (and depth 3's Wound) and goes
+  to the map, or for `chooseHero` first to the `library` phase when the hero's library holds a card.
 - **Time:** `GameScene.update(time)` computes `dt` from the frame timestamp (not Phaser's smoothed
   delta), clamped to `MAX_STEP_MS` (250), and calls `tick(state, dt)`. `tick` counts down pops and
   hit flashes, advances walking (`WALK_MS`), steps the foes' turn one foe per `ENEMY_ACT_MS` (a
@@ -234,8 +273,10 @@ How it runs:
   `winFight` adds the gold and moves a won fight to the reward (rare after an elite), to
   `descend` after a boss before `lastAct`, or to `won` after the last (then `endRun`, which `tick`
   also calls on `over`).
-- **Input:** Phaser `pointerdown` handlers call sim functions directly: the hero panel's three
-  buttons `chooseHero`, its daily button `startDailyRun` and its `<`/`>` `setDepth`, room circles call
+- **Input:** Phaser `pointerdown` handlers call sim functions directly: the hero panel's four
+  buttons `chooseHero`, its daily button `startDailyRun`, its weekly button `startWeeklyRun` and its
+  `<`/`>` `setDepth`, the library's cards `swapIn` (after a starting card is picked) and `swapBack`,
+  its Back `backToHeroes` and Set out `setOutFromLibrary`, room circles call
   `walkTo`, hand cards `playCard(state, i)`, flask slots `useFlask(state, i)`, End turn `endTurn`, reward cards and Skip
   `takeReward`, the campfire's Rest `rest` and its picker's cards `temperCard` or `removeCard`, the
   merchant's wares `buyCard`, `buyRelic`, `buyFlask` and (through the picker) `buyRemoval`, Leave `leaveShop`,
@@ -254,24 +295,26 @@ How it runs:
 State model (`src/game/state.ts`):
 
 - `GameState` is plain data: `phase`, `hero`, `depth` and `bestDepth`, `heroWins`, `daily` (the
-  day of a daily run, or null), `dailyRecord`, `dailyScore`, `flasks`, `act`,
+  day of a daily run, or null), `dailyRecord`, `weekly` (the Monday of a weekly run, or null),
+  `weeklyRecord`, `dailyScore`, `library`, `swaps`, `flasks`, `act`,
   `hp`/`maxHp`, `deck` (all owned cards, curses included), `gold`,
   `relics`, `rooms` (this act's map), `at` (room index into `rooms`, or null at the entrance),
   `cleared` (rooms done in this act, in order), `walk`, `fight`, `reward` with `rewardRare`,
   `goldWon` and `flaskWon`, `shop`, `notice` (what the last event, temper or descent did, shown on the map), plus
   timers (`timerMs`, `heroHitMs`), `healed`, `pops` and `nextId`.
-- `Phase` runs `hero` -> `map` -> `walk` -> `player` <-> `enemy` -> `cleared` -> `reward` -> `map`, with
+- `Phase` runs `hero` (-> `library`) -> `map` -> `walk` -> `player` <-> `enemy` -> `cleared` -> `reward` -> `map`, with
   `rest`, `shop`, `event` (which can lead to `reward`), `descend` (to the next act's `map`), `over`
   and `won` as side exits.
 - `Fight` holds the `draw`, `hand` and `discard` piles, `energy`, hero `block`, `turn`, `enemies`,
   `acted`, the hero's `status` and `strength`, the `powers` in play, the cards `played` this turn,
-  the cards `drawn` this fight (for the draw sound), `wasVulnerable` (set in `endTurn`) and the `gold`
+  the cards `drawn` this fight (for the draw sound), the tonics `brewed` (for the brew sound), `wasVulnerable` (set in `endTurn`) and the `gold`
   to drop. `enemies[0]` is the one in front and takes single-target damage.
 - Statuses wear off like this: the hero's Weak in `endTurn`, a foe's Weak after it acts, everyone's
   Vulnerable in `endRound` (the hero's only when `wasVulnerable`, so Vulnerable a foe puts on starts
   wearing off the round after and lasts its full number of foe turns); a foe's poison bites at the start of its go, the hero's in `endRound`.
 - Only `src/game/sim.ts` mutates state. The scene only reads it and calls sim functions.
-- Invariants: a fight never changes `deck` except through a foe's `curse` intent, which pushes the
+- Invariants: a brewed or combined tonic lives in the fight's piles only, never in `deck`; a
+  fight never changes `deck` except through a foe's `curse` intent, which pushes the
   curse onto both `deck` and `fight.discard` (each fight otherwise shuffles a copy into `draw`); a
   played power goes to `fight.powers` and to no pile; a dead
   foe is spliced out of `enemies` at once (poison or Thorns can do it on the foes' turn, and `act`
@@ -284,7 +327,9 @@ State model (`src/game/state.ts`):
 Randomness and timing:
 
 - Every draw goes through `random()` in `src/game/rng.ts`, which reads `Math.random` at each call
-  outside the daily, so the list below is what the seeded test sees. In the daily, `startDailyRun`
+  outside the daily and the weekly, so the list below is what the seeded test sees. The weekly
+  works like the daily with `weeklyRand(week)` and offer keys `week:<monday>:offer:<act>:<room>`,
+  and `weeklyHero` draws from its own key. In the daily, `startDailyRun`
   sets the day's source (`dailyRand('catacomb')`) and draws a fresh act-one map from it, and the
   rewards and wares come from `keyedRand('<day>:offer:<act>:<room>')` (`offerDraw`), so they match
   for everyone whatever happened before. `dailyHero` draws from its own key, not from `random`.
@@ -292,7 +337,7 @@ Randomness and timing:
   `src/game/sim.ts`, which draws piles, reshuffles the discard and picks rewards (`pickSome`) and
   wares (cards, relics, then flasks), in `grantRelic`, `grantFlask` (after an elite or boss) and `temperRandom`, and in `nextIntent` after each foe acts. The test seeds it, so changing the number or order of these
   calls changes the map, hands, rewards and foe moves the test sees. Choosing the hero and the
-  depth draws nothing. The Hexer's own cards are not in `COMMON` and `RARE`, so the Knight's and
+  depth, the library's swaps and combining tonics draw nothing. The Hexer's own cards are not in `COMMON` and `RARE`, so the Knight's and
   the Hunter's pools (and their draws) are as before.
 - Art noise uses `seeded` from `src/art/pixelArt.ts`, not `Math.random`.
 - All timing is game time from `tick`; there is no `Date.now`, `setTimeout` or Phaser timer in
@@ -307,7 +352,10 @@ Data tables (where to tune):
 - Foe health, gold and moves: `ENEMIES` in `src/game/enemies.ts` (health is the Normal value;
   `startFight` scales it by difficulty).
 - Map shape, foes and mystery rooms per act: `COLUMN_KINDS`, `ACT_FOES`, `ROWS` and `colX` in `src/game/map.ts`; the Bone Spire's depth `SPIRE_DEPTH` there.
-- The daily: `DAILY_HEROES` and `DAILY_ROOM_SCORE` in `src/game/sim.ts`. The Hexer's unlock: `HEXER_UNLOCK_DEPTH` in `src/game/heroes.ts`.
+- The daily and the weekly: `DAILY_HEROES` and `DAILY_ROOM_SCORE` in `src/game/sim.ts`, the
+  weekly's mutators in `WEEKLY_MUTATORS` (`src/game/weekly.ts`) and `makeMap`. The Hexer's and the
+  Alchemist's unlocks: `HEXER_UNLOCK_DEPTH` and `ALCHEMIST_UNLOCK_DEPTH` in `src/game/heroes.ts`.
+  The library's swaps: `LIBRARY_SWAPS` in `src/game/library.ts`.
 - Relics: `RELICS` in `src/game/relics.ts`; events: `EVENTS` and their constants in
   `src/game/events.ts`.
 - `ENERGY`, `HAND_SIZE`, `REST_HEAL`, `MIN_DECK`, `REWARD_CHOICES`, `START_GOLD`,
@@ -339,7 +387,7 @@ Data tables (where to tune):
 - Difficulty scales one number: foe health. `startFight` in `src/game/sim.ts` sets each foe's `hp`
   and `maxHp` to `Math.round(ENEMIES[kind].hp * byDifficulty(0.75, 1, 1.3) * depthFoeHp(depth))`, so Easy 0.75x,
   Normal 1x, Hard 1.3x, times the depth's multiplier (1 at depth 0). Damage, block and the hero are not scaled.
-  The daily crypt always plays on Normal (multiplier 1), so its score compares across players.
+  The daily and weekly crypts always play on Normal (multiplier 1), so their scores compare across players.
 - `settings.reduceMotion` also stops the hero's hit shake, the hero's red hit tint, the foes'
   white hit flash and the foes' idle bob in `GameScene.drawFight`, and holds the enterable rooms'
   gold ring pulse still (full brightness, no outer ring) in `GameScene.drawMap`.
@@ -348,7 +396,7 @@ Data tables (where to tune):
 - Keep the Catacomb row of the difficulty table in the root `README.md` (and the difficulty line
   in this game's `README.md`) in sync with the multipliers.
 - The shared settings live under the `hub-settings` storage key, owned by `shared/settings.ts`;
-  this game's own keys are `catacomb-best-depth`, `catacomb-heroes`, `catacomb-daily` and `catacomb-trophies`.
+  this game's own keys are `catacomb-best-depth`, `catacomb-heroes`, `catacomb-library`, `catacomb-daily`, `catacomb-weekly` and `catacomb-trophies`.
 
 ## Sound
 
@@ -363,7 +411,7 @@ once, so an attack on every foe is one thwack. Nothing uses `Math.random` outsid
 
 Music, in A minor (harmonic), from `src/audio/music.ts`, chosen by `Cues.playTune`:
 
-- `MAP_SONG` (80 BPM, triangle drone): `calm` on the hero panel and the Crypt's map, `tombs` (lower,
+- `MAP_SONG` (80 BPM, triangle drone): `calm` on the hero panel, the library and the Crypt's map, `tombs` (lower,
   with a heartbeat kick) on the Sunken Tombs' and the Bone Spire's map, `camp` (warmer, leaning to C major) at the
   campfire, the merchant and mystery rooms.
 - `FIGHT_SONG` (120 BPM, with drums): `battle` for a Crypt fight, `depths` for a Tombs or Spire fight (with a
@@ -377,14 +425,15 @@ Sound table (`src/audio/sounds.ts`) and where each plays:
 
 | Sound | Where |
 | --- | --- |
-| `select` | a hero picked on the hero panel, or the daily crypt started |
+| `select` | a hero picked on the hero panel, the daily or weekly crypt started, or Set out in the library |
 | `ratchet` | the depth row's `<` or `>` |
 | `step` | every 175ms of walking on the map (`Cues`, alternating pitch) |
 | `door` | arriving at the merchant, a mystery room or a treasure room |
 | `fire` | arriving at a campfire |
-| `drip` | now and then on the hero panel and the map (every 2.6 to 6.8s, steady pattern) |
+| `drip` | now and then on the hero panel, the library and the map (every 2.6 to 6.8s, steady pattern) |
 | `descend` | the descent panel's Descend (or Climb, up the Bone Spire) |
 | `fight`, `stab` | arriving at a fight; `stab` too for an elite or a boss |
+| `brew` | two tonics combine in hand (`fight.brewed` grows) |
 | `draw` | cards are drawn (each turn's draw, the opening hand of a fight included, a card that draws, even one that only replaces itself, the Foresight Flask) |
 | `shuffle` | the discard pile shuffled into the draw pile |
 | `attack`, `skill`, `power` | a hand card played, by its kind |
@@ -402,12 +451,12 @@ Sound table (`src/audio/sounds.ts`) and where each plays:
 | `endTurn` | End turn |
 | `flask` | a flask drunk |
 | `cleared` | the last foe falls (phase `cleared`) |
-| `pick` | a reward card taken |
+| `pick` | a reward card taken, or a library card swapped in |
 | `rest`, `temper`, `burn` | the campfire's Rest, a card tempered, a card burned |
 | `buy` | a card, relic, flask or the removal bought from the merchant |
 | `mystery` | a mystery room's choice taken |
 | `ui('coin')` | the gold goes up (a fight's gold, the shrine, a boss's spare gold) |
-| `ui('click')` | Skip, Leave, Back, Delve again, and opening the temper, burn or removal picker |
+| `ui('click')` | Skip, Leave, Back (the picker's and the library's), Delve again, opening the temper, burn or removal picker, and picking or putting back a starting card in the library |
 | `ui('refuse')` | a locked hero, the daily crypt already tried today, an unplayable card, a flask off the hero's turn, a room out of reach, a ware too dear or with no slot, a greyed campfire or mystery choice, the depth at its end |
 
 To add a sound: add it to `sfx` in `sounds.ts`, then play it from the tap handler (through `act`)
@@ -418,7 +467,7 @@ for the hero's own action, or from `Cues.hear` for something the run does on its
 - `src/main.ts` sets `window.game` in dev builds only. The test reads
   `game.scene.getScene('Game')` and its `state`, `hand` and `rewards` (`CardSpot` lists with id
   and centre x/y). It never writes state.
-- Inputs it drives: a tap on the Knight's button on the hero panel (`KNIGHT_BUTTON`, 300,384, the
+- Inputs it drives: a tap on the Knight's button on the hero panel (`KNIGHT_BUTTON`, 255,384, the
   first of `HERO_PANEL.xs` at `HERO_PANEL.buttonY`), a tap on the first room (`FIRST_ROOM`, 110,290), taps on hand cards at the
   spots from `hand`, taps on End turn (`END_TURN`, 884,420) and a tap on the first reward card.
 - Numbers mirrored in `e2e/playthrough.spec.ts` that must change with the game: the Knight's health (50), the Knight's
@@ -426,7 +475,8 @@ for the hero's own action, or from `Cues.hear` for something the run does on its
   (24, on Normal at depth 0), gold (12) and `moves` (`SLIME` in the test), `START_GOLD` (0, with no relics and one
   flask), `ENERGY` (3), `HAND_SIZE` (5),
   `REWARD_CHOICES` (3, all different), the first room being a lone slime at `rooms[0]`, the run
-  opening on the `hero` phase at depth 0 (and never in a daily), and the `KNIGHT_BUTTON`, `END_TURN` and `VIEW` positions. The test checks each slime turn against its shown `intent`,
+  opening on the `hero` phase at depth 0 (and never in a daily or weekly), the Knight going straight
+  to the map (a fresh browser has an empty library, so no `library` phase), and the `KNIGHT_BUTTON`, `END_TURN` and `VIEW` positions. The test checks each slime turn against its shown `intent`,
   that it opens with its first move and that it never repeats a move twice in a row. The test also expects the slime to fall in under eight turns without killing the hero, and
   `catacomb-trophies` to hold exactly `firstFight` once the reward is taken (a trophy a first round
   can reach in another way changes that expectation).
@@ -440,7 +490,7 @@ for the hero's own action, or from `Cues.hear` for something the run does on its
 - Screenshots are saved as `playthrough-0-heroes` and `playthrough-0-map` through `playthrough-3-next-room` in
   `docs/screenshots/`; refresh them when the look of the first room changes. `map`, `boss`,
   `treasure`, `victory`, `campfire`, `campfire-temper`, `campfire-remove`, `shop`, `event`,
-  `elite-fight`, `descend`, `act2-map`, `tombs-foes`, `hollow-queen`, `heroes` (the three heroes and the daily button),
+  `elite-fight`, `descend`, `act2-map`, `tombs-foes`, `hollow-queen`, `heroes` (the four heroes and the daily and weekly buttons), `library` (the Knight's library with a swap), `alchemist-tonics` (a Blaze Tonic in the Alchemist's first hand), `weekly-map` (a weekly crypt's map),
   `flasks-and-powers`, `curses`, `spire-foes` (the Hexer in the Bone Spire), `marrow-tyrant`, `daily-crypt` (a daily's end panel) and `german-shop` (the merchant with `?lang=de`) there are taken by hand
   (not by the test); refresh them too when the look changes. `cover.png` is a copy of `playthrough-1-fight`.
 
@@ -466,9 +516,13 @@ for the hero's own action, or from `Cues.hear` for something the run does on its
   `FLASK_ICONS` in `src/art/icons.ts` and its effect to `useFlask` in `sim.ts`. Update the
   README's flask table.
 - **Add a hero:** add it to `HeroId`, `HEROES` and `HERO_IDS` in `src/game/heroes.ts` (its deck in
-  `cards.ts`, and its own cards with `hero` set), draw its `Figure` in `src/art/characters.ts` and
-  add it to `HERO_FIGURES`; the hero panel has room for three in a row (`HERO_PANEL.xs`), so a
-  fourth needs a new layout. An unlock goes in `heroUnlocked`.
+  `cards.ts`, and its own cards with `hero` set, a union on `Card`), draw its `Figure` in `src/art/characters.ts` and
+  add it to `HERO_FIGURES`; the hero panel has room for four in a row (`HERO_PANEL.xs`), so a
+  fifth needs a new layout. An unlock goes in `heroUnlocked`, and its caption in `LOCKED` in `GameScene.ts`.
+- **Add a tonic:** a card with `tonic` set to the key of its strong form (rarity `starter`, so no
+  pool offers it); a card that makes one sets `brew`. `describe` adds the rider and the brew line.
+- **Add a weekly mutator:** add it to `Mutators` and `WEEKLY_MUTATORS` in `src/game/weekly.ts`
+  and apply it where it bites (`makeMap` for the map), then say so in the README and How to play.
 - **Add a depth rule:** add its line to `DEPTH_RULES` in `src/game/depth.ts` and apply it in
   `sim.ts` by `s.depth` (foe health in `startFight`, rests in `restShare`, the start of a run in
   `chooseHero`). Update the README's depth table.

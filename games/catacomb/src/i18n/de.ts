@@ -40,6 +40,15 @@ const de: Translation<typeof en> = {
   blightCard: 'Fäulnis',
   hexStormCard: 'Fluchsturm',
   maledictionCard: 'Verwünschung',
+  fireTonicCard: 'Feuertrunk',
+  ironTonicCard: 'Eisentrunk',
+  venomTonicCard: 'Gifttrunk',
+  strongFireTonicCard: 'Gluttrunk',
+  strongIronTonicCard: 'Stahltrunk',
+  strongVenomTonicCard: 'Todestrunk',
+  grindCard: 'Zerstoßen',
+  distilCard: 'Destillieren',
+  transmuteCard: 'Verwandeln',
 
   // Cards: rules, built from these parts
   deal: '{damage} Schaden.',
@@ -55,6 +64,8 @@ const de: Translation<typeof en> = {
   heal: 'Heile {n}.',
   gainEnergy: 'Erhalte {n} Energie.',
   draw: { one: 'Ziehe {n} Karte.', other: 'Ziehe {n} Karten.' },
+  brew: 'Braue {name}.',
+  tonicRider: 'Zwei verbinden sich.',
   powerLead: 'Kraft.',
   bulwarkPower: 'Zu Beginn jedes Zuges {n} Block.',
   thornsPower: 'Wer dich trifft, erleidet {n} Schaden.',
@@ -104,7 +115,10 @@ const de: Translation<typeof en> = {
   hunterText: 'Giftmesser und Ausweichen, {hp} Leben',
   hexerName: 'Hexer',
   hexerText: 'Flüche und Fluchblitze, {hp} Leben',
-  hexerLocked: 'Schlage Tiefe 2 als Ritter und als Jäger, um ihn freizuschalten',
+  hexerLocked: 'Schlage Tiefe 2 als Ritter und Jäger zum Freischalten',
+  alchemistName: 'Alchemist',
+  alchemistText: 'Tränke, die sich verbinden, {hp} Leben',
+  alchemistLocked: 'Bezwinge den Knochenturm, um ihn freizuschalten',
   locked: 'Gesperrt',
 
   // Flasks
@@ -250,6 +264,16 @@ const de: Translation<typeof en> = {
   dailyWon: 'Du hast die tägliche Gruft mit {hp} Leben übrig geschafft.\nPunkte {score}, Bestwert {best}, {streak}. Morgen öffnet eine neue Gruft.',
   dailyFell: 'Du bist in {act} gefallen, Raum {room} von {rooms}.\nPunkte {score}, Bestwert {best}, {streak}. Morgen öffnet eine neue Gruft.',
   dailyBar: 'Tägliche Gruft',
+  weeklyButton: 'Wöchentliche Gruft: diese Woche der {hero}',
+  weeklyBest: 'Wöchentliche Gruft: Bestwert {best} der Woche',
+  weeklyWon: 'Du hast die wöchentliche Gruft mit {hp} Leben übrig geschafft.\nPunkte {score}, Wochenbestwert {best} nach {tries}. Versuch es so oft du willst.',
+  weeklyFell: 'Du bist in {act} gefallen, Raum {room} von {rooms}.\nPunkte {score}, Wochenbestwert {best} nach {tries}. Versuch es so oft du willst.',
+  weeklyTries: { one: '{n} Versuch', other: '{n} Versuchen' },
+  weeklyBar: 'Wöchentliche Gruft',
+  libraryTitle: 'Die Bibliothek: {hero}',
+  libraryHint: 'Tippe eine Startkarte an, dann eine Karte der Bibliothek, um sie zu tauschen ({n} von {max} Tauschen). Tippe eine getauschte Karte an, um sie zurückzulegen.',
+  libraryShelf: 'Jede Karte, die du je in ein Deck genommen hast',
+  setOut: 'Aufbrechen',
 
   // The card picker
   burnPick: 'Karte verbrennen: Sie verlässt dein Deck für immer',
@@ -268,6 +292,6 @@ const de: Translation<typeof en> = {
 };
 
 /** Texts that are the same in German. */
-export const keepEnglish = ['deck', 'hexerName'];
+export const keepEnglish = ['deck', 'hexerName', 'alchemistName'];
 
 export default de;

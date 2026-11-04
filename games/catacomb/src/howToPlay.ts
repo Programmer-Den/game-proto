@@ -4,8 +4,10 @@ import { byLanguage } from '../../../shared/i18n';
 const en: HowToPlay = {
   goal: 'Lead your hero through the Crypt and the Sunken Tombs to beat the Hollow Queen (and from depth 3, up the Bone Spire to the Marrow Tyrant). The run ends if your health reaches zero.',
   controls: [
-    { input: 'Tap a hero', action: 'Set out as the Knight, the Hunter or the Hexer once unlocked (< and > pick the depth once one is open)' },
+    { input: 'Tap a hero', action: 'Set out as the Knight, the Hunter, or the Hexer or the Alchemist once unlocked (< and > pick the depth once one is open)' },
+    { input: 'Tap a starting card, then a library card', action: "In the hero's library before a run: swap up to three starting cards for cards found before, then Set out" },
     { input: 'Tap Daily crypt', action: "Set out on the day's run, the same for everyone, once a day" },
+    { input: 'Tap Weekly crypt', action: "Set out on the week's run, with more elites and no campfires, as often as you like" },
     { input: 'Tap a lit room', action: 'Walk there and go in' },
     { input: 'Tap a card in hand', action: 'Play it, if you have the energy for it' },
     { input: 'Tap a flask', action: 'Drink it on your turn, for no energy' },
@@ -31,14 +33,19 @@ const en: HowToPlay = {
     'From depth 3 the Hollow Queen is not the end: climb the Bone Spire and beat the Marrow Tyrant to win.',
     'Win at depth 2 with both the Knight and the Hunter to unlock the Hexer, whose cards hit foes with a status harder.',
     'The daily crypt scores 10 for every room cleared, plus the health left if you beat the Hollow Queen.',
+    'The weekly crypt scores the same way and keeps your best of the week, however many tries it takes.',
+    "Every card a hero adds to a deck joins that hero's library, ready to swap in at the start of a later run.",
+    "Beat the Bone Spire with any hero to unlock the Alchemist: two of the same tonic in hand combine at once into a strong one for the same cost.",
   ],
 };
 
 const de: HowToPlay = {
   goal: 'Führe deinen Helden durch die Gruft und die versunkenen Gräber und besiege die Hohle Königin (ab Tiefe 3 auch den Knochenturm hinauf bis zum Marktyrannen). Der Lauf endet, wenn dein Leben auf null fällt.',
   controls: [
-    { input: 'Einen Helden antippen', action: 'Als Ritter, Jäger oder, sobald freigeschaltet, als Hexer aufbrechen (< und > wählen die Tiefe, sobald eine offen ist)' },
+    { input: 'Einen Helden antippen', action: 'Als Ritter, Jäger oder, sobald freigeschaltet, als Hexer oder Alchemist aufbrechen (< und > wählen die Tiefe, sobald eine offen ist)' },
+    { input: 'Eine Startkarte, dann eine Karte der Bibliothek antippen', action: 'In der Bibliothek des Helden vor dem Lauf: bis zu drei Startkarten gegen früher gefundene Karten tauschen, dann aufbrechen' },
     { input: 'Tägliche Gruft antippen', action: 'Zum Lauf des Tages aufbrechen, für alle gleich, einmal am Tag' },
+    { input: 'Wöchentliche Gruft antippen', action: 'Zum Lauf der Woche aufbrechen, mit mehr Eliten und ohne Lagerfeuer, so oft du willst' },
     { input: 'Einen leuchtenden Raum antippen', action: 'Dorthin gehen und eintreten' },
     { input: 'Eine Karte auf der Hand antippen', action: 'Sie spielen, wenn du genug Energie hast' },
     { input: 'Einen Trank antippen', action: 'Ihn in deinem Zug trinken, ohne Energie' },
@@ -64,6 +71,9 @@ const de: HowToPlay = {
     'Ab Tiefe 3 ist die Hohle Königin nicht das Ende: Steig den Knochenturm hinauf und besiege den Marktyrannen.',
     'Gewinne auf Tiefe 2 mit dem Ritter und mit dem Jäger, um den Hexer freizuschalten, dessen Karten Feinde mit Zustand härter treffen.',
     'Die tägliche Gruft gibt 10 Punkte für jeden geschafften Raum, dazu das übrige Leben, wenn du die Hohle Königin besiegst.',
+    'Die wöchentliche Gruft zählt genauso und behält deinen Bestwert der Woche, egal wie viele Versuche es braucht.',
+    'Jede Karte, die ein Held in sein Deck nimmt, kommt in seine Bibliothek und kann zu Beginn eines späteren Laufs eingetauscht werden.',
+    'Bezwinge den Knochenturm mit einem Helden, um den Alchemisten freizuschalten: Zwei gleiche Tränke auf der Hand verbinden sich sofort zu einem starken, zum selben Preis.',
   ],
 };
 

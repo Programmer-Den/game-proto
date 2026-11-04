@@ -37,6 +37,15 @@ const en = {
   blightCard: 'Blight',
   hexStormCard: 'Hex Storm',
   maledictionCard: 'Malediction',
+  fireTonicCard: 'Fire Tonic',
+  ironTonicCard: 'Iron Tonic',
+  venomTonicCard: 'Venom Tonic',
+  strongFireTonicCard: 'Blaze Tonic',
+  strongIronTonicCard: 'Steel Tonic',
+  strongVenomTonicCard: 'Bane Tonic',
+  grindCard: 'Grind',
+  distilCard: 'Distil',
+  transmuteCard: 'Transmute',
 
   // Cards: rules, built from these parts
   deal: 'Deal {damage}.',
@@ -52,6 +61,8 @@ const en = {
   heal: 'Heal {n}.',
   gainEnergy: 'Gain {n} energy.',
   draw: { one: 'Draw {n}.', other: 'Draw {n}.' },
+  brew: 'Brew one {name}.',
+  tonicRider: 'Two in hand combine.',
   powerLead: 'Power.',
   bulwarkPower: 'Gain {n} block at the start of each turn.',
   thornsPower: 'Deal {n} back to any foe that hits you.',
@@ -102,6 +113,9 @@ const en = {
   hexerName: 'Hexer',
   hexerText: 'curses and hex bolts, {hp} health',
   hexerLocked: 'Beat depth 2 as the Knight and as the Hunter to unlock',
+  alchemistName: 'Alchemist',
+  alchemistText: 'tonics that combine, {hp} health',
+  alchemistLocked: 'Beat the Bone Spire with any hero to unlock',
   locked: 'Locked',
 
   // Flasks
@@ -247,6 +261,16 @@ const en = {
   dailyWon: 'You cleared the daily crypt with {hp} health left.\nScore {score}, best {best}, {streak}. A new crypt opens tomorrow.',
   dailyFell: 'You fell in {act}, room {room} of {rooms}.\nScore {score}, best {best}, {streak}. A new crypt opens tomorrow.',
   dailyBar: 'Daily crypt',
+  weeklyButton: "Weekly crypt: the {hero} this week",
+  weeklyBest: 'Weekly crypt: best {best} this week',
+  weeklyWon: "You cleared the weekly crypt with {hp} health left.\nScore {score}, this week's best {best} after {tries}. Try again as often as you like.",
+  weeklyFell: "You fell in {act}, room {room} of {rooms}.\nScore {score}, this week's best {best} after {tries}. Try again as often as you like.",
+  weeklyTries: { one: '{n} try', other: '{n} tries' },
+  weeklyBar: 'Weekly crypt',
+  libraryTitle: "The {hero}'s library",
+  libraryHint: 'Tap a starting card, then a library card to swap it in ({n} of {max} swaps). Tap a swapped card to put it back.',
+  libraryShelf: 'Every card you have added to a deck',
+  setOut: 'Set out',
 
   // The card picker
   burnPick: 'Burn a card: it leaves your deck for good',

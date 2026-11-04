@@ -33,23 +33,37 @@ export const REST_BUTTONS = { dx: 182, w: 172 };
 export const EVENT_BUTTONS = { y: 324, gap: 52, w: 440 };
 /**
  * The hero panel, a taller box than the other panels: its title, the depth row's arrows and label
- * with the depth's rules under it, the three heroes standing in a row (by their feet) with a
- * button and a caption under each, and the daily crypt's button under the box.
+ * with the depth's rules under it, the four heroes standing in a row (by their feet) with a
+ * button and a caption under each, and the daily and weekly crypts' buttons side by side under the box.
  */
 export const HERO_PANEL = {
-  box: { w: 620, h: 380 },
+  box: { w: 780, h: 380 },
   titleY: 108,
   depthY: 152,
   depthDx: 90,
   rulesY: 192,
   rulesH: 40,
-  xs: [300, 480, 660],
+  xs: [255, 405, 555, 705],
   feetY: 352,
   buttonY: 384,
-  buttonW: 172,
+  buttonW: 140,
   captionY: 412,
   dailyY: 496,
-  dailyW: 460,
+  dailyXs: [295, 665],
+  dailyW: 360,
+};
+/**
+ * The library, before a run: the starting deck in a row along the top, the library's cards in up
+ * to two rows under it, by the cards' centres, and Back and Set out along the bottom.
+ */
+export const LIBRARY = {
+  titleY: 64,
+  hintY: 96,
+  deck: { y: 180, gap: 78, scale: 0.55 },
+  shelfY: 282,
+  cards: { y: 340, rowGap: 92, gap: 68, perRow: 13, scale: 0.48 },
+  back: { x: 300, y: 500 },
+  go: { x: 660, y: 500 },
 };
 /** The flask slots down the left of a fight, by their centres. */
 export const FLASKS = { x: 60, y: 120, gap: 58, r: 24 };

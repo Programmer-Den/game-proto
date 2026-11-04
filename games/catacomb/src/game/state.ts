@@ -3,6 +3,8 @@ import type { EnemyKind, Intent, StatusKind } from './enemies';
 import type { FlaskId } from './flasks';
 import type { DailyRecord } from '../../../../shared/daily';
 import type { HeroId, HeroWins } from './heroes';
+import type { Library } from './library';
+import type { WeeklyRecord } from './weekly';
 import type { Room } from './map';
 import type { RelicId } from './relics';
 
@@ -47,6 +49,8 @@ export const POP_MS = 900;
 export type Phase =
   /** Choosing the hero (and the depth) before the first room. */
   | 'hero'
+  /** Swapping starting cards for library cards, once the hero has a library. */
+  | 'library'
   /** Choosing the next room on the map. */
   | 'map'
   /** Walking to the room picked. */
@@ -130,6 +134,8 @@ export interface Fight {
   played: number;
   /** How many cards have been drawn this fight (the draw sound listens to it). */
   drawn: number;
+  /** How many pairs of tonics have combined in hand this fight (the brew sound listens to it). */
+  brewed: number;
   /** Whether the hero was Vulnerable when the turn ended: Vulnerable put on during the foes' turn starts wearing off the round after. */
   wasVulnerable: boolean;
   /** The gold the foes leave behind once they all fall. */
@@ -160,8 +166,16 @@ export interface GameState {
   daily: string | null;
   /** Today's daily crypt as saved: whether it was tried, its score, the best and the streak. */
   dailyRecord: DailyRecord;
-  /** The daily's score once it ends, null before. */
+  /** The week (its Monday, `YYYY-MM-DD`) when this run is that week's weekly crypt, or null. */
+  weekly: string | null;
+  /** This week's weekly crypt as saved: the best score and the tries. */
+  weeklyRecord: WeeklyRecord;
+  /** The daily's or the weekly's score once it ends, null before. */
   dailyScore: number | null;
+  /** Each hero's library, saved in the browser: every card they have added to a deck. */
+  library: Library;
+  /** The starting cards swapped for library cards before this run: where in the deck, and what was there. */
+  swaps: { at: number; was: CardId }[];
   /** The flasks held, up to FLASK_SLOTS. */
   flasks: FlaskId[];
   /** Which act the hero is in, from 1. */

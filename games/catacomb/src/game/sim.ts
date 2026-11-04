@@ -1,12 +1,13 @@
 import { dailyRand, finishDaily, loadDaily, startDaily, today } from '../../../../shared/daily';
 import { byDifficulty } from '../../../../shared/settings';
 import { t } from '../i18n';
-import { DOUBT_COST, HEX_WEAK, POWER_BLOCK, POWER_STRENGTH, THORNS, WOUND_HURT, canBeTempered, card, cardName, isCurse, poolFor, tempered, type BaseId, type CardId } from './cards';
+import { DOUBT_COST, HEX_WEAK, POWER_BLOCK, POWER_STRENGTH, THORNS, WOUND_HURT, canBeTempered, card, cardName, isCurse, poolFor, tempered, tonicOf, type BaseId, type CardId } from './cards';
 import { DEPTH_CURSE, depthFoeHp, DEEP_REST_HEAL, loadBestDepth, saveBestDepth } from './depth';
 import { ENEMIES, type EnemyKind, type StatusKind } from './enemies';
 import { ALTAR_COST, BRAZIER_HEAL, CHEST_CURSE, EVENTS, POOL_COST, POOL_HEAL, RELIQUARY_COST, RELIQUARY_MAX_HP, SHRINE_CURSE, SHRINE_GOLD } from './events';
 import { FLASKS, FLASK_BLOCK, FLASK_DRAW, FLASK_ENERGY, FLASK_HEAL, FLASK_IDS, FLASK_POISON, FLASK_PRICE, FLASK_SLOTS, type FlaskId } from './flasks';
 import { HEROES, heroUnlocked, loadHeroWins, saveHeroWins, type HeroId } from './heroes';
+import { LIBRARY_SWAPS, addToLibrary, loadLibrary } from './library';
 import { ACTS, ACT_FOES, COLUMNS, SPIRE_DEPTH, makeMap, reachable } from './map';
 import { keyedRand, random, setRandom, withRandom } from './rng';
 import { BONE_CHARM_VULNERABLE, EMBER_LANTERN_ENERGY, GOLDEN_IDOL_GOLD, MENDING_MOSS_HEAL, OAK_WARD_BLOCK, RELICS, RELIC_IDS, VENOM_GLAND_POISON, WHETSTONE_DAMAGE, relicText, type RelicId } from './relics';
@@ -37,6 +38,7 @@ import {
   type Pop,
   type Status,
 } from './state';
+import { WEEKLY_MUTATORS, loadWeekly, saveWeekly, weekOf, weeklyRand } from './weekly';
 
 // The rules: moving on the map, playing cards, the foes' turn, statuses, rewards, the campfire,
 // the merchant, mystery rooms, the descent to the next act and the daily crypt. Plain TypeScript,
@@ -62,7 +64,11 @@ export function newRun(): GameState {
     heroWins: loadHeroWins(),
     daily: null,
     dailyRecord: loadDaily(DAILY),
+    weekly: null,
+    weeklyRecord: loadWeekly(),
     dailyScore: null,
+    library: loadLibrary(),
+    swaps: [],
     flasks: [],
     act: 1,
     rooms: makeMap(1),
@@ -103,11 +109,63 @@ export const hasRelic = (s: GameState, id: RelicId) => s.relics.includes(id);
 
 // The hero and the depth
 
-/** Picks the hero: their health, deck and flask, plus the depth's starting curse, then on to the map. */
+/** Picks the hero: their health, deck and flask, plus the depth's starting curse, then on to the map, or first to their library if it holds any cards. */
 export function chooseHero(s: GameState, hero: HeroId) {
   if (s.phase !== 'hero' || !heroUnlocked(s.heroWins, hero)) return false;
   setOut(s, hero);
+  s.swaps = [];
+  if (s.library[hero].length > 0) s.phase = 'library';
   return true;
+}
+
+// The library
+
+/** How many of the deck's first cards are the hero's own starting cards, the ones that can be swapped (not depth 3's Wound). */
+const startingCards = (s: GameState) => HEROES[s.hero].deck.length;
+
+/** Whether the library card `id` can take the place of the starting card at `at`: a swap left, that card not swapped yet and `id` not already swapped in. */
+export function canSwap(s: GameState, at: number, id: BaseId) {
+  if (s.phase !== 'library' || at < 0 || at >= startingCards(s) || s.swaps.length >= LIBRARY_SWAPS) return false;
+  return s.library[s.hero].includes(id) && !s.swaps.some((w) => w.at === at || s.deck[w.at] === id);
+}
+
+/** Swaps the starting card at `at` for the library card `id`. */
+export function swapIn(s: GameState, at: number, id: BaseId) {
+  if (!canSwap(s, at, id)) return false;
+  s.swaps.push({ at, was: s.deck[at] });
+  s.deck[at] = id;
+  return true;
+}
+
+/** Puts the starting card back where a library card was swapped in. */
+export function swapBack(s: GameState, at: number) {
+  const i = s.phase === 'library' ? s.swaps.findIndex((w) => w.at === at) : -1;
+  if (i < 0) return false;
+  s.deck[at] = s.swaps[i].was;
+  s.swaps.splice(i, 1);
+  return true;
+}
+
+/** Leaves the library with the deck as it stands, on to the map. */
+export function setOutFromLibrary(s: GameState) {
+  if (s.phase !== 'library') return false;
+  s.phase = 'map';
+  return true;
+}
+
+/** Leaves the library back to the hero choice, undoing the swaps. */
+export function backToHeroes(s: GameState) {
+  if (s.phase !== 'library') return false;
+  for (const w of s.swaps) s.deck[w.at] = w.was;
+  s.swaps = [];
+  s.phase = 'hero';
+  return true;
+}
+
+/** A card joins the deck from a reward or the merchant: it goes into the hero's library too. */
+function gainCard(s: GameState, id: CardId) {
+  s.deck.push(id);
+  addToLibrary(s.library, s.hero, id);
 }
 
 function setOut(s: GameState, hero: HeroId) {
@@ -119,6 +177,28 @@ function setOut(s: GameState, hero: HeroId) {
   if (s.depth >= 3) s.deck.push(DEPTH_CURSE);
   s.flasks = [h.flask];
   s.phase = 'map';
+}
+
+/** The hero the weekly crypt sends out in this week: the same for everyone. */
+export const weeklyHero = (week = weekOf()) => DAILY_HEROES[Math.floor(keyedRand(`week:${week}:hero`)() * DAILY_HEROES.length)];
+
+/**
+ * Sets out on this week's weekly crypt: the week's hero at depth 0 and on Normal, on maps with the
+ * week's mutators (more elites, no campfires), the maps and fights drawn from the week's seed and
+ * the card offers seeded by the room. It can be tried again and again; the best score is kept.
+ */
+export function startWeeklyRun(s: GameState) {
+  if (s.phase !== 'hero') return false;
+  const week = weekOf();
+  s.weekly = week;
+  s.weeklyRecord = { ...loadWeekly(week), week };
+  s.weeklyRecord.tries++;
+  saveWeekly(s.weeklyRecord);
+  setRandom(weeklyRand(week));
+  s.depth = 0;
+  s.rooms = makeMap(1, WEEKLY_MUTATORS);
+  setOut(s, weeklyHero(week));
+  return true;
 }
 
 /** Whether today's daily crypt can still be tried, on the hero panel. */
@@ -147,16 +227,27 @@ export function startDailyRun(s: GameState) {
 /** The daily's score so far: ten for each room cleared, in every act, plus the health left after a win. */
 export const dailyScore = (s: GameState) => ((s.act - 1) * COLUMNS + s.cleared.length) * DAILY_ROOM_SCORE + (s.phase === 'won' ? s.hp : 0);
 
-/** Card offers in the daily come from the room's own seed, the same whatever came before; any other run draws as usual. */
+/** The key of a seeded run's offers: the day for the daily, the week for the weekly, null for a run of one's own. */
+const seedKey = (s: GameState) => s.daily ?? (s.weekly ? `week:${s.weekly}` : null);
+
+/** Card offers in the daily and the weekly come from the room's own seed, the same whatever came before; any other run draws as usual. */
 function offerDraw<T>(s: GameState, fn: () => T): T {
-  return s.daily ? withRandom(keyedRand(`${s.daily}:offer:${s.act}:${s.at}`), fn) : fn();
+  const key = seedKey(s);
+  return key ? withRandom(keyedRand(`${key}:offer:${s.act}:${s.at}`), fn) : fn();
 }
 
 /** The act whose boss ends the run: the Hollow Queen's, or from SPIRE_DEPTH down the Bone Spire's (never in the daily, at depth 0). */
 export const lastAct = (s: GameState) => (s.depth >= SPIRE_DEPTH ? ACTS + 1 : ACTS);
 
-/** The run just ended: saves the daily's score, or what the win means for the heroes and the depths. */
+/** The run just ended: saves the daily's or the weekly's score, or what the win means for the heroes and the depths. */
 function endRun(s: GameState) {
+  if (s.weekly) {
+    if (s.dailyScore !== null) return;
+    s.dailyScore = dailyScore(s);
+    s.weeklyRecord = { ...s.weeklyRecord, best: Math.max(s.weeklyRecord.best, s.dailyScore) };
+    saveWeekly(s.weeklyRecord);
+    return;
+  }
   if (s.daily) {
     if (s.dailyScore !== null) return;
     s.dailyScore = dailyScore(s);
@@ -254,8 +345,8 @@ function startFight(s: GameState, foes: EnemyKind[]) {
     turn: 0,
     enemies: foes.map((kind) => {
       // Foes are a quarter weaker on Easy and 30% tougher on Hard, and tougher again down the depths.
-      // The daily crypt is always on Normal, so every player meets the same foes.
-      const hp = Math.round(ENEMIES[kind].hp * (s.daily ? 1 : byDifficulty(0.75, 1, 1.3)) * depthFoeHp(s.depth));
+      // The daily and the weekly crypt are always on Normal, so every player meets the same foes.
+      const hp = Math.round(ENEMIES[kind].hp * (seedKey(s) ? 1 : byDifficulty(0.75, 1, 1.3)) * depthFoeHp(s.depth));
       const status = noStatus();
       if (hasRelic(s, 'boneCharm')) status.vulnerable = BONE_CHARM_VULNERABLE;
       return { id: s.nextId++, kind, hp, maxHp: hp, block: 0, strength: 0, status, step: 0, intent: ENEMIES[kind].moves[0], hitMs: 0, actMs: 0 };
@@ -266,6 +357,7 @@ function startFight(s: GameState, foes: EnemyKind[]) {
     powers: [],
     played: 0,
     drawn: 0,
+    brewed: 0,
     wasVulnerable: false,
     gold: foes.reduce((sum, kind) => sum + ENEMIES[kind].gold, 0),
   };
@@ -315,6 +407,22 @@ function drawCards(s: GameState, n: number) {
       s.heroHitMs = HIT_MS;
       pop(s, 'hero', `-${hurt}`, 'damage');
     }
+  }
+  combineTonics(s);
+}
+
+/** Two of the same tonic in hand combine at once into its strong form, in the first one's place; repeats while pairs are left. */
+function combineTonics(s: GameState) {
+  const f = s.fight!;
+  for (let i = 0; i < f.hand.length; i++) {
+    const j = f.hand.findIndex((id, k) => k > i && tonicOf(f.hand[i], id));
+    if (j < 0) continue;
+    const into = tonicOf(f.hand[i], f.hand[j])!;
+    f.hand.splice(j, 1);
+    f.hand[i] = into;
+    f.brewed++;
+    pop(s, 'hero', cardName(into), 'status');
+    i = -1;
   }
 }
 
@@ -377,6 +485,10 @@ export function playCard(s: GameState, index: number) {
   if (c.block) gainBlock(s, c.block);
   if (c.heal) heal(s, c.heal);
   if (c.energy) f.energy += c.energy;
+  if (c.brew) {
+    f.hand.push(c.brew as BaseId);
+    combineTonics(s);
+  }
   if (c.draw) drawCards(s, c.draw);
   f.discard.push(id);
   if (f.enemies.length === 0) clearFight(s);
@@ -597,7 +709,7 @@ export function takeReward(s: GameState, index: number | null) {
   if (index !== null) {
     const id = s.reward[index];
     if (!id) return false;
-    s.deck.push(id);
+    gainCard(s, id);
   }
   s.reward = null;
   s.goldWon = 0;
@@ -623,7 +735,7 @@ function grantRelic(s: GameState) {
 export function descend(s: GameState) {
   if (s.phase !== 'descend') return false;
   s.act++;
-  s.rooms = makeMap(s.act);
+  s.rooms = makeMap(s.act, s.weekly ? WEEKLY_MUTATORS : undefined);
   s.at = null;
   s.cleared = [];
   const healed = heal(s, restHeal(s));
@@ -715,7 +827,7 @@ export function buyCard(s: GameState, i: number) {
   const w = s.phase === 'shop' ? s.shop?.cards[i] : undefined;
   if (!w || w.sold || s.gold < w.price) return false;
   s.gold -= w.price;
-  s.deck.push(w.id);
+  gainCard(s, w.id);
   w.sold = true;
   return true;
 }

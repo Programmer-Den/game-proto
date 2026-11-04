@@ -65,6 +65,8 @@ export const sfx = sounds({
   endTurn: { wave: 'square', freq: 1200, arp: [0, -5], arpStep: 0.08, length: 0.16, volume: 0.14 },
   /** A flask drunk: a glug and a sparkle. */
   flask: { wave: 'sine', freq: 220, arp: [0, 5, 0, 7, 12, 19], arpStep: 0.045, length: 0.3, volume: 0.35 },
+  /** Two tonics combine in hand (the Alchemist): a bubbling rise. */
+  brew: { wave: 'sine', freq: 330, arp: [0, 3, 7, 10, 15], arpStep: 0.04, length: 0.32, volume: 0.3 },
   /** The last foe fell: a short jingle. */
   cleared: { wave: 'pulse25', freq: 440, arp: [0, 4, 7, 12], arpStep: 0.08, length: 0.5, volume: 0.26 },
 
