@@ -37,7 +37,8 @@ Implemented today:
   no push puts a ship over a rock. An idle ship left over a rock drifts off it. No `Math.random`.
 - Nebulae (`World.inNebula`, `Unit.nebula`, `updateCover`): a ship inside one flies at 70% speed
   (`NEBULA_SLOW`) and is hidden from an enemy faction (`hidden`) unless that faction has a ship
-  within 70 px (`NEBULA_SPOT`), a building within 70 px of its edge or claimed sensors in range, or
+  within 70 px (`NEBULA_SPOT`), a building within 70 px of its edge or claimed sensors in range (or
+  a teammate does, in a teams skirmish), or
   the ship fired in the last 1.5 s (`revealMs`, shared with the cloak). `updateCover` works the
   cover out once an update into `spotted` (unit id to the factions that see it). Hidden ships are
   skipped by `nearestEnemy` and drop out of an attacker's order, so a chase into a nebula is lost
@@ -109,8 +110,9 @@ Implemented today:
   Accepting gives 90 s (`TRUCE_MS`) of peace: `nearestEnemy`, `nearestEnemyBuilding`, mines, splash
   and the AI's raid target all skip a faction at peace, and ships already sent at each other are
   called off. A player command to attack a rival under truce breaks it. Tribute (`BRIBE_COST` 60)
-  turns a rival's grudge onto the living faction nearest its hub (other than the player) for 60 s
-  (`BRIBE_MS`): hits do not move the grudge while `grudgeLockMs` runs, and its ships already sent at
+  turns a rival's grudge onto the living faction nearest its hub (other than the player and any
+  faction it is at peace with: its teammates in a teams skirmish, every rival in `survive`, where
+  `bribeTarget` is null and the Tribute button hides) for 60 s (`BRIBE_MS`): hits do not move the grudge while `grudgeLockMs` runs, and its ships already sent at
   the player turn on that faction's hub. The rivals panel (`RIVALS_PANEL` in `layout.ts`,
   `GameScene.rivalsOpen`, `rivalButtons`, `drawRivals`) opens from the rivals area of the top bar
   (`RIVALS_TAB`, which glows while an offer waits) or with T, and shows each rival's grudge, truce or
@@ -306,10 +308,13 @@ Implemented today:
   60, 120, 300) replaces every side's crystal. Teams (`TEAM_OF`, by side index: the player and slot
   3 against slots 1 and 2, slot 4 alone): `atPeace` holds between teammates, so targeting, mines and
   splash skip them; `command` turns a tap on an ally into a move; the ally's ships and buildings stamp
-  the player's fog; it never pickets the beacon (`contestBeacon`); `bribe` and `acceptTruce` refuse
+  the player's fog, and so do sensors it holds; `seesUnit` shows the ally's ships wherever they are
+  (cloaked or in a nebula), and `hidden` counts a teammate's spotting in a nebula as the faction's
+  own, so an enemy the ally spots there shows and can be attacked; it never pickets the beacon (`contestBeacon`); `bribe` and `acceptTruce` refuse
   it (`allyNoTribute`); there is no pact (`updatePact`); the battle is won once every side but the
   player's team has fallen. The rivals panel names the ally (`allyStatus`), and the battle opens
-  with `teamsBattle` on the message line. The end overlay's tap goes back to the Skirmish tab.
+  with `teamsBattle` on the message line. The end overlay says `skirmishWon` or `skirmishLost`
+  (`battleOver`), and its tap goes back to the Skirmish tab.
 - Wormholes (`Wormhole`, `wormholes()` in `game/map.ts`, `MapLayout.wormholes`, `World.wormholes`,
   `wormholeFor`, `approach`/`fly`, `WORMHOLE_MOUTH`, `WORMHOLE_SAVING`, `WORMHOLE_RADIUS`;
   `GameScene.drawWormholes`): two fixed pairs, 110 px in from the corners (bottom-left with
@@ -407,7 +412,7 @@ File map (`src/`):
 - `i18n.ts` and `i18n/`: the game's texts (`shared/i18n.ts`). `i18n/en.ts` is the British English
   source, `i18n/de.ts` the German (faction, ship and building names are compound nouns used without
   an article, so they fit any sentence) and `i18n/en-US.ts` the texts spelled differently in US
-  English (only `skirmishTeamsText`). `t(key, vars)` shows a text in the hub's language; `TextKey` types the keys.
+  English (only `skirmishTeamsText` and `scenarioRelayBrief`). `t(key, vars)` shows a text in the hub's language; `TextKey` types the keys.
   Every text on screen, the notices and problems `World` returns and the Watch AI log go through
   `t` (`tr` in `GameScene`, where `t` names the text helper in `create`); game logic compares ids
   and keys, never shown text.
@@ -518,7 +523,8 @@ File map (`src/`):
   ship shows the baked frame nearest its heading (`facing`), rotated by the few degrees left over,
   with an exhaust flame Image behind it while it moves. The fog (`drawFog`) is a canvas texture,
   one pixel a cell box-blurred and smoothed up 3x, stretched over the battlefield above the ships
-  and repainted every third frame. Mines are drawn on `underGfx` (`drawMines`), a hacked turret
+  and repainted every third frame; on a battlefield smaller than the largest, the cells past it copy
+  its rim before the blur, so its edge stays clear where the player sees. Mines are drawn on `underGfx` (`drawMines`), a hacked turret
   fills a cyan ring toward its takeover, and research buttons are drawn by `drawResearchButton`.
   Beams, fireballs, rings and health pills are Graphics redrawn each frame (`underGfx` under the sprites, `gfx` over them), as are the nebula edges (`drawNebulae`), the derelict stations with their claim arcs and labels (`drawDerelicts`), the veteran chevrons and repair crosses (in `drawShips`), the Fall back pill (`drawCommandButton`) and the rivals panel (`drawRivals`, on `pickGfx`). `toWorld(x, y)` and `toScreen(x, y)` convert between view pixels and
   battlefield pixels from the camera's scroll. Input: `onDown`, `onMove`, `onUp` (box or tap; each
