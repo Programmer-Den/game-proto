@@ -292,3 +292,20 @@ export const EARLY_BONUS = 5;
 export const GROW_RATE = 10;
 /** After wave 1, the next wave comes this many seconds after the last one is all out, unless the game is calm. */
 export const WAVE_TIMER = 20;
+
+/** The greenhouse: a sprinkler's spray slows the ground foes on the 8 tiles round it to `slow` of their speed. */
+export const SPRINKLER = { slow: 0.6 };
+
+/**
+ * The hero gardener, hired in the potting shed for `seeds`: he walks the lawn at `speed` cells a
+ * second (over hedges and towers alike), the towers within `reach` of him reload `boost` faster, and
+ * every `every` seconds he can lift a ground foe within `lift` of him back into its burrow.
+ */
+export const HERO = { seeds: 30, speed: 3, reach: 2, boost: 0.25, lift: 1.3, every: 12 };
+/** The gardener's skills, each bought once in the shed: a stronger boost, quicker feet, and a grip that lifts sooner and lifts big foes too. */
+export const SKILLS = ['thumb', 'boots', 'grip'] as const;
+export type Skill = (typeof SKILLS)[number];
+export const SKILL = { thumb: { seeds: 40, boost: 0.5 }, boots: { seeds: 30, speed: 5 }, grip: { seeds: 50, every: 7 } } as const;
+
+/** The daily maze: `waves` waves on Normal with `lives` cabbages and `rocks` more rocks; a win scores `perCabbage` a cabbage kept plus the gold left, a loss `perWave` a wave held. */
+export const DAILY = { waves: 12, lives: 15, rocks: 4, perCabbage: 100, perWave: 10 };

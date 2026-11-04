@@ -1,8 +1,9 @@
 import { MAPS } from './maps';
 import { REPLAY_VERSION, type Action, type Replay } from './sim';
-import { ALWAYS, DEFAULT_POUCH, FREE, MODES, POUCH_PICKS, SEEDS, SLOT_SEEDS, TOWERS, type Mode, type TowerKind } from './rules';
+import { ALWAYS, DEFAULT_POUCH, FREE, MODES, POUCH_PICKS, SEEDS, SKILLS, SLOT_SEEDS, TOWERS, type Mode, type Skill, type TowerKind } from './rules';
 
-// Mazewright keeps eight keys: each garden's records (best wave, win, stars, best time, Endless
+// Mazewright keeps nine keys (the ninth, the daily maze's `mazewright-daily`, is kept by
+// `shared/daily.ts`): each garden's records (best wave, win, stars, best time, Endless
 // best), the towers picked for the pouch, whether waves wait to be started (calm), whether two
 // gardeners play (duo), the way of play
 // picked (mode), the potting shed (seeds, the towers and master levels bought, extra slots),
@@ -118,13 +119,17 @@ export function saveMode(mode: Mode) {
   }
 }
 
-/** The potting shed: seeds to spend, the towers and master levels bought, and pouch slots bought (0 to 2). */
+/** The potting shed: seeds to spend, the towers and master levels bought, pouch slots bought (0 to 2), and the gardener hired and his skills. */
 export interface Shed {
   seeds: number;
   owned: TowerKind[];
   masters: TowerKind[];
   slots: number;
+  hero: boolean;
+  skills: Skill[];
 }
+
+const skillsIn = (v: unknown) => (Array.isArray(v) ? SKILLS.filter((k) => v.includes(k)) : []);
 
 const kindsIn = (v: unknown) => (Array.isArray(v) ? TOWERS.filter((k) => v.includes(k)) : []);
 
@@ -136,7 +141,7 @@ export function loadShed(records: Records): Shed {
   try {
     const saved = JSON.parse(localStorage.getItem(SHED_KEY) ?? 'null');
     if (saved && typeof saved === 'object') {
-      return { seeds: count(saved.seeds), owned: kindsIn(saved.owned), masters: kindsIn(saved.masters), slots: Math.min(SLOT_SEEDS.length, count(saved.slots)) };
+      return { seeds: count(saved.seeds), owned: kindsIn(saved.owned), masters: kindsIn(saved.masters), slots: Math.min(SLOT_SEEDS.length, count(saved.slots)), hero: saved.hero === true, skills: skillsIn(saved.skills) };
     }
   } catch {
     // A broken or blocked save starts with an empty shed.
@@ -146,7 +151,7 @@ export function loadShed(records: Records): Shed {
     if (r.won) seeds += SEEDS.win + SEEDS.star * r.stars;
     else if (r.wave > 0) seeds += SEEDS.loss + Math.floor(r.wave / SEEDS.waves);
   }
-  return { seeds, owned: [], masters: [], slots: 0 };
+  return { seeds, owned: [], masters: [], slots: 0, hero: false, skills: [] };
 }
 
 export function saveShed(shed: Shed) {
@@ -190,7 +195,7 @@ export function pouchOf(kinds: TowerKind[], shed: Shed): TowerKind[] {
 /** Each garden's latest win (Classic or Swarm), to watch again, by garden. */
 export type Replays = Record<string, Replay>;
 
-const ACTIONS: readonly Action['a'][] = ['build', 'upgrade', 'sell', 'turn', 'aim', 'wave'];
+const ACTIONS: readonly Action['a'][] = ['build', 'upgrade', 'sell', 'turn', 'aim', 'wave', 'walk', 'lift'];
 const whole = (v: unknown) => Number.isInteger(v) && (v as number) >= 0;
 /** Whether a logged action can be played: a known action at a step, on a cell, with a tower that exists. */
 const playable = (a: Action) =>
@@ -201,7 +206,8 @@ function valid(r: Replay, map: string) {
   return (
     r && r.v === REPLAY_VERSION && r.map === map && MODES.includes(r.mode) && Array.isArray(r.log) && r.log.every(playable) &&
     Number.isFinite(r.seed) && Number.isFinite(r.steps) && Number.isFinite(r.toughness) && whole(r.lives) && r.lives > 0 &&
-    (r.masters === null || (Array.isArray(r.masters) && r.masters.every((k) => TOWERS.includes(k))))
+    (r.masters === null || (Array.isArray(r.masters) && r.masters.every((k) => TOWERS.includes(k)))) &&
+    (r.hero == null || (Array.isArray(r.hero) && r.hero.every((k) => SKILLS.includes(k))))
   );
 }
 

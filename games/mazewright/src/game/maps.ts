@@ -3,10 +3,11 @@ import { COLS, ROWS, type TowerKind } from './rules';
 /** A cell as [column, row]. */
 export type Cell = [number, number];
 
-export type Season = 'spring' | 'summer' | 'autumn' | 'winter';
-export const SEASONS: Season[] = ['spring', 'summer', 'autumn', 'winter'];
+/** The four seasons and, after them, the greenhouse (a tab of its own on the picker). */
+export type Season = 'spring' | 'summer' | 'autumn' | 'winter' | 'greenhouse';
+export const SEASONS: Season[] = ['spring', 'summer', 'autumn', 'winter', 'greenhouse'];
 /** The stars won across all gardens that open each season's gardens. */
-export const SEASON_STARS: Record<Season, number> = { spring: 0, summer: 4, autumn: 10, winter: 18 };
+export const SEASON_STARS: Record<Season, number> = { spring: 0, summer: 4, autumn: 10, winter: 18, greenhouse: 24 };
 
 export interface MapDef {
   id: string;
@@ -23,6 +24,10 @@ export interface MapDef {
   banks?: Cell[];
   /** A path garden's gravel path: foes walk only on it, and towers go only on the lawn beside it. */
   path?: Cell[];
+  /** Glass panes: walls that walkers go round and no tower's shot or beam crosses (moths fly over). */
+  glass?: Cell[];
+  /** Sprinklers: fixtures nothing is built on, whose spray slows ground foes on the 8 tiles round them (`SPRINKLER`). */
+  sprinklers?: Cell[];
   /** Cabbages in the patch, for a garden that sets its own. */
   lives?: number;
   /** Starting gold, for a garden that sets its own (each gardener's). */
@@ -53,7 +58,7 @@ function block(x: number, y: number, w: number, h: number): Cell[] {
   return cells;
 }
 
-/** The twelve gardens, three a season, each with its own rocks, water and burrows. */
+/** The thirteen gardens: three a season, each with its own rocks, water and burrows, and the greenhouse. */
 export const MAPS: MapDef[] = [
   {
     id: 'meadow',
@@ -169,6 +174,17 @@ export const MAPS: MapDef[] = [
     rocks: [[8, 3], [13, 7], [19, 6]],
     path: [...line([0, 5], [5, 5], [5, 1], [16, 1], [16, 8], [21, 8], [21, 5]), [11, 0]],
     banks: [[6, 3], [14, 3], [17, 6], [10, 2]],
+  },
+  {
+    id: 'greenhouse',
+    challenge: ['hedge', 'frost', 'crossbow'],
+    season: 'greenhouse',
+    gates: [[0, 2], [0, 8]],
+    goal: [21, 5],
+    rocks: [],
+    // Three panes of glass split the house; sprinklers stand between them.
+    glass: [...line([7, 0], [7, 3]), ...line([7, 7], [7, 10]), ...line([14, 3], [14, 7])],
+    sprinklers: [[4, 5], [11, 2], [11, 8], [18, 5]],
   },
 ];
 

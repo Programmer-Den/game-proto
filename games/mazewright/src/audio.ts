@@ -121,6 +121,10 @@ export const SFX = sounds({
   wilt: { wave: 'triangle', freq: 440, to: 220, length: 0.3, volume: 0.12, gap: 300 },
   /** Winter: frost freezes a tower. */
   freeze: { wave: 'sine', freq: 2600, to: 1800, length: 0.25, volume: 0.1, gap: 300 },
+  /** The gardener sets off walking. */
+  step: { wave: 'noise', freq: 1200, to: 600, length: 0.06, volume: 0.08, gap: 120 },
+  /** The gardener lifts a foe back into its burrow. */
+  lift: { wave: 'triangle', freq: 330, to: 880, length: 0.22, volume: 0.18, gap: 200 },
   /** A mole starts chewing, and a hedge gone. */
   chew: { wave: 'noise', freq: 900, to: 300, length: 0.22, volume: 0.18, gap: 200 },
 });

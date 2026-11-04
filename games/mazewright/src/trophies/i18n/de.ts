@@ -20,7 +20,7 @@ const de: Translation<typeof en> = {
   lastCabbage: 'Der letzte Kohl',
   lastCabbageText: 'Gewinne Letzter Kohl mit seinem einen Kohlkopf.',
   allChallenges: 'Jeder Garten gezähmt',
-  allChallengesText: 'Gewinne die Herausforderung aller zwölf Gärten.',
+  allChallengesText: 'Gewinne die Herausforderung jedes Gartens.',
   endless: 'Die Hecke ohne Ende',
   endlessText: 'Halte im Endlos-Modus 30 Wellen.',
 };

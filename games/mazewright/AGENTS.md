@@ -14,7 +14,7 @@ or any foe on the ground, without a way to the cottage.
 
 Implemented today:
 
-- Twelve gardens (`MAPS`), three a season (`MapDef.season`, `SEASONS`): spring's Meadow, Orchard
+- Thirteen gardens (`MAPS`), three a season (`MapDef.season`, `SEASONS`) and the greenhouse (a season of its own, see below): spring's Meadow, Orchard
   and Millpond, summer's Brook, Warren and Gravel Walk, autumn's Hillside, Crossroads and Leaf Walk,
   winter's Ice Pond, Last Cabbage and Snow Path. Each has one to six burrows (`gates`, opening on
   the waves in `GATE_WAVES`: 1, 6, 10, 13, 15, 17), a cottage, rocks, and maybe `ponds` (water:
@@ -22,10 +22,46 @@ Implemented today:
   reaches `BANK_REACH` (1.25) times further, `reachOf`), a `path` (a path garden: foes keep to the
   gravel, towers go only on the lawn beside it, which never changes a route) and its own `lives`
   (Last Cabbage: 1) and starting `gold` (Last Cabbage: 130). The picker has a tab per season (`season-<season>` buttons); a season opens
-  at `SEASON_STARS` (0, 4, 10, 18) stars won across all gardens, and a shut one's cards are dimmed
+  at `SEASON_STARS` (0, 4, 10, 18, greenhouse 24) stars won across all gardens, and a shut one's cards are dimmed
   and refuse a tap. Each season has its own lawn colours (`art.SEASON_LAWN`), and winter's water is
-  ice. The greedy bot (`e2e/bot.ts`, see Missing or rough) wins all twelve on
+  ice. The greedy bot (`e2e/bot.ts`, see Missing or rough) wins all thirteen on
   Normal with the default pouch, weather included.
+- The greenhouse (`greenhouse`, season `greenhouse`, its tab's one card in the middle of
+  `CARDS.xs`): `MapDef.glass` panes are `blocked` 5 (`GLASS`): walkers go round, moths fly over,
+  nothing is built, `beamCells` stops at them, and `sees(g, cell, x, y)` (sampled every fifth of a
+  cell, only when `g.glassy`) keeps every tower's `fire` from picking a foe across one.
+  `MapDef.sprinklers` are `blocked` 6 (nothing built) and mark `g.wet` on the 8 tiles round them;
+  `moveFoe` walks a ground foe on a wet tile at `SPRINKLER.slow` (0.6), the stronger of that and
+  frost. `art.glass`, `art.spray` and `art.sprinkler` draw them on the lawn layer; the banner
+  `greenhouseStart` tells them at the start. No weather.
+- The daily maze (`game/daily.ts`, `shared/daily.ts` under `mazewright-daily`): the picker's `daily`
+  button, at the end of the season tabs, runs `startDailyMaze`: `dailyPlan(dailyRand('mazewright'))`
+  picks a garden (not Last Cabbage), adds `DAILY.rocks` (4) rocks on free lawn (two tiles clear of
+  the burrows and the cottage, every burrow still reaching it; a path garden's on its lawn) and
+  four seeded pouch picks besides hedge and bow (`kit`, lent), and a seed. `newGame` takes the made
+  `MapDef` through `Extra.map` and `daily: true` (`g.daily`): `totalWaves` is `DAILY.waves` (12),
+  `fixed` gives Normal (`DAILY.lives` 15, toughness 1), masters `[]`, no duo, no gardener.
+  `startDaily` uses up the try at the start; `won` or `lost` calls `endDaily`, which keeps
+  `dailyScore` (a win: `cabbagesLeft` times `DAILY.perCabbage` (100) plus `g.gold`; a loss: waves
+  held times `DAILY.perWave` (10)) with `finishDaily`. A daily game is never `keep`-saved, leaves
+  the saved game alone, notes no garden records or replay, and still pays seeds and trophies. Its
+  end panel shows `dailyScore`/`dailyLostScore` and `dailyBest` with Gardens only, and the button
+  shows `dailyDone` (today's score) or `dailyUsed` until the next day.
+- The hero gardener (`Hero`, `g.hero`): hired in the shed (`Shed.hero`, `HERO.seeds` 30) and given
+  to every new game with one gardener as `Extra.hero` (the shed's `skills`); a replay or saved game
+  carries them as `Fixed.hero` (`replayOf`), and one without it has no gardener, so old replays play
+  the same. He starts on the cottage and `walkOn` moves him straight to `tx, ty` at `HERO.speed` (3,
+  `SKILL.boots.speed` 5), over anything. `boosts` adds `heroBoost` (`HERO.boost` 0.25,
+  `SKILL.thumb.boost` 0.5) to every tower within `HERO.reach` (2) of him. `lift(g, id)` puts a
+  `liftable` ground foe (within `HERO.lift` (1.3) plus its body, never a king or the queen, big ones
+  only with `grip`) back at its burrow (`drop`s what it carried, event `lifted`), then `liftReady`
+  waits `HERO.every` (12, `SKILL.grip.every` 7) seconds. `walk` and `lift` are logged actions
+  (`walk` with the cell, `lift` with the foe's id). In the scene the `hero` tool mode (`tool-hero`
+  after Sell, key G, `heroText` in the top bar) makes a tap `heroTap`: a liftable foe under it is
+  lifted when ready, otherwise he walks to the tapped cell (`step` sound). `art.gardener` draws him,
+  with his reach and lift circles while his tool is picked and a ring while his hands rest; the
+  button's sub tells `liftReady` or `liftWait`. Skills (`SKILLS`: `thumb`, `boots`, `grip`, prices
+  in `SKILL`) are bought once each in the shed's bottom row (`buy-hero`, `buy-<skill>`).
 - Season weather (`WEATHER`, in `step`): in summer gardens `wilt` stops a tower that has fired
   nonstop (`busy`, no gap over `rest` since `lastShot`, set only when it really fires, not when a toadstool looks
   again for a foe to shrink) for `wiltAfter` (8) seconds for
@@ -47,7 +83,7 @@ Implemented today:
   often as one gardener does.
 - Replays: a game draws its random numbers from its own seed (`rand`, mulberry32 on `g.rng`; frost
   and nothing else uses chance today) and fixes `toughness` and `lives` at the start, and
-  `note` logs every player action (`Action`: build, upgrade, sell, turn, aim, wave) at the step it
+  `note` logs every player action (`Action`: build, upgrade, sell, turn, aim, wave, walk, lift) at the step it
   came (`g.steps`). The wave timer starts waves through `beginWave`, which isn't logged. A Classic
   or Swarm win is kept with `replayOf` as the garden's `Replay` (`saveReplay`); the card's
   `watch-<garden>` button starts `replayGame(r)`, and `GameScene.update` calls `replayStep` before
@@ -103,14 +139,15 @@ Implemented today:
   the burrow. The game is lost when `cabbagesLeft` is 0; building on a loose cabbage is refused
   like a foe.
 - The potting shed (`Shed` in `save.ts`, the `shed` screen; each card tells what the buy brings:
-  `◆ cost · ${kind}Text` while the tower is still to buy or a trap, `${kind}Master` after, and
-  `slotInfo` under the slots): `seedsFor` pays a finished game
+  `◆ cost · ${kind}Text` while the tower is still to buy or a trap, `${kind}Master` after, the
+  slots' buttons carry `slotInfo`, and a bottom row hires the gardener and sells his skills): `seedsFor` pays a finished game
   (`SEEDS`), and `buy` spends them on towers (`towerSeeds`; `FREE` needs none), master levels
   (`masterSeeds`; `newGame`'s `masters` list, which `nextUpgrade` and `masterOpen` check; null in
   the sim means all, as the bot and tests use) and pouch slots (`SLOT_SEEDS`, `picksOf`). `pouchOf`
   keeps only `usable` towers. `loadShed` credits past records once, when the key is missing. The
   tool bar narrows its buttons when the pouch holds more than six.
-- Ways of play (`MODES`, `Game.mode`, picked by the `mode` button on the picker): `classic`,
+- Ways of play (`MODES`, `Game.mode`, picked by the `mode` button on the picker; the daily maze is
+  a Classic game with `g.daily`): `classic`,
   `challenge` (Classic with the garden's own pouch, `MapDef.challenge`, lent whether bought or not:
   the scene's `kit`, the run's tool bar, is it instead of `pouch`; the picker hides the pouch chips
   and shows `challengeInfo`, and each card `challengePouch`; a win notes `GardenRecord.challenge`,
@@ -194,8 +231,10 @@ Missing or rough:
 - No Watch AI mode, no upright layout (an upright phone gets the turn hint).
 - Balance is checked with `e2e/bot.ts`, a greedy bot run in Node (how to build and run it is at
   its top): hedges where they lengthen the routes most, towers where they cover most route, an
-  upgrade when it adds more per gold, Classic and Calm, no master levels. On Normal (15 cabbages,
-  `HP_PER_WAVE` 0.2) with the default pouch it wins all twelve gardens, building during waves or
+  upgrade when it adds more per gold, Classic and Calm, no master levels and no gardener (it knows
+  nothing of glass: the greenhouse is won all the same, with all 15 cabbages, with the default
+  pouch and with its challenge pouch). On Normal (15 cabbages,
+  `HP_PER_WAVE` 0.2) with the default pouch it wins all thirteen gardens, building during waves or
   only between them; most keep all 15 cabbages, Crossroads and Leaf Walk 7 to 10. Last Cabbage
   starts with `gold` 130 (`MapDef.gold`), since at 90 the bot lost it on wave 2 or 3 every time; at
   130 it wins it. With only hedges and bows it also wins every garden, so the bow is strong for
@@ -205,7 +244,7 @@ Missing or rough:
   crossbow, cannon, bow, whirligig and puffball do most, the storm rod, bonfire and beehive less
   but need bunched foes, a straight corridor or neighbours to shine, and the sunglass needs a
   corridor in line with it. A tower's balance is a first pass.
-- `docs/screenshots/gardens.webp` (the picker on its autumn tab, with the pouch), `path.webp` (Gravel Walk), `ponds.webp` (Ice Pond, towers on its banks), `wilt.webp` (Brook, a wilted cannon), `frost.webp` (Ice Pond, a frozen frost tower), `towers.webp`, `aim.webp`, `kings.webp`, `cabbages.webp`, `grow.webp`, `master.webp`, `traps.webp`, `shed.webp` (the shed's cards with their info lines), `modes.webp` (upgrade mode and its gold marks), `hedge-swap.webp` (a bow hovered over a hedge), `no-tool.webp` (the tool put away), `gold-notes.webp` (the notes over a planting, an upgrade and a sale), `refund.webp` (a growing bow's panel, selling for all it cost), `maze.webp`,
+- `docs/screenshots/gardens.webp` (the picker on its greenhouse tab, with the pouch and the daily button), `greenhouse.webp` (the greenhouse in wave 1, towers on both sides of the glass), `gardener.webp` (the Meadow with the gardener's tool picked) and `daily.webp` (a daily maze's first moment, its banner and lent pouch) were taken by a Playwright script with stored records and shed, `path.webp` (Gravel Walk), `ponds.webp` (Ice Pond, towers on its banks), `wilt.webp` (Brook, a wilted cannon), `frost.webp` (Ice Pond, a frozen frost tower), `towers.webp`, `aim.webp`, `kings.webp`, `cabbages.webp`, `grow.webp`, `master.webp`, `traps.webp`, `shed.webp` (the shed's cards with their info lines, and the gardener's row), `modes.webp` (upgrade mode and its gold marks), `hedge-swap.webp` (a bow hovered over a hedge), `no-tool.webp` (the tool put away), `gold-notes.webp` (the notes over a planting, an upgrade and a sale), `refund.webp` (a growing bow's panel, selling for all it cost), `maze.webp`,
   `mole.webp` and `cover.png` were taken by hand (a
   Playwright script that plants a maze and sends waves 8 and 9); `duo-replay.webp` (a
   two-gardener replay of the Meadow, both purses in the top bar) was made from a replay put in
@@ -228,7 +267,7 @@ File map (`src/`):
   (`${map}Name`, `${map}Text`, `${tower}Name`, `${tower}Text`, `refuse_${reason}`, `new_${foe}`)
   must exist for every id.
 - `audio.ts`: `SONG` and the `SFX` table (see Sound).
-- `game/rules.ts`: `COLS`, `ROWS`, `TOWERS`/`TOWER` (cost, range, damage and reload by level, air,
+- `game/rules.ts`: `SPRINKLER`, `HERO`, `SKILLS`/`SKILL`, `DAILY`, `COLS`, `ROWS`, `TOWERS`/`TOWER` (cost, range, damage and reload by level, air,
   splash, slow, stun, shrink, airOnly), `MAX_LEVEL`, `MASTER`, `tier`, `MASTER_TRICKS`, `harms`, `SELL_BACK`, `upgradeCost`, `SHOT_SPEED`, `FOES`/`FOE` (hp, speed,
   gold, lives, gap, flies, digs, size), `CHEW_TIME`, `CHEW_GAIN`, `WAVES`, `GATE_WAVES`, `SECOND_GATE`, `BANK_REACH`,
   `GROUP_GAP`, `HP_PER_WAVE`, `FINAL_QUEEN`, `startLives`, `START_GOLD`, `hpScale`, `waveReward`,
@@ -237,17 +276,18 @@ File map (`src/`):
   `faces`/`cone`, `boost`, `apples`, `spinTo`/`spinUp`, `aim`), `DAMAGE_KINDS`, `SHELLS`,
   `shellFactor`, `HEAT`, `AIMS`, `aims`. No Phaser.
 - `game/maps.ts`: `MAPS` (`MapDef`: `id`, `season`, `gates`, `goal`, `rocks`, `challenge`, and optional `ponds`,
-  `banks`, `path`, `lives`; `line` and `block` spell paths and ponds), `SEASONS`, `SEASON_STARS`,
+  `banks`, `path`, `glass`, `sprinklers`, `lives`; `line` and `block` spell paths and ponds), `SEASONS`, `SEASON_STARS`,
   `cellIndex`, `cellOf`, `inGrid`. A cell index is `row * COLS + col`.
+- `game/daily.ts`: `dailyPlan`, the daily maze's garden, pouch and seed from a random source.
 - `game/grid.ts`: `distances` (breadth-first search out from the cottage over free cells, 4
   neighbours), `nextStep` (a neighbour one step closer, keeping the heading on ties, then right,
   down, up, left), `route`, `UNREACHABLE`, `DIRS`.
 - `game/sim.ts`: `Game`, `Tower`, `Foe`, `Shot`, `GameEvent`, `Refusal` and the actions:
   `newGame`, `replayGame`, `replayStep`, `replayOf`, `resumeGame` (with `Action`, `Fixed` and `Replay`), `sideOf`, `goldAt`, `canBuild`, `hedgeUnder`, `costOn`, `wouldBlock`, `build`, `nextUpgrade`, `upgrade`, `sellValue`, `sell`, `turn`, `setAim`,
-  `canStartWave`, `startWave`, `step`, `remaining`, `routeLength`, `towerAt`, and `beamCells`,
+  `canStartWave`, `startWave`, `step`, `remaining`, `routeLength`, `towerAt`, `totalWaves`, `dailyScore`, `sees`, the gardener's `walk`, `lift`, `liftable`, `liftReady` and `heroBoost`, and `beamCells`,
   `inCone` and `bestFace` for the towers that point one way, `reachOf` and `openGates`. Only this file
   changes a `Game`. `g.blocked` is 0 free (a path garden's path), 1 rock, 2 tower, 3 water, 4
-  (`LAWN`) a path garden's lawn; `g.ground` is the same without towers (selling puts it back), and
+  (`LAWN`) a path garden's lawn, 5 (`GLASS`) a glass pane, 6 a sprinkler; `g.ground` is the same without towers (selling puts it back), and
   `g.banks` marks banks. `g.dist` (and `homeDist`, one per burrow) is made again whenever a cell
   is blocked or freed. A ground foe walks from `from` to `to` (neighbouring cells) with `t` from 0
   to 1, and picks its next cell from `g.dist` on arrival, so a maze changed mid-wave takes effect at
@@ -262,13 +302,14 @@ File map (`src/`):
 - `game/save.ts`: `loadRecords`, `noteRecord`, `loadPouch`, `savePouch`, `pouchOf` (hedge and bow,
   then up to four more in tower order, traps included), `loadShed`/`saveShed`, `usable`, `picksOf`,
   `loadMode`/`saveMode`, `loadReplays` (only valid replays of this `REPLAY_VERSION`), `saveReplay`,
-  `loadCalm`/`saveCalm`, `loadDuo`/`saveDuo` and `loadGame`/`saveGame` (`SavedGame`).
+  `loadCalm`/`saveCalm`, `loadDuo`/`saveDuo` and `loadGame`/`saveGame` (`SavedGame`). `Shed` also
+  holds `hero` and `skills`.
 - `scenes/layout.ts`: `VIEW`, `CELL` (40), `GRID` (the grid's corner in the 960x540 frame), the bar
   height, the tool, wave, speed and Gardens buttons, `TIP_X` (the tool's use in the top bar), the
   tower panel (taller with Turn), the garden cards, the pouch's `CHIPS` (two rows, above the corner buttons)
   and `DEPTH`.
 - `scenes/art.ts`: `C` (colours), `FOE_COLOUR` and the drawing functions (`lawn`, `flowers`,
-  `hedge`, `chewedHedge`, `rock`, `pond`, `bank`, `gravel`, `tower`, `burrow`, `cottage`, `foe`, `healthBar`, `dotted`,
+  `hedge`, `chewedHedge`, `rock`, `pond`, `bank`, `gravel`, `glass`, `spray`, `sprinkler`, `gardener`, `tower`, `burrow`, `cottage`, `foe`, `healthBar`, `dotted`,
   `dashedCircle`, `noEntry`), all on a Phaser Graphics at a cell's middle.
 - `scenes/GameScene.ts`: the only scene. Screens `menu` (the garden picker) and `play`. It steps the
   game in fixed `STEP`s (1/60 s, times `speed`), drains `g.events` for sound, flashes and records,
@@ -284,13 +325,14 @@ stars, fastest win in seconds, the Endless best and whether its Challenge was wo
 `mazewright-shed` (seeds, `owned` towers, `masters` bought and extra `slots`) and
 `mazewright-replays` (per garden, the latest Classic or Swarm win as a `Replay`) and
 `mazewright-game-replays` (the game in play at its last break, a `SavedGame`) and
-`mazewright-trophies` (the trophies earned, kept by `shared/trophies.ts`); progress files carry
+`mazewright-trophies` (the trophies earned, kept by `shared/trophies.ts`) and `mazewright-daily`
+(the daily maze's day, try, score, best and streak, kept by `shared/daily.ts`); progress files carry
 both `-replays` keys, and progress codes leave them out as too big for a QR code (`shared/saveFile.ts` `fileOnly`
 skips keys ending in `-replays`).
 
 Test hooks (read by `e2e/playthrough.spec.ts` through `window.game.scene.getScene('Game')`):
 `screen`, `state` (the `Game`), `replay` (the `Replay` watched, or null), `pouch`, `buttons` (every button by id, centred, in view pixels:
-`map-<garden>` (the cards of the season shown, `season-<season>`), `watch-<garden>`, `resume-<garden>`, `duo`, `pouch-<tower>`, `tool-<tower>`, `tool2-<tower>` (two gardeners), `tool-upgrade`, `tool-sell`, `tool2-upgrade`, `tool2-sell`, `wave`, `speed`, `gardens`, `upgrade`, `sell`,
+`map-<garden>` (the cards of the season shown, `season-<season>`), `daily`, `watch-<garden>`, `resume-<garden>`, `duo`, `pouch-<tower>`, `tool-<tower>`, `tool2-<tower>` (two gardeners), `tool-upgrade`, `tool-sell`, `tool2-upgrade`, `tool2-sell`, `tool-hero`, `wave`, `speed`, `gardens`, `upgrade`, `sell`,
 `turn`, `aim`, `again`) and `grid` (the grid's corner and cell size in view pixels).
 
 Difficulty: `startLives` (25, 15, 10) and `hpScale` (0.8, 1, 1.25) use `byDifficulty`. Reduced
@@ -316,6 +358,7 @@ motion holds the frost pulse and cannon boom rings at full size and the gold num
 | `horn`, `cleared` | a wave starts, a wave is held |
 | `chew` | a mole starts chewing, and the hedge is gone |
 | `wilt`, `freeze` | summer wilts a tower, winter frost freezes one (`wilt`, `frozen`) |
+| `step`, `lift` | the gardener sets off walking, and lifts a foe back to its burrow (`lifted`) |
 | shared `refuse` | a refused placement, a disabled button, Start wave while a wave is still coming out |
 | shared `click` | every button |
 
@@ -327,7 +370,7 @@ motion holds the frost pulse and cannon boom rings at full size and the gold num
   `CHIPS.perRow`.
 - **A foe**: add it to `FOES` and `FOE`, its look in `art.foe` (beetle-shaped foes in `beetle`), its colour in `FOE_COLOUR`, its
   `new_${kind}` text, and put it in `WAVES`.
-- **A garden**: add a `MapDef` to `MAPS` with its season (three a season fill `CARDS.xs`; keep the
+- **A garden**: add a `MapDef` to `MAPS` with its season (three a season fill `CARDS.xs`, a season with one garden puts it in the middle; keep the
   burrows and the cottage free of rocks and water, the burrows able to reach the cottage, and a path
   garden's banks on its lawn), and its `${id}Name`/`${id}Text` texts (two lines on the card).
 - **The playthrough** plays the first wave on the Meadow with the default pouch: hedges in column 4 rows 0 to 9 (a drag),
