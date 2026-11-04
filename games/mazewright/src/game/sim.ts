@@ -2,7 +2,7 @@ import { DIRS, distances, nextStep, route, UNREACHABLE } from './grid';
 import { cellIndex, cellOf, inGrid, MAPS, type MapDef } from './maps';
 import {
   AIMS, attacks, BIG, CABBAGE, RUSH, CHEW_GAIN, EMPRESS, HEAT, KING, KING_TRICKS, RUSH_KINDS, shellFactor, CHEW_TIME, COLS, EARLY_BONUS, FINAL_QUEEN, FOE, GROUP_GAP, HP_PER_WAVE, hpScale, MAX_LEVEL, ROWS,
-  GROW_RATE, SEEDS, SANDBOX_GOLD, STARS, SWARM_GOLD, waveGroups, type Mode, TRAP, type TrapKind, MASTER, MASTER_TRICKS, tier, GATE_WAVES, BANK_REACH, WEATHER, DUO_TOUGHNESS, SELL_BACK, WAVE_TIMER, SHOT_SPEED, SPREAD, START_GOLD, startLives, TOWER, upgradeCost, WAVES, waveReward,
+  DAILY, HERO, SKILL, SPRINKLER, type Skill, GROW_RATE, SEEDS, SANDBOX_GOLD, STARS, SWARM_GOLD, waveGroups, type Mode, TRAP, type TrapKind, MASTER, MASTER_TRICKS, tier, GATE_WAVES, BANK_REACH, WEATHER, DUO_TOUGHNESS, SELL_BACK, WAVE_TIMER, SHOT_SPEED, SPREAD, START_GOLD, startLives, TOWER, upgradeCost, WAVES, waveReward,
   type Aim, type DamageKind, type FoeKind, type ShellKind, type ShotKind, type TowerKind,
 } from './rules';
 
@@ -175,6 +175,7 @@ export type GameEvent =
   | { type: 'shell'; shell: ShellKind }
   | { type: 'wilt'; cell: number }
   | { type: 'frozen'; cell: number }
+  | { type: 'lifted'; x: number; y: number; x2: number; y2: number }
   | { type: 'wave'; wave: number; early: boolean }
   | { type: 'cleared'; wave: number; gold: number }
   | { type: 'won' }
@@ -197,8 +198,22 @@ export interface Spawn {
   rush?: boolean;
 }
 
+/** The hero gardener, walking the lawn: where he is, where he walks to, his skills and when he can next lift a foe. */
+export interface Hero {
+  x: number;
+  y: number;
+  tx: number;
+  ty: number;
+  skills: Skill[];
+  liftAt: number;
+}
+
 export interface Game {
   map: MapDef;
+  /** The daily maze: a seeded garden of its own, `DAILY.waves` waves, scored by `dailyScore`. */
+  daily: boolean;
+  /** The hero gardener, when one was hired in the potting shed (one gardener only). */
+  hero: Hero | null;
   phase: Phase;
   /** The wave in play or last played, from 1; 0 before the first. */
   wave: number;
@@ -218,10 +233,15 @@ export interface Game {
   traps: Trap[];
   /**
    * Per cell: 0 free (in a path garden, the path), 1 a rock, 2 a tower, 3 water, 4 a path garden's
-   * lawn (walkers keep off it, towers go on it). `ground` is the same without the towers.
+   * lawn (walkers keep off it, towers go on it), 5 a greenhouse's glass pane, 6 a sprinkler.
+   * `ground` is the same without the towers.
    */
   blocked: Uint8Array;
   ground: Uint8Array;
+  /** Per cell: 1 in a sprinkler's spray, which slows ground foes. */
+  wet: Uint8Array;
+  /** The garden has glass, so towers look for a clear line to a foe (`sees`). */
+  glassy: boolean;
   /** Per cell: 1 on a raised bank. */
   banks: Uint8Array;
   towers: Tower[];
@@ -260,15 +280,18 @@ export interface Game {
   nextId: number;
 }
 
-/** `blocked` values: water, and a path garden's lawn. */
+/** `blocked` values: water, a path garden's lawn, a glass pane and a sprinkler. */
 const WATER = 3;
 export const LAWN = 4;
+export const GLASS = 5;
+const SPRAY = 6;
 
 /** A player's action, at the step it was taken: what a replay plays back. */
 export interface Action {
   /** Steps of play before it (`Game.steps`). */
   s: number;
-  a: 'build' | 'upgrade' | 'sell' | 'turn' | 'aim' | 'wave';
+  /** `walk` sends the gardener to cell `c`; `lift` has him lift the foe whose id is `c`. */
+  a: 'build' | 'upgrade' | 'sell' | 'turn' | 'aim' | 'wave' | 'walk' | 'lift';
   c?: number;
   k?: TowerKind;
 }
@@ -278,6 +301,8 @@ export interface Fixed {
   seed: number;
   toughness: number;
   lives: number;
+  /** The hero gardener's skills, or null (or missing, in an older replay) for no gardener. */
+  hero?: Skill[] | null;
 }
 
 /**
@@ -313,8 +338,16 @@ function rand(g: Game) {
 
 const note = (g: Game, a: Action['a'], c?: number, k?: TowerKind) => g.log.push(k ? { s: g.steps, a, c, k } : c === undefined ? { s: g.steps, a } : { s: g.steps, a, c });
 
-export function newGame(mapId: string, calm = false, mode: Mode = 'classic', masters: readonly TowerKind[] | null = null, fixed?: Fixed, duo = false): Game {
-  const map = MAPS.find((m) => m.id === mapId) ?? MAPS[0];
+/** What else a new game may bring: a garden made for it (the daily's), whether it is the daily, and its gardener. */
+export interface Extra {
+  map?: MapDef;
+  daily?: boolean;
+  /** A new game's gardener: his skills, or null for none (a replay brings its own in `fixed`). */
+  hero?: Skill[] | null;
+}
+
+export function newGame(mapId: string, calm = false, mode: Mode = 'classic', masters: readonly TowerKind[] | null = null, fixed?: Fixed, duo = false, extra: Extra = {}): Game {
+  const map = extra.map ?? MAPS.find((m) => m.id === mapId) ?? MAPS[0];
   const blocked = new Uint8Array(COLS * ROWS);
   const goal = cellIndex(map.goal);
   const gates = map.gates.map(cellIndex);
@@ -324,12 +357,23 @@ export function newGame(mapId: string, calm = false, mode: Mode = 'classic', mas
   }
   for (const rock of map.rocks) blocked[cellIndex(rock)] = 1;
   for (const pond of map.ponds ?? []) blocked[cellIndex(pond)] = WATER;
+  for (const pane of map.glass ?? []) blocked[cellIndex(pane)] = GLASS;
+  const wet = new Uint8Array(COLS * ROWS);
+  for (const [sx, sy] of map.sprinklers ?? []) {
+    blocked[cellIndex([sx, sy])] = SPRAY;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (inGrid(sx + dx, sy + dy)) wet[(sy + dy) * COLS + sx + dx] = 1;
+  }
   const banks = new Uint8Array(COLS * ROWS);
   for (const bank of map.banks ?? []) banks[cellIndex(bank)] = 1;
   const lives = fixed?.lives ?? map.lives ?? startLives();
   const seed = fixed?.seed ?? Math.floor(Math.random() * 4294967296);
+  const home = centre(goal);
+  const skills = fixed?.hero ?? extra.hero;
+  const hero = skills && !duo ? { x: home.x, y: home.y, tx: home.x, ty: home.y, skills: [...skills], liftAt: 0 } : null;
   return {
     map,
+    daily: !!extra.daily,
+    hero,
     phase: 'build',
     wave: 0,
     paid: 0,
@@ -342,6 +386,8 @@ export function newGame(mapId: string, calm = false, mode: Mode = 'classic', mas
     traps: [],
     blocked,
     ground: blocked.slice(),
+    wet,
+    glassy: !!map.glass?.length,
     banks,
     towers: [],
     dist: distances(blocked, goal),
@@ -497,12 +543,12 @@ function routeCells(g: Game) {
   return new Set(g.gates.flatMap((gate) => route(g.dist, gate)));
 }
 
-/** The cells a sunglass on `cell` facing `face` shines over: up to the first rock or tower (it crosses water). */
+/** The cells a sunglass on `cell` facing `face` shines over: up to the first rock, tower or glass pane (it crosses water). */
 export function beamCells(g: Game, cell: number, face: number) {
   const cells: number[] = [];
   let [x, y] = cellOf(cell);
   const [dx, dy] = DIRS[face];
-  const stops = (v: number) => v === 1 || v === 2;
+  const stops = (v: number) => v === 1 || v === 2 || v === GLASS;
   for (x += dx, y += dy; inGrid(x, y) && !stops(g.blocked[y * COLS + x]); x += dx, y += dy) cells.push(y * COLS + x);
   return cells;
 }
@@ -618,8 +664,11 @@ function removeTower(g: Game, tower: Tower) {
 /** Whether the next wave can be started: between waves, or once the wave in play is all out. */
 export const canStartWave = (g: Game) => !over(g) && g.wave < totalWaves(g) && g.spawns.length === 0;
 
-/** How many waves the game has: 20, or no end in Endless and Sandbox. */
-export const totalWaves = (g: Game) => (g.mode === 'endless' || g.mode === 'sandbox' ? Infinity : WAVES.length);
+/** How many waves the game has: 20, fewer in the daily maze, or no end in Endless and Sandbox. */
+export const totalWaves = (g: Game) => (g.daily ? DAILY.waves : g.mode === 'endless' || g.mode === 'sandbox' ? Infinity : WAVES.length);
+
+/** The daily maze's score: a cabbage kept is worth `DAILY.perCabbage` and every gold left counts, or a loss scores the waves held. */
+export const dailyScore = (g: Game) => (g.phase === 'won' ? cabbagesLeft(g) * DAILY.perCabbage + g.gold : Math.max(0, g.wave - 1) * DAILY.perWave);
 
 /** Gold paid for beating foes and holding waves: more in Swarm. */
 const pay = (g: Game, gold: number) => (g.mode === 'swarm' ? Math.round(gold * SWARM_GOLD) : gold);
@@ -807,7 +856,10 @@ function hurt(g: Game, f: Foe, damage: number, kind: DamageKind, pierce = false)
 
 function moveFoe(g: Game, f: Foe, dt: number) {
   const def = FOE[f.kind];
-  const speed = def.speed * (f.king ? KING.speed : 1) * (g.clock < f.slowUntil ? f.slowFactor : 1);
+  // A sprinkler's spray slows a ground foe like frost does; the stronger of the two counts.
+  const chill = g.clock < f.slowUntil ? f.slowFactor : 1;
+  const wet = !def.flies && g.wet[Math.floor(f.y) * COLS + Math.floor(f.x)] ? SPRINKLER.slow : 1;
+  const speed = def.speed * (f.king ? KING.speed : 1) * Math.min(chill, wet);
   if (def.flies) {
     const goal = centre(f.home ? g.gates[f.gate] : g.goal);
     const dx = goal.x - f.x;
@@ -1029,6 +1081,15 @@ function boosts(g: Game) {
       if (t !== hive && Math.abs(x - hx) <= 1 && Math.abs(y - hy) <= 1) out.set(t.id, Math.max(out.get(t.id) ?? 0, boost));
     }
   }
+  // The gardener tends the towers round him: on top of a beehive's.
+  const hero = g.hero;
+  if (hero) {
+    const boost = heroBoost(hero);
+    for (const t of g.towers) {
+      const m = centre(t.cell);
+      if (Math.hypot(m.x - hero.x, m.y - hero.y) <= HERO.reach) out.set(t.id, (out.get(t.id) ?? 0) + boost);
+    }
+  }
   return out;
 }
 
@@ -1065,7 +1126,7 @@ function fire(g: Game, tower: Tower, dt: number, boost: number) {
   const { x, y } = centre(tower.cell);
   const lvl = tier(tower.level);
   const range = reachOf(g, tower.cell, tower.kind);
-  const reaches = (f: Foe) => !f.dead && (def.air || !FOE[f.kind].flies) && (!def.airOnly || !!FOE[f.kind].flies);
+  const reaches = (f: Foe) => !f.dead && (def.air || !FOE[f.kind].flies) && (!def.airOnly || !!FOE[f.kind].flies) && sees(g, tower.cell, f.x, f.y);
   if (tower.kind === 'sunglass') {
     const cells = beamCells(g, tower.cell, tower.face);
     const lit = new Set(cells);
@@ -1272,6 +1333,7 @@ export function step(g: Game, dt: number) {
     const s = g.spawns.shift()!;
     spawn(g, s);
   }
+  if (g.hero) walkOn(g.hero, dt);
   for (const f of g.foes) if (!f.dead) moveFoe(g, f, dt);
   for (const f of g.foes) if (!f.dead) afflict(g, f, dt);
   springTraps(g);
@@ -1330,6 +1392,8 @@ export function replayStep(g: Game, r: Replay, from: number) {
     else if (a === 'sell') sell(g, c);
     else if (a === 'turn') turn(g, c);
     else if (a === 'aim') setAim(g, c);
+    else if (a === 'walk') walk(g, c);
+    else if (a === 'lift') lift(g, c);
     else startWave(g);
   }
   return i;
@@ -1357,5 +1421,73 @@ export function resumeGame(r: Replay, dt: number, events: (e: GameEvent[]) => vo
 /** What to keep of a finished game to watch it again. */
 export const replayOf = (g: Game): Replay => ({
   v: REPLAY_VERSION, map: g.map.id, calm: g.calm, duo: g.duo, mode: g.mode, masters: g.masters ? [...g.masters] : null, seed: g.seed, toughness: g.toughness, lives: g.maxLives,
+  hero: g.hero ? [...g.hero.skills] : null,
   log: g.log, steps: g.steps, stars: stars(g), time: Math.round(g.clock),
 });
+
+/**
+ * Whether a tower on `cell` has a clear line to a point: in a greenhouse no shot or beam crosses a
+ * glass pane. The line is sampled every fifth of a cell, which is enough for 40-pixel panes.
+ */
+export function sees(g: Game, cell: number, px: number, py: number) {
+  if (!g.glassy) return true;
+  const { x, y } = centre(cell);
+  const n = Math.ceil(Math.hypot(px - x, py - y) * 5);
+  for (let i = 1; i < n; i++) {
+    const cx = Math.floor(x + ((px - x) * i) / n);
+    const cy = Math.floor(y + ((py - y) * i) / n);
+    if (inGrid(cx, cy) && g.blocked[cy * COLS + cx] === GLASS) return false;
+  }
+  return true;
+}
+
+/** How much faster the gardener makes the towers round him reload. */
+export const heroBoost = (hero: Hero) => (hero.skills.includes('thumb') ? SKILL.thumb.boost : HERO.boost);
+/** The seconds between the gardener's lifts. */
+const liftEvery = (hero: Hero) => (hero.skills.includes('grip') ? SKILL.grip.every : HERO.every);
+
+function walkOn(hero: Hero, dt: number) {
+  const dx = hero.tx - hero.x;
+  const dy = hero.ty - hero.y;
+  const d = Math.hypot(dx, dy);
+  const move = (hero.skills.includes('boots') ? SKILL.boots.speed : HERO.speed) * dt;
+  if (d <= move) (hero.x = hero.tx), (hero.y = hero.ty);
+  else (hero.x += (dx / d) * move), (hero.y += (dy / d) * move);
+}
+
+/** Sends the gardener walking to the middle of `cell`, straight over whatever stands there. */
+export function walk(g: Game, cell: number) {
+  if (!g.hero || over(g) || cell < 0 || cell >= COLS * ROWS) return false;
+  const to = centre(cell);
+  g.hero.tx = to.x;
+  g.hero.ty = to.y;
+  note(g, 'walk', cell);
+  return true;
+}
+
+/** Whether the gardener can lift now: his hands rest a while after each lift. */
+export const liftReady = (g: Game) => !!g.hero && g.clock >= g.hero.liftAt;
+
+/** Whether the gardener could lift `f`: a ground foe close to him, not a king or queen, and a big one only with a strong grip. */
+export function liftable(g: Game, f: Foe) {
+  const hero = g.hero;
+  if (!hero || f.dead || FOE[f.kind].flies || f.king || f.kind === 'queen') return false;
+  if (f.big > 1 && !hero.skills.includes('grip')) return false;
+  return Math.hypot(f.x - hero.x, f.y - hero.y) <= HERO.lift + f.body;
+}
+
+/** The gardener lifts the foe `id` and puts it back into its burrow, to walk the maze again; what it carried drops where it was. */
+export function lift(g: Game, id: number) {
+  const f = g.foes.find((o) => o.id === id);
+  if (!f || !g.hero || over(g) || !liftReady(g) || !liftable(g, f)) return false;
+  const x = f.x;
+  const y = f.y;
+  if (f.carry > 0) drop(g, f);
+  const gate = g.gates[f.gate];
+  const at = centre(gate);
+  Object.assign(f, { x: at.x, y: at.y, from: gate, to: gate, t: 1, home: false, chew: null, lure: 0 });
+  g.hero.liftAt = g.clock + liftEvery(g.hero);
+  g.events.push({ type: 'lifted', x, y, x2: at.x, y2: at.y });
+  note(g, 'lift', id);
+  return true;
+}

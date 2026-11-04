@@ -16,6 +16,8 @@ const en: HowToPlay = {
     { input: '▶ Wave on a garden card', action: 'Go on with the game you left there, from its last break between waves' },
     { input: 'One gardener / Two gardeners (garden picker)', action: 'Play together on one screen: each gardener plants on their half of the lawn with their own gold and tools' },
     { input: 'Watch on a garden card', action: 'Watch your latest win in that garden again, at up to four times the speed' },
+    { input: 'Daily maze (garden picker)', action: 'Today\'s seeded garden, pouch and 12 waves on Normal, the same for everyone: one try a day, scored by cabbages kept and gold left' },
+    { input: 'Gardener button, G', action: 'Once hired in the potting shed: tap the lawn to walk him there, or a foe beside him to lift it back to its burrow' },
   ],
   loop: [
     'Under the garden cards, pick up to four towers or traps to take along with the hedge and the bow.',
@@ -43,6 +45,9 @@ const en: HowToPlay = {
     'A crowned king is six foes in one: put your strongest towers on the route it walks.',
     'The Empress on wave 20 lays beetles and turns her shell against the damage that hurt her most, so mix your damage kinds.',
     'A bonfire or sunglass likes a long straight corridor; a storm rod likes foes bunched in tight bends.',
+    'In the greenhouse no shot or beam crosses a glass pane, so keep towers on the same side of the glass as the route; its sprinklers slow foes walking past them.',
+    'The gardener makes the towers round him shoot a quarter faster (half with Green thumb), and his hands rest 12 seconds between lifts. He lifts no king or queen, and big foes only with Strong grip.',
+    'The daily maze scores 100 a cabbage kept plus the gold left, so a win that spent little scores most.',
   ],
 };
 
@@ -61,6 +66,8 @@ const de: HowToPlay = {
     { input: '▶ Welle auf einer Gartenkarte', action: 'Das dort verlassene Spiel fortsetzen, ab seiner letzten Pause zwischen zwei Wellen' },
     { input: 'Allein / Zu zweit gärtnern (Gartenauswahl)', action: 'Zu zweit an einem Bildschirm spielen: Jede Person pflanzt auf ihrer Rasenhälfte, mit eigenem Gold und eigenen Werkzeugen' },
     { input: 'Ansehen auf einer Gartenkarte', action: 'Deinen letzten Sieg in diesem Garten noch einmal ansehen, mit bis zu vierfachem Tempo' },
+    { input: 'Tageslabyrinth (Gartenauswahl)', action: 'Der Garten, Beutel und 12 Wellen des Tages auf Normal, für alle gleich: ein Versuch am Tag, gewertet nach behaltenen Kohlköpfen und übrigem Gold' },
+    { input: 'Knopf Gärtner, G', action: 'Sobald im Gartenschuppen angestellt: Tippe auf den Rasen, damit er dorthin geht, oder auf einen Gegner neben ihm, um ihn in seinen Bau zurückzuheben' },
   ],
   loop: [
     'Wähle unter den Gartenkarten bis zu vier Türme oder Fallen, die du neben Hecke und Bogen mitnimmst.',
@@ -88,6 +95,9 @@ const de: HowToPlay = {
     'Ein gekrönter König ist sechs Gegner in einem: Stell deine stärksten Türme an seinen Weg.',
     'Die Kaiserin in Welle 20 legt Käfer und wechselt ihre Schale gegen den Schaden, der ihr am meisten wehtat, also mische die Schadensarten.',
     'Feuerkorb und Brennglas mögen einen langen geraden Gang, der Sturmstab Gegner dicht gedrängt in engen Kurven.',
+    'Im Gewächshaus geht kein Schuss und kein Strahl durch eine Glasscheibe, also stell Türme auf dieselbe Seite des Glases wie den Weg; seine Sprenger bremsen Gegner, die vorbeilaufen.',
+    'Der Gärtner lässt die Türme um ihn ein Viertel schneller schießen (mit Grünem Daumen die Hälfte), und seine Hände ruhen 12 Sekunden zwischen zwei Hebungen. Könige und Königinnen hebt er nie, große Gegner nur mit Festem Griff.',
+    'Das Tageslabyrinth zählt 100 je behaltenem Kohlkopf plus das übrige Gold, also bringt ein sparsamer Sieg am meisten.',
   ],
 };
 

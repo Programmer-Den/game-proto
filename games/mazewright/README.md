@@ -55,9 +55,10 @@ come, and upgrade between waves rather than in the thick of one.
 
 ![The garden picker](docs/screenshots/gardens.webp)
 
-Twelve gardens in four seasons, three a season, each with its own rocks, water and burrows, so
-each asks for its own maze. The picker has a tab for each season: spring is open from the start,
-and summer, autumn and winter open once 4, 10 and 18 stars are won across all gardens.
+Thirteen gardens: twelve in four seasons, three a season, each with its own rocks, water and
+burrows, so each asks for its own maze, and the greenhouse. The picker has a tab for each season
+and one for the greenhouse: spring is open from the start, and summer, autumn, winter and the
+greenhouse open once 4, 10, 18 and 24 stars are won across all gardens.
 
 | Season | Gardens |
 | --- | --- |
@@ -65,6 +66,16 @@ and summer, autumn and winter open once 4, 10 and 18 stars are won across all ga
 | Summer | **Brook** (a brook with two fords and banks), **Warren** (three burrows), **Gravel Walk** (a path garden) |
 | Autumn | **Hillside** (a raised terrace), **Crossroads** (the cottage in the middle, four burrows), **Leaf Walk** (a winding path garden) |
 | Winter | **Ice Pond** (a frozen pond, three burrows), **Last Cabbage** (one cabbage, six burrows, 130 gold to start), **Snow Path** (a path garden with banks) |
+| Greenhouse | **Greenhouse** (glass panes and sprinklers) |
+
+**The greenhouse.** Three panes of glass split the house into rooms. Foes walk round the glass like
+a rock and moths fly over it, but no tower's shot, beam, flame or pulse crosses a pane, so a tower
+only covers the part of the route on its own side of the glass. Four sprinklers stand between the
+panes; nothing is planted on them, and their spray slows a ground foe on any of the eight tiles
+round them to 60% of its pace (like frost, the stronger of the two counts). A maze that leads foes
+through the spray, past towers that can see them, is the way to hold it.
+
+![The greenhouse: glass panes, sprinklers and their spray](docs/screenshots/greenhouse.webp)
 
 Rocks never move and nothing is planted on them. **Water** is the same for walkers, but moths fly
 over it and a sunglass beam shines across it. A tower on a raised **bank** (a lighter tile with a
@@ -84,7 +95,20 @@ its gold price, each tower's master level twice that, and the pouch's fifth and 
 the slots say they take one more tower along. A tower still in the shed shows its price on its pouch chip. A first visit credits the gardens
 already played, so seeds are waiting for players from before the shed.
 
-![The potting shed](docs/screenshots/shed.webp)
+**The gardener.** The shed's bottom row hires a hero gardener for 30 seeds. From then on he comes
+along in every game with one gardener (not with two, nor in the daily maze), starting by the
+cottage. Pick the Gardener tool (after Sell, or G) and tap the lawn: he walks there at 3 tiles a
+second, straight over hedges and towers. Every tower within 2 tiles of him reloads 25% faster, on
+top of a beehive's boost. Tap a ground foe beside him and he lifts it back into its burrow, to walk
+the whole maze again (what it carried drops where it was); then his hands rest for 12 seconds, a
+ring round him filling up. He never lifts a king or the queen. Three skills, each bought once,
+make him better: **Green thumb** (40 seeds, towers near him 50% faster), **Quick boots** (30, he
+walks 5 tiles a second) and **Strong grip** (50, he lifts every 7 seconds, big foes too). Replays
+and saved games play his walks and lifts back like any other action.
+
+![The gardener on the Meadow, the towers within his reach shooting faster](docs/screenshots/gardener.webp)
+
+![The potting shed, with the gardener and his skills in the bottom row](docs/screenshots/shed.webp)
 
 ![Gravel Walk, a path garden: towers on the lawn beside the path](docs/screenshots/path.webp)
 
@@ -233,6 +257,17 @@ falls once none are left in the patch, carried or rolling.
 
 ![Ladybirds carrying cabbages home, and dropped cabbages rolling back to the patch](docs/screenshots/cabbages.webp)
 
+**The daily maze.** The Daily maze button at the end of the season tabs plays today's garden, the
+same for every player on the same day: one of the gardens (any but Last Cabbage) with four more
+rocks, hedge and bow with four more towers or traps lent for the day, and 12 waves on Normal (15
+cabbages, foes at their usual health) with no master levels and no gardener. There is one try a
+day, and leaving it half way uses it up. A win scores 100 a cabbage kept plus the gold left, a
+loss 10 a wave held. The end panel shows the score, the best and the days in a row played, and the
+button shows today's score until the next day. It keeps no garden records, but pays seeds and earns
+trophies like any game.
+
+![Today's daily maze: Brook with more rocks and its own pouch](docs/screenshots/daily.webp)
+
 **Ways of play.** The button at the top left of the garden picker picks how every garden is
 played, and is kept for the next game:
 
@@ -260,6 +295,7 @@ played, and is kept for the next game:
 | Ice Pond | Hedge, Bonfire, Bow |
 | Last Cabbage | Hedge, Bow, Whirligig |
 | Snow Path | Sunglass, Bonfire, Bow |
+| Greenhouse | Hedge, Frost, Crossbow |
 
 **Trophies.** Ten trophies, listed on the start and pause screens and on the hub. Sandbox earns none:
 
@@ -273,21 +309,22 @@ played, and is kept for the next game:
 | Not one leaf lost | Silver | Win a garden with every cabbage still in the patch |
 | Into the snow | Silver | Win enough stars to open the winter gardens |
 | The last cabbage | Gold | Win Last Cabbage |
-| Every garden tamed | Gold | Win all twelve Challenges |
+| Every garden tamed | Gold | Win every garden's Challenge |
 | (hidden) | Gold | Hold 30 waves in Endless |
 
 ![The First hedge row trophy, earned by holding wave 1](docs/screenshots/trophy.webp)
 
 **Difficulty** (hub setting): Easy gives 25 cabbages and foes 20% less health, Hard 10 cabbages and
-25% more health; Normal is 15 cabbages.
+25% more health; Normal is 15 cabbages. The daily maze is always played on Normal.
 
 ## Code layout
 
 - `src/game/rules.ts`: the grid size, towers, foes, waves and tuning numbers.
-- `src/game/maps.ts`: the twelve gardens and their seasons (burrows, cottage, rocks, water, banks, paths).
+- `src/game/maps.ts`: the thirteen gardens and their seasons (burrows, cottage, rocks, water, banks, paths, glass, sprinklers).
+- `src/game/daily.ts`: the daily maze's garden and pouch, made from the day's seed.
 - `src/game/grid.ts`: the walking field (steps from every tile to the cottage) and routes.
 - `src/game/sim.ts`: a game: building and the never-close rule, foes, shots, waves and events.
-- `src/game/save.ts`: the records per garden, the pouch, the way of play, the potting shed, replays and the game in play.
+- `src/game/save.ts`: the records per garden, the pouch, the way of play, the potting shed (with the gardener), replays and the game in play.
 - `src/scenes/GameScene.ts`: the garden picker and the game screen: input, drawing and the bars.
 - `src/scenes/art.ts`, `layout.ts`: the flat vector art and where things go.
 - `src/audio.ts`: music and sound effects.

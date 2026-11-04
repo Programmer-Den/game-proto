@@ -20,7 +20,7 @@ const en = {
   lastCabbage: 'The last cabbage',
   lastCabbageText: 'Win Last Cabbage, with its one cabbage.',
   allChallenges: 'Every garden tamed',
-  allChallengesText: 'Win the Challenge of all twelve gardens.',
+  allChallengesText: 'Win the Challenge of every garden.',
   endless: 'The hedge that never ends',
   endlessText: 'Hold 30 waves in Endless.',
 };

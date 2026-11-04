@@ -30,7 +30,7 @@ start page lists the games; each one lives in its own folder under `games/`.
 | [Bramblecrest](games/bramblecrest/README.md) | A small knight explores an overgrown kingdom by lamplight, finding a new tool in every dungeon that opens more of the world. |
 | [Ninefold](games/ninefold/README.md) | Fill every row, column and box with each digit once: a daily puzzle, Classic boards at three levels, and Delve, a run of ever bigger boards with hearts and relics, in nine unlockable art styles. |
 | [Augury](games/augury/README.md) | Nine kinds of brain puzzle dealt like tarot cards (picture grids, bridges, code breaking, calc cages, cross sums, sliding blocks, tile flips, path links and a memory echo), in six modes from an endless medley to pass and play. |
-| [Mazewright](games/mazewright/README.md) | A tower defense with no road: every hedge and tower you plant on the open lawn is a wall, so you build the maze the beetles walk, and a planting that would close the last way through is refused. Three gardens, twenty waves, moths that fly over and moles that chew through hedges. |
+| [Mazewright](games/mazewright/README.md) | A tower defense with no road: every hedge and tower you plant on the open lawn is a wall, so you build the maze the beetles walk, and a planting that would close the last way through is refused. Thirteen gardens, twenty waves, moths that fly over and moles that chew through hedges, a hero gardener and a daily maze. |
 
 ## Settings
 

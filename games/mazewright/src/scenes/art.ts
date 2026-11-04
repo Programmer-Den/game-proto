@@ -63,6 +63,8 @@ export const SEASON_LAWN: Record<Season, { lawn: number; lawn2: number; edge: nu
   summer: { lawn: 0xa3c35c, lawn2: 0x97b752, edge: 0x7f9c40 },
   autumn: { lawn: 0xb39d58, lawn2: 0xa69050, edge: 0x8a7640 },
   winter: { lawn: 0x9db5c2, lawn2: 0x92aab8, edge: 0x7a95a4 },
+  // The greenhouse: a pale tiled floor.
+  greenhouse: { lawn: 0xa9cdb0, lawn2: 0x9cc2a4, edge: 0x6f9a7a },
 };
 
 export function lawn(g: G, x: number, y: number, w: number, h: number, cols: number, rows: number, cell: number, season: Season = 'spring') {
@@ -592,4 +594,46 @@ export function noEntry(g: G, x: number, y: number) {
   g.strokeRect(x - 18, y - 18, 36, 36);
   g.strokeCircle(x, y, 10);
   g.lineBetween(x - 7, y + 7, x + 7, y - 7);
+}
+
+/** A glass pane by its cell's top-left corner: pale see-through blue with a white frame and a glint. */
+export function glass(g: G, x: number, y: number, cell: number) {
+  g.fillStyle(0xd7f1f7, 0.75);
+  g.fillRect(x + 2, y + 2, cell - 4, cell - 4);
+  g.lineStyle(2, 0xffffff, 0.9);
+  g.strokeRect(x + 2, y + 2, cell - 4, cell - 4);
+  g.fillStyle(0xffffff, 0.8);
+  g.fillTriangle(x + cell * 0.22, y + cell * 0.7, x + cell * 0.5, y + cell * 0.2, x + cell * 0.58, y + cell * 0.28);
+}
+
+/** A sprinkler's spray over the tiles round it, by its cell's top-left corner: a faint blue wash. */
+export function spray(g: G, x: number, y: number, cell: number) {
+  g.fillStyle(0x6fc3ef, 0.18);
+  g.fillRect(x - cell, y - cell, cell * 3, cell * 3);
+}
+
+/** A sprinkler at a cell's middle: a grey head on a stand, with drops round it. */
+export function sprinkler(g: G, x: number, y: number) {
+  shadow(g, () => g.fillCircle(x + 2, y + 3, 11));
+  g.fillStyle(0x7d8a92, 1);
+  g.fillCircle(x, y, 11);
+  g.fillStyle(0xb9c5cc, 1);
+  g.fillCircle(x, y, 6);
+  g.fillStyle(0x3d8fd1, 1);
+  for (let i = 0; i < 6; i++) g.fillCircle(x + Math.cos(i * 1.047) * 16, y + Math.sin(i * 1.047) * 16, 2.2);
+}
+
+/** The hero gardener at his middle: a green apron, a face and a wide straw hat. */
+export function gardener(g: G, x: number, y: number) {
+  shadow(g, () => g.fillEllipse(x + 2, y + 13, 24, 9));
+  g.fillStyle(0x3f7d34, 1);
+  g.fillRoundedRect(x - 9, y - 2, 18, 16, 6);
+  g.fillStyle(0xf1c9a0, 1);
+  g.fillCircle(x, y - 6, 7);
+  g.fillStyle(0xe2c25a, 1);
+  g.fillEllipse(x, y - 10, 26, 8);
+  g.fillStyle(0xd1ab3e, 1);
+  g.fillCircle(x, y - 13, 6);
+  g.fillStyle(C.wood, 1);
+  g.fillRect(x - 6, y - 12, 12, 2);
 }
