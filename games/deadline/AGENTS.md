@@ -93,7 +93,7 @@ also picks the squad leader whose active the run brings. Kills fill a lasting zo
   - The Scout's flare marks only the zombies not yet spawned, so late in a wave it marks nothing
     and its banner says so.
   - Two Bridges' wreck is the sandbag wall sprite, stretched; it doesn't block anything itself (no
-    zombie is planned in that lane), and a boss's pack can still land there.
+    zombie or fuel drum is planned in that lane), and a boss's pack can still land there.
   - Night-vision textures are baked the first time that style is shown, a hitch of about 0.4s
     (measured in headless Chromium) on that first switch; later switches take a frame or so. On a
     big screen the textures are painted finer, and the first switch takes about twice as long.
@@ -305,7 +305,7 @@ also picks the squad leader whose active the run brings. Kills fill a lasting zo
   within `GRENADE.radius` past shields). `drawBars` badges grenadiers and marksmen.
 - **Outpost:** `state.outpost` (saved under `deadline-outpost`) is applied in `create`: Barricade
   levels as `sandbags`, Field Medic as `medkits`, Veteran as companions (Gunners); the Fuel Depot
-  goes to `planWave` as `extraDrums`. `buyOutpost` buys the next level at `outpostCost`.
+  goes to `planWave` as `extraDrums` (0 on the daily). `buyOutpost` buys the next level at `outpostCost`.
 - **Operations:** `state.operation` (read from `deadline-operation` in `create`) sets the wave
   rules from `OPERATIONS`; `pickOperation` sets `state.nextOperation` and saves it, so the choice
   sticks. In an operation `state.best` is its best (waves cleared, from `deadline-operation-best`),
@@ -320,14 +320,16 @@ also picks the squad leader whose active the run brings. Kills fill a lasting zo
   which the game over screen names. Twists: Fogbank's `condition: 'fog'` (`visibility` fades
   anything above `CONDITION.fogY`, `fog` is a pale band over the far road, styled per art style
   in `styleFog`); Two Bridges' `lanes: [0, 2]` (`startWave` moves every planned zombie but flank
-  spitters into an open lane with `openLaneX`, no draws, and `create` puts a `wrecks` image over
+  spitters, and every fuel drum, into an open lane with `openLaneX`, no draws, and `create` puts a `wrecks` image over
   each blocked lane at `WRECK_Y`); the Evacuation's `conditionFrom: 1` (handed to `drawCondition`).
 - **Veterans:** `state.names` and `state.ranks` run beside `state.roles` (squad order; null and 0
   for companions from crates or the outpost; `addCompanions` pads them). `create` loads the roster
   (`deadline-roster`) and, off the daily, puts each picked veteran (`state.picked`, call signs) in
   the squad first, before the starting crates, noting them in `state.brought`. `pickRole` gives a
   joining survivor `callSign(taken)`. `fire` multiplies each companion's bullets' `mult` by
-  `rankMult(rank)`; only a marksman's round (`mult >= MARKSMAN.mult`) shows bigger.
+  `rankMult(rank)`; only a marksman's round (`mult >= MARKSMAN.mult`) shows bigger. `hitTargets`
+  hurts zombies (and chips shields) by the exact `damage * mult`, a fraction for a veteran, and
+  survivors, drums and crates by it rounded, as their hp is shown whole.
   `endAsWin` calls `promoteSquad` (not on the daily): `promote` ranks up the brought veterans and
   adds this run's recruits at rank 1, replacing a rank 1 veteran once the roster has
   `LOYALTY.size`. The game over screen's roster chips call `pickVeteran` (at most `LOYALTY.picks`).
@@ -368,8 +370,8 @@ also picks the squad leader whose active the run brings. Kills fill a lasting zo
   `overPage` to 0.
 - **Daily stand:** `state.operation === 'daily'`. `create` takes today (`today()`, kept in `day`),
   falls back to the Open Road when `loadDaily` says today's try is used, and otherwise calls
-  `startDaily`; the daily keeps the starting crates for the next run (`nextKit`), and uses no
-  outpost (`NO_OUTPOST`), no veterans, no leader and no codex bonus (its kills still fill the codex). `startWave` seeds `waveRand` with
+  `startDaily` and saves `'road'` as the next run (so a later day doesn't start its daily on its own); the daily keeps the starting crates for the next run (`nextKit`), and uses no
+  outpost (`NO_OUTPOST`, and `startWave` hands `planWave` no Depot `extraDrums`), no veterans, no leader and no codex bonus (its kills still fill the codex). `startWave` seeds `waveRand` with
   `seeded(seedOf('deadline:<day>:<wave>'))` and draws, in order, `dailyAdapt` (the horde's answer,
   in place of `adaptTo`), the condition, `planWave` and, on a boss wave, `supplyPick`. `gameOver` and
   `completeOperation` call `finishDaily` with `dailyScore(scrap, cleared)`; the daily's best is
@@ -494,8 +496,9 @@ imports it. Under browser automation it all does nothing, so the playthrough is 
   read and removed by `create`; unknown kinds are dropped.
 - `deadline-outpost`: a JSON object of `OutpostKind` levels (0 to 3). Written by `buyOutpost`;
   missing or broken levels load as 0.
-- `deadline-operation`: the `OperationKind` the next run plays. Written by `pickOperation`, read
-  (and kept) by `create`; anything unknown loads as `'road'`.
+- `deadline-operation`: the `OperationKind` the next run plays. Written by `pickOperation`, by
+  `completeOperation` (the next town after a win) and by `create` (`'road'` once a daily starts),
+  read by `create`; anything unknown loads as `'road'`.
 - `deadline-operation-best`: a JSON object of each operation's most waves cleared (towns only,
   not the daily). Written by `recordOperation`; it also says which towns are open (`townOpen`).
 - `deadline-roster`: a JSON object `{ vets: [{ name, role, rank }], picked: [index] }`, at most

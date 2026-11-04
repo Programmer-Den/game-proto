@@ -254,7 +254,8 @@ and the fuel drum's blast doesn't swell.
   ![The squad leaders and the zombie codex on the game over screen's second page](docs/screenshots/leaders-and-codex.webp)
 - **Daily Stand**: the same 10 waves for every player on the same day (the crates, conditions,
   supply drops and the horde's answers all come from the day's seed), with no starting crates,
-  outpost upgrades or veterans, and one try a day. Its score is the run's scrap plus 100 for each
+  outpost upgrades or veterans, and one try a day; the run after it is the Open Road again unless
+  you pick another. Its score is the run's scrap plus 100 for each
   wave cleared; the card keeps today's score, the best and the days in a row.
 
   ![A boss on wave 5 against a full squad of nine](docs/screenshots/boss.webp)

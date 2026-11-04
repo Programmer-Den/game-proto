@@ -577,6 +577,8 @@ export class GameScene extends Phaser.Scene {
     s0.daily ??= loadDaily(DAILY.game, this.day);
     const daily = s0.operation === 'daily';
     this.state.nextOperation = daily ? 'road' : this.state.operation;
+    // Saved too, so a later day's first page load starts the Open Road rather than that day's daily.
+    if (daily) saveOperation('road');
     // An operation shows its own best (waves cleared) in place of the Open Road's.
     if (this.state.operation !== 'road') this.state.best = this.bestAtStart = this.state.operationBests[this.state.operation];
     // The squad leader picked last time leads this run (not the daily, which every player starts the same).
@@ -959,14 +961,16 @@ export class GameScene extends Phaser.Scene {
     // From wave 8 the horde answers the squad's strongest stat.
     this.state.adapt = daily ? adapt : wave >= ADAPT.fromWave ? adaptTo(this.state.stats) : null;
     this.plan = planWave(wave, rand, this.state.condition, {
-      extraDrums: this.state.outpost.depot,
+      // The daily brings no outpost upgrades, so no Depot drums either: they would shift the seeded draws.
+      extraDrums: daily ? 0 : this.state.outpost.depot,
       drums: op.drums,
       survivors: op.survivors,
       survivorsFrom: op.survivorsFrom,
       adapt: this.state.adapt,
     });
-    // Two Bridges: the horde only comes down the open lanes.
-    if (op.lanes) for (const sp of this.plan) if (sp.type === 'enemy' && !sp.flank) sp.x = openLaneX(sp.x, op.lanes);
+    // Two Bridges: the horde and the fuel drums only come down the open lanes (no draws, so the plan
+    // stays the same otherwise).
+    if (op.lanes) for (const sp of this.plan) if ((sp.type === 'enemy' && !sp.flank) || sp.type === 'drum') sp.x = openLaneX(sp.x, op.lanes);
     this.waveClock = 0;
     this.bossClock = 0;
     this.bossAct = null;
@@ -1613,7 +1617,9 @@ export class GameScene extends Phaser.Scene {
     let struck = false, blocked = false, bounced = false;
     for (const b of this.bullets.all) {
       if (!b.alive) continue;
-      const damage = Math.round(this.state.stats.damage * b.mult);
+      // Zombies take the exact hit (a veteran's rank bonus is a fraction); survivors, drums and crates
+      // take it rounded, as their hp is shown as a whole number.
+      const exact = this.state.stats.damage * b.mult, damage = Math.round(exact);
       // Swept along the stretch from prevY up to y, so a long frame can't carry a bullet through a
       // target; the nearest ones (largest y) are hit first. Survivors are in the way like zombies.
       const sx = b.x - b.prevX, sy = b.y - b.prevY, len2 = sx * sx + sy * sy || 1;
@@ -1642,7 +1648,7 @@ export class GameScene extends Phaser.Scene {
         if (!('kind' in e)) this.hurtSurvivor(e, damage);
         // A riot shield stops a bullet without pierce, and takes the hit itself.
         else if (e.shield > 0 && !b.pierces) {
-          if (this.chipShield(e, damage) && this.visibility(e.x, e.y) > 0) blocked = true;
+          if (this.chipShield(e, exact) && this.visibility(e.x, e.y) > 0) blocked = true;
         }
         else {
           last = e;
@@ -1653,7 +1659,7 @@ export class GameScene extends Phaser.Scene {
             this.effect('', e.x, e.y - ENEMIES[e.kind].radius - 12, { life: 600, rise: 30, text: tr(this.style === 'comic' ? 'fxHeadshot' : 'nvFxHeadshot') });
           }
           if (fire) e.burn = FIRE_ROUNDS.ms;
-          this.hurt(e, head ? damage * HEADSHOT.mult : damage);
+          this.hurt(e, head ? exact * HEADSHOT.mult : exact);
           if (e.alive && this.visibility(e.x, e.y) > 0) struck = true;
           // An armoured brute stops the bullet, pierce or not, and nothing ricochets off it.
           if (e.armoured) {
