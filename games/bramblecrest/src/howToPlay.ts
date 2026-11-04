@@ -2,7 +2,7 @@ import type { HowToPlay } from '../../../shared/howToPlay';
 import { byLanguage } from '../../../shared/i18n';
 
 const en: HowToPlay = {
-  goal: 'Explore Mossford, the woods, the fen and the peaks by lamplight, beat what grows the thorns, find what rings the bell under the fen and what burns on the peaks. Moonstones are hidden everywhere; how many you find changes the ending.',
+  goal: 'Explore Mossford, the woods, the fen, the peaks and the coast by lamplight, beat what grows the thorns, find what rings the bell under the fen, what burns on the peaks and what holds the tide. Moonstones are hidden everywhere; how many you find changes the ending.',
   controls: [
     { input: 'WASD or arrow keys', action: 'Walk' },
     { input: 'Click or tap the ground', action: 'Walk there' },
@@ -12,8 +12,11 @@ const en: HowToPlay = {
     { input: 'Shift, K or the roll button', action: 'Roll out of the way; nothing hits you mid-roll' },
     { input: 'Q, L or the vine button', action: 'Throw the hookvine (once found): pulls you to golden posts' },
     { input: 'B, X or the seed button', action: 'Plant a bellseed (once given): it bursts, breaking boulders and cracked walls' },
+    { input: 'H, C or the horn button', action: 'Blow the gust horn (once found): it blows foes back and turns windmills' },
+    { input: 'Space facing water, or a tap on water', action: 'Cast the fishing rod (once found); press or tap again when it bites' },
     { input: 'Space or a tap', action: 'Read on while someone is talking' },
     { input: 'N or a tap on the moonstone counter', action: 'Open the journal: what each place still hides, the villagers\' requests and your trial times' },
+    { input: '← → or the corner button in the journal', action: 'Turn to the bestiary and back' },
   ],
   loop: [
     'Talk to Elder Wren in the square: she sends you for the old blade.',
@@ -23,6 +26,9 @@ const en: HowToPlay = {
     'Face the Thornmother: pull her glowing bulbs down with the hookvine, then strike them.',
     'Chapter two: ask about the bell in the night, get bellseeds from the fen hermit and find the Drowned Belfry.',
     'Chapter three: climb the pass north of the woods to the Hollow Peaks, find the Moonlantern, cross the hidden bridge and face the Gloamwing in the Glass Caverns.',
+    'Chapter four: go east of the fen to the Tidewrack Coast, find the old keeper\'s gust horn, drain the inlet with the windmill and blow the Brinewyrm ashore in the Brine Grotto.',
+    'Fish with the rod from the chest by Mossford\'s pond, and cook two fish at a campfire for a meal that lasts until you next fall.',
+    'Every foe you beat fills the bestiary. Fill a whole family and its foes drop an extra coin.',
     'Along the way: villagers ask for small favours. Bring them what they lost for a heart or a lasting perk.',
     'After the end: turn the hourglass by each dungeon door to race it again, or begin a new game+ with your tools, stronger foes and the moonstones moved.',
   ],
@@ -34,13 +40,14 @@ const en: HowToPlay = {
     'Step back from a planted bellseed: its burst hurts you too.',
     'Shelled beetles and lantern moths shrug off the sword: knock them down with the hookvine or a bellseed first.',
     'The Moonlantern shows hidden bridges only close by. Feel your way across a chasm a few steps at a time.',
+    'The Brinewyrm is too slick to strike in the water. Blow it ashore with the gust horn first.',
     'Fall in a fight and you wake where you last came in, healed.',
     'Your progress saves whenever you change place.',
   ],
 };
 
 const de: HowToPlay = {
-  goal: 'Erkunde Moosfurt, den Wald, das Moor und die Gipfel im Laternenlicht, besiege, was die Dornen wachsen lässt, finde, was die Glocke unter dem Moor läutet und was auf den Gipfeln brennt. Überall sind Mondsteine versteckt; wie viele du findest, ändert das Ende.',
+  goal: 'Erkunde Moosfurt, den Wald, das Moor, die Gipfel und die Küste im Laternenlicht, besiege, was die Dornen wachsen lässt, finde, was die Glocke unter dem Moor läutet, was auf den Gipfeln brennt und was die Flut festhält. Überall sind Mondsteine versteckt; wie viele du findest, ändert das Ende.',
   controls: [
     { input: 'WASD oder Pfeiltasten', action: 'Gehen' },
     { input: 'Den Boden anklicken oder antippen', action: 'Dorthin gehen' },
@@ -50,8 +57,11 @@ const de: HowToPlay = {
     { input: 'Umschalt, K oder die Rolltaste', action: 'Ausweichen; mitten in der Rolle trifft dich nichts' },
     { input: 'Q, L oder die Rankentaste', action: 'Die Hakenranke werfen (sobald gefunden): zieht dich zu goldenen Pfosten' },
     { input: 'B, X oder die Samentaste', action: 'Einen Glockensamen pflanzen (sobald erhalten): er platzt und bricht Felsbrocken und rissige Wände' },
+    { input: 'H, C oder die Horntaste', action: 'Das Windhorn blasen (sobald gefunden): es wirft Feinde zurück und dreht Windmühlen' },
+    { input: 'Leertaste vor Wasser oder Tippen aufs Wasser', action: 'Die Angel auswerfen (sobald gefunden); noch einmal drücken oder tippen, wenn es beißt' },
     { input: 'Leertaste oder Tippen', action: 'Weiterlesen, während jemand spricht' },
     { input: 'N oder Tippen auf den Mondsteinzähler', action: 'Das Tagebuch öffnen: was jeder Ort noch verbirgt, die Bitten der Leute und deine Prüfungszeiten' },
+    { input: '← → oder die Ecktaste im Tagebuch', action: 'Zum Bestiarium blättern und zurück' },
   ],
   loop: [
     'Sprich mit der Ältesten Wren auf dem Platz: Sie schickt dich nach der alten Klinge.',
@@ -61,6 +71,9 @@ const de: HowToPlay = {
     'Stell dich der Dornenmutter: Zieh ihre leuchtenden Knollen mit der Hakenranke herunter und schlag dann zu.',
     'Kapitel zwei: Frag nach der Glocke in der Nacht, hol dir Glockensamen vom Einsiedler im Moor und finde den Ertrunkenen Glockenturm.',
     'Kapitel drei: Steig über den Pass nördlich des Waldes zu den Hohlen Gipfeln, finde die Mondlaterne, überquere die verborgene Brücke und stell dich der Dämmerschwinge in den Gläsernen Höhlen.',
+    'Kapitel vier: Geh östlich des Moors zur Treibgutküste, finde das Windhorn des alten Wärters, leg den Priel mit der Windmühle trocken und blas den Salzwurm in der Salzgrotte an Land.',
+    'Angle mit der Rute aus der Truhe am Teich von Moosfurt und koch zwei Fische an einem Lagerfeuer zu einem Essen, das hält, bis du das nächste Mal fällst.',
+    'Jeder besiegte Feind füllt das Bestiarium. Füll eine ganze Familie, und ihre Feinde lassen eine Münze mehr fallen.',
     'Unterwegs bitten dich die Leute um kleine Gefallen. Bring ihnen, was sie verloren haben, für ein Herz oder einen bleibenden Vorteil.',
     'Nach dem Ende: Dreh die Sanduhr an jeder Verliestür und lauf es noch einmal auf Bestzeit, oder beginne ein neues Spiel+ mit deinen Werkzeugen, stärkeren Feinden und umgezogenen Mondsteinen.',
   ],
@@ -72,6 +85,7 @@ const de: HowToPlay = {
     'Tritt von einem gepflanzten Glockensamen zurück: Sein Platzen trifft auch dich.',
     'Panzerkäfer und Laternenmotten trotzen dem Schwert: Wirf sie erst mit der Hakenranke oder einem Glockensamen um.',
     'Die Mondlaterne zeigt verborgene Brücken nur aus der Nähe. Taste dich Schritt für Schritt über eine Schlucht.',
+    'Der Salzwurm ist im Wasser zu glitschig für die Klinge. Blas ihn erst mit dem Windhorn an Land.',
     'Fällst du im Kampf, erwachst du geheilt dort, wo du zuletzt hereingekommen bist.',
     'Dein Fortschritt wird bei jedem Ortswechsel gespeichert.',
   ],

@@ -127,6 +127,8 @@ export function paintAll(scene: Phaser.Scene) {
   tree('tree', '#3f7f46');
   tree('tree-b', '#4a8a3c');
   tree('tree-fen', '#3d7a6c', true);
+  // The coast grows dark, salt-bitten pines.
+  tree('tree-coast', '#2f5e4c');
   // The peaks grow dark pines with snow on every tier.
   paint(scene, 'tree-pine', 56, 72, (c) => {
     shadow(c, 30, 64, 22, 7, 0.45);
@@ -1206,6 +1208,220 @@ export function paintAll(scene: Phaser.Scene) {
     ball(c, 9, 16, 1.8, '#6a4a20');
   });
 
+  // Chapter four: Nell, the campfire, the windmill and pinwheels, crabs, gulls and the Brinewyrm.
+  // Nell the fisher: a broad oilskin hat.
+  person('fisher', '#3a5a6a', '#e8c09a', '#8a5a3a', (c) => {
+    c.fillStyle = '#d8b04a';
+    c.beginPath();
+    c.ellipse(16, 10, 14, 4, 0, 0, Math.PI * 2);
+    c.fill();
+    ball(c, 16, 7, 7, '#e8c05a', 5);
+  });
+  paint(scene, 'campfire', 32, 30, (c) => {
+    shadow(c, 16, 25, 14, 4);
+    for (const [x, y] of [[6, 23], [12, 26], [20, 26], [26, 23], [16, 21]]) ball(c, x, y, 4, '#7a7c84', 3);
+    c.strokeStyle = '#5a3a26';
+    c.lineWidth = 3;
+    c.lineCap = 'round';
+    c.beginPath();
+    c.moveTo(8, 24);
+    c.lineTo(24, 16);
+    c.moveTo(24, 24);
+    c.lineTo(8, 16);
+    c.stroke();
+    glowDot(c, 16, 14, 14, 'rgba(255,170,70,0.9)');
+    c.fillStyle = '#ffb04a';
+    c.beginPath();
+    c.moveTo(9, 20);
+    c.quadraticCurveTo(12, 6, 16, 2);
+    c.quadraticCurveTo(20, 8, 23, 20);
+    c.fill();
+    c.fillStyle = '#ffe28a';
+    c.beginPath();
+    c.moveTo(13, 20);
+    c.quadraticCurveTo(15, 12, 16, 9);
+    c.quadraticCurveTo(18, 13, 19, 20);
+    c.fill();
+  });
+  // The windmill's tower, and its four sails (a separate image that turns).
+  paint(scene, 'mill', 64, 112, (c) => {
+    shadow(c, 32, 104, 30, 8, 0.5);
+    const g = c.createLinearGradient(12, 0, 52, 0);
+    g.addColorStop(0, '#d8ccb0');
+    g.addColorStop(0.5, '#a89878');
+    g.addColorStop(1, '#5a5040');
+    c.fillStyle = g;
+    c.beginPath();
+    c.moveTo(18, 30);
+    c.lineTo(46, 30);
+    c.lineTo(52, 104);
+    c.lineTo(12, 104);
+    c.fill();
+    c.fillStyle = '#6a4a30';
+    c.beginPath();
+    c.moveTo(12, 32);
+    c.lineTo(32, 10);
+    c.lineTo(52, 32);
+    c.fill();
+    c.fillStyle = '#2e2418';
+    c.beginPath();
+    c.roundRect(25, 80, 14, 24, [7, 7, 0, 0]);
+    c.fill();
+    c.fillStyle = WINDOW;
+    c.fillRect(28, 50, 8, 9);
+    glowDot(c, 32, 55, 12, 'rgba(255,200,110,0.35)');
+  });
+  paint(scene, 'mill-sails', 96, 96, (c) => {
+    c.translate(48, 48);
+    for (let i = 0; i < 4; i++) {
+      c.save();
+      c.rotate(Math.PI / 4 + (i * Math.PI) / 2);
+      c.fillStyle = '#5a3a26';
+      c.fillRect(-2, -46, 4, 44);
+      c.fillStyle = 'rgba(232,224,204,0.92)';
+      c.fillRect(2, -44, 12, 34);
+      c.strokeStyle = '#7a5a3a';
+      c.lineWidth = 1;
+      for (let k = 0; k < 4; k++) c.strokeRect(2, -44 + k * 8.5, 12, 8.5);
+      c.restore();
+    }
+    ball(c, 0, 0, 5, '#6a4a30');
+  });
+  paint(scene, 'pinwheel', 24, 40, (c) => {
+    shadow(c, 12, 37, 8, 2.5);
+    c.fillStyle = '#5a5e6a';
+    c.fillRect(10, 12, 4, 26);
+    box(c, 4, 32, 16, 2, 5, '#6a6e7a');
+  });
+  paint(scene, 'pinwheel-head', 30, 30, (c) => {
+    c.translate(15, 15);
+    const cols = ['#5fc8d0', '#e8d070', '#5fc8d0', '#e8d070'];
+    for (let i = 0; i < 4; i++) {
+      c.save();
+      c.rotate((i * Math.PI) / 2);
+      c.fillStyle = cols[i];
+      c.beginPath();
+      c.moveTo(0, 0);
+      c.lineTo(0, -14);
+      c.quadraticCurveTo(10, -10, 11, -1);
+      c.closePath();
+      c.fill();
+      c.restore();
+    }
+    ball(c, 0, 0, 3, '#e8eef8');
+  });
+  paint(scene, 'crab', 36, 26, (c) => {
+    shadow(c, 18, 22, 15, 4);
+    c.strokeStyle = '#8a3a24';
+    c.lineWidth = 2;
+    for (const s of [-1, 1])
+      for (const k of [0, 1, 2]) {
+        c.beginPath();
+        c.moveTo(18 + s * 6, 16 + k * 2);
+        c.lineTo(18 + s * (12 + k * 2), 21 + k);
+        c.stroke();
+      }
+    ball(c, 18, 15, 10, '#c8603a', 7);
+    for (const s of [-1, 1]) {
+      ball(c, 18 + s * 13, 9, 5, '#d8704a', 4);
+      c.fillStyle = '#1a1420';
+      c.fillRect(18 + s * 3 - 1, 7, 2, 3);
+    }
+  });
+  const gull = (key: string, up: boolean) =>
+    paint(scene, key, 38, 26, (c) => {
+      shadow(c, 19, 24, 7, 2, 0.25);
+      c.fillStyle = '#e8eef4';
+      for (const s of [-1, 1]) {
+        c.beginPath();
+        c.moveTo(19, 12);
+        c.quadraticCurveTo(19 + s * 10, up ? 0 : 10, 19 + s * 18, up ? 4 : 16);
+        c.quadraticCurveTo(19 + s * 9, up ? 8 : 16, 19, 15);
+        c.fill();
+      }
+      c.fillStyle = '#5a6070';
+      for (const s of [-1, 1]) {
+        c.beginPath();
+        c.arc(19 + s * 17, up ? 4.5 : 15.5, 2, 0, Math.PI * 2);
+        c.fill();
+      }
+      ball(c, 19, 13, 5, '#f4f6f8', 4);
+      ball(c, 19, 8, 3.5, '#f4f6f8');
+      c.fillStyle = '#e8b040';
+      c.beginPath();
+      c.moveTo(19, 9);
+      c.lineTo(23, 10);
+      c.lineTo(19, 11);
+      c.fill();
+    });
+  gull('gull-a', true);
+  gull('gull-b', false);
+  // The Brinewyrm: a green-grey sea serpent's head and neck, with a pale crest.
+  paint(scene, 'wyrm', 70, 90, (c) => {
+    shadow(c, 35, 84, 26, 6, 0.4);
+    const g = c.createLinearGradient(18, 0, 56, 0);
+    g.addColorStop(0, '#6aa898');
+    g.addColorStop(0.5, '#3a7468');
+    g.addColorStop(1, '#1e4440');
+    c.fillStyle = g;
+    c.beginPath();
+    c.moveTo(20, 88);
+    c.quadraticCurveTo(16, 50, 30, 30);
+    c.lineTo(48, 32);
+    c.quadraticCurveTo(54, 56, 52, 88);
+    c.fill();
+    ball(c, 38, 24, 18, '#4a8a7c', 14);
+    c.fillStyle = '#d8e8d0';
+    for (let i = 0; i < 5; i++) {
+      c.beginPath();
+      c.moveTo(24 + i * 6, 14 - (i % 2) * 2);
+      c.lineTo(27 + i * 6, 2 + (i % 2) * 2);
+      c.lineTo(30 + i * 6, 14);
+      c.fill();
+    }
+    c.fillStyle = '#c8e070';
+    c.beginPath();
+    c.ellipse(32, 22, 3, 4, 0, 0, Math.PI * 2);
+    c.ellipse(46, 22, 3, 4, 0, 0, Math.PI * 2);
+    c.fill();
+    c.fillStyle = '#10201e';
+    c.fillRect(31, 21, 2, 3);
+    c.fillRect(45, 21, 2, 3);
+    c.strokeStyle = '#1e3a34';
+    c.lineWidth = 2;
+    c.beginPath();
+    c.moveTo(30, 32);
+    c.quadraticCurveTo(39, 36, 48, 32);
+    c.stroke();
+    c.fillStyle = 'rgba(200,230,220,0.5)';
+    for (let i = 0; i < 4; i++) c.fillRect(26, 44 + i * 10, 24, 2);
+  });
+  paint(scene, 'ripple', 64, 24, (c) => {
+    c.strokeStyle = 'rgba(200,235,255,0.7)';
+    c.lineWidth = 2;
+    for (const [rx, ry] of [[28, 9], [18, 6], [8, 3]] as const) {
+      c.beginPath();
+      c.ellipse(32, 12, rx, ry, 0, 0, Math.PI * 2);
+      c.stroke();
+    }
+  });
+  paint(scene, 'brine', 12, 12, (c) => {
+    glowDot(c, 6, 6, 6, 'rgba(150,240,220,0.7)');
+    ball(c, 6, 6, 3.5, '#c8f4ea');
+  });
+  paint(scene, 'bobber', 12, 14, (c) => {
+    c.fillStyle = '#e8eef8';
+    c.beginPath();
+    c.ellipse(6, 9, 5, 4, 0, 0, Math.PI);
+    c.fill();
+    c.fillStyle = '#e8b040';
+    c.beginPath();
+    c.ellipse(6, 8, 5, 4, 0, Math.PI, 0);
+    c.fill();
+    c.fillStyle = '#2a2030';
+    c.fillRect(5, 0, 2, 5);
+  });
+
   // The HUD's icons and the touch buttons.
   const icon = (key: string, draw: (c: Ctx) => void) => paint(scene, key, 22, 20, draw);
   icon('ui-heart', (c) => heart(c, 11, 10, 8, '#e8506a'));
@@ -1255,6 +1471,27 @@ export function paintAll(scene: Phaser.Scene) {
     c.fill();
   });
   button('btn-seed', (c) => seedPod(c, 32, 34, 11));
+  button('btn-horn', (c) => {
+    const g = c.createLinearGradient(14, 0, 50, 0);
+    g.addColorStop(0, '#f0d890');
+    g.addColorStop(1, '#a8803a');
+    c.fillStyle = g;
+    c.beginPath();
+    c.moveTo(14, 38);
+    c.quadraticCurveTo(26, 40, 40, 22);
+    c.lineTo(50, 30);
+    c.quadraticCurveTo(34, 46, 16, 44);
+    c.closePath();
+    c.fill();
+    c.strokeStyle = '#e8eef8';
+    c.lineWidth = 2;
+    c.beginPath();
+    c.moveTo(48, 16);
+    c.quadraticCurveTo(54, 12, 56, 18);
+    c.moveTo(52, 24);
+    c.quadraticCurveTo(58, 22, 58, 28);
+    c.stroke();
+  });
   button('btn-vine', (c) => {
     c.strokeStyle = '#9ad86a';
     c.lineWidth = 4;

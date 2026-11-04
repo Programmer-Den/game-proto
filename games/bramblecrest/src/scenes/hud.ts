@@ -1,11 +1,11 @@
 // What sits on the screen over the world: hearts, moonstones, keys and bellseeds, the journal line, the
-// name of the place, the touch buttons, the talk box, short toasts, the trial's clock, the moonstone
-// page and the chapter's end card.
+// name of the place, the touch buttons, the talk box, short toasts, the trial's clock, the journal
+// and bestiary pages, the shops and campfires, and the chapter's end card.
 // Everything here has a scroll factor of 0, so `splitHudCamera` draws it with the fixed camera.
 
 import Phaser from 'phaser';
 import { texScale } from '../art/paint';
-import { clock, OBJECTIVES, stonesToFind, type GameState, type UpgradeId } from '../game/state';
+import { clock, OBJECTIVES, stonesToFind, type GameState } from '../game/state';
 import { t } from '../i18n';
 import { formatNumber } from '../../../../shared/i18n';
 import { ui } from '../../../../shared/audio';
@@ -29,7 +29,7 @@ export class Hud {
   private seeds: Phaser.GameObjects.Text;
   private coinIcon: Phaser.GameObjects.Image;
   private coins: Phaser.GameObjects.Text;
-  /** A seller's wares, while they are open, and what pressing each row's button does. */
+  /** A seller's wares or a campfire's meals, while they are open, and what pressing each row's button does. */
   private shop: Phaser.GameObjects.Container | null = null;
   private shopPress: (() => void)[] = [];
   private objective: Phaser.GameObjects.Text;
@@ -79,6 +79,7 @@ export class Hud {
       roll: fixed(add.image(this.btn('roll').x, this.btn('roll').y, 'btn-roll').setScale(texScale('btn-roll') * (BUTTONS.roll.r / 30))),
       vine: fixed(add.image(this.btn('vine').x, this.btn('vine').y, 'btn-vine').setScale(texScale('btn-vine') * (BUTTONS.vine.r / 30))),
       seed: fixed(add.image(this.btn('seed').x, this.btn('seed').y, 'btn-seed').setScale(texScale('btn-seed') * (BUTTONS.seed.r / 30))),
+      horn: fixed(add.image(this.btn('horn').x, this.btn('horn').y, 'btn-horn').setScale(texScale('btn-horn') * (BUTTONS.horn.r / 30))),
     };
     this.stick = fixed(add.graphics());
     this.box = fixed(add.graphics()).setDepth(DEPTH + 1);
@@ -115,6 +116,7 @@ export class Hud {
       if (!this.buttons[id].visible) continue;
       if (id === 'vine' && !s.items.hookvine) continue;
       if (id === 'seed' && !s.items.seeds) continue;
+      if (id === 'horn' && !s.items.horn) continue;
       if (Math.hypot(p.x - b.x, p.y - b.y) <= b.r) return id;
     }
     return null;
@@ -168,6 +170,7 @@ export class Hud {
     this.buttons.vine.setVisible(s.items.hookvine && !dialog);
     this.buttons.roll.setVisible(!dialog);
     this.buttons.seed.setVisible(s.items.seeds && !dialog).setAlpha(s.seeds > 0 ? 1 : 0.4);
+    this.buttons.horn.setVisible(s.items.horn && !dialog);
     if (this.placeMs > 0) {
       this.placeMs -= dt;
       this.place.setAlpha(Math.min(1, this.placeMs / 600));
@@ -196,10 +199,11 @@ export class Hud {
   }
 
   /**
-   * A seller's wares: each upgrade's name, what it does and a button with its price, or that it is
-   * bought or not yet of use. The rows' buttons, or 1 and 2 on the keyboard, buy.
+   * A seller's wares or a campfire's meals: each row's name, what it does and a button (a price,
+   * Cook, or why not), with the coins or a note under the title. The rows' live buttons, or 1 to 9
+   * on the keyboard, pick; a dead one buzzes.
    */
-  showShop(seller: string, coins: number, rows: { id: UpgradeId; cost: number; state: 'buy' | 'owned' | 'locked' }[], onBuy: (id: UpgradeId) => void) {
+  showShop(title: string, note: string | null, coins: number | null, rows: { name: string; text: string; label: string; live: boolean }[], onPick: (i: number) => void) {
     const add = this.scene.add;
     const f = viewFrame(this.scene);
     const c = add.container(f.x, f.y).setScrollFactor(0).setDepth(DEPTH + 10);
@@ -210,18 +214,20 @@ export class Hud {
     g.fillStyle(0x10163a, 0.95).fillRoundedRect(220, top, 520, h, 18);
     g.lineStyle(2, 0xc8b070, 0.9).strokeRoundedRect(220, top, 520, h, 18);
     c.add(g);
-    c.add(add.text(VIEW.w / 2, top + 30, t('shopTitle', { name: seller }), { fontFamily: FONT, fontSize: '26px', color: '#f0d890' }).setOrigin(0.5));
-    c.add(add.image(VIEW.w / 2 - 30, top + 64, 'ui-coin').setScale(texScale('ui-coin')));
-    c.add(add.text(VIEW.w / 2 - 16, top + 64, formatNumber(coins), { fontFamily: FONT, fontSize: '18px', color: '#f0d070' }).setOrigin(0, 0.5));
+    c.add(add.text(VIEW.w / 2, top + 30, title, { fontFamily: FONT, fontSize: '26px', color: '#f0d890' }).setOrigin(0.5));
+    if (coins !== null) {
+      c.add(add.image(VIEW.w / 2 - 30, top + 64, 'ui-coin').setScale(texScale('ui-coin')));
+      c.add(add.text(VIEW.w / 2 - 16, top + 64, formatNumber(coins), { fontFamily: FONT, fontSize: '18px', color: '#f0d070' }).setOrigin(0, 0.5));
+    }
+    if (note) c.add(add.text(VIEW.w / 2, top + 64, note, { fontFamily: FONT, fontSize: '15px', color: '#cfe8ff' }).setOrigin(0.5));
     this.shopPress = [];
     rows.forEach((r, i) => {
       const y = top + 112 + i * 80;
-      c.add(add.text(250, y - 12, `${i + 1}. ${t(r.id)}`, { fontFamily: FONT, fontSize: '19px', color: '#f3ead2' }).setOrigin(0, 0.5));
-      c.add(add.text(250, y + 14, t(`${r.id}Text`), { fontFamily: FONT, fontSize: '14px', color: '#a8b0d0', wordWrap: { width: 330 } }).setOrigin(0, 0.5));
-      const label = r.state === 'owned' ? t('owned') : r.state === 'locked' ? t('notYet') : t('price', { n: r.cost });
-      const live = r.state === 'buy';
-      const b = add.text(650, y, label, { fontFamily: FONT, fontSize: '17px', color: '#10163a', backgroundColor: live ? '#f0d890' : '#6a6e86', padding: { x: 12, y: 6 } }).setOrigin(0.5);
-      const press = () => (live ? onBuy(r.id) : ui('refuse'));
+      c.add(add.text(250, y - 12, `${i + 1}. ${r.name}`, { fontFamily: FONT, fontSize: '19px', color: '#f3ead2' }).setOrigin(0, 0.5));
+      c.add(add.text(250, y + 14, r.text, { fontFamily: FONT, fontSize: '14px', color: '#a8b0d0', wordWrap: { width: 330 } }).setOrigin(0, 0.5));
+      const live = r.live;
+      const b = add.text(650, y, r.label, { fontFamily: FONT, fontSize: '17px', color: '#10163a', backgroundColor: live ? '#f0d890' : '#6a6e86', padding: { x: 12, y: 6 } }).setOrigin(0.5);
+      const press = () => (live ? onPick(i) : ui('refuse'));
       b.setInteractive({ useHandCursor: true }).on('pointerdown', (_p: unknown, _x: unknown, _y: unknown, e: Phaser.Types.Input.EventData) => {
         e.stopPropagation();
         press();
@@ -251,20 +257,23 @@ export class Hud {
   /**
    * The journal page: on the left each map's moonstones, found ones lit, so the player knows where
    * to look again without being told where; on the right the villagers' requests taken and done,
-   * then the best time of each hourglass trial once they open. `plus` names the new game+ cycle.
+   * then the best time of each hourglass trial once they open. `plus` names the new game+ cycle,
+   * `larder` the creel and the meal along the bottom, and its corner button turns to the bestiary.
    */
   showStones(
     rows: { name: string; found: number; total: number }[],
     trials: { place: string; ms?: number }[],
     requests: { text: string; state: string; done: boolean }[],
     plus: string,
+    larder: string,
+    onTurn: () => void,
   ) {
     const add = this.scene.add;
     const f = viewFrame(this.scene);
     const c = add.container(f.x, f.y).setScrollFactor(0).setDepth(DEPTH + 10);
     const left = rows.length * 34;
     const right = 30 + Math.max(1, requests.length) * 26 + (trials.length ? 44 + trials.length * 26 : 0);
-    const h = 140 + Math.max(left, right);
+    const h = 140 + Math.max(left, right) + (larder ? 26 : 0);
     const top = (VIEW.h - h) / 2;
     const g = add.graphics();
     g.fillStyle(0x05081a, 0.7).fillRect(-f.x, -f.y, this.vw, this.vh);
@@ -301,7 +310,56 @@ export class Hud {
         c.add(add.text(670, y + 30 + i * 26, text, { fontFamily: FONT, fontSize: '16px', color: '#cfe8ff' }).setOrigin(0.5));
       });
     }
-    c.add(add.text(VIEW.w / 2, top + h - 24, t('closePage'), { fontFamily: FONT, fontSize: '13px', color: '#a8b0d0' }).setOrigin(0.5));
+    if (larder) c.add(add.text(VIEW.w / 2, top + h - 50, larder, { fontFamily: FONT, fontSize: '14px', color: '#cfe8ff' }).setOrigin(0.5));
+    c.add(add.text(VIEW.w / 2, top + h - 24, t('pageHint'), { fontFamily: FONT, fontSize: '13px', color: '#a8b0d0' }).setOrigin(0.5));
+    this.turnButton(c, 840, top + 30, t('bestiaryOpen'), onTurn, 1);
+    this.page = c;
+  }
+
+  /** The button in a page's top corner that turns to the other page. */
+  private turnButton(c: Phaser.GameObjects.Container, x: number, y: number, label: string, fn: () => void, originX: number) {
+    const b = this.scene.add.text(x, y, label, { fontFamily: FONT, fontSize: '15px', color: '#10163a', backgroundColor: '#c8b070', padding: { x: 10, y: 5 } }).setOrigin(originX, 0.5);
+    b.setInteractive({ useHandCursor: true }).on('pointerdown', (_p: unknown, _x: unknown, _y: unknown, e: Phaser.Types.Input.EventData) => {
+      e.stopPropagation();
+      fn();
+    });
+    c.add(b);
+  }
+
+  /**
+   * The bestiary: a row per family, each kind's picture (dark until one is beaten), its name and how
+   * many are beaten against `pageAt`, and what a full family gives.
+   */
+  showBestiary(families: { name: string; done: boolean; kinds: { key: string; name: string; n: number }[] }[], pageAt: number, onTurn: () => void) {
+    const add = this.scene.add;
+    const f = viewFrame(this.scene);
+    const c = add.container(f.x, f.y).setScrollFactor(0).setDepth(DEPTH + 10);
+    const h = 150 + families.length * 112;
+    const top = (VIEW.h - h) / 2;
+    const g = add.graphics();
+    g.fillStyle(0x05081a, 0.7).fillRect(-f.x, -f.y, this.vw, this.vh);
+    g.fillStyle(0x10163a, 0.95).fillRoundedRect(100, top, 760, h, 18);
+    g.lineStyle(2, 0xc8b070, 0.9).strokeRoundedRect(100, top, 760, h, 18);
+    c.add(g);
+    c.add(add.text(VIEW.w / 2, top + 30, t('bestiaryTitle'), { fontFamily: FONT, fontSize: '26px', color: '#f0d890' }).setOrigin(0.5));
+    c.add(add.text(VIEW.w / 2, top + 62, t('bestiaryIntro', { n: pageAt }), { fontFamily: FONT, fontSize: '15px', color: '#a8b0d0' }).setOrigin(0.5));
+    families.forEach((fam, i) => {
+      const y = top + 104 + i * 112;
+      c.add(add.text(128, y, fam.name, { fontFamily: FONT, fontSize: '19px', color: fam.done ? '#cfe8ff' : '#f0d890' }).setOrigin(0, 0.5));
+      c.add(add.text(836, y, fam.done ? t('familyPerk') : t('familyWant'), { fontFamily: FONT, fontSize: '14px', color: fam.done ? '#9ad86a' : '#a8b0d0' }).setOrigin(1, 0.5));
+      fam.kinds.forEach((k, j) => {
+        const x = 200 + j * 240;
+        const img = add.image(x, y + 46, k.key);
+        img.setScale(texScale(k.key) * Math.min(1.3, 44 / (img.height * texScale(k.key))));
+        if (!k.n) img.setTint(0x000000).setAlpha(0.6);
+        c.add(img);
+        c.add(add.text(x + 34, y + 34, k.name, { fontFamily: FONT, fontSize: '16px', color: k.n ? '#f3ead2' : '#6a6e86' }).setOrigin(0, 0.5));
+        const full = k.n >= pageAt;
+        c.add(add.text(x + 34, y + 58, t('bestiaryCount', { n: Math.min(k.n, pageAt), total: pageAt }), { fontFamily: FONT, fontSize: '14px', color: full ? '#9ad86a' : '#f0d070' }).setOrigin(0, 0.5));
+      });
+    });
+    c.add(add.text(VIEW.w / 2, top + h - 24, t('pageHint'), { fontFamily: FONT, fontSize: '13px', color: '#a8b0d0' }).setOrigin(0.5));
+    this.turnButton(c, 120, top + 30, t('journalOpen'), onTurn, 0);
     this.page = c;
   }
 

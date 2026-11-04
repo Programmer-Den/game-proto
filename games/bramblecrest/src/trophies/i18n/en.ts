@@ -20,7 +20,7 @@ const en = {
   swift: 'Swifter than sand',
   swiftText: 'Finish the shrine trial in under 2:30 and the belfry trial in under 2:00.',
   allStones: 'The whole moon',
-  allStonesText: 'Find all seventeen moonstones.',
+  allStonesText: 'Find all twenty-two moonstones.',
   unbroken: 'Unbroken',
   unbrokenText: 'Finish chapter two without ever falling.',
 };

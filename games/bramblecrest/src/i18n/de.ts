@@ -14,6 +14,9 @@ const de: Translation<typeof en> = {
   thornmother: 'Die Dornenmutter',
   bellwraith: 'Der Glockengeist',
   gloamwing: 'Die Dämmerschwinge',
+  coast: 'Treibgutküste',
+  grotto: 'Salzgrotte',
+  brinewyrm: 'Der Salzwurm',
 
   // Speakers
   elderName: 'Älteste Wren',
@@ -22,6 +25,7 @@ const de: Translation<typeof en> = {
   catName: 'Keks',
   hermitName: 'Der alte Sedge',
   herderName: 'Tam',
+  fisherName: 'Nell',
   sign: 'Schild',
   wisp: 'Das Irrlicht',
 
@@ -34,6 +38,8 @@ const de: Translation<typeof en> = {
   signPass: 'Norden: die Hohlen Gipfel. Vorsicht vor Steinschlag.',
   signLookout: 'Der Ausguck der Wächter. Was sie hier oben brennen ließen, haben sie mit einem Stein eingeschlossen.',
   signIce: 'Ins Eis gefroren: „Wo die Laterne scheint, trägt der Boden.“',
+  signCoast: 'Norden: die Meereshöhle, hinter dem Priel. Osten: der Strand und die Insel des Wärters.',
+  signTide: 'Neben der Tür eingeritzt: „Zwei Winde öffnen den Weg. Atme tief.“',
 
   // The journal line, one per quest step
   objStart: 'Sprich mit der Ältesten Wren auf dem Platz',
@@ -49,7 +55,11 @@ const de: Translation<typeof en> = {
   objPeaks: 'Finde die Laterne der Wächter auf den Hohlen Gipfeln',
   objCaverns: 'Überquere die Schlucht zu den Gläsernen Höhlen',
   objHomeward: 'Sag der Ältesten Wren, dass die Gipfel wieder dunkel sind',
-  objFinal: 'Finde alle Mondsteine, hilf den Leuten oder bezwinge die Sanduhren',
+  objFinal: 'Frag die Älteste Wren nach dem Wind vom Meer',
+  objCoast: 'Finde das Horn des alten Wärters an der Treibgutküste',
+  objSeacave: 'Leg den Priel trocken und säubere die Meereshöhle',
+  objTidings: 'Sag der Ältesten Wren, dass die Flut zurück ist',
+  objAfter: 'Finde alle Mondsteine, hilf den Leuten oder bezwinge die Sanduhren',
 
   // Pip
   pipNook1: 'Hinter dem Schuppen steckt ein Felsen zwischen den Bäumen fest.',
@@ -111,6 +121,14 @@ const de: Translation<typeof en> = {
   elderHomeward1: 'Eine Motte, groß wie eine Scheune, aus der Dunkelheit selbst? Und du hast sie zur Ruhe gebracht.',
   elderHomeward2: 'Die Gipfel sind wieder dunkel, auf die richtige Art, mit Sternen darin.',
   elderHomeward3: 'Ruh dich aus, Ritter. Bramblecrest ist wieder ganz.',
+  elderCoast1: 'Riechst du das? Salz, bis hier herauf. Seit drei Nächten weht der Wind vom Meer.',
+  elderCoast2: 'Hinter dem Moor, östlich vom alten Glockenturm, liegt die Treibgutküste. Die Felsen auf dem Weg dorthin sind abgerutscht.',
+  elderCoast3: 'Nell fischt dort draußen. Wenn mit dem Meer etwas nicht stimmt, weiß sie, warum.',
+  elderCoastHint: 'Die Küste liegt östlich des Moors, hinter dem Weg zum alten Glockenturm.',
+  elderSeacave: 'Ein Horn, das den Wind selbst bläst? Dann geh und sieh nach, was die Flut festhält.',
+  elderTidings1: 'Ein Wurm in der Tiefe, der die Flut hinter sich herzieht? Und du hast ihn an Land geblasen.',
+  elderTidings2: 'Hör nur: Das Meer atmet wieder ein und aus, wie es sich gehört.',
+  elderTidings3: 'Ruh dich aus, Ritter. Von den Gipfeln bis zum Meer ist Brombeerkamm wieder heil.',
   elderEnd: 'Die Nacht ist lang, und das Moor glimmt noch. Na los.',
   elderTrials: 'Man sagt, die alten Sanduhren an den Verliestüren leuchten wieder. Dreh eine um, wenn du dich traust.',
   elderPlus: 'Und wenn du alles noch einmal von der ersten Nacht an gehen willst, mit deinen Werkzeugen, sag einfach Bescheid.',
@@ -123,6 +141,14 @@ const de: Translation<typeof en> = {
   herderLamp2: 'Eine der Kiefern hinter der Schlucht trägt nie Schnee, heißt es. Komisch, nicht?',
   herderQuiet: 'Das Licht ist von den Gipfeln verschwunden, und meine Ziegen schlafen wieder ruhig.',
 
+  // Nell die Fischerin
+  fisherHorn1: 'Ein Ritter, den ganzen Weg vom Moor her? Dann spürst du es auch. Die Ebbe kam vor einer Woche, und die Flut nie zurück.',
+  fisherHorn2: 'Etwas in der Meereshöhle hält sie fest. Der Weg dorthin liegt unter dem Priel, und der Priel läuft nie leer.',
+  fisherHorn3: 'Das Windhorn des alten Wärters liegt auf der Insel vor dem Strand. Die Pfosten stehen noch, falls du hinüberkommst.',
+  fisherCave1: 'Das ist das Horn des Wärters! Blas es gegen die Windmühle nördlich vom Weg. Die alte Pumpe legt den Priel trocken.',
+  fisherCave2: 'Meine Oma hat ihren Ring beim einsamen Felsen am Strand vergraben und ihn nie wiedergefunden. Pass auf die Krabben auf.',
+  fisherQuiet: 'Die Flut kommt und geht wieder. Bring mal eine Brasse an mein Feuer und koch sie langsam.',
+
   // Chests and doors
   empty: 'Leer.',
   unlocked: 'Das Schloss springt auf.',
@@ -134,6 +160,8 @@ const de: Translation<typeof en> = {
   foundKey: 'Du hast einen kleinen Schlüssel gefunden. Er öffnet eine verschlossene Tür an diesem Ort.',
   foundHeart: 'Du hast ein Herzgefäß gefunden! Ein Herz mehr.',
   foundOil: 'Du hast Laternenöl gefunden. Deine Laterne leuchtet jetzt heller.',
+  foundHorn: 'Du hast das Windhorn gefunden! H, C oder die Horntaste bläst es. Sein Wind wirft Feinde zurück und dreht Windmühlen.',
+  foundRod: 'Du hast eine Angel gefunden! Stell dich vor Wasser und drück Leertaste, J oder die Schwerttaste zum Auswerfen. Zieh, wenn es beißt, und koch deinen Fang an einem Lagerfeuer.',
   foundMoonlantern: 'Du hast die Mondlaterne gefunden! Ihr bleiches Licht zeigt verborgene Wege, etwa Brücken über dem Dunkel. Such sie an Schluchten.',
   foundSeeds: 'Du hast {n} Glockensamen! B, X oder die Samentaste pflanzt einen. Tritt zurück: er platzt und bricht rissigen Stein.',
   gotSeeds:
@@ -144,6 +172,11 @@ const de: Translation<typeof en> = {
   doneQuestBlade: 'Aufgabe erfüllt: Die Alte Klinge',
   newQuestBell: 'Neue Aufgabe: Die Ertrunkene Glocke',
   newQuestPeaks: 'Neue Aufgabe: Die Hohlen Gipfel',
+  newQuestCoast: 'Neue Aufgabe: Die Treibgutküste',
+  millTurns: 'Die Flügel knarren herum. Irgendwo beginnt eine Pumpe zu stampfen.',
+  drained: 'Der Priel läuft leer!',
+  pinwheelTurns: 'Das Windrad dreht sich.',
+  gustsOpen: 'Beide Windräder drehen sich. Eisengitter knirschen auf.',
   wayShut: 'Der Weg ist dunkel. Noch nicht.',
   seedsRefilled: 'Glockensamen {n}',
   moonstone: 'Mondstein! {n} von {total}',
@@ -176,11 +209,17 @@ const de: Translation<typeof en> = {
   gloamDown: 'Gefangen! Sie zappelt am Boden. Schlag zu!',
   gloamHigh: 'Sie flattert außer Reichweite. Fang sie mit der Hakenranke, solange sie tief hängt!',
   gloamFlees: 'Die Dämmerschwinge reißt sich los und steigt ins Dunkel!',
+  brineBeaten: 'Der Salzwurm versinkt ein letztes Mal im Becken, und das Meer atmet aus.',
+  brineQuiet: 'Weit draußen kehrt die Flut um. Die Älteste Wren wird davon hören wollen.',
+  brineBeached: 'An Land geblasen! Schlag zu!',
+  brineSlick: 'Zu glitschig! Blas ihn erst mit dem Horn an Land.',
+  brineFlees: 'Der Salzwurm schlängelt sich zurück in die Tiefe!',
 
   // Chapter end cards
   chapterOne: 'Kapitel eins: Die Dornenmutter',
   chapterTwo: 'Kapitel zwei: Die Ertrunkene Glocke',
   chapterThree: 'Kapitel drei: Die Hohlen Gipfel',
+  chapterFour: 'Kapitel vier: Die Treibgutküste',
   endStats: 'Mondsteine {n} von {total}   ·   Besiegte Feinde {beaten}   ·   Stürze {falls}',
   endOneAll: 'Alle Mondsteine summen zugleich. Fern im Glimmermoor öffnet etwas Gewaltiges ein Auge und lächelt.',
   endOneSome: 'Ein kaltes Licht flackert über dem Glimmermoor. Ein Teil des Mondes fehlt noch.',
@@ -191,6 +230,9 @@ const de: Translation<typeof en> = {
   endThreeAll: 'Alle Mondsteine des Königreichs leuchten auf einmal, und der Mond neigt sich so nah herab, dass man ihn berühren könnte. Bramblecrest wird nie wieder ganz dunkel sein.',
   endThreeSome: 'Die Gipfel schlafen unter den Sternen. Ein paar Mondsteine glimmen noch, wo keine Laterne hingeschaut hat.',
   endThreeFew: 'Das kalte Licht ist von den Gipfeln verschwunden. Das Königreich ruht, fürs Erste.',
+  endFourAll: 'Die Mondsteine steigen aus jedem Winkel des Königreichs auf und treiben übers Meer, und der Mond zieht die Flut mit ihnen heim. Brombeerkamm leuchtet von den Gipfeln bis zum Strand.',
+  endFourSome: 'Unter den Sternen atmet das Meer wieder. Draußen hinter den Inseln glimmen noch ein paar Mondsteine unter Wasser.',
+  endFourFew: 'Die Flut kehrt heim an die Treibgutküste. Das Königreich schläft, fürs Erste.',
   keepExploring: 'Weiter erkunden',
   newGame: 'Neues Spiel',
   newGamePlus: 'Neues Spiel+',
@@ -264,7 +306,6 @@ const de: Translation<typeof en> = {
   trialsTitle: 'Sanduhr-Prüfungen',
   trialBest: '{place}: {time}',
   trialNone: '{place}: noch nicht gelaufen',
-  closePage: 'Tippen oder N zum Schließen',
   stonesPlus: '{stones}   ·   {plus}',
 
   // The shops
@@ -290,6 +331,61 @@ const de: Translation<typeof en> = {
   charm: 'Mondanhänger',
   charmText: 'Nach einem Treffer kann dir länger nichts schaden.',
 
+  // Angeln und Kochen
+  fishBite: 'Es beißt! Zieh!',
+  fishCaught: '{fish} gefangen! Du hast {n}.',
+  fishLost: 'Er ist entwischt.',
+  fishTooSoon: 'Noch nichts. Warte, bis es beißt.',
+  fishFull: 'Dein Korb ist voll mit {fish}.',
+  fishNone: 'In diesem Wasser beißt nichts.',
+  perch: 'Einen Barsch',
+  eel: 'Einen Aal',
+  bream: 'Eine Brasse',
+  perchName: 'Barsch',
+  eelName: 'Aal',
+  breamName: 'Brasse',
+  campfire: 'Lagerfeuer',
+  cookNow: 'Du isst gerade: {meal}',
+  cookNone: 'Koch ein Essen: Es hält, bis du das nächste Mal fällst.',
+  cook: 'Kochen',
+  eating: 'Isst du',
+  needFish: '{fish} ×{n}',
+  stew: 'Barscheintopf',
+  stewText: 'Ein Herz mehr, bis du das nächste Mal fällst.',
+  skewer: 'Aalspieße',
+  skewerText: 'Schneller und öfter rollen, bis du das nächste Mal fällst.',
+  chowder: 'Brassensuppe',
+  chowderText: 'Die Hakenranke reicht weiter, bis du das nächste Mal fällst.',
+  ate: '{meal}! Es hält, bis du das nächste Mal fällst.',
+  creel: 'Korb: Barsche {perch}, Aale {eel}, Brassen {bream}',
+  mealNow: 'Essen: {meal}',
+  mealNone: 'Essen: keins',
+
+  // Das Bestiarium
+  bestiaryTitle: 'Bestiarium',
+  bestiaryOpen: 'Bestiarium ▸',
+  journalOpen: '◂ Tagebuch',
+  pageHint: 'Tippen oder N schließt   ·   ← → blättert um',
+  bestiaryCount: '{n} von {total}',
+  bestiaryIntro: 'Besiege {n} einer Art, um ihre Seite zu füllen. Eine ganze Familie bringt einen bleibenden Vorteil.',
+  unknownFoe: '???',
+  crawlers: 'Krabbler',
+  moths: 'Motten',
+  wilds: 'Wilde Wesen',
+  familyPerk: 'Alle Seiten voll: Sie lassen eine Münze mehr fallen.',
+  familyWant: 'Füll alle Seiten: Dann lassen sie eine Münze mehr fallen.',
+  pageFilled: 'Bestiarium-Seite voll: {name}',
+  familyFull: 'Bestiarium: alle {family} bekannt! Sie lassen eine Münze mehr fallen.',
+  slugName: 'Schnecke',
+  mothName: 'Motte',
+  thornlingName: 'Dornling',
+  frogName: 'Frosch',
+  beetleName: 'Panzerkäfer',
+  lanternName: 'Laternenmotte',
+  shadeName: 'Schatten',
+  crabName: 'Felsenkrabbe',
+  gullName: 'Sturmmöwe',
+
   // HUD
   keys: 'Schlüssel {n}',
   seeds: 'Samen {n}',
@@ -297,6 +393,6 @@ const de: Translation<typeof en> = {
 };
 
 /** Names and bell sounds that stay as they are in German. */
-export const keepEnglish: (keyof typeof en)[] = ['pipName', 'bakerName', 'herderName', 'bellLow', 'bellMid', 'trialBest', 'requestRow', 'stonesPlus'];
+export const keepEnglish: (keyof typeof en)[] = ['pipName', 'bakerName', 'herderName', 'fisherName', 'unknownFoe', 'needFish', 'bellLow', 'bellMid', 'trialBest', 'requestRow', 'stonesPlus'];
 
 export default de;

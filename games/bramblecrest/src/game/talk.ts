@@ -7,7 +7,7 @@ import { t, type TextKey } from '../i18n';
 /** What a talk does once its last line is read. */
 export type TalkEffect =
   | 'quest-blade' | 'quest-thorns' | 'finish' | 'cat-pet' | 'cat-stone' | 'quest-bell' | 'seeds' | 'refill' | 'finish-two' | 'trial' | 'shop-baker' | 'shop-hermit'
-  | 'quest-peaks' | 'finish-three' | 'plus-offer' | `take-${RequestId}` | `reward-${RequestId}`;
+  | 'quest-peaks' | 'finish-three' | 'quest-coast' | 'finish-four' | 'plus-offer' | `take-${RequestId}` | `reward-${RequestId}`;
 
 export interface Talk {
   lines: string[];
@@ -24,7 +24,7 @@ const ASK: Record<RequestId, [TextKey, TextKey, TextKey, TextKey]> = {
 };
 
 /** Talk that moves the story on, which a request never gets in the way of. */
-const STORY: ReadonlySet<TalkEffect | undefined> = new Set<TalkEffect | undefined>(['quest-blade', 'quest-thorns', 'finish', 'quest-bell', 'seeds', 'refill', 'finish-two', 'quest-peaks', 'finish-three']);
+const STORY: ReadonlySet<TalkEffect | undefined> = new Set<TalkEffect | undefined>(['quest-blade', 'quest-thorns', 'finish', 'quest-bell', 'seeds', 'refill', 'finish-two', 'quest-peaks', 'finish-three', 'quest-coast', 'finish-four']);
 
 /**
  * What a person says: their own talk, with their request worked in. A request is asked for, or its
@@ -70,6 +70,10 @@ function own(id: NpcId, s: GameState): Talk {
       if (reached(s, 'homeward')) return { lines: [t('herderQuiet')] };
       if (s.items.moonlantern) return { lines: [t('herderLamp1'), t('herderLamp2')] };
       return { lines: [t('herderPass1'), t('herderPass2'), t('herderPass3')] };
+    case 'fisher':
+      if (reached(s, 'tidings')) return { lines: [t('fisherQuiet')] };
+      if (s.items.horn) return { lines: [t('fisherCave1'), t('fisherCave2')] };
+      return { lines: [t('fisherHorn1'), t('fisherHorn2'), t('fisherHorn3')] };
   }
 }
 
@@ -164,6 +168,14 @@ function elder(s: GameState): Talk {
     case 'homeward':
       return { lines: [t('elderHomeward1'), t('elderHomeward2'), t('elderHomeward3')], then: 'finish-three' };
     case 'final':
+      return { lines: [t('elderCoast1'), t('elderCoast2'), t('elderCoast3')], then: 'quest-coast' };
+    case 'coast':
+      return { lines: [t('elderCoastHint')] };
+    case 'seacave':
+      return { lines: [t('elderSeacave')] };
+    case 'tidings':
+      return { lines: [t('elderTidings1'), t('elderTidings2'), t('elderTidings3')], then: 'finish-four' };
+    case 'after':
       return { lines: [t('elderEnd'), t('elderTrials'), t('elderPlus')], then: 'plus-offer' };
   }
 }
