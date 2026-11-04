@@ -38,6 +38,9 @@ study, shade gardens and a mirrored second production line.
   shortest of, and gardens that grow at close to the same pace.
 - Round four (AP15 to AP17): the next town once the town is a city, royal requests from day 7,
   and master craftsmen (see their entries under "How it runs").
+- Round five (AP18 to AP20): the alchemy bench, herb expeditions and shop decor (see their entries
+  under "How it runs"). No trophies were added for them: the game already lists ten, the most a
+  game may have.
 - The town (the first of a planned series of PRs): once `state.seals > 0` (`townOpen`) a Town
   button left of Recipes opens the `Town` scene, a map of lot cards: the apothecary and one per shop
   in `SHOPS`. A shop costs `shopCost` (1,000 for the bakery, then ten times more each `tier`) and is
@@ -165,6 +168,24 @@ study, shade gardens and a mirrored second production line.
 - `src/game/save.ts`: `loadState`, `saveState` (stamps `lastSeen` with `Date.now()` and writes
   `thinSave`, which `baseline`, `trimmed`, `merged` and `roundTimers` serve), `clearSave` (key `apothecary-save`), `grantLessons` (lessons an old save was already
   using), and the `ontoOwnRuns`, `ontoColumns` and `ontoHeart` belt migrations.
+- `src/game/alchemy.ts`: the round-five rules, free of Phaser. The bench (AP18): `WildHerb`,
+  `WILD_HERBS`, `Ingredient` (a refined good or a wild herb; `isWild`, `isGood`), `MixId`, `MIXES`
+  (inputs in any order, `price`, `cures`), `MURKY` and `MURKY_PRICE`, `Brewed`, `Alchemy` (the
+  `state.alchemy` record: `stock`, `mix`, `found`, `rack`, `wild`, `courier`) and `createAlchemy`,
+  `alchemyOpen` (every recipe `researched`), `mixFor`, `brewedPrice` (raised by `SEAL_PRICE` per
+  seal), `onHand`, `alchemyName`, and the actions `dropAtBench` (`BENCH_STOCK` of each refined
+  good), `addToMix`, `clearMix`, `mixNow` (`MIX_MIN` to `MIX_MAX` ingredients; a new recipe goes into
+  `found`), `mixAgain`, `sellBrewed` (into the purse), `canCure` and `useCure` (`plagueAt` the next
+  stage, as `deliverForPlague` does when a stage's potions are in). The courier (AP19): `Place`,
+  `PLACES`, `TRIPS` (herb, ms, how many it brings), `COURIER_COST`, `SATCHEL`, `hireCourier`,
+  `sendCourier` and `tickCourier`, which `tick` calls every step, so a trip also ends while away.
+  The decor (AP20): `DecorId`, `DECOR` (costs), `DECOR_IDS`, `decorOpen` (the guild joined),
+  `hasDecor`, `buyDecor` (also `nudgeReputation` by 3) and the bonuses the sim reads: `decorTip`
+  (`SIGN_TIP` on a filled order's tip in `serveFromShelf`), `decorPatience` (`LANTERN_PATIENCE` on
+  `newOrder`'s `maxPatience`), `decorRegulars` (`ARCH_REGULARS` on `REGULAR_CHANCE`) and
+  `decorWalkOff` (`FOUNTAIN_WALK_OFF` on `REPUTATION_WALKED_OFF`). Each is 1 without the decor, so
+  a new game plays exactly as before. `alchemy.ts` imports values from `state.ts` and `state.ts` only
+  `createAlchemy` from it, which `createInitialState` calls.
 - `src/game/away.ts`: the autopilot. `catchUp(state, now, rand)` plays the time since `lastSeen`
   (capped at `AWAY_CAP_MS`, 2h; nothing under `AWAY_MIN_MS`, 60s) through `tick` in 500ms steps
   with nobody on a work spot and every customer at the counter, and returns an `AwaySummary`
@@ -330,6 +351,16 @@ study, shade gardens and a mirrored second production line.
   they give beside the arrow (`pickUpPad(what)`, `pad-out-<sack|bottle|coin>`: the refining tables',
   the cauldrons' and the till's). The counter's front panels each carry the shop's sign, Apothecary's
   favicon (`shopSign` in `stations.ts`, drawn from the favicon's own shapes).
+- `src/ui/Board.ts`: `Board`, a panel over the middle of the view whose `build(kit)` lays its
+  contents out afresh on `toggle(true)` and after every button pressed on it (`refresh`), with a
+  `BoardKit` of `heading`, `text`, `icon`, `button` (faded and dead when disabled) and `next` line by
+  line; its background goes under its parts and stops taps. `GameScene.boards` holds the bench's,
+  the courier's and the decor board's, and `closePanels` closes them like the others.
+- `src/art/alchemy.ts`: `bakeAlchemy` (called by `BootScene`) paints `alchemy-bench`,
+  `courier-post`, the wild herbs' and bench potions' icons (`alchemy-<id>`; the potions are
+  `itemIcon` flasks, their colours and shapes in `ITEM_COL` and `POTION_SHAPES` in `paint.ts`) and
+  `decor-<id>` for each piece of decor; `alchemyTexture(id)` gives an ingredient's or bench
+  potion's icon (a refined good's item icon).
 - `src/ui/`: `BackStack` (items piled on the doctor), `IconRow` (customer wants), `Pallet` (crate
   stacks, exposes `item` and `count`, `setVisible`), `Shelf` (a shop shelf of one potion, up to six bottles, fine
   ones first; exposes `item` and `count`), `ProgressBar` (redraws only when its fill changes;
@@ -551,6 +582,25 @@ study, shade gardens and a mirrored second production line.
   `deliverToRoyal`, which takes what the shelf holds of each (plain first) and, once every want is
   met, pays `reward` (`ROYAL_PREMIUM` 2.5 times their prices) and `ROYAL_REPUTATION` and sets `done`.
   No randomness.
+- Alchemy bench (AP18; layout `BENCH`): `createAlchemy` lays the bench's drop marker (`pad-in`,
+  `dropAtBench`, hidden until `alchemyOpen`) and, through `once(alchemyOpen)`, the bench (an
+  obstacle, so it never blocks a game that hasn't opened it) with its label and a "2/6 found"
+  line, and the courier's post. A tap on the bench (`opensBoard`) opens `drawBench`: the bowl with
+  Mix and Clear, a `+` for each refined good on the bench and each wild herb in the satchel, then
+  every `MIXES` entry, found (its inputs, icon, name, price or "Cures a plague stage", how many on
+  the rack, Make, Sell and for a cure Cure) or hinted (`<id>Hint`), and the Murky Draughts on the
+  rack. `acted` shows the feedback and plays its sound, or `ui('refuse')` for none.
+- Herb expeditions (AP19; layout `COURIER_POST`): the post is an obstacle with the courier
+  (`customerTexture(5)`) standing at `home` while hired and not out, and a status line ("Tap to
+  hire", "Tap to send", "Back in 2:30" by `clock`). A tap opens `drawCourier`: Hire for
+  `COURIER_COST`, then a Send per `PLACES` entry while home, and the satchel. The view says
+  "Courier back: +3 Silverleaf" when `courier.trips` goes up and refreshes the courier's board each
+  second for its countdown. No randomness: trips always take and bring the same.
+- Shop decor (AP20; layout `DECOR_SPOTS`): `createDecor` hangs a tappable "Shop decor" sign on the
+  shop's front wall right of the street door (shown once `decorOpen`), which opens `drawDecor` (each
+  piece's name, bonus, cost and Buy, or "Put up"), and stands each bought piece's `decor-<id>` on the
+  street: the painted sign and the fountain right of the path above the wagon's lines, the herb arch
+  over the path and a lantern either side of it below.
 - Master craftsmen (AP16, `MASTERY_MS`, `MASTERY_SPEED`, `masteryLevel`, `masterySpeed`):
   `state.mastery[id]` adds `dt` while a refining table or cauldron with hired craftsmen has work in
   hand (also while away, through `tick`); each of `MASTERY_MS` (10, 30, 90 min) reached is a level,
@@ -611,7 +661,8 @@ save or load, 0 in a new game), `reputation` (0 to 100), `regulars` (`face`, `wa
 `rival` (`open`, `day`, `potion`, `sold`, `streak`, and `dayShare` once a kept contract ended the day early),
 `seals` (town seals), `wagon` (`day`, `potion`, `crate`, `pay`, `left`, `sold`, or null), `royal`
 (`day`, `until`, `wants`, `reward`, `done`, or null), `mastery` (ms worked per station) and
-`marketPick` (the herb market's good to buy). `town` (`TownState`) holds the shops bought, the
+`marketPick` (the herb market's good to buy), `alchemy` (the bench, the courier and the satchel,
+see `alchemy.ts`) and `decor` (the decor bought). `town` (`TownState`) holds the shops bought, the
 doctor's hands in town, the `districts` and `cities` (towns made cities, 0 when missing); `loadState` fills it through `normalizeTown`, which merges each shop, station
 and route per key and each district by index, so new shops, stations and districts load into old saves. The contract may have a `bundle` (`potion`, `need`,
 `made`); the plague may have `season` and `curedDay`, and the state `untoldCure`. Each order also has `tip`, its full tip (`maxTip`
@@ -793,13 +844,18 @@ Under browser automation the engine is a no-op, so the playthrough is unchanged.
 | `sell` / `served` | `createSound`: `state.sold` went up / an order left with nothing more to want |
 | `cascade` | the till collected, the herb market's sell marker, a crate sold to the wagon, a royal request filled |
 | `upgrade` (town map) | the next town founded |
+| `drop` | the alchemy bench's drop marker |
+| `upgrade` | a bench potion discovered, the courier hired, a piece of decor bought |
+| `bubble` | a bench mix that discovers nothing, Make |
+| `cascade` | a bench potion sold |
+| `plagueUp` | a cure given to the town |
 | `hmph` | `createSound`, an order gone with wants left and no patience |
 | `missed` | `createContract`, a day ended with its contract missed |
 | `rush` | `createSound`, a market day's crowd arrives |
 | `blight` | `createSound`, more beds blighted than last frame |
 | `plagueUp` | `createPlague`, a stage beaten or the Panacea unlocked |
 
-- Shared sounds: `ui('click')` for the Recipes and Settings buttons, price signs, priority signs,
+- Shared sounds: `ui('click')` for the bench, the courier's post, the decor board and Send, `ui('coin')` when the courier comes back, `ui('refuse')` for a bench, courier or decor button that does nothing; `ui('click')` for the Recipes and Settings buttons, price signs, priority signs,
   the herb market's sign and a garden sign that replants; `ui('refuse')` for a garden sign with nothing else to plant, a tap on an order bubble
   that hands nothing over (out of the shop or not on the shelf), a wagon tap without a full crate, a royal courier tap with none of its potions on the shelf
   (`ui('coin')` when some were handed over),
@@ -920,6 +976,10 @@ Under browser automation the engine is a no-op, so the playthrough is unchanged.
 - `tick` runs before `movePlayer`, so `workingAt` uses last frame's feet position.
 - Healing Draught art is red; keep any cross shapes off red (root rule on red crosses).
 - `replantGarden` must change plots in place: `createPlots` keeps each plot object in a closure.
+- The bench and the courier's post are created only once `alchemyOpen`, and the decor sign only shows
+  once the guild is joined, so neither stands in the playthrough's way; their bonuses are 1 until
+  bought. A new bench potion is a `MixId` and `MIXES` entry, its colour in `ITEM_COL` and a
+  `POTION_SHAPES` entry, and its name and `<id>Hint` in each language file.
 - New randomness in `tick` must stay behind a condition that is false on day 1 (like the blight's),
   or the playthrough's seeded orders change.
 - The town's randomness (`tickTown`'s customers) runs only for a shop bought, which needs the

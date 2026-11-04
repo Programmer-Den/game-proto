@@ -1,6 +1,7 @@
 import { GROW_MS, PLANTS, POTION_PRICE, POTIONS, REFINED, type BrewOut, type ItemId, type PlantId, type PotionId, type RefinedId, type SellableId } from './items';
 import type { TextKey } from '../i18n';
 import { SHOP_IDS, createTown, type Gear, type TownState } from './town';
+import { createAlchemy, type Alchemy, type DecorId } from './alchemy';
 
 export interface Plot {
   plant: PlantId;
@@ -304,6 +305,10 @@ export interface GameState {
   royal: RoyalRequest | null;
   /** How long hired craftsmen have worked at each refining table and cauldron, for their mastery (AP16). */
   mastery: Partial<Record<StationId, number>>;
+  /** The alchemy bench, the courier and the wild herbs they bring (AP18, AP19; see `alchemy.ts`). */
+  alchemy: Alchemy;
+  /** The shop decor bought (AP20). */
+  decor: DecorId[];
 }
 
 /**
@@ -957,6 +962,8 @@ export function createInitialState(): GameState {
     town: createTown(),
     royal: null,
     mastery: {},
+    alchemy: createAlchemy(),
+    decor: [],
   };
   state.contract = contractFor(state, 1, 0);
   return state;

@@ -1,4 +1,5 @@
 import { byDifficulty } from '../../../../shared/settings';
+import { decorPatience, decorRegulars, decorTip, decorWalkOff, tickCourier } from './alchemy';
 import {
   FINE,
   GROW_MS,
@@ -222,7 +223,7 @@ export function tick(
   // market day's crowd walking off loses the rush bonus.
   for (const order of state.orders) {
     if (order.patience > 0) continue;
-    nudgeReputation(state, -REPUTATION_WALKED_OFF);
+    nudgeReputation(state, -REPUTATION_WALKED_OFF * decorWalkOff(state));
     if (order.rush && state.rush) state.rush.lost = true;
   }
   state.orders = state.orders.filter((o) => o.patience > 0);
@@ -249,6 +250,8 @@ export function tick(
   if (state.wagon && state.wagon.left > 0) state.wagon.left -= dt;
   // Every so many days the crown's courier comes with a royal request.
   if (isRoyalDay(day) && state.royal?.day !== day) state.royal = royalFor(state, day);
+  // The courier out on an expedition (AP19) walks on, also while the game is closed.
+  tickCourier(state, dt);
   const stage = plagueStage(state);
   if (stage) {
     state.plague!.left -= dt;
@@ -563,7 +566,7 @@ function newOrder(state: GameState, rand: () => number, regulars = true): Order 
   const busy = state.upgrades.customers.level;
   const potions = orderable(state);
   // Now and then a regular comes back, for the same potions as last time.
-  const regular = regulars && state.regulars.length > 0 && rand() < REGULAR_CHANCE ? state.regulars.shift()! : null;
+  const regular = regulars && state.regulars.length > 0 && rand() < REGULAR_CHANCE * decorRegulars(state) ? state.regulars.shift()! : null;
   const theirs = regular?.wants.filter((p) => potions.includes(p)) ?? [];
   let wants: PotionId[];
   if (theirs.length > 0) wants = theirs;
@@ -580,7 +583,7 @@ function newOrder(state: GameState, rand: () => number, regulars = true): Order 
   const level = state.upgrades.counter.level;
   const pay = Object.fromEntries(wants.map((p) => [p, potionPrice(state, p) + 2 * (level + 1) + (back ? REGULAR_BONUS : 0)]));
   const maxPatience =
-    ((60_000 + rand() * 30_000) * (1 + 0.25 * level) * byDifficulty(1.5, 1, 0.7)) / (1 + 0.5 * busy);
+    ((60_000 + rand() * 30_000) * (1 + 0.25 * level) * byDifficulty(1.5, 1, 0.7) * decorPatience(state)) / (1 + 0.5 * busy);
   const id = state.nextOrderId++;
   return {
     id,
@@ -681,7 +684,8 @@ function serveFromShelf(state: GameState, atCounter: (order: Order) => boolean, 
     });
     // A filled order tips what is left of its tip, which shrank while the customer waited.
     if (order.wants.length === 0) {
-      const tip = tipNow(order);
+      // The painted sign over the street door makes for bigger tips.
+      const tip = Math.round(tipNow(order) * decorTip(state));
       counter.till += tip;
       state.tips += tip;
       orderFilled(state, order);
