@@ -270,6 +270,11 @@ and tries to link it to the repo (the run summary says if the link has to be mad
   row to the Watch AI table in the README and its path to `WATCH` in `e2e/hub.spec.ts`, which opens
   it with `?watch`. The hub has no link to it: it is opened by URL only. A game's playthrough never
   uses `?watch`.
+- **Daily challenges.** A game with a daily (the same seeded run for every player on the same day,
+  one try a day) uses `shared/daily.ts`: `dailyRand(game)` seeds the run, `startDaily(game)` uses
+  up today's try when it starts, `finishDaily(game, score)` keeps today's score, the best and the
+  days-in-a-row streak under `<game>-daily`, and `loadDaily(game)` reads them for the menu. Hotfoot,
+  Augury, Ninefold and Tiny Kingdom keep their own older dailies.
 - **Never use a red cross.** No game art, icon, button, cover or favicon (the hub's included) may show a
   red cross: no red plus, red-cross health or medic symbol, or red crosshair. Use a green cross (or
   another colour) for healing and aiming marks instead.
