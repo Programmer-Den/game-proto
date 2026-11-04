@@ -126,6 +126,8 @@ export class GameScene extends Phaser.Scene {
   unlocking: HeroId[] = [];
   /** Whether the run that ended has been saved. */
   private recorded = false;
+  /** When the run ended (`time.now`), so a Space press meant for the signature doesn't go on into the endless rift. */
+  private endAt = 0;
   /** Plays the run's sounds and music by watching the state frame to frame. */
   private cues = new SoundCues();
   /** The run time of the last save of the run under way. */
@@ -200,8 +202,9 @@ export class GameScene extends Phaser.Scene {
     this.keys = kb.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,SPACE,ONE,TWO,THREE,FOUR,FIVE,SIX,SEVEN,EIGHT,NINE,ZERO,MINUS,PLUS,ENTER') as Record<string, Phaser.Input.Keyboard.Key>;
     this.keys.SPACE.on('down', () => {
       if (this.unlocking.length) this.closeUnlock();
-      else if (this.state.phase === 'won') this.goEndless();
-      else this.sigQueued = true;
+      else if (this.state.phase !== 'won') this.sigQueued = true;
+      // Not at once: a press meant for the signature as the last boss falls stays on the end screen.
+      else if (this.time.now - this.endAt > 800) this.goEndless();
     });
     // 1-9 and 0 pick the first ten heroes, - and = the last two.
     ['ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE', 'ZERO', 'MINUS', 'PLUS'].forEach((key, i) => {
@@ -705,6 +708,7 @@ export class GameScene extends Phaser.Scene {
     this.panel = null;
     if ((s.phase === 'won' || s.phase === 'lost') && !this.recorded) {
       this.recorded = true;
+      this.endAt = this.time.now;
       this.bonus = 0;
       unseed();
       const route = s.route.map((i) => PLANETS[i].id);
