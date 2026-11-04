@@ -97,6 +97,8 @@ export interface Pest {
   slowFactor: number;
   /** Time left on its hit flash, in ms. */
   hitMs: number;
+  /** Golem hits taken (spores don't count), so the scene clinks only for a throw on armour. */
+  hits: number;
   /** Time left standing still, stunned by a bell golem's ring, in ms. */
   stunMs: number;
   /** Time left until a ring can stun it again, in ms: its stun and STUN_GUARD_MS after it. */
@@ -670,7 +672,7 @@ function step(s: GameState, dt: number) {
       const { kind } = s.queue.shift()!;
       const hp = Math.round(PEST_INFO[kind].hp * s.waveHpScale);
       const route = s.spawned++ % routes.length;
-      s.pests.push({ id: s.nextId++, kind, wave: s.wave, hp, maxHp: hp, route, dist: 0, under: false, slowMs: 0, slowFactor: 1, hitMs: 0, stunMs: 0, stunGuardMs: 0 });
+      s.pests.push({ id: s.nextId++, kind, wave: s.wave, hp, maxHp: hp, route, dist: 0, under: false, slowMs: 0, slowFactor: 1, hitMs: 0, hits: 0, stunMs: 0, stunGuardMs: 0 });
     }
   }
 
@@ -758,6 +760,7 @@ function step(s: GameState, dt: number) {
       const armour = stats.pierce ? 0 : (PEST_INFO[target.kind].armour ?? 0);
       target.hp -= pricks * Math.max(1, damage * boost - armour);
       target.hitMs = HIT_MS;
+      target.hits++;
       // A weaker slow never undoes a stronger one still running; an equal one tops it up.
       if (stats.slow) {
         const current = target.slowMs > 0 ? target.slowFactor : 1;

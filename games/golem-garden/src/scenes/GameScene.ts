@@ -390,7 +390,7 @@ export class GameScene extends Phaser.Scene {
     const before = this.soundWatch();
     // The garden picker (and the harvest and game-over screens) and a boon pick waiting to be made
     // hold the game still behind them.
-    tick(s, this.picker || this.graftBox || this.plotBox || s.offer.length ? 0 : dt * (s.fast ? FAST : 1));
+    tick(s, this.overlayOpen() || s.offer.length ? 0 : dt * (s.fast ? FAST : 1));
     this.tickSounds(before);
     checkTrophies(s);
     if (s.heart < heart) this.heartHit();
@@ -420,8 +420,8 @@ export class GameScene extends Phaser.Scene {
         this.showPicker('over');
       }
     }
-    // The boon pick waits for the harvest screen to close.
-    if (s.offer.length && !this.picker && !this.boonBox) this.showBoons();
+    // The boon pick waits for the harvest screen (and the plots, editor or grafts opened from it) to close.
+    if (s.offer.length && !this.overlayOpen()) this.showBoons();
     for (const pop of s.pops) this.sapPop(pop);
     s.pops = [];
     this.bars.clear();
@@ -436,7 +436,7 @@ export class GameScene extends Phaser.Scene {
     this.refresh();
   }
 
-  /** What the frame's sounds are told from: the next id, seeds still growing, hedges and armoured pests' health. */
+  /** What the frame's sounds are told from: the next id, seeds still growing, hedges and armoured pests' golem hits. */
   /**
    * Moves the frame off the shared corner buttons when they would cover the board's bottom-left
    * cell, as on a short window (a phone on its side), where the buttons keep their CSS size and so
@@ -477,7 +477,7 @@ export class GameScene extends Phaser.Scene {
       nextId: s.nextId,
       growing: new Set(s.golems.filter((g) => g.growMs > 0).map((g) => g.id)),
       hedges: new Set(s.hedges.map((h) => h.id)),
-      armoured: new Map(s.pests.filter((p) => PEST_INFO[p.kind].armour).map((p) => [p.id, p.hp])),
+      armoured: new Map(s.pests.filter((p) => PEST_INFO[p.kind].armour).map((p) => [p.id, p.hits])),
     };
   }
 
@@ -494,7 +494,8 @@ export class GameScene extends Phaser.Scene {
     if (come.has('crow')) sfx('caw');
     if (come.has('mole')) sfx('dig');
     if (come.has('queen')) sfx('groan');
-    if (s.pests.some((p) => (before.armoured.get(p.id) ?? 0) > p.hp)) sfx('clink');
+    // A throw on armour, not spore damage (which takes health off every step).
+    if (s.pests.some((p) => p.hits > (before.armoured.get(p.id) ?? Infinity))) sfx('clink');
     if ([...before.hedges].some((id) => !s.hedges.some((h) => h.id === id))) sfx('snap');
     if (s.pops.length) {
       sfx('squash');
@@ -509,6 +510,11 @@ export class GameScene extends Phaser.Scene {
     if (part === this.musicPart) return;
     this.musicPart = part;
     playMusic(part === 'calm' ? CALM : WAVES, part);
+  }
+
+  /** Whether an overlay (the picker, plots or editor, grafts or boon pick) is up. */
+  private overlayOpen() {
+    return !!(this.picker || this.graftBox || this.plotBox || this.boonBox);
   }
 
   /** The dark cover behind an overlay, over the whole view, taking the taps behind it. */

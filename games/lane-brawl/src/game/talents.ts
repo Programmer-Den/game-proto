@@ -1,15 +1,21 @@
 // Talent pages (LB18): the player's page for each class, kept in the browser under
 // `lane-brawl-talents` as JSON `{ classId: [talentId, ...] }`, one id per row. Every read and write is
-// in try/catch, so blocked storage only forgets the page.
+// in try/catch and odd saves are cleaned on load, so blocked or damaged storage only forgets the page.
 
 import { TALENTS, TALENT_ROWS, TalentId, TalentRow } from './data';
 
 const KEY = 'lane-brawl-talents';
 
+/** Every saved page, each kept only as a list of talent ids (anything else in the save is dropped). */
 function loadAll(): Record<string, TalentId[]> {
   try {
-    const raw = JSON.parse(localStorage.getItem(KEY) ?? '{}');
-    return raw && typeof raw === 'object' ? raw : {};
+    const raw: unknown = JSON.parse(localStorage.getItem(KEY) ?? '{}');
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+    const all: Record<string, TalentId[]> = {};
+    for (const [classId, page] of Object.entries(raw)) {
+      if (Array.isArray(page)) all[classId] = page.filter((id): id is TalentId => TALENTS.some((t) => t.id === id));
+    }
+    return all;
   } catch {
     return {};
   }

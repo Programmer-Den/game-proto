@@ -1623,7 +1623,7 @@ export class GameScene extends Phaser.Scene {
     const fy = tgt.y + FOOT[tgt.kind];
     const bob = settings.reduceMotion ? 0 : Math.sin(s.time / 220) * 3;
     const y = fy - headOf(tgt) - (tgt.kind === 'champion' ? 30 : 18) + bob;
-    const label = t('objectiveMarker', { gold: o.gold });
+    const label = t('objectiveMarker', { gold: o.gold * s.goldMult });
     const w = 128;
     g.fillStyle(col(UI.slateDark), 0.92).fillRect(tgt.x - w / 2, y - 22, w, 18);
     g.lineStyle(1.5, col(UI.gold), 1).strokeRect(tgt.x - w / 2, y - 22, w, 18);
@@ -2131,7 +2131,7 @@ export class GameScene extends Phaser.Scene {
       this.t('obj-title', c.x + 14, c.y + 20, objectiveTitle(o), 14, UI.text, 'left', true);
       g.fillStyle(0x151a24, 1).fillRect(c.x + 14, c.y + 46, 92, 6);
       g.fillStyle(col(UI.gold), 1).fillRect(c.x + 14, c.y + 46, 92 * progress, 6);
-      this.t('obj-reward', c.x + c.w - 10, c.y + 42, t(o.banner ? 'objectiveRewardBanner' : 'objectiveReward', { gold: o.gold }), 11, UI.gold, 'right', true);
+      this.t('obj-reward', c.x + c.w - 10, c.y + 42, t(o.banner ? 'objectiveRewardBanner' : 'objectiveReward', { gold: o.gold * s.goldMult }), 11, UI.gold, 'right', true);
     } else {
       const last = s.lastObjective;
       this.t('obj-head', c.x + 14, c.y + 6, t(last ? (last.done ? 'objectiveDone' : 'objectiveMissed') : 'objectiveHead'), 10, last && !last.done ? UI.muted : UI.green, 'left', true);

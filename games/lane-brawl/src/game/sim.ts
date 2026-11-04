@@ -146,6 +146,8 @@ export function tick(s: GameState, dt: number) {
   }
   if (s.event === 'suddenDeath' && !s.suddenDeath && s.time >= SUDDEN_DEATH.at) {
     s.suddenDeath = true;
+    // Champions already down stay down too, like those that fall from now on.
+    for (const u of s.units) if (u.kind === 'champion' && u.dead) u.respawnAt = Infinity;
     notice(s, text('noticeSuddenDeath'), '#ff6a5a');
     sound(s, 'suddenDeath');
     aiLog('blue', 'Sudden death: no more respawns');
@@ -323,7 +325,7 @@ function updateObjective(s: GameState) {
       if (t) s.fx.push({ kind: 'ring', x: t.x, y: t.y, r: 80, color: '#f2c14e', ms: 700 });
     }
     sound(s, done ? 'objective' : 'objectiveMissed');
-    s.lastObjective = { title: o.title, done, gold: o.gold, at: s.time };
+    s.lastObjective = { title: o.title, done, gold: o.gold * s.goldMult, at: s.time };
     s.objective = null;
     s.nextObjectiveAt = s.time + OBJECTIVE_GAP_MS;
     return;
@@ -918,8 +920,8 @@ function breakPlates(s: GameState, t: Unit) {
     if (!near.length) continue;
     const gold = Math.round(PLATING.gold / near.length);
     for (const c of near) {
-      earn(s, c, gold);
-      if (c.player) s.fx.push({ kind: 'coin', x: t.x, y: t.y - 40, gold, color: '#f2c14e', ms: 900 });
+      const banked = earn(s, c, gold);
+      if (c.player) s.fx.push({ kind: 'coin', x: t.x, y: t.y - 40, gold: banked, color: '#f2c14e', ms: 900 });
     }
     sound(s, 'plate', t, near.some((c) => c.player));
     aiLog(near[0].side as Team, `breaks a plate off the ${t.lane} tower for ${gold} gold each`);
@@ -1007,9 +1009,11 @@ export function hiddenFrom(_s: GameState, team: Unit['side'], u: Unit): boolean 
   return team !== 'neutral' && u.hidden[team];
 }
 
-/** Gold earned by a champion, doubled in a double gold event (`s.goldMult`). */
+/** Gold earned by a champion, doubled in a double gold event (`s.goldMult`): returns the gold banked, for its coin popup. */
 function earn(s: GameState, u: Unit, gold: number) {
-  u.gold += gold * s.goldMult;
+  const banked = gold * s.goldMult;
+  u.gold += banked;
+  return banked;
 }
 
 /** Red's units hit harder or softer on Hard and Easy. */
@@ -1327,8 +1331,8 @@ function kill(s: GameState, t: Unit, killerId: number) {
         const helper = getUnit(s, Number(id));
         if (!helper || helper === champKiller || helper.side === t.side || s.time - at > ASSIST.windowMs) continue;
         helper.assists++;
-        earn(s, helper, ASSIST.gold);
-        if (helper.player) s.fx.push({ kind: 'coin', x: t.x, y: t.y - 24, gold: ASSIST.gold, color: '#9fd8ff', ms: 900 });
+        const banked = earn(s, helper, ASSIST.gold);
+        if (helper.player) s.fx.push({ kind: 'coin', x: t.x, y: t.y - 24, gold: banked, color: '#9fd8ff', ms: 900 });
       }
       t.hurtBy = {};
       // In sudden death a fallen champion stays down.
@@ -1759,9 +1763,9 @@ function updateRunes(s: GameState) {
     const def = RUNES[r.kind];
     if (def.buff && def.ms) addBuff(taker, def.name, def.buff, def.ms, def.color);
     if (def.gold) {
-      earn(s, taker, def.gold);
+      const banked = earn(s, taker, def.gold);
       for (const a of s.units) if (a !== taker && a.kind === 'champion' && a.side === taker.side) earn(s, a, def.teamGold ?? 0);
-      if (taker.player) s.fx.push({ kind: 'coin', x: r.x, y: r.y, gold: def.gold, color: def.color, ms: 900 });
+      if (taker.player) s.fx.push({ kind: 'coin', x: r.x, y: r.y, gold: banked, color: def.color, ms: 900 });
     }
     s.fx.push({ kind: 'ring', x: r.x, y: r.y, r: 50, color: def.color, ms: 600 });
     sound(s, 'runeTaken', r, taker.player);

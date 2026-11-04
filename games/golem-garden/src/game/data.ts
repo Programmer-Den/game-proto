@@ -398,10 +398,13 @@ export const BOON_INFO: Record<Boon, { name: TextKey; blurb: TextKey }> = {
 export const BOON = { mossSlow: 0.5, sunReach: 20, leaves: 2, hedgeHp: 0.5, pebbleDamage: 0.2, compostCap: 15 };
 /**
  * The three boons offered after the `nth` Queen Slug (1 for wave 10): two sets of three, in turn.
- * With the 'hedges' twist, where no hedge can be planted, Long moss takes Thick hedges' place.
+ * With the 'hedges' twist, where no hedge can be planted, Long moss takes Thick hedges' place; with
+ * the 'seeds' twist, where no pebble golem can be planted, Sunny row takes Sharp rocks' place.
  */
 export const boonOffer = (nth: number, twist: Twist | null = null): Boon[] =>
-  BOONS.slice(((nth - 1) % 2) * 3, ((nth - 1) % 2) * 3 + 3).map((b) => (b === 'hedge' && twist === 'hedges' ? 'moss' : b));
+  BOONS.slice(((nth - 1) % 2) * 3, ((nth - 1) % 2) * 3 + 3).map((b) =>
+    b === 'hedge' && twist === 'hedges' ? 'moss' : b === 'pebble' && twist === 'seeds' ? 'sun' : b,
+  );
 
 /**
  * Thorny variants (GG13): three stars on a garden unlock its thorny variant, played with one twist
@@ -426,7 +429,7 @@ export const LEAN_SAP = 30;
 
 /**
  * The daily plot (GG16): one seeded garden a day, the same for everyone, played for `waves` waves
- * (or until the Heartwood falls). Its three golem seeds are fixed for the day, each growing into
+ * (or until the Heartwood falls). Its five golem seeds are fixed for the day, each growing into
  * one set form at level 3. The score is `perWave` points a wave cleared and `perLeaf` a leaf kept.
  */
 export const DAILY = { waves: 15, perWave: 10, perLeaf: 5 };
