@@ -49,6 +49,8 @@ const en = {
   inkText: 'Charts sell for 25% more',
   compassName: 'Lodestone Compass',
   compassText: 'Shows villages and ruins through the fog',
+  sloopName: 'Coastal Sloop',
+  sloopText: 'A second landing on the far coast',
 
   // Hands: name and card text (the card has room for about 26 characters)
   woodsmanName: 'Woodsman',
@@ -280,6 +282,39 @@ const en = {
   expeditionScore: 'Charted',
   expeditionRecord: 'Best on this isle: {n}%',
   backToHarbour: 'Back to the harbour',
+
+  // The coastal sloop (MM14)
+  sloopLanding: '{price} · sloop landing',
+  sloopLands: 'The sloop lands on the far coast',
+
+  // Winter isles (MM16)
+  winterKind: '{kind} in winter',
+  winterSail: '{sail} in winter',
+  winterNotice: 'Winter: snow hides the ground',
+  underSnow: 'under snow: cost unknown',
+
+  // Village trade (MM15)
+  tradeHead: 'VILLAGE TRADE · NEXT VOYAGE',
+  tradeButton: 'Village trade',
+  tradeOffers: { one: '{n} village offers a trade', other: '{n} villages offer a trade' },
+  tradePicked: '{trade} on the next voyage',
+  tradeNone: 'Chart a village to trade',
+  tradeTitle: 'Village trade',
+  tradeLine: 'Each charted village trades once for a copy of your chart. Pick one trade for the next voyage.',
+  tradeTake: 'Take',
+  tradeTaken: 'Taken',
+  storesName: 'Stores',
+  storesText: '+{n} supplies on the next voyage',
+  guideName: 'A guide',
+  guideText: 'The first {n} surveys of the next voyage are free, and snow hides nothing',
+  rumourName: 'A rumour',
+  rumourText: "Marks this isle's wonder through the fog",
+  rumourNext: "Marks the next isle's wonder through the fog",
+  rumourDone: "This isle's wonder is seen or marked already",
+  guideAboard: '  ·  GUIDE: {n} FREE',
+  guideJoins: { one: 'A guide: {n} survey free', other: 'A guide: {n} surveys free' },
+  storesJoin: 'Village stores: +{n} supplies',
+  rumourHint: 'wonder?',
 };
 
 export default en;

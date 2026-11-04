@@ -152,8 +152,17 @@ function heightField(tiles: Tile[]) {
 /** How many canvas pixels a CANVAS unit is on `ctx`'s canvas, which is CANVAS times that. */
 const unitOf = (ctx: Ctx) => ctx.canvas.width / CANVAS.w;
 
-/** Paints the whole island (charted or not) onto a context the shape of CANVAS. */
-export function paintTerrain(ctx: Ctx, tiles: Tile[]) {
+/** The snow over a winter isle's land, per theme, and how much of the tint it covers. */
+const SNOW = { light: [243, 246, 249], dark: [128, 141, 153] } as const;
+const SNOW_COVER = 0.72;
+/** A frozen river's ice, per theme. */
+const ICE = { light: '#8fc3e0', dark: '#4f7f9f' } as const;
+
+/**
+ * Paints the whole island (charted or not) onto a context the shape of CANVAS; a winter isle's land
+ * lies under snow and its rivers are ice.
+ */
+export function paintTerrain(ctx: Ctx, tiles: Tile[], winter = false) {
   const T = terrainOf(tiles);
   const k = unitOf(ctx);
   const heightAt = heightField(tiles);
@@ -199,6 +208,12 @@ export function paintTerrain(ctx: Ctx, tiles: Tile[]) {
         r = r * 0.35 + forest[0] * 0.65;
         g = g * 0.35 + forest[1] * 0.65;
         bl = bl * 0.35 + forest[2] * 0.65;
+      }
+      if (winter && h > -0.02) {
+        const [sr, sg, sb] = SNOW[theme];
+        r += (sr - r) * SNOW_COVER;
+        g += (sg - g) * SNOW_COVER;
+        bl += (sb - bl) * SNOW_COVER;
       }
       if (h > -0.02) {
         const s = Math.max(-0.35, Math.min(0.3, between(L, fi, fj) * 9));
@@ -298,7 +313,13 @@ export function paintTerrain(ctx: Ctx, tiles: Tile[]) {
     ctx.stroke();
   };
   links(['river', 'sea'], (segs) => stroke(segs, theme === 'dark' ? 'rgba(24,50,73,0.9)' : 'rgba(188,223,241,0.9)', 12), 'river');
-  links(['river', 'sea'], (segs) => stroke(segs, BLUE, 5), 'river');
+  links(['river', 'sea'], (segs) => stroke(segs, winter ? ICE[theme] : BLUE, 5), 'river');
+  if (winter) {
+    // Frozen: a broken white line of ice down the river's middle.
+    ctx.setLineDash([5, 6]);
+    links(['river', 'sea'], (segs) => stroke(segs, theme === 'dark' ? 'rgba(220,235,245,0.7)' : '#ffffff', 1.6), 'river');
+    ctx.setLineDash([]);
+  }
   // A cased road: an ink edge round a pale fill.
   links(['road', 'village', 'port'], (segs) => stroke(segs, INK, 8), 'road');
   links(['road', 'village', 'port'], (segs) => stroke(segs, ROAD_FILL[theme], 4), 'road');
@@ -363,8 +384,11 @@ export function paintTerrain(ctx: Ctx, tiles: Tile[]) {
   }
 }
 
-/** Paints the blank drafting paper over every fogged tile, and the dashed survey limit. */
-export function paintFog(ctx: Ctx, tiles: Tile[]) {
+/**
+ * Paints the blank drafting paper over every fogged tile, and the dashed survey limit; on a winter
+ * isle, pale blue snowflakes are scattered over the paper.
+ */
+export function paintFog(ctx: Ctx, tiles: Tile[], winter = false) {
   const fogged = (x: number, y: number) => x >= 0 && y >= 0 && x < GRID.w && y < GRID.h && !tiles[indexOf(x, y)].revealed;
   const k = unitOf(ctx);
   ctx.setTransform(k, 0, 0, k, 0, 0);
@@ -422,6 +446,29 @@ export function paintFog(ctx: Ctx, tiles: Tile[]) {
       }
       run = 0;
     }
+  }
+  if (winter) {
+    // A six-armed flake on about every other fogged tile, placed by a hash of the tile.
+    ctx.strokeStyle = 'rgba(90,166,220,0.55)';
+    ctx.lineWidth = 1.6;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    for (let y = 0; y < GRID.h; y++) {
+      for (let x = 0; x < GRID.w; x++) {
+        const h = (Math.imul(x * 31 + y * 17 + 5, 2654435761) >>> 0) / 2 ** 32;
+        if (!fogged(x, y) || h > 0.5) continue;
+        const cx = x * TS + 16 + ((h * 997) % 1) * 48;
+        const cy = y * TS + 16 + ((h * 7919) % 1) * 48;
+        for (let a = 0; a < 3; a++) {
+          const dx = Math.cos(Math.PI / 6 + (a * Math.PI) / 3) * 7;
+          const dy = Math.sin(Math.PI / 6 + (a * Math.PI) / 3) * 7;
+          ctx.moveTo(cx - dx, cy - dy);
+          ctx.lineTo(cx + dx, cy + dy);
+        }
+      }
+    }
+    ctx.stroke();
+    ctx.lineCap = 'butt';
   }
   ctx.restore();
 

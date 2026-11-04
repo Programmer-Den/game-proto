@@ -1,11 +1,12 @@
 // Voyages away from the atlas: expeditions to the far isles (MM11) and the daily isle (MM13). Each is
 // one voyage on an isle of its own, with one fixed budget of supplies for the whole isle and no
-// restocking, played on a `GameState` of its own (`run` set) while the atlas waits at the harbour.
+// restocking (an expedition takes the coastal sloop's landing along), played on a `GameState` of its own (`run` set) while the atlas waits at the harbour.
 import { dailyRand, today } from '../../../../shared/daily';
 import { byDifficulty } from '../../../../shared/settings';
 import { makeIsland } from './island';
+import { landingSpot } from './sim';
 import type { IsleKind } from './kinds';
-import type { GameState, Run } from './state';
+import { rankOf, type GameState, type Run } from './state';
 
 /** The storage name the daily isle keeps its record under (`mapmaker-daily`). */
 export const DAILY_GAME = 'mapmaker';
@@ -41,7 +42,7 @@ export function dailyIsle(day = today()) {
 export function newRun(atlas: GameState, run: Run): GameState {
   const { island, seed } = run.mode === 'expedition' ? FAR_ISLES[run.far] : dailyIsle(run.day);
   const isle = makeIsland(island, seed);
-  return {
+  const s: GameState = {
     island,
     kind: isle.kind,
     seed,
@@ -75,8 +76,15 @@ export function newRun(atlas: GameState, run: Run): GameState {
     next: null,
     wonder: null,
     wonders: [],
+    landing: null,
+    guide: 0,
+    trade: null,
+    traded: [],
     run,
   };
+  // An expedition with the coastal sloop gets its second landing too.
+  if (rankOf(s, 'sloop') > 0) s.landing = landingSpot(s);
+  return s;
 }
 
 export const expedition = (far: number): Run => ({ mode: 'expedition', far, supplies: EXPEDITION_SUPPLIES });

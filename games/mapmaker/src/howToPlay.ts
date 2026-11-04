@@ -32,6 +32,7 @@ const en: HowToPlay = {
     { input: 'Daily isle', action: "At the harbour: one voyage on today's isle, the same for everyone, scored by coins" },
     { input: 'Wonders', action: 'At the harbour: the gallery of the wonders you have seen' },
     { input: 'Expeditions', action: 'At the harbour, once the Royal Atlas is bound: one voyage to a far isle, scored by how much you chart' },
+    { input: 'Village trade', action: 'At the harbour: trade a copy of your chart with a charted village for stores, a guide or a rumour' },
     { input: 'Moon or sun beside the logo', action: 'Switch between the white sheet and the dark night sheet' },
   ],
   loop: [
@@ -51,6 +52,8 @@ const en: HowToPlay = {
     'From the third isle a rival surveyor charts too, and tiles they reach first sell for half.',
     'Every isle hides a wonder that shows once its tile and every tile beside it are charted.',
     'The daily isle and the expeditions have one sack of supplies for the whole isle and no restocking.',
+    'The Coastal Sloop lands you on the far coast each voyage, so a big isle can be charted from two ends.',
+    'From the fifth isle every third one is in winter: snow hides costs until you stand beside a tile, lookouts see less and frozen rivers cost 1.',
   ],
 };
 
@@ -94,6 +97,7 @@ const de: HowToPlay = {
     { input: 'Tagesinsel', action: 'Im Hafen: eine Reise zur heutigen Insel, für alle gleich, gewertet nach Münzen' },
     { input: 'Wunder', action: 'Im Hafen: die Galerie der Wunder, die du gesehen hast' },
     { input: 'Expeditionen', action: 'Im Hafen, sobald der Königliche Atlas gebunden ist: eine Reise zu einer fernen Insel, gewertet nach dem kartierten Anteil' },
+    { input: 'Dorfhandel', action: 'Im Hafen: eine Abschrift deiner Karte bei einem kartierten Dorf gegen Vorräte, einen Führer oder ein Gerücht tauschen' },
     { input: 'Mond oder Sonne neben dem Logo', action: 'Zwischen dem weißen Blatt und dem dunklen Nachtblatt wechseln' },
   ],
   loop: [
@@ -113,6 +117,8 @@ const de: HowToPlay = {
     'Ab der dritten Insel kartiert auch ein rivalisierender Vermesser, und Felder, die er zuerst erreicht, bringen nur die Hälfte.',
     'Jede Insel birgt ein Wunder, das sich zeigt, sobald sein Feld und alle Felder daneben kartiert sind.',
     'Die Tagesinsel und die Expeditionen haben einen Sack Vorräte für die ganze Insel und keinen Nachschub.',
+    'Die Küstenschaluppe setzt dich auf jeder Reise an der fernen Küste ab, so lässt sich eine große Insel von zwei Seiten kartieren.',
+    'Ab der fünften Insel liegt jede dritte im Winter: Schnee verdeckt die Kosten, bis du neben einem Feld stehst, Aussichtspunkte sehen weniger und gefrorene Flüsse kosten 1.',
   ],
 };
 

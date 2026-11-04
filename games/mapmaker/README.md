@@ -15,7 +15,9 @@ surveyor sails home and draws what they found into a chart, which sells at the p
 commission off the board and a hand for the next voyage, spend the coins at the harbor, set sail
 again, and chart the whole isle to bind it into your atlas before a new one waits over the horizon:
 an archipelago, a volcanic isle or a jungle isle. From the third isle a rival surveyor charts
-alongside you, and binding one isle of every kind completes the Royal Atlas.
+alongside you, and binding one isle of every kind completes the Royal Atlas. A coastal sloop opens a
+second landing on the far coast, charted villages trade stores, a guide or a rumour of the isle's
+wonder for a copy of your chart, and from the fifth isle every third one lies under winter snow.
 
 ![Surveying the island](docs/screenshots/island.webp)
 
@@ -175,6 +177,7 @@ lost half of three of them while a long commission paid.
 | Spyglass | 2 | 60, 120 | Hills and peaks see one tile further |
 | Fine Ink | 3 | 50, 100, 180 | Charts sell for 25% more |
 | Lodestone Compass | 1 | 90 | Shows villages and ruins on blank paper as gold compass roses |
+| Coastal Sloop | 1 | 120 | Every voyage, opens a second landing on the far coast (see below) |
 
 The harbor, with the commission board and the hands beside the upgrades.
 
@@ -188,6 +191,42 @@ new isle; one page of every kind completes the Royal Atlas.
 ![The Royal Atlas](docs/screenshots/royal-atlas.webp)
 
 ![An archipelago, a volcanic isle and a jungle isle, charted in full](docs/screenshots/isle-kinds.webp)
+
+### The coastal sloop
+
+Once the Coastal Sloop is bought, it sails along the coast at the start of every voyage (and every
+expedition) and drops anchor off the fogged coast tile farthest from everything charted, at least
+three steps away. That tile is a survey station like any beside charted ground, for its usual cost,
+so a big isle can be charted from two ends at once. The landing lasts until it is charted or the
+voyage ends.
+
+![The sloop's landing on the far coast](docs/screenshots/sloop-landing.webp)
+
+### Village trade
+
+Every charted village trades once for a copy of your chart. At the harbor, Village trade (under
+the hands) opens the trade page once a village is charted; pick one trade for the next voyage, and
+the first village yet to trade gives it when you set sail:
+
+| Trade | What it gives on the next voyage |
+| --- | --- |
+| Stores | +4 supplies |
+| A guide | The first 3 surveys that would cost something are free, and snow hides nothing while they last |
+| A rumour | The isle's wonder is marked through the fog with a gold ring (on a new isle, that isle's wonder) |
+
+![The harbor with the Coastal Sloop and Village trade](docs/screenshots/harbor-sloop-trade.webp)
+
+![The village trade page](docs/screenshots/village-trade.webp)
+
+### Winter isles
+
+From the fifth isle on, every third isle (5, 8, 11...) lies under snow, whatever its kind: the
+land is drawn white, the rivers are ice and snowflakes cover the blank paper. Snow hides what a
+survey station costs (it shows `?`) until the surveyor stands next to it, hills and peaks see only
+the tiles beside them, Spyglass or not, and a frozen river costs a supply like a meadow instead of
+being free to follow. The daily isle can fall on a winter isle, and the third far isle is one.
+
+![A winter isle](docs/screenshots/winter-isle.webp)
 
 ### Hidden wonders
 
