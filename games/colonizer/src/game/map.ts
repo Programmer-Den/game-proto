@@ -4,6 +4,10 @@ export const GRASS = 0;
 export const WATER = 1;
 export const ROCK = 2;
 export const DIRT = 3;
+/** Shallows, the fords between islands: land units wade them and ships sail them, but nothing is built there. */
+export const SHALLOW = 4;
+/** Whether a ship can sail a terrain tile. */
+export const sailable = (k: number) => k === WATER || k === SHALLOW;
 
 export interface Node {
   id: number;
@@ -41,6 +45,8 @@ export interface MapData {
   posts: PostSpot[];
   /** Each side's Town Center corner, in side order: the player, the AI and, in a three-way match, the second AI. */
   starts: { tx: number; ty: number }[];
+  /** A map of islands, where the AI builds a Harbour and warships. */
+  naval?: boolean;
 }
 
 const B = 'wild-brigand';
@@ -86,6 +92,15 @@ const FOURTH_CORNER = { tx: MAP_SIZE - THIRD_START.tx - 4, ty: MAP_SIZE - THIRD_
 /** Where Highlands' two long ridges cross each side's half of the map (tiles with x + y on these lines), and their passes. */
 const HIGH_RIDGE = 88;
 const HIGH_PASSES = [20, 44, 68];
+/**
+ * Islands: the land discs of the first side (centre and radius; each is mirrored) and the fords of
+ * shallows between them (from, to), three tiles wide. A home island under each start, a middle island
+ * for the Relic of Valour and the trading posts, and a flank island for each flank relic, each linked
+ * to its side's home and to the middle. In a three-way match the other two corners get islands too.
+ */
+const ISLANDS: [number, number, number][] = [[18, 18, 25], [64, 64, 17], [100, 26, 10]];
+const THIRD_ISLAND: [number, number, number] = [108, 20, 22];
+const FORDS: [number, number, number, number][] = [[34, 34, 52, 52], [20, 40, 25, 93], [54, 74, 32, 95]];
 
 export const idx = (x: number, y: number) => y * MAP_SIZE + x;
 export const inMap = (x: number, y: number) => x >= 0 && y >= 0 && x < MAP_SIZE && y < MAP_SIZE;
@@ -198,6 +213,57 @@ function drawMap(kind: MapKind, sides: 2 | 3): MapData {
         for (let x = p - 4; x <= p + 4; x++)
           for (const t of [{ x, y }, mirrorTile({ x, y })]) if (inMap(t.x, t.y) && terrain[idx(t.x, t.y)] !== ROCK) taken[idx(t.x, t.y)] = 1;
   }
+  if (kind === 'islands') {
+    // The sea everywhere, then the islands carved out of it and the fords laid across. Water stays
+    // taken, so trees, bushes, mines and ridges only go on land.
+    terrain.fill(WATER);
+    taken.fill(1);
+    const discs = sides === 3 ? [...ISLANDS, THIRD_ISLAND] : ISLANDS;
+    for (const [cx, cy, r] of discs)
+      for (let y = cy - r - 1; y <= cy + r + 1; y++)
+        for (let x = cx - r - 1; x <= cx + r + 1; x++) {
+          if (Math.hypot(x - cx, y - cy) > r + (Math.random() < 0.3 ? 0.9 : 0)) continue;
+          for (const t of [{ x, y }, mirrorTile({ x, y })]) {
+            if (!inMap(t.x, t.y)) continue;
+            terrain[idx(t.x, t.y)] = GRASS;
+            taken[idx(t.x, t.y)] = 0;
+          }
+        }
+    for (const [x0, y0, x1, y1] of FORDS) {
+      const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+      for (let i = 0; i <= n; i++) {
+        const fx = Math.round(x0 + ((x1 - x0) * i) / n);
+        const fy = Math.round(y0 + ((y1 - y0) * i) / n);
+        for (let dy = -1; dy <= 1; dy++)
+          for (let dx = -1; dx <= 1; dx++)
+            for (const t of [{ x: fx + dx, y: fy + dy }, mirrorTile({ x: fx + dx, y: fy + dy })]) {
+              if (inMap(t.x, t.y) && terrain[idx(t.x, t.y)] === WATER) terrain[idx(t.x, t.y)] = SHALLOW;
+            }
+      }
+    }
+    // Puddles of sea cut off by an island at the map's edge become land, so no Harbour is built
+    // where its ships could never leave.
+    const seen = new Uint8Array(MAP_SIZE * MAP_SIZE);
+    for (let i = 0; i < seen.length; i++) {
+      if (seen[i] || !sailable(terrain[i])) continue;
+      const pool = [i];
+      seen[i] = 1;
+      for (let k = 0; k < pool.length; k++) {
+        const x = pool[k] % MAP_SIZE;
+        const y = Math.floor(pool[k] / MAP_SIZE);
+        for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) {
+          if (!inMap(nx, ny) || seen[idx(nx, ny)] || !sailable(terrain[idx(nx, ny)])) continue;
+          seen[idx(nx, ny)] = 1;
+          pool.push(idx(nx, ny));
+        }
+      }
+      if (pool.length < 400)
+        for (const j of pool) {
+          terrain[j] = GRASS;
+          taken[j] = 0;
+        }
+    }
+  }
   if (kind === 'lakes') {
     // Two wide lakes either side of the middle, so the way across runs between waters, and a pond by
     // each start for the Dock.
@@ -208,7 +274,7 @@ function drawMap(kind: MapKind, sides: 2 | 3): MapData {
   }
 
   // Lakes: round blobs with ragged edges.
-  const lakes = kind === 'lakes' ? { n: 12, lo: 3, hi: 6 } : kind === 'highlands' ? { n: 4, lo: 2, hi: 4 } : { n: 7, lo: 2, hi: 4 };
+  const lakes = kind === 'lakes' ? { n: 12, lo: 3, hi: 6 } : kind === 'highlands' ? { n: 4, lo: 2, hi: 4 } : kind === 'islands' ? { n: 0, lo: 0, hi: 0 } : { n: 7, lo: 2, hi: 4 };
   for (let n = 0; n < lakes.n; n++) {
     const cx = rand(8, 60);
     const cy = rand(8, 60);
@@ -216,7 +282,7 @@ function drawMap(kind: MapKind, sides: 2 | 3): MapData {
   }
 
   // Rock ridges: short two-tile-thick lines.
-  for (let n = 0; n < (kind === 'highlands' ? 9 : kind === 'lakes' ? 3 : 6); n++) {
+  for (let n = 0; n < (kind === 'highlands' ? 9 : kind === 'lakes' || kind === 'islands' ? 3 : 6); n++) {
     const x0 = rand(6, 56);
     const y0 = rand(6, 56);
     const horizontal = Math.random() < 0.5;
@@ -301,5 +367,5 @@ function drawMap(kind: MapKind, sides: 2 | 3): MapData {
   }
 
   const starts = sides === 3 ? [...START_TILES, THIRD_START] : [...START_TILES];
-  return { terrain, nodes: kept, camps, posts, starts };
+  return { terrain, nodes: kept, camps, posts, starts, naval: kind === 'islands' };
 }

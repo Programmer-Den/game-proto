@@ -22,7 +22,9 @@ import {
   type BuildingId,
   type Resource,
   type Temperament,
+  isNaval,
   isSoldier,
+  PACKS,
   takesRally,
   unitFor,
 } from './data';
@@ -31,8 +33,13 @@ import {
   PLAYER,
   affordable,
   campSpots,
+  canPack,
   canPlace,
   chooseBoon,
+  foesOf,
+  hostile,
+  packUp,
+  pitch,
   chooseEdge,
   endRaid,
   garrisoned,
@@ -50,7 +57,6 @@ import {
   releaseBell,
   research,
   ringBell,
-  rivalsOf,
   setRally,
   startRaid,
   trade,
@@ -62,7 +68,7 @@ import {
   type RaidGoal,
   type Unit,
 } from './sim';
-import { WATER, inMap, idx, type Node } from './map';
+import { SHALLOW, WATER, inMap, idx, sailable, type Node } from './map';
 import { aiLog } from '../../../../shared/watch';
 import { t } from '../i18n';
 
@@ -88,6 +94,10 @@ const SWAP_LOW = 60;
 const WALL_OFFSET = 9;
 /** The army goes for an unheld relic once it has this many soldiers, between raids. */
 const ARMY_FOR_RELIC = 8;
+/** On a map of islands: warships the AI keeps from Age II, which shell the foe's shore. */
+const AI_WARSHIPS = 3;
+/** A Steppe Horde camp with no wood or ore left within this many tiles packs up and moves on. */
+const CAMP_REACH = 7;
 
 /** The side the planner is thinking for, the side it plays against and its temperament; set by `think`. */
 let ME = AI;
@@ -112,7 +122,8 @@ export function think(s: GameState, dt: number, side = AI) {
  * raids each of the others by turns.
  */
 function foeFor(s: GameState, side: number) {
-  const rivals = rivalsOf(s, side);
+  // A rival at peace with this side (a truce or alliance with the player) is no foe.
+  const rivals = foesOf(s, side);
   const raid = s.aiRaid[side];
   if (rivals.length === 0) return raid.foe;
   if (raid.goal && rivals.includes(raid.foe)) return raid.foe;
@@ -140,11 +151,14 @@ function plan(s: GameState) {
   const p = s.players[ME];
   const villagers = [...s.units.values()].filter((u) => u.owner === ME && UNITS[u.type].role === 'villager');
   const idleVillagers = villagers.filter((u) => u.order.t === 'idle');
-  const military = [...s.units.values()].filter((u) => u.owner === ME && isSoldier(UNITS[u.type].role));
+  // The army on land; warships keep to the sea (8c).
+  const military = [...s.units.values()].filter((u) => u.owner === ME && isSoldier(UNITS[u.type].role) && !isNaval(UNITS[u.type].role));
+  // No side to fight this think: a truce or alliance with each rival left.
+  const peace = !hostile(s, ME, FOE);
 
   // 0a. The town bell: enemy soldiers near the base send the villagers to shelter in the Town Center
   // and the towers, and once the base is clear again they go back to work.
-  const threat = [...s.units.values()].some((u) => u.owner !== ME && u.owner !== NEUTRAL && u.hp > 0 && isSoldier(UNITS[u.type].role) && Math.hypot(u.x - town.tx - 2, u.y - town.ty - 2) <= BELL_RANGE);
+  const threat = [...s.units.values()].some((u) => hostile(s, u.owner, ME) && u.owner !== NEUTRAL && u.hp > 0 && isSoldier(UNITS[u.type].role) && !isNaval(UNITS[u.type].role) && Math.hypot(u.x - town.tx - 2, u.y - town.ty - 2) <= BELL_RANGE);
   if (threat && !p.bell) {
     if (act(() => ringBell(s, ME) > 0)) log(t('logRingBell'));
   } else if (!threat && p.bell) {
@@ -266,7 +280,10 @@ function plan(s: GameState) {
   const monument =
     [...s.buildings.values()].find((b) => b.owner === FOE && b.type === 'wonder') ??
     (monumentLeft(s, FOE) !== null ? [...s.buildings.values()].find((b) => b.owner === FOE && b.type === 'monument') : undefined);
-  if (monument && army.length > 0) {
+  if (peace) {
+    // At peace with everyone left: a raid under way turns home, and no new one starts.
+    if (raid.goal) pressRaid(s, town);
+  } else if (monument && army.length > 0) {
     if (idleArmy.length > 0 && act(() => true)) {
       const half = BUILDINGS[monument.type].w / 2;
       const ids = army.map((u) => u.id);
@@ -303,6 +320,12 @@ function plan(s: GameState) {
       log(t('logRelic', { n: army.length, relic: t(RELICS[relic.relic!].name) }));
     }
   }
+
+  // 6c. On a map of islands, a Harbour on the nearest shore, then warships that shell the foe's shore.
+  if (s.naval && hasBuilt(s, ME, 'barracks')) navy(s, town, idleVillagers, peace);
+
+  // 6d. The Steppe Horde packs up a camp whose wood or ore has run out and pitches it by fresh ground.
+  if (p.faction === 'steppe') nomads(s);
 
   // 7. Gather: idle villagers go to the resource the AI is shortest of.
   for (const u of idleVillagers) {
@@ -363,7 +386,8 @@ function pressRaid(s: GameState, town: Building) {
   const raid = s.aiRaid[ME];
   const goal = raid.goal!;
   const party = raid.party.map((id) => s.units.get(id)).filter((u): u is Unit => !!u && u.hp > 0);
-  const done = goal.b !== null ? !s.buildings.has(goal.b) : s.camps.find((c) => c.id === goal.camp)?.holder !== FOE;
+  // A truce or alliance with the side it was raiding ends the raid as if its goal were done.
+  const done = !hostile(s, ME, raid.foe) || (goal.b !== null ? !s.buildings.has(goal.b) : s.camps.find((c) => c.id === goal.camp)?.holder !== FOE);
   const bled = party.length < raid.party.length / 2;
   const late = goal.kind !== 'town' && s.time - raid.started > RAID_MAX_MS;
   if (done || bled || late) {
@@ -450,8 +474,72 @@ function frontOf(s: GameState, town: Building, d: number) {
   return { x: cx + Math.cos(ang) * d, y: cy + Math.sin(ang) * d };
 }
 
-/** Places a Dock on the shore nearest the Town Center (Tide Coven). */
-function buildAtShore(s: GameState, town: Building, idle: Unit[]): boolean {
+/**
+ * On a map of islands: a Harbour on the shore nearest the Town Center, warships from it in Age II, and
+ * each idle warship sent to shell the shore nearest the foe's Town Center.
+ */
+function navy(s: GameState, town: Building, idle: Unit[], peace: boolean) {
+  const p = s.players[ME];
+  if (!hasBuildingFor(s, ME, 'harbour') && affordable(p, BUILDINGS.harbour.cost)) {
+    act(() => buildAtShore(s, town, idle, 'harbour'));
+    return;
+  }
+  const harbour = [...s.buildings.values()].find((b) => b.owner === ME && b.type === 'harbour' && b.built && b.queue.length === 0);
+  if (harbour && p.age >= 2 && unitCount(s, ME, 'warship') < AI_WARSHIPS && affordable(p, UNITS.warship.cost) && popUsed(s, ME) < popCap(s, ME)) {
+    if (act(() => train(s, ME, harbour.id, 'warship'))) log(t('logTrain', { unit: t('warship') }));
+  }
+  const foeTown = [...s.buildings.values()].find((b) => b.owner === FOE && b.type === 'town');
+  if (peace || !foeTown) return;
+  const idleShips = [...s.units.values()].filter((u) => u.owner === ME && UNITS[u.type].role === 'warship' && u.order.t === 'idle' && u.cool <= 0);
+  if (idleShips.length === 0) return;
+  // The sea nearest the foe's Town Center.
+  let best: { x: number; y: number; d: number } | null = null;
+  for (let y = 0; y < 128; y += 2)
+    for (let x = 0; x < 128; x += 2) {
+      if (!sailable(s.terrain[idx(x, y)])) continue;
+      const d = Math.hypot(x - foeTown.tx - 2, y - foeTown.ty - 2);
+      if (!best || d < best.d) best = { x, y, d };
+    }
+  if (best && act(() => (issue(s, ME, idleShips.map((u) => u.id), { t: 'attackMove', x: best.x + 0.5, y: best.y + 0.5 }), true))) log(t('logShell', { n: idleShips.length }));
+}
+
+/**
+ * The Steppe Horde moves its camps: a Lumber or Mining Camp with no wood or ore left near it packs
+ * onto a wagon, which drives to the nearest node of its resource and pitches there; a wagon that
+ * can't pitch where it stands drives on a little.
+ */
+function nomads(s: GameState) {
+  for (const u of s.units.values()) {
+    if (u.owner !== ME || !u.packed || u.order.t !== 'idle') continue;
+    if (act(() => pitch(s, ME, u.id) !== null)) log(t('logPitch', { building: t(BUILDINGS[u.packed.type].name) }));
+    else {
+      const spot = findSpot(s, u.x, u.y, 2, 5, 1, 1);
+      if (spot) act(() => (issue(s, ME, [u.id], { t: 'move', x: spot.tx + 0.5, y: spot.ty + 0.5 }), true));
+    }
+    return;
+  }
+  for (const b of s.buildings.values()) {
+    if (b.owner !== ME || !PACKS.includes(b.type) || b.type === 'yurt' || !canPack(s, b)) continue;
+    const res: Resource = b.type === 'lumber' ? 'wood' : 'ore';
+    const near = (n: Node) => n.res === res && n.amount > 0 && Math.hypot(n.tx - b.tx - 1, n.ty - b.ty - 1) <= CAMP_REACH;
+    if ([...s.nodes.values()].some(near)) continue;
+    let best: Node | null = null;
+    for (const n of s.nodes.values()) if (n.res === res && n.amount > 0 && (!best || Math.hypot(n.tx - b.tx, n.ty - b.ty) < Math.hypot(best.tx - b.tx, best.ty - b.ty))) best = n;
+    if (!best) continue;
+    const spot = findSpot(s, best.tx, best.ty, 2, 5, 2, 2);
+    if (!spot) continue;
+    const type = b.type;
+    const wagon = act(() => packUp(s, ME, b.id) !== null) ? [...s.units.values()].find((u) => u.owner === ME && u.packed?.type === type && u.order.t === 'idle') : undefined;
+    if (wagon) {
+      issue(s, ME, [wagon.id], { t: 'move', x: spot.tx + 1.5, y: spot.ty + 1.5 });
+      log(t('logPack', { building: t(BUILDINGS[type].name) }));
+    }
+    return;
+  }
+}
+
+/** Places a Dock (Tide Coven) or a Harbour on the shore nearest the Town Center. */
+function buildAtShore(s: GameState, town: Building, idle: Unit[], type: 'dock' | 'harbour' = 'dock'): boolean {
   let best: { x: number; y: number; d: number } | null = null;
   for (let y = 0; y < 128; y++)
     for (let x = 0; x < 128; x++) {
@@ -460,9 +548,10 @@ function buildAtShore(s: GameState, town: Building, idle: Unit[]): boolean {
       if (d < 30 && (!best || d < best.d)) best = { x, y, d };
     }
   if (!best) return false;
-  const spot = findSpot(s, best.x, best.y, 1, 4, 2, 2, (tx, ty) => canPlace(s, 'dock', tx, ty, ME));
+  const size = BUILDINGS[type].w;
+  const spot = findSpot(s, best.x, best.y, 1, 5, size, size, (tx, ty) => canPlace(s, type, tx, ty, ME));
   if (!spot) return false;
-  return startBuild(s, ME, 'dock', spot, idle);
+  return startBuild(s, ME, type, spot, idle);
 }
 
 /** Lays the palisade line across the front of the base, then turns its middle piece into a gate. */
@@ -530,6 +619,6 @@ function findSpot(s: GameState, x: number, y: number, min: number, max: number, 
 
 function fits(s: GameState, tx: number, ty: number, w: number, h: number) {
   for (let y = ty; y < ty + h; y++)
-    for (let x = tx; x < tx + w; x++) if (!inMap(x, y) || s.solid[idx(x, y)]) return false;
+    for (let x = tx; x < tx + w; x++) if (!inMap(x, y) || s.solid[idx(x, y)] || s.terrain[idx(x, y)] === SHALLOW) return false;
   return true;
 }

@@ -26,6 +26,7 @@ export const T = {
   tan: '#b8955e',
   skin: '#e8cfa0',
   faded: '#7a6a50',
+  plum: '#7e4f76',
 } as const;
 
 /** System serif stack for every stitched letter. */

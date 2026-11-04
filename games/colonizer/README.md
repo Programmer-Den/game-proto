@@ -7,9 +7,9 @@ figure in profile with a kite shield, buildings in elevation, fog as unworked li
 still at its edge, and the HUD as the tapestry's borders with slanted bars and stitched lettering.
 All of it is painted in code on 2D canvases; there are no image files.
 
-You pick one of three factions and play a skirmish on a 128 by 128 tile map against an AI opponent,
+You pick one of four factions and play a skirmish on a 128 by 128 tile map against an AI opponent,
 which plays the next faction along, or against two AIs in a three-way match. The menu also picks the
-map kind: Lowlands, Lakes or Highlands. Gather wood, food and ore, put up buildings, research techs in
+map kind: Lowlands, Lakes, Highlands or Islands. Gather wood, food and ore, put up buildings, research techs in
 the Academy and the Town Center, train villagers and armies, earn your way through four ages, and
 destroy the enemy Town Center to win, raise a Monument in Age III and hold it for three minutes, or
 finish a Wonder in Age IV. Lose your own Town Center, or let the enemy's Monument stand or Wonder be
@@ -25,7 +25,8 @@ Two rows of toggles under the faction cards set up the match, and the menu keeps
   so the ways across run between waters, a Dock always has a shore, and a short palisade across a
   gap between two lakes shuts a whole approach. **Highlands** has two long rock ridges, one across
   each side's half of the map, each broken by three narrow passes, so walls and rams decide where
-  armies get through. Every map is checked so that each Town Center, camp and trading post can be
+  armies get through. **Islands** is all sea: one island for each side and one in the middle, joined
+  by shallow fords armies can wade, so it plays on land and at sea at once (see Ships below). Every map is checked so that each Town Center, camp and trading post can be
   walked to.
 - **Rivals**: **One AI**, or **Two AIs** for a three-way match: the second AI plays the third
   faction from the top-right corner, with two caches of its own nearby (the free bottom-left corner
@@ -40,6 +41,40 @@ Two rows of toggles under the faction cards set up the match, and the menu keeps
 ![A Highlands pass in a three-way match: the ridge's rock and the gap through it, and the log naming each side's temperament](docs/screenshots/highlands-three-way.webp)
 
 ![Lakes: two big lakes and a stand of trees on the way across, and a minimap full of water](docs/screenshots/lakes.webp)
+
+## Ships
+
+On the Islands map every faction can build a **Harbour** (160 wood, on a shore, up to two, on the
+second page of the build list). It trains:
+
+- the **Transport** (120 wood): right click it with land units selected to send them aboard (up to
+  eight), then right click the land to sail to the nearest shore and put them ashore there, or press
+  **Unload** to land them where it is. Whoever is aboard sinks with it.
+- the **Warship** (160 wood, 60 ore, from Age II): fights other ships and shells whatever stands
+  within six tiles of the shore. Land troops can only hit a ship that comes close to them.
+
+The AI builds a Harbour and three warships and sends them to shell the shore by your Town Center.
+
+![The Steppe Horde's Harbour on Islands: three warships and a transport on the sea, with a ford's shallows beside it](docs/screenshots/islands-ships.webp)
+
+## Diplomacy
+
+In a three-way match, click a rival's banner on the card under the deeds card to talk to it. You can
+**offer a truce**, **send tribute** (100 food, 100 wood) to raise its goodwill, or **ask it to ally**
+against the other AI. Its temperament decides the answer and how long it keeps its word:
+
+| Temperament | Truce | How long | Alliance | Tribute |
+| --- | --- | --- | --- | --- |
+| **Raider** | only at goodwill 2 | 2 min | at goodwill 0, for 4 min | +1 goodwill |
+| **Builder** | at once | 5 min | at goodwill 2, for 3 min | +2 goodwill |
+| **Warden** | at goodwill 1 | 7 min | at goodwill 3, for 4 min | +1 goodwill |
+
+A side at peace with you doesn't raid you and its soldiers and towers leave yours alone. An ally
+turns on the other AI only. A refusal means waiting 45 s before asking again, and if you attack a
+rival you are at peace with, the pact breaks and its goodwill falls by 3. Rivals at peace with you
+get a green ring on the card.
+
+![Talks with the Steppe Horde: its temperament still unknown, goodwill 0, and the offers](docs/screenshots/diplomacy-talks.webp)
 
 ## Rival temperaments
 
@@ -63,6 +98,11 @@ have seen its Town Center: scout its base to learn what it is.
 | Ember Legion | Militia (melee), Archer (ranged), Knight (cavalry) | **Forge** (150 wood, 50 ore, one only): every soldier costs 20% less |
 | Tide Coven | Spearman (melee, strong against cavalry), Slinger (ranged), Rider (cavalry) | **Dock** (140 wood, up to three): stands on a shore and lands 10 food every 12 s |
 | Thorn Grove | Brute (tough melee), Hunter (long-range), Stalker (fast cavalry) | **Grove** (100 wood, 50 food, up to two): plants a tree nearby every 15 s, up to 14 around it, and takes wood like a Lumber Camp |
+| Steppe Horde | Clansman (axe), Bowman (ranged), Outrider (fast cavalry) | **Yurt** (70 wood, 30 food, up to four): houses 4 and takes every resource |
+
+The Steppe Horde are nomads: **Pack up** turns a finished Yurt, Lumber Camp or Mining Camp into a
+wagon, which you drive like a cart, and **Pitch camp** sets it up again, finished, where the wagon
+stands. So when the trees round a camp are gone, the camp goes after the next forest.
 
 Every faction has the same villagers and the same other buildings. The faction's own building is
 the last one on the first page of the build list.
@@ -74,6 +114,8 @@ the last one on the first page of the build list.
 ![A Tide Coven Dock on the shore landing a catch of 10 food](docs/screenshots/dock.webp)
 
 ![A Thorn Grove Grove with the trees it has planted round it](docs/screenshots/grove.webp)
+
+![A Steppe Horde Yurt selected, with its Pack up button](docs/screenshots/steppe-yurt.webp)
 
 ## How to play
 
@@ -241,6 +283,8 @@ In Age III the Town Center trains the faction's **champion** (200 food, 150 ore,
   army round it is never surprised.
 - The Thorn Grove's **Druid** (130 health, 5 damage) who mends every own unit within 5 tiles by 3
   health every 1.5 s; a green ring shows its reach.
+- The Steppe Horde's **Chieftain** (150 health, 9 damage) whose own units within 6 tiles move 25%
+  faster; a teal ring shows its reach.
 
 A champion earns ranks like any soldier. The AI trains its own once it reaches Age III, so a late
 match has one to protect and one to hunt.
@@ -336,6 +380,7 @@ each faction's wins, and the end screen says how far it has come.
 | Ember Legion | Torchbearer (60 food, 40 wood, 20 ore) | Barracks | Triple damage to buildings |
 | Tide Coven | Harpooner (50 food, 60 wood, 20 ore) | Archery Range | Range 6, 9 damage, double against cavalry |
 | Thorn Grove | Briar Warden (80 food, 50 wood, 30 ore) | Barracks | 150 health, slow and hard to bring down |
+| Steppe Horde | Horse Archer (70 food, 40 wood, 20 ore) | Stable | A fast rider that shoots at range 4.5 |
 
 ![Ember Torchbearers burning the Tide Town Center: 18 damage a blow, three times a Militia's](docs/screenshots/torchbearers.webp)
 

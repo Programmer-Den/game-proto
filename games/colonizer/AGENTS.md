@@ -6,10 +6,10 @@ as the root AGENTS.md asks.
 
 ## Current state
 
-Colonizer is a skirmish RTS: one player against one AI (or two, in a three-way match) on a 128x128 tile map, with three factions
-(Ember Legion, Tide Coven, Thorn Grove) that differ in their three combat units, one unique
-building each (Forge, Dock, Grove) and an Age III champion. The map is
-generated each match from `Math.random` in one of three kinds (Lowlands, Lakes, Highlands) and is
+Colonizer is a skirmish RTS: one player against one AI (or two, in a three-way match) on a 128x128 tile map, with four factions
+(Ember Legion, Tide Coven, Thorn Grove, Steppe Horde) that differ in their three combat units, one unique
+building each (Forge, Dock, Grove, Yurt) and an Age III champion. The map is
+generated each match from `Math.random` in one of four kinds (Lowlands, Lakes, Highlands, Islands) and is
 point-symmetric, so both sides start the same. It is
 drawn as the Bayeux tapestry: wool laid-and-couched work and stem-stitch outlines on linen, painted
 in code on 2D canvases (no image files), with `pixelArt` off.
@@ -110,8 +110,9 @@ in code on 2D canvases (no image files), with `pixelArt` off.
   for their faction (`addWin`, in `GameScene.showEnd`); `MASTERY_WINS` (2) master it. A mastered
   faction's side gets `SideSetup.elite`, so `Player.elite` lets `train` take its second unique unit
   (`elite: true` on the def, `eliteFor(faction)`): the Ember Torchbearer (melee, Barracks,
-  `vsBuildings` 3 in `strike`), the Tide Harpooner (ranged, Archery Range, `vsCavalry` 2) and the
-  Thorn Briar Warden (melee, Barracks, 150 hp). Each shares a role with its faction's own unit, so
+  `vsBuildings` 3 in `strike`), the Tide Harpooner (ranged, Archery Range, `vsCavalry` 2), the
+  Thorn Briar Warden (melee, Barracks, 150 hp) and the Steppe Horse Archer (`steppe-horsebow`:
+  cavalry, Stable, range 4.5). Each shares a role with its faction's own unit, so
   `unitFor` skips elites; the panel adds the elite's button after its role's unit. The AI never trains
   them. The menu's cards show each faction's wins (`masteryLine`, `masteryDone`).
 - The campaign (`src/game/campaign.ts`, `src/progress.ts`, `colonizer-campaign`): `SCENARIOS` lists
@@ -198,6 +199,47 @@ in code on 2D canvases (no image files), with `pixelArt` off.
   sends everyone. Idle raiders are sent at the goal again; the party walks home when the goal is
   done, when half of it has fallen (`endRaid(s, by, true)`: repelled, the deed is done) or after
   `RAID_MAX_MS` for a non-town raid (`endRaid(s, by, false)`: withdrawn).
+- Islands and ships (`MAP_KINDS.islands`, `MapData.naval`, `GameState.naval`): `generateMap` fills
+  the map with `WATER`, carves the discs in `ISLANDS` (and `THIRD_ISLAND` in a three-way match, each
+  with its mirror), lays the 3-wide `FORDS` as `SHALLOW` (walkable and sailable, never built on; see
+  `sailable`), and turns any pool of sea under 400 tiles into land, so no Harbour sits on a puddle.
+  The fords keep every start connected, so `connected` still holds and land armies can walk across.
+  The Harbour (`BUILDINGS.harbour`, `naval: true`, on a shore like the Dock, limit 2, in `BUILD_MORE`
+  for every faction) trains the neutral `transport` (role `transport`, civil, carries
+  `TRANSPORT_CAP` 8 land units in `Unit.cargo`) and `warship` (role `warship`, Age II, range 6).
+  `isNaval(role)` and `isShip(u)` mark them; ships spawn on water (`waterSpotNear`), path on sailable
+  tiles only (`findPath(..., naval)`), are run by `shipUpdate` (move, attack-move, attack from the
+  sea, unload; an idle warship shoots what comes in range) and are kept apart from land units in
+  `separate`. Land units given `{ t: 'board', ship }` walk to the transport and go aboard (out of
+  `units`, into `cargo`; `popUsed` and `unitCount` still count them, and they sink with it in `reap`).
+  `{ t: 'unload', x, y }` sails to the water nearest the point (`seaNear` for a point inland) and
+  `dropCargo` puts them ashore within `LANDING` tiles; the panel's Unload does it where the ship is.
+  Land units ignore ships further than their range + 2 (`shipReach` in `nearestEnemy`), so they never
+  chase one they can't reach. The AI (`navy` in the planner, on a naval map once it has a Barracks)
+  builds a Harbour, keeps `AI_WARSHIPS` (3) warships from Age II and sends idle ones to the sea
+  nearest its foe's Town Center (`logShell`); it never uses transports, since the fords carry its army.
+- Diplomacy (three-way matches only, `GameState.pacts`, one `Pact` per player: `truceUntil`,
+  `allyUntil`, `mood`, `askAt`): clicking a rival's banner on the status card (`StatusCard.rivalAt`)
+  sets `GameScene.talkTo` and the panel shows talks (`renderTalks`, `talkActions`). `offer(s, ai,
+  what)` asks: `tribute` pays `TRIBUTE` and raises `mood` by the temperament's `diplomacy.tribute`;
+  `truce` is taken when `mood` reaches `diplomacy.truce` and lasts `truceMs`; `ally` (against the
+  other AI) needs `mood` of `diplomacy.ally` and lasts `allyMs`. A refusal makes the rival wait
+  `ASK_MS` before the next ask. `atPeace`/`hostile`/`foesOf` read the pacts: the sides at peace don't
+  target each other (`nearestEnemy`, `militaryUpdate`, towers, `updateAssault`), the planner skips
+  raids on them and an ally's foe becomes its only foe (`foeFor`). An attack order by the player on a
+  rival at peace breaks the pact (`breakPact`, mood falls by `BREAK_MOOD`); `updatePacts` ends an
+  alliance whose time is up or whose common foe is out, and says when a truce runs out. The status
+  card rings a rival at peace in green. Temperaments: a Raider takes a truce only at mood 2 and keeps
+  it 2 minutes, a Builder at once for 5, a Warden at mood 1 for 7; tribute moves a Builder twice as far.
+- The Steppe Horde (`steppe`, plum wool): Clansman (axe), Bowman, Outrider, the Chieftain (champion,
+  `gift: 'stride'`: own units within `STRIDE_RANGE` move `STRIDE_SPEED` times as fast, `inStride` in
+  `speedOf`) and its unique Yurt (2x2, houses 4, takes every resource, limit 4). It packs up:
+  `canPack`/`packUp(s, owner, bid)` turn a finished Yurt, Lumber Camp or Mining Camp (`PACKS`) into a
+  `wagon` unit (role `wagon`, civil, `Unit.packed` = the building's type and health), which drives
+  like a cart and `pitch(s, owner, uid)` sets up again where it stands (the building comes back
+  finished, with its health). A packed wagon counts toward the building's `limit`. The panel shows
+  Pack up on such a building and Pitch camp on a wagon. The AI (`nomads` in the planner) packs a camp
+  with nothing left within `CAMP_REACH` and drives it to the nearest node of its resource.
 - Watch AI (`?watch`, `shared/watch.ts`): Boot skips the menu and starts `Game` with two random
   different factions on a random map kind, half the time with the third faction as a second AI; the
   planner plays every side (`GameScene.aiSides`, `think(state, dt, PLAYER)` as well), the sides are
@@ -269,7 +311,7 @@ in code on 2D canvases (no image files), with `pixelArt` off.
 - `src/game/map.ts`: `generateMap(kind, sides)` draws lakes, rock ridges (and Highlands' long
   ridges), forests, bushes and mines, mirrors each one, adds each side's starting trees, bushes and mine, then clears the camps' and the two
   trading posts' patches (`POST_PLAN` and its mirror, `MapData.posts`). Terrain is `Uint8Array` of
-  `GRASS`, `WATER`, `ROCK` and `DIRT`; `Node`s are the resources. `START_TILES` are the two Town
+  `GRASS`, `WATER`, `ROCK`, `DIRT` and `SHALLOW` (Islands' fords; `sailable` is water or shallows); `Node`s are the resources. `START_TILES` are the two Town
   Center corners of a two-side match, `THIRD_START` the second AI's.
 - `src/game/sim.ts`: the rules, free of Phaser. `createGame` builds the state, `tick` advances it,
   `issue` gives unit orders, `placeBuilding`, `canPlace`, `train` and `research` queue things,
@@ -364,6 +406,9 @@ in code on 2D canvases (no image files), with `pixelArt` off.
   entry per player, the guards' unused.
 - `GameState.aiRaid[side]`: `next` (earliest time of the next raid), `foe`, `count`, `goal`, `party`
   and `started`; the planner's memory, which changes no rule.
+- `Unit.cargo` (a transport's passengers, whole `Unit`s taken out of `units`) and `Unit.packed`
+  (a wagon's building, `{ type, hp }`, or null); orders `board` and `unload`. `GameState.naval` (an
+  Islands map) and `GameState.pacts` (per player: the player's pact with that AI).
 - `Building.rally`, `doneAt`, `workMs` (the Dock's and Grove's timer) and `garrison` (the
   sheltering villagers, as whole `Unit`s taken out of `units`); `Unit.post` (a guard's post);
   `GameState.gates`, `camps`, `posts`, `winBy` (`town`, `monument`, `wonder`, `goal` or `cart`) and
@@ -539,7 +584,8 @@ There is no save of a match. Settings come from the hub (`shared/settings.ts`).
   and each building's `garrison` the villagers inside it. In a scenario, `scenario` is its
   `Scenario`, `state.mission` its progress, `missionCard.shown` the card's progress line, and
   `endLines` what the end screen said under its title (`2/3` for the stars, then the lines, translated).
-  The menu takes `scenario` (an id) in its start data.
+  The menu takes `scenario` (an id) in its start data. `talkTo` is the rival the panel is holding
+  talks with (or null), and `state.pacts[side]` that rival's pact with the player.
 - The playthrough runs in British English, the default language, and plays the same in German
   (`?lang=de`), since it finds buttons by `id`.
 - Inputs are canvas clicks (left and right), so the test drives the real controls. It never writes
@@ -591,7 +637,13 @@ There is no save of a match. Settings come from the hub (`shared/settings.ts`).
   they are, so the playthrough's seeded map stays the same.
 - Add a faction: add it to `FACTIONS` and `FACTION_IDS`, its colours to `WOOL`, its three units to
   `UNITS` (one each for melee, ranged and cavalry), its own building to `BUILDINGS` (with `faction`),
-  `UNIQUE` and `UNIQUE_EFFECT` (with its texts in the `i18n/` files), and the menu shows a card for it (re-space the cards for four).
+  `UNIQUE` and `UNIQUE_EFFECT` (with its texts in the `i18n/` files), and the menu shows a card for it
+  (`MENU_CARDS` in layout.ts holds four; narrow them for a fifth, and keep the first card under the
+  playthrough's click at (126, 300)).
+- Add a building the Steppe Horde can pack: add its id to `PACKS`; `canPack`, the panel's Pack up
+  and the wagon's Pitch camp pick it up.
+- Change what a rival thinks of an offer: the temperament's `diplomacy` in `TEMPERAMENTS`, and
+  `TRIBUTE`, `BREAK_MOOD` and `ASK_MS` in data.ts.
 - Add a scenario: add it to `SCENARIOS` in `src/game/campaign.ts` (its name, goal and rule texts in
   the `i18n/` files, a map kind, a new seed, the rivals' temperaments, a `mission` and two `stars`) and
   re-space `MENU_SCENARIOS` for a sixth tile. A new kind of goal is a `Goal` in sim.ts, a branch in

@@ -12,7 +12,7 @@ export const RESOURCES = ['wood', 'food', 'ore'] as const;
 export type Resource = (typeof RESOURCES)[number];
 export type Cost = Partial<Record<Resource, number>>;
 
-export const FACTION_IDS = ['ember', 'tide', 'thorn'] as const;
+export const FACTION_IDS = ['ember', 'tide', 'thorn', 'steppe'] as const;
 export type FactionId = (typeof FACTION_IDS)[number];
 
 export interface Faction {
@@ -53,15 +53,28 @@ export const FACTIONS: Record<FactionId, Faction> = {
     trim: 0xc7e07a,
     horse: 0x4a3526,
   },
+  // The nomads: they pack up their camps and move them to fresh ground.
+  steppe: {
+    id: 'steppe',
+    name: 'steppeName',
+    blurb: 'steppeBlurb',
+    cloth: 0x7e4f76,
+    clothDark: 0x50304b,
+    trim: 0xc99a3a,
+    horse: 0xb8955e,
+  },
 };
 
 /**
- * Villagers and trade carts are civil; melee, ranged, cavalry, siege (the ram) and the faction's
- * champion are soldiers. `isSoldier` and `isCivil` are the two sides of that line.
+ * Villagers, trade carts, the Steppe Horde's packed camps (wagons) and transports are civil; melee,
+ * ranged, cavalry, siege (the ram), the faction's champion and the warship are soldiers. `isSoldier`
+ * and `isCivil` are the two sides of that line. Transports and warships sail (`isNaval`).
  */
-export type Role = 'villager' | 'melee' | 'ranged' | 'cavalry' | 'cart' | 'siege' | 'champion';
-export const isCivil = (role: Role) => role === 'villager' || role === 'cart';
+export type Role = 'villager' | 'melee' | 'ranged' | 'cavalry' | 'cart' | 'siege' | 'champion' | 'wagon' | 'transport' | 'warship';
+export const isCivil = (role: Role) => role === 'villager' || role === 'cart' || role === 'wagon' || role === 'transport';
 export const isSoldier = (role: Role) => !isCivil(role);
+/** Ships: they move on water and shallows only, and are built at a Harbour. */
+export const isNaval = (role: Role) => role === 'transport' || role === 'warship';
 /** Soldiers that earn veteran ranks by kills: every soldier but the ram. */
 export const earnsRanks = (role: Role) => isSoldier(role) && role !== 'siege';
 
@@ -83,7 +96,9 @@ export type BuildingId =
   | 'gate'
   | 'market'
   | 'monument'
-  | 'wonder';
+  | 'wonder'
+  | 'harbour'
+  | 'yurt';
 
 export interface UnitDef {
   id: string;
@@ -110,8 +125,8 @@ export interface UnitDef {
   elite?: boolean;
   /** At most this many alive or in training per player (the champion). */
   limit?: number;
-  /** A champion's gift: a damage aura for nearby soldiers, far sight, or healing nearby units. */
-  gift?: 'aura' | 'sight' | 'heal';
+  /** A champion's gift: a damage aura for nearby soldiers, far sight, healing nearby units, or a quicker stride for them. */
+  gift?: 'aura' | 'sight' | 'heal' | 'stride';
 }
 
 export const UNITS: Record<string, UnitDef> = {
@@ -195,6 +210,43 @@ export const UNITS: Record<string, UnitDef> = {
     id: 'thorn-warden', faction: 'thorn', role: 'melee', name: 'briarWarden',
     cost: { food: 80, wood: 50, ore: 30 }, time: 14000, hp: 150, dmg: 7, range: 1, speed: 1.6, sight: 5, cooldown: 1300, trainer: 'barracks', age: 2, elite: true,
   },
+  // The Steppe Horde: light, quick footmen and riders.
+  'steppe-clansman': {
+    id: 'steppe-clansman', faction: 'steppe', role: 'melee', name: 'clansman',
+    cost: { food: 45, wood: 25 }, time: 8000, hp: 50, dmg: 6, range: 1, speed: 2.4, sight: 5, cooldown: 1000, trainer: 'barracks',
+  },
+  'steppe-bowman': {
+    id: 'steppe-bowman', faction: 'steppe', role: 'ranged', name: 'bowman',
+    cost: { food: 35, wood: 45 }, time: 9000, hp: 32, dmg: 5, range: 4.5, speed: 2.4, sight: 6, cooldown: 1100, trainer: 'range',
+  },
+  'steppe-outrider': {
+    id: 'steppe-outrider', faction: 'steppe', role: 'cavalry', name: 'outrider',
+    cost: { food: 60, ore: 25 }, time: 12000, hp: 65, dmg: 7, range: 1, speed: 3.8, sight: 7, cooldown: 1000, trainer: 'stable',
+  },
+  'steppe-chieftain': {
+    id: 'steppe-chieftain', faction: 'steppe', role: 'champion', name: 'chieftain',
+    cost: { food: 200, ore: 150 }, time: 30000, hp: 150, dmg: 9, range: 1, speed: 2.4, sight: 8, cooldown: 1100, trainer: 'town', age: 3, limit: 1, gift: 'stride',
+  },
+  // The Steppe Horde's mastery unit: a rider who shoots from the saddle.
+  'steppe-horsebow': {
+    id: 'steppe-horsebow', faction: 'steppe', role: 'cavalry', name: 'horseArcher',
+    cost: { food: 70, wood: 40, ore: 20 }, time: 13000, hp: 60, dmg: 6, range: 4.5, speed: 3.4, sight: 7, cooldown: 1300, trainer: 'stable', age: 2, elite: true,
+  },
+  // A Steppe Horde camp packed onto a wagon (`packUp`); it pitches again where it stands (`pitch`).
+  wagon: {
+    id: 'wagon', faction: 'neutral', role: 'wagon', name: 'wagon',
+    cost: {}, time: 0, hp: 120, dmg: 0, range: 1, speed: 1.8, sight: 4, cooldown: 1000, trainer: 'town',
+  },
+  // Ships, built at a Harbour: a transport ferries TRANSPORT_CAP villagers or soldiers, a warship
+  // fights at sea and shells the shore.
+  transport: {
+    id: 'transport', faction: 'neutral', role: 'transport', name: 'transport',
+    cost: { wood: 120 }, time: 14000, hp: 160, dmg: 0, range: 1, speed: 2.6, sight: 6, cooldown: 1000, trainer: 'harbour',
+  },
+  warship: {
+    id: 'warship', faction: 'neutral', role: 'warship', name: 'warship',
+    cost: { wood: 160, ore: 60 }, time: 20000, hp: 220, dmg: 12, range: 6, speed: 2.4, sight: 8, cooldown: 2200, trainer: 'harbour', age: 2,
+  },
   // The guards of the neutral camps (see CAMPS); nobody trains them.
   'wild-brigand': {
     id: 'wild-brigand', faction: 'wild', role: 'melee', name: 'brigand',
@@ -248,6 +300,8 @@ export interface BuildingDef {
   shore?: boolean;
   /** At most this many per player. */
   limit?: number;
+  /** Ships come out on the water beside it (the Harbour). */
+  naval?: boolean;
   /** A palisade piece, placed by dragging a line; walls and gates are never auto-targeted. */
   palisade?: boolean;
   /** Villagers shelter inside when the town bell rings, up to this many; each adds an arrow to its volleys. */
@@ -276,6 +330,10 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
   monument: { id: 'monument', name: 'monument', cost: { wood: 500, food: 300, ore: 400 }, time: 90000, w: 3, h: 3, hp: 2500, sight: 5, age: 3, limit: 1 },
   // Age IV: finishing it wins at once, but only WONDER_CREW builders can work on it at a time.
   wonder: { id: 'wonder', name: 'wonder', cost: { wood: 1000, food: 800, ore: 800 }, time: 480000, w: 4, h: 4, hp: 4000, sight: 6, age: 4, limit: 1 },
+  // On a shore, like the Dock: trains transports and (from Age II) warships, which come out on the water.
+  harbour: { id: 'harbour', name: 'harbour', cost: { wood: 160 }, time: 35000, w: 3, h: 3, hp: 700, sight: 6, shore: true, limit: 2, trains: ['transport', 'warship'], naval: true },
+  // The Steppe Horde's own: a felt tent that takes every resource and houses a few; it packs up and moves.
+  yurt: { id: 'yurt', name: 'yurt', cost: { wood: 70, food: 30 }, time: 18000, w: 2, h: 2, hp: 350, sight: 4, pop: 4, drops: 'all', faction: 'steppe', limit: 4 },
 };
 /** Builders who can work on a Wonder at once; more stand by. 480 s of work takes four of them two minutes. */
 export const WONDER_CREW = 4;
@@ -288,11 +346,17 @@ export function takesRally(type: BuildingId) {
 /** The build list's first page; the faction's own building comes after these. */
 export const BUILD_ORDER: BuildingId[] = ['house', 'farm', 'lumber', 'mine', 'barracks', 'range', 'stable', 'academy', 'watchtower'];
 /** The build list's second page. */
-export const BUILD_MORE: BuildingId[] = ['wall', 'gate', 'market', 'monument', 'wonder'];
+export const BUILD_MORE: BuildingId[] = ['wall', 'gate', 'market', 'harbour', 'monument', 'wonder'];
 /** Each faction's unique building. */
-export const UNIQUE: Record<FactionId, BuildingId> = { ember: 'forge', tide: 'dock', thorn: 'grove' };
+export const UNIQUE: Record<FactionId, BuildingId> = { ember: 'forge', tide: 'dock', thorn: 'grove', steppe: 'yurt' };
 /** What each unique building does, for the menu and the panel. */
-export const UNIQUE_EFFECT: Record<FactionId, TextKey> = { ember: 'forgeEffect', tide: 'dockEffect', thorn: 'groveEffect' };
+export const UNIQUE_EFFECT: Record<FactionId, TextKey> = { ember: 'forgeEffect', tide: 'dockEffect', thorn: 'groveEffect', steppe: 'yurtEffect' };
+/** The Steppe Horde's camps that pack onto a wagon and pitch again elsewhere (`packUp`, `pitch`). */
+export const PACKS: BuildingId[] = ['yurt', 'lumber', 'mine'];
+/** Villagers or soldiers a transport carries at once. */
+export const TRANSPORT_CAP = 8;
+/** How far from a point, in tiles, a ship stops when it can't sail onto it (a landing on the shore). */
+export const LANDING = 2.5;
 /** Soldier costs with a finished Forge (Ember Legion). */
 export const FORGE_COST = 0.8;
 /** A finished Dock lands this much food every DOCK_MS (Tide Coven). */
@@ -440,6 +504,9 @@ export const AURA_DMG = 2;
 export const HEAL_RANGE = 5;
 export const HEAL_HP = 3;
 export const HEAL_MS = 1500;
+/** The Chieftain's stride: own units within STRIDE_RANGE move STRIDE_SPEED times as fast. */
+export const STRIDE_RANGE = 6;
+export const STRIDE_SPEED = 1.25;
 
 /** The Monument (Age III): if it stands this long once built, its owner wins. */
 export const MONUMENT_MS = 180000;
@@ -478,6 +545,7 @@ export const MAP_KINDS = {
   lowlands: { id: 'lowlands', name: 'lowlandsName', text: 'lowlandsText' },
   lakes: { id: 'lakes', name: 'lakesName', text: 'lakesText' },
   highlands: { id: 'highlands', name: 'highlandsName', text: 'highlandsText' },
+  islands: { id: 'islands', name: 'islandsName', text: 'islandsText' },
 } as const;
 export type MapKind = keyof typeof MAP_KINDS;
 export const MAP_KIND_IDS = Object.keys(MAP_KINDS) as MapKind[];
@@ -506,6 +574,12 @@ export interface Temperament {
   wall: { age: 1 | 2; half: number } | null;
   boon: BoonId;
   edge: EdgeId;
+  /**
+   * How it treats the player's offers in a three-way match: the goodwill it needs to take a truce
+   * or join an alliance against the other AI, how long it keeps each (ms), and the goodwill a
+   * tribute (TRIBUTE) earns.
+   */
+  diplomacy: { truce: number; truceMs: number; ally: number; allyMs: number; tribute: number };
 }
 
 export const TEMPERAMENTS: Record<Temperament['id'], Temperament> = {
@@ -516,6 +590,7 @@ export const TEMPERAMENTS: Record<Temperament['id'], Temperament> = {
     plan: ['farm', 'lumber', 'mine', 'barracks', 'stable', 'unique', 'academy', 'range', 'market', 'watchtower', 'monument', 'wonder'],
     research: ['axes', 'baskets', 'age2', 'stirrups', 'ironworks', 'picks', 'fletching', 'bodkin', 'age3', 'age4'],
     towers: 1, wall: null, boon: 'shieldwall', edge: 'muster',
+    diplomacy: { truce: 2, truceMs: 120000, ally: 0, allyMs: 240000, tribute: 1 },
   },
   builder: {
     id: 'builder', name: 'builderName', text: 'builderText',
@@ -524,6 +599,7 @@ export const TEMPERAMENTS: Record<Temperament['id'], Temperament> = {
     plan: ['monument', 'farm', 'lumber', 'mine', 'unique', 'academy', 'barracks', 'range', 'stable', 'market', 'watchtower', 'wonder'],
     research: ['axes', 'baskets', 'picks', 'age2', 'ironworks', 'fletching', 'bodkin', 'stirrups', 'age3', 'age4'],
     towers: 1, wall: { age: 2, half: 4 }, boon: 'shieldwall', edge: 'masonry',
+    diplomacy: { truce: 0, truceMs: 300000, ally: 2, allyMs: 180000, tribute: 2 },
   },
   warden: {
     id: 'warden', name: 'wardenName', text: 'wardenText',
@@ -532,7 +608,17 @@ export const TEMPERAMENTS: Record<Temperament['id'], Temperament> = {
     plan: ['farm', 'lumber', 'mine', 'barracks', 'watchtower', 'academy', 'unique', 'range', 'stable', 'market', 'monument', 'wonder'],
     research: ['axes', 'baskets', 'fletching', 'age2', 'bodkin', 'ironworks', 'picks', 'stirrups', 'age3', 'age4'],
     towers: 3, wall: { age: 1, half: 6 }, boon: 'harvest', edge: 'masonry',
+    diplomacy: { truce: 1, truceMs: 420000, ally: 3, allyMs: 240000, tribute: 1 },
   },
 };
 export type TemperamentId = Temperament['id'];
 export const TEMPERAMENT_IDS = Object.keys(TEMPERAMENTS) as TemperamentId[];
+
+/**
+ * Diplomacy in a three-way match: the player may offer each AI a truce, send it a TRIBUTE, or ask it
+ * to join against the other AI. Its temperament decides (see `Temperament.diplomacy`). Breaking a
+ * pact with an attack costs BREAK_MOOD goodwill; after a refusal it won't hear another ask for ASK_MS.
+ */
+export const TRIBUTE: Cost = { food: 100, wood: 100 };
+export const BREAK_MOOD = 3;
+export const ASK_MS = 45000;

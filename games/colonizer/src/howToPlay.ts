@@ -14,6 +14,9 @@ const en: HowToPlay = {
     { input: 'B, or the bottom panel', action: 'Open the build list with villagers selected, then click a spot' },
     { input: '1 to 9 (Ctrl to save)', action: 'Select a control group, or save the selection to one' },
     { input: 'Arrow keys, screen edge or minimap', action: 'Scroll the map' },
+    { input: 'Right click, with ships selected', action: 'Sail there; a transport on the shore puts its troops ashore, a warship attacks what you click' },
+    { input: 'Right click your transport', action: 'Send the selected land units aboard' },
+    { input: "A rival's banner, top right", action: 'In a three-way match, open talks: offer a truce, send tribute or ask it to join you' },
     { input: 'Esc', action: 'Cancel placing a building or attack-moving' },
   ],
   loop: [
@@ -34,14 +37,17 @@ const en: HowToPlay = {
     'Soldiers earn ranks from kills, adding health and damage.',
     'Rams break buildings and walls but cannot hurt units, so give them an escort.',
     'Each faction has its own building, shown last on the first page of the build list.',
-    'Two wins with a faction master it: its card then trains a second unique unit (Torchbearer, Harpooner or Briar Warden).',
+    'Two wins with a faction master it: its card then trains a second unique unit (Torchbearer, Harpooner, Briar Warden or Horse Archer).',
+    'On the Islands map, build a Harbour on the shore: transports carry eight units across, warships fight at sea and shell the shore. Shallow fords join the islands too.',
+    'Diplomacy: a Raider rarely makes peace, a Warden keeps its word longest, and tribute raises any rival\'s goodwill. Attacking a rival at peace breaks the pact.',
+    'The Steppe Horde packs its Yurts and camps into wagons and pitches them again near fresh trees and mines; its chieftain speeds up nearby soldiers.',
     'A Wonder wins the moment it is finished, but only four builders can work on it at once, and every rival sees it.',
     'In the campaign, each win opens the next scenario; beat its two star goals for three stars.',
   ],
 };
 
 /** US English only changes the spelling. */
-const us = (text: string) => text.replace(/Town Centre/g, 'Town Center');
+const us = (text: string) => text.replace(/Town Centre/g, 'Town Center').replace(/Harbour/g, 'Harbor');
 const enUS: HowToPlay = {
   goal: us(en.goal),
   controls: en.controls.map((c) => ({ input: us(c.input), action: us(c.action) })),
@@ -62,6 +68,9 @@ const de: HowToPlay = {
     { input: 'B oder die untere Leiste', action: 'Mit gewählten Dorfbewohnern die Bauliste öffnen, dann einen Platz anklicken' },
     { input: '1 bis 9 (Strg zum Speichern)', action: 'Eine Gruppe wählen oder die Auswahl darin speichern' },
     { input: 'Pfeiltasten, Bildschirmrand oder Minikarte', action: 'Die Karte verschieben' },
+    { input: 'Rechtsklick, mit gewählten Schiffen', action: 'Dorthin segeln; ein Transporter am Ufer setzt seine Truppen ab, ein Kriegsschiff greift das Angeklickte an' },
+    { input: 'Rechtsklick auf deinen Transporter', action: 'Die gewählten Landeinheiten an Bord schicken' },
+    { input: 'Banner eines Rivalen, oben rechts', action: 'In einem Spiel zu dritt verhandeln: Waffenruhe anbieten, Tribut schicken oder ein Bündnis erbitten' },
     { input: 'Esc', action: 'Setzen eines Gebäudes oder Angriffsmarsch abbrechen' },
   ],
   loop: [
@@ -82,7 +91,10 @@ const de: HowToPlay = {
     'Soldaten steigen durch Siege im Rang auf und gewinnen Leben und Schaden.',
     'Rammböcke zerschlagen Gebäude und Mauern, können Einheiten aber nichts tun, also gib ihnen Geleitschutz.',
     'Jedes Volk hat ein eigenes Gebäude, als letztes auf der ersten Seite der Bauliste.',
-    'Zwei Siege mit einem Volk meistern es: Dann bildet es eine zweite eigene Einheit aus (Fackelträger, Harpunier oder Dornwächter).',
+    'Zwei Siege mit einem Volk meistern es: Dann bildet es eine zweite eigene Einheit aus (Fackelträger, Harpunier, Dornwächter oder Berittener Bogenschütze).',
+    'Auf der Inselkarte baust du einen Hafen am Ufer: Transporter bringen acht Einheiten hinüber, Kriegsschiffe kämpfen auf See und beschießen das Ufer. Seichte Furten verbinden die Inseln ebenfalls.',
+    'Diplomatie: Ein Plünderer schließt selten Frieden, ein Wächter hält sein Wort am längsten, und Tribut hebt bei jedem Rivalen das Wohlwollen. Wer einen befriedeten Rivalen angreift, bricht den Pakt.',
+    'Die Steppenhorde packt ihre Jurten und Lager auf Wagen und schlägt sie bei frischen Bäumen und Minen wieder auf; ihr Häuptling macht Soldaten in der Nähe schneller.',
     'Ein Weltwunder gewinnt, sobald es fertig ist, aber nur vier Bauleute können zugleich daran arbeiten, und jeder Rivale sieht es.',
     'Im Feldzug öffnet jeder Sieg das nächste Szenario; erfüll seine zwei Sternziele für drei Sterne.',
   ],

@@ -32,7 +32,16 @@ import {
   RANK_HP,
   RANK_KILLS,
   TRADE_ORE,
+  ASK_MS,
+  BREAK_MOOD,
+  LANDING,
+  PACKS,
+  STRIDE_RANGE,
+  STRIDE_SPEED,
+  TRANSPORT_CAP,
+  TRIBUTE,
   earnsRanks,
+  isNaval,
   isSoldier,
   GROVE_MS,
   GROVE_RANGE,
@@ -71,7 +80,7 @@ import {
   type Resource,
   type UnitDef,
 } from './data';
-import { AMOUNT, WATER, ROCK, idx, inMap, type MapData, type Node, type PostSpot } from './map';
+import { AMOUNT, WATER, ROCK, SHALLOW, idx, inMap, sailable, type MapData, type Node, type PostSpot } from './map';
 import { t, type TextKey } from '../i18n';
 
 export type Order =
@@ -85,7 +94,11 @@ export type Order =
   /** A villager runs to shelter in a building (the town bell). */
   | { t: 'garrison'; b: number }
   /** A trade cart drives to the nearest trading post. */
-  | { t: 'trade' };
+  | { t: 'trade' }
+  /** A villager or soldier walks to the shore by a transport and goes aboard. */
+  | { t: 'board'; ship: number }
+  /** A transport sails to a shore and puts its cargo on land there. */
+  | { t: 'unload'; x: number; y: number };
 
 export interface Unit {
   id: number;
@@ -122,6 +135,10 @@ export interface Unit {
   rank: number;
   /** A champion's timer towards its next heal. */
   pulse: number;
+  /** A transport's passengers, as whole `Unit`s taken out of `units` until they land. */
+  cargo: Unit[];
+  /** A wagon's packed camp (the Steppe Horde): its building type and health, as a share of full. */
+  packed: { type: BuildingId; hp: number } | null;
 }
 
 /** Things that happened this tick, for the scene's effects; the scene empties the list each frame. */
@@ -250,6 +267,18 @@ export interface Player {
   elite: boolean;
 }
 
+/**
+ * The player's standing with an AI in a three-way match (`GameState.pacts`, by the AI's index): a
+ * truce or alliance until a game time, the AI's goodwill towards the player, and the time before
+ * which it won't hear another ask after a refusal.
+ */
+export interface Pact {
+  truceUntil: number;
+  allyUntil: number;
+  mood: number;
+  askAt: number;
+}
+
 /** One side of a match: its faction, how fast it gathers (the difficulty, for the AI) and its temperament. */
 export interface SideSetup {
   faction: FactionId;
@@ -339,6 +368,10 @@ export interface GameState {
   winBy: 'town' | 'monument' | 'wonder' | 'goal' | 'cart' | null;
   /** The campaign scenario being played, or null in a skirmish. */
   mission: Mission | null;
+  /** A map of islands (`MapData.naval`): the AI builds a Harbour and warships. */
+  naval: boolean;
+  /** The player's truces and alliances with each AI, by the AI's index (see `Pact`). */
+  pacts: Pact[];
 }
 
 export type Command =
@@ -348,6 +381,8 @@ export type Command =
   | { t: 'gather'; node: number }
   | { t: 'build'; b: number }
   | { t: 'trade' }
+  | { t: 'board'; ship: number }
+  | { t: 'unload'; x: number; y: number }
   | { t: 'stop' };
 
 export const PLAYER = 0;
@@ -418,6 +453,8 @@ export function createGame(sides: SideSetup[], map: MapData, toLast = false, mis
     events: [],
     winBy: null,
     mission: mission ? { ...mission, cart: null, trips: 0, heldSince: null } : null,
+    naval: map.naval ?? false,
+    pacts: players.map(() => ({ truceUntil: 0, allyUntil: 0, mood: 0, askAt: 0 })),
   };
   for (const n of map.nodes) s.nodes.set(n.id, n);
   // Node ids come from the map, so units and buildings count on from the largest of them.
@@ -522,6 +559,28 @@ export function rivalsOf(s: GameState, owner: number): number[] {
 /** Whether the match has a second AI. */
 export const threeWay = (s: GameState) => s.players.length > AI2;
 
+/** Whether the player and an AI are under a truce or an alliance right now. */
+export function atPeace(s: GameState, a: number, b: number) {
+  const ai = a === PLAYER ? b : b === PLAYER ? a : -1;
+  if (ai < 0 || ai === NEUTRAL) return false;
+  const p = s.pacts[ai];
+  return !!p && (p.truceUntil > s.time || p.allyUntil > s.time);
+}
+
+/** Whether two sides fight: different sides, not at peace. */
+export const hostile = (s: GameState, a: number, b: number) => a !== b && !atPeace(s, a, b);
+
+/** The rivals still in that a side fights now (`rivalsOf` less those at peace with it). */
+export function foesOf(s: GameState, owner: number) {
+  return rivalsOf(s, owner).filter((r) => hostile(s, owner, r));
+}
+
+/** Whether a unit is a ship. */
+export const isShip = (u: Unit) => isNaval(UNITS[u.type].role);
+
+/** Whether a ship can sail a tile. */
+export const seaAt = (s: GameState, x: number, y: number) => inMap(x, y) && sailable(s.terrain[idx(x, y)]);
+
 /** A building's full health: its kind's, and 30% more under Masonry. */
 export function buildingHp(s: GameState, b: Building) {
   const hp = BUILDINGS[b.type].hp;
@@ -543,6 +602,8 @@ export function notAllowed(s: GameState, owner: number, type: BuildingId): strin
   if (def.limit !== undefined) {
     let n = 0;
     for (const b of s.buildings.values()) if (b.owner === owner && b.type === type) n++;
+    // A camp packed on a wagon still counts.
+    for (const u of s.units.values()) if (u.owner === owner && u.packed?.type === type) n++;
     if (n >= def.limit) return def.limit === 1 ? t('haveOne') : t('atMost', { n: def.limit });
   }
   return null;
@@ -636,12 +697,12 @@ export function entityAt(
 
 /** How tall a unit's figure stands above its feet, in tiles (its health thread hangs there). */
 export function figureTall(def: UnitDef) {
-  return (def.role === 'cavalry' ? 48 : def.role === 'siege' ? 44 : 40) / TILE;
+  return (def.role === 'cavalry' ? 48 : def.role === 'siege' || def.role === 'warship' ? 44 : 40) / TILE;
 }
 
 export function popUsed(s: GameState, owner: number) {
   let used = 0;
-  for (const u of s.units.values()) if (u.owner === owner) used++;
+  for (const u of s.units.values()) if (u.owner === owner) used += 1 + u.cargo.length;
   for (const b of s.buildings.values()) {
     if (b.owner !== owner) continue;
     used += b.garrison.length;
@@ -658,7 +719,11 @@ export function maxHp(u: Unit) {
 /** How many of a kind of unit a player has alive, sheltering or in training (the champion's limit). */
 export function unitCount(s: GameState, owner: number, type: string) {
   let n = 0;
-  for (const u of s.units.values()) if (u.owner === owner && u.type === type) n++;
+  for (const u of s.units.values()) {
+    if (u.owner !== owner) continue;
+    if (u.type === type) n++;
+    for (const c of u.cargo) if (c.type === type) n++;
+  }
   for (const b of s.buildings.values()) {
     if (b.owner !== owner) continue;
     for (const g of b.garrison) if (g.type === type) n++;
@@ -730,7 +795,8 @@ function addBuilding(s: GameState, owner: number, type: BuildingId, tx: number, 
 }
 
 function spawnUnit(s: GameState, owner: number, type: string, near: Building): Unit | null {
-  const spot = freeSpotNear(s, near);
+  // Ships come out on the water beside the Harbour.
+  const spot = isNaval(UNITS[type].role) ? waterSpotNear(s, near) : freeSpotNear(s, near);
   if (!spot) return null;
   return spawnAt(s, owner, type, spot.x, spot.y);
 }
@@ -761,9 +827,24 @@ function spawnAt(s: GameState, owner: number, type: string, x: number, y: number
     kills: 0,
     rank: 0,
     pulse: 0,
+    cargo: [],
+    packed: null,
   };
   s.units.set(u.id, u);
   return u;
+}
+
+/** A tile a ship can sail next to a building (the Harbour), nearest first. */
+function waterSpotNear(s: GameState, b: Building): { x: number; y: number } | null {
+  const def = BUILDINGS[b.type];
+  for (let r = 1; r <= 4; r++) {
+    for (let y = b.ty - r; y < b.ty + def.h + r; y++)
+      for (let x = b.tx - r; x < b.tx + def.w + r; x++) {
+        const edge = x < b.tx || y < b.ty || x >= b.tx + def.w || y >= b.ty + def.h;
+        if (edge && seaAt(s, x, y)) return { x: x + 0.5, y: y + 0.5 };
+      }
+  }
+  return null;
 }
 
 /** A walkable tile next to a building, nearest first; the building's own tiles are not walkable. */
@@ -796,6 +877,8 @@ function ringAround(s: GameState, tx: number, ty: number, w: number, h: number, 
   for (let y = y1; y > y0; y--) push(x0, y);
   return out;
 }
+
+const isBlocked = (s: GameState, x: number, y: number, owner: number) => blocked(s, x, y, owner);
 
 /** Whether a tile stops a unit of `owner`: solid ground, or a gate that isn't its own. */
 export function blocked(s: GameState, x: number, y: number, owner: number) {
@@ -861,7 +944,9 @@ const NEIGHBOURS = [
  * Breadth-first search from a point to the nearest tile that `goal` accepts. Returns the tile
  * centres to walk through (empty if the start already qualifies), or null when nothing is reachable.
  */
-export function findPath(s: GameState, sx: number, sy: number, goal: (tx: number, ty: number) => boolean, owner = -1) {
+export function findPath(s: GameState, sx: number, sy: number, goal: (tx: number, ty: number) => boolean, owner = -1, naval = false) {
+  // Ships sail water and shallows; everyone else walks where nothing blocks them.
+  const blocked = naval ? (x: number, y: number) => !seaAt(s, x, y) : (x: number, y: number, o: number) => isBlocked(s, x, y, o);
   const startX = Math.floor(sx);
   const startY = Math.floor(sy);
   if (goal(startX, startY)) return [];
@@ -880,10 +965,10 @@ export function findPath(s: GameState, sx: number, sy: number, goal: (tx: number
       const ny = cy + dy;
       if (!inMap(nx, ny)) continue;
       const ni = idx(nx, ny);
-      if (visited[ni] === stamp || blocked(s, nx, ny, owner)) continue;
+      if (visited[ni] === stamp || blocked(nx, ny, owner)) continue;
       // A diagonal step needs both straight neighbours free, so units never squeeze past a corner
       // (and a diagonal palisade has no gaps).
-      if (dx && dy && (blocked(s, cx + dx, cy, owner) || blocked(s, cx, cy + dy, owner))) continue;
+      if (dx && dy && (blocked(cx + dx, cy, owner) || blocked(cx, cy + dy, owner))) continue;
       visited[ni] = stamp;
       parent[ni] = cur;
       if (goal(nx, ny)) {
@@ -924,7 +1009,7 @@ function stepAlong(u: Unit, speed: number, dt: number) {
 function pursue(s: GameState, u: Unit, speed: number, dt: number, goal: (tx: number, ty: number) => boolean): boolean {
   u.repath -= dt;
   if (u.path.length === 0 || u.repath <= 0) {
-    const path = findPath(s, u.x, u.y, goal, u.owner);
+    const path = findPath(s, u.x, u.y, goal, u.owner, isShip(u));
     if (path === null) return false;
     // Already on a qualifying tile: still walk to its centre, so the unit is in reach of the goal.
     u.path = path.length > 0 ? path : [{ x: Math.floor(u.x) + 0.5, y: Math.floor(u.y) + 0.5 }];
@@ -953,6 +1038,8 @@ export function issue(s: GameState, owner: number, ids: number[], cmd: Command) 
         break;
       case 'attack': {
         const target = getEntity(s, cmd.target);
+        // The player attacking a side it is at peace with breaks the pact.
+        if (target && owner === PLAYER && atPeace(s, owner, target.owner)) breakPact(s, target.owner);
         // A ram can't hurt a unit: sent at one, it walks there instead.
         if (target && role === 'siege' && 'order' in target) u.order = { t: 'move', x: target.x, y: target.y };
         else if (target && target.owner !== owner && isSoldier(role)) u.order = { t: 'attack', target: cmd.target, resume: null };
@@ -960,6 +1047,15 @@ export function issue(s: GameState, owner: number, ids: number[], cmd: Command) 
       }
       case 'trade':
         if (role === 'cart') u.order = { t: 'trade' };
+        break;
+      case 'board': {
+        // Every land unit can go aboard one of its side's transports.
+        const ship = s.units.get(cmd.ship);
+        if (!isNaval(role) && ship && ship.owner === owner && UNITS[ship.type].role === 'transport') u.order = { t: 'board', ship: ship.id };
+        break;
+      }
+      case 'unload':
+        if (role === 'transport') u.order = { t: 'unload', x: cmd.x, y: cmd.y };
         break;
       case 'gather':
         if (role === 'villager') {
@@ -1019,7 +1115,7 @@ export function canPlace(s: GameState, type: BuildingId, tx: number, ty: number,
   const onWall = type === 'gate' && wallAt(s, owner, tx, ty) !== null;
   if (!onWall)
     for (let y = ty; y < ty + def.h; y++)
-      for (let x = tx; x < tx + def.w; x++) if (!inMap(x, y) || s.solid[idx(x, y)] || s.gates[idx(x, y)] >= 0) return false;
+      for (let x = tx; x < tx + def.w; x++) if (!inMap(x, y) || s.solid[idx(x, y)] || s.gates[idx(x, y)] >= 0 || s.terrain[idx(x, y)] === SHALLOW) return false;
   for (const u of s.units.values()) {
     const ux = Math.floor(u.x);
     const uy = Math.floor(u.y);
@@ -1355,7 +1451,7 @@ function updateAssault(s: GameState) {
     const cx = town.tx + 2;
     const cy = town.ty + 2;
     const near = (u: Unit, range: number) => Math.hypot(u.x - cx, u.y - cy) <= range;
-    const attackers = [...s.units.values()].filter((u) => u.owner !== p.id && u.owner !== NEUTRAL && u.hp > 0 && isSoldier(unitDef(u).role) && !tracked.has(u.id) && near(u, BELL_RANGE));
+    const attackers = [...s.units.values()].filter((u) => hostile(s, u.owner, p.id) && u.owner !== NEUTRAL && u.hp > 0 && isSoldier(unitDef(u).role) && !tracked.has(u.id) && near(u, BELL_RANGE));
     const ids = s.assault[p.id];
     if (!ids) {
       if (attackers.length >= ASSAULT_MIN) s.assault[p.id] = attackers.map((u) => u.id);
@@ -1423,6 +1519,7 @@ export function tick(s: GameState, dt: number) {
   updateDeeds(s);
   updateRaid(s);
   updateAssault(s);
+  updatePacts(s);
   updateSight(s);
   checkWinner(s);
 }
@@ -1571,10 +1668,144 @@ function updateUnit(s: GameState, u: Unit, dt: number) {
   const def = unitDef(u);
   u.cool = Math.max(0, u.cool - dt);
   u.act = 'idle';
-  if (def.role === 'villager') villagerUpdate(s, u, def, dt);
-  else if (def.role === 'cart') cartUpdate(s, u, def, dt);
+  if (u.order.t === 'board') boardUpdate(s, u, def, dt);
+  else if (isNaval(def.role)) shipUpdate(s, u, def, dt);
+  else if (def.role === 'villager') villagerUpdate(s, u, def, dt);
+  else if (def.role === 'cart' || def.role === 'wagon') cartUpdate(s, u, def, dt);
   else militaryUpdate(s, u, def, dt);
   if (def.gift === 'heal') heal(s, u, dt);
+}
+
+/** A villager or soldier walking to its transport: on the shore beside it, it goes aboard while there is room. */
+function boardUpdate(s: GameState, u: Unit, def: UnitDef, dt: number) {
+  const o = u.order as Extract<Order, { t: 'board' }>;
+  const ship = s.units.get(o.ship);
+  if (!ship || ship.hp <= 0 || ship.owner !== u.owner) return void (u.order = { t: 'idle' });
+  if (ship.cargo.length >= TRANSPORT_CAP) {
+    if (u.owner === PLAYER) say(s, t('transportFull', { n: TRANSPORT_CAP }));
+    return void (u.order = { t: 'idle' });
+  }
+  if (Math.hypot(u.x - ship.x, u.y - ship.y) <= 1.7) {
+    u.path = [];
+    u.order = { t: 'idle' };
+    s.units.delete(u.id);
+    ship.cargo.push(u);
+    return;
+  }
+  if (!pursue(s, u, speedOf(s, u, def), dt, (tx, ty) => !s.solid[idx(tx, ty)] && Math.hypot(tx + 0.5 - ship.x, ty + 0.5 - ship.y) <= 1.6)) u.order = { t: 'idle' };
+}
+
+/**
+ * A ship: it sails to a point (on land, to the water within LANDING of it, where a transport puts its
+ * cargo ashore for an `unload`), and a warship fights what comes within its range on its own, at sea
+ * or on the shore. A ship that finds no way stands still a moment before it looks again.
+ */
+function shipUpdate(s: GameState, u: Unit, def: UnitDef, dt: number) {
+  const o = u.order;
+  const warship = def.role === 'warship';
+  const sea = (cond: (tx: number, ty: number) => boolean) => (tx: number, ty: number) => seaAt(s, tx, ty) && cond(tx, ty);
+  const landing = (x: number, y: number) => {
+    if (seaAt(s, Math.floor(x), Math.floor(y))) return sea((tx, ty) => Math.hypot(tx + 0.5 - x, ty + 0.5 - y) <= 0.75);
+    // Inland: the water nearest the point, so a click deep on an island lands on its nearest shore.
+    const shore = seaNear(s, x, y) ?? { x, y };
+    const r = Math.max(LANDING, Math.hypot(shore.x - x, shore.y - y) + 0.6);
+    return sea((tx, ty) => Math.hypot(tx + 0.5 - x, ty + 0.5 - y) <= r);
+  };
+  const stuck = () => {
+    u.order = { t: 'idle' };
+    u.cool = 1500;
+  };
+  if (o.t === 'idle') {
+    if (!warship || u.cool > 0) return;
+    const foe = nearestEnemy(s, u.owner, u.x, u.y, def.range + 1.5);
+    if (foe) u.order = { t: 'attack', target: foe.id, resume: null };
+    return;
+  }
+  if (o.t === 'move' || o.t === 'unload') {
+    const goal = landing(o.x, o.y);
+    if (u.path.length === 0 && goal(Math.floor(u.x), Math.floor(u.y))) {
+      if (o.t === 'unload' && dropCargo(s, u) === 0 && u.owner === PLAYER) say(s, t('noLanding'));
+      u.order = { t: 'idle' };
+      return;
+    }
+    if (!pursue(s, u, def.speed, dt, goal)) stuck();
+    return;
+  }
+  if (o.t === 'attackMove') {
+    const foe = nearestEnemy(s, u.owner, u.x, u.y, def.range + 1.5);
+    if (foe) return void (u.order = { t: 'attack', target: foe.id, resume: { x: o.x, y: o.y } });
+    const goal = landing(o.x, o.y);
+    if (u.path.length === 0 && goal(Math.floor(u.x), Math.floor(u.y))) return void (u.order = { t: 'idle' });
+    if (!pursue(s, u, def.speed, dt, goal)) stuck();
+    return;
+  }
+  if (o.t === 'attack') {
+    const target = getEntity(s, o.target);
+    if (!target || target.hp <= 0 || !hostile(s, u.owner, target.owner)) {
+      u.order = o.resume ? { t: 'attackMove', ...o.resume } : { t: 'idle' };
+      return;
+    }
+    const f = footprintOf(s, o.target);
+    if (!f) return;
+    if (gap(u.x, u.y, f) <= def.range + 0.5) {
+      u.path = [];
+      u.act = 'fight';
+      faceTo(u, centre(f).x);
+      if (u.cool <= 0) {
+        strike(s, u, def, target);
+        u.cool = def.cooldown;
+      }
+      return;
+    }
+    if (!pursue(s, u, def.speed, dt, sea((tx, ty) => gap(tx + 0.5, ty + 0.5, f) <= def.range))) stuck();
+    return;
+  }
+  u.order = { t: 'idle' };
+}
+
+/** The middle of the sea tile nearest a point, up to 24 tiles away, or null. */
+function seaNear(s: GameState, x: number, y: number): { x: number; y: number } | null {
+  const cx = Math.floor(x);
+  const cy = Math.floor(y);
+  let best: { x: number; y: number } | null = null;
+  let bestD = Infinity;
+  for (let r = 0; r <= 24 && !best; r++)
+    for (let ty = cy - r; ty <= cy + r; ty++)
+      for (let tx = cx - r; tx <= cx + r; tx++) {
+        if (Math.max(Math.abs(tx - cx), Math.abs(ty - cy)) !== r || !seaAt(s, tx, ty)) continue;
+        const d = Math.hypot(tx + 0.5 - x, ty + 0.5 - y);
+        if (d < bestD) {
+          bestD = d;
+          best = { x: tx + 0.5, y: ty + 0.5 };
+        }
+      }
+  return best;
+}
+
+/** Puts a transport's cargo ashore on the free land round it, as many as find room. Returns how many landed. */
+export function dropCargo(s: GameState, ship: Unit): number {
+  let landed = 0;
+  for (const c of [...ship.cargo]) {
+    let spot: { x: number; y: number } | null = null;
+    const cx = Math.floor(ship.x);
+    const cy = Math.floor(ship.y);
+    for (let r = 1; r <= Math.ceil(LANDING) + 1 && !spot; r++)
+      for (let y = cy - r; y <= cy + r && !spot; y++)
+        for (let x = cx - r; x <= cx + r && !spot; x++) {
+          if (Math.max(Math.abs(x - cx), Math.abs(y - cy)) !== r || blocked(s, x, y, c.owner)) continue;
+          if ([...s.units.values()].some((o) => Math.floor(o.x) === x && Math.floor(o.y) === y)) continue;
+          spot = { x: x + 0.5, y: y + 0.5 };
+        }
+    if (!spot) break;
+    ship.cargo.splice(ship.cargo.indexOf(c), 1);
+    c.x = spot.x;
+    c.y = spot.y;
+    c.path = [];
+    c.order = { t: 'idle' };
+    s.units.set(c.id, c);
+    landed++;
+  }
+  return landed;
 }
 
 /** The Druid mends every own unit within HEAL_RANGE by HEAL_HP every HEAL_MS. */
@@ -1648,8 +1879,10 @@ function militaryUpdate(s: GameState, u: Unit, def: UnitDef, dt: number) {
   const o = u.order;
   // A ram only ever goes for buildings, palisades and gates included.
   const pick = def.role === 'siege' ? 'structures' : 'auto';
+  // A soldier on land only goes for a ship close enough to the shore to hit.
+  const reach = def.range + 2;
   if (o.t === 'idle') {
-    const t = nearestEnemy(s, u.owner, u.x, u.y, def.sight, pick);
+    const t = nearestEnemy(s, u.owner, u.x, u.y, def.sight, pick, reach);
     if (t) u.order = { t: 'attack', target: t.id, resume: null };
     return;
   }
@@ -1660,7 +1893,7 @@ function militaryUpdate(s: GameState, u: Unit, def: UnitDef, dt: number) {
     return;
   }
   if (o.t === 'attackMove') {
-    const t = nearestEnemy(s, u.owner, u.x, u.y, def.sight, pick);
+    const t = nearestEnemy(s, u.owner, u.x, u.y, def.sight, pick, reach);
     if (t) {
       u.order = { t: 'attack', target: t.id, resume: { x: o.x, y: o.y } };
       return;
@@ -1672,7 +1905,8 @@ function militaryUpdate(s: GameState, u: Unit, def: UnitDef, dt: number) {
   }
   if (o.t === 'attack') {
     const target = getEntity(s, o.target);
-    if (!target || target.hp <= 0) {
+    // A truce or alliance called off the fight.
+    if (!target || target.hp <= 0 || !hostile(s, u.owner, target.owner)) {
       u.order = o.resume ? { t: 'attackMove', ...o.resume } : { t: 'idle' };
       return;
     }
@@ -1690,8 +1924,10 @@ function militaryUpdate(s: GameState, u: Unit, def: UnitDef, dt: number) {
     }
     const range = def.range;
     if (!pursue(s, u, speedOf(s, u, def), dt, (tx, ty) => !s.solid[idx(tx, ty)] && gap(tx + 0.5, ty + 0.5, f) <= range)) {
+      // A ship out of reach is let go; a wall in the way is broken through.
       const isWall = 'queue' in target && BUILDINGS[target.type].palisade;
-      if (isWall || !breach(s, u, o.resume ?? centre(f))) u.order = o.resume ? { t: 'attackMove', ...o.resume } : { t: 'idle' };
+      const atSea = 'order' in target && isShip(target);
+      if (isWall || atSea || !breach(s, u, o.resume ?? centre(f))) u.order = o.resume ? { t: 'attackMove', ...o.resume } : { t: 'idle' };
     }
     return;
   }
@@ -1730,7 +1966,7 @@ function guardUpdate(s: GameState, u: Unit, def: UnitDef, dt: number) {
     if (!pursue(s, u, def.speed, dt, (tx, ty) => !s.solid[idx(tx, ty)] && gap(tx + 0.5, ty + 0.5, f) <= range)) u.order = { t: 'move', x: post.x, y: post.y };
     return;
   }
-  const t = nearestEnemy(s, u.owner, post.x, post.y, def.sight, 'units');
+  const t = nearestEnemy(s, u.owner, post.x, post.y, def.sight, 'units', def.range + 2);
   if (t && away <= LEASH) return void (u.order = { t: 'attack', target: t.id, resume: null });
   if (o.t === 'move') {
     if (u.path.length === 0 && Math.hypot(u.x - o.x, u.y - o.y) < 0.9) return void (u.order = { t: 'idle' });
@@ -1919,11 +2155,19 @@ function nearestUnbuilt(s: GameState, owner: number, x: number, y: number, range
   return best?.b ?? null;
 }
 
-/** Move speed: cavalry go faster under Stirrups, and everyone with the Relic of Haste. */
+/** Move speed: cavalry go faster under Stirrups, everyone with the Relic of Haste and near the Chieftain. */
 function speedOf(s: GameState, u: Unit, def: UnitDef) {
   const stirrups = def.role === 'cavalry' && s.players[u.owner].techs.includes('stirrups');
   const haste = holds(s, u.owner, 'haste') ? RELIC_SPEED : 1;
-  return (stirrups ? def.speed * STIRRUPS_SPEED : def.speed) * haste;
+  const stride = inStride(s, u) ? STRIDE_SPEED : 1;
+  return (stirrups ? def.speed * STIRRUPS_SPEED : def.speed) * haste * stride;
+}
+
+/** Whether an own champion with the stride gift (the Steppe Horde's Chieftain) stands within STRIDE_RANGE of a unit, itself included. */
+export function inStride(s: GameState, u: Unit) {
+  if (s.players[u.owner].faction !== 'steppe') return false;
+  for (const o of s.units.values()) if (o.owner === u.owner && o.hp > 0 && UNITS[o.type].gift === 'stride' && Math.hypot(o.x - u.x, o.y - u.y) <= STRIDE_RANGE) return true;
+  return false;
 }
 
 /** Gather speed from researched techs. */
@@ -1994,14 +2238,16 @@ function nearestDropoff(s: GameState, owner: number, res: Resource | null, x: nu
  * their own) skips palisades and gates, `palisade` looks only at those, `units` only at units, and
  * `structures` (what a ram goes for) at every building, palisades and gates included.
  */
-function nearestEnemy(s: GameState, owner: number, x: number, y: number, range: number, pick: 'auto' | 'palisade' | 'units' | 'structures' = 'auto'): Unit | Building | null {
+function nearestEnemy(s: GameState, owner: number, x: number, y: number, range: number, pick: 'auto' | 'palisade' | 'units' | 'structures' = 'auto', shipReach = Infinity): Unit | Building | null {
   const foes: (Unit | Building)[] = pick === 'palisade' || pick === 'structures' ? [...s.buildings.values()] : pick === 'units' ? [...s.units.values()] : [...s.units.values(), ...s.buildings.values()];
   let best: Unit | Building | null = null;
   let bestD = Infinity;
   for (const e of foes) {
-    if (e.owner === owner || e.hp <= 0) continue;
+    if (e.hp <= 0 || !hostile(s, owner, e.owner)) continue;
     if (pick !== 'structures' && 'queue' in e && !!BUILDINGS[e.type].palisade !== (pick === 'palisade')) continue;
     const d = gap(x, y, footprint(e));
+    // `shipReach`: a soldier on land leaves alone a ship it can't reach from the shore.
+    if (d > shipReach && 'order' in e && isShip(e)) continue;
     if (d <= range && d < bestD) {
       best = e;
       bestD = d;
@@ -2065,7 +2311,9 @@ function reap(s: GameState) {
   for (const u of [...s.units.values()]) {
     if (u.hp > 0) continue;
     s.units.delete(u.id);
-    s.players[u.owner].lost++;
+    // A sunk transport takes its passengers down with it.
+    s.players[u.owner].lost += 1 + u.cargo.length;
+    u.cargo = [];
     changed = true;
   }
   for (const b of [...s.buildings.values()]) {
@@ -2159,6 +2407,9 @@ function separate(s: GameState, dt: number) {
   const anchored = (u: Unit) => u.act === 'gather' || u.act === 'build';
   for (const u of s.units.values()) {
     if (anchored(u) || u.hp <= 0) continue;
+    // Ships push apart on the water, everyone else on land.
+    const ship = isShip(u);
+    const free = (x: number, y: number) => (ship ? seaAt(s, x, y) : !blocked(s, x, y, u.owner));
     let px = 0;
     let py = 0;
     const cx = Math.floor(u.x);
@@ -2168,7 +2419,7 @@ function separate(s: GameState, dt: number) {
         const cell = grid.get(idx(cx + dx, cy + dy));
         if (!cell || !inMap(cx + dx, cy + dy)) continue;
         for (const o of cell) {
-          if (o === u) continue;
+          if (o === u || isShip(o) !== ship) continue;
           const ox = u.x - o.x;
           const oy = u.y - o.y;
           const d = Math.hypot(ox, oy);
@@ -2185,8 +2436,8 @@ function separate(s: GameState, dt: number) {
     const k = Math.min(1, maxStep / len);
     const nx = u.x + px * k;
     const ny = u.y + py * k;
-    if (!blocked(s, Math.floor(nx), Math.floor(u.y), u.owner)) u.x = nx;
-    if (!blocked(s, Math.floor(u.x), Math.floor(ny), u.owner)) u.y = ny;
+    if (free(Math.floor(nx), Math.floor(u.y))) u.x = nx;
+    if (free(Math.floor(u.x), Math.floor(ny))) u.y = ny;
   }
 }
 
@@ -2200,7 +2451,7 @@ function updateCamps(s: GameState) {
     const cx = c.tx + 1;
     const cy = c.ty + 1;
     const present = new Set<number>();
-    for (const u of s.units.values()) if (u.owner !== NEUTRAL && u.hp > 0 && Math.hypot(u.x - cx, u.y - cy) <= CLAIM_RANGE) present.add(u.owner);
+    for (const u of s.units.values()) if (u.owner !== NEUTRAL && u.hp > 0 && !isShip(u) && Math.hypot(u.x - cx, u.y - cy) <= CLAIM_RANGE) present.add(u.owner);
     if (present.size !== 1) continue;
     const who = [...present][0];
     if (c.kind === 'cache' && c.res) {
@@ -2232,3 +2483,136 @@ export function campAt(s: GameState, x: number, y: number, fog = false): Camp | 
   return null;
 }
 
+
+// ---------------------------------------------------------------- diplomacy
+
+/** What the player can offer an AI in a three-way match. */
+export type Offer = 'truce' | 'tribute' | 'ally';
+
+/**
+ * The player offers an AI a truce, sends it a tribute, or asks it to join against the other AI. The
+ * AI's temperament (`Temperament.diplomacy`) decides from its goodwill (`Pact.mood`), which a tribute
+ * raises; a refusal makes it deaf to asks for ASK_MS. Says the answer, and returns whether it was taken.
+ */
+export function offer(s: GameState, ai: number, what: Offer): boolean {
+  const p = s.players[ai];
+  const pact = s.pacts[ai];
+  if (!threeWay(s) || ai === PLAYER || ai === NEUTRAL || !p || p.out || !pact) return false;
+  const d = TEMPERAMENTS[p.temperament ?? 'builder'].diplomacy;
+  const faction = t(FACTIONS[p.faction].name);
+  if (what === 'tribute') {
+    const me = s.players[PLAYER];
+    if (!affordable(me, TRIBUTE)) {
+      say(s, t('notEnoughResources'));
+      return false;
+    }
+    pay(me, TRIBUTE);
+    for (const r of Object.keys(TRIBUTE) as Resource[]) p.res[r] += TRIBUTE[r] ?? 0;
+    pact.mood += d.tribute;
+    say(s, t('tributeSent', { faction }));
+    return true;
+  }
+  const other = rivalsOf(s, PLAYER).find((r) => r !== ai);
+  if (what === 'ally' && (other === undefined || pact.allyUntil > s.time)) {
+    say(s, t(other === undefined ? 'allyNoFoe' : 'pactAlready', { faction }));
+    return false;
+  }
+  if (what === 'truce' && atPeace(s, PLAYER, ai)) {
+    say(s, t('pactAlready', { faction }));
+    return false;
+  }
+  if (s.time < pact.askAt) {
+    say(s, t('pactWait', { faction, s: Math.ceil((pact.askAt - s.time) / 1000) }));
+    return false;
+  }
+  const need = what === 'truce' ? d.truce : d.ally;
+  if (pact.mood < need) {
+    pact.askAt = s.time + ASK_MS;
+    say(s, t(what === 'truce' ? 'truceRefused' : 'allyRefused', { faction }));
+    return false;
+  }
+  const ms = what === 'truce' ? d.truceMs : d.allyMs;
+  const min = Math.round(ms / 60000);
+  if (what === 'truce') pact.truceUntil = s.time + ms;
+  else {
+    pact.allyUntil = s.time + ms;
+    pact.truceUntil = Math.max(pact.truceUntil, pact.allyUntil);
+    // An ally goes for the common foe soon, once its army is ready.
+    s.aiRaid[ai].next = Math.min(s.aiRaid[ai].next, s.time + 20000);
+  }
+  // Its raid on the player is called off.
+  if (s.raid?.by === ai && s.raid.target === PLAYER) endRaid(s, ai, false);
+  say(s, t(what === 'truce' ? 'truceTaken' : 'allyTaken', { faction, n: min }));
+  return true;
+}
+
+/** The player broke a pact with an attack: it ends at once, and the AI's goodwill falls. */
+function breakPact(s: GameState, ai: number) {
+  const pact = s.pacts[ai];
+  if (!pact) return;
+  pact.truceUntil = 0;
+  pact.allyUntil = 0;
+  pact.mood -= BREAK_MOOD;
+  say(s, t('pactBroken', { faction: t(FACTIONS[s.players[ai].faction].name) }));
+}
+
+/** Ends truces and alliances whose time is up, and an alliance whose common foe has fallen. */
+function updatePacts(s: GameState) {
+  if (!threeWay(s)) return;
+  for (const ai of [AI, AI2]) {
+    const pact = s.pacts[ai];
+    const p = s.players[ai];
+    if (!pact || p.out) continue;
+    const faction = t(FACTIONS[p.faction].name);
+    // An alliance ends when its time is up or the common foe has fallen; the truce under it with it.
+    if (pact.allyUntil > 0 && (pact.allyUntil <= s.time || rivalsOf(s, PLAYER).length < 2)) {
+      if (pact.truceUntil <= pact.allyUntil) pact.truceUntil = 0;
+      pact.allyUntil = 0;
+      say(s, t('allyOver', { faction }));
+    }
+    if (pact.truceUntil > 0 && pact.truceUntil <= s.time) {
+      pact.truceUntil = 0;
+      say(s, t('truceOver', { faction }));
+    }
+  }
+}
+
+// ---------------------------------------------------------------- the Steppe Horde's camps
+
+/** Whether a building can pack onto a wagon: a finished, idle Yurt, Lumber or Mining Camp of the Steppe Horde. */
+export function canPack(s: GameState, b: Building) {
+  return b.built && b.hp > 0 && PACKS.includes(b.type) && s.players[b.owner].faction === 'steppe' && b.queue.length === 0 && b.garrison.length === 0;
+}
+
+/** Packs a camp onto a wagon standing where it stood. Returns the wagon's id, or null. */
+export function packUp(s: GameState, owner: number, bid: number): number | null {
+  const b = s.buildings.get(bid);
+  if (!b || b.owner !== owner || !canPack(s, b)) return null;
+  const def = BUILDINGS[b.type];
+  const hp = b.hp / buildingHp(s, b);
+  s.buildings.delete(b.id);
+  rebuildSolid(s);
+  const u = spawnAt(s, owner, 'wagon', b.tx + Math.floor(def.w / 2) + 0.5, b.ty + Math.floor(def.h / 2) + 0.5);
+  u.packed = { type: b.type, hp };
+  return u.id;
+}
+
+/** Pitches a wagon's camp again where the wagon stands, if it fits there. Returns the building's id, or null. */
+export function pitch(s: GameState, owner: number, uid: number): number | null {
+  const u = s.units.get(uid);
+  if (!u || u.owner !== owner || !u.packed) return null;
+  const type = u.packed.type;
+  const def = BUILDINGS[type];
+  const ox = Math.floor(u.x) - Math.floor(def.w / 2);
+  const oy = Math.floor(u.y) - Math.floor(def.h / 2);
+  // The wagon itself doesn't stand in the way of its own camp.
+  s.units.delete(u.id);
+  if (!canPlace(s, type, ox, oy, owner)) {
+    s.units.set(u.id, u);
+    return null;
+  }
+  const b = addBuilding(s, owner, type, ox, oy, true);
+  b.hp = Math.max(1, u.packed.hp * buildingHp(s, b));
+  rebuildSolid(s);
+  return b.id;
+}

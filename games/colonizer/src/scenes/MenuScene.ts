@@ -7,7 +7,7 @@ import { t } from '../i18n';
 import { FEET, FRAME, WOOL } from '../art/figures';
 import { hexNum, SERIF, T } from '../art/stitch';
 import { figKey } from './BootScene';
-import { MENU_MODE, MENU_OPTS, MENU_SCENARIOS } from './layout';
+import { MENU_CARDS, MENU_MODE, MENU_OPTS, MENU_SCENARIOS } from './layout';
 import { viewFrame } from '../../../../shared/scaling';
 import { playMusic, ui } from '../../../../shared/audio';
 import { COLONY } from '../audio/music';
@@ -50,7 +50,7 @@ export class MenuScene extends Phaser.Scene {
 
     this.against = [];
     this.opts = [];
-    FACTION_IDS.forEach((id, i) => this.card(id, ox + 170 + i * 310, oy + 300));
+    FACTION_IDS.forEach((id, i) => this.card(id, ox + MENU_CARDS.x + i * MENU_CARDS.dx, oy + MENU_CARDS.y));
 
     // Skirmish or campaign, as a toggle over the cards.
     (['skirmish', 'campaign'] as const).forEach((mode, i) => {
@@ -146,7 +146,8 @@ export class MenuScene extends Phaser.Scene {
     const two = campaign ? sc.rivals.length > 1 : options.rivals === 2;
     for (const { text, id } of this.against) {
       const [ai, ai2] = rivalsFor(id);
-      text.setText(two ? t('playsAgainstTwo', { a: t(FACTIONS[ai].name), b: t(FACTIONS[ai2].name) }) : t('playsAgainst', { a: t(FACTIONS[ai].name) }));
+      text.setScale(1).setText(two ? t('playsAgainstTwo', { a: t(FACTIONS[ai].name), b: t(FACTIONS[ai2].name) }) : t('playsAgainst', { a: t(FACTIONS[ai].name) }));
+      fit(text);
     }
   }
 
@@ -154,27 +155,27 @@ export class MenuScene extends Phaser.Scene {
     const f = FACTIONS[id];
     const box = this.add.image(x, y, 'card-faction').setInteractive({ useHandCursor: true });
     const top = y - 115;
-    this.add.rectangle(x, top + 12, 250, 6, hexNum(WOOL[id].cloth)).setOrigin(0.5);
+    this.add.rectangle(x, top + 12, MENU_CARDS.w - 30, 6, hexNum(WOOL[id].cloth)).setOrigin(0.5);
     // The faction's three soldiers, in profile.
     (['melee', 'ranged', 'cavalry'] as const).forEach((role, k) => {
       const type = unitFor(id, role).id;
       this.add
-        .image(x - 70 + k * 70, top + 96, figKey(type, id), 'idle-0')
+        .image(x - 62 + k * 62, top + 96, figKey(type, id), 'idle-0')
         .setOrigin(FEET.x / FRAME, FEET.y / FRAME)
-        .setScale(1.35);
+        .setScale(1.3);
     });
-    this.add.text(x, top + 122, t(f.name).toUpperCase(), { fontFamily: SERIF, fontSize: '21px', fontStyle: 'bold', color: WOOL[id].cloth }).setOrigin(0.5);
+    fit(this.add.text(x, top + 122, t(f.name).toUpperCase(), { fontFamily: SERIF, fontSize: '20px', fontStyle: 'bold', color: WOOL[id].cloth }).setOrigin(0.5));
     this.add
-      .text(x, top + 156, t(f.blurb), { fontFamily: SERIF, fontSize: '14px', color: T.ink, wordWrap: { width: 240 }, align: 'center' })
+      .text(x, top + 156, t(f.blurb), { fontFamily: SERIF, fontSize: '13px', color: T.ink, wordWrap: { width: MENU_CARDS.w - 26 }, align: 'center' })
       .setOrigin(0.5, 0.5);
-    this.add.text(x, top + 182, t('uniqueLine', { building: t(BUILDINGS[UNIQUE[id]].name), effect: t(UNIQUE_EFFECT[id]) }), { fontFamily: SERIF, fontSize: '12.5px', fontStyle: 'bold', color: WOOL[id].cloth }).setOrigin(0.5);
+    fit(this.add.text(x, top + 184, t('uniqueLine', { building: t(BUILDINGS[UNIQUE[id]].name), effect: t(UNIQUE_EFFECT[id]) }), { fontFamily: SERIF, fontSize: '12px', fontStyle: 'bold', color: WOOL[id].cloth }).setOrigin(0.5));
     this.against.push({ id, text: this.add.text(x, top + 200, '', { fontFamily: SERIF, fontSize: '12px', fontStyle: 'italic', color: T.faded }).setOrigin(0.5) });
     // Faction mastery: wins with the faction towards its second unique unit, or the unit once unlocked.
     const wins = loadMastery();
     const unit = t(eliteFor(id).name);
     const mastery = mastered(id, wins) ? t('masteryDone', { unit }) : t('masteryLine', { n: wins[id], total: MASTERY_WINS, unit });
     const line = this.add.text(x, top + 217, mastery, { fontFamily: SERIF, fontSize: '11.5px', fontStyle: 'bold', color: mastered(id, wins) ? T.green : T.indigo }).setOrigin(0.5);
-    if (line.width > 266) line.setScale(266 / line.width, 1);
+    fit(line);
     box.on('pointerover', () => box.setTexture('card-faction-hot'));
     box.on('pointerout', () => box.setTexture('card-faction'));
     box.on('pointerdown', () => {
@@ -188,6 +189,13 @@ export class MenuScene extends Phaser.Scene {
       this.scene.start('Game', { faction: id, aiFaction: ai, rival2: options.rivals === 2 ? ai2 : null, kind: options.kind });
     });
   }
+}
+
+/** Squeezes a card's line that would run past the card's edge. */
+function fit(text: Phaser.GameObjects.Text) {
+  const max = MENU_CARDS.w - 14;
+  if (text.width > max) text.setScale(max / text.width, 1);
+  return text;
 }
 
 /** The AI's faction and the second AI's for a player's faction: the next two along. */

@@ -3,7 +3,7 @@
 // frame; all of them are fixed to the screen (scroll factor 0).
 import Phaser from 'phaser';
 import { AGE3_DAMAGE, AGE4_DAMAGE, ARMY_DEED, BUILDINGS, DEEDS, DEEDS4, RANK_NAMES, VETERAN_RANK, FACTIONS, MAP_SIZE, RELICS, RESOURCES, TEMPERAMENTS, TILE, type FactionId, type RelicId } from '../game/data';
-import { DIRT, ROCK, WATER } from '../game/map';
+import { DIRT, ROCK, SHALLOW, WATER } from '../game/map';
 import { deed4Count, deedCount, monumentLeft, NEUTRAL, PLAYER, popCap, popUsed, rivalsOf, type GameState, type Player } from '../game/sim';
 import type { Scenario } from '../game/campaign';
 import { WOOL } from '../art/figures';
@@ -275,7 +275,7 @@ export class StatusCard {
   private icons: Phaser.GameObjects.Image[] = [];
   private held: Phaser.GameObjects.Text;
   private monument: Phaser.GameObjects.Text;
-  private rivals: { id: number; name: Phaser.GameObjects.Text }[] = [];
+  private rivals: { id: number; name: Phaser.GameObjects.Text; x: number }[] = [];
   private relics = Object.keys(RELICS) as RelicId[];
   /** The Monument line on show, for the test and the screenshots. */
   shown = '';
@@ -295,7 +295,7 @@ export class StatusCard {
       .forEach((p, k) => {
         const rx = x + 74 + k * 82;
         fixed(scene.add.image(rx, y + 37, `icon-banner-${p.faction}`).setScale(0.8), 2);
-        this.rivals.push({ id: p.id, name: fixed(scene.add.text(rx + 10, y + 37.5, '', ink(10, T.faded)).setOrigin(0, 0.5), 2) });
+        this.rivals.push({ id: p.id, x: rx, name: fixed(scene.add.text(rx + 10, y + 37.5, '', ink(10, T.faded)).setOrigin(0, 0.5), 2) });
       });
     this.monument = fixed(scene.add.text(x + 9, y + 60, '', ink(11, T.red)).setOrigin(0, 0.5), 2);
   }
@@ -313,8 +313,14 @@ export class StatusCard {
     this.held.setText(t('relicsHeld', { n: mine }));
     stitchLine(g, x + 4, y + 26, x + STATUS_CARD.w - 4, y + 26, 0.8, hexNum(T.ochre));
     // A rival's temperament shows once its Town Center has been seen; one that has fallen says so.
-    this.temperaments = this.rivals.map(({ id, name }) => {
+    this.temperaments = this.rivals.map(({ id, name, x: rx }) => {
       const p = s.players[id];
+      // A truce rings the rival's banner in green; an alliance rings it twice.
+      const pact = s.pacts[id];
+      if (pact && !p.out && (pact.truceUntil > s.time || pact.allyUntil > s.time)) {
+        stitchEllipse(g, rx, y + 37, 9, 9, 1.4, hexNum(T.green));
+        if (pact.allyUntil > s.time) stitchEllipse(g, rx, y + 37, 12, 12, 1.1, hexNum(T.green));
+      }
       const word = p.out ? t('rivalFallen') : p.scouted && p.temperament ? t(TEMPERAMENTS[p.temperament].name) : '?';
       name.setText(word.toUpperCase()).setColor(p.scouted && !p.out ? WOOL[p.faction].cloth : T.faded);
       return word;
@@ -329,6 +335,13 @@ export class StatusCard {
     this.monument.setText(line).setColor(ours ? T.green : T.red);
     this.bg.setTexture(line ? 'card-status-tall' : 'card-status');
     if (line) stitchLine(g, x + 4, y + 48, x + STATUS_CARD.w - 4, y + 48, 0.8, hexNum(T.ochre));
+  }
+
+  /** The rival whose banner and temperament sit under a point on the Rivals row, if any. */
+  rivalAt(px: number, py: number): number | null {
+    const { y } = STATUS_CARD;
+    if (py < y + 27 || py > y + 48) return null;
+    return this.rivals.find((r) => px >= r.x - 12 && px <= r.x + 70)?.id ?? null;
   }
 
   contains(px: number, py: number) {
@@ -385,6 +398,7 @@ const MINI_COLOURS: Record<number, [number, number, number]> = {
   [WATER]: [74, 95, 140],
   [ROCK]: [154, 154, 140],
   [DIRT]: [184, 149, 94],
+  [SHALLOW]: [140, 170, 160],
 };
 
 const rgb = (c: string): [number, number, number] => {
