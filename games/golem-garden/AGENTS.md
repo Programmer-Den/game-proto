@@ -11,7 +11,9 @@ Pests walk dirt paths from the left edge to the Heartwood at their end. The play
 soil cells beside the path; each grows into a golem that throws at pests within reach, and a hedge
 seed blocks a path cell. Squashed pests drop sap, which buys seeds and golem levels. Waves are
 started by the player, without end; the next one can be called early. Wave 30 is the garden's
-harvest, which earns the stars that unlock the other gardens. The art is claymation (plasticine on
+harvest, which earns the stars that unlock the other gardens; past it the garden grows wild. Laurels
+from thorny harvests buy golem grafts, and a daily plot gives every player the same seeded garden
+once a day. The art is claymation (plasticine on
 a studio table), painted in code at startup.
 
 Implemented today:
@@ -113,13 +115,42 @@ Implemented today:
   700ms behind) and Two Gates 'sap' (`newGame` starts with `LEAN_SAP` = 30). Its harvest sets
   `state.laurels[garden]`, saved and shown on the tag ("laurel won"); the HUD garden tag reads
   "<name> · thorny" and the wave tag "laurel at 30".
+- Wild garden (GG14): past `HARVEST_WAVE`, `waveFor` multiplies each wave's `hpScale` by
+  `WILD.grow` (1.06) per wave past it (`wildness(n)`), `isBossWave(n)` brings a Queen Slug every
+  `WILD.bossEvery` (5) waves as well as every `BOSS_EVERY`, and the scene draws a wild wave's pests
+  `wildScale(wave)` bigger (1.5% a wave, up to 30%). Use `isBossWave` for every "is this a queen
+  wave" test (music, banners, hint, boons; `bossNumber(n)` counts them for `boonOffer`).
+  `finishWave` past the harvest raises `state.wild[garden]` (outside the daily plot), shown on the
+  wave tag ("wild · best N") and under the garden's picker card; the wave-31 start (or call) banner
+  says the garden grows wild.
+- Golem grafts (GG15): `GRAFTS` (`GRAFT_INFO`), bought for good with laurels, one each
+  (`laurelsFree(laurels, grafts)`, `canGraft`), in the grafts overlay (`showGrafts`, opened by the
+  picker's Grafts button once a laurel is won, Back reopens the picker in its mode; `buyGraft`).
+  Three are third forms (`FormInfo.graft`, same ids: Quartz, Lichen, Nettle): `formsOf(kind)` lists
+  all three of a kind's forms, `formsFor(s, kind)` only those open here, and the form menu shows
+  them before Back (one to three chips). The Seedling sets `state.freeSeed` in `newGame` (or when
+  bought before a garden's first golem): `seedCost(s, kind)` is then 0 for a golem seed, the golem
+  cards read "free" and the hint says so; `plant` clears it. `state.grafts` holds the rules' grafts
+  (none in the daily plot); the overlay reads the saved list.
+- Daily plot (GG16, `shared/daily.ts`): the picker's Daily plot button (`dailyButton`, refused once
+  today's try is used) calls `startDaily` and restarts the scene with `{ daily: true }` (every
+  restart passes its `StartData`, since Phaser keeps the last one); `create` draws
+  `dailyPlot(dailyRand('golem-garden'), GARDENS.length)` (a garden, thorny or not, and one of the
+  two first forms per golem) into `newGame`'s `extras.daily`, which plants it whatever the stars
+  (`state.daily`). There `unlocked` opens the Thorn golem, `formsFor` offers only the day's form,
+  grafts don't count, the seed cards name the forms ("lv 3: Sling") and `announceDaily` shows the
+  rules. `lastWave(s)` is `DAILY.waves` (15): it can't be called early and `step` sets phase
+  'over' once `state.cleared` reaches it; the scene then calls `finishDaily` with `dailyScore(s)`
+  (`DAILY.perWave` a wave cleared, `DAILY.perLeaf` a leaf kept) and opens the picker in 'daily'
+  mode. Planting a garden from the picker mid-plot (`leaveDaily`) scores it as it stands.
 - Sap pops: each squashed pest pushes a `Pop` onto `state.pops`; the scene drains them into a
   splat, a "+N" label and three droplets that arc to the sap counter, whose glow pulses as they
   land.
 - Trophies: ten (see `src/trophies/` below), awarded by `checkTrophies` from the state every frame
   and Bold call by the scene as a called wave ends clean (`Settled.clean`).
-- The most waves ever cleared, the bloom, each garden's stars and laurels, the trophies, and the
-  garden last picked (and whether thorny) persist. Boons and regrown leaves last one garden.
+- The most waves ever cleared, the bloom, each garden's stars, laurels and best wild wave, the
+  grafts, the daily record, the trophies, and the garden last picked (and whether thorny) persist.
+  Boons and regrown leaves last one garden; a daily plot isn't resumed after a reload.
 
 Missing or rough:
 
@@ -139,7 +170,8 @@ Missing or rough:
 - The cover and the loop screenshots (`heartwood-bloom`, `call-early`, `sap-pops`, `golem-menu`,
   `golem-move`, `new-pests`, `queen-slug`, `garden-picker`, `forked-brook`, `two-gates`,
   `level-3-forms`, `targeting`, `hedge`, `compost`, `harvest`, `harvest-wave`, `boons`,
-  `regrow-leaf`, `thorny-picker`, `thorny-meadow`, `trophies`) were
+  `regrow-leaf`, `thorny-picker`, `thorny-meadow`, `trophies`, `wild-garden`,
+  `daily-grafts-picker`, `grafts`, `daily-plot`) were
   staged through `window.game` with a scratch Playwright script against the dev server (set
   `state` fields and `localStorage` keys, push pests or pops, click cells and buttons, pause the
   scene); refresh them the same way.
@@ -162,7 +194,8 @@ File map (`src/`):
   `setupScaling(game, { fill: true })` from `shared/scaling.ts`, and in dev builds puts `game` on `window`.
 - `scenes/BootScene.ts`: calls `bakeTextures`, then starts `Game`.
 - `scenes/GameScene.ts`: builds the garden, HUD, panel, golem menu and banner, and the garden
-  picker each time it opens (`createPicker(mode)`, `showPicker`, `closePicker`) and the boon pick (`showBoons`); turns taps into
+  picker each time it opens (`createPicker(mode)` with its `PickerMode`, `showPicker`, `closePicker`, `dailyButton`), the
+  grafts overlay (`showGrafts`, `buyGraft`) and the boon pick (`showBoons`); `create(data)` takes `StartData` (`daily`); turns taps into
   `select`, `plant`, `regrow`, `takeBoon`, `upgrade` (with a form, through `menuTap` and `formMenu`), `setTarget`,
   `move`, `uproot`, `startWave` and the speed toggle; calls `tick` in `update` and draws slime,
   hedges, golems (and combo vines, form beads), pests (and mole mounds), shots, bars, level beads
@@ -171,7 +204,7 @@ File map (`src/`):
   when they change. `frame` is the designed frame in the view (see Screens), and `dim()` the
   overlays' dark cover over the whole view.
 - `scenes/layout.ts`: `VIEW`, `HUD` (title, garden tag and tag positions), `SPEED_BUTTON`,
-  `GOLEM_MENU` (four chips wide), `GARDEN_CARD`, `PANEL`, `SEED_BUTTONS` (`ys` and `hs` per
+  `GOLEM_MENU` (four chips wide), `GARDEN_CARD`, `GRAFT_CARD`, `PANEL`, `SEED_BUTTONS` (`ys` and `hs` per
   card, in `SEEDS` order), `PREVIEW`, `HINT`, `WAVE_BUTTON`, `BUTTON`, `UI_DEPTH`, `FONT` (a system sans stack), and
   re-exports `GRID` and `cellCentre` from `game/board.ts`.
 - `game/board.ts`: `GRID`, the `Cell`, `Route` and `Garden` types, `GARDENS` (each with its
@@ -180,24 +213,27 @@ File map (`src/`):
   `pathPoint(route, dist)` (position and facing at a distance along a route).
 - `game/data.ts`: `GOLEMS`, `SEEDS`/`SeedKind`, `GOLEM_INFO` (with `area` and `locked` for the
   thorn golem), `BLOOM_GOAL`, `EARLY_BONUS`, `UPROOT_REFUND`, `MOVE_FEE`, `FAST`, `COMBO`,
-  `MAX_LEVEL`, `UPGRADE_COST`, `FORMS`, `FORM_INFO`, `formsOf`, `TARGETS`, `TARGET_INFO`,
+  `MAX_LEVEL`, `UPGRADE_COST`, `FORMS`, `FORM_INFO`, `formsOf`, `GRAFTS`/`Graft`, `GRAFT_INFO`, `TARGETS`, `TARGET_INFO`,
   `golemStats(kind, level, form)` (a `GolemStats`), `HEDGE`, `CHEW_PER_BITE`, `COMPOST`,
   `HARVEST_WAVE`, `STAR_LEAVES`, `harvestStars`, `PESTS`, `PEST_INFO` (with `armour`, `tunnel`,
-  `slime`, `boss`, `flies`), `BOSS_EVERY`, `SLIME`, `PEST_HP_SCALE` (difficulty), `waveFor(n, twist)`,
+  `slime`, `boss`, `flies`), `BOSS_EVERY`, `WILD`, `wildness`, `wildScale`, `isBossWave`, `bossNumber`, `SLIME`, `PEST_HP_SCALE` (difficulty), `waveFor(n, twist)`,
   `waveCounts(n, twist)`, `waveBonus`, `START`, `REGROW`/`regrowCost`, `BOONS`/`Boon`,
   `BOON_INFO`, `BOON`, `boonOffer`, `TWISTS`/`Twist`, `TWIST_INFO`, `GARDEN_TWISTS`,
-  `THORNY_STARS` and `LEAN_SAP`. Every name and blurb in the catalogues (golems, with `lower` for
+  `THORNY_STARS`, `LEAN_SAP`, `DAILY`, `Plot` and `dailyPlot`. Every name and blurb in the catalogues (golems, with `lower` for
   inside a sentence and `card` for a tall seed card's two lines, the hedge, forms, targets, boons and
   twists) is a `TextKey`, shown with `t`.
 - `game/state.ts`: `GameState`, `Golem` (with `form` and `target`), `Hedge`, `Pest`, `Shot`,
-  `Pop`, `Called`, `Settled`, `Slime`, `SHOT_MS`, `newGame(best, bloom, garden, stars, thorny, laurels)`,
-  `gardenOf`, `totalStars`, `gardenOpen`, `thornyOpen`, `twistOf`, `boonCount`, `unlocked`, `seedCost`, `select`, `golemAt`, `hedgeAt`,
+  `Pop`, `Called`, `Settled`, `Slime`, `SHOT_MS`, `Extras`, `newGame(best, bloom, garden, stars, thorny, laurels, extras)`
+  (`extras`: `wild`, `grafts`, `daily`),
+  `gardenOf`, `totalStars`, `gardenOpen`, `thornyOpen`, `twistOf`, `boonCount`, `unlocked`, `seedCost(s, kind)`, `formsFor`,
+  `lastWave`, `dailyScore`, `laurelsFree`, `canGraft`, `select`, `golemAt`, `hedgeAt`,
   `freeSoil`, `freePath`, `canPlant`, `plant`, `upgradeCost`, `picksForm`, `upgrade(s, g, form)`,
   `boonedStats`, `statsOf(s, g)`, `setTarget`, `nextTarget`, `uprootValue`, `uproot`, `canMove`, `move`, `neighbours`,
   `comboAt`, `slimed`, `queenOnPath`, `canCallEarly`, `nextWave`, `regrowPrice`, `canRegrow`, `regrow`, `sunRow`,
   `compostCap`, `takeBoon`, `startWave` (returns `'start'`, `'early'` or null) and `tick`. No Phaser.
 - `game/save.ts`: `loadBest`/`saveBest`, `loadBloom`/`saveBloom`, `loadGarden`/`saveGarden`,
-  `loadThorny`/`saveThorny`, `loadStars`/`saveStars`, `loadLaurels`/`saveLaurels`.
+  `loadThorny`/`saveThorny`, `loadStars`/`saveStars`, `loadLaurels`/`saveLaurels`, `loadWild`/`saveWild`,
+  `loadGrafts`/`saveGrafts`.
 - `art/clay.ts`: the claymation toolkit. `bake` paints a texture in art units (2 per view pixel)
   around an anchor, on a canvas `sharpRes` times the view size (at most `MAX_RES` = 2), and adds it
   with `addSharp`, which marks the texture's resolution so images show it at its view size; `clay` shades any path as
@@ -211,7 +247,7 @@ File map (`src/`):
   `slime`, `slow`, `shot-<kind>`, `sap`, `glow`, `splat`, `leaf`, `card-<h>[-dim]` (one per
   height in `SEED_BUTTONS.hs`), `rim-<h>`,
   `card-locked`, `btn-wave[-off]`, `menu`, `chip[-off]`, `speed[-on]`, `pill`,
-  `gcard[-rim|-locked]`, `btn`), `bakeGarden` and `gardenBg` (each garden's `bg-<n>`, baked when
+  `gcard[-rim|-locked]`, `graft[-rim|-dim]`, `btn`), `bakeGarden` and `gardenBg` (each garden's `bg-<n>`, baked when
   it is first planted), `bakeTable` (the `table` over the whole view with the HUD strip and its
   tags across its top, and `edge`, the table from the view's left edge to the board, which hides
   pests coming in; baked by `GameScene` once it knows the view) and `TREE_FLOWERS`, where the five
@@ -237,7 +273,7 @@ File map (`src/`):
 Shared code it imports (outside the game folder): `shared/setupGame.ts` (`setupGame`),
 `shared/scaling.ts` (`setupScaling`, `sharpRes`, `viewSize`, `viewFrame`), `shared/settings.ts` (`byDifficulty`,
 `settings`), `shared/i18n.ts` (`translator`, `byLanguage`, `formatNumber`), `shared/audio.ts` (`sounds`, `ui`,
-`playMusic`, `playSting`) and `shared/trophies.ts` (`trophySet`, `award`).
+`playMusic`, `playSting`), `shared/daily.ts` (`dailyRand`, `startDaily`, `finishDaily`, `loadDaily`) and `shared/trophies.ts` (`trophySet`, `award`).
 
 Screens: `setupScaling` gives the canvas `renderScale` canvas pixels per game pixel (up to 4 on a
 4K screen) and zooms the one camera to match from its top-left. With `fill: true` the view takes
@@ -299,22 +335,27 @@ pests not yet shown; the scene empties it every frame), `best`, `compost` (paid 
 end), `stars` (per garden), `harvest` (this garden's, 0 before wave 30), `thorny`, `laurels` (per
 garden), `boons`, `sunRows`, `offer` (the boons to pick from, or empty), `queenSquashed`, `called` (waves
 called early whose last pests still walk), `settled` (called waves just finished, each with `clean`; the scene
-empties it), `regrown` and `nextId`. Golem
+empties it), `regrown`, `cleared` (the most waves cleared in this garden), `wild` (per garden), `grafts`,
+`freeSeed`, `daily` (the `Plot`, or null) and `nextId`. Golem
 positions are cells; pest positions are `dist` pixels along their route. The open menu, its form
 mode and the golem being moved (`picked`, `formMenu`, `moving`) are the scene's, not the state's.
 
-Persistence: seven `localStorage` keys, six written by the scene: `golem-garden-best` (the most waves
+Persistence: ten `localStorage` keys, eight written by the scene: `golem-garden-best` (the most waves
 ever cleared, when `state.best` rises), `golem-garden-bloom` (the Heartwood's bloom, when it rises;
 kept between gardens, so the Thorn golem stays unlocked once it blooms), `golem-garden-stars`
 (each garden's harvest stars, comma-separated in `GARDENS` order, when they change) and
 `golem-garden-garden` (the garden last picked, which a reload plants), `golem-garden-thorny` (1
 when that pick was its thorny variant) and `golem-garden-laurels` (each garden's laurel, 0 or 1,
-comma-separated, when one is won), and `golem-garden-trophies` (the trophies earned, each id with
+comma-separated, when one is won), `golem-garden-wild` (each garden's best wild wave, comma-separated,
+when one rises), `golem-garden-grafts` (the grafts bought, comma-separated ids), `golem-garden-daily`
+(the daily record, written by `startDaily` and `finishDaily` in `shared/daily.ts`) and
+`golem-garden-trophies` (the trophies earned, each id with
 the time, written by `award` in `shared/trophies.ts`). The garden's golems, hedges, pests and boons are never saved.
 The hub's settings are read from the shared `hub-settings` key.
 
 Randomness and timing: no `Math.random`, `Date.now` or `performance.now`. Waves are fixed by
-`waveFor`; art uses the seeded `rnd` in `art/clay.ts`. Game time is only the frame timestamps
+`waveFor`; art uses the seeded `rnd` in `art/clay.ts`; the daily plot is drawn from `dailyRand`
+(seeded by the date, read only when the Daily plot button is pressed). Game time is only the frame timestamps
 Phaser passes to `update`; the pops' tweens run on Phaser's clock and are cosmetic.
 
 ### Sound
@@ -327,10 +368,10 @@ game still (it ticks by 0).
 
 Music (`syncMusic`, called in `create` and every `update`, before the stings, so a sting ducks
 the song that plays on): `CALM` (96 BPM, G major pentatonic, part `calm`, chords G Em C D) between waves and after the Heartwood falls; `WAVES` (132 BPM)
-`battle` while a wave comes and `boss` (E minor) on a Queen Slug wave (`wave % BOSS_EVERY`).
+`battle` while a wave comes and `boss` (E minor) on a Queen Slug wave (`isBossWave`).
 Changing song fades the old one; battle and boss switch at the next bar. `STINGS` (120 BPM):
 `harvest1` to `harvest3` (one rising note per star) when the harvest picker opens, `lose` when the
-Heartwood falls.
+Heartwood falls (`harvest3` instead when a daily plot ends with leaves left).
 
 | Sound | Where it plays |
 |---|---|
@@ -349,7 +390,8 @@ Heartwood falls.
 | `cleared`, `bud` (higher per bud), `bloom` | `waveDone`: a wave cleared, or a called wave whose last pests are gone |
 | `rustle` + `chime` / buzz | `regrowLeaf` (the Heartwood's cell, the leaf tag) |
 | `boon` | a boon card taken |
-| `ui('click')` | opening a golem's menu, form-menu open and Back, Move chip, speed button, garden tag, garden and thorny cards, the picker's Back or Keep going |
+| `boon` + `ui('coin')` / buzz | a graft bought / refused (bought, or no laurel) |
+| `ui('click')` | opening a golem's menu, form-menu open and Back, Move chip, speed button, garden tag, garden and thorny cards, the picker's Back, Keep going, Daily plot (buzz once played) and Grafts, the grafts' Back |
 
 ### Hub settings
 
@@ -405,12 +447,15 @@ Heartwood falls.
 - **Add a garden**: a `garden(...)` entry in `GARDENS` with its corner lists (straight runs,
   starting off the left edge at col -1, every route ending on the same Heartwood cell). The
   background, picker card and mini map follow; `GARDEN_CARD` fits three cards side by side.
-- **Retune combos, the boss or the menu's prices**: `COMBO`, `BOSS_EVERY`, `SLIME`, the queen's
+- **Retune combos, the boss or the menu's prices**: `COMBO`, `BOSS_EVERY` (and `WILD.bossEvery`), `SLIME`, the queen's
   `PEST_INFO` row, `UPROOT_REFUND` and `MOVE_FEE` in `data.ts`, and the README.
 - **Retune boons, regrowing or thorny variants**: `BOON` (numbers), `BOON_INFO` and the order of
   `BOONS` (`boonOffer` takes them three at a time), `REGROW`, `TWIST_INFO`, `GARDEN_TWISTS`,
   `THORNY_STARS` and `LEAN_SAP` in `data.ts`; the boon cards' detail line is `boonDetail` in
   `GameScene`; and the README's tables.
+- **Retune the wild garden, grafts or the daily plot**: `WILD`, the third forms' `FORM_INFO` rows,
+  `GRAFTS`/`GRAFT_INFO` (four cards fit at `GRAFT_CARD`'s width), `DAILY` and `dailyPlot` in
+  `data.ts`; the README's sections and tables.
 - **Change the bloom goal or early bonus**: `BLOOM_GOAL` and `EARLY_BONUS` in `data.ts`. The HUD
   draws `BLOOM_GOAL` flowers but the tree has five spots (`TREE_FLOWERS`), and the test's
   `EARLY_BONUS` mirrors the bonus.
@@ -437,12 +482,12 @@ Heartwood falls.
 
 - `SEED_BUTTONS.ys` and `hs` are indexed in `SEEDS` order; a card under 70px tall uses the short
   card layout (the thorn golem's), and the hedge strip has its own.
-- The menu's chip `i` means different things in form mode (form A, form B, Back) and out of it
-  (Raise, Aim, Move, Uproot); `refreshMenu` and `menuTap` agree on that order.
+- The menu's chip `i` means different things in form mode (each of `formsFor`'s forms, then Back)
+  and out of it (Raise, Aim, Move, Uproot); `refreshMenu` and `menuTap` agree on that order.
 - A hedge's `stops` are fixed when it is planted, from the garden's routes; a pest exactly at a
   stop keeps chewing because the halt test is `dist <= stop <= next`.
 - `startWave` during a wave returns null until the queue is empty, while a Queen Slug walks, and
-  always on wave 30. The scene shows the "called
+  always on wave 30 (and on the daily plot's last wave). The scene shows the "called
   early" banner itself (from the click), while a natural clear is spotted in `update`.
 - A golem's damage lands when it throws; the shot image is cosmetic, so a pest can vanish before
   the rock arrives.

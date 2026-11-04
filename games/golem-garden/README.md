@@ -14,8 +14,10 @@ Slug slimes the garden. From wave 3 a compost heap pays interest on unspent sap.
 garden's harvest: one to three stars by the leaves kept, which unlock new gardens with forked
 paths, and then the waves go on without end. After each Queen Slug you pick one of three boons
 that shape the rest of the run, lost leaves can be regrown for sap between waves, and three stars
-on a garden open its thorny variant, a harder twist with a laurel to win. Hold out as many waves
-as you can.
+on a garden open its thorny variant, a harder twist with a laurel to win. Past the harvest the
+garden grows wild, with tougher pests every wave and a Queen Slug every fifth; laurels buy golem
+grafts that last for good, and a daily plot gives everyone the same seeded garden once a day. Hold
+out as many waves as you can.
 
 Everything is claymation: hand-rolled plasticine on a studio table, with fingerprint smudges and
 soft highlights, lumpy golems with bead eyes, a pressed clay path, soil pads with tool-cut furrows
@@ -45,6 +47,8 @@ and pressed lettering on clay tags. It is all painted in code at startup; there 
 | Tap the Heartwood (or the leaf tag) | Between waves: regrow a lost leaf for sap, dearer each time |
 | A boon card | After a Queen Slug wave: take that boon for the rest of the garden |
 | A garden's Thorny tag | In the garden picker, once the garden has 3 stars: plant its thorny variant |
+| Daily plot | In the garden picker: plant today's daily plot, once a day |
+| Grafts | In the garden picker, once a laurel is won: buy golem grafts with laurels |
 
 1. **Seeds grow first.** A seed takes a few seconds to grow into a golem, and only a grown golem
    fights. You can plant between waves and during them.
@@ -70,6 +74,11 @@ and pressed lettering on clay tags. It is all painted in code at startup; there 
    | Moss golem | Spore | slows every pest within reach at once, for 70% of the damage |
    | Thorn golem | Bramble | reaches 60px further |
    | Thorn golem | Barb | pricks half again as deep and ignores armour |
+   | Pebble golem | Quartz (grafted) | 40% more damage and reaches 30px further |
+   | Moss golem | Lichen (grafted) | pests it hits crawl at 40% speed for 2.5s; reaches 40px further |
+   | Thorn golem | Nettle (grafted) | pricks 30% deeper and a quarter quicker |
+
+   The last three are third forms, offered once their graft is bought (below).
 
 4. **Aim.** Each golem aims at the **First** pest (furthest along the path, the default), the
    **Strongest** (most health left), the **Weakest** or **Flyers** (crows before anything else).
@@ -98,7 +107,7 @@ and pressed lettering on clay tags. It is all painted in code at startup; there 
    | Mole | 4 | 34 | 34 | 8 | 1 | tunnels under the middle of the path (30% to 60% of the way), out of reach, as a moving heap of earth |
    | Armoured snail | 5 | 36 | 20 | 11 | 2 | shrugs off small hits: 4 off every hit, down to 1 |
    | Aphid | 6 | 5 | 46 | 1 | 1 | comes in a swarm of 6 + half the wave's number, two swarms from wave 12 |
-   | Queen Slug | 10, 20, ... | 620 | 13 | 80 | 5 | a boss every tenth wave; her slime trail halves the throwing speed of golems on and beside the cells she crosses for 6s |
+   | Queen Slug | 10, 20, ... | 620 | 13 | 80 | 5 | a boss every tenth wave (every fifth past wave 30); her slime trail halves the throwing speed of golems on and beside the cells she crosses for 6s |
 
 8. **The Heartwood** has 10 leaves. A pest that reaches it eats as many as it bites, and the garden
    is lost when none are left. Clearing a wave adds 10 + 5 x the wave's number in sap. The most
@@ -109,7 +118,8 @@ and pressed lettering on clay tags. It is all painted in code at startup; there 
 10. **Harvest.** Clearing wave 30 is the garden's harvest. It earns stars by the leaves the
     Heartwood still has: one star for any, two for 6 or more, three for all 10. The stars are saved
     per garden (the best harvest counts), and the stars from every garden together unlock the next
-    gardens. The waves then go on without end; Keep going, or plant another garden.
+    gardens. The waves then go on without end in the wild garden (below); Keep going, or plant
+    another garden.
 11. **Heartwood bloom.** Each wave you clear (or call early, below) opens one of the five buds on the
     Heartwood, shown on the tree and in the top bar (for example 3/5). With all five open the tree is
     in bloom and the Thorn golem's seed card unlocks; until then it shows a padlock and the buds
@@ -167,7 +177,31 @@ and pressed lettering on clay tags. It is all painted in code at startup; there 
     | Meadow | No hedges: the hedge seed is gone |
     | Forked Brook | Double crows: every crow comes with a twin |
     | Two Gates | Lean start: start with 30 sap instead of 60 |
-19. **Trophies.** Ten trophies, listed on the start and pause screens (Trophies) and counted on the
+19. **The wild garden.** Past the harvest the garden grows wild: on top of the usual 12% a wave,
+    every wave from 31 has 6% more health than the one before it (so wave 40 is about 1.8 times as
+    tough as it would have been), its pests are drawn a little bigger each wave (up to 30% bigger),
+    and a Queen Slug comes every fifth wave (35, 40, 45 and on), each with its boon pick. The wave
+    tag shows the garden's best wild wave, which is saved per garden and shown on its card in the
+    garden picker.
+20. **Golem grafts.** Laurels won in thorny gardens buy grafts in the garden picker's Grafts
+    screen, one laurel each, and a graft lasts for good. With three laurels and four grafts, one
+    stays out of reach:
+
+    | Graft | What it does |
+    | --- | --- |
+    | Quartz graft | pebble golems can take a third form at level 3, Quartz |
+    | Lichen graft | moss golems can take a third form at level 3, Lichen |
+    | Nettle graft | thorn golems can take a third form at level 3, Nettle |
+    | Seedling | the first golem seed planted in every garden is free (its card reads "free") |
+
+21. **Daily plot.** The Daily plot button in the garden picker plants today's daily plot, the same
+    for every player on the same day: a seeded garden (in its thorny variant on some days) whose
+    three golem seeds each grow into one set form at level 3 (shown on the seed cards), with the
+    Thorn golem open from the start and no grafts. Hold 15 waves; the score is 10 points a wave
+    cleared and 5 a leaf kept at the end (the last wave can't be called early). There is one try a
+    day, which starting uses up (leaving half way scores what you had); the button then shows
+    today's score, with your best daily and days in a row under it.
+22. **Trophies.** Ten trophies, listed on the start and pause screens (Trophies) and counted on the
     hub's card; a toast shows each one as it is earned:
 
     | Trophy | Tier | Earned by |
@@ -182,6 +216,14 @@ and pressed lettering on clay tags. It is all painted in code at startup; there 
     | Perfect harvest | gold | harvesting a garden with all ten leaves |
     | Every garden | gold | harvesting all three gardens |
     | Thorny laurel | gold, hidden | harvesting a thorny garden |
+
+![The wild garden: wave 35's Queen Slug and the grown pests, with the wave tag showing the best wild wave](docs/screenshots/wild-garden.webp)
+
+![The garden picker with the Daily plot and Grafts buttons, and the Meadow's best wild wave](docs/screenshots/daily-grafts-picker.webp)
+
+![Golem grafts: two bought with laurels, the other two waiting for one](docs/screenshots/grafts.webp)
+
+![Today's daily plot: Forked Brook, its seeds growing into Sling, Spore and Barb](docs/screenshots/daily-plot.webp)
 
 ![A seed just planted, growing](docs/screenshots/playthrough-1-sprout.webp)
 

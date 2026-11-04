@@ -97,8 +97,11 @@ export const MAX_LEVEL = 3;
 /** Sap to raise a golem from level `n` to `n + 1`, indexed by its current level. */
 export const UPGRADE_COST = [0, 40, 70];
 
-/** The forms a golem can take at level `MAX_LEVEL`: two per kind, and the raise to 3 picks one. */
-export const FORMS = ['boulder', 'sling', 'bog', 'spore', 'bramble', 'barb'] as const;
+/**
+ * The forms a golem can take at level `MAX_LEVEL`: two per kind, and a third once its graft is
+ * bought (GG15, `FormInfo.graft`); the raise to 3 picks one.
+ */
+export const FORMS = ['boulder', 'sling', 'bog', 'spore', 'bramble', 'barb', 'quartz', 'lichen', 'nettle'] as const;
 export type FormKind = (typeof FORMS)[number];
 
 export interface FormInfo {
@@ -122,6 +125,8 @@ export interface FormInfo {
   pierce?: boolean;
   /** The form's colour, for its level bead and badge. */
   colour: number;
+  /** A third form, open once its graft (of the same id) is bought with a laurel. */
+  graft?: boolean;
 }
 
 export const FORM_INFO: Record<FormKind, FormInfo> = {
@@ -131,10 +136,27 @@ export const FORM_INFO: Record<FormKind, FormInfo> = {
   spore: { of: 'moss', name: 'sporeName', blurb: 'sporeBlurb', area: true, damage: 0.7, colour: 0xb0d860 },
   bramble: { of: 'thorn', name: 'brambleName', blurb: 'brambleBlurb', range: 60, colour: 0x6fae4a },
   barb: { of: 'thorn', name: 'barbName', blurb: 'barbBlurb', damage: 1.5, pierce: true, colour: 0xf2a6c8 },
+  quartz: { of: 'pebble', name: 'quartzName', blurb: 'quartzBlurb', damage: 1.4, range: 30, colour: 0xc8a8f0, graft: true },
+  lichen: { of: 'moss', name: 'lichenName', blurb: 'lichenBlurb', slow: { factor: 0.4, ms: 2500 }, range: 40, colour: 0xe0d890, graft: true },
+  nettle: { of: 'thorn', name: 'nettleName', blurb: 'nettleBlurb', damage: 1.3, cooldown: 0.75, colour: 0xa8d848, graft: true },
 };
 
-/** The two forms a golem of `kind` can take at level 3. */
+/** Every form a golem of `kind` can take at level 3, the grafted third one included. */
 export const formsOf = (kind: GolemKind) => FORMS.filter((form) => FORM_INFO[form].of === kind);
+
+/**
+ * Golem grafts (GG15): bought for good with laurels, one laurel each. The first three open a third
+ * form for one golem (the form of the same id); the Seedling plants the first golem seed of every
+ * garden for free.
+ */
+export const GRAFTS = ['quartz', 'lichen', 'nettle', 'seedling'] as const;
+export type Graft = (typeof GRAFTS)[number];
+export const GRAFT_INFO: Record<Graft, { name: TextKey; blurb: TextKey }> = {
+  quartz: { name: 'quartzGraftName', blurb: 'quartzGraftBlurb' },
+  lichen: { name: 'lichenGraftName', blurb: 'lichenGraftBlurb' },
+  nettle: { name: 'nettleGraftName', blurb: 'nettleGraftBlurb' },
+  seedling: { name: 'seedlingName', blurb: 'seedlingBlurb' },
+};
 
 /** How a golem picks its target, among the pests within reach. */
 export const TARGETS = ['first', 'strongest', 'weakest', 'flyers'] as const;
@@ -226,8 +248,23 @@ export const PEST_INFO: Record<PestKind, PestInfo> = {
   queen: { hp: 620, speed: 13, bounty: 80, bite: 5, slime: true, boss: true },
 };
 
-/** A Queen Slug comes every this many waves. */
+/** A Queen Slug comes every this many waves (every `WILD.bossEvery` in the wild garden). */
 export const BOSS_EVERY = 10;
+
+/**
+ * The wild garden (GG14): past the harvest (wave HARVEST_WAVE) the waves grow wild. Each wild wave's
+ * pests have `grow` times the health of the last one's on top of the usual rise, and stand `size`
+ * bigger, up to `maxSize`; a Queen Slug comes every `bossEvery` waves.
+ */
+export const WILD = { grow: 1.06, size: 0.015, maxSize: 0.3, bossEvery: 5 };
+/** How many waves past the harvest wave `n` is: 0 up to the harvest. */
+export const wildness = (n: number) => Math.max(0, n - HARVEST_WAVE);
+/** How much bigger wave `n`'s pests are drawn, from 1 up to the harvest. */
+export const wildScale = (n: number) => 1 + Math.min(WILD.maxSize, WILD.size * wildness(n));
+/** Whether wave `n` brings a Queen Slug: every tenth wave, and every fifth in the wild garden. */
+export const isBossWave = (n: number) => n % BOSS_EVERY === 0 || (n > HARVEST_WAVE && n % WILD.bossEvery === 0);
+/** Which Queen Slug wave `n` brings: 1 for wave 10, 3 for wave 30, 4 for 35 and so on. */
+export const bossNumber = (n: number) => Math.floor(Math.min(n, HARVEST_WAVE) / BOSS_EVERY) + Math.floor(wildness(n) / WILD.bossEvery);
 /** How long a cell stays slimed after the Queen Slug passes, in ms, and how much it slows throws. */
 export const SLIME = { ms: 6000, slow: 0.5 };
 
@@ -245,7 +282,8 @@ export interface Spawn {
  * second, two crows more each wave from the third, a mole more each wave from the fourth, an
  * armoured snail more every other wave from the fifth, and from the sixth a swarm of aphids that
  * grows each wave (two swarms from the twelfth). Every tenth wave the Queen Slug leads. Later
- * waves also get tougher, 12% more health per wave. A thorny garden with the 'crows' twist doubles the crows.
+ * waves also get tougher, 12% more health per wave, and past the harvest the wild garden's growth
+ * on top (`WILD`). A thorny garden with the 'crows' twist doubles the crows.
  */
 export function waveFor(n: number, twist: Twist | null = null): { spawns: Spawn[]; hpScale: number } {
   const spawns: Spawn[] = [];
@@ -261,9 +299,9 @@ export function waveFor(n: number, twist: Twist | null = null): { spawns: Spawn[
   for (let w = 0; w < swarms; w++) {
     for (let i = 0; i < 6 + Math.floor(n / 2); i++) spawns.push({ kind: 'aphid', atMs: 6000 + w * 9000 + i * 140 });
   }
-  if (n % BOSS_EVERY === 0) spawns.push({ kind: 'queen', atMs: 1500 });
+  if (isBossWave(n)) spawns.push({ kind: 'queen', atMs: 1500 });
   spawns.sort((a, b) => a.atMs - b.atMs);
-  return { spawns, hpScale: (1 + 0.12 * (n - 1)) * PEST_HP_SCALE };
+  return { spawns, hpScale: (1 + 0.12 * (n - 1)) * WILD.grow ** wildness(n) * PEST_HP_SCALE };
 }
 
 /** How many of each pest wave `n` brings, counted from `waveFor`; shown in the wave preview. */
@@ -323,3 +361,30 @@ export const GARDEN_TWISTS: Twist[] = ['hedges', 'crows', 'sap'];
 export const THORNY_STARS = 3;
 /** Sap a garden with the 'sap' twist starts with. */
 export const LEAN_SAP = 30;
+
+/**
+ * The daily plot (GG16): one seeded garden a day, the same for everyone, played for `waves` waves
+ * (or until the Heartwood falls). Its three golem seeds are fixed for the day, each growing into
+ * one set form at level 3. The score is `perWave` points a wave cleared and `perLeaf` a leaf kept.
+ */
+export const DAILY = { waves: 15, perWave: 10, perLeaf: 5 };
+
+/** Today's daily plot: the garden, whether in its thorny variant, and the form each golem seed takes. */
+export interface Plot {
+  garden: number;
+  thorny: boolean;
+  forms: Record<GolemKind, FormKind>;
+}
+
+/** The daily plot drawn from `rand` (`dailyRand` in `shared/daily.ts`): any garden, either variant, one of the two first forms per golem. */
+export function dailyPlot(rand: () => number, gardens: number): Plot {
+  const garden = Math.floor(rand() * gardens) % gardens;
+  const thorny = rand() < 0.5;
+  const forms = Object.fromEntries(
+    GOLEMS.map((kind) => {
+      const two = formsOf(kind).filter((form) => !FORM_INFO[form].graft);
+      return [kind, two[Math.floor(rand() * two.length) % two.length]];
+    }),
+  ) as Record<GolemKind, FormKind>;
+  return { garden, thorny, forms };
+}

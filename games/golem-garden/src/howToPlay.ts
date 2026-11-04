@@ -15,6 +15,8 @@ const en: HowToPlay = {
     { input: '1x / 2x button', action: 'Play at double speed, or back to normal' },
     { input: 'Garden tag under the title', action: 'Pick a garden to plant, or its thorny variant' },
     { input: 'Click or tap the Heartwood', action: 'Between waves, regrow a lost leaf for sap' },
+    { input: 'Daily plot (garden picker)', action: "Play today's seeded garden, once a day" },
+    { input: 'Grafts (garden picker)', action: 'Spend laurels on golem grafts that last for good' },
   ],
   loop: [
     'Pick the Pebble golem seed and plant it on soil next to the path.',
@@ -34,6 +36,9 @@ const en: HowToPlay = {
     'Wave 30 is the harvest: stars for the leaves you kept unlock new gardens.',
     'After every Queen Slug you squash you pick one of three boons for the rest of the garden.',
     'Three stars on a garden open its thorny variant; harvest it to win a laurel.',
+    'Past wave 30 the garden grows wild: pests get tougher every wave and a Queen Slug comes every fifth.',
+    'Laurels buy grafts: a third form for a golem, or a free first seed in every garden.',
+    "The daily plot gives everyone the same garden and seeds for a day: hold 15 waves for the best score.",
   ],
 };
 
@@ -50,6 +55,8 @@ const de: HowToPlay = {
     { input: 'Taste 1x / 2x', action: 'Doppelt so schnell spielen oder zurück zu normal' },
     { input: 'Garten-Schild unter dem Titel', action: 'Einen Garten zum Pflanzen wählen oder seine dornige Variante' },
     { input: 'Das Herzholz anklicken oder antippen', action: 'Zwischen den Wellen ein verlorenes Blatt für Saft nachwachsen lassen' },
+    { input: 'Tagesbeet (Gartenauswahl)', action: 'Den heutigen Garten mit festen Samen spielen, einmal am Tag' },
+    { input: 'Pfropfen (Gartenauswahl)', action: 'Lorbeeren für Golem-Pfropfen ausgeben, die für immer bleiben' },
   ],
   loop: [
     'Wähle den Samen des Kieselgolems und pflanze ihn auf Erde neben dem Weg.',
@@ -69,6 +76,9 @@ const de: HowToPlay = {
     'Welle 30 ist die Ernte: Sterne für die behaltenen Blätter schalten neue Gärten frei.',
     'Nach jeder zerquetschten Schneckenkönigin wählst du eine von drei Gaben für den Rest des Gartens.',
     'Drei Sterne auf einem Garten öffnen seine dornige Variante; ernte sie, um einen Lorbeer zu gewinnen.',
+    'Nach Welle 30 verwildert der Garten: Schädlinge werden mit jeder Welle zäher, und jede fünfte bringt eine Schneckenkönigin.',
+    'Lorbeeren kaufen Pfropfen: eine dritte Form für einen Golem oder einen freien ersten Samen in jedem Garten.',
+    'Das Tagesbeet gibt allen für einen Tag denselben Garten und dieselben Samen: halte 15 Wellen für die beste Punktzahl.',
   ],
 };
 

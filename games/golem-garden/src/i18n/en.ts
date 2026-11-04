@@ -115,14 +115,14 @@ const en = {
   // Hints
   hintMove: 'Tap soil to move the {golem} there for {cost} sap',
   hintForm: '{form}: {blurb}',
-  hintFormPick: 'Level 3 picks its form for good: {a} or {b}',
+  hintFormPick: 'Level 3 picks its form for good: {forms}',
   hintFormed: '{form} {golem}: {blurb}',
   hintGrowing: '{golem}, still growing',
   hintLevel: '{golem}, level {n}',
   hintComboSlowed: '{golem} lv {n}: moss combo, harder on slowed pests',
   hintComboPricks: '{golem} lv {n}: moss combo, pricks twice',
   hintAims: '{level}, aims at {target}',
-  hintPicksForm: '{level}. Level 3 picks a form: {a} or {b}',
+  hintPicksForm: '{level}. Level 3 picks a form: {forms}',
   hintTapAgain: '{level}. Tap it again to close',
   hintTapGolem: '{level}. Tap it to raise, aim, move or uproot',
   hintHedge: 'A hedge: pests stop and chew on it ({n} left)',
@@ -163,7 +163,7 @@ const en = {
   harvestThornyOpen: 'Its thorny variant is open.',
   harvestNext: '{garden} opens at {need} stars; you have {stars}.',
   harvestAllOpen: 'Every garden is open.',
-  harvestGoOn: 'The waves go on: keep going, or plant another garden.',
+  harvestGoOn: 'Past wave {wave} the garden grows wild: pests grow every wave and a Queen Slug comes every fifth. Keep going, or plant another garden.',
   chooseTitle: 'Choose a garden',
   chooseText:
     "A new garden starts from wave 1; this one is left behind. Your best ({best} waves),\nyour stars and the Heartwood's bloom carry over. {thorny} stars open a garden's thorny variant.",
@@ -185,6 +185,59 @@ const en = {
   boonPebble: 'Pebble damage +{pct}%',
   boonCompost: 'Compost up to {cap}',
   boonTaken: '{detail} (taken {n}x)',
+
+  // Grafted third forms (GG15): name and what it does
+  quartzName: 'Quartz',
+  quartzBlurb: 'hard crystal throws, 30px further',
+  lichenName: 'Lichen',
+  lichenBlurb: 'slows to 40% for 2.5s, far reach',
+  nettleName: 'Nettle',
+  nettleBlurb: 'harder, quicker stings',
+  formsOr: '{a} or {b}',
+
+  // Golem grafts (GG15): name and card text
+  quartzGraftName: 'Quartz graft',
+  quartzGraftBlurb: 'Pebble golems can take a third form at level 3: Quartz, hard crystal throws from further away',
+  lichenGraftName: 'Lichen graft',
+  lichenGraftBlurb: 'Moss golems can take a third form at level 3: Lichen, a long, deep slow from further away',
+  nettleGraftName: 'Nettle graft',
+  nettleGraftBlurb: 'Thorn golems can take a third form at level 3: Nettle, harder and quicker stings',
+  seedlingName: 'Seedling',
+  seedlingBlurb: 'The first golem seed you plant in every garden is free',
+  graftsButton: 'Grafts',
+  graftsTitle: 'Golem grafts',
+  graftsText: 'Laurels from thorny harvests buy grafts that last for good, one laurel each.',
+  laurelsLeft: 'Laurels to spend: {n} of {total}',
+  graftBuy: 'Graft for 1 laurel',
+  graftOwned: 'Grafted',
+  graftNeeds: 'Needs a laurel',
+  free: 'free',
+  hintFreeSeed: 'Seedling graft: your first golem seed here is free',
+
+  // The wild garden (GG14)
+  wildSub: 'wild  ·  best {best}',
+  wildBanner: 'The garden grows wild: pests grow every wave!',
+  wildBest: 'Wild garden best: wave {n}',
+
+  // The daily plot (GG16)
+  gardenTagDaily: 'Daily plot  ·  {garden}',
+  dailyAt: 'daily ends at {wave}',
+  dailyForm: 'lv 3: {form}',
+  dailyButton: 'Daily plot',
+  dailyPlayed: 'Daily: {score}',
+  dailyNote: { one: 'best {best}  ·  {n} day in a row', other: 'best {best}  ·  {n} days in a row' },
+  dailyNew: "Today's plot is waiting",
+  dailyBanner: 'Daily plot: {garden}',
+  dailyBannerThorny: 'Daily plot: thorny {garden}',
+  dailySeeds: 'Seeds grow into {forms}',
+  dailyRules: 'Hold {waves} waves: {perWave} points a wave, {perLeaf} a leaf kept',
+  dailyLastWave: 'Last wave',
+  dailyWonTitle: 'Daily plot harvested!',
+  dailyLostTitle: 'The daily plot has fallen',
+  dailyText: {
+    one: 'You cleared {waves} of {total} waves with {n} leaf kept: {score} points.\nBest daily: {best}. Days in a row: {streak}. A new plot grows tomorrow; pick a garden to play on.',
+    other: 'You cleared {waves} of {total} waves with {n} leaves kept: {score} points.\nBest daily: {best}. Days in a row: {streak}. A new plot grows tomorrow; pick a garden to play on.',
+  },
 };
 
 export default en;
