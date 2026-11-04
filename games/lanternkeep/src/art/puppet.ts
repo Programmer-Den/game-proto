@@ -470,6 +470,62 @@ const SCENERY: Record<DistrictId, Scenery> = {
       }
     },
   },
+  // The mountain monastery (LK20): two bell towers on the crags, a domed hall, snowy peaks behind
+  // and the pilgrims' path climbing through an opening at the foot.
+  monastery: {
+    card(spots) {
+      r(40, 320, 380, GROUND - 320 + 2);
+      r(540, 320, 380, GROUND - 320 + 2);
+      for (const x of merlonXs(40, 920, 308, spots)) {
+        if (x > 408 && x < 540) continue;
+        ctx.moveTo(x + 1, 322);
+        ctx.lineTo(x + 1, 308);
+        ctx.arc(x + 6, 308, 5, PI, 0);
+        ctx.lineTo(x + 11, 322);
+        ctx.closePath();
+      }
+      // Jagged peaks behind the walls.
+      for (const [a, b, c, d, e] of [
+        [200, 260, 290, 330, 380],
+        [580, 630, 670, 700, 760],
+      ]) {
+        ctx.moveTo(a, 322);
+        ctx.lineTo(b, a < 480 ? 236 : 214);
+        ctx.lineTo(c, 262);
+        ctx.lineTo(d, a < 480 ? 214 : 236);
+        ctx.lineTo(e, 322);
+        ctx.closePath();
+      }
+      // The bell towers.
+      for (const tx of [130, 770]) {
+        r(tx, 200, 60, GROUND - 200);
+        r(tx - 6, 202, 72, 6);
+      }
+      // The hall, its dome and its finial.
+      r(400, 250, 160, GROUND - 250);
+      ctx.moveTo(410, 252);
+      ctx.arc(480, 252, 70, PI, 0);
+      ctx.closePath();
+      r(477, 124, 6, 64);
+    },
+    trim() {
+      // The belfries, the hall's windows and a round window in the dome.
+      for (const x of [160, 800]) {
+        arch(x - 8, 248, 16, 34, '#ffd8a0');
+        glow(x, 262, 22, '#ffc870', 0.4);
+      }
+      for (const x of [430, 530]) arch(x, 330, 10, 40);
+      cut([[480, 206], [490, 216], [480, 226], [470, 216]], '#c8d8ff');
+      // Snow on the peaks, in pale blue gel.
+      for (const [x, y] of [[260, 236], [330, 214], [630, 214], [700, 236]]) cut([[x, y + 4], [x + 9, y + 16], [x - 9, y + 16]], '#e8f0ff');
+      joints({ x: 400, y: 250, w: 160 }, 40);
+      joints({ x: 130, y: 200, w: 60 }, 34);
+      joints({ x: 770, y: 200, w: 60 }, 34);
+      // The pilgrims' path: an opening at the foot with a post at each path lantern.
+      gateway(300, 660, 408);
+      for (const x of [340, 480, 620]) poly([[x - 5, 408], [x + 5, 408], [x + 5, 500], [x - 5, 500]], INK);
+    },
+  },
 };
 
 /** The district's scenery as one black cut card, with light through its cuts and the jar at the gate. */
@@ -1198,4 +1254,7 @@ export function bakeTextures(scene: Phaser.Scene) {
   padded('card-wide-off', MOVE_CARDS.w, MOVE_CARDS.h, () => paintCard(MOVE_CARDS.w, MOVE_CARDS.h, false));
   padded('btn', 200, 40, () => paintCard(200, 40, true));
   padded('btn-hover', 200, 40, () => paintCard(200, 40, true, true));
+  // The narrower buttons of the Great Festival's three ways on (LK20).
+  padded('btn-180', 180, 40, () => paintCard(180, 40, true));
+  padded('btn-180-hover', 180, 40, () => paintCard(180, 40, true, true));
 }

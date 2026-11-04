@@ -30,8 +30,12 @@ const en: HowToPlay = {
     },
     { input: 'Next dusk', action: "Start the next night's dusk" },
     {
-      input: 'Keep going / Set sail / New keep',
-      action: 'Play on after the Great Festival or sail to the harbour, or start again after a loss',
+      input: 'Village',
+      action: 'On the night panel: build a smithy, a chandler or a chapel, kept for every game after',
+    },
+    {
+      input: 'Keep going / Set sail / Climb / New keep',
+      action: 'Play on after the Great Festival, sail to the harbour or climb to the monastery, or start again after a loss',
     },
     {
       input: 'Daily night',
@@ -59,6 +63,9 @@ const en: HowToPlay = {
     'In the harbour the tide floods the low quay twice a dusk, and ships pay 6 coins if their lantern is lit when they arrive.',
     'The Harbour Festival gives a boon you keep in every later game.',
     'Moths grow traits from the flights they fly, kept from game to game: swift, frugal and gust-proof.',
+    'Every night kept adds a house to the village below the keep; with enough houses, coins build a smithy (cheaper cask fills), a chandler (a spare moth) or a chapel (it spares the first hearth a game loses).',
+    'The nights turn through the seasons, three nights each: summer dusks are short and stormy, autumn brings fog, and winter dusks are long but snow slows the moths.',
+    'In the monastery avalanches bury the low path twice a dusk: a moth sitting on a path lantern keeps it, and a buried one takes 2 seconds to dig out. Ring the named bell tower before the snow comes to warn a pilgrim for 6 coins.',
   ],
 };
 
@@ -91,8 +98,12 @@ const de: HowToPlay = {
     },
     { input: 'Nächste Nacht', action: 'Die Dämmerung der nächsten Nacht beginnen' },
     {
-      input: 'Weiterspielen / In See stechen / Neue Burg',
-      action: 'Nach dem Großen Fest weiterspielen oder zum Hafen segeln, oder nach einer Niederlage neu beginnen',
+      input: 'Dorf',
+      action: 'Im Nachtfenster: eine Schmiede, einen Kerzler oder eine Kapelle bauen, die für jedes spätere Spiel bleiben',
+    },
+    {
+      input: 'Weiterspielen / In See stechen / Aufsteigen / Neue Burg',
+      action: 'Nach dem Großen Fest weiterspielen, zum Hafen segeln oder zum Kloster aufsteigen, oder nach einer Niederlage neu beginnen',
     },
     {
       input: 'Nacht des Tages',
@@ -120,6 +131,9 @@ const de: HowToPlay = {
     'Im Hafen überspült die Flut zweimal je Dämmerung den Kai, und Schiffe zahlen 6 Münzen, wenn ihre Laterne bei der Ankunft brennt.',
     'Das Hafenfest schenkt eine Gunst, die du in jedem späteren Spiel behältst.',
     'Motten bekommen durch ihre Flüge Eigenschaften, die von Spiel zu Spiel bleiben: flink, sparsam und windfest.',
+    'Jede gehaltene Nacht baut ein Haus im Dorf unter der Burg; mit genug Häusern bauen Münzen eine Schmiede (billigere Fassfüllungen), einen Kerzler (eine Ersatzmotte) oder eine Kapelle (sie rettet das erste Herdfeuer eines Spiels).',
+    'Die Nächte folgen den Jahreszeiten, je drei Nächte: Sommerdämmerungen sind kurz und stürmisch, der Herbst bringt Nebel, und Winterdämmerungen sind lang, doch Schnee bremst die Motten.',
+    'Im Kloster begraben Lawinen zweimal je Dämmerung den unteren Pfad: eine Motte auf einer Pfadlaterne hält sie, und eine verschüttete braucht 2 Sekunden zum Freigraben. Läute vor dem Schnee den genannten Glockenturm, um einen Pilger für 6 Münzen zu warnen.',
   ],
 };
 

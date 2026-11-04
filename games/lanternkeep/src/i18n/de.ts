@@ -202,7 +202,7 @@ const de: Translation<typeof en> = {
   festivalWasHeld: '\nDas Große Fest wurde gefeiert.',
   bestPeril: '  ·  bestes Wagnis x{mult}',
   festivalTitle: 'Das Große Fest!',
-  festivalText: '{n} Nächte gehalten: das ganze Tal kommt,\num die Laternen der Burg zu sehen.\n\nMach hier weiter oder stich in See zur Hafenstadt\nund ihren eigenen zehn Nächten.',
+  festivalText: '{n} Nächte gehalten: das ganze Tal kommt,\num die Laternen der Burg zu sehen.\n\nMach hier weiter, stich in See zur Hafenstadt\noder steig zum Bergkloster auf: je zehn eigene Nächte.',
 
   // The harbour (LK15)
   harbourName: 'Der Hafen',
@@ -254,9 +254,65 @@ const de: Translation<typeof en> = {
     other: '{district}, {kind}: {lit} von {count} brennen.\nWertung: {score} Münzen{halved}\n\nBestwert {best} · {n} Tage in Folge.\nMorgen kommt eine neue Nacht.',
   },
   dailyHalved: ' (halbiert: zu dunkel)',
+
+  // A village that grows (LK18)
+  smithyName: 'Schmiede',
+  smithyBlurb: 'Eine Fassfüllung kostet 2 M',
+  chandlerName: 'Kerzler',
+  chandlerBlurb: 'Eine Ersatzmotte im Glas',
+  chapelHouseName: 'Kapelle',
+  chapelHouseBlurb: 'Rettet das erste Herdfeuer',
+  villageButton: 'Dorf',
+  villageTitle: 'Das Dorf unter der Burg',
+  villageSub: {
+    one: 'Bisher {n} Haus: jede gehaltene Nacht baut eines, in jedem Spiel.\nWas du hier baust, bleibt für jedes spätere Spiel.',
+    other: 'Bisher {n} Häuser: jede gehaltene Nacht baut eines, in jedem Spiel.\nWas du hier baust, bleibt für jedes spätere Spiel.',
+  },
+  needHouses: { one: 'braucht {n} Haus', other: 'braucht {n} Häuser' },
+  back: 'Zurück',
+  newHouse: '+1 Haus im Dorf',
+  verdictSpared: 'Zu dunkel, doch die Dorfkapelle hielt das Herdfeuer am Brennen.',
+
+  // Seasons (LK19)
+  springName: 'Frühling',
+  springBlurb: 'milde Dämmerungen',
+  summerName: 'Sommer',
+  summerBlurb: 'kurze Dämmerungen, oft Stürme',
+  autumnName: 'Herbst',
+  autumnBlurb: 'oft Nebel',
+  winterName: 'Winter',
+  winterBlurb: 'lange Dämmerungen, doch Schnee bremst die Motten',
+  kindSeason: '{kind} · {season}',
+  nextSeason: '\nDer {season} kommt: {blurb}',
+
+  // The mountain monastery (LK20)
+  monasteryName: 'Das Kloster',
+  monasteryBlurb: 'Lawinen begraben den Pfad; Glocken warnen Pilger',
+  spotWestBell: 'Westglockenturm',
+  spotEastBell: 'Ostglockenturm',
+  spotDome: 'die Kuppel',
+  spotCloister: 'der Kreuzgang',
+  spotRefectory: 'das Refektorium',
+  spotWestCrag: 'Westfels',
+  spotEastCrag: 'Ostfels',
+  spotLowerPath: 'unterer Pfad',
+  spotUpperPath: 'oberer Pfad',
+  spotShrine: 'der Schrein',
+  avalancheIn: 'Lawine in {n} s',
+  pilgrimRing: 'Ein Pilger steigt auf: läute {spot} (+{coins} M)',
+  buried: 'Verschüttet!',
+  snowedIn: 'eingeschneit',
+  pilgrimWarned: '+{n} M Pilger gewarnt!',
+  pilgrimLost: 'Der Pilger kehrt um',
+  pilgrimsEarned: '+{n} von Pilgern',
+  mountainGoal: 'Bergfest: {kept} von {of} Nächten gehalten',
+  mountainHeldGoal: 'Das Bergfest wurde gefeiert: die Nächte gehen weiter.',
+  climb: 'Aufsteigen',
+  mountainFestivalTitle: 'Das Bergfest!',
+  mountainBoonSub: '{n} Nächte auf dem Berg gehalten. Die Mönche schenken der Burg eine Gunst,\nfür dieses Spiel und jedes danach, in jeder Burg.',
 };
 
 /** Texts that are the same in German. */
-export const keepEnglish: (keyof typeof en)[] = ['caskLevel'];
+export const keepEnglish: (keyof typeof en)[] = ['caskLevel', 'winterName', 'kindSeason'];
 
 export default de;

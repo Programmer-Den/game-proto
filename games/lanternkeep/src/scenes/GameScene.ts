@@ -4,11 +4,20 @@ import { settings } from '../../../../shared/settings';
 import { BACK_RES, bakeScenery, DUSK, FX, FY, HUD_RES, INK, INK_HEX, lampOriginY, PAD, RES, SCREENS } from '../art/puppet';
 import { dailyRand, finishDaily, loadDaily, startDaily, type DailyRecord } from '../../../../shared/daily';
 import { DISTRICTS, type DistrictId, JARS, LANTERN_SPOTS, MOVE_IDS } from '../game/places';
-import { loadBest, loadBestPeril, loadBoon, loadFlown, saveBest, saveBestPeril, saveBoon, saveFlown } from '../game/save';
+import { loadBest, loadBestPeril, loadBoon, loadFlown, loadVillage, saveBest, saveBestPeril, saveBoon, saveFlown, saveVillage } from '../game/save';
 import {
   BOON_IDS,
   BOONS,
-  CASK_COST,
+  build,
+  BUILDING_IDS,
+  BUILDINGS,
+  buildCost,
+  caskCost,
+  climb,
+  PILGRIM_PAY,
+  SEASONS,
+  seasonOf,
+  type BuildingId,
   caskMax,
   CASK_NIGHT,
   dailyNight,
@@ -49,7 +58,6 @@ import {
   moveTo,
   NIGHT_KINDS,
   buy,
-  DUSK_MS,
   LIVES,
   mothLightMs,
   newGame,
@@ -165,13 +173,32 @@ export class GameScene extends Phaser.Scene {
   /** The night panel's "Next dusk" button; read by the playthrough test. */
   nextButton: ButtonSpot = { x: NEXT_BUTTON.x, y: NEXT_BUTTON.y, w: 200, h: 40 };
   /** The Great Festival panel's "Keep going" and "Set sail" buttons, for tests that play ten nights. */
-  carryOnButton: ButtonSpot = { x: VIEW.w / 2 - 110, y: VIEW.h / 2 + 76, w: 200, h: 40 };
-  sailButton: ButtonSpot = { x: VIEW.w / 2 + 110, y: VIEW.h / 2 + 76, w: 200, h: 40 };
+  carryOnButton: ButtonSpot = { x: VIEW.w / 2 - 190, y: VIEW.h / 2 + 115, w: 180, h: 40 };
+  sailButton: ButtonSpot = { x: VIEW.w / 2, y: VIEW.h / 2 + 115, w: 180, h: 40 };
   /** The Harbour Festival's boon cards, by id. */
   boonButtons: (ButtonSpot & { id: BoonId })[] = [];
   /** The night panel's "Daily night" link and the daily's "Back to my keep" button. */
   dailyButton: ButtonSpot = { x: NIGHT_PANEL.x + NIGHT_PANEL.w / 2 - 92, y: NEXT_BUTTON.y, w: 150, h: 34 };
   backButton: ButtonSpot = { x: VIEW.w / 2, y: VIEW.h / 2 + 76, w: 200, h: 40 };
+  /** The village panel's building cards (LK18), by id, its "Back" button and the night panel's "Village" link. */
+  villageButtons: (ButtonSpot & { id: BuildingId })[] = [];
+  villageBack: ButtonSpot = { x: VIEW.w / 2, y: VIEW.h / 2 + 115, w: 200, h: 40 };
+  villageButton: ButtonSpot = { x: NIGHT_PANEL.x - NIGHT_PANEL.w / 2 + 92, y: NEXT_BUTTON.y, w: 150, h: 34 };
+  /** The Great Festival's "Climb" button (LK20). */
+  climbButton: ButtonSpot = { x: VIEW.w / 2 + 190, y: VIEW.h / 2 + 115, w: 180, h: 40 };
+  /** True while the village panel is open over the night panel. */
+  private villageOpen = false;
+  private villagePanel!: Phaser.GameObjects.Container;
+  private villageSub!: Phaser.GameObjects.Text;
+  private villageCards = new Map<BuildingId, { bg: Phaser.GameObjects.Image; note: Phaser.GameObjects.Text }>();
+  /** The houses and buildings at the foot of the screen, redrawn when the village changes. */
+  private houses!: Phaser.GameObjects.Graphics;
+  private housesShown = '';
+  /** The monastery's avalanche warning and the pilgrim's plea (LK20). */
+  private snowLabel!: Phaser.GameObjects.Text;
+  private pilgrimLabel!: Phaser.GameObjects.Text;
+  private boonTitle!: Phaser.GameObjects.Text;
+  private boonSub!: Phaser.GameObjects.Text;
   /** The game put aside while a daily night is played, given back after it. */
   private run: GameState | null = null;
   /** Today's daily record, read when the scene starts and after each daily. */
@@ -306,12 +333,13 @@ export class GameScene extends Phaser.Scene {
     this.createFestival();
     this.createBoonPanel();
     this.createDailyPanel();
+    this.createVillagePanel();
     updateMusic(this.state, true);
   }
 
-  /** A new game, with the moths' flights and the harbour's boon carried in from earlier games. */
+  /** A new game, with the moths' flights, the harbour's boon and the village carried in from earlier games. */
   private freshGame() {
-    return newGame(loadBest(), loadBestPeril(), { flown: loadFlown(), boon: loadBoon() });
+    return newGame(loadBest(), loadBestPeril(), { flown: loadFlown(), boon: loadBoon(), village: loadVillage() });
   }
 
   /** A tap on lantern `i`: a moth flutters off, or the tap queues with a pip; a lost tap buzzes. */
@@ -386,6 +414,9 @@ export class GameScene extends Phaser.Scene {
     this.tideLabel = this.label(0, 0, '', { size: 12.5, bold: true, color: '#cfe8ff', stroke: true }).setOrigin(0.5).setDepth(8.5).setVisible(false);
     this.ship = this.sprite(-200, SHIP_Y, 'ship').setDepth(7.1).setVisible(false);
     this.shipLabel = this.label(0, 0, '', { size: 11, bold: true, color: '#ffe6b0', stroke: true }).setOrigin(0.5).setDepth(8.5).setVisible(false);
+    this.houses = this.add.graphics().setDepth(2.6);
+    this.snowLabel = this.label(0, 0, '', { size: 12.5, bold: true, color: '#eef4ff', stroke: true }).setOrigin(0.5).setDepth(8.5).setVisible(false);
+    this.pilgrimLabel = this.label(0, 0, '', { size: 11, bold: true, color: '#ffe6b0', stroke: true }).setOrigin(0.5).setDepth(8.5).setVisible(false);
   }
 
   private createKindTag() {
@@ -502,6 +533,17 @@ export class GameScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true })
       .on('pointerdown', () => this.openDaily());
     parts.push(this.dailyLink, dailyHit);
+    // The village's link, left of "Next dusk" (LK18).
+    const v = this.villageButton;
+    const villageLink = this.label(v.x, v.y, t('villageButton'), { size: 14, bold: true, color: '#ffd890', glow: true }).setOrigin(0.5);
+    const villageHit = this.add
+      .zone(v.x, v.y, v.w, v.h)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', () => {
+        ui('click');
+        this.villageOpen = true;
+      });
+    parts.push(villageLink, villageHit);
     this.nightPanel = this.add.container(0, 0, parts).setDepth(UI_DEPTH + 10).setVisible(false);
   }
 
@@ -600,15 +642,17 @@ export class GameScene extends Phaser.Scene {
       const sky = this.sprite(this.left + 40 + ((k * 331) % (this.right - this.left - 80)), 0, 'sky-lantern').setScale((0.7 + (k % 3) * 0.2) / RES);
       this.skyLanterns.push(sky);
     }
-    const panel = this.add.image(cx - SMALL_PANEL.w / 2 - PAD, cy - SMALL_PANEL.h / 2 - PAD, 'panel-small').setOrigin(0).setScale(1 / RES);
-    const title = this.label(cx, cy - 78, t('festivalTitle'), { size: 28, bold: true, color: '#ffc870', glow: true }).setOrigin(0.5);
+    const panel = this.add.image(cx - MOVE_PANEL.w / 2 - PAD, cy - MOVE_PANEL.h / 2 - PAD, 'panel-move').setOrigin(0).setScale(1 / RES);
+    const title = this.label(cx, cy - MOVE_PANEL.h / 2 + 34, t('festivalTitle'), { size: 28, bold: true, color: '#ffc870', glow: true }).setOrigin(0.5);
     const text = this.label(cx, cy - 12, t('festivalText', { n: FESTIVAL_NIGHTS }), { size: 15 })
       .setOrigin(0.5)
       .setAlign('center');
-    const go = makeButton(this, this.carryOnButton.x, this.carryOnButton.y, t('keepGoing'), () => this.answer(carryOn(this.state)));
-    const sailOff = makeButton(this, this.sailButton.x, this.sailButton.y, t('setSail'), () => this.answer(sail(this.state), 'rumble'));
+    // Three ways on: stay, sail to the harbour (LK15) or climb to the monastery (LK20).
+    const go = makeButton(this, this.carryOnButton.x, this.carryOnButton.y, t('keepGoing'), () => this.answer(carryOn(this.state)), true);
+    const sailOff = makeButton(this, this.sailButton.x, this.sailButton.y, t('setSail'), () => this.answer(sail(this.state), 'rumble'), true);
+    const climbUp = makeButton(this, this.climbButton.x, this.climbButton.y, t('climb'), () => this.answer(climb(this.state), 'rumble'), true);
     this.festival = this.add
-      .container(0, 0, [dim, ...this.skyLanterns, panel, title, text, go, sailOff])
+      .container(0, 0, [dim, ...this.skyLanterns, panel, title, text, go, sailOff, climbUp])
       .setDepth(UI_DEPTH + 15)
       .setVisible(false);
   }
@@ -619,11 +663,12 @@ export class GameScene extends Phaser.Scene {
     const cy = VIEW.h / 2;
     const dim = this.dim(0.35);
     const panel = this.add.image(cx - MOVE_PANEL.w / 2 - PAD, cy - MOVE_PANEL.h / 2 - PAD, 'panel-move').setOrigin(0).setScale(1 / RES);
-    const title = this.label(cx, cy - MOVE_PANEL.h / 2 + 32, t('harbourFestivalTitle'), { size: 26, bold: true, color: '#ffc870', glow: true }).setOrigin(0.5);
-    const sub = this.label(cx, cy - MOVE_PANEL.h / 2 + 68, t('boonSub', { n: FESTIVAL_NIGHTS }), { size: 12.5 })
+    // The Harbour Festival's texts, or the Mountain Festival's (LK20), set as the panel opens.
+    this.boonTitle = this.label(cx, cy - MOVE_PANEL.h / 2 + 32, t('harbourFestivalTitle'), { size: 26, bold: true, color: '#ffc870', glow: true }).setOrigin(0.5);
+    this.boonSub = this.label(cx, cy - MOVE_PANEL.h / 2 + 68, t('boonSub', { n: FESTIVAL_NIGHTS }), { size: 12.5 })
       .setOrigin(0.5)
       .setAlign('center');
-    const parts: Phaser.GameObjects.GameObject[] = [dim, panel, title, sub];
+    const parts: Phaser.GameObjects.GameObject[] = [dim, panel, this.boonTitle, this.boonSub];
     const spots = [
       { x: MOVE_CARDS.xs[0], y: MOVE_CARDS.ys[0] },
       { x: MOVE_CARDS.xs[1], y: MOVE_CARDS.ys[0] },
@@ -663,6 +708,49 @@ export class GameScene extends Phaser.Scene {
     this.dailyText = this.label(cx, cy - 12, '', { size: 15 }).setOrigin(0.5).setAlign('center');
     const back = makeButton(this, this.backButton.x, this.backButton.y, t('backToKeep'), () => this.leaveDaily());
     this.dailyPanel = this.add.container(0, 0, [dim, panel, title, this.dailyText, back]).setDepth(UI_DEPTH + 20).setVisible(false);
+  }
+
+  /** The village below the keep (LK18): its houses and three buildings to build for every game after, and "Back". */
+  private createVillagePanel() {
+    const cx = VIEW.w / 2;
+    const cy = VIEW.h / 2;
+    const dim = this.dim(0.35);
+    const panel = this.add.image(cx - MOVE_PANEL.w / 2 - PAD, cy - MOVE_PANEL.h / 2 - PAD, 'panel-move').setOrigin(0).setScale(1 / RES);
+    const title = this.label(cx, cy - MOVE_PANEL.h / 2 + 32, t('villageTitle'), { size: 26, bold: true, color: '#ffc870', glow: true }).setOrigin(0.5);
+    this.villageSub = this.label(cx, cy - MOVE_PANEL.h / 2 + 68, '', { size: 12.5 }).setOrigin(0.5).setAlign('center');
+    const parts: Phaser.GameObjects.GameObject[] = [dim, panel, title, this.villageSub];
+    const spots = [
+      { x: MOVE_CARDS.xs[0], y: MOVE_CARDS.ys[0] - 4 },
+      { x: MOVE_CARDS.xs[1], y: MOVE_CARDS.ys[0] - 4 },
+      { x: cx, y: MOVE_CARDS.ys[1] - 8 },
+    ];
+    BUILDING_IDS.forEach((id, i) => {
+      const { x: bx, y: by } = spots[i];
+      const left = bx - MOVE_CARDS.w / 2;
+      const top = by - MOVE_CARDS.h / 2;
+      const bg = this.add.image(left - PAD, top - PAD, 'card-wide-off').setOrigin(0).setScale(1 / RES);
+      const name = this.label(left + 14, top + 6, t(BUILDINGS[id].name), { size: 16, bold: true, color: '#ffc870', glow: true });
+      const note = this.label(left + MOVE_CARDS.w - 14, top + 10, '', { size: 11, bold: true, color: '#ffc870' }).setOrigin(1, 0);
+      const blurb = this.label(left + 14, top + 32, t(BUILDINGS[id].blurb), { size: 11.5, color: '#e0cfb4' }).setWordWrapWidth(MOVE_CARDS.w - 28);
+      const hit = this.add
+        .zone(bx, by, MOVE_CARDS.w, MOVE_CARDS.h)
+        .setInteractive({ useHandCursor: true })
+        .on('pointerdown', () => {
+          const built = build(this.state, id);
+          if (built) saveVillage(this.state.village);
+          this.answer(built, 'kaching');
+        });
+      this.villageCards.set(id, { bg, note });
+      this.villageButtons.push({ id, x: bx, y: by, w: MOVE_CARDS.w, h: MOVE_CARDS.h });
+      parts.push(bg, name, note, blurb, hit);
+    });
+    parts.push(
+      makeButton(this, this.villageBack.x, this.villageBack.y, t('back'), () => {
+        ui('click');
+        this.villageOpen = false;
+      }),
+    );
+    this.villagePanel = this.add.container(0, 0, parts).setDepth(UI_DEPTH + 12).setVisible(false);
   }
 
   /**
@@ -722,6 +810,8 @@ export class GameScene extends Phaser.Scene {
     if (s.phase !== phase) {
       saveBest(s.best);
       if (s.breeds) saveFlown(s.flown);
+      if (!s.daily) saveVillage(s.village);
+      this.villageOpen = false;
       this.nightAt = this.clock;
       this.payout();
       nightfallSounds(s, (ms, fn) => this.time.delayedCall(ms, fn));
@@ -738,6 +828,8 @@ export class GameScene extends Phaser.Scene {
     this.drawOwl();
     this.drawCall();
     this.drawHarbour();
+    this.drawMountain();
+    this.drawVillage();
     this.drawMoths();
     this.drawBats();
     this.drawOrder();
@@ -747,7 +839,7 @@ export class GameScene extends Phaser.Scene {
 
   /** How far dusk has gone, from 0 at its start to 1 once night has fallen. */
   private dusk() {
-    return this.state.phase === 'dusk' ? 1 - this.state.duskMs / DUSK_MS : 1;
+    return this.state.phase === 'dusk' ? 1 - this.state.duskMs / this.state.duskMax : 1;
   }
 
   /** The paper screen crossfades from saffron through deep dusk to indigo; stars and moon come out. */
@@ -775,20 +867,122 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     const kind = NIGHT_KINDS[s.kind];
     this.kindIcon.setTexture(`kind-${s.kind}`);
-    this.kindName.setText(t(kind.name));
+    // The plaque names the season too (LK19), shrunk to fit a long name.
+    const season = seasonOf(s.night);
+    const name = t('kindSeason', { kind: t(kind.name), season: t(SEASONS[season].name) });
+    if (name !== this.kindName.text) {
+      this.kindName.setFontSize(12.5).setText(name);
+      for (let size = 12; size >= 9.5 && this.kindName.width > KIND_TAG.w - 52; size -= 0.5) this.kindName.setFontSize(size);
+    }
     this.kindBlurb.setText(t(kind.blurb));
     const still = settings.reduceMotion;
     this.fog.setVisible(s.kind === 'fog').setX(this.left + (still ? 0 : Math.sin(this.clock / 6000) * 30));
     this.bunting.setVisible(s.kind === 'feast');
     const g = this.rain.clear();
-    if (s.kind !== 'storm') return;
-    // Slanted streaks falling across the screen; reduce motion holds them still.
-    const fall = still ? 0 : this.clock * 0.5;
-    for (let k = 0; k < Math.round((90 * (this.right - this.left) * (this.bottom - this.top)) / (VIEW.w * VIEW.h)); k++) {
-      const x = this.left + ((k * 137 + fall * 0.4) % (this.right - this.left + 40));
-      const y = this.top + ((((k * 211) % VIEW.h) + fall) % (this.bottom - this.top));
-      g.lineStyle(1, 0xc8d4ff, 0.3).lineBetween(x, y, x - 6, y + 15);
+    const w = this.right - this.left;
+    const h = this.bottom - this.top;
+    const many = (n: number) => Math.round((n * w * h) / (VIEW.w * VIEW.h));
+    if (s.kind === 'storm') {
+      // Slanted streaks falling across the screen; reduce motion holds them still.
+      const fall = still ? 0 : this.clock * 0.5;
+      for (let k = 0; k < many(90); k++) {
+        const x = this.left + ((k * 137 + fall * 0.4) % (w + 40));
+        const y = this.top + ((((k * 211) % VIEW.h) + fall) % h);
+        g.lineStyle(1, 0xc8d4ff, 0.3).lineBetween(x, y, x - 6, y + 15);
+      }
     }
+    if (season === 'winter' || season === 'autumn') {
+      // Winter's snowflakes or autumn's leaves drift down; reduce motion holds them still.
+      const fall = still ? 0 : this.clock * (season === 'winter' ? 0.04 : 0.06);
+      const n = many(season === 'winter' ? 70 : 24);
+      for (let k = 0; k < n; k++) {
+        const sway = still ? 0 : Math.sin(this.clock / 900 + k) * 8;
+        const x = this.left + ((((k * 173) % w) + sway + w) % w);
+        const y = this.top + ((((k * 97) % h) + fall * (0.7 + (k % 3) * 0.2)) % h);
+        if (season === 'winter') g.fillStyle(0xf4f8ff, 0.75).fillCircle(x, y, 1.2 + (k % 3) * 0.5);
+        else g.fillStyle(k % 2 ? 0xe08a3c : 0xc8642a, 0.7).fillEllipse(x, y, 5, 2.6);
+      }
+    }
+  }
+
+  /**
+   * The village at the foot of the screen (LK18): a lit window and a roof line for each house, and
+   * the buildings built, bigger, with their own gel. Redrawn only when the village changes.
+   */
+  private drawVillage() {
+    const v = this.state.village;
+    const key = `${v.houses}:${v.built.join(',')}`;
+    if (key === this.housesShown) return;
+    this.housesShown = key;
+    const g = this.houses.clear();
+    const y = VIEW.h - 8;
+    // The buildings stand at the left end, past the corner buttons, the houses along the rest, clear of the jars.
+    let x = this.left + 104;
+    const BUILDING_GEL: Record<BuildingId, number> = { smithy: 0xff7a3a, chandler: 0xffd870, chapel: 0xb8c8ff };
+    for (const id of BUILDING_IDS) {
+      if (!v.built.includes(id)) continue;
+      g.lineStyle(1.6, 0xd89a60, 1).strokeTriangle(x - 13, y - 14, x + 13, y - 14, x, y - 27);
+      g.strokeRect(x - 11, y - 14, 22, 14);
+      g.fillStyle(BUILDING_GEL[id], 0.95).fillRect(x - 4, y - 10, 8, 8);
+      if (id === 'chapel') g.fillStyle(BUILDING_GEL[id], 0.95).fillCircle(x, y - 20, 2.4);
+      if (id === 'smithy') g.fillStyle(0xff9a50, 0.8).fillCircle(x + 8, y - 28, 2);
+      x += 32;
+    }
+    let shown = 0;
+    for (; x < this.right - 16 && shown < v.houses; x += 24) {
+      if (Math.abs(x - JARS[0].x) < 40 || Math.abs(x - JARS[1].x) < 30) continue;
+      g.lineStyle(1.4, 0xd89a60, 1).strokeTriangle(x - 9, y - 10, x + 9, y - 10, x, y - 19);
+      g.lineStyle(1.2, 0xd89a60, 0.7).strokeRect(x - 7, y - 10, 14, 10);
+      g.fillStyle(0xffc870, 0.6).fillCircle(x, y - 5, 5);
+      g.fillStyle(0xffe0a0, 1).fillRect(x - 2.5, y - 7, 5, 5);
+      shown++;
+    }
+  }
+
+  /**
+   * The monastery (LK20): the avalanche's warning (a dashed snow line over the low path, a
+   * countdown), the pilgrim's lamp climbing the path, a violet ring on the bell tower to ring, and
+   * snow mounds on buried lanterns.
+   */
+  private drawMountain() {
+    const s = this.state;
+    const g = this.water;
+    const a = s.phase === 'dusk' ? s.avalanche : null;
+    this.snowLabel.setVisible(!!a);
+    this.pilgrimLabel.setVisible(!!a && !a.rung);
+    s.lanterns.forEach((l) => {
+      if (!l.buried || s.phase !== 'dusk') return;
+      g.fillStyle(0xeef4ff, 0.9).fillEllipse(l.x, l.y + 14, 40, 16);
+      g.fillStyle(0xeef4ff, 0.75).fillEllipse(l.x - 8, l.y + 4, 22, 14);
+    });
+    if (!a) return;
+    const still = settings.reduceMotion;
+    const left = Math.max(1, Math.ceil((s.duskMs - a.atMs) / 1000));
+    const dash = still ? 0 : (this.clock / 50) % 14;
+    for (let x = this.left - dash; x < this.right; x += 14) g.lineStyle(2, 0xeef4ff, 0.8).lineBetween(x, a.y - 40, Math.min(this.right, x + 7), a.y - 40);
+    // A pale ring round each lantern of the path: a moth on one keeps it.
+    for (const i of a.lanterns) {
+      const l = s.lanterns[i];
+      const spin = still ? 0 : this.clock / 2000;
+      for (let k = 0; k < 24; k++) {
+        const ang = spin + (k / 24) * Math.PI * 2;
+        g.lineStyle(1.6, 0xeef4ff, 0.95).beginPath().arc(l.x, l.y, 28, ang, ang + 0.14).strokePath();
+      }
+    }
+    this.snowLabel.setPosition(VIEW.w / 2, a.y - 56).setText(t('avalancheIn', { n: left }));
+    if (a.rung) return;
+    // The pilgrim's lamp climbs the path from the west as the snow comes.
+    const p = Phaser.Math.Clamp(1 - (s.duskMs - a.atMs) / 8_000, 0, 1);
+    const px = this.left + 30 + (VIEW.w / 2 - 60 - this.left) * p;
+    g.fillStyle(0xffe6b0, 0.35).fillCircle(px, a.y + 72, 7);
+    g.fillStyle(0xffe6b0, 1).fillCircle(px, a.y + 72, 2.6);
+    const bell = s.lanterns[a.bell];
+    const pulse = still ? 1 : 0.7 + 0.3 * Math.sin(this.clock / 150);
+    this.marks.lineStyle(2, 0xd8c8ff, 0.9 * pulse).strokeCircle(bell.x, bell.y, 33);
+    const spot = DISTRICTS[s.district].spots[a.bell];
+    this.pilgrimLabel.setText(t('pilgrimRing', { spot: t(spot.name), coins: PILGRIM_PAY }));
+    const half = this.pilgrimLabel.width / 2 + 8;
+    this.pilgrimLabel.setPosition(Phaser.Math.Clamp(bell.x, this.left + half, this.right - half), bell.y + 58);
   }
 
   /**
@@ -841,7 +1035,8 @@ export class GameScene extends Phaser.Scene {
       const kind = lantern.kind === 'plain' ? '' : `${lantern.kind}-`;
       // setTexture keeps the origin's fraction, so re-anchor it for the taller special textures.
       parts.lamp.setTexture(`lantern-${kind}${lantern.lit ? 'lit' : 'dark'}`).setOrigin(0.5, lampOriginY(lantern.kind));
-      if (lantern.kind !== 'plain') {
+      if (lantern.buried) parts.kindLabel.setVisible(true).setPosition(x, y + 38).setText(t('snowedIn'));
+      else if (lantern.kind !== 'plain') {
         parts.kindLabel.setVisible(true).setPosition(x, y + 38).setText(t(LANTERN_KINDS[lantern.kind].name));
       }
       // The flicker wavers the flame and the glow; reduce motion holds them still.
@@ -1222,7 +1417,7 @@ export class GameScene extends Phaser.Scene {
     // Grey until refills draw on it, orange once it is dry.
     const caskColour = !usesCask(s) ? '#8a7e8a' : s.cask <= 0 ? '#ff9a6a' : '#ffe4b8';
     if (this.caskText.style.color !== caskColour) this.caskText.setColor(caskColour);
-    const f = s.phase === 'dusk' ? s.duskMs / DUSK_MS : 0;
+    const f = s.phase === 'dusk' ? s.duskMs / s.duskMax : 0;
     this.duskFill.setCrop(0, 0, DUSK.w * RES * f, DUSK.h * RES).setVisible(f > 0);
     this.duskSun.setX(DUSK.x + DUSK.w * f);
     const secs = Math.ceil(s.duskMs / 1000);
@@ -1236,14 +1431,33 @@ export class GameScene extends Phaser.Scene {
 
   private drawPanels() {
     const s = this.state;
-    this.nightPanel.setVisible(s.phase === 'night' && this.panelOpen);
+    if (s.phase !== 'night') this.villageOpen = false;
+    this.nightPanel.setVisible(s.phase === 'night' && this.panelOpen && !this.villageOpen);
+    this.villagePanel.setVisible(s.phase === 'night' && this.panelOpen && this.villageOpen);
+    if (this.villageOpen) {
+      this.villageSub.setText(t('villageSub', { n: s.village.houses }));
+      for (const [id, parts] of this.villageCards) {
+        const cost = buildCost(s, id);
+        const built = s.village.built.includes(id);
+        const affordable = cost !== null && s.coins >= cost;
+        parts.bg.setTexture(affordable ? 'card-wide-on' : 'card-wide-off');
+        parts.note.setText(built ? t('built') : cost === null ? t('needHouses', { n: BUILDINGS[id].houses }) : t('cost', { n: cost }));
+        const colour = affordable ? '#ffc870' : '#8a7e8a';
+        if (parts.note.style.color !== colour) parts.note.setColor(colour);
+      }
+    }
     this.gameOver.setVisible(s.phase === 'over' && this.panelOpen);
     this.festival.setVisible(s.phase === 'festival' && this.panelOpen);
     this.movePanel.setVisible(s.phase === 'move' && this.panelOpen);
     this.perilPanel.setVisible(s.phase === 'peril' && this.panelOpen);
     this.boonPanel.setVisible(s.phase === 'boon' && this.panelOpen);
     this.dailyPanel.setVisible(s.phase === 'daily' && this.panelOpen);
-    if (s.phase === 'boon') for (const [id, note] of this.boonNotes) note.setText(id === s.boon ? t('yourBoon') : '');
+    if (s.phase === 'boon') {
+      for (const [id, note] of this.boonNotes) note.setText(id === s.boon ? t('yourBoon') : '');
+      const mountain = s.district === 'monastery';
+      this.boonTitle.setText(t(mountain ? 'mountainFestivalTitle' : 'harbourFestivalTitle'));
+      this.boonSub.setText(t(mountain ? 'mountainBoonSub' : 'boonSub', { n: FESTIVAL_NIGHTS }));
+    }
     if (s.phase === 'daily' && s.report) {
       const r = s.report;
       this.dailyText.setText(
@@ -1293,7 +1507,7 @@ export class GameScene extends Phaser.Scene {
     const r = s.report;
     if (s.phase === 'night' && r) {
       this.nightTitle.setText(t('nightFalls', { n: s.night }));
-      const verdict = t(r.lostHearth ? 'verdictLost' : r.lit === r.count ? 'verdictAll' : 'verdictHeld');
+      const verdict = t(r.lostHearth ? (s.spared ? 'verdictSpared' : 'verdictLost') : r.lit === r.count ? 'verdictAll' : 'verdictHeld');
       const mult = s.kind === 'feast' ? FEAST_PAY : 1;
       const order = r.orderMet ? t('orderKeptLine', { n: Math.round(s.order.reward * s.paidMult) }) : t('orderMissedLine');
       const chains = r.chains ? t('chainsLit', { n: r.chains, coins: Math.round(r.chains * CHAIN_BONUS * mult * s.paidMult) }) : '';
@@ -1302,11 +1516,16 @@ export class GameScene extends Phaser.Scene {
         s.closeCalls ? t('closeCallsEarned', { n: s.closeCalls * closeCallPay(s) }) : '',
         s.callsKept ? t('windowsEarned', { n: s.callsKept * callPay(s) }) : '',
         s.shipsGuided ? t('shipsEarned', { n: s.shipsGuided * SHIP_PAY }) : '',
+        s.pilgrimsWarned ? t('pilgrimsEarned', { n: s.pilgrimsWarned * PILGRIM_PAY }) : '',
       ]
         .filter(Boolean)
         .join(', ');
       const feast = mult > 1 ? t('feastDouble') : '';
-      const goal = s.sailed
+      const goal = s.climbed
+        ? s.mountainFestival
+          ? t('mountainHeldGoal')
+          : t('mountainGoal', { kept: s.mountainKept, of: FESTIVAL_NIGHTS })
+        : s.sailed
         ? s.harbourFestival
           ? t('harbourHeldGoal')
           : t('harbourGoal', { kept: s.harbourKept, of: FESTIVAL_NIGHTS })
@@ -1317,17 +1536,20 @@ export class GameScene extends Phaser.Scene {
       const where = s.nextDistrict !== s.district ? t('nextWhere', { district: t(DISTRICTS[s.nextDistrict].name) }) : '';
       // English lowers the rule's first letter inside the brackets; German nouns keep their capital.
       const blurb = t(next.blurb);
+      // A new season coming says what it brings (LK19).
+      const nextSeason = seasonOf(s.night + 1);
+      const seasonLine = nextSeason !== seasonOf(s.night) ? t('nextSeason', { season: t(SEASONS[nextSeason].name), blurb: t(SEASONS[nextSeason].blurb) }) : '';
       this.tallyText.setText([
         t('litLine', { lit: r.lit, count: r.count, need: r.required, feast }),
         order + chains,
         t('coinsLine', { n: r.earned, during: during ? `  (${during})` : '', peril }),
         verdict,
         goal,
-        t('nextNight', { kind: t(next.name), where, blurb: language() === 'de' ? blurb : blurb[0].toLowerCase() + blurb.slice(1) }),
+        t('nextNight', { kind: t(next.name), where, blurb: language() === 'de' ? blurb : blurb[0].toLowerCase() + blurb.slice(1) }) + seasonLine,
       ]);
       this.dailyLink.setText(this.dailyLine());
       for (const [id, parts] of this.shop) {
-        const cost = id === 'cask' ? (s.cask >= caskMax(s) ? null : CASK_COST) : id === 'hearth' ? hearthCost(s) : nextCost(s, id);
+        const cost = id === 'cask' ? (s.cask >= caskMax(s) ? null : caskCost(s)) : id === 'hearth' ? hearthCost(s) : nextCost(s, id);
         const affordable = cost !== null && s.coins >= cost;
         parts.bg.setTexture(affordable ? 'card-on' : 'card-off');
         parts.level.setText(
@@ -1381,6 +1603,10 @@ export class GameScene extends Phaser.Scene {
       this.popup(l.x, l.y - 40, t('caskDry'), '#ff9a6a');
     } else if (e.type === 'tide') {
       this.popup(l.x, l.y - 40, t('flooded'), '#cfe8ff');
+    } else if (e.type === 'avalanche') {
+      this.popup(l.x, l.y - 40, t(e.shielded ? 'keptPopup' : 'buried'), e.shielded ? '#ffe6c0' : '#eef4ff');
+    } else if (e.type === 'pilgrim') {
+      this.popup(l.x, l.y - 40, e.warned ? t('pilgrimWarned', { n: e.coins }) : t('pilgrimLost'), e.warned ? '#d8c8ff' : '#b8a8c8');
     } else if (e.type === 'ship') {
       this.popup(l.x, l.y - 40, e.guided ? t('shipGuided', { n: e.coins }) : t('shipTurned'), e.guided ? '#9ad8e8' : '#b8a8c8');
     } else if (e.type === 'closeCall') {
@@ -1419,6 +1645,8 @@ export class GameScene extends Phaser.Scene {
       const [a, , b] = chainsOf(s)[i].lanterns.map((l) => s.lanterns[l]);
       this.popup((a.x + b.x) / 2, (a.y + b.y) / 2 + 4, t('chainPay', { n: Math.round(CHAIN_BONUS * mult) }), '#ffd890', 15);
     }
+    // Every night kept adds a house to the village (LK18).
+    if (!s.daily && !r.lostHearth) this.popup(VIEW.w / 2 + 170, VIEW.h - 36, t('newHouse'), '#ffd890', 13);
     if (r.orderMet) this.popup(this.orderAt.x + ORDER.w - 24, this.orderAt.y + ORDER.h + 14, t('orderPay', { n: Math.round(s.order.reward * s.paidMult) }), '#ffc870', 15);
   }
 

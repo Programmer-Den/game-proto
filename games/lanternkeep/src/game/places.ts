@@ -38,7 +38,7 @@ export interface District {
   name: TextKey;
   /** The rule, in a line for the panel. */
   blurb: TextKey;
-  rule: 'none' | 'seawind' | 'vespers' | 'trade' | 'tide';
+  rule: 'none' | 'seawind' | 'vespers' | 'trade' | 'tide' | 'avalanche';
   spots: readonly Spot[];
   chains: readonly Chain[];
 }
@@ -164,13 +164,43 @@ export const DISTRICTS = {
       { name: 'Slipway', lanterns: [7, 9, 8] },
     ],
   },
+  /**
+   * The mountain monastery (LK20), the third keep: climbed to from the Great Festival, never one of
+   * the fifth nightfall's choices. Its pilgrims' path (7, 8, 9) is the row avalanches bury; the
+   * west and east bell towers (0, 1) are rung to warn the pilgrims.
+   */
+  monastery: {
+    name: 'monasteryName',
+    blurb: 'monasteryBlurb',
+    rule: 'avalanche',
+    spots: [
+      { x: 160, y: 184, name: 'spotWestBell' },
+      { x: 800, y: 184, name: 'spotEastBell' },
+      { x: 480, y: 112, name: 'spotDome' },
+      { x: 310, y: 304, name: 'spotCloister' },
+      { x: 650, y: 304, name: 'spotRefectory' },
+      { x: 64, y: 304, name: 'spotWestCrag' },
+      { x: 896, y: 304, name: 'spotEastCrag' },
+      { x: 340, y: 392, name: 'spotLowerPath' },
+      { x: 620, y: 392, name: 'spotUpperPath' },
+      { x: 480, y: 392, name: 'spotShrine' },
+    ],
+    chains: [
+      { name: 'West cloister', lanterns: [5, 0, 3] },
+      { name: 'East cloister', lanterns: [4, 1, 6] },
+      { name: 'Bells', lanterns: [0, 2, 1] },
+      { name: 'Path', lanterns: [7, 9, 8] },
+    ],
+  },
 } as const satisfies Record<string, District>;
 export type DistrictId = keyof typeof DISTRICTS;
 export const DISTRICT_IDS = Object.keys(DISTRICTS) as DistrictId[];
-/** The districts of the first keep, offered at a fifth nightfall (the harbour is sailed to instead). */
+/** The districts of the first keep, offered at a fifth nightfall (the harbour is sailed to and the monastery climbed to instead). */
 export const MOVE_IDS: readonly DistrictId[] = ['keep', 'docks', 'chapel', 'market'];
 /** The lanterns that guide the harbour's ships in, in the order ships ask for them. */
 export const SHIP_GUIDES = [1, 0] as const;
+/** The monastery's bell towers, rung to warn the pilgrims (LK20), in the order the pilgrims need them. */
+export const BELL_TOWERS = [0, 1] as const;
 
 /** The keep's lantern spots, where every game starts: the first night uses the first five. */
 export const LANTERN_SPOTS: readonly Spot[] = DISTRICTS.keep.spots;

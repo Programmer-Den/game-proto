@@ -28,7 +28,12 @@ nightfall from the tenth offers two curses that raise the pay (LK11). The Great 
 the keep to a harbour town with tides and ships and a Harbour Festival of its own, whose boon is
 kept for every later game (LK15); the jar's moths grow traits from the flights they have ever
 flown, kept from game to game (LK16); and a daily night gives everyone the same seeded dusk once a
-day (LK17, `shared/daily.ts`).
+day (LK17, `shared/daily.ts`). Every night kept adds a house to a village along the foot of the
+screen, kept from game to game, where coins build a smithy, a chandler and a chapel with lasting
+perks (LK18); the nights turn through four seasons, with short stormy summers and long snowy
+winters (LK19); and the Great Festival can instead send the keep up to a mountain monastery, where
+avalanches bury the low path and bell towers are rung to warn pilgrims, with a Mountain Festival
+of its own (LK20).
 
 Implemented today:
 
@@ -212,19 +217,69 @@ Implemented today:
   curse offer). The scene then calls `finishDaily` with `coins` (once) and shows the daily panel
   (`createDailyPanel`), whose "Back to my keep" (`backButton`, `leaveDaily`) gives back `run`, or
   a new game. A daily earns no trophies and saves no flights.
+- A village that grows (LK18): `state.village` (`Village`: `houses`, `built`) is loaded with
+  `loadVillage` (`Carried.village`, copied by `newGame`) and saved with `saveVillage` at every
+  phase change of a game that is not a daily (which starts with an empty village) and after each
+  build. `nightfall` adds a house for every night kept. `BUILDINGS` (`smithy`, `chandler`,
+  `chapel`, each with `cost` and the `houses` it needs); `buildCost(s, id)` is null once built or
+  while the village is too small, and `build(s, id)` buys it in the night phase. `hasBuilt` reads
+  them: the smithy makes `caskCost(s)` `SMITHY_CASK_COST` (2), the chandler adds a moth in `stats`
+  (`flown` has a place for it), and the chapel makes the first `nightfall` of a game that would put
+  out a hearth spare it instead (`chapelUsed`, and `spared` for that night's verdict; the report
+  still says `lostHearth`). The scene's "Village" link (`villageButton`, left of "Next dusk") sets
+  `villageOpen`, which swaps the night panel for the village panel (`createVillagePanel`, cards
+  `villageButtons`, "Back" `villageBack`); `drawVillage` draws a roof and a lit window per house
+  along the foot of the screen (from `left` + 104, past the corner buttons, and clear of the
+  jars), and the buildings, bigger, at the left end, redrawn only when the village changes. A
+  night kept floats "+1 house in the village" at nightfall.
+- Seasons (LK19): `seasonOf(night)` turns through `SEASON_IDS` (`spring`, `summer`, `autumn`,
+  `winter`), `SEASON_NIGHTS` (3) each from spring on night 1. `duskFor(night)` gives the dusk's
+  length, `state.duskMax`, set by `startDusk` (`SUMMER_DUSK_MS` 36 s, `WINTER_DUSK_MS` 54 s, else
+  `DUSK_MS`); the scene's dusk bar and paper screen read `duskMax`. `drawKind` makes half of summer
+  nights stormy and half of autumn nights foggy (`SEASON_KIND`) before its usual draw; winter
+  multiplies `mothSpeed` by `SNOW_SPEED` (0.85). The kind plaque names the season (`kindSeason`,
+  shrunk to fit), `drawKind` in the scene adds snowflakes in winter and leaves in autumn to the
+  `rain` layer, and the night panel's last line says when a new season comes (`nextSeason`). Every
+  event time (gusts, calls, bats, the owl, tides, ships) stays a time of dusk left, so a summer
+  dusk starts with the 37 s call already due and a winter dusk has a quiet first stretch.
+- A third keep (LK20): the Great Festival's panel (now `panel-move` size with three 180-wide
+  buttons, `makeButton(..., narrow)` and the `btn-180` textures) has "Climb" (`climbButton`,
+  `climb(s)`) right of "Set sail"; `sail` and `climb` exclude each other. It sets `climbed` and
+  `nextDistrict` `'monastery'` (`DISTRICTS.monastery`, rule `avalanche`, `SCENERY.monastery`:
+  bell towers, a domed hall, snowy peaks and the path's opening), and no later nightfall offers a
+  move. `startDusk` gives a monastery dusk `AVALANCHE_TIMES` (30 s and 12 s left).
+  `avalanches(s)`: `AVALANCHE_WARN_MS` (8 s) before, `state.avalanche` names the lowest row
+  (`rows(s)`, the path's 7, 8 and 9) and the bell a pilgrim needs (`BELL_TOWERS` in turn, west
+  then east); `threatened` covers the row, so a moth that lights one guards it. When the snow
+  comes, a missed pilgrim pushes a `pilgrim` event (`warned` false), and each lantern of the row
+  pushes an `avalanche` event: kept if a moth sits on it, else dark and `buried`. A buried lantern
+  adds `DIG_MS` (2 s) to `mothLightMs` and is cleared when a moth lights it. `ringBell` (called
+  after every lighting completes, even when the cask was dry) rings the named bell while warned:
+  `PILGRIM_PAY` (6) coins, `pilgrimsWarned` and a `pilgrim` event. `mayTap` allows a tap on the
+  bell (`pilgrimBell`) without a spare fill. A nightfall kept there counts `mountainKept`; the one
+  that brings it to `FESTIVAL_NIGHTS` sets `mountainFestival`, `report.festival` and phase
+  `'boon'`, whose panel then shows the Mountain Festival's title and text (the boons are the
+  same). The scene's `drawMountain` draws the warning (a dashed snow line, rings on the row, the
+  `snowLabel` countdown), the pilgrim's lamp climbing the path, a violet ring on the bell and the
+  `pilgrimLabel`, and snow mounds on buried lanterns, whose kind label says "snowed in".
 
 Missing or rough:
 
 - No title screen of its own (the shared start and pause screens cover it). No ambience (crickets,
   rain): the storm's rain is only in its music. The kinds, bats, chains, fireflies, the festival, the window
   calls, the cask, the kinds of lantern, the owl, the districts, tired moths, the second jar,
-  rekindling, the curses, the harbour, the moths' traits and the daily night are not exercised by the
+  rekindling, the curses, the harbour, the moths' traits, the daily night, the village's buildings,
+  the later seasons and the monastery are not exercised by the
   playthrough (night 1 is clear with no bats, chains, calls, cask use or special lanterns), only
   by hand and the scratch staging script.
 - The feast bunting is strung between the keep's towers in every district, so it floats over the
   other districts' buildings.
 - Moths fly straight lines.
-- The ten trophies are the most a game has, so the harbour, the traits and the daily earn none.
+- The ten trophies are the most a game has, so the harbour, the traits, the daily, the village, the
+  seasons and the monastery earn none.
+- The seasons only change the dusk's length, the kind draw and the moths' speed; the event times
+  stay as dusk left, so a summer dusk's first window call comes at once.
+- The Mountain Festival offers the harbour's boons rather than its own.
 - A moth's traits belong to its place in the jar, so a game with fewer Moths upgrades leaves the
   later places' flights waiting.
 - The upgrade buttons are not exercised by the playthrough (purchases stay out of it), only by
@@ -265,7 +320,7 @@ File map (`src/`):
   `setupScaling(game, { fill: true })` from `shared/scaling.ts`, and in dev builds puts `game` on `window`.
 - `scenes/BootScene.ts`: calls `bakeTextures`, then starts `Game`.
 - `scenes/GameScene.ts`: builds the world, order card, gust, owl and window plaques, HUD and
-  panels (night, move, peril, game over, festival) once; `update` ticks the rules, turns `state.events`
+  panels (night, village, move, peril, game over, festival, boon, daily) once; `update` ticks the rules, turns `state.events`
   into popups and redraws from state. `drawDistrict` swaps the scenery texture when the keep moves
   (baking it with `bakeScenery` the first time), and `drawLanterns` moves each lantern's images,
   tag, kind label and tap zone to where the district hangs it, and hides the images and tap zone
@@ -279,7 +334,7 @@ File map (`src/`):
   Serif / serif).
 - `game/places.ts`: `JAR`, `JARS` (the gate's jar and the second one), `DISTRICTS` (each district's `spots` in view pixels, in the order
   nights add them, with names, its `chains` and `rule`; the district's and spots' names and the
-  rule's blurb are `TextKey`s, while a chain's `name` is a label for code readers, never shown), `DISTRICT_IDS`, `MOVE_IDS` (the move panel's four, without the harbour), `SHIP_GUIDES`, `LANTERN_SPOTS` (the keep's) and `mothRest` (30 px apart on a jar's rim).
+  rule's blurb are `TextKey`s, while a chain's `name` is a label for code readers, never shown), `DISTRICT_IDS`, `MOVE_IDS` (the move panel's four, without the harbour and the monastery), `SHIP_GUIDES`, `BELL_TOWERS`, `LANTERN_SPOTS` (the keep's) and `mothRest` (30 px apart on a jar's rim).
 - `game/state.ts`: `GameState`, `Lantern`, `Moth`, `Bat`, `Gust`, `GameEvent`, `Order`,
   `OrderGoal`, `NightReport`, `NightKind`, the balance constants, `MOTH_KINDS`, `KIND_ORDER`,
   `FIREFLY_LANTERNS`, `QUEUE_MAX`, `GUST_WARN_MS`, `gustsFor`, `NIGHT_KINDS`, `drawKind`,
@@ -294,12 +349,16 @@ File map (`src/`):
   `swapJar`, `tick`, `nextCost`, `buy`, `rekindle`, `topUp`, `carryOn`, `moveTo`, `takeCurse`,
   `endPeril` and `nextDusk`; for LK15 to LK17 `TIDE_*`, `SHIP_*`, `Tide`, `Ship`, `flooded`,
   `shipX`, `BOONS`, `BOON_*`, `caskMax`, `sail`, `takeBoon`, `Carried`, `TRAIT_*`, `SWIFT_SPEED`,
-  `FRUGAL_OIL`, `traitsOf`, `DAILY_NIGHTS`, `DAILY_LEVELS` and `dailyNight`. No Phaser;
+  `FRUGAL_OIL`, `traitsOf`, `DAILY_NIGHTS`, `DAILY_LEVELS` and `dailyNight`; for LK18 to LK20
+  `BUILDINGS`, `BUILDING_IDS`, `Village`, `hasBuilt`, `SMITHY_CASK_COST`, `caskCost`, `buildCost`,
+  `build`, `SEASONS`, `SEASON_IDS`, `SEASON_NIGHTS`, `SUMMER_DUSK_MS`, `WINTER_DUSK_MS`,
+  `SNOW_SPEED`, `SEASON_KIND`, `seasonOf`, `duskFor`, `AVALANCHE_*`, `DIG_MS`, `PILGRIM_PAY`,
+  `Avalanche`, `pilgrimBell` and `climb`. No Phaser;
   `baseBurnMs` reads `byDifficulty` from `shared/settings.ts`. The catalogues name their texts by
   `TextKey` (`UPGRADES`, `CURSES` and `NIGHT_KINDS` names and blurbs, `LANTERN_KINDS` names, and each
   `Order`'s `text`), which the scene shows with `t`; the rules never read a text.
 - `game/save.ts`: `loadBest`, `saveBest`, `loadBestPeril`, `saveBestPeril`, `loadFlown`,
-  `saveFlown`, `loadBoon` and `saveBoon`.
+  `saveFlown`, `loadBoon`, `saveBoon`, `loadVillage` and `saveVillage`.
 - `art/puppet.ts`: `bakeTextures`, `bakeScenery(scene, district)` and the painters. Full-screen
   layers are painted at `BACK_RES` (1 on a screen that needs no scaling, up to 4 on a 4K screen)
   and drawn at 1 / `BACK_RES` by `GameScene.backdrop` (`screen-0/1/2`, `castle-<district>` with
@@ -319,7 +378,8 @@ File map (`src/`):
   `btn`/`btn-hover`. The glows stay at 1x, as they are soft anyway. Plaques, cards and panels are
   baked with `PAD` pixels of room for their shadow; place them at (x - `PAD`, y - `PAD`) with origin 0. Also exports `INK`,
   `INK_HEX`, `DUSK` (layout's `DUSK_BAR`) and `SCREENS`.
-- `ui/Button.ts`: `makeButton`, the carved card button (texture swap on hover, a `Zone` for taps).
+- `ui/Button.ts`: `makeButton`, the carved card button (texture swap on hover, a `Zone` for taps);
+  `narrow` makes it 180 wide (`btn-180`).
 
 Shared code it imports (outside the game folder): `shared/setupGame.ts` (`setupGame`),
 `shared/scaling.ts` (`setupScaling`, `sharpRes`, `viewSize`, `viewFrame`), `shared/audio.ts` (`sounds`, `ui`, `playMusic`, `playSting`), `shared/settings.ts` (`byDifficulty`,
@@ -376,11 +436,11 @@ State model (`GameState` in `src/game/state.ts`):
 
 - `phase` is `'dusk'`, `'night'` (panel open, shop live), `'festival'` (the Great Festival's
   panel, once), `'move'` (a fifth nightfall's choice of district), `'peril'` (the curses offered),
-  `'boon'` (the Harbour Festival's boons), `'daily'` (a daily night's end) or `'over'`. `duskMs` counts
+  `'boon'` (the Harbour or Mountain Festival's boons), `'daily'` (a daily night's end) or `'over'`. `duskMs` counts
   down.
 - `lanterns[i]` sits at the district's `spots[i]`: `kind`, `lit`, `oilMs` left of `oilMaxMs`,
   `claimed` while a moth is on its way to it, lighting it or guarding it, `sheltered` once a
-  gust-proof moth lit it.
+  gust-proof moth lit it, `buried` while an avalanche's snow is on it.
 - `moths[i]` has a `kind`, a position, a `task` (`idle`, `out`, `lighting`, `guard`, `chase`,
   `home`, `rest`), its `target` lantern, `lightingMs`, `closeCall` (set when it arrived at a nearly
   dry lantern), `bat` (the id it chases), `hops` (lanterns left on a firefly's flight),
@@ -397,31 +457,34 @@ State model (`GameState` in `src/game/state.ts`):
 - `gusts` are the dusk-left times of the gusts still to come; `gust` is the warned one
   (`{ target, atMs }`) or null. `closeCalls` and `shields` count this dusk's.
 - `events` lists `closeCall`, `gust`, `bat` (snuffed or driven off), `chased`, `owl` (snuffed or
-  kept), `call` (kept or run out), `dry`, `tide`, `ship` (guided or turned away) and `trait`
-  events since the scene last looked; the scene empties
+  kept), `call` (kept or run out), `dry`, `tide`, `ship` (guided or turned away), `trait`, `avalanche`
+  (buried or kept) and `pilgrim` (warned or not) events since the scene last looked; the scene empties
   it.
 - `owls` and `owl`, `callTimes`, `call` and `callsKept`, `cask`, `district`, `nextDistrict` and
   `moveDue`, `homes`, `rekindled`, `curses`, `offer`, `paidMult`, `bestPeril`, `sailed`,
   `harbourKept`, `harbourFestival`, `tideTimes`, `tide`, `shipTimes`, `ship`, `shipsGuided`,
-  `boon`, `breeds`, `flown` and `daily` are described
+  `boon`, `breeds`, `flown`, `daily`, `duskMax`, `village`, `chapelUsed`, `spared`, `climbed`,
+  `mountainKept`, `mountainFestival`, `avalancheTimes`, `avalanche` and `pilgrimsWarned` are described
   under their upgrades above.
 - `levels` per upgrade; `stats(s)` turns them into moth count, speed, wick time and burn time.
 - `report` is the last nightfall's tally (`lit`, `count`, `required`, `earned` with the order's
   reward, `lostHearth`, `orderMet`, `chains` lit, `festival`); `kept` counts nights that met the
   quota, `best` the most.
 
-Persistence: six `localStorage` keys: `lanternkeep-best`, the most nights kept, written when
+Persistence: seven `localStorage` keys: `lanternkeep-best`, the most nights kept, written when
 nightfall ends a dusk (to night or game over), `lanternkeep-best-peril`, the best pay
 multiplier reached with curses, written when a curse is taken, `lanternkeep-moths`, the flights
 each place in the jar has flown (a JSON array, written at every phase change of a game with
 breeds), `lanternkeep-boon`, the Harbour Festival's boon (an id of `BOONS`), `lanternkeep-daily`,
 the daily night's record (`shared/daily.ts`: today's try, score, best and streak; a daily itself
-is never saved), and `lanternkeep-trophies`, the
+is never saved), `lanternkeep-village`, the village (LK18: `{ houses, built }`, written at every
+phase change of a game that is not a daily and after each build), and `lanternkeep-trophies`, the
 trophies earned (`shared/trophies.ts`, each id with the time). The hub's settings are read from the shared
 `hub-settings` key.
 
 Randomness and timing: the only `Math.random` in the rules are `drawKind` (never on night 1, so the
-playthrough's night is fixed, and the test seeds it anyway) and `drawOffer` (only from night 10); no `Date.now` or `performance.now`.
+playthrough's night is fixed, and the test seeds it anyway; a summer or autumn night draws twice
+when its season's kind doesn't come) and `drawOffer` (only from night 10); no `Date.now` or `performance.now`.
 `dailyNight` draws from the day's seeded source (`dailyRand`, its date from `Date`) instead, and
 nothing else in a dusk is random, so every player's daily plays alike.
 Gust and bat targets, bat edges, the tide's row, ships and orders are deterministic. Game time is the frame timestamps `update` receives. The art uses a
@@ -487,6 +550,8 @@ Sound table, `sfx` (plus the shared `ui('coin')`, `ui('refuse')` and `ui('click'
 | `horn` / `callKept` + coin / `callLost` | a ship comes in sight / `ship` guided / `ship` turned away |
 | `swell` | `takeBoon` |
 | `bloom` | `trait` event (LK16) |
+| `crack` / `slide` + fizzle / `peal` + coin / `callLost` | an avalanche warned / it comes down (a `ting` for a kept lantern) / `pilgrim` warned / `pilgrim` missed (LK20) |
+| `kaching` | `build` in the village (LK18) |
 | click | "Go on", "Keep going", "New keep", "Daily night", "Back to my keep" (refuse when today's daily is used) |
 
 The nightfall coins and stings are timed with `this.time.delayedCall`, so they pause with the
@@ -498,8 +563,10 @@ scene. Under browser automation nothing plays, so the playthrough is unchanged.
   (copied through JSON) and `panelOpen`. `shopButtons`, `nextButton` and `carryOnButton` give the
   panel buttons in frame (world) coordinates, which match view pixels only at 960x540, for tests that go past the first night; `perilButtons` (the two
   curse cards, in `state.offer` order when the panel opens) and `goOnButton` the peril panel's;
-  `sailButton` the festival's "Set sail", `boonButtons` the Harbour Festival's cards, and
-  `dailyButton` and `backButton` the daily night's link and way back.
+  `sailButton` the festival's "Set sail", `boonButtons` the Harbour (or Mountain) Festival's cards, and
+  `dailyButton` and `backButton` the daily night's link and way back; `climbButton` the festival's
+  "Climb" (the three festival buttons are 180 wide, at y + 115), `villageButton` the night
+  panel's "Village" link, `villageButtons` the village panel's cards and `villageBack` its "Back".
 - Inputs: it clicks lanterns at their `x`, `y` from state, scaled by the canvas bounding box.
 - The test mirrors these, so change them together: `DUSK_MS` (45 s), the first night's five
   lanterns and quota of three, three moths in kind order (fast, slow, heavy), three lives, the 20 s
@@ -512,7 +579,10 @@ scene. Under browser automation nothing plays, so the playthrough is unchanged.
   none of the round-2 systems touch it, nor do tired moths (night 6), the jar, the hearth or the
   curses (no offer before night 10, `perilMult` 1). A fresh browser has no boon and no flights,
   so the harbour (from night 11), the traits (25 flights at the least) and the daily (only when
-  its link is pressed) don't touch it either. `moveButtons` gives the district cards for tests that
+  its link is pressed) don't touch it either. Night 1 is spring, which changes nothing (the dusk
+  stays 45 s); a fresh browser has no village, so no building touches it (the night kept saves a
+  house under `lanternkeep-village`, which the test doesn't read), and the monastery comes only
+  after the Great Festival. `moveButtons` gives the district cards for tests that
   play five nights.
 - The timing matters. It lights lantern 0 at the start (lit about 41 s left); when the gust is
   warned (39 s left) it taps lantern 0 again, and the fast moth refills it and guards it until the
@@ -555,6 +625,14 @@ scene. Under browser automation nothing plays, so the playthrough is unchanged.
   the boons; night 5 with flights one short of a trait and a tapped lantern; and `openDaily`
   ticked to just before nightfall, then left to the scene.
 
+- `loop-village`, `loop-winter`, `loop-monastery` and `loop-great-festival` were staged with a
+  scratch script: `lanternkeep-village` (14 houses, the smithy) and every trophy (so no toast
+  covers the shot) set before the page loads, night 1 ended with every lantern lit and the
+  "Village" link clicked; `night` 9 and `nextDusk` imported from `src/game/state.ts` for winter,
+  with lanterns lit through state; `night` 13 with `climbed` and `nextDistrict` `'monastery'`,
+  `nextDusk`, and `duskMs` set to 35 s for the avalanche's warning; and `kept` 9 on night 10 for
+  the festival.
+
 ## Making common changes
 
 - **Add or change a text**: its key in `i18n/en.ts` and the German in `i18n/de.ts` (the build
@@ -589,6 +667,14 @@ scene. Under browser automation nothing plays, so the playthrough is unchanged.
 - **Add or retune a trait**: an id in `TRAIT_IDS` (the order places start from), its look in
   `TRAIT_LOOK` and popup text, its effect where the rule lives (`mothSpeed`, `mothFill`, `blow`),
   and `TRAIT_FLIGHTS` for when they come.
+- **Add a building**: a row in `BUILDINGS` (name and blurb keys, `cost`, `houses`), its effect
+  where the rule lives (read with `hasBuilt`), its gel in `drawVillage`'s `BUILDING_GEL` and a card
+  spot in `createVillagePanel` (three fit, like the boons).
+- **Retune the seasons**: `SEASON_NIGHTS`, `SUMMER_DUSK_MS`, `WINTER_DUSK_MS`, `SNOW_SPEED`,
+  `SEASON_KIND` and `drawKind` in `state.ts`; night 1 must stay spring at 45 s for the playthrough.
+- **Retune the monastery**: `AVALANCHE_*`, `DIG_MS` and `PILGRIM_PAY` in `state.ts`, the bells in
+  `BELL_TOWERS` and its spots in `DISTRICTS.monastery` (the avalanche takes the lowest row, so keep
+  the path the lowest).
 - **Change the daily night**: `DAILY_NIGHTS`, `DAILY_LEVELS` and the draws in `dailyNight`; any
   change to what it draws changes every player's daily from that day on, which is fine.
 - **Retune the owl, the calls or the cask**: `OWL_*`, `owlsFor`, `CALL_*`, `callsFor` and
