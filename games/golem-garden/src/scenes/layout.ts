@@ -27,6 +27,8 @@ export const SPEED_BUTTON = { x: 914, y: 32, w: 54, h: 32 };
 export const GOLEM_MENU = { w: 270, h: 50, chip: { w: 60, h: 38, gap: 6 } };
 /** The garden picker's cards, side by side. */
 export const GARDEN_CARD = { y: 318, w: 236, h: 196, gap: 20 };
+/** The golem grafts' four cards, side by side, at the garden cards' height and y. */
+export const GRAFT_CARD = { w: 200, gap: 16 };
 /** The side panel right of the board. */
 export const PANEL = { x: 800, y: 64, w: 148, h: 448 };
 /** The seed cards, by their centres, in the order of SEEDS: two tall golem cards, the shorter thorn card and the hedge strip. */

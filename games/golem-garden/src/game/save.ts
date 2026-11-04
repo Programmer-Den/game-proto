@@ -1,7 +1,9 @@
 // What outlives a garden: the most waves ever cleared, the Heartwood's bloom (kept from garden to
 // garden), each garden's harvest stars and laurels, and the garden last picked (and whether in its
-// thorny variant). The garden's golems and pests are never saved.
+// thorny variant), each garden's best wild wave and the grafts bought. The garden's golems and pests
+// are never saved. The daily plot keeps its own record under `golem-garden-daily` (`shared/daily.ts`).
 import { GARDENS } from './board';
+import { GRAFTS, type Graft } from './data';
 
 const BEST = 'golem-garden-best';
 const BLOOM = 'golem-garden-bloom';
@@ -9,6 +11,8 @@ const GARDEN = 'golem-garden-garden';
 const STARS = 'golem-garden-stars';
 const LAURELS = 'golem-garden-laurels';
 const THORNY = 'golem-garden-thorny';
+const WILD = 'golem-garden-wild';
+const GRAFTED = 'golem-garden-grafts';
 
 function load(key: string) {
   try {
@@ -53,3 +57,18 @@ export const saveStars = (stars: number[]) => save(STARS, stars.join(','));
 /** Each garden's laurel (0 or 1), won by harvesting its thorny variant. */
 export const loadLaurels = () => loadList(LAURELS, 1);
 export const saveLaurels = (laurels: number[]) => save(LAURELS, laurels.join(','));
+/** Each garden's best wave cleared in the wild garden, past the harvest (0 until then). */
+export const loadWild = () => loadList(WILD, 99999);
+export const saveWild = (wild: number[]) => save(WILD, wild.join(','));
+
+/** The golem grafts bought with laurels, comma-separated ids. */
+export function loadGrafts(): Graft[] {
+  let raw = '';
+  try {
+    raw = localStorage.getItem(GRAFTED) ?? '';
+  } catch {
+    // Unsaved: no grafts.
+  }
+  return GRAFTS.filter((graft) => raw.split(',').includes(graft));
+}
+export const saveGrafts = (grafts: Graft[]) => save(GRAFTED, grafts.join(','));

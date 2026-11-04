@@ -4,10 +4,10 @@ import { GARDENS, cellAt, cellCentre, pathPoint, routeDist, type Garden } from '
 import {
   BLOOM_GOAL,
   BOON,
-  BOSS_EVERY,
   CHEW_PER_BITE,
   COMBO,
   COMPOST,
+  DAILY,
   EARLY_BONUS,
   FORM_INFO,
   GARDEN_TWISTS,
@@ -25,15 +25,20 @@ import {
   UPGRADE_COST,
   UPROOT_REFUND,
   boonOffer,
+  bossNumber,
+  formsOf,
   golemStats,
   harvestStars,
+  isBossWave,
   regrowCost,
   waveBonus,
   waveFor,
   type Boon,
   type FormKind,
   type GolemKind,
+  type Graft,
   type PestKind,
+  type Plot,
   type SeedKind,
   type Spawn,
   type Target,
@@ -185,6 +190,16 @@ export interface GameState {
   settled: Settled[];
   /** Leaves regrown this garden; each makes the next one dearer. */
   regrown: number;
+  /** The most waves cleared in this garden so far. */
+  cleared: number;
+  /** Each garden's best wave cleared past the harvest, in the wild garden (GG14), or 0; in GARDENS order. */
+  wild: number[];
+  /** The golem grafts bought with laurels (GG15) that count in this garden; none in the daily plot. */
+  grafts: Graft[];
+  /** The Seedling graft's free seed: the next golem seed planted costs no sap. */
+  freeSeed: boolean;
+  /** Today's daily plot being played (GG16), or null in an ordinary garden. */
+  daily: Plot | null;
   nextId: number;
 }
 
@@ -197,9 +212,29 @@ export const SHOT_MS = 160;
 /** How long a pest flashes after a hit, in ms. */
 const HIT_MS = 120;
 
-export function newGame(best: number, bloom = 0, garden = 0, stars: number[] = [], thorny = false, laurels: number[] = []): GameState {
-  const n = GARDENS[garden] ? garden : 0;
-  const isThorny = thorny && (stars[n] ?? 0) >= THORNY_STARS;
+/** What a new garden is planted with besides the saved progress `newGame` takes first. */
+export interface Extras {
+  /** Each garden's best wild wave. */
+  wild?: number[];
+  /** The grafts bought (ignored in the daily plot). */
+  grafts?: Graft[];
+  /** Plants today's daily plot instead of `garden`: its garden and variant, and its fixed seeds. */
+  daily?: Plot | null;
+}
+
+export function newGame(
+  best: number,
+  bloom = 0,
+  garden = 0,
+  stars: number[] = [],
+  thorny = false,
+  laurels: number[] = [],
+  extras: Extras = {},
+): GameState {
+  const daily = extras.daily ?? null;
+  const n = daily ? daily.garden : GARDENS[garden] ? garden : 0;
+  const isThorny = daily ? daily.thorny : thorny && (stars[n] ?? 0) >= THORNY_STARS;
+  const grafts = daily ? [] : [...(extras.grafts ?? [])];
   return {
     garden: n,
     wave: 1,
@@ -233,6 +268,11 @@ export function newGame(best: number, bloom = 0, garden = 0, stars: number[] = [
     called: [],
     settled: [],
     regrown: 0,
+    cleared: 0,
+    wild: GARDENS.map((_, i) => extras.wild?.[i] ?? 0),
+    grafts,
+    freeSeed: grafts.includes('seedling'),
+    daily,
     nextId: 1,
   };
 }
@@ -259,10 +299,31 @@ export const boonCount = (s: GameState, boon: Boon) => s.boons.filter((b) => b =
  * hedge unless the thorny variant's twist took it away.
  */
 export const unlocked = (s: GameState, kind: SeedKind) =>
-  kind === 'hedge' ? twistOf(s) !== 'hedges' : !GOLEM_INFO[kind].locked || s.bloom >= BLOOM_GOAL;
+  kind === 'hedge' ? twistOf(s) !== 'hedges' : !GOLEM_INFO[kind].locked || s.bloom >= BLOOM_GOAL || !!s.daily;
 
-/** What a seed costs to plant. */
-export const seedCost = (kind: SeedKind) => (kind === 'hedge' ? HEDGE.cost : GOLEM_INFO[kind].cost);
+/** What a seed costs to plant here now: nothing for a golem seed while the Seedling graft's free seed waits. */
+export const seedCost = (s: GameState, kind: SeedKind) => (kind === 'hedge' ? HEDGE.cost : s.freeSeed ? 0 : GOLEM_INFO[kind].cost);
+
+/**
+ * The forms a golem of `kind` can pick at level 3 here: its two, and its third once grafted; in
+ * the daily plot only the day's one.
+ */
+export function formsFor(s: GameState, kind: GolemKind): FormKind[] {
+  if (s.daily) return [s.daily.forms[kind]];
+  return formsOf(kind).filter((form) => !FORM_INFO[form].graft || s.grafts.includes(form as Graft));
+}
+
+/** The last wave of this garden: the daily plot's DAILY.waves, or none (the waves go on). */
+export const lastWave = (s: GameState) => (s.daily ? DAILY.waves : Infinity);
+
+/** The daily plot's score: DAILY.perWave a wave cleared and DAILY.perLeaf a leaf kept. */
+export const dailyScore = (s: GameState) => DAILY.perWave * s.cleared + DAILY.perLeaf * s.heart;
+
+/** Laurels won and not yet spent on grafts. */
+export const laurelsFree = (laurels: number[], grafts: Graft[]) => laurels.reduce((a, b) => a + b, 0) - grafts.length;
+
+/** Whether `graft` can be bought: not yet bought, and a laurel to spend. */
+export const canGraft = (laurels: number[], grafts: Graft[], graft: Graft) => !grafts.includes(graft) && laurelsFree(laurels, grafts) > 0;
 
 export function select(s: GameState, kind: SeedKind) {
   if (!unlocked(s, kind)) return false;
@@ -281,14 +342,15 @@ export const freePath = (s: GameState, col: number, row: number) => gardenOf(s).
 
 /** Whether the selected seed can be planted at (col, row) now: a golem on free soil, a hedge on a free path cell. */
 export function canPlant(s: GameState, col: number, row: number) {
-  if (s.phase === 'over' || !unlocked(s, s.selected) || s.sap < seedCost(s.selected)) return false;
+  if (s.phase === 'over' || !unlocked(s, s.selected) || s.sap < seedCost(s, s.selected)) return false;
   return s.selected === 'hedge' ? freePath(s, col, row) : freeSoil(s, col, row);
 }
 
 /** Plants the selected seed, if there is sap for it: a golem seed on empty soil, or a hedge on the path. */
 export function plant(s: GameState, col: number, row: number) {
   if (!canPlant(s, col, row)) return false;
-  s.sap -= seedCost(s.selected);
+  const cost = seedCost(s, s.selected);
+  s.sap -= cost;
   if (s.selected === 'hedge') {
     const stops = gardenOf(s).routes.map((route) => {
       const at = routeDist(route, col, row);
@@ -299,7 +361,8 @@ export function plant(s: GameState, col: number, row: number) {
     return true;
   }
   const info = GOLEM_INFO[s.selected];
-  s.golems.push({ id: s.nextId++, kind: s.selected, col, row, level: 1, growMs: info.growMs, cooldownMs: 0, spent: info.cost, form: null, target: 'first' });
+  s.freeSeed = false;
+  s.golems.push({ id: s.nextId++, kind: s.selected, col, row, level: 1, growMs: info.growMs, cooldownMs: 0, spent: cost, form: null, target: 'first' });
   return true;
 }
 
@@ -319,7 +382,7 @@ export function upgrade(s: GameState, g: Golem, form: FormKind | null = null) {
   const cost = upgradeCost(g);
   if (s.phase === 'over' || cost === null || s.sap < cost) return false;
   if (picksForm(g)) {
-    if (!form || FORM_INFO[form].of !== g.kind) return false;
+    if (!form || !formsFor(s, g.kind).includes(form)) return false;
     g.form = form;
   }
   s.sap -= cost;
@@ -400,9 +463,10 @@ export const queenOnPath = (s: GameState) => s.pests.some((p) => PEST_INFO[p.kin
 /**
  * Whether the next wave can be called early: the current one has all come in but is still on the
  * path. The harvest wave can't be called early: its stars count the leaves left once its pests are
- * done. Nor can a wave while its Queen Slug walks: its boons wait to see whether she is squashed.
+ * done; nor can the daily plot's last wave, whose score counts them too. Nor can a wave while its Queen Slug walks: its boons wait to see whether she is squashed.
  */
-export const canCallEarly = (s: GameState) => s.phase === 'wave' && s.queue.length === 0 && s.wave !== HARVEST_WAVE && !queenOnPath(s);
+export const canCallEarly = (s: GameState) =>
+  s.phase === 'wave' && s.queue.length === 0 && s.wave !== HARVEST_WAVE && s.wave < lastWave(s) && !queenOnPath(s);
 
 /** The wave the wave button would send next. */
 export const nextWave = (s: GameState) => (s.phase === 'build' ? s.wave : s.wave + 1);
@@ -463,19 +527,22 @@ function beginWave(s: GameState) {
 /**
  * Counts wave `n` as done: its bonus, compost on the sap unspent (from COMPOST.fromWave), a bud on
  * the Heartwood, the best, after a Queen Slug wave whose queen was squashed three boons to pick from,
- * and at HARVEST_WAVE the garden's harvest stars (and in its thorny variant, its laurel).
+ * at HARVEST_WAVE the garden's harvest stars (and in its thorny variant, its laurel), and past it
+ * the garden's best wild wave.
  */
 function finishWave(s: GameState, n: number, queenSquashed: boolean) {
   s.compost = n >= COMPOST.fromWave ? Math.min(compostCap(s), Math.floor(s.sap * COMPOST.rate)) : 0;
   s.sap += waveBonus(n) + s.compost;
   s.bloom = Math.min(BLOOM_GOAL, s.bloom + 1);
   s.best = Math.max(s.best, n);
+  s.cleared = Math.max(s.cleared, n);
+  if (n > HARVEST_WAVE && !s.daily) s.wild[s.garden] = Math.max(s.wild[s.garden], n);
   if (n === HARVEST_WAVE) {
     s.harvest = harvestStars(s.heart);
     s.stars[s.garden] = Math.max(s.stars[s.garden], s.harvest);
     if (s.thorny) s.laurels[s.garden] = 1;
   }
-  if (n % BOSS_EVERY === 0 && queenSquashed) s.offer = boonOffer(n / BOSS_EVERY, twistOf(s));
+  if (isBossWave(n) && queenSquashed) s.offer = boonOffer(bossNumber(n), twistOf(s));
 }
 
 /**
@@ -667,4 +734,6 @@ function step(s: GameState, dt: number) {
     s.wave++;
     s.phase = 'build';
   }
+  // The daily plot ends once its last wave is cleared.
+  if (s.cleared >= lastWave(s)) s.phase = 'over';
 }

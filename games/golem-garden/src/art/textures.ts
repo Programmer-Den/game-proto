@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { GARDENS, GRID, cellCentre, pathPoint, type Garden } from '../game/board';
-import { BUTTON, GARDEN_CARD, GOLEM_MENU, HUD, PANEL, PREVIEW, SEED_BUTTONS, SPEED_BUTTON, WAVE_BUTTON } from '../scenes/layout';
+import { BUTTON, GARDEN_CARD, GOLEM_MENU, GRAFT_CARD, HUD, PANEL, PREVIEW, SEED_BUTTONS, SPEED_BUTTON, WAVE_BUTTON } from '../scenes/layout';
 import { C, E, PI, Pp, R, addSharp, bake, blur, ctx, drop, ellipse, flower, golem, pest, reseed, rnd, sprout, type ClayOptions } from './clay';
 
 // Every texture, painted in clay at startup. Sizes and anchors are in view pixels; painters work in
@@ -31,6 +31,7 @@ import { C, E, PI, Pp, R, addSharp, bake, blur, ctx, drop, ellipse, flower, gole
 // speed[-on]      the speed button in the HUD, off or on
 // pill            the garden tag under the title, which opens the garden picker
 // gcard[-rim|-locked] a garden card in the garden picker, its gold rim, and a locked one
+// graft[-rim|-dim] a golem graft's card, its gold rim once bought, and one with no laurel to buy it
 
 const A = 2; // art units per view pixel
 const G = { x: GRID.x * A, y: GRID.y * A, cell: GRID.cell * A, cols: GRID.cols, rows: GRID.rows };
@@ -142,6 +143,10 @@ export function bakeTextures(scene: Phaser.Scene) {
   bake(scene, 'gcard', gw + 16, gh + 16, () => R(-gw, -gh, gw * A, gh * A, 26, C.card, { sb: 8, sa: 0.5, rim: 7 }), gw / 2 + 6, gh / 2 + 6);
   bake(scene, 'gcard-locked', gw + 16, gh + 16, () => R(-gw, -gh, gw * A, gh * A, 26, '#a89c84', { sb: 8, sa: 0.5, rim: 7 }), gw / 2 + 6, gh / 2 + 6);
   bake(scene, 'gcard-rim', gw + 24, gh + 24, () => R(-gw - 8, -gh - 8, gw * A + 16, gh * A + 16, 32, C.gold, { sb: 8, rim: 7 }), gw / 2 + 10, gh / 2 + 10);
+  const gfw = GRAFT_CARD.w;
+  bake(scene, 'graft', gfw + 16, gh + 16, () => R(-gfw, -gh, gfw * A, gh * A, 26, C.card, { sb: 8, sa: 0.5, rim: 7 }), gfw / 2 + 6, gh / 2 + 6);
+  bake(scene, 'graft-dim', gfw + 16, gh + 16, () => R(-gfw, -gh, gfw * A, gh * A, 26, '#a89c84', { sb: 8, sa: 0.5, rim: 7 }), gfw / 2 + 6, gh / 2 + 6);
+  bake(scene, 'graft-rim', gfw + 24, gh + 24, () => R(-gfw - 8, -gh - 8, gfw * A + 16, gh * A + 16, 32, C.gold, { sb: 8, rim: 7 }), gfw / 2 + 10, gh / 2 + 10);
   bake(scene, 'btn', BUTTON.w + 16, BUTTON.h + 16, () => R(-BUTTON.w, -BUTTON.h, BUTTON.w * A, BUTTON.h * A, 30, '#e0a23a', { sb: 8, sx: 5, sy: 9, rim: 8 }), BUTTON.w / 2 + 6, BUTTON.h / 2 + 6);
 }
 
