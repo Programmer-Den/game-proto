@@ -1,12 +1,12 @@
 import Phaser from 'phaser';
 import { playMusic, playSting, ui } from '../../../../shared/audio';
-import { dailyRand, finishDaily, loadDaily, startDaily } from '../../../../shared/daily';
+import { dailyRand, finishDaily, loadDaily, startDaily, today } from '../../../../shared/daily';
 import { formatNumber } from '../../../../shared/i18n';
 import { settings } from '../../../../shared/settings';
 import { viewFrame, viewSize } from '../../../../shared/scaling';
 import { CALM, STINGS, WAVES, sfx } from '../audio';
-import { TREE_FLOWERS, bakeGarden, bakeTable, gardenBg } from '../art/textures';
-import { GARDENS, cellAt, pathPoint } from '../game/board';
+import { TREE_FLOWERS, bakeGarden, bakePlot, bakeTable, gardenBg } from '../art/textures';
+import { GARDENS, cellAt, drawingOk, drawnGarden, editDrawing, pathPoint, type Drawing, type Garden } from '../game/board';
 import {
   BLOOM_GOAL,
   BOON,
@@ -27,6 +27,7 @@ import {
   MOVE_FEE,
   PEST_INFO,
   PESTS,
+  PLOT,
   SEEDS,
   STAR_LEAVES,
   TARGET_INFO,
@@ -34,6 +35,8 @@ import {
   TWIST_INFO,
   dailyPlot,
   isBossWave,
+  weekOf,
+  weeklyGarden,
   waveBonus,
   waveCounts,
   wildScale,
@@ -50,6 +53,8 @@ import {
   loadLaurels,
   loadStars,
   loadThorny,
+  loadPlots,
+  loadWeekly,
   loadWild,
   saveBest,
   saveBloom,
@@ -58,10 +63,15 @@ import {
   saveLaurels,
   saveStars,
   saveThorny,
+  savePlots,
+  saveWeekly,
   saveWild,
+  type SavedPlot,
 } from '../game/save';
 import {
+  RING_MS,
   SHOT_MS,
+  barred,
   boonCount,
   compostCap,
   boonedStats,
@@ -83,6 +93,7 @@ import {
   newGame,
   nextTarget,
   nextWave,
+  ordinary,
   picksForm,
   plant,
   queenOnPath,
@@ -114,6 +125,8 @@ import { award } from '../../../../shared/trophies';
 import { trophies } from '../trophies';
 import { checkTrophies } from '../trophies/check';
 import {
+  BUTTON,
+  EDITOR,
   FONT,
   GARDEN_CARD,
   GOLEM_MENU,
@@ -153,8 +166,13 @@ const PREVIEW_PESTS = PESTS.filter((kind) => kind !== 'queen');
 const GAME = 'golem-garden';
 /** The garden picker's modes: from the garden tag, after the Heartwood falls, at the harvest, at the daily plot's end. */
 type PickerMode = 'choose' | 'over' | 'harvest' | 'daily';
-/** What the scene is started with: whether to plant today's daily plot. */
-type StartData = { daily?: boolean };
+/**
+ * What the scene is started with: whether to plant today's daily plot or this week's garden, or
+ * which drawn plot to plant. Every restart passes all three, since Phaser keeps the last data.
+ */
+type StartData = { daily?: boolean; weekly?: boolean; plot?: number | null };
+/** The garden editor's tools: drawing the path, or soil beds. */
+type Tool = 'path' | 'soil';
 
 type Rect = { x: number; y: number; w: number; h: number };
 type Text = Phaser.GameObjects.Text;
@@ -200,11 +218,18 @@ export class GameScene extends Phaser.Scene {
   private savedStars = '';
   private savedLaurels = '';
   private savedWild = '';
+  /** The weekly garden's or drawn plot's best wave as last saved. */
+  private savedOwn = 0;
+  /** The drawn plot being played, as saved when it was planted, so an edit since stops its best being written over the new drawing. */
+  private playedDrawing = '';
+  /** The plots overlay and the garden editor, while one is open. */
+  private plotBox: Phaser.GameObjects.Container | null = null;
   private golems = new Map<number, Image>();
   private hedges = new Map<number, Image>();
   private pests = new Map<number, { body: Image; slow: Image; mound: Image }>();
   private shots = new Map<number, Image>();
   private slimes = new Map<string, Image>();
+  private spores = new Map<number, Image>();
   private tree!: Image;
   private treeFlowers: Image[] = [];
   private bars!: Phaser.GameObjects.Graphics;
@@ -240,11 +265,18 @@ export class GameScene extends Phaser.Scene {
 
   create(data: StartData = {}) {
     const daily = data.daily ? dailyPlot(dailyRand(GAME), GARDENS.length) : null;
+    const weekly = data.weekly ? weeklyGarden(weekOf(today()), GARDENS.length) : null;
+    const drawn = data.plot === undefined || data.plot === null ? null : loadPlots()[data.plot];
+    const plot = drawn && drawingOk(drawn, PLOT.minPath, PLOT.soil) ? { slot: data.plot!, garden: drawnGarden(drawn) } : null;
     this.state = newGame(loadBest(), loadBloom(), loadGarden(), loadStars(), loadThorny(), loadLaurels(), {
       wild: loadWild(),
       grafts: loadGrafts(),
       daily,
+      weekly,
+      plot,
     });
+    this.playedDrawing = drawn ? this.drawingKey(drawn) : '';
+    this.savedOwn = this.ownBest();
     this.savedWild = this.state.wild.join(',');
     this.savedBest = this.state.best;
     this.savedBloom = this.state.bloom;
@@ -259,6 +291,7 @@ export class GameScene extends Phaser.Scene {
     this.picker = null;
     this.boonBox = null;
     this.graftBox = null;
+    this.plotBox = null;
     this.previewKey = '';
     this.cards = [];
     this.treeFlowers = [];
@@ -267,6 +300,7 @@ export class GameScene extends Phaser.Scene {
     this.pests.clear();
     this.shots.clear();
     this.slimes.clear();
+    this.spores.clear();
     this.viewObjects.clear();
 
     // Everything is laid out in the designed frame, which the camera centres in the view (unless the
@@ -278,8 +312,10 @@ export class GameScene extends Phaser.Scene {
     bakeTable(this, view.width, view.height, frame.x, frame.y);
     this.table = this.add.image(-frame.x, -frame.y, 'table').setOrigin(0);
     this.viewObjects.add(this.table);
-    bakeGarden(this, this.state.garden);
-    this.add.image(0, 0, gardenBg(this.state.garden)).setOrigin(0);
+    let bg = gardenBg(this.state.garden);
+    if (this.state.plot) bg = bakePlot(this, this.state.plot.garden);
+    else bakeGarden(this, this.state.garden);
+    this.add.image(0, 0, bg).setOrigin(0);
     this.sunGfx = this.add.graphics().setDepth(1);
     this.createBoard();
     this.bars = this.add.graphics().setDepth(UI_DEPTH - 20);
@@ -312,6 +348,10 @@ export class GameScene extends Phaser.Scene {
       .setAlpha(0);
     this.refresh();
     if (daily) this.announceDaily();
+    else if (this.state.weekly) {
+      const { twist } = this.state.weekly;
+      this.announce([t('weeklyBanner', { garden: t(gardenOf(this.state).name) }), t('weeklyTwist', { twist: t(TWIST_INFO[twist].name) }), t('weeklyRules')], 2);
+    } else if (this.state.plot) this.announce([t('plotBanner', { n: this.state.plot.slot + 1 })]);
     this.musicPart = null;
     this.syncMusic();
     // The corner buttons keep their CSS size, so a window resized or a phone turned after the start
@@ -350,7 +390,7 @@ export class GameScene extends Phaser.Scene {
     const before = this.soundWatch();
     // The garden picker (and the harvest and game-over screens) and a boon pick waiting to be made
     // hold the game still behind them.
-    tick(s, this.picker || this.graftBox || s.offer.length ? 0 : dt * (s.fast ? FAST : 1));
+    tick(s, this.picker || this.graftBox || this.plotBox || s.offer.length ? 0 : dt * (s.fast ? FAST : 1));
     this.tickSounds(before);
     checkTrophies(s);
     if (s.heart < heart) this.heartHit();
@@ -387,6 +427,7 @@ export class GameScene extends Phaser.Scene {
     this.bars.clear();
     this.drawSun();
     this.drawSlime();
+    this.drawSpores();
     this.drawHedges();
     this.drawGolems();
     this.drawPests();
@@ -554,8 +595,9 @@ export class GameScene extends Phaser.Scene {
       ui('click');
       this.showPicker('choose');
     });
-    const tagKey = this.state.daily ? 'gardenTagDaily' : this.state.thorny ? 'gardenTagThorny' : 'gardenTag';
-    const tagText = t(tagKey, { garden: t(gardenOf(this.state).name) });
+    const s = this.state;
+    const tagKey = s.daily ? 'gardenTagDaily' : s.weekly ? 'gardenTagWeekly' : s.thorny ? 'gardenTagThorny' : 'gardenTag';
+    const tagText = s.plot ? t('gardenTagPlot', { n: s.plot.slot + 1 }) : t(tagKey, { garden: t(gardenOf(s).name) });
     this.press(HUD.garden.x, HUD.garden.y, tagText, 10.5, this.state.thorny ? '#7a2a4a' : '#4a2e18', [0.5, 0.5]);
     // The leaf tag regrows a leaf too, like a tap on the Heartwood.
     this.add
@@ -616,8 +658,8 @@ export class GameScene extends Phaser.Scene {
       if (kind === 'hedge') {
         // The hedge strip: the hedge, its name and its cost; the hint says what it does.
         face = [
-          this.add.image(left + 28, y + 15, 'hedge').setOrigin(0.5, 54 / 64).setScale(0.5),
-          this.press(left + 55, y - 9, t(HEDGE.name), 10.5, ink),
+          this.add.image(left + 28, y + 13, 'hedge').setOrigin(0.5, 54 / 64).setScale(0.46),
+          this.press(left + 55, y - 8, t(HEDGE.name), 10.5, ink),
           this.add.image(left + 62, y + 6, 'sap').setScale(0.5),
           this.press(left + 70, y + 7, formatNumber(HEDGE.cost), 12, ink),
         ];
@@ -626,39 +668,34 @@ export class GameScene extends Phaser.Scene {
         // In the daily plot a card names the form its golem grows into at level 3 instead.
         const daily = this.state.daily;
         const blurb = daily ? t('dailyForm', { form: t(FORM_INFO[daily.forms[kind]].name) }) : t(info.blurb);
-        const tall = h > 70;
         // The card's face: the golem, its name, its cost in sap and what it does.
-        const icon = this.add
-          .image(left + (tall ? 31 : 27), y + (tall ? 27 : 22), `golem-${kind}`)
-          .setOrigin(GOLEM_ORIGIN.x, GOLEM_ORIGIN.y)
-          .setScale(tall ? 0.62 : 0.45);
-        const [first, second] = t(info.card).split('\n');
-        cost = tall ? this.press(left + 78, y + 12, formatNumber(info.cost), 14, ink) : this.press(left + 70, y, formatNumber(info.cost), 12, ink);
-        face = tall
-          ? [
-              icon,
-              this.press(left + 61, y - 21, first, 14, ink),
-              this.press(left + 61, y - 6, second, 14, ink),
-              this.add.image(left + 68, y + 11, 'sap').setScale(0.62),
-              cost,
-              this.press(left + 61, y + 27, blurb, 9, daily ? '#7a2a4a' : '#7a5a34'),
-            ]
-          : [
-              icon,
-              this.press(left + 55, y - 15, t(info.name), 10.5, ink),
-              this.add.image(left + 62, y - 1, 'sap').setScale(0.5),
-              cost,
-              this.press(left + 55, y + 14, blurb, 9, daily ? '#7a2a4a' : '#7a5a34'),
-            ];
-        if (info.locked) {
-          locked = this.add.container(0, 0, [
-            this.add.image(x, y, 'card-locked'),
-            this.press(left + 55, y - 16, t(info.name), 10.5, ink),
-            this.press(left + 56, y - 4, t('bloomsAfter'), 9, '#4a6a24'),
-            this.press(left + 56, y + 7, t('bloomWaves', { n: BLOOM_GOAL }), 9, '#4a6a24'),
-          ]);
-          this.lockPips = this.add.graphics();
-          locked.add(this.lockPips);
+        cost = this.press(left + 70, y + 1, formatNumber(info.cost), 12, ink);
+        // Names and lines too long for the card (in German, say) shrink to fit it.
+        const fit = (text: Text) => {
+          for (let size = Number.parseFloat(String(text.style.fontSize)); text.width > SEED_BUTTONS.w - 59 && size > 7; size -= 0.5) text.setFontSize(size);
+          return text;
+        };
+        face = [
+          this.add.image(left + 26, y + 18, `golem-${kind}`).setOrigin(GOLEM_ORIGIN.x, GOLEM_ORIGIN.y).setScale(0.42),
+          fit(this.press(left + 53, y - 12, t(info.name), 10.5, ink)),
+          this.add.image(left + 61, y, 'sap').setScale(0.5),
+          cost,
+          fit(this.press(left + 53, y + 13, blurb, 9, daily ? '#7a2a4a' : '#7a5a34')),
+        ];
+        // A golem still to unlock shows a padlock card: the Thorn golem with the Heartwood's buds,
+        // the Fungus and Bell golems with the wave to clear.
+        if (info.locked || info.unlockBest) {
+          const lines = info.locked
+            ? [fit(this.press(left + 53, y + 1, t('bloomsAfter'), 9, '#4a6a24'))]
+            : [
+                fit(this.press(left + 53, y + 1, t('lockedWave', { n: info.unlockBest! }), 9, '#4a6a24')),
+                fit(this.press(left + 53, y + 12, t('lockedToUnlock'), 9, '#4a6a24')),
+              ];
+          locked = this.add.container(0, 0, [this.add.image(x, y, 'card-locked'), fit(this.press(left + 53, y - 12, t(info.name), 10.5, ink)), ...lines]);
+          if (info.locked) {
+            this.lockPips = this.add.graphics();
+            locked.add(this.lockPips);
+          }
         }
       }
       const open = this.add.container(0, 0, face);
@@ -793,7 +830,8 @@ export class GameScene extends Phaser.Scene {
       );
     } else if (mode === 'over') {
       title.setText(t('overTitle'));
-      text.setText(t('overText', { wave: s.wave, kills: s.kills, best: s.best }));
+      const key = s.weekly ? 'overTextWeekly' : s.plot ? 'overTextPlot' : 'overText';
+      text.setText(t(key, { wave: s.wave, kills: s.kills, best: s.weekly || s.plot ? this.savedOwn : s.best }));
     } else if (mode === 'harvest' && s.thorny) {
       title.setText(t('thornyHarvestTitle'));
       text.setText(t('thornyHarvestText', { wave: HARVEST_WAVE, garden: t(gardenOf(s).name), heart: s.heart, max: START_HEART }));
@@ -820,7 +858,7 @@ export class GameScene extends Phaser.Scene {
     GARDENS.forEach((garden, i) => {
       const x = VIEW.w / 2 + (i - (GARDENS.length - 1) / 2) * (w + gap);
       const open = gardenOpen(s, i);
-      const here = i === s.garden && !s.thorny && !s.daily;
+      const here = i === s.garden && !s.thorny && ordinary(s);
       if (here) parts.push(this.add.image(x, y, 'gcard-rim'));
       const card = this.add.image(x, y, open ? 'gcard' : 'gcard-locked');
       const plantIt = (thorny: boolean) => {
@@ -828,20 +866,20 @@ export class GameScene extends Phaser.Scene {
         this.leaveDaily();
         saveGarden(i);
         saveThorny(thorny);
-        this.scene.restart({ daily: false } satisfies StartData);
+        this.scene.restart({ daily: false, weekly: false, plot: null } satisfies StartData);
       };
       if (open) card.setInteractive({ useHandCursor: true }).on('pointerdown', () => plantIt(false));
       if (thornyOpen(s, i)) {
         // Three stars open the garden's thorny variant: a tag under its card, with its twist and laurel.
         const twist = TWIST_INFO[GARDEN_TWISTS[i]];
         const ty = y + GARDEN_CARD.h / 2 + 24;
-        if (i === s.garden && s.thorny && !s.daily) parts.push(this.add.image(x, ty, 'pill').setScale(1.42, 1.9).setTint(0xf2c44a));
+        if (i === s.garden && s.thorny && ordinary(s)) parts.push(this.add.image(x, ty, 'pill').setScale(1.42, 1.9).setTint(0xf2c44a));
         const tag = this.add.image(x, ty, 'pill').setScale(1.3, 1.6);
         tag.setInteractive({ useHandCursor: true }).on('pointerdown', () => plantIt(true));
         const label = t(s.laurels[i] ? 'thornyTagWon' : 'thornyTag', { twist: t(twist.name) });
         parts.push(tag, this.press(x, ty, label, 10.5, '#7a2a4a', [0.5, 0.5]));
       }
-      parts.push(card, this.press(x, y - 80, t(garden.name), 18, '#3a2a18', [0.5, 0.5]), this.miniMap(i, x, y - 18, open));
+      parts.push(card, this.press(x, y - 80, t(garden.name), 18, '#3a2a18', [0.5, 0.5]), this.miniMap(garden, x, y - 18, open));
       parts.push(this.press(x, y + 50, t(garden.blurb), 10, '#7a5a34', [0.5, 0.5]).setAlign('center').setWordWrapWidth(w - 24));
       // A garden kept going past its harvest shows its best wild wave under the caption.
       const wild = s.wild[i];
@@ -854,25 +892,28 @@ export class GameScene extends Phaser.Scene {
       parts.push(caption);
       if (wild) parts.push(this.press(x, y + 88, t('wildBest', { n: wild }), 10, '#7a3a14', [0.5, 0.5]));
     });
+    // A row of buttons along the bottom, each with its note under it: Daily plot, Plots, then Back
+    // (or Keep going) and Grafts where they show.
+    const row: ((x: number) => Phaser.GameObjects.GameObject[])[] = [(x) => this.dailyButton(x, 492), (x) => this.plotsButton(x, 492, mode)];
     if (mode === 'choose' || mode === 'harvest') {
-      parts.push(
-        makeButton(this, VIEW.w / 2, 492, t(mode === 'harvest' ? 'keepGoing' : 'back'), () => {
+      row.push((x) => [
+        makeButton(this, x, 492, t(mode === 'harvest' ? 'keepGoing' : 'back'), () => {
           ui('click');
           this.closePicker();
         }),
-      );
+      ]);
     }
-    parts.push(...this.dailyButton(VIEW.w / 2 - 230, 492));
     // Grafts show once a laurel has been won.
     if (laurelsFree(s.laurels, []) > 0) {
-      parts.push(
-        makeButton(this, VIEW.w / 2 + 230, 492, t('graftsButton'), () => {
+      row.push((x) => [
+        makeButton(this, x, 492, t('graftsButton'), () => {
           ui('click');
           this.showGrafts(mode);
         }),
-        this.press(VIEW.w / 2 + 230, 527, t('laurelsLeft', { n: laurelsFree(s.laurels, loadGrafts()), total: laurelsFree(s.laurels, []) }), 10.5, '#e8d6a8', [0.5, 0.5]),
-      );
+        this.press(x, 527, t('laurelsLeft', { n: laurelsFree(s.laurels, loadGrafts()), total: laurelsFree(s.laurels, []) }), 10.5, '#e8d6a8', [0.5, 0.5]),
+      ]);
     }
+    row.forEach((make, i) => parts.push(...make(VIEW.w / 2 + (i - (row.length - 1) / 2) * (BUTTON.w + 16))));
     return this.add.container(0, 0, parts).setDepth(UI_DEPTH + 10);
   }
 
@@ -888,11 +929,236 @@ export class GameScene extends Phaser.Scene {
       ui('click');
       this.leaveDaily();
       startDaily(GAME);
-      this.scene.restart({ daily: true } satisfies StartData);
+      this.scene.restart({ daily: true, weekly: false, plot: null } satisfies StartData);
     });
     if (record.played) button.setAlpha(0.7);
     const note = record.best || record.streak ? t('dailyNote', { best: record.best, n: record.streak }) : t('dailyNew');
     return [button, this.press(x, y + 35, note, 10.5, '#e8d6a8', [0.5, 0.5])];
+  }
+
+  /** The Plots button and the note under it (this week's best): opens the plots overlay. */
+  private plotsButton(x: number, y: number, back: PickerMode) {
+    const best = loadWeekly(weekOf(today()));
+    const button = makeButton(this, x, y, t('plotsButton'), () => {
+      ui('click');
+      this.showPlots(back);
+    });
+    return [button, this.press(x, y + 35, best ? t('plotsNote', { n: best }) : t('plotsNew'), 10.5, '#e8d6a8', [0.5, 0.5])];
+  }
+
+  /** The weekly garden's or drawn plot's own best wave, as saved (0 in any other garden). */
+  private ownBest() {
+    const s = this.state;
+    if (s.weekly) return loadWeekly(s.weekly.week);
+    if (s.plot) return loadPlots()[s.plot.slot]?.best ?? 0;
+    return 0;
+  }
+
+  /** Saves the weekly garden's or drawn plot's best wave (not over a plot drawn again since it was planted). */
+  private saveOwnBest(best: number) {
+    const s = this.state;
+    if (s.weekly) saveWeekly(s.weekly.week, best);
+    if (!s.plot) return;
+    const plots = loadPlots();
+    const plot = plots[s.plot.slot];
+    if (!plot || this.drawingKey(plot) !== this.playedDrawing) return;
+    plot.best = best;
+    savePlots(plots);
+  }
+
+  /** A drawing as text, to tell whether it changed. */
+  private drawingKey(d: Drawing) {
+    return JSON.stringify([d.path, d.soil]);
+  }
+
+  /** Plants this week's garden (`weekly`) or the drawn plot in `slot`, afresh. */
+  private plantPlot(weekly: boolean, slot: number | null) {
+    ui('click');
+    this.leaveDaily();
+    this.scene.restart({ daily: false, weekly, plot: slot } satisfies StartData);
+  }
+
+  /**
+   * The plots overlay (GG18, GG19), opened from the garden picker: the weekly garden's card and a
+   * card per drawn plot, each with its own best wave. A drawn plot's card plants it and its Edit
+   * tag opens the editor; an empty or unfinished one opens the editor. Back opens the picker again.
+   */
+  private showPlots(back: PickerMode) {
+    this.hideBanner();
+    this.closePicker();
+    this.plotBox?.destroy();
+    const parts: Phaser.GameObjects.GameObject[] = [this.dim()];
+    parts.push(
+      this.add
+        .text(VIEW.w / 2, 104, t('plotsTitle'), { fontFamily: FONT, fontStyle: 'bold', fontSize: '30px', color: '#f2c44a', stroke: '#3a2008', strokeThickness: 6 })
+        .setOrigin(0.5),
+      this.add
+        .text(VIEW.w / 2, 164, t('plotsText'), { fontFamily: FONT, fontStyle: 'bold', fontSize: '15px', color: '#fbefd6', align: 'center' })
+        .setOrigin(0.5)
+        .setLineSpacing(5)
+        .setWordWrapWidth(VIEW.w - 60),
+    );
+    const { y, h } = GARDEN_CARD;
+    const { w, gap } = GRAFT_CARD;
+    const at = (i: number) => VIEW.w / 2 + (i - (PLOT.slots + 1 - 1) / 2) * (w + gap);
+    const s = this.state;
+
+    // The weekly garden.
+    const week = weeklyGarden(weekOf(today()), GARDENS.length);
+    const best = loadWeekly(week.week);
+    const wx = at(0);
+    if (s.weekly) parts.push(this.add.image(wx, y, 'graft-rim'));
+    const weekly = this.add.image(wx, y, 'graft');
+    weekly.setInteractive({ useHandCursor: true }).on('pointerdown', () => this.plantPlot(true, null));
+    parts.push(weekly, this.press(wx, y - 80, t('weeklyName'), 16, '#3a2a18', [0.5, 0.5]), this.miniMap(GARDENS[week.garden], wx, y - 18, true));
+    parts.push(
+      this.press(wx, y + 40, t(GARDENS[week.garden].name), 12.5, '#3a2a18', [0.5, 0.5]),
+      this.press(wx, y + 57, t('weeklyTwist', { twist: t(TWIST_INFO[week.twist].name) }), 10.5, '#7a2a4a', [0.5, 0.5]),
+      this.press(wx, y + 80, best ? t('weeklyBest', { n: best }) : t('weeklyNone'), 11, '#4a6a24', [0.5, 0.5]),
+    );
+
+    // The drawn plots.
+    loadPlots().forEach((plot, slot) => {
+      const x = at(slot + 1);
+      const ok = !!plot && drawingOk(plot, PLOT.minPath, PLOT.soil);
+      if (s.plot?.slot === slot) parts.push(this.add.image(x, y, 'graft-rim'));
+      const card = this.add.image(x, y, ok ? 'graft' : 'graft-dim');
+      card.setInteractive({ useHandCursor: true }).on('pointerdown', () => (ok ? this.plantPlot(false, slot) : this.openEditor(slot, back)));
+      parts.push(card, this.press(x, y - 80, t('slotName', { n: slot + 1 }), 16, '#3a2a18', [0.5, 0.5]));
+      if (ok) {
+        parts.push(this.miniMap(drawnGarden(plot), x, y - 18, true));
+        parts.push(this.press(x, y + 48, t('plantIt'), 13, '#3a2a18', [0.5, 0.5]));
+        parts.push(this.press(x, y + 74, plot.best ? t('plotBest', { n: plot.best }) : t('plotNoBest'), 11, '#4a6a24', [0.5, 0.5]));
+        // The Edit tag under the card opens the editor on it.
+        const ty = y + h / 2 + 24;
+        const tag = this.add.image(x, ty, 'pill').setScale(0.8, 1.6);
+        tag.setInteractive({ useHandCursor: true }).on('pointerdown', () => this.openEditor(slot, back));
+        parts.push(tag, this.press(x, ty, t('editTag'), 11, '#4a2e18', [0.5, 0.5]));
+      } else {
+        parts.push(this.press(x, y, t(plot ? 'slotUnfinished' : 'slotEmpty'), 11.5, '#5a4a34', [0.5, 0.5]).setAlign('center').setWordWrapWidth(w - 30));
+      }
+    });
+    parts.push(
+      makeButton(this, VIEW.w / 2, 492, t('back'), () => {
+        ui('click');
+        this.closePlots();
+        this.showPicker(back);
+      }),
+    );
+    this.plotBox = this.add.container(0, 0, parts).setDepth(UI_DEPTH + 10);
+  }
+
+  private closePlots() {
+    this.plotBox?.destroy();
+    this.plotBox = null;
+  }
+
+  private openEditor(slot: number, back: PickerMode) {
+    ui('click');
+    this.showEditor(slot, back);
+  }
+
+  /**
+   * The garden editor (GG18): a blank plot of grass to draw a path on, cell by cell from the first
+   * column to the Heartwood, and soil beds beside it. Plant it saves the drawing and plants it; Back
+   * saves it and goes back to the plots. A changed drawing starts its best wave afresh.
+   */
+  private showEditor(slot: number, back: PickerMode) {
+    this.closePlots();
+    const saved = loadPlots()[slot];
+    const d: Drawing = { path: saved ? [...saved.path] : [], soil: saved ? [...saved.soil] : [] };
+    const before = this.drawingKey(d);
+    let tool: Tool = 'path';
+    const { x: gx, y: gy, cell } = EDITOR;
+    const parts: Phaser.GameObjects.GameObject[] = [this.dim()];
+    parts.push(
+      this.add
+        .text(VIEW.w / 2, 72, t('editorTitle', { n: slot + 1 }), { fontFamily: FONT, fontStyle: 'bold', fontSize: '26px', color: '#f2c44a', stroke: '#3a2008', strokeThickness: 6 })
+        .setOrigin(0.5),
+    );
+    const help = this.add
+      .text(VIEW.w / 2, 118, '', { fontFamily: FONT, fontStyle: 'bold', fontSize: '13px', color: '#fbefd6', align: 'center' })
+      .setOrigin(0.5)
+      .setWordWrapWidth(VIEW.w - 140);
+    const grid = this.add.graphics();
+    const zone = this.add.zone(gx, gy, GRID.cols * cell, GRID.rows * cell).setOrigin(0).setInteractive({ useHandCursor: true });
+    const status = this.press(VIEW.w / 2, 458, '', 12, '#fbefd6', [0.5, 0.5]);
+    parts.push(help, grid, zone, status);
+
+    // The tool tags: Path, Soil and Clear.
+    const tags = (['path', 'soil', 'clear'] as const).map((id, i) => {
+      const x = VIEW.w / 2 + (i - 1) * 150;
+      const bg = this.add.image(x, EDITOR.tools, 'pill').setScale(0.8, 1.7);
+      const label = this.press(x, EDITOR.tools, t(id === 'path' ? 'toolPath' : id === 'soil' ? 'toolSoil' : 'toolClear'), 13, '#4a2e18', [0.5, 0.5]);
+      bg.setInteractive({ useHandCursor: true }).on('pointerdown', () => {
+        ui('click');
+        if (id === 'clear') d.path.length = d.soil.length = 0;
+        else tool = id;
+        draw();
+      });
+      parts.push(bg, label);
+      return { id, bg };
+    });
+
+    const draw = () => {
+      const ok = drawingOk(d, PLOT.minPath, PLOT.soil);
+      help.setText(t(tool === 'path' ? 'editorPathHelp' : 'editorSoilHelp'));
+      for (const tag of tags) tag.bg.setTint(tag.id === tool ? 0xf2c44a : 0xffffff);
+      status.setText(t('editorStatus', { path: d.path.length, min: PLOT.minPath, soil: d.soil.length, max: PLOT.soil })).setColor(ok ? '#b8e890' : '#fbefd6');
+      grid.clear();
+      grid.fillStyle(0x1a0e06, 0.35).fillRoundedRect(gx - 4, gy - 1, GRID.cols * cell + 10, GRID.rows * cell + 10, 10);
+      grid.fillStyle(0x6fae4a).fillRoundedRect(gx - 6, gy - 6, GRID.cols * cell + 12, GRID.rows * cell + 12, 10);
+      for (let r = 0; r < GRID.rows; r++) {
+        for (let c = 0; c < GRID.cols; c++) {
+          grid.lineStyle(1, 0x3e7a2c, 0.5).strokeRect(gx + c * cell, gy + r * cell, cell, cell);
+        }
+      }
+      for (const [c, r] of d.soil) grid.fillStyle(0x7a4c2c).fillRoundedRect(gx + c * cell + 3, gy + r * cell + 3, cell - 6, cell - 6, 5);
+      for (const [c, r] of d.path) grid.fillStyle(0xd8b27a).fillRect(gx + c * cell, gy + r * cell, cell, cell);
+      if (d.path.length) {
+        // Where pests come in, the way the path runs, and the Heartwood at its end.
+        const r0 = d.path[0][1];
+        grid.fillStyle(0xd8b27a).fillRect(gx - 14, gy + r0 * cell + 4, 14, cell - 8);
+        grid.lineStyle(3, 0x8a6a3a, 0.8).beginPath();
+        grid.moveTo(gx - 10, gy + r0 * cell + cell / 2);
+        for (const [c, r] of d.path) grid.lineTo(gx + c * cell + cell / 2, gy + r * cell + cell / 2);
+        grid.strokePath();
+        const [hc, hr] = d.path[d.path.length - 1];
+        grid.fillStyle(0x3e8c3e).fillCircle(gx + hc * cell + cell / 2, gy + hr * cell + cell / 2, cell * 0.36);
+        this.bead(grid, gx + hc * cell + cell / 2 - 3, gy + hr * cell + cell / 2 - 4, 3.5, 0xf2c44a);
+      }
+    };
+    zone.on('pointerdown', (p: Phaser.Input.Pointer) => {
+      const col = Math.floor((p.worldX - gx) / cell);
+      const row = Math.floor((p.worldY - gy) / cell);
+      if (editDrawing(d, tool, col, row, PLOT.soil)) sfx(tool === 'path' ? 'select' : 'rustle');
+      else ui('refuse');
+      draw();
+    });
+    draw();
+
+    // Keeps the drawing in its slot; a changed one starts its best afresh, and an empty one empties the slot.
+    const keep = () => {
+      const plots = loadPlots();
+      const same = this.drawingKey(d) === before;
+      const plot: SavedPlot | null = d.path.length || d.soil.length ? { ...d, best: same ? (plots[slot]?.best ?? 0) : 0 } : null;
+      plots[slot] = plot;
+      savePlots(plots);
+    };
+    const bx = BUTTON.w / 2 + 8;
+    parts.push(
+      makeButton(this, VIEW.w / 2 - bx, 500, t('plantIt'), () => {
+        if (!drawingOk(d, PLOT.minPath, PLOT.soil)) return ui('refuse');
+        keep();
+        this.plantPlot(false, slot);
+      }),
+      makeButton(this, VIEW.w / 2 + bx, 500, t('back'), () => {
+        ui('click');
+        keep();
+        this.showPlots(back);
+      }),
+    );
+    this.plotBox = this.add.container(0, 0, parts).setDepth(UI_DEPTH + 10);
   }
 
   /** Leaving a daily plot half way through ends today's try with the score so far. */
@@ -1079,14 +1345,20 @@ export class GameScene extends Phaser.Scene {
     return '★'.repeat(n) + '☆'.repeat(3 - n);
   }
 
+  /** Hides the banner: one still showing would run through an overlay's title. */
+  private hideBanner() {
+    this.tweens.killTweensOf(this.banner);
+    this.banner.setAlpha(0);
+  }
+
   private closePicker() {
     this.picker?.destroy();
     this.picker = null;
   }
 
-  /** A garden's map in miniature: grass, its paths and the Heartwood. */
-  private miniMap(n: number, x: number, y: number, open: boolean) {
-    const { map, heart } = GARDENS[n];
+  /** A garden's map in miniature: grass, its soil beds, its paths and the Heartwood. */
+  private miniMap(garden: Garden, x: number, y: number, open: boolean) {
+    const { map, heart } = garden;
     const c = 12;
     const left = x - (GRID.cols * c) / 2;
     const top = y - (GRID.rows * c) / 2;
@@ -1096,10 +1368,10 @@ export class GameScene extends Phaser.Scene {
     for (let r = 0; r < GRID.rows; r++) {
       for (let col = 0; col < GRID.cols; col++) {
         if (map[r][col] === 'soil') g.fillStyle(0x7a4c2c, 0.55).fillRoundedRect(left + col * c + 2, top + r * c + 2, c - 4, c - 4, 2);
-        else g.fillStyle(0xd8b27a).fillRect(left + col * c, top + r * c, c, c);
+        else if (map[r][col] !== 'grass') g.fillStyle(0xd8b27a).fillRect(left + col * c, top + r * c, c, c);
       }
     }
-    for (const route of GARDENS[n].routes) {
+    for (const route of garden.routes) {
       const [, row] = route.corners[0];
       g.fillStyle(0xd8b27a).fillRect(left - 4, top + row * c, 4, c);
     }
@@ -1113,9 +1385,7 @@ export class GameScene extends Phaser.Scene {
    * ('harvest', with a Keep going button) or when the Heartwood falls ('over').
    */
   private showPicker(mode: PickerMode) {
-    // A banner still showing would run through the picker's title.
-    this.tweens.killTweensOf(this.banner);
-    this.banner.setAlpha(0);
+    this.hideBanner();
     this.picked = null;
     this.moving = null;
     this.formMenu = false;
@@ -1141,11 +1411,17 @@ export class GameScene extends Phaser.Scene {
       this.savedWild = s.wild.join(',');
       saveWild(s.wild);
     }
+    // The weekly garden and drawn plots keep their own best wave.
+    if (s.cleared > this.savedOwn) this.saveOwnBest((this.savedOwn = s.cleared));
     this.hud.wave.setText(t('waveTag', { n: s.wave }));
     this.hud.waveSub.setText(
       s.daily
         ? t('dailyAt', { wave: DAILY.waves })
-        : s.wave > HARVEST_WAVE
+        : s.weekly
+          ? t('weeklySub', { best: this.savedOwn })
+          : s.plot
+            ? t('plotSub', { best: this.savedOwn })
+            : s.wave > HARVEST_WAVE
           ? t('wildSub', { best: s.wild[s.garden] })
           : s.harvest
             ? t('harvested', { stars: this.starText(s.harvest) })
@@ -1173,20 +1449,21 @@ export class GameScene extends Phaser.Scene {
       const h = SEED_BUTTONS.hs[SEEDS.indexOf(kind)];
       const isOpen = unlocked(s, kind);
       rim.setVisible(isOpen && s.selected === kind);
-      // The hedge strip of a thorny garden without hedges stays, faded, and picks nothing.
-      const faded = kind === 'hedge' && !isOpen;
+      // A seed the twist takes away (the hedge strip of a garden without hedges, every golem but
+      // Moss and Thorn in a weekly garden with only those) stays, faded, and picks nothing.
+      const faded = barred(s, kind);
       const price = seedCost(s, kind);
       card.setVisible(isOpen || faded).setTexture(isOpen && s.sap >= price ? `card-${h}` : `card-${h}-dim`);
       // The Seedling graft's free seed shows on every golem card until it is planted.
       cost?.setText(price ? formatNumber(price) : t('free'));
       open.setVisible(isOpen || faded).setAlpha(faded ? 0.35 : 1);
-      locked?.setVisible(!isOpen);
+      locked?.setVisible(!isOpen && !faded);
     }
     if (this.lockPips) {
       const left = SEED_BUTTONS.x - SEED_BUTTONS.w / 2;
-      const y = SEED_BUTTONS.ys[2] + 19;
+      const y = SEED_BUTTONS.ys[SEEDS.indexOf('thorn')] + 13;
       this.lockPips.clear();
-      for (let i = 0; i < BLOOM_GOAL; i++) this.bead(this.lockPips, left + 61 + i * 13, y, 4, i < s.bloom ? 0xf2c44a : 0x8a8070);
+      for (let i = 0; i < BLOOM_GOAL; i++) this.bead(this.lockPips, left + 58 + i * 13, y, 4, i < s.bloom ? 0xf2c44a : 0x8a8070);
     }
 
     this.refreshPreview();
@@ -1200,7 +1477,7 @@ export class GameScene extends Phaser.Scene {
         ? [t('startWave', { n }), '']
         : early
           ? [t('callWave', { n }), t('earlyBonus', { n: EARLY_BONUS })]
-          : s.phase === 'wave' && s.wave === HARVEST_WAVE && s.queue.length === 0 && !s.daily
+          : s.phase === 'wave' && s.wave === HARVEST_WAVE && s.queue.length === 0 && ordinary(s)
             ? [t('harvestWave'), t('squashEvery')]
             : s.phase === 'wave' && s.wave === lastWave(s) && s.queue.length === 0
             ? [t('dailyLastWave'), t('squashEvery')]
@@ -1314,7 +1591,7 @@ export class GameScene extends Phaser.Scene {
     const hedge = this.hover && hedgeAt(s, this.hover.col, this.hover.row);
     if (hedge) return t('hintHedge', { n: Math.ceil(hedge.hp) });
     const twist = twistOf(s);
-    if (twist === 'hedges' && this.hover && gardenOf(s).map[this.hover.row][this.hover.col] === 'path') return t('hintNoHedges');
+    if (twist === 'hedges' && this.hover && gardenOf(s).map[this.hover.row][this.hover.col] === 'path') return t(s.weekly ? 'hintNoHedgesWeek' : 'hintNoHedges');
     if (s.selected === 'hedge') return t('hintPlantHedge');
     const onHeart = this.hover && gardenOf(s).map[this.hover.row][this.hover.col] === 'heart';
     const lost = s.heart < START_HEART;
@@ -1379,7 +1656,7 @@ export class GameScene extends Phaser.Scene {
         // A level-3 golem wears a bead in its form's colour on its shoulder.
         if (g.form) this.bead(this.bars, x + 20, y - 22, 5, FORM_INFO[g.form].colour);
         // Combos: a vine to each grown moss golem beside a pebble or thorn golem.
-        if (g.kind === 'moss') continue;
+        if (g.kind !== 'pebble' && g.kind !== 'thorn') continue;
         for (const o of s.golems) {
           if (o.kind === 'moss' && o.growMs === 0 && Math.abs(o.col - g.col) + Math.abs(o.row - g.row) === 1) {
             this.vine(this.bars, g, o, g.kind === 'pebble' ? 0xf2c44a : 0xf2a6c8);
@@ -1440,6 +1717,14 @@ export class GameScene extends Phaser.Scene {
       else if (p.slowMs > 0) art.body.setTint(0x9ae07a).setTintMode(Phaser.TintModes.MULTIPLY);
       else art.body.clearTint();
       if (p.hp < p.maxHp) this.bar(pos.x, top, p.kind === 'queen' ? 64 : p.kind === 'aphid' ? 18 : 30, Math.max(0, p.hp / p.maxHp), 0xf2c44a);
+      // A pest stunned by a bell golem: three pale blue beads circle over it (held still with reduced motion).
+      if (p.stunMs > 0) {
+        const spin = settings.reduceMotion ? 0 : p.stunMs / 160;
+        for (let k = 0; k < 3; k++) {
+          const a = spin + (k / 3) * Math.PI * 2;
+          this.bead(this.bars, pos.x + Math.cos(a) * 11, top - 7 + Math.sin(a) * 3, 3, 0xa8ecff);
+        }
+      }
     }
     for (const [id, art] of this.pests) {
       if (seen.has(id)) continue;
@@ -1468,11 +1753,36 @@ export class GameScene extends Phaser.Scene {
     for (const [key, image] of this.slimes) if (!seen.has(key)) (image.destroy(), this.slimes.delete(key));
   }
 
+  /** The fungus golems' spore patches on the path, fading as they wear off. */
+  private drawSpores() {
+    const seen = new Set<number>();
+    for (const patch of this.state.spores) {
+      seen.add(patch.id);
+      let image = this.spores.get(patch.id);
+      if (!image) {
+        image = this.add.image(patch.x, patch.y, 'spores').setDepth(3).setScale(patch.r / 30);
+        this.spores.set(patch.id, image);
+      }
+      image.setAlpha(Math.min(1, patch.ms / 600) * 0.9);
+    }
+    for (const [id, image] of this.spores) if (!seen.has(id)) (image.destroy(), this.spores.delete(id));
+  }
+
   private drawShots() {
     const seen = new Set<number>();
     for (const shot of this.state.shots) {
       seen.add(shot.id);
       let image = this.shots.get(shot.id);
+      if (shot.ring) {
+        // A bell golem's ring spreads out to its reach and fades (only fades, with reduced motion).
+        if (!image) {
+          image = this.add.image(shot.from.x, shot.from.y - 10, 'shot-bell').setDepth(UI_DEPTH - 26);
+          this.shots.set(shot.id, image);
+        }
+        const k = 1 - shot.ms / RING_MS;
+        image.setScale((shot.ring / 46) * (settings.reduceMotion ? 1 : 0.3 + 0.7 * k)).setAlpha(1 - k);
+        continue;
+      }
       if (!image) {
         image = this.add.image(shot.from.x, shot.from.y, `shot-${shot.kind}`).setDepth(UI_DEPTH - 25);
         if (shot.kind === 'thorn') image.setRotation(Math.atan2(shot.to.y - shot.from.y, shot.to.x - shot.from.x));
@@ -1599,7 +1909,12 @@ export class GameScene extends Phaser.Scene {
     const sap = waveBonus(n) + (early ? EARLY_BONUS : 0);
     const compost = s.compost ? t('compostBonus', { n: s.compost }) : '';
     const lines = [t('waveCleared', { n, sap }) + compost];
-    if (n === HARVEST_WAVE) lines.push(t('harvestBanner', { stars: this.starText(s.harvest), n: s.heart }));
+    if (n === HARVEST_WAVE && ordinary(s)) lines.push(t('harvestBanner', { stars: this.starText(s.harvest), n: s.heart }));
+    // A golem that unlocks at this wave (Fungus at 10, Bell at 20), the first time it is reached.
+    for (const kind of GOLEMS) {
+      const at = GOLEM_INFO[kind].unlockBest;
+      if (at === n && this.savedBest < at) lines.push(t('golemUnlocked', { golem: t(GOLEM_INFO[kind].name) }));
+    }
     const buds = Math.min(BLOOM_GOAL, bloomBefore + 1);
     if (buds > bloomBefore) lines.push(buds >= BLOOM_GOAL ? t('bloomBanner') : t('budBanner', { n: buds, goal: BLOOM_GOAL }));
     this.announce(lines);
