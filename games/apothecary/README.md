@@ -346,7 +346,8 @@ to the town to end the plague's current stage at once.
 courier at the post beside the bench (400 coins, once), tap the post and send them to the forest
 (3 minutes, Silverleaf), the marsh (5 minutes, Bogbloom) or the mountains (8 minutes, Frostcap).
 The trip runs on game time, which the time away plays too, so the courier comes back with 3 of the
-herb even while the game is closed. The satchel holds up to 12 of each.
+herb even while the game is closed. The satchel holds up to 12 of each; herbs that don't fit stay out
+in the wild.
 
 ![The alchemy bench and the courier's post north of the yard, the courier out in the mountains](docs/screenshots/courier-post.webp)
 

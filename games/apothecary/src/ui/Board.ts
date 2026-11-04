@@ -86,19 +86,22 @@ export class Board {
         parts.push(fit(scene.add.image(x, y + 11, texture), scale).setAlpha(alpha));
       },
       button: (x, label, onTap, enabled = true, bw = 64) => {
-        parts.push(fit(scene.add.image(x, y + 11, cardTexture(scene, 'button', bw, 22))).setAlpha(enabled ? 1 : 0.45));
-        const text = scene.add
-          .text(x, y + 11, label, { ...TEXT, fontSize: '12px', fontStyle: 'bold' })
-          .setOrigin(0.5)
-          .setAlpha(enabled ? 1 : 0.45);
+        const card = fit(scene.add.image(x, y + 11, cardTexture(scene, 'button', bw, 22))).setAlpha(enabled ? 1 : 0.45);
+        // The whole card answers a tap, not just its label, which on a `+` is a few pixels wide.
         if (enabled) {
-          text.setInteractive({ useHandCursor: true }).on('pointerdown', (_p: Phaser.Input.Pointer, _x: number, _y: number, e: Phaser.Types.Input.EventData) => {
+          card.setInteractive({ useHandCursor: true }).on('pointerdown', (_p: Phaser.Input.Pointer, _x: number, _y: number, e: Phaser.Types.Input.EventData) => {
             e.stopPropagation();
             onTap();
             this.refresh();
           });
         }
-        parts.push(text);
+        parts.push(card);
+        parts.push(
+          scene.add
+            .text(x, y + 11, label, { ...TEXT, fontSize: '12px', fontStyle: 'bold' })
+            .setOrigin(0.5)
+            .setAlpha(enabled ? 1 : 0.45),
+        );
       },
       next: (h = 26) => {
         y += h;

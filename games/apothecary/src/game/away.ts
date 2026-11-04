@@ -1,3 +1,4 @@
+import { tickCourier } from './alchemy';
 import { tick } from './sim';
 import { SHOP_IDS } from './town';
 import { tickTown, townAutomated } from './townSim';
@@ -33,13 +34,19 @@ const tills = (state: GameState) => state.counter.till + SHOP_IDS.reduce((n, id)
 /**
  * Plays the time since `state.lastSeen` up to `now` (wall-clock ms, capped at `AWAY_CAP_MS`) through
  * the rules with nobody on a work spot, and returns what it earned. Returns null, and plays nothing,
- * for a new game, a short absence, or an apothecary with no automation to run.
+ * for a new game, a short absence, or an apothecary with no automation to run (where only a courier
+ * out on a trip walks on).
  */
 export function catchUp(state: GameState, now: number, rand: () => number = Math.random): AwaySummary | null {
   const since = state.lastSeen;
   state.lastSeen = now;
-  if (!since || now - since < AWAY_MIN_MS || !hasAutomation(state)) return null;
+  if (!since || now - since < AWAY_MIN_MS) return null;
   const ms = Math.min(now - since, AWAY_CAP_MS);
+  if (!hasAutomation(state)) {
+    // Nothing else runs without the doctor, but a courier out on a trip still walks on and comes home.
+    tickCourier(state, ms);
+    return null;
+  }
   const coins = state.coins + tills(state);
   const sold = state.sold;
   for (let t = 0; t < ms; t += AWAY_STEP_MS) {
