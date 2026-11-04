@@ -30,10 +30,11 @@ export type Icon =
   | 'bulwark'
   | 'skull'
   | 'rust'
-  | 'doubt';
+  | 'doubt'
+  | 'eye';
 
 /** A power that stays in play for the rest of the fight. */
-export type PowerKind = 'rage' | 'thorns' | 'splash' | 'bulwark';
+export type PowerKind = 'rage' | 'thorns' | 'splash' | 'bulwark' | 'hex';
 /** A curse: an unplayable card that clogs the hand (Rust), hurts when drawn (Wound) or makes the first card of a turn dearer (Doubt). */
 export type CurseKind = 'rust' | 'wound' | 'doubt';
 
@@ -41,6 +42,8 @@ export type CurseKind = 'rust' | 'wound' | 'doubt';
 interface Effects {
   cost: number;
   damage?: number;
+  /** Extra damage per hit to a hexed foe: one with any status on it (the Hexer's cards). */
+  hexed?: number;
   /** How many times the damage is dealt; 1 if not given. */
   hits?: number;
   /** Damage and statuses go to every foe instead of only the one in front. */
@@ -65,6 +68,8 @@ export interface Card extends Effects {
   icon: Icon;
   /** Common cards are offered after a fight; rare ones in treasure rooms and by elites. Starter and curse cards neither. */
   rarity: 'starter' | 'common' | 'rare' | 'curse';
+  /** A card only this hero finds, in rewards and at the merchant; no one else's pools hold it. */
+  hero?: 'hexer';
   /** The fields a tempered copy changes. */
   up: Partial<Effects>;
 }
@@ -102,12 +107,22 @@ export const CARDS = {
   rust: { name: 'rustCard', cost: 0, icon: 'rust', rarity: 'curse', curse: 'rust', up: {} },
   wound: { name: 'woundCard', cost: 0, icon: 'skull', rarity: 'curse', curse: 'wound', up: {} },
   doubt: { name: 'doubtCard', cost: 0, icon: 'doubt', rarity: 'curse', curse: 'doubt', up: {} },
+  // The Hexer's starters and the cards only the Hexer finds.
+  hexBolt: { name: 'hexBoltCard', cost: 1, icon: 'eye', rarity: 'starter', damage: 4, hexed: 4, up: { damage: 6, hexed: 5 } },
+  evilEye: { name: 'evilEyeCard', cost: 0, icon: 'eye', rarity: 'starter', weak: 1, vulnerable: 1, up: { weak: 2, vulnerable: 2 } },
+  soulDrain: { name: 'soulDrainCard', cost: 1, icon: 'fang', rarity: 'common', hero: 'hexer', damage: 4, hexed: 3, heal: 3, up: { damage: 6, heal: 4 } },
+  hexWard: { name: 'hexWardCard', cost: 1, icon: 'veil', rarity: 'common', hero: 'hexer', block: 7, weak: 1, up: { block: 10 } },
+  blight: { name: 'blightCard', cost: 1, icon: 'cloud', rarity: 'common', hero: 'hexer', poison: 3, vulnerable: 1, up: { poison: 5, vulnerable: 2 } },
+  hexStorm: { name: 'hexStormCard', cost: 2, icon: 'whirl', rarity: 'rare', hero: 'hexer', damage: 5, hexed: 5, all: true, up: { damage: 7, hexed: 7 } },
+  malediction: { name: 'maledictionCard', cost: 1, icon: 'eye', rarity: 'rare', hero: 'hexer', power: 'hex', up: { cost: 0 } },
 } satisfies Record<string, Card>;
 
 /** What each power does every turn (Bulwark, Battle Rage) or whenever it applies (Thorns, Venom Veil). */
 export const POWER_BLOCK = 3;
 export const POWER_STRENGTH = 1;
 export const THORNS = 3;
+/** The Weak Malediction puts on every foe at the start of each turn. */
+export const HEX_WEAK = 1;
 /** What a Wound costs when drawn (it never kills), and how much dearer Doubt makes the first card of a turn. */
 export const WOUND_HURT = 2;
 export const DOUBT_COST = 1;
@@ -118,6 +133,7 @@ const POWER_TEXT: Record<PowerKind, () => string> = {
   thorns: () => t('thornsPower', { n: THORNS }),
   rage: () => t('ragePower', { n: POWER_STRENGTH }),
   splash: () => t('splashPower'),
+  hex: () => t('hexPower', { n: HEX_WEAK }),
 };
 
 /** Each curse's rules, after the "Curse. Unplayable." lead-in. */
@@ -149,8 +165,18 @@ export const STARTER_DECK: CardId[] = ['strike', 'strike', 'strike', 'strike', '
 /** The Hunter's starting deck of ten: fewer shields, poison knives and dodges. */
 export const HUNTER_DECK: CardId[] = ['strike', 'strike', 'strike', 'venomKnife', 'venomKnife', 'venomKnife', 'dodge', 'dodge', 'dodge', 'defend'];
 
-export const COMMON = (Object.keys(CARDS) as BaseId[]).filter((id) => card(id).rarity === 'common');
-export const RARE = (Object.keys(CARDS) as BaseId[]).filter((id) => card(id).rarity === 'rare');
+/** The Hexer's starting deck of ten: hex bolts that hit harder on a foe with a status, and an Evil Eye to put one on. */
+export const HEXER_DECK: CardId[] = ['strike', 'strike', 'strike', 'defend', 'defend', 'defend', 'hexBolt', 'hexBolt', 'hexBolt', 'evilEye'];
+
+/** The reward pools every hero shares (curses and the heroes' own cards are in neither). */
+export const COMMON = (Object.keys(CARDS) as BaseId[]).filter((id) => card(id).rarity === 'common' && !card(id).hero);
+export const RARE = (Object.keys(CARDS) as BaseId[]).filter((id) => card(id).rarity === 'rare' && !card(id).hero);
+
+/** A hero's reward pool: the shared one, plus the cards only that hero finds. */
+export const poolFor = (hero: string, rarity: 'common' | 'rare'): BaseId[] => [
+  ...(rarity === 'common' ? COMMON : RARE),
+  ...(Object.keys(CARDS) as BaseId[]).filter((id) => card(id).rarity === rarity && card(id).hero === hero),
+];
 
 /** A power's rules, without the "Power." lead-in its card face carries; for the tip of a power in play. */
 export const describePower = (id: CardId) => {
@@ -164,7 +190,8 @@ export function describe(id: CardId) {
   if (c.power) return `${t('powerLead')} ${POWER_TEXT[c.power]()}`;
   if (c.curse) return `${t('curseLead')} ${CURSE_TEXT[c.curse]()}`;
   const parts: string[] = [];
-  if (c.damage) parts.push(t(c.hits ? (c.all ? 'dealHitsAll' : 'dealHits') : c.all ? 'dealAll' : 'deal', { damage: c.damage, hits: c.hits ?? 1 }));
+  if (c.damage && c.hexed) parts.push(t(c.all ? 'dealHexedAll' : 'dealHexed', { damage: c.damage, n: c.hexed }));
+  else if (c.damage) parts.push(t(c.hits ? (c.all ? 'dealHitsAll' : 'dealHits') : c.all ? 'dealAll' : 'deal', { damage: c.damage, hits: c.hits ?? 1 }));
   const statuses = (['weak', 'vulnerable', 'poison'] as const).filter((k) => c[k]).map((k) => `${c[k]} ${t(k)}`);
   if (statuses.length) {
     const list = statuses.reduce((a, b) => t('and', { a, b }));

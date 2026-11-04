@@ -17,6 +17,7 @@ export const trophies = trophySet(
     { id: 'hunter', tier: 'silver', icon: '🏹' },
     { id: 'hollowQueen', tier: 'gold', icon: '👑' },
     { id: 'depthThree', tier: 'gold', icon: '⛓️' },
+    { id: 'spire', tier: 'gold', icon: '🗼' },
     { id: 'depthFive', tier: 'gold', icon: '🌑', hidden: true },
   ],
   { en, de },

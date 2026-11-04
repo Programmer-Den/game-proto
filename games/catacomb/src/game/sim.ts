@@ -1,12 +1,14 @@
+import { dailyRand, finishDaily, loadDaily, startDaily, today } from '../../../../shared/daily';
 import { byDifficulty } from '../../../../shared/settings';
 import { t } from '../i18n';
-import { COMMON, DOUBT_COST, POWER_BLOCK, POWER_STRENGTH, RARE, THORNS, WOUND_HURT, canBeTempered, card, cardName, isCurse, tempered, type BaseId, type CardId } from './cards';
+import { DOUBT_COST, HEX_WEAK, POWER_BLOCK, POWER_STRENGTH, THORNS, WOUND_HURT, canBeTempered, card, cardName, isCurse, poolFor, tempered, type BaseId, type CardId } from './cards';
 import { DEPTH_CURSE, depthFoeHp, DEEP_REST_HEAL, loadBestDepth, saveBestDepth } from './depth';
 import { ENEMIES, type EnemyKind, type StatusKind } from './enemies';
-import { ALTAR_COST, CHEST_CURSE, EVENTS, POOL_COST, POOL_HEAL, SHRINE_CURSE, SHRINE_GOLD } from './events';
+import { ALTAR_COST, BRAZIER_HEAL, CHEST_CURSE, EVENTS, POOL_COST, POOL_HEAL, RELIQUARY_COST, RELIQUARY_MAX_HP, SHRINE_CURSE, SHRINE_GOLD } from './events';
 import { FLASKS, FLASK_BLOCK, FLASK_DRAW, FLASK_ENERGY, FLASK_HEAL, FLASK_IDS, FLASK_POISON, FLASK_PRICE, FLASK_SLOTS, type FlaskId } from './flasks';
-import { HEROES, type HeroId } from './heroes';
-import { ACTS, ACT_FOES, makeMap, reachable } from './map';
+import { HEROES, heroUnlocked, loadHeroWins, saveHeroWins, type HeroId } from './heroes';
+import { ACTS, ACT_FOES, COLUMNS, SPIRE_DEPTH, makeMap, reachable } from './map';
+import { keyedRand, random, setRandom, withRandom } from './rng';
 import { BONE_CHARM_VULNERABLE, EMBER_LANTERN_ENERGY, GOLDEN_IDOL_GOLD, MENDING_MOSS_HEAL, OAK_WARD_BLOCK, RELICS, RELIC_IDS, VENOM_GLAND_POISON, WHETSTONE_DAMAGE, relicText, type RelicId } from './relics';
 import {
   CARD_PRICE,
@@ -37,17 +39,30 @@ import {
 } from './state';
 
 // The rules: moving on the map, playing cards, the foes' turn, statuses, rewards, the campfire,
-// the merchant, mystery rooms and the descent to the next act. Plain TypeScript, with randomness
-// only through Math.random so the playthrough test can seed it.
+// the merchant, mystery rooms, the descent to the next act and the daily crypt. Plain TypeScript,
+// with randomness only through `random` (`rng.ts`: Math.random, so the playthrough test can seed
+// it, or the day's source in the daily crypt).
+
+/** The game's name for its daily record (`catacomb-daily`) and seed. */
+export const DAILY = 'catacomb';
+/** The heroes the daily crypt picks from. */
+const DAILY_HEROES: HeroId[] = ['knight', 'hunter'];
+/** What each room cleared in the daily crypt scores; a win adds the health left. */
+export const DAILY_ROOM_SCORE = 10;
 
 /** A new run, waiting for the hero to be chosen. The Knight's health and deck stand in until then. */
 export function newRun(): GameState {
+  setRandom(null);
   const bestDepth = loadBestDepth();
   return {
     phase: 'hero',
     hero: 'knight',
     depth: bestDepth,
     bestDepth,
+    heroWins: loadHeroWins(),
+    daily: null,
+    dailyRecord: loadDaily(DAILY),
+    dailyScore: null,
     flasks: [],
     act: 1,
     rooms: makeMap(1),
@@ -78,7 +93,7 @@ export function newRun(): GameState {
 export function shuffle<T>(items: T[]) {
   const out = [...items];
   for (let i = out.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(random() * (i + 1));
     [out[i], out[j]] = [out[j], out[i]];
   }
   return out;
@@ -90,7 +105,12 @@ export const hasRelic = (s: GameState, id: RelicId) => s.relics.includes(id);
 
 /** Picks the hero: their health, deck and flask, plus the depth's starting curse, then on to the map. */
 export function chooseHero(s: GameState, hero: HeroId) {
-  if (s.phase !== 'hero') return false;
+  if (s.phase !== 'hero' || !heroUnlocked(s.heroWins, hero)) return false;
+  setOut(s, hero);
+  return true;
+}
+
+function setOut(s: GameState, hero: HeroId) {
   const h = HEROES[hero];
   s.hero = hero;
   s.hp = h.hp;
@@ -99,7 +119,60 @@ export function chooseHero(s: GameState, hero: HeroId) {
   if (s.depth >= 3) s.deck.push(DEPTH_CURSE);
   s.flasks = [h.flask];
   s.phase = 'map';
+}
+
+/** Whether today's daily crypt can still be tried, on the hero panel. */
+export const canStartDaily = (s: GameState) => s.phase === 'hero' && !s.dailyRecord.played;
+
+/** The hero the daily crypt sends out on this day: the same for everyone. */
+export const dailyHero = (day = today()) => DAILY_HEROES[Math.floor(keyedRand(`${day}:hero`)() * DAILY_HEROES.length)];
+
+/**
+ * Sets out on today's daily crypt: the day's hero at depth 0 and on Normal, on a map and with fights
+ * drawn from the day's seed, and card offers seeded by the room, so everyone meets the same run.
+ * It uses up today's try at once, so leaving half way still counts.
+ */
+export function startDailyRun(s: GameState) {
+  if (!canStartDaily(s)) return false;
+  const day = today();
+  s.daily = day;
+  s.dailyRecord = startDaily(DAILY, day);
+  setRandom(dailyRand(DAILY, day));
+  s.depth = 0;
+  s.rooms = makeMap(1);
+  setOut(s, dailyHero(day));
   return true;
+}
+
+/** The daily's score so far: ten for each room cleared, in every act, plus the health left after a win. */
+export const dailyScore = (s: GameState) => ((s.act - 1) * COLUMNS + s.cleared.length) * DAILY_ROOM_SCORE + (s.phase === 'won' ? s.hp : 0);
+
+/** Card offers in the daily come from the room's own seed, the same whatever came before; any other run draws as usual. */
+function offerDraw<T>(s: GameState, fn: () => T): T {
+  return s.daily ? withRandom(keyedRand(`${s.daily}:offer:${s.act}:${s.at}`), fn) : fn();
+}
+
+/** The act whose boss ends the run: the Hollow Queen's, or from SPIRE_DEPTH down the Bone Spire's (never in the daily, at depth 0). */
+export const lastAct = (s: GameState) => (s.depth >= SPIRE_DEPTH ? ACTS + 1 : ACTS);
+
+/** The run just ended: saves the daily's score, or what the win means for the heroes and the depths. */
+function endRun(s: GameState) {
+  if (s.daily) {
+    if (s.dailyScore !== null) return;
+    s.dailyScore = dailyScore(s);
+    s.dailyRecord = finishDaily(DAILY, s.dailyScore, s.daily);
+    return;
+  }
+  if (s.phase !== 'won') return;
+  // The last boss falls: the next depth opens, and this hero's best win is kept.
+  if (s.depth + 1 > s.bestDepth) {
+    s.bestDepth = s.depth + 1;
+    saveBestDepth(s.bestDepth);
+  }
+  if (s.depth > s.heroWins[s.hero]) {
+    s.heroWins = { ...s.heroWins, [s.hero]: s.depth };
+    saveHeroWins(s.heroWins);
+  }
 }
 
 /** Sets the depth to delve to, between 0 and the best unlocked, while choosing the hero. */
@@ -136,7 +209,7 @@ function addFlask(s: GameState, id: FlaskId) {
 
 /** A random flask, left behind by an elite or a boss; none when the slots are full. */
 function grantFlask(s: GameState) {
-  const id = FLASK_IDS[Math.floor(Math.random() * FLASK_IDS.length)];
+  const id = FLASK_IDS[Math.floor(random() * FLASK_IDS.length)];
   return addFlask(s, id) ? id : null;
 }
 
@@ -162,7 +235,7 @@ function enterRoom(s: GameState, i: number) {
   } else if (room.kind === 'treasure') {
     offerReward(s, true);
   } else if (room.kind === 'shop') {
-    s.shop = makeShop(s);
+    s.shop = offerDraw(s, () => makeShop(s));
     s.phase = 'shop';
   } else if (room.kind === 'event') {
     s.phase = 'event';
@@ -181,7 +254,8 @@ function startFight(s: GameState, foes: EnemyKind[]) {
     turn: 0,
     enemies: foes.map((kind) => {
       // Foes are a quarter weaker on Easy and 30% tougher on Hard, and tougher again down the depths.
-      const hp = Math.round(ENEMIES[kind].hp * byDifficulty(0.75, 1, 1.3) * depthFoeHp(s.depth));
+      // The daily crypt is always on Normal, so every player meets the same foes.
+      const hp = Math.round(ENEMIES[kind].hp * (s.daily ? 1 : byDifficulty(0.75, 1, 1.3)) * depthFoeHp(s.depth));
       const status = noStatus();
       if (hasRelic(s, 'boneCharm')) status.vulnerable = BONE_CHARM_VULNERABLE;
       return { id: s.nextId++, kind, hp, maxHp: hp, block: 0, strength: 0, status, step: 0, intent: ENEMIES[kind].moves[0], hitMs: 0, actMs: 0 };
@@ -212,6 +286,8 @@ function startTurn(s: GameState) {
     else if (power === 'rage') {
       f.strength += POWER_STRENGTH;
       pop(s, 'hero', t('strengthPop', { n: POWER_STRENGTH }), 'heal');
+    } else if (power === 'hex') {
+      for (const e of f.enemies) applyStatus(s, e.status, e.id, 'weak', HEX_WEAK);
     }
   }
   drawCards(s, HAND_SIZE);
@@ -289,7 +365,7 @@ export function playCard(s: GameState, index: number) {
   if (c.damage) {
     for (let hit = 0; hit < (c.hits ?? 1); hit++) {
       const now = c.all ? [...f.enemies] : f.enemies.slice(0, 1);
-      for (const e of now) damageEnemy(s, e, heroHit(s, c.damage, e));
+      for (const e of now) damageEnemy(s, e, heroHit(s, c.damage + (c.hexed && hexed(e) ? c.hexed : 0), e));
     }
   }
   for (const e of targets) {
@@ -306,6 +382,9 @@ export function playCard(s: GameState, index: number) {
   if (f.enemies.length === 0) clearFight(s);
   return true;
 }
+
+/** Whether a foe is hexed: it has any status on it (the Hexer's cards hit it harder). */
+export const hexed = (e: Enemy) => e.status.weak > 0 || e.status.vulnerable > 0 || e.status.poison > 0;
 
 function clearFight(s: GameState) {
   s.phase = 'cleared';
@@ -367,7 +446,7 @@ function damageHero(s: GameState, amount: number, from?: Enemy) {
 function nextIntent(e: Enemy) {
   const moves = ENEMIES[e.kind].moves;
   const choices = moves.length > 1 ? moves.filter((m) => m !== e.intent) : moves;
-  e.intent = choices[Math.floor(Math.random() * choices.length)];
+  e.intent = choices[Math.floor(random() * choices.length)];
 }
 
 /** Ends the hero's turn: the hand is discarded, the hero's Weak wears off a turn, and the foes act, one at a time. */
@@ -472,6 +551,7 @@ export function tick(s: GameState, dt: number) {
     } else {
       endRound(s);
     }
+    if (s.phase === 'over') endRun(s);
   } else if (s.phase === 'cleared') {
     s.timerMs -= dt;
     if (s.timerMs > 0) return;
@@ -493,13 +573,9 @@ function winFight(s: GameState) {
     return;
   }
   s.cleared.push(s.at!);
-  if (s.act >= ACTS) {
-    // The Hollow Queen falls: the next depth opens, and is saved.
-    if (s.depth + 1 > s.bestDepth) {
-      s.bestDepth = s.depth + 1;
-      saveBestDepth(s.bestDepth);
-    }
+  if (s.act >= lastAct(s)) {
     s.phase = 'won';
+    endRun(s);
     return;
   }
   const relic = grantRelic(s);
@@ -510,7 +586,7 @@ function winFight(s: GameState) {
 
 function offerReward(s: GameState, rare: boolean) {
   s.rewardRare = rare;
-  s.reward = pickSome(rare ? RARE : COMMON, REWARD_CHOICES);
+  s.reward = offerDraw(s, () => pickSome(poolFor(s.hero, rare ? 'rare' : 'common'), REWARD_CHOICES));
   s.flaskWon = null;
   s.phase = 'reward';
 }
@@ -538,7 +614,7 @@ function grantRelic(s: GameState) {
     s.gold += RELIC_GOLD;
     return null;
   }
-  const relic = left[Math.floor(Math.random() * left.length)];
+  const relic = left[Math.floor(random() * left.length)];
   s.relics.push(relic);
   return relic;
 }
@@ -605,7 +681,7 @@ function temperRandom(s: GameState, n: number) {
   for (let k = 0; k < n; k++) {
     const plain = s.deck.map((id, i) => (canBeTempered(id) ? i : -1)).filter((i) => i >= 0);
     if (plain.length === 0) break;
-    const i = plain[Math.floor(Math.random() * plain.length)];
+    const i = plain[Math.floor(random() * plain.length)];
     s.deck[i] = tempered(s.deck[i]);
     names.push(cardName(s.deck[i]));
   }
@@ -624,8 +700,8 @@ function makeShop(s: GameState) {
   const relics = shuffle(RELIC_IDS.filter((r) => !hasRelic(s, r))).slice(0, SHOP_RELICS);
   return {
     cards: [
-      ...shuffle(COMMON).slice(0, SHOP_CARDS.common).map((id) => ware<BaseId>(id, CARD_PRICE.common)),
-      ...shuffle(RARE).slice(0, SHOP_CARDS.rare).map((id) => ware<BaseId>(id, CARD_PRICE.rare)),
+      ...shuffle(poolFor(s.hero, 'common')).slice(0, SHOP_CARDS.common).map((id) => ware<BaseId>(id, CARD_PRICE.common)),
+      ...shuffle(poolFor(s.hero, 'rare')).slice(0, SHOP_CARDS.rare).map((id) => ware<BaseId>(id, CARD_PRICE.rare)),
     ],
     relics: relics.map((id) => ware(id, RELIC_PRICE)),
     flasks: shuffle(FLASK_IDS).slice(0, SHOP_FLASKS).map((id) => ware(id, FLASK_PRICE)),
@@ -699,6 +775,8 @@ export function canChoose(s: GameState, choice: number) {
   if (!ev || (choice !== 0 && choice !== 1)) return false;
   if (ev === 'altar' && choice === 0) return s.hp > ALTAR_COST;
   if (ev === 'pool' && choice === 1) return s.hp > POOL_COST && s.deck.some(canBeTempered);
+  if (ev === 'brazier' && choice === 0) return s.deck.some(isCurse);
+  if (ev === 'reliquary' && choice === 1) return s.hp > RELIQUARY_COST;
   return true;
 }
 
@@ -732,6 +810,21 @@ export function chooseEvent(s: GameState, choice: number) {
       curse(s, CHEST_CURSE);
       const found = relic ? t('foundRelic', { name: t(RELICS[relic].name), text: relicText(relic) }) : t('foundGold', { n: RELIC_GOLD });
       s.notice = t('chestCurse', { found, curse: cardName(CHEST_CURSE) });
+    }
+  } else if (ev === 'brazier') {
+    if (choice === 0) {
+      const id = s.deck.splice(s.deck.findIndex(isCurse), 1)[0];
+      s.notice = t('brazierBurns', { curse: cardName(id) });
+    } else s.notice = t('healed', { n: heal(s, BRAZIER_HEAL) });
+  } else if (ev === 'reliquary') {
+    if (choice === 0) {
+      s.maxHp += RELIQUARY_MAX_HP;
+      heal(s, RELIQUARY_MAX_HP);
+      s.notice = t('reliquaryBlesses', { n: RELIQUARY_MAX_HP });
+    } else {
+      hurt(RELIQUARY_COST);
+      const relic = grantRelic(s);
+      s.notice = relic ? t('foundRelic', { name: t(RELICS[relic].name), text: relicText(relic) }) : t('foundGold', { n: RELIC_GOLD });
     }
   } else if (choice === 0) {
     const healed = heal(s, POOL_HEAL);

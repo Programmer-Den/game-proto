@@ -71,6 +71,21 @@ const SHIELD = [
 ];
 
 const CARD_ICONS: Record<Icon, string[]> = {
+  // An evil eye, green iris in a purple lid, for the Hexer's cards.
+  eye: [
+    '............',
+    '....pppp....',
+    '..ppPPPPpp..',
+    '.pPqqqqqqPp.',
+    'pPqclllLcqPp',
+    'pqcllelllcqp',
+    'pqclleelLcqp',
+    'pPqcllllcqPp',
+    '.pPqqqqqqPp.',
+    '..ppPPPPpp..',
+    '....pppp....',
+    '............',
+  ],
   sword: SWORD,
   shield: SHIELD,
   // A short knife dripping venom (the Hunter's Venom Knife).

@@ -2,9 +2,10 @@ import type { HowToPlay } from '../../../shared/howToPlay';
 import { byLanguage } from '../../../shared/i18n';
 
 const en: HowToPlay = {
-  goal: 'Lead your hero through the Crypt and the Sunken Tombs to beat the Hollow Queen. The run ends if your health reaches zero.',
+  goal: 'Lead your hero through the Crypt and the Sunken Tombs to beat the Hollow Queen (and from depth 3, up the Bone Spire to the Marrow Tyrant). The run ends if your health reaches zero.',
   controls: [
-    { input: 'Tap a hero', action: 'Set out as the Knight or the Hunter (< and > pick the depth once one is open)' },
+    { input: 'Tap a hero', action: 'Set out as the Knight, the Hunter or the Hexer once unlocked (< and > pick the depth once one is open)' },
+    { input: 'Tap Daily crypt', action: "Set out on the day's run, the same for everyone, once a day" },
     { input: 'Tap a lit room', action: 'Walk there and go in' },
     { input: 'Tap a card in hand', action: 'Play it, if you have the energy for it' },
     { input: 'Tap a flask', action: 'Drink it on your turn, for no energy' },
@@ -27,13 +28,17 @@ const en: HowToPlay = {
     'Weak cuts attacks by a quarter, Vulnerable makes attacks hit harder, and Poison hurts each turn.',
     'Elites are tougher and can add curse cards to your deck, but drop rare cards and a flask.',
     'Beating the Hollow Queen opens the next depth, a harder run with one more rule.',
+    'From depth 3 the Hollow Queen is not the end: climb the Bone Spire and beat the Marrow Tyrant to win.',
+    'Win at depth 2 with both the Knight and the Hunter to unlock the Hexer, whose cards hit foes with a status harder.',
+    'The daily crypt scores 10 for every room cleared, plus the health left if you beat the Hollow Queen.',
   ],
 };
 
 const de: HowToPlay = {
-  goal: 'Führe deinen Helden durch die Gruft und die versunkenen Gräber und besiege die Hohle Königin. Der Lauf endet, wenn dein Leben auf null fällt.',
+  goal: 'Führe deinen Helden durch die Gruft und die versunkenen Gräber und besiege die Hohle Königin (ab Tiefe 3 auch den Knochenturm hinauf bis zum Marktyrannen). Der Lauf endet, wenn dein Leben auf null fällt.',
   controls: [
-    { input: 'Einen Helden antippen', action: 'Als Ritter oder Jäger aufbrechen (< und > wählen die Tiefe, sobald eine offen ist)' },
+    { input: 'Einen Helden antippen', action: 'Als Ritter, Jäger oder, sobald freigeschaltet, als Hexer aufbrechen (< und > wählen die Tiefe, sobald eine offen ist)' },
+    { input: 'Tägliche Gruft antippen', action: 'Zum Lauf des Tages aufbrechen, für alle gleich, einmal am Tag' },
     { input: 'Einen leuchtenden Raum antippen', action: 'Dorthin gehen und eintreten' },
     { input: 'Eine Karte auf der Hand antippen', action: 'Sie spielen, wenn du genug Energie hast' },
     { input: 'Einen Trank antippen', action: 'Ihn in deinem Zug trinken, ohne Energie' },
@@ -56,6 +61,9 @@ const de: HowToPlay = {
     'Schwäche senkt Angriffe um ein Viertel, Verwundbar lässt Angriffe härter treffen, und Gift schadet jeden Zug.',
     'Eliten sind zäher und können Fluchkarten in dein Deck legen, lassen aber seltene Karten und einen Trank fallen.',
     'Wer die Hohle Königin besiegt, öffnet die nächste Tiefe: einen härteren Lauf mit einer Regel mehr.',
+    'Ab Tiefe 3 ist die Hohle Königin nicht das Ende: Steig den Knochenturm hinauf und besiege den Marktyrannen.',
+    'Gewinne auf Tiefe 2 mit dem Ritter und mit dem Jäger, um den Hexer freizuschalten, dessen Karten Feinde mit Zustand härter treffen.',
+    'Die tägliche Gruft gibt 10 Punkte für jeden geschafften Raum, dazu das übrige Leben, wenn du die Hohle Königin besiegst.',
   ],
 };
 
