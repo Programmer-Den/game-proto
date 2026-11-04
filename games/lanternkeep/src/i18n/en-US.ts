@@ -10,7 +10,7 @@ const enUS: Partial<Translation<typeof en>> = {
   harbourFestivalTitle: 'The Harbor Festival!',
   boonSub: '{n} nights kept by the sea. The harbor town gives the keep a boon,\nkept in this game and every game after, in both keeps.',
   bigCaskName: 'Harbor cask',
-  festivalText: "{n} nights kept: the whole valley comes\nto see the keep's lanterns.\n\nKeep going here, or set sail for the harbor\ntown and ten nights of its own.",
+  festivalText: "{n} nights kept: the whole valley comes\nto see the keep's lanterns.\n\nKeep going here, set sail for the harbor town,\nor climb to the mountain monastery: ten nights each.",
 };
 
 export default enUS;

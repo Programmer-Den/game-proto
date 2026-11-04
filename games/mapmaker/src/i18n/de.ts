@@ -48,6 +48,8 @@ const de: Translation<typeof en> = {
   inkText: 'Karten bringen 25 % mehr',
   compassName: 'Magnetkompass',
   compassText: 'Zeigt Dörfer und Ruinen im Nebel',
+  sloopName: 'Küstenschaluppe',
+  sloopText: 'Zweite Landung an der fernen Küste',
 
   // Hands: name and card text (the card has room for about 26 characters)
   woodsmanName: 'Holzfäller',
@@ -279,6 +281,39 @@ const de: Translation<typeof en> = {
   expeditionScore: 'Kartiert',
   expeditionRecord: 'Rekord auf dieser Insel: {n} %',
   backToHarbour: 'Zurück zum Hafen',
+
+  // The coastal sloop (MM14)
+  sloopLanding: '{price} · Landung der Schaluppe',
+  sloopLands: 'Die Schaluppe landet an der fernen Küste',
+
+  // Winter isles (MM16)
+  winterKind: '{kind} im Winter',
+  winterSail: '{sail} im Winter',
+  winterNotice: 'Winter: Schnee verdeckt den Boden',
+  underSnow: 'unter Schnee: Kosten unbekannt',
+
+  // Village trade (MM15)
+  tradeHead: 'DORFHANDEL · NÄCHSTE REISE',
+  tradeButton: 'Dorfhandel',
+  tradeOffers: { one: '{n} Dorf bietet Handel', other: '{n} Dörfer bieten Handel' },
+  tradePicked: '{trade} auf der nächsten Reise',
+  tradeNone: 'Kartiere ein Dorf zum Handeln',
+  tradeTitle: 'Dorfhandel',
+  tradeLine: 'Jedes kartierte Dorf handelt einmal für eine Abschrift deiner Karte. Wähle einen Handel für die nächste Reise.',
+  tradeTake: 'Nehmen',
+  tradeTaken: 'Genommen',
+  storesName: 'Vorräte',
+  storesText: '+{n} Vorräte auf der nächsten Reise',
+  guideName: 'Ein Führer',
+  guideText: 'Die ersten {n} Vermessungen der nächsten Reise sind frei, und Schnee verdeckt nichts',
+  rumourName: 'Ein Gerücht',
+  rumourText: 'Markiert das Wunder dieser Insel im Nebel',
+  rumourNext: 'Markiert das Wunder der nächsten Insel im Nebel',
+  rumourDone: 'Das Wunder dieser Insel ist schon gesehen oder markiert',
+  guideAboard: '  ·  FÜHRER: {n} FREI',
+  guideJoins: { one: 'Ein Führer: {n} Vermessung frei', other: 'Ein Führer: {n} Vermessungen frei' },
+  storesJoin: 'Vorräte aus dem Dorf: +{n}',
+  rumourHint: 'Wunder?',
 };
 
 export default de;

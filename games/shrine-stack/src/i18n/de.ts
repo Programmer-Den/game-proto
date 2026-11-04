@@ -87,9 +87,9 @@ const de: Translation<typeof en> = {
 
   // The daily shrine
   dailyName: 'Tagesschrein',
-  dailyReady: 'Heute für alle gleicher Schutzherr und Steine · Rekord {best} · Serie {streak}',
-  dailyUnfinished: 'Heute gespielt: komm morgen wieder',
-  dailyDone: { one: 'Heute: {n} Ebene · Serie {streak}: komm morgen wieder', other: 'Heute: {n} Ebenen · Serie {streak}: komm morgen wieder' },
+  dailyReady: 'Ein Versuch heute · Rekord {best} · Serie {streak}',
+  dailyUnfinished: 'Gespielt: komm morgen wieder',
+  dailyDone: { one: 'Heute: {n} Ebene · Serie {streak}', other: 'Heute: {n} Ebenen · Serie {streak}' },
   dailyBest: 'Tagesrekord {best} · Serie {streak}',
 
   // Panel
@@ -178,9 +178,60 @@ const de: Translation<typeof en> = {
   bestOn: { one: 'Rekord ({site}): {n} Ebene.', other: 'Rekord ({site}): {n} Ebenen.' },
   crownedText: 'Alle {tiers} Ebenen stehen,\n{balanced} davon ausgewogen, für {favour} Gunst.',
   keepAsk: 'Weiter in den windigen Himmel bauen?',
+
+  // Weather (SS15): name and what it does
+  clearName: 'Klarer Himmel',
+  clearText: 'Kein Wetter in diesem Lauf',
+  rainName: 'Regen',
+  rainText: 'Nicht perfekte Steine rutschen {n} Pixel weiter ab · x{mult} Gunst',
+  snowName: 'Schnee',
+  snowText: 'Der Schwung wird langsamer und wieder schneller · x{mult} Gunst',
+  weatherLine: '{weather}: {text}',
+  weatherTag: '{weather} · x{mult} Gunst',
+
+  // The pilgrims' village (SS14)
+  innName: 'Gasthaus',
+  innText: 'Jeder Tempel beginnt mit einem Segen gratis.',
+  wellName: 'Brunnen',
+  wellText: 'Jeder Tempel beginnt mit {n} Gunst.',
+  yardName: 'Steinmetzhof',
+  yardText: 'Der erste Stein ist {n} breiter.',
+  villageName: 'Dorf',
+  villageNote: { one: '{n} Pilger · {favour} Gunst', other: '{n} Pilger · {favour} Gunst' },
+  villageEmpty: 'Kröne erst einen Schrein',
+  villageTitle: 'Das Pilgerdorf',
+  villageSub: {
+    one: '{n} Pilger hat sich angesiedelt · {favour} Gunst zum Ausgeben',
+    other: '{n} Pilger haben sich angesiedelt · {favour} Gunst zum Ausgeben',
+  },
+  villageHint: 'Jede Krone bringt Pilger und die Gunst des Tempels. Nicht im Tagesschrein oder Rennen.',
+  buildingBuilt: 'Gebaut',
+  buildingCost: 'Bauen: {n} Gunst',
+  back: 'Zurück',
+  pilgrimsArrive: {
+    one: '{n} Pilger siedelt sich unten an, mit {favour} Gunst.',
+    other: '{n} Pilger siedeln sich unten an, mit {favour} Gunst.',
+  },
+  innGift: 'Das Gasthaus gibt dir {blessing} mit',
+
+  // Two-player race (SS16)
+  raceName: 'Rennen',
+  raceNote: '2 Spieler · ein Bildschirm',
+  raceLeft: 'Links: diese Seite tippen oder A',
+  raceRight: 'Rechts: diese Seite tippen oder L',
+  raceTier: 'Ebene {tier}/{goal}',
+  raceGo: 'Rennen bis Ebene {goal}: zuerst krönen oder stehen bleiben, wenn der andere danebenwirft',
+  raceWinLeft: 'Der linke Tempel gewinnt!',
+  raceWinRight: 'Der rechte Tempel gewinnt!',
+  raceDraw: 'Beide Tempel fielen zugleich',
+  raceDrawText: 'Unentschieden: noch ein Rennen?',
+  raceCrowned: 'Zuerst gekrönt, mit {tiers} Ebenen.',
+  raceLast: 'Der andere Tempel fiel zuerst, bei {tiers} Ebenen.',
+  raceAgain: 'Neues Rennen',
+  raceBack: 'Zurück',
 };
 
 export default de;
 
 /** Texts that are the same in German, so the translation check doesn't flag them. */
-export const keepEnglish: (keyof typeof en)[] = ['title', 'basaltName', 'blessingCount', 'bought'];
+export const keepEnglish: (keyof typeof en)[] = ['title', 'basaltName', 'blessingCount', 'bought', 'weatherLine'];

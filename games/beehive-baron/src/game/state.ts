@@ -9,7 +9,10 @@ import { ORDER_GAP_MS, type Order } from './orders';
 import { SEASONS, SEASON_MS, SUMMER_NECTAR, WINTER_EAT_MS, YEAR_MS, type Season } from './seasons';
 import { ESTATE_HIVES, ORCHARD_SPRING_NECTAR, RIVERSIDE_SUMMER_RIPEN, plotOf } from './estate';
 import { BUSY_NECTAR, MAX_HIVES, QUEEN_IDS, SWARM_MS, type Queen } from './swarm';
+import { RARES, RARE_KINDS, noBeds, noRare, rarePairs, type Bloom, type Rare } from './garden';
 import { rested, unwilted } from './tired';
+import { WORKSHOP_FROM, noWares, type Commission, type Ware } from './workshop';
+import { warrantBonus, type RoyalAsk } from './warrant';
 import type { UpgradeId } from './upgrades';
 import { WASP_GAP, WASP_STEAL_MS, type Wasp } from './wasps';
 
@@ -143,6 +146,17 @@ export interface GameState {
   combs: Record<Kind, number>;
   /** This season's buyer's book: the towns' asks, or empty before `BOOK_FROM` jars are sold. */
   book: Ask[];
+  /** The garden's beds (`BEDS`), each with its flower or empty, and the game time since its rare pairs last gave honey. */
+  garden: (Bloom | null)[];
+  gardenMs: number;
+  /** Jars of the garden's rare honey, by kind, sold with the jars. */
+  rare: Record<Rare, number>;
+  /** Candles and tins of polish made in the workshop, and this season's commissions from the church and the manor. */
+  wares: Record<Ware, number>;
+  commissions: Commission[];
+  /** Years the royal warrant has been kept in a row, and this autumn's ask from the crown (null outside autumn). */
+  warrant: number;
+  royal: RoyalAsk | null;
   nextId: number;
   /** Things that just happened, for the scene to animate; it empties the list as it draws them. */
   events: GameEvent[];
@@ -189,7 +203,15 @@ export type GameEvent =
   | { kind: 'bred'; trait: Trait; rank: number }
   | { kind: 'cut'; slot: number }
   | { kind: 'book' }
-  | { kind: 'supplied'; ask: number; coins: number };
+  | { kind: 'supplied'; ask: number; coins: number }
+  | { kind: 'planted'; bed: number; bloom: Bloom }
+  | { kind: 'bloomed'; jars: number }
+  | { kind: 'made'; ware: Ware }
+  | { kind: 'commissions' }
+  | { kind: 'fulfilled'; ware: Ware; coins: number }
+  | { kind: 'royal' }
+  | { kind: 'warranted'; years: number }
+  | { kind: 'warrant-lost' };
 
 /** What is kept between visits: the comb, the coins, the jars, the wax, the bees, the upgrades and the meadows. */
 export interface Progress {
@@ -223,6 +245,12 @@ export interface Progress {
   breedPending: number;
   combs: Record<Kind, number>;
   book: Ask[];
+  garden: (Bloom | null)[];
+  rare: Record<Rare, number>;
+  wares: Record<Ware, number>;
+  commissions: Commission[];
+  warrant: number;
+  royal: RoyalAsk | null;
   /** The orchard contract whose bees are away (paid up front), so a reload can't bring them home early; null if none. */
   lent: { bees: number; leftMs: number } | null;
   /** When the hive was last seen (`Date.now()`), for the nectar gathered while away; 0 if never. */
@@ -257,6 +285,12 @@ export const freshProgress = (): Progress => ({
   breedPending: 0,
   combs: noJars(),
   book: [],
+  garden: noBeds(),
+  rare: noRare(),
+  wares: noWares(),
+  commissions: [],
+  warrant: 0,
+  royal: null,
   lent: null,
   seen: 0,
 });
@@ -324,6 +358,13 @@ export function newHive(progress: Progress): GameState {
     breedPending: Math.max(0, Math.floor(progress.breedPending) || 0),
     combs: { ...noJars(), ...progress.combs },
     book: progress.sold >= BOOK_FROM ? progress.book.map((a) => ({ ...a })) : [],
+    garden: noBeds().map((_, i) => progress.garden[i] ?? null),
+    gardenMs: 0,
+    rare: { ...noRare(), ...progress.rare },
+    wares: { ...noWares(), ...progress.wares },
+    commissions: progress.sold >= WORKSHOP_FROM ? progress.commissions.map((c) => ({ ...c })) : [],
+    warrant: Math.max(0, Math.floor(progress.warrant) || 0),
+    royal: progress.royal ? { ...progress.royal } : null,
     nextId: count + 1,
     events: [],
   };
@@ -379,6 +420,12 @@ export const progressOf = (s: GameState): Progress => ({
   breedPending: s.breedPending,
   combs: { ...s.combs },
   book: s.book.map((a) => ({ ...a })),
+  garden: [...s.garden],
+  rare: { ...s.rare },
+  wares: { ...s.wares },
+  commissions: s.commissions.map((c) => ({ ...c })),
+  warrant: s.warrant,
+  royal: s.royal ? { ...s.royal } : null,
   lent: s.contract?.phase === 'lent' ? { bees: s.contract.bees, leftMs: s.contract.leftMs } : null,
   seen: Date.now(),
 });
@@ -404,9 +451,11 @@ export const cellarValue = (s: GameState) => meadReady(s).reduce((n, c) => n + c
 export const caskDone = (c: Cask) => 1 - c.agingMs / CASK_MS;
 /** This year's fair's points, over the classes it judges; null while a class is missing. */
 export function fairTotal(s: GameState) {
-  const classes = classesFor(s.fairs);
+  const classes = fairClasses(s);
   return classes.every((k) => s.fair[k] !== null) ? classes.reduce((n, k) => n + (s.fair[k] ?? 0), 0) : null;
 }
+/** The classes this year's fair judges: `classesFor` its number, and rare honey while the garden has a rare bloom. */
+export const fairClasses = (s: GameState) => classesFor(s.fairs, rarePairs(s.garden).length > 0);
 /** Whether the county fair is held: every meadow is open. */
 export const fairOpen = (s: GameState) => s.meadows >= MEADOWS.length;
 /** The summer game time the fair opens at: `FAIR_MS` before autumn. */
@@ -472,7 +521,7 @@ export function withWax(s: GameState, price: number) {
 export const room = (s: GameState, kind: Kind = s.forage) =>
   s.cells.reduce((n, c) => n + (isHoney(c) && c.phase === 'filling' && (c.kind === null || c.kind === kind) ? CELL_CAP - c.nectar : 0), 0);
 /** What a jar of a kind is worth before the market's demand: its price, the Sunflower Ridge and the comb bonus; the buyer's book prices from it. */
-export const basePrice = (s: GameState, kind: Kind) => HONEY[kind].price + (s.meadows >= 2 ? SUNFLOWER_COINS : 0) + combBonus(s);
+export const basePrice = (s: GameState, kind: Kind) => Math.round((HONEY[kind].price + (s.meadows >= 2 ? SUNFLOWER_COINS : 0) + combBonus(s)) * (1 + warrantBonus(s.warrant)));
 /** How long a wasp sits on a cell before its honey is gone: longer with the Wasp wardens bred in. */
 export const stealMs = (s: GameState) => WASP_STEAL_MS * (1 + WARDEN_STEAL * s.breeds.wardens);
 /** Every jar on the shelf, of any kind. */
@@ -512,9 +561,14 @@ export const sharedEdges = (s: GameState) =>
 export const combBonus = (s: GameState) => sharedEdges(s).length;
 /**
  * What one jar of a kind sells for now: its price (half again while the market wants it), plus the
- * Sunflower Ridge, plus the comb bonus.
+ * Sunflower Ridge, plus the comb bonus, all raised by the royal warrant's years.
  */
 export const jarPrice = (s: GameState, kind: Kind = 'clover') =>
-  Math.round(HONEY[kind].price * (demand(s) === kind ? DEMAND : 1)) + (s.meadows >= 2 ? SUNFLOWER_COINS : 0) + combBonus(s);
-/** What every jar on the shelf, and every cask of ready mead, sells for now. */
-export const shelfValue = (s: GameState) => KINDS.reduce((n, k) => n + s.jars[k] * jarPrice(s, k), 0) + cellarValue(s);
+  Math.round((HONEY[kind].price * (demand(s) === kind ? DEMAND : 1) + (s.meadows >= 2 ? SUNFLOWER_COINS : 0) + combBonus(s)) * (1 + warrantBonus(s.warrant)));
+/** What a jar of the garden's rare honey sells for: its multiple of a heather jar's worth before the market. */
+export const rarePrice = (s: GameState, rare: Rare) => Math.round(basePrice(s, 'heather') * RARES[rare].mult);
+/** Jars of rare honey kept, of every kind. */
+export const rareCount = (s: GameState) => RARE_KINDS.reduce((n, r) => n + s.rare[r], 0);
+/** What every jar on the shelf, every jar of rare honey and every cask of ready mead sells for now. */
+export const shelfValue = (s: GameState) =>
+  KINDS.reduce((n, k) => n + s.jars[k] * jarPrice(s, k), 0) + RARE_KINDS.reduce((n, r) => n + s.rare[r] * rarePrice(s, r), 0) + cellarValue(s);

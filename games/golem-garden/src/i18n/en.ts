@@ -3,19 +3,22 @@
  * `shared/i18n.ts`). The catalogues in `game/` name their texts by these keys.
  */
 const en = {
-  // Golems: name, name inside a sentence, the tall seed card's two lines and what it does
+  // Golems: name, name inside a sentence and what it does
   pebbleName: 'Pebble golem',
   pebbleLower: 'pebble golem',
-  pebbleCard: 'Pebble\ngolem',
   pebbleBlurb: 'Throws rocks',
   mossName: 'Moss golem',
   mossLower: 'moss golem',
-  mossCard: 'Moss\ngolem',
   mossBlurb: 'Slows pests',
   thornName: 'Thorn golem',
   thornLower: 'thorn golem',
-  thornCard: 'Thorn\ngolem',
   thornBlurb: 'Pricks all near',
+  fungusName: 'Fungus golem',
+  fungusLower: 'fungus golem',
+  fungusBlurb: 'Poison spores',
+  bellName: 'Bell golem',
+  bellLower: 'bell golem',
+  bellBlurb: 'Stuns all near',
   hedgeName: 'Hedge',
 
   // Level 3 forms: name and what it does
@@ -31,6 +34,14 @@ const en = {
   brambleBlurb: 'reaches 60px further',
   barbName: 'Barb',
   barbBlurb: 'deeper pricks, pierce armour',
+  puffballName: 'Puffball',
+  puffballBlurb: 'wider spore patches that last longer',
+  blightName: 'Blight',
+  blightBlurb: 'spores poison twice as hard',
+  chimeName: 'Chime',
+  chimeBlurb: 'rings far more often',
+  gongName: 'Gong',
+  gongBlurb: 'longer stuns, harder rings, 20px further',
 
   // Targeting: the Aim chip's name and what the golem aims at
   firstName: 'First',
@@ -60,6 +71,8 @@ const en = {
   noHedgesName: 'No hedges',
   doubleCrowsName: 'Double crows',
   leanStartName: 'Lean start',
+  mossThornName: 'Only Moss and Thorn',
+  doublePestsName: 'Double pests',
 
   // Gardens: name and card text
   meadowName: 'Meadow',
@@ -86,7 +99,6 @@ const en = {
   // Seed panel, preview and wave button
   seeds: 'Seeds',
   bloomsAfter: 'Blooms after',
-  bloomWaves: { one: '{n} wave', other: '{n} waves' },
   previewNext: 'Next: wave {n}',
   previewQueen: 'Wave {n}: Queen Slug!',
   startWave: 'Start wave {n}',
@@ -238,6 +250,48 @@ const en = {
     one: 'You cleared {waves} of {total} waves with {n} leaf kept: {score} points.\nBest daily: {best}. Days in a row: {streak}. A new plot grows tomorrow; pick a garden to play on.',
     other: 'You cleared {waves} of {total} waves with {n} leaves kept: {score} points.\nBest daily: {best}. Days in a row: {streak}. A new plot grows tomorrow; pick a garden to play on.',
   },
+
+  // Fungus and Bell golems (GG17)
+  lockedWave: 'Clear wave {n}',
+  lockedToUnlock: 'to unlock',
+  golemUnlocked: '{golem} unlocked!',
+
+  // The weekly garden and plots you draw (GG18, GG19)
+  plotName: 'My plot',
+  plotBlurb: 'Drawn by you',
+  gardenTagWeekly: 'Weekly  ·  {garden}',
+  gardenTagPlot: 'My plot {n}',
+  weeklySub: 'week best {best}',
+  plotSub: 'plot best {best}',
+  hintNoHedgesWeek: 'Weekly garden: no hedges here',
+  plotsButton: 'Plots',
+  plotsNote: 'Weekly best: wave {n}',
+  plotsNew: 'Weekly garden and your own',
+  plotsTitle: 'Plots',
+  plotsText: 'The weekly garden is the same for everyone all week: play it as often as you like.\nDraw plots of your own too. Each keeps its own best wave.',
+  weeklyName: 'Weekly garden',
+  weeklyTwist: 'Twist: {twist}',
+  weeklyBest: 'Best this week: wave {n}',
+  weeklyNone: 'No wave cleared this week',
+  plantIt: 'Plant it',
+  slotName: 'My plot {n}',
+  slotEmpty: 'Empty: tap to draw',
+  slotUnfinished: 'Unfinished: tap to draw',
+  plotBest: 'Best: wave {n}',
+  plotNoBest: 'No wave cleared yet',
+  editTag: 'Edit',
+  editorTitle: 'Draw my plot {n}',
+  editorPathHelp: 'Path: start in the first column, then tap each next cell. Its last cell is the Heartwood; tap it again to take it back.',
+  editorSoilHelp: 'Soil: tap grass for a soil bed, where golems grow, or tap a bed to clear it.',
+  toolPath: 'Path',
+  toolSoil: 'Soil',
+  toolClear: 'Clear',
+  editorStatus: 'Path: {path} cells (at least {min})  ·  Soil: {soil} of {max} beds',
+  weeklyBanner: 'Weekly garden: {garden}',
+  weeklyRules: 'Play it as often as you like this week',
+  plotBanner: 'My plot {n}',
+  overTextWeekly: 'Pests ate the Heartwood on wave {wave}. {kills} pests squashed.\nBest this week: wave {best}. Plant the weekly garden again from Plots, or pick a garden.',
+  overTextPlot: 'Pests ate the Heartwood on wave {wave}. {kills} pests squashed.\nBest on this plot: wave {best}. Plant it again from Plots, or pick a garden.',
 };
 
 export default en;

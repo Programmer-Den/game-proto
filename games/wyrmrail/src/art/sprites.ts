@@ -18,6 +18,7 @@ export function bakeSprites(scene: Phaser.Scene) {
   bakePixelArt(scene, 'heart-empty', HEART.map((r) => r.replace(/[rp]/g, 'x')), ICON_COLORS, 3, INK);
   bakePixelArt(scene, 'food', FOOD, ICON_COLORS, 2, INK);
   bakePixelArt(scene, 'depot', DEPOT, ICON_COLORS, 2, INK);
+  bakePixelArt(scene, 'warehouse', WAREHOUSE, ICON_COLORS, 2, INK);
 }
 
 /** Every wyrm texture is this size, with the ground point under the part at `x`, `y`. */
@@ -254,6 +255,7 @@ const CARGO_ICONS: Record<Cargo, string[]> = {
   wool: ['.......', '.nNnNn.', 'nNnnnNn', 'nnNnNnn', 'NnnNnnN', '.nNnnN.', '..x.x..'],
   peat: ['.......', '.bbbbb.', '.DbDbD.', 'bbbbbbb', 'DbDbDbD', 'bbbbbbb', '.DDDDD.'],
   salt: ['...I...', '..IcI..', '..III..', '.ttttt.', 'tnnnnnt', 'tnnnnnt', '.ttttt.'],
+  wares: ['..GGG..', '...G...', 'WWWGWWW', 'wwwGwwD', 'GGGGGGG', 'wwwGwwD', 'DDDGDDD'],
   passengers: ['.s...s.', 'sss.sss', '.s...s.', 'hhh.ddd', 'hhh.ddd', '.hh.dd.', '.h...d.'],
 };
 
@@ -262,6 +264,9 @@ const FOOD = ['....mm.', '...mMmm', '..mmmmm', '..mmmm.', '.Bm....', 'BB.....', 
 
 /** A village's depot (WR11): a wooden goods shed. */
 const DEPOT = ['...D...', '..DWD..', '.DWWWD.', 'DDDDDDD', '.wwDww.', '.wwDww.', '.wwDww.'];
+
+/** A town's warehouse (WR18): a wide stone store with a gold door. */
+const WAREHOUSE = ['..kkkkk..', '.kOOOOOk.', 'kOOOOOOOk', 'kkkkkkkkk', '.OOGGGOO.', '.OOGLGOO.', '.OOGGGOO.'];
 
 const COIN = ['.GGG.', 'GLGGG', 'GLGGG', 'GGGGG', '.GGG.'];
 const HEART = ['.rr.rr.', 'rpprrrr', 'rprrrrr', '.rrrrr.', '..rrr..', '...r...'];

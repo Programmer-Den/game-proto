@@ -18,7 +18,7 @@ a bounty each wave, a side goal that pays half the wave's loot on top. From wave
 carry shore forts that shell you, and the harbor charts two courses for the next wave; from wave 7
 every third wave sends a merchantman with you to see safe to an island. A prize can be kept as a
 consort that sails on with you from wave to wave, and late drafts offer the second rank of a perk; wave 20 is the pirate haven, three forts and the admiral's
-flagship, and sinking her wins the campaign and opens the Storm Reaches, 20 waves of squalls and reefs ending with the Tempest. Five named enemy captains sail in their own waves, run when beaten and come back with a bounty; sinking all five over any runs fills the captain's log. Once a day the end card offers the daily voyage, the same seeded run for everyone. When your ship goes down, the Admiralty awards
+flagship, and sinking her wins the campaign and opens the Storm Reaches, 20 waves of squalls and reefs ending with the Tempest. Five named enemy captains sail in their own waves, run when beaten and come back with a bounty; sinking all five over any runs fills the captain's log. Once a day the end card offers the daily voyage, the same seeded run for everyone. The harbor also sells cargo to sell dearer at the next port, if you dare sail laden; from wave 9 a rare wave brings a sea serpent or a kraken; and every fourth wave sails at night, lit only by lanterns, gun flashes and your flares. When your ship goes down, the Admiralty awards
 medals that buy a head start for the next run, which can sail a different ship.
 
 ![Holding the starboard guns: the arc is washed in ochre and the charge fills its rim and the ring
@@ -35,6 +35,8 @@ round the held button, while a brig steers round the island on a dotted course](
 | Tap a card of the prize draft (as the harbor opens) | Keep that perk for the rest of the run |
 | Tap a row at the harbor | Buy that upgrade, patch the hull, hire sailors or keep a prize as a consort |
 | Tap **Port** or **Starboard** under the harbor's ledger | Load that side with the next kind of shot |
+| Tap **Rum**, **Silk** or **Spice** on the harbor's trade row | Buy a crate of cargo to sell at the next port |
+| Tap **Flare** (foot of the screen) or F on a night wave | Light the whole sea for six seconds |
 | **Set sail**, or from wave 6 **Merchant lane** or **Hunter patrol** | Leave the harbor for the next wave, on the course chosen |
 | Tap **Scuttle the prize** (under the bounty) | Sink your newest prize for twice its loot |
 | Tap a ship and rows on the "Sunk!" panel, then **Sail again** | Choose the ship for the next run and spend the Admiralty's medals on starting upgrades |
@@ -229,6 +231,29 @@ On a phone, one thumb can hold a wheel while the other holds a fire control.
    gold plundered (the score so far stands in the top bar). It earns no medals and keeps no best
    wave; the end card shows the score, the best and the days in a row, and the button reads
    "Today" with the score until tomorrow.
+25. **Trade.** The harbor's last row sells cargo by the crate: rum (6 gold plus 1 a wave), silk
+   (12 plus 2) and spice (20 plus 3), each button saying what a crate fetches at the next port
+   (half again for rum, 60% more for silk, 75% more for spice). The hold carries six crates, shown
+   in the top bar, and everything in it is sold as the next harbor opens ("Cargo sold" in the
+   news). The risk: a laden ship turns slower, by up to 30% with a full hold, and every two crates
+   bring a raider hunting you early in the next wave (a sloop, and from wave 8 every second one a
+   brig), named on the wave's banner.
+26. **Sea beasts.** On wave 9 a sea serpent rises among a smaller fleet (the size of a wave three
+   earlier), on wave 17 a kraken, and every eighth wave after by turns. The beast stays under the
+   sea, out of reach of shot: every second or so a dark swirl ringed in rust marks where one of its
+   arms will rise, where you'll be if you hold your course, and 1.4 seconds later the arm slaps up
+   for 12 (serpent) or 14 (kraken) to any of your ships under it. Every few seconds its head comes
+   up for three seconds, 150 away off your port or starboard beam, inside even an uncharged
+   broadside's reach: that's when to fire. Sinking it pays 120 or 150 gold plus the wave's bonus
+   and hangs its head on the harbor wall, kept between runs and shown at the harbor beside the
+   perks; the harbor's news says so the wave you sink it.
+27. **Night waves.** Waves 4, 8, 12, 16 and every fourth after (never the haven, the Tempest or a
+   beast's wave) sail at night. Dusk falls during the banner, and the sea goes dark but for your
+   own lanterns' glow round the ship. An enemy shows only by the lantern at her stern and, for a
+   moment, the flash of her guns; her hull bar, name and the arrows at the screen's edge show only
+   while you can see her. Your crews only train their guns on a ship they can see (within your
+   lanterns' light, lit by her own guns' flash, or under a flare), otherwise they fire straight
+   out. Three flares a night (the **Flare** button or F) each light the whole sea for six seconds.
 
 ![From wave 6 the harbor charts two courses, and a brig prize can be kept as a consort](docs/screenshots/harbor-courses.webp)
 
@@ -255,6 +280,14 @@ On a phone, one thumb can hold a wheel while the other holds a fire control.
 ![The haven razed: the campaign won, with the Daily voyage, Sail again and Storm Reaches buttons](docs/screenshots/haven-won.webp)
 
 ![The Storm Reaches: a squall's rain sweeping the chart, the wind swung round to the north-east, and reefs ringed with breakers](docs/screenshots/storm-reaches.webp)
+
+![The harbor's trade row: rum, silk and spice by the crate, with the hold four crates full](docs/screenshots/trade.webp)
+
+![A sea serpent's head up off the starboard beam, while one of its coils slaps up beside the ship](docs/screenshots/sea-serpent.webp)
+
+![A kraken's head up beside the ship, and a swirl where its next arm will rise](docs/screenshots/kraken.webp)
+
+![A night wave: the dark round the ship's lanterns, a named captain's ship in their glow, and the Flare button](docs/screenshots/night-wave.webp)
 
 ![Reach 20: the Tempest under grey sails, calling a squall down as her hull falls, the wind rose showing the wind it brings](docs/screenshots/tempest.webp)
 
@@ -310,6 +343,8 @@ astern came over the edge after the ship](docs/screenshots/wrap-around.webp)
 | Admiral's flagship | wave 20 | The haven's last ship: five guns a side, 440 hull, 300 gold. Sinking her wins the campaign |
 | The Tempest | Reach 20 (wave 40) | The Storm Reaches' last ship: five guns a side, 520 hull before the waves' growth, 400 gold. Calls a squall down at two thirds and one third of her hull; sinking her calms the Reaches |
 | Merchantman | Merchant lane waves | No guns; runs from you and gets away after 30 seconds. 40 gold (doubled on the lane). Also the convoy you escort |
+| Sea serpent | wave 9, then every 16th | A sea beast: stays under, raising an arm near you every 1.2 seconds (12 damage), and shows its head off your beam for three seconds at a time. 90 hull before the waves' growth, 120 gold |
+| Kraken | wave 17, then every 16th | The same, with arms every 1.5 seconds for 14 damage. 120 hull before the waves' growth, 150 gold |
 
 Every wave brings one more sloop than the last (out in the Storm Reaches, one more every second wave), and enemy hulls (and forts) get 12% tougher each wave. A named captain's ship is a brig, galleon or mortar ketch half again as sturdy.
 
@@ -388,10 +423,13 @@ All paths are inside `games/broadside/`.
   player's ship from its hull, the upgrades bought, the perks and the wave's order, `sim.ts`
   sails the ships (enemy captains plan their way round islands), charges and fires the
   broadsides, shells from forts and mortars, boards prizes, keeps the crew and runs the harbor,
-  `captains.ts` (the captain's log), `storm.ts` (the Storm Reaches' squalls and reefs) and
+  `captains.ts` (the captain's log), `storm.ts` (the Storm Reaches' squalls and reefs),
+  `trade.ts` (the harbor's cargo), `beasts.ts` (the sea serpent and the kraken), `night.ts` (night
+  waves and flares) and
   `voyage.ts` (the daily voyage's ship, perks and score) hold the loop's later goals, `random.ts`
   is the one source of the rules' randomness (seeded on the daily voyage), and `save.ts` keeps the
-  best wave, the medals, the ship chosen, the captain's log and the best Storm Reaches wave.
+  best wave, the medals, the ship chosen, the captain's log, the best Storm Reaches wave and the
+  harbor wall of sea beasts.
 - `src/scenes/`: `BootScene` paints the textures, `GameScene` draws the chart, follows the ship
   with the camera across the wrapping sea and wires the helm wheels, fire controls and keys to the
   rules, `soundCues.ts` turns what each frame changed into sound and music, `layout.ts` says

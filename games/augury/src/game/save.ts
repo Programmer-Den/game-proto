@@ -1,7 +1,7 @@
 import { MODES, RELICS } from './catalog';
 import { NODES } from './journey';
 import { KINDS, LEVELS } from './kinds';
-import { newProgress, type Progress } from './progress';
+import { MAX_MASTERY, newProgress, type Progress } from './progress';
 import { makeCurrent, type Card, type Run } from './run';
 
 // Augury keeps two keys: the records (per kind and per mode) and the last daily five, and the run
@@ -22,7 +22,9 @@ export function loadProgress(): Progress {
       p.kinds[k].solved = count(rec.solved);
       p.kinds[k].lost = count(rec.lost);
       if (Array.isArray(rec.best)) p.kinds[k].best = LEVELS.map((l) => count(rec.best[l]));
+      p.trials[k] = Math.min(MAX_MASTERY, count(saved.trials?.[k]));
     }
+    if (Array.isArray(saved.ghost)) p.ghost = saved.ghost.filter(Array.isArray).slice(0, 5).map((m: unknown[]) => [count(m[0]), count(m[1])] as [number, number]);
     for (const key of ['endless', 'blitz', 'daily', 'draft'] as const) p.best[key] = count(saved.best?.[key]);
     if (saved.daily && Number.isFinite(saved.daily.day)) p.daily = { day: saved.daily.day, score: count(saved.daily.score) };
     if (saved.weekly && Number.isFinite(saved.weekly.week)) p.weekly = { week: saved.weekly.week, best: count(saved.weekly.best) };
@@ -87,6 +89,10 @@ export function loadRun(progress: Progress): Run | null {
     // A boss in play starts again from its first half.
     const card = run.current?.pair ?? run.current?.card;
     run.current = isCard(card) ? makeCurrent(run, card) : null;
+    // Runs saved before the daily five's ghost have neither list.
+    const marks = (v: unknown) => (Array.isArray(v) ? v.filter((m) => Array.isArray(m) && m.every(Number.isFinite)) : []);
+    run.marks = marks(run.marks);
+    run.ghost = marks(run.ghost);
     return { ...run, progress, events: [] };
   } catch {
     clearRun();

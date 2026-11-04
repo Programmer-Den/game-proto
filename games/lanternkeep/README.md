@@ -15,8 +15,11 @@ a candle or a bell, every fifth night the Great Owl sweeps a row, and at every f
 keep can move to the Docks, Chapel Hill or the Market. From night 6 a moth tires after four
 flights. Spend the coins between nights on better wicks, more oil, more and faster moths,
 fireflies, nectar, a second jar, the cask and rekindling a lost hearth. Keep ten nights to reach
-the Great Festival; the nights go on after it, and every nightfall from the tenth offers two curses
-that make the nights harder and pay more.
+the Great Festival; the nights go on after it, here, in a harbour town or up at a mountain
+monastery where avalanches bury the path and bells warn pilgrims, and every nightfall from the
+tenth offers two curses that make the nights harder and pay more. The nights turn through the
+seasons, and every night kept adds a house to a village below the keep, whose smithy, chandler and
+chapel last from game to game.
 
 It is played as a shadow-puppet theatre: the keep is black cut card in front of a backlit paper
 screen that turns from saffron to indigo as dusk falls, light shows through its arrow slits and
@@ -35,12 +38,13 @@ stone joints, the lanterns have coloured-glass panes and the moths are lace-wing
 | Tap or click a district | At a fifth nightfall: move the keep there (or stay) |
 | Tap or click a curse | At a nightfall from the tenth: take it (or press Go on to take none) |
 | Next dusk | Between nights: start the next night's dusk |
-| Keep going / Set sail | After the Great Festival: play on here, or sail to the harbour |
-| Tap or click a boon | At the Harbour Festival: keep it for this and every later game |
+| Village | On the night panel: open the village, and tap a building to build it |
+| Keep going / Set sail / Climb | After the Great Festival: play on here, sail to the harbour or climb to the monastery |
+| Tap or click a boon | At the Harbour or Mountain Festival: keep it for this and every later game |
 | Daily night | On the night panel or after the game ends: play today's daily night |
 | New keep | After the game ends: start again |
 
-1. **Dusk lasts 45 seconds.** The bar at the top empties as the sun sinks.
+1. **Dusk lasts 45 seconds** (36 in summer, 54 in winter). The bar at the top empties as the sun sinks.
 2. **Moths**: three wait in the jar at the gate, one of each kind. Each one flies to the lantern
    you tap, takes a moment to catch the wick (the ring fills), then flies back to the jar before it
    can go again. A lantern a moth is already on its way to sends no second moth.
@@ -172,6 +176,32 @@ stone joints, the lanterns have coloured-glass panes and the moths are lace-wing
     upgrade but the Jar and a full cask, with no traits or boon. Your game waits and comes back
     after it. The score is the coins at nightfall (halved if too few lanterns burn); today's
     score, the best and the days in a row are kept. One try a day: leaving it half way uses it.
+26. **A village that grows**: every night kept, in any game, adds a house to the village along the
+    foot of the screen, and the village is kept from game to game (a daily night adds none). The
+    "Village" link on the night panel opens it; once it has enough houses, coins build:
+    - **Smithy** (3 houses, 60 coins): a cask fill costs 2 coins instead of 3.
+    - **Chandler** (6 houses, 90 coins): a spare moth in the jar.
+    - **Chapel** (10 houses, 120 coins): the first night of each game that would put out a hearth
+      doesn't ("the village chapel kept the hearth burning").
+    A building lasts for every later game and stands at the left end of the village.
+27. **Seasons**: the nights turn through spring, summer, autumn and winter, three nights each from
+    spring on night 1, named on the night-kind plaque. Spring changes nothing. Summer dusks last
+    36 seconds and half of summer nights are stormy; half of autumn nights are foggy, with leaves
+    falling. Winter dusks last 54 seconds, but snow slows every moth to 85%. The night panel says
+    when a new season comes.
+28. **The monastery, a third keep**: the Great Festival's panel also offers "Climb". The keep then
+    moves to a mountain monastery from the next dusk and stays there, with its own ten spots,
+    chains and danger:
+    - **Avalanches**: 30 and 12 seconds before nightfall snow comes down on the pilgrims' path
+      (the bottom row of three lanterns), warned eight seconds before by a dashed line, rings and
+      a countdown. A lantern there with a moth sitting on it is kept ("Kept!"); every other one
+      goes dark under the snow ("snowed in"), and a moth sent to it digs for 2 seconds before it
+      lights it.
+    - **Pilgrims**: each warning brings a pilgrim up the path, first for the west bell tower, then
+      for the east one (a violet ring marks it). A moth that lights or refills that lantern before
+      the snow comes warns the pilgrim for 6 coins, even with the cask dry.
+    Keep ten nights in the monastery for the **Mountain Festival**, which offers the same three
+    boons as the harbour's (picking one replaces the boon you had).
 
 ![The first lantern lit](docs/screenshots/playthrough-1-first-lantern.webp)
 
@@ -191,7 +221,7 @@ stone joints, the lanterns have coloured-glass panes and the moths are lace-wing
 
 ![A firefly flying on from the far left lantern it lit to light the left tower](docs/screenshots/loop-firefly.webp)
 
-![The Great Festival](docs/screenshots/loop-great-festival.webp)
+![The Great Festival: keep going, set sail or climb](docs/screenshots/loop-great-festival.webp)
 
 ![A window calling for the left wall's lantern on night 2](docs/screenshots/loop-window-call.webp)
 
@@ -222,6 +252,12 @@ stone joints, the lanterns have coloured-glass panes and the moths are lace-wing
 ![Moths in the jar with their trait dots, one just grown swift](docs/screenshots/loop-moth-breeds.webp)
 
 ![The end of a daily night: today's score, the best and the streak](docs/screenshots/loop-daily-night.webp)
+
+![The village below the keep: the smithy built, the chandler and the chapel to build, and the houses along the foot of the screen](docs/screenshots/loop-village.webp)
+
+![A winter night: snow falling and the plaque naming the season](docs/screenshots/loop-winter.webp)
+
+![The monastery: an avalanche warned over the pilgrims' path, and a pilgrim asking for the west bell tower](docs/screenshots/loop-monastery.webp)
 
 ### Upgrades
 
@@ -293,9 +329,10 @@ All paths are inside `games/lanternkeep/`.
 - `src/game/`: the rules in plain TypeScript with no Phaser dependency. `state.ts` has dusk, moths,
   oil, gusts, close calls, the herald's orders, kinds of night, bats, chains, window calls, the
   cask, kinds of lantern, the Great Owl, nightfall, the Great Festival, the move between
-  districts, the harbour's tide and ships, the boons, the moths' traits, the daily night and the
-  upgrades, `places.ts` the districts and the harbour (where their lanterns and chains are) and
-  the jar, and `save.ts` the best score, the moths' flights and the boon.
+  districts, the harbour's tide and ships, the boons, the moths' traits, the daily night, the
+  village, the seasons, the monastery's avalanches and pilgrims and the upgrades, `places.ts` the
+  districts, the harbour and the monastery (where their lanterns and chains are) and the jar, and
+  `save.ts` the best score, the moths' flights, the boon and the village.
 - `src/scenes/`: `BootScene` bakes textures, `GameScene` draws the screen, the district's
   scenery, lanterns, chains, moths, bats, the owl, the order card and night-kind plaque, mist,
   bunting and rain, gust, owl and window plaques, close-call tags, HUD and panels and wires taps

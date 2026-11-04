@@ -5,28 +5,32 @@ import { aiLog, mountWatch, watching, watchSteps } from '../../../../shared/watc
 import { playMusic, playSting, stopMusic, ui, type PlayOptions } from '../../../../shared/audio';
 import { FIGHT_SONG, PLAN_SONG, play, type Sfx } from '../audio';
 import {
-  AUGMENT_BY_ID, CAMPAIGN, CLASS_STATS, GHOST, COST_COLOR, DRAFT_PICK_S, ECONOMY, ITEM_BENCH, ITEMS, MAX_LEVEL, ORIGIN_COLOR, PLAN_S, PLAYER_COMMANDERS, RANKS, RIVALS, SETS,
+  AUGMENT_BY_ID, CAMPAIGN, CHASSIS, CLASS_STATS, DAILY, DUO, GHOST, WEAPONS, WEAPON_NAMES, WORKSHOP, WORKSHOP_UNLOCKS, COST_COLOR, DRAFT_PICK_S, ECONOMY, ITEM_BENCH, ITEMS, MAX_LEVEL, ORIGIN_COLOR, PLAN_S, PLAYER_COMMANDERS, RANKS, RIVALS, SETS,
   PARTS, RAT, SCRAP_TOKENS_PER_PART, SKILLS, TERRAIN, TRAITS, UNIT_BY_ID, comboOf, isPart,
-  type CommanderDef, type DeedId, type PartId, type SetId, type TraitId,
+  type ClassId, type CommanderDef, type DeedId, type OriginId, type PartId, type SetId, type TraitId, type UnitDef,
 } from '../game/data';
 import {
   addRankPoints, campaignKit, clearLobby, doDeeds, fullOrigin, isUnlocked, loadProgress, loadSquads, lobbyCleared, nextLobby, pickSquad, planDeeds, rankOf,
   recordWeekly, saveProgress, saveSquad, weekOf, weekStart, weeklyBest, weeklyRules,
+  addBuild, buildDef, cleanName, dailyMatchRand, dailyRecord, dailyRules, finishDailyTry, loadBuilds, scrapBuild, startDailyTry, suggestName, unlockedBy, workshopParts,
+  type Build,
 } from '../progress';
+import { useRand } from '../game/rng';
+import { today } from '../../../../shared/daily';
 import { STEP_S, traitValue, type BEvent } from '../game/battle';
 import {
   advance, isGhostRound, squadOf, boardCount, boardUnits, buy, buyXp, countTraits, draftPick, endFight, equip, equipPreview, matchOver, moveUnit, newDrops, newMatch,
   pickAugment, player, rerollCost, reroll, roundLabel, sell, sellValue, startDraft, startFight, startPlan, unitAt, unitCost,
   xpToNext, allUnits,
-  toggleShopLock,
+  toggleShopLock, giveGold, partner, passUnit, teamCount,
   type Match, type MeterRow, type Owned, type Player, type Spot,
 } from '../game/match';
 import { aiDraft, aiPickAugment, aiPlan } from '../game/ai';
-import { ordinal, t } from '../i18n';
+import { ordinal, t, unitName } from '../i18n';
 import { formatDate } from '../../../../shared/i18n';
 import { award } from '../../../../shared/trophies';
 import { trophies } from '../trophies';
-import { CMD_TEX, INK, UNIT_TEX, bakeAll, cmdKey, itemKey, monsterKey, textureRes, unitKey } from '../art/paint';
+import { CMD_TEX, INK, UNIT_TEX, bakeAll, bakeUnit, cmdKey, itemKey, monsterKey, textureRes, unitKey } from '../art/paint';
 import {
   BENCH, BUTTONS, COMMANDER_HOME, DRAFT_RING, INFO_PANEL, ITEMS_PANEL, PLAYERS_PANEL, RIVAL_HOME, SELL_ZONE, SHOP,
   LEFT_BOTTOM, TERRAIN_LEGEND, TRAITS_PANEL, UNIT_SCALE, VIEWPORT as VIEW, benchX, placeLayout, boardPoint, project, shopCardX, tileAt,
@@ -106,6 +110,7 @@ interface Button {
 }
 
 type Held = { kind: 'unit'; spot: Spot } | { kind: 'item'; index: number };
+type Say = (x: number, y: number, s: string, size: number, color?: string, opts?: Partial<Phaser.Types.GameObjects.Text.TextStyle>) => Phaser.GameObjects.Text;
 
 /** Parts are bolted onto these points of a robot's texture (game px from its feet). */
 const ATTACH: Record<PartId, { x: number; y: number }> = {
@@ -120,8 +125,12 @@ const ATTACH: Record<PartId, { x: number; y: number }> = {
 export class GameScene extends Phaser.Scene {
   /** The match, or null on the menu. Read by the playthrough test. */
   state: Match | null = null;
-  /** The menu's choices. */
-  menu = { commander: 0, set: 'scrap' as SetId | 'weekly' | 'campaign', terrain: false };
+  /** The menu's choices, and which of its screens is up (the main menu or the robot workshop). */
+  menu = { commander: 0, set: 'scrap' as SetId | 'weekly' | 'campaign' | 'daily', terrain: false, duo: false, screen: 'main' as 'main' | 'workshop' };
+  /** The workshop's picks for the next build. */
+  private workbench = { chassis: CHASSIS[0], weapon: WEAPONS[0], name: '' };
+  /** The saved workshop builds. */
+  private builds: Build[] = [];
   /** The fight's playback speed (1 or 2). */
   speed = 1;
   private t = 0;
@@ -179,6 +188,8 @@ export class GameScene extends Phaser.Scene {
   private lobbyEnd: { cleared: boolean; reward: string | null } | null = null;
   /** Whether the finished match saved the player's squad. */
   private squadSaved = false;
+  /** The workshop pieces the finished match's lobby clear unlocked. */
+  private piecesNow: string[] = [];
 
   constructor() {
     super('Game');
@@ -189,6 +200,8 @@ export class GameScene extends Phaser.Scene {
     const frame = viewFrame(this);
     placeLayout(view.width, view.height, frame.x, frame.y);
     bakeAll(this);
+    this.builds = loadBuilds();
+    for (const d of this.builds) bakeUnit(this, buildDef(d));
     this.bgG = this.add.graphics().setDepth(0);
     this.boardG = this.add.graphics().setDepth(1);
     this.underG = this.add.graphics().setDepth(2);
@@ -232,20 +245,44 @@ export class GameScene extends Phaser.Scene {
 
   // ------------------------------------------------------------------ match flow
 
+  /** Whether START MATCH can start the menu's pick: an unlocked commander, or the daily lobby not yet tried today. */
+  private canStart() {
+    if (this.menu.set === 'daily') return !dailyRecord().played;
+    return isUnlocked(this.progress, PLAYER_COMMANDERS[this.menu.commander]);
+  }
+
+  /** Whether duo mode applies to the menu's pick: only the two plain seasons have it. */
+  private duoOn() {
+    return this.menu.duo && (this.menu.set === 'scrap' || this.menu.set === 'neon');
+  }
+
   startMatch() {
-    const commander = watching ? Math.floor(Math.random() * PLAYER_COMMANDERS.length) : this.menu.commander;
+    if (!watching && !this.canStart()) return ui('refuse');
+    // The daily lobby is the same for everyone on the day: its rules, rivals and loaned commander
+    // come from the date, and the match draws from the day's seeded random source.
+    const daily = !watching && this.menu.set === 'daily' ? dailyRules(today()) : null;
+    useRand(daily ? dailyMatchRand(daily.day) : null);
+    const commander = watching ? Math.floor(Math.random() * PLAYER_COMMANDERS.length) : daily ? daily.commander : this.menu.commander;
     // The weekly season takes its season and terrain from the date, a campaign lobby from the lobby.
     const week = !watching && this.menu.set === 'weekly' ? weekOf(Date.now()) : null;
     const lobby = !watching && this.menu.set === 'campaign' ? nextLobby(this.progress) : null;
-    const rules = week !== null ? weeklyRules(week) : lobby !== null ? CAMPAIGN[lobby] : null;
+    const rules = daily ?? (week !== null ? weeklyRules(week) : lobby !== null ? CAMPAIGN[lobby] : null);
     const set = rules ? rules.set : watching ? (Math.random() < 0.5 ? 'scrap' : 'neon') : (this.menu.set as SetId);
     const terrain = rules ? rules.terrain : watching ? Math.random() < 0.5 : this.menu.terrain;
-    const rank = watching ? 0 : lobby !== null ? CAMPAIGN[lobby].rank : rankOf(this.progress.points);
+    const rank = watching ? 0 : daily ? DAILY.rank : lobby !== null ? CAMPAIGN[lobby].rank : rankOf(this.progress.points);
+    if (daily) startDailyTry(daily.day);
     this.state = newMatch({
       set, commander, terrain, watch: watching, rank, weekly: week, lobby,
-      kit: lobby !== null ? campaignKit(this.progress) : [], ghost: watching ? null : pickSquad(),
+      kit: lobby !== null ? campaignKit(this.progress) : [],
+      // Saved squads and workshop robots are the player's own, so the daily lobby leaves them out.
+      ghost: watching || daily ? null : pickSquad(),
+      custom: !watching && !daily && this.builds.length > 0,
+      duo: !watching && this.duoOn(),
+      daily: daily?.day ?? null,
+      rivals: daily?.rivals,
     });
     this.recorded = false;
+    this.piecesNow = [];
     this.lobbyEnd = null;
     this.squadSaved = false;
     this.unlockedNow = [];
@@ -287,6 +324,9 @@ export class GameScene extends Phaser.Scene {
     if (m.phase !== 'plan') return;
     const me = player(m);
     if (me.augmentOffer) pickAugment(m, me, 0);
+    // The duo partner plans again, with whatever it was handed this round.
+    const mate = partner(m);
+    if (mate?.alive) aiPlan(m, mate);
     this.selected = null;
     this.held = null;
     this.dragging = false;
@@ -319,7 +359,8 @@ export class GameScene extends Phaser.Scene {
     if (r) {
       const text = t(r.outcome === 'win' ? 'victory' : r.outcome === 'draw' ? 'draw' : 'defeat');
       const extra = r.damage ? t('lostHp', { n: r.damage }) : r.gold ? t('wonGold', { n: r.gold }) : '';
-      this.banner.setText(text + extra).setColor(r.outcome === 'win' ? '#7cf3ff' : r.outcome === 'draw' ? '#ffd166' : '#ff8a7a');
+      const mate = r.partner ? `\n${t(r.partner === 'win' ? 'partnerWon' : r.partner === 'draw' ? 'partnerDraw' : 'partnerLost', { name: t(partner(m)!.name) })}` : '';
+      this.banner.setText(text + extra + mate).setColor(r.outcome === 'win' ? '#7cf3ff' : r.outcome === 'draw' ? '#ffd166' : '#ff8a7a');
       playSting(FIGHT_SONG, r.outcome === 'win' ? 'roundWin' : r.outcome === 'draw' ? 'roundDraw' : 'roundLoss');
     }
     this.resultUntil = m.time + 2;
@@ -350,10 +391,12 @@ export class GameScene extends Phaser.Scene {
     } else this.beginPlan();
   }
 
-  private record(place: number) {
+  private record(teamPlace: number) {
     // Watched matches are the AI's, not the player's: they never count.
     if (this.recorded || watching) return;
     this.recorded = true;
+    // A duo team's place (1 to 4) counts as the best seat of the pair would: 1st, 3rd, 5th or 7th.
+    const place = this.state?.opts.duo ? teamPlace * 2 - 1 : teamPlace;
     this.progress.played++;
     if (place === 1) this.progress.wins++;
     this.progress.best = this.progress.best ? Math.min(this.progress.best, place) : place;
@@ -364,7 +407,10 @@ export class GameScene extends Phaser.Scene {
     if (m && m.opts.lobby != null) {
       const cleared = lobbyCleared(m, place);
       this.lobbyEnd = { cleared, reward: cleared ? clearLobby(this.progress, m.opts.lobby) : null };
+      // A first clear also unlocks workshop pieces.
+      if (this.lobbyEnd.reward) this.piecesNow = WORKSHOP_UNLOCKS[m.opts.lobby] ?? [];
     }
+    if (m?.opts.daily) finishDailyTry(m.opts.daily, place);
     // A won match's final board is kept, to come back as a ghost in a later match.
     if (m && place === 1) this.squadSaved = saveSquad(squadOf(m));
     this.noteDeeds(place <= 4 ? (place === 1 ? ['topFour', 'champion'] : ['topFour']) : []);
@@ -1172,6 +1218,12 @@ export class GameScene extends Phaser.Scene {
     const selUnit = this.selected?.kind === 'unit' ? unitAt(me, this.selected.spot) : null;
     if (selUnit && planning) this.button(g, BUTTONS.sell, t('sellFor', { n: sellValue(selUnit) }), () => this.doSell(), { color: 0xffb703, size: 11 });
     else this.txt(80, lb + 82, t('boardCount', { n: boardCount(me), max: me.level }), 11, boardCount(me) > me.level ? '#ff8a7a' : C.dim);
+    // Duo mode: hand the selected robot to the partner, or give it gold.
+    const mate = partner(m);
+    if (mate && planning && me.human) {
+      if (selUnit) this.button(g, BUTTONS.pass, t('pass'), () => this.doPass(), { on: mate.alive && mate.bench.some((b) => !b), size: 10 });
+      else this.button(g, BUTTONS.pass, t('giveGold', { n: DUO.gift }), () => this.doGift(), { on: mate.alive && me.gold >= DUO.gift, size: 10, color: 0xffd166 });
+    }
     // The shop.
     me.shop.forEach((s, i) => {
       const x = shopCardX(i);
@@ -1193,7 +1245,7 @@ export class GameScene extends Phaser.Scene {
       this.txt(x + 72, y + 9, t('gold'), 9, C.dim);
       this.txt(x + 58, y + 26, t(TRAITS[def.origin].name) + (s.gilded ? `\n+${t(TRAITS[s.gilded].name)}` : ''), 9, s.gilded ? C.gold : `#${ORIGIN_COLOR[def.origin].toString(16)}`);
       this.txt(x + 58, y + (s.gilded ? 50 : 40), t(TRAITS[def.cls].name), 9, '#d0d8e8');
-      this.txt(x + 6, y + 66, s.gilded ? t('gilded', { name: t(def.name) }) : t(def.name), 11, '#ffffff', { fontStyle: 'bold', wordWrap: { width: SHOP.cardW - 10 } });
+      this.txt(x + 6, y + 66, s.gilded ? t('gilded', { name: unitName(def) }) : unitName(def), 11, def.custom ? C.gold : '#ffffff', { fontStyle: 'bold', wordWrap: { width: SHOP.cardW - 10 } });
       if (!me.human) return;
       if (can) this.buttons.push({ x, y, w: SHOP.cardW, h: SHOP.h, run: () => this.doBuy(i) });
       else if (planning) this.buttons.push({ x, y, w: SHOP.cardW, h: SHOP.h, run: () => ui('refuse') });
@@ -1212,6 +1264,9 @@ export class GameScene extends Phaser.Scene {
       this.txt(PLAYERS_PANEL.x + 110, y + 11, p.alive ? `${Math.max(0, p.hp)}` : `#${p.place}`, 11, p.alive ? '#ffffff' : C.dim, { fontStyle: 'bold' });
       if (p.last && p.alive) g.fillStyle(p.last === 'win' ? C.good : p.last === 'loss' ? C.bad : 0xffd166).fillCircle(PLAYERS_PANEL.x + PLAYERS_PANEL.w - 6, y + 6, 3);
       if (this.scout === p.seat) g.lineStyle(2, 0xffd166, 1).strokeRoundedRect(PLAYERS_PANEL.x, y, PLAYERS_PANEL.w, PLAYERS_PANEL.rowH - 3, 6);
+      // Duo teams: a bar joins each pair's rows, the player's own in cyan, and the partner is tagged.
+      if (m.opts.duo && p.seat % 2 === 0) g.fillStyle(p.team === me.team ? C.cyan : 0x8f8cc0, p.alive ? 0.9 : 0.35).fillRect(PLAYERS_PANEL.x - 5, y + 2, 3, PLAYERS_PANEL.rowH * 2 - 7);
+      if (m.opts.duo && p.seat === 1) this.txt(PLAYERS_PANEL.x + PLAYERS_PANEL.w - 4, y + 2, t('partnerTag'), 8, '#7cf3ff', { fontStyle: 'bold' }).setOrigin(1, 0);
       // Tap a rival during planning to scout its board.
       if (planning && p.alive && p.seat !== 0) this.buttons.push({ x: PLAYERS_PANEL.x, y, w: PLAYERS_PANEL.w, h: PLAYERS_PANEL.rowH - 3, run: () => {
         this.scout = this.scout === p.seat ? null : p.seat;
@@ -1272,7 +1327,7 @@ export class GameScene extends Phaser.Scene {
     if (unit) {
       const def = UNIT_BY_ID[unit.defId];
       const cs = CLASS_STATS[def.cls];
-      title = `${unit.gilded ? t('gilded', { name: t(def.name) }) : t(def.name)} ${'★'.repeat(unit.star)}`;
+      title = `${unit.gilded ? t('gilded', { name: unitName(def) }) : unitName(def)} ${'★'.repeat(unit.star)}`;
       const traitNames = `${t(TRAITS[def.origin].name)}${unit.gilded ? ` + ${t(TRAITS[unit.gilded].name)}` : ''}`;
       body = t('unitInfo', { traits: traitNames, cls: t(TRAITS[def.cls].name), ability: t(cs.abilityName), range: cs.range, cost: unitCost(unit) });
       if (unit.items.length) body += `\n${unit.items.map((i) => t(ITEMS[i].name)).join(', ')}`;
@@ -1319,14 +1374,14 @@ export class GameScene extends Phaser.Scene {
     const n = Math.min(rows.length, Math.floor((r.h - 40) / 19));
     rows.slice(0, n).forEach((row, i) => {
       const y = r.y + 24 + i * 19;
-      const name = t(UNIT_BY_ID[row.defId].name);
+      const name = unitName(UNIT_BY_ID[row.defId]);
       this.txt(r.x + 8, y, `${name.length > 12 ? `${name.slice(0, 11)}.` : name}${'★'.repeat(row.star - 1)}`, 9, row.alive ? '#ffffff' : C.dim);
       this.txt(r.x + r.w - 8, y, `${row.dealt}`, 9, C.gold, { fontStyle: 'bold' }).setOrigin(1, 0);
       g.fillStyle(0x000000, 0.5).fillRect(r.x + 8, y + 12, r.w - 16, 3);
       g.fillStyle(ORIGIN_COLOR[UNIT_BY_ID[row.defId].origin]).fillRect(r.x + 8, y + 12, ((r.w - 16) * row.dealt) / max, 3);
     });
     const tanked = [...rows].sort((a, b) => b.taken - a.taken)[0];
-    if (tanked) this.txt(r.x + 8, r.y + r.h - 16, t('tookMost', { name: t(UNIT_BY_ID[tanked.defId].name), n: tanked.taken }), 9, C.dim);
+    if (tanked) this.txt(r.x + 8, r.y + r.h - 16, t('tookMost', { name: unitName(UNIT_BY_ID[tanked.defId]), n: tanked.taken }), 9, C.dim);
     if (toggles) this.infoRect = r;
   }
 
@@ -1392,7 +1447,8 @@ export class GameScene extends Phaser.Scene {
       g.fillStyle(0x05040f, 0.8).fillRect(0, 0, VIEW.w, VIEW.h);
       const place = m.phase === 'won' ? 1 : me.place;
       say(VIEW.w / 2, VIEW.fy + 150, t(m.phase === 'won' ? 'won' : 'lost'), 34, m.phase === 'won' ? '#7cf3ff' : '#ff8a7a', { fontStyle: 'bold', stroke: INK, strokeThickness: 6 }).setOrigin(0.5);
-      say(VIEW.w / 2, VIEW.fy + 200, t(watching ? 'seatFinished' : 'youFinished', { place: ordinal(place), n: m.players.length, round: roundLabel(m) }), 16, '#ffffff').setOrigin(0.5);
+      const finished = watching ? 'seatFinished' : m.opts.duo ? 'teamFinished' : 'youFinished';
+      say(VIEW.w / 2, VIEW.fy + 200, t(finished, { place: ordinal(place), n: teamCount(m), round: roundLabel(m) }), 16, '#ffffff').setOrigin(0.5);
       const le = this.lobbyEnd;
       if (le && m.opts.lobby != null) {
         const lobby = CAMPAIGN[m.opts.lobby];
@@ -1407,12 +1463,18 @@ export class GameScene extends Phaser.Scene {
         const rankText = rg.after > rg.before ? t('rankUp', { rank: t(RANKS[rg.after].name) }) : t('rankPoints', { n: rg.gained, rank: t(RANKS[rg.after].name), points: this.progress.points });
         say(VIEW.w / 2, VIEW.fy + 104, rankText, 15, rg.after > rg.before ? C.gold : C.text, { fontStyle: 'bold' }).setOrigin(0.5);
       }
+      if (this.piecesNow.length) say(VIEW.w / 2, VIEW.fy + 342, t('piecesUnlocked', { names: this.piecesNow.map((x) => this.pieceName(x)).join(', ') }), 12, C.gold, { fontStyle: 'bold' }).setOrigin(0.5);
+      if (m.opts.daily && !watching) {
+        const rec = dailyRecord(m.opts.daily);
+        say(VIEW.w / 2, VIEW.fy + 124, t('dailyEnd', { place: ordinal(rec.place || place), best: ordinal(rec.best || place), n: rec.streak }), 13, '#39e58c').setOrigin(0.5);
+      }
       if (m.opts.weekly != null && !watching) say(VIEW.w / 2, VIEW.fy + 124, t('weeklyEnd', { place: ordinal(weeklyBest(this.progress, m.opts.weekly)) }), 13, C.gold).setOrigin(0.5);
       if (this.unlockedNow.length) say(VIEW.w / 2, VIEW.fy + 248, t('unlockedList', { names: this.unlockedNow.map((c) => t(c.name)).join(', ') }), 12, C.gold, { fontStyle: 'bold' }).setOrigin(0.5);
       say(VIEW.w / 2, VIEW.fy + 228, t('endStats', { played: this.progress.played, wins: this.progress.wins, best: this.progress.best ? ordinal(this.progress.best) : '-' }), 12, C.dim).setOrigin(0.5);
       this.button(g, { x: VIEW.w / 2 - 90, y: VIEW.fy + 270, w: 180, h: 44 }, t(watching ? 'watchAnother' : 'playAgain'), () => {
         ui('click');
         playMusic(PLAN_SONG, 'calm');
+        useRand(null);
         this.state = null;
         this.clearViews();
         this.orbs = [];
@@ -1424,41 +1486,56 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private buildMenu(g: Phaser.GameObjects.Graphics, say: (x: number, y: number, s: string, size: number, color?: string, opts?: Partial<Phaser.Types.GameObjects.Text.TextStyle>) => Phaser.GameObjects.Text) {
+  private buildMenu(g: Phaser.GameObjects.Graphics, say: Say) {
+    if (this.menu.screen === 'workshop') return this.buildWorkshop(g, say);
+    const X0 = VIEW.w / 2;
+    const Y = VIEW.fy;
     g.fillStyle(0x05040f, 0.55).fillRect(0, 0, VIEW.w, VIEW.h);
-    say(VIEW.w / 2, VIEW.fy + 46, t('title'), 38, '#7cf3ff', { fontStyle: 'bold', stroke: INK, strokeThickness: 7 }).setOrigin(0.5);
-    say(VIEW.w / 2, VIEW.fy + 82, t('tagline'), 13, C.text).setOrigin(0.5);
-    say(VIEW.w / 2, VIEW.fy + 112, t('pickCommander'), 14, C.gold, { fontStyle: 'bold' }).setOrigin(0.5);
+    say(X0, Y + 46, t('title'), 38, '#7cf3ff', { fontStyle: 'bold', stroke: INK, strokeThickness: 7 }).setOrigin(0.5);
+    say(X0, Y + 82, t('tagline'), 13, C.text).setOrigin(0.5);
+    // The workshop, top right.
+    this.button(g, { x: X0 + 330, y: Y + 14, w: 136, h: 32 }, t('workshopButton', { n: this.builds.length, max: WORKSHOP.slots }), () => {
+      ui('click');
+      this.menu.screen = 'workshop';
+      // A name to start from, picked when the workshop first opens.
+      this.workbench.name ||= suggestName();
+      this.dirty = true;
+    }, { list: this.overlayButtons, container: this.overlay, size: 11, color: 0xffd166 });
+    say(X0, Y + 112, t('pickCommander'), 14, C.gold, { fontStyle: 'bold' }).setOrigin(0.5);
+    // The daily lobby lends its own commander, locked or not.
+    const daily = this.menu.set === 'daily' ? dailyRules(today()) : null;
+    const shown = daily ? daily.commander : this.menu.commander;
     // Eight small cards; the picked one's skill (or what unlocks it) is spelled out under them.
     const n = PLAYER_COMMANDERS.length;
     const cw = 104;
     const gap = 8;
     PLAYER_COMMANDERS.forEach((c, i) => {
-      const r = { x: VIEW.w / 2 - (n * cw + (n - 1) * gap) / 2 + i * (cw + gap), y: VIEW.fy + 126, w: cw, h: 104 };
-      const on = this.menu.commander === i;
-      const open = isUnlocked(this.progress, c);
+      const r = { x: X0 - (n * cw + (n - 1) * gap) / 2 + i * (cw + gap), y: Y + 126, w: cw, h: 104 };
+      const on = shown === i;
+      const open = isUnlocked(this.progress, c) || !!daily;
       g.fillStyle(on ? 0x2a2360 : C.panel, 0.95).fillRoundedRect(r.x, r.y, r.w, r.h, 10);
       g.lineStyle(on ? 3 : 1.5, on ? 0xffb703 : C.panelLine, 1).strokeRoundedRect(r.x, r.y, r.w, r.h, 10);
       this.overlay.add(this.add.image(r.x + r.w / 2, r.y + 70, cmdKey(c.name)).setOrigin(0.5, 1).setScale(1.2 / (textureRes.get(cmdKey(c.name)) ?? 2)).setAlpha(open ? 1 : 0.35));
-      if (!open) this.padlock(g, r.x + r.w - 16, r.y + 16);
+      if (!isUnlocked(this.progress, c)) this.padlock(g, r.x + r.w - 16, r.y + 16);
       say(r.x + r.w / 2, r.y + 74, t(c.name), 11, open ? '#ffffff' : C.dim, { fontStyle: 'bold', align: 'center', wordWrap: { width: r.w - 8 } }).setOrigin(0.5, 0);
       this.overlayButtons.push({ ...r, run: () => {
         this.menu.commander = i;
+        // Picking a commander leaves the daily lobby, which lends its own.
+        if (this.menu.set === 'daily') this.menu.set = 'scrap';
         ui('click');
         this.dirty = true;
       } });
     });
-    const pickedC = PLAYER_COMMANDERS[this.menu.commander];
-    const pickedOpen = isUnlocked(this.progress, pickedC);
+    const pickedC = PLAYER_COMMANDERS[shown];
+    const pickedOpen = isUnlocked(this.progress, pickedC) || !!daily;
     const skill = SKILLS[pickedC.skill];
     if (pickedOpen) {
-      say(VIEW.w / 2, VIEW.fy + 240, `${t(pickedC.name)}: ${t(skill.name)}`, 13, '#ff5cf0', { fontStyle: 'bold' }).setOrigin(0.5, 0);
-      say(VIEW.w / 2, VIEW.fy + 260, `${t(skill.text)} ${t('skillHint')}`, 11, C.text, { align: 'center', wordWrap: { width: 640 } }).setOrigin(0.5, 0);
+      say(X0, Y + 240, `${t(pickedC.name)}: ${t(skill.name)}${daily ? ` · ${t('dailyLent')}` : ''}`, 13, '#ff5cf0', { fontStyle: 'bold' }).setOrigin(0.5, 0);
+      say(X0, Y + 260, `${t(skill.text)} ${t('skillHint')}`, 11, C.text, { align: 'center', wordWrap: { width: 640 } }).setOrigin(0.5, 0);
     } else {
-      say(VIEW.w / 2, VIEW.fy + 240, t('lockedCommander', { name: t(pickedC.name), skill: t(skill.name) }), 13, C.dim, { fontStyle: 'bold' }).setOrigin(0.5, 0);
-      say(VIEW.w / 2, VIEW.fy + 260, t(`${pickedC.unlock!}Unlock`), 11, C.gold, { align: 'center', wordWrap: { width: 640 } }).setOrigin(0.5, 0);
+      say(X0, Y + 240, t('lockedCommander', { name: t(pickedC.name), skill: t(skill.name) }), 13, C.dim, { fontStyle: 'bold' }).setOrigin(0.5, 0);
+      say(X0, Y + 260, t(`${pickedC.unlock!}Unlock`), 11, C.gold, { align: 'center', wordWrap: { width: 640 } }).setOrigin(0.5, 0);
     }
-    say(VIEW.w / 2, VIEW.fy + 296, t('season'), 13, C.gold, { fontStyle: 'bold' }).setOrigin(0.5);
     // The two seasons and this week's, three cards across.
     const week = weekOf(Date.now());
     const rules = weeklyRules(week);
@@ -1471,69 +1548,209 @@ export class GameScene extends Phaser.Scene {
         blurb: `${t(SETS.find((s) => s.id === rules.set)!.name)}, ${t(rules.terrain ? 'weeklyTerrain' : 'weeklyNoTerrain')}\n${best ? t('weeklyBest', { place: ordinal(best) }) : t('weeklyUnplayed')}`,
       },
     ];
+    const pick = (id: typeof this.menu.set) => () => {
+      this.menu.set = id;
+      ui('click');
+      this.dirty = true;
+    };
     cards.forEach((c, i) => {
-      const r = { x: VIEW.w / 2 - 300 + i * 204, y: VIEW.fy + 312, w: 192, h: 62 };
+      const r = { x: X0 - 300 + i * 204, y: Y + 292, w: 192, h: 62 };
       const on = this.menu.set === c.id;
       const color = c.id === 'weekly' ? 0xffd166 : C.cyan;
       g.fillStyle(on ? 0x2a2360 : C.panel, 0.95).fillRoundedRect(r.x, r.y, r.w, r.h, 10);
       g.lineStyle(on ? 2.5 : 1.2, on ? color : C.panelLine, 1).strokeRoundedRect(r.x, r.y, r.w, r.h, 10);
       say(r.x + 10, r.y + 6, c.name, 12, c.id === 'weekly' ? C.gold : '#ffffff', { fontStyle: 'bold' });
       say(r.x + 10, r.y + 24, c.blurb, 9, C.text, { wordWrap: { width: r.w - 18 } });
+      this.overlayButtons.push({ ...r, run: pick(c.id) });
+    });
+    // Terrain and duo toggles, then START. The weekly season, the campaign and the daily set the
+    // terrain themselves, and only the two plain seasons have duo mode.
+    const lobby = nextLobby(this.progress);
+    const campaign = this.menu.set === 'campaign';
+    const fixed = this.menu.set !== 'scrap' && this.menu.set !== 'neon';
+    const terrainOn = daily ? daily.terrain : campaign ? CAMPAIGN[lobby].terrain : this.menu.set === 'weekly' ? rules.terrain : this.menu.terrain;
+    const toggle = (r: { x: number; y: number; w: number; h: number }, on: boolean, off: boolean, color: number, title: string, text: string, run: () => void) => {
+      g.fillStyle(on ? 0x2a2360 : C.panel, off ? 0.5 : 0.95).fillRoundedRect(r.x, r.y, r.w, r.h, 10);
+      g.lineStyle(on ? 2.5 : 1.2, on ? color : C.panelLine, off ? 0.4 : 1).strokeRoundedRect(r.x, r.y, r.w, r.h, 10);
+      say(r.x + 10, r.y + 5, title, 12, off ? C.dim : '#ffffff', { fontStyle: 'bold' });
+      say(r.x + 10, r.y + 21, text, 9, C.dim, { wordWrap: { width: r.w - 16 } });
       this.overlayButtons.push({ ...r, run: () => {
-        this.menu.set = c.id;
+        if (off) return ui('refuse');
+        run();
         ui('click');
         this.dirty = true;
       } });
-    });
-    // The weekly season and the campaign set the terrain themselves.
-    const lobby = nextLobby(this.progress);
-    const campaign = this.menu.set === 'campaign';
-    const weekly = this.menu.set === 'weekly' || campaign;
-    const terrainOn = campaign ? CAMPAIGN[lobby].terrain : this.menu.set === 'weekly' ? rules.terrain : this.menu.terrain;
-    const tr = { x: VIEW.w / 2 - 300, y: VIEW.fy + 384, w: 290, h: 40 };
-    g.fillStyle(terrainOn ? 0x2a2360 : C.panel, weekly ? 0.5 : 0.95).fillRoundedRect(tr.x, tr.y, tr.w, tr.h, 10);
-    g.lineStyle(terrainOn ? 2.5 : 1.2, terrainOn ? 0x39e58c : C.panelLine, weekly ? 0.4 : 1).strokeRoundedRect(tr.x, tr.y, tr.w, tr.h, 10);
-    say(tr.x + 12, tr.y + 6, t(terrainOn ? 'terrainOn' : 'terrainOff'), 13, weekly ? C.dim : '#ffffff', { fontStyle: 'bold' });
-    say(tr.x + 12, tr.y + 24, t(campaign ? 'lobbySetsTerrain' : weekly ? 'weeklySetsTerrain' : 'terrainKinds'), 9, C.dim);
-    this.overlayButtons.push({ ...tr, run: () => {
-      if (weekly) return ui('refuse');
-      this.menu.terrain = !this.menu.terrain;
-      ui('click');
-      this.dirty = true;
-    } });
-    this.button(g, { x: VIEW.w / 2 + 10, y: VIEW.fy + 384, w: 290, h: 40 }, t('startMatch'), () => {
+    };
+    const fixedBy = daily ? 'dailySetsTerrain' : campaign ? 'lobbySetsTerrain' : 'weeklySetsTerrain';
+    toggle({ x: X0 - 300, y: Y + 360, w: 144, h: 46 }, terrainOn, fixed, 0x39e58c, t(terrainOn ? 'terrainOn' : 'terrainOff'), t(fixed ? fixedBy : 'terrainShort'), () => (this.menu.terrain = !this.menu.terrain));
+    const duo = this.duoOn();
+    toggle({ x: X0 - 148, y: Y + 360, w: 148, h: 46 }, duo, fixed, 0x7cf3ff, t(duo ? 'duoOn' : 'duoOff'), t(fixed ? 'duoSeasonsOnly' : 'duoText', { name: t(RIVALS[0].name) }), () => (this.menu.duo = !this.menu.duo));
+    this.button(g, { x: X0 + 10, y: Y + 360, w: 290, h: 46 }, t('startMatch'), () => {
       ui('click');
       this.startMatch();
-    }, { list: this.overlayButtons, container: this.overlay, size: 16, color: 0xffb703, on: pickedOpen });
+    }, { list: this.overlayButtons, container: this.overlay, size: 16, color: 0xffb703, on: this.canStart() });
     // The junkyard campaign: the next lobby, its goal and its reward, and a pip for each of the ten.
-    const cr = { x: VIEW.w / 2 - 300, y: VIEW.fy + 432, w: 600, h: 46 };
+    const cr = { x: X0 - 300, y: Y + 412, w: 400, h: 58 };
     const l = CAMPAIGN[lobby];
     const done = this.progress.campaign >= CAMPAIGN.length;
     g.fillStyle(campaign ? 0x2a2360 : C.panel, 0.95).fillRoundedRect(cr.x, cr.y, cr.w, cr.h, 10);
     g.lineStyle(campaign ? 2.5 : 1.2, campaign ? 0xff8a2a : C.panelLine, 1).strokeRoundedRect(cr.x, cr.y, cr.w, cr.h, 10);
-    say(cr.x + 12, cr.y + 6, t('campaignCard', { n: lobby + 1, name: t(l.name) }), 12, '#ff8a2a', { fontStyle: 'bold' });
+    say(cr.x + 12, cr.y + 6, t('campaignCard', { n: lobby + 1, name: t(l.name) }), 12, '#ff8a2a', { fontStyle: 'bold', wordWrap: { width: cr.w - 20 } });
     const sets = `${t(SETS.find((x) => x.id === l.set)!.name)}, ${t(l.terrain ? 'weeklyTerrain' : 'weeklyNoTerrain')}`;
     const kit = campaignKit(this.progress).length;
-    say(cr.x + 12, cr.y + 25, done ? t('campaignDone', { sets }) : t('campaignNext', { goal: this.lobbyGoal(lobby), reward: this.rewardName(l.reward), sets, kit }), 9, C.text, { wordWrap: { width: cr.w - 150 } });
+    say(cr.x + 12, cr.y + 23, done ? t('campaignDone', { sets }) : t('campaignNext', { goal: this.lobbyGoal(lobby), reward: this.rewardName(l.reward), sets, kit }), 9, C.text, { wordWrap: { width: cr.w - 150 } });
     for (let i = 0; i < CAMPAIGN.length; i++) {
       const boss = CAMPAIGN[i].seats.some((x) => typeof x !== 'number');
       const px = cr.x + cr.w - 128 + i * 12;
       const cleared = i < this.progress.campaign;
       g.fillStyle(cleared ? 0xff8a2a : i === lobby ? 0xffd166 : 0x3b3478, 1);
-      if (boss) g.fillRect(px - 4, cr.y + 19, 8, 8);
-      else g.fillCircle(px, cr.y + 23, 3.5);
+      if (boss) g.fillRect(px - 4, cr.y + cr.h - 18, 8, 8);
+      else g.fillCircle(px, cr.y + cr.h - 14, 3.5);
     }
-    this.overlayButtons.push({ ...cr, run: () => {
-      this.menu.set = 'campaign';
-      ui('click');
-      this.dirty = true;
-    } });
+    this.overlayButtons.push({ ...cr, run: pick('campaign') });
+    // The daily lobby: the day's rules, and today's try or place.
+    const dr = { x: X0 + 108, y: Y + 412, w: 192, h: 58 };
+    const today_ = dailyRules(today());
+    const rec = dailyRecord();
+    const on = this.menu.set === 'daily';
+    g.fillStyle(on ? 0x2a2360 : C.panel, 0.95).fillRoundedRect(dr.x, dr.y, dr.w, dr.h, 10);
+    g.lineStyle(on ? 2.5 : 1.2, on ? 0x39e58c : C.panelLine, 1).strokeRoundedRect(dr.x, dr.y, dr.w, dr.h, 10);
+    say(dr.x + 10, dr.y + 6, t('dailyCard', { date: formatDate(Date.now(), { day: 'numeric', month: 'short' }) }), 12, '#39e58c', { fontStyle: 'bold' });
+    const status = rec.place ? t('dailyDone', { place: ordinal(rec.place) }) : rec.played ? t('dailyUsed') : t('dailyOpen');
+    const extra = `${rec.best ? ` · ${t('dailyBest', { place: ordinal(rec.best) })}` : ''}${rec.streak ? ` · ${t('dailyStreak', { n: rec.streak })}` : ''}`;
+    say(dr.x + 10, dr.y + 23, `${t(SETS.find((x) => x.id === today_.set)!.name)}, ${t(today_.terrain ? 'weeklyTerrain' : 'weeklyNoTerrain')} · ${t(PLAYER_COMMANDERS[today_.commander].name)}\n${status}${extra}`, 9, C.text, { wordWrap: { width: dr.w - 16 } });
+    this.overlayButtons.push({ ...dr, run: pick('daily') });
     const rank = rankOf(this.progress.points);
     const next = RANKS[rank + 1];
     const squads = loadSquads().length;
-    if (squads) say(VIEW.w / 2, VIEW.fy + 526, t('squadsSaved', { n: squads, round: `${GHOST.stage}-${GHOST.index}` }), 10, C.dim).setOrigin(0.5);
-    say(VIEW.w / 2, VIEW.fy + 508, `${t('rankLine', { rank: t(RANKS[rank].name), points: this.progress.points })}${next ? t('rankNext', { rank: t(next.name), points: next.points }) : ''} · ${t(RANKS[rank].text)}`, 11, C.gold).setOrigin(0.5);
-    if (this.progress.played) say(VIEW.w / 2, VIEW.fy + 491, t('menuStats', { played: this.progress.played, wins: this.progress.wins, best: ordinal(this.progress.best) }), 11, C.dim).setOrigin(0.5);
+    if (squads) say(X0, Y + 514, t('squadsSaved', { n: squads, round: `${GHOST.stage}-${GHOST.index}` }), 10, C.dim).setOrigin(0.5);
+    say(X0, Y + 498, `${t('rankLine', { rank: t(RANKS[rank].name), points: this.progress.points })}${next ? t('rankNext', { rank: t(next.name), points: next.points }) : ''} · ${t(RANKS[rank].text)}`, 11, C.gold).setOrigin(0.5);
+    if (this.progress.played) say(X0, Y + 482, t('menuStats', { played: this.progress.played, wins: this.progress.wins, best: ordinal(this.progress.best) }), 11, C.dim).setOrigin(0.5);
+  }
+
+  /** A chassis and weapon's look, painted once (the workshop's cards and preview). */
+  private pieceKey(origin: OriginId, cls: ClassId) {
+    const def: UnitDef = { id: `pv-${origin}-${cls}`, name: 'customRobot', cost: WORKSHOP.cost, origin, cls, custom: true };
+    bakeUnit(this, def);
+    return unitKey(def.id);
+  }
+
+  /** The robot workshop: pick an unlocked chassis and weapon, name the robot and build it; up to three builds join later shops. */
+  private buildWorkshop(g: Phaser.GameObjects.Graphics, say: Say) {
+    const X0 = VIEW.w / 2;
+    const Y = VIEW.fy;
+    const wb = this.workbench;
+    const parts = workshopParts(this.progress);
+    // Start on pieces the player has, if the picks are still locked.
+    if (!parts.has(wb.chassis)) wb.chassis = CHASSIS.find((c) => parts.has(c)) ?? wb.chassis;
+    if (!parts.has(wb.weapon)) wb.weapon = WEAPONS.find((c) => parts.has(c)) ?? wb.weapon;
+    g.fillStyle(0x05040f, 0.8).fillRect(0, 0, VIEW.w, VIEW.h);
+    say(X0, Y + 34, t('workshop'), 28, '#ffd166', { fontStyle: 'bold', stroke: INK, strokeThickness: 6 }).setOrigin(0.5);
+    say(X0, Y + 58, t('workshopHint', { cost: WORKSHOP.cost, max: WORKSHOP.slots }), 11, C.text, { align: 'center', wordWrap: { width: 600 } }).setOrigin(0.5, 0);
+    this.button(g, { x: X0 - 466, y: Y + 14, w: 100, h: 32 }, t('back'), () => this.leaveWorkshop(), { list: this.overlayButtons, container: this.overlay, size: 12 });
+    const img = (key: string, x: number, y: number, scale: number, alpha = 1) =>
+      this.overlay.add(this.add.image(x, y, key).setOrigin(0.5, UNIT_TEX.footY / UNIT_TEX.h).setScale(scale / (textureRes.get(key) ?? 2)).setAlpha(alpha));
+    const card = (r: { x: number; y: number; w: number; h: number }, on: boolean, open: boolean) => {
+      g.fillStyle(on ? 0x2a2360 : C.panel, open ? 0.95 : 0.6).fillRoundedRect(r.x, r.y, r.w, r.h, 10);
+      g.lineStyle(on ? 2.5 : 1.2, on ? 0xffd166 : C.panelLine, 1).strokeRoundedRect(r.x, r.y, r.w, r.h, 10);
+      if (!open) this.padlock(g, r.x + r.w - 14, r.y + 14);
+    };
+    // Chassis: four cards, each showing the picked weapon on it.
+    say(X0 - 300, Y + 94, t('chassis'), 12, C.gold, { fontStyle: 'bold' });
+    CHASSIS.forEach((o, i) => {
+      const r = { x: X0 - 300 + i * 152, y: Y + 110, w: 144, h: 78 };
+      const open = parts.has(o);
+      card(r, open && wb.chassis === o, open);
+      img(this.pieceKey(o, wb.weapon), r.x + 32, r.y + 72, 0.95, open ? 1 : 0.35);
+      say(r.x + 62, r.y + 12, t('chassisName', { name: t(TRAITS[o].name) }), 11, open ? '#ffffff' : C.dim, { fontStyle: 'bold', wordWrap: { width: r.w - 76 } });
+      if (!open) say(r.x + 62, r.y + 48, t('unlockLobby', { n: unlockedBy(o) + 1 }), 9, C.gold, { wordWrap: { width: r.w - 70 } });
+      this.overlayButtons.push({ ...r, run: () => this.pickPiece(open, () => (wb.chassis = o)) });
+    });
+    // Weapons: seven cards, each on the picked chassis.
+    say(X0 - 300, Y + 196, t('weapons'), 12, C.gold, { fontStyle: 'bold' });
+    WEAPONS.forEach((c, i) => {
+      const r = { x: X0 - 300 + i * (600 + 6) / 7, y: Y + 212, w: 80, h: 92 };
+      const open = parts.has(c);
+      card(r, open && wb.weapon === c, open);
+      img(this.pieceKey(wb.chassis, c), r.x + r.w / 2, r.y + 58, 0.85, open ? 1 : 0.35);
+      say(r.x + r.w / 2, r.y + 61, t(WEAPON_NAMES[c]), 9, open ? '#ffffff' : C.dim, { fontStyle: 'bold', align: 'center', wordWrap: { width: r.w - 6 } }).setOrigin(0.5, 0);
+      if (!open) say(r.x + r.w / 2, r.y + 76, t('unlockLobby', { n: unlockedBy(c) + 1 }), 8, C.gold).setOrigin(0.5, 0);
+      this.overlayButtons.push({ ...r, run: () => this.pickPiece(open, () => (wb.weapon = c)) });
+    });
+    // The build: a big preview, its name, Rename and Build.
+    const ready = parts.has(wb.chassis) && parts.has(wb.weapon);
+    const full = this.builds.length >= WORKSHOP.slots;
+    const br = { x: X0 - 300, y: Y + 314, w: 372, h: 116 };
+    g.fillStyle(C.panel, 0.95).fillRoundedRect(br.x, br.y, br.w, br.h, 10);
+    g.lineStyle(1.2, C.panelLine, 1).strokeRoundedRect(br.x, br.y, br.w, br.h, 10);
+    img(this.pieceKey(wb.chassis, wb.weapon), br.x + 50, br.y + 104, 1.5, ready ? 1 : 0.3);
+    say(br.x + 104, br.y + 10, ready ? wb.name : t('workshopLocked'), ready ? 18 : 12, ready ? '#ffffff' : C.gold, { fontStyle: 'bold', wordWrap: { width: br.w - 114 } });
+    if (ready) say(br.x + 104, br.y + 36, t('buildLine', { origin: t(TRAITS[wb.chassis].name), cls: t(TRAITS[wb.weapon].name), cost: WORKSHOP.cost }), 10, C.text);
+    this.button(g, { x: br.x + 104, y: br.y + 66, w: 108, h: 36 }, t('rename'), () => this.renameBuild(), { list: this.overlayButtons, container: this.overlay, size: 12, on: ready });
+    this.button(g, { x: br.x + 220, y: br.y + 66, w: 140, h: 36 }, t(full ? 'workshopFull' : 'buildRobot'), () => this.doBuild(), { list: this.overlayButtons, container: this.overlay, size: 12, color: 0xffb703, on: ready && !full });
+    // The builds, right of it, each with a Scrap button.
+    const lr = { x: X0 + 84, y: Y + 314, w: 216, h: 116 };
+    g.fillStyle(C.panel, 0.95).fillRoundedRect(lr.x, lr.y, lr.w, lr.h, 10);
+    g.lineStyle(1.2, C.panelLine, 1).strokeRoundedRect(lr.x, lr.y, lr.w, lr.h, 10);
+    say(lr.x + 10, lr.y + 6, t('yourBuilds', { n: this.builds.length, max: WORKSHOP.slots }), 11, C.gold, { fontStyle: 'bold' });
+    if (!this.builds.length) say(lr.x + 10, lr.y + 28, t('noBuilds'), 9, C.dim, { wordWrap: { width: lr.w - 20 } });
+    this.builds.forEach((b, i) => {
+      const y = lr.y + 26 + i * 29;
+      img(unitKey(b.id), lr.x + 20, y + 27, 0.42);
+      say(lr.x + 38, y + 2, b.name, 11, '#ffffff', { fontStyle: 'bold' });
+      say(lr.x + 38, y + 15, `${t(TRAITS[b.origin].name)} · ${t(TRAITS[b.cls].name)}`, 9, `#${ORIGIN_COLOR[b.origin].toString(16)}`);
+      this.button(g, { x: lr.x + lr.w - 62, y: y + 3, w: 54, h: 22 }, t('scrapBuild'), () => {
+        scrapBuild(b.id);
+        this.builds = loadBuilds();
+        this.sfx('sell');
+        this.dirty = true;
+      }, { list: this.overlayButtons, container: this.overlay, size: 10, color: 0xff8a7a });
+    });
+    say(X0, Y + 446, t(this.builds.length ? 'buildsInShop' : 'buildsLater'), 10, C.dim, { align: 'center', wordWrap: { width: 600 } }).setOrigin(0.5, 0);
+  }
+
+  private pickPiece(open: boolean, set: () => void) {
+    if (!open) return ui('refuse');
+    set();
+    ui('click');
+    this.dirty = true;
+  }
+
+  private leaveWorkshop() {
+    ui('click');
+    this.menu.screen = 'main';
+    this.dirty = true;
+  }
+
+  /** Asks for the build's name (the browser's own prompt, so any keyboard works). */
+  private renameBuild() {
+    let typed: string | null = null;
+    try {
+      typed = window.prompt(t('namePrompt', { max: WORKSHOP.nameMax }), this.workbench.name);
+    } catch {
+      // No prompt here (a sandboxed frame): a new suggested name instead.
+      typed = suggestName();
+    }
+    const name = typed === null ? '' : cleanName(typed);
+    if (name) this.workbench.name = name;
+    ui('click');
+    this.dirty = true;
+  }
+
+  private doBuild() {
+    const wb = this.workbench;
+    const build = addBuild(this.progress, wb.name, wb.chassis, wb.weapon);
+    if (!build) return ui('refuse');
+    this.builds = loadBuilds();
+    bakeUnit(this, buildDef(build));
+    wb.name = suggestName();
+    this.sfx('starUp');
+    this.dirty = true;
+  }
+
+  /** A workshop piece's name: a chassis (origin) or a weapon (class). */
+  private pieceName(id: string) {
+    return (WEAPONS as string[]).includes(id) ? t(WEAPON_NAMES[id as ClassId]) : t('chassisName', { name: t(TRAITS[id as OriginId].name) });
   }
 
   /** A campaign reward's name: a robot or a part. */
@@ -1617,6 +1834,28 @@ export class GameScene extends Phaser.Scene {
     const o = unitAt(me, this.selected.spot);
     if (o) this.doSellUnit(me, o);
     this.selected = null;
+    this.dirty = true;
+  }
+
+  /** Duo mode: hands the selected robot to the partner's bench. */
+  private doPass() {
+    const m = this.state!;
+    if (m.phase !== 'plan' || this.selected?.kind !== 'unit') return;
+    const o = unitAt(player(m), this.selected.spot);
+    if (o && passUnit(m, o)) {
+      this.sfx('place');
+      this.number({ x: BUTTONS.pass.x + 31, y: BUTTONS.pass.y + 60, s: 1 }, t('passed', { name: t(partner(m)!.name) }), '#7cf3ff', 12, 1.2);
+    } else ui('refuse');
+    this.selected = null;
+    this.dirty = true;
+  }
+
+  /** Duo mode: gives the partner `DUO.gift` gold. */
+  private doGift() {
+    const m = this.state!;
+    if (m.phase !== 'plan') return;
+    if (giveGold(m)) ui('coin');
+    else ui('refuse');
     this.dirty = true;
   }
 
@@ -1820,7 +2059,9 @@ export class GameScene extends Phaser.Scene {
     if (e.repeat) return;
     const m = this.state;
     if (!m) {
-      if (e.key === 'Enter') this.startMatch();
+      if (this.menu.screen === 'workshop') {
+        if (e.key === 'Escape') this.leaveWorkshop();
+      } else if (e.key === 'Enter') this.startMatch();
       return;
     }
     const me = player(m);
@@ -1836,6 +2077,10 @@ export class GameScene extends Phaser.Scene {
     else if (k === 'e' && me.human) this.doSell();
     else if (k === 't') this.toggleSpeed();
     else if (k === 'l' && me.human) this.toggleLock();
+    else if (k === 'g' && me.human && partner(m)) {
+      if (this.selected?.kind === 'unit') this.doPass();
+      else this.doGift();
+    }
   }
 }
 

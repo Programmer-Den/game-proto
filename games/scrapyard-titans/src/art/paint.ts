@@ -82,7 +82,7 @@ const EYE: Record<OriginId, string> = {
 };
 
 /** A robot, standing on (0, 0), facing the viewer. */
-function robot(ctx: Ctx, def: { origin: OriginId; cls: ClassId; cost: number }) {
+function robot(ctx: Ctx, def: { origin: OriginId; cls: ClassId; cost: number; custom?: boolean }) {
   const base = ORIGIN_COLOR[def.origin];
   const metal = 0xb8c0d8;
   const dark = 0x3a3f58;
@@ -131,6 +131,16 @@ function robot(ctx: Ctx, def: { origin: OriginId; cls: ClassId; cost: number }) 
   ctx.fillStyle = INK;
   if (def.origin === 'neon' || def.origin === 'sparker') glowDot(ctx, 0, hip - torsoH / 2, 3, eye);
   else for (let i = -1; i <= 1; i++) ctx.fillRect(i * 5 - 1, hip - torsoH / 2 - 1, 2.4, 2.4);
+  // A workshop robot wears a gold stripe across its chest.
+  if (def.custom) {
+    ctx.fillStyle = '#ffd166';
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.rect(-torsoW / 2 + 2, hip - torsoH / 2 + 3, torsoW - 4, 3.5);
+    ctx.fill();
+    ctx.stroke();
+  }
 
   // Arms and weapons by class.
   const sh = top + 5;
@@ -476,7 +486,8 @@ export function bakeAll(scene: Phaser.Scene) {
   }
 }
 
-function bakeUnit(scene: Phaser.Scene, def: UnitDef) {
+/** Paints a robot's texture if it has none yet: a workshop robot, or a chassis and weapon the workshop previews (`unit:pv-<origin>-<class>`). */
+export function bakeUnit(scene: Phaser.Scene, def: UnitDef) {
   bake(scene, unitKey(def.id), UNIT_TEX.w, UNIT_TEX.h, (ctx) => {
     ctx.translate(UNIT_TEX.w / 2, UNIT_TEX.footY);
     robot(ctx, def);

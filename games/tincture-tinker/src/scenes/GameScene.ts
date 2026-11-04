@@ -4,7 +4,7 @@ import { finishDaily, loadDaily, startDaily, today } from '../../../../shared/da
 import { renderScale, viewFrame } from '../../../../shared/scaling';
 import { settings } from '../../../../shared/settings';
 import { BROWN, GOLD, MOSS, num, OCHRE, RES, RUST, SEPIA, shown } from '../art/nouveau';
-import { needTexture, POTION_ORIGIN, potionTexture, tileTexture, TOOL_PAD, toolTexture } from '../art/textures';
+import { guestTexture, needTexture, POTION_ORIGIN, potionTexture, tileTexture, TOOL_PAD, toolTexture } from '../art/textures';
 import { adjacent, COLS, holesOf, inBoard, ROWS, special, stuck, validMoves, type Board, type Cell, type Tile } from '../game/board';
 import { EXAMS } from '../game/exams';
 import { formatNumber } from '../../../../shared/i18n';
@@ -12,8 +12,10 @@ import { KIND_COUNTS, KIND_NAMES, KINDS, type Kind } from '../game/kinds';
 import { blockersFor, MOVE_BONUS, orderFor, POTION_NAMES, RICH_BLOCKERS, RICH_MOVES, RICH_SHARE, riskFor, RUSH_COINS, RUSH_MOVES, TWIN_BONUS } from '../game/orders';
 import { RANKS, rankOf, starsFor, STARS_2, STARS_3 } from '../game/ranks';
 import { loadProgress, saveProgress } from '../game/save';
-import { canUse, funnel, nextDaily, nextEndless, nextExam, nextOrder, nextTown, pestle, sift, stir, TOOL_ORDER, TOOLS, trySwap, type Step, type Tool } from '../game/sim';
+import { canUse, funnel, nextDaily, nextEndless, nextExam, nextGuest, nextOrder, nextTown, nextWeekly, pestle, sift, stir, TOOL_ORDER, TOOLS, trySwap, type Step, type Tool } from '../game/sim';
+import { GUEST_STAR_COINS, GUEST_TEXTS, guestOpen, GUESTS } from '../game/guests';
 import { TOWN_STAR_COINS, townOpen, TOWNS } from '../game/towns';
+import { finishWeekly, loadWeekly, weekOf, WEEKLY_STARS, weeklyStars } from '../game/weekly';
 import { checkTrophies } from '../trophies/check';
 import { buyHerb, endlessOpen, examOpen, GAME, heldPantry, HERB_COST, PANTRY_MAX, progressOf, standingOf, startOrder, type GameState } from '../game/state';
 import { buyUpgrade, UPGRADE_ORDER, upgradeCost, UPGRADES, type UpgradeId } from '../game/upgrades';
@@ -131,6 +133,9 @@ export class GameScene extends Phaser.Scene {
   private mapRows?: Phaser.GameObjects.Container;
   /** What the caption says while the result card is up, if anything. */
   private resultCaption: string | null = null;
+  /** The live score on the weekly order's label, and the week's best before the try that just ended. */
+  private scoreText?: Phaser.GameObjects.Text;
+  private weeklyBefore = 0;
   private herbs?: Phaser.GameObjects.Container;
   private herbRows?: Phaser.GameObjects.Container;
   private herbCoins?: Phaser.GameObjects.Text;
@@ -443,7 +448,7 @@ export class GameScene extends Phaser.Scene {
         ms: MOULD_MS,
         start: () => {
           sprite = this.sprites.get(grown.id)?.setTexture(tileTexture(grown)).setDepth(DEPTH.tile);
-          sfx('spread');
+          sfx(step.toad ? 'croak' : 'spread');
         },
         step: (k) => sprite && shown(sprite, settings.reduceMotion ? 1 : 1 + 0.2 * Math.sin(Math.PI * k)),
       });
@@ -536,10 +541,15 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     // The daily's try ends with the stars it was sold with, or none.
     if (s.current.daily && s.phase !== 'play') finishDaily(GAME, s.phase === 'sold' ? s.orderStars : 0, s.current.daily.day);
+    // The weekly order's try ends with its score; the week keeps the best.
+    if (s.current.weekly && s.phase !== 'play') {
+      this.weeklyBefore = loadWeekly(s.current.weekly.week).best;
+      finishWeekly(s.current.weekly.week, s.score);
+    }
     if (s.phase === 'sold') {
       saveProgress(progressOf(s));
       this.showSold();
-    } else if (s.phase === 'failed' && (s.current.town || s.current.endless || s.current.daily)) {
+    } else if (s.phase === 'failed' && (s.current.town || s.current.guest || s.current.endless || s.current.daily)) {
       playSting(SONG, 'fail');
       this.showAsideFailed();
     } else if (s.current.exam && s.phase === 'failed') {
@@ -725,9 +735,14 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     const o = s.current;
     const mid = PANEL.x + PANEL.w / 2;
+    const guest = o.guest && { guest: t(GUEST_TEXTS[o.guest.rule].name), town: t(TOWNS[o.guest.index].name) };
     const title = o.exam
       ? t('examTitle', { n: o.exam.index + 1 })
-      : o.town
+      : guest
+        ? t('guestTitle', guest)
+        : o.weekly
+          ? t('weeklyTitle')
+          : o.town
         ? t('townTitle', { town: t(TOWNS[o.town.index].name) })
         : o.endless
           ? t('endlessTitle', { n: o.endless })
@@ -741,16 +756,35 @@ export class GameScene extends Phaser.Scene {
           ? t('twinTitle', { n: o.number })
           : t('orderTitle', { n: o.number });
     const items: Phaser.GameObjects.GameObject[] = [
-      this.add.text(mid, 62, title, ink(o.stages || o.second || o.exam || o.town || o.endless || o.daily ? 24 : 28, SEPIA, 'bold')).setOrigin(0.5),
+      this.add.text(mid, 62, title, ink(o.stages || o.second || o.exam || o.town || o.endless || o.daily || o.guest || o.weekly ? 24 : 28, SEPIA, 'bold')).setOrigin(0.5),
       shown(this.add.image(606, 145, potionTexture(o.potion))).setOrigin(POTION_ORIGIN.x, POTION_ORIGIN.y),
       this.add.text(606, 164.5, t('potionNumber', { n: o.number }), ink(9, RUST, 'italic bold')).setOrigin(0.5),
       this.add.text(666, 124, t(POTION_NAMES[o.potion]), ink(22, SEPIA, 'italic bold')).setOrigin(0, 0.5),
-      this.add.text(666, 152, o.town ? t('paysStars', { coins: TOWN_STAR_COINS }) : t(o.exam ? 'paysPass' : o.rich ? 'paysRich' : 'pays', { price: o.price }), ink(15, BROWN)).setOrigin(0, 0.5),
-      this.add.text(666, 174, o.town ? t('townBest', { n: s.towns[o.town.index] }) : t('perMove', { n: MOVE_BONUS }), ink(15, BROWN)).setOrigin(0, 0.5),
+      this.add.text(
+        666,
+        152,
+        o.weekly
+          ? t('weeklyBest', { n: loadWeekly(o.weekly.week).best })
+          : o.town || o.guest
+            ? t('paysStars', { coins: o.guest ? GUEST_STAR_COINS : TOWN_STAR_COINS })
+            : t(o.exam ? 'paysPass' : o.rich ? 'paysRich' : 'pays', { price: o.price }),
+        ink(15, BROWN),
+      ).setOrigin(0, 0.5),
+      this.add.text(
+        666,
+        174,
+        o.weekly ? t('weeklyScore', { n: s.score }) : o.town ? t('townBest', { n: s.towns[o.town.index] }) : o.guest ? t('townBest', { n: s.guests[o.guest.index] }) : t('perMove', { n: MOVE_BONUS }),
+        ink(15, o.weekly ? SEPIA : BROWN, o.weekly ? 'bold' : ''),
+      ).setOrigin(0, 0.5),
     ];
+    this.scoreText = o.weekly ? (items[items.length - 1] as Phaser.GameObjects.Text) : undefined;
     // The order's twist, stage or second customer, under the price.
     const line = o.exam
       ? t('examLine', { stars: o.exam.stars, moves: o.exam.stars === 3 ? STARS_3 : STARS_2 })
+      : o.guest
+      ? t(GUEST_TEXTS[o.guest.rule].line, { n: o.moves })
+      : o.weekly
+      ? t('weeklyLine', { town: t(TOWNS[o.weekly.town].name) })
       : o.town
       ? t('townLine', { n: o.town.index + 1, towns: TOWNS.length })
       : o.endless
@@ -810,13 +844,18 @@ export class GameScene extends Phaser.Scene {
   private refreshMoves() {
     const s = this.state;
     // The waltz: statelier for a royal commission, an examination or an endless run, tense with three moves or fewer left.
-    playMusic(SONG, s.phase === 'play' && s.moves <= 3 ? 'tense' : s.current.stages || s.current.exam || s.current.endless ? 'royal' : 'calm');
+    playMusic(SONG, s.phase === 'play' && s.moves <= 3 ? 'tense' : s.current.stages || s.current.exam || s.current.endless || s.current.guest ? 'royal' : 'calm');
     this.movesText.setText(t('moves', { n: s.moves })).setColor(s.moves <= 3 && s.phase === 'play' ? '#a8352a' : SEPIA);
-    const lit = s.phase === 'sold' ? s.orderStars : s.phase === 'failed' ? 0 : starsFor(s.moves);
+    // The weekly order's stars come from its score, not the moves left.
+    const weekly = s.current.weekly;
+    const lit = weekly ? weeklyStars(s.score) : s.phase === 'sold' ? s.orderStars : s.phase === 'failed' ? 0 : starsFor(s.moves);
     this.starIcons.forEach((icon, k) => icon.setTexture(k < lit ? 'star-on' : 'star-off'));
     this.ruleText.setText(
-      lit === 3 ? t('stars3', { n: STARS_3 }) : lit === 2 ? t('stars2', { n: STARS_2 }) : t('stars1'),
+      weekly
+        ? lit === 3 ? t('weeklyAllStars') : t('weeklyNext', { n: WEEKLY_STARS[lit] })
+        : lit === 3 ? t('stars3', { n: STARS_3 }) : lit === 2 ? t('stars2', { n: STARS_2 }) : t('stars1'),
     );
+    this.scoreText?.setText(t('weeklyScore', { n: s.score }));
   }
 
   private refreshNeeds() {
@@ -914,7 +953,9 @@ export class GameScene extends Phaser.Scene {
     else if (given.length > 0 && Object.values(s.got).every((n, i) => n === (s.fromPantry[Object.keys(s.got)[i] as Kind] ?? 0)))
       text = t('captionPantry', { list: given.map(([k, n]) => t(KIND_COUNTS[k as Kind], { n })).reduce((a, b) => t('and', { a, b })) });
     else if (s.current.exam) text = t('captionExam', { stars: s.current.exam.stars });
-    else if (s.current.town) text = t('captionTown');
+    else if (s.current.guest) text = t(GUEST_TEXTS[s.current.guest.rule].caption, { n: s.current.moves });
+    else if (s.current.weekly) text = t('captionWeekly');
+    else if (s.current.town) text = t('captionTownRare', { town: t(TOWNS[s.current.town.index].name), kind: t(KIND_NAMES[TOWNS[s.current.town.index].rare]) });
     else if (s.current.endless) text = t('captionEndless');
     else if (s.current.daily) text = t('captionDaily');
     else if (s.current.rich)
@@ -1164,7 +1205,7 @@ export class GameScene extends Phaser.Scene {
   private showSold() {
     const s = this.state;
     const o = s.current;
-    if (o.town || o.endless || o.daily) return this.showAsideSold();
+    if (o.town || o.guest || o.weekly || o.endless || o.daily) return this.showAsideSold();
     if (o.exam) {
       const need = o.exam.stars === 3 ? STARS_3 : STARS_2;
       if (!s.passed) {
@@ -1213,8 +1254,25 @@ export class GameScene extends Phaser.Scene {
       const won = s.earned / TOWN_STAR_COINS;
       const text = won > 0 ? t('townStarsWon', { n: won, coins: s.earned }) : t('townNoNew', { n: s.towns[i] });
       const opened = won === s.towns[i] && i + 1 < TOWNS.length;
-      const rank = opened ? t('townOpened', { town: t(TOWNS[i + 1].name) }) : t('journeyStars', { n: this.townStars(), max: TOWNS.length * 3 });
+      // The town's first star also brings its guest.
+      const rank = won === s.towns[i]
+        ? [t('guestWaits', { guest: t(GUEST_TEXTS[GUESTS[i].rule].name), town: t(TOWNS[i].name) }), ...(opened ? [t('townOpened', { town: t(TOWNS[i + 1].name) })] : [])].join('\n')
+        : t('journeyStars', { n: this.townStars(), max: TOWNS.length * 3 });
       this.showResult(t('townFilled', { town: t(TOWNS[i].name) }), text, rank, [{ label: t('journeyMap'), act: () => this.openMap() }, back], s.orderStars);
+    } else if (o.guest) {
+      const i = o.guest.index;
+      const won = s.earned / GUEST_STAR_COINS;
+      const text = won > 0 ? t('townStarsWon', { n: won, coins: s.earned }) : t('townNoNew', { n: s.guests[i] });
+      const rank = t('guestStars', { n: s.guests.reduce((sum, n) => sum + n, 0), max: GUESTS.length * 3 });
+      const guest = { guest: t(GUEST_TEXTS[o.guest.rule].name), town: t(TOWNS[i].name) };
+      this.showResult(t('guestServed', guest), text, rank, [{ label: t('journeyMap'), act: () => this.openMap() }, back], s.orderStars);
+    } else if (o.weekly) {
+      const week = o.weekly.week;
+      const record = loadWeekly(week);
+      const best = s.score > this.weeklyBefore;
+      const text = [t('weeklyScored', { n: s.score }), ...(best ? [t('weeklyNewBest')] : [])].join('\n');
+      const again = { label: t('playAgain'), act: () => this.begin(nextWeekly(this.state, week)) };
+      this.showResult(t('weeklyDone'), text, t('weeklyRecord', { best: record.best, n: record.tries }), [again, back], s.orderStars);
     } else if (o.endless) {
       const step = o.endless;
       const next = { label: t('nextInRun'), act: () => this.begin(nextEndless(this.state, step + 1)) };
@@ -1233,6 +1291,9 @@ export class GameScene extends Phaser.Scene {
     if (o.town) {
       const i = o.town.index;
       this.showResult(t('outOfMoves'), what, t('noStars'), [{ label: t('tryAgain'), act: () => this.begin(nextTown(this.state, i)) }, { label: t('journeyMap'), act: () => this.openMap() }], 0);
+    } else if (o.guest) {
+      const i = o.guest.index;
+      this.showResult(t('outOfMoves'), what, t('noStars'), [{ label: t('tryAgain'), act: () => this.begin(nextGuest(this.state, i)) }, { label: t('journeyMap'), act: () => this.openMap() }], 0);
     } else if (o.endless) {
       const fresh = { label: t('newRun'), act: () => this.begin(nextEndless(this.state, 1)) };
       this.showResult(t('runOver'), t('runOverText', { n: o.endless - 1 }), t('bestStreak', { n: s.endless }), [fresh, back], 0);
@@ -1322,17 +1383,25 @@ export class GameScene extends Phaser.Scene {
       hit.on('pointerdown', () => (open ? (ui('click'), this.begin(nextTown(this.state, i))) : ui('refuse')));
       for (const part of [pic, name, ...stars]) part.setAlpha(open ? 1 : 0.35);
       rows.add([pic, name, ...stars, hit]);
+      // The town's guest, on its picture's corner once the town has a star: a gold star beside it once served.
+      if (guestOpen(s.towns, i)) {
+        const badge = shown(this.add.image(x + 24, y - 22, guestTexture(GUESTS[i].rule)));
+        const served = s.guests[i] > 0 ? [shown(this.add.image(x + 36, y - 32, 'star-on'), 0.42)] : [];
+        const tap = this.add.zone(x + 26, y - 24, 34, 34).setInteractive({ useHandCursor: true });
+        tap.on('pointerdown', () => (ui('click'), this.begin(nextGuest(this.state, i))));
+        rows.add([badge, ...served, tap]);
+      }
     });
     rows.add(this.add.graphics().lineStyle(1.5, num(GOLD)).lineBetween(-180, 76, 180, 76));
     // The daily order: one try a day, the same for everyone.
     const daily = loadDaily(GAME);
-    const dailyButton = makeButton(this, -96, 106, t('dailyTitle'), () => {
+    const dailyButton = makeButton(this, -136, 106, t('dailyTitle'), () => {
       if (loadDaily(GAME).played) return ui('refuse');
       ui('click');
       const day = today();
       startDaily(GAME, day);
       this.begin(nextDaily(this.state, day));
-    }).setScale(0.72);
+    }).setScale(0.62);
     if (daily.played) dailyButton.setAlpha(0.45);
     const dailyNote = daily.played
       ? daily.score === null
@@ -1341,17 +1410,23 @@ export class GameScene extends Phaser.Scene {
       : t('dailyNew', { n: daily.streak });
     // Endless orders: open once every guild examination is passed.
     const endless = endlessOpen(progressOf(s));
-    const endlessButton = makeButton(this, 96, 106, t('endlessOrders'), () => {
+    const endlessButton = makeButton(this, 136, 106, t('endlessOrders'), () => {
       if (!endlessOpen(progressOf(this.state))) return ui('refuse');
       ui('click');
       this.begin(nextEndless(this.state, 1));
-    }).setScale(0.72);
+    }).setScale(0.62);
     if (!endless) endlessButton.setAlpha(0.45);
     const endlessNote = endless ? t('bestStreak', { n: s.endless }) : t('endlessLocked');
-    rows.add([dailyButton, endlessButton]);
-    for (const [x, note] of [[-96, dailyNote], [96, endlessNote]] as const) {
-      const text = this.add.text(x, 134, note, ink(11, BROWN, 'italic')).setOrigin(0.5).setAlign('center');
-      for (let size = 10; size >= 8 && text.width > 180; size--) text.setFontSize(size);
+    // The weekly order: the same board all week, played as often as you like for the best score.
+    const week = weekOf();
+    const weekly = loadWeekly(week);
+    const weeklyButton = makeButton(this, 0, 106, t('weeklyTitle'), () => (ui('click'), this.begin(nextWeekly(this.state, week)))).setScale(0.62);
+    const weeklyNote = t('weeklyNote', { best: weekly.best, n: weekly.tries });
+    rows.add([dailyButton, weeklyButton, endlessButton]);
+    for (const [x, note] of [[-136, dailyNote], [0, weeklyNote], [136, endlessNote]] as const) {
+      // Two short lines under each button, shrinking for a longer language.
+      const text = this.add.text(x, 134, note, ink(11, BROWN, 'italic')).setOrigin(0.5).setAlign('center').setWordWrapWidth(124);
+      for (let size = 10; size >= 8 && text.height > 30; size--) text.setFontSize(size);
       rows.add(text);
     }
   }

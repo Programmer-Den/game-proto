@@ -202,7 +202,7 @@ const en = {
   festivalWasHeld: '\nThe Great Festival was held.',
   bestPeril: '  ·  best peril x{mult}',
   festivalTitle: 'The Great Festival!',
-  festivalText: "{n} nights kept: the whole valley comes\nto see the keep's lanterns.\n\nKeep going here, or set sail for the harbour\ntown and ten nights of its own.",
+  festivalText: "{n} nights kept: the whole valley comes\nto see the keep's lanterns.\n\nKeep going here, set sail for the harbour town,\nor climb to the mountain monastery: ten nights each.",
 
   // The harbour (LK15)
   harbourName: 'The Harbour',
@@ -254,6 +254,62 @@ const en = {
     other: '{district}, {kind}: {lit} of {count} lit.\nScore: {score} coins{halved}\n\nBest {best} · {n} days running.\nA new night comes tomorrow.',
   },
   dailyHalved: ' (halved: too dark)',
+
+  // A village that grows (LK18)
+  smithyName: 'Smithy',
+  smithyBlurb: 'A cask fill costs 2c',
+  chandlerName: 'Chandler',
+  chandlerBlurb: 'A spare moth in the jar',
+  chapelHouseName: 'Chapel',
+  chapelHouseBlurb: 'Spares the first hearth a game loses',
+  villageButton: 'Village',
+  villageTitle: 'The village below the keep',
+  villageSub: {
+    one: '{n} house so far: every night kept adds one, in any game.\nWhat you build here lasts for every game after.',
+    other: '{n} houses so far: every night kept adds one, in any game.\nWhat you build here lasts for every game after.',
+  },
+  needHouses: { one: 'needs {n} house', other: 'needs {n} houses' },
+  back: 'Back',
+  newHouse: '+1 house in the village',
+  verdictSpared: 'Too dark, but the village chapel kept the hearth burning.',
+
+  // Seasons (LK19)
+  springName: 'Spring',
+  springBlurb: 'mild dusks',
+  summerName: 'Summer',
+  summerBlurb: 'short dusks, and storms come often',
+  autumnName: 'Autumn',
+  autumnBlurb: 'fog comes often',
+  winterName: 'Winter',
+  winterBlurb: 'long dusks, but snow slows the moths',
+  kindSeason: '{kind} · {season}',
+  nextSeason: '\n{season} comes: {blurb}',
+
+  // The mountain monastery (LK20)
+  monasteryName: 'The Monastery',
+  monasteryBlurb: 'Avalanches bury the low path; bells warn pilgrims',
+  spotWestBell: 'west bell tower',
+  spotEastBell: 'east bell tower',
+  spotDome: 'the dome',
+  spotCloister: 'the cloister',
+  spotRefectory: 'the refectory',
+  spotWestCrag: 'west crag',
+  spotEastCrag: 'east crag',
+  spotLowerPath: 'lower path',
+  spotUpperPath: 'upper path',
+  spotShrine: 'the shrine',
+  avalancheIn: 'Avalanche in {n}s',
+  pilgrimRing: 'A pilgrim climbs: ring the {spot} (+{coins}c)',
+  buried: 'Buried!',
+  snowedIn: 'snowed in',
+  pilgrimWarned: '+{n}c pilgrim warned!',
+  pilgrimLost: 'The pilgrim turns back',
+  pilgrimsEarned: '+{n} from pilgrims',
+  mountainGoal: 'Mountain Festival: {kept} of {of} nights kept',
+  mountainHeldGoal: 'The Mountain Festival was held: the nights go on.',
+  climb: 'Climb',
+  mountainFestivalTitle: 'The Mountain Festival!',
+  mountainBoonSub: '{n} nights kept on the mountain. The monks give the keep a boon,\nkept in this game and every game after, in every keep.',
 };
 
 export default en;

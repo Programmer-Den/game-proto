@@ -200,9 +200,55 @@ const de: Translation<typeof en> = {
     other: 'Du hast heute {score} Münzen verdient.\nBestwert {best} · {n} Tage in Folge',
   },
   dailyBack: 'Zurück zu meiner Schmiede',
+
+  tourney: 'Turnier',
+  bannerCount: '×{n}',
+  tourneyNext: 'Nächstes in {time}',
+  tourneyOn: 'Ritter reiten an!\nBewaffnet {n} von {total}',
+  noFinish: 'Siege für Schliffe',
+  knightLine: 'Turnierritter: tjostiert damit',
+  orBetter: '{sword} oder besser',
+  knightCoins: 'zahlt den Wert',
+  place1: '1.',
+  place2: '2.',
+  place3: '3.',
+  place4: '4.',
+  ridesPlace: 'Platz {place}',
+  armed: 'Bewaffnet! +{n} M, Platz {place}',
+  rodeOff: 'Ohne Schwert fort',
+  tourneyStart: 'Turnier! Drei Ritter wollen {sword} oder besser',
+  tourneyWon: 'Dein Ritter gewinnt das Turnier! +{n} M und ein Banner',
+  tourneyPlaced: 'Dein Ritter wird {place} im Turnier: +{n} M',
+  tourneyLost: 'Diesmal kein Preis im Turnier',
+  finishUnlocked: 'Klingenschliff: {name}, {blurb}',
+  bluedName: 'Gebläut',
+  bluedBlurb: 'Ritter zahlen die Hälfte mehr',
+  etchedName: 'Geätzt',
+  etchedBlurb: 'das goldene Meisterwerk-Fenster hält die Hälfte länger',
+  gildedName: 'Vergoldet',
+  gildedBlurb: 'jeder Verkauf bringt 10 % mehr',
+
+  apprentice: 'Lehrling',
+  hire: 'Anheuern: {n} M',
+  apprenticeEvery: 'ein Paar alle {n} s',
+  apprenticeWaits: 'wartet auf ein Paar',
+  hired: 'Lehrling angeheuert: verschmilzt alle {n} s ein Paar',
+
+  oreCart: 'Erzkarren',
+  cartHere: 'Erzkarren {time}',
+  cartNext: 'Nächster in {time}',
+  oreBuy: '{name} {n} M',
+  oreLeft: '{name} {time}',
+  cartCame: 'Ein Erzkarren hält: Silber für Juwelen, Sternmetall für Stahlrohlinge',
+  oreBought: '{name}: {blurb}',
+  silverName: 'Silber',
+  silverBlurb: 'drei Minuten lang dreimal so viele Juwelen',
+  starmetalName: 'Sternmetall',
+  starmetalBlurb: 'drei Minuten lang Stahlrohlinge aus der Esse',
 };
+
 
 export default de;
 
 /** Texts that are the same in German, so the translation check doesn't flag them. */
-export const keepEnglish: (keyof typeof en)[] = ['title', 'anvilheart', 'anvilhearts', 'perkCost'];
+export const keepEnglish: (keyof typeof en)[] = ['title', 'anvilheart', 'anvilhearts', 'perkCost', 'bannerCount', 'oreLeft', 'oreBought'];

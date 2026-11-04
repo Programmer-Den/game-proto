@@ -121,6 +121,29 @@ export const FRUGAL_HUNGER = 0.6;
 export const NIMBLE_TIME = 0.5;
 export const CHARMING_GAP = 1.5;
 
+/** Villages that grow (WR18), from `TOWN_ROUND`: deliveries in time a village needs to grow into a town. */
+export const TOWN_ROUND = 2;
+export const GROW_AT = 4;
+/** A town's orders pay this many times a village's, and are its wares this often. */
+export const TOWN_PAY = 1.3;
+export const WARES_CHANCE = 0.35;
+/** Wares pay this many times the town's own goods. */
+export const WARES_PAY = 1.4;
+/** A town's warehouse: its price. Goods waiting there that run late go back in store, costing no heart. */
+export const WAREHOUSE_COST = 50;
+/** Night rounds (WR19): which rounds fly at night, and from when lamps can be hung on the line. */
+export const NIGHT_ROUNDS = [5, 8];
+export const LAMP_ROUND = 3;
+export const LAMP_COST = 4;
+/** How fast a wyrm flies over unlit track at night, times the usual. */
+export const DARK_SLOWDOWN = 0.5;
+/** A rival line (WR20), from `RIVAL_ROUND` until the festival: how often it lays a tile, how long it takes to win an order, and its rest after one. */
+export const RIVAL_ROUND = 3;
+export const RIVAL_BUILD_MS = 5_000;
+export const RIVAL_CLAIM_MS = 9_000;
+export const RIVAL_REST_MS = 5_000;
+/** Taking over a rival's tile costs this many times the usual track price. */
+export const RIVAL_BUYOUT = 3;
 /** How long a banner and a floating number stay on screen. */
 export const BANNER_MS = 2_800;
 export const POP_MS = 1_200;
@@ -243,6 +266,19 @@ export interface Pop {
   ms: number;
 }
 
+/** The rival company's line (WR20): its yard, its track, and the order it is racing the wyrm for. */
+export interface Rival {
+  yard: Tile;
+  /** Its track, as "c,r" keys; it never joins the wyrm's line. */
+  track: string[];
+  buildMs: number;
+  /** The waiting order it is about to take, and the time left before it does. */
+  claim: { order: number; ms: number } | null;
+  restMs: number;
+  /** Orders it has taken from the board. */
+  taken: number;
+}
+
 export interface GameState {
   /** `won` once the festival's goal is met. */
   phase: 'play' | 'over' | 'won';
@@ -290,6 +326,15 @@ export interface GameState {
   moultOffer: Trait[] | null;
   /** Today's daily valley (WR17): the same seeded valley for everyone, with no boons and no chain. */
   daily: boolean;
+  /** Deliveries in time to each village (by index), which grow it into a town at `GROW_AT`. */
+  growth: number[];
+  /** The villages that have grown into towns, and the towns with a warehouse, by index. */
+  towns: number[];
+  warehouses: number[];
+  /** Track tiles with a lamp (WR19), which lights it and the tiles beside it at night. */
+  lamps: string[];
+  /** The rival line, once it has set up (null before `RIVAL_ROUND`). */
+  rival: Rival | null;
   /** The best medal on this difficulty when the game began: its boons and the ones below it apply. */
   boon: Medal | null;
   /** Game time spent in the festival so far, and the medal it earned once won. */

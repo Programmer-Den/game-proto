@@ -13,7 +13,10 @@ without a break wilt, and the county honey fair, held every late summer, is the 
 gold makes you the Beehive Baron, and each year after asks for more. Town buyers in a buyer's book
 pay a premium for mixed, pure and comb honey; each fair gold breeds a trait into the queen line;
 and after the first gold the Baron can buy plots for a third and a fourth hive, an apiary estate
-whose plots each have their own season quirks.
+whose plots each have their own season quirks. The estate's flower garden cross-pollinates beds
+into rare honeys no meadow gives, a candle workshop turns spare wax into candles and polish for
+the church and the manor, and after three golds the crown asks for a gift of honey every autumn
+for a royal warrant that raises every price.
 
 ![A hive with every meadow open: clover, lavender and heather cells, two brood cells, the market board under the hive, a village order on the board and wax in the HUD](docs/screenshots/upgrades-overview.webp)
 
@@ -30,7 +33,7 @@ whose plots each have their own season quirks.
    comb bonus, plus 5 once the Sunflower Ridge is open; other kinds and the market change that.
 5. **The hive is kept**: the comb, coins, jars, wax, bees, upgrades, unlocked meadows, where
    the bees forage, the season and the bees' next winter meal, the casks, the hives and the queen, the fair entries and fairs held,
-   the tired meadows, the traits bred in, the comb honey, this season's buyer's book and the bees lent to the orchard are saved in the browser. Bees out foraging come home when the page reloads, and
+   the tired meadows, the traits bred in, the comb honey, this season's buyer's book, the garden and its rare honey, the candles and polish and their commissions, the royal warrant and the crown's ask, and the bees lent to the orchard are saved in the browser. Bees out foraging come home when the page reloads, and
    wasps, the market's timer, village orders, contract offers and a gathering swarm start afresh. **New hive**, in the bottom
    right corner, starts over.
 
@@ -241,6 +244,7 @@ Every fair after the first asks for more and adds a class, a ladder after the en
 | 2nd | + Mead: tap a ready cask while entering (clover 4, lavender 5, heather 6 points) | 17 points |
 | 3rd | + Fresh: a jar from a cell whose first drop came this summer (it counts for its kind too) | 20 points |
 | later | the same five classes | 3 more each year, up to 28 |
+| any, with a rare bloom | + Rare: a jar of the garden's rare honey (5 to 7 points) | the same |
 
 ![Entering honey: each capped cell shows the points it would score](docs/screenshots/fair-entering.webp)
 
@@ -281,6 +285,51 @@ and 4).
 
 ![The estate's third hive on Orchard Hollow, with its roof tab and plaque, and the plot chip offering the fourth](docs/screenshots/estate.webp)
 
+### The flower garden
+
+After the first gold a **Garden** chip joins the column under the buyer's book. Its card has eight
+flower beds in two rows of four. Pick a flower at the top (clover, lavender, heather or
+sunflower), then tap a bed to plant it (120 coins, or to replant it with another flower). Two
+beds that touch, side by side or one above the other, cross-pollinate, and three pairs give a rare
+bloom whose honey no meadow gives, marked by a coloured bar between the beds:
+
+| Beds side by side | Rare honey | A jar sells for | Fair points |
+| --- | --- | --- | --- |
+| Clover + Lavender | Blossom | 1.4 times a heather jar's worth | 5 |
+| Clover + Sunflower | Sunburst | 1.6 times | 6 |
+| Lavender + Heather | Mountain | 2 times | 7 |
+
+Every rare pair gives a jar of its honey each minute (not in winter), up to 12 jars kept. **Sell**
+sells them with the jars. While the garden has a rare bloom the fair adds a **Rare** class: while
+the fair is on, the card's Enter button enters your best rare jar. A bed can belong to more than
+one pair, so a lavender bed between clover and heather gives two honeys.
+
+![The flower garden: rare bloom bars between touching beds, the flower picker and the rare honey kept](docs/screenshots/flower-garden.webp)
+
+### The candle workshop
+
+From 50 jars sold a **Workshop** chip opens the candle workshop. Wax from the harvests (which also
+pays part of every cell) dips into candles (2 wax) or mixes into tins of polish (3 wax). Each
+season the church asks for 3 to 6 candles and the manor for 2 to 4 tins of polish, at a price set
+by what a clover jar is worth (candles 0.9 times, polish 1.5 times, swung by the season), and the
+church pays half as much again for candles in winter. Tap a commission with the goods made to
+deliver it. Candles and polish only sell to these two; they don't count as jars sold.
+
+![The candle workshop: making candles and polish, and the church's and the manor's commissions](docs/screenshots/candle-workshop.webp)
+
+### The royal warrant
+
+After three fair golds a **Royal warrant** chip shows, and every autumn the crown asks for a gift:
+pure jars of heather or clover in even years, pieces of comb (cut in the buyer's book) in odd
+ones, more for every year the warrant is kept. Give it before winter and the warrant is kept
+another year: every price (jars, mead, the buyer's book and the garden's rare honey) rises 10% a
+year kept, up to 50%. Miss a gift and winter takes the warrant away, and the count starts again
+next autumn.
+
+![The royal warrant: the crown's autumn ask and the price bonus](docs/screenshots/royal-warrant.webp)
+
+![The estate's chips under the buyer's book: the garden, the workshop and the royal warrant](docs/screenshots/estate-chips.webp)
+
 ### Trophies
 
 Ten trophies, listed behind the Trophies button on the start and pause screens and counted on the
@@ -314,6 +363,7 @@ hub's card. Each pops up at the top of the page once, when it is earned.
 | Mead cask | up to 3 at a time, 3 jars of one kind each | Mead worth 1.5 to 1.8 times the jars, 90 seconds later |
 | Catch the swarm | once (180 coins), when the hive is crowded | A second hive with its own comb, room for 12 more bees and a queen of your pick |
 | Estate plot | twice (500, then 900 coins), after the first gold with two hives | A third, then a fourth hive with its own comb, 2 bees and room for 12 more, on a plot with its own season quirks |
+| Garden bed | 8 beds, 120 coins a planting, after the first gold | A flower; two touching beds of a rare pair give a jar of rare honey every minute |
 
 The difficulty, set on the hub page's Settings, changes one thing: foraging trips take 25% less
 time on Easy and 30% more on Hard.
@@ -346,13 +396,13 @@ All paths are inside `games/beehive-baron/`.
 - `src/game/`: the rules in plain TypeScript with no Phaser dependency. `state.ts` holds the hive,
   its numbers, prices and the comb bonus, `sim.ts` builds, forages, ripens, hatches, harvests,
   sells, buys, turns the seasons, runs the market, wasp raids, village orders, orchard contracts,
-  casks, swarms, tired meadows, the fair, the buyer's book, bee breeds and the estate's plots and adds the nectar gathered while away, `honey.ts` is
+  casks, swarms, tired meadows, the fair, the buyer's book, bee breeds, the estate's plots, the garden, the workshop and the royal warrant and adds the nectar gathered while away, `honey.ts` is
   the kinds of honey, `meadows.ts` the chain of goals, `upgrades.ts` the upgrade table, `wasps.ts`,
   `orders.ts`, `seasons.ts`, `mead.ts`, `swarm.ts` (and the queens), `contracts.ts`, `tired.ts`,
-  `fair.ts`, `book.ts` (the buyer's book), `breeds.ts` (the traits) and `estate.ts` (the plots) their numbers, and `save.ts`
+  `fair.ts`, `book.ts` (the buyer's book), `breeds.ts` (the traits), `estate.ts` (the plots), `garden.ts` (the beds and rare honeys), `workshop.ts` (candles, polish and commissions) and `warrant.ts` (the crown's ask) their numbers, and `save.ts`
   keeps the hive.
 - `src/scenes/`: `BootScene` bakes textures, `GameScene` draws the hive and turns taps into rules
-  calls, `layout.ts` says where things are drawn.
+  calls, `EstatePanels.ts` draws the garden, workshop and royal warrant chips and cards, `layout.ts` says where things are drawn.
 - `src/art/`: the cut-paper art, painted on canvases at startup: `paper.ts` cuts card with
   shadows and grain, `scenery.ts` the meadow, meadows, hive, flowers, jar, comb cells and UI cards,
   `bees.ts` the bee and the wasp.

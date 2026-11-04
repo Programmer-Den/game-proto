@@ -5,7 +5,7 @@ import { expect, test, type Page } from '@playwright/test';
 // drags like a player's) and checks their points and the streak, then skips the third and checks
 // it costs a heart, and that the first solve earned its trophy. Game state is only read, through the `game` object the dev build puts on window.
 
-type KindId = 'nonogram' | 'bridges' | 'code' | 'calc' | 'sums' | 'unjam' | 'flip' | 'link' | 'slide' | 'series' | 'echo';
+type KindId = 'nonogram' | 'bridges' | 'code' | 'calc' | 'sums' | 'unjam' | 'flip' | 'link' | 'slide' | 'pipe' | 'beam' | 'series' | 'echo';
 interface Card {
   kind: KindId;
   level: number;
@@ -30,7 +30,7 @@ const HEARTS_NORMAL = 3;
 const QUEUE = 3;
 const BETWEEN_MS = 1200;
 const POINTS_PER_LEVEL = 100;
-const KINDS: KindId[] = ['nonogram', 'bridges', 'code', 'calc', 'sums', 'unjam', 'flip', 'link', 'slide', 'series', 'echo'];
+const KINDS: KindId[] = ['nonogram', 'bridges', 'code', 'calc', 'sums', 'unjam', 'flip', 'link', 'slide', 'pipe', 'beam', 'series', 'echo'];
 
 /** Game time per animation frame, every frame the same length. */
 const FRAME_MS = 64;
@@ -202,6 +202,24 @@ test('plays the first round', async ({ page }, testInfo) => {
           const cur = (await game.run()).current;
           if (cur?.card.kind !== 'slide' || (await game.run()).phase !== 'playing') break;
           await press(`cell-${cur.state.trail[cur.state.trail.length - 1]}`);
+        }
+        break;
+      case 'pipe':
+        // Turn each tile until its ends match the answer's, until the water reaches every house.
+        for (;;) {
+          const now = await game.run();
+          if (now.current?.card.kind !== 'pipe' || now.phase !== 'playing') break;
+          const st = now.current.state;
+          await press(`cell-${st.tiles.findIndex((m: number, k: number) => m !== st.answer[k])}`);
+        }
+        break;
+      case 'beam':
+        // Tap each of the answer's mirror cells until it holds the answer's mirror (/ once, \ twice).
+        for (;;) {
+          const now = await game.run();
+          if (now.current?.card.kind !== 'beam' || now.phase !== 'playing') break;
+          const st = now.current.state;
+          await press(`cell-${st.answer.findIndex((m: number, k: number) => m && st.mirrors[k] !== m)}`);
         }
         break;
       case 'series':

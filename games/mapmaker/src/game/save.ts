@@ -73,6 +73,10 @@ function load(key: string): GameState | null {
     // Saves from before the wonders: the isle's wonder is placed now (a far or daily isle has
     // none), and seen at once when its neighbours are already charted.
     s.wonders ??= [];
+    s.landing ??= null;
+    s.guide ??= 0;
+    s.trade ??= null;
+    s.traded ??= [];
     if (s.wonder === undefined) {
       s.wonder = s.run ? null : placeWonder(s.tiles, s.island, s.kind);
       if (s.wonder && wonderInSight(s)) {

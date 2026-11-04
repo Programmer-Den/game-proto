@@ -16,8 +16,11 @@ paths, and then the waves go on without end. After each Queen Slug you pick one 
 that shape the rest of the run, lost leaves can be regrown for sap between waves, and three stars
 on a garden open its thorny variant, a harder twist with a laurel to win. Past the harvest the
 garden grows wild, with tougher pests every wave and a Queen Slug every fifth; laurels buy golem
-grafts that last for good, and a daily plot gives everyone the same seeded garden once a day. Hold
-out as many waves as you can.
+grafts that last for good, and a daily plot gives everyone the same seeded garden once a day.
+Clearing wave 10 and wave 20 unlocks two more golems, the Fungus golem whose spores poison the path
+and the Bell golem whose ring stuns every pest near it. A weekly garden gives everyone one garden
+with a twist for the whole week, played as often as you like, and the garden editor lets you draw
+plots of your own. Hold out as many waves as you can.
 
 Everything is claymation: hand-rolled plasticine on a studio table, with fingerprint smudges and
 soft highlights, lumpy golems with bead eyes, a pressed clay path, soil pads with tool-cut furrows
@@ -29,12 +32,12 @@ and pressed lettering on clay tags. It is all painted in code at startup; there 
 
 | Control | Action |
 | --- | --- |
-| Tap or click a seed card | Pick the seed to plant (the Thorn golem's once it is unlocked) |
+| Tap or click a seed card | Pick the seed to plant (the Thorn, Fungus and Bell golems' once they are unlocked) |
 | Hover a soil cell | See how far the golem would reach |
 | Tap or click a soil cell | Plant the picked seed there, if you have the sap |
 | Hedge card, then a path cell | Plant a hedge on the path for 15 sap; pests stop and chew through it |
 | Tap or click a golem | Open its menu: Raise (a level, up to 3), Aim, Move or Uproot; tap it again to close |
-| Raise a level-2 golem | Pick its level-3 form from the two offered (Boulder or Sling, Bog or Spore, Bramble or Barb) |
+| Raise a level-2 golem | Pick its level-3 form from the two offered (Boulder or Sling, Bog or Spore, Bramble or Barb, Puffball or Blight, Chime or Gong) |
 | Aim | Step the golem's targeting: First, Strongest, Weakest or Flyers |
 | Move, then tap soil | Move the golem there for 10 sap, as it is (level and all) |
 | Uproot | Pull the golem up for 70% of the sap spent on it (its seed and levels) |
@@ -49,6 +52,9 @@ and pressed lettering on clay tags. It is all painted in code at startup; there 
 | A garden's Thorny tag | In the garden picker, once the garden has 3 stars: plant its thorny variant |
 | Daily plot | In the garden picker: plant today's daily plot, once a day |
 | Grafts | In the garden picker, once a laurel is won: buy golem grafts with laurels |
+| Plots | In the garden picker: plant the weekly garden or a plot you drew, or draw one |
+| A plot's Edit tag, or an empty plot | Open the garden editor on that plot |
+| Path / Soil / Clear (editor) | Pick what a tap on the grid draws, or clear the plot |
 
 1. **Seeds grow first.** A seed takes a few seconds to grow into a golem, and only a grown golem
    fights. You can plant between waves and during them.
@@ -59,6 +65,14 @@ and pressed lettering on clay tags. It is all painted in code at startup; there 
    | Pebble golem | 30 sap | 3s | 7 | 110px | 0.7s | |
    | Moss golem | 50 sap | 4s | 3 | 140px | 0.8s | halves a pest's speed for 1.5s |
    | Thorn golem | 60 sap | 4s | 5 | 80px | 0.6s | pricks every pest within reach at once; locked until the Heartwood blooms |
+   | Fungus golem | 45 sap | 4s | 2 | 110px | 1.8s | its throw leaves a patch of spores (28px round, 3.5s) that poisons pests walking through for 6 health a second; locked until you clear wave 10 |
+   | Bell golem | 55 sap | 4s | 1 | 90px | 3s | rings: every pest within reach stands still for 1s (the Queen Slug half as long); locked until you clear wave 20 |
+
+   Spore patches poison crows and moles in their tunnel not at all, and where patches overlap only
+   the strongest counts. Each level makes spores poison 60% harder and a ring stun 20% longer, and a
+   pest just stunned can't be stunned again until 1.5s after it wakes, so bells slow a crowd rather
+   than hold it for good. The Fungus and Bell golems unlock once your best (in any garden) reaches
+   wave 10 and 20, and are open from the start in the daily plot and the weekly garden.
 
    Raising a golem to level 2 costs 40 sap and to level 3 costs 70; each level adds 60% damage and
    12px of reach. A tapped golem opens a little menu: **Raise**, **Aim**, **Move** (10 sap, to any
@@ -77,13 +91,17 @@ and pressed lettering on clay tags. It is all painted in code at startup; there 
    | Pebble golem | Quartz (grafted) | 40% more damage and reaches 30px further |
    | Moss golem | Lichen (grafted) | pests it hits crawl at 40% speed for 2.5s; reaches 40px further |
    | Thorn golem | Nettle (grafted) | pricks 30% deeper and a quarter quicker |
+   | Fungus golem | Puffball | spore patches half again as wide that last 40% longer |
+   | Fungus golem | Blight | spores poison twice as hard |
+   | Bell golem | Chime | rings every 1.8s instead of every 3s |
+   | Bell golem | Gong | stuns 60% longer, rings four times as hard and reaches 20px further |
 
    The last three are third forms, offered once their graft is bought (below).
 
 4. **Aim.** Each golem aims at the **First** pest (furthest along the path, the default), the
    **Strongest** (most health left), the **Weakest** or **Flyers** (crows before anything else).
-   The Aim chip steps through them; a golem that hits everything in reach (a thorn golem, a Spore
-   moss golem) has nothing to aim.
+   The Aim chip steps through them; a golem that hits everything in reach (a thorn or bell golem, a
+   Spore moss golem) has nothing to aim. A fungus golem's spores land on the pest it aims at.
 5. **Hedges.** The Hedge card plants a hedge on any free path cell for 15 sap. A hedge has 60
    health; walking pests stop in front of it and chew (6 health a second for each leaf they would
    bite, so a beetle takes 10 seconds and the Queen Slug 2), and move on once it is gone. Crows fly
@@ -201,7 +219,30 @@ and pressed lettering on clay tags. It is all painted in code at startup; there 
     cleared and 5 a leaf kept at the end (the last wave can't be called early). There is one try a
     day, which starting uses up (leaving half way scores what you had); the button then shows
     today's score, with your best daily and days in a row under it.
-22. **Trophies.** Ten trophies, listed on the start and pause screens (Trophies) and counted on the
+22. **Weekly garden.** The Plots button in the garden picker opens the plots, whose first card is
+    this week's garden (Monday to Sunday), the same for every player: one of the three gardens with
+    one twist, open whatever your stars, with every golem open. Play it as often as you like; it
+    keeps the week's best wave (the Plots button and the card show it), and starts afresh each
+    week. The twist turns every week and the garden every third week, so nine weeks play every
+    pairing:
+
+    | Twist | What it does |
+    | --- | --- |
+    | Only Moss and Thorn | the Pebble, Fungus and Bell seeds are faded out |
+    | Double pests | every pest but the Queen Slug comes with a twin, 0.35s behind |
+    | No hedges | the hedge seed is faded out |
+
+    The weekly garden earns no stars, laurels or wild record; wave 30 is just another wave there.
+23. **Your own plots.** The other three cards are your plots. An empty one opens the garden editor:
+    a blank plot of grass to draw on. With Path, tap a cell in the first column (pests come in
+    there), then each next cell beside the last; the path's last cell is the Heartwood. Tap the
+    last cell again to take it back, or an earlier one to cut the path back to it. With Soil, tap
+    grass for a soil bed (golems grow only on soil; up to 24 beds) or a bed to clear it. A plot
+    needs a path of at least 8 cells and one bed; Plant it saves and plants it, Back saves it and
+    goes back. A drawn plot's card plants it, and its Edit tag opens the editor again. Each plot
+    keeps its own best wave (changing its drawing starts that afresh) and, like the weekly garden,
+    earns no stars, laurels or wild record.
+24. **Trophies.** Ten trophies, listed on the start and pause screens (Trophies) and counted on the
     hub's card; a toast shows each one as it is earned:
 
     | Trophy | Tier | Earned by |
@@ -216,6 +257,12 @@ and pressed lettering on clay tags. It is all painted in code at startup; there 
     | Perfect harvest | gold | harvesting a garden with all ten leaves |
     | Every garden | gold | harvesting all three gardens |
     | Thorny laurel | gold, hidden | harvesting a thorny garden |
+
+![The Fungus and Bell golems in play: spore patches on the path and stunned pests](docs/screenshots/new-golems.webp)
+
+![The garden editor: a path from the left edge to the Heartwood and soil beds beside it](docs/screenshots/garden-editor.webp)
+
+![The plots: this week's garden with its twist, a drawn plot and two empty ones](docs/screenshots/plots.webp)
 
 ![The wild garden: wave 35's Queen Slug and the grown pests, with the wave tag showing the best wild wave](docs/screenshots/wild-garden.webp)
 
@@ -300,12 +347,15 @@ npx playwright test --project golem-garden
 All paths are inside `games/golem-garden/`.
 
 - `src/game/`: the rules in plain TypeScript with no Phaser dependency. `board.ts` has the grid
-  and the gardens with their paths, `data.ts` the golems, their forms and targeting, the hedge,
+  and the gardens with their paths (and drawn plots: checking and building one, and the editor's
+  taps), `data.ts` the golems, their forms and targeting, the hedge,
   combos, compost, the harvest, pests and waves, `state.ts` planting, upgrading, aiming, moving,
-  uprooting, calling waves and the tick that moves pests (and stops them at hedges) and makes
-  golems throw, and `save.ts` the best wave, the bloom, the stars and the garden last picked.
+  uprooting, calling waves and the tick that moves pests (and stops them at hedges and stuns) and
+  makes golems throw (and spores poison), and `save.ts` the best wave, the bloom, the stars, the
+  garden last picked, the week's best and the drawn plots.
 - `src/scenes/`: `BootScene` bakes textures, `GameScene` draws the garden, the HUD, the seed
-  panel, the golem menu and the garden picker and wires taps to the rules, `layout.ts` says where
+  panel, the golem menu, the garden picker, the plots and the garden editor and wires taps to the
+  rules, `layout.ts` says where
   things are drawn.
 - `src/art/`: `clay.ts` is the plasticine toolkit and the golem, pest, sprout and flower painters;
   `textures.ts` paints the table, garden, HUD, panel, cards and icons into textures at startup.

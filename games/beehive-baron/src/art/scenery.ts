@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { CELL_CAP, FLOWERS } from '../game/state';
 import { MEADOWS } from '../game/meadows';
-import { viewEdges, AWAY, BOARD, BOOK, BOOK_CARD, CASK, COMB, CONTRACT, END_CARD, FAR_RIDGE, FLOWER_GROUND, GOAL, HIVE, HIVE_TAB, MARKET, MEADOW_SPOTS, ORDER, PLAQUE, MEADOW_TAG, SWARM, farY, flowerSpot } from '../scenes/layout';
+import { viewEdges, AWAY, BOARD, BOOK, BOOK_CARD, CASK, ESTATE_CARD, COMB, CONTRACT, END_CARD, FAR_RIDGE, FLOWER_GROUND, GOAL, HIVE, HIVE_TAB, MARKET, MEADOW_SPOTS, ORDER, PLAQUE, MEADOW_TAG, SWARM, farY, flowerSpot } from '../scenes/layout';
 import { KINDS } from '../game/honey';
 import { BROOD_CARD, CARD, KIND_CARD, MEADOW_CARD, MEAD_CARD, NOTE_CARD, ORCHARD_CARD, PETALS, WAX_CARD } from './palette';
 
@@ -400,6 +400,8 @@ function bakeCards(scene: Phaser.Scene) {
     outline(ctx, rr(4, 4, BOOK.w - 8, BOOK.h - 8, 6), NOTE_CARD.edge, 1, [4, 3]);
   });
   card('book-card', BOOK_CARD.w, BOOK_CARD.h, (ctx) => bigCard(ctx, BOOK_CARD.w, BOOK_CARD.h));
+  // The garden's, the workshop's and the royal warrant's card, opened from their chips under the book.
+  card('estate-card', ESTATE_CARD.w, ESTATE_CARD.h, (ctx) => bigCard(ctx, ESTATE_CARD.w, ESTATE_CARD.h));
   // The queen card is the end card without the gold rosette.
   card('queen-card', END_CARD.w, END_CARD.h, bigCard);
   card('end-card', END_CARD.w, END_CARD.h, (ctx) => {

@@ -3,6 +3,7 @@ import { sharpRes } from '../../../../shared/scaling';
 import { ORDER_IDS, type OrderId } from '../game/orders';
 import { HULLS, type HullId } from '../game/hulls';
 import type { EnemyKind } from '../game/ships';
+import { NIGHT_SIGHT } from '../game/night';
 import { FORT, ISLANDS, WORLD } from '../game/state';
 import { t } from '../i18n';
 import { FIRE, HARBOR, HELM, HUD_HEIGHT, OVER, VIEW, WIND } from '../scenes/layout';
@@ -45,7 +46,7 @@ interface ShipLook {
    * mortar on the foredeck, the flagship's gilded rail and stern lanterns, or a merchantman's
    * cargo lashed on deck, or the Tempest's silvered rail and storm lanterns.
    */
-  extra?: 'fire' | 'mortar' | 'flagship' | 'cargo' | 'storm';
+  extra?: 'fire' | 'mortar' | 'flagship' | 'cargo' | 'storm' | 'beast';
 }
 
 export const SHIP_LOOKS: Record<HullId | EnemyKind, ShipLook> = {
@@ -62,6 +63,9 @@ export const SHIP_LOOKS: Record<HullId | EnemyKind, ShipLook> = {
   admiral: { length: 114, beam: 42, masts: [0.3, 0.08, -0.14, -0.34], guns: 5, sail: '#efd9a0', flag: 'rgba(200,150,30,0.98)', extra: 'flagship' },
   tempest: { length: 118, beam: 44, masts: [0.3, 0.08, -0.14, -0.34], guns: 5, sail: '#a9b3b5', flag: 'rgba(40,96,110,0.98)', extra: 'storm' },
   merchant: { length: 74, beam: 31, masts: [0.16, -0.2], guns: 0, sail: '#efe4c8', flag: 'rgba(50,120,110,0.95)', extra: 'cargo' },
+  // The sea beasts' heads above the water (`bakeBeast`): `sail` is the skin, `flag` the eye.
+  kraken: { length: 66, beam: 56, masts: [], guns: 0, sail: '#a8604c', flag: '#f0c860', extra: 'beast' },
+  serpent: { length: 86, beam: 34, masts: [], guns: 0, sail: '#5f8a6a', flag: '#f0c860', extra: 'beast' },
 };
 
 /** The look of a ship: the player's by the hull sailed, an enemy's or a prize's by its kind. */
@@ -406,6 +410,7 @@ function bakeFrame(scene: Phaser.Scene) {
 /** A ship seen from above, bow to the east, as an engraved miniature: the texture `ship-<kind>`. */
 function bakeShip(scene: Phaser.Scene, kind: keyof typeof SHIP_LOOKS) {
   const look = SHIP_LOOKS[kind];
+  if (look.extra === 'beast') return bakeBeast(scene, kind as 'kraken' | 'serpent');
   const L = look.length;
   const B = look.beam;
   const w = L + 12;
@@ -520,6 +525,131 @@ function bakeShip(scene: Phaser.Scene, kind: keyof typeof SHIP_LOOKS) {
         circle(ctx, x - 0.5 * s, y, 1.4 * s, '#f0c860');
       }
     }
+  });
+}
+
+/**
+ * A sea beast's head above the water, facing east like a ship's bow, engraved and washed: the
+ * kraken's mantle with its great eyes and two arms curling ahead, or the sea serpent's coils
+ * breaking the surface behind its horned head. Ripples ring where it breaks the water.
+ */
+function bakeBeast(scene: Phaser.Scene, kind: 'kraken' | 'serpent') {
+  const look = SHIP_LOOKS[kind];
+  const L = look.length;
+  const B = look.beam;
+  const w = L + 16;
+  const h = B + 16;
+  bake(scene, `ship-${kind}`, w, h, HI, (ctx) => {
+    ctx.translate(w / 2, h / 2);
+    const ripple = (x: number, y: number, rx: number, ry: number) => {
+      ctx.beginPath();
+      ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+      ctx.strokeStyle = ink(0.45);
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+    };
+    const hatch = (clip: () => void, step: number) => {
+      ctx.save();
+      clip();
+      ctx.clip();
+      for (let k = -L; k <= L; k += step) line(ctx, k, -B, k + B * 0.5, B, ink(0.4), 0.5);
+      ctx.restore();
+    };
+    if (kind === 'kraken') {
+      ripple(-L * 0.08, 0, L * 0.46, B * 0.48);
+      // Two arms curling out ahead, ringed with suckers.
+      for (const side of [-1, 1]) {
+        const arm = () => {
+          ctx.beginPath();
+          ctx.moveTo(L * 0.1, side * B * 0.12);
+          ctx.bezierCurveTo(L * 0.32, side * B * 0.1, L * 0.5, side * B * 0.38, L * 0.36, side * B * 0.46);
+          ctx.bezierCurveTo(L * 0.28, side * B * 0.5, L * 0.3, side * B * 0.32, L * 0.38, side * B * 0.34);
+          ctx.bezierCurveTo(L * 0.3, side * B * 0.22, L * 0.2, side * B * 0.28, L * 0.08, side * B * 0.3);
+          ctx.closePath();
+        };
+        arm();
+        ctx.fillStyle = look.sail;
+        ctx.fill();
+        ctx.strokeStyle = INK;
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+        for (const [sx, sy] of [[0.18, 0.2], [0.26, 0.22], [0.33, 0.28]]) circle(ctx, sx * L, side * sy * B, 1.4, CREAM, INK, 0.5);
+      }
+      // The mantle, a great rounded hood, hatched in ink, with spots.
+      const mantle = () => {
+        ctx.beginPath();
+        ctx.ellipse(-L * 0.12, 0, L * 0.34, B * 0.36, 0, 0, Math.PI * 2);
+      };
+      mantle();
+      ctx.fillStyle = look.sail;
+      ctx.fill();
+      hatch(mantle, 3.5);
+      mantle();
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 1.6;
+      ctx.stroke();
+      for (const [sx, sy, r] of [[-0.3, 0.1, 2.4], [-0.22, -0.18, 2], [-0.36, -0.06, 1.6], [-0.1, 0.22, 1.8]]) circle(ctx, sx * L, sy * B, r, '#6a3428', INK, 0.5);
+      // The eyes, gold with a slit, either side of the front.
+      for (const side of [-1, 1]) {
+        circle(ctx, L * 0.1, side * B * 0.2, 5, look.flag, INK, 1.2);
+        line(ctx, L * 0.1, side * B * 0.2 - 3.5, L * 0.1, side * B * 0.2 + 3.5, INK, 1.6);
+      }
+    } else {
+      ripple(-L * 0.3, 0, L * 0.14, B * 0.42);
+      ripple(-L * 0.02, 0, L * 0.14, B * 0.42);
+      ripple(L * 0.28, 0, L * 0.18, B * 0.36);
+      // Two coils arching out of the water behind the head, like hoops.
+      for (const cx of [-0.3, -0.02]) {
+        const coil = () => {
+          ctx.beginPath();
+          ctx.ellipse(cx * L, 0, L * 0.11, B * 0.4, 0, 0, Math.PI * 2);
+          ctx.ellipse(cx * L, 0, L * 0.05, B * 0.24, 0, 0, Math.PI * 2, true);
+        };
+        coil();
+        ctx.fillStyle = look.sail;
+        ctx.fill('evenodd');
+        ctx.save();
+        coil();
+        ctx.clip('evenodd');
+        for (let k = -B; k <= B; k += 3) line(ctx, cx * L - L * 0.12, k, cx * L + L * 0.12, k + 2, ink(0.35), 0.5);
+        ctx.restore();
+        coil();
+        ctx.strokeStyle = INK;
+        ctx.lineWidth = 1.3;
+        ctx.stroke();
+      }
+      // The head, long-jawed with a fin of spines down the neck and a horn.
+      const head: Pt[] = [[L * 0.48, 0], [L * 0.38, B * 0.2], [L * 0.2, B * 0.26], [L * 0.1, B * 0.18], [L * 0.1, -B * 0.18], [L * 0.2, -B * 0.26], [L * 0.38, -B * 0.2]];
+      for (const [fx, fy] of [[0.12, 0], [0.18, 0], [0.24, 0]]) poly(ctx, [[fx * L - 3, fy], [fx * L + 3, fy], [fx * L - 2, -B * 0.4]], '#3f6a4a', INK, 0.7);
+      poly(ctx, head, look.sail, INK, 1.5);
+      ctx.save();
+      poly(ctx, head);
+      ctx.clip();
+      for (let k = 0; k < L; k += 3) line(ctx, k, -B, k + 4, B, ink(0.35), 0.5);
+      ctx.restore();
+      line(ctx, L * 0.48, 0, L * 0.3, 0, INK, 0.8);
+      for (const side of [-1, 1]) {
+        circle(ctx, L * 0.28, side * B * 0.14, 3.2, look.flag, INK, 1);
+        circle(ctx, L * 0.28, side * B * 0.14, 1.2, INK);
+        poly(ctx, [[L * 0.2, side * B * 0.2], [L * 0.1, side * B * 0.44], [L * 0.16, side * B * 0.18]], '#e8dcc0', INK, 0.7);
+      }
+    }
+  });
+}
+
+/**
+ * The dark of a night wave, the size of the view: deep blue all over but for the glow of the
+ * player's own lanterns round the middle, where her ship always is.
+ */
+function bakeNight(scene: Phaser.Scene) {
+  const w = VIEW.w;
+  const h = VIEW.h;
+  bake(scene, 'night', w, h, SHEET_RES, (ctx) => {
+    const glow = ctx.createRadialGradient(w / 2, h / 2, NIGHT_SIGHT * 0.45, w / 2, h / 2, NIGHT_SIGHT * 1.15);
+    glow.addColorStop(0, 'rgba(14,20,40,0)');
+    glow.addColorStop(1, 'rgba(14,20,40,0.86)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, w, h);
   });
 }
 
@@ -890,4 +1020,5 @@ export function bakeAll(scene: Phaser.Scene) {
   bakeWindRose(scene);
   bakeOrderCard(scene);
   bakeHudBar(scene);
+  bakeNight(scene);
 }

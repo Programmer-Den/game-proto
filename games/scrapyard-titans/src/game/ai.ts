@@ -4,10 +4,10 @@
  * keep savings for interest from stage 3, bolt parts onto the best robot, tanks in front.
  */
 import { aiLog } from '../../../../shared/watch';
-import { t } from '../i18n';
+import { unitName } from '../i18n';
 import { BENCH_SLOTS, CLASS_STATS, ECONOMY, RANKS, UNIT_BY_ID, type AugmentId } from './data';
 import {
-  allUnits, boardUnits, buy, buyXp, countTraits, draftPick, equip, pickAugment, removeUnit, reroll, sell, unitCost,
+  allUnits, boardUnits, buy, buyXp, countTraits, draftPick, equip, isRival, pickAugment, removeUnit, reroll, sell, unitCost,
   type Match, type Owned, type Player,
 } from './match';
 
@@ -43,26 +43,26 @@ export function aiPlan(m: Match, p: Player) {
       const score = copies * 3 + synergy + def.cost * 0.6 + (s.gilded ? 3 : 0);
       const short = allUnits(p).length < p.level;
       const spend = p.gold - unitCost(s) >= reserve || copies >= 1 || short;
-      if ((score >= 1.5 || short) && spend && buy(m, p, i)) aiLog(`p${p.seat}`, `buys ${t(def.name)}${copies ? ' (another copy)' : ''}`);
+      if ((score >= 1.5 || short) && spend && buy(m, p, i)) aiLog(`p${p.seat}`, `buys ${unitName(def)}${copies ? ' (another copy)' : ''}`);
     });
   };
   shop();
   let rolls = 0;
-  // The player's seat under `?watch` plays as designed; the rivals roll sooner at higher ranks.
-  const rank = RANKS[p.seat === 0 ? 0 : m.opts.rank];
+  // The player's seat under `?watch` (and its duo partner) plays as designed; the rivals roll sooner at higher ranks.
+  const rank = RANKS[isRival(m, p) ? m.opts.rank : 0];
   while (m.stage >= rank.rollFrom && p.gold > rank.rollAbove + ECONOMY.rerollCost && rolls++ < 6 && reroll(m, p)) shop();
   // Clear a full bench of its weakest robot.
   const benched = p.bench.filter((b): b is Owned => !!b);
   if (benched.length >= BENCH_SLOTS - 1) {
     const weakest = benched.sort((a, b) => value(a) - value(b))[0];
-    aiLog(`p${p.seat}`, `sells ${t(UNIT_BY_ID[weakest.defId].name)}`);
+    aiLog(`p${p.seat}`, `sells ${unitName(UNIT_BY_ID[weakest.defId])}`);
     sell(p, weakest);
   }
   arrange(p);
   // Parts onto the strongest robots on the board.
   const carriers = boardUnits(p).sort((a, b) => value(b) - value(a));
   for (const carrier of carriers) {
-    while (p.items.length && equip(p, 0, carrier)) aiLog(`p${p.seat}`, `bolts a part onto ${t(UNIT_BY_ID[carrier.defId].name)}`);
+    while (p.items.length && equip(p, 0, carrier)) aiLog(`p${p.seat}`, `bolts a part onto ${unitName(UNIT_BY_ID[carrier.defId])}`);
   }
 }
 
@@ -105,7 +105,7 @@ export function aiDraft(m: Match, p: Player) {
     }
   });
   if (best >= 0) {
-    aiLog(`p${p.seat}`, `drafts ${t(UNIT_BY_ID[d.options[best].defId].name)}`);
+    aiLog(`p${p.seat}`, `drafts ${unitName(UNIT_BY_ID[d.options[best].defId])}`);
     draftPick(m, p.seat, best);
   }
 }

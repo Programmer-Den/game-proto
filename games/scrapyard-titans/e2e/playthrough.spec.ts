@@ -28,7 +28,7 @@ interface MatchView {
 
 const VIEW = { w: 960, h: 540 };
 /** The menu's START MATCH button (GameScene's menu, its centre). */
-const START_BUTTON = { x: 635, y: 404 };
+const START_BUTTON = { x: 635, y: 383 };
 /** The first shop card (layout.ts shopCardX(0) plus half a card, SHOP.y plus half its height). */
 const SHOP_CARD_1 = { x: 172 + 58, y: 482 };
 /** The first bench slot (layout.ts benchX(0), BENCH.y). */

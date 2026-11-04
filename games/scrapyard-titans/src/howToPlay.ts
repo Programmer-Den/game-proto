@@ -17,9 +17,11 @@ const en: HowToPlay = {
     { input: 'Space, or FIGHT!', action: 'Start the fight; during a fight, use your commander’s skill' },
     { input: 'T, or Speed', action: 'Watch fights at 1x or 2x' },
     { input: '1, 2 or 3', action: 'Pick a power card when one is offered' },
+    { input: 'G, or Pass and Give left of the bench (duo mode)', action: 'Hand the selected robot to your partner, or give it 2 gold' },
+    { input: 'Workshop (menu, top right)', action: 'Build your own robots from the chassis and weapons the campaign unlocks' },
   ],
   loop: [
-    'Pick a commander, a season (or this week’s, or the next campaign lobby), and whether the board has terrain tiles.',
+    'Pick a commander, a season (or this week’s, the next campaign lobby or today’s daily lobby), whether the board has terrain tiles, and whether to play as a duo.',
     'Buy robots from the shop with your gold.',
     'Place them on your half of the board: tanks in front, shooters behind.',
     'Press FIGHT! and watch them battle on their own.',
@@ -40,6 +42,9 @@ const en: HowToPlay = {
     'The junkyard campaign is ten fixed lobbies, with a boss commander in every third. Reach the lobby’s place (and outlast its bosses) to clear it; each one cleared adds a robot or part to the kit you start the later lobbies with.',
     'Clockwork robots join every season’s shop: they wind up four seconds into a fight, and their two Bombers lob bombs that hit a whole cluster.',
     'Win a match and its final board is saved: in later matches it comes back as a ghost in round 4-7, in place of the monsters.',
+    'Each campaign lobby you clear unlocks a chassis or a weapon for the workshop. Build up to three named robots there: they cost 3 gold, wear a gold stripe and join the shops of your later matches.',
+    'The daily lobby is the same for everyone today: its season, terrain, rivals, loaned commander and your shops all come from the date. You get one try a day.',
+    'In duo mode you and Baron Bolt are a team against three other pairs: you share one bigger health bar, never fight each other, and the last team standing wins. Pass him robots you don’t need, or gold, during planning.',
   ],
 };
 
@@ -58,9 +63,11 @@ const de: HowToPlay = {
     { input: 'Leertaste, oder KAMPF!', action: 'Den Kampf starten; im Kampf die Fähigkeit deines Kommandanten nutzen' },
     { input: 'T, oder Tempo', action: 'Kämpfe mit 1x oder 2x ansehen' },
     { input: '1, 2 oder 3', action: 'Eine Machtkarte wählen, wenn eine angeboten wird' },
+    { input: 'G, oder Geben links neben der Bank (Duo)', action: 'Den ausgewählten Roboter deinem Partner geben, oder ihm 2 Gold geben' },
+    { input: 'Werkstatt (Menü, oben rechts)', action: 'Eigene Roboter aus den Fahrwerken und Waffen bauen, die die Kampagne freischaltet' },
   ],
   loop: [
-    'Wähle einen Kommandanten, eine Saison (oder die der Woche, oder die nächste Kampagnen-Lobby) und ob das Brett Geländefelder hat.',
+    'Wähle einen Kommandanten, eine Saison (oder die der Woche, die nächste Kampagnen-Lobby oder die heutige Tageslobby), ob das Brett Geländefelder hat und ob du im Duo spielst.',
     'Kaufe mit deinem Gold Roboter im Shop.',
     'Stelle sie auf deine Bretthälfte: Tanks nach vorn, Schützen nach hinten.',
     'Drücke KAMPF! und sieh zu, wie sie von selbst kämpfen.',
@@ -81,6 +88,9 @@ const de: HowToPlay = {
     'Die Schrottplatz-Kampagne hat zehn feste Lobbys, in jeder dritten wartet ein Boss. Erreiche den Platz der Lobby (und überlebe ihre Bosse), um sie zu schaffen; jede geschaffte legt einen Roboter oder ein Teil in das Startpaket der späteren Lobbys.',
     'Uhrwerk-Roboter gibt es in jeder Saison im Shop: Vier Sekunden nach Kampfbeginn sind sie aufgezogen, und ihre zwei Bomber werfen Bomben, die einen ganzen Pulk treffen.',
     'Gewinnst du ein Match, wird sein letztes Brett gespeichert: In späteren Matches kehrt es in Runde 4-7 als Geist zurück, statt der Monster.',
+    'Jede geschaffte Kampagnen-Lobby schaltet ein Fahrwerk oder eine Waffe für die Werkstatt frei. Baue dort bis zu drei Roboter mit eigenem Namen: Sie kosten 3 Gold, tragen einen goldenen Streifen und kommen in die Shops deiner späteren Partien.',
+    'Die Tageslobby ist heute für alle gleich: Saison, Gelände, Rivalen, der geliehene Kommandant und deine Shops ergeben sich aus dem Datum. Du hast einen Versuch pro Tag.',
+    'Im Duo bildest du mit Baron Bolzen ein Team gegen drei andere Paare: Ihr teilt eine größere Lebensleiste, kämpft nie gegeneinander, und das letzte Team gewinnt. Gib ihm beim Planen Roboter, die du nicht brauchst, oder Gold.',
   ],
 };
 

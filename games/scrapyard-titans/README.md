@@ -112,6 +112,23 @@ terrain tiles. The plan phase lasts 30 seconds; when it runs out the fight start
   better (2nd in a small lobby, 3rd in the middle, 2nd at the end) with every boss out before you.
   Each cleared lobby adds a robot or a part to your kit, which every later lobby starts you with.
   The card shows the next lobby, its goal and reward, and a pip per lobby (square for a boss).
+- **Robot workshop.** The Workshop button at the menu's top right opens a garage where you build
+  your own robots: pick a chassis (Heavy, Drone, Sparker or Clockwork, the origins both seasons
+  share) and a weapon (one of the seven classes), give it a name and press Build. The pieces unlock
+  as you clear campaign lobbies for the first time: lobby 1 gives the Heavy chassis and the piston
+  fists, and each later lobby one more piece. Up to three builds are kept; each joins the shop pool
+  as a 3-gold robot with a gold stripe in your later matches (rivals can buy them too), but not in
+  the daily lobby or under Watch AI. Scrap a build to make room.
+- **Daily lobby.** The green card next to the campaign is the same lobby for every player on the
+  day: the date picks the season, the terrain, the seven rivals (sometimes with a campaign boss among
+  them) and a commander it lends you, locked or not, and your shops roll from the day's own seed. One
+  try a day; the card and end screen show today's place, the best and the days in a row.
+- **Duo mode.** The Duo toggle (in the two plain seasons) teams you with Baron Bolt against three
+  other pairs. Teammates share one health bar, twice a commander's, and never meet in a fight; the
+  last team standing wins and places run 1st to 4th (counted as 1st, 3rd, 5th and 7th for stats and
+  rank points). During planning, Pass (left of the bench, or G) hands your selected robot to his
+  bench and Give 2g hands him gold; he places them before the fight. Bars in the players list join
+  each team.
 - **Squad replays.** The final board of every won match is saved (the newest five). In later
   matches one of them comes back as a ghost in round 4-7, in place of the monsters: beat it for the
   round's usual drops, or lose 6 health.
@@ -133,7 +150,8 @@ terrain tiles. The plan phase lasts 30 seconds; when it runs out the fight start
   counts for a second origin, but never merges.
 
 Difficulty (the hub's setting): Easy gives your commander 130 health and the rivals 1 gold less a
-round; Hard gives it 80 health and the rivals 1 gold more. Normal is 100 health.
+round; Hard gives it 80 health and the rivals 1 gold more. Normal is 100 health. In duo mode your
+team shares twice that, and your partner gets no rival gold.
 
 Watch AI: `?watch` lets the AI play your seat too, with a random commander, season and terrain, and
 shows your seat's fights on the board.
@@ -144,11 +162,12 @@ shows your seat's fights on the board.
 | --- | --- |
 | `src/main.ts` | Creates the game and calls the hub's `setupGame` and `setupScaling` |
 | `src/howToPlay.ts` | The How to play screen's text |
-| `src/progress.ts` | What lasts between matches: stats, the deeds that unlock commanders, the campaign and the saved squads |
+| `src/progress.ts` | What lasts between matches: stats, the deeds that unlock commanders, the campaign, the saved squads, the workshop's robots and the daily lobby |
 | `src/game/data.ts` | Every rule and number: robots, traits, parts, items, power cards, commanders, monsters, rounds, economy, terrain |
 | `src/game/battle.ts` | The fight sim on the 8x8 board, in fixed 50 ms steps, raising events for the view |
 | `src/game/match.ts` | The match: players, shops, buying, merging, items, rounds, pairings, damage, drafts |
 | `src/game/ai.ts` | The rival commanders' plan, power card and draft choices |
+| `src/game/rng.ts` | The match's random source, seeded by the date in the daily lobby |
 | `src/art/paint.ts` | Paints the cel-shaded robots, monsters, commanders and part icons at start-up |
 | `src/scenes/layout.ts` | Screen positions and the board's fake 3D projection |
 | `src/scenes/GameScene.ts` | The menu, the board, the HUD, fight playback and input |
@@ -156,7 +175,13 @@ shows your seat's fights on the board.
 
 ## Screenshots
 
-![The menu: eight commanders (some locked until their deed is done), two seasons and the weekly one, the terrain toggle and the rank](docs/screenshots/menu.webp)
+![The menu: eight commanders (some locked until their deed is done), two seasons and the weekly one, the terrain and duo toggles, the campaign and daily lobby cards, the Workshop button and the rank](docs/screenshots/menu.webp)
+
+![The robot workshop: chassis and weapons (some still locked behind campaign lobbies), the build being named and the saved robots](docs/screenshots/workshop.webp)
+
+![The daily lobby picked on the menu: today's season, terrain and lent commander](docs/screenshots/daily.webp)
+
+![Duo mode: the team bars and PARTNER tag in the players list, Pass left of the bench and a workshop robot in the shop](docs/screenshots/duo.webp)
 
 ![The menu's junkyard campaign card: the next lobby, its goal, its reward and a pip for each of the ten lobbies](docs/screenshots/campaign.webp)
 

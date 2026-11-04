@@ -38,6 +38,8 @@ export interface Wonder {
   kind: WonderKind;
   /** True once the tile and its neighbours are charted. */
   seen: boolean;
+  /** Set by a village's rumour (MM15): the tile is marked through the fog until the wonder is seen. */
+  rumour?: boolean;
 }
 
 /** The wonder of the n-th isle of a kind: green isles 1 and 5 have different ones, and so on. */

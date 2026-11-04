@@ -19,6 +19,8 @@ const en = {
   dragonslayerText: 'Forge a Dragonslayer.',
   crownBlade: 'The Crown Blade',
   crownBladeText: 'Deliver the Crown Blade and win the crown for your smithy.',
+  champion: 'Tourney champion',
+  championText: 'Arm a knight who wins a tourney.',
   dynasty: 'Smithing dynasty',
   dynastyText: 'Found a third new smithy after a win.',
 };

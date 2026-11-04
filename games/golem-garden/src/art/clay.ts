@@ -25,6 +25,11 @@ export const C = {
   thorn: '#8a8a3c',
   thornDark: '#5e6228',
   thornSpike: '#efe2b8',
+  fungus: '#c8b08a',
+  fungusDark: '#8e7a58',
+  cap: '#8a5a9a',
+  bell: '#c89a48',
+  bellDark: '#8a6428',
   gold: '#f2c44a',
   cream: '#fbefd6',
   sap: '#f09a32',
@@ -245,12 +250,12 @@ export function flower(x: number, y: number, s: number, open: boolean) {
   } else E(x, y, 7 * s, 9 * s, '#a6d870', { print: false, sb: 2, sx: 2, sy: 2, rim: 2 });
 }
 
-export type GolemArt = 'pebble' | 'moss' | 'thorn';
+export type GolemArt = 'pebble' | 'moss' | 'thorn' | 'fungus' | 'bell';
 
 /** A golem standing with its feet at (fx, fy). */
 export function golem(fx: number, fy: number, kind: GolemArt) {
-  const body = kind === 'pebble' ? C.stone : kind === 'moss' ? C.moss : C.thorn;
-  const dark = kind === 'pebble' ? C.stoneDark : kind === 'moss' ? C.mossDark : C.thornDark;
+  const body = { pebble: C.stone, moss: C.moss, thorn: C.thorn, fungus: C.fungus, bell: C.bell }[kind];
+  const dark = { pebble: C.stoneDark, moss: C.mossDark, thorn: C.thornDark, fungus: C.fungusDark, bell: C.bellDark }[kind];
   if (kind === 'thorn') {
     // Thorns stick out all round its bramble body.
     for (let k = 0; k < 9; k++) {
@@ -296,6 +301,28 @@ export function golem(fx: number, fy: number, kind: GolemArt) {
     E(fx - 34, fy - 86, 14, 9, '#c8c3b6', { print: false });
     E(fx + 34, fy - 86, 14, 9, '#c8c3b6', { print: false });
     flower(fx, fy - 126, 0.75, true);
+  } else if (kind === 'fungus') {
+    // A spotted mushroom cap for a hat, and two little mushrooms growing from a shoulder.
+    E(fx, fy - 118, 36, 18, C.cap, { sb: 4 });
+    for (const [dx, dy, r] of [[-18, -122, 5], [4, -128, 6], [20, -116, 4.5], [-4, -112, 3.5]] as const) {
+      E(fx + dx, fy + dy, r, r * 0.8, C.cream, { print: false, shadow: false, rim: 1.5 });
+    }
+    for (const [dx, dy] of [[-40, -88], [-30, -96]] as const) {
+      E(fx + dx, fy + dy + 8, 3, 7, C.cream, { print: false, sb: 2 });
+      E(fx + dx, fy + dy, 9, 5, C.cap, { print: false, sb: 2, rim: 1.5 });
+    }
+  } else if (kind === 'bell') {
+    // A brass bell on its head, its clapper showing, and two rings pressed into its chest.
+    Pp([[fx - 22, fy - 112], [fx - 14, fy - 140], [fx, fy - 148], [fx + 14, fy - 140], [fx + 22, fy - 112]], C.gold, { sb: 3, rim: 2 });
+    E(fx, fy - 112, 24, 6, '#d8a83a', { print: false, sb: 2, rim: 1.5 });
+    E(fx, fy - 108, 5, 5, C.bellDark, { print: false, shadow: false, rim: 1 });
+    ctx.strokeStyle = 'rgba(90,60,20,0.55)';
+    ctx.lineWidth = 3;
+    for (const r of [10, 18]) {
+      ctx.beginPath();
+      ctx.arc(fx, fy - 56, r, 0, PI * 2);
+      ctx.stroke();
+    }
   } else {
     // A crown of three small thorns and a pink bramble flower.
     for (const dx of [-14, 0, 14]) Pp([[fx + dx - 6, fy - 118], [fx + dx, fy - 136], [fx + dx + 6, fy - 118]], C.thornSpike, { print: false, sb: 2, rim: 1.5 });

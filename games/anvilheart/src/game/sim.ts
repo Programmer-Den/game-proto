@@ -1,7 +1,7 @@
 import { byDifficulty } from '../../../../shared/settings';
 import { commissionAt, grandOf, offered, type Commission } from './commissions';
 import { EDICT_IDS, HALL_IDS, HALL_TOP, edictRule, edictsFor, hallLevels, PERKS, type Edict, type Hall, type Perk } from './charter';
-import { GEM, MASTER, combine, isGemmed, isShield, isSword, shield, sword, tierOf } from './items';
+import { GEM, MASTER, combine, isGemmed, isMaster, isShield, isSword, shield, sword, tierOf } from './items';
 import { SHIELD_TOP } from './shields';
 import {
   BARREL,
@@ -10,7 +10,7 @@ import {
   GEM_ORDER_CHANCE,
   HAGGLER_PATIENCE,
   LOOKS,
-  MASTER_MS,
+  APPRENTICE_PRICE,
   MAX_SLOTS,
   PATIENCE_MS,
   PATIENCE_PER_TIER_MS,
@@ -30,8 +30,14 @@ import {
   STREAK_TOP,
   TRAITS,
   TRAIT_CHANCE,
+  apprenticeAbout,
+  apprenticeEvery,
   autoForging,
+  cartsAbout,
   desksOf,
+  knightPay,
+  masterMs,
+  tourneyOpen,
   fitOf,
   forgeMs,
   freeStars,
@@ -65,6 +71,8 @@ import {
 } from './state';
 import { MAX_TIER, ORDER_TOP } from './swords';
 import { locked, nextPrice, type UpgradeId } from './upgrades';
+import { KNIGHTS, KNIGHT_LOOK, KNIGHT_MS, TOURNEY_EVERY_MS, freshTourney, lance, placeOf, purse, tourneyTier } from './tourney';
+import { CART_EVERY_MS, CART_STAY_MS, ORE_IDS, ORE_MS, STARMETAL_TIER, freshCart, noOres, orePrice, type Ore } from './cart';
 
 /**
  * Where the rules' random numbers come from: `Math.random`, so a seeded test repeats, or the daily
@@ -108,10 +116,17 @@ export function tick(s: GameState, dt: number) {
   s.streakMs = Math.max(0, s.streakMs - dt);
   if (s.streakMs === 0) s.streak = 0;
   rust(s, dt);
+  apprentice(s, dt);
+  cartDay(s, dt);
 
   for (const a of s.adventurers) a.patienceMs -= dt;
   for (const a of s.adventurers.filter((a) => a.patienceMs <= 0)) {
     s.adventurers.splice(s.adventurers.indexOf(a), 1);
+    // A knight rides off unarmed: the tourney goes on without them, and the guild minds no more.
+    if (a.knight) {
+      s.events.push({ kind: 'left', desk: a.desk, knight: true });
+      continue;
+    }
     s.walkedOff++;
     s.reputation = Math.max(0, s.reputation - REP_WALKOFF);
     // Someone kept waiting walks across the street to the rival.
@@ -120,6 +135,9 @@ export function tick(s: GameState, dt: number) {
     const half = a.given.sword ?? a.given.shield;
     s.events.push({ kind: 'left', desk: a.desk, back: half === null ? undefined : handBack(s, half) });
   }
+
+  // Knights ride in ahead of the adventurers.
+  if (tourneyOpen(s)) tourneyDay(s, dt);
 
   if (s.adventurers.length < desksOf(s)) {
     s.nextVisitorMs -= dt;
@@ -148,6 +166,142 @@ function rivalDay(s: GameState, dt: number) {
   s.rival = freshRival();
 }
 
+/**
+ * The tourney (AN18): every `TOURNEY_EVERY_MS` three knights ride in, taking desks as they free up
+ * ahead of the adventurers. Once each has a sword or has ridden off, the best sword handed over
+ * jousts against the field: its place pays a purse, and 1st hangs a banner in the smithy.
+ */
+function tourneyDay(s: GameState, dt: number) {
+  const t = s.tourney;
+  if (!t.on) {
+    t.inMs -= dt;
+    if (t.inMs > 0) return;
+    s.tourney = { inMs: TOURNEY_EVERY_MS, on: true, riding: KNIGHTS, wants: tourneyTier(s.bestTier), entries: [] };
+    s.events.push({ kind: 'tourneyStart', wants: s.tourney.wants });
+  }
+  const now = s.tourney;
+  while (now.riding > 0 && freeDesk(s) !== undefined) {
+    arriveKnight(s, now.wants);
+    now.riding--;
+  }
+  if (now.riding > 0 || s.adventurers.some((a) => a.knight)) return;
+  const place = now.entries.length > 0 ? placeOf(Math.max(...now.entries), now.wants) : 0;
+  const coins = place > 0 ? purse(place, now.wants) : 0;
+  const banner = place === 1;
+  s.coins += coins;
+  if (banner) s.banners++;
+  s.events.push({ kind: 'tourney', place, coins, banner });
+  s.tourney = { ...freshTourney(), inMs: TOURNEY_EVERY_MS };
+}
+
+/** A knight rides up to the first free desk, wanting any sword at least as good as `wants` within `KNIGHT_MS`. No random rolls. */
+function arriveKnight(s: GameState, wants: number) {
+  const desk = freeDesk(s);
+  if (desk === undefined) return;
+  const patience = KNIGHT_MS * byDifficulty(1.5, 1, 0.7);
+  s.adventurers.push({
+    id: s.nextId++,
+    desk,
+    wants,
+    gem: false,
+    trait: 'none',
+    shield: 0,
+    patience,
+    patienceMs: patience,
+    look: KNIGHT_LOOK,
+    returned: false,
+    knight: true,
+    given: { sword: null, shield: null },
+  });
+}
+
+/**
+ * The apprentice (AN19): every `apprenticeEvery` they merge one matching pair on the anvils, the
+ * lowest first, leaving Masterworks and the sword in the player's hand alone. With no pair to merge
+ * they wait for one.
+ */
+function apprentice(s: GameState, dt: number) {
+  if (!s.apprentice) return;
+  s.apprenticeMs = Math.max(0, s.apprenticeMs - dt);
+  if (s.apprenticeMs > 0) return;
+  const pair = apprenticePair(s);
+  if (!pair) return;
+  const [to, from] = pair;
+  const made = combine(s.slots[from]!, s.slots[to]!)!;
+  put(s, from, null);
+  put(s, to, made.item);
+  raiseBest(s, made.item);
+  s.apprenticeMs = apprenticeEvery(s);
+  s.events.push({ kind: 'apprenticed', slot: to, from, tier: tierOf(made.item) });
+}
+
+/** The pair the apprentice merges next: the lowest-tier matching pair on the anvils, as [into, from], or null. */
+export function apprenticePair(s: GameState): [number, number] | null {
+  let best: [number, number] | null = null;
+  let bestTier = Infinity;
+  const ok = (slot: number) => {
+    const item = s.slots[slot];
+    return item !== null && slot !== s.held && !(isSword(item) && isMaster(item));
+  };
+  for (let i = 0; i < s.slots.length; i++) {
+    if (!ok(i)) continue;
+    for (let j = i + 1; j < s.slots.length; j++) {
+      if (!ok(j)) continue;
+      const made = combine(s.slots[j]!, s.slots[i]!);
+      if (!made?.merged || tierOf(s.slots[i]!) >= bestTier) continue;
+      best = [i, j];
+      bestTier = tierOf(s.slots[i]!);
+    }
+  }
+  return best;
+}
+
+/** Hires the apprentice, once the smithy has made a Steel Sword, if there are coins enough. */
+export function hireApprentice(s: GameState) {
+  if (s.apprentice || !apprenticeAbout(s) || s.coins < APPRENTICE_PRICE) return false;
+  s.coins -= APPRENTICE_PRICE;
+  s.apprentice = true;
+  s.apprenticeMs = apprenticeEvery(s);
+  s.events.push({ kind: 'hired' });
+  return true;
+}
+
+/**
+ * The ore cart (AN20): once carts are about it comes every `CART_EVERY_MS` and stays `CART_STAY_MS`.
+ * Ores bought from it run down meanwhile.
+ */
+function cartDay(s: GameState, dt: number) {
+  for (const ore of ORE_IDS) s.ores[ore] = Math.max(0, s.ores[ore] - dt);
+  if (!cartsAbout(s)) return;
+  const c = s.cart;
+  if (c.hereMs > 0) {
+    c.hereMs = Math.max(0, c.hereMs - dt);
+    if (c.hereMs === 0) c.inMs = CART_EVERY_MS;
+    return;
+  }
+  c.inMs -= dt;
+  if (c.inMs > 0) return;
+  s.cart = { inMs: 0, hereMs: CART_STAY_MS, sold: { silver: false, starmetal: false } };
+  s.events.push({ kind: 'cart' });
+}
+
+/** Buys an ore from the cart while it is here: once per ore a visit, for `ORE_MS` of forging (added to any left). */
+export function buyOre(s: GameState, ore: Ore) {
+  const price = orePrice(ore, s.bestTier);
+  if (s.cart.hereMs <= 0 || s.cart.sold[ore] || s.coins < price) return false;
+  s.coins -= price;
+  s.ores[ore] += ORE_MS;
+  s.cart.sold[ore] = true;
+  s.events.push({ kind: 'ore', ore });
+  return true;
+}
+
+/** The first free desk at the counter, if any. */
+function freeDesk(s: GameState) {
+  const taken = new Set(s.adventurers.map((a) => a.desk));
+  return [...Array(desksOf(s)).keys()].find((d) => !taken.has(d));
+}
+
 /** Swords left on an anvil dull after `rustMs`, and `RUST_DROP_MS` later drop a tier; the barrel keeps them safe. */
 function rust(s: GameState, dt: number) {
   for (let slot = 0; slot < s.slots.length; slot++) {
@@ -166,8 +320,7 @@ function rust(s: GameState, dt: number) {
 
 /** An adventurer walks up to the first free spot at the counter with an order; a hero back from a quest keeps their look. */
 function arrive(s: GameState, hero?: Returning) {
-  const taken = new Set(s.adventurers.map((a) => a.desk));
-  const desk = [...Array(desksOf(s)).keys()].find((d) => !taken.has(d));
+  const desk = freeDesk(s);
   if (desk === undefined) return null;
   // After the first order, they ask for anything up to one better than the best sword made yet.
   const top = Math.min(ORDER_TOP, Math.max(3, s.bestTier + 1));
@@ -204,6 +357,7 @@ function arrive(s: GameState, hero?: Returning) {
     patienceMs: patience,
     look,
     returned: hero !== undefined,
+    knight: false,
     given: { sword: null, shield: null },
   };
   s.adventurers.push(a);
@@ -255,7 +409,9 @@ export function forge(s: GameState) {
   if (s.heatMs > 0 || edictOffers(s) || hallOffers(s) || (s.daily && s.daily.ms <= 0)) return false;
   const slot = s.slots.indexOf(null);
   if (slot < 0) return false;
-  const tier = random() < oreChance(s) ? 2 : 1;
+  // Starmetal from the ore cart forges Steel blanks; the Fine Ore roll is still made, so the random sequence holds.
+  const fine = random() < oreChance(s) ? 2 : 1;
+  const tier = s.ores.starmetal > 0 ? Math.max(STARMETAL_TIER, fine) : fine;
   const made = s.shieldMode && shieldsAbout(s) ? shield(tier) : tier;
   const item = gemsAbout(s) && random() < gemChance(s) ? GEM : made;
   s.slots[slot] = item;
@@ -282,6 +438,10 @@ export function toggleShieldMode(s: GameState) {
 /** What lies at a place: an anvil, or the quench barrel (`BARREL`). */
 export function itemAt(s: GameState, place: number) {
   return place === BARREL ? s.barrel : (s.slots[place] ?? null);
+}
+/** Notes the place the player holds a sword from (or null once let go), so the apprentice leaves it be. */
+export function hold(s: GameState, place: number | null) {
+  s.held = place;
 }
 /** Tends the sword on an anvil, as picking it up does: it starts afresh against rust. */
 export function touch(s: GameState, place: number) {
@@ -311,7 +471,7 @@ export function drop(s: GameState, from: number, to: number) {
   const there = itemAt(s, to);
   const made = there === null ? null : combine(item, there);
   if (made) {
-    const master = made.merged && isSword(made.item) && s.streakMs > 0 && s.streakMs <= MASTER_MS;
+    const master = made.merged && isSword(made.item) && s.streakMs > 0 && s.streakMs <= masterMs(s);
     const item = master ? made.item + MASTER : made.item;
     put(s, from, null);
     put(s, to, item);
@@ -435,6 +595,18 @@ export function sell(s: GameState, from: number, id: number) {
       return true;
     }
   }
+  // A knight takes the sword for its worth and rides to the joust with it.
+  if (a.knight) {
+    const coins = knightPay(item, s);
+    s.coins += coins;
+    s.sold++;
+    if (rivalOpen(s)) s.rival.mine++;
+    if (s.daily) s.daily.earned += coins;
+    s.tourney.entries.push(lance(item));
+    s.adventurers.splice(s.adventurers.indexOf(a), 1);
+    s.events.push({ kind: 'armed', desk: a.desk, coins, place: placeOf(lance(item), a.wants) });
+    return true;
+  }
   const sold = a.given.sword ?? item;
   const fit = fitOf(sold, a);
   const coins = a.shield > 0 ? setPay(sold, a, s) : payFor(sold, a, s);
@@ -534,6 +706,11 @@ export function foundCharter(s: GameState) {
   s.streak = 0;
   s.streakMs = 0;
   s.rival = freshRival();
+  // The apprentice comes along, quicker for the new charter; the tourney, the cart and the ores start afresh.
+  s.apprenticeMs = apprenticeEvery(s);
+  s.tourney = freshTourney();
+  s.cart = freshCart();
+  s.ores = noOres();
   // The Armoury lays its Iron Shortswords on the new smithy's first anvils.
   for (let k = 0; k < s.halls.armoury; k++) s.slots[k] = 2;
   s.events.push({ kind: 'charter', charter: s.charter });

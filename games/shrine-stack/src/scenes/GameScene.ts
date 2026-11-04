@@ -3,6 +3,8 @@ import { settings } from '../../../../shared/settings';
 import { t } from '../i18n';
 import { BLESSING_INFO, BLESSINGS, type BlessingId } from '../game/blessings';
 import {
+  BUILDING_INFO,
+  BUILDINGS,
   CURSE_INFO,
   KIND_INFO,
   MATERIAL_INFO,
@@ -12,13 +14,29 @@ import {
   SITE_INFO,
   SITES,
   TRIAL_INFO,
+  WEATHER_INFO,
+  type BuildingId,
   type MaterialId,
   type PatronId,
   type ShopId,
   type SiteId,
   type StoneKind,
 } from '../game/catalog';
-import { bestOn, loadRanks, loadSites, openNextSite, pickSite, raiseRank, saveBestOn, type Sites } from '../game/save';
+import {
+  bestOn,
+  build,
+  canBuild,
+  loadRanks,
+  loadSites,
+  loadVillage,
+  openNextSite,
+  pickSite,
+  raiseRank,
+  saveBestOn,
+  welcomePilgrims,
+  type Sites,
+  type Village,
+} from '../game/save';
 import { dailyRand, finishDaily, loadDaily, seedOf, seeded as seededRand, startDaily, today, type DailyRecord } from '../../../../shared/daily';
 import {
   buildOn,
@@ -53,7 +71,12 @@ import {
   LEAN_FROM_TIER,
   LEAN_MAX,
   newGame,
+  PILGRIMS_PER_CROWN,
   PLINTH_W,
+  RAIN_SLIDE,
+  WEATHER_MULT,
+  WELL_FAVOR,
+  YARD_PX,
   reroll,
   RESERVE_FROM_TIER,
   TRIALS_FROM_TIER,
@@ -74,11 +97,11 @@ import { playMusic, playSting, ui } from '../../../../shared/audio';
 import { bellPitch, sfx, SONG } from '../audio';
 import { viewFrame, viewSize } from '../../../../shared/scaling';
 import {
+  BOTTOM_ROW,
   BUILD_ON,
   CARDS,
   CARDS_FOUR,
   CURSE,
-  DAILY_BUTTON,
   FONT,
   GOAL,
   LEAN_BAR,
@@ -97,6 +120,8 @@ import {
   TOP_SCREEN_Y,
   UI_DEPTH,
   VIEW,
+  VILLAGE_BACK,
+  VILLAGE_CARDS,
 } from './layout';
 
 /** The longest step of game time one frame may take, so a hidden tab doesn't drop a stone through the temple. */
@@ -129,7 +154,7 @@ const ALTAR_STONE = 0xcfe2f2;
 /** Curses are drawn in a dusky plum. */
 const CURSE_COLOR = 0xb0609a;
 
-const textStyle = (size: number, color = '#f3e9d2') => ({
+export const textStyle = (size: number, color = '#f3e9d2') => ({
   fontFamily: FONT,
   fontSize: `${size}px`,
   color,
@@ -243,7 +268,7 @@ function materialColor(tier: number, material: MaterialId, goal: number) {
  * Draws a stone `w` wide with its bottom middle at the graphics' origin; heavy ones darker and strapped,
  * light ones pale and porous; marble veined, sandstone grained, basalt pitted.
  */
-function drawStone(
+export function drawStone(
   g: Phaser.GameObjects.Graphics,
   w: number,
   tier: number,
@@ -326,6 +351,19 @@ export class GameScene extends Phaser.Scene {
   /** The site buttons and the daily shrine's button on the patron pick. */
   siteButtons: (Spot & { id: SiteId })[] = [];
   dailyButton: Spot | null = null;
+  /** The village's and the race's buttons on the patron pick, and while the village is open its buildings and Back. */
+  villageButton: Spot | null = null;
+  raceButton: Spot | null = null;
+  buildingButtons: (Spot & { id: BuildingId })[] = [];
+  villageBack: Spot | null = null;
+  /** The pilgrims' village, whether it is open in place of the patron cards, and whether the patron layer is to be rebuilt next frame. */
+  private village!: Village;
+  private villageOpen = false;
+  private patronDirty = false;
+  /** Rain or snow falling over the view, and the game time it has fallen for (held still under reduced motion). */
+  private weatherFx!: Phaser.GameObjects.Graphics;
+  private weatherText!: Phaser.GameObjects.Text;
+  private weatherMs = 0;
   /** Where the temple stands and what is open, and today's daily record. */
   private sites!: Sites;
   private daily!: DailyRecord;
@@ -396,17 +434,27 @@ export class GameScene extends Phaser.Scene {
     super('Game');
   }
 
-  create(data: { daily?: boolean } = {}) {
+  create(data: { daily?: boolean; village?: boolean } = {}) {
     this.sites = loadSites();
     this.daily = loadDaily('shrine-stack');
+    this.village = loadVillage();
     if (data.daily && !this.daily.played) {
       // Today's shrine: one source for the stones' kinds and one for everything else, the same for everyone.
       this.daily = startDaily('shrine-stack');
       this.state = newGame({ best: this.daily.best, daily: { rand: dailyRand('shrine-stack'), kindRand: seededRand(seedOf(`shrine-stack:stones:${today()}`)) } });
     } else {
       const site = this.sites.current;
-      this.state = newGame({ best: bestOn(site), site, sites: this.sites.open, ranks: loadRanks() });
+      // Weather comes once a shrine has been crowned, which opens the cliff.
+      const weather = this.sites.open.length > 1 || this.village.pilgrims > 0;
+      this.state = newGame({ best: bestOn(site), site, sites: this.sites.open, ranks: loadRanks(), weather, village: this.village.built });
     }
+    this.villageOpen = !!data.village && !this.state.daily;
+    this.patronDirty = false;
+    this.villageButton = null;
+    this.raceButton = null;
+    this.buildingButtons = [];
+    this.villageBack = null;
+    this.weatherMs = 0;
     this.goal = goalOf(this.state);
     this.gilded = gildedOf(this.state);
     this.crownNews = [];
@@ -442,6 +490,7 @@ export class GameScene extends Phaser.Scene {
     this.createPlinth();
     this.guide = this.add.graphics().setDepth(4);
     this.moving = this.add.graphics().setDepth(5);
+    this.weatherFx = this.add.graphics().setScrollFactor(0).setDepth(7);
     this.createPanel();
 
     this.hint = this.add
@@ -450,6 +499,13 @@ export class GameScene extends Phaser.Scene {
       .setScrollFactor(0)
       .setDepth(UI_DEPTH);
     this.windText = this.add.text(this.fx + TOWER_X, 20, '', textStyle(15, '#bfe4f4')).setOrigin(0.5).setScrollFactor(0).setDepth(UI_DEPTH);
+    const weather = WEATHER_INFO[this.state.weather];
+    this.weatherText = this.add
+      .text(this.fx + TOWER_X, 40, t('weatherTag', { weather: t(weather.name), mult: WEATHER_MULT }), textStyle(13, weather.color))
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(UI_DEPTH)
+      .setVisible(false);
     this.bannerBack = this.add.rectangle(0, 0, BANNER_MIN.w, BANNER_MIN.h, 0x231c38, 0.92).setStrokeStyle(3, GOLD);
     this.bannerText = this.add
       .text(0, 0, '', { ...textStyle(20), wordWrap: { width: BANNER_WRAP } })
@@ -491,6 +547,8 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     tick(s, dt);
     if (s.phase === 'crowned') this.crownedMs += dt;
+    if (!settings.reduceMotion) this.weatherMs += dt;
+    this.drawWeather();
     // The lake's raft carries the temple side to side.
     this.temple.x = drift(s);
     for (const e of s.events.splice(0)) {
@@ -603,6 +661,7 @@ export class GameScene extends Phaser.Scene {
       g.fillStyle(0x3d5e42).fillEllipse(TOWER_X, PLINTH_Y + 110, 760 + 2 * this.fx, 150);
       g.fillStyle(0x2f4a36).fillRect(left, PLINTH_Y + 60, this.vw, 200 + this.fy);
     }
+    this.drawVillage(g);
     // Three steps up to the plinth, the top one exactly as wide as the plinth: part of the temple.
     const plinth = this.add.graphics();
     this.temple.add(plinth);
@@ -805,7 +864,10 @@ export class GameScene extends Phaser.Scene {
       const info = PATRON_INFO[e.patron];
       sfx('gong');
       const where = s.daily ? t('dailyName') : s.site !== 'hill' ? t(SITE_INFO[s.site].text) : '';
-      this.announce([t('watchesOver', { patron: t(info.name) }), this.boonText(e.patron, s.rank), where].filter(Boolean));
+      const gift = e.gift ? t('innGift', { blessing: t(BLESSING_INFO[e.gift].name) }) : '';
+      const weather = s.weather !== 'clear' ? t(WEATHER_INFO[s.weather].name) : '';
+      this.announce([t('watchesOver', { patron: t(info.name) }), this.boonText(e.patron, s.rank), where, gift, weather].filter(Boolean));
+      if (e.gift === 'broad') this.movingKey = '';
     } else if (e.type === 'crowned') {
       this.onCrowned(e.site, e.patron, e.daily);
     } else {
@@ -835,6 +897,10 @@ export class GameScene extends Phaser.Scene {
     }
     const opened = openNextSite(site);
     if (opened) this.crownNews.push(t('siteOpened', { site: t(SITE_INFO[opened].name) }));
+    // Pilgrims settle below, bringing the favour the temple holds to the village.
+    const favour = Math.max(0, this.state.favor);
+    this.village = welcomePilgrims(PILGRIMS_PER_CROWN, favour);
+    this.crownNews.push(t('pilgrimsArrive', { n: PILGRIMS_PER_CROWN, favour }));
   }
 
   /** A patron's boon, strengthened by their rank. */
@@ -1030,6 +1096,7 @@ export class GameScene extends Phaser.Scene {
     this.drawLean();
     const playing = s.phase === 'swinging' || s.phase === 'falling';
     this.windText.setText(windy(s) && playing ? (s.wind ? t('gust', { arrows: s.wind > 0 ? '>>>' : '<<<', n: Math.abs(s.wind) }) : t('calmAir')) : '');
+    this.weatherText.setVisible(playing && s.weather !== 'clear');
     const counts = BLESSINGS.filter((b) => s.blessings.includes(b)).map((b) => {
       const n = s.blessings.filter((x) => x === b).length;
       const name = n > 1 ? t('blessingCount', { blessing: t(BLESSING_INFO[b].name), n }) : t(BLESSING_INFO[b].name);
@@ -1045,8 +1112,9 @@ export class GameScene extends Phaser.Scene {
       this.offerKey = offerKey;
       this.buildOffer();
     }
-    if ((s.phase === 'patron') !== this.patronShown) {
+    if ((s.phase === 'patron') !== this.patronShown || this.patronDirty) {
       this.patronShown = s.phase === 'patron';
+      this.patronDirty = false;
       this.buildPatrons();
     }
 
@@ -1255,12 +1323,42 @@ export class GameScene extends Phaser.Scene {
     this.patronCards = [];
     this.siteButtons = [];
     this.dailyButton = null;
+    this.villageButton = null;
+    this.raceButton = null;
+    this.buildingButtons = [];
+    this.villageBack = null;
     const s = this.state;
     if (s.phase !== 'patron') return;
     const dim = this.add.rectangle(this.vw / 2, this.vh / 2, this.vw, this.vh, 0x0c0916, 0.55).setInteractive();
+    const parts: UiPart[] = [dim];
+    if (this.villageOpen) parts.push(...this.makeVillage());
+    else parts.push(...this.makePatronCards(), ...this.makeSites(), ...this.makeDaily(), ...this.makeVillageButton(), ...this.makeRace());
+    for (const part of parts) {
+      if (part !== dim) part.setPosition(part.x + this.fx, part.y + this.fy);
+      this.patronParts.push(part.setScrollFactor(0).setDepth(UI_DEPTH + 10));
+    }
+    for (const spot of [...this.patronCards, ...this.siteButtons, this.dailyButton, this.villageButton, this.raceButton, ...this.buildingButtons, this.villageBack]) {
+      if (spot) Object.assign(spot, { x: spot.x + this.fx, y: spot.y + this.fy });
+    }
+  }
+
+  /** The title, the weather (or the patron's rule) and the two patron cards. */
+  private makePatronCards() {
+    const s = this.state;
     const title = this.add.text(PATRON_TITLE.x, PATRON_TITLE.y, t('patronTitle'), textStyle(22, '#f3c64e')).setOrigin(0.5);
-    const sub = this.add.text(PATRON_TITLE.x, PATRON_TITLE.y + 30, t('patronSub'), textStyle(14, '#d8cbe8')).setOrigin(0.5);
-    const parts: UiPart[] = [dim, title, sub];
+    // Weather shows before the first stone, in place of the reminder that the patron's rule lasts.
+    const weather = WEATHER_INFO[s.weather];
+    const subText =
+      s.weather === 'clear'
+        ? t('patronSub')
+        : t('weatherLine', { weather: t(weather.name), text: t(weather.text, { n: RAIN_SLIDE, mult: WEATHER_MULT }) });
+    const sub = setFitted(
+      this.add.text(PATRON_TITLE.x, PATRON_TITLE.y + 30, '', textStyle(14, s.weather === 'clear' ? '#d8cbe8' : weather.color)).setOrigin(0.5),
+      subText,
+      680,
+      14,
+    );
+    const parts: UiPart[] = [title, sub];
     s.patronOffer.forEach((id, i) => {
       const info = PATRON_INFO[id];
       const x = PATRON_CARDS.xs[i];
@@ -1282,14 +1380,9 @@ export class GameScene extends Phaser.Scene {
         .on('pointerout', () => bg.setStrokeStyle(3, rank ? GOLD : 0x6a5a9a))
         .on('pointerdown', () => choosePatron(this.state, id));
       parts.push(bg, icon, name, boon, bane, ranked);
-      this.patronCards.push({ id, x: x + this.fx, y: y + this.fy, w, h });
+      this.patronCards.push({ id, x, y, w, h });
     });
-    parts.push(...this.makeSites(), ...this.makeDaily());
-    for (const part of parts) {
-      if (part !== dim) part.setPosition(part.x + this.fx, part.y + this.fy);
-      this.patronParts.push(part.setScrollFactor(0).setDepth(UI_DEPTH + 10));
-    }
-    for (const spot of [...this.siteButtons, this.dailyButton]) if (spot) Object.assign(spot, { x: spot.x + this.fx, y: spot.y + this.fy });
+    return parts;
   }
 
   /** The shrine sites: the one here lit, the open ones a tap away, the others locked until the site before is crowned. */
@@ -1322,7 +1415,8 @@ export class GameScene extends Phaser.Scene {
 
   /** The daily shrine's button: the same patron and stones for everyone today, one try, then today's score. */
   private makeDaily() {
-    const { x, y, w, h } = DAILY_BUTTON;
+    const { y, w, h } = BOTTOM_ROW;
+    const x = BOTTOM_ROW.xs[0];
     const d = this.daily;
     const ready = !d.played;
     const bg = this.add.rectangle(0, 0, w, h, 0x2c2446).setStrokeStyle(3, ready ? 0x7fc8e8 : 0x3a3052);
@@ -1343,6 +1437,220 @@ export class GameScene extends Phaser.Scene {
       });
     this.dailyButton = { x, y, w, h };
     return place([bg, name, text], x, y, ready ? 1 : 0.7);
+  }
+
+  /** The village's button: what the pilgrims have brought, or a reminder that a crown brings them. */
+  private makeVillageButton() {
+    const { y, w, h } = BOTTOM_ROW;
+    const x = BOTTOM_ROW.xs[1];
+    const v = this.village;
+    const ready = v.pilgrims > 0;
+    const bg = this.add.rectangle(0, 0, w, h, 0x2c2446).setStrokeStyle(3, ready ? 0xd9a066 : 0x3a3052);
+    const name = this.add.text(0, -8, t('villageName'), textStyle(14, ready ? '#f3c64e' : '#8a7ea0')).setOrigin(0.5);
+    const note = ready ? t('villageNote', { n: v.pilgrims, favour: v.favour }) : t('villageEmpty');
+    const text = setFitted(this.add.text(0, 9, '', { fontFamily: FONT, fontSize: '11px', color: '#d8cbe8' }).setOrigin(0.5), note, w - 12, 11);
+    bg.setInteractive({ useHandCursor: ready })
+      .on('pointerover', () => ready && bg.setFillStyle(0x3a3060))
+      .on('pointerout', () => bg.setFillStyle(0x2c2446))
+      .on('pointerdown', () => {
+        if (!ready) return ui('refuse');
+        ui('click');
+        this.villageOpen = true;
+        this.patronDirty = true;
+      });
+    this.villageButton = { x, y, w, h };
+    return place([bg, name, text], x, y, ready ? 1 : 0.7);
+  }
+
+  /** The two-player race's button: two temples side by side on this screen. */
+  private makeRace() {
+    const { y, w, h } = BOTTOM_ROW;
+    const x = BOTTOM_ROW.xs[2];
+    const bg = this.add.rectangle(0, 0, w, h, 0x2c2446).setStrokeStyle(3, 0x9ad46a);
+    const name = this.add.text(0, -8, t('raceName'), textStyle(14, '#c8eaa8')).setOrigin(0.5);
+    const text = setFitted(this.add.text(0, 9, '', { fontFamily: FONT, fontSize: '11px', color: '#d8cbe8' }).setOrigin(0.5), t('raceNote'), w - 12, 11);
+    bg.setInteractive({ useHandCursor: true })
+      .on('pointerover', () => bg.setFillStyle(0x3a3060))
+      .on('pointerout', () => bg.setFillStyle(0x2c2446))
+      .on('pointerdown', () => {
+        sfx('rise');
+        this.scene.start('Race');
+      });
+    this.raceButton = { x, y, w, h };
+    return place([bg, name, text], x, y);
+  }
+
+  /** The pilgrims' village in place of the patron cards: its three buildings, each built once with the pilgrims' favour, and Back. */
+  private makeVillage() {
+    const v = this.village;
+    const title = this.add.text(PATRON_TITLE.x, PATRON_TITLE.y, t('villageTitle'), textStyle(22, '#f3c64e')).setOrigin(0.5);
+    const sub = setFitted(
+      this.add.text(PATRON_TITLE.x, PATRON_TITLE.y + 30, '', textStyle(14, '#d8cbe8')).setOrigin(0.5),
+      t('villageSub', { n: v.pilgrims, favour: v.favour }),
+      680,
+      14,
+    );
+    const parts: UiPart[] = [title, sub];
+    BUILDINGS.forEach((id, i) => {
+      const info = BUILDING_INFO[id];
+      const x = VILLAGE_CARDS.xs[i];
+      const { y, w, h } = VILLAGE_CARDS;
+      const built = v.built.includes(id);
+      const afford = canBuild(v, id);
+      const bg = this.add.rectangle(x, y, w, h, built ? 0x3a3060 : 0x2c2446).setStrokeStyle(3, built ? GOLD : afford ? info.color : 0x4a3a6a);
+      const icon = this.add.graphics().setPosition(x, y - h / 2 + 46);
+      this.drawBuildingIcon(icon, id, info.color);
+      const name = this.add.text(x, y - h / 2 + 96, t(info.name), textStyle(16, '#f3c64e')).setOrigin(0.5);
+      const text = this.add
+        .text(x, y - h / 2 + 114, t(info.text, { n: id === 'well' ? WELL_FAVOR : YARD_PX }), {
+          fontFamily: FONT,
+          fontSize: '12px',
+          color: '#9ad46a',
+          align: 'center',
+          wordWrap: { width: w - 24 },
+          lineSpacing: 2,
+        })
+        .setOrigin(0.5, 0);
+      const cost = this.add
+        .text(x, y + h / 2 - 16, built ? t('buildingBuilt') : t('buildingCost', { n: info.cost }), textStyle(13, built ? '#f3c64e' : afford ? '#f3e9d2' : '#8a7ea0'))
+        .setOrigin(0.5);
+      bg.setInteractive({ useHandCursor: afford })
+        .on('pointerover', () => afford && bg.setFillStyle(0x3a3060))
+        .on('pointerout', () => !built && bg.setFillStyle(0x2c2446))
+        .on('pointerdown', () => {
+          if (!build(id)) return ui('refuse');
+          ui('coin');
+          // A restart starts the temple with the new building, the village still open.
+          this.scene.restart({ village: true });
+        });
+      for (const part of [bg, icon, name, text, cost]) part.setAlpha(afford || built ? 1 : 0.6);
+      parts.push(bg, icon, name, text, cost);
+      this.buildingButtons.push({ id, x, y, w, h });
+    });
+    const hint = setFitted(
+      this.add.text(PATRON_TITLE.x, VILLAGE_CARDS.y + VILLAGE_CARDS.h / 2 + 22, '', { fontFamily: FONT, fontSize: '12px', color: '#a99cc0' }).setOrigin(0.5),
+      t('villageHint'),
+      680,
+      12,
+    );
+    const { x, y } = VILLAGE_BACK;
+    const back = makeButton(this, 0, 0, t('back'), () => {
+      ui('click');
+      this.villageOpen = false;
+      this.patronDirty = true;
+    }) as UiPart[];
+    this.villageBack = { ...VILLAGE_BACK };
+    return [...parts, hint, ...place(back, x, y)];
+  }
+
+  /** A small emblem for each village building, centred on the graphics' origin. */
+  private drawBuildingIcon(g: Phaser.GameObjects.Graphics, id: BuildingId, color: number) {
+    g.fillStyle(color, 0.2).fillCircle(0, 0, 30);
+    g.lineStyle(2, color).strokeCircle(0, 0, 30);
+    this.drawBuilding(g, id, 0, 14, 1);
+  }
+
+  /** A village building standing on (x, base), `k` times its size on the ground. */
+  private drawBuilding(g: Phaser.GameObjects.Graphics, id: BuildingId, x: number, base: number, k: number) {
+    const r = (dx: number, dy: number, w: number, h: number) => g.fillRect(x + dx * k, base + dy * k, w * k, h * k);
+    if (id === 'inn') {
+      // A timbered house with a warm window and a hanging sign.
+      g.fillStyle(OUTLINE);
+      r(-17, -20, 34, 20);
+      g.fillTriangle(x - 21 * k, base - 19 * k, x, base - 34 * k, x + 21 * k, base - 19 * k);
+      g.fillStyle(0xe8d4b0);
+      r(-16, -19, 32, 18);
+      g.fillStyle(0xa04a3a).fillTriangle(x - 18 * k, base - 20 * k, x, base - 32 * k, x + 18 * k, base - 20 * k);
+      g.fillStyle(0x6a4428);
+      r(-16, -12, 32, 2);
+      r(-3, -10, 6, 10);
+      g.fillStyle(0xffd27a);
+      r(-13, -17, 5, 4);
+      r(8, -17, 5, 4);
+      g.fillStyle(0x6a4428);
+      r(17, -16, 6, 2);
+      g.fillStyle(0xd9a066);
+      r(18, -14, 5, 5);
+    } else if (id === 'well') {
+      // A round stone well under a little roof on two posts.
+      g.fillStyle(OUTLINE);
+      r(-11, -10, 22, 10);
+      g.fillStyle(0x9a96a8);
+      r(-10, -9, 20, 8);
+      g.fillStyle(0x7a7688);
+      r(-10, -5, 20, 1);
+      g.fillStyle(0x6a4428);
+      r(-9, -24, 2, 14);
+      r(7, -24, 2, 14);
+      g.fillStyle(0x7fc8e8);
+      r(-1, -18, 2, 6);
+      g.fillStyle(0x5a3a7a).fillTriangle(x - 13 * k, base - 23 * k, x, base - 31 * k, x + 13 * k, base - 23 * k);
+    } else {
+      // A mason's yard: a lean-to, a block on trestles and a stack of cut stone.
+      g.fillStyle(OUTLINE);
+      r(-18, -18, 4, 18);
+      r(-18, -20, 22, 3);
+      g.fillStyle(0x8a5a36);
+      r(-17, -19, 20, 1);
+      g.fillStyle(0xb9c3cc);
+      r(-12, -8, 12, 6);
+      g.fillStyle(0x6a4428);
+      r(-11, -2, 2, 2);
+      r(-3, -2, 2, 2);
+      g.fillStyle(0xd8b58a);
+      r(4, -5, 14, 5);
+      r(6, -10, 10, 5);
+      r(8, -15, 6, 5);
+      g.fillStyle(OUTLINE);
+      r(4, -5, 14, 1);
+      r(6, -10, 10, 1);
+    }
+  }
+
+  /** The pilgrims' village below the shrine on the hill and the cliff: what is built, and the pilgrims who came. */
+  private drawVillage(g: Phaser.GameObjects.Graphics) {
+    const site = this.state.site;
+    if (site === 'lake' || this.state.daily) return;
+    // Where the ground is at `dx` from the temple's middle: the hill's crest curves down, the headland is flat.
+    const ground = (dx: number) =>
+      site === 'hill' ? PLINTH_Y + 110 - 75 * Math.sqrt(Math.max(0, 1 - (dx / 380) ** 2)) + 3 : PLINTH_Y + 40;
+    const spots: Record<BuildingId, number> = { inn: -290, well: -243, yard: -200 };
+    for (const id of BUILDINGS) if (this.village.built.includes(id)) this.drawBuilding(g, id, TOWER_X + spots[id], ground(spots[id]), 1);
+    // The pilgrims stand on the hill's far side, or among the houses on the cliff.
+    const robes = [0xa04a3a, 0x5a7a9a, 0x8a6a3a, 0x6a5a9a, 0x3d7a52, 0xb08a6a];
+    const shown = Math.min(12, this.village.pilgrims);
+    for (let i = 0; i < shown; i++) {
+      const dx = site === 'hill' ? 180 + i * 9 : -300 + i * 9;
+      const x = TOWER_X + dx + (i % 2) * 2;
+      const y = ground(dx);
+      g.fillStyle(OUTLINE).fillRect(x - 3, y - 11, 6, 11);
+      g.fillStyle(robes[i % robes.length]).fillRect(x - 2, y - 10, 4, 10);
+      g.fillStyle(0xe8c8a0).fillRect(x - 2, y - 14, 4, 4);
+    }
+  }
+
+  /** Rain streaks or snowflakes over the view, falling with the game's own time. */
+  private drawWeather() {
+    const g = this.weatherFx.clear();
+    const weather = this.state.weather;
+    if (weather === 'clear') return;
+    const rand = seeded(weather === 'rain' ? 4242 : 7171);
+    const ms = this.weatherMs;
+    const count = weather === 'rain' ? 70 : 50;
+    for (let i = 0; i < count; i++) {
+      const x0 = rand() * this.vw;
+      const y0 = rand() * this.vh;
+      const speed = 0.4 + rand() * 0.3;
+      if (weather === 'rain') {
+        const y = (y0 + ms * speed) % (this.vh + 20) - 20;
+        const x = (x0 - (y + 20) * 0.15 + this.vw) % this.vw;
+        g.fillStyle(0x9ac8f0, 0.45).fillRect(Math.round(x), Math.round(y), 1, 9);
+      } else {
+        const y = (y0 + ms * speed * 0.12) % (this.vh + 10) - 10;
+        const x = (x0 + 8 * Math.sin(ms / 900 + i) + this.vw) % this.vw;
+        g.fillStyle(0xf4fbff, 0.7).fillRect(Math.round(x), Math.round(y), 2, 2);
+      }
+    }
   }
 
   /** A small emblem for each patron, centred on the graphics' origin. */

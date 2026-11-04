@@ -44,6 +44,7 @@ import {
   buy,
   canAfford,
   canCamp,
+  canTrade,
   carriesOver,
   chartOf,
   closeAtlas,
@@ -60,12 +61,15 @@ import {
   milestonesDue,
   newGame,
   pickCommission,
+  pickTrade,
   pitchCamp,
   returnToPort,
   runScore,
   sellChart,
   setSail,
+  snowHides,
   survey,
+  tradeVillages,
   valueOf,
 } from '../game/sim';
 import { HANDS } from '../game/hands';
@@ -77,9 +81,13 @@ import {
   MILESTONES,
   ROYAL_KINDS,
   SELL_BACK,
+  TRADES,
+  TRADE_GUIDE,
+  TRADE_STORES,
   TREASURE_VALUE,
   WRECK_SUPPLIES,
   indexOf,
+  isWinter,
   maxSupplies,
   rankOf,
   type Clue,
@@ -89,6 +97,7 @@ import {
   type Point,
   type Run,
   type Tile,
+  type Trade,
 } from '../game/state';
 import { CHART_ORDER, TERRAIN, isLandmark } from '../game/terrain';
 import { UPGRADES, UPGRADE_IDS, nextCost } from '../game/upgrades';
@@ -107,6 +116,7 @@ import {
   RETURN_BUTTON,
   SHOP,
   SMALL_BUTTON,
+  TRADE_CARD,
   UI_DEPTH,
   tileCentre,
 } from './layout';
@@ -251,7 +261,7 @@ export class GameScene extends Phaser.Scene {
   /** The atlas waiting at the harbour while an expedition or the daily isle is under way (`state`). */
   private atlasState: GameState | null = null;
   /** A page opened over the harbour: the far isles or the wonder gallery. */
-  private sheetView: '' | 'expeditions' | 'wonders' = '';
+  private sheetView: '' | 'expeditions' | 'wonders' | 'trade' = '';
 
   constructor() {
     super('Game');
@@ -537,7 +547,7 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     if (s.tiles !== this.paintedTiles) {
       this.paintedTiles = s.tiles;
-      paintTerrain(this.terrainTex.context, s.tiles);
+      paintTerrain(this.terrainTex.context, s.tiles, isWinter(s.island));
       this.terrainTex.refresh();
       for (const n of this.names) n.text.destroy();
       this.names = placeNames(s.tiles, s.island, s.port, s.features).map((n) => {
@@ -573,7 +583,7 @@ export class GameScene extends Phaser.Scene {
         this.freshAt.set(i, this.clock);
       });
       this.known = s.tiles.map((t) => t.revealed);
-      paintFog(this.fogTex.context, s.tiles);
+      paintFog(this.fogTex.context, s.tiles, isWinter(s.island));
       this.fogTex.refresh();
       for (const n of this.names) n.text.setVisible(s.tiles[indexOf(n.tile.x, n.tile.y)].revealed);
     }
@@ -874,7 +884,10 @@ export class GameScene extends Phaser.Scene {
     if (s.phase === 'survey') {
       const pulse = settings.reduceMotion ? 0.5 : 0.5 + 0.5 * Math.sin(this.clock / 300);
       for (const p of frontier(s)) {
-        const can = canAfford(s, p);
+        // On a winter isle, snow hides what a tile costs (and so whether the supplies can pay it)
+        // until the surveyor stands next to it.
+        const hidden = snowHides(s, p.x, p.y);
+        const can = hidden ? s.supplies > 0 : canAfford(s, p);
         const m = can ? hex(MAGENTA) : hex(GREY);
         const x = MAP.x + p.x * MAP.tile + 3;
         const y = MAP.y + p.y * MAP.tile + 3;
@@ -893,16 +906,18 @@ export class GameScene extends Phaser.Scene {
         g.lineStyle(1, m).strokeTriangle(c.x, cy - 5, c.x + 5, cy + 3.5, c.x - 5, cy + 3.5);
         g.fillStyle(lit ? hex(ON_MAGENTA) : m).fillCircle(c.x, cy + 0.75, 1);
         const cost = costOf(s, p.x, p.y);
-        if (!lit && cost !== 1) {
+        if (!lit && (cost !== 1 || hidden)) {
           const label = this.costLabel(used++);
-          const caption = cost === 0 ? t('free') : `−${cost}`;
+          const caption = hidden ? '?' : cost === 0 ? t('free') : `−${cost}`;
           if (label.text !== caption) label.setText(caption);
           label.setPosition(c.x, c.y + 10).setColor(can ? MAGENTA : GREY).setVisible(true);
         }
         if (lit) {
           const f = featureAt(s, p.x, p.y);
-          const price = cost === 0 ? t('freeToFollow') : t('supplyCost', { n: cost });
-          this.showPill(c, f ? t('finishes', { price, name: t(f.name), n: f.bonus }) : price);
+          const landing = s.landing?.x === p.x && s.landing.y === p.y;
+          const price = hidden ? t('underSnow') : cost === 0 ? t('freeToFollow') : t('supplyCost', { n: cost });
+          const caption = f && !hidden ? t('finishes', { price, name: t(f.name), n: f.bonus }) : price;
+          this.showPill(c, landing ? t('sloopLanding', { price: caption }) : caption);
         }
       }
       const h = this.hover;
@@ -956,6 +971,10 @@ export class GameScene extends Phaser.Scene {
     else if (r?.rival && s.tiles[indexOf(r.at.x, r.at.y)].revealed) want.set(`dug:${indexOf(r.at.x, r.at.y)}`, { key: 'dug', ...at(r.at, 0, 6), scale: 0.9 });
     // The isle's wonder, once its tile and every tile beside it are charted.
     if (s.wonder?.seen) want.set('wonder', { key: `wonder-${s.wonder.kind}`, ...at(s.wonder.at, 0, 0), scale: 0.9 });
+    // A village's rumour marks the wonder's tile through the fog until it is seen.
+    else if (s.wonder?.rumour) want.set('rumour', { key: 'rumour', ...at(s.wonder.at, 0, 0), scale: 1.1 });
+    // The coastal sloop at anchor off its landing, until the landing is charted.
+    if (s.phase === 'survey' && s.landing) want.set(`sloop:${indexOf(s.landing.x, s.landing.y)}`, { key: 'sloop', ...at(s.landing, 10, -9), scale: 0.85 });
     for (const p of s.camps) want.set(`camp:${indexOf(p.x, p.y)}`, { key: 'camp', ...at(p, 9, -9), scale: 1 });
     // The rival's claims show through the paper, so you know which tiles will sell for half.
     for (const p of s.rival?.claims ?? []) want.set(`claim:${indexOf(p.x, p.y)}`, { key: 'claim', ...at(p, 11, -10), scale: 0.8 });
@@ -966,7 +985,7 @@ export class GameScene extends Phaser.Scene {
     }
     for (const [id, m] of want) {
       if (this.marks.has(id)) continue;
-      this.marks.set(id, this.add.image(m.x, m.y, m.key).setScale(m.scale / HI).setDepth(m.key === 'camp' || m.key === 'claim' ? 5.5 : m.key.startsWith('wonder') ? 3.6 : 3.5));
+      this.marks.set(id, this.add.image(m.x, m.y, m.key).setScale(m.scale / HI).setDepth(m.key === 'camp' || m.key === 'claim' || m.key === 'sloop' ? 5.5 : m.key.startsWith('wonder') || m.key === 'rumour' ? 3.6 : 3.5));
     }
   }
 
@@ -1141,8 +1160,10 @@ export class GameScene extends Phaser.Scene {
     const head = runHead(s.run);
     set(this.header.isle, head ?? t('isleHead', { n: s.island }));
     this.header.sheet.setX(24 + this.header.isle.width + 14);
-    const aboard = s.hand ? t('aboard', { hand: t(HANDS[s.hand].name).toUpperCase() }) : '';
-    const kind = t(KINDS[s.kind].name).toUpperCase();
+    const guide = s.guide > 0 ? t('guideAboard', { n: s.guide }) : '';
+    const aboard = (s.hand ? t('aboard', { hand: t(HANDS[s.hand].name).toUpperCase() }) : '') + guide;
+    const kindName = t(KINDS[s.kind].name);
+    const kind = (isWinter(s.island) ? t('winterKind', { kind: kindName }) : kindName).toUpperCase();
     set(this.header.sheet, s.run ? t('runSheet', { kind }) : t('sheetHead', { kind, sheet: s.voyage - s.isleStart + 1, aboard }));
     set(p.isle, s.run ? t('runPanel', { n: s.run.supplies }) : t('panelIsle', { island: s.island, voyage: s.voyage }));
     // The atlas waits at the harbour during a run; its pages still show.
@@ -1296,7 +1317,7 @@ export class GameScene extends Phaser.Scene {
   private syncOverlay() {
     const s = this.state;
     const pick = s.board.findIndex((_, n) => isPicked(s, n));
-    const key = s.phase === 'survey' ? '' : `${s.phase}:${s.coins}:${JSON.stringify(s.ranks)}:${s.hand}:${pick}:${this.sheetView}:${s.run?.mode ?? ''}`;
+    const key = s.phase === 'survey' ? '' : `${s.phase}:${s.coins}:${JSON.stringify(s.ranks)}:${s.hand}:${pick}:${s.trade}:${this.sheetView}:${s.run?.mode ?? ''}`;
     if (key === this.overlayKey) return;
     this.overlayKey = key;
     this.overlay?.destroy();
@@ -1306,6 +1327,7 @@ export class GameScene extends Phaser.Scene {
     if (s.phase === 'atlas') this.showAtlas();
     if (s.phase === 'harbor' && this.sheetView === 'expeditions') this.showExpeditions();
     else if (s.phase === 'harbor' && this.sheetView === 'wonders') this.showWonders();
+    else if (s.phase === 'harbor' && this.sheetView === 'trade') this.showTrade();
     else if (s.phase === 'harbor') this.showHarbor();
   }
 
@@ -1598,6 +1620,84 @@ export class GameScene extends Phaser.Scene {
     this.spots.back = { ...OVERLAY_BUTTON };
   }
 
+  /** The village trade page: what a charted village gives for a copy of your chart, one trade for the next voyage. */
+  private showTrade() {
+    const s = this.state;
+    const c = this.overlayBase(t('tradeTitle'));
+    const top = OVERLAY.y - OVERLAY.h / 2;
+    const left = OVERLAY.x - OVERLAY.w / 2 + 34;
+    const right = OVERLAY.x + OVERLAY.w / 2 - 34;
+    c.add(this.text(left, top + 74, t('tradeLine'), { size: 11.5, weight: 600, wrap: right - left }).setOrigin(0, 0.5));
+    c.add(this.text(left, top + 104, t('tradeOffers', { n: tradeVillages(s).length }), { size: 10, weight: 700, color: MAGENTA }).setOrigin(0, 0.5));
+    const g = this.add.graphics();
+    c.add(g);
+    const nextIsle = islandCharted(s);
+    TRADES.forEach((id, n) => {
+      const y = top + 156 + n * 62;
+      const can = canTrade(s, id);
+      const on = s.trade === id;
+      g.fillStyle(hex(RULE)).fillRect(left, y - 31, right - left, 1);
+      c.add(this.add.image(left + 14, y, tradeIcon(id)).setScale(1.2 / HI));
+      c.add(this.text(left + 40, y - 9, t(TRADE_NAMES[id]), { size: 13, weight: 800, color: can || on ? INK : GREY }).setOrigin(0, 0.5));
+      const text =
+        id === 'stores'
+          ? t('storesText', { n: TRADE_STORES })
+          : id === 'guide'
+            ? t('guideText', { n: TRADE_GUIDE })
+            : nextIsle
+              ? t('rumourNext')
+              : can || on
+                ? t('rumourText')
+                : t('rumourDone');
+      const line = this.text(left + 40, y + 9, text, { size: 10.5, weight: 500, color: SLATE }).setOrigin(0, 0.5);
+      const room = right - SMALL_BUTTON.w - 16 - (left + 40);
+      c.add(line.setScale(Math.min(1, room / line.width), 1));
+      const bx = right - SMALL_BUTTON.w / 2;
+      c.add(
+        makeButton(
+          this,
+          bx,
+          y,
+          on ? t('tradeTaken') : t('tradeTake'),
+          () => {
+            if (!pickTrade(this.state, on ? null : id)) return ui('refuse');
+            saveGame(this.state);
+            if (on) ui('click');
+            else sfx('hire');
+          },
+          SMALL_BUTTON,
+          can || on,
+        ),
+      );
+      this.spots[`trade-${id}`] = { x: bx, y };
+    });
+    c.add(
+      makeButton(this, OVERLAY_BUTTON.x, OVERLAY_BUTTON.y, t('back'), () => {
+        ui('click');
+        this.sheetView = '';
+      }),
+    );
+    this.spots.back = { ...OVERLAY_BUTTON };
+  }
+
+  /** Notices for a voyage just set out: the village's trade, winter, and the sloop's landing. */
+  private sailNotices(trade: Trade | null, newIsle: boolean) {
+    const s = this.state;
+    const port = tileCentre(s.port.x, s.port.y);
+    let dy = -30;
+    const say = (caption: string) => {
+      this.notice(port.x, port.y + dy, caption, true);
+      dy -= 22;
+    };
+    if (trade === 'stores') say(t('storesJoin', { n: TRADE_STORES }));
+    if (trade === 'guide') say(t('guideJoins', { n: TRADE_GUIDE }));
+    if (newIsle && isWinter(s.island)) say(t('winterNotice'));
+    if (s.landing) {
+      const c = tileCentre(s.landing.x, s.landing.y);
+      this.notice(c.x, c.y - 30, t('sloopLands'));
+    }
+  }
+
   /** The Royal Atlas: the win page, with the four pages, the voyages it took and the best. */
   private showAtlas() {
     const s = this.state;
@@ -1732,6 +1832,25 @@ export class GameScene extends Phaser.Scene {
       this.spots[`hire-${id}`] = { x: hx + HANDS_COLUMN.w / 2, y };
     });
     if (s.hands.length === 0) c.add(this.text(hx, HANDS_COLUMN.y, t('noHands'), { size: 9.5, weight: 500, color: SLATE }).setOrigin(0, 0.5));
+    // Village trade, under the hands: a card that opens the trade page once a village is charted.
+    c.add(small(hx, TRADE_CARD.y - TRADE_CARD.h / 2 - 12, t('tradeHead')));
+    const villages = tradeVillages(s).length;
+    if (villages > 0) {
+      const on = !!s.trade;
+      const card = this.card(hx, TRADE_CARD.y, HANDS_COLUMN.w, TRADE_CARD.h, on, () => {
+        this.sheetView = 'trade';
+        return true;
+      }, 'click');
+      c.add(card);
+      c.add(this.add.image(hx + 16, TRADE_CARD.y, s.trade ? tradeIcon(s.trade) : 'icon-provisions').setScale(0.9 / HI));
+      c.add(this.text(hx + 32, TRADE_CARD.y - 8, t('tradeButton'), { size: 11, weight: 800, color: on ? ON_INK : INK }).setOrigin(0, 0.5));
+      const sub = s.trade ? t('tradePicked', { trade: t(TRADE_NAMES[s.trade]) }) : t('tradeOffers', { n: villages });
+      const line = this.text(hx + 32, TRADE_CARD.y + 7, sub, { size: 8, weight: 500, color: on ? ON_INK_ACCENT : SLATE }).setOrigin(0, 0.5);
+      c.add(line.setScale(Math.min(1, (HANDS_COLUMN.w - 38) / line.width), 1));
+      this.spots.trade = { x: hx + HANDS_COLUMN.w / 2, y: TRADE_CARD.y };
+    } else {
+      c.add(this.text(hx, TRADE_CARD.y, t('tradeNone'), { size: 9.5, weight: 500, color: SLATE }).setOrigin(0, 0.5));
+    }
     // The commission board, across the bottom: the one picked is inked.
     const by = BOARD.y - BOARD.h / 2 - 14;
     g.fillStyle(hex(RULE)).fillRect(left, by - 12, right - left, 1);
@@ -1788,9 +1907,12 @@ export class GameScene extends Phaser.Scene {
     const { pct } = isleProgress(s);
     c.add(small(right, ay - 8, t('isleHead', { n: s.island }), 1));
     c.add(this.text(right, ay + 7, t('pctSurveyed', { n: pct }), { size: 10, weight: 700, color: pct === 100 ? MAGENTA : INK }).setOrigin(1, 0.5));
-    const caption = islandCharted(s) ? t(KINDS[kindOf(s.island + 1)].sail) : t('setSail');
+    const sail = t(KINDS[kindOf(s.island + 1)].sail);
+    const caption = islandCharted(s) ? (isWinter(s.island + 1) ? t('winterSail', { sail }) : sail) : t('setSail');
     c.add(
       makeButton(this, OVERLAY_BUTTON.x, OVERLAY_BUTTON.y, caption, () => {
+        const trade = this.state.trade;
+        const newIsle = islandCharted(this.state);
         if (!setSail(this.state)) return;
         saveGame(this.state);
         sfx('swell');
@@ -1798,6 +1920,7 @@ export class GameScene extends Phaser.Scene {
         this.endSweep();
         // The surveyor starts the voyage at the port, not walking back from the last tile.
         this.walker = tileCentre(this.state.port.x, this.state.port.y);
+        this.sailNotices(trade, newIsle);
       }),
     );
     this.spots.sail = { ...OVERLAY_BUTTON };
@@ -1815,6 +1938,10 @@ export class GameScene extends Phaser.Scene {
     return box;
   }
 }
+
+/** Each village trade's name, and its icon. */
+const TRADE_NAMES: Record<Trade, TextKey> = { stores: 'storesName', guide: 'guideName', rumour: 'rumourName' };
+const tradeIcon = (id: Trade) => (id === 'stores' ? 'icon-provisions' : `trade-${id}`);
 
 /** A commission in words: "Chart 3 forests this voyage: +12c", or "7 forests over 2 voyages" when short. */
 function commissionText(c: Commission, form: 'full' | 'short' = 'full') {

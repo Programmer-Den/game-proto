@@ -8,12 +8,16 @@ import { MEADOWS } from './meadows';
 import { WINTER_EAT_MS, YEAR_MS } from './seasons';
 import { freshProgress, type Progress } from './state';
 import { FAIR_CLASSES } from './fair';
+import { BEDS, BLOOMS, RARE_CAP, RARE_KINDS, type Bloom } from './garden';
+import { WARES, type Commission, type Ware } from './workshop';
+import type { RoyalAsk } from './warrant';
 import { QUEEN_IDS, type Queen } from './swarm';
 import { UPGRADES, UPGRADE_IDS } from './upgrades';
 
 // The comb, the coins, the jars, the wax, the bees, the upgrades, the meadows unlocked, where the
 // bees forage, the season and years, the time to the bees' next winter meal, the casks, the hives and the queen, the fair entries and fairs held,
-// the tired meadows, the traits bred in, the comb honey cut, this season's buyer's book, the bees lent to the orchard and when the hive was last seen are saved; bees out foraging come home on load, and
+// the tired meadows, the traits bred in, the comb honey cut, this season's buyer's book, the garden and its rare honey, the
+// workshop's goods and commissions, the royal warrant and the crown's ask, the bees lent to the orchard and when the hive was last seen are saved; bees out foraging come home on load, and
 // wasps, the market, village orders, contract offers and a swarm start afresh.
 const KEY = 'beehive-baron-progress';
 
@@ -66,6 +70,14 @@ export function loadProgress(): Progress {
           ? [{ city: Math.min(CITIES.length - 1, num(a.city, 0)), grade: a.grade as Grade, kind: a.kind as Kind, count: num(a.count, 1), price: num(a.price, 0), done: a.done === true }]
           : [],
       ).slice(0, GRADES.length),
+      garden: [...Array(BEDS).keys()].map((i) => (BLOOMS.includes(saved.garden?.[i] as Bloom) ? (saved.garden?.[i] as Bloom) : null)),
+      rare: Object.fromEntries(RARE_KINDS.map((r) => [r, Math.min(RARE_CAP, num(saved.rare?.[r], 0))])) as Progress['rare'],
+      wares: Object.fromEntries(WARES.map((w) => [w, num(saved.wares?.[w], 0)])) as Progress['wares'],
+      commissions: (Array.isArray(saved.commissions) ? saved.commissions : []).flatMap((c: Partial<Commission>) =>
+        WARES.includes(c?.ware as Ware) && num(c.count, 0) > 0 ? [{ ware: c.ware as Ware, count: num(c.count, 1), price: num(c.price, 0), done: c.done === true }] : [],
+      ).slice(0, WARES.length),
+      warrant: num(saved.warrant, 0),
+      royal: royalOf(saved.royal),
       lent:
         saved.lent && typeof saved.lent === 'object' && num(saved.lent.bees, 0) > 0
           ? { bees: num(saved.lent.bees, 0), leftMs: Math.min(CONTRACT_MS, num(saved.lent.leftMs, CONTRACT_MS)) }
@@ -75,6 +87,13 @@ export function loadProgress(): Progress {
   } catch {
     return fresh;
   }
+}
+
+/** A saved ask from the crown, checked, or null. */
+function royalOf(saved: unknown): RoyalAsk | null {
+  const r = saved as Partial<RoyalAsk> | null | undefined;
+  if (!r || (r.grade !== 'pure' && r.grade !== 'comb') || !KINDS.includes(r.kind as Kind) || typeof r.count !== 'number' || !(r.count > 0)) return null;
+  return { grade: r.grade, kind: r.kind as Kind, count: Math.floor(r.count), done: r.done === true };
 }
 
 export function saveProgress(progress: Progress) {

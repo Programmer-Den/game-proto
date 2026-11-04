@@ -27,6 +27,8 @@ const en = {
   planksLower: 'planks',
   iron: 'Iron',
   ironLower: 'iron',
+  wares: 'Wares',
+  waresLower: 'wares',
   passengers: 'Passengers',
   passengersLower: 'passengers',
 
@@ -68,6 +70,10 @@ const en = {
   festivalBanner: 'Festival at {village}: bring it {n} loads!',
   roundJoins: 'Round {round}: {village} joins the line',
   roundBanner: 'Round {round}',
+  townBanner: '{village} grows into a town: bigger orders and wares!',
+  rivalBanner: 'A rival line sets up in the valley and races you for orders',
+  lampsBanner: 'Tap track to hang a lamp: night rounds are coming',
+  nightBanner: 'Night falls: unlit track slows the wyrm',
 
   // Floating texts over the valley
   depotPop: 'Depot -{n}',
@@ -82,6 +88,11 @@ const en = {
   munch: 'Munch!',
   gifts: 'Gifts!',
   late: '{cargo} late!',
+  lampPop: 'Lamp -{n}',
+  warehousePop: 'Warehouse -{n}',
+  backInStore: 'Back in store',
+  beatRival: 'Beat the rival!',
+  rivalTook: 'Rival took the {cargo}',
 
   // The kinds of valley in a chain, and what is different about each
   meadowName: 'the green meadow',
@@ -145,6 +156,7 @@ const en = {
   route: '{from} > {to}',
   rushOrder: 'rush order',
   morePay: '+{n}% pay',
+  rivalRace: 'Rival racing!',
 
   // The HUD: the round and what each wyrm is doing
   festivalProgress: 'Festival: {n}/{goal} delivered',
@@ -167,6 +179,9 @@ const en = {
   hintRemove: 'Tap track to take it up for half its cost. Tap Remove again to lay track.',
   hintPlain: 'Plain track joins only the piece it continues. Track on all four sides makes a crossing.',
   hintDepot: 'Tap a village for a depot ({cost}c): its goods wait at half speed and load at once.',
+  hintWarehouse: 'Tap a village for a depot ({cost}c), or a town with a depot for a warehouse ({warehouse}c).',
+  hintNight: 'Night: unlit track slows the wyrm. Tap track to hang a lamp ({cost}c).',
+  hintRival: 'The rival takes orders between villages it reaches: send the wyrm first.',
   hintWashout: 'A washout is coming: lay a way round it, or rebuild the track after.',
   hintRockfall: 'A rockfall is coming: lay a way round it, or rebuild the track after.',
   hintCourier: 'A village is sulking: tap it to send a free wyrm with gifts ({cost}c).',

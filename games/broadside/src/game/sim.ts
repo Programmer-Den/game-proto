@@ -55,6 +55,9 @@ import {
   wrapPoint,
 } from './state';
 import { medalsFor } from './admiralty';
+import { DIVE_MS, FIRST_DIVE_MS, HEAD_MS, isBeast, type BeastKind, SURFACE_AT, TENTACLE_MS, TENTACLE_R, TENTACLE_SPREAD } from './beasts';
+import { FLARE_MS, FLARES, FLASH_MS, isNightWave, NIGHT_SIGHT } from './night';
+import { cargoPrice, cargoSale, HOLD_MAX, RAIDER_BRIG_WAVE, raidersFor, type CargoId } from './trade';
 import { costOf, HIRE, REPAIR_COST, type UpgradeId } from './upgrades';
 import { fortsFor, HAVEN_WAVE, hpScale, inReaches, reachWave, TEMPEST_WAVE, waveShips } from './waves';
 
@@ -132,6 +135,7 @@ export function tick(s: GameState, dt: number) {
     ship.agroundMs = Math.max(0, ship.agroundMs - dt);
     ship.slowMs = Math.max(0, ship.slowMs - dt);
     ship.jamMs = Math.max(0, ship.jamMs - dt);
+    ship.flashMs = Math.max(0, ship.flashMs - dt);
   }
   for (const fort of s.forts) fort.hitMs = Math.max(0, fort.hitMs - dt);
   if (s.phase === 'harbor' || s.phase === 'over' || s.phase === 'won') return;
@@ -144,6 +148,7 @@ export function tick(s: GameState, dt: number) {
     }
   }
 
+  s.flareMs = Math.max(0, s.flareMs - dt);
   const p = stats(s);
   steer(s.player, s.player.heading + (s.helm * Math.PI) / 2, p.turn * Math.abs(s.helm), p.speed * windSpeed(s.wind, s.player.heading), dt);
   if (s.phase !== 'fighting') {
@@ -162,7 +167,9 @@ export function tick(s: GameState, dt: number) {
   for (const e of s.escorts) sailEscort(s, e, dt);
   escape(s, dt);
   separate(s);
+  // A sea beast lies under the sea, out of reach of beaches and reefs.
   for (const ship of [s.player, ...s.enemies, ...s.escorts]) {
+    if (isBeast(ship.kind)) continue;
     runAground(s, ship);
     strikeReefs(s, ship);
   }
@@ -171,9 +178,11 @@ export function tick(s: GameState, dt: number) {
   ownMortar(s, dt);
   enemyBroadsides(s, dt);
   escortBroadsides(s, dt);
+  beasts(s, dt);
   fortsFire(s, dt);
   moveBalls(s, dt);
   landShells(s, dt);
+  riseTentacles(s, dt);
   ram(s);
   tempestCalls(s);
 
@@ -370,6 +379,11 @@ function spawn(s: GameState, dt: number) {
   const hp = Math.round(type.hp * hpScale(s.wave) * byDifficulty(0.75, 1, 1.3));
   const ship = newShip(s.nextId++, kind, x, y, bearing({ x, y }, s.player), hp, type.radius, type.crew);
   if (type.role === 'merchant') ship.escapeMs = ESCAPE_MS;
+  // A sea beast rises under the sea and comes up for the first time a little later.
+  if (type.role === 'beast') {
+    ship.diveMs = FIRST_DIVE_MS;
+    ship.reload.port = type.reloadMs;
+  }
   // The first ship of a named captain's kind due this wave is hers: sturdier, and more so each time she got away.
   const named = s.named.find((id) => CAPTAINS[id].kind === kind);
   if (named) {
@@ -434,7 +448,7 @@ function arrive(s: GameState) {
 }
 
 /** An enemy ship crippled enough to board and take: under a fifth of its hull (a quarter with Renown). Fireships burn instead. */
-export const boardable = (e: Ship, renown = false) => e.kind !== 'player' && e.kind !== 'fireship' && e.hp > 0 && e.hp <= e.maxHp * (renown ? RENOWN_BOARD_HP : BOARD_HP);
+export const boardable = (e: Ship, renown = false) => e.kind !== 'player' && e.kind !== 'fireship' && !isBeast(e.kind) && e.hp > 0 && e.hp <= e.maxHp * (renown ? RENOWN_BOARD_HP : BOARD_HP);
 
 /**
  * How fast an enemy ship (or a prize) sails right now on its heading: with or against the wind,
@@ -458,6 +472,8 @@ export function speedOf(s: GameState, e: Ship) {
  * bear off a beach rather than run onto it.
  */
 function sailEnemy(s: GameState, e: Ship, dt: number) {
+  // A sea beast never sails: it rises and dives in `beasts`.
+  if (isBeast(e.kind)) return;
   // On a convoy wave the sloops and fireships hunt the merchantman rather than the player.
   const convoy = convoyShip(s);
   captain(s, e, convoy && (e.kind === 'sloop' || e.kind === 'fireship') ? convoy : s.player, dt);
@@ -537,7 +553,7 @@ function sailConvoy(s: GameState, e: Ship, to: number, dt: number) {
 function nearestFoe(s: GameState, from: { x: number; y: number }, within: number) {
   let best: Ship | null = null;
   for (const e of s.enemies) {
-    if (e.hp <= 0 || distance(from, e) >= within) continue;
+    if (!afloat(e) || distance(from, e) >= within) continue;
     if (!best || distance(from, e) < distance(from, best)) best = e;
   }
   return best;
@@ -674,7 +690,7 @@ function fend(e: Ship, want: number, skip = -1) {
 
 /** Pushes overlapping ships apart. */
 function separate(s: GameState) {
-  const ships = [s.player, ...s.enemies, ...s.escorts];
+  const ships = [s.player, ...s.enemies, ...s.escorts].filter((ship) => !isBeast(ship.kind));
   for (let i = 0; i < ships.length; i++) {
     for (let j = i + 1; j < ships.length; j++) {
       const a = ships[i];
@@ -731,7 +747,7 @@ function firePlayer(s: GameState, side: Side, charge: number) {
   const out = player.heading + (side === 'starboard' ? Math.PI / 2 : -Math.PI / 2);
   const inReach = reach * windReach(s.wind, out);
   const target = s.enemies
-    .filter((e) => e.hp > 0 && distance(player, e) < inReach + radiusOf(e) && Math.abs(wrap(bearing(player, e) - out)) < p.arc + TRAIN_SLACK)
+    .filter((e) => afloat(e) && seen(s, e) && distance(player, e) < inReach + radiusOf(e) && Math.abs(wrap(bearing(player, e) - out)) < p.arc + TRAIN_SLACK)
     .sort((a, b) => distance(player, a) - distance(player, b))[0];
   if (hull.mortarSide === side) {
     // The shell comes down where the target will be (as far round as the mortar trains), or straight out at the reach.
@@ -847,7 +863,7 @@ function escortBroadsides(s: GameState, dt: number) {
     for (const side of SIDES) {
       e.reload[side] = Math.max(0, e.reload[side] - reloadStep(e, dt * pace));
       if (e.reload[side] > 0) continue;
-      const target = s.enemies.find((t) => t.hp > 0 && distance(e, t) < type.range && sideFacing(e, t) === side);
+      const target = s.enemies.find((t) => afloat(t) && distance(e, t) < type.range && sideFacing(e, t) === side);
       if (!target) continue;
       fire(s, e, side, target, speedOf(s, target), type.guns, type.damage, type.range, ENEMY_SPREAD, 'round', 1, 1, true);
       e.reload[side] = type.reloadMs;
@@ -866,6 +882,7 @@ function mortar(s: GameState, e: Ship, target: Ship, targetSpeed: number, dt: nu
   if (e.reload.port > 0 || distance(e, target) >= type.range) return;
   lobAt(s, e, target, targetSpeed, type.damage, SHELL_SPREAD);
   e.reload.port = type.reloadMs;
+  e.flashMs = FLASH_MS;
 }
 
 /** Lobs a shell at where `target` will be in `SHELL_MS` if it holds its course, off by up to `spread`. Uses random() twice. */
@@ -912,7 +929,7 @@ function landShells(s: GameState, dt: number) {
  */
 function blast(s: GameState, x: number, y: number, radius: number, damage: number) {
   for (const ship of [s.player, ...s.enemies, ...s.escorts]) {
-    if (ship.hp <= 0 || distance(ship, { x, y }) >= radius + radiusOf(ship) * 0.5) continue;
+    if (!afloat(ship) || distance(ship, { x, y }) >= radius + radiusOf(ship) * 0.5) continue;
     hurt(s, ship, damage);
     kill(ship, BLAST_KILLS);
   }
@@ -946,6 +963,100 @@ function ram(s: GameState) {
     blast(s, e.x, e.y, FIRE_BLAST, ENEMIES.fireship.damage);
     return ram(s);
   }
+}
+
+/** A ship (or a sea beast's head) above the water, so shot and blasts can hit it: a beast under the sea is out of reach. */
+export const afloat = (e: Ship) => e.hp > 0 && !(isBeast(e.kind) && e.surfaceMs <= 0);
+
+/**
+ * Whether the player can see enemy `e`: always by day; at night only under a flare, within her
+ * own lanterns' light (`NIGHT_SIGHT`) or while the flash of `e`'s guns lights her up.
+ */
+export const seen = (s: GameState, e: Ship) => !s.night || s.flareMs > 0 || e.flashMs > 0 || distance(s.player, e) < NIGHT_SIGHT + radiusOf(e);
+
+/**
+ * The sea beasts: under the sea, each raises a tentacle near the player every `reloadMs` (marked
+ * on the sea for `TENTACLE_MS` before it strikes, where she will be then, off by up to
+ * `TENTACLE_SPREAD`), and when `diveMs` runs out its head comes up `SURFACE_AT` abeam of her, port
+ * or starboard, for `HEAD_MS`, where her broadside can reach it. Uses random() twice a tentacle and
+ * twice each time it comes up.
+ */
+function beasts(s: GameState, dt: number) {
+  const player = s.player;
+  for (const e of s.enemies) {
+    const type = ENEMIES[e.kind as EnemyKind];
+    if (type.role !== 'beast' || e.hp <= 0) continue;
+    if (e.surfaceMs > 0) {
+      e.surfaceMs = Math.max(0, e.surfaceMs - dt);
+      if (e.surfaceMs > 0) continue;
+      // Down it goes again, leaving a swirl of water.
+      e.diveMs = DIVE_MS;
+      effect(s, 'splash', e.x, e.y, 700);
+      continue;
+    }
+    e.diveMs -= dt;
+    e.reload.port -= dt;
+    if (e.reload.port <= 0) {
+      e.reload.port = type.reloadMs;
+      const lead = (stats(s).speed * windSpeed(s.wind, player.heading) * TENTACLE_MS) / 1000;
+      const a = random() * Math.PI * 2;
+      const r = random() * TENTACLE_SPREAD;
+      const x = wrapCoord(player.x + Math.cos(player.heading) * lead + Math.cos(a) * r, WORLD.w);
+      const y = wrapCoord(player.y + Math.sin(player.heading) * lead + Math.sin(a) * r, WORLD.h);
+      s.tentacles.push({ id: s.nextId++, x, y, ms: TENTACLE_MS, total: TENTACLE_MS, damage: type.damage, beast: e.kind as BeastKind });
+    }
+    if (e.diveMs > 0) continue;
+    // Up comes the head, off one side of the player's ship, on open water.
+    const side = random() < 0.5 ? 1 : -1;
+    let angle = player.heading + side * (Math.PI / 2) + (random() - 0.5) * 0.4;
+    let at = { x: 0, y: 0 };
+    for (let k = 0; k < 8; k++) {
+      at = { x: wrapCoord(player.x + Math.cos(angle) * SURFACE_AT, WORLD.w), y: wrapCoord(player.y + Math.sin(angle) * SURFACE_AT, WORLD.h) };
+      if (clearSea(s, at, radiusOf(e))) break;
+      // The other side, then further round each way.
+      angle += k % 2 ? Math.PI + 0.35 : Math.PI;
+    }
+    e.x = at.x;
+    e.y = at.y;
+    e.heading = bearing(e, player);
+    e.surfaceMs = HEAD_MS;
+    effect(s, 'splash', e.x, e.y, 700);
+  }
+}
+
+/** The tentacles rise where their ripples showed, striking the player's ship and her prizes under them. */
+function riseTentacles(s: GameState, dt: number) {
+  // A beast sunk takes its tentacles down with it.
+  if (!s.enemies.some((e) => isBeast(e.kind) && e.hp > 0)) s.tentacles = [];
+  s.tentacles = s.tentacles.filter((arm) => {
+    arm.ms -= dt;
+    if (arm.ms > 0) return true;
+    for (const ship of [s.player, ...s.escorts]) {
+      if (ship.hp <= 0 || distance(ship, arm) >= TENTACLE_R + radiusOf(ship) * 0.5) continue;
+      hurt(s, ship, arm.damage);
+      effect(s, 'hit', ship.x, ship.y, 400);
+    }
+    effect(s, 'tentacle', arm.x, arm.y, 900, { ship: arm.beast });
+    return false;
+  });
+}
+
+/** Fires a flare on a night wave, lighting the whole sea for `FLARE_MS`; false with none left or by day. */
+export function fireFlare(s: GameState) {
+  if ((s.phase !== 'fighting' && s.phase !== 'break') || !s.night || s.flares <= 0) return false;
+  s.flares--;
+  s.flareMs = FLARE_MS;
+  effect(s, 'flare', s.player.x, s.player.y, FLARE_MS);
+  return true;
+}
+
+/** Buys a crate of `good` at the harbor, to sell at the next port; false if the hold is full or it can't be afforded. */
+export function trade(s: GameState, good: CargoId) {
+  const price = cargoPrice(good, s.wave);
+  if (s.phase !== 'harbor' || s.hold.length >= HOLD_MAX || s.gold < price) return false;
+  s.gold -= price;
+  s.hold.push({ good, paid: price });
+  return true;
 }
 
 /**
@@ -1005,6 +1116,8 @@ function fire(
     }
     effect(s, 'smoke', x, y, 600, { heading: out });
   }
+  // The flash of her guns lights her up for a moment at night.
+  ship.flashMs = FLASH_MS;
 }
 
 function moveBalls(s: GameState, dt: number) {
@@ -1014,7 +1127,7 @@ function moveBalls(s: GameState, dt: number) {
     wrapPoint(ball);
     ball.ms -= dt;
     const targets = ball.fromPlayer ? s.enemies : [s.player, ...s.escorts];
-    const hit = targets.find((t) => t.hp > 0 && distance(ball, t) < radiusOf(t));
+    const hit = targets.find((t) => afloat(t) && distance(ball, t) < radiusOf(t));
     if (hit) {
       hurt(s, hit, ball.damage);
       if (ball.shot === 'chain') hit.slowMs = SLOW_MS;
@@ -1059,6 +1172,8 @@ function sink(s: GameState, e: Ship) {
   s.loot.push({ id: s.nextId++, x: e.x, y: e.y, gold: lootOf(s, kind), ms: LOOT_MS });
   if (kind === 'fireship') blast(s, e.x, e.y, FIRE_BLAST, ENEMIES.fireship.damage);
   logCaptain(s, e);
+  // A sea beast's head goes up on the harbor wall, for good.
+  if (isBeast(kind)) s.wall[kind]++;
   // Not for a player sunk this same tick: salvage can't raise a wreck.
   if (hasPerk(s, 'salvage') && s.player.hp > 0) s.player.hp = Math.min(s.player.maxHp, s.player.hp + perkValue(s, 'salvage', SALVAGE_HULL, 0));
 }
@@ -1157,6 +1272,15 @@ function haulIn(s: GameState, l: Loot) {
  * patches some hull, and the harbor opens with the prize draft on offer.
  */
 function reachHarbor(s: GameState) {
+  // The cargo in the hold is sold at this port for more than it cost at the last.
+  s.cargoSold = s.hold.length ? s.hold.reduce((sum, c) => sum + cargoSale(c.good, c.paid), 0) : null;
+  if (s.cargoSold) {
+    s.gold += s.cargoSold;
+    effect(s, 'coins', s.player.x, s.player.y, 900, { gold: s.cargoSold });
+  }
+  s.hold = [];
+  s.tentacles = [];
+  s.flareMs = 0;
   // Prizes still afloat are sold in harbor for their loot, and moored there in case one is kept.
   s.moored = [];
   for (const e of s.escorts) {
@@ -1305,6 +1429,13 @@ export function setSail(s: GameState, course: CourseId | null = null) {
     return (run.state === 'waiting' || run.state === 'escaped') && run.due === s.wave;
   });
   s.named.forEach((id, i) => s.toSpawn.splice(Math.min(s.toSpawn.length, 1 + 2 * i), 0, CAPTAINS[id].kind));
+  // Raiders come hunting a loaded hold, early in the wave: sloops, and from `RAIDER_BRIG_WAVE` brigs too.
+  s.raiders = raidersFor(s.hold.length);
+  for (let i = 0; i < s.raiders; i++) s.toSpawn.splice(Math.min(s.toSpawn.length, 1 + 2 * i), 0, s.wave >= RAIDER_BRIG_WAVE && i % 2 ? 'brig' : 'sloop');
+  s.night = isNightWave(s.wave);
+  s.flares = s.night ? FLARES : 0;
+  s.flareMs = 0;
+  s.tentacles = [];
   s.waveCaptains = [];
   s.tempestCalls = 0;
   s.squallMs = FIRST_SQUALL;

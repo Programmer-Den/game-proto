@@ -19,8 +19,26 @@ export interface Progress {
   weekly: { week: number; best: number } | null;
   /** The journey: the stars each step holds, 0 to 3. */
   journey: number[];
+  /** The highest Practice trial cleared per kind (0 for none), up to its mastery. */
+  trials: Record<KindId, number>;
+  /** The daily five that set the best score, as [time into the run, score] after each card: the ghost the next one races. */
+  ghost: [number, number][];
   runs: number;
 }
+
+/**
+ * Mastery per kind, 1 to 10, from its solves in any mode: level n + 1 needs `MASTERY_AT[n]` solves.
+ * Each level opens the next Practice trial of that kind, and Endless deals the kinds with the
+ * lowest mastery more often.
+ */
+export const MASTERY_AT = [0, 2, 5, 9, 14, 20, 28, 38, 50, 65] as const;
+export const MAX_MASTERY = MASTERY_AT.length;
+export const masteryOf = (solved: number) => MASTERY_AT.filter((at) => solved >= at).length;
+/** Solves still needed for the next mastery level, or null at the top. */
+export const toNextMastery = (solved: number) => {
+  const next = MASTERY_AT.find((at) => at > solved);
+  return next === undefined ? null : next - solved;
+};
 
 export function newProgress(): Progress {
   return {
@@ -29,6 +47,8 @@ export function newProgress(): Progress {
     daily: null,
     weekly: null,
     journey: Array(NODES).fill(0),
+    trials: Object.fromEntries(KINDS.map((k) => [k, 0])) as Record<KindId, number>,
+    ghost: [],
     runs: 0,
   };
 }

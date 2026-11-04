@@ -14,8 +14,10 @@ Implemented today:
 
 - Menu: eight commanders (`PLAYER_COMMANDERS`, each with one skill in `SKILLS`) as small cards,
   with the picked one's skill (or, while locked, its unlock) spelled out under them, two seasons
-  (`SETS`) and a terrain toggle, then START MATCH (greyed out on a locked commander), the
-  campaign card under them, and the saved stats, rank and saved squads at the bottom.
+  (`SETS`) and the weekly one, the terrain and duo toggles and START MATCH (greyed out on a locked
+  commander or a daily lobby already tried today, `canStart`), the campaign and daily lobby cards
+  under them, and the saved stats, rank and saved squads at the bottom. The Workshop button at the
+  top right switches `menu.screen` to `'workshop'`.
 - Commander unlocks (`progress.ts`): Grit, Sparks and Magna are open; the other five each have an
   `unlock` deed (`DeedId`): `topFour` (Rosa, Patch-Up), `threeStar` (Volt, Power Surge),
   `fullOrigin` (Hexa, EMP Blast: a won fight with an origin at 6), `maxLevel` (Ironside, Rally Cry)
@@ -123,6 +125,37 @@ Implemented today:
   reroll from stage `rollFrom` while holding more than `rollAbove` gold (seat 0 always uses Rust's).
   Rank 0 plays exactly as before. The menu shows it under the stats, the end screen the points won
   or the rank up.
+- Robot workshop (`buildWorkshop`, ST4): pick a chassis (`CHASSIS`, origins both seasons share)
+  and a weapon (`WEAPONS`, every class, named by `WEAPON_NAMES`), name it (Rename opens the
+  browser's `window.prompt`; `suggestName` from `NAME_PARTS` fills it first) and Build
+  (`addBuild`). Pieces unlock with first campaign clears (`WORKSHOP_UNLOCKS`, read from
+  `Progress.campaign` by `workshopParts`, so older saves get theirs at once); the end screen lists
+  a clear's new pieces (`piecesNow`). Up to `WORKSHOP.slots` builds are saved under
+  `scrapyard-titans-workshop` (`loadBuilds`, `scrapBuild`); `register` puts them into `CUSTOM` and
+  `UNIT_BY_ID` as `UnitDef`s with `custom` and the typed `label` (shown by `unitName` in `i18n.ts`)
+  costing `WORKSHOP.cost`. `startMatch` sets `MatchOptions.custom` when any exist (not in the daily
+  or under `?watch`), and `poolOf(m)` (`rosterOf(set, custom)`) adds them to every shop, draft and
+  Duplicator roll, the rivals' too. `paint.ts` gives them a gold chest stripe; `bakeUnit` paints a
+  build's texture and the workshop's previews (`pieceKey`, `unit:pv-<origin>-<class>`).
+- Daily lobby (ST5, `shared/daily.ts` under `scrapyard-titans-daily`): the menu's green card
+  (`menu.set` `'daily'`). `dailyRules(day)` seeds the season, terrain, a lent commander (any of
+  the eight, locked or not) and the rivals (`RIVALS` shuffled, at `DAILY.bossChance` one swapped for
+  a boss) from the date; `startMatch` calls `startDailyTry`, sets `useRand(dailyMatchRand(day))`
+  (`game/rng.ts`) for the whole match, passes `MatchOptions.daily` (which gives every seat its own
+  seeded shop stream, `Match.shopRand`) and `rivals`, rank `DAILY.rank`, no ghost squad and no
+  workshop robots. `record` calls `finishDailyTry` (score `9 - place`); `dailyRecord` reads it for
+  the card and the end screen. Play again goes back to `Math.random` (`useRand(null)`).
+- Duo mode (ST6, `MatchOptions.duo`, the menu's Duo toggle in the two plain seasons): `Player.team`
+  pairs seats 0-1, 2-3, 4-5 and 6-7; seat 1 (Baron Bolt) is the player's AI partner (`partner`).
+  Teammates start with `DUO.hpScale` times the health and `endFight` takes a loss off every
+  teammate's bar alike; `startFight` pairs teams in a ring so nobody meets a teammate;
+  `knockOuts` drops a whole team and places count teams (`teamsLeft`, `teamCount`), and `record`
+  counts a team place as `2 * place - 1`. Ranks and difficulty gold apply only to `isRival` seats.
+  During planning `BUTTONS.pass` (left of the bench) reads Pass with a robot selected
+  (`passUnit`, stars and items go with it) or Give 2g (`giveGold`, `DUO.gift`); G does the same.
+  The partner plans in `beginPlan` and again in `goFight` with what it got. The players list joins
+  each team with a bar and tags the partner; the result banner adds the partner's outcome
+  (`Match.result.partner`).
 - Progress (matches, wins, best place, `deeds`, rank `points`, `weekly` best and `campaign` lobbies cleared) saved under `scrapyard-titans-stats`
   (`progress.ts`, `loadProgress`/`saveProgress`); watched matches never count.
 
@@ -132,7 +165,7 @@ Missing or rough:
 - AI rivals use a simple scored plan (`aiPlan`). Balance is checked with AI-only matches (see
   Gotchas); every origin's average place (Clockwork about 4.8) sits between about 4.0 and 4.9 of 8, and matches end
   around stages 5 and 6.
-- Only the weekly season rotates; the two plain seasons are picked on the menu.
+- Only the weekly season and the daily lobby change by date; the two plain seasons are picked on the menu.
 
 ## Architecture
 
@@ -150,7 +183,11 @@ File map (`src/`):
   just 3 in German, where the text says "Platz"). Every text on screen goes through `t`, and a new
   one gets its German entry (and a US one if its spelling differs) in the same PR. The watch
   panel's title and `aiLog` lines stay English, with the names inside them translated.
+- `game/rng.ts`: `rand`, which every random draw in `game/` uses, and `useRand` (the daily seeds it).
 - `progress.ts`: what lasts between matches (`Progress`: stats, deeds, rank points, campaign),
+  the workshop (`Build`, `loadBuilds`, `addBuild`, `scrapBuild`, `buildDef`, `workshopParts`,
+  `unlockedBy`, `suggestName`, `cleanName`), the daily lobby (`dailyRules`, `dailyMatchRand`,
+  `dailyRecord`, `startDailyTry`, `finishDailyTry`),
   `rankOf`, `addRankPoints`, `weekOf`, `weekStart`, `weeklyRules`, `weeklyBest`, `recordWeekly`,
   `isUnlocked`, `doDeeds` (saves new deeds, returns the commanders they unlock), `planDeeds`,
   `fullOrigin`, the campaign's `nextLobby`, `campaignKit`, `lobbyCleared`, `clearLobby`, and the
@@ -203,14 +240,15 @@ Shared code it imports: `shared/audio.ts`, `shared/setupGame.ts`, `shared/scalin
 ### Hub settings
 
 - Difficulty: `newMatch` gives the player `byDifficulty(130, 100, 80)` health (also its
-  `Player.maxHp`, which scales its bar in the players list), and `startPlan`
-  gives each rival `byDifficulty(-1, 0, 1)` gold a round. Keep the README rows in step.
+  `Player.maxHp`, which scales its bar in the players list; times `DUO.hpScale` for a duo team), and
+  `startPlan` gives each rival (`isRival`, so not the duo partner) `byDifficulty(-1, 0, 1)` gold a
+  round. Keep the README rows in step.
 - Reduced motion: no camera shake on slams, no hit flash, no idle sway or orb bob, no avatar walk
   bounce or skill hop, and stun stars and the draft ring stand still instead of circling.
 - Watch AI (`?watch`): the scene starts a match at once with a random commander (any of the eight), season and
   terrain, seat 0 is AI-run (`human` false: `aiPlan` once, near the end of each plan phase, where the
   rivals plan in `beginPlan`; skill at 3 s;
-  the taps and keys that act for the player, R, X, E, L, 1-3 and Space, do nothing: the shop cards,
+  the taps and keys that act for the player, R, X, E, L, G, 1-3 and Space, do nothing: the shop cards,
   Reroll, Buy XP, FIGHT, Lock and the skill button are off and the Scrap Rat can't be zapped),
   and `mountWatch` shows the panel; `watchSteps()` ticks per frame. Watch another on the end screen
   starts the next match.
@@ -236,10 +274,10 @@ Sound table and where each plays:
 
 | Sound | Where |
 | --- | --- |
-| `buy`, `starUp` (when the buy merges three) | `doBuy` |
+| `buy`, `starUp` (when the buy merges three) | `doBuy`; `starUp` also for the workshop's Build (`doBuild`) |
 | `reroll`, `xp`, `levelUp` | `doReroll`, `doXp`; `levelUp` also in `beginPlan` when income XP levels up |
-| `sell` | `doSellUnit` (Sell button, E, drag to the sell zone) |
-| `place` | `doMove` (a robot moved or swapped by tap or drag) |
+| `sell` | `doSellUnit` (Sell button, E, drag to the sell zone); the workshop's Scrap |
+| `place` | `doMove` (a robot moved or swapped by tap or drag), `doPass` (a robot handed to the duo partner) |
 | `bolt`, `itemBuilt` (two parts make an item) | `doEquip` |
 | `latch` | `toggleLock`, `toggleSpeed` |
 | `tick` | `tick`, each of the plan phase's last 3 seconds (player only) |
@@ -253,7 +291,7 @@ Sound table and where each plays:
 | `zap` | `onDown`, the player's tap on the Scrap Rat |
 | `orb` | `drawCommanders`, when the avatar picks an orb up |
 
-Shared sounds: `ui('coin')` for the player's `gold` events in a fight; `ui('click')` for the menu
+Shared sounds: `ui('coin')` for the player's `gold` events in a fight and Give 2g in duo mode; `ui('click')` for the menu
 choices, START MATCH, Play again, scouting a rival and flipping the info panel; `ui('refuse')` for
 a refused buy, reroll, Buy XP, skill, move (board full) or equip (robot full), and for a tap on any
 greyed-out button or shop card (`button` pushes a refusal for them).
@@ -262,7 +300,7 @@ greyed-out button or shop card (`button` pushes a refusal for them).
 
 - `window.game` in dev builds; the test reads `game.scene.getScene('Game').state` (the `Match`)
   and waits until the scene is active and the shared loading screen is gone.
-- `e2e/playthrough.spec.ts` plays round 1-1: START MATCH (`START_BUTTON` 635,404), the first shop
+- `e2e/playthrough.spec.ts` plays round 1-1: START MATCH (`START_BUTTON` 635,383), the first shop
   card (`SHOP_CARD_1`), bench slot 0 (`BENCH_SLOT_1`), tile 3,4 (`FRONT_TILE`), FIGHT
   (`FIGHT_BUTTON`); it asserts the bought robot moves bench → board, the fight is won with no
   damage, a part drops, the damage meter (`Match.meter`) lists the robot with damage dealt, and
@@ -270,7 +308,7 @@ greyed-out button or shop card (`button` pushes a refusal for them).
   `layout.ts` (`SHOP`, `BENCH`, `BUTTONS.fight`, `BOARD_VIEW`), the menu's START MATCH rect in
   `buildMenu`, `ECONOMY.startGold`, and round 1-1's monsters (`MONSTERS.mite`), which every 1-cost
   robot must beat alone.
-- Screenshots: `docs/screenshots/menu.webp` is from a scratch run with three deeds, 285 rank points and a weekly best saved, the weekly season picked; `fight.webp` (also
+- Screenshots: `docs/screenshots/menu.webp` (duo on), `campaign.webp` (the campaign card picked), `daily.webp` (the daily card picked) and `workshop.webp` are from a scratch run with two deeds, 285 rank points, five lobbies cleared and two workshop builds saved; `duo.webp` is that run's duo match on round 1-1 with a robot selected (Pass showing) and a workshop robot set into the shop from the dev console; `fight.webp` (also
   `cover.png`), `draft.webp` and `scrap-rat.webp` are from a scratch `?watch` run with the watch
   panel hidden; `scout.webp`, `part-preview.webp` and `damage-meter.webp` from a scratch run that
   plays round 1-1 with real clicks; `german-result.webp` is the test's `3-result` run with a
@@ -295,6 +333,13 @@ greyed-out button or shop card (`button` pushes a refusal for them).
   sim handles in `battle.ts`, its arms in `paint.ts` and its cast sound in `CAST_SOUND`.
 - **Add an item**: add a part to `PARTS`/`PART_DEFS` (every pair then needs a combo) or change a
   `combo` row; a new `Special` needs handling in `battle.ts`.
+- **Add a workshop piece**: a chassis must be an origin in both seasons (`CHASSIS`); a weapon is a
+  class (`WEAPONS`, with its name key in `WEAPON_NAMES`). Give it a lobby in `WORKSHOP_UNLOCKS`.
+- **Change duo mode or the daily lobby**: `DUO` and `DAILY` in `data.ts`; the daily's rules are
+  `dailyRules` in `progress.ts`. Every random draw in `game/` goes through `rand` (`game/rng.ts`),
+  never `Math.random`, so the daily stays the same for everyone; a seat's shop uses its own stream
+  (`Match.shopRand`). Check duo with the balance harness and `duo: true` (with `hpScale` 2 its
+  matches ended around 5-2 against 5-5 alone when it came in).
 - **Change the campaign**: a row in `CAMPAIGN` (name key `lobby<n>` in the `i18n/` files, the
   menu's pips and `lobbyGoal` follow it); a new boss goes into `BOSSES` (name and taunt keys) and
   is seated with `b<index>`. Keep the rewards to robots of origins both seasons share, or parts.

@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { GARDENS, GRID, cellCentre, pathPoint, type Garden } from '../game/board';
+import { GOLEMS } from '../game/data';
 import { BUTTON, GARDEN_CARD, GOLEM_MENU, GRAFT_CARD, HUD, PANEL, PREVIEW, SEED_BUTTONS, SPEED_BUTTON, WAVE_BUTTON } from '../scenes/layout';
 import { C, E, PI, Pp, R, addSharp, bake, blur, ctx, drop, ellipse, flower, golem, pest, reseed, rnd, sprout, type ClayOptions } from './clay';
 
@@ -8,6 +9,7 @@ import { C, E, PI, Pp, R, addSharp, bake, blur, ctx, drop, ellipse, flower, gole
 //
 // table           the studio table over the whole view, with the HUD strip and its tags across its
 //                 top; baked at the view's size, again when the frame moves (see `bakeTable`)
+// bg-plot         a drawn plot's static scene, painted again for each plot planted
 // bg-<n>          garden n's static scene over the table, in the designed 960x540 frame: the
 //                 garden slab with its pressed paths and soil beds, the side panel and the wave
 //                 preview's dark pad (transparent where the table shows)
@@ -19,13 +21,14 @@ import { C, E, PI, Pp, R, addSharp, bake, blur, ctx, drop, ellipse, flower, gole
 // mound           the heap of earth over a mole tunnelling under the path
 // slime           the Queen Slug's slime on a cell
 // slow            the moss clumps over a slowed pest
-// shot-<kind>     a thrown pellet
+// spores          a fungus golem's patch of spores on the path, 32 view pixels round
+// shot-<kind>     a thrown pellet; shot-bell is a bell golem's ring, 50 view pixels round
 // sap, glow       a sap drop and the glow behind the sap counter
 // splat           what a squashed pest leaves on the path
 // leaf            the Heartwood's leaf in the HUD
 // hedge           a hedge planted on a path cell, anchored at its foot
-// card-<h>[-dim]  a seed card, h 76, 52 or 40 view pixels tall; rim-<h> is the gold rim of the picked one
-// card-locked     the Thorn golem's card before the Heartwood blooms, with its padlock
+// card-<h>[-dim]  a seed card, h 44 (a golem's) or 36 (the hedge strip) view pixels tall; rim-<h> is the gold rim of the picked one
+// card-locked     a golem's card before it unlocks (Thorn, Fungus, Bell), with its padlock
 // btn-wave[-off]  the wave button, lit or waiting; btn is the overlays' button
 // menu, chip[-off] the golem menu's slab and its buttons (Raise, Aim, Move, Uproot, the forms), usable or not
 // speed[-on]      the speed button in the HUD, off or on
@@ -49,6 +52,13 @@ export const gardenBg = (n: number) => `bg-${n}`;
 /** Bakes garden n's background, unless it is baked already. */
 export function bakeGarden(scene: Phaser.Scene, n: number) {
   bake(scene, gardenBg(n), 960, 540, () => paintBackground(GARDENS[n]));
+}
+
+/** Bakes a drawn plot's background as `bg-plot`, afresh (each plot planted may differ). */
+export function bakePlot(scene: Phaser.Scene, garden: Garden) {
+  if (scene.textures.exists('bg-plot')) scene.textures.remove('bg-plot');
+  bake(scene, 'bg-plot', 960, 540, () => paintBackground(garden));
+  return 'bg-plot';
 }
 
 /** The view size and frame offset the table was last painted for. */
@@ -83,7 +93,7 @@ export function bakeTextures(scene: Phaser.Scene) {
   bake(scene, 'bud', 28, 28, () => flower(0, 0, 1.05, false), 14, 14);
   bake(scene, 'bloom', 28, 28, () => flower(0, 0, 1.05, true), 14, 14);
 
-  for (const kind of ['pebble', 'moss', 'thorn'] as const) {
+  for (const kind of GOLEMS) {
     reseed(kind.length * 11);
     bake(scene, `golem-${kind}`, 100, 88, () => golem(0, 0, kind), 50, 78);
   }
@@ -99,6 +109,33 @@ export function bakeTextures(scene: Phaser.Scene) {
 
   bake(scene, 'shot-pebble', 20, 20, () => E(0, 0, 12, 11, '#a8a49a', { print: false, sb: 3, sx: 2, sy: 4, sa: 0.3 }), 10, 10);
   bake(scene, 'shot-moss', 20, 20, () => E(0, 0, 12, 11, '#6fb048', { print: false, sb: 3, sx: 2, sy: 4, sa: 0.3 }), 10, 10);
+  bake(scene, 'shot-fungus', 24, 24, () => {
+    for (const [x, y, r] of [[-6, 2, 9], [6, 3, 8], [0, -6, 9]] as const) E(x, y, r, r, '#c8a0d8', { print: false, sb: 3, sx: 2, sy: 3, sa: 0.3, rim: 2 });
+  }, 12, 12);
+  bake(scene, 'shot-bell', 100, 100, () => {
+    ctx.strokeStyle = 'rgba(248,232,160,0.9)';
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.arc(0, 0, 92, 0, PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(242,196,74,0.6)';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(0, 0, 80, 0, PI * 2);
+    ctx.stroke();
+  }, 50, 50);
+  bake(scene, 'spores', 64, 64, () => {
+    reseed(83);
+    ctx.save();
+    ctx.globalAlpha = 0.55;
+    for (let k = 0; k < 9; k++) {
+      const a = (k / 9) * PI * 2;
+      const d = k % 3 ? 34 : 14;
+      E(Math.cos(a) * d, Math.sin(a) * d * 0.8, 18 + rnd() * 8, 14 + rnd() * 6, k % 2 ? '#b088c8' : '#9a70b0', { print: false, shadow: false, rim: 2 });
+    }
+    ctx.restore();
+    for (let k = 0; k < 7; k++) ellipse(-36 + rnd() * 72, -26 + rnd() * 52, 3, 3, 'rgba(248,236,255,0.8)');
+  }, 32, 32);
   bake(scene, 'shot-thorn', 20, 20, () => Pp([[-10, 6], [14, -2], [-10, -8]], C.thornSpike, { print: false, sb: 3, rim: 2 }), 10, 10);
 
   bake(scene, 'sap', 24, 30, () => drop(0, 0, 1), 12, 16);
@@ -130,7 +167,7 @@ export function bakeTextures(scene: Phaser.Scene) {
     bake(scene, `card-${h}-dim`, 150, h + 16, () => R(-w / 2, -ha / 2, w, ha, 22, '#c4b48f', { sb: 6, sa: 0.45, rim: 6 }), 75, h / 2 + 6);
     bake(scene, `rim-${h}`, 150, h + 16, () => R(-w / 2 - 6, -ha / 2 - 6, w + 12, ha + 12, 26, C.gold, { sb: 6, rim: 6 }), 75, h / 2 + 6);
   }
-  bake(scene, 'card-locked', 150, 84, paintLockedCard, 75, 40);
+  bake(scene, 'card-locked', 150, 60, paintLockedCard, 75, 28);
   bake(scene, 'btn-wave', 150, 64, () => R(-WAVE_BUTTON.w, -WAVE_BUTTON.h, WAVE_BUTTON.w * A, WAVE_BUTTON.h * A, 30, '#e0a23a', { sb: 8, sx: 5, sy: 9, rim: 8 }), 72, 28);
   bake(scene, 'btn-wave-off', 150, 64, () => R(-WAVE_BUTTON.w, -WAVE_BUTTON.h, WAVE_BUTTON.w * A, WAVE_BUTTON.h * A, 30, '#9c8a68', { sb: 8, sx: 5, sy: 9, rim: 8 }), 72, 28);
   const { w: mw, h: mh, chip } = GOLEM_MENU;
@@ -230,36 +267,39 @@ export const TREE_FLOWERS: readonly [number, number][] = [
 
 function paintLockedCard() {
   const w = SEED_BUTTONS.w * A - 8;
-  const h = SEED_BUTTONS.hs[2] * A - 8;
+  const h = SEED_BUTTONS.hs[0] * A - 8;
   const x = -w / 2;
   const y = -h / 2;
   R(x, y, w, h, 22, '#b9ad94', { sb: 6, rim: 6 });
-  const tx = x + 58;
-  const ty = y + h / 2;
+  // The padlock on a burst, sized for a 52-pixel card and shrunk to fit this one.
+  ctx.save();
+  ctx.translate(x + 50, 0);
+  ctx.scale(0.72, 0.72);
   ctx.save();
   ctx.globalAlpha = 0.6;
   for (let k = 0; k < 8; k++) {
     const a = (k / 8) * PI * 2;
     Pp(
       [
-        [tx + Math.cos(a - 0.25) * 26, ty + Math.sin(a - 0.25) * 30],
-        [tx + Math.cos(a) * 46, ty + Math.sin(a) * 50],
-        [tx + Math.cos(a + 0.25) * 26, ty + Math.sin(a + 0.25) * 30],
+        [Math.cos(a - 0.25) * 26, Math.sin(a - 0.25) * 30],
+        [Math.cos(a) * 46, Math.sin(a) * 50],
+        [Math.cos(a + 0.25) * 26, Math.sin(a + 0.25) * 30],
       ],
       '#6a5a40',
       { print: false, shadow: false, rim: 2 },
     );
   }
-  E(tx, ty, 32, 36, '#7a6a4c', { shadow: false });
+  E(0, 0, 32, 36, '#7a6a4c', { shadow: false });
   ctx.restore();
   ctx.lineCap = 'round';
   ctx.strokeStyle = '#9a7a2a';
   ctx.lineWidth = 7;
   ctx.beginPath();
-  ctx.arc(tx, ty - 6, 12, PI, 0);
+  ctx.arc(0, -6, 12, PI, 0);
   ctx.stroke();
-  R(tx - 18, ty - 6, 36, 28, 8, C.gold, { sb: 3, print: false, rim: 3 });
-  ellipse(tx, ty + 7, 4, 4, '#6a4a10');
+  R(-18, -6, 36, 28, 8, C.gold, { sb: 3, print: false, rim: 3 });
+  ellipse(0, 7, 4, 4, '#6a4a10');
+  ctx.restore();
 }
 
 /** The studio table over a `w` x `h` view, its designed frame at (fx, fy), with the HUD strip across the top. */

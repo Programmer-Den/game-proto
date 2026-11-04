@@ -7,6 +7,34 @@ import { WONDER_IDS, type WonderKind } from '../game/wonders';
 import { TERRAINS, tintOf } from './map';
 import { BLUE, BROWN, GOLD, GOLD_DARK, INK, MAGENTA, RULE, SHEET, TRACK, TREE, bake, circle, poly, rrect, star, theme, type Ctx } from './paint';
 
+/** A small sloop: a brown hull, a mast and a magenta sail, on a blue wave. */
+function sloop(ctx: Ctx) {
+  ctx.beginPath();
+  ctx.moveTo(3, 15);
+  ctx.lineTo(21, 15);
+  ctx.quadraticCurveTo(18.5, 20, 12, 20);
+  ctx.quadraticCurveTo(5.5, 20, 3, 15);
+  ctx.fillStyle = BROWN;
+  ctx.fill();
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.moveTo(11, 15);
+  ctx.lineTo(11, 2.5);
+  ctx.stroke();
+  poly(ctx, [[12, 3], [19.5, 13], [12, 13]], MAGENTA, INK, 1);
+  poly(ctx, [[10, 5], [10, 13], [4.5, 13]], SHEET, INK, 1);
+  ctx.strokeStyle = BLUE;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(2, 22);
+  ctx.quadraticCurveTo(7, 19.5, 12, 22);
+  ctx.quadraticCurveTo(17, 24.5, 22, 22);
+  ctx.stroke();
+}
+
 /** Upgrade icons: clean line symbols in ink with a magenta mark, 24 px, baked as `icon-<id>`. */
 const UPGRADE_ICONS: Record<UpgradeId, (ctx: Ctx) => void> = {
   // A provisions crate.
@@ -60,6 +88,8 @@ const UPGRADE_ICONS: Record<UpgradeId, (ctx: Ctx) => void> = {
     star(ctx, 12, 12, 7.5, 2, 4, GOLD, GOLD_DARK, 0.8);
     circle(ctx, 12, 12, 1.2, INK);
   },
+  // The coastal sloop.
+  sloop,
 };
 
 /** The hands' icons, 24 px, baked as `hand-<id>`: a tool each, in ink with a magenta mark. */
@@ -214,6 +244,54 @@ function swatch(ctx: Ctx, t: Terrain) {
  * camp is magenta survey overprint like the stations, and the treasure gold like the compass.
  */
 const MARKS: Record<string, (ctx: Ctx) => void> = {
+  // The coastal sloop at anchor off its landing.
+  sloop,
+  // A village's rumour of the wonder: a dashed gold ring round a question mark, seen through the fog.
+  rumour: (ctx) => {
+    ctx.setLineDash([3, 2]);
+    circle(ctx, 12, 12, 9.5, null, GOLD_DARK, 1.4);
+    ctx.setLineDash([]);
+    ctx.fillStyle = GOLD_DARK;
+    ctx.font = '800 13px Inter, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('?', 12, 12.5);
+  },
+  // A village's guide: a walking staff and a trail of magenta footsteps.
+  'trade-guide': (ctx) => {
+    ctx.strokeStyle = BROWN;
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(6, 21);
+    ctx.lineTo(9, 3.5);
+    ctx.stroke();
+    ctx.lineCap = 'butt';
+    circle(ctx, 9.2, 3.5, 1.8, INK);
+    ctx.fillStyle = MAGENTA;
+    for (const [x, y] of [[13, 19], [17, 16], [14.5, 12], [18.5, 9], [16, 5]]) {
+      ctx.beginPath();
+      ctx.ellipse(x, y, 1.6, 1.1, -0.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  },
+  // A village's rumour: a speech bubble with a gold question mark.
+  'trade-rumour': (ctx) => {
+    rrect(ctx, 3, 3, 18, 13, 3);
+    ctx.fillStyle = SHEET;
+    ctx.fill();
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    poly(ctx, [[7, 15.5], [7, 21], [12, 15.5]], SHEET, INK, 1.2);
+    ctx.fillStyle = SHEET;
+    ctx.fillRect(7.6, 14.6, 3.8, 1.6);
+    ctx.fillStyle = GOLD_DARK;
+    ctx.font = '800 11px Inter, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('?', 12, 10);
+  },
   // A wrecked hull on its side with a broken mast.
   'find-wreck': (ctx) => {
     ctx.save();

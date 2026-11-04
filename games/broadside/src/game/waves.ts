@@ -1,4 +1,5 @@
 import { HUNTER_BRIGS, MERCHANTS, type CourseId } from './courses';
+import { BEAST_FLEET_CUT, beastFor } from './beasts';
 import type { EnemyKind } from './ships';
 
 /**
@@ -9,7 +10,9 @@ export function waveShips(wave: number, course: CourseId | null = null): EnemyKi
   const ships: EnemyKind[] = [];
   // Out in the Storm Reaches the fleets start the size of a home wave `REACHES_FLEET` and grow
   // slowly, while their hulls go on growing with the wave (`hpScale`).
-  const size = inReaches(wave) ? REACHES_FLEET + Math.floor(reachWave(wave) / 2) : wave;
+  // A sea beast's wave brings a smaller fleet, with the beast rising first.
+  const beast = beastFor(wave);
+  const size = Math.max(1, (inReaches(wave) ? REACHES_FLEET + Math.floor(reachWave(wave) / 2) : wave) - (beast ? BEAST_FLEET_CUT : 0));
   const sloops = 1 + size;
   const brigs = (size >= 3 ? Math.floor((size - 1) / 2) : 0) + (course === 'hunter' ? HUNTER_BRIGS : 0);
   const galleons = size >= 5 ? Math.floor((size - 3) / 2) : 0;
@@ -24,6 +27,7 @@ export function waveShips(wave: number, course: CourseId | null = null): EnemyKi
   if (course === 'merchant') for (let i = 0; i < MERCHANTS; i++) ships.splice(Math.min(ships.length, 1 + i * 3), 0, 'merchant');
   // Every fifth wave the enemy's flagship comes last, once its fleet is engaged; at the pirate
   // haven it is the admiral's own, and at the end of the Storm Reaches the Tempest.
+  if (beast) ships.unshift(beast);
   if (wave === HAVEN_WAVE) ships.push('admiral');
   else if (wave === TEMPEST_WAVE) ships.push('tempest');
   else if (wave % 5 === 0) ships.push('flagship');

@@ -27,12 +27,12 @@ export const SPEED_BUTTON = { x: 914, y: 32, w: 54, h: 32 };
 export const GOLEM_MENU = { w: 270, h: 50, chip: { w: 60, h: 38, gap: 6 } };
 /** The garden picker's cards, side by side. */
 export const GARDEN_CARD = { y: 318, w: 236, h: 196, gap: 20 };
-/** The golem grafts' four cards, side by side, at the garden cards' height and y. */
+/** The golem grafts' four cards (and the plots' four), side by side, at the garden cards' height and y. */
 export const GRAFT_CARD = { w: 200, gap: 16 };
 /** The side panel right of the board. */
 export const PANEL = { x: 800, y: 64, w: 148, h: 448 };
-/** The seed cards, by their centres, in the order of SEEDS: two tall golem cards, the shorter thorn card and the hedge strip. */
-export const SEED_BUTTONS = { x: 874, ys: [120, 204, 276, 330], hs: [76, 76, 52, 40], w: 136 };
+/** The seed cards, by their centres, in the order of SEEDS: five golem cards and the hedge strip. */
+export const SEED_BUTTONS = { x: 874, ys: [106, 152, 198, 244, 290, 332], hs: [44, 44, 44, 44, 44, 36], w: 136 };
 /** The next wave's preview, above the wave button. */
 export const PREVIEW = { x: 808, y: 358, w: 132, h: 60 };
 /** The one-line hint between the preview and the wave button. */
@@ -40,6 +40,8 @@ export const HINT = { y: 432 };
 /** The button that sends the next wave, or calls it early. */
 export const WAVE_BUTTON = { x: 874, y: 470, w: 136, h: 48 };
 export const BUTTON = { w: 200, h: 44 };
+/** The garden editor's grid: its top-left corner and each cell's size, and the y of its tool tags. */
+export const EDITOR = { x: 264, y: 150, cell: 36, tools: 428 };
 
 export const UI_DEPTH = 10_000;
 export const FONT = '"DejaVu Sans", "Trebuchet MS", Verdana, system-ui, sans-serif';

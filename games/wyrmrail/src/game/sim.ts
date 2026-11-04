@@ -14,6 +14,7 @@ import {
   opposite,
   sameTile,
   terrainAt,
+  inGrid,
   type Cargo,
   type Tile,
   type Village,
@@ -86,6 +87,21 @@ import {
   WINGS_SPEED,
   WORKSHOP_CHANCE,
   WORKSHOP_PAY,
+  DARK_SLOWDOWN,
+  GROW_AT,
+  LAMP_COST,
+  LAMP_ROUND,
+  NIGHT_ROUNDS,
+  RIVAL_BUILD_MS,
+  RIVAL_BUYOUT,
+  RIVAL_CLAIM_MS,
+  RIVAL_REST_MS,
+  RIVAL_ROUND,
+  TOWN_PAY,
+  TOWN_ROUND,
+  WAREHOUSE_COST,
+  WARES_CHANCE,
+  WARES_PAY,
   isPassengers,
   roundGoal,
   type Charter,
@@ -95,6 +111,7 @@ import {
   type Medal,
   type Order,
   type Trait,
+  type Rival,
   type Upgrade,
   type Wyrm,
 } from './state';
@@ -157,6 +174,11 @@ export function newGame(boon: Medal | null = null, journey: Partial<Journey> = {
     traits: [...(journey.traits ?? [])],
     moultOffer: null,
     daily,
+    growth: valley.villages.map(() => 0),
+    towns: [],
+    warehouses: [],
+    lamps: [],
+    rival: null,
     boon,
     festivalMs: 0,
     medal: null,
@@ -226,7 +248,10 @@ export function trackCost(s: GameState, t: Tile): number | null {
   if (sameTile(t, ROOST) || villages(s).some((v) => sameTile(v, t))) return null;
   // Track grows from the line: next to track, the Roost or an open village.
   if (!neighbours(t).some((n) => onLine(s, n))) return null;
-  return Math.max(1, Math.round(terrainCost(s.valley.kind, terrain) * (s.charter?.track ?? 1)));
+  if (s.rival && sameTile(s.rival.yard, t)) return null;
+  // A rival's tile can be taken over, at a price.
+  const buyout = s.rival?.track.includes(key(t)) ? RIVAL_BUYOUT : 1;
+  return Math.max(1, Math.round(terrainCost(s.valley.kind, terrain) * (s.charter?.track ?? 1) * buyout));
 }
 
 export function canBuild(s: GameState, t: Tile) {
@@ -253,6 +278,7 @@ export function buildTrack(s: GameState, t: Tile, plain = false, from: Tile | nu
       for (const n of line) if (!sameTile(n, origin) && !sameTile(n, across)) s.cuts.push(cutKey(t, n));
     }
   }
+  if (s.rival) s.rival.track = s.rival.track.filter((k) => k !== key(t));
   s.track.push(key(t));
   s.paid[key(t)] = cost;
   syncSwitches(s, t);
@@ -279,6 +305,7 @@ export function canRemove(s: GameState, t: Tile) {
 export function removeTrack(s: GameState, t: Tile) {
   if (!canRemove(s, t)) return false;
   s.track = s.track.filter((k) => k !== key(t));
+  s.lamps = s.lamps.filter((k) => k !== key(t));
   syncSwitches(s);
   // Half of what the tile cost when it was laid (a charter may have changed the price since).
   const refund = Math.floor(s.paid[key(t)] / 2);
@@ -419,15 +446,51 @@ export function buyUpgrade(s: GameState, u: Upgrade) {
   return true;
 }
 
-/** A wyrm's speed in tiles a second: Swift wings make it faster, an empty belly slower. */
+/** A wyrm's speed in tiles a second: Swift wings make it faster, an empty belly or unlit track at night slower. */
 export const wyrmSpeed = (s: GameState, w: Wyrm) =>
-  (BASE_SPEED + WINGS_SPEED * s.upgrades.wings + (hasTrait(s, 'swift') ? TRAIT_SPEED : 0)) * (w.food <= 0 ? STARVING_SLOWDOWN : 1);
+  (BASE_SPEED + WINGS_SPEED * s.upgrades.wings + (hasTrait(s, 'swift') ? TRAIT_SPEED : 0)) *
+  (w.food <= 0 ? STARVING_SLOWDOWN : 1) *
+  (isNight(s) && w.path.length && !isLit(s, w.path[0]) ? DARK_SLOWDOWN : 1);
 
 /** What each tile costs a wyrm's belly: more in the snowy valley's cold, less once it has moulted Frugal. */
 const foodPerTile = (s: GameState) => FOOD_PER_TILE * (s.valley.kind === 'snow' ? COLD_HUNGER : 1) * (hasTrait(s, 'frugal') ? FRUGAL_HUNGER : 1);
 
 /** Loading and throwing a switch take half as long once the wyrm has moulted Nimble. */
 const nimble = (s: GameState, ms: number) => ms * (hasTrait(s, 'nimble') ? NIMBLE_TIME : 1);
+
+/** Whether this round flies at night (WR19). */
+export const isNight = (s: GameState) => NIGHT_ROUNDS.includes(s.round);
+
+/** Whether a tile is lit at night: a station, or a lamp on it or beside it. */
+export const isLit = (s: GameState, t: Tile) => isStation(s, t) || [t, ...neighbours(t)].some((n) => s.lamps.includes(key(n)));
+
+/** Whether a lamp can be hung on `t`: track without one, once lamps are sold, and paid for. */
+export function canBuyLamp(s: GameState, t: Tile) {
+  return s.phase === 'play' && !choosing(s) && s.round >= LAMP_ROUND && s.track.includes(key(t)) && !s.lamps.includes(key(t)) && s.coins >= LAMP_COST;
+}
+
+/** Hangs a lamp on a track tile: at night it lights it and the tiles beside it, so the wyrm flies on at full speed. */
+export function buyLamp(s: GameState, t: Tile) {
+  if (!canBuyLamp(s, t)) return false;
+  s.coins -= LAMP_COST;
+  s.lamps.push(key(t));
+  pop(s, tr('lampPop', { n: LAMP_COST }), t, '#f0c070');
+  return true;
+}
+
+/** Whether a warehouse can go at village `v`: a town with a depot and no warehouse yet, paid for. */
+export function canBuyWarehouse(s: GameState, v: number) {
+  return s.phase === 'play' && !choosing(s) && s.towns.includes(v) && s.depots.includes(v) && !s.warehouses.includes(v) && s.coins >= WAREHOUSE_COST;
+}
+
+/** Builds a town's warehouse (WR18): its goods that run late while still waiting go back in store, costing no heart. */
+export function buyWarehouse(s: GameState, v: number) {
+  if (!canBuyWarehouse(s, v)) return false;
+  s.coins -= WAREHOUSE_COST;
+  s.warehouses.push(v);
+  pop(s, tr('warehousePop', { n: WAREHOUSE_COST }), villages(s)[v], '#f0c070');
+  return true;
+}
 
 /** What delivering an order pays, with the Golden hoard. */
 export const orderPay = (s: GameState, o: Order) => Math.round(o.pay * (1 + HOARD_BONUS * s.upgrades.hoard));
@@ -449,7 +512,8 @@ export function pickCharter(s: GameState, i: number) {
   if (s.phase !== 'play' || s.moultOffer || !charter) return false;
   s.charter = charter;
   s.charterOffer = null;
-  s.banner = { text: tr('charterBanner', { name: tr(charter.name) }), ms: BANNER_MS };
+  const news = roundNews(s);
+  s.banner = { text: [tr('charterBanner', { name: tr(charter.name) }), ...news].join('\n'), ms: BANNER_MS * (news.length ? 1.5 : 1) };
   return true;
 }
 
@@ -461,6 +525,15 @@ export function pickMoult(s: GameState, i: number) {
   s.moultOffer = null;
   s.banner = { text: tr('moultBanner', { name: tr(TRAIT_TEXT[trait].name) }), ms: BANNER_MS };
   return true;
+}
+
+/** What is new this round, for its banner (again under the charter's, since the charter cards hide the first): the rival, lamps and night. */
+function roundNews(s: GameState) {
+  const news: string[] = [];
+  if (s.round === RIVAL_ROUND && s.rival) news.push(tr('rivalBanner'));
+  if (s.round === LAMP_ROUND) news.push(tr('lampsBanner'));
+  if (isNight(s)) news.push(tr('nightBanner'));
+  return news;
 }
 
 /** What the next depot costs: each one costs more than the last. */
@@ -550,6 +623,7 @@ export function tick(s: GameState, dt: number) {
   }
   tickMoods(s, dt);
   tickHazard(s, dt);
+  tickRival(s, dt);
   for (let i = 0; i < s.wyrms.length && s.phase === 'play'; i++) moveWyrm(s, i, dt);
 }
 
@@ -636,6 +710,7 @@ function strikeHazard(s: GameState) {
   }
   s.hazard = null;
   s.track = s.track.filter((k) => k !== key(h.tile));
+  s.lamps = s.lamps.filter((k) => k !== key(h.tile));
   delete s.paid[key(h.tile)];
   syncSwitches(s);
   pop(s, tr(HAZARD_TEXT[h.kind].pop), h.tile, '#f08a6a');
@@ -825,6 +900,7 @@ function arrive(s: GameState, i: number) {
   s.idleMs[o.to] = 0;
   cheer(s, o.to, 1);
   pop(s, `+${pay}`, villages(s)[o.to], '#f3c64e');
+  grow(s, o.to);
   const shop = workshopOf(villages(s)[o.to]);
   if (shop && shop.takes === o.cargo) makeGoods(s, o.to);
   if (s.delivered < roundGoal(s.round)) return;
@@ -872,14 +948,19 @@ function nextRound(s: GameState) {
     while (offer.length < MOULT_OFFER && lacking.length) offer.push(lacking.splice(Math.floor(Math.random() * lacking.length), 1)[0]);
     s.moultOffer = offer;
   }
+  if (s.round === RIVAL_ROUND && !s.rival) s.rival = newRival(s);
+  if (s.rival && s.round === FESTIVAL_ROUND) s.rival.claim = null;
+  const news = roundNews(s);
   s.banner = {
-    text:
+    text: [
       s.round === FESTIVAL_ROUND
         ? tr('festivalBanner', { village: villages(s)[festivalHost(s)].name, n: FESTIVAL_GOAL })
         : joining
           ? tr('roundJoins', { round: s.round, village: joining.name })
           : tr('roundBanner', { round: s.round }),
-    ms: BANNER_MS * (s.round === FESTIVAL_ROUND ? 1.5 : 1),
+      ...news,
+    ].join('\n'),
+    ms: BANNER_MS * (s.round === FESTIVAL_ROUND || news.length ? 1.5 : 1),
   };
 }
 
@@ -907,6 +988,8 @@ function offerCharters(s: GameState): Charter[] {
 function failOrder(s: GameState, o: Order) {
   s.orders = s.orders.filter((x) => x !== o);
   s.queue = s.queue.filter((id) => id !== o.id);
+  // Goods still waiting at a town's warehouse go back in store: no heart lost, nobody sours.
+  const stored = o.status !== 'carrying' && s.warehouses.includes(o.from);
   for (const w of s.wyrms) {
     if (jobOrder(w.job) !== o.id) continue;
     w.job = null;
@@ -915,6 +998,7 @@ function failOrder(s: GameState, o: Order) {
     w.path = w.progress > 0 ? w.path.slice(0, 1) : [];
     if (!w.path.length) stopWaiting(w);
   }
+  if (stored) return void pop(s, tr('backInStore'), villages(s)[o.from], '#d8c7a6');
   s.hearts--;
   pop(s, tr('late', { cargo: tr(CARGO_NAMES[o.cargo].name) }), villages(s)[o.to], '#f08a6a');
   if (s.hearts <= 0) return void (s.phase = 'over');
@@ -926,16 +1010,17 @@ function failOrder(s: GameState, o: Order) {
  * sending village's mood sets its pay (cheerful or delighted) or its time (sulking); the round's
  * charter and passengers scale both.
  */
-function addOrder(s: GameState, from: number, to: number, made = false, passengers = false) {
+function addOrder(s: GameState, from: number, to: number, made = false, passengers = false, wares = false) {
   const vs = villages(s);
   const dist = manhattan(vs[from], vs[to]);
-  const cargo: Cargo = passengers ? 'passengers' : made ? workshopOf(vs[from])!.makes : vs[from].cargo;
+  const cargo: Cargo = passengers ? 'passengers' : wares ? 'wares' : made ? workshopOf(vs[from])!.makes : vs[from].cargo;
   const mood = moodOf(s, from);
   const charter = s.charter;
   const time = (mood < 0 ? MOOD_RUSH : 1) * (passengers ? PASSENGER_TIME : 1) * (charter?.time ?? 1);
   const totalMs = Math.round((DEADLINE_BASE_MS + DEADLINE_PER_TILE_MS * dist) * byDifficulty(1.5, 1, 0.7) * time);
   const local = cargo === LOCAL_GOODS[s.valley.kind] ? LOCAL_PAY : 1;
-  const pay = local * (made ? WORKSHOP_PAY : 1) * MOOD_PAY[Math.max(0, mood)] * (passengers ? PASSENGER_PAY : 1) * charterPay(s, cargo);
+  const town = (s.towns.includes(from) ? TOWN_PAY : 1) * (wares ? WARES_PAY : 1);
+  const pay = local * (made ? WORKSHOP_PAY : 1) * MOOD_PAY[Math.max(0, mood)] * (passengers ? PASSENGER_PAY : 1) * charterPay(s, cargo) * town;
   s.orders.push({
     id: s.nextId++,
     cargo,
@@ -967,8 +1052,165 @@ function randomOrder(s: GameState) {
   const from = pick(open);
   const others = open.filter((i) => i !== from);
   if (passengers) return addOrder(s, from, pick(others), false, true);
+  // A town also sends its wares, anywhere on the line.
+  if (s.towns.includes(from) && Math.random() < WARES_CHANCE) return addOrder(s, from, pick(others), false, false, true);
   const shops = others.filter((i) => workshopOf(villages(s)[i])?.takes === villages(s)[from].cargo);
   addOrder(s, from, shops.length && Math.random() < WORKSHOP_CHANCE ? pick(shops) : pick(others));
+}
+
+/** A village fed well grows (WR18): enough deliveries in time from `TOWN_ROUND` and it is a town. */
+function grow(s: GameState, v: number) {
+  if (s.round < TOWN_ROUND || s.towns.includes(v)) return;
+  if (++s.growth[v] < GROW_AT) return;
+  s.towns.push(v);
+  s.banner = { text: tr('townBanner', { village: villages(s)[v].name }), ms: BANNER_MS * 1.5 };
+}
+
+/** A tile the rival can lay track on: open ground off the wyrm's line, away from every village, the Roost and the hazard. */
+function rivalFree(s: GameState, r: Rival, t: Tile) {
+  if (!inGrid(t) || terrainAt(s.valley, t) === 'mountain') return false;
+  if (sameTile(t, ROOST) || sameTile(t, r.yard) || villages(s).some((v) => sameTile(v, t))) return false;
+  if (s.hazard && sameTile(s.hazard.tile, t)) return false;
+  return !s.track.includes(key(t)) && !r.track.includes(key(t));
+}
+
+/** How many open villages a rival line from `yard` could reach. */
+function rivalReach(s: GameState, probe: Rival, yard: Tile) {
+  const free = (t: Tile) => rivalFree(s, probe, t);
+  const seen = new Set([key(yard)]);
+  const queue = [yard];
+  for (let i = 0; i < queue.length; i++) {
+    for (const n of rivalSteps(s, queue[i], free)) {
+      if (seen.has(key(n))) continue;
+      seen.add(key(n));
+      queue.push(n);
+    }
+  }
+  return openIndexes(s).filter((v) => queue.some((t) => manhattan(t, villages(s)[v]) === 1)).length;
+}
+
+/**
+ * The rival sets up its yard on open grass from where its line can reach the most villages, as far
+ * from the Roost as it can; null if there is no room.
+ */
+function newRival(s: GameState): Rival | null {
+  const probe: Rival = { yard: ROOST, track: [], buildMs: RIVAL_BUILD_MS, claim: null, restMs: RIVAL_REST_MS, taken: 0 };
+  let best: { t: Tile; score: number } | null = null;
+  for (let r = 0; r < s.valley.terrain.length; r++) {
+    for (let c = 0; c < s.valley.terrain[0].length; c++) {
+      const t = { c, r };
+      if (terrainAt(s.valley, t) !== 'grass' || !rivalFree(s, probe, t)) continue;
+      const score = rivalReach(s, probe, t) * 100 + manhattan(t, ROOST);
+      if (!best || score > best.score) best = { t, score };
+    }
+  }
+  return best && best.score >= 200 ? { ...probe, yard: best.t } : null;
+}
+
+/**
+ * Where the rival line goes on from `t`: to its free neighbours, and straight over a tile of the
+ * wyrm's track to the one beyond (on a flyover), never through a station. `ok` says which tiles count.
+ */
+function rivalSteps(s: GameState, t: Tile, ok: (n: Tile) => boolean): Tile[] {
+  const out: Tile[] = [];
+  for (const n of neighbours(t)) {
+    if (ok(n)) out.push(n);
+    else if (s.track.includes(key(n))) {
+      const beyond = opposite(n, t);
+      if (inGrid(beyond) && ok(beyond)) out.push(beyond);
+    }
+  }
+  return out;
+}
+
+/** The rival's line: its yard and the track joined to it, over flyovers (a tile the wyrm's line took over can cut it). */
+function rivalNetwork(s: GameState, r: Rival): Tile[] {
+  const seen = new Set([key(r.yard)]);
+  const out = [r.yard];
+  for (let i = 0; i < out.length; i++) {
+    for (const n of rivalSteps(s, out[i], (t) => r.track.includes(key(t)))) {
+      if (seen.has(key(n))) continue;
+      seen.add(key(n));
+      out.push(n);
+    }
+  }
+  return out;
+}
+
+/** The wyrm's track tiles the rival line flies over: a rival tile on each side, straight across. */
+export function rivalFlyovers(s: GameState): Tile[] {
+  const r = s.rival;
+  if (!r) return [];
+  const own = (t: Tile) => sameTile(t, r.yard) || r.track.includes(key(t));
+  return s.track.map(tileOf).filter((t) => (own({ c: t.c - 1, r: t.r }) && own({ c: t.c + 1, r: t.r })) || (own({ c: t.c, r: t.r - 1 }) && own({ c: t.c, r: t.r + 1 })));
+}
+
+/** The open villages the rival's line reaches: next to its yard or its joined track. */
+export function rivalServes(s: GameState): number[] {
+  if (!s.rival) return [];
+  const net = rivalNetwork(s, s.rival);
+  return openIndexes(s).filter((i) => net.some((t) => manhattan(t, villages(s)[i]) === 1));
+}
+
+/** The rival lays its next tile towards the nearest open village its line doesn't reach yet. */
+function rivalBuild(s: GameState, r: Rival) {
+  const served = rivalServes(s);
+  const wanted = openIndexes(s).filter((i) => !served.includes(i)).map((i) => villages(s)[i]);
+  if (!wanted.length) return;
+  const net = rivalNetwork(s, r);
+  const free = (t: Tile) => rivalFree(s, r, t);
+  const first = new Map<string, Tile>();
+  const queue: Tile[] = [];
+  for (const t of net) for (const n of rivalSteps(s, t, free)) {
+    if (first.has(key(n))) continue;
+    first.set(key(n), n);
+    queue.push(n);
+  }
+  for (let i = 0; i < queue.length; i++) {
+    const t = queue[i];
+    if (wanted.some((v) => manhattan(t, v) === 1)) return void r.track.push(key(first.get(key(t))!));
+    for (const n of rivalSteps(s, t, free)) {
+      if (first.has(key(n))) continue;
+      first.set(key(n), first.get(key(t))!);
+      queue.push(n);
+    }
+  }
+}
+
+/**
+ * The rival line (WR20): it lays a tile now and then, and races the wyrm for waiting orders between
+ * villages it reaches. An order it has its eye on goes to the rival unless the wyrm is sent for it
+ * first. It closes for the festival.
+ */
+function tickRival(s: GameState, dt: number) {
+  const r = s.rival;
+  if (!r || s.round === FESTIVAL_ROUND) return;
+  if ((r.buildMs -= dt) <= 0) {
+    r.buildMs = RIVAL_BUILD_MS;
+    rivalBuild(s, r);
+  }
+  if (r.claim) {
+    const o = s.orders.find((o) => o.id === r.claim!.order);
+    if (!o || o.status !== 'waiting') {
+      if (o) pop(s, tr('beatRival'), villages(s)[o.from], '#9be883');
+      r.claim = null;
+      r.restMs = RIVAL_REST_MS;
+      return;
+    }
+    if ((r.claim.ms -= dt) > 0) return;
+    s.orders = s.orders.filter((x) => x !== o);
+    r.claim = null;
+    r.restMs = RIVAL_REST_MS;
+    r.taken++;
+    pop(s, tr('rivalTook', { cargo: tr(CARGO_NAMES[o.cargo].name) }), villages(s)[o.from], '#c7a0e8');
+    return;
+  }
+  if ((r.restMs -= dt) > 0) return;
+  const served = rivalServes(s);
+  const prize = s.orders
+    .filter((o) => o.status === 'waiting' && served.includes(o.from) && served.includes(o.to))
+    .sort((a, b) => b.pay - a.pay)[0];
+  if (prize) r.claim = { order: prize.id, ms: RIVAL_CLAIM_MS };
 }
 
 function pop(s: GameState, text: string, t: Tile, color: string) {

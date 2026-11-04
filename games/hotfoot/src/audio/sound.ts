@@ -55,6 +55,14 @@ export const sfx = sounds({
   gust: { wave: 'noise', freq: 500, to: 2200, length: 0.7, attack: 0.25, volume: 0.12, gap: 1200 },
   /** A cloud on the Sky Road gives way and starts to fall: a soft sinking puff. */
   sink: { wave: 'triangle', freq: 520, to: 160, length: 0.35, volume: 0.22, gap: 300 },
+  /** The hound barks at a trap ahead: two short gruff yaps. */
+  bark: { wave: 'square', freq: 240, to: 170, arp: [0, 0], arpStep: 0.09, length: 0.18, volume: 0.2, gap: 400 },
+  /** The owl swoops on a coin: a soft hoot. */
+  owl: { wave: 'triangle', freq: 440, to: 392, length: 0.22, attack: 0.04, volume: 0.22, gap: 250 },
+  /** The fox takes a hit for the knight: a sharp yip. */
+  fox: { wave: 'square', freq: 880, to: 1320, length: 0.12, volume: 0.2, gap: 300 },
+  /** A challenge course's banner reached: a bright flourish. */
+  cleared: { wave: 'pulse25', freq: 659, arp: [0, 4, 7, 12, 16, 19, 24], arpStep: 0.07, length: 0.7, volume: 0.24, gap: 600 },
   /** Run again: a whoosh up. */
   again: { wave: 'noise', freq: 400, to: 2400, length: 0.26, attack: 0.05, volume: 0.13, gap: 300 },
 });

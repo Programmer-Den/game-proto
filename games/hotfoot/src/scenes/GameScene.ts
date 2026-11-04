@@ -10,16 +10,20 @@ import { bakePanel } from '../art/hud';
 import { armouryIcon } from '../art/icons';
 import { C, N, tileAt } from '../art/ink';
 import { KNIGHT_FEET, type KnightPose } from '../art/knight';
+import { PET_ART } from '../art/pets';
 import { CLOUD_DEPTH, CLOUD_TOP, FAR_H, GROUND_TOP, NEAR_H } from '../art/scenery';
 import { ARMOURY, ARMOURY_IDS, nextPrice, type ArmouryId } from '../game/armoury';
 import { MISSILES, bossOf, bossStands } from '../game/boss';
 import { BOONS, forSale, type BoonId } from '../game/boons';
+import { ALL_STARS, CHALLENGES, STAR, starCount, starsOf, totalStars } from '../game/challenges';
 import { SKY_GAPS } from '../game/course';
 import { ghostAt, ghostOf, record, type Ghost } from '../game/ghost';
 import { KNIGHTS, KNIGHT_IDS, type KnightId } from '../game/knights';
 import { PAIRS, pairsOf } from '../game/pairs';
+import { PETS, PET_IDS, nextPetPrice, type PetId } from '../game/pets';
+import { weekOf, weeklyBoons, weeklyKey } from '../game/weekly';
 import { loadGhosts, loadProgress, saveGhosts, saveProgress, type Progress } from '../game/save';
-import { buyArmoury, buyKnight, buyMissed, jump, newRun, pick, pickRoad, slide, tick } from '../game/sim';
+import { buyArmoury, buyKnight, buyMissed, buyPet, jump, newRun, pick, pickRoad, slide, tick } from '../game/sim';
 import {
   BOON_PRICE,
   LEAD_IN,
@@ -42,6 +46,7 @@ import {
   type Dare,
   type Effect,
   type GameState,
+  type Mode,
   type Road,
   type Shrine,
   type Trap,
@@ -171,6 +176,28 @@ export class GameScene extends Phaser.Scene {
   private armouryBank!: Phaser.GameObjects.Text;
   private armouryRows: { id: ArmouryId; level: Phaser.GameObjects.Text; buy: Phaser.GameObjects.Container; full: Phaser.GameObjects.Text }[] = [];
   private knightCells: { id: KnightId; best: Phaser.GameObjects.Text; button: Phaser.GameObjects.Container; riding: Phaser.GameObjects.Text }[] = [];
+  /** The game-over panel's title ("The knight has fallen", or a challenge course cleared), a challenge's stars and its Try again. */
+  private overTitle!: Phaser.GameObjects.Text;
+  private overStars!: Phaser.GameObjects.Graphics;
+  private overStarLabels: Phaser.GameObjects.Text[] = [];
+  private retryButton!: Phaser.GameObjects.Container;
+  /** The Courses panel: the daily course, the weekly road and the ten challenge courses with their stars. */
+  private coursesPanel!: Phaser.GameObjects.Container;
+  private coursesDaily!: Phaser.GameObjects.Text;
+  private coursesWeekly!: Phaser.GameObjects.Text;
+  private coursesStars!: Phaser.GameObjects.Text;
+  private coursesGfx!: Phaser.GameObjects.Graphics;
+  private challengeCells: { x: number; y: number }[] = [];
+  /** The Companions panel, opened from the armoury. */
+  private petsPanel!: Phaser.GameObjects.Container;
+  private petsBank!: Phaser.GameObjects.Text;
+  private petCells: { id: PetId; level: Phaser.GameObjects.Text; buy: Phaser.GameObjects.Container; full: Phaser.GameObjects.Text; take: Phaser.GameObjects.Container }[] = [];
+  /** The companion running with the knight, and the fox's gold ring while it is ready to take a hit. */
+  private pet!: Phaser.GameObjects.Image;
+  private petGuard!: Phaser.GameObjects.Image;
+  /** Whether the gold boots are won (every challenge star), and whether this run's stars just won them. */
+  private boots = false;
+  private bootsNew = false;
   /** What is saved between runs; the run's own numbers are copied into it by `persist`. */
   private progress!: Progress;
   /** Plays the run's sounds and music from what changed in it each frame. */
@@ -192,7 +219,8 @@ export class GameScene extends Phaser.Scene {
     this.progress = loadProgress();
     this.ghosts = loadGhosts();
     this.samples = [];
-    this.state = this.freshRun(null);
+    this.boots = totalStars(this.progress.challenges) >= ALL_STARS;
+    this.state = this.freshRun('run');
     this.persist();
     this.cues.reset(this.state);
 
@@ -208,6 +236,8 @@ export class GameScene extends Phaser.Scene {
     this.weather = this.add.graphics().setDepth(4.4);
     this.add.image(0, 0, 'frame').setOrigin(0).setDepth(4.5);
     this.ghost = this.add.image(RUNNER_X, GROUND_Y, 'knight-run0').setDepth(4.9).setAlpha(GHOST_LOOK.alpha).setTint(GHOST_LOOK.tint).setVisible(false);
+    this.pet = this.add.image(RUNNER_X, GROUND_Y, 'hound-0').setDepth(4.95).setVisible(false);
+    this.petGuard = this.add.image(RUNNER_X, GROUND_Y, 'fox-guard').setDepth(4.96).setVisible(false);
     this.knight = this.add.image(RUNNER_X, GROUND_Y, 'knight-run0').setDepth(5);
     this.fx = this.add.graphics().setDepth(6);
     this.caption = this.add
@@ -220,6 +250,8 @@ export class GameScene extends Phaser.Scene {
     this.createTitle();
     this.createGameOver();
     this.createArmoury();
+    this.createPets();
+    this.createCourses();
     this.boonCards = new BoonCards(
       this,
       (id) => this.pick(id),
@@ -269,6 +301,7 @@ export class GameScene extends Phaser.Scene {
     this.drawRocks();
     this.drawWeather();
     this.drawKnight();
+    this.drawPet();
     this.drawGhost();
     this.drawEffects();
     this.drawHud();
@@ -276,21 +309,33 @@ export class GameScene extends Phaser.Scene {
     this.boonCards.show(s.phase === 'checkpoint' ? s.choices : null, s.phase === 'checkpoint' ? s.roads : null, s.ranks, s.stage);
     this.gameOver.setVisible(s.phase === 'over');
     if (s.phase === 'over') this.drawGameOver();
-    else this.armouryPanel.setVisible(false);
+    else {
+      this.armouryPanel.setVisible(false);
+      this.petsPanel.setVisible(false);
+      this.coursesPanel.setVisible(false);
+    }
   }
 
   /**
-   * A new run, ordinary or the daily course of `daily`, carrying over the bank, the bought boon and
-   * the armoury, with the knight chosen in the armoury chasing their own best (a daily course is
-   * always the knight's).
+   * A new run of a kind: ordinary, today's daily course, this week's road or challenge course
+   * `challenge`, carrying over the bank, the bought boon, the armoury and the companion, with the
+   * knight chosen in the armoury chasing their own best (a seeded run is always the knight's, bare).
    */
-  private freshRun(daily: string | null) {
+  private freshRun(mode: Mode, challenge = 0) {
     const p = this.progress;
-    const knight = daily ? 'knight' : p.knights.ride;
-    const best = daily ? (p.daily?.date === daily ? p.daily.best : 0) : this.bestOf(knight);
+    const week = weekOf();
+    const key = mode === 'daily' ? today() : mode === 'weekly' ? weeklyKey(week) : mode === 'challenge' ? `challenge:${challenge}` : null;
+    const knight = key ? 'knight' : p.knights.ride;
+    const best =
+      mode === 'daily' ? (p.daily?.date === key ? p.daily.best : 0) : mode === 'weekly' ? (p.weekly?.week === week ? p.weekly.best : 0) : mode === 'challenge' ? 0 : this.bestOf(knight);
     this.samples = [];
     this.ghostSaved = false;
-    return newRun({ best, bank: p.bank, pending: p.pending, armoury: p.armoury, crown: p.crown, knight, knights: p.knights.unlocked }, daily);
+    this.bootsNew = false;
+    return newRun(
+      { best, bank: p.bank, pending: p.pending, armoury: p.armoury, crown: p.crown, knight, knights: p.knights.unlocked, pet: p.pets.with, pets: p.pets.levels },
+      key,
+      { mode, challenge: mode === 'challenge' ? challenge : undefined, boons: mode === 'weekly' ? weeklyBoons(week) : undefined },
+    );
   }
 
   /** A knight's best ordinary run, in metres. */
@@ -313,7 +358,9 @@ export class GameScene extends Phaser.Scene {
   private persist() {
     const s = this.state;
     const p = this.progress;
-    if (s.daily) p.daily = { date: s.daily, best: s.best };
+    if (s.mode === 'daily' && s.daily) p.daily = { date: s.daily, best: s.best };
+    else if (s.mode === 'weekly' && s.daily) p.weekly = { week: s.daily.replace('weekly:', ''), best: s.best };
+    else if (s.challenge) p.challenges[s.challenge.index] |= starsOf(s.challenge, s.hits);
     else if (s.knight === 'knight') p.best = s.best;
     else p.knights.best[s.knight] = s.best;
     p.knights.unlocked = [...s.knights];
@@ -321,12 +368,27 @@ export class GameScene extends Phaser.Scene {
     p.pending = s.pending;
     p.armoury = { ...s.armoury };
     p.crown = p.crown || s.crown;
+    p.pets.levels = { ...s.pets };
     saveProgress(p);
+    // Every star of every challenge course wins the gold boots.
+    const boots = totalStars(p.challenges) >= ALL_STARS;
+    if (boots && !this.boots) this.bootsNew = true;
+    this.boots = boots;
   }
 
   /** The game-over panel: the run's result, the boon missed at the last checkpoint, and the shop. */
   private drawGameOver() {
     const s = this.state;
+    this.overStars.clear().setVisible(!!s.challenge);
+    for (const label of this.overStarLabels) label.setVisible(!!s.challenge);
+    this.retryButton.setVisible(!!s.challenge);
+    if (s.challenge) {
+      this.drawChallengeOver();
+      if (this.armouryPanel.visible) this.drawArmoury();
+      if (this.petsPanel.visible) this.drawPets();
+      return;
+    }
+    this.overTitle.setText(t('fallen'));
     const boons = (Object.entries(s.ranks) as [BoonId, number][]).map(([id, n]) => (n > 1 ? t('boonRanks', { boon: t(BOONS[id].name), n }) : t(BOONS[id].name)));
     const pairs = pairsOf(s.ranks).map((id) => t(PAIRS.find((p) => p.id === id)!.name));
     const missed = s.missed ? `\n${t('missed', { boon: t(BOONS[s.missed].name) })}` : '';
@@ -336,7 +398,7 @@ export class GameScene extends Phaser.Scene {
       s.dragonBeaten ? t('dragonDown') : '',
     ];
     const best = [
-      s.daily ? t('bestDaily', { date: dayName(s.daily), n: s.best }) : s.knight === 'knight' ? t('bestRun', { n: s.best }) : t('bestKnight', { knight: t(KNIGHTS[s.knight].name), n: s.best }),
+      s.mode === 'weekly' ? t('bestWeekly', { n: s.best }) : s.daily ? t('bestDaily', { date: dayName(s.daily), n: s.best }) : s.knight === 'knight' ? t('bestRun', { n: s.best }) : t('bestKnight', { knight: t(KNIGHTS[s.knight].name), n: s.best }),
       this.ghostSaved ? t('ghostSaved') : '',
       s.crown ? t('crowned') : '',
     ];
@@ -358,6 +420,32 @@ export class GameScene extends Phaser.Scene {
     this.shopText.setText(line);
     this.buyButton.setVisible(canBuy);
     if (this.armouryPanel.visible) this.drawArmoury();
+    if (this.petsPanel.visible) this.drawPets();
+  }
+
+  /** The game-over panel after a challenge course: cleared or fallen, its coins and its three stars, and Try again. */
+  private drawChallengeOver() {
+    const s = this.state;
+    const c = s.challenge!;
+    const won = starsOf(c, s.hits);
+    const best = this.progress.challenges[c.index];
+    this.overTitle.setText(t(c.done ? 'courseCleared' : 'fallen'));
+    const lines = [
+      t('challengeRun', { n: c.index + 1, name: t(CHALLENGES[c.index].name) }),
+      c.done ? t('challengeDone', { n: s.hits }) : t('challengeFell', { m: metres(s.distance - s.stageStart) }),
+      t('challengeCoins', { got: c.got, total: c.coins }),
+      t('challengeStars', { n: starCount(won), best: starCount(best) }),
+      this.bootsNew ? t('bootsWon') : t('challengeNoBank'),
+    ];
+    this.gameOverText.setText(lines.filter(Boolean).join('\n'));
+    this.shopText.setText('');
+    this.buyButton.setVisible(false);
+    // The three stars: gold where this run won them, faint where it didn't.
+    const g = this.overStars;
+    [STAR.finish, STAR.nohit, STAR.coins].forEach((bit, i) => {
+      const label = this.overStarLabels[i];
+      this.star(g, label.x, label.y - 22, 13, won & bit ? 1 : 0.25);
+    });
   }
 
   /** Screen x of a point on the course. */
@@ -626,7 +714,7 @@ export class GameScene extends Phaser.Scene {
     else pose = `run${Math.floor(s.distance / STRIDE_PX) % 4}` as KnightPose;
     const feet = pose === 'slide' ? KNIGHT_FEET.slide : KNIGHT_FEET.stand;
     this.knight
-      .setTexture(`${s.knight}-${pose}`)
+      .setTexture(`${s.knight}${this.boots ? '-gold' : ''}-${pose}`)
       .setOrigin(feet.x / feet.w, feet.y / feet.h)
       .setPosition(RUNNER_X, GROUND_Y - r.h)
       .setAngle(s.phase === 'over' ? -8 : 0);
@@ -635,6 +723,34 @@ export class GameScene extends Phaser.Scene {
     this.knight.setAlpha(!hurt ? 1 : settings.reduceMotion ? 0.6 : Math.floor(this.clock / 80) % 2 === 0 ? 0.35 : 1);
     if (s.phase === 'over') this.knight.setTint(0x9a8f88).setTintMode(Phaser.TintModes.MULTIPLY);
     else this.knight.clearTint();
+  }
+
+  /**
+   * The companion running along: the hound or the fox at the knight's heels on the ground (hopping
+   * over a trap underfoot), or the owl flying above and behind them. The fox wears a gold ring
+   * while it is ready to take a hit.
+   */
+  private drawPet() {
+    const s = this.state;
+    const id = s.pet;
+    this.pet.setVisible(!!id);
+    this.petGuard.setVisible(!!id && id === 'fox' && s.foxGuard > 0 && s.phase !== 'over');
+    if (!id) return;
+    const a = PET_ART[id];
+    const still = settings.reduceMotion;
+    this.pet.setOrigin(a.x / a.w, a.y / a.h);
+    if (id === 'owl') {
+      const bob = still ? 0 : Math.sin(this.clock / 220) * 5;
+      const flap = s.phase === 'running' && !still ? Math.floor(this.clock / 140) % 2 : 0;
+      this.pet.setTexture(`owl-${flap}`).setPosition(RUNNER_X - 40, GROUND_Y - s.runner.h - 104 + bob);
+      return;
+    }
+    const x = s.distance - 60;
+    const floor = floorAt(s, x - 12, x + 12);
+    const under = s.traps.some((t) => t.h === 0 && t.kind !== 'blade' && x + 16 > t.x && x - 16 < t.x + t.w);
+    const step = s.phase === 'running' ? Math.floor(s.distance / 18) % 2 : 0;
+    this.pet.setTexture(`${id}-${step}`).setPosition(RUNNER_X - 60, GROUND_Y - floor - (under ? 34 : 0));
+    this.petGuard.setPosition(RUNNER_X - 52, this.pet.y - 30);
   }
 
   /**
@@ -707,6 +823,19 @@ export class GameScene extends Phaser.Scene {
         // A puff thrown up from a pit fallen into while unhurtable.
         g.fillStyle(N.vellumDark, 0.8 * (1 - t)).fillCircle(x - 10, y - 6 - 14 * t, 7 + 7 * t).fillCircle(x + 10, y - 6 - 14 * t, 7 + 7 * t);
         g.lineStyle(1, N.ink, 0.6 * (1 - t)).strokeCircle(x - 10, y - 6 - 14 * t, 7 + 7 * t).strokeCircle(x + 10, y - 6 - 14 * t, 7 + 7 * t);
+      } else if (e.kind === 'bark') {
+        // The hound's bark: three arcs ringing out ahead of it.
+        for (let i = 0; i < 3; i++) {
+          const r = 8 + i * 7 + 10 * t;
+          g.lineStyle(2, N.madder, (1 - t) * (1 - i * 0.25)).beginPath().arc(x + 22, y - 6, r, -0.7, 0.7).strokePath();
+        }
+      } else if (e.kind === 'owl') {
+        // Feathers and a glint where the owl took a coin.
+        for (let i = 0; i < 3; i++) this.star(g, x + (i - 1) * 9, y - 6 * t - (i % 2) * 6, 4, 1 - t);
+      } else if (e.kind === 'fox') {
+        // The fox leaps in front of the blow: an orange ring round it.
+        g.lineStyle(5, N.ink, 0.8 * (1 - t)).strokeCircle(x, y, 14 + 20 * t);
+        g.lineStyle(3, 0xd9792e, 1 - t).strokeCircle(x, y, 14 + 20 * t);
       } else if (e.kind === 'dust') {
         g.fillStyle(N.vellum, 0.7 * (1 - t)).fillCircle(x - 10 - 16 * t, y - 4 - 6 * t, 5 + 4 * t).fillCircle(x - 22 - 20 * t, y - 3 - 4 * t, 4 + 3 * t);
       } else {
@@ -736,6 +865,17 @@ export class GameScene extends Phaser.Scene {
       if (seen.has(id)) continue;
       word.destroy();
       this.words.delete(id);
+    }
+
+    // The hound's marks: a madder diamond on the road under each trap it has barked at, still ahead.
+    if (s.pet === 'hound' && s.phase === 'running') {
+      for (const tr of s.traps) {
+        if (!tr.barked || tr.x + tr.w < s.distance) continue;
+        const mx = this.sx(tr.kind === 'pit' ? tr.x - 10 : tr.x + tr.w / 2);
+        if (mx > VIEW.w + 20) continue;
+        const pts = [new Phaser.Math.Vector2(mx, GROUND_Y + 1), new Phaser.Math.Vector2(mx + 5, GROUND_Y + 6), new Phaser.Math.Vector2(mx, GROUND_Y + 11), new Phaser.Math.Vector2(mx - 5, GROUND_Y + 6)];
+        g.fillStyle(N.madder, 0.9).fillPoints(pts, true).lineStyle(1, N.ink).strokePoints(pts, true);
+      }
     }
 
     // The crown from the Dragon's Keep sits on the knight's helm.
@@ -893,7 +1033,7 @@ export class GameScene extends Phaser.Scene {
     this.trackNext.setText(s.boss && bossStands(s) ? t(dragon ? 'dragonTrack' : 'gateTrack') : tr.next > 0 ? t('trackNext', { n: tr.next }) : t('trackAt'));
 
     // The stage's tag (its ground and road), and the boss's stomps left as pips while it stands.
-    const daily = s.daily ? t('daily') : '';
+    const daily = s.challenge ? t('challengeTag', { n: s.challenge.index + 1 }) : s.mode === 'weekly' ? t('weekly') : s.daily ? t('daily') : '';
     const tag = (...parts: string[]) => parts.filter(Boolean).join(' · ');
     if (s.boss && bossStands(s)) {
       this.tagText.setText(tag(daily, t(bossOf(s.boss).name)));
@@ -922,15 +1062,22 @@ export class GameScene extends Phaser.Scene {
     }
 
     // The controls hint fades out a little way into the first stage.
-    const hint = s.stage === 1 && s.phase === 'running' ? (HINT_UNTIL - s.distance) / 200 : 0;
+    const hint = s.stage === 1 && !s.challenge && s.phase === 'running' ? (HINT_UNTIL - s.distance) / 200 : 0;
     this.hint.setAlpha(Phaser.Math.Clamp(hint, 0, 1));
 
     this.actionButtons.setVisible(this.touchScreen && s.phase === 'running');
 
     // Each stage after the first opens with its title: its name and its rule.
     const intoStage = s.distance - s.stageStart;
-    const shown = s.stage > 1 && s.phase === 'running' ? (TITLE_UNTIL - intoStage) / 200 : 0;
-    if (shown > 0) {
+    const shown = (s.stage > 1 || s.challenge) && s.phase === 'running' ? (TITLE_UNTIL - intoStage) / 200 : 0;
+    if (shown > 0 && s.challenge) {
+      // A challenge course opens with its name, its ground's rule and the three stars to win.
+      const rule = TERRAIN[s.terrain].rule;
+      const rules = [rule ? t(rule) : '', t('challengeGoal')].filter(Boolean).join('\n');
+      const title = t('challengeTitle', { n: s.challenge.index + 1, name: t(CHALLENGES[s.challenge.index].name) });
+      if (this.titleName.text !== title) this.titleName.setText(title);
+      if (this.titleRule.text !== rules) this.titleRule.setText(rules);
+    } else if (shown > 0) {
       const name = t(dragon ? 'dragonTitle' : s.boss ? 'gateTitle' : TERRAIN[s.terrain].name);
       const rule = TERRAIN[s.terrain].rule;
       // The dare reads on after a colon, so it starts small: "The herald's dare: stomp 2 foes".
@@ -969,7 +1116,7 @@ export class GameScene extends Phaser.Scene {
   private drawCaption() {
     const s = this.state;
     let line: string;
-    if (s.phase === 'over') line = t('captionOver');
+    if (s.phase === 'over') line = t(s.challenge?.done ? 'captionCleared' : 'captionOver');
     else if (s.phase === 'checkpoint') line = t(s.roads ? 'captionRoads' : 'captionBoons');
     else if (s.stage === 1 && s.distance < HINT_UNTIL) line = t('captionStart');
     else if (s.boss && bossStands(s)) {
@@ -1071,9 +1218,9 @@ export class GameScene extends Phaser.Scene {
     bakePanel(this, 'over-panel', 600, 400);
     const dim = this.add.rectangle(VIEW.w / 2, VIEW.h / 2, VIEW.w, VIEW.h, N.ink, 0.6).setInteractive();
     const panel = this.add.image(VIEW.w / 2, VIEW.h / 2, 'over-panel');
-    const title = this.add
+    const title = (this.overTitle = this.add
       .text(VIEW.w / 2, VIEW.h / 2 - 160, t('fallen'), { fontFamily: FONT, fontSize: '30px', fontStyle: 'bold', color: C.madder })
-      .setOrigin(0.5);
+      .setOrigin(0.5));
     this.gameOverText = this.add
       .text(VIEW.w / 2, VIEW.h / 2 - 70, '', { fontFamily: FONT, fontSize: '16px', color: C.ink, align: 'center', wordWrap: { width: 540 } })
       .setOrigin(0.5, 0.5);
@@ -1082,10 +1229,16 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0.5);
     this.buyButton = makeButton(this, VIEW.w / 2, VIEW.h / 2 + 80, t('buy', { n: BOON_PRICE }), () => this.buy(), 400);
     this.armouryButton = makeButton(this, VIEW.w / 2 - 190, VIEW.h / 2 + 150, t('armoury'), () => this.openArmoury());
-    const again = makeButton(this, VIEW.w / 2, VIEW.h / 2 + 150, t('runAgain'), () => this.restart(null));
-    const daily = makeButton(this, VIEW.w / 2 + 190, VIEW.h / 2 + 150, t('dailyCourse'), () => this.restart(today()));
+    const again = makeButton(this, VIEW.w / 2, VIEW.h / 2 + 150, t('runAgain'), () => this.restart('run'));
+    const courses = makeButton(this, VIEW.w / 2 + 190, VIEW.h / 2 + 150, t('courses'), () => this.openCourses());
+    // A challenge course's three stars, with Try again under them.
+    this.overStars = this.add.graphics();
+    this.overStarLabels = (['starFinish', 'starNohit', 'starCoins'] as const).map((key, i) =>
+      this.add.text(VIEW.w / 2 + (i - 1) * 150, VIEW.h / 2 + 74, t(key), { fontFamily: FONT, fontSize: '13px', fontStyle: 'italic', color: C.ink }).setOrigin(0.5),
+    );
+    this.retryButton = makeButton(this, VIEW.w / 2, VIEW.h / 2 + 104, t('tryAgain'), () => this.restart('challenge', this.state.challenge?.index ?? 0), 220);
     this.gameOver = this.add
-      .container(0, 0, [dim, panel, title, this.gameOverText, this.shopText, this.buyButton, this.armouryButton, again, daily])
+      .container(0, 0, [dim, panel, title, this.gameOverText, this.shopText, this.buyButton, this.overStars, ...this.overStarLabels, this.retryButton, this.armouryButton, again, courses])
       .setDepth(UI_DEPTH + 20)
       .setVisible(false);
   }
@@ -1153,12 +1306,161 @@ export class GameScene extends Phaser.Scene {
       parts.push(icon, name, text, best, button, riding);
       this.knightCells.push({ id, best, button, riding });
     });
-    const back = makeButton(this, cx, cy + h / 2 - 30, t('back'), () => {
+    const back = makeButton(this, cx - 110, cy + h / 2 - 30, t('back'), () => {
       ui('click');
       this.armouryPanel.setVisible(false);
     });
-    parts.push(back);
+    const pets = makeButton(this, cx + 110, cy + h / 2 - 30, t('companions'), () => this.openPets());
+    parts.push(back, pets);
     this.armouryPanel = this.add.container(0, 0, parts).setDepth(UI_DEPTH + 30).setVisible(false);
+  }
+
+  /**
+   * The Companions panel, over the armoury: the owl, the hound and the fox, each bought and then
+   * trained with banked coins, and one of them taken along on the ordinary runs.
+   */
+  private createPets() {
+    const { w, h, knightX } = ARMOURY_PANEL;
+    const cx = VIEW.w / 2;
+    const cy = VIEW.h / 2;
+    const dim = this.add.rectangle(cx, cy, VIEW.w, VIEW.h, N.ink, 0.4).setInteractive();
+    const panel = this.add.image(cx, cy, 'armoury-panel');
+    const title = this.add.text(cx, cy - h / 2 + 36, t('companionsTitle'), { fontFamily: FONT, fontSize: '28px', fontStyle: 'bold', color: C.madder }).setOrigin(0.5);
+    this.petsBank = this.add.text(cx, cy - h / 2 + 68, '', { fontFamily: FONT, fontSize: '15px', fontStyle: 'italic', color: C.lapis, align: 'center', wordWrap: { width: w - 60 } }).setOrigin(0.5);
+    const parts: Phaser.GameObjects.GameObject[] = [dim, panel, title, this.petsBank];
+    PET_IDS.forEach((id, i) => {
+      const x = cx + knightX[i];
+      const pet = PETS[id];
+      const icon = this.add.image(x, cy - 118, `${id}-0`).setScale(1.5);
+      const name = this.add.text(x, cy - 70, t(pet.name), { fontFamily: FONT, fontSize: '19px', fontStyle: 'bold', color: C.madder }).setOrigin(0.5);
+      const text = this.add.text(x, cy - 50, t(pet.text), { fontFamily: FONT, fontSize: '13px', color: C.ink, align: 'center', wordWrap: { width: 186 } }).setOrigin(0.5, 0);
+      const levels = this.add.text(x, cy + 2, t(pet.levels), { fontFamily: FONT, fontSize: '11px', fontStyle: 'italic', color: C.lapis, align: 'center', wordWrap: { width: 186 } }).setOrigin(0.5, 0);
+      const level = this.add.text(x, cy + 86, '', { fontFamily: FONT, fontSize: '13px', fontStyle: 'italic', color: '#2f7a4a' }).setOrigin(0.5);
+      const buy = makeButton(this, x, cy + 116, '', () => this.buyPet(id), 186);
+      const full = this.add.text(x, cy + 116, t('fullyTrained'), { fontFamily: FONT, fontSize: '16px', fontStyle: 'bold italic', color: C.lapis }).setOrigin(0.5);
+      const take = makeButton(this, x, cy + 162, '', () => this.choosePet(id), 186);
+      parts.push(icon, name, text, levels, level, buy, full, take);
+      this.petCells.push({ id, level, buy, full, take });
+    });
+    const back = makeButton(this, cx, cy + h / 2 - 30, t('back'), () => {
+      ui('click');
+      this.petsPanel.setVisible(false);
+    });
+    parts.push(back);
+    this.petsPanel = this.add.container(0, 0, parts).setDepth(UI_DEPTH + 40).setVisible(false);
+  }
+
+  private drawPets() {
+    const s = this.state;
+    const chosen = this.progress.pets.with;
+    this.petsBank.setText(t('companionsBank', { n: s.bank }));
+    for (const cell of this.petCells) {
+      const lv = s.pets[cell.id];
+      const price = nextPetPrice(s.pets, cell.id);
+      cell.level.setText(lv === 0 ? t('petNotBought') : t(chosen === cell.id ? 'petLevelWith' : 'level', { n: lv, max: PETS[cell.id].prices.length }));
+      cell.full.setVisible(price === null);
+      cell.buy.setVisible(price !== null).setAlpha(price !== null && s.bank >= price ? 1 : 0.45);
+      const caption = cell.buy.getAt(1) as Phaser.GameObjects.Text;
+      const words = price === null ? '' : t(lv === 0 ? 'petBuy' : 'petTrain', { n: price });
+      if (caption.text !== words) caption.setText(words);
+      cell.take.setVisible(lv > 0);
+      const take = cell.take.getAt(1) as Phaser.GameObjects.Text;
+      const takeWords = t(chosen === cell.id ? 'petLeave' : 'petTake');
+      if (take.text !== takeWords) take.setText(takeWords);
+    }
+  }
+
+  private openPets() {
+    ui('click');
+    this.petsPanel.setVisible(true);
+    this.drawPets();
+  }
+
+  /** Buys a companion, or trains it a level, with banked coins. */
+  private buyPet(id: PetId) {
+    const s = this.state;
+    const first = s.pets[id] === 0;
+    if (!buyPet(s, id)) {
+      ui('refuse');
+      return;
+    }
+    ui('coin');
+    // A companion just bought comes along at once.
+    if (first) this.progress.pets.with = id;
+    this.persist();
+    this.drawGameOver();
+    this.drawArmoury();
+  }
+
+  /** Takes a companion along on the ordinary runs from the next one on, or leaves the one along at home. */
+  private choosePet(id: PetId) {
+    ui('click');
+    const p = this.progress.pets;
+    p.with = p.with === id ? null : id;
+    this.persist();
+    this.drawPets();
+  }
+
+  /**
+   * The Courses panel, over the game-over panel: today's daily course and this week's road, each
+   * with its best, and the ten challenge courses with the stars won on each, for the gold boots.
+   */
+  private createCourses() {
+    const { w, h } = ARMOURY_PANEL;
+    const cx = VIEW.w / 2;
+    const cy = VIEW.h / 2;
+    const dim = this.add.rectangle(cx, cy, VIEW.w, VIEW.h, N.ink, 0.4).setInteractive();
+    const panel = this.add.image(cx, cy, 'armoury-panel');
+    const title = this.add.text(cx, cy - h / 2 + 34, t('coursesTitle'), { fontFamily: FONT, fontSize: '28px', fontStyle: 'bold', color: C.madder }).setOrigin(0.5);
+    const daily = makeButton(this, cx - 150, cy - 162, t('dailyCourse'), () => this.restart('daily'), 220);
+    const weekly = makeButton(this, cx + 150, cy - 162, t('weeklyRoad'), () => this.restart('weekly'), 220);
+    const small = { fontFamily: FONT, fontSize: '12px', fontStyle: 'italic', color: C.lapis, align: 'center', wordWrap: { width: 270 } };
+    this.coursesDaily = this.add.text(cx - 150, cy - 136, '', small).setOrigin(0.5, 0);
+    this.coursesWeekly = this.add.text(cx + 150, cy - 136, '', small).setOrigin(0.5, 0);
+    const rule = this.add.graphics();
+    rule.lineStyle(1, N.gold).lineBetween(cx - w / 2 + 40, cy - 78, cx - 110, cy - 78).lineBetween(cx + 110, cy - 78, cx + w / 2 - 40, cy - 78);
+    const heading = this.add.text(cx, cy - 78, t('challengesTitle'), { fontFamily: FONT, fontSize: '19px', fontStyle: 'bold', color: C.madder }).setOrigin(0.5);
+    this.coursesStars = this.add.text(cx, cy - 54, '', { ...small, fontSize: '13px', wordWrap: { width: w - 60 } }).setOrigin(0.5);
+    this.coursesGfx = this.add.graphics();
+    const parts: Phaser.GameObjects.GameObject[] = [dim, panel, title, daily, weekly, this.coursesDaily, this.coursesWeekly, rule, heading, this.coursesStars, this.coursesGfx];
+    CHALLENGES.forEach((c, i) => {
+      const x = cx + ((i % 5) - 2) * 120;
+      const y = cy - 8 + Math.floor(i / 5) * 112;
+      const button = makeButton(this, x, y, formatNumber(i + 1), () => this.restart('challenge', i), 104);
+      const name = this.add.text(x, y + 24, t(c.name), { fontFamily: FONT, fontSize: '11px', fontStyle: 'bold', color: C.ink, align: 'center', wordWrap: { width: 112 } }).setOrigin(0.5, 0);
+      parts.push(button, name);
+      this.challengeCells.push({ x, y: y + 66 });
+    });
+    const back = makeButton(this, cx, cy + h / 2 - 30, t('back'), () => {
+      ui('click');
+      this.coursesPanel.setVisible(false);
+    });
+    parts.push(back);
+    this.coursesPanel = this.add.container(0, 0, parts).setDepth(UI_DEPTH + 30).setVisible(false);
+  }
+
+  private drawCourses() {
+    const p = this.progress;
+    const day = today();
+    const week = weekOf();
+    const dailyBest = p.daily?.date === day ? p.daily.best : 0;
+    const weeklyBest = p.weekly?.week === week ? p.weekly.best : 0;
+    this.coursesDaily.setText(dailyBest > 0 ? t('coursesDailyBest', { n: dailyBest }) : t('coursesDailyNew'));
+    const [a, b] = weeklyBoons(week);
+    const boons = t('coursesWeeklyBoons', { a: t(BOONS[a].name), b: t(BOONS[b].name) });
+    this.coursesWeekly.setText(`${boons}\n${weeklyBest > 0 ? t('coursesWeeklyBest', { n: weeklyBest }) : t('coursesWeeklyNew')}`);
+    const stars = totalStars(p.challenges);
+    this.coursesStars.setText(stars >= ALL_STARS ? t('bootsWorn') : t('starsTotal', { n: stars, max: ALL_STARS }));
+    const g = this.coursesGfx.clear();
+    this.challengeCells.forEach(({ x, y }, i) => {
+      for (let k = 0; k < 3; k++) this.star(g, x + (k - 1) * 22, y, 8, p.challenges[i] & (1 << k) ? 1 : 0.22);
+    });
+  }
+
+  private openCourses() {
+    ui('click');
+    this.coursesPanel.setVisible(true);
+    this.drawCourses();
   }
 
   private drawArmoury() {
@@ -1219,15 +1521,18 @@ export class GameScene extends Phaser.Scene {
 
   /**
    * A new run from the start, with no boons except one bought at the game over; the bank, the
-   * armoury and the best carry over. `daily` is the date of a daily course to run, or null.
+   * armoury and the best carry over. `mode` says which kind of run: an ordinary one, today's daily
+   * course, this week's road or the challenge course `challenge`.
    */
-  private restart(daily: string | null) {
+  private restart(mode: Mode, challenge = 0) {
     this.persist();
-    this.state = this.freshRun(daily);
+    this.state = this.freshRun(mode, challenge);
     this.persist();
     sfx('again');
     this.cues.reset(this.state);
     this.armouryPanel.setVisible(false);
+    this.petsPanel.setVisible(false);
+    this.coursesPanel.setVisible(false);
     for (const sprite of [...this.traps.values(), ...this.coins.values(), ...this.ledges.values(), ...this.clouds.values(), ...this.words.values()]) sprite.destroy();
     for (const art of this.shrines.values()) {
       art.image.destroy();

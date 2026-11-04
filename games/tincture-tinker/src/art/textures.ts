@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
-import { KINDS, type Kind } from '../game/kinds';
+import { ALL_KINDS, type Kind } from '../game/kinds';
 import type { Tile } from '../game/board';
-import type { PotionId } from '../game/orders';
+import type { GuestRule, PotionId } from '../game/orders';
 import { TOOLS, type Tool } from '../game/sim';
 import { BOARD, BUTTON, PANEL, TOOL, TRAY, VIEW } from '../scenes/layout';
 import { viewSize } from '../../../../shared/scaling';
@@ -19,6 +19,7 @@ import {
   doubleRule,
   ell,
   GOLD,
+  OCHRE,
   GOLDD,
   GOLDL,
   goldStar,
@@ -41,10 +42,12 @@ import {
 // art units (twice that).
 
 export const kindTexture = (kind: Kind, catalyst = false) => (catalyst ? `catalyst-${kind}` : `kind-${kind}`);
-/** The texture of a tile on the board: a town's wall, a jar, a resin-held or mouldy tile, a Bloom, a Catalyst or a plain ingredient. */
+/** The texture of a tile on the board: a town's wall, a toad, a jar, a resin-held or mouldy tile, a Bloom, a Catalyst or a plain ingredient. */
 export const tileTexture = (t: Tile) =>
-  t.hole ? 'hole' : t.jar ? `jar-${t.kind}` : t.resin ? `resin-${t.kind}` : t.mould ? `mould-${t.kind}` : t.bloom ? `bloom-${t.kind}` : kindTexture(t.kind, t.catalyst);
+  t.hole ? 'hole' : t.toad ? 'toad' : t.jar ? `jar-${t.kind}` : t.resin ? `resin-${t.kind}` : t.mould ? `mould-${t.kind}` : t.bloom ? `bloom-${t.kind}` : kindTexture(t.kind, t.catalyst);
 export const needTexture = (kind: Kind) => `need-${kind}`;
+/** A town guest's medallion on the journey map. */
+export const guestTexture = (rule: GuestRule) => `guest-${rule}`;
 export const potionTexture = (potion: PotionId) => `potion-${potion}`;
 export const toolTexture = (tool: Tool, look: 'on' | 'off' | 'armed') => `tool-${tool}-${look}`;
 /** Where the flask texture's anchor (the middle of its bulb) sits, as a Phaser origin. */
@@ -69,7 +72,7 @@ export function bakeTextures(scene: Phaser.Scene) {
   const view = viewSize(scene);
   bake(scene, 'wall', view.width, view.height, () => paintWall(view.width * ART, view.height * ART));
   bake(scene, 'table', VIEW.w, VIEW.h, paintTable);
-  for (const kind of KINDS) {
+  for (const kind of ALL_KINDS) {
     bake(scene, kindTexture(kind), BOARD.cell, BOARD.cell, () => ingredient(kind, 56, 56, 39, 7));
     bake(scene, kindTexture(kind, true), 64, 64, () => paintCatalyst(kind));
     bake(scene, `bloom-${kind}`, 64, 64, () => paintBloom(kind));
@@ -99,6 +102,8 @@ export function bakeTextures(scene: Phaser.Scene) {
   bake(scene, 'result-card', 400, 236, () => paintCard(800, 472));
   bake(scene, 'map-card', 440, 440, () => paintCard(880, 880));
   bake(scene, 'hole', BOARD.cell, BOARD.cell, paintHole);
+  bake(scene, 'toad', BOARD.cell, BOARD.cell, paintToad);
+  for (const rule of ['witch', 'knight', 'miser'] as const) bake(scene, guestTexture(rule), 26, 26, () => paintGuest(rule));
 }
 
 /** The bottle-green wall with its lily pattern and gold rules, `W` x `H` art units: the whole view. */
@@ -557,4 +562,54 @@ function paintCard(w: number, h: number) {
   cornerOrn(w - 26, 22, -1, 1, 56);
   cornerOrn(26, h - 34, 1, -1, 56);
   cornerOrn(w - 26, h - 34, -1, -1, 56);
+}
+
+/** A tile the witch turned into a toad: a squat green toad with gold eyes, sitting where the ingredient was. */
+function paintToad() {
+  const x = 56;
+  const y = 60;
+  const body = '#6f9a4a';
+  const dark = '#4f7a36';
+  // Legs splayed under the body, then the body, the head's eye bumps and the eyes.
+  for (const sx of [-1, 1]) {
+    poly([[x + sx * 18, y + 18], [x + sx * 42, y + 30], [x + sx * 34, y + 38], [x + sx * 12, y + 32]], dark, SEPIA, 4);
+    poly([[x + sx * 24, y - 4], [x + sx * 44, y + 6], [x + sx * 38, y + 14], [x + sx * 20, y + 8]], dark, SEPIA, 4);
+  }
+  poly(ell(x, y + 8, 36, 26, 0, 20), body, SEPIA, 5);
+  for (const sx of [-1, 1]) {
+    circle(x + sx * 18, y - 14, 13, body, SEPIA, 5);
+    circle(x + sx * 18, y - 15, 7, OCHRE, SEPIA, 2.5);
+    circle(x + sx * 18, y - 15, 2.6, SEPIA);
+  }
+  // A wide mouth and a few warts.
+  ctx.beginPath();
+  ctx.arc(x, y + 4, 18, 0.2 * Math.PI, 0.8 * Math.PI);
+  ctx.strokeStyle = SEPIA;
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  for (const [dx, dy, r] of [[-14, 18, 4], [10, 22, 3.5], [22, 10, 3], [-24, 6, 3]] as const) circle(x + dx, y + dy, r, dark);
+  circle(x - 10, y - 2, 5, '#9cc06e');
+}
+
+/** A guest's medallion: cream with a gold rim, and the witch's hat, the knight's shield or the miser's coins. */
+function paintGuest(rule: GuestRule) {
+  const c = 26;
+  circle(c, c, 23, '#f6ecd2', GOLD, 3.5);
+  if (rule === 'witch') {
+    poly([[c - 17, c + 9], [c + 17, c + 9], [c + 13, c + 13], [c - 13, c + 13]], '#3d2a4e', SEPIA, 2.5);
+    poly([[c - 9, c + 9], [c + 9, c + 9], [c + 5, c - 6], [c + 10, c - 17], [c - 1, c - 9]], '#4a3360', SEPIA, 2.5);
+    poly([[c - 9, c + 5], [c + 9, c + 5], [c + 9, c + 9], [c - 9, c + 9]], OCHRE);
+  } else if (rule === 'knight') {
+    // A blue shield with a gold chevron.
+    poly([[c - 13, c - 14], [c + 13, c - 14], [c + 13, c], [c, c + 16], [c - 13, c]], '#3f5f8f', SEPIA, 2.5);
+    poly([[c - 11, c + 2], [c, c - 8], [c + 11, c + 2], [c + 11, c + 7], [c, c - 3], [c - 11, c + 7]], GOLD);
+  } else {
+    for (const [dy, dx] of [[8, -4], [2, 3], [-4, -2]] as const) {
+      ctx.save();
+      ctx.scale(1, 0.55);
+      coin(c + dx, (c + dy) / 0.55, 11);
+      ctx.restore();
+    }
+    coin(c + 4, c - 9, 8);
+  }
 }

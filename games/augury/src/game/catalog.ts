@@ -27,6 +27,8 @@ export const CHARMS = {
   flip: 'mirror',
   link: 'spool',
   slide: 'compass',
+  pipe: 'spigot',
+  beam: 'prism',
   series: 'sextant',
   echo: 'shell',
 } as const satisfies Record<KindId, string>;
@@ -48,6 +50,8 @@ export const KIND_COLOR: Record<KindId, number> = {
   flip: 0x7fb8ff,
   link: 0xe6a4ff,
   slide: 0x9fd8c8,
+  pipe: 0x6fd6e8,
+  beam: 0xd8f07a,
   series: 0xffc6a0,
   echo: 0xfff0a8,
 };

@@ -27,6 +27,21 @@ const enUS: Partial<Translation<typeof en>> = {
     one: 'Your shrine stood {n} tier tall,\n{balanced} of them balanced, for {favour} favor.',
     other: 'Your shrine stood {n} tiers tall,\n{balanced} of them balanced, for {favour} favor.',
   },
+  rainText: 'Stones that are not perfect slide {n} pixels further off · x{mult} favor',
+  snowText: 'The swing slows down and speeds up · x{mult} favor',
+  weatherTag: '{weather} · x{mult} favor',
+  villageNote: { one: '{n} pilgrim · {favour} favor', other: '{n} pilgrims · {favour} favor' },
+  villageSub: {
+    one: '{n} pilgrim has settled · {favour} favor to spend',
+    other: '{n} pilgrims have settled · {favour} favor to spend',
+  },
+  villageHint: 'Every crown brings pilgrims and the favor the temple held. Not in the daily or a race.',
+  buildingCost: 'Build: {n} favor',
+  pilgrimsArrive: {
+    one: '{n} pilgrim settles below with {favour} favor.',
+    other: '{n} pilgrims settle below with {favour} favor.',
+  },
+  wellText: 'Every temple starts with {n} favor.',
 };
 
 export default enUS;

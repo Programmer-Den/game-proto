@@ -1,4 +1,5 @@
 import type { KindId } from '../../game/kinds';
+import { beamView } from './beam';
 import { bridgesView } from './bridges';
 import { calcView } from './calc';
 import { codeView } from './code';
@@ -6,6 +7,7 @@ import { echoView } from './echo';
 import { flipView } from './flip';
 import { linkView } from './link';
 import { nonogramView } from './nonogram';
+import { pipeView } from './pipe';
 import { seriesView } from './series';
 import { slideView } from './slide';
 import { sumsView } from './sums';
@@ -22,6 +24,8 @@ export const VIEWS: Record<KindId, PuzzleView> = {
   flip: flipView,
   link: linkView,
   slide: slideView,
+  pipe: pipeView,
+  beam: beamView,
   series: seriesView,
   echo: echoView,
 };

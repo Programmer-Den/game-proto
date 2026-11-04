@@ -23,8 +23,11 @@ coins and a third boon card. Every seventh stage a rockfall rolls in behind the 
 goes on harder, beyond the Keep along the Sky Road of gusts and falling clouds. Coins are banked when
 the knight falls, and buy back the boon you missed at the last checkpoint, lasting upgrades in the
 armoury, or a second knight to run as: the squire or the heavy knight. Your best run plays back as a
-faint ghost beside you, to race. A daily course, the same for everyone on the day, keeps its own
-best distance.
+faint ghost beside you, to race. A companion bought in the armoury runs along: an owl that grabs
+coins out of reach, a hound that barks before a trap, or a fox that takes a hit for you once a stage.
+A daily course, the same for everyone on the day, and a weekly road, the same all week with two set
+boons, keep their own best distances, and ten hand-made challenge courses pay three stars each,
+every star of them winning a pair of gold boots.
 
 ![The knight leaping a flame on stage 3, a wayside shrine and a goblin ahead](cover.png)
 
@@ -39,8 +42,9 @@ best distance.
 | Tap a card | Take that boon at a checkpoint |
 | Tap a road card | From stage 3: pick the road the next stage runs on, once the boon is taken |
 | Run again | After a fall: a new run from the start, with no boons (or the one bought on the game-over panel) |
-| Daily course | After a fall: a run on the day's own course |
-| Armoury | After a fall: spend banked coins on lasting upgrades |
+| Courses | After a fall: the daily course, the weekly road and the ten challenge courses |
+| Try again | After a challenge course: run the same course again |
+| Armoury | After a fall: spend banked coins on lasting upgrades, knights and companions |
 
 A hint on the first stretch of the run shows where to tap. On a touch screen, round Slide and Jump
 buttons in the bottom right of the margin do the same while the knight runs.
@@ -108,7 +112,7 @@ buttons in the bottom right of the margin do the same while the knight runs.
    | Lodestone Charm | 3 | 40, 100, 200 | Coins fly in from a little further off |
    | Squire's Purse | 2 | 30, 80 | Start with 10 more coins |
 
-16. **Daily course**: "Daily course" on the game-over panel starts a run whose course and boon
+16. **Daily course**: "Daily course" in the Courses panel (opened from the game-over panel) starts a run whose course and boon
    offers are drawn from the date, the same for everyone that day. It starts bare, without the
    armoury or a bought boon (which waits for the next ordinary run), so everyone runs it alike. Its
    best distance is kept apart from the ordinary best, and the tag says "Daily" while it runs.
@@ -167,10 +171,35 @@ buttons in the bottom right of the margin do the same while the knight runs.
    after it plays back as a faint, pale ghost of that knight, where that run was after as long a time
    running, jumping and sliding where it did. A pale ring on the run track marks it too. It goes once
    its run has ended; outrun it and the game-over panel says your ghost will run this one next time.
+25. **Companions**: the armoury's Companions button opens a panel of three pets, each bought and
+   then trained with banked coins. One runs with the knight on every ordinary run (tap "Take along";
+   "Leave at home" runs alone); the daily course, the weekly road and the challenge courses are run
+   without one.
+
+   | Companion | Prices | What it does | Levels |
+   | --- | --- | --- | --- |
+   | Owl | 50, 100, 160 | Flies above the knight and swoops on a coin they pass out of reach, so it flies in | Reaches 50, 90, 140 px above or below the knight |
+   | Hound | 40, 80, 130 | Runs at the knight's heels, barks at each trap as it comes within reach and marks it with a madder diamond on the road | Barks 380, 500, 640 px ahead |
+   | Fox | 70, 130, 200 | Takes a hit for the knight once a stage, after the Aegis: no heart lost (a gold ring shows while it is ready) | Level 2 keeps the streak through it, level 3 takes two hits a stage |
+
+26. **Challenge courses**: the Courses panel lists ten short courses laid out by hand, each a fixed
+   row of traps on its own ground and at its own pace, from the Meadow Path to the Gauntlet. They
+   are run bare, from three hearts (on Normal) to a finish banner, with coins drawn in from a little
+   further off (as with a rank of Lodestone) so a good leap can take a whole arc. Each pays up to
+   three stars: reaching the banner, reaching it without a hit, and reaching it with every coin on
+   the course. The panel shows the stars won on each; **every star of all ten wins the gold boots**,
+   worn by every knight in every run after. A challenge course banks no coins, and "Try again" on
+   its panel runs it again.
+27. **The weekly road**: "Weekly road" in the Courses panel starts a run drawn from the week's seed
+   (ISO weeks, from Monday), the same for everyone all week, that starts with two set boons named on
+   the panel. Run it as often as you like; it starts bare otherwise, like the daily course, and
+   keeps the week's best distance, shown on the panel and on the game-over panel. The tag reads
+   "Weekly" while it runs.
 
    The best distance, the banked coins, any boon bought, the armoury, the day's best on the
-   daily course, the crown, the knights unlocked and chosen with their bests, and each knight's
-   ghost are saved between runs.
+   daily course, the crown, the knights unlocked and chosen with their bests, each knight's
+   ghost, the companions, the week's best on the weekly road and each challenge course's stars
+   are saved between runs.
 
 ![A streak at x3: the chip, a "+3" pop and the trail of gold stars](docs/screenshots/streak.webp)
 
@@ -228,6 +257,14 @@ buttons in the bottom right of the margin do the same while the knight runs.
 
 ![The ghost of the best run leaps a flame behind the knight](docs/screenshots/ghost-runner.webp)
 
+![The Companions panel: the owl, the hound and the fox](docs/screenshots/companions.webp)
+
+![The hound at the knight's heels has marked the spikes and the log ahead; the knight wears the gold boots](docs/screenshots/companion-hound.webp)
+
+![The Courses panel: the daily course, the weekly road and the ten challenge courses with their stars](docs/screenshots/courses.webp)
+
+![A challenge course cleared with all three stars](docs/screenshots/challenge-cleared.webp)
+
 ### Boons and the coin shop
 
 | Boon | Ranks | What it does |
@@ -255,9 +292,9 @@ buttons in the bottom right of the margin do the same while the knight runs.
 
 ![A hit](docs/screenshots/hit.webp)
 
-![After a fall: the shop, the armoury and the daily course](docs/screenshots/game-over.webp)
+![After a fall: the shop, the armoury and the courses](docs/screenshots/game-over.webp)
 
-![The armoury, with its Knights row](docs/screenshots/armoury.webp)
+![The armoury, with its Knights row and the way to the companions](docs/screenshots/armoury.webp)
 
 **The coin shop.** Coins collected in a run are banked when the knight falls. On the game-over panel,
 the boon you missed at the last checkpoint (a card you did not tap, one that can be sold if there is one) is for sale for 30 coins. Buy
@@ -303,13 +340,15 @@ All paths are inside `games/hotfoot/`.
   `course.ts` lays out each stage's traps, foes, ledges, coins and shrine by its road, its dare
   and its rockfall (or the Gatekeeper or the dragon), `boons.ts` is the table of boons (cursed ones
   too), `pairs.ts` the boon pairs, `boss.ts` moves the Gatekeeper and the dragon and their throws,
-  `armoury.ts` is the table of lasting upgrades, `knights.ts` the knights to run as, `ghost.ts`
+  `armoury.ts` is the table of lasting upgrades, `knights.ts` the knights to run as, `pets.ts`
+  the companions, `challenges.ts` the challenge courses and their stars, `weekly.ts` the weekly
+  road's week and boons, `ghost.ts`
   records the run and plays back the ghost, `sim.ts` moves the run on (foes, ledges, stomps,
   the ground's rules, the Sky Road's gusts and clouds, the bosses, the rockfall, the dares, the
   pairs' bonuses, the coin streak and shrines included), jumps, slides, takes boons and roads and
-  sells the missed boon, the armoury's levels and the knights, and `save.ts` keeps the best
-  distance, the banked coins, any boon bought, the armoury, the daily course's best, the crown,
-  the knights and the ghosts.
+  sells the missed boon, the armoury's levels, the knights and the companions, and `save.ts` keeps
+  the best distance, the banked coins, any boon bought, the armoury, the daily course's and the
+  weekly road's bests, the crown, the knights, the ghosts, the companions and the challenge stars.
 - `src/scenes/`: `BootScene` bakes textures, `GameScene` draws the run and wires taps and keys to
   the rules, `layout.ts` says where things are drawn.
 - `src/art/`: all the art, painted in code on 2D canvases at startup, in the manner of an
@@ -317,7 +356,8 @@ All paths are inside `games/hotfoot/`.
   helpers and pigments in `ink.ts`. `scenery.ts` paints the vellum page and its margin, the sky,
   crags and trees (and the cloud banks beyond the Keep), the road on each ground, the gaps in the
   clouds and the clouds over them, the ledges, the traps, the coins, the checkpoint
-  banner, the wayside shrine and the miniature's frame; `knight.ts` the poses of each knight; `foes.ts`
+  banner, the wayside shrine and the miniature's frame; `knight.ts` the poses of each knight (and
+  again in gold boots); `pets.ts` the owl, the hound and the fox; `foes.ts`
   the goblin, bat, Gatekeeper and its barrel and axe, the dragon and its fire and tail lash, and
   the rockfall's boulder; `icons.ts` the boon, road and armoury icons and hearts; `hud.ts` the top
   band, the illuminated initial, the streak chip, the run track's strip, the stage's tag, the

@@ -1,9 +1,10 @@
 // What outlives a garden: the most waves ever cleared, the Heartwood's bloom (kept from garden to
 // garden), each garden's harvest stars and laurels, and the garden last picked (and whether in its
 // thorny variant), each garden's best wild wave and the grafts bought. The garden's golems and pests
-// are never saved. The daily plot keeps its own record under `golem-garden-daily` (`shared/daily.ts`).
-import { GARDENS } from './board';
-import { GRAFTS, type Graft } from './data';
+// are never saved. The daily plot keeps its own record under `golem-garden-daily` (`shared/daily.ts`);
+// the weekly garden its week's best wave, and each drawn plot its drawing and best wave.
+import { GARDENS, GRID, type Drawing } from './board';
+import { GRAFTS, PLOT, type Graft } from './data';
 
 const BEST = 'golem-garden-best';
 const BLOOM = 'golem-garden-bloom';
@@ -13,6 +14,8 @@ const LAURELS = 'golem-garden-laurels';
 const THORNY = 'golem-garden-thorny';
 const WILD = 'golem-garden-wild';
 const GRAFTED = 'golem-garden-grafts';
+const WEEKLY = 'golem-garden-weekly';
+const PLOTS = 'golem-garden-plots';
 
 function load(key: string) {
   try {
@@ -72,3 +75,46 @@ export function loadGrafts(): Graft[] {
   return GRAFTS.filter((graft) => raw.split(',').includes(graft));
 }
 export const saveGrafts = (grafts: Graft[]) => save(GRAFTED, grafts.join(','));
+
+/** The best wave cleared in week `week`'s weekly garden, or 0 (a best from another week doesn't count). */
+export function loadWeekly(week: number) {
+  let raw = '';
+  try {
+    raw = localStorage.getItem(WEEKLY) ?? '';
+  } catch {
+    // Unsaved: nothing cleared this week.
+  }
+  const [w, best] = raw.split(':').map(Number);
+  return w === week ? Math.max(0, best || 0) : 0;
+}
+/** Keeps week `week`'s best wave, as `<week>:<best>`. */
+export const saveWeekly = (week: number, best: number) => save(WEEKLY, `${week}:${best}`);
+
+/** A drawn plot as saved: its drawing and the best wave cleared on it. */
+export interface SavedPlot extends Drawing {
+  best: number;
+}
+
+/** A list of cells on the board, from saved JSON. */
+const cells = (raw: unknown): [number, number][] =>
+  (Array.isArray(raw) ? raw : [])
+    .filter((c): c is [number, number] => Array.isArray(c) && Number.isInteger(c[0]) && Number.isInteger(c[1]))
+    .filter(([c, r]) => c >= 0 && r >= 0 && c < GRID.cols && r < GRID.rows)
+    .map(([c, r]) => [c, r]);
+
+/** The PLOT.slots drawn plots, null for an empty slot. */
+export function loadPlots(): (SavedPlot | null)[] {
+  let raw: unknown = [];
+  try {
+    raw = JSON.parse(localStorage.getItem(PLOTS) ?? '[]');
+  } catch {
+    // Unsaved or unreadable: every slot empty.
+  }
+  const list = Array.isArray(raw) ? raw : [];
+  return Array.from({ length: PLOT.slots }, (_, i) => {
+    const p = list[i];
+    if (!p || typeof p !== 'object') return null;
+    return { path: cells(p.path), soil: cells(p.soil), best: Math.max(0, Number(p.best) || 0) };
+  });
+}
+export const savePlots = (plots: (SavedPlot | null)[]) => save(PLOTS, JSON.stringify(plots));

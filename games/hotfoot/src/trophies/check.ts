@@ -11,7 +11,8 @@ const DISTANCE = 1000;
 
 /** Whether each trophy's condition holds in the state. */
 const EARNED: Record<string, (state: GameState) => boolean> = {
-  checkpoint: (s) => s.stage > 1 || s.phase === 'checkpoint',
+  // A challenge course can start past stage 1 and has no checkpoint.
+  checkpoint: (s) => !s.challenge && (s.stage > 1 || s.phase === 'checkpoint'),
   stomps: (s) => s.stomps >= STOMPS,
   shrine: (s) => s.shrines.some((sh) => sh.used),
   streak: (s) => streakMult(s.streak, streakMax(s.road)) >= STREAK.max,

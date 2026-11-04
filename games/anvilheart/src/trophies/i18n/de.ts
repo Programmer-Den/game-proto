@@ -19,6 +19,8 @@ const de: Translation<typeof en> = {
   dragonslayerText: 'Schmiede einen Drachentöter.',
   crownBlade: 'Die Kronklinge',
   crownBladeText: 'Liefere die Kronklinge und gewinne die Krone für deine Schmiede.',
+  champion: 'Turniersieger',
+  championText: 'Bewaffne einen Ritter, der ein Turnier gewinnt.',
   dynasty: 'Schmiededynastie',
   dynastyText: 'Gründe nach einem Sieg eine dritte neue Schmiede.',
 };

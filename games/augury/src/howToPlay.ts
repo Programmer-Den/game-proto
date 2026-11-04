@@ -2,9 +2,9 @@ import type { HowToPlay } from '../../../shared/howToPlay';
 import { byLanguage } from '../../../shared/i18n';
 
 const en: HowToPlay = {
-  goal: 'Solve the puzzles the deck deals you, eleven kinds in all: logic, numbers, space and memory. In Endless Medley, keep going until your three hearts run out.',
+  goal: 'Solve the puzzles the deck deals you, thirteen kinds in all: logic, numbers, space and memory. In Endless Medley, keep going until your three hearts run out.',
   controls: [
-    { input: 'Click or tap', action: 'Fill a cell, pick an island, flip or slide a tile, press a key' },
+    { input: 'Click or tap', action: 'Fill a cell, pick an island, flip, slide or turn a tile, place a mirror, press a key' },
     { input: 'Drag', action: 'Slide a block (Unjam) or draw a path (Path Link)' },
     { input: 'Keys 1-9, Backspace', action: 'Write or clear a number; pick a glyph in Code Breaker' },
     { input: 'Enter', action: 'Make the guess in Code Breaker' },
@@ -27,13 +27,15 @@ const en: HowToPlay = {
     'Pass and Play deals both players the same three puzzles; skips and hints add time.',
     'The Journey walks five temples of eight set steps; up to three stars a step, and 12 stars in a temple open the next.',
     'The Weekly League is the same Draft Run for everyone all week: play it as often as you like, and your best score sets your rank, from Novice to Seer.',
+    'Every solve raises that kind\'s mastery, from 1 to 10. Each level opens a harder trial of it in Practice (pick Trial), and Endless deals your weakest kinds more often.',
+    'In the Daily Five, a faint bar races you: the score your best daily five had at this point.',
   ],
 };
 
 const de: HowToPlay = {
-  goal: 'Löse die Rätsel, die dir das Deck austeilt, elf Arten insgesamt: Logik, Zahlen, Raum und Gedächtnis. In der Endlosen Mischung spielst du weiter, bis deine drei Herzen verbraucht sind.',
+  goal: 'Löse die Rätsel, die dir das Deck austeilt, dreizehn Arten insgesamt: Logik, Zahlen, Raum und Gedächtnis. In der Endlosen Mischung spielst du weiter, bis deine drei Herzen verbraucht sind.',
   controls: [
-    { input: 'Klicken oder tippen', action: 'Ein Feld füllen, eine Insel wählen, ein Licht drehen oder ein Feld schieben, eine Taste drücken' },
+    { input: 'Klicken oder tippen', action: 'Ein Feld füllen, eine Insel wählen, ein Licht drehen, ein Feld schieben oder drehen, einen Spiegel setzen, eine Taste drücken' },
     { input: 'Ziehen', action: 'Einen Block schieben (Freischieben) oder einen Pfad zeichnen (Pfadfinder)' },
     { input: 'Tasten 1-9, Rücktaste', action: 'Eine Zahl schreiben oder löschen; im Codeknacker ein Zeichen wählen' },
     { input: 'Eingabe', action: 'Im Codeknacker raten' },
@@ -56,6 +58,8 @@ const de: HowToPlay = {
     'Beim Weitergeben bekommen beide Spieler dieselben drei Rätsel; Überspringen und Tipps kosten Zeit.',
     'Die Reise führt durch fünf Tempel mit je acht festen Schritten; bis zu drei Sterne pro Schritt, und 12 Sterne in einem Tempel öffnen den nächsten.',
     'Die Wochenliga ist die ganze Woche dieselbe Kartenwahl für alle: Spiel sie so oft du willst, dein bester Punktestand bestimmt deinen Rang, vom Novizen bis zum Seher.',
+    'Jede Lösung hebt die Meisterung dieser Rätselart, von 1 bis 10. Jede Stufe öffnet beim Üben eine schwerere Prüfung (wähle Prüfung), und die Endlose Mischung teilt deine schwächsten Arten öfter aus.',
+    'In der Tagesfünf läuft ein blasser Balken gegen dich: der Punktestand deiner besten Tagesfünf an dieser Stelle.',
   ],
 };
 

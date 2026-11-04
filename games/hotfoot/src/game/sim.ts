@@ -2,9 +2,11 @@ import type { TextKey } from '../i18n';
 import { ARMOURY_EACH, nextPrice, noArmoury, type Armoury, type ArmouryId } from './armoury';
 import { BOONS, BOON_IDS, CURSE, forSale, type BoonId } from './boons';
 import { MISSILES, bossOf, bossStands, moveBoss } from './boss';
+import { CHALLENGES } from './challenges';
 import { buildStage, nextStage, roadChoiceDue } from './course';
 import { KNIGHTS, type KnightId } from './knights';
 import { PAIRS, pairsOf } from './pairs';
+import { nextPetPrice, noPets, type PetId, type PetLevels } from './pets';
 import {
   AWAKE,
   BOON_PRICE,
@@ -34,6 +36,7 @@ import {
   streakMult,
   type DareKind,
   type GameState,
+  type Mode,
   type Road,
   type Trap,
   type TrapKind,
@@ -79,24 +82,55 @@ export interface Carry {
   /** Who rides this run (a daily course always takes the knight), and the knights unlocked. */
   knight: KnightId;
   knights: KnightId[];
+  /** The companion chosen to run along on ordinary runs, and each companion's level. */
+  pet: PetId | null;
+  pets: PetLevels;
+}
+
+/** A seeded run's kind (the daily course by default), the challenge course it runs, and the boons it starts with (the weekly road's). */
+export interface RunKind {
+  mode?: Mode;
+  challenge?: number;
+  boons?: BoonId[];
 }
 
 /**
- * A new run: an ordinary one, or the daily course of the date given. A boon bought at the last
- * game over starts an ordinary run with one rank of that boon, and the armoury's levels apply. A
- * daily course starts bare, so every player runs it alike; the bought boon waits for the next
- * ordinary run.
+ * A new run: an ordinary one, or a seeded one with the key given: the daily course of a date, the
+ * weekly road (with its two boons) or a challenge course. A boon bought at the last game over
+ * starts an ordinary run with one rank of that boon, and the armoury's levels and the companion
+ * apply. A seeded run starts bare, so every player runs it alike; the bought boon waits for the
+ * next ordinary run.
  */
 export function newRun(
-  { best, bank, pending, armoury, crown, knight, knights }: Carry = { best: 0, bank: 0, pending: null, armoury: noArmoury(), crown: false, knight: 'knight', knights: ['knight'] },
+  { best, bank, pending, armoury, crown, knight, knights, pet, pets }: Carry = {
+    best: 0,
+    bank: 0,
+    pending: null,
+    armoury: noArmoury(),
+    crown: false,
+    knight: 'knight',
+    knights: ['knight'],
+    pet: null,
+    pets: noPets(),
+  },
   daily: string | null = null,
+  kind: RunKind = {},
 ): GameState {
   const s = freshState(best, bank, armoury, daily, crown, daily ? 'knight' : knight, knights);
+  s.mode = daily ? (kind.mode ?? 'daily') : 'run';
+  s.pets = { ...pets };
+  s.pet = daily || !pet || pets[pet] <= 0 ? null : pet;
+  if (daily && kind.challenge !== undefined) {
+    s.challenge = { index: kind.challenge, coins: 0, got: 0, done: false };
+    s.stage = CHALLENGES[kind.challenge].stage;
+  }
   if (daily) s.pending = pending;
   else if (pending) s.ranks[pending] = 1;
+  for (const id of kind.boons ?? []) s.ranks[id] = 1;
   const st = stats(s);
   s.hearts = st.maxHearts;
   s.shields = st.shields;
+  s.foxGuard = st.fox;
   s.purse = daily ? 0 : armoury.purse * ARMOURY_EACH.purse;
   s.coins = s.purse;
   buildStage(s);
@@ -307,10 +341,18 @@ function hurt(s: GameState, kind: TrapKind | 'wall' | 'boss' | 'rock') {
     }
   }
   s.hits += 1;
-  s.streak = 0;
   r.hurtMs = st.hurtMs;
   // A no-hit dare is lost to any hit, a blocked one included.
   if (s.dare?.kind === 'nohit' && !s.dare.done) s.dare.failed = true;
+  // The fox leaps in and takes the hit, once a stage (twice at its last level); from its second
+  // level the streak survives it.
+  if (s.shields <= 0 && s.foxGuard > 0) {
+    s.foxGuard -= 1;
+    if (!st.foxStreak) s.streak = 0;
+    effect(s, 'fox', s.distance - 50, 30, 600);
+    return;
+  }
+  s.streak = 0;
   if (s.shields > 0) {
     s.shields -= 1;
     effect(s, 'block', s.distance, r.h + RUNNER.h / 2, 500);
@@ -329,7 +371,8 @@ function hurt(s: GameState, kind: TrapKind | 'wall' | 'boss' | 'rock') {
     s.phase = 'over';
     s.best = Math.max(s.best, metres(s.distance));
     // The Squire's Purse's coins are for the road, not the bank, so dying early can't farm them.
-    s.bank += Math.max(0, s.coins - s.purse);
+    // A challenge course banks nothing: it is run for its stars.
+    if (!s.challenge) s.bank += Math.max(0, s.coins - s.purse);
   }
 }
 
@@ -343,6 +386,16 @@ export function tick(s: GameState, dt: number) {
   const r = s.runner;
   s.time += dt;
   moveFoes(s, sec);
+  // The hound barks at the traps coming up and marks them, once each.
+  if (st.bark > 0) {
+    let barked = false;
+    for (const t of s.traps) {
+      if (t.barked || t.x <= s.distance || t.x - s.distance > st.bark) continue;
+      t.barked = true;
+      barked = true;
+    }
+    if (barked) effect(s, 'bark', s.distance - 64, 40, 600);
+  }
   // The checkpoint stays out of reach while the boss stands.
   if (s.boss && bossStands(s)) s.checkpointX = Math.max(s.checkpointX, Math.round(s.distance + bossOf(s.boss).holdBack));
 
@@ -443,11 +496,17 @@ export function tick(s: GameState, dt: number) {
     const near = Math.hypot(dx, dh);
     if (near < COIN_REACH) {
       c.x = Number.NaN;
+      if (s.challenge) s.challenge.got += 1;
       gainCoin(s, s.distance, midH);
       effect(s, 'coin', s.distance, midH, 400);
       continue;
     }
     if (near < st.reach) c.pulled = true;
+    // The owl swoops on a coin the knight is passing out of reach, above or below.
+    if (!c.pulled && st.owl > 0 && c.x <= box.x1 && c.x >= box.x0 - 30 && dh <= st.owl) {
+      c.pulled = true;
+      effect(s, 'owl', c.x, c.h, 450);
+    }
     if (c.pulled) {
       const tx = s.distance - c.x;
       const th = midH - c.h;
@@ -463,6 +522,15 @@ export function tick(s: GameState, dt: number) {
   s.shrines = s.shrines.filter((sh) => sh.x + sh.w > s.distance - BEHIND);
   if (s.boss && !bossStands(s) && s.boss.x + s.boss.w < s.distance - BEHIND) s.boss = null;
 
+  // A challenge course ends at its banner: the run is over, and its stars are counted.
+  if (s.phase === 'running' && s.challenge && s.distance >= s.checkpointX) {
+    s.challenge.done = true;
+    s.phase = 'over';
+    r.slideMs = 0;
+    r.slideQueued = false;
+    r.jumpQueued = false;
+    return;
+  }
   if (s.phase === 'running' && s.distance >= s.checkpointX) {
     s.phase = 'checkpoint';
     s.banners.push(metres(s.checkpointX));
@@ -610,5 +678,14 @@ export function buyKnight(s: GameState, id: KnightId) {
   if (s.phase !== 'over' || s.knights.includes(id) || s.bank < price) return false;
   s.bank -= price;
   s.knights.push(id);
+  return true;
+}
+
+/** At the game-over screen, buys a companion or its next level with banked coins, for the ordinary runs after. */
+export function buyPet(s: GameState, id: PetId) {
+  const price = nextPetPrice(s.pets, id);
+  if (s.phase !== 'over' || price === null || s.bank < price) return false;
+  s.bank -= price;
+  s.pets[id] += 1;
   return true;
 }

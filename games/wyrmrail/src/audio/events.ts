@@ -14,6 +14,9 @@ interface Snapshot {
   moods: number[];
   orders: Map<number, GameState['orders'][number]['status']>;
   wyrms: { eating: boolean; switching: boolean; visiting: boolean }[];
+  towns: number;
+  rivalTaken: number;
+  rivalClaim: number | null;
 }
 
 const snapshot = (s: GameState): Snapshot => ({
@@ -27,6 +30,9 @@ const snapshot = (s: GameState): Snapshot => ({
   moods: [...s.moods],
   orders: new Map(s.orders.map((o) => [o.id, o.status])),
   wyrms: s.wyrms.map((w) => ({ eating: w.eatMs > 0, switching: w.switchMs > 0, visiting: w.job?.leg === 'visit' })),
+  towns: s.towns.length,
+  rivalTaken: s.rival?.taken ?? 0,
+  rivalClaim: s.rival?.claim?.order ?? null,
 });
 
 /** The part of the song the game calls for now. */
@@ -67,7 +73,12 @@ export class GameSounds {
     }
     const delivered = now.totalDelivered - was.totalDelivered;
     for (const id of was.orders.keys()) if (!now.orders.has(id)) late++;
-    late -= delivered;
+    // An order the rival took is gone too, but not late.
+    const taken = now.rivalTaken - was.rivalTaken;
+    late -= delivered + taken;
+    if (taken > 0) sfx('rival');
+    else if (was.rivalClaim !== null && now.rivalClaim === null && now.orders.has(was.rivalClaim)) sfx('beatRival');
+    if (now.towns > was.towns) sfx('grow');
     if (delivered > 0) sfx('deliver');
     if (late > 0) sfx('late');
     if (was.hearts - now.hearts > Math.max(0, late)) sfx('faith');
