@@ -59,13 +59,13 @@ import {
   fairTotal,
   fairWon,
   freshProgress,
+  hiveFull,
   hiveOf,
   isOpen,
   isWinter,
   jarCount,
   jarPrice,
   marketLeft,
-  maxBees,
   meadReady,
   neighbours,
   newHive,
@@ -564,7 +564,7 @@ export class GameScene extends Phaser.Scene {
       if (cell.type === 'brood') {
         image.setTexture('cell-brood');
         // A green arc goes round as the next bee grows; it waits while the hive is full.
-        if (s.bees.length < maxBees(s)) {
+        if (!hiveFull(s, hiveOf(slot))) {
           const done = 1 - cell.hatchMs / BROOD_MS;
           g.lineStyle(3.5, LIVE.broodArc, 0.95).beginPath().arc(c.x, c.y, 15, -Math.PI / 2, -Math.PI / 2 + done * Math.PI * 2).strokePath();
         }
@@ -1100,7 +1100,7 @@ export class GameScene extends Phaser.Scene {
             ? t('broodNoSpot')
             : !freeHere
               ? t('broodCombFull')
-              : t('brood', { price: t('price', { n: pay.coins }), what: t(s.bees.length >= maxBees(s) ? 'beesFull' : 'hatches') });
+              : t('brood', { price: t('price', { n: pay.coins }), what: t(hiveFull(s, this.hive) ? 'beesFull' : 'hatches') });
         button.set(caption, freeHere && canPay(s, broodPrice(s, this.hive)), this.placing);
         continue;
       }

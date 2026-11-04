@@ -58,7 +58,7 @@ const de: Translation<typeof en> = {
   neonName: 'Neon-Spielhalle',
   neonGoal: 'Löse ein 9×9 in unter 10 Minuten',
   glassName: 'Buntglas',
-  glassGoal: 'Alle Stile außer Almanach freischalten',
+  glassGoal: 'Schalte alle Stile davor frei',
   almanacName: 'Almanach',
   almanacGoal: 'Stemple jeden Tag eines Monats im Kalender',
   // Board

@@ -1580,7 +1580,7 @@ export class GameScene extends Phaser.Scene {
     return this.state.items.rod && !this.map.fish && tileAt(this.map, tx, ty) === 'water';
   }
 
-  /** Whether a tile is the Brinewyrm's pool while the wyrm is about: there act and a tap are at it, not a cast. */
+  /** Whether a tile is the Brinewyrm's pool while the wyrm is about: there act swings at it rather than casting, and a tap is not refused. */
   private brinePool(tx: number, ty: number) {
     const p = this.map.pool;
     return !!this.brine && !!p && tx >= p.x && tx < p.x + p.w && ty >= p.y && ty < p.y + p.h;
