@@ -19,7 +19,10 @@ import {
   chooseCommission,
   chooseEdict,
   chooseHall,
+  buyOre,
   dailyShop,
+  hireApprentice,
+  hold,
   hallOffers,
   useRandom,
   deliver,
@@ -41,14 +44,20 @@ import {
 } from '../game/sim';
 import {
   BARREL as BARREL_PLACE,
-  MASTER_MS,
+  APPRENTICE_PRICE,
   MAX_DESKS,
   MAX_SLOTS,
   REP_MAX,
   STAR_PRICE,
   STREAK_MS,
+  apprenticeAbout,
+  apprenticeEvery,
+  cartsAbout,
   desksOf,
   dull,
+  knightPay,
+  masterMs,
+  tourneyOpen,
   forgeMs,
   freeStars,
   freshProgress,
@@ -68,12 +77,18 @@ import {
 } from '../game/state';
 import { MAX_TIER, swordOf } from '../game/swords';
 import { FORGE_UPGRADES, UPGRADES, locked, nextPrice, type UpgradeId } from '../game/upgrades';
+import { FINISHES, FINISH_IDS, KNIGHTS, finishesOf, lance, placeOf } from '../game/tourney';
+import { ORES, ORE_IDS, orePrice, type Ore } from '../game/cart';
 import { t, type TextKey } from '../i18n';
 import { checkTrophies } from '../trophies/check';
 import { Button } from '../ui/Button';
 import {
+  APPRENTICE_PANE,
   BANNER,
   BARREL,
+  CART_PANE,
+  SIDE,
+  TOURNEY_PANE,
   CELL_SCALE,
   DESK,
   EDICT_PLAQUE,
@@ -140,6 +155,15 @@ function roman(n: number) {
   for (const [v, s] of parts) while (n >= v) (out += s), (n -= v);
   return out;
 }
+
+/** A time left as m:ss. */
+function clockText(ms: number) {
+  const secs = Math.ceil(Math.max(0, ms) / 1000);
+  return `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+}
+
+/** A tourney place, 1st to 4th, as words. */
+const placeText = (place: number) => t((['place1', 'place2', 'place3', 'place4'] as const)[Math.min(4, Math.max(1, place)) - 1]);
 
 /** The fit tag's first line: how the held sword fits the order, and what the buyer's trait makes of it. */
 function tagLine(fit: Fit, trait: Trait, master: boolean) {
@@ -224,6 +248,19 @@ export class GameScene extends Phaser.Scene {
   private dailyLink!: Phaser.GameObjects.Text;
   private dailyWindow!: Phaser.GameObjects.Container;
   private dailyResult!: Phaser.GameObjects.Text;
+  /** The side column (AN18 to AN20): the tourney's pane, the apprentice's with its hire button, and the ore cart's with its two buttons. */
+  private tourneyPane!: Phaser.GameObjects.Container;
+  private tourneyStatus!: Phaser.GameObjects.Text;
+  private tourneyFinish!: Phaser.GameObjects.Text;
+  private bannerText!: Phaser.GameObjects.Text;
+  private apprenticePane!: Phaser.GameObjects.Container;
+  private hireButton!: Button;
+  private apprenticeLine!: Phaser.GameObjects.Text;
+  private cartPane!: Phaser.GameObjects.Container;
+  private cartTitle!: Phaser.GameObjects.Text;
+  private cartLines!: Phaser.GameObjects.Text;
+  private cartPicture!: Phaser.GameObjects.Image;
+  private oreButtons = new Map<Ore, Button>();
   /** The counter's desk frames, three or four, and how many the visitors were drawn for. */
   private counter!: Phaser.GameObjects.Image;
   private drawnDesks = 0;
@@ -347,6 +384,7 @@ export class GameScene extends Phaser.Scene {
     this.createEdicts();
     this.createHalls();
     this.createDaily();
+    this.createSide();
     // An offer still waiting from the last visit opens at once.
     this.chooser.setVisible(this.state.choosing);
 
@@ -382,7 +420,7 @@ export class GameScene extends Phaser.Scene {
     if (!this.windowOpen) tick(this.state, dt);
     // Forging (the Forge button's or the Auto Forge's inside tick), rust dropping tiers, heroes
     // bringing swords back and walk-offs costing reputation are kept here.
-    if (this.state.events.some((e) => e.kind === 'forged' || e.kind === 'rusted' || e.kind === 'returned' || e.kind === 'left')) this.save();
+    if (this.state.events.some((e) => e.kind === 'forged' || e.kind === 'rusted' || e.kind === 'returned' || e.kind === 'left' || e.kind === 'apprenticed' || e.kind === 'tourney')) this.save();
     checkTrophies(this.state);
 
     this.drawSwords();
@@ -391,6 +429,7 @@ export class GameScene extends Phaser.Scene {
     this.drawMarks();
     this.drawHud();
     this.drawForge();
+    this.drawSide();
     this.drawChooser();
     this.drawEdicts();
     this.drawHalls();
@@ -457,8 +496,9 @@ export class GameScene extends Phaser.Scene {
     if (place === BARREL_PLACE && this.state.ranks.barrel === 0) return this.buy('barrel');
     const item = itemAt(this.state, place);
     if (item === null) return;
-    // A sword in hand is tended, so rust can't lower it under the held picture.
+    // A sword in hand is tended, so rust can't lower it under the held picture, and the apprentice leaves it be.
     touch(this.state, place);
+    hold(this.state, place);
     this.spriteAt(place)?.setVisible(false);
     const sprite = this.image(p.worldX, p.worldY, itemTexture(item), swordScale(1.35)).setDepth(UI_DEPTH - 1);
     this.held = { slot: place, sprite };
@@ -474,6 +514,7 @@ export class GameScene extends Phaser.Scene {
     const held = this.held;
     if (!held) return;
     this.held = null;
+    hold(this.state, null);
     held.sprite.destroy();
     this.spriteAt(held.slot)?.setVisible(true);
     if (!p) return;
@@ -562,13 +603,13 @@ export class GameScene extends Phaser.Scene {
     const gem = this.image(mid + 50, ORDER.y + 52, 'gem', 0.5).setVisible(a.gem);
     const buckler = set ? this.image(mid + 34, ORDER.y + 50, shieldTexture(a.shield), 0.5) : null;
     const ticks = set ? [mid - 30, mid + 34].map((x) => this.image(x, ORDER.y + 50, 'tick').setVisible(false)) : [];
-    const label = a.gem ? t('withGem', { sword: t(sword.name) }) : set ? `${t(sword.name)} + ${t(shieldOf(a.shield).name)}` : t(sword.name);
+    const label = a.knight ? t('orBetter', { sword: t(sword.name) }) : a.gem ? t('withGem', { sword: t(sword.name) }) : set ? `${t(sword.name)} + ${t(shieldOf(a.shield).name)}` : t(sword.name);
     const name = this.add
       .text(mid, ORDER.y + 86, label, { fontFamily: FONT, fontStyle: 'bold', fontSize: label.length > 28 ? '9px' : label.length > 24 ? '10.5px' : a.gem || set ? '12px' : '13px', color: '#2a1a14' })
       .setOrigin(0.5);
     // Between the order card and the patience bar: the trait, that this is a set order, or that this hero is back from a quest.
-    const line = a.trait !== 'none' ? t(TRAIT_LINES[a.trait]) : set ? t('setLine') : a.returned ? t('backLine') : '';
-    const trait = this.add.text(mid, ORDER.y + ORDER.h + 8.5, line, textStyle(11, set ? '#ffd36a' : TRAIT_COLOURS[a.trait], 2.5)).setOrigin(0.5);
+    const line = a.knight ? t('knightLine') : a.trait !== 'none' ? t(TRAIT_LINES[a.trait]) : set ? t('setLine') : a.returned ? t('backLine') : '';
+    const trait = this.add.text(mid, ORDER.y + ORDER.h + 8.5, line, textStyle(11, a.knight ? '#ff9ab8' : set ? '#ffd36a' : TRAIT_COLOURS[a.trait], 2.5)).setOrigin(0.5);
     const tagImage = this.image(0, 0, 'tag-exact').setOrigin(0);
     const tagTop = this.add.text(TAG.w / 2 + 1, 11.5, '', textStyle(10, '#eaffd8', 2)).setOrigin(0.5);
     const tagBottom = this.add.text(TAG.w / 2 + 1, 23.5, '', textStyle(11, '#ffe27a', 2)).setOrigin(0.5);
@@ -583,6 +624,7 @@ export class GameScene extends Phaser.Scene {
   /** The order card's price: what the asked-for sword (and buckler, for a set) pays at today's prices. */
   private orderCoins(a: Adventurer) {
     const s = this.state;
+    if (a.knight) return t('knightCoins');
     return a.shield > 0 ? t('setCoins', { n: orderPrice(a, s) + shieldPrice(a, s) }) : t(a.gem ? 'gemCoins' : 'orderCoins', { n: orderPrice(a, s) });
   }
 
@@ -597,7 +639,11 @@ export class GameScene extends Phaser.Scene {
     const done = events.some((e) => e.kind === 'commission');
     this.playEvents(events, done);
     for (const e of events) {
-      if (e.kind === 'forged' || e.kind === 'merged' || e.kind === 'set' || e.kind === 'repaired') {
+      if (e.kind === 'forged' || e.kind === 'merged' || e.kind === 'set' || e.kind === 'repaired' || e.kind === 'apprenticed') {
+        if (e.kind === 'apprenticed') {
+          const at = this.placeSpot(e.slot);
+          this.float(at.x, at.y - 20, t('apprentice'), '#b8e8a0');
+        }
         if (e.kind === 'merged' && e.master) {
           const at = this.placeSpot(e.slot);
           this.float(at.x, at.y + 62, t('masterworkStruck'), '#ffe27a', 1800);
@@ -638,7 +684,7 @@ export class GameScene extends Phaser.Scene {
         this.float(c.x + 40, c.y, message, e.fit === 'exact' ? '#ffd36a' : '#d8d0e0');
       } else if (e.kind === 'left') {
         const c = deskCentre(e.desk, desksOf(this.state));
-        this.float(c.x, c.y, t('leftUnhappy'), '#ff8a6a');
+        this.float(c.x, c.y, t(e.knight ? 'rodeOff' : 'leftUnhappy'), '#ff8a6a');
         if (e.back) this.float(c.x, c.y + 26, e.back.coins > 0 ? t('halfPaid', { n: e.back.coins }) : t('halfBack'), '#ffe7a8');
       } else if (e.kind === 'handed') {
         const c = deskCentre(e.desk, desksOf(this.state));
@@ -654,6 +700,27 @@ export class GameScene extends Phaser.Scene {
         this.float(EDICT_PLAQUE.x + 120, EDICT_PLAQUE.y + 27, e.won ? t('rivalWon', { n: e.coins }) : t('rivalLost'), e.won ? '#ffd36a' : '#ff8a6a', 2600);
       } else if (e.kind === 'dailyEnd') {
         this.endDaily(e.earned);
+      } else if (e.kind === 'tourneyStart') {
+        this.float(VIEW.w / 2, VIEW.h / 2 - 120, t('tourneyStart', { sword: t(swordOf(e.wants).name) }), '#ff9ab8', 2800);
+      } else if (e.kind === 'armed') {
+        const c = deskCentre(e.desk, desksOf(this.state));
+        this.float(c.x + 20, c.y, t('armed', { n: e.coins, place: placeText(e.place) }), '#ffd36a', 1800);
+      } else if (e.kind === 'tourney') {
+        const message = e.banner
+          ? t('tourneyWon', { n: e.coins })
+          : e.coins > 0
+            ? t('tourneyPlaced', { place: placeText(e.place), n: e.coins })
+            : t('tourneyLost');
+        this.float(VIEW.w / 2, VIEW.h / 2 - 120, message, e.banner ? '#ffd36a' : e.coins > 0 ? '#ffe7a8' : '#ff8a6a', 2800);
+        // A banner that reaches a finish's count unlocks it.
+        const finish = FINISH_IDS.find((f) => e.banner && FINISHES[f].banners === this.state.banners);
+        if (finish) this.float(VIEW.w / 2, VIEW.h / 2 - 84, t('finishUnlocked', { name: t(FINISHES[finish].name), blurb: t(FINISHES[finish].blurb) }), '#9ad0ff', 3200);
+      } else if (e.kind === 'hired') {
+        this.float(VIEW.w / 2, VIEW.h / 2 - 60, t('hired', { n: Math.round(apprenticeEvery(this.state) / 1000) }), '#b8e8a0', 2400);
+      } else if (e.kind === 'cart') {
+        this.float(VIEW.w / 2, VIEW.h / 2 - 150, t('cartCame'), '#c8d0e0', 2800);
+      } else if (e.kind === 'ore') {
+        this.float(VIEW.w / 2, VIEW.h / 2 - 90, t('oreBought', { name: t(ORES[e.ore].name), blurb: t(ORES[e.ore].blurb) }), '#c8d0e0', 2400);
       }
     }
   }
@@ -673,6 +740,30 @@ export class GameScene extends Phaser.Scene {
         case 'forged':
           sfx('hiss', { volume: auto ? 0.5 : 1 });
           sfx('clink', { volume: auto ? 0.5 : 1 });
+          break;
+        case 'apprenticed':
+          // The apprentice's hammer, softer than the player's own.
+          sfx('clang', { volume: 0.5, pitch: 2 ** ((Math.min(e.tier, MAX_TIER) - 2) / 6) });
+          break;
+        case 'tourneyStart':
+          sfx('horn');
+          break;
+        case 'armed':
+          sfx('exact');
+          break;
+        case 'tourney':
+          if (e.banner) {
+            sfx('fanfare');
+            ui('coin');
+          } else if (e.coins > 0) ui('coin');
+          else sfx('grumble');
+          break;
+        case 'hired':
+        case 'ore':
+          sfx('buy');
+          break;
+        case 'cart':
+          sfx('cart');
           break;
         case 'merged':
           // The clang climbs two semitones a tier; a Masterwork rings its bell over it.
@@ -831,7 +922,7 @@ export class GameScene extends Phaser.Scene {
       const r = 40;
       const start = -Math.PI / 2;
       g.lineStyle(8, LEAD).strokeCircle(c.x, c.y + 4, r);
-      g.lineStyle(4.5, s.streakMs <= MASTER_MS ? 0xffe27a : 0xff8a2a);
+      g.lineStyle(4.5, s.streakMs <= masterMs(s) ? 0xffe27a : 0xff8a2a);
       g.beginPath();
       g.arc(c.x, c.y + 4, r, start, start + Math.PI * 2 * (s.streakMs / STREAK_MS));
       g.strokePath();
@@ -875,6 +966,14 @@ export class GameScene extends Phaser.Scene {
       v.ticks.forEach((tick, j) => tick.setVisible((j === 0 ? a.given.sword : a.given.shield) !== null));
       v.tag.setVisible(buys);
       if (!buys || item === null) continue;
+      if (a.knight) {
+        // A knight's tag says where the sword would place in the joust, and what they pay for it.
+        const place = placeOf(lance(item), a.wants);
+        v.tagImage.setTexture(place === 1 ? 'tag-exact' : 'tag-overkill');
+        v.tagTop.setText(t('ridesPlace', { place: placeText(place) })).setFontSize(10).setColor(place === 1 ? '#eaffd8' : '#d8d0e0');
+        v.tagBottom.setText(t('tagCoins', { n: knightPay(item, s) })).setColor('#ffe27a');
+        continue;
+      }
       if (a.shield > 0) {
         // The second half completes the set and shows what it pays; the first only promises it.
         const swordItem = isShield(item) ? a.given.sword : item;
@@ -1328,13 +1427,122 @@ export class GameScene extends Phaser.Scene {
   /** The line under the edict plaque: the daily shift's clock and earnings, or the day against the rival smithy. */
   private statusText() {
     const s = this.state;
-    const clock = (ms: number) => {
-      const secs = Math.ceil(ms / 1000);
-      return `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
-    };
+    const clock = clockText;
     if (s.daily) return t('dailyLine', { time: clock(s.daily.ms), n: s.daily.earned });
     if (rivalOpen(s)) return t('rivalLine', { mine: s.rival.mine, theirs: s.rival.theirs, time: clock(s.rival.ms) });
     return '';
+  }
+
+  /** The side column between the board and the counter: the tourney (AN18), the apprentice (AN19) and the ore cart (AN20). */
+  private createSide() {
+    const small = (x: number, y: number, size: number, col: string) =>
+      this.add.text(x, y, '', { ...textStyle(size, col, 3), align: 'center', fontStyle: 'normal', wordWrap: { width: SIDE.w - 8 } }).setOrigin(0.5, 0);
+    const mid = SIDE.w / 2;
+    const title = (key: TextKey) => this.add.text(mid, 12, t(key), textStyle(12, '#ffd36a', 3)).setOrigin(0.5);
+
+    // The tourney: its title with the banners won, when the next comes or how many knights are armed, and the finishes.
+    this.bannerText = this.add.text(SIDE.w - 8, 12, '', textStyle(11, '#fff1d0', 3)).setOrigin(1, 0.5);
+    const pennant = this.image(SIDE.w - 8, 12, 'pennant', 0.75);
+    this.tourneyStatus = small(mid, 22, 10.5, '#fff1d0');
+    this.tourneyFinish = small(mid, 58, 9.5, '#9ad0ff');
+    this.tourneyPane = this.add
+      .container(TOURNEY_PANE.x, TOURNEY_PANE.y, [this.image(0, 0, 'pane-tourney').setOrigin(0), this.add.text(7, 12, t('tourney'), textStyle(12, '#ffd36a', 3)).setOrigin(0, 0.5), pennant, this.bannerText, this.tourneyStatus, this.tourneyFinish])
+      .setDepth(4)
+      .setVisible(false);
+    pennant.setName('pennant');
+
+    // The apprentice: hire button, then how often they merge.
+    this.hireButton = new Button(this, mid, 40, 'side', '', () => this.hire());
+    this.apprenticeLine = small(mid, 40, 10.5, '#b8e8a0');
+    this.apprenticePane = this.add
+      .container(APPRENTICE_PANE.x, APPRENTICE_PANE.y, [this.image(0, 0, 'pane-apprentice').setOrigin(0), title('apprentice'), this.hireButton.root, this.apprenticeLine])
+      .setDepth(4)
+      .setVisible(false);
+
+    // The ore cart: when it comes or how long it stays, its two ores, and the time left on those bought.
+    this.cartTitle = this.add.text(mid, 12, '', textStyle(11.5, '#ffd36a', 3)).setOrigin(0.5);
+    this.cartPicture = this.image(mid, 38, 'cart');
+    this.cartLines = small(mid, 50, 10, '#c8d0e0');
+    const buttons = ORE_IDS.map((ore, i) => {
+      const b = new Button(this, mid, 36 + i * 26, 'side', '', () => this.buyOre(ore));
+      this.oreButtons.set(ore, b);
+      return b.root;
+    });
+    this.cartPane = this.add
+      .container(CART_PANE.x, CART_PANE.y, [this.image(0, 0, 'pane-cart').setOrigin(0), this.cartTitle, this.cartPicture, this.cartLines, ...buttons])
+      .setDepth(4)
+      .setVisible(false);
+  }
+
+  private hire() {
+    if (this.windowOpen) return;
+    if (!hireApprentice(this.state)) return ui('refuse');
+    this.save();
+  }
+
+  private buyOre(ore: Ore) {
+    if (this.windowOpen) return;
+    if (!buyOre(this.state, ore)) return ui('refuse');
+    this.save();
+  }
+
+  /** Fills the side column's panes; each shows once its feature is about. */
+  private drawSide() {
+    const s = this.state;
+    const tourney = tourneyOpen(s) || s.banners > 0;
+    this.tourneyPane.setVisible(tourney);
+    if (tourney) {
+      const tn = s.tourney;
+      this.bannerText.setText(t('bannerCount', { n: s.banners }));
+      const pennant = this.tourneyPane.getByName('pennant') as Phaser.GameObjects.Image;
+      pennant.setX(this.bannerText.x - this.bannerText.width - 7);
+      const armed = tn.entries.length;
+      this.tourneyStatus.setText(!tourneyOpen(s) ? '' : tn.on ? t('tourneyOn', { n: armed, total: KNIGHTS }) : t('tourneyNext', { time: clockText(tn.inMs) }));
+      const owned = finishesOf(s.banners);
+      this.tourneyFinish.setText(owned.length > 0 ? owned.map((f) => t(FINISHES[f].name)).join(' · ') : t('noFinish'));
+    }
+
+    const hiring = apprenticeAbout(s);
+    this.apprenticePane.setVisible(hiring);
+    if (hiring) {
+      this.hireButton.root.setVisible(!s.apprentice);
+      const hire = t('hire', { n: APPRENTICE_PRICE });
+      this.hireButton.set(hire, s.coins >= APPRENTICE_PRICE, hire.length > 12 ? 10 : 11.5);
+      this.apprenticeLine.setVisible(s.apprentice);
+      if (s.apprentice) {
+        const every = apprenticeEvery(s);
+        this.apprenticeLine.setText(s.apprenticeMs > 0 ? t('apprenticeEvery', { n: Math.round(every / 1000) }) : t('apprenticeWaits'));
+        // A bar of jewels that fills as the next merge comes.
+        const g = this.hud;
+        const bar = { x: APPRENTICE_PANE.x + 8, y: APPRENTICE_PANE.y + 26, w: SIDE.w - 16, h: 8 };
+        const fill = Phaser.Math.Clamp(1 - s.apprenticeMs / every, 0, 1);
+        g.fillStyle(0x2a2436).fillRect(bar.x, bar.y, bar.w, bar.h);
+        g.fillStyle(0x6ac070).fillRect(bar.x, bar.y, bar.w * fill, bar.h);
+        g.lineStyle(1.5, LEAD).strokeRect(bar.x, bar.y, bar.w, bar.h);
+      }
+    }
+
+    const carts = cartsAbout(s);
+    this.cartPane.setVisible(carts);
+    if (carts) {
+      const here = s.cart.hereMs > 0;
+      this.cartTitle.setText(here ? t('cartHere', { time: clockText(s.cart.hereMs) }) : t('oreCart'));
+        // Away, the cart's picture and when it comes back, or, while ores burn, the time left on each instead of the picture.
+      const left = ORE_IDS.filter((ore) => s.ores[ore] > 0).map((ore) => t('oreLeft', { name: t(ORES[ore].name), time: clockText(s.ores[ore]) }));
+      this.cartPicture.setVisible(!here && left.length === 0);
+      this.cartLines
+        .setVisible(!here)
+        .setY(left.length === 0 ? 50 : 22)
+        .setText([t('cartNext', { time: clockText(s.cart.inMs) }), ...left].join('\n'));
+      for (const ore of ORE_IDS) {
+        const b = this.oreButtons.get(ore)!;
+        b.root.setVisible(here);
+        const price = orePrice(ore, s.bestTier);
+        const sold = s.cart.sold[ore];
+        const caption = sold ? t('oreLeft', { name: t(ORES[ore].name), time: clockText(s.ores[ore]) }) : t('oreBuy', { name: t(ORES[ore].name), n: price });
+        b.set(caption, !sold && s.coins >= price, caption.length > 14 ? 9.5 : 10.5);
+      }
+    }
   }
 
   /** The daily forge (AN17): a link at the bottom that starts today's seeded shift, and the window at its end. */

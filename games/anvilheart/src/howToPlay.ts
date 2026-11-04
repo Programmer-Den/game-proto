@@ -38,6 +38,10 @@ const en: HowToPlay = {
       input: 'Tap an upgrade, the barrel or the fifth row',
       action: 'Buy it with your coins',
     },
+    {
+      input: 'Tap Hire, or an ore at the ore cart',
+      action: 'Hire the apprentice, or buy silver or starmetal for a few minutes, in the column beside the board',
+    },
   ],
   loop: [
     'Tap Forge to make Rusty Daggers on the anvils.',
@@ -59,6 +63,9 @@ const en: HowToPlay = {
     'Each new charter also raises one guild hall a level for good: more swords to start with, more gems or more patient adventurers.',
     'From the second charter a rival smithy sells across the street: outsell it over its three-minute day for a prize. Adventurers you keep waiting go to it.',
     'The Daily forge at the bottom is a ten-minute shift, the same for everyone today: earn as many coins as you can. One try a day.',
+    "Once you have made a Knight's Blade, a tourney comes every four minutes: three knights each want a sword within a minute and joust with it. Tier, gem and Masterwork decide where your best knight places; a win hangs a banner, and banners unlock blade finishes.",
+    'An apprentice, hired once you have made a Steel Sword, merges the lowest matching pair on the anvils every 20 seconds, quicker in every charter. They leave Masterworks and the sword in your hand alone.',
+    'Now and then an ore cart stops for 45 seconds: silver makes the forge find three times the gems, starmetal makes it forge Steel Swords, each for three minutes.',
   ],
 };
 
@@ -99,6 +106,10 @@ const de: HowToPlay = {
       input: 'Eine Verbesserung, das Fass oder die fünfte Reihe tippen',
       action: 'Sie mit deinen Münzen kaufen',
     },
+    {
+      input: 'Anheuern oder ein Erz am Erzkarren tippen',
+      action: 'Den Lehrling anheuern oder Silber oder Sternmetall für ein paar Minuten kaufen, in der Spalte neben den Ambossen',
+    },
   ],
   loop: [
     'Tippe auf Schmieden, um Rostige Dolche auf die Ambosse zu legen.',
@@ -120,6 +131,9 @@ const de: HowToPlay = {
     'Jeder neue Freibrief baut außerdem eine Gildenhalle für immer aus: mehr Schwerter zum Start, mehr Juwelen oder geduldigere Abenteurer.',
     'Ab dem zweiten Freibrief verkauft eine Rivalenschmiede gegenüber: Verkaufe in ihrem dreiminütigen Tag mehr als sie und gewinne einen Preis. Abenteurer, die du warten lässt, gehen zu ihr.',
     'Die Tagesschicht unten sind zehn Minuten, heute für alle gleich: Verdiene so viele Münzen wie möglich. Ein Versuch pro Tag.',
+    'Sobald du eine Ritterklinge gemacht hast, kommt alle vier Minuten ein Turnier: Drei Ritter wollen je binnen einer Minute ein Schwert und tjostieren damit. Stufe, Juwel und Meisterwerk entscheiden, welchen Platz dein bester Ritter belegt; ein Sieg hängt ein Banner auf, und Banner schalten Klingenschliffe frei.',
+    'Ein Lehrling, anzuheuern sobald du ein Stahlschwert gemacht hast, verschmilzt alle 20 Sekunden das niedrigste gleiche Paar auf den Ambossen, in jedem Freibrief schneller. Meisterwerke und das Schwert in deiner Hand lässt er in Ruhe.',
+    'Ab und zu hält ein Erzkarren für 45 Sekunden: Mit Silber findet die Esse dreimal so viele Juwelen, mit Sternmetall schmiedet sie Stahlschwerter, jeweils drei Minuten lang.',
   ],
 };
 

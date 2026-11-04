@@ -41,6 +41,16 @@ export const ROW_BUTTON = { x: BOARD.x + (GRID.cols * BOARD.cell) / 2, y: ROW_BO
 export const BARREL = { x: 636, y: 428, w: 72, h: 92 };
 /** The scrap bin above the barrel, by its centre: a sword, buckler or gem dropped on it is thrown away. */
 export const SCRAP = { x: 636, y: 322, w: 64, h: 64 };
+/**
+ * The column between the board and the counter, above the scrap bin: the tourney's pane (AN18),
+ * the apprentice's (AN19) and the ore cart's (AN20), each by its top left corner, and the small
+ * buttons in them.
+ */
+export const SIDE = { x: 593, w: 86 };
+export const TOURNEY_PANE = { x: SIDE.x, y: 50, w: SIDE.w, h: 76 };
+export const APPRENTICE_PANE = { x: SIDE.x, y: 130, w: SIDE.w, h: 62 };
+export const CART_PANE = { x: SIDE.x, y: 196, w: SIDE.w, h: 78 };
+export const SIDE_BUTTON = { w: 80, h: 24 };
 export const onScrap = (x: number, y: number) => Math.abs(x - SCRAP.x) <= SCRAP.w / 2 && Math.abs(y - SCRAP.y) <= SCRAP.h / 2;
 export const slotCentre =(slot: number) => ({
   x: BOARD.x + (slot % GRID.cols) * BOARD.cell + BOARD.cell / 2,

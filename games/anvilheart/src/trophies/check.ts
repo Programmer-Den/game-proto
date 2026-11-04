@@ -20,6 +20,7 @@ const EARNED: Record<string, (state: GameState) => boolean> = {
   hundredSold: (s) => s.sold >= HUNDRED_SOLD,
   renowned: (s) => s.reputation >= REP_MAX,
   dragonslayer: (s) => s.bestTier >= DRAGONSLAYER,
+  champion: (s) => s.banners >= 1,
   crownBlade: (s) => s.won || s.charter > 0,
   dynasty: (s) => s.charter >= DYNASTY,
 };
