@@ -1,5 +1,6 @@
 // The bosses' moves, each one boss's own: the Troll King throws rocks that stun a guard, the Ogre
-// Warlord calls goblins at half health, and the Frost Giant's roar slows the ranger's shots.
+// Warlord calls goblins at half health, and the Frost Giant's roar slows the ranger's shots; on the frozen pass
+// the Yeti Chieftain's howl stuns every guard and slows the shots too.
 
 /** The Troll King throws a rock every ROCK_MS once in view (the first one sooner). */
 export const ROCK_MS = 7_000;
@@ -15,3 +16,9 @@ export const ROAR_MS = 9_000;
 export const FIRST_ROAR_MS = 3_000;
 export const ROAR_SLOW = 1.7;
 export const ROAR_SLOW_MS = 4_000;
+/**
+ * The Yeti Chieftain, the frozen pass's last boss, howls every HOWL_MS: every hired guard is stunned
+ * for STUN_MS and the hero's shots slow as under the Frost Giant's roar.
+ */
+export const HOWL_MS = 10_000;
+export const FIRST_HOWL_MS = 3_500;

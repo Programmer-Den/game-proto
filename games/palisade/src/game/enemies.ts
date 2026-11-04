@@ -2,7 +2,7 @@
 
 import type { TextKey } from '../i18n';
 
-export type EnemyKind = 'goblin' | 'orc' | 'knight' | 'harpy' | 'bearer' | 'shaman' | 'troll' | 'ogre' | 'giant';
+export type EnemyKind = 'goblin' | 'orc' | 'knight' | 'harpy' | 'bearer' | 'shaman' | 'wolf' | 'wisp' | 'troll' | 'ogre' | 'giant' | 'chieftain';
 
 export interface EnemyType {
   /** Its name, a key of `i18n/en.ts`. */
@@ -29,6 +29,8 @@ export interface EnemyType {
   shield?: boolean;
   /** Heals the foes around it every few seconds. */
   healer?: boolean;
+  /** Made of frost: shrugs off burning and chill, like a Warded elite. */
+  cold?: boolean;
 }
 
 export const ENEMIES: Record<EnemyKind, EnemyType> = {
@@ -38,8 +40,13 @@ export const ENEMIES: Record<EnemyKind, EnemyType> = {
   harpy: { name: 'harpyName', hp: 16, speed: 44, dps: 0, armor: 0, xp: 3, radius: 14, coins: 2, flying: true },
   bearer: { name: 'bearerName', hp: 40, speed: 34, dps: 10, armor: 0, xp: 5, radius: 18, coins: 3, shield: true },
   shaman: { name: 'shamanName', hp: 30, speed: 30, dps: 6, armor: 0, xp: 6, radius: 16, coins: 4, healer: true },
+  // The frozen pass's own foes (see frontier.ts): wolves that run in fast, and wisps of frost that fly.
+  wolf: { name: 'wolfName', hp: 18, speed: 100, dps: 7, armor: 0, xp: 3, radius: 15, coins: 2 },
+  wisp: { name: 'wispName', hp: 24, speed: 40, dps: 0, armor: 0, xp: 4, radius: 14, coins: 3, flying: true, cold: true },
   // The bosses at the end of each road of ten waves, in turn: wave 10, 20, 30, then round again.
   troll: { name: 'trollName', hp: 300, speed: 16, dps: 45, armor: 2, xp: 60, radius: 40, coins: 30, boss: true },
   ogre: { name: 'ogreName', hp: 330, speed: 18, dps: 50, armor: 4, xp: 70, radius: 40, coins: 30, boss: true },
   giant: { name: 'giantName', hp: 380, speed: 14, dps: 55, armor: 3, xp: 80, radius: 42, coins: 30, boss: true },
+  // The frozen pass's last boss, on its wave 30.
+  chieftain: { name: 'chieftainName', hp: 420, speed: 14, dps: 60, armor: 4, xp: 100, radius: 42, coins: 40, boss: true, cold: true },
 };

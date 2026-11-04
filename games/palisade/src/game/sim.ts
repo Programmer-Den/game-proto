@@ -1,5 +1,8 @@
 import { type AimMode, sortTargets } from './aim';
-import { CALL_GOBLINS, FIRST_ROAR_MS, FIRST_ROCK_MS, ROAR_MS, ROAR_SLOW, ROAR_SLOW_MS, ROCK_DAMAGE, ROCK_MS, ROCK_SPEED, STUN_MS } from './bosses';
+import { CALL_GOBLINS, FIRST_HOWL_MS, FIRST_ROAR_MS, FIRST_ROCK_MS, HOWL_MS, ROAR_MS, ROAR_SLOW, ROAR_SLOW_MS, ROCK_DAMAGE, ROCK_MS, ROCK_SPEED, STUN_MS } from './bosses';
+import { planned, type DailyPlan } from './daily';
+import { FRONTIERS, canFrontier, type FrontierId } from './frontier';
+import { canClass, type HeroClass } from './hero';
 import { ELITE_COINS, ELITE_HP, ELITE_XP, ENRAGE_PACE, SPLIT_HP, SPLIT_INTO, TRAIT_IDS, eliteChance } from './elites';
 import { ENEMIES } from './enemies';
 import { FORTS, LOOKOUT_RING, LOOKOUT_WAVES, OIL_DPS, OIL_HIT, OIL_MS, OIL_RADIUS, REPAIR_SHARE, STAKE_FRONT, STAKE_HP, repairCost, type FortId } from './forts';
@@ -14,6 +17,7 @@ import {
   HERO_FRONT,
   BARRICADE_FRONT,
   GUARD_SLOTS,
+  bestOn,
   freshProgress,
   offerable,
   progressOf,
@@ -32,7 +36,7 @@ import type { EnemyKind } from './enemies';
 import { ARCANE_RADIUS, GUARDS, MAX_GUARD_LEVEL, SPEAR_REACH, guardDamage, trainCost, type GuardKind } from './guards';
 import { RELIC_IDS, type RelicId } from './relics';
 import { ROAD_IDS, roadEffects, type RoadId } from './roads';
-import { BASE_SKILLS, FILLERS, PURSE_COINS, type UpgradeId } from './upgrades';
+import { FILLERS, PURSE_COINS, baseSkills, type UpgradeId } from './upgrades';
 import { BREAK_MS, bossBars, foeHp, isBossWave, spawnInterval, waveFoes } from './waves';
 
 // The rules of a run, in plain TypeScript: `tick` moves the battle on, `pick` takes an upgrade.
@@ -40,6 +44,8 @@ import { BREAK_MS, bossBars, foeHp, isBossWave, spawnInterval, waveFoes } from '
 /** Longest step simulated at once, so fast arrows can't skip past a foe. */
 const SUBSTEP_MS = 16;
 export const ARROW_SPEED = 720;
+/** How fast the mage hero's bolts fly. */
+const SPELL_SPEED = 560;
 const FIREBALL_SPEED = 400;
 const MAGIC_SPEED = 380;
 /** How far lightning leaps from one foe to the next. */
@@ -50,7 +56,7 @@ const VIEW_RIGHT = 950;
 /** How long each kind of effect plays, in milliseconds. */
 const EFFECT_MS = {
   blast: 260, fireblast: 360, bolt: 220, death: 320, crit: 400, rain: 520, xp: 900, orb: 750, block: 260, heal: 700, stab: 200, arcane: 360,
-  rockHit: 400, call: 900, roar: 1_000, split: 400, autoPick: 2_400,
+  rockHit: 400, call: 900, roar: 1_000, howl: 1_100, split: 400, autoPick: 2_400,
 } as const;
 /** How long an Arrow Rain volley takes to come down after it is loosed. */
 export const RAIN_FALL_MS = 450;
@@ -136,7 +142,7 @@ function step(state: GameState, dt: number) {
       state.relicFound = null;
       // An omen left alone until the break ends is refused.
       if (state.omen && !state.omen.accepted) state.omen = null;
-      state.toSpawn = waveFoes(state.wave, state.road);
+      state.toSpawn = waveFoes(state.wave, state.road, state.frontier);
       state.spawnMs = 0;
     }
   } else {
@@ -168,9 +174,12 @@ function spawn(state: GameState, dt: number) {
   const chance = Math.min(1, eliteChance(state.wave) * omenEffects(state.omen).elites);
   const elite = !type.boss && chance > 0 && Math.random() < chance;
   const trait = elite ? TRAIT_IDS[Math.floor(Math.random() * TRAIT_IDS.length)] : null;
-  addFoe(state, kind, SPAWN_X + type.radius, y, Math.round(foeHp(kind, state.wave, state.road, state.heat) * (trait ? ELITE_HP : 1)), trait);
+  addFoe(state, kind, SPAWN_X + type.radius, y, Math.round(hpOf(state, kind) * (trait ? ELITE_HP : 1)), trait);
   state.spawnMs = spawnInterval(state.wave, state.heat);
 }
+
+/** A foe's full health on this run's wave, road, heat and map. */
+const hpOf = (state: GameState, kind: EnemyKind) => foeHp(kind, state.wave, state.road, state.heat, state.frontier);
 
 /** Puts a foe on the field with this much health; a boss's move timer or a shaman's healing timer starts. */
 function addFoe(state: GameState, kind: EnemyKind, x: number, y: number, hp: number, trait: Trait | null) {
@@ -191,7 +200,7 @@ function addFoe(state: GameState, kind: EnemyKind, x: number, y: number, hp: num
     hitMs: 0,
     // A shaman heals for the first time soon after coming into view, then every HEAL_MS; the Troll
     // King's first rock and the Frost Giant's first roar come soon after they come into view too.
-    castMs: kind === 'troll' ? FIRST_ROCK_MS : kind === 'giant' ? FIRST_ROAR_MS : FIRST_HEAL_MS,
+    castMs: kind === 'troll' ? FIRST_ROCK_MS : kind === 'giant' ? FIRST_ROAR_MS : kind === 'chieftain' ? FIRST_HOWL_MS : FIRST_HEAL_MS,
     trait,
   });
 }
@@ -219,8 +228,10 @@ function shoot(state: GameState, s: Stats, dt: number) {
   if (foes.length === 0) return;
 
   if (cd.arrow === 0) {
-    // Each arrow of a volley goes at a different foe while there are enough of them.
-    for (let i = 0; i < s.arrows; i++) launch(state, 'arrow', foes[i % foes.length], s.pierce, i, s.arrows);
+    // Each arrow of a volley (or the mage's bolt, with Twin Bolt) goes at a different foe while there are enough of them.
+    const kind = state.hero === 'mage' ? 'spell' : 'arrow';
+    const pierce = kind === 'spell' ? s.chain : s.pierce;
+    for (let i = 0; i < s.arrows; i++) launch(state, kind, foes[i % foes.length], pierce, i, s.arrows);
     // The Frost Giant's roar slows the ranger's shots for a while.
     cd.arrow = s.shotMs * (state.roarMs > 0 ? ROAR_SLOW : 1);
   }
@@ -237,8 +248,8 @@ function shoot(state: GameState, s: Stats, dt: number) {
   }
 }
 
-function launch(state: GameState, kind: 'arrow' | 'fireball', target: Enemy, pierce: number, i: number, of: number) {
-  const speed = kind === 'arrow' ? ARROW_SPEED : FIREBALL_SPEED;
+function launch(state: GameState, kind: 'arrow' | 'spell' | 'fireball', target: Enemy, pierce: number, i: number, of: number) {
+  const speed = missileSpeed(kind);
   // A volley fans out a little before the arrows turn towards their foes.
   const fan = of > 1 ? (i / (of - 1) - 0.5) * 0.5 : 0;
   const angle = Math.atan2(target.y - BOW.y, target.x - BOW.x) + fan;
@@ -270,7 +281,7 @@ function moveMissiles(state: GameState, s: Stats, dt: number) {
       gone.add(m.id);
       continue;
     }
-    const speed = m.kind === 'arrow' ? ARROW_SPEED : m.kind === 'magic' ? MAGIC_SPEED : FIREBALL_SPEED;
+    const speed = missileSpeed(m.kind);
     let target = state.enemies.find((e) => e.id === m.target);
     // A foe that fell before the arrow got there, or none was left to turn to: turn to the nearest
     // seen one not yet hit. An arrow that has pierced a foe never turns back: it only takes one ahead.
@@ -314,6 +325,17 @@ function moveMissiles(state: GameState, s: Stats, dt: number) {
       gone.add(m.id);
       continue;
     }
+    if (m.kind === 'spell') {
+      spellHit(state, s, struck, m.x, m.y);
+      m.hit.push(struck.id);
+      // Chain Spark: the bolt leaps on to the nearest seen foe it has not struck, within a leap.
+      const next = m.pierce > 0 ? nearest(targets(state, 'nearest').filter((e) => !m.hit.includes(e.id) && e.hp > 0 && Math.hypot(e.x - struck.x, e.y - struck.y) < LEAP_RANGE), m.x, m.y) : undefined;
+      if (next) {
+        m.pierce--;
+        m.target = next.id;
+      } else gone.add(m.id);
+      continue;
+    }
     const blocked = arrowHit(state, s, struck, m.x, m.y);
     m.hit.push(struck.id);
     // An arrow that glances off a shield goes no further.
@@ -325,6 +347,36 @@ function moveMissiles(state: GameState, s: Stats, dt: number) {
   }
   state.missiles = state.missiles.filter((m) => !gone.has(m.id));
   removeDead(state);
+}
+
+const missileSpeed = (kind: string) => (kind === 'arrow' ? ARROW_SPEED : kind === 'spell' ? SPELL_SPEED : kind === 'magic' ? MAGIC_SPEED : FIREBALL_SPEED);
+
+/**
+ * The mage hero's bolt strikes a foe: magic, so a shield does not stop it (armour still counts),
+ * then it bursts round the foe (wider with Wide Burst) and burns or chills like the ranger's arrows.
+ */
+function spellHit(state: GameState, s: Stats, foe: Enemy, x: number, y: number) {
+  const crit = Math.random() < s.critChance;
+  const damage = s.damage * (crit ? 2 : 1);
+  const type = ENEMIES[foe.kind];
+  hurt(foe, damage * (type.boss ? s.bossDamage : 1), true);
+  if (crit) addEffect(state, { kind: 'crit', x: foe.x, y: foe.y - type.radius });
+  if (s.burn) ignite(foe, s.burn.dps, s.burn.ms);
+  if (s.chill) chill(foe, s.chill.slow, s.chill.ms);
+  if (s.burst) {
+    addEffect(state, { kind: 'arcane', x, y, radius: s.burst.radius });
+    for (const e of state.enemies) {
+      if (e.id === foe.id || Math.hypot(e.x - x, e.y - y) > s.burst.radius + ENEMIES[e.kind].radius) continue;
+      hurt(e, damage * s.burst.share, true);
+    }
+  }
+}
+
+/** Chills a foe, unless it is Warded or made of frost. */
+function chill(foe: Enemy, slow: number, ms: number) {
+  if (foe.trait === 'warded' || ENEMIES[foe.kind].cold) return;
+  foe.slow = Math.max(foe.slow, slow);
+  foe.slowMs = ms;
 }
 
 /**
@@ -348,11 +400,8 @@ function arrowHit(state: GameState, s: Stats, foe: Enemy, x: number, y: number) 
   }
   if (crit) addEffect(state, { kind: 'crit', x: foe.x, y: foe.y - ENEMIES[foe.kind].radius });
   if (s.burn) ignite(foe, s.burn.dps, s.burn.ms);
-  // A Warded elite shrugs off burning and chill alike.
-  if (s.chill && foe.trait !== 'warded') {
-    foe.slow = Math.max(foe.slow, s.chill.slow);
-    foe.slowMs = s.chill.ms;
-  }
+  // A Warded elite (or a foe made of frost) shrugs off burning and chill alike.
+  if (s.chill) chill(foe, s.chill.slow, s.chill.ms);
   if (s.burst) explode(state, x, y, s.burst.radius, damage * s.burst.share, 'blast', s, foe.id);
   return false;
 }
@@ -368,9 +417,9 @@ function explode(state: GameState, x: number, y: number, radius: number, damage:
   }
 }
 
-/** Sets a foe alight, unless it is Warded. */
+/** Sets a foe alight, unless it is Warded or made of frost. */
 function ignite(foe: Enemy, dps: number, ms: number) {
-  if (foe.trait === 'warded') return;
+  if (foe.trait === 'warded' || ENEMIES[foe.kind].cold) return;
   foe.burnDps = Math.max(foe.burnDps, dps);
   foe.burnMs = ms;
 }
@@ -466,7 +515,8 @@ function burstOil(state: GameState, at: Enemy) {
 /**
  * The bosses' moves, once in view: the Troll King throws a rock at a hired guard (at the barricade
  * when none is hired), the Ogre Warlord calls goblins to its side once below half health, and the
- * Frost Giant roars, slowing the ranger's shots.
+ * Frost Giant roars, slowing the ranger's shots. On the frozen pass the Yeti Chieftain howls,
+ * stunning every guard and slowing the shots too.
  */
 function bossMoves(state: GameState, dt: number) {
   for (const boss of state.enemies.filter((e) => ENEMIES[e.kind].boss && e.x < VIEW_RIGHT)) {
@@ -474,7 +524,7 @@ function bossMoves(state: GameState, dt: number) {
       if (boss.moved || boss.hp >= boss.maxHp / 2) continue;
       boss.moved = true;
       addEffect(state, { kind: 'call', x: boss.x, y: boss.y, radius: ENEMIES.ogre.radius });
-      const hp = Math.round(foeHp('goblin', state.wave, state.road, state.heat));
+      const hp = Math.round(hpOf(state, 'goblin'));
       for (let i = 0; i < CALL_GOBLINS; i++) {
         const y = FIELD.top + 12 + ((i + 0.5) / CALL_GOBLINS) * (FIELD.bottom - FIELD.top - 24);
         addFoe(state, 'goblin', Math.min(SPAWN_X, boss.x + 30 + (i % 2) * 24), y, hp, null);
@@ -509,6 +559,12 @@ function bossMoves(state: GameState, dt: number) {
       boss.castMs = ROAR_MS;
       state.roarMs = ROAR_SLOW_MS;
       addEffect(state, { kind: 'roar', x: boss.x, y: boss.y - 40, radius: 160 });
+    } else if (boss.kind === 'chieftain') {
+      // The Yeti Chieftain's howl: every hired guard is stunned and the hero's shots slow.
+      boss.castMs = HOWL_MS;
+      state.roarMs = ROAR_SLOW_MS;
+      for (const g of state.guards) if (g) g.stunMs = STUN_MS;
+      addEffect(state, { kind: 'howl', x: boss.x, y: boss.y - 50, radius: 220 });
     }
   }
 }
@@ -675,7 +731,9 @@ function removeDead(state: GameState) {
     const road = roadEffects(state.road);
     const omen = omenEffects(state.omen);
     const elite = e.trait ? ELITE_COINS : 1;
-    state.coins += Math.round((ENEMIES[e.kind].coins * elite + s.bounty) * road.coins * omen.coins);
+    // The frozen pass pays more for every kill, in coins and experience.
+    const reward = FRONTIERS[state.frontier].reward;
+    state.coins += Math.round((ENEMIES[e.kind].coins * elite + s.bounty) * road.coins * omen.coins * reward);
     // Each kill charges Arrow Rain and the caltrops and carries the streak on (or starts a new one).
     state.rain.charge = Math.min(state.rain.need, state.rain.charge + 1);
     state.caltrops.charge = Math.min(state.caltrops.need, state.caltrops.charge + 1);
@@ -683,7 +741,7 @@ function removeDead(state: GameState) {
     streak.count = streak.ms > 0 ? streak.count + 1 : 1;
     streak.ms = s.streakMs;
     streak.best = Math.max(streak.best, streak.count);
-    const base = ENEMIES[e.kind].xp * s.xpGain * road.xp * omen.xp * (e.trait ? ELITE_XP : 1);
+    const base = ENEMIES[e.kind].xp * s.xpGain * road.xp * omen.xp * (e.trait ? ELITE_XP : 1) * reward;
     const bonus = base * streakBonus(streak.count);
     streak.bonusXp += bonus;
     const radius = ENEMIES[e.kind].radius;
@@ -692,7 +750,7 @@ function removeDead(state: GameState) {
     if (e.trait === 'splitting') {
       const y = Math.min(FIELD.bottom - 8, Math.max(FIELD.top + 8, e.y));
       addEffect(state, { kind: 'split', x: e.x, y, radius });
-      const hp = Math.max(1, Math.round(foeHp('goblin', state.wave, state.road, state.heat) * SPLIT_HP));
+      const hp = Math.max(1, Math.round(hpOf(state, 'goblin') * SPLIT_HP));
       // They land on the road's side of a standing barricade (or stake line), so one that flew over
       // it does not drop goblins behind it, where nothing stops them reaching the hero.
       const front = state.barricade.hp > 0 ? BARRICADE_FRONT : state.forts.stakeHp > 0 ? STAKE_FRONT : null;
@@ -824,7 +882,7 @@ function mend(state: GameState) {
  */
 export function rollChoices(state: GameState): UpgradeId[] {
   const pool = offerable(state);
-  if (pool.length === 0) return [...BASE_SKILLS];
+  if (pool.length === 0) return [...baseSkills(state.hero)];
   const picks: UpgradeId[] = [];
   while (picks.length < 3 && pool.length > 0) picks.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
   if (picks.length === 2) picks.push(FILLERS[0]);
@@ -854,35 +912,46 @@ export function pick(state: GameState, id: UpgradeId) {
 }
 
 function clearWave(state: GameState) {
-  state.bestWave = Math.max(state.bestWave, state.wave);
+  if (state.frontier === 'pass') state.passBest = Math.max(state.passBest, state.wave);
+  else state.bestWave = Math.max(state.bestWave, state.wave);
+  const plan = state.daily;
   // The relic chest at the end of the road: a lasting bonus for beating the boss (two after a
-  // Hardened Road). Then the hero picks the next road from two.
+  // Hardened Road). Then the hero picks the next road from two. On the daily siege the day's plan
+  // sets both: the chest's relics and the one road taken.
   if (isBossWave(state.wave)) {
     state.relicFound = [];
+    const road = state.wave / 10 - 1;
     for (let i = 0; i < roadEffects(state.road).relics; i++) {
-      const id = RELIC_IDS[Math.floor(Math.random() * RELIC_IDS.length)];
+      const id = plan ? planned(planned(plan.chests, road), i) : RELIC_IDS[Math.floor(Math.random() * RELIC_IDS.length)];
       state.relics[id] = (state.relics[id] ?? 0) + 1;
       state.relicFound.push(id);
     }
-    const roads = [...ROAD_IDS];
-    state.roadChoices = [0, 1].map(() => roads.splice(Math.floor(Math.random() * roads.length), 1)[0]);
-    state.roadMs = AUTO_PICK_MS;
+    if (plan) state.road = planned(plan.roads, road);
+    else {
+      const roads = [...ROAD_IDS];
+      state.roadChoices = [0, 1].map(() => roads.splice(Math.floor(Math.random() * roads.length), 1)[0]);
+      state.roadMs = AUTO_PICK_MS;
+    }
   }
   // Caltrops wear off once they have lain for CALTROP_WAVES waves, and the lookout after its waves.
   for (const p of state.caltrops.patches) p.waves--;
   state.caltrops.patches = state.caltrops.patches.filter((p) => p.waves > 0);
   if (state.forts.lookout > 0) state.forts.lookout--;
-  // Clearing the third boss's wave lifts the siege: the run is won and the next heat unlocked. The
-  // victory panel holds everything until "Keep fighting" (or a new run at a heat).
-  if (state.wave === WIN_WAVE && !state.won) {
+  // Clearing the third boss's wave lifts the siege (or wins the frozen pass): the run is won and the
+  // next heat unlocked. The victory panel holds everything until "Keep fighting" (or a new run at a
+  // heat). The daily siege has no victory panel: it fights on until the hero falls.
+  const won = state.wave === WIN_WAVE && !state.won && !plan;
+  if (won) {
     state.won = true;
+    if (state.frontier === 'pass') state.passWon = true;
     state.heatUnlocked = Math.max(state.heatUnlocked, Math.min(MAX_HEAT, state.heat + 1));
   }
-  const won = state.wave === WIN_WAVE;
   state.wave++;
   state.phase = 'break';
-  // From wave 4 the break names the next wave's omen (not after a boss), and lasts long enough to read it.
-  state.omen = omenWave(state.wave) ? { id: OMEN_IDS[Math.floor(Math.random() * OMEN_IDS.length)], accepted: false } : null;
+  // From wave 4 the break names the next wave's omen (not after a boss), and lasts long enough to
+  // read it; on the daily siege it is the day's omen for that wave.
+  const omen = omenWave(state.wave) ? (plan ? planned(plan.omens, state.wave) : OMEN_IDS[Math.floor(Math.random() * OMEN_IDS.length)]) : null;
+  state.omen = omen ? { id: omen, accepted: false } : null;
   state.breakMs = state.omen ? OMEN_BREAK_MS : BREAK_MS;
   state.missiles = [];
   // An Oakheart Charm from the chest makes the barricade bigger at once.
@@ -905,16 +974,23 @@ export function keepFighting(state: GameState) {
   return true;
 }
 
-/** A new run at this heat (one that is unlocked), from wave 1 (or a forced march's start) with the hero kept. */
-export function startHeat(state: GameState, heat: number, start = 1): GameState {
+/**
+ * A new run at this heat (one that is unlocked), from wave 1 (or a forced march's start) with the
+ * hero kept, on this map (the frozen pass once the siege is lifted, else the vale).
+ */
+export function startHeat(state: GameState, heat: number, start = 1, frontier: FrontierId = state.frontier): GameState {
   const progress = progressOf(state);
   progress.heat = Math.max(0, Math.min(progress.heatUnlocked, heat));
+  progress.frontier = canFrontier(progress, frontier) ? frontier : 'vale';
   // Leaving a won run for a new heat ends it, so it counts like a fall does (which counted already).
   if (state.phase !== 'over') progress.runs++;
-  const next = newRun(progress, state.aimMode, canMarch(progress.bestWave, start) ? start : 1);
+  const next = newRun(progress, state.aimMode, canMarch(bestOn(progress, progress.frontier), start) ? start : 1);
   reoffer(next, state.choices);
   return next;
 }
+
+/** From the victory panel after lifting the siege: the hero marches on to wave 1 of the frozen pass, at the same heat. */
+export const marchOn = (state: GameState) => startHeat(state, state.heat, 1, 'pass');
 
 /** Takes one of the two roads offered after a boss; the break then counts down to its first wave. */
 export function pickRoad(state: GameState, road: RoadId) {
@@ -935,29 +1011,42 @@ function gameOver(state: GameState) {
  * After a fall, a new run with the hero's level and upgrades kept: from wave 1, or on a forced
  * march from the first wave of a road whose boss the hero has beaten (wave 11 or 21).
  */
-export function fightAgain(state: GameState, start = 1): GameState {
-  const next = newRun(progressOf(state), state.aimMode, canMarch(state.bestWave, start) ? start : 1);
+export function fightAgain(state: GameState, start = 1, frontier: FrontierId = state.frontier): GameState {
+  const progress = progressOf(state);
+  progress.frontier = canFrontier(progress, frontier) ? frontier : 'vale';
+  const next = newRun(progress, state.aimMode, canMarch(bestOn(progress, progress.frontier), start) ? start : 1);
   reoffer(next, state.choices);
   return next;
 }
 
+/**
+ * The daily siege's run: a fresh ranger on wave 1 of the vale, with the day's two relics and its
+ * plan of roads, omens and chests (see daily.ts). Its progress is never saved.
+ */
+export function dailyRun(plan: DailyPlan, aimMode: AimMode): GameState {
+  const progress = freshProgress();
+  for (const id of plan.relics) progress.relics[id] = (progress.relics[id] ?? 0) + 1;
+  return newRun(progress, aimMode, 1, plan);
+}
+
 /** Whether the hero may retire for a legacy: every skill learned, or the siege lifted (a heat unlocked). */
-export const canRetire = (state: GameState) => offerable(state).length === 0 || state.heatUnlocked > 0;
+export const canRetire = (state: GameState) => !state.daily && (offerable(state).length === 0 || state.heatUnlocked > 0);
 
 /** The relic the "A first relic" legacy would keep, rolled when the retire panel opens. */
 export const rollLegacyRelic = (): RelicId => RELIC_IDS[Math.floor(Math.random() * RELIC_IDS.length)];
 
 /**
  * Retires the hero (after a fall or from the victory panel) for this legacy perk, with `relic` the
- * first relic when that is the one kept. The next hero starts from scratch on wave 1, with every
- * legacy the retired heroes left. Returns null when the hero cannot retire or the perk is kept already.
+ * first relic when that is the one kept. The next hero, of class `hero` (the mage is open from this
+ * first legacy on), starts from scratch on wave 1 of the vale, with every legacy the retired heroes
+ * left. Returns null when the hero cannot retire or the perk is kept already.
  */
-export function retire(state: GameState, id: LegacyId, relic: RelicId): GameState | null {
+export function retire(state: GameState, id: LegacyId, relic: RelicId, hero: HeroClass = 'ranger'): GameState | null {
   if ((state.phase !== 'over' && state.phase !== 'won') || !canRetire(state) || !canKeep(state.legacy, id)) return null;
   const legacy = { ...state.legacy, relics: [...state.legacy.relics], retired: state.legacy.retired + 1 };
   if (id === 'relic') legacy.relics.push(relic);
   else legacy[id] = true;
-  return newRun(freshProgress(legacy), state.aimMode);
+  return newRun(freshProgress(legacy, canClass(legacy, hero) ? hero : 'ranger'), state.aimMode);
 }
 
 function nearest(foes: Enemy[], x: number, y: number) {

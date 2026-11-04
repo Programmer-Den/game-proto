@@ -42,6 +42,8 @@ export const LEGACY = { xs: [230, 480, 730], y: 268, w: 230, h: 190 };
 export const MARCH = { w: 150, h: 26, step: 160 };
 /** The heat chip right of the wave track, by its centre. */
 export const HEAT = { x: 398, y: 58, w: 68, h: 20 };
+/** The chip right of the Repair button naming the frozen pass or the daily siege, by its centre. */
+export const FRONTIER_CHIP = { x: 318, y: 108, w: 124, h: 22 };
 /** The "Chilled bow" chip over the hero while the Frost Giant's roar slows the shots, by its centre. */
 export const ROAR_CHIP = { x: 300, y: 236, w: 150, h: 20 };
 /**
@@ -91,6 +93,7 @@ const PINS: [Box, 'left' | 'right' | 'stretch', 'top' | 'bottom', Box][] = (
     [BARRICADE_BAR, 'left', 'top'],
     [TRACK, 'left', 'top'],
     [HEAT, 'left', 'top'],
+    [FRONTIER_CHIP, 'left', 'top'],
     [BOSS_BAR, 'left', 'top'],
     [FORTIFY, 'left', 'top'],
     [REPAIR, 'left', 'top'],

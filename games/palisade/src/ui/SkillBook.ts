@@ -5,7 +5,8 @@ import { fit } from '../art/lowpoly';
 import { GOLD, SLATE } from '../art/palette';
 import { SKILL_BOOK, SEEN, UI_DEPTH, VIEW } from '../scenes/layout';
 import { RELIC_IDS, RELICS, SETS, setComplete, setRelics, type RelicId } from '../game/relics';
-import { BOOK_ORDER, UPGRADE_IDS, UPGRADES, type UpgradeId } from '../game/upgrades';
+import { UPGRADES, bookOrder, type UpgradeId } from '../game/upgrades';
+import type { HeroClass } from '../game/hero';
 import { drawPanel, makeButton, textStyle } from './panel';
 import { t } from '../i18n';
 
@@ -84,17 +85,19 @@ export class SkillBook {
    * Updates the button's count, hides it for `hidden`, and redraws the slots and relics when what
    * has been found, taken or won changes.
    */
-  show(found: ReadonlySet<UpgradeId>, ranks: Partial<Record<UpgradeId, number>>, relics: Partial<Record<RelicId, number>>, hidden: boolean) {
-    this.buttonText.setText(t('skillBookCount', { found: found.size, total: UPGRADE_IDS.length }));
+  show(found: ReadonlySet<UpgradeId>, ranks: Partial<Record<UpgradeId, number>>, relics: Partial<Record<RelicId, number>>, hidden: boolean, hero: HeroClass = 'ranger') {
+    // Each class has its own book: the skills it learns, found or not yet.
+    const order = bookOrder(hero);
+    this.buttonText.setText(t('skillBookCount', { found: order.filter((id) => found.has(id)).length, total: order.length }));
     this.button.setVisible(!hidden);
     if (hidden) this.setOpen(false);
-    const key = BOOK_ORDER.map((id) => (found.has(id) ? ranks[id] ?? 0 : '-')).join() + '|' + RELIC_IDS.map((id) => relics[id] ?? 0).join();
+    const key = order.map((id) => (found.has(id) ? ranks[id] ?? 0 : '-')).join() + '|' + RELIC_IDS.map((id) => relics[id] ?? 0).join();
     if (key === this.shown) return;
     this.shown = key;
     this.slots.removeAll(true);
     const { cols, colW, rowH, top } = SKILL_BOOK;
     const left = VIEW.w / 2 - (cols * colW) / 2;
-    BOOK_ORDER.forEach((id, i) => {
+    order.forEach((id, i) => {
       const x = left + (i % cols) * colW;
       const y = top + Math.floor(i / cols) * rowH;
       this.addSlot(id, x, y, found.has(id), ranks[id] ?? 0);

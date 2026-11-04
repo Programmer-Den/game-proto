@@ -3,7 +3,11 @@ import Phaser from 'phaser';
 import { ui } from '../../../../shared/audio';
 import { formatNumber } from '../../../../shared/i18n';
 import { sfx } from '../audio/sfx';
-import { FIGURES, foeTexture, guardTexture } from '../art/characters';
+import { FIGURES, foeTexture, guardTexture, heroTexture } from '../art/characters';
+import { dailyRand, finishDaily, loadDaily, startDaily, today } from '../../../../shared/daily';
+import { DAILY_GAME, dailyPlan } from '../game/daily';
+import { FRONTIERS, FRONTIER_IDS, canFrontier, type FrontierId } from '../game/frontier';
+import { HEROES, canClass, type HeroClass } from '../game/hero';
 import { bossNodeTexture, relicTexture } from '../art/icons';
 import { fit } from '../art/lowpoly';
 import { BAR, BOSS_BARS, FIRE, GOLD, SLATE, STORM, XP } from '../art/palette';
@@ -28,6 +32,7 @@ import {
   canRepair,
   canRetire,
   crowdSpot,
+  dailyRun,
   decideOmen,
   fieldSpot,
   fightAgain,
@@ -36,6 +41,7 @@ import {
   hire,
   keepFighting,
   loose,
+  marchOn,
   pick,
   pickRoad,
   rainRingOf,
@@ -54,6 +60,7 @@ import {
   FIELD,
   GUARD_SLOTS,
   SPAWN_X,
+  bestOn,
   freshProgress,
   newRun,
   progressOf,
@@ -79,7 +86,7 @@ import { checkTrophies } from '../trophies/check';
 import { trophies } from '../trophies';
 import { award } from '../../../../shared/trophies';
 import { viewFrame } from '../../../../shared/scaling';
-import { AIM, BARRICADE, BARRICADE_BAR, BARRICADE_TIP_W, BOSS_BAR, CALTROPS, FORTIFY, GUARD_HIT, HEAT, HERO_FEET, HUD_HEIGHT, MARCH, OMEN_CHIP, RAIN, RAIN_HINT, REPAIR, ROAR_CHIP, SEEN, SKILL_BOOK, SPEED, STREAK, TRACK, UI_DEPTH, VIEW, XP_BAR, placeHud } from './layout';
+import { AIM, BARRICADE, BARRICADE_BAR, BARRICADE_TIP_W, BOSS_BAR, CALTROPS, FORTIFY, FRONTIER_CHIP, GUARD_HIT, HEAT, HERO_FEET, HUD_HEIGHT, MARCH, OMEN_CHIP, RAIN, RAIN_HINT, REPAIR, ROAR_CHIP, SEEN, SKILL_BOOK, SPEED, STREAK, TRACK, UI_DEPTH, VIEW, XP_BAR, placeHud } from './layout';
 
 /** Longest simulated step, so a backgrounded tab doesn't jump the battle forward. */
 const MAX_STEP_MS = 250;
@@ -127,6 +134,10 @@ export class GameScene extends Phaser.Scene {
   legacyPanel!: LegacyPanel;
   /** The wave the next run starts on, picked on the game-over panel's "Start at" row (a forced march). */
   startWave = 1;
+  /** The map the next run is on, picked on the game-over panel's "Map" row; the run's own until then. */
+  nextFrontier: FrontierId = 'vale';
+  /** The class a new hero (or the next hero after a retirement) is, toggled on the game-over panel and the legacy panel. */
+  nextHero: HeroClass = 'ranger';
   /** The relic the "A first relic" legacy card offers, rolled when the retire panel opens. */
   private legacyRelic: RelicId = 'crown';
   private repairBg!: Phaser.GameObjects.Graphics;
@@ -150,6 +161,23 @@ export class GameScene extends Phaser.Scene {
   private wonNext!: Phaser.GameObjects.Container;
   private wonNextText!: Phaser.GameObjects.Text;
   private heatPicks: { bg: Phaser.GameObjects.Graphics; text: Phaser.GameObjects.Text; zone: Phaser.GameObjects.Zone }[] = [];
+  private mapPicks: { bg: Phaser.GameObjects.Graphics; text: Phaser.GameObjects.Text; zone: Phaser.GameObjects.Zone }[] = [];
+  /** The game-over panel's rows and buttons for the hero's own run, hidden after the daily siege. */
+  private heroOnly: Phaser.GameObjects.GameObject[] = [];
+  private gameOverTitle!: Phaser.GameObjects.Text;
+  private againButton!: Phaser.GameObjects.Container;
+  private againText!: Phaser.GameObjects.Text;
+  private heroPick!: Phaser.GameObjects.Container;
+  private heroPickText!: Phaser.GameObjects.Text;
+  private dailyButton!: Phaser.GameObjects.Container;
+  private dailyNote!: Phaser.GameObjects.Text;
+  /** Whether the daily siege's fall has been scored (once a run). */
+  private dailyScored = false;
+  private wonTitle!: Phaser.GameObjects.Text;
+  private wonPass!: Phaser.GameObjects.Container;
+  private frontierText!: Phaser.GameObjects.Text;
+  private background!: Phaser.GameObjects.Image;
+  private heroKey = '';
   private foes = new Map<number, Phaser.GameObjects.Image>();
   private missiles = new Map<number, Phaser.GameObjects.Image>();
   private pops = new Map<number, Phaser.GameObjects.Text[]>();
@@ -234,16 +262,17 @@ export class GameScene extends Phaser.Scene {
     this.state = newRun(progress, loadAim());
     // A pending level-up comes back with the cards it had up before the reload.
     reoffer(this.state, progress.choices);
-    saveProgress(progressOf(this.state));
+    this.saveHero();
+    this.nextFrontier = this.state.frontier;
+    this.nextHero = this.state.hero;
 
     // The view may be wider or taller than 960x540: the camera keeps the designed battlefield in
     // its middle, the background is painted over all of it and the HUD is pinned to its edges.
     const frame = viewFrame(this);
     placeHud(frame);
     this.cameras.main.setScroll(-frame.x, -frame.y);
-    fit(this.add.image(SEEN.x, SEEN.y, 'background')).setOrigin(0);
-    const hero = FIGURES.hero!;
-    this.hero = fit(this.add.image(HERO_FEET.x, HERO_FEET.y, 'hero')).setOrigin(hero.originX, hero.originY).setDepth(HERO_FEET.y);
+    this.background = fit(this.add.image(SEEN.x, SEEN.y, 'background')).setOrigin(0);
+    this.hero = this.add.image(HERO_FEET.x, HERO_FEET.y, 'hero').setDepth(HERO_FEET.y);
     this.barricade = fit(this.add.image(BARRICADE.x, BARRICADE.y, 'barricade-0')).setOrigin(0).setDepth(1);
     this.bars = this.add.graphics().setDepth(UI_DEPTH - 20);
     this.fx = this.add.graphics().setDepth(UI_DEPTH - 30);
@@ -304,11 +333,16 @@ export class GameScene extends Phaser.Scene {
     }
     this.sounds.play(s, ticked);
     checkTrophies(s);
-    if (s.phase !== phase || s.wave !== wave || s.levelUps !== levelUps || s.level !== level) saveProgress(progressOf(s));
+    if (s.phase !== phase || s.wave !== wave || s.levelUps !== levelUps || s.level !== level) this.saveHero();
+    // The daily siege's score, the waves cleared, is kept once its hero falls.
+    if (s.daily && s.phase === 'over' && !this.dailyScored) {
+      this.dailyScored = true;
+      finishDaily(DAILY_GAME, s.wave - 1, s.daily.day);
+    }
     // A level-up or a fall drops Arrow Rain from the hand.
     if (s.choices || held(s) || this.skillBook.open || this.hirePanel.open || this.fortifyPanel.open) this.aim = null;
 
-    this.track = waveTrack(s.wave);
+    this.track = waveTrack(s.wave, s.frontier);
     this.drawFoes();
     this.drawMissiles();
     this.drawEffects();
@@ -326,30 +360,30 @@ export class GameScene extends Phaser.Scene {
     this.omenCard.show(omen, s.wave);
     this.levelUp.show(held(s) ? null : s.choices, s.ranks, s.level - s.levelUps + 1, s.levelUps, s.pickMs);
     this.discover();
-    this.skillBook.show(this.found, s.ranks, s.relics, held(s));
+    this.skillBook.show(this.found, s.ranks, s.relics, held(s), s.hero);
     this.gameOver.setVisible(s.phase === 'over');
     if (s.phase !== 'over' && this.newHeroArmed) this.armNewHero(false);
     if (!held(s)) this.legacyPanel.close();
     // Retiring needs every skill learned or the siege lifted; until then the button stays dim.
     for (const b of this.retireButtons) b.setAlpha(canRetire(s) ? 1 : 0.45);
     this.retireNote.setText(canRetire(s) ? '' : t('retireNote'));
-    if (s.phase === 'over') {
-      this.gameOverText.setText(
-        t(s.heat > 0 ? 'fallenHeat' : 'fallen', { wave: s.wave, heat: s.heat, kills: s.kills, streak: s.streak.best, best: s.bestWave, level: s.level }),
-      );
-      this.drawHeatPicks();
-      this.drawMarchPicks();
-    }
+    if (s.phase === 'over') this.drawGameOver();
     this.won.setVisible(s.phase === 'won');
     if (s.phase === 'won') {
       const next = s.heat + 1;
+      const pass = s.frontier === 'pass';
+      const vars = { wave: WIN_WAVE, heat: s.heat, kills: s.kills, streak: s.streak.best };
+      this.wonTitle.setText(t(pass ? 'passWonTitle' : 'wonTitle'));
       this.wonText.setText(
-        t(s.heat > 0 ? 'wonHeat' : 'won', { wave: WIN_WAVE, heat: s.heat, kills: s.kills, streak: s.streak.best }) +
-          '\n\n' +
+        [
+          t(pass ? (s.heat > 0 ? 'passWonHeat' : 'passWon') : s.heat > 0 ? 'wonHeat' : 'won', vars),
           t(next <= MAX_HEAT ? HEAT_UNLOCKED[next - 1] : 'wonAll'),
+          ...(pass ? [] : [t('passOpen')]),
+        ].join('\n\n'),
       );
       this.wonNext.setVisible(next <= MAX_HEAT);
       this.wonNextText.setText(t('heat', { n: next }));
+      this.wonPass.setVisible(!pass);
     }
   }
 
@@ -368,7 +402,12 @@ export class GameScene extends Phaser.Scene {
   private pick(id: UpgradeId) {
     if (!pick(this.state, id)) return;
     sfx('pick');
-    saveProgress(progressOf(this.state));
+    this.saveHero();
+  }
+
+  /** Saves the hero's progress, unless this is the daily siege, whose hero is the day's own. */
+  private saveHero() {
+    if (!this.state.daily) saveProgress(progressOf(this.state));
   }
 
   private pickRoad(id: RoadId) {
@@ -531,8 +570,9 @@ export class GameScene extends Phaser.Scene {
       seen.add(m.id);
       let sprite = this.missiles.get(m.id);
       if (!sprite) {
-        sprite = fit(this.add.image(m.x, m.y, m.kind === 'arrow' ? arrowKey : m.kind === 'magic' ? 'magic-bolt' : m.kind === 'rock' ? 'rock' : 'fireball')).setDepth(UI_DEPTH - 40);
-        if (m.kind === 'arrow') sprite.setOrigin(30 / 44, 0.5);
+        const key = m.kind === 'arrow' ? arrowKey : m.kind === 'spell' ? 'spell-bolt' : m.kind === 'magic' ? 'magic-bolt' : m.kind === 'rock' ? 'rock' : 'fireball';
+        sprite = fit(this.add.image(m.x, m.y, key)).setDepth(UI_DEPTH - 40);
+        if (m.kind === 'arrow' || m.kind === 'spell') sprite.setOrigin(30 / 44, 0.5);
         else if (m.kind === 'magic') sprite.setOrigin(28 / 40, 0.5);
         else if (m.kind === 'fireball') sprite.setOrigin(34 / 48, 0.5);
         this.missiles.set(m.id, sprite);
@@ -654,6 +694,13 @@ export class GameScene extends Phaser.Scene {
         const r = (e.radius ?? 160) * life;
         glow.lineStyle(5, 0xa8dcf8, 0.8 * (1 - life)).strokeEllipse(e.x - r * 0.4, e.y, r * 2.4, r * 1.2);
         glow.lineStyle(2, 0xffffff, 0.6 * (1 - life)).strokeEllipse(e.x - r * 0.4, e.y, r * 1.6, r * 0.8);
+      } else if (e.kind === 'howl') {
+        // The Yeti Chieftain's howl: white rings of frost roll out over the field to the barricade.
+        for (let k = 0; k < 3; k++) {
+          const u = Math.max(0, life - k * 0.18);
+          const r = (e.radius ?? 220) * u;
+          glow.lineStyle(4, 0xe8f8ff, 0.7 * (1 - u)).strokeEllipse(e.x - r * 0.5, e.y + 20, r * 2.2, r * 1.1);
+        }
       } else if (e.kind === 'split') {
         // A Splitting foe falls apart: green shards burst sideways.
         const r = (e.radius ?? 16) * (0.6 + 1.4 * life);
@@ -774,6 +821,15 @@ export class GameScene extends Phaser.Scene {
   }
 
   private drawHero() {
+    // The hero's class and the map: the ranger or the mage, in the vale or on the frozen pass.
+    const key = heroTexture(this.state.hero);
+    if (this.heroKey !== key) {
+      this.heroKey = key;
+      const fig = FIGURES[key]!;
+      fit(this.hero.setTexture(key)).setOrigin(fig.originX, fig.originY);
+    }
+    const bg = this.state.frontier === 'pass' ? 'background-pass' : 'background';
+    if (this.background.texture.key !== bg) fit(this.background.setTexture(bg));
     // The bow kicks back a little with each shot.
     const cd = this.state.cooldown.arrow;
     if (cd > this.lastArrowCooldown) this.hero.setX(HERO_FEET.x - 3);
@@ -876,7 +932,7 @@ export class GameScene extends Phaser.Scene {
     this.foesText.setText(t('foesLeft', { n: s.toSpawn.length + s.enemies.length }));
     this.slainText.setText(t('slain', { n: s.kills }));
     this.coinsText.setText(formatNumber(s.coins));
-    this.bestText.setText(t('bestWave', { n: s.bestWave }));
+    this.bestText.setText(t('bestWave', { n: bestOn(s, s.frontier) }));
     this.fitTopRight();
 
     // Experience along the bottom: the blue fill, and a gold preview of the experience still
@@ -1010,7 +1066,7 @@ export class GameScene extends Phaser.Scene {
   private drawTrack() {
     const s = this.state;
     // During the break after a boss, the road just finished stays up with its chest open.
-    const tr = s.relicFound || s.roadChoices ? waveTrack(s.wave - 1) : this.track;
+    const tr = s.relicFound || s.roadChoices ? waveTrack(s.wave - 1, s.frontier) : this.track;
     const g = this.trackG;
     g.clear();
     drawPanel(g, TRACK.x, TRACK.y, TRACK.w, TRACK.h, { c: 8, fill: 0x222630, alpha: 0.9, edge: GOLD.mid, lw: 1.5 });
@@ -1193,6 +1249,7 @@ export class GameScene extends Phaser.Scene {
       });
     this.omenText = this.add.text(OMEN_CHIP.x, OMEN_CHIP.y, '', textStyle(10, '#e6ccff')).setOrigin(0.5).setDepth(UI_DEPTH - 5);
     this.heatText = this.add.text(HEAT.x, HEAT.y, '', textStyle(11, '#ffb08a')).setOrigin(0.5).setDepth(UI_DEPTH - 4);
+    this.frontierText = this.add.text(FRONTIER_CHIP.x, FRONTIER_CHIP.y, '', textStyle(11, '#d8f0ff')).setOrigin(0.5).setDepth(UI_DEPTH - 4);
     this.roarText = this.add.text(ROAR_CHIP.x, ROAR_CHIP.y, t('chilledBow'), textStyle(10, '#d8f0ff')).setOrigin(0.5).setDepth(UI_DEPTH - 5);
   }
 
@@ -1226,6 +1283,11 @@ export class GameScene extends Phaser.Scene {
     const heat = s.heat > 0;
     this.heatText.setVisible(heat).setText(t('heat', { n: s.heat }));
     if (heat) drawPanel(g, HEAT.x - HEAT.w / 2, HEAT.y - HEAT.h / 2, HEAT.w, HEAT.h, { c: 5, fill: 0x3a2414, alpha: 0.95, edge: 0xff9b3a, lw: 1.5 });
+    // The chip right of the Repair button names the frozen pass, or the daily siege.
+    const chip = s.daily ? t('dailyChip') : s.frontier === 'pass' ? t('passChip') : '';
+    this.frontierText.setVisible(!!chip).setText(chip);
+    const F = FRONTIER_CHIP;
+    if (chip) drawPanel(g, F.x - F.w / 2, F.y - F.h / 2, F.w, F.h, { c: 5, fill: s.daily ? 0x2a2414 : 0x1a2a3a, alpha: 0.95, edge: s.daily ? GOLD.light : 0xa8dcf8, lw: 1.5 });
     const roar = s.roarMs > 0 && !held(s);
     this.roarText.setVisible(roar);
     if (roar) drawPanel(g, ROAR_CHIP.x - ROAR_CHIP.w / 2, ROAR_CHIP.y - ROAR_CHIP.h / 2, ROAR_CHIP.w, ROAR_CHIP.h, { c: 5, fill: 0x1a2a3a, alpha: 0.95, edge: 0xa8dcf8, lw: 1.5 });
@@ -1550,30 +1612,54 @@ export class GameScene extends Phaser.Scene {
     const cy = VIEW.h / 2;
     const dim = this.add.rectangle(cx, cy, SEEN.w, SEEN.h, 0x0e1218, 0.7).setInteractive();
     const panel = this.add.graphics();
-    drawPanel(panel, cx - 300, cy - 180, 600, 360, { c: 18, fill: SLATE.mid, alpha: 1, lw: 3 });
-    const title = this.add.text(cx, cy - 145, t('fallenTitle'), textStyle(30, '#ff9a7a', 5)).setOrigin(0.5);
+    drawPanel(panel, cx - 320, cy - 200, 640, 400, { c: 18, fill: SLATE.mid, alpha: 1, lw: 3 });
+    this.gameOverTitle = this.add.text(cx - 60, cy - 170, t('fallenTitle'), textStyle(28, '#ff9a7a', 5)).setOrigin(0.5);
     this.gameOverText = this.add
-      .text(cx, cy - 62, '', { ...textStyle(15, '#e9e4d8'), fontStyle: 'normal', align: 'center' })
+      .text(cx, cy - 84, '', { ...textStyle(14, '#e9e4d8'), fontStyle: 'normal', align: 'center', wordWrap: { width: 590 } })
       .setOrigin(0.5);
-    const again = makeButton(this, cx - 195, cy + 112, 170, 40, t('fightAgain'), () => this.restart(false));
-    const reset = makeButton(this, cx, cy + 112, 170, 40, t('newHero'), () => {
+    this.againButton = makeButton(this, cx - 195, cy + 150, 170, 40, t('fightAgain'), () => (this.state.daily ? this.leaveDaily() : this.restart(false)));
+    this.againText = this.againButton.list[1] as Phaser.GameObjects.Text;
+    const reset = makeButton(this, cx, cy + 150, 170, 40, t('newHero'), () => {
       if (this.newHeroArmed) this.restart(true);
       else this.armNewHero(true);
     });
     this.newHeroCaption = reset.list[1] as Phaser.GameObjects.Text;
-    this.newHeroNote = this.add.text(cx, cy + 140, '', { ...textStyle(10, '#ff9a7a'), fontStyle: 'normal', align: 'center', wordWrap: { width: 180 } }).setOrigin(0.5, 0);
-    const retire = makeButton(this, cx + 195, cy + 112, 170, 40, t('retire'), () => this.openRetire());
+    this.newHeroNote = this.add.text(cx, cy + 172, '', { ...textStyle(10, '#ff9a7a'), fontStyle: 'normal', align: 'center', wordWrap: { width: 180 } }).setOrigin(0.5, 0);
+    const retire = makeButton(this, cx + 195, cy + 150, 170, 40, t('retire'), () => this.openRetire());
     this.retireButtons.push(retire);
-    this.retireNote = this.add.text(cx + 195, cy + 150, '', { ...textStyle(10, '#9aa0ac'), fontStyle: 'normal', align: 'center', wordWrap: { width: 190 } }).setOrigin(0.5, 0);
-    // The heat the next run plays at: one button per heat, the locked ones dimmed.
-    const heatLabel = this.add.text(cx - 260, cy + 14, t('nextRunAt'), textStyle(13, '#c9c3b6')).setOrigin(0, 0.5);
+    this.retireNote = this.add.text(cx + 195, cy + 172, '', { ...textStyle(10, '#9aa0ac'), fontStyle: 'normal', align: 'center', wordWrap: { width: 190 } }).setOrigin(0.5, 0);
+    // The class of a new hero, over "New hero": the mage once a hero has retired.
+    this.heroPick = makeButton(this, cx, cy + 112, 170, 24, '', () => this.toggleHero());
+    this.heroPickText = this.heroPick.list[1] as Phaser.GameObjects.Text;
+    // The daily siege, in the panel's top right corner: one try a day.
+    this.dailyButton = makeButton(this, cx + 220, cy - 172, 150, 30, t('dailyButton'), () => this.startDaily());
+    this.dailyNote = this.add.text(cx + 220, cy - 150, '', { ...textStyle(10, '#c9c3b6'), fontStyle: 'normal', align: 'center', wordWrap: { width: 170 } }).setOrigin(0.5, 0);
+    // The map the next run is on: the vale, or the frozen pass once the siege is lifted.
+    const rowLabel = (y: number, key: 'mapLabel' | 'nextRunAt' | 'startAt') => this.add.text(cx - 290, y, t(key), textStyle(13, '#c9c3b6')).setOrigin(0, 0.5);
+    const mapLabel = rowLabel(cy - 22, 'mapLabel');
     const picks: Phaser.GameObjects.GameObject[] = [];
-    for (let h = 0; h <= MAX_HEAT; h++) {
-      const x = cx - 110 + h * 92;
-      const y = cy + 14;
+    FRONTIER_IDS.forEach((id, i) => {
+      const x = cx - 105 + i * MARCH.step;
+      const y = cy - 22;
       const bg = this.add.graphics();
-      const text = this.add.text(x, y, t('heat', { n: h }), textStyle(12, '#ffe7a0')).setOrigin(0.5);
-      const zone = this.add.zone(x, y, 84, 26).setInteractive({ useHandCursor: true }).on('pointerdown', () => {
+      const text = this.add.text(x, y, '', textStyle(11, '#ffe7a0')).setOrigin(0.5);
+      const zone = this.add.zone(x, y, MARCH.w, MARCH.h).setInteractive({ useHandCursor: true }).on('pointerdown', () => {
+        if (!canFrontier(this.state, id)) return ui('refuse');
+        this.armNewHero(false);
+        this.nextFrontier = id;
+        ui('click');
+      });
+      this.mapPicks.push({ bg, text, zone });
+      picks.push(bg, text, zone);
+    });
+    // The heat the next run plays at: one button per heat, the locked ones dimmed.
+    const heatLabel = rowLabel(cy + 12, 'nextRunAt');
+    for (let h = 0; h <= MAX_HEAT; h++) {
+      const x = cx - 124 + h * 118;
+      const y = cy + 12;
+      const bg = this.add.graphics();
+      const text = this.add.text(x, y, t('heat', { n: h }), textStyle(11, '#ffe7a0')).setOrigin(0.5);
+      const zone = this.add.zone(x, y, 112, 26).setInteractive({ useHandCursor: true }).on('pointerdown', () => {
         if (h <= this.state.heatUnlocked) this.restartAt(h, this.startWave);
         else ui('refuse');
       });
@@ -1581,14 +1667,14 @@ export class GameScene extends Phaser.Scene {
       picks.push(bg, text, zone);
     }
     // Forced march: the wave the next run starts on, wave 11 or 21 once the boss before it is beaten.
-    const marchLabel = this.add.text(cx - 260, cy + 52, t('startAt'), textStyle(13, '#c9c3b6')).setOrigin(0, 0.5);
+    const marchLabel = rowLabel(cy + 46, 'startAt');
     MARCH_STARTS.forEach((m, i) => {
       const x = cx - 105 + i * MARCH.step;
-      const y = cy + 52;
+      const y = cy + 46;
       const bg = this.add.graphics();
       const text = this.add.text(x, y, '', textStyle(11, '#ffe7a0')).setOrigin(0.5);
       const zone = this.add.zone(x, y, MARCH.w, MARCH.h).setInteractive({ useHandCursor: true }).on('pointerdown', () => {
-        if (!canMarch(this.state.bestWave, m.wave)) return ui('refuse');
+        if (!canMarch(bestOn(this.state, this.nextFrontier), m.wave)) return ui('refuse');
         this.armNewHero(false);
         this.startWave = m.wave;
         ui('click');
@@ -1596,19 +1682,101 @@ export class GameScene extends Phaser.Scene {
       this.marchPicks.push({ bg, text, zone });
       picks.push(bg, text, zone);
     });
+    this.heroOnly = [mapLabel, heatLabel, marchLabel, ...picks, reset, retire, this.retireNote, this.newHeroNote, this.heroPick, this.dailyButton, this.dailyNote];
     this.gameOver = this.add
-      .container(0, 0, [dim, panel, title, this.gameOverText, heatLabel, marchLabel, ...picks, again, reset, retire, this.retireNote, this.newHeroNote])
+      .container(0, 0, [dim, panel, this.gameOverTitle, this.gameOverText, ...this.heroOnly, this.againButton])
       .setDepth(UI_DEPTH + 20)
       .setVisible(false);
+  }
+
+  /**
+   * The game-over panel each frame: after the hero's own run, what the run did and the rows for the
+   * next one; after the daily siege, its score and the way back to the hero.
+   */
+  private drawGameOver() {
+    const s = this.state;
+    const daily = !!s.daily;
+    for (const o of this.heroOnly) (o as unknown as Phaser.GameObjects.Components.Visible).setVisible(!daily);
+    this.gameOverTitle.setText(t(daily ? 'dailyTitle' : 'fallenTitle')).setX(VIEW.w / 2 - (daily ? 0 : 60));
+    this.againButton.setPosition(VIEW.w / 2 - (daily ? 0 : 195), VIEW.h / 2 + (daily ? 60 : 150));
+    this.againText.setText(t(daily ? 'dailyBack' : 'fightAgain'));
+    if (daily) {
+      const record = loadDaily(DAILY_GAME, s.daily!.day);
+      this.gameOverText.setText(
+        t('dailyOver', { wave: s.wave, n: s.wave - 1, kills: s.kills, streak: s.streak.best, best: record.best, days: record.streak }),
+      );
+      return;
+    }
+    const best = bestOn(s, s.frontier);
+    this.gameOverText.setText(
+      t(s.heat > 0 ? 'fallenHeat' : 'fallen', { wave: s.wave, heat: s.heat, kills: s.kills, streak: s.streak.best, best, level: s.level }),
+    );
+    // A new hero's class: the mage once a hero has retired.
+    if (!canClass(s.legacy, this.nextHero)) this.nextHero = 'ranger';
+    const mage = canClass(s.legacy, 'mage');
+    this.heroPick.setAlpha(mage ? 1 : 0.55);
+    this.heroPickText.setText(mage ? t('heroPick', { name: t(HEROES[this.nextHero].name) }) : t('heroPickLocked')).setFontSize(mage ? 11 : 9);
+    // Today's daily siege: tappable until today's try is used.
+    const record = loadDaily(DAILY_GAME);
+    this.dailyButton.setAlpha(record.played ? 0.5 : 1);
+    this.dailyNote.setText(record.score !== null ? t('dailyPlayed', { n: record.score }) : record.played ? t('dailyUnfinished') : t('dailyReady'));
+    this.drawMapPicks();
+    this.drawHeatPicks();
+    this.drawMarchPicks();
+  }
+
+  /** The "Map" buttons on the game-over panel: the next run's map lit gold, the frozen pass dim until the siege is lifted. */
+  private drawMapPicks() {
+    const s = this.state;
+    if (!canFrontier(s, this.nextFrontier)) this.nextFrontier = 'vale';
+    this.mapPicks.forEach(({ bg, text, zone }, i) => {
+      const id = FRONTIER_IDS[i];
+      const open = canFrontier(s, id);
+      const current = id === this.nextFrontier;
+      bg.clear();
+      drawPanel(bg, zone.x - MARCH.w / 2, zone.y - MARCH.h / 2, MARCH.w, MARCH.h, { c: 5, fill: current ? GOLD.mid : open ? SLATE.light : SLATE.panel, alpha: 1, edge: open ? GOLD.mid : 0x4a5060, lw: 1.5 });
+      text.setColor(current ? '#2b2010' : open ? '#ffe7a0' : '#7a8294').setText(t(open ? FRONTIERS[id].name : 'frontierLocked'));
+    });
+  }
+
+  /** Switches a new hero's class, once the mage is open. */
+  private toggleHero() {
+    this.armNewHero(false);
+    if (!canClass(this.state.legacy, 'mage')) return ui('refuse');
+    this.nextHero = this.nextHero === 'mage' ? 'ranger' : 'mage';
+  }
+
+  /** Starts today's daily siege, if today's try is not used yet: a fresh ranger on the day's set run. */
+  private startDaily() {
+    this.armNewHero(false);
+    if (loadDaily(DAILY_GAME).played) return ui('refuse');
+    const day = today();
+    startDaily(DAILY_GAME, day);
+    this.state = dailyRun(dailyPlan(dailyRand(DAILY_GAME, day), day), this.state.aimMode);
+    this.dailyScored = false;
+    this.startWave = 1;
+    this.clearSprites();
+  }
+
+  /** After the daily siege: back to the hero's own run, as saved. */
+  private leaveDaily() {
+    const progress = loadProgress();
+    this.state = newRun(progress, this.state.aimMode);
+    reoffer(this.state, progress.choices);
+    this.nextFrontier = this.state.frontier;
+    this.nextHero = this.state.hero;
+    this.startWave = 1;
+    this.clearSprites();
   }
 
   /** The "Start at" buttons on the game-over panel: the chosen start lit gold, the earned ones tappable with their coin stake, the rest dim. */
   private drawMarchPicks() {
     const s = this.state;
-    if (!canMarch(s.bestWave, this.startWave)) this.startWave = 1;
+    const best = bestOn(s, this.nextFrontier);
+    if (!canMarch(best, this.startWave)) this.startWave = 1;
     this.marchPicks.forEach(({ bg, text, zone }, i) => {
       const m = MARCH_STARTS[i];
-      const open = canMarch(s.bestWave, m.wave);
+      const open = canMarch(best, m.wave);
       const current = m.wave === this.startWave;
       bg.clear();
       drawPanel(bg, zone.x - MARCH.w / 2, zone.y - MARCH.h / 2, MARCH.w, MARCH.h, { c: 5, fill: current ? GOLD.mid : open ? SLATE.light : SLATE.panel, alpha: 1, edge: open ? GOLD.mid : 0x4a5060, lw: 1.5 });
@@ -1630,18 +1798,20 @@ export class GameScene extends Phaser.Scene {
     this.armNewHero(false);
     if (!held(this.state) || !canRetire(this.state)) return ui('refuse');
     this.legacyRelic = rollLegacyRelic();
-    this.legacyPanel.show(this.state.legacy, this.legacyRelic);
+    this.legacyPanel.show(this.state.legacy, this.legacyRelic, this.nextHero);
   }
 
   /** Retires the hero for a legacy: the next hero starts from scratch on wave 1, keeping it. */
   private retire(id: LegacyId) {
-    const next = retire(this.state, id, this.legacyRelic);
+    const next = retire(this.state, id, this.legacyRelic, this.legacyPanel.hero);
     if (!next) return ui('refuse');
     sfx('pick');
     this.legacyPanel.close();
     this.state = next;
     this.startWave = 1;
-    saveProgress(progressOf(this.state));
+    this.nextFrontier = 'vale';
+    this.nextHero = next.hero;
+    this.saveHero();
     this.clearSprites();
   }
 
@@ -1654,7 +1824,7 @@ export class GameScene extends Phaser.Scene {
       const unlocked = h <= s.heatUnlocked;
       const current = h === s.heat;
       bg.clear();
-      drawPanel(bg, x - 42, y - 13, 84, 26, { c: 5, fill: current ? GOLD.mid : unlocked ? SLATE.light : SLATE.panel, alpha: 1, edge: unlocked ? GOLD.mid : 0x4a5060, lw: 1.5 });
+      drawPanel(bg, x - 56, y - 13, 112, 26, { c: 5, fill: current ? GOLD.mid : unlocked ? SLATE.light : SLATE.panel, alpha: 1, edge: unlocked ? GOLD.mid : 0x4a5060, lw: 1.5 });
       text.setColor(current ? '#2b2010' : unlocked ? '#ffe7a0' : '#7a8294').setText(unlocked ? t('heat', { n: h }) : t('heatLocked', { n: h }));
     });
   }
@@ -1663,25 +1833,38 @@ export class GameScene extends Phaser.Scene {
   private createWon() {
     const dim = this.add.rectangle(VIEW.w / 2, VIEW.h / 2, SEEN.w, SEEN.h, 0x0e1218, 0.7).setInteractive();
     const panel = this.add.graphics();
-    drawPanel(panel, VIEW.w / 2 - 290, VIEW.h / 2 - 150, 580, 300, { c: 18, fill: SLATE.mid, alpha: 1, lw: 3 });
-    const title = this.add.text(VIEW.w / 2, VIEW.h / 2 - 110, t('wonTitle'), textStyle(30, '#ffcf4a', 5)).setOrigin(0.5);
+    drawPanel(panel, VIEW.w / 2 - 300, VIEW.h / 2 - 190, 600, 380, { c: 18, fill: SLATE.mid, alpha: 1, lw: 3 });
+    this.wonTitle = this.add.text(VIEW.w / 2, VIEW.h / 2 - 155, t('wonTitle'), textStyle(30, '#ffcf4a', 5)).setOrigin(0.5);
     this.wonText = this.add
-      .text(VIEW.w / 2, VIEW.h / 2 - 25, '', { ...textStyle(15, '#e9e4d8'), fontStyle: 'normal', align: 'center', wordWrap: { width: 520 } })
+      .text(VIEW.w / 2, VIEW.h / 2 - 40, '', { ...textStyle(14, '#e9e4d8'), fontStyle: 'normal', align: 'center', wordWrap: { width: 540 } })
       .setOrigin(0.5);
-    const on = makeButton(this, VIEW.w / 2 - 195, VIEW.h / 2 + 100, 170, 40, t('keepFighting'), () => keepFighting(this.state));
-    this.wonNext = makeButton(this, VIEW.w / 2, VIEW.h / 2 + 100, 170, 40, t('heat', { n: 1 }), () => this.restartAt(this.state.heat + 1));
+    // New frontiers: the hero marches on to the frozen pass (not shown once it is won there).
+    this.wonPass = makeButton(this, VIEW.w / 2, VIEW.h / 2 + 88, 260, 36, t('toPass'), () => this.marchOn());
+    const on = makeButton(this, VIEW.w / 2 - 195, VIEW.h / 2 + 142, 170, 40, t('keepFighting'), () => keepFighting(this.state));
+    this.wonNext = makeButton(this, VIEW.w / 2, VIEW.h / 2 + 142, 170, 40, t('heat', { n: 1 }), () => this.restartAt(this.state.heat + 1));
     this.wonNextText = this.wonNext.getAt(1) as Phaser.GameObjects.Text;
     // Lifting the siege earns the right to retire for a legacy.
-    const retire = makeButton(this, VIEW.w / 2 + 195, VIEW.h / 2 + 100, 170, 40, t('retire'), () => this.openRetire());
+    const retire = makeButton(this, VIEW.w / 2 + 195, VIEW.h / 2 + 142, 170, 40, t('retire'), () => this.openRetire());
     this.retireButtons.push(retire);
-    this.won = this.add.container(0, 0, [dim, panel, title, this.wonText, on, this.wonNext, retire]).setDepth(UI_DEPTH + 20).setVisible(false);
+    this.won = this.add.container(0, 0, [dim, panel, this.wonTitle, this.wonText, this.wonPass, on, this.wonNext, retire]).setDepth(UI_DEPTH + 20).setVisible(false);
   }
 
-  /** A new run at an unlocked heat, from wave 1 (or a forced march's start) with the hero kept. */
+  /** A new run at an unlocked heat, from wave 1 (or a forced march's start) with the hero kept, on the next run's map. */
   private restartAt(heat: number, start = 1) {
-    this.state = startHeat(this.state, heat, start);
+    // From the victory panel the run stays on its map; after a fall the "Map" row picks it.
+    const frontier = this.state.phase === 'won' ? this.state.frontier : this.nextFrontier;
+    this.state = startHeat(this.state, heat, start, frontier);
     this.startWave = 1;
-    saveProgress(progressOf(this.state));
+    this.saveHero();
+    this.clearSprites();
+  }
+
+  /** From the victory panel: on to wave 1 of the frozen pass, with the hero and the heat kept. */
+  private marchOn() {
+    this.state = marchOn(this.state);
+    this.nextFrontier = 'pass';
+    this.startWave = 1;
+    this.saveHero();
     this.clearSprites();
   }
 
@@ -1719,9 +1902,11 @@ export class GameScene extends Phaser.Scene {
   private restart(newHero: boolean) {
     this.armNewHero(false);
     if (newHero) clearProgress();
-    this.state = newHero ? newRun(freshProgress(this.state.legacy), this.state.aimMode) : fightAgain(this.state, this.startWave);
+    const hero = canClass(this.state.legacy, this.nextHero) ? this.nextHero : 'ranger';
+    this.state = newHero ? newRun(freshProgress(this.state.legacy, hero), this.state.aimMode) : fightAgain(this.state, this.startWave, this.nextFrontier);
+    if (newHero) this.nextFrontier = 'vale';
     this.startWave = 1;
-    saveProgress(progressOf(this.state));
+    this.saveHero();
     this.clearSprites();
   }
 

@@ -1,4 +1,7 @@
 import type { AimMode } from './aim';
+import type { DailyPlan } from './daily';
+import type { FrontierId } from './frontier';
+import { MAGE_BURST, MAGE_CAST_MS, MAGE_DAMAGE, type HeroClass } from './hero';
 import type { Trait } from './elites';
 import type { EnemyKind } from './enemies';
 import type { FortId } from './forts';
@@ -10,7 +13,7 @@ import { marchCoins } from './march';
 import type { OmenId } from './omens';
 import { setComplete, type RelicId } from './relics';
 import type { RoadId } from './roads';
-import { UPGRADES, UPGRADE_IDS, type UpgradeId } from './upgrades';
+import { UPGRADES, UPGRADE_IDS, learns, type UpgradeId } from './upgrades';
 
 // The battlefield, in the 960x540 view. Foes walk in from the right towards the barricade, and past
 // it to the hero once it falls.
@@ -64,8 +67,11 @@ export interface Enemy {
   moved?: boolean;
 }
 
-/** The hero's arrows and fireballs, the hired mage's arcane bolts and the Troll King's rocks. */
-export type MissileKind = 'arrow' | 'fireball' | 'magic' | 'rock';
+/**
+ * The ranger's arrows and fireballs, the mage hero's `spell` bolts (and fire orbs, which fly as
+ * fireballs), the hired mage's arcane bolts and the Troll King's rocks.
+ */
+export type MissileKind = 'arrow' | 'spell' | 'fireball' | 'magic' | 'rock';
 
 export interface Missile {
   id: number;
@@ -78,7 +84,7 @@ export interface Missile {
   target: number | null;
   /** Foes it has hit, so a piercing arrow doesn't hit the same one twice. */
   hit: number[];
-  /** How many more foes an arrow passes through. */
+  /** How many more foes an arrow passes through, or a spell leaps on to. */
   pierce: number;
   /** Arcane bolts: the damage of their burst. */
   damage?: number;
@@ -96,7 +102,7 @@ export interface Missile {
  */
 export interface Effect {
   id: number;
-  kind: 'blast' | 'fireblast' | 'bolt' | 'death' | 'crit' | 'rain' | 'xp' | 'orb' | 'block' | 'heal' | 'stab' | 'arcane' | 'rockHit' | 'call' | 'roar' | 'split' | 'autoPick';
+  kind: 'blast' | 'fireblast' | 'bolt' | 'death' | 'crit' | 'rain' | 'xp' | 'orb' | 'block' | 'heal' | 'stab' | 'arcane' | 'rockHit' | 'call' | 'roar' | 'howl' | 'split' | 'autoPick';
   x: number;
   y: number;
   /** Blast radius, or the lightning's path (the healed foes, the thrust's two ends). */
@@ -181,6 +187,13 @@ export interface GameState {
   heatUnlocked: number;
   /** What retired heroes left to this one (see legacy.ts). */
   legacy: Legacy;
+  /** The hero's class (see hero.ts): the ranger, or the mage once a hero has retired. */
+  hero: HeroClass;
+  /** The map this run is on: the vale, or the frozen pass once the siege is lifted (see frontier.ts). */
+  frontier: FrontierId;
+  /** The highest wave cleared on the frozen pass, and whether its wave 30 has been cleared (the pass won). */
+  passBest: number;
+  passWon: boolean;
 
   // This run.
   wave: number;
@@ -228,6 +241,8 @@ export interface GameState {
   roarMs: number;
   /** The fortifications bought in the breaks. */
   forts: Forts;
+  /** The day's set run when this is the daily siege (see daily.ts), or null for the hero's own run. */
+  daily: DailyPlan | null;
   /** Whether this run has lifted the siege (cleared wave 30), so going on past it never wins again. */
   won: boolean;
   /** Paid repairs bought this run; each costs more than the last. */
@@ -251,25 +266,35 @@ export const streakBonus = (count: number) => (count >= 2 ? Math.min(0.5, 0.05 *
 export const STREAK_MS = 2_500;
 
 /** Everything the upgrades and relics change, worked out from their ranks and counts. */
-export function stats(state: Pick<GameState, 'ranks' | 'relics' | 'heat'> & Partial<Pick<GameState, 'legacy'>>) {
+export function stats(state: Pick<GameState, 'ranks' | 'relics' | 'heat'> & Partial<Pick<GameState, 'legacy' | 'hero'>>) {
   const r = (id: UpgradeId) => rank(state, id);
   const relic = (id: RelicId) => state.relics?.[id] ?? 0;
   const relics = state.relics ?? {};
   const heat = heatRules(state.heat ?? 0);
+  // The mage's skills work like the ranger's that match them (a hero only ever has one class's), so
+  // each stat adds both: Focus to Swift Draw, Ember Bolt to Fire Arrows, and so on.
+  const mage = state.hero === 'mage';
+  const deep = r('deepFreeze') + r('glacier');
+  const pyro = r('pyromancy') + r('orbMastery');
+  const fork = r('forked') + r('arc');
   return {
-    /** Milliseconds between two shots of the bow. */
-    shotMs: 1_000 / (1 + 0.2 * r('swift')) / (1 + 0.1 * relic('drum')),
-    damage: 10 * (1 + 0.25 * r('sharp')) * (1 + 0.15 * relic('feather')),
-    arrows: 1 + r('volley'),
+    /** Milliseconds between two shots of the bow (or casts of the mage's bolt). */
+    shotMs: (mage ? MAGE_CAST_MS : 1_000) / (1 + 0.2 * (r('swift') + r('focus'))) / (1 + 0.1 * relic('drum')),
+    damage: (mage ? MAGE_DAMAGE : 10) * (1 + 0.25 * (r('sharp') + r('potency'))) * (1 + 0.15 * relic('feather')),
+    arrows: 1 + r('volley') + r('twin'),
     pierce: r('pierce'),
+    /** Chain Spark: how many more foes a mage's bolt leaps on to. */
+    chain: r('chain'),
     critChance: 0.1 * r('crit') + (setComplete(relics, 'warlord') ? 0.1 : 0),
-    burn: r('fire') ? { dps: 5 * (1 + 0.5 * r('wildfire')), ms: 3_000 } : null,
-    chill: r('frost') ? { slow: 0.35 + 0.1 * r('deepFreeze'), ms: 1_500 + 500 * r('deepFreeze') } : null,
-    burst: r('blast') ? { radius: 45 + 15 * r('bigBlast'), share: 0.4 + 0.15 * r('bigBlast') } : null,
-    fireball: r('fireball')
-      ? { ms: 3_000 * 0.85 ** r('pyromancy'), damage: 30 * (1 + 0.4 * r('pyromancy')), radius: 70 }
-      : null,
-    storm: r('storm') ? { ms: 3_500, damage: 20 * (1 + 0.25 * r('forked')), leaps: 3 + r('forked') } : null,
+    burn: r('fire') || r('ember') ? { dps: 5 * (1 + 0.5 * (r('wildfire') + r('inferno'))), ms: 3_000 } : null,
+    chill: r('frost') || r('frostbolt') ? { slow: 0.35 + 0.1 * deep, ms: 1_500 + 500 * deep } : null,
+    burst: r('blast')
+      ? { radius: 45 + 15 * r('bigBlast'), share: 0.4 + 0.15 * r('bigBlast') }
+      : mage
+        ? { radius: MAGE_BURST.radius + 12 * r('nova'), share: MAGE_BURST.share + 0.1 * r('nova') }
+        : null,
+    fireball: r('fireball') || r('orb') ? { ms: 3_000 * 0.85 ** pyro, damage: 30 * (1 + 0.4 * pyro), radius: 70 } : null,
+    storm: r('storm') || r('tempest') ? { ms: 3_500, damage: 20 * (1 + 0.25 * fork), leaps: 3 + fork } : null,
     barricadeMax: Math.round(BASE_BARRICADE_HP * (1 + 0.25 * r('timber')) * (1 + 0.3 * relic('oakheart'))),
     xpGain: (1 + 0.2 * r('lore')) * (1 + 0.15 * relic('crown')),
     /** Arrow Rain's kills to charge, as a share of the wave's (see `rainNeed` in sim.ts). */
@@ -286,7 +311,7 @@ export function stats(state: Pick<GameState, 'ranks' | 'relics' | 'heat'> & Part
     /** Finishing Shot: arrows deal double damage to a foe below this share of its health. */
     finisher: 0.15 * r('finisher'),
     /** Giant Slayer: arrows and Arrow Rain deal this many times their damage to a boss. */
-    bossDamage: 1 + 0.3 * r('slayer'),
+    bossDamage: 1 + 0.3 * (r('slayer') + r('hex')),
     /** Cloudburst: how many times wider (and taller) Arrow Rain's ring is. */
     rainRing: 1 + 0.15 * r('cloudburst'),
     /** Caltrops: the share foes on them are slowed by, and how many times an arrow's damage they take a second. */
@@ -307,19 +332,31 @@ export type Stats = ReturnType<typeof stats>;
 export const rainNeed = (wave: number, s: Stats) => Math.max(2, Math.round((RAIN_KILLS + Math.floor((wave - 1) / 2)) * s.rainCharge));
 
 /** The hero's level and upgrades, kept from one run to the next. */
-export type Progress = Pick<GameState, 'level' | 'xp' | 'ranks' | 'levelUps' | 'bestWave' | 'runs' | 'relics' | 'mastered' | 'heat' | 'heatUnlocked' | 'legacy' | 'choices'>;
+export type Progress = Pick<
+  GameState,
+  'level' | 'xp' | 'ranks' | 'levelUps' | 'bestWave' | 'runs' | 'relics' | 'mastered' | 'heat' | 'heatUnlocked' | 'legacy' | 'hero' | 'frontier' | 'passBest' | 'passWon' | 'choices'
+>;
 
-/** A hero from scratch, with what retired heroes left: their first relics among the relics. */
-export function freshProgress(legacy: Legacy = freshLegacy()): Progress {
+/** A hero from scratch, of this class, with what retired heroes left: their first relics among the relics. */
+export function freshProgress(legacy: Legacy = freshLegacy(), hero: HeroClass = 'ranger'): Progress {
   const relics: Progress['relics'] = {};
   for (const id of legacy.relics) relics[id] = (relics[id] ?? 0) + 1;
-  return { level: 1, xp: 0, ranks: {}, levelUps: 0, bestWave: 0, runs: 0, relics, mastered: false, heat: 0, heatUnlocked: 0, legacy, choices: null };
+  return {
+    level: 1, xp: 0, ranks: {}, levelUps: 0, bestWave: 0, runs: 0, relics, mastered: false, heat: 0, heatUnlocked: 0, legacy,
+    hero, frontier: 'vale', passBest: 0, passWon: false, choices: null,
+  };
 }
+
+/** The best wave the hero has cleared on a map: the vale's `bestWave`, or the frozen pass's `passBest`. */
+export const bestOn = (state: Pick<GameState, 'bestWave' | 'passBest'>, frontier: FrontierId) => (frontier === 'pass' ? state.passBest : state.bestWave);
 
 export const freshForts = (): Forts => ({ stakeHp: 0, oil: false, lookout: 0, boughtWave: 0, queued: null });
 
-/** A new run from wave 1 (or a forced march's start, with its coins), with the hero's progress kept. */
-export function newRun(progress: Progress, aimMode: AimMode = 'nearest', start = 1): GameState {
+/**
+ * A new run from wave 1 (or a forced march's start, with its coins), with the hero's progress kept,
+ * on the map in `progress.frontier`. With a daily plan it is the daily siege's run (see daily.ts).
+ */
+export function newRun(progress: Progress, aimMode: AimMode = 'nearest', start = 1, daily: DailyPlan | null = null): GameState {
   const s = stats(progress);
   const barricadeMax = s.barricadeMax;
   return {
@@ -355,22 +392,23 @@ export function newRun(progress: Progress, aimMode: AimMode = 'nearest', start =
     won: false,
     repairs: 0,
     omen: null,
+    daily,
     nextId: 1,
   };
 }
 
 export function progressOf(state: GameState): Progress {
-  const { level, xp, ranks, levelUps, bestWave, runs, relics, mastered, heat, heatUnlocked, legacy, choices } = state;
+  const { level, xp, ranks, levelUps, bestWave, runs, relics, mastered, heat, heatUnlocked, legacy, hero, frontier, passBest, passWon, choices } = state;
   // The cards up for a pending level-up are kept too, so a reload shows the same three.
   return {
     level, xp, ranks: { ...ranks }, levelUps, bestWave, runs, relics: { ...relics }, mastered, heat, heatUnlocked,
-    legacy: { ...legacy, relics: [...legacy.relics] }, choices: choices && [...choices],
+    legacy: { ...legacy, relics: [...legacy.relics] }, hero, frontier, passBest, passWon, choices: choices && [...choices],
   };
 }
 
-/** Upgrades that can still be offered: not maxed, and with what they build on already picked. */
-export const offerable = (state: Pick<GameState, 'ranks'>) =>
+/** Upgrades that can still be offered: the hero's class's, not maxed, and with what they build on already picked. */
+export const offerable = (state: Pick<GameState, 'ranks'> & Partial<Pick<GameState, 'hero'>>) =>
   UPGRADE_IDS.filter((id) => {
     const u = UPGRADES[id];
-    return !u.filler && rank(state, id) < u.maxRank && (!u.requires || rank(state, u.requires) > 0);
+    return !u.filler && learns(id, state.hero) && rank(state, id) < u.maxRank && (!u.requires || rank(state, u.requires) > 0);
   });

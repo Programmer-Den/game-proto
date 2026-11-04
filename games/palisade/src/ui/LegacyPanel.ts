@@ -6,6 +6,7 @@ import { fit } from '../art/lowpoly';
 import { GOLD, SLATE } from '../art/palette';
 import { LEGACY, SEEN, UI_DEPTH, VIEW } from '../scenes/layout';
 import { LEGACIES, LEGACY_IDS, canKeep, type Legacy, type LegacyId } from '../game/legacy';
+import { HEROES, HERO_CLASSES, type HeroClass } from '../game/hero';
 import { RELICS, type RelicId } from '../game/relics';
 import { drawPanel, makeButton, textStyle } from './panel';
 import { t } from '../i18n';
@@ -27,7 +28,10 @@ export class LegacyPanel {
   private root: Phaser.GameObjects.Container;
   private body: Phaser.GameObjects.Container;
   private keptText: Phaser.GameObjects.Text;
+  private heroButtons: { bg: Phaser.GameObjects.Graphics; text: Phaser.GameObjects.Text; id: HeroClass }[] = [];
   cards: LegacySpot[] = [];
+  /** The class the next hero is: retiring opens the mage, so both are on offer here. */
+  hero: HeroClass = 'ranger';
 
   constructor(
     private scene: Phaser.Scene,
@@ -40,10 +44,25 @@ export class LegacyPanel {
     const sub = scene.add
       .text(VIEW.w / 2, 158, t('retireSub'), { ...textStyle(13, '#e9e4d8'), fontStyle: 'normal' })
       .setOrigin(0.5);
-    this.keptText = scene.add.text(VIEW.w / 2, 384, '', { ...textStyle(12, '#c9c3b6'), fontStyle: 'normal' }).setOrigin(0.5);
-    const cancel = makeButton(scene, VIEW.w / 2, 430, 160, 34, t('cancel'), () => this.close());
+    this.keptText = scene.add.text(VIEW.w / 2, 378, '', { ...textStyle(12, '#c9c3b6'), fontStyle: 'normal' }).setOrigin(0.5);
+    // The next hero's class: the ranger, or the mage this first legacy opens.
+    const heroLabel = scene.add.text(VIEW.w / 2 - 410, 430, t('nextHero'), textStyle(13, '#c9c3b6')).setOrigin(0, 0.5);
+    const heroParts: Phaser.GameObjects.GameObject[] = [heroLabel];
+    HERO_CLASSES.forEach((id, i) => {
+      const x = VIEW.w / 2 - 410 + heroLabel.width + 70 + i * 120;
+      const bg = scene.add.graphics();
+      const text = scene.add.text(x, 430, t(HEROES[id].name), textStyle(12, '#ffe7a0')).setOrigin(0.5);
+      const zone = scene.add.zone(x, 430, 110, 26).setInteractive({ useHandCursor: true }).on('pointerdown', () => {
+        ui('click');
+        this.hero = id;
+        this.drawHeroes();
+      });
+      this.heroButtons.push({ bg, text, id });
+      heroParts.push(bg, text, zone);
+    });
+    const cancel = makeButton(scene, VIEW.w / 2 + 300, 430, 160, 34, t('cancel'), () => this.close());
     this.body = scene.add.container(0, 0);
-    this.root = scene.add.container(0, 0, [dim, g, title, sub, this.keptText, cancel, this.body]).setDepth(UI_DEPTH + 30).setVisible(false);
+    this.root = scene.add.container(0, 0, [dim, g, title, sub, this.keptText, ...heroParts, cancel, this.body]).setDepth(UI_DEPTH + 30).setVisible(false);
   }
 
   get open() {
@@ -54,9 +73,21 @@ export class LegacyPanel {
     this.root.setVisible(false);
   }
 
-  /** Opens the panel with what earlier heroes left and the relic the first card would keep. */
-  show(legacy: Legacy, relic: RelicId) {
+  /** The class buttons: the picked one lit gold. */
+  private drawHeroes() {
+    for (const { bg, text, id } of this.heroButtons) {
+      const on = id === this.hero;
+      bg.clear();
+      drawPanel(bg, text.x - 55, 430 - 13, 110, 26, { c: 5, fill: on ? GOLD.mid : SLATE.light, alpha: 1, edge: GOLD.mid, lw: 1.5 });
+      text.setColor(on ? '#2b2010' : '#ffe7a0');
+    }
+  }
+
+  /** Opens the panel with what earlier heroes left, the relic the first card would keep and the next hero's class. */
+  show(legacy: Legacy, relic: RelicId, hero: HeroClass = 'ranger') {
     this.root.setVisible(true);
+    this.hero = hero;
+    this.drawHeroes();
     this.body.removeAll(true);
     this.cards = [];
     LEGACY_IDS.forEach((id, i) => this.addCard(id, LEGACY.xs[i], canKeep(legacy, id), relic));

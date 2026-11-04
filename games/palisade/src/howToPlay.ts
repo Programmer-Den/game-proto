@@ -21,6 +21,7 @@ const en: HowToPlay = {
     { input: 'Tap a card', action: 'Take that upgrade at a level-up, or that road after a boss' },
     { input: '1x / 2x button', action: 'Switch the battle between normal and double speed' },
     { input: 'Skill book button', action: 'See every upgrade and relic you have found' },
+    { input: 'Daily siege button, after a fall', action: 'Play today’s seeded run with a fresh ranger, once a day' },
   ],
   loop: [
     'Foes march in from the right and hack at the barricade while your ranger shoots on their own.',
@@ -39,6 +40,8 @@ const en: HowToPlay = {
     'Lifting the siege unlocks a harder heat for your next run.',
     'Once a boss has fallen, the next run can start at the following road with a stake of coins.',
     'A hero who knows every skill or lifted the siege can retire: the next hero keeps a legacy.',
+    'Lifting the siege opens the frozen pass, a second map with its own foes and boss for the same hero.',
+    'Retiring a hero opens the mage, who casts bolts through shields and has a skill tree of their own.',
   ],
 };
 
@@ -61,6 +64,7 @@ const de: HowToPlay = {
     { input: 'Eine Karte antippen', action: 'Diese Verbesserung beim Stufenaufstieg nehmen, oder diesen Weg nach einem Boss' },
     { input: '1x / 2x', action: 'Den Kampf zwischen normaler und doppelter Geschwindigkeit wechseln' },
     { input: 'Fertigkeiten-Taste', action: 'Jede gefundene Verbesserung und Reliquie ansehen' },
+    { input: 'Tagesbelagerung, nach einem Fall', action: 'Den heutigen Lauf mit einem frischen Waldläufer spielen, einmal am Tag' },
   ],
   loop: [
     'Feinde marschieren von rechts heran und hacken auf die Barrikade ein, während dein Waldläufer von selbst schießt.',
@@ -79,6 +83,8 @@ const de: HowToPlay = {
     'Eine gebrochene Belagerung schaltet für den nächsten Lauf eine härtere Hitze frei.',
     'Ist ein Boss gefallen, kann der nächste Lauf mit einem Münzeinsatz beim folgenden Weg beginnen.',
     'Ein Held, der jede Fertigkeit kennt oder die Belagerung gebrochen hat, kann sich zur Ruhe setzen: der nächste Held behält ein Vermächtnis.',
+    'Eine gebrochene Belagerung öffnet den Eispass, eine zweite Karte mit eigenen Feinden und eigenem Boss für denselben Helden.',
+    'Der erste Ruhestand öffnet den Magier, der Bolzen durch Schilde zaubert und eigene Fertigkeiten hat.',
   ],
 };
 
