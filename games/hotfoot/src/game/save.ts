@@ -1,12 +1,15 @@
 import { ARMOURY_IDS, ARMOURY, noArmoury, type Armoury } from './armoury';
 import { BOON_IDS, type BoonId } from './boons';
+import { CHALLENGES } from './challenges';
 import type { Ghost } from './ghost';
 import { KNIGHT_IDS, type KnightId } from './knights';
+import { PETS, PET_IDS, noPets, type PetId, type PetLevels } from './pets';
 
 // Progress kept between runs, in the browser's local storage: the best distance, the coins banked,
 // the boon bought for the next run, the armoury's levels and the daily course's best. Every key is
 // prefixed with the game's name, since every game shares the hub's origin, and the crown from the
-// Dragon's Keep, the knights unlocked and ridden with their own bests, and each knight's ghost.
+// Dragon's Keep, the knights unlocked and ridden with their own bests, each knight's ghost, the
+// weekly road's best, the challenge courses' stars and the companions bought.
 // Storage can be blocked or full, so every access is wrapped.
 
 const BEST = 'hotfoot-best';
@@ -16,6 +19,9 @@ const ARMOURY_KEY = 'hotfoot-armoury';
 const DAILY = 'hotfoot-daily';
 const CROWN = 'hotfoot-crown';
 const KNIGHTS_KEY = 'hotfoot-knights';
+const WEEKLY = 'hotfoot-weekly';
+const CHALLENGES_KEY = 'hotfoot-challenges';
+const PETS_KEY = 'hotfoot-pets';
 /** The ghosts: `-replays`, so they go into a progress file but never into a progress code (too big for a QR code). */
 const GHOSTS = 'hotfoot-replays';
 
@@ -30,6 +36,12 @@ export interface Progress {
   crown: boolean;
   /** The knights unlocked (the knight always), who rides the next ordinary run, and the squire's and heavy knight's bests (the knight's is `best`). */
   knights: { unlocked: KnightId[]; ride: KnightId; best: Partial<Record<KnightId, number>> };
+  /** The best distance on the weekly road, and its week (`YYYY-Www`). */
+  weekly: { week: string; best: number } | null;
+  /** Each challenge course's best score, as star bits (`STAR` in challenges.ts). */
+  challenges: number[];
+  /** Each companion's level (0 until bought), and the one that runs along on ordinary runs. */
+  pets: { levels: PetLevels; with: PetId | null };
 }
 
 function read(key: string) {
@@ -66,7 +78,34 @@ export function loadProgress(): Progress {
     daily,
     crown: read(CROWN) === '1',
     knights: loadKnights(),
+    weekly: loadWeekly(),
+    challenges: loadChallenges(),
+    pets: loadPets(),
   };
+}
+
+function loadWeekly(): Progress['weekly'] {
+  const raw = parse(read(WEEKLY)) as { week?: unknown; best?: unknown } | null;
+  return typeof raw?.week === 'string' && Number.isFinite(Number(raw.best)) ? { week: raw.week, best: Number(raw.best) } : null;
+}
+
+function loadChallenges(): number[] {
+  const raw = parse(read(CHALLENGES_KEY));
+  return CHALLENGES.map((_, i) => {
+    const bits = Array.isArray(raw) ? Number(raw[i]) : 0;
+    return Number.isInteger(bits) ? bits & 7 : 0;
+  });
+}
+
+function loadPets(): Progress['pets'] {
+  const raw = parse(read(PETS_KEY)) as { levels?: Partial<Record<string, unknown>>; with?: unknown } | null;
+  const levels = noPets();
+  for (const id of PET_IDS) {
+    const level = Number(raw?.levels?.[id]);
+    if (Number.isInteger(level)) levels[id] = Math.max(0, Math.min(PETS[id].prices.length, level));
+  }
+  const pet = PET_IDS.find((id) => id === raw?.with && levels[id] > 0) ?? null;
+  return { levels, with: pet };
 }
 
 function loadKnights(): Progress['knights'] {
@@ -100,7 +139,7 @@ export function saveGhosts(ghosts: Partial<Record<KnightId, Ghost>>) {
   }
 }
 
-export function saveProgress({ best, bank, pending, armoury, daily, crown, knights }: Progress) {
+export function saveProgress({ best, bank, pending, armoury, daily, crown, knights, weekly, challenges, pets }: Progress) {
   try {
     localStorage.setItem(BEST, String(best));
     localStorage.setItem(BANK, String(bank));
@@ -110,6 +149,9 @@ export function saveProgress({ best, bank, pending, armoury, daily, crown, knigh
     if (daily) localStorage.setItem(DAILY, JSON.stringify(daily));
     if (crown) localStorage.setItem(CROWN, '1');
     localStorage.setItem(KNIGHTS_KEY, JSON.stringify(knights));
+    if (weekly) localStorage.setItem(WEEKLY, JSON.stringify(weekly));
+    localStorage.setItem(CHALLENGES_KEY, JSON.stringify(challenges));
+    localStorage.setItem(PETS_KEY, JSON.stringify(pets));
   } catch {
     // Storage can be full or blocked (private mode); the game keeps running unsaved.
   }

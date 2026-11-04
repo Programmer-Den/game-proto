@@ -8,6 +8,8 @@ interface Look {
   helm: string;
   plume: string | null;
   crest: boolean;
+  /** The gold boots from the challenge courses, gilding the sabatons. */
+  boots?: boolean;
 }
 const LOOKS: Record<KnightId, Look> = {
   knight: { coat: C.lapis, helm: C.silver, plume: C.verm, crest: false },
@@ -22,7 +24,8 @@ const LOOKS: Record<KnightId, Look> = {
 // (66, 38). GameScene sets the origins from `KNIGHT_FEET`. Each knight of `KNIGHT_IDS` has their own
 // look (`LOOKS`): the knight in lapis with a vermilion plume, the squire in green with a gold plume,
 // and the heavy knight in madder with an iron helm and a gold fan crest; their poses are painted as
-// `<knight>-<pose>` (`knight-run0`, `squire-run0`, `heavy-run0`...).
+// `<knight>-<pose>` (`knight-run0`, `squire-run0`, `heavy-run0`...), and again with the gold boots
+// won on the challenge courses as `<knight>-gold-<pose>` (`knight-gold-run0`...).
 
 export type KnightPose = 'run0' | 'run1' | 'run2' | 'run3' | 'jump' | 'fall' | 'slide';
 
@@ -65,12 +68,20 @@ function limb(ctx: Ctx, a: Pt, b: Pt, w: number, fill: string) {
 }
 
 /** A leg in plate: thigh, shin and a pointed sabaton facing forward. */
-function leg(ctx: Ctx, [hip, knee, foot]: Leg, near: boolean) {
+function leg(ctx: Ctx, [hip, knee, foot]: Leg, near: boolean, boots = false) {
   const fill = near ? C.steel : C.iron;
   limb(ctx, hip, knee, 16, fill);
   limb(ctx, knee, foot, 14, fill);
   const [fx, fy] = foot;
-  poly(ctx, [[fx - 8, fy - 6], [fx + 6, fy - 6], [fx + 16, fy], [fx - 8, fy + 2]], near ? C.iron : '#6e7388', 2.5);
+  const sabaton: Pt[] = [[fx - 8, fy - 6], [fx + 6, fy - 6], [fx + 16, fy], [fx - 8, fy + 2]];
+  if (!boots) {
+    poly(ctx, sabaton, near ? C.iron : '#6e7388', 2.5);
+    return;
+  }
+  // Gold boots: the sabaton and a cuff above it in gold leaf.
+  poly(ctx, [[fx - 9, fy - 14], [fx + 7, fy - 14], [fx + 7, fy - 6], [fx - 9, fy - 6]], gold(ctx, fx - 9, fy - 14, fx + 7, fy - 6), 2);
+  poly(ctx, sabaton, gold(ctx, fx - 8, fy - 6, fx + 16, fy + 2), 2.5);
+  hl(ctx, [[fx - 5, fy - 4], [fx + 6, fy - 4]], 1.5);
 }
 
 /** An arm from `shoulder` to `hand`, with a mailed fist. */
@@ -140,9 +151,9 @@ function body(ctx: Ctx, look: Look) {
 }
 
 function standing(ctx: Ctx, p: Pose, look: Look) {
-  leg(ctx, p.back, false);
+  leg(ctx, p.back, false, look.boots);
   arm(ctx, [-16, -94 + p.bob], [p.hand[0], p.hand[1] + p.bob], false);
-  leg(ctx, p.front, true);
+  leg(ctx, p.front, true, look.boots);
   ctx.save();
   ctx.translate(0, p.bob);
   body(ctx, look);
@@ -156,7 +167,7 @@ function standing(ctx: Ctx, p: Pose, look: Look) {
 function sliding(ctx: Ctx, look: Look) {
   const hip: Pt = [0, -18];
   const lean = -1.15;
-  leg(ctx, [[-4, -20], [26, -18], [54, -14]], false);
+  leg(ctx, [[-4, -20], [26, -18], [54, -14]], false, look.boots);
   ctx.save();
   ctx.translate(hip[0], hip[1]);
   ctx.rotate(lean);
@@ -164,7 +175,7 @@ function sliding(ctx: Ctx, look: Look) {
   arm(ctx, [-16, -94], [-30, -60], false);
   body(ctx, look);
   ctx.restore();
-  leg(ctx, [[2, -16], [32, -12], [62, -8]], true);
+  leg(ctx, [[2, -16], [32, -12], [62, -8]], true, look.boots);
   const sh: Pt = [hip[0] + 18 * Math.cos(lean) + 42 * Math.sin(lean), hip[1] + 18 * Math.sin(lean) - 42 * Math.cos(lean)];
   const grip: Pt = [6, -40];
   sword(ctx, grip, -0.25);
@@ -173,16 +184,17 @@ function sliding(ctx: Ctx, look: Look) {
 
 export function bakeKnight(scene: Phaser.Scene) {
   const { stand, slide } = KNIGHT_FEET;
-  for (const id of KNIGHT_IDS) {
-    const look = LOOKS[id];
+  for (const [id, boots] of KNIGHT_IDS.flatMap((k) => [[k, false], [k, true]] as const)) {
+    const look = { ...LOOKS[id], boots };
+    const key = boots ? `${id}-gold` : id;
     for (const pose of Object.keys(POSES) as Exclude<KnightPose, 'slide'>[]) {
-      paint(scene, `${id}-${pose}`, stand.w, stand.h, (ctx) => {
+      paint(scene, `${key}-${pose}`, stand.w, stand.h, (ctx) => {
         ctx.translate(stand.x, stand.y);
         ctx.scale(S, S);
         standing(ctx, POSES[pose], look);
       });
     }
-    paint(scene, `${id}-slide`, slide.w, slide.h, (ctx) => {
+    paint(scene, `${key}-slide`, slide.w, slide.h, (ctx) => {
       ctx.translate(slide.x, slide.y);
       ctx.scale(S, S);
       sliding(ctx, look);

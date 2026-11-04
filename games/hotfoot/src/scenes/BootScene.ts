@@ -3,6 +3,7 @@ import { bakeFoes } from '../art/foes';
 import { bakeHud } from '../art/hud';
 import { bakeIcons } from '../art/icons';
 import { bakeKnight } from '../art/knight';
+import { bakePets } from '../art/pets';
 import { bakeScenery } from '../art/scenery';
 import { viewSize } from '../../../../shared/scaling';
 import { fitLayout } from './layout';
@@ -20,6 +21,7 @@ export class BootScene extends Phaser.Scene {
     bakeScenery(this);
     bakeFoes(this);
     bakeKnight(this);
+    bakePets(this);
     bakeIcons(this);
     bakeHud(this);
     this.scene.start('Game');

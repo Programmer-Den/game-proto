@@ -1,4 +1,5 @@
 import { BOSS } from './boss';
+import { CHALLENGES } from './challenges';
 import {
   AWAKE,
   CLOUD,
@@ -18,6 +19,7 @@ import {
   rand,
   seedOf,
   speedOf,
+  stats,
   terrainOf,
   type BossKind,
   type GameState,
@@ -186,6 +188,7 @@ function planOf(s: GameState, piece: Piece): Plan {
 export const dragonStage = (s: Pick<GameState, 'stageStart' | 'dragonBeaten'>) => !s.dragonBeaten && metres(s.stageStart) >= DRAGON_AT;
 
 export function buildStage(s: GameState) {
+  if (s.challenge) return buildChallenge(s);
   if (s.daily) s.seed = seedOf(`${s.daily}:${s.stage}`);
   if (dragonStage(s)) return buildBossStage(s, 'dragon');
   if (isBossStage(s.stage)) return buildBossStage(s, 'gate');
@@ -239,6 +242,27 @@ function buildBossStage(s: GameState, kind: BossKind) {
   s.terrain = 'road';
 }
 
+/**
+ * A challenge course: its row of pieces, laid by hand with an even gap between them on its own
+ * ground and at its stage's pace, the coins that come with them and a short row on the lead-in.
+ * Its banner is the finish, a clear stretch past the last piece. No shrine, dare, road or rockfall.
+ */
+function buildChallenge(s: GameState) {
+  const c = CHALLENGES[s.challenge!.index];
+  s.seed = seedOf(s.daily ?? `challenge:${s.challenge!.index}`);
+  s.terrain = c.terrain;
+  s.speed = speedOf(c.stage);
+  for (let i = 0; i < 5; i++) s.course.push({ id: s.nextId++, x: s.stageStart + 300 + i * 40, h: 12, pulled: false });
+  let x = s.stageStart + LEAD_IN;
+  for (const piece of c.pieces) {
+    const plan = planOf(s, piece);
+    plan.place(x);
+    x += plan.span + c.gap;
+  }
+  s.checkpointX = Math.round(x - c.gap + CLEAR_BEFORE_CHECKPOINT);
+  s.challenge!.coins = s.course.length;
+}
+
 /** Starts the stage after a checkpoint, right where the last one ended. */
 export function nextStage(s: GameState) {
   s.stage += 1;
@@ -249,6 +273,8 @@ export function nextStage(s: GameState) {
   s.dare = null;
   s.stageStart = s.checkpointX;
   s.checkpointX = s.stageStart + STAGE_LEN;
+  // The fox is ready again on every stage.
+  s.foxGuard = stats(s).fox;
   buildStage(s);
 }
 

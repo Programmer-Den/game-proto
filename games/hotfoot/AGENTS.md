@@ -37,7 +37,7 @@ in.
   (banked coins forge lasting upgrades: Iron Heart, Lodestone Charm, Squire's Purse), **cursed
   boons** (Cursed Gold, Glass Greaves, Iron Oath: from the second checkpoint one may take the
   second card, half the time; they trade something away and are never for sale) and the **daily
-  course** (a "Daily course" button on the game-over panel starts a run whose course and boons are
+  course** (a "Daily course" button in the Courses panel starts a run whose course and boons are
   drawn from a seed of the date, with its own best distance; it starts bare, without the armoury or
   a bought boon, so everyone runs it alike).
 - Round 2 upgrades: **forked roads** (from the checkpoint before stage 3, once the boon is taken,
@@ -67,6 +67,20 @@ in.
   keeps their own best and ghost; a daily course is always the knight's) and **the ghost runner**
   (`ghost.ts`: each knight's best ordinary run is recorded every 100 ms of running and plays back
   as a faint pale ghost of that knight, with a ring on the run track).
+- Round 4 loop extensions: **companions** (`pets.ts`: the owl, the hound and the fox, bought and
+  trained to level 3 with banked coins in the Companions panel, opened from the armoury; one, chosen
+  with "Take along", runs with the knight on ordinary runs only: the owl swoops on coins passed out
+  of reach (`PET_EACH.owl` px above or below the box), the hound barks at each trap within
+  `PET_EACH.hound` px ahead and marks it with a madder diamond on the road, and the fox takes a hit
+  once a stage, after the Aegis, keeping the streak from level 2 and taking two from level 3),
+  **challenge courses** (`challenges.ts`: ten hand-made courses, each a fixed row of pieces on its
+  own ground at a stage's pace with an even gap, run bare from the Courses panel to a finish banner;
+  stars for the banner, for no hit and for every coin (coins reach `CHALLENGE_REACH` px further
+  there), kept per course; every star of all ten wins the gold boots, gilded sabatons on every
+  knight; a challenge banks no coins and has "Try again") and **the weekly road** (`weekly.ts`: a
+  run seeded by the ISO week, starting bare with two boons drawn from the week, played as often as
+  you like for the week's best). The game-over panel's third button is "Courses", which opens the
+  Courses panel: the daily course, the weekly road and the ten challenge courses with their stars.
 - The art is an illuminated manuscript: a gothic miniature on vellum, painted on 2D canvases
   (`src/art/ink.ts`): a lapis-and-madder diapered sky with a gold-leaf moon, crags and a pink
   castle, lollipop trees, a turf road, ink outlines with white highlights, gold-leaf coins, a lapis
@@ -81,8 +95,8 @@ in.
   The Squire's Purse's starting coins (`purse`) are never banked: a fall banks `coins - purse`. One purchase at a time; Field Dressing
   and cursed boons are never for sale, and no boon is for sale before the first checkpoint. The
   "Armoury" button opens a panel over the game-over panel where the bank also buys armoury levels.
-- The best distance, the banked coins, a bought boon, the armoury's levels and the last daily
-  course's best persist. A run in progress is lost on
+- The best distance, the banked coins, a bought boon, the armoury's levels, the last daily
+  course's best, the companions, the week's best on the weekly road and the challenge stars persist. A run in progress is lost on
   reload; a bought boon waits in storage until a run starts with it.
 - No TODOs or FIXMEs in the code.
 
@@ -112,7 +126,9 @@ in.
   `check.ts` holds each trophy's condition on the `GameState` (`EARNED`: the first checkpoint,
   `STOMPS` 10 stomps in a run, a shrine used, a x5 streak, a boon pair, a dare met, a Gatekeeper
   beaten, `DISTANCE` 1,000 m in a run, every armoury item full, the dragon beaten) and
-  `checkTrophies(state)`, which `GameScene.update` calls every frame after `tick`. A new trophy is an
+  `checkTrophies(state)`, which `GameScene.update` calls every frame after `tick`. First banner is
+  never earned on a challenge course, which can start past stage 1 and has no checkpoint. Hotfoot
+  already has the most trophies a game may have (10), so the round 4 extensions add none. A new trophy is an
   entry in `index.ts`, its two texts in each language file and its condition in `EARNED`.
 - `src/main.ts`: creates the `Phaser.Game` (designed at 960x540, `Scale.FIT`, `pixelArt: false`) with `BootScene`
   then `GameScene`, calls `setupGame(game, { howToPlay, trophies })` and `setupScaling(game, { fill: true })` (see Screen scaling), and puts
@@ -133,13 +149,15 @@ in.
   `hoard`, `bulwark`), `canTake`, `freshState`, `metres`, and `trackOf` (the run track's numbers:
   metres run, best, track length, banners, metres to the next banner).
 - `src/game/sim.ts`: the rules. `newRun` (from a `Carry`: best, bank, pending boon, armoury,
-  crown; and a daily date or null), `jump`, `slide`, `tick`, `rollChoices`, `pick`, `pickRoad`,
-  `buyMissed`, `buyArmoury`, plus `runnerBox` and the private helpers: collision (`touches`), foe
+  crown, knights, the companion chosen and the companions' levels; a seed key or null; and a
+  `RunKind`: the mode, the challenge course, the weekly road's boons), `jump`, `slide`, `tick`,
+  `rollChoices`, `pick`, `pickRoad`, `buyMissed`, `buyArmoury`, `buyKnight`, `buyPet`, plus `runnerBox` and the private helpers: collision (`touches`), foe
   movement (`moveFoes`), stomping (`stomp`, with the hoard's coins), a boss's stomps and bumps
   (`bossContact`, which also crowns the knight), coins (`gainCoin`: the streak and its multiplier),
   the dare's progress and reward (`dared`, `meetDare`), shrines (`visitShrines`) and damage
   (`hurt`, which also takes `'wall'` for a ledge's side, `'boss'` and `'rock'`, resets the streak,
-  loses a no-hit dare and, with Bulwark, knocks foes away on a block).
+  loses a no-hit dare and, with Bulwark, knocks foes away on a block; the fox takes a hit after the
+  Aegis: a `fox` effect, no heart lost, the streak kept from its second level).
 - `src/game/boss.ts`: both bosses' numbers (`BOSS` by `BossKind`, each with its name as a
   `TextKey` and its `missiles`),
   `bossOf`, `MISSILES` (the thrown trap kinds), `moveBoss` (its modes and throws) and `bossStands`.
@@ -154,6 +172,17 @@ in.
   running), `ghostOf` (the finished run as a ghost if it went further than the old one) and
   `ghostAt` (the ghost's x, h and pose after a time running, or null past its end). Pure; the scene
   records and draws it.
+- `src/game/pets.ts`: the companions. `PetId` (`owl`, `hound`, `fox`), `PETS` (name, text and the
+  levels line as `TextKey`s, prices per level, the first buying the pet), `PET_IDS`, `PetLevels`,
+  `noPets`, `PET_EACH` (by level: the owl's reach, the hound's bark distance, the fox's hits a stage,
+  and `foxStreak`, the level from which the streak survives) and `nextPetPrice`. Read by `stats`.
+- `src/game/challenges.ts`: the challenge courses. `CHALLENGES` (name key, the `stage` whose pace and
+  pool rules apply, `terrain`, `gap`, `pieces`), `STAR` (the score bits: finish 1, no hit 2, every
+  coin 4), `starCount`, `ALL_STARS` (30), `totalStars`, `ChallengeRun` (`index`, `coins` laid, `got`,
+  `done`) and `starsOf`.
+- `src/game/weekly.ts`: `weekOf` (a date's ISO week, `YYYY-Www`), `weeklyKey` (`weekly:YYYY-Www`, the
+  run's seed key) and `weeklyBoons` (the week's two boons, drawn from its own seed among the boons
+  that can be sold).
 - `src/game/armoury.ts`: the `ARMOURY` table (name and text as `TextKey`s, price per level), `ARMOURY_EACH` (what a
   level adds), `noArmoury` and `nextPrice`.
 - `src/game/course.ts`: `buildStage` lays out a stage's pieces (`Piece`: each trap kind, `ledge`
@@ -162,15 +191,18 @@ in.
   `DARE.from` its dare and on a rockfall stage its rockfall; `planOf` sizes and places one piece,
   `piecesOf` is the pool per stage and road, `OPENING` is stage 1's fixed first four, `gapsOf` gives
   spacing per stage, road and the run after the dragon, `dragonStage` says whether a stage is the
-  dragon's, `buildBossStage` lays out a boss's stage (the road terrain, no road), `nextStage` moves
-  to the next stage (and sets its speed and terrain), and `roadChoiceDue` says whether a checkpoint
+  dragon's, `buildBossStage` lays out a boss's stage (the road terrain, no road), `buildChallenge`
+  lays out a challenge course (its pieces from `CHALLENGES` with its gap, five lead-in coins, the
+  finish banner `CLEAR_BEFORE_CHECKPOINT` past the last piece, and `challenge.coins`), `nextStage`
+  moves to the next stage (and sets its speed and terrain, and the fox's `foxGuard`), and `roadChoiceDue` says whether a checkpoint
   asks for a road (the next stage is ordinary and at least `ROAD.from`).
 - `src/game/boons.ts`: the `BOONS` table (name and text as `TextKey`s, `maxRank`, `filler`,
   `cursed`), `BOON_IDS`,
   `forSale` and `CURSE` (from which stage, how often).
 - `src/game/save.ts`: `loadProgress` and `saveProgress` (best distance, banked coins, the bought
   boon, the armoury, the daily best, the crown, the knights: unlocked, chosen and the squire's and
-  heavy knight's bests), `loadGhosts` and `saveGhosts` (each knight's ghost).
+  heavy knight's bests, the weekly best, the challenge stars, the companions' levels and the one
+  along), `loadGhosts` and `saveGhosts` (each knight's ghost).
 - `src/scenes/BootScene.ts`: fits the layout to the view (`fitLayout(viewSize)`), bakes every texture, then starts `Game`.
 - `src/scenes/GameScene.ts`: owns the `GameState`, wires input, ticks the sim and draws everything.
 - `src/scenes/layout.ts`: screen constants, laid out for the designed view (`DESIGN`, `DESIGN_GROUND_Y`) and
@@ -208,7 +240,14 @@ in.
   and the rockfall's `boulder`.
 - `src/art/knight.ts`: the knights' poses (`KnightPose`), painted for each knight by its `LOOKS`
   (surcoat, helm, a plume or the heavy knight's gold crest) as `<knight>-<pose>` (`knight-run0`,
-  `squire-jump`, `heavy-slide`...), and `KNIGHT_FEET` (texture sizes and where the feet are).
+  `squire-jump`, `heavy-slide`...), and again in the gold boots as `<knight>-gold-<pose>` (drawn
+  once every challenge star is won; the ghost keeps the plain ones), and `KNIGHT_FEET` (texture
+  sizes and where the feet are).
+- `src/art/pets.ts`: the companions facing right, two frames each (`owl-0`/`owl-1` wings up and
+  down, `hound-0`/`hound-1` and `fox-0`/`fox-1` the strides), sized and anchored by `PET_ART`, and
+  the fox's `fox-guard` ring. `GameScene.drawPet` places them: the hound and fox 60 px behind the
+  knight on the floor there (hopping 34 px over a trap underfoot), the owl 40 px behind and 104 px
+  over the knight's feet with a bob.
 - `src/art/icons.ts`: one 64x64 icon per boon (`iconTexture`), per road (`roadIcon`), the
   armoury's (`armouryIcon`: the purse's own, Iron Heart and Lodestone Charm reuse Hearty Ale's and
   Lodestone's), and the HUD's `heart-full` and `heart-empty`.
@@ -331,11 +370,27 @@ in.
   further than this knight's ghost. `drawGhost` places the `ghost` image (depth 4.9, `GHOST_LOOK`
   alpha and tint) with `ghostAt(ghost, state.time)` and its pose, and `drawHud` rings its place on
   the run track. Only `state.time` is used, so a checkpoint's rest keeps it in step.
+- Seeded runs: `GameState.mode` is `'run'`, `'daily'`, `'weekly'` or `'challenge'`; every kind but
+  `'run'` has its seed key in `daily` (the date, `weekly:YYYY-Www` or `challenge:N`), so everything
+  that keys on `daily` (`rand`, no armoury in `stats`, no companion, no ghost, the knight) treats
+  them alike. `GameScene.freshRun(mode, challenge)` builds each kind: the weekly road with
+  `weeklyBoons` at rank 1 and the week's best, a challenge with `challenge` set and its stage.
+  A challenge's `tick` ends at its banner (`challenge.done`, phase `over`), and `hurt` banks nothing
+  on a challenge. The Courses panel (`createCourses`, `drawCourses`) starts them with `restart`;
+  the Companions panel (`createPets`, `drawPets`) buys with `buyPet` and sets
+  `progress.pets.with` (`choosePet`).
+- The companions in `tick`: after the foes move, a hound (`stats().bark`) marks each trap whose left
+  edge is within that far ahead (`Trap.barked`) and adds one `bark` effect when any is new; in the
+  coin loop the owl (`stats().owl`) pulls a coin the knight's box is passing (from 30 px behind its
+  back to its front) that is no more than that far above or below it, with an `owl` effect; the fox
+  is `foxGuard`, set from `stats().fox` by `newRun` and `nextStage` and spent by `hurt`.
 - Saving (`persist`) happens in `update` whenever the phase changes away from `running` (checkpoint
   or fall), on each run's start (`create` and `restart`) and when a boon or armoury level is
   bought. `GameScene` keeps the loaded `Progress`; `persist` copies the run's bank, pending boon and
   armoury and unlocked knights into it, and its best into `progress.best` (the knight),
-  `progress.knights.best` (the squire or heavy knight) or, on a daily run, `progress.daily`.
+  `progress.knights.best` (the squire or heavy knight) or, on a daily run, `progress.daily`, on the
+  weekly road `progress.weekly`, and on a challenge course ORs `starsOf` into
+  `progress.challenges` (setting `boots` once every star is won, and `bootsNew` for the panel).
   `freshRun(daily)` builds the next run from it with `progress.knights.ride` (the knight on a daily
   course), chasing that knight's best or the daily best when the date matches.
 
@@ -418,7 +473,10 @@ in.
 and heavy knight's bests in metres) and `hotfoot-replays` (JSON of each knight's ghost, `{ m, at }`;
 the `-replays` suffix keeps it out of a progress code, so only a progress file carries it). Read once in
 `GameScene.create` via `loadProgress`, written by `saveProgress`; every access is wrapped in
-try/catch. `hotfoot-trophies` holds the trophies earned (`shared/trophies.ts`, each id with the time). Nothing
+try/catch. `hotfoot-weekly` (JSON `{ week, best }` of the last weekly road run, `week` as `YYYY-Www`),
+`hotfoot-challenges` (JSON array of each challenge course's best score as star bits, `STAR`) and
+`hotfoot-pets` (JSON `{ levels, with }`: each companion's level and the one along, or null).
+`hotfoot-trophies` holds the trophies earned (`shared/trophies.ts`, each id with the time). Nothing
 else is saved by the game; the hub's settings live under the shared `hub-settings`
 key (see Hub settings).
 
@@ -433,12 +491,15 @@ key (see Hub settings).
   `src/game/course.ts` (sizes and fire vent phases in `planOf`, ledge heights, `pickOf`, gap
   length) and in `rollChoices` in `src/game/sim.ts`. `placeShrine`, the bosses, the terrains, the
   roads' extra coins, the dare (`dareOf` goes round by stage) and the rockfall take no draws, and
-  the curse draw only happens from `CURSE.from` (stage 2). A met dare adds a third draw to
+  the curse draw only happens from `CURSE.from` (stage 2). A challenge course seeds from
+  `challenge:N` once, so its sizes and fire vents' phases are the same on every run; the weekly
+  road seeds its stages like a daily course from its key and draws its two boons from
+  `weekly:YYYY-Www:boons`. The companions take no draws. A met dare adds a third draw to
   `rollChoices`, from the second checkpoint on. The art
   uses `seeded()` from `ink.ts`, not `Math.random`.
 - Time comes only from the `time` argument of `GameScene.update` (the sim's `state.time` is the sum
-  of the `dt`s it was given). No timers, tweens or `Date.now`. The one use of the calendar is
-  `today()`, read when "Daily course" is tapped, to pick the day's seed.
+  of the `dt`s it was given). No timers, tweens or `Date.now`. The calendar is only read by
+  `today()`, read when "Daily course" is tapped, to pick the day's seed, and `weekOf()`, read when "Weekly road" is tapped or the Courses panel is drawn.
 
 ### Data tables
 
@@ -524,7 +585,10 @@ the stage), at most one sound of each kind a frame, so a row of coins or a volle
   barrel or fire), `bossHit` (the boss's hp drops), `bossDown` (the `gateBeaten` pop), `rock` (the
   rockfall catches the knight and falls back), `checkpoint` (the phase turns `checkpoint`), `pick`
   (a boon or road taken), `horn` (a new stage starts), `gust` (a gust starts blowing on the Sky Road), `sink` (a
-  cloud starts to fall), `again` (Run again or Daily course). Shared
+  cloud starts to fall), `bark` (a `bark` effect), `owl` (an `owl` effect), `fox` (a `fox`
+  effect; it counts as a hurt, so a pit's throw-out it took plays no `jump`), `cleared` (a challenge
+  course's banner reached, instead of the `lose` sting), `again` (Run again, Try again or a course
+  started from the Courses panel). Shared
   sounds: `ui('refuse')` for a shrine's refusal and a refused purchase, `ui('coin')` for a boon or
   armoury level bought, `ui('click')` for Armoury, Back and choosing an unlocked knight (`ui('coin')` for unlocking one).
 
@@ -542,7 +606,7 @@ the stage), at most one sound of each kind a frame, so a row of coins or a volle
   alpha, the "+N" coin pops and the shrine's "+1 heart" stay where they appear instead of rising,
   the streak's sparkle trail is not drawn, the Gatekeeper's flash after a stomp is held at 0.6
   alpha, the snow and wind streaks, the dragon's tail lash bob, the boulders' roll and the
-  rockfall's dust are drawn still, the lit fire vents and the dragon's rolling fire keep one frame
+  rockfall's dust are drawn still, the owl holds still with its wings up, the lit fire vents and the dragon's rolling fire keep one frame
   (`flames-lit0`, `fire-0`) instead of flickering, and the bats keep one wing frame with no bob, and a cloud about to fall doesn't tremble.
 - Normal must stay exactly as designed: the playthrough runs on Normal and its `STAGE_1` expects 3
   hearts.
@@ -635,6 +699,14 @@ the stage), at most one sound of each kind a frame, so a row of coins or a volle
   rule is `isRockStage`.
 - Add a cursed boon: a `BOONS` entry with `cursed: true` and `maxRank: 1`, its gift and price in
   `stats`, and an icon; `rollChoices` offers it on its own.
+- Add a companion: a `PetId`, a `PETS` entry (texts in the `i18n/` files) and its row in
+  `PET_EACH` in `pets.ts`, its number in `stats` and its effect in `tick` or `hurt`, its art in
+  `pets.ts` (`PET_ART`, `DRAW`) and a cell x in `ARMOURY_PANEL.knightX` (three fit the Companions
+  panel), and its cue in `cues.ts`.
+- Add or change a challenge course: an entry in `CHALLENGES` (keep the gap at least `gapsOf(stage).min`
+  and every coin within reach: `CHALLENGE_REACH` makes a whole arc takeable with a well-timed leap),
+  its name in the `i18n/` files, and a cell in the Courses panel (two rows of five fit; `ALL_STARS`
+  follows the table). A course's layout only changes when its pieces, gap or stage change.
 - Add an armoury item: an `ARMOURY` entry and `ARMOURY_EACH` value, its effect in `stats` or
   `newRun`, an icon (`ARMOURY_ICONS` in `icons.ts` unless a boon's fits), and a row y in
   `ARMOURY_PANEL.rowY`.

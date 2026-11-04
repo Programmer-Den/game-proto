@@ -18,12 +18,12 @@ const en: HowToPlay = {
       action: 'Choose the High Road or the Low Road for the next stage',
     },
     {
-      input: 'Run again or Daily course',
-      action: "After a fall, start a new run or the day's own course",
+      input: 'Run again or Courses',
+      action: "After a fall, start a new run, or pick the day's course, the week's road or a challenge course",
     },
     {
       input: 'Armoury',
-      action: 'After a fall, spend banked coins on lasting upgrades and other knights, and choose who runs',
+      action: 'After a fall, spend banked coins on lasting upgrades, other knights and companions, and choose who runs',
     },
   ],
   loop: [
@@ -44,6 +44,9 @@ const en: HowToPlay = {
     "Beyond the Dragon's Keep the Sky Road crosses gaps on clouds: land on one and leap off before it falls. A gust at your back carries jumps further.",
     'The squire jumps again in the air but has a heart fewer; the heavy knight smashes goblins and bats but jumps lower.',
     'Your best run races beside you as a faint ghost.',
+    'A companion runs along on ordinary runs: the owl grabs coins out of reach, the hound barks before a trap, the fox takes a hit once a stage.',
+    'Each challenge course pays three stars: reach its banner, with no hit, with every coin. Every star wins the gold boots.',
+    'The weekly road is the same all week and starts with two set boons: run it as often as you like for a best distance.',
   ],
 };
 
@@ -73,12 +76,12 @@ const de: HowToPlay = {
       action: 'Den Höhenweg oder den Talweg für die nächste Etappe wählen',
     },
     {
-      input: 'Neuer Lauf oder Tagesstrecke',
-      action: 'Nach einem Sturz einen neuen Lauf oder die Strecke des Tages beginnen',
+      input: 'Neuer Lauf oder Strecken',
+      action: 'Nach einem Sturz einen neuen Lauf beginnen, oder die Strecke des Tages, den Weg der Woche oder eine Prüfungsstrecke wählen',
     },
     {
       input: 'Rüstkammer',
-      action: 'Nach einem Sturz gesparte Münzen für dauerhafte Verbesserungen und andere Ritter ausgeben, und wählen, wer läuft',
+      action: 'Nach einem Sturz gesparte Münzen für dauerhafte Verbesserungen, andere Ritter und Gefährten ausgeben, und wählen, wer läuft',
     },
   ],
   loop: [
@@ -99,6 +102,9 @@ const de: HowToPlay = {
     'Jenseits der Drachenfeste führt die Himmelsstraße auf Wolken über Lücken: lande auf einer und spring ab, ehe sie fällt. Eine Böe im Rücken trägt Sprünge weiter.',
     'Der Knappe springt in der Luft erneut, hat aber ein Herz weniger; der schwere Ritter zermalmt Kobolde und Fledermäuse, springt aber niedriger.',
     'Dein bester Lauf läuft als blasser Geist neben dir mit.',
+    'Ein Gefährte läuft bei gewöhnlichen Läufen mit: die Eule schnappt Münzen außer Reichweite, der Jagdhund bellt vor einer Falle, der Fuchs fängt einmal pro Etappe einen Treffer ab.',
+    'Jede Prüfungsstrecke bringt drei Sterne: erreiche ihr Banner, ohne Treffer, mit jeder Münze. Alle Sterne gewinnen die goldenen Stiefel.',
+    'Der Wochenweg bleibt die ganze Woche gleich und beginnt mit zwei festen Gaben: lauf ihn so oft du willst für einen Rekord.',
   ],
 };
 
