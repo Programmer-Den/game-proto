@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { GameScene } from './scenes/GameScene';
+import { RaceScene } from './scenes/RaceScene';
 import { VIEW } from './scenes/layout';
 import { setupGame } from '../../../shared/setupGame';
 import { howToPlay } from './howToPlay';
@@ -17,7 +18,7 @@ const game = new Phaser.Game({
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
-  scene: [GameScene],
+  scene: [GameScene, RaceScene],
 });
 setupGame(game, { howToPlay, trophies });
 setupScaling(game, { fill: true });

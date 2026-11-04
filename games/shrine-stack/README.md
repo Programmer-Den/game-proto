@@ -14,7 +14,9 @@ next tier's stone. A curse taken with a blessing doubles a tier's favor, tier 10
 favor, and finishing tier 12 crowns the shrine. After the crown you can keep building into a windy
 sky. A crown opens a new site to build on (a windy cliff, then a lake where the raft bobs), each
 with its own crown height and best, and raises your patron's rank, which strengthens their boon. The
-daily shrine gives every player the same patron and stones, one try a day.
+daily shrine gives every player the same patron and stones, one try a day. Every crown also brings
+pilgrims, whose favor builds a village that gives later temples a head start; later runs can bring
+rain or snow for more favor; and two players can race two temples side by side on one screen.
 
 ![Building the gilded tenth tier](cover.png)
 
@@ -25,6 +27,8 @@ daily shrine gives every player the same patron and stones, one try a day.
 | Tap or click a patron card | Start the temple under that patron |
 | Hill, Cliff, Lake | Before the first stone: build on another site, once a crown has opened it |
 | Daily shrine | Before the first stone: play today's shrine, one try a day |
+| Village | Before the first stone: open the pilgrims' village and build an inn, a well or a mason's yard with its favor |
+| Race | Before the first stone: start a two-player race; the left player taps the left half (or A), the right player the right half (or L) |
 | Tap or click anywhere | Drop the swinging stone |
 | Swap (R) | From tier 2: put the stone in hand in reserve, or swap it with the one held (once per tier) |
 | Tap or click a blessing card | Keep that blessing after a balanced tier |
@@ -103,6 +107,28 @@ daily shrine gives every player the same patron and stones, one try a day.
     takes the next one early). Ranks don't count in it, and its crown ends the run. You get one try a
     day; the button then shows today's height and your streak of days in a row, and the end panel
     your best.
+20. **The pilgrims' village**: every crown (not in the daily) brings 5 pilgrims, who settle below the
+    shrine and bring the favor the temple held at the crown. The Village button under the sites
+    spends it on three buildings, once each, which help every later temple on any site (not the
+    daily or a race): the **Inn** (60 favor) starts each temple with a free blessing, drawn from
+    those the patron allows; the **Well** (30) starts it with 10 favor; the **Mason's yard** (45)
+    makes the first stone 20 wider. The built ones, and the pilgrims, stand on the hill and the cliff.
+21. **Weather**: once a shrine has been crowned, half the runs bring weather, shown on the patron
+    screen before the first stone (and in the daily, the same for everyone). **Rain** slides a stone
+    that isn't perfect 6 pixels further off as it lands, so it cuts more; **Snow** sways the swing,
+    up to 40% slower and faster, once every 2.4 seconds. Either way every favor the run earns is
+    multiplied by 1.5.
+22. **Two-player race**: two temples side by side on one screen, each player tapping their own half
+    (or A and L). Both get the same stones, with no patron and no breaks between tiers; the first to
+    crown the shrine at tier 12 wins, and if a stone misses, the other temple wins.
+
+![The pilgrims' village](docs/screenshots/village.webp)
+
+![Rain over a temple, with the village below](docs/screenshots/rain-village.webp)
+
+![Snow on the patron screen](docs/screenshots/weather-snow.webp)
+
+![A two-player race](docs/screenshots/race.webp)
 
 ![Choosing a patron for the temple](docs/screenshots/playthrough-0-patrons.webp)
 
@@ -225,8 +251,8 @@ page).
 ## Playthrough test
 
 `e2e/playthrough.spec.ts` plays the first round in headless Chromium: it checks the new temple
-waits for a patron (on the hill, the only site open, with every patron unranked and the daily
-shrine's button left alone), takes the first of the two offered and checks its rule, checks that the first
+waits for a patron (on the hill, the only site open, with every patron unranked, clear weather, an empty village and
+the daily shrine's button left alone), takes the first of the two offered and checks its rule, checks that the first
 stone swings, drops each of the first tier's three stones with a tap while it is
 over the stone below (checking that a second tap while it falls drops nothing), checks the balanced
 tier's favor and its three blessings (four under the Many-Handed), taps Reroll and checks it cost 5
@@ -249,15 +275,17 @@ All paths are inside `games/shrine-stack/`.
   reserve, trials, the lean, perfect chains, materials, patrons, curses, the gilded tier, the goal
   and the endless sky, the sites, the patrons' ranks and the daily's seeded chances, `blessings.ts`
   the blessing names and texts, `catalog.ts` the shop items, stone kinds, trials, curses,
-  materials, patrons and sites, and `save.ts` the best height on each site, the sites open and the
-  patrons' ranks.
+  materials, patrons, sites, weathers and village buildings, and `save.ts` the best height on each
+  site, the sites open, the patrons' ranks and the village.
 - `src/trophies/`: the trophies (`index.ts`), their texts (`i18n/`) and when each is earned
   (`check.ts`).
 - `src/scenes/`: `GameScene` draws the sky, the temple, the panel with the patron, the goal track,
   the next stone, the reserve, the trial, the curse and the lean meter, the patron cards with the
   site row and the daily shrine's button, the hill, cliff or lake under the temple, the
   blessing cards, the reroll button, the material row, the curse toggle and the shop, gusts, the
-  crown, and the end panel and wires taps to the rules; `layout.ts` says where things are drawn.
+  crown, and the end panel and wires taps to the rules, plus the village screen, the village on the
+  ground and the rain or snow; `RaceScene` draws the two-player race; `layout.ts` says where things
+  are drawn.
 - `src/ui/`: the button.
 
 Balance numbers (swing speed, the perfect window, the balance share, favor) are the constants at

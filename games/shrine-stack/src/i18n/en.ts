@@ -87,9 +87,9 @@ const en = {
 
   // The daily shrine
   dailyName: 'Daily shrine',
-  dailyReady: 'Same patron and stones for all today · best {best} · streak {streak}',
-  dailyUnfinished: 'Played today: come back tomorrow',
-  dailyDone: { one: 'Today: {n} tier · streak {streak}: come back tomorrow', other: 'Today: {n} tiers · streak {streak}: come back tomorrow' },
+  dailyReady: 'One try today · best {best} · streak {streak}',
+  dailyUnfinished: 'Played: come back tomorrow',
+  dailyDone: { one: 'Today: {n} tier · streak {streak}', other: 'Today: {n} tiers · streak {streak}' },
   dailyBest: 'Daily best {best} · streak {streak}',
 
   // Panel
@@ -178,6 +178,57 @@ const en = {
   bestOn: { one: 'Best ({site}): {n} tier.', other: 'Best ({site}): {n} tiers.' },
   crownedText: 'All {tiers} tiers stand,\n{balanced} of them balanced, for {favour} favour.',
   keepAsk: 'Keep building into the windy sky?',
+
+  // Weather (SS15): name and what it does
+  clearName: 'Clear skies',
+  clearText: 'No weather this run',
+  rainName: 'Rain',
+  rainText: 'Stones that are not perfect slide {n} pixels further off · x{mult} favour',
+  snowName: 'Snow',
+  snowText: 'The swing slows down and speeds up · x{mult} favour',
+  weatherLine: '{weather}: {text}',
+  weatherTag: '{weather} · x{mult} favour',
+
+  // The pilgrims' village (SS14)
+  innName: 'Inn',
+  innText: 'Every temple starts with a free blessing.',
+  wellName: 'Well',
+  wellText: 'Every temple starts with {n} favour.',
+  yardName: "Mason's yard",
+  yardText: 'The first stone is {n} wider.',
+  villageName: 'Village',
+  villageNote: { one: '{n} pilgrim · {favour} favour', other: '{n} pilgrims · {favour} favour' },
+  villageEmpty: 'Crown a shrine first',
+  villageTitle: "The pilgrims' village",
+  villageSub: {
+    one: '{n} pilgrim has settled · {favour} favour to spend',
+    other: '{n} pilgrims have settled · {favour} favour to spend',
+  },
+  villageHint: 'Every crown brings pilgrims and the favour the temple held. Not in the daily or a race.',
+  buildingBuilt: 'Built',
+  buildingCost: 'Build: {n} favour',
+  back: 'Back',
+  pilgrimsArrive: {
+    one: '{n} pilgrim settles below with {favour} favour.',
+    other: '{n} pilgrims settle below with {favour} favour.',
+  },
+  innGift: 'The inn sends {blessing} with you',
+
+  // Two-player race (SS16)
+  raceName: 'Race',
+  raceNote: '2 players · one screen',
+  raceLeft: 'Left: tap this side or A',
+  raceRight: 'Right: tap this side or L',
+  raceTier: 'Tier {tier}/{goal}',
+  raceGo: 'Race to tier {goal}: crown first, or keep standing when the other misses',
+  raceWinLeft: 'The left temple wins!',
+  raceWinRight: 'The right temple wins!',
+  raceDraw: 'Both temples fell at once',
+  raceDrawText: 'A draw: race again?',
+  raceCrowned: 'Crowned first, at {tiers} tiers.',
+  raceLast: 'The other temple fell first, at {tiers} tiers.',
+  raceAgain: 'Race again',
+  raceBack: 'Back',
 };
 
 export default en;
