@@ -11,6 +11,19 @@ import { ACID_COLOR, BURN_COLOR, CRATE_COLORS, OPERATION_COLORS, OUTPOST_COLORS,
 import { Pool } from '../game/pool';
 import {
   ACID_SLOW,
+  NO_OUTPOST,
+  DAILY,
+  LOYALTY,
+  TOWNS,
+  callSign,
+  dailyAdapt,
+  dailyScore,
+  nextTown,
+  openLaneX,
+  promote,
+  rankMult,
+  townOpen,
+  type Veteran,
   ADAPT,
   ADAPTS,
   BASE_STATS,
@@ -38,7 +51,6 @@ import {
   MAX_COMPANIONS,
   MEDKIT,
   OPERATION_BONUS,
-  OPERATION_KINDS,
   OPERATIONS,
   OUTPOST,
   OUTPOST_KINDS,
@@ -102,6 +114,7 @@ import {
   loadOperation,
   loadOperationBests,
   loadOutpost,
+  loadRoster,
   loadScrap,
   loadStyle,
   saveBest,
@@ -109,11 +122,13 @@ import {
   saveOperation,
   saveOperationBests,
   saveOutpost,
+  saveRoster,
   saveScrap,
   saveStyle,
   type ArtStyle,
 } from '../game/save';
 import { HUD_DEPTH, Hud, fireRate } from './Hud';
+import { finishDaily, loadDaily, seeded, seedOf, startDaily, today, type DailyRecord } from '../../../../shared/daily';
 import { checkBlast, checkTrophies } from '../trophies/check';
 // Text objects go by `t` in this scene, so the translator goes by `tr`.
 import { t as tr, type TextKey } from '../i18n';
@@ -122,6 +137,8 @@ const DEPTH = {
   ground: 0, sandbags: 5, splats: 8, acid: 8.5, ringUnder: 9, drums: 10, pickups: 11, dark: 19, enemies: 20, hero: 40,
   bullets: 45, muzzle: 46, fx: 47, moon: 48, bars: 50, overlay: 90, labels: 92, pops: 95, hud: HUD_DEPTH,
 };
+/** Where Two Bridges' wreck stands in each blocked lane. */
+const WRECK_Y = 300;
 /** How long a fallen enemy's splat stays on the road, in ms. */
 const SPLAT_MS = 900;
 /** One BLAM! lettered over the squad every this many volleys (comic only). */
@@ -335,6 +352,19 @@ export interface GameState {
   operationBests: Record<OperationKind, number>;
   /** What the horde answers the squad with this wave (null before wave 8, or when no stat stands out). */
   adapt: Adapt | null;
+  /** The squad's veterans (saved), the call signs picked to start the next run, and those who started this one. */
+  roster: Veteran[];
+  picked: string[];
+  brought: string[];
+  /** Each companion's call sign (null for one from a crate or the outpost) and rank, in squad order like `roles`. */
+  names: (string | null)[];
+  ranks: number[];
+  /** A town won for the first time pays its bounty; the town that win opened (null if none). */
+  bounty: number;
+  opened: OperationKind | null;
+  /** Today's daily stand (null off the daily), and the score this run ended with. */
+  daily: DailyRecord | null;
+  dailyScore: number;
 }
 
 export class GameScene extends Phaser.Scene {
@@ -399,6 +429,12 @@ export class GameScene extends Phaser.Scene {
   private moon!: Phaser.GameObjects.Rectangle;
   /** Bullet hits on zombies, counted for the headshot perk. */
   private bulletHits = 0;
+  /** The day the daily stand is seeded by, and the source the wave draws from. */
+  private day = '';
+  private waveRand: () => number = Math.random;
+  /** Two Bridges' wrecks over the blocked lanes, and the fog bank over the far road. */
+  private wrecks: Phaser.GameObjects.Image[] = [];
+  private fog!: Phaser.GameObjects.Rectangle;
   private keys!: { left: Phaser.Input.Keyboard.Key[]; right: Phaser.Input.Keyboard.Key[] };
   private static backdrop: Backdrop | null = null;
 
@@ -451,19 +487,56 @@ export class GameScene extends Phaser.Scene {
       nextOperation: 'road',
       operationBests: loadOperationBests(),
       adapt: null,
+      roster: [],
+      picked: [],
+      brought: [],
+      names: [],
+      ranks: [],
+      bounty: 0,
+      opened: null,
+      daily: null,
+      dailyScore: 0,
     };
-    this.state.nextOperation = this.state.operation;
+    const s0 = this.state, roster = loadRoster();
+    s0.roster = roster.vets;
+    s0.picked = roster.picked.map((i) => roster.vets[i].name);
+    // The daily stand is one try a day: once today's is used, the run falls back to the Open Road.
+    this.day = today();
+    if (s0.operation === 'daily') {
+      if (loadDaily(DAILY.game, this.day).played) s0.operation = 'road';
+      else s0.daily = startDaily(DAILY.game, this.day);
+    } else if (!townOpen(s0.operation, s0.operationBests)) s0.operation = 'road';
+    s0.daily ??= loadDaily(DAILY.game, this.day);
+    const daily = s0.operation === 'daily';
+    this.state.nextOperation = daily ? 'road' : this.state.operation;
     // An operation shows its own best (waves cleared) in place of the Open Road's.
     if (this.state.operation !== 'road') this.state.best = this.bestAtStart = this.state.operationBests[this.state.operation];
-    // The starting crates bought last run are spent now; they count towards the perks.
-    saveKit([]);
+    // The veterans picked on the roster start in the squad, with their roles and ranks (not on the
+    // daily, which every player starts the same).
+    if (!daily) {
+      for (const name of s0.picked) {
+        const v = s0.roster.find((r) => r.name === name);
+        if (!v) continue;
+        s0.stats = applyUpgrade(s0.stats, 'companion');
+        s0.roles.push(v.role);
+        s0.names.push(v.name);
+        s0.ranks.push(v.rank);
+        s0.brought.push(v.name);
+      }
+    }
+    // The starting crates bought last run are spent now; they count towards the perks. The daily
+    // leaves them for the run after it.
+    if (daily) {
+      s0.nextKit = s0.startKit;
+      s0.startKit = [];
+    } else saveKit([]);
     for (const kind of this.state.startKit) {
       this.state.stats = applyUpgrade(this.state.stats, kind);
       this.state.collected[kind]++;
     }
     this.state.perks = perksOf(this.state.collected);
     // The outpost: sandbag walls and medkits to start with, and veteran companions (Gunners).
-    const o = this.state.outpost;
+    const o = daily ? NO_OUTPOST : this.state.outpost;
     this.state.sandbags = o.barricade;
     this.state.medkits = o.medic;
     for (let i = 0; i < o.veteran; i++) this.state.stats = applyUpgrade(this.state.stats, 'companion');
@@ -508,6 +581,7 @@ export class GameScene extends Phaser.Scene {
     this.scan = this.add.image(FIELD.x, FIELD.y, '__DEFAULT').setOrigin(0).setDepth(DEPTH.overlay);
     this.dark = this.fieldRect(0x05040c, 0.55).setDepth(DEPTH.dark).setVisible(false);
     this.moon = this.fieldRect(0xc01a1a, 0.16).setDepth(DEPTH.moon).setVisible(false);
+    this.fog = this.add.rectangle(FIELD.x, FIELD.y, FIELD.w, CONDITION.fogY - FIELD.y, 0xc8d0d8, 0.5).setOrigin(0).setDepth(DEPTH.moon).setVisible(false);
     this.grain = this.add.tileSprite(FIELD.x, FIELD.y, FIELD.w, FIELD.h, '__DEFAULT').setOrigin(0).setDepth(DEPTH.overlay + 1);
 
     const text = (depth: number) => this.add.text(0, 0, '').setOrigin(0.5).setDepth(depth).setVisible(false);
@@ -565,6 +639,15 @@ export class GameScene extends Phaser.Scene {
       () => ({ alive: false, id: 0, hp: 0, maxHp: 0, x: 0, y: 0, sprite: this.add.image(0, 0, '__DEFAULT'), label: text(DEPTH.labels) }),
       (v) => [v.sprite, v.label].forEach((o) => o.setVisible(false)),
     );
+    // Two Bridges: a wreck blocks the lanes the horde can't come down.
+    const lanes = OPERATIONS[s0.operation].lanes;
+    this.wrecks = [];
+    LANES.forEach(({ x0, x1 }, lane) => {
+      if (!lanes || lanes.includes(lane)) return;
+      const w = this.skin(this.add.image((x0 + x1) / 2, WRECK_Y, '__DEFAULT'), 'wall').setDepth(DEPTH.enemies + WRECK_Y / VIEW.h);
+      w.setScale(w.scaleX * ((x1 - x0) / GEOM.wall.w), w.scaleY * 1.4);
+      this.wrecks.push(w);
+    });
     // Starting crates bought with scrap: a companion one brings its soldier in at once.
     this.addCompanions();
 
@@ -654,6 +737,7 @@ export class GameScene extends Phaser.Scene {
     this.scan.setTexture(nv ? tex('nv', 'scan') : '__DEFAULT').setDisplaySize(FIELD.w, FIELD.h).setVisible(nv);
     if (nv) this.grain.setTexture(tex('nv', 'grain')).setTileScale(GRAIN_TILE / this.grain.frame.width);
     this.grain.setVisible(nv).setAlpha(0.9);
+    this.styleFog();
     // In the comic the blast ring is painted on the road under the horde; in night vision it is
     // part of the overlay, over the scanlines.
     for (const d of this.drums.all) d.ring.setDepth(nv ? DEPTH.labels - 1 : DEPTH.ringUnder);
@@ -785,16 +869,23 @@ export class GameScene extends Phaser.Scene {
     // anything before wave 6, so the first waves are the same as without conditions.
     // An operation can fix the condition (Lights Out's blackout); then nothing is drawn for it.
     const op = OPERATIONS[this.state.operation];
-    this.state.condition = op.condition ?? drawCondition(wave);
+    // The daily stand draws every wave from the day's seed, the same for every player, in a fixed
+    // order: the horde's answer, the condition, the plan and the supply drop.
+    const daily = this.state.operation === 'daily';
+    const rand = (this.waveRand = daily ? seeded(seedOf(`${DAILY.game}:${this.day}:${wave}`)) : Math.random);
+    const adapt = daily ? dailyAdapt(wave, rand) : null;
+    this.state.condition = op.condition ?? drawCondition(wave, rand, op.conditionFrom);
     // From wave 8 the horde answers the squad's strongest stat.
-    this.state.adapt = wave >= ADAPT.fromWave ? adaptTo(this.state.stats) : null;
-    this.plan = planWave(wave, Math.random, this.state.condition, {
+    this.state.adapt = daily ? adapt : wave >= ADAPT.fromWave ? adaptTo(this.state.stats) : null;
+    this.plan = planWave(wave, rand, this.state.condition, {
       extraDrums: this.state.outpost.depot,
       drums: op.drums,
       survivors: op.survivors,
       survivorsFrom: op.survivorsFrom,
       adapt: this.state.adapt,
     });
+    // Two Bridges: the horde only comes down the open lanes.
+    if (op.lanes) for (const sp of this.plan) if (sp.type === 'enemy' && !sp.flank) sp.x = openLaneX(sp.x, op.lanes);
     this.waveClock = 0;
     this.bossClock = 0;
     this.bossAct = null;
@@ -830,7 +921,7 @@ export class GameScene extends Phaser.Scene {
     if (s.phase !== 'wave') playMusic(SONG, 'calm');
     else if (s.bossKind) playMusic(BOSS_SONG, 'boss');
     else if (s.frenzyMs > 0) playMusic(SONG, 'frenzy');
-    else playMusic(SONG, s.condition === 'blackout' || s.condition === 'bloodmoon' ? 'dark' : 'battle');
+    else playMusic(SONG, s.condition === 'blackout' || s.condition === 'bloodmoon' || s.condition === 'fog' ? 'dark' : 'battle');
   }
 
   /** The blackout's dark and the blood moon's red cast come and go with the wave's condition. */
@@ -838,6 +929,14 @@ export class GameScene extends Phaser.Scene {
     const c = this.state.condition;
     this.dark.setVisible(c === 'blackout');
     this.moon.setVisible(c === 'bloodmoon');
+    this.fog.setVisible(c === 'fog');
+    this.styleFog();
+  }
+
+  /** The fog bank is a pale grey in the comic and a green haze in night vision. */
+  private styleFog() {
+    if (this.style === 'comic') this.fog.setFillStyle(0xc8d0d8, 0.5);
+    else this.fog.setFillStyle(0x7acf8a, 0.22);
   }
 
   /**
@@ -845,6 +944,8 @@ export class GameScene extends Phaser.Scene {
    * the hero during a blackout.
    */
   private visibility(x: number, y: number) {
+    // In fog only the lower road can be seen, fading in over 70px above `fogY`.
+    if (this.state.condition === 'fog') return Phaser.Math.Clamp((y - CONDITION.fogY + 70) / 70, 0, 1);
     if (this.state.condition !== 'blackout') return 1;
     const d = Math.hypot(x - this.player.x, y - HERO.y), r = CONDITION.blackoutRadius;
     return Phaser.Math.Clamp((r + 70 - d) / 70, 0, 1);
@@ -1007,7 +1108,7 @@ export class GameScene extends Phaser.Scene {
       b.hit.length = 0;
       b.sprite.setPosition(b.x, b.y).setRotation(angle).setVisible(true);
       // A grenade and a marksman's round show bigger than a bullet.
-      b.sprite.setScale(this.unit(b.sprite) * (b.grenade ? 2 : b.mult > 1 ? 1.5 : 1));
+      b.sprite.setScale(this.unit(b.sprite) * (b.grenade ? 2 : b.mult >= MARKSMAN.mult ? 1.5 : 1));
     };
     while (this.fireClock >= interval) {
       this.fireClock -= interval;
@@ -1016,11 +1117,13 @@ export class GameScene extends Phaser.Scene {
       for (let i = 0; i <= this.squad.length; i++) {
         const x = this.player.x + SQUAD_SLOTS[i].dx, y = HERO.y + SQUAD_SLOTS[i].dy - 30;
         const role = i === 0 ? 'gunner' : this.state.roles[i - 1];
+        // A veteran's rank adds to the damage of their bullets.
+        const rank = i === 0 ? 1 : rankMult(this.state.ranks[i - 1] ?? 0);
         if (role === 'marksman') {
           if (this.volleys % MARKSMAN.every) continue;
           const t = this.toughestEnemy(y);
-          shoot(x, y, t ? Math.atan2(t.x - x, y - t.y) : 0, { mult: MARKSMAN.mult, pierce: MARKSMAN.pierce });
-        } else if (!this.survivorAhead(x, y)) shoot(x, y, 0, { grenade: role === 'grenadier' && this.volleys % GRENADE.every === 0 });
+          shoot(x, y, t ? Math.atan2(t.x - x, y - t.y) : 0, { mult: MARKSMAN.mult * rank, pierce: MARKSMAN.pierce });
+        } else if (!this.survivorAhead(x, y)) shoot(x, y, 0, { mult: rank, grenade: role === 'grenadier' && this.volleys % GRENADE.every === 0 });
         if (i === 0) for (let k = 1; k <= this.state.pellets; k++) [-1, 1].forEach((side) => shoot(x, y, side * k * SHOTGUN.angle));
         this.effect('muzzle', x, y, { life: 70 });
       }
@@ -1419,7 +1522,7 @@ export class GameScene extends Phaser.Scene {
     let struck = false, blocked = false, bounced = false;
     for (const b of this.bullets.all) {
       if (!b.alive) continue;
-      const damage = this.state.stats.damage * b.mult;
+      const damage = Math.round(this.state.stats.damage * b.mult);
       // Swept along the stretch from prevY up to y, so a long frame can't carry a bullet through a
       // target; the nearest ones (largest y) are hit first. Survivors are in the way like zombies.
       const sx = b.x - b.prevX, sy = b.y - b.prevY, len2 = sx * sx + sy * sy || 1;
@@ -1653,6 +1756,8 @@ export class GameScene extends Phaser.Scene {
   /** Brings in companions until the squad matches the stats, each in the next free slot (a Gunner unless a role was picked). */
   private addCompanions() {
     while (this.state.roles.length < this.state.stats.companions) this.state.roles.push('gunner');
+    while (this.state.names.length < this.state.roles.length) this.state.names.push(null);
+    while (this.state.ranks.length < this.state.roles.length) this.state.ranks.push(0);
     while (this.squad.length < this.state.stats.companions) {
       const slot = SQUAD_SLOTS[this.squad.length + 1];
       const c = this.skin(this.add.image(this.player.x + slot.dx, HERO.y + slot.dy, '__DEFAULT'), 'companion').setDepth(this.squadDepth(this.squad.length + 1));
@@ -1723,14 +1828,15 @@ export class GameScene extends Phaser.Scene {
         saveScrap(this.state.bank + this.state.scrap);
         this.showBanner(tr('waveCleared', { wave: this.state.wave }));
         sfx('cleared');
-        this.recordOperation(this.state.wave);
-        // An operation's last wave cleared wins it.
+        // An operation's last wave cleared wins it (a town's first win pays its bounty).
         const op = OPERATIONS[this.state.operation];
-        if (op.waves && this.state.wave >= op.waves) this.completeOperation();
+        const first = this.state.operationBests[this.state.operation] < (op.waves ?? Infinity);
+        this.recordOperation(this.state.wave);
+        if (op.waves && this.state.wave >= op.waves) this.completeOperation(first);
         // A boss leaves a supply drop behind: the game waits for a pick.
         else if (isBossWave(this.state.wave)) {
           this.state.phase = 'supply';
-          this.state.offer = supplyPick(this.state.pellets >= SHOTGUN.maxPairs);
+          this.state.offer = supplyPick(this.state.pellets >= SHOTGUN.maxPairs, this.waveRand);
           this.showSupply();
           sfx('supply');
           this.music();
@@ -1961,6 +2067,7 @@ export class GameScene extends Phaser.Scene {
     // The run's scrap goes in the bank, to spend on starting crates and the outpost.
     this.state.bank += this.state.scrap;
     saveScrap(this.state.bank);
+    this.finishDaily(this.state.wave - 1);
     playMusic(SONG, 'calm');
     playSting(SONG, 'lose');
     this.updateHud();
@@ -1971,17 +2078,53 @@ export class GameScene extends Phaser.Scene {
   /** An operation's best is the most of its waves cleared; saved as soon as a run beats it. */
   private recordOperation(cleared: number) {
     const s = this.state;
-    if (s.operation === 'road' || cleared <= s.operationBests[s.operation]) return;
+    if (s.operation === 'road' || s.operation === 'daily' || cleared <= s.operationBests[s.operation]) return;
     s.operationBests = { ...s.operationBests, [s.operation]: cleared };
     s.best = cleared;
     saveOperationBests(s.operationBests);
   }
 
   /** The operation's last wave is cleared: the run ends as a win, its scrap paid `OPERATION_BONUS` times. */
-  private completeOperation() {
-    const s = this.state;
-    s.payout = Math.round(s.scrap * OPERATION_BONUS);
+  private completeOperation(first: boolean) {
+    const s = this.state, op = OPERATIONS[s.operation];
+    s.bounty = first && op.bounty ? op.bounty : 0;
+    s.payout = Math.round(s.scrap * OPERATION_BONUS) + s.bounty;
+    // A won town opens the next one down the road, and the next run goes there.
+    const next = nextTown(s.operation);
+    if (next) {
+      s.opened = first ? next : null;
+      s.nextOperation = next;
+      saveOperation(next);
+    }
+    this.finishDaily(op.waves ?? 0);
     this.endAsWin();
+  }
+
+  /** Ends today's daily stand with its score (waves cleared and scrap). */
+  private finishDaily(cleared: number) {
+    const s = this.state;
+    if (s.operation !== 'daily') return;
+    s.dailyScore = dailyScore(s.scrap, cleared);
+    s.daily = finishDaily(DAILY.game, s.dailyScore, this.day);
+  }
+
+  /**
+   * A won run (not the daily): the veterans who started it rank up, and the survivors who joined
+   * it go on the roster. The picks for the next run stay the same veterans.
+   */
+  private promoteSquad() {
+    const s = this.state;
+    if (s.operation === 'daily') return;
+    const brought = s.brought.map((n) => s.roster.findIndex((v) => v.name === n)).filter((i) => i >= 0);
+    const recruits = s.names.flatMap((name, i) => (name && !s.brought.includes(name) ? [{ name, role: s.roles[i] }] : []));
+    s.roster = promote(s.roster, brought, recruits);
+    s.picked = s.picked.filter((n) => s.roster.some((v) => v.name === n));
+    this.saveRoster();
+  }
+
+  private saveRoster() {
+    const s = this.state;
+    saveRoster({ vets: s.roster, picked: s.picked.map((n) => s.roster.findIndex((v) => v.name === n)).filter((i) => i >= 0) });
   }
 
   /** A rectangle over the whole view (`FIELD`), for a shade or a tint. */
@@ -2010,19 +2153,25 @@ export class GameScene extends Phaser.Scene {
     const op = OPERATIONS[s.operation], onOp = s.operation !== 'road';
     const shade = this.fieldRect(comic ? 0x15121a : 0x000000, comic ? 0.6 : 0.65).setDepth(DEPTH.hud + 1);
     const won = s.extracted;
-    const winTitle = onOp ? tr(comic ? 'operationWon' : 'nvOperationWon') : tr(comic ? 'extracted' : 'nvExtracted');
+    const winTitle = s.operation === 'evac' ? tr(comic ? 'evacuated' : 'nvEvacuated') : onOp ? tr(comic ? 'operationWon' : 'nvOperationWon') : tr(comic ? 'extracted' : 'nvExtracted');
     const title = this.add.text(VIEW.w / 2, 120, won ? winTitle : tr(comic ? 'overrun' : 'nvOverrun')).setOrigin(0.5).setDepth(DEPTH.hud + 2);
     if (comic) this.font(title, won ? 46 : 52, won ? '#8cd05a' : '#e8402a', { stroke: th.ink, sw: 9 });
     else this.font(title, 30, won ? '#6ae06a' : th.warn, { glow: won ? '#6ae06a' : th.warn });
     const medal = medalOf(s.best), opBest = { op: tr(op.label), best: s.best, waves: op.waves ?? 0 };
-    const best = onOp
-      ? medal ? tr('opBestMedal', { ...opBest, medal: tr(medal) }) : tr('opBest', opBest)
-      : s.wave >= s.best && this.bestAtStart < s.wave ? tr('aNewBest') : tr('bestWave', { wave: s.best });
+    const daily = s.daily;
+    const best = s.operation === 'daily' && daily
+      ? tr('dailyResult', { score: s.dailyScore, best: daily.best, n: daily.streak })
+      : s.opened ? tr('townOpened', { town: tr(OPERATIONS[s.opened].label) })
+        : onOp
+          ? medal ? tr('opBestMedal', { ...opBest, medal: tr(medal) }) : tr('opBest', opBest)
+          : s.wave >= s.best && this.bestAtStart < s.wave ? tr('aNewBest') : tr('bestWave', { wave: s.best });
     const bonus = onOp ? OPERATION_BONUS : EXTRACT.bonus(s.wave);
-    const scrap = won ? tr('scrapPaid', { scrap: s.scrap, bonus, payout: s.payout, bank: s.bank }) : tr('scrapBanked', { scrap: s.scrap, bank: s.bank });
+    const scrap = won
+      ? s.bounty ? tr('scrapPaidBounty', { scrap: s.scrap, bonus, bounty: s.bounty, payout: s.payout, bank: s.bank }) : tr('scrapPaid', { scrap: s.scrap, bonus, payout: s.payout, bank: s.bank })
+      : tr('scrapBanked', { scrap: s.scrap, bank: s.bank });
     const reached = tr(won ? (onOp ? 'heldTo' : 'gotOut') : 'reached', { wave: s.wave, n: s.kills });
     const info = this.add
-      .text(VIEW.w / 2, 158, `${reached}\n${best}\n${scrap}`, { align: 'center' })
+      .text(VIEW.w / 2, 158, `${reached}\n${best}\n${scrap}`, { align: 'center', wordWrap: { width: VIEW.w - 30, useAdvancedWrap: true } })
       .setOrigin(0.5, 0)
       .setDepth(DEPTH.hud + 2);
     const body = (t: Phaser.GameObjects.Text, size: number, color = comic ? '#fff8e8' : th.text) =>
@@ -2073,15 +2222,69 @@ export class GameScene extends Phaser.Scene {
       const note = `${tr(OUTPOST[kind].detail).toUpperCase()}\n${level}`;
       button(x, y, 220, 54, OUTPOST_COLORS[kind], lv > 0, afford, tr(OUTPOST[kind].label).toUpperCase(), note, () => this.buyOutpost(kind));
     });
-    // The operation the next run plays: the Open Road, or a 10-wave operation with its own rules.
+    // The next run: the Open Road or today's daily stand, then the towns down the road.
     heading(568, tr('operationHeading'), tr('nvOperationHeading'));
-    OPERATION_KINDS.forEach((kind, i) => {
-      const w = 160, x = 18 + i * (w + 11), y = 586, rec = s.operationBests[kind], m = medalOf(rec);
-      const waves = OPERATIONS[kind].waves ?? 0;
-      const record = kind === 'road' ? tr('bestWaveCaps', { wave: kind === s.operation ? s.best : this.roadBest() }) : m ? tr('opRecordMedal', { best: rec, waves, medal: tr(m).toUpperCase() }) : tr('opRecord', { best: rec, waves });
-      button(x, y, w, 76, OPERATION_COLORS[kind], s.nextOperation === kind, true, tr(OPERATIONS[kind].label).toUpperCase(), `${tr(OPERATIONS[kind].detail)}\n${record}`, () => this.pickOperation(kind));
+    const road = tr('bestWaveCaps', { wave: s.operation === 'road' ? s.best : this.roadBest() });
+    const line = (kind: OperationKind) => tr(OPERATIONS[kind].detail).replace(/\n/g, ' ');
+    button(18, 584, 246, 54, OPERATION_COLORS.road, s.nextOperation === 'road', true, tr('opRoad').toUpperCase(), `${line('road')}\n${road}`, () => this.pickOperation('road'));
+    const played = !!daily && daily.played;
+    const dailyNote = !daily ? '' : daily.score !== null ? tr('dailyDone', { score: daily.score, n: daily.streak }) : played ? tr('dailyUsed') : tr('dailyOpen', { best: daily.best, n: daily.streak });
+    button(276, 584, 246, 54, OPERATION_COLORS.daily, s.nextOperation === 'daily', !played, tr('opDaily').toUpperCase(), `${line('daily')}\n${dailyNote}`, () => this.pickOperation('daily'));
+    // The road map: each town a 10-wave stand with its own twist, opened by winning the one before.
+    heading(652, tr('roadMapHeading'), tr('nvRoadMapHeading'));
+    const tw = 94, gap = (VIEW.w - 36 - TOWNS.length * tw) / (TOWNS.length - 1);
+    TOWNS.forEach((kind, i) => {
+      const x = 18 + i * (tw + gap), y = 668, h = 78, open = townOpen(kind, s.operationBests), lit = s.nextOperation === kind;
+      const col = OPERATION_COLORS[kind], rec = s.operationBests[kind], m = medalOf(rec), waves = OPERATIONS[kind].waves ?? 0;
+      // The road between the towns.
+      if (i > 0) {
+        if (comic) g.fillStyle(num(th.ink)).fillRect(x - gap - 1, y + 36, gap + 2, 6);
+        else g.fillStyle(num(th.accent), 0.6).fillRect(x - gap, y + 38, gap, 2);
+      }
+      if (comic) {
+        g.fillStyle(num(th.ink)).fillRect(x + 3, y + 3, tw, h);
+        g.fillStyle(num(lit ? col : open ? '#fff8e8' : '#8a8494')).fillRect(x, y, tw, h);
+        g.fillStyle(num(col)).fillRect(x, y, tw, 7);
+        g.lineStyle(2.5, num(th.ink)).strokeRect(x, y, tw, h);
+      } else {
+        g.fillStyle(num(lit ? col : '#020a05'), lit ? 0.3 : 0.8).fillRoundedRect(x, y, tw, h, 3);
+        g.lineStyle(1.5, num(open ? col : th.muted), open ? 1 : 0.5).strokeRoundedRect(x, y, tw, h, 3);
+        g.fillStyle(num(col), open ? 1 : 0.4).fillRect(x + 6, y + 4, tw - 12, 3);
+      }
+      const ink = comic ? th.ink : open ? th.text : th.muted;
+      const n = this.add.text(x + tw / 2, y + 18, `${i + 1}. ${tr(OPERATIONS[kind].label).toUpperCase()}`).setOrigin(0.5).setDepth(DEPTH.hud + 3);
+      this.fit(this.font(n, 12, ink, comic ? {} : { glow: ink }), tw - 8);
+      const d = this.add.text(x + tw / 2, y + 28, tr(OPERATIONS[kind].detail), { align: 'center' }).setOrigin(0.5, 0).setDepth(DEPTH.hud + 3);
+      this.fit(this.font(d, 9, comic ? th.ink : open ? th.accent : th.muted), tw - 8);
+      const record = !open ? tr('townLocked') : m ? tr('opRecordMedal', { best: rec, waves, medal: tr(m).toUpperCase() }) : tr('opRecord', { best: rec, waves });
+      const r = this.add.text(x + tw / 2, y + h - 11, record).setOrigin(0.5).setDepth(DEPTH.hud + 3);
+      this.fit(this.font(r, 9, comic ? th.ink : open ? th.text : th.muted), tw - 8);
+      objs.push(n, d, r);
+      this.shop.push({ act: () => (open ? this.pickOperation(kind) : ui('refuse')), x, y, w: tw, h });
     });
-    const again = this.add.text(VIEW.w / 2, 702, tr('tapToStart', { op: tr(OPERATIONS[s.nextOperation].label) })).setOrigin(0.5).setDepth(DEPTH.hud + 2);
+    // The roster: veterans who lived through a won run; two picked start the next one.
+    heading(762, s.roster.length ? tr('rosterHeading', { n: LOYALTY.picks }) : tr('rosterEmpty'), s.roster.length ? tr('nvRosterHeading', { n: LOYALTY.picks }) : tr('rosterEmpty'));
+    const cw = 77, cgap = (VIEW.w - 36 - LOYALTY.size * cw) / (LOYALTY.size - 1);
+    s.roster.forEach((v, i) => {
+      const x = 18 + i * (cw + cgap), y = 778, h = 44, lit = s.picked.includes(v.name), col = ROLE_COLORS[v.role];
+      if (comic) {
+        g.fillStyle(num(th.ink)).fillRect(x + 3, y + 3, cw, h);
+        g.fillStyle(num(lit ? col : '#fff8e8')).fillRect(x, y, cw, h);
+        g.lineStyle(2, num(th.ink)).strokeRect(x, y, cw, h);
+      } else {
+        g.fillStyle(num(lit ? col : '#020a05'), lit ? 0.3 : 0.8).fillRoundedRect(x, y, cw, h, 3);
+        g.lineStyle(1.5, num(lit ? th.text : th.accent)).strokeRoundedRect(x, y, cw, h, 3);
+      }
+      const ink = comic ? th.ink : th.text;
+      const n = this.add.text(x + cw / 2, y + 12, v.name.toUpperCase()).setOrigin(0.5).setDepth(DEPTH.hud + 3);
+      this.fit(this.font(n, 12, ink, comic ? {} : { glow: ink }), cw - 6);
+      const r = this.add.text(x + cw / 2, y + 31, `${tr(ROLES[v.role].label).toUpperCase()}\n${'★'.repeat(v.rank)}`, { align: 'center' }).setOrigin(0.5).setDepth(DEPTH.hud + 3);
+      r.setLineSpacing(-2);
+      this.fit(this.font(r, 9, comic ? th.ink : th.accent), cw - 6);
+      objs.push(n, r);
+      this.shop.push({ act: () => this.pickVeteran(v.name), x, y, w: cw, h });
+    });
+    const again = this.add.text(VIEW.w / 2, 840, tr('tapToStart', { op: tr(OPERATIONS[s.nextOperation].label) })).setOrigin(0.5).setDepth(DEPTH.hud + 2);
     body(again, 18);
     objs.push(again);
     this.overText = objs;
@@ -2133,8 +2336,26 @@ export class GameScene extends Phaser.Scene {
     this.redrawGameOver();
   }
 
-  /** Picks the operation the next run plays. */
+  /** Picks a veteran to start the next run, or puts one back; at most `LOYALTY.picks`. */
+  private pickVeteran(name: string) {
+    const s = this.state;
+    if (s.picked.includes(name)) s.picked = s.picked.filter((n) => n !== name);
+    else if (s.picked.length < LOYALTY.picks) s.picked = [...s.picked, name];
+    else {
+      ui('refuse');
+      return;
+    }
+    ui('click');
+    this.saveRoster();
+    this.redrawGameOver();
+  }
+
+  /** Picks the operation the next run plays: today's daily only while its try is unused. */
   private pickOperation(kind: OperationKind) {
+    if (kind === 'daily' && this.state.daily?.played) {
+      ui('refuse');
+      return;
+    }
     ui('click');
     this.state.nextOperation = kind;
     saveOperation(kind);
@@ -2229,6 +2450,7 @@ export class GameScene extends Phaser.Scene {
     this.bossCall.setVisible(false);
     s.bank += s.payout;
     saveScrap(s.bank);
+    this.promoteSquad();
     playMusic(SONG, 'calm');
     playSting(SONG, 'win');
     this.updateHud();
@@ -2328,12 +2550,16 @@ export class GameScene extends Phaser.Scene {
     sfx('confirm');
     s.stats = applyUpgrade(s.stats, 'companion');
     s.roles.push(role);
+    // A survivor who joins gets a call sign: one who lives through a won run joins the roster.
+    s.names.push(callSign([...s.roster.map((v) => v.name), ...s.names.filter((n): n is string => !!n)]));
+    s.ranks.push(0);
     this.addCompanions();
     for (const o of this.supplyUi) o.destroy();
     this.supplyUi = [];
     this.roleCards = [];
     s.phase = this.rolePrev;
-    this.pop(tr(this.style === 'comic' ? 'roleJoins' : 'nvRoleJoins', { role: tr(ROLES[role].label).toUpperCase() }), SURVIVOR_COLOR);
+    const name = s.names[s.names.length - 1] ?? '';
+    this.pop(tr(this.style === 'comic' ? 'roleJoins' : 'nvRoleJoins', { role: `${name.toUpperCase()}, ${tr(ROLES[role].label).toUpperCase()}` }), SURVIVOR_COLOR);
     this.refreshBackdrop();
   }
 }

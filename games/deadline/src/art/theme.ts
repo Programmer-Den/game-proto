@@ -22,7 +22,9 @@ export const BURN_COLOR = '#ff8a2a';
 /** The squad roles' colours (badges and cards in the comic), the outpost upgrades' and the operations' bands. */
 export const ROLE_COLORS: Record<Role, string> = { gunner: '#4ab0ff', grenadier: '#ff9a3a', marksman: '#b48aff' };
 export const OUTPOST_COLORS: Record<OutpostKind, string> = { barricade: '#e0c088', medic: '#5ad07a', depot: '#ff8a2a', veteran: '#4ab0ff' };
-export const OPERATION_COLORS: Record<OperationKind, string> = { road: '#ffd23f', hospital: '#5ad07a', lightsout: '#8a8ae8' };
+export const OPERATION_COLORS: Record<OperationKind, string> = {
+  road: '#ffd23f', hospital: '#5ad07a', lightsout: '#8a8ae8', fogbank: '#a8b8c4', bridges: '#e8a04a', evac: '#e8709a', daily: '#4ac0e8',
+};
 
 export interface Theme {
   /** Font family for Phaser text, and its style ('italic bold' or 'bold'). */

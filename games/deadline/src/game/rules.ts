@@ -159,20 +159,23 @@ export const SURVIVOR = { fromWave: 3, speed: 44, steer: 30, radius: 12, hp: (wa
  * Wave conditions: from wave `fromWave` each wave draws one of these (or none).
  * - blackout: zombies and survivors can only be seen within `blackoutRadius` px of the hero;
  * - bloodmoon: runners move `bloodMoonRunner` times as fast;
- * - shortage: the squad fires `shortageFire` times slower, and `shortageDrums` more fuel drums roll down.
+ * - shortage: the squad fires `shortageFire` times slower, and `shortageDrums` more fuel drums roll down;
+ * - fog (never drawn, only the Fogbank town has it): zombies and survivors can only be seen below
+ *   `fogY`, the lower part of the road.
  */
-export type Condition = 'clear' | 'blackout' | 'bloodmoon' | 'shortage';
+export type Condition = 'clear' | 'blackout' | 'bloodmoon' | 'shortage' | 'fog';
 /** The name and effect of each condition but the clear one, which has nothing to show. */
 export const CONDITIONS: Record<Exclude<Condition, 'clear'>, { label: TextKey; detail: TextKey }> = {
   blackout: { label: 'conditionBlackout', detail: 'conditionBlackoutDetail' },
   bloodmoon: { label: 'conditionBloodmoon', detail: 'conditionBloodmoonDetail' },
   shortage: { label: 'conditionShortage', detail: 'conditionShortageDetail' },
+  fog: { label: 'conditionFog', detail: 'conditionFogDetail' },
 };
-export const CONDITION = { fromWave: 6, blackoutRadius: 250, bloodMoonRunner: 1.5, shortageFire: 1.4, shortageDrums: 2 };
+export const CONDITION = { fromWave: 6, blackoutRadius: 250, bloodMoonRunner: 1.5, shortageFire: 1.4, shortageDrums: 2, fogY: 420 };
 const CONDITION_DRAWS: Condition[] = ['clear', 'blackout', 'bloodmoon', 'shortage'];
 /** The wave's condition: none before `CONDITION.fromWave`, then one draw among the four (one of them clear). */
-export function drawCondition(wave: number, rand: () => number = Math.random): Condition {
-  return wave < CONDITION.fromWave ? 'clear' : CONDITION_DRAWS[Math.floor(rand() * CONDITION_DRAWS.length)];
+export function drawCondition(wave: number, rand: () => number = Math.random, from: number = CONDITION.fromWave): Condition {
+  return wave < from ? 'clear' : CONDITION_DRAWS[Math.floor(rand() * CONDITION_DRAWS.length)];
 }
 
 /**
@@ -286,11 +289,17 @@ export const MARKSMAN = { every: 3, mult: 3, pierce: 2 };
  * with extraction; an operation is `waves` waves long under a fixed rule set, won by clearing its
  * last wave (paying the run's scrap `OPERATION_BONUS` times over). Each operation keeps its own
  * best (the most waves cleared) and the medal that earns.
+ *
+ * The operations are towns down the road (`TOWNS`, the road map): Hospital is open from the start,
+ * and winning a town opens the next one, paying its `bounty` in scrap the first time. The last is
+ * the evacuation. The daily stand is a 10-wave run of its own, seeded by the day (see `DAILY`).
  * - survivors: how many walk down each wave, from wave `survivorsFrom`;
  * - drums: whether fuel drums roll down at all;
- * - condition: the condition every wave has (null: drawn as usual from wave 6).
+ * - condition: the condition every wave has (null: drawn as usual from `conditionFrom`, wave 6);
+ * - lanes: the lanes the horde comes down (every lane when left out): the rest are blocked by a wreck;
+ * - bounty: the scrap the first win pays on top.
  */
-export type OperationKind = 'road' | 'hospital' | 'lightsout';
+export type OperationKind = 'road' | 'hospital' | 'lightsout' | 'fogbank' | 'bridges' | 'evac' | 'daily';
 export interface Operation {
   label: TextKey;
   detail: TextKey;
@@ -299,14 +308,101 @@ export interface Operation {
   survivorsFrom: number;
   drums: boolean;
   condition: Condition | null;
+  conditionFrom?: number;
+  lanes?: number[];
+  bounty?: number;
 }
 export const OPERATIONS: Record<OperationKind, Operation> = {
   road: { label: 'opRoad', detail: 'opRoadDetail', waves: null, survivors: 1, survivorsFrom: SURVIVOR.fromWave, drums: true, condition: null },
-  hospital: { label: 'opHospital', detail: 'opHospitalDetail', waves: 10, survivors: 2, survivorsFrom: 1, drums: false, condition: null },
-  lightsout: { label: 'opLightsout', detail: 'opLightsoutDetail', waves: 10, survivors: 1, survivorsFrom: SURVIVOR.fromWave, drums: true, condition: 'blackout' },
+  hospital: { label: 'opHospital', detail: 'opHospitalDetail', waves: 10, survivors: 2, survivorsFrom: 1, drums: false, condition: null, bounty: 60 },
+  lightsout: { label: 'opLightsout', detail: 'opLightsoutDetail', waves: 10, survivors: 1, survivorsFrom: SURVIVOR.fromWave, drums: true, condition: 'blackout', bounty: 90 },
+  fogbank: { label: 'opFogbank', detail: 'opFogbankDetail', waves: 10, survivors: 1, survivorsFrom: SURVIVOR.fromWave, drums: true, condition: 'fog', bounty: 120 },
+  bridges: { label: 'opBridges', detail: 'opBridgesDetail', waves: 10, survivors: 1, survivorsFrom: SURVIVOR.fromWave, drums: true, condition: null, lanes: [0, 2], bounty: 160 },
+  evac: { label: 'opEvac', detail: 'opEvacDetail', waves: 10, survivors: 2, survivorsFrom: 2, drums: true, condition: null, conditionFrom: 1, bounty: 250 },
+  daily: { label: 'opDaily', detail: 'opDailyDetail', waves: 10, survivors: 1, survivorsFrom: SURVIVOR.fromWave, drums: true, condition: null },
 };
 export const OPERATION_KINDS = Object.keys(OPERATIONS) as OperationKind[];
 export const OPERATION_BONUS = 2;
+/** The road map: the towns in the order they open, ending in the evacuation. */
+export const TOWNS: OperationKind[] = ['hospital', 'lightsout', 'fogbank', 'bridges', 'evac'];
+export const isTown = (kind: OperationKind) => TOWNS.includes(kind);
+/**
+ * Whether a town on the road map can be picked: the first always, the others once the town before
+ * them is won (or once they have been played, so a save from before the road map keeps them).
+ */
+export function townOpen(kind: OperationKind, bests: Record<OperationKind, number>) {
+  const i = TOWNS.indexOf(kind);
+  if (i < 0) return true;
+  const prev = TOWNS[i - 1];
+  return i === 0 || bests[prev] >= (OPERATIONS[prev].waves ?? 0) || bests[kind] > 0;
+}
+/** The town a win opens next, or null after the evacuation (or off the road map). */
+export const nextTown = (kind: OperationKind) => (isTown(kind) ? (TOWNS[TOWNS.indexOf(kind) + 1] ?? null) : null);
+/**
+ * Where a zombie planned at x comes in when only `lanes` are open: a blocked lane's zombie moves
+ * across to the nearest open lane, keeping its place in that lane. No draws.
+ */
+export function openLaneX(x: number, lanes: number[] | undefined) {
+  if (!lanes) return x;
+  const lane = laneAt(x);
+  if (lanes.includes(lane)) return x;
+  const to = lanes.reduce((a, b) => (Math.abs(laneMid(b) - x) < Math.abs(laneMid(a) - x) ? b : a));
+  const from = LANES[lane], into = LANES[to], k = (x - from.x0) / (from.x1 - from.x0);
+  return Math.round(into.x0 + 12 + k * (into.x1 - into.x0 - 24));
+}
+
+/**
+ * The daily stand: the same 10 waves for every player on the same day, one try a day
+ * (`shared/daily.ts`). Each wave draws from its own seeded source (`dailyWaveRand`), in a fixed
+ * order: the horde's answer, the condition, the plan, the supply drop. The horde's answer is drawn
+ * from `ADAPT.fromWave` (the same for everyone, not read from the squad). No starting crates,
+ * outpost upgrades or veterans come along, so every player starts the same. The score is the run's
+ * scrap plus `perWave` for each wave cleared.
+ */
+export const DAILY = { game: 'deadline', perWave: 100 };
+export const dailyScore = (scrap: number, cleared: number) => scrap + DAILY.perWave * cleared;
+
+/**
+ * Squad loyalty: a survivor who joins the squad and lives through a won run (a town, or an Open Road
+ * extraction; not the daily) stays on the roster with their role and rank 1. Two picked from the
+ * roster start the next run in the squad, and each win they live through raises their rank, up to
+ * `maxRank`: every rank adds `damage` to their bullets' damage. The roster keeps `size` veterans;
+ * a new one past that takes the place of the lowest rank.
+ */
+export const LOYALTY = { size: 6, picks: 2, maxRank: 3, damage: 0.2 };
+export interface Veteran {
+  name: string;
+  role: Role;
+  rank: number;
+}
+/** Call signs for veterans, in the order they are handed out. */
+export const CALL_SIGNS = ['Ash', 'Brick', 'Cole', 'Dusty', 'Echo', 'Flint', 'Gator', 'Hawk', 'Iris', 'Jinx', 'Knox', 'Lark', 'Moss', 'Nova', 'Onyx', 'Pike'];
+/** The first call sign no one in `taken` has (numbered once all are used). */
+export function callSign(taken: string[]) {
+  for (let n = 1; ; n++) {
+    const sign = CALL_SIGNS.find((c) => !taken.includes(n > 1 ? `${c} ${n}` : c));
+    if (sign) return n > 1 ? `${sign} ${n}` : sign;
+  }
+}
+/** How much more damage a veteran of `rank` does. */
+export const rankMult = (rank: number) => 1 + LOYALTY.damage * rank;
+/**
+ * The roster after a won run: the veterans brought along rank up, and the survivors who joined
+ * this run come in at rank 1, taking the place of the lowest-ranked veteran once the roster is full.
+ */
+export function promote(roster: Veteran[], brought: number[], recruits: { name: string; role: Role }[]): Veteran[] {
+  const next = roster.map((v, i) => (brought.includes(i) ? { ...v, rank: Math.min(LOYALTY.maxRank, v.rank + 1) } : v));
+  for (const r of recruits) {
+    if (next.length >= LOYALTY.size) {
+      let low = 0;
+      next.forEach((v, i) => v.rank < next[low].rank && (low = i));
+      if (next[low].rank > 1) continue;
+      next.splice(low, 1);
+    }
+    next.push({ name: r.name, role: r.role, rank: 1 });
+  }
+  return next;
+}
 /** The medals an operation's best earns: waves cleared out of its 10. */
 export const MEDALS: { label: TextKey; cleared: number }[] = [
   { label: 'medalGold', cleared: 10 },
@@ -331,6 +427,9 @@ export const ADAPTS: Record<Adapt, { label: TextKey }> = {
   flanks: { label: 'adaptFlanks' },
 };
 export const ADAPT = { fromWave: 8, minScore: 2, every: 4 };
+export const ADAPT_KINDS = Object.keys(ADAPTS) as Adapt[];
+/** The daily stand's horde answer: drawn from the day's seed, the same for every player. */
+export const dailyAdapt = (wave: number, rand: () => number): Adapt | null => (wave >= ADAPT.fromWave ? ADAPT_KINDS[Math.floor(rand() * ADAPT_KINDS.length)] : null);
 export function adaptTo(stats: Stats): Adapt | null {
   const rate = Math.round(Math.log(BASE_STATS.fireInterval / stats.fireInterval) / Math.log(1.25));
   const scores: [Adapt, number][] = [['armour', stats.pierce], ['shields', rate], ['flanks', Math.floor(stats.companions / 2)]];
