@@ -891,7 +891,9 @@ ${played ? t('weeklyDone', { total }) : t('weeklyLine', { day: day + 1, total })
     // A single long word (German names on the narrow cards) can't wrap, so it shrinks to fit.
     if (name.width > room) name.setScale(room / name.width);
     const line = worn ? t('worn') : open ? t('wear') : t(STYLE_INFO[style].goal);
-    this.add_(this.add.text(tx, y + 14, line, { fontFamily: th.font, fontSize: '13px', color: textColor, wordWrap: { width: w - (tx - x + w / 2) - 10 } }).setOrigin(0, 0.5).setDepth(UI_DEPTH + 2));
+    const goal = this.add_(this.add.text(tx, y + 14, line, { fontFamily: th.font, fontSize: '13px', color: textColor, wordWrap: { width: w - (tx - x + w / 2) - 10 } }).setOrigin(0, 0.5).setDepth(UI_DEPTH + 2));
+    // A long goal on a locked card rises so its foot stays above the Locked tag (its top is about h / 2 - 30 down).
+    if (!open) goal.setY(Math.min(y + 14, y + h / 2 - 32 - goal.height / 2));
   }
 
   /** A stamp: two rings and a tick, in one colour. */

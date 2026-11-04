@@ -756,6 +756,9 @@ export class GameScene extends Phaser.Scene {
     if (!this.hushed) this.playEvents(events);
     this.hushed = false;
     for (const e of events) {
+      // A cell's flourish shows only on its own comb; a hive in the background caps and hatches unseen.
+      const cellEvent = e.kind === 'built' || e.kind === 'capped' || e.kind === 'harvested' || e.kind === 'hatched';
+      if (cellEvent && hiveOf(e.slot) !== this.hive) continue;
       if (e.kind === 'built' || e.kind === 'capped') {
         const c = cellCentre(e.slot);
         if (!settings.reduceMotion) {
