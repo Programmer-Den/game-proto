@@ -6,11 +6,11 @@ import { sharpRes } from '../../../../shared/scaling';
 import { DUNGEONS, TILE, tileAt, underBoulder, type MapDef, type Tile } from '../game/maps';
 import { paint, shade } from './paint';
 
-/** The ground of each place; on the peaks the grass is snow and the path trodden snow. */
-const GRASS: Record<string, string> = { village: '#4f7a46', woods: '#3f6a40', fen: '#3d6a5a', shrine: '#4a4a56', belfry: '#44505a', peaks: '#9aa8bc', caverns: '#48566a' };
-const PATH: Record<string, string> = { village: '#b49a72', woods: '#8f7c5c', fen: '#8a7a5a', shrine: '#6a6a74', belfry: '#62707a', peaks: '#7c8698', caverns: '#5a6a80' };
-/** Flagstones: the shrine's grey, the belfry's drowned blue, the caverns' ice, and the peaks' old lookout. */
-const FLOOR: Record<string, string> = { shrine: '#55535e', belfry: '#4a5868', caverns: '#58708a', peaks: '#62666e' };
+/** The ground of each place; on the peaks the grass is snow and the path trodden snow, on the coast sand and wet sand. */
+const GRASS: Record<string, string> = { village: '#4f7a46', woods: '#3f6a40', fen: '#3d6a5a', shrine: '#4a4a56', belfry: '#44505a', peaks: '#9aa8bc', caverns: '#48566a', coast: '#a8987a', grotto: '#3e5a5a' };
+const PATH: Record<string, string> = { village: '#b49a72', woods: '#8f7c5c', fen: '#8a7a5a', shrine: '#6a6a74', belfry: '#62707a', peaks: '#7c8698', caverns: '#5a6a80', coast: '#7a6c58', grotto: '#4e6a6a' };
+/** Flagstones: the shrine's grey, the belfry's drowned blue, the caverns' ice, the peaks' old lookout and the grotto's wet green rock. */
+const FLOOR: Record<string, string> = { shrine: '#55535e', belfry: '#4a5868', caverns: '#58708a', peaks: '#62666e', grotto: '#4a6462' };
 
 function rng(seed: number) {
   return () => {

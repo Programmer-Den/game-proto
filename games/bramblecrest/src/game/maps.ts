@@ -1,6 +1,6 @@
-// The places of the three chapters, built in code from rectangles and lines on a grid of
+// The places of the four chapters, built in code from rectangles and lines on a grid of
 // TILE-pixel tiles: Mossford (the village), Bramble Woods, Glimmer Fen, the Sunken Shrine, the
-// Drowned Belfry, the Hollow Peaks and the Glass Caverns.
+// Drowned Belfry, the Hollow Peaks, the Glass Caverns, the Tidewrack Coast and the Brine Grotto.
 // Everything that is not ground (houses, lamps, people, foes, chests, posts) is listed beside the
 // tiles. Tile coordinates count from the map's top-left corner.
 
@@ -39,18 +39,21 @@ export const CUTTABLE: ReadonlySet<Tile> = new Set<Tile>(['bush', 'thorns']);
 /** Tiles a bursting bellseed breaks: boulders outdoors and cracked walls indoors. */
 export const BREAKABLE: ReadonlySet<Tile> = new Set<Tile>(['boulder', 'crack']);
 
-export type MapId = 'village' | 'woods' | 'fen' | 'shrine' | 'belfry' | 'peaks' | 'caverns';
+export type MapId = 'village' | 'woods' | 'fen' | 'shrine' | 'belfry' | 'peaks' | 'caverns' | 'coast' | 'grotto';
 export type Theme = MapId;
 /** Indoor maps: walls and floors, keys and shut doors, and foes that stay beaten. */
-export const DUNGEONS: ReadonlySet<MapId> = new Set<MapId>(['shrine', 'belfry', 'caverns']);
+export const DUNGEONS: ReadonlySet<MapId> = new Set<MapId>(['shrine', 'belfry', 'caverns', 'grotto']);
 /** Each dungeon's boss, by the flag that beating it sets. */
-export const BOSS_FLAG: Partial<Record<MapId, string>> = { shrine: 'boss', belfry: 'wraith', caverns: 'gloam' };
+export const BOSS_FLAG: Partial<Record<MapId, string>> = { shrine: 'boss', belfry: 'wraith', caverns: 'gloam', grotto: 'brine' };
 /** Moonstones that only show once a boss is beaten, and the flag that beats it. */
-export const AFTER_BOSS: Record<string, string> = { 's-boss': 'boss', 'b-bell': 'wraith', 'c-boss': 'gloam' };
+export const AFTER_BOSS: Record<string, string> = { 's-boss': 'boss', 'b-bell': 'wraith', 'c-boss': 'gloam', 'g-boss': 'brine' };
 export type Facing = 'up' | 'down' | 'left' | 'right';
-export type PropKind = 'house' | 'shed' | 'well' | 'lamp' | 'statue' | 'arch' | 'hut' | 'brazier' | 'shroom' | 'bench' | 'rock' | 'tower' | 'bell' | 'candle' | 'cave' | 'crystal';
-export type EnemyKind = 'slug' | 'moth' | 'thornling' | 'frog' | 'beetle' | 'lantern' | 'shade';
-export type NpcId = 'elder' | 'pip' | 'baker' | 'cat' | 'hermit' | 'herder';
+export type PropKind = 'house' | 'shed' | 'well' | 'lamp' | 'statue' | 'arch' | 'hut' | 'brazier' | 'shroom' | 'bench' | 'rock' | 'tower' | 'bell' | 'candle' | 'cave' | 'crystal'
+  | 'campfire' | 'mill' | 'pinwheel';
+export type EnemyKind = 'slug' | 'moth' | 'thornling' | 'frog' | 'beetle' | 'lantern' | 'shade' | 'crab' | 'gull';
+export type NpcId = 'elder' | 'pip' | 'baker' | 'cat' | 'hermit' | 'herder' | 'fisher';
+/** What bites where the knight fishes: perch in the village pond, eels in the woods and the fen, bream off the coast. */
+export type FishId = 'perch' | 'eel' | 'bream';
 /** The villagers' requests (`REQUESTS` in `state.ts`). */
 export type RequestId = 'lilies' | 'boat' | 'glowcaps' | 'specs' | 'goatbells';
 
@@ -83,7 +86,7 @@ export interface Exit {
   /** A flag that must be set before the way opens. */
   flag?: string;
   /** A quest step the story must have reached first (a new game+ knight has the tools early). */
-  quest?: 'belfry' | 'peaks';
+  quest?: 'belfry' | 'peaks' | 'coast';
 }
 export interface EnemySpawn { kind: EnemyKind; x: number; y: number; room?: string }
 export interface Post { x: number; y: number }
@@ -92,15 +95,15 @@ export interface Door { id: string; x: number; y: number; w: number; h: number; 
 /**
  * A moonstone: lying in the open, under a bush (shows once the bush is cut) or buried (a sword swing
  * on the spot digs it up). `chapter` 2 marks the five that count once chapter two starts, 3 the four
- * of chapter three. `glimmer` marks a stone a new game+ moved (`plus.ts`): buried, it glimmers in
+ * of chapter three and 4 the five of chapter four. `glimmer` marks a stone a new game+ moved (`plus.ts`): buried, it glimmers in
  * the knight's light.
  */
-export interface Moonstone { id: string; x: number; y: number; hidden?: 'buried'; chapter?: 2 | 3; glimmer?: boolean }
+export interface Moonstone { id: string; x: number; y: number; hidden?: 'buried'; chapter?: 2 | 3 | 4; glimmer?: boolean }
 /** A thing a villager asked for, lying somewhere until the request is taken and it is picked up. */
 export interface Find { req: RequestId; x: number; y: number }
 export interface Room { id: string; x: number; y: number; w: number; h: number }
 
-export type ItemId = 'sword' | 'hookvine' | 'key' | 'heart' | 'oil' | 'seeds' | 'moonlantern';
+export type ItemId = 'sword' | 'hookvine' | 'key' | 'heart' | 'oil' | 'seeds' | 'moonlantern' | 'horn' | 'rod';
 
 export interface MapDef {
   id: MapId;
@@ -131,6 +134,14 @@ export interface MapDef {
   wisp?: { x: number; y: number }[];
   /** A dungeon's hourglass, by its entry: once chapter two is done and its boss beaten, it starts the trial (`GameScene.startTrial`). */
   hourglass?: { x: number; y: number };
+  /** What the rod catches in this map's water (none in a dungeon). */
+  fish?: FishId;
+  /** Turning every mill or pinwheel here with the gust horn sets this flag (`GameScene.turnMill`). */
+  millFlag?: string;
+  /** Water the coast's windmill pumps dry once `millFlag` is set: it turns to path. */
+  drain?: { x: number; y: number; w: number; h: number };
+  /** The Brinewyrm's pool in the grotto's hall, in tiles. */
+  pool?: { x: number; y: number; w: number; h: number };
 }
 
 /** A small fixed-seed random number generator, so the maps are the same every time. */
@@ -241,6 +252,10 @@ function village(): MapDef {
   b.scatter('tree', 7, { x: 2, y: 2, w: 36, h: 22 }, 11, 'grass', 2);
   b.scatter('bush', 8, { x: 2, y: 2, w: 36, h: 22 }, 12);
   b.scatter('flowers', 30, { x: 2, y: 2, w: 36, h: 22 }, 13, 'grass', 0);
+  // Chapter four's fishing: a rod in a chest by the pond and a campfire to cook on, after the scatter.
+  d.chests.push({ id: 'rod', x: 11, y: 18, item: 'rod' });
+  b.prop('campfire', 8, 16);
+  d.fish = 'perch';
   return d;
 }
 
@@ -288,6 +303,7 @@ function woods(): MapDef {
   d.exits.push({ x: 24, y: 0, w: 2, h: 1, to: 'peaks', tx: 19, ty: 27, facing: 'up', quest: 'peaks' });
   d.signs.push({ x: 27, y: 4, text: t('signPass') });
   d.finds.push({ req: 'boat', x: 5, y: 24 }, { req: 'glowcaps', x: 35, y: 5 }, { req: 'glowcaps', x: 5, y: 11 });
+  d.fish = 'eel';
   return d;
 }
 
@@ -316,6 +332,12 @@ function fen(): MapDef {
   b.scatter('flowers', 14, { x: 2, y: 2, w: 32, h: 20 }, 33, 'grass', 0);
   d.enemies.push({ kind: 'beetle', x: 21, y: 16 }, { kind: 'lantern', x: 16, y: 10 });
   d.finds.push({ req: 'lilies', x: 20, y: 7 }, { req: 'lilies', x: 30, y: 19 }, { req: 'lilies', x: 3, y: 15 }, { req: 'glowcaps', x: 14, y: 4 });
+  // Chapter four: the way east to the Tidewrack Coast, from the bell tower's path, cut after the
+  // scatter. Fallen rock closes it until the story gets there (`GameScene.enterMap`).
+  b.rect(32, 8, 4, 2, 'path');
+  d.exits.push({ x: 35, y: 8, w: 1, h: 2, to: 'coast', tx: 1, ty: 14, facing: 'right', quest: 'coast' });
+  b.prop('campfire', 7, 8);
+  d.fish = 'eel';
   return d;
 }
 
@@ -470,6 +492,7 @@ function peaks(): MapDef {
   b.scatter('tree', 10, { x: 8, y: 2, w: 30, h: 6 }, 42, 'grass', 1);
   b.scatter('flowers', 10, { x: 2, y: 13, w: 36, h: 15 }, 43, 'grass', 0);
   d.finds.push({ req: 'goatbells', x: 4, y: 26 }, { req: 'goatbells', x: 36, y: 24 }, { req: 'goatbells', x: 29, y: 6 });
+  b.prop('campfire', 9, 19);
   return d;
 }
 
@@ -513,7 +536,93 @@ function caverns(): MapDef {
   return d;
 }
 
-const BUILT: Record<MapId, () => MapDef> = { village, woods, fen, shrine, belfry, peaks, caverns };
+function coast(): MapDef {
+  const b = new Builder('coast', t('coast'), 'coast', 44, 28, 0.8, 'grass');
+  const d = b.def;
+  b.border('tree', 2);
+  // The sea along the east and the south; the ground here is sand.
+  b.rect(34, 0, 10, 28, 'water').rect(0, 24, 44, 4, 'water');
+  // The path from the fen along the shore, north to the sea cave, and down to the strand.
+  b.rect(0, 14, 31, 2, 'path').rect(18, 4, 2, 10, 'path').rect(30, 15, 2, 5, 'path').rect(30, 19, 4, 1, 'path');
+  // A tidal inlet cuts the way north until the windmill pumps it dry.
+  b.rect(12, 6, 22, 2, 'water');
+  d.drain = { x: 12, y: 6, w: 22, h: 2 };
+  d.millFlag = 'drained';
+  b.prop('mill', 24, 9, 2, 3);
+  // The sea cave's mouth under the cliff, past the inlet.
+  b.prop('cave', 17, 1, 4, 3);
+  d.exits.push(
+    { x: 18, y: 4, w: 2, h: 1, to: 'grotto', tx: 17, ty: 37, facing: 'up' },
+    { x: 0, y: 14, w: 1, h: 2, to: 'fen', tx: 34, ty: 8, facing: 'left' },
+  );
+  // Nell's hut, her campfire and the lamps.
+  b.prop('hut', 5, 8, 4, 3).prop('campfire', 7, 12).prop('lamp', 13, 12).prop('lamp', 21, 12);
+  d.npcs.push({ id: 'fisher', name: t('fisherName'), x: 10, y: 12 });
+  d.signs.push({ x: 16, y: 12, text: t('signCoast') });
+  // A tide islet crossed on the hookvine, with the old keeper's horn, and a smaller one past it.
+  b.rect(36, 17, 5, 4, 'grass').rect(36, 23, 3, 2, 'grass');
+  d.posts.push({ x: 33, y: 19 }, { x: 37, y: 19 }, { x: 37, y: 23 });
+  d.chests.push({ id: 'horn', x: 39, y: 18, item: 'horn' });
+  d.stones.push({ id: 'k-isle', x: 38, y: 24, chapter: 4 });
+  // A ring of pines past the inlet with a boulder for a door, and the lone rock on the strand.
+  b.rect(26, 2, 5, 4, 'tree').rect(27, 3, 3, 2, 'grass').set(28, 5, 'boulder');
+  d.stones.push({ id: 'k-nook', x: 28, y: 3, chapter: 4 });
+  b.prop('rock', 6, 20);
+  d.stones.push({ id: 'k-dune', x: 6, y: 21, hidden: 'buried', chapter: 4 });
+  b.prop('rock', 31, 22).prop('rock', 3, 4).prop('shroom', 22, 3).prop('shroom', 12, 18);
+  b.scatter('tree', 10, { x: 2, y: 2, w: 10, h: 4 }, 51, 'grass', 1);
+  b.scatter('tree', 14, { x: 2, y: 16, w: 26, h: 8 }, 52, 'grass', 1);
+  b.scatter('reeds', 30, { x: 2, y: 8, w: 30, h: 16 }, 53, 'grass', 0);
+  d.enemies.push(
+    { kind: 'crab', x: 14, y: 19 }, { kind: 'crab', x: 25, y: 20 }, { kind: 'crab', x: 29, y: 11 },
+    { kind: 'gull', x: 9, y: 20 }, { kind: 'gull', x: 26, y: 17 }, { kind: 'gull', x: 23, y: 3 },
+  );
+  d.fish = 'bream';
+  return d;
+}
+
+function grotto(): MapDef {
+  const b = new Builder('grotto', t('grotto'), 'grotto', 40, 40, 0.9, 'wall');
+  const d = b.def;
+  b.room('entry', 13, 30, 10, 8).room('hub', 13, 18, 10, 9).room('wind', 2, 18, 9, 9).room('tide', 25, 18, 9, 9).room('boss', 6, 2, 24, 12);
+  // Corridors: down to the coast, entry to hub, hub west to the wind room, east to the tide room and north to the hall.
+  b.rect(17, 38, 2, 2, 'floor').rect(17, 27, 2, 3, 'floor').rect(11, 21, 2, 2, 'floor').rect(23, 21, 2, 2, 'floor').rect(17, 14, 2, 4, 'floor');
+  // The wind room: two pinwheels that lift the bars to the tide room once both turn.
+  b.prop('pinwheel', 3, 19).prop('pinwheel', 9, 25);
+  d.millFlag = 'gusts';
+  // The tide room: a channel crossed on the hookvine, the key on the far ledge, and a hollow behind it.
+  b.rect(27, 18, 5, 9, 'water');
+  d.posts.push({ x: 26, y: 22 }, { x: 32, y: 22 });
+  d.chests.push({ id: 'grotto-key', x: 33, y: 19, item: 'key' });
+  b.rect(35, 21, 2, 2, 'floor').set(34, 22, 'crack');
+  d.stones.push({ id: 'g-hollow', x: 36, y: 22, chapter: 4 });
+  d.doors.push(
+    { id: 'wind-door', x: 12, y: 21, w: 1, h: 2, kind: 'shut', room: 'wind' },
+    { id: 'grotto-bars', x: 23, y: 21, w: 1, h: 2, kind: 'bars', flag: 'gusts' },
+    { id: 'grotto-north', x: 17, y: 15, w: 2, h: 1, kind: 'key' },
+    { id: 'boss-door', x: 17, y: 14, w: 2, h: 1, kind: 'shut', room: 'boss' },
+  );
+  d.hourglass = { x: 14, y: 35 };
+  d.signs.push({ x: 21, y: 32, text: t('signTide') });
+  d.enemies.push(
+    { kind: 'crab', x: 15, y: 33, room: 'entry' }, { kind: 'crab', x: 20, y: 35, room: 'entry' },
+    { kind: 'shade', x: 18, y: 22, room: 'hub' }, { kind: 'frog', x: 15, y: 24, room: 'hub' }, { kind: 'thornling', x: 21, y: 19, room: 'hub' },
+    { kind: 'crab', x: 5, y: 21, room: 'wind' }, { kind: 'crab', x: 8, y: 23, room: 'wind' },
+    { kind: 'frog', x: 33, y: 21, room: 'tide' }, { kind: 'lantern', x: 32, y: 25, room: 'tide' },
+  );
+  b.prop('shroom', 14, 31).prop('shroom', 21, 36).prop('shroom', 14, 19).prop('shroom', 21, 25).prop('shroom', 3, 25).prop('shroom', 9, 19);
+  b.prop('shroom', 25, 19).prop('shroom', 33, 26).prop('shroom', 7, 3).prop('shroom', 28, 3).prop('shroom', 7, 12).prop('shroom', 28, 12);
+  // The Brinewyrm's hall: a deep pool in the middle, braziers either side.
+  b.rect(14, 5, 8, 4, 'water');
+  d.pool = { x: 14, y: 5, w: 8, h: 4 };
+  b.prop('brazier', 9, 8).prop('brazier', 26, 8);
+  d.boss = { x: 18, y: 7 };
+  d.stones.push({ id: 'g-boss', x: 18, y: 11, chapter: 4 });
+  d.exits.push({ x: 17, y: 39, w: 2, h: 1, to: 'coast', tx: 18, ty: 5, facing: 'down' });
+  return d;
+}
+
+const BUILT: Record<MapId, () => MapDef> = { village, woods, fen, shrine, belfry, peaks, caverns, coast, grotto };
 /** Every map, in the order the moonstone page lists them. */
 export const MAP_IDS = Object.keys(BUILT) as MapId[];
 

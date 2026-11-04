@@ -3,7 +3,7 @@
 // whenever the knight changes place or the quest moves on.
 
 import { byDifficulty } from '../../../../shared/settings';
-import { isMapId, type Facing, type ItemId, type MapId, type NpcId, type RequestId } from './maps';
+import { isMapId, type EnemyKind, type Facing, type FishId, type ItemId, type MapId, type NpcId, type RequestId } from './maps';
 import type { TextKey } from '../i18n';
 import { formatNumber } from '../../../../shared/i18n';
 
@@ -11,10 +11,11 @@ export const SAVE_KEY = 'bramblecrest-save';
 
 /** Health is counted in half hearts. */
 export const START_HEARTS = byDifficulty(5, 3, 2);
-/** Moonstones hidden in the first chapter, in the first two together, and in all three. */
+/** Moonstones hidden in the first chapter, in the first two together, the first three, and in all four. */
 export const CHAPTER_ONE_STONES = 8;
 export const CHAPTER_TWO_STONES = 13;
-export const MOONSTONES = 17;
+export const CHAPTER_THREE_STONES = 17;
+export const MOONSTONES = 22;
 /** The most bellseeds the knight can carry, and with Sedge's bigger pouch. */
 export const MAX_SEEDS = 10;
 export const BIG_POUCH = 15;
@@ -75,8 +76,11 @@ export function found(s: GameState, id: RequestId) {
   return s.flags.filter((f) => f.startsWith(`find-${id}-`)).length;
 }
 
-/** The quest line of the three chapters, in order. */
-export const QUESTS = ['start', 'blade', 'thorns', 'shrine', 'return', 'done', 'bell', 'belfry', 'home', 'end', 'peaks', 'caverns', 'homeward', 'final'] as const;
+/**
+ * The quest line of the four chapters, in order. `final` is chapter three's end (the elder then
+ * tells of the coast) and `after` the post-game, after chapter four.
+ */
+export const QUESTS = ['start', 'blade', 'thorns', 'shrine', 'return', 'done', 'bell', 'belfry', 'home', 'end', 'peaks', 'caverns', 'homeward', 'final', 'coast', 'seacave', 'tidings', 'after'] as const;
 export type Quest = (typeof QUESTS)[number];
 
 /** A time on the clock as m:ss.t, with the language's decimal mark. */
@@ -103,6 +107,10 @@ export const OBJECTIVES: Record<Quest, TextKey> = {
   caverns: 'objCaverns',
   homeward: 'objHomeward',
   final: 'objFinal',
+  coast: 'objCoast',
+  seacave: 'objSeacave',
+  tidings: 'objTidings',
+  after: 'objAfter',
 };
 
 /** Whether the quest has reached `q`. */
@@ -112,12 +120,44 @@ export function reached(s: GameState, q: Quest) {
 
 /** How many moonstones there are to find so far: each chapter's show up once it starts. */
 export function stonesToFind(s: GameState) {
-  return reached(s, 'peaks') ? MOONSTONES : reached(s, 'bell') ? CHAPTER_TWO_STONES : CHAPTER_ONE_STONES;
+  return reached(s, 'coast') ? MOONSTONES : reached(s, 'peaks') ? CHAPTER_THREE_STONES : reached(s, 'bell') ? CHAPTER_TWO_STONES : CHAPTER_ONE_STONES;
 }
 
 /** Whether a moonstone of a chapter counts yet. */
-export function stoneCounts(s: GameState, chapter?: 2 | 3) {
-  return chapter === 3 ? reached(s, 'peaks') : chapter === 2 ? reached(s, 'bell') : true;
+export function stoneCounts(s: GameState, chapter?: 2 | 3 | 4) {
+  return chapter === 4 ? reached(s, 'coast') : chapter === 3 ? reached(s, 'peaks') : chapter === 2 ? reached(s, 'bell') : true;
+}
+
+/** The most of each fish the knight's creel holds. */
+export const FISH_MAX = 5;
+export const FISH: FishId[] = ['perch', 'eel', 'bream'];
+/** A campfire's meals: the fish each takes and how many. One meal at a time, until the knight next falls. */
+export type MealId = 'stew' | 'skewer' | 'chowder';
+export const MEALS: { id: MealId; fish: FishId; n: number }[] = [
+  { id: 'stew', fish: 'perch', n: 2 },
+  { id: 'skewer', fish: 'eel', n: 2 },
+  { id: 'chowder', fish: 'bream', n: 2 },
+];
+
+/** Cooks and eats a meal if the creel holds its fish; returns whether it was cooked. Perch stew is one more heart while it lasts. */
+export function cook(s: GameState, id: MealId) {
+  const m = MEALS.find((x) => x.id === id)!;
+  if (s.meal === id || s.fish[m.fish] < m.n) return false;
+  s.fish[m.fish] -= m.n;
+  endMeal(s);
+  s.meal = id;
+  if (id === 'stew') s.maxHp += 2;
+  s.hp = s.maxHp;
+  return true;
+}
+
+/** The meal wears off (a fall, or another meal): the stew's heart goes with it. */
+export function endMeal(s: GameState) {
+  if (s.meal === 'stew') {
+    s.maxHp -= 2;
+    s.hp = Math.min(s.hp, s.maxHp);
+  }
+  s.meal = null;
 }
 
 export interface GameState {
@@ -130,7 +170,7 @@ export interface GameState {
   spawn: { map: MapId; x: number; y: number; facing: Facing };
   hp: number;
   maxHp: number;
-  items: { sword: boolean; hookvine: boolean; oil: boolean; seeds: boolean; moonlantern: boolean };
+  items: { sword: boolean; hookvine: boolean; oil: boolean; seeds: boolean; moonlantern: boolean; horn: boolean; rod: boolean };
   keys: number;
   /** Bellseeds carried. */
   seeds: number;
@@ -150,6 +190,11 @@ export interface GameState {
   requests: Partial<Record<RequestId, 'taken' | 'done'>>;
   /** How many times new game+ began again: 0 on a first run. */
   cycle: number;
+  /** Fish in the creel, and the meal eaten (until the next fall). */
+  fish: Record<FishId, number>;
+  meal: MealId | null;
+  /** Foes beaten of each kind, for the bestiary. */
+  bestiary: Partial<Record<EnemyKind, number>>;
 }
 
 export function newState(): GameState {
@@ -162,7 +207,7 @@ export function newState(): GameState {
     spawn,
     hp: START_HEARTS * 2,
     maxHp: START_HEARTS * 2,
-    items: { sword: false, hookvine: false, oil: false, seeds: false, moonlantern: false },
+    items: { sword: false, hookvine: false, oil: false, seeds: false, moonlantern: false, horn: false, rod: false },
     keys: 0,
     seeds: 0,
     moonstones: [],
@@ -175,13 +220,16 @@ export function newState(): GameState {
     upgrades: [],
     requests: {},
     cycle: 0,
+    fish: { perch: 0, eel: 0, bream: 0 },
+    meal: null,
+    bestiary: {},
   };
 }
 
 /**
  * New game+: the story starts over from the first night, one cycle on, keeping the tools, the
- * upgrades, the coins, the requests done and the trials' best times. Hearts start again, with the
- * pie's and the requests' hearts kept.
+ * upgrades, the coins, the requests done, the trials' best times, the creel and the bestiary. Hearts
+ * start again, with the pie's and the requests' hearts kept; a meal does not carry over.
  */
 export function newPlus(old: GameState): GameState {
   const s = newState();
@@ -191,6 +239,8 @@ export function newPlus(old: GameState): GameState {
   s.requests = { ...old.requests };
   s.trials = { ...old.trials };
   s.cycle = old.cycle + 1;
+  s.fish = { ...old.fish };
+  s.bestiary = { ...old.bestiary };
   const hearts = (hasUpgrade(s, 'pie') ? 1 : 0) + REQUESTS.filter((r) => r.reward === 'heart' && s.requests[r.id] === 'done').length;
   s.maxHp += hearts * 2;
   s.hp = s.maxHp;
@@ -225,6 +275,8 @@ export function give(s: GameState, item: ItemId) {
   else if (item === 'hookvine') s.items.hookvine = true;
   else if (item === 'oil') s.items.oil = true;
   else if (item === 'moonlantern') s.items.moonlantern = true;
+  else if (item === 'horn') s.items.horn = true;
+  else if (item === 'rod') s.items.rod = true;
   else if (item === 'key') s.keys++;
   else if (item === 'seeds') {
     s.items.seeds = true;
@@ -256,7 +308,7 @@ export function load(): GameState {
     if (raw) {
       const saved = JSON.parse(raw) as Partial<GameState>;
       const fresh = newState();
-      if (saved && QUESTS.includes(saved.quest as Quest) && placeOk(saved) && placeOk(saved.spawn ?? fresh.spawn)) return { ...fresh, ...saved, items: { ...fresh.items, ...saved.items } };
+      if (saved && QUESTS.includes(saved.quest as Quest) && placeOk(saved) && placeOk(saved.spawn ?? fresh.spawn)) return { ...fresh, ...saved, items: { ...fresh.items, ...saved.items }, fish: { ...fresh.fish, ...saved.fish } };
     }
   } catch {
     // A broken save starts over.

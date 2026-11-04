@@ -41,12 +41,26 @@ export const GLIMMER_PX = 110;
  */
 export const STICK = { r: 60, knob: 24, dead: 8, drag: 14, snap: 0.4 };
 
-/** Touch buttons, bottom right: sword, roll, hookvine and bellseeds. */
+/** Touch buttons, bottom right: sword, roll, hookvine, bellseeds and the gust horn. */
 export const BUTTONS = {
   sword: { x: 880, y: 456, r: 34 },
   roll: { x: 800, y: 490, r: 28 },
   vine: { x: 812, y: 410, r: 28 },
   seed: { x: 728, y: 468, r: 26 },
+  horn: { x: 740, y: 394, r: 26 },
 };
+
+/**
+ * The gust horn's blast: how far it reaches in front of the knight, how wide (it widens by `spread`
+ * of the distance), how far it shoves foes, how long they reel, and how long before the next blast.
+ */
+export const GUST = { range: 130, width: 26, spread: 0.3, push: 64, stunMs: 900, cooldownMs: 900 };
+
+/** Fishing: how long before a bite (a random time between the two), and how long a bite lasts. */
+export const FISH_WAIT_MS = [1200, 3200] as const;
+export const BITE_MS = 900;
+/** The meals' effects: eel skewers roll this much faster and sooner, bream chowder this much more vine. */
+export const SKEWER = { speed: 1.25, cooldown: 0.6 };
+export const CHOWDER = 1.35;
 /** Where a bellseed is planted: this far in front of the knight's feet. */
 export const PLANT_REACH = 22;

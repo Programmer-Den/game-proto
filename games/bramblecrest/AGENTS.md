@@ -5,7 +5,7 @@ play. Keep this file up to date with any change to the game, per the root AGENTS
 
 ## Current state
 
-Bramblecrest is a top-down adventure in three chapters, about a small kingdom at night. The knight
+Bramblecrest is a top-down adventure in four chapters, about a small kingdom at night. The knight
 walks a 32-pixel tile grid by keys or by tap (A* to the tile, or next to a person, chest, sign,
 block, door, bush, bell, boulder, cracked wall or foe, then acts on it). The quest (`QUESTS` in
 `state.ts`) runs `start` (talk to Elder Wren), `blade` (take the Old Blade from the chest by the
@@ -14,9 +14,11 @@ Shrine), `return` (tell the elder), `done` (chapter one's end card; the elder th
 bell), `bell` (ask Old Sedge), `belfry` (he gives bellseeds; find and clear the Drowned Belfry),
 `home` (tell the elder), `end` (chapter two's end card; the elder then tells of the light on the
 peaks), `peaks` (find the watchers' lantern on the Hollow Peaks), `caverns` (the Moonlantern found:
-cross the chasm and clear the Glass Caverns), `homeward` (tell the elder) and `final` (chapter
-three's end card, then the post-game: free roaming, the journal, the requests, the hourglass trials
-and new game+).
+cross the chasm and clear the Glass Caverns), `homeward` (tell the elder), `final` (chapter
+three's end card; the elder then tells of the coast), `coast` (go east from the fen to the
+Tidewrack Coast), `seacave` (Nell the fisher points to the horn: find it and clear the Sea Cave),
+`tidings` (tell the elder) and `after` (chapter four's end card, then the post-game: free roaming,
+the journal, the requests, the hourglass trials and new game+).
 
 Implemented today:
 
@@ -34,6 +36,13 @@ Implemented today:
   across the map crossed only by a hidden bridge, and the cave mouth of the Glass Caverns
   (`caverns`: entry, hub, a chasm room with another hidden bridge to the key, a ledges room behind
   cracked ice crossed on the hookvine, and the Gloamwing's hall behind a key door).
+  The Tidewrack Coast (`coast`, sand and sea, east of the fen through a gap two `rock` props close
+  until the quest reaches `coast`): Nell the fisher (`fisher`) by her hut and campfire, an inlet
+  that cuts the map in two until the windmill is turned (its `drain` rect becomes path, flag
+  `drained`, the map's `millFlag`), islets reached by hookvine posts with the `horn` chest, and the
+  Sea Cave's mouth. The Sea Cave (`grotto`, laid out like the belfry): entry, hub, a wind room whose
+  two pinwheels (`millFlag` `gusts`) lift the `grotto-bars`, a tide room crossed on the hookvine
+  with the key and a hollow behind a cracked wall, and the Brinewyrm's hall behind a key door.
   Each map has a darkness, exits (some behind a flag) and saved flags for what changed.
 - The knight: walking (`WALK_SPEED`), a roll with no hits taken (`ROLL_*`), a sword swing that hits
   foes and bulbs and cuts bushes and thorns (`SWING_*`), and the hookvine (`VINE_*`, `PULL_SPEED`):
@@ -53,8 +62,8 @@ Implemented today:
   `shop-hermit` talk effect, `openShop`, which `Hud.showShop` draws; its buttons or 1 and 2 call
   `buy` (`state.ts`), and a tap off them, Space or Esc closes it. Bought upgrades are in
   `state.upgrades` (`hasUpgrade`). The HUD shows coins after the first one.
-- Items: the Old Blade, the Hookvine, lantern oil (a bigger lantern light), the Moonlantern, small
-  keys and heart vessels, all from chests (`openChest`), plus hearts dropped by cut bushes.
+- Items: the Old Blade, the Hookvine, lantern oil (a bigger lantern light), the Moonlantern, the
+  gust horn, the fishing rod, small keys and heart vessels, all from chests (`openChest`), plus hearts dropped by cut bushes.
 - The Moonlantern (`items.moonlantern`) turns the knight's light pale and shows hidden bridges:
   `veil` tiles, painted as pit and listed in `SOLID` and `LOW` (so foes, shots and the hookvine
   treat them as a gap). `solidTile` lets the knight walk one only while `lit` (within `VEIL_PX` of
@@ -68,13 +77,37 @@ Implemented today:
   `crack` indoors) within `BURST_PX`, cuts bushes, hits foes twice, hurts the knight if close, and
   tips the Bellwraith's bell. Broken rock is saved as `broke-<map>-<x>-<y>` and cleared again in
   `enterMap`. Cut bushes and beaten foes sometimes drop seed pods (one seed each).
+- The gust horn (`items.horn`, `blowHorn`, H or C or the horn button, `BUTTONS.horn`): a cone of
+  wind `GUST.range` long in the facing direction (`GUST` in `layout.ts`) that pushes foes back
+  `GUST.push` and stuns them, brings a lantern moth down (`knockDown`), ends a gull's swoop, blows
+  shots away, beaches the Brinewyrm and turns `mill` and `pinwheel` props (`turnMill`, flag
+  `mill-<map>-<x>-<y>` from `millKey`). Once every mill on a map is turned, the map's `millFlag` is
+  set (`drain` repaints the coast's ground when it is `drained`). It has a cooldown
+  (`GUST.cooldownMs`). Opening its chest moves the quest from `coast` to `seacave`.
+- Fishing and cooking. The rod (`items.rod`, a chest in Mossford) casts into water that a map lists
+  fish for (`MapDef.fish`; `fishable`): act or tap facing such water with no foe near
+  (`startFishing`). A bobber waits `FISH_WAIT_MS`, then bites for `BITE_MS` (`updateFishing`); act
+  or tap then (`reel`) to catch the map's fish into the creel (`state.fish`, at most `FISH_MAX`
+  each); too early or late it gets away. Walking, being hurt or another tool ends it
+  (`endFishing`). Campfires (`campfire` props in the village, fen, peaks and coast) open
+  `openCook`, a `Hud.showShop` card of `MEALS` (`state.ts`): each takes two of one fish, `cook`
+  eats it and heals fully. One meal at a time (`state.meal`) until the next fall (`endMeal`):
+  `stew` one more heart (`maxHp` + 2), `skewer` a faster roll (`SKEWER`), `chowder` a longer
+  hookvine (`CHOWDER`). The sense of "until you next rest" is the next fall.
+- The bestiary (`FAMILIES`, `PAGE_AT` in `foes.ts`). `hitFoe` counts each kind beaten in
+  `state.bestiary` and toasts when a page fills (`PAGE_AT` of a kind) and when a family's every page
+  is full (`familyDone`). A full family (crawlers: slug, beetle, crab; moths: moth, lantern moth,
+  shade; wild things: thornling, frog, gull) drops one more coin from each of its foes. It is the
+  journal's second page (`showBestiary`, turned with the page button, ← → or Tab).
 - Belfry puzzles: three bell props (`note` 0 to 2) rung with the sword in `BELL_ORDER`; a wrong
   bell starts over, the right tune sets `bells`, which lifts the bars to the flooded room.
 - Shrine puzzles: a key door, a pushable block onto a pressure plate that lifts iron bars (a block
   on a plate stays), shut doors that close behind the knight while their room still has foes (only
   once the knight's whole feet box, `FEET`, is in the room, so a door never shuts on them), and
   pit crossings by hookvine posts.
-- Foes (`src/scenes/foes.ts`): slugs, moths (they fly over water and pits), thornlings (they
+- Foes (`src/scenes/foes.ts`): rock crabs (they scuttle like slugs, on the coast and summoned by
+  the Brinewyrm), storm gulls (they fly, circle and swoop at the knight at `GULL_SWOOP_SPEED` every
+  `GULL_SWOOP_MS`; a bump or a gust ends the swoop), slugs, moths (they fly over water and pits), thornlings (they
   stand still and spit seeds), frogs (they sit, then leap at the knight), shades (they fly like
   moths but fade out beyond `SHADE_SEEN_PX` of the knight), shelled beetles and lantern moths. The last two are `ARMOURED`: the sword only hurts them while `down`. The hookvine
   or a burst calls `knockDown` (`DOWN_MS`; a beetle shows `beetle-back`, a lantern moth lands), and
@@ -86,7 +119,7 @@ Implemented today:
   (`shellHard`, `beetleFlipped`, `lanternDown`, `gloamHigh`). New dungeon foes go at the end of the map's
   `enemies`, so the beaten flags of the old ones keep their index; new outdoor ones go after the
   scatter, so the trees and bushes it sows stay put. Dungeon foes stay
-  beaten (`foe-<i>` flags in the shrine, `belfry-foe-<i>` in the belfry; `DUNGEONS` lists them).
+  beaten (`foe-<i>` flags in the shrine, `<map>-foe-<i>` in the others; `DUNGEONS` lists them).
 - The Thornmother: a ring no blade cuts, three bulbs raised one at a time (`BULB_*`), thorn volleys
   that speed up as bulbs fall (`VOLLEY_MS`) and summoned slugs (`SUMMON_MS`, by difficulty). A bulb
   yanked down by the hookvine takes `BULB_HP` sword hits. Beating her clears the ring, gives a
@@ -104,10 +137,18 @@ Implemented today:
   sends it back up (`hitGloam`; a swing while it is low shows the `gloamHigh` hint). `GLOAM.hp`
   hits beat it: the `gloam` flag, a heart vessel, a moonstone and the quest at `homeward`. It calls
   shades (`SUMMON_MS`).
-- Seventeen moonstones (`MOONSTONES`; `CHAPTER_ONE_STONES` of them in chapter one and
-  `CHAPTER_TWO_STONES` by the end of chapter two), placed in `maps.ts` and `talk.ts`. The HUD
+- The Brinewyrm (`brine`, `makeBrine`, `updateBrine`; `BRINE` in `foes.ts`): a sea wyrm in its
+  hall's pool (`MapDef.pool`). It dives (`underMs`), rises (`riseMs`) and spits fans of `brine`
+  shots (`shots`, `spread`, every `spitMs`) for `upMs`. A horn gust while it is up beaches it
+  (`beachBrine`) for `beachedMs`; one sword hit (`hitBrine`) sends it back under. `BRINE.hp` hits
+  beat it (`brineDown`): the `brine` flag, a heart vessel, a moonstone and the quest at `tidings`.
+  It calls crabs (`SUMMON_MS`). Its trial factors are `TRIAL.brine*`.
+- Twenty-two moonstones (`MOONSTONES`; `CHAPTER_ONE_STONES` of them in chapter one,
+  `CHAPTER_TWO_STONES` by the end of chapter two and `CHAPTER_THREE_STONES` by the end of chapter
+  three), placed in `maps.ts` and `talk.ts`. The HUD
   counts against each chapter's total once it starts (`stonesToFind`; `stoneCounts` for a stone's
-  `chapter`); chapter two's five need bellseeds and chapter three's four the Moonlantern. Most are
+  `chapter`); chapter two's five need bellseeds, chapter three's four the Moonlantern and chapter four's five
+  the horn and the tools before it. Most are
   hidden behind something the player has to notice; each chapter's end card has three endings by
   how many were found (`GameScene.ENDS`). Stones in `AFTER_BOSS` (`maps.ts`) show once their boss
   is beaten. **Keep the secrets in code**: the README and this file only hint at where stones are, so
@@ -139,20 +180,22 @@ Implemented today:
   and shows as the HUD's clock; beating the boss calls `trialWon` instead of the story's ending
   (no flag, quest step, heart or stone) and keeps the best time in `state.trials[map]`. Leaving the
   map (`enterMap` with another id) or a fall ends the trial with the `trialLost` toast.
-- New game+. Chapter three's end card has a New game+ button, and Elder Wren offers it at `final`
+- New game+. Chapter four's end card has a New game+ button, and Elder Wren offers it at `after`
   (effect `plus-offer`, a card from `Hud.showEnd`). `startPlus` saves `newPlus(state)`: a fresh
-  story with `cycle` one higher, keeping the items, upgrades, coins, requests done and trial
-  times, with hearts back to the start plus the pie's and the requests' hearts. While `cycle` > 0
+  story with `cycle` one higher, keeping the items, upgrades, coins, requests done, trial
+  times, the creel and the bestiary (not the meal), with hearts back to the start plus the pie's and the requests' hearts. While `cycle` > 0
   every foe has `PLUS.hp` times its hearts (rounded up, `spawnFoe`), `PLUS.speed` times its speed
   and `PLUS.damage` times its touch, and the bosses fight as in a trial (`hard`). `plusStones`
   (`src/game/plus.ts`) moves every moonstone that lies on a map (not one given by a person, the
   wisp or a boss) to a seeded spot of the same map that a knight with every tool can reach, buried
   with `glimmer`: `glimmers` shows a sparkle within `GLIMMER_PX` of the knight, and a swing digs it
-  up. Exits with a `quest` (the belfry's and the peaks') stay shut until the story gets there, so
+  up. Exits with a `quest` (the belfry's, the peaks' and the coast's) stay shut until the story gets there, so
   the early tools can't skip ahead (`wayShut` toast).
 - The HUD (`src/scenes/hud.ts`): hearts, moonstones, keys (in a dungeon), bellseeds, the journal
   line (the quest's objective), place banners, toasts, the touch buttons, the floating touch stick,
-  the dialog box, the trial's clock (top middle), the journal page and the end and new game+ cards. The counters sit side by side, and a longer word (German
+  the dialog box, the trial's clock (top middle), the journal and bestiary pages (the journal shows
+  the creel and the meal as its larder line), the shop and campfire card (`showShop`, rows of name,
+  text and button) and the end and new game+ cards. The counters sit side by side, and a longer word (German
   "Schlüssel") pushes the next one along and widens their plate.
 
 ## Trophies
@@ -161,7 +204,8 @@ Implemented today:
 (`trophies`: id, tier, icon, `hidden` for Unbroken) with their texts in `trophies/i18n/` (`en.ts`
 and `de.ts`: the name keyed by the id, what earns it by `<id>Text`), and imports nothing else from
 the game, since the hub loads it. `main.ts` hands `trophies` to `setupGame`. `check.ts` has each
-trophy's condition on the `GameState` and `checkTrophies(state)`, which `GameScene.update` calls
+trophy's condition on the `GameState`. Chapter four added none, since the game is at the most
+(ten); `allStones` now counts its stones too and `checkTrophies(state)`, which `GameScene.update` calls
 every frame (the first call after a load is quiet, so a restored save earns its trophies without a
 toast), plus `awardNow` for one earned by an event. They are:
 
@@ -171,7 +215,7 @@ toast), plus `awardNow` for one earned by an event. They are:
 - Silver: `bellwraith` (the `wraith` flag), `allUpgrades` (all of `UPGRADES`) and `trial` (any
   hourglass trial finished).
 - Gold: `swift` (both trials' best times under `PAR`: 2:30 in the shrine, 2:00 in the belfry),
-  `allStones` (all seventeen `MOONSTONES`) and the hidden `unbroken` (the quest at `end` with no fall).
+  `allStones` (all twenty-two `MOONSTONES`) and the hidden `unbroken` (the quest at `end` with no fall).
 
 The playthrough earns `blade`. A new trophy goes in `index.ts`, its texts in both `i18n` files and
 its condition in `EARNED` (or an `awardNow` call where it happens); retune the trial pars in `PAR`.
@@ -184,14 +228,15 @@ All in code through `shared/audio.ts` (no audio files), in `src/audio/`:
   (called at the end of `enterMap`, when a boss wakes and when one is beaten):
   - `VILLAGE` (`calm`): Mossford, a lullaby waltz in F major at 120 BPM in eighths, a triangle
     lead over a soft square pad, no drums.
-  - `WILDS` (`woods`, `fen`, `peaks`): 84 BPM, pulse arpeggios and a shaker; the Woods in A Dorian,
-    the Fen sparser in D Dorian, the Peaks in a cold E minor. One song, so walking between them
+  - `WILDS` (`woods`, `fen`, `peaks`, `coast`): 84 BPM, pulse arpeggios and a shaker; the Woods in
+    A Dorian, the Fen sparser in D Dorian, the Peaks in a cold E minor, the Coast in a bright G
+    Mixolydian. One song, so walking between them
     changes at the next bar.
-  - `DEEP` (`shrine`, `belfry`, `caverns`): 72 BPM slow minor loops over a bass drone with a drip
+  - `DEEP` (`shrine`, `belfry`, `caverns`, `grotto`): 72 BPM slow minor loops over a bass drone with a drip
     for drums; the Shrine in D minor, the Belfry in E minor with a bell-like lead, the Caverns in F#
-    minor.
-  - `BOSS` (`thornmother`, `bellwraith`, `gloamwing`): 140 BPM, plays while a boss is awake (A minor,
-    E Phrygian, B minor).
+    minor, the Sea Cave in C minor.
+  - `BOSS` (`thornmother`, `bellwraith`, `gloamwing`, `brinewyrm`): 140 BPM, plays while a boss is
+    awake (A minor, E Phrygian, B minor, G minor).
   - `STINGS`: `item` (a chest), `victory` (a boss beaten), `fall` (out of hearts) and the chapter
     end card's `endAll`, `endSome` and `endFew`, by the same thresholds as its ending text.
 - `sounds.ts`: the effects table `sfx`, and where each plays in `GameScene.ts`: `swing`
@@ -211,7 +256,10 @@ All in code through `shared/audio.ts` (no audio files), in `src/audio/`:
   `rattle` and `clang` (the Bellwraith's drop and slam; `rattle` higher when the Gloamwing marks
   its spot), `topple` (`tipBell`), `wail` (`hitWraith`), `swoop` (the Gloamwing dives), `screech`
   (`hitGloam`), `find` (a request's thing picked up), `wisp` (the wisp hops on) and `swell`
-  (`checkExits`, walking into another map). The Gloamwing's frost rings play `volley` higher.
+  (`checkExits`, walking into another map). The Gloamwing's frost rings play `volley` higher. Chapter four's: `gust` (`blowHorn`), `whirr`
+  (`turnMill`), `cast`, `bite` and `catch` (`startFishing`, `updateFishing`, `reel`), `sizzle`
+  (`cook`, at a campfire), `caw` (a gull starts a swoop) and `splash` (the Brinewyrm rises or
+  sinks).
 - `ui('refuse')` for a locked or barred door, the thorny door, an empty chest, no bellseeds left,
   the hourglass while its trial runs, a way the story has not opened yet and a shop's button that
   can't buy; `ui('coin')` for a coin picked up, an upgrade bought and a request handed in (with the
@@ -271,7 +319,7 @@ All in code through `shared/audio.ts` (no audio files), in `src/audio/`:
 
 `bramblecrest-save` in localStorage: the whole `GameState` (map, position, facing, spawn, hearts,
 items, keys, moonstones, flags, quest, falls, foes beaten, the trials' best times in ms, coins,
-upgrades, requests and the new game+ `cycle`). A trial
+upgrades, requests, the new game+ `cycle`, the creel `fish`, the `meal` and the `bestiary`). A trial
 under way is not saved. It is written on a map change, on a
 chest, cut thorns, a key door unlocked, a plate, broken rock, the bells, a moonstone, a quest step
 and each boss, all through `GameScene.persist`, which holds a save asked for while the hookvine
@@ -279,16 +327,17 @@ pulls the knight (a bellseed bursting, a moonstone picked up) until they land on
 reload never puts them or their spawn over water or a pit. Trophies are saved apart, under `bramblecrest-trophies` (`shared/trophies.ts`), and outlive a
 new game. Flags in use: `chest-<id>`, `door-<id>`, `gate-cut`, `woods-thorns`, `plate`,
 `boss`, `foe-<i>`, `belfry-foe-<i>`, `caverns-foe-<i>`, `broke-<map>-<x>-<y>`, `bells`, `wraith`,
-`gloam`, `cat-1` to `cat-3`, `find-<request>-<i>`, plus the flags of hidden places. `load` fills in
-fields a save from an older version lacks (`items.seeds`, `items.moonlantern`, `seeds`, `trials`,
-`coins`, `upgrades`, `requests`, `cycle`); an old save at `end` meets chapter three's start at the
-elder, and starts over when the saved `map` or `spawn` is not a map (`isMapId`)
+`gloam`, `grotto-foe-<i>`, `mill-<map>-<x>-<y>`, `drained`, `gusts`, `brine`, `cat-1` to `cat-3`, `find-<request>-<i>`, plus the flags of hidden places. `load` fills in
+fields a save from an older version lacks (`items.seeds`, `items.moonlantern`, `items.horn`,
+`items.rod`, `seeds`, `trials`, `coins`, `upgrades`, `requests`, `cycle`, `fish`, `meal`,
+`bestiary`); an old save at `end` meets chapter three's start at the elder, one at `final` meets
+chapter four's, and starts over when the saved `map` or `spawn` is not a map (`isMapId`)
 or a position is not a number. Cutting the gate before bringing the blade back is fine: the
 elder's `quest-thorns` then moves the quest straight on to `shrine`.
 
 ### Hub settings
 
-- Difficulty: `START_HEARTS` (5, 3, 2) in `state.ts` and `SUMMON_MS` in `foes.ts` (all three bosses).
+- Difficulty: `START_HEARTS` (5, 3, 2) in `state.ts` and `SUMMON_MS` in `foes.ts` (all four bosses).
 - Reduce motion: no screen shake, light flashes, foe hit flash, roll spin, bell swing, boss pulse
   or bobbing (the walk, the wisp, moonstones, the wraith, the Gloamwing's wings and low hover); the
   knight's hurt blink, a bellseed's last flicker and a moved moonstone's glimmer hold still.
@@ -297,7 +346,8 @@ elder's `quest-thorns` then moves the quest straight on to `shrine`.
 
 - `window.game.scene.getScene('Game')` gives `state` (the `GameState`), `dialog` (`{ speaker,
   lines, i }` or null), `route` (the steps left of a tap's walk, or null), `target`, `foes` and
-  `boss`, `wraith`, `gloam`, `bombs`, `trial` (`{ map, ms }` or null) and `hud` (`shopOpen`, `pageOpen`); `spot('npc' | 'chest', id)` is where to tap a person or chest in the world and
+  `boss`, `wraith`, `gloam`, `brine` (the Brinewyrm, or null), `fishing` (`{ t, bite, fish }` while
+  a line is out, or null), `bombs`, `trial` (`{ map, ms }` or null) and `hud` (`shopOpen`, `pageOpen`); `spot('npc' | 'chest', id)` is where to tap a person or chest in the world and
   `screenOf(x, y)` turns a world point into view pixels (allowing for the camera's zoom).
 - `e2e/playthrough.spec.ts` taps the elder, taps through her lines, taps the `blade` chest, taps
   the elder again, walks to the street below the gate (`STREET`) and taps the gate's thorns
@@ -324,10 +374,14 @@ elder's `quest-thorns` then moves the quest straight on to `shrine`.
 - **Add rock to break**: a `boulder` tile (outdoors, a sprite like a bush) or a `crack` tile (a
   dungeon wall, painted in `ground.ts`). Nothing else is needed: the burst and the saved flag
   handle it.
+- **Add a fish or meal**: its id in `FishId` and `FISH`, a map's `fish`, a row in `MEALS` with its
+  `<id>`/`<id>Text` texts, and its effect where the number it changes is used (and `endMeal`).
+- **Add a foe to the bestiary**: its kind in a family of `FAMILIES` (`foes.ts`), its art in
+  `FOE_PAGE` and its name text.
 - **Add a chapter**: new stages at the end of `QUESTS` with their `OBJECTIVES` (text keys), lines in `talk.ts`
   that move them on (and in `STORY`, so no request gets in their way), and a row in
   `GameScene.ENDS`; raise `MOONSTONES` with the new stones (`chapter` on each, and `stoneCounts`).
-  Keep `final` last: the elder's new game+ offer hangs off it.
+  Keep `after` last: the elder's new game+ offer hangs off it.
 - **Add a request**: its id in `RequestId`, a row in `REQUESTS` (giver, count, `from`, reward), its
   things in the maps' `finds` (after the scatter), its four talk keys in `ASK` (`talk.ts`), its
   art in `FIND_ART` and `paint.ts`, and its name in `REQUEST_NAME`.

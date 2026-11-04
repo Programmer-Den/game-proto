@@ -4,11 +4,11 @@
 import Phaser from 'phaser';
 import { paintAll, texScale } from '../art/paint';
 import { paintGround, groundKey } from '../art/ground';
-import { AFTER_BOSS, BOSS_FLAG, BREAKABLE, buildMap, centre, CUTTABLE, DUNGEONS, LOW, MAP_IDS, setTile, SOLID, TILE, tileAt, underBoulder, type Door, type Facing, type ItemId, type MapDef, type MapId, type NpcId, type Prop, type PropKind, type RequestId } from '../game/maps';
+import { AFTER_BOSS, BOSS_FLAG, BREAKABLE, buildMap, centre, CUTTABLE, DUNGEONS, LOW, MAP_IDS, setTile, SOLID, TILE, tileAt, underBoulder, type Door, type EnemyKind, type Facing, type FishId, type ItemId, type MapDef, type MapId, type NpcId, type Prop, type PropKind, type RequestId } from '../game/maps';
 import { findPath, type Step } from '../game/path';
 import { plusStones } from '../game/plus';
 import {
-  advance, buy, CHAPTER_ONE_STONES, CHAPTER_TWO_STONES, clearSave, clock, found, give, hasFlag, hasUpgrade, load, maxSeeds, MOONSTONES, newPlus, newState, reached, REQUESTS, reward, save, setFlag, stoneCounts, stonesToFind, UPGRADES,
+  advance, buy, CHAPTER_ONE_STONES, CHAPTER_THREE_STONES, CHAPTER_TWO_STONES, clearSave, clock, cook, endMeal, FISH_MAX, found, give, hasFlag, hasUpgrade, load, maxSeeds, MEALS, MOONSTONES, newPlus, newState, reached, REQUESTS, reward, save, setFlag, stoneCounts, stonesToFind, UPGRADES,
   type GameState, type Seller,
 } from '../game/state';
 import { talk, type TalkEffect } from '../game/talk';
@@ -22,12 +22,12 @@ import { Hud } from './hud';
 import { awardNow, checkTrophies } from '../trophies/check';
 import { NightLight, type Light } from './light';
 import {
-  ARMOURED, BELL_DOWN_MS, BULB_DOWN_MS, DOWN_MS, LANTERN_KEEP, LANTERN_LIFT, LANTERN_SHOT_MS, BULB_EVERY_MS, BULB_HP, BULB_UP_MS, BURST_PX, DROP_MS, EXPOSED_MS, FOES, foeFree, FROG_LEAP_MS, FROG_WAIT_MS, FUSE_MS, GLOAM, HOVER_MS, HOVER_SPEED,
+  ARMOURED, BELL_DOWN_MS, BRINE, BULB_DOWN_MS, FAMILIES, familyDone, familyOf, GULL_SWOOP_MS, GULL_SWOOP_SPEED, PAGE_AT, DOWN_MS, LANTERN_KEEP, LANTERN_LIFT, LANTERN_SHOT_MS, BULB_EVERY_MS, BULB_HP, BULB_UP_MS, BURST_PX, DROP_MS, EXPOSED_MS, FOES, foeFree, FROG_LEAP_MS, FROG_WAIT_MS, FUSE_MS, GLOAM, HOVER_MS, HOVER_SPEED,
   makeFoe, PLUS, SEED_SPEED, SHADE_SEEN_PX, SLAM_PX, SUMMON_MS, THORNLING_SHOT_MS, TRIAL, VOLLEY_MS, WRAITH_HP,
-  type Bomb, type Boss, type Foe, type Gloam, type Seed, type Wraith,
+  type Bomb, type Boss, type Brine, type Foe, type Gloam, type Seed, type Wraith,
 } from './foes';
 import {
-  BOOTS, CHARM, GLIMMER_PX, HURT_MS, LANTERN, LONG_VINE, LANTERN_OIL, PICKUP_PX, PLANT_REACH, PULL_SPEED, ROLL_COOLDOWN_MS, ROLL_MS, ROLL_SPEED, STICK, SWING_COOLDOWN_MS, SWING_MS, SWING_RADIUS, SWING_REACH, VEIL_PX, VINE_RANGE, VINE_SPEED,
+  BITE_MS, BOOTS, CHARM, CHOWDER, FISH_WAIT_MS, GLIMMER_PX, GUST, SKEWER, HURT_MS, LANTERN, LONG_VINE, LANTERN_OIL, PICKUP_PX, PLANT_REACH, PULL_SPEED, ROLL_COOLDOWN_MS, ROLL_MS, ROLL_SPEED, STICK, SWING_COOLDOWN_MS, SWING_MS, SWING_RADIUS, SWING_REACH, VEIL_PX, VINE_RANGE, VINE_SPEED,
   WALK_SPEED, WHETSTONE,
 } from './layout';
 
@@ -49,6 +49,22 @@ const PROP_ART: Record<PropKind, { key: string; foot: number; solid: boolean }> 
   candle: { key: 'candle', foot: 26 / 28, solid: false },
   cave: { key: 'cave', foot: 96 / 104, solid: true },
   crystal: { key: 'crystal', foot: 28 / 30, solid: true },
+  campfire: { key: 'campfire', foot: 27 / 30, solid: true },
+  mill: { key: 'mill', foot: 104 / 112, solid: true },
+  pinwheel: { key: 'pinwheel', foot: 37 / 40, solid: true },
+};
+
+/** Each kind of foe's name and picture on the bestiary page. */
+const FOE_PAGE: Record<EnemyKind, { key: string; name: TextKey }> = {
+  slug: { key: 'slug', name: 'slugName' },
+  moth: { key: 'moth-a', name: 'mothName' },
+  thornling: { key: 'thornling', name: 'thornlingName' },
+  frog: { key: 'frog', name: 'frogName' },
+  beetle: { key: 'beetle', name: 'beetleName' },
+  lantern: { key: 'lantern-a', name: 'lanternName' },
+  shade: { key: 'shade', name: 'shadeName' },
+  crab: { key: 'crab', name: 'crabName' },
+  gull: { key: 'gull-a', name: 'gullName' },
 };
 
 /** What each request's things look like where they lie, and the text that names one. */
@@ -61,7 +77,7 @@ const FIND_ART: Record<RequestId, { key: string; name: TextKey; reward: TextKey 
 };
 /** A request's name on the journal page and in its toasts. */
 export const REQUEST_NAME: Record<RequestId, TextKey> = { lilies: 'reqLilies', boat: 'reqBoat', glowcaps: 'reqGlowcaps', specs: 'reqSpecs', goatbells: 'reqGoatbells' };
-const NPC_NAME: Record<NpcId, TextKey> = { elder: 'elderName', pip: 'pipName', baker: 'bakerName', cat: 'catName', hermit: 'hermitName', herder: 'herderName' };
+const NPC_NAME: Record<NpcId, TextKey> = { elder: 'elderName', pip: 'pipName', baker: 'bakerName', cat: 'catName', hermit: 'hermitName', herder: 'herderName', fisher: 'fisherName' };
 /** The order the belfry's bells must ring in, by voice (0 is the deepest). */
 const BELL_ORDER = [0, 2, 1];
 const BELL_SOUND: TextKey[] = ['bellLow', 'bellMid', 'bellHigh'];
@@ -80,7 +96,7 @@ type Target =
   | { kind: 'npc'; id: NpcId }
   | { kind: 'chest'; id: string }
   | { kind: 'sign'; i: number }
-  | { kind: 'cut' | 'dig' | 'block' | 'door' | 'ring' | 'plant' | 'hourglass'; tx: number; ty: number }
+  | { kind: 'cut' | 'dig' | 'block' | 'door' | 'ring' | 'plant' | 'hourglass' | 'fish' | 'cook'; tx: number; ty: number }
   | { kind: 'foe'; foe: Foe };
 
 interface Dialog {
@@ -102,6 +118,9 @@ export class GameScene extends Phaser.Scene {
   boss: Boss | null = null;
   wraith: Wraith | null = null;
   gloam: Gloam | null = null;
+  brine: Brine | null = null;
+  /** The line in the water: counting down to a bite, or the bite itself, which a pull must catch. */
+  fishing: { t: number; bite: boolean; fish: FishId; x: number; y: number; bobber: Phaser.GameObjects.Image } | null = null;
   /** Bellseeds planted and swelling. */
   bombs: Bomb[] = [];
   /**
@@ -126,6 +145,11 @@ export class GameScene extends Phaser.Scene {
   private pods: { x: number; y: number; sprite: Phaser.GameObjects.Image }[] = [];
   private coins: { x: number; y: number; sprite: Phaser.GameObjects.Image }[] = [];
   private bells: { note: number; x: number; y: number; sprite: Phaser.GameObjects.Image }[] = [];
+  /** The windmill and pinwheels here, the point a gust must reach, their turning heads, and whether they turn. */
+  private mills: { prop: Prop; cx: number; cy: number; head: Phaser.GameObjects.Image; turned: boolean }[] = [];
+  private hornCd = 0;
+  /** Which side of the journal is open: the journal itself or the bestiary. */
+  private pageTab: 'journal' | 'bestiary' = 'journal';
   /** The bells rung so far, in order, toward the belfry's tune. */
   private bellSeq: number[] = [];
   /** Short bursts of light: a bellseed going off, a bell ringing. */
@@ -224,6 +248,9 @@ export class GameScene extends Phaser.Scene {
     this.boss = null;
     this.wraith = null;
     this.gloam = null;
+    this.brine = null;
+    this.fishing = null;
+    this.mills = [];
     this.wisp = null;
     this.veilSprites.clear();
     this.findSprites.clear();
@@ -255,6 +282,10 @@ export class GameScene extends Phaser.Scene {
     plusStones(map, s.cycle);
     // Fallen rock shuts the pass to the peaks until chapter three.
     if (id === 'woods' && !reached(s, 'peaks')) map.props.push({ kind: 'rock', x: 24, y: 1, w: 1, h: 1 }, { kind: 'rock', x: 25, y: 1, w: 1, h: 1 });
+    // And the way east from the fen to the coast until chapter four.
+    if (id === 'fen' && !reached(s, 'coast')) map.props.push({ kind: 'rock', x: 34, y: 8, w: 1, h: 1 }, { kind: 'rock', x: 34, y: 9, w: 1, h: 1 });
+    // The coast's inlet, once its windmill has pumped it dry.
+    if (map.drain && map.millFlag && hasFlag(s, map.millFlag)) this.drain(map);
     // What the knight has already changed here.
     if (id === 'village' && hasFlag(s, 'gate-cut')) for (const i of [19, 20]) setTile(map, i, 3, 'path');
     if (id === 'woods' && hasFlag(s, 'woods-thorns')) for (const i of [42, 43]) setTile(map, i, 10, 'path');
@@ -282,7 +313,7 @@ export class GameScene extends Phaser.Scene {
         const t = tileAt(map, tx, ty);
         if (t === 'tree' || t === 'faketree') {
           // Trees right at the edge of the map are left off where nobody can see behind them.
-          const key = map.theme === 'fen' ? 'tree-fen' : map.theme === 'peaks' ? 'tree-pine' : (tx * 7 + ty * 3) % 3 === 0 ? 'tree-b' : 'tree';
+          const key = map.theme === 'fen' ? 'tree-fen' : map.theme === 'peaks' ? 'tree-pine' : map.theme === 'coast' ? 'tree-coast' : (tx * 7 + ty * 3) % 3 === 0 ? 'tree-b' : 'tree';
           this.addWorld(this.add.image(tx * TILE + 16, ty * TILE + 30, key).setOrigin(0.5, 64 / 72), (ty + 1) * TILE - 2);
         } else if (t === 'bush' || t === 'thorns') {
           const img = this.add.image(tx * TILE + 16, ty * TILE + 28, t).setOrigin(0.5, t === 'bush' ? 25 / 30 : 29 / 34);
@@ -370,6 +401,7 @@ export class GameScene extends Phaser.Scene {
     if (id === 'shrine' && map.boss && (!hasFlag(s, 'boss') || trial)) this.makeBoss(map.boss);
     if (id === 'belfry' && map.boss && (!hasFlag(s, 'wraith') || trial)) this.makeWraith(map.boss);
     if (id === 'caverns' && map.boss && (!hasFlag(s, 'gloam') || trial)) this.makeGloam(map.boss);
+    if (id === 'grotto' && map.pool && (!hasFlag(s, 'brine') || trial)) this.makeBrine(map);
     // The hourglass by a dungeon's entry turns up once chapter two is done and its boss is beaten.
     if (map.hourglass && this.hourglassUp()) {
       const c = centre(map.hourglass);
@@ -413,16 +445,19 @@ export class GameScene extends Phaser.Scene {
     if (this.boss?.awake) return playMusic(BOSS, 'thornmother');
     if (this.wraith?.awake) return playMusic(BOSS, 'bellwraith');
     if (this.gloam?.awake) return playMusic(BOSS, 'gloamwing');
+    if (this.brine?.awake) return playMusic(BOSS, 'brinewyrm');
     switch (this.map.theme) {
       case 'village':
         return playMusic(VILLAGE, 'calm');
       case 'woods':
       case 'fen':
       case 'peaks':
+      case 'coast':
         return playMusic(WILDS, this.map.theme);
       case 'shrine':
       case 'belfry':
       case 'caverns':
+      case 'grotto':
         return playMusic(DEEP, this.map.theme);
     }
   }
@@ -445,6 +480,12 @@ export class GameScene extends Phaser.Scene {
     const bottom = (p.y + p.h) * TILE;
     const img = this.addWorld(this.add.image(x, bottom, key).setOrigin(0.5, art.foot), bottom - 1);
     if (p.kind === 'bell') this.bells.push({ note: p.note ?? 1, x: p.x, y: p.y, sprite: img });
+    if (p.kind === 'mill' || p.kind === 'pinwheel') {
+      // The sails (or the pinwheel's head) are their own image, turning once the horn has blown on them.
+      const mill = p.kind === 'mill';
+      const head = this.addWorld(this.add.image(x, bottom - (mill ? 78 : 25), mill ? 'mill-sails' : 'pinwheel-head'), bottom + 1);
+      this.mills.push({ prop: p, cx: x, cy: (p.y + p.h - 0.5) * TILE, head, turned: hasFlag(this.state, this.millKey(p)) });
+    }
     if (art.solid) for (let j = 0; j < p.h; j++) for (let i = 0; i < p.w; i++) this.block(p.x + i, p.y + j);
     const top = bottom - this.textures.get(key).getSourceImage().height * texScale(key) * art.foot;
     switch (p.kind) {
@@ -478,6 +519,12 @@ export class GameScene extends Phaser.Scene {
       case 'crystal':
         this.glows.push({ x, y: bottom - 16, r: 90, col: [150, 210, 255], power: 0.75 });
         break;
+      case 'campfire':
+        this.glows.push({ x, y: bottom - 14, r: 130, col: [255, 160, 80], power: 1 });
+        break;
+      case 'mill':
+        this.glows.push({ x, y: bottom - 56, r: 60, col: WARM, power: 0.6 });
+        break;
     }
   }
 
@@ -500,7 +547,7 @@ export class GameScene extends Phaser.Scene {
       return tx >= room.x && tx < room.x + room.w && ty >= room.y && ty < room.y + room.h;
     });
     if (!inside) return false;
-    if (d.room === 'boss') return !!this.boss || !!this.wraith || !!this.gloam;
+    if (d.room === 'boss') return !!this.boss || !!this.wraith || !!this.gloam || !!this.brine;
     return this.foes.some((f) => f.alive && f.room === d.room);
   }
 
@@ -563,6 +610,7 @@ export class GameScene extends Phaser.Scene {
       else if (code === 'Escape' || code === 'Space' || code === 'Enter' || code === 'KeyN') this.hud.closeShop();
       return;
     }
+    if (this.hud.pageOpen && ['ArrowLeft', 'ArrowRight', 'KeyA', 'KeyD', 'Tab'].includes(code)) return this.turnPage();
     if (code === 'KeyN' || (this.hud.pageOpen && (code === 'Escape' || code === 'Space' || code === 'Enter'))) return this.toggleStones();
     if (this.hud.covered || this.fading) return;
     if (this.dialog) {
@@ -573,6 +621,7 @@ export class GameScene extends Phaser.Scene {
     else if (code === 'ShiftLeft' || code === 'ShiftRight' || code === 'KeyK') this.startRoll();
     else if (code === 'KeyQ' || code === 'KeyE' || code === 'KeyL') this.fireVine();
     else if (code === 'KeyB' || code === 'KeyX') this.plantSeed();
+    else if (code === 'KeyH' || code === 'KeyC') this.blowHorn();
   }
 
   private onPointer(pointer: Phaser.Input.Pointer) {
@@ -584,12 +633,15 @@ export class GameScene extends Phaser.Scene {
       this.nextLine();
       return;
     }
+    // A tap anywhere pulls in a line in the water.
+    if (this.fishing) return this.reel();
     if (this.hud.plateAt(viewPoint(pointer))) return this.toggleStones();
     const btn = this.hud.buttonAt(viewPoint(pointer), this.state);
     if (btn === 'sword') return this.act();
     if (btn === 'roll') return this.startRoll();
     if (btn === 'vine') return this.fireVine();
     if (btn === 'seed') return this.plantSeed();
+    if (btn === 'horn') return this.blowHorn();
     const w = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
     if (!pointer.wasTouch) return this.tapWorld(w.x, w.y);
     // A touch waits to see whether it is a tap or the start of a steering drag.
@@ -648,6 +700,8 @@ export class GameScene extends Phaser.Scene {
     if (s.items.sword && CUTTABLE.has(tileAt(this.map, tx, ty))) return this.goTo({ kind: 'cut', tx, ty }, tx, ty);
     const buried = this.map.stones.find((st) => st.hidden === 'buried' && st.x === tx && st.y === ty && !this.dug.has(st.id));
     if (buried && s.items.sword) return this.goTo({ kind: 'dig', tx, ty }, tx, ty, true);
+    if (this.map.props.some((p) => p.kind === 'campfire' && p.x === tx && p.y === ty)) return this.goTo({ kind: 'cook', tx, ty }, tx, ty);
+    if (this.fishable(tx, ty)) return this.goTo({ kind: 'fish', tx, ty }, tx, ty);
     this.target = null;
     this.walkTo(tx, ty);
   }
@@ -704,16 +758,21 @@ export class GameScene extends Phaser.Scene {
     this.applyFacing();
     if (t.kind === 'cut' || t.kind === 'dig' || t.kind === 'ring') this.startSwing();
     else if (t.kind === 'plant') this.plantSeed();
+    else if (t.kind === 'fish') this.startFishing(t.tx, t.ty);
     else this.interactAt(at.x, at.y);
   }
 
   /** Space, J or the sword button: talk to or use what is in front, else swing the sword. */
   private act() {
     const s = this.state;
+    if (this.fishing) return this.reel();
     const d = DIRS[s.facing];
     const tx = Math.floor((s.x + d.x * 22) / TILE);
     const ty = Math.floor((s.y - 4 + d.y * 22) / TILE);
     if (this.interactAt(tx, ty)) return;
+    // Facing water with the rod, the knight casts, unless a foe is close enough to swing at.
+    const foeNear = this.foes.some((f) => f.alive && Math.hypot(f.x - (s.x + d.x * SWING_REACH), f.y - s.y - d.y * SWING_REACH) < 44);
+    if (this.fishable(tx, ty) && !foeNear) return this.startFishing(tx, ty);
     this.startSwing();
   }
 
@@ -733,6 +792,10 @@ export class GameScene extends Phaser.Scene {
         ui('refuse');
         this.hud.toast(t('empty'));
       }
+      return true;
+    }
+    if (this.map.props.some((p) => p.kind === 'campfire' && p.x === tx && p.y === ty)) {
+      this.openCook();
       return true;
     }
     if (this.hourglassAt(tx, ty)) {
@@ -819,6 +882,12 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     if (this.hud.covered || this.dialog) return;
+    this.pageTab = 'journal';
+    ui('click');
+    this.showPage();
+  }
+
+  private showJournal() {
     const s = this.state;
     const rows = MAP_IDS.map((id) => buildMap(id))
       .map((m) => {
@@ -827,18 +896,49 @@ export class GameScene extends Phaser.Scene {
       })
       .filter((r) => r.total > 0);
     const trials = reached(s, 'end')
-      ? (['shrine', 'belfry', 'caverns'] as const).filter((id) => id !== 'caverns' || hasFlag(s, 'gloam')).map((id) => ({ place: t(id), ms: s.trials[id] }))
+      ? (['shrine', 'belfry', 'caverns', 'grotto'] as const)
+          .filter((id) => (id !== 'caverns' || hasFlag(s, 'gloam')) && (id !== 'grotto' || hasFlag(s, 'brine')))
+          .map((id) => ({ place: t(id), ms: s.trials[id] }))
       : [];
     const requests = REQUESTS.filter((r) => s.requests[r.id]).map((r) => ({
       text: t('requestRow', { giver: t(NPC_NAME[r.giver]), name: t(REQUEST_NAME[r.id]) }),
       state: s.requests[r.id] === 'done' ? t('requestDone') : t('requestProgress', { n: Math.min(r.count, found(s, r.id)), total: r.count }),
       done: s.requests[r.id] === 'done',
     }));
-    ui('click');
+    // The creel and the meal, once there is a rod.
+    const larder = s.items.rod
+      ? `${t('creel', { perch: s.fish.perch, eel: s.fish.eel, bream: s.fish.bream })}   ·   ${s.meal ? t('mealNow', { meal: t(s.meal) }) : t('mealNone')}`
+      : '';
+    this.hud.showStones(rows, trials, requests, s.cycle > 0 ? t('plusLevel', { n: s.cycle }) : '', larder, () => this.turnPage());
+  }
+
+  /** The bestiary: each family's kinds, named once one is beaten, with how many, and whether the family's perk is earned. */
+  private showBestiary() {
+    const b = this.state.bestiary;
+    const families = FAMILIES.map((fam) => ({
+      name: t(fam.id),
+      done: familyDone(b, fam.id),
+      kinds: fam.kinds.map((k) => ({ key: FOE_PAGE[k].key, name: b[k] ? t(FOE_PAGE[k].name) : t('unknownFoe'), n: b[k] ?? 0 })),
+    }));
+    this.hud.showBestiary(families, PAGE_AT, () => this.turnPage());
+  }
+
+  /** Opens the journal's open side. */
+  private showPage() {
     this.route = null;
     this.target = null;
     this.stick = null;
-    this.hud.showStones(rows, trials, requests, s.cycle > 0 ? t('plusLevel', { n: s.cycle }) : '');
+    if (this.pageTab === 'bestiary') this.showBestiary();
+    else this.showJournal();
+  }
+
+  /** Turns from the journal to the bestiary or back. */
+  private turnPage() {
+    if (!this.hud.pageOpen) return;
+    this.hud.closeStones();
+    this.pageTab = this.pageTab === 'journal' ? 'bestiary' : 'journal';
+    ui('click');
+    this.showPage();
   }
 
   private openChest(id: string, item: ItemId) {
@@ -856,9 +956,12 @@ export class GameScene extends Phaser.Scene {
       oil: t('foundOil'),
       seeds: t('foundSeeds', { n: s.seeds }),
       moonlantern: t('foundMoonlantern'),
+      horn: t('foundHorn'),
+      rod: t('foundRod'),
     };
-    // The Moonlantern is chapter three's tool: finding it points the story at the caverns.
+    // The Moonlantern is chapter three's tool: finding it points the story at the caverns. The gust horn does the same for the sea cave.
     if (item === 'moonlantern' && s.quest === 'peaks') advance(s, 'caverns');
+    if (item === 'horn' && s.quest === 'coast') advance(s, 'seacave');
     this.openDialog('', [text[item]]);
     this.persist();
   }
@@ -946,6 +1049,14 @@ export class GameScene extends Phaser.Scene {
         advance(s, 'final');
         this.chapterEnd(3);
         break;
+      case 'quest-coast':
+        advance(s, 'coast');
+        this.hud.toast(t('newQuestCoast'));
+        break;
+      case 'finish-four':
+        advance(s, 'after');
+        this.chapterEnd(4);
+        break;
       case 'plus-offer':
         this.offerPlus();
         return;
@@ -1002,10 +1113,11 @@ export class GameScene extends Phaser.Scene {
   private static readonly ENDS = {
     1: { title: 'chapterOne', total: CHAPTER_ONE_STONES, many: 4, all: 'endOneAll', some: 'endOneSome', few: 'endOneFew' },
     2: { title: 'chapterTwo', total: CHAPTER_TWO_STONES, many: 10, all: 'endTwoAll', some: 'endTwoSome', few: 'endTwoFew' },
-    3: { title: 'chapterThree', total: MOONSTONES, many: 14, all: 'endThreeAll', some: 'endThreeSome', few: 'endThreeFew' },
+    3: { title: 'chapterThree', total: CHAPTER_THREE_STONES, many: 14, all: 'endThreeAll', some: 'endThreeSome', few: 'endThreeFew' },
+    4: { title: 'chapterFour', total: MOONSTONES, many: 18, all: 'endFourAll', some: 'endFourSome', few: 'endFourFew' },
   } as const;
 
-  private chapterEnd(chapter: 1 | 2 | 3) {
+  private chapterEnd(chapter: 1 | 2 | 3 | 4) {
     const s = this.state;
     const n = s.moonstones.length;
     const end = GameScene.ENDS[chapter];
@@ -1024,7 +1136,7 @@ export class GameScene extends Phaser.Scene {
       },
     ];
     // After the last chapter the knight can also begin again, keeping their tools.
-    if (chapter === 3) buttons.push({ label: t('newGamePlus'), fn: () => this.startPlus() });
+    if (chapter === 4) buttons.push({ label: t('newGamePlus'), fn: () => this.startPlus() });
     this.hud.showEnd(t(end.title), [t('endStats', { n, total: end.total, beaten: s.beaten, falls: s.falls }), ending], buttons);
   }
 
@@ -1060,6 +1172,8 @@ export class GameScene extends Phaser.Scene {
     if (w && (w.state === 'tipped' || w.state === 'down') && Math.hypot(w.x - hx, w.y - 12 - hy) < SWING_RADIUS + 26) this.hitWraith();
     const g = this.gloam;
     if (g && (g.state === 'down' || g.state === 'low') && Math.hypot(g.x - hx, g.y - g.lift - 10 - hy) < reach + 26) this.hitGloam();
+    const bw = this.brine;
+    if (bw && (bw.state === 'beached' || bw.state === 'up') && Math.hypot(bw.x - hx, bw.y - 12 - hy) < reach + 30) this.hitBrine();
     // The belfry's bells, one at a time.
     const bell = this.bells.find((b) => Math.hypot((b.x + 0.5) * TILE - hx, (b.y + 0.5) * TILE - hy) < SWING_RADIUS + 14);
     if (bell) this.ringBell(bell);
@@ -1151,7 +1265,7 @@ export class GameScene extends Phaser.Scene {
   /** Plants a bellseed in front of the knight; it bursts after FUSE_MS. */
   private plantSeed() {
     const s = this.state;
-    if (!s.items.seeds || this.roll || this.hook || this.bombs.length >= 2) return;
+    if (!s.items.seeds || this.roll || this.hook || this.fishing || this.bombs.length >= 2) return;
     if (s.seeds <= 0) {
       ui('refuse');
       this.hud.toast(t('noSeeds'));
@@ -1274,7 +1388,7 @@ export class GameScene extends Phaser.Scene {
     const d = mv.x || mv.y ? mv : DIRS[s.facing];
     const len = Math.hypot(d.x, d.y) || 1;
     this.roll = { t: 0, dx: d.x / len, dy: d.y / len };
-    this.rollCd = ROLL_COOLDOWN_MS * (hasUpgrade(s, 'boots') ? BOOTS.cooldown : 1);
+    this.rollCd = ROLL_COOLDOWN_MS * (hasUpgrade(s, 'boots') ? BOOTS.cooldown : 1) * (s.meal === 'skewer' ? SKEWER.cooldown : 1);
     sfx('roll');
     this.route = null;
     this.target = null;
@@ -1287,7 +1401,7 @@ export class GameScene extends Phaser.Scene {
 
   private fireVine() {
     const s = this.state;
-    if (!s.items.hookvine || this.hook || this.roll) return;
+    if (!s.items.hookvine || this.hook || this.roll || this.fishing) return;
     const d = DIRS[s.facing];
     this.hook = { x: s.x, y: s.y - 12, dx: d.x, dy: d.y, dist: 0, phase: 'out' };
     sfx('vine');
@@ -1327,15 +1441,16 @@ export class GameScene extends Phaser.Scene {
   /** Opens a seller's wares: each upgrade with its price, or that it is bought. */
   private openShop(seller: Seller) {
     const s = this.state;
-    const rows = UPGRADES.filter((u) => u.seller === seller).map((u) => ({
-      id: u.id,
-      cost: u.cost,
-      state: hasUpgrade(s, u.id) ? ('owned' as const) : u.needs && !s.items[u.needs] ? ('locked' as const) : ('buy' as const),
-    }));
+    const wares = UPGRADES.filter((u) => u.seller === seller);
+    const rows = wares.map((u) => {
+      const state = hasUpgrade(s, u.id) ? 'owned' : u.needs && !s.items[u.needs] ? 'locked' : 'buy';
+      return { name: t(u.id), text: t(`${u.id}Text`), label: state === 'owned' ? t('owned') : state === 'locked' ? t('notYet') : t('price', { n: u.cost }), live: state === 'buy' };
+    });
     this.route = null;
     this.target = null;
     this.stick = null;
-    this.hud.showShop(t(seller === 'baker' ? 'bakerName' : 'hermitName'), s.coins, rows, (id) => {
+    this.hud.showShop(t('shopTitle', { name: t(seller === 'baker' ? 'bakerName' : 'hermitName') }), null, s.coins, rows, (i) => {
+      const id = wares[i].id;
       if (!buy(s, id)) {
         ui('refuse');
         this.hud.toast(t('tooPoor'));
@@ -1360,6 +1475,179 @@ export class GameScene extends Phaser.Scene {
       const dot = this.add.circle(x, y, 3, colour).setDepth(y + 1);
       this.tweens.add({ targets: dot, x: x + Math.cos(a) * 20, y: y + Math.sin(a) * 14, alpha: 0, duration: 350, onComplete: () => dot.destroy() });
     }
+  }
+
+  // ---------------------------------------------------------------- the gust horn
+
+  /** The flag that remembers a mill or pinwheel turned. */
+  private millKey(p: Prop) {
+    return `mill-${this.map.id}-${p.x}-${p.y}`;
+  }
+
+  /** The windmill's pump empties the coast's inlet: its water turns to wet sand (path). */
+  private drain(map: MapDef) {
+    const d = map.drain!;
+    for (let ty = d.y; ty < d.y + d.h; ty++) for (let tx = d.x; tx < d.x + d.w; tx++) if (tileAt(map, tx, ty) === 'water') setTile(map, tx, ty, 'path');
+  }
+
+  /**
+   * Blows the gust horn: a cone of wind in front of the knight shoves foes back and makes them reel
+   * (it brings a lantern moth down), blows shots away, turns mills and pinwheels, and blows a
+   * surfaced Brinewyrm ashore.
+   */
+  private blowHorn() {
+    const s = this.state;
+    if (!s.items.horn || this.hornCd > 0 || this.roll || this.hook || this.fishing) return;
+    this.hornCd = GUST.cooldownMs;
+    sfx('gust');
+    this.route = null;
+    this.target = null;
+    const d = DIRS[s.facing];
+    const ox = s.x;
+    const oy = s.y - 10;
+    const inGust = (x: number, y: number) => {
+      const along = (x - ox) * d.x + (y - oy) * d.y;
+      const side = Math.abs((x - ox) * d.y - (y - oy) * d.x);
+      return along >= -8 && along <= GUST.range && side <= GUST.width + Math.max(0, along) * GUST.spread;
+    };
+    for (let i = 0; i < 7; i++) {
+      const off = (i - 3) * 7;
+      const sx = ox - d.y * off;
+      const sy = oy + d.x * off;
+      const streak = this.add.rectangle(sx, sy, d.x ? 12 : 2, d.y ? 12 : 2, 0xe8f4ff, 0.8).setDepth(s.y + 2);
+      this.tweens.add({ targets: streak, x: sx + d.x * GUST.range, y: sy + d.y * GUST.range, alpha: 0, duration: 280 + Math.abs(off) * 3, onComplete: () => streak.destroy() });
+    }
+    for (const f of this.foes) {
+      if (!f.alive || !inGust(f.x, f.y - 8)) continue;
+      if (f.kind === 'lantern') this.knockDown(f);
+      else f.stun = Math.max(f.stun, GUST.stunMs);
+      f.leap = 0;
+      for (let k = 0; k < GUST.push / 4; k++)
+        if (foeFree(this.map, this.standing, f.x + d.x * 4, f.y + d.y * 4, FOES[f.kind].flies)) {
+          f.x += d.x * 4;
+          f.y += d.y * 4;
+        }
+    }
+    this.seeds = this.seeds.filter((sd) => {
+      if (!inGust(sd.x, sd.y)) return true;
+      sd.sprite.destroy();
+      return false;
+    });
+    for (const m of this.mills) if (!m.turned && inGust(m.cx, m.cy)) this.turnMill(m);
+    const b = this.brine;
+    if (b && b.state === 'up' && inGust(b.x, b.y - 10)) this.beachBrine();
+  }
+
+  /** A gust turns a mill or a pinwheel; once all of them on the map turn, the map's `millFlag` is set. */
+  private turnMill(m: GameScene['mills'][number]) {
+    const s = this.state;
+    m.turned = true;
+    setFlag(s, this.millKey(m.prop));
+    sfx('whirr');
+    const flag = this.map.millFlag;
+    if (flag && !hasFlag(s, flag) && this.mills.every((x) => x.turned)) {
+      setFlag(s, flag);
+      sfx('chime');
+      if (this.map.drain) {
+        this.drain(this.map);
+        paintGround(this, this.map);
+        this.ground.setTexture(groundKey(this.map));
+        this.hud.toast(t('drained'));
+      } else {
+        this.hud.toast(t('gustsOpen'));
+        this.updateDoors();
+      }
+    } else this.hud.toast(t(m.prop.kind === 'mill' ? 'millTurns' : 'pinwheelTurns'));
+    this.persist();
+  }
+
+  // ---------------------------------------------------------------- fishing and cooking
+
+  /** Whether the knight can cast into a tile: water on a map with fish, with the rod. */
+  private fishable(tx: number, ty: number) {
+    return this.state.items.rod && !!this.map.fish && tileAt(this.map, tx, ty) === 'water';
+  }
+
+  /** Casts into the water tile: a bite comes after a while, and must be pulled in time. */
+  private startFishing(tx: number, ty: number) {
+    const s = this.state;
+    if (this.fishing || this.roll || this.hook || this.swing || !this.fishable(tx, ty)) return;
+    const fish = this.map.fish!;
+    if (s.fish[fish] >= FISH_MAX) {
+      ui('refuse');
+      this.hud.toast(t('fishFull', { fish: t(`${fish}Name`) }));
+      return;
+    }
+    const c = centre({ x: tx, y: ty });
+    const bobber = this.addWorld(this.add.image(c.x, c.y, 'bobber'), -4000);
+    const [lo, hi] = FISH_WAIT_MS;
+    this.fishing = { t: lo + Math.random() * (hi - lo), bite: false, fish, x: c.x, y: c.y, bobber };
+    sfx('cast');
+    this.route = null;
+    this.target = null;
+  }
+
+  /** Pulls the line in: a fish if it was biting, else nothing. */
+  private reel() {
+    const f = this.fishing;
+    if (!f) return;
+    const s = this.state;
+    if (f.bite) {
+      s.fish[f.fish] = Math.min(FISH_MAX, s.fish[f.fish] + 1);
+      sfx('catch');
+      this.hud.toast(t('fishCaught', { fish: t(f.fish), n: s.fish[f.fish] }));
+      this.persist();
+    } else this.hud.toast(t('fishTooSoon'));
+    this.endFishing();
+  }
+
+  private endFishing() {
+    this.fishing?.bobber.destroy();
+    this.fishing = null;
+  }
+
+  private updateFishing(dt: number) {
+    const f = this.fishing;
+    if (!f) return;
+    f.t -= dt;
+    if (!f.bite && f.t <= 0) {
+      f.bite = true;
+      f.t = BITE_MS;
+      sfx('bite');
+      this.hud.toast(t('fishBite'));
+    } else if (f.bite && f.t <= 0) {
+      this.hud.toast(t('fishLost'));
+      return this.endFishing();
+    }
+    // The float bobs on the water, and dips under when a fish bites.
+    const bob = settings.reduceMotion ? 0 : Math.sin(this.now / (f.bite ? 60 : 300)) * (f.bite ? 2 : 1.5);
+    f.bobber.setY(f.y + (f.bite ? 5 : 0) + bob);
+  }
+
+  /** The campfire: cook a meal from the creel's fish. */
+  private openCook() {
+    const s = this.state;
+    const rows = MEALS.map((m) => ({
+      name: t(m.id),
+      text: t(`${m.id}Text`),
+      label: s.meal === m.id ? t('eating') : s.fish[m.fish] >= m.n ? t('cook') : t('needFish', { fish: t(`${m.fish}Name`), n: m.n }),
+      live: s.meal !== m.id && s.fish[m.fish] >= m.n,
+    }));
+    this.route = null;
+    this.target = null;
+    this.stick = null;
+    const note = s.meal ? t('cookNow', { meal: t(s.meal) }) : t('cookNone');
+    this.hud.showShop(t('campfire'), note, null, rows, (i) => {
+      const m = MEALS[i];
+      if (!cook(s, m.id)) {
+        ui('refuse');
+        return;
+      }
+      sfx('sizzle');
+      this.hud.toast(t('ate', { meal: t(m.id) }));
+      this.persist();
+      this.hud.closeShop();
+    });
   }
 
   // ---------------------------------------------------------------- the loop
@@ -1389,6 +1677,7 @@ export class GameScene extends Phaser.Scene {
       if (this.trial) this.trial.ms += dt;
       this.swingCd = Math.max(0, this.swingCd - dt);
       this.rollCd = Math.max(0, this.rollCd - dt);
+      this.hornCd = Math.max(0, this.hornCd - dt);
       this.invuln = Math.max(0, this.invuln - dt);
       this.movePlayer(dt);
       this.updateHook(dt);
@@ -1398,6 +1687,8 @@ export class GameScene extends Phaser.Scene {
       this.updateBoss(dt);
       this.updateWraith(dt);
       this.updateGloam(dt);
+      this.updateBrine(dt);
+      this.updateFishing(dt);
       this.updateWisp(dt);
       this.pickups();
       this.updateDoors();
@@ -1420,7 +1711,8 @@ export class GameScene extends Phaser.Scene {
     }
     if (this.roll) {
       this.roll.t += dt;
-      this.tryMove(this.roll.dx * ROLL_SPEED * sec, this.roll.dy * ROLL_SPEED * sec);
+      const speed = ROLL_SPEED * (s.meal === 'skewer' ? SKEWER.speed : 1);
+      this.tryMove(this.roll.dx * speed * sec, this.roll.dy * speed * sec);
       if (this.roll.t >= this.rollMs()) this.roll = null;
       return;
     }
@@ -1429,6 +1721,8 @@ export class GameScene extends Phaser.Scene {
     if (mv.x || mv.y) {
       this.route = null;
       this.target = null;
+      // Walking off pulls the line in.
+      if (this.fishing) this.endFishing();
     } else if (this.target?.kind === 'foe') {
       mv = this.chase(dt);
     } else if (this.route?.length) {
@@ -1617,13 +1911,14 @@ export class GameScene extends Phaser.Scene {
       const ty = Math.floor((h.y + 12) / TILE);
       const t = tileAt(this.map, tx, ty);
       const blocked = (SOLID.has(t) && !LOW.has(t)) || this.blockers.has(ty * this.map.w + tx) || this.closedDoors.has(ty * this.map.w + tx);
-      if (blocked || h.dist >= VINE_RANGE * (hasUpgrade(s, 'vine') ? LONG_VINE : 1)) h.phase = 'back';
+      if (blocked || h.dist >= VINE_RANGE * (hasUpgrade(s, 'vine') ? LONG_VINE : 1) * (s.meal === 'chowder' ? CHOWDER : 1)) h.phase = 'back';
     }
   }
 
   private hurt(damage: number, from: { x: number; y: number }) {
     const s = this.state;
     if (this.invuln > 0 || this.roll || this.hook?.phase === 'pull') return;
+    if (this.fishing) this.endFishing();
     s.hp = Math.max(0, s.hp - damage);
     // Sedge's moon charm keeps harm off a while longer.
     this.invuln = HURT_MS * (hasUpgrade(s, 'charm') ? CHARM : 1);
@@ -1640,6 +1935,8 @@ export class GameScene extends Phaser.Scene {
   private fall() {
     const s = this.state;
     s.falls++;
+    // A meal lasts until the next fall.
+    endMeal(s);
     s.hp = s.maxHp;
     const sp = s.spawn;
     const lost = !!this.trial;
@@ -1752,7 +2049,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** A toast that shows once since the page opened, to teach the armoured foes. */
-  private hint(key: 'beetleFlipped' | 'lanternDown' | 'shellHard' | 'gloamHigh') {
+  private hint(key: 'beetleFlipped' | 'lanternDown' | 'shellHard' | 'gloamHigh' | 'brineSlick') {
     if (this.hinted.has(key)) return;
     this.hinted.add(key);
     this.hud.toast(t(key));
@@ -1780,7 +2077,14 @@ export class GameScene extends Phaser.Scene {
     f.alive = false;
     this.state.beaten++;
     if (f.kind === 'beetle') awardNow('bellyUp');
-    this.puff(f.x, f.y - 10, f.kind === 'moth' ? 0xc8bce0 : f.kind === 'lantern' ? 0xf0c070 : f.kind === 'beetle' ? 0x3a7a8a : f.kind === 'shade' ? 0x40466a : 0x6a8a4a);
+    // The bestiary: a page fills at PAGE_AT, a family with every page filled drops an extra coin.
+    const book = this.state.bestiary;
+    const family = familyOf(f.kind);
+    const had = familyDone(book, family);
+    book[f.kind] = (book[f.kind] ?? 0) + 1;
+    if (book[f.kind] === PAGE_AT) this.hud.toast(!had && familyDone(book, family) ? t('familyFull', { family: t(family) }) : t('pageFilled', { name: t(FOE_PAGE[f.kind].name) }));
+    if (familyDone(book, family)) this.dropCoin(f.x + 4, f.y - 10);
+    this.puff(f.x, f.y - 10, f.kind === 'moth' ? 0xc8bce0 : f.kind === 'lantern' ? 0xf0c070 : f.kind === 'beetle' ? 0x3a7a8a : f.kind === 'shade' ? 0x40466a : f.kind === 'crab' ? 0xc8603a : f.kind === 'gull' ? 0xe8eef4 : 0x6a8a4a);
     f.sprite.destroy();
     if (DUNGEONS.has(this.map.id) && f.index >= 0) setFlag(this.state, this.foeFlag(f.index));
     // Every foe leaves a coin (two with Wren's deep purse), and sometimes a heart or a seed pod beside it.
@@ -1830,6 +2134,38 @@ export class GameScene extends Phaser.Scene {
           }
           vx = f.dir.x * info.speed;
           vy = f.dir.y * info.speed;
+        }
+      } else if (f.kind === 'crab') {
+        // A crab scuttles sideways at the knight, and only creeps up or down.
+        if (sees) {
+          vx = Math.sign(dx) * info.speed * 1.6 * Math.min(1, Math.abs(dx) / 24);
+          vy = (dy / dist) * info.speed * 0.5;
+        } else {
+          if (f.t <= 0) {
+            f.dir = { x: Math.random() < 0.3 ? 0 : Math.random() < 0.5 ? -1 : 1, y: 0 };
+            f.t = 1200 + Math.random() * 1200;
+          }
+          vx = f.dir.x * info.speed;
+        }
+      } else if (f.kind === 'gull') {
+        // A gull wheels round the knight, then swoops through where they stand.
+        if (f.leap > 0) {
+          f.leap -= dt;
+          vx = f.dir.x * GULL_SWOOP_SPEED;
+          vy = f.dir.y * GULL_SWOOP_SPEED;
+        } else if (sees) {
+          const k = (dist - 90) / dist;
+          vx = dx * k * 1.2 + (-dy / dist) * 60;
+          vy = dy * k * 1.2 + (dx / dist) * 60;
+          if (f.t <= 0) {
+            f.t = GULL_SWOOP_MS + Math.random() * 800;
+            f.dir = { x: dx / dist, y: dy / dist };
+            f.leap = 650;
+            sfx('caw');
+          }
+        } else {
+          vx = f.home.x + Math.cos(this.now / 1000 + f.index) * 60 - f.x;
+          vy = f.home.y + Math.sin(this.now / 800 + f.index) * 30 - f.y;
         }
       } else if (f.kind === 'moth' || f.kind === 'shade') {
         const wob = Math.sin(this.now / 220 + f.index);
@@ -1887,12 +2223,12 @@ export class GameScene extends Phaser.Scene {
       const quick = s.cycle > 0 ? PLUS.speed : 1;
       const nx = f.x + vx * sec * quick;
       const ny = f.y + vy * sec * quick;
-      // A foe that bumps into something turns at once; a frog just ends its leap.
+      // A foe that bumps into something turns at once; a frog or a swooping gull just ends its leap.
       if (foeFree(this.map, this.standing, nx, f.y, info.flies)) f.x = nx;
-      else if (f.kind === 'frog') f.leap = 0;
+      else if (f.kind === 'frog' || f.kind === 'gull') f.leap = 0;
       else f.t = 0;
       if (foeFree(this.map, this.standing, f.x, ny, info.flies)) f.y = ny;
-      else if (f.kind === 'frog') f.leap = 0;
+      else if (f.kind === 'frog' || f.kind === 'gull') f.leap = 0;
       else f.t = 0;
       // A lantern moth flies too high to bump into.
       if (f.kind !== 'lantern' && Math.hypot(s.x - f.x, s.y - f.y) < 18) this.hurt(info.damage * (s.cycle > 0 ? PLUS.damage : 1), f);
@@ -2393,6 +2729,180 @@ export class GameScene extends Phaser.Scene {
     else g.shadow.setPosition(g.x, g.y).setScale(texScale('bell-shadow') * (0.6 + (1 - g.lift / GLOAM.lift) * 0.4)).setAlpha(0.6);
   }
 
+  // ---------------------------------------------------------------- the Brinewyrm
+
+  private makeBrine(map: MapDef) {
+    const p = map.pool!;
+    const left = p.x * TILE;
+    const right = (p.x + p.w) * TILE;
+    const top = p.y * TILE;
+    const bottom = (p.y + p.h) * TILE;
+    const cx = (left + right) / 2;
+    const cy = (top + bottom) / 2;
+    // Where it rises at each edge of the pool, and the shore a gust blows it onto.
+    const spots = [
+      { wx: cx, wy: top + 18, sx: cx, sy: top - 22 },
+      { wx: right - 18, wy: cy, sx: right + 24, sy: cy },
+      { wx: cx, wy: bottom - 14, sx: cx, sy: bottom + 22 },
+      { wx: left + 18, wy: cy, sx: left - 24, sy: cy },
+    ];
+    const ripple = this.addWorld(this.add.image(cx, cy, 'ripple'), -4000);
+    const sprite = this.add.image(cx, cy, 'wyrm').setOrigin(0.5, 0.95).setScale(texScale('wyrm')).setVisible(false);
+    this.world.push(sprite);
+    this.brine = { x: cx, y: cy, state: 'under', t: BRINE.underMs, hp: this.hard ? TRIAL.brineHp : BRINE.hp, spot: 2, spots, sprite, ripple, shotT: BRINE.spitMs, summonT: SUMMON_MS, awake: false };
+  }
+
+  /** A gust blows the surfaced Brinewyrm onto the shore beside it, where it flops and can be struck. */
+  private beachBrine() {
+    const b = this.brine!;
+    const sp = b.spots[b.spot];
+    b.state = 'beached';
+    b.t = BRINE.beachedMs * (this.hard ? TRIAL.brineBeached : 1);
+    b.x = sp.sx;
+    b.y = sp.sy;
+    sfx('splash');
+    sfx('thud');
+    this.puff(sp.wx, sp.wy - 10, 0xc8f4ea);
+    this.hud.toast(t('brineBeached'));
+  }
+
+  /** It slips back under the water from wherever it is. */
+  private sinkBrine() {
+    const b = this.brine!;
+    const sp = b.spots[b.spot];
+    b.x = sp.wx;
+    b.y = sp.wy;
+    b.state = 'sink';
+    b.t = BRINE.sinkMs;
+    sfx('splash', { pitch: 0.8 });
+  }
+
+  private hitBrine() {
+    const b = this.brine!;
+    if (b.state !== 'beached') {
+      this.hint('brineSlick');
+      return;
+    }
+    b.hp--;
+    sfx('squelch', { pitch: 0.7 });
+    sfx('wail', { pitch: b.hp > 0 ? 0.6 : 0.5 });
+    this.puff(b.x, b.y - 16, 0x6aa898);
+    if (!settings.reduceMotion) this.flashes.push({ x: b.x, y: b.y - 20, r: 140, col: [160, 250, 220], power: 1, t: 400 });
+    if (b.hp <= 0) return this.brineDown();
+    this.hud.toast(t('brineFlees'));
+    this.sinkBrine();
+  }
+
+  private brineDown() {
+    const s = this.state;
+    const b = this.brine!;
+    this.puff(b.x, b.y - 20, 0x6aa898);
+    this.tweens.add({ targets: [b.sprite, b.ripple], alpha: 0, duration: 900 });
+    this.brine = null;
+    playSting(STINGS, 'victory');
+    this.playAreaMusic();
+    for (const sd of this.seeds) sd.sprite.destroy();
+    this.seeds = [];
+    for (const f of this.foes)
+      if (f.room === 'boss') {
+        f.alive = false;
+        f.sprite.destroy();
+      }
+    if (this.trial) return this.trialWon();
+    setFlag(s, 'brine');
+    advance(s, 'tidings');
+    give(s, 'heart');
+    this.stoneSprites.get('g-boss')?.setVisible(true);
+    this.openDialog('', [t('brineBeaten'), t('foundHeart'), t('brineQuiet')]);
+    this.persist();
+  }
+
+  private updateBrine(dt: number) {
+    const b = this.brine;
+    if (!b) return;
+    const s = this.state;
+    if (!b.awake) {
+      if (!this.inRoom('boss')) return;
+      b.awake = true;
+      this.playAreaMusic();
+      this.hud.showPlace(t('brinewyrm'));
+    }
+    const room = this.map.rooms.find((r) => r.id === 'boss')!;
+    const sp = b.spots[b.spot];
+    b.t -= dt;
+    if (b.state === 'under') {
+      // A ripple glides under the water to where it will rise.
+      b.x += (sp.wx - b.x) * Math.min(1, dt / 400);
+      b.y += (sp.wy - b.y) * Math.min(1, dt / 400);
+      if (b.t <= 0) {
+        b.state = 'rise';
+        b.t = BRINE.riseMs;
+        b.x = sp.wx;
+        b.y = sp.wy;
+        sfx('splash');
+      }
+    } else if (b.state === 'rise') {
+      if (b.t <= 0) {
+        b.state = 'up';
+        b.t = BRINE.upMs * (this.hard ? TRIAL.brineUp : 1);
+        b.shotT = BRINE.spitMs * 0.6;
+      }
+    } else if (b.state === 'up') {
+      b.shotT -= dt;
+      if (b.shotT <= 0) {
+        b.shotT = BRINE.spitMs;
+        sfx('spit', { pitch: 0.7 });
+        // A fan of brine at the knight's body, sinking from its mouth on the way like an ember.
+        const lift = 40;
+        const dx = s.x - b.x;
+        const dy = s.y - 14 - (b.y - lift);
+        const fly = Math.hypot(dx, dy) || 1;
+        const shots = BRINE.shots + (this.hard ? 2 : 0);
+        for (let i = 0; i < shots; i++) {
+          const a = Math.atan2(dy, dx) + (i - (shots - 1) / 2) * BRINE.spread;
+          this.shoot(b.x, b.y - lift, Math.cos(a), Math.sin(a), 'brine', lift, ((lift - 14) * SEED_SPEED) / fly);
+        }
+      }
+      if (b.t <= 0) this.sinkBrine();
+    } else if (b.state === 'beached') {
+      if (b.t <= 0) this.sinkBrine();
+      // It lies in the way on the shore: the knight can't stand inside it.
+      const dx = s.x - b.x;
+      const dy = s.y - b.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist < 28) this.tryMove(((dx || 1) / (dist || 1)) * (28 - dist), (dy / (dist || 1)) * (28 - dist));
+    } else if (b.state === 'sink') {
+      if (b.t <= 0) {
+        b.state = 'under';
+        b.t = BRINE.underMs;
+        // It rises next at another edge of the pool.
+        b.spot = (b.spot + 1 + Math.floor(Math.random() * 3)) % 4;
+      }
+    }
+    // Crabs out of the deep while the knight fights it.
+    b.summonT -= dt;
+    if (b.summonT <= 0) {
+      b.summonT = SUMMON_MS * (this.hard ? TRIAL.summon : 1);
+      if (this.foes.filter((f) => f.alive && f.room === 'boss').length < 2) {
+        const c = centre({ x: Math.random() < 0.5 ? room.x + 2 : room.x + room.w - 3, y: room.y + room.h - 2 });
+        this.spawnFoe('crab', c.x, c.y, -1, 'boss');
+      }
+    }
+    // Drawing: its neck rising out of the water, or lying on the shore.
+    const shown = b.state !== 'under';
+    const k = b.state === 'rise' ? 1 - Math.max(0, b.t) / BRINE.riseMs : b.state === 'sink' ? Math.max(0, b.t) / BRINE.sinkMs : 1;
+    const beached = b.state === 'beached';
+    const sway = settings.reduceMotion ? 0 : Math.sin(this.now / 260) * (beached ? 6 : 3);
+    b.sprite
+      .setVisible(shown)
+      .setPosition(b.x, b.y + (beached ? 10 : 0))
+      .setScale(texScale('wyrm'), texScale('wyrm') * Math.max(0.05, k))
+      .setAngle((beached ? (sp.sx < sp.wx ? -80 : 80) : 0) + sway)
+      .setDepth(b.y + 2);
+    const ripple = settings.reduceMotion ? 1 : 1 + Math.sin(this.now / 180) * 0.12;
+    b.ripple.setVisible(!beached).setPosition(b.state === 'under' ? b.x : sp.wx, (b.state === 'under' ? b.y : sp.wy) + 2).setScale(texScale('ripple') * ripple);
+  }
+
   private updateWisp(dt: number) {
     const w = this.wisp;
     const path = this.map.wisp;
@@ -2474,9 +2984,11 @@ export class GameScene extends Phaser.Scene {
         : f.kind === 'lantern' ? (f.down > 0 || !flap ? 'lantern-b' : 'lantern-a')
         : f.kind === 'beetle' && f.down > 0 ? 'beetle-back'
         : f.kind === 'shade' ? (flap ? 'shade' : 'shade-b')
+        : f.kind === 'gull' ? (flap ? 'gull-a' : 'gull-b')
         : f.kind;
       const lift =
         f.kind === 'moth' || f.kind === 'shade' ? 12
+        : f.kind === 'gull' ? (f.down > 0 || f.stun > 0 ? 4 : f.leap > 0 ? 8 : 16)
         : f.kind === 'lantern' ? (f.down > 0 ? 2 : LANTERN_LIFT + (settings.reduceMotion ? 0 : Math.sin(this.now / 300 + f.index) * 3))
         : f.kind === 'frog' && f.leap > 0 ? Math.sin((1 - f.leap / FROG_LEAP_MS) * Math.PI) * 10
         : 0;
@@ -2497,6 +3009,8 @@ export class GameScene extends Phaser.Scene {
     }
     // The hidden bridges fade in where the Moonlantern shines; a moved moonstone glimmers in the knight's light.
     for (const [, img] of this.veilSprites) img.setAlpha(this.moonlight(img.x, img.y, VEIL_PX));
+    // A mill or pinwheel the horn has blown on keeps turning.
+    for (const m of this.mills) if (m.turned) m.head.setAngle((this.now / (m.prop.kind === 'mill' ? 30 : 6)) % 360);
     for (const [, img] of this.glimmers) {
       const near = Phaser.Math.Clamp(1.2 - Math.hypot(img.x - s.x, img.y - s.y) / GLIMMER_PX, 0, 1);
       img.setAlpha(near * (settings.reduceMotion ? 0.9 : 0.65 + Math.sin(this.now / 160 + img.x) * 0.35));
@@ -2508,6 +3022,9 @@ export class GameScene extends Phaser.Scene {
     for (const [, img] of this.findSprites) lights.push({ x: img.x, y: img.y - 6, r: 34, col: [255, 240, 200], power: 0.5 });
     const g = this.gloam;
     if (g) lights.push({ x: g.x, y: g.y - g.lift - 10, r: 130, col: [160, 170, 255], power: 0.6 });
+    const bw = this.brine;
+    if (bw && bw.awake) lights.push({ x: bw.x, y: bw.y - 30, r: 120, col: [140, 240, 210], power: bw.state === 'under' ? 0.3 : 0.6 });
+    if (this.fishing) lights.push({ x: this.fishing.x, y: this.fishing.y, r: 30, col: [255, 230, 170], power: 0.5 });
     for (const [, img] of this.stoneSprites) if (img.visible) lights.push({ x: img.x, y: img.y, r: 40, col: [170, 210, 255], power: 0.6 });
     if (this.wisp) lights.push({ x: this.wisp.sprite.x, y: this.wisp.sprite.y, r: 110, col: [170, 230, 255], power: 0.9 });
     if (this.boss) {

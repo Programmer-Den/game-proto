@@ -84,6 +84,22 @@ export const sfx = sounds({
   swoop: { wave: 'noise', freq: 3000, to: 400, length: 0.4, volume: 0.32, gap: 300 },
   /** The Gloamwing struck while it lies on the floor. */
   screech: { wave: 'sawtooth', freq: 1400, to: 500, length: 0.45, attack: 0.02, volume: 0.2, gap: 300, vary: 0.05 },
+  /** The gust horn blown: a low horn note under a rush of wind. */
+  gust: { wave: 'noise', freq: 900, to: 2600, length: 0.4, attack: 0.04, volume: 0.3, gap: 300 },
+  /** A mill's sails or a pinwheel set turning. */
+  whirr: { wave: 'pulse25', freq: 140, to: 420, length: 0.5, volume: 0.18, gap: 300 },
+  /** The fishing line cast. */
+  cast: { wave: 'sine', freq: 900, to: 300, length: 0.18, volume: 0.22, gap: 200 },
+  /** A fish bites: the float dips. */
+  bite: { wave: 'triangle', freq: 660, arp: [0, 0, 7], arpStep: 0.05, length: 0.18, volume: 0.32, gap: 200 },
+  /** A fish landed. */
+  catch: { wave: 'triangle', freq: 784, arp: [0, 4, 7, 12], arpStep: 0.06, length: 0.32, volume: 0.3, gap: 200 },
+  /** A meal cooked at a campfire. */
+  sizzle: { wave: 'noise', freq: 4200, to: 2600, length: 0.5, volume: 0.18, gap: 300 },
+  /** A storm gull swoops. */
+  caw: { wave: 'sawtooth', freq: 1100, to: 700, length: 0.16, volume: 0.12, gap: 400, vary: 0.08 },
+  /** The Brinewyrm rises, sinks or is blown ashore. */
+  splash: { wave: 'noise', freq: 1200, to: 220, length: 0.35, volume: 0.32, gap: 150 },
   /** Walking into another map. */
   swell: { wave: 'sine', freq: 220, to: 440, length: 0.6, attack: 0.3, volume: 0.2, gap: 400 },
 });

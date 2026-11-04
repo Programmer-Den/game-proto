@@ -1,6 +1,7 @@
 // The things that bite back: slugs, moths, thornlings, frogs, shelled beetles, lantern moths and
 // shades, the thornlings' seeds and the lantern moths' embers, the Thornmother at the bottom of the
-// shrine with her three bulbs, the Bellwraith in the belfry and the Gloamwing in the Glass Caverns.
+// shrine with her three bulbs, the Bellwraith in the belfry, the Gloamwing in the Glass Caverns,
+// rock crabs and storm gulls on the coast, the Brinewyrm in the Brine Grotto, and the bestiary's families.
 
 import Phaser from 'phaser';
 import { texScale } from '../art/paint';
@@ -26,7 +27,35 @@ export const FOES: Record<EnemyKind, FoeInfo> = {
   beetle: { hp: 3, speed: 40, sees: 160, damage: 1 },
   lantern: { hp: 2, speed: 64, sees: 220, damage: 1, flies: true },
   shade: { hp: 2, speed: 60, sees: 190, damage: 1, flies: true },
+  crab: { hp: 2, speed: 46, sees: 170, damage: 1 },
+  gull: { hp: 1, speed: 96, sees: 230, damage: 1, flies: true },
 };
+
+/**
+ * The bestiary: every kind of foe in a family. Beating `PAGE_AT` of a kind fills its page; a family
+ * whose pages are all filled drops one more coin from each of its foes (`familyDone`).
+ */
+export type FamilyId = 'crawlers' | 'moths' | 'wilds';
+export const FAMILIES: { id: FamilyId; kinds: EnemyKind[] }[] = [
+  { id: 'crawlers', kinds: ['slug', 'beetle', 'crab'] },
+  { id: 'moths', kinds: ['moth', 'lantern', 'shade'] },
+  { id: 'wilds', kinds: ['thornling', 'frog', 'gull'] },
+];
+export const PAGE_AT = 3;
+
+/** Whether every page of a family is filled. */
+export function familyDone(bestiary: Partial<Record<EnemyKind, number>>, id: FamilyId) {
+  return FAMILIES.find((f) => f.id === id)!.kinds.every((k) => (bestiary[k] ?? 0) >= PAGE_AT);
+}
+
+/** The family a kind of foe belongs to. */
+export function familyOf(kind: EnemyKind) {
+  return FAMILIES.find((f) => f.kinds.includes(kind))!.id;
+}
+
+/** A storm gull wheels high, then swoops on the knight this often, this fast. */
+export const GULL_SWOOP_MS = 2400;
+export const GULL_SWOOP_SPEED = 230;
 
 /** A shade is all but invisible outside the knight's light: this far from them it starts to show. */
 export const SHADE_SEEN_PX = 130;
@@ -84,7 +113,32 @@ export const HOVER_SPEED = 85;
  * up less long, her volleys come faster and wider and she calls more slugs; the Bellwraith takes more
  * hits, hunts faster and shows itself for less time.
  */
-export const TRIAL = { bulbUp: 0.8, volley: 0.75, volleyShots: 12, summon: 0.75, summoned: 3, wraithHp: 5, hover: 0.7, hoverSpeed: 1.3, exposed: 0.8, gloamHp: 6, gloamCircle: 0.7, gloamLow: 0.75 };
+export const TRIAL = { bulbUp: 0.8, volley: 0.75, volleyShots: 12, summon: 0.75, summoned: 3, wraithHp: 5, hover: 0.7, hoverSpeed: 1.3, exposed: 0.8, gloamHp: 6, gloamCircle: 0.7, gloamLow: 0.75, brineHp: 6, brineUp: 0.75, brineBeached: 0.8 };
+
+/**
+ * The Brinewyrm, a sea serpent in the grotto's pool: it swims under the water to one of four spots
+ * at the pool's edge (`underMs`), rises (`riseMs`) and stays up (`upMs`) spitting fans of brine
+ * (`spitMs`, `shots`), then sinks again. A blast of the gust horn while it is up blows it ashore at
+ * that spot's edge, where it flops for `beachedMs`; one sword hit sends it back into the deep. A
+ * swing while it is up only shows the `brineSlick` hint. `hp` hits beat it.
+ */
+export const BRINE = { hp: 4, underMs: 1600, riseMs: 450, upMs: 3000, spitMs: 1000, shots: 3, spread: 0.28, beachedMs: 2800, sinkMs: 450, lift: 26 };
+export type BrineState = 'under' | 'rise' | 'up' | 'beached' | 'sink';
+export interface Brine {
+  x: number;
+  y: number;
+  state: BrineState;
+  t: number;
+  hp: number;
+  /** The spot it rises at, by index into `spots`: a point in the water and the shore beside it. */
+  spot: number;
+  spots: { wx: number; wy: number; sx: number; sy: number }[];
+  sprite: Phaser.GameObjects.Image;
+  ripple: Phaser.GameObjects.Image;
+  shotT: number;
+  summonT: number;
+  awake: boolean;
+}
 
 /**
  * The Gloamwing, a moth of the dark itself: it circles high over its hall (`GLOAM.circleMs`) and
