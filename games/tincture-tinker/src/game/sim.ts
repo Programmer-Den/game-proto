@@ -24,7 +24,8 @@ import {
 import { randomKind, type Kind } from './kinds';
 import { MOVE_BONUS, TWIN_BONUS, type PotionId } from './orders';
 import { starsFor } from './ranks';
-import { drawPantry, filled, firstNeeds, progressOf, startOrder, stockPantry, tileMaker, wanted, type GameState } from './state';
+import { drawPantry, filled, firstNeeds, progressOf, startDailyOrder, startEndless, startOrder, startTown, stockPantry, tileMaker, wanted, type GameState } from './state';
+import { TOWN_STAR_COINS } from './towns';
 
 /** One round of a swap's outcome: the tiles matched, then the board once the rest have fallen. */
 export interface Step {
@@ -183,6 +184,21 @@ function resolve(s: GameState, board: Board, prefer: Cell[], extra?: Extra, char
     s.earned = s.passed ? s.current.price + s.moves * MOVE_BONUS : 0;
     s.coins += s.earned;
     if (s.passed) s.seals++;
+  } else if (filled(s) && (s.current.town || s.current.endless || s.current.daily)) {
+    // A town, an endless run's order or the daily: it pays, and leaves the orders, the stars and the
+    // pantry as they were. A town pays only for the stars it hadn't given before, and keeps the best.
+    s.phase = 'sold';
+    s.orderStars = starsFor(s.moves);
+    const town = s.current.town;
+    if (town) {
+      const best = s.towns[town.index] ?? 0;
+      s.earned = Math.max(0, s.orderStars - best) * TOWN_STAR_COINS;
+      s.towns[town.index] = Math.max(best, s.orderStars);
+    } else {
+      s.earned = s.current.price + s.moves * MOVE_BONUS;
+    }
+    if (s.current.endless) s.endless = Math.max(s.endless, s.current.endless);
+    s.coins += s.earned;
   } else if (filled(s)) {
     stockPantry(s);
     s.phase = 'sold';
@@ -230,6 +246,8 @@ function gather(s: GameState, board: Board, prefer: Cell[], extra?: Extra): Step
     for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) if (inBoard({ row: a.row + dr, col: a.col + dc })) swept.add(key({ row: a.row + dr, col: a.col + dc }));
   }
   for (const i of swept) hit.add(i);
+  // A town's walls are never gathered: a swept row or square passes over them.
+  for (const i of [...hit]) if (tile(i).hole) hit.delete(i);
   // Only the Catalysts that fired count, not ones another special swept up.
   s.fired += [...firing].filter((i) => tile(i).catalyst).length;
   s.bloomsFired += areas.length;
@@ -366,7 +384,7 @@ export function sift(s: GameState, row: number): Tile[] | null {
  * melts, a Catalyst or Bloom fires) and the board plays out. Null if it can't be bought.
  */
 export function pestle(s: GameState, cell: Cell): Step[] | null {
-  if (!canUse(s, 'pestle') || !inBoard(cell)) return null;
+  if (!canUse(s, 'pestle') || !inBoard(cell) || s.board[cell.row][cell.col].hole) return null;
   s.coins -= TOOLS.pestle.cost;
   return resolve(s, s.board, [], { cells: [cell], fire: true });
 }
@@ -394,3 +412,9 @@ export function funnel(s: GameState, a: Cell, b: Cell): Step[] | null {
 export const nextOrder = (s: GameState) => startOrder(progressOf(s));
 /** The next guild examination (the same one again after a failed try). */
 export const nextExam = (s: GameState) => startOrder(progressOf(s), true);
+/** Town `index` of the journey map (the same board again on a second try). */
+export const nextTown = (s: GameState, index: number) => startTown(progressOf(s), index);
+/** Order `step` of an endless run: 1 starts a new run. */
+export const nextEndless = (s: GameState, step: number) => startEndless(progressOf(s), step);
+/** The daily order for `day`. */
+export const nextDaily = (s: GameState, day: string) => startDailyOrder(progressOf(s), day);
