@@ -92,6 +92,9 @@ import {
   WARD_AI,
   WARD_SPOTS,
   bountyOf,
+  RANKED_AI,
+  SUDDEN_DEATH,
+  EVENTS,
 } from './data';
 import { DeathRecap, GameState, HitHow, ObjectiveTitle, RecapRow, SoundId, Unit, dist, getUnit, laneNear, levelFor, refreshStats, spawnMercs, spawnWard, spawnWave } from './state';
 import { shortName } from './names';
@@ -137,11 +140,18 @@ export function tick(s: GameState, dt: number) {
     notice(s, text(night ? 'noticeNightfall' : 'noticeDaybreak'), night ? '#9fb4ff' : '#f2c14e');
     sound(s, night ? 'nightfall' : 'daybreak');
   }
+  if (s.event === 'suddenDeath' && !s.suddenDeath && s.time >= SUDDEN_DEATH.at) {
+    s.suddenDeath = true;
+    notice(s, text('noticeSuddenDeath'), '#ff6a5a');
+    sound(s, 'suddenDeath');
+    aiLog('blue', 'Sudden death: no more respawns');
+  }
   if (s.pings.length && s.time - s.pings[0].at > PING.showMs) s.pings = s.pings.filter((p) => s.time - p.at <= PING.showMs);
   for (const u of [...s.units]) updateUnit(s, u, dt);
   separate(s);
   updateProjectiles(s, dt);
   updateZones(s, dt);
+  if (s.suddenDeath && s.phase === 'playing') checkWipe(s);
   // Dead minions and wards are gone for good; their slots are cleaned up here.
   s.units = s.units.filter((u) => !(u.dead && (u.kind === 'minion' || u.kind === 'ward')));
   if (s.phase !== 'playing') return;
@@ -275,7 +285,7 @@ function updateObjective(s: GameState) {
     if (!gone && s.time < o.endsAt) return;
     const p = getUnit(s, s.player);
     if (done && p) {
-      p.gold += o.gold;
+      earn(s, p, o.gold);
       if (o.banner === 'siege') s.siegeUntil = s.time + SIEGE.ms;
       s.objectivesDone++;
       if (t) s.fx.push({ kind: 'ring', x: t.x, y: t.y, r: 80, color: '#f2c14e', ms: 700 });
@@ -503,7 +513,7 @@ export function castSpell(s: GameState, u: Unit, aim: Vec): boolean {
 
 /** An AI champion's battle spell: a shield, heal or blink away when low with a foe near, a firebrand to finish one. */
 function aiSpell(s: GameState, u: Unit) {
-  if (!u.spell || u.spellCd > 0 || u.dead || s.time < SPELL_AI.from) return;
+  if (!u.spell || u.spellCd > 0 || u.dead || s.time < SPELL_AI.from - smarts(s, u) * RANKED_AI.spellSooner) return;
   const foe = nearest(s, u, SPELL_AI.look, (e) => e.kind === 'champion');
   if (!foe) return;
   const low = u.hp < u.maxHp * SPELL_AI.low;
@@ -645,7 +655,7 @@ export function buybackCost(u: Unit): number {
 
 /** Pays for a dead champion to respawn at once, once per `BUYBACK.cd`. Returns false if it can't. */
 export function buyBack(s: GameState, u: Unit): boolean {
-  if (s.phase !== 'playing' || !u.dead || !u.champ || s.time < u.buybackReadyAt) return false;
+  if (s.phase !== 'playing' || !u.dead || !u.champ || s.time < u.buybackReadyAt || s.suddenDeath) return false;
   const cost = buybackCost(u);
   if (u.gold < cost) return false;
   u.gold -= cost;
@@ -876,7 +886,7 @@ function breakPlates(s: GameState, t: Unit) {
     if (!near.length) continue;
     const gold = Math.round(PLATING.gold / near.length);
     for (const c of near) {
-      c.gold += gold;
+      earn(s, c, gold);
       if (c.player) s.fx.push({ kind: 'coin', x: t.x, y: t.y - 40, gold, color: '#f2c14e', ms: 900 });
     }
     sound(s, 'plate', t, near.some((c) => c.player));
@@ -955,13 +965,19 @@ function takenMult(s: GameState, t: Unit): number {
  */
 export function invulnerable(s: GameState, u: Unit): boolean {
   if (u.kind === 'inhibitor') return s.units.some((t) => t.kind === 'tower' && !t.dead && t.side === u.side && t.lane === u.lane);
-  if (u.kind === 'nexus') return !s.units.some((t) => t.kind === 'inhibitor' && t.dead && t.side === u.side);
+  // Sudden death lifts the Nexus wards, so the match ends.
+  if (u.kind === 'nexus') return !s.suddenDeath && !s.units.some((t) => t.kind === 'inhibitor' && t.dead && t.side === u.side);
   return false;
 }
 
 /** Whether a team can't see a unit this tick: in the fog, in a bush or in stealth. */
 export function hiddenFrom(_s: GameState, team: Unit['side'], u: Unit): boolean {
   return team !== 'neutral' && u.hidden[team];
+}
+
+/** Gold earned by a champion, doubled in a double gold event (`s.goldMult`). */
+function earn(s: GameState, u: Unit, gold: number) {
+  u.gold += gold * s.goldMult;
 }
 
 /** Red's units hit harder or softer on Hard and Easy. */
@@ -973,7 +989,7 @@ function dealt(s: GameState, u: Unit, amount: number): number {
 // Each unit's turn.
 
 /** The per-tick countdowns of a unit: swing, flash, control effects, shield, buffs and a champion's cooldowns and gold. */
-function countDown(u: Unit, dt: number) {
+function countDown(u: Unit, dt: number, goldMult = 1) {
   u.attackCd = Math.max(0, u.attackCd - dt);
   u.swing = Math.max(0, u.swing - dt);
   u.flash = Math.max(0, u.flash - dt);
@@ -997,7 +1013,7 @@ function countDown(u: Unit, dt: number) {
   u.aiCastMs = Math.max(0, u.aiCastMs - dt);
   u.hasteMs = Math.max(0, u.hasteMs - dt);
   u.lullMs += dt;
-  u.gold += (GOLD_PER_SEC * dt) / 1000;
+  u.gold += (GOLD_PER_SEC * dt * goldMult) / 1000;
 }
 
 function updateUnit(s: GameState, u: Unit, dt: number) {
@@ -1013,7 +1029,7 @@ function updateUnit(s: GameState, u: Unit, dt: number) {
   }
   // Every countdown runs dead or alive, so a champion comes back with its cooldowns, item actives
   // and buffs run down and its passive gold earned (only a recall needs it standing).
-  countDown(u, dt);
+  countDown(u, dt, s.goldMult);
   if (u.dead) {
     if ((u.kind === 'champion' || u.kind === 'camp' || u.kind === 'beast') && s.time >= u.respawnAt) {
       if (u.kind === 'beast' && s.time >= ELDER.at && !s.beastElder) makeElder(s, u);
@@ -1125,14 +1141,14 @@ function kill(s: GameState, t: Unit, killerId: number) {
         s.streak++;
         s.lastHits++;
         s.bestStreak = Math.max(s.bestStreak, s.streak);
-        const gold = Math.round(MINION.gold * (s.streak >= STREAK.at ? 1 + STREAK.bonus : 1));
+        const gold = Math.round(MINION.gold * (s.streak >= STREAK.at ? 1 + STREAK.bonus : 1) * s.goldMult);
         champKiller.gold += gold;
         s.fx.push({ kind: 'coin', x: t.x, y: t.y, gold, color: '#f2c14e', ms: 900 });
         sound(s, 'lastHit', t, true);
         champKiller.cs++;
       } else {
         if (champKiller) {
-          champKiller.gold += MINION.gold;
+          earn(s, champKiller, MINION.gold);
           champKiller.cs++;
         }
         // The minion the player could have finished fell to someone else: the streak breaks.
@@ -1148,7 +1164,7 @@ function kill(s: GameState, t: Unit, killerId: number) {
       const def = CAMP_KINDS[t.campKind ?? 'boar'];
       t.respawnAt = s.time + def.respawnMs;
       if (champKiller) {
-        champKiller.gold += def.gold;
+        earn(s, champKiller, def.gold);
         champKiller.cs++;
         gainXp(s, champKiller, def.xp);
         // A brute's slayer carries its buff.
@@ -1179,13 +1195,13 @@ function kill(s: GameState, t: Unit, killerId: number) {
         const team = champKiller.side;
         s.beastBuff[team] = s.time + BEAST.buffMs;
         s.beastKills[team]++;
-        champKiller.gold += BEAST.gold;
+        earn(s, champKiller, BEAST.gold);
         gainXp(s, champKiller, BEAST.xp);
         const secs = Math.round(BEAST.buffMs / 1000);
         if (s.beastElder) {
           // The elder blesses the slayers' whole team: siege damage and an execute.
           s.elderBuff[team] = s.time + ELDER.buffMs;
-          champKiller.gold += ELDER.gold;
+          earn(s, champKiller, ELDER.gold);
           aiLog(team, `${shortName(champKiller.name)} slays the Elder Guardian`);
           notice(s, text(team === 'blue' ? 'noticeElderBlue' : 'noticeElderRed', { s: ELDER.buffMs / 1000 }), SIDE_COLOR[team]);
         } else {
@@ -1197,7 +1213,7 @@ function kill(s: GameState, t: Unit, killerId: number) {
       sound(s, 'beastSlain');
       break;
     case 'inhibitor': {
-      if (champKiller) champKiller.gold += INHIBITOR.gold;
+      if (champKiller) earn(s, champKiller, INHIBITOR.gold);
       const foe = t.side === 'blue' ? 'red' : 'blue';
       aiLog(foe, `breaks the ${t.lane} inhibitor`);
       notice(s, text(t.side === 'red' ? 'noticeRedInhibitor' : 'noticeBlueInhibitor', { lane: t.lane ? text(LANE_NAME[t.lane]) : '' }), SIDE_COLOR[foe]);
@@ -1206,7 +1222,7 @@ function kill(s: GameState, t: Unit, killerId: number) {
       break;
     }
     case 'ward': {
-      if (champKiller) champKiller.gold += WARD.gold;
+      if (champKiller) earn(s, champKiller, WARD.gold);
       const foe = t.side === 'blue' ? 'red' : 'blue';
       aiLog(foe, 'destroys a ward');
       if (t.side === 'blue' && !s.watch) notice(s, text('noticeWardLost'), SIDE_COLOR.red);
@@ -1215,7 +1231,7 @@ function kill(s: GameState, t: Unit, killerId: number) {
       break;
     }
     case 'tower':
-      if (champKiller) champKiller.gold += TOWER.gold;
+      if (champKiller) earn(s, champKiller, TOWER.gold);
       aiLog(t.side === 'blue' ? 'red' : 'blue', `takes a ${t.lane} tower`);
       s.fx.push({ kind: 'ring', x: t.x, y: t.y, r: 60, color: SIDE_COLOR[t.side], ms: 600 });
       sound(s, 'crash', t);
@@ -1234,11 +1250,11 @@ function kill(s: GameState, t: Unit, killerId: number) {
       if (champKiller && champKiller.side !== t.side) {
         // Rook, the bounty hunter, gets more for a head with a price on it.
         const bounty = Math.round(bountyOf(streak) * (1 + (champKiller.champ?.perk?.bountyGold ?? 0) / 100));
-        champKiller.gold += KILL.gold + bounty;
+        earn(s, champKiller, KILL.gold + bounty);
         // A team that is behind gets more for each kill, to climb back.
         const comeback = behind(s, champKiller.side as Team, COMEBACK.gap);
         if (comeback) {
-          champKiller.gold += COMEBACK.gold;
+          earn(s, champKiller, COMEBACK.gold);
           gainXp(s, champKiller, COMEBACK.xp);
           aiLog(champKiller.side as Team, `${shortName(champKiller.name)} earns a comeback bounty`);
           if (champKiller.player) {
@@ -1250,7 +1266,7 @@ function kill(s: GameState, t: Unit, killerId: number) {
         const first = !s.firstBlood;
         if (first) {
           s.firstBlood = true;
-          champKiller.gold += FIRST_BLOOD.gold;
+          earn(s, champKiller, FIRST_BLOOD.gold);
           sound(s, 'firstBlood', undefined, champKiller.player);
           aiLog(champKiller.side as Team, `${shortName(champKiller.name)} draws first blood`);
         }
@@ -1279,11 +1295,12 @@ function kill(s: GameState, t: Unit, killerId: number) {
         const helper = getUnit(s, Number(id));
         if (!helper || helper === champKiller || helper.side === t.side || s.time - at > ASSIST.windowMs) continue;
         helper.assists++;
-        helper.gold += ASSIST.gold;
+        earn(s, helper, ASSIST.gold);
         if (helper.player) s.fx.push({ kind: 'coin', x: t.x, y: t.y - 24, gold: ASSIST.gold, color: '#9fd8ff', ms: 900 });
       }
       t.hurtBy = {};
-      t.respawnAt = s.time + RESPAWN_BASE_MS + t.level * RESPAWN_PER_LEVEL_MS;
+      // In sudden death a fallen champion stays down.
+      t.respawnAt = s.suddenDeath ? Infinity : s.time + RESPAWN_BASE_MS + t.level * RESPAWN_PER_LEVEL_MS;
       s.fx.push({ kind: 'ring', x: t.x, y: t.y, r: 50, color: SIDE_COLOR[t.side], ms: 500 });
       if (t.player) sound(s, 'youDie', undefined, true);
       else sound(s, 'slain', t, champKiller?.player);
@@ -1373,14 +1390,15 @@ function playerAct(s: GameState, u: Unit, dt: number) {
 function aiAct(s: GameState, u: Unit, dt: number) {
   if (u.kind === 'champion') {
     // A hurt champion drinks its flask, and one carrying a ward plants it at a spot it passes.
-    if (u.hp < u.maxHp * 0.4) useActive(s, u, 'flask', u);
+    if (u.hp < u.maxHp * (0.4 + smarts(s, u) * RANKED_AI.flask)) useActive(s, u, 'flask', u);
     aiWard(s, u);
     aiSpell(s, u);
     if (championPlan(s, u, dt)) return;
   }
   const reach = u.kind === 'champion' ? CHAMP_AGGRO : MINION.aggro;
+  // A ranked red champion of a high enough tier goes for the weakest champion in reach.
   const t =
-    nearest(s, u, reach, (e) => e.kind === 'champion') ??
+    (u.kind === 'champion' && smarts(s, u) >= RANKED_AI.focusFrom ? weakest(s, u, reach) : nearest(s, u, reach, (e) => e.kind === 'champion')) ??
     nearest(s, u, reach, (e) => e.kind === 'minion') ??
     nearest(s, u, u.range, (e) => e.kind === 'tower' || e.kind === 'nexus' || e.kind === 'inhibitor') ??
     // An enemy ward in the way is knocked down.
@@ -1427,7 +1445,7 @@ function championPlan(s: GameState, u: Unit, dt: number): boolean {
   if (nearest(s, u, RETREAT.look, (e) => e.kind === 'champion')) {
     const foes = s.units.filter((e) => e.kind === 'champion' && !e.dead && e.side !== u.side && !hiddenFrom(s, u.side, e) && dist(e, u) <= RETREAT.look).length;
     const friends = s.units.filter((a) => a.kind === 'champion' && !a.dead && a.side === u.side && dist(a, u) <= RETREAT.look).length;
-    const low = u.hp < u.maxHp * RETREAT.hp;
+    const low = u.hp < u.maxHp * (RETREAT.hp + smarts(s, u) * RANKED_AI.retreat);
     const outnumbered = foes >= friends + RETREAT.outnumber;
     if (low || outnumbered) {
       // Hurt allies near by (or all of them, when outnumbered) fall back with it.
@@ -1664,14 +1682,19 @@ function updateGanks(s: GameState) {
       .filter((u) => u.kind === 'champion' && !u.dead && u.side !== team && !hiddenFrom(s, team, u))
       .sort((a, b) => bountyOf(b.killStreak) - bountyOf(a.killStreak) || a.hp / a.maxHp - b.hp / b.maxHp || a.id - b.id)[0];
     if (!prey) continue;
-    const hunter = s.units
+    const hunters = s.units
       .filter((u) => u.side === team && free(s, u, GANK.minHp) && !s.contesters.includes(u.id) && dist(u, prey) > GANK.from)
-      .sort((a, b) => dist(a, prey) - dist(b, prey) || a.id - b.id)[0];
+      .sort((a, b) => dist(a, prey) - dist(b, prey) || a.id - b.id);
+    const hunter = hunters[0];
     if (!hunter) continue;
-    hunter.gankTarget = prey.id;
-    hunter.ambushBush = -1;
-    hunter.ambushUntil = 0;
-    hunter.gankUntil = s.time + GANK.ms;
+    // Ranked red from `RANKED_AI.pairFrom` sends the next nearest along too.
+    const pack = team === 'red' && s.aiTier >= RANKED_AI.pairFrom ? hunters.slice(0, 2) : [hunter];
+    for (const h of pack) {
+      h.gankTarget = prey.id;
+      h.ambushBush = -1;
+      h.ambushUntil = 0;
+      h.gankUntil = s.time + GANK.ms;
+    }
     const lane = laneNear(prey);
     const price = bountyOf(prey.killStreak);
     aiLog(team, `${shortName(hunter.name)} roams to the ${lane} lane after ${shortName(prey.name)}${price ? ` and its ${price} gold bounty` : ''}`);
@@ -1704,8 +1727,8 @@ function updateRunes(s: GameState) {
     const def = RUNES[r.kind];
     if (def.buff && def.ms) addBuff(taker, def.name, def.buff, def.ms, def.color);
     if (def.gold) {
-      taker.gold += def.gold;
-      for (const a of s.units) if (a !== taker && a.kind === 'champion' && a.side === taker.side) a.gold += def.teamGold ?? 0;
+      earn(s, taker, def.gold);
+      for (const a of s.units) if (a !== taker && a.kind === 'champion' && a.side === taker.side) earn(s, a, def.teamGold ?? 0);
       if (taker.player) s.fx.push({ kind: 'coin', x: r.x, y: r.y, gold: def.gold, color: def.color, ms: 900 });
     }
     s.fx.push({ kind: 'ring', x: r.x, y: r.y, r: 50, color: def.color, ms: 600 });
@@ -1848,6 +1871,27 @@ export function mvpOf(s: GameState): Unit | null {
 }
 
 /** A team gives up: the other wins, as if the Nexus fell. */
+/** Sudden death: a team whose champions have all fallen for good loses. */
+function checkWipe(s: GameState) {
+  for (const team of TEAMS) {
+    const champs = s.units.filter((u) => u.kind === 'champion' && u.side === team);
+    if (!champs.length || !champs.every((u) => u.dead && u.respawnAt === Infinity)) continue;
+    sampleWorth(s);
+    s.wipedOut = team;
+    s.phase = team === 'blue' ? 'lost' : 'won';
+    s.winner = team === 'blue' ? 'red' : 'blue';
+    aiLog(team, 'is wiped out in sudden death');
+    sound(s, 'nexus');
+    return;
+  }
+}
+
+/** The event's notice at the start of an event match: the rule of the week. */
+export function announceEvent(s: GameState) {
+  const ev = EVENTS.find((e) => e.id === s.event);
+  if (ev) notice(s, text('noticeEvent', { rule: text(ev.name) }), '#f2c14e');
+}
+
 function surrender(s: GameState, team: Team) {
   sampleWorth(s);
   s.surrendered = team;
@@ -2018,6 +2062,11 @@ function beastAct(s: GameState, u: Unit, dt: number) {
 /** How long an AI champion waits between two abilities, in ms. */
 const AI_CAST_GAP = 800;
 
+/** How much smarter a champion plays: red's ranked AI tier (`s.aiTier`), 0 for everyone else. */
+function smarts(s: GameState, u: Unit): number {
+  return u.side === 'red' ? s.aiTier : 0;
+}
+
 /** An AI champion uses an ability when it has a clear use for it. */
 function castAi(s: GameState, u: Unit, t: Unit) {
   // One ability at a time, as a player would, rather than all four in the same instant.
@@ -2029,7 +2078,7 @@ function castAi(s: GameState, u: Unit, t: Unit) {
     if (ab.level >= 3 && t.kind !== 'champion' && t.kind !== 'beast') continue;
     const aim = aimFor(s, u, t, ab);
     if (aim && cast(s, u, ab.key, aim)) {
-      u.aiCastMs = AI_CAST_GAP;
+      u.aiCastMs = AI_CAST_GAP * (1 - smarts(s, u) * RANKED_AI.castGap);
       return;
     }
   }
@@ -2143,6 +2192,16 @@ function nearest(s: GameState, u: Unit, within: number, filter: (e: Unit) => boo
       best = e;
       bestD = d;
     }
+  }
+  return best;
+}
+
+/** The visible enemy champion within reach with the least health left, by share. */
+function weakest(s: GameState, u: Unit, within: number): Unit | null {
+  let best: Unit | null = null;
+  for (const e of s.units) {
+    if (e.kind !== 'champion' || e.dead || e.side === u.side || hiddenFrom(s, u.side, e) || dist(u, e) - e.radius > within) continue;
+    if (!best || e.hp / e.maxHp < best.hp / best.maxHp) best = e;
   }
   return best;
 }

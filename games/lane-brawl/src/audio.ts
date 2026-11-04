@@ -80,7 +80,7 @@ export const SONG: Song = {
 };
 
 /** The game's effects: the rules' sounds (`SoundId`) plus the scene's own for the player's buttons. */
-export type SfxName = SoundId | 'pick' | 'upgrade' | 'recall';
+export type SfxName = SoundId | 'pick' | 'upgrade' | 'recall' | 'promote';
 
 export const sfx = sounds<SfxName>({
   // Picking a champion: a rising arpeggio.
@@ -124,6 +124,9 @@ export const sfx = sounds<SfxName>({
   firstBlood: { wave: 'square', freq: 440, arp: [0, 3, 7, 12, 15], arpStep: 0.06, length: 0.5, volume: 0.3 },
   comeback: { wave: 'triangle', freq: 523, arp: [0, 4, 7, 12], arpStep: 0.05, length: 0.3, volume: 0.26 },
   vote: { wave: 'square', freq: 330, arp: [0, 5], arpStep: 0.1, length: 0.25, volume: 0.22 },
+  suddenDeath: { wave: 'sawtooth', freq: 220, arp: [0, -1, -5, -12], arpStep: 0.14, attack: 0.02, length: 0.8, volume: 0.24, gap: 1000 },
+  // The end panel: a ranked tier won, or a champion unlocked.
+  promote: { wave: 'square', freq: 523, arp: [0, 4, 7, 12, 16, 19], arpStep: 0.07, length: 0.6, volume: 0.28, gap: 1000 },
   nightfall: { wave: 'triangle', freq: 392, to: 196, attack: 0.1, length: 0.9, volume: 0.2, gap: 1000 },
   daybreak: { wave: 'triangle', freq: 262, arp: [0, 4, 7, 12], arpStep: 0.12, length: 0.7, volume: 0.2, gap: 1000 },
   plate: { wave: 'square', freq: 880, to: 660, length: 0.12, volume: 0.22, gap: 120 },

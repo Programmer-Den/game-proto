@@ -5,6 +5,10 @@ import type en from './en';
 const enUS: Partial<Translation<typeof en>> = {
   itemCloth: 'Cloth Armor',
   statArmour: '+{n} armor',
+  pickSkinLine: 'Colors: {skin}',
+  pickSkinTitle: 'Colors: {skin}, {n} of {of} won',
+  pickSkinDesc: 'Each ranked tier you reach wins your champion its color. Click to change.',
+  ladderSkin: '{line} New colors: {skin}.',
 };
 
 export default enUS;

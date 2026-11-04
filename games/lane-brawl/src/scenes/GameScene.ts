@@ -54,12 +54,22 @@ import {
   COMEBACK,
   PING_KINDS,
   PingKind,
+  UNLOCKS,
+  TIERS,
+  SKINS,
+  SkinId,
+  EVENTS,
+  EventId,
+  eventOfWeek,
+  weekEnds,
+  SUDDEN_DEATH,
 } from '../game/data';
 import { Fx, GameState, ObjectiveTitle, Phase, Unit, createGame, dist, getUnit } from '../game/state';
-import { loadMastery, masteryRank, recordWin } from '../game/mastery';
+import { isUnlocked, loadMastery, masteryRank, ranksBesides, recordWin } from '../game/mastery';
+import { Ladder, LadderResult, loadLadder, loadSkin, recordRanked, saveSkin, skinsWon, starText } from '../game/ladder';
 import { checkTrophies } from '../trophies/check';
-import { loadQuick, loadSpell, saveQuick, saveSpell } from '../game/spellChoice';
-import { abilityFor, atFountain, atShop, buy, buyBack, buybackCost, cast, castSpell, chooseUpgrade, commandAttack, commandMove, hiddenFrom, invulnerable, priceFor, sendPing, startRecall, stealthed, nightness, behind, callSurrender, mvpOf, tick, useActive, viewers } from '../game/sim';
+import { MODES, MatchMode, loadMode, loadSpell, saveMode, saveSpell } from '../game/spellChoice';
+import { announceEvent, abilityFor, atFountain, atShop, buy, buyBack, buybackCost, cast, castSpell, chooseUpgrade, commandAttack, commandMove, hiddenFrom, invulnerable, priceFor, sendPing, startRecall, stealthed, nightness, behind, callSurrender, mvpOf, tick, useActive, viewers } from '../game/sim';
 import { FxLayers, drawAura, drawProjectile, drawSkill, drawZone, skillMs } from './skillFx';
 import { shortName } from '../game/names';
 import { t, type TextKey } from '../i18n';
@@ -124,6 +134,7 @@ import {
   SPELL_BUTTON,
   SPELL_PICK,
   MODE_PICK,
+  SKIN_PICK,
   SCORE_CHIP,
   SCORE_PANEL,
   surrenderButton,
@@ -339,8 +350,19 @@ export class GameScene extends Phaser.Scene {
   private pingArmed: PingKind | null = null;
   /** The battle spell the player takes into the next match (`loadSpell`). */
   private spell: SpellId = 'blink';
-  /** Whether the next match is a quick one (`loadQuick`). */
-  private quick = false;
+  /** The kind of the next match (`loadMode`): full, quick, ranked or the week's event. */
+  private mode: MatchMode = 'full';
+  /** The colours the player's champion wears (`loadSkin`), and whether the pointer is on their button. */
+  private skin: SkinId = 'team';
+  private hoverSkin = false;
+  /** The ranked ladder (`loadLadder`), read when the pick screen shows. */
+  private ladder: Ladder = loadLadderSafe();
+  /** This match's ranked result once counted, and the champions its win unlocked. */
+  private ladderResult: LadderResult | null = null;
+  private unlockedNow: ChampionDef[] = [];
+  /** The event of the week, picked when the pick screen shows (by the date, not game time). */
+  private event: EventId = 'allMid';
+  private eventDays = 7;
   /** Whether the pointer is over the match kind button on the pick screen. */
   private hoverMode = false;
   /** The objective target's damage as blue last saw it, for the card while it is out of sight. */
@@ -377,7 +399,9 @@ export class GameScene extends Phaser.Scene {
     this.paintPickBackdrop();
     this.mastery = loadMastery();
     this.spell = loadSpell();
-    this.quick = loadQuick();
+    this.mode = loadMode();
+    this.skin = loadSkin();
+    this.readWeek();
     // The world camera follows the champion; the HUD (scroll factor 0) gets a fixed camera.
     splitHudCamera(this);
     this.cameras.main.setBounds(0, 0, WORLD.w, WORLD.h);
@@ -397,7 +421,7 @@ export class GameScene extends Phaser.Scene {
     this.pickBg = this.add.image(0, 0, 'lb-pick-bg').setOrigin(0, 0).setDisplaySize(SCREEN.w, SCREEN.h).setScrollFactor(0).setDepth(9);
     this.portrait = this.add.image(0, 0, pickKey('warden'), frameName(2, 'idle')).setScrollFactor(0).setDepth(11).setVisible(false);
     CHAMPIONS.forEach((c, i) => {
-      const r = pickCard(i);
+      const r = pickCard(i, CHAMPIONS.length);
       this.pickImages.push(
         this.add
           .image(r.x + r.w / 2, r.y + 56, pickKey(c.id), frameName(2, 'idle'))
@@ -446,13 +470,15 @@ export class GameScene extends Phaser.Scene {
       }) : -1;
       this.hoverAbility = box >= 0 ? ABILITY_KEYS[box] : null;
       this.hoverPick = CHAMPIONS.findIndex((_, i) => {
-        const r = pickCard(i);
+        const r = pickCard(i, CHAMPIONS.length);
         return v.x >= r.x && v.x <= r.x + r.w && v.y >= r.y && v.y <= r.y + r.h;
       });
       const sb = SPELL_PICK;
       this.hoverSpell = this.phase === 'pick' && v.x >= sb.x && v.x <= sb.x + sb.w && v.y >= sb.y && v.y <= sb.y + sb.h;
       const mb = MODE_PICK;
       this.hoverMode = this.phase === 'pick' && v.x >= mb.x && v.x <= mb.x + mb.w && v.y >= mb.y && v.y <= mb.y + mb.h;
+      const kb = SKIN_PICK;
+      this.hoverSkin = this.phase === 'pick' && v.x >= kb.x && v.x <= kb.x + kb.w && v.y >= kb.y && v.y <= kb.y + kb.h;
     });
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => this.onPointerDown(p));
     // A second touch pointer, so one thumb can press an ability while the other steers.
@@ -516,13 +542,31 @@ export class GameScene extends Phaser.Scene {
   }
 
   private startMatch(def: ChampionDef) {
-    // Watching, neither side gets the difficulty's damage, so the match is even.
-    this.state = createGame(def, watching ? 1 : ENEMY_DAMAGE, { watch: watching, mastery: masteryRank(this.mastery[def.id] ?? 0), spell: this.spell, quick: this.quick });
+    // Watching, neither side gets the difficulty's damage, so the match is even, every class plays
+    // and no ladder or event applies.
+    const mode = watching ? 'full' : this.mode;
+    this.state = createGame(def, watching ? 1 : ENEMY_DAMAGE, {
+      watch: watching,
+      mastery: masteryRank(this.mastery[def.id] ?? 0),
+      spell: this.spell,
+      quick: mode === 'quick',
+      ranked: mode === 'ranked' ? this.ladder.tier : undefined,
+      event: mode === 'event' ? this.event : undefined,
+      // Only the unlocked classes play, so a locked one first shows up once the player has it.
+      pool: watching ? CHAMPIONS : CHAMPIONS.filter((c) => isUnlocked(c.id, this.mastery)),
+    });
+    if (mode === 'event') announceEvent(this.state);
     this.winCounted = null;
-    // Each champion in the match gets its sheet in its team's colours, once.
+    this.ladderResult = null;
+    this.unlockedNow = [];
+    // Each champion in the match gets its sheet in its team's colours (the player's in the colours
+    // it wears), once.
+    const skin = SKINS.find((k) => k.id === this.skin && k.id !== 'team');
     const ms = bakeChampions(
       this,
-      this.state.units.filter((u) => u.champ).map((u) => ({ id: u.champ!.id, team: u.side === 'red' ? ('red' as const) : ('blue' as const) })),
+      this.state.units
+        .filter((u) => u.champ)
+        .map((u) => ({ id: u.champ!.id, team: u.side === 'red' ? ('red' as const) : ('blue' as const), skin: u.id === this.state!.player && !watching ? skin : undefined })),
     );
     if (import.meta.env.DEV) console.info(`Lane Brawl champions baked in ${Math.round(ms)} ms`);
     this.shopOpen = false;
@@ -535,10 +579,35 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.centerOn(BASE.blue.x + 70, BASE.blue.y - 40);
   }
 
+  /** The pick screen's match kind button: full, quick, ranked, the week's event, and round again. */
+  private nextMode() {
+    ui('click');
+    this.mode = MODES[(MODES.indexOf(this.mode) + 1) % MODES.length];
+    saveMode(this.mode);
+  }
+
+  /** The pick screen's colours button: the next colour won on the ladder (only the team's blue at first). */
+  private nextSkin() {
+    const won = skinsWon(this.ladder);
+    if (won.length < 2) return ui('refuse');
+    ui('click');
+    this.skin = won[(won.indexOf(this.skin) + 1) % won.length];
+    saveSkin(this.skin);
+  }
+
+  /** The event of this week and the days left in it, by the date. */
+  private readWeek() {
+    const now = Date.now();
+    this.event = eventOfWeek(now);
+    this.eventDays = Math.max(1, Math.ceil((weekEnds(now) - now) / 86_400_000));
+  }
+
   private resetToPick() {
     this.state = null;
     this.startMusic('pick');
     this.mastery = loadMastery();
+    this.ladder = loadLadderSafe();
+    this.readWeek();
     this.shopOpen = false;
     this.liveFx = [];
     this.cameras.main.centerOn(WORLD.w / 2, WORLD.h / 2);
@@ -660,9 +729,11 @@ export class GameScene extends Phaser.Scene {
     this.zones = [];
     const phase = this.phase;
     if (phase === 'pick') {
-      CHAMPIONS.forEach((def, i) => this.zones.push({ ...pickCard(i), run: () => (sfx('pick'), this.startMatch(def)) }));
+      // A locked champion's card only refuses.
+      CHAMPIONS.forEach((def, i) => this.zones.push({ ...pickCard(i, CHAMPIONS.length), run: () => (isUnlocked(def.id, this.mastery) ? (sfx('pick'), this.startMatch(def)) : ui('refuse')) }));
       this.zones.push({ ...SPELL_PICK, run: () => this.nextSpell() });
-      this.zones.push({ ...MODE_PICK, run: () => (ui('click'), (this.quick = !this.quick), saveQuick(this.quick)) });
+      this.zones.push({ ...MODE_PICK, run: () => this.nextMode() });
+      this.zones.push({ ...SKIN_PICK, run: () => this.nextSkin() });
       return;
     }
     if (phase === 'won' || phase === 'lost') {
@@ -1288,7 +1359,7 @@ export class GameScene extends Phaser.Scene {
     const team = u.side === 'red' ? 'red' : 'blue';
     switch (u.kind) {
       case 'champion':
-        key = champKey(u.champ!.id, team);
+        key = u.id === s.player && !watching && this.skin !== 'team' ? champKey(u.champ!.id, `skin-${this.skin}`) : champKey(u.champ!.id, team);
         frame = frameName(dirFor(u.facing), pose(11));
         cell = CHAMP_CELL;
         break;
@@ -1519,18 +1590,36 @@ export class GameScene extends Phaser.Scene {
 
   private drawPick(g: Phaser.GameObjects.Graphics) {
     this.t('title', SCREEN.w / 2, FRAME.y + 12, t('gameTitle'), 32, UI.gold, 'center', true);
-    this.t('sub', SCREEN.w / 2, FRAME.y + 52, t(this.quick ? 'pickSubQuick' : 'pickSub'), 12, UI.dim, 'center');
+    this.t('sub', SCREEN.w / 2, FRAME.y + 52, t(this.mode === 'quick' ? 'pickSubQuick' : 'pickSub'), 12, UI.dim, 'center');
+    const n = CHAMPIONS.length;
     CHAMPIONS.forEach((c, i) => {
-      const r = pickCard(i);
+      const r = pickCard(i, n);
       const hover = this.hoverPick === i;
-      this.panel(g, r.x, r.y, r.w, r.h, hover ? '#3a4660' : UI.card);
-      g.fillStyle(col(c.color), 1).fillRect(r.x + 2, r.y + 2, r.w - 4, 4);
-      g.fillStyle(col('#3b7be8'), 0.25).fillEllipse(r.x + r.w / 2, r.y + 56, 50, 14);
-      g.lineStyle(2, col('#3b7be8'), 0.9).strokeEllipse(r.x + r.w / 2, r.y + 56, 50, 14);
-      this.t(`pick-name-${i}`, r.x + r.w / 2, r.y + 60, t(c.hero), t(c.hero).length > 18 ? 11 : 12, UI.text, 'center', true);
-      this.t(`pick-role-${i}`, r.x + r.w / 2, r.y + 75, `${t(c.name)} · ${t(c.role)}`.toUpperCase(), 9, c.color, 'center', true);
-      this.t(`pick-pas-${i}`, r.x + r.w / 2, r.y + 87, t(c.passive.name), 10, UI.gold, 'center', true);
-      this.t(`pick-desc-${i}`, r.x + r.w / 2, r.y + 100, t(c.passive.desc), 9, UI.dim, 'center');
+      const open = isUnlocked(c.id, this.mastery);
+      const cx = r.x + r.w / 2;
+      this.panel(g, r.x, r.y, r.w, r.h, hover ? '#3a4660' : open ? UI.card : '#1c222e');
+      g.fillStyle(col(c.color), open ? 1 : 0.35).fillRect(r.x + 2, r.y + 2, r.w - 4, 4);
+      g.fillStyle(col('#3b7be8'), 0.25).fillEllipse(cx, r.y + 56, 50, 14);
+      g.lineStyle(2, col('#3b7be8'), open ? 0.9 : 0.3).strokeEllipse(cx, r.y + 56, 50, 14);
+      // A locked champion shows as a dark figure, its name and what unlocks it.
+      this.pickImages[i]?.setTint(open ? 0xffffff : 0x10131a).setAlpha(open ? 1 : 0.5);
+      this.t(`pick-name-${i}`, cx, r.y + 60, t(c.hero), t(c.hero).length > 16 ? 11 : 12, open ? UI.text : UI.muted, 'center', true);
+      this.fit(`pick-name-${i}`, r.w - 8);
+      this.t(`pick-role-${i}`, cx, r.y + 75, `${t(c.name)} · ${t(c.role)}`.toUpperCase(), 9, c.color, 'center', true);
+      this.fit(`pick-role-${i}`, r.w - 8);
+      if (open) {
+        this.t(`pick-pas-${i}`, cx, r.y + 87, t(c.passive.name), 10, UI.gold, 'center', true);
+        this.t(`pick-desc-${i}`, cx, r.y + 100, t(c.passive.desc), 9, UI.dim, 'center');
+      } else {
+        // A padlock in the card's top left corner.
+        const lx = r.x + 16, ly = r.y + 22;
+        g.lineStyle(3, col(UI.goldDeep), 1).beginPath().arc(lx, ly, 5, Math.PI, 0).strokePath();
+        g.fillStyle(col(UI.goldDeep), 1).fillRect(lx - 8, ly, 16, 12);
+        g.fillStyle(col(UI.edge), 1).fillRect(lx - 1.5, ly + 3, 3, 6);
+        this.t(`pick-pas-${i}`, cx, r.y + 87, t('pickLockedShort'), 10, UI.muted, 'center', true);
+        this.t(`pick-desc-${i}`, cx, r.y + 100, t('pickLocked', { n: UNLOCKS[c.id], have: Math.min(UNLOCKS[c.id], ranksBesides(this.mastery, c.id)) }), 9, UI.dim, 'center');
+      }
+      this.fit(`pick-desc-${i}`, r.w - 8);
       // Mastery: one gold diamond per rank in the card's top right corner.
       const rank = masteryRank(this.mastery[c.id] ?? 0);
       for (let k = 0; k < rank; k++) {
@@ -1543,33 +1632,83 @@ export class GameScene extends Phaser.Scene {
     const h = CHAMPIONS[this.hoverPick];
     // A spell chip under the pointer: its name and what it does, in the champion's two lines.
     const hs = this.hoverSpell ? spellById(this.spell) : null;
-    if (this.hoverMode) {
-      this.t('pick-blurb', SCREEN.w / 2, FRAME.y + 444, t(this.quick ? 'pickModeQuick' : 'pickModeFull'), 12, UI.gold, 'center', true);
-      this.t('pick-motive', SCREEN.w / 2, FRAME.y + 464, t(this.quick ? 'pickModeQuickDesc' : 'pickModeFullDesc'), 12, UI.text, 'center', true);
-    } else if (hs) {
-      this.t('pick-blurb', SCREEN.w / 2, FRAME.y + 444, t(hs.name), 12, hs.color, 'center', true);
-      this.t('pick-motive', SCREEN.w / 2, FRAME.y + 464, t(hs.desc), 12, UI.text, 'center', true);
+    const skin = SKINS.find((k) => k.id === this.skin) ?? SKINS[0];
+    const line = (a: string, ac: string, b: string, bc: string) => {
+      this.t('pick-blurb', SCREEN.w / 2, FRAME.y + 444, a, 12, ac, 'center', true);
+      this.t('pick-motive', SCREEN.w / 2, FRAME.y + 464, b, 12, bc, 'center', true);
+      this.fit('pick-blurb', SCREEN.w - 24);
+      this.fit('pick-motive', SCREEN.w - 24);
+    };
+    if (this.hoverMode) line(this.modeLine(), UI.gold, this.modeDesc(), UI.text);
+    else if (this.hoverSkin) line(t('pickSkinTitle', { skin: t(skin.name), n: skinsWon(this.ladder).length - 1, of: SKINS.length - 1 }), skin.id === 'team' ? UI.gold : skin.cloth, t('pickSkinDesc'), UI.text);
+    else if (hs) line(t(hs.name), hs.color, t(hs.desc), UI.text);
+    else if (h && !isUnlocked(h.id, this.mastery)) {
+      line(t('pickBlurb', { hero: t(h.hero), title: t(h.title), class: t(h.name), blurb: t(h.blurb) }), h.color, t('pickLockedLine', { hero: h.short, n: UNLOCKS[h.id], have: ranksBesides(this.mastery, h.id) }), UI.text);
     } else {
-      const line = h && t('pickBlurb', { hero: t(h.hero), title: t(h.title), class: t(h.name), blurb: t(h.blurb) });
-      this.t('pick-blurb', SCREEN.w / 2, FRAME.y + 444, h ? (h.perk ? t('pickPerk', { line, perk: t(h.perk.desc) }) : line) : t('pickPoint'), 12, h ? h.color : UI.muted, 'center', true);
-      this.t('pick-motive', SCREEN.w / 2, FRAME.y + 464, h ? t(h.motive) : t('pickSetting'), 12, h ? UI.text : UI.dim, 'center', true);
+      const blurb = h && t('pickBlurb', { hero: t(h.hero), title: t(h.title), class: t(h.name), blurb: t(h.blurb) });
+      line(h ? (h.perk ? t('pickPerk', { line: blurb!, perk: t(h.perk.desc) }) : blurb!) : t('pickPoint'), h ? h.color : UI.muted, h ? t(h.motive) : t('pickSetting'), h ? UI.text : UI.dim);
     }
-    // The battle spell to take along, one button: a click picks the next. One text, like the line it
-    // replaced, so the pick screen makes as many texts (and Math.random draws) as before.
+    // The battle spell to take along, one button: a click picks the next.
     const sb = SPELL_PICK;
     const chosen = spellById(this.spell);
     this.panel(g, sb.x, sb.y, sb.w, sb.h, this.hoverSpell ? '#3a4660' : UI.card);
     g.lineStyle(1.5, col(UI.goldDeep), 1).strokeRect(sb.x + 1, sb.y + 1, sb.w - 2, sb.h - 2);
     g.fillStyle(col(chosen.color), 1).fillCircle(sb.x + 12, sb.y + sb.h / 2, 5);
     this.t('pick-spell', sb.x + sb.w / 2 + 6, sb.y + 4, t('pickSpellLine', { spell: t(chosen.name) }), 10, UI.gold, 'center', true);
-    // The match kind, full or quick. The two hint lines share one text, so the pick screen still
-    // makes as many texts as before.
+    this.fit('pick-spell', sb.w - 26);
+    // The match kind: full, quick, ranked or the week's event.
     const mb = MODE_PICK;
     this.panel(g, mb.x, mb.y, mb.w, mb.h, this.hoverMode ? '#3a4660' : UI.card);
-    g.lineStyle(1.5, col(UI.goldDeep), 1).strokeRect(mb.x + 1, mb.y + 1, mb.w - 2, mb.h - 2);
-    this.t('pick-mode', mb.x + mb.w / 2, mb.y + 4, t(this.quick ? 'pickModeQuick' : 'pickModeFull'), 10, UI.gold, 'center', true);
+    g.lineStyle(1.5, col(this.mode === 'ranked' ? TIERS[this.ladder.tier].color : UI.goldDeep), 1).strokeRect(mb.x + 1, mb.y + 1, mb.w - 2, mb.h - 2);
+    this.t('pick-mode', mb.x + mb.w / 2, mb.y + 4, this.modeLine(), 10, this.mode === 'ranked' ? TIERS[this.ladder.tier].color : UI.gold, 'center', true);
+    this.fit('pick-mode', mb.w - 10);
+    // The colours the champion wears: a swatch and their name.
+    const kb = SKIN_PICK;
+    this.panel(g, kb.x, kb.y, kb.w, kb.h, this.hoverSkin ? '#3a4660' : UI.card);
+    g.lineStyle(1.5, col(UI.goldDeep), 1).strokeRect(kb.x + 1, kb.y + 1, kb.w - 2, kb.h - 2);
+    g.fillStyle(col(skin.cloth), 1).fillRect(kb.x + 7, kb.y + 5, 10, 10);
+    g.lineStyle(1, col(UI.edge), 1).strokeRect(kb.x + 7, kb.y + 5, 10, 10);
+    this.t('pick-skin', kb.x + kb.w / 2 + 8, kb.y + 4, t('pickSkinLine', { skin: t(skin.name) }), 10, UI.gold, 'center', true);
+    this.fit('pick-skin', kb.w - 28);
     this.t('hint', SCREEN.w / 2, FRAME.y + 509, `${t('pickHint1')}\n${t('pickHint2')}`, 11, UI.dim, 'center');
     this.texts.get('hint')?.setAlign('center').setLineSpacing(1);
+  }
+
+  /** The match kind button's text. */
+  private modeLine(): string {
+    switch (this.mode) {
+      case 'quick':
+        return t('pickModeQuick');
+      case 'ranked':
+        return t('pickModeRanked', { tier: t(TIERS[this.ladder.tier].name), stars: starText(this.ladder.stars) });
+      case 'event':
+        return t('pickModeEvent', { rule: t(EVENTS.find((e) => e.id === this.event)!.name) });
+      default:
+        return t('pickModeFull');
+    }
+  }
+
+  /** What the match kind under the pointer means. */
+  private modeDesc(): string {
+    switch (this.mode) {
+      case 'quick':
+        return t('pickModeQuickDesc');
+      case 'ranked':
+        return t('pickModeRankedDesc');
+      case 'event':
+        return t('pickModeEventDesc', { desc: t(EVENTS.find((e) => e.id === this.event)!.desc), days: t('eventDays', { n: this.eventDays }) });
+      default:
+        return t('pickModeFullDesc');
+    }
+  }
+
+  /** Shrinks a text to fit `maxW` view pixels (back to full size once it fits). */
+  private fit(key: string, maxW: number) {
+    const obj = this.texts.get(key);
+    if (!obj) return;
+    const w = obj.width;
+    const k = w > maxW ? maxW / w : 1;
+    if (obj.scaleX !== k) obj.setScale(k);
   }
 
   private drawPlaying(g: Phaser.GameObjects.Graphics, s: GameState) {
@@ -1639,7 +1778,7 @@ export class GameScene extends Phaser.Scene {
           if (item.from) g.lineStyle(1, col(UI.gold), 1).strokeRect(x + 1, iy + 1, 15, 15);
         }
         const bounty = bountyOf(u.killStreak);
-        const state = u.dead ? t('respawnIn', { n: Math.max(0, Math.ceil((u.respawnAt - s.time) / 1000)) }) : bounty ? t('bountyLabel', { gold: bounty }) : '';
+        const state = u.dead ? (u.respawnAt === Infinity ? t('outForGood') : t('respawnIn', { n: Math.max(0, Math.ceil((u.respawnAt - s.time) / 1000)) })) : bounty ? t('bountyLabel', { gold: bounty }) : '';
         this.t(`score-state-${u.id}`, cols.state, y + 6, state, 11, u.dead ? UI.red : UI.gold, 'left', true);
       });
     });
@@ -1706,10 +1845,13 @@ export class GameScene extends Phaser.Scene {
     if (me.dead) {
       const cost = buybackCost(me);
       const ready = s.time >= me.buybackReadyAt;
-      const can = ready && me.gold >= cost;
+      const can = ready && me.gold >= cost && !s.suddenDeath;
       this.panel(g, b.x, b.y, b.w, b.h, can ? '#6b4f17' : '#3a4256');
       if (can) this.coin(g, b.x + 12, b.y + b.h / 2, 6);
-      this.t('recall', b.x + b.w / 2 + (can ? 6 : 0), b.y + 6, ready ? t('buyBack', { gold: cost }) : t('buyBackIn', { time: clock(me.buybackReadyAt - s.time) }), 11, can ? UI.gold : UI.muted, 'center', true);
+      // Sudden death has no buy back, and no respawn either.
+      const label = s.suddenDeath ? t('noBuyBack') : ready ? t('buyBack', { gold: cost }) : t('buyBackIn', { time: clock(me.buybackReadyAt - s.time) });
+      this.t('recall', b.x + b.w / 2 + (can ? 6 : 0), b.y + 6, label, 11, can ? UI.gold : UI.muted, 'center', true);
+      this.fit('recall', b.w - 8);
       return;
     }
     const on = me.recallMs > 0;
@@ -1779,6 +1921,25 @@ export class GameScene extends Phaser.Scene {
       g.fillStyle(0xb98cff, 1).fillPoints([new Phaser.Math.Vector2(cx, cy - 7), new Phaser.Math.Vector2(cx + 5, cy), new Phaser.Math.Vector2(cx, cy + 7), new Phaser.Math.Vector2(cx - 5, cy)], true);
       g.fillStyle(0xffffff, 0.45).fillTriangle(cx, cy - 7, cx - 5, cy, cx, cy);
       this.t(`buff-${team}`, c.x + 24, c.y + 4, t(team === 'blue' ? 'minionsEmpoweredBlue' : 'minionsEmpoweredRed', { time: clock(left) }), 10, team === 'blue' ? UI.blue : UI.red, 'left', true);
+    }
+    // The match's kind: the week's event (with sudden death's countdown) or the ranked tier.
+    if (!watching && (s.event || s.ranked)) {
+      const c = buffChip(i++);
+      const tier = TIERS[s.aiTier];
+      const ev = EVENTS.find((e) => e.id === s.event);
+      g.fillStyle(col(UI.edge), 1).fillRect(c.x - 1, c.y - 1, c.w + 2, c.h + 2);
+      g.fillStyle(col(s.suddenDeath ? '#4a1f1f' : '#2a2a3c'), 1).fillRect(c.x, c.y, c.w, c.h);
+      g.lineStyle(1, col(s.ranked ? tier.color : UI.gold), 1).strokeRect(c.x + 1, c.y + 1, c.w - 2, c.h - 2);
+      let label: string;
+      if (s.ranked) label = t('rankedChip', { tier: t(tier.name), stars: starText(this.ladder.stars) });
+      else if (s.event === 'suddenDeath') label = s.suddenDeath ? t('suddenNow') : t('suddenIn', { time: clock(SUDDEN_DEATH.at - s.time) });
+      else label = t('eventChip', { rule: t(ev!.name) });
+      // A star for the ladder, a coin-gold diamond for an event.
+      const cx = c.x + 12, cy = c.y + c.h / 2;
+      if (s.ranked) g.fillStyle(col(tier.color), 1).fillPoints(pts2([0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((k) => ({ x: cx + Math.cos(-Math.PI / 2 + (k * Math.PI) / 5) * (k % 2 ? 3 : 7), y: cy + Math.sin(-Math.PI / 2 + (k * Math.PI) / 5) * (k % 2 ? 3 : 7) }))), true);
+      else g.fillStyle(col(s.suddenDeath ? '#ff6a5a' : UI.gold), 1).fillPoints(pts2([{ x: cx, y: cy - 7 }, { x: cx + 5, y: cy }, { x: cx, y: cy + 7 }, { x: cx - 5, y: cy }]), true);
+      this.t('mode-chip', c.x + 24, c.y + 4, label, 10, s.ranked ? tier.color : s.suddenDeath ? '#ff9a8a' : UI.gold, 'left', true);
+      this.fit('mode-chip', c.w - 28);
     }
     // Comeback help: while blue is behind, its kills pay more.
     if (!watching && behind(s, 'blue', COMEBACK.gap)) {
@@ -1899,7 +2060,7 @@ export class GameScene extends Phaser.Scene {
     g.fillStyle(col('#3b7be8'), 0.25).fillEllipse(P.x + 40, P.y + 92, 56, 18);
     g.lineStyle(2, col('#3b7be8'), 0.9).strokeEllipse(P.x + 40, P.y + 92, 56, 18);
     this.portrait
-      .setTexture(champKey(c.id, 'blue'), frameName(2, me.castMs > 0 ? 'c0' : me.swing > 0 ? 'a1' : 'idle'))
+      .setTexture(watching || this.skin === 'team' ? champKey(c.id, 'blue') : champKey(c.id, `skin-${this.skin}`), frameName(2, me.castMs > 0 ? 'c0' : me.swing > 0 ? 'a1' : 'idle'))
       .setOrigin(0.5, CHAMP_CELL.footY / CHAMP_CELL.h)
       .setPosition(P.x + 40, P.y + 92)
       .setScale(1.2 / RES)
@@ -1930,7 +2091,7 @@ export class GameScene extends Phaser.Scene {
       g.fillStyle(0xffffff, 0.4).fillTriangle(cx, cy - 6, cx - 6, cy, cx, cy);
       if (item.from) g.lineStyle(1, col(UI.gold), 1).strokeRect(x + 1, y + 1, 15, 15);
     }
-    this.t('dead', bx, P.y + 72, me.dead ? t('respawnIn', { n: Math.ceil((me.respawnAt - s.time) / 1000) }) : t('classPassive', { class: t(c.name), passive: t(c.passive.name) }), 11, me.dead ? UI.red : UI.dim, 'left', true);
+    this.t('dead', bx, P.y + 72, me.dead ? (me.respawnAt === Infinity ? t('outForGood') : t('respawnIn', { n: Math.ceil((me.respawnAt - s.time) / 1000) })) : t('classPassive', { class: t(c.name), passive: t(c.passive.name) }), 11, me.dead ? UI.red : UI.dim, 'left', true);
     this.t('lasthits', bx, P.y + 89, t('scoreLine', { kills: me.kills, deaths: me.deaths, assists: me.assists, lastHits: s.lastHits }), 10, UI.muted);
     this.drawBuffStrip(g, me);
 
@@ -2284,7 +2445,7 @@ export class GameScene extends Phaser.Scene {
       this.t('end-sub', SCREEN.w / 2, p.y + 72, t(why), 13, UI.dim, 'center');
     } else {
       this.t('end-title', SCREEN.w / 2, p.y + 22, t(won ? 'victory' : 'defeat'), 34, won ? UI.green : UI.red, 'center', true);
-      const why = s.surrendered ? (s.surrendered === 'red' ? 'redSurrendered' : 'blueSurrendered') : won ? 'redNexusFell' : 'yourNexusFell';
+      const why = s.wipedOut ? (s.wipedOut === 'red' ? 'redWipedOut' : 'blueWipedOut') : s.surrendered ? (s.surrendered === 'red' ? 'redSurrendered' : 'blueSurrendered') : won ? 'redNexusFell' : 'yourNexusFell';
       this.t('end-sub', SCREEN.w / 2, p.y + 72, t(why), 13, UI.dim, 'center');
     }
     this.t('end-stats', SCREEN.w / 2, p.y + 94, t('endStats', { kills: t('kills', { n: this.player()?.kills ?? 0 }), deaths: t('deaths', { n: this.player()?.deaths ?? 0 }), objectives: s.objectivesDone, lastHits: s.lastHits, streak: s.bestStreak, beasts: s.beastKills.blue }), 11, UI.muted, 'center');
@@ -2292,8 +2453,12 @@ export class GameScene extends Phaser.Scene {
     const me = this.player();
     if (!watching && won && me?.champ) {
       if (this.winCounted === null) {
+        const before = this.mastery;
         this.winCounted = recordWin(me.champ.id);
         this.mastery = loadMastery();
+        // A win can bring the mastery ranks that unlock a new champion.
+        this.unlockedNow = CHAMPIONS.filter((c) => !isUnlocked(c.id, before) && isUnlocked(c.id, this.mastery));
+        if (this.unlockedNow.length) sfx('promote');
       }
       const wins = this.winCounted;
       const rank = masteryRank(wins);
@@ -2302,8 +2467,33 @@ export class GameScene extends Phaser.Scene {
       const line = next ? t('masteryNext', { line: winsLine, rank: rank + 1, n: next }) : t('masteryFull', { line: winsLine });
       this.t('end-mastery', SCREEN.w / 2, p.y + 112, line, 11, UI.gold, 'center', true);
     }
+    // A ranked match moves the ladder, once: a star won or lost, a tier up or down, a colour won.
+    if (!watching && s.ranked) {
+      if (!this.ladderResult) {
+        this.ladderResult = recordRanked(won);
+        this.ladder = this.ladderResult.after;
+        if (this.ladderResult.moved === 'up' || this.ladderResult.skin) sfx('promote');
+      }
+      const r = this.ladderResult;
+      const tier = TIERS[r.after.tier];
+      const vars = { tier: t(tier.name), stars: starText(r.after.stars) };
+      let text = r.moved === 'up' ? t('ladderPromoted', vars) : r.moved === 'down' ? t('ladderDemoted', vars) : won ? t('ladderUp', vars) : r.before.stars === 0 ? t('ladderHold', vars) : t('ladderDown', vars);
+      const skin = SKINS.find((k) => k.id === r.skin);
+      if (skin) text = t('ladderSkin', { line: text, skin: t(skin.name) });
+      this.t('end-ladder', SCREEN.w / 2, p.y + 318, text, 12, tier.color, 'center', true);
+      this.fit('end-ladder', p.w - 24);
+    }
+    if (!watching && this.unlockedNow.length) {
+      const c = this.unlockedNow[0];
+      this.t('end-unlock', SCREEN.w / 2, p.y + (s.ranked ? 334 : 318), t('championUnlocked', { hero: t(c.hero), class: t(c.name) }), 12, c.color, 'center', true);
+    }
     this.drawSummary(g, s);
     this.panel(g, PLAY_AGAIN.x, PLAY_AGAIN.y, PLAY_AGAIN.w, PLAY_AGAIN.h, '#4a5876');
     this.t('again-label', PLAY_AGAIN.x + PLAY_AGAIN.w / 2, PLAY_AGAIN.y + 12, t(watching ? 'watchAnother' : 'playAgain'), 16, UI.text, 'center', true);
   }
+}
+
+/** The ladder, read once the class field initialises (storage may be blocked; `loadLadder` copes). */
+function loadLadderSafe(): Ladder {
+  return loadLadder();
 }

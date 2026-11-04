@@ -139,7 +139,8 @@ function outlineOf(src: HTMLCanvasElement): HTMLCanvasElement {
 
 export const TEAMS: TeamName[] = ['blue', 'red'];
 
-export const champKey = (id: string, team: TeamName) => `lb-champ-${id}-${team}`;
+/** A champion's sheet: in its team's cloth, or (`skin-<id>`) in a colour the player won on the ranked ladder. */
+export const champKey = (id: string, team: TeamName | `skin-${string}`) => `lb-champ-${id}-${team}`;
 /** One idle figure per class, facing the viewer, for the pick cards. */
 export const pickKey = (id: string) => `lb-pick-${id}`;
 export const WOLF = 'lb-wolf';
@@ -207,10 +208,11 @@ export function bakeDrake(scene: Phaser.Scene, element: DrakeElement): number {
 }
 
 /** Bakes the sheets of the champions in a match that are not baked yet. Returns the time it took, in ms. */
-export function bakeChampions(scene: Phaser.Scene, list: { id: string; team: TeamName }[]): number {
+export function bakeChampions(scene: Phaser.Scene, list: { id: string; team: TeamName; skin?: { id: string; cloth: `#${string}` } }[]): number {
   const t0 = performance.now();
-  for (const { id, team } of list) {
-    if (!scene.textures.exists(champKey(id, team))) bake(scene, champKey(id, team), CHAMP_CELL, movingCells((p) => championModel(id, team, p)));
+  for (const { id, team, skin } of list) {
+    const key = champKey(id, skin ? `skin-${skin.id}` : team);
+    if (!scene.textures.exists(key)) bake(scene, key, CHAMP_CELL, movingCells((p) => championModel(id, skin ? skin.cloth : team, p)));
   }
   return performance.now() - t0;
 }

@@ -50,6 +50,9 @@ import {
   WARD,
   QUICK,
   SURRENDER,
+  ALL_MID,
+  DOUBLE_GOLD,
+  EventId,
 } from './data';
 import { openLanes } from './terrain';
 
@@ -277,7 +280,7 @@ export type SoundId =
   | 'burst' | 'bolt' | 'dash' | 'ally' | 'buff' | 'zone' | 'impact'
   | 'lastHit' | 'slain' | 'youDie' | 'streak' | 'crash' | 'nexus' | 'wardBreak'
   | 'levelUp' | 'flask' | 'blink' | 'ward' | 'recallHome' | 'respawn' | 'buyBack'
-  | 'wave' | 'watchstone' | 'rune' | 'runeTaken' | 'mercs' | 'spell' | 'ping' | 'drake' | 'drakeWakes' | 'firstBlood' | 'plate' | 'nightfall' | 'daybreak' | 'comeback' | 'vote' | 'growl' | 'beastSlain' | 'brute' | 'objective' | 'objectiveMissed';
+  | 'wave' | 'watchstone' | 'rune' | 'runeTaken' | 'mercs' | 'spell' | 'ping' | 'drake' | 'drakeWakes' | 'firstBlood' | 'plate' | 'nightfall' | 'daybreak' | 'comeback' | 'vote' | 'growl' | 'beastSlain' | 'brute' | 'objective' | 'objectiveMissed' | 'suddenDeath';
 
 /**
  * A sound raised by the rules: at a point in the world (the view plays it only where blue sees and
@@ -376,6 +379,15 @@ export interface GameState {
   /** Whether this is a quick match, and the lanes it plays on (all three, or `QUICK.lanes`). */
   quick: boolean;
   lanes: LaneId[];
+  /** A ranked match (LB15), and red's AI tier (0 to 5, `RANKED_AI`; 0 outside ranked). */
+  ranked: boolean;
+  aiTier: number;
+  /** An event match's rule of the week (LB17), or null; gold earned is multiplied by `goldMult`. */
+  event: EventId | null;
+  goldMult: number;
+  /** Sudden death (the `suddenDeath` event, from `SUDDEN_DEATH.at`): no more respawns. The team wiped out, if one was. */
+  suddenDeath: boolean;
+  wipedOut: Team | null;
   /** Whether it is night, past the middle of dusk (for the notices). */
   night: boolean;
   /** The river drake's unit id, its element now, how many have woken, and each team's stacks. */
@@ -605,6 +617,12 @@ export interface MatchOptions {
   spell?: SpellId;
   /** A quick match: three a side on one lane (`QUICK`). */
   quick?: boolean;
+  /** A ranked match at this tier (0 to 5): red's AI plays smarter by it (`RANKED_AI`). */
+  ranked?: number;
+  /** An event match with this rule of the week. */
+  event?: EventId;
+  /** The classes the rosters are drawn from (the unlocked ones), in `CHAMPIONS` order; all when not given. */
+  pool?: ChampionDef[];
 }
 
 /**
@@ -652,7 +670,13 @@ export function createGame(pick: ChampionDef, enemyDamage: number, opts: MatchOp
     firstBlood: false,
     platesGone: false,
     quick: !!opts.quick,
-    lanes: opts.quick ? QUICK.lanes : ['top', 'mid', 'bottom'],
+    lanes: opts.quick || opts.event === 'allMid' ? QUICK.lanes : ['top', 'mid', 'bottom'],
+    ranked: opts.ranked !== undefined && !opts.watch,
+    aiTier: opts.watch ? 0 : (opts.ranked ?? 0),
+    event: opts.event ?? null,
+    goldMult: opts.event === 'doubleGold' ? DOUBLE_GOLD : 1,
+    suddenDeath: false,
+    wipedOut: null,
     night: false,
     drake: 0,
     drakeElement: DRAKE_ORDER[0],
@@ -671,7 +695,7 @@ export function createGame(pick: ChampionDef, enemyDamage: number, opts: MatchOp
     notices: [],
   };
 
-  const structHp = opts.quick ? QUICK.hp : 1;
+  const structHp = opts.quick ? QUICK.hp : opts.event === 'allMid' ? ALL_MID.hp : 1;
   for (const team of ['blue', 'red'] as Team[]) {
     const nexus = blankUnit(s, 'nexus', team, BASE[team].x, BASE[team].y, {
       hp: NEXUS_HP * structHp,
@@ -744,7 +768,7 @@ export function createGame(pick: ChampionDef, enemyDamage: number, opts: MatchOp
   s.beast = beast.id;
 
   // The other classes, shuffled: four join the player, five fight on red.
-  const others = CHAMPIONS.filter((c) => c.id !== pick.id);
+  const others = (opts.pool ?? CHAMPIONS).filter((c) => c.id !== pick.id);
   for (let i = others.length - 1; i > 0; i--) {
     const j = Math.floor(rnd() * (i + 1)) % (i + 1);
     [others[i], others[j]] = [others[j], others[i]];
@@ -761,7 +785,7 @@ export function createGame(pick: ChampionDef, enemyDamage: number, opts: MatchOp
 
   // A quick match has fewer a side, every one on its one lane.
   const allies = opts.quick ? QUICK.allies : ALLY_LANES.length, enemies = opts.quick ? QUICK.enemies : ENEMY_LANES.length;
-  const laneOf = (lanes: LaneId[], i: number) => (opts.quick ? QUICK.lanes[i % QUICK.lanes.length] : lanes[i]);
+  const laneOf = (lanes: LaneId[], i: number) => (opts.quick || opts.event === 'allMid' ? QUICK.lanes[i % QUICK.lanes.length] : lanes[i]);
   const player = spawnChampion(s, pick, 'blue', blueAt(0).x, blueAt(0).y, !opts.watch, opts.watch ? laneOf(['top'], 0) : null, pick.hero);
   s.player = player.id;
   if (opts.spell && !opts.watch) player.spell = opts.spell;

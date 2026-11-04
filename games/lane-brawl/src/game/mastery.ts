@@ -1,7 +1,7 @@
 // Class mastery (#292): the player's wins with each class, kept in the browser. Each rank a class
 // reaches (`masteryRank`) puts a third upgrade card in one more of its level-up offers.
 
-import { MASTERY_WINS } from './data';
+import { MASTERY_WINS, UNLOCKS } from './data';
 
 const KEY = 'lane-brawl-mastery';
 
@@ -32,3 +32,14 @@ export function recordWin(champId: string): number {
 
 /** A class's mastery rank for its wins: 0 to `MASTERY_WINS.length`. */
 export const masteryRank = (wins: number) => MASTERY_WINS.filter((w) => wins >= w).length;
+
+/** The mastery ranks summed over every class but `except`. */
+export function ranksBesides(m: Record<string, number>, except: string): number {
+  return Object.entries(m).reduce((sum, [id, wins]) => sum + (id === except ? 0 : masteryRank(wins)), 0);
+}
+
+/** Whether a class can be played (LB16): always, unless `UNLOCKS` asks for mastery ranks on the others. */
+export function isUnlocked(id: string, m: Record<string, number>): boolean {
+  const need = UNLOCKS[id];
+  return !need || ranksBesides(m, id) >= need;
+}

@@ -945,6 +945,100 @@ const LOOKS: Record<string, Look> = {
       stunStars(top, f.x, f.y, k, 0xffc46a, a);
     },
   },
+  // Falconer: the falcon loosed, a hawk circling over its prey, a step on a gust of feathers, the
+  // royal stoop from the sky.
+  'falconer.Q': {
+    ms: 300,
+    draw: ({ top }, f, k, a) => {
+      for (const sd of [-1, 1]) arcStroke(top, f.x, f.y - AIR, 14 + 12 * k, f.a + sd * 0.4 - 0.5, f.a + sd * 0.4 + 0.5, 2, 0xe8e2d0, a);
+    },
+  },
+  'falconer.W': {
+    ms: 450,
+    draw: ({ ground }, f, k, a) => ring(ground, f.x, f.y, f.r * out(k), 3, 0xc9a46a, a),
+  },
+  'falconer.E': {
+    ms: 600,
+    draw: ({ ground, top }, f, k, a, n) => {
+      dottedPath(ground, f, 0, 6, 3, 0xe8e2d0, a * 0.7);
+      for (let i = 0; i < 7; i++) {
+        const t = hash(n + i), ang = hash(n + i * 5) * TAU;
+        const fx = lerp(f.x2, f.x, t) + Math.cos(ang) * 14 * k, fy = lerp(f.y2, f.y, t) - 18 - 20 * k + Math.sin(ang) * 8;
+        poly(top, [{ x: fx, y: fy - 4 }, { x: fx + 2, y: fy }, { x: fx, y: fy + 5 }, { x: fx - 2, y: fy }], 0xe8e2d0, a);
+      }
+    },
+  },
+  'falconer.R': {
+    ms: 900,
+    draw: ({ ground, top }, f, k, _a, n) => {
+      const fall = clamp01(k / 0.3);
+      if (fall < 1) {
+        // The falcon stoops out of the sky, wings folded, trailing a gold streak.
+        const fx = lerp(f.x - 120, f.x, fall), fy = lerp(f.y - 360, f.y - AIR, fall);
+        line(top, fx - 40, fy - 120, fx, fy, 6, 0xf2c14e, 0.35);
+        poly(top, [{ x: fx, y: fy + 10 }, { x: fx - 7, y: fy - 8 }, { x: fx + 7, y: fy - 8 }], 0x8a5d36, 1);
+        disc(top, fx, fy - 9, 4, 0xefe6cf, 1);
+        ring(ground, f.x, f.y, f.r, 2, 0xf2c14e, 0.5 * fall);
+        return;
+      }
+      const k2 = (k - 0.3) / 0.7, a2 = 1 - k2;
+      disc(ground, f.x, f.y, f.r * out(k2), 0xc9a46a, 0.25 * a2);
+      ring(ground, f.x, f.y, f.r * out(k2), 4, 0xf2c14e, a2);
+      burstDots(top, f.x, f.y - 10, f.r * 0.8, 14, k2, n, 3, 0xe8e2d0, a2);
+      stunStars(top, f.x, f.y - 40, k2, 0xf2c14e, a2);
+    },
+  },
+
+  // Alchemist: a flask that shatters into acid, a tonic's green mist, a smoke bomb, the grand mixture.
+  'alchemist.Q': {
+    ms: 500,
+    draw: ({ ground, top }, f, k, a, n) => {
+      const fly = clamp01(k / 0.4);
+      if (fly < 1) {
+        const fx = lerp(f.x2, f.x, fly), fy = lerp(f.y2, f.y, fly) - AIR - Math.sin(fly * Math.PI) * 60;
+        disc(top, fx, fy, 5, 0x9be15d, 1);
+        disc(top, fx - 1.5, fy - 1.5, 2, 0xffffff, 0.9);
+        return;
+      }
+      const k2 = (k - 0.4) / 0.6;
+      burstDots(ground, f.x, f.y, f.r * 0.7, 10, k2, n, 3, 0xd8ffb0, a);
+      ring(ground, f.x, f.y, f.r * out(k2), 3, 0x9be15d, a);
+    },
+  },
+  'alchemist.W': {
+    ms: 900,
+    draw: ({ ground, top }, f, k, a, n) => {
+      disc(ground, f.x, f.y, f.r, 0x9be15d, 0.12 * a);
+      ring(ground, f.x, f.y, f.r * (0.85 + 0.15 * out(k)), 3, 0xc7f59a, a);
+      rising(top, f.x, f.y, f.r * 0.8, 12, k, n, 4, 60, 0xd8ffb0, a, 'dot');
+      rising(top, f.x, f.y, f.r * 0.6, 4, k, n + 40, 5, 50, 0x6fd06a, a, 'plus');
+    },
+  },
+  'alchemist.E': {
+    ms: 800,
+    draw: ({ top }, f, k, a, n) => {
+      puffs(top, f.x, f.y - 14, 26 + 30 * out(k), 9, k, n, 18, 0x8f96a3, a);
+      puffs(top, f.x, f.y - 24, 18 + 20 * out(k), 6, k, n + 21, 14, 0xc79bff, a * 0.6);
+    },
+  },
+  'alchemist.R': {
+    ms: 1000,
+    draw: ({ ground, top }, f, k, a, n) => {
+      const fly = clamp01(k / 0.3);
+      if (fly < 1) {
+        const fx = lerp(f.x2, f.x, fly), fy = lerp(f.y2, f.y, fly) - AIR - Math.sin(fly * Math.PI) * 120;
+        disc(top, fx, fy, 9, 0xc79bff, 1);
+        disc(top, fx, fy - 9, 3, 0xb88a5a, 1);
+        return;
+      }
+      const k2 = (k - 0.3) / 0.7, a2 = 1 - k2;
+      disc(ground, f.x, f.y, f.r * out(k2), 0x6a3aa8, 0.25 * a2);
+      wavyRing(ground, f.x, f.y, f.r * out(k2), 9, 8, k2 * 3, 4, 0xc79bff, a2);
+      ring(ground, f.x, f.y, f.r * 0.7 * out(k2), 3, 0x9be15d, a2);
+      puffs(top, f.x, f.y - 20, f.r * 0.6 * out(k2), 12, k2, n, 22, 0x9be15d, 0.5 * a);
+      burstDots(top, f.x, f.y - 30, f.r * 0.7, 16, k2, n + 7, 4, 0xe9d6ff, a2);
+    },
+  },
   'bruin.R': {
     ms: 1050,
     draw: ({ ground, top }, f, k, a, n) => {
@@ -1096,6 +1190,19 @@ export function drawProjectile(g: G, p: Projectile, time: number, owner: { x: nu
       line(g, x - dx * 26, y - dy * 26, x, y, 2, 0x5fd3f0, 0.6);
       return;
     }
+    case 'falconer.Q': {
+      // The falcon in a dive: swept wings, a pale breast and a gold beak.
+      const flap = Math.sin(time / 45) * 0.35;
+      for (const sd of [-1, 1]) {
+        const w = { x: x - dx * 6 + px * sd * (14 + 4 * flap), y: y - dy * 6 + py * sd * (14 + 4 * flap) };
+        poly(g, [{ x: x + px * sd * 2, y: y + py * sd * 2 }, w, { x: x - dx * 12, y: y - dy * 12 }], 0x8a5d36, 1);
+      }
+      disc(g, x, y, 5, 0x8a5d36, 1);
+      disc(g, x + dx * 2, y + dy * 2, 3, 0xefe6cf, 1);
+      poly(g, [{ x: x + dx * 9, y: y + dy * 9 }, { x: x + dx * 5 + px * 2, y: y + dy * 5 + py * 2 }, { x: x + dx * 5 - px * 2, y: y + dy * 5 - py * 2 }], 0xf2c14e, 1);
+      line(g, x - dx * 40, y - dy * 40, x - dx * 14, y - dy * 14, 2, 0xe8e2d0, 0.35);
+      return;
+    }
     default: {
       // Towers, the beast's rocks and anything without a look of its own.
       const tail = p.width >= 28 ? 22 : 15;
@@ -1121,6 +1228,7 @@ const HIT_COLOR: Record<string, number> = {
   'gunslinger.R': 0xffd76a,
   'automaton.E': 0xd8a24a,
   'tinker.Q': 0x9ff4ff,
+  'falconer.Q': 0xe8e2d0,
 };
 
 function drawHit({ ground, top }: FxLayers, f: SkillShot, k: number, a: number, n: number) {
@@ -1278,6 +1386,32 @@ export function drawZone(L: FxLayers, z: Zone, time: number, reduceMotion: boole
       }
       return;
     }
+    case 'falconer.W': {
+      // A hawk wheeling over the circle, its shadow sweeping the ground.
+      edge(0xc9a46a, 0x6b4a2e, 0.14);
+      const a = t / 260;
+      const hx = z.x + Math.cos(a) * z.r * 0.7, hy = z.y + Math.sin(a) * z.r * 0.35;
+      disc(ground, hx, hy, 9, 0x000000, 0.18 * fade);
+      const tx = -Math.sin(a), ty = Math.cos(a) * 0.5;
+      for (const sd of [-1, 1]) poly(top, [{ x: hx, y: hy - 60 }, { x: hx - ty * 4 + tx * 2 + sd * 14 * Math.abs(ty * 2 + 0.3), y: hy - 60 + sd * 6 }, { x: hx - tx * 8, y: hy - 60 - ty * 8 }], 0x8a5d36, fade);
+      disc(top, hx, hy - 60, 4, 0x8a5d36, fade);
+      for (let i = 0; i < 6; i++) {
+        const ph = (t / 1100 + hash(n + i)) % 1;
+        const fa = hash(n + i * 3) * TAU, fd = z.r * 0.8 * hash(n + i * 7);
+        poly(top, [{ x: z.x + Math.cos(fa) * fd, y: z.y + Math.sin(fa) * fd - 50 * (1 - ph) - 4 }, { x: z.x + Math.cos(fa) * fd + 2, y: z.y + Math.sin(fa) * fd - 50 * (1 - ph) }, { x: z.x + Math.cos(fa) * fd, y: z.y + Math.sin(fa) * fd - 50 * (1 - ph) + 5 }], 0xe8e2d0, fade * Math.sin(ph * Math.PI));
+      }
+      return;
+    }
+    case 'alchemist.Q': {
+      // A bubbling green pool.
+      edge(0x9be15d, 0x3f7a1e, 0.3);
+      for (let i = 0; i < 10; i++) {
+        const ph = (t / 700 + hash(n + i)) % 1;
+        const ba = hash(n + i * 3) * TAU, bd = z.r * 0.85 * Math.sqrt(hash(n + i * 7));
+        ring(top, z.x + Math.cos(ba) * bd, z.y + Math.sin(ba) * bd - 4 - ph * 10, 2 + ph * 4, 1.5, 0xd8ffb0, fade * (1 - ph));
+      }
+      return;
+    }
     default:
       edge(parseInt(z.color.slice(1), 16), parseInt(z.color.slice(1), 16), 0.2);
   }
@@ -1315,6 +1449,13 @@ export function drawAura(L: FxLayers, look: string, x: number, y: number, time: 
       return;
     case 'bruin.R':
       zigRing(ground, x, y + 8, 30, 10, 4, 3, 0xd9a66a, 0.8);
+      return;
+    case 'alchemist.E':
+      // Smoke curling round the hidden alchemist.
+      for (let i = 0; i < 5; i++) {
+        const a = t / 700 + (i * TAU) / 5;
+        disc(top, x + Math.cos(a) * 18, y - 14 + Math.sin(a) * 8, 9, 0x8f96a3, 0.35);
+      }
       return;
     case 'lancer.R':
       for (let i = 0; i < 3; i++) {
