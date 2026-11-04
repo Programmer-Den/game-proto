@@ -1,19 +1,21 @@
 import Phaser from 'phaser';
 import { playMusic, playSting, ui } from '../../../../shared/audio';
+import { finishDaily, loadDaily, startDaily, today } from '../../../../shared/daily';
 import { renderScale, viewFrame } from '../../../../shared/scaling';
 import { settings } from '../../../../shared/settings';
 import { BROWN, GOLD, MOSS, num, OCHRE, RES, RUST, SEPIA, shown } from '../art/nouveau';
 import { needTexture, POTION_ORIGIN, potionTexture, tileTexture, TOOL_PAD, toolTexture } from '../art/textures';
-import { adjacent, COLS, inBoard, ROWS, special, stuck, validMoves, type Board, type Cell, type Tile } from '../game/board';
+import { adjacent, COLS, holesOf, inBoard, ROWS, special, stuck, validMoves, type Board, type Cell, type Tile } from '../game/board';
 import { EXAMS } from '../game/exams';
 import { formatNumber } from '../../../../shared/i18n';
 import { KIND_COUNTS, KIND_NAMES, KINDS, type Kind } from '../game/kinds';
 import { blockersFor, MOVE_BONUS, orderFor, POTION_NAMES, RICH_BLOCKERS, RICH_MOVES, RICH_SHARE, riskFor, RUSH_COINS, RUSH_MOVES, TWIN_BONUS } from '../game/orders';
 import { RANKS, rankOf, starsFor, STARS_2, STARS_3 } from '../game/ranks';
 import { loadProgress, saveProgress } from '../game/save';
-import { canUse, funnel, nextExam, nextOrder, pestle, sift, stir, TOOL_ORDER, TOOLS, trySwap, type Step, type Tool } from '../game/sim';
+import { canUse, funnel, nextDaily, nextEndless, nextExam, nextOrder, nextTown, pestle, sift, stir, TOOL_ORDER, TOOLS, trySwap, type Step, type Tool } from '../game/sim';
+import { TOWN_STAR_COINS, townOpen, TOWNS } from '../game/towns';
 import { checkTrophies } from '../trophies/check';
-import { buyHerb, examOpen, heldPantry, HERB_COST, PANTRY_MAX, progressOf, standingOf, startOrder, type GameState } from '../game/state';
+import { buyHerb, endlessOpen, examOpen, GAME, heldPantry, HERB_COST, PANTRY_MAX, progressOf, standingOf, startOrder, type GameState } from '../game/state';
 import { buyUpgrade, UPGRADE_ORDER, upgradeCost, UPGRADES, type UpgradeId } from '../game/upgrades';
 import { sfx, SONG } from '../audio';
 import { t } from '../i18n';
@@ -36,9 +38,10 @@ const NOTE_MS = 700;
 
 /**
  * Draw order: the table, catalyst row bands, the cursor, specials (whose rays and petals sit under
- * their neighbours), tiles, the panel, and gathered tiles flying to the label.
+ * their neighbours), tiles, resin and a town's walls (tiles fall behind both), the panel, and
+ * gathered tiles flying to the label.
  */
-const DEPTH = { band: 1.5, cursor: 1.8, catalyst: 1.9, tile: 2, resin: 2.1, panel: 3, flying: 4 };
+const DEPTH = { band: 1.5, cursor: 1.8, catalyst: 1.9, tile: 2, resin: 2.1, hole: 2.2, panel: 3, flying: 4 };
 
 /** A result card button: its caption and what a tap does. */
 interface Choice {
@@ -122,6 +125,10 @@ export class GameScene extends Phaser.Scene {
   private resultBench?: Phaser.GameObjects.Text;
   private resultHerbs?: Phaser.GameObjects.Text;
   private resultExam?: Phaser.GameObjects.Text;
+  private resultJourney?: Phaser.GameObjects.Text;
+  /** The journey map card: the towns on their road, the daily order and endless orders. */
+  private map?: Phaser.GameObjects.Container;
+  private mapRows?: Phaser.GameObjects.Container;
   /** What the caption says while the result card is up, if anything. */
   private resultCaption: string | null = null;
   private herbs?: Phaser.GameObjects.Container;
@@ -195,6 +202,7 @@ export class GameScene extends Phaser.Scene {
     this.result.setVisible(false);
     this.bench?.setVisible(false);
     this.herbs?.setVisible(false);
+    this.map?.setVisible(false);
     this.note?.setVisible(false);
     this.resultCaption = null;
     this.buildPanel();
@@ -202,8 +210,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private tileSprite(tile: Tile, x: number, y: number) {
-    // Tiles fall past resin, behind it.
-    return shown(this.add.image(x, y, tileTexture(tile))).setDepth(special(tile) ? DEPTH.catalyst : tile.resin ? DEPTH.resin : DEPTH.tile);
+    // Tiles fall past resin and a town's walls, behind them.
+    return shown(this.add.image(x, y, tileTexture(tile))).setDepth(tile.hole ? DEPTH.hole : special(tile) ? DEPTH.catalyst : tile.resin ? DEPTH.resin : DEPTH.tile);
   }
 
   private cellAt(x: number, y: number): Cell | null {
@@ -526,9 +534,14 @@ export class GameScene extends Phaser.Scene {
     this.shown = { ...this.state.got };
     this.refresh();
     const s = this.state;
+    // The daily's try ends with the stars it was sold with, or none.
+    if (s.current.daily && s.phase !== 'play') finishDaily(GAME, s.phase === 'sold' ? s.orderStars : 0, s.current.daily.day);
     if (s.phase === 'sold') {
       saveProgress(progressOf(s));
       this.showSold();
+    } else if (s.phase === 'failed' && (s.current.town || s.current.endless || s.current.daily)) {
+      playSting(SONG, 'fail');
+      this.showAsideFailed();
     } else if (s.current.exam && s.phase === 'failed') {
       playSting(SONG, 'fail');
       this.showResult(t('outOfMoves'), t('potionUnfinished', { potion: t(POTION_NAMES[s.current.potion]) }), t('noSeal'), this.examRetry(), 0);
@@ -714,7 +727,13 @@ export class GameScene extends Phaser.Scene {
     const mid = PANEL.x + PANEL.w / 2;
     const title = o.exam
       ? t('examTitle', { n: o.exam.index + 1 })
-      : o.stages
+      : o.town
+        ? t('townTitle', { town: t(TOWNS[o.town.index].name) })
+        : o.endless
+          ? t('endlessTitle', { n: o.endless })
+          : o.daily
+            ? t('dailyTitle')
+            : o.stages
         ? o.last
           ? t('crownsLast')
           : t('royalCommission')
@@ -722,16 +741,22 @@ export class GameScene extends Phaser.Scene {
           ? t('twinTitle', { n: o.number })
           : t('orderTitle', { n: o.number });
     const items: Phaser.GameObjects.GameObject[] = [
-      this.add.text(mid, 62, title, ink(o.stages || o.second || o.exam ? 24 : 28, SEPIA, 'bold')).setOrigin(0.5),
+      this.add.text(mid, 62, title, ink(o.stages || o.second || o.exam || o.town || o.endless || o.daily ? 24 : 28, SEPIA, 'bold')).setOrigin(0.5),
       shown(this.add.image(606, 145, potionTexture(o.potion))).setOrigin(POTION_ORIGIN.x, POTION_ORIGIN.y),
       this.add.text(606, 164.5, t('potionNumber', { n: o.number }), ink(9, RUST, 'italic bold')).setOrigin(0.5),
       this.add.text(666, 124, t(POTION_NAMES[o.potion]), ink(22, SEPIA, 'italic bold')).setOrigin(0, 0.5),
-      this.add.text(666, 152, t(o.exam ? 'paysPass' : o.rich ? 'paysRich' : 'pays', { price: o.price }), ink(15, BROWN)).setOrigin(0, 0.5),
-      this.add.text(666, 174, t('perMove', { n: MOVE_BONUS }), ink(15, BROWN)).setOrigin(0, 0.5),
+      this.add.text(666, 152, o.town ? t('paysStars', { coins: TOWN_STAR_COINS }) : t(o.exam ? 'paysPass' : o.rich ? 'paysRich' : 'pays', { price: o.price }), ink(15, BROWN)).setOrigin(0, 0.5),
+      this.add.text(666, 174, o.town ? t('townBest', { n: s.towns[o.town.index] }) : t('perMove', { n: MOVE_BONUS }), ink(15, BROWN)).setOrigin(0, 0.5),
     ];
     // The order's twist, stage or second customer, under the price.
     const line = o.exam
       ? t('examLine', { stars: o.exam.stars, moves: o.exam.stars === 3 ? STARS_3 : STARS_2 })
+      : o.town
+      ? t('townLine', { n: o.town.index + 1, towns: TOWNS.length })
+      : o.endless
+      ? t('endlessLine', { n: s.endless })
+      : o.daily
+      ? t('dailyLine', { town: t(TOWNS[o.daily.town].name) })
       : o.stages
       ? t('stageLine', { stage: s.stage + 1, stages: o.stages.length })
       : o.second
@@ -784,8 +809,8 @@ export class GameScene extends Phaser.Scene {
   /** The moves left, lit with the stars a sale would earn now, and what keeps the next star. */
   private refreshMoves() {
     const s = this.state;
-    // The waltz: statelier for a royal commission or an examination, tense with three moves or fewer left.
-    playMusic(SONG, s.phase === 'play' && s.moves <= 3 ? 'tense' : s.current.stages || s.current.exam ? 'royal' : 'calm');
+    // The waltz: statelier for a royal commission, an examination or an endless run, tense with three moves or fewer left.
+    playMusic(SONG, s.phase === 'play' && s.moves <= 3 ? 'tense' : s.current.stages || s.current.exam || s.current.endless ? 'royal' : 'calm');
     this.movesText.setText(t('moves', { n: s.moves })).setColor(s.moves <= 3 && s.phase === 'play' ? '#a8352a' : SEPIA);
     const lit = s.phase === 'sold' ? s.orderStars : s.phase === 'failed' ? 0 : starsFor(s.moves);
     this.starIcons.forEach((icon, k) => icon.setTexture(k < lit ? 'star-on' : 'star-off'));
@@ -880,6 +905,7 @@ export class GameScene extends Phaser.Scene {
     const given = Object.entries(s.fromPantry);
     let text = t('captionTip');
     if (this.herbs?.visible) text = t('captionHerbs', { cost: HERB_COST, max: PANTRY_MAX });
+    else if (this.map?.visible) text = t('captionMap', { coins: TOWN_STAR_COINS });
     else if (this.resultCaption && s.phase !== 'play') text = this.resultCaption;
     else if (this.armed === 'sift') text = t('captionSift', { cost: TOOLS.sift.cost });
     else if (this.armed === 'pestle') text = t('captionPestle', { cost: TOOLS.pestle.cost });
@@ -888,6 +914,9 @@ export class GameScene extends Phaser.Scene {
     else if (given.length > 0 && Object.values(s.got).every((n, i) => n === (s.fromPantry[Object.keys(s.got)[i] as Kind] ?? 0)))
       text = t('captionPantry', { list: given.map(([k, n]) => t(KIND_COUNTS[k as Kind], { n })).reduce((a, b) => t('and', { a, b })) });
     else if (s.current.exam) text = t('captionExam', { stars: s.current.exam.stars });
+    else if (s.current.town) text = t('captionTown');
+    else if (s.current.endless) text = t('captionEndless');
+    else if (s.current.daily) text = t('captionDaily');
     else if (s.current.rich)
       text = s.current.rich === 'moves'
         ? t('captionRichMoves', { share: RICH_SHARE * 100, moves: RICH_MOVES })
@@ -960,8 +989,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * The result card's links, made the first time the card shows: the workbench, the herbalist and,
-   * once Royal Apothecary, the next guild examination. They sit in a row, centred.
+   * The result card's links, made the first time the card shows: the workbench, the herbalist, the
+   * journey map (once a potion is sold) and, once Royal Apothecary, the next guild examination. They
+   * sit in a row, centred.
    */
   private refreshLinks() {
     this.resultBench ??= this.link(t('workbench'), () => this.openBench());
@@ -969,9 +999,18 @@ export class GameScene extends Phaser.Scene {
     const exam = examOpen(progressOf(this.state));
     if (exam) this.resultExam ??= this.link('', () => this.begin(nextExam(this.state)));
     this.resultExam?.setText(t('examTitle', { n: this.state.seals + 1 })).setVisible(exam);
-    const links = [this.resultBench, this.resultHerbs, ...(exam && this.resultExam ? [this.resultExam] : [])];
-    const gap = 26;
-    let x = -(links.reduce((w, l) => w + l.width, 0) + gap * (links.length - 1)) / 2;
+    // The journey map opens with the first potion sold.
+    const journey = this.state.sold > 0;
+    if (journey) this.resultJourney ??= this.link(t('journeyMap'), () => this.openMap());
+    this.resultJourney?.setVisible(journey);
+    const links = [this.resultBench, this.resultHerbs, ...(journey && this.resultJourney ? [this.resultJourney] : []), ...(exam && this.resultExam ? [this.resultExam] : [])];
+    // Four links (or a longer language) close up and shrink to stay on the card.
+    let gap = 26;
+    links.forEach((l) => l.setFontSize(12));
+    const span = () => links.reduce((w, l) => w + l.width, 0) + gap * (links.length - 1);
+    if (span() > 350) gap = 16;
+    for (let size = 11; size >= 9 && span() > 350; size--) links.forEach((l) => l.setFontSize(size));
+    let x = -span() / 2;
     for (const l of links) {
       l.setX(x + l.width / 2);
       x += l.width + gap;
@@ -1125,6 +1164,7 @@ export class GameScene extends Phaser.Scene {
   private showSold() {
     const s = this.state;
     const o = s.current;
+    if (o.town || o.endless || o.daily) return this.showAsideSold();
     if (o.exam) {
       const need = o.exam.stars === 3 ? STARS_3 : STARS_2;
       if (!s.passed) {
@@ -1159,6 +1199,161 @@ export class GameScene extends Phaser.Scene {
     if (kept.length > 0) lines.push(t('keptInPantry', { list: kept.join(', ') }));
     const title = o.last ? t('crownFilled') : o.stages ? t('royalFilled') : o.second ? t('twinFilled') : t('sold', { potion: t(POTION_NAMES[o.potion]) });
     this.showResult(title, lines.join('\n'), rank, this.orderChoice(), s.orderStars);
+  }
+
+  /** A town, an endless run's order or the daily order sold. */
+  private showAsideSold() {
+    const s = this.state;
+    const o = s.current;
+    playSting(SONG, `sold${Math.max(1, Math.min(3, s.orderStars))}`);
+    const back = { label: t('backToOrders'), act: () => this.begin(nextOrder(this.state)) };
+    const earned = t('earned', { price: o.price, bonus: s.earned - o.price, n: s.moves });
+    if (o.town) {
+      const i = o.town.index;
+      const won = s.earned / TOWN_STAR_COINS;
+      const text = won > 0 ? t('townStarsWon', { n: won, coins: s.earned }) : t('townNoNew', { n: s.towns[i] });
+      const opened = won === s.towns[i] && i + 1 < TOWNS.length;
+      const rank = opened ? t('townOpened', { town: t(TOWNS[i + 1].name) }) : t('journeyStars', { n: this.townStars(), max: TOWNS.length * 3 });
+      this.showResult(t('townFilled', { town: t(TOWNS[i].name) }), text, rank, [{ label: t('journeyMap'), act: () => this.openMap() }, back], s.orderStars);
+    } else if (o.endless) {
+      const step = o.endless;
+      const next = { label: t('nextInRun'), act: () => this.begin(nextEndless(this.state, step + 1)) };
+      this.showResult(t('endlessSold', { n: step }), earned, t('streakLine', { n: step, best: s.endless }), [next, back], s.orderStars);
+    } else {
+      this.showResult(t('dailySold'), earned, this.dailyRecord(), [back], s.orderStars);
+    }
+  }
+
+  /** A town, an endless run's order or the daily order out of moves: a town can be tried again, a run is over, the daily's try is used. */
+  private showAsideFailed() {
+    const s = this.state;
+    const o = s.current;
+    const back = { label: t('backToOrders'), act: () => this.begin(nextOrder(this.state)) };
+    const what = t('potionUnfinished', { potion: t(POTION_NAMES[o.potion]) });
+    if (o.town) {
+      const i = o.town.index;
+      this.showResult(t('outOfMoves'), what, t('noStars'), [{ label: t('tryAgain'), act: () => this.begin(nextTown(this.state, i)) }, { label: t('journeyMap'), act: () => this.openMap() }], 0);
+    } else if (o.endless) {
+      const fresh = { label: t('newRun'), act: () => this.begin(nextEndless(this.state, 1)) };
+      this.showResult(t('runOver'), t('runOverText', { n: o.endless - 1 }), t('bestStreak', { n: s.endless }), [fresh, back], 0);
+    } else {
+      this.showResult(t('outOfMoves'), what, this.dailyRecord(), [back], 0);
+    }
+  }
+
+  /** The daily's best and streak, for the result card. */
+  private dailyRecord() {
+    const record = loadDaily(GAME, this.state.current.daily?.day);
+    return t('dailyRecord', { best: record.best, n: record.streak });
+  }
+
+  private townStars() {
+    return this.state.towns.reduce((sum, n) => sum + n, 0);
+  }
+
+  // ---- The journey map ----
+
+  /** The journey map card over the board: the towns along their road, and the daily order and endless orders below. */
+  private createMap() {
+    const size = BOARD.cell * COLS;
+    const card = shown(this.add.image(0, 0, 'map-card'));
+    const title = this.add.text(0, -184, t('journeyMap'), ink(24, SEPIA, 'italic bold')).setOrigin(0.5);
+    this.mapRows = this.add.container(0, 0);
+    const back = makeButton(this, 0, 172, t('back'), () => (ui('click'), this.closeMap())).setScale(0.72);
+    this.map = this.add.container(BOARD.x + size / 2, BOARD.y + size / 2, [card, title, this.mapRows, back]).setDepth(UI_DEPTH);
+  }
+
+  private openMap() {
+    if (!this.map) this.createMap();
+    this.result.setVisible(false);
+    this.map!.setVisible(true);
+    this.refreshMap();
+    this.refreshCaption();
+  }
+
+  private closeMap() {
+    this.map?.setVisible(false);
+    this.result.setVisible(true);
+    this.refreshCaption();
+  }
+
+  /** Where town `i` sits on the map: four along the top from the left, four back along the bottom. */
+  private townAt(i: number) {
+    const row = Math.floor(i / 4);
+    const k = i % 4;
+    return { x: (row === 0 ? k - 1.5 : 1.5 - k) * 100, y: row === 0 ? -112 : -6 };
+  }
+
+  /** The road and its towns (each a little picture of its board's shape, its name and its best stars), then the daily and endless orders. */
+  private refreshMap() {
+    const rows = this.mapRows;
+    if (!rows) return;
+    rows.removeAll(true);
+    const s = this.state;
+    rows.add(this.add.text(0, -160, t('journeyStars', { n: this.townStars(), max: TOWNS.length * 3 }), ink(13, BROWN, 'italic')).setOrigin(0.5));
+    const road = this.add.graphics();
+    rows.add(road);
+    road.lineStyle(3, num(GOLD), 0.8);
+    for (let i = 0; i + 1 < TOWNS.length; i++) {
+      const a = this.townAt(i);
+      const b = this.townAt(i + 1);
+      // A dotted road from town to town.
+      for (let k = 0; k <= 12; k++) {
+        const x = Phaser.Math.Linear(a.x, b.x, k / 12);
+        const y = Phaser.Math.Linear(a.y, b.y, k / 12);
+        // No dots over a town's picture, name or stars.
+        if ([a, b].some((c) => Math.abs(x - c.x) < 34 && y > c.y - 30 && y < c.y + 60)) continue;
+        road.fillStyle(num(GOLD)).fillCircle(x, y, 2);
+      }
+    }
+    TOWNS.forEach((town, i) => {
+      const { x, y } = this.townAt(i);
+      const open = townOpen(s.towns, i);
+      const pic = this.add.graphics();
+      const cell = 5;
+      pic.fillStyle(num(SEPIA)).fillRoundedRect(x - 23, y - 23, 46, 46, 5);
+      const holes = new Set(holesOf(town.shape).map((c) => c.row * COLS + c.col));
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) pic.fillStyle(holes.has(r * COLS + c) ? 0x2f5a48 : (r + c) % 2 ? 0xeadcb8 : 0xf4ead0).fillRect(x - 20 + c * cell, y - 20 + r * cell, cell - 0.5, cell - 0.5);
+      }
+      const name = this.add.text(x, y + 33, t(town.name), ink(11, SEPIA, 'italic bold')).setOrigin(0.5);
+      const stars = [0, 1, 2].map((k) => shown(this.add.image(x + (k - 1) * 14, y + 50, k < s.towns[i] ? 'star-on' : 'star-off'), 0.5));
+      const hit = this.add.zone(x, y + 10, 92, 92).setInteractive({ useHandCursor: open });
+      hit.on('pointerdown', () => (open ? (ui('click'), this.begin(nextTown(this.state, i))) : ui('refuse')));
+      for (const part of [pic, name, ...stars]) part.setAlpha(open ? 1 : 0.35);
+      rows.add([pic, name, ...stars, hit]);
+    });
+    rows.add(this.add.graphics().lineStyle(1.5, num(GOLD)).lineBetween(-180, 76, 180, 76));
+    // The daily order: one try a day, the same for everyone.
+    const daily = loadDaily(GAME);
+    const dailyButton = makeButton(this, -96, 106, t('dailyTitle'), () => {
+      if (loadDaily(GAME).played) return ui('refuse');
+      ui('click');
+      const day = today();
+      startDaily(GAME, day);
+      this.begin(nextDaily(this.state, day));
+    }).setScale(0.72);
+    if (daily.played) dailyButton.setAlpha(0.45);
+    const dailyNote = daily.played
+      ? daily.score === null
+        ? t('dailyUsed')
+        : t('dailyPlayed', { n: daily.score })
+      : t('dailyNew', { n: daily.streak });
+    // Endless orders: open once every guild examination is passed.
+    const endless = endlessOpen(progressOf(s));
+    const endlessButton = makeButton(this, 96, 106, t('endlessOrders'), () => {
+      if (!endlessOpen(progressOf(this.state))) return ui('refuse');
+      ui('click');
+      this.begin(nextEndless(this.state, 1));
+    }).setScale(0.72);
+    if (!endless) endlessButton.setAlpha(0.45);
+    const endlessNote = endless ? t('bestStreak', { n: s.endless }) : t('endlessLocked');
+    rows.add([dailyButton, endlessButton]);
+    for (const [x, note] of [[-96, dailyNote], [96, endlessNote]] as const) {
+      const text = this.add.text(x, 134, note, ink(11, BROWN, 'italic')).setOrigin(0.5).setAlign('center');
+      for (let size = 10; size >= 8 && text.width > 180; size--) text.setFontSize(size);
+      rows.add(text);
+    }
   }
 
   /** Shows the result card with one button, or two side by side. */
