@@ -1,12 +1,15 @@
 import Phaser from 'phaser';
-import { BUTTON, DECREE, GIFT_CARD, ISLAND_BUTTON, ISLANDS_CARD, PANEL, TILE_BUTTONS, TITLE, TRADE_CARD, TRAY, UNDO_BUTTON } from '../scenes/layout';
+import { BUTTON, DECREE, FEATS_BUTTON, GIFT_CARD, ISLAND_BUTTON, ISLANDS_CARD, PANEL, TILE_BUTTONS, TITLE, TRADE_CARD, TRAY, UNDO_BUTTON } from '../scenes/layout';
 import { viewFrame, viewSize } from '../../../../shared/scaling';
-import { bake, setArtRes, ball, castle, circle, crown, ctx, grain, harbor, house, lumber, manor, market, peg, PI, reseed, rnd, rrect, stripes, T, tile, tower, walnut, windmill } from './wood';
+import { bake, setArtRes, ball, castle, circle, crown, ctx, grain, harbor, house, lighthouse, lumber, manor, market, orchard, peg, PI, reseed, rnd, rrect, stripes, T, temple, tile, tower, walnut, windmill } from './wood';
+import type { Skin } from '../game/feats';
 
 // Every texture the game uses, painted once at boot:
 // - `bg`: the table, the decree sign, the walnut tray and the panel with its title plaque.
 // - `tile-grass-0..3` (grass with painted flowers), `tile-plain` (grass under a building or wood),
-//   `tile-lake`, `tile-farm`, `tile-road`: one 64px cell each.
+//   `tile-lake`, `tile-farm`, `tile-road`, `tile-sea` (open water cut into a chain island): one
+//   64px cell each. A tile skin (`useSkin`) bakes its own grass, plain and road tiles, named
+//   `<key>-<skin>`, the first time it is shown.
 // - `prop-<kind>` for every building but the farm and the road (house, tower, windmill, market,
 //   harbor, lumber, manor), for the forest and for the castle: what stands on a cell, 80x100 with
 //   the cell's centre at PROP_ORIGIN, so roofs and flags reach into the row above.
@@ -23,12 +26,48 @@ export const PROP = { w: 80, h: 100 };
 export const PROP_ORIGIN = { x: 0.5, y: 0.68 };
 export const GRASS_VARIANTS = 4;
 
-/** A cell's tile, painted with its top left at (0, 0). */
-function cellTile(kind: 'grass' | 'plain' | 'lake' | 'farm' | 'road', variant = 0) {
+/** The grass paint of each tile skin (`SKINS` in `game/feats.ts`); '' is the classic green. */
+export const SKIN_GREEN: Record<Skin, string> = {
+  '': T.green,
+  spring: '#8fcf5a',
+  autumn: '#c98f3a',
+  heather: '#a77bc0',
+  snow: '#e4edf1',
+  sand: '#e0c07a',
+  moss: '#3d8358',
+  dusk: '#4f6aa8',
+};
+
+/** A cell's tile, painted with its top left at (0, 0); `green` is the grass's paint. */
+function cellTile(kind: 'grass' | 'plain' | 'lake' | 'farm' | 'road' | 'sea', variant = 0, green = T.green) {
   const pad = 5;
   const X = CELL / 2;
   const Y = CELL / 2;
   reseed(900 + variant * 31 + kind.length * 7);
+  if (kind === 'sea') {
+    // open water filling the cell, with no beech block: the sea between the island's tiles
+    const g = ctx.createLinearGradient(0, 0, CELL, CELL);
+    g.addColorStop(0, '#2c6aa8');
+    g.addColorStop(1, '#1d4a7c');
+    rrect(1, 1, CELL - 2, CELL - 2, 10);
+    ctx.fillStyle = g;
+    ctx.fill();
+    grain(1, 1, CELL - 2, CELL - 2, '#0c2a50', 6, 3, 0.2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    for (const [px, py] of [
+      [X - 26, Y - 22],
+      [X + 8, Y - 4],
+      [X - 12, Y + 24],
+      [X + 28, Y + 30],
+    ]) {
+      ctx.beginPath();
+      ctx.arc(px, py, 8, PI * 1.1, PI * 1.9);
+      ctx.stroke();
+    }
+    return;
+  }
   if (kind === 'lake') {
     tile(pad, pad, CELL - 2 * pad, CELL - 2 * pad - 6, 14, T.beech);
     rrect(16, 15, CELL - 32, CELL - 40, 12);
@@ -63,7 +102,7 @@ function cellTile(kind: 'grass' | 'plain' | 'lake' | 'farm' | 'road', variant = 
     stripes(18, 16, CELL - 36, CELL - 44);
     return;
   }
-  tile(pad, pad, CELL - 2 * pad, CELL - 2 * pad - 6, 14, T.green);
+  tile(pad, pad, CELL - 2 * pad, CELL - 2 * pad - 6, 14, green);
   if (kind === 'road') {
     // a cobbled cross, so it joins whichever side the chain comes from
     ctx.save();
@@ -97,8 +136,8 @@ function cellTile(kind: 'grass' | 'plain' | 'lake' | 'farm' | 'road', variant = 
 }
 
 /** A building or wood standing on a cell, around the cell's centre (0, 0). */
-type PropKind = 'house' | 'tower' | 'forest' | 'windmill' | 'market' | 'harbor' | 'lumber' | 'manor' | 'castle';
-const PROPS: PropKind[] = ['house', 'tower', 'forest', 'windmill', 'market', 'harbor', 'lumber', 'manor', 'castle'];
+type PropKind = 'house' | 'tower' | 'forest' | 'windmill' | 'market' | 'harbor' | 'lumber' | 'temple' | 'lighthouse' | 'orchard' | 'manor' | 'castle';
+const PROPS: PropKind[] = ['house', 'tower', 'forest', 'windmill', 'market', 'harbor', 'lumber', 'temple', 'lighthouse', 'orchard', 'manor', 'castle'];
 
 function prop(kind: PropKind) {
   reseed(500 + kind.length * 13);
@@ -113,6 +152,9 @@ function prop(kind: PropKind) {
   else if (kind === 'harbor') harbor(0, -6, 1);
   else if (kind === 'lumber') lumber(0, 0, 1.05);
   else if (kind === 'castle') castle(0, 0, 1);
+  else if (kind === 'temple') temple(0, 0, 1);
+  else if (kind === 'lighthouse') lighthouse(0, 0, 1);
+  else if (kind === 'orchard') orchard(0, 0, 1);
   else manor(0, 2, 1);
 }
 
@@ -182,8 +224,8 @@ function spot(kind: 'farm' | 'house') {
 }
 
 /** A building on its own, `k` times the size of a gift chip's icon. */
-type IconKind = 'farm' | 'house' | 'tower' | 'windmill' | 'market' | 'harbor' | 'lumber';
-const ICONS: IconKind[] = ['farm', 'house', 'tower', 'windmill', 'market', 'harbor', 'lumber'];
+type IconKind = 'farm' | 'house' | 'tower' | 'windmill' | 'market' | 'harbor' | 'lumber' | 'temple' | 'lighthouse' | 'orchard';
+const ICONS: IconKind[] = ['farm', 'house', 'tower', 'windmill', 'market', 'harbor', 'lumber', 'temple', 'lighthouse', 'orchard'];
 
 function icon(kind: IconKind, k = 1) {
   reseed(77);
@@ -197,6 +239,9 @@ function icon(kind: IconKind, k = 1) {
   else if (kind === 'windmill') windmill(0, 2 * k, 0.38 * k);
   else if (kind === 'market') market(0, 4 * k, 0.4 * k);
   else if (kind === 'harbor') harbor(0, 0, 0.4 * k);
+  else if (kind === 'temple') temple(0, 4 * k, 0.4 * k);
+  else if (kind === 'lighthouse') lighthouse(0, 6 * k, 0.36 * k);
+  else if (kind === 'orchard') orchard(0, 2 * k, 0.4 * k);
   else lumber(0, 2 * k, 0.42 * k);
 }
 
@@ -261,6 +306,7 @@ export function bakeTextures(scene: Phaser.Scene) {
   bake(scene, 'tile-lake', 64, 64, () => cellTile('lake'));
   bake(scene, 'tile-farm', 64, 64, () => cellTile('farm'));
   bake(scene, 'tile-road', 64, 64, () => cellTile('road'));
+  bake(scene, 'tile-sea', 64, 64, () => cellTile('sea'));
   for (const kind of PROPS) {
     bake(scene, `prop-${kind}`, PROP.w, PROP.h, () => prop(kind), PROP.w * PROP_ORIGIN.x, PROP.h * PROP_ORIGIN.y);
   }
@@ -305,13 +351,35 @@ export function bakeTextures(scene: Phaser.Scene) {
   walnutBoard(scene, GIFT_CARD.w, GIFT_CARD.h);
   walnutBoard(scene, 440, 96);
   walnutBoard(scene, 520, 260);
+  walnutBoard(scene, 700, 260);
+  plaques(scene, FEATS_BUTTON.w, FEATS_BUTTON.h, 14);
+}
+
+/** The skin the board is painted in; '' for the classic set. */
+let skin: Skin = '';
+const suffix = (k: Skin) => (k ? `-${k}` : '');
+
+/** Bakes skin `k`'s tile of `kind` (and grass `variant`) if it is not baked yet, and returns its key. */
+export function skinTile(scene: Phaser.Scene, k: Skin, kind: 'grass' | 'plain' | 'road', variant = 0) {
+  const key = `tile-${kind}${kind === 'grass' ? `-${variant}` : ''}${suffix(k)}`;
+  bake(scene, key, 64, 64, () => cellTile(kind, variant, SKIN_GREEN[k]));
+  return key;
+}
+
+/** Paints the board in skin `k` from now on: bakes its tiles the first time, then `tileKey` names them. */
+export function useSkin(scene: Phaser.Scene, k: Skin) {
+  for (let v = 0; v < GRASS_VARIANTS; v++) skinTile(scene, k, 'grass', v);
+  skinTile(scene, k, 'plain');
+  skinTile(scene, k, 'road');
+  skin = k;
 }
 
 /** The texture of a cell's tile: grass shows one of its flower variants, picked by position. */
 export function tileKey(cell: string, col: number, row: number) {
-  if (cell === 'grass') return `tile-grass-${(col * 7 + row * 13 + ((col * row) % 5)) % GRASS_VARIANTS}`;
-  if (cell === 'lake' || cell === 'farm' || cell === 'road') return `tile-${cell}`;
-  return 'tile-plain';
+  if (cell === 'grass') return `tile-grass-${(col * 7 + row * 13 + ((col * row) % 5)) % GRASS_VARIANTS}${suffix(skin)}`;
+  if (cell === 'road') return `tile-road${suffix(skin)}`;
+  if (cell === 'lake' || cell === 'farm' || cell === 'sea') return `tile-${cell}`;
+  return `tile-plain${suffix(skin)}`;
 }
 
 /** The prop standing on a cell, or null for flat cells. */

@@ -1,16 +1,24 @@
 import { byDifficulty } from '../../../../shared/settings';
-import { ISLANDS } from './tiles';
+import { ISLANDS, type Building } from './tiles';
 
 // Where a kingdom is built: a random island, one typed in by its number, the island of the day,
-// or a campaign level. The island itself always follows from its number (islandMap).
+// a campaign level, or the next island of a chain. The island itself always follows from its
+// number (islandMap), and on a chain from its place in the chain too (chainMap).
 
-export type Mode = 'random' | 'code' | 'daily' | 'campaign';
+export type Mode = 'random' | 'code' | 'daily' | 'campaign' | 'chain';
 
-/** How a new kingdom is chosen. `level` is the campaign level (1 and up), `day` the daily island's date. */
+/**
+ * How a new kingdom is chosen. `level` is the campaign level (1 and up), `day` the daily island's
+ * date. A chain island (`mode` 'chain') has its `link` in the chain (2 and up), the final scores
+ * of the islands before it (`chainScore`) and the `cargo` the last island's harbours shipped.
+ */
 export interface Kingdom {
   mode: Mode;
   level?: number;
   day?: string;
+  link?: number;
+  chainScore?: number;
+  cargo?: Partial<Record<Building, number>>;
 }
 
 /** A campaign level: its island and the final scores that earn one, two and three stars. */

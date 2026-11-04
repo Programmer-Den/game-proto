@@ -12,7 +12,7 @@ const en = {
   roundEight: 'Eighth harvest',
   roundEightText: 'Reach round 8 in one kingdom.',
   allGifts: 'Royal favour',
-  allGiftsText: 'Win all four gift buildings in one kingdom.',
+  allGiftsText: 'Win all five gift buildings in one kingdom.',
   longChain: 'All roads lead home',
   longChainText: 'Join 40 buildings to the castle at once.',
   tenCrowns: 'Crown jewels',

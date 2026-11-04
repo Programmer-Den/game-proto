@@ -46,6 +46,13 @@ export const ISLANDS_CARD = {
   close: { x: 586, y: 82, w: 84, h: 28 },
 };
 
+/** The Feats button on the islands card's title line, left of Close, by its centre: opens the feats card. */
+export const FEATS_BUTTON = { x: 476, y: 82, w: 108, h: 28 };
+/** The feats card over the board: a row per feat with the skin it unlocks, then a swatch per tile skin (the islands card's level plaques). */
+export const FEATS_CARD = { x: 346, y: 270, w: 600, h: 432, rowY: 138, rowH: 30, swatchY: 420 };
+/** The game-over card and its three buttons' centres, from its middle. */
+export const GAME_OVER = { w: 700, h: 260, dx: 226, dy: 88 };
+
 export const UI_DEPTH = 10_000;
 export const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
 

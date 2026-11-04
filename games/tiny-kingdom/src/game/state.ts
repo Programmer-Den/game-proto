@@ -5,7 +5,7 @@ import { GIFT_INFO, giftsFor, newSpecial, type Gift } from './gifts';
 import type { Kingdom, Mode } from './islands';
 import { omenFor, strike, type Omen, type Struck } from './omens';
 import { seasonBonus, seasonFor, type Season } from './seasons';
-import { AROUND, BUILDINGS, SIDES, isBuilding, isHome, randomIsland, scores, seeded, startingGrid, type Building, type Cell, type Special } from './tiles';
+import { AROUND, BUILDINGS, SIDES, isBuilding, isHome, nativeFor, nextIsland, randomIsland, scores, seaSides, seeded, startingGrid, type Building, type Cell, type Native, type Special } from './tiles';
 
 // The rules in plain TypeScript, with no Phaser. The score is the whole board's score plus the
 // bonuses won (decrees and seasons): each building's points depend on its neighbours, so a
@@ -61,6 +61,16 @@ export interface GameState {
   tradedIn: number;
   /** The castle bonus paid when the kingdom was finished: one point per building joined to the castle. 0 before. */
   castle: number;
+  /** Which island of a chain this is: 1 for a kingdom of its own (or a chain's first), 2 and up for the islands sailed on to. */
+  link: number;
+  /** The building found only on this chain island (from link 2), or null. */
+  native: Native | null;
+  /** The final scores of the chain's islands before this one; 0 on a first island. */
+  chainScore: number;
+  /** How many tiles the last island's harbours shipped here as cargo; 0 on a first island. */
+  cargo: number;
+  /** The trade bonus paid when a chain island was finished: TRADE_BONUS per harbour. 0 before. */
+  trade: number;
   /** The board as it was before the last placement, if that placement can be undone. */
   undo: Snapshot | null;
   /** The round in which the undo was last used; 0 if none yet. One undo per round. */
@@ -80,9 +90,18 @@ export interface Snapshot {
 }
 
 /** The first round's tiles. */
-export const FIRST_POUCH: Pouch = { farm: 4, house: 4, tower: 2, windmill: 0, market: 0, harbor: 0, lumber: 0, road: 1 };
+export const FIRST_POUCH: Pouch = { farm: 4, house: 4, tower: 2, windmill: 0, market: 0, harbor: 0, lumber: 0, temple: 0, lighthouse: 0, orchard: 0, road: 1 };
 /** The tiles each later round adds to whatever is left. */
-export const ROUND_POUCH: Pouch = { farm: 3, house: 3, tower: 2, windmill: 0, market: 0, harbor: 0, lumber: 0, road: 1 };
+export const ROUND_POUCH: Pouch = { farm: 3, house: 3, tower: 2, windmill: 0, market: 0, harbor: 0, lumber: 0, temple: 0, lighthouse: 0, orchard: 0, road: 1 };
+/** A chain island's own building: how many its first pouch holds, and how many each later round adds. */
+export const NATIVE_FIRST = 2;
+export const NATIVE_ROUND = 1;
+/** On a chain island, each harbour pays this at the end: trade with the islands behind it. */
+export const TRADE_BONUS = 2;
+/** The most cargo tiles the last island's harbours ship to the next one (one per harbour). */
+export const CARGO_MAX = 4;
+/** What a temple is worth at most: one per cell between it and the nearest tower. */
+export const TEMPLE_MAX = 4;
 /** How many tiles a turn draws from the pouch. */
 export const HAND = 3;
 /** A market trade gives this many tiles of one kind for one gift building. */
@@ -99,13 +118,22 @@ export const season = (s: GameState): Season => seasonFor(s.round);
 
 /** A new kingdom on island `island` (a random one unless given), chosen as `kingdom` says. */
 export function newGame(best = 0, crowns = 0, island = randomIsland(), kingdom: Kingdom = { mode: 'random' }): GameState {
-  const grid = startingGrid(island);
+  const link = kingdom.link ?? 1;
+  const grid = startingGrid(island, link);
+  const native = nativeFor(link);
+  const pouch = { ...FIRST_POUCH };
+  if (native) pouch[native] += NATIVE_FIRST;
+  let cargo = 0;
+  for (const b of BUILDINGS) {
+    pouch[b] += kingdom.cargo?.[b] ?? 0;
+    cargo += kingdom.cargo?.[b] ?? 0;
+  }
   const s: GameState = {
     round: 1,
     goal: goalFor(1),
     score: 0,
     bonus: 0,
-    pouch: { ...FIRST_POUCH },
+    pouch,
     hand: [],
     draws: 0,
     selected: null,
@@ -118,13 +146,18 @@ export function newGame(best = 0, crowns = 0, island = randomIsland(), kingdom: 
     phase: 'playing',
     best,
     crowns,
-    decree: decreeFor(island, 1, grid, FIRST_POUCH),
+    decree: decreeFor(island, 1, grid, pouch),
     gifts: giftsFor(island, 1, []),
     giftsDue: 0,
     unlocked: [],
     omen: null,
     tradedIn: 0,
     castle: 0,
+    link,
+    native,
+    chainScore: kingdom.chainScore ?? 0,
+    cargo,
+    trade: 0,
     undo: null,
     undoneIn: 0,
   };
@@ -132,10 +165,11 @@ export function newGame(best = 0, crowns = 0, island = randomIsland(), kingdom: 
   return s;
 }
 
-/** Whether `kind` could go at (col, row) on `grid`, whatever the phase: on grass, a harbor by a lake, a lumber camp by a forest. */
+/** Whether `kind` could go at (col, row) on `grid`, whatever the phase: on grass, a harbor by a lake or the sea, a lighthouse on the coast, a lumber camp by a forest. */
 function fits(grid: Cell[][], col: number, row: number, kind: Building) {
   if (grid[row]?.[col] !== 'grass') return false;
-  if (kind === 'harbor') return beside(grid, col, row, 'lake');
+  if (kind === 'harbor') return beside(grid, col, row, 'lake') || seaSides(grid, col, row) > 0;
+  if (kind === 'lighthouse') return seaSides(grid, col, row) > 0;
   if (kind === 'lumber') return beside(grid, col, row, 'forest');
   return true;
 }
@@ -228,14 +262,34 @@ export function cellParts(grid: Cell[][], col: number, row: number): { base: num
       return { base: 0, from };
     }
     case 'harbor':
+      // The sea scores in the base: its sides are off the board, or sea cells with no building.
       add(SIDES, (c) => (c === 'lake' ? 2 : isHome(c) ? 1 : 0));
+      return { base: seaSides(grid, col, row), from };
+    case 'lighthouse':
+      add(AROUND, (c) => (c === 'harbor' ? 2 : 0));
+      return { base: seaSides(grid, col, row), from };
+    case 'orchard':
+      add(AROUND, (c) => (c === 'farm' || c === 'forest' || c === 'windmill' ? 1 : 0));
       return { base: 0, from };
+    case 'temple':
+      // A quiet place: its worth is its distance from the nearest tower, so it all sits in the base.
+      return { base: templeWorth(grid, col, row), from };
     case 'lumber':
       add(SIDES, (c) => (c === 'forest' ? 2 : 0));
       return { base: 0, from };
     default:
       return { base: 0, from };
   }
+}
+
+/**
+ * What a temple at (col, row) is worth: one per cell between it and the nearest tower (counting
+ * diagonal steps as one), up to TEMPLE_MAX, which it is also worth with no tower on the island.
+ */
+export function templeWorth(grid: Cell[][], col: number, row: number) {
+  let near = TEMPLE_MAX + 1;
+  grid.forEach((cells, r) => cells.forEach((cell, c) => cell === 'tower' && (near = Math.min(near, Math.max(Math.abs(c - col), Math.abs(r - row))))));
+  return Math.min(TEMPLE_MAX, near - 1);
 }
 
 /** What the building at (col, row) is worth where it stands; 0 for land. */
@@ -287,14 +341,14 @@ export function previewPlacement(s: GameState, kind: Building, col: number, row:
     shares.set(k, share);
   };
   for (const f of own.from) give(f.col, f.row, f.pts);
-  // Only the eight cells around can change worth, as no rule reaches further.
-  for (const [dc, dr] of AROUND) {
-    const c = col + dc;
-    const r = row + dr;
-    if (!grid[r]?.[c] || !isBuilding(grid[r][c])) continue;
-    const change = cellScore(grid, c, r) - cellScore(s.grid, c, r);
-    if (change) give(c, r, change);
-  }
+  // Every other building whose worth changes: the eight around, and a temple further off when a tower goes up near it.
+  grid.forEach((cells, r) =>
+    cells.forEach((cell, c) => {
+      if ((c === col && r === row) || !isBuilding(cell)) return;
+      const change = cellScore(grid, c, r) - cellScore(s.grid, c, r);
+      if (change) give(c, r, change);
+    }),
+  );
   const links = [...shares.values()].filter((l) => l.pts !== 0);
   const bonus = seasonBonus(season(s), kind, cellScore(grid, col, row));
   return { gained: boardScore(grid) - boardScore(s.grid) + bonus, base: own.base, links, season: bonus, joins: joinedCount(grid) - joinedCount(s.grid) };
@@ -339,11 +393,18 @@ export function anyPlace(s: GameState) {
   return BUILDINGS.some((b) => s.pouch[b] > 0 && s.grid.some((cells, row) => cells.some((_, col) => canPlace(s, col, row, b))));
 }
 
-/** Finishes the kingdom: the castle pays a point per building its chain reaches, and the best score is kept. */
+/** How many harbours stand on `grid`: what a chain island's trade pays for, and the cargo the next island gets. */
+export const harbourCount = (grid: Cell[][]) => grid.reduce((n, cells) => n + cells.filter((c) => c === 'harbor').length, 0);
+
+/**
+ * Finishes the kingdom: the castle pays a point per building its chain reaches, a chain island's
+ * harbours pay their trade, and the best score is kept.
+ */
 function end(s: GameState) {
   s.castle = joinedCount(s.grid);
-  s.bonus += s.castle;
-  s.score += s.castle;
+  s.trade = s.link > 1 ? TRADE_BONUS * harbourCount(s.grid) : 0;
+  s.bonus += s.castle + s.trade;
+  s.score += s.castle + s.trade;
   s.phase = 'over';
   s.best = Math.max(s.best, s.score);
 }
@@ -406,6 +467,7 @@ function settle(s: GameState, prior: Snapshot, at: { col: number; row: number },
     s.round++;
     s.goal = goalFor(s.round);
     for (const b of BUILDINGS) s.pouch[b] += ROUND_POUCH[b];
+    if (s.native) s.pouch[s.native] += NATIVE_ROUND;
     s.giftsDue++;
     newRound = true;
   }
@@ -553,3 +615,19 @@ export function chooseGift(s: GameState, gift: Gift) {
 export const shownKinds = (s: GameState): Building[] => BUILDINGS.filter((b) => s.hand.includes(b));
 /** How many tiles of `kind` the hand holds. */
 export const handCount = (s: GameState, kind: Building) => s.hand.filter((b) => b === kind).length;
+
+/**
+ * The island a finished kingdom sails on to: the next island of its chain, with the chain's score so
+ * far and the cargo its harbours ship, one tile per harbour (up to CARGO_MAX) of the gift buildings
+ * won on it, in the order they were won (farms when none were won).
+ */
+export function nextKingdom(s: GameState): { island: number; kingdom: Kingdom } {
+  const link = s.link + 1;
+  const kinds: Building[] = s.unlocked.length ? [...s.unlocked] : ['farm'];
+  const cargo: Partial<Pouch> = {};
+  for (let i = 0; i < Math.min(CARGO_MAX, harbourCount(s.grid)); i++) {
+    const b = kinds[i % kinds.length];
+    cargo[b] = (cargo[b] ?? 0) + 1;
+  }
+  return { island: nextIsland(s.island, link), kingdom: { mode: 'chain', link, chainScore: s.chainScore + s.score, cargo } };
+}

@@ -12,7 +12,7 @@ const de: Translation<typeof en> = {
   roundEight: 'Achte Ernte',
   roundEightText: 'Erreiche in einem Königreich Runde 8.',
   allGifts: 'Königliche Gunst',
-  allGiftsText: 'Gewinne in einem Königreich alle vier Geschenkgebäude.',
+  allGiftsText: 'Gewinne in einem Königreich alle fünf Geschenkgebäude.',
   longChain: 'Alle Wege führen heim',
   longChainText: 'Verbinde 40 Gebäude zugleich mit der Burg.',
   tenCrowns: 'Kronjuwelen',

@@ -11,6 +11,11 @@ const enUS: Partial<Translation<typeof en>> = {
   harborsDesc: '2 more harbors',
   springRule: 'Markets and harbors score double',
   springShort: 'markets, harbors x2',
+  lighthouseRule: 'Coast only: +1 per sea side, +2 per harbor around it',
+  bannerCargo: { one: "The last island's harbors shipped {n} tile", other: "The last island's harbors shipped {n} tiles" },
+  bannerNoCargo: 'No cargo: harbors ship tiles to the next island',
+  featHarbourLight: 'A lighthouse with 2 harbors around it',
+  overTrade: { one: '{n} harbor traded with the islands behind: +{trade}.', other: '{n} harbors traded with the islands behind: +{trade}.' },
 };
 
 export default enUS;

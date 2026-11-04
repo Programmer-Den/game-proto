@@ -5,15 +5,18 @@ import type { TextKey } from '../i18n';
  * Every building the pouch holds, in the order of the panel's tile buttons. The first three are
  * there from the start; the rest are gifts, and each one's button shows once it is won.
  */
-export const BUILDINGS = ['farm', 'house', 'tower', 'windmill', 'market', 'harbor', 'lumber', 'road'] as const;
+export const BUILDINGS = ['farm', 'house', 'tower', 'windmill', 'market', 'harbor', 'lumber', 'temple', 'lighthouse', 'orchard', 'road'] as const;
 export type Building = (typeof BUILDINGS)[number];
 /** The buildings won as gifts, in the order they join the panel. */
-export const SPECIALS = ['windmill', 'market', 'harbor', 'lumber'] as const;
+export const SPECIALS = ['windmill', 'market', 'harbor', 'lumber', 'temple'] as const;
 export type Special = (typeof SPECIALS)[number];
+/** The buildings found only on the islands of a chain after the first (see `chainMap`): each such island has one. */
+export const NATIVES = ['lighthouse', 'orchard'] as const;
+export type Native = (typeof NATIVES)[number];
 /** Everything that can stand on a cell: the pouch's buildings, and the manor two houses merge into. */
 export type Structure = Building | 'manor';
-/** The land: grass to build on, lakes, woods and the island's castle, which stands from the start. */
-export type Terrain = 'grass' | 'lake' | 'forest' | 'castle';
+/** The land: grass to build on, lakes, woods, the island's castle, which stands from the start, and the sea cut into a chain island's shape. */
+export type Terrain = 'grass' | 'lake' | 'forest' | 'castle' | 'sea';
 export type Cell = Terrain | Structure;
 
 export interface BuildingInfo {
@@ -33,6 +36,9 @@ export const INFO: Record<Structure, BuildingInfo> = {
   market: { name: 'marketName', rule: 'marketRule', count: 'marketCount' },
   harbor: { name: 'harborName', rule: 'harborRule', count: 'harborCount' },
   lumber: { name: 'lumberName', rule: 'lumberRule', count: 'lumberCount' },
+  temple: { name: 'templeName', rule: 'templeRule', count: 'templeCount' },
+  lighthouse: { name: 'lighthouseName', rule: 'lighthouseRule', count: 'lighthouseCount' },
+  orchard: { name: 'orchardName', rule: 'orchardRule', count: 'orchardCount' },
   road: { name: 'roadName', rule: 'roadRule', count: 'roadCount' },
   manor: { name: 'manorName', rule: 'manorRule', count: 'manorCount' },
 };
@@ -152,6 +158,66 @@ export function fairIsland(map: string[]): boolean {
   return false;
 }
 
+/**
+ * How many of the four sides of (col, row) face the sea: the board's edge (every island is an
+ * island) or a sea cell cut into a chain island. Harbours and lighthouses score them.
+ */
+export const seaSides = (grid: readonly (readonly Cell[])[], col: number, row: number) =>
+  SIDES.filter(([dc, dr]) => {
+    const c = grid[row + dr]?.[col + dc];
+    return c === undefined || c === 'sea';
+  }).length;
+
+/** The next island of a chain after island `island`, for its `link`th island (2 and up): the same for every player. */
+export const nextIsland = (island: number, link: number) => 1 + ((island * 7 + link * 1013) % ISLANDS);
+
+/** The building found only on the `link`th island of a chain (2 and up): lighthouses and orchards in turn. */
+export const nativeFor = (link: number): Native | null => (link < 2 ? null : NATIVES[link % NATIVES.length]);
+
+/**
+ * Island `island` laid out as the `link`th island of a chain: from the second on, the sea cuts
+ * into its shape (' ' cells): two corners and a bay along one edge, taken from grass only, so
+ * lakes, woods and the castle stay. A cut that would leave the island unfair (`fairIsland`) is
+ * made smaller, down to none. The first island (link 1) is `islandMap` as it always was.
+ */
+export function chainMap(island: number, link = 1): string[] {
+  const base = islandMap(island);
+  if (link < 2) return base;
+  const rand = seeded(island * 31 + link * 977);
+  const int = (n: number) => Math.floor(rand() * n);
+  const { cols, rows } = MAP_SIZE;
+  const corners = [
+    [0, 0, 1, 1],
+    [cols - 1, 0, -1, 1],
+    [0, rows - 1, 1, -1],
+    [cols - 1, rows - 1, -1, -1],
+  ];
+  const first = int(4);
+  const picked = [corners[first], corners[(first + 1 + int(3)) % 4]];
+  const sizes = picked.map(() => 2 + int(2));
+  // A bay along the top or bottom edge, two to four cells long, one deeper in the middle.
+  const bayRow = int(2) ? 0 : rows - 1;
+  const bayLen = 2 + int(3);
+  const bayCol = 3 + int(cols - 6 - bayLen + 2);
+  for (let shrink = 0; shrink <= 3; shrink++) {
+    const map = base.map((row) => [...row]);
+    const cut = (c: number, r: number) => {
+      if (map[r]?.[c] === '.') map[r][c] = ' ';
+    };
+    picked.forEach(([c0, r0, dc, dr], i) => {
+      const k = sizes[i] - shrink;
+      for (let a = 0; a < k; a++) for (let b = 0; a + b < k; b++) cut(c0 + a * dc, r0 + b * dr);
+    });
+    if (shrink < 2) {
+      for (let i = 0; i < bayLen - shrink; i++) cut(bayCol + i, bayRow);
+      cut(bayCol + Math.floor((bayLen - shrink) / 2), bayRow === 0 ? 1 : rows - 2);
+    }
+    const out = map.map((cells) => cells.join(''));
+    if (fairIsland(out)) return out;
+  }
+  return base;
+}
+
 /** A small seeded random generator (mulberry32), so an island number always lays out the same. */
 export function seeded(seed: number) {
   let s = seed | 0;
@@ -166,8 +232,9 @@ export function seeded(seed: number) {
 /** Picks a random island number, from Math.random so the playthrough's seeded runs repeat. */
 export const randomIsland = () => 1 + Math.floor(Math.random() * ISLANDS);
 
-const TERRAIN: Record<string, Terrain> = { '.': 'grass', '~': 'lake', T: 'forest', C: 'castle' };
+const TERRAIN: Record<string, Terrain> = { '.': 'grass', '~': 'lake', T: 'forest', C: 'castle', ' ': 'sea' };
 
-export function startingGrid(island: number): Cell[][] {
-  return islandMap(island).map((row) => [...row].map((c) => TERRAIN[c]));
+/** The board of island `island` as the `link`th island of a chain (1 for a kingdom of its own). */
+export function startingGrid(island: number, link = 1): Cell[][] {
+  return chainMap(island, link).map((row) => [...row].map((c) => TERRAIN[c]));
 }
