@@ -125,8 +125,8 @@ stronger than the one before: foes have 6% more health per wave over 30 (compoun
 by wave 40) and 1.5% more chance per wave over 30 to come as an elite. The hero keeps levelling and
 the breaks, bosses, roads and relic chests carry on as before. Each map keeps its own best endless
 wave, saved with the hero: a chip under the wave track reads "Endless, best N" while the endless
-siege is on, the victory panel names the best so far, and the game-over panel names it after an
-endless run falls.
+siege is on (just "Endless siege" until a wave past 30 is cleared on that map), the victory panel
+names the best so far, and the game-over panel names it after an endless run falls.
 
 ![The endless siege's chip with the best wave on this map](docs/screenshots/endless-siege.webp)
 
@@ -198,10 +198,11 @@ hero.
 ### The warden
 
 The second retirement opens a third class, the **warden** (the retire panel's "The next hero" row
-and the game-over panel's "Hero" button show it dimmed, and refuse it, until then). The warden
-stands at the barricade instead of behind it and doesn't shoot: every 1.2s they slam every foe
+shows it dimmed, and refuses it, until then, and the game-over panel's "Hero" button says under the
+class it picks how to open it). The warden doesn't shoot: every 1.2s they slam every foe
 within 60 of the barricade's front for 14 and shove it back 16 (a boss a third as far), and a
-hound runs out to bite the foe nearest the barricade, for half the warden's damage, and holds it
+hound runs out to bite the first walking foe in the aim priority's order (the foe nearest the
+barricade by default), for half the warden's damage, and holds it
 there, slowed by 60% for 0.7s (half as much on a boss). The hound keeps off flyers. The warden has
 a skill tree of their own and shares the barricade, guard, caltrops, Arrow Rain and lore skills;
 their base skills with no cap are Vigilance, Heavy Shield and Stout Timber.

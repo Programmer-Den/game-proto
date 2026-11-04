@@ -377,7 +377,7 @@ const de: Translation<typeof en> = {
   packName: 'Zweiter Hund',
   packText: 'Ein zweiter Hund kommt dazu',
   heroWarden: 'Wächter',
-  wardenLocked: 'Wächter: zwei Helden in Ruhestand',
+  wardenLocked: 'Wächter ab zwei Ruheständen',
 
   // Siege engines
   engineButton: 'Geschütz',
@@ -407,6 +407,9 @@ const de: Translation<typeof en> = {
   endlessOpen: 'Endlose Belagerung: halte über Welle 30 hinaus stand, während jede Welle stärker wird. Rekord hier: Welle {n}.',
   endlessChip: 'Endlos, Rekord {n}',
   endlessFallen: 'Endlose Belagerung auf dieser Karte: beste Welle {best}.',
+  endlessOpenNew: 'Endlose Belagerung: halte über Welle 30 hinaus stand, während jede Welle stärker wird.',
+  endlessChipNew: 'Endlos',
+  endlessFallenNew: 'Endlose Belagerung auf dieser Karte: noch keine Welle nach 30 gehalten.',
 };
 
 export default de;
