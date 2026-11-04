@@ -21,6 +21,8 @@ const en = {
   outpacedText: 'Finish all five contracts before any rival finishes its chain.',
   campaign: 'Master of the sectors',
   campaignText: 'Win the last sector of the campaign.',
+  galaxy: 'Galaxy conquered',
+  galaxyText: 'Take every sector of a galaxy conquest.',
 };
 
 export default en;

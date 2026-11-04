@@ -103,6 +103,8 @@ export const RIVALS_TAB = { x: 798, w: VIEW.w - 798 };
 export const BOARD = { y: MAP_VIEW.y + 6, cardY: MAP_VIEW.y + 26, w: 236, h: 58, gap: 10 };
 /** The sector campaign's strip on the faction picker, under the cards: its box and the row of sector nodes. */
 export const SECTOR_STRIP = { x: 16, y: 352, w: VIEW.w - 32, h: 82, nodeX: 330, nodeStep: 140, nodeY: 380, r: 13 };
+/** The picker's mode tabs along the top of the map's window: the sectors, the galaxy, the scenarios and the tech tree. */
+export const PICK_TABS = { x: 16, y: MAP_VIEW.y + 16, w: 104, h: 24, gap: 6 };
 /** The cards a victory offers to keep one perk for the campaign, in a row under the overlay. */
 export const KEEP = { y: MAP_VIEW.y + 210, w: 172, h: 64, gap: 8 };
 
@@ -116,6 +118,7 @@ const base = {
   CONTRACT_PILL: { ...CONTRACT_PILL },
   SECTOR_STRIP: { ...SECTOR_STRIP },
   KEEP: { ...KEEP },
+  PICK_TABS: { ...PICK_TABS },
   BUTTONS: BUTTONS.map((b) => ({ ...b })),
 };
 
@@ -157,6 +160,7 @@ export function fitView(w: number, h: number, corner = { w: 0, h: 0 }) {
     nodeY: base.SECTOR_STRIP.nodeY + dy / 2,
   });
   KEEP.y = base.KEEP.y + dy / 2;
+  Object.assign(PICK_TABS, { x: base.PICK_TABS.x + dx / 2, y: base.PICK_TABS.y + dy / 2 });
   BUTTONS.forEach((b, i) => {
     const from = base.BUTTONS[i];
     b.y = from.y + dy - lift;

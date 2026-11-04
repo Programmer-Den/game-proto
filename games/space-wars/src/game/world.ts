@@ -7,6 +7,11 @@ import {
   BOARD_MS, CONTRACT_POOL, CONTRACT_STEPS, FLAGSHIP_STEP, NO_PERKS, RANKS, boardOffer, contractOf, type Contract, type Goal, type Perks,
 } from './contracts';
 import { SECTORS, type Sector } from './campaign';
+import {
+  CARRIER_DEPART_MS, CARRIER_HP, CARRIER_HUNTERS, CARRIER_HUNT_MS, CARRIER_ROUTE, CARRIER_SPEED, DOCK_RADIUS, RELAY_HOLD, SURVIVE_ARMY, SURVIVE_GRACE_MS, SURVIVE_MS, SURVIVE_RAID_MS, SURVIVE_TURRETS,
+  scenarioOf, type ScenarioId,
+} from './scenarios';
+import { techOf, type TechId } from './tech';
 import { Fog } from './fog';
 import { PATH_CELL, Pathing } from './pathing';
 import { t, type TextKey } from '../i18n';
@@ -240,6 +245,8 @@ export interface Unit {
   flagship: boolean;
   /** A convoy harvester still flying to the convoy's field. */
   convoy: boolean;
+  /** The `escort` scenario's carrier: the player's, unarmed, never ordered, flying its own route. */
+  carrier: boolean;
 }
 
 /** What a faction can build: the buildings beside a hub, and an expansion (a second hub) at a far crystal field. */
@@ -564,6 +571,21 @@ function dist(a: Point, b: Point) {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
+/** What kind of battle this is: a sector of the campaign, a galaxy conquest battle, or a scenario. */
+export type Mode = 'sectors' | 'galaxy' | 'scenario';
+
+/** How a battle is set up beyond its map and sector. */
+export interface BattleSetup {
+  mode?: Mode;
+  /** The tech the player's faction has bought between battles (`game/tech.ts`). */
+  tech?: readonly TechId[];
+  scenario?: ScenarioId;
+  /** A galaxy battle: the faction holding the sector (an index into FACTIONS) and the crystal it starts with on top. */
+  defender?: { faction: number; crystal: number };
+  /** A galaxy battle: the factions (indices into FACTIONS) with no sector left, which sit it out. */
+  absent?: readonly number[];
+}
+
 /**
  * The battle on one map: crystal, the factions' bases and armies, and the rules that move them.
  * It has no Phaser in it; the scene draws `World` each frame and sends it the player's commands.
@@ -596,8 +618,21 @@ export class World {
   convoyTo: (Point & { node: number }) | null = null;
   /** The last-stand pact, once the rivals have signed it. */
   pact: Pact | null = null;
-  /** The campaign sector this battle is in (an index into SECTORS). */
+  /** The campaign sector this battle is in (an index into SECTORS); a galaxy battle's difficulty. */
   readonly sector: number;
+  readonly mode: Mode;
+  /** The scenario being played, or null. */
+  readonly scenario: ScenarioId | null;
+  /**
+   * The scenario's goal so far: `relay`, seconds each side has held the beacon (by side index);
+   * `escort`, the route's waypoints passed (index 0). Why a lost scenario was lost is `scenarioLost`.
+   */
+  scenarioHeld: number[];
+  scenarioLost: TextKey | null = null;
+  /** The `escort` carrier's unit id, or -1; whether it has docked; and time to the next hunt. */
+  carrier = -1;
+  docked = false;
+  private huntMs = 0;
   /** Crystal the player has collected from salvage shards. */
   salvaged = 0;
   /** Enemy ships the player has destroyed. */
@@ -625,8 +660,11 @@ export class World {
    * slot 0 too, nothing is fogged, and the battle ends when one faction is left (`winner`). `sector`
    * is the campaign sector (its rivals start stronger) and `kept` the perks the campaign carries in.
    */
-  constructor(readonly layout: MapLayout, pick = 0, readonly watch = false, sector = 0, kept: readonly Goal[] = []) {
+  constructor(readonly layout: MapLayout, pick = 0, readonly watch = false, sector = 0, kept: readonly Goal[] = [], setup: BattleSetup = {}) {
     this.sector = sector;
+    this.mode = setup.mode ?? 'sectors';
+    this.scenario = setup.scenario ?? null;
+    this.scenarioHeld = FACTIONS.map(() => 0);
     const order = [pick, ...FACTIONS.map((_, i) => i).filter((i) => i !== pick)];
     this.sides = order.map((f, index) => ({
       index, def: FACTIONS[f], crystal: START_CRYSTAL, alive: true, thinkMs: 0, attackMs: 0, perks: { ...NO_PERKS }, picket: -1,
@@ -634,12 +672,13 @@ export class World {
       flagship: { state: 'locked', left: 0 }, rally: null, rallyNext: 0, deal: { step: 1, goal: null, progress: 0, ms: 0, done: [] },
     }));
     for (const goal of kept) contractOf(goal).apply(this.sides[PLAYER].perks);
+    for (const id of setup.tech ?? []) techOf(id).apply(this.sides[PLAYER].perks);
     this.rng = localRandom((layout.homes[0].x * 3.7 + layout.homes[0].y) % 1);
     this.dealRng = localRandom((layout.homes[0].y * 5.3 + layout.homes[0].x) % 1);
     this.pathing = new Pathing(layout.rocks, UNIT_RADIUS - ROCK_OVERLAP);
     const nodes = layout.nodes.map((n) => ({ id: this.id(), x: n.x, y: n.y, amount: n.amount }));
     // One loose crystal node partway to the centre becomes the relay beacon and is no longer mined.
-    const spot = nodes[beaconNode(layout.homes, layout.nodes)];
+    const spot = nodes[layout.beacon ?? beaconNode(layout.homes, layout.nodes)];
     this.nodes = nodes.filter((n) => n !== spot);
     this.beacon = { x: spot.x, y: spot.y, owner: -1, capturer: -1, capture: 0, held: false, payMs: 0, paid: 0 };
     this.derelicts = layout.derelicts.map((d) => ({
@@ -658,13 +697,45 @@ export class World {
       this.spawn(index, 'harvester', home.x + 30, home.y + 34).home = hub.id;
     });
     // A harder campaign sector: rivals start richer, further researched, and some with an outpost.
-    const setup: Sector = SECTORS[sector] ?? SECTORS[0];
+    const hard: Sector = SECTORS[sector] ?? SECTORS[0];
     this.sides.forEach((side, index) => {
       if (index === PLAYER) return;
-      side.crystal += setup.rivalCrystal;
-      for (const t of TRACKS) side.research.levels[t] = setup.rivalResearch;
-      if (index <= setup.outposts) this.seedOutpost(index);
+      side.crystal += hard.rivalCrystal;
+      for (const t of TRACKS) side.research.levels[t] = hard.rivalResearch;
+      if (index <= hard.outposts) this.seedOutpost(index);
+      if (setup.defender && side.def === FACTIONS[setup.defender.faction]) side.crystal += setup.defender.crystal;
     });
+    // A galaxy battle: a faction with no sector left sits it out, as if its hub had already fallen.
+    for (const f of setup.absent ?? []) {
+      const side = this.sides.find((s) => s.def === FACTIONS[f]);
+      if (!side || side.index === PLAYER) continue;
+      side.alive = false;
+      side.crystal = 0;
+      this.buildings = this.buildings.filter((b) => b.faction !== side.index);
+      this.units = this.units.filter((u) => u.faction !== side.index);
+    }
+    if (this.scenario) {
+      this.sides[PLAYER].crystal += scenarioOf(this.scenario).crystal;
+      if (this.scenario === 'escort') {
+        const home = layout.homes[PLAYER];
+        const c = this.spawn(PLAYER, 'heavy', home.x + 46, home.y - 44);
+        c.carrier = true;
+        c.hp = c.maxHp = c.maxHp * CARRIER_HP;
+        this.carrier = c.id;
+        this.huntMs = CARRIER_HUNT_MS;
+      }
+      // Holding out starts with a finished turret at each of the ring's gates toward the hub.
+      if (this.scenario === 'survive') {
+        const home = layout.homes[PLAYER];
+        const stats = buildingStats(this.sides[PLAYER], 'turret');
+        for (const [dx, dy] of SURVIVE_TURRETS) {
+          this.buildings.push({
+            kind: 'building', id: this.id(), faction: PLAYER, type: 'turret', x: home.x + dx, y: home.y + dy, hp: stats.hp, maxHp: stats.hp,
+            done: true, buildLeft: 0, queue: [], trainLeft: 0, cooldown: 0, disabledMs: 0, hacks: 0, layMs: 0, lastHit: -1, expansion: false, buildMs: 0,
+          });
+        }
+      }
+    }
     this.updateFog();
   }
 
@@ -708,7 +779,8 @@ export class World {
   /** Whether two factions are under a truce (the player with one rival), or both rivals in the last-stand pact. */
   atPeace(a: number, b: number) {
     if (a === b) return false;
-    if (this.pact && a !== PLAYER && b !== PLAYER) return true;
+    // The pact, and the `survive` scenario, make the rivals allies.
+    if ((this.pact || this.scenario === 'survive') && a !== PLAYER && b !== PLAYER) return true;
     return (a === PLAYER && this.sides[b].truceMs > 0) || (b === PLAYER && this.sides[a].truceMs > 0);
   }
 
@@ -1059,7 +1131,7 @@ export class World {
   }
 
   private commandable(u: Unit) {
-    return u.faction === PLAYER && u.type !== 'harvester' && u.decoyMs === null;
+    return u.faction === PLAYER && u.type !== 'harvester' && u.decoyMs === null && !u.carrier;
   }
 
   /** Advances the battle by `dt` milliseconds of game time. */
@@ -1103,6 +1175,60 @@ export class World {
       }
     } else if (!this.sides[PLAYER].alive) this.phase = 'lost';
     else if (this.sides.every((s) => s.index === PLAYER || !s.alive)) this.phase = 'won';
+    else if (this.scenario) this.updateScenario(dt);
+  }
+
+  /** A scenario's own goal: the carrier docked or lost, ten minutes held, or the beacon held long enough. */
+  private updateScenario(dt: number) {
+    if (this.scenario === 'escort') {
+      if (this.docked) this.phase = 'won';
+      else if (!this.unit(this.carrier)) {
+        this.scenarioLost = 'carrierLost';
+        this.phase = 'lost';
+      } else if (this.elapsedMs >= CARRIER_DEPART_MS && (this.huntMs -= dt) <= 0) {
+        this.huntMs = CARRIER_HUNT_MS;
+        this.huntCarrier();
+      }
+    } else if (this.scenario === 'survive') {
+      if (this.elapsedMs >= SURVIVE_MS) this.phase = 'won';
+    } else if (this.scenario === 'relay') {
+      if (this.scenarioHeld[PLAYER] >= RELAY_HOLD) this.phase = 'won';
+      else if (this.scenarioHeld.some((s, i) => i !== PLAYER && s >= RELAY_HOLD)) {
+        this.scenarioLost = 'relayLost';
+        this.phase = 'lost';
+      }
+    }
+  }
+
+  /** The rival nearest the flying carrier sends a few warships at it. */
+  private huntCarrier() {
+    const c = this.unit(this.carrier);
+    if (!c) return;
+    const hunter = this.sides
+      .filter((s) => s.index !== PLAYER && s.alive && this.hubOf(s.index) && !this.atPeace(PLAYER, s.index))
+      .reduce<Side | null>((best, s) => (!best || dist(this.hubOf(s.index)!, c) < dist(this.hubOf(best.index)!, c) ? s : best), null);
+    if (!hunter) return;
+    const raiders = this.units
+      .filter((u) => u.faction === hunter.index && u.type !== 'harvester' && u.decoyMs === null && u.id !== hunter.picket && u.id !== hunter.claimer)
+      .sort((a, b) => dist(a, c) - dist(b, c))
+      .slice(0, CARRIER_HUNTERS);
+    for (const u of raiders) u.order = { kind: 'attack', id: c.id, auto: false };
+    if (!raiders.length) return;
+    this.cue('klaxon');
+    this.events.push({ kind: 'notice', text: t('carrierHunted', { faction: t(hunter.def.name), n: raiders.length }) });
+  }
+
+  /** The carrier waits at the hub, then flies its route round the rocks to the dock. */
+  private flyCarrier(u: Unit, dt: number) {
+    if (this.elapsedMs < CARRIER_DEPART_MS || this.docked) return;
+    const leg = this.scenarioHeld[0];
+    if (leg === 0 && this.elapsedMs - dt < CARRIER_DEPART_MS) this.events.push({ kind: 'notice', text: t('carrierDeparts') });
+    const to = CARRIER_ROUTE[Math.min(leg, CARRIER_ROUTE.length - 1)];
+    const last = leg >= CARRIER_ROUTE.length - 1;
+    const speed = u.nebula ? CARRIER_SPEED * NEBULA_SLOW : CARRIER_SPEED;
+    if (!this.approach(u, to.x, to.y, last ? DOCK_RADIUS - 10 : 12, dt, speed)) return;
+    if (last) this.docked = true;
+    else this.scenarioHeld[0] = leg + 1;
   }
 
   private updateBuilding(b: Building, dt: number) {
@@ -1175,6 +1301,11 @@ export class World {
     if (u.hp < u.maxHp && this.repairSpots(u.faction).some((b) => dist(b, u) <= REPAIR_RANGE)) {
       u.hp = Math.min(u.maxHp, u.hp + (u.maxHp * REPAIR_RATE * this.sides[u.faction].perks.repair * dt) / 1000);
       u.repairing = true;
+    }
+    // The escort carrier has no guns and no ability: it only flies its route.
+    if (u.carrier) {
+      this.flyCarrier(u, dt);
+      return;
     }
     if (ability?.kind === 'decoy' || ability?.kind === 'brood') {
       u.timer += dt;
@@ -1365,7 +1496,7 @@ export class World {
 
   /** A rival holding a grudge against the player sues for peace when it is under pressure. */
   private considerTruce(side: Side) {
-    if (this.watch || this.pact || side.grudge !== PLAYER || side.truceMs > 0 || side.offerMs > 0 || side.offerCooldownMs > 0) return;
+    if (this.watch || this.pact || this.scenario === 'survive' || side.grudge !== PLAYER || side.truceMs > 0 || side.offerMs > 0 || side.offerCooldownMs > 0) return;
     if (side.crystal < TRUCE_TRIBUTE) return;
     const hub = this.hubOf(side.index);
     const pressed = (hub && hub.hp < hub.maxHp * PRESSURE_HUB) || side.pressure >= PRESSURE_LOSSES;
@@ -1672,7 +1803,7 @@ export class World {
    * other gives way; a drift that would put a ship over a rock is undone.
    */
   private spread(dt: number) {
-    const ships = this.units.filter((u) => u.type !== 'harvester' && !u.convoy && u.hp > 0);
+    const ships = this.units.filter((u) => u.type !== 'harvester' && !u.convoy && !u.carrier && u.hp > 0);
     const most = (SPREAD_SPEED * dt) / 1000;
     // An idle ship left over a rock (after a fight among them) drifts off it.
     for (const u of ships) {
@@ -1773,7 +1904,7 @@ export class World {
       y: Math.min(ARENA.y + ARENA.h - 12, Math.max(ARENA.y + 12, y)),
       angle: -Math.PI / 2, hp: stats.hp, maxHp: stats.hp, cooldown: 0, order: null, mining: null, carry: 0,
       timer: 0, revealMs: 0, decoyMs, lastHit: -1, lastHitBy: -1, home: -1, kills: 0, nebula: false, repairing: false,
-      flagship, convoy: false,
+      flagship, convoy: false, carrier: false,
     };
     unit.nebula = this.inNebula(unit);
     this.units.push(unit);
@@ -1815,7 +1946,8 @@ export class World {
       }
       else if (track) saving = true;
     }
-    if (army.length < AI_MAX_ARMY && !(saving && army.length >= AI_ARMY_TO_ATTACK)) {
+    const cap = this.scenario === 'survive' ? SURVIVE_ARMY : AI_MAX_ARMY;
+    if (army.length < cap && !(saving && army.length >= AI_ARMY_TO_ATTACK)) {
       for (const type of [...COMBAT_UNITS].sort(() => Math.random() - 0.5)) {
         if (this.train(type, f) === null) break;
       }
@@ -1834,8 +1966,22 @@ export class World {
     // A raid contract sends the army out sooner.
     const raiding = side.deal.goal === 'kills' || side.deal.goal === 'razes' || side.deal.goal === 'hubs';
     const need = raiding ? Math.max(2, AI_ARMY_TO_ATTACK - AI_DEAL_EAGER) : AI_ARMY_TO_ATTACK;
-    if (this.elapsedMs < AI_GRACE_MS || army.length < need || side.attackMs < AI_ATTACK_MS) return;
+    // Holding out, the allied rivals raid in turn, each less often and with smaller fleets.
+    const survive = this.scenario === 'survive';
+    const grace = survive ? SURVIVE_GRACE_MS + (f - 1) * (SURVIVE_RAID_MS / 4) : AI_GRACE_MS;
+    if (this.elapsedMs < grace || army.length < need || side.attackMs < (survive ? SURVIVE_RAID_MS : AI_ATTACK_MS)) return;
     side.attackMs = 0;
+    // Holding out alone: every rival's grudge is the player.
+    if (this.scenario === 'survive') side.grudge = PLAYER;
+    // The relay race: a rival that doesn't hold the beacon sends its raid there.
+    if (this.scenario === 'relay' && this.beacon.owner !== f) {
+      const bc = this.beacon;
+      const raid = army.filter((u) => u.id !== side.picket && u.id !== side.claimer && !u.repairing && u.hp >= u.maxHp * AI_FALL_BACK_HP);
+      const sent = raid.slice(0, Math.max(0, raid.length - AI_HOME_GUARD));
+      for (const u of sent) u.order = { kind: 'move', x: bc.x + (Math.random() - 0.5) * 60, y: bc.y + (Math.random() - 0.5) * 60 };
+      if (sent.length) aiLog(String(f), t('aiRelay', { n: sent.length }));
+      return;
+    }
     const foe = side.grudge >= 0 && this.sides[side.grudge].alive && !this.atPeace(f, side.grudge) ? side.grudge : -1;
     // A hub contract goes straight for the nearest main hub it may attack, the grudge's while tribute holds it.
     const target = (side.deal.goal === 'hubs' ? this.nearestEnemyHub(hub, f, side.grudgeLockMs > 0 ? foe : -1) : null)
@@ -1949,7 +2095,7 @@ export class World {
       .sort((a, b) => dist(this.hubOf(a.index)!, bc) - dist(this.hubOf(b.index)!, bc))
       .findIndex((s) => s.index === f);
     // A hold contract keeps a picket on the beacon however far the rival's hub is.
-    const keen = side.deal.goal === 'hold';
+    const keen = side.deal.goal === 'hold' || this.scenario === 'relay';
     if (!keen && (rank < 0 || rank >= AI_PICKETS || this.elapsedMs < AI_PICKET_MS + rank * AI_PICKET_STAGGER_MS)) return;
     const current = this.unit(side.picket);
     if (current && current.faction === f) {
@@ -2142,6 +2288,7 @@ export class World {
       return;
     }
     if (bc.owner === PLAYER && this.contract.goal === 'hold') this.contract.progress += dt / 1000;
+    if (this.scenario === 'relay') this.scenarioHeld[bc.owner] += dt / 1000;
     this.dealScore(bc.owner, 'hold', dt / 1000);
     bc.payMs += dt;
     while (bc.payMs >= BEACON_PAY_MS) {
@@ -2426,7 +2573,7 @@ export class World {
    * PACT_HUB_SHARE of the finished hubs (after the opening). Then the rivals raid together on a countdown.
    */
   private updatePact(dt: number) {
-    if (this.watch || this.elapsedMs < AI_GRACE_MS) return;
+    if (this.watch || this.scenario === 'survive' || this.elapsedMs < AI_GRACE_MS) return;
     if (!this.pact) {
       const rivals = this.sides.filter((s) => s.index !== PLAYER && s.alive);
       const hubs = this.buildings.filter((b) => b.type === 'hub' && b.done);

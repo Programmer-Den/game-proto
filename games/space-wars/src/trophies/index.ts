@@ -18,6 +18,7 @@ export const trophies = trophySet(
     { id: 'victory', tier: 'silver', icon: '🏆' },
     { id: 'outpaced', tier: 'gold', icon: '🏁' },
     { id: 'campaign', tier: 'gold', icon: '🌌', hidden: true },
+    { id: 'galaxy', tier: 'gold', icon: '🪐', hidden: true },
   ],
   { en, de },
 );

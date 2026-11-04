@@ -249,6 +249,56 @@ Implemented today:
   card per goal in `contract.done` (`drawKeep`); tapping one runs `winSector` (keeps it, opens the
   next sector) and saves; with no card any tap does. Watching always plays sector 1 and leaves the
   campaign alone.
+- Picker tabs (`GameScene.mode`, a `PickMode`: `sectors`, `galaxy`, `scenario`, `tech`;
+  `modeTabs`, `PICK_TABS` in `layout.ts`, `drawTabs`, `pickMode`): four pills over the cards, the
+  title right-aligned beside them. Sectors (the default, so the playthrough plays as before) is the
+  campaign above. Each tab keeps the strip under the cards (`drawStrip`, its texts' wrap width wider
+  where there is no node chain) and switching makes a fresh map for it (`newGame`, `makeMap`).
+  `startBattle` hands the battle a `BattleSetup` (`mode`, `tech`, `scenario`, `defender`, `absent`).
+  The end overlay of a galaxy or scenario battle says `outcome`, set once when the battle ends
+  (`battleOver`, from `listen`), and a tap goes back to the picker on the same tab.
+- Galaxy conquest (`game/galaxy.ts`, `GameScene.galaxy`, `target`, `galaxyNodes`, `galaxyButtons`,
+  `drawGalaxy`, `tapGalaxy`): twelve `GALAXY` sectors joined by `LANES`, saved under
+  `space-wars-galaxy` as `{ faction, owners, battles, news }` (indices into `FACTIONS`; removed once
+  won or lost). With none under way the cards start one (`newGalaxy`: each faction's home from
+  `HOMES`, every other sector to the nearest home by lanes, a tie to the rival). Then the star map
+  takes the cards' place (`cardArea`): sectors in their holder's colour, the player's ringed cream,
+  `targets` (rival sectors beside the player's) dashed mustard, the pick tangerine; the strip names
+  it and has Attack and New galaxy (`abandonArmed`: tapped twice). A battle uses `generateMap` with
+  the loose nodes of `SECTORS[galaxyTier]` and `new World(layout, faction, false, galaxyTier, [],
+  { mode: 'galaxy', defender, absent })`: the tier (0 to 4, a step every two sectors past two) is
+  the sector setup, the defender (the sector's holder) starts with `DEFENDER_CRYSTAL` (40) per
+  sector it holds, and `absent` factions (no sector left, `outOfGalaxy`) start fallen. When it ends
+  `afterBattle` takes the sector, or gives the defender the player's sector beside it with the
+  fewest of the player's sectors round it, then `rivalsMove` (half the time a rival takes a sector
+  beside it from another rival, saved as `news`). `conquered` awards `galaxy` (`galaxyWon` in
+  `trophies/check.ts`).
+- Scenario battles (`game/scenarios.ts`, `World.scenario`, `scenarioHeld`, `scenarioLost`,
+  `updateScenario`, `GameScene.scenario`, `scenarioBest`, `drawScenarios`, `drawScenario`): three
+  `SCENARIOS` with hand-made maps (`handMade`: the homes, three nodes round each at `turn`, the loose
+  nodes, the beacon as `MapLayout.beacon`, rock fields of five rocks, stars and rocks from
+  `localRandom`, so no `Math.random`), picked on the strip's first three nodes. `escort`: a player
+  heavy with `carrier: true` and `CARRIER_HP` (5) times the hull, never commandable, spread or armed
+  (`flyCarrier` in `updateUnit`, before abilities), waits `CARRIER_DEPART_MS` (75 s) and flies
+  `CARRIER_ROUTE` at `CARRIER_SPEED` (12 px/s) through `approach`; every `CARRIER_HUNT_MS` (30 s) the
+  rival nearest it sends `CARRIER_HUNTERS` (3) (`huntCarrier`); won when it docks (`docked`), lost
+  when it dies. `survive`: rivals at peace with each other (`atPeace`), no truces or pact, grudge
+  on the player, an army of at most `SURVIVE_ARMY` (10), raids every `SURVIVE_RAID_MS` (40 s) each,
+  the first from `SURVIVE_GRACE_MS` (120 s) and staggered by side; the player starts with a finished
+  turret at each of `SURVIVE_TURRETS` and +200 crystal; won at `SURVIVE_MS` (10 min). `relay`:
+  every rival keeps a picket on the beacon and sends its raids there while it doesn't own it;
+  `scenarioHeld[side]` counts seconds held in `updateBeacon`, and `RELAY_HOLD` (150) wins or loses.
+  The scene draws a banner on the map's top left (`scenarioBanner`, the pact banner moving under
+  it), and for the escort the route, a ring on the carrier and the dock with its label
+  (`dockLabel`); the carrier's hover says `carrierName`. Wins keep the fastest time under
+  `space-wars-scenarios` (`winScenario`).
+- Tech tree (`game/tech.ts`, `GameScene.tech`, `techFaction`, `techChips`, `techCards`, `drawTech`,
+  `tapTech`): `TECHS`, three branches (`BRANCHES`) of two tiers, each multiplying the player's
+  `Perks` (`apply`); a second tier needs the first (`techProblem`). Saved under `space-wars-tech` as
+  `{ salvage, bought }` (bought by faction name key). Every battle but a watched one banks
+  `World.salvaged` plus `WIN_SALVAGE` (50) for a win when it ends (`bankSalvage` in `battleOver`,
+  with a notice), and `startBattle` hands the faction's tech to the world (`BattleSetup.tech`,
+  applied after the kept perks). The playthrough starts with empty storage, so it plays with no tech.
 - Relay beacon (`World.beacon`, `World.updateBeacon`): the loose crystal node nearest the point
   halfway from the player's start to the map's centre, at least 300 px from every rival start
   (`beaconNode` in `game/map.ts`), is taken out of `nodes` and becomes the beacon. A faction alone in its 70 px ring with warships
@@ -281,7 +331,7 @@ Implemented today:
 Missing or rough:
 
 - Pathing is round rocks only: ships still fly over buildings, nebulae and the derelicts, and
-  spread apart softly rather than colliding. No save of a battle in progress (only the campaign is saved). No ambient hum under the music, and no per-faction music motif.
+  spread apart softly rather than colliding. No save of a battle in progress (the campaign, galaxy, tech and scenario times are saved). No ambient hum under the music, and no per-faction music motif.
 - No edge scrolling: the map scrolls with the keys, a two-finger drag or the minimap.
 - The rivals' Barracks and Turrets are placed at random within 60 to 150 px of their hub.
 - The AI runs its own contracts but doesn't play against the player's (beyond hunting a convoy and
@@ -318,7 +368,8 @@ File map (`src/`):
   owned), `truce` (bronze, a rival under truce), `ace` (silver, a player ship with Ace's kills),
   `derelicts` (silver, all three derelicts held), `flagship` (silver, the flagship out), `victory`
   (silver, a battle won), `outpaced` (gold, all five contracts done while no rival's `deal.step`
-  has reached `CONTRACT_STEPS`) and `campaign` (gold, hidden: the last sector won). A battle never
+  has reached `CONTRACT_STEPS`), `campaign` (gold, hidden: the last sector won, in the sectors mode)
+  and `galaxy` (gold, hidden: a galaxy conquered, awarded by `galaxyWon` from the scene). A battle never
   replays time, so no award is quiet.
 - `audio.ts`: the game's sound (see "Sound" below): `SONG`, the `sfx` table, its `Sfx` names and
   `LASER_PITCH`. Only `GameScene` imports it.
@@ -344,6 +395,14 @@ File map (`src/`):
 - `game/campaign.ts`: `SECTORS` (name as a `TextKey`, rival outposts, loose nodes, rival crystal and research),
   `Campaign`, `CAMPAIGN_KEY`, `loadCampaign`, `saveCampaign`, `newCampaign`, `keptFor`, `winSector`,
   `sectorText`. No Phaser.
+- `game/galaxy.ts`: `GALAXY`, `LANES`, `DEFENDER_CRYSTAL`, `Galaxy`, `GALAXY_KEY`, `neighbours`,
+  `newGalaxy`, `loadGalaxy`, `saveGalaxy`, `held`, `targets`, `galaxyTier`, `outOfGalaxy`,
+  `conquered`, `afterBattle`. No Phaser.
+- `game/scenarios.ts`: `ScenarioId`, `SCENARIOS` (name and brief keys, extra crystal, `layout()`),
+  the escort, survive and relay constants, `CARRIER_ROUTE`, `scenarioOf`, `SCENARIO_KEY`,
+  `loadScenarios`, `winScenario`. No Phaser, no `Math.random`.
+- `game/tech.ts`: `TechId`, `TECHS`, `BRANCHES`, `WIN_SALVAGE`, `TechTree`, `TECH_KEY`, `techOf`,
+  `loadTech`, `saveTech`, `techFor`, `techProblem`, `buyTech`, `bankSalvage`. No Phaser.
 - `game/arena.ts`: `ARENA` (the 1600 by 1000 battlefield in world pixels), `START_POINTS` (the five
   fixed hub spots, player first), `NODE_AMOUNT`, `NODE_CLEARANCE` and `BUILD_RANGE`.
 - `game/pathing.ts`: `Pathing` (built from the map's rocks and a clearance: `over`, `clear`,
@@ -355,8 +414,9 @@ File map (`src/`):
 - `game/describe.ts`: the text for tooltips and faction cards (`unitLines`, `buildingLines`,
   `factionLines`, `abilityText`, `expansionLines`, `researchLines`, `fallBackLines`,
   `derelictLines`, `rallyLines`), built from the faction data in the hub's language. No Phaser.
-- `game/world.ts`: `World`, the whole battle. `new World(layout, pick, watch, sector, kept)` puts faction `pick` in the
-  player's slot (`watch`: the AI plays it, see Watch AI above; `sector` and `kept`: the campaign). `PLAYER` (0), `unitStats` and `buildingStats`
+- `game/world.ts`: `World`, the whole battle. `new World(layout, pick, watch, sector, kept, setup)` puts faction `pick` in the
+  player's slot (`watch`: the AI plays it, see Watch AI above; `sector` and `kept`: the campaign;
+  `setup`, a `BattleSetup`: the mode, tech, scenario and a galaxy battle's defender and absent factions). `PLAYER` (0), `unitStats` and `buildingStats`
   (faction numbers with the faction's multipliers, the side's perks and research applied),
   `expansionStats`, `buildInfo` (what a build button costs and is called), `researchCost`, the
   expansion constants (`EXPANSION_COST`, `EXPANSION_NEAR`, `EXPANSION_GAP`), `MINE_SPOT`, the beacon and
@@ -369,7 +429,7 @@ File map (`src/`):
   (`FLAGSHIP_COST`, `FLAGSHIP_MS`, `FLAGSHIP_HP`, `FLAGSHIP_DAMAGE`, `FLAGSHIP_SPEED`, `FLAGSHIP_RANGE`,
   `CONVOY_SIZE`, `PACT_MS`, `PACT_WAVE_MS`), the rival contract constants (`AI_DEAL_MS`, `AI_GOALS`), `flagshipStats` and the types `Beacon`, `Deal`, `Shard`, `Mine`,
   `Pop`, `Build`, `ContractState`, `Pact`, `WorldEvent`, `Struck`, `Cue`, `Derelict`, `SeenBuilding`. Fields `fog`, `known`, `mines`,
-  `derelicts`, `contract`, `convoyTo`, `pact`, `sector`. Methods the scene and test use: `update(dt)`, `build`, `train`, `research`,
+  `derelicts`, `contract`, `convoyTo`, `pact`, `sector`, `mode`, `scenario`, `scenarioHeld`, `scenarioLost`, `carrier`, `docked`. Methods the scene and test use: `update(dt)`, `build`, `train`, `research`,
   `command`, `fallBack`, `setRally`, `clearRally`, `fleet`, `pickContract`, `currentContract`, `buildFlagship`, `abilityOf`, `acceptTruce`, `declineTruce`, `bribe`, `bribeTarget`, `selectableIn`,
   `selectable`, `entityAt`, `derelictAt`, `placementProblem`, `count`, `hubOf`, `hubsOf`,
   `seesUnit`, `seesMine`, `inNebula`, `atPeace`, `rankOf`, `veteranBonus`, `unit`,
@@ -532,7 +592,9 @@ follows or uses bounds (`scrollTo` clamps it), so it keeps the top-left origin r
 `e2e/screens.spec.ts` checks the game on five screens.
 
 Save keys: `space-wars-campaign` (`CAMPAIGN_KEY` in `game/campaign.ts`): the sector campaign, as
-`{ unlocked, kept }`, and `space-wars-trophies` (by `shared/trophies.ts`): the trophies earned. `loadCampaign` rounds `unlocked` to a whole sector and turns a `kept` goal
+`{ unlocked, kept }`; `space-wars-galaxy` (`GALAXY_KEY`): a galaxy conquest under way;
+`space-wars-tech` (`TECH_KEY`): the salvage bank and each faction's tech; `space-wars-scenarios`
+(`SCENARIO_KEY`): the best time of each scenario won; and `space-wars-trophies` (by `shared/trophies.ts`): the trophies earned. `loadCampaign` rounds `unlocked` to a whole sector and turns a `kept` goal
 the game no longer knows into `null`, so an old or hand-edited save still loads. Nothing else is kept between visits; the game reads the hub's settings
 (`byDifficulty`, `settings.reduceMotion`, the language through `shared/i18n.ts`) through `shared/`. The playthrough starts with empty
 storage, so it plays sector 1 with no kept perks.
@@ -557,7 +619,9 @@ Test hooks (read by `e2e/playthrough.spec.ts`):
 - `scene.selected`: the ids of the selected units; the test checks that its box selected the wing.
 - Not read by the test, but there: `scene.state.derelicts` (`perk`, `owner`, `claim`), `sides[i].deal`, `sides[i].truceMs`,
   `offerMs`, `grudge`, `flagship`, `units[i].kills`, `nebula`, `repairing`, `flagship`, `convoy`,
-  `state.pact`, `state.convoyTo`, `scene.rivalsOpen`, `keepCards`, `campaign`, `sector` and `sectorNodes`.
+  `state.pact`, `state.convoyTo`, `scene.rivalsOpen`, `keepCards`, `campaign`, `sector` and `sectorNodes`,
+  `scene.mode`, `modeTabs`, `galaxy`, `target`, `galaxyNodes`, `galaxyButtons`, `tech`, `techFaction`,
+  `techChips`, `techCards`, `scenario`, `scenarioBest`, and `state.mode`, `scenario`, `scenarioHeld`, `carrier`.
 - `scene.camera.scrollX` and `scrollY`: the map's scroll, which the test reads to see whether a pan
   moved. `scene.toScreen(x, y)` gives where a battlefield point is in view pixels.
 - Not read by the test either: `scene.rallyMode`, `scene.alerts` (`x`, `y`, `first`, `last`,
@@ -617,6 +681,14 @@ Test hooks (read by `e2e/playthrough.spec.ts`):
 - **New text in the scene**: a Phaser text draws its texture key from `Math.random`, so make any
   text that exists before the battle inside the `localRandom` swap at the end of `create`, or the
   seeded playthrough plays a different battle.
+- **A scenario**: add a row to `SCENARIOS` with a `handMade` map (keep its spots inside the arena
+  and its nodes off the rocks), its `ScenarioId`, its goal in `updateScenario` and any AI rule (search
+  `this.scenario ===`), and its banner in `drawScenario`. The strip shows a node per scenario, so more
+  than five needs a new layout.
+- **A tech**: add it to `TechId` and `TECHS` with its branch, tier, cost, texts and `apply` on
+  `Perks`; the tab lays out three columns of two, so a new branch or tier needs `techCards` moved.
+- **The galaxy**: sectors and lanes are `GALAXY` and `LANES` (shares of the map's area); a new
+  sector needs its name in all three text files, and `HOMES` names each slot's home sector.
 - **Beacon or salvage numbers**: the constants at the top of `game/world.ts`; the playthrough
   waits on the beacon paying 3 a second and a shard worth 8.
 - **Sight and fog**: the vision constants at the top of `game/world.ts` and the fog's look at the

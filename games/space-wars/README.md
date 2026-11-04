@@ -7,7 +7,8 @@ Five factions share a random star map, a battlefield larger than the screen that
 around. Each one starts with a hub and two harvesters (crystal haulers) at its own start point, and
 each has its own ships and buildings. Mine crystal, raise a base beside your hub, train a fleet,
 pick your way through five contracts on the contract board and take down the four rival hubs
-before they take down yours. Won battles carry you across a five-sector campaign.
+before they take down yours. Won battles carry you across a five-sector campaign, conquer a
+galaxy of twelve sectors or win hand-made scenarios, and the salvage you collect buys lasting tech.
 
 It looks like a 1970s science-fiction paperback cover: airbrushed violet skies and nebulae, a
 ringed gas giant, sparkle glints, and real low-poly 3D ships with chrome and painted hulls, racing
@@ -21,6 +22,10 @@ stripes and long exhaust flames, under a chocolate-and-mustard striped HUD with 
 | --- | --- |
 | Tap a faction card (before the battle) | Command that faction. The other four are AI |
 | Tap an open sector under the cards (before the battle) | Fight the next battle in that campaign sector |
+| The Sectors, Galaxy, Scenarios and Tech tabs over the cards | Switch between the sector campaign, galaxy conquest, scenario battles and the tech tree |
+| Tap a rival sector on the galaxy map, then Attack | Fight the battle for that sector |
+| Tap a scenario under the cards | Play that scenario's hand-made map |
+| Tap a tech card on the Tech tab | Buy that tech for the faction shown, with banked salvage |
 | Tap a card on the contract board | Take that contract (the first is taken when the countdown runs out) |
 | Flagship button (after the third contract) | Build your one flagship at the hub |
 | Tap a combat unit | Select it (replaces the selection) |
@@ -181,6 +186,51 @@ same sector. The campaign is kept in the browser.
 
 ![The sector campaign under the faction cards: sectors 1 and 2 won, sector 3 picked, and the two perks kept from them](docs/screenshots/sectors.webp)
 
+### Galaxy conquest
+
+The Galaxy tab starts a conquest of a star map of twelve sectors, with the faction you tap. Every
+faction starts on a home sector, and the sectors round it are its own. Tap a rival sector beside one
+of yours (ringed in mustard) and then Attack to fight the battle for it, on a fresh map: win it and
+the sector is yours, lose it and its defender takes the sector of yours beside it. The defending
+faction starts with 40 more crystal for every sector it holds, and the battles get harder the more
+you hold (the campaign's sector setups 1 to 5, a step for every two sectors past your first two). A
+faction with no sector left sits the battles out. Half the time, a rival also takes a sector from
+another rival between two battles. Hold all twelve to win the galaxy (a hidden gold trophy); lose
+your last and the galaxy is over. It is kept in the browser, and New galaxy (tapped twice) gives it
+up.
+
+![The galaxy's star map: twelve sectors in their holders' colours, the player's two ringed in cream, the three they can attack in dashed mustard and the one picked in tangerine](docs/screenshots/galaxy.webp)
+
+### Scenario battles
+
+The Scenarios tab plays hand-made maps with goals of their own, with any faction. The contracts,
+truces and the rest work as in any battle, and your hub falling still loses.
+
+| Scenario | The map | The goal |
+| --- | --- | --- |
+| Carrier escort | Your hub bottom left, the dock in the top-right corner | Your unarmed carrier (a heavy with five times the hull) leaves after 1:15 and flies slowly to the dock; from then on, every 30 s the rival nearest it sends three ships after it. See it docked |
+| Hold out | Your hub walled in by rocks in the middle, with four gates and a turret at each, the rivals in the corners | The four rivals are allies and raid you in turn from 2:00 on (each at most every 40 s, with at most 10 ships). Keep the hub standing for ten minutes |
+| Relay race | The relay beacon in the centre, ringed by rocks | Every rival sends a picket and its raids to the beacon. Be the first to hold it for 150 seconds in all |
+
+The scenario strip shows your best time in each one won.
+
+![The carrier escort: the carrier's banner at the top left, and its route traced to the dock](docs/screenshots/escort.webp)
+
+### The tech tree
+
+Salvage you collect in a battle (any battle but a watched one) is banked when it ends, with 50 more
+for a win. The Tech tab spends it on lasting tech, bought for one faction at a time: every later
+battle with that faction starts with it, in the sectors, the galaxy and the scenarios. Each faction
+has three branches of two tiers, and a second tier needs the first.
+
+| Branch | Tier I (120 salvage) | Tier II (240 salvage) |
+| --- | --- | --- |
+| Hull | Reinforced plating: ships +8% hit points | Bulwark frames: ships +12% hit points, repair 25% faster |
+| Guns | Focused lenses: ships +8% damage | Overcharged cores: ships +10% damage, turrets +15% damage |
+| Supply | Deep holds: harvesters carry 15% more | Quick docks: ships train 12% faster and cost 6% less |
+
+![The tech tree: a chip for each faction, the Iron Dominion's six techs in three branches, and the salvage bank on the strip](docs/screenshots/tech.webp)
+
 ### The relay beacon
 
 A warship (not a harvester) inside the beacon's ring holds it. A faction alone in the ring fills
@@ -318,7 +368,7 @@ Freight's Salvage Yard still pays its own 8 crystal on top for enemy ships destr
 
 ### Trophies
 
-Nine trophies, listed under Trophies on the start and pause screens and counted on the hub's card:
+Ten trophies, listed under Trophies on the start and pause screens and counted on the hub's card:
 
 | Trophy | Tier | How to earn it |
 | --- | --- | --- |
@@ -331,6 +381,7 @@ Nine trophies, listed under Trophies on the start and pause screens and counted 
 | Last faction standing | Silver | Win a battle |
 | Ahead of the field | Gold | Finish all five contracts before any rival finishes its own chain |
 | Master of the sectors | Gold, hidden | Win the last sector of the campaign |
+| Galaxy conquered | Gold, hidden | Take every sector of a galaxy conquest |
 
 ![The Trophies list over the faction picker: Under contract and Signal found earned in the first round, the rest still locked](docs/screenshots/trophies.webp)
 
@@ -435,6 +486,9 @@ what it taps. Run it with `npx playwright test --project space-wars`.
 - `src/game/factions.ts`: the five factions, their ship and building outlines and stats.
 - `src/game/contracts.ts`: the first contract, the contract board's pool, their rewards and perks, and how the board draws its two cards.
 - `src/game/campaign.ts`: the five campaign sectors and the saved campaign (sectors open, perks kept).
+- `src/game/galaxy.ts`: galaxy conquest's star map, who holds each sector, and what a battle won or lost changes.
+- `src/game/scenarios.ts`: the three scenarios' hand-made maps, goals and numbers, and their best times.
+- `src/game/tech.ts`: the tech tree, the salvage bank and the tech each faction has bought.
 - `src/game/fog.ts`: the fog of war's grid of explored and in-sight cells.
 - `src/game/research.ts`: the hull, weapons and engines research tracks.
 - `src/game/pathing.ts`: how ships find their way round the rock fields.
