@@ -110,6 +110,12 @@ export const THEMES: Record<StyleId, Theme> = {
     given: '#fff4d6', player: '#9fe8ff', wrong: '#ffd0d0', note: '#e9d9b0', selText: '#1a0f00', glow: '#ffe8b0',
     panel: 0x1a1226, panelAlpha: 1, panelLine: 0x0a0a0a, text: '#f3e6c8', accent: '#ffd77a', key: 0x2b1d3f, keyLine: 0x000000, keyText: '#fff4d6', heart: '#ff6b8a',
   },
+  almanac: {
+    font: serif, bold: true, bg: [0xe8edf1, 0xc9d4dd], line: 0x2c3e50, thin: 1.5, thick: 4, frame: 5, radius: 6, cellRadius: 2,
+    cell: 0xfdfdfb, peer: 0xe4edf3, same: 0xcfe3ee, sel: 0x9fd3e0, done: 0xe3f0e0, wrongBg: 0xd9826a,
+    given: '#1f2d3a', player: '#1f6f78', wrong: '#ffffff', note: '#6a7a88', shadow: { color: 0xaebbc6, dy: 5 },
+    panel: 0xfdfdfb, panelAlpha: 1, panelLine: 0x2c3e50, text: '#1f2d3a', accent: '#1f6f78', key: 0xeef3f6, keyLine: 0x8a9aa8, keyText: '#1f2d3a', heart: '#c0504a',
+  },
 };
 
 /** The colour a hex string names, as a number. */

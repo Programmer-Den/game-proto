@@ -1,5 +1,5 @@
 import { award } from '../../../../shared/trophies';
-import { STYLES } from '../game/catalog';
+import { PALETTE_STYLES } from '../game/catalog';
 import type { Progress } from '../game/state';
 import { trophies } from './index';
 
@@ -11,7 +11,7 @@ const EARNED: Record<string, (p: Progress) => boolean> = {
   streak3: (p) => p.bestStreak >= 3,
   firstBoss: (p) => p.bosses >= 1,
   floor10: (p) => p.bestFloor >= 10,
-  allStyles: (p) => STYLES.every((s) => p.unlocked.includes(s)),
+  allStyles: (p) => PALETTE_STYLES.every((s) => p.unlocked.includes(s)),
   streak7: (p) => p.bestStreak >= 7,
   floor20: (p) => p.bestFloor >= 20,
   // Floor 10 cleared at Ascension 5 (`climbed` is one more than the highest ascension cleared).

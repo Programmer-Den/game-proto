@@ -2,16 +2,18 @@ import Phaser from 'phaser';
 import { playMusic, playSting, ui } from '../../../../shared/audio';
 import { viewFrame, viewSize } from '../../../../shared/scaling';
 import { settings } from '../../../../shared/settings';
-import { ASCENSION_RULES, LEVELS, RELIC_INFO, STYLES, STYLE_INFO, TWIST_INFO, type Level, type RelicId, type StyleId, type Twist } from '../game/catalog';
+import { ASCENSION_RULES, LEVELS, MONTH_STYLE, RELIC_INFO, STYLES, STYLE_INFO, TWIST_INFO, type Level, type RelicId, type StyleId, type Twist } from '../game/catalog';
+import { LESSONS } from '../game/lessons';
 import { loadBoard, loadProgress, saveBoard, saveProgress } from '../game/save';
 import {
-  ascensionOpen, canEnter, canUndo, chooseStyle, clockLeft, dailyStreakNow, undoMove, digitsLeft, enter, erase, GAUNTLET, hasTwist, hint, isRight, newGame,
-  notesLocked, select, startClassic, startDaily, startDelve, startWeekly, takeRelic, tick, toggleNotes, toMenu, weekDay, weekScores, type FloorPlan, type GameState,
+  ascensionOpen, beginLesson, canEnter, canUndo, chooseStyle, clockLeft, dailyStreakNow, daysIn, undoMove, digitsLeft, enter, erase, GAUNTLET, hasTwist, hint, HINT_NOTE_MS, isRight, lessonOf, newGame,
+  notesLocked, select, stampedDays, startClassic, startDaily, startDelve, startLesson, startWeekly, takeRelic, tick, toggleNotes, toMenu, weekDay, weekScores, type FloorPlan, type GameState,
 } from '../game/state';
 import { boxOf, dailySeed, peersOf, units, type Puzzle } from '../game/sudoku';
+import type { Technique } from '../game/techniques';
 import { SFX, SONG } from '../audio';
-import { formatNumber } from '../../../../shared/i18n';
-import { t } from '../i18n';
+import { formatDate, formatNumber } from '../../../../shared/i18n';
+import { t, type TextKey } from '../i18n';
 import { checkTrophies } from '../trophies/check';
 import { layoutFor, UI_DEPTH, WIDE, type Layout } from './layout';
 import { hex, THEMES, type Theme } from './themes';
@@ -35,8 +37,10 @@ export class GameScene extends Phaser.Scene {
   /** Spots for the test: the cells, the pad's digits and every button on screen, by id. */
   cellSpots: (Spot & { cell: number })[] = [];
   buttons: Record<string, Spot> = {};
-  /** The screen being shown: the menu, the style picker or a board. */
-  screen: 'menu' | 'styles' | 'board' = 'menu';
+  /** The screen being shown: the menu, the style picker, the technique school, the calendar or a board. */
+  screen: 'menu' | 'styles' | 'school' | 'calendar' | 'board' = 'menu';
+  /** The month the calendar shows, as year * 12 + month (from 0). */
+  calMonth = 0;
 
   private vw = 960;
   private vh = 540;
@@ -52,6 +56,8 @@ export class GameScene extends Phaser.Scene {
   private noteTexts: Phaser.GameObjects.Text[] = [];
   /** The Killer cages' sums, one text per cage. */
   private sumTexts: Phaser.GameObjects.Text[] = [];
+  /** The Sandwich sums outside the board: the rows' on the left, then the columns' on top. */
+  private clueTexts: Phaser.GameObjects.Text[] = [];
   /** The ascension the menu's Delve button starts at. */
   private pickAscent = 0;
   /** Everything drawn for the current screen and overlay, rebuilt when `layerKey` changes. */
@@ -85,6 +91,9 @@ export class GameScene extends Phaser.Scene {
       this.noteTexts.push(this.add.text(0, 0, '', {}).setOrigin(0, 0));
       this.sumTexts.push(this.add.text(0, 0, '', {}).setOrigin(0, 0));
     }
+    for (let i = 0; i < 18; i++) this.clueTexts.push(this.add.text(0, 0, '', {}).setOrigin(0.5));
+    const now = new Date();
+    this.calMonth = now.getFullYear() * 12 + now.getMonth();
     this.pickAscent = ascensionOpen(this.state.progress);
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => this.onBoardTap(p.worldX, p.worldY));
     this.input.keyboard?.on('keydown', (e: KeyboardEvent) => this.onKey(e));
@@ -105,6 +114,14 @@ export class GameScene extends Phaser.Scene {
     this.L = layoutFor(this.vw, this.vh);
     // The designed frame sits in the middle of the view; everything is laid out in its coordinates.
     this.cameras.main.setSize(this.scale.width, this.scale.height).setScroll(-this.fx, -this.fy);
+  }
+
+  /** The board's square: the layout's, made room in for the Sandwich sums along its top and left. */
+  private get B() {
+    const b = this.L.board;
+    if (!this.state.puzzle?.sandwich) return b;
+    const m = Math.round(b.size * 0.075);
+    return { x: b.x + m, y: b.y + m, size: b.size - m, margin: m };
   }
 
   /** Wears the progress's style: redraws the backdrop and restyles the digits and the screen. */
@@ -145,9 +162,10 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     if (this.screen !== 'board' || s.phase !== 'playing' || !s.puzzle) return;
     const size = s.puzzle.size;
-    const cs = this.L.board.size / size;
-    const c = Math.floor((x - this.L.board.x) / cs);
-    const r = Math.floor((y - this.L.board.y) / cs);
+    const B = this.B;
+    const cs = B.size / size;
+    const c = Math.floor((x - B.x) / cs);
+    const r = Math.floor((y - B.y) / cs);
     if (c < 0 || r < 0 || c >= size || r >= size) return;
     select(s, r * size + c);
     SFX('tap');
@@ -270,6 +288,11 @@ export class GameScene extends Phaser.Scene {
         case 'relic':
           SFX('relic');
           break;
+        case 'learned':
+          playSting(SONG, 'solved');
+          SFX('unlock');
+          saveProgress(s.progress);
+          break;
       }
     }
     if (this.dirty) checkTrophies(s.progress);
@@ -283,7 +306,8 @@ export class GameScene extends Phaser.Scene {
     g.clear();
     const s = this.state;
     if (!s.puzzle || this.screen !== 'board') return (this.flashes = []), undefined;
-    const cs = this.L.board.size / s.puzzle.size;
+    const B = this.B;
+    const cs = B.size / s.puzzle.size;
     this.flashes = this.flashes.filter((f) => (f.age += dt) < 600);
     if (settings.reduceMotion) return;
     for (const f of this.flashes) {
@@ -291,7 +315,7 @@ export class GameScene extends Phaser.Scene {
       for (const cell of f.cells) {
         const r = Math.floor(cell / s.puzzle.size);
         const c = cell % s.puzzle.size;
-        g.fillRect(this.L.board.x + c * cs, this.L.board.y + r * cs, cs, cs);
+        g.fillRect(B.x + c * cs, B.y + r * cs, cs, cs);
       }
     }
   }
@@ -373,6 +397,16 @@ export class GameScene extends Phaser.Scene {
         for (let x = -w; x < 2 * w; x += 80) g.lineBetween(x0 + w / 2 + (x - w / 2) * 0.2, y0 + h - 160, x0 + x, y0 + h);
         for (const dy of [150, 135, 115, 88, 50, 0]) g.lineBetween(x0, y0 + h - dy, x0 + w, y0 + h - dy);
         break;
+      case 'almanac':
+        // A wall calendar: faint day squares over the wall and a spiral binding along the top.
+        g.lineStyle(1, 0x2c3e50, 0.08);
+        for (let x = 0; x < w; x += 48) g.lineBetween(x0 + x, y0, x0 + x, y0 + h);
+        for (let y = 0; y < h; y += 48) g.lineBetween(x0, y0 + y, x0 + w, y0 + y);
+        for (let x = 24; x < w; x += 36) {
+          g.fillStyle(0x2c3e50, 0.25).fillCircle(x0 + x, y0 + 12, 4);
+          g.lineStyle(2.5, 0x7a8a98, 1).strokeEllipse(x0 + x, y0 + 6, 9, 18);
+        }
+        break;
       case 'glass':
         g.lineStyle(2, 0x6a4a20, 0.5);
         for (const spread of [0, 60]) {
@@ -394,16 +428,18 @@ export class GameScene extends Phaser.Scene {
       this.noteTexts[i].setVisible(false);
       this.sumTexts[i].setVisible(false);
     }
+    for (const clue of this.clueTexts) clue.setVisible(false);
     this.cellSpots = [];
     if (!p || this.screen !== 'board') return;
     const size = p.size;
-    const cs = this.L.board.size / size;
-    const { x, y } = this.L.board;
+    const B = this.B;
+    const cs = B.size / size;
+    const { x, y } = B;
     const f = th.frame;
-    if (th.shadow) g.fillStyle(th.shadow.color, 1).fillRoundedRect(x - f + (th.shadow.dx ?? 0), y - f + th.shadow.dy, this.L.board.size + 2 * f, this.L.board.size + 2 * f, th.radius);
-    g.fillStyle(th.line, 1).fillRoundedRect(x - f, y - f, this.L.board.size + 2 * f, this.L.board.size + 2 * f, th.radius);
+    if (th.shadow) g.fillStyle(th.shadow.color, 1).fillRoundedRect(x - f + (th.shadow.dx ?? 0), y - f + th.shadow.dy, B.size + 2 * f, B.size + 2 * f, th.radius);
+    g.fillStyle(th.line, 1).fillRoundedRect(x - f, y - f, B.size + 2 * f, B.size + 2 * f, th.radius);
     if (th.glow && this.state.progress.style === 'neon') {
-      for (let k = 1; k <= 4; k++) g.lineStyle(k * 3, th.line, 0.12).strokeRoundedRect(x - f, y - f, this.L.board.size + 2 * f, this.L.board.size + 2 * f, th.radius);
+      for (let k = 1; k <= 4; k++) g.lineStyle(k * 3, th.line, 0.12).strokeRoundedRect(x - f, y - f, B.size + 2 * f, B.size + 2 * f, th.radius);
     }
     const sel = s.selected;
     const selValue = sel >= 0 && isRight(s, sel) ? s.values[sel] : 0;
@@ -417,6 +453,9 @@ export class GameScene extends Phaser.Scene {
     p.cages?.forEach((cage, k) => cage.cells.forEach((c) => cageOf.set(c, k)));
     const sumAt = new Map<number, number>((p.cages ?? []).map((cage) => [cage.cells[0], cage.sum]));
     const sumSize = Math.round(cs * 0.22);
+    // A lesson marks the cells that show its technique and rings the cell it unlocks.
+    const lesson = lessonOf(s);
+    const marks = new Set<number>(lesson && s.phase !== 'solved' ? lesson.marks : []);
     for (let i = 0; i < size * size; i++) {
       const r = Math.floor(i / size);
       const c = i % size;
@@ -438,6 +477,7 @@ export class GameScene extends Phaser.Scene {
         g.fillStyle(tint, alpha).fillRoundedRect(cx, cy, w, h, th.cellRadius);
       }
       if (th.boxes) g.fillStyle(0xffffff, 0.08).fillRect(cx, cy, w, h / 3);
+      if (marks.has(i) && !wrong && i !== sel) g.fillStyle(hex(th.accent), 0.28).fillRoundedRect(cx, cy, w, h, th.cellRadius);
       // Parity: an even cell carries a round mark behind its digit.
       if (p.even?.[i]) g.fillStyle(hex(th.note), 0.22).fillCircle(cx + w / 2, cy + h / 2, Math.min(w, h) * 0.4);
       // A wrong digit keeps its warning colour when picked; a ring in the selection colour marks it.
@@ -498,11 +538,65 @@ export class GameScene extends Phaser.Scene {
         g.fillCircle(ex, ey, cs * 0.13);
       }
     }
+    // Arrow: a ring on each circle and a line from it through the arrow's cells, ending in a head.
+    for (const arrow of p.arrows ?? []) {
+      const centre = (cell: number) => [x + (cell % size) * cs + cs / 2, y + Math.floor(cell / size) * cs + cs / 2] as const;
+      const color = hex(th.note);
+      const [ox, oy] = centre(arrow.circle);
+      const ring = cs * 0.4;
+      g.lineStyle(Math.max(2, cs * 0.06), color, 0.85).strokeCircle(ox, oy, ring);
+      const path = [centre(arrow.circle), ...arrow.cells.map(centre)];
+      // The line leaves the circle at its edge.
+      const [nx, ny] = path[1];
+      const len = Math.hypot(nx - ox, ny - oy);
+      path[0] = [ox + ((nx - ox) * ring) / len, oy + ((ny - oy) * ring) / len];
+      g.lineStyle(Math.max(2, cs * 0.05), color, 0.85);
+      for (let k = 1; k < path.length; k++) g.lineBetween(path[k - 1][0], path[k - 1][1], path[k][0], path[k][1]);
+      const [ax, ay] = path[path.length - 2];
+      const [ex, ey] = path[path.length - 1];
+      const ang = Math.atan2(ey - ay, ex - ax);
+      const head = cs * 0.2;
+      for (const turn of [-2.5, 2.5]) g.lineBetween(ex, ey, ex + Math.cos(ang + turn) * head, ey + Math.sin(ang + turn) * head);
+    }
+    // Kropki: a dot on the line between two cells, white or black, each ringed in the other colour.
+    for (const dot of p.dots ?? []) {
+      const ra = Math.floor(dot.a / size);
+      const ca = dot.a % size;
+      const across = dot.b === dot.a + 1;
+      const dx = x + (across ? (ca + 1) * cs : ca * cs + cs / 2);
+      const dy = y + (across ? ra * cs + cs / 2 : (ra + 1) * cs);
+      const rad = Math.max(4, cs * 0.11);
+      g.fillStyle(dot.black ? 0x1c1c22 : 0xffffff, 1).fillCircle(dx, dy, rad);
+      g.lineStyle(Math.max(1.5, cs * 0.03), dot.black ? 0xffffff : 0x1c1c22, 0.9).strokeCircle(dx, dy, rad);
+    }
+    // Sandwich: each row's sum at its left and each column's on top, in the margin `B` keeps.
+    if (p.sandwich) {
+      const m = (B as { margin?: number }).margin ?? 0;
+      const clueSize = Math.round(Math.min(m * 0.62, cs * 0.4));
+      const clueKey = `${th.font}|${clueSize}|${th.text}`;
+      const sums = [...p.sandwich.rows, ...p.sandwich.cols];
+      const off = (m - th.frame) / 2 + th.frame;
+      sums.forEach((sum, k) => {
+        const label = this.clueTexts[k];
+        const row = k < size;
+        const at = (row ? k : k - size) * cs + cs / 2;
+        label.setText(String(sum)).setPosition(row ? x - off : x + at, row ? y + at : y - off).setVisible(true).setDepth(2);
+        if (label.getData('styleKey') !== clueKey) {
+          label.setStyle({ fontFamily: th.font, fontSize: `${clueSize}px`, color: th.text, fontStyle: 'bold' });
+          label.setData('styleKey', clueKey);
+        }
+      });
+    }
+    // A lesson's target cell is ringed in the accent colour.
+    if (lesson && s.phase !== 'solved') {
+      const t0 = lesson.target;
+      g.lineStyle(Math.max(3, cs * 0.07), hex(th.accent), 1).strokeRoundedRect(x + (t0 % size) * cs + 3, y + Math.floor(t0 / size) * cs + 3, cs - 6, cs - 6, Math.min(th.cellRadius + 2, cs / 4));
+    }
     // Diagonal: both long diagonals are drawn as faint lines across the board.
     if (p.diagonal) {
-      const B = this.L.board.size;
+      const side = B.size;
       g.lineStyle(Math.max(2, th.thick), hex(th.accent), 0.35);
-      g.lineBetween(x + 4, y + 4, x + B - 4, y + B - 4).lineBetween(x + B - 4, y + 4, x + 4, y + B - 4);
+      g.lineBetween(x + 4, y + 4, x + side - 4, y + side - 4).lineBetween(x + side - 4, y + 4, x + 4, y + side - 4);
     }
     const left = digitsLeft(s);
     this.padTexts.forEach((pt, k) => {
@@ -566,7 +660,14 @@ export class GameScene extends Phaser.Scene {
     );
     pt.hint.setText(hasTwist(s, 'sealed') ? t('hintSealed') : t('hintButton', { n: s.hintsLeft }));
     pt.notes.setText(notesLocked(s) ? t('notesLocked') : s.notesMode ? t('notesOn') : t('notesOff'));
-    pt.relics?.setText(this.relicLine());
+    // The relics row: the hint's technique for a few seconds, else a lesson's task or the run's relics.
+    const lesson = lessonOf(s);
+    const note = s.hintNote && s.timeMs - s.hintAt < HINT_NOTE_MS ? t('hintUsed', { technique: s.hintNote === 'revealed' ? t('revealed') : this.techniqueName(s.hintNote) }) : '';
+    pt.relics?.setText(note || (lesson ? t(lesson.task) : s.mode === 'delve' ? this.relicLine() : ''));
+  }
+
+  private techniqueName(technique: Technique) {
+    return t(`${technique}Name` as const);
   }
 
   private relicLine() {
@@ -582,7 +683,7 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     // The menu's daily button depends on today's date, so the menu is rebuilt when the date changes.
     const today = this.screen === 'menu' ? dailySeed(new Date()) : 0;
-    return `${this.screen}|${s.phase}|${s.progress.style}|${s.puzzle?.size ?? 0}|${s.floor}|${s.relicOffer.join()}|${s.mode}|${today}|${this.pickAscent}`;
+    return `${this.screen}|${s.phase}|${s.progress.style}|${s.puzzle?.size ?? 0}|${s.floor}|${s.relicOffer.join()}|${s.mode}|${today}|${this.pickAscent}|${s.lesson}|${this.calMonth}`;
   }
 
   private buildLayer() {
@@ -593,10 +694,13 @@ export class GameScene extends Phaser.Scene {
     this.buttons = {};
     if (this.screen === 'menu') this.buildMenu();
     else if (this.screen === 'styles') this.buildStyles();
+    else if (this.screen === 'school') this.buildSchool();
+    else if (this.screen === 'calendar') this.buildCalendar();
     else {
       this.buildPanel();
       const phase = this.state.phase;
-      if (phase === 'solved') this.buildSolved();
+      if (phase === 'lesson') this.buildLessonIntro();
+      if (phase === 'solved') (this.state.mode === 'lesson' ? this.buildLearned() : this.buildSolved());
       if (phase === 'relic') this.buildRelics();
       if (phase === 'over') this.buildOver();
     }
@@ -684,9 +788,10 @@ ${played ? t('weeklyDone', { total }) : t('weeklyLine', { day: day + 1, total })
       if (startWeekly(this.state, new Date())) saveProgress(this.state.progress);
     }, m.topFont, !played);
     weekly.label.setLineSpacing(2).setFontSize(m.topFont - 1);
-    this.text(m.levels.xs[2], m.levels.y - 44, t('classic'), 15);
+    this.text(m.delve.x, m.levels.ys[0] - 44, t('classic'), 15);
     LEVELS.forEach((level, k) => {
-      this.button(level, m.levels.xs[k], m.levels.y, m.levels.w, m.levels.h, t(level), () => {
+      const cols = m.levels.xs.length;
+      this.button(level, m.levels.xs[k % cols], m.levels.ys[Math.floor(k / cols)], m.levels.w, m.levels.h, t(level), () => {
         ui('click');
         startClassic(this.state, level as Level);
       }, m.levels.font);
@@ -710,10 +815,19 @@ ${played ? t('weeklyDone', { total }) : t('weeklyLine', { day: day + 1, total })
     }
     const delveLine = ascent ? t('ascentLine', { n: ascent, rule: t(ASCENSION_RULES[ascent - 1]) }) : p.bestFloor ? t('bestFloor', { n: p.bestFloor }) : t('delveBlurb');
     this.text(m.delve.x, m.delve.y + 40, delveLine, 13, undefined, { wordWrap: { width: m.box.w - 30 } });
-    this.button('styles', this.L.menu.styles.x, this.L.menu.styles.y, this.L.menu.styles.w, this.L.menu.styles.h, t('stylesButton', { n: p.unlocked.length, of: STYLES.length }), () => {
+    this.button('school', m.school.x, m.school.y, m.school.w, m.school.h, `${t('school')} ${p.lessons.length}/${LESSONS.length}`, () => {
+      ui('click');
+      this.screen = 'school';
+    }, m.bottomFont);
+    this.button('styles', m.styles.x, m.styles.y, m.styles.w, m.styles.h, t('stylesButton', { n: p.unlocked.length, of: STYLES.length }), () => {
       ui('click');
       this.screen = 'styles';
-    }, 18);
+    }, m.bottomFont);
+    this.button('calendar', m.calendar.x, m.calendar.y, m.calendar.w, m.calendar.h, t('calendar'), () => {
+      ui('click');
+      this.calMonth = now.getFullYear() * 12 + now.getMonth();
+      this.screen = 'calendar';
+    }, m.bottomFont);
     const streak = dailyStreakNow(p, today);
     const stats = t('stats', { solved: p.solved, flawless: p.flawless }) + (streak ? ` · ${t('streak', { n: streak })}` : '');
     this.text(this.L.menu.stats.x, this.L.menu.stats.y, stats, 14);
@@ -722,10 +836,7 @@ ${played ? t('weeklyDone', { total }) : t('weeklyLine', { day: day + 1, total })
   private buildStyles() {
     const p = this.state.progress;
     this.text(this.L.stylesTitle.x, this.L.stylesTitle.y, t('stylesTitle'), 30, this.theme.accent);
-    this.button('back', this.L.back.x, this.L.back.y, this.L.back.w, this.L.back.h, t('back'), () => {
-      ui('click');
-      this.screen = 'menu';
-    }, 17);
+    this.backButton();
     STYLES.forEach((style, k) => {
       const cols = this.L.styleCards.xs.length;
       const x = this.L.styleCards.xs[k % cols];
@@ -775,9 +886,151 @@ ${played ? t('weeklyDone', { total }) : t('weeklyLine', { day: day + 1, total })
     }
     const tx = bx + 3 * cs + 16;
     const textColor = !open ? '#ffffff' : THEMES[style].panelAlpha > 0.5 && style !== 'parchment' ? th.text : th.given;
-    this.add_(this.add.text(tx, y - 30, t(STYLE_INFO[style].name), { fontFamily: th.font, fontSize: w < 260 ? '16px' : '18px', color: textColor, fontStyle: 'bold', wordWrap: { width: w - (tx - x + w / 2) - 10 } }).setOrigin(0, 0.5).setDepth(UI_DEPTH + 2));
+    const room = w - (tx - x + w / 2) - 10;
+    const name = this.add_(this.add.text(tx, y - 30, t(STYLE_INFO[style].name), { fontFamily: th.font, fontSize: w < 260 ? '16px' : '18px', color: textColor, fontStyle: 'bold', wordWrap: { width: room } }).setOrigin(0, 0.5).setDepth(UI_DEPTH + 2));
+    // A single long word (German names on the narrow cards) can't wrap, so it shrinks to fit.
+    if (name.width > room) name.setScale(room / name.width);
     const line = worn ? t('worn') : open ? t('wear') : t(STYLE_INFO[style].goal);
     this.add_(this.add.text(tx, y + 14, line, { fontFamily: th.font, fontSize: '13px', color: textColor, wordWrap: { width: w - (tx - x + w / 2) - 10 } }).setOrigin(0, 0.5).setDepth(UI_DEPTH + 2));
+  }
+
+  /** A stamp: two rings and a tick, in one colour. */
+  private drawStamp(g: Phaser.GameObjects.Graphics, x: number, y: number, r: number, color: number) {
+    g.lineStyle(Math.max(2, r * 0.12), color, 0.9).strokeCircle(x, y, r);
+    g.lineStyle(Math.max(1, r * 0.05), color, 0.9).strokeCircle(x, y, r * 0.78);
+    g.lineStyle(Math.max(2, r * 0.16), color, 0.95).beginPath().moveTo(x - r * 0.38, y + r * 0.02).lineTo(x - r * 0.1, y + r * 0.32).lineTo(x + r * 0.42, y - r * 0.32).strokePath();
+  }
+
+  private backButton() {
+    this.button('back', this.L.back.x, this.L.back.y, this.L.back.w, this.L.back.h, t('back'), () => {
+      ui('click');
+      this.screen = 'menu';
+    }, 17);
+  }
+
+  /** The technique school: a card per lesson, stamped once learned; a tap opens it. */
+  private buildSchool() {
+    const p = this.state.progress;
+    const th = this.theme;
+    const S = this.L.school;
+    this.text(S.title.x, S.title.y, t('schoolTitle'), 30, th.accent);
+    this.backButton();
+    this.text(S.line.x, S.line.y, t('schoolLine', { n: p.lessons.length, of: LESSONS.length }), 15, undefined, { wordWrap: { width: this.L.view.w - 80 } });
+    LESSONS.forEach((lesson, k) => {
+      const cols = S.cards.xs.length;
+      const x = S.cards.xs[k % cols];
+      const y = S.cards.ys[Math.floor(k / cols)];
+      const { w, h } = S.cards;
+      const done = p.lessons.includes(lesson.id);
+      this.box(x - w / 2, y - h / 2, w, h, UI_DEPTH, undefined, Math.max(0.9, th.panelAlpha));
+      const textW = w - 150;
+      this.add_(this.add.text(x - w / 2 + 20, y - 26, this.techniqueName(lesson.id), { fontFamily: th.font, fontSize: '21px', color: th.accent, fontStyle: 'bold', wordWrap: { width: textW } }).setOrigin(0, 0.5).setDepth(UI_DEPTH + 2));
+      this.add_(this.add.text(x - w / 2 + 20, y + 20, t(`${lesson.id}Blurb` as TextKey), { fontFamily: th.font, fontSize: '14px', color: th.text, wordWrap: { width: textW } }).setOrigin(0, 0.5).setDepth(UI_DEPTH + 2));
+      const g = this.add_(this.add.graphics().setDepth(UI_DEPTH + 1));
+      const sx = x + w / 2 - 66;
+      if (done) this.drawStamp(g, sx, y - 10, 34, hex(th.accent));
+      else g.lineStyle(2, hex(th.text), 0.35).strokeCircle(sx, y - 10, 34);
+      this.text(sx, y + 44, done ? t('lessonStamped') : t('lessonOpen'), 12, th.text).setAlpha(done ? 1 : 0.75);
+      const zone = this.add_(this.add.zone(x, y, w, h).setDepth(UI_DEPTH + 3).setInteractive({ useHandCursor: true }));
+      zone.on('pointerdown', (_p: unknown, _x: number, _y: number, e: Phaser.Types.Input.EventData) => {
+        e.stopPropagation();
+        ui('click');
+        startLesson(this.state, k);
+      });
+      this.buttons[`lesson-${k}`] = { x: this.fx + x, y: this.fy + y, w, h };
+    });
+  }
+
+  /** The calendar: a month of days, each solved daily stamped, with arrows to earlier months. */
+  private buildCalendar() {
+    const p = this.state.progress;
+    const th = this.theme;
+    const C = this.L.calendar;
+    this.text(C.title.x, C.title.y, t('calendar'), 30, th.accent);
+    this.backButton();
+    const year = Math.floor(this.calMonth / 12);
+    const month = this.calMonth % 12;
+    const now = new Date();
+    const thisMonth = now.getFullYear() * 12 + now.getMonth();
+    const firstDay = p.dailyDays[0];
+    const first = firstDay ? Math.floor(firstDay / 10_000) * 12 + (Math.floor(firstDay / 100) % 100) - 1 : thisMonth;
+    this.text(C.month.x, C.month.y, formatDate(new Date(year, month, 1), { month: 'long', year: 'numeric' }), 22);
+    this.button('month-prev', C.prev.x, C.prev.y, C.prev.w, C.prev.h, '‹', () => {
+      ui('click');
+      this.calMonth--;
+    }, 24, this.calMonth > Math.min(first, thisMonth));
+    this.button('month-next', C.next.x, C.next.y, C.next.w, C.next.h, '›', () => {
+      ui('click');
+      this.calMonth++;
+    }, 24, this.calMonth < thisMonth);
+    const G = C.grid;
+    const head = 26;
+    this.box(G.x - 12, G.y - 8, 7 * G.w + 24, head + 6 * G.h + 18, UI_DEPTH, undefined, Math.max(0.9, th.panelAlpha));
+    // 1 January 2024 was a Monday, so its week names the weekdays from Monday.
+    for (let k = 0; k < 7; k++) this.text(G.x + k * G.w + G.w / 2, G.y + head / 2, formatDate(new Date(2024, 0, 1 + k), { weekday: 'short' }), 13).setAlpha(0.75);
+    const stamps = stampedDays(p, year, month);
+    const days = daysIn(year, month);
+    const offset = (new Date(year, month, 1).getDay() + 6) % 7;
+    const today = now.getFullYear() * 12 + now.getMonth() === this.calMonth ? now.getDate() : 0;
+    const g = this.add_(this.add.graphics().setDepth(UI_DEPTH + 1));
+    for (let d = 1; d <= days; d++) {
+      const at = offset + d - 1;
+      const cx = G.x + (at % 7) * G.w;
+      const cy = G.y + head + Math.floor(at / 7) * G.h;
+      g.fillStyle(th.key, 1).fillRoundedRect(cx + 3, cy + 3, G.w - 6, G.h - 6, 6);
+      g.lineStyle(d === today ? 3 : 1, d === today ? hex(th.accent) : th.keyLine, d === today ? 1 : 0.5).strokeRoundedRect(cx + 3, cy + 3, G.w - 6, G.h - 6, 6);
+      this.add_(this.add.text(cx + 9, cy + 7, String(d), { fontFamily: th.font, fontSize: '12px', color: th.keyText }).setOrigin(0, 0).setDepth(UI_DEPTH + 2));
+      if (stamps.has(d)) this.drawStamp(g, cx + G.w / 2 + 5, cy + G.h / 2 + 4, Math.min(G.w, G.h) * 0.3, hex(th.accent));
+    }
+    this.text(C.line.x, C.line.y, t('calendarLine', { n: stamps.size, of: days }), 16, th.accent);
+    const earned = p.unlocked.includes(MONTH_STYLE);
+    this.text(C.goal.x, C.goal.y, earned ? t('calendarDone') : t('calendarGoal'), 14, undefined, { wordWrap: { width: this.L.view.w - 80 } });
+  }
+
+  /** A lesson's opening card: what its technique is, and Start. */
+  private buildLessonIntro() {
+    const lesson = lessonOf(this.state)!;
+    const th = this.theme;
+    const E = this.L.end;
+    this.dim();
+    const from = this.parts.length;
+    this.box(E.x - E.w / 2, E.y - E.h / 2, E.w, E.h, UI_DEPTH, undefined, Math.max(0.95, th.panelAlpha));
+    this.text(E.x, E.y - E.h / 2 + 36, this.techniqueName(lesson.id), 28, th.accent);
+    this.text(E.x, E.y - 12, t(lesson.text), 15, undefined, { wordWrap: { width: E.w - 48 } });
+    this.button('start', E.x, this.L.endButtons.y, this.L.endButtons.w, this.L.endButtons.h, t('start'), () => {
+      ui('click');
+      beginLesson(this.state);
+    });
+    this.raise(from);
+  }
+
+  /** A learned lesson's card: its stamp, and on to the next lesson or back to the school. */
+  private buildLearned() {
+    const s = this.state;
+    const lesson = lessonOf(s)!;
+    const th = this.theme;
+    const E = this.L.end;
+    this.dim();
+    const from = this.parts.length;
+    this.box(E.x - E.w / 2, E.y - E.h / 2, E.w, E.h, UI_DEPTH, undefined, Math.max(0.95, th.panelAlpha));
+    this.text(E.x, E.y - 100, t('learned'), 32, th.accent);
+    const g = this.add_(this.add.graphics().setDepth(UI_DEPTH + 1));
+    this.drawStamp(g, E.x, E.y - 38, 28, hex(th.accent));
+    this.text(E.x, E.y + 22, t('learnedLine', { technique: this.techniqueName(lesson.id) }), 15, undefined, { wordWrap: { width: E.w - 48 } });
+    const next = s.lesson + 1 < LESSONS.length;
+    const B = this.L.endButtons;
+    if (next) {
+      this.button('next', B.xs[0], B.y, B.w, B.h, t('nextLesson'), () => {
+        ui('click');
+        startLesson(this.state, this.state.lesson + 1);
+      }, 17);
+    }
+    this.button('done', next ? B.xs[1] : E.x, B.y, B.w, B.h, t('school'), () => {
+      ui('click');
+      toMenu(this.state);
+      this.screen = 'school';
+    });
+    this.raise(from);
   }
 
   private buildPanel() {
@@ -790,14 +1043,15 @@ ${played ? t('weeklyDone', { total }) : t('weeklyLine', { day: day + 1, total })
     const left = (x: number, y: number, content: string, size: number, color?: string) =>
       this.add_(this.add.text(x, y, content, { fontFamily: th.font, fontSize: `${size}px`, color: color ?? th.text, fontStyle: th.bold ? 'bold' : '' }).setOrigin(0, 0.5).setDepth(UI_DEPTH + 2));
     const twistIds: Twist[] = s.mode === 'delve' ? (s.plan?.twists ?? []) : s.mode === 'weekly' && GAUNTLET[s.weekDay]?.twist ? [GAUNTLET[s.weekDay].twist!] : [];
-    const modeName = { delve: t('delve'), daily: t('daily'), weekly: t('weekly'), classic: t('classic') }[s.mode];
+    const modeName = { delve: t('delve'), daily: t('daily'), weekly: t('weekly'), classic: t('classic'), lesson: t('schoolTitle') }[s.mode];
     const ascent = s.mode === 'delve' && s.ascent ? [t('ascentTag', { n: s.ascent })] : [];
     const kicker = [modeName, ...ascent, ...twistIds.map((tw) => t(TWIST_INFO[tw].name))].join(' · ');
     const kickerText = left(panel.x + 24, panel.y + rows.kicker, kicker.toUpperCase(), 13).setAlpha(0.75);
     // A long kicker shrinks to stay clear of the Menu button.
     const room = this.L.menuButton.x - this.L.menuButton.w / 2 - 10 - (panel.x + 24);
     if (kickerText.width > room) kickerText.setScale(room / kickerText.width);
-    const heading = s.mode === 'weekly' ? t('weeklyHeading', { day: s.weekDay + 1 })
+    const lesson = lessonOf(s);
+    const heading = lesson ? this.techniqueName(lesson.id) : s.mode === 'weekly' ? t('weeklyHeading', { day: s.weekDay + 1 })
       : s.mode !== 'delve' ? t(s.level) : s.plan?.boss ? t('bossFloor', { n: s.floor }) : t('floor', { n: s.floor, size: p.size });
     const h1 = left(panel.x + 24, panel.y + rows.heading, heading, 28, th.accent);
     if (th.glow) h1.setShadow(0, 0, th.glow === 'auto' ? th.accent : th.glow, 10, false, true);
@@ -808,7 +1062,9 @@ ${played ? t('weeklyDone', { total }) : t('weeklyLine', { day: day + 1, total })
     }, 15);
     this.panelTexts.status = left(panel.x + 24, panel.y + rows.status, '', s.mode === 'delve' ? 26 : 17, s.mode === 'delve' ? th.heart : th.text);
     this.panelTexts.clock = this.add_(this.add.text(panel.x + panel.w - 24, panel.y + rows.status, '', { fontFamily: th.font, fontSize: '20px', color: th.text }).setOrigin(1, 0.5).setDepth(UI_DEPTH + 2));
-    if (s.mode === 'delve') this.panelTexts.relics = left(panel.x + 24, panel.y + rows.relics, '', 12);
+    // The relics row also names a hint's technique and a lesson's task, so every board has it.
+    this.panelTexts.relics = left(panel.x + 24, panel.y + rows.relics, '', 12);
+    this.panelTexts.relics.setWordWrapWidth(panel.w - 48).setLineSpacing(-2);
     for (let d = 1; d <= 9; d++) {
       const k = d - 1;
       const x = pad.x + (k % pad.cols) * (pad.w + pad.gap) + pad.w / 2;
@@ -858,7 +1114,14 @@ ${played ? t('weeklyDone', { total }) : t('weeklyLine', { day: day + 1, total })
     // A gauntlet board shows its score and the week's total so far.
     const weekly = s.mode === 'weekly';
     if (weekly) this.text(this.L.end.x, this.L.end.y - 12, t('weeklyScore', { score: formatNumber(s.score), total: formatNumber(s.weekTotal) }), 20, this.theme.accent);
-    this.text(this.L.end.x, this.L.end.y + (weekly ? 24 : -10), this.unlockedLine(), weekly ? 14 : 16, this.theme.accent, { wordWrap: { width: this.L.end.w - 40 } });
+    // A daily stamps the calendar: say how far this month has come.
+    if (s.mode === 'daily' && s.dailyDate) {
+      const year = Math.floor(s.dailyDate / 10_000);
+      const month = (Math.floor(s.dailyDate / 100) % 100) - 1;
+      const line = t('calendarStamp', { n: stampedDays(s.progress, year, month).size, of: daysIn(year, month) });
+      this.text(this.L.end.x, this.L.end.y + 22, line, 14, undefined, { wordWrap: { width: this.L.end.w - 40 } });
+    }
+    this.text(this.L.end.x, this.L.end.y + (weekly ? 24 : -12), this.unlockedLine(), weekly ? 14 : 16, this.theme.accent, { wordWrap: { width: this.L.end.w - 40 } });
     if (s.mode === 'classic') {
       this.button('next', this.L.endButtons.xs[0], this.L.endButtons.y, this.L.endButtons.w, this.L.endButtons.h, t('next'), () => {
         ui('click');
