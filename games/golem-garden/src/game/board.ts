@@ -5,7 +5,8 @@ import type { TextKey } from '../i18n';
 /** The board: its top left corner in view pixels, its size in cells, and each cell's size. */
 export const GRID = { x: 16, y: 64, cols: 12, rows: 7, cell: 64 };
 
-export type Cell = 'soil' | 'path' | 'heart';
+/** What a cell is; grass (only in a plot you draw) grows nothing. */
+export type Cell = 'soil' | 'path' | 'heart' | 'grass';
 
 /** One way through a garden, from where pests come in (off the left edge) to the Heartwood. */
 export interface Route {
@@ -54,8 +55,8 @@ function route(corners: readonly [number, number][]): Route {
   return { corners, points, segments, length: segments.reduce((a, b) => a + b, 0) };
 }
 
-function garden(name: TextKey, blurb: TextKey, unlockStars: number, routes: (readonly [number, number][])[]): Garden {
-  const map: Cell[][] = Array.from({ length: GRID.rows }, () => Array<Cell>(GRID.cols).fill('soil'));
+function garden(name: TextKey, blurb: TextKey, unlockStars: number, routes: (readonly [number, number][])[], fill: Cell = 'soil'): Garden {
+  const map: Cell[][] = Array.from({ length: GRID.rows }, () => Array<Cell>(GRID.cols).fill(fill));
   for (const corners of routes) {
     for (let i = 1; i < corners.length; i++) {
       const [c0, r0] = corners[i - 1];
@@ -121,4 +122,79 @@ export function pathPoint(route: Route, dist: number) {
     left -= segments[i];
   }
   return { ...points[points.length - 1], facing: 1 };
+}
+
+/** A plot drawn in the garden editor (GG18): its path, cell by cell from the left edge to the Heartwood, and its soil beds. */
+export interface Drawing {
+  path: [number, number][];
+  soil: [number, number][];
+}
+
+const onBoard = ([c, r]: [number, number]) => c >= 0 && r >= 0 && c < GRID.cols && r < GRID.rows;
+const same = (a: [number, number], b: [number, number]) => a[0] === b[0] && a[1] === b[1];
+
+/**
+ * Whether a drawing can be planted: a path of at least `minPath` cells on the board, starting in the
+ * first column, each cell beside the one before and none twice, and from 1 to `maxSoil` soil beds
+ * off the path.
+ */
+export function drawingOk(d: Drawing, minPath: number, maxSoil: number) {
+  const { path, soil } = d;
+  if (path.length < minPath || path[0][0] !== 0 || !path.every(onBoard)) return false;
+  for (let i = 1; i < path.length; i++) {
+    if (Math.abs(path[i][0] - path[i - 1][0]) + Math.abs(path[i][1] - path[i - 1][1]) !== 1) return false;
+    if (path.slice(0, i).some((c) => same(c, path[i]))) return false;
+  }
+  return soil.length >= 1 && soil.length <= maxSoil && soil.every(onBoard) && !soil.some((c) => path.some((p) => same(p, c)));
+}
+
+/**
+ * The garden a drawing plants: one route along its path (in at the left edge, turning where the
+ * path turns), the Heartwood on its last cell, soil on its beds and grass everywhere else.
+ */
+export function drawnGarden(d: Drawing): Garden {
+  const { path } = d;
+  const corners: [number, number][] = [[-1, path[0][1]]];
+  for (let i = 1; i < path.length - 1; i++) {
+    const [a, b, c] = [path[i - 1], path[i], path[i + 1]];
+    // A corner where the path turns.
+    if (b[0] - a[0] !== c[0] - b[0] || b[1] - a[1] !== c[1] - b[1]) corners.push(b);
+  }
+  // The first cell is a corner too when the path turns there, off the straight run in from the edge.
+  if (path.length > 1 && path[1][1] !== path[0][1]) corners.splice(1, 0, path[0]);
+  corners.push(path[path.length - 1]);
+  const g = garden('plotName', 'plotBlurb', 0, [corners], 'grass');
+  for (const [c, r] of d.soil) if (g.map[r][c] === 'grass') g.map[r][c] = 'soil';
+  return g;
+}
+
+/**
+ * One tap of the garden editor on (col, row), with the path or the soil tool; returns whether it
+ * changed the drawing. Path: the first cell must be in the first column; then a cell beside the
+ * last one, not on the path yet, adds it (and clears its soil bed); a tap on the last cell takes it
+ * back, and on an earlier one cuts the path back to it. Soil: a tap off the path lays a bed (up to
+ * `maxSoil`) or clears one.
+ */
+export function editDrawing(d: Drawing, tool: 'path' | 'soil', col: number, row: number, maxSoil: number) {
+  const at: [number, number] = [col, row];
+  if (!onBoard(at)) return false;
+  const i = d.path.findIndex((c) => same(c, at));
+  if (tool === 'soil') {
+    if (i >= 0) return false;
+    const bed = d.soil.findIndex((c) => same(c, at));
+    if (bed >= 0) d.soil.splice(bed, 1);
+    else if (d.soil.length < maxSoil) d.soil.push(at);
+    else return false;
+    return true;
+  }
+  if (i >= 0) {
+    // The last cell is taken back; an earlier one cuts the path back to it.
+    d.path.length = i === d.path.length - 1 ? i : i + 1;
+    return true;
+  }
+  const last = d.path[d.path.length - 1];
+  if (last ? Math.abs(last[0] - col) + Math.abs(last[1] - row) !== 1 : col !== 0) return false;
+  d.path.push(at);
+  d.soil = d.soil.filter((c) => !same(c, at));
+  return true;
 }

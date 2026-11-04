@@ -3,7 +3,7 @@
 import { byDifficulty } from '../../../../shared/settings';
 import type { TextKey } from '../i18n';
 
-export const GOLEMS = ['pebble', 'moss', 'thorn'] as const;
+export const GOLEMS = ['pebble', 'moss', 'thorn', 'fungus', 'bell'] as const;
 export type GolemKind = (typeof GOLEMS)[number];
 /** What a seed card plants: a golem on soil, or a hedge on the path. */
 export const SEEDS = [...GOLEMS, 'hedge'] as const;
@@ -13,8 +13,6 @@ export interface GolemInfo {
   name: TextKey;
   /** Its name inside a sentence. */
   lower: TextKey;
-  /** Its name on two lines, for a tall seed card. */
-  card: TextKey;
   /** Sap to plant its seed. */
   cost: number;
   /** How long the seed takes to grow into a golem that fights, in ms. */
@@ -31,6 +29,15 @@ export interface GolemInfo {
   area?: boolean;
   /** Can only be planted once the Heartwood is in full bloom (`BLOOM_GOAL` buds open). */
   locked?: boolean;
+  /** Can only be planted once this many waves have been cleared in one garden (the saved best). */
+  unlockBest?: number;
+  /**
+   * A fungus golem's spores: each throw leaves a patch of radius `r` pixels round the pest it hit,
+   * for `ms`, that poisons every pest walking through it for `dps` health a second (crows fly over).
+   */
+  spore?: { r: number; ms: number; dps: number };
+  /** A bell golem's ring: every pest in reach stands still for this many ms (a Queen Slug half as long). */
+  stun?: number;
   blurb: TextKey;
 }
 
@@ -38,7 +45,6 @@ export const GOLEM_INFO: Record<GolemKind, GolemInfo> = {
   pebble: {
     name: 'pebbleName',
     lower: 'pebbleLower',
-    card: 'pebbleCard',
     cost: 30,
     growMs: 3000,
     damage: 7,
@@ -49,7 +55,6 @@ export const GOLEM_INFO: Record<GolemKind, GolemInfo> = {
   moss: {
     name: 'mossName',
     lower: 'mossLower',
-    card: 'mossCard',
     cost: 50,
     growMs: 4000,
     damage: 3,
@@ -61,7 +66,6 @@ export const GOLEM_INFO: Record<GolemKind, GolemInfo> = {
   thorn: {
     name: 'thornName',
     lower: 'thornLower',
-    card: 'thornCard',
     cost: 60,
     growMs: 4000,
     damage: 5,
@@ -71,7 +75,37 @@ export const GOLEM_INFO: Record<GolemKind, GolemInfo> = {
     locked: true,
     blurb: 'thornBlurb',
   },
+  fungus: {
+    name: 'fungusName',
+    lower: 'fungusLower',
+    cost: 45,
+    growMs: 4000,
+    damage: 2,
+    range: 110,
+    cooldownMs: 1800,
+    spore: { r: 28, ms: 3500, dps: 6 },
+    unlockBest: 10,
+    blurb: 'fungusBlurb',
+  },
+  bell: {
+    name: 'bellName',
+    lower: 'bellLower',
+    cost: 55,
+    growMs: 4000,
+    damage: 1,
+    range: 90,
+    cooldownMs: 3000,
+    area: true,
+    stun: 1000,
+    unlockBest: 20,
+    blurb: 'bellBlurb',
+  },
 };
+
+/** How long a ring stuns a boss (the Queen Slug), as a share of the usual. */
+export const BOSS_STUN = 0.5;
+/** After a stun wears off, a pest can't be stunned again for this many ms, so bells never hold it still for good. */
+export const STUN_GUARD_MS = 1500;
 
 /** Buds the Heartwood opens, one per cleared wave, before the Thorn golem's seed unlocks. */
 export const BLOOM_GOAL = 5;
@@ -101,7 +135,7 @@ export const UPGRADE_COST = [0, 40, 70];
  * The forms a golem can take at level `MAX_LEVEL`: two per kind, and a third once its graft is
  * bought (GG15, `FormInfo.graft`); the raise to 3 picks one.
  */
-export const FORMS = ['boulder', 'sling', 'bog', 'spore', 'bramble', 'barb', 'quartz', 'lichen', 'nettle'] as const;
+export const FORMS = ['boulder', 'sling', 'bog', 'spore', 'bramble', 'barb', 'quartz', 'lichen', 'nettle', 'puffball', 'blight', 'chime', 'gong'] as const;
 export type FormKind = (typeof FORMS)[number];
 
 export interface FormInfo {
@@ -123,6 +157,10 @@ export interface FormInfo {
   splash?: number;
   /** Its hits ignore armour. */
   pierce?: boolean;
+  /** Multiplies a fungus golem's spore patches: their radius, how long they last and their poison. */
+  spore?: { r?: number; ms?: number; dps?: number };
+  /** Multiplies a bell golem's stun. */
+  stun?: number;
   /** The form's colour, for its level bead and badge. */
   colour: number;
   /** A third form, open once its graft (of the same id) is bought with a laurel. */
@@ -139,6 +177,10 @@ export const FORM_INFO: Record<FormKind, FormInfo> = {
   quartz: { of: 'pebble', name: 'quartzName', blurb: 'quartzBlurb', damage: 1.4, range: 30, colour: 0xc8a8f0, graft: true },
   lichen: { of: 'moss', name: 'lichenName', blurb: 'lichenBlurb', slow: { factor: 0.4, ms: 2500 }, range: 40, colour: 0xe0d890, graft: true },
   nettle: { of: 'thorn', name: 'nettleName', blurb: 'nettleBlurb', damage: 1.3, cooldown: 0.75, colour: 0xa8d848, graft: true },
+  puffball: { of: 'fungus', name: 'puffballName', blurb: 'puffballBlurb', spore: { r: 1.5, ms: 1.4 }, colour: 0xe8dcc0 },
+  blight: { of: 'fungus', name: 'blightName', blurb: 'blightBlurb', spore: { dps: 2 }, colour: 0x6a3a7a },
+  chime: { of: 'bell', name: 'chimeName', blurb: 'chimeBlurb', cooldown: 0.6, colour: 0xf8e8a0 },
+  gong: { of: 'bell', name: 'gongName', blurb: 'gongBlurb', stun: 1.6, damage: 4, range: 20, colour: 0xb07028 },
 };
 
 /** Every form a golem of `kind` can take at level 3, the grafted third one included. */
@@ -177,6 +219,10 @@ export interface GolemStats {
   area: boolean;
   splash: number;
   pierce: boolean;
+  /** Spore patches left where its throws land (a fungus golem). */
+  spore?: { r: number; ms: number; dps: number };
+  /** How long its ring stuns the pests in reach, in ms (a bell golem), or 0. */
+  stun: number;
 }
 
 /**
@@ -186,14 +232,23 @@ export interface GolemStats {
 export function golemStats(kind: GolemKind, level: number, form: FormKind | null = null): GolemStats {
   const info = GOLEM_INFO[kind];
   const f = form && level >= MAX_LEVEL ? FORM_INFO[form] : undefined;
+  const grow = 1 + 0.6 * (level - 1);
+  const spore = info.spore && {
+    r: info.spore.r * (f?.spore?.r ?? 1),
+    ms: info.spore.ms * (f?.spore?.ms ?? 1),
+    dps: info.spore.dps * grow * (f?.spore?.dps ?? 1),
+  };
   return {
-    damage: info.damage * (1 + 0.6 * (level - 1)) * (f?.damage ?? 1),
+    damage: info.damage * grow * (f?.damage ?? 1),
     range: info.range + 12 * (level - 1) + (f?.range ?? 0),
     cooldownMs: info.cooldownMs * (f?.cooldown ?? 1),
     slow: f?.slow ?? info.slow,
     area: !!(info.area || f?.area),
     splash: f?.splash ?? 0,
     pierce: !!f?.pierce,
+    spore,
+    // A ring stuns 20% longer per level.
+    stun: (info.stun ?? 0) * (1 + 0.2 * (level - 1)) * (f?.stun ?? 1),
   };
 }
 
@@ -283,7 +338,8 @@ export interface Spawn {
  * armoured snail more every other wave from the fifth, and from the sixth a swarm of aphids that
  * grows each wave (two swarms from the twelfth). Every tenth wave the Queen Slug leads. Later
  * waves also get tougher, 12% more health per wave, and past the harvest the wild garden's growth
- * on top (`WILD`). A thorny garden with the 'crows' twist doubles the crows.
+ * on top (`WILD`). A thorny garden with the 'crows' twist doubles the crows, and the weekly
+ * garden's 'double' twist every pest but the queen.
  */
 export function waveFor(n: number, twist: Twist | null = null): { spawns: Spawn[]; hpScale: number } {
   const spawns: Spawn[] = [];
@@ -299,6 +355,8 @@ export function waveFor(n: number, twist: Twist | null = null): { spawns: Spawn[
   for (let w = 0; w < swarms; w++) {
     for (let i = 0; i < 6 + Math.floor(n / 2); i++) spawns.push({ kind: 'aphid', atMs: 6000 + w * 9000 + i * 140 });
   }
+  // The weekly garden's double pests: a twin for every pest, 350ms behind.
+  if (twist === 'double') spawns.push(...spawns.map((spawn) => ({ kind: spawn.kind, atMs: spawn.atMs + 350 })));
   if (isBossWave(n)) spawns.push({ kind: 'queen', atMs: 1500 });
   spawns.sort((a, b) => a.atMs - b.atMs);
   return { spawns, hpScale: (1 + 0.12 * (n - 1)) * WILD.grow ** wildness(n) * PEST_HP_SCALE };
@@ -349,13 +407,17 @@ export const boonOffer = (nth: number, twist: Twist | null = null): Boon[] =>
  * Thorny variants (GG13): three stars on a garden unlock its thorny variant, played with one twist
  * (`GARDEN_TWISTS`, in GARDENS order). Its harvest at wave HARVEST_WAVE wins the garden's laurel.
  */
-export const TWISTS = ['hedges', 'crows', 'sap'] as const;
+export const TWISTS = ['hedges', 'crows', 'sap', 'seeds', 'double'] as const;
 export type Twist = (typeof TWISTS)[number];
 export const TWIST_INFO: Record<Twist, { name: TextKey }> = {
   hedges: { name: 'noHedgesName' },
   crows: { name: 'doubleCrowsName' },
   sap: { name: 'leanStartName' },
+  seeds: { name: 'mossThornName' },
+  double: { name: 'doublePestsName' },
 };
+/** The golem seeds the 'seeds' twist (the weekly garden's "only Moss and Thorn") leaves to plant. */
+export const TWIST_SEEDS: GolemKind[] = ['moss', 'thorn'];
 export const GARDEN_TWISTS: Twist[] = ['hedges', 'crows', 'sap'];
 /** Stars on a garden that unlock its thorny variant. */
 export const THORNY_STARS = 3;
@@ -388,3 +450,38 @@ export function dailyPlot(rand: () => number, gardens: number): Plot {
   ) as Record<GolemKind, FormKind>;
   return { garden, thorny, forms };
 }
+
+/**
+ * The weekly garden (GG19): one garden all week, the same for everyone, with one of
+ * `WEEK_TWISTS`, played as often as you like for the week's best wave. The twist turns every week
+ * and the garden every third, so nine weeks play every pairing once.
+ */
+export const WEEK_TWISTS: Twist[] = ['seeds', 'double', 'hedges'];
+
+/** A week's garden: the week's number, the garden (an index into GARDENS) and its twist. */
+export interface Week {
+  week: number;
+  garden: number;
+  twist: Twist;
+}
+
+/** The number of the week (Monday to Sunday) a `YYYY-MM-DD` day falls in, counted from 1970. */
+export function weekOf(day: string) {
+  const [y, m, d] = day.split('-').map(Number);
+  // 1 January 1970 was a Thursday: three days on, every week starts on a Monday.
+  return Math.floor((Date.UTC(y, m - 1, d) / 86_400_000 + 3) / 7);
+}
+
+/** Week `week`'s garden, out of `gardens` gardens. */
+export const weeklyGarden = (week: number, gardens: number): Week => ({
+  week,
+  garden: Math.floor(week / WEEK_TWISTS.length) % gardens,
+  twist: WEEK_TWISTS[week % WEEK_TWISTS.length],
+});
+
+/**
+ * Plots you draw yourself (GG18): `slots` of them, each a path of at least `minPath` cells from the
+ * board's left edge to the Heartwood and up to `soil` soil beds; the other cells are grass, where
+ * nothing grows.
+ */
+export const PLOT = { slots: 3, minPath: 8, soil: 24 };

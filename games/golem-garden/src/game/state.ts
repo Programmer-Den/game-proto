@@ -4,6 +4,8 @@ import { GARDENS, cellAt, cellCentre, pathPoint, routeDist, type Garden } from '
 import {
   BLOOM_GOAL,
   BOON,
+  BOSS_STUN,
+  STUN_GUARD_MS,
   CHEW_PER_BITE,
   COMBO,
   COMPOST,
@@ -11,6 +13,7 @@ import {
   EARLY_BONUS,
   FORM_INFO,
   GARDEN_TWISTS,
+  GOLEMS,
   GOLEM_INFO,
   HARVEST_WAVE,
   HEDGE,
@@ -22,6 +25,7 @@ import {
   START,
   TARGETS,
   THORNY_STARS,
+  TWIST_SEEDS,
   UPGRADE_COST,
   UPROOT_REFUND,
   boonOffer,
@@ -43,6 +47,7 @@ import {
   type Spawn,
   type Target,
   type Twist,
+  type Week,
 } from './data';
 
 export interface Golem {
@@ -92,6 +97,22 @@ export interface Pest {
   slowFactor: number;
   /** Time left on its hit flash, in ms. */
   hitMs: number;
+  /** Time left standing still, stunned by a bell golem's ring, in ms. */
+  stunMs: number;
+  /** Time left until a ring can stun it again, in ms: its stun and STUN_GUARD_MS after it. */
+  stunGuardMs: number;
+}
+
+/** A patch of a fungus golem's spores on the path: it poisons pests walking through until it fades. */
+export interface Spores {
+  id: number;
+  x: number;
+  y: number;
+  r: number;
+  /** Health a second it takes off a pest inside it. */
+  dps: number;
+  ms: number;
+  maxMs: number;
 }
 
 /** A thrown stone, moss clump or thorn in flight, drawn by the scene; its damage lands when thrown. */
@@ -101,6 +122,8 @@ export interface Shot {
   from: { x: number; y: number };
   to: { x: number; y: number };
   ms: number;
+  /** A bell golem's ring, which spreads from the golem out to this reach instead of flying. */
+  ring?: number;
 }
 
 /** A wave called early, still waiting for its last pests to be squashed or get through. */
@@ -200,6 +223,12 @@ export interface GameState {
   freeSeed: boolean;
   /** Today's daily plot being played (GG16), or null in an ordinary garden. */
   daily: Plot | null;
+  /** This week's garden being played (GG19), or null. */
+  weekly: Week | null;
+  /** A plot drawn in the garden editor being played (GG18): its slot and its garden, or null. */
+  plot: { slot: number; garden: Garden } | null;
+  /** The fungus golems' spore patches on the path. */
+  spores: Spores[];
   nextId: number;
 }
 
@@ -211,6 +240,8 @@ const HEDGE_STOP = 30;
 export const SHOT_MS = 160;
 /** How long a pest flashes after a hit, in ms. */
 const HIT_MS = 120;
+/** How long a bell golem's ring takes to spread, in ms. */
+export const RING_MS = 320;
 
 /** What a new garden is planted with besides the saved progress `newGame` takes first. */
 export interface Extras {
@@ -220,6 +251,10 @@ export interface Extras {
   grafts?: Graft[];
   /** Plants today's daily plot instead of `garden`: its garden and variant, and its fixed seeds. */
   daily?: Plot | null;
+  /** Plants this week's garden instead of `garden`, with its twist. */
+  weekly?: Week | null;
+  /** Plants a drawn plot instead of `garden`: its slot and the garden drawn there. */
+  plot?: { slot: number; garden: Garden } | null;
 }
 
 export function newGame(
@@ -232,10 +267,12 @@ export function newGame(
   extras: Extras = {},
 ): GameState {
   const daily = extras.daily ?? null;
-  const n = daily ? daily.garden : GARDENS[garden] ? garden : 0;
-  const isThorny = daily ? daily.thorny : thorny && (stars[n] ?? 0) >= THORNY_STARS;
+  const weekly = daily ? null : (extras.weekly ?? null);
+  const plot = daily || weekly ? null : (extras.plot ?? null);
+  const n = daily ? daily.garden : weekly ? weekly.garden : plot ? 0 : GARDENS[garden] ? garden : 0;
+  const isThorny = daily ? daily.thorny : !weekly && !plot && thorny && (stars[n] ?? 0) >= THORNY_STARS;
   const grafts = daily ? [] : [...(extras.grafts ?? [])];
-  return {
+  const s: GameState = {
     garden: n,
     wave: 1,
     phase: 'build',
@@ -273,11 +310,20 @@ export function newGame(
     grafts,
     freeSeed: grafts.includes('seedling'),
     daily,
+    weekly,
+    plot,
+    spores: [],
     nextId: 1,
   };
+  // The first seed that can be planted here is picked: Moss in a garden with only Moss and Thorn.
+  s.selected = GOLEMS.find((kind) => unlocked(s, kind)) ?? 'pebble';
+  return s;
 }
 
-export const gardenOf = (s: GameState): Garden => GARDENS[s.garden];
+/** Whether this is an ordinary garden: not the daily plot, the weekly garden or a drawn plot, which keep their own records. */
+export const ordinary = (s: GameState) => !s.daily && !s.weekly && !s.plot;
+
+export const gardenOf = (s: GameState): Garden => s.plot?.garden ?? GARDENS[s.garden];
 
 /** Harvest stars earned over every garden; they unlock gardens (`Garden.unlockStars`). */
 export const totalStars = (s: GameState) => s.stars.reduce((a, b) => a + b, 0);
@@ -288,18 +334,29 @@ export const gardenOpen = (s: GameState, n: number) => totalStars(s) >= GARDENS[
 /** Whether garden `n`'s thorny variant can be planted: it has THORNY_STARS stars. */
 export const thornyOpen = (s: GameState, n: number) => s.stars[n] >= THORNY_STARS;
 
-/** The twist this garden is played with: its own in its thorny variant, none otherwise. */
-export const twistOf = (s: GameState): Twist | null => (s.thorny ? GARDEN_TWISTS[s.garden] : null);
+/** The twist this garden is played with: the week's in the weekly garden, its own in its thorny variant, none otherwise. */
+export const twistOf = (s: GameState): Twist | null => s.weekly?.twist ?? (s.thorny ? GARDEN_TWISTS[s.garden] : null);
 
 /** How many times boon `boon` has been taken this garden. */
 export const boonCount = (s: GameState, boon: Boon) => s.boons.filter((b) => b === boon).length;
 
+/** Whether this garden's twist takes this seed away: hedges with 'hedges', all but Moss and Thorn with 'seeds'. */
+export function barred(s: GameState, kind: SeedKind) {
+  const twist = twistOf(s);
+  return kind === 'hedge' ? twist === 'hedges' : twist === 'seeds' && !TWIST_SEEDS.includes(kind);
+}
+
 /**
- * Whether this seed can be picked: the Thorn golem only once the Heartwood is in full bloom, the
- * hedge unless the thorny variant's twist took it away.
+ * Whether this seed can be picked: not barred by the twist, the Thorn golem only once the
+ * Heartwood is in full bloom, the Fungus and Bell golems only once enough waves were cleared in
+ * one garden (`unlockBest`). The daily plot and the weekly garden open every golem.
  */
-export const unlocked = (s: GameState, kind: SeedKind) =>
-  kind === 'hedge' ? twistOf(s) !== 'hedges' : !GOLEM_INFO[kind].locked || s.bloom >= BLOOM_GOAL || !!s.daily;
+export function unlocked(s: GameState, kind: SeedKind) {
+  if (barred(s, kind)) return false;
+  if (kind === 'hedge' || s.daily || s.weekly) return true;
+  const info = GOLEM_INFO[kind];
+  return (!info.locked || s.bloom >= BLOOM_GOAL) && s.best >= (info.unlockBest ?? 0);
+}
 
 /** What a seed costs to plant here now: nothing for a golem seed while the Seedling graft's free seed waits. */
 export const seedCost = (s: GameState, kind: SeedKind) => (kind === 'hedge' ? HEDGE.cost : s.freeSeed ? 0 : GOLEM_INFO[kind].cost);
@@ -448,9 +505,10 @@ export function neighbours(s: GameState, col: number, row: number) {
 /**
  * What combo a golem of `kind` at (col, row) gets from its neighbours: a pebble golem next to a
  * moss golem hits slowed pests harder ('slowed'), a thorn golem next to one pricks twice ('twice').
+ * Other golems make no combo.
  */
 export function comboAt(s: GameState, kind: GolemKind, col: number, row: number): 'slowed' | 'twice' | null {
-  if (kind === 'moss' || !neighbours(s, col, row).some((o) => o.kind === 'moss')) return null;
+  if ((kind !== 'pebble' && kind !== 'thorn') || !neighbours(s, col, row).some((o) => o.kind === 'moss')) return null;
   return kind === 'pebble' ? 'slowed' : 'twice';
 }
 
@@ -466,7 +524,7 @@ export const queenOnPath = (s: GameState) => s.pests.some((p) => PEST_INFO[p.kin
  * done; nor can the daily plot's last wave, whose score counts them too. Nor can a wave while its Queen Slug walks: its boons wait to see whether she is squashed.
  */
 export const canCallEarly = (s: GameState) =>
-  s.phase === 'wave' && s.queue.length === 0 && s.wave !== HARVEST_WAVE && s.wave < lastWave(s) && !queenOnPath(s);
+  s.phase === 'wave' && s.queue.length === 0 && (s.wave !== HARVEST_WAVE || !ordinary(s)) && s.wave < lastWave(s) && !queenOnPath(s);
 
 /** The wave the wave button would send next. */
 export const nextWave = (s: GameState) => (s.phase === 'build' ? s.wave : s.wave + 1);
@@ -536,8 +594,9 @@ function finishWave(s: GameState, n: number, queenSquashed: boolean) {
   s.bloom = Math.min(BLOOM_GOAL, s.bloom + 1);
   s.best = Math.max(s.best, n);
   s.cleared = Math.max(s.cleared, n);
-  if (n > HARVEST_WAVE && !s.daily) s.wild[s.garden] = Math.max(s.wild[s.garden], n);
-  if (n === HARVEST_WAVE) {
+  // The weekly garden and drawn plots keep only their own best wave: no stars, laurels or wild record.
+  if (n > HARVEST_WAVE && ordinary(s)) s.wild[s.garden] = Math.max(s.wild[s.garden], n);
+  if (n === HARVEST_WAVE && ordinary(s)) {
     s.harvest = harvestStars(s.heart);
     s.stars[s.garden] = Math.max(s.stars[s.garden], s.harvest);
     if (s.thorny) s.laurels[s.garden] = 1;
@@ -611,7 +670,7 @@ function step(s: GameState, dt: number) {
       const { kind } = s.queue.shift()!;
       const hp = Math.round(PEST_INFO[kind].hp * s.waveHpScale);
       const route = s.spawned++ % routes.length;
-      s.pests.push({ id: s.nextId++, kind, wave: s.wave, hp, maxHp: hp, route, dist: 0, under: false, slowMs: 0, slowFactor: 1, hitMs: 0 });
+      s.pests.push({ id: s.nextId++, kind, wave: s.wave, hp, maxHp: hp, route, dist: 0, under: false, slowMs: 0, slowFactor: 1, hitMs: 0, stunMs: 0, stunGuardMs: 0 });
     }
   }
 
@@ -624,8 +683,12 @@ function step(s: GameState, dt: number) {
     const info = PEST_INFO[p.kind];
     const slowed = p.slowMs > 0 ? p.slowFactor : 1;
     const length = routes[p.route].length;
-    let next = p.dist + (info.speed * slowed * dt) / 1000;
-    if (!info.flies && !p.under) {
+    // A pest stunned by a bell golem's ring stands still, and doesn't chew.
+    const stunned = p.stunMs > 0;
+    p.stunMs = Math.max(0, p.stunMs - dt);
+    p.stunGuardMs = Math.max(0, p.stunGuardMs - dt);
+    let next = stunned ? p.dist : p.dist + (info.speed * slowed * dt) / 1000;
+    if (!info.flies && !p.under && !stunned) {
       for (const hedge of s.hedges) {
         const stop = hedge.stops[p.route];
         if (stop === null || p.dist > stop || next < stop) continue;
@@ -655,8 +718,22 @@ function step(s: GameState, dt: number) {
     return;
   }
 
+  // Spore patches fade; a pest walking through one is poisoned by it (the strongest, where they
+  // overlap). Crows fly over them and a mole tunnels under.
+  for (const patch of s.spores) patch.ms -= dt;
+  s.spores = s.spores.filter((patch) => patch.ms > 0);
+  if (s.spores.length) {
+    for (const p of s.pests) {
+      if (p.hp <= 0 || p.under || PEST_INFO[p.kind].flies) continue;
+      const pos = pathPoint(routes[p.route], p.dist);
+      let dps = 0;
+      for (const patch of s.spores) if (Math.hypot(pos.x - patch.x, pos.y - patch.y) <= patch.r) dps = Math.max(dps, patch.dps);
+      p.hp -= (dps * dt) / 1000;
+    }
+  }
+
   // Seeds grow; grown golems throw at the pest their targeting picks within reach, or a golem that
-  // hits all (a thorn golem, a spore form) at every pest within reach.
+  // hits all (a thorn golem, a spore form, a bell golem's ring) at every pest within reach.
   for (const g of s.golems) {
     if (g.growMs > 0) {
       g.growMs = Math.max(0, g.growMs - dt);
@@ -694,7 +771,13 @@ function step(s: GameState, dt: number) {
     };
     for (const target of targets) {
       hit(target, stats.damage);
+      if (stats.stun && target.stunGuardMs <= 0) {
+        target.stunMs = stats.stun * (PEST_INFO[target.kind].boss ? BOSS_STUN : 1);
+        target.stunGuardMs = target.stunMs + STUN_GUARD_MS;
+      }
       const to = where(target);
+      // A fungus golem's throw leaves a patch of spores where it lands.
+      if (stats.spore) s.spores.push({ id: s.nextId++, x: to.x, y: to.y, ...stats.spore, maxMs: stats.spore.ms });
       if (stats.splash) {
         // Splash lands on every pest near the target, in the golem's reach or not.
         for (const other of s.pests) {
@@ -703,10 +786,13 @@ function step(s: GameState, dt: number) {
           if (Math.hypot(pos.x - to.x, pos.y - to.y) <= stats.splash) hit(other, stats.damage / 2);
         }
       }
+      // A bell golem's ring is one shot, spreading from the golem, whatever it reaches.
+      if (stats.stun) continue;
       for (let k = 0; k < pricks; k++) {
         s.shots.push({ id: s.nextId++, kind: g.kind, from: { x: at.x, y: at.y - 14 }, to: { x: to.x, y: to.y }, ms: SHOT_MS + k * SHOT_MS * 0.5 });
       }
     }
+    if (stats.stun) s.shots.push({ id: s.nextId++, kind: g.kind, from: { ...at }, to: { ...at }, ms: RING_MS, ring: stats.range });
     g.cooldownMs = stats.cooldownMs;
   }
 

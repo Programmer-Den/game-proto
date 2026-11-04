@@ -26,6 +26,9 @@ export const sfx = sounds({
   pebble: { wave: 'triangle', freq: 190, to: 85, length: 0.07, volume: 0.32, gap: 70, vary: 0.08 },
   moss: { wave: 'noise', freq: 1100, to: 300, length: 0.1, volume: 0.2, gap: 70, vary: 0.08 },
   thorn: { wave: 'pulse12', freq: 1600, to: 2500, length: 0.05, volume: 0.13, gap: 70, vary: 0.06 },
+  /** A fungus golem's spore puff, and a bell golem's ring (a bell: a high sine with a fifth over it). */
+  fungus: { wave: 'noise', freq: 600, to: 1400, length: 0.14, attack: 0.03, volume: 0.16, gap: 70, vary: 0.08 },
+  bell: { wave: 'sine', freq: 1568, arp: [0, 7], arpStep: 0.02, length: 0.5, volume: 0.2, gap: 120, vary: 0.02 },
   /** An armoured snail hit: a small metal clink. */
   clink: { wave: 'square', freq: 2400, length: 0.04, volume: 0.13, gap: 90, vary: 0.1 },
   /** A pest squashed: a squish, then the sap's bright blip. */

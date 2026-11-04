@@ -3,19 +3,22 @@ import type en from './en';
 
 /** Golem Garden's texts in German. */
 const de: Translation<typeof en> = {
-  // Golems: name, name inside a sentence, the tall seed card's two lines and what it does
+  // Golems: name, name inside a sentence and what it does
   pebbleName: 'Kieselgolem',
   pebbleLower: 'Kieselgolem',
-  pebbleCard: 'Kiesel-\ngolem',
   pebbleBlurb: 'Wirft Steine',
   mossName: 'Moosgolem',
   mossLower: 'Moosgolem',
-  mossCard: 'Moos-\ngolem',
   mossBlurb: 'Verlangsamt',
   thornName: 'Dorngolem',
   thornLower: 'Dorngolem',
-  thornCard: 'Dorn-\ngolem',
   thornBlurb: 'Sticht ringsum',
+  fungusName: 'Pilzgolem',
+  fungusLower: 'Pilzgolem',
+  fungusBlurb: 'Giftsporen',
+  bellName: 'Glockengolem',
+  bellLower: 'Glockengolem',
+  bellBlurb: 'Betäubt ringsum',
   hedgeName: 'Hecke',
 
   // Level 3 forms: name and what it does
@@ -31,6 +34,14 @@ const de: Translation<typeof en> = {
   brambleBlurb: 'reicht 60 px weiter',
   barbName: 'Stachel',
   barbBlurb: 'tiefere Stiche, durchdringt Panzer',
+  puffballName: 'Bovist',
+  puffballBlurb: 'breitere Sporenfelder, die länger halten',
+  blightName: 'Fäule',
+  blightBlurb: 'Sporen vergiften doppelt so stark',
+  chimeName: 'Klingel',
+  chimeBlurb: 'läutet viel öfter',
+  gongName: 'Gong',
+  gongBlurb: 'längeres Betäuben, härteres Läuten, 20px weiter',
 
   // Targeting: the Aim chip's name and what the golem aims at
   firstName: 'Vorne',
@@ -60,6 +71,8 @@ const de: Translation<typeof en> = {
   noHedgesName: 'Keine Hecken',
   doubleCrowsName: 'Doppelte Krähen',
   leanStartName: 'Magerer Start',
+  mossThornName: 'Nur Moos und Dorn',
+  doublePestsName: 'Doppelte Schädlinge',
 
   // Gardens: name and card text
   meadowName: 'Wiese',
@@ -86,7 +99,6 @@ const de: Translation<typeof en> = {
   // Seed panel, preview and wave button
   seeds: 'Samen',
   bloomsAfter: 'Blüht nach',
-  bloomWaves: { one: '{n} Welle', other: '{n} Wellen' },
   previewNext: 'Nächste: Welle {n}',
   previewQueen: 'Welle {n}: Königin!',
   startWave: 'Welle {n} starten',
@@ -234,9 +246,51 @@ const de: Translation<typeof en> = {
     one: 'Du hast {waves} von {total} Wellen geschafft und {n} Blatt behalten: {score} Punkte.\nBestes Tagesbeet: {best}. Tage in Folge: {streak}. Morgen wächst ein neues Beet; wähle einen Garten zum Weiterspielen.',
     other: 'Du hast {waves} von {total} Wellen geschafft und {n} Blätter behalten: {score} Punkte.\nBestes Tagesbeet: {best}. Tage in Folge: {streak}. Morgen wächst ein neues Beet; wähle einen Garten zum Weiterspielen.',
   },
+
+  // Fungus and Bell golems (GG17)
+  lockedWave: 'Schaffe Welle {n}',
+  lockedToUnlock: 'zum Öffnen',
+  golemUnlocked: '{golem} freigeschaltet!',
+
+  // The weekly garden and plots you draw (GG18, GG19)
+  plotName: 'Mein Beet',
+  plotBlurb: 'Von dir gezeichnet',
+  gardenTagWeekly: 'Wochengarten  ·  {garden}',
+  gardenTagPlot: 'Mein Beet {n}',
+  weeklySub: 'Wochenrekord {best}',
+  plotSub: 'Beetrekord {best}',
+  hintNoHedgesWeek: 'Wochengarten: hier keine Hecken',
+  plotsButton: 'Beete',
+  plotsNote: 'Wochenrekord: Welle {n}',
+  plotsNew: 'Wochengarten und eigene Beete',
+  plotsTitle: 'Beete',
+  plotsText: 'Der Wochengarten ist die ganze Woche für alle gleich: spiele ihn, so oft du willst.\nZeichne auch eigene Beete. Jedes behält seinen eigenen Wellenrekord.',
+  weeklyName: 'Wochengarten',
+  weeklyTwist: 'Kniff: {twist}',
+  weeklyBest: 'Wochenrekord: Welle {n}',
+  weeklyNone: 'Diese Woche noch keine Welle',
+  plantIt: 'Pflanzen',
+  slotName: 'Mein Beet {n}',
+  slotEmpty: 'Leer: zum Zeichnen tippen',
+  slotUnfinished: 'Unfertig: zum Zeichnen tippen',
+  plotBest: 'Rekord: Welle {n}',
+  plotNoBest: 'Noch keine Welle geschafft',
+  editTag: 'Bearbeiten',
+  editorTitle: 'Mein Beet {n} zeichnen',
+  editorPathHelp: 'Weg: Beginne in der ersten Spalte und tippe dann jedes nächste Feld an. Sein letztes Feld ist das Herzholz; tippe es noch einmal an, um es zurückzunehmen.',
+  editorSoilHelp: 'Erde: Tippe auf Gras für ein Erdbeet, in dem Golems wachsen, oder auf ein Beet, um es zu räumen.',
+  toolPath: 'Weg',
+  toolSoil: 'Erde',
+  toolClear: 'Leeren',
+  editorStatus: 'Weg: {path} Felder (mindestens {min})  ·  Erde: {soil} von {max} Beeten',
+  weeklyBanner: 'Wochengarten: {garden}',
+  weeklyRules: 'Spiele ihn diese Woche, so oft du willst',
+  plotBanner: 'Mein Beet {n}',
+  overTextWeekly: 'Schädlinge fraßen das Herzholz in Welle {wave}. {kills} Schädlinge zerquetscht.\nWochenrekord: Welle {best}. Pflanze den Wochengarten unter Beete neu oder wähle einen Garten.',
+  overTextPlot: 'Schädlinge fraßen das Herzholz in Welle {wave}. {kills} Schädlinge zerquetscht.\nRekord auf diesem Beet: Welle {best}. Pflanze es unter Beete neu oder wähle einen Garten.',
 };
 
 /** Texts that stay the same in German. */
-export const keepEnglish: (keyof typeof en)[] = ['title', 'hintForm'];
+export const keepEnglish: (keyof typeof en)[] = ['title', 'hintForm', 'gongName'];
 
 export default de;

@@ -17,6 +17,7 @@ const en: HowToPlay = {
     { input: 'Click or tap the Heartwood', action: 'Between waves, regrow a lost leaf for sap' },
     { input: 'Daily plot (garden picker)', action: "Play today's seeded garden, once a day" },
     { input: 'Grafts (garden picker)', action: 'Spend laurels on golem grafts that last for good' },
+    { input: 'Plots (garden picker)', action: "Play this week's garden, or draw and plant plots of your own" },
   ],
   loop: [
     'Pick the Pebble golem seed and plant it on soil next to the path.',
@@ -39,6 +40,9 @@ const en: HowToPlay = {
     'Past wave 30 the garden grows wild: pests get tougher every wave and a Queen Slug comes every fifth.',
     'Laurels buy grafts: a third form for a golem, or a free first seed in every garden.',
     "The daily plot gives everyone the same garden and seeds for a day: hold 15 waves for the best score.",
+    'Clear wave 10 to unlock the Fungus golem, whose spores poison pests walking through them, and wave 20 for the Bell golem, which stuns every pest near it.',
+    'The weekly garden is the same for everyone all week, with a twist; play it as often as you like for your best wave.',
+    'In the garden editor, draw a path from the left edge to the Heartwood and soil beds beside it; each plot keeps its own best wave.',
   ],
 };
 
@@ -57,6 +61,7 @@ const de: HowToPlay = {
     { input: 'Das Herzholz anklicken oder antippen', action: 'Zwischen den Wellen ein verlorenes Blatt für Saft nachwachsen lassen' },
     { input: 'Tagesbeet (Gartenauswahl)', action: 'Den heutigen Garten mit festen Samen spielen, einmal am Tag' },
     { input: 'Pfropfen (Gartenauswahl)', action: 'Lorbeeren für Golem-Pfropfen ausgeben, die für immer bleiben' },
+    { input: 'Beete (Gartenauswahl)', action: 'Den Wochengarten spielen oder eigene Beete zeichnen und pflanzen' },
   ],
   loop: [
     'Wähle den Samen des Kieselgolems und pflanze ihn auf Erde neben dem Weg.',
@@ -79,6 +84,9 @@ const de: HowToPlay = {
     'Nach Welle 30 verwildert der Garten: Schädlinge werden mit jeder Welle zäher, und jede fünfte bringt eine Schneckenkönigin.',
     'Lorbeeren kaufen Pfropfen: eine dritte Form für einen Golem oder einen freien ersten Samen in jedem Garten.',
     'Das Tagesbeet gibt allen für einen Tag denselben Garten und dieselben Samen: halte 15 Wellen für die beste Punktzahl.',
+    'Schaffe Welle 10, um den Pilzgolem freizuschalten, dessen Sporen Schädlinge auf dem Weg vergiften, und Welle 20 für den Glockengolem, der jeden Schädling in seiner Nähe betäubt.',
+    'Der Wochengarten ist die ganze Woche für alle gleich, mit einem Kniff; spiele ihn, so oft du willst, für deinen besten Wellenrekord.',
+    'Zeichne im Garteneditor einen Weg vom linken Rand zum Herzholz und Erdbeete daneben; jedes Beet behält seinen eigenen Wellenrekord.',
   ],
 };
 
