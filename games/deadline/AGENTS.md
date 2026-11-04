@@ -301,8 +301,9 @@ also picks the squad leader whose active the run brings. Kills fill a lasting zo
   the companion with that role and goes back to `rolePrev`. While the pick is up, `moveSurvivors`
   holds every other survivor. In `fire` a marksman only shoots every `MARKSMAN.every`th volley, at
   `toughestEnemy` (a bullet with `mult` and extra pierce), a grenadier's every `GRENADE.every`th
-  bullet is a `grenade`, which bursts on the first zombie it hits (`grenade(x, y)`: every zombie
-  within `GRENADE.radius` past shields). `drawBars` badges grenadiers and marksmen.
+  bullet is a `grenade`, which bursts on the first zombie it hits (`grenade(x, y, mult)`: every zombie
+  within `GRENADE.radius` past shields, for `GRENADE.damage` times the bullet's `mult`, so a
+  veteran Grenadier's rank counts). `drawBars` badges grenadiers and marksmen.
 - **Outpost:** `state.outpost` (saved under `deadline-outpost`) is applied in `create`: Barricade
   levels as `sandbags`, Field Medic as `medkits`, Veteran as companions (Gunners); the Fuel Depot
   goes to `planWave` as `extraDrums` (0 on the daily). `buyOutpost` buys the next level at `outpostCost`.
@@ -329,7 +330,9 @@ also picks the squad leader whose active the run brings. Kills fill a lasting zo
   joining survivor `callSign(taken)`. `fire` multiplies each companion's bullets' `mult` by
   `rankMult(rank)`; only a marksman's round (`mult >= MARKSMAN.mult`) shows bigger. `hitTargets`
   hurts zombies (and chips shields) by the exact `damage * mult`, a fraction for a veteran, and
-  survivors, drums and crates by it rounded, as their hp is shown whole.
+  survivors, drums and crates by it rounded, as their hp is shown whole. `hurt` and `chipShield`
+  snap what is left to a millionth, so fractional hits that add up to the hp or shield break it
+  rather than leave a float sliver.
   `endAsWin` calls `promoteSquad` (not on the daily): `promote` ranks up the brought veterans and
   adds this run's recruits at rank 1, replacing a rank 1 veteran once the roster has
   `LOYALTY.size`. The game over screen's roster chips call `pickVeteran` (at most `LOYALTY.picks`).
@@ -369,13 +372,14 @@ also picks the squad leader whose active the run brings. Kills fill a lasting zo
   the roster), the page button (`turnOverPage`) and the tap-to-start line. `create` resets
   `overPage` to 0.
 - **Daily stand:** `state.operation === 'daily'`. `create` takes today (`today()`, kept in `day`),
-  falls back to the Open Road when `loadDaily` says today's try is used, and otherwise calls
+  falls back to the Open Road (saving `'road'`) when `loadDaily` says today's try is used, and otherwise calls
   `startDaily` and saves `'road'` as the next run (so a later day doesn't start its daily on its own); the daily keeps the starting crates for the next run (`nextKit`), and uses no
   outpost (`NO_OUTPOST`, and `startWave` hands `planWave` no Depot `extraDrums`), no veterans, no leader and no codex bonus (its kills still fill the codex). `startWave` seeds `waveRand` with
   `seeded(seedOf('deadline:<day>:<wave>'))` and draws, in order, `dailyAdapt` (the horde's answer,
   in place of `adaptTo`), the condition, `planWave` and, on a boss wave, `supplyPick`. `gameOver` and
   `completeOperation` call `finishDaily` with `dailyScore(scrap, cleared)`; the daily's best is
-  not in `deadline-operation-best`. The daily card can't be picked once today's try is used.
+  not in `deadline-operation-best`, and `recordOperation` only sets `state.best` to the waves this
+  run cleared (not saved), which the HUD's best chip shows. The daily card can't be picked once today's try is used.
 - **Extraction:** `showSupply` adds a fourth, wide card when `canExtract(wave)` (a boss wave from
   `EXTRACT.fromWave`), tapped or taken with 4; `pickSupply('extract')` calls `extract`, which
   sets `state.extracted`, pays `state.payout = round(scrap * EXTRACT.bonus(wave))` into the bank
@@ -497,7 +501,7 @@ imports it. Under browser automation it all does nothing, so the playthrough is 
 - `deadline-outpost`: a JSON object of `OutpostKind` levels (0 to 3). Written by `buyOutpost`;
   missing or broken levels load as 0.
 - `deadline-operation`: the `OperationKind` the next run plays. Written by `pickOperation`, by
-  `completeOperation` (the next town after a win) and by `create` (`'road'` once a daily starts),
+  `completeOperation` (the next town after a win) and by `create` (`'road'` once a daily starts, or when a saved `'daily'` finds today's try used),
   read by `create`; anything unknown loads as `'road'`.
 - `deadline-operation-best`: a JSON object of each operation's most waves cleared (towns only,
   not the daily). Written by `recordOperation`; it also says which towns are open (`townOpen`).

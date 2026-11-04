@@ -571,8 +571,11 @@ export class GameScene extends Phaser.Scene {
     // The daily stand is one try a day: once today's is used, the run falls back to the Open Road.
     this.day = today();
     if (s0.operation === 'daily') {
-      if (loadDaily(DAILY.game, this.day).played) s0.operation = 'road';
-      else s0.daily = startDaily(DAILY.game, this.day);
+      // Saved too, so a save that holds 'daily' from before doesn't start a later day's daily on its own.
+      if (loadDaily(DAILY.game, this.day).played) {
+        s0.operation = 'road';
+        saveOperation('road');
+      } else s0.daily = startDaily(DAILY.game, this.day);
     } else if (!townOpen(s0.operation, s0.operationBests)) s0.operation = 'road';
     s0.daily ??= loadDaily(DAILY.game, this.day);
     const daily = s0.operation === 'daily';
@@ -1640,7 +1643,7 @@ export class GameScene extends Phaser.Scene {
         b.hit.push(e.id);
         // A grenade bursts on the first zombie it hits.
         if (b.grenade && 'kind' in e) {
-          this.grenade(e.x, e.y);
+          this.grenade(e.x, e.y, b.mult);
           b.hitsLeft = 0;
           b.ricochets = 0;
           break;
@@ -1715,9 +1718,12 @@ export class GameScene extends Phaser.Scene {
     if (bounced) sfx('ricochet');
   }
 
-  /** A grenadier's grenade bursts: every zombie within `GRENADE.radius` takes its damage, past any shield. */
-  private grenade(x: number, y: number) {
-    const dmg = GRENADE.damage(this.state.wave);
+  /**
+   * A grenadier's grenade bursts: every zombie within `GRENADE.radius` takes its damage (times the
+   * thrower's rank bonus, `mult`), past any shield.
+   */
+  private grenade(x: number, y: number, mult = 1) {
+    const dmg = GRENADE.damage(this.state.wave) * mult;
     sfx('grenade');
     const caught = this.enemies.all.filter((e) => e.alive && Math.hypot(e.x - x, e.y - y) <= GRENADE.radius + ENEMIES[e.kind].radius);
     for (const e of caught) this.hurt(e, dmg);
@@ -1743,7 +1749,8 @@ export class GameScene extends Phaser.Scene {
    * shield held, so `hitTargets` plays one `block` for the pass.
    */
   private chipShield(e: Enemy, damage: number) {
-    e.shield = Math.max(0, e.shield - damage);
+    // Snapped to a millionth, so a veteran's fractional hits that add up to the shield break it.
+    e.shield = Math.max(0, Math.round((e.shield - damage) * 1e6) / 1e6);
     const r = ENEMIES[e.kind].radius;
     if (e.shield > 0) {
       if (this.volleys % 3 === 0) this.effect('', e.x, e.y + r, { life: 360, rise: 20, text: tr(this.style === 'comic' ? 'fxBlock' : 'nvFxBlock') });
@@ -1760,7 +1767,9 @@ export class GameScene extends Phaser.Scene {
     // A full codex page (not on the daily) and the Scout's flare make every hit land harder.
     const s = this.state, mult = (s.operation !== 'daily' && codexFull(s.codex, e.kind) ? CODEX.bonus : 1) * (s.flareMs > 0 ? FLARE.spotted : 1);
     const dealt = damage * mult;
-    e.hp -= dealt;
+    // Snapped to a millionth, so fractional hits (a veteran's rank bonus) that add up to the hp kill
+    // rather than leave a sliver of float residue; whole-number hits are unchanged.
+    e.hp = Math.round((e.hp - dealt) * 1e6) / 1e6;
     const r = ENEMIES[e.kind].radius;
     this.effect('', e.x + r * 0.8 + 4, e.y - r * 0.4, { life: 520, rise: 36, text: `-${Math.round(dealt)}` });
     if (e.hp <= 0) this.kill(e);
@@ -2385,6 +2394,8 @@ export class GameScene extends Phaser.Scene {
   /** An operation's best is the most of its waves cleared; saved as soon as a run beats it. */
   private recordOperation(cleared: number) {
     const s = this.state;
+    // The daily's record is its score in `deadline-daily`; its best chip counts this run's clears (not saved).
+    if (s.operation === 'daily') s.best = Math.max(s.best, cleared);
     if (s.operation === 'road' || s.operation === 'daily' || cleared <= s.operationBests[s.operation]) return;
     s.operationBests = { ...s.operationBests, [s.operation]: cleared };
     s.best = cleared;
