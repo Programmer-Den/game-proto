@@ -12,7 +12,9 @@ light stones and tier trials change each drop, a stone can be held in reserve, a
 temple leans with every off-centre drop, perfect chains grow the stone back and each break picks the
 next tier's stone. A curse taken with a blessing doubles a tier's favor, tier 10 is gilded for double
 favor, and finishing tier 12 crowns the shrine. After the crown you can keep building into a windy
-sky.
+sky. A crown opens a new site to build on (a windy cliff, then a lake where the raft bobs), each
+with its own crown height and best, and raises your patron's rank, which strengthens their boon. The
+daily shrine gives every player the same patron and stones, one try a day.
 
 ![Building the gilded tenth tier](cover.png)
 
@@ -21,6 +23,8 @@ sky.
 | Control | Action |
 | --- | --- |
 | Tap or click a patron card | Start the temple under that patron |
+| Hill, Cliff, Lake | Before the first stone: build on another site, once a crown has opened it |
+| Daily shrine | Before the first stone: play today's shrine, one try a day |
 | Tap or click anywhere | Drop the swinging stone |
 | Swap (R) | From tier 2: put the stone in hand in reserve, or swap it with the one held (once per tier) |
 | Tap or click a blessing card | Keep that blessing after a balanced tier |
@@ -29,7 +33,7 @@ sky.
 | Slow drop, Wider stone, Mason's Grace | Between tiers: spend favor on one-time help |
 | Take a curse | Between tiers: tick it before choosing a blessing to take the curse with it |
 | Build on | After a break with no blessing: go back to stacking |
-| Keep building | On the crowned panel: carry on into the endless sky |
+| Keep building | On the crowned panel: carry on into the endless sky (not in the daily shrine) |
 | Build again | After the temple falls or is crowned: start again on a bare plinth |
 
 1. **Choose a patron.** Every temple starts with a pick of two patrons, each with a boon and a bane
@@ -87,20 +91,47 @@ sky.
     favor, and finishing it offers a blessing even if it came out wobbly. The panel's goal box
     names the next one.
 16. **The end** comes when a stone misses the temple. The most tiers built in one temple are saved
-    in the browser.
+    in the browser, one best for each site.
+17. **Shrine sites**: a crown on the hill opens the **Cliff**, and a crown there opens the **Lake**.
+    The patron screen shows the sites under the cards; tap an open one to build there (the game
+    remembers the pick, and a crown that opens a site moves you there). On every site the gilded tier
+    is two below the crown, and the sky altars count from it.
+18. **Patron favour**: each crown raises the patron's rank, up to 3, shown on their card. Every rank
+    strengthens the boon (see the table below).
+19. **The daily shrine**: the button under the sites starts today's shrine on the hill, the same for
+    every player: one patron, chosen for you, and the same stones in the same order (a swap only
+    takes the next one early). Ranks don't count in it, and its crown ends the run. You get one try a
+    day; the button then shows today's height and your streak of days in a row, and the end panel
+    your best.
 
 ![Choosing a patron for the temple](docs/screenshots/playthrough-0-patrons.webp)
 
 ![The first stone landed perfectly](docs/screenshots/playthrough-1-first-stone.webp)
 
+### Sites
+
+| Site | Crown | Gilded tier | What is different |
+| --- | --- | --- | --- |
+| Hill | 12 | 10 | Nothing: the quiet hilltop of the first temple. |
+| Cliff | 10 | 8 | From tier 2 a wind off the sea pushes every falling stone left, 30 strong on tier 2 and 5 more each tier up to 80 (give or take a fifth). Aim to the right of the stone below. |
+| Lake | 11 | 9 | The temple stands on a raft that bobs side to side, 10 pixels each way on tier 1, 1.5 more each tier up to 24, once every 3 seconds of play. Drop where the top will be when the stone lands. |
+
+![The sites and the patrons' ranks on the patron screen](docs/screenshots/sites-and-ranks.webp)
+
+![The sea wind on the cliff](docs/screenshots/cliff-wind.webp)
+
+![The raft on the lake](docs/screenshots/lake-raft.webp)
+
+![A crown raises the patron's rank and opens the lake](docs/screenshots/crown-opens-site.webp)
+
 ### Patrons
 
-| Patron | Boon | Bane |
-| --- | --- | --- |
-| The Gilded Hand | Every stone earns 1 more favor. | No Mason's Grace: a miss always ends the run. |
-| The Many-Handed | Balanced tiers offer four blessings. | Stones swing 10% faster. |
-| The Patient Mason | Stones swing 10% slower. | Perfect drops earn no extra favor. |
-| The Storm Caller | Perfect drops get 3 more pixels of leeway. | Gusts blow from tier 6, not only past the crown. |
+| Patron | Boon | Bane | Each rank adds |
+| --- | --- | --- | --- |
+| The Gilded Hand | Every stone earns 1 more favor. | No Mason's Grace: a miss always ends the run. | 2 more favor for every balanced tier |
+| The Many-Handed | Balanced tiers offer four blessings. | Stones swing 10% faster. | One free reroll a run |
+| The Patient Mason | Stones swing 10% slower. | Perfect drops earn no extra favor. | Stones swing 3% slower |
+| The Storm Caller | Perfect drops get 3 more pixels of leeway. | Gusts blow from tier 6, not only past the crown. | 1 more pixel of leeway |
 
 ![Four blessings on offer under the Many-Handed](docs/screenshots/four-blessings.webp)
 
@@ -163,7 +194,7 @@ Blessings can be taken more than once, and they add up.
 
 ### Trophies
 
-Eight trophies, listed behind the Trophies button on the start and pause screens and counted on the
+Ten trophies, listed behind the Trophies button on the start and pause screens and counted on the
 hub:
 
 | Trophy | Tier | How to earn it |
@@ -171,9 +202,11 @@ hub:
 | First course | Bronze | Finish your first tier. |
 | Grown back | Bronze | Grow a stone back with a chain of perfect drops. |
 | Bound by a curse | Bronze | Finish a tier under a curse you took for double favor. |
-| Leaf gold | Silver | Finish the gilded tenth tier. |
-| Crowned shrine | Silver | Finish tier 12 and crown the shrine. |
-| Flawless shrine | Gold | Crown the shrine with every tier balanced. |
+| Leaf gold | Silver | Finish a gilded tier, two below the crown. |
+| Crowned shrine | Silver | Finish the top tier and crown a shrine. |
+| Flawless shrine | Gold | Crown a shrine with every tier balanced. |
+| Crown on the cliff | Silver | Crown a shrine on the windy cliff. |
+| Crown on the lake | Gold | Crown a shrine on the bobbing lake. |
 | Altar in the clouds | Gold, hidden | Finish a sky altar, the tenth tier past the crown. |
 | Stairway of altars | Gold, hidden | Finish three sky altars in one temple. |
 
@@ -192,7 +225,8 @@ page).
 ## Playthrough test
 
 `e2e/playthrough.spec.ts` plays the first round in headless Chromium: it checks the new temple
-waits for a patron, takes the first of the two offered and checks its rule, checks that the first
+waits for a patron (on the hill, the only site open, with every patron unranked and the daily
+shrine's button left alone), takes the first of the two offered and checks its rule, checks that the first
 stone swings, drops each of the first tier's three stones with a tap while it is
 over the stone below (checking that a second tap while it falls drops nothing), checks the balanced
 tier's favor and its three blessings (four under the Many-Handed), taps Reroll and checks it cost 5
@@ -213,12 +247,15 @@ All paths are inside `games/shrine-stack/`.
 - `src/game/`: the rules in plain TypeScript with no Phaser dependency. `state.ts` has the
   swinging, dropping, cutting, tiers, blessing effects, the reroll, the shop, stone kinds, the
   reserve, trials, the lean, perfect chains, materials, patrons, curses, the gilded tier, the goal
-  and the endless sky, `blessings.ts` the blessing names and texts, `catalog.ts` the shop items,
-  stone kinds, trials, curses, materials and patrons, and `save.ts` the best height.
+  and the endless sky, the sites, the patrons' ranks and the daily's seeded chances, `blessings.ts`
+  the blessing names and texts, `catalog.ts` the shop items, stone kinds, trials, curses,
+  materials, patrons and sites, and `save.ts` the best height on each site, the sites open and the
+  patrons' ranks.
 - `src/trophies/`: the trophies (`index.ts`), their texts (`i18n/`) and when each is earned
   (`check.ts`).
 - `src/scenes/`: `GameScene` draws the sky, the temple, the panel with the patron, the goal track,
-  the next stone, the reserve, the trial, the curse and the lean meter, the patron cards, the
+  the next stone, the reserve, the trial, the curse and the lean meter, the patron cards with the
+  site row and the daily shrine's button, the hill, cliff or lake under the temple, the
   blessing cards, the reroll button, the material row, the curse toggle and the shop, gusts, the
   crown, and the end panel and wires taps to the rules; `layout.ts` says where things are drawn.
 - `src/ui/`: the button.

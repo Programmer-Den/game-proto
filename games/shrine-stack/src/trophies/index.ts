@@ -16,6 +16,8 @@ export const trophies = trophySet(
     { id: 'gilded', tier: 'silver', icon: '🌟' },
     { id: 'crowned', tier: 'silver', icon: '👑' },
     { id: 'flawless', tier: 'gold', icon: '💎' },
+    { id: 'cliffCrown', tier: 'silver', icon: '🌊' },
+    { id: 'lakeCrown', tier: 'gold', icon: '🛶' },
     { id: 'skyAltar', tier: 'gold', icon: '☁️', hidden: true },
     { id: 'threeAltars', tier: 'gold', icon: '🌌', hidden: true },
   ],

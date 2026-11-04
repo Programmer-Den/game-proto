@@ -9,13 +9,17 @@ import {
   MATERIAL_PICKS,
   PATRON_INFO,
   SHOP_INFO,
+  SITE_INFO,
+  SITES,
   TRIAL_INFO,
   type MaterialId,
   type PatronId,
   type ShopId,
+  type SiteId,
   type StoneKind,
 } from '../game/catalog';
-import { loadBest, saveBest } from '../game/save';
+import { bestOn, loadRanks, loadSites, openNextSite, pickSite, raiseRank, saveBestOn, type Sites } from '../game/save';
+import { dailyRand, finishDaily, loadDaily, seedOf, seeded as seededRand, startDaily, today, type DailyRecord } from '../../../../shared/daily';
 import {
   buildOn,
   buy,
@@ -28,20 +32,28 @@ import {
   choosePatron,
   CURSE_MULT,
   curseNow,
+  drift,
   drop,
-  gusty,
+  gildedOf,
+  goalOf,
+  GILDED_RANK_FAVOR,
+  PATIENT_RANK,
+  PATIENT_SPEED,
+  RANK_MAX,
+  rerollCost,
+  STORM_PERFECT,
+  STORM_RANK_PX,
+  windy,
   keepBuilding,
   ALTAR_MULT,
   isAltar,
   nextAltar,
+  GILDED_BELOW,
   GILDED_MULT,
-  GILDED_TIER,
-  GOAL_TIER,
   LEAN_FROM_TIER,
   LEAN_MAX,
   newGame,
   PLINTH_W,
-  REROLL_COST,
   reroll,
   RESERVE_FROM_TIER,
   TRIALS_FROM_TIER,
@@ -66,6 +78,7 @@ import {
   CARDS,
   CARDS_FOUR,
   CURSE,
+  DAILY_BUTTON,
   FONT,
   GOAL,
   LEAN_BAR,
@@ -80,6 +93,7 @@ import {
   RESERVE_BUTTON,
   SHOP_ROW,
   SHOP_TITLE,
+  SITE_ROW,
   TOP_SCREEN_Y,
   UI_DEPTH,
   VIEW,
@@ -100,6 +114,9 @@ const BANNER_PAD = { x: 40, y: 20 };
 const BANNER_WRAP = 640;
 /** How long the crowned shrine shows on its own before the win panel comes up. */
 const CROWN_MS = 2400;
+/** The end panel's size, and how far below the middle its buttons sit. */
+const END_PANEL = { w: 580, h: 330 };
+const END_BUTTON_Y = 124;
 
 /** Stone colours, one per tier, repeating. */
 const TIER_COLORS = [0xd8b58a, 0xb9c3cc, 0xe3c98f, 0xa9c49a, 0xd6a7a0, 0xc2b0dc];
@@ -211,12 +228,14 @@ function place(parts: UiPart[], x: number, y: number, alpha = 1) {
   return parts;
 }
 
-const tierColor = (tier: number) => (tier === GILDED_TIER ? GILT : isAltar(tier) ? ALTAR_STONE : TIER_COLORS[(tier - 1) % TIER_COLORS.length]);
+/** A tier's colour on a shrine crowned at `goal`: gilded two below it, cloud-silver on a sky altar. */
+const tierColor = (tier: number, goal: number) =>
+  tier === goal - GILDED_BELOW ? GILT : isAltar(tier, goal) ? ALTAR_STONE : TIER_COLORS[(tier - 1) % TIER_COLORS.length];
 
 /** The colour of a tier's stone in a material: marble pale, sandstone warm, basalt dark; limestone is the tier's own colour. */
-function materialColor(tier: number, material: MaterialId) {
-  const base = tierColor(tier);
-  if (tier === GILDED_TIER) return base;
+function materialColor(tier: number, material: MaterialId, goal: number) {
+  const base = tierColor(tier, goal);
+  if (tier === goal - GILDED_BELOW) return base;
   return material === 'marble' ? blend(base, 0xf4f0f8, 0.6) : material === 'sandstone' ? blend(base, 0xe0a060, 0.6) : material === 'basalt' ? blend(base, 0x3e4454, 0.7) : base;
 }
 
@@ -224,8 +243,16 @@ function materialColor(tier: number, material: MaterialId) {
  * Draws a stone `w` wide with its bottom middle at the graphics' origin; heavy ones darker and strapped,
  * light ones pale and porous; marble veined, sandstone grained, basalt pitted.
  */
-function drawStone(g: Phaser.GameObjects.Graphics, w: number, tier: number, perfect: boolean, kind: StoneKind = 'normal', material: MaterialId = 'limestone') {
-  const base = materialColor(tier, material);
+function drawStone(
+  g: Phaser.GameObjects.Graphics,
+  w: number,
+  tier: number,
+  perfect: boolean,
+  kind: StoneKind,
+  material: MaterialId,
+  goal: number,
+) {
+  const base = materialColor(tier, material, goal);
   const color = kind === 'heavy' ? shade(base, -0.28) : kind === 'light' ? shade(base, 0.35) : base;
   const x = -w / 2;
   const y = -STONE_H;
@@ -261,12 +288,12 @@ function drawStone(g: Phaser.GameObjects.Graphics, w: number, tier: number, perf
     g.fillStyle(shade(color, -0.45));
     for (let px = x + 10, i = 0; px < x + w - 6; px += 17, i++) g.fillRect(Math.round(px), y + (i % 3 ? 8 : 15), 3, 2);
   }
-  if (isAltar(tier) && w > 12) {
+  if (isAltar(tier, goal) && w > 12) {
     // A sky altar: a silver line along the top and a star near either end.
     g.fillStyle(0xf4fbff).fillRect(x + 1, y + 1, w - 2, 2);
     for (const sx of [x + 8, x + w - 11]) g.fillRect(Math.round(sx) + 1, y + 7, 1, 5).fillRect(Math.round(sx), y + 9, 3, 1);
   }
-  if (tier === GILDED_TIER && w > 12) {
+  if (tier === goal - GILDED_BELOW && w > 12) {
     // Gilding: a bright leaf along the top and a glint near either end.
     g.fillStyle(0xfff1b8).fillRect(x + 1, y + 1, w - 2, 2);
     g.fillStyle(0xfff8dc).fillRect(x + 6, y + 6, 3, 3).fillRect(x + w - 10, y + 9, 2, 2);
@@ -296,6 +323,19 @@ export class GameScene extends Phaser.Scene {
   /** The material buttons during a break (from tier 3), and the reserve's swap button while it can be used. */
   materialButtons: MaterialButton[] = [];
   reserveButton: Spot | null = null;
+  /** The site buttons and the daily shrine's button on the patron pick. */
+  siteButtons: (Spot & { id: SiteId })[] = [];
+  dailyButton: Spot | null = null;
+  /** Where the temple stands and what is open, and today's daily record. */
+  private sites!: Sites;
+  private daily!: DailyRecord;
+  /** The crown height and gilded tier of this temple's site. */
+  private goal = 12;
+  private gilded = 10;
+  /** The temple's stones, ornaments, plinth and crown: on the lake it bobs with the raft. */
+  private temple!: Phaser.GameObjects.Container;
+  /** What the last crown brought: the patron's new rank and the site it opened. */
+  private crownNews: string[] = [];
   private lastFrame: number | null = null;
   private stoneViews: Phaser.GameObjects.Graphics[] = [];
   /** The gold trim and lanterns on each balanced tier, by tier. */
@@ -356,8 +396,22 @@ export class GameScene extends Phaser.Scene {
     super('Game');
   }
 
-  create() {
-    this.state = newGame(loadBest());
+  create(data: { daily?: boolean } = {}) {
+    this.sites = loadSites();
+    this.daily = loadDaily('shrine-stack');
+    if (data.daily && !this.daily.played) {
+      // Today's shrine: one source for the stones' kinds and one for everything else, the same for everyone.
+      this.daily = startDaily('shrine-stack');
+      this.state = newGame({ best: this.daily.best, daily: { rand: dailyRand('shrine-stack'), kindRand: seededRand(seedOf(`shrine-stack:stones:${today()}`)) } });
+    } else {
+      const site = this.sites.current;
+      this.state = newGame({ best: bestOn(site), site, sites: this.sites.open, ranks: loadRanks() });
+    }
+    this.goal = goalOf(this.state);
+    this.gilded = gildedOf(this.state);
+    this.crownNews = [];
+    this.siteButtons = [];
+    this.dailyButton = null;
     this.lastFrame = null;
     this.stoneViews = [];
     this.ornaments = new Map();
@@ -384,6 +438,7 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.setScroll(-this.fx, -this.fy);
 
     this.createBackdrop();
+    this.temple = this.add.container(0, 0).setDepth(3);
     this.createPlinth();
     this.guide = this.add.graphics().setDepth(4);
     this.moving = this.add.graphics().setDepth(5);
@@ -436,6 +491,8 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     tick(s, dt);
     if (s.phase === 'crowned') this.crownedMs += dt;
+    // The lake's raft carries the temple side to side.
+    this.temple.x = drift(s);
     for (const e of s.events.splice(0)) {
       this.show(e);
       checkTrophies(s, e);
@@ -503,11 +560,52 @@ export class GameScene extends Phaser.Scene {
 
   private createPlinth() {
     const g = this.add.graphics().setDepth(1);
-    // The hill the shrine stands on.
-    g.fillStyle(0x2f4a36).fillEllipse(TOWER_X, PLINTH_Y + 120, 900 + 2 * this.fx, 200);
-    g.fillStyle(0x3d5e42).fillEllipse(TOWER_X, PLINTH_Y + 110, 760 + 2 * this.fx, 150);
-    g.fillStyle(0x2f4a36).fillRect(-this.fx, PLINTH_Y + 60, this.vw, 200 + this.fy);
-    // Three steps up to the plinth, the top one exactly as wide as the plinth.
+    const left = -this.fx;
+    const bottom = PLINTH_Y + 200 + this.fy;
+    const site = this.state.site;
+    if (site === 'cliff') {
+      // The sea far below, and the headland the shrine stands on, dropping sheer to the right.
+      g.fillStyle(0x24405e).fillRect(left, PLINTH_Y + 30, this.vw, bottom - PLINTH_Y);
+      g.fillStyle(0x4a7aa0);
+      for (let i = 0; i < 14; i++) g.fillRect(TOWER_X + 120 + ((i * 97) % 420), PLINTH_Y + 42 + ((i * 23) % 50), 18 + (i % 3) * 8, 2);
+      g.fillStyle(0x4e485e).fillPoints(
+        [
+          new Phaser.Math.Vector2(left, PLINTH_Y + 40),
+          new Phaser.Math.Vector2(TOWER_X + 200, PLINTH_Y + 40),
+          new Phaser.Math.Vector2(TOWER_X + 230, PLINTH_Y + 70),
+          new Phaser.Math.Vector2(TOWER_X + 222, PLINTH_Y + 110),
+          new Phaser.Math.Vector2(TOWER_X + 250, bottom),
+          new Phaser.Math.Vector2(left, bottom),
+        ],
+        true,
+      );
+      g.fillStyle(0x3d5e42).fillRect(left, PLINTH_Y + 38, TOWER_X + 200 - left, 8);
+      g.fillStyle(0x3a3448);
+      for (let i = 0; i < 6; i++) g.fillRect(TOWER_X - 300 + i * 90, PLINTH_Y + 64 + (i % 2) * 22, 40, 3);
+    } else if (site === 'lake') {
+      // Still water to the far shore, with reeds; the temple stands on a raft (drawn with the temple, so it bobs).
+      g.fillStyle(0x23384e).fillRect(left, PLINTH_Y + 18, this.vw, 14);
+      g.fillStyle(0x3d5e42);
+      for (let x = left + 8; x < left + this.vw; x += 23) g.fillRect(x, PLINTH_Y + 8 + (x % 3) * 3, 2, 12);
+      g.fillStyle(0x2c5a78).fillRect(left, PLINTH_Y + 32, this.vw, bottom - PLINTH_Y);
+      g.fillStyle(0x6a9ab8, 0.7);
+      for (let i = 0; i < 18; i++) g.fillRect(left + ((i * 131) % this.vw), PLINTH_Y + 50 + ((i * 17) % 60), 26 + (i % 4) * 6, 2);
+      const raft = this.add.graphics();
+      const w = PLINTH_W + 120;
+      raft.fillStyle(OUTLINE).fillRect(TOWER_X - w / 2, PLINTH_Y + 40, w, 14);
+      raft.fillStyle(0x8a5a36).fillRect(TOWER_X - w / 2 + 1, PLINTH_Y + 41, w - 2, 12);
+      raft.fillStyle(0x6a4428);
+      for (let x = TOWER_X - w / 2 + 24; x < TOWER_X + w / 2; x += 26) raft.fillRect(x, PLINTH_Y + 41, 2, 12);
+      this.temple.add(raft);
+    } else {
+      // The hill the shrine stands on.
+      g.fillStyle(0x2f4a36).fillEllipse(TOWER_X, PLINTH_Y + 120, 900 + 2 * this.fx, 200);
+      g.fillStyle(0x3d5e42).fillEllipse(TOWER_X, PLINTH_Y + 110, 760 + 2 * this.fx, 150);
+      g.fillStyle(0x2f4a36).fillRect(left, PLINTH_Y + 60, this.vw, 200 + this.fy);
+    }
+    // Three steps up to the plinth, the top one exactly as wide as the plinth: part of the temple.
+    const plinth = this.add.graphics();
+    this.temple.add(plinth);
     const steps = [
       { w: PLINTH_W + 80, h: 14 },
       { w: PLINTH_W + 40, h: 14 },
@@ -515,9 +613,9 @@ export class GameScene extends Phaser.Scene {
     ];
     let y = PLINTH_Y + 44;
     for (const step of steps) {
-      g.fillStyle(OUTLINE).fillRect(TOWER_X - step.w / 2, y - step.h, step.w, step.h);
-      g.fillStyle(0x8e8496).fillRect(TOWER_X - step.w / 2 + 1, y - step.h + 1, step.w - 2, step.h - 2);
-      g.fillStyle(0xb2a9b8).fillRect(TOWER_X - step.w / 2 + 1, y - step.h + 1, step.w - 2, 3);
+      plinth.fillStyle(OUTLINE).fillRect(TOWER_X - step.w / 2, y - step.h, step.w, step.h);
+      plinth.fillStyle(0x8e8496).fillRect(TOWER_X - step.w / 2 + 1, y - step.h + 1, step.w - 2, step.h - 2);
+      plinth.fillStyle(0xb2a9b8).fillRect(TOWER_X - step.w / 2 + 1, y - step.h + 1, step.w - 2, 3);
       y -= step.h;
     }
   }
@@ -556,7 +654,7 @@ export class GameScene extends Phaser.Scene {
     // The run's goal: a pip per tier up to the crown, the gilded one framed in gold.
     const goal = PANEL.y + GOAL.y;
     fixed(this.add.rectangle(PANEL.x + 10, goal, PANEL.w - 20, 76, 0x2c2446).setOrigin(0).setStrokeStyle(2, 0x6a5a9a));
-    fixed(this.add.text(PANEL.x + 18, goal + 6, t('goal', { tier: GOAL_TIER }), textStyle(14, '#f3c64e')));
+    fixed(this.add.text(PANEL.x + 18, goal + 6, t(this.state.daily ? 'goalDaily' : 'goalSite', { tier: this.goal, site: t(SITE_INFO[this.state.site].name) }), textStyle(14, '#f3c64e')));
     this.goalPips = fixed(this.add.graphics());
     this.goalNote = fixed(this.add.text(PANEL.x + 18, goal + 52, '', { fontFamily: FONT, fontSize: '12px', color: '#e9b949' }));
     // The rules sit between the goal box and the corner buttons, which reach 42px up from the view's bottom.
@@ -592,7 +690,7 @@ export class GameScene extends Phaser.Scene {
   private updateSound() {
     const s = this.state;
     const playing = s.phase === 'swinging' || s.phase === 'falling';
-    const part = !playing ? 'break' : s.tier === GILDED_TIER || isAltar(s.tier) ? 'gilded' : s.endless ? 'sky' : 'calm';
+    const part = !playing ? 'break' : s.tier === this.gilded || isAltar(s.tier, this.goal) ? 'gilded' : s.endless ? 'sky' : 'calm';
     if (part !== this.musicPart) {
       this.musicPart = part;
       playMusic(SONG, part);
@@ -616,19 +714,20 @@ export class GameScene extends Phaser.Scene {
     const cx = this.vw / 2;
     const cy = this.vh / 2;
     const dim = this.add.rectangle(cx, cy, this.vw, this.vh, 0x0c0916, 0.7).setInteractive();
-    const panel = this.add.rectangle(cx, cy, 520, 260, 0x231c38).setStrokeStyle(4, 0x6a5a9a);
-    const title = (this.gameOverTitle = this.add.text(cx, cy - 90, '', textStyle(30, '#f3c64e')).setOrigin(0.5));
+    const panel = this.add.rectangle(cx, cy, END_PANEL.w, END_PANEL.h, 0x231c38).setStrokeStyle(4, 0x6a5a9a);
+    const title = (this.gameOverTitle = this.add.text(cx, cy - 128, '', textStyle(30, '#f3c64e')).setOrigin(0.5));
     this.gameOverText = this.add
-      .text(cx, cy - 10, '', { fontFamily: FONT, fontSize: '16px', color: '#f1e3c6', align: 'center' })
+      .text(cx, cy - 6, '', { fontFamily: FONT, fontSize: '16px', color: '#f1e3c6', align: 'center' })
       .setOrigin(0.5);
     this.gameOver = [dim, panel, title, this.gameOverText];
     const restart = () => {
       ui('click');
-      this.scene.restart();
+      // Always a plain temple again, even after the daily (a restart keeps the last data otherwise).
+      this.scene.restart({});
     };
-    this.againButton = makeButton(this, cx, cy + 80, t('buildAgain'), restart);
-    this.againBeside = makeButton(this, cx - 115, cy + 80, t('buildAgain'), restart);
-    this.keepBuildingButton = makeButton(this, cx + 115, cy + 80, t('keepBuilding'), () => {
+    this.againButton = makeButton(this, cx, cy + END_BUTTON_Y, t('buildAgain'), restart);
+    this.againBeside = makeButton(this, cx - 115, cy + END_BUTTON_Y, t('buildAgain'), restart);
+    this.keepBuildingButton = makeButton(this, cx + 115, cy + END_BUTTON_Y, t('keepBuilding'), () => {
       if (keepBuilding(this.state)) {
         sfx('rise');
         this.onKeepBuilding();
@@ -650,12 +749,15 @@ export class GameScene extends Phaser.Scene {
     if (e.type === 'placed') {
       // Drawn from the event: a topple may already have taken the stone off `s.stones`.
       const { stone, row: i } = e;
-      const g = this.add.graphics().setDepth(3).setPosition(stone.x, this.worldY(i * STONE_H));
-      drawStone(g, stone.w, stone.tier, stone.perfect, stone.kind, stone.material);
+      const g = this.add.graphics().setPosition(stone.x, this.worldY(i * STONE_H));
+      drawStone(g, stone.w, stone.tier, stone.perfect, stone.kind, stone.material, this.goal);
+      this.temple.add(g);
       this.stoneViews.push(g);
+      // The event's stone sits where the raft was when it landed, which is where it is drawn now.
+      const x = stone.x + drift(s);
       for (const piece of e.cut) this.debris(piece.x, this.worldY(i * STONE_H), piece.w, stone.tier, stone.kind, stone.material);
-      this.popup(stone.x, this.worldY((i + 1) * STONE_H) - 6, e.drop.perfect ? t('perfectPopup', { n: e.favor }) : `+${e.favor}`, e.drop.perfect);
-      if (e.drop.perfect) this.glow(stone.x, this.worldY(i * STONE_H), stone.w);
+      this.popup(x, this.worldY((i + 1) * STONE_H) - 6, e.drop.perfect ? t('perfectPopup', { n: e.favor }) : `+${e.favor}`, e.drop.perfect);
+      if (e.drop.perfect) this.glow(x, this.worldY(i * STONE_H), stone.w);
       sfx('thud', { pitch: stone.kind === 'heavy' ? 0.8 : stone.kind === 'light' ? 1.25 : 1 });
       if (e.drop.perfect) sfx('bell', { pitch: bellPitch(s.chain) });
       else if (e.cut.length) sfx('crack');
@@ -665,10 +767,10 @@ export class GameScene extends Phaser.Scene {
       this.debris(e.drop.x, this.worldY(stackHeight(s)), e.drop.w, e.tier, e.kind, e.material);
       this.cameras.main.shake(200, 0.006);
       if (e.drop.caught) this.announce([t('graceName'), t('caught')]);
-      if (s.phase === 'over') saveBest(s.best);
+      if (s.phase === 'over') this.saveRun();
     } else if (e.type === 'rerolled') {
       sfx('shuffle');
-      this.popup(PANEL.x + 150, PANEL.y + 126, `-${REROLL_COST}`, false, true);
+      if (e.cost) this.popup(PANEL.x + 150, PANEL.y + 126, `-${e.cost}`, false, true);
     } else if (e.type === 'bought') {
       ui('coin');
       this.popup(PANEL.x + 150, PANEL.y + 126, `-${SHOP_INFO[e.item].cost}`, false, true);
@@ -677,7 +779,7 @@ export class GameScene extends Phaser.Scene {
       const top = s.stones.at(-1)!;
       const y = this.worldY(stackHeight(s)) - 34;
       sfx(e.passed ? 'sparkle' : 'blip');
-      this.popup(top.x, y, e.passed ? t('trialPassed', { n: e.favor }) : t('trialFailedPopup'), e.passed);
+      this.popup(top.x + drift(s), y, e.passed ? t('trialPassed', { n: e.favor }) : t('trialFailedPopup'), e.passed);
     } else if (e.type === 'toppled') {
       // The tier's stones tumble off the way the temple was leaning.
       const side = e.lean > 0 ? 1 : -1;
@@ -691,7 +793,7 @@ export class GameScene extends Phaser.Scene {
     } else if (e.type === 'regrown') {
       sfx('shimmer');
       this.redrawTop();
-      this.popup(s.stones.at(-1)!.x, this.worldY(stackHeight(s)) - 34, t('regrown', { n: e.px }), true);
+      this.popup(s.stones.at(-1)!.x + drift(s), this.worldY(stackHeight(s)) - 34, t('regrown', { n: e.px }), true);
     } else if (e.type === 'swapped') {
       sfx('swish');
       this.popup(PANEL.x + PANEL.w + 90, RESERVE_BUTTON.y + 8, t('inHand', { kind: t(KIND_INFO[e.kind].name) }), false, true);
@@ -702,14 +804,51 @@ export class GameScene extends Phaser.Scene {
     } else if (e.type === 'patron') {
       const info = PATRON_INFO[e.patron];
       sfx('gong');
-      this.announce([t('watchesOver', { patron: t(info.name) }), t(info.boon)]);
+      const where = s.daily ? t('dailyName') : s.site !== 'hill' ? t(SITE_INFO[s.site].text) : '';
+      this.announce([t('watchesOver', { patron: t(info.name) }), this.boonText(e.patron, s.rank), where].filter(Boolean));
+    } else if (e.type === 'crowned') {
+      this.onCrowned(e.site, e.patron, e.daily);
     } else {
       if (e.balanced) this.ornament(e.tier);
       if (s.phase !== 'crowned') sfx(e.balanced ? 'chime' : 'meh');
       if (s.phase === 'crowned') this.crownTemple();
       // A break between tiers says so itself; only a wobbly tier with nothing to buy goes straight on.
       else if (s.phase !== 'blessing') this.announce([t('wobbly', { tier: e.tier })]);
-      saveBest(s.best);
+      this.saveRun();
+    }
+  }
+
+  /** Keeps the run's best: on its site, or for the daily in its own record when the run ends. */
+  private saveRun() {
+    const s = this.state;
+    if (!s.daily) saveBestOn(s.site, s.best);
+    else if (s.phase === 'over' || s.phase === 'crowned') this.daily = finishDaily('shrine-stack', s.tiersBuilt);
+  }
+
+  /** A crown raises the patron's rank and opens the next site (not in the daily, which stands apart). */
+  private onCrowned(site: SiteId, patron: PatronId | null, daily: boolean) {
+    this.crownNews = [];
+    if (daily) return;
+    if (patron) {
+      const rank = raiseRank(patron, RANK_MAX);
+      if (rank !== null) this.crownNews.push(t('rankUp', { patron: t(PATRON_INFO[patron].name), rank }));
+    }
+    const opened = openNextSite(site);
+    if (opened) this.crownNews.push(t('siteOpened', { site: t(SITE_INFO[opened].name) }));
+  }
+
+  /** A patron's boon, strengthened by their rank. */
+  private boonText(patron: PatronId, rank: number) {
+    if (!rank) return t(PATRON_INFO[patron].boon);
+    switch (patron) {
+      case 'gilded':
+        return t('gildedBoonRank', { n: GILDED_RANK_FAVOR * rank });
+      case 'hands':
+        return t('handsBoonRank', { n: rank });
+      case 'patient':
+        return t('patientBoonRank', { n: Math.round((1 - PATIENT_SPEED + PATIENT_RANK * rank) * 100) });
+      case 'storm':
+        return t('stormBoonRank', { n: STORM_PERFECT + STORM_RANK_PX * rank });
     }
   }
 
@@ -717,7 +856,8 @@ export class GameScene extends Phaser.Scene {
   private crownTemple() {
     const top = this.state.stones.at(-1)!;
     const y = this.worldY(stackHeight(this.state));
-    const g = (this.crown = this.add.graphics().setDepth(3.6).setPosition(top.x, y));
+    const g = (this.crown = this.add.graphics().setPosition(top.x, y));
+    this.temple.add(g);
     g.fillStyle(OUTLINE).fillRect(-30, -12, 60, 12);
     g.fillTriangle(-32, -10, -22, -40, -12, -10).fillTriangle(-12, -10, 0, -48, 12, -10).fillTriangle(12, -10, 22, -40, 32, -10);
     g.fillStyle(GOLD).fillRect(-28, -11, 56, 10);
@@ -725,15 +865,15 @@ export class GameScene extends Phaser.Scene {
     g.fillStyle(0xfff1b8).fillRect(-28, -11, 56, 2);
     g.fillStyle(0x6ac0e8).fillCircle(0, -6, 3);
     g.fillStyle(0x8ad06a).fillCircle(-18, -6, 2.5).fillCircle(18, -6, 2.5);
-    this.glow(top.x, y, top.w);
+    this.glow(top.x + drift(this.state), y, top.w);
     playSting(SONG, 'crown');
-    this.announce([t('crowned'), t('tierStands', { tier: GOAL_TIER })]);
+    this.announce([t('crowned'), t('tierStands', { tier: this.goal })]);
   }
 
   /** A broken piece or a missed stone, tumbling down off the temple. */
   private debris(x: number, y: number, w: number, tier: number, kind: StoneKind = 'normal', material: MaterialId = 'limestone') {
     const g = this.add.graphics().setDepth(6).setPosition(x, y);
-    drawStone(g, w, tier, false, kind, material);
+    drawStone(g, w, tier, false, kind, material, this.goal);
     this.tumble(g, x < TOWER_X ? -1 : 1);
   }
 
@@ -763,7 +903,8 @@ export class GameScene extends Phaser.Scene {
   private ornament(tier: number) {
     const top = this.state.stones[tier * STONES_PER_TIER - 1];
     const y = this.worldY(tier * STONES_PER_TIER * STONE_H);
-    const g = this.ornaments.get(tier) ?? this.add.graphics().setDepth(3.5);
+    let g = this.ornaments.get(tier);
+    if (!g) this.temple.add((g = this.add.graphics()));
     this.ornaments.set(tier, g.clear());
     g.fillStyle(GOLD).fillRect(top.x - top.w / 2 + 1, y + 1, top.w - 2, 3);
     for (const side of [-1, 1]) {
@@ -811,7 +952,7 @@ export class GameScene extends Phaser.Scene {
     if (key !== this.movingKey) {
       this.movingKey = key;
       this.moving.clear();
-      drawStone(this.moving, m.w, s.tier, false, m.kind, m.material);
+      drawStone(this.moving, m.w, s.tier, false, m.kind, m.material, this.goal);
     }
     const y = this.worldY(m.h);
     this.moving.setPosition(m.x, y);
@@ -834,7 +975,7 @@ export class GameScene extends Phaser.Scene {
 
   private refresh() {
     const s = this.state;
-    this.tierText.setText(s.endless ? t('tierSky', { tier: s.tier }) : t('tier', { tier: Math.min(s.tier, GOAL_TIER) }));
+    this.tierText.setText(s.endless ? t('tierSky', { tier: s.tier }) : t('tier', { tier: Math.min(s.tier, this.goal) }));
     this.pips.clear();
     for (let i = 0; i < STONES_PER_TIER; i++) {
       const x = PANEL.x + 16 + i * 30;
@@ -842,16 +983,16 @@ export class GameScene extends Phaser.Scene {
       this.pips.fillStyle(i < s.inTier ? (s.wobbly ? 0xb08a6a : TIER_COLORS[(s.tier - 1) % TIER_COLORS.length]) : 0x3a3052).fillRect(x + 2, PANEL.y + 84, 20, 10);
     }
     this.goalPips.clear();
-    for (let t = 1; t <= GOAL_TIER; t++) {
+    for (let t = 1; t <= this.goal; t++) {
       const x = PANEL.x + 18 + (t - 1) * (GOAL.pip + GOAL.gap);
       const y = PANEL.y + GOAL.y + 30;
       const built = t <= s.tiersBuilt;
-      this.goalPips.fillStyle(built ? tierColor(t) : 0x3a3052).fillRect(x, y, GOAL.pip, GOAL.pip);
-      if (t === GILDED_TIER) this.goalPips.lineStyle(2, GILT).strokeRect(x - 1, y - 1, GOAL.pip + 2, GOAL.pip + 2);
+      this.goalPips.fillStyle(built ? tierColor(t, this.goal) : 0x3a3052).fillRect(x, y, GOAL.pip, GOAL.pip);
+      if (t === this.gilded) this.goalPips.lineStyle(2, GILT).strokeRect(x - 1, y - 1, GOAL.pip + 2, GOAL.pip + 2);
       if (t === s.tier && s.phase !== 'crowned') this.goalPips.fillStyle(0xf3e9d2).fillRect(x, y + GOAL.pip + 2, GOAL.pip, 2);
     }
-    if (s.endless) setFitted(this.goalNote.setColor('#bfe4f4'), t('altarGoal', { tier: nextAltar(s.tier), mult: ALTAR_MULT }), PANEL_TEXT_W, 12);
-    else this.goalNote.setText(t('gildedGoal', { tier: GILDED_TIER, mult: GILDED_MULT }));
+    if (s.endless) setFitted(this.goalNote.setColor('#bfe4f4'), t('altarGoal', { tier: nextAltar(s.tier, this.goal), mult: ALTAR_MULT }), PANEL_TEXT_W, 12);
+    else this.goalNote.setText(t('gildedGoal', { tier: this.gilded, mult: GILDED_MULT }));
     this.favorText.setText(t('favour', { n: s.favor }));
     this.builtText.setText(t('built', { built: s.tiersBuilt, best: s.best }));
     const next = KIND_INFO[s.nextKind];
@@ -873,7 +1014,12 @@ export class GameScene extends Phaser.Scene {
       ? [t('curse', { curse: t(CURSE_INFO[curse].name), mult: CURSE_MULT }), materialName].filter(Boolean).join(' · ')
       : materialName && t('materialTier', { material: materialName });
     setFitted(this.curseText, curseLine, PANEL_TEXT_W, 13);
-    setFitted(this.patronText, s.patron ? t('patron', { patron: t(PATRON_INFO[s.patron].name) }) : t('choosePatron'), PANEL_TEXT_W, 12);
+    const patronLine = !s.patron
+      ? t('choosePatron')
+      : s.rank
+        ? t('patronRanked', { patron: t(PATRON_INFO[s.patron].name), rank: s.rank })
+        : t('patron', { patron: t(PATRON_INFO[s.patron].name) });
+    setFitted(this.patronText, patronLine, PANEL_TEXT_W, 12);
     const reserveOn = s.tier >= RESERVE_FROM_TIER;
     this.reserveText
       .setText(reserveOn ? (s.reserve ? t('hold', { kind: t(KIND_INFO[s.reserve].short) }) : t('holdNothing')) : t('reserveFrom', { tier: RESERVE_FROM_TIER }))
@@ -883,7 +1029,7 @@ export class GameScene extends Phaser.Scene {
     this.reserveButton = swappable ? { ...RESERVE_BUTTON } : null;
     this.drawLean();
     const playing = s.phase === 'swinging' || s.phase === 'falling';
-    this.windText.setText(gusty(s) && playing ? (s.wind ? t('gust', { arrows: s.wind > 0 ? '>>>' : '<<<', n: Math.abs(s.wind) }) : t('calmAir')) : '');
+    this.windText.setText(windy(s) && playing ? (s.wind ? t('gust', { arrows: s.wind > 0 ? '>>>' : '<<<', n: Math.abs(s.wind) }) : t('calmAir')) : '');
     const counts = BLESSINGS.filter((b) => s.blessings.includes(b)).map((b) => {
       const n = s.blessings.filter((x) => x === b).length;
       const name = n > 1 ? t('blessingCount', { blessing: t(BLESSING_INFO[b].name), n }) : t(BLESSING_INFO[b].name);
@@ -907,20 +1053,25 @@ export class GameScene extends Phaser.Scene {
     const ended = s.phase === 'over' || (s.phase === 'crowned' && this.crownedMs >= CROWN_MS);
     const crowned = s.phase === 'crowned';
     for (const part of this.gameOver) part.setVisible(ended);
-    for (const part of this.againButton) part.setVisible(ended && !crowned);
-    for (const part of [...this.againBeside, ...this.keepBuildingButton]) part.setVisible(ended && crowned);
-    this.keepButton = crowned && ended ? { x: this.vw / 2 + 115, y: this.vh / 2 + 80, w: 200, h: 40 } : null;
+    // The daily ends at the crown: its score is the height, so there is no climbing on.
+    const keep = crowned && !s.daily;
+    for (const part of this.againButton) part.setVisible(ended && !keep);
+    for (const part of [...this.againBeside, ...this.keepBuildingButton]) part.setVisible(ended && keep);
+    this.keepButton = keep && ended ? { x: this.vw / 2 + 115, y: this.vh / 2 + END_BUTTON_Y, w: 200, h: 40 } : null;
+    const best = s.daily
+      ? t('dailyBest', { best: this.daily.best, streak: this.daily.streak })
+      : t('bestOn', { n: s.best, site: t(SITE_INFO[s.site].name) });
     if (s.phase === 'over' && s.endless) {
       this.gameOverTitle.setText(t('fallen'));
-      this.gameOverText.setText(`${t('fallenSky', { tiers: s.tiersBuilt, favour: s.favor })}\n\n${t('bestTiers', { n: s.best })}`);
+      this.gameOverText.setText(`${t('fallenSky', { tiers: s.tiersBuilt, favour: s.favor })}\n\n${best}`);
     } else if (s.phase === 'over') {
       this.gameOverTitle.setText(t('fallen'));
-      this.gameOverText.setText(
-        `${t('fallenStood', { n: s.tiersBuilt, balanced: s.balancedTiers, favour: s.favor })}\n\n${t('bestTiers', { n: s.best })}`,
-      );
+      this.gameOverText.setText(`${t('fallenStood', { n: s.tiersBuilt, balanced: s.balancedTiers, favour: s.favor })}\n\n${best}`);
     } else if (s.phase === 'crowned') {
       this.gameOverTitle.setText(t('crowned'));
-      this.gameOverText.setText(t('crownedText', { tiers: GOAL_TIER, balanced: s.balancedTiers, favour: s.favor }));
+      const stands = t('crownedText', { tiers: this.goal, balanced: s.balancedTiers, favour: s.favor });
+      const after = s.daily ? best : t('keepAsk');
+      this.gameOverText.setText([stands, '', ...this.crownNews, after].join('\n'));
     }
   }
 
@@ -952,7 +1103,7 @@ export class GameScene extends Phaser.Scene {
     this.addOffer(...this.makeShop());
     if (canPickMaterial(s)) this.addOffer(...this.makeMaterials());
     if (!s.offer.length) {
-      const sky = s.endless && s.tier === GOAL_TIER + 1;
+      const sky = s.endless && s.tier === this.goal + 1;
       const text = sky ? t('skyPick') : t('wobbly', { tier: s.tier - 1 });
       const title = this.add.text(OFFER_TITLE.x + 70, OFFER_TITLE.y, text, textStyle(20, '#d8cbe8')).setOrigin(0.5);
       this.addOffer(title, ...this.makeBuildOn());
@@ -960,8 +1111,8 @@ export class GameScene extends Phaser.Scene {
     }
     const done = s.tier - 1;
     const title = setFitted(
-      this.add.text(OFFER_TITLE.x, OFFER_TITLE.y, '', textStyle(20, isAltar(done) ? '#bfe4f4' : '#f3c64e')).setOrigin(0.5),
-      isAltar(done) ? t('altarBlessing', { tier: done }) : t('balanced', { tier: done }),
+      this.add.text(OFFER_TITLE.x, OFFER_TITLE.y, '', textStyle(20, isAltar(done, this.goal) ? '#bfe4f4' : '#f3c64e')).setOrigin(0.5),
+      isAltar(done, this.goal) ? t('altarBlessing', { tier: done }) : t('balanced', { tier: done }),
       2 * (REROLL.x - REROLL.w / 2 - OFFER_TITLE.x) - 16,
       20,
     );
@@ -1007,7 +1158,9 @@ export class GameScene extends Phaser.Scene {
     coin.fillStyle(shade(GOLD, -0.35)).fillCircle(-w / 2 + 20, 0, 6);
     coin.fillStyle(GOLD).fillRect(-w / 2 + 19, -4, 2, 8);
     const label = this.add.text(-w / 2 + 38, 0, t('reroll'), textStyle(17)).setOrigin(0, 0.5);
-    const cost = this.add.text(w / 2 - 12, 0, String(REROLL_COST), textStyle(17, '#f3c64e')).setOrigin(1, 0.5);
+    const price = rerollCost(this.state);
+    const cost = this.add.text(w / 2 - 12, 0, price ? String(price) : t('free'), textStyle(price ? 17 : 13, '#9ad46a')).setOrigin(1, 0.5);
+    if (price) cost.setColor('#f3c64e');
     const button = place([bg, coin, label, cost], x, y, afford ? 1 : 0.5);
     bg.setInteractive({ useHandCursor: afford })
       .on('pointerover', () => afford && bg.setFillStyle(0x3a3060))
@@ -1095,11 +1248,13 @@ export class GameScene extends Phaser.Scene {
     return parts;
   }
 
-  /** Before the first stone: the two patrons on offer, each a card with its boon and its bane. */
+  /** Before the first stone: the two patrons on offer, each a card with its boon, its bane and its rank, the sites and the daily. */
   private buildPatrons() {
     for (const part of this.patronParts) part.destroy();
     this.patronParts = [];
     this.patronCards = [];
+    this.siteButtons = [];
+    this.dailyButton = null;
     const s = this.state;
     if (s.phase !== 'patron') return;
     const dim = this.add.rectangle(this.vw / 2, this.vh / 2, this.vw, this.vh, 0x0c0916, 0.55).setInteractive();
@@ -1110,24 +1265,84 @@ export class GameScene extends Phaser.Scene {
       const info = PATRON_INFO[id];
       const x = PATRON_CARDS.xs[i];
       const { y, w, h } = PATRON_CARDS;
-      const bg = this.add.rectangle(x, y, w, h, 0x2c2446).setStrokeStyle(3, 0x6a5a9a);
-      const icon = this.add.graphics().setPosition(x, y - 56);
+      const rank = Math.min(RANK_MAX, s.ranks[id]);
+      const bg = this.add.rectangle(x, y, w, h, 0x2c2446).setStrokeStyle(3, rank ? GOLD : 0x6a5a9a);
+      const icon = this.add.graphics().setPosition(x, y - h / 2 + 44);
       this.drawPatronIcon(icon, id, info.color);
-      const name = this.add.text(x, y - 4, t(info.name), textStyle(16, '#f3c64e')).setOrigin(0.5);
+      const name = this.add.text(x, y - h / 2 + 92, t(info.name), textStyle(16, '#f3c64e')).setOrigin(0.5);
       const style = (color: string) => ({ fontFamily: FONT, fontSize: '12px', color, align: 'center', wordWrap: { width: w - 24 }, lineSpacing: 2 });
-      const boon = this.add.text(x, y + 16, t(info.boon), style('#9ad46a')).setOrigin(0.5, 0);
-      const bane = this.add.text(x, y + 54, t(info.bane), style('#e8a0d4')).setOrigin(0.5, 0);
+      // The bane follows the boon, which a rank can make longer.
+      const boon = this.add.text(x, y - h / 2 + 108, this.boonText(id, rank), style('#9ad46a')).setOrigin(0.5, 0);
+      const bane = this.add.text(x, boon.y + boon.height + 6, t(info.bane), style('#e8a0d4')).setOrigin(0.5, 0);
+      const ranked = this.add
+        .text(x, y + h / 2 - 12, t('rank', { rank, max: RANK_MAX }), { fontFamily: FONT, fontSize: '11px', color: rank ? '#f3c64e' : '#8a7ea0' })
+        .setOrigin(0.5);
       bg.setInteractive({ useHandCursor: true })
         .on('pointerover', () => bg.setStrokeStyle(3, GOLD))
-        .on('pointerout', () => bg.setStrokeStyle(3, 0x6a5a9a))
+        .on('pointerout', () => bg.setStrokeStyle(3, rank ? GOLD : 0x6a5a9a))
         .on('pointerdown', () => choosePatron(this.state, id));
-      parts.push(bg, icon, name, boon, bane);
+      parts.push(bg, icon, name, boon, bane, ranked);
       this.patronCards.push({ id, x: x + this.fx, y: y + this.fy, w, h });
     });
+    parts.push(...this.makeSites(), ...this.makeDaily());
     for (const part of parts) {
       if (part !== dim) part.setPosition(part.x + this.fx, part.y + this.fy);
       this.patronParts.push(part.setScrollFactor(0).setDepth(UI_DEPTH + 10));
     }
+    for (const spot of [...this.siteButtons, this.dailyButton]) if (spot) Object.assign(spot, { x: spot.x + this.fx, y: spot.y + this.fy });
+  }
+
+  /** The shrine sites: the one here lit, the open ones a tap away, the others locked until the site before is crowned. */
+  private makeSites() {
+    const s = this.state;
+    const parts: UiPart[] = [];
+    SITES.forEach((id, i) => {
+      const { y, w, h } = SITE_ROW;
+      const x = SITE_ROW.xs[i];
+      const here = s.site === id;
+      const open = s.sites.includes(id);
+      const bg = this.add.rectangle(0, 0, w, h, here ? 0x3a3060 : 0x2c2446).setStrokeStyle(3, here ? GOLD : open ? 0x6a5a9a : 0x3a3052);
+      const name = this.add.text(0, -8, t(SITE_INFO[id].name), textStyle(14, here ? '#f3c64e' : open ? '#f3e9d2' : '#8a7ea0')).setOrigin(0.5);
+      const note = open
+        ? t('siteNote', { tier: SITE_INFO[id].goal, best: id === s.site ? s.best : bestOn(id) })
+        : t('siteLocked', { site: t(SITE_INFO[SITES[i - 1]].name) });
+      const text = setFitted(this.add.text(0, 9, '', { fontFamily: FONT, fontSize: '11px', color: '#d8cbe8' }).setOrigin(0.5), note, w - 10, 11);
+      bg.setInteractive({ useHandCursor: open && !here }).on('pointerdown', () => {
+        if (!open) return ui('refuse');
+        if (here) return;
+        ui('click');
+        pickSite(id);
+        this.scene.restart({});
+      });
+      parts.push(...place([bg, name, text], x, y, open ? 1 : 0.6));
+      this.siteButtons.push({ id, x, y, w, h });
+    });
+    return parts;
+  }
+
+  /** The daily shrine's button: the same patron and stones for everyone today, one try, then today's score. */
+  private makeDaily() {
+    const { x, y, w, h } = DAILY_BUTTON;
+    const d = this.daily;
+    const ready = !d.played;
+    const bg = this.add.rectangle(0, 0, w, h, 0x2c2446).setStrokeStyle(3, ready ? 0x7fc8e8 : 0x3a3052);
+    const name = this.add.text(0, -8, t('dailyName'), textStyle(14, ready ? '#bfe4f4' : '#8a7ea0')).setOrigin(0.5);
+    const note = ready
+      ? t('dailyReady', { best: d.best, streak: d.streak })
+      : d.score === null
+        ? t('dailyUnfinished')
+        : t('dailyDone', { n: d.score, streak: d.streak });
+    const text = setFitted(this.add.text(0, 9, '', { fontFamily: FONT, fontSize: '11px', color: '#d8cbe8' }).setOrigin(0.5), note, w - 12, 11);
+    bg.setInteractive({ useHandCursor: ready })
+      .on('pointerover', () => ready && bg.setFillStyle(0x3a3060))
+      .on('pointerout', () => bg.setFillStyle(0x2c2446))
+      .on('pointerdown', () => {
+        if (!ready) return ui('refuse');
+        sfx('rise');
+        this.scene.restart({ daily: true });
+      });
+    this.dailyButton = { x, y, w, h };
+    return place([bg, name, text], x, y, ready ? 1 : 0.7);
   }
 
   /** A small emblem for each patron, centred on the graphics' origin. */
@@ -1222,8 +1437,8 @@ export class GameScene extends Phaser.Scene {
     const i = this.state.stones.length - 1;
     const top = this.state.stones[i];
     this.stoneViews[i].clear();
-    drawStone(this.stoneViews[i], top.w, top.tier, top.perfect, top.kind, top.material);
-    this.glow(top.x, this.worldY(i * STONE_H), top.w);
+    drawStone(this.stoneViews[i], top.w, top.tier, top.perfect, top.kind, top.material, this.goal);
+    this.glow(top.x + drift(this.state), this.worldY(i * STONE_H), top.w);
     if (this.ornaments.has(top.tier) && i === top.tier * STONES_PER_TIER - 1) this.ornament(top.tier);
   }
 
@@ -1231,7 +1446,7 @@ export class GameScene extends Phaser.Scene {
     sfx('choir');
     if (id === 'broad') this.redrawTop();
     const tier = this.state.tier;
-    const special = tier === GILDED_TIER ? t('gildedTierFavour', { tier, mult: GILDED_MULT }) : isAltar(tier) ? t('altarTierFavour', { tier, mult: ALTAR_MULT }) : '';
+    const special = tier === this.gilded ? t('gildedTierFavour', { tier, mult: GILDED_MULT }) : isAltar(tier, this.goal) ? t('altarTierFavour', { tier, mult: ALTAR_MULT }) : '';
     const curse = cursed ? t('cursedWith', { curse: t(CURSE_INFO[this.state.curse!.id].name), mult: CURSE_MULT }) : null;
     this.announce([t('blessingYours', { blessing: t(BLESSING_INFO[id].name) }), curse ?? special].filter(Boolean));
   }
@@ -1239,8 +1454,8 @@ export class GameScene extends Phaser.Scene {
   /** The banner for a tier that starts after a break with no blessing: the gilded tier or a sky altar. */
   private tierNotice() {
     const tier = this.state.tier;
-    if (tier === GILDED_TIER) return [t('gildedTier', { tier }), t('gildedFavour', { mult: GILDED_MULT })];
-    if (isAltar(tier)) return [t('altarTier', { tier }), t('altarFavour', { mult: ALTAR_MULT })];
+    if (tier === this.gilded) return [t('gildedTier', { tier }), t('gildedFavour', { mult: GILDED_MULT })];
+    if (isAltar(tier, this.goal)) return [t('altarTier', { tier }), t('altarFavour', { mult: ALTAR_MULT })];
     return null;
   }
 

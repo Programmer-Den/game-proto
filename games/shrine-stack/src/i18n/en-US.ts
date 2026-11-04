@@ -20,7 +20,9 @@ const enUS: Partial<Translation<typeof en>> = {
   spendFavour: 'Spend favor (you have {n})',
   takeCurse: 'Take a curse on tier {tier}: {curse}, {text}. Earn x{mult} favor.',
   fallenSky: 'Your crowned shrine climbed the sky\nto {tiers} tiers, for {favour} favor.',
-  crownedText: 'All {tiers} tiers stand,\n{balanced} of them balanced, for {favour} favor.\n\nKeep building into the windy sky?',
+  crownedText: 'All {tiers} tiers stand,\n{balanced} of them balanced, for {favour} favor.',
+  gildedBoonRank: 'Every stone earns 1 more favor, every balanced tier {n} more.',
+  rank: 'Favor rank {rank}/{max}',
   fallenStood: {
     one: 'Your shrine stood {n} tier tall,\n{balanced} of them balanced, for {favour} favor.',
     other: 'Your shrine stood {n} tiers tall,\n{balanced} of them balanced, for {favour} favor.',

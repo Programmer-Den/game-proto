@@ -2,12 +2,17 @@ import type { HowToPlay } from '../../../shared/howToPlay';
 import { byLanguage } from '../../../shared/i18n';
 
 const en: HowToPlay = {
-  goal: 'Stack swinging stones into a temple and finish tier 12 to crown the shrine. The run ends when a stone misses the temple.',
+  goal: 'Stack swinging stones into a temple and finish its top tier (12 on the hill) to crown the shrine. The run ends when a stone misses the temple.',
   controls: [
     {
       input: 'Click or tap a patron card',
       action: 'Start the temple under that patron',
     },
+    {
+      input: 'Hill, Cliff, Lake',
+      action: 'Before the first stone: pick where to build, once a crown has opened the site',
+    },
+    { input: 'Daily shrine', action: "Play today's shrine: the same patron and stones for everyone, one try a day" },
     { input: 'Click or tap anywhere', action: 'Drop the swinging stone' },
     {
       input: 'Swap button or R',
@@ -41,7 +46,9 @@ const en: HowToPlay = {
     'From tier 3 off-centre drops make the temple lean, and past 60 pixels the tier topples, losing its favour, and starts over.',
     'From tier 3, three perfect drops in a row start growing the stone back.',
     'Ticking a curse before you choose a blessing doubles everything the next tier earns.',
-    'Tier 10 is gilded for double favour, and after the crown you can keep building into a windy sky, where every tenth tier is a sky altar with double favour and a blessing.',
+    'The tier two below the crown is gilded for double favour, and after the crown you can keep building into a windy sky, where every tenth tier is a sky altar with double favour and a blessing.',
+    'A crown on the hill opens the windy cliff (crown at 10), and one there opens the lake (crown at 11), where the raft bobs side to side.',
+    "Each crown raises your patron's rank, up to 3, and every rank strengthens their boon.",
   ],
 };
 
@@ -55,12 +62,17 @@ const enUS: HowToPlay = {
 };
 
 const de: HowToPlay = {
-  goal: 'Stapele schwingende Steine zu einem Tempel und vollende Ebene 12, um den Schrein zu krönen. Der Lauf endet, wenn ein Stein den Tempel verfehlt.',
+  goal: 'Stapele schwingende Steine zu einem Tempel und vollende seine oberste Ebene (12 auf dem Hügel), um den Schrein zu krönen. Der Lauf endet, wenn ein Stein den Tempel verfehlt.',
   controls: [
     {
       input: 'Eine Schutzherrnkarte anklicken oder antippen',
       action: 'Den Tempel unter diesem Schutzherrn beginnen',
     },
+    {
+      input: 'Hügel, Klippe, See',
+      action: 'Vor dem ersten Stein: den Bauort wählen, sobald eine Krone ihn geöffnet hat',
+    },
+    { input: 'Tagesschrein', action: 'Den heutigen Schrein spielen: für alle gleicher Schutzherr und Steine, ein Versuch am Tag' },
     { input: 'Irgendwo klicken oder tippen', action: 'Den schwingenden Stein fallen lassen' },
     {
       input: 'Tausch-Taste oder R',
@@ -94,7 +106,9 @@ const de: HowToPlay = {
     'Ab Ebene 3 neigen Würfe neben der Mitte den Tempel, und ab 60 Pixeln stürzt die Ebene ein, verliert ihre Gunst und beginnt von vorn.',
     'Ab Ebene 3 lassen drei perfekte Würfe in Folge den Stein wieder wachsen.',
     'Ein angekreuzter Fluch vor der Segenswahl verdoppelt alles, was die nächste Ebene bringt.',
-    'Ebene 10 ist vergoldet und bringt doppelte Gunst, und nach der Krone kannst du in einen windigen Himmel weiterbauen, wo jede zehnte Ebene ein Himmelsaltar mit doppelter Gunst und einem Segen ist.',
+    'Die Ebene zwei unter der Krone ist vergoldet und bringt doppelte Gunst, und nach der Krone kannst du in einen windigen Himmel weiterbauen, wo jede zehnte Ebene ein Himmelsaltar mit doppelter Gunst und einem Segen ist.',
+    'Eine Krone auf dem Hügel öffnet die windige Klippe (Krone bei 10), eine dort den See (Krone bei 11), wo das Floß hin und her schaukelt.',
+    'Jede Krone hebt den Rang deines Schutzherrn, bis 3, und jeder Rang stärkt seinen Segen.',
   ],
 };
 

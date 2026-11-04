@@ -1,5 +1,5 @@
 import { award } from '../../../../shared/trophies';
-import { GILDED_TIER, GOAL_TIER, type GameEvent, type GameState } from '../game/state';
+import { gildedOf, goalOf, type GameEvent, type GameState } from '../game/state';
 import { trophies } from './index';
 
 /** Sky altars finished in one temple for the Stairway of altars trophy. */
@@ -10,9 +10,11 @@ const EARNED: Record<string, (s: GameState, e: GameEvent) => boolean> = {
   firstTier: (_, e) => e.type === 'tier',
   regrown: (_, e) => e.type === 'regrown',
   cursed: (_, e) => e.type === 'tier' && e.cursed,
-  gilded: (_, e) => e.type === 'tier' && e.tier === GILDED_TIER,
-  crowned: (_, e) => e.type === 'tier' && e.tier === GOAL_TIER,
-  flawless: (s, e) => e.type === 'tier' && e.tier === GOAL_TIER && s.balancedTiers === GOAL_TIER,
+  gilded: (s, e) => e.type === 'tier' && e.tier === gildedOf(s),
+  crowned: (_, e) => e.type === 'crowned',
+  flawless: (s, e) => e.type === 'crowned' && s.balancedTiers === goalOf(s),
+  cliffCrown: (_, e) => e.type === 'crowned' && e.site === 'cliff',
+  lakeCrown: (_, e) => e.type === 'crowned' && e.site === 'lake',
   skyAltar: (_, e) => e.type === 'altar',
   threeAltars: (s, e) => e.type === 'altar' && s.altars >= THREE_ALTARS,
 };
