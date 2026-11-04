@@ -23,7 +23,7 @@ const en: HowToPlay = {
     },
     {
       input: 'Armoury',
-      action: 'After a fall, spend banked coins on lasting upgrades',
+      action: 'After a fall, spend banked coins on lasting upgrades and other knights, and choose who runs',
     },
   ],
   loop: [
@@ -41,6 +41,9 @@ const en: HowToPlay = {
     "Meet the herald's dare on a stage for 20 coins and a third boon card.",
     'Every fifth stage a Gatekeeper bars the road: dodge its barrels and axes, then stomp its helm three times.',
     'Some boons cost you something, and two boons held together can unlock a hidden bonus.',
+    "Beyond the Dragon's Keep the Sky Road crosses gaps on clouds: land on one and leap off before it falls. A gust at your back carries jumps further.",
+    'The squire jumps again in the air but has a heart fewer; the heavy knight smashes goblins and bats but jumps lower.',
+    'Your best run races beside you as a faint ghost.',
   ],
 };
 
@@ -75,7 +78,7 @@ const de: HowToPlay = {
     },
     {
       input: 'Rüstkammer',
-      action: 'Nach einem Sturz gesparte Münzen für dauerhafte Verbesserungen ausgeben',
+      action: 'Nach einem Sturz gesparte Münzen für dauerhafte Verbesserungen und andere Ritter ausgeben, und wählen, wer läuft',
     },
   ],
   loop: [
@@ -93,6 +96,9 @@ const de: HowToPlay = {
     'Erfülle die Mutprobe des Herolds auf einer Etappe für 20 Münzen und eine dritte Gabenkarte.',
     'Jede fünfte Etappe versperrt ein Torwächter den Weg: weiche seinen Fässern und Äxten aus und zertritt dann dreimal seinen Helm.',
     'Manche Gaben kosten dich etwas, und zwei Gaben zusammen können einen verborgenen Bonus freischalten.',
+    'Jenseits der Drachenfeste führt die Himmelsstraße auf Wolken über Lücken: lande auf einer und spring ab, ehe sie fällt. Eine Böe im Rücken trägt Sprünge weiter.',
+    'Der Knappe springt in der Luft erneut, hat aber ein Herz weniger; der schwere Ritter zermalmt Kobolde und Fledermäuse, springt aber niedriger.',
+    'Dein bester Lauf läuft als blasser Geist neben dir mit.',
   ],
 };
 

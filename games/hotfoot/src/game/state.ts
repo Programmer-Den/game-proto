@@ -2,6 +2,7 @@ import { byDifficulty } from '../../../../shared/settings';
 import type { TextKey } from '../i18n';
 import { ARMOURY_EACH, noArmoury, type Armoury } from './armoury';
 import { BOONS, type BoonId } from './boons';
+import { KNIGHT_EACH, type KnightId } from './knights';
 import { pairsOf } from './pairs';
 
 // The run in plain numbers. The course runs left to right along x in world pixels; heights are
@@ -97,7 +98,7 @@ export const SHRINE = { from: 2, price: 15, w: 46 };
 
 /** Running speed on a stage, in pixels per second; `HARDER.speed` more once the dragon is beaten. */
 export const speedOf = (stage: number, hard = false) => Math.min(480, 260 + 30 * (stage - 1)) + (hard ? HARDER.speed : 0);
-/** How the run goes on after the dragon is beaten: faster, with the obstacles closer together. */
+/** How the run goes on after the dragon is beaten: faster, with the obstacles closer together, on the Sky Road. */
 export const HARDER = { speed: 60, gap: -50 };
 
 /**
@@ -105,26 +106,50 @@ export const HARDER = { speed: 60, gap: -50 };
  * slides run longer and landings skid, a fen where jumps are lower, and a windy pass whose headwind
  * pushes jumps back.
  */
-export type Terrain = 'road' | 'ice' | 'marsh' | 'wind';
+export type Terrain = 'road' | 'ice' | 'marsh' | 'wind' | 'sky';
 /** Each terrain's name and rule (none on the old road), keys of `i18n/en.ts`. */
 export const TERRAIN: Record<Terrain, { name: TextKey; rule: TextKey | null }> = {
   road: { name: 'roadName', rule: null },
   ice: { name: 'iceName', rule: 'iceRule' },
   marsh: { name: 'marshName', rule: 'marshRule' },
   wind: { name: 'windName', rule: 'windRule' },
+  sky: { name: 'skyName', rule: 'skyRule' },
 };
 /** The terrains' numbers: ice slides longer and skids on landing (jumps wait out the skid), the fen jumps lower, the wind slows the knight in the air. */
 export const ICE = { slide: 1.6, skidMs: 220 };
 export const MARSH = { jump: 0.8 };
 export const WIND = { air: 0.7 };
 
+/**
+ * Beyond the Keep: once the dragon is beaten, every ordinary stage runs on the Sky Road, where a
+ * gust blows at the knight's back for `blow` ms of every `cycle` (warned `warn` ms before): it
+ * speeds the run up `speed` times and lets jumps float, with only `lift` of the pull while airborne.
+ */
+export const GUST = { cycle: 4200, blow: 1300, warn: 700, speed: 1.3, lift: 0.7 };
+/** Where the Sky Road's gust is: calm, about to blow, or blowing (always calm on other ground). */
+export function gustOf(s: Pick<GameState, 'time' | 'terrain'>): 'calm' | 'warn' | 'blow' {
+  if (s.terrain !== 'sky') return 'calm';
+  const at = s.time % GUST.cycle;
+  if (at >= GUST.cycle - GUST.blow) return 'blow';
+  return at >= GUST.cycle - GUST.blow - GUST.warn ? 'warn' : 'calm';
+}
+/**
+ * A cloud over a gap in the Sky Road: it holds `sink` ms once the knight lands on it, then falls
+ * away, gathering speed at `fall` px/s² (the knight rides it down if still on it).
+ */
+export const CLOUD = { h: 44, sink: 500, fall: 1400 };
+
 /** A Gatekeeper bars the road on every `BOSS_EVERY`th stage. */
 export const BOSS_EVERY = 5;
 export const isBossStage = (stage: number) => stage % BOSS_EVERY === 0;
 
-/** Stage 1 and Gatekeeper stages run on the old road; the others go ice, fen, wind, ice and so on. */
-export function terrainOf(stage: number): Terrain {
+/**
+ * Stage 1 and Gatekeeper stages run on the old road; the others go ice, fen, wind, ice and so on,
+ * and once the dragon is beaten (`sky`) every ordinary stage runs on the Sky Road.
+ */
+export function terrainOf(stage: number, sky = false): Terrain {
   if (stage === 1 || isBossStage(stage)) return 'road';
+  if (sky) return 'sky';
   return (['ice', 'marsh', 'wind'] as const)[(stage - 2) % 3];
 }
 
@@ -184,6 +209,12 @@ export interface Ledge {
   w: number;
   /** Height of its top above the road. */
   h: number;
+  /** A cloud over a gap on the Sky Road, which falls away once stood on (see `CLOUD`). */
+  cloud?: boolean;
+  /** A cloud's time left before it falls, once the knight has landed on it. */
+  sinkMs?: number;
+  /** A falling cloud's speed downward. */
+  fallV?: number;
 }
 
 /** Height of the ground under a stretch of course: the highest ledge over it, or the road. */
@@ -263,6 +294,10 @@ export interface Runner {
 
 export interface GameState {
   stage: number;
+  /** Who runs this run: the knight, the squire or the heavy knight (always the knight on a daily course). */
+  knight: KnightId;
+  /** The knights unlocked in the armoury, kept between runs (the knight is always there). */
+  knights: KnightId[];
   /** The ground this stage is run on (`terrainOf(stage)`). */
   terrain: Terrain;
   phase: 'running' | 'checkpoint' | 'over';
@@ -353,16 +388,19 @@ export function trackOf(s: Pick<GameState, 'distance' | 'checkpointX' | 'best' |
  * The knight's numbers with the boons taken so far (cursed ones included), the armoury bought (not
  * on a daily course, which everyone runs alike), and the rule of the ground underfoot.
  */
-export function stats(s: Pick<GameState, 'ranks' | 'armoury' | 'terrain' | 'daily'>) {
+export function stats(s: Pick<GameState, 'ranks' | 'armoury' | 'terrain' | 'daily' | 'knight'>) {
   const r = (id: BoonId) => s.ranks[id] ?? 0;
   const a = s.daily ? noArmoury() : s.armoury;
+  const k = KNIGHT_EACH[s.knight];
   const pairs = pairsOf(s.ranks);
   // Jump height goes with the square of the speed off the ground.
-  const height = (1 + 0.12 * r('boots') - 0.15 * r('oath')) * (s.terrain === 'marsh' ? MARSH.jump : 1);
+  const height = (1 + 0.12 * r('boots') - 0.15 * r('oath')) * (s.terrain === 'marsh' ? MARSH.jump : 1) * k.height;
   return {
-    maxHearts: Math.max(1, START_HEARTS + r('heart') + a.heart * ARMOURY_EACH.heart - r('gilt')),
+    maxHearts: Math.max(1, START_HEARTS + k.hearts + r('heart') + a.heart * ARMOURY_EACH.heart - r('gilt')),
     jumpV: JUMP_V * Math.sqrt(height),
-    jumps: 1 + r('double'),
+    jumps: 1 + k.jumps + r('double'),
+    /** The heavy knight smashes the goblins and bats he runs into. */
+    smash: k.smash,
     slideMs: SLIDE_MS * (1 + 0.3 * r('greaves')) * (1 + 0.6 * r('glass')) * (s.terrain === 'ice' ? ICE.slide : 1),
     hurtMs: HURT_MS * (1 + 0.5 * r('cloak')) * (r('glass') ? 0.5 : 1),
     reach: COIN_REACH + 45 * r('magnet') + a.magnet * ARMOURY_EACH.magnet,
@@ -407,9 +445,11 @@ export function today(now = new Date()) {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
 
-export function freshState(best = 0, bank = 0, armoury: Armoury = noArmoury(), daily: string | null = null, crown = false): GameState {
+export function freshState(best = 0, bank = 0, armoury: Armoury = noArmoury(), daily: string | null = null, crown = false, knight: KnightId = 'knight', knights: KnightId[] = ['knight']): GameState {
   return {
     stage: 1,
+    knight,
+    knights: [...knights],
     terrain: terrainOf(1),
     phase: 'running',
     road: null,

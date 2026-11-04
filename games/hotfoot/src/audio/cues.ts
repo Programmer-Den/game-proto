@@ -1,6 +1,6 @@
 import { playMusic, playSting, ui } from '../../../../shared/audio';
 import { MISSILES, bossStands } from '../game/boss';
-import { flameOf, stats, streakMax, streakMult, STREAK, type GameState } from '../game/state';
+import { flameOf, gustOf, stats, streakMax, streakMult, STREAK, type GameState } from '../game/state';
 import { RUNNER_X, VIEW } from '../scenes/layout';
 import { SONG, sfx, type MusicPart, type SoundName } from './sound';
 
@@ -15,6 +15,7 @@ function partOf(s: GameState): MusicPart {
   if (s.terrain === 'ice') return 'ice';
   if (s.terrain === 'marsh') return 'fen';
   if (s.terrain === 'wind') return 'wind';
+  if (s.terrain === 'sky') return 'sky';
   return 'road';
 }
 
@@ -35,6 +36,8 @@ export class SoundCues {
   private bossHp = 0;
   private rockX: number | null = null;
   private flames = new Map<number, string>();
+  private gust = 'calm';
+  private falling = new Set<number>();
   private part: MusicPart | null = null;
 
   /** Forgets the last run: call it once a new run starts, before its first frame. */
@@ -49,6 +52,8 @@ export class SoundCues {
     this.bossHp = s.boss?.hp ?? 0;
     this.rockX = s.rockfall?.x ?? null;
     this.flames.clear();
+    this.gust = gustOf(s);
+    this.falling.clear();
     this.music(s);
   }
 
@@ -123,6 +128,14 @@ export class SoundCues {
       flames.set(t.id, burn);
     }
     this.flames = flames;
+
+    // The Sky Road: a gust starting to blow, and a cloud giving way.
+    const gust = gustOf(s);
+    if (gust === 'blow' && this.gust !== 'blow' && s.phase === 'running') play('gust');
+    this.gust = gust;
+    const falling = new Set(s.ledges.filter((l) => l.cloud && l.sinkMs === 0).map((l) => l.id));
+    for (const id of falling) if (!this.falling.has(id)) play('sink');
+    this.falling = falling;
 
     // The run's phase and stage.
     if (s.phase !== this.phase) {

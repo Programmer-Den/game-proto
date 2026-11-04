@@ -51,6 +51,10 @@ export const sfx = sounds({
   pair: { wave: 'pulse25', freq: 880, arp: [0, 4, 7, 11, 14, 19], arpStep: 0.05, length: 0.5, volume: 0.2, gap: 400 },
   /** A new stage's title: a heraldic horn call. */
   horn: { wave: 'square', freq: 293.66, arp: [0, 7, 12, 7, 12], arpStep: 0.11, length: 0.6, attack: 0.02, volume: 0.2, gap: 600 },
+  /** A gust on the Sky Road starts blowing at the knight's back: a long airy whoosh. */
+  gust: { wave: 'noise', freq: 500, to: 2200, length: 0.7, attack: 0.25, volume: 0.12, gap: 1200 },
+  /** A cloud on the Sky Road gives way and starts to fall: a soft sinking puff. */
+  sink: { wave: 'triangle', freq: 520, to: 160, length: 0.35, volume: 0.22, gap: 300 },
   /** Run again: a whoosh up. */
   again: { wave: 'noise', freq: 400, to: 2400, length: 0.26, attack: 0.05, volume: 0.13, gap: 300 },
 });
@@ -90,7 +94,7 @@ const ROAD_HARMONY = bars(
 /**
  * Hotfoot's song: a galloping chiptune at 150 BPM in D Mixolydian, with a square lead, a pulse
  * counter-melody, a triangle bass in a gallop and noise drums. One loop per ground (road, ice, fen,
- * wind), the boss fights, the rockfall and the campfire of a checkpoint, plus two stings.
+ * wind, the Sky Road), the boss fights, the rockfall and the campfire of a checkpoint, plus two stings.
  */
 export const SONG: Song = {
   bpm: 150,
@@ -154,6 +158,13 @@ export const SONG: Song = {
       bass: bars(drive('d2', 'd3'), drive('c2', 'c3'), drive('d2', 'd3'), 'g2 - g2 - g3 - g2 - a2 - a2 - a3 - a2 a2', drive('d2', 'd3'), drive('c2', 'c3'), drive('g2', 'g3'), drive('d2', 'd3')),
       drums: 'k h s h k h s h k h s h k k s s',
     },
+    /** The Sky Road beyond the Keep: a soaring lead in D Lydian over slow, bright chords. */
+    sky: {
+      lead: bars('d5 . . . e5 . f#5 . g#5 . . . a5 . . .', 'f#5 . . . e5 . d5 . e5 . . . . . . .', 'a5 . . . b5 . a5 . g#5 . f#5 . e5 . d5 .', 'e5 . . . . . . . d5 . . . - - - -'),
+      harmony: bars('f#4 a4 d5 a4 f#4 a4 d5 a4 e4 g#4 b4 g#4 e4 g#4 b4 g#4', 'd4 f#4 a4 f#4 d4 f#4 a4 f#4 e4 a4 c#5 a4 e4 a4 c#5 a4'),
+      bass: bars('d2 . . . . . . . e2 . . . . . . .', 'd2 . . . . . . . a1 . . . . . . .'),
+      drums: 'k - - h - - h - s - - h - - h h',
+    },
     /** The campfire at a checkpoint, and the game-over panel: a calm loop. */
     camp: {
       lead: bars('f#4 . . . a4 . . . d5 . . . . . c5 .', 'b4 . . . g4 . . . a4 . . . . . . .', 'f#4 . . . e4 . d4 . e4 . . . c4 . . .', 'd4 . . . . . . . . . . . - - - -'),
@@ -179,4 +190,4 @@ export const SONG: Song = {
 };
 
 /** The looping parts, by what the run is doing. */
-export type MusicPart = 'road' | 'ice' | 'fen' | 'wind' | 'boss' | 'rockfall' | 'camp';
+export type MusicPart = 'road' | 'ice' | 'fen' | 'wind' | 'sky' | 'boss' | 'rockfall' | 'camp';

@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { SKY_GAPS } from '../game/course';
 import { DESIGN, DESIGN_GROUND_Y, FRAME, GROUND_Y, MARGIN, VIEW } from '../scenes/layout';
 import { C, bezant, circle, gold, heartPath, hl, oval, paint, poly, seeded, shade, star6, type Ctx, type Pt } from './ink';
 
@@ -227,6 +228,88 @@ function far(scene: Phaser.Scene) {
   });
 }
 
+/** A scalloped cloud bank in page units: puffs of radius about `r` along `w` from (x, y), on a flat bottom. */
+function cloudBank(ctx: Ctx, x: number, y: number, w: number, r: number, fill: string, seed: number, lw = 3) {
+  const rand = seeded(seed);
+  const n = Math.max(2, Math.round(w / (r * 1.4)));
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  for (let i = 0; i < n; i++) {
+    const x0 = x + (w * i) / n;
+    const x1 = x + (w * (i + 1)) / n;
+    const up = r * (0.8 + rand() * 0.6);
+    ctx.bezierCurveTo(x0, y - up * 1.3, x1, y - up * 1.3, x1, y);
+  }
+  ctx.closePath();
+  ctx.fillStyle = fill;
+  ctx.fill();
+  ctx.strokeStyle = C.ink;
+  ctx.lineWidth = lw;
+  ctx.stroke();
+}
+
+/**
+ * Beyond the Keep, the far and near layers give way to banks of cloud: a far bank of pale lapis
+ * cloud and a nearer one of white, both wrapping every 960 px like the crags and trees.
+ */
+function skyLayers(scene: Phaser.Scene) {
+  paint(scene, 'far-sky', W, FAR_H, (ctx) => {
+    half(ctx);
+    const base = FAR_H * U;
+    for (const dx of [-W * U, 0, W * U]) {
+      cloudBank(ctx, -60 + dx, base, 700, 70, '#b8c6ea', 3);
+      cloudBank(ctx, 560 + dx, base, 760, 90, '#c9d2ee', 5);
+      cloudBank(ctx, 1260 + dx, base, 700, 60, '#b8c6ea', 8);
+    }
+  });
+  paint(scene, 'near-sky', W, NEAR_H, (ctx) => {
+    half(ctx);
+    const base = NEAR_H * U;
+    for (const dx of [-W * U, 0, W * U]) {
+      cloudBank(ctx, 40 + dx, base, 520, 46, '#f4f6ff', 11);
+      cloudBank(ctx, 900 + dx, base, 380, 40, '#ffffff', 13);
+      cloudBank(ctx, 1460 + dx, base, 300, 36, '#f4f6ff', 17);
+      hl(ctx, [[120 + dx, base - 60], [220 + dx, base - 74]], 3);
+    }
+  });
+}
+
+/** How far a cloud's art reaches below its top, in screen pixels. */
+export const CLOUD_DEPTH = 26;
+/** How far down a cloud's texture its walking top is. */
+export const CLOUD_TOP = 14;
+
+/**
+ * The clouds that float over the Sky Road's gaps, one for each width a gap's cloud can be (the gap
+ * less a margin each side): a white scalloped top with a flat lapis-shadowed base.
+ */
+function clouds(scene: Phaser.Scene) {
+  for (const gap of SKY_GAPS) {
+    const width = gap - 120;
+    paint(scene, `cloud-${width}`, width, CLOUD_DEPTH + 14, (ctx) => {
+      half(ctx);
+      const w = width * U;
+      const top = 14 * U;
+      const bottom = (CLOUD_DEPTH + 14) * U - 4;
+      // The base of the cloud, under its walking top.
+      const rand = seeded(width);
+      ctx.beginPath();
+      ctx.moveTo(4, top);
+      ctx.lineTo(w - 4, top);
+      for (let x = w - 4; x > 4; x -= 40) ctx.quadraticCurveTo(x - 20, bottom + 4 - rand() * 14, x - 40 < 4 ? 4 : x - 40, bottom - 10);
+      ctx.closePath();
+      ctx.fillStyle = '#dfe6fb';
+      ctx.fill();
+      ctx.strokeStyle = C.ink;
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      // Puffs along the top, which the knight runs on.
+      cloudBank(ctx, 0, top + 8, w, 18, '#ffffff', width + 1, 3);
+      hl(ctx, [[20, top - 8], [w * 0.35, top - 12]], 2.5);
+    });
+  }
+}
+
 /** Height of the near layer, in screen pixels; its bottom is the road. */
 const NEAR_H = 140;
 
@@ -294,7 +377,8 @@ const GROUNDS = {
   'ground-ice': { blade: '#e9eefb', turf: '#b9c9e8', lean: 0, flowers: ['#ffffff'], puddles: false, ice: true },
   'ground-marsh': { blade: '#3e5a2c', turf: '#7a7442', lean: 0, flowers: [C.goldLight], puddles: true, ice: false },
   'ground-wind': { blade: C.leaf, turf: C.turf, lean: -7, flowers: ['#ffffff', C.goldLight], puddles: false, ice: false },
-};
+  'ground-sky': { blade: '#ffffff', turf: '#e4eafc', lean: 0, flowers: ['#ffffff'], puddles: false, ice: false, cloud: true },
+} as Record<string, { blade: string; turf: string; lean: number; flowers: string[]; puddles: boolean; ice: boolean; cloud?: boolean }>;
 
 function ground(scene: Phaser.Scene) {
   const w = 63;
@@ -303,9 +387,36 @@ function ground(scene: Phaser.Scene) {
     paint(scene, key, w, h, (ctx) => {
       half(ctx);
       const top = GROUND_TOP * U;
-      // Grass blades (or reeds, or frosted blades) over the top edge, then the band, inked only
-      // along its top and bottom.
+      // Grass blades (or reeds, or frosted blades, or the Sky Road's puffs) over the top edge, then
+      // the band, inked only along its top and bottom.
       ctx.fillStyle = look.blade;
+      if (look.cloud) {
+        // A flat-topped band of cloud (a gap's art covers it whole), scalloped along its top edge
+        // and puffed inside, with a lapis shadow along its bottom.
+        ctx.fillStyle = look.turf;
+        ctx.fillRect(0, top - 4, w * U, 30);
+        ctx.fillStyle = '#c9d2ee';
+        ctx.fillRect(0, top + 17, w * U, 8);
+        for (let x = 0; x < w * U; x += 42) {
+          ctx.beginPath();
+          ctx.arc(x + 21, top - 4, 21, 0, Math.PI);
+          ctx.fillStyle = '#ffffff';
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(43,27,18,0.45)';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        }
+        ctx.strokeStyle = C.ink;
+        ctx.lineWidth = 3;
+        for (const y of [top - 4, top + 25]) {
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(w * U, y);
+          ctx.stroke();
+        }
+        hl(ctx, [[0, top], [w * U, top]], 2);
+        return;
+      }
       for (let x = 0; x < w * U; x += 9) {
         const tall = look.puddles && x % 27 === 0 ? 8 : 0;
         ctx.beginPath();
@@ -388,6 +499,34 @@ function spikes(scene: Phaser.Scene) {
 
 /** Depth of a pit's art below the road, cut through the turf into the page. */
 export const PIT_DEPTH = 64;
+
+/** A gap in the Sky Road's clouds, for each width one can be: the lapis sky far below, with wisps, between ragged cloud lips. */
+function skyGaps(scene: Phaser.Scene) {
+  for (const width of SKY_GAPS) {
+    paint(scene, `pit-${width}`, width, PIT_DEPTH, (ctx) => {
+      half(ctx);
+      const w = width * U;
+      const h = PIT_DEPTH * U;
+      const g = ctx.createLinearGradient(0, 0, 0, h);
+      g.addColorStop(0, '#6f86c8');
+      g.addColorStop(1, C.lapisDeep);
+      poly(ctx, [[10, 0], [w - 10, 0], [w - 30, h - 4], [30, h - 4]], g, 3);
+      ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+      ctx.lineWidth = 2.5;
+      for (const [x, y, len] of [[60, 50, 90], [w * 0.5, 80, 120], [w - 160, 40, 70], [120, 104, 60]] as const) {
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + len, y);
+        ctx.stroke();
+      }
+      star6(ctx, w * 0.3, 70, 7);
+      star6(ctx, w * 0.72, 100, 6);
+      // The cloud lips either side of the gap.
+      cloudBank(ctx, -6, 34, 46, 14, '#ffffff', width + 3, 2.5);
+      cloudBank(ctx, w - 40, 34, 46, 14, '#ffffff', width + 4, 2.5);
+    });
+  }
+}
 
 /** A pit: a hole cut through the turf, with stakes at its bottom, for each width a pit can be. */
 function pits(scene: Phaser.Scene) {
@@ -691,6 +830,9 @@ export function bakeScenery(scene: Phaser.Scene) {
   ground(scene);
   spikes(scene);
   pits(scene);
+  skyGaps(scene);
+  skyLayers(scene);
+  clouds(scene);
   blade(scene);
   flames(scene);
   ledge(scene);

@@ -1,6 +1,7 @@
 import { BOSS } from './boss';
 import {
   AWAKE,
+  CLOUD,
   DARE,
   DRAGON_AT,
   FLAMES,
@@ -29,7 +30,8 @@ import {
 // stage's middle (not on the High Road). New kinds join on later stages, and obstacles come closer
 // together: closer still on the High Road, which also has more foes and more coins, and further
 // apart on the Low Road. Every fifth stage is the Gatekeeper's instead, and the first stage past
-// 1500 m the dragon's: a clear road with the boss waiting on it. Every seventh stage a rockfall
+// 1500 m the dragon's: a clear road with the boss waiting on it. Past the dragon the ordinary stages
+// run on the Sky Road, with gaps in the clouds crossed on falling clouds. Every seventh stage a rockfall
 // rolls in behind the knight. Every random pick goes through `rand` (Math.random, or the daily
 // course's seed) so a seeded run repeats (the shrine, the bosses, the roads' extra coins, the dare
 // and the rockfall take no random draws). A daily stage reseeds from the date and the stage, so
@@ -41,16 +43,17 @@ const CLEAR_BEFORE_CHECKPOINT = 420;
 const RUNNER_BACK = 14;
 
 /** One obstacle on the course: a trap, a foe, or a ledge or flight of steps to climb. */
-export type Piece = Exclude<TrapKind, 'barrel' | 'axe' | 'fire' | 'tail'> | 'ledge' | 'steps';
+export type Piece = Exclude<TrapKind, 'barrel' | 'axe' | 'fire' | 'tail'> | 'ledge' | 'steps' | 'cloud';
 
 /**
  * What can turn up on a stage. Spikes come up most often; fire vents and bats join on stage 2, steps
- * on stage 3. The High Road adds another goblin and bat to the pool.
+ * on stage 3. The High Road adds another goblin and bat to the pool. The Sky Road beyond the Keep
+ * has no stone ledges, pits or fire vents: its gaps in the clouds are crossed on falling clouds.
  */
-export function piecesOf(stage: number, road: Road | null = null): Piece[] {
-  const pool: Piece[] = ['spikes', 'spikes', 'blade', 'pit', 'goblin', 'ledge'];
-  if (stage >= 2) pool.push('flames', 'bat');
-  if (stage >= 3) pool.push('steps', 'goblin');
+export function piecesOf(stage: number, road: Road | null = null, sky = false): Piece[] {
+  const pool: Piece[] = sky ? ['spikes', 'spikes', 'blade', 'goblin', 'bat', 'bat', 'cloud', 'cloud'] : ['spikes', 'spikes', 'blade', 'pit', 'goblin', 'ledge'];
+  if (stage >= 2 && !sky) pool.push('flames', 'bat');
+  if (stage >= 3 && !sky) pool.push('steps', 'goblin');
   if (road === 'high') pool.push('goblin', 'bat');
   return pool;
 }
@@ -77,6 +80,9 @@ const GOBLIN = { w: 24, beat: 160, speed: (stage: number) => Math.min(100, 50 + 
 const BAT = { w: 34, h: 34, speed: (stage: number) => Math.min(160, 80 + 15 * stage) };
 /** Ledge heights: a low step, and a tall one from stage 3. */
 const LEDGE_H = { low: 48, high: 80 };
+/** The Sky Road's gaps in the clouds (each width has a baked `pit-<w>`), and how far in from each edge the cloud over one floats. */
+export const SKY_GAPS = [560, 620, 680];
+const CLOUD_INSET = 60;
 
 interface Plan {
   /** Course length the piece takes up from where it starts. */
@@ -159,6 +165,20 @@ function planOf(s: GameState, piece: Piece): Plan {
         },
       };
     }
+    case 'cloud': {
+      // A gap in the clouds too wide for one jump (but not for one carried by a gust), and a cloud
+      // floating over it to land on and leap off
+      // before it falls away. Its coins sit along the cloud.
+      const w = SKY_GAPS[Math.floor(rand(s) * SKY_GAPS.length)];
+      return {
+        span: w,
+        place: (x) => {
+          trap('pit', x, w);
+          s.ledges.push({ id: id(), x: x + CLOUD_INSET, w: w - 2 * CLOUD_INSET, h: CLOUD.h, cloud: true });
+          for (let cx = x + CLOUD_INSET + 30; cx < x + w - CLOUD_INSET - 10; cx += 40) coin(cx, CLOUD.h + 12);
+        },
+      };
+    }
   }
 }
 
@@ -184,7 +204,7 @@ export function buildStage(s: GameState) {
   while (x < end) {
     // Nothing but spikes comes twice in a row. The opening is evenly spaced, so it always fits.
     const first = opening.shift();
-    const piece = first ?? pickOf(s, piecesOf(s.stage, s.road).filter((p) => p === 'spikes' || p !== last));
+    const piece = first ?? pickOf(s, piecesOf(s.stage, s.road, s.terrain === 'sky').filter((p) => p === 'spikes' || p !== last));
     const plan = planOf(s, piece);
     if (x + plan.span > end) break;
     plan.place(x);
@@ -222,7 +242,7 @@ function buildBossStage(s: GameState, kind: BossKind) {
 /** Starts the stage after a checkpoint, right where the last one ended. */
 export function nextStage(s: GameState) {
   s.stage += 1;
-  s.terrain = terrainOf(s.stage);
+  s.terrain = terrainOf(s.stage, s.dragonBeaten);
   s.speed = speedOf(s.stage, s.dragonBeaten);
   s.boss = null;
   s.rockfall = null;

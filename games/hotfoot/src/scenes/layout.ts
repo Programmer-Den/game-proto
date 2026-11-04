@@ -29,8 +29,8 @@ export const TAG = { x: 718, y: 43, w: 232, h: 22 };
 export const DARE_TAG = { x: 718, y: 69, w: 232, h: 20 };
 /** The stage's title, shown as it begins: its name and its rule. */
 export const STAGE_TITLE = { x: 560, y: 150 };
-/** The armoury panel's rows, by their centres' y, and the panel's size. */
-export const ARMOURY_PANEL = { w: 640, h: 440, rowY: [-80, 10, 100] };
+/** The armoury panel's rows, by their centres' y, the knights' row under them (its heading and cells by their centres), and the panel's size. */
+export const ARMOURY_PANEL = { w: 640, h: 500, rowY: [-128, -58, 12], knightsY: 70, knightX: [-205, 0, 205], knightCellY: 120 };
 /** The streak chip in the HUD. */
 export const STREAK_CHIP = { x: 565, y: 8, w: 98, h: 24 };
 /**

@@ -1,11 +1,28 @@
 import Phaser from 'phaser';
+import { KNIGHT_IDS, type KnightId } from '../game/knights';
 import { C, gold, hl, paint, poly, type Ctx, type Pt } from './ink';
+
+/** A knight's colours: the surcoat, the helm, and the plume or, for the heavy knight, a fan crest. */
+interface Look {
+  coat: string;
+  helm: string;
+  plume: string | null;
+  crest: boolean;
+}
+const LOOKS: Record<KnightId, Look> = {
+  knight: { coat: C.lapis, helm: C.silver, plume: C.verm, crest: false },
+  squire: { coat: C.leaf, helm: C.silver, plume: C.goldLight, crest: false },
+  heavy: { coat: C.madder, helm: C.iron, plume: null, crest: true },
+};
 
 // The knight as a figure from a miniature: a lapis surcoat with a gold cross (never red), mail and
 // plate in silver, a great helm with a vermilion plume, and a sword held forward. Each pose is painted
 // into its own texture. Poses are written in page units with the feet at (0, 0), scaled by `S`.
 // The standing poses are 104x100 px with the feet at (52, 94); the slide is 108x42 with the feet at
-// (66, 38). GameScene sets the origins from `KNIGHT_FEET`.
+// (66, 38). GameScene sets the origins from `KNIGHT_FEET`. Each knight of `KNIGHT_IDS` has their own
+// look (`LOOKS`): the knight in lapis with a vermilion plume, the squire in green with a gold plume,
+// and the heavy knight in madder with an iron helm and a gold fan crest; their poses are painted as
+// `<knight>-<pose>` (`knight-run0`, `squire-run0`, `heavy-run0`...).
 
 export type KnightPose = 'run0' | 'run1' | 'run2' | 'run3' | 'jump' | 'fall' | 'slide';
 
@@ -83,8 +100,8 @@ function sword(ctx: Ctx, hand: Pt, angle: number) {
 }
 
 /** The surcoat with its gold cross and belt, the helm and its plume, around the hips at (0, -52). */
-function body(ctx: Ctx) {
-  poly(ctx, [[-22, -100], [22, -100], [28, -50], [12, -44], [0, -50], [-12, -44], [-30, -50]], C.lapis, 3);
+function body(ctx: Ctx, look: Look) {
+  poly(ctx, [[-22, -100], [22, -100], [28, -50], [12, -44], [0, -50], [-12, -44], [-30, -50]], look.coat, 3);
   hl(ctx, [[-18, -96], [-24, -54]], 2);
   // The cross is gold leaf, never red.
   poly(ctx, [[-3, -92], [3, -92], [3, -82], [13, -82], [13, -76], [3, -76], [3, -58], [-3, -58], [-3, -76], [-13, -76], [-13, -82], [-3, -82]], gold(ctx, -12, -92, 12, -58), 1.5);
@@ -97,32 +114,38 @@ function body(ctx: Ctx) {
   ctx.quadraticCurveTo(24, -146, 26, -122);
   ctx.lineTo(24, -100);
   ctx.closePath();
-  ctx.fillStyle = C.silver;
+  ctx.fillStyle = look.helm;
   ctx.fill();
   ctx.strokeStyle = C.ink;
   ctx.lineWidth = 3;
   ctx.stroke();
   poly(ctx, [[4, -126], [25, -126], [25, -120], [4, -120]], C.ink, 1);
   hl(ctx, [[-16, -104], [-16, -128], [-6, -140]], 2.5);
+  if (look.crest) {
+    // The heavy knight's fan crest of gold leaf along the top of the helm.
+    poly(ctx, [[-16, -142], [-20, -162], [-8, -170], [6, -172], [18, -164], [16, -144]], gold(ctx, -20, -172, 18, -142), 2.5);
+    for (const x of [-10, 0, 10]) hl(ctx, [[x, -146], [x - 2, -164]], 1.5);
+  }
+  if (!look.plume) return;
   // The plume streams back from the crest.
   ctx.beginPath();
   ctx.moveTo(-2, -144);
   ctx.bezierCurveTo(-20, -180, -50, -172, -62, -150);
   ctx.bezierCurveTo(-40, -160, -22, -152, 4, -140);
-  ctx.fillStyle = C.verm;
+  ctx.fillStyle = look.plume;
   ctx.fill();
   ctx.strokeStyle = C.ink;
   ctx.lineWidth = 2.5;
   ctx.stroke();
 }
 
-function standing(ctx: Ctx, p: Pose) {
+function standing(ctx: Ctx, p: Pose, look: Look) {
   leg(ctx, p.back, false);
   arm(ctx, [-16, -94 + p.bob], [p.hand[0], p.hand[1] + p.bob], false);
   leg(ctx, p.front, true);
   ctx.save();
   ctx.translate(0, p.bob);
-  body(ctx);
+  body(ctx, look);
   ctx.restore();
   const grip: Pt = [p.grip[0], p.grip[1] + p.bob];
   sword(ctx, grip, p.sword);
@@ -130,7 +153,7 @@ function standing(ctx: Ctx, p: Pose) {
 }
 
 /** Feet first along the road, leaning far back, the sword still held forward. */
-function sliding(ctx: Ctx) {
+function sliding(ctx: Ctx, look: Look) {
   const hip: Pt = [0, -18];
   const lean = -1.15;
   leg(ctx, [[-4, -20], [26, -18], [54, -14]], false);
@@ -139,7 +162,7 @@ function sliding(ctx: Ctx) {
   ctx.rotate(lean);
   ctx.translate(0, 52);
   arm(ctx, [-16, -94], [-30, -60], false);
-  body(ctx);
+  body(ctx, look);
   ctx.restore();
   leg(ctx, [[2, -16], [32, -12], [62, -8]], true);
   const sh: Pt = [hip[0] + 18 * Math.cos(lean) + 42 * Math.sin(lean), hip[1] + 18 * Math.sin(lean) - 42 * Math.cos(lean)];
@@ -150,16 +173,19 @@ function sliding(ctx: Ctx) {
 
 export function bakeKnight(scene: Phaser.Scene) {
   const { stand, slide } = KNIGHT_FEET;
-  for (const pose of Object.keys(POSES) as Exclude<KnightPose, 'slide'>[]) {
-    paint(scene, `knight-${pose}`, stand.w, stand.h, (ctx) => {
-      ctx.translate(stand.x, stand.y);
+  for (const id of KNIGHT_IDS) {
+    const look = LOOKS[id];
+    for (const pose of Object.keys(POSES) as Exclude<KnightPose, 'slide'>[]) {
+      paint(scene, `${id}-${pose}`, stand.w, stand.h, (ctx) => {
+        ctx.translate(stand.x, stand.y);
+        ctx.scale(S, S);
+        standing(ctx, POSES[pose], look);
+      });
+    }
+    paint(scene, `${id}-slide`, slide.w, slide.h, (ctx) => {
+      ctx.translate(slide.x, slide.y);
       ctx.scale(S, S);
-      standing(ctx, POSES[pose]);
+      sliding(ctx, look);
     });
   }
-  paint(scene, 'knight-slide', slide.w, slide.h, (ctx) => {
-    ctx.translate(slide.x, slide.y);
-    ctx.scale(S, S);
-    sliding(ctx);
-  });
 }

@@ -10,13 +10,16 @@ import { bakePanel } from '../art/hud';
 import { armouryIcon } from '../art/icons';
 import { C, N, tileAt } from '../art/ink';
 import { KNIGHT_FEET, type KnightPose } from '../art/knight';
-import { FAR_H, GROUND_TOP, NEAR_H } from '../art/scenery';
+import { CLOUD_DEPTH, CLOUD_TOP, FAR_H, GROUND_TOP, NEAR_H } from '../art/scenery';
 import { ARMOURY, ARMOURY_IDS, nextPrice, type ArmouryId } from '../game/armoury';
 import { MISSILES, bossOf, bossStands } from '../game/boss';
 import { BOONS, forSale, type BoonId } from '../game/boons';
+import { SKY_GAPS } from '../game/course';
+import { ghostAt, ghostOf, record, type Ghost } from '../game/ghost';
+import { KNIGHTS, KNIGHT_IDS, type KnightId } from '../game/knights';
 import { PAIRS, pairsOf } from '../game/pairs';
-import { loadProgress, saveProgress, type Progress } from '../game/save';
-import { buyArmoury, buyMissed, jump, newRun, pick, pickRoad, slide, tick } from '../game/sim';
+import { loadGhosts, loadProgress, saveGhosts, saveProgress, type Progress } from '../game/save';
+import { buyArmoury, buyKnight, buyMissed, jump, newRun, pick, pickRoad, slide, tick } from '../game/sim';
 import {
   BOON_PRICE,
   LEAD_IN,
@@ -29,6 +32,7 @@ import {
   DARE_TEXT,
   flameOf,
   floorAt,
+  gustOf,
   metres,
   stats,
   streakMax,
@@ -74,6 +78,9 @@ const dayName = (date: string) => {
   return formatDate(new Date(y, m - 1, d), { day: 'numeric', month: 'short' });
 };
 
+/** The ghost runner's look: how faint it is, and its pale tint. */
+const GHOST_LOOK = { alpha: 0.5, tint: 0x8fa8ff };
+
 /** The words over the road of a pop, a shrine's heart or a shrine's refusal. */
 const wordsOf = (e: Effect) => (e.kind === 'heal' ? t('healPop') : e.text ? t(e.text, { n: e.n ?? 0 }) : '');
 
@@ -103,6 +110,8 @@ export class GameScene extends Phaser.Scene {
   private traps = new Map<number, Phaser.GameObjects.Image>();
   private coins = new Map<number, Phaser.GameObjects.Image>();
   private ledges = new Map<number, Phaser.GameObjects.TileSprite>();
+  /** The Sky Road's clouds over its gaps, by ledge id. */
+  private clouds = new Map<number, Phaser.GameObjects.Image>();
   private shrines = new Map<number, ShrineArt>();
   /** Words over the road: coin pops, a shrine's heart and its refusals, by effect id. */
   private words = new Map<number, Phaser.GameObjects.Text>();
@@ -112,6 +121,13 @@ export class GameScene extends Phaser.Scene {
   private near!: Phaser.GameObjects.TileSprite;
   private ground!: Phaser.GameObjects.TileSprite;
   private knight!: Phaser.GameObjects.Image;
+  /** The ghost of this knight's best run, racing beside them. */
+  private ghost!: Phaser.GameObjects.Image;
+  /** Each knight's ghost, as saved, and the samples of the run under way. */
+  private ghosts: Partial<Record<KnightId, Ghost>> = {};
+  private samples: number[] = [];
+  /** Whether the run just ended left a new ghost. */
+  private ghostSaved = false;
   private flag!: Phaser.GameObjects.Image;
   private fx!: Phaser.GameObjects.Graphics;
   /** Points along the course the knight passed on a streak, newest first, for the sparkle trail. */
@@ -154,6 +170,7 @@ export class GameScene extends Phaser.Scene {
   private armouryPanel!: Phaser.GameObjects.Container;
   private armouryBank!: Phaser.GameObjects.Text;
   private armouryRows: { id: ArmouryId; level: Phaser.GameObjects.Text; buy: Phaser.GameObjects.Container; full: Phaser.GameObjects.Text }[] = [];
+  private knightCells: { id: KnightId; best: Phaser.GameObjects.Text; button: Phaser.GameObjects.Container; riding: Phaser.GameObjects.Text }[] = [];
   /** What is saved between runs; the run's own numbers are copied into it by `persist`. */
   private progress!: Progress;
   /** Plays the run's sounds and music from what changed in it each frame. */
@@ -169,9 +186,12 @@ export class GameScene extends Phaser.Scene {
     this.traps.clear();
     this.coins.clear();
     this.ledges.clear();
+    this.clouds.clear();
     this.shrines.clear();
     this.words.clear();
     this.progress = loadProgress();
+    this.ghosts = loadGhosts();
+    this.samples = [];
     this.state = this.freshRun(null);
     this.persist();
     this.cues.reset(this.state);
@@ -187,6 +207,7 @@ export class GameScene extends Phaser.Scene {
     this.rocks = BOULDERS.map((b) => this.add.image(0, GROUND_Y + 2 - (ROCK.r * b.scale) / 1, 'boulder').setScale(b.scale).setDepth(4.3).setVisible(false));
     this.weather = this.add.graphics().setDepth(4.4);
     this.add.image(0, 0, 'frame').setOrigin(0).setDepth(4.5);
+    this.ghost = this.add.image(RUNNER_X, GROUND_Y, 'knight-run0').setDepth(4.9).setAlpha(GHOST_LOOK.alpha).setTint(GHOST_LOOK.tint).setVisible(false);
     this.knight = this.add.image(RUNNER_X, GROUND_Y, 'knight-run0').setDepth(5);
     this.fx = this.add.graphics().setDepth(6);
     this.caption = this.add
@@ -238,6 +259,8 @@ export class GameScene extends Phaser.Scene {
     tick(s, dt);
     checkTrophies(s);
     this.clock += dt;
+    if (!s.daily) record(this.samples, s);
+    if (s.phase !== phase && s.phase === 'over') this.keepGhost();
     if (s.phase !== phase && s.phase !== 'running') this.persist();
     this.cues.update(s);
 
@@ -246,6 +269,7 @@ export class GameScene extends Phaser.Scene {
     this.drawRocks();
     this.drawWeather();
     this.drawKnight();
+    this.drawGhost();
     this.drawEffects();
     this.drawHud();
     this.drawCaption();
@@ -255,19 +279,44 @@ export class GameScene extends Phaser.Scene {
     else this.armouryPanel.setVisible(false);
   }
 
-  /** A new run, ordinary or the daily course of `daily`, carrying over the bank, the bought boon and the armoury. */
+  /**
+   * A new run, ordinary or the daily course of `daily`, carrying over the bank, the bought boon and
+   * the armoury, with the knight chosen in the armoury chasing their own best (a daily course is
+   * always the knight's).
+   */
   private freshRun(daily: string | null) {
     const p = this.progress;
-    const best = daily ? (p.daily?.date === daily ? p.daily.best : 0) : p.best;
-    return newRun({ best, bank: p.bank, pending: p.pending, armoury: p.armoury, crown: p.crown }, daily);
+    const knight = daily ? 'knight' : p.knights.ride;
+    const best = daily ? (p.daily?.date === daily ? p.daily.best : 0) : this.bestOf(knight);
+    this.samples = [];
+    this.ghostSaved = false;
+    return newRun({ best, bank: p.bank, pending: p.pending, armoury: p.armoury, crown: p.crown, knight, knights: p.knights.unlocked }, daily);
   }
 
-  /** Copies the run's lasting numbers into the progress and saves it; a daily run keeps its own best. */
+  /** A knight's best ordinary run, in metres. */
+  private bestOf(knight: KnightId) {
+    return knight === 'knight' ? this.progress.best : (this.progress.knights.best[knight] ?? 0);
+  }
+
+  /** At a fall, keeps the run as the knight's ghost if it went further than the ghost there was (not on a daily course). */
+  private keepGhost() {
+    const s = this.state;
+    if (s.daily) return;
+    const ghost = ghostOf(this.samples, s, this.ghosts[s.knight] ?? null);
+    if (!ghost) return;
+    this.ghosts[s.knight] = ghost;
+    this.ghostSaved = true;
+    saveGhosts(this.ghosts);
+  }
+
+  /** Copies the run's lasting numbers into the progress and saves it; a daily run keeps its own best, and each knight theirs. */
   private persist() {
     const s = this.state;
     const p = this.progress;
     if (s.daily) p.daily = { date: s.daily, best: s.best };
-    else p.best = s.best;
+    else if (s.knight === 'knight') p.best = s.best;
+    else p.knights.best[s.knight] = s.best;
+    p.knights.unlocked = [...s.knights];
     p.bank = s.bank;
     p.pending = s.pending;
     p.armoury = { ...s.armoury };
@@ -286,7 +335,11 @@ export class GameScene extends Phaser.Scene {
       s.bosses ? t('gatesBeaten', { n: s.bosses }) : '',
       s.dragonBeaten ? t('dragonDown') : '',
     ];
-    const best = [s.daily ? t('bestDaily', { date: dayName(s.daily), n: s.best }) : t('bestRun', { n: s.best }), s.crown ? t('crowned') : ''];
+    const best = [
+      s.daily ? t('bestDaily', { date: dayName(s.daily), n: s.best }) : s.knight === 'knight' ? t('bestRun', { n: s.best }) : t('bestKnight', { knight: t(KNIGHTS[s.knight].name), n: s.best }),
+      this.ghostSaved ? t('ghostSaved') : '',
+      s.crown ? t('crowned') : '',
+    ];
     const join = (parts: string[]) => parts.filter(Boolean).join(' ');
     this.gameOverText.setText(
       `${join(fell)}\n${join(best)}\n\n` + `${t('boons', { boons: boons.length ? boons.join(', ') : t('boonsNone') })}${pairs.length ? ` (${pairs.join(', ')})` : ''}${missed}`,
@@ -316,6 +369,10 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     const groundKey = s.terrain === 'road' ? 'ground' : `ground-${s.terrain}`;
     if (this.ground.texture.key !== groundKey) this.ground.setTexture(groundKey);
+    // Beyond the Keep the crags and trees give way to banks of cloud.
+    const sky = s.terrain === 'sky' ? '-sky' : '';
+    if (this.far.texture.key !== `far${sky}`) this.far.setTexture(`far${sky}`);
+    if (this.near.texture.key !== `near${sky}`) this.near.setTexture(`near${sky}`);
     tileAt(this.far, s.distance * 0.15);
     tileAt(this.near, s.distance * 0.4);
     tileAt(this.ground, s.distance);
@@ -325,6 +382,10 @@ export class GameScene extends Phaser.Scene {
     const sides = this.ledgeSides.clear();
     for (const l of s.ledges) {
       seen.add(l.id);
+      if (l.cloud) {
+        this.drawCloud(l);
+        continue;
+      }
       let sprite = this.ledges.get(l.id);
       if (!sprite) {
         // The wall reaches a little below the road's top so it sits on the road.
@@ -351,6 +412,11 @@ export class GameScene extends Phaser.Scene {
       if (seen.has(id)) continue;
       sprite.destroy();
       this.ledges.delete(id);
+    }
+    for (const [id, cloud] of this.clouds) {
+      if (seen.has(id)) continue;
+      cloud.destroy();
+      this.clouds.delete(id);
     }
 
     seen.clear();
@@ -413,6 +479,17 @@ export class GameScene extends Phaser.Scene {
       sprite.destroy();
       this.coins.delete(id);
     }
+  }
+
+  /** A cloud over a gap in the Sky Road: trembling once stood on (held still with reduced motion), then falling with its ledge. */
+  private drawCloud(l: GameState['ledges'][number]) {
+    let cloud = this.clouds.get(l.id);
+    if (!cloud) {
+      cloud = this.add.image(0, 0, `cloud-${l.w}`).setOrigin(0, CLOUD_TOP / (CLOUD_TOP + CLOUD_DEPTH)).setDepth(2.5);
+      this.clouds.set(l.id, cloud);
+    }
+    const shake = l.sinkMs !== undefined && l.sinkMs > 0 && !settings.reduceMotion ? Math.sin(this.clock / 25) * 1.5 : 0;
+    cloud.setPosition(this.sx(l.x) + shake, GROUND_Y - l.h).setAlpha(l.sinkMs === 0 ? Math.max(0.3, l.h / 44) : 1);
   }
 
   /** A shrine on the road and its banderole: "Wayside shrine / Slide in: 15 coins = 1 heart". */
@@ -501,10 +578,26 @@ export class GameScene extends Phaser.Scene {
   private drawWeather() {
     const g = this.weather.clear();
     const s = this.state;
-    if (s.terrain !== 'ice' && s.terrain !== 'wind') return;
+    if (s.terrain !== 'ice' && s.terrain !== 'wind' && s.terrain !== 'sky') return;
     const t = settings.reduceMotion ? 0 : this.clock / 1000;
     const top = FRAME.y + 30;
     const height = GROUND_Y - top;
+    if (s.terrain === 'sky') {
+      // The Sky Road's gust: streaks rushing on ahead of the knight while it blows, a few faint ones as it gathers.
+      const gust = gustOf(s);
+      if (gust === 'calm') return;
+      const n = gust === 'blow' ? WEATHER.gusts + 4 : 4;
+      const alpha = gust === 'blow' ? 0.9 : 0.45;
+      for (let i = 0; i < n; i++) {
+        const len = 50 + (i % 3) * 26;
+        const x = ((((i * 197 + t * 900) % (VIEW.w + 200)) + VIEW.w + 200) % (VIEW.w + 200)) - 200;
+        const y = top + 30 + ((i * 61) % (height - 50));
+        g.lineStyle(2.5, N.ink, 0.3 * alpha).lineBetween(x, y, x + len, y);
+        g.lineStyle(1.5, 0xffffff, alpha).lineBetween(x, y, x + len, y);
+        g.lineStyle(1.5, 0xffffff, alpha).beginPath().arc(x + len, y + 5, 5, -Math.PI * 0.5, Math.PI * 0.5).strokePath();
+      }
+      return;
+    }
     if (s.terrain === 'ice') {
       for (let i = 0; i < WEATHER.flakes; i++) {
         const x = (((i * 137 + s.distance * 0.3 - t * 30) % VIEW.w) + VIEW.w) % VIEW.w;
@@ -533,7 +626,7 @@ export class GameScene extends Phaser.Scene {
     else pose = `run${Math.floor(s.distance / STRIDE_PX) % 4}` as KnightPose;
     const feet = pose === 'slide' ? KNIGHT_FEET.slide : KNIGHT_FEET.stand;
     this.knight
-      .setTexture(`knight-${pose}`)
+      .setTexture(`${s.knight}-${pose}`)
       .setOrigin(feet.x / feet.w, feet.y / feet.h)
       .setPosition(RUNNER_X, GROUND_Y - r.h)
       .setAngle(s.phase === 'over' ? -8 : 0);
@@ -542,6 +635,25 @@ export class GameScene extends Phaser.Scene {
     this.knight.setAlpha(!hurt ? 1 : settings.reduceMotion ? 0.6 : Math.floor(this.clock / 80) % 2 === 0 ? 0.35 : 1);
     if (s.phase === 'over') this.knight.setTint(0x9a8f88).setTintMode(Phaser.TintModes.MULTIPLY);
     else this.knight.clearTint();
+  }
+
+  /**
+   * The ghost of this knight's best run, faint and pale, where that run was after as long a time
+   * running. It shows on ordinary runs only, and goes once its run has ended or it is off screen.
+   */
+  private drawGhost() {
+    const s = this.state;
+    const g = this.ghosts[s.knight];
+    const at = g && !s.daily && s.phase !== 'over' ? ghostAt(g, s.time) : null;
+    const x = at ? this.sx(at.x) : 0;
+    this.ghost.setVisible(!!at && x > -60 && x < VIEW.w + 60);
+    if (!at) return;
+    const pose: KnightPose = at.slide ? 'slide' : at.air ? (at.rising ? 'jump' : 'fall') : (`run${Math.floor(at.x / STRIDE_PX) % 4}` as KnightPose);
+    const feet = pose === 'slide' ? KNIGHT_FEET.slide : KNIGHT_FEET.stand;
+    this.ghost
+      .setTexture(`${s.knight}-${pose}`)
+      .setOrigin(feet.x / feet.w, feet.y / feet.h)
+      .setPosition(x, GROUND_Y - at.h);
   }
 
   /** A gold six-pointed star, inked, for the sparkles. */
@@ -771,6 +883,10 @@ export class GameScene extends Phaser.Scene {
       const flag = [new Phaser.Math.Vector2(x, ly - 11), new Phaser.Math.Vector2(x + 10, ly - 8.5), new Phaser.Math.Vector2(x, ly - 5.5)];
       g.fillStyle(N.madder, 0.85).fillPoints(flag, true).lineStyle(0.75, N.ink).strokePoints(flag, true);
     }
+    // The ghost's marker, a pale ring where this knight's best run is now.
+    const ghost = this.ghosts[s.knight];
+    const ghostNow = ghost && !s.daily ? ghostAt(ghost, s.time) : null;
+    if (ghostNow) g.fillStyle(GHOST_LOOK.tint, 0.8).fillCircle(at(metres(ghostNow.x)), ly, 3.5).lineStyle(1, N.ink, 0.7).strokeCircle(at(metres(ghostNow.x)), ly, 3.5);
     g.fillStyle(N.lapis).fillCircle(at(tr.at), ly, 4).lineStyle(1, N.ink).strokeCircle(at(tr.at), ly, 4);
     g.fillStyle(N.goldLight).fillCircle(at(tr.at), ly, 1.5);
     const dragon = s.boss?.kind === 'dragon';
@@ -790,7 +906,7 @@ export class GameScene extends Phaser.Scene {
       }
     } else {
       const ground = s.boss ? t(dragon ? 'dragonBeatenTag' : 'gateBeatenTag') : t(TERRAIN[s.terrain].name);
-      this.tagText.setText(tag(daily, ground, s.rockfall && !s.boss ? t('rockfall') : '', s.road ? t(ROADS[s.road].short) : ''));
+      this.tagText.setText(tag(daily, ground, s.rockfall && !s.boss ? t('rockfall') : '', s.road ? t(ROADS[s.road].short) : '', gustOf(s) === 'blow' ? t('gustTag') : ''));
     }
     this.trackBest.setText(tr.best === 0 ? t('trackFirst') : tr.at > tr.best ? t('trackNewBest') : t('best', { n: tr.best }));
 
@@ -871,13 +987,15 @@ export class GameScene extends Phaser.Scene {
       else if (thrown?.kind === 'axe') line = t('captionGateAxe');
       else line = t('captionGateChase');
     } else if (s.rockfall && s.rockfall.x > s.distance - RUNNER.w / 2 - 110) line = t('captionRockfall');
+    else if (gustOf(s) === 'blow') line = t('captionGust');
     else {
       const ahead = (x: number) => x > s.distance && x < s.distance + 700;
       const trap = s.traps.find((t) => t.x + t.w > s.distance - 20 && t.x < s.distance + 700);
-      const wall = s.ledges.find((l) => ahead(l.x));
+      const wall = s.ledges.find((l) => !l.cloud && ahead(l.x));
       const shrine = s.shrines.find((sh) => !sh.used && ahead(sh.x));
       const next = [
-        trap && { x: trap.x, kind: trap.kind as string },
+        // A gap in the clouds is crossed on its cloud.
+        trap && { x: trap.x, kind: trap.kind === 'pit' && trap.w >= SKY_GAPS[0] ? 'cloud' : (trap.kind as string) },
         wall && { x: wall.x, kind: 'wall' },
         shrine && { x: shrine.x, kind: 'shrine' },
       ]
@@ -891,6 +1009,7 @@ export class GameScene extends Phaser.Scene {
         goblin: 'captionGoblin',
         bat: 'captionBat',
         wall: 'captionWall',
+        cloud: 'captionCloud',
         shrine: 'captionShrine',
         barrel: 'captionBarrel',
         axe: 'captionAxe',
@@ -902,6 +1021,7 @@ export class GameScene extends Phaser.Scene {
         ice: 'captionIce',
         marsh: 'captionMarsh',
         wind: 'captionWind',
+        sky: 'captionSky',
       };
       line = t(next ? lines[next.kind] : s.boss ? (s.boss.kind === 'dragon' ? 'captionPastDragon' : 'captionPastGate') : onward[s.terrain]);
     }
@@ -998,8 +1118,8 @@ export class GameScene extends Phaser.Scene {
     const cy = VIEW.h / 2;
     const dim = this.add.rectangle(cx, cy, VIEW.w, VIEW.h, N.ink, 0.4).setInteractive();
     const panel = this.add.image(cx, cy, 'armoury-panel');
-    const title = this.add.text(cx, cy - h / 2 + 42, t('armouryTitle'), { fontFamily: FONT, fontSize: '28px', fontStyle: 'bold', color: C.madder }).setOrigin(0.5);
-    this.armouryBank = this.add.text(cx, cy - h / 2 + 76, '', { fontFamily: FONT, fontSize: '15px', fontStyle: 'italic', color: C.lapis }).setOrigin(0.5);
+    const title = this.add.text(cx, cy - h / 2 + 36, t('armouryTitle'), { fontFamily: FONT, fontSize: '28px', fontStyle: 'bold', color: C.madder }).setOrigin(0.5);
+    this.armouryBank = this.add.text(cx, cy - h / 2 + 68, '', { fontFamily: FONT, fontSize: '15px', fontStyle: 'italic', color: C.lapis }).setOrigin(0.5);
     const parts: Phaser.GameObjects.GameObject[] = [dim, panel, title, this.armouryBank];
     ARMOURY_IDS.forEach((id, i) => {
       const y = cy + rowY[i];
@@ -1013,7 +1133,27 @@ export class GameScene extends Phaser.Scene {
       parts.push(icon, name, text, level, buy, full);
       this.armouryRows.push({ id, level, buy, full });
     });
-    const back = makeButton(this, cx, cy + h / 2 - 44, t('back'), () => {
+    // The knights: the one everyone starts with, and two to unlock with banked coins and ride.
+    const { knightsY, knightX, knightCellY } = ARMOURY_PANEL;
+    const rule = this.add.graphics();
+    rule.lineStyle(1, N.gold).lineBetween(cx - w / 2 + 40, cy + knightsY, cx - 70, cy + knightsY).lineBetween(cx + 70, cy + knightsY, cx + w / 2 - 40, cy + knightsY);
+    const heading = this.add.text(cx, cy + knightsY, t('knightsTitle'), { fontFamily: FONT, fontSize: '19px', fontStyle: 'bold', color: C.madder }).setOrigin(0.5);
+    parts.push(rule, heading);
+    KNIGHT_IDS.forEach((id, i) => {
+      const x = cx + knightX[i];
+      const y = cy + knightCellY;
+      const k = KNIGHTS[id];
+      const icon = this.add.image(x - 66, y - 4, `${id}-run1`).setScale(0.62);
+      const name = this.add.text(x - 30, y - 22, t(k.name), { fontFamily: FONT, fontSize: '15px', fontStyle: 'bold', color: C.lapis }).setOrigin(0, 0.5);
+      if (name.width > 124) name.setScale(124 / name.width);
+      const text = this.add.text(x - 30, y - 12, t(k.text), { fontFamily: FONT, fontSize: '11px', color: C.ink, wordWrap: { width: 124 } }).setOrigin(0, 0);
+      const best = this.add.text(x - 30, y + 22, '', { fontFamily: FONT, fontSize: '11px', fontStyle: 'italic', color: '#2f7a4a' }).setOrigin(0, 0.5);
+      const button = makeButton(this, x, y + 50, '', () => this.chooseKnight(id), 180);
+      const riding = this.add.text(x, y + 50, t('riding'), { fontFamily: FONT, fontSize: '16px', fontStyle: 'bold italic', color: C.lapis }).setOrigin(0.5);
+      parts.push(icon, name, text, best, button, riding);
+      this.knightCells.push({ id, best, button, riding });
+    });
+    const back = makeButton(this, cx, cy + h / 2 - 30, t('back'), () => {
       ui('click');
       this.armouryPanel.setVisible(false);
     });
@@ -1035,6 +1175,32 @@ export class GameScene extends Phaser.Scene {
       const words = price === null ? '' : t('forge', { n: price });
       if (caption.text !== words) caption.setText(words);
     }
+    const ride = this.progress.knights.ride;
+    for (const cell of this.knightCells) {
+      const unlocked = s.knights.includes(cell.id);
+      const price = KNIGHTS[cell.id].price;
+      const best = this.bestOf(cell.id);
+      cell.best.setText(unlocked && best > 0 ? t('best', { n: best }) : '');
+      cell.riding.setVisible(ride === cell.id);
+      cell.button.setVisible(ride !== cell.id).setAlpha(unlocked || s.bank >= price ? 1 : 0.45);
+      const caption = cell.button.getAt(1) as Phaser.GameObjects.Text;
+      const words = unlocked ? t('ride') : t('unlock', { n: price });
+      if (caption.text !== words) caption.setText(words);
+    }
+  }
+
+  /** Unlocks a knight with banked coins, or picks an unlocked one to ride from the next run on. */
+  private chooseKnight(id: KnightId) {
+    const s = this.state;
+    if (!s.knights.includes(id) && !buyKnight(s, id)) {
+      ui('refuse');
+      return;
+    }
+    ui(s.knights.includes(id) && this.progress.knights.unlocked.includes(id) ? 'click' : 'coin');
+    this.progress.knights.ride = id;
+    this.persist();
+    this.drawGameOver();
+    this.drawArmoury();
   }
 
   private openArmoury() {
@@ -1062,7 +1228,7 @@ export class GameScene extends Phaser.Scene {
     sfx('again');
     this.cues.reset(this.state);
     this.armouryPanel.setVisible(false);
-    for (const sprite of [...this.traps.values(), ...this.coins.values(), ...this.ledges.values(), ...this.words.values()]) sprite.destroy();
+    for (const sprite of [...this.traps.values(), ...this.coins.values(), ...this.ledges.values(), ...this.clouds.values(), ...this.words.values()]) sprite.destroy();
     for (const art of this.shrines.values()) {
       art.image.destroy();
       art.label.destroy();
@@ -1070,6 +1236,7 @@ export class GameScene extends Phaser.Scene {
     this.traps.clear();
     this.coins.clear();
     this.ledges.clear();
+    this.clouds.clear();
     this.shrines.clear();
     this.words.clear();
     this.trail.length = 0;
