@@ -102,3 +102,9 @@ export const LIVE = {
   tiredTrack: 0xead9ad,
   snow: 0xffffff,
 };
+
+/** The garden card's dots: each bed's flower, and the link between two beds that give a rare honey. */
+export const GARDEN_LIVE = {
+  bloom: { clover: 0xf2a226, lavender: 0xa982d6, heather: 0xd9739e, sunflower: 0xf5c518 },
+  rare: { blossom: 0xf08cc0, sunburst: 0xffb020, mountain: 0x7a5cc8 },
+};
