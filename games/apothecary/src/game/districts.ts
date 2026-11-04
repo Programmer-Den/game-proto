@@ -82,5 +82,16 @@ export function districtAsks(district: DistrictState): Need[] {
 /** Whether a district has grown as far as it can: every home built at the last tier. */
 export const districtFull = (d: DistrictState) => d.homes >= MAX_HOMES && d.tier >= HOME_TIERS.length - 1;
 
+/**
+ * The towns down the road (AP15): once a town is a city, the next is founded with fresh districts.
+ * The first town has no name of its own; later ones go round `NEXT_TOWNS`. Each later town's homes
+ * pay `CITY_PAY` more per city made, and take one more happy round per city to grow (up to three).
+ */
+export const NEXT_TOWNS: TextKey[] = ['marshgate', 'highcrag', 'saltmere'];
+export const CITY_PAY = 0.25;
+export const townName = (cities: number): TextKey | null => (cities === 0 ? null : NEXT_TOWNS[(cities - 1) % NEXT_TOWNS.length]);
+export const cityPay = (cities: number) => 1 + CITY_PAY * cities;
+export const growRounds = (cities: number) => GROW_ROUNDS + Math.min(3, cities);
+
 /** The town's second ending: every district grown as far as it can, and the town is a city. */
 export const townIsCity = (districts: DistrictState[]) => districts.every(districtFull);

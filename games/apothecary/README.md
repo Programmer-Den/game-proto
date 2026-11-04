@@ -316,6 +316,20 @@ between the wagon and the counter.
 
 ![The merchant wagon wanting a crate of Shadow Elixirs](docs/screenshots/merchant-wagon.webp)
 
+**Royal requests.** On day 7 and every seventh day after, the crown's courier waits on the green
+right of the guild for three days. It asks for 4 (one more every two weeks) of up to three of the
+potions customers ask for, and pays two and a half times their price for the lot, plus reputation.
+Tap it to hand over what the shelf holds of them, plain ones first; it keeps what it got until the
+last one is in.
+
+![The royal courier waiting right of the guild, asking for Sleeping Tonics and Healing Draughts](docs/screenshots/royal-request.webp)
+
+**Master craftsmen.** Hired craftsmen grow better at a refining table or cauldron the longer they
+work it: after 10, 30 and 90 minutes of work it earns a master's star, shown under the craftsman,
+and each star makes the station work 15% faster.
+
+![A master craftsman with two stars at the refining table](docs/screenshots/master-craftsman.webp)
+
 The **guild** in the market below the second line sells upgrades for the rest of the apothecary:
 growth makes every garden grow a quarter faster per level (20, then 40 coins), pixies fly half again
 as fast per level, carrying more goods a second (30, then 60), storage lets every pallet and shelf
@@ -540,6 +554,14 @@ Once every district is full of castles, the town map says the town has become a 
 game's second ending, after the cure of the plague.
 
 ![Every district full of castles](docs/screenshots/city.webp)
+
+**The next town.** Once the town is a city, the heading over its districts offers the road to the
+next town: tap it to found Marshgate, then Highcrag and Saltmere. The shops stay; the districts
+start over from three cottages in Market Row, and the city made earns a town seal (every potion's
+price goes up). Each later town's homes pay a quarter more per city made, and take one more happy
+round per city (up to three) to grow.
+
+![Marshgate founded: its districts start over](docs/screenshots/next-town.webp)
 
 ![The town map with the apothecary and the bakery](docs/screenshots/town-map.webp)
 

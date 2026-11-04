@@ -570,6 +570,8 @@ export interface TownState {
   hands: Held[];
   /** The households of each of `DISTRICTS`, in order. */
   districts: DistrictState[];
+  /** Towns grown into cities and left behind for the next (AP15): 0 in the first town. Missing in older saves. */
+  cities?: number;
 }
 
 export const createTown = (): TownState => ({ shops: {}, hands: [], districts: createDistricts() });
@@ -614,7 +616,7 @@ export function createShop(id: ShopId): ShopState {
  */
 export function normalizeTown(saved: Partial<TownState> | undefined): TownState {
   const districts = createDistricts().map((d, i) => ({ ...d, ...saved?.districts?.[i] }));
-  const town: TownState = { shops: {}, hands: saved?.hands ?? [], districts };
+  const town: TownState = { shops: {}, hands: saved?.hands ?? [], districts, cities: Math.max(0, Math.floor(Number(saved?.cities) || 0)) };
   for (const id of SHOP_IDS) {
     const shop = saved?.shops?.[id];
     if (!shop) continue;

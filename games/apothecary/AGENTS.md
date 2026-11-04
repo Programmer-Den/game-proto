@@ -36,6 +36,8 @@ study, shade gardens and a mirrored second production line.
   merchant wagon across the street on wagon days; the herb market below the outfitter; an
   overstock cut that starts past 5 of a potion on its shelf; cauldrons that brew what the shop is
   shortest of, and gardens that grow at close to the same pace.
+- Round four (AP15 to AP17): the next town once the town is a city, royal requests from day 7,
+  and master craftsmen (see their entries under "How it runs").
 - The town (the first of a planned series of PRs): once `state.seals > 0` (`townOpen`) a Town
   button left of Recipes opens the `Town` scene, a map of lot cards: the apothecary and one per shop
   in `SHOPS`. A shop costs `shopCost` (1,000 for the bakery, then ten times more each `tier`) and is
@@ -540,6 +542,26 @@ study, shade gardens and a mirrored second production line.
   (out of the doctor's reach, a tappable image that stops propagation) while `wagonHere`; a tap
   calls `sellToWagon`, which takes a full crate off the shelf, plain first, for `crate * pay` coins
   into the purse. The scenery leaves trees off the street's right for it.
+- Royal requests (AP17, `RoyalRequest`, `ROYAL_*`, `isRoyalDay`, `royalFor`, `royalHere` in
+  `state.ts`): `tick` sets `state.royal = royalFor(state, day)` on each `isRoyalDay` (day 7, then
+  every 7th). It asks for `ROYAL_NEED` (+1 per 14 days) of up to three distinct `orderable` potions,
+  picked by the day, and waits to dusk of `until` (`ROYAL_DAYS` 3 days). `createRoyal` draws the
+  wagon texture tinted purple at `ROYAL` (on the green right of the guild yard, clear of its
+  markers), with the reward, each potion's `made/need` and the days left; a tap calls
+  `deliverToRoyal`, which takes what the shelf holds of each (plain first) and, once every want is
+  met, pays `reward` (`ROYAL_PREMIUM` 2.5 times their prices) and `ROYAL_REPUTATION` and sets `done`.
+  No randomness.
+- Master craftsmen (AP16, `MASTERY_MS`, `MASTERY_SPEED`, `masteryLevel`, `masterySpeed`):
+  `state.mastery[id]` adds `dt` while a refining table or cauldron with hired craftsmen has work in
+  hand (also while away, through `tick`); each of `MASTERY_MS` (10, 30, 90 min) reached is a level,
+  and `masterySpeed` (1 + 0.15 per level, only with craftsmen hired) multiplies its work speed.
+  `addCraftsmen` shows "Master ★★" under the first craftsman.
+- The next town (AP15, `NEXT_TOWNS`, `CITY_PAY`, `townName`, `cityPay`, `growRounds` in
+  `districts.ts`, `foundNextTown` in `townSim.ts`): once `townIsCity`, the town map's districts
+  heading reads "Tap here to found {town}" and a tap calls `foundNextTown`: `town.cities++`, fresh
+  `createDistricts()`, `seals++`. Homes in later towns pay `cityPay` (1 + 0.25 per city) on every
+  need supplied, and need `growRounds` (`GROW_ROUNDS` + cities, at most +3) to grow or shrink. The
+  heading names the town ("Districts of Marshgate") after the first.
 - Herb market: `createHerbMarket` lays its stall, a sell marker (`pad-in`) and a buy marker
   (`pad-out`) at `HERB_MARKET`, both with `pays` so walking over them trades nothing, and a
   tappable sign that calls `cycleMarketPick`; all shown once `marketOpen` (the garden pixies
@@ -587,9 +609,10 @@ save or load, 0 in a new game), `reputation` (0 to 100), `regulars` (`face`, `wa
 (`day`, `size`, `served`, `lost`, `paid`, or null), `plague` (`stage`, `need`, `made`, `left`,
 `relapses`, `cured`, or null before day 5), `signs` (a `PriceSign` per potion, Fair when missing),
 `rival` (`open`, `day`, `potion`, `sold`, `streak`, and `dayShare` once a kept contract ended the day early),
-`seals` (town seals), `wagon` (`day`, `potion`, `crate`, `pay`, `left`, `sold`, or null) and
+`seals` (town seals), `wagon` (`day`, `potion`, `crate`, `pay`, `left`, `sold`, or null), `royal`
+(`day`, `until`, `wants`, `reward`, `done`, or null), `mastery` (ms worked per station) and
 `marketPick` (the herb market's good to buy). `town` (`TownState`) holds the shops bought, the
-doctor's hands in town and the `districts`; `loadState` fills it through `normalizeTown`, which merges each shop, station
+doctor's hands in town, the `districts` and `cities` (towns made cities, 0 when missing); `loadState` fills it through `normalizeTown`, which merges each shop, station
 and route per key and each district by index, so new shops, stations and districts load into old saves. The contract may have a `bundle` (`potion`, `need`,
 `made`); the plague may have `season` and `curedDay`, and the state `untoldCure`. Each order also has `tip`, its full tip (`maxTip`
 of its size), and may have `asked`, `face`, `regular` and `rush`. `counter.shelf` and `carrying`
@@ -768,7 +791,8 @@ Under browser automation the engine is a no-op, so the playthrough is unchanged.
 | `upgrade` | a level, craftsman, recipe, pixie route or build fully paid |
 | `toss` | a hands slot tapped (`dropItem`) |
 | `sell` / `served` | `createSound`: `state.sold` went up / an order left with nothing more to want |
-| `cascade` | the till collected, the herb market's sell marker, a crate sold to the wagon |
+| `cascade` | the till collected, the herb market's sell marker, a crate sold to the wagon, a royal request filled |
+| `upgrade` (town map) | the next town founded |
 | `hmph` | `createSound`, an order gone with wants left and no patience |
 | `missed` | `createContract`, a day ended with its contract missed |
 | `rush` | `createSound`, a market day's crowd arrives |
@@ -777,7 +801,8 @@ Under browser automation the engine is a no-op, so the playthrough is unchanged.
 
 - Shared sounds: `ui('click')` for the Recipes and Settings buttons, price signs, priority signs,
   the herb market's sign and a garden sign that replants; `ui('refuse')` for a garden sign with nothing else to plant, a tap on an order bubble
-  that hands nothing over (out of the shop or not on the shelf), a wagon tap without a full crate,
+  that hands nothing over (out of the shop or not on the shelf), a wagon tap without a full crate, a royal courier tap with none of its potions on the shelf
+  (`ui('coin')` when some were handed over),
   and a purple or herb market marker that takes nothing (no coins, nothing to trade), once a visit
   (`refusedMarker`, reset on stepping off).
 - The town's scenes play the `calm` part, and `ShopScene` the `rush` part while a market crowd is

@@ -7,12 +7,12 @@ import { SONG, sfx } from '../audio';
 import { INK, PAPER, PAPER_NUM, SERIF, WASH, fit } from '../art/paint';
 import { itemTexture } from '../art/items';
 import { goodTexture, lotTexture } from '../art/town';
-import { DISTRICTS, HOME_TIERS, districtFull, townIsCity, type Need } from '../game/districts';
+import { DISTRICTS, HOME_TIERS, NEXT_TOWNS, districtFull, townIsCity, townName, type Need } from '../game/districts';
 import { loadState } from '../game/save';
 import { tick } from '../game/sim';
 import type { GameState } from '../game/state';
 import { GOODS, SHOPS, SHOP_IDS, shopCost, shopKnows, type GoodId, type ShopId } from '../game/town';
-import { buyShop, tickTown } from '../game/townSim';
+import { buyShop, foundNextTown, tickTown } from '../game/townSim';
 import { t } from '../i18n';
 import { coined } from '../ui/coins';
 import { TOWN_HUD_H, TOWN_TEXT, TOWN_UI_DEPTH, keepSaving, leaveFor, townCard, townTopBar } from './townKit';
@@ -67,8 +67,20 @@ export class TownScene extends Phaser.Scene {
     });
     const districtsY = top + rows * this.lot.h + (rows - 1) * this.lot.gap + DISTRICT.above;
     // The second ending: once every district is full of castles, the heading says the town is a city.
-    const heading = this.add.text(width / 2, districtsY - DISTRICT.above / 2 + 4, t('districts'), { ...TOWN_TEXT, color: PAPER }).setOrigin(0.5);
-    this.views.push(() => heading.setText(townIsCity(this.state.town.districts) ? t('townCity') : t('districts')));
+    // Once a city, the heading founds the next town down the road (AP15) when tapped.
+    const heading = this.add
+      .text(width / 2, districtsY - DISTRICT.above / 2 + 4, t('districts'), { ...TOWN_TEXT, color: PAPER })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true });
+    heading.on('pointerdown', () => this.foundTown(heading));
+    this.views.push(() => {
+      const cities = this.state.town.cities ?? 0;
+      const here = townName(cities);
+      const next = NEXT_TOWNS[cities % NEXT_TOWNS.length];
+      heading.setText(
+        townIsCity(this.state.town.districts) ? t('townCityNext', { town: t(next) }) : here ? t('districtsOf', { town: t(here) }) : t('districts'),
+      );
+    });
     DISTRICTS.forEach((_, i) => this.addDistrict(i, width / 2 + (i - (DISTRICTS.length - 1) / 2) * (DISTRICT.w + this.lot.gap), districtsY + DISTRICT.h / 2));
     const purse = townTopBar(this, () => this.state, t('townMap'), { label: t('apothecary'), onTap: () => this.enter('apothecary') });
     this.views.push(purse);
@@ -184,6 +196,18 @@ export class TownScene extends Phaser.Scene {
       g.fillStyle(0x5a3a22, 1).fillRect(left + HOME.w / 2 - 3, base - 7, 6, 7);
       g.lineStyle(1, 0x2a1c12, 0.8).strokeRect(left, base - h, HOME.w, h);
     }
+  }
+
+  /** Founds the next town once this one is a city: fresh districts, a town seal more. */
+  private foundTown(heading: Phaser.GameObjects.Text) {
+    const done = foundNextTown(this.state);
+    if (!done) return;
+    sfx('upgrade');
+    const note = this.add
+      .text(heading.x, heading.y - 24, done[0], { fontFamily: SERIF, fontSize: '16px', fontStyle: 'bold', color: PAPER })
+      .setOrigin(0.5)
+      .setDepth(TOWN_UI_DEPTH);
+    this.tweens.add({ targets: note, y: note.y - 24, alpha: 0, delay: 1400, duration: 900, onComplete: () => note.destroy() });
   }
 
   /** `homeX` is where the card sits, so a shake started during another one still ends there. */

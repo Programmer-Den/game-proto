@@ -44,6 +44,7 @@ import {
   sellHerb,
   serveOrder,
   sellToWagon,
+  deliverToRoyal,
   type Feedback,
 } from '../game/sim';
 import { clearSave, loadState, saveState } from '../game/save';
@@ -112,6 +113,8 @@ import {
   stagesFor,
   storage,
   wagonHere,
+  royalHere,
+  masteryLevel,
   RIVAL_CUT,
   RIVAL_MONTH_DAYS,
   RIVAL_SALES,
@@ -167,6 +170,7 @@ import {
   HERB_MARKET,
   LINE2_BELTS,
   WAGON,
+  ROYAL,
   customerPosition,
   plotPosition,
   type StationMarkers,
@@ -417,6 +421,7 @@ export class GameScene extends Phaser.Scene {
     this.createTown();
     this.createRival();
     this.createWagon();
+    this.createRoyal();
     this.createHerbMarket();
     this.createOrderStrip();
     this.views.push(addWeather(this, WORLD, WEATHER_DEPTH, () => this.state));
@@ -856,6 +861,18 @@ export class GameScene extends Phaser.Scene {
       () => unlocked(this.state, `hire-${id}`),
       ROW_CAPTION,
     );
+    // Their mastery (AP16), as stars under the first craftsman once they have earned one.
+    if (id !== 'counter') {
+      const at = stand[0];
+      const master = this.add
+        .text(at.x, at.y + 4, '', { fontFamily: SERIF, fontSize: '11px', fontStyle: 'bold', color: '#ffd36a', stroke: TEXT_HALO, strokeThickness: 3 })
+        .setOrigin(0.5, 0)
+        .setDepth(at.y + 0.5);
+      this.views.push(() => {
+        const level = hired().level > 0 ? masteryLevel(this.state, id) : 0;
+        master.setText(level > 0 ? t('master', { n: level, stars: '★'.repeat(level) }) : '');
+      });
+    }
     stand.forEach((at, i) => {
       const craftsman = fit(this.add.image(at.x, at.y, craftsmanTexture(i)).setOrigin(0.5, 1).setDepth(at.y).setFlipX(i === 1));
       this.views.push(() => {
@@ -1628,6 +1645,49 @@ export class GameScene extends Phaser.Scene {
       icon.setTexture(itemTexture(w.potion)).setX(want.x - want.width / 2 - 12);
       left.setText(t(have >= w.crate ? 'wagonReady' : 'wagonWaiting', { have: Math.min(have, w.crate), crate: w.crate, s: Math.ceil(w.left / 1000) }));
       left.setColor(have >= w.crate ? '#2f6a1a' : INK);
+    });
+  }
+
+  /**
+   * The crown's courier across the street on a royal request's days (AP17): the reward, each potion
+   * asked for with how many are in, and how long it waits. A tap hands over what the shelf holds.
+   */
+  private createRoyal() {
+    const carriage = fit(this.add.image(ROYAL.x, ROYAL.y, 'wagon').setOrigin(0.5, 1).setDepth(ROYAL.y))
+      .setTint(0xc8a8ff)
+      .setVisible(false);
+    carriage.setInteractive({ useHandCursor: true }).on('pointerdown', (_p: Phaser.Input.Pointer, _x: number, _y: number, e: Phaser.Types.Input.EventData) => {
+      e.stopPropagation();
+      if (this.pinching()) return;
+      if (this.closePanels()) return;
+      const feedback = deliverToRoyal(this.state);
+      if (this.state.royal?.done) sfx('cascade');
+      else if (feedback && this.state.royal?.wants.some((w) => w.made > 0)) ui('coin');
+      else ui('refuse');
+      if (feedback) this.showFeedback(feedback);
+    });
+    const style = { fontFamily: SERIF, fontSize: '12px', fontStyle: 'bold', color: INK, stroke: TEXT_HALO, strokeThickness: 3 };
+    const title = coined(this.add.text(ROYAL.x, ROYAL.title, '', style).setOrigin(0.5).setDepth(ROYAL.y + 0.2).setVisible(false));
+    const icons = [0, 1, 2].map((k) => fit(this.add.image(ROYAL.x - 50 + k * 50, ROYAL.wants, itemTexture('healingDraught'))).setDepth(ROYAL.y + 0.2).setVisible(false));
+    const counts = [0, 1, 2].map((k) => this.add.text(ROYAL.x - 50 + k * 50 + 12, ROYAL.wants, '', style).setOrigin(0, 0.5).setDepth(ROYAL.y + 0.2).setVisible(false));
+    const left = this.add.text(ROYAL.x, ROYAL.left, '', style).setOrigin(0.5).setDepth(ROYAL.y + 0.2).setVisible(false);
+    let drawn = '';
+    this.views.push(() => {
+      const r = this.state.royal;
+      const here = royalHere(this.state);
+      const key = `${here}:${r?.day}:${r?.wants.map((w) => w.made).join(',')}:${this.state.contract.day}`;
+      if (key === drawn) return;
+      drawn = key;
+      for (const part of [carriage, title, left]) part.setVisible(here);
+      icons.forEach((icon, k) => icon.setVisible(here && !!r?.wants[k]));
+      counts.forEach((count, k) => count.setVisible(here && !!r?.wants[k]));
+      if (!here || !r) return;
+      title.setText(t('royalAsks', { n: r.reward }));
+      r.wants.forEach((w, k) => {
+        icons[k].setTexture(itemTexture(w.potion));
+        counts[k].setText(`${w.made}/${w.need}`).setColor(w.made >= w.need ? '#2f6a1a' : INK);
+      });
+      left.setText(t('royalWaits', { n: r.until - this.state.contract.day + 1 }));
     });
   }
 
