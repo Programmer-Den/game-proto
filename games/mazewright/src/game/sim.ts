@@ -2,7 +2,7 @@ import { DIRS, distances, nextStep, route, UNREACHABLE } from './grid';
 import { cellIndex, cellOf, inGrid, MAPS, type MapDef } from './maps';
 import {
   AIMS, attacks, BIG, CABBAGE, RUSH, CHEW_GAIN, EMPRESS, HEAT, KING, KING_TRICKS, RUSH_KINDS, shellFactor, CHEW_TIME, COLS, EARLY_BONUS, FINAL_QUEEN, FOE, GROUP_GAP, HP_PER_WAVE, hpScale, MAX_LEVEL, ROWS,
-  DAILY, HERO, SKILL, SPRINKLER, type Skill, GROW_RATE, SEEDS, SANDBOX_GOLD, STARS, SWARM_GOLD, waveGroups, type Mode, TRAP, type TrapKind, MASTER, MASTER_TRICKS, tier, GATE_WAVES, BANK_REACH, WEATHER, DUO_TOUGHNESS, SELL_BACK, WAVE_TIMER, SHOT_SPEED, SPREAD, START_GOLD, startLives, TOWER, upgradeCost, WAVES, waveReward,
+  DAILY, HERO, NIGHT, SKILL, SPRINKLER, VERSUS, type Skill, GROW_RATE, SEEDS, SANDBOX_GOLD, STARS, SWARM_GOLD, waveGroups, type Mode, TRAP, type TrapKind, MASTER, MASTER_TRICKS, tier, GATE_WAVES, BANK_REACH, WEATHER, DUO_TOUGHNESS, SELL_BACK, WAVE_TIMER, SHOT_SPEED, SPREAD, START_GOLD, startLives, TOWER, upgradeCost, WAVES, waveReward,
   type Aim, type DamageKind, type FoeKind, type ShellKind, type ShotKind, type TowerKind,
 } from './rules';
 
@@ -97,6 +97,8 @@ export interface Foe {
   shell: ShellKind | undefined;
   /** Cabbages it carries off; once it has some (or found the patch empty) it walks home to its burrow. */
   carry: number;
+  /** Versus: beaten, it is sent on to the other gardener's burrow (one that came over that way is not sent back). */
+  sendable: boolean;
   home: boolean;
   /** The Empress: when she next lays a beetle and turns her shell, and the damage she took since. */
   empress: { eggAt: number; turnAt: number; taken: Partial<Record<DamageKind, number>> } | null;
@@ -123,6 +125,8 @@ export interface Loose {
   from: number;
   to: number;
   t: number;
+  /** Versus: whose patch it rolls back to (0 otherwise). */
+  side: number;
 }
 
 export interface Shot {
@@ -176,6 +180,7 @@ export type GameEvent =
   | { type: 'wilt'; cell: number }
   | { type: 'frozen'; cell: number }
   | { type: 'lifted'; x: number; y: number; x2: number; y2: number }
+  | { type: 'sent'; kind: FoeKind; side: number }
   | { type: 'wave'; wave: number; early: boolean }
   | { type: 'cleared'; wave: number; gold: number }
   | { type: 'won' }
@@ -196,6 +201,8 @@ export interface Spawn {
   king?: boolean;
   /** The first king of the last wave's rush. */
   rush?: boolean;
+  /** Versus: sent over by the other gardener, so not sent back when beaten. */
+  sent?: boolean;
 }
 
 /** The hero gardener, walking the lawn: where he is, where he walks to, his skills and when he can next lift a foe. */
@@ -224,6 +231,18 @@ export interface Game {
   gold2: number;
   /** Two gardeners, each building on their half of the lawn (`sideOf`) with their own gold. */
   duo: boolean;
+  /**
+   * Versus (always with `duo`): each half is a garden of its own, with its own burrow, cottage
+   * (`goal2`, `dist2` for the right) and cabbages (`lives2`); `winner` is the side that won (-1 when
+   * both lost on the same step). Otherwise `goal2` is -1, `dist2` is `dist` and `lives2` 0.
+   */
+  versus: boolean;
+  goal2: number;
+  dist2: Int16Array;
+  lives2: number;
+  winner: number;
+  /** The night garden: the foes lit this step (by a lantern, or glow-worms), the only ones towers see; null by day. */
+  lit: Set<number> | null;
   /** Cabbages in the patch by the cottage (the lives), and how many it started with. */
   lives: number;
   maxLives: number;
@@ -344,10 +363,14 @@ export interface Extra {
   daily?: boolean;
   /** A new game's gardener: his skills, or null for none (a replay brings its own in `fixed`). */
   hero?: Skill[] | null;
+  /** Versus: two gardeners on gardens of their own (the map must have `goal2`). */
+  versus?: boolean;
 }
 
 export function newGame(mapId: string, calm = false, mode: Mode = 'classic', masters: readonly TowerKind[] | null = null, fixed?: Fixed, duo = false, extra: Extra = {}): Game {
   const map = extra.map ?? MAPS.find((m) => m.id === mapId) ?? MAPS[0];
+  const versus = !!extra.versus && !!map.goal2;
+  if (versus) duo = true;
   const blocked = new Uint8Array(COLS * ROWS);
   const goal = cellIndex(map.goal);
   const gates = map.gates.map(cellIndex);
@@ -365,12 +388,12 @@ export function newGame(mapId: string, calm = false, mode: Mode = 'classic', mas
   }
   const banks = new Uint8Array(COLS * ROWS);
   for (const bank of map.banks ?? []) banks[cellIndex(bank)] = 1;
-  const lives = fixed?.lives ?? map.lives ?? startLives();
+  const lives = fixed?.lives ?? (versus ? VERSUS.lives : map.lives ?? startLives());
   const seed = fixed?.seed ?? Math.floor(Math.random() * 4294967296);
   const home = centre(goal);
   const skills = fixed?.hero ?? extra.hero;
   const hero = skills && !duo ? { x: home.x, y: home.y, tx: home.x, ty: home.y, skills: [...skills], liftAt: 0 } : null;
-  return {
+  const g: Game = {
     map,
     daily: !!extra.daily,
     hero,
@@ -380,6 +403,12 @@ export function newGame(mapId: string, calm = false, mode: Mode = 'classic', mas
     gold: mode === 'sandbox' ? SANDBOX_GOLD : (map.gold ?? START_GOLD),
     gold2: !duo ? 0 : mode === 'sandbox' ? SANDBOX_GOLD : (map.gold ?? START_GOLD),
     duo,
+    versus,
+    goal2: map.goal2 ? cellIndex(map.goal2) : -1,
+    dist2: new Int16Array(0),
+    lives2: versus ? lives : 0,
+    winner: -1,
+    lit: null,
     lives,
     maxLives: lives,
     loose: [],
@@ -390,8 +419,8 @@ export function newGame(mapId: string, calm = false, mode: Mode = 'classic', mas
     glassy: !!map.glass?.length,
     banks,
     towers: [],
-    dist: distances(blocked, goal),
-    homeDist: gates.map((gate) => distances(blocked, gate)),
+    dist: new Int16Array(0),
+    homeDist: [],
     gates,
     goal,
     foes: [],
@@ -404,7 +433,7 @@ export function newGame(mapId: string, calm = false, mode: Mode = 'classic', mas
     frostAt: null,
     seed,
     rng: seed,
-    toughness: fixed?.toughness ?? hpScale() * (duo ? DUO_TOUGHNESS : 1),
+    toughness: fixed?.toughness ?? hpScale() * (duo && !versus ? DUO_TOUGHNESS : 1),
     steps: 0,
     log: [],
     clock: 0,
@@ -414,6 +443,8 @@ export function newGame(mapId: string, calm = false, mode: Mode = 'classic', mas
     events: [],
     nextId: 1,
   };
+  refield(g);
+  return g;
 }
 
 export const towerAt = (g: Game, cell: number) => g.towers.find((t) => t.cell === cell);
@@ -431,9 +462,14 @@ function addGold(g: Game, side: number, gold: number) {
   if (side) g.gold2 += gold;
   else g.gold += gold;
 }
-/** Pays both gardeners: half each, the odd coin to the poorer one. */
+/** Pays both gardeners: half each, the odd coin to the poorer one (versus: each the whole, as each holds a garden of their own). */
 function share(g: Game, gold: number) {
   if (!g.duo) return void (g.gold += gold);
+  if (g.versus) {
+    g.gold += gold;
+    g.gold2 += gold;
+    return;
+  }
   const half = Math.floor(gold / 2);
   const odd = gold - 2 * half;
   const left = g.gold <= g.gold2;
@@ -441,27 +477,52 @@ function share(g: Game, gold: number) {
   g.gold2 += half + (left ? 0 : odd);
 }
 
-/** Makes the walking fields again after a cell was blocked or freed. */
-function refield(g: Game) {
-  g.dist = distances(g.blocked, g.goal);
-  g.homeDist = g.gates.map((gate) => distances(g.blocked, gate));
-  for (const trap of g.traps) if (trap.field) trap.field = distances(g.blocked, trap.cell);
+/** Versus: whose half burrow `gate` (an index into `gates`) is in, and so whose foes come out of it; 0 otherwise. */
+export const gateSide = (g: Game, gate: number) => (g.versus ? sideOf(g, g.gates[gate]) : 0);
+/** The walking field to a gardener's cottage, and the cottage (versus has one each; otherwise side 0's is the only one). */
+export const fieldOf = (g: Game, side: number) => (side ? g.dist2 : g.dist);
+export const goalOf = (g: Game, side: number) => (side ? g.goal2 : g.goal);
+
+/** Versus: `blocked` with the other gardener's half walled off, so foes keep to their own garden. */
+function half(g: Game, blocked: Uint8Array, side: number) {
+  if (!g.versus) return blocked;
+  const out = blocked.slice();
+  for (let i = 0; i < out.length; i++) if (sideOf(g, i) !== side) out[i] = 1;
+  return out;
 }
 
-/** All the cabbages still in the game: in the patch, carried and loose. */
-export const cabbagesLeft = (g: Game) => g.lives + g.foes.reduce((n, f) => n + (f.dead ? 0 : f.carry), 0) + g.loose.reduce((n, c) => n + c.n, 0);
+/** The walking fields to each cottage over `blocked`: the left (or only) one and the right one (the same field when there is one). */
+function fields(g: Game, blocked: Uint8Array) {
+  const left = distances(half(g, blocked, 0), g.goal);
+  return [left, g.versus ? distances(half(g, blocked, 1), g.goal2) : left];
+}
 
-/** Whether a field leaves every burrow, every foe on the ground and every cabbage rolling on it a way to the cottage. */
-function open(g: Game, dist: Int16Array) {
-  if (g.gates.some((gate) => dist[gate] === UNREACHABLE)) return false;
-  if (!g.foes.every((f) => f.dead || FOE[f.kind].flies || dist[f.to] !== UNREACHABLE)) return false;
+/** Makes the walking fields again after a cell was blocked or freed. */
+function refield(g: Game) {
+  [g.dist, g.dist2] = fields(g, g.blocked);
+  g.homeDist = g.gates.map((gate, i) => distances(half(g, g.blocked, gateSide(g, i)), gate));
+  for (const trap of g.traps) if (trap.field) trap.field = trapField(g, trap.cell);
+}
+
+const trapField = (g: Game, cell: number) => distances(half(g, g.blocked, sideOf(g, cell)), cell);
+
+/** All the cabbages still in the game: in the patch, carried and loose (versus: the right-hand gardener's with `side` 1). */
+export const cabbagesLeft = (g: Game, side = 0) =>
+  (side ? g.lives2 : g.lives) +
+  g.foes.reduce((n, f) => n + (f.dead || gateSide(g, f.gate) !== side ? 0 : f.carry), 0) +
+  g.loose.reduce((n, c) => n + (c.side === side ? c.n : 0), 0);
+
+/** Whether fields leave every burrow, every foe on the ground and every cabbage rolling on them a way to its cottage. */
+function open(g: Game, fs: Int16Array[]) {
+  if (g.gates.some((gate, i) => fs[gateSide(g, i)][gate] === UNREACHABLE)) return false;
+  if (!g.foes.every((f) => f.dead || FOE[f.kind].flies || fs[gateSide(g, f.gate)][f.to] !== UNREACHABLE)) return false;
   // A loose cabbage walled in would never roll home, and still count as kept.
-  return g.loose.every((c) => c.from < 0 || dist[c.to] !== UNREACHABLE);
+  return g.loose.every((c) => c.from < 0 || fs[c.side][c.to] !== UNREACHABLE);
 }
 
 /** Whether a `kind` tower can go on `cell` right now, and if not why. */
 export function canBuild(g: Game, cell: number, kind: TowerKind): Refusal | null {
-  if (cell === g.goal || g.gates.includes(cell)) return 'reserved';
+  if (cell === g.goal || cell === g.goal2 || g.gates.includes(cell)) return 'reserved';
   if (g.traps.some((t) => t.cell === cell)) return 'taken';
   // A trap never blocks, so it may go under foes and needs no way kept open, but only where foes walk.
   if (TOWER[kind].trap) return g.blocked[cell] ? 'taken' : goldAt(g, cell) < TOWER[kind].cost ? 'gold' : null;
@@ -497,7 +558,18 @@ export function wouldBlock(g: Game, cell: number) {
   if (g.blocked[cell]) return false;
   const blocked = g.blocked.slice();
   blocked[cell] = 2;
-  return !open(g, distances(blocked, g.goal));
+  return !open(g, fields(g, blocked));
+}
+
+/** The route from each burrow as foes would walk it with `cell` planted too (-1 for the routes now). */
+export function routesWith(g: Game, cell = -1) {
+  let fs = [g.dist, g.dist2];
+  if (cell >= 0) {
+    const blocked = g.blocked.slice();
+    blocked[cell] = 2;
+    fs = fields(g, blocked);
+  }
+  return g.gates.map((gate, i) => route(fs[gateSide(g, i)], gate));
 }
 
 export function build(g: Game, cell: number, kind: TowerKind): Refusal | null {
@@ -540,7 +612,7 @@ function growFor(tower: Tower, cost: number, g: Game) {
 
 /** The route cells foes walk now, from every burrow. */
 function routeCells(g: Game) {
-  return new Set(g.gates.flatMap((gate) => route(g.dist, gate)));
+  return new Set(routesWith(g).flat());
 }
 
 /** The cells a sunglass on `cell` facing `face` shines over: up to the first rock, tower or glass pane (it crosses water). */
@@ -604,6 +676,8 @@ export function turn(g: Game, cell: number) {
 /** The gold an upgrade of `tower` costs, or null when it can't go higher (the master level waits for the potting shed). */
 export function nextUpgrade(tower: Tower, g?: Game) {
   if (tower.kind === 'hedge' || tower.level >= MAX_LEVEL || TOWER[tower.kind].trap) return null;
+  // A lantern goes up to level 3: it has no master level.
+  if (tower.kind === 'lantern' && tower.level >= 3) return null;
   if (tower.level === MASTER - 1 && !masterOpen(g, tower.kind)) return null;
   return upgradeCost(tower.kind, tower.level);
 }
@@ -613,8 +687,8 @@ export const masterOpen = (g: Game | undefined, kind: TowerKind) => !g?.masters 
 
 /** Seeds a finished game pays, by its result; none in Sandbox. */
 export function seedsFor(g: Game) {
-  if (g.mode === 'sandbox') return 0;
-  if (g.phase === 'won') return SEEDS.win + SEEDS.star * stars(g) + (g.mode === 'challenge' ? SEEDS.challenge : 0);
+  if (g.mode === 'sandbox' || g.versus) return 0;
+  if (g.phase === 'won') return SEEDS.win + SEEDS.star * stars(g) + (g.mode === 'challenge' ? SEEDS.challenge : 0) + (g.mode === 'night' ? NIGHT.seeds : 0);
   return SEEDS.loss + Math.floor(Math.max(0, g.wave - 1) / SEEDS.waves);
 }
 
@@ -665,7 +739,7 @@ function removeTower(g: Game, tower: Tower) {
 export const canStartWave = (g: Game) => !over(g) && g.wave < totalWaves(g) && g.spawns.length === 0;
 
 /** How many waves the game has: 20, fewer in the daily maze, or no end in Endless and Sandbox. */
-export const totalWaves = (g: Game) => (g.daily ? DAILY.waves : g.mode === 'endless' || g.mode === 'sandbox' ? Infinity : WAVES.length);
+export const totalWaves = (g: Game) => (g.daily ? DAILY.waves : g.versus || g.mode === 'endless' || g.mode === 'sandbox' ? Infinity : WAVES.length);
 
 /** The daily maze's score: a cabbage kept is worth `DAILY.perCabbage` and every gold left counts, or a loss scores the waves held. */
 export const dailyScore = (g: Game) => (g.phase === 'won' ? cabbagesLeft(g) * DAILY.perCabbage + g.gold : Math.max(0, g.wave - 1) * DAILY.perWave);
@@ -702,9 +776,14 @@ function beginWave(g: Game, byHand = false) {
   let turn = 0;
   const open = openGates(g);
   const gateFor = () => turn++ % open;
-  for (const [kind, count, opts] of waveGroups(g.wave)) {
+  // Versus: each gardener gets the whole wave, out of their own burrow.
+  const add = (sp: Omit<Spawn, 'gate'>) => {
+    if (g.versus) g.spawns.push({ ...sp, gate: 0 }, { ...sp, gate: 1 });
+    else g.spawns.push({ ...sp, gate: gateFor() });
+  };
+  for (const [kind, count, opts] of waveGroups(g.wave, g.mode === 'night')) {
     for (let i = 0; i < count; i++) {
-      g.spawns.push({ kind, gate: gateFor(), at, wave: g.wave, big: opts?.size, king: opts?.king });
+      add({ kind, at, wave: g.wave, big: opts?.size, king: opts?.king });
       at += FOE[kind].gap * (opts?.king ? 2 : 1);
     }
     at += GROUP_GAP - FOE[kind].gap;
@@ -713,7 +792,7 @@ function beginWave(g: Game, byHand = false) {
     // The rush: one king of every kind, a while after the queen is out.
     at += RUSH.delay;
     RUSH_KINDS.forEach((kind, i) => {
-      g.spawns.push({ kind, gate: gateFor(), at, wave: g.wave, king: true, rush: i === 0 });
+      add({ kind, at, wave: g.wave, king: true, rush: i === 0 });
       at += RUSH.gap;
     });
   }
@@ -722,7 +801,7 @@ function beginWave(g: Game, byHand = false) {
 }
 
 /** How many of the garden's burrows are open in the wave in play (they open in order). */
-export const openGates = (g: Game) => Math.max(1, GATE_WAVES.slice(0, g.gates.length).filter((w) => g.wave >= w).length);
+export const openGates = (g: Game) => (g.versus ? g.gates.length : Math.max(1, GATE_WAVES.slice(0, g.gates.length).filter((w) => g.wave >= w).length));
 
 function spawn(g: Game, sp: Spawn) {
   const { kind, wave } = sp;
@@ -746,6 +825,7 @@ function spawn(g: Game, sp: Spawn) {
     g.events.push({ type: 'king', kind });
   }
   if (empress) f.empress = { eggAt: g.clock + EMPRESS.egg, turnAt: g.clock + EMPRESS.turn, taken: {} };
+  f.sendable = g.versus && !sp.sent;
   if (sp.rush) g.events.push({ type: 'rush' });
 }
 
@@ -756,7 +836,7 @@ function makeFoe(g: Game, kind: FoeKind, hp: number, gate: number, x: number, y:
     id: g.nextId++, kind, hp, maxHp: hp, gate, x, y, from: cell, to: cell, t: 1, heading: 0, angle: 0,
     slowUntil: 0, slowFactor: 1, lure: 0, stunUntil: 0, shrunk: false, blueFlame: false, burnUntil: 0, burnDps: 0, poisonUntil: 0, poisonDps: 0, spreads: false, spreadAt: 0, heat: 0,
     chew: null, chews: def.digs ? 1 : 0, king: false, big: 1, body: def.size, gold: def.gold, lives: def.lives,
-    splits: def.splits ?? 0, shell: def.shell, carry: 0, home: false, empress: null, dead: false,
+    splits: def.splits ?? 0, shell: def.shell, carry: 0, sendable: false, home: false, empress: null, dead: false,
   };
   g.foes.push(f);
   return f;
@@ -781,6 +861,8 @@ function offspring(g: Game, parent: Foe, kind: FoeKind, hp: number, lag: number)
 
 /** How far a foe still has to go, in cells: what towers aim by (the closest to the cottage first). */
 export function remaining(g: Game, f: Foe) {
+  const side = gateSide(g, f.gate);
+  const dist = fieldOf(g, side);
   if (f.home) {
     // On its way out, a foe is as close as its way home is short.
     if (FOE[f.kind].flies) {
@@ -790,16 +872,16 @@ export function remaining(g: Game, f: Foe) {
     return g.homeDist[f.gate][f.to] + (1 - f.t);
   }
   if (FOE[f.kind].flies) {
-    const goal = centre(g.goal);
+    const goal = centre(goalOf(g, side));
     return Math.hypot(goal.x - f.x, goal.y - f.y);
   }
-  if (f.chew) return g.dist[f.from];
-  return g.dist[f.to] + (1 - f.t);
+  if (f.chew) return dist[f.from];
+  return dist[f.to] + (1 - f.t);
 }
 
 /** A hedge next to `from` whose removal would save a mole at least `CHEW_GAIN` steps, or -1. */
-function hedgeToChew(g: Game, from: number) {
-  const here = g.dist[from];
+function hedgeToChew(g: Game, from: number, dist: Int16Array) {
+  const here = dist[from];
   const [x, y] = cellOf(from);
   let best = -1;
   let bestGain = CHEW_GAIN - 1;
@@ -814,7 +896,7 @@ function hedgeToChew(g: Game, from: number) {
       const nx = hx + ex;
       const ny = hy + ey;
       if (nx < 0 || ny < 0 || nx >= COLS || ny >= ROWS) continue;
-      const past = g.dist[ny * COLS + nx];
+      const past = dist[ny * COLS + nx];
       if (past === UNREACHABLE) continue;
       const gain = here - (past + 2);
       if (gain > bestGain) (bestGain = gain), (best = hedge);
@@ -832,6 +914,7 @@ function hurt(g: Game, f: Foe, damage: number, kind: DamageKind, pierce = false)
   if (f.empress) f.empress.taken[kind] = (f.empress.taken[kind] ?? 0) + dealt;
   if (f.hp > 0) return;
   f.dead = true;
+  if (f.sendable) send(g, f);
   // With two gardeners, a foe pays the one on whose half it was beaten.
   const gold = pay(g, f.gold);
   addGold(g, g.duo && f.x >= COLS / 2 ? 1 : 0, gold);
@@ -856,12 +939,15 @@ function hurt(g: Game, f: Foe, damage: number, kind: DamageKind, pierce = false)
 
 function moveFoe(g: Game, f: Foe, dt: number) {
   const def = FOE[f.kind];
+  const side = gateSide(g, f.gate);
+  const dist = fieldOf(g, side);
+  const goalCell = goalOf(g, side);
   // A sprinkler's spray slows a ground foe like frost does; the stronger of the two counts.
   const chill = g.clock < f.slowUntil ? f.slowFactor : 1;
   const wet = !def.flies && g.wet[Math.floor(f.y) * COLS + Math.floor(f.x)] ? SPRINKLER.slow : 1;
   const speed = def.speed * (f.king ? KING.speed : 1) * Math.min(chill, wet);
   if (def.flies) {
-    const goal = centre(f.home ? g.gates[f.gate] : g.goal);
+    const goal = centre(f.home ? g.gates[f.gate] : goalCell);
     const dx = goal.x - f.x;
     const dy = goal.y - f.y;
     const d = Math.hypot(dx, dy);
@@ -887,13 +973,13 @@ function moveFoe(g: Game, f: Foe, dt: number) {
   while (f.t >= 1) {
     f.t -= 1;
     f.from = f.to;
-    if (f.home ? f.from === g.gates[f.gate] : f.from === g.goal) {
+    if (f.home ? f.from === g.gates[f.gate] : f.from === goalCell) {
       if (f.home) return leak(g, f);
       grab(g, f);
       if (f.dead) return;
     }
     if (f.chews > 0 && !f.home && !f.lure) {
-      const hedge = hedgeToChew(g, f.from);
+      const hedge = hedgeToChew(g, f.from, dist);
       if (hedge >= 0) {
         f.chew = { cell: hedge, left: CHEW_TIME };
         f.t = 0;
@@ -905,7 +991,7 @@ function moveFoe(g: Game, f: Foe, dt: number) {
       }
     }
     const lure = f.lure ? g.traps.find((t) => t.id === f.lure)?.field : null;
-    const step = nextStep(lure ?? (f.home ? g.homeDist[f.gate] : g.dist), f.from, f.heading);
+    const step = nextStep(lure ?? (f.home ? g.homeDist[f.gate] : dist), f.from, f.heading);
     if (!step) {
       f.t = 0;
       break;
@@ -923,8 +1009,10 @@ function moveFoe(g: Game, f: Foe, dt: number) {
 /** A foe reaches the patch: it takes its share of cabbages (`lives`) and turns for home. */
 function grab(g: Game, f: Foe) {
   g.leaks++;
-  const n = Math.min(f.lives, g.lives);
-  g.lives -= n;
+  const side = gateSide(g, f.gate);
+  const n = Math.min(f.lives, side ? g.lives2 : g.lives);
+  if (side) g.lives2 -= n;
+  else g.lives -= n;
   f.carry = n;
   f.home = true;
   f.chew = null;
@@ -944,15 +1032,17 @@ function leak(g: Game, f: Foe) {
 /** A beaten foe drops its cabbages where it fell. */
 function drop(g: Game, f: Foe) {
   const flier = FOE[f.kind].flies;
-  g.loose.push({ id: g.nextId++, n: f.carry, x: f.x, y: f.y, from: flier ? -1 : f.from, to: flier ? -1 : f.to, t: flier ? 0 : f.t });
+  g.loose.push({ id: g.nextId++, n: f.carry, x: f.x, y: f.y, from: flier ? -1 : f.from, to: flier ? -1 : f.to, t: flier ? 0 : f.t, side: gateSide(g, f.gate) });
   g.events.push({ type: 'drop', x: f.x, y: f.y, n: f.carry });
   f.carry = 0;
 }
 
 /** Loose cabbages roll back to the patch, and a passing foe with free hands picks them up. */
 function roll(g: Game, c: Loose, dt: number) {
+  const goalCell = goalOf(g, c.side);
+  const dist = fieldOf(g, c.side);
   for (const f of g.foes) {
-    if (f.dead || f.carry > 0 || Math.hypot(f.x - c.x, f.y - c.y) > CABBAGE.reach + f.body) continue;
+    if (f.dead || f.carry > 0 || gateSide(g, f.gate) !== c.side || Math.hypot(f.x - c.x, f.y - c.y) > CABBAGE.reach + f.body) continue;
     f.carry = c.n;
     f.home = true;
     f.chew = null;
@@ -961,7 +1051,7 @@ function roll(g: Game, c: Loose, dt: number) {
   }
   const move = CABBAGE.speed * dt;
   if (c.from < 0) {
-    const goal = centre(g.goal);
+    const goal = centre(goalCell);
     const d = Math.hypot(goal.x - c.x, goal.y - c.y);
     if (d > move) {
       c.x += ((goal.x - c.x) / d) * move;
@@ -970,14 +1060,14 @@ function roll(g: Game, c: Loose, dt: number) {
     }
   } else {
     c.t += move;
-    while (c.t >= 1 && c.to !== g.goal) {
+    while (c.t >= 1 && c.to !== goalCell) {
       c.t -= 1;
       c.from = c.to;
-      const step = nextStep(g.dist, c.from);
+      const step = nextStep(dist, c.from);
       if (!step) break;
       c.to = step.cell;
     }
-    if (c.to !== g.goal || c.t < 1) {
+    if (c.to !== goalCell || c.t < 1) {
       c.t = Math.min(c.t, 1);
       const a = centre(c.from);
       const b = centre(c.to);
@@ -986,7 +1076,8 @@ function roll(g: Game, c: Loose, dt: number) {
       return false;
     }
   }
-  g.lives += c.n;
+  if (c.side) g.lives2 += c.n;
+  else g.lives += c.n;
   g.events.push({ type: 'saved', n: c.n });
   return true;
 }
@@ -1126,7 +1217,8 @@ function fire(g: Game, tower: Tower, dt: number, boost: number) {
   const { x, y } = centre(tower.cell);
   const lvl = tier(tower.level);
   const range = reachOf(g, tower.cell, tower.kind);
-  const reaches = (f: Foe) => !f.dead && (def.air || !FOE[f.kind].flies) && (!def.airOnly || !!FOE[f.kind].flies) && sees(g, tower.cell, f.x, f.y);
+  // At night a tower sees only the foes lit this step.
+  const reaches = (f: Foe) => !f.dead && (!g.lit || g.lit.has(f.id)) && (def.air || !FOE[f.kind].flies) && (!def.airOnly || !!FOE[f.kind].flies) && sees(g, tower.cell, f.x, f.y);
   if (tower.kind === 'sunglass') {
     const cells = beamCells(g, tower.cell, tower.face);
     const lit = new Set(cells);
@@ -1303,7 +1395,7 @@ function springTraps(g: Game) {
       if (near.length === 0) continue;
       trap.sprung = true;
       trap.until = g.clock + TRAP.honey.for;
-      trap.field = distances(g.blocked, trap.cell);
+      trap.field = trapField(g, trap.cell);
       g.events.push({ type: 'lured', x: at.x, y: at.y });
     }
     if (g.clock < trap.until) {
@@ -1339,6 +1431,7 @@ export function step(g: Game, dt: number) {
   springTraps(g);
   g.loose = g.loose.filter((c) => !roll(g, c, dt));
   const boost = boosts(g);
+  g.lit = g.mode === 'night' ? litFoes(g) : null;
   for (const t of g.towers) {
     if (stopped(g, t)) continue;
     fire(g, t, dt, boost.get(t.id) ?? 0);
@@ -1347,7 +1440,17 @@ export function step(g: Game, dt: number) {
   if (g.map.season === 'winter') frost(g);
   g.shots = g.shots.filter((s) => !moveShot(g, s, dt));
   g.foes = g.foes.filter((f) => !f.dead);
-  if (cabbagesLeft(g) <= 0) {
+  if (g.versus) {
+    // The first to lose every cabbage loses; both on the same step is a draw.
+    const left = cabbagesLeft(g, 0);
+    const right = cabbagesLeft(g, 1);
+    if (left <= 0 || right <= 0) {
+      g.phase = 'won';
+      g.winner = left <= 0 && right <= 0 ? -1 : left <= 0 ? 1 : 0;
+      g.events.push({ type: 'won' });
+      return;
+    }
+  } else if (cabbagesLeft(g) <= 0) {
     g.phase = 'lost';
     g.events.push({ type: 'lost' });
     return;
@@ -1376,7 +1479,30 @@ export function step(g: Game, dt: number) {
 
 /** The cells of the route from a burrow to the cottage, as foes would walk it now. */
 export function routeLength(g: Game, gate: number) {
-  return g.dist[g.gates[gate]];
+  return fieldOf(g, gateSide(g, gate))[g.gates[gate]];
+}
+
+/** How far a lantern's light reaches, by its level. */
+export const lightOf = (t: Tower) => TOWER.lantern.light![tier(t.level)];
+
+/** The night garden: the foes a grown lantern's light reaches, and every glow-worm. */
+function litFoes(g: Game) {
+  const lamps = g.towers.filter((t) => t.kind === 'lantern' && t.grow <= 0).map((t) => ({ ...centre(t.cell), r: lightOf(t) }));
+  const lit = new Set<number>();
+  for (const f of g.foes) if (f.kind === 'glowworm' || lamps.some((l) => Math.hypot(f.x - l.x, f.y - l.y) <= l.r + f.body)) lit.add(f.id);
+  return lit;
+}
+
+/** Whether towers can see a foe: always by day; at night only lit ones. */
+export const isLit = (g: Game, f: Foe) => !g.lit || g.lit.has(f.id) || f.kind === 'glowworm';
+
+/** Versus: a beaten foe comes out of the other gardener's burrow a moment later, at full health, not to be sent back. */
+function send(g: Game, f: Foe) {
+  const gate = 1 - gateSide(g, f.gate);
+  const sp: Spawn = { kind: f.kind, gate, at: g.clock + VERSUS.delay, wave: g.wave, big: f.big > 1 ? (f.big as 2 | 3) : undefined, king: f.king || undefined, sent: true };
+  const i = g.spawns.findIndex((o) => o.at > sp.at);
+  g.spawns.splice(i < 0 ? g.spawns.length : i, 0, sp);
+  g.events.push({ type: 'sent', kind: f.kind, side: gate });
 }
 
 /** A new game that plays `replay` back: call `replayStep` before each `step`. */

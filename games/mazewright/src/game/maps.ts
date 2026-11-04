@@ -16,6 +16,8 @@ export interface MapDef {
   gates: Cell[];
   /** The cottage they walk to. */
   goal: Cell;
+  /** Versus: the right-hand gardener's cottage (`goal` is the left-hand one's), with a burrow in each half. */
+  goal2?: Cell;
   /** Boulders that block for good: nothing is built on them. */
   rocks: Cell[];
   /** Water: walkers go round it, moths and sunglass beams cross it, and nothing is built on it. */
@@ -191,3 +193,21 @@ export const MAPS: MapDef[] = [
 export const cellIndex = ([x, y]: Cell) => y * COLS + x;
 export const cellOf = (i: number): Cell => [i % COLS, Math.floor(i / COLS)];
 export const inGrid = (x: number, y: number) => x >= 0 && y >= 0 && x < COLS && y < ROWS;
+
+/** Mirrors a cell from the left half of the lawn to the right. */
+const mirror = ([x, y]: Cell): Cell => [COLS - 1 - x, y];
+const VERSUS_ROCKS: Cell[] = [[3, 2], [3, 8], [6, 4], [6, 7], [8, 1], [8, 9]];
+
+/**
+ * The versus lawn: two gardens side by side, each with its burrow at the outer edge and its cottage
+ * near the middle. Not a picker card: the picker's Versus button plays it.
+ */
+export const VERSUS_MAP: MapDef = {
+  id: 'versus',
+  season: 'spring',
+  gates: [[0, 5], mirror([0, 5])],
+  goal: [9, 5],
+  goal2: mirror([9, 5]),
+  rocks: [...VERSUS_ROCKS, ...VERSUS_ROCKS.map(mirror)],
+  challenge: [],
+};

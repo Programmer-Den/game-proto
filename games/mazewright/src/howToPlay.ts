@@ -12,11 +12,13 @@ const en: HowToPlay = {
     { input: 'A tower tool on a hedge', action: 'Plant the tower in the hedge\'s place, for its cost less what the hedge sells for' },
     { input: 'Start wave button, Space', action: 'Send the next wave, early for a bonus; after wave 1 the wave timer sends it after 20 seconds (Calm on the garden picker turns it off)' },
     { input: 'Speed button, F', action: 'Play at double speed' },
-    { input: 'Way of play (garden picker)', action: 'Classic, Challenge (the garden\'s own few towers, for its ✦), Swarm (no waiting, more gold), Endless or Sandbox' },
+    { input: 'Way of play (garden picker)', action: 'Classic, Challenge (the garden\'s own few towers, for its ✦), Swarm (no waiting, more gold), Endless, Night (towers see only what your lanterns light, for its ☾) or Sandbox' },
     { input: '▶ Wave on a garden card', action: 'Go on with the game you left there, from its last break between waves' },
     { input: 'One gardener / Two gardeners (garden picker)', action: 'Play together on one screen: each gardener plants on their half of the lawn with their own gold and tools' },
     { input: 'Watch on a garden card', action: 'Watch your latest win in that garden again, at up to four times the speed' },
     { input: 'Daily maze (garden picker)', action: 'Today\'s seeded garden, pouch and 12 waves on Normal, the same for everyone: one try a day, scored by cabbages kept and gold left' },
+    { input: 'Versus (garden picker)', action: 'Two gardeners on one screen, each with a garden of their own: every foe you beat is sent on to the other\'s burrow, and the first to lose every cabbage loses' },
+    { input: 'Maze code (top bar)', action: 'Copy the maze in play as a short code to share; in Sandbox, Plant code on the garden picker plants a code again' },
     { input: 'Gardener button, G', action: 'Once hired in the potting shed: tap the lawn to walk him there, or a foe beside him to lift it back to its burrow' },
   ],
   loop: [
@@ -48,6 +50,8 @@ const en: HowToPlay = {
     'In the greenhouse no shot or beam crosses a glass pane, so keep towers on the same side of the glass as the route; its sprinklers slow foes walking past them.',
     'The gardener makes the towers round him shoot a quarter faster (half with Green thumb), and his hands rest 12 seconds between lifts. He lifts no king or queen, and big foes only with Strong grip.',
     'The daily maze scores 100 a cabbage kept plus the gold left, so a win that spent little scores most.',
+    'At night towers only see foes in a lantern\'s light, so hang lanterns where your towers cover the route; glow-worms glow, so every tower sees them.',
+    'In Versus a foe you beat comes back out of the other burrow: a strong maze sends your rival more to beat.',
   ],
 };
 
@@ -62,11 +66,13 @@ const de: HowToPlay = {
     { input: 'Ein Turm-Werkzeug auf einer Hecke', action: 'Den Turm an die Stelle der Hecke pflanzen, für seinen Preis abzüglich dessen, was die Hecke beim Verkauf bringt' },
     { input: 'Knopf Welle starten, Leertaste', action: 'Die nächste Welle schicken, früh mit Bonus; nach Welle 1 schickt die Wellen-Uhr sie nach 20 Sekunden (Ruhig in der Gartenauswahl schaltet sie ab)' },
     { input: 'Tempo-Knopf, F', action: 'Mit doppeltem Tempo spielen' },
-    { input: 'Spielart (Gartenauswahl)', action: 'Klassisch, Herausforderung (die paar Türme des Gartens, für sein ✦), Schwarm (ohne Pause, mehr Gold), Endlos oder Sandkasten' },
+    { input: 'Spielart (Gartenauswahl)', action: 'Klassisch, Herausforderung (die paar Türme des Gartens, für sein ✦), Schwarm (ohne Pause, mehr Gold), Endlos, Nacht (Türme sehen nur, was deine Laternen erhellen, für sein ☾) oder Sandkasten' },
     { input: '▶ Welle auf einer Gartenkarte', action: 'Das dort verlassene Spiel fortsetzen, ab seiner letzten Pause zwischen zwei Wellen' },
     { input: 'Allein / Zu zweit gärtnern (Gartenauswahl)', action: 'Zu zweit an einem Bildschirm spielen: Jede Person pflanzt auf ihrer Rasenhälfte, mit eigenem Gold und eigenen Werkzeugen' },
     { input: 'Ansehen auf einer Gartenkarte', action: 'Deinen letzten Sieg in diesem Garten noch einmal ansehen, mit bis zu vierfachem Tempo' },
     { input: 'Tageslabyrinth (Gartenauswahl)', action: 'Der Garten, Beutel und 12 Wellen des Tages auf Normal, für alle gleich: ein Versuch am Tag, gewertet nach behaltenen Kohlköpfen und übrigem Gold' },
+    { input: 'Gegeneinander (Gartenauswahl)', action: 'Zwei Gärtner an einem Bildschirm, jeder mit eigenem Garten: Jeder besiegte Gegner zieht in den Bau des anderen weiter, und wer zuerst alle Kohlköpfe verliert, verliert' },
+    { input: 'Labyrinth-Code (obere Leiste)', action: 'Das Labyrinth im Spiel als kurzen Code zum Teilen kopieren; im Sandkasten pflanzt Code pflanzen in der Gartenauswahl einen Code wieder' },
     { input: 'Knopf Gärtner, G', action: 'Sobald im Gartenschuppen angestellt: Tippe auf den Rasen, damit er dorthin geht, oder auf einen Gegner neben ihm, um ihn in seinen Bau zurückzuheben' },
   ],
   loop: [
@@ -98,6 +104,8 @@ const de: HowToPlay = {
     'Im Gewächshaus geht kein Schuss und kein Strahl durch eine Glasscheibe, also stell Türme auf dieselbe Seite des Glases wie den Weg; seine Sprenger bremsen Gegner, die vorbeilaufen.',
     'Der Gärtner lässt die Türme um ihn ein Viertel schneller schießen (mit Grünem Daumen die Hälfte), und seine Hände ruhen 12 Sekunden zwischen zwei Hebungen. Könige und Königinnen hebt er nie, große Gegner nur mit Festem Griff.',
     'Das Tageslabyrinth zählt 100 je behaltenem Kohlkopf plus das übrige Gold, also bringt ein sparsamer Sieg am meisten.',
+    'Nachts sehen Türme nur Gegner im Licht einer Laterne, also häng Laternen dorthin, wo deine Türme den Weg abdecken; Glühwürmchen leuchten, also sieht jeder Turm sie.',
+    'Beim Gegeneinander kommt ein besiegter Gegner aus dem anderen Bau wieder: Ein starkes Labyrinth schickt deinem Gegenüber mehr zu besiegen.',
   ],
 };
 

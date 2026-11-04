@@ -1,6 +1,6 @@
 import { MAPS } from './maps';
 import { REPLAY_VERSION, type Action, type Replay } from './sim';
-import { ALWAYS, DEFAULT_POUCH, FREE, MODES, POUCH_PICKS, SEEDS, SKILLS, SLOT_SEEDS, TOWERS, type Mode, type Skill, type TowerKind } from './rules';
+import { ALL_TOWERS, ALWAYS, DEFAULT_POUCH, FREE, MODES, POUCH_PICKS, SEEDS, SKILLS, SLOT_SEEDS, TOWERS, type Mode, type Skill, type TowerKind } from './rules';
 
 // Mazewright keeps nine keys (the ninth, the daily maze's `mazewright-daily`, is kept by
 // `shared/daily.ts`): each garden's records (best wave, win, stars, best time, Endless
@@ -55,6 +55,8 @@ export interface GardenRecord {
   endless: number;
   /** Won its Challenge (its own pouch). */
   challenge: boolean;
+  /** Won it at night (the Night way of play). */
+  night: boolean;
 }
 export type Records = Record<string, GardenRecord>;
 
@@ -62,7 +64,7 @@ const count = (v: unknown) => (Number.isFinite(v) && (v as number) > 0 ? Math.fl
 
 export function loadRecords(): Records {
   const records: Records = {};
-  for (const m of MAPS) records[m.id] = { wave: 0, won: false, stars: 0, time: 0, endless: 0, challenge: false };
+  for (const m of MAPS) records[m.id] = { wave: 0, won: false, stars: 0, time: 0, endless: 0, challenge: false, night: false };
   try {
     const saved = JSON.parse(localStorage.getItem(KEY) ?? 'null');
     for (const m of MAPS) {
@@ -75,6 +77,7 @@ export function loadRecords(): Records {
       into.time = count(r.time);
       into.endless = count(r.endless);
       into.challenge = r.challenge === true;
+      into.night = r.night === true;
     }
   } catch {
     // A broken or blocked save starts fresh.
@@ -93,6 +96,7 @@ export function noteRecord(records: Records, mapId: string, result: Partial<Gard
   if (result.time) r.time = r.time ? Math.min(r.time, result.time) : result.time;
   r.endless = Math.max(r.endless, result.endless ?? 0);
   r.challenge ||= !!result.challenge;
+  r.night ||= !!result.night;
   if (JSON.stringify(r) === before) return;
   try {
     localStorage.setItem(KEY, JSON.stringify(records));
@@ -199,14 +203,14 @@ const ACTIONS: readonly Action['a'][] = ['build', 'upgrade', 'sell', 'turn', 'ai
 const whole = (v: unknown) => Number.isInteger(v) && (v as number) >= 0;
 /** Whether a logged action can be played: a known action at a step, on a cell, with a tower that exists. */
 const playable = (a: Action) =>
-  a && ACTIONS.includes(a.a) && whole(a.s) && (a.c === undefined || whole(a.c)) && (a.k === undefined || TOWERS.includes(a.k));
+  a && ACTIONS.includes(a.a) && whole(a.s) && (a.c === undefined || whole(a.c)) && (a.k === undefined || ALL_TOWERS.includes(a.k));
 
 /** Whether a saved replay is one this version can play: its own rules version, a known way of play and playable actions. */
 function valid(r: Replay, map: string) {
   return (
     r && r.v === REPLAY_VERSION && r.map === map && MODES.includes(r.mode) && Array.isArray(r.log) && r.log.every(playable) &&
     Number.isFinite(r.seed) && Number.isFinite(r.steps) && Number.isFinite(r.toughness) && whole(r.lives) && r.lives > 0 &&
-    (r.masters === null || (Array.isArray(r.masters) && r.masters.every((k) => TOWERS.includes(k)))) &&
+    (r.masters === null || (Array.isArray(r.masters) && r.masters.every((k) => ALL_TOWERS.includes(k)))) &&
     (r.hero == null || (Array.isArray(r.hero) && r.hero.every((k) => SKILLS.includes(k))))
   );
 }
@@ -244,7 +248,7 @@ export interface SavedGame extends Replay {
 export function loadGame(): SavedGame | null {
   try {
     const saved = JSON.parse(localStorage.getItem(GAME_KEY) ?? 'null');
-    if (saved && MAPS.some((m) => m.id === saved.map) && valid(saved, saved.map) && Array.isArray(saved.pouch) && saved.pouch.every((k: TowerKind) => TOWERS.includes(k)) && whole(saved.wave)) return saved;
+    if (saved && MAPS.some((m) => m.id === saved.map) && valid(saved, saved.map) && Array.isArray(saved.pouch) && saved.pouch.every((k: TowerKind) => ALL_TOWERS.includes(k)) && whole(saved.wave)) return saved;
   } catch {
     // A broken or blocked save, or one from other rules, starts at the garden picker.
   }
