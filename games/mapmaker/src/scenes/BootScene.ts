@@ -14,11 +14,11 @@ export class BootScene extends Phaser.Scene {
     super('Boot');
   }
 
-  create(data?: { state?: GameState; theme?: Theme }) {
+  create(data?: { state?: GameState; atlas?: GameState | null; theme?: Theme }) {
     sharpenArt();
     applyTheme(data?.theme ?? loadTheme());
     bakeSurveyor(this);
     bakeIcons(this);
-    this.scene.start('Game', { state: data?.state });
+    this.scene.start('Game', { state: data?.state, atlas: data?.atlas });
   }
 }

@@ -31,6 +31,7 @@ import {
 } from './state';
 import { CHART_ORDER, TERRAIN, type Terrain } from './terrain';
 import { nextCost, type UpgradeId } from './upgrades';
+import { placeWonder, spotWonder } from './wonders';
 
 /** What a commission can ask for on one voyage: how many tiles of a terrain, and the bonus it pays. */
 const COMMISSIONS: Omit<Commission, 'voyages' | 'done' | 'left'>[] = [
@@ -80,6 +81,8 @@ export function newGame(): GameState {
     rival: null,
     royal: null,
     next: null,
+    wonder: placeWonder(tiles, 1, kind),
+    wonders: [],
   };
   s.supplies = maxSupplies(s);
   s.commission = rollCommission(fogged(s.tiles));
@@ -145,10 +148,11 @@ export function sightOf(s: GameState, terrain: Terrain) {
  * shore beside it, for sea), and from hills and peaks also reveals the tiles in sight for free.
  * Finds under the revealed tiles turn up at once. Every `RIVAL_PACE` surveys the rival takes a
  * turn. The voyage ends when nothing more can be done. Returns false when the tile can't be surveyed,
- * else the storms it `settled` (which may have ended the voyage, clearing `storms`) and the storm
- * finds that found no fogged tile to settle on (they `passed`).
+ * else the storms it `settled` (which may have ended the voyage, clearing `storms`), the storm
+ * finds that found no fogged tile to settle on (they `passed`) and whether the isle's wonder came
+ * into sight (`wonder`).
  */
-export function survey(s: GameState, x: number, y: number): { settled: Point[]; passed: Point[] } | false {
+export function survey(s: GameState, x: number, y: number): { settled: Point[]; passed: Point[]; wonder: boolean } | false {
   if (s.phase !== 'survey' || !canSurvey(s, x, y) || !canAfford(s, { x, y })) return false;
   s.supplies -= costOf(s, x, y);
   const tile = tileAt(s, x, y)!;
@@ -195,12 +199,13 @@ export function survey(s: GameState, x: number, y: number): { settled: Point[]; 
     } else passed.push(p);
   }
 
+  const wonder = spotWonder(s);
   if (s.rival && ++s.rival.due >= RIVAL_PACE) {
     s.rival.due = 0;
     rivalTurn(s);
   }
   endIfDone(s);
-  return { settled, passed };
+  return { settled, passed, wonder };
 }
 
 /**
@@ -363,7 +368,8 @@ export function returnToPort(s: GameState) {
   // Once this isle is charted in full (storms cleared, so they hide nothing), the next one is
   // rolled now, so the chart can tell whether a long commission carries over to it, and the sale
   // lays the board out for it.
-  if (islandCharted(s)) s.next = makeIsland(s.island + 1);
+  // A far or daily isle is a voyage of its own, with no isle after it.
+  if (!s.run && islandCharted(s)) s.next = makeIsland(s.island + 1);
   return true;
 }
 
@@ -458,6 +464,8 @@ export function isleProgress(s: GameState) {
 
 /** The isle milestones reached but not paid yet. */
 export function milestonesDue(s: GameState) {
+  // A far or daily isle pays no milestones and binds no page.
+  if (s.run) return [];
   const { pct } = isleProgress(s);
   return MILESTONES.slice(s.milestones).filter((m) => pct >= m.pct);
 }
@@ -472,7 +480,7 @@ export const royalComplete = (s: GameState) => atlasKinds(s).size >= Math.min(RO
  * completes the Royal Atlas opens its page first.
  */
 export function sellChart(s: GameState) {
-  if (s.phase !== 'chart' || !s.chart) return false;
+  if (s.phase !== 'chart' || !s.chart || s.run) return false;
   s.coins += s.chart.total;
   s.lastSale = s.chart.total;
   s.milestones += s.chart.milestones;
@@ -562,7 +570,7 @@ export const islandCharted = (s: GameState) => frontier(s).length === 0;
  * one `sellChart` rolled), where the rival lands too from `RIVAL_FROM`.
  */
 export function setSail(s: GameState) {
-  if (s.phase !== 'harbor') return false;
+  if (s.phase !== 'harbor' || s.run) return false;
   if (islandCharted(s)) {
     s.island += 1;
     const { kind, tiles, port, riddle, features, seed } = s.next ?? makeIsland(s.island);
@@ -573,6 +581,7 @@ export function setSail(s: GameState) {
     s.port = port;
     s.riddle = riddle;
     s.features = features;
+    s.wonder = placeWonder(tiles, s.island, kind);
     s.camps = [];
     s.dug = [];
     s.milestones = 0;
@@ -641,4 +650,13 @@ function rollHands(): Hand[] {
     [ids[i], ids[j]] = [ids[j], ids[i]];
   }
   return ids.slice(0, HANDS_OFFERED);
+}
+
+/**
+ * A run's score once its voyage is over: the coins its chart is worth on the daily isle, the share of
+ * the isle charted (in percent) on an expedition.
+ */
+export function runScore(s: GameState) {
+  if (!s.run) return 0;
+  return s.run.mode === 'daily' ? (s.chart ?? chartOf(s)).total : isleProgress(s).pct;
 }

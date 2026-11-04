@@ -29,6 +29,9 @@ const en: HowToPlay = {
       action: 'At the harbour: pick a commission, take a hand aboard or buy an upgrade',
     },
     { input: 'Set sail', action: 'Start the next voyage with full supplies' },
+    { input: 'Daily isle', action: "At the harbour: one voyage on today's isle, the same for everyone, scored by coins" },
+    { input: 'Wonders', action: 'At the harbour: the gallery of the wonders you have seen' },
+    { input: 'Expeditions', action: 'At the harbour, once the Royal Atlas is bound: one voyage to a far isle, scored by how much you chart' },
     { input: 'Moon or sun beside the logo', action: 'Switch between the white sheet and the dark night sheet' },
   ],
   loop: [
@@ -46,6 +49,8 @@ const en: HowToPlay = {
     'Charting a whole river, road or wood pays 2 extra coins for each of its tiles.',
     'Charting all of an isle binds it into your atlas, and the next voyage sails to a new isle.',
     'From the third isle a rival surveyor charts too, and tiles they reach first sell for half.',
+    'Every isle hides a wonder that shows once its tile and every tile beside it are charted.',
+    'The daily isle and the expeditions have one sack of supplies for the whole isle and no restocking.',
   ],
 };
 
@@ -86,6 +91,9 @@ const de: HowToPlay = {
       action: 'Im Hafen: einen Auftrag wählen, einen Helfer an Bord nehmen oder eine Verbesserung kaufen',
     },
     { input: 'In See stechen', action: 'Die nächste Reise mit vollen Vorräten beginnen' },
+    { input: 'Tagesinsel', action: 'Im Hafen: eine Reise zur heutigen Insel, für alle gleich, gewertet nach Münzen' },
+    { input: 'Wunder', action: 'Im Hafen: die Galerie der Wunder, die du gesehen hast' },
+    { input: 'Expeditionen', action: 'Im Hafen, sobald der Königliche Atlas gebunden ist: eine Reise zu einer fernen Insel, gewertet nach dem kartierten Anteil' },
     { input: 'Mond oder Sonne neben dem Logo', action: 'Zwischen dem weißen Blatt und dem dunklen Nachtblatt wechseln' },
   ],
   loop: [
@@ -103,6 +111,8 @@ const de: HowToPlay = {
     'Einen ganzen Fluss, eine Straße oder einen Wald zu kartieren bringt 2 Münzen extra für jedes seiner Felder.',
     'Eine ganz kartierte Insel wird in deinen Atlas gebunden, und die nächste Reise geht zu einer neuen Insel.',
     'Ab der dritten Insel kartiert auch ein rivalisierender Vermesser, und Felder, die er zuerst erreicht, bringen nur die Hälfte.',
+    'Jede Insel birgt ein Wunder, das sich zeigt, sobald sein Feld und alle Felder daneben kartiert sind.',
+    'Die Tagesinsel und die Expeditionen haben einen Sack Vorräte für die ganze Insel und keinen Nachschub.',
   ],
 };
 

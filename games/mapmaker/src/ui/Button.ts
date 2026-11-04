@@ -29,6 +29,8 @@ export function makeButton(
       resolution: Math.max(2, renderScale),
     })
     .setOrigin(align === 'left' ? 0 : 0.5, 0.5);
+  // A caption too long for a small button (in German, say) is squeezed to fit.
+  if (text.width > size.w - 12) text.setScale((size.w - 12) / text.width, 1);
   const button = scene.add.container(x, y, [bg, text]);
   bg.setInteractive({ useHandCursor: enabled });
   if (enabled) {

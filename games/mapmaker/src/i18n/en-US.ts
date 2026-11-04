@@ -8,6 +8,7 @@ const enUS: Partial<Translation<typeof en>> = {
   artefactsRow: 'Artifacts from caves   {n} × {each}',
   harbourTitle: 'The harbor',
   noHands: 'No hands at the harbor',
+  backToHarbour: 'Back to the harbor',
 };
 
 export default enUS;

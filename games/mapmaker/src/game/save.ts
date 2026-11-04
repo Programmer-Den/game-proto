@@ -2,6 +2,7 @@ import type { Theme } from '../art/paint';
 import en from '../i18n/en';
 import type { TextKey } from '../i18n';
 import { findFeatures, makeIsland } from './island';
+import { placeWonder, wonderInSight } from './wonders';
 import { GRID, WRECK_SUPPLIES, indexOf, maxSupplies, type Clue, type GameState, type Ground, type Riddle, type Tile } from './state';
 
 // The whole game is saved after every successful action, so a
@@ -14,10 +15,33 @@ import { GRID, WRECK_SUPPLIES, indexOf, maxSupplies, type Clue, type GameState, 
 const KEY = 'mapmaker-save';
 const BEST_KEY = 'mapmaker-best';
 const THEME_KEY = 'mapmaker-theme';
+/** An expedition or the daily isle under way, saved apart from the atlas (only a progress file carries it). */
+const RUN_KEY = 'mapmaker-run';
+/** The best share of each far isle an expedition has charted, in percent, by `FAR_ISLES` order. */
+const EXPEDITIONS_KEY = 'mapmaker-expeditions';
 
 export function loadGame(): GameState | null {
+  return load(KEY);
+}
+
+/** The expedition or daily isle under way, or null. */
+export function loadRun(): GameState | null {
+  const s = load(RUN_KEY);
+  return s?.run ? s : null;
+}
+
+/** Ends the run under way, so a reload goes back to the atlas. */
+export function clearRun() {
   try {
-    const s = unpack(JSON.parse(localStorage.getItem(KEY) ?? 'null') as Stored | GameState | null);
+    localStorage.removeItem(RUN_KEY);
+  } catch {
+    // Blocked storage never held the run.
+  }
+}
+
+function load(key: string): GameState | null {
+  try {
+    const s = unpack(JSON.parse(localStorage.getItem(key) ?? 'null') as Stored | GameState | null);
     // A save from a different grid size or a broken one starts over.
     if (!s || !Array.isArray(s.tiles) || s.tiles.length !== GRID.w * GRID.h || !s.port || !s.phase) return null;
     // Supplies saved on an easier difficulty can exceed this one's maximum (plus this voyage's wrecks).
@@ -46,6 +70,16 @@ export function loadGame(): GameState | null {
     s.royal ??= null;
     // Saves from before the next isle was rolled at the sale: setSail rolls it.
     s.next ??= null;
+    // Saves from before the wonders: the isle's wonder is placed now (a far or daily isle has
+    // none), and seen at once when its neighbours are already charted.
+    s.wonders ??= [];
+    if (s.wonder === undefined) {
+      s.wonder = s.run ? null : placeWonder(s.tiles, s.island, s.kind);
+      if (s.wonder && wonderInSight(s)) {
+        s.wonder.seen = true;
+        if (!s.wonders.some((w) => w.kind === s.wonder!.kind)) s.wonders.push({ kind: s.wonder.kind, island: s.island });
+      }
+    }
     // Saves from before the translations kept feature names and riddle clues in English words.
     for (const f of [...s.features, ...(s.next?.features ?? []), ...(s.chart?.features ?? [])]) f.name = nameKey(f.name);
     for (const r of [s.riddle, s.next?.riddle]) if (r) r.clues = r.clues.map(oldClue).filter((c) => c !== null);
@@ -159,9 +193,10 @@ function unmask(text: string) {
   return Array.from({ length: GRID.w * GRID.h }, (_, i) => ((bytes[i >> 3] ?? 0) >> (i & 7)) & 1).map(Boolean);
 }
 
+/** Saves the atlas, or the run under way when `s` is one. */
 export function saveGame(s: GameState) {
   try {
-    localStorage.setItem(KEY, JSON.stringify(pack(s)));
+    localStorage.setItem(s.run ? RUN_KEY : KEY, JSON.stringify(pack(s)));
   } catch {
     // Storage can be full or blocked (private mode); the game keeps running unsaved.
   }
@@ -207,4 +242,29 @@ export function saveTheme(t: Theme) {
     // Storage can be full or blocked; the theme button hands the theme to Boot itself, so it
     // still switches and lasts until the page is closed.
   }
+}
+
+/** The best share charted on each far isle, in percent (0 for one never reached). */
+export function loadExpeditions(count: number): number[] {
+  let saved: unknown = null;
+  try {
+    saved = JSON.parse(localStorage.getItem(EXPEDITIONS_KEY) ?? 'null');
+  } catch {
+    // A broken or blocked record starts over.
+  }
+  const list = Array.isArray(saved) ? saved : [];
+  return Array.from({ length: count }, (_, i) => (typeof list[i] === 'number' && Number.isFinite(list[i]) ? list[i] : 0));
+}
+
+/** Records an expedition's share charted on a far isle when it beats the best, and says whether it did. */
+export function saveExpedition(far: number, pct: number, count: number) {
+  const bests = loadExpeditions(count);
+  if (pct <= bests[far]) return false;
+  bests[far] = pct;
+  try {
+    localStorage.setItem(EXPEDITIONS_KEY, JSON.stringify(bests));
+  } catch {
+    // Storage can be full or blocked; the best is simply not kept.
+  }
+  return true;
 }

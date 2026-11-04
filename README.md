@@ -68,7 +68,7 @@ The hub's **Settings** button opens the settings every game shares. They are sav
   | Beehive Baron | foraging trips 25% shorter | foraging trips 30% longer |
   | Wyrmrail | orders allow 50% more time | orders allow 30% less time |
   | Shrine Stack | stones swing 20% slower | stones swing 25% faster |
-  | Mapmaker | 16 supplies a voyage | 9 supplies a voyage |
+  | Mapmaker | 16 supplies a voyage (40 on an expedition) | 9 supplies a voyage (24 on an expedition) |
   | Lanternkeep | lanterns burn 30% longer | lanterns burn 20% shorter |
   | Space Wars | rivals attack with 9 warships | rivals attack with 4 warships |
   | Colonizer | the AI gathers 25% slower | the AI gathers 25% faster |

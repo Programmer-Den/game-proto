@@ -5,6 +5,7 @@ import type { Island } from './island';
 import type { IsleKind } from './kinds';
 import type { Terrain } from './terrain';
 import type { UpgradeId } from './upgrades';
+import type { Wonder, WonderKind } from './wonders';
 
 /** The island grid, in tiles. */
 export const GRID = { w: 15, h: 11 };
@@ -47,6 +48,13 @@ export const RIVAL_PACE = 2;
 export const RIVAL_STEPS = 3;
 /** The kinds of isle the Royal Atlas needs one page of each. */
 export const ROYAL_KINDS = 4;
+
+/**
+ * A voyage away from the atlas, on an isle of its own with one fixed budget of supplies and no
+ * restocking: an expedition to one of the far isles (from the Royal Atlas on, scored by the share of
+ * the isle charted) or the daily isle (the same for everyone on the same day, scored by coins).
+ */
+export type Run = { mode: 'expedition'; far: number; supplies: number } | { mode: 'daily'; day: string; supplies: number };
 
 export interface Milestone {
   pct: number;
@@ -235,10 +243,16 @@ export interface GameState {
   royal: { voyage: number } | null;
   /** The next isle, rolled by the sale that charted this one in full; `setSail` lands on it. */
   next: Island | null;
+  /** The wonder this isle hides (null on a far or daily isle), shown once its neighbours are charted. */
+  wonder: Wonder | null;
+  /** The wonder gallery: the first wonder of each kind seen, and the isle it was seen on. */
+  wonders: { kind: WonderKind; island: number }[];
+  /** Set on an expedition or the daily isle, which are played apart from the atlas. */
+  run?: Run;
 }
 
 export const rankOf = (s: GameState, id: UpgradeId) => s.ranks[id] ?? 0;
-export const maxSupplies = (s: GameState) => BASE_SUPPLIES + PROVISIONS_STEP * rankOf(s, 'provisions');
+export const maxSupplies = (s: GameState) => s.run?.supplies ?? BASE_SUPPLIES + PROVISIONS_STEP * rankOf(s, 'provisions');
 export const inkBonus = (s: GameState) => INK_STEP * rankOf(s, 'ink');
 
 export const indexOf = (x: number, y: number) => y * GRID.w + x;

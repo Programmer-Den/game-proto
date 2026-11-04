@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { settings } from '../../../../shared/settings';
+import { finishDaily, loadDaily, startDaily, today } from '../../../../shared/daily';
 import { formatNumber } from '../../../../shared/i18n';
 import { renderScale, viewFrame, viewSize } from '../../../../shared/scaling';
 import { playMusic, playSting, ui } from '../../../../shared/audio';
@@ -33,7 +34,9 @@ import {
   theme,
 } from '../art/paint';
 import { SURVEYOR_ORIGIN } from '../art/surveyor';
-import { loadBest, loadGame, saveBest, saveGame, saveTheme } from '../game/save';
+import { clearRun, loadBest, loadExpeditions, loadGame, loadRun, saveBest, saveExpedition, saveGame, saveTheme } from '../game/save';
+import { DAILY_GAME, EXPEDITION_SUPPLIES, FAR_ISLES, dailyRun, expedition, newRun } from '../game/runs';
+import { WONDERS, WONDER_IDS } from '../game/wonders';
 import { checkTrophies } from '../trophies/check';
 import {
   artifactValue,
@@ -59,6 +62,7 @@ import {
   pickCommission,
   pitchCamp,
   returnToPort,
+  runScore,
   sellChart,
   setSail,
   survey,
@@ -83,6 +87,7 @@ import {
   type GameState,
   type Ground,
   type Point,
+  type Run,
   type Tile,
 } from '../game/state';
 import { CHART_ORDER, TERRAIN, isLandmark } from '../game/terrain';
@@ -135,6 +140,8 @@ const PL = PANEL.x + 18;
 const PR = PANEL.x + PANEL.w - 18;
 /** The theme switch beside the panel's logo. */
 const THEME_BUTTON = { x: PR - 36, y: 50, size: 20 };
+/** The small buttons in the harbour's heading row: the daily isle, the wonders and the expeditions. */
+const HEAD_BUTTON = { w: 100, h: 24 };
 /** Type on an atlas page's cover, light on every kind's colour in both themes. */
 const PAGE_TYPE = '#fbfaf6';
 
@@ -241,12 +248,16 @@ export class GameScene extends Phaser.Scene {
   private musicPart = '';
   /** Whether the sale that completed the Royal Atlas set a new best (a reload shows the best instead). */
   private newBest = false;
+  /** The atlas waiting at the harbour while an expedition or the daily isle is under way (`state`). */
+  private atlasState: GameState | null = null;
+  /** A page opened over the harbour: the far isles or the wonder gallery. */
+  private sheetView: '' | 'expeditions' | 'wonders' = '';
 
   constructor() {
     super('Game');
   }
 
-  create(data?: { state?: GameState }) {
+  create(data?: { state?: GameState; atlas?: GameState | null }) {
     this.paintedTiles = null;
     this.known = [];
     this.fading = [];
@@ -262,7 +273,11 @@ export class GameScene extends Phaser.Scene {
     this.overlay = null;
     this.overlayKey = '';
     this.musicPart = '';
-    this.state = data?.state ?? loadGame() ?? newGame();
+    this.sheetView = '';
+    // A run under way (an expedition or the daily isle) comes back with the atlas waiting behind it.
+    const run = data?.state ? null : loadRun();
+    this.state = data?.state ?? run ?? loadGame() ?? newGame();
+    this.atlasState = data?.state ? (data.atlas ?? null) : run ? (loadGame() ?? newGame()) : null;
     // The sheet is laid out for 960x540; on a screen of another shape the camera centres it in the
     // view and the drafting table fills the rest.
     const frame = viewFrame(this);
@@ -325,6 +340,11 @@ export class GameScene extends Phaser.Scene {
           this.announceFeatures(before.features),
           this.announceRival(before.rivalRuins, before.rivalTreasure),
         ].filter((n): n is News => n !== null);
+        if (storms.wonder && s.wonder) {
+          const c = tileCentre(s.wonder.at.x, s.wonder.at.y);
+          this.notice(c.x, c.y - 30, t('wonderSeen', { name: t(WONDERS[s.wonder.kind].name) }), true);
+          news.push('wonder');
+        }
         news.sort((a, b) => NEWS_ORDER.indexOf(a) - NEWS_ORDER.indexOf(b));
         if (news.length) playNews(news[0]);
         this.endedVoyage();
@@ -934,6 +954,8 @@ export class GameScene extends Phaser.Scene {
     const r = s.riddle;
     if (r?.found && !r.rival) want.set(`treasure`, { key: 'treasure', ...at(r.at, 0, 4), scale: 0.9 });
     else if (r?.rival && s.tiles[indexOf(r.at.x, r.at.y)].revealed) want.set(`dug:${indexOf(r.at.x, r.at.y)}`, { key: 'dug', ...at(r.at, 0, 6), scale: 0.9 });
+    // The isle's wonder, once its tile and every tile beside it are charted.
+    if (s.wonder?.seen) want.set('wonder', { key: `wonder-${s.wonder.kind}`, ...at(s.wonder.at, 0, 0), scale: 0.9 });
     for (const p of s.camps) want.set(`camp:${indexOf(p.x, p.y)}`, { key: 'camp', ...at(p, 9, -9), scale: 1 });
     // The rival's claims show through the paper, so you know which tiles will sell for half.
     for (const p of s.rival?.claims ?? []) want.set(`claim:${indexOf(p.x, p.y)}`, { key: 'claim', ...at(p, 11, -10), scale: 0.8 });
@@ -944,7 +966,7 @@ export class GameScene extends Phaser.Scene {
     }
     for (const [id, m] of want) {
       if (this.marks.has(id)) continue;
-      this.marks.set(id, this.add.image(m.x, m.y, m.key).setScale(m.scale / HI).setDepth(m.key === 'camp' || m.key === 'claim' ? 5.5 : 3.5));
+      this.marks.set(id, this.add.image(m.x, m.y, m.key).setScale(m.scale / HI).setDepth(m.key === 'camp' || m.key === 'claim' ? 5.5 : m.key.startsWith('wonder') ? 3.6 : 3.5));
     }
   }
 
@@ -1082,7 +1104,7 @@ export class GameScene extends Phaser.Scene {
         saveTheme(next);
         // The running game and the new theme are handed along, so the restart never falls back to
         // an older save (or a new game) or the old theme when storage is blocked or full.
-        this.scene.start('Boot', { state: this.state, theme: next });
+        this.scene.start('Boot', { state: this.state, atlas: this.atlasState, theme: next });
       });
     this.add.container(x, y, [g, hit]).setDepth(UI_DEPTH + 1);
     this.spots.theme = { x, y };
@@ -1116,15 +1138,19 @@ export class GameScene extends Phaser.Scene {
     const p = this.panel;
     const max = maxSupplies(s);
     const set = (text: Phaser.GameObjects.Text, v: string) => text.text !== v && text.setText(v);
-    set(this.header.isle, t('isleHead', { n: s.island }));
+    const head = runHead(s.run);
+    set(this.header.isle, head ?? t('isleHead', { n: s.island }));
     this.header.sheet.setX(24 + this.header.isle.width + 14);
     const aboard = s.hand ? t('aboard', { hand: t(HANDS[s.hand].name).toUpperCase() }) : '';
-    set(this.header.sheet, t('sheetHead', { kind: t(KINDS[s.kind].name).toUpperCase(), sheet: s.voyage - s.isleStart + 1, aboard }));
-    set(p.isle, t('panelIsle', { island: s.island, voyage: s.voyage }));
-    const pages = s.atlas.length;
+    const kind = t(KINDS[s.kind].name).toUpperCase();
+    set(this.header.sheet, s.run ? t('runSheet', { kind }) : t('sheetHead', { kind, sheet: s.voyage - s.isleStart + 1, aboard }));
+    set(p.isle, s.run ? t('runPanel', { n: s.run.supplies }) : t('panelIsle', { island: s.island, voyage: s.voyage }));
+    // The atlas waits at the harbour during a run; its pages still show.
+    const book = this.atlasState ?? s;
+    const pages = book.atlas.length;
     set(p.atlas, t('atlasCount', { n: pages }));
     p.atlas.setColor(pages ? INK : GREY);
-    p.atlasIcon.setTexture(pages ? `atlas-${s.atlas[pages - 1].kind}` : 'atlas-empty').setX(PR - p.atlas.width - 10);
+    p.atlasIcon.setTexture(pages ? `atlas-${book.atlas[pages - 1].kind}` : 'atlas-empty').setX(PR - p.atlas.width - 10);
     set(p.supplies, `${s.supplies}`);
     set(p.max, `/ ${max}`);
     p.max.setX(PL + p.supplies.width + 3);
@@ -1218,7 +1244,7 @@ export class GameScene extends Phaser.Scene {
 
     // The isle goal: the share charted, with its milestones.
     const { pct } = isleProgress(s);
-    set(p.isleLabel, t('isleSurveyed', { n: s.island }));
+    set(p.isleLabel, head ?? t('isleSurveyed', { n: s.island }));
     set(p.pct, t('percent', { n: pct }));
     const bw = PR - PL;
     const by = 389;
@@ -1227,6 +1253,9 @@ export class GameScene extends Phaser.Scene {
     for (let k = 0; k <= 20; k++) g.fillStyle(hex(INK)).fillRect(PL + (bw * k) / 20 - 0.25, by + 8, 0.5, k % 5 ? 2.5 : 4.5);
     const due = milestonesDue(s).length;
     MILESTONES.forEach((m, k) => {
+      // A far or daily isle pays no milestones.
+      p.marks[k].setVisible(!s.run);
+      if (s.run) return;
       const mx = PL + (bw * m.pct) / 100;
       const paid = k < s.milestones;
       const reached = !paid && k < s.milestones + due;
@@ -1267,7 +1296,7 @@ export class GameScene extends Phaser.Scene {
   private syncOverlay() {
     const s = this.state;
     const pick = s.board.findIndex((_, n) => isPicked(s, n));
-    const key = s.phase === 'survey' ? '' : `${s.phase}:${s.coins}:${JSON.stringify(s.ranks)}:${s.hand}:${pick}`;
+    const key = s.phase === 'survey' ? '' : `${s.phase}:${s.coins}:${JSON.stringify(s.ranks)}:${s.hand}:${pick}:${this.sheetView}:${s.run?.mode ?? ''}`;
     if (key === this.overlayKey) return;
     this.overlayKey = key;
     this.overlay?.destroy();
@@ -1275,7 +1304,9 @@ export class GameScene extends Phaser.Scene {
     for (const name of Object.keys(this.spots)) if (!['return', 'camp', 'theme'].includes(name)) delete this.spots[name];
     if (s.phase === 'chart') this.showChart();
     if (s.phase === 'atlas') this.showAtlas();
-    if (s.phase === 'harbor') this.showHarbor();
+    if (s.phase === 'harbor' && this.sheetView === 'expeditions') this.showExpeditions();
+    else if (s.phase === 'harbor' && this.sheetView === 'wonders') this.showWonders();
+    else if (s.phase === 'harbor') this.showHarbor();
   }
 
   private overlayBase(title: string) {
@@ -1299,6 +1330,7 @@ export class GameScene extends Phaser.Scene {
 
   private showChart() {
     const s = this.state;
+    if (s.run) return this.showRunChart(s.run);
     const chart = s.chart!;
     const c = this.overlayBase(t('chartTitle', { island: s.island, voyage: s.voyage }));
     const top = OVERLAY.y - OVERLAY.h / 2;
@@ -1378,6 +1410,194 @@ export class GameScene extends Phaser.Scene {
     this.spots.sell = { ...OVERLAY_BUTTON };
   }
 
+  /**
+   * The end of an expedition or the daily isle: what the voyage charted, its score (coins on the
+   * daily isle, the share of the isle on an expedition) against the best, and the way back to the
+   * harbour, which keeps the score.
+   */
+  private showRunChart(run: Run) {
+    const s = this.state;
+    const chart = s.chart!;
+    const daily = run.mode === 'daily';
+    const c = this.overlayBase(daily ? t('dailyTitle', { day: run.day }) : t('expeditionTitle', { n: run.far + 1 }));
+    const top = OVERLAY.y - OVERLAY.h / 2;
+    const left = OVERLAY.x - OVERLAY.w / 2 + 60;
+    const right = OVERLAY.x + OVERLAY.w / 2 - 60;
+    type Row = { icon?: string; label: string; value: string; color?: string };
+    const rows: Row[] = [];
+    const kinds = CHART_ORDER.filter((t) => chart.counts[t]);
+    if (kinds.length === 0) rows.push({ label: t('nothingCharted'), value: '0' });
+    for (const terrain of kinds) {
+      const n = chart.counts[terrain]!;
+      const { name, value } = TERRAIN[terrain];
+      // An expedition counts tiles; the daily isle counts coins.
+      rows.push({ icon: `swatch-${terrain}`, label: daily ? `${t(name)}   ${n} × ${value}` : t(name), value: daily ? `${n * value}` : `${n}` });
+    }
+    if (daily) {
+      if (chart.ink > 0) rows.push({ label: t('inkName'), value: `+${chart.ink}` });
+      for (const f of chart.features) rows.push({ label: t('featureRow', { name: t(f.name) }), value: `+${f.bonus}`, color: GREEN });
+      if (chart.artifacts > 0) rows.push({ icon: 'artifact', label: t('artefactsRow', { n: chart.artifacts, each: artifactValue(s) }), value: `+${chart.artifactCoins}`, color: GOLD_DARK });
+      if (chart.treasure > 0) rows.push({ icon: 'treasure', label: t('treasureRow'), value: `+${chart.treasure}`, color: GOLD_DARK });
+      if (chart.unused > 0) {
+        const capped = chart.sellBack < chart.unused * SELL_BACK;
+        rows.push({ label: t(capped ? 'unusedRowCapped' : 'unusedRow', { n: chart.unused, each: SELL_BACK }), value: `+${chart.sellBack}`, color: MAGENTA });
+      }
+    }
+    // The rows share what is left above the score and the record under it.
+    const room = OVERLAY_BUTTON.y - 80 - (top + 62);
+    const rowH = Math.min(24, room / rows.length);
+    let y = top + 62;
+    for (const r of rows) {
+      const color = r.color ?? INK;
+      if (r.icon) c.add(this.add.image(left + 8, y + rowH / 2, r.icon).setScale((r.icon.startsWith('swatch') ? 1 : 0.7) / HI));
+      c.add(this.text(left + 24, y + rowH / 2, r.label, { size: 11.5, weight: 600, color }).setOrigin(0, 0.5));
+      c.add(this.text(right, y + rowH / 2, r.value, { size: 11.5, weight: 700, color }).setOrigin(1, 0.5));
+      y += rowH;
+    }
+    y += 6;
+    const g = this.add.graphics();
+    g.fillStyle(hex(INK)).fillRect(left, y, right - left, 1.5);
+    c.add(g);
+    y += 16;
+    const score = runScore(s);
+    c.add(this.text(left, y, daily ? t('dailyScore') : t('expeditionScore'), { size: 15, weight: 800 }).setOrigin(0, 0.5));
+    c.add(this.text(right, y, daily ? t('coinCount', { n: score }) : t('percent', { n: score }), { size: 15, weight: 800 }).setOrigin(1, 0.5));
+    // The record as it stood before this voyage, and whether this one beats it.
+    const record = daily ? loadDaily(DAILY_GAME, run.day) : null;
+    const best = daily ? record!.best : loadExpeditions(FAR_ISLES.length)[run.far];
+    const beaten = score > best;
+    const line = beaten
+      ? t('newBest')
+      : daily
+        ? t('dailyRecord', { best: coins(best), streak: record!.streak })
+        : t('expeditionRecord', { n: best });
+    c.add(this.text(OVERLAY.x, y + 22, line, { size: 11, weight: 700, color: beaten ? MAGENTA : GREY, ls: 1 }).setOrigin(0.5));
+    c.add(makeButton(this, OVERLAY_BUTTON.x, OVERLAY_BUTTON.y, t('backToHarbour'), () => this.finishRun(), { w: 240, h: BUTTON.h }));
+    this.spots.finish = { ...OVERLAY_BUTTON };
+  }
+
+  /** Sets out on an expedition or the daily isle from the harbour; the atlas waits there. */
+  private startRun(run: Run) {
+    if (this.state.phase !== 'harbor' || this.state.run) return ui('refuse');
+    if (run.mode === 'daily') startDaily(DAILY_GAME, run.day);
+    this.atlasState = this.state;
+    this.state = newRun(this.atlasState, run);
+    this.sheetView = '';
+    saveGame(this.state);
+    sfx('swell');
+    sfx('horn');
+    this.endSweep();
+    this.walker = tileCentre(this.state.port.x, this.state.port.y);
+  }
+
+  /** Keeps the run's score (today's daily, or the far isle's best) and goes back to the atlas at the harbour. */
+  private finishRun() {
+    const s = this.state;
+    const run = s.run;
+    if (!run || s.phase !== 'chart') return;
+    const score = runScore(s);
+    if (run.mode === 'daily') finishDaily(DAILY_GAME, score, run.day);
+    else saveExpedition(run.far, score, FAR_ISLES.length);
+    clearRun();
+    this.state = this.atlasState ?? loadGame() ?? newGame();
+    this.atlasState = null;
+    this.sheetView = run.mode === 'expedition' ? 'expeditions' : '';
+    sfx('coins');
+    this.endSweep();
+    this.walker = tileCentre(this.state.port.x, this.state.port.y);
+  }
+
+  /** A small button in the overlay's heading row. */
+  private headButton(c: Phaser.GameObjects.Container, n: number, caption: string, onClick: () => void, enabled = true) {
+    const x = OVERLAY.x + OVERLAY.w / 2 - 33 - 26 - HEAD_BUTTON.w / 2 - n * (HEAD_BUTTON.w + 6);
+    const y = OVERLAY.y - OVERLAY.h / 2 + 26;
+    c.add(makeButton(this, x, y, caption, onClick, HEAD_BUTTON, enabled));
+    return { x, y };
+  }
+
+  /** The far isles: one expedition each, with the best share charted, open once the Royal Atlas is bound. */
+  private showExpeditions() {
+    const s = this.state;
+    const c = this.overlayBase(t('expeditionsTitle'));
+    const top = OVERLAY.y - OVERLAY.h / 2;
+    const left = OVERLAY.x - OVERLAY.w / 2 + 34;
+    const right = OVERLAY.x + OVERLAY.w / 2 - 34;
+    const open = !!s.royal;
+    c.add(
+      this.text(left, top + 74, open ? t('expeditionsLine', { n: EXPEDITION_SUPPLIES }) : t('expeditionsLocked'), {
+        size: 11.5,
+        weight: 600,
+        color: open ? INK : SLATE,
+        wrap: right - left,
+      }).setOrigin(0, 0.5),
+    );
+    const bests = loadExpeditions(FAR_ISLES.length);
+    const g = this.add.graphics();
+    c.add(g);
+    FAR_ISLES.forEach((far, n) => {
+      const y = top + 128 + n * 62;
+      g.fillStyle(hex(RULE)).fillRect(left, y - 31, right - left, 1);
+      c.add(this.add.image(left + 12, y, `atlas-${far.kind}`).setScale(1.4 / HI));
+      c.add(this.text(left + 36, y - 9, t('farIsle', { n: n + 1 }), { size: 13, weight: 800 }).setOrigin(0, 0.5));
+      c.add(this.text(left + 36, y + 9, t(KINDS[far.kind].name), { size: 10.5, weight: 500, color: SLATE }).setOrigin(0, 0.5));
+      const best = bests[n];
+      const bx = right - SMALL_BUTTON.w / 2;
+      c.add(
+        this.text(bx - SMALL_BUTTON.w / 2 - 16, y, best > 0 ? t('farBest', { n: best }) : t('farNone'), {
+          size: 11,
+          weight: 700,
+          color: best >= 100 ? MAGENTA : best > 0 ? INK : GREY,
+        }).setOrigin(1, 0.5),
+      );
+      c.add(makeButton(this, bx, y, t('setOut'), () => this.startRun(expedition(n)), SMALL_BUTTON, open));
+      this.spots[`far-${n}`] = { x: bx, y };
+    });
+    c.add(
+      makeButton(this, OVERLAY_BUTTON.x, OVERLAY_BUTTON.y, t('back'), () => {
+        ui('click');
+        this.sheetView = '';
+      }),
+    );
+    this.spots.back = { ...OVERLAY_BUTTON };
+  }
+
+  /** The wonder gallery: a frame for each of the eight wonders, filled with the first of each kind seen. */
+  private showWonders() {
+    const s = this.state;
+    const c = this.overlayBase(t('galleryTitle'));
+    const top = OVERLAY.y - OVERLAY.h / 2;
+    const left = OVERLAY.x - OVERLAY.w / 2 + 34;
+    const right = OVERLAY.x + OVERLAY.w / 2 - 34;
+    c.add(this.text(left, top + 72, t('galleryLine'), { size: 11, weight: 600, color: SLATE, wrap: right - left }).setOrigin(0, 0.5));
+    const cols = 4;
+    const gap = (right - left) / cols;
+    WONDER_IDS.forEach((id, k) => {
+      const seen = s.wonders.find((w) => w.kind === id);
+      const x = left + gap * ((k % cols) + 0.5);
+      const y = top + 150 + Math.floor(k / cols) * 126;
+      c.add(this.add.image(x, y, seen ? `wonder-${id}` : 'wonder-unseen').setScale(1.8 / HI));
+      const name = this.text(x, y + 40, seen ? t(WONDERS[id].name) : '?', { size: 11.5, weight: 800, color: seen ? INK : GREY }).setOrigin(0.5);
+      c.add(name.setScale(Math.min(1, (gap - 8) / name.width), 1));
+      if (seen) {
+        const line = this.text(x, y + 55, t(WONDERS[id].text), { size: 8.5, weight: 500, color: SLATE }).setOrigin(0.5);
+        c.add(line.setScale(Math.min(1, (gap - 8) / line.width), 1));
+      }
+      c.add(this.text(x, y + 69, seen ? t('galleryFound', { n: seen.island }) : t('galleryUnseen'), { size: 8.5, weight: 700, color: seen ? MAGENTA : GREY }).setOrigin(0.5));
+    });
+    c.add(
+      this.text(OVERLAY.x, OVERLAY_BUTTON.y - 36, t('galleryCount', { n: s.wonders.length, total: WONDER_IDS.length }), { size: 10.5, weight: 700 }).setOrigin(
+        0.5,
+      ),
+    );
+    c.add(
+      makeButton(this, OVERLAY_BUTTON.x, OVERLAY_BUTTON.y, t('back'), () => {
+        ui('click');
+        this.sheetView = '';
+      }),
+    );
+    this.spots.back = { ...OVERLAY_BUTTON };
+  }
+
   /** The Royal Atlas: the win page, with the four pages, the voyages it took and the best. */
   private showAtlas() {
     const s = this.state;
@@ -1441,6 +1661,19 @@ export class GameScene extends Phaser.Scene {
   private showHarbor() {
     const s = this.state;
     const c = this.overlayBase(t('harbourTitle'));
+    // The heading row: today's daily isle (one try a day), the wonder gallery and the far isles.
+    const day = today();
+    const daily = loadDaily(DAILY_GAME, day);
+    const dailyCaption = daily.score !== null ? t('dailyPlayed', { score: coins(daily.score) }) : t('dailyButton');
+    this.spots.daily = this.headButton(c, 0, dailyCaption, () => this.startRun(dailyRun(day)), !daily.played);
+    this.spots.wonders = this.headButton(c, 1, t('wondersButton'), () => {
+      ui('click');
+      this.sheetView = 'wonders';
+    });
+    this.spots.expeditions = this.headButton(c, 2, t('expeditionsButton'), () => {
+      ui('click');
+      this.sheetView = 'expeditions';
+    });
     const top = OVERLAY.y - OVERLAY.h / 2;
     const left = OVERLAY.x - OVERLAY.w / 2 + 34;
     const right = OVERLAY.x + OVERLAY.w / 2 - 34;
@@ -1591,6 +1824,12 @@ function commissionText(c: Commission, form: 'full' | 'short' = 'full') {
   return t(long ? 'commissionOver' : 'commissionThis', { count, voyages: c.voyages, n: c.bonus });
 }
 
+/** A far or daily isle's name for the sheet's header ("FAR ISLE 2", "DAILY ISLE"), or null on the atlas's own isles. */
+function runHead(run: Run | undefined) {
+  if (!run) return null;
+  return run.mode === 'daily' ? t('dailyHead') : t('farHead', { n: run.far + 1 });
+}
+
 /** What is left of a long commission: "last voyage" or "2 voyages left". */
 function voyagesLeft(c: Commission) {
   return c.left === 1 ? t('lastVoyage') : t('voyagesLeft', { n: c.left });
@@ -1637,8 +1876,8 @@ function dashedRect(g: Phaser.GameObjects.Graphics, x: number, y: number, w: num
 }
 
 /** What a survey turned up that has a sound; `NEWS_ORDER` puts the most important first. */
-type News = 'riddle' | 'rival' | 'feature' | 'cave' | 'wreck' | 'storm';
-const NEWS_ORDER: News[] = ['riddle', 'rival', 'feature', 'cave', 'wreck', 'storm'];
+type News = 'wonder' | 'riddle' | 'rival' | 'feature' | 'cave' | 'wreck' | 'storm';
+const NEWS_ORDER: News[] = ['wonder', 'riddle', 'rival', 'feature', 'cave', 'wreck', 'storm'];
 
 function playNews(news: News) {
   switch (news) {
