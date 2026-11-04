@@ -3,7 +3,7 @@
 A collection of brain puzzles built with [Phaser 4](https://phaser.io), TypeScript and Vite, part of
 the [game hub](../../README.md).
 
-Eleven kinds of puzzle, dealt like cards from an arcane tarot deck: logic, numbers, spatial thinking
+Thirteen kinds of puzzle, dealt like cards from an arcane tarot deck: logic, numbers, spatial thinking
 and memory. Every puzzle is made in code from a seed, so they never run out, and each kind comes at
 four levels, from Novice to Oracle. Walk a journey of forty set puzzles through five temples, play an endless medley of random puzzles, the same five puzzles
 as everyone else today, a race against the clock, a draft run where you pick the next card and
@@ -19,7 +19,7 @@ It plays sideways or upright, and turns with the phone.
 
 | Control | Action |
 | --- | --- |
-| Tap or click | Fill a cell, pick an island, flip or slide a tile, press a pad key, a glyph or a number |
+| Tap or click | Fill a cell, pick an island, flip, slide or turn a tile, place a mirror, press a pad key, a glyph or a number |
 | Drag | Slide a block (Unjam) or draw a path (Path Link) |
 | Keys 1-9, Backspace | Write or clear a number (Calc Cages, Cross Sums); pick a glyph (Code Breaker) |
 | Enter | Make the guess (Code Breaker) |
@@ -42,6 +42,8 @@ It plays sideways or upright, and turns with the phone.
 | Path Link | Spatial | Drag to join each pair of matching stars; the paths fill every cell and never cross. |
 | Star Slide | Spatial | Tap a tile beside the gap to slide it in. Put the tiles in order, 1 first and the gap last (3x3 up to Adept, 4x4 from Master). |
 | Star Series | Numbers | Three rows of numbers, each following a rule (steps, two steps in turn, growing steps, doubling or tripling, and at Oracle the sum of the two before, squares, or double and add). Pick the number that comes next from four; a third wrong pick loses the puzzle, and a hint strikes out a wrong option. |
+| Pipe Turn | Spatial | Every tile is a piece of pipe; a tap turns it a quarter round. Turn the tiles until the water from the well reaches every house (4x4 at Novice up to 7x7 at Oracle). A hint turns one tile right. |
+| Mirror Maze | Logic | A beam shines in from the lamp at one edge. Tap empty cells to place a mirror (/, then \\, then none) so the beam passes through every crystal, with only as many mirrors as the puzzle gives (2 at Novice up to 5 at Oracle). A hint takes away a wrong mirror or places a right one. |
 | Memory Echo | Memory | Cards turn up one at a time; say whether each is the same as the one 1, 2 or 3 steps back. Three in four must be right. |
 
 Any answer that keeps the rules counts, not only the one the puzzle was made from.
@@ -51,6 +53,10 @@ Any answer that keeps the rules counts, not only the one the puzzle was made fro
 ![Star Slide](docs/screenshots/star-slide.webp)
 
 ![Star Series](docs/screenshots/star-series.webp)
+
+![Pipe Turn](docs/screenshots/pipe-turn.webp)
+
+![Mirror Maze](docs/screenshots/mirror-maze.webp)
 
 ### Modes
 
@@ -65,9 +71,15 @@ Any answer that keeps the rules counts, not only the one the puzzle was made fro
 
 - **Endless Medley**: random puzzles one after another, never the same kind twice in a row, three
   more always showing as Up next. Every three puzzles the level goes up. Each puzzle has its own
-  clock; a lost, skipped or timed-out puzzle costs one of 3 hearts. 2 hints for the whole run.
+  clock; a lost, skipped or timed-out puzzle costs one of 3 hearts. 2 hints for the whole run. It
+  deals the kinds you have the least mastery of more often (see Mastery).
 - **Daily Five**: five puzzles of five kinds, the same for everyone on the same day, from Novice to
-  Oracle. One try a day; the menu shows today's score.
+  Oracle. One try a day; the menu shows today's score. The ghost of your best daily five races you
+  in the side panel: a faint bar shows the score your best run had at this point of its run, under
+  your own.
+
+  ![The daily five with the ghost of the best run](docs/screenshots/daily-ghost.webp)
+
 - **Blitz**: three minutes on one clock and no hearts. A solve gives back 10 to 25 seconds (more at
   higher levels), a skip or a loss takes 10. The level rises every two solves.
 - **Draft Run**: before each puzzle, choose one of the cards dealt. Every third solve offers three
@@ -83,8 +95,8 @@ Any answer that keeps the rules counts, not only the one the puzzle was made fro
 
   Each puzzle kind has its own charm, taken once: Inkwell (Picture Grid), Bridgewright (Bridges),
   Cipher Wheel (Code Breaker), Abacus (Calc Cages), Tally Stone (Cross Sums), Oiled Gear (Unjam),
-  Mirror Coin (Tile Flip), Silver Spool (Path Link), Brass Compass (Star Slide), Sextant (Star
-  Series) and Echo Shell (Memory Echo). Its kind's
+  Mirror Coin (Tile Flip), Silver Spool (Path Link), Brass Compass (Star Slide), Brass Spigot (Pipe
+  Turn), Prism (Mirror Maze), Sextant (Star Series) and Echo Shell (Memory Echo). Its kind's
   puzzles come with a free hint, which costs no points, and pay half again the points; Memory Echo,
   which has no hints, turns its cards a third slower instead. A draft card marks the charm it
   is helped by, so the run leans towards the kinds you hold charms for.
@@ -101,7 +113,16 @@ Any answer that keeps the rules counts, not only the one the puzzle was made fro
 - **Pass and Play**: two players take turns on the same three puzzles (Novice, Adept, Master). The
   lower total time wins; a skip or loss adds 30 seconds and a hint 15.
 - **Practice**: pick any puzzle and level. No clock, no hearts, free hints, and a new puzzle of the
-  same kind whenever you like.
+  same kind whenever you like. Or pick **Trial** for each kind's hardest open trial (see Mastery).
+
+**Mastery**: every solve of a kind, in any mode, raises its mastery, from 1 to 10 (2, 5, 9, 14, 20,
+28, 38, 50 and 65 solves). Practice and Records show each kind's level as a badge. Each level opens
+the next of ten trials of that kind in Practice, on the clock: trial I is a Novice puzzle on its
+usual time, trial IV a Master one, trial VI an Oracle one, and trials VII to X Oracle puzzles on
+85% down to half their time. A trial solved in time without a hint is cleared. Endless deals the
+kinds with the lowest mastery more often (one share more per level below your best kind).
+
+![Practice trials with each kind's mastery](docs/screenshots/mastery.webp)
 
 ![A draft: two cards to choose from](docs/screenshots/draft.webp)
 
@@ -125,22 +146,23 @@ Trophies button on the start and pause screens.
 
 **Points**: 100 per level (Novice 100 to Oracle 400), plus 2 for every second left, less 40 per
 hint (never below 20), times a streak bonus of 10% per puzzle solved in a row (up to double).
-**Records** keeps the puzzles solved of each kind, the fastest solve without hints at each level,
-and the best score of each mode.
+**Records** keeps the puzzles solved of each kind, its mastery, the fastest solve without hints at
+each level, and the best score of each mode.
 
 **Difficulty** (hub setting): Easy gives 4 hearts in Endless and the drafts and 4 minutes of Blitz, Hard
 2 hearts and 2½ minutes; Normal is 3 hearts and 3 minutes. The puzzles themselves don't change.
 
 ## Code layout
 
-- `src/game/puzzles/`: the eleven puzzles, each making itself from a seed and level, with its rules,
-  moves and hint (`nonogram`, `bridges`, `code`, `calc`, `sums`, `unjam`, `flip`, `link`, `slide`,
-  `series`, `echo`).
+- `src/game/puzzles/`: the thirteen puzzles, each making itself from a seed and level, with its
+  rules, moves and hint (`nonogram`, `bridges`, `code`, `calc`, `sums`, `unjam`, `flip`, `link`,
+  `slide`, `pipe`, `beam`, `series`, `echo`).
 - `src/game/kinds.ts`: the puzzle kinds, their skills and the `PuzzleDef` they share.
 - `src/game/journey.ts`, `src/game/weekly.ts`: the journey's steps and stars, the weekly league's
   week and ranks.
 - `src/game/run.ts`: the eight modes: dealing, hearts, hints, clocks, points, drafts and relics.
-- `src/game/progress.ts`, `src/game/save.ts`: the records and their save.
+- `src/game/progress.ts`, `src/game/save.ts`: the records, mastery, trials and the daily ghost, and
+  their save.
 - `src/scenes/GameScene.ts`: the menu, journey map, practice picker, records and the run screen.
 - `src/scenes/views/`: how each puzzle is drawn and played.
 - `src/scenes/painter.ts`, `glyphs.ts`, `theme.ts`, `layout.ts`: drawing, emblems, colours and

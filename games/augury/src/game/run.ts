@@ -4,7 +4,7 @@ import { journeyCard, starsFor } from './journey';
 import { weekOf } from './weekly';
 import { DEFS, KINDS, type KindId, type Level } from './kinds';
 import { dailySeed, seeded, shuffle, type Rand } from './rng';
-import { newProgress, recordResult, type Progress } from './progress';
+import { MAX_MASTERY, masteryOf, newProgress, recordResult, type Progress } from './progress';
 
 // The rules of a run: which puzzle comes next, hearts, hints, clocks, score, draft picks and
 // relics, for every mode. Only this file changes a `Run`. The scene turns taps into moves on the
@@ -50,6 +50,23 @@ export const PERIL_HEARTS = 2;
 export const BOSS_EVERY = 5;
 export const BOSS_TIME = 0.8;
 export const BOSS_POINTS = 2;
+/**
+ * Practice trials, one per mastery level (1 to 10): tier n is a puzzle at `TRIALS[n - 1].level` on a
+ * clock of `share` times its usual time. A kind's highest open tier is its mastery; a trial solved
+ * in time and without a hint clears it.
+ */
+export const TRIALS: readonly { level: Level; share: number }[] = [
+  { level: 0, share: 1 },
+  { level: 1, share: 1 },
+  { level: 1, share: 0.75 },
+  { level: 2, share: 1 },
+  { level: 2, share: 0.75 },
+  { level: 3, share: 1 },
+  { level: 3, share: 0.85 },
+  { level: 3, share: 0.7 },
+  { level: 3, share: 0.6 },
+  { level: 3, share: 0.5 },
+];
 /** Points: per level, per second left, taken per hint (down to a floor), and the streak bonus. */
 export const POINTS_PER_LEVEL = 100;
 export const POINTS_PER_SECOND = 2;
@@ -65,6 +82,8 @@ export interface Card {
   seed: number;
   /** A boss: the second puzzle, played straight after this one on the same clock. */
   boss?: Card;
+  /** A Practice trial: its tier, 1 to 10 (see `TRIALS`). */
+  trial?: number;
 }
 
 export interface Current {
@@ -102,6 +121,8 @@ export interface Result {
   omen?: OmenId;
   /** A boss (`card` is its first half). */
   boss?: boolean;
+  /** A Practice trial cleared for the first time. */
+  cleared?: boolean;
 }
 
 export type Phase = 'playing' | 'between' | 'draft' | 'relic' | 'handover' | 'over';
@@ -153,6 +174,9 @@ export interface Run {
   /** Journey: the step played (-1 otherwise) and the stars it earned. */
   node: number;
   stars: number;
+  /** Daily: [time into the run, score] after each card, and the best run's marks to race (its ghost). */
+  marks: [number, number][];
+  ghost: [number, number][];
   progress: Progress;
   /** A new best this run set, for the end card. */
   newBest: boolean;
@@ -187,6 +211,8 @@ export function newRun(mode: Mode, progress: Progress = newProgress()): Run {
     draws: 0,
     node: -1,
     stars: 0,
+    marks: [],
+    ghost: [],
     progress,
     newBest: false,
     events: [],
@@ -203,35 +229,60 @@ export function luck(run: Run): Rand {
   return () => seeded(Math.imul(run.week, 1_000_003) + Math.imul(run.draws++, 7919))();
 }
 
-/** A random card of a kind other than `not`. */
-function randomCard(level: Level, not: KindId[] = [], rand: Rand = Math.random): Card {
+/** A random card of a kind other than `not`, each kind as likely as its weight (all alike without). */
+function randomCard(level: Level, not: KindId[] = [], rand: Rand = Math.random, weights?: Record<KindId, number>): Card {
   const kinds = KINDS.filter((k) => !not.includes(k));
-  return { kind: kinds[Math.floor(rand() * kinds.length)], level, seed: Math.floor(rand() * 2 ** 31) };
+  const ws = kinds.map((k) => weights?.[k] ?? 1);
+  // One draw either way, so equal weights deal exactly as an even pick.
+  const u = rand();
+  let index = Math.floor(u * kinds.length);
+  if (ws.some((w) => w !== ws[0])) {
+    let r = u * ws.reduce((a, b) => a + b, 0);
+    index = 0;
+    while (index < kinds.length - 1 && r >= ws[index]) r -= ws[index++];
+  }
+  return { kind: kinds[index], level, seed: Math.floor(rand() * 2 ** 31) };
 }
+
+/**
+ * How often Endless deals each kind: the kinds with the lowest mastery the most, one share more
+ * per level below the best kind's, so a fresh save deals every kind alike.
+ */
+export function weakWeights(progress: Progress): Record<KindId, number> {
+  const mastery = KINDS.map((k) => masteryOf(progress.kinds[k].solved));
+  const top = Math.max(...mastery);
+  return Object.fromEntries(KINDS.map((k, i) => [k, 1 + top - mastery[i]])) as Record<KindId, number>;
+}
+
+/** A kind's highest open Practice trial: its mastery. */
+export const trialTier = (progress: Progress, kind: KindId) => Math.min(MAX_MASTERY, masteryOf(progress.kinds[kind].solved));
+/** The card of a Practice trial tier. */
+export const trialCard = (kind: KindId, tier: number): Card => ({ kind, level: TRIALS[tier - 1].level, seed: Math.floor(Math.random() * 2 ** 31), trial: tier });
 
 /** Whether the `n`th puzzle (from 0) of an Endless or Draft run is a boss. */
 export const isBossTurn = (n: number) => (n + 1) % BOSS_EVERY === 0;
 
 /** A random boss: two cards of two kinds other than `not`, at one level. */
-function bossCard(level: Level, not: KindId[] = [], rand: Rand = Math.random): Card {
-  const first = randomCard(level, not, rand);
-  return { ...first, boss: randomCard(level, [...not, first.kind], rand) };
+function bossCard(level: Level, not: KindId[] = [], rand: Rand = Math.random, weights?: Record<KindId, number>): Card {
+  const first = randomCard(level, not, rand, weights);
+  return { ...first, boss: randomCard(level, [...not, first.kind], rand, weights) };
 }
 
-/** The `n`th card of an Endless run, of a kind other than `not`: a boss on a boss turn. */
-const endlessCard = (n: number, not: KindId[]) => (isBossTurn(n) ? bossCard : randomCard)(endlessLevel(n), not);
+/** The `n`th card of an Endless run, of a kind other than `not`: a boss on a boss turn, the weaker kinds more often. */
+const endlessCard = (run: Run, n: number, not: KindId[]) =>
+  (isBossTurn(n) ? bossCard : randomCard)(endlessLevel(n), not, Math.random, weakWeights(run.progress));
 /** The kind a card ends on, which the next card must not repeat. */
 const lastKind = (card: Card) => card.boss?.kind ?? card.kind;
 
 /** Starts a run of a mode. Practice needs its kind and level. */
-export function startRun(mode: Mode, progress: Progress, opts: { kind?: KindId; level?: Level; date?: Date; node?: number } = {}): Run {
+export function startRun(mode: Mode, progress: Progress, opts: { kind?: KindId; level?: Level; trial?: boolean; date?: Date; node?: number } = {}): Run {
   const run = newRun(mode, progress);
   switch (mode) {
     case 'endless':
     case 'blitz': {
       let last: KindId[] = [];
       for (let i = 0; i < QUEUE + 1; i++) {
-        const card = mode === 'blitz' ? randomCard(0, last) : endlessCard(i, last);
+        const card = mode === 'blitz' ? randomCard(0, last) : endlessCard(run, i, last);
         last = [lastKind(card)];
         run.queue.push(card);
       }
@@ -246,6 +297,7 @@ export function startRun(mode: Mode, progress: Progress, opts: { kind?: KindId; 
       // One try a day: the day, and the run, count as played from its first card.
       progress.daily = { day: run.day, score: 0 };
       progress.runs++;
+      run.ghost = progress.ghost.map(([ms, score]) => [ms, score]);
       deal(run, run.queue[0]);
       break;
     }
@@ -255,9 +307,11 @@ export function startRun(mode: Mode, progress: Progress, opts: { kind?: KindId; 
       deal(run, run.queue[0]);
       break;
     }
-    case 'practice':
-      deal(run, { kind: opts.kind ?? 'nonogram', level: opts.level ?? 0, seed: Math.floor(Math.random() * 2 ** 31) });
+    case 'practice': {
+      const kind = opts.kind ?? 'nonogram';
+      deal(run, opts.trial ? trialCard(kind, trialTier(progress, kind)) : { kind, level: opts.level ?? 0, seed: Math.floor(Math.random() * 2 ** 31) });
       break;
+    }
     case 'weekly':
       run.week = weekOf(opts.date ?? new Date());
       offerDraft(run);
@@ -275,6 +329,7 @@ export function startRun(mode: Mode, progress: Progress, opts: { kind?: KindId; 
 }
 
 function timeFor(run: Run, card: Card) {
+  if (card.trial) return DEFS[card.kind].limit[card.level] * TRIALS[card.trial - 1].share * 1000;
   if (run.mode === 'practice' || run.mode === 'blitz') return null;
   const hourglasses = run.relics.filter((r) => r === 'hourglass').length;
   const limit = (c: Card) => DEFS[c.kind].limit[c.level];
@@ -441,10 +496,28 @@ export function hint(run: Run) {
  */
 export function skip(run: Run) {
   if (run.phase !== 'playing' || !run.current) return false;
-  if (run.mode === 'practice') deal(run, { ...run.current.card, seed: Math.floor(Math.random() * 2 ** 31) });
+  if (run.mode === 'practice') deal(run, practiceNext(run));
   else end(run, 'skip');
   return true;
 }
+
+/** Practice's next puzzle: the same kind and level, or a trial at the kind's highest open tier now. */
+function practiceNext(run: Run): Card {
+  const card = run.current!.card;
+  if (card.trial) return trialCard(card.kind, trialTier(run.progress, card.kind));
+  return { ...card, seed: Math.floor(Math.random() * 2 ** 31) };
+}
+
+/** Where the daily five's ghost had got this far into its run: the cards it had played and its score. */
+export function ghostAt(ghost: [number, number][], ms: number) {
+  let cards = 0;
+  let score = 0;
+  for (const [at, s] of ghost) if (at <= ms) (cards++, (score = s));
+  return { cards, score };
+}
+
+/** How far into a daily five the player is: the time of the cards played and of the one in play. */
+export const runTime = (run: Run) => run.results.reduce((ms, r) => ms + r.ms, 0) + (run.phase === 'playing' ? run.current?.elapsedMs ?? 0 : 0);
 
 function check(run: Run) {
   const cur = run.current!;
@@ -479,7 +552,18 @@ function end(run: Run, reason: EndReason) {
   // cards played.
   if (run.mode === 'daily') {
     run.progress.daily = { day: run.day, score: run.score };
-    if (run.score > run.progress.best.daily) (run.progress.best.daily = run.score), (run.newBest = true);
+    run.marks.push([run.results.reduce((ms, r) => ms + r.ms, 0), run.score]);
+    if (run.score > run.progress.best.daily) {
+      run.progress.best.daily = run.score;
+      run.progress.ghost = run.marks.map(([ms, score]) => [ms, score]);
+      run.newBest = true;
+    }
+  }
+  // A trial solved in time and without a hint clears its tier.
+  const tier = cur.card.trial ?? 0;
+  if (tier && solved && !cur.hintsUsed && tier > run.progress.trials[cur.card.kind]) {
+    run.progress.trials[cur.card.kind] = tier;
+    result.cleared = true;
   }
   if (run.mode === 'journey') run.stars = starsFor(solved, cur.timeTotalMs ? (cur.timeLeftMs ?? 0) / cur.timeTotalMs : 0, cur.hintsUsed - cur.freeUsed);
   if (solved) {
@@ -543,7 +627,7 @@ export function next(run: Run) {
       } else offerDraft(run);
       return true;
     case 'practice':
-      deal(run, { ...run.current!.card, seed: Math.floor(Math.random() * 2 ** 31) });
+      deal(run, practiceNext(run));
       return true;
   }
 }
@@ -552,7 +636,7 @@ export function next(run: Run) {
 function dealQueued(run: Run) {
   const card = run.queue.shift()!;
   const after = lastKind(run.queue[run.queue.length - 1] ?? card);
-  run.queue.push(run.mode === 'blitz' ? randomCard(blitzLevel(run.solved), [after]) : endlessCard(run.dealt + QUEUE, [after]));
+  run.queue.push(run.mode === 'blitz' ? randomCard(blitzLevel(run.solved), [after]) : endlessCard(run, run.dealt + QUEUE, [after]));
   deal(run, card);
 }
 

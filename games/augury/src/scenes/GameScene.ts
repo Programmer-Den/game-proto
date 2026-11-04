@@ -8,10 +8,10 @@ import { CHARMS, KIND_COLOR, MODES, RELIC_COLOR, hasHearts, type Mode, type Reli
 import { NODES, STEPS, TEMPLES, TEMPLE_STARS, isBossNode, journeyCard, nodeOpen, templeOpen, templeStars, totalStars } from '../game/journey';
 import { nextRankAt, rankOf, weekOf } from '../game/weekly';
 import { DEFS, KINDS, LEVELS, SKILLS, SKILL_OF, type KindId, type Level } from '../game/kinds';
-import type { Progress } from '../game/progress';
+import { MAX_MASTERY, masteryOf, toNextMastery, type Progress } from '../game/progress';
 import {
-  act, canHint, canTakeOmen, canUndo, dailyDone, draftPick, drag, hint, holdsCharm, next, omenFor, takeOmen, quit, skip, startRun, startSecondPlayer, takeRelic, tick, undo,
-  BLITZ_PENALTY_S, DUEL_FAIL_S, PERIL_HEARTS, QUEUE, type Card, type Run,
+  act, canHint, canTakeOmen, canUndo, dailyDone, draftPick, drag, ghostAt, hint, holdsCharm, next, omenFor, runTime, takeOmen, trialTier, quit, skip, startRun, startSecondPlayer, takeRelic, tick, undo,
+  BLITZ_PENALTY_S, DUEL_FAIL_S, PERIL_HEARTS, QUEUE, TRIALS, type Card, type Run,
 } from '../game/run';
 import { clearRun, loadProgress, loadRun, saveProgress, saveRun } from '../game/save';
 import { t, type TextKey } from '../i18n';
@@ -28,7 +28,7 @@ type Spot = { x: number; y: number; w: number; h: number };
 
 /** The longest step the clocks take in one frame, so a stalled tab doesn't jump. */
 const MAX_STEP_MS = 100;
-const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI'];
+const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
 
 const timeText = (ms: number) => {
   const secs = Math.ceil(ms / 1000);
@@ -52,7 +52,8 @@ export class GameScene extends Phaser.Scene {
   /** A run saved before the last reload, which the menu's Continue picks up. */
   saved: Run | null = null;
   screen: 'menu' | 'journey' | 'practice' | 'records' | 'run' = 'menu';
-  practiceLevel: Level = 0;
+  /** The level Practice deals, or `trial` for each kind's highest open trial. */
+  practiceLevel: Level | 'trial' = 0;
   /** Spots for the test: every tappable thing on screen by id, centred, in view pixels. */
   buttons: Record<string, Spot> = {};
 
@@ -227,7 +228,8 @@ export class GameScene extends Phaser.Scene {
     this.saved = null;
     clearRun();
     resetUnjam();
-    this.run = startRun(mode, this.progress, { kind, level: this.practiceLevel, node });
+    const trial = this.practiceLevel === 'trial';
+    this.run = startRun(mode, this.progress, { kind, level: trial ? 0 : (this.practiceLevel as Level), trial, node });
     this.screen = 'run';
     saveProgress(this.progress);
   }
@@ -495,25 +497,53 @@ export class GameScene extends Phaser.Scene {
     const PRACTICE = this.L.practice;
     this.heading(PRACTICE.title.x, PRACTICE.title.y, t('practiceName'), 28);
     const lv = PRACTICE.levels;
-    LEVELS.forEach((level, k) => {
-      p.button(`level-${level}`, lv.xs[k % lv.xs.length], lv.ys[Math.floor(k / lv.xs.length)], lv.w, lv.h, `${ROMAN[k]} · ${t(`level${level}` as TextKey)}`, () => {
+    [...LEVELS, 'trial' as const].forEach((level, k) => {
+      const label = level === 'trial' ? `✦ ${t('trial')}` : `${ROMAN[k]} · ${t(`level${level}` as TextKey)}`;
+      p.button(`level-${level}`, lv.xs[k % lv.xs.length], lv.ys[Math.floor(k / lv.xs.length)], lv.w, lv.h, label, () => {
         ui('click');
         this.practiceLevel = level;
       }, { accent: this.practiceLevel === level, size: 14 });
     });
     const cards = PRACTICE.cards;
+    const across = cards.xs.length;
+    const trial = this.practiceLevel === 'trial';
     KINDS.forEach((kind, k) => {
-      const x = cards.xs[k % cards.xs.length];
-      const y = cards.ys[Math.floor(k / cards.xs.length)];
-      p.frame(x - cards.w / 2, y - cards.h / 2, cards.w, cards.h);
-      drawKindIcon(p.g, kind, x - cards.w / 2 + 46, y, 52, KIND_COLOR[kind]);
-      const tx = x - cards.w / 2 + 86;
-      p.text(tx, y - 24, t(`${kind}Name` as TextKey), { size: 17, color: C.goldText, bold: true, ox: 0 });
-      p.text(tx, y + 2, t(SKILL_OF[kind]), { size: 12, color: C.inkDim, ox: 0 });
-      const best = this.progress.kinds[kind].best[this.practiceLevel];
-      p.text(tx, y + 26, best ? t('fastest', { time: timeText(best) }) : t('notYet'), { size: 12, color: C.cyanText, ox: 0 });
-      p.hit(`kind-${kind}`, x - cards.w / 2, y - cards.h / 2, cards.w, cards.h, () => this.start('practice', kind));
+      const row = Math.floor(k / across);
+      // A short last row sits in the middle.
+      const inRow = Math.min(across, KINDS.length - row * across);
+      const gap = across > 1 ? cards.xs[1] - cards.xs[0] : 0;
+      const mid = (cards.xs[0] + cards.xs[across - 1]) / 2;
+      const x = mid + ((k % across) - (inRow - 1) / 2) * gap;
+      const y = cards.ys[row];
+      const left = x - cards.w / 2;
+      const rec = this.progress.kinds[kind];
+      p.frame(left, y - cards.h / 2, cards.w, cards.h);
+      drawKindIcon(p.g, kind, left + 40, y, Math.min(52, cards.h - 30), KIND_COLOR[kind]);
+      this.masteryBadge(left + cards.w - 20, y - cards.h / 2 + 20, masteryOf(rec.solved));
+      const tx = left + 76;
+      p.text(tx, y - 22, t(`${kind}Name` as TextKey), { size: 16, color: C.goldText, bold: true, ox: 0 });
+      if (trial) {
+        const tier = trialTier(this.progress, kind);
+        const { level, share } = TRIALS[tier - 1];
+        const time = timeText(DEFS[kind].limit[level] * share * 1000);
+        p.text(tx, y + 1, t('trialLine', { n: ROMAN[tier - 1], level: t(`level${level}` as TextKey), time }), { size: 12, color: C.ink, ox: 0 });
+        p.text(tx, y + 22, t('clearedOf', { n: this.progress.trials[kind], of: tier }), { size: 12, color: C.cyanText, ox: 0 });
+      } else {
+        p.text(tx, y + 1, t(SKILL_OF[kind]), { size: 12, color: C.inkDim, ox: 0 });
+        const best = rec.best[this.practiceLevel as Level];
+        p.text(tx, y + 22, best ? t('fastest', { time: timeText(best) }) : t('notYet'), { size: 12, color: C.cyanText, ox: 0 });
+      }
+      p.hit(`kind-${kind}`, left, y - cards.h / 2, cards.w, cards.h, () => this.start('practice', kind));
     });
+  }
+
+  /** A kind's mastery, 1 to 10, as a number in a ring; gold at the top. */
+  private masteryBadge(x: number, y: number, mastery: number, r = 13) {
+    const g = this.p.g;
+    const top = mastery >= MAX_MASTERY;
+    g.fillStyle(top ? C.gold : C.deep, 1).fillCircle(x, y, r);
+    g.lineStyle(1.5, top ? C.goldBright : C.cyan, 1).strokeCircle(x, y, r);
+    this.p.text(x, y, String(mastery), { size: Math.round(r * 0.95), color: top ? '#120b28' : C.cyanText, bold: true });
   }
 
   private drawRecords() {
@@ -528,6 +558,8 @@ export class GameScene extends Phaser.Scene {
     const { cols, top } = R;
     p.frame(R.frame.x, R.frame.y, R.frame.w, R.frame.h);
     [t('colPuzzle'), t('colSkill'), t('colSolved')].forEach((h, i) => cols[i] >= 0 && p.text(cols[i], top, h, { size: 13, color: C.goldText, ox: 0 }));
+    // Upright, the mastery column is headed by its badge's star alone.
+    p.text(R.mastery, top, cols[1] >= 0 ? t('colMastery') : '✦', { size: 13, color: C.goldText });
     LEVELS.forEach((l) => p.text(cols[3 + l] + 30, top, `${ROMAN[l]}`, { size: 13, color: C.goldText }));
     // Upright, the table has no room for the label before the fastest times.
     if (cols[1] >= 0) p.text(cols[3] - 16, top, t('colBest'), { size: 13, color: C.goldText, ox: 1 });
@@ -538,6 +570,7 @@ export class GameScene extends Phaser.Scene {
       p.text(cols[0] + 30, y, t(`${kind}Name` as TextKey), { size: 15, ox: 0 });
       if (cols[1] >= 0) p.text(cols[1], y, t(SKILL_OF[kind]), { size: 13, color: C.inkDim, ox: 0 });
       p.text(cols[2], y, String(rec.solved), { size: 15, ox: 0 });
+      this.masteryBadge(R.mastery, y, masteryOf(rec.solved), Math.min(11, R.step / 2 - 1));
       LEVELS.forEach((l) => p.text(cols[3 + l] + 30, y, rec.best[l] ? timeText(rec.best[l]) : '–', { size: 14, color: rec.best[l] ? C.cyanText : C.inkDim }));
     });
     const skills = SKILLS.map((sk) => `${t(sk)} ${KINDS.filter((k) => SKILL_OF[k] === sk).reduce((n, k) => n + prog.kinds[k].solved, 0)}`).join('   ·   ');
@@ -562,7 +595,8 @@ export class GameScene extends Phaser.Scene {
       const kind = cur.card.kind;
       this.heading(STAGE.x + STAGE.w / 2, STAGE.y + 28, t(`${kind}Name` as TextKey), 22);
       p.text(STAGE.x + STAGE.w / 2, STAGE.y + 54, t(`${kind}Rule` as TextKey), { size: 12, color: C.inkDim, wrap: STAGE.w - 160 });
-      p.text(STAGE.x + STAGE.w - 16, STAGE.y + 22, `${ROMAN[cur.card.level]} · ${t(`level${cur.card.level}` as TextKey)}`, { size: 12, color: C.cyanText, ox: 1 });
+      const level = `${ROMAN[cur.card.level]} · ${t(`level${cur.card.level}` as TextKey)}`;
+      p.text(STAGE.x + STAGE.w - 16, STAGE.y + 22, cur.card.trial ? `${t('trialN', { n: ROMAN[cur.card.trial - 1] })} · ${level}` : level, { size: 12, color: C.cyanText, ox: 1 });
       p.text(STAGE.x + 16, STAGE.y + 22, t(SKILL_OF[kind]), { size: 12, color: C.inkDim, ox: 0 });
       VIEWS[kind].draw(this.ctx());
       const def = DEFS[kind];
@@ -655,7 +689,7 @@ export class GameScene extends Phaser.Scene {
       case 'duel':
         return t('cardN', { n: Math.min(run.results.length - run.player * run.queue.length + 1, run.queue.length), of: run.queue.length });
       case 'practice':
-        return t('practiceLine');
+        return cur?.card.trial ? t('trialTopLine') : t('practiceLine');
     }
   }
 
@@ -719,9 +753,11 @@ export class GameScene extends Phaser.Scene {
         run.queue.forEach((card, i) => {
           const res = run.results[i];
           const line = res ? (res.reason === 'solved' ? t('pointsLine', { n: res.points }) : t(`res_${res.reason}` as TextKey)) : t(`level${card.level}` as TextKey);
-          const { top, h } = slot(i, run.queue.length, 56);
+          // Room under the five for the ghost.
+          const { top, h } = slot(i, run.queue.length, 52);
           this.smallCard(card, x, top, w, h, line, i === run.results.length);
         });
+        this.drawGhost(run);
         scoreBox([[t('score'), formatNumber(run.score)]]);
         break;
       case 'journey': {
@@ -772,14 +808,57 @@ export class GameScene extends Phaser.Scene {
       case 'practice': {
         const card = run.current?.card;
         if (!card) break;
-        this.smallCard(card, x, y, w, 62, `${ROMAN[card.level]} · ${t(`level${card.level}` as TextKey)}`);
-        const best = this.progress.kinds[card.kind].best[card.level];
-        p.text(x + 4, y + 90, best ? t('fastest', { time: timeText(best) }) : t('notYet'), { size: 13, color: C.cyanText, ox: 0 });
-        p.text(x + 4, y + 120, t('practiceSide'), { size: 13, color: C.inkDim, ox: 0, wrap: w - 8, align: 'left' });
+        const level = `${ROMAN[card.level]} · ${t(`level${card.level}` as TextKey)}`;
+        this.smallCard(card, x, y, w, 62, card.trial ? `${t('trialN', { n: ROMAN[card.trial - 1] })} · ${level}` : level);
+        const solves = this.progress.kinds[card.kind].solved;
+        const toNext = toNextMastery(solves);
+        const mastery = t('masteryLine', { n: masteryOf(solves) }) + (toNext === null ? '' : ` · ${t('masteryNext', { n: toNext })}`);
+        if (card.trial) {
+          p.text(x + 4, y + 82, t('clearedOf', { n: this.progress.trials[card.kind], of: card.trial }), { size: 13, color: C.cyanText, ox: 0 });
+          p.text(x + 4, y + 104, mastery, { size: 12, color: C.ink, ox: 0, wrap: w - 8, align: 'left' });
+          p.text(x + 4, y + 132, t('trialSide'), { size: 13, color: C.inkDim, ox: 0, wrap: w - 8, align: 'left', oy: 0 });
+        } else {
+          const best = this.progress.kinds[card.kind].best[card.level];
+          p.text(x + 4, y + 82, best ? t('fastest', { time: timeText(best) }) : t('notYet'), { size: 13, color: C.cyanText, ox: 0 });
+          p.text(x + 4, y + 104, mastery, { size: 12, color: C.ink, ox: 0, wrap: w - 8, align: 'left' });
+          p.text(x + 4, y + 132, t('practiceSide'), { size: 13, color: C.inkDim, ox: 0, wrap: w - 8, align: 'left', oy: 0 });
+        }
         scoreBox([[t('solvedLabel'), String(run.solved)]]);
         break;
       }
     }
+  }
+
+  /**
+   * The daily five's ghost: the score the best daily five had at this point of its run, as a faint
+   * bar under the player's own, both against the larger of the two final scores.
+   */
+  private drawGhost(run: Run) {
+    const p = this.p;
+    const G = this.L.side.ghost;
+    p.frame(G.x, G.y, G.w, G.h, { inner: false });
+    p.text(G.x + 12, G.y + 13, t('ghostTitle').toLocaleUpperCase(), { size: 11, color: C.inkDim, ox: 0, spacing: 2 });
+    if (!run.ghost.length) {
+      p.text(G.x + 12, G.y + 30, t('ghostNone'), { size: 12, color: C.inkDim, ox: 0, oy: 0, wrap: G.w - 24, align: 'left' });
+      return;
+    }
+    const ghost = ghostAt(run.ghost, runTime(run));
+    const end = run.ghost[run.ghost.length - 1][1];
+    const most = Math.max(1, end, run.score);
+    const rows: [string, number, number, number][] = [
+      [t('ghostYou'), run.score, C.cyan, 1],
+      [t('ghostBest', { n: ghost.cards }), ghost.score, C.goldBright, 0.4],
+    ];
+    const step = Math.min(40, (G.h - 30) / 2);
+    rows.forEach(([name, score, color, alpha], i) => {
+      const top = G.y + 26 + i * step;
+      p.text(G.x + 12, top + 8, name, { size: 12, color: C.ink, ox: 0 });
+      p.text(G.x + G.w - 12, top + 8, formatNumber(score), { size: 12, color: i ? C.goldText : C.cyanText, ox: 1, alpha: i ? 0.7 : 1 });
+      const bw = G.w - 24;
+      p.g.fillStyle(C.deep, 1).fillRect(G.x + 12, top + 18, bw, 7);
+      p.g.fillStyle(color, alpha).fillRect(G.x + 12, top + 18, (bw * Math.min(score, most)) / most, 7);
+      p.g.lineStyle(1, C.gold, 0.5).strokeRect(G.x + 12, top + 18, bw, 7);
+    });
   }
 
   /** Endless: the relics bosses gave, a row of small emblems over the score box. */
@@ -810,7 +889,7 @@ export class GameScene extends Phaser.Scene {
     this.heading(bx + (STAGE.w - 120) / 2, by + 40, last.boss && solved ? t('bossBeaten') : t(`res_${last.reason}` as TextKey), 26, solved ? C.cyanText : C.roseText);
     const points = t('pointsLine', { n: last.points }) + (last.omen ? ` · ${t('omenLine')}` : '');
     const heart = last.omen === 'peril' ? t('heartsLost', { n: PERIL_HEARTS }) : t('heartLost');
-    const line = practice || run.mode === 'duel' ? t('timeLine', { time: timeText(last.ms) }) : solved ? points : hasHearts(run.mode) ? heart : run.mode === 'blitz' ? t('timeLost', { n: BLITZ_PENALTY_S }) : '';
+    const line = last.cleared ? t('trialCleared', { n: ROMAN[(last.card.trial ?? 1) - 1] }) : practice || run.mode === 'duel' ? t('timeLine', { time: timeText(last.ms) }) : solved ? points : hasHearts(run.mode) ? heart : run.mode === 'blitz' ? t('timeLost', { n: BLITZ_PENALTY_S }) : '';
     p.text(bx + (STAGE.w - 120) / 2, by + 80, line, { size: 16, color: C.ink });
     if (practice) {
       p.button('next', bx + (STAGE.w - 120) / 2 - 95, by + 130, 170, 40, t('nextPuzzle'), () => (ui('click'), next(run)), { accent: true });

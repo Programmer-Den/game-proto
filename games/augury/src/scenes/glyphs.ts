@@ -130,6 +130,18 @@ export function drawKindIcon(g: G, kind: KindId, x: number, y: number, size: num
       }
       g.strokeRect(X(23), Y(23), 8 * s, 8 * s);
       break;
+    case 'pipe':
+      // A bend of pipe from a well to a house.
+      g.lineStyle(4 * s, color, 1).beginPath().moveTo(X(8), Y(9)).lineTo(X(8), Y(25)).lineTo(X(24), Y(25)).strokePath();
+      g.fillCircle(X(8), Y(8), 5 * s);
+      g.fillTriangle(X(19), Y(15), X(31), Y(15), X(25), Y(9)).fillRect(X(20), Y(15), 10 * s, 7 * s);
+      break;
+    case 'beam':
+      // A beam that bends at a mirror and runs into a crystal.
+      g.lineStyle(2.4 * s, color, 1).lineBetween(X(3), Y(8), X(24), Y(8)).lineBetween(X(24), Y(8), X(24), Y(24));
+      g.lineStyle(3 * s, color, 1).lineBetween(X(19), Y(3), X(29), Y(13));
+      trace(g, [{ x: X(24), y: Y(22) }, { x: X(29), y: Y(27) }, { x: X(24), y: Y(32) }, { x: X(19), y: Y(27) }]).fillPath();
+      break;
     case 'series':
       // Three rising bars and a question mark of a dot and a ring.
       g.fillRect(X(3), Y(21), 6 * s, 10 * s).fillRect(X(11), Y(15), 6 * s, 16 * s).fillRect(X(19), Y(9), 6 * s, 22 * s);
