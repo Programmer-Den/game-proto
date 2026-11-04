@@ -21,6 +21,21 @@ export const buildingKey = (faction: FactionId, type: BuildingId) => `bld-${fact
 export const TREE_VARIANTS = 4;
 export const relicKey = (relic: RelicId, holder: FactionId | null) => `camp-relic-${relic}-${holder ?? 'none'}`;
 
+/**
+ * How far down the view, in game pixels, the shared full-screen and pause buttons in the top right
+ * corner (`setupGame`'s `corner`) reach, safe area included: on a small screen they cover more of the
+ * view. The page may be turned round (`shared/scaling.ts`), so this reads layout sizes, not boxes on screen.
+ */
+function cornerReach(scene: Phaser.Scene, viewH: number): number {
+  const bar = document.querySelector<HTMLElement>('.game-corner');
+  const shown = scene.scale.displaySize.height;
+  if (!bar || !shown) return 0;
+  const top = parseFloat(getComputedStyle(bar).top) || 12;
+  const canvasTop = Math.max(0, (scene.scale.parentSize.height - shown) / 2);
+  // The buttons are 30 CSS px tall (`shared/corner.ts`).
+  return ((top + 30 - canvasTop) * viewH) / shown;
+}
+
 /** Paints every texture once, so the game itself only places sprites. */
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -30,7 +45,7 @@ export class BootScene extends Phaser.Scene {
   create() {
     // The view's shape is picked once at start: fit the HUD to it before anything is painted.
     const view = viewSize(this);
-    fitLayout(view.width, view.height);
+    fitLayout(view.width, view.height, cornerReach(this, view.height));
     for (let v = 0; v < TREE_VARIANTS; v++) this.bake(`tree-${v}`, bakeTree(v));
     this.bake('bush', bakeBush());
     this.bake('mine', bakeMine());

@@ -509,7 +509,7 @@ function startMission(s: GameState, m: Mission, map: MapData) {
       p.boonPending = true;
       if (age === 3) {
         p.edgePending = true;
-        p.deeds = { age2: true, army: ARMY_DEED, raid: true };
+        p.deeds = { age2: true, army: ARMY_DEED, raid: false };
       }
     }
     if (m.startRes) Object.assign(p.res, m.startRes);
@@ -603,7 +603,12 @@ export function notAllowed(s: GameState, owner: number, type: BuildingId): strin
     let n = 0;
     for (const b of s.buildings.values()) if (b.owner === owner && b.type === type) n++;
     // A camp packed on a wagon still counts.
-    for (const u of s.units.values()) if (u.owner === owner && u.packed?.type === type) n++;
+    for (const u of s.units.values()) {
+      if (u.owner !== owner) continue;
+      if (u.packed?.type === type) n++;
+      // A wagon aboard a transport too.
+      for (const c of u.cargo) if (c.packed?.type === type) n++;
+    }
     if (n >= def.limit) return def.limit === 1 ? t('haveOne') : t('atMost', { n: def.limit });
   }
   return null;
@@ -1880,7 +1885,7 @@ function militaryUpdate(s: GameState, u: Unit, def: UnitDef, dt: number) {
   // A ram only ever goes for buildings, palisades and gates included.
   const pick = def.role === 'siege' ? 'structures' : 'auto';
   // A soldier on land only goes for a ship close enough to the shore to hit.
-  const reach = def.range + 2;
+  const reach = def.range;
   if (o.t === 'idle') {
     const t = nearestEnemy(s, u.owner, u.x, u.y, def.sight, pick, reach);
     if (t) u.order = { t: 'attack', target: t.id, resume: null };
@@ -1966,7 +1971,7 @@ function guardUpdate(s: GameState, u: Unit, def: UnitDef, dt: number) {
     if (!pursue(s, u, def.speed, dt, (tx, ty) => !s.solid[idx(tx, ty)] && gap(tx + 0.5, ty + 0.5, f) <= range)) u.order = { t: 'move', x: post.x, y: post.y };
     return;
   }
-  const t = nearestEnemy(s, u.owner, post.x, post.y, def.sight, 'units', def.range + 2);
+  const t = nearestEnemy(s, u.owner, post.x, post.y, def.sight, 'units', def.range);
   if (t && away <= LEASH) return void (u.order = { t: 'attack', target: t.id, resume: null });
   if (o.t === 'move') {
     if (u.path.length === 0 && Math.hypot(u.x - o.x, u.y - o.y) < 0.9) return void (u.order = { t: 'idle' });
@@ -2246,14 +2251,24 @@ function nearestEnemy(s: GameState, owner: number, x: number, y: number, range: 
     if (e.hp <= 0 || !hostile(s, owner, e.owner)) continue;
     if (pick !== 'structures' && 'queue' in e && !!BUILDINGS[e.type].palisade !== (pick === 'palisade')) continue;
     const d = gap(x, y, footprint(e));
-    // `shipReach`: a soldier on land leaves alone a ship it can't reach from the shore.
-    if (d > shipReach && 'order' in e && isShip(e)) continue;
-    if (d <= range && d < bestD) {
-      best = e;
-      bestD = d;
-    }
+    if (d > range || d >= bestD) continue;
+    // `shipReach`: a soldier on land leaves alone a ship it can't hit from any land tile.
+    if (shipReach !== Infinity && 'order' in e && isShip(e) && !shoreWithin(s, e, shipReach)) continue;
+    best = e;
+    bestD = d;
   }
   return best;
+}
+
+/** Whether some land tile lies within `reach` tiles of a ship: the tiles a soldier chasing it walks to. */
+function shoreWithin(s: GameState, ship: Unit, reach: number): boolean {
+  const f = footprint(ship);
+  for (let ty = Math.floor(ship.y - reach - 1); ty <= Math.ceil(ship.y + reach + 1); ty++) {
+    for (let tx = Math.floor(ship.x - reach - 1); tx <= Math.ceil(ship.x + reach + 1); tx++) {
+      if (inMap(tx, ty) && !s.solid[idx(tx, ty)] && gap(tx + 0.5, ty + 0.5, f) <= reach) return true;
+    }
+  }
+  return false;
 }
 
 function strike(s: GameState, u: Unit, def: UnitDef, target: Unit | Building) {
@@ -2375,7 +2390,10 @@ function missionOver(s: GameState, m: Mission) {
   if (g.t === 'survive' && s.time >= g.ms) return end(PLAYER, 'goal');
   if (g.t === 'escort') {
     if (m.trips >= g.trips) return end(PLAYER, 'goal');
-    if (m.cart !== null && !s.units.has(m.cart)) return end(rivalsOf(s, PLAYER)[0] ?? AI, 'cart');
+    // A cart aboard a transport is still there; one that sinks with it is not (`reap` drops the cargo).
+    const cart = m.cart;
+    const aboard = cart !== null && [...s.units.values()].some((u) => u.cargo.some((c) => c.id === cart));
+    if (cart !== null && !s.units.has(cart) && !aboard) return end(rivalsOf(s, PLAYER)[0] ?? AI, 'cart');
   }
   if (g.t === 'hold') {
     if (!holds(s, PLAYER, g.relic)) m.heldSince = null;
