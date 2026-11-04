@@ -138,8 +138,9 @@ Implemented today:
   `QUICK.lanes` with all ten champions there and `ALL_MID.hp` times the structures' health;
   `doubleGold` sets `s.goldMult` to `DOUBLE_GOLD`, which `earn(s, u, gold)` (every gold gain but the
   player's streak last hits, which multiply it themselves) and passive gold in `countDown` apply
-  (`earn` returns the gold banked, which the coin popups show, and the objective card, its marker
-  and `lastObjective.gold` show the reward times `goldMult`);
+  (`earn` returns the gold banked, which the coin popups and the comeback and first blood notices
+  show; the bounty claimed and kill streak notices, the objective card, its marker and
+  `lastObjective.gold` show the reward times `goldMult`);
   `suddenDeath` sets `s.suddenDeath` at `SUDDEN_DEATH.at` (a notice and the `suddenDeath` sound):
   champions that fall, and those already down then, get `respawnAt` Infinity, `buyBack` refuses, `invulnerable` lifts the Nexus
   wards, and `checkWipe` ends the match for the team with every champion down for good

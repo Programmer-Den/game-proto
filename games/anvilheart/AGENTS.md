@@ -115,7 +115,10 @@ Implemented today:
   streak instead; otherwise it saves, calls `startDaily('anvilheart')` and swaps `state` for
   `dailyShop(dailyRand('anvilheart'))`: a fresh first smithy with the barrel, the edict picked by the
   day's seed, `daily` `{ ms: DAILY_MS (10 min), earned }`, and `useRandom` pointing every random
-  roll in `sim.ts` at the seeded source. `sell` and `deliver` add to `daily.earned`. `save()` does
+  roll in `sim.ts` at the seeded source. Forges, visitors and returns share that one stream, so
+  only the start (edict, first order, seed) is the same for everyone; later orders and Fine Ore
+  follow how often the player forges and sells, which the texts (`dailyStart`, the How to play tip,
+  the README) say. `sell` and `deliver` add to `daily.earned`. `save()` does
   nothing while `daily` is set, and "New smithy" refuses. When `ms` reaches 0 `tick` pushes
   `dailyEnd` once and then stands still (`forge` too); the scene calls `finishDaily` and shows the
   end window (`dailyWindow`, `win-panel`), whose "Back to my smithy" (`leaveDaily`) resets

@@ -202,7 +202,9 @@ export function tickCourier(state: GameState, dt: number) {
   trip.left -= dt;
   if (trip.left > 0) return;
   const { herb, brings } = TRIPS[trip.to];
-  state.alchemy.wild[herb] = Math.min(SATCHEL, (state.alchemy.wild[herb] ?? 0) + brings);
+  const have = state.alchemy.wild[herb] ?? 0;
+  // Never lower the count: Clear and Make return the bowl's herbs uncapped, so the satchel can hold more than SATCHEL.
+  state.alchemy.wild[herb] = Math.max(have, Math.min(SATCHEL, have + brings));
   courier.trip = null;
   courier.trips++;
 }

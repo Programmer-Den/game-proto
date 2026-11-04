@@ -211,7 +211,7 @@ const en = {
   dailyLink: 'Daily forge',
   dailyDone: 'Daily ✓ {n}c',
   dailyLine: 'Daily forge {time} · {n}c',
-  dailyStart: 'Daily forge: the same 10 minutes for everyone today',
+  dailyStart: 'Daily forge: 10 minutes, the same start for everyone today',
   dailyBest: { one: 'Today {score}c · best {best}c · {n} day in a row', other: 'Today {score}c · best {best}c · {n} days in a row' },
   dailyTitle: 'The shift is over',
   dailyText: {

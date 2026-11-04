@@ -1290,19 +1290,20 @@ function kill(s: GameState, t: Unit, killerId: number) {
         // A team that is behind gets more for each kill, to climb back.
         const comeback = behind(s, champKiller.side as Team, COMEBACK.gap);
         if (comeback) {
-          earn(s, champKiller, COMEBACK.gold);
+          const comebackGold = earn(s, champKiller, COMEBACK.gold);
           gainXp(s, champKiller, COMEBACK.xp);
           aiLog(champKiller.side as Team, `${shortName(champKiller.name)} earns a comeback bounty`);
           if (champKiller.player) {
-            notice(s, text('noticeComeback', { gold: COMEBACK.gold }), '#9fd8ff');
+            notice(s, text('noticeComeback', { gold: comebackGold }), '#9fd8ff');
             sound(s, 'comeback', undefined, true);
           }
         }
         // The first kill of the match pays extra.
         const first = !s.firstBlood;
+        let firstGold = 0;
         if (first) {
           s.firstBlood = true;
-          earn(s, champKiller, FIRST_BLOOD.gold);
+          firstGold = earn(s, champKiller, FIRST_BLOOD.gold);
           sound(s, 'firstBlood', undefined, champKiller.player);
           aiLog(champKiller.side as Team, `${shortName(champKiller.name)} draws first blood`);
         }
@@ -1316,14 +1317,14 @@ function kill(s: GameState, t: Unit, killerId: number) {
           : t.player
             ? text('noticeSlewYou', { killer: shortName(champKiller.name) })
             : text('noticeSlew', { killer: shortName(champKiller.name), victim: shortName(t.name) });
-        notice(s, bounty ? text('noticeBountyClaimed', { line: slain, gold: bounty }) : slain, SIDE_COLOR[side]);
-        if (first) notice(s, text('noticeFirstBlood', { line: slain, gold: FIRST_BLOOD.gold }), '#f2c14e');
+        notice(s, bounty ? text('noticeBountyClaimed', { line: slain, gold: bounty * s.goldMult }) : slain, SIDE_COLOR[side]);
+        if (first) notice(s, text('noticeFirstBlood', { line: slain, gold: firstGold }), '#f2c14e');
         // Three kills in a row put a price on the killer's head, and every kill after raises it.
         const price = bountyOf(champKiller.killStreak);
         if (price || bounty) sound(s, 'streak', undefined, champKiller.player);
         if (price) {
           aiLog(side, `${shortName(champKiller.name)} is on a ${champKiller.killStreak} kill streak: a ${price} gold bounty`);
-          notice(s, champKiller.player ? text('noticeYourStreak', { n: champKiller.killStreak, gold: price }) : text('noticeStreak', { name: shortName(champKiller.name), n: champKiller.killStreak, gold: price }), '#f2c14e');
+          notice(s, champKiller.player ? text('noticeYourStreak', { n: champKiller.killStreak, gold: price * s.goldMult }) : text('noticeStreak', { name: shortName(champKiller.name), n: champKiller.killStreak, gold: price * s.goldMult }), '#f2c14e');
         }
       }
       // Every other enemy champion that hurt it lately gets an assist.

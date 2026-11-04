@@ -180,7 +180,8 @@ study, shade gardens and a mirrored second production line.
   stage, as `deliverForPlague` does when a stage's potions are in). The courier (AP19): `Place`,
   `PLACES`, `TRIPS` (herb, ms, how many it brings), `COURIER_COST`, `SATCHEL`, `hireCourier`,
   `sendCourier` and `tickCourier`, which `tick` calls every step, so a trip also ends while away
-  (`catchUp` runs it on its own when there is no automation).
+  (`catchUp` runs it on its own when there is no automation). A return fills the herb up to
+  `SATCHEL` but never lowers a count that Clear or Make left above it (`clearMix` is uncapped).
   The decor (AP20): `DecorId`, `DECOR` (costs), `DECOR_IDS`, `decorOpen` (the guild joined),
   `hasDecor`, `buyDecor` (also `nudgeReputation` by 3) and the bonuses the sim reads: `decorTip`
   (`SIGN_TIP` on a filled order's tip in `serveFromShelf`), `decorPatience` (`LANTERN_PATIENCE` on

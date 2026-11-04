@@ -140,7 +140,8 @@ Masterwork.
    adventurer who walks off goes to it. Sell more swords than it in its day for a prize of 60 coins
    per charter and 10 reputation.
 21. **Daily forge.** "Daily forge" at the bottom starts today's shift: ten minutes in a fresh smithy
-   with the quench barrel and an edict, the same orders and forge for everyone that day. Earn as many
+   with the quench barrel and an edict, starting the same for everyone that day (the same edict, first
+   order and random seed; later orders and Fine Ore follow how often you forge and sell). Earn as many
    coins from sales and commissions as you can; the end window shows today's coins, your best and
    your days in a row, and "Back to my smithy" returns to your own smithy, untouched. One try a day:
    leaving half way uses it up.
