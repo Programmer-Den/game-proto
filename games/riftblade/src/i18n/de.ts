@@ -1255,7 +1255,7 @@ const de: Translation<typeof en> = {
   rushPop: 'Boss {n}/{of}: {planet}',
   rushTag: 'Boss-Ansturm {n}/{of}  ·  {planet}',
   rushWon: '{hero} hat jeden Boss besiegt: {n} von {of}.',
-  rushFell: '{hero} ist {boss} nach {n} von {of} Bossen erlegen.',
+  rushFell: '{boss} hat den Ansturm beendet: {hero} ist nach {n} von {of} Bossen gefallen.',
   rushEnd: 'Boss-Ansturm: {n}/{of} Bosse in {time}',
   rushNewBest: 'Neuer Bestwert im Ansturm!',
   dailyWon: '{boss} ist zerschlagen. {hero} hat alle drei Welten des Tages befreit.',

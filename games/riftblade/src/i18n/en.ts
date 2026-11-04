@@ -1259,7 +1259,7 @@ const en = {
   rushPop: 'Boss {n}/{of}: {planet}',
   rushTag: 'Boss rush {n}/{of}  ·  {planet}',
   rushWon: '{hero} beat every boss: {n} of {of}.',
-  rushFell: '{hero} fell to {boss} after {n} of {of} bosses.',
+  rushFell: '{boss} ended the rush: {hero} fell after {n} of {of} bosses.',
   rushEnd: 'Boss rush: {n}/{of} bosses in {time}',
   rushNewBest: 'A new best boss rush!',
   dailyWon: '{boss} is broken. {hero} cleared all three of today\'s worlds.',
