@@ -23,8 +23,8 @@ export type Layout = {
   board: Rect;
   /** Undo, Hint and Skip under the stage, clear of the corner buttons at the bottom left. */
   tools: { xs: number[]; y: number; w: number; h: number };
-  /** The side panel: its list of cards (top-left) and the score box, anchored at its bottom. */
-  side: { list: Rect; score: { x: number; w: number; bottom: number } };
+  /** The side panel: its list of cards (top-left), the score box, anchored at its bottom, and the daily five's ghost (top-left). */
+  side: { list: Rect; score: { x: number; w: number; bottom: number }; ghost: Rect };
   /** The menu: the title, the mode cards (by their centres, as many across as `xs` has) and the
    * Records button. */
   menu: {
@@ -40,15 +40,15 @@ export type Layout = {
   };
   /** The journey map: a row per temple (its name at `label`, its steps from `x0`, `step` apart). */
   journey: { title: Point; rows: number[]; label: { x: number; dy: number }; nodes: { x0: number; step: number; r: number; dy: number }; line: Point };
-  /** The practice picker: level buttons and the eleven puzzle cards, by their centres. */
+  /** The practice picker: level buttons (the four levels and Trial) and the thirteen puzzle cards, by their centres (a short last row is centred). */
   practice: {
     title: Point;
     levels: { xs: number[]; ys: number[]; w: number; h: number };
     cards: { xs: number[]; ys: number[]; w: number; h: number };
   };
-  /** The records table: its frame, header row, row step, columns (-1 leaves the skill out) and the
-   * two lines under it. */
-  records: { title: Point; frame: Rect; top: number; step: number; cols: number[]; skills: Point; bests: Point & { w: number } };
+  /** The records table: its frame, header row, row step, columns (-1 leaves the skill out), the
+   * mastery badge's column and the two lines under it. */
+  records: { title: Point; frame: Rect; top: number; step: number; cols: number[]; mastery: number; skills: Point; bests: Point & { w: number } };
   back: Rect;
   /** Cards dealt over the stage (a draft, relics), by their centres. */
   deal: { title: Point; xs2: number[]; xs3: number[]; y: number; w: number; h: number };
@@ -65,7 +65,7 @@ export const WIDE: Layout = {
   stage: { x: 24, y: 80, w: 620, h: 404 },
   board: { x: 44, y: 146, w: 580, h: 330 },
   tools: { xs: [234, 364, 494], y: 507, w: 124, h: 34 },
-  side: { list: { x: 660, y: 80, w: 276, h: 306 }, score: { x: 660, w: 276, bottom: 526 } },
+  side: { list: { x: 660, y: 80, w: 276, h: 306 }, score: { x: 660, w: 276, bottom: 526 }, ghost: { x: 660, y: 368, w: 276, h: 94 } },
   menu: {
     title: { x: 480, y: 64 },
     tagline: { x: 480, y: 108, w: 860 },
@@ -84,15 +84,16 @@ export const WIDE: Layout = {
   },
   practice: {
     title: { x: 480, y: 46 },
-    levels: { xs: [264, 408, 552, 696], ys: [104], w: 132, h: 38 },
-    cards: { xs: [126, 362, 598, 834], ys: [190, 300, 410], w: 224, h: 100 },
+    levels: { xs: [192, 336, 480, 624, 768], ys: [104], w: 132, h: 38 },
+    cards: { xs: [126, 362, 598, 834], ys: [170, 256, 342, 428], w: 224, h: 80 },
   },
   records: {
     title: { x: 480, y: 46 },
     frame: { x: 36, y: 82, w: 888, h: 362 },
     top: 102,
-    step: 28,
-    cols: [60, 270, 400, 520, 620, 720, 820],
+    step: 24,
+    cols: [60, 240, 340, 560, 650, 740, 830],
+    mastery: 440,
     skills: { x: 480, y: 466 },
     bests: { x: 480, y: 498, w: 880 },
   },
@@ -110,7 +111,7 @@ export const TALL: Layout = {
   stage: { x: 16, y: 122, w: 508, h: 520 },
   board: { x: 26, y: 202, w: 488, h: 430 },
   tools: { xs: [130, 270, 410], y: 668, w: 132, h: 40 },
-  side: { list: { x: 16, y: 700, w: 300, h: 210 }, score: { x: 328, w: 196, bottom: 910 } },
+  side: { list: { x: 16, y: 700, w: 300, h: 210 }, score: { x: 328, w: 196, bottom: 910 }, ghost: { x: 328, y: 700, w: 196, h: 116 } },
   menu: {
     title: { x: 270, y: 96 },
     tagline: { x: 270, y: 150, w: 480 },
@@ -129,15 +130,16 @@ export const TALL: Layout = {
   },
   practice: {
     title: { x: 300, y: 46 },
-    levels: { xs: [140, 400], ys: [106, 152], w: 240, h: 38 },
-    cards: { xs: [140, 400], ys: [230, 334, 438, 542, 646, 750], w: 250, h: 94 },
+    levels: { xs: [97, 270, 443], ys: [106, 152], w: 164, h: 38 },
+    cards: { xs: [140, 400], ys: [222, 318, 414, 510, 606, 702, 798], w: 250, h: 88 },
   },
   records: {
     title: { x: 300, y: 46 },
     frame: { x: 16, y: 92, w: 508, h: 470 },
     top: 118,
-    step: 38,
-    cols: [30, -1, 196, 236, 296, 356, 416],
+    step: 32,
+    cols: [30, -1, 175, 262, 315, 368, 421],
+    mastery: 236,
     skills: { x: 270, y: 600 },
     bests: { x: 270, y: 640, w: 480 },
   },

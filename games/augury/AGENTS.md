@@ -6,7 +6,7 @@ the root AGENTS.md.
 
 ## Current state
 
-Augury is a collection of eleven brain puzzles in an Arcane Tarot look (night-sky purple, thin gold
+Augury is a collection of thirteen brain puzzles in an Arcane Tarot look (night-sky purple, thin gold
 frames, cyan for what is picked or done), played through eight modes. Every puzzle is made in code
 from a seed at one of four levels (0 Novice to 3 Oracle), and is solved when its rules hold, not
 only by the answer it was made from.
@@ -15,7 +15,8 @@ Implemented today:
 
 - Puzzles (`KINDS`): Picture Grid (`nonogram`), Bridges, Code Breaker (`code`), Calc Cages
   (`calc`), Cross Sums (`sums`), Unjam, Tile Flip (`flip`), Path Link (`link`), Star Slide (`slide`, a sliding-tile tray), Star
-  Series (`series`, three rows of numbers to continue) and Memory Echo (`echo`), each in its own file under `game/puzzles/` with its maker, rules, moves and hint, and a
+  Series (`series`, three rows of numbers to continue), Pipe Turn (`pipe`, tiles turned until the well's water reaches every
+  house), Mirror Maze (`beam`, mirrors placed so a beam lights every crystal) and Memory Echo (`echo`), each in its own file under `game/puzzles/` with its maker, rules, moves and hint, and a
   view under `scenes/views/`.
 - Modes (`MODES`): Journey (`journey`), Endless Medley (`endless`), Daily Five (`daily`), Blitz,
   Draft Run (`draft`), Weekly League (`weekly`), Pass and Play (`duel`) and Practice, all in
@@ -33,9 +34,25 @@ Implemented today:
   every player and survive a reload. Played as often as wanted; `finish` keeps the week's best in
   `Progress.weekly`, and `rankOf` gives its band (`RANKS`, from `RANK_AT`: Novice 0, Adept 1,000,
   Mystic 3,000, Oracle 6,000, Seer 10,000).
+- Mastery (`progress.ts`): each kind's level, 1 to 10, comes from its solves in any mode
+  (`MASTERY_AT`, `masteryOf`, `toNextMastery`), so it needs no save of its own. Each level opens the
+  next Practice trial of that kind (`TRIALS` in `run.ts`: a level and a share of its usual time;
+  `trialTier` is the kind's mastery, `trialCard` makes the card, with `trial` set): a trial is on the
+  clock (`timeFor`), and solved in time without a hint it raises `Progress.trials[kind]` and marks the
+  `Result` `cleared`. New puzzle and Next puzzle deal the kind's highest open tier again
+  (`practiceNext`). Endless deals kinds by `weakWeights` (one share more per mastery level below the
+  best kind's) through `randomCard`'s `weights`, which draws one number either way, so a fresh save
+  (all alike) deals exactly as an even pick; Blitz, the drafts and the weekly league stay even.
+- The daily five's ghost: `run.marks` gets [time into the run, score] after each card; when the
+  daily best rises, `Progress.ghost` takes a copy. `startRun` copies the ghost into `run.ghost`, so
+  the run races the best from before it, and the side panel (`drawGhost`, at `side.ghost`) shows the
+  score `ghostAt(run.ghost, runTime(run))` gives as a faint bar under the player's own. A best
+  set before the ghost existed has none (the panel says so).
 - Screens (`screen`): `menu` (eight mode cards, Records, and Continue when a run was saved),
   `journey` (the map: a row of eight steps per temple, each with its kind's icon and stars),
-  `practice` (level buttons and eleven puzzle cards), `records` and `run`. A run's `phase` is `playing`, `between` (the result banner),
+  `practice` (the four level buttons and Trial, and thirteen puzzle cards with their mastery badges; in
+  Trial each card shows its open tier, level and time, and the tiers cleared), `records` (with a
+  mastery column) and `run`. A run's `phase` is `playing`, `between` (the result banner),
   `draft`, `relic`, `handover` (pass and play) or `over`.
 - Both ways round: a wide view gets the `WIDE` layout (the stage with a side panel at its right)
   and an upright one the `TALL` layout (the top bar in two rows, the stage, the tools, then the
@@ -44,7 +61,8 @@ Implemented today:
   way.
 - Records (`Progress`): solves and losses per kind, the fastest hint-free solve per kind and level,
   the best score of Endless, Blitz and the daily five, the most solves in a draft run, the last
-  daily played, the weekly league's week and best, and the journey's stars per step.
+  daily played, the weekly league's week and best, the journey's stars per step, the highest trial
+  cleared per kind and the best daily five's marks (its ghost).
 
 Missing or rough:
 
@@ -54,9 +72,13 @@ Missing or rough:
   Calc Cages and Cross Sums may have more than one answer (any that keeps the rules counts).
 - Unjam makes its layouts by scattering blocks and searching (up to about half a second at
   Oracle); `TRIES`, `MAX_STATES` and `TARGET_MOVES` in `puzzles/unjam.ts` trade speed for depth.
+- The journey's temples teach the first eleven kinds only; Pipe Turn and Mirror Maze come from the
+  other modes (adding them to `TEMPLE_KINDS` would change steps players have already starred).
+- The hub card's text (`auguryCard` in `shared/i18n/`) still says eleven kinds; changing it plays
+  every game in CI, so it waits for a PR that touches `shared/` anyway.
 - No translations of the glyph names (there are none on screen); the How to play names the modes.
 - `docs/screenshots/menu.webp`, `puzzles.webp`, `draft.webp`, `upright.webp` (a 390x844 phone at
-  2x) and `cover.png` are not made by the
+  2x), `pipe-turn.webp`, `mirror-maze.webp`, `mastery.webp`, `daily-ghost.webp` and `cover.png` are not made by the
   test; refresh them by hand (a Playwright script that taps the menu, Practice with hints, and a
   draft) when the look changes.
 
@@ -84,15 +106,16 @@ File map (`src/`):
 - `game/puzzles/*.ts`: one per kind, no Phaser. Each exports its `PuzzleDef`, its state type and
   its move functions (`nonoTap`, `bridgesTap`, `codeAdd`/`codeBack`/`codeGuess`, `calcSelect`/
   `calcEnter`, `sumsSelect`/`sumsEnter`, `unjamMove`, `flipTap`, `linkStart`/`linkMove`/`linkEnd`,
-  `echoAnswer`, `slideTap`, `seriesPick`), each returning whether it made a move worth keeping for Undo.
+  `echoAnswer`, `slideTap`, `seriesPick`, `pipeTap`, `beamTap`), each returning whether it made a move worth keeping for Undo.
 - `game/run.ts`: the tuning (`QUEUE`, `BETWEEN_MS`, `START_HINTS`, `startHearts`, `MAX_HEARTS`,
   `blitzSeconds`, `BLITZ_SOLVE_S`, `BLITZ_PENALTY_S`, `DAILY_LEVELS`, `DUEL_LEVELS`, `DUEL_FAIL_S`,
   `DUEL_HINT_S`, `RELIC_EVERY`, `RELIC_OFFER`, `DRAFT_MAX`, `HOURGLASS`, `CHARM_POINTS`,
-  `CHARM_ECHO_SLOW`, `OMEN_POINTS`, `PERIL_HEARTS`, `BOSS_EVERY`, `BOSS_TIME`, `BOSS_POINTS`, the
+  `CHARM_ECHO_SLOW`, `OMEN_POINTS`, `PERIL_HEARTS`, `BOSS_EVERY`, `BOSS_TIME`, `BOSS_POINTS`, `TRIALS`, the
   points constants),
   `Card`, `Current`, `Result`, `Run`, `RunEvent`, and the actions (`startRun`, `act`, `drag`,
   `undo`, `hint`, `skip`, `quit`, `next`, `draftPick`, `takeRelic`, `startSecondPlayer`, `tick`,
-  `canUndo`, `canHint`, `dailyDone`, `endlessLevel`, `holdsCharm`, `offerRelics`, and `makeCurrent`,
+  `canUndo`, `canHint`, `dailyDone`, `endlessLevel`, `holdsCharm`, `offerRelics`, `weakWeights`,
+  `trialTier`, `trialCard`, `ghostAt`, `runTime`, and `makeCurrent`,
   which makes a card's puzzle fresh with its time and its charm's help, for `deal` and `loadRun`).
   A charm gives its kind's puzzles one free hint (`freeHints`; `freeUsed` counts them, and they
   cost no points) and `CHARM_POINTS` times the points, and slows Memory Echo's cards
@@ -125,11 +148,13 @@ File map (`src/`):
   `CharmId`, `CHARM_KIND` and `isCharm`, `RELICS`/`RelicId` (both kinds), `KIND_COLOR`,
   `RELIC_COLOR` (a charm takes its kind's colour).
 - `game/journey.ts` and `game/weekly.ts`: see Current state.
-- `game/progress.ts`: `Progress`, `newProgress`, `recordResult`. `game/save.ts`: `loadProgress`,
+- `game/progress.ts`: `Progress`, `newProgress`, `recordResult`, and mastery (`MASTERY_AT`,
+  `MAX_MASTERY`, `masteryOf`, `toNextMastery`). `game/save.ts`: `loadProgress`,
   `saveProgress`, and `saveRun`, `loadRun` (checks the saved run and deals its puzzle in play again
   from its card) and `clearRun`.
 - `scenes/GameScene.ts`: every screen, input and event. Endless shows the relics bosses gave as a
-  row of emblems over the score box (`relicRow`).
+  row of emblems over the score box (`relicRow`); `masteryBadge` draws a kind's mastery in a ring
+  (gold at 10) on the practice cards and in Records; `drawGhost` draws the daily five's ghost.
 - `scenes/painter.ts`: `Painter`, an immediate-mode drawer: per layer a Graphics and a text pool,
   plus `hits` (tappable spots); `frame` (a tarot frame), `button`, `text`, `hit`, `layer`.
 - `scenes/views/`: one `PuzzleView` per kind (`draw`, and `down`/`move`/`up` for the dragged ones),
@@ -138,7 +163,7 @@ File map (`src/`):
   `drawRelic` (a charm is its kind's icon in a ringed medallion), `trace`.
 - `scenes/theme.ts`: `FONT`, `C` (colours), `PALETTE`. `scenes/layout.ts`: the `Layout` type and its two values, `WIDE` (960x540) and
   `TALL` (540x960), with every spot in the frame (`top`, `leave`, `stage`, `board`, `tools`,
-  `side`, `omen` (the omen's button in the top bar), `menu` (with `resume` and `recordsAside` for when a run was saved, and each card's line offsets `cards.dy`), `journey`, `practice`, `records`, `back`, `deal`, `end`, `endButtons`); `layoutFor(w, h)`,
+  `side` (with `ghost`, the daily five's ghost box), `omen` (the omen's button in the top bar), `menu` (with `resume` and `recordsAside` for when a run was saved, and each card's line offsets `cards.dy`), `journey`, `practice`, `records`, `back`, `deal`, `end`, `endButtons`); `layoutFor(w, h)`,
   `VIEW` (= `WIDE.view`, for `main.ts`) and `UI_DEPTH`.
 
 Shared code it imports: `shared/setupGame.ts`, `shared/scaling.ts` (`setupScaling`, `viewSize`,
@@ -185,7 +210,8 @@ How it runs:
 State model (`Run`): `mode`, `phase`, `hearts`, `maxHearts`, `hints`, `score`, `streak`, `dealt`,
 `solved`, `current` (`card`, `state`, `timeLeftMs`, `timeTotalMs`, `elapsedMs`, `hintsUsed`, `freeHints`,
 `freeUsed`, `omen`, `touched`, `pair`, `pairMs`, `pairHints`, `history`), `queue`, `results`, `last`, `betweenMs`, `clockMs`, `relics`, `relicOffer`,
-`draftOffer`, `player`, `totals`, `duelSolved`, `day`, `week`, `draws`, `node`, `stars`, `progress`, `newBest` and `events`.
+`draftOffer`, `player`, `totals`, `duelSolved`, `day`, `week`, `draws`, `node`, `stars`, `marks`, `ghost`, `progress`, `newBest` and `events`. A `Card` may carry
+`trial` (a Practice trial's tier) and a `Result` `cleared`.
 
 Persistence: three `localStorage` keys. `augury-trophies` holds the trophies earned (written by
 `shared/trophies.ts`). `augury-run` holds the run in play (every mode but Practice,
@@ -196,7 +222,8 @@ first ends the saved one through `quit`, so its bests and its run count. `augury
 `Progress`. It is written when a run
 starts (the daily five counts as played, and as a run, from its first card), after every puzzle
 (with the daily five's score so far and its best), when a run ends and when leaving to the menu, which ends the run and records
-it (`quit`). `loadProgress` keeps only known kinds and whole, non-negative numbers.
+it (`quit`). `loadProgress` keeps only known kinds and whole, non-negative numbers (trials up to 10,
+at most five ghost marks); `loadRun` gives a run saved before the ghost empty `marks` and `ghost`.
 
 ### Hub settings
 
@@ -258,12 +285,13 @@ cell is picked, the daily five played today), and a Hint tap that finds nothing 
 - `src/main.ts` exposes `window.game` in dev builds. The test reads `game.scene.getScene('Game')`
   and its `run` (copied through JSON, without `events` and `progress`), `screen` and `buttons`
   (every spot on screen by id, centred, in view pixels: `mode-<mode>`, `records`, `back`,
-  `resume`, `omen`, `level-<n>`, `kind-<kind>`, `node-<i>` (a journey step), `next-step`, `option-<i>` (Star Series), `undo`, `hint`, `skip`, `leave`, `cell-<i>`, `key-<n>` (0 is Clear),
+  `resume`, `omen`, `level-<n>` (`level-trial` for Trial), `kind-<kind>`, `node-<i>` (a journey step), `next-step`, `option-<i>` (Star Series), `undo`, `hint`, `skip`, `leave`, `cell-<i>`, `key-<n>` (0 is Clear),
   `island-<i>`, `glyph-<i>`, `code-back`, `code-guess`, `block-<k>`, `echo-same`, `echo-diff`,
   `draft-<i>`, `relic-<i>`, `next`, `done`, `again`, `start2`, `dim`).
 - Inputs: it taps `mode-endless`, then solves whatever the seeded deck deals with real taps and
   drags, reading each puzzle's answer from its state (`picture`, `needed`, `answer`, `code`,
-  `solution`, `open`, `blocks`, `trail` (Star Slide), `rows` (Star Series), `seq`/`step`/`back`/`answers`), and taps `skip`.
+  `solution`, `open`, `blocks`, `trail` (Star Slide), `rows` (Star Series), `tiles`/`answer` (Pipe Turn),
+  `mirrors`/`answer` (Mirror Maze), `seq`/`step`/`back`/`answers`), and taps `skip`.
 - Mirrored in `e2e/playthrough.spec.ts`, so change them together: the `Run` field names, `VIEW`,
   3 hearts on Normal, `QUEUE`, `BETWEEN_MS`, `POINTS_PER_LEVEL`, the first puzzle at level 0 with a
   clock, never the same kind twice in a row, Unjam's 6x6 board, every puzzle state's answer fields
@@ -277,11 +305,12 @@ cell is picked, the daily five played today), and a Hint tap that finds nothing 
 
 - **Add a puzzle kind**: a file in `game/puzzles/` exporting its `PuzzleDef` and moves, its id in
   `KINDS`, `SKILL_OF`, `DEFS` and `KIND_COLOR`, a view in `scenes/views/` added to `VIEWS`, an icon
-  case in `drawKindIcon`, its `Name` and `Rule` texts in English and German, a README row, and a
-  case in the test's `solve` (the deck may deal it), and a temple in `TEMPLE_KINDS` if the journey
-  should teach it. Eleven kinds fill the practice screen's 4x3 grid sideways and two columns of six
-  upright; a thirteenth needs `practice.cards` laid out again in both layouts, and the records
-  table's `step` may need to shrink.
+  case in `drawKindIcon`, its charm in `CHARMS` with its `Name` and `Text`, its `Name` and `Rule`
+  texts in English and German, a README row, and a case in the test's `solve` (the deck may deal it),
+  and a temple in `TEMPLE_KINDS` if the journey should teach it. Thirteen kinds fill the practice
+  screen's four rows of four sideways (the short last row centred) and two columns of seven upright;
+  a seventeenth sideways or fifteenth upright needs `practice.cards` laid out again, and the records
+  table's `step` (24 sideways, 32 upright) to shrink.
 - **Add a mode**: its id in `MODES` (eight fill the menu's two rows of four, three rows of three
   upright; a ninth upright fits, a ninth sideways needs `menu.cards` laid out again), its `START_HINTS`, its rules in `startRun`, `end`, `next` and
   `finish`, its side panel in `drawSide`, its top line in `topLine`, its icon in `modeIcon`, its
