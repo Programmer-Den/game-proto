@@ -56,6 +56,9 @@ const en: HowToPlay = {
     'Two Dragonslayers merge into the Anvilheart, which the Crown Blade commission asks for.',
     'Some adventurers order a sword and buckler set: hand over both, in either order, for a 50% bonus.',
     'Each new charter after the win makes you choose one of two edicts that change its rules.',
+    'Each new charter also raises one guild hall a level for good: more swords to start with, more gems or more patient adventurers.',
+    'From the second charter a rival smithy sells across the street: outsell it over its three-minute day for a prize. Adventurers you keep waiting go to it.',
+    'The Daily forge at the bottom is a ten-minute shift, the same for everyone today: earn as many coins as you can. One try a day.',
   ],
 };
 
@@ -114,6 +117,9 @@ const de: HowToPlay = {
     'Zwei Drachentöter verschmelzen zum Anvilheart, das der Auftrag für die Kronklinge verlangt.',
     'Manche Abenteurer bestellen ein Set aus Schwert und Schild: Gib beides, in beliebiger Reihenfolge, für 50 % Bonus.',
     'Jeder neue Freibrief nach dem Sieg lässt dich einen von zwei Erlassen wählen, die seine Regeln ändern.',
+    'Jeder neue Freibrief baut außerdem eine Gildenhalle für immer aus: mehr Schwerter zum Start, mehr Juwelen oder geduldigere Abenteurer.',
+    'Ab dem zweiten Freibrief verkauft eine Rivalenschmiede gegenüber: Verkaufe in ihrem dreiminütigen Tag mehr als sie und gewinne einen Preis. Abenteurer, die du warten lässt, gehen zu ihr.',
+    'Die Tagesschicht unten sind zehn Minuten, heute für alle gleich: Verdiene so viele Münzen wie möglich. Ein Versuch pro Tag.',
   ],
 };
 

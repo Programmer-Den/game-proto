@@ -1,4 +1,5 @@
 import { playMusic, playSting, ui } from '../../../../shared/audio';
+import { dailyRand, finishDaily, loadDaily, startDaily } from '../../../../shared/daily';
 import { settings } from '../../../../shared/settings';
 import { viewFrame, viewSize } from '../../../../shared/scaling';
 import Phaser from 'phaser';
@@ -7,7 +8,7 @@ import { SONG, sfx } from '../audio';
 import { itemTexture, shieldTexture, swordScale, swordTexture } from '../art/swords';
 import { fit, shown } from '../art/glass';
 import { EMBLEMS, emblemTexture } from '../art/ui';
-import { EDICTS, PERKS, PERK_IDS, type Edict, type Perk } from '../game/charter';
+import { EDICTS, HALLS, HALL_IDS, HALL_TOP, PERKS, PERK_IDS, type Edict, type Hall, type Perk } from '../game/charter';
 import { commissionTitle } from '../game/commissions';
 import { combine, isMaster, isShield, isSword, tierOf } from '../game/items';
 import { clearProgress, loadProgress, saveProgress } from '../game/save';
@@ -17,6 +18,10 @@ import {
   buyPerk,
   chooseCommission,
   chooseEdict,
+  chooseHall,
+  dailyShop,
+  hallOffers,
+  useRandom,
   deliver,
   deliverable,
   drop,
@@ -51,6 +56,7 @@ import {
   orderPrice,
   payFor,
   progressOf,
+  rivalOpen,
   rustLeft,
   setPay,
   shieldPrice,
@@ -78,6 +84,7 @@ import {
   MODE_BUTTON,
   ORDER,
   PERK_LINK,
+  DAILY_LINK,
   PATIENCE,
   REPUTATION,
   ROW_BOX,
@@ -103,6 +110,8 @@ import {
 const MAX_STEP_MS = 250;
 /** How long "New smithy" waits for the second tap that confirms the wipe. */
 const RESET_CONFIRM_MS = 3000;
+/** The storage name the daily forge keeps its record under (`anvilheart-daily`). */
+const GAME = 'anvilheart';
 /** How far up from an anvil's centre a sword lies on it. */
 const SWORD_LIFT = Math.round(11 * CELL_SCALE);
 /** How a sword lies on the barrel's mouth. */
@@ -208,6 +217,13 @@ export class GameScene extends Phaser.Scene {
   private edictButtons: Button[] = [];
   private edictName!: Phaser.GameObjects.Text;
   private edictLine!: Phaser.GameObjects.Text;
+  /** The guild hall window (AN15), its three buttons, the line under the plaque (the rival's day or the daily shift's clock), the daily forge link and its end window. */
+  private hallWindow!: Phaser.GameObjects.Container;
+  private hallButtons = new Map<Hall, Button>();
+  private statusLine!: Phaser.GameObjects.Text;
+  private dailyLink!: Phaser.GameObjects.Text;
+  private dailyWindow!: Phaser.GameObjects.Container;
+  private dailyResult!: Phaser.GameObjects.Text;
   /** The counter's desk frames, three or four, and how many the visitors were drawn for. */
   private counter!: Phaser.GameObjects.Image;
   private drawnDesks = 0;
@@ -278,6 +294,7 @@ export class GameScene extends Phaser.Scene {
     this.barrelSword = null;
     this.visitors.clear();
     this.held = null;
+    useRandom(null);
     this.state = newShop(loadProgress());
 
     // The layout sits in the middle of the view; the lancets and the top bar span all of it.
@@ -328,6 +345,8 @@ export class GameScene extends Phaser.Scene {
     this.createChooser();
     this.createPerks();
     this.createEdicts();
+    this.createHalls();
+    this.createDaily();
     // An offer still waiting from the last visit opens at once.
     this.chooser.setVisible(this.state.choosing);
 
@@ -347,7 +366,7 @@ export class GameScene extends Phaser.Scene {
 
   /** Keeps the song's part in step with the shop: tense while a choice waits, busier during a hammer streak. */
   private playPart() {
-    const part = this.chooser.visible || this.edictWindow.visible ? 'tense' : this.state.streak >= 2 ? 'streak' : 'calm';
+    const part = this.chooser.visible || this.edictWindow.visible || this.hallWindow.visible ? 'tense' : this.state.streak >= 2 ? 'streak' : 'calm';
     if (part === this.musicPart) return;
     this.musicPart = part;
     playMusic(SONG, part);
@@ -374,6 +393,7 @@ export class GameScene extends Phaser.Scene {
     this.drawForge();
     this.drawChooser();
     this.drawEdicts();
+    this.drawHalls();
     this.playPart();
   }
 
@@ -399,7 +419,9 @@ export class GameScene extends Phaser.Scene {
 
   /** Whether a window (the win, the crown's offer, the guild perks or the edicts) is open over the board. */
   private get windowOpen() {
-    return this.win.visible || this.chooser.visible || this.perkWindow.visible || this.edictWindow.visible;
+    return (
+      this.win.visible || this.chooser.visible || this.perkWindow.visible || this.edictWindow.visible || this.hallWindow.visible || this.dailyWindow.visible
+    );
   }
 
   /** Buys an upgrade; a bought Auto Forge's button switches it on and off instead. */
@@ -414,6 +436,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private save() {
+    // The daily forge's shift is never saved, so the player's own smithy waits as it was.
+    if (this.state.daily) return;
     saveProgress(progressOf(this.state));
   }
 
@@ -624,6 +648,12 @@ export class GameScene extends Phaser.Scene {
         this.float(WIN.x, WIN.y + WIN.tallH / 2 + 30, `${t(PERKS[e.perk].name)}: ${t(PERKS[e.perk].blurb)}`, '#ffd36a', 2200, UI_DEPTH + 6);
       } else if (e.kind === 'edict') {
         this.float(VIEW.w / 2, VIEW.h / 2, t('byEdict', { name: t(EDICTS[e.edict].name) }), '#ffd36a', 2200);
+      } else if (e.kind === 'hall') {
+        this.float(VIEW.w / 2, VIEW.h / 2, t('hallRaised', { name: t(HALLS[e.hall].name) }), '#ffd36a', 2200);
+      } else if (e.kind === 'rivalDay') {
+        this.float(EDICT_PLAQUE.x + 120, EDICT_PLAQUE.y + 27, e.won ? t('rivalWon', { n: e.coins }) : t('rivalLost'), e.won ? '#ffd36a' : '#ff8a6a', 2600);
+      } else if (e.kind === 'dailyEnd') {
+        this.endDaily(e.earned);
       }
     }
   }
@@ -696,7 +726,17 @@ export class GameScene extends Phaser.Scene {
           sfx('buy');
           break;
         case 'edict':
+        case 'hall':
           sfx('seal');
+          break;
+        case 'rivalDay':
+          if (e.won) {
+            sfx('fanfare');
+            ui('coin');
+          } else sfx('grumble');
+          break;
+        case 'dailyEnd':
+          playSting(SONG, 'charter');
           break;
       }
     }
@@ -1050,6 +1090,7 @@ export class GameScene extends Phaser.Scene {
     const rule = s.edict ? EDICTS[s.edict] : null;
     this.edictName.setText(rule ? t('edictPlaque', { name: t(rule.name) }) : '');
     this.edictLine.setText(rule ? t(rule.short) : '');
+    this.statusLine.setText(this.statusText());
     this.drawPerks();
   }
 
@@ -1223,14 +1264,18 @@ export class GameScene extends Phaser.Scene {
       confirm = null;
       text.setText(t('newSmithy'));
       this.perkLink.setVisible(true);
+      this.dailyLink.setVisible(true);
     };
     text.on('pointerdown', () => {
       if (this.windowOpen) return;
+      // The daily shift is left from its end window, not thrown away.
+      if (this.state.daily) return ui('refuse');
       ui('click');
       if (!confirm) {
         text.setText(t('newSmithyConfirm'));
         // The longer question would run into the perk link beside it.
         this.perkLink.setVisible(false);
+        this.dailyLink.setVisible(false);
         confirm = this.time.delayedCall(RESET_CONFIRM_MS, settle);
         return;
       }
@@ -1239,6 +1284,126 @@ export class GameScene extends Phaser.Scene {
       this.state = newShop(freshProgress());
       this.clearBoard();
     });
+  }
+
+  /** The window where a new charter raises one guild hall a level; it opens after the edict and stays until one is chosen. */
+  private createHalls() {
+    const items = [
+      this.image(0, 0, 'tall-panel'),
+      this.add.text(0, -80, t('hallTitle'), textStyle(22, '#ffd36a', 4)).setOrigin(0.5),
+      this.add
+        .text(0, -50, t('hallText'), { ...textStyle(13, '#fff1d0', 3), align: 'center', fontStyle: 'normal' })
+        .setOrigin(0.5),
+    ];
+    HALL_IDS.forEach((id, i) => this.hallButtons.set(id, new Button(this, 0, -2 + i * 50, 'wide', '', () => this.chooseHall(id))));
+    this.hallWindow = this.add
+      .container(WIN.x, WIN.y, [...items, ...[...this.hallButtons.values()].map((b) => b.root)])
+      .setDepth(UI_DEPTH + 5)
+      .setVisible(false);
+    this.statusLine = this.add
+      .text(EDICT_PLAQUE.x, EDICT_PLAQUE.y + 27, '', { ...textStyle(11.5, '#ffe7a8', 3.5), fontStyle: 'normal' })
+      .setOrigin(0.5)
+      .setDepth(UI_DEPTH + 1);
+  }
+
+  private chooseHall(hall: Hall) {
+    if (chooseHall(this.state, hall)) this.save();
+    else ui('refuse');
+  }
+
+  /** Shows the hall window once a new charter's edict is chosen, while it still owes a hall level. */
+  private drawHalls() {
+    const s = this.state;
+    const open = hallOffers(s) && !this.win.visible && !this.edictWindow.visible;
+    this.hallWindow.setVisible(open);
+    if (!open) return;
+    for (const id of HALL_IDS) {
+      const level = s.halls[id];
+      const vars = { name: t(HALLS[id].name), blurb: t(HALLS[id].blurb), from: level, to: level + 1 };
+      const top = level >= HALL_TOP;
+      this.hallButtons.get(id)!.set(top ? t('hallTop', { ...vars, to: level }) : t('hallCaption', vars), !top, 12.5);
+    }
+  }
+
+  /** The line under the edict plaque: the daily shift's clock and earnings, or the day against the rival smithy. */
+  private statusText() {
+    const s = this.state;
+    const clock = (ms: number) => {
+      const secs = Math.ceil(ms / 1000);
+      return `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+    };
+    if (s.daily) return t('dailyLine', { time: clock(s.daily.ms), n: s.daily.earned });
+    if (rivalOpen(s)) return t('rivalLine', { mine: s.rival.mine, theirs: s.rival.theirs, time: clock(s.rival.ms) });
+    return '';
+  }
+
+  /** The daily forge (AN17): a link at the bottom that starts today's seeded shift, and the window at its end. */
+  private createDaily() {
+    this.dailyLink = this.add
+      .text(this.edge.right - (VIEW.w - DAILY_LINK.x), this.edge.bottom - (VIEW.h - DAILY_LINK.y), '', {
+        ...textStyle(11.5, '#ffe27a', 3.5),
+        fontStyle: 'normal',
+      })
+      .setOrigin(1, 0.5)
+      .setDepth(UI_DEPTH + 1)
+      .setInteractive({ useHandCursor: true });
+    this.dailyLink.on('pointerdown', () => this.openDaily());
+    this.drawDailyLink();
+    const back = new Button(this, 0, 70, 'wide', t('dailyBack'), () => this.leaveDaily());
+    back.set(t('dailyBack'), true, 15);
+    this.dailyResult = this.add
+      .text(0, 6, '', { ...textStyle(15, '#fff1d0', 3), align: 'center', fontStyle: 'normal' })
+      .setOrigin(0.5);
+    this.dailyWindow = this.add
+      .container(WIN.x, WIN.y, [
+        this.image(0, 0, 'win-panel'),
+        this.add.text(0, -40, t('dailyTitle'), textStyle(24, '#ffd36a', 4)).setOrigin(0.5),
+        this.dailyResult,
+        back.root,
+      ])
+      .setDepth(UI_DEPTH + 5)
+      .setVisible(false);
+  }
+
+  private drawDailyLink() {
+    const day = loadDaily(GAME);
+    this.dailyLink.setText(this.state.daily ? '' : day.score !== null ? t('dailyDone', { n: day.score }) : day.played ? '' : t('dailyLink'));
+  }
+
+  /** Starts today's shift, once a day; once played, the link shows today's score and the best instead. */
+  private openDaily() {
+    if (this.windowOpen || this.state.daily) return;
+    const day = loadDaily(GAME);
+    if (day.played) {
+      ui('click');
+      if (day.score !== null) this.float(VIEW.w / 2, VIEW.h - 60, t('dailyBest', { score: day.score, best: day.best, n: day.streak }), '#ffd36a', 2600);
+      return;
+    }
+    ui('click');
+    this.save();
+    startDaily(GAME);
+    this.state = dailyShop(dailyRand(GAME));
+    this.clearBoard();
+    this.drawDailyLink();
+    this.float(VIEW.w / 2, VIEW.h / 2, t('dailyStart'), '#ffd36a', 3000);
+  }
+
+  /** The shift's time is up: today's score is kept and the end window opens. */
+  private endDaily(earned: number) {
+    const day = finishDaily(GAME, earned);
+    this.dailyResult.setText(t('dailyText', { score: earned, best: day.best, n: day.streak }));
+    this.putDown(null);
+    this.dailyWindow.setVisible(true);
+  }
+
+  /** Back from the daily forge to the player's own smithy, as it was saved. */
+  private leaveDaily() {
+    ui('click');
+    useRandom(null);
+    this.state = newShop(loadProgress());
+    this.clearBoard();
+    this.dailyWindow.setVisible(false);
+    this.drawDailyLink();
   }
 
   /** Throws away every sword sprite and visitor, after the state was replaced or the board cleared. */

@@ -1,6 +1,6 @@
 import { byDifficulty } from '../../../../shared/settings';
 import { commissionAt, grandOf, offered, type Commission } from './commissions';
-import { edictRule, edictsFor, PERKS, type Edict, type Perk } from './charter';
+import { EDICT_IDS, HALL_IDS, HALL_TOP, edictRule, edictsFor, hallLevels, PERKS, type Edict, type Hall, type Perk } from './charter';
 import { GEM, MASTER, combine, isGemmed, isShield, isSword, shield, sword, tierOf } from './items';
 import { SHIELD_TOP } from './shields';
 import {
@@ -35,7 +35,17 @@ import {
   fitOf,
   forgeMs,
   freeStars,
+  freshProgress,
+  freshRival,
   gemChance,
+  newShop,
+  rivalOpen,
+  rivalPrize,
+  DAILY_MS,
+  RIVAL_DAY_MS,
+  RIVAL_REP,
+  RIVAL_SALE_MS,
+  tavernFactor,
   gemsAbout,
   oreChance,
   patienceFactor,
@@ -57,13 +67,33 @@ import { MAX_TIER, ORDER_TOP } from './swords';
 import { locked, nextPrice, type UpgradeId } from './upgrades';
 
 /**
+ * Where the rules' random numbers come from: `Math.random`, so a seeded test repeats, or the daily
+ * forge's own seeded source while a daily shift runs (`useRandom`).
+ */
+let rng: (() => number) | null = null;
+const random = () => (rng ? rng() : Math.random());
+/** Sets the random source for the rules: a seeded one for the daily forge, or null for `Math.random`. */
+export function useRandom(source: (() => number) | null) {
+  rng = source;
+}
+
+/**
  * Moves the smithy on by `dt` milliseconds: the forge cools (and forges by itself with the Auto
  * Forge on), swords left lying rust, adventurers come, wait and leave, and heroes return. Nothing
  * moves while a new charter waits for its edict.
  */
 export function tick(s: GameState, dt: number) {
-  // A new charter's smithy stands still until its edict is chosen.
-  if (edictOffers(s)) return;
+  // A new charter's smithy stands still until its edict and hall are chosen, and a daily shift
+  // stands still once its time is up.
+  if (edictOffers(s) || hallOffers(s) || (s.daily && s.daily.ms <= 0)) return;
+  if (s.daily) {
+    s.daily.ms = Math.max(0, s.daily.ms - dt);
+    if (s.daily.ms === 0) {
+      s.events.push({ kind: 'dailyEnd', earned: s.daily.earned });
+      return;
+    }
+  }
+  if (rivalOpen(s)) rivalDay(s, dt);
   s.heatMs = Math.max(0, s.heatMs - dt);
 
   // A due hero takes a free anvil before the Auto Forge can fill it.
@@ -84,6 +114,8 @@ export function tick(s: GameState, dt: number) {
     s.adventurers.splice(s.adventurers.indexOf(a), 1);
     s.walkedOff++;
     s.reputation = Math.max(0, s.reputation - REP_WALKOFF);
+    // Someone kept waiting walks across the street to the rival.
+    if (rivalOpen(s)) s.rival.theirs++;
     // Half a set they held comes back to the smithy.
     const half = a.given.sword ?? a.given.shield;
     s.events.push({ kind: 'left', desk: a.desk, back: half === null ? undefined : handBack(s, half) });
@@ -96,6 +128,24 @@ export function tick(s: GameState, dt: number) {
       s.nextVisitorMs = visitorEveryMs(s);
     }
   }
+}
+
+/**
+ * The rival smithy's day: it sells a sword of its own every `RIVAL_SALE_MS`, and at the day's end
+ * outselling it pays a prize and reputation.
+ */
+function rivalDay(s: GameState, dt: number) {
+  const before = s.rival.ms;
+  s.rival.ms -= dt;
+  const elapsed = (ms: number) => Math.floor((RIVAL_DAY_MS - ms) / RIVAL_SALE_MS);
+  s.rival.theirs += Math.max(0, elapsed(Math.max(0, s.rival.ms)) - elapsed(before));
+  if (s.rival.ms > 0) return;
+  const won = s.rival.mine > s.rival.theirs;
+  const coins = won ? rivalPrize(s) : 0;
+  s.coins += coins;
+  if (won) s.reputation = Math.min(REP_MAX, s.reputation + RIVAL_REP);
+  s.events.push({ kind: 'rivalDay', won, coins });
+  s.rival = freshRival();
 }
 
 /** Swords left on an anvil dull after `rustMs`, and `RUST_DROP_MS` later drop a tier; the barrel keeps them safe. */
@@ -121,14 +171,14 @@ function arrive(s: GameState, hero?: Returning) {
   if (desk === undefined) return null;
   // After the first order, they ask for anything up to one better than the best sword made yet.
   const top = Math.min(ORDER_TOP, Math.max(3, s.bestTier + 1));
-  const wants = s.orders === 0 ? FIRST_ORDER : 1 + Math.floor(Math.random() * top);
-  const look = hero ? hero.look : Math.floor(Math.random() * LOOKS);
+  const wants = s.orders === 0 ? FIRST_ORDER : 1 + Math.floor(random() * top);
+  const look = hero ? hero.look : Math.floor(random() * LOOKS);
   // Once bucklers are about, some ask for a sword and shield set (never with a dagger), with no gem
   // or trait, and a buckler up to one better than the best made yet.
-  const set = shieldsAbout(s) && wants >= 2 && Math.random() < SET_ORDER_CHANCE;
-  const shieldWanted = set ? 1 + Math.floor(Math.random() * Math.min(SHIELD_TOP, Math.max(2, s.bestShield + 1))) : 0;
+  const set = shieldsAbout(s) && wants >= 2 && random() < SET_ORDER_CHANCE;
+  const shieldWanted = set ? 1 + Math.floor(random() * Math.min(SHIELD_TOP, Math.max(2, s.bestShield + 1))) : 0;
   // Once gems are about, some ask for one set in their sword (never in a dagger).
-  const gem = !set && gemsAbout(s) && wants >= 2 && Math.random() < GEM_ORDER_CHANCE;
+  const gem = !set && gemsAbout(s) && wants >= 2 && random() < GEM_ORDER_CHANCE;
   // From the second order on, some come with a trait; a Veteran who wants a dagger has nothing
   // below it to take, so comes with none.
   const rolled = s.orders === 0 || set ? 'none' : rollTrait();
@@ -141,7 +191,8 @@ function arrive(s: GameState, hero?: Returning) {
     patienceFactor(s) *
     (trait === 'haggler' ? HAGGLER_PATIENCE : 1) *
     (set ? SET_PATIENCE : 1) *
-    edictRule(s.edict).patience;
+    edictRule(s.edict).patience *
+    tavernFactor(s);
   const a = {
     id: s.nextId++,
     desk,
@@ -180,7 +231,7 @@ function handBack(s: GameState, item: number): { place: number; coins: number } 
 }
 
 function rollTrait(): Trait {
-  const r = Math.random();
+  const r = random();
   return r < TRAIT_CHANCE ? TRAITS[Math.floor((r / TRAIT_CHANCE) * TRAITS.length)] : 'none';
 }
 
@@ -201,12 +252,12 @@ function comeBack(s: GameState, hero: Returning) {
  */
 export function forge(s: GameState) {
   // A new charter forges nothing until its edict is chosen.
-  if (s.heatMs > 0 || edictOffers(s)) return false;
+  if (s.heatMs > 0 || edictOffers(s) || hallOffers(s) || (s.daily && s.daily.ms <= 0)) return false;
   const slot = s.slots.indexOf(null);
   if (slot < 0) return false;
-  const tier = Math.random() < oreChance(s) ? 2 : 1;
+  const tier = random() < oreChance(s) ? 2 : 1;
   const made = s.shieldMode && shieldsAbout(s) ? shield(tier) : tier;
-  const item = gemsAbout(s) && Math.random() < gemChance(s) ? GEM : made;
+  const item = gemsAbout(s) && random() < gemChance(s) ? GEM : made;
   s.slots[slot] = item;
   s.idle[slot] = 0;
   raiseBest(s, item);
@@ -349,6 +400,7 @@ export function deliver(s: GameState, from: number) {
   s.events.push({ kind: 'delivered', tier });
   if (s.commission.made < c.count) return true;
   s.coins += c.reward;
+  if (s.daily) s.daily.earned += c.reward;
   s.stars++;
   s.commission = { level: s.commission.level + 1, made: 0, grand: false };
   s.won = commissionAt(s.commission.level, s.charter) === null;
@@ -389,10 +441,12 @@ export function sell(s: GameState, from: number, id: number) {
   const tier = tierOf(sold);
   s.coins += coins;
   s.sold++;
+  if (rivalOpen(s)) s.rival.mine++;
+  if (s.daily) s.daily.earned += coins;
   if (fit === 'exact') s.reputation = Math.min(REP_MAX, s.reputation + REP_EXACT);
   s.adventurers.splice(s.adventurers.indexOf(a), 1);
   s.events.push({ kind: 'sold', desk: a.desk, tier, coins, fit });
-  if (tier >= RETURN_TIER && Math.random() < RETURN_CHANCE) {
+  if (tier >= RETURN_TIER && random() < RETURN_CHANCE) {
     s.returning.push({ inMs: RETURN_MS, item: sword(tier - 1, isGemmed(sold), true), trophy: trophyFor(tier), look: a.look });
   }
   return true;
@@ -479,6 +533,39 @@ export function foundCharter(s: GameState) {
   s.won = false;
   s.streak = 0;
   s.streakMs = 0;
+  s.rival = freshRival();
+  // The Armoury lays its Iron Shortswords on the new smithy's first anvils.
+  for (let k = 0; k < s.halls.armoury; k++) s.slots[k] = 2;
   s.events.push({ kind: 'charter', charter: s.charter });
   return true;
+}
+
+/** Whether a new charter still owes a hall level: once its edict is chosen, one per charter founded, while a hall has room. */
+export const hallOffers = (s: GameState) =>
+  s.charter > 0 && s.edict !== null && hallLevels(s.halls) < s.charter && HALL_IDS.some((id) => s.halls[id] < HALL_TOP);
+
+/** Raises a guild hall a level for good; a new Armoury level lays its Iron Shortsword at once. */
+export function chooseHall(s: GameState, hall: Hall) {
+  if (!hallOffers(s) || s.halls[hall] >= HALL_TOP) return false;
+  s.halls[hall]++;
+  if (hall === 'armoury') {
+    const slot = s.slots.indexOf(null);
+    if (slot >= 0) put(s, slot, 2);
+  }
+  s.events.push({ kind: 'hall', hall });
+  return true;
+}
+
+/**
+ * The daily forge's smithy: a fresh first smithy with the quench barrel, under an edict the day's
+ * seed picks, with `DAILY_MS` on the clock. Every random number of the shift comes from `rand`, so
+ * everyone plays the same day. Nothing of the player's own smithy carries over.
+ */
+export function dailyShop(rand: () => number): GameState {
+  useRandom(rand);
+  const s = newShop(freshProgress());
+  s.ranks.barrel = 1;
+  s.edict = EDICT_IDS[Math.floor(rand() * EDICT_IDS.length)];
+  s.daily = { ms: DAILY_MS, earned: 0 };
+  return s;
 }

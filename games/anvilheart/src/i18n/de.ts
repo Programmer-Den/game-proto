@@ -174,6 +174,32 @@ const de: Translation<typeof en> = {
   givenGemmed: 'Geliefert {have}/{need}, mit Juwel',
   givenReady: 'Geliefert {have}/{need}: hierher',
   reward: '+{n} M',
+
+  armouryName: 'Waffenkammer',
+  armouryBlurb: 'Jede neue Schmiede beginnt mit einem Eisenkurzschwert mehr',
+  jewellerName: 'Juwelier',
+  jewellerBlurb: 'Die Esse findet halb so viele Juwelen mehr',
+  tavernName: 'Taverne',
+  tavernBlurb: 'Abenteurer warten ein Zehntel länger',
+  hallTitle: 'Eine Gildenhalle ausbauen',
+  hallText: 'Jeder neue Freibrief baut eine Halle für immer aus.',
+  hallCaption: '{name}: Stufe {from} auf {to}\n{blurb}',
+  hallTop: '{name}: Stufe {to}, die höchste\n{blurb}',
+  hallRaised: '{name} ausgebaut',
+  rivalLine: 'Rivale: du {mine} · er {theirs} · {time}',
+  rivalWon: 'Mehr verkauft als die Rivalen! +{n} M',
+  rivalLost: 'Die Rivalen haben heute mehr verkauft',
+  dailyLink: 'Tagesschicht',
+  dailyDone: 'Heute ✓ {n} M',
+  dailyLine: 'Tagesschicht {time} · {n} M',
+  dailyStart: 'Tagesschicht: heute für alle dieselben 10 Minuten',
+  dailyBest: { one: 'Heute {score} M · Bestwert {best} M · {n} Tag in Folge', other: 'Heute {score} M · Bestwert {best} M · {n} Tage in Folge' },
+  dailyTitle: 'Die Schicht ist vorbei',
+  dailyText: {
+    one: 'Du hast heute {score} Münzen verdient.\nBestwert {best} · {n} Tag in Folge',
+    other: 'Du hast heute {score} Münzen verdient.\nBestwert {best} · {n} Tage in Folge',
+  },
+  dailyBack: 'Zurück zu meiner Schmiede',
 };
 
 export default de;
