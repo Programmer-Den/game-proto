@@ -383,10 +383,11 @@ How it runs:
   background's mosaic is computed pixel by pixel once at boot.
 - Tick: `GameScene.update(time)` takes `dt` from the frame timestamp (clamped to `MAX_STEP_MS`,
   250ms), adds it to `clock`, and, unless a window is open (`windowOpen`: the win, offer, perk, edict, hall or daily end
-  window, so nothing waits out its patience behind one), calls `tick(state, dt)`, which cools the forge, forges when
+  window, so nothing waits out its patience behind one), calls `tick(state, dt)`, which cools the forge,
   brings heroes back, forges when `autoForging`, drains the hammer streak and patience (a walk-off
   costs reputation and gives a held half set back), rusts idle swords and brings adventurers. If that (or the Forge button since the last
-  frame) pushed a `forged`, `rusted`, `returned` or `left` event the scene saves. Then it draws,
+  frame) pushed a `forged`, `rusted`, `returned`, `left`, `apprenticed`, `tourney` or `rivalDay` (a
+  rival day's end, which pays its prize) event the scene saves. Then it draws,
   ending with `drawChooser` (which hides the offer window once a choice is made), `drawEdicts` and
   `playPart`.
 - Input: pointers are read through `pointer.worldX/worldY` (game pixels; `pointer.x/y` are canvas

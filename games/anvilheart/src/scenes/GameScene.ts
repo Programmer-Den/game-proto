@@ -419,8 +419,9 @@ export class GameScene extends Phaser.Scene {
     // The smithy stands still while a window covers the board, as it does under the edict window.
     if (!this.windowOpen) tick(this.state, dt);
     // Forging (the Forge button's or the Auto Forge's inside tick), rust dropping tiers, heroes
-    // bringing swords back and walk-offs costing reputation are kept here.
-    if (this.state.events.some((e) => e.kind === 'forged' || e.kind === 'rusted' || e.kind === 'returned' || e.kind === 'left' || e.kind === 'apprenticed' || e.kind === 'tourney')) this.save();
+    // bringing swords back, walk-offs costing reputation, the apprentice's merges, a tourney's end
+    // and a rival day's end (its prize) are kept here.
+    if (this.state.events.some((e) => e.kind === 'forged' || e.kind === 'rusted' || e.kind === 'returned' || e.kind === 'left' || e.kind === 'apprenticed' || e.kind === 'tourney' || e.kind === 'rivalDay')) this.save();
     checkTrophies(this.state);
 
     this.drawSwords();

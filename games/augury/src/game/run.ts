@@ -121,6 +121,8 @@ export interface Result {
   omen?: OmenId;
   /** A boss (`card` is its first half). */
   boss?: boolean;
+  /** Which half of a boss it ended on. */
+  half?: 1 | 2;
   /** A Practice trial cleared for the first time. */
   cleared?: boolean;
 }
@@ -404,7 +406,9 @@ function deal(run: Run, card: Card) {
 function offerDraft(run: Run) {
   const level = endlessLevel(run.dealt);
   const count = 2 + run.relics.filter((r) => r === 'crystal').length;
-  const last = run.results.length ? [lastKind(run.results[run.results.length - 1].card)] : [];
+  // The kind just played: a boss lost in its first half ends on that half's kind, not the second's.
+  const prev = run.results[run.results.length - 1];
+  const last = prev ? [prev.half === 1 ? prev.card.kind : lastKind(prev.card)] : [];
   const offer: Card[] = [];
   // A boss turn deals only bosses to choose from.
   const make = isBossTurn(run.dealt) ? bossCard : randomCard;
@@ -540,7 +544,7 @@ function end(run: Run, reason: EndReason) {
   const solved = reason === 'solved';
   const points = solved && run.mode !== 'practice' && run.mode !== 'duel' ? pointsFor(run, cur) : 0;
   const boss = cur.pair ?? (cur.card.boss ? cur.card : null);
-  const result: Result = { card: boss ?? cur.card, reason, ms: cur.elapsedMs, points, ...(cur.omen ? { omen: cur.omen } : {}), ...(boss ? { boss: true } : {}) };
+  const result: Result = { card: boss ?? cur.card, reason, ms: cur.elapsedMs, points, ...(cur.omen ? { omen: cur.omen } : {}), ...(boss ? { boss: true, half: cur.pair ? 2 : 1 } : {}) };
   run.results.push(result);
   run.last = result;
   // A boss records its first half (solved) only now, so a reload in its second half, which deals
@@ -555,9 +559,10 @@ function end(run: Run, reason: EndReason) {
     run.marks.push([run.results.reduce((ms, r) => ms + r.ms, 0), run.score]);
     if (run.score > run.progress.best.daily) {
       run.progress.best.daily = run.score;
-      run.progress.ghost = run.marks.map(([ms, score]) => [ms, score]);
       run.newBest = true;
     }
+    // Once this run holds the best, every card it plays goes into the ghost, scoring or not.
+    if (run.newBest) run.progress.ghost = run.marks.map(([ms, score]) => [ms, score]);
   }
   // A trial solved in time and without a hint clears its tier.
   const tier = cur.card.trial ?? 0;
