@@ -7,9 +7,10 @@ AGENTS.md.
 ## Current state
 
 Ninefold is a number-placement puzzle (every row, column and box holds each digit once) with two
-modes and nine unlockable art styles. Classic plays a 9x9 board at Easy, Normal or Hard, plus a
-daily puzzle seeded by the date; Delve is a run of floors (4x4, then 6x6, then 9x9 with fewer
-givens) with hearts, hints and relics between floors. Every solved board counts towards the style
+modes and nine unlockable art styles. Classic plays a 9x9 board at Easy, Normal, Hard, Killer or
+Thermo, plus a daily puzzle seeded by the date and the weekly gauntlet (a seeded board a day, scored
+over the week); Delve is a run of floors (4x4, then 6x6, then 9x9 with fewer givens) with hearts,
+hints and relics between floors, at up to five ascensions. Every solved board counts towards the style
 unlocks; the worn style redraws everything (backdrop, board, panel, buttons, cards).
 
 Implemented today:
@@ -19,7 +20,14 @@ Implemented today:
   `over` (a Delve run out of hearts).
 - Puzzles are made in code (`makePuzzle`): a random full board, then cells emptied while the
   solution stays unique, down to the givens asked for (a board that can't lose more keeps a few
-  more). 9x9 boards take a few to a few tens of milliseconds.
+  more). 9x9 boards take a few to a few tens of milliseconds. An `Extra` rule adds `Puzzle.even`
+  (Parity), `Puzzle.cages` (Killer: `makeCages` cuts the solved board into cages of 1 to 4 cells,
+  no digit twice, each with its `sum`) or `Puzzle.thermos` (Thermo: `makeThermos` walks up to six
+  lines of 3 to 6 cells, bulb first, each step to a cell beside or diagonal to the last with a higher
+  digit, no diagonal step crossing another). The solver checks them per candidate (`checker`,
+  `allowed`: a cage's open cells must still be able to make up its sum, a thermometer cell must
+  leave room below and above and rise past every filled cell on its line), so the solution is
+  unique with the extra rule. Killer boards with 10 givens take about 10 ms.
 - Entering: a right digit is filled in for good and clears that digit from its peers' notes; a
   wrong one stays (shown in `wrong`/`wrongBg`), counts a mistake, and in Delve costs a heart unless
   a Ward catches the floor's first. Erase clears a wrong digit, or an empty cell's notes. Notes mode
@@ -35,9 +43,9 @@ Implemented today:
   taking `TWIST_GIVENS` off): `diagonal` (`Shape.diagonal`: both long diagonals are units too, so
   `units`, `peersOf` and the solver all know them), `parity` (`Puzzle.even` marks the even cells;
   `makePuzzle(..., parity)` keeps the solution unique with the marking, which the solver honours),
-  `clock` (`tick` takes a heart every `CLOCK_MS` of floor time, a `clock` event; `clockLeft` counts
+  `killer` and `thermo` (the Classic levels' rules; `extraOf` picks a floor's `Extra`), `clock` (`tick` takes a heart every `CLOCK_MS` of floor time, a `clock` event; `clockLeft` counts
   down in the panel) and `sealed` (`hint` refuses; clearing the floor gives a hint back). Every
-  `BOSS_EVERY` (5th) floor is a boss floor: one board twist and one pressing twist, `BOSS_GIVENS`
+  `BOSS_EVERY` (5th) floor is a boss floor: one board twist (`BOARD_TWISTS`) and one pressing twist (`PRESSING_TWISTS`), `BOSS_GIVENS`
   fewer givens, and clearing it restores every heart and counts `Progress.bosses`. Floors before
   `TWIST_FLOOR` draw no randomness, so the first floors deal as before. `solved` plans the next
   floor into `upcoming`, which the cleared-floor card names (`nextLine`) and `nextFloor` deals;
@@ -51,6 +59,24 @@ Implemented today:
   Sandglass (a floor cleared within `SANDGLASS_MS` heals a heart), Iron Vow (`VOW_HEARTS` more
   hearts, every hint gone) and Keystone (`keyHealed`: the first finished box a floor heals a heart).
   Every heart lost goes through `loseHearts` and every heart healed through `heal` (a `heal` event).
+- Ascensions: `startDelve(s, ascent)` starts a run at an ascension no higher than
+  `ascensionOpen(progress)` (`min(MAX_ASCENT, Progress.climbed)`), kept in `GameState.ascent`.
+  Clearing floor `ASCEND_FLOOR` (10) at an ascension `>= climbed` sets `climbed` to one more, and if
+  that is still an ascension (`<= MAX_ASCENT`) sets `ascended` and pushes an `ascended` event (the
+  cleared-floor card says it opened; the menu moves its pick there). The rules, cumulative, start
+  at `ASCENT` (`hearts` 1: one heart fewer; `hint` 2: no starting hint; `givens` 3: `ASCENT_GIVENS`
+  fewer givens in `planFloor`; `notes` 4: `notesLocked`, so `toggleNotes` refuses and Twin Sight
+  leaves the pool; `offer` 5: one relic fewer offered, the two cards sit between the three spots).
+  `ASCENSION_RULES` in `catalog.ts` names each rule's text for the menu. The scene's `pickAscent`
+  is the ascension the menu's Delve button starts at (the `ascent-down`/`ascent-up` arrows, shown
+  once one is open).
+- The weekly gauntlet (`mode: 'weekly'`): `GAUNTLET` lists the seven boards (givens and a board
+  twist), Monday first; `startWeekly` deals today's from `seeded(weekSeed * 10 + weekDay)` once a
+  day (it sets `Progress.weekScores[day]` to 0, so the try is used, and returns false when it
+  already was), resetting `weekScores` when `Progress.week` is an older week. `solved` scores it
+  with `gauntletScore` (`GAUNTLET_SCORE`), records it under the board's own `week`, and keeps
+  `bestWeek`; `score` and `weekTotal` feed the solved card. `weekScores(p, date)` reads the week as
+  it stands. Hints are `classicHints`, mistakes unlimited.
 - Both ways round: a wide view gets the `WIDE` layout (board left, panel with a 3x3 pad right) and an
   upright one the `TALL` layout (header panel, board, then a dock with one row of nine keys and the
   tools), and turning the phone mid-game lays everything out again.
@@ -60,6 +86,8 @@ Implemented today:
 
 Missing or rough:
 
+- The weekly gauntlet has no shared leaderboard either; a gauntlet board left by Menu scores 0 for
+  its day, and a missed day of the week can't be played late.
 - The daily puzzle has no shared leaderboard; once solved, the menu ticks it off and disables its
   button for today.
 - Undo takes back notes, wrong digits and erases only; a right digit can't be taken back (it is
@@ -86,24 +114,28 @@ File map (`src/`):
   `de.ts` the German (with `keepEnglish` for the title) and `en-US.ts` only "Cozy Pixel". Every text
   on screen goes through `t`; game logic compares ids.
 - `audio.ts`: `SONG` (parts `menu`, `calm`, `delve`, stings `solved` and `over`) and the `SFX` table.
-- `game/sudoku.ts`: `Shape`, `SHAPES`, `Puzzle`, `seeded` (mulberry32), `dailySeed`, `boxOf`,
+- `game/sudoku.ts`: `Shape`, `SHAPES`, `Puzzle`, `Cage`, `Rules`, `Extra`, `makeCages`, `makeThermos`, `seeded` (mulberry32), `dailySeed`, `boxOf`,
   `units`, `peersOf`, `countSolutions` and `makePuzzle` (the solver picks the cell with the fewest
   candidates). No Phaser.
 - `game/state.ts`: the tuning (`CLASSIC_GIVENS`, `DAILY_LEVEL`, `classicHints`, `delveHearts`,
   `DELVE_HINTS`, `MAX_HEARTS`, `RELIC_OFFER`, `SEER_CELLS`, `FAST_MS`, `HARD_FLOOR`, `FLOORS`,
-  `DEEPER_EVERY`, `MIN_GIVENS`, `TWIST_FLOOR`, `BOSS_EVERY`, `BOSS_GIVENS`, `TWIST_GIVENS`, `CLOCK_MS`),
+  `DEEPER_EVERY`, `MIN_GIVENS`, `TWIST_FLOOR`, `BOSS_EVERY`, `BOSS_GIVENS`, `TWIST_GIVENS`, `CLOCK_MS`,
+  `LEVEL_EXTRA`, `ASCEND_FLOOR`, `ASCENT_GIVENS`, `ASCENT`, `GAUNTLET`, `GAUNTLET_SCORE`),
   `FloorPlan` and `planFloor`, `Progress`, `UNLOCKS`, `GameEvent`, `GameState` and the actions (`newGame`, `startClassic`,
-  `startDaily`, `startDelve`, `select`, `toggleNotes`, `canEnter`, `enter`, `erase`, `hint`, `hasTwist`, `clockLeft`,
+  `startDaily`, `startWeekly`, `startDelve`, `notesLocked`, `ascensionOpen`, `weekDay`, `weekSeed`, `weekScores`, `gauntletScore`, `select`, `toggleNotes`, `canEnter`, `enter`, `erase`, `hint`, `hasTwist`, `clockLeft`,
   `takeRelic`, `chooseStyle`, `toMenu`, `tick`, `unlock`, `isRight`, `digitsLeft`). Only this file
   changes `GameState`.
-- `game/catalog.ts`: `STYLES`/`StyleId`/`STYLE_INFO`, `RELICS`/`RelicId`/`RELIC_INFO`, `TWISTS`/`Twist`/`TWIST_INFO` and `LEVELS`.
+- `game/catalog.ts`: `STYLES`/`StyleId`/`STYLE_INFO`, `RELICS`/`RelicId`/`RELIC_INFO`, `TWISTS`/`Twist`/`TWIST_INFO`
+  with `BOARD_TWISTS` and `PRESSING_TWISTS`, `ASCENSION_RULES`/`MAX_ASCENT` and `LEVELS` (`easy`,
+  `normal`, `hard`, `killer`, `thermo`).
 - `game/save.ts`: `loadProgress` and `saveProgress`.
 - `scenes/GameScene.ts`: everything drawn and all input.
 - `scenes/themes.ts`: `Theme`, `THEMES` (one per style) and `hex`.
 - `scenes/layout.ts`: the `Layout` type and its two values, `WIDE` (960x540) and `TALL` (540x960),
   with every spot (`board`, `panel` and its `rows`, `dock`, `pad` with its `cols`, `tools`,
   `keysHint`, `menuButton`, `menu`, `stylesTitle`, `styleCards`, `back`, `end`, `endButtons`,
-  `relicBox`, `relicCards`); `layoutFor(w, h)`, `VIEW` (= `WIDE.view`, for `main.ts`) and `UI_DEPTH`.
+  `relicBox`, `relicCards`; the menu's `daily` and `weekly` side by side, five `levels` and the
+  `ascentDown`/`ascentUp` arrows beside `delve`); `layoutFor(w, h)`, `VIEW` (= `WIDE.view`, for `main.ts`) and `UI_DEPTH`.
 
 Shared code it imports: `shared/setupGame.ts`, `shared/scaling.ts` (`setupScaling`, `viewSize`,
 `viewFrame`), `shared/audio.ts` (`sounds`, `playMusic`, `playSting`, `ui`), `shared/settings.ts`
@@ -123,35 +155,42 @@ How it runs:
 - Time: `update` takes `dt` from the frame time (capped at `MAX_STEP_MS`) and calls `tick`, which
   only runs the board's clock (`timeMs`) while playing. Nothing else is timed; the flashes age by
   `dt`.
-- Events: the rules push `GameEvent`s (`board`, `placed`, `wrong`, `clock`, `phoenix`, `heal`, `gift`, `hint`, `unit`, `solved`,
+- Events: the rules push `GameEvent`s (`board`, `placed`, `wrong`, `clock`, `phoenix`, `heal`, `gift`, `hint`, `unit`, `solved`, `ascended`,
   `unlocked`, `relic`, `over`) onto `state.events`; `drain` plays their sounds, adds flashes, saves
   the progress and switches the screen to `board` when a board loads. It also picks the music part.
 - Redrawing: `currentKey` names what is on screen (screen, phase, style, board size, relic offer,
-  mode, floor, and today's date on the menu); when it changes `buildLayer` destroys `parts` and rebuilds the screen or card. The board
+  mode, floor, the menu's ascension pick, and today's date on the menu); when it changes `buildLayer` destroys `parts` and rebuilds the screen or card. The board
   (`boardG`, the 81 digit and note texts) is redrawn when `dirty` is set by an input or event; the
   panel's clock, hearts, hints and notes label are set every frame in `updatePanel`.
 - Input: the scene's `pointerdown` picks a cell (only on the board while playing). Buttons are a
   `Graphics` and a text under an interactive `Zone` (`button`), which stops the event so it never
   reaches the board; disabled ones play `ui('refuse')`. Keys: 1-9, arrows, N, H, U or Z (undo), Backspace/Delete/0.
 - End cards sit above a dim zone that swallows taps (`dim`, `raise`).
+- Board rules on screen: `drawCage` draws a Killer cage's dashed edge inside each cell (running on
+  across the grid line where the cage goes on), and the cage's sum sits in its first cell's corner
+  (`sumTexts`, one per cage; that cell's notes move down). Thermometers are an opaque tube, mixed
+  from the cell and note colours, with a round bulb on the first cell, under the digits. The
+  panel's kicker names the mode, the ascension (`ascentTag`) and the twists, and shrinks to stay
+  clear of the Menu button.
 
 State model (`GameState`): `phase` (`menu`, `playing`, `solved`, `relic`, `over`), `mode`
-(`classic`, `daily`, `delve`), `level`, `puzzle` (`size`, `boxW`, `boxH`, `solution`, `givens`),
+(`classic`, `daily`, `weekly`, `delve`), `level`, `puzzle` (`size`, `boxW`, `boxH`, `solution`, `givens`, and `even`, `cages` or `thermos`), `week` and `weekDay` (the gauntlet board in play), `score` and `weekTotal` (its result), `ascent` and `ascended`,
 `values` (0 empty; may hold a wrong digit), `notes` (bit per digit), `selected` (-1 none),
 `notesMode`, `mistakes`, `hintsLeft`, `hintsUsed`, `timeMs`, `hearts`, `maxHearts`, `floor`,
 `plan` and `upcoming` (Delve `FloorPlan`s, null otherwise), `dailyDate` (the `dailySeed` a daily board was dealt for, 0 otherwise), `relics`, `relicOffer`, `warded`, `streak`, `keyHealed`, `undo` (the cells' digits and notes before each note, wrong digit or erase; `undoMove` restores the newest whose cell isn't right, `canUndo`), `doneUnits` (indexes into `units`), `newStyles`, `progress` and
 `events`.
 
 Persistence: two `localStorage` keys of its own (and `ninefold-trophies`, kept by `shared/trophies.ts`). `ninefold-board` holds the board in play (`saveBoard`/`loadBoard`
-in `save.ts`: the `BOARD_FIELDS` of `GameState`, written by `update` whenever the scene is dirty and
+in `save.ts`: the `BOARD_FIELDS` of `GameState` plus `LATER_FIELDS` (`week`, `weekDay`, `ascent`, `ascended`, which a save from before them may lack and then load as their defaults), written by `update` whenever the scene is dirty and
 every `SAVE_EVERY_MS` of board time, and removed once the phase is neither `playing` nor `relic`);
 `create` restores it, straight onto the board or the relic offer. `ninefold-progress` holds `Progress` (`solved`, `flawless`,
-`noHint`, `hard`, `fast`, `bestFloor`, `bosses`, `daily`, `dailyStreak`, `bestStreak`, `style`, `unlocked`). It is written when a board is
-solved, a style unlocks, a Delve run ends or a style is picked. `loadProgress` keeps only known
+`noHint`, `hard`, `fast`, `bestFloor`, `bosses`, `daily`, `dailyStreak`, `bestStreak`, `climbed`, `week`, `weekScores` (seven numbers, -1 not played), `bestWeek`, `style`, `unlocked`). It is written when a board is
+solved or a gauntlet board starts (that uses up the day's try), a style unlocks, a Delve run ends or a style is picked. `loadProgress` keeps only known
 styles and re-checks `UNLOCKS`.
 
 Randomness and timing: `makePuzzle` and the relic offer use `Math.random`, except the daily puzzle,
-which uses `seeded(dailySeed(date))`. The backdrops use Phaser's `RandomDataGenerator` with a fixed
+which uses `seeded(dailySeed(date))`, and the gauntlet, which uses `seeded(weekSeed * 10 + day)`.
+A puzzle with no extra rule draws the same numbers as before, so daily boards didn't change. The backdrops use Phaser's `RandomDataGenerator` with a fixed
 seed. All rule timing is game time from `tick`.
 
 ### Hub settings
@@ -165,11 +204,12 @@ seed. All rule timing is game time from `tick`.
 
 ## Trophies
 
-`src/trophies/index.ts` lists nine (`trophySet('ninefold', ...)`, handed to `setupGame` in
+`src/trophies/index.ts` lists ten (`trophySet('ninefold', ...)`, handed to `setupGame` in
 `main.ts`), with their texts in `src/trophies/i18n/` (`en.ts`, `de.ts`). `src/trophies/check.ts`
 awards each from `Progress` alone (`EARNED`): `firstSolve` (solved 1), `flawless`, `fast`, `streak3`
-and `streak7` (`bestStreak`), `firstBoss` (`bosses`), `floor10` and `floor20` (`bestFloor`) and
-`allStyles` (every style unlocked); `streak7` and `floor20` are hidden. `GameScene` calls
+and `streak7` (`bestStreak`), `firstBoss` (`bosses`), `floor10` and `floor20` (`bestFloor`),
+`allStyles` (every style unlocked) and `ascent5` (`climbed >= 6`: floor 10 cleared at Ascension 5);
+`streak7`, `floor20` and `ascent5` are hidden. `GameScene` calls
 `checkTrophies` once in `create` (quietly, for a saved progress) and in `drain` after any event.
 They are saved under `ninefold-trophies`. The playthrough checks that floor 1, solved with a
 mistake, earns only First fill. A new trophy needs its id in `index.ts`, its two texts in each
@@ -194,7 +234,7 @@ part for the screen; the engine only switches when it changes.
 | `erase` | Erase on a cell with a wrong digit or notes to clear |
 | `hint` | a `hint` event |
 | `unit` | a `unit` event (a row, column or box finished) |
-| `unlock` | an `unlocked` event, and picking a style |
+| `unlock` | an `unlocked` or `ascended` event, and picking a style |
 | `relic` | a `relic` event, and a `phoenix` event |
 | `unlock` (heal) / `hint` (gift) | a `heal` event / a `gift` event |
 
@@ -206,7 +246,7 @@ digit, Erase or Hint that can't be used, a disabled pad key and a locked style.
 - `src/main.ts` exposes `window.game` in dev builds. The test reads `game.scene.getScene('Game')`
   and its `state` (copied through JSON, without `events`), `screen`, `cellSpots` (`{ cell, x, y,
   w, h }` per cell of the board, in view pixels) and `buttons` (spots by id: `daily`, `easy`,
-  `normal`, `hard`, `delve`, `styles`, `menu`, `key-1`..`key-9`, `notes`, `erase`, `undo`, `hint`,
+  `normal`, `hard`, `killer`, `thermo`, `weekly`, `delve`, `ascent-down`, `ascent-up` (once an ascension is open), `styles`, `menu`, `key-1`..`key-9`, `notes`, `erase`, `undo`, `hint`,
   `relic-0`..`relic-2`, `next`, `done`, `again`, `back`, `style-<id>`).
 - Inputs: it taps `delve`, taps cells from `cellSpots` and pad keys from `buttons`, toggles
   `notes`, taps `erase` and `relic-0`. It never uses hints and stays on Delve floors 1 and 2.
@@ -227,6 +267,12 @@ digit, Erase or Hint that can't be used, a disabled pad key and a locked style.
 - **Add a style**: its id in `STYLES` (the order is the unlock order; Stained Glass waits for every
   other one), `STYLE_INFO` and its two texts, its goal in `UNLOCKS`, its `THEMES` entry, a case in
   `drawDeco`, and the README row. Ten styles need `styleCards` laid out four across in `WIDE` (`TALL`'s five rows of two already hold ten).
+- **Add a board rule** (like Killer or Thermo): its data on `Puzzle` and `Rules`, a maker run from
+  `makePuzzle` for a new `Extra`, its check in `allowed` (keep it cheap: it runs per candidate), its
+  drawing in `drawBoard`, then a Classic level (`LEVELS`, `CLASSIC_GIVENS`, `LEVEL_EXTRA` and a
+  `levels` spot in both layouts) and/or a twist.
+- **Add an ascension**: its rule's text in `ASCENSION_RULES`, its start in `ASCENT`, its effect where
+  the run applies it, and the README's table.
 - **Add a twist**: its id in `TWISTS` with `TWIST_INFO` and its two texts, its `TWIST_GIVENS`, its
   rule where it applies (`sudoku.ts` for a board rule, `tick`, `hint` or `solved` otherwise), how
   the board or panel shows it in `GameScene`, and the README's twist table. A boss floor draws its

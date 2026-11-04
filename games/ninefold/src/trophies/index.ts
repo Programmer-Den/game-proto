@@ -18,6 +18,7 @@ export const trophies = trophySet(
     { id: 'allStyles', tier: 'gold', icon: '🎨' },
     { id: 'streak7', tier: 'gold', icon: '🔥', hidden: true },
     { id: 'floor20', tier: 'gold', icon: '🕳️', hidden: true },
+    { id: 'ascent5', tier: 'gold', icon: '🏔️', hidden: true },
   ],
   { en, de },
 );

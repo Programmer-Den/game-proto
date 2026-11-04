@@ -1,8 +1,11 @@
-import { addBlockers, freshBoard, stuck, type Board, type Cell, type Tile } from './board';
+import { dailyRand } from '../../../../shared/daily';
+import { addBlockers, freshBoard, layBoard, stuck, type Board, type Cell, type Tile } from './board';
+import { endlessOrder } from './endless';
 import { EXAMS, examOrder, examSeed, seeded } from './exams';
 import { KINDS, randomKind, type Kind } from './kinds';
 import { orderFor, type Needs, type Order, type PotionId } from './orders';
 import { unlockedRecipes } from './ranks';
+import { dailyOrder, TOWNS, townOrder, townSeed } from './towns';
 import { freshUpgrades, type Upgrades } from './upgrades';
 
 /** What carries over between orders, and is saved. */
@@ -24,7 +27,14 @@ export interface Progress {
   seals: number;
   /** The next order was picked rich on the result card. */
   rich: boolean;
+  /** The best stars each town on the journey map was sold with, 0 for one not sold yet (see towns.ts). */
+  towns: number[];
+  /** The longest endless run so far: orders sold in a row (see endless.ts). */
+  endless: number;
 }
+
+/** The game's name for the shared daily (`shared/daily.ts`): its record is kept under `tincture-tinker-daily`. */
+export const GAME = 'tincture-tinker';
 
 export interface GameState extends Progress {
   current: Order;
@@ -64,6 +74,8 @@ export interface GameState extends Progress {
   passed: boolean;
   board: Board;
   nextId: number;
+  /** Where new tiles' kinds come from on the daily order (today's seeded source); Math.random otherwise. Never saved. */
+  rand?: () => number;
 }
 
 /** The most of one kind the pantry keeps. */
@@ -71,9 +83,9 @@ export const PANTRY_MAX = 5;
 /** What the herbalist charges for one ingredient put in the pantry between orders. */
 export const HERB_COST = 8;
 
-export const freshProgress = (): Progress => ({ order: 1, coins: 0, sold: 0, stars: 0, pantry: {}, upgrades: freshUpgrades(), royal: false, seals: 0, rich: false });
+export const freshProgress = (): Progress => ({ order: 1, coins: 0, sold: 0, stars: 0, pantry: {}, upgrades: freshUpgrades(), royal: false, seals: 0, rich: false, towns: TOWNS.map(() => 0), endless: 0 });
 /** The progress to save or carry on with. Until the order sells, its pantry draws are given back. */
-export const progressOf = ({ order, coins, sold, stars, pantry, startPantry, phase, upgrades, royal, seals, rich }: GameState): Progress => ({
+export const progressOf = ({ order, coins, sold, stars, pantry, startPantry, phase, upgrades, royal, seals, rich, towns, endless }: GameState): Progress => ({
   order,
   coins,
   sold,
@@ -83,6 +95,8 @@ export const progressOf = ({ order, coins, sold, stars, pantry, startPantry, pha
   royal,
   seals,
   rich,
+  towns: [...towns],
+  endless,
 });
 
 /** The pantry as it stands between orders: after a sale what it holds, otherwise what the order found. */
@@ -90,6 +104,8 @@ export const heldPantry = (s: Pick<GameState, 'pantry' | 'startPantry' | 'phase'
 
 /** True when there is a guild examination to sit: the tinker is Royal Apothecary and has seals still to earn. */
 export const examOpen = (p: Progress) => p.royal && p.seals < EXAMS.length;
+/** True once every guild examination is passed: endless runs are open. */
+export const endlessOpen = (p: Progress) => p.seals >= EXAMS.length;
 
 /**
  * The herbalist, between orders: one `kind` into the pantry for `HERB_COST` coins, up to `PANTRY_MAX`.
@@ -103,7 +119,7 @@ export function buyHerb(s: GameState, kind: Kind): boolean {
   return true;
 }
 
-export const tileMaker = (s: GameState) => (): Tile => ({ id: s.nextId++, kind: randomKind() });
+export const tileMaker = (s: GameState) => (): Tile => ({ id: s.nextId++, kind: randomKind(s.rand) });
 
 /** The orders' view of the progress: the recipes unlocked, the workbench's moves, the royal title and a rich pick. */
 export const standingOf = (p: Progress) => ({ unlocked: unlockedRecipes(p.stars), extraMoves: p.upgrades.hands, royal: p.royal, rich: p.rich });
@@ -113,11 +129,45 @@ export const standingOf = (p: Progress) => ({ unlocked: unlockedRecipes(p.stars)
  * examination on its fixed board (no Bloom starter, no pantry).
  */
 export function startOrder(progress: Progress, exam = false): GameState {
-  const current = exam ? examOrder(progress.seals, progress.order) : orderFor(progress.order, standingOf(progress));
-  const s: GameState = {
+  if (exam) return startAside(progress, examOrder(progress.seals, progress.order), seeded(examSeed(progress.seals)));
+  const s = blankState(progress, orderFor(progress.order, standingOf(progress)));
+  const current = s.current;
+  s.board = addBlockers(freshBoard(tileMaker(s)), current.jars, current.resin, current.mould);
+  if (s.upgrades.bloom > 0) s.board = withBloom(s.board);
+  drawPantry(s);
+  return s;
+}
+
+/** Town `index` of the journey map on its own fixed board, cut to the town's shape. */
+export const startTown = (progress: Progress, index: number) => startAside(progress, townOrder(index, progress.order), seeded(townSeed(index)));
+/** Order `step` of an endless run, on a new board. */
+export const startEndless = (progress: Progress, step: number) => startAside(progress, endlessOrder(step, progress.order));
+/** Today's daily order: the order, its board and every tile that drops in come from today's seed. */
+export function startDailyOrder(progress: Progress, day: string): GameState {
+  const rand = dailyRand(GAME, day);
+  return startAside(progress, dailyOrder(rand, day, progress.order), rand, true);
+}
+
+/**
+ * An order outside the round (an examination, a town, an endless run's or the daily) on a board laid
+ * from `rand`, with walls cut where the order has `holes`: no Bloom starter and no pantry. With
+ * `refills`, the tiles that drop in come from `rand` too.
+ */
+function startAside(progress: Progress, current: Order, rand: () => number = Math.random, refills = false): GameState {
+  const s = blankState(progress, current);
+  if (refills) s.rand = rand;
+  const make = () => ({ id: s.nextId++, kind: randomKind(rand) });
+  s.board = addBlockers(layBoard(make, current.holes ?? [], rand), current.jars, current.resin, current.mould, rand);
+  return s;
+}
+
+/** A state for `current` with all its moves and nothing gathered yet; its board is laid by the caller. */
+function blankState(progress: Progress, current: Order): GameState {
+  return {
     ...progress,
     pantry: { ...progress.pantry },
     upgrades: { ...progress.upgrades },
+    towns: [...progress.towns],
     current,
     got: Object.fromEntries(KINDS.map((k) => [k, 0])) as Record<Kind, number>,
     moves: current.moves,
@@ -142,15 +192,6 @@ export function startOrder(progress: Progress, exam = false): GameState {
     board: [],
     nextId: 1,
   };
-  if (exam) {
-    const rand = seeded(examSeed(progress.seals));
-    s.board = addBlockers(freshBoard(() => ({ id: s.nextId++, kind: randomKind(rand) }), rand), current.jars, current.resin, current.mould, rand);
-    return s;
-  }
-  s.board = addBlockers(freshBoard(tileMaker(s)), current.jars, current.resin, current.mould);
-  if (s.upgrades.bloom > 0) s.board = withBloom(s.board);
-  drawPantry(s);
-  return s;
 }
 
 /** The Bloom starter's Bloom, on a random tile that is free to move (the board matches no more than before). */

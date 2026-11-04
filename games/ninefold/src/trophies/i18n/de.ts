@@ -21,6 +21,8 @@ const de: Translation<typeof en> = {
   streak7Text: 'Löse das Tagesrätsel sieben Tage hintereinander.',
   floor20: 'Grund des Brunnens',
   floor20Text: 'Schaffe Ebene 20 im Abstieg.',
+  ascent5: 'Gipfel der Tiefe',
+  ascent5Text: 'Schaffe Ebene 10 des Abstiegs auf Stufe 5.',
 };
 
 export default de;

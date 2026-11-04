@@ -2,14 +2,15 @@ import Phaser from 'phaser';
 import { playMusic, playSting, ui } from '../../../../shared/audio';
 import { viewFrame, viewSize } from '../../../../shared/scaling';
 import { settings } from '../../../../shared/settings';
-import { LEVELS, RELIC_INFO, STYLES, STYLE_INFO, TWIST_INFO, type Level, type RelicId, type StyleId } from '../game/catalog';
+import { ASCENSION_RULES, LEVELS, RELIC_INFO, STYLES, STYLE_INFO, TWIST_INFO, type Level, type RelicId, type StyleId, type Twist } from '../game/catalog';
 import { loadBoard, loadProgress, saveBoard, saveProgress } from '../game/save';
 import {
-  canEnter, canUndo, chooseStyle, clockLeft, dailyStreakNow, undoMove, digitsLeft, enter, erase, hasTwist, hint, isRight, newGame, select, startClassic,
-  startDaily, startDelve, takeRelic, tick, toggleNotes, toMenu, type FloorPlan, type GameState,
+  ascensionOpen, canEnter, canUndo, chooseStyle, clockLeft, dailyStreakNow, undoMove, digitsLeft, enter, erase, GAUNTLET, hasTwist, hint, isRight, newGame,
+  notesLocked, select, startClassic, startDaily, startDelve, startWeekly, takeRelic, tick, toggleNotes, toMenu, weekDay, weekScores, type FloorPlan, type GameState,
 } from '../game/state';
 import { boxOf, dailySeed, peersOf, units, type Puzzle } from '../game/sudoku';
 import { SFX, SONG } from '../audio';
+import { formatNumber } from '../../../../shared/i18n';
 import { t } from '../i18n';
 import { checkTrophies } from '../trophies/check';
 import { layoutFor, UI_DEPTH, WIDE, type Layout } from './layout';
@@ -49,6 +50,10 @@ export class GameScene extends Phaser.Scene {
   private flashG!: Phaser.GameObjects.Graphics;
   private digits: Phaser.GameObjects.Text[] = [];
   private noteTexts: Phaser.GameObjects.Text[] = [];
+  /** The Killer cages' sums, one text per cage. */
+  private sumTexts: Phaser.GameObjects.Text[] = [];
+  /** The ascension the menu's Delve button starts at. */
+  private pickAscent = 0;
   /** Everything drawn for the current screen and overlay, rebuilt when `layerKey` changes. */
   private parts: Part[] = [];
   private layerKey = '';
@@ -78,7 +83,9 @@ export class GameScene extends Phaser.Scene {
     for (let i = 0; i < 81; i++) {
       this.digits.push(this.add.text(0, 0, '', {}).setOrigin(0.5));
       this.noteTexts.push(this.add.text(0, 0, '', {}).setOrigin(0, 0));
+      this.sumTexts.push(this.add.text(0, 0, '', {}).setOrigin(0, 0));
     }
+    this.pickAscent = ascensionOpen(this.state.progress);
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => this.onBoardTap(p.worldX, p.worldY));
     this.input.keyboard?.on('keydown', (e: KeyboardEvent) => this.onKey(e));
     // A phone turned the other way round reshapes the view: lay everything out again.
@@ -182,7 +189,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onNotes() {
-    toggleNotes(this.state);
+    if (!toggleNotes(this.state)) return ui('refuse');
     ui('click');
     this.dirty = true;
   }
@@ -249,6 +256,11 @@ export class GameScene extends Phaser.Scene {
           break;
         case 'unlocked':
           SFX('unlock');
+          saveProgress(s.progress);
+          break;
+        case 'ascended':
+          SFX('unlock');
+          this.pickAscent = e.ascent;
           saveProgress(s.progress);
           break;
         case 'over':
@@ -380,6 +392,7 @@ export class GameScene extends Phaser.Scene {
     for (let i = 0; i < 81; i++) {
       this.digits[i].setVisible(false);
       this.noteTexts[i].setVisible(false);
+      this.sumTexts[i].setVisible(false);
     }
     this.cellSpots = [];
     if (!p || this.screen !== 'board') return;
@@ -399,6 +412,11 @@ export class GameScene extends Phaser.Scene {
     const done = new Set<number>();
     for (const u of s.doneUnits) for (const c of this.shapeOf.units[u]) done.add(c);
     const fontSize = Math.round(cs * (size === 9 ? 0.62 : 0.56));
+    // Killer: each cage's first cell carries its sum in the top-left corner, so notes sit lower there.
+    const cageOf = new Map<number, number>();
+    p.cages?.forEach((cage, k) => cage.cells.forEach((c) => cageOf.set(c, k)));
+    const sumAt = new Map<number, number>((p.cages ?? []).map((cage) => [cage.cells[0], cage.sum]));
+    const sumSize = Math.round(cs * 0.22);
     for (let i = 0; i < size * size; i++) {
       const r = Math.floor(i / size);
       const c = i % size;
@@ -445,13 +463,40 @@ export class GameScene extends Phaser.Scene {
         const noteSize = Math.round(cs * 0.24);
         const noteColor = i === sel && th.selText ? th.selText : th.note;
         const noteKey = `${th.font}|${noteSize}|${noteColor}|${w - 6}`;
-        note.setText(marks.join(' ')).setPosition(cx + 4, cy + 3).setVisible(true);
+        note.setText(marks.join(' ')).setPosition(cx + 4, cy + 3 + (sumAt.has(i) ? sumSize : 0)).setVisible(true);
         if (note.getData('styleKey') !== noteKey) {
           note.setStyle({ fontFamily: th.font, fontSize: `${noteSize}px`, color: noteColor, wordWrap: { width: w - 6 } });
           note.setData('styleKey', noteKey);
         }
       }
+      if (p.cages) this.drawCage(g, i, cageOf, cx, cy, w, h, x + c * cs, y + r * cs, cs);
+      const sum = sumAt.get(i);
+      if (sum !== undefined) {
+        const label = this.sumTexts[cageOf.get(i)!];
+        const sumKey = `${th.font}|${sumSize}|${th.given}`;
+        label.setText(String(sum)).setPosition(cx + 3, cy + 1).setVisible(true);
+        if (label.getData('styleKey') !== sumKey) {
+          label.setStyle({ fontFamily: th.font, fontSize: `${sumSize}px`, color: th.given, fontStyle: 'bold' });
+          label.setData('styleKey', sumKey);
+        }
+      }
       this.cellSpots.push({ cell: i, x: this.fx + x + c * cs + cs / 2, y: this.fy + y + r * cs + cs / 2, w: cs, h: cs });
+    }
+    // Thermo: a bulb on each line's first cell and a tube through the rest, under the digits.
+    for (const line of p.thermos ?? []) {
+      const centre = (cell: number) => [x + (cell % size) * cs + cs / 2, y + Math.floor(cell / size) * cs + cs / 2] as const;
+      // Opaque, mixed from the cell and note colours, so the tube's joints don't darken where they overlap.
+      const mix = Phaser.Display.Color.Interpolate.ColorWithColor(Phaser.Display.Color.ValueToColor(th.cell), Phaser.Display.Color.ValueToColor(hex(th.note)), 100, 45);
+      const tube = Phaser.Display.Color.GetColor(mix.r, mix.g, mix.b);
+      g.fillStyle(tube, 1).lineStyle(cs * 0.26, tube, 1);
+      const [bx, by] = centre(line[0]);
+      g.fillCircle(bx, by, cs * 0.34);
+      for (let k = 1; k < line.length; k++) {
+        const [ax, ay] = centre(line[k - 1]);
+        const [ex, ey] = centre(line[k]);
+        g.lineBetween(ax, ay, ex, ey);
+        g.fillCircle(ex, ey, cs * 0.13);
+      }
     }
     // Diagonal: both long diagonals are drawn as faint lines across the board.
     if (p.diagonal) {
@@ -467,6 +512,40 @@ export class GameScene extends Phaser.Scene {
       pt.setText(usable && left[d] > 0 ? String(left[d]) : '');
       key?.setAlpha(usable && left[d] > 0 ? 1 : 0.35);
     });
+  }
+
+  /**
+   * Draws a Killer cage's dashed edge inside one cell (`cx`, `cy`, `w`, `h`; `ox`, `oy` is the
+   * cell's outer corner, past the grid line): a side whose neighbour is in another cage gets a line
+   * just inside it, and the line runs on across the grid line where the cage goes on.
+   */
+  private drawCage(g: Phaser.GameObjects.Graphics, cell: number, cageOf: Map<number, number>, cx: number, cy: number, w: number, h: number, ox: number, oy: number, cs: number) {
+    const size = this.state.puzzle!.size;
+    const r = Math.floor(cell / size);
+    const c = cell % size;
+    const same = (dr: number, dc: number) => {
+      const rr = r + dr;
+      const cc = c + dc;
+      return rr >= 0 && cc >= 0 && rr < size && cc < size && cageOf.get(rr * size + cc) === cageOf.get(cell);
+    };
+    const d = Math.max(3, cs * 0.08);
+    const x0 = same(0, -1) ? ox : cx + d;
+    const x1 = same(0, 1) ? ox + cs : cx + w - d;
+    const y0 = same(-1, 0) ? oy : cy + d;
+    const y1 = same(1, 0) ? oy + cs : cy + h - d;
+    g.lineStyle(Math.max(1.5, cs * 0.035), hex(this.theme.given), 0.85);
+    const dash = (ax: number, ay: number, bx: number, by: number) => {
+      const len = Math.hypot(bx - ax, by - ay);
+      const step = Math.max(6, cs * 0.12);
+      for (let k = 0; k < len; k += step) {
+        const e = Math.min(len, k + step * 0.55);
+        g.lineBetween(ax + ((bx - ax) * k) / len, ay + ((by - ay) * k) / len, ax + ((bx - ax) * e) / len, ay + ((by - ay) * e) / len);
+      }
+    };
+    if (!same(-1, 0)) dash(x0, cy + d, x1, cy + d);
+    if (!same(1, 0)) dash(x0, cy + h - d, x1, cy + h - d);
+    if (!same(0, -1)) dash(cx + d, y0, cx + d, y1);
+    if (!same(0, 1)) dash(cx + w - d, y0, cx + w - d, y1);
   }
 
   /** Sets the panel's changing texts: hearts or mistakes, the clock, hints and notes mode. */
@@ -486,7 +565,7 @@ export class GameScene extends Phaser.Scene {
         : t('mistakes', { n: s.mistakes }),
     );
     pt.hint.setText(hasTwist(s, 'sealed') ? t('hintSealed') : t('hintButton', { n: s.hintsLeft }));
-    pt.notes.setText(s.notesMode ? t('notesOn') : t('notesOff'));
+    pt.notes.setText(notesLocked(s) ? t('notesLocked') : s.notesMode ? t('notesOn') : t('notesOff'));
     pt.relics?.setText(this.relicLine());
   }
 
@@ -503,7 +582,7 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     // The menu's daily button depends on today's date, so the menu is rebuilt when the date changes.
     const today = this.screen === 'menu' ? dailySeed(new Date()) : 0;
-    return `${this.screen}|${s.phase}|${s.progress.style}|${s.puzzle?.size ?? 0}|${s.floor}|${s.relicOffer.join()}|${s.mode}|${today}`;
+    return `${this.screen}|${s.phase}|${s.progress.style}|${s.puzzle?.size ?? 0}|${s.floor}|${s.relicOffer.join()}|${s.mode}|${today}|${this.pickAscent}`;
   }
 
   private buildLayer() {
@@ -585,24 +664,52 @@ export class GameScene extends Phaser.Scene {
     if (th.glow) title.setShadow(0, 0, th.glow === 'auto' ? th.accent : th.glow, 16, false, true);
     this.text(this.L.menu.title.x, this.L.menu.title.y + 44, t('tagline'), 17, undefined, { wordWrap: { width: this.L.menu.box.w } });
     this.box(this.L.menu.box.x, this.L.menu.box.y, this.L.menu.box.w, this.L.menu.box.h, UI_DEPTH, undefined, Math.min(th.panelAlpha, 0.85));
-    const today = dailySeed(new Date());
+    const m = this.L.menu;
+    const now = new Date();
+    const today = dailySeed(now);
     const dailyDone = p.daily === today;
-    this.button('daily', this.L.menu.daily.x, this.L.menu.daily.y, this.L.menu.daily.w, this.L.menu.daily.h, dailyDone ? t('dailyDone') : t('daily'), () => {
+    this.button('daily', m.daily.x, m.daily.y, m.daily.w, m.daily.h, dailyDone ? t('dailyDone') : t('daily'), () => {
       ui('click');
       startDaily(this.state, new Date());
-    }, 20, !dailyDone);
-    this.text(this.L.menu.levels.xs[1], this.L.menu.levels.y - 44, t('classic'), 15);
+    }, m.topFont, !dailyDone);
+    // The weekly gauntlet: today's board, once, and the week's total so far.
+    const scores = weekScores(p, now);
+    const day = weekDay(now);
+    const total = formatNumber(scores.reduce((sum, v) => sum + Math.max(0, v), 0));
+    const played = scores[day] >= 0;
+    const weeklyCaption = `${t('weekly')}
+${played ? t('weeklyDone', { total }) : t('weeklyLine', { day: day + 1, total })}`;
+    const weekly = this.button('weekly', m.weekly.x, m.weekly.y, m.weekly.w, m.weekly.h, weeklyCaption, () => {
+      ui('click');
+      if (startWeekly(this.state, new Date())) saveProgress(this.state.progress);
+    }, m.topFont, !played);
+    weekly.label.setLineSpacing(2).setFontSize(m.topFont - 1);
+    this.text(m.levels.xs[2], m.levels.y - 44, t('classic'), 15);
     LEVELS.forEach((level, k) => {
-      this.button(level, this.L.menu.levels.xs[k], this.L.menu.levels.y, this.L.menu.levels.w, this.L.menu.levels.h, t(level), () => {
+      this.button(level, m.levels.xs[k], m.levels.y, m.levels.w, m.levels.h, t(level), () => {
         ui('click');
         startClassic(this.state, level as Level);
-      }, 19);
+      }, m.levels.font);
     });
-    this.button('delve', this.L.menu.delve.x, this.L.menu.delve.y, this.L.menu.delve.w, this.L.menu.delve.h, t('delve'), () => {
+    const open = ascensionOpen(p);
+    const ascent = Math.min(this.pickAscent, open);
+    this.button('delve', m.delve.x, m.delve.y, m.delve.w, m.delve.h, ascent ? t('delveAscent', { n: ascent }) : t('delve'), () => {
       ui('click');
-      startDelve(this.state);
+      startDelve(this.state, ascent);
     }, 20);
-    this.text(this.L.menu.delve.x, this.L.menu.delve.y + 40, p.bestFloor ? t('bestFloor', { n: p.bestFloor }) : t('delveBlurb'), 13);
+    // Once an ascension is open, the arrows either side of Delve pick where the next run starts.
+    if (open) {
+      this.button('ascent-down', m.ascentDown.x, m.ascentDown.y, m.ascentDown.w, m.ascentDown.h, '‹', () => {
+        ui('click');
+        this.pickAscent = ascent - 1;
+      }, 26, ascent > 0);
+      this.button('ascent-up', m.ascentUp.x, m.ascentUp.y, m.ascentUp.w, m.ascentUp.h, '›', () => {
+        ui('click');
+        this.pickAscent = ascent + 1;
+      }, 26, ascent < open);
+    }
+    const delveLine = ascent ? t('ascentLine', { n: ascent, rule: t(ASCENSION_RULES[ascent - 1]) }) : p.bestFloor ? t('bestFloor', { n: p.bestFloor }) : t('delveBlurb');
+    this.text(m.delve.x, m.delve.y + 40, delveLine, 13, undefined, { wordWrap: { width: m.box.w - 30 } });
     this.button('styles', this.L.menu.styles.x, this.L.menu.styles.y, this.L.menu.styles.w, this.L.menu.styles.h, t('stylesButton', { n: p.unlocked.length, of: STYLES.length }), () => {
       ui('click');
       this.screen = 'styles';
@@ -682,10 +789,16 @@ export class GameScene extends Phaser.Scene {
     if (dock) this.box(dock.x, dock.y, dock.w, dock.h, 5);
     const left = (x: number, y: number, content: string, size: number, color?: string) =>
       this.add_(this.add.text(x, y, content, { fontFamily: th.font, fontSize: `${size}px`, color: color ?? th.text, fontStyle: th.bold ? 'bold' : '' }).setOrigin(0, 0.5).setDepth(UI_DEPTH + 2));
-    const twists = s.mode === 'delve' ? (s.plan?.twists ?? []).map((tw) => t(TWIST_INFO[tw].name)) : [];
-    const kicker = [s.mode === 'delve' ? t('delve') : s.mode === 'daily' ? t('daily') : t('classic'), ...twists].join(' · ');
-    left(panel.x + 24, panel.y + rows.kicker, kicker.toUpperCase(), 13).setAlpha(0.75);
-    const heading = s.mode !== 'delve' ? t(s.level) : s.plan?.boss ? t('bossFloor', { n: s.floor }) : t('floor', { n: s.floor, size: p.size });
+    const twistIds: Twist[] = s.mode === 'delve' ? (s.plan?.twists ?? []) : s.mode === 'weekly' && GAUNTLET[s.weekDay]?.twist ? [GAUNTLET[s.weekDay].twist!] : [];
+    const modeName = { delve: t('delve'), daily: t('daily'), weekly: t('weekly'), classic: t('classic') }[s.mode];
+    const ascent = s.mode === 'delve' && s.ascent ? [t('ascentTag', { n: s.ascent })] : [];
+    const kicker = [modeName, ...ascent, ...twistIds.map((tw) => t(TWIST_INFO[tw].name))].join(' · ');
+    const kickerText = left(panel.x + 24, panel.y + rows.kicker, kicker.toUpperCase(), 13).setAlpha(0.75);
+    // A long kicker shrinks to stay clear of the Menu button.
+    const room = this.L.menuButton.x - this.L.menuButton.w / 2 - 10 - (panel.x + 24);
+    if (kickerText.width > room) kickerText.setScale(room / kickerText.width);
+    const heading = s.mode === 'weekly' ? t('weeklyHeading', { day: s.weekDay + 1 })
+      : s.mode !== 'delve' ? t(s.level) : s.plan?.boss ? t('bossFloor', { n: s.floor }) : t('floor', { n: s.floor, size: p.size });
     const h1 = left(panel.x + 24, panel.y + rows.heading, heading, 28, th.accent);
     if (th.glow) h1.setShadow(0, 0, th.glow === 'auto' ? th.accent : th.glow, 10, false, true);
     this.button('menu', this.L.menuButton.x, this.L.menuButton.y, this.L.menuButton.w, this.L.menuButton.h, t('menu'), () => {
@@ -742,7 +855,10 @@ export class GameScene extends Phaser.Scene {
     this.text(this.L.end.x, this.L.end.y - 92, t('solved'), 34, this.theme.accent);
     const secs = Math.floor(s.timeMs / 1000);
     this.text(this.L.end.x, this.L.end.y - 46, t('solvedLine', { time: `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`, mistakes: s.mistakes, hints: s.hintsUsed }), 16);
-    this.text(this.L.end.x, this.L.end.y - 10, this.unlockedLine(), 16, this.theme.accent, { wordWrap: { width: this.L.end.w - 40 } });
+    // A gauntlet board shows its score and the week's total so far.
+    const weekly = s.mode === 'weekly';
+    if (weekly) this.text(this.L.end.x, this.L.end.y - 12, t('weeklyScore', { score: formatNumber(s.score), total: formatNumber(s.weekTotal) }), 20, this.theme.accent);
+    this.text(this.L.end.x, this.L.end.y + (weekly ? 24 : -10), this.unlockedLine(), weekly ? 14 : 16, this.theme.accent, { wordWrap: { width: this.L.end.w - 40 } });
     if (s.mode === 'classic') {
       this.button('next', this.L.endButtons.xs[0], this.L.endButtons.y, this.L.endButtons.w, this.L.endButtons.h, t('next'), () => {
         ui('click');
@@ -765,11 +881,14 @@ export class GameScene extends Phaser.Scene {
     const box = this.L.relicBox;
     this.box(box.x, box.y, box.w, box.h, UI_DEPTH, undefined, Math.max(0.95, th.panelAlpha));
     this.text(box.x + box.w / 2, box.title, s.plan?.boss ? t('bossCleared', { n: s.floor }) : t('floorCleared', { n: s.floor }), 30, th.accent);
-    const line = this.unlockedLine() || (s.plan?.boss ? `${t('heartsRestored')} ${t('takeRelic')}` : t('takeRelic'));
-    this.text(box.x + box.w / 2, box.line, line, 15, this.unlockedLine() ? th.accent : th.text, { wordWrap: { width: box.w - 40 } });
+    const news = [s.ascended ? t('ascentOpened', { n: s.ascended }) : '', this.unlockedLine()].filter(Boolean).join(' ');
+    const line = news || (s.plan?.boss ? `${t('heartsRestored')} ${t('takeRelic')}` : t('takeRelic'));
+    this.text(box.x + box.w / 2, box.line, line, 15, news ? th.accent : th.text, { wordWrap: { width: box.w - 40 } });
     if (s.upcoming) this.text(box.x + box.w / 2, box.next, this.nextLine(s.upcoming), 14, th.text, { wordWrap: { width: box.w - 40 } });
     s.relicOffer.forEach((relic, k) => {
-      const x = this.L.relicCards.xs[k];
+      // Two cards (Ascension 5) sit between the three spots.
+      const xs = this.L.relicCards.xs;
+      const x = s.relicOffer.length === xs.length ? xs[k] : (xs[k] + xs[k + 1]) / 2;
       const y = this.L.relicCards.y;
       const { w, h } = this.L.relicCards;
       const info = RELIC_INFO[relic];

@@ -19,6 +19,8 @@ export interface Tile {
   resin?: boolean;
   /** Creeping mould: the tile can't be swapped and never matches; a match next to it scrubs it clean. */
   mould?: boolean;
+  /** A wall in a town's board shape: no tile is ever there, nothing matches through it and tiles fall past it. */
+  hole?: boolean;
 }
 export type Board = Tile[][];
 export interface Cell {
@@ -30,9 +32,9 @@ export type NewTile = () => Tile;
 export const adjacent = (a: Cell, b: Cell) => Math.abs(a.row - b.row) + Math.abs(a.col - b.col) === 1;
 export const inBoard = (c: Cell) => c.row >= 0 && c.row < ROWS && c.col >= 0 && c.col < COLS;
 /** What a tile matches as: its kind, or nothing for a corked jar or a mouldy tile. */
-export const matchKind = (t: Tile): Kind | null => (t.jar || t.mould ? null : t.kind);
-/** Jars, resin and mould hold their tiles in place: they can't be swapped. */
-export const stuck = (t: Tile) => !!(t.jar || t.resin || t.mould);
+export const matchKind = (t: Tile): Kind | null => (t.jar || t.mould || t.hole ? null : t.kind);
+/** Jars, resin and mould hold their tiles in place, and a wall is no tile at all: they can't be swapped. */
+export const stuck = (t: Tile) => !!(t.jar || t.resin || t.mould || t.hole);
 /** Catalysts and Blooms: the special tiles. */
 export const special = (t: Tile) => !!(t.catalyst || t.bloom);
 
@@ -119,13 +121,13 @@ export function validMoves(board: Board): [Cell, Cell][] {
 
 /**
  * Takes the cleared cells out, lets the tiles above fall and drops new ones in at the top. Resin
- * holds its tile in place: the others fall past it.
+ * holds its tile in place and a wall stays where it is: the others fall past both.
  */
 export function collapse(board: Board, cleared: Cell[], newTile: NewTile): Board {
   const gone = new Set(cleared.map((c) => c.row * COLS + c.col));
   const next: Board = Array.from({ length: ROWS }, () => new Array<Tile>(COLS));
   for (let col = 0; col < COLS; col++) {
-    const held = (r: number) => !gone.has(r * COLS + col) && !!board[r][col].resin;
+    const held = (r: number) => !gone.has(r * COLS + col) && !!(board[r][col].resin || board[r][col].hole);
     const falling: Tile[] = [];
     for (let r = ROWS - 1; r >= 0; r--) {
       if (held(r)) next[r][col] = board[r][col];
@@ -170,8 +172,27 @@ export function shuffle(board: Board, newTile: NewTile): Board {
     free.forEach((c, i) => (next[c.row][c.col] = tiles[i]));
     if (findMatches(next).length === 0 && validMoves(next).length > 0) return next;
   }
-  return freshBoard(newTile);
+  // A town's walls stay where they are on the fresh board.
+  const holes = board.flatMap((row, r) => row.flatMap((t, c) => (t.hole ? [{ row: r, col: c }] : [])));
+  return layBoard(newTile, holes);
 }
+
+/**
+ * A new board with walls cut at `holes` (a town's board shape), no matches and a move to make;
+ * with no holes it is `freshBoard` itself, so the boards without walls are laid as before.
+ */
+export function layBoard(newTile: NewTile, holes: Cell[], rand: () => number = Math.random): Board {
+  for (;;) {
+    const board = freshBoard(newTile, rand);
+    if (holes.length === 0) return board;
+    for (const h of holes) board[h.row][h.col] = { ...board[h.row][h.col], hole: true };
+    if (validMoves(board).length > 0) return board;
+  }
+}
+
+/** The cells marked `#` in a board shape of eight rows of eight (`.` for a cell, `#` for a wall). */
+export const holesOf = (shape: string[]): Cell[] =>
+  shape.flatMap((line, row) => [...line].flatMap((ch, col) => (ch === '#' ? [{ row, col }] : [])));
 
 /**
  * Corks `jars` random tiles into jars, coats `resin` others in resin and grows `mould` on others,

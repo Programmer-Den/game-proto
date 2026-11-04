@@ -18,6 +18,10 @@ const en: HowToPlay = {
       input: 'Tap Try again, Workbench or Herbalist',
       action: 'After an order: retry it, buy lasting upgrades, or stock the pantry',
     },
+    {
+      input: 'Tap Journey map, then a town, Daily order or Endless orders',
+      action: "After a sale: a town's own board, today's order, or a run of orders after the examinations",
+    },
   ],
   loop: [
     'Read the order label: the ingredients the potion needs, the moves you have and what it pays.',
@@ -36,6 +40,8 @@ const en: HowToPlay = {
     'Corked jars, resin and creeping mould block the board; match right next to them to free the tiles.',
     'Every fifth order is a royal commission: three potions in a row on one board.',
     'Once Royal Apothecary, pass guild examinations on fixed boards to fill the ribbon with seals.',
+    "Each town on the journey map has a board of its own shape: tiles fall past its walls. A town's first star opens the next.",
+    'The daily order is the same for everyone each day, with one try; endless orders open once every seal is earned.',
   ],
 };
 
@@ -65,6 +71,10 @@ const de: HowToPlay = {
       input: 'Noch einmal, Werkbank oder Kräuterladen antippen',
       action: 'Nach einem Auftrag: ihn wiederholen, dauerhafte Verbesserungen kaufen oder den Vorrat auffüllen',
     },
+    {
+      input: 'Reisekarte antippen, dann eine Stadt, Tagesauftrag oder Endlose Aufträge',
+      action: 'Nach einem Verkauf: das eigene Brett einer Stadt, der Auftrag von heute oder eine Serie nach den Prüfungen',
+    },
   ],
   loop: [
     'Lies das Auftragsetikett: welche Zutaten der Trank braucht, wie viele Züge du hast und was er bringt.',
@@ -83,6 +93,8 @@ const de: HowToPlay = {
     'Verkorkte Gläser, Harz und wuchernder Schimmel blockieren das Brett; kombiniere direkt daneben, um die Felder zu befreien.',
     'Jeder fünfte Auftrag ist ein königlicher Auftrag: drei Tränke nacheinander auf einem Brett.',
     'Als Hofapotheker bestehst du Gildenprüfungen auf festen Brettern und füllst das Band mit Siegeln.',
+    'Jede Stadt auf der Reisekarte hat ein Brett in eigener Form: Felder fallen an ihren Mauern vorbei. Der erste Stern einer Stadt öffnet die nächste.',
+    'Der Tagesauftrag ist jeden Tag für alle gleich, mit einem Versuch; endlose Aufträge öffnen, wenn jedes Siegel verdient ist.',
   ],
 };
 

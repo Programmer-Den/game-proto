@@ -41,9 +41,9 @@ import {
 // art units (twice that).
 
 export const kindTexture = (kind: Kind, catalyst = false) => (catalyst ? `catalyst-${kind}` : `kind-${kind}`);
-/** The texture of a tile on the board: a jar, a resin-held or mouldy tile, a Bloom, a Catalyst or a plain ingredient. */
+/** The texture of a tile on the board: a town's wall, a jar, a resin-held or mouldy tile, a Bloom, a Catalyst or a plain ingredient. */
 export const tileTexture = (t: Tile) =>
-  t.jar ? `jar-${t.kind}` : t.resin ? `resin-${t.kind}` : t.mould ? `mould-${t.kind}` : t.bloom ? `bloom-${t.kind}` : kindTexture(t.kind, t.catalyst);
+  t.hole ? 'hole' : t.jar ? `jar-${t.kind}` : t.resin ? `resin-${t.kind}` : t.mould ? `mould-${t.kind}` : t.bloom ? `bloom-${t.kind}` : kindTexture(t.kind, t.catalyst);
 export const needTexture = (kind: Kind) => `need-${kind}`;
 export const potionTexture = (potion: PotionId) => `potion-${potion}`;
 export const toolTexture = (tool: Tool, look: 'on' | 'off' | 'armed') => `tool-${tool}-${look}`;
@@ -96,7 +96,9 @@ export function bakeTextures(scene: Phaser.Scene) {
   bake(scene, 'band-col', BOARD.cell + 2, BOARD.cell * 8 + 2, () => paintBand(BOARD.cell, BOARD.cell * 8));
   bake(scene, 'area', BOARD.cell * 3 + 2, BOARD.cell * 3 + 2, () => paintBand(BOARD.cell * 3, BOARD.cell * 3, 'rgba(200,120,140,0.22)'));
   bake(scene, 'sun', 18, 18, () => paintSun(18, 18, '#8a6fae'));
-  bake(scene, 'result-card', 400, 236, paintResultCard);
+  bake(scene, 'result-card', 400, 236, () => paintCard(800, 472));
+  bake(scene, 'map-card', 440, 440, () => paintCard(880, 880));
+  bake(scene, 'hole', BOARD.cell, BOARD.cell, paintHole);
 }
 
 /** The bottle-green wall with its lily pattern and gold rules, `W` x `H` art units: the whole view. */
@@ -519,9 +521,26 @@ function paintSun(x: number, y: number, ink: string) {
 }
 
 /** The card shown over the board when an order sells or runs out of moves. */
-function paintResultCard() {
-  const w = 800;
-  const h = 472;
+/** A wall in a town's board shape: a bottle-green inlay with a gold rim and a small gold lozenge, over the tray's cell. */
+function paintHole() {
+  const cell = BOARD.cell * ART;
+  ctx.fillStyle = CREAM;
+  ctx.fillRect(0, 0, cell, cell);
+  rrect(4, 4, cell - 8, cell - 8, 14);
+  ctx.fillStyle = GREEN;
+  ctx.fill();
+  ctx.strokeStyle = GOLD;
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  rrect(14, 14, cell - 28, cell - 28, 8);
+  ctx.strokeStyle = 'rgba(201,162,74,0.45)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  poly([[cell / 2, cell / 2 - 12], [cell / 2 + 8, cell / 2], [cell / 2, cell / 2 + 12], [cell / 2 - 8, cell / 2]], GOLD, null);
+}
+
+/** A cream card `w` x `h` art units with a shadow, a double rule and corner whiplashes: the result card and the journey map. */
+function paintCard(w: number, h: number) {
   ctx.save();
   ctx.shadowColor = 'rgba(0,0,0,0.5)';
   ctx.shadowBlur = 20;
