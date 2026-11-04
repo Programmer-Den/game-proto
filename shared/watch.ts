@@ -1,7 +1,8 @@
 /**
  * Watch AI: a game opened with `?watch` in its URL (the hub's "Watch AI" link on a card) lets its
  * AI play every side while you look on. This module is the part every such game shares: the flag,
- * a panel in the top right with pause and speed buttons, and a log of what each AI decides.
+ * a panel in the top right (below the corner row when a game puts that there) with pause and speed
+ * buttons, and a log of what each AI decides.
  *
  * A game that supports it reads `watching`, hands the player's side to its AI when it is set, calls
  * `mountWatch` once its match starts, runs its sim through `watchSteps`, and reports AI decisions
@@ -157,6 +158,8 @@ function addStyles() {
     .watch-panel { position: fixed; top: 6px; right: 6px; z-index: 11; width: min(300px, calc(100vw - 12px));
       box-sizing: border-box; padding: 6px; font: 12px/1.35 ui-monospace, monospace; color: #f3e9d2;
       background: rgba(16, 11, 8, 0.86); border: 1px solid rgba(243, 233, 210, 0.35); border-radius: 3px; }
+    /* A game whose corner row sits in the top right (setupGame's corner) keeps it clear: the panel goes below it. */
+    .game-corner[data-corner="top-right"] ~ .watch-panel { top: calc(48px + var(--safe-top, env(safe-area-inset-top, 0px))); }
     .watch-title { margin: 0 0 5px; font-weight: bold; letter-spacing: 1px; color: #f3c64e; }
     .watch-bar { display: flex; gap: 4px; }
     .watch-bar button { flex: 1; min-width: 0; height: 26px; padding: 0 4px; font: inherit; cursor: pointer;

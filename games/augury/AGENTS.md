@@ -74,8 +74,6 @@ Missing or rough:
   Oracle); `TRIES`, `MAX_STATES` and `TARGET_MOVES` in `puzzles/unjam.ts` trade speed for depth.
 - The journey's temples teach the first eleven kinds only; Pipe Turn and Mirror Maze come from the
   other modes (adding them to `TEMPLE_KINDS` would change steps players have already starred).
-- The hub card's text (`auguryCard` in `shared/i18n/`) still says eleven kinds; changing it plays
-  every game in CI, so it waits for a PR that touches `shared/` anyway.
 - No translations of the glyph names (there are none on screen); the How to play names the modes.
 - `docs/screenshots/menu.webp`, `puzzles.webp`, `draft.webp`, `upright.webp` (a 390x844 phone at
   2x), `pipe-turn.webp`, `mirror-maze.webp`, `mastery.webp`, `daily-ghost.webp` and `cover.png` are not made by the

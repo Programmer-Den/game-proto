@@ -140,7 +140,7 @@ const de: Translation<typeof en> = {
   settingEffects: 'Soundeffekte',
   settingEffectsHint: 'Wie laut Klicks, Treffer, Münzen und die übrigen Geräusche spielen.',
   settingMuted: 'Alle Töne stumm',
-  settingMutedHint: 'Schaltet jedes Spiel stumm. Der Lautsprecherknopf in der Ecke eines Spiels und die Taste M schalten es auch.',
+  settingMutedHint: 'Schaltet jedes Spiel stumm. Die Taste M und der Stumm-Knopf auf dem Pausebildschirm schalten es auch.',
 
   // Loading, start, pause and How to play screens
   loading: 'Lädt',
@@ -190,7 +190,7 @@ const de: Translation<typeof en> = {
   // Hub cards: each game's text and its cover's description
   apothecaryCard: 'Führe als Pestdoktor eine mittelalterliche Apotheke: Kräuter anbauen, verarbeiten, Tränke brauen und verkaufen.',
   apothecaryCover: 'Die Apotheke mit einem Kunden an der Theke',
-  auguryCard: 'Elf Arten von Denkrätseln, ausgeteilt wie Tarotkarten: eine Reise durch fünf Tempel, eine endlose Mischung, die Tagesfünf, Blitz, Kartenwahl mit Relikten, eine Wochenliga, Weitergeben und Üben.',
+  auguryCard: 'Dreizehn Arten von Denkrätseln, ausgeteilt wie Tarotkarten: eine Reise durch fünf Tempel, eine endlose Mischung, die Tagesfünf, Blitz, Kartenwahl mit Relikten, eine Wochenliga, Weitergeben und Üben.',
   auguryCover: 'Ein Pfadrätsel auf einem goldgerahmten Nachthimmel, daneben warten die nächsten Rätsel als Karten',
   deadlineCard: 'Halte das Ende der Straße gegen Zombiewellen: nach links und rechts laufen und Kisten für Verbesserungen aufschießen.',
   deadlineCover: 'Ein Soldat hinter Sandsäcken schießt auf eine Zombiehorde, die eine Straße herunterkommt',
@@ -220,7 +220,7 @@ const de: Translation<typeof en> = {
   mapmakerCover: 'Ein Bär als Landvermesser kartiert eine nebelverhangene Insel Feld für Feld',
   mazewrightCard: 'Pflanze Hecken und Türme auf offenem Rasen und baue so das Labyrinth, durch das die Käfer laufen müssen, aber schließe nie den letzten Weg.',
   mazewrightCover: 'Ein Heckenlabyrinth auf einem Gartenrasen, mit Steintürmen in den Hecken und Käfern, die einen gepunkteten Weg zu einem Häuschen laufen',
-  ninefoldCard: 'Löse Zahlenrätsel in neun freischaltbaren Grafikstilen: ein Tagesrätsel, klassische Rätsel in drei Stufen und der Abstieg, eine Reihe immer größerer Rätsel mit Herzen und Relikten.',
+  ninefoldCard: 'Löse Zahlenrätsel in zehn freischaltbaren Grafikstilen: ein Tagesrätsel, ein Wochenlauf, klassische Rätsel in acht Stufen und der Abstieg, eine Reihe immer größerer Rätsel mit Herzen und Relikten.',
   ninefoldCover: 'Ein Zahlenrätsel auf geschichtetem Papier, mit einigen eingetragenen Ziffern und einem gewählten Feld',
   lanternkeepCard: 'Schicke Motten aus ihrem Glas, um die Laternen der Burg vor Einbruch der Nacht anzuzünden, und gib die Münzen für Dochte, Öl und mehr Motten aus.',
   lanternkeepCover: 'Eine Burg bei Einbruch der Nacht mit leuchtenden Laternen auf den Türmen und Motten, die zwischen ihnen fliegen',
