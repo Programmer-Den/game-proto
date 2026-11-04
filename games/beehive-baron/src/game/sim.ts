@@ -135,7 +135,7 @@ function turn(s: GameState, dt: number) {
     if (s.sold >= WORKSHOP_FROM) newCommissions(s);
     royal(s, now);
   }
-  if (!fair && fairOn(s)) s.events.push({ kind: 'fair-open' });
+  if (!fair && fairOn(s)) openFair(s);
   if (fair && !fairOn(s)) closeFair(s);
   if (!isOpen(s, s.forage)) s.forage = 'clover';
   if (now !== 'winter') return;
@@ -364,7 +364,7 @@ function afterSale(s: GameState, wanted: Kind | null, fair: boolean) {
   const now = demand(s);
   if (now && now !== wanted) s.events.push({ kind: 'demand', honey: now });
   // The meadow that opens the fair can come during its last minute of summer, between two ticks.
-  if (!fair && fairOn(s)) s.events.push({ kind: 'fair-open' });
+  if (!fair && fairOn(s)) openFair(s);
 }
 
 /**
@@ -614,6 +614,12 @@ function enter(s: GameState, classes: FairClass[], score: number) {
   if (s.baron) return;
   s.baron = true;
   s.events.push({ kind: 'baron' });
+}
+
+/** The fair opens: its classes are held for its minute, rare honey among them if the garden has a rare bloom now. */
+function openFair(s: GameState) {
+  s.fairRare = rarePairs(s.garden).length > 0;
+  s.events.push({ kind: 'fair-open' });
 }
 
 /** Autumn closes the fair: its result is told, the next fair asks for more, and the entries are cleared. */

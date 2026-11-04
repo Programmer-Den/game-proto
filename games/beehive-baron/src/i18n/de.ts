@@ -286,6 +286,7 @@ const de: Translation<typeof en> = {
   rareScores: '{honey} bringt {n}',
   noRareJar: 'kein seltener Honig',
   rareClassNone: 'braucht eine seltene Blüte',
+  rareClassNext: 'ab der nächsten Schau',
   rareClassLater: 'wenn die Schau läuft',
   fairWonShort: 'diese Schau ist gewonnen',
   rareRecipes: 'Nebeneinander: Klee + Lavendel geben Blütenzauber, Klee + Sonnenblume Sonnenglanz, Lavendel + Heide Berghonig',

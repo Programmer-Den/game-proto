@@ -11,7 +11,7 @@ import { WARE, WARES, WORKSHOP_FROM } from '../game/workshop';
 import { WARRANT_GOLDS, WARRANT_MAX, WARRANT_STEP, warrantBonus } from '../game/warrant';
 import { t, type TextKey } from '../i18n';
 import { Button } from '../ui/Button';
-import { ESTATE_CARD, FONT, GARDEN, UI_DEPTH, VIEW, WARRANT, WORKSHOP } from './layout';
+import { BOOK, ESTATE_CARD, FONT, GARDEN, UI_DEPTH, VIEW, WARRANT, WORKSHOP } from './layout';
 
 // The estate's three late-game cards, each opened by a chip in the column under the buyer's book:
 // the flower garden (its beds and rare honey), the candle workshop (wax into candles and polish for
@@ -155,7 +155,11 @@ export class EstatePanels {
   }
 
   private chipDetail(p: Panel, text: string, hot: boolean) {
-    p.detail.setText(text);
+    // Shrink a line too long for the chip (two-digit counts, longer words) so it stays off the button board.
+    if (p.detail.text !== text) {
+      p.detail.setFontSize(10).setText(text);
+      for (let size = 9.5; size >= 7 && p.detail.width > BOOK.w - 12; size -= 0.5) p.detail.setFontSize(size);
+    }
     const colour = hot ? '#a85a10' : '#6a4a28';
     if (p.detail.style.color !== colour) p.detail.setColor(colour);
   }
@@ -195,7 +199,7 @@ export class EstatePanels {
       g.links.fillRoundedRect(mx - w / 2, my - h / 2, w, h, 4).strokeRoundedRect(mx - w / 2, my - h / 2, w, h, 4);
     }
     const best = [...RARE_KINDS].sort((a, b) => RARES[b].points - RARES[a].points).find((r) => s.rare[r] > 0);
-    const why = !fairClasses(s).includes('rare') ? t('rareClassNone') : !fairOn(s) ? t('rareClassLater') : fairWon(s) ? t('fairWonShort') : best ? t('rareScores', { honey: t(RARES[best].name), n: RARES[best].points }) : t('noRareJar');
+    const why = !fairClasses(s).includes('rare') ? t(fairOn(s) && pairs.length > 0 ? 'rareClassNext' : 'rareClassNone') : !fairOn(s) ? t('rareClassLater') : fairWon(s) ? t('fairWonShort') : best ? t('rareScores', { honey: t(RARES[best].name), n: RARES[best].points }) : t('noRareJar');
     g.enter.set(`${t('enterRare')}\n${why}`, canEnter);
     const prices = RARE_KINDS.map((r) => t('rarePrice', { honey: t(RARES[r].name), price: t('price', { n: rarePrice(s, r) }) })).join(' · ');
     g.recipe.setText(`${t('rareRecipes')}\n${prices}`);

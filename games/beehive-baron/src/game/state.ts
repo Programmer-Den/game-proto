@@ -136,6 +136,8 @@ export interface GameState {
   fairs: number;
   golds: number;
   baron: boolean;
+  /** Whether this year's fair judges rare honey: the garden's rare bloom as the fair opened, held for its minute so a bed planted during it can't change the classes. */
+  fairRare: boolean;
   /** How long each kind's meadow has been foraged without a break, and whether it has wilted until the season turns. */
   tired: Record<Kind, number>;
   wilted: Record<Kind, boolean>;
@@ -239,6 +241,8 @@ export interface Progress {
   fairs: number;
   golds: number;
   baron: boolean;
+  /** Whether the fair on when saved judges rare honey (saves from before it take the garden's rare bloom then). */
+  fairRare: boolean;
   tired: Record<Kind, number>;
   wilted: Record<Kind, boolean>;
   breeds: Record<Trait, number>;
@@ -279,6 +283,7 @@ export const freshProgress = (): Progress => ({
   fairs: 0,
   golds: 0,
   baron: false,
+  fairRare: false,
   tired: rested(),
   wilted: unwilted(),
   breeds: noBreeds(),
@@ -352,6 +357,7 @@ export function newHive(progress: Progress): GameState {
     fairs: Math.max(0, Math.floor(progress.fairs) || 0),
     golds: Math.max(0, Math.floor(progress.golds) || 0),
     baron: progress.baron,
+    fairRare: progress.fairRare === true,
     tired: { ...rested(), ...progress.tired },
     wilted: { ...unwilted(), ...progress.wilted },
     breeds: { ...noBreeds(), ...progress.breeds },
@@ -414,6 +420,7 @@ export const progressOf = (s: GameState): Progress => ({
   fairs: s.fairs,
   golds: s.golds,
   baron: s.baron,
+  fairRare: s.fairRare,
   tired: { ...s.tired },
   wilted: { ...s.wilted },
   breeds: { ...s.breeds },
@@ -454,8 +461,8 @@ export function fairTotal(s: GameState) {
   const classes = fairClasses(s);
   return classes.every((k) => s.fair[k] !== null) ? classes.reduce((n, k) => n + (s.fair[k] ?? 0), 0) : null;
 }
-/** The classes this year's fair judges: `classesFor` its number, and rare honey while the garden has a rare bloom. */
-export const fairClasses = (s: GameState) => classesFor(s.fairs, rarePairs(s.garden).length > 0);
+/** The classes this year's fair judges: `classesFor` its number, and rare honey if the garden had a rare bloom as the fair opened (outside the fair, while it has one now). */
+export const fairClasses = (s: GameState) => classesFor(s.fairs, fairOn(s) ? s.fairRare : rarePairs(s.garden).length > 0);
 /** Whether the county fair is held: every meadow is open. */
 export const fairOpen = (s: GameState) => s.meadows >= MEADOWS.length;
 /** The summer game time the fair opens at: `FAIR_MS` before autumn. */
