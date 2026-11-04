@@ -58,7 +58,7 @@ const en = {
   neonName: 'Neon Arcade',
   neonGoal: 'Solve a 9×9 in under 10 minutes',
   glassName: 'Stained Glass',
-  glassGoal: 'Unlock every other style',
+  glassGoal: 'Unlock every other style but the Almanac',
   almanacName: 'Almanac',
   almanacGoal: 'Stamp every day of a month on the calendar',
   // Board

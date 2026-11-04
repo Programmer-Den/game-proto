@@ -121,7 +121,8 @@ Implemented today:
   costs `GHOST.lossDamage`. The rivals fight the monsters as usual. Never under `?watch`.
 - Rank ladder (`RANKS`, `RANK_POINTS` in `data.ts`): `Progress.points` grow by a top-four place in
   `record` (`addRankPoints`) and never drop; `record` reads a campaign lobby's place on the 8-seat
-  scale for the best place, rank points and the `topFour` deed (`ceil(place * 8 / seats)`, so 4th
+  scale for the best place, rank points and the `topFour` deed (a win stays 1st, any other place is
+  `ceil(place * 8 / seats)`, so 4th
   of 4 counts as 8th), and a duo team's as 1st, 3rd, 5th or 7th; `rankOf(points)` gives the
   rank, which `startMatch` passes as `MatchOptions.rank` (0 under `?watch`). The rank gives each rival `gold` more a round
   in `startPlan`, rolls the rivals' shops `odds` levels higher in `rollShop`, and lets `aiPlan`

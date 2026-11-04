@@ -74,7 +74,8 @@ seconds without a tap.
   boss a third as far), stops hacking and is dazed (a `slam` effect). `houndsAct` keeps
   `state.hounds` (a `Hound` each: `x`, `y`, `target`, `cd`, `face`) at `hound.count`: each hound
   runs at `HOUND_SPEED` to the first foe of `targets(state)` (the aim priority's order, nearest the
-  barricade by default) that is not flying nor the other hound's, bites every `HOUND_MS` for `share` of the slam's damage and slows it (a `bite` effect),
+  barricade by default) that is not flying, preferring one the other hound isn't on (both share
+  the only foe there is), bites every `HOUND_MS` for `share` of the slam's damage and slows it (a `bite` effect),
   and goes back to its spot in `HOUND_HOMES` when there is none. The scene shows `hero-warden`
   and the `hound-N` frames (`drawHounds`, called from `drawHero`).
 - **Siege engines** (`engines.ts`, `state.engine`, an `Engine` or null): the "Siege engine" button

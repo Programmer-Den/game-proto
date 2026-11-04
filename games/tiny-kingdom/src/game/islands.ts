@@ -111,11 +111,14 @@ export const PUZZLES: Puzzle[] = [
 
 /**
  * The scores that earn one, two and three stars on puzzle `n` (1 and up) at the chosen difficulty: a
- * little lower on Easy, higher on Hard but never above the best score found, so three stars stay reachable.
+ * little lower on Easy, higher on Hard but never above the best score found, so three stars stay reachable
+ * (and the first two stay just below it, so two stars stay a step of their own).
  */
 export const puzzleStars = (n: number) => {
   const stars = PUZZLES[n - 1].stars;
-  return stars.map((s) => Math.min(Math.round(s * byDifficulty(0.9, 1, 1.05)), stars[2])) as Puzzle['stars'];
+  return stars.map((s, i) =>
+    Math.min(Math.round(s * byDifficulty(0.9, 1, 1.05)), i < 2 ? stars[2] - 1 : stars[2]),
+  ) as Puzzle['stars'];
 };
 
 /** Stars a final score earns on puzzle `n` (1 and up): 0 to 3. */

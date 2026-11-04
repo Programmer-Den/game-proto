@@ -71,8 +71,9 @@ Implemented today:
   Best stars save under `tiny-kingdom-puzzles`. The stars were set by a scratch script with the
   game's own hands: one at 85% of the greedy bot's score, two at it, three at the best of a 40-wide
   beam search (placements only), so three stars can always be won; `puzzleStars` scales them by
-  `byDifficulty(0.9, 1, 1.05)` and caps each at the found best (`stars[2]`), so Hard raises the
-  first two stars but never the third, which stays reachable.
+  `byDifficulty(0.9, 1, 1.05)` and caps the third at the found best (`stars[2]`) and the first two
+  one point below it, so Hard raises the first two stars but never the third, which stays
+  reachable, and two stars stay a step of their own.
 - The coast (`seaSides` in `tiles.ts`): a cell's sides off the board or on a `'sea'` cell face the
   sea. The harbour `fits` beside a lake or the sea and scores its sea sides in its `base` (so the
   neighbour links still add up); the lighthouse only fits on the coast.

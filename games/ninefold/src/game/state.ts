@@ -170,7 +170,7 @@ export const newProgress = (): Progress => ({ solved: 0, flawless: 0, noHint: 0,
 /** The highest Delve ascension open. */
 export const ascensionOpen = (p: Progress) => Math.min(MAX_ASCENT, p.climbed);
 
-/** When each style unlocks, from the progress. Stained Glass waits for every other one. */
+/** When each style unlocks, from the progress. Stained Glass waits for every other one but the Almanac. */
 export const UNLOCKS: Record<StyleId, (p: Progress) => boolean> = {
   paper: () => true,
   garden: (p) => p.solved >= 3,

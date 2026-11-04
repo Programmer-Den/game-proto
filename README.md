@@ -62,7 +62,7 @@ The hub's **Settings** button opens the settings every game shares. They are sav
   | Broadside | enemy ships and forts have 25% less health | enemy ships and forts have 30% more health |
   | Lane Brawl | red's champions, minions and towers deal 20% less damage | red's champions, minions and towers deal 25% more damage |
   | Scrapyard Titans | your commander has 130 health and rivals get 1 gold less a round | your commander has 80 health and rivals get 1 gold more a round |
-  | TinctureTinker | 5 more moves per order | 3 fewer moves per order |
+  | TinctureTinker | 5 more moves per order | 3 fewer moves per order (a knight guest keeps all ten) |
   | Catacomb | foes have 25% less health | foes have 30% more health |
   | Golem Garden | pests have 25% less health | pests have 30% more health |
   | Beehive Baron | foraging trips 25% shorter | foraging trips 30% longer |

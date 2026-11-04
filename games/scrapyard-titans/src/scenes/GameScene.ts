@@ -399,8 +399,9 @@ export class GameScene extends Phaser.Scene {
     // A duo team's place (1 to 4) counts as the best seat of the pair would: 1st, 3rd, 5th or 7th.
     const place = m?.opts.duo ? teamPlace * 2 - 1 : teamPlace;
     // The place-based rewards (best place, rank points, top four) read a smaller campaign lobby's
-    // place on the 8-seat scale, so 4th of 4 is not a top-four finish.
-    const scaled = m?.opts.duo ? place : Math.ceil((teamPlace * PLAYERS) / (m?.players.length ?? PLAYERS));
+    // place on the 8-seat scale, so 4th of 4 is not a top-four finish. A win stays 1st.
+    const scaled =
+      m?.opts.duo || teamPlace === 1 ? place : Math.ceil((teamPlace * PLAYERS) / (m?.players.length ?? PLAYERS));
     this.progress.played++;
     if (place === 1) this.progress.wins++;
     this.progress.best = this.progress.best ? Math.min(this.progress.best, scaled) : scaled;
