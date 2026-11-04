@@ -58,6 +58,16 @@ export const SOUNDS = {
   supply: { wave: 'noise', freq: 1800, to: 4200, attack: 0.03, length: 0.26, volume: 0.18, gap: 300 },
   /** A supply card or a role picked. */
   confirm: { wave: 'square', freq: 660, arp: [0, 7], arpStep: 0.06, length: 0.14, volume: 0.28, gap: 120 },
+  /** The Sergeant calls an airstrike: a falling whistle before the blasts. */
+  airstrike: { wave: 'triangle', freq: 1800, to: 300, length: 0.8, volume: 0.3, gap: 500 },
+  /** The Scout's flare goes up and pops. */
+  flare: { wave: 'noise', freq: 2400, to: 7000, attack: 0.05, length: 0.6, volume: 0.2, gap: 500 },
+  /** The escort bus gets through: two blasts of its horn. */
+  busThrough: { wave: 'square', freq: 392, arp: [0, 4, 0, 4], arpStep: 0.1, length: 0.42, volume: 0.26, gap: 500 },
+  /** A zombie bites into the bus: a dull knock, now and then while it holds on. */
+  busHit: { wave: 'square', freq: 180, to: 130, length: 0.08, volume: 0.16, gap: 450 },
+  /** A codex page fills up. */
+  codex: { wave: 'pulse25', freq: 880, arp: [0, 7, 12], arpStep: 0.06, length: 0.3, volume: 0.24, gap: 300 },
 } satisfies Record<string, SoundDef>;
 
 export type SoundName = keyof typeof SOUNDS;

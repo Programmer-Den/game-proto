@@ -1,4 +1,4 @@
-import type { CrateKind, OperationKind, OutpostKind, Role, UpgradeKind } from '../game/rules';
+import type { CrateKind, LeaderKind, OperationKind, OutpostKind, Role, UpgradeKind } from '../game/rules';
 import type { ArtStyle } from '../game/save';
 
 // The colours and type of each art style's HUD, labels and overlays. System font stacks only: no
@@ -23,8 +23,12 @@ export const BURN_COLOR = '#ff8a2a';
 export const ROLE_COLORS: Record<Role, string> = { gunner: '#4ab0ff', grenadier: '#ff9a3a', marksman: '#b48aff' };
 export const OUTPOST_COLORS: Record<OutpostKind, string> = { barricade: '#e0c088', medic: '#5ad07a', depot: '#ff8a2a', veteran: '#4ab0ff' };
 export const OPERATION_COLORS: Record<OperationKind, string> = {
-  road: '#ffd23f', hospital: '#5ad07a', lightsout: '#8a8ae8', fogbank: '#a8b8c4', bridges: '#e8a04a', evac: '#e8709a', daily: '#4ac0e8',
+  road: '#ffd23f', hospital: '#5ad07a', lightsout: '#8a8ae8', fogbank: '#a8b8c4', bridges: '#e8a04a', evac: '#e8709a', depot: '#f0c020', convoy: '#c89a5a', daily: '#4ac0e8',
 };
+/** The squad leaders' colours: their cards and the leader button. */
+export const LEADER_COLORS: Record<LeaderKind, string> = { sergeant: '#ff9a2a', medic: '#5ad07a', scout: '#f0e05a' };
+/** The escort bus's paint and health bar. */
+export const BUS_COLOR = '#f0c020';
 
 export interface Theme {
   /** Font family for Phaser text, and its style ('italic bold' or 'bold'). */

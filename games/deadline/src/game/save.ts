@@ -1,8 +1,8 @@
-import { LOYALTY, NO_OUTPOST, OPERATION_KINDS, OUTPOST_KINDS, OUTPOST_MAX, ROLE_KINDS, type OperationKind, type Outpost, type UpgradeKind, type Veteran, UPGRADE_KINDS } from './rules';
+import { CODEX, CODEX_KINDS, LEADER_KINDS, LOYALTY, NO_OUTPOST, type Codex, type LeaderKind, OPERATION_KINDS, OUTPOST_KINDS, OUTPOST_MAX, ROLE_KINDS, type OperationKind, type Outpost, type UpgradeKind, type Veteran, UPGRADE_KINDS } from './rules';
 
 // What Deadline keeps between visits: the best wave reached, the chosen art style, the scrap banked
 // from kills, the starting crates and outpost upgrades bought with it, the operation picked for the
-// next run, each operation's best and the squad's veterans. Every game shares the hub's
+// next run, each operation's best, the squad's veterans, the squad leaders and the zombie codex. Every game shares the hub's
 // origin, so every key starts with the game's name.
 
 export const BEST_KEY = 'deadline-best';
@@ -13,6 +13,8 @@ export const OUTPOST_KEY = 'deadline-outpost';
 export const OPERATION_KEY = 'deadline-operation';
 export const OPERATION_BEST_KEY = 'deadline-operation-best';
 export const ROSTER_KEY = 'deadline-roster';
+export const LEADERS_KEY = 'deadline-leaders';
+export const CODEX_KEY = 'deadline-codex';
 
 /** The two looks the game can be drawn in: a pulp horror comic, or a night-vision camera feed. */
 export type ArtStyle = 'comic' | 'nv';
@@ -171,4 +173,34 @@ export function loadRoster(): Roster {
 
 export function saveRoster(roster: Roster) {
   saveObject(ROSTER_KEY, roster);
+}
+
+/** The squad leaders: the one picked to lead the next run (null for none) and each one's xp. */
+export interface Leaders {
+  picked: LeaderKind | null;
+  xp: Record<LeaderKind, number>;
+}
+
+/** The leaders; none picked and no xp on a fresh save, and anything broken loads as that. */
+export function loadLeaders(): Leaders {
+  const o = loadObject(LEADERS_KEY) ?? {};
+  const xp = (o.xp && typeof o.xp === 'object' ? o.xp : {}) as Record<string, unknown>;
+  return {
+    picked: LEADER_KINDS.find((k) => k === o.picked) ?? null,
+    xp: Object.fromEntries(LEADER_KINDS.map((k) => [k, level(xp[k], 100000)])) as Record<LeaderKind, number>,
+  };
+}
+
+export function saveLeaders(leaders: Leaders) {
+  saveObject(LEADERS_KEY, leaders);
+}
+
+/** The zombie codex: kills of each kind, up to its full page; all 0 on a fresh save. */
+export function loadCodex(): Codex {
+  const o = loadObject(CODEX_KEY) ?? {};
+  return Object.fromEntries(CODEX_KINDS.map((k) => [k, level(o[k], CODEX.pages[k])])) as Codex;
+}
+
+export function saveCodex(codex: Codex) {
+  saveObject(CODEX_KEY, codex);
 }

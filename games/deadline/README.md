@@ -15,7 +15,9 @@ has a record to beat, and every kill banks scrap that buys a head start for the 
 lasting upgrades for your outpost. Instead of the endless road, a run can also be a
 10-wave stand in a town down the road, each with its own twist, opening the next one up to the
 evacuation, or the daily stand, the same for everyone that day. Survivors who live through a won
-run stay on as veterans for the runs to come.
+run stay on as veterans for the runs to come, a squad leader you pick brings an active of their own
+and levels up across runs, two escort towns send a bus up the road that has to get through, and a
+zombie codex fills with your kills and makes you hit each kind harder once its page is full.
 
 ![The comic style at wave 4, with its comic panels beside the road](docs/screenshots/style-comic.webp)
 
@@ -48,10 +50,13 @@ and the fuel drum's blast doesn't swell.
 | S | Place a sandbag wall in the soldier's lane |
 | Tap a card, or 1 / 2 / 3 | Pick a supply after a boss, or the role of a survivor who joins |
 | Tap the wide card, or 4 | Extract: end the run as a win (from wave 20) |
+| Tap the leader button (right), or Q | Use the squad leader's active, once it has filled |
 | Tap the COMIC / NV switch, or V | Switch the art style |
 | Tap a starting crate after game over | Buy it with scrap for the next run (tap again to refund) |
 | Tap an outpost upgrade after game over | Buy its next level with scrap, for good |
 | Tap an operation after game over | Pick what the next run is: the Open Road or an operation |
+| Tap the wide button after game over | Turn to the page with the squad leaders, codex and veterans, and back |
+| Tap a leader after game over | Pick the squad leader of the next run (tap again for none) |
 | Tap anywhere else after game over | Start again from wave 1 |
 
 - **Shooting** is automatic: a volley goes straight up from the soldier's rifle every so often.
@@ -203,9 +208,20 @@ and the fuel drum's blast doesn't swell.
   | Fogbank | Fog: zombies only show on the lower part of the road | 120 |
   | Two Bridges | A wreck blocks the middle lane: the horde comes down the two outer lanes | 160 |
   | Evacuation | A condition can come from wave 1, and two survivors a wave from wave 2 | 250 |
+  | Bus Depot | Escort: a bus every wave (opened by winning the Hospital) | 140 |
+  | Night Convoy | Escort, and a condition can come from wave 1 (opened by the Bus Depot) | 220 |
 
   Each town keeps its own best (waves cleared, shown in the top bar) and the medal it earns:
   Bronze for 5 waves cleared, Silver for 8, Gold for all 10.
+- **Escort towns**: the Bus Depot and the Night Convoy branch off the road map below the Hospital.
+  Every wave a bus sets off from just above the sandbags and drives up the middle lane to the far
+  end of the road, where it gets through and pays 25 scrap. A zombie that walks into it holds it
+  still and bites it (a brute twice as hard, a boss far harder), and zombies close above it leave
+  their lanes to go for it. Its health shows under its bumper; the wave isn't cleared until it is
+  through, and if it is lost, so is the run. The squad shoots over it.
+
+  ![An escort town: zombies hold the bus up in the middle lane](docs/screenshots/escort-bus.webp)
+  ![The escort route below the road map](docs/screenshots/escort-route.webp)
 
   ![The road map with two towns won, the daily stand and the veterans](docs/screenshots/operations.webp)
   ![Fogbank: the fog hides the far road](docs/screenshots/fogbank.webp)
@@ -215,6 +231,27 @@ and the fuel drum's blast doesn't swell.
   game over screen, tap up to two veterans to start the next run in the squad; every win they live
   through ranks them up (up to three stars), and each rank adds 20% to their damage. The roster
   holds six; a new veteran past that takes the place of a rank 1 one.
+- **Squad leaders**: on the game over screen's second page (the wide button turns to it), pick one
+  of three leaders to lead the next run (not the daily). Their round button sits on the road's right
+  shoulder; tap it or press Q once it has filled to use their active, which then cools down again:
+
+  | Leader | Active | Wait at level 1 |
+  | --- | --- | --- |
+  | Sergeant | Airstrike: after a moment, blasts every zombie in the hero's lane, past shields | 28s |
+  | Medic | Patch-up: throws back every zombie near the sandbags, and mends the escort bus | 34s |
+  | Scout | Flare: lights the road (no blackout or fog), marks and lists the rest of the wave, and every hit lands 25% harder while it burns | 30s |
+
+  The first use is ready 8 seconds into the run. A leader earns 1 xp for every wave cleared in a
+  run they led and levels up at 6, 16, 32 and 56 xp, up to level 5: each level cuts the wait by 8%
+  and strengthens the active (a harder airstrike, a longer push and more mending, a longer flare).
+
+  ![The Sergeant's airstrike coming down the hero's lane](docs/screenshots/squad-leader-airstrike.webp)
+- **Zombie codex**: every kill fills that kind's page (200 grunts, 120 runners, 60 brutes, 50
+  spitters, 150 crawlers, 40 riot zombies, 3 of each boss), kept for good. A full page makes every
+  hit on that kind land 15% harder in every run but the daily. The codex shows on the game over
+  screen's second page, with the leaders and the veterans.
+
+  ![The squad leaders and the zombie codex on the game over screen's second page](docs/screenshots/leaders-and-codex.webp)
 - **Daily Stand**: the same 10 waves for every player on the same day (the crates, conditions,
   supply drops and the horde's answers all come from the day's seed), with no starting crates,
   outpost upgrades or veterans, and one try a day. Its score is the run's scrap plus 100 for each
@@ -234,12 +271,13 @@ Deadline follows the hub's Language setting: every text in the game, How to play
 - `src/game/rules.ts`: the numbers and rules: enemy stats, upgrades and their perks, fuel drums,
   the frenzy, wave plans and conditions, the horde adapting, the bosses and their moves, survivors
   and squad roles, sandbag walls, the supply drop, extraction, scrap, the outpost, the towns on the
-  road map, the daily stand and the veterans.
+  road map and the escort bus, the daily stand, the veterans, the squad leaders and the codex.
   No drawing; its names and texts are keys of `src/i18n/en.ts`.
 - `src/i18n.ts` and `src/i18n/`: the game's texts in British English (`en.ts`), German (`de.ts`)
   and US spelling (`en-US.ts`, only what differs). `src/howToPlay.ts` has How to play in all three.
 - `src/game/save.ts`: the saved best wave, art style, banked scrap, starting crates, outpost
-  upgrades, the next operation, each operation's best and the roster of veterans.
+  upgrades, the next operation, each operation's best, the roster of veterans, the squad leaders
+  and the zombie codex.
 - `src/game/pool.ts`: reuses sprites for enemies, bullets, crates, drums and effects, so a big horde
   doesn't create and destroy objects every frame.
 - `src/art/`: both art styles, painted on canvases in code (no image files): `comic.ts`,
@@ -247,9 +285,10 @@ Deadline follows the hub's Language setting: every text in the game, How to play
   `theme.ts`, and the side panels on wide screens in `backdrop.ts`.
 - `src/scenes/GameScene.ts`: the battle: moving the soldier, spawning, shooting, hits and perks,
   drums, the frenzy, acid, boss moves, survivors and their roles, conditions, sandbag walls,
-  waves, the supply drop, extraction and operations, switching styles and game over with its scrap
-  shop, outpost and operation picker. `src/scenes/Hud.ts` draws the top bar, the progress strip, the condition
-  chip, the frenzy meter and the kit panel.
+  waves, the supply drop, extraction and operations, the escort bus, the squad leaders' actives,
+  the codex, switching styles and game over with its two pages: the scrap shop, outpost and
+  operation picker, and the leaders, codex and veterans. `src/scenes/Hud.ts` draws the top bar, the
+  progress strip, the condition chip, the frenzy meter, the kit panel and the leader's button.
 - `e2e/playthrough.spec.ts`: plays the first wave with taps: switches the style and back, blows up
   the wave's fuel drum among the horde, collects its crate and checks the wave's scrap is banked
   (see `AGENTS.md` at the repo root).

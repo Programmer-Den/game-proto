@@ -10,8 +10,9 @@ straight up on a timer, and the player only moves them left and right. Zombies w
 to the middle of their lane, never chasing the soldier; upgrade crates drift down among them and are shot open for a stat upgrade, and
 fuel drums roll down and blow up the zombies round them when shot. Bosses fight back and leave a
 supply drop, and kills bank scrap that buys starting crates for the next run and lasting outpost
-upgrades. A run is the endless Open Road, the daily stand or a 10-wave town on the road map, picked
-on the game over screen.
+upgrades. A run is the endless Open Road, the daily stand or a 10-wave town on the road map (two of
+them escort towns, where a bus has to get through every wave), picked on the game over screen, which
+also picks the squad leader whose active the run brings. Kills fill a lasting zombie codex.
 
 - **Implemented:** endless waves that grow in size and toughness, runners from wave 2, brutes from
   wave 3, spitters (acid from range) and crawler swarms from wave 4, riot zombies (a shield only
@@ -37,6 +38,15 @@ on the game over screen.
   join get a call sign and, once they live through a won run, stay on a roster of six with their
   role and a rank; two picked start the next run and rank up with each win, for more damage), the
   daily stand (`shared/daily.ts`: the same seeded 10 waves for everyone on the day, one try),
+  squad leaders (Sergeant, Medic, Scout: one picked leads the next run, with an active on a
+  cooldown used from a button on the right shoulder or Q, an airstrike on the hero's lane, a
+  patch-up that throws back the zombies at the sandbags and mends the bus, or a flare that lights
+  the road, marks the rest of the wave and makes hits land harder; xp from waves cleared levels them
+  up to 5 across runs), two escort towns branching off the road map below the Hospital (Bus Depot
+  and Night Convoy: a bus drives up the middle lane each wave and has to reach the far end;
+  zombies block and bite it and go for it from close above; the wave waits for it and losing it
+  ends the run), the zombie codex (kills fill a lasting page per kind; a full page makes hits on that
+  kind land 15% harder, not on the daily),
   a squad of up to eight companions in three staggered rows of three, fuel drums with a
   blast ring that previews how many zombies they would catch, a frenzy streak (12 quick kills
   double the fire rate for 5s), damage numbers on hits, a wave progress strip with a boss warning,
@@ -56,13 +66,15 @@ on the game over screen.
   (phase `'role'`) and game over are overlays in the same scene; an extraction or a won operation
   ends in the same game over overlay with a win title (`state.extracted`). On game over a tap on a
   starting crate buys or refunds it, on an outpost upgrade buys its next level, on the Open Road,
-  the daily or an open town picks it for the next run, on a veteran picks or drops them; any other
-  tap calls `scene.restart()`. Taps count only once the
+  the daily or an open town picks it for the next run, on a veteran picks or drops them, on the wide
+  page button turns to the other page (`turnOverPage`), on a leader card picks or drops it
+  (`pickLeader`); any other tap calls `scene.restart()`. Taps count only once the
   screen has been up for `OVER_GRACE_MS` (600ms of game time, `overMs`), so a steering tap as the
   horde breaks through doesn't skip it.
 - **Persistence:** the Open Road's best wave, the art style, the trophies earned, banked scrap, the starting crates
   bought for the next run, the outpost levels, the next operation, each operation's best, the
-  roster of veterans and the daily stand's record (see Save keys). It also reads the hub's
+  roster of veterans, the daily stand's record, the leader picked with every leader's xp, and the
+  zombie codex (see Save keys). It also reads the hub's
   shared settings (the `hub-settings` key, see Hub settings below).
 - **Rough edges seen in the code:**
   - No camera shake.
@@ -70,10 +82,16 @@ on the game over screen.
   - A spitter stands still at its range until shot, so a wave can't end while one stands; it is
     an easy target once the soldier walks under it. Zombies steer to their lane's middle, inside
     `HERO.minX..HERO.maxX`, so none stops out of every rifle's reach.
-  - Supply drop picks, kit panel items, squad roles, veterans and the operation are not shown in the
-    wide-screen backdrop.
-  - The game over screen is full: the road map and the roster sit below the operation cards, and
-    in a tall view the frenzy panel shows faintly under the "tap to start" line.
+  - Supply drop picks, kit panel items, squad roles, veterans, the operation, the leader, the bus
+    and the codex are not shown in the wide-screen backdrop.
+  - The game over screen is full, so it has two pages (`overPage`): the shop, outpost, run cards
+    and road map with the escort route, and the leaders, codex and roster. In a tall view the
+    frenzy panel and the leader's button show faintly under the shade.
+  - The squad shoots over the bus (bullets never hit it), and the bus drives through sandbag walls,
+    drums and crates. A zombie beside the bus (not above it) bites it without stopping it. The
+    escort route only shows one connector from the Hospital, drawn under the overlay's tap boxes.
+  - The Scout's flare marks only the zombies not yet spawned, so late in a wave it marks nothing
+    and its banner says so.
   - Two Bridges' wreck is the sandbag wall sprite, stretched; it doesn't block anything itself (no
     zombie is planned in that lane), and a boss's pack can still land there.
   - Night-vision textures are baked the first time that style is shown, a hitch of about 0.4s
@@ -115,14 +133,17 @@ on the game over screen.
   switching, bars, game over and its scrap shop.
 - `src/scenes/Hud.ts`: `Hud` (top bar, style switch, progress strip, the wave condition's chip,
   frenzy meter, kit panel with the perks (its list wraps and the panel grows upward; both panels sit
-  clear above the shared corner buttons), the
+  clear above the shared corner buttons), the squad leader's round button (`drawLeader`, `onLeader`;
+  hidden with no leader), the
   in-acid warning, drawn per style into one Graphics plus Text objects, redrawn only when its data
   changes), and the layout constants `STYLE_SWITCH`, `PROGRESS`, `CONDITION_CHIP`, `FRENZY_PANEL`,
-  `KIT_PANEL`, `HUD_DEPTH`.
+  `KIT_PANEL`, `LEADER_BUTTON`, `HUD_DEPTH`.
 - `src/game/rules.ts`: pure numbers and rules (also `OUTPOST`, `OUTPOST_KINDS`, `OUTPOST_MAX`,
   `NO_OUTPOST`, `outpostCost`, `ROLES`, `ROLE_KINDS`, `GRENADE`, `MARKSMAN`, `OPERATIONS`,
   `OPERATION_KINDS`, `OPERATION_BONUS`, `MEDALS`, `medalOf`, `TOWNS`, `isTown`, `townOpen`,
-  `nextTown`, `openLaneX`, `DAILY`, `dailyScore`, `dailyAdapt`, `LOYALTY`, `Veteran`, `CALL_SIGNS`,
+  `nextTown`, `nextTowns`, `ESCORTS`, `BUS`, `busBite`, `openLaneX`, `LEADERS`, `LEADER_KINDS`,
+  `LEADER`, `LEADER_MAX`, `leaderLevel`, `nextLevelXp`, `leaderCooldown`, `AIRSTRIKE`, `PATCH`,
+  `FLARE`, `CODEX`, `CODEX_KINDS`, `EMPTY_CODEX`, `codexFull`, `KIND_NAMES`, `Codex`, `DAILY`, `dailyScore`, `dailyAdapt`, `LOYALTY`, `Veteran`, `CALL_SIGNS`,
   `callSign`, `rankMult`, `promote`, `ADAPTS`, `ADAPT`, `ADAPT_KINDS`, `adaptTo`,
   `WaveRules`; every `label`, `detail` and `name` in them is a `TextKey`): `VIEW`, `HERO`, `REACH_Y`, `SQUAD_SLOTS`,
   `MAX_COMPANIONS`, `ENEMIES`, `SCRAP`, `SPITTER`, `ACID_SLOW`, `riotShield`, `SWARM`,
@@ -137,7 +158,8 @@ on the game over screen.
   `CONDITIONS` has no entry for `'clear'`, which shows nothing.
 - `src/game/save.ts`: `loadBest`/`saveBest`, `loadStyle`/`saveStyle`, `loadScrap`/`saveScrap`,
   `loadKit`/`saveKit`, `loadOutpost`/`saveOutpost`, `loadOperation`/`saveOperation`,
-  `loadOperationBests`/`saveOperationBests`, `loadRoster`/`saveRoster` (`Roster`), the `ArtStyle` type (`'comic' | 'nv'`) and the key
+  `loadOperationBests`/`saveOperationBests`, `loadRoster`/`saveRoster` (`Roster`),
+  `loadLeaders`/`saveLeaders` (`Leaders`), `loadCodex`/`saveCodex`, the `ArtStyle` type (`'comic' | 'nv'`) and the key
   names.
 - `src/trophies/`: the game's ten trophies (`shared/trophies.ts`). `index.ts` lists them
   (`trophies`: id, tier, icon, `hidden` for Fortress) with their texts in `trophies/i18n/` (`en.ts`
@@ -162,7 +184,7 @@ on the game over screen.
 - `src/art/nightvision.ts`: `bakeNightVision`; sprites are painted in greys, then `phosphor` maps
   them to green and blooms the brightest pixels; chemlights and amber brackets are painted after.
 - `src/art/theme.ts`: `UPGRADE_COLORS`, `CRATE_COLORS` (adds the sandbag crate's tan),
-  `ROLE_COLORS`, `OUTPOST_COLORS`, `OPERATION_COLORS`,
+  `ROLE_COLORS`, `OUTPOST_COLORS`, `OPERATION_COLORS`, `LEADER_COLORS`, `BUS_COLOR` (the comic bus's paint),
   `ACID_COLOR`, `SHIELD_COLOR`, `SURVIVOR_COLOR`, `BURN_COLOR` and the per-style `Theme` (fonts, text colours, accent,
   warning, hp bar) in `THEMES`. System font stacks only.
 - `src/art/backdrop.ts`: `Backdrop`, the page canvas behind the game (comic panels or the overwatch
@@ -180,7 +202,7 @@ on the game over screen.
   `ground`, `sandbags`, `hero`, `companion`, `grunt`, `runner`, `brute`, `boss`, `crate-<kind>`,
   `label-<kind>` (the crate's caption), `drum`, `ring` (the drum's blast ring), `bullet`, `muzzle`,
   `splat`, `blast`, `streak`, `hudbar`, `spitter`, `riot`, `riot-bare` (its shield broken),
-  `crawler`, `brood`, `bloater`, `survivor`, `acid` (a puddle, painted for radius 78 and scaled), `glob`, `wall` (painted for the
+  `crawler`, `brood`, `bloater`, `survivor`, `bus` (the escort bus, from above, facing up), `acid` (a puddle, painted for radius 78 and scaled), `glob`, `wall` (painted for the
   middle lane and stretched to the others), `flame`, `supply-<kind>` (the supply drop's icons)
   and `supply-extract` (the extraction card's flare),
   plus `sfx-blam`, `sfx-splut`, `sfx-boom` (comic only) and `scan`, `grain` (night vision only). Enemy sprites use the `EnemyKind` as the name. `create`
@@ -195,8 +217,8 @@ on the game over screen.
   and unless the phase is `'over'`, `'supply'` or `'role'` (everything holds still then) runs in order:
   `moveHero`, `spawn`, `fire`, `moveBullets`, `tickBoss`, `moveEnemies` (stops the frame on game
   over; also ticks the burn of fire rounds), `movePickups`, `moveDrums`, `moveAcid`, `moveWalls`,
-  `moveSurvivors`, `hitTargets`, `tickFlamer`,
-  `tickFrenzy`, `ageEffects`, `checkWave`, `drawBars`, `updateHud`, and once per game second
+  `moveBus` (stops the frame when the bus is lost), `moveSurvivors`, `hitTargets`, `tickFlamer`,
+  `tickFrenzy`, `tickLeader`, `ageEffects`, `checkWave`, `drawBars`, `updateHud`, and once per game second
   `refreshBackdrop`. All timing is accumulated `dt` in private clocks (`waveClock`, `fireClock`,
   `breakClock`, `sinceKill`, `runMs`, effect and splat ages); no Phaser timers drive gameplay.
   Tweens only fade the banner and the upgrade pop-up text.
@@ -309,10 +331,45 @@ on the game over screen.
   `endAsWin` calls `promoteSquad` (not on the daily): `promote` ranks up the brought veterans and
   adds this run's recruits at rank 1, replacing a rank 1 veteran once the roster has
   `LOYALTY.size`. The game over screen's roster chips call `pickVeteran` (at most `LOYALTY.picks`).
+- **Squad leaders:** `create` loads `deadline-leaders` (`loadLeaders`): `state.nextLeader` is the
+  pick and `state.leaderXp` every leader's xp; off the daily the pick leads this run
+  (`state.leader`, at `leaderLevel(xp)`), with `state.leaderMs = LEADER.firstMs`. `tickLeader`
+  counts `leaderMs` down in a wave only, and the flare's `flareMs` and the airstrike's `strike`
+  (`{ lane, ms }`) in waves and breaks. `useLeader` (the button or Q) refuses outside a wave or
+  while cooling, sets `leaderMs = leaderCooldown(kind, level)` and: for the Sergeant sets `strike`
+  on `laneAt(player.x)`, which `airstrike` lands after `AIRSTRIKE.warnMs` (`hurt` with
+  `AIRSTRIKE.damage` on every zombie in the lane, by id; `drawBars` lights the lane in orange with
+  chevrons meanwhile); for the Medic `patchUp` (like a medkit: zombies within `PATCH.reach` pushed
+  up `PATCH.push(level)`, a charge ended, the bus mended by `PATCH.bus(level)`); for the Scout
+  `flare` (`flareMs = FLARE.ms(level)`; `applyCondition` hides the blackout and fog while it burns,
+  `visibility` returns 1, `hurt` multiplies by `FLARE.spotted`, `drawBars` marks each planned zombie's
+  x at the top, and the banner lists the plan's zombies by kind). `gameOver` (waves cleared) and
+  `endAsWin` (the wave) call `awardLeaderXp`, which adds to the leader's xp and saves;
+  `state.xpGained` shows on its card. `pickLeader` toggles `nextLeader` and saves.
+- **Escort bus:** an operation with `escort` (`ESCORTS`: `depot`, `convoy`; each opened by its
+  `after` town in `townOpen`, and `nextTowns` lists every town a win opens, so a first Hospital win
+  sets `state.opened` to Lights Out and the Bus Depot) calls `launchBus` in `startWave`:
+  `state.busOn`, `busHp = BUS.hp`, and the scene's `bus` image at `busX = laneMid(1)`,
+  `busY = BUS.startY` (its middle). In `moveEnemies` a zombie within `BUS.lure` above the bus's top
+  steers to `busX`, and one above its middle that `touchesBus` is held at the bus's front. `moveBus`
+  sums `busBite(kind)` over every zombie touching it (hit points a second), moves it up at
+  `BUS.speed` unless one of them is above its middle, and at `BUS.endY` gets it through
+  (`busesThrough`, `BUS.scrap` scrap, `busThrough` text); at 0 it sets `busLost` and calls
+  `gameOver` (the title reads Bus lost). `checkWave` waits while `busOn`. `drawBars` draws its health
+  under the bumper.
+- **Codex:** `state.codex` (`loadCodex`, `deadline-codex`) counts kills per kind up to
+  `CODEX.pages`; `kill` calls `recordCodex`, which shows a banner and saves when a page fills
+  (`state.codexFilled`). It is saved at each wave clear, `gameOver` and `endAsWin`. `hurt`
+  multiplies damage by `CODEX.bonus` against a full page (not on the daily), so enemy hp can be
+  fractional; the damage number is rounded.
+- **Game over pages:** `drawGameOver` draws the title, the run's lines, the page (`overPage` 0: the
+  shop, outpost, run cards, road map and the escort row under it; 1: `drawLeaders`, `drawCodex` and
+  the roster), the page button (`turnOverPage`) and the tap-to-start line. `create` resets
+  `overPage` to 0.
 - **Daily stand:** `state.operation === 'daily'`. `create` takes today (`today()`, kept in `day`),
   falls back to the Open Road when `loadDaily` says today's try is used, and otherwise calls
   `startDaily`; the daily keeps the starting crates for the next run (`nextKit`), and uses no
-  outpost (`NO_OUTPOST`) and no veterans. `startWave` seeds `waveRand` with
+  outpost (`NO_OUTPOST`), no veterans, no leader and no codex bonus (its kills still fill the codex). `startWave` seeds `waveRand` with
   `seeded(seedOf('deadline:<day>:<wave>'))` and draws, in order, `dailyAdapt` (the horde's answer,
   in place of `adaptTo`), the condition, `planWave` and, on a boss wave, `supplyPick`. `gameOver` and
   `completeOperation` call `finishDaily` with `dailyScore(scrap, cleared)`; the daily's best is
@@ -362,7 +419,8 @@ on the game over screen.
 - **Input:** a `pointerdown` inside `Hud.onSwitch` (the `STYLE_SWITCH` box, padded 6px) calls
   `switchStyle` and nothing else; the V key does the same. In `'over'` it runs a `shop` button's
   `act` or restarts, in `'supply'` it picks a card (1, 2, 3, or 4 for the extraction card), in
-  `'role'` a role card (1, 2, 3), on the kit panel it toggles placing (outside a wave, or in a
+  `'role'` a role card (1, 2, 3), on the leader's button (`Hud.onLeader`, or the Q key) it calls
+  `useLeader` (which refuses outside a wave, and never aims), on the kit panel it toggles placing (outside a wave, or in a
   wave with no sandbags, it only plays `ui('refuse')` and never aims; `Hud.onKit` is false while
   the panel is hidden, `kitShown`, so a tap there then aims as anywhere else), and while placing it places a wall. Otherwise `createInput` sets `pointerTarget` (clamped to `heroRange()`) on
   `pointerdown`, and on `pointermove` while held (unless the press was used by any of the above:
@@ -411,11 +469,16 @@ imports it. Under browser automation it all does nothing, so the playthrough is 
   (the glob lands, `moveAcid`), `siren` (a boss winds up, `tickBoss`), `yelp` and `survivorLost`
   (`hurtSurvivor`), `rescue` (`rescue`), `medkit` (`useMedkit`), `waveStart` (`startWave`, from
   wave 2, not on boss waves), `cleared` and `supply` (`checkWave`), `confirm` (`pickSupply`,
-  `pickRole`).
+  `pickRole`), `airstrike` (`useLeader`, the Sergeant's call; `boom` as it lands), `medkit` (also
+  the Medic's patch-up), `flare` (the Scout's flare), `busHit` (`moveBus`, rate limited while
+  zombies bite), `busThrough` (the bus gets through), `boom` (the bus is lost) and `codex` (a codex
+  page fills, `recordCodex`).
 - **Shared sounds:** `ui('click')` for the style switch, the kit panel toggle, putting the
-  sandbags away, refunding a starting crate, picking an operation and the restart tap;
+  sandbags away, refunding a starting crate, picking an operation or a leader, turning the game over
+  page and the restart tap;
   `ui('coin')` for buying a starting crate or an outpost level; `ui('refuse')` for one that can't
-  be afforded, for S with no sandbags in a wave (`placeWall` returns whether it placed) and for a
+  be afforded, for the leader's button or Q outside a wave or while it cools down, for S with no
+  sandbags in a wave (`placeWall` returns whether it placed) and for a
   tap on the kit panel outside a wave or with no sandbags.
 - There is no `?watch` mode, so nothing for it.
 
@@ -438,6 +501,11 @@ imports it. Under browser automation it all does nothing, so the playthrough is 
 - `deadline-roster`: a JSON object `{ vets: [{ name, role, rank }], picked: [index] }`, at most
   `LOYALTY.size` veterans and `LOYALTY.picks` picks. Written by `promoteSquad` and `pickVeteran`;
   broken veterans and picks load as dropped.
+- `deadline-leaders`: a JSON object `{ picked, xp }`: the `LeaderKind` picked for the next run (or
+  null) and each leader's xp. Written by `pickLeader` and `awardLeaderXp`; anything broken loads as
+  no pick and 0 xp.
+- `deadline-codex`: a JSON object of each `EnemyKind`'s kills, capped at its page
+  (`CODEX.pages`). Written at each wave clear, at game over or a win, and when a page fills.
 - `deadline-daily`: the daily stand's record (`shared/daily.ts`, not `save.ts`): today's try and
   score, the best and the days in a row.
 - All are read and written through `src/game/save.ts`, wrapped in try/catch.
@@ -456,7 +524,7 @@ imports it. Under browser automation it all does nothing, so the playthrough is 
 - `settings.reduceMotion` stops the zombies' side-to-side sway in `GameScene.moveEnemies` (they
   still walk and steer), holds the night-vision grain, scanline and flicker still (`animateFeed`
   does nothing), and makes a drum's blast show at full size instead of swelling and a flame burst
-  stay its size. There is no shake, screen flash or blinking effect; the boss's warnings and acid
+  stay its size; the airstrike's blasts show at full size too. There is no shake, screen flash or blinking effect; the boss's warnings and acid
   rings are drawn still.
 - Normal (multiplier 1) must stay exactly as designed, since the playthrough runs on Normal.
 - Keep the Deadline row of the difficulty table in the root `README.md` (and the sentence in this
@@ -476,7 +544,10 @@ imports it. Under browser automation it all does nothing, so the playthrough is 
   and `supplies` (picked this run), `inAcid`, `bossMove`, `bossMoves` and `bossKind`, `perks` and
   `headshots`, `survivorsSaved` and `survivorsLost`, `condition`, `extracted` and `payout`,
   `outpost`, `roles`, `operation`, `nextOperation`, `operationBests`, `adapt`, `roster`, `picked`,
-  `brought`, `names`, `ranks`, `bounty`, `opened`, `daily` and `dailyScore`. The
+  `brought`, `names`, `ranks`, `bounty`, `opened` (the towns a first win opened, a list), `daily`,
+  `dailyScore`, `leader`, `leaderLevel`, `leaderMs`, `leaderUses`, `nextLeader`, `leaderXp`,
+  `xpGained`, `flareMs`, `strike`, `busOn`, `busHp`, `busesThrough`, `busLost`, `codex` and
+  `codexFilled`. The
   scene's public `squad` holds the companion images, one per `stats.companions`,
   and `style` the current `ArtStyle`.
 - Entities (`Enemy`, `Survivor`, `Pickup`, `Drum`, `Bullet`, `Acid`, `Wall`, `Splat`, `Fx`) are private interfaces in
@@ -563,7 +634,8 @@ imports it. Under browser automation it all does nothing, so the playthrough is 
   updating the test in the same PR, and refreshing `docs/screenshots/playthrough-*.webp`.
 - The test runs on Normal difficulty (no `hub-settings` saved), so enemy hp is unscaled. It
   starts from a fresh save, so the outpost is at 0 and the run is the Open Road: wave 1 has no
-  survivors, roles or adapting, and its plan is unchanged.
+  survivors, roles or adapting, and its plan is unchanged. No leader is picked (no button, no
+  active) and the codex is empty (no bonus), and the Open Road sends no bus.
 - Balance matters: the test needs wave 1 to be winnable by its simple strategy within the game time
   it allows, and the wave-1 drum to catch a zombie while the front is far enough away; slower
   firing, tougher wave 1 grunts or a later drum can turn it red.
@@ -617,8 +689,14 @@ imports it. Under browser automation it all does nothing, so the playthrough is 
   outpost buttons, two run cards (Open Road and daily), five towns and six roster chips; more need
   a new layout there.
 - **Add a town:** add it to `OperationKind` and `OPERATIONS` (with its twist and `bounty`), to
-  `TOWNS` where it opens, a colour in `OPERATION_COLORS`, and its name and two-line twist in each
-  language; the road map row then needs narrower nodes.
+  `TOWNS` where it opens (or to `ESCORTS` with its `after`), a colour in `OPERATION_COLORS`, and its
+  name and two-line twist in each language; the road map row then needs narrower nodes (the escort
+  row holds two wide ones).
+- **Add a leader:** add it to `LeaderKind` and `LEADERS` (name, active, detail, cooldown), a colour
+  in `LEADER_COLORS`, its sign in `Hud.drawLeader` and its active in `useLeader`; the second page
+  lays out three cards, so a fourth needs narrower ones.
+- **Change the codex:** `CODEX.pages` and `CODEX.bonus` in `rules.ts`; a new enemy kind goes into
+  `CODEX_KINDS` and `KIND_NAMES` (the page grid is 3x3, so a tenth needs a new layout).
 - **Add a new phase or screen** (title, pause): extend `Phase`, guard `update`, `spawn` and the
   `pointerdown` handler on it, and keep wave 1 starting at once or update the test's opening steps.
 

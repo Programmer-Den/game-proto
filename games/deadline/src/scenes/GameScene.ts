@@ -7,10 +7,30 @@ import { Backdrop, type BackdropInfo } from '../art/backdrop';
 import { bakeComic } from '../art/comic';
 import { bakeNightVision } from '../art/nightvision';
 import { FIELD, GEOM, GRAIN_TILE, fitField, geomOf, num, tex } from '../art/paint';
-import { ACID_COLOR, BURN_COLOR, CRATE_COLORS, OPERATION_COLORS, OUTPOST_COLORS, ROLE_COLORS, SHIELD_COLOR, SURVIVOR_COLOR, THEMES, UPGRADE_COLORS, type Theme } from '../art/theme';
+import { ACID_COLOR, BURN_COLOR, CRATE_COLORS, LEADER_COLORS, OPERATION_COLORS, OUTPOST_COLORS, ROLE_COLORS, SHIELD_COLOR, SURVIVOR_COLOR, THEMES, UPGRADE_COLORS, type Theme } from '../art/theme';
 import { Pool } from '../game/pool';
 import {
   ACID_SLOW,
+  AIRSTRIKE,
+  BUS,
+  CODEX,
+  CODEX_KINDS,
+  ESCORTS,
+  FLARE,
+  KIND_NAMES,
+  LEADER,
+  LEADERS,
+  LEADER_KINDS,
+  LEADER_MAX,
+  PATCH,
+  busBite,
+  codexFull,
+  leaderCooldown,
+  leaderLevel,
+  nextLevelXp,
+  nextTowns,
+  type Codex,
+  type LeaderKind,
   NO_OUTPOST,
   DAILY,
   LOYALTY,
@@ -110,6 +130,10 @@ import {
 } from '../game/rules';
 import {
   loadBest,
+  loadCodex,
+  loadLeaders,
+  saveCodex,
+  saveLeaders,
   loadKit,
   loadOperation,
   loadOperationBests,
@@ -359,12 +383,35 @@ export interface GameState {
   /** Each companion's call sign (null for one from a crate or the outpost) and rank, in squad order like `roles`. */
   names: (string | null)[];
   ranks: number[];
-  /** A town won for the first time pays its bounty; the town that win opened (null if none). */
+  /** A town won for the first time pays its bounty; the towns that win opened (none if not the first). */
   bounty: number;
-  opened: OperationKind | null;
+  opened: OperationKind[];
   /** Today's daily stand (null off the daily), and the score this run ended with. */
   daily: DailyRecord | null;
   dailyScore: number;
+  /**
+   * The squad leader leading this run (null for none, and always on the daily), its level, the time
+   * left before its active can be used again, and how often it was used this run.
+   */
+  leader: LeaderKind | null;
+  leaderLevel: number;
+  leaderMs: number;
+  leaderUses: number;
+  /** The leader picked for the next run, every leader's xp (saved together), and the xp this run earned its leader. */
+  nextLeader: LeaderKind | null;
+  leaderXp: Record<LeaderKind, number>;
+  xpGained: number;
+  /** The Scout's flare time left, and the Sergeant's airstrike on its way: its lane and the time to impact. */
+  flareMs: number;
+  strike: { lane: number; ms: number } | null;
+  /** The escort towns' bus: on the road this wave, its hit points, the buses brought through this run, and whether one was lost. */
+  busOn: boolean;
+  busHp: number;
+  busesThrough: number;
+  busLost: boolean;
+  /** The zombie codex (saved): kills of each kind towards its page, and the pages this run filled. */
+  codex: Codex;
+  codexFilled: EnemyKind[];
 }
 
 export class GameScene extends Phaser.Scene {
@@ -435,6 +482,12 @@ export class GameScene extends Phaser.Scene {
   /** Two Bridges' wrecks over the blocked lanes, and the fog bank over the far road. */
   private wrecks: Phaser.GameObjects.Image[] = [];
   private fog!: Phaser.GameObjects.Rectangle;
+  /** The escort bus's sprite and where it is (its middle). */
+  private bus!: Phaser.GameObjects.Image;
+  private busX = 0;
+  private busY = 0;
+  /** The game over screen's page: 0 for the shop, outpost and road map, 1 for the leaders, codex and veterans. */
+  private overPage = 0;
   private keys!: { left: Phaser.Input.Keyboard.Key[]; right: Phaser.Input.Keyboard.Key[] };
   private static backdrop: Backdrop | null = null;
 
@@ -493,9 +546,24 @@ export class GameScene extends Phaser.Scene {
       names: [],
       ranks: [],
       bounty: 0,
-      opened: null,
+      opened: [],
       daily: null,
       dailyScore: 0,
+      leader: null,
+      leaderLevel: 0,
+      leaderMs: LEADER.firstMs,
+      leaderUses: 0,
+      nextLeader: null,
+      leaderXp: Object.fromEntries(LEADER_KINDS.map((k) => [k, 0])) as Record<LeaderKind, number>,
+      xpGained: 0,
+      flareMs: 0,
+      strike: null,
+      busOn: false,
+      busHp: 0,
+      busesThrough: 0,
+      busLost: false,
+      codex: loadCodex(),
+      codexFilled: [],
     };
     const s0 = this.state, roster = loadRoster();
     s0.roster = roster.vets;
@@ -511,6 +579,12 @@ export class GameScene extends Phaser.Scene {
     this.state.nextOperation = daily ? 'road' : this.state.operation;
     // An operation shows its own best (waves cleared) in place of the Open Road's.
     if (this.state.operation !== 'road') this.state.best = this.bestAtStart = this.state.operationBests[this.state.operation];
+    // The squad leader picked last time leads this run (not the daily, which every player starts the same).
+    const leaders = loadLeaders();
+    s0.nextLeader = leaders.picked;
+    s0.leaderXp = leaders.xp;
+    s0.leader = daily ? null : leaders.picked;
+    s0.leaderLevel = s0.leader ? leaderLevel(s0.leaderXp[s0.leader]) : 0;
     // The veterans picked on the roster start in the squad, with their roles and ranks (not on the
     // daily, which every player starts the same).
     if (!daily) {
@@ -547,6 +621,7 @@ export class GameScene extends Phaser.Scene {
     this.flameClock = 0;
     this.pressOnUi = false;
     this.overMs = 0;
+    this.overPage = 0;
     this.supplyUi = [];
     this.cards = [];
     this.shop = [];
@@ -648,6 +723,8 @@ export class GameScene extends Phaser.Scene {
       w.setScale(w.scaleX * ((x1 - x0) / GEOM.wall.w), w.scaleY * 1.4);
       this.wrecks.push(w);
     });
+    // The escort towns' bus, hidden until a wave sends it up the middle lane.
+    this.bus = this.skin(this.add.image(0, 0, '__DEFAULT'), 'bus').setVisible(false);
     // Starting crates bought with scrap: a companion one brings its soldier in at once.
     this.addCompanions();
 
@@ -812,6 +889,8 @@ export class GameScene extends Phaser.Scene {
         else if (this.state.phase === 'role') this.pickRole(ROLE_KINDS[i]);
       }),
     );
+    // Q uses the squad leader's active.
+    kb.addKey(K.Q).on('down', () => this.useLeader());
     // 4 takes the extraction, when it is on offer.
     kb.addKey(K.FOUR).on('down', () => this.state.phase === 'supply' && this.cards.some((c) => c.kind === 'extract') && this.pickSupply('extract'));
     // Tap or drag anywhere: the hero walks along their line to below that spot.
@@ -840,6 +919,8 @@ export class GameScene extends Phaser.Scene {
       } else if (s.phase === 'role') {
         const card = this.roleCards.find((c) => inBox(x, y, c));
         if (card) this.pickRole(card.role);
+      } else if (this.hud.onLeader(x, y)) {
+        this.useLeader();
       } else if (this.hud.onKit(x, y) && ((s.phase === 'wave' && s.sandbags > 0) || s.placing)) {
         s.placing = !s.placing;
         ui('click');
@@ -892,6 +973,8 @@ export class GameScene extends Phaser.Scene {
     this.state.bossMove = null;
     this.state.bossMoves = 0;
     this.state.bossKind = isBossWave(wave) ? bossKind(wave) : null;
+    // An escort town sends its bus up the middle lane every wave.
+    if (op.escort) this.launchBus();
     // The Open Road's best is the wave reached; an operation's is the waves cleared (saved on clearing them).
     if (this.state.operation === 'road' && wave > this.state.best) {
       this.state.best = wave;
@@ -902,6 +985,7 @@ export class GameScene extends Phaser.Scene {
     const lines = [title, isBossWave(wave) ? tr('bossIncoming', { boss: bossName }) : isBossWave(wave + 1) ? tr('bannerBossNext') : ''];
     if (this.state.condition !== 'clear') lines.push(`${tr(CONDITIONS[this.state.condition].label).toUpperCase()}!`);
     if (this.state.adapt) lines.push(tr('hordeAdapts', { adapt: tr(ADAPTS[this.state.adapt].label).toUpperCase() }));
+    if (op.escort) lines.push(tr(this.style === 'comic' ? 'busBanner' : 'nvBusBanner'));
     this.showBanner(lines.filter(Boolean).join('\n'));
     this.applyCondition();
     this.refreshBackdrop();
@@ -926,10 +1010,11 @@ export class GameScene extends Phaser.Scene {
 
   /** The blackout's dark and the blood moon's red cast come and go with the wave's condition. */
   private applyCondition() {
-    const c = this.state.condition;
-    this.dark.setVisible(c === 'blackout');
+    // The Scout's flare lifts the blackout and the fog while it burns.
+    const c = this.state.condition, lit = this.state.flareMs > 0;
+    this.dark.setVisible(c === 'blackout' && !lit);
     this.moon.setVisible(c === 'bloodmoon');
-    this.fog.setVisible(c === 'fog');
+    this.fog.setVisible(c === 'fog' && !lit);
     this.styleFog();
   }
 
@@ -944,6 +1029,7 @@ export class GameScene extends Phaser.Scene {
    * the hero during a blackout.
    */
   private visibility(x: number, y: number) {
+    if (this.state.flareMs > 0) return 1;
     // In fog only the lower road can be seen, fading in over 70px above `fogY`.
     if (this.state.condition === 'fog') return Phaser.Math.Clamp((y - CONDITION.fogY + 70) / 70, 0, 1);
     if (this.state.condition !== 'blackout') return 1;
@@ -971,7 +1057,7 @@ export class GameScene extends Phaser.Scene {
     this.moveBullets(dt);
     this.tickBoss(dt);
     // A game over or a rescue ends the frame early, so each saves its trophies before returning.
-    if (this.moveEnemies(dt)) return checkTrophies(this.state);
+    if (this.moveEnemies(dt) || this.moveBus(dt)) return checkTrophies(this.state);
     this.movePickups(dt);
     this.moveDrums(dt);
     this.moveAcid(dt);
@@ -986,6 +1072,7 @@ export class GameScene extends Phaser.Scene {
     this.hitTargets();
     this.tickFlamer(dt);
     this.tickFrenzy(dt);
+    this.tickLeader(dt);
     this.ageEffects(dt);
     this.checkWave(dt);
     // Again after the step, so a trophy its events earn is saved in the same frame.
@@ -1210,9 +1297,13 @@ export class GameScene extends Phaser.Scene {
           }
         } else if (!e.flank) {
           const aside = boss ? 0 : ((e.id * 53) % 25) - 12;
-          const dx = laneMid(laneAt(e.x)) + aside - e.x, maxStep = (steer * dt) / 1000;
+          // In an escort town, a zombie close above the bus goes for it instead of its lane's sandbags.
+          const top = this.busY - BUS.h / 2, lured = this.state.busOn && e.y < top && top - e.y < BUS.lure;
+          const dx = (lured ? this.busX : laneMid(laneAt(e.x))) + aside - e.x, maxStep = (steer * dt) / 1000;
           e.x += Phaser.Math.Clamp(dx, -maxStep, maxStep);
         }
+        // The bus is in the way: a zombie that walks into its front stays there and bites.
+        if (this.state.busOn && e.y < this.busY && this.touchesBus(e)) e.y = Math.min(e.y, this.busY - BUS.h / 2 - radius * 0.6);
       }
       // A little shamble from side to side, the same for every frame rate (none when motion is reduced).
       const sway = settings.reduceMotion || boss ? 0 : Math.sin((e.y + e.id * 37) / 9) * 1.5;
@@ -1660,13 +1751,17 @@ export class GameScene extends Phaser.Scene {
 
   /** Takes hit points off an enemy, with a little damage number, and kills it at 0. */
   private hurt(e: Enemy, damage: number) {
-    e.hp -= damage;
+    // A full codex page (not on the daily) and the Scout's flare make every hit land harder.
+    const s = this.state, mult = (s.operation !== 'daily' && codexFull(s.codex, e.kind) ? CODEX.bonus : 1) * (s.flareMs > 0 ? FLARE.spotted : 1);
+    const dealt = damage * mult;
+    e.hp -= dealt;
     const r = ENEMIES[e.kind].radius;
-    this.effect('', e.x + r * 0.8 + 4, e.y - r * 0.4, { life: 520, rise: 36, text: `-${damage}` });
+    this.effect('', e.x + r * 0.8 + 4, e.y - r * 0.4, { life: 520, rise: 36, text: `-${Math.round(dealt)}` });
     if (e.hp <= 0) this.kill(e);
   }
 
   private kill(e: Enemy) {
+    this.recordCodex(e.kind);
     this.state.kills++;
     this.state.fallen++;
     this.state.scrap += SCRAP[e.kind];
@@ -1820,12 +1915,14 @@ export class GameScene extends Phaser.Scene {
   /** A wave is cleared once every enemy in it has come in and fallen; the next one follows a short pause. */
   private checkWave(dt: number) {
     if (this.state.phase === 'wave') {
-      if (this.enemiesToCome() === 0 && this.enemies.live().length === 0) {
+      // In an escort town the wave also waits for the bus to get through.
+      if (this.enemiesToCome() === 0 && this.enemies.live().length === 0 && !this.state.busOn) {
         this.state.phase = 'break';
         this.breakClock = 0;
         this.state.placing = false;
-        // The wave's scrap is banked.
+        // The wave's scrap is banked, and the codex saved.
         saveScrap(this.state.bank + this.state.scrap);
+        saveCodex(this.state.codex);
         this.showBanner(tr('waveCleared', { wave: this.state.wave }));
         sfx('cleared');
         // An operation's last wave cleared wins it (a town's first win pays its bounty).
@@ -1974,6 +2071,38 @@ export class GameScene extends Phaser.Scene {
         g.lineStyle(comic ? 3 : 1.5, col).strokeCircle(boss.x, boss.y, ENEMIES[boss.kind].radius + 14);
       }
     }
+    // The Sergeant's airstrike on its way: its lane lit in orange (never red), with chevrons pointing down it.
+    if (this.state.strike) {
+      const { x0, x1 } = LANES[this.state.strike.lane], col = num(comic ? '#ff9a2a' : th.warn), mx = (x0 + x1) / 2;
+      g.fillStyle(col, 0.16).fillRect(x0 + 3, HUD_HEIGHT + 30, x1 - x0 - 6, REACH_Y - HUD_HEIGHT - 40);
+      g.lineStyle(comic ? 3 : 1.5, col, 0.9);
+      for (let y = HUD_HEIGHT + 80; y < REACH_Y - 40; y += 90) g.lineBetween(mx - 16, y - 8, mx, y + 6).lineBetween(mx, y + 6, mx + 16, y - 8);
+    }
+    // The Scout's flare: a mark at the top of the road where each zombie still to come walks in.
+    if (this.state.flareMs > 0) {
+      const col = num(comic ? '#f0e05a' : th.accent), seen = new Set<number>();
+      for (const sp of this.plan) {
+        if (sp.type !== 'enemy') continue;
+        const bx = Math.round(sp.x / 24) * 24;
+        if (seen.has(bx)) continue;
+        seen.add(bx);
+        const y = HUD_HEIGHT + 60;
+        g.fillStyle(col, 0.9).fillTriangle(bx - 7, y - 6, bx + 7, y - 6, bx, y + 6);
+        if (comic) g.lineStyle(1.4, num(th.ink)).strokeTriangle(bx - 7, y - 6, bx + 7, y - 6, bx, y + 6);
+      }
+    }
+    // The escort bus's health, under its back bumper.
+    if (this.state.busOn) {
+      const w = BUS.w, x = this.busX - w / 2, y = this.busY + BUS.h / 2 + 6, f = this.state.busHp / BUS.hp;
+      if (comic) {
+        g.fillStyle(num('#fff8e8')).fillRect(x - 1, y - 1, w + 2, 8);
+        g.lineStyle(1.4, num(th.ink)).strokeRect(x - 1, y - 1, w + 2, 8);
+        g.fillStyle(num(f > 0.35 ? '#5ad07a' : '#ff9a2a')).fillRect(x + 0.5, y + 0.5, (w - 1) * f, 5);
+      } else {
+        g.lineStyle(1, num(th.text)).strokeRect(x - 1, y - 1, w + 2, 6);
+        g.fillStyle(num(f > 0.35 ? th.text : th.warn)).fillRect(x + 0.5, y + 0.5, (w - 1) * f, 3);
+      }
+    }
     // Placing a sandbag wall: every lane lights up, with where its wall would stand.
     if (this.state.placing) {
       const col = num(comic ? '#ffd23f' : th.accent);
@@ -1995,6 +2124,167 @@ export class GameScene extends Phaser.Scene {
         g.fillStyle(num(th.warn), 0.85).fillRect(x + 2, y + 2, ((w - 4) * boss.hp) / boss.maxHp, 8);
       }
     }
+  }
+
+  // ---------- Squad leaders, the escort bus and the codex ----------
+
+  /** Counts down the leader's cooldown (only in a wave), the Scout's flare and the Sergeant's airstrike on its way. */
+  private tickLeader(dt: number) {
+    const s = this.state;
+    if (s.leader && s.phase === 'wave') s.leaderMs = Math.max(0, s.leaderMs - dt);
+    if (s.flareMs > 0) {
+      s.flareMs = Math.max(0, s.flareMs - dt);
+      if (s.flareMs === 0) this.applyCondition();
+    }
+    if (s.strike) {
+      s.strike.ms -= dt;
+      if (s.strike.ms <= 0) this.airstrike(s.strike.lane);
+    }
+  }
+
+  /** Uses the squad leader's active, once it has cooled down and only in a wave. */
+  private useLeader() {
+    const s = this.state;
+    if (!s.leader || s.phase !== 'wave' || s.leaderMs > 0) {
+      ui('refuse');
+      return;
+    }
+    s.leaderMs = leaderCooldown(s.leader, s.leaderLevel);
+    s.leaderUses++;
+    const comic = this.style === 'comic';
+    if (s.leader === 'sergeant') {
+      s.strike = { lane: laneAt(this.player.x), ms: AIRSTRIKE.warnMs };
+      sfx('airstrike');
+      this.showBanner(tr(comic ? 'airstrikeCall' : 'nvAirstrikeCall'));
+    } else if (s.leader === 'medic') this.patchUp();
+    else this.flare();
+  }
+
+  /** The Sergeant's airstrike lands: every zombie in its lane takes the hit, past any shield. */
+  private airstrike(lane: number) {
+    const s = this.state, dmg = AIRSTRIKE.damage(s.wave, s.leaderLevel);
+    s.strike = null;
+    sfx('boom');
+    // By id, as a boss that bursts could take a released enemy back from the pool mid-loop.
+    const hit = this.enemies.all.filter((e) => e.alive && laneAt(e.x) === lane), ids = new Set(hit.map((e) => e.id));
+    for (const e of hit) if (e.alive && ids.has(e.id)) this.hurt(e, dmg);
+    const x = laneMid(lane);
+    for (const y of [240, 460, 680]) this.effect('blast', x, y, settings.reduceMotion ? { life: 520, baseScale: 0.6 } : { life: 520, grow: 0.4, baseScale: 0.45 });
+    if (this.style === 'comic') this.effect('sfx-boom', x, 400, { life: 700, grow: 0.2 });
+  }
+
+  /** The Medic's patch-up: the zombies near the sandbags are thrown back, and the bus is mended. */
+  private patchUp() {
+    const s = this.state, push = PATCH.push(s.leaderLevel);
+    sfx('medkit');
+    for (const e of this.enemies.all) {
+      if (!e.alive || e.y < REACH_Y - PATCH.reach) continue;
+      e.y -= push;
+      e.sprite.setY(e.y);
+    }
+    if (this.bossAct?.acting) this.endBossMove();
+    if (s.busOn) s.busHp = Math.min(BUS.hp, s.busHp + PATCH.bus(s.leaderLevel));
+    this.showBanner(tr(this.style === 'comic' ? 'patchUp' : 'nvPatchUp'));
+  }
+
+  /** The Scout's flare: the road is lit, and the rest of the wave is marked and listed. */
+  private flare() {
+    const s = this.state;
+    s.flareMs = FLARE.ms(s.leaderLevel);
+    sfx('flare');
+    this.applyCondition();
+    const counts = new Map<EnemyKind, number>();
+    for (const sp of this.plan) if (sp.type === 'enemy') counts.set(sp.kind, (counts.get(sp.kind) ?? 0) + 1);
+    const list = CODEX_KINDS.filter((k) => counts.has(k)).map((k) => `${tr(KIND_NAMES[k]).toUpperCase()} x${counts.get(k)}`).join(' · ');
+    const title = tr(this.style === 'comic' ? 'flareUp' : 'nvFlareUp');
+    this.showBanner(`${title}\n${list ? tr('flareComing', { list }) : tr('flareNone')}`);
+  }
+
+  /** The leader of a run (not the daily) earns xp for each wave it cleared. */
+  private awardLeaderXp(cleared: number) {
+    const s = this.state;
+    if (!s.leader || cleared <= 0) return;
+    s.xpGained = cleared;
+    s.leaderXp = { ...s.leaderXp, [s.leader]: s.leaderXp[s.leader] + cleared };
+    saveLeaders({ picked: s.nextLeader, xp: s.leaderXp });
+  }
+
+  /** Picks the squad leader for the next run, or drops the one picked. */
+  private pickLeader(kind: LeaderKind) {
+    const s = this.state;
+    ui('click');
+    s.nextLeader = s.nextLeader === kind ? null : kind;
+    saveLeaders({ picked: s.nextLeader, xp: s.leaderXp });
+    this.redrawGameOver();
+  }
+
+  /** A kill fills its kind's codex page; filling it shows a banner (saved with the wave). */
+  private recordCodex(kind: EnemyKind) {
+    const c = this.state.codex;
+    if (c[kind] >= CODEX.pages[kind]) return;
+    c[kind]++;
+    if (!codexFull(c, kind)) return;
+    this.state.codexFilled.push(kind);
+    saveCodex(c);
+    sfx('codex');
+    this.showBanner(tr('codexFull', { kind: tr(KIND_NAMES[kind]).toUpperCase(), n: Math.round((CODEX.bonus - 1) * 100) }));
+  }
+
+  /** The escort bus sets off from just above the sandbags, up the middle lane, at full health. */
+  private launchBus() {
+    const s = this.state;
+    s.busOn = true;
+    s.busHp = BUS.hp;
+    this.busX = laneMid(1);
+    this.busY = BUS.startY;
+    this.bus.setPosition(this.busX, this.busY).setDepth(DEPTH.enemies + this.busY / VIEW.h).setVisible(true);
+  }
+
+  /** Whether a zombie is touching the bus (its front, sides or back). */
+  private touchesBus(e: Enemy) {
+    const r = ENEMIES[e.kind].radius;
+    return Math.abs(e.x - this.busX) < BUS.w / 2 + r * 0.6 && e.y + r * 0.6 >= this.busY - BUS.h / 2 && e.y - r <= this.busY + BUS.h / 2;
+  }
+
+  /**
+   * The bus drives up the middle lane unless a zombie stands at its front; every zombie touching it
+   * bites. It gets through at the far end; at 0 hit points it is lost, and with it the run (returns true).
+   */
+  private moveBus(dt: number) {
+    const s = this.state;
+    if (!s.busOn) return false;
+    let bite = 0, blocked = false;
+    for (const e of this.enemies.all) {
+      if (!e.alive || !this.touchesBus(e)) continue;
+      bite += busBite(e.kind);
+      if (e.y < this.busY) blocked = true;
+    }
+    if (bite > 0) {
+      s.busHp -= (bite * dt) / 1000;
+      sfx('busHit');
+      if (s.busHp <= 0) {
+        s.busHp = 0;
+        s.busOn = false;
+        s.busLost = true;
+        sfx('boom');
+        this.effect('blast', this.busX, this.busY, { life: 700, baseScale: 0.7 });
+        this.bus.setVisible(false);
+        this.gameOver();
+        return true;
+      }
+    }
+    if (!blocked) this.busY -= (BUS.speed * dt) / 1000;
+    this.bus.setPosition(this.busX, this.busY).setDepth(DEPTH.enemies + this.busY / VIEW.h);
+    if (this.busY <= BUS.endY) {
+      s.busOn = false;
+      s.busesThrough++;
+      s.scrap += BUS.scrap;
+      this.bus.setVisible(false);
+      sfx('busThrough');
+      this.effect('', this.busX, BUS.endY + 20, { life: 1200, rise: 24, text: tr(this.style === 'comic' ? 'busThrough' : 'nvBusThrough', { n: BUS.scrap }) });
+      this.refreshBackdrop();
+    }
+    return false;
   }
 
   private updateHud() {
@@ -2024,7 +2314,16 @@ export class GameScene extends Phaser.Scene {
       adapt: s.adapt,
       bossLive: this.enemies.all.some((e) => e.alive && isBoss(e.kind)),
       operation: s.operation === 'road' ? null : { label: OPERATIONS[s.operation].label, waves: OPERATIONS[s.operation].waves ?? 0 },
+      leader: s.leader ? { kind: s.leader, fill: this.leaderFill(), secs: Math.ceil(s.leaderMs / 1000) } : null,
     });
+  }
+
+  /** How far the leader's active has cooled down, 0..1, in fortieths so the HUD redraws only as it fills. */
+  private leaderFill() {
+    const s = this.state;
+    if (!s.leader || s.leaderMs <= 0) return 1;
+    const total = s.leaderUses ? leaderCooldown(s.leader, s.leaderLevel) : LEADER.firstMs;
+    return Math.floor((1 - s.leaderMs / total) * 40) / 40;
   }
 
   private nextBoss() {
@@ -2067,6 +2366,8 @@ export class GameScene extends Phaser.Scene {
     // The run's scrap goes in the bank, to spend on starting crates and the outpost.
     this.state.bank += this.state.scrap;
     saveScrap(this.state.bank);
+    saveCodex(this.state.codex);
+    this.awardLeaderXp(this.state.wave - 1);
     this.finishDaily(this.state.wave - 1);
     playMusic(SONG, 'calm');
     playSting(SONG, 'lose');
@@ -2091,8 +2392,8 @@ export class GameScene extends Phaser.Scene {
     s.payout = Math.round(s.scrap * OPERATION_BONUS) + s.bounty;
     // A won town opens the next one down the road, and the next run goes there.
     const next = nextTown(s.operation);
+    s.opened = first ? nextTowns(s.operation) : [];
     if (next) {
-      s.opened = first ? next : null;
       s.nextOperation = next;
       saveOperation(next);
     }
@@ -2154,14 +2455,16 @@ export class GameScene extends Phaser.Scene {
     const shade = this.fieldRect(comic ? 0x15121a : 0x000000, comic ? 0.6 : 0.65).setDepth(DEPTH.hud + 1);
     const won = s.extracted;
     const winTitle = s.operation === 'evac' ? tr(comic ? 'evacuated' : 'nvEvacuated') : onOp ? tr(comic ? 'operationWon' : 'nvOperationWon') : tr(comic ? 'extracted' : 'nvExtracted');
-    const title = this.add.text(VIEW.w / 2, 120, won ? winTitle : tr(comic ? 'overrun' : 'nvOverrun')).setOrigin(0.5).setDepth(DEPTH.hud + 2);
+    const lostTitle = s.busLost ? tr(comic ? 'busLost' : 'nvBusLost') : tr(comic ? 'overrun' : 'nvOverrun');
+    const title = this.add.text(VIEW.w / 2, 120, won ? winTitle : lostTitle).setOrigin(0.5).setDepth(DEPTH.hud + 2);
     if (comic) this.font(title, won ? 46 : 52, won ? '#8cd05a' : '#e8402a', { stroke: th.ink, sw: 9 });
     else this.font(title, 30, won ? '#6ae06a' : th.warn, { glow: won ? '#6ae06a' : th.warn });
     const medal = medalOf(s.best), opBest = { op: tr(op.label), best: s.best, waves: op.waves ?? 0 };
     const daily = s.daily;
     const best = s.operation === 'daily' && daily
       ? tr('dailyResult', { score: s.dailyScore, best: daily.best, n: daily.streak })
-      : s.opened ? tr('townOpened', { town: tr(OPERATIONS[s.opened].label) })
+      : s.opened.length > 1 ? tr('townsOpened', { a: tr(OPERATIONS[s.opened[0]].label), b: tr(OPERATIONS[s.opened[1]].label) })
+        : s.opened.length ? tr('townOpened', { town: tr(OPERATIONS[s.opened[0]].label) })
         : onOp
           ? medal ? tr('opBestMedal', { ...opBest, medal: tr(medal) }) : tr('opBest', opBest)
           : s.wave >= s.best && this.bestAtStart < s.wave ? tr('aNewBest') : tr('bestWave', { wave: s.best });
@@ -2207,87 +2510,216 @@ export class GameScene extends Phaser.Scene {
       this.shop.push({ act, x, y, w, h });
     };
     const grid = (i: number, top: number, step: number) => ({ x: i % 2 ? VIEW.w / 2 + 8 : VIEW.w / 2 - 8 - 220, y: top + Math.floor(i / 2) * step });
-    // The scrap shop: starting crates for the next run, each bought once, tapped again to refund.
-    heading(262, tr('shopHeading'), tr('nvShopHeading'));
-    UPGRADE_KINDS.forEach((kind, i) => {
-      const { x, y } = grid(i, 280, 58), bought = s.nextKit.includes(kind), afford = bought || s.bank >= KIT_COSTS[kind];
-      const note = bought ? tr(comic ? 'kitBought' : 'nvKitBought') : tr('scrapCost', { n: KIT_COSTS[kind] });
-      button(x, y, 220, 48, UPGRADE_COLORS[kind], bought, afford, tr(UPGRADES[kind].label).toUpperCase(), note, () => this.buyKit(kind));
-    });
-    // The outpost: lasting upgrades, three levels each, bought for good.
-    heading(410, tr('outpostHeading'), tr('nvOutpostHeading'));
-    OUTPOST_KINDS.forEach((kind, i) => {
-      const { x, y } = grid(i, 428, 62), lv = s.outpost[kind], cost = outpostCost(kind, lv), afford = cost !== null && s.bank >= cost;
-      const level = cost === null ? tr('outpostMaxed', { level: lv, max: OUTPOST_MAX }) : tr('outpostNext', { level: lv, max: OUTPOST_MAX, cost });
-      const note = `${tr(OUTPOST[kind].detail).toUpperCase()}\n${level}`;
-      button(x, y, 220, 54, OUTPOST_COLORS[kind], lv > 0, afford, tr(OUTPOST[kind].label).toUpperCase(), note, () => this.buyOutpost(kind));
-    });
-    // The next run: the Open Road or today's daily stand, then the towns down the road.
-    heading(568, tr('operationHeading'), tr('nvOperationHeading'));
-    const road = tr('bestWaveCaps', { wave: s.operation === 'road' ? s.best : this.roadBest() });
-    const line = (kind: OperationKind) => tr(OPERATIONS[kind].detail).replace(/\n/g, ' ');
-    button(18, 584, 246, 54, OPERATION_COLORS.road, s.nextOperation === 'road', true, tr('opRoad').toUpperCase(), `${line('road')}\n${road}`, () => this.pickOperation('road'));
-    const played = !!daily && daily.played;
-    const dailyNote = !daily ? '' : daily.score !== null ? tr('dailyDone', { score: daily.score, n: daily.streak }) : played ? tr('dailyUsed') : tr('dailyOpen', { best: daily.best, n: daily.streak });
-    button(276, 584, 246, 54, OPERATION_COLORS.daily, s.nextOperation === 'daily', !played, tr('opDaily').toUpperCase(), `${line('daily')}\n${dailyNote}`, () => this.pickOperation('daily'));
-    // The road map: each town a 10-wave stand with its own twist, opened by winning the one before.
-    heading(652, tr('roadMapHeading'), tr('nvRoadMapHeading'));
-    const tw = 94, gap = (VIEW.w - 36 - TOWNS.length * tw) / (TOWNS.length - 1);
-    TOWNS.forEach((kind, i) => {
-      const x = 18 + i * (tw + gap), y = 668, h = 78, open = townOpen(kind, s.operationBests), lit = s.nextOperation === kind;
-      const col = OPERATION_COLORS[kind], rec = s.operationBests[kind], m = medalOf(rec), waves = OPERATIONS[kind].waves ?? 0;
-      // The road between the towns.
-      if (i > 0) {
-        if (comic) g.fillStyle(num(th.ink)).fillRect(x - gap - 1, y + 36, gap + 2, 6);
-        else g.fillStyle(num(th.accent), 0.6).fillRect(x - gap, y + 38, gap, 2);
-      }
-      if (comic) {
-        g.fillStyle(num(th.ink)).fillRect(x + 3, y + 3, tw, h);
-        g.fillStyle(num(lit ? col : open ? '#fff8e8' : '#8a8494')).fillRect(x, y, tw, h);
-        g.fillStyle(num(col)).fillRect(x, y, tw, 7);
-        g.lineStyle(2.5, num(th.ink)).strokeRect(x, y, tw, h);
-      } else {
-        g.fillStyle(num(lit ? col : '#020a05'), lit ? 0.3 : 0.8).fillRoundedRect(x, y, tw, h, 3);
-        g.lineStyle(1.5, num(open ? col : th.muted), open ? 1 : 0.5).strokeRoundedRect(x, y, tw, h, 3);
-        g.fillStyle(num(col), open ? 1 : 0.4).fillRect(x + 6, y + 4, tw - 12, 3);
-      }
-      const ink = comic ? th.ink : open ? th.text : th.muted;
-      const n = this.add.text(x + tw / 2, y + 18, `${i + 1}. ${tr(OPERATIONS[kind].label).toUpperCase()}`).setOrigin(0.5).setDepth(DEPTH.hud + 3);
-      this.fit(this.font(n, 12, ink, comic ? {} : { glow: ink }), tw - 8);
-      const d = this.add.text(x + tw / 2, y + 28, tr(OPERATIONS[kind].detail), { align: 'center' }).setOrigin(0.5, 0).setDepth(DEPTH.hud + 3);
-      this.fit(this.font(d, 9, comic ? th.ink : open ? th.accent : th.muted), tw - 8);
-      const record = !open ? tr('townLocked') : m ? tr('opRecordMedal', { best: rec, waves, medal: tr(m).toUpperCase() }) : tr('opRecord', { best: rec, waves });
-      const r = this.add.text(x + tw / 2, y + h - 11, record).setOrigin(0.5).setDepth(DEPTH.hud + 3);
-      this.fit(this.font(r, 9, comic ? th.ink : open ? th.text : th.muted), tw - 8);
-      objs.push(n, d, r);
-      this.shop.push({ act: () => (open ? this.pickOperation(kind) : ui('refuse')), x, y, w: tw, h });
-    });
-    // The roster: veterans who lived through a won run; two picked start the next one.
-    heading(762, s.roster.length ? tr('rosterHeading', { n: LOYALTY.picks }) : tr('rosterEmpty'), s.roster.length ? tr('nvRosterHeading', { n: LOYALTY.picks }) : tr('rosterEmpty'));
-    const cw = 77, cgap = (VIEW.w - 36 - LOYALTY.size * cw) / (LOYALTY.size - 1);
-    s.roster.forEach((v, i) => {
-      const x = 18 + i * (cw + cgap), y = 778, h = 44, lit = s.picked.includes(v.name), col = ROLE_COLORS[v.role];
-      if (comic) {
-        g.fillStyle(num(th.ink)).fillRect(x + 3, y + 3, cw, h);
-        g.fillStyle(num(lit ? col : '#fff8e8')).fillRect(x, y, cw, h);
-        g.lineStyle(2, num(th.ink)).strokeRect(x, y, cw, h);
-      } else {
-        g.fillStyle(num(lit ? col : '#020a05'), lit ? 0.3 : 0.8).fillRoundedRect(x, y, cw, h, 3);
-        g.lineStyle(1.5, num(lit ? th.text : th.accent)).strokeRoundedRect(x, y, cw, h, 3);
-      }
-      const ink = comic ? th.ink : th.text;
-      const n = this.add.text(x + cw / 2, y + 12, v.name.toUpperCase()).setOrigin(0.5).setDepth(DEPTH.hud + 3);
-      this.fit(this.font(n, 12, ink, comic ? {} : { glow: ink }), cw - 6);
-      const r = this.add.text(x + cw / 2, y + 31, `${tr(ROLES[v.role].label).toUpperCase()}\n${'★'.repeat(v.rank)}`, { align: 'center' }).setOrigin(0.5).setDepth(DEPTH.hud + 3);
-      r.setLineSpacing(-2);
-      this.fit(this.font(r, 9, comic ? th.ink : th.accent), cw - 6);
-      objs.push(n, r);
-      this.shop.push({ act: () => this.pickVeteran(v.name), x, y, w: cw, h });
-    });
-    const again = this.add.text(VIEW.w / 2, 840, tr('tapToStart', { op: tr(OPERATIONS[s.nextOperation].label) })).setOrigin(0.5).setDepth(DEPTH.hud + 2);
+    if (this.overPage === 0) {
+      // The scrap shop: starting crates for the next run, each bought once, tapped again to refund.
+      heading(262, tr('shopHeading'), tr('nvShopHeading'));
+      UPGRADE_KINDS.forEach((kind, i) => {
+        const { x, y } = grid(i, 280, 58), bought = s.nextKit.includes(kind), afford = bought || s.bank >= KIT_COSTS[kind];
+        const note = bought ? tr(comic ? 'kitBought' : 'nvKitBought') : tr('scrapCost', { n: KIT_COSTS[kind] });
+        button(x, y, 220, 48, UPGRADE_COLORS[kind], bought, afford, tr(UPGRADES[kind].label).toUpperCase(), note, () => this.buyKit(kind));
+      });
+      // The outpost: lasting upgrades, three levels each, bought for good.
+      heading(410, tr('outpostHeading'), tr('nvOutpostHeading'));
+      OUTPOST_KINDS.forEach((kind, i) => {
+        const { x, y } = grid(i, 428, 62), lv = s.outpost[kind], cost = outpostCost(kind, lv), afford = cost !== null && s.bank >= cost;
+        const level = cost === null ? tr('outpostMaxed', { level: lv, max: OUTPOST_MAX }) : tr('outpostNext', { level: lv, max: OUTPOST_MAX, cost });
+        const note = `${tr(OUTPOST[kind].detail).toUpperCase()}\n${level}`;
+        button(x, y, 220, 54, OUTPOST_COLORS[kind], lv > 0, afford, tr(OUTPOST[kind].label).toUpperCase(), note, () => this.buyOutpost(kind));
+      });
+      // The next run: the Open Road or today's daily stand, then the towns down the road.
+      heading(568, tr('operationHeading'), tr('nvOperationHeading'));
+      const road = tr('bestWaveCaps', { wave: s.operation === 'road' ? s.best : this.roadBest() });
+      const line = (kind: OperationKind) => tr(OPERATIONS[kind].detail).replace(/\n/g, ' ');
+      button(18, 584, 246, 54, OPERATION_COLORS.road, s.nextOperation === 'road', true, tr('opRoad').toUpperCase(), `${line('road')}\n${road}`, () => this.pickOperation('road'));
+      const played = !!daily && daily.played;
+      const dailyNote = !daily ? '' : daily.score !== null ? tr('dailyDone', { score: daily.score, n: daily.streak }) : played ? tr('dailyUsed') : tr('dailyOpen', { best: daily.best, n: daily.streak });
+      button(276, 584, 246, 54, OPERATION_COLORS.daily, s.nextOperation === 'daily', !played, tr('opDaily').toUpperCase(), `${line('daily')}\n${dailyNote}`, () => this.pickOperation('daily'));
+      // The road map: each town a 10-wave stand with its own twist, opened by winning the one before.
+      heading(652, tr('roadMapHeading'), tr('nvRoadMapHeading'));
+      const tw = 94, gap = (VIEW.w - 36 - TOWNS.length * tw) / (TOWNS.length - 1);
+      TOWNS.forEach((kind, i) => {
+        const x = 18 + i * (tw + gap), y = 668, h = 78, open = townOpen(kind, s.operationBests), lit = s.nextOperation === kind;
+        const col = OPERATION_COLORS[kind], rec = s.operationBests[kind], m = medalOf(rec), waves = OPERATIONS[kind].waves ?? 0;
+        // The road between the towns.
+        if (i > 0) {
+          if (comic) g.fillStyle(num(th.ink)).fillRect(x - gap - 1, y + 36, gap + 2, 6);
+          else g.fillStyle(num(th.accent), 0.6).fillRect(x - gap, y + 38, gap, 2);
+        }
+        if (comic) {
+          g.fillStyle(num(th.ink)).fillRect(x + 3, y + 3, tw, h);
+          g.fillStyle(num(lit ? col : open ? '#fff8e8' : '#8a8494')).fillRect(x, y, tw, h);
+          g.fillStyle(num(col)).fillRect(x, y, tw, 7);
+          g.lineStyle(2.5, num(th.ink)).strokeRect(x, y, tw, h);
+        } else {
+          g.fillStyle(num(lit ? col : '#020a05'), lit ? 0.3 : 0.8).fillRoundedRect(x, y, tw, h, 3);
+          g.lineStyle(1.5, num(open ? col : th.muted), open ? 1 : 0.5).strokeRoundedRect(x, y, tw, h, 3);
+          g.fillStyle(num(col), open ? 1 : 0.4).fillRect(x + 6, y + 4, tw - 12, 3);
+        }
+        const ink = comic ? th.ink : open ? th.text : th.muted;
+        const n = this.add.text(x + tw / 2, y + 18, `${i + 1}. ${tr(OPERATIONS[kind].label).toUpperCase()}`).setOrigin(0.5).setDepth(DEPTH.hud + 3);
+        this.fit(this.font(n, 12, ink, comic ? {} : { glow: ink }), tw - 8);
+        const d = this.add.text(x + tw / 2, y + 28, tr(OPERATIONS[kind].detail), { align: 'center' }).setOrigin(0.5, 0).setDepth(DEPTH.hud + 3);
+        this.fit(this.font(d, 9, comic ? th.ink : open ? th.accent : th.muted), tw - 8);
+        const record = !open ? tr('townLocked') : m ? tr('opRecordMedal', { best: rec, waves, medal: tr(m).toUpperCase() }) : tr('opRecord', { best: rec, waves });
+        const r = this.add.text(x + tw / 2, y + h - 11, record).setOrigin(0.5).setDepth(DEPTH.hud + 3);
+        this.fit(this.font(r, 9, comic ? th.ink : open ? th.text : th.muted), tw - 8);
+        objs.push(n, d, r);
+        this.shop.push({ act: () => (open ? this.pickOperation(kind) : ui('refuse')), x, y, w: tw, h });
+      });
+
+      // The escort route branches off below the Hospital: a bus to bring through every wave.
+      const ew = 246, ey = 756, eh = 56, hx = 18 + tw / 2 - 20;
+      if (comic) g.fillStyle(num(th.ink)).fillRect(hx - 3, 746, 6, ey - 746);
+      else g.fillStyle(num(th.accent), 0.6).fillRect(hx - 1, 746, 2, ey - 746);
+      ESCORTS.forEach((kind, i) => {
+        const x = 18 + i * (ew + 12), y = ey, open = townOpen(kind, s.operationBests), lit = s.nextOperation === kind;
+        const col = OPERATION_COLORS[kind], rec = s.operationBests[kind], m = medalOf(rec), waves = OPERATIONS[kind].waves ?? 0;
+        if (i > 0) {
+          if (comic) g.fillStyle(num(th.ink)).fillRect(x - 13, y + 25, 14, 6);
+          else g.fillStyle(num(th.accent), 0.6).fillRect(x - 12, y + 27, 12, 2);
+        }
+        if (comic) {
+          g.fillStyle(num(th.ink)).fillRect(x + 3, y + 3, ew, eh);
+          g.fillStyle(num(lit ? col : open ? '#fff8e8' : '#8a8494')).fillRect(x, y, ew, eh);
+          g.fillStyle(num(col)).fillRect(x, y, 7, eh);
+          g.lineStyle(2.5, num(th.ink)).strokeRect(x, y, ew, eh);
+        } else {
+          g.fillStyle(num(lit ? col : '#020a05'), lit ? 0.3 : 0.8).fillRoundedRect(x, y, ew, eh, 3);
+          g.lineStyle(1.5, num(open ? col : th.muted), open ? 1 : 0.5).strokeRoundedRect(x, y, ew, eh, 3);
+          g.fillStyle(num(col), open ? 1 : 0.4).fillRect(x + 4, y + 6, 3, eh - 12);
+        }
+        const ink = comic ? th.ink : open ? th.text : th.muted;
+        const n = this.add.text(x + 16, y + 13, `${TOWNS.length + i + 1}. ${tr(OPERATIONS[kind].label).toUpperCase()}`).setOrigin(0, 0.5).setDepth(DEPTH.hud + 3);
+        this.fit(this.font(n, 12, ink, comic ? {} : { glow: ink }), ew - 24);
+        const d = this.add.text(x + 16, y + 28, tr(OPERATIONS[kind].detail).replace(/\n/g, ' ')).setOrigin(0, 0.5).setDepth(DEPTH.hud + 3);
+        this.fit(this.font(d, 9.5, comic ? th.ink : open ? th.accent : th.muted), ew - 24);
+        const record = !open ? tr('escortLocked', { town: tr(OPERATIONS[OPERATIONS[kind].after ?? 'hospital'].label).toUpperCase() }) : m ? tr('opRecordMedal', { best: rec, waves, medal: tr(m).toUpperCase() }) : tr('opRecord', { best: rec, waves });
+        const r = this.add.text(x + 16, y + 44, record).setOrigin(0, 0.5).setDepth(DEPTH.hud + 3);
+        this.fit(this.font(r, 9.5, comic ? th.ink : open ? th.text : th.muted), ew - 24);
+        objs.push(n, d, r);
+        this.shop.push({ act: () => (open ? this.pickOperation(kind) : ui('refuse')), x, y, w: ew, h: eh });
+      });
+    } else {
+      this.drawLeaders(g, objs, heading);
+      this.drawCodex(g, objs, heading);
+      // The roster: veterans who lived through a won run; two picked start the next one.
+      heading(656, s.roster.length ? tr('rosterHeading', { n: LOYALTY.picks }) : tr('rosterEmpty'), s.roster.length ? tr('nvRosterHeading', { n: LOYALTY.picks }) : tr('rosterEmpty'));
+      const cw = 77, cgap = (VIEW.w - 36 - LOYALTY.size * cw) / (LOYALTY.size - 1);
+      s.roster.forEach((v, i) => {
+        const x = 18 + i * (cw + cgap), y = 672, h = 44, lit = s.picked.includes(v.name), col = ROLE_COLORS[v.role];
+        if (comic) {
+          g.fillStyle(num(th.ink)).fillRect(x + 3, y + 3, cw, h);
+          g.fillStyle(num(lit ? col : '#fff8e8')).fillRect(x, y, cw, h);
+          g.lineStyle(2, num(th.ink)).strokeRect(x, y, cw, h);
+        } else {
+          g.fillStyle(num(lit ? col : '#020a05'), lit ? 0.3 : 0.8).fillRoundedRect(x, y, cw, h, 3);
+          g.lineStyle(1.5, num(lit ? th.text : th.accent)).strokeRoundedRect(x, y, cw, h, 3);
+        }
+        const ink = comic ? th.ink : th.text;
+        const n = this.add.text(x + cw / 2, y + 12, v.name.toUpperCase()).setOrigin(0.5).setDepth(DEPTH.hud + 3);
+        this.fit(this.font(n, 12, ink, comic ? {} : { glow: ink }), cw - 6);
+        const r = this.add.text(x + cw / 2, y + 31, `${tr(ROLES[v.role].label).toUpperCase()}\n${'★'.repeat(v.rank)}`, { align: 'center' }).setOrigin(0.5).setDepth(DEPTH.hud + 3);
+        r.setLineSpacing(-2);
+        this.fit(this.font(r, 9, comic ? th.ink : th.accent), cw - 6);
+        objs.push(n, r);
+        this.shop.push({ act: () => this.pickVeteran(v.name), x, y, w: cw, h });
+      });
+    }
+    // The page switch: the shop, outpost and road map, or the leaders, codex and veterans.
+    const pw = 320, px = VIEW.w / 2 - pw / 2, py = 820, ph = 34;
+    if (comic) {
+      g.fillStyle(num(th.ink)).fillRect(px + 4, py + 4, pw, ph);
+      g.fillStyle(num('#ffe04a')).fillRect(px, py, pw, ph);
+      g.lineStyle(2.5, num(th.ink)).strokeRect(px, py, pw, ph);
+    } else {
+      g.fillStyle(num('#020a05'), 0.85).fillRoundedRect(px, py, pw, ph, 3);
+      g.lineStyle(1.5, num(th.accent)).strokeRoundedRect(px, py, pw, ph, 3);
+    }
+    const pageText = this.add.text(VIEW.w / 2, py + ph / 2, tr(this.overPage === 0 ? 'overPageSquad' : 'overPageOutfit')).setOrigin(0.5).setDepth(DEPTH.hud + 3);
+    this.fit(this.font(pageText, 13, comic ? th.ink : th.accent, comic ? {} : { glow: th.accent }), pw - 16);
+    objs.push(pageText);
+    this.shop.push({ act: () => this.turnOverPage(), x: px, y: py, w: pw, h: ph });
+    const again = this.add.text(VIEW.w / 2, 884, tr('tapToStart', { op: tr(OPERATIONS[s.nextOperation].label) })).setOrigin(0.5).setDepth(DEPTH.hud + 2);
     body(again, 18);
     objs.push(again);
     this.overText = objs;
+  }
+
+  /** Turns the game over screen to its other page. */
+  private turnOverPage() {
+    ui('click');
+    this.overPage = 1 - this.overPage;
+    this.redrawGameOver();
+  }
+
+  /** The game over screen's squad leaders: three cards, each with its active, level and xp; a tap picks one to lead the next run. */
+  private drawLeaders(g: Phaser.GameObjects.Graphics, objs: Phaser.GameObjects.GameObject[], heading: (y: number, comicText: string, nvText: string) => void) {
+    const th = this.theme(), comic = this.style === 'comic', s = this.state;
+    heading(262, tr('leaderHeading'), tr('nvLeaderHeading'));
+    LEADER_KINDS.forEach((kind, i) => {
+      const w = 160, h = 132, x = 18 + i * 171, y = 280, lit = s.nextLeader === kind, col = LEADER_COLORS[kind];
+      const xp = s.leaderXp[kind], lv = leaderLevel(xp), next = nextLevelXp(xp), from = LEADER.levels[lv - 1];
+      if (comic) {
+        g.fillStyle(num(th.ink)).fillRect(x + 4, y + 4, w, h);
+        g.fillStyle(num(lit ? col : '#fff8e8')).fillRect(x, y, w, h);
+        g.fillStyle(num(col)).fillRect(x, y, w, 8);
+        g.lineStyle(2.5, num(th.ink)).strokeRect(x, y, w, h);
+      } else {
+        g.fillStyle(num(lit ? col : '#020a05'), lit ? 0.3 : 0.85).fillRoundedRect(x, y, w, h, 3);
+        g.lineStyle(1.5, num(col)).strokeRoundedRect(x, y, w, h, 3);
+        g.fillStyle(num(col)).fillRect(x + 6, y + 4, w - 12, 3);
+      }
+      const ink = comic ? th.ink : th.text;
+      const name = this.add.text(x + w / 2, y + 22, tr(LEADERS[kind].label).toUpperCase()).setOrigin(0.5).setDepth(DEPTH.hud + 3);
+      this.fit(this.font(name, 15, ink, comic ? {} : { glow: ink }), w - 12);
+      const ability = this.add.text(x + w / 2, y + 40, tr(LEADERS[kind].ability).toUpperCase()).setOrigin(0.5).setDepth(DEPTH.hud + 3);
+      this.fit(this.font(ability, 11, comic ? '#7a3a10' : col, comic ? {} : { glow: col }), w - 12);
+      const detail = this.add.text(x + w / 2, y + 52, tr(LEADERS[kind].detail), { align: 'center' }).setOrigin(0.5, 0).setDepth(DEPTH.hud + 3);
+      this.fit(this.font(detail, 9.5, comic ? th.ink : th.muted), w - 10);
+      const gained = kind === s.leader && s.xpGained > 0 ? ` · ${tr('leaderGained', { n: s.xpGained })}` : '';
+      const level = this.add.text(x + w / 2, y + h - 26, `${tr('leaderLevel', { level: lv, max: LEADER_MAX })}${gained}`).setOrigin(0.5).setDepth(DEPTH.hud + 3);
+      this.fit(this.font(level, 10, ink, comic ? {} : { glow: ink }), w - 10);
+      // The xp towards the next level (full at the top level).
+      const bx = x + 12, by = y + h - 15, bw = w - 24, f = next === null ? 1 : (xp - from) / (next - from);
+      g.fillStyle(num(comic ? '#d8d0c0' : '#0c2410')).fillRect(bx, by, bw, 6);
+      g.fillStyle(num(comic ? '#7a3a10' : col)).fillRect(bx, by, bw * f, 6);
+      if (comic) g.lineStyle(1.2, num(th.ink)).strokeRect(bx, by, bw, 6);
+      objs.push(name, ability, detail, level);
+      this.shop.push({ act: () => this.pickLeader(kind), x, y, w, h });
+    });
+  }
+
+  /** The game over screen's zombie codex: a page for each kind, filling with kills; a full one shows its bonus. */
+  private drawCodex(g: Phaser.GameObjects.Graphics, objs: Phaser.GameObjects.GameObject[], heading: (y: number, comicText: string, nvText: string) => void) {
+    const th = this.theme(), comic = this.style === 'comic', s = this.state, pct = Math.round((CODEX.bonus - 1) * 100);
+    heading(430, tr('codexHeading', { n: pct }), tr('nvCodexHeading', { n: pct }));
+    CODEX_KINDS.forEach((kind, i) => {
+      const w = 162, h = 58, x = 18 + (i % 3) * 171, y = 446 + Math.floor(i / 3) * 64;
+      const n = s.codex[kind], page = CODEX.pages[kind], full = n >= page, fresh = s.codexFilled.includes(kind);
+      if (comic) {
+        g.fillStyle(num(th.ink)).fillRect(x + 3, y + 3, w, h);
+        g.fillStyle(num(full ? '#bfe89a' : '#fff8e8')).fillRect(x, y, w, h);
+        g.lineStyle(2, num(th.ink)).strokeRect(x, y, w, h);
+      } else {
+        g.fillStyle(num(full ? '#0c2410' : '#020a05'), 0.85).fillRoundedRect(x, y, w, h, 3);
+        g.lineStyle(1.2, num(full ? th.text : th.accent), full ? 1 : 0.6).strokeRoundedRect(x, y, w, h, 3);
+      }
+      const geom = GEOM[kind], icon = this.add.image(x + 26, y + h / 2, tex(this.style, kind)).setDepth(DEPTH.hud + 3);
+      icon.setScale(Math.min(40 / geom.w, 50 / geom.h) * (geom.w / icon.frame.width));
+      // A page not started yet shows its zombie as a dim shape.
+      if (!n) icon.setTint(comic ? 0x5a5464 : 0x1a3a1a).setAlpha(0.7);
+      const ink = comic ? th.ink : th.text;
+      const name = this.add.text(x + 50, y + 13, tr(KIND_NAMES[kind]).toUpperCase()).setOrigin(0, 0.5).setDepth(DEPTH.hud + 3);
+      this.fit(this.font(name, 11, ink, comic ? {} : { glow: ink }), w - 56);
+      const count = full ? `${tr('codexBonus', { n: pct })}${fresh ? ' ★' : ''}` : `${n}/${page}`;
+      const c = this.add.text(x + 50, y + 29, count).setOrigin(0, 0.5).setDepth(DEPTH.hud + 3);
+      this.fit(this.font(c, 10, comic ? (full ? '#2a6a1a' : th.ink) : full ? th.text : th.accent), w - 56);
+      const bx = x + 50, by = y + 41, bw = w - 60;
+      g.fillStyle(num(comic ? '#d8d0c0' : '#0c2410')).fillRect(bx, by, bw, 6);
+      g.fillStyle(num(comic ? (full ? '#5aa03a' : '#8a2a6a') : th.text)).fillRect(bx, by, (bw * n) / page, 6);
+      if (comic) g.lineStyle(1.2, num(th.ink)).strokeRect(bx, by, bw, 6);
+      objs.push(icon, name, c);
+    });
   }
 
   /** The Open Road's best wave, saved under `deadline-best`. */
@@ -2450,6 +2882,8 @@ export class GameScene extends Phaser.Scene {
     this.bossCall.setVisible(false);
     s.bank += s.payout;
     saveScrap(s.bank);
+    saveCodex(s.codex);
+    this.awardLeaderXp(s.wave);
     this.promoteSquad();
     playMusic(SONG, 'calm');
     playSting(SONG, 'win');

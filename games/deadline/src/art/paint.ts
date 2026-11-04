@@ -81,6 +81,8 @@ export const GEOM = {
   /** The flamethrower's burst along the sandbags, its origin on the line. */
   flame: { w: 540, h: 200, ox: 270, oy: 176 },
   supply: { w: 72, h: 72, ox: 36, oy: 36 },
+  /** The escort towns' bus, from above and driving up the road, its origin in the middle. */
+  bus: { w: 64, h: 124, ox: 32, oy: 62 },
 } as const;
 export type SpriteName = keyof typeof GEOM;
 
