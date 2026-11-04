@@ -27,6 +27,15 @@ surveyor charts one tile for every two surveys, heading for ruins and high groun
 treasure first. An atlas with a page of every kind completes the Royal Atlas: a win page with the
 voyages it took and a saved best, then Keep charting or New atlas.
 
+Three side loops hang off the harbor's heading row (MM11 to MM13). Every isle hides a wonder (two
+per isle kind) that shows on the map once its tile and the four beside it are charted; the first of
+each kind fills the wonder gallery (Wonders). Daily isle sails one voyage to today's seeded isle
+(`shared/daily.ts`), the same for everyone, with 18 supplies and no upgrades, scored by its chart's
+coins, one try a day. Expeditions, open once the Royal Atlas is bound, sail one voyage to one of four
+fixed far isles with one budget of supplies for the whole isle (30 on Normal) and no restocking,
+scored by the share charted, with a best per isle. Both are a run: a `GameState` of its own (`run`
+set) played while the atlas waits at the harbor, and neither touches the atlas's coins or isle.
+
 - Implemented: island generation in four kinds (with rivers, a road, finds and a riddle),
   surveying with a walking surveyor and per-terrain costs, lookouts (hills and peaks) with the
   viewshed tally, sea as a dead end, finds (wrecks, caves, storms), base camps, the treasure riddle
@@ -34,7 +43,8 @@ voyages it took and a saved best, then Keep charting or New atlas.
   whole, the commission board with long commissions, hands for a voyage, sell-back of unused
   supplies, the isle completion goal with milestones and the atlas (pages coloured by isle kind),
   the rival surveyor, the Royal Atlas ending with a saved best, the harbor with four upgrades, new
-  islands, a full save after every action.
+  islands, a full save after every action, hidden wonders and the wonder gallery, the daily isle and
+  expeditions to the far isles.
 - Art style: a survey sheet on a drafting table. Charted ground has hypsometric tints, contour
   lines, hillshade, black map symbols and italic place names; uncharted ground is blank gridded
   paper with a dashed survey limit; rivers are blue lines and roads cased ink lines; finds, storms,
@@ -87,6 +97,18 @@ voyages it took and a saved best, then Keep charting or New atlas.
   `DIG_COST`, `TREASURE_VALUE`, `FEATURE_BONUS`, `WOOD_MIN`, `RIVAL_FROM`, `RIVAL_PACE`,
   `RIVAL_STEPS`, `ROYAL_KINDS`, `MILESTONES`; helpers `rankOf`, `maxSupplies`, `inkBonus`,
   `indexOf`, `inGrid`, `tileAt`, `neighbours`.
+- `src/game/wonders.ts`: `WonderKind`, the `WONDERS` table (name and line as `TextKey`s, the isle
+  kind, the ground it hides under and what must lie beside it), `WONDER_IDS` (the gallery's order),
+  `Wonder`, `wonderKind(island, kind)` (the first four isles get the first of their kind's two, the
+  next four the second, and so on), `placeWonder(tiles, island, kind)` (picks the tile from the
+  island number by a hash, with no random draws, so it never moves a seeded isle), `wonderInSight`
+  and `spotWonder` (marks it seen and fills the gallery; `survey` calls it).
+- `src/game/runs.ts`: the runs. `FAR_ISLES` (four fixed isles: number 9 to 12 and a seed each),
+  `EXPEDITION_SUPPLIES` (`byDifficulty(40, 30, 24)`), `DAILY_SUPPLIES` (18), `DAILY_GAME`
+  (`mapmaker`, for `shared/daily.ts`), `dailyIsle(day)` (number 5 to 8 and a seed from
+  `dailyRand`), `newRun(atlas, run)` (the run's `GameState`: the isle with only the port charted, the
+  run's supplies, no commission, hand, rival or wonder; an expedition takes the atlas's `ranks`, the
+  daily none), `expedition(far)` and `dailyRun(day)`.
 - `src/game/hands.ts`: `Hand`, the `HANDS` table (name and card text as `TextKey`s), `HAND_IDS`, `HANDS_OFFERED`.
 - `src/game/terrain.ts`: `Terrain`, the `TERRAIN` table (name and tile count as `TextKey`s, value, cost, sight, shape),
   `CHART_ORDER`, `isLandmark`.
@@ -111,9 +133,11 @@ voyages it took and a saved best, then Keep charting or New atlas.
   `valueOf`, `returnToPort`, `featuresDone`, `featureAt`, `artifactValue`, `chartOf`,
   `sellBackOf`, `chartable`, `isleProgress`, `milestonesDue`, `atlasKinds`, `royalComplete`,
   `sellChart`, `carriesOver`, `closeAtlas`, `pickCommission`, `isPicked`, `hire`, `buy`, `islandCharted`,
-  `setSail`, and the private `reveal` (turns up finds), `landRival` and `rivalTurn`, `fogged`,
+  `setSail`, `runScore` (a run's score: the chart's total on the daily isle, the isle's percent on an
+  expedition), and the private `reveal` (turns up finds), `landRival` and `rivalTurn`, `fogged`,
   `rollCommission` and `rollBoard` with the `COMMISSIONS` table, and `rollHands`.
-- `src/game/save.ts`: `loadGame` (fills the new fields on older saves, and turns English feature
+- `src/game/save.ts`: `loadRun` and `clearRun` for a run under way, `loadExpeditions` and
+  `saveExpedition` for the far isles' bests; `saveGame` writes a run to its own key. `loadGame` (fills the new fields on older saves, and turns English feature
   names and riddle clues from before the translations into keys and `Clue`s) and `saveGame`; `loadBest`
   and `saveBest` for the Royal Atlas's fewest voyages; `loadTheme` (the saved theme, else the
   device's `prefers-color-scheme`) and `saveTheme`.
@@ -123,12 +147,14 @@ voyages it took and a saved best, then Keep charting or New atlas.
 - `src/scenes/GameScene.ts`: owns the `GameState`, takes taps, paints the island into two canvas
   textures, draws the sheet, survey stations with their costs, the map marks, surveyor and rival,
   value chips and notices, the viewshed, the side panel (with the riddle box and the Camp button)
-  and the chart, Royal Atlas and harbor overlays; exposes `spots`. `commissionText`, `voyagesLeft`
+  and the chart, Royal Atlas and harbor overlays, the run's end (`showRunChart`), the far isles
+  (`showExpeditions`) and the wonder gallery (`showWonders`); exposes `spots`. `commissionText`, `voyagesLeft`
   and `clueText` put commissions and riddle clues into words.
 - `src/scenes/layout.ts`: screen constants (`VIEW`, `MAP`, `PANEL`, `CAMP_BUTTON`, `RETURN_BUTTON`, `OVERLAY`,
   `OVERLAY_BUTTON`, `SHOP`, `HANDS_COLUMN`, `BOARD`, `BUTTON`, `SMALL_BUTTON`, `UI_DEPTH`, `FONT`) and `tileCentre`.
 - `src/ui/Button.ts`: `makeButton`, a flat ink button with an optional size, disabled look (a tap
-  on a disabled one plays `ui('refuse')`) and left-aligned caption.
+  on a disabled one plays `ui('refuse')`) and left-aligned caption; a caption too wide for its
+  button is squeezed to fit.
 - `src/art/paint.ts`: the palette, `PALETTES.light` and `PALETTES.dark` (`INK`, `ON_INK`,
   `MAGENTA`, `SHEET`, `VELLUM`, `CARD`, `TABLE`, `RULE`, the fog's colours, the overlay `DIM`...)
   exported as `let`s that `applyTheme(theme)` swaps (read them when drawing, never copy them into
@@ -150,7 +176,8 @@ voyages it took and a saved best, then Keep charting or New atlas.
 - `src/art/icons.ts`: `icon-<upgrade>`, `hand-<hand>`, `swatch-<terrain>`, `landmark-hint` (the
   compass rose), `logo`, `atlas-<kind>` and `atlas-empty`, and the `MARKS`: `find-wreck`,
   `find-cave`, `artifact`, `storm`, `camp`, `dug`, `treasure`, `claim` (the rival's pennant) and
-  `riddle`.
+  `riddle`; and `wonder-<kind>` (32 px, a picture in a gold ring, from `WONDER_ICONS`) and
+  `wonder-unseen` (the gallery's empty frame).
 - `shared/setupGame.ts`, `shared/settings.ts` and `shared/i18n.ts` (outside the game folder): the
   hub's settings. `main.ts` imports `setupGame`; `state.ts` imports `byDifficulty`; `GameScene`
   reads `settings.reduceMotion`; `i18n.ts` and `howToPlay.ts` use `translator` and `byLanguage`.
@@ -174,7 +201,19 @@ voyages it took and a saved best, then Keep charting or New atlas.
   Buttons call `pitchCamp`, `returnToPort`, `sellChart` (then `saveBest` when the Royal Atlas
   page opens; it returns whether the voyages set a new best, which the page shows, kept in
   `newBest`, so a reload or a tie shows the best instead), `closeAtlas`, `newGame` (New atlas), `pickCommission` and `hire` (the harbor's
-  `card`s), `buy` and `setSail`. Every successful action calls `saveGame`. The theme button
+  `card`s), `buy` and `setSail`. Every successful action calls `saveGame`. The harbor's heading row
+  (`headButton`, `HEAD_BUTTON`) holds Daily isle (disabled once today's try is used, then showing
+  today's score), Wonders and Expeditions, which set `sheetView` to open the gallery or the far isles
+  over the harbor (Back clears it).
+- Runs: Daily isle and an expedition's Set out call `startRun` (the daily calls `startDaily` first,
+  so leaving half way still uses the day's try): the atlas moves to `atlasState`, `state` becomes
+  `newRun(...)`, and every scene path (taps, Camp, Return to port, the theme switch, which hands
+  `atlas` along through `Boot`) works on it as on the atlas. Its voyage ends as usual, in `'chart'`,
+  where `showRunChart` shows its rows, its score and the record as it stood; Back to the harbor
+  (`finishRun`) keeps the score (`finishDaily` or `saveExpedition`), clears the run's save and puts
+  the atlas back (reopening the far isles after an expedition). On load, a saved run comes back with
+  the atlas loaded behind it. In a run the header and panel name the run (`runHead`), and the
+  milestone marks are hidden. The theme button
   (`makeThemeButton`, above the overlays' dim) calls `saveTheme` with the other theme and starts
   `Boot` with `{ state, theme }`, which applies that theme (`loadTheme()` only when none is handed
   over, so the switch works with storage blocked or full), bakes the icons again and restarts
@@ -192,7 +231,8 @@ voyages it took and a saved best, then Keep charting or New atlas.
     the pointer is solid with a cost pill, which also names the feature the tile would finish,
     from `featureAt`), and once the riddle is known a dashed dig square and
     pill on charted ground under the pointer. Cost labels come from a reused pool of texts.
-  - `syncMarks` keeps an image per map mark (finds on charted tiles, storms, camps, dug tiles,
+  - `syncMarks` keeps an image per map mark (finds on charted tiles, storms, camps, dug tiles, the
+    wonder once seen,
     the treasure chest for the player's own find, a dug mark on the riddle's tile once charted when
     the rival dug it, the rival's claims) and adds or removes them as the state changes.
   - `agePopups` floats the value chips of ordinary surveys and the notices.
@@ -289,7 +329,16 @@ voyages it took and a saved best, then Keep charting or New atlas.
   over, from `carriesOver`), and the sale works the board out from that isle's fog; `setSail` lands
   on `next` and clears it. `setSail` rolls a one-voyage commission only when none is set, which only a
   save from before `next` can reach.
-- All mutation is in `src/game/sim.ts`. `GameScene` only calls those functions.
+- `wonder` is the isle's wonder (`placeWonder`, set by `newGame`, `setSail` on a new isle and
+  `loadGame` for older saves; null on a run): `at`, `kind` and `seen`. `survey` calls `spotWonder`
+  after its reveals and returns `wonder: true` when it came into sight, which the scene announces.
+  `wonders` is the gallery: `{ kind, island }` for the first of each kind seen; it is kept by the
+  atlas for good (New atlas starts it over). Wonders pay nothing.
+- `run` (a run only): `{ mode: 'expedition', far, supplies }` or `{ mode: 'daily', day, supplies }`.
+  `maxSupplies` is `run.supplies`; `milestonesDue` is empty; `returnToPort` rolls no next isle;
+  `sellChart` and `setSail` refuse it.
+- All mutation is in `src/game/sim.ts` (and `spotWonder` in `wonders.ts`). `GameScene` only calls
+  those functions, and swaps between the atlas and a run in `startRun` and `finishRun`.
 
 ### Persistence
 
@@ -316,7 +365,12 @@ feature names turned into keys and their riddle clues into `Clue`s. `mapmaker-be
 the fewest voyages a Royal Atlas took, kept across New atlas. `mapmaker-theme` holds `'light'` or
 `'dark'` once the theme button has been used; until then the device's preference decides. The hub's settings live under the
 shared `hub-settings` key. `mapmaker-trophies` holds the trophies earned (`shared/trophies.ts`),
-each id with the time; New atlas keeps them.
+each id with the time; New atlas keeps them. `mapmaker-run` holds a run under way (packed like the
+atlas; only a progress file carries it, `fileOnly` in `shared/saveFile.ts`), cleared when it ends.
+`mapmaker-daily` is the daily isle's record (`shared/daily.ts`: today's try and score, the best and
+the streak). `mapmaker-expeditions` is the far isles' best percents, a list in `FAR_ISLES` order.
+Saves from before the wonders get their isle's wonder placed on load (seen at once if already in
+sight, filling the gallery) and an empty gallery.
 
 ### Randomness and timing
 
@@ -324,7 +378,8 @@ each id with the time; New atlas keeps them.
   lattices, landmark and find spots and the riddle's first candidate tile come from the seed) and in `rollCommission`, `rollBoard` and `rollHands` (called by
   `sellChart`; `returnToPort` also calls `makeIsland` for the next isle once this one is charted in full). Rivers, the road, features and their
   names, storms' targets, the rival's every move and the riddle's clues are worked out from the
-  tiles, without randomness. The art uses `rng()` and a sine hash; place names come from the island number
+  tiles, without randomness. The wonder's tile comes from the island number by a hash. The daily
+  isle's number and seed come from `dailyRand('mapmaker')` (the day), the far isles' are fixed. The art uses `rng()` and a sine hash; place names come from the island number
   and tile spots.
 - Animation time comes only from the `time` argument of `GameScene.update`. No timers or tweens.
 
@@ -334,6 +389,8 @@ each id with the time; New atlas keeps them.
 - `src/game/kinds.ts`: each isle kind's terrain mix and atlas colour.
 - `src/game/upgrades.ts`: upgrade costs and text keys.
 - `src/game/hands.ts`: the hands' names and card texts (as keys).
+- `src/game/wonders.ts`: the wonders, their isle kinds and their ground.
+- `src/game/runs.ts`: the far isles and the run supplies.
 - `src/i18n/`: every text on screen, in British English, German and US English.
 - `src/game/state.ts`: `GRID`, `BASE_SUPPLIES`, `PROVISIONS_STEP`, `INK_STEP`, `SELL_BACK`,
   `WRECK_SUPPLIES`, `ARTIFACT_VALUE`, `CAMP_COST`, `CAMP_REACH`, `DIG_COST`, `TREASURE_VALUE`,
@@ -371,6 +428,8 @@ has no audio imports.
   - `dig`, then `treasure` or `thud`, on a dig; `flap` and `peg` on Camp.
   - `horn` when the voyage ends (Return to port, or the last supplies spent); `swell` and `horn` on
     Set sail.
+  - `wonder` when a survey brings the isle's wonder into sight (first in `NEWS_ORDER`).
+  - `swell` and `horn` when a run sets out; `coins` on Back to the harbor at its end.
   - `coins` on Sell chart, plus `milestone` when the chart pays a milestone without binding a page.
   - `buy` for an upgrade, `hire` for a hand taken aboard (`ui('click')` for one left ashore),
     `flip` for a commission picked, `ui('click')` for the theme button, Keep charting and New
@@ -389,8 +448,9 @@ has no audio imports.
   keeps its top-left origin and never follows or zooms, so no `scrollingCamera` is needed. Art is
   painted at `HI` (at least `renderScale`) and texts at `Math.max(2, renderScale)`.
   `e2e/screens.spec.ts` at the root checks the game on five screens.
-- Difficulty scales one number: `BASE_SUPPLIES` in `src/game/state.ts` is `byDifficulty(16, 12, 9)`,
-  read at module load. Normal must stay 12: the playthrough expects it.
+- Difficulty scales two numbers: `BASE_SUPPLIES` in `src/game/state.ts` is `byDifficulty(16, 12, 9)`,
+  read at module load (Normal must stay 12: the playthrough expects it), and `EXPEDITION_SUPPLIES`
+  in `src/game/runs.ts` is `byDifficulty(40, 30, 24)`. The daily isle's 18 never changes.
 - With `settings.reduceMotion` on, the survey stations stop pulsing, value chips and notices don't float, and
   the viewshed shows its full ring, chips and total at once without the sweep or the gathering.
 - Keep the README's difficulty line and the root README's difficulty row in sync.
@@ -400,7 +460,9 @@ has no audio imports.
 - `src/main.ts` sets `window.game` in dev builds only.
 - `e2e/playthrough.spec.ts` reads `game.scene.getScene('Game')`: its `state` (JSON-copied) and
   `spots` (button centres by name: `return`, `camp`, `theme`, `sell`, `sail`, `buy-<upgrade>`,
-  `hire-<hand>`, `pick-<n>` for the board's rows, `keep` and `newAtlas` on the Royal Atlas page).
+  `hire-<hand>`, `pick-<n>` for the board's rows, `keep` and `newAtlas` on the Royal Atlas page,
+  `daily`, `wonders` and `expeditions` in the harbor's heading row, `far-<n>` and `back` on the far
+  isles, `back` on the gallery, `finish` at a run's end).
 - It seeds `Math.random`, owns the clock with 64 ms frames, and blocks WebGL so Phaser uses canvas.
 - It taps tile centres (from `MAP` 24,64 and 40px tiles) of `frontier` tiles the supplies can pay
   for, nearest the surveyor, until none is left; if the voyage is still open (a known riddle keeps
@@ -411,6 +473,8 @@ has no audio imports.
   tile values in `VALUE`, the survey costs in `COST`, `WRECK_SUPPLIES`, `ARTIFACT_VALUE`,
   `SELL_BACK`, `FEATURE_BONUS`, `WOOD_MIN`, `HANDS_OFFERED`, `MILESTONES`, the surveyable rule in
   its `frontier` (storms block, no camps, no Boatman) and the chartable rule in its `islePercent`.
+  It asserts the isle hides an unseen wonder on land, and after every survey that the wonder is
+  seen exactly when its tile and the tiles beside it are charted, with the gallery holding it then.
   It asserts the isle's features (a river and a road at least, each all of its terrain, named,
   paying `FEATURE_BONUS` a tile), each survey's cost and finds (wreck supplies, cave artifacts,
   storms off the frontier), that only hills and peaks reveal more than the tapped tile, that a
@@ -446,6 +510,12 @@ has no audio imports.
   `hand-<id>` in `HAND_ICONS` in `icons.ts`, apply it in `sim.ts` (`costOf`, `sightOf`,
   `canSurvey`, `artifactValue`...) and add it to the README's table. `HANDS_OFFERED` cards fill the
   right column (`HANDS_COLUMN`).
+- Add a wonder: add it to `WonderKind` and `WONDERS` in `wonders.ts` (name and line in the `i18n/`
+  files), draw it in `WONDER_ICONS` in `icons.ts`; the gallery lays out four to a row, two rows.
+  `wonderKind` cycles through a kind's wonders in `WONDERS` order.
+- Change the runs: `FAR_ISLES`, `EXPEDITION_SUPPLIES` and `DAILY_SUPPLIES` in `runs.ts` (a far isle's
+  number picks its kind, `kindOf`). Changing a far isle's number or seed makes its saved best refer to
+  another isle; the daily isle changes for everyone from the next day.
 - Add a feature kind: add it to `Feature['kind']` and `findFeatures` in `island.ts` (with a name
   list of keys, their names in the `i18n/` files), label it in `placeNames` if it should print, and add it to the test's feature check and
   the README's table.

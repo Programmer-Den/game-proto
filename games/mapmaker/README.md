@@ -34,6 +34,10 @@ alongside you, and binding one isle of every kind completes the Royal Atlas.
 | Buy | Buy an upgrade at the harbor |
 | Keep charting, New atlas | On the Royal Atlas page: carry on, or start over and try for a better best |
 | Set sail | Start the next voyage with full supplies (to a new isle once this one is charted) |
+| Daily isle | At the harbor: one voyage on today's isle, the same for everyone, scored by coins (once a day) |
+| Wonders | At the harbor: the wonder gallery |
+| Expeditions | At the harbor: the far isles, open once the Royal Atlas is bound; Set out sails to one |
+| Back to the harbor | At the end of the daily isle or an expedition: keep the score and go back to the atlas |
 
 1. **Surveying**: a blank tile next to a charted land tile carries a magenta survey station
    (pointing at one shows its cost). The sea can be charted but leads nowhere: you can't survey
@@ -185,6 +189,38 @@ new isle; one page of every kind completes the Royal Atlas.
 
 ![An archipelago, a volcanic isle and a jungle isle, charted in full](docs/screenshots/isle-kinds.webp)
 
+### Hidden wonders
+
+Every isle hides one wonder, two for each kind of isle: a waterfall or standing stones on a green
+isle, a sea arch or a coral lagoon on an archipelago, a smoking crater or hot springs on a volcanic
+isle, a giant tree or a lost temple in a jungle (the first four isles have the first of each, the
+next four the second). It shows on the map once its tile and every tile beside it are charted, and
+the first of each kind fills a frame of the wonder gallery, behind Wonders at the harbor. Wonders
+pay nothing; they are there to be found.
+
+![A waterfall coming into sight](docs/screenshots/wonder-on-map.webp)
+
+![The wonder gallery](docs/screenshots/wonder-gallery.webp)
+
+### The daily isle
+
+Daily isle at the harbor sails one voyage to today's isle, the same for every player on the same
+day (any kind of isle), with 18 supplies, no upgrades and no hand. It is scored by the coins its
+chart is worth, with sell-back and treasure. You get one try a day: the harbor button then shows
+today's score, and the record keeps the best and the days in a row.
+
+![The end of a daily isle](docs/screenshots/daily-isle.webp)
+
+### Expeditions
+
+Once the Royal Atlas is bound, Expeditions at the harbor opens the four far isles, one of each
+kind and the same for every player. An expedition is one voyage with 30 supplies for the whole
+isle and no restocking (the Spyglass comes along, Provisions add nothing), scored by the share of
+the isle it charts; each far isle keeps its best. Neither the daily isle nor an expedition changes
+the atlas, its coins or its isle, which wait at the harbor.
+
+![The far isles](docs/screenshots/expeditions.webp)
+
 ## Dark theme
 
 The sheet comes in two looks: the white survey sheet and a night sheet with light ink on dark paper
@@ -219,7 +255,9 @@ hub's card:
 
 ## Difficulty
 
-The hub's Difficulty setting changes the supplies of a voyage: 16 on Easy, 12 on Normal, 9 on Hard.
+The hub's Difficulty setting changes the supplies of a voyage: 16 on Easy, 12 on Normal, 9 on Hard,
+and an expedition's supplies: 40 on Easy, 30 on Normal, 24 on Hard. The daily isle always has 18,
+so every player sails it alike.
 
 ## Code layout
 

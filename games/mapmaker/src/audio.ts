@@ -26,6 +26,8 @@ export const sfx = sounds({
   thunder: { wave: 'noise', freq: 140, to: 40, length: 0.8, attack: 0.02, volume: 0.4, gap: 300 },
   /** The ruins give up the treasure riddle. */
   riddle: { wave: 'triangle', freq: 587, arp: [0, 3, 7, 6], arpStep: 0.12, length: 0.6, volume: 0.35 },
+  /** An isle's wonder comes into sight. */
+  wonder: { wave: 'triangle', freq: 523, arp: [0, 7, 12, 16, 19], arpStep: 0.1, length: 0.8, volume: 0.32 },
   /** A river, road or wood charted whole. */
   feature: { wave: 'sine', freq: 880, arp: [0, 4, 7, 12], arpStep: 0.07, length: 0.42, volume: 0.3 },
   /** A spade in the ground, then the treasure or nothing. */

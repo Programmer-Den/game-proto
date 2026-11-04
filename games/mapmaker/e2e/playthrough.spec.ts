@@ -58,6 +58,8 @@ interface GameState {
   isleStart: number;
   atlas: { island: number; kind: string; voyages: number; tiles: number }[];
   camps: Point[];
+  wonder: { at: Point; kind: string; seen: boolean } | null;
+  wonders: { kind: string; island: number }[];
   storms: Point[];
   artifacts: number;
   treasure: number;
@@ -265,7 +267,17 @@ test('plays the first voyage', async ({ page }, testInfo) => {
     hand: null,
     rival: null,
     royal: null,
+    wonders: [],
   });
+  // The isle hides one wonder on its land, unseen until its tile and the four beside it are charted.
+  expect(s.wonder, 'the isle hides a wonder').toMatchObject({ seen: false });
+  expect(['sea', 'port']).not.toContain(at(s, s.wonder!.at.x, s.wonder!.at.y).terrain);
+  const wonderInSight = () =>
+    [[0, 0], [0, -1], [1, 0], [0, 1], [-1, 0]].every(([dx, dy]) => {
+      const x = s.wonder!.at.x + dx;
+      const y = s.wonder!.at.y + dy;
+      return !inGrid(x, y) || at(s, x, y).revealed;
+    });
   expect(at(s, s.port.x, s.port.y)).toEqual({ terrain: 'port', revealed: true });
   // The isle's features: every river, road and wood (of WOOD_MIN or more forest tiles) is one, named,
   // paying FEATURE_BONUS a tile once charted whole. A green isle has at least a river and a road.
@@ -325,6 +337,9 @@ test('plays the first voyage', async ({ page }, testInfo) => {
     if (lookout && fogAround) expect(gained, 'a hill or peak reveals the fog around it').toBeGreaterThan(1);
     if (!lookout) expect(gained, 'only hills and peaks reveal more').toBe(1);
     if (terrain !== 'sea') expect(s.surveyor, 'the surveyor walks onto the tile').toEqual(target);
+    // The wonder shows once it is in sight, and goes into the wonder gallery.
+    expect(s.wonder!.seen, 'the wonder shows once its neighbours are charted').toBe(wonderInSight());
+    expect(s.wonders).toEqual(s.wonder!.seen ? [{ kind: s.wonder!.kind, island: 1 }] : []);
     await play(400, async () => false);
     if (surveys === 6) await snap('1-surveying');
   }

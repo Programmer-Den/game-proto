@@ -3,6 +3,7 @@ import { HANDS, type Hand } from '../game/hands';
 import { KINDS, type IsleKind } from '../game/kinds';
 import type { Terrain } from '../game/terrain';
 import type { UpgradeId } from '../game/upgrades';
+import { WONDER_IDS, type WonderKind } from '../game/wonders';
 import { TERRAINS, tintOf } from './map';
 import { BLUE, BROWN, GOLD, GOLD_DARK, INK, MAGENTA, RULE, SHEET, TRACK, TREE, bake, circle, poly, rrect, star, theme, type Ctx } from './paint';
 
@@ -365,7 +366,165 @@ const MARKS: Record<string, (ctx: Ctx) => void> = {
   },
 };
 
+
+/**
+ * The wonders (`wonder-<kind>`, 32 px): a small picture in a gold ring, drawn on the map once a
+ * wonder is seen and in the wonder gallery; `wonder-unseen` is the gallery's empty frame.
+ */
+const STONE = '#9aa3a8';
+const WATER = '#5aa6d6';
+const LEAF = '#3f8f3a';
+const WONDER_ICONS: Record<WonderKind, (ctx: Ctx) => void> = {
+  // White water falling over a cliff into a pool.
+  waterfall: (ctx) => {
+    poly(ctx, [[6, 24], [9, 9], [14, 7], [14, 24]], STONE, INK, 1);
+    poly(ctx, [[18, 24], [18, 7], [23, 9], [26, 24]], STONE, INK, 1);
+    ctx.fillStyle = WATER;
+    ctx.fillRect(14, 7, 4, 17);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(15, 9, 1, 13);
+    ctx.beginPath();
+    ctx.ellipse(16, 25, 8, 2.5, 0, 0, Math.PI * 2);
+    ctx.fillStyle = WATER;
+    ctx.fill();
+  },
+  // A rock arch over the waves.
+  arch: (ctx) => {
+    ctx.beginPath();
+    ctx.moveTo(6, 24);
+    ctx.lineTo(8, 11);
+    ctx.quadraticCurveTo(16, 4, 24, 11);
+    ctx.lineTo(26, 24);
+    ctx.lineTo(21, 24);
+    ctx.lineTo(20, 15);
+    ctx.quadraticCurveTo(16, 11, 12, 15);
+    ctx.lineTo(11, 24);
+    ctx.closePath();
+    ctx.fillStyle = '#c9b48d';
+    ctx.fill();
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.strokeStyle = WATER;
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(5, 25.5);
+    ctx.quadraticCurveTo(10.5, 23, 16, 25.5);
+    ctx.quadraticCurveTo(21.5, 28, 27, 25.5);
+    ctx.stroke();
+  },
+  // A cone with a glowing crater and a plume of smoke.
+  volcano: (ctx) => {
+    poly(ctx, [[5, 25], [13, 12], [19, 12], [27, 25]], '#8a5a3c', INK, 1);
+    ctx.fillStyle = GOLD;
+    ctx.fillRect(13, 11, 6, 2);
+    ctx.fillStyle = '#7c868c';
+    for (const [x, y, r] of [[15, 8, 2.5], [18, 5.5, 3], [14, 4, 2]] as const) {
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  },
+  // A wide old tree with a heavy crown.
+  tree: (ctx) => {
+    ctx.fillStyle = BROWN;
+    ctx.fillRect(14, 15, 4, 11);
+    ctx.fillStyle = LEAF;
+    for (const [x, y, r] of [[10, 13, 5], [16, 9, 6], [22, 13, 5], [16, 15, 5]] as const) {
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(8, 26);
+    ctx.lineTo(24, 26);
+    ctx.stroke();
+  },
+  // Three standing stones and a lintel.
+  stones: (ctx) => {
+    poly(ctx, [[6, 25], [7, 13], [11, 13], [11, 25]], STONE, INK, 1);
+    poly(ctx, [[14, 25], [14, 10], [18, 10], [18, 25]], STONE, INK, 1);
+    poly(ctx, [[21, 25], [21, 13], [25, 13], [26, 25]], STONE, INK, 1);
+    poly(ctx, [[12, 9], [20, 9], [20, 7], [12, 7]], STONE, INK, 1);
+  },
+  // A ring of reef round still blue water.
+  lagoon: (ctx) => {
+    ctx.beginPath();
+    ctx.ellipse(16, 17, 11, 8, 0, 0, Math.PI * 2);
+    ctx.fillStyle = '#e9d9a8';
+    ctx.fill();
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(16, 17, 7, 4.5, 0, 0, Math.PI * 2);
+    ctx.fillStyle = '#8fd3e6';
+    ctx.fill();
+    ctx.fillStyle = '#e8829c';
+    for (const [x, y] of [[8, 13], [24, 20], [11, 22]] as const) {
+      ctx.beginPath();
+      ctx.arc(x, y, 1.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  },
+  // A steaming pool among rocks.
+  springs: (ctx) => {
+    ctx.beginPath();
+    ctx.ellipse(16, 22, 10, 4, 0, 0, Math.PI * 2);
+    ctx.fillStyle = WATER;
+    ctx.fill();
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.strokeStyle = '#9aa3a8';
+    ctx.lineWidth = 1.4;
+    for (const x of [11, 16, 21]) {
+      ctx.beginPath();
+      ctx.moveTo(x, 18);
+      ctx.bezierCurveTo(x - 3, 15, x + 3, 12, x, 8);
+      ctx.stroke();
+    }
+  },
+  // A stepped temple under vines.
+  temple: (ctx) => {
+    poly(ctx, [[5, 25], [27, 25], [24, 19], [8, 19]], STONE, INK, 1);
+    poly(ctx, [[9, 19], [23, 19], [21, 13], [11, 13]], STONE, INK, 1);
+    poly(ctx, [[12, 13], [20, 13], [18, 8], [14, 8]], STONE, INK, 1);
+    ctx.fillStyle = INK;
+    ctx.fillRect(15, 21, 2, 4);
+    ctx.strokeStyle = LEAF;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(8, 19);
+    ctx.quadraticCurveTo(10, 23, 9, 25);
+    ctx.moveTo(21, 13);
+    ctx.quadraticCurveTo(24, 16, 23, 19);
+    ctx.stroke();
+  },
+};
+
+function wonderIcon(ctx: Ctx, draw: ((ctx: Ctx) => void) | null) {
+  circle(ctx, 16, 16, 15, SHEET, null);
+  if (draw) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(16, 16, 14, 0, Math.PI * 2);
+    ctx.clip();
+    draw(ctx);
+    ctx.restore();
+    circle(ctx, 16, 16, 15, null, GOLD_DARK, 1.6);
+  } else {
+    ctx.setLineDash([3, 2.5]);
+    circle(ctx, 16, 16, 14.5, null, RULE, 1.2);
+    ctx.setLineDash([]);
+  }
+}
+
 export function bakeIcons(scene: Phaser.Scene) {
+  for (const id of WONDER_IDS) bake(scene, `wonder-${id}`, 32, 32, (ctx) => wonderIcon(ctx, WONDER_ICONS[id]));
+  bake(scene, 'wonder-unseen', 32, 32, (ctx) => wonderIcon(ctx, null));
   for (const [id, draw] of Object.entries(UPGRADE_ICONS)) bake(scene, `icon-${id}`, 24, 24, draw);
   for (const id of Object.keys(HANDS) as Hand[]) bake(scene, `hand-${id}`, 24, 24, HAND_ICONS[id]);
   for (const t of TERRAINS) bake(scene, `swatch-${t}`, 16, 16, (ctx) => swatch(ctx, t));
