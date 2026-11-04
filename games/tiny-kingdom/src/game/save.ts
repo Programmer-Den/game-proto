@@ -1,9 +1,13 @@
-// The best final score, the crowns won from decrees, the island of the day's best and the
-// campaign's stars are saved; the board is never saved.
+// The best final score, the crowns won from decrees, the island of the day's best, the
+// campaign's stars, the best island chain, the feats won and the tile skin picked are saved; the
+// board is never saved.
 const BEST_KEY = 'tiny-kingdom-best';
 const CROWNS_KEY = 'tiny-kingdom-crowns';
 const DAILY_KEY = 'tiny-kingdom-daily';
 const STARS_KEY = 'tiny-kingdom-stars';
+const CHAIN_KEY = 'tiny-kingdom-chain';
+const FEATS_KEY = 'tiny-kingdom-feats';
+const SKIN_KEY = 'tiny-kingdom-skin';
 
 function read(key: string) {
   try {
@@ -50,3 +54,33 @@ export function loadStars(): number[] {
   }
 }
 export const saveStars = (stars: number[]) => save(STARS_KEY, JSON.stringify(stars));
+
+/** The best island chain finished: how many islands it had and their final scores in all. */
+export interface BestChain {
+  links: number;
+  total: number;
+}
+export function loadChain(): BestChain {
+  try {
+    const saved = JSON.parse(read(CHAIN_KEY) ?? 'null');
+    return { links: Number(saved?.links) || 0, total: Number(saved?.total) || 0 };
+  } catch {
+    return { links: 0, total: 0 };
+  }
+}
+export const saveChain = (chain: BestChain) => save(CHAIN_KEY, JSON.stringify(chain));
+
+/** The ids of the kingdom feats won (see `feats.ts`). */
+export function loadFeats(): string[] {
+  try {
+    const saved = JSON.parse(read(FEATS_KEY) ?? '[]');
+    return Array.isArray(saved) ? saved.filter((id) => typeof id === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+export const saveFeats = (feats: string[]) => save(FEATS_KEY, JSON.stringify(feats));
+
+/** The tile skin picked on the feats card, or '' for the painted classic set. */
+export const loadSkin = () => read(SKIN_KEY) ?? '';
+export const saveSkin = (skin: string) => save(SKIN_KEY, skin);

@@ -669,3 +669,113 @@ export function crown(x: number, y: number, s: number, col = T.yellow) {
   ctx.lineWidth = 2;
   ctx.stroke();
 }
+
+/** A temple: a stepped beech base, four cream columns and a navy pediment with a gold finial. */
+export function temple(x: number, y: number, s = 1) {
+  shadowBlob(x + 12 * s, y + 30 * s, 46 * s, 12 * s, 0.38);
+  const w = 56 * s;
+  const x0 = x - w / 2 - 3 * s;
+  box(x0 - 4 * s, y + 18 * s, w + 8 * s, 10 * s, 9 * s, T.beech);
+  box(x0, y + 10 * s, w, 9 * s, 8 * s, lit(T.beech, 0.15));
+  for (let i = 0; i < 4; i++) {
+    const cx = x0 + 6 * s + (i * (w - 18 * s)) / 3;
+    const g = ctx.createLinearGradient(cx, 0, cx + 7 * s, 0);
+    g.addColorStop(0, '#fffaf0');
+    g.addColorStop(1, '#cfc4ae');
+    rrect(cx, y - 22 * s, 7 * s, 33 * s, 2 * s);
+    ctx.fillStyle = g;
+    ctx.fill();
+  }
+  box(x0 - 2 * s, y - 28 * s, w + 4 * s, 7 * s, 8 * s, T.cream);
+  poly(
+    [
+      [x0 - 6 * s, y - 27 * s],
+      [x0 + w + 6 * s, y - 27 * s],
+      [x0 + w / 2, y - 48 * s],
+    ],
+    T.navy,
+  );
+  poly(
+    [
+      [x0 + w + 6 * s, y - 27 * s],
+      [x0 + w + 6 * s + 8 * s, y - 33 * s],
+      [x0 + w / 2 + 8 * s, y - 54 * s],
+      [x0 + w / 2, y - 48 * s],
+    ],
+    dark(T.navy, 0.3),
+  );
+  ball(x0 + w / 2 + 2 * s, y - 52 * s, 5 * s, T.yellow);
+}
+
+/** A lighthouse: a tapered tower in red and cream bands, a glowing lamp room and a navy cap. */
+export function lighthouse(x: number, y: number, s = 1) {
+  shadowBlob(x + 14 * s, y + 30 * s, 36 * s, 11 * s, 0.4);
+  const base = y + 28 * s;
+  const top = y - 40 * s;
+  const wb = 34 * s;
+  const wt = 20 * s;
+  const band = 5;
+  for (let i = 0; i < band; i++) {
+    const y1 = base - ((base - top) * i) / band;
+    const y2 = base - ((base - top) * (i + 1)) / band;
+    const w1 = wb - ((wb - wt) * i) / band;
+    const w2 = wb - ((wb - wt) * (i + 1)) / band;
+    const col = i % 2 ? T.cream : T.red;
+    const g = ctx.createLinearGradient(x - w1 / 2, 0, x + w1 / 2, 0);
+    g.addColorStop(0, lit(col, 0.12));
+    g.addColorStop(0.35, lit(col, 0.25));
+    g.addColorStop(1, dark(col, 0.25));
+    ctx.beginPath();
+    ctx.moveTo(x - w1 / 2, y1);
+    ctx.lineTo(x - w2 / 2, y2);
+    ctx.lineTo(x + w2 / 2, y2);
+    ctx.lineTo(x + w1 / 2, y1);
+    ctx.closePath();
+    ctx.fillStyle = g;
+    ctx.fill();
+  }
+  ctx.save();
+  shadow(14, 0, 0, 'rgba(255,220,90,0.9)');
+  rrect(x - 11 * s, top - 14 * s, 22 * s, 14 * s, 3 * s);
+  ctx.fillStyle = T.yellow;
+  ctx.fill();
+  ctx.restore();
+  rrect(x - 14 * s, top - 2 * s, 28 * s, 5 * s, 2 * s);
+  ctx.fillStyle = T.ink;
+  ctx.fill();
+  poly(
+    [
+      [x - 14 * s, top - 13 * s],
+      [x + 14 * s, top - 13 * s],
+      [x, top - 28 * s],
+    ],
+    T.navy,
+  );
+  ball(x, top - 29 * s, 3.5 * s, T.yellow);
+}
+
+/** An orchard: three peg trees hung with red and orange fruit, behind a low beech fence. */
+export function orchard(x: number, y: number, s = 1) {
+  const trees: [number, number, number][] = [
+    [-22, -2, 0.85],
+    [20, -8, 0.9],
+    [0, 20, 0.95],
+  ];
+  for (const [tx, ty, k] of trees) {
+    peg(x + tx * s, y + ty * s, k * s);
+    for (const [fx, fy, col] of [
+      [-8, -34, T.red],
+      [7, -28, '#e08a2a'],
+      [2, -40, T.red],
+    ] as const)
+      ball(x + (tx + fx * k) * s, y + (ty + fy * k) * s, 3.6 * k * s, col);
+  }
+  for (const px of [-34, -12, 10, 32]) {
+    rrect(x + px * s, y + 22 * s, 5 * s, 14 * s, 2 * s);
+    ctx.fillStyle = T.beech;
+    ctx.fill();
+  }
+  rrect(x - 36 * s, y + 26 * s, 74 * s, 4 * s, 2 * s);
+  ctx.fillStyle = dark(T.beech, 0.15);
+  ctx.fill();
+}

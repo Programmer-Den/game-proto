@@ -2,9 +2,9 @@ import type { TextKey } from '../i18n';
 import { SPECIALS, seeded, type Building, type Special } from './tiles';
 
 // Royal gifts: reaching a round's goal offers a choice of two, shown in the panel all round long.
-// The windmill, the market, the harbor and the lumber camp are won this way: each is a new tile.
+// The windmill, the market, the harbor, the lumber camp and the temple are won this way: each is a new tile.
 
-export const GIFTS = ['towers', 'houses', 'farms', 'windmill', 'windmills', 'market', 'markets', 'harbor', 'harbors', 'lumber', 'lumbers'] as const;
+export const GIFTS = ['towers', 'houses', 'farms', 'windmill', 'windmills', 'market', 'markets', 'harbor', 'harbors', 'lumber', 'lumbers', 'temple', 'temples'] as const;
 export type Gift = (typeof GIFTS)[number];
 
 export interface GiftInfo {
@@ -30,11 +30,13 @@ export const GIFT_INFO: Record<Gift, GiftInfo> = {
   harbors: { label: 'harborsGift', icon: 'harbor', desc: 'harborsDesc', tiles: { harbor: 2 } },
   lumber: { label: 'lumberGift', icon: 'lumber', desc: 'lumberDesc', tiles: { lumber: 2 } },
   lumbers: { label: 'lumbersGift', icon: 'lumber', desc: 'lumbersDesc', tiles: { lumber: 2 } },
+  temple: { label: 'templeGift', icon: 'temple', desc: 'templeDesc', tiles: { temple: 2 } },
+  temples: { label: 'templesGift', icon: 'temple', desc: 'templesDesc', tiles: { temple: 2 } },
 };
 
 /** The gift that first brings each special building, and the one that brings more of it. */
-const NEW: Record<Special, Gift> = { windmill: 'windmill', market: 'market', harbor: 'harbor', lumber: 'lumber' };
-const MORE: Record<Special, Gift> = { windmill: 'windmills', market: 'markets', harbor: 'harbors', lumber: 'lumbers' };
+const NEW: Record<Special, Gift> = { windmill: 'windmill', market: 'market', harbor: 'harbor', lumber: 'lumber', temple: 'temple' };
+const MORE: Record<Special, Gift> = { windmill: 'windmills', market: 'markets', harbor: 'harbors', lumber: 'lumbers', temple: 'temples' };
 
 /**
  * The two gifts offered for reaching round `round`'s goal on island `island`, with `unlocked` the

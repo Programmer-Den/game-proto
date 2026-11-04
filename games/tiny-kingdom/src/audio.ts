@@ -113,5 +113,8 @@ export const PLACE_PITCH: Record<Building, number> = {
   market: 1.05,
   harbor: 0.9,
   lumber: 0.95,
+  temple: 1.15,
+  lighthouse: 1.25,
+  orchard: 0.9,
   road: 0.75,
 };

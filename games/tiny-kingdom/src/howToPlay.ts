@@ -38,7 +38,11 @@ const en: HowToPlay = {
     },
     {
       input: 'Island button',
-      action: 'Pick a campaign level, the island of the day, or type an island number',
+      action: 'Pick a campaign level, the island of the day, or type an island number; Feats there shows the feats and tile skins',
+    },
+    {
+      input: 'Sail on',
+      action: 'Once a kingdom is finished, settle the next island of its chain',
     },
   ],
   loop: [
@@ -56,11 +60,14 @@ const en: HowToPlay = {
     'Each season doubles the score of some buildings when you place them, like farms at the Harvest festival.',
     'From round 3 an omen warns of a flood or a storm next round, so you have a round to prepare.',
     'Out of room? Merging two houses into a manor frees a cell.',
+    'Harbours also go on the coast and score each side facing the sea; a temple scores more the further it stands from towers.',
+    'Sail on after a kingdom to a neighbouring island with the sea cut into its shape and a building found only there. Your harbours ship tiles to it, and its harbours pay +2 each at the end.',
+    'Kingdom feats, like a farm with 3 lakes beside it, unlock new paints for the tiles.',
   ],
 };
 
 /** US English only changes the spelling. */
-const us = (text: string) => text.replace(/neighbour/g, 'neighbor');
+const us = (text: string) => text.replace(/neighbour/g, 'neighbor').replace(/arbour/g, 'arbor');
 const enUS: HowToPlay = {
   goal: us(en.goal),
   controls: en.controls.map((c) => ({ input: us(c.input), action: us(c.action) })),
@@ -105,7 +112,11 @@ const de: HowToPlay = {
     },
     {
       input: 'Insel-Taste',
-      action: 'Ein Kampagnenlevel, die Insel des Tages oder eine Inselnummer wählen',
+      action: 'Ein Kampagnenlevel, die Insel des Tages oder eine Inselnummer wählen; dort zeigt Taten die Taten und Plättchenfarben',
+    },
+    {
+      input: 'Weitersegeln',
+      action: 'Nach einem fertigen Königreich die nächste Insel seiner Kette besiedeln',
     },
   ],
   loop: [
@@ -123,6 +134,9 @@ const de: HowToPlay = {
     'Jede Jahreszeit verdoppelt die Punkte mancher Gebäude beim Setzen, etwa Äcker beim Erntefest.',
     'Ab Runde 3 warnt ein Omen vor einer Flut oder einem Sturm in der nächsten Runde, so bleibt dir eine Runde zur Vorbereitung.',
     'Kein Platz mehr? Zwei Häuser zu einem Herrenhaus zu vereinen macht ein Feld frei.',
+    'Häfen stehen auch an der Küste und zählen jede Seite zum Meer; ein Tempel bringt mehr, je weiter er von Türmen steht.',
+    'Segle nach einem Königreich weiter zu einer Nachbarinsel, in die das Meer schneidet, mit einem Gebäude, das es nur dort gibt. Deine Häfen schicken ihr Plättchen, und ihre Häfen bringen am Ende je +2.',
+    'Taten des Königreichs, etwa ein Acker mit 3 Seen daneben, schalten neue Farben für die Plättchen frei.',
   ],
 };
 

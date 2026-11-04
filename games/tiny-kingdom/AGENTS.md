@@ -8,7 +8,7 @@ to the game, per the root AGENTS.md.
 
 Tiny Kingdom is a turn-based tile-placing puzzle on a 10x7 island. Each turn draws three tiles
 from a pouch of farms, houses, towers and roads (and, once won as gifts, windmills, markets,
-harbors and lumber camps); the player places one on grass and the others go back. Each building
+harbors, lumber camps and temples); the player places one on grass and the others go back. Each building
 scores from its neighbours and the score is the whole board's plus bonuses (decrees and seasons).
 Two houses side by side can merge into a manor, a lumber camp can clear a wood, a market can trade
 tiles. Each round has a royal decree (a side goal paying +8 and a crown) and a season; from round 3
@@ -16,10 +16,41 @@ an omen warns of a flood or storm the next round brings. Every island has a cast
 buildings joined to it by a chain of buildings and roads pay +1 each when the kingdom is finished.
 Reaching the round's goal refills the pouch, raises the goal and offers a choice of two gifts. The
 island is random, typed in by its number, the island of the day, or one of eight campaign levels
-scored with stars.
+scored with stars. A finished kingdom can sail on to the next island of its chain, cut into by the
+sea, with a building found only there (lighthouse or orchard), cargo from the last island's harbours
+and a trade bonus for its own. Seven kingdom feats unlock tile skins.
 
 Implemented today:
 
+- The coast (`seaSides` in `tiles.ts`): a cell's sides off the board or on a `'sea'` cell face the
+  sea. The harbour `fits` beside a lake or the sea and scores its sea sides in its `base` (so the
+  neighbour links still add up); the lighthouse only fits on the coast.
+- The temple (`'temple'`, the fifth of `SPECIALS`, won after the lumber camp with the `temple` /
+  `temples` gifts): `templeWorth` is one per cell between it and the nearest tower (Chebyshev
+  distance minus one) up to `TEMPLE_MAX` (4), and 4 with no tower; all of it is `base`. A tower
+  placed up to 4 cells away lowers it, so `previewPlacement` checks every building on the board for
+  a change (not just the eight around), and the far temple shows as a coral link.
+- Island chains (`chainMap`, `nextIsland`, `nativeFor` in `tiles.ts`, `nextKingdom` in `state.ts`):
+  the game-over card's **Sail on** (`sailOn`) starts `nextKingdom(state)`: island
+  `nextIsland(island, link)` as mode `'chain'` with `link + 1`, the chain's score so far
+  (`chainScore`) and `cargo`, one tile per harbour on the finished board (up to `CARGO_MAX`, 4) of
+  its `unlocked` specials in order (farms when none). `newGame` lays a chain island with
+  `startingGrid(island, link)`: from link 2, `chainMap` cuts two seeded corners (triangles of 3 or
+  6 cells) and a bay (2 to 4 cells along the top or bottom, one deeper) out of grass only, shrinking
+  the cut until `fairIsland` passes; `' '` in the map is `'sea'`. Its `native` (`nativeFor`: the
+  orchard on odd links, the lighthouse on even ones) gets `NATIVE_FIRST` (2) tiles in the first
+  pouch and `NATIVE_ROUND` (1) each round (`settle`). `end` pays `trade` = `TRADE_BONUS` (2) per
+  harbour (`harbourCount`) on a chain island. The island button reads "Chain N: island", the
+  panel's bottom line "Chain so far", `announceChain` shows a banner as the island starts, the game
+  over adds the trade and chain lines, and `gameEnded` saves the longest chain (`saveChain`).
+- Kingdom feats (`src/game/feats.ts`): `FEATS`, seven board goals, each with the `Skin` it unlocks;
+  `newFeats(state, won)` lists the ones done and not yet won. The scene's `checkFeats` runs at the
+  end of `refresh`, saves them (`saveFeats`) and shows the feat board (`featToast`, a walnut board at
+  the top of the tray) with `ui('coin')`. The islands card's **Feats** button (`FEATS_BUTTON`) opens
+  the feats card (`createFeatsCard`, `FEATS_CARD`): a row per feat and a swatch per skin in `SKINS`;
+  `pickSkin` paints the board in an open one (`skinOpen`) and saves it (`saveSkin`). Skins only
+  change the grass, plain and road tiles: `useSkin` in `textures.ts` bakes `tile-<kind>-<skin>` from
+  `SKIN_GREEN` the first time and `tileKey` names them from then on.
 - The hand (`HAND` = 3): `drawHand` draws three tiles from the pouch (which still counts them)
   with a generator seeded by the island and `draws`, so a kingdom's hands never touch
   `Math.random` and an undone placement redraws the same hand; when no drawn tile has room but a
@@ -144,7 +175,7 @@ Implemented today:
 - Royal gifts (`src/game/gifts.ts`): `state.gifts` is the pair on offer for reaching `goal`, shown
   in the panel's gift row as blue chips ("Gift at 20:"). `giftsFor` gives round 1 +2 Towers or
   Windmill, then the next special not won yet (in `SPECIALS` order) plus one of +2 Towers / +3
-  Houses / +3 Farms, then, once all four are won, two of the tile packs and +2 of each special
+  Houses / +3 Farms, then, once all five are won, two of the tile packs and +2 of each special
   (seeded by island and round).
   Reaching the goal sets `phase` to `'gift'` and counts `giftsDue` (one per goal; one placement
   can reach several); `chooseGift` adds the gift's tiles, adds a new special to `unlocked`,
@@ -164,7 +195,7 @@ Implemented today:
 - Trophies (`src/trophies/`, `shared/trophies.ts`): ten, listed in `trophies/index.ts` and handed to
   `setupGame(game, { howToPlay, trophies })`. Bronze: `firstCrown` (a decree fulfilled, `crowns >= 1`),
   `firstManor` (a manor on the board), `firstTrade` (a market trade, `tradedIn > 0`) and `allGifts`
-  (all four `SPECIALS` in `unlocked`). Silver: `roundEight` (round 8 reached), `longChain` (40
+  (all five `SPECIALS` in `unlocked`). Silver: `roundEight` (round 8 reached), `longChain` (40
   buildings joined to the castle at once, `joinedCount`) and `tenCrowns` (10 crowns in all). Gold:
   `bigKingdom` (a kingdom finished with 350), `threeStars` (three stars on a campaign level) and
   `campaign` (hidden: a star on all eight levels), the last two read from `loadStars` with a
@@ -196,6 +227,11 @@ Implemented today:
 Missing or rough:
 
 - No title screen or menu. The sound has not had a listen on real speakers yet; retune `src/audio.ts` by ear.
+- The campaign's star scores were set before harbours scored the coast and the temple joined the
+  gifts, so they may now be a little easy; retune `LEVELS` from a greedy run if so.
+- Chain islands score about 15% less than a first island for a greedy bot (less grass), and a
+  greedy bot builds one to three harbours, so the cargo and trade stay small. The chain is not
+  saved mid-way: a reload starts a new kingdom (only the longest chain is kept).
 - The campaign's star scores come from a greedy bot (`previewPlacement(...).gained` for every kind in the hand and
   every cell, merging when it gains, taking the second gift, the castle bonus included), not from
   human play; retune `LEVELS` if they feel off. The bot never trades or clears woods.
@@ -218,6 +254,10 @@ Missing or rough:
   scene.refresh()`), then real hovers, taps and keys. The cover, the island shots, `windmill`,
   `new-buildings`, the season, manor and islands-card shots predate the hand, the castle and the
   omen strip, so their panels look older.
+- `chain-island`, `temple-preview`, `chain-over` and `feats-card` were taken the same way: island
+  4821 started with `scene.start(4821, { mode: 'chain', link: 2, ... })`, greedy moves, then the
+  hand set to a harbour, a lighthouse and a temple and real hovers; the feats card with
+  `scene.feats` set and `pickSkin('spring')`.
 - `docs/screenshots/favicon.webp` is an older shot no README links.
 - `docs/screenshots/german-links.webp` is the playthrough's `3-links` shot from a run with the
   browser's locale set to `de-DE` (a copy of `playwright.config.ts` with `locale: 'de-DE'`).
@@ -252,16 +292,19 @@ File map (`src/`):
   (`refreshBoardMarks`), popups and panel in `refresh`; saves at game over (`gameEnded`).
 - `scenes/layout.ts`: `VIEW`, `GRID`, `TRAY`, `DECREE`, `PANEL`, `TITLE`, `ISLAND_BUTTON`,
   `GOAL_BAR`, `GIFT_ROW`, `SEASON`, `TILE_BUTTONS` (three 60px slots), `POUCH_LINE`, `OMEN`,
-  `UNDO_BUTTON`, `GIFT_CARD`, `TRADE_CARD`, `BUTTON`, `ISLANDS_CARD`, `UI_DEPTH`, `FONT` and
-  `cellCentre`.
-- `game/tiles.ts`: `BUILDINGS` (farm, house, tower, windmill, market, harbor, lumber, road),
-  `SPECIALS` (the four gift buildings), the `Building`, `Special`, `Structure` (a building or
-  `'manor'`), `Terrain` (grass, lake, forest, castle) and `Cell` types, `INFO` (the `TextKey`s of
+  `UNDO_BUTTON`, `GIFT_CARD`, `TRADE_CARD`, `BUTTON`, `ISLANDS_CARD`, `FEATS_BUTTON`, `FEATS_CARD`,
+  `GAME_OVER` (the 700x260 card and its three buttons), `UI_DEPTH`, `FONT` and `cellCentre`.
+- `game/tiles.ts`: `BUILDINGS` (farm, house, tower, windmill, market, harbor, lumber, temple,
+  lighthouse, orchard, road), `SPECIALS` (the five gift buildings), `NATIVES` (the chain islands'
+  own buildings), the `Building`, `Special`, `Native`, `Structure` (a building or `'manor'`),
+  `Terrain` (grass, lake, forest, castle, sea) and `Cell` types, `seaSides`, `nextIsland`,
+  `nativeFor`, `chainMap`, `INFO` (the `TextKey`s of
   each one's name, rule and count, such as "3 farms"), `isBuilding`, `isBuilt`, `scores`, `isHome`, `MAP_SIZE`, `ISLANDS`,
   `SIDES`, `AROUND`, `islandMap` (lakes, woods, then the castle, redrawn until `fairIsland`), `seeded` (mulberry32),
   `randomIsland` and `startingGrid`.
 - `game/state.ts`: `GameState`, `Snapshot`, `Share`, `Preview`, `Placed`, `FIRST_POUCH`,
-  `ROUND_POUCH`, `HAND`, `TRADE_GIVE`, `goalFor`, `season`, `newGame(best, crowns, island?,
+  `ROUND_POUCH`, `HAND`, `TRADE_GIVE`, `NATIVE_FIRST`, `NATIVE_ROUND`, `TRADE_BONUS`, `CARGO_MAX`,
+  `TEMPLE_MAX`, `templeWorth`, `harbourCount`, `nextKingdom`, `goalFor`, `season`, `newGame(best, crowns, island?,
   kingdom?)`, `inHand`, `cellParts`, `cellScore`, `boardScore`, `canPlace(s, col, row, kind?)`,
   `previewPlacement`, `select`, `place`, `canClear`, `previewClear`, `clear`,
   `canTrade`, `tradeGives`, `tradeTakes`, `trade`, `canClearAny`, `canMerge`, `mergeable`, `previewMerge`, `merge`, `anyPlace`,
@@ -281,20 +324,23 @@ File map (`src/`):
 - `game/gifts.ts`: `GIFTS`, `Gift`, `GIFT_INFO` (label and line as `TextKey`s, icon, tiles),
   `giftsFor` and `newSpecial`.
 - `game/save.ts`: `loadBest`, `saveBest`, `loadCrowns`, `saveCrowns`, `loadDailyBest`,
-  `saveDailyBest`, `loadStars` and `saveStars`.
+  `saveDailyBest`, `loadStars`, `saveStars`, `loadChain`, `saveChain` (`BestChain`), `loadFeats`,
+  `saveFeats`, `loadSkin` and `saveSkin`.
+- `game/feats.ts`: `SKINS`, `Skin`, `Feat`, `FEATS`, `newFeats` and `skinOpen`.
 - `art/wood.ts`: the toolkit: `RES` and `setArtRes` (texture pixels per view pixel, from
   `sharpRes`), `bake` (a canvas `RES` times its view size, painted in art units, added with
   `textures.addCanvas`), `addArt` (an image of a baked texture scaled by `1 / RES`, so it shows at
   view size), `shadow` (canvas shadows turned from art units into canvas pixels), `rrect`, `poly`,
   `circle`, `grain`, `tile` (a painted block), `walnut`, `shadowBlob`, `ball`, the palette `T`, the
   seeded `rnd` / `reseed`, and the painters `peg`, `house`, `tower`, `windmill`, `stripes` and
-  `crown`, ported from the mockup's `woodtoy.js`, plus `manor`, `market`, `harbor` and `lumber`
-  in the same style.
+  `crown`, ported from the mockup's `woodtoy.js`, plus `manor`, `market`, `harbor`, `lumber`,
+  `temple`, `lighthouse` and `orchard` in the same style.
 - `art/textures.ts`: `bakeTextures` (every texture, listed at the top of the file), `PROP` and
   `PROP_ORIGIN` (where a prop's cell centre sits), `tileKey(cell, col, row)` (grass picks one of
   `GRASS_VARIANTS` flower variants by position; lakes, farms and roads have tiles of their own;
   buildings, woods and the castle stand on `tile-plain`) and `propKey(cell)` (`prop-castle` among
-  them; `castle` in `wood.ts` paints it). The table, the decree sign, the tray, the panel and the title plaque are the one
+  them; `castle` in `wood.ts` paints it), `tile-sea` (open water, no block), and the skins:
+  `SKIN_GREEN`, `skinTile` and `useSkin` (see Kingdom feats above). The table, the decree sign, the tray, the panel and the title plaque are the one
   `bg` texture.
 - `ui/Button.ts`: `makeButton`, the beech plaque button used by the game-over overlay.
 - `trophies/index.ts`: the trophy list (`trophySet`), loaded by the hub too, so it imports nothing
@@ -352,6 +398,10 @@ State model (`GameState` in `src/game/state.ts`):
   offer), `giftsDue`, `unlocked` (the specials won, in order), `omen` (`Omen | null`, for the next
   round), `tradedIn` (the round of the last market trade, 0 for none) and `castle` (the bonus paid
   at the end, 0 before).
+- `link` (1 for a kingdom of its own, 2 and up on a chain), `native` (the chain island's own
+  building or null), `chainScore` (the chain's islands before this one), `cargo` (tiles shipped
+  here) and `trade` (paid at the end, 0 before). None changes on a placement, so none is in
+  `Snapshot`.
 - `island`, `mode`, `level` (0 outside the campaign), `day` ('' unless daily), `round`, `goal`,
   `placed`, `phase` (`'playing'`, `'gift'` or `'over'`) and `best`. The season is not stored:
   `season(s)` derives it from `round`.
@@ -373,7 +423,9 @@ Persistence: `tiny-kingdom-best` (the best final score, written at game over),
 `tiny-kingdom-crowns` (crowns won, written whenever a decree pays), `tiny-kingdom-daily`
 (`{ day, best }`, the island of the day's best, replaced when a new day's game ends) and
 `tiny-kingdom-stars` (a JSON array of the best stars per campaign level, 0 to 3) and
-`tiny-kingdom-trophies` (the trophies earned, written by `award`). Board and round
+`tiny-kingdom-trophies` (the trophies earned, written by `award`), `tiny-kingdom-chain`
+(`{ links, total }`, the longest chain finished, written at game over), `tiny-kingdom-feats` (a
+JSON array of the feat ids won) and `tiny-kingdom-skin` (the skin picked, '' for classic). Board and round
 are never saved. The hub's settings are read from the shared `hub-settings` key.
 
 Randomness and timing: `randomIsland` makes the game's only `Math.random` call, once per random
@@ -466,6 +518,10 @@ Effects (`sfx`), and where they play:
 | `tick` | at the end of a kingdom (`endSounds`, from `gameEnded`), one per building the castle joined, at most ten |
 | `star` | at the end of a campaign kingdom, one rising chime per star won |
 
+A feat won plays the shared `ui('coin')`; the Feats button, its Close and a skin picked play
+`ui('click')`, a locked skin `ui('refuse')`. Sail on starts a kingdom, so it clicks like New
+kingdom.
+
 Shared sounds: `ui('click')` for the island button, the trade card's chips and Close, a market
 tapped to trade, the islands card's Close (and Escape), keypad digits and Del, and every new
 kingdom (`start`); `ui('refuse')` for a tap where nothing can be placed, a tile button or gift
@@ -550,6 +606,11 @@ valid island number. Hovering makes no sound. The game has no `?watch` mode.
 - **Add or change a trophy**: its row in `trophies/index.ts`, its name and `<id>Text` in every
   `trophies/i18n/` file and its condition in `EARNED` (`trophies/check.ts`); a trophy the first
   round earns changes the playthrough's trophy check.
+- **Add a chain island building**: add it to `BUILDINGS` (before `road`) and `NATIVES`, then as
+  under Add a building; `nativeFor` cycles through `NATIVES`.
+- **Add a feat or a skin**: a row in `FEATS` (its text in the `i18n/` files as `feat<Id>`) and, for
+  a new skin, its id in `SKINS`, its paint in `SKIN_GREEN` and its name as `skin<Name>`. The feats
+  card fits about eight rows and eight swatches.
 - **Add a gift**: add it to `GIFTS` and `GIFT_INFO` (its label and line in the `i18n/` files) and to a pool in `giftsFor`; a gift that is not
   a tile pack also needs handling in `chooseGift`.
 - **Retune rounds**: `FIRST_POUCH`, `ROUND_POUCH` and `goalFor` (keep its `byDifficulty` factor
@@ -593,6 +654,10 @@ valid island number. Hovering makes no sound. The game has no `?watch` mode.
   `start` keeps the higher of the stored and current best and crowns, so they survive blocked
   storage. A finished daily's "today's best" (game over and the panel's bottom line) also counts
   the kingdom's own score, since `saveDailyBest` fails silently then.
+- `previewPlacement` checks every building for a change, since a tower changes a temple up to 4
+  cells away.
+- `chainMap` only cuts grass, after `islandMap`, so a chain island keeps its lakes, woods and
+  castle (and their names) and a first island (link 1) lies exactly as before.
 - `previewPlacement` returns null when the kind is not in the hand (or can't go on that cell), so
   the hover outline shows but no ghost.
 - In the `'gift'` phase `round` and `goal` already show the next round; the card's title uses

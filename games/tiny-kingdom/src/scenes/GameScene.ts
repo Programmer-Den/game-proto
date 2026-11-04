@@ -2,14 +2,15 @@ import Phaser from 'phaser';
 import { playMusic, playSting, ui } from '../../../../shared/audio';
 import { settings } from '../../../../shared/settings';
 import { viewFrame, viewSize } from '../../../../shared/scaling';
-import { propKey, PROP_ORIGIN, tileKey } from '../art/textures';
+import { propKey, PROP_ORIGIN, skinTile, tileKey, useSkin } from '../art/textures';
 import { addArt, RES } from '../art/wood';
 import { PLACE_PITCH, sfx, SONG } from '../audio';
 import { joinedCells, joinedCount } from '../game/castle';
 import { DECREE_BONUS, decreeMarks, decreeRegion, type At, type Decree } from '../game/decree';
 import { GIFT_INFO, type Gift } from '../game/gifts';
 import { dailyIsland, LEVELS, levelOpen, parseIsland, starScores, starsFor, today, type Kingdom } from '../game/islands';
-import { loadBest, loadCrowns, loadDailyBest, loadStars, saveBest, saveCrowns, saveDailyBest, saveStars } from '../game/save';
+import { FEATS, newFeats, SKINS, skinOpen, type Skin } from '../game/feats';
+import { loadBest, loadChain, loadCrowns, loadDailyBest, loadFeats, loadSkin, loadStars, saveBest, saveChain, saveCrowns, saveDailyBest, saveFeats, saveSkin, saveStars } from '../game/save';
 import { OMEN_FROM, type Omen } from '../game/omens';
 import { SEASON_INFO } from '../game/seasons';
 import {
@@ -26,9 +27,12 @@ import {
   goalFor,
   handCount,
   housesCanMerge,
+  harbourCount,
   merge,
   mergeable,
+  NATIVE_ROUND,
   newGame,
+  nextKingdom,
   place,
   previewClear,
   previewMerge,
@@ -47,14 +51,17 @@ import {
   type Share,
 } from '../game/state';
 import { BUILDINGS, INFO, ISLANDS, randomIsland, type Building, type Special } from '../game/tiles';
-import { placeName, t } from '../i18n';
+import { placeName, t, type TextKey } from '../i18n';
 import { checkTrophies } from '../trophies/check';
 import { makeButton } from '../ui/Button';
 import {
   BUTTON,
   cellCentre,
   DECREE,
+  FEATS_BUTTON,
+  FEATS_CARD,
   FONT,
+  GAME_OVER,
   GIFT_CARD,
   GIFT_ROW,
   GOAL_BAR,
@@ -223,6 +230,15 @@ export class GameScene extends Phaser.Scene {
   private stars: number[] = [];
   /** The best score when this kingdom began, to tell a new best at its end. */
   private bestAtStart = 0;
+  /** The kingdom feats won so far (ids), loaded at start and saved as each is won. */
+  private feats: string[] = [];
+  /** The tile skin the board is painted in. */
+  private skin: Skin = '';
+  private featsCard!: Phaser.GameObjects.Container;
+  private featRows: { bead: Phaser.GameObjects.Image; text: Phaser.GameObjects.Text; skin: Phaser.GameObjects.Text }[] = [];
+  private swatches: { plaque: Phaser.GameObjects.Image; tile: Phaser.GameObjects.Image; name: Phaser.GameObjects.Text }[] = [];
+  private featToast!: Phaser.GameObjects.Container;
+  private featToastText!: Phaser.GameObjects.Text;
 
   constructor() {
     super('Game');
@@ -230,6 +246,10 @@ export class GameScene extends Phaser.Scene {
 
   create() {
     this.state = newGame(loadBest(), loadCrowns());
+    this.feats = loadFeats();
+    const saved = loadSkin() as Skin;
+    this.skin = SKINS.includes(saved) && skinOpen(saved, this.feats) ? saved : '';
+    useSkin(this, this.skin);
     // The layout is drawn for VIEW (960x540); on a wider or taller screen the camera centres it in
     // the view (`viewFrame`), and the background's table fills the rest.
     const frame = viewFrame(this);
@@ -242,11 +262,18 @@ export class GameScene extends Phaser.Scene {
     this.createTradeCard();
     this.createGameOver();
     this.createIslandsCard();
+    this.createFeatsCard();
     const backdrop = addArt(this, 0, 0, 'walnut-440x96');
     this.bannerText = this.add.text(0, -2, '', style(15, CREAM, '900', { align: 'center', lineSpacing: 4 })).setOrigin(0.5);
     this.banner = this.add
       .container(GRID.x + (GRID.cols * GRID.cell) / 2, GRID.y + (GRID.rows * GRID.cell) / 2, [backdrop, this.bannerText])
       .setDepth(UI_DEPTH + 5)
+      .setAlpha(0);
+    // A feat won: a small board at the top of the tray naming it and the skin it brings.
+    this.featToastText = this.add.text(0, -1, '', style(13, CREAM, '900', { align: 'center', lineSpacing: 3 })).setOrigin(0.5);
+    this.featToast = this.add
+      .container(GRID.x + (GRID.cols * GRID.cell) / 2, GRID.y + 52, [addArt(this, 0, 0, 'walnut-440x96').setScale(1 / RES, 0.7 / RES), this.featToastText])
+      .setDepth(UI_DEPTH + 6)
       .setAlpha(0);
     this.refresh();
     this.bestAtStart = this.state.best;
@@ -568,17 +595,126 @@ export class GameScene extends Phaser.Scene {
 
   private createGameOver() {
     const dim = this.dimmer();
-    const panel = addArt(this, VIEW.w / 2, VIEW.h / 2, 'walnut-520x260');
+    const panel = addArt(this, VIEW.w / 2, VIEW.h / 2, `walnut-${GAME_OVER.w}x${GAME_OVER.h}`);
     const title = this.add
       .text(VIEW.w / 2, VIEW.h / 2 - 90, t('gameOver'), style(28, CREAM, '900', { shadow: { offsetX: 1, offsetY: 2, color: 'rgba(0,0,0,0.45)', fill: true } }))
       .setOrigin(0.5);
     this.gameOverText = this.add.text(VIEW.w / 2, VIEW.h / 2 - 8, '', style(15, LABEL, '700', { align: 'center', lineSpacing: 4 })).setOrigin(0.5);
-    const islands = makeButton(this, VIEW.w / 2 - 110, VIEW.h / 2 + 88, t('islands'), () => {
+    const by = VIEW.h / 2 + GAME_OVER.dy;
+    const islands = makeButton(this, VIEW.w / 2 - GAME_OVER.dx, by, t('islands'), () => {
       ui('click');
       this.openIslands();
     });
-    const again = makeButton(this, VIEW.w / 2 + 110, VIEW.h / 2 + 88, t('newKingdom'), () => this.start(randomIsland()));
-    this.gameOver = this.add.container(0, 0, [dim, panel, title, this.gameOverText, islands, again]).setDepth(UI_DEPTH + 20).setVisible(false);
+    // Sailing on settles the next island of the chain, with this one's cargo.
+    const sail = makeButton(this, VIEW.w / 2, by, t('sailOn'), () => this.sailOn());
+    const again = makeButton(this, VIEW.w / 2 + GAME_OVER.dx, by, t('newKingdom'), () => this.start(randomIsland()));
+    for (const b of [islands, sail, again]) fit(b.list[1] as Phaser.GameObjects.Text, BUTTON.w - 14);
+    this.gameOver = this.add.container(0, 0, [dim, panel, title, this.gameOverText, islands, sail, again]).setDepth(UI_DEPTH + 20).setVisible(false);
+  }
+
+  /** Settles the next island of the chain once a kingdom is finished. */
+  private sailOn() {
+    if (this.state.phase !== 'over') return;
+    const { island, kingdom } = nextKingdom(this.state);
+    this.start(island, kingdom);
+  }
+
+  /**
+   * The feats card: a row per kingdom feat (a bead once won, what earns it and the skin it brings)
+   * and a swatch per tile skin, picked with a tap once its feat is won.
+   */
+  private createFeatsCard() {
+    const C = FEATS_CARD;
+    const left = C.x - C.w / 2;
+    const top = C.y - C.h / 2;
+    const close = ISLANDS_CARD.close;
+    const objects: Phaser.GameObjects.GameObject[] = [
+      this.dimmer(),
+      addArt(this, C.x, C.y, `walnut-${C.w}x${C.h}`),
+      this.add.text(left + 30, close.y, t('featsTitle'), style(22, CREAM, '900', { shadow: { offsetX: 1, offsetY: 1.5, color: 'rgba(0,0,0,0.45)', fill: true } })).setOrigin(0, 0.5),
+      this.plaque(close.x, close.y, close.w, close.h, () => {
+        ui('click');
+        this.featsCard.setVisible(false);
+      }),
+      fit(this.add.text(close.x, close.y - 1, t('close'), style(13, INK, '900')).setOrigin(0.5), close.w - 8),
+      fit(this.add.text(left + 30, top + 56, t('featsSub'), style(11, LABEL, '700')).setOrigin(0, 0.5), C.w - 60),
+    ];
+    FEATS.forEach((feat, i) => {
+      const y = C.rowY + i * C.rowH;
+      const bead = addArt(this, left + 42, y, 'bead-off');
+      const text = fit(this.add.text(left + 58, y, t(feat.text), style(13, CREAM, '800')).setOrigin(0, 0.5), 380);
+      const skin = fit(this.add.text(left + C.w - 30, y, t('featSkin', { skin: t(skinName(feat.skin)) }), style(11, LABEL, '700')).setOrigin(1, 0.5), 130);
+      objects.push(bead, text, skin);
+      this.featRows.push({ bead, text, skin });
+    });
+    objects.push(this.add.text(left + 30, C.swatchY - 50, t('skinsHeading'), style(10, '#f2c33a', '900', { letterSpacing: 1 } as never)).setOrigin(0, 0.5));
+    const L = ISLANDS_CARD.level;
+    const rowW = SKINS.length * L.w + (SKINS.length - 1) * L.gap;
+    SKINS.forEach((k, i) => {
+      const x = C.x - rowW / 2 + L.w / 2 + i * (L.w + L.gap);
+      const plaque = this.plaque(x, C.swatchY, L.w, L.h, () => this.pickSkin(k));
+      const tile = addArt(this, x, C.swatchY - 8, skinTile(this, k, 'grass', 1)).setScale(0.55 / RES);
+      const name = fit(this.add.text(x, C.swatchY + 21, t(skinName(k)), style(10, INK, '900')).setOrigin(0.5), L.w - 6);
+      objects.push(plaque, tile, name);
+      this.swatches.push({ plaque, tile, name });
+    });
+    this.featsCard = this.add.container(0, 0, objects).setDepth(UI_DEPTH + 31).setVisible(false);
+  }
+
+  private openFeats() {
+    this.refreshFeats();
+    this.featsCard.setVisible(true);
+  }
+
+  /** Marks the feats won and the skins open on the feats card, and the skin in use. */
+  private refreshFeats() {
+    FEATS.forEach((feat, i) => {
+      const won = this.feats.includes(feat.id);
+      const row = this.featRows[i];
+      row.bead.setTexture(won ? 'bead-on' : 'bead-off');
+      row.text.setAlpha(won ? 1 : 0.75);
+      row.skin.setColor(won ? '#f2c33a' : LABEL);
+    });
+    const key = `plaque-${ISLANDS_CARD.level.w}x${ISLANDS_CARD.level.h}`;
+    SKINS.forEach((k, i) => {
+      const open = skinOpen(k, this.feats);
+      const sw = this.swatches[i];
+      sw.plaque.setTexture(k === this.skin ? `${key}-sel` : key).setAlpha(open ? 1 : 0.45);
+      sw.tile.setAlpha(open ? 1 : 0.35);
+      sw.name.setAlpha(open ? 1 : 0.45).setColor(k === this.skin ? '#b0401f' : INK);
+    });
+  }
+
+  /** Paints the board in skin `k`, if its feat is won, and keeps it for the next visit. */
+  private pickSkin(k: Skin) {
+    if (!skinOpen(k, this.feats)) {
+      ui('refuse');
+      return;
+    }
+    ui('click');
+    this.skin = k;
+    saveSkin(k);
+    useSkin(this, k);
+    this.redrawCells();
+    // The tile buttons show the board's grass too.
+    this.shownKinds = '';
+    this.refresh();
+    this.refreshFeats();
+  }
+
+  /** Saves the feats the board has just done and shows the first one's board. */
+  private checkFeats() {
+    const won = newFeats(this.state, this.feats);
+    if (!won.length) return;
+    this.feats.push(...won.map((f) => f.id));
+    saveFeats(this.feats);
+    const feat = won[0];
+    this.featToastText.setText([t('featWon', { feat: t(feat.text) }), t('featSkinWon', { skin: t(skinName(feat.skin)) })]);
+    fit(this.featToastText, 420);
+    ui('coin');
+    this.featToast.setAlpha(1);
+    this.tweens.killTweensOf(this.featToast);
+    this.tweens.add({ targets: this.featToast, alpha: 0, delay: BANNER_MS, duration: BANNER_MS / 3 });
   }
 
   /** A dark veil over the whole view that swallows taps, behind a card. */
@@ -616,6 +752,11 @@ export class GameScene extends Phaser.Scene {
         this.closeIslands();
       }),
       fit(this.add.text(C.close.x, C.close.y - 1, t('close'), style(13, INK, '900')).setOrigin(0.5), C.close.w - 8),
+      this.plaque(FEATS_BUTTON.x, FEATS_BUTTON.y, FEATS_BUTTON.w, FEATS_BUTTON.h, () => {
+        ui('click');
+        this.openFeats();
+      }),
+      fit(this.add.text(FEATS_BUTTON.x, FEATS_BUTTON.y - 1, t('feats'), style(13, INK, '900')).setOrigin(0.5), FEATS_BUTTON.w - 8),
     );
 
     // The campaign: one plaque per level with its number and stars.
@@ -667,6 +808,13 @@ export class GameScene extends Phaser.Scene {
     this.islandsCard = this.add.container(0, 0, objects).setDepth(UI_DEPTH + 30).setVisible(false);
 
     this.input.keyboard?.on('keydown', (e: KeyboardEvent) => {
+      if (this.featsCard?.visible) {
+        if (e.key === 'Escape') {
+          ui('click');
+          this.featsCard.setVisible(false);
+        }
+        return;
+      }
       if (!this.islandsCard.visible) return;
       if (/^\d$/.test(e.key)) this.keyIn(e.key);
       else if (e.key === 'Backspace') this.keyIn('Del');
@@ -721,6 +869,7 @@ export class GameScene extends Phaser.Scene {
 
   private closeIslands() {
     this.islandsCard.setVisible(false);
+    this.featsCard.setVisible(false);
   }
 
   /** The line under the levels: a level's island and the scores its stars need. */
@@ -838,6 +987,11 @@ export class GameScene extends Phaser.Scene {
       stars[s.level - 1] = Math.max(stars[s.level - 1] ?? 0, starsFor(s.level, s.score));
       saveStars(stars);
     }
+    if (s.link > 1) {
+      const best = loadChain();
+      const total = s.chainScore + s.score;
+      if (s.link > best.links || (s.link === best.links && total > best.total)) saveChain({ links: s.link, total });
+    }
     this.endSounds();
   }
 
@@ -912,8 +1066,10 @@ export class GameScene extends Phaser.Scene {
 
   private announceRound(gift: Gift) {
     const s = this.state;
-    const tiles = BUILDINGS.filter((b) => ROUND_POUCH[b] > 0)
-      .map((b) => `+${count(b, ROUND_POUCH[b])}`)
+    const round = { ...ROUND_POUCH };
+    if (s.native) round[s.native] += NATIVE_ROUND;
+    const tiles = BUILDINGS.filter((b) => round[b] > 0)
+      .map((b) => `+${count(b, round[b])}`)
       .join('  ');
     const info = SEASON_INFO[season(s)];
     const lines = [
@@ -984,7 +1140,7 @@ export class GameScene extends Phaser.Scene {
     const cleared = previewClear(this.state, at.col, at.row);
     if (cleared !== null) {
       box(at.col, at.row, TEAL);
-      this.ghost.setTexture('tile-grass-0').setOrigin(0.5).setPosition(cx, cy).setAlpha(0.6).setVisible(true);
+      this.ghost.setTexture(tileKey('grass', 0, 0)).setOrigin(0.5).setPosition(cx, cy).setAlpha(0.6).setVisible(true);
       this.bubble(cx, y - 4, cleared);
       this.hint(cx, y + GRID.cell - 12, t('clearWood'));
       return;
@@ -1253,7 +1409,15 @@ export class GameScene extends Phaser.Scene {
     }
     this.roundText.setText(t('round', { n: s.round }));
     const island = String(s.island);
-    this.islandText.setText(s.mode === 'campaign' ? t('levelButton', { n: s.level }) : s.mode === 'daily' ? t('dailyButton', { n: island }) : t('islandButton', { n: island }));
+    this.islandText.setText(
+      s.mode === 'campaign'
+        ? t('levelButton', { n: s.level })
+        : s.mode === 'daily'
+          ? t('dailyButton', { n: island })
+          : s.mode === 'chain'
+            ? t('chainButton', { n: island, link: s.link })
+            : t('islandButton', { n: island }),
+    );
     fit(this.islandText, ISLAND_BUTTON.w - 8);
     this.scoreText.setText(t('score', { n: s.score }));
     fit(this.goalText.setText(t('goal', { score: s.score, goal: s.goal, next: s.round + 1 })), GOAL_BAR.w - 8);
@@ -1263,6 +1427,7 @@ export class GameScene extends Phaser.Scene {
       const [one, two, three] = starScores(s.level);
       this.bestText.setText(t('starsAt', { one, two, three }));
     } else if (s.mode === 'daily') this.bestText.setText(t('todaysBest', { n: dailyBest }));
+    else if (s.mode === 'chain') this.bestText.setText(t('chainSoFar', { n: s.chainScore + (s.phase === 'over' ? s.score : 0) }));
     else this.bestText.setText(t('bestScore', { n: s.best }));
 
     // The season strip.
@@ -1335,10 +1500,18 @@ export class GameScene extends Phaser.Scene {
         const next = stars < 3 ? t('nextStarAt', { n: starScores(s.level)[stars] }) : '';
         won = t('overLevel', { level: s.level, n: stars, next, crowns: s.crowns });
       } else if (s.mode === 'daily') won = t('overDaily', { best: dailyBest, crowns: s.crowns });
-      const over = { score: s.score, island: String(s.island), round: s.round, n: s.placed, castle: s.castle, won };
-      fit(this.gameOverText.setText(t('overText', over)), 500);
+      else if (s.mode === 'chain') {
+        const best = loadChain();
+        const total = s.chainScore + s.score;
+        won = t('overChain', { link: s.link, total, best: Math.max(best.links, s.link), crowns: s.crowns });
+      }
+      // A chain island's harbours paid their trade; any island's harbours ship cargo to the next.
+      const trade = s.link > 1 ? t('overTrade', { n: harbourCount(s.grid), trade: s.trade }) + '\n' : '';
+      const over = { score: s.score, island: String(s.island), round: s.round, n: s.placed, castle: s.castle, won: trade + won };
+      fit(this.gameOverText.setText(t('overText', over)), GAME_OVER.w - 30);
     }
     checkTrophies(s);
+    this.checkFeats();
   }
 
   /** A new kingdom on island `island`, chosen as `kingdom` says. */
@@ -1358,6 +1531,19 @@ export class GameScene extends Phaser.Scene {
     this.mergeFrom = null;
     this.drawHover(null);
     this.refresh();
+    if (this.state.link > 1) this.announceChain();
+  }
+
+  /** The banner as a chain island is settled: which island of the chain, its own building and the cargo shipped. */
+  private announceChain() {
+    const s = this.state;
+    const lines = [t('bannerChain', { link: s.link, n: String(s.island) })];
+    if (s.native) lines.push(t('bannerNative', { name: t(INFO[s.native].name) }));
+    lines.push(s.cargo ? t('bannerCargo', { n: s.cargo }) : t('bannerNoCargo'));
+    fit(this.bannerText.setText(lines), 430);
+    this.banner.setAlpha(1);
+    this.tweens.killTweensOf(this.banner);
+    this.tweens.add({ targets: this.banner, alpha: 0, delay: BANNER_MS / 2, duration: BANNER_MS / 2 });
   }
 
   /** Shows each cell's current tile and what stands on it. */
@@ -1372,3 +1558,6 @@ export class GameScene extends Phaser.Scene {
     );
   }
 }
+
+/** A tile skin's name, a key of `i18n/en.ts`. */
+const skinName = (k: Skin): TextKey => (k ? (`skin${k[0].toUpperCase()}${k.slice(1)}` as TextKey) : 'skinClassic');

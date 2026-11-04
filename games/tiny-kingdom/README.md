@@ -10,12 +10,15 @@ pouch of farms, houses, towers and a road, and every turn draws three of them: y
 the others go back. Every building scores against its neighbours, so where it goes matters more
 than what it is. Each round also brings a royal decree, a side goal that pays a crown, a season
 that makes some buildings score double, and reaching the round's goal earns a royal gift, such as a
-new building: the windmill, the market, the harbor or the lumber camp. From round 3 an omen warns of
+new building: the windmill, the market, the harbor, the lumber camp or the temple. From round 3 an omen warns of
 what the next round brings. Every island has a castle, and the buildings joined to it by a chain of
 buildings and roads pay a bonus when the kingdom is finished. Two houses side by side can merge into
 a manor; a lumber camp can clear a wood; a market can trade tiles. Play a random island, type in an
 island's number, try the island of the day, or work through the eight-island campaign for up to
-three stars each. Run out of tiles or room and the kingdom is finished.
+three stars each. Run out of tiles or room and the kingdom is finished; then sail on to the next
+island of a chain, cut into by the sea, with a building found only there, the cargo your harbors
+ship and a trade bonus for its own. Kingdom feats, such as a farm with three lakes beside it, unlock
+new paints for the tiles.
 
 ![A kingdom in round 3: the decree's lake outlined, a house previewed with its neighbour links](cover.png)
 
@@ -33,6 +36,8 @@ three stars each. Run out of tiles or room and the kingdom is finished.
 | Tap a gift | When the round's goal is reached: take one of the two gifts |
 | Undo last tile | Take back the last placement, clearing or merge; once per round |
 | Island button (next to the round) | Open the islands card: campaign levels, the island of the day, a random island, or type a number (keypad or keyboard digits, Enter to play, Esc to close) |
+| Feats (on the islands card) | Open the kingdom feats and pick a tile skin won by one |
+| Sail on | After the game ends: settle the next island of this kingdom's chain |
 | New kingdom | After the game ends: start again on a new random island |
 
 1. **Buildings go on grass.** Lakes and forests stay as they are, but buildings score from them.
@@ -61,11 +66,14 @@ three stars each. Run out of tiles or room and the kingdom is finished.
 7. **Royal gift**: the panel shows the two gifts on offer for reaching the goal ("Gift at 20: +2
    Towers or Windmill"). When the goal is reached, the board pauses on a card until you take one.
    Round 1 always offers +2 Towers or the Windmill; later rounds offer one new building you don't
-   have yet (the Windmill, then the Market, the Harbor and the Lumber camp) beside +2 Towers, +3
-   Houses or +3 Farms. Once all four are won, two of the tile packs and +2 of each new building.
+   have yet (the Windmill, then the Market, the Harbor, the Lumber camp and the Temple) beside +2
+   Towers, +3 Houses or +3 Farms. Once all five are won, two of the tile packs and +2 of each new
+   building.
 8. **New buildings**, each won as a gift: the **market** scores 1 for each different kind of
-   building around it; the **harbor** only goes on a lake's shore; the **lumber camp** only goes
-   beside a forest and makes each house beside it score 1 more.
+   building around it; the **harbor** goes on a lake's shore or the coast (a cell on the island's
+   edge, or beside the sea on a chain island) and scores each side facing the sea; the **lumber
+   camp** only goes beside a forest and makes each house beside it score 1 more; the **temple**
+   wants quiet: it scores 1 per cell between it and the nearest tower, up to 4.
 9. **Manors**: tap a house that has a house beside it, then tap that house. The second house
    becomes a manor (4 points and more per farm) and the first cell is grass again, free to build
    on. A merge takes no tile, counts for the decree and the goal, and can be undone like a tile.
@@ -109,9 +117,24 @@ three stars each. Run out of tiles or room and the kingdom is finished.
     cell can be taken back first. The castle then pays its bonus, and the best final score and the
     crowns are saved in the browser.
 19. **Trophies**: ten to earn across your kingdoms, listed behind the Trophies button on the start
-    and pause screens. A first decree, manor, market trade and all four gift buildings are bronze;
+    and pause screens. A first decree, manor, market trade and all five gift buildings are bronze;
     round 8, 40 buildings joined to the castle and 10 crowns in all are silver; a kingdom of 350
     points, three stars on a campaign level and a star on every level are gold.
+20. **Island chains**: when a kingdom is finished, **Sail on** settles the next island of its
+    chain (the same chain for every player who starts from the same island). From the second
+    island on, the sea cuts into the island's shape (two corners and a bay), so it has more coast
+    and less room, and each has a building found only there, two in its first pouch and one more
+    each round: the **lighthouse** (coast only: 1 per side facing the sea, 2 per harbor around
+    it) or the **orchard** (1 per farm, forest or windmill around it). The last island's harbors
+    ship cargo: one tile per harbor (up to 4) of the gift buildings won there. On a chain island
+    each harbor pays **+2 trade** when the kingdom is finished. The island button reads "Chain 2:
+    4821", the panel's bottom line counts the chain's score so far, and the longest chain is saved.
+21. **Kingdom feats**: seven goals done on any island, each unlocking a **tile skin**, a new paint
+    for the grass: a farm with 3 lakes beside it, a tower with 6 houses or manors around it, a
+    manor with 3 farms beside it, a temple worth 4 on an island with a tower, a market with 5
+    different buildings around it, a lighthouse with 2 harbors around it, and sailing on to the
+    third island of a chain. A board at the top of the tray names a feat when it is won; the
+    **Feats** button on the islands card lists them and picks the skin, which is kept.
 
 ![Hovering a cell beside the castle: the house would score 1 from the forest and join the castle's chain](docs/screenshots/playthrough-1-preview.webp)
 
@@ -126,8 +149,11 @@ three stars each. Run out of tiles or room and the kingdom is finished.
 | Tower | 2 per house or manor around it, but nothing while another tower is beside it |
 | Windmill (a gift) | 1 per farm around it; and each farm beside it scores 1 more |
 | Market (a gift) | 1 for each different kind of building around it |
-| Harbor (a gift) | Only on a lake's shore: 2 per lake and 1 per house or manor beside it |
+| Harbor (a gift) | Only on a lake's shore or the coast: 2 per lake, 1 per side facing the sea and 1 per house or manor beside it |
 | Lumber camp (a gift) | Only beside a forest: 2 per forest beside it; and each house beside it scores 1 more. Spend one to clear a wood beside a camp |
+| Temple (a gift) | 1 per cell between it and the nearest tower (diagonal steps count as one), up to 4; 4 with no tower |
+| Lighthouse (chain islands only) | Only on the coast: 1 per side facing the sea and 2 per harbor around it |
+| Orchard (chain islands only) | 1 per farm, forest or windmill around it |
 | Road | Nothing; it runs the castle's chain on |
 | Manor (two houses merged) | 4, plus 3 per farm and 1 per house, manor or forest beside it |
 | Castle (on every island) | Nothing itself; every building joined to it by a chain of buildings and roads pays 1 when the kingdom is finished |
@@ -163,6 +189,16 @@ three stars each. Run out of tiles or room and the kingdom is finished.
 ![The market trade card: two farms picked to give, a lumber camp to take](docs/screenshots/trade-card.webp)
 
 ![Clearing a wood: with the lumber camp picked, the wood beside the camp shows what clearing it costs](docs/screenshots/clear-wood.webp)
+
+### Island chains, coast buildings and feats
+
+![Island 2 of a chain: the sea cuts into its corners and a bay, a harbor stands on the coast and a lighthouse beside it would score 4](docs/screenshots/chain-island.webp)
+
+![A temple far from the towers scores the full 4](docs/screenshots/temple-preview.webp)
+
+![A chain island finished: its harbor's trade and the chain's total, with Sail on to the next island](docs/screenshots/chain-over.webp)
+
+![The feats card: three feats won, and the Spring skin picked from the tile skins](docs/screenshots/feats-card.webp)
 
 ### New buildings, manors, seasons and islands
 
@@ -226,7 +262,8 @@ All paths are inside `games/tiny-kingdom/`.
   the hand, rounds, placing, clearing woods, trades, merging and gifts taken, `decree.ts` the royal
   decrees and the lake and wood names, `omens.ts` the omens, `castle.ts` the castle's chain,
   `gifts.ts` the gifts, `seasons.ts` the seasons, `islands.ts` the campaign, the island of the day
-  and typed island numbers, and `save.ts` the best score, the crowns, the daily best and the stars.
+  and typed island numbers, `feats.ts` the kingdom feats and tile skins, and `save.ts` the best
+  score, the crowns, the daily best, the stars, the best chain, the feats and the skin.
 - `src/scenes/`: `BootScene` paints the textures, `GameScene` draws the board, the decree banner,
   the side panel, the trade card and the islands card and wires taps to the rules, `layout.ts`
   says where things are drawn.
