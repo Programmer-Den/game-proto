@@ -20,7 +20,9 @@ building into an endless, gusty sky, where every tenth tier is a sky altar (doub
 blessing even when wobbly). A crown opens the next site (the hill, then a windy cliff, then a lake
 whose raft bobs), each with its own crown height and best, and raises the patron's rank, which
 strengthens their boon. The daily shrine gives every player the same patron and stones, one try a
-day.
+day. Every crown brings pilgrims to a village whose favour builds an inn, a well and a mason's yard,
+each a head start for later temples; once a shrine is crowned, runs can bring rain or snow for more
+favour; and a two-player race (`RaceScene`) stacks two temples side by side on one screen.
 
 Implemented today:
 
@@ -137,6 +139,35 @@ Implemented today:
   daily crown shows no "Keep building", raises no rank, opens no site and keeps no site best. The
   patron screen's Daily shrine button restarts the scene with `{ daily: true }`; once today's try is
   used it is dimmed and shows today's height and the streak.
+- Pilgrims' village (SS14): `BUILDINGS`/`BuildingId`/`BUILDING_INFO` (name, text, cost, colour) in
+  `catalog.ts`; `save.ts` keeps the `Village` (`pilgrims`, `favour`, `built`) with `loadVillage`,
+  `welcomePilgrims` (called by `onCrowned`, outside the daily: `PILGRIMS_PER_CROWN` pilgrims and the
+  run's `favor`), `canBuild` and `build`. `newGame({ village })` (ignored in the daily and a race)
+  sets `village`; the Well starts `favor` at `WELL_FAVOR`, the Mason's yard sets `startW` (the first
+  stone's width, used by `spawn`) to `START_W + YARD_PX`, and the Inn makes `choosePatron` draw a
+  `gift` from `blessingsFor` (one `rand` draw) and keep it (`applyBlessing`, shared with
+  `chooseBlessing`; Broad Stones before the first stone widens `startW`). The `patron` event carries
+  the `gift`. The patron screen's Village button (`makeVillageButton`, dimmed until the first
+  pilgrims) swaps the cards for the village (`villageOpen`, `makeVillage`: three building cards and
+  Back); a build restarts the scene with `{ village: true }` so the new temple has it. The scene
+  draws the built buildings and up to 12 pilgrims on the ground (`drawVillage`, hill and cliff only).
+- Weather (SS15): `WEATHERS`/`WeatherId`/`WEATHER_INFO` in `catalog.ts`; `newGame({ weather: true })`
+  (the scene passes it once a crown has opened the cliff or brought pilgrims) and the daily roll
+  `weather` after the patrons (`rollWeather`: `WEATHER_CHANCE` for rain or snow, half each); a first
+  temple draws nothing more, so its random order is unchanged. Rain slides a non-perfect stone
+  `RAIN_SLIDE` further from the stone below before the cut (`land`); snow multiplies `swingSpeed` by
+  `snowSway` (`1 ± SNOW_SWAY` over `SNOW_PERIOD` ms of `clock`); any weather multiplies `favorMult`
+  by `WEATHER_MULT`. The patron screen's sub line shows it (`weatherLine`), the top of the view
+  shows `weatherTag` while stacking, the patron banner names it, and `drawWeather` paints rain
+  streaks or snowflakes over the view from `weatherMs` (game time, held still under reduced motion).
+- Two-player race (SS16): `newGame({ race: { rand, kindRand } })` sets `race`, offers no patron,
+  starts `swinging` at once on the hill, and `land` opens no break (`blessed` and the wobbly break
+  are skipped). `RaceScene` (key `'Race'`, started by the patron screen's Race button,
+  `makeRace`) makes two such states from one random seed (so both get the same stones and trials),
+  draws each in a container scaled by `SCALE` in its half of the view (scrolled down as it grows,
+  `follow`), drops with a tap on that half or A/L, and `judge`s each frame: the first `crowned` wins,
+  one `over` loses to the other, both at once is a draw. Its end panel has Race again
+  (`scene.restart`) and Back (`scene.start('Game')`). It keeps no save and awards no trophies.
 - The game ends on a miss (a stone keeping less than `MIN_W`) unless Mason's Grace catches it; a
   caught stone still marks the tier `wobbly` and fails its trial (with a `trial` event), then is
   replayed.
@@ -144,7 +175,11 @@ Implemented today:
 Missing or rough:
 
 - The title and pause button are the shared ones from `setupGame`. Only the bests, the sites open, the
-  ranks and the daily persist; a reload starts a new temple.
+  ranks, the village and the daily persist; a reload starts a new temple (and a new weather roll, as
+  does picking a site).
+- The race has no patron, blessings, shop or materials, no sound for the gust, and no Watch AI; the
+  lake has no village drawn. There is no new trophy for the village, weather or race (the game already
+  has the most, ten).
 - The cliff's and the lake's ground only shows on the first tiers; higher up they look like the hill.
 - Past tier 23 gusts stop growing (`WIND_MAX`); the sky altars are the only milestones after that.
 - A tap is ignored while a stone falls; a tap during the blessing choice lands on the dim.
@@ -152,7 +187,7 @@ Missing or rough:
 - `docs/screenshots/game-over.webp`, `gilded.webp`, `crowned.webp`, `wobbly-break.webp`,
   `shop-bought.webp`, `curse-taken.webp`, `stone-kinds.webp`, `endless-gust.webp`, `four-blessings.webp`,
   `material-pick.webp`, `reserve.webp`, `lean-meter.webp`, `toppled.webp`, `regrown.webp`,
-  `storm-gust.webp`, `crowned-blessing.webp`, `sites-and-ranks.webp`, `cliff-wind.webp`, `lake-raft.webp`, `crown-opens-site.webp`, `sky-altar.webp`, `sky-altar-blessing.webp`, `trophy-earned.webp`, `trophies.webp`, `fill-ultrawide.webp`, `fill-tablet.webp` (the play scene filling a 2560x1080 and a 1024x768 screen) and `cover.png` (a copy of `gilded.webp`) are not produced by the test; refresh
+  `storm-gust.webp`, `crowned-blessing.webp`, `sites-and-ranks.webp`, `cliff-wind.webp`, `lake-raft.webp`, `crown-opens-site.webp`, `sky-altar.webp`, `sky-altar-blessing.webp`, `trophy-earned.webp`, `trophies.webp`, `village.webp`, `rain-village.webp`, `weather-snow.webp`, `race.webp`, `fill-ultrawide.webp`, `fill-tablet.webp` (the play scene filling a 2560x1080 and a 1024x768 screen) and `cover.png` (a copy of `gilded.webp`) are not produced by the test; refresh
   them by hand (play several tiers in the dev build, or drive it with a Playwright script that taps
   like the test does) if the look changes.
 
@@ -171,7 +206,7 @@ File map (`src/`):
   a US one if its spelling differs) in the same PR.
 - `audio.ts`: the game's sound (see Sound below): `SONG`, the `sfx` table and `bellPitch`.
 - `main.ts`: creates the `Phaser.Game` (960x540 from `VIEW`, `Phaser.Scale.FIT`,
-  `pixelArt: true`) with `GameScene` only, calls `setupGame(game)` from `shared/setupGame.ts` and
+  `pixelArt: true`) with `GameScene` and `RaceScene`, calls `setupGame(game)` from `shared/setupGame.ts` and
   then `setupScaling(game, { fill: true })` from `shared/scaling.ts`, and in dev builds puts `game` on `window`.
 - `game/state.ts`: the tuning constants (`TOWER_X`, `PLINTH_W`, `START_W`, `STONE_H`, `DROP_GAP`,
   `SWING`, `BASE_SPEED`, `TIER_SPEEDUP`, `CALM`, `GRAVITY`, `PERFECT_PX`, `STEADY_PX`, `BROAD_PX`,
@@ -185,14 +220,16 @@ File map (`src/`):
   `BASALT_CRACK`, `BASALT_TRIAL_MULT`, `RESERVE_FROM_TIER`, `PATRON_OFFER`, `PATRON_FAVOR`,
   `HANDS_OFFER`, `HANDS_SPEED`, `PATIENT_SPEED`, `STORM_PERFECT`, `STORM_FROM_TIER`, `GILDED_BELOW`,
   `RANK_MAX`, `GILDED_RANK_FAVOR`, `PATIENT_RANK`, `STORM_RANK_PX`, `CLIFF_FROM_TIER`, `CLIFF_WIND`,
-  `CLIFF_PER_TIER`, `CLIFF_MAX`, `LAKE_BOB`, `LAKE_PER_TIER`, `LAKE_MAX`, `LAKE_PERIOD`), the types
+  `CLIFF_PER_TIER`, `CLIFF_MAX`, `LAKE_BOB`, `LAKE_PER_TIER`, `LAKE_MAX`, `LAKE_PERIOD`,
+  `WEATHER_CHANCE`, `WEATHER_MULT`, `RAIN_SLIDE`, `SNOW_SWAY`, `SNOW_PERIOD`, `PILGRIMS_PER_CROWN`,
+  `WELL_FAVOR`, `YARD_PX`), the types
   (`Phase`, `Stone`, `Moving`, `Trial`, `Drop`, `GameEvent`, `GameState`, `NewGame`) and the rules
-  (`goalOf`, `gildedOf`, `windy`, `drift`, `rerollCost`, `patronSpeed`, `speedFor`, `newGame`, `choosePatron`, `offerSize`, `blessingsFor`, `shopFor`,
+  (`goalOf`, `gildedOf`, `windy`, `drift`, `snowSway`, `rerollCost`, `patronSpeed`, `speedFor`, `newGame`, `choosePatron`, `offerSize`, `blessingsFor`, `shopFor`,
   `stackHeight`, `topOf`, `curseNow`, `swingSpeed`, `perfectWindow`, `canSwap`, `swapReserve`,
   `tick`, `drop`, `canPickMaterial`, `chooseMaterial`, `chooseBlessing`, `canReroll`, `reroll`,
   `canBuy`, `buy`, `toggleCurse`, `buildOn`, `keepBuilding`, `isAltar`, `nextAltar`, `gild`, `materialMult`, `favorMult`,
   `stoneFavor`, `gusty`; `tierSpeed`, `pickPatrons`, `spawn`, `cliffWind`, `gustFor`, `kindFor`, `gust`, `land`, `topple`,
-  `pickOffer`, `pickCurse`, `widenTop` and `endBreak` are private). No Phaser; `speedFor` reads
+  `pickOffer`, `pickCurse`, `widenTop`, `endBreak`, `rollWeather` and `applyBlessing` are private). No Phaser; `speedFor` reads
   `byDifficulty` from `shared/settings.ts`.
 - `game/blessings.ts`: `BLESSINGS`, `BlessingId` and `BLESSING_INFO` (name and card text as
   `TextKey`s, colour).
@@ -201,11 +238,13 @@ File map (`src/`):
   `TRIALS`/`TrialId`/`TRIAL_INFO` (short text), `CURSES`/`CurseId`/`CURSE_INFO`,
   `MATERIALS`/`MaterialId`/`MATERIAL_INFO` (name, short button text, colour) with `MATERIAL_PICKS`
   (the three on buttons), `PATRONS`/`PatronId`/`PATRON_INFO` (name, boon, bane, colour) and
-  `SITES`/`SiteId`/`SITE_INFO` (name, arrival text, crown) with `nextSite`. Every
+  `SITES`/`SiteId`/`SITE_INFO` (name, arrival text, crown) with `nextSite`,
+  `WEATHERS`/`WeatherId`/`WEATHER_INFO` (name, text, colour) and `BUILDINGS`/`BuildingId`/
+  `BUILDING_INFO` (name, text, cost, colour). Every
   name and text is a `TextKey` of `i18n/en.ts`, which the scene shows with `t`.
 - `game/save.ts`: `loadBest` and `saveBest` (the hill's), `bestOn` and `saveBestOn` (any site),
   `loadSites` (`Sites`: open, current, the cliff's and lake's bests), `pickSite`, `openNextSite`,
-  `loadRanks` and `raiseRank`.
+  `loadRanks` and `raiseRank`, `loadVillage`, `welcomePilgrims`, `canBuild` and `build` (`Village`).
 - `trophies/`: the game's ten trophies (`shared/trophies.ts`). `index.ts` lists them (`trophies`:
   id, tier, icon, `hidden` for the two sky altar ones) with their texts in `trophies/i18n/` (`en.ts`,
   `de.ts` and `en-US.ts` for "favor": the name keyed by the id, what earns it by `<id>Text`), and
@@ -221,9 +260,14 @@ File map (`src/`):
 - `scenes/GameScene.ts`: everything drawn (the ground per site in `createPlinth`; the temple's
   plinth, raft, stones, ornaments and crown in the `temple` container, moved by `drift` every frame),
   the site row (`makeSites`), the daily button (`makeDaily`), saving (`saveRun`, `onCrowned`), plus `setFitted`, `drawStone`, `materialColor`, `tierColor`,
-  `blend`, `shade`, `seeded`, `pin` and `place` helpers and the `UiPart` type.
+  `blend`, `shade`, `seeded`, `pin` and `place` helpers and the `UiPart` type; the village screen
+  (`makeVillageButton`, `makeVillage`, `drawBuildingIcon`, `drawBuilding`, `drawVillage`), the race
+  button (`makeRace`) and the weather (`drawWeather`). It exports `drawStone` and `textStyle` for
+  `RaceScene`.
+- `scenes/RaceScene.ts`: the two-player race (see Current state).
 - `scenes/layout.ts`: `VIEW`, `PLINTH_Y`, `TOP_SCREEN_Y`, `PANEL`, `CARDS`, `CARDS_FOUR`,
-  `PATRON_TITLE`, `PATRON_CARDS`, `SITE_ROW`, `DAILY_BUTTON`, `BUTTON`, `OFFER_TITLE`, `REROLL`, `MATERIAL_TITLE`,
+  `PATRON_TITLE`, `PATRON_CARDS`, `SITE_ROW`, `BOTTOM_ROW` (the daily, village and race buttons),
+  `VILLAGE_CARDS`, `VILLAGE_BACK`, `BUTTON`, `OFFER_TITLE`, `REROLL`, `MATERIAL_TITLE`,
   `MATERIAL_ROW`, `CURSE`, `SHOP_TITLE`, `SHOP_ROW`, `BUILD_ON`, `RESERVE_BUTTON`, `LEAN_BAR`,
   `GOAL`, `UI_DEPTH`, `FONT`.
 - `ui/Button.ts`: `makeButton`, the captioned buttons on the end panel (returned as loose parts).
@@ -317,22 +361,24 @@ State model (`GameState`): `phase` (`patron`, `swinging`, `falling`, `blessing`,
 `speed`, `perfectPx`, `favorPerStone` and `grace`, `dropped` (misses included), `lastDrop`, `best`,
 `nextKind`, `slow`, `bought`, `trial`, `curseOffer`, `cursed`, `curse` (`{ id, tier }`), `endless`,
 `wind`, `altars`, `lean`, `chain`, `material`, `reserve` and `swapped`, `patronOffer` and `patron`,
-`site` and `sites`, `ranks`, `rank` and `freeRerolls`, `clock`, `daily`, the random sources `rand` and
+`site` and `sites`, `ranks`, `rank` and `freeRerolls`, `clock`, `daily`, `race`, `weather`,
+`village`, `startW` and `gift`, the random sources `rand` and
 `kindRand` (functions, dropped when the test copies the state through JSON), and `events`. `Stone` and `Moving` carry a `kind` and a `material`. Only
 `src/game/state.ts` mutates it. `moving` exists in every phase; it simply does not move outside
 `swinging`/`falling`.
 
 Persistence: `shrine-stack-best` in `localStorage` holds the most tiers built in one temple on the
 hill, `shrine-stack-sites` the sites open, the current one and the cliff's and lake's bests
-(`{ open, current, best }`), `shrine-stack-patrons` each patron's rank, `shrine-stack-daily` the daily
+(`{ open, current, best }`), `shrine-stack-patrons` each patron's rank, `shrine-stack-village` the pilgrims' village
+(`{ pilgrims, favour, built }`, written on a crown and a build), `shrine-stack-daily` the daily
 record (`shared/daily.ts`) and `shrine-stack-trophies` the trophies earned (`shared/trophies.ts`),
 each id with the time. The scene writes the site's best when a tier finishes and on game over (not
 in the daily, which finishes its record instead); `award()` writes each trophy the moment it is
 earned, mid-tier too. The hub's settings are read
 from the shared `hub-settings` key, not from this game's save.
 
-Randomness and timing: the rules draw only from `s.rand` (`pickPatrons`, `pickOffer`, `pickCurse`,
-the trial roll in `land`, `gust` and `cliffWind`) and `s.kindRand` (`kindFor`, from the third stone,
+Randomness and timing: the rules draw only from `s.rand` (`pickPatrons`, `rollWeather`, the inn's
+gift, `pickOffer`, `pickCurse`, the trial roll in `land`, `gust` and `cliffWind`) and `s.kindRand` (`kindFor`, from the third stone,
 and when the reserve takes a stone); outside the daily both call `Math.random`, in the same order as
 before. Stars, mountains and clouds use `seeded` in `GameScene.ts`. All rule timing is game time
 from `tick`; tweens are cosmetic only.
@@ -388,10 +434,16 @@ Effects, `sfx` (all from `GameScene`):
 | `shuffle` | `rerolled` |
 | `stone` | a material button that changed the pick |
 | `pluck` | the curse toggle taking the curse (`ui('click')` when untaking it) |
-| `rise` | "Build on", "Keep building" and the Daily shrine button |
+| `rise` | "Build on", "Keep building", the Daily shrine button and the Race button |
 | `gust` | `updateSound`, once per stone in hand (keyed by `dropped`) that has a non-zero `wind` |
 
-Shared sounds: `ui('coin')` on `bought`, `ui('click')` on "Build again" and a site button,
+In the race (`RaceScene`): the `calm` part plays throughout; `whoosh`, `thud`, `bell`, `crack`, `crash`,
+`rumble`, `shimmer`, `chime` and `meh` play on the same events for both temples, and the `crown`
+sting (a win) or `fall` sting (a draw) when the race is decided.
+
+Shared sounds: `ui('coin')` on `bought` and on a village build, `ui('click')` on "Build again", a
+site button, the Village button, the village's Back and the race's buttons, `ui('refuse')` on a
+building the village can't afford or a Village button with no pilgrims yet,
 `ui('refuse')` on a locked site or a used daily, and `ui('refuse')` for a
 Reroll or shop button that can't be used, and for the Swap button or R while stacking when
 `canSwap` is false.
@@ -405,7 +457,9 @@ Reroll or shop button that can't be used, and for the Swap button or R while sta
   `materialButtons` (`{ id, x, y, w, h }`, from tier 3), `curseToggle` and `buildOnButton`
   (`{ x, y, w, h }` or null) during a break, `reserveButton` (`{ x, y, w, h }` while a swap is
   allowed, else null), `keepButton` while the crowned panel shows, and `siteButtons`
-  (`{ id, x, y, w, h }`) and `dailyButton` on the patron screen.
+  (`{ id, x, y, w, h }`), `dailyButton`, `villageButton` and `raceButton` on the patron screen, and
+  `buildingButtons` (`{ id, x, y, w, h }`) and `villageBack` while the village is open.
+  `RaceScene` exposes `states` (both sides' `GameState`) and `winner`.
 - Inputs: it taps the first patron card's centre from `patronCards` (after checking nothing moves
   before that), then taps the sky at (860, 200) to drop, waiting frame by frame until the swinging
   stone's middle is within 12 pixels (`AIM_PX`) of the middle of what it lands on; it taps a
@@ -415,7 +469,8 @@ Reroll or shop button that can't be used, and for the Swap button or R while sta
   the reserve alone: purchases and swaps stay out of the first round.
   The sky point must stay clear of the panel; the cards are not shown when it is tapped. It checks the
   first temple is on the hill (`site`, `sites: ['hill']`), not the daily, with `rank` and
-  `freeRerolls` 0, and that `dailyButton` is there, and leaves the site row and the daily alone.
+  `freeRerolls` 0, clear `weather`, an empty `village`, no `race` and no `gift`, and that
+  `dailyButton` is there, and leaves the site row, the daily, the village and the race alone.
 - Mirrored in `e2e/playthrough.spec.ts`, so change them together: the `GameState` field names,
   `VIEW`, `TOWER_X`, `PLINTH_W`, `START_W`, `STONE_H`, `DROP_GAP` (as the literal 120), the Normal
   speed 230, `STONES_PER_TIER`, `BALANCE`, `PERFECT_FAVOR`, `TIER_FAVOR`, `BROAD_PX`, `CALM`,

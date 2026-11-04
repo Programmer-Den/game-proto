@@ -13,6 +13,8 @@ const en: HowToPlay = {
       action: 'Before the first stone: pick where to build, once a crown has opened the site',
     },
     { input: 'Daily shrine', action: "Play today's shrine: the same patron and stones for everyone, one try a day" },
+    { input: 'Village', action: "Spend the pilgrims' favour on an inn, a well or a mason's yard for a head start" },
+    { input: 'Race', action: 'Two players: the left one taps the left half or A, the right one the right half or L' },
     { input: 'Click or tap anywhere', action: 'Drop the swinging stone' },
     {
       input: 'Swap button or R',
@@ -49,6 +51,9 @@ const en: HowToPlay = {
     'The tier two below the crown is gilded for double favour, and after the crown you can keep building into a windy sky, where every tenth tier is a sky altar with double favour and a blessing.',
     'A crown on the hill opens the windy cliff (crown at 10), and one there opens the lake (crown at 11), where the raft bobs side to side.',
     "Each crown raises your patron's rank, up to 3, and every rank strengthens their boon.",
+    "Each crown brings pilgrims with the temple's favour: build an inn (a free blessing), a well (10 favour to start) or a mason's yard (a wider first stone).",
+    'After a crown some runs bring rain (stones that are not perfect slide further off) or snow (the swing slows and speeds up), for 1.5 times the favour.',
+    'In a race both temples get the same stones and no breaks: crown first, or keep standing when the other stone misses.',
   ],
 };
 
@@ -73,6 +78,8 @@ const de: HowToPlay = {
       action: 'Vor dem ersten Stein: den Bauort wählen, sobald eine Krone ihn geöffnet hat',
     },
     { input: 'Tagesschrein', action: 'Den heutigen Schrein spielen: für alle gleicher Schutzherr und Steine, ein Versuch am Tag' },
+    { input: 'Dorf', action: 'Die Gunst der Pilger für Gasthaus, Brunnen oder Steinmetzhof ausgeben, als Vorsprung' },
+    { input: 'Rennen', action: 'Zwei Spieler: links tippt die linke Hälfte oder A, rechts die rechte Hälfte oder L' },
     { input: 'Irgendwo klicken oder tippen', action: 'Den schwingenden Stein fallen lassen' },
     {
       input: 'Tausch-Taste oder R',
@@ -109,6 +116,9 @@ const de: HowToPlay = {
     'Die Ebene zwei unter der Krone ist vergoldet und bringt doppelte Gunst, und nach der Krone kannst du in einen windigen Himmel weiterbauen, wo jede zehnte Ebene ein Himmelsaltar mit doppelter Gunst und einem Segen ist.',
     'Eine Krone auf dem Hügel öffnet die windige Klippe (Krone bei 10), eine dort den See (Krone bei 11), wo das Floß hin und her schaukelt.',
     'Jede Krone hebt den Rang deines Schutzherrn, bis 3, und jeder Rang stärkt seinen Segen.',
+    'Jede Krone bringt Pilger mit der Gunst des Tempels: baue ein Gasthaus (ein Segen gratis), einen Brunnen (10 Gunst zum Start) oder einen Steinmetzhof (ein breiterer erster Stein).',
+    'Nach einer Krone bringen manche Läufe Regen (nicht perfekte Steine rutschen weiter ab) oder Schnee (der Schwung wird langsamer und schneller), für 1,5-fache Gunst.',
+    'Im Rennen bekommen beide Tempel dieselben Steine und keine Pausen: kröne zuerst oder bleib stehen, wenn der andere Stein danebengeht.',
   ],
 };
 

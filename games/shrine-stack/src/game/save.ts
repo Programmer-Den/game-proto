@@ -1,10 +1,12 @@
 // What lasts between temples: the best height on each site (the hill's under its old key), the
-// sites open and the one picked last, and each patron's rank. Every game starts on a bare plinth.
-import { PATRONS, SITES, nextSite, type PatronId, type SiteId } from './catalog';
+// sites open and the one picked last, each patron's rank and the pilgrims' village. Every game starts
+// on a bare plinth.
+import { BUILDINGS, BUILDING_INFO, PATRONS, SITES, nextSite, type BuildingId, type PatronId, type SiteId } from './catalog';
 
 const KEY = 'shrine-stack-best';
 const SITES_KEY = 'shrine-stack-sites';
 const RANKS_KEY = 'shrine-stack-patrons';
+const VILLAGE_KEY = 'shrine-stack-village';
 
 function read(key: string): unknown {
   try {
@@ -104,4 +106,48 @@ export function raiseRank(patron: PatronId, max: number): number | null {
   ranks[patron]++;
   write(RANKS_KEY, JSON.stringify(ranks));
   return ranks[patron];
+}
+
+/** The pilgrims' village: how many pilgrims have settled, the favour they brought that is still to spend, and what is built. */
+export interface Village {
+  pilgrims: number;
+  favour: number;
+  built: BuildingId[];
+}
+
+const count = (v: unknown) => {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+};
+
+export function loadVillage(): Village {
+  const raw = read(VILLAGE_KEY) as Partial<Village> | null;
+  const built = BUILDINGS.filter((id) => Array.isArray(raw?.built) && raw.built.includes(id));
+  return { pilgrims: count(raw?.pilgrims), favour: count(raw?.favour), built };
+}
+
+const saveVillage = (village: Village) => write(VILLAGE_KEY, JSON.stringify(village));
+
+/** A crown brings `pilgrims` to the village, with `favour` as their offering. */
+export function welcomePilgrims(pilgrims: number, favour: number) {
+  const village = loadVillage();
+  village.pilgrims += pilgrims;
+  village.favour += Math.max(0, Math.floor(favour));
+  saveVillage(village);
+  return village;
+}
+
+/** Whether a building can go up: not built yet, and the village has the favour for it. */
+export function canBuild(village: Village, id: BuildingId) {
+  return !village.built.includes(id) && village.favour >= BUILDING_INFO[id].cost;
+}
+
+/** Spends the village's favour on a building. Returns the village after, or null when it can't be built. */
+export function build(id: BuildingId): Village | null {
+  const village = loadVillage();
+  if (!canBuild(village, id)) return null;
+  village.favour -= BUILDING_INFO[id].cost;
+  village.built.push(id);
+  saveVillage(village);
+  return village;
 }

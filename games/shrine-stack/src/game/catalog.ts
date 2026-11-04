@@ -83,3 +83,31 @@ export const SITE_INFO: Record<SiteId, { name: TextKey; text: TextKey; goal: num
 
 /** The site a crown here opens, or null after the last. */
 export const nextSite = (site: SiteId): SiteId | null => SITES[SITES.indexOf(site) + 1] ?? null;
+
+/**
+ * Weather (SS15): once a shrine has been crowned, some runs bring rain (a stone that isn't perfect slides
+ * a little further off on landing) or snow (the swing slows down and speeds up again), shown on the patron
+ * screen before the first stone, for more favour. Clear weather changes nothing.
+ */
+export const WEATHERS = ['clear', 'rain', 'snow'] as const;
+export type WeatherId = (typeof WEATHERS)[number];
+
+export const WEATHER_INFO: Record<WeatherId, { name: TextKey; text: TextKey; color: string }> = {
+  clear: { name: 'clearName', text: 'clearText', color: '#d8cbe8' },
+  rain: { name: 'rainName', text: 'rainText', color: '#9ac8f0' },
+  snow: { name: 'snowName', text: 'snowText', color: '#e8f4ff' },
+};
+
+/**
+ * The pilgrims' village (SS14): every crown brings pilgrims who settle below the shrines, with the favour
+ * the run held as their offering. That favour builds three buildings, once each, which give every later
+ * temple (not the daily or a race) a head start.
+ */
+export const BUILDINGS = ['inn', 'well', 'yard'] as const;
+export type BuildingId = (typeof BUILDINGS)[number];
+
+export const BUILDING_INFO: Record<BuildingId, { name: TextKey; text: TextKey; cost: number; color: number }> = {
+  inn: { name: 'innName', text: 'innText', cost: 60, color: 0xd9a066 },
+  well: { name: 'wellName', text: 'wellText', cost: 30, color: 0x7fc8e8 },
+  yard: { name: 'yardName', text: 'yardText', cost: 45, color: 0xb9c3cc },
+};

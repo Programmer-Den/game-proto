@@ -11,7 +11,10 @@
 // is a sky altar: double favor and a blessing whether it balanced or not. Every temple starts
 // under one of two patrons offered, whose rule holds for the whole run. A crown opens the next
 // site (a windy cliff, a bobbing lake), each with its own crown height, raises the patron's rank, which
-// strengthens their boon, and the daily shrine gives every player the same patron and stones.
+// strengthens their boon, and the daily shrine gives every player the same patron and stones. Crowns
+// also bring pilgrims whose favour builds a village (an inn, a well, a mason's yard) that gives later
+// temples a head start, later runs can bring rain or snow for more favour, and two players can race
+// two temples side by side.
 
 import { byDifficulty } from '../../../../shared/settings';
 import type { Rand } from '../../../../shared/daily';
@@ -31,6 +34,8 @@ import {
   type SiteId,
   type StoneKind,
   type TrialId,
+  type BuildingId,
+  type WeatherId,
 } from './catalog';
 
 /** The middle of the temple, in view pixels. */
@@ -153,6 +158,20 @@ export const LAKE_BOB = 10;
 export const LAKE_PER_TIER = 1.5;
 export const LAKE_MAX = 24;
 export const LAKE_PERIOD = 3000;
+/**
+ * Weather (SS15): once any shrine is crowned, a run brings rain or snow half the time (`WEATHER_CHANCE`),
+ * for `WEATHER_MULT` times the favour. Rain slides a stone that isn't perfect `RAIN_SLIDE` pixels further
+ * off as it lands; snow sways the swing `SNOW_SWAY` slower and faster, once every `SNOW_PERIOD` ms.
+ */
+export const WEATHER_CHANCE = 0.5;
+export const WEATHER_MULT = 1.5;
+export const RAIN_SLIDE = 6;
+export const SNOW_SWAY = 0.4;
+export const SNOW_PERIOD = 2400;
+/** The pilgrims' village (SS14): pilgrims a crown brings, the well's favour at the start and the mason's yard's wider first stone. */
+export const PILGRIMS_PER_CROWN = 5;
+export const WELL_FAVOR = 10;
+export const YARD_PX = 20;
 
 /**
  * `patron` is the pick of a patron before the first stone. `blessing` is the break between tiers: after
@@ -211,7 +230,7 @@ export type GameEvent =
   | { type: 'toppled'; count: number; lean: number; favor: number }
   | { type: 'regrown'; px: number }
   | { type: 'swapped'; kind: StoneKind }
-  | { type: 'patron'; patron: PatronId }
+  | { type: 'patron'; patron: PatronId; gift: BlessingId | null }
   | { type: 'altar'; tier: number }
   | { type: 'crowned'; site: SiteId; patron: PatronId | null; daily: boolean };
 
@@ -282,6 +301,14 @@ export interface GameState {
   clock: number;
   /** The daily shrine: the same patron and stones for everyone today. */
   daily: boolean;
+  /** One side of a two-player race (SS16): no patron, no breaks, the first crown or the last miss wins. */
+  race: boolean;
+  /** This run's weather, shown before the first stone. */
+  weather: WeatherId;
+  /** The village's buildings this temple starts with (none in the daily or a race), the first stone's width and the inn's free blessing. */
+  village: BuildingId[];
+  startW: number;
+  gift: BlessingId | null;
   /** Where the run's chances come from: `kindRand` draws only the stone kinds, so the daily's stones come in the same order whatever else happens; `rand` everything else. */
   rand: Rand;
   kindRand: Rand;
@@ -295,6 +322,12 @@ export interface NewGame {
   sites?: SiteId[];
   ranks?: Partial<Record<PatronId, number>>;
   daily?: { rand: Rand; kindRand: Rand };
+  /** One side of a race, with its random sources (the same seed on both sides, so both get the same stones). */
+  race?: { rand: Rand; kindRand: Rand };
+  /** Whether this run can bring weather: once a shrine has been crowned. The daily always can. */
+  weather?: boolean;
+  /** The village's buildings. */
+  village?: BuildingId[];
 }
 
 /** The tier that crowns the shrine where the temple stands, and its gilded tier. */
@@ -320,17 +353,21 @@ const NO_RANKS: Record<PatronId, number> = { gilded: 0, hands: 0, patient: 0, st
  * patron, drawn from its own random source, and takes it straight away.
  */
 export function newGame(opts: NewGame = {}): GameState {
-  const rand = opts.daily?.rand ?? (() => Math.random());
+  const seededBy = opts.daily ?? opts.race;
+  const rand = seededBy?.rand ?? (() => Math.random());
+  const plain = !opts.daily && !opts.race;
+  const village = plain ? [...(opts.village ?? [])] : [];
+  const startW = Math.min(PLINTH_W, START_W + (village.includes('yard') ? YARD_PX : 0));
   const s: GameState = {
     phase: 'patron',
     stones: [],
-    moving: { x: 0, w: START_W, h: 0, dir: 1, vy: 0, kind: 'normal', material: 'limestone' },
+    moving: { x: 0, w: startW, h: 0, dir: 1, vy: 0, kind: 'normal', material: 'limestone' },
     tier: 1,
     inTier: 0,
     wobbly: false,
     tiersBuilt: 0,
     balancedTiers: 0,
-    favor: 0,
+    favor: village.includes('well') ? WELL_FAVOR : 0,
     tierFavor: 0,
     blessings: [],
     offer: [],
@@ -356,22 +393,37 @@ export function newGame(opts: NewGame = {}): GameState {
     material: 'limestone',
     reserve: null,
     swapped: false,
-    patronOffer: pickPatrons(rand, opts.daily ? 1 : PATRON_OFFER),
+    patronOffer: opts.race ? [] : pickPatrons(rand, opts.daily ? 1 : PATRON_OFFER),
     patron: null,
-    site: opts.daily ? 'hill' : (opts.site ?? 'hill'),
-    sites: opts.daily ? ['hill'] : (opts.sites ?? ['hill']),
-    ranks: { ...NO_RANKS, ...(opts.daily ? {} : opts.ranks) },
+    site: plain ? (opts.site ?? 'hill') : 'hill',
+    sites: plain ? (opts.sites ?? ['hill']) : ['hill'],
+    ranks: { ...NO_RANKS, ...(plain ? opts.ranks : {}) },
     rank: 0,
     freeRerolls: 0,
     clock: 0,
     daily: !!opts.daily,
+    race: !!opts.race,
+    weather: 'clear',
+    village,
+    startW,
+    gift: null,
     rand,
-    kindRand: opts.daily?.kindRand ?? (() => Math.random()),
+    kindRand: seededBy?.kindRand ?? (() => Math.random()),
     events: [],
   };
+  // Drawn after the patrons, and only when weather can come, so a first temple draws as it always did.
+  if (opts.daily || (plain && opts.weather)) s.weather = rollWeather(rand);
   spawn(s);
   if (s.daily) choosePatron(s, s.patronOffer[0]);
+  // A race starts swinging at once, with no patron.
+  if (s.race) s.phase = 'swinging';
   return s;
+}
+
+/** Clear skies, rain or snow: weather half the time, rain or snow alike. */
+function rollWeather(rand: Rand): WeatherId {
+  if (rand() >= WEATHER_CHANCE) return 'clear';
+  return rand() < 0.5 ? 'rain' : 'snow';
 }
 
 /** `n` different patrons to choose from. */
@@ -391,9 +443,16 @@ export function choosePatron(s: GameState, id: PatronId) {
   if (id === 'gilded') s.favorPerStone += PATRON_FAVOR;
   else if (id === 'storm') s.perfectPx += STORM_PERFECT + STORM_RANK_PX * s.rank;
   else if (id === 'hands') s.freeRerolls = s.rank;
+  // The village's inn sends the temple off with a free blessing, drawn from those the patron allows.
+  if (s.village.includes('inn')) {
+    const pool = blessingsFor(s);
+    s.gift = pool[Math.floor(s.rand() * pool.length)];
+    s.blessings.push(s.gift);
+    applyBlessing(s, s.gift);
+  }
   s.speed = tierSpeed(s);
   s.phase = 'swinging';
-  s.events.push({ type: 'patron', patron: id });
+  s.events.push({ type: 'patron', patron: id, gift: s.gift });
   return true;
 }
 
@@ -417,7 +476,7 @@ export function topOf(s: GameState) {
 /** Hands out the next stone, as wide as the top one, swinging in from alternate sides. */
 function spawn(s: GameState) {
   const dir = s.dropped % 2 === 0 ? 1 : -1;
-  const w = s.stones.length ? topOf(s).w : START_W;
+  const w = s.stones.length ? topOf(s).w : s.startW;
   s.moving = { x: TOWER_X - dir * SWING, w, h: stackHeight(s) + DROP_GAP, dir, vy: 0, kind: s.nextKind, material: s.material };
   s.nextKind = kindFor(s, s.stones.length + 1);
   s.wind = cliffWind(s) + gustFor(s);
@@ -467,10 +526,13 @@ function gust(s: GameState, from: number) {
 /** The curse in force on the tier being built, if any. */
 export const curseNow = (s: GameState) => (s.curse && s.curse.tier === s.tier ? s.curse.id : null);
 
-/** How fast the stone in hand swings: the tier's speed, its kind and material, a slow drop and Haste. */
+/** Snow's sway on the swing: slower, then faster, over `SNOW_PERIOD` ms of play; 1 in any other weather. */
+export const snowSway = (s: GameState) => (s.weather === 'snow' ? 1 + SNOW_SWAY * Math.sin((2 * Math.PI * s.clock) / SNOW_PERIOD) : 1);
+
+/** How fast the stone in hand swings: the tier's speed, its kind and material, a slow drop, Haste and snow. */
 export function swingSpeed(s: GameState) {
   const basalt = s.moving.material === 'basalt' ? BASALT_SPEED : 1;
-  return s.speed * KIND_SPEED[s.moving.kind] * basalt * (s.slow ? SLOW_MULT : 1) * (curseNow(s) === 'haste' ? HASTE : 1);
+  return s.speed * KIND_SPEED[s.moving.kind] * basalt * (s.slow ? SLOW_MULT : 1) * (curseNow(s) === 'haste' ? HASTE : 1) * snowSway(s);
 }
 
 /** How close to the stone below a drop must be to be perfect: the blessings' window, scaled by the material. */
@@ -547,16 +609,18 @@ function land(s: GameState) {
   // can't save a narrow stone that misses.
   const perfect = Math.abs(m.x - top.x) <= Math.min(perfectWindow(s), (top.w + m.w) / 2 - MIN_W);
   const cut: { x: number; w: number }[] = [];
+  // In the rain a stone that isn't perfect slides a little further off as it lands.
+  const mx = !perfect && s.weather === 'rain' ? m.x + Math.sign(m.x - top.x) * RAIN_SLIDE : m.x;
   if (perfect) {
     x = top.x;
     kept = Math.min(m.w, top.w);
   } else {
-    const left = Math.max(m.x - m.w / 2, top.x - top.w / 2);
-    const right = Math.min(m.x + m.w / 2, top.x + top.w / 2);
+    const left = Math.max(mx - m.w / 2, top.x - top.w / 2);
+    const right = Math.min(mx + m.w / 2, top.x + top.w / 2);
     kept = Math.max(0, right - left);
     x = (left + right) / 2;
-    if (left > m.x - m.w / 2) cut.push({ x: (m.x - m.w / 2 + left) / 2, w: left - (m.x - m.w / 2) });
-    if (right < m.x + m.w / 2) cut.push({ x: (right + m.x + m.w / 2) / 2, w: m.x + m.w / 2 - right });
+    if (left > mx - m.w / 2) cut.push({ x: (mx - m.w / 2 + left) / 2, w: left - (mx - m.w / 2) });
+    if (right < mx + m.w / 2) cut.push({ x: (right + mx + m.w / 2) / 2, w: mx + m.w / 2 - right });
     // Heavy stones, Basalt and the Brittle curse crack a little more off either side.
     const crack = (m.kind === 'heavy' ? HEAVY_CRACK : 0) + (m.material === 'basalt' ? BASALT_CRACK : 0) + (curseNow(s) === 'brittle' ? BRITTLE_CRACK : 0);
     if (crack && kept >= MIN_W) {
@@ -568,7 +632,7 @@ function land(s: GameState) {
 
   if (kept < MIN_W) {
     const caught = s.grace > 0;
-    const d: Drop = { x: m.x, w: m.w, kept: 0, share: 0, perfect: false, missed: true, caught };
+    const d: Drop = { x: mx, w: m.w, kept: 0, share: 0, perfect: false, missed: true, caught };
     s.lastDrop = d;
     s.chain = 0;
     s.events.push({ type: 'missed', drop: d, tier: s.tier, kind: m.kind, material: m.material });
@@ -659,7 +723,8 @@ function land(s: GameState) {
       s.altars++;
       s.events.push({ type: 'altar', tier: done });
     }
-    const blessed = balanced || altar;
+    // A race has no breaks: the temples climb straight on.
+    const blessed = !s.race && (balanced || altar);
     if (blessed) {
       s.offer = pickOffer(s);
       s.curseOffer = pickCurse(s);
@@ -672,7 +737,7 @@ function land(s: GameState) {
     }
     if (blessed) {
       s.phase = 'blessing';
-    } else if (s.favor >= CHEAPEST || s.tier >= MATERIAL_FROM_TIER) {
+    } else if (!s.race && (s.favor >= CHEAPEST || s.tier >= MATERIAL_FROM_TIER)) {
       // A wobbly tier earns no blessing, but the break still opens when favor can buy something or
       // a material is to be picked.
       s.offer = [];
@@ -726,7 +791,10 @@ export const materialMult = (material: MaterialId) => (material === 'marble' ? M
  * material (known only for the tier being built). Favor is rounded up after it.
  */
 export const favorMult = (s: GameState, tier: number) =>
-  gild(tier, goalOf(s)) * (s.curse && s.curse.tier === tier ? CURSE_MULT : 1) * (tier === s.tier ? materialMult(s.material) : 1);
+  gild(tier, goalOf(s)) *
+  (s.curse && s.curse.tier === tier ? CURSE_MULT : 1) *
+  (tier === s.tier ? materialMult(s.material) : 1) *
+  (s.weather === 'clear' ? 1 : WEATHER_MULT);
 
 /** The favor a stone placed now earns; the Patient Mason's perfect drops earn nothing extra. */
 export const stoneFavor = (s: GameState, perfect: boolean, kind: StoneKind = 'normal') =>
@@ -830,9 +898,16 @@ export function chooseBlessing(s: GameState, id: BlessingId) {
   s.blessings.push(id);
   if (s.cursed && s.curseOffer) s.curse = { id: s.curseOffer, tier: s.tier };
   endBreak(s);
+  applyBlessing(s, id);
+  return true;
+}
+
+/** What a blessing does as it is kept. Broad Stones before the first stone widens the first stone instead. */
+function applyBlessing(s: GameState, id: BlessingId) {
   switch (id) {
     case 'broad':
-      widenTop(s, BROAD_PX);
+      if (s.stones.length) widenTop(s, BROAD_PX);
+      else s.moving.w = s.startW = Math.min(PLINTH_W, s.startW + BROAD_PX);
       break;
     case 'calm':
       s.speed = tierSpeed(s);
@@ -847,5 +922,4 @@ export function chooseBlessing(s: GameState, id: BlessingId) {
       s.grace++;
       break;
   }
-  return true;
 }

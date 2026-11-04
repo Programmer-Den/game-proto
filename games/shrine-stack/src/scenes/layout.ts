@@ -14,9 +14,12 @@ export const CARDS_FOUR = { xs: [333, 511, 689, 867], y: 226, w: 168, h: 170 };
 /** The two patron cards before the first stone, and their title. */
 export const PATRON_TITLE = { x: 590, y: 100 };
 export const PATRON_CARDS = { xs: [470, 710], y: 262, w: 220, h: 214 };
-/** Under the patron cards: the row of shrine sites and the daily shrine's button, by their centres. */
+/** Under the patron cards: the row of shrine sites, and below it the daily shrine's, the village's and the race's buttons, by their centres. */
 export const SITE_ROW = { xs: [420, 590, 760], y: 400, w: 158, h: 40 };
-export const DAILY_BUTTON = { x: 590, y: 452, w: 420, h: 40 };
+export const BOTTOM_ROW = { xs: [360, 590, 820], y: 452, w: 220, h: 40 };
+/** The pilgrims' village, in place of the patron cards: its three buildings and the Back button, by their centres. */
+export const VILLAGE_CARDS = { xs: [360, 590, 820], y: 266, w: 220, h: 200 };
+export const VILLAGE_BACK = { x: 590, y: 452, w: 200, h: 40 };
 export const BUTTON = { w: 200, h: 40 };
 /** The offer's title, and the reroll button beside it, by their centres. */
 export const OFFER_TITLE = { x: 520, y: 96 };

@@ -198,6 +198,8 @@ test('plays the first round', async ({ page }, testInfo) => {
   // A first temple goes up on the hill, the only site open, with every patron unranked; the daily
   // shrine's button waits on the same screen and is left alone.
   expect(s).toMatchObject({ site: 'hill', sites: ['hill'], daily: false, rank: 0 });
+  // No crown yet, so clear weather and an empty village: no head start, no rain or snow.
+  expect(s).toMatchObject({ weather: 'clear', village: [], race: false, gift: null });
   expect(await page.evaluate(() => (window as any).game.scene.getScene('Game').dailyButton)).not.toBeNull();
   const patronCards = await game.patrons();
   expect(patronCards.map((c) => c.id)).toEqual(s.patronOffer);
