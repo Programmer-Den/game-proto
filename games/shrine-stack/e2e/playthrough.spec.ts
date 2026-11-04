@@ -3,7 +3,8 @@ import { expect, test, type Page } from '@playwright/test';
 // Plays the first round with real inputs: picks one of the two patrons offered, watches the first
 // stone swing, taps to drop each of the first tier's three stones while it is over the stone below,
 // checks a tap while a stone falls drops nothing more, checks the break between tiers also offers a
-// curse and the favor shop (which it leaves alone), spends favor to reroll the balanced tier's
+// curse and the favor shop (which it leaves alone), checks the first temple stands on the hill with an
+// unranked patron and leaves the daily shrine's button alone, spends favor to reroll the balanced tier's
 // blessings, and takes one, which starts tier 2 with a trial.
 // Game state is only read, through the `game` object the dev build puts on window.
 
@@ -47,6 +48,11 @@ interface GameState {
   swapped: boolean;
   patronOffer: PatronId[];
   patron: PatronId | null;
+  site: 'hill' | 'cliff' | 'lake';
+  sites: string[];
+  rank: number;
+  freeRerolls: number;
+  daily: boolean;
 }
 type Spot = { x: number; y: number; w: number; h: number };
 type Card = Spot & { id: BlessingId };
@@ -189,6 +195,10 @@ test('plays the first round', async ({ page }, testInfo) => {
   let s = await game.state();
   expect(s).toMatchObject({ phase: 'patron', tier: 1, inTier: 0, stones: [], favor: 0, blessings: [], tiersBuilt: 0, patron: null });
   expect(new Set(s.patronOffer).size).toBe(2);
+  // A first temple goes up on the hill, the only site open, with every patron unranked; the daily
+  // shrine's button waits on the same screen and is left alone.
+  expect(s).toMatchObject({ site: 'hill', sites: ['hill'], daily: false, rank: 0 });
+  expect(await page.evaluate(() => (window as any).game.scene.getScene('Game').dailyButton)).not.toBeNull();
   const patronCards = await game.patrons();
   expect(patronCards.map((c) => c.id)).toEqual(s.patronOffer);
   const idle = s.moving.x;
@@ -201,7 +211,7 @@ test('plays the first round', async ({ page }, testInfo) => {
   await tap(await onPage(patronCards[0].x, patronCards[0].y));
   s = await game.state();
   const patron = PATRON_RULES[patronCards[0].id];
-  expect(s).toMatchObject({ phase: 'swinging', patron: patronCards[0].id, patronOffer: [], favorPerStone: patron.perStone, perfectPx: patron.perfectPx });
+  expect(s).toMatchObject({ phase: 'swinging', patron: patronCards[0].id, patronOffer: [], favorPerStone: patron.perStone, perfectPx: patron.perfectPx, rank: 0, freeRerolls: 0 });
   expect(s.moving.w).toBe(START_W);
   expect(s.speed).toBeCloseTo(SPEED_NORMAL * patron.speed);
   // The first tier is all ordinary limestone, with no trial, curse, wind, lean or reserve.

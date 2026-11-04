@@ -12,8 +12,11 @@ export const PANEL = { x: 16, y: 16, w: 214, h: 508 };
 export const CARDS = { xs: [350, 590, 830], y: 226, w: 220, h: 170 };
 export const CARDS_FOUR = { xs: [333, 511, 689, 867], y: 226, w: 168, h: 170 };
 /** The two patron cards before the first stone, and their title. */
-export const PATRON_TITLE = { x: 590, y: 118 };
-export const PATRON_CARDS = { xs: [470, 710], y: 268, w: 220, h: 196 };
+export const PATRON_TITLE = { x: 590, y: 100 };
+export const PATRON_CARDS = { xs: [470, 710], y: 262, w: 220, h: 214 };
+/** Under the patron cards: the row of shrine sites and the daily shrine's button, by their centres. */
+export const SITE_ROW = { xs: [420, 590, 760], y: 400, w: 158, h: 40 };
+export const DAILY_BUTTON = { x: 590, y: 452, w: 420, h: 40 };
 export const BUTTON = { w: 200, h: 40 };
 /** The offer's title, and the reroll button beside it, by their centres. */
 export const OFFER_TITLE = { x: 520, y: 96 };

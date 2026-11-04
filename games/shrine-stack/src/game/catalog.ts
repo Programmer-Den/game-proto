@@ -66,3 +66,20 @@ export const PATRON_INFO: Record<PatronId, { name: TextKey; boon: TextKey; bane:
   patient: { name: 'patientName', boon: 'patientBoon', bane: 'patientBane', color: 0x7fc8e8 },
   storm: { name: 'stormName', boon: 'stormBoon', bane: 'stormBane', color: 0x9ad46a },
 };
+
+/**
+ * Shrine sites (SS11): the hill is open from the start, and crowning a shrine opens the next site. Each
+ * has its own crown height (`goal`, the gilded tier two below it) and its own best. The cliff blows a
+ * steady wind off the sea; on the lake the temple stands on a raft that bobs side to side.
+ */
+export const SITES = ['hill', 'cliff', 'lake'] as const;
+export type SiteId = (typeof SITES)[number];
+
+export const SITE_INFO: Record<SiteId, { name: TextKey; text: TextKey; goal: number }> = {
+  hill: { name: 'hillName', text: 'hillText', goal: 12 },
+  cliff: { name: 'cliffName', text: 'cliffText', goal: 10 },
+  lake: { name: 'lakeName', text: 'lakeText', goal: 11 },
+};
+
+/** The site a crown here opens, or null after the last. */
+export const nextSite = (site: SiteId): SiteId | null => SITES[SITES.indexOf(site) + 1] ?? null;

@@ -63,6 +63,35 @@ const en = {
   stormBoon: 'Perfect drops get 3 more pixels of leeway.',
   stormBane: 'Gusts blow from tier 6, not only past the crown.',
 
+  // Patron favour: a ranked patron's stronger boon, and the rank on the card
+  gildedBoonRank: 'Every stone earns 1 more favour, every balanced tier {n} more.',
+  handsBoonRank: {
+    one: 'Balanced tiers offer four blessings, and {n} reroll is free.',
+    other: 'Balanced tiers offer four blessings, and {n} rerolls are free.',
+  },
+  patientBoonRank: 'Stones swing {n}% slower.',
+  stormBoonRank: 'Perfect drops get {n} more pixels of leeway.',
+  rank: 'Favour rank {rank}/{max}',
+  rankUp: '{patron} rises to rank {rank}.',
+
+  // Shrine sites: name, the banner line on arrival, and the button's note
+  hillName: 'Hill',
+  hillText: 'A quiet hilltop',
+  cliffName: 'Cliff',
+  cliffText: 'The sea wind blows from the right from tier 2',
+  lakeName: 'Lake',
+  lakeText: 'The raft bobs from side to side',
+  siteNote: 'Crown {tier} · best {best}',
+  siteLocked: 'Opens after {site}',
+  siteOpened: 'New site: {site}. Build again to build there.',
+
+  // The daily shrine
+  dailyName: 'Daily shrine',
+  dailyReady: 'Same patron and stones for all today · best {best} · streak {streak}',
+  dailyUnfinished: 'Played today: come back tomorrow',
+  dailyDone: { one: 'Today: {n} tier · streak {streak}: come back tomorrow', other: 'Today: {n} tiers · streak {streak}: come back tomorrow' },
+  dailyBest: 'Daily best {best} · streak {streak}',
+
   // Panel
   hint: 'Tap anywhere to drop the stone',
   title: 'Shrine Stack',
@@ -70,7 +99,8 @@ const en = {
   lean: 'Lean',
   leanFrom: 'Lean from tier {tier}',
   blessings: 'Blessings',
-  goal: 'Goal: crown tier {tier}',
+  goalSite: '{site}: crown tier {tier}',
+  goalDaily: 'Daily: crown tier {tier}',
   gildedGoal: 'Tier {tier} gilded: x{mult} favour',
   rules: 'Tap to drop a stone.\nOverhangs break off.\nLand 3/4 on to balance.',
   tier: 'Tier {tier}',
@@ -84,6 +114,7 @@ const en = {
   curse: 'Curse: {curse} x{mult}',
   materialTier: '{material} tier',
   patron: 'Patron: {patron}',
+  patronRanked: 'Patron: {patron}, rank {rank}',
   choosePatron: 'Choose a patron',
   hold: 'Hold: {kind}',
   holdNothing: 'Hold: nothing',
@@ -126,6 +157,7 @@ const en = {
   balanced: 'Tier {tier} balanced: choose a blessing',
   altarBlessing: 'Sky altar {tier}: choose a blessing',
   reroll: 'Reroll',
+  free: 'free',
   spendFavour: 'Spend favour (you have {n})',
   bought: 'ok',
   stoneFor: 'Stone for tier {tier}: {material}',
@@ -143,8 +175,9 @@ const en = {
     one: 'Your shrine stood {n} tier tall,\n{balanced} of them balanced, for {favour} favour.',
     other: 'Your shrine stood {n} tiers tall,\n{balanced} of them balanced, for {favour} favour.',
   },
-  bestTiers: { one: 'Best {n} tier.', other: 'Best {n} tiers.' },
-  crownedText: 'All {tiers} tiers stand,\n{balanced} of them balanced, for {favour} favour.\n\nKeep building into the windy sky?',
+  bestOn: { one: 'Best ({site}): {n} tier.', other: 'Best ({site}): {n} tiers.' },
+  crownedText: 'All {tiers} tiers stand,\n{balanced} of them balanced, for {favour} favour.',
+  keepAsk: 'Keep building into the windy sky?',
 };
 
 export default en;

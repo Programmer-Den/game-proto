@@ -63,6 +63,35 @@ const de: Translation<typeof en> = {
   stormBoon: 'Perfekte Würfe haben 3 Pixel mehr Spielraum.',
   stormBane: 'Böen wehen ab Ebene 6, nicht erst nach der Krone.',
 
+  // Patron favour
+  gildedBoonRank: 'Jeder Stein bringt 1 Gunst mehr, jede ausgewogene Ebene {n} mehr.',
+  handsBoonRank: {
+    one: 'Ausgewogene Ebenen bieten vier Segen, und {n} Neuwurf ist gratis.',
+    other: 'Ausgewogene Ebenen bieten vier Segen, und {n} Neuwürfe sind gratis.',
+  },
+  patientBoonRank: 'Steine schwingen {n} % langsamer.',
+  stormBoonRank: 'Perfekte Würfe haben {n} Pixel mehr Spielraum.',
+  rank: 'Gunst-Rang {rank}/{max}',
+  rankUp: '{patron} steigt auf Rang {rank}.',
+
+  // Shrine sites
+  hillName: 'Hügel',
+  hillText: 'Ein stiller Hügel',
+  cliffName: 'Klippe',
+  cliffText: 'Ab Ebene 2 weht der Seewind von rechts',
+  lakeName: 'See',
+  lakeText: 'Das Floß schaukelt hin und her',
+  siteNote: 'Krone {tier} · Rekord {best}',
+  siteLocked: 'Öffnet nach {site}',
+  siteOpened: 'Neuer Ort: {site}. Neu bauen, um dort zu bauen.',
+
+  // The daily shrine
+  dailyName: 'Tagesschrein',
+  dailyReady: 'Heute für alle gleicher Schutzherr und Steine · Rekord {best} · Serie {streak}',
+  dailyUnfinished: 'Heute gespielt: komm morgen wieder',
+  dailyDone: { one: 'Heute: {n} Ebene · Serie {streak}: komm morgen wieder', other: 'Heute: {n} Ebenen · Serie {streak}: komm morgen wieder' },
+  dailyBest: 'Tagesrekord {best} · Serie {streak}',
+
   // Panel
   hint: 'Tippe irgendwo, um den Stein fallen zu lassen',
   title: 'Shrine Stack',
@@ -70,7 +99,8 @@ const de: Translation<typeof en> = {
   lean: 'Neigung',
   leanFrom: 'Neigung ab Ebene {tier}',
   blessings: 'Segen',
-  goal: 'Ziel: Ebene {tier} krönen',
+  goalSite: '{site}: Ebene {tier} krönen',
+  goalDaily: 'Tag: Ebene {tier} krönen',
   gildedGoal: 'Ebene {tier} vergoldet: x{mult} Gunst',
   rules: 'Tippen lässt einen Stein fallen.\nÜberhänge brechen ab.\n3/4 aufsetzen für Balance.',
   tier: 'Ebene {tier}',
@@ -84,6 +114,7 @@ const de: Translation<typeof en> = {
   curse: 'Fluch: {curse} x{mult}',
   materialTier: 'Ebene aus {material}',
   patron: '{patron}',
+  patronRanked: '{patron}, Rang {rank}',
   choosePatron: 'Wähle einen Schutzherrn',
   hold: 'Halten: {kind}',
   holdNothing: 'Halten: nichts',
@@ -126,6 +157,7 @@ const de: Translation<typeof en> = {
   balanced: 'Ebene {tier} ausgewogen: wähle einen Segen',
   altarBlessing: 'Himmelsaltar {tier}: wähle einen Segen',
   reroll: 'Würfeln',
+  free: 'gratis',
   spendFavour: 'Gunst ausgeben (du hast {n})',
   bought: 'ok',
   stoneFor: 'Stein für Ebene {tier}: {material}',
@@ -143,8 +175,9 @@ const de: Translation<typeof en> = {
     one: 'Dein Schrein stand {n} Ebene hoch,\n{balanced} davon ausgewogen, für {favour} Gunst.',
     other: 'Dein Schrein stand {n} Ebenen hoch,\n{balanced} davon ausgewogen, für {favour} Gunst.',
   },
-  bestTiers: { one: 'Rekord {n} Ebene.', other: 'Rekord {n} Ebenen.' },
-  crownedText: 'Alle {tiers} Ebenen stehen,\n{balanced} davon ausgewogen, für {favour} Gunst.\n\nWeiter in den windigen Himmel bauen?',
+  bestOn: { one: 'Rekord ({site}): {n} Ebene.', other: 'Rekord ({site}): {n} Ebenen.' },
+  crownedText: 'Alle {tiers} Ebenen stehen,\n{balanced} davon ausgewogen, für {favour} Gunst.',
+  keepAsk: 'Weiter in den windigen Himmel bauen?',
 };
 
 export default de;
