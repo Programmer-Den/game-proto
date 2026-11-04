@@ -1217,8 +1217,10 @@ function fire(g: Game, tower: Tower, dt: number, boost: number) {
   const { x, y } = centre(tower.cell);
   const lvl = tier(tower.level);
   const range = reachOf(g, tower.cell, tower.kind);
-  // At night a tower sees only the foes lit this step.
-  const reaches = (f: Foe) => !f.dead && (!g.lit || g.lit.has(f.id)) && (def.air || !FOE[f.kind].flies) && (!def.airOnly || !!FOE[f.kind].flies) && sees(g, tower.cell, f.x, f.y);
+  // At night a tower sees only the foes lit this step; in Versus only the foes in its own garden.
+  const side = sideOf(g, tower.cell);
+  const reaches = (f: Foe) =>
+    !f.dead && (!g.lit || g.lit.has(f.id)) && (def.air || !FOE[f.kind].flies) && (!def.airOnly || !!FOE[f.kind].flies) && (!g.versus || gateSide(g, f.gate) === side) && sees(g, tower.cell, f.x, f.y);
   if (tower.kind === 'sunglass') {
     const cells = beamCells(g, tower.cell, tower.face);
     const lit = new Set(cells);
@@ -1378,9 +1380,11 @@ function moveShot(g: Game, s: Shot, dt: number) {
 
 /** Honey pots lure and burst, and bramble snares catch the first foe to step on them. */
 function springTraps(g: Game) {
-  const ground = g.foes.filter((f) => !f.dead && !FOE[f.kind].flies);
+  const all = g.foes.filter((f) => !f.dead && !FOE[f.kind].flies);
   for (const trap of g.traps) {
     const at = centre(trap.cell);
+    // In Versus a trap lures, catches and bursts on the foes of its own garden only.
+    const ground = g.versus ? all.filter((f) => gateSide(g, f.gate) === sideOf(g, trap.cell)) : all;
     if (trap.kind === 'snare') {
       const caught = ground.find((f) => f.from === trap.cell);
       if (!caught) continue;

@@ -289,7 +289,7 @@ played, and is kept for the next game:
 **Versus.** The Versus button under the gardeners plays two gardeners on one screen, each on a
 garden of their own: the lawn is fenced down the middle, with a burrow at each outer edge and a
 cottage each by the fence. Each has their own gold, tools and 10 cabbages, and both get every wave,
-which never stops. Every foe a gardener beats (but not one sent over) comes out of the other's
+which never stops. Towers and traps only reach the foes in their own garden, never over the fence. Every foe a gardener beats (but not one sent over) comes out of the other's
 burrow a moment and a half later, at full health; held waves pay each gardener in full. The first
 to lose every cabbage loses (both on the same moment is a draw), and Rematch plays again. Versus
 keeps no records, pays no seeds and earns no trophies.
@@ -328,7 +328,7 @@ with the maze planted, telling how many of its pieces fit.
 | --- | --- | --- |
 | First hedge row | Bronze | Hold off your first wave |
 | The long way round | Bronze | Make a burrow walk 60 steps to the cottage (not on a path garden) |
-| Safe for the season | Bronze | Hold off all 20 waves in a garden |
+| Safe for the season | Bronze | Hold off all 20 waves in a garden (Classic, Challenge or Night) |
 | Master gardener | Bronze | Raise a tower to its master level |
 | Make do | Silver | Win a garden's Challenge |
 | Not one leaf lost | Silver | Win a garden with every cabbage still in the patch |
