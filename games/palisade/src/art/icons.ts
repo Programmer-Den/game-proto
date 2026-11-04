@@ -134,6 +134,35 @@ const ICONS: Record<Icon, (ctx: Ctx) => void> = {
     line(ctx, [[28, 4], [26, 14], [31, 20]], '#5a2a9a', 2);
     for (const x of [23, 28, 33]) line(ctx, [[x, 40], [x, 46]], '#7a6a5a', 1.5);
   },
+  // The warden's skills: a green kite shield (Heavy Shield), a flanged mace (Vigilance), a shield
+  // shoving with motion lines (Shove) and a hound's head (Sharp Fangs, Firm Hold, Second Hound).
+  shield: (ctx) => {
+    facet(ctx, [[10, 8], [46, 8], [46, 28], [28, 52], [10, 28]], '#2f7a4a', { k: 1.3 });
+    poly(ctx, [[10, 8], [46, 8], [46, 12], [10, 12]], '#e5b53a');
+    gem(ctx, 28, 26, 7, 6, 0.3, '#b8862c', '#ffe48a');
+  },
+  mace: (ctx) => {
+    line(ctx, [[14, 50], [34, 18]], '#6a4426', 5);
+    poly(ctx, rect(10, 46, 9, 6), '#e5b53a');
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      poly(ctx, [[38 + Math.cos(a) * 6, 14 + Math.sin(a) * 6], [38 + Math.cos(a + 0.3) * 16, 14 + Math.sin(a + 0.3) * 16], [38 + Math.cos(a + 0.6) * 6, 14 + Math.sin(a + 0.6) * 6]], '#9aa4ae');
+    }
+    gem(ctx, 38, 14, 9, 8, 0.2, '#5d6379', '#d8e0e8');
+  },
+  shove: (ctx) => {
+    for (const y of [16, 28, 40]) line(ctx, [[4, y], [16, y]], '#f3ead2', 2.5);
+    facet(ctx, [[22, 8], [50, 8], [50, 28], [36, 50], [22, 28]], '#2f7a4a', { k: 1.3 });
+    poly(ctx, [[22, 8], [50, 8], [50, 12], [22, 12]], '#e5b53a');
+  },
+  hound: (ctx) => {
+    facet(ctx, [[8, 40], [14, 22], [26, 14], [40, 16], [50, 28], [48, 36], [32, 38], [24, 50], [12, 50]], '#9a6a3c', { k: 1.3 });
+    poly(ctx, [[24, 16], [20, 2], [32, 14]], '#6e4826');
+    poly(ctx, [[48, 30], [54, 32], [50, 36]], '#2a1c14');
+    poly(ctx, [[36, 36], [40, 42], [44, 36]], '#efe7d4');
+    poly(ctx, ngon(36, 24, 3, 3, 6), '#2a1c14');
+    poly(ctx, [[14, 40], [26, 40], [24, 44], [16, 44]], '#2f7a4a');
+  },
   bow: (ctx) => {
     const t: Pt = [20, 6];
     const g: Pt = [34, 28];

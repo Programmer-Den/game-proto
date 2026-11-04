@@ -16,6 +16,10 @@ const en: HowToPlay = {
       action: 'Hire a spearman or a mage with coins, or train one you have',
     },
     { input: 'Fortify button, during a break', action: 'Buy a stake line, an oil pot or a lookout, one per break' },
+    {
+      input: 'Siege engine button, during a break',
+      action: 'Build a ballista or a catapult on the wall, upgrade it and set its aim',
+    },
     { input: 'Repair button, during a break', action: 'Mend 15% of the barricade for coins, a little dearer each time' },
     { input: 'Accept or Refuse an omen', action: 'From wave 4, take on a harder wave for 30% more experience' },
     { input: 'Tap a card', action: 'Take that upgrade at a level-up, or that road after a boss' },
@@ -42,6 +46,9 @@ const en: HowToPlay = {
     'A hero who knows every skill or lifted the siege can retire: the next hero keeps a legacy.',
     'Lifting the siege opens the frozen pass, a second map with its own foes and boss for the same hero.',
     'Retiring a hero opens the mage, who casts bolts through shields and has a skill tree of their own.',
+    'A second retirement opens the warden, who slams foes back from the barricade with a hound at their side.',
+    'The ballista pierces a whole line of foes; the catapult lobs stones into the back ranks.',
+    'After lifting the siege, Endless siege keeps the waves coming, stronger each time, for a best wave per map.',
   ],
 };
 
@@ -59,6 +66,10 @@ const de: HowToPlay = {
       action: 'Einen Speerträger oder Magier für Münzen anheuern, oder eine Wache ausbilden',
     },
     { input: 'Befestigen, in einer Pause', action: 'Eine Pfahlreihe, einen Öltopf oder einen Ausguck kaufen, einen pro Pause' },
+    {
+      input: 'Geschütz, in einer Pause',
+      action: 'Eine Balliste oder ein Katapult auf der Mauer bauen, verbessern und sein Ziel wählen',
+    },
     { input: 'Reparieren, in einer Pause', action: '15 % der Barrikade für Münzen reparieren, jedes Mal etwas teurer' },
     { input: 'Ein Omen annehmen oder ablehnen', action: 'Ab Welle 4 eine härtere Welle für 30 % mehr Erfahrung wagen' },
     { input: 'Eine Karte antippen', action: 'Diese Verbesserung beim Stufenaufstieg nehmen, oder diesen Weg nach einem Boss' },
@@ -85,6 +96,9 @@ const de: HowToPlay = {
     'Ein Held, der jede Fertigkeit kennt oder die Belagerung gebrochen hat, kann sich zur Ruhe setzen: der nächste Held behält ein Vermächtnis.',
     'Eine gebrochene Belagerung öffnet den Eispass, eine zweite Karte mit eigenen Feinden und eigenem Boss für denselben Helden.',
     'Der erste Ruhestand öffnet den Magier, der Bolzen durch Schilde zaubert und eigene Fertigkeiten hat.',
+    'Der zweite Ruhestand öffnet den Wächter, der Feinde mit einem Hund an seiner Seite von der Barrikade zurückschlägt.',
+    'Die Balliste durchbohrt eine ganze Reihe Feinde; das Katapult wirft Steine in die hinteren Reihen.',
+    'Nach der gebrochenen Belagerung lässt Endlos weiter die Wellen immer stärker kommen, mit einer besten Welle pro Karte.',
   ],
 };
 

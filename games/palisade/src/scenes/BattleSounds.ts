@@ -64,7 +64,8 @@ export class BattleSounds {
     // What was launched: one sound per volley.
     const launched = new Set(s.missiles.filter((m) => fresh(m.id)).map((m) => m.kind));
     if (launched.has('arrow')) sfx('bow');
-    if (launched.has('fireball') || launched.has('rock')) sfx('whoosh');
+    if (launched.has('fireball') || launched.has('rock') || launched.has('stone')) sfx('whoosh');
+    if (launched.has('lance')) sfx('twang');
     // The hired mage's bolt and the mage hero's cast share the arcane sound.
     if (launched.has('magic') || launched.has('spell')) sfx('magic');
     // Arrows that are gone hit something, unless the wave ended or the run did and cleared them.
@@ -102,6 +103,8 @@ export class BattleSounds {
     else if (kinds.has('blast')) sfx('blast');
     if (kinds.has('bolt')) sfx('zap');
     if (kinds.has('stab')) sfx('stab');
+    if (kinds.has('slam')) sfx('slam');
+    if (kinds.has('bite')) sfx('bite');
     if (kinds.has('arcane')) sfx('arcane');
     if (kinds.has('heal')) sfx('heal');
     if (kinds.has('rockHit')) sfx('thud');

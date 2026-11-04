@@ -32,7 +32,8 @@ run a day, the same for everyone.
 | Repair (right of Fortify) | During a break, mend 15% of the barricade for coins; each repair of the run costs 10 more |
 | Accept / Refuse on an omen card | From wave 4, take on (or turn down) the coming wave's omen for 30% more experience; left alone it is refused |
 | Aim toggle (above the caltrops) or T | Cycle who the ranger shoots first: Nearest, Strongest, Flyers or Healers |
-| Keep fighting / Heat N | After the siege is lifted on wave 30: fight on past it, or start a new run at the next heat |
+| Endless siege / Heat N | After the siege is lifted on wave 30: fight on past it as the waves grow stronger, or start a new run at the next heat |
+| Siege engine button | In a break: build a ballista or a catapult on the wall, upgrade it, and set its aim (any time) |
 | Tap a road card | After a boss, take that road for the next ten waves (after 10 seconds one is taken at random) |
 | Tap or click a card | Take that upgrade when a level-up comes up (after 10 seconds one is taken at random, and a pop-up names it) |
 | Auto-pick checkbox (beside the level-up's countdown) | On by default; untick it to halt the countdown so a level-up waits for your pick, tick it to let it run again |
@@ -101,8 +102,8 @@ skill book lists the relics of a full set in green with its bonus above them.
 ### Siege lifted and heats
 
 Beating the third boss, the Frost Giant on wave 30, **lifts the siege**: the run is won, with a
-victory panel over the relic chest. "Keep fighting" goes on to wave 31 and beyond on the same
-heat, with a boss every tenth wave as before; "Heat N" starts a new run at the next heat, from wave
+victory panel over the relic chest. "Endless siege" goes on to wave 31 and beyond on the same
+heat, with a boss every tenth wave as before (see Endless siege below); "Heat N" starts a new run at the next heat, from wave
 1 with the hero kept; "To the frozen pass" marches on to the second map (see below). Each heat adds a rule on top of the lower ones, and the game-over panel's
 "Next run at" row starts the next run at any heat unlocked so far. A chip beside the wave track
 shows the heat the run is on.
@@ -116,6 +117,18 @@ shows the heat the run is on.
 ![The siege is lifted, with the way on to the frozen pass](docs/screenshots/siege-lifted.webp)
 ![A new run at Heat 1](docs/screenshots/heat-1.webp)
 ![The game-over panel with the map, the heats, the forced march, the hero's class and the daily siege](docs/screenshots/game-over-heats.webp)
+
+### Endless siege
+
+"Endless siege" on the victory panel keeps the run going past wave 30. Every wave after 30 is
+stronger than the one before: foes have 6% more health per wave over 30 (compounded, so about 1.8x
+by wave 40) and 1.5% more chance per wave over 30 to come as an elite. The hero keeps levelling and
+the breaks, bosses, roads and relic chests carry on as before. Each map keeps its own best endless
+wave, saved with the hero: a chip under the wave track reads "Endless, best N" while the endless
+siege is on, the victory panel names the best so far, and the game-over panel names it after an
+endless run falls.
+
+![The endless siege's chip with the best wave on this map](docs/screenshots/endless-siege.webp)
 
 ### The frozen pass
 
@@ -181,6 +194,32 @@ hero.
 
 ![The mage hero casting violet bolts](docs/screenshots/mage-hero.webp)
 ![The mage's skill book](docs/screenshots/mage-skill-book.webp)
+
+### The warden
+
+The second retirement opens a third class, the **warden** (the retire panel's "The next hero" row
+and the game-over panel's "Hero" button show it dimmed, and refuse it, until then). The warden
+stands at the barricade instead of behind it and doesn't shoot: every 1.2s they slam every foe
+within 60 of the barricade's front for 14 and shove it back 16 (a boss a third as far), and a
+hound runs out to bite the foe nearest the barricade, for half the warden's damage, and holds it
+there, slowed by 60% for 0.7s (half as much on a boss). The hound keeps off flyers. The warden has
+a skill tree of their own and shares the barricade, guard, caltrops, Arrow Rain and lore skills;
+their base skills with no cap are Vigilance, Heavy Shield and Stout Timber.
+
+| Warden skill | Ranks | What it does |
+| --- | --- | --- |
+| Heavy Shield | 5, then no cap | Slams deal 25% more damage |
+| Vigilance | 5, then no cap | Slam 20% faster |
+| Long Reach | 3 | Slams reach 20 further in front of the barricade |
+| Shove | 3 | Slams push foes 14 further back |
+| Daze | 3 | Slammed foes are slowed by half for 0.4s a rank |
+| Giant's Bane | 3 | Slams, bites and Arrow Rain deal 30% more damage to bosses |
+| Bulwark | 3 | Foes hack at the barricade 10% slower |
+| Sharp Fangs | 3 | The hound bites 40% harder |
+| Firm Hold | 3 | Bitten foes are held 0.35s longer |
+| Second Hound | 1 | A second hound joins the first (after Sharp Fangs) |
+
+![The warden slamming foes back, with two hounds](docs/screenshots/warden-hero.webp)
 
 ### Daily siege
 
@@ -300,6 +339,23 @@ the panel is open.
 **Paid repairs.** The "Repair" button beside Fortify mends 15% of the barricade's health during a
 break, for 15 coins, then 25, 35 and so on within the run, so coins go to repairs, guards or a
 fortification. It is lit while the barricade is hurt and the coins are there.
+
+### Siege engines
+
+A "Siege engine" button beside the aim toggle opens the engine panel. In a break, one engine can be
+built on the wall for the run, and later breaks buy its upgrades (two ranks each); the aim can be
+switched any time, also during a wave. The battle waits while the panel is open. An engine's
+damage grows by 15% of its base every wave, and it stands idle while the barricade is down.
+
+| Engine | Cost | What it does | Upgrades (35 then 60 coins a rank) | Aim |
+| --- | --- | --- | --- | --- |
+| Ballista | 40 coins | A bolt every 2.6s for 24 that flies on through every foe in its line, shields and all | Heavy Bolts (+50% damage), Iron Winch (reloads 35% faster) | Strongest, Nearest, Flyers |
+| Catapult | 50 coins | A stone every 4s for 30 that lands among the back ranks (or the thickest crowd) and crushes every foe within 55 | Bigger Stones (+40% damage, wider), Pitch Pots (sets them alight) | Back ranks, Crowd |
+
+The catapult can't hit flyers or foes right at the barricade.
+
+![The siege engine panel: a ballista or a catapult to build](docs/screenshots/engine-panel.webp)
+![The catapult lobbing a stone at the back ranks](docs/screenshots/catapult.webp)
 
 ### Kill streak
 
@@ -510,7 +566,7 @@ All paths are inside `games/palisade/`.
 - `src/trophies/`: the trophies (`index.ts`), their texts (`i18n/`) and when each is earned
   (`check.ts`).
 - `src/ui/`: the level-up cards, the road cards (`RoadChoice`), the hire panel (`HirePanel`), the
-  fortify panel (`FortifyPanel`), the omen card (`OmenCard`), the legacy cards (`LegacyPanel`), the skill book, and `panel.ts` with the slate-and-gold panels,
+  fortify panel (`FortifyPanel`), the siege engine panel (`EnginePanel`), the omen card (`OmenCard`), the legacy cards (`LegacyPanel`), the skill book, and `panel.ts` with the slate-and-gold panels,
   buttons and text style.
 
 Adding an upgrade is an entry in `src/game/upgrades.ts` and its effect in `stats` in
