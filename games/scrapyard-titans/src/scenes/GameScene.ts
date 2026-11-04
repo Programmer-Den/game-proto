@@ -5,16 +5,17 @@ import { aiLog, mountWatch, watching, watchSteps } from '../../../../shared/watc
 import { playMusic, playSting, stopMusic, ui, type PlayOptions } from '../../../../shared/audio';
 import { FIGHT_SONG, PLAN_SONG, play, type Sfx } from '../audio';
 import {
-  AUGMENT_BY_ID, CLASS_STATS, COST_COLOR, DRAFT_PICK_S, ECONOMY, ITEM_BENCH, ITEMS, MAX_LEVEL, ORIGIN_COLOR, PLAN_S, PLAYER_COMMANDERS, RANKS, RIVALS, SETS,
+  AUGMENT_BY_ID, CAMPAIGN, CLASS_STATS, GHOST, COST_COLOR, DRAFT_PICK_S, ECONOMY, ITEM_BENCH, ITEMS, MAX_LEVEL, ORIGIN_COLOR, PLAN_S, PLAYER_COMMANDERS, RANKS, RIVALS, SETS,
   PARTS, RAT, SCRAP_TOKENS_PER_PART, SKILLS, TERRAIN, TRAITS, UNIT_BY_ID, comboOf, isPart,
   type CommanderDef, type DeedId, type PartId, type SetId, type TraitId,
 } from '../game/data';
 import {
-  addRankPoints, doDeeds, fullOrigin, isUnlocked, loadProgress, planDeeds, rankOf, recordWeekly, saveProgress, weekOf, weekStart, weeklyBest, weeklyRules,
+  addRankPoints, campaignKit, clearLobby, doDeeds, fullOrigin, isUnlocked, loadProgress, loadSquads, lobbyCleared, nextLobby, pickSquad, planDeeds, rankOf,
+  recordWeekly, saveProgress, saveSquad, weekOf, weekStart, weeklyBest, weeklyRules,
 } from '../progress';
 import { STEP_S, traitValue, type BEvent } from '../game/battle';
 import {
-  advance, boardCount, boardUnits, buy, buyXp, countTraits, draftPick, endFight, equip, equipPreview, matchOver, moveUnit, newDrops, newMatch,
+  advance, isGhostRound, squadOf, boardCount, boardUnits, buy, buyXp, countTraits, draftPick, endFight, equip, equipPreview, matchOver, moveUnit, newDrops, newMatch,
   pickAugment, player, rerollCost, reroll, roundLabel, sell, sellValue, startDraft, startFight, startPlan, unitAt, unitCost,
   xpToNext, allUnits,
   toggleShopLock,
@@ -51,7 +52,7 @@ const FONT = 'Verdana, Arial, sans-serif';
 const reduced = settings.reduceMotion;
 /** Fight sounds left out of a watched match, which plays a thinner, quieter battle. */
 const WATCH_QUIET = new Set<Sfx>(['hit', 'punch', 'shot', 'heal', 'shield', 'dodge', 'tick']);
-const CAST_SOUND: Record<string, Sfx> = { shield: 'castShield', slam: 'castSlam', barrage: 'castBarrage', snipe: 'castSnipe', backstab: 'blink', repair: 'castRepair' };
+const CAST_SOUND: Record<string, Sfx> = { shield: 'castShield', slam: 'castSlam', barrage: 'castBarrage', snipe: 'castSnipe', backstab: 'blink', repair: 'castRepair', bomb: 'castBarrage' };
 const PROJ_SOUND: Record<string, Sfx> = { shot: 'shot', shell: 'shell', snipe: 'snipe' };
 
 interface View {
@@ -120,7 +121,7 @@ export class GameScene extends Phaser.Scene {
   /** The match, or null on the menu. Read by the playthrough test. */
   state: Match | null = null;
   /** The menu's choices. */
-  menu = { commander: 0, set: 'scrap' as SetId | 'weekly', terrain: false };
+  menu = { commander: 0, set: 'scrap' as SetId | 'weekly' | 'campaign', terrain: false };
   /** The fight's playback speed (1 or 2). */
   speed = 1;
   private t = 0;
@@ -174,6 +175,10 @@ export class GameScene extends Phaser.Scene {
   /** The rank points the finished match won, for the end screen. */
   private rankGain: { gained: number; before: number; after: number } | null = null;
   private recorded = false;
+  /** The campaign lobby the finished match played: whether it was cleared and the reward it added. */
+  private lobbyEnd: { cleared: boolean; reward: string | null } | null = null;
+  /** Whether the finished match saved the player's squad. */
+  private squadSaved = false;
 
   constructor() {
     super('Game');
@@ -229,13 +234,20 @@ export class GameScene extends Phaser.Scene {
 
   startMatch() {
     const commander = watching ? Math.floor(Math.random() * PLAYER_COMMANDERS.length) : this.menu.commander;
-    // The weekly season takes its season and terrain from the date.
+    // The weekly season takes its season and terrain from the date, a campaign lobby from the lobby.
     const week = !watching && this.menu.set === 'weekly' ? weekOf(Date.now()) : null;
-    const rules = week === null ? null : weeklyRules(week);
+    const lobby = !watching && this.menu.set === 'campaign' ? nextLobby(this.progress) : null;
+    const rules = week !== null ? weeklyRules(week) : lobby !== null ? CAMPAIGN[lobby] : null;
     const set = rules ? rules.set : watching ? (Math.random() < 0.5 ? 'scrap' : 'neon') : (this.menu.set as SetId);
     const terrain = rules ? rules.terrain : watching ? Math.random() < 0.5 : this.menu.terrain;
-    this.state = newMatch({ set, commander, terrain, watch: watching, rank: watching ? 0 : rankOf(this.progress.points), weekly: week });
+    const rank = watching ? 0 : lobby !== null ? CAMPAIGN[lobby].rank : rankOf(this.progress.points);
+    this.state = newMatch({
+      set, commander, terrain, watch: watching, rank, weekly: week, lobby,
+      kit: lobby !== null ? campaignKit(this.progress) : [], ghost: watching ? null : pickSquad(),
+    });
     this.recorded = false;
+    this.lobbyEnd = null;
+    this.squadSaved = false;
     this.unlockedNow = [];
     this.rankGain = null;
     this.avatar.setTexture(cmdKey(PLAYER_COMMANDERS[commander].name)).setVisible(true);
@@ -348,6 +360,13 @@ export class GameScene extends Phaser.Scene {
     this.rankGain = addRankPoints(this.progress, place);
     if (this.state?.opts.weekly != null) recordWeekly(this.progress, this.state.opts.weekly, place);
     saveProgress(this.progress);
+    const m = this.state;
+    if (m && m.opts.lobby != null) {
+      const cleared = lobbyCleared(m, place);
+      this.lobbyEnd = { cleared, reward: cleared ? clearLobby(this.progress, m.opts.lobby) : null };
+    }
+    // A won match's final board is kept, to come back as a ghost in a later match.
+    if (m && place === 1) this.squadSaved = saveSquad(squadOf(m));
     this.noteDeeds(place <= 4 ? (place === 1 ? ['topFour', 'champion'] : ['topFour']) : []);
     if (place === 1 && this.state?.opts.weekly != null) award(trophies, 'weeklyWin');
     this.awardProgress();
@@ -1319,12 +1338,12 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     const label = roundLabel(m);
-    const kind = t(m.round.kind === 'pvp' ? 'vsRival' : m.round.kind === 'draft' ? 'draft' : m.round.kind === 'rat' ? 'ratChase' : 'vsMonsters');
+    const kind = t(m.round.kind === 'pvp' ? 'vsRival' : m.round.kind === 'draft' ? 'draft' : m.round.kind === 'rat' ? 'ratChase' : isGhostRound(m) && player(m).human ? 'vsGhostSquad' : 'vsMonsters');
     let phase = '';
     if (m.phase === 'plan') phase = t('planPhase', { n: Math.max(0, Math.ceil(m.phaseEnds - m.time)) });
     else if (m.phase === 'fight') {
       const rival = m.opponent >= 0 ? t(m.players[m.opponent].name) : '';
-      const opp = rival ? (m.ghost ? t('ghost', { name: rival }) : rival) : t(m.round.kind === 'rat' ? 'tapRat' : 'monsters');
+      const opp = rival ? (m.ghost ? t('ghost', { name: rival }) : rival) : t(m.round.kind === 'rat' ? 'tapRat' : m.ghostSquad ? 'ghostSquad' : 'monsters');
       phase = t('fightPhase', { opp, n: m.battle ? Math.floor(m.battle.time) : 0 });
     } else if (m.phase === 'result') phase = t('resultPhase');
     else if (m.phase === 'draft') {
@@ -1373,7 +1392,16 @@ export class GameScene extends Phaser.Scene {
       g.fillStyle(0x05040f, 0.8).fillRect(0, 0, VIEW.w, VIEW.h);
       const place = m.phase === 'won' ? 1 : me.place;
       say(VIEW.w / 2, VIEW.fy + 150, t(m.phase === 'won' ? 'won' : 'lost'), 34, m.phase === 'won' ? '#7cf3ff' : '#ff8a7a', { fontStyle: 'bold', stroke: INK, strokeThickness: 6 }).setOrigin(0.5);
-      say(VIEW.w / 2, VIEW.fy + 200, t(watching ? 'seatFinished' : 'youFinished', { place: ordinal(place), round: roundLabel(m) }), 16, '#ffffff').setOrigin(0.5);
+      say(VIEW.w / 2, VIEW.fy + 200, t(watching ? 'seatFinished' : 'youFinished', { place: ordinal(place), n: m.players.length, round: roundLabel(m) }), 16, '#ffffff').setOrigin(0.5);
+      const le = this.lobbyEnd;
+      if (le && m.opts.lobby != null) {
+        const lobby = CAMPAIGN[m.opts.lobby];
+        const text = le.cleared
+          ? t(le.reward ? 'lobbyCleared' : 'lobbyClearedAgain', { n: m.opts.lobby + 1, name: t(lobby.name), reward: le.reward ? this.rewardName(le.reward) : '' })
+          : t('lobbyFailed', { n: m.opts.lobby + 1, goal: this.lobbyGoal(m.opts.lobby) });
+        say(VIEW.w / 2, VIEW.fy + 182, text, 13, le.cleared ? C.gold : '#ff8a7a', { fontStyle: 'bold', align: 'center' }).setOrigin(0.5);
+      }
+      if (this.squadSaved) say(VIEW.w / 2, VIEW.fy + 324, t('squadSaved', { round: `${GHOST.stage}-${GHOST.index}` }), 12, '#7cf3ff').setOrigin(0.5);
       const rg = this.rankGain;
       if (rg) {
         const rankText = rg.after > rg.before ? t('rankUp', { rank: t(RANKS[rg.after].name) }) : t('rankPoints', { n: rg.gained, rank: t(RANKS[rg.after].name), points: this.progress.points });
@@ -1457,14 +1485,16 @@ export class GameScene extends Phaser.Scene {
         this.dirty = true;
       } });
     });
-    // The weekly season sets the terrain itself.
-    const weekly = this.menu.set === 'weekly';
-    const terrainOn = weekly ? rules.terrain : this.menu.terrain;
+    // The weekly season and the campaign set the terrain themselves.
+    const lobby = nextLobby(this.progress);
+    const campaign = this.menu.set === 'campaign';
+    const weekly = this.menu.set === 'weekly' || campaign;
+    const terrainOn = campaign ? CAMPAIGN[lobby].terrain : this.menu.set === 'weekly' ? rules.terrain : this.menu.terrain;
     const tr = { x: VIEW.w / 2 - 300, y: VIEW.fy + 384, w: 290, h: 40 };
     g.fillStyle(terrainOn ? 0x2a2360 : C.panel, weekly ? 0.5 : 0.95).fillRoundedRect(tr.x, tr.y, tr.w, tr.h, 10);
     g.lineStyle(terrainOn ? 2.5 : 1.2, terrainOn ? 0x39e58c : C.panelLine, weekly ? 0.4 : 1).strokeRoundedRect(tr.x, tr.y, tr.w, tr.h, 10);
     say(tr.x + 12, tr.y + 6, t(terrainOn ? 'terrainOn' : 'terrainOff'), 13, weekly ? C.dim : '#ffffff', { fontStyle: 'bold' });
-    say(tr.x + 12, tr.y + 24, t(weekly ? 'weeklySetsTerrain' : 'terrainKinds'), 9, C.dim);
+    say(tr.x + 12, tr.y + 24, t(campaign ? 'lobbySetsTerrain' : weekly ? 'weeklySetsTerrain' : 'terrainKinds'), 9, C.dim);
     this.overlayButtons.push({ ...tr, run: () => {
       if (weekly) return ui('refuse');
       this.menu.terrain = !this.menu.terrain;
@@ -1475,10 +1505,47 @@ export class GameScene extends Phaser.Scene {
       ui('click');
       this.startMatch();
     }, { list: this.overlayButtons, container: this.overlay, size: 16, color: 0xffb703, on: pickedOpen });
+    // The junkyard campaign: the next lobby, its goal and its reward, and a pip for each of the ten.
+    const cr = { x: VIEW.w / 2 - 300, y: VIEW.fy + 432, w: 600, h: 46 };
+    const l = CAMPAIGN[lobby];
+    const done = this.progress.campaign >= CAMPAIGN.length;
+    g.fillStyle(campaign ? 0x2a2360 : C.panel, 0.95).fillRoundedRect(cr.x, cr.y, cr.w, cr.h, 10);
+    g.lineStyle(campaign ? 2.5 : 1.2, campaign ? 0xff8a2a : C.panelLine, 1).strokeRoundedRect(cr.x, cr.y, cr.w, cr.h, 10);
+    say(cr.x + 12, cr.y + 6, t('campaignCard', { n: lobby + 1, name: t(l.name) }), 12, '#ff8a2a', { fontStyle: 'bold' });
+    const sets = `${t(SETS.find((x) => x.id === l.set)!.name)}, ${t(l.terrain ? 'weeklyTerrain' : 'weeklyNoTerrain')}`;
+    const kit = campaignKit(this.progress).length;
+    say(cr.x + 12, cr.y + 25, done ? t('campaignDone', { sets }) : t('campaignNext', { goal: this.lobbyGoal(lobby), reward: this.rewardName(l.reward), sets, kit }), 9, C.text, { wordWrap: { width: cr.w - 150 } });
+    for (let i = 0; i < CAMPAIGN.length; i++) {
+      const boss = CAMPAIGN[i].seats.some((x) => typeof x !== 'number');
+      const px = cr.x + cr.w - 128 + i * 12;
+      const cleared = i < this.progress.campaign;
+      g.fillStyle(cleared ? 0xff8a2a : i === lobby ? 0xffd166 : 0x3b3478, 1);
+      if (boss) g.fillRect(px - 4, cr.y + 19, 8, 8);
+      else g.fillCircle(px, cr.y + 23, 3.5);
+    }
+    this.overlayButtons.push({ ...cr, run: () => {
+      this.menu.set = 'campaign';
+      ui('click');
+      this.dirty = true;
+    } });
     const rank = rankOf(this.progress.points);
     const next = RANKS[rank + 1];
-    say(VIEW.w / 2, VIEW.fy + 466, `${t('rankLine', { rank: t(RANKS[rank].name), points: this.progress.points })}${next ? t('rankNext', { rank: t(next.name), points: next.points }) : ''} · ${t(RANKS[rank].text)}`, 11, C.gold).setOrigin(0.5);
-    if (this.progress.played) say(VIEW.w / 2, VIEW.fy + 446, t('menuStats', { played: this.progress.played, wins: this.progress.wins, best: ordinal(this.progress.best) }), 11, C.dim).setOrigin(0.5);
+    const squads = loadSquads().length;
+    if (squads) say(VIEW.w / 2, VIEW.fy + 526, t('squadsSaved', { n: squads, round: `${GHOST.stage}-${GHOST.index}` }), 10, C.dim).setOrigin(0.5);
+    say(VIEW.w / 2, VIEW.fy + 508, `${t('rankLine', { rank: t(RANKS[rank].name), points: this.progress.points })}${next ? t('rankNext', { rank: t(next.name), points: next.points }) : ''} · ${t(RANKS[rank].text)}`, 11, C.gold).setOrigin(0.5);
+    if (this.progress.played) say(VIEW.w / 2, VIEW.fy + 491, t('menuStats', { played: this.progress.played, wins: this.progress.wins, best: ordinal(this.progress.best) }), 11, C.dim).setOrigin(0.5);
+  }
+
+  /** A campaign reward's name: a robot or a part. */
+  private rewardName(id: string) {
+    return t(UNIT_BY_ID[id]?.name ?? ITEMS[id].name);
+  }
+
+  /** What clearing a lobby asks for: its place, and the bosses to outlast. */
+  private lobbyGoal(lobby: number) {
+    const l = CAMPAIGN[lobby];
+    const bosses = l.seats.filter((s) => typeof s !== 'number').length;
+    return t(bosses ? 'goalBoss' : 'goalPlace', { place: ordinal(l.goal), n: bosses });
   }
 
   /** A small padlock on a locked commander's card. */

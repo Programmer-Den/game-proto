@@ -7,10 +7,10 @@
 import type { TextKey } from '../i18n';
 
 export type SetId = 'scrap' | 'neon';
-export type OriginId = 'heavy' | 'drone' | 'sparker' | 'magnet' | 'salvager' | 'neon' | 'hacker';
-export type ClassId = 'guardian' | 'brawler' | 'gunner' | 'sniper' | 'saboteur' | 'mechanic';
+export type OriginId = 'heavy' | 'drone' | 'sparker' | 'magnet' | 'salvager' | 'neon' | 'hacker' | 'clockwork';
+export type ClassId = 'guardian' | 'brawler' | 'gunner' | 'sniper' | 'saboteur' | 'mechanic' | 'bomber';
 export type TraitId = OriginId | ClassId;
-export type AbilityKind = 'shield' | 'slam' | 'barrage' | 'snipe' | 'backstab' | 'repair';
+export type AbilityKind = 'shield' | 'slam' | 'barrage' | 'snipe' | 'backstab' | 'repair' | 'bomb';
 
 export interface UnitDef {
   id: string;
@@ -28,19 +28,22 @@ export interface SetDef {
   origins: OriginId[];
 }
 
-/** Two seasons, each a roster of 30 robots: three origins are shared, two are the season's own. */
+/**
+ * Two seasons, each a roster of 34 robots: three origins of six are shared, two are the season's own,
+ * and the four Clockwork robots (`CLOCKWORK`) join both shop pools as a sixth origin.
+ */
 export const SETS: SetDef[] = [
   {
     id: 'scrap',
     name: 'scrapSet',
     blurb: 'scrapBlurb',
-    origins: ['heavy', 'drone', 'sparker', 'magnet', 'salvager'],
+    origins: ['heavy', 'drone', 'sparker', 'magnet', 'salvager', 'clockwork'],
   },
   {
     id: 'neon',
     name: 'neonSet',
     blurb: 'neonBlurb',
-    origins: ['heavy', 'drone', 'sparker', 'neon', 'hacker'],
+    origins: ['heavy', 'drone', 'sparker', 'neon', 'hacker', 'clockwork'],
   },
 ];
 
@@ -109,7 +112,17 @@ export const UNITS: UnitDef[] = [
   u('firewall', 'firewall', 3, 'hacker', 'guardian'),
   u('trojan', 'trojan', 4, 'hacker', 'saboteur'),
   u('kernel', 'kernel', 5, 'hacker', 'sniper'),
+  // Clockwork (both seasons): wind-up robots with clock faces; two carry the Bomber class, theirs alone.
+  u('tick-tock', 'tickTock', 1, 'clockwork', 'guardian'),
+  u('mainspring', 'mainspring', 2, 'clockwork', 'bomber'),
+  u('cuckoo', 'cuckoo', 3, 'clockwork', 'sniper'),
+  u('pendulum', 'pendulum', 4, 'clockwork', 'bomber'),
 ];
+
+/** The Clockwork robots, which every season's shop holds. */
+export const CLOCKWORK = UNITS.filter((d) => d.origin === 'clockwork').map((d) => d.id);
+/** Clockwork robots wind up this many seconds into a fight, then act faster by their trait's value. */
+export const WIND_UP_S = 4;
 
 export const UNIT_BY_ID: Record<string, UnitDef> = Object.fromEntries(UNITS.map((d) => [d.id, d]));
 
@@ -141,7 +154,11 @@ export const CLASS_STATS: Record<ClassId, ClassStats> = {
   sniper: { hp: 460, atk: 62, as: 0.6, range: 4, armor: 10, mana: 70, startMana: 10, ability: 'snipe', power: 330, abilityName: 'sniperAbility' },
   saboteur: { hp: 560, atk: 60, as: 0.8, range: 1, armor: 15, mana: 60, startMana: 0, ability: 'backstab', power: 260, abilityName: 'saboteurAbility' },
   mechanic: { hp: 560, atk: 40, as: 0.6, range: 2, armor: 20, mana: 70, startMana: 20, ability: 'repair', power: 250, abilityName: 'mechanicAbility' },
+  bomber: { hp: 540, atk: 42, as: 0.6, range: 3, armor: 15, mana: 80, startMana: 20, ability: 'bomb', power: 250, abilityName: 'bomberAbility' },
 };
+
+/** A Bomber's bomb hits its target in full and the enemies next to it by this share. */
+export const BOMB_SPLASH = 0.6;
 
 /** Health and attack multiply by this for each star above one. */
 export const STAR_STAT = 1.8;
@@ -172,12 +189,14 @@ export const TRAITS: Record<TraitId, TraitDef> = {
   salvager: { id: 'salvager', name: 'salvagerTrait', kind: 'origin', tiers: [2, 4, 6], values: [8, 16, 28], text: 'salvagerTraitText' },
   neon: { id: 'neon', name: 'neonTrait', kind: 'origin', tiers: [2, 4, 6], values: [30, 65, 115], text: 'neonTraitText' },
   hacker: { id: 'hacker', name: 'hackerTrait', kind: 'origin', tiers: [2, 4, 6], values: [20, 35, 55], text: 'hackerTraitText' },
+  clockwork: { id: 'clockwork', name: 'clockworkTrait', kind: 'origin', tiers: [2, 4], values: [50, 110], text: 'clockworkTraitText' },
   guardian: { id: 'guardian', name: 'guardianTrait', kind: 'class', tiers: [2, 4], values: [25, 55], text: 'guardianTraitText' },
   brawler: { id: 'brawler', name: 'brawlerTrait', kind: 'class', tiers: [2, 4], values: [250, 550], text: 'brawlerTraitText' },
   gunner: { id: 'gunner', name: 'gunnerTrait', kind: 'class', tiers: [2, 4], values: [20, 50], text: 'gunnerTraitText' },
   sniper: { id: 'sniper', name: 'sniperTrait', kind: 'class', tiers: [2, 4], values: [20, 50], text: 'sniperTraitText' },
   saboteur: { id: 'saboteur', name: 'saboteurTrait', kind: 'class', tiers: [2, 4], values: [15, 30], text: 'saboteurTraitText' },
   mechanic: { id: 'mechanic', name: 'mechanicTrait', kind: 'class', tiers: [2, 4], values: [15, 40], text: 'mechanicTraitText' },
+  bomber: { id: 'bomber', name: 'bomberTrait', kind: 'class', tiers: [2], values: [50], text: 'bomberTraitText' },
 };
 
 export const ORIGIN_COLOR: Record<OriginId, number> = {
@@ -188,6 +207,7 @@ export const ORIGIN_COLOR: Record<OriginId, number> = {
   salvager: 0x8bbf5a,
   neon: 0xff5cf0,
   hacker: 0x39e58c,
+  clockwork: 0xc9a45c,
 };
 
 /** Cost colours on cards and pips: grey, green, blue, purple, gold. */
@@ -378,6 +398,8 @@ export interface CommanderDef {
   taunts: TextKey[];
   /** The deed that unlocks it (player commanders only); open from the start without one. */
   unlock?: DeedId;
+  /** A campaign boss (`BOSSES`): more health and gold a round (`BOSS`). */
+  boss?: boolean;
 }
 
 /** The commanders the player picks from: three open from the start, five unlocked by deeds. */
@@ -402,6 +424,57 @@ export const RIVALS: CommanderDef[] = [
   { name: 'widowWrench', skill: 'bulwark', color: 0x6b7a99, trim: 0xd0d8e8, taunts: ['widowWrench1', 'widowWrench2', 'widowWrench3'] },
   { name: 'tinpotTess', skill: 'zap', color: 0x39e58c, trim: 0x123a2a, taunts: ['tinpotTess1', 'tinpotTess2', 'tinpotTess3'] },
 ];
+
+/** The campaign's three boss commanders, met in lobbies 3, 6 and 9 and all at once in lobby 10. */
+export const BOSSES: CommanderDef[] = [
+  { name: 'foreman', skill: 'rally', color: 0xffd166, trim: 0x2b2d42, taunts: ['foreman1', 'foreman2'], boss: true },
+  { name: 'scrapQueen', skill: 'emp', color: 0xc78bff, trim: 0xffd166, taunts: ['scrapQueen1', 'scrapQueen2'], boss: true },
+  { name: 'ironTyrant', skill: 'airstrike', color: 0x5a5a6a, trim: 0xe85d4a, taunts: ['ironTyrant1', 'ironTyrant2'], boss: true },
+];
+
+/** A boss commander's health and the extra gold it gets each round. */
+export const BOSS = { hp: 130, gold: 1 };
+
+// ---------------------------------------------------------------- the junkyard campaign
+
+export interface LobbyDef {
+  name: TextKey;
+  set: SetId;
+  terrain: boolean;
+  /** The rivals' toughness, as a rank of the ladder (`RANKS`). */
+  rank: number;
+  /** The rivals in seat order: indexes into `RIVALS`, or `b0` to `b2` for a boss of `BOSSES`. */
+  seats: (number | `b${0 | 1 | 2}`)[];
+  /** The place to finish in or better to clear it; every boss must also fall before the player. */
+  goal: number;
+  /** What clearing it adds to the kit every later lobby starts with: a robot or a part. */
+  reward: string;
+}
+
+/**
+ * The junkyard campaign: ten fixed lobbies played in order, from a four-seat warm-up to a full
+ * lobby with all three bosses. Rewards are robots of origins both seasons share, or parts.
+ */
+export const CAMPAIGN: LobbyDef[] = [
+  { name: 'lobby1', set: 'scrap', terrain: false, rank: 0, seats: [0, 1, 2], goal: 2, reward: 'plate' },
+  { name: 'lobby2', set: 'neon', terrain: true, rank: 0, seats: [0, 1, 2, 3], goal: 2, reward: 'zip-drone' },
+  { name: 'lobby3', set: 'scrap', terrain: false, rank: 0, seats: ['b0', 1, 2, 4, 5], goal: 3, reward: 'saw' },
+  { name: 'lobby4', set: 'neon', terrain: false, rank: 1, seats: [0, 1, 2, 3, 4, 5], goal: 3, reward: 'ohm-wall' },
+  { name: 'lobby5', set: 'scrap', terrain: true, rank: 1, seats: [0, 1, 2, 3, 4, 5, 6], goal: 3, reward: 'cell' },
+  { name: 'lobby6', set: 'neon', terrain: true, rank: 1, seats: ['b1', 0, 2, 3, 4, 5, 6], goal: 3, reward: 'tick-tock' },
+  { name: 'lobby7', set: 'scrap', terrain: false, rank: 2, seats: [0, 1, 2, 3, 4, 5, 6], goal: 2, reward: 'servo' },
+  { name: 'lobby8', set: 'neon', terrain: true, rank: 2, seats: [0, 1, 2, 3, 4, 5, 6], goal: 2, reward: 'mainspring' },
+  { name: 'lobby9', set: 'scrap', terrain: true, rank: 3, seats: ['b2', 0, 1, 3, 4, 5, 6], goal: 2, reward: 'cap' },
+  { name: 'lobby10', set: 'neon', terrain: false, rank: 3, seats: ['b0', 'b1', 'b2', 0, 2, 4, 6], goal: 2, reward: 'scope' },
+];
+
+/** A lobby's rival commanders, in seat order. */
+export const lobbyRivals = (l: LobbyDef): CommanderDef[] => l.seats.map((s) => (typeof s === 'number' ? RIVALS[s] : BOSSES[Number(s.slice(1))]));
+
+// ---------------------------------------------------------------- squad replays
+
+/** Round 4-7's monsters make way for one of the player's saved winning squads, fought as a ghost. */
+export const GHOST = { stage: 4, index: 7, lossDamage: 6, keep: 5 };
 
 // ---------------------------------------------------------------- neutral monsters
 

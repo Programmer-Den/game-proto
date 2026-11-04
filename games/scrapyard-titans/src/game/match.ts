@@ -7,8 +7,8 @@
 import { byDifficulty } from '../../../../shared/settings';
 import type { TextKey } from '../i18n';
 import {
-  AUGMENTS, BENCH_SLOTS, RANKS, RARE, RARE_FROM_STAGE, BOARD, ECONOMY, GILDED, ITEM_BENCH, LEVEL_XP, MAX_ITEMS, MAX_LEVEL, PARTS, PLAYER_COMMANDERS,
-  PLAYERS, RIVALS, SCRAP_TOKENS_PER_PART, SETS, SHOP_ODDS, SHOP_SLOTS, SURVIVOR_DAMAGE, TERRAIN_TILES, UNIT_BY_ID, comboOf,
+  AUGMENTS, BENCH_SLOTS, BOSS, CAMPAIGN, GHOST, RANKS, RARE, RARE_FROM_STAGE, BOARD, ECONOMY, GILDED, ITEM_BENCH, LEVEL_XP, MAX_ITEMS, MAX_LEVEL, PARTS, PLAYER_COMMANDERS,
+  PLAYERS, RIVALS, SCRAP_TOKENS_PER_PART, lobbyRivals, SETS, SHOP_ODDS, SHOP_SLOTS, SURVIVOR_DAMAGE, TERRAIN_TILES, UNIT_BY_ID, comboOf,
   isPart, rosterOf, stageDamage, stageRounds,
   type AugmentId, type CommanderDef, type MonsterId, type OriginId, type PartId, type RoundDef, type SetId, type TerrainId,
   type TraitId,
@@ -112,7 +112,48 @@ export interface MatchOptions {
   rank: number;
   /** The week number of a weekly season match (`weekOf`), or null for a season picked on the menu. */
   weekly: number | null;
+  /** The campaign lobby (index into `CAMPAIGN`) this match plays, which sets its rivals; null outside the campaign. */
+  lobby?: number | null;
+  /** Robots and parts the player starts with: the campaign kit. */
+  kit?: string[];
+  /** A saved winning squad the player fights as a ghost in round 4-7 instead of its monsters. */
+  ghost?: SavedSquad | null;
 }
+
+/** A robot of a saved squad, where it stood on the board (rows 4 to 7). */
+export interface SquadFighter {
+  defId: string;
+  star: number;
+  items: string[];
+  gilded: OriginId | null;
+  col: number;
+  row: number;
+}
+
+/** The final board of a won match, kept to come back as a ghost (`progress.ts` saves them). */
+export interface SavedSquad {
+  /** Index into `PLAYER_COMMANDERS`, whose skill the ghost uses. */
+  commander: number;
+  set: SetId;
+  /** The round it won in, and when (ms since 1970). */
+  round: string;
+  at: number;
+  fighters: SquadFighter[];
+  augments: AugmentId[];
+}
+
+/** The player's board as a squad to save. */
+export function squadOf(m: Match): SavedSquad {
+  const me = m.players[0];
+  const fighters = Object.entries(me.board).map(([k, o]) => {
+    const [col, row] = k.split(',').map(Number);
+    return { defId: o.defId, star: o.star, items: [...o.items], gilded: o.gilded, col, row };
+  });
+  return { commander: m.opts.commander, set: m.opts.set, round: roundLabel(m), at: Date.now(), fighters, augments: [...me.augments] };
+}
+
+/** Whether this round is the player's ghost round: round 4-7 with a saved squad to fight. */
+export const isGhostRound = (m: Match) => !!m.opts.ghost && m.round.stage === GHOST.stage && m.round.index === GHOST.index;
 
 export interface Match {
   opts: MatchOptions;
@@ -129,6 +170,8 @@ export interface Match {
   opponent: number;
   /** Whether the player's opponent is a ghost copy (an odd seat out). */
   ghost: boolean;
+  /** Whether the player is fighting its own saved squad this round (`isGhostRound`). */
+  ghostSquad: boolean;
   drops: Drop[];
   terrain: Record<string, TerrainId>;
   draft: Draft | null;
@@ -156,19 +199,26 @@ const shuffle = <T>(list: T[]) => {
 export function newMatch(opts: MatchOptions): Match {
   const players: Player[] = [];
   const startHp = byDifficulty(130, 100, 80);
-  for (let seat = 0; seat < PLAYERS; seat++) {
-    const commander = seat === 0 ? PLAYER_COMMANDERS[opts.commander] : RIVALS[seat - 1];
+  // A campaign lobby sets its own rivals, bosses among them; otherwise all seven rivals play.
+  const rivals = opts.lobby != null ? lobbyRivals(CAMPAIGN[opts.lobby]) : RIVALS.slice(0, PLAYERS - 1);
+  for (let seat = 0; seat <= rivals.length; seat++) {
+    const commander = seat === 0 ? PLAYER_COMMANDERS[opts.commander] : rivals[seat - 1];
+    const hp = seat === 0 ? startHp : commander.boss ? BOSS.hp : 100;
     players.push({
       seat, name: seat === 0 ? 'you' : commander.name, commander, human: seat === 0 && !opts.watch,
-      hp: seat === 0 ? startHp : 100, maxHp: seat === 0 ? startHp : 100, gold: ECONOMY.startGold, level: 1, xp: 0, board: {}, bench: Array(BENCH_SLOTS).fill(null),
+      hp, maxHp: hp, gold: ECONOMY.startGold, level: 1, xp: 0, board: {}, bench: Array(BENCH_SLOTS).fill(null),
       shop: [], items: [], augments: [], augmentOffer: null, streak: 0, alive: true, place: 0, scrapTokens: 0, freeRolls: 0, shopLocked: false, lastOpponent: -1, last: null,
     });
   }
   const m: Match = {
     opts, players, stage: 1, index: 0, round: stageRounds(1)[0], phase: 'plan', time: 0, phaseEnds: Infinity, battle: null,
-    opponent: -1, ghost: false, drops: [], terrain: {}, draft: null, taunt: null, result: null, meter: [], nextUid: 1, roundsPlayed: 0,
+    opponent: -1, ghost: false, ghostSquad: false, drops: [], terrain: {}, draft: null, taunt: null, result: null, meter: [], nextUid: 1, roundsPlayed: 0,
   };
   for (const p of players) rollShop(m, p);
+  for (const id of opts.kit ?? []) {
+    if (isPart(id)) giveItem(players[0], id);
+    else if (UNIT_BY_ID[id]) addUnit(m, players[0], id, null);
+  }
   return m;
 }
 
@@ -418,7 +468,7 @@ export function startPlan(m: Match, planS: number) {
       // Hand to Mouth trades interest for a flat sum.
       const interest = p.augments.includes('hand-to-mouth') ? RARE.handToMouthGold : Math.min(Math.floor(p.gold / ECONOMY.interestPer), interestCap);
       p.gold += (m.stage === 1 ? ECONOMY.stageOneIncome : ECONOMY.baseIncome) + interest + streak;
-      if (p.seat !== 0) p.gold = Math.max(0, p.gold + byDifficulty(-1, 0, 1) + RANKS[m.opts.rank].gold);
+      if (p.seat !== 0) p.gold = Math.max(0, p.gold + byDifficulty(-1, 0, 1) + RANKS[m.opts.rank].gold + (p.commander.boss ? BOSS.gold : 0));
       gainXp(p, ECONOMY.xpPerRound);
       if (!p.shopLocked) rollShop(m, p);
     }
@@ -475,6 +525,13 @@ function monsterSide(m: Match, monsters: MonsterId[]): SideSpec {
   };
 }
 
+/** A saved squad on the far half, mirrored the way a rival's board lines up. */
+function ghostSide(m: Match, squad: SavedSquad): SideSpec {
+  const fighters: FighterSpec[] = squad.fighters.map((f) => ({ defId: f.defId, star: f.star, items: f.items, gilded: f.gilded, col: BOARD.cols - 1 - f.col, row: 7 - f.row }));
+  const traits = countTraits(squad.fighters.map((f, i) => ({ uid: -1 - i, defId: f.defId, star: f.star, items: f.items, gilded: f.gilded })));
+  return { fighters, traits, augments: squad.augments, skill: PLAYER_COMMANDERS[squad.commander]?.skill ?? null, season: m.opts.set };
+}
+
 function terrainMap(m: Match) {
   return new Map(Object.entries(m.terrain)) as Map<string, TerrainId>;
 }
@@ -512,6 +569,7 @@ export function startFight(m: Match) {
   for (const p of m.players) if (p.alive) autoFill(p);
   m.phase = 'fight';
   m.phaseEnds = Infinity;
+  m.ghostSquad = false;
   pairings = [];
   const alive = m.players.filter((p) => p.alive);
   if (m.round.kind === 'pvp') {
@@ -532,7 +590,11 @@ export function startFight(m: Match) {
     }
   } else {
     for (const p of alive) {
-      const battle = new Battle(sideOf(m, p, false), monsterSide(m, m.round.monsters!), terrainMap(m));
+      // The player's ghost round: its saved squad stands in for the monsters (the rivals fight them as usual).
+      const ghost = p.seat === 0 && isGhostRound(m) && p.human;
+      if (ghost) m.ghostSquad = true;
+      const foe = ghost ? ghostSide(m, m.opts.ghost!) : monsterSide(m, m.round.monsters!);
+      const battle = new Battle(sideOf(m, p, false), foe, terrainMap(m));
       pairings.push({ a: p.seat, b: -1, ghost: false, battle, drops: [] });
     }
     for (const pr of pairings) pr.drops = rollDrops(m, pr.battle);
@@ -608,7 +670,8 @@ export function endFight(m: Match) {
         else a.gold += d.gold ?? 0;
       }
       const won = m.round.kind === 'rat' ? true : b.winner === 0;
-      const dmg = settle(a, won, won ? 0 : 1 + survivorDamage(b, 1), b.gold[0]);
+      const lossDamage = pr.a === 0 && m.ghostSquad ? GHOST.lossDamage : 1 + survivorDamage(b, 1);
+      const dmg = settle(a, won, won ? 0 : lossDamage, b.gold[0]);
       if (pr.a === 0) m.result = { outcome: won ? 'win' : 'loss', damage: won ? 0 : dmg, gold: b.gold[0] };
       continue;
     }

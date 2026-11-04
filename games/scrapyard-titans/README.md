@@ -47,8 +47,9 @@ terrain tiles. The plan phase lasts 30 seconds; when it runs out the fight start
   standing.
 - **Star-ups.** Three copies of a robot merge into a 2-star, three 2-stars into a 3-star; health
   and attack grow 1.8x a star and the ability more.
-- **Robots.** Each season's roster has 30 robots: five origins with one robot of each of the six
-  classes, at costs 1 to 5. Origins have tiers at 2, 4 and 6 robots; classes at 2 and 4.
+- **Robots.** Each season's roster has 34 robots: five origins with one robot of each of the six
+  classes, at costs 1 to 5, and the four Clockwork robots that join both seasons' shops. Origins
+  have tiers at 2, 4 and 6 robots (Clockwork at 2 and 4); classes at 2 and 4 (Bomber at 2).
 
   | Class | Ability |
   | --- | --- |
@@ -58,6 +59,7 @@ terrain tiles. The plan phase lasts 30 seconds; when it runs out the fight start
   | Sniper | Long Shot: a heavy round at the farthest enemy |
   | Saboteur | Backstab: leaps behind the enemy line at the start, then blinks to the weakest enemy |
   | Mechanic | Patch Job: repairs and shields the most hurt ally |
+  | Bomber (Clockwork only) | Lob Bomb: a bomb at the most crowded enemy, which also hits the enemies next to it |
 
   | Origin | Bonus |
   | --- | --- |
@@ -68,6 +70,10 @@ terrain tiles. The plan phase lasts 30 seconds; when it runs out the fight start
   | Salvager (Season 1) | Attack speed each time an ally falls |
   | Neon (Season 2) | Stronger abilities |
   | Hacker (Season 2) | Enemies gain less charge |
+  | Clockwork (both seasons) | Four seconds into a fight, attack 50% (or 110%) faster |
+
+  The Clockwork robots are Tick-Tock (1, Guardian), Mainspring (2, Bomber), Cuckoo (3, Sniper) and
+  Old Pendulum (4, Bomber).
 
 - **Parts and items.** Six parts (Buzzsaw, Servo, Plating, Fuel Cell, Capacitor, Scope) each add a
   stat; any two on one robot build one of 21 finished items with a special effect (like the Chain
@@ -98,6 +104,17 @@ terrain tiles. The plan phase lasts 30 seconds; when it runs out the fight start
   bound (top four), Gold-plated (a 3-star robot), Lucky draw (a rare power card), Full set (a won
   fight with six robots of one origin), Top of the heap (level 9), Last one standing (win a match),
   Full roster (every commander unlocked), and two hidden ones for the long run.
+- **Junkyard campaign.** The wide card under START MATCH is a ladder of ten fixed lobbies, played
+  in order, each with its own season, terrain, rivals and rival toughness (a rank of the ladder
+  below). It starts with three rivals at the Scrapyard Gate and grows to a full lobby. Every third
+  lobby has a boss commander, the Foreman, the Scrap Queen and the Iron Tyrant, with 130 health and
+  1 more gold a round, and the tenth has all three. A lobby is cleared by finishing in its place or
+  better (2nd in a small lobby, 3rd in the middle, 2nd at the end) with every boss out before you.
+  Each cleared lobby adds a robot or a part to your kit, which every later lobby starts you with.
+  The card shows the next lobby, its goal and reward, and a pip per lobby (square for a boss).
+- **Squad replays.** The final board of every won match is saved (the newest five). In later
+  matches one of them comes back as a ghost in round 4-7, in place of the monsters: beat it for the
+  round's usual drops, or lose 6 health.
 - **Rank ladder.** A saved rank that only goes up: a finish in the top four earns rank points (50,
   35, 25 or 15), and the rank sets how hard the rivals play. Rust (0 points) is the game as
   designed; Iron (100) rivals reroll for copies sooner, Steel (250) also get 1 more gold a round,
@@ -127,7 +144,7 @@ shows your seat's fights on the board.
 | --- | --- |
 | `src/main.ts` | Creates the game and calls the hub's `setupGame` and `setupScaling` |
 | `src/howToPlay.ts` | The How to play screen's text |
-| `src/progress.ts` | What lasts between matches: stats and the deeds that unlock commanders |
+| `src/progress.ts` | What lasts between matches: stats, the deeds that unlock commanders, the campaign and the saved squads |
 | `src/game/data.ts` | Every rule and number: robots, traits, parts, items, power cards, commanders, monsters, rounds, economy, terrain |
 | `src/game/battle.ts` | The fight sim on the 8x8 board, in fixed 50 ms steps, raising events for the view |
 | `src/game/match.ts` | The match: players, shops, buying, merging, items, rounds, pairings, damage, drafts |
@@ -140,6 +157,12 @@ shows your seat's fights on the board.
 ## Screenshots
 
 ![The menu: eight commanders (some locked until their deed is done), two seasons and the weekly one, the terrain toggle and the rank](docs/screenshots/menu.webp)
+
+![The menu's junkyard campaign card: the next lobby, its goal, its reward and a pip for each of the ten lobbies](docs/screenshots/campaign.webp)
+
+![A boss lobby: the Scrap Queen in the players list, with the Clockwork robots on the board](docs/screenshots/boss-lobby.webp)
+
+![The ghost round: the player's squad fights its own saved winning board on round 4-7](docs/screenshots/ghost-round.webp)
 
 ![A draft round: robots carrying parts on the board, picked lowest health first](docs/screenshots/draft.webp)
 

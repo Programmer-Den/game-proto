@@ -52,6 +52,10 @@ const de: Translation<typeof en> = {
   firewall: 'Firewall',
   trojan: 'Trojaner',
   kernel: 'Kernel',
+  tickTock: 'Tick-Tack',
+  mainspring: 'Triebfeder',
+  cuckoo: 'Kuckuck',
+  pendulum: 'Altes Pendel',
 
   // Class abilities
   guardianAbility: 'Panzern: schirmt sich selbst ab',
@@ -60,6 +64,7 @@ const de: Translation<typeof en> = {
   sniperAbility: 'Fernschuss: ein schwerer Schuss auf den fernsten Gegner',
   saboteurAbility: 'Hinterhalt: springt zum schwächsten Gegner und schlägt zu',
   mechanicAbility: 'Flickarbeit: repariert und schirmt den am meisten verletzten Verbündeten',
+  bomberAbility: 'Bombenwurf: eine Bombe auf den Gegner im dichtesten Pulk, die auch seine Nachbarn trifft',
 
   // Traits: name and bonus, {v} is the bonus at each tier
   heavyTrait: 'Schwer',
@@ -88,6 +93,10 @@ const de: Translation<typeof en> = {
   saboteurTraitText: 'Saboteure erhalten {v} % kritische Trefferchance.',
   mechanicTrait: 'Mechaniker',
   mechanicTraitText: 'Alle deine Roboter reparieren {v} Leben pro Sekunde.',
+  clockworkTrait: 'Uhrwerk',
+  clockworkTraitText: 'Nach vier Sekunden sind Uhrwerk-Roboter aufgezogen und greifen {v}% schneller an.',
+  bomberTrait: 'Bomber',
+  bomberTraitText: 'Die Bomben der Bomber richten {v}% mehr Schaden an.',
 
   // Parts: name and bonus
   sawName: 'Kreissäge',
@@ -243,6 +252,16 @@ const de: Translation<typeof en> = {
   tinpotTess2: 'Kawumm, vielleicht!',
   tinpotTess3: 'Hoppla, hab ich gewonnen?',
   tauntStart: 'Auf zur Keilerei!',
+  // Kampagnenbosse
+  foreman: 'Der Vorarbeiter',
+  foreman1: 'Pause vorbei. Zurück an die Arbeit!',
+  foreman2: 'Einstempeln, ausstempeln, untergehen.',
+  scrapQueen: 'Schrottkönigin',
+  scrapQueen1: 'Knie nieder vor dem Haufen!',
+  scrapQueen2: 'Jeder Bolzen hier gehört mir.',
+  ironTyrant: 'Eiserner Tyrann',
+  ironTyrant1: 'Der Hof beugt sich dem Eisen.',
+  ironTyrant2: 'So weit geklettert, um zu fallen.',
   tauntWin: 'Ha!',
 
   // Monsters
@@ -380,7 +399,30 @@ const de: Translation<typeof en> = {
   // End of the match
   won: 'Letzter Titan auf den Beinen!',
   lost: 'K. o.',
-  youFinished: 'Du belegst Platz {place} von 8 nach Runde {round}.',
+  youFinished: 'Du belegst Platz {place} von {n} nach Runde {round}.',
+  lobby1: 'Schrottplatztor',
+  lobby2: 'Ölebene',
+  lobby3: 'Die Grube des Vorarbeiters',
+  lobby4: 'Rosthügel',
+  lobby5: 'Ofengasse',
+  lobby6: 'Hof der Schrottkönigin',
+  lobby7: 'Magnetmeile',
+  lobby8: 'Neon-Nachtmarkt',
+  lobby9: 'Thron des Eisernen Tyrannen',
+  lobby10: 'Die Titanenleiter',
+  campaignCard: 'Schrottplatz-Kampagne · Lobby {n} von 10: {name}',
+  campaignNext: '{sets} · {goal} · Sieg: {reward} · dein Startpaket: {kit}',
+  campaignDone: 'Leiter erklommen! Spiel die letzte Lobby noch einmal · {sets}',
+  goalPlace: 'Platz {place} oder besser',
+  goalBoss: 'Platz {place} oder besser und den Boss überleben',
+  lobbySetsTerrain: 'Die Kampagnen-Lobby legt das Gelände fest',
+  lobbyCleared: 'Lobby {n}, {name}, geschafft! Neu im Startpaket: {reward}',
+  lobbyClearedAgain: 'Lobby {n}, {name}, wieder geschafft!',
+  lobbyFailed: 'Lobby {n} nicht geschafft: {goal}.',
+  vsGhostSquad: 'gegen deinen Geistertrupp',
+  ghostSquad: 'dein Geistertrupp',
+  squadSaved: 'Trupp gespeichert: Er kehrt in Runde {round} als Geist zurück.',
+  squadsSaved: { one: '1 Siegertrupp gespeichert: Einer kehrt in Runde {round} als Geist zurück', other: '{n} Siegertrupps gespeichert: Einer kehrt in Runde {round} als Geist zurück' },
   seatFinished: 'Sitz 1 belegt Platz {place} von 8 nach Runde {round}.',
   endStats: 'Partien {played} · Siege {wins} · bester Platz {best}',
   playAgain: 'Nochmal spielen',
@@ -396,7 +438,7 @@ const de: Translation<typeof en> = {
 /** Texts that are the same in German. */
 export const keepEnglish: (keyof typeof en)[] = [
   'magnetTrait', 'neonTrait', 'hackerTrait', 'saboteurTrait', 'servoName', 'firewall', 'kernel', 'flicker', 'sparks', 'magna',
-  'tauntWin', 'title', 'skillCall', 'hexa', 'nova', 'rankTitan',
+  'tauntWin', 'title', 'skillCall', 'hexa', 'nova', 'rankTitan', 'bomberTrait',
 ];
 
 export default de;
