@@ -6,7 +6,8 @@ the game, per the root AGENTS.md.
 
 ## Current state
 
-Lane Brawl is a single-player MOBA on one 3500x3500 square map with three lanes, a river, towers,
+Lane Brawl is a single-player MOBA on a 3500x3500 square map, Kessmoor (below) or the Twin Rivers
+(LB20, round 4), with three lanes, a river, towers,
 inhibitors, minion waves, a jungle of twelve camps, watchstones, a guardian beast, tall grass, fog of
 war, two Nexuses, five champions a side and a shop. The player picks one of seventeen champion classes
 (two unlocked by mastery), from medieval fantasy to steampunk and beasts,
@@ -21,10 +22,57 @@ Implemented today:
   (`pickCard(i, n)`; 3D figure, the champion's name, class and role, passive; a locked class's card
   shows its figure dark, a padlock and what unlocks it), two lines under them for the card under the
   pointer (`hoverPick`): the champion's name, title, class, blurb and story perk, then their motive;
-  with no card under the pointer, the setting in one line. Three buttons under them: the battle
-  spell (`SPELL_PICK`), the match kind (`MODE_PICK`) and the colours (`SKIN_PICK`); hovering one puts
-  what it means in the two lines. `fit` shrinks a text to its card or button where German runs long.
-  Then one match.
+  with no card under the pointer, the setting in one line. Four buttons under them: the battle
+  spell (`SPELL_PICK`), the match kind (`MODE_PICK`), the map (`MAP_PICK`) and the colours
+  (`SKIN_PICK`); hovering one puts what it means in the two lines. `fit` shrinks a text to its card
+  or button where German runs long. A card press goes through `choose`: in a ranked match the first
+  press bans (see Pick and ban), and a pick with a draft or a talent page opens the panel before the
+  match (`lobby`, `drawLobby`), else the match starts at once. Then one match.
+- Two maps (LB20, round 4): `MapId` (`classic`, Kessmoor, and `twin`, the Twin Rivers), `MAP_NAMES`
+  and `setMapData` in `data.ts`, which swaps the map's own data, all `export let` so importers see
+  the swap: `MAP_ID`, `MAP_LANES` (the twin has `top` and `bottom` only), `RIVERS` (one `RiverDef`
+  on Kessmoor, two on the twin, each crossing both lanes; the water is `RIVER_HALF` either side),
+  `CAMPS` and `BUSHES` (`CLASSIC_*` and `TWIN_*`, blue's half mirrored by `both`). The Nexuses,
+  towers and inhibitors (the twin uses the top and bottom ones), watchstones, pits, runes, ward spots
+  and mercenary camps are the same spots on both. `useMap(id)` in `terrain.ts` calls `setMapData`
+  and swaps in the map's terrain (`RUINS_OF`, `JUNGLE_PATHS_OF`: the twin's `TWIN_PATHS` run down
+  the old riverbed along the diagonal and out to both rivers, the camps and the lanes), built once
+  per map and kept in `BUILT` (the field, `PATHS`, `SCENERY`, `OBSTACLES` and their grid);
+  `laneDist` and `riverDist` read `MAP_LANES` and `RIVERS`. `createGame` calls `useMap` first with
+  `MatchOptions.map` (Kessmoor for quick and event matches and when watching) and keeps it as
+  `s.map`; `s.lanes` is `MAP_LANES`, `laneOf` takes `TWIN_ALLY_LANES` and `TWIN_ENEMY_LANES`, and
+  structures get `TWIN.hp` times their health there. `paintMap` paints whichever map is in use into
+  `MAP_KEY` (`PAINTED` says which; painting the other replaces the canvas), and `startMatch` paints
+  again and rebuilds the tiles (`buildTiles`) when the match's map differs. The pick is kept under
+  `lane-brawl-map` (`loadMap`, `saveMap` in `spellChoice.ts`). Kessmoor's data, terrain and art are
+  exactly as before, so its matches and the playthrough play the same.
+- Floods (LB20): `FLOOD` in `data.ts`, `s.flood` (`next`, `until`, `warned`). On the twin `tick`
+  calls `updateFlood` (a notice `FLOOD.warnMs` before, then `noticeFlood` and the `flood` sound;
+  the rivers stay up `FLOOD.ms`, and rise again `FLOOD.every` after) and sets the module's
+  `flooded`, which `inFlood(p)` reads: `speedOf` multiplies by `FLOOD.slow` for any walker within
+  `RIVER_HALF` of a river's centre line while it is up. The view draws the swollen water and foam
+  (`drawFlood`, under the units), widens the minimap's rivers and shows a chip (`floodChipSoon` in
+  the last 30 s before, `floodChipUp` while up). The AI does not plan round floods. Watched AI-only
+  matches on the twin end in 4 to 16 minutes, most near 9 to 12.
+- Pick and ban (LB19, round 4): `DRAFT` and `COUNTERS` in `data.ts`, `game/draft.ts`. In ranked
+  mode the scene's first card press sets `bans` (`redBan`: random below `DRAFT.counterFrom`, from
+  it the class the player has most mastery wins with), drawn as a band on both cards with their
+  figures dark; a banned card refuses. The next press calls `runDraft`, which picks the other nine
+  in `DRAFT.order` (blue's AI at random, red's first pick from `counterFrom` and every one from
+  `DRAFT.allFrom` the class whose role `COUNTERS` the last blue pick, `counterTo`), and opens the
+  lobby, which lists the bans, both teams' picks with their numbers and red's counter pick.
+  `startMatch` hands `createGame` the draft as `MatchOptions.roster` (blue's four allies, red's
+  five), used in place of the shuffle. Changing the match kind, Back or Esc drops the bans. The
+  draft draws from `Math.random`, in ranked matches only.
+- Talent pages (LB18, round 4): `TALENTS`, `TALENT_ROWS` (damage, defence, utility, opened at
+  mastery ranks 1, 2 and 3) and `TalentId` in `data.ts`; `game/talents.ts` keeps each class's page
+  under `lane-brawl-talents` (`loadPage`, `chooseTalent`, `openRows`, `talentsOf`; JSON
+  `{ classId: [talentId, ...] }`, in try/catch). A pick of a class with rank 1 or more opens the
+  lobby with its page (`talentCard(row, i, top)` in `layout.ts`, three cards a row; shut rows say
+  the rank that opens them); Fight (`LOBBY_FIGHT`) starts the match with `MatchOptions.talents`.
+  `createGame` sums the page's `buff`s into the player's `Unit.talent` (counted in `buffSum` like
+  the drakes), adds `hp` to `Unit.talentHp` (in `refreshStats`) and `gold` at once. Only the player
+  has one; with no save no class has a rank, so the playthrough never sees the lobby.
 - Map (`WORLD` 3500x3500): every spot on it (Nexuses, lanes, towers, inhibitors, the river, camps,
   watchstones, bushes, runes, ward spots, the beast's and the drake's pits, the ruins and the jungle's paths) is
   written at the first 2800x2800 layout and scaled by `MAP_SCALE` (1.25) with `at` in `data.ts`.
@@ -35,7 +83,7 @@ Implemented today:
   bottom lanes along the edges, the middle lane on the diagonal. Everything red is blue mirrored
   through the centre (`mirror`, `both` in `data.ts`), with top and bottom lanes swapped. Two towers
   per team per lane, an inhibitor per team per lane near its Nexus (`INHIBITORS`), the river
-  (`RIVER`, top left to bottom right, crossing the middle lane), twelve camps (`CAMPS`), three
+  (`RIVERS`, Kessmoor's one from top left to bottom right, crossing the middle lane), twelve camps (`CAMPS`), three
   watchstones on river islands (`WATCHSTONES`), the beast's pit by the river (`BEAST`), eighteen
   bushes (`BUSHES`), four ruins (painted only) and minion waves every 25 s (three per lane per team).
 - Champions: seventeen classes (`CHAMPIONS`): ten medieval (Warden to Lancer), five steampunk or
@@ -469,6 +517,7 @@ Implemented today:
 
 Missing or rough:
 
+- The AI ignores floods and the Twin Rivers' fords when it plans; AI champions have no talent pages.
 - Paths are found round the forest only; towers, pillars and stones are slid round one step at a
   time (`steer`), which their spacing keeps clear of pockets.
 - No title screen of its own. The saves are class mastery, the ladder and colours, and the battle
@@ -513,7 +562,7 @@ File map (`src/`):
   live in the same map).
 - `scenes/skillFx.ts`: every ability's look (see "Skill looks" above): `drawSkill`, `skillMs`,
   `drawProjectile`, `drawZone` and `drawAura`, with small shape helpers. No game rules.
-- `scenes/layout.ts`: screen rectangles for the bars, the pick screen's cards and three buttons (`pickCard`, `SPELL_PICK`, `MODE_PICK`, `SKIN_PICK`), the objective card, the streak chip, the
+- `scenes/layout.ts`: screen rectangles for the bars, the pick screen's cards and four buttons (`pickCard`, `SPELL_PICK`, `MODE_PICK`, `MAP_PICK`, `SKIN_PICK`), the panel before a match (`LOBBY`, `talentCard`, `LOBBY_BACK`, `LOBBY_FIGHT`), the objective card, the streak chip, the
   ability boxes, the upgrade panel and cards (`upgradeCard`), the shop, the kill score and scoreboard (`SCORE_CHIP`, `SCORE_PANEL`), the minimap, the pick cards
   and the end panel, plus `VIEW` (the designed 960x540), `SCREEN` (the view actually shown),
   `FRAME` (the designed rectangle's corner in it), `fitLayout` and `FONT` (a system font stack).
@@ -573,13 +622,15 @@ File map (`src/`):
   pines and rocks, from a fixed seed; then the beast's pit and the bushes (tall faceted grass).
 - `trophies/`: the trophy list (`index.ts`), its texts (`i18n/`) and the conditions (`check.ts`).
 - `game/names.ts`: `shortName`, a champion's first name from its full name.
-- `game/spellChoice.ts`: the player's battle spell and match kind, the save keys `lane-brawl-spell` (`loadSpell`, `saveSpell`) and `lane-brawl-mode` (`loadMode`, `saveMode`; `lane-brawl-quick`, `loadQuick`, is the older quick pick).
+- `game/spellChoice.ts`: the player's battle spell, match kind and map, the save keys `lane-brawl-spell` (`loadSpell`, `saveSpell`), `lane-brawl-mode` (`loadMode`, `saveMode`; `lane-brawl-quick`, `loadQuick`, is the older quick pick) and `lane-brawl-map` (`loadMap`, `saveMap`).
+- `game/draft.ts`: a ranked match's pick and ban (`redBan`, `runDraft`, `counterTo`, `Draft`).
+- `game/talents.ts`: talent pages, the save key `lane-brawl-talents` (`loadPage`, `chooseTalent`, `openRows`, `talentsOf`).
 - `game/mastery.ts`: class mastery, the save key `lane-brawl-mastery` (`loadMastery`, `recordWin`,
   `masteryRank`), and the unlocks (`ranksBesides`, `isUnlocked`).
 - `game/ladder.ts`: the ranked ladder and colours, the save keys `lane-brawl-ladder` (`loadLadder`,
   `climb`, `recordRanked`, `skinsWon`, `starText`) and `lane-brawl-skin` (`loadSkin`, `saveSkin`).
-- `game/terrain.ts`: the map's forest and paths (`JUNGLE_PATHS`, `PATHS`, `clearance`, `route`, `clearLine`), its obstacles (`SCENERY`, `OBSTACLES`, `SOLID`) and `steer`, `settle`, `blockedBy`; `art/map.ts` takes the lane and clearing helpers, the paths, the field and the scenery from it.
-- `game/data.ts`: plain data, with text keys for names and texts. `MAP_SCALE`, `at`, `WORLD`, `LANES`, `BASE`, `TOWERS`, `RIVER`, `CAMPS`, `CAMP_KINDS`,
+- `game/terrain.ts`: `useMap`, and the map's forest and paths (`JUNGLE_PATHS_OF`, `PATHS`, `clearance`, `route`, `clearLine`), its obstacles (`SCENERY`, `OBSTACLES`, `SOLID`) and `steer`, `settle`, `blockedBy`; `art/map.ts` takes the lane and clearing helpers, the paths, the field and the scenery from it.
+- `game/data.ts`: plain data, with text keys for names and texts. `MAP_SCALE`, `at`, `WORLD`, `LANES`, `BASE`, `TOWERS`, the maps' data (`MapId`, `setMapData`, `MAP_LANES`, `RIVERS`, `FLOOD`, `TWIN`), `CAMPS`, `CAMP_KINDS`,
   `PUPS`, `SIGHT`, `WATCHSTONES`, `WATCH`, `BUFFS`, `JUNGLE`, `KITE`, the balance constants (`TOWER`,
   `CAMP`, `MINION`, `KILL`, `XP_FOR_LEVEL`, respawn times), `CHAMPIONS` with their `AbilityDef`s,
   `ITEMS`, `ALLY_LANES`, `ENEMY_LANES`, `SIDE_COLOR`, and the loop's data: `OBJECTIVES`,
@@ -637,6 +688,7 @@ State model:
   `expiresAt`. A dead unit's countdowns keep running (`countDown` in `updateUnit`: attack
   cooldown, shield, buffs, and a champion's ability and item cooldowns, aggro and passive gold),
   so a champion respawns with them run down; only a recall needs it alive.
+- `map` is the match's map and `flood` the Twin Rivers' flood clock (see Two maps); a player's champion keeps its talent page in `talent` and `talentHp`.
 - `Unit.lane` is the lane of a tower, inhibitor, minion or lane champion; `power` a minion's
   super multiplier.
 - `sounds` holds the `SoundEvent`s (`SoundId`, an optional world point, `mine` for the player's
@@ -749,6 +801,7 @@ Effects (`sfx`), where they are raised:
 | `nightfall` / `daybreak` | night falls / day breaks (`tick`) |
 | `comeback`, `vote` | the player's kill pays a comeback bounty (`kill`), the player calls a surrender vote (`callSurrender`) |
 | `suddenDeath` | sudden death begins in a `suddenDeath` event (`tick`) |
+| `flood` | the Twin Rivers flood (`updateFlood`) |
 | `promote` | the end panel: a ranked tier or colours won, or a champion unlocked (the scene) |
 | `objective` / `objectiveMissed` | the player's objective done / missed (`updateObjective`) |
 
@@ -789,7 +842,8 @@ Shared `ui` sounds: `click` for the Shop button, B and Play again; `coin` for a 
   the Warden's level 2 `UPGRADES` pair (`wide-slam`, `stun-slam`), and the 240 s game-time budget.
 - The seed in `addInitScript` is picked so the shuffle in `createGame` fields Harpooner, Tinker,
   Mage and Archer on blue and Stalker, Wolfkin, Bruin, Blade and Berserker on red, the roster the
-  round was tuned with (2388 `Math.random` calls come before the shuffle in the browser). With no
+  round was tuned with (2419 `Math.random` calls come before the shuffle in the browser; the map
+  button's text added 31, as Phaser draws 31 for each text's texture key). With no
   save the Falconer and Alchemist are locked and out of the pool, so the shuffle sees the old
   fifteen. Anything that adds or removes draws before the shuffle (a new text on the pick screen
   too: each Phaser text draws for its texture key) shifts the roster. The generator's state only
@@ -818,7 +872,9 @@ Shared `ui` sounds: `click` for the Shop button, B and Play again; `coin` for a 
   `Math.random` sequence so blue fields the five new classes), `ten-classes.webp`, `fog-of-war.webp`,
   `jungle-brute.webp`, `watchstone.webp`, `watch-ai.webp` (a `?watch` match at 8x with the log open), `skill-looks-1.webp` to
   `skill-looks-3.webp` (every ability's effect, five classes each), `aim-indicators.webp`,
-  `home-heal-and-dead-shop.webp`, `scoreboard.webp` (a match run 7 minutes with blue's fifth on the AI, Tab held), `river-rune.webp` (run to 2:00, the Warden placed by the first spot), `merc-camp.webp` and `mercs-march.webp` (the Warden placed by blue's camp, then made strong to clear it), `pick-spell.webp` and `spell-button.webp` (the spell button pressed once, then a match run to 2:30 and Firebrand cast), `loop-objective.webp`, `loop-last-hit.webp` and
+  `home-heal-and-dead-shop.webp`, `pick-and-ban.webp`, `draft-and-talents.webp` and
+  `twin-rivers-flood.webp` (a Gold ladder, mastery, mode, map and talent saves set first, the
+  Blade banned and the Archer picked, then the Archer placed by a ford and the flood called early), `scoreboard.webp` (a match run 7 minutes with blue's fifth on the AI, Tab held), `river-rune.webp` (run to 2:00, the Warden placed by the first spot), `merc-camp.webp` and `mercs-march.webp` (the Warden placed by blue's camp, then made strong to clear it), `pick-spell.webp` and `spell-button.webp` (the spell button pressed once, then a match run to 2:30 and Firebrand cast), `loop-objective.webp`, `loop-last-hit.webp` and
   `upgrade-*.webp` and `round2-*.webp` (the ward in the shop and planted by a bush, a recall, a
   bounty, the buy back button and the watch log of the AI shopping) and `german-pick.webp` (the pick
   screen with `?lang=de`, Grumm's card under the pointer) are staged docs shots (a scratch
@@ -863,7 +919,14 @@ Shared `ui` sounds: `click` for the Shop button, B and Play again; `coin` for a 
   at the origin and the figure inside its `*_CELL` in `bake.ts` (raise the cell if a pose clips).
   More poses or directions multiply the boot bake (about two seconds in headless Chrome now, and a
   match's champions about one more).
-- **Tune the map**: edit `LANES`, `TOWERS`, `CAMPS`, `WATCHSTONES`, `BUSHES` and `RIVER` in
+- **Tune the Twin Rivers**: `TWIN_CAMPS`, `TWIN_BUSHES`, `TWIN_RIVERS` and `TWIN` in `data.ts`,
+  `TWIN_PATHS` and `RUINS_OF.twin` in `terrain.ts` (keep clearings about 200 px off the water and
+  the lanes; a place the paths miss gets a straight path of its own), and `FLOOD`. Run AI-only
+  matches on it with the balance harness (`createGame(def, 1, { watch: true, map: 'twin' })`).
+- **Add a talent**: a `TalentDef` in `TALENTS` (its row, a `buff`, `hp` or `gold`) with its two
+  texts; a fourth in a row needs `talentCard` narrower. A new kind of bonus needs a line in
+  `createGame`.
+- **Tune the map**: edit `LANES`, `TOWERS`, `CLASSIC_CAMPS`, `WATCHSTONES`, `CLASSIC_BUSHES` and `CLASSIC_RIVERS` in
   `data.ts`; `map.ts` paints from them. Give only blue's half and build red's with `both`/`mirror`,
   so the map stays fair, and check the playthrough still reaches the red mid tower at (1793, 1007).
 - **Tune the fog**: `SIGHT` in `data.ts` (per unit kind) and `FOG_ALPHA` in `GameScene.ts`.

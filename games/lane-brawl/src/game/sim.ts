@@ -95,10 +95,12 @@ import {
   RANKED_AI,
   SUDDEN_DEATH,
   EVENTS,
+  FLOOD,
+  RIVER_HALF,
 } from './data';
 import { DeathRecap, GameState, HitHow, ObjectiveTitle, RecapRow, SoundId, Unit, dist, getUnit, laneNear, levelFor, refreshStats, spawnMercs, spawnWard, spawnWave } from './state';
 import { shortName } from './names';
-import { clearLine, route, settle, steer } from './terrain';
+import { clearLine, riverDist, route, settle, steer } from './terrain';
 import { aiLog } from '../../../../shared/watch';
 import { english, t as text, type TextKey } from '../i18n';
 
@@ -127,6 +129,8 @@ export function tick(s: GameState, dt: number) {
   updateGanks(s);
   updateJungle(s);
   updateRunes(s);
+  if (s.map === 'twin') updateFlood(s);
+  flooded = s.map === 'twin' && s.time < s.flood.until;
   if (!s.platesGone && s.time >= PLATING.until) {
     s.platesGone = true;
     for (const u of s.units) u.plates = 0;
@@ -214,7 +218,7 @@ export function chooseUpgrade(s: GameState, choice: number): boolean {
 
 /** The sum of one field over a unit's buffs, its team's drake bonus counted in. */
 function buffSum(u: Unit, key: Exclude<keyof BuffDef, 'stealth'>): number {
-  let n = u.drake?.[key] ?? 0;
+  let n = (u.drake?.[key] ?? 0) + (u.talent?.[key] ?? 0);
   for (const b of u.buffs) n += b.def[key] ?? 0;
   return n;
 }
@@ -232,10 +236,38 @@ function attackMsOf(u: Unit): number {
   return u.attackMs / (1 + buffSum(u, 'atk') / 100);
 }
 
-/** Walking speed now: slowed by half, faster with a haste or a buff. */
+/** Whether the Twin Rivers are in flood this tick (set at the top of `tick`). */
+let flooded = false;
+/** Whether a point stands in a flooded river's water now. */
+export const inFlood = (p: Vec) => flooded && riverDist(p) < RIVER_HALF;
+
+/** Walking speed now: slowed by half, faster with a haste or a buff, slower wading a flooded river. */
 export function speedOf(u: Unit): number {
   const haste = u.hasteMs > 0 ? (u.champ?.passive.haste ?? 0) : 0;
-  return u.speed * (u.slowMs > 0 ? 0.5 : 1) * (1 + (buffSum(u, 'speed') + haste) / 100);
+  return u.speed * (u.slowMs > 0 ? 0.5 : 1) * (1 + (buffSum(u, 'speed') + haste) / 100) * (inFlood(u) ? FLOOD.slow : 1);
+}
+
+/**
+ * The Twin Rivers' floods (LB20): a warning `FLOOD.warnMs` before, then the rivers stay up for
+ * `FLOOD.ms`, and rise again `FLOOD.every` after they last rose.
+ */
+function updateFlood(s: GameState) {
+  const f = s.flood;
+  if (!f.warned && s.time >= f.next - FLOOD.warnMs) {
+    f.warned = true;
+    notice(s, text('noticeFloodSoon'), '#9fd0ff');
+  }
+  if (s.time >= f.next) {
+    f.until = f.next + FLOOD.ms;
+    f.next += FLOOD.every;
+    f.warned = false;
+    notice(s, text('noticeFlood'), '#7fc4ff');
+    sound(s, 'flood');
+    aiLog('blue', 'The rivers flood');
+  } else if (f.until && s.time >= f.until) {
+    f.until = 0;
+    notice(s, text('noticeFloodEnds'), '#9fd0ff');
+  }
 }
 
 /** Gives a unit a buff, or renews it if it already has one of that id. */
@@ -643,7 +675,7 @@ function finishTeleport(s: GameState, u: Unit) {
   u.moveTo = null;
   s.fx.push({ kind: 'ring', x: u.x, y: u.y, r: 40, color, ms: 500 });
   if (u.id === s.player) sound(s, 'recallHome', u, true);
-  if (!u.player) aiLog(u.side, `${shortName(u.name)} teleports to the ${laneNear(u)} lane`);
+  if (!u.player) aiLog(u.side, `${shortName(u.name)} teleports to the ${laneNear(u, s.lanes)} lane`);
 }
 /** How far from its tower or minion a teleport lands, toward home. */
 const TELEPORT_GAP = 60;
@@ -1695,7 +1727,7 @@ function updateGanks(s: GameState) {
       h.ambushUntil = 0;
       h.gankUntil = s.time + GANK.ms;
     }
-    const lane = laneNear(prey);
+    const lane = laneNear(prey, s.lanes);
     const price = bountyOf(prey.killStreak);
     aiLog(team, `${shortName(hunter.name)} roams to the ${lane} lane after ${shortName(prey.name)}${price ? ` and its ${price} gold bounty` : ''}`);
     const roams = { name: shortName(hunter.name), lane: text(LANE_NAME[lane]) };

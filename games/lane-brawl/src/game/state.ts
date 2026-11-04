@@ -53,8 +53,16 @@ import {
   ALL_MID,
   DOUBLE_GOLD,
   EventId,
+  FLOOD,
+  MAP_LANES,
+  MapId,
+  TALENTS,
+  TWIN,
+  TWIN_ALLY_LANES,
+  TWIN_ENEMY_LANES,
+  TalentId,
 } from './data';
-import { openLanes } from './terrain';
+import { openLanes, useMap } from './terrain';
 
 export type Phase = 'pick' | 'playing' | 'won' | 'lost';
 export type UnitKind = 'champion' | 'minion' | 'tower' | 'nexus' | 'camp' | 'beast' | 'inhibitor' | 'watchstone' | 'ward';
@@ -169,6 +177,9 @@ export interface Unit {
   plates: number;
   /** Champions: the bonus of their team's drake stacks (`DRAKES`), counted in with the buffs; null with none. */
   drake: BuffDef | null;
+  /** The player's talent page (LB18): its passives summed, counted with the buffs, and the health it adds. */
+  talent: BuffDef | null;
+  talentHp: number;
   /** AI champions: the point a ping of the player's sent it to, the enemy marked there, and until when. */
   pingGoal: Vec | null;
   pingTarget: number | null;
@@ -280,7 +291,7 @@ export type SoundId =
   | 'burst' | 'bolt' | 'dash' | 'ally' | 'buff' | 'zone' | 'impact'
   | 'lastHit' | 'slain' | 'youDie' | 'streak' | 'crash' | 'nexus' | 'wardBreak'
   | 'levelUp' | 'flask' | 'blink' | 'ward' | 'recallHome' | 'respawn' | 'buyBack'
-  | 'wave' | 'watchstone' | 'rune' | 'runeTaken' | 'mercs' | 'spell' | 'ping' | 'drake' | 'drakeWakes' | 'firstBlood' | 'plate' | 'nightfall' | 'daybreak' | 'comeback' | 'vote' | 'growl' | 'beastSlain' | 'brute' | 'objective' | 'objectiveMissed' | 'suddenDeath';
+  | 'wave' | 'watchstone' | 'rune' | 'runeTaken' | 'mercs' | 'spell' | 'ping' | 'drake' | 'drakeWakes' | 'firstBlood' | 'plate' | 'nightfall' | 'daybreak' | 'comeback' | 'vote' | 'growl' | 'beastSlain' | 'brute' | 'objective' | 'objectiveMissed' | 'suddenDeath' | 'flood';
 
 /**
  * A sound raised by the rules: at a point in the world (the view plays it only where blue sees and
@@ -376,7 +387,10 @@ export interface GameState {
   /** Whether the match's first champion kill has fallen, and whether the tower plates have fallen away. */
   firstBlood: boolean;
   platesGone: boolean;
-  /** Whether this is a quick match, and the lanes it plays on (all three, or `QUICK.lanes`). */
+  /** The map (LB20), and on the Twin Rivers when the rivers next rise, until when they are up and whether the warning went out. */
+  map: MapId;
+  flood: { next: number; until: number; warned: boolean };
+  /** Whether this is a quick match, and the lanes it plays on (all three, `QUICK.lanes`, or the Twin Rivers' two). */
   quick: boolean;
   lanes: LaneId[];
   /** A ranked match (LB15), and red's AI tier (0 to 5, `RANKED_AI`; 0 outside ranked). */
@@ -538,6 +552,8 @@ export function blankUnit(
     lastMoveDist: Infinity,
     plates: 0,
     drake: null,
+    talent: null,
+    talentHp: 0,
     pingGoal: null,
     pingTarget: null,
     pingUntil: 0,
@@ -566,7 +582,7 @@ export function refreshStats(u: Unit) {
   const owned = ITEMS.filter((i) => u.items.includes(i.id));
   const sum = (key: 'hp' | 'dmg' | 'armor' | 'speed' | 'atk' | 'cdr') => owned.reduce((n, i) => n + (i[key] ?? 0), 0);
   const levels = u.level - 1;
-  const maxHp = c.hp + levels * c.hpPerLevel + sum('hp');
+  const maxHp = c.hp + levels * c.hpPerLevel + sum('hp') + u.talentHp;
   // A dead champion stays at 0 until it respawns full.
   if (!u.dead) u.hp += maxHp - u.maxHp;
   u.maxHp = maxHp;
@@ -623,6 +639,12 @@ export interface MatchOptions {
   event?: EventId;
   /** The classes the rosters are drawn from (the unlocked ones), in `CHAMPIONS` order; all when not given. */
   pool?: ChampionDef[];
+  /** The map (LB20): Kessmoor when not given. Quick and event matches always play on Kessmoor. */
+  map?: MapId;
+  /** A ranked match's draft (LB19): blue's four allies and red's five, in place of the shuffle. */
+  roster?: { blue: ChampionDef[]; red: ChampionDef[] };
+  /** The player's talent page (LB18): one talent per opened row. */
+  talents?: TalentId[];
 }
 
 /**
@@ -631,6 +653,8 @@ export interface MatchOptions {
  */
 export function createGame(pick: ChampionDef, enemyDamage: number, opts: MatchOptions = {}): GameState {
   const rnd = opts.rnd ?? Math.random;
+  const map: MapId = opts.quick || opts.event ? 'classic' : (opts.map ?? 'classic');
+  useMap(map);
   const s: GameState = {
     phase: 'playing',
     time: 0,
@@ -669,8 +693,10 @@ export function createGame(pick: ChampionDef, enemyDamage: number, opts: MatchOp
     runeRounds: 0,
     firstBlood: false,
     platesGone: false,
+    map,
+    flood: { next: FLOOD.firstAt, until: 0, warned: false },
     quick: !!opts.quick,
-    lanes: opts.quick || opts.event === 'allMid' ? QUICK.lanes : ['top', 'mid', 'bottom'],
+    lanes: opts.quick || opts.event === 'allMid' ? QUICK.lanes : [...MAP_LANES],
     ranked: opts.ranked !== undefined && !opts.watch,
     aiTier: opts.watch ? 0 : (opts.ranked ?? 0),
     event: opts.event ?? null,
@@ -695,7 +721,7 @@ export function createGame(pick: ChampionDef, enemyDamage: number, opts: MatchOp
     notices: [],
   };
 
-  const structHp = opts.quick ? QUICK.hp : opts.event === 'allMid' ? ALL_MID.hp : 1;
+  const structHp = opts.quick ? QUICK.hp : opts.event === 'allMid' ? ALL_MID.hp : map === 'twin' ? TWIN.hp : 1;
   for (const team of ['blue', 'red'] as Team[]) {
     const nexus = blankUnit(s, 'nexus', team, BASE[team].x, BASE[team].y, {
       hp: NEXUS_HP * structHp,
@@ -767,9 +793,9 @@ export function createGame(pick: ChampionDef, enemyDamage: number, opts: MatchOp
   s.units.push(beast);
   s.beast = beast.id;
 
-  // The other classes, shuffled: four join the player, five fight on red.
-  const others = (opts.pool ?? CHAMPIONS).filter((c) => c.id !== pick.id);
-  for (let i = others.length - 1; i > 0; i--) {
+  // The other classes, shuffled: four join the player, five fight on red. A ranked draft has picked them already.
+  const others = opts.roster ? [...opts.roster.blue, ...opts.roster.red] : (opts.pool ?? CHAMPIONS).filter((c) => c.id !== pick.id);
+  for (let i = opts.roster ? 0 : others.length - 1; i > 0; i--) {
     const j = Math.floor(rnd() * (i + 1)) % (i + 1);
     [others[i], others[j]] = [others[j], others[i]];
   }
@@ -785,10 +811,25 @@ export function createGame(pick: ChampionDef, enemyDamage: number, opts: MatchOp
 
   // A quick match has fewer a side, every one on its one lane.
   const allies = opts.quick ? QUICK.allies : ALLY_LANES.length, enemies = opts.quick ? QUICK.enemies : ENEMY_LANES.length;
-  const laneOf = (lanes: LaneId[], i: number) => (opts.quick || opts.event === 'allMid' ? QUICK.lanes[i % QUICK.lanes.length] : lanes[i]);
+  const laneOf = (lanes: LaneId[], i: number) =>
+    opts.quick || opts.event === 'allMid' ? QUICK.lanes[i % QUICK.lanes.length] : map === 'twin' ? (lanes === ENEMY_LANES ? TWIN_ENEMY_LANES : TWIN_ALLY_LANES)[i] : lanes[i];
   const player = spawnChampion(s, pick, 'blue', blueAt(0).x, blueAt(0).y, !opts.watch, opts.watch ? laneOf(['top'], 0) : null, pick.hero);
   s.player = player.id;
   if (opts.spell && !opts.watch) player.spell = opts.spell;
+  // The talent page: its passives ride with the buffs, its health and gold come at once.
+  if (opts.talents?.length && !opts.watch) {
+    const page: BuffDef = {};
+    for (const id of opts.talents) {
+      const tal = TALENTS.find((x) => x.id === id);
+      if (!tal) continue;
+      for (const [k, v] of Object.entries(tal.buff ?? {}) as [keyof BuffDef, number][]) (page as Record<string, number>)[k] = ((page as Record<string, number>)[k] ?? 0) + v;
+      player.talentHp += tal.hp ?? 0;
+      player.gold += tal.gold ?? 0;
+    }
+    player.talent = page;
+    refreshStats(player);
+    player.hp = player.maxHp;
+  }
   others.slice(0, allies).forEach((def, i) => {
     spawnChampion(s, def, 'blue', blueAt(i + 1).x, blueAt(i + 1).y, false, laneOf(ALLY_LANES, i), def.hero);
   });
@@ -911,7 +952,7 @@ export function dist(a: Vec, b: Vec): number {
 }
 
 /** The lane whose centre line runs nearest a point. */
-export function laneNear(p: Vec, lanes: LaneId[] = ['top', 'mid', 'bottom']): LaneId {
+export function laneNear(p: Vec, lanes: LaneId[] = MAP_LANES): LaneId {
   let best: LaneId = lanes[0];
   let bestD = Infinity;
   for (const id of lanes) {

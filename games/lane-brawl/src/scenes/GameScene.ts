@@ -18,7 +18,17 @@ import {
   ELIXIR_COLOR,
   ItemDef,
   LANES,
-  RIVER,
+  RIVERS,
+  RIVER_HALF,
+  MAP_IDS,
+  MAP_LANES,
+  MAP_NAMES,
+  MapId,
+  FLOOD,
+  TALENTS,
+  TALENT_ROWS,
+  TalentId,
+  DRAFT,
   RUNE,
   RUNES,
   MAX_LEVEL,
@@ -27,7 +37,6 @@ import {
   Team,
   TOWERS,
   Vec,
-  LaneId,
   WORLD,
   XP_FOR_LEVEL,
   MAX_ITEMS,
@@ -68,7 +77,7 @@ import { Fx, GameState, ObjectiveTitle, Phase, Unit, createGame, dist, getUnit }
 import { isUnlocked, loadMastery, masteryRank, ranksBesides, recordWin } from '../game/mastery';
 import { Ladder, LadderResult, loadLadder, loadSkin, recordRanked, saveSkin, skinsWon, starText } from '../game/ladder';
 import { checkTrophies } from '../trophies/check';
-import { MODES, MatchMode, loadMode, loadSpell, saveMode, saveSpell } from '../game/spellChoice';
+import { MODES, MatchMode, loadMap, loadMode, loadSpell, saveMap, saveMode, saveSpell } from '../game/spellChoice';
 import { announceEvent, abilityFor, atFountain, atShop, buy, buyBack, buybackCost, cast, castSpell, chooseUpgrade, commandAttack, commandMove, hiddenFrom, invulnerable, priceFor, sendPing, startRecall, stealthed, nightness, behind, callSurrender, mvpOf, tick, useActive, viewers } from '../game/sim';
 import { FxLayers, drawAura, drawProjectile, drawSkill, drawZone, skillMs } from './skillFx';
 import { shortName } from '../game/names';
@@ -113,7 +122,9 @@ import {
   towerKey,
   watchKey,
 } from '../art/bake';
-import { MAP_KEY, MAP_RES, paintMap } from '../art/map';
+import { MAP_KEY, MAP_RES, PAINTED, paintMap } from '../art/map';
+import { Draft, redBan, runDraft } from '../game/draft';
+import { chooseTalent, loadPage, openRows, talentsOf } from '../game/talents';
 import { PATHS } from '../game/terrain';
 import { PoseName } from '../art/models';
 import { byDifficulty, settings } from '../../../../shared/settings';
@@ -134,7 +145,12 @@ import {
   SPELL_BUTTON,
   SPELL_PICK,
   MODE_PICK,
+  MAP_PICK,
   SKIN_PICK,
+  LOBBY,
+  LOBBY_BACK,
+  LOBBY_FIGHT,
+  talentCard,
   SCORE_CHIP,
   SCORE_PANEL,
   surrenderButton,
@@ -365,6 +381,13 @@ export class GameScene extends Phaser.Scene {
   private eventDays = 7;
   /** Whether the pointer is over the match kind button on the pick screen. */
   private hoverMode = false;
+  /** The map of the next full or ranked match (`loadMap`), and whether the pointer is on its button. */
+  private mapId: MapId = 'classic';
+  private hoverMap = false;
+  /** A ranked match's bans so far (LB19): the player's, then red's. */
+  private bans: { blue: ChampionDef; red: ChampionDef } | null = null;
+  /** The panel before a match (LB18, LB19): the picked champion, its ranked draft and its talent page. */
+  private lobby: { def: ChampionDef; draft: Draft | null; talents: TalentId[]; rank: number } | null = null;
   /** The objective target's damage as blue last saw it, for the card while it is out of sight. */
   private objSeen = { id: -1, progress: 0 };
   /** The fog of war: how much each cell is hidden from blue (0 clear, 1 hidden), and its images. */
@@ -400,21 +423,13 @@ export class GameScene extends Phaser.Scene {
     this.mastery = loadMastery();
     this.spell = loadSpell();
     this.mode = loadMode();
+    this.mapId = loadMap();
     this.skin = loadSkin();
     this.readWeek();
     // The world camera follows the champion; the HUD (scroll factor 0) gets a fixed camera.
     splitHudCamera(this);
     this.cameras.main.setBounds(0, 0, WORLD.w, WORLD.h);
-    // The map in tiles, so only the ones in view are drawn.
-    for (let y = 0; y < WORLD.h; y += MAP_TILE) {
-      for (let x = 0; x < WORLD.w; x += MAP_TILE) {
-        const frame = `${x},${y}`;
-        const w = Math.min(MAP_TILE, WORLD.w - x);
-        const h = Math.min(MAP_TILE, WORLD.h - y);
-        this.textures.get(MAP_KEY).add(frame, 0, Math.round(x * MAP_RES), Math.round(y * MAP_RES), Math.round(w * MAP_RES), Math.round(h * MAP_RES));
-        this.mapTiles.push(this.add.image(x, y, MAP_KEY, frame).setOrigin(0, 0).setDisplaySize(w, h).setDepth(0));
-      }
-    }
+    this.buildTiles();
     this.groundG = this.add.graphics().setDepth(1);
     this.topG = this.add.graphics().setDepth(4);
     this.hudG = this.add.graphics().setDepth(10).setScrollFactor(0);
@@ -450,6 +465,7 @@ export class GameScene extends Phaser.Scene {
       this.keys.G.on('down', () => this.spellAtCursor());
       PING_KINDS.forEach((kind, i) => this.keys[PING_KEYS[i]].on('down', () => this.ping(kind, this.lastWorld)));
       this.keys.ESC.on('down', () => {
+        if (this.lobby) this.leaveLobby();
         this.aiming = null;
         this.pingArmed = null;
         this.setShop(false);
@@ -479,6 +495,12 @@ export class GameScene extends Phaser.Scene {
       this.hoverMode = this.phase === 'pick' && v.x >= mb.x && v.x <= mb.x + mb.w && v.y >= mb.y && v.y <= mb.y + mb.h;
       const kb = SKIN_PICK;
       this.hoverSkin = this.phase === 'pick' && v.x >= kb.x && v.x <= kb.x + kb.w && v.y >= kb.y && v.y <= kb.y + kb.h;
+      const pb = MAP_PICK;
+      this.hoverMap = this.phase === 'pick' && v.x >= pb.x && v.x <= pb.x + pb.w && v.y >= pb.y && v.y <= pb.y + pb.h;
+      if (this.lobby) {
+        this.hoverPick = -1;
+        this.hoverSpell = this.hoverMode = this.hoverSkin = this.hoverMap = false;
+      }
     });
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => this.onPointerDown(p));
     // A second touch pointer, so one thumb can press an ability while the other steers.
@@ -531,6 +553,21 @@ export class GameScene extends Phaser.Scene {
     this.refreshZones();
   }
 
+  /** The map in tiles, so only the ones in view are drawn; built again when another map is painted. */
+  private buildTiles() {
+    for (const tile of this.mapTiles) tile.destroy();
+    this.mapTiles = [];
+    for (let y = 0; y < WORLD.h; y += MAP_TILE) {
+      for (let x = 0; x < WORLD.w; x += MAP_TILE) {
+        const frame = `${x},${y}`;
+        const w = Math.min(MAP_TILE, WORLD.w - x);
+        const h = Math.min(MAP_TILE, WORLD.h - y);
+        this.textures.get(MAP_KEY).add(frame, 0, Math.round(x * MAP_RES), Math.round(y * MAP_RES), Math.round(w * MAP_RES), Math.round(h * MAP_RES));
+        this.mapTiles.push(this.add.image(x, y, MAP_KEY, frame).setOrigin(0, 0).setDisplaySize(w, h).setDepth(0));
+      }
+    }
+  }
+
   /** Watch AI: a new match with a random champion for blue, which the AI plays like the other nine. */
   private watchMatch() {
     this.startMatch(CHAMPIONS[Math.floor(Math.random() * CHAMPIONS.length)]);
@@ -541,11 +578,79 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  private startMatch(def: ChampionDef) {
+  /**
+   * A card pressed on the pick screen. In a ranked match the first press bans the class (and red
+   * bans one back), the next picks; a pick then opens the panel before the match when there is a
+   * draft to show or a talent page (mastery rank 1 or more), else the match starts at once.
+   */
+  private choose(def: ChampionDef) {
+    if (!isUnlocked(def.id, this.mastery)) return ui('refuse');
+    const pool = CHAMPIONS.filter((c) => isUnlocked(c.id, this.mastery));
+    const rank = masteryRank(this.mastery[def.id] ?? 0);
+    if (this.mode === 'ranked') {
+      if (!this.bans) {
+        sfx('pick');
+        this.bans = { blue: def, red: redBan(pool, def.id, this.ladder.tier, this.mastery) };
+        return;
+      }
+      if (def === this.bans.blue || def === this.bans.red) return ui('refuse');
+      sfx('pick');
+      this.lobby = { def, draft: runDraft(pool, def, this.bans, this.ladder.tier), talents: loadPage(def.id, rank), rank };
+      return;
+    }
+    sfx('pick');
+    if (rank > 0) this.lobby = { def, draft: null, talents: loadPage(def.id, rank), rank };
+    else this.startMatch(def);
+  }
+
+  /** The panel before the match: Fight starts it with the draft and the talent page. */
+  private fight() {
+    const l = this.lobby;
+    if (!l) return;
+    ui('click');
+    this.lobby = null;
+    this.bans = null;
+    this.startMatch(l.def, l.draft, l.talents);
+  }
+
+  /** Back to the cards; a ranked draft and its bans are dropped and made again. */
+  private leaveLobby() {
+    ui('click');
+    this.lobby = null;
+    this.bans = null;
+  }
+
+  /** A talent card pressed: it takes its row on the page, and the page is kept for the class. */
+  private pickTalent(id: TalentId) {
+    const l = this.lobby;
+    const tal = TALENTS.find((x) => x.id === id);
+    if (!l || !tal) return;
+    if (!openRows(l.rank).includes(tal.row)) return ui('refuse');
+    ui('click');
+    l.talents = [...l.talents.filter((x) => TALENTS.find((y) => y.id === x)?.row !== tal.row), id];
+    chooseTalent(l.def.id, id);
+  }
+
+  /** The map button: Kessmoor or the Twin Rivers, for full and ranked matches. */
+  private nextMap() {
+    ui('click');
+    this.mapId = MAP_IDS[(MAP_IDS.indexOf(this.mapId) + 1) % MAP_IDS.length];
+    saveMap(this.mapId);
+  }
+
+  /** The map the next match plays on: quick and event matches keep to Kessmoor. */
+  private matchMap(): MapId {
+    return this.mode === 'quick' || this.mode === 'event' ? 'classic' : this.mapId;
+  }
+
+  private startMatch(def: ChampionDef, draft: Draft | null = null, talents: TalentId[] = []) {
     // Watching, neither side gets the difficulty's damage, so the match is even, every class plays
     // and no ladder or event applies.
     const mode = watching ? 'full' : this.mode;
     this.state = createGame(def, watching ? 1 : ENEMY_DAMAGE, {
+      map: watching ? 'classic' : this.matchMap(),
+      roster: draft && !watching ? { blue: draft.blue, red: draft.red } : undefined,
+      talents: watching ? [] : talents,
       watch: watching,
       mastery: masteryRank(this.mastery[def.id] ?? 0),
       spell: this.spell,
@@ -556,6 +661,11 @@ export class GameScene extends Phaser.Scene {
       pool: watching ? CHAMPIONS : CHAMPIONS.filter((c) => isUnlocked(c.id, this.mastery)),
     });
     if (mode === 'event') announceEvent(this.state);
+    // The map's canvas is painted again when this match plays on the other map.
+    if (PAINTED !== this.state.map) {
+      paintMap(this);
+      this.buildTiles();
+    }
     this.winCounted = null;
     this.ladderResult = null;
     this.unlockedNow = [];
@@ -582,6 +692,7 @@ export class GameScene extends Phaser.Scene {
   /** The pick screen's match kind button: full, quick, ranked, the week's event, and round again. */
   private nextMode() {
     ui('click');
+    this.bans = null;
     this.mode = MODES[(MODES.indexOf(this.mode) + 1) % MODES.length];
     saveMode(this.mode);
   }
@@ -604,6 +715,8 @@ export class GameScene extends Phaser.Scene {
 
   private resetToPick() {
     this.state = null;
+    this.bans = null;
+    this.lobby = null;
     this.startMusic('pick');
     this.mastery = loadMastery();
     this.ladder = loadLadderSafe();
@@ -723,16 +836,25 @@ export class GameScene extends Phaser.Scene {
   /** The zones the pointer can press, rebuilt when the screen they belong to changes. */
   private refreshZones() {
     const offer = this.state?.upgradeOffers[0]?.options.length ?? 0;
-    const key = `${this.phase}|${this.shopOpen}|${offer}|${this.scoreOpen}`;
+    const key = `${this.phase}|${this.shopOpen}|${offer}|${this.scoreOpen}|${this.lobby ? 'lobby' : ''}`;
     if (key === this.zoneKey) return;
     this.zoneKey = key;
     this.zones = [];
     const phase = this.phase;
+    if (phase === 'pick' && this.lobby) {
+      // The panel before the match: its talent cards, Back and Fight; the rest of it blocks.
+      this.zones.push({ ...LOBBY, run: noop });
+      const top = this.lobbyTop();
+      TALENT_ROWS.forEach((r, row) => talentsOf(r.row).forEach((tal, i) => this.zones.push({ ...talentCard(row, i, top), run: () => this.pickTalent(tal.id) })));
+      this.zones.push({ ...LOBBY_BACK, run: () => this.leaveLobby() }, { ...LOBBY_FIGHT, run: () => this.fight() });
+      return;
+    }
     if (phase === 'pick') {
       // A locked champion's card only refuses.
-      CHAMPIONS.forEach((def, i) => this.zones.push({ ...pickCard(i, CHAMPIONS.length), run: () => (isUnlocked(def.id, this.mastery) ? (sfx('pick'), this.startMatch(def)) : ui('refuse')) }));
+      CHAMPIONS.forEach((def, i) => this.zones.push({ ...pickCard(i, CHAMPIONS.length), run: () => this.choose(def) }));
       this.zones.push({ ...SPELL_PICK, run: () => this.nextSpell() });
       this.zones.push({ ...MODE_PICK, run: () => this.nextMode() });
+      this.zones.push({ ...MAP_PICK, run: () => this.nextMap() });
       this.zones.push({ ...SKIN_PICK, run: () => this.nextSkin() });
       return;
     }
@@ -1076,6 +1198,7 @@ export class GameScene extends Phaser.Scene {
     if (s) {
       const me = this.player();
       const layers: FxLayers = { ground: g, top };
+      this.drawFlood(g, s);
       this.drawFountains(g, s);
       this.drawRunes(g, s);
       for (const z of s.zones) if (!this.fogged(z.x, z.y)) drawZone(layers, z, s.time, settings.reduceMotion);
@@ -1183,6 +1306,32 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** The healing ground round each Nexus: a soft ring in the team's colour. */
+  /**
+   * The Twin Rivers in flood (LB20): the water spills wider over the banks and the fords, pale and
+   * rippling (still under reduced motion), and swells in over its first second.
+   */
+  private drawFlood(g: Phaser.GameObjects.Graphics, s: GameState) {
+    if (s.map !== 'twin' || s.time >= s.flood.until) return;
+    const start = s.flood.until - FLOOD.ms;
+    const k = Math.min(1, (s.time - start) / 1000, (s.flood.until - s.time) / 1000);
+    for (const r of RIVERS) {
+      g.lineStyle((RIVER_HALF + 16) * 2 * k, 0x4f9fd6, 0.42).lineBetween(r.from.x, r.from.y, r.to.x, r.to.y);
+      g.lineStyle((RIVER_HALF - 10) * 2 * k, 0x9fd8ff, 0.18).lineBetween(r.from.x, r.from.y, r.to.x, r.to.y);
+      // Foam lines drifting down the stream.
+      const len = Math.hypot(r.to.x - r.from.x, r.to.y - r.from.y);
+      const ux = (r.to.x - r.from.x) / len, uy = (r.to.y - r.from.y) / len;
+      const drift = settings.reduceMotion ? 0 : (s.time / 12) % 90;
+      g.lineStyle(2, 0xe6f6ff, 0.5 * k);
+      for (let u = drift; u < len; u += 90) {
+        for (const side of [-1, 1]) {
+          const ox = -uy * side * (RIVER_HALF * 0.55), oy = ux * side * (RIVER_HALF * 0.55);
+          const x = r.from.x + ux * (u + side * 30) + ox, y = r.from.y + uy * (u + side * 30) + oy;
+          g.lineBetween(x, y, x + ux * 22, y + uy * 22);
+        }
+      }
+    }
+  }
+
   private drawFountains(g: Phaser.GameObjects.Graphics, s: GameState) {
     for (const team of ['blue', 'red'] as const) {
       const b = BASE[team];
@@ -1572,9 +1721,10 @@ export class GameScene extends Phaser.Scene {
     g.clear();
     const pick = this.phase === 'pick';
     this.pickBg.setVisible(pick);
-    this.pickImages.forEach((img) => img.setVisible(pick));
+    this.pickImages.forEach((img) => img.setVisible(pick && !this.lobby));
     this.portrait.setVisible(false);
-    if (pick) this.drawPick(g);
+    if (pick && this.lobby) this.drawLobby(g, this.lobby);
+    else if (pick) this.drawPick(g);
     else if (this.state) this.drawPlaying(g, this.state);
     if (!pick) this.drawStick(g);
     for (const [key, obj] of this.texts) {
@@ -1602,7 +1752,8 @@ export class GameScene extends Phaser.Scene {
       g.fillStyle(col('#3b7be8'), 0.25).fillEllipse(cx, r.y + 56, 50, 14);
       g.lineStyle(2, col('#3b7be8'), open ? 0.9 : 0.3).strokeEllipse(cx, r.y + 56, 50, 14);
       // A locked champion shows as a dark figure, its name and what unlocks it.
-      this.pickImages[i]?.setTint(open ? 0xffffff : 0x10131a).setAlpha(open ? 1 : 0.5);
+      const banned = this.bans && (this.bans.blue === c ? 'blue' : this.bans.red === c ? 'red' : null);
+      this.pickImages[i]?.setTint(open && !banned ? 0xffffff : 0x10131a).setAlpha(open && !banned ? 1 : 0.5);
       this.t(`pick-name-${i}`, cx, r.y + 60, t(c.hero), t(c.hero).length > 16 ? 11 : 12, open ? UI.text : UI.muted, 'center', true);
       this.fit(`pick-name-${i}`, r.w - 8);
       this.t(`pick-role-${i}`, cx, r.y + 75, `${t(c.name)} · ${t(c.role)}`.toUpperCase(), 9, c.color, 'center', true);
@@ -1627,6 +1778,13 @@ export class GameScene extends Phaser.Scene {
         g.fillStyle(col(UI.goldDeep), 1).fillPoints(pts2([{ x: dx, y: dy - 5 }, { x: dx + 5, y: dy }, { x: dx, y: dy + 5 }, { x: dx - 5, y: dy }]), true);
         g.fillStyle(col(UI.gold), 1).fillPoints(pts2([{ x: dx, y: dy - 3.5 }, { x: dx + 3.5, y: dy }, { x: dx, y: dy + 3.5 }, { x: dx - 3.5, y: dy }]), true);
       }
+      // A ranked ban: the figure dark under a grey band naming who banned it.
+      if (banned) {
+        g.fillStyle(col('#3a3f4a'), 0.95).fillRect(r.x + 2, r.y + 34, r.w - 4, 20);
+        g.lineStyle(1, col(SIDE_COLOR[banned]), 1).strokeRect(r.x + 2, r.y + 34, r.w - 4, 20);
+        this.t(`pick-ban-${i}`, cx, r.y + 37, t(banned === 'blue' ? 'banYours' : 'banRed'), 11, banned === 'blue' ? UI.blue : UI.red, 'center', true);
+        this.fit(`pick-ban-${i}`, r.w - 10);
+      }
     });
     // The champion under the pointer: who they are and what they play like, then why they fight.
     const h = CHAMPIONS[this.hoverPick];
@@ -1639,7 +1797,15 @@ export class GameScene extends Phaser.Scene {
       this.fit('pick-blurb', SCREEN.w - 24);
       this.fit('pick-motive', SCREEN.w - 24);
     };
+    const ranked = this.mode === 'ranked';
     if (this.hoverMode) line(this.modeLine(), UI.gold, this.modeDesc(), UI.text);
+    else if (this.hoverMap) {
+      const m = MAP_NAMES[this.mapId];
+      line(t('pickMapLine', { map: t(m.name) }), UI.gold, this.matchMap() === this.mapId ? t(m.desc) : t('pickMapClassicOnly'), UI.text);
+    } else if (ranked && !h && !this.hoverSkin && !hs) {
+      // A ranked match drafts: ban a class first, then pick.
+      line(this.bans ? t('draftPickNow', { red: t(this.bans.red.hero) }) : t('draftBanNow'), TIERS[this.ladder.tier].color, this.ladder.tier >= DRAFT.counterFrom ? t('draftCounterWarn') : t('draftHow'), UI.text);
+    }
     else if (this.hoverSkin) line(t('pickSkinTitle', { skin: t(skin.name), n: skinsWon(this.ladder).length - 1, of: SKINS.length - 1 }), skin.id === 'team' ? UI.gold : skin.cloth, t('pickSkinDesc'), UI.text);
     else if (hs) line(t(hs.name), hs.color, t(hs.desc), UI.text);
     else if (h && !isUnlocked(h.id, this.mastery)) {
@@ -1662,6 +1828,15 @@ export class GameScene extends Phaser.Scene {
     g.lineStyle(1.5, col(this.mode === 'ranked' ? TIERS[this.ladder.tier].color : UI.goldDeep), 1).strokeRect(mb.x + 1, mb.y + 1, mb.w - 2, mb.h - 2);
     this.t('pick-mode', mb.x + mb.w / 2, mb.y + 4, this.modeLine(), 10, this.mode === 'ranked' ? TIERS[this.ladder.tier].color : UI.gold, 'center', true);
     this.fit('pick-mode', mb.w - 10);
+    // The map: Kessmoor or the Twin Rivers (dim when the match kind keeps to Kessmoor).
+    const pb = MAP_PICK;
+    const mapOn = this.matchMap() === this.mapId;
+    this.panel(g, pb.x, pb.y, pb.w, pb.h, this.hoverMap ? '#3a4660' : UI.card);
+    g.lineStyle(1.5, col(UI.goldDeep), 1).strokeRect(pb.x + 1, pb.y + 1, pb.w - 2, pb.h - 2);
+    // Two little wavy rivers or one, as its sign.
+    for (let k = 0; k < (this.mapId === 'twin' ? 2 : 1); k++) g.lineStyle(2, col('#5fb0e0'), mapOn ? 1 : 0.4).lineBetween(pb.x + 7 + k * 6, pb.y + 15, pb.x + 13 + k * 6, pb.y + 5);
+    this.t('pick-map', pb.x + pb.w / 2 + 8, pb.y + 4, t('pickMapLine', { map: t(MAP_NAMES[this.mapId].name) }), 10, mapOn ? UI.gold : UI.muted, 'center', true);
+    this.fit('pick-map', pb.w - 30);
     // The colours the champion wears: a swatch and their name.
     const kb = SKIN_PICK;
     this.panel(g, kb.x, kb.y, kb.w, kb.h, this.hoverSkin ? '#3a4660' : UI.card);
@@ -1672,6 +1847,73 @@ export class GameScene extends Phaser.Scene {
     this.fit('pick-skin', kb.w - 28);
     this.t('hint', SCREEN.w / 2, FRAME.y + 509, `${t('pickHint1')}\n${t('pickHint2')}`, 11, UI.dim, 'center');
     this.texts.get('hint')?.setAlign('center').setLineSpacing(1);
+  }
+
+  /** Where the talent rows start on the panel before the match: under the draft in a ranked match. */
+  private lobbyTop(): number {
+    return this.lobby?.draft ? 232 : 96;
+  }
+
+  /** The panel before the match (LB18, LB19): the ranked draft, the talent page, Back and Fight. */
+  private drawLobby(g: Phaser.GameObjects.Graphics, l: NonNullable<GameScene['lobby']>) {
+    const p = LOBBY;
+    const def = l.def;
+    this.panel(g, p.x, p.y, p.w, p.h, UI.slate);
+    this.goldFrame(g, p.x, p.y, p.w, p.h, true);
+    this.t('lobby-title', p.x + p.w / 2, p.y + 12, t(def.hero), 20, def.color, 'center', true);
+    this.t('lobby-sub', p.x + p.w / 2, p.y + 40, `${t(def.title)} · ${t(def.name)} · ${t(def.role)}`, 11, UI.dim, 'center');
+    this.fit('lobby-sub', p.w - 24);
+    const d = l.draft;
+    if (d) {
+      // The bans, then both teams' picks in the order they fell.
+      this.t('lobby-bans', p.x + p.w / 2, p.y + 62, t('draftBans', { blue: t(d.bans.blue.hero), red: t(d.bans.red.hero) }), 11, UI.text, 'center', true);
+      this.fit('lobby-bans', p.w - 24);
+      for (const team of ['blue', 'red'] as Team[]) {
+        const x = p.x + (team === 'blue' ? 30 : p.w / 2 + 10);
+        this.t(`lobby-head-${team}`, x, p.y + 84, t(team === 'blue' ? 'draftBlue' : 'draftRed'), 11, team === 'blue' ? UI.blue : UI.red, 'left', true);
+        d.picks.filter((pk) => pk.team === team).forEach((pk, k) => {
+          const y = p.y + 102 + k * 18;
+          const n = d.picks.indexOf(pk) + 1;
+          g.fillStyle(col(pk.def.color), 1).fillRect(x, y + 3, 4, 10);
+          const who = pk.def === def ? t('draftYou', { hero: t(pk.def.hero) }) : t(pk.def.hero);
+          this.t(`lobby-pick-${team}-${k}`, x + 10, y, t('draftPick', { n, hero: who, class: t(pk.def.name) }), 10, pk.def === def ? UI.gold : UI.text, 'left', pk.def === def);
+          this.fit(`lobby-pick-${team}-${k}`, p.w / 2 - 50);
+        });
+      }
+      const counter = d.picks.find((pk) => pk.counters);
+      if (counter) {
+        this.t('lobby-counter', p.x + p.w / 2, p.y + 200, t('draftCounter', { hero: t(counter.def.hero), role: t(counter.def.role), target: t(counter.counters!.hero) }), 10, UI.red, 'center', true);
+        this.fit('lobby-counter', p.w - 24);
+      }
+    }
+    // The talent page: a row per kind, three cards each; rows mastery has not opened yet stay shut.
+    const top = this.lobbyTop();
+    const open = openRows(l.rank);
+    this.t('lobby-talents', p.x + 20, p.y + top, open.length ? t('talentPage') : t('talentNone'), 12, UI.gold, 'left', true);
+    this.fit('lobby-talents', p.w - 40);
+    TALENT_ROWS.forEach((r, row) => {
+      const isOpen = open.includes(r.row);
+      const y = talentCard(row, 0, top).y;
+      this.t(`lobby-row-${row}`, p.x + 20, y + 6, t(r.name), 12, isOpen ? r.color : UI.muted, 'left', true);
+      this.t(`lobby-rowsub-${row}`, p.x + 20, y + 24, isOpen ? t('talentPickOne') : t('talentOpensAt', { n: r.rank }), 9, UI.dim, 'left');
+      this.fit(`lobby-rowsub-${row}`, 124);
+      talentsOf(r.row).forEach((tal, i) => {
+        const c = talentCard(row, i, top);
+        const on = isOpen && l.talents.includes(tal.id);
+        this.panel(g, c.x, c.y, c.w, c.h, on ? '#3a4660' : isOpen ? UI.card : '#1c222e');
+        if (on) this.goldFrame(g, c.x, c.y, c.w, c.h, true);
+        g.fillStyle(col(r.color), isOpen ? 1 : 0.3).fillRect(c.x + 2, c.y + 2, 4, c.h - 4);
+        this.t(`lobby-tal-${tal.id}`, c.x + 12, c.y + 6, t(tal.name), 11, isOpen ? (on ? UI.gold : UI.text) : UI.muted, 'left', true);
+        this.fit(`lobby-tal-${tal.id}`, c.w - 18);
+        this.t(`lobby-tdesc-${tal.id}`, c.x + 12, c.y + 24, t(tal.desc), 9, isOpen ? UI.dim : UI.muted, 'left');
+        this.fit(`lobby-tdesc-${tal.id}`, c.w - 18);
+      });
+    });
+    for (const [b, key, hot] of [[LOBBY_BACK, 'lobbyBack', false], [LOBBY_FIGHT, 'lobbyFight', true]] as const) {
+      this.panel(g, b.x, b.y, b.w, b.h, hot ? '#4a3a1c' : UI.card);
+      this.goldFrame(g, b.x, b.y, b.w, b.h, hot);
+      this.t(`lobby-${key}`, b.x + b.w / 2, b.y + 6, t(key), 13, hot ? UI.gold : UI.text, 'center', true);
+    }
   }
 
   /** The match kind button's text. */
@@ -1940,6 +2182,19 @@ export class GameScene extends Phaser.Scene {
       else g.fillStyle(col(s.suddenDeath ? '#ff6a5a' : UI.gold), 1).fillPoints(pts2([{ x: cx, y: cy - 7 }, { x: cx + 5, y: cy }, { x: cx, y: cy + 7 }, { x: cx - 5, y: cy }]), true);
       this.t('mode-chip', c.x + 24, c.y + 4, label, 10, s.ranked ? tier.color : s.suddenDeath ? '#ff9a8a' : UI.gold, 'left', true);
       this.fit('mode-chip', c.w - 28);
+    }
+    // The Twin Rivers: how long until the rivers rise, or how long they stay up.
+    if (s.map === 'twin' && (s.time < s.flood.until || s.flood.next - s.time <= FLOOD.warnMs * 3)) {
+      const c = buffChip(i++);
+      const up = s.time < s.flood.until;
+      g.fillStyle(col(UI.edge), 1).fillRect(c.x - 1, c.y - 1, c.w + 2, c.h + 2);
+      g.fillStyle(col(up ? '#1d3f5c' : '#23303f'), 1).fillRect(c.x, c.y, c.w, c.h);
+      g.lineStyle(1, col('#5fb0e0'), 1).strokeRect(c.x + 1, c.y + 1, c.w - 2, c.h - 2);
+      // A wave.
+      const cx = c.x + 12, cy = c.y + c.h / 2;
+      g.lineStyle(2, col('#9fd8ff'), 1).beginPath().moveTo(cx - 6, cy + 2).lineTo(cx - 3, cy - 2).lineTo(cx, cy + 2).lineTo(cx + 3, cy - 2).lineTo(cx + 6, cy + 2).strokePath();
+      this.t('flood-chip', c.x + 24, c.y + 4, up ? t('floodChipUp', { time: clock(s.flood.until - s.time) }) : t('floodChipSoon', { time: clock(s.flood.next - s.time) }), 10, '#9fd8ff', 'left', true);
+      this.fit('flood-chip', c.w - 28);
     }
     // Comeback help: while blue is behind, its kills pay more.
     if (!watching && behind(s, 'blue', COMEBACK.gap)) {
@@ -2270,8 +2525,11 @@ export class GameScene extends Phaser.Scene {
     const mx = (x: number) => m.x + x * k;
     const my = (y: number) => m.y + y * k;
     g.fillStyle(col('#3f7a3a'), 1).fillRect(m.x, m.y, m.w, m.h);
-    g.lineStyle(4, col('#3a7ea3'), 0.95).lineBetween(mx(RIVER.from.x), my(RIVER.from.y), mx(RIVER.to.x), my(RIVER.to.y));
-    for (const [id, lane] of Object.entries(LANES) as [LaneId, Vec[]][]) {
+    // The rivers, wider and lighter while the Twin Rivers flood.
+    const flood = s.map === 'twin' && s.time < s.flood.until;
+    for (const r of RIVERS) g.lineStyle(flood ? 6 : 4, col(flood ? '#5fb0e0' : '#3a7ea3'), 0.95).lineBetween(mx(r.from.x), my(r.from.y), mx(r.to.x), my(r.to.y));
+    for (const id of MAP_LANES) {
+      const lane = LANES[id];
       // A quick match's closed lanes are faint.
       g.lineStyle(3, col('#d2b483'), s.lanes.includes(id) ? 0.95 : 0.3);
       g.beginPath();

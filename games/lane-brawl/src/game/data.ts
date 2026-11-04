@@ -35,11 +35,51 @@ export const LANES: Record<LaneId, Vec[]> = {
   bottom: [BASE.blue, at(2500, 2500), BASE.red],
 };
 
+// ---------------------------------------------------------------------------------------------
+// Two maps (LB20): Kessmoor, the first, with three lanes and one river, and the Twin Rivers, with the
+// top and bottom lanes only, a jungle where the middle lane was and two rivers that each cross both
+// lanes and flood now and then (`FLOOD`). `setMapData` swaps the map's own data below (`MAP_ID`,
+// `MAP_LANES`, `RIVERS`, `CAMPS`, `BUSHES`); everything else (the Nexuses, towers, pits, watchstones,
+// runes) stands in the same spot on both. `useMap` in `terrain.ts` calls it and rebuilds the terrain.
+
+export type MapId = 'classic' | 'twin';
+export const MAP_IDS: MapId[] = ['classic', 'twin'];
+export const MAP_NAMES: Record<MapId, { name: TextKey; desc: TextKey }> = {
+  classic: { name: 'mapClassic', desc: 'mapClassicDesc' },
+  twin: { name: 'mapTwin', desc: 'mapTwinDesc' },
+};
+/** The map a match plays on now, and its lanes. */
+export let MAP_ID: MapId = 'classic';
+export let MAP_LANES: LaneId[] = ['top', 'mid', 'bottom'];
+
+/** A stretch of river, centre line from `from` to `to`; the water reaches `RIVER_HALF` either side. */
+export interface RiverDef {
+  from: Vec;
+  to: Vec;
+}
+export const RIVER_HALF = 62;
 /**
- * The river runs from the top-left corner to the bottom-right one, across the middle lane, and
- * splits each team's jungle in two. It is only scenery: units cross it at full speed.
+ * Kessmoor's river runs from the top-left corner to the bottom-right one, across the middle lane,
+ * and splits each team's jungle in two. The Twin Rivers run the same way either side of the
+ * middle, each crossing both lanes. Kessmoor's is only scenery: units cross it at full speed.
  */
-export const RIVER = { from: at(420, 420), to: at(2380, 2380), half: 62 };
+const CLASSIC_RIVERS: RiverDef[] = [{ from: at(420, 420), to: at(2380, 2380) }];
+const TWIN_RIVERS: RiverDef[] = [
+  { from: at(100, 800), to: at(2000, 2700) },
+  { from: at(2700, 2000), to: at(800, 100) },
+];
+export let RIVERS: RiverDef[] = CLASSIC_RIVERS;
+/**
+ * The Twin Rivers flood (LB20): from `firstAt` every `every` ms the rivers rise for `ms`, with a
+ * warning `warnMs` before. Anything walking in the water while they are up moves at `slow` of its
+ * speed, so a lane's ford holds up the minions and champions caught in it.
+ */
+export const FLOOD = { firstAt: 180_000, every: 180_000, ms: 30_000, warnMs: 10_000, slow: 0.5 };
+/** With two lanes a side falls faster, so the Twin Rivers' towers, inhibitors and Nexuses have `hp` times their health. */
+export const TWIN = { hp: 1.35 };
+/** Which lane each AI champion walks on the Twin Rivers, like `ALLY_LANES` and `ENEMY_LANES`. */
+export const TWIN_ALLY_LANES: LaneId[] = ['top', 'bottom', 'bottom', 'top'];
+export const TWIN_ENEMY_LANES: LaneId[] = ['top', 'bottom', 'top', 'bottom', 'top'];
 
 export interface TowerSpot {
   team: Team;
@@ -98,7 +138,7 @@ export interface CampSpot extends Vec {
   kind: 'boar' | 'wolf' | 'ember' | 'moss' | 'merc';
 }
 /** Six camps per team's half: blue's first, then their red copies. */
-export const CAMPS: CampSpot[] = both<CampSpot>([
+const CLASSIC_CAMPS: CampSpot[] = both<CampSpot>([
   { kind: 'ember', ...at(640, 1300) },
   { kind: 'boar', ...at(900, 1520) },
   { kind: 'wolf', ...at(620, 1850) },
@@ -106,6 +146,16 @@ export const CAMPS: CampSpot[] = both<CampSpot>([
   { kind: 'boar', ...at(1280, 1900) },
   { kind: 'wolf', ...at(950, 2180) },
 ]);
+/** The Twin Rivers' camps: three in each team's home jungle behind its river, three between the rivers. */
+const TWIN_CAMPS: CampSpot[] = both<CampSpot>([
+  { kind: 'ember', ...at(560, 1800) },
+  { kind: 'wolf', ...at(900, 2050) },
+  { kind: 'boar', ...at(1250, 2280) },
+  { kind: 'moss', ...at(1250, 1550) },
+  { kind: 'boar', ...at(850, 1100) },
+  { kind: 'wolf', ...at(1850, 2200) },
+]);
+export let CAMPS: CampSpot[] = CLASSIC_CAMPS;
 /** Where a wolf pack's two pups stand, from the alpha. */
 export const PUPS: Vec[] = [
   { x: -46, y: 26 },
@@ -1319,7 +1369,7 @@ export interface Bush {
   ry: number;
 }
 /** Nine pairs, each mirrored under the map's 180-degree turn: by the lanes, in the jungle and on the river banks. */
-export const BUSHES: Bush[] = both<Bush>([
+const CLASSIC_BUSHES: Bush[] = both<Bush>([
   { ...at(1150, 1450), rx: 78, ry: 48 },
   { ...at(1750, 2100), rx: 70, ry: 50 },
   { ...at(780, 1680), rx: 72, ry: 52 },
@@ -1330,6 +1380,25 @@ export const BUSHES: Bush[] = both<Bush>([
   { ...at(1300, 2300), rx: 70, ry: 50 },
   { ...at(700, 980), rx: 70, ry: 50 },
 ]);
+/** The Twin Rivers' bushes: six pairs, kept off both rivers and the camps. */
+const TWIN_BUSHES: Bush[] = both<Bush>([
+  { ...at(1050, 1350), rx: 78, ry: 48 },
+  { ...at(1650, 2050), rx: 70, ry: 50 },
+  { ...at(780, 1680), rx: 72, ry: 52 },
+  { ...at(1120, 2050), rx: 72, ry: 52 },
+  { ...at(440, 900), rx: 60, ry: 62 },
+  { ...at(1900, 2360), rx: 70, ry: 50 },
+]);
+export let BUSHES: Bush[] = CLASSIC_BUSHES;
+
+/** Swaps in a map's own data (see `MapId`); `useMap` in `terrain.ts` calls it and rebuilds the terrain. */
+export function setMapData(id: MapId) {
+  MAP_ID = id;
+  MAP_LANES = id === 'twin' ? ['top', 'bottom'] : ['top', 'mid', 'bottom'];
+  RIVERS = id === 'twin' ? TWIN_RIVERS : CLASSIC_RIVERS;
+  CAMPS = id === 'twin' ? TWIN_CAMPS : CLASSIC_CAMPS;
+  BUSHES = id === 'twin' ? TWIN_BUSHES : CLASSIC_BUSHES;
+}
 /** An enemy this close sees into a bush, and through stealth. */
 export const BUSH_REVEAL = 90;
 /** How long attacking or casting from a bush shows the champion, in ms. */
@@ -1472,4 +1541,66 @@ export const RETREAT = {
   /** Allied AI champions this close fall back too. */
   call: 420,
   ms: 3500,
+};
+
+// ---------------------------------------------------------------------------------------------
+// Talent pages (LB18): before a match the player picks one small passive from each row of the
+// tree, a damage, a defence and a utility row. Mastery with the class opens them: the damage row
+// at rank `TALENT_ROWS[0].rank`, then the others. A talent adds a `buff` (counted with the buffs
+// for the whole match), health (`hp`) or starting gold (`gold`). Only the player's champion has one.
+
+export type TalentRow = 'damage' | 'defence' | 'utility';
+export type TalentId = 'keenEdge' | 'quickHands' | 'bloodthirst' | 'thickHide' | 'secondWind' | 'stoutHeart' | 'fleetFoot' | 'focus' | 'coinPurse';
+export interface TalentDef {
+  id: TalentId;
+  row: TalentRow;
+  name: TextKey;
+  desc: TextKey;
+  buff?: BuffDef;
+  hp?: number;
+  gold?: number;
+}
+export const TALENT_ROWS: { row: TalentRow; name: TextKey; rank: number; color: string }[] = [
+  { row: 'damage', name: 'talentRowDamage', rank: 1, color: '#ff8a3d' },
+  { row: 'defence', name: 'talentRowDefence', rank: 2, color: '#7fb0ff' },
+  { row: 'utility', name: 'talentRowUtility', rank: 3, color: '#7fe08a' },
+];
+export const TALENTS: TalentDef[] = [
+  { id: 'keenEdge', row: 'damage', name: 'talentKeenEdge', desc: 'talentKeenEdgeDesc', buff: { dmg: 6 } },
+  { id: 'quickHands', row: 'damage', name: 'talentQuickHands', desc: 'talentQuickHandsDesc', buff: { atk: 10 } },
+  { id: 'bloodthirst', row: 'damage', name: 'talentBloodthirst', desc: 'talentBloodthirstDesc', buff: { lifesteal: 6 } },
+  { id: 'thickHide', row: 'defence', name: 'talentThickHide', desc: 'talentThickHideDesc', buff: { armor: 6 } },
+  { id: 'secondWind', row: 'defence', name: 'talentSecondWind', desc: 'talentSecondWindDesc', buff: { regen: 4 } },
+  { id: 'stoutHeart', row: 'defence', name: 'talentStoutHeart', desc: 'talentStoutHeartDesc', hp: 120 },
+  { id: 'fleetFoot', row: 'utility', name: 'talentFleetFoot', desc: 'talentFleetFootDesc', buff: { speed: 6 } },
+  { id: 'focus', row: 'utility', name: 'talentFocus', desc: 'talentFocusDesc', buff: { cdr: 8 } },
+  { id: 'coinPurse', row: 'utility', name: 'talentCoinPurse', desc: 'talentCoinPurseDesc', gold: 150 },
+];
+
+// ---------------------------------------------------------------------------------------------
+// Pick and ban (LB19): before a ranked match the player bans a class, then red bans one, then the
+// sides pick in turn by `DRAFT.order` (the player's pick first, for blue). Below `DRAFT.counterFrom`
+// red bans and picks at random; from that tier red bans the class the player has won most with and
+// its first pick counters the player's role (`COUNTERS`), and from `DRAFT.allFrom` every red pick
+// counters the blue champion picked last.
+
+export const DRAFT = {
+  order: ['blue', 'red', 'red', 'blue', 'blue', 'red', 'red', 'blue', 'blue', 'red'] as Team[],
+  counterFrom: 2,
+  allFrom: 4,
+};
+/** The roles that beat each role, best first: a red counter pick takes the first it can. */
+export const COUNTERS: Record<string, TextKey[]> = {
+  roleMarksman: ['roleAssassin', 'roleAmbusher', 'roleHunter'],
+  roleBurst: ['roleAssassin', 'roleAmbusher', 'roleCatcher'],
+  roleSupport: ['roleCatcher', 'roleAssassin', 'roleHunter'],
+  roleController: ['roleAssassin', 'roleHunter', 'roleAmbusher'],
+  roleTank: ['roleController', 'roleMarksman', 'roleBurst'],
+  roleFighter: ['roleController', 'roleTank', 'roleCatcher'],
+  roleBruiser: ['roleController', 'roleMarksman', 'roleTank'],
+  roleBrawler: ['roleController', 'roleCatcher', 'roleMarksman'],
+  roleAssassin: ['roleTank', 'roleBruiser', 'roleSupport'],
+  roleAmbusher: ['roleTank', 'roleSupport', 'roleBrawler'],
+  roleHunter: ['roleTank', 'roleBruiser', 'roleFighter'],
+  roleCatcher: ['roleTank', 'roleSupport', 'roleBruiser'],
 };
