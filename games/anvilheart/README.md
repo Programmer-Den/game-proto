@@ -131,10 +131,23 @@ Masterwork.
    the sword as usual plus the buckler's price, with 50% on top. Someone who walks off holding half
    a set leaves it behind: it goes back onto an empty anvil (or into the empty barrel), or, with no
    room, pays its plain price. A reload puts a handed-over half back the same way.
-19. **The smithy is kept**: the board and barrel (and how long each sword has lain), coins, swords
+19. **Guild halls.** Once a new charter's edict is chosen, it also raises one guild hall a level
+   (up to 3), kept in every charter after: the **Armoury** lays one more Iron Shortsword on each new
+   smithy's anvils, the **Jeweller** makes the forge find half as many gems again, and the
+   **Tavern** makes adventurers wait a tenth longer.
+20. **The rival smithy.** From the second charter a rival smithy sells across the street. Its day
+   lasts three minutes, shown under the edict: it sells a sword every 30 seconds, and every
+   adventurer who walks off goes to it. Sell more swords than it in its day for a prize of 60 coins
+   per charter and 10 reputation.
+21. **Daily forge.** "Daily forge" at the bottom starts today's shift: ten minutes in a fresh smithy
+   with the quench barrel and an edict, the same orders and forge for everyone that day. Earn as many
+   coins from sales and commissions as you can; the end window shows today's coins, your best and
+   your days in a row, and "Back to my smithy" returns to your own smithy, untouched. One try a day:
+   leaving half way uses it up.
+22. **The smithy is kept**: the board and barrel (and how long each sword has lain), coins, swords
    sold, upgrades, the forge's mode and best buckler, the standing commission and its open offer,
-   your guild stars, perks, charter and edict, reputation and whether you have won are saved in the
-   browser.
+   your guild stars, perks, guild halls, charter and edict, reputation and whether you have won are
+   saved in the browser, and the daily forge's record under its own key.
 
 ![While a Steel Sword is held, the knight who asked for one shows the tipped price and the ranger who asked for less shows Overkill](docs/screenshots/exact-fit-tip.webp)
 
@@ -185,6 +198,10 @@ Masterwork.
 ![The guild perks window, with the fourth desk bought and four adventurers at the smaller counter](docs/screenshots/guild-perks.webp)
 
 ![A set order: the Iron Buckler is handed over, and the Knight's Blade held over the knight completes the set](docs/screenshots/shield-set.webp)
+
+![A new charter raises a guild hall: Armoury, Jeweller or Tavern, with the rival smithy's day under the edict](docs/screenshots/guild-halls.webp)
+
+![The daily forge's shift is over: today's coins, the best and the days in a row](docs/screenshots/daily-forge.webp)
 
 ![Dragging a dagger onto its twin](docs/screenshots/playthrough-1-dragging.webp)
 

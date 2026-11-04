@@ -192,6 +192,33 @@ const en = {
   givenGemmed: 'Given {have}/{need}, gemmed',
   givenReady: 'Given {have}/{need}: drag here',
   reward: '+{n}c',
+
+  // Guild halls, the rival smithy and the daily forge
+  armouryName: 'Armoury',
+  armouryBlurb: 'Every new smithy starts with one more Iron Shortsword',
+  jewellerName: 'Jeweller',
+  jewellerBlurb: 'The forge finds half as many gems again',
+  tavernName: 'Tavern',
+  tavernBlurb: 'Adventurers wait a tenth longer',
+  hallTitle: 'Raise a guild hall',
+  hallText: 'Each new charter raises one hall a level, for good.',
+  hallCaption: '{name}: level {from} to {to}\n{blurb}',
+  hallTop: '{name}: level {to}, the highest\n{blurb}',
+  hallRaised: '{name} raised',
+  rivalLine: 'Rival: you {mine} · them {theirs} · {time}',
+  rivalWon: 'You outsold the rival smithy! +{n}c',
+  rivalLost: 'The rival smithy outsold you today',
+  dailyLink: 'Daily forge',
+  dailyDone: 'Daily ✓ {n}c',
+  dailyLine: 'Daily forge {time} · {n}c',
+  dailyStart: 'Daily forge: the same 10 minutes for everyone today',
+  dailyBest: { one: 'Today {score}c · best {best}c · {n} day in a row', other: 'Today {score}c · best {best}c · {n} days in a row' },
+  dailyTitle: 'The shift is over',
+  dailyText: {
+    one: 'You earned {score} coins today.\nBest {best} · {n} day in a row',
+    other: 'You earned {score} coins today.\nBest {best} · {n} days in a row',
+  },
+  dailyBack: 'Back to my smithy',
 };
 
 export default en;

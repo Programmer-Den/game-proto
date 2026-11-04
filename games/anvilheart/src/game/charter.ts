@@ -59,3 +59,32 @@ export const PERK_IDS = Object.keys(PERKS) as Perk[];
 export const noPerks = (): Record<Perk, boolean> => ({ barrel: false, rust: false, desk: false });
 /** Guild stars spent on perks. */
 export const spentStars = (perks: Record<Perk, boolean>) => PERK_IDS.reduce((n, id) => n + (perks[id] ? PERKS[id].stars : 0), 0);
+
+/**
+ * Guild halls (AN15): each new charter raises one hall a level, for good. The Armoury lays Iron
+ * Shortswords on a new smithy's anvils, the Jeweller makes the forge find more gems and the Tavern
+ * makes adventurers wait longer.
+ */
+export type Hall = 'armoury' | 'jeweller' | 'tavern';
+
+export interface HallRule {
+  name: TextKey;
+  /** What one level does. */
+  blurb: TextKey;
+}
+
+export const HALLS: Record<Hall, HallRule> = {
+  armoury: { name: 'armouryName', blurb: 'armouryBlurb' },
+  jeweller: { name: 'jewellerName', blurb: 'jewellerBlurb' },
+  tavern: { name: 'tavernName', blurb: 'tavernBlurb' },
+};
+export const HALL_IDS = Object.keys(HALLS) as Hall[];
+/** The highest level a hall reaches. */
+export const HALL_TOP = 3;
+/** Each Jeweller level adds half the gem chance again; each Tavern level a tenth more patience. */
+export const JEWELLER_GEMS = 0.5;
+export const TAVERN_PATIENCE = 0.1;
+
+export const noHalls = (): Record<Hall, number> => ({ armoury: 0, jeweller: 0, tavern: 0 });
+/** Hall levels raised so far. */
+export const hallLevels = (halls: Record<Hall, number>) => HALL_IDS.reduce((n, id) => n + halls[id], 0);

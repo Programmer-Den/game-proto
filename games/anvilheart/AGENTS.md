@@ -91,6 +91,33 @@ Implemented today:
   `UI_DEPTH + 5`. With four desks `deskBox(desk, desks)` shrinks each desk by `deskScale` and centres it in
   the same column: the counter frames are their own textures (`counter-3`, `counter-4`), and
   `drawVisitors` rebuilds the visitors, buyer frames and hint when the count changes.
+- Guild halls (AN15, `HALLS`, `HALL_IDS`, `HALL_TOP` 3 in `charter.ts`): `halls` (saved, kept by
+  `foundCharter`, wiped only by "New smithy") holds each hall's level. `hallOffers(s)` holds while a
+  charter past the first has its edict but `hallLevels(halls) < charter` (so an old save catches up,
+  one window per missing level) and a hall has room; the hall window (`createHalls`/`drawHalls`,
+  `tall-panel`, three `wide` buttons, no way to close it) shows after the edict window, and `tick`
+  and `forge` wait like they do for an edict, until `chooseHall` raises one (pushing `hall`). The
+  Armoury lays one Iron Shortsword (tier 2) on the first empty anvil when raised and
+  `halls.armoury` of them on the first anvils in `foundCharter`; the Jeweller multiplies
+  `gemChance` by `1 + JEWELLER_GEMS * level` (0.5); the Tavern multiplies patience in `arrive` by
+  `tavernFactor` (`1 + TAVERN_PATIENCE * level`, 0.1).
+- The rival smithy (AN16): while `rivalOpen` (charter > 0, not a daily shift) `tick` runs
+  `rivalDay`: `rival` (`{ ms, mine, theirs }`, not saved, reset by `foundCharter` and `newShop`)
+  counts down `RIVAL_DAY_MS` (3 min); the rival sells one sword per `RIVAL_SALE_MS` (30s) of it and
+  takes every walk-off, `sell` adds to `mine`. At the day's end `mine > theirs` pays `rivalPrize`
+  (`RIVAL_PRIZE` 60 times `charter + 1`) and `RIVAL_REP` (10) reputation, pushes `rivalDay` (won,
+  coins) and starts a new day. `statusLine`, under the edict plaque, shows the tally and the clock.
+- Daily forge (AN17, `shared/daily.ts`): the "Daily forge" link (`DAILY_LINK`, right-aligned left
+  of the perk link) calls `openDaily`: once today's try is used it floats today's score, best and
+  streak instead; otherwise it saves, calls `startDaily('anvilheart')` and swaps `state` for
+  `dailyShop(dailyRand('anvilheart'))`: a fresh first smithy with the barrel, the edict picked by the
+  day's seed, `daily` `{ ms: DAILY_MS (10 min), earned }`, and `useRandom` pointing every random
+  roll in `sim.ts` at the seeded source. `sell` and `deliver` add to `daily.earned`. `save()` does
+  nothing while `daily` is set, and "New smithy" refuses. When `ms` reaches 0 `tick` pushes
+  `dailyEnd` once and then stands still (`forge` too); the scene calls `finishDaily` and shows the
+  end window (`dailyWindow`, `win-panel`), whose "Back to my smithy" (`leaveDaily`) resets
+  `useRandom(null)` and reloads the saved smithy. A reload during the shift lands in the saved
+  smithy with the try used up.
 - Bucklers (AN14, `src/game/shields.ts`, `SHIELDS`: Wooden 6, Iron 15, Steel 40, Silver 100, Golden
   240): once `shieldsAbout` (`bestTier >= SHIELD_TIER`, 4) the mode switch (`MODE_BUTTON`, style
   `mode`) calls `toggleShieldMode`; with `shieldMode` on `forge` makes `shield(tier)` (`SHIELD` +
@@ -223,10 +250,12 @@ File map (`src/`):
   `shield`, `validItem`) and `combine`, the merge, gem-setting and repair rule.
 - `game/sim.ts`: the rules as pure functions on `GameState`: `tick`, `forge`, `toggleShieldMode`,
   `itemAt`, `touch`, `drop`, `standing`, `offers`, `chooseCommission`, `deliverable`, `deliver`, `takes`,
-  `sell`, `buy`, `toggleAutoForge`, `buyPerk`, `edictOffers`, `chooseEdict`, `foundCharter`, plus
-  the private `rust`, `arrive`, `rollTrait`, `comeBack`, `raiseBest`, `put` and `hammer` (streaks).
+  `sell`, `buy`, `toggleAutoForge`, `buyPerk`, `edictOffers`, `chooseEdict`, `foundCharter`,
+  `hallOffers`, `chooseHall`, `dailyShop` and `useRandom` (the rules' random source), plus
+  the private `random`, `rivalDay`, `rust`, `arrive`, `rollTrait`, `comeBack`, `raiseBest`, `put` and `hammer` (streaks).
 - `game/charter.ts`: `Edict`, `EDICTS`, `EDICT_IDS`, `edictsFor`, `edictRule`, `Perk`, `PERKS`,
-  `PERK_IDS`, `noPerks` and `spentStars`.
+  `PERK_IDS`, `noPerks`, `spentStars`, and the guild halls: `Hall`, `HALLS`, `HALL_IDS`,
+  `HALL_TOP`, `JEWELLER_GEMS`, `TAVERN_PATIENCE`, `noHalls` and `hallLevels`.
 - `game/shields.ts`: the `SHIELDS` table (name, price per tier), `SHIELD_TOP`, `shieldOf`.
 - `game/commissions.ts`: `Commission`, `COMMISSIONS`, `GRAND_PAY`,
   `commissionAt(level, charter)`, `grandOf`, `commissionTitle` (the banner's title, already
@@ -259,9 +288,9 @@ File map (`src/`):
   `FORGE_BUTTON`, `HEAT_BAR`, `BANNER`, `REPUTATION`, `EDICT_PLAQUE`, `UPGRADE_BUTTONS`,
   `WIDE_BUTTON`, `BOARD` with `CELL_SCALE`, `ROW_BOX`, `ROW_BUTTON`, `BARREL`, `DISCOVERED` with
   `discoveredCentre`, `DESK` with `deskScale`, `deskBox` and `deskCentre` (all taking the desk
-  count), inside a desk `ORDER`, `PATIENCE` and `TAG`, `PERK_LINK`, and `WIN` with `tallH`), the
+  count), inside a desk `ORDER`, `PATIENCE` and `TAG`, `PERK_LINK`, `DAILY_LINK`, and `WIN` with `tallH`), the
   `FONT` stack (Georgia, serif) and hit tests `slotAt`, `placeAt` (anvil or barrel), `onBanner` and
-  `deskAt`.
+  `deskAt`, and `DAILY_LINK`.
 - `ui/Button.ts`: a leaded-glass caption button (style `forge`, `upgrade`, `row`, `wide` or `mode`,
   textures from `bakeUi`) that fires on `pointerdown` and can be disabled.
 - `art/glass.ts`: the painting kit: `bake` (paints a canvas in art units, twice the view's, at
@@ -292,7 +321,7 @@ How it runs:
   view pixel, which matches the screen's `renderScale`) and add them with `textures.addCanvas`. There are no asset files. The
   background's mosaic is computed pixel by pixel once at boot.
 - Tick: `GameScene.update(time)` takes `dt` from the frame timestamp (clamped to `MAX_STEP_MS`,
-  250ms), adds it to `clock`, and, unless a window is open (`windowOpen`: the win, offer, perk or edict
+  250ms), adds it to `clock`, and, unless a window is open (`windowOpen`: the win, offer, perk, edict, hall or daily end
   window, so nothing waits out its patience behind one), calls `tick(state, dt)`, which cools the forge, forges when
   brings heroes back, forges when `autoForging`, drains the hammer streak and patience (a walk-off
   costs reputation and gives a held half set back), rusts idle swords and brings adventurers. If that (or the Forge button since the last
@@ -307,7 +336,7 @@ How it runs:
   `pointerup` never arrives) put the sword back. A press on an interactive object (a button or
   link) never reaches `pickUp`, so a window button that closes its window can't pick up the sword
   under it. Forging, pick-ups and buys are ignored while a window shows (`windowOpen`: the win,
-  offer, perk or edict window), and `forge` in the sim also refuses while a new charter's edict
+  offer, perk, edict, hall or daily end window), and `forge` in the sim also refuses while a new charter's edict
   waits. A `pointerdown` on the banner with
   nothing under it opens the offer window while `choosing`, or the win window once `won`. Forge
   and upgrade buttons call `forge` and `buy`; a
@@ -339,6 +368,8 @@ State model (`src/game/state.ts`):
   (minimum tier), `gem` (wants it gemmed), `trait`, `shield` (0, or the least buckler of a set
   order), `given` (the set's halves handed over), `patienceMs` counting down from `patience`, `look`
   (0 to `LOOKS - 1`) and `returned`. `returning` holds heroes on their way back.
+- `halls` are the guild halls' levels; `rival` the rival smithy's day; `daily` the daily shift
+  (null in the player's smithy).
 - `shieldMode` is the forge's mode, `bestShield` the best buckler made; `perks` the bought perks
   and `edict` the charter's edict (null while a new charter's waits, and in the first smithy).
 - `streak` is the number of merges in the current hammer streak (0 when none), `streakSlot` the
@@ -364,7 +395,7 @@ State model (`src/game/state.ts`):
 
 Persistence: one key of its own, `anvilheart-progress`, holding `Progress` as JSON (`coins`,
 `slots`, `idle`, `sold`, `bestTier`, `ranks`, `autoForge`, `commission`, `choosing`, `stars`,
-`charter`, `barrel`, `reputation`, `won`, `shieldMode`, `bestShield`, `perks`, `edict`). Adventurers
+`charter`, `barrel`, `reputation`, `won`, `shieldMode`, `bestShield`, `perks`, `edict`, `halls`). Adventurers
 (half sets they hold go back onto empty anvils, or into the coins, in the snapshot), returning
 heroes, heat, the streak and timers are not saved. An old save
 loads with no perks, swords mode and no edict, so a charter past the first asks for its edict. `loadProgress` merges over `freshProgress()`, so a new upgrade id in `ranks`
@@ -373,12 +404,15 @@ won, no idle times, no open offer (its standing commission counts as the quick w
 0. `newShop` sizes `slots` by `anvilsOf` and drops anything `validItem` rejects. An old save's
 commission level keeps its meaning for the first three; an old level past them lands on the
 multi-Dragonslayer ones or the win.
+The daily forge's record is `anvilheart-daily` (`shared/daily.ts`: today's try, score, best and
+streak); a daily shift itself is never saved. An old save loads with no halls.
 The trophies earned are a second key, `anvilheart-trophies` (`shared/trophies.ts`, each id with
 the time); neither "New smithy" nor a new charter touches it.
 
 Randomness and timing:
 
-- `Math.random` is only used in `src/game/sim.ts`: per `arrive`, the order tier (skipped for the
+- `Math.random` is only used in `src/game/sim.ts`, through `random()`, which a daily shift points
+  at the day's seeded source (`useRandom`; the daily also draws its edict from it first): per `arrive`, the order tier (skipped for the
   first order), the look (skipped for a returning hero), the set roll and the buckler tier (only
   once `shieldsAbout` and for tier 2+), the gem order roll (only once `gemsAbout`, for tier 2+ and
   no set), then the trait roll (skipped for the first order and a set); per `forge` call, the Fine
@@ -489,7 +523,9 @@ Effects (`sfx`, plus the shared `ui`):
 | `grumble` | `left` |
 | `chime` | `delivered` (unless it completes the commission) |
 | `fanfare` + `ui('coin')` | `commission` (the `win` sting instead once won) |
-| `seal` | a commission offer chosen (`choose`), `edict` |
+| `seal` | a commission offer chosen (`choose`), `edict`, `hall` |
+| `fanfare` + `ui('coin')` / `grumble` | `rivalDay` won / lost |
+| `charter` sting | `dailyEnd` |
 | `buy` | an upgrade, the row or the barrel bought (`buy`), `perk` |
 | `ui('click')` | mode switch, Auto Forge on/off, opening the offer, win or perk window, their close links, Keep smithing, New smithy |
 | `ui('refuse')` | a refused forge, buy, perk, charter or offer, a disabled button, a sword dropped where the anvil, crown or buyer won't take it |

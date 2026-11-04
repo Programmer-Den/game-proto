@@ -2,7 +2,7 @@ import { isGem, isGemmed, isMaster, isShield, isSword, tierOf, validItem } from 
 import { swordOf } from './swords';
 import { SHIELD_TOP, shieldOf } from './shields';
 import { COMMISSIONS } from './commissions';
-import { EDICT_IDS, edictRule, noPerks, spentStars, type Edict, type Perk } from './charter';
+import { EDICT_IDS, HALL_IDS, HALL_TOP, JEWELLER_GEMS, TAVERN_PATIENCE, edictRule, noHalls, noPerks, spentStars, type Edict, type Hall, type Perk } from './charter';
 import type { UpgradeId } from './upgrades';
 
 /**
@@ -175,6 +175,12 @@ export interface GameState {
   perks: Record<Perk, boolean>;
   /** This charter's edict, or null (the first smithy has none, and a new charter's waits for a choice). */
   edict: Edict | null;
+  /** The guild halls' levels (AN15), one raised per new charter; kept across charters. */
+  halls: Record<Hall, number>;
+  /** The rival smithy's day (AN16), from the second charter on: time left, and swords sold by you and by them. Not saved. */
+  rival: { ms: number; mine: number; theirs: number };
+  /** The daily forge (AN17): a seeded shift with its time left and the coins earned in it, or null in the smithy. Never saved. */
+  daily: { ms: number; earned: number } | null;
   /** Things that just happened, for the scene to animate; it empties the list as it draws them. */
   events: GameEvent[];
 }
@@ -195,6 +201,9 @@ export type GameEvent =
   | { kind: 'handed'; desk: number; shield: boolean }
   | { kind: 'perk'; perk: Perk }
   | { kind: 'edict'; edict: Edict }
+  | { kind: 'hall'; hall: Hall }
+  | { kind: 'rivalDay'; won: boolean; coins: number }
+  | { kind: 'dailyEnd'; earned: number }
   /** `back` says where half a set they held went: an anvil, the barrel (`BARREL`), or (place -1) its plain price paid. */
   | { kind: 'left'; desk: number; back?: { place: number; coins: number } };
 
@@ -218,6 +227,7 @@ export interface Progress {
   bestShield: number;
   perks: Record<Perk, boolean>;
   edict: Edict | null;
+  halls: Record<Hall, number>;
 }
 
 export const freshProgress = (): Progress => ({
@@ -239,6 +249,7 @@ export const freshProgress = (): Progress => ({
   bestShield: 0,
   perks: noPerks(),
   edict: null,
+  halls: noHalls(),
 });
 
 /** How many anvils the smithy has: 16, or 20 with the fifth row. */
@@ -278,6 +289,9 @@ export function newShop(progress: Progress): GameState {
     bestShield: Math.min(SHIELD_TOP, count(progress.bestShield)),
     perks: { barrel: progress.perks?.barrel === true, rust: progress.perks?.rust === true, desk: progress.perks?.desk === true },
     edict: EDICT_IDS.includes(progress.edict as Edict) ? progress.edict : null,
+    halls: Object.fromEntries(HALL_IDS.map((id) => [id, Math.min(HALL_TOP, count(progress.halls?.[id]))])) as Record<Hall, number>,
+    rival: freshRival(),
+    daily: null,
     events: [],
   };
 }
@@ -314,8 +328,23 @@ export const progressOf = (s: GameState): Progress => {
     bestShield: s.bestShield,
     perks: { ...s.perks },
     edict: s.edict,
+    halls: { ...s.halls },
   };
 };
+
+/** How long the rival smithy's day lasts, how often it sells a sword itself, and what beating it pays per charter. */
+export const RIVAL_DAY_MS = 180_000;
+export const RIVAL_SALE_MS = 30_000;
+export const RIVAL_PRIZE = 60;
+export const RIVAL_REP = 10;
+/** The rival smithy opens across the street from the second charter on. */
+export const rivalOpen = (s: Pick<GameState, 'charter' | 'daily'>) => s.charter > 0 && s.daily === null;
+export const freshRival = () => ({ ms: RIVAL_DAY_MS, mine: 0, theirs: 0 });
+/** What a day won against the rival pays: more in later charters, as prices rise. */
+export const rivalPrize = (s: Pick<GameState, 'charter'>) => RIVAL_PRIZE * (s.charter + 1);
+
+/** How long the daily forge's shift lasts. */
+export const DAILY_MS = 600_000;
 
 /** A whole number of at least 0 from a save, or 0. */
 const count = (n: unknown) => (typeof n === 'number' && Number.isFinite(n) && n > 0 ? Math.floor(n) : 0);
@@ -377,7 +406,9 @@ export const autoForging = (s: GameState) => s.ranks.auto > 0 && s.autoForge;
 /** Whether gems turn up yet: once the smithy has made a Steel Sword. */
 export const gemsAbout = (s: GameState) => s.bestTier >= GEM_TIER;
 /** The chance a forge makes a gem, once gems are about. */
-export const gemChance = (s: GameState) => GEM_CHANCE * edictRule(s.edict).gems;
+export const gemChance = (s: GameState) => GEM_CHANCE * edictRule(s.edict).gems * (1 + JEWELLER_GEMS * s.halls.jeweller);
+/** How much longer adventurers wait thanks to the Tavern hall. */
+export const tavernFactor = (s: Pick<GameState, 'halls'>) => 1 + TAVERN_PATIENCE * s.halls.tavern;
 /** Whether the forge can make bucklers yet: once the smithy has made a Knight's Blade. */
 export const shieldsAbout = (s: GameState) => s.bestTier >= SHIELD_TIER;
 /** How many desks the counter has: three, or four with the perk. */

@@ -97,6 +97,8 @@ export const TAG = { x: 9, y: 9, w: 75, h: 33 };
 
 /** The bottom-right link to the guild perks, left of "New smithy". */
 export const PERK_LINK = { x: 700, y: 527 };
+/** The daily forge link, right-aligned just left of the perk link (its x is its right end). */
+export const DAILY_LINK = { x: 690, y: 527 };
 
 /** The window shown when the Crown Blade is delivered (and the other windows), by its centre. */
 export const WIN = { x: 480, y: 270, w: 440, h: 230, tallH: 310 };
