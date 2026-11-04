@@ -1,9 +1,10 @@
 import { STYLES } from './catalog';
+import { TECHNIQUES } from './techniques';
 import { GAUNTLET, newProgress, unlock, type GameState, type Progress } from './state';
 
-// Ninefold keeps two keys: the progress that unlocks the styles, with the style worn, and the
-// board in play (with a Delve run's relics, or its relic offer between floors), so a reload goes
-// on where it stood.
+// Ninefold keeps two keys: the progress that unlocks the styles (with the style worn, the
+// calendar's stamps and the school's), and the board in play (with a Delve run's relics, or its
+// relic offer between floors), so a reload goes on where it stood.
 const KEY = 'ninefold-progress';
 const BOARD_KEY = 'ninefold-board';
 
@@ -25,12 +26,16 @@ export function loadProgress(): Progress {
         if (Number.isFinite(saved[key])) p[key] = saved[key];
       }
       if (Array.isArray(saved.weekScores) && saved.weekScores.length === GAUNTLET.length && saved.weekScores.every(Number.isFinite)) p.weekScores = saved.weekScores;
+      if (Array.isArray(saved.dailyDays)) p.dailyDays = [...new Set<number>(saved.dailyDays.filter(Number.isFinite))].sort((a, b) => a - b);
+      if (Array.isArray(saved.lessons)) p.lessons = TECHNIQUES.filter((t) => saved.lessons.includes(t));
       if (Array.isArray(saved.unlocked)) p.unlocked = STYLES.filter((s) => s === 'paper' || saved.unlocked.includes(s));
       if (p.unlocked.includes(saved.style)) p.style = saved.style;
     }
   } catch {
     // A broken or blocked save starts fresh.
   }
+  // A save from before the calendar stamps the last daily it solved.
+  if (p.daily && !p.dailyDays.includes(p.daily)) p.dailyDays = [...p.dailyDays, p.daily].sort((a, b) => a - b);
   unlock(p);
   return p;
 }
@@ -46,7 +51,8 @@ export function saveProgress(p: Progress) {
 /** Saves the board in play, or clears the save when there is none to come back to. */
 export function saveBoard(s: GameState) {
   try {
-    if (s.phase === 'playing' || s.phase === 'relic') {
+    // A lesson is short and starts over from the school, so it isn't kept.
+    if ((s.phase === 'playing' || s.phase === 'relic') && s.mode !== 'lesson') {
       localStorage.setItem(BOARD_KEY, JSON.stringify(Object.fromEntries([...BOARD_FIELDS, ...LATER_FIELDS].map((k) => [k, s[k]]))));
     } else localStorage.removeItem(BOARD_KEY);
   } catch {

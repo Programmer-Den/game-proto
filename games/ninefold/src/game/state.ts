@@ -1,16 +1,20 @@
 import { byDifficulty } from '../../../../shared/settings';
-import { BOARD_TWISTS, MAX_ASCENT, PRESSING_TWISTS, RELICS, STYLES, TWISTS, UNIQUE_RELICS, type Level, type RelicId, type StyleId, type Twist } from './catalog';
-import { dailySeed, makePuzzle, nextDay, peersOf, seeded, SHAPES, shuffle, units, type Extra, type Puzzle, type Random } from './sudoku';
+import { BOARD_TWISTS, MAX_ASCENT, PALETTE_STYLES, PRESSING_TWISTS, RELICS, STYLES, TWISTS, UNIQUE_RELICS, type Level, type RelicId, type StyleId, type Twist } from './catalog';
+import { LESSONS, lessonPuzzle } from './lessons';
+import { dailySeed, EXTRAS, makePuzzle, nextDay, peersOf, seeded, SHAPES, shuffle, units, type Extra, type Puzzle, type Random } from './sudoku';
+import { candidates, explain, TECHNIQUES, type Technique } from './techniques';
 
-// Ninefold's rules: Classic (a daily puzzle, the weekly gauntlet and free play at five levels) and
-// Delve (a run of ever bigger puzzles with hearts and relics, at up to five ascensions), and the
-// progress that unlocks the art styles.
+// Ninefold's rules: Classic (a daily puzzle, the weekly gauntlet and free play at eight levels),
+// Delve (a run of ever bigger puzzles with hearts and relics, at up to five ascensions), the
+// technique school's lessons, and the progress that unlocks the art styles and stamps the calendar.
 // The scene calls the actions below and reads `GameState`; nothing here knows about Phaser.
 
 /** Givens on a Classic 9x9 board at each level. */
-export const CLASSIC_GIVENS: Record<Level, number> = { easy: 40, normal: 32, hard: 26, killer: 16, thermo: 24 };
+export const CLASSIC_GIVENS: Record<Level, number> = { easy: 40, normal: 32, hard: 26, killer: 16, thermo: 24, arrow: 18, kropki: 14, sandwich: 20 };
 /** The extra rule a Classic level's boards carry. */
-export const LEVEL_EXTRA: Partial<Record<Level, Extra>> = { killer: 'killer', thermo: 'thermo' };
+export const LEVEL_EXTRA: Partial<Record<Level, Extra>> = { killer: 'killer', thermo: 'thermo', arrow: 'arrow', kropki: 'kropki', sandwich: 'sandwich' };
+/** How long the panel names the technique a hint used, in game time. */
+export const HINT_NOTE_MS = 6_000;
 /** The daily puzzle is a Normal board. */
 export const DAILY_LEVEL: Level = 'normal';
 /** Hints a Classic board starts with (hub difficulty: Easy, Normal, Hard). */
@@ -55,7 +59,7 @@ export const TWIST_FLOOR = 4;
 export const BOSS_EVERY = 5;
 export const BOSS_GIVENS = 3;
 /** Givens a twist takes away, since its rule tells the solver more. */
-export const TWIST_GIVENS: Record<Twist, number> = { diagonal: 2, parity: 6, killer: 14, thermo: 6, clock: 0, sealed: 0 };
+export const TWIST_GIVENS: Record<Twist, number> = { diagonal: 2, parity: 6, killer: 14, thermo: 6, arrow: 8, kropki: 14, sandwich: 6, clock: 0, sealed: 0 };
 /** On a Clock floor a heart is lost every this much game time. */
 export const CLOCK_MS = 3 * 60_000;
 /** Clearing this Delve floor at the highest ascension open opens the next one. */
@@ -128,8 +132,9 @@ export function planFloor(floor: number, random: Random, ascent = 0): FloorPlan 
 
 const pick = <T>(items: readonly T[], random: Random) => items[Math.floor(random() * items.length)];
 
-export type Mode = 'classic' | 'daily' | 'weekly' | 'delve';
-export type Phase = 'menu' | 'playing' | 'solved' | 'relic' | 'over';
+export type Mode = 'classic' | 'daily' | 'weekly' | 'delve' | 'lesson';
+/** `lesson` is a lesson's opening card, over its board, before play starts. */
+export type Phase = 'menu' | 'lesson' | 'playing' | 'solved' | 'relic' | 'over';
 
 /** What a player has done across every board, saved by `save.ts`. */
 export interface Progress {
@@ -152,11 +157,15 @@ export interface Progress {
   week: number;
   weekScores: number[];
   bestWeek: number;
+  /** Every daily solved, by the date it was dealt for (`dailySeed`), oldest first: the calendar's stamps. */
+  dailyDays: number[];
+  /** The school's lessons stamped. */
+  lessons: Technique[];
   style: StyleId;
   unlocked: StyleId[];
 }
 
-export const newProgress = (): Progress => ({ solved: 0, flawless: 0, noHint: 0, hard: 0, fast: 0, bestFloor: 0, bosses: 0, daily: 0, dailyStreak: 0, bestStreak: 0, climbed: 0, week: 0, weekScores: GAUNTLET.map(() => -1), bestWeek: 0, style: 'paper', unlocked: ['paper'] });
+export const newProgress = (): Progress => ({ solved: 0, flawless: 0, noHint: 0, hard: 0, fast: 0, bestFloor: 0, bosses: 0, daily: 0, dailyStreak: 0, bestStreak: 0, climbed: 0, week: 0, weekScores: GAUNTLET.map(() => -1), bestWeek: 0, dailyDays: [], lessons: [], style: 'paper', unlocked: ['paper'] });
 
 /** The highest Delve ascension open. */
 export const ascensionOpen = (p: Progress) => Math.min(MAX_ASCENT, p.climbed);
@@ -171,8 +180,28 @@ export const UNLOCKS: Record<StyleId, (p: Progress) => boolean> = {
   stars: (p) => p.hard >= 1,
   stone: (p) => p.solved >= 25,
   neon: (p) => p.fast >= 1,
-  glass: (p) => STYLES.every((s) => s === 'glass' || p.unlocked.includes(s)),
+  glass: (p) => PALETTE_STYLES.every((s) => s === 'glass' || p.unlocked.includes(s)),
+  almanac: (p) => fullMonths(p.dailyDays) >= 1,
 };
+
+/** How many days a month has (`month` from 0). */
+export const daysIn = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
+
+/** How many calendar months have every day's daily solved. */
+export function fullMonths(days: number[]) {
+  const perMonth = new Map<number, number>();
+  for (const d of days) {
+    const month = Math.floor(d / 100);
+    perMonth.set(month, (perMonth.get(month) ?? 0) + 1);
+  }
+  let full = 0;
+  for (const [month, n] of perMonth) if (n >= daysIn(Math.floor(month / 100), (month % 100) - 1)) full++;
+  return full;
+}
+
+/** The days of a month (`month` from 0) whose daily was solved, by day of the month. */
+export const stampedDays = (p: Progress, year: number, month: number) =>
+  new Set(p.dailyDays.filter((d) => Math.floor(d / 100) === year * 100 + month + 1).map((d) => d % 100));
 
 export type GameEvent =
   | { type: 'board' }
@@ -188,7 +217,8 @@ export type GameEvent =
   | { type: 'over' }
   | { type: 'unlocked'; style: StyleId }
   | { type: 'relic'; relic: RelicId }
-  | { type: 'hint'; cell: number };
+  | { type: 'hint'; cell: number }
+  | { type: 'learned'; lesson: Technique };
 
 export interface GameState {
   phase: Phase;
@@ -238,6 +268,11 @@ export interface GameState {
   doneUnits: number[];
   /** Styles unlocked by the last board solved. */
   newStyles: StyleId[];
+  /** The lesson in play (an index into `LESSONS`), -1 for none. */
+  lesson: number;
+  /** The technique the last hint used (`revealed` when none found it), and the board time it was given at. */
+  hintNote: Technique | 'revealed' | null;
+  hintAt: number;
   progress: Progress;
   events: GameEvent[];
 }
@@ -246,7 +281,7 @@ export function newGame(progress: Progress): GameState {
   return {
     phase: 'menu', mode: 'classic', level: 'easy', puzzle: null, values: [], notes: [], selected: -1, notesMode: false,
     mistakes: 0, hintsLeft: 0, hintsUsed: 0, timeMs: 0, hearts: 0, maxHearts: 0, floor: 0, plan: null, upcoming: null, dailyDate: 0, week: 0, weekDay: 0, score: 0, weekTotal: 0, ascent: 0, ascended: 0, relics: [], relicOffer: [],
-    warded: false, streak: 0, keyHealed: 0, undo: [], doneUnits: [], newStyles: [], progress, events: [],
+    warded: false, streak: 0, keyHealed: 0, undo: [], doneUnits: [], newStyles: [], lesson: -1, hintNote: null, hintAt: 0, progress, events: [],
   };
 }
 
@@ -263,6 +298,8 @@ function load(s: GameState, puzzle: Puzzle) {
   s.keyHealed = 0;
   s.undo = [];
   s.newStyles = [];
+  s.lesson = -1;
+  s.hintNote = null;
   markDone(s);
   s.phase = 'playing';
   s.events.push({ type: 'board' });
@@ -315,7 +352,34 @@ export function startWeekly(s: GameState, date: Date) {
 }
 
 /** The extra board rule among a floor's twists, if any. */
-const extraOf = (twists: readonly Twist[]): Extra | undefined => twists.find((tw): tw is Extra => tw === 'parity' || tw === 'killer' || tw === 'thermo');
+const extraOf = (twists: readonly Twist[]): Extra | undefined => twists.find((tw): tw is Extra => (EXTRAS as readonly string[]).includes(tw));
+
+/**
+ * Opens a lesson of the technique school: its board with every empty cell's candidates noted,
+ * under the card that explains the technique (`phase` `lesson`; `beginLesson` starts play).
+ */
+export function startLesson(s: GameState, index: number) {
+  const lesson = LESSONS[index];
+  if (!lesson) return false;
+  s.mode = 'lesson';
+  s.level = 'normal';
+  s.dailyDate = 0;
+  s.plan = s.upcoming = null;
+  load(s, lessonPuzzle(lesson));
+  s.lesson = index;
+  s.hintsLeft = 1;
+  s.notes = candidates(s.puzzle!, s.values);
+  s.phase = 'lesson';
+  return true;
+}
+
+/** Leaves a lesson's opening card for its board. */
+export function beginLesson(s: GameState) {
+  if (s.phase === 'lesson') s.phase = 'playing';
+}
+
+/** The lesson in play, if any. */
+export const lessonOf = (s: GameState) => (s.mode === 'lesson' ? LESSONS[s.lesson] : undefined);
 
 /** Starts a Delve run on floor 1, at an ascension that is open (0 for none). */
 export function startDelve(s: GameState, ascent = 0) {
@@ -519,17 +583,26 @@ export function dailyStreakNow(p: Progress, today: number) {
   return p.daily === today || nextDay(p.daily) === today ? p.dailyStreak : 0;
 }
 
-/** Fills in the selected cell (or the first open one) with its digit, using up a hint. */
+/**
+ * Fills in the selected cell (or, with none picked, the easiest cell to place by logic, else the
+ * first open one) with its digit, using up a hint, and names the technique that places it
+ * (`hintNote`; `revealed` when no technique in `TECHNIQUES` gets there).
+ */
 export function hint(s: GameState) {
   const p = s.puzzle;
   if (!p || s.phase !== 'playing' || s.hintsLeft <= 0 || hasTwist(s, 'sealed')) return false;
   const open = (c: number) => c >= 0 && !p.givens[c] && s.values[c] !== p.solution[c];
-  const cell = open(s.selected) ? s.selected : s.values.findIndex((_, c) => open(c));
+  const grid = s.values.map((v, i) => (v === p.solution[i] ? v : 0));
+  const picked = open(s.selected) ? s.selected : -1;
+  const step = explain(p, grid, picked);
+  const cell = picked >= 0 ? picked : step ? step.cell : s.values.findIndex((_, c) => open(c));
   if (cell < 0) return false;
   s.hintsLeft--;
   s.hintsUsed++;
   fill(s, cell);
   s.selected = cell;
+  s.hintNote = step ? step.technique : 'revealed';
+  s.hintAt = s.timeMs;
   s.events.push({ type: 'hint', cell });
   afterFill(s);
   return true;
@@ -537,6 +610,9 @@ export function hint(s: GameState) {
 
 function afterFill(s: GameState) {
   const p = s.puzzle!;
+  // A lesson ends once its target cell holds its digit.
+  const lesson = lessonOf(s);
+  if (lesson && isRight(s, lesson.target)) return learned(s, lesson.id);
   units(p).forEach((u, i) => {
     if (!s.doneUnits.includes(i) && u.every((c) => s.values[c] === p.solution[c])) {
       s.doneUnits.push(i);
@@ -552,6 +628,15 @@ function afterFill(s: GameState) {
   if (s.values.every((v, i) => v === p.solution[i])) solved(s);
 }
 
+/** Stamps a lesson in the school and shows its card. */
+function learned(s: GameState, lesson: Technique) {
+  const p = s.progress;
+  if (!p.lessons.includes(lesson)) p.lessons = TECHNIQUES.filter((t) => t === lesson || p.lessons.includes(t));
+  s.selected = -1;
+  s.phase = 'solved';
+  s.events.push({ type: 'learned', lesson });
+}
+
 function solved(s: GameState) {
   const p = s.progress;
   p.solved++;
@@ -563,6 +648,8 @@ function solved(s: GameState) {
     p.dailyStreak = p.daily && nextDay(p.daily) === s.dailyDate ? p.dailyStreak + 1 : 1;
     p.bestStreak = Math.max(p.bestStreak, p.dailyStreak);
     p.daily = s.dailyDate;
+    // The calendar's stamp for the day.
+    if (!p.dailyDays.includes(s.dailyDate)) p.dailyDays = [...p.dailyDays, s.dailyDate].sort((a, b) => a - b);
   }
   if (s.mode === 'weekly') {
     s.score = gauntletScore(s.mistakes, s.hintsUsed, s.timeMs);

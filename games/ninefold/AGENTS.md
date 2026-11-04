@@ -7,17 +7,20 @@ AGENTS.md.
 ## Current state
 
 Ninefold is a number-placement puzzle (every row, column and box holds each digit once) with two
-modes and nine unlockable art styles. Classic plays a 9x9 board at Easy, Normal, Hard, Killer or
-Thermo, plus a daily puzzle seeded by the date and the weekly gauntlet (a seeded board a day, scored
-over the week); Delve is a run of floors (4x4, then 6x6, then 9x9 with fewer givens) with hearts,
-hints and relics between floors, at up to five ascensions. Every solved board counts towards the style
-unlocks; the worn style redraws everything (backdrop, board, panel, buttons, cards).
+modes, a technique school and ten unlockable art styles. Classic plays a 9x9 board at Easy, Normal,
+Hard, Killer, Thermo, Arrow, Kropki or Sandwich, plus a daily puzzle seeded by the date (each one
+solved stamps the calendar) and the weekly gauntlet (a seeded board a day, scored over the week);
+Delve is a run of floors (4x4, then 6x6, then 9x9 with fewer givens) with hearts, hints and relics
+between floors, at up to five ascensions. Every solved board counts towards the first nine style
+unlocks, and a full calendar month earns the tenth (Almanac); the worn style redraws everything
+(backdrop, board, panel, buttons, cards).
 
 Implemented today:
 
-- One scene (`GameScene`) with three screens (`screen`: `menu`, `styles`, `board`) and end cards
-  over the board for the phases `solved` (Classic and daily), `relic` (a cleared Delve floor) and
-  `over` (a Delve run out of hearts).
+- One scene (`GameScene`) with five screens (`screen`: `menu`, `styles`, `school`, `calendar`,
+  `board`) and cards over the board for the phases `lesson` (a lesson's opening card), `solved`
+  (Classic, daily, weekly, and a learned lesson's stamp), `relic` (a cleared Delve floor) and `over`
+  (a Delve run out of hearts).
 - Puzzles are made in code (`makePuzzle`): a random full board, then cells emptied while the
   solution stays unique, down to the givens asked for (a board that can't lose more keeps a few
   more). 9x9 boards take a few to a few tens of milliseconds. An `Extra` rule adds `Puzzle.even`
@@ -27,7 +30,37 @@ Implemented today:
   digit, no diagonal step crossing another). The solver checks them per candidate (`checker`,
   `allowed`: a cage's open cells must still be able to make up its sum, a thermometer cell must
   leave room below and above and rise past every filled cell on its line), so the solution is
-  unique with the extra rule. Killer boards with 10 givens take about 10 ms.
+  unique with the extra rule. Killer boards with 10 givens take about 10 ms. Three more rules:
+  `Puzzle.arrows` (Arrow: `makeArrows` draws up to eight circles, each with an arrow of 2 to 4 cells
+  stepping beside or diagonal, whose digits add up to the circle's; `allowed` keeps an arrow's sum
+  within reach of its circle), `Puzzle.dots` (Kropki: `makeDots` puts a dot between every two
+  side-by-side cells one apart (white) or one double the other (black; 1-2 gets black), and two
+  cells without a dot are neither, checked by `dotFits`) and `Puzzle.sandwich` (Sandwich:
+  `makeSandwich` sums each row's and column's digits between its 1 and its highest digit;
+  `sandwichFits` checks a line once both ends stand). A board with an extra rule gives each
+  uniqueness check `CHECK_STEPS` search steps; a check that runs out keeps its cell, so a hard
+  board keeps a few more givens instead of taking seconds (Sandwich boards prune least: 20 givens
+  take about 50 ms, 12 about 600 ms). Plain boards have no budget, so daily boards are as before.
+- Hints (`hint`) fill the picked cell, or with none picked the cell `explain` (`techniques.ts`)
+  finds easiest, else the first open one, and set `hintNote` to the technique that places it
+  (`revealed` when none of `TECHNIQUES` does; `explain` only knows rows, columns, boxes and
+  diagonals, so boards with an extra rule often end there) and `hintAt`; the panel's relics row names
+  it for `HINT_NOTE_MS`. `explain` looks for a hidden single, then a naked single, and when there is
+  neither applies one elimination (naked pair, pointing pair, X-wing) to the candidates and looks
+  again; the step's `technique` is the hardest it used.
+- The technique school (`lessons.ts`): `LESSONS` are four 6x6 boards (hidden single, naked pair,
+  pointing pair, X-wing) stopped where that technique is the way on, found once by `explain` from
+  seeded boards and kept as digit strings, with the `marks` that show the technique and the `target`
+  cell it unlocks. `startLesson` deals one (`mode` `lesson`, `lesson` its index, every empty cell's
+  candidates noted, one hint) under its opening card (`phase` `lesson`); `beginLesson` starts play.
+  `afterFill` ends it once `target` is right: `learned` adds the technique to `Progress.lessons`
+  and shows the stamp card (`phase` `solved`, a `learned` event). Lessons count nothing else and are
+  never saved as the board in play.
+- The calendar: `solved` adds each daily's `dailyDate` to `Progress.dailyDays` (sorted, once);
+  `stampedDays` reads a month's, `daysIn` its length and `fullMonths` how many months are full,
+  which unlocks `MONTH_STYLE` (Almanac). The scene's `calMonth` is the month shown (year * 12 +
+  month), between the first month stamped and this one. A daily's solved card says how far its month
+  has come.
 - Entering: a right digit is filled in for good and clears that digit from its peers' notes; a
   wrong one stays (shown in `wrong`/`wrongBg`), counts a mistake, and in Delve costs a heart unless
   a Ward catches the floor's first. Erase clears a wrong digit, or an empty cell's notes. Notes mode
@@ -43,7 +76,8 @@ Implemented today:
   taking `TWIST_GIVENS` off): `diagonal` (`Shape.diagonal`: both long diagonals are units too, so
   `units`, `peersOf` and the solver all know them), `parity` (`Puzzle.even` marks the even cells;
   `makePuzzle(..., parity)` keeps the solution unique with the marking, which the solver honours),
-  `killer` and `thermo` (the Classic levels' rules; `extraOf` picks a floor's `Extra`), `clock` (`tick` takes a heart every `CLOCK_MS` of floor time, a `clock` event; `clockLeft` counts
+  `killer`, `thermo`, `arrow`, `kropki` and `sandwich` (the Classic levels' rules; `extraOf` picks a
+  floor's `Extra` from `EXTRAS`), `clock` (`tick` takes a heart every `CLOCK_MS` of floor time, a `clock` event; `clockLeft` counts
   down in the panel) and `sealed` (`hint` refuses; clearing the floor gives a hint back). Every
   `BOSS_EVERY` (5th) floor is a boss floor: one board twist (`BOARD_TWISTS`) and one pressing twist (`PRESSING_TWISTS`), `BOSS_GIVENS`
   fewer givens, and clearing it restores every heart and counts `Progress.bosses`. Floors before
@@ -81,8 +115,10 @@ Implemented today:
   upright one the `TALL` layout (header panel, board, then a dock with one row of nine keys and the
   tools), and turning the phone mid-game lays everything out again.
 - Styles (`STYLES`, `THEMES`): Paper Cut-out (default), Garden Markers, Chalkboard, Ink &
-  Parchment, Cosy Pixel, Star Chart, Carved Stone, Neon Arcade, Stained Glass, unlocked by
-  `UNLOCKS` and picked on the style screen. Fonts are the device's own, so nothing is downloaded.
+  Parchment, Cosy Pixel, Star Chart, Carved Stone, Neon Arcade, Stained Glass and Almanac (a wall
+  calendar), unlocked by `UNLOCKS` and picked on the style screen. `PALETTE_STYLES` are the nine
+  before Almanac: Stained Glass and the Full palette trophy wait only for those. Fonts are the
+  device's own, so nothing is downloaded.
 
 Missing or rough:
 
@@ -94,7 +130,10 @@ Missing or rough:
   right), and an undone mistake still counts.
 - Leaving a board by Menu drops it (the save is cleared); only a closed or reloaded page comes back
   to it.
-- Puzzle levels are by given count, not by the solving techniques they need.
+- Puzzle levels are by given count, not by the solving techniques they need; `explain` could grade
+  them, but it doesn't yet, and it knows no extra rule.
+- The calendar can't fill a missed day late, so a full month needs every day's daily on its day.
+- Only four lessons, all 6x6; the hint can name a naked single, which has no lesson.
 - `docs/screenshots/all-styles.webp`, `style-picker.webp`, `menu.webp`, `upright-board.webp` (a
   390x844 phone at 2x) and `cover.png` are not made by
   the test; refresh them by hand (a Playwright script that sets `ninefold-progress` with every style
@@ -114,28 +153,31 @@ File map (`src/`):
   `de.ts` the German (with `keepEnglish` for the title) and `en-US.ts` only "Cozy Pixel". Every text
   on screen goes through `t`; game logic compares ids.
 - `audio.ts`: `SONG` (parts `menu`, `calm`, `delve`, stings `solved` and `over`) and the `SFX` table.
-- `game/sudoku.ts`: `Shape`, `SHAPES`, `Puzzle`, `Cage`, `Rules`, `Extra`, `makeCages`, `makeThermos`, `seeded` (mulberry32), `dailySeed`, `boxOf`,
+- `game/sudoku.ts`: `Shape`, `SHAPES`, `Puzzle`, `Cage`, `Arrow`, `Dot`, `Rules`, `EXTRAS`/`Extra`, `makeCages`, `makeThermos`, `makeArrows`, `makeDots`, `makeSandwich`, `dotFits`, `seeded` (mulberry32), `dailySeed`, `boxOf`,
   `units`, `peersOf`, `countSolutions` and `makePuzzle` (the solver picks the cell with the fewest
   candidates). No Phaser.
-- `game/state.ts`: the tuning (`CLASSIC_GIVENS`, `DAILY_LEVEL`, `classicHints`, `delveHearts`,
+- `game/techniques.ts`: `TECHNIQUES`/`Technique`, `Step`, `candidates` and `explain`. No Phaser.
+- `game/lessons.ts`: `Lesson`, `LESSONS` and `lessonPuzzle`.
+- `game/state.ts`: the tuning (`CLASSIC_GIVENS`, `HINT_NOTE_MS`, `DAILY_LEVEL`, `classicHints`, `delveHearts`,
   `DELVE_HINTS`, `MAX_HEARTS`, `RELIC_OFFER`, `SEER_CELLS`, `FAST_MS`, `HARD_FLOOR`, `FLOORS`,
   `DEEPER_EVERY`, `MIN_GIVENS`, `TWIST_FLOOR`, `BOSS_EVERY`, `BOSS_GIVENS`, `TWIST_GIVENS`, `CLOCK_MS`,
   `LEVEL_EXTRA`, `ASCEND_FLOOR`, `ASCENT_GIVENS`, `ASCENT`, `GAUNTLET`, `GAUNTLET_SCORE`),
   `FloorPlan` and `planFloor`, `Progress`, `UNLOCKS`, `GameEvent`, `GameState` and the actions (`newGame`, `startClassic`,
-  `startDaily`, `startWeekly`, `startDelve`, `notesLocked`, `ascensionOpen`, `weekDay`, `weekSeed`, `weekScores`, `gauntletScore`, `select`, `toggleNotes`, `canEnter`, `enter`, `erase`, `hint`, `hasTwist`, `clockLeft`,
+  `startDaily`, `startWeekly`, `startDelve`, `startLesson`, `beginLesson`, `lessonOf`, `daysIn`, `fullMonths`, `stampedDays`, `notesLocked`, `ascensionOpen`, `weekDay`, `weekSeed`, `weekScores`, `gauntletScore`, `select`, `toggleNotes`, `canEnter`, `enter`, `erase`, `hint`, `hasTwist`, `clockLeft`,
   `takeRelic`, `chooseStyle`, `toMenu`, `tick`, `unlock`, `isRight`, `digitsLeft`). Only this file
   changes `GameState`.
-- `game/catalog.ts`: `STYLES`/`StyleId`/`STYLE_INFO`, `RELICS`/`RelicId`/`RELIC_INFO`, `TWISTS`/`Twist`/`TWIST_INFO`
+- `game/catalog.ts`: `STYLES`/`StyleId`/`STYLE_INFO`, `MONTH_STYLE`, `PALETTE_STYLES`, `RELICS`/`RelicId`/`RELIC_INFO`, `TWISTS`/`Twist`/`TWIST_INFO`
   with `BOARD_TWISTS` and `PRESSING_TWISTS`, `ASCENSION_RULES`/`MAX_ASCENT` and `LEVELS` (`easy`,
-  `normal`, `hard`, `killer`, `thermo`).
+  `normal`, `hard`, `killer`, `thermo`, `arrow`, `kropki`, `sandwich`).
 - `game/save.ts`: `loadProgress` and `saveProgress`.
 - `scenes/GameScene.ts`: everything drawn and all input.
 - `scenes/themes.ts`: `Theme`, `THEMES` (one per style) and `hex`.
 - `scenes/layout.ts`: the `Layout` type and its two values, `WIDE` (960x540) and `TALL` (540x960),
   with every spot (`board`, `panel` and its `rows`, `dock`, `pad` with its `cols`, `tools`,
-  `keysHint`, `menuButton`, `menu`, `stylesTitle`, `styleCards`, `back`, `end`, `endButtons`,
-  `relicBox`, `relicCards`; the menu's `daily` and `weekly` side by side, five `levels` and the
-  `ascentDown`/`ascentUp` arrows beside `delve`); `layoutFor(w, h)`, `VIEW` (= `WIDE.view`, for `main.ts`) and `UI_DEPTH`.
+  `keysHint`, `menuButton`, `menu`, `school`, `calendar`, `stylesTitle`, `styleCards`, `back`, `end`, `endButtons`,
+  `relicBox`, `relicCards`; the menu's `daily` and `weekly` side by side, eight `levels` (one row
+  wide, two rows of four upright), the `ascentDown`/`ascentUp` arrows beside `delve`, and `school`,
+  `styles` and `calendar` in its bottom row); `layoutFor(w, h)`, `VIEW` (= `WIDE.view`, for `main.ts`) and `UI_DEPTH`.
 
 Shared code it imports: `shared/setupGame.ts`, `shared/scaling.ts` (`setupScaling`, `viewSize`,
 `viewFrame`), `shared/audio.ts` (`sounds`, `playMusic`, `playSting`, `ui`), `shared/settings.ts`
@@ -166,6 +208,10 @@ How it runs:
   `Graphics` and a text under an interactive `Zone` (`button`), which stops the event so it never
   reaches the board; disabled ones play `ui('refuse')`. Keys: 1-9, arrows, N, H, U or Z (undo), Backspace/Delete/0.
 - End cards sit above a dim zone that swallows taps (`dim`, `raise`).
+- The board's square is `B`: the layout's `board`, less a margin along its top and left on a
+  Sandwich board, where `clueTexts` (18) hold the sums. Arrows are a ring on the circle and a line
+  with a head through the arrow's cells; Kropki dots sit on the line between two cells, white or
+  black; a lesson tints its `marks` and rings its `target`, all under the digits.
 - Board rules on screen: `drawCage` draws a Killer cage's dashed edge inside each cell (running on
   across the grid line where the cage goes on), and the cage's sum sits in its first cell's corner
   (`sumTexts`, one per cage; that cell's notes move down). Thermometers are an opaque tube, mixed
@@ -177,14 +223,14 @@ State model (`GameState`): `phase` (`menu`, `playing`, `solved`, `relic`, `over`
 (`classic`, `daily`, `weekly`, `delve`), `level`, `puzzle` (`size`, `boxW`, `boxH`, `solution`, `givens`, and `even`, `cages` or `thermos`), `week` and `weekDay` (the gauntlet board in play), `score` and `weekTotal` (its result), `ascent` and `ascended`,
 `values` (0 empty; may hold a wrong digit), `notes` (bit per digit), `selected` (-1 none),
 `notesMode`, `mistakes`, `hintsLeft`, `hintsUsed`, `timeMs`, `hearts`, `maxHearts`, `floor`,
-`plan` and `upcoming` (Delve `FloorPlan`s, null otherwise), `dailyDate` (the `dailySeed` a daily board was dealt for, 0 otherwise), `relics`, `relicOffer`, `warded`, `streak`, `keyHealed`, `undo` (the cells' digits and notes before each note, wrong digit or erase; `undoMove` restores the newest whose cell isn't right, `canUndo`), `doneUnits` (indexes into `units`), `newStyles`, `progress` and
+`plan` and `upcoming` (Delve `FloorPlan`s, null otherwise), `dailyDate` (the `dailySeed` a daily board was dealt for, 0 otherwise), `relics`, `relicOffer`, `warded`, `streak`, `keyHealed`, `lesson`, `hintNote`, `hintAt`, `undo` (the cells' digits and notes before each note, wrong digit or erase; `undoMove` restores the newest whose cell isn't right, `canUndo`), `doneUnits` (indexes into `units`), `newStyles`, `progress` and
 `events`.
 
 Persistence: two `localStorage` keys of its own (and `ninefold-trophies`, kept by `shared/trophies.ts`). `ninefold-board` holds the board in play (`saveBoard`/`loadBoard`
 in `save.ts`: the `BOARD_FIELDS` of `GameState` plus `LATER_FIELDS` (`week`, `weekDay`, `ascent`, `ascended`, which a save from before them may lack and then load as their defaults), written by `update` whenever the scene is dirty and
-every `SAVE_EVERY_MS` of board time, and removed once the phase is neither `playing` nor `relic`);
+every `SAVE_EVERY_MS` of board time, and removed once the phase is neither `playing` nor `relic`, or the board is a lesson);
 `create` restores it, straight onto the board or the relic offer. `ninefold-progress` holds `Progress` (`solved`, `flawless`,
-`noHint`, `hard`, `fast`, `bestFloor`, `bosses`, `daily`, `dailyStreak`, `bestStreak`, `climbed`, `week`, `weekScores` (seven numbers, -1 not played), `bestWeek`, `style`, `unlocked`). It is written when a board is
+`noHint`, `hard`, `fast`, `bestFloor`, `bosses`, `daily`, `dailyStreak`, `bestStreak`, `climbed`, `week`, `weekScores` (seven numbers, -1 not played), `bestWeek`, `dailyDays`, `lessons`, `style`, `unlocked`; a save from before `dailyDays` gets its `daily` stamped). It is written when a board is
 solved or a gauntlet board starts (that uses up the day's try), a style unlocks, a Delve run ends or a style is picked. `loadProgress` keeps only known
 styles and re-checks `UNLOCKS`.
 
@@ -208,7 +254,7 @@ seed. All rule timing is game time from `tick`.
 `main.ts`), with their texts in `src/trophies/i18n/` (`en.ts`, `de.ts`). `src/trophies/check.ts`
 awards each from `Progress` alone (`EARNED`): `firstSolve` (solved 1), `flawless`, `fast`, `streak3`
 and `streak7` (`bestStreak`), `firstBoss` (`bosses`), `floor10` and `floor20` (`bestFloor`),
-`allStyles` (every style unlocked) and `ascent5` (`climbed >= 6`: floor 10 cleared at Ascension 5);
+`allStyles` (every one of `PALETTE_STYLES` unlocked) and `ascent5` (`climbed >= 6`: floor 10 cleared at Ascension 5);
 `streak7`, `floor20` and `ascent5` are hidden. `GameScene` calls
 `checkTrophies` once in `create` (quietly, for a saved progress) and in `drain` after any event.
 They are saved under `ninefold-trophies`. The playthrough checks that floor 1, solved with a
@@ -234,7 +280,7 @@ part for the screen; the engine only switches when it changes.
 | `erase` | Erase on a cell with a wrong digit or notes to clear |
 | `hint` | a `hint` event |
 | `unit` | a `unit` event (a row, column or box finished) |
-| `unlock` | an `unlocked` or `ascended` event, and picking a style |
+| `unlock` | an `unlocked` or `ascended` event, picking a style, and a `learned` event (with the `solved` sting) |
 | `relic` | a `relic` event, and a `phoenix` event |
 | `unlock` (heal) / `hint` (gift) | a `heal` event / a `gift` event |
 
@@ -246,8 +292,8 @@ digit, Erase or Hint that can't be used, a disabled pad key and a locked style.
 - `src/main.ts` exposes `window.game` in dev builds. The test reads `game.scene.getScene('Game')`
   and its `state` (copied through JSON, without `events`), `screen`, `cellSpots` (`{ cell, x, y,
   w, h }` per cell of the board, in view pixels) and `buttons` (spots by id: `daily`, `easy`,
-  `normal`, `hard`, `killer`, `thermo`, `weekly`, `delve`, `ascent-down`, `ascent-up` (once an ascension is open), `styles`, `menu`, `key-1`..`key-9`, `notes`, `erase`, `undo`, `hint`,
-  `relic-0`..`relic-2`, `next`, `done`, `again`, `back`, `style-<id>`).
+  `normal`, `hard`, `killer`, `thermo`, `arrow`, `kropki`, `sandwich`, `weekly`, `delve`, `ascent-down`, `ascent-up` (once an ascension is open), `styles`, `school`, `calendar`, `menu`, `key-1`..`key-9`, `notes`, `erase`, `undo`, `hint`,
+  `relic-0`..`relic-2`, `next`, `done`, `again`, `back`, `style-<id>`, `lesson-0`..`lesson-3`, `start`, `month-prev`, `month-next`).
 - Inputs: it taps `delve`, taps cells from `cellSpots` and pad keys from `buttons`, toggles
   `notes`, taps `erase` and `relic-0`. It never uses hints and stays on Delve floors 1 and 2.
 - The playthrough also reads `ninefold-trophies` (only `firstSolve` after floor 1).
@@ -264,13 +310,19 @@ digit, Erase or Hint that can't be used, a disabled pad key and a locked style.
   without it) and a US entry in `i18n/en-US.ts` if the spelling differs; run
   `node scripts/check-translations.mjs` and check German with `?lang=de` (style card names and the
   pad tools are the tightest spots).
-- **Add a style**: its id in `STYLES` (the order is the unlock order; Stained Glass waits for every
-  other one), `STYLE_INFO` and its two texts, its goal in `UNLOCKS`, its `THEMES` entry, a case in
-  `drawDeco`, and the README row. Ten styles need `styleCards` laid out four across in `WIDE` (`TALL`'s five rows of two already hold ten).
+- **Add a style**: its id in `STYLES` (the order is the unlock order; Stained Glass waits for the
+  `PALETTE_STYLES` before it), `STYLE_INFO` and its two texts, its goal in `UNLOCKS`, its `THEMES`
+  entry, a case in `drawDeco`, and the README row. `WIDE` lays the cards four across in three rows
+  (twelve) and `TALL` two across in five (ten), so an eleventh style needs a sixth `TALL` row.
+- **Add a lesson**: find a board with a script that runs `explain` over seeded `makePuzzle` boards
+  until a step needs the technique alone (`used` is just it), add it to `LESSONS` with its texts
+  (`<id>Name`, `<id>Blurb`, `<id>Lesson`, `<id>Task`), and a technique `explain` doesn't know goes
+  into `TECHNIQUES` (by difficulty) with its elimination. More than four needs more `school.cards`.
 - **Add a board rule** (like Killer or Thermo): its data on `Puzzle` and `Rules`, a maker run from
-  `makePuzzle` for a new `Extra`, its check in `allowed` (keep it cheap: it runs per candidate), its
+  `makePuzzle` for a new `Extra` in `EXTRAS` (and its data in `hasRules`), its check in `allowed` (keep it cheap: it runs per candidate), its
   drawing in `drawBoard`, then a Classic level (`LEVELS`, `CLASSIC_GIVENS`, `LEVEL_EXTRA` and a
-  `levels` spot in both layouts) and/or a twist.
+  `levels` spot in both layouts; the rows are full at eight) and/or a twist. Time `makePuzzle` at
+  the givens you pick: a rule that prunes little leans on `CHECK_STEPS`.
 - **Add an ascension**: its rule's text in `ASCENSION_RULES`, its start in `ASCENT`, its effect where
   the run applies it, and the README's table.
 - **Add a twist**: its id in `TWISTS` with `TWIST_INFO` and its two texts, its `TWIST_GIVENS`, its

@@ -1,11 +1,17 @@
 import type { TextKey } from '../i18n';
 
 /**
- * The nine art styles, in the order they unlock. Paper Cut-out is the default; each other one
- * unlocks once its `UNLOCKS` goal in `state.ts` is met. The scene draws them from `THEMES`.
+ * The art styles, in the order they unlock. Paper Cut-out is the default; each other one unlocks
+ * once its `UNLOCKS` goal in `state.ts` is met. Almanac, the calendar's own, comes last and stands
+ * apart: Stained Glass and the Full palette trophy only wait for the nine before it
+ * (`PALETTE_STYLES`). The scene draws them from `THEMES`.
  */
-export const STYLES = ['paper', 'garden', 'chalk', 'parchment', 'pixel', 'stars', 'stone', 'neon', 'glass'] as const;
+export const STYLES = ['paper', 'garden', 'chalk', 'parchment', 'pixel', 'stars', 'stone', 'neon', 'glass', 'almanac'] as const;
 export type StyleId = (typeof STYLES)[number];
+/** The style a full month of dailies on the calendar earns. */
+export const MONTH_STYLE: StyleId = 'almanac';
+/** The nine styles earned by solving, which Stained Glass and the Full palette trophy wait for. */
+export const PALETTE_STYLES = STYLES.filter((s) => s !== MONTH_STYLE);
 
 export const STYLE_INFO: Record<StyleId, { name: TextKey; goal: TextKey }> = {
   paper: { name: 'paperName', goal: 'paperGoal' },
@@ -17,6 +23,7 @@ export const STYLE_INFO: Record<StyleId, { name: TextKey; goal: TextKey }> = {
   stone: { name: 'stoneName', goal: 'stoneGoal' },
   neon: { name: 'neonName', goal: 'neonGoal' },
   glass: { name: 'glassName', goal: 'glassGoal' },
+  almanac: { name: 'almanacName', goal: 'almanacGoal' },
 };
 
 /**
@@ -45,11 +52,14 @@ export const UNIQUE_RELICS: readonly RelicId[] = ['twin'];
 /**
  * Delve twists, drawn from floor 4 on: Diagonal (both long diagonals hold each digit once),
  * Parity (shaded cells hold even digits, the rest odd), Killer (dashed cages add up to their
- * sums), Thermo (digits rise along each thermometer from its bulb), Clock (a heart is lost every
- * 3 minutes) and Sealed (no hints on the floor; clearing it gives one back). The first four
- * change the board's rules (`BOARD_TWISTS`), the last two press the player.
+ * sums), Thermo (digits rise along each thermometer from its bulb), Arrow (the digits on an arrow
+ * add up to its circle), Kropki (dots join digits one apart or one double the other; no dot,
+ * neither), Sandwich (the sums outside the board add up the digits between the 1 and the highest
+ * digit), Clock (a heart is lost every 3 minutes) and Sealed (no hints on the floor; clearing it
+ * gives one back). All but the last two change the board's rules (`BOARD_TWISTS`); those two press
+ * the player.
  */
-export const TWISTS = ['diagonal', 'parity', 'killer', 'thermo', 'clock', 'sealed'] as const;
+export const TWISTS = ['diagonal', 'parity', 'killer', 'thermo', 'arrow', 'kropki', 'sandwich', 'clock', 'sealed'] as const;
 export type Twist = (typeof TWISTS)[number];
 
 export const TWIST_INFO: Record<Twist, { name: TextKey; rule: TextKey }> = {
@@ -58,10 +68,13 @@ export const TWIST_INFO: Record<Twist, { name: TextKey; rule: TextKey }> = {
   clock: { name: 'clockName', rule: 'clockRule' },
   killer: { name: 'killer', rule: 'killerRule' },
   thermo: { name: 'thermo', rule: 'thermoRule' },
+  arrow: { name: 'arrow', rule: 'arrowRule' },
+  kropki: { name: 'kropki', rule: 'kropkiRule' },
+  sandwich: { name: 'sandwich', rule: 'sandwichRule' },
   sealed: { name: 'sealedName', rule: 'sealedRule' },
 };
 
-export const BOARD_TWISTS = ['diagonal', 'parity', 'killer', 'thermo'] as const satisfies readonly Twist[];
+export const BOARD_TWISTS = ['diagonal', 'parity', 'killer', 'thermo', 'arrow', 'kropki', 'sandwich'] as const satisfies readonly Twist[];
 export const PRESSING_TWISTS = ['clock', 'sealed'] as const satisfies readonly Twist[];
 
 /**
@@ -72,6 +85,6 @@ export const PRESSING_TWISTS = ['clock', 'sealed'] as const satisfies readonly T
 export const ASCENSION_RULES = ['ascentHearts', 'ascentHint', 'ascentGivens', 'ascentNotes', 'ascentOffer'] as const satisfies readonly TextKey[];
 export const MAX_ASCENT = ASCENSION_RULES.length;
 
-/** Classic's puzzle levels: three by givens, then a Killer and a Thermo board. */
-export const LEVELS = ['easy', 'normal', 'hard', 'killer', 'thermo'] as const;
+/** Classic's puzzle levels: three by givens, then a board for each extra rule. */
+export const LEVELS = ['easy', 'normal', 'hard', 'killer', 'thermo', 'arrow', 'kropki', 'sandwich'] as const;
 export type Level = (typeof LEVELS)[number];

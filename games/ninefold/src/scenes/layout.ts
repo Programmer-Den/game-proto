@@ -33,14 +33,23 @@ export type Layout = {
     weekly: Rect;
     /** The caption size of the daily and weekly buttons. */
     topFont: number;
-    levels: { xs: number[]; y: number; w: number; h: number; font: number };
+    /** The Classic levels, as many across as `xs` has, in rows at `ys`. */
+    levels: { xs: number[]; ys: number[]; w: number; h: number; font: number };
     delve: Rect;
     /** The buttons either side of Delve that pick its ascension, by their centres. */
     ascentDown: Rect;
     ascentUp: Rect;
+    /** The bottom row: the technique school, the styles and the calendar, and their captions' size. */
+    school: Rect;
     styles: Rect;
+    calendar: Rect;
+    bottomFont: number;
     stats: Point;
   };
+  /** The technique school: its title, its line, the lesson cards by their centres. */
+  school: { title: Point; line: Point; cards: { xs: number[]; ys: number[]; w: number; h: number } };
+  /** The calendar: its title, the month's name between its arrows, the grid (top-left, a cell's size; the weekdays head it) and two lines under it. */
+  calendar: { title: Point; month: Point; prev: Rect; next: Rect; grid: { x: number; y: number; w: number; h: number }; line: Point; goal: Point };
   /** The style picker's title, its cards (as many across as `xs` has) and the Back button. */
   stylesTitle: Point;
   styleCards: { xs: number[]; ys: number[]; w: number; h: number; cell: number };
@@ -70,15 +79,23 @@ export const WIDE: Layout = {
     daily: { x: 310, y: 186, w: 300, h: 56 },
     weekly: { x: 650, y: 186, w: 300, h: 56 },
     topFont: 18,
-    levels: { xs: [232, 356, 480, 604, 728], y: 270, w: 116, h: 54, font: 18 },
+    levels: { xs: [179, 265, 351, 437, 523, 609, 695, 781], ys: [270], w: 80, h: 54, font: 15 },
     delve: { x: 480, y: 352, w: 330, h: 54 },
     ascentDown: { x: 282, y: 352, w: 50, h: 54 },
     ascentUp: { x: 678, y: 352, w: 50, h: 54 },
-    styles: { x: 480, y: 430, w: 330, h: 50 },
+    school: { x: 262, y: 430, w: 196, h: 50 },
+    styles: { x: 480, y: 430, w: 220, h: 50 },
+    calendar: { x: 698, y: 430, w: 196, h: 50 },
+    bottomFont: 17,
     stats: { x: 480, y: 490 },
   },
+  school: { title: { x: 480, y: 50 }, line: { x: 480, y: 98 }, cards: { xs: [300, 660], ys: [214, 392], w: 340, h: 150 } },
+  calendar: {
+    title: { x: 480, y: 50 }, month: { x: 480, y: 102 }, prev: { x: 300, y: 102, w: 48, h: 40 }, next: { x: 660, y: 102, w: 48, h: 40 },
+    grid: { x: 256, y: 136, w: 64, h: 46 }, line: { x: 480, y: 470 }, goal: { x: 480, y: 504 },
+  },
   stylesTitle: { x: 480, y: 50 },
-  styleCards: { xs: [180, 480, 780], ys: [150, 295, 440], w: 280, h: 128, cell: 28 },
+  styleCards: { xs: [138, 366, 594, 822], ys: [146, 284, 422], w: 216, h: 122, cell: 24 },
   back: { x: 90, y: 50, w: 120, h: 40 },
   end: { x: 480, y: 270, w: 460, h: 280 },
   endButtons: { xs: [380, 580], y: 360, w: 170, h: 46 },
@@ -104,12 +121,20 @@ export const TALL: Layout = {
     daily: { x: 157, y: 290, w: 214, h: 66 },
     weekly: { x: 383, y: 290, w: 214, h: 66 },
     topFont: 15,
-    levels: { xs: [94, 182, 270, 358, 446], y: 410, w: 82, h: 58, font: 15 },
-    delve: { x: 270, y: 530, w: 300, h: 60 },
-    ascentDown: { x: 84, y: 530, w: 52, h: 60 },
-    ascentUp: { x: 456, y: 530, w: 52, h: 60 },
-    styles: { x: 270, y: 660, w: 380, h: 56 },
-    stats: { x: 270, y: 740 },
+    levels: { xs: [100, 213, 327, 440], ys: [400, 466], w: 104, h: 56, font: 15 },
+    delve: { x: 270, y: 562, w: 300, h: 60 },
+    ascentDown: { x: 84, y: 562, w: 52, h: 60 },
+    ascentUp: { x: 456, y: 562, w: 52, h: 60 },
+    school: { x: 117, y: 682, w: 142, h: 56 },
+    styles: { x: 270, y: 682, w: 152, h: 56 },
+    calendar: { x: 423, y: 682, w: 142, h: 56 },
+    bottomFont: 14,
+    stats: { x: 270, y: 748 },
+  },
+  school: { title: { x: 300, y: 50 }, line: { x: 270, y: 112 }, cards: { xs: [270], ys: [240, 410, 580, 750], w: 460, h: 150 } },
+  calendar: {
+    title: { x: 300, y: 50 }, month: { x: 270, y: 140 }, prev: { x: 84, y: 140, w: 56, h: 50 }, next: { x: 456, y: 140, w: 56, h: 50 },
+    grid: { x: 39, y: 190, w: 66, h: 72 }, line: { x: 270, y: 690 }, goal: { x: 270, y: 736 },
   },
   stylesTitle: { x: 300, y: 50 },
   styleCards: { xs: [143, 397], ys: [170, 320, 470, 620, 770], w: 244, h: 136, cell: 24 },
