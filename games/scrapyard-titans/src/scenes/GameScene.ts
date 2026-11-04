@@ -6,7 +6,7 @@ import { playMusic, playSting, stopMusic, ui, type PlayOptions } from '../../../
 import { FIGHT_SONG, PLAN_SONG, play, type Sfx } from '../audio';
 import {
   AUGMENT_BY_ID, CAMPAIGN, CHASSIS, CLASS_STATS, DAILY, DUO, GHOST, WEAPONS, WEAPON_NAMES, WORKSHOP, WORKSHOP_UNLOCKS, COST_COLOR, DRAFT_PICK_S, ECONOMY, ITEM_BENCH, ITEMS, MAX_LEVEL, ORIGIN_COLOR, PLAN_S, PLAYER_COMMANDERS, RANKS, RIVALS, SETS,
-  PARTS, RAT, SCRAP_TOKENS_PER_PART, SKILLS, TERRAIN, TRAITS, UNIT_BY_ID, comboOf, isPart,
+  PARTS, PLAYERS, RAT, SCRAP_TOKENS_PER_PART, SKILLS, TERRAIN, TRAITS, UNIT_BY_ID, comboOf, isPart,
   type ClassId, type CommanderDef, type DeedId, type OriginId, type PartId, type SetId, type TraitId, type UnitDef,
 } from '../game/data';
 import {
@@ -395,15 +395,18 @@ export class GameScene extends Phaser.Scene {
     // Watched matches are the AI's, not the player's: they never count.
     if (this.recorded || watching) return;
     this.recorded = true;
+    const m = this.state;
     // A duo team's place (1 to 4) counts as the best seat of the pair would: 1st, 3rd, 5th or 7th.
-    const place = this.state?.opts.duo ? teamPlace * 2 - 1 : teamPlace;
+    const place = m?.opts.duo ? teamPlace * 2 - 1 : teamPlace;
+    // The place-based rewards (best place, rank points, top four) read a smaller campaign lobby's
+    // place on the 8-seat scale, so 4th of 4 is not a top-four finish.
+    const scaled = m?.opts.duo ? place : Math.ceil((teamPlace * PLAYERS) / (m?.players.length ?? PLAYERS));
     this.progress.played++;
     if (place === 1) this.progress.wins++;
-    this.progress.best = this.progress.best ? Math.min(this.progress.best, place) : place;
-    this.rankGain = addRankPoints(this.progress, place);
-    if (this.state?.opts.weekly != null) recordWeekly(this.progress, this.state.opts.weekly, place);
+    this.progress.best = this.progress.best ? Math.min(this.progress.best, scaled) : scaled;
+    this.rankGain = addRankPoints(this.progress, scaled);
+    if (m?.opts.weekly != null) recordWeekly(this.progress, m.opts.weekly, place);
     saveProgress(this.progress);
-    const m = this.state;
     if (m && m.opts.lobby != null) {
       const cleared = lobbyCleared(m, place);
       this.lobbyEnd = { cleared, reward: cleared ? clearLobby(this.progress, m.opts.lobby) : null };
@@ -413,7 +416,7 @@ export class GameScene extends Phaser.Scene {
     if (m?.opts.daily) finishDailyTry(m.opts.daily, place);
     // A won match's final board is kept, to come back as a ghost in a later match.
     if (m && place === 1) this.squadSaved = saveSquad(squadOf(m));
-    this.noteDeeds(place <= 4 ? (place === 1 ? ['topFour', 'champion'] : ['topFour']) : []);
+    this.noteDeeds(scaled <= 4 ? (place === 1 ? ['topFour', 'champion'] : ['topFour']) : []);
     if (place === 1 && this.state?.opts.weekly != null) award(trophies, 'weeklyWin');
     this.awardProgress();
   }

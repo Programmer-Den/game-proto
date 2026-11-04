@@ -29,7 +29,8 @@ Implemented today:
   Scrap Rush adds scrap tokens on wins (`SCRAP_TOKENS_PER_PART`), Overcharge gives every robot
   `OVERCHARGE_MANA` at the start of a fight. `UNITS` holds all 46 robots.
 - Clockwork and Bomber: the Clockwork origin (tiers 2/4) winds up once at `WIND_UP_S` into a
-  fight (`Battle.step` adds its trait value to `rampAs`). Its 2- and 4-cost robots are the only
+  fight (`Battle.step` adds its trait value to `rampAs`; an Overclocker ramps `itemRamp` apart,
+  so the two stack). Its 2- and 4-cost robots are the only
   Bombers, a seventh class (tier 2, more bomb damage) whose `bomb` ability lobs a shell at the
   enemy with the most others next to it and hits them all, the neighbours by `BOMB_SPLASH`.
   `paint.ts` draws the clock-face head and the Bomber's shoulder mortar.
@@ -119,8 +120,10 @@ Implemented today:
   commander's skill and power cards) instead of the monsters, sets `Match.ghostSquad`, and a loss
   costs `GHOST.lossDamage`. The rivals fight the monsters as usual. Never under `?watch`.
 - Rank ladder (`RANKS`, `RANK_POINTS` in `data.ts`): `Progress.points` grow by a top-four place in
-  `record` (`addRankPoints`) and never drop; `rankOf(points)` gives the rank, which `startMatch`
-  passes as `MatchOptions.rank` (0 under `?watch`). The rank gives each rival `gold` more a round
+  `record` (`addRankPoints`) and never drop; `record` reads a campaign lobby's place on the 8-seat
+  scale for the best place, rank points and the `topFour` deed (`ceil(place * 8 / seats)`, so 4th
+  of 4 counts as 8th), and a duo team's as 1st, 3rd, 5th or 7th; `rankOf(points)` gives the
+  rank, which `startMatch` passes as `MatchOptions.rank` (0 under `?watch`). The rank gives each rival `gold` more a round
   in `startPlan`, rolls the rivals' shops `odds` levels higher in `rollShop`, and lets `aiPlan`
   reroll from stage `rollFrom` while holding more than `rollAbove` gold (seat 0 always uses Rust's).
   Rank 0 plays exactly as before. The menu shows it under the stats, the end screen the points won
@@ -131,7 +134,8 @@ Implemented today:
   (`addBuild`). Pieces unlock with first campaign clears (`WORKSHOP_UNLOCKS`, read from
   `Progress.campaign` by `workshopParts`, so older saves get theirs at once); the end screen lists
   a clear's new pieces (`piecesNow`). Up to `WORKSHOP.slots` builds are saved under
-  `scrapyard-titans-workshop` (`loadBuilds`, `scrapBuild`); `register` puts them into `CUSTOM` and
+  `scrapyard-titans-workshop` (`loadBuilds`, `scrapBuild`; when saving fails, `loadBuilds` hands
+  back the list kept in memory until the page closes); `register` puts them into `CUSTOM` and
   `UNIT_BY_ID` as `UnitDef`s with `custom` and the typed `label` (shown by `unitName` in `i18n.ts`)
   costing `WORKSHOP.cost`. `startMatch` sets `MatchOptions.custom` when any exist (not in the daily
   or under `?watch`), and `poolOf(m)` (`rosterOf(set, custom)`) adds them to every shop, draft and
@@ -172,7 +176,7 @@ Missing or rough:
 File map (`src/`):
 
 - `main.ts`: creates the `Phaser.Game` (960x540) with `GameScene`, calls `setupGame(game,
-  { howToPlay })` and `setupScaling(game, { fill: true })` (the view takes the screen's shape,
+  { howToPlay, trophies })` and `setupScaling(game, { fill: true })` (the view takes the screen's shape,
   960 to 1296 wide and 540 to 720 tall), and in dev builds puts `game` on `window`.
 - `howToPlay.ts`: the How to play text in British English (US English spells it the same and falls
   back to it) and German, picked with `byLanguage`; update both when controls or the loop change.
