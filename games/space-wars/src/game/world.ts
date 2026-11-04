@@ -2,7 +2,7 @@ import { byDifficulty } from '../../../../shared/settings';
 import { aiLog } from '../../../../shared/watch';
 import { ARENA, BUILD_RANGE, NODE_AMOUNT, NODE_CLEARANCE } from './arena';
 import { COMBAT_UNITS, FACTIONS, type Ability, type Faction, type Role, type UnitId } from './factions';
-import { beaconNode, localRandom, type DerelictKind, type MapLayout, type Point } from './map';
+import { beaconNode, localRandom, type DerelictKind, type MapLayout, type Point, type Wormhole } from './map';
 import {
   BOARD_MS, CONTRACT_POOL, CONTRACT_STEPS, FLAGSHIP_STEP, NO_PERKS, RANKS, boardOffer, contractOf, type Contract, type Goal, type Perks,
 } from './contracts';
@@ -12,6 +12,8 @@ import {
   scenarioOf, type ScenarioId,
 } from './scenarios';
 import { techOf, type TechId } from './tech';
+import { admiralAt, admiralOf, type AdmiralId } from './admirals';
+import { TEAM_OF } from './skirmish';
 import { Fog } from './fog';
 import { PATH_CELL, Pathing } from './pathing';
 import { t, type TextKey } from '../i18n';
@@ -23,8 +25,17 @@ import {
 
 /** The faction the player commands. */
 export const PLAYER = 0;
-/** Crystal every faction starts with. */
+/** Crystal every faction starts with (a skirmish can change it). */
 const START_CRYSTAL = 120;
+/** How close a warship has to fly to a wormhole's mouth to go through, and how far out of the other it comes. */
+export const WORMHOLE_MOUTH = 16;
+const WORMHOLE_EXIT = 24;
+/** How much further than the straight flight a way through a wormhole may look and still be taken over it (it must be shorter by this much). */
+const WORMHOLE_SAVING = 120;
+/** The ring round a wormhole that buildings keep clear of. */
+export const WORMHOLE_RADIUS = 30;
+/** The hyperspace jump's spots round the tapped point, so the jumped ships don't stack. */
+const JUMP_SPREAD = 26;
 /** How many units a building can have queued. */
 const MAX_QUEUE = 5;
 /** How many harvesters an AI faction keeps working. */
@@ -476,7 +487,7 @@ export type WorldEvent =
 export type Cue =
   | 'built' | 'warpIn' | 'researchDone' | 'rankUp' | 'contractStarted' | 'contractDone' | 'contractFailed'
   | 'won' | 'lost' | 'truceOffered' | 'truceMade' | 'truceBroken' | 'tribute' | 'klaxon'
-  | 'flagshipReady' | 'flagshipLaunched' | 'flagshipLost' | 'hubFalls';
+  | 'flagshipReady' | 'flagshipLaunched' | 'flagshipLost' | 'hubFalls' | 'admiralReady';
 
 /** Anything that can fire a shot. */
 type Shooter = Unit | Building | Derelict;
@@ -572,7 +583,7 @@ function dist(a: Point, b: Point) {
 }
 
 /** What kind of battle this is: a sector of the campaign, a galaxy conquest battle, or a scenario. */
-export type Mode = 'sectors' | 'galaxy' | 'scenario';
+export type Mode = 'sectors' | 'galaxy' | 'scenario' | 'skirmish';
 
 /** How a battle is set up beyond its map and sector. */
 export interface BattleSetup {
@@ -584,6 +595,23 @@ export interface BattleSetup {
   defender?: { faction: number; crystal: number };
   /** A galaxy battle: the factions (indices into FACTIONS) with no sector left, which sit it out. */
   absent?: readonly number[];
+  /** The admiral in command of the player's fleet and its rank (`game/admirals.ts`). */
+  admiral?: { id: AdmiralId; rank: number };
+  /** A skirmish's options: teams (two against two plus one, `TEAM_OF`) and the crystal every faction starts with. */
+  skirmish?: { teams: boolean; crystal: number };
+}
+
+/**
+ * The player's admiral in a battle: its rank, the active's cooldown (`readyMs`, 0 when it can be
+ * used) and, for Bulwark, the time its shield has left (`activeMs`).
+ */
+export interface AdmiralState {
+  id: AdmiralId;
+  rank: number;
+  readyMs: number;
+  activeMs: number;
+  /** How often the active has been used this battle. */
+  used: number;
 }
 
 /**
@@ -643,6 +671,12 @@ export class World {
 
   /** The last faction standing in a watched battle (a side index), or -1. */
   winner = -1;
+  /** A teams skirmish: each side's team (by side index), or null in free for all. */
+  readonly teams: readonly number[] | null;
+  /** The player's admiral, or null with none in command. */
+  admiral: AdmiralState | null = null;
+  /** The map's wormhole pairs. */
+  readonly wormholes: readonly Wormhole[];
   /** Which factions can see each ship hiding in a nebula this update (by unit id), from `updateCover`. */
   private spotted = new Map<number, Set<number>>();
   /** The board's own generator, so drawing contracts leaves the battle's Math.random as it was. */
@@ -663,6 +697,8 @@ export class World {
   constructor(readonly layout: MapLayout, pick = 0, readonly watch = false, sector = 0, kept: readonly Goal[] = [], setup: BattleSetup = {}) {
     this.sector = sector;
     this.mode = setup.mode ?? 'sectors';
+    this.teams = setup.skirmish?.teams ? TEAM_OF : null;
+    this.wormholes = layout.wormholes ?? [];
     this.scenario = setup.scenario ?? null;
     this.scenarioHeld = FACTIONS.map(() => 0);
     const order = [pick, ...FACTIONS.map((_, i) => i).filter((i) => i !== pick)];
@@ -671,7 +707,13 @@ export class World {
       research: noResearch(), grudge: -1, grudgeLockMs: 0, truceMs: 0, offerMs: 0, offerCooldownMs: 0, pressure: 0, claimer: -1,
       flagship: { state: 'locked', left: 0 }, rally: null, rallyNext: 0, deal: { step: 1, goal: null, progress: 0, ms: 0, done: [] },
     }));
+    if (setup.skirmish) for (const side of this.sides) side.crystal = setup.skirmish.crystal;
     for (const goal of kept) contractOf(goal).apply(this.sides[PLAYER].perks);
+    if (setup.admiral && !watch) {
+      const def = admiralOf(setup.admiral.id);
+      def.applyAura(this.sides[PLAYER].perks, admiralAt(def, setup.admiral.rank).aura);
+      this.admiral = { id: def.id, rank: setup.admiral.rank, readyMs: 0, activeMs: 0, used: 0 };
+    }
     for (const id of setup.tech ?? []) techOf(id).apply(this.sides[PLAYER].perks);
     this.rng = localRandom((layout.homes[0].x * 3.7 + layout.homes[0].y) % 1);
     this.dealRng = localRandom((layout.homes[0].y * 5.3 + layout.homes[0].x) % 1);
@@ -779,9 +821,15 @@ export class World {
   /** Whether two factions are under a truce (the player with one rival), or both rivals in the last-stand pact. */
   atPeace(a: number, b: number) {
     if (a === b) return false;
+    if (this.teams && this.teams[a] === this.teams[b]) return true;
     // The pact, and the `survive` scenario, make the rivals allies.
     if ((this.pact || this.scenario === 'survive') && a !== PLAYER && b !== PLAYER) return true;
     return (a === PLAYER && this.sides[b].truceMs > 0) || (b === PLAYER && this.sides[a].truceMs > 0);
+  }
+
+  /** Whether a faction is the player's ally in a teams skirmish. */
+  allyOfPlayer(f: number) {
+    return f !== PLAYER && !!this.teams && this.teams[f] === this.teams[PLAYER];
   }
 
   /** The contract being worked on, or null while the board is up or once the chain is done. */
@@ -862,6 +910,7 @@ export class World {
     if (this.nodes.some((n) => n.amount > 0 && dist(n, { x, y }) < NODE_CLEARANCE + r)) return t('tooCloseCrystal');
     if (dist(this.beacon, { x, y }) < NODE_CLEARANCE + r + 10) return t('tooCloseBeacon');
     if (this.derelicts.some((d) => dist(d, { x, y }) < DERELICT_RADIUS + r)) return t('tooCloseDerelict');
+    if (this.wormholes.some((w) => dist(w.a, { x, y }) < WORMHOLE_RADIUS + r || dist(w.b, { x, y }) < WORMHOLE_RADIUS + r)) return t('tooCloseWormhole');
     return null;
   }
 
@@ -932,9 +981,11 @@ export class World {
     const known = target?.kind === 'building' ? this.known.get(target.id) : undefined;
     const seen = known && !this.fog.sees(known) ? known : undefined;
     const units = ids.map((id) => this.unit(id)).filter((u): u is Unit => !!u && this.commandable(u));
+    // A tap on an ally's ship or building is a move there, never an attack.
+    const foe = target && target.faction !== PLAYER && !this.allyOfPlayer(target.faction) ? target : null;
     // An attack on a rival under truce breaks the truce.
-    if (units.length && target && target.faction !== PLAYER && this.atPeace(PLAYER, target.faction)) {
-      const side = this.sides[target.faction];
+    if (units.length && foe && this.atPeace(PLAYER, foe.faction)) {
+      const side = this.sides[foe.faction];
       side.truceMs = 0;
       side.grudge = PLAYER;
       this.cue('truceBroken');
@@ -943,8 +994,8 @@ export class World {
     // A wing sent to one point fans out round it (RALLY_SPOTS) rather than stacking on it.
     units.forEach((u, k) => {
       const spot = units.length > 1 ? RALLY_SPOTS[k % RALLY_SPOTS.length] : { x: 0, y: 0 };
-      u.order = target && target.faction !== PLAYER
-        ? { kind: 'attack', id: target.id, auto: false, seen: seen ? { x: seen.x, y: seen.y, faction: seen.faction } : undefined }
+      u.order = foe
+        ? { kind: 'attack', id: foe.id, auto: false, seen: seen ? { x: seen.x, y: seen.y, faction: seen.faction } : undefined }
         : {
           kind: 'move',
           x: Math.min(ARENA.x + ARENA.w - 8, Math.max(ARENA.x + 8, x + spot.x)),
@@ -1042,6 +1093,7 @@ export class World {
     if (this.phase !== 'playing') return t('battleOver');
     const side = this.sides[faction];
     if (faction === PLAYER || !side.alive) return t('noRival');
+    if (this.allyOfPlayer(faction)) return t('allyNoTribute');
     if (this.pact) return t('inPact');
     const target = this.bribeTarget(faction);
     if (!target) return t('noTarget');
@@ -1141,6 +1193,7 @@ export class World {
     this.pops = this.pops.filter((p) => (p.life -= dt) > 0);
     if (this.phase !== 'playing') return;
     this.elapsedMs += dt;
+    this.updateAdmiral(dt);
 
     this.updateCover();
     for (const b of [...this.buildings]) this.updateBuilding(b, dt);
@@ -1174,7 +1227,7 @@ export class World {
         this.phase = 'won';
       }
     } else if (!this.sides[PLAYER].alive) this.phase = 'lost';
-    else if (this.sides.every((s) => s.index === PLAYER || !s.alive)) this.phase = 'won';
+    else if (this.sides.every((s) => s.index === PLAYER || this.allyOfPlayer(s.index) || !s.alive)) this.phase = 'won';
     else if (this.scenario) this.updateScenario(dt);
   }
 
@@ -1548,7 +1601,7 @@ export class World {
   /** One shot from `from` at `target`: shields soak part of it, and the shot's own ability acts. */
   private shoot(from: Shooter, damage: number, target: Unit | Building) {
     const faction = from.kind === 'derelict' ? from.owner : from.faction;
-    const dealt = Math.round(damage * this.shieldShare(target));
+    const dealt = Math.round(damage * this.shieldShare(target) * this.bulwarkShare(target));
     target.hp -= dealt;
     target.lastHit = faction;
     if (target.kind === 'unit') target.lastHitBy = from.kind === 'unit' ? from.id : -1;
@@ -1710,16 +1763,101 @@ export class World {
   private stampFog() {
     const fog = this.fog;
     fog.clear();
+    // A teams skirmish shares the ally's sight with the player.
+    const mine = (f: number) => f === PLAYER || this.allyOfPlayer(f);
     for (const u of this.units) {
-      if (u.faction !== PLAYER) continue;
+      if (!mine(u.faction)) continue;
       const sight = this.statsOf(u).sight;
       fog.stamp(u.x, u.y, u.type === 'harvester' ? HARVESTER_VISION : sight * (u.type === 'scout' ? SCOUT_VISION : SHIP_VISION));
     }
     for (const b of this.buildings) {
-      if (b.faction !== PLAYER) continue;
-      fog.stamp(b.x, b.y, b.type === 'hub' ? HUB_VISION : buildingStats(this.sides[PLAYER], b.type).radius + BUILDING_VISION);
+      if (!mine(b.faction)) continue;
+      fog.stamp(b.x, b.y, b.type === 'hub' ? HUB_VISION : buildingStats(this.sides[b.faction], b.type).radius + BUILDING_VISION);
     }
     for (const d of this.derelicts) if (d.perk === 'sensors' && d.owner === PLAYER) fog.stamp(d.x, d.y, SENSOR_RANGE);
+  }
+
+  /** The share of a shot that reaches a player ship while the Warden's Bulwark holds: half. */
+  private bulwarkShare(target: Unit | Building) {
+    const a = this.admiral;
+    return target.kind === 'unit' && target.faction === PLAYER && a?.id === 'warden' && a.activeMs > 0 ? 0.5 : 1;
+  }
+
+  /** The admiral's cooldown and Bulwark's shield run down; the player hears when the active is ready again. */
+  private updateAdmiral(dt: number) {
+    const a = this.admiral;
+    if (!a) return;
+    a.activeMs = Math.max(0, a.activeMs - dt);
+    if (a.readyMs > 0 && (a.readyMs -= dt) <= 0) {
+      a.readyMs = 0;
+      this.cue('admiralReady');
+      this.events.push({ kind: 'notice', text: t('admiralReady', { name: t(admiralOf(a.id).active) }) });
+    }
+  }
+
+  /**
+   * The player uses the admiral's active: Bulwark halves every shot at the fleet for a while, the
+   * jump takes up to `power` of the selected warships (`ids`) to (x, y) on explored ground, and the
+   * windfall pays crystal at once. Returns why not, or null when it went off.
+   */
+  useAdmiral(ids: number[] = [], x = 0, y = 0): string | null {
+    const a = this.admiral;
+    if (this.phase !== 'playing') return t('battleOver');
+    if (!a) return t('noAdmiral');
+    if (a.readyMs > 0) return t('admiralCooling', { s: Math.ceil(a.readyMs / 1000) });
+    const def = admiralOf(a.id);
+    const at = admiralAt(def, a.rank);
+    const side = this.sides[PLAYER];
+    if (a.id === 'warden') {
+      a.activeMs = at.power * 1000;
+      this.events.push({ kind: 'notice', text: t('shieldWallUp', { s: at.power }) });
+    } else if (a.id === 'navigator') {
+      const ships = ids.map((id) => this.unit(id)).filter((u): u is Unit => !!u && this.commandable(u)).slice(0, at.power);
+      if (!ships.length) return t('jumpNoShips');
+      const to = { x: Math.min(ARENA.x + ARENA.w - 12, Math.max(ARENA.x + 12, x)), y: Math.min(ARENA.y + ARENA.h - 12, Math.max(ARENA.y + 12, y)) };
+      if (!this.fog.knows(to)) return t('jumpScoutFirst');
+      ships.forEach((u, k) => {
+        this.booms.push({ x: u.x, y: u.y, color: side.def.color, life: BOOM_MS, r: 14 });
+        const spot = k === 0 ? { x: 0, y: 0 } : { x: Math.cos(k * 2.4) * JUMP_SPREAD, y: Math.sin(k * 2.4) * JUMP_SPREAD };
+        u.x = Math.min(ARENA.x + ARENA.w - 8, Math.max(ARENA.x + 8, to.x + spot.x));
+        u.y = Math.min(ARENA.y + ARENA.h - 8, Math.max(ARENA.y + 8, to.y + spot.y));
+        this.offRocks(u, u.x, u.y, 0);
+        this.routes.delete(u);
+        u.order = null;
+      });
+      this.booms.push({ x: to.x, y: to.y, color: side.def.color, life: BOOM_MS, r: 30 });
+      this.events.push({ kind: 'notice', text: t('jumpDone', { n: ships.length }) });
+    } else {
+      side.crystal += at.power;
+      const hub = this.hubOf(PLAYER);
+      if (hub) this.pops.push({ x: hub.x, y: hub.y - 30, text: `+${at.power}`, color: 0xffd36a, life: POP_MS });
+      this.events.push({ kind: 'gain', amount: at.power });
+      this.events.push({ kind: 'notice', text: t('windfallPaid', { n: at.power }) });
+    }
+    a.readyMs = at.cooldownMs;
+    a.used += 1;
+    return null;
+  }
+
+  /**
+   * The wormhole mouth a warship should fly into on its way to (x, y), and the mouth it comes out
+   * of, when that way is shorter than the straight flight by WORMHOLE_SAVING; or null.
+   */
+  private wormholeFor(u: Unit, x: number, y: number): { into: Point; out: Point } | null {
+    if (!this.wormholes.length || u.type === 'harvester' || u.carrier) return null;
+    const to = { x, y };
+    let best: { into: Point; out: Point } | null = null;
+    let length = dist(u, to) - WORMHOLE_SAVING;
+    for (const w of this.wormholes) {
+      for (const [into, out] of [[w.a, w.b], [w.b, w.a]] as const) {
+        const via = dist(u, into) + dist(out, to);
+        if (via < length) {
+          length = via;
+          best = { into, out };
+        }
+      }
+    }
+    return best;
   }
 
   /** The share of a shot that reaches a unit: a Halo Cruiser's shield lets through half, from friends in range. */
@@ -1741,6 +1879,22 @@ export class World {
    * there; the half pixel of slack lets a unit that stops at exactly `stop` count as arrived.
    */
   private approach(u: Unit, x: number, y: number, stop: number, dt: number, speed: number) {
+    // A wormhole that cuts the way short: fly into its mouth and come out of the other one.
+    const hole = this.wormholeFor(u, x, y);
+    if (hole) {
+      if (dist(u, hole.into) <= WORMHOLE_MOUTH) {
+        const d = Math.max(1, dist(hole.out, { x, y }));
+        u.x = hole.out.x + ((x - hole.out.x) / d) * WORMHOLE_EXIT;
+        u.y = hole.out.y + ((y - hole.out.y) / d) * WORMHOLE_EXIT;
+        this.routes.delete(u);
+      } else this.fly(u, hole.into.x, hole.into.y, 0, dt, speed);
+      return false;
+    }
+    return this.fly(u, x, y, stop, dt, speed);
+  }
+
+  /** One step of a ship's flight toward (x, y), round the rocks, stopping `stop` short; true once it is there. */
+  private fly(u: Unit, x: number, y: number, stop: number, dt: number, speed: number) {
     const d = Math.hypot(x - u.x, y - u.y);
     if (d <= stop + 0.5) return true;
     const step = Math.min(d - stop, (speed * dt) / 1000);
@@ -2089,9 +2243,11 @@ export class World {
   private contestBeacon(side: Side) {
     const f = side.index;
     const bc = this.beacon;
+    // The player's ally in a teams skirmish leaves the beacon to the player.
+    if (this.allyOfPlayer(f)) return;
     if (this.elapsedMs < AI_PICKET_MS) return;
     const rank = this.sides
-      .filter((s) => (s.index !== PLAYER || this.watch) && s.alive && this.hubOf(s.index))
+      .filter((s) => (s.index !== PLAYER || this.watch) && !this.allyOfPlayer(s.index) && s.alive && this.hubOf(s.index))
       .sort((a, b) => dist(this.hubOf(a.index)!, bc) - dist(this.hubOf(b.index)!, bc))
       .findIndex((s) => s.index === f);
     // A hold contract keeps a picket on the beacon however far the rival's hub is.
@@ -2573,7 +2729,7 @@ export class World {
    * PACT_HUB_SHARE of the finished hubs (after the opening). Then the rivals raid together on a countdown.
    */
   private updatePact(dt: number) {
-    if (this.watch || this.scenario === 'survive' || this.elapsedMs < AI_GRACE_MS) return;
+    if (this.watch || this.teams || this.scenario === 'survive' || this.elapsedMs < AI_GRACE_MS) return;
     if (!this.pact) {
       const rivals = this.sides.filter((s) => s.index !== PLAYER && s.alive);
       const hubs = this.buildings.filter((b) => b.type === 'hub' && b.done);

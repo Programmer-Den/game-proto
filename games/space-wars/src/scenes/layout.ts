@@ -25,7 +25,7 @@ export const FONT = '"Avenir Next", Futura, "Century Gothic", "Trebuchet MS", "S
 
 export const BUTTON = { w: 107, h: 30 };
 
-export type ButtonKey = Role | UnitId | 'expansion' | Track | 'fallback' | 'flagship' | 'rally';
+export type ButtonKey = Role | UnitId | 'expansion' | Track | 'fallback' | 'flagship' | 'rally' | 'admiral';
 
 /** The generic role of each building and unit type, as the buttons and hover labels name it: keys of `i18n/en.ts`. */
 export const ROLE_LABEL: Record<ButtonKey, TextKey> = {
@@ -44,6 +44,7 @@ export const ROLE_LABEL: Record<ButtonKey, TextKey> = {
   fallback: 'roleCommand',
   flagship: 'roleFlagship',
   rally: 'roleCommand',
+  admiral: 'roleAdmiral',
 };
 
 export interface Button {
@@ -75,6 +76,9 @@ export const FLAGSHIP_BUTTON: Button = { kind: 'command', key: 'flagship', x: 33
 /** The Rally button, a slim pill left of the Flagship button (also the R key): plants or moves the rally point for new warships. */
 export const RALLY_BUTTON: Button = { kind: 'command', key: 'rally', x: 180, y: 444, w: 144, h: 21 };
 
+/** The admiral's active, a slim pill left of the Rally button over the BUILD label (also the G key): only with an admiral in command. */
+export const ADMIRAL_BUTTON: Button = { kind: 'command', key: 'admiral', x: GRID_X, y: 444, w: 90, h: 21 };
+
 /** The buttons of the command bar, in the top-left corner of each one. */
 export const BUTTONS: Button[] = [
   ...BUILD_KEYS.map((key, i): Button => ({ kind: 'build', key, x: GRID_X + i * COLUMN, y: BUILD_ROW, ...BUTTON })),
@@ -86,6 +90,7 @@ export const BUTTONS: Button[] = [
   FALL_BACK_BUTTON,
   FLAGSHIP_BUTTON,
   RALLY_BUTTON,
+  ADMIRAL_BUTTON,
 ];
 /** Where the message line and the contract panel start, right of the research column. */
 export let PANEL_X = RESEARCH_COLUMN.x + RESEARCH_COLUMN.w + 8;
@@ -103,8 +108,10 @@ export const RIVALS_TAB = { x: 798, w: VIEW.w - 798 };
 export const BOARD = { y: MAP_VIEW.y + 6, cardY: MAP_VIEW.y + 26, w: 236, h: 58, gap: 10 };
 /** The sector campaign's strip on the faction picker, under the cards: its box and the row of sector nodes. */
 export const SECTOR_STRIP = { x: 16, y: 352, w: VIEW.w - 32, h: 82, nodeX: 330, nodeStep: 140, nodeY: 380, r: 13 };
-/** The picker's mode tabs along the top of the map's window: the sectors, the galaxy, the scenarios and the tech tree. */
-export const PICK_TABS = { x: 16, y: MAP_VIEW.y + 16, w: 104, h: 24, gap: 6 };
+/** The picker's mode tabs along the top of the map's window: the sectors, the galaxy, the scenarios, skirmish and the tech tree. */
+export const PICK_TABS = { x: 16, y: MAP_VIEW.y + 16, w: 98, h: 24, gap: 6 };
+/** The admiral pill right of the picker's tabs: a tap picks the next admiral (or none). */
+export const ADMIRAL_PILL = { x: 538, y: MAP_VIEW.y + 16, w: 150, h: 24 };
 /** The cards a victory offers to keep one perk for the campaign, in a row under the overlay. */
 export const KEEP = { y: MAP_VIEW.y + 210, w: 172, h: 64, gap: 8 };
 
@@ -119,6 +126,7 @@ const base = {
   SECTOR_STRIP: { ...SECTOR_STRIP },
   KEEP: { ...KEEP },
   PICK_TABS: { ...PICK_TABS },
+  ADMIRAL_PILL: { ...ADMIRAL_PILL },
   BUTTONS: BUTTONS.map((b) => ({ ...b })),
 };
 
@@ -161,6 +169,7 @@ export function fitView(w: number, h: number, corner = { w: 0, h: 0 }) {
   });
   KEEP.y = base.KEEP.y + dy / 2;
   Object.assign(PICK_TABS, { x: base.PICK_TABS.x + dx / 2, y: base.PICK_TABS.y + dy / 2 });
+  Object.assign(ADMIRAL_PILL, { x: base.ADMIRAL_PILL.x + dx / 2, y: base.ADMIRAL_PILL.y + dy / 2 });
   BUTTONS.forEach((b, i) => {
     const from = base.BUTTONS[i];
     b.y = from.y + dy - lift;

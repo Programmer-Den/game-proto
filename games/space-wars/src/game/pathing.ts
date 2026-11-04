@@ -6,8 +6,6 @@ export type Rock = Point & { r: number };
 
 /** The pathing grid's cell size, in battlefield pixels. */
 export const PATH_CELL = 20;
-const COLS = Math.ceil(ARENA.w / PATH_CELL);
-const ROWS = Math.ceil(ARENA.h / PATH_CELL);
 const DIAGONAL = Math.SQRT2;
 
 /**
@@ -20,15 +18,18 @@ const DIAGONAL = Math.SQRT2;
 export class Pathing {
   /** For each grid cell, the rocks (by index) that cover its centre. */
   private readonly cover: number[][];
+  /** The grid's size, from the battlefield's when the map's pathing is made. */
+  private readonly cols = Math.ceil(ARENA.w / PATH_CELL);
+  private readonly rows = Math.ceil(ARENA.h / PATH_CELL);
 
   constructor(readonly rocks: readonly Rock[], readonly clearance: number) {
-    this.cover = Array.from({ length: COLS * ROWS }, () => []);
+    this.cover = Array.from({ length: this.cols * this.rows }, () => []);
     rocks.forEach((k, i) => {
       const reach = k.r + clearance;
-      for (let row = Math.max(0, Math.floor((k.y - reach) / PATH_CELL)); row <= Math.min(ROWS - 1, Math.floor((k.y + reach) / PATH_CELL)); row++) {
-        for (let col = Math.max(0, Math.floor((k.x - reach) / PATH_CELL)); col <= Math.min(COLS - 1, Math.floor((k.x + reach) / PATH_CELL)); col++) {
-          const c = this.centre(col + row * COLS);
-          if (Math.hypot(c.x - k.x, c.y - k.y) < reach) this.cover[col + row * COLS].push(i);
+      for (let row = Math.max(0, Math.floor((k.y - reach) / PATH_CELL)); row <= Math.min(this.rows - 1, Math.floor((k.y + reach) / PATH_CELL)); row++) {
+        for (let col = Math.max(0, Math.floor((k.x - reach) / PATH_CELL)); col <= Math.min(this.cols - 1, Math.floor((k.x + reach) / PATH_CELL)); col++) {
+          const c = this.centre(col + row * this.cols);
+          if (Math.hypot(c.x - k.x, c.y - k.y) < reach) this.cover[col + row * this.cols].push(i);
         }
       }
     });
@@ -64,8 +65,8 @@ export class Pathing {
     const start = this.cellOf(a);
     const goal = this.cellOf(b);
     const open = (cell: number) => cell === start || cell === goal || this.cover[cell].every((i) => ignore.includes(i));
-    const cost = new Float64Array(COLS * ROWS).fill(Infinity);
-    const from = new Int32Array(COLS * ROWS).fill(-1);
+    const cost = new Float64Array(this.cols * this.rows).fill(Infinity);
+    const from = new Int32Array(this.cols * this.rows).fill(-1);
     const heap: [number, number][] = [];
     const push = (cell: number, f: number) => {
       heap.push([f, cell]);
@@ -94,11 +95,11 @@ export class Pathing {
       }
       return top;
     };
-    const gx = goal % COLS;
-    const gy = Math.floor(goal / COLS);
+    const gx = goal % this.cols;
+    const gy = Math.floor(goal / this.cols);
     const guess = (cell: number) => {
-      const dx = Math.abs((cell % COLS) - gx);
-      const dy = Math.abs(Math.floor(cell / COLS) - gy);
+      const dx = Math.abs((cell % this.cols) - gx);
+      const dy = Math.abs(Math.floor(cell / this.cols) - gy);
       return Math.max(dx, dy) + (DIAGONAL - 1) * Math.min(dx, dy);
     };
     cost[start] = 0;
@@ -106,18 +107,18 @@ export class Pathing {
     while (heap.length) {
       const [, cell] = pop();
       if (cell === goal) break;
-      const cx = cell % COLS;
-      const cy = Math.floor(cell / COLS);
+      const cx = cell % this.cols;
+      const cy = Math.floor(cell / this.cols);
       for (let dy = -1; dy <= 1; dy++) {
         for (let dx = -1; dx <= 1; dx++) {
           if (!dx && !dy) continue;
           const nx = cx + dx;
           const ny = cy + dy;
-          if (nx < 0 || ny < 0 || nx >= COLS || ny >= ROWS) continue;
-          const next = nx + ny * COLS;
+          if (nx < 0 || ny < 0 || nx >= this.cols || ny >= this.rows) continue;
+          const next = nx + ny * this.cols;
           if (!open(next)) continue;
           // No cutting a corner past a rock.
-          if (dx && dy && (!open(cx + dx + cy * COLS) || !open(cx + ny * COLS))) continue;
+          if (dx && dy && (!open(cx + dx + cy * this.cols) || !open(cx + ny * this.cols))) continue;
           const c = cost[cell] + (dx && dy ? DIAGONAL : 1);
           if (c >= cost[next]) continue;
           cost[next] = c;
@@ -133,12 +134,12 @@ export class Pathing {
   }
 
   private cellOf(p: Point) {
-    const col = Math.max(0, Math.min(COLS - 1, Math.floor(p.x / PATH_CELL)));
-    const row = Math.max(0, Math.min(ROWS - 1, Math.floor(p.y / PATH_CELL)));
-    return col + row * COLS;
+    const col = Math.max(0, Math.min(this.cols - 1, Math.floor(p.x / PATH_CELL)));
+    const row = Math.max(0, Math.min(this.rows - 1, Math.floor(p.y / PATH_CELL)));
+    return col + row * this.cols;
   }
 
   private centre(cell: number): Point {
-    return { x: (cell % COLS) * PATH_CELL + PATH_CELL / 2, y: Math.floor(cell / COLS) * PATH_CELL + PATH_CELL / 2 };
+    return { x: (cell % this.cols) * PATH_CELL + PATH_CELL / 2, y: Math.floor(cell / this.cols) * PATH_CELL + PATH_CELL / 2 };
   }
 }

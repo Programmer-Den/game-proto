@@ -6,6 +6,7 @@ import {
   CLAIM_MS, EXPANSION_GAP, REPAIR_RANGE, REPAIR_RATE, VETERAN_NAMES, VETERAN_RANKS, VETERAN_STEP, buildingStats,
   derelictText, expansionStats, flagshipStats, researchCost, unitStats, type Side,
 } from './world';
+import { ADMIRAL_RANKS, MAX_ADMIRAL_RANK, admiralAt, admiralOf, type AdmiralId } from './admirals';
 import { t } from '../i18n';
 
 // Every line is in the hub's language, through `t`.
@@ -122,5 +123,17 @@ export function factionLines(def: Faction): string[] {
     .find((a): a is Ability => !!a) ?? def.buildings.barracks.ability;
   const lines = [t('factionBarracks', { name: t(def.buildings.barracks.name) }), t('factionShips', { names: ships })];
   if (ability) lines.push(abilityText(ability));
+  return lines;
+}
+
+/** An admiral's lines at a rank: its aura, its active with the cooldown, and how far its next rank is. */
+export function admiralLines(id: AdmiralId, rank: number): string[] {
+  const def = admiralOf(id);
+  const at = admiralAt(def, rank);
+  const lines = [
+    t(def.auraText, { pct: Math.round(at.aura * 100) }),
+    t(def.activeText, { n: at.power, s: at.cooldownMs / 1000 }),
+  ];
+  lines.push(rank >= MAX_ADMIRAL_RANK ? t('admiralTopRank') : t('admiralNextRank', { rank: rank + 1, xp: ADMIRAL_RANKS[rank] }));
   return lines;
 }

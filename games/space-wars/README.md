@@ -22,7 +22,9 @@ stripes and long exhaust flames, under a chocolate-and-mustard striped HUD with 
 | --- | --- |
 | Tap a faction card (before the battle) | Command that faction. The other four are AI |
 | Tap an open sector under the cards (before the battle) | Fight the next battle in that campaign sector |
-| The Sectors, Galaxy, Scenarios and Tech tabs over the cards | Switch between the sector campaign, galaxy conquest, scenario battles and the tech tree |
+| The Sectors, Galaxy, Scenarios, Skirmish and Tech tabs over the cards | Switch between the sector campaign, galaxy conquest, scenario battles, a skirmish of your own and the tech tree |
+| The admiral pill beside the tabs | Pick the admiral who commands your fleet (or none); each tap picks the next |
+| The options on the Skirmish strip | Step through teams, the map's size, the starting crystal and wormholes |
 | Tap a rival sector on the galaxy map, then Attack | Fight the battle for that sector |
 | Tap a scenario under the cards | Play that scenario's hand-made map |
 | Tap a tech card on the Tech tab | Buy that tech for the faction shown, with banked salvage |
@@ -38,6 +40,7 @@ stripes and long exhaust flames, under a chocolate-and-mustard striped HUD with 
 | Train buttons | Queue a unit: harvesters at a hub, combat units at a Barracks |
 | Research buttons (Hull, Weapons, Engines) | Start the next level at your hub |
 | Fall back button, or B | Send the selected ships home to the nearest hub or Depot, where ships repair |
+| Admiral button, or G | Use your admiral's active: the shield wall, a hyperspace jump (then tap the map where the selected ships go) or a crystal windfall |
 | Rally point button, or R, then tap the map | Plant the rally point: new warships fly there and fan out round it. Tap the flag in rally mode to take it down |
 | Space, or tap an arrow on the map's edge | Jump to the latest attack on your ships or base |
 | The rivals on the top bar, or T | Open the rivals panel: accept or decline a truce, or pay tribute to turn a rival |
@@ -215,6 +218,48 @@ truces and the rest work as in any battle, and your hub falling still loses.
 The scenario strip shows your best time in each one won.
 
 ![The carrier escort: the carrier's banner at the top left, and its route traced to the dock](docs/screenshots/escort.webp)
+
+### Skirmish
+
+The Skirmish tab fights a battle set up your way, with any faction. Its strip has four options,
+saved for next time, and a tap on one steps it on:
+
+| Option | Choices |
+| --- | --- |
+| Teams | Free for all, or teams: you and the top-left start against the two starts on the right, with the centre on its own. Your ally fights beside you (its ships and buildings can't be attacked, and it leaves the relay beacon to you), shares its sight, and you win once every hub but yours and your ally's has fallen. The rivals never sign the last-stand pact in a teams skirmish |
+| Map size | Small (1360 by 850), standard (1600 by 1000) or large (1920 by 1200); the start points and the number of loose crystal fields scale with it |
+| Starting crystal | 60, 120 or 300 for every faction |
+| Wormholes | On or off (below) |
+
+![The Skirmish tab: teams, a large map, 300 crystal and wormholes on the strip, with the Navigator picked as admiral](docs/screenshots/skirmish.webp)
+
+### Wormholes
+
+Two wormhole pairs link the far corners of the map, behind the corner starts: a warship that flies
+into one mouth comes out of the other. Ships take one on their own whenever the way through is
+clearly shorter (by 120 px or more) than flying straight, so a raid can strike the back of a base
+across the map, and the rivals use them too. Harvesters never do. Buildings keep 30 px clear of a
+mouth. Wormholes are on every skirmish map with the option on, every galaxy battle and every
+campaign sector after the first; the first sector and the scenarios have none. The minimap marks
+each mouth in its pair's colour.
+
+![A Solar Concord fleet out of the top-right wormhole, striking the Ferrox Hive from behind](docs/screenshots/wormholes.webp)
+
+### Admirals
+
+The pill beside the picker's tabs picks an admiral for the next battles (or none, the start). An
+admiral gives the fleet an aura for the whole battle and an active on the Admiral button (or G)
+with a cooldown, and gains experience from every battle it commands: 1 for a battle, 3 for a win.
+Ranks come at 0, 3, 7, 12 and 18 experience, and each rank makes the aura stronger, the active
+stronger and its cooldown shorter.
+
+| Admiral | Aura (rank 1, + per rank) | Active (rank 1, + per rank) |
+| --- | --- | --- |
+| Warden Marr | Ships +8% hit points (+3%) | Shield wall: every shot at your ships does half damage for 8 s (+1 s), every 90 s (-6 s) |
+| Navigator Quill | Ships 8% faster (+3%) | Jump: up to 6 (+2) selected warships jump to a tapped spot you have explored, every 80 s (-6 s) |
+| Broker Vale | Harvesters carry 10% more (+4%) | Windfall: 120 crystal (+30) at once, every 120 s (-8 s) |
+
+![The Warden's shield wall up over a Solar Concord fleet, with the admiral's tooltip on the command bar](docs/screenshots/admiral.webp)
 
 ### The tech tree
 
@@ -451,7 +496,7 @@ attacks.
 | Normal | 6 combat units |
 | Hard | 4 combat units |
 
-The map is 1600 by 1000 pixels. Each faction's hub starts at its own spot, the player's at the
+The map is 1600 by 1000 pixels (a skirmish can make it smaller or larger). Each faction's hub starts at its own spot, the player's at the
 bottom left, the other four at the other corners and in the middle, nudged a little at random.
 
 ![The faction picker: five cream cards, each with the faction's hub, its three warships, its barracks and its ability](docs/screenshots/playthrough-0-start.webp)
@@ -462,7 +507,7 @@ bottom left, the other four at the other corners and in the middle, nudged a lit
 
 With Reduce motion on, the explosions are left out, shots stay at a steady brightness instead of
 fading, exhaust flames, shards and the beacon's glow hold still, floating numbers fade in place
-without rising and the Solar Concord's crystal pylons stop bobbing.
+without rising, the Solar Concord's crystal pylons stop bobbing and the wormholes' rims stop turning.
 
 ## Running locally
 
@@ -489,17 +534,19 @@ what it taps. Run it with `npx playwright test --project space-wars`.
 - `src/game/galaxy.ts`: galaxy conquest's star map, who holds each sector, and what a battle won or lost changes.
 - `src/game/scenarios.ts`: the three scenarios' hand-made maps, goals and numbers, and their best times.
 - `src/game/tech.ts`: the tech tree, the salvage bank and the tech each faction has bought.
+- `src/game/admirals.ts`: the three admirals, their auras, actives and ranks, and the saved pick and experience.
+- `src/game/skirmish.ts`: the skirmish options (teams, map size, starting crystal, wormholes) and their save.
 - `src/game/fog.ts`: the fog of war's grid of explored and in-sight cells.
 - `src/game/research.ts`: the hull, weapons and engines research tracks.
 - `src/game/pathing.ts`: how ships find their way round the rock fields.
 - `src/game/map.ts`: random star maps: hub spots, crystal nodes, rock fields, nebulae, stars and
-  derelict stations, and which node is the relay beacon.
+  derelict stations, which node is the relay beacon, and the wormholes.
 - `src/game/world.ts`: the battle (economy, expansions, production, research, orders, combat, mines
   and hacks, nebula cover, veteran ranks, repair, derelict stations, truces and tribute, the AI, the
   relay beacon, salvage, the fog, the contract board, the convoy, the flagship, the last-stand pact
   and a sector's head start), with no Phaser.
 - `src/game/describe.ts`: the tooltip and faction-card text, from the faction data.
-- `src/game/arena.ts`: the battlefield, the fixed start points and the placement and crystal distances.
+- `src/game/arena.ts`: the battlefield and a skirmish's map sizes, the fixed start points and the placement and crystal distances.
 - `src/scenes/GameScene.ts`: draws the battle each frame, scrolls the map and turns clicks into commands, and plays the sound and music.
 - `src/audio.ts`: the music (a synth space opera in E minor) and the sound effects, made in code.
 - `src/scenes/layout.ts`: the top bar, the command bar, its buttons (the Fall back and Flagship buttons included), the rivals panel's box, the contract board, the sector strip, the perk cards, the role names and the font.

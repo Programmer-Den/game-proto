@@ -7,7 +7,7 @@ the root AGENTS.md.
 ## Current state
 
 Space Wars is an RTS on a random star map, played with taps, box selection and a scrolling camera.
-The battlefield is 1600 by 1000 pixels; the screen shows a window of it (960 by 406 at the designed 960x540 view, more on a wider or
+The battlefield is 1600 by 1000 pixels (a skirmish can make it 1360 by 850 or 1920 by 1200); the screen shows a window of it (960 by 406 at the designed 960x540 view, more on a wider or
 taller screen) between the top
 and command bars. Five factions each start with a hub and two harvesters at a fixed start point.
 The player picks one of the five factions on a picker before each battle; the other four are AI.
@@ -249,9 +249,9 @@ Implemented today:
   card per goal in `contract.done` (`drawKeep`); tapping one runs `winSector` (keeps it, opens the
   next sector) and saves; with no card any tap does. Watching always plays sector 1 and leaves the
   campaign alone.
-- Picker tabs (`GameScene.mode`, a `PickMode`: `sectors`, `galaxy`, `scenario`, `tech`;
-  `modeTabs`, `PICK_TABS` in `layout.ts`, `drawTabs`, `pickMode`): four pills over the cards, the
-  title right-aligned beside them. Sectors (the default, so the playthrough plays as before) is the
+- Picker tabs (`GameScene.mode`, a `PickMode`: `sectors`, `galaxy`, `scenario`, `skirmish`, `tech`;
+  `modeTabs`, `PICK_TABS` in `layout.ts`, `drawTabs`, `pickMode`): five pills over the cards, then
+  the admiral pill (`ADMIRAL_PILL`), the title right-aligned beside them (shrunk to clear the pill). Sectors (the default, so the playthrough plays as before) is the
   campaign above. Each tab keeps the strip under the cards (`drawStrip`, its texts' wrap width wider
   where there is no node chain) and switching makes a fresh map for it (`newGame`, `makeMap`).
   `startBattle` hands the battle a `BattleSetup` (`mode`, `tech`, `scenario`, `defender`, `absent`).
@@ -292,6 +292,54 @@ Implemented today:
   it), and for the escort the route, a ring on the carrier and the dock with its label
   (`dockLabel`); the carrier's hover says `carrierName`. Wins keep the fastest time under
   `space-wars-scenarios` (`winScenario`).
+- Skirmish (`game/skirmish.ts`, `GameScene.skirmish`, `skirmishChips`, `skirmishTexts`,
+  `drawSkirmish`; `BattleSetup.skirmish`, `World.teams`, `allyOfPlayer`): the Skirmish tab's strip
+  has four chips (`SKIRMISH_OPTIONS`) that a tap steps on (`stepSkirmish`), saved under
+  `space-wars-skirmish`; the size and wormholes make a fresh map. Map size (`MapSize`: `small` 1360
+  by 850, `standard`, `large` 1920 by 1200, `ARENA_SIZES` in `game/arena.ts`): `makeMap` calls
+  `setArena` before `generateMap` (every other tab sets `standard`), the start points scale with it
+  (`startPoints`) and the loose crystal fields with its area. `ARENA` is mutable: the fog's grid is
+  laid out for the largest (`FOG_COLS`, `FOG_ROWS` from `MAX_ARENA`) and a smaller battlefield uses
+  its top-left part (`Fog.cols`, `Fog.rows`, which `toJSON`'s share divides by), the pathing grid
+  takes its size from `ARENA` when it is made, the backdrop is baked at `ARENA`'s size and the
+  minimap crops its texture to the battlefield (`fitMinimap`). Starting crystal (`START_CRYSTALS`:
+  60, 120, 300) replaces every side's crystal. Teams (`TEAM_OF`, by side index: the player and slot
+  3 against slots 1 and 2, slot 4 alone): `atPeace` holds between teammates, so targeting, mines and
+  splash skip them; `command` turns a tap on an ally into a move; the ally's ships and buildings stamp
+  the player's fog; it never pickets the beacon (`contestBeacon`); `bribe` and `acceptTruce` refuse
+  it (`allyNoTribute`); there is no pact (`updatePact`); the battle is won once every side but the
+  player's team has fallen. The rivals panel names the ally (`allyStatus`), and the battle opens
+  with `teamsBattle` on the message line. The end overlay's tap goes back to the Skirmish tab.
+- Wormholes (`Wormhole`, `wormholes()` in `game/map.ts`, `MapLayout.wormholes`, `World.wormholes`,
+  `wormholeFor`, `approach`/`fly`, `WORMHOLE_MOUTH`, `WORMHOLE_SAVING`, `WORMHOLE_RADIUS`;
+  `GameScene.drawWormholes`): two fixed pairs, 110 px in from the corners (bottom-left with
+  top-right, top-left with bottom-right), no `Math.random`. `makeMap` adds them to a skirmish map
+  with the option on, a galaxy battle and a campaign sector after the first (never sector 1, the
+  scenarios or watch mode, so the seeded playthrough plays as before). Every flight goes through
+  `approach`: for a warship (not a harvester or the carrier) it asks `wormholeFor` whether flying
+  into a mouth and out of the other is shorter than straight by `WORMHOLE_SAVING` (120 px); if so it
+  flies (`fly`, the old `approach`) to the mouth and within `WORMHOLE_MOUTH` (16 px) comes out
+  `WORMHOLE_EXIT` toward its destination, its route dropped. The AI's raids and chases use them the
+  same way. `placementProblem` keeps buildings `WORMHOLE_RADIUS` clear (`tooCloseWormhole`). The
+  scene draws each mouth under the fog as a dark well with a turning dashed rim in its pair's colour
+  (`WORMHOLE_COLORS`; the rim holds still with reduced motion) and the minimap always rings them.
+- Admirals (`game/admirals.ts`, `GameScene.admirals`, `drawAdmiralPill`, `ADMIRAL_BUTTON`,
+  `drawAdmiralButton`, `jumpMode`; `BattleSetup.admiral`, `World.admiral`, an `AdmiralState`,
+  `useAdmiral`, `updateAdmiral`, `bulwarkShare`): the pill beside the tabs steps through none and
+  the three `ADMIRALS` (`nextAdmiral`), saved under `space-wars-admirals` as `{ pick, xp }`. Each
+  has an aura (`applyAura` on the player's perks: Warden hit points, Navigator speed, Broker carry)
+  and an active with a cooldown (`readyMs`), both by rank (`admiralAt`: `aura`, `cooldownMs`,
+  `power`); ranks come at `ADMIRAL_RANKS` experience (`admiralRank`), and `battleOver` adds 1 for a
+  battle and 2 more for a win (`admiralServed`, `ADMIRAL_XP`), with a notice on a new rank. Every
+  battle but a watched one takes the pick (`startBattle`). The Admiral button (kind `command`, key
+  `admiral`, over the BUILD label, which hides; also G) shows only with an admiral: Warden's shield
+  wall halves every shot at a player ship (`shoot` times `bulwarkShare`) for `power` seconds, drawn
+  as cyan shells (`drawBulwark`); Navigator's jump arms `jumpMode`, and the next map tap moves up
+  to `power` selected warships there if explored (`jumpNoShips`, `jumpScoutFirst`); Broker's
+  windfall pays `power` crystal. `updateAdmiral` pushes the `admiralReady` cue and a notice when
+  the cooldown runs out. Tapping the pill shows the admiral's lines (`admiralLines` in
+  `describe.ts`) on the message line, which on the picker shows `message` before the tab's hint.
+  The AI has no admiral. The playthrough starts with empty storage, so it plays with none.
 - Tech tree (`game/tech.ts`, `GameScene.tech`, `techFaction`, `techChips`, `techCards`, `drawTech`,
   `tapTech`): `TECHS`, three branches (`BRANCHES`) of two tiers, each multiplying the player's
   `Perks` (`apply`); a second tier needs the first (`techProblem`). Saved under `space-wars-tech` as
@@ -333,6 +381,9 @@ Missing or rough:
 - Pathing is round rocks only: ships still fly over buildings, nebulae and the derelicts, and
   spread apart softly rather than colliding. No save of a battle in progress (the campaign, galaxy, tech and scenario times are saved). No ambient hum under the music, and no per-faction music motif.
 - No edge scrolling: the map scrolls with the keys, a two-finger drag or the minimap.
+- Map size is a skirmish option only; teams are only the one fixed split, and the player can't
+  ask the ally for help. Rival AIs have no admirals, and their AI doesn't plan routes around
+  wormholes (it takes one only when its flight happens to be shorter through it).
 - The rivals' Barracks and Turrets are placed at random within 60 to 150 px of their hub.
 - The AI runs its own contracts but doesn't play against the player's (beyond hunting a convoy and
   the survive raid), and never takes the convoy, nebula, lattice or survive contracts. It sees through the fog
@@ -356,7 +407,7 @@ File map (`src/`):
 - `i18n.ts` and `i18n/`: the game's texts (`shared/i18n.ts`). `i18n/en.ts` is the British English
   source, `i18n/de.ts` the German (faction, ship and building names are compound nouns used without
   an article, so they fit any sentence) and `i18n/en-US.ts` the texts spelled differently in US
-  English (none yet). `t(key, vars)` shows a text in the hub's language; `TextKey` types the keys.
+  English (only `skirmishTeamsText`). `t(key, vars)` shows a text in the hub's language; `TextKey` types the keys.
   Every text on screen, the notices and problems `World` returns and the Watch AI log go through
   `t` (`tr` in `GameScene`, where `t` names the text helper in `create`); game logic compares ids
   and keys, never shown text.
@@ -383,9 +434,10 @@ File map (`src/`):
   `FACTION_ART` and the Solar Concord's floating pylons go by. Also `COMBAT_UNITS` and the types
   `UnitId`, `Role`, `Poly`, `Weapon`, `Ability`, `UnitDef`, `BuildingDef`. The outlines (`shape`) are
   no longer drawn; the art comes from `art/models.ts`.
-- `game/fog.ts`: `Fog` (`explored` and `visible` cells, `stamp`, `sees`, `knows`; `toJSON` gives
-  only the explored share, so the test's state reads stay small), `FOG_CELL` (10), `FOG_COLS`,
-  `FOG_ROWS`. No Phaser.
+- `game/fog.ts`: `Fog` (`explored` and `visible` cells, `cols` and `rows` the battlefield covers,
+  `stamp`, `sees`, `knows`; `toJSON` gives only the explored share of the battlefield, so the
+  test's state reads stay small), `FOG_CELL` (10), `FOG_COLS`, `FOG_ROWS` (the grid's stride, for the
+  largest battlefield). No Phaser.
 - `game/research.ts`: `TRACKS`, `TRACK_DEFS` (name and effect as `TextKey`s), `RESEARCH_LEVELS`, `RESEARCH_STEP`, `RESEARCH_COSTS`,
   `RESEARCH_MS`, `Research`, `noResearch`, `researchBonus`. No Phaser.
 - `game/contracts.ts`: `FIRST_CONTRACT` and `CONTRACT_POOL` (goal, target, reward, `from` step,
@@ -403,20 +455,31 @@ File map (`src/`):
   `loadScenarios`, `winScenario`. No Phaser, no `Math.random`.
 - `game/tech.ts`: `TechId`, `TECHS`, `BRANCHES`, `WIN_SALVAGE`, `TechTree`, `TECH_KEY`, `techOf`,
   `loadTech`, `saveTech`, `techFor`, `techProblem`, `buyTech`, `bankSalvage`. No Phaser.
-- `game/arena.ts`: `ARENA` (the 1600 by 1000 battlefield in world pixels), `START_POINTS` (the five
-  fixed hub spots, player first), `NODE_AMOUNT`, `NODE_CLEARANCE` and `BUILD_RANGE`.
-- `game/pathing.ts`: `Pathing` (built from the map's rocks and a clearance: `over`, `clear`,
-  `route`), `PATH_CELL` and the `Rock` type. No Phaser, no `Math.random`.
+- `game/admirals.ts`: `AdmiralId`, `ADMIRAL_IDS`, `ADMIRALS` (name, active and aura text keys, the
+  aura, cooldown and power with their steps per rank, `applyAura`), `ADMIRAL_RANKS`,
+  `MAX_ADMIRAL_RANK`, `ADMIRAL_XP`, `admiralOf`, `admiralRank`, `admiralAt`, `Admirals`,
+  `ADMIRALS_KEY`, `newAdmirals`, `loadAdmirals`, `saveAdmirals`, `nextAdmiral`, `admiralServed`. No
+  Phaser.
+- `game/skirmish.ts`: `Skirmish` (`teams`, `size`, `crystal`, `wormholes`), `SkirmishOption`,
+  `SKIRMISH_OPTIONS`, `START_CRYSTALS`, `TEAM_OF`, `SKIRMISH_KEY`, `newSkirmish`, `loadSkirmish`,
+  `saveSkirmish`, `stepSkirmish`. No Phaser.
+- `game/arena.ts`: `ARENA` (the battlefield in world pixels, 1600 by 1000 but for a skirmish's map
+  size: `MapSize`, `MAP_SIZES`, `ARENA_SIZES`, `MAX_ARENA`, `setArena`), `START_POINTS` (the five
+  fixed hub spots, player first, on the standard map) and `startPoints()` (scaled to `ARENA`),
+  `NODE_AMOUNT`, `NODE_CLEARANCE` and `BUILD_RANGE`.
+- `game/pathing.ts`: `Pathing` (built from the map's rocks and a clearance, its grid sized from
+  `ARENA` then: `over`, `clear`, `route`), `PATH_CELL` and the `Rock` type. No Phaser, no `Math.random`.
 - `game/map.ts`: `generateMap(count, loose)` returns a `MapLayout` (homes, nodes, rocks, nebulae, stars,
-  derelicts), `beaconNode` (which node is the relay beacon), `DerelictKind` and `DERELICT_KINDS`.
+  derelicts, and `wormholes` when the scene adds them), `beaconNode` (which node is the relay
+  beacon), `wormholes()` and `Wormhole`, `DerelictKind` and `DERELICT_KINDS`.
   Uses `Math.random`, plus `localRandom` (exported: the world's board and the scene use it too) for
   the retries that keep nebulae and derelicts clear.
 - `game/describe.ts`: the text for tooltips and faction cards (`unitLines`, `buildingLines`,
   `factionLines`, `abilityText`, `expansionLines`, `researchLines`, `fallBackLines`,
-  `derelictLines`, `rallyLines`), built from the faction data in the hub's language. No Phaser.
+  `derelictLines`, `rallyLines`, `admiralLines`), built from the faction data in the hub's language. No Phaser.
 - `game/world.ts`: `World`, the whole battle. `new World(layout, pick, watch, sector, kept, setup)` puts faction `pick` in the
   player's slot (`watch`: the AI plays it, see Watch AI above; `sector` and `kept`: the campaign;
-  `setup`, a `BattleSetup`: the mode, tech, scenario and a galaxy battle's defender and absent factions). `PLAYER` (0), `unitStats` and `buildingStats`
+  `setup`, a `BattleSetup`: the mode (`Mode`, `skirmish` too), tech, scenario, a galaxy battle's defender and absent factions, the admiral and a skirmish's teams and crystal). `PLAYER` (0), `unitStats` and `buildingStats`
   (faction numbers with the faction's multipliers, the side's perks and research applied),
   `expansionStats`, `buildInfo` (what a build button costs and is called), `researchCost`, the
   expansion constants (`EXPANSION_COST`, `EXPANSION_NEAR`, `EXPANSION_GAP`), `MINE_SPOT`, the beacon and
@@ -427,10 +490,10 @@ File map (`src/`):
   keys; `derelictText` fills in the numbers), `TRUCE_MS`,
   `TRUCE_TRIBUTE`, `OFFER_MS`, `BRIBE_COST`, `BRIBE_MS`), `RALLY_SPOTS`, the flagship, convoy and pact constants
   (`FLAGSHIP_COST`, `FLAGSHIP_MS`, `FLAGSHIP_HP`, `FLAGSHIP_DAMAGE`, `FLAGSHIP_SPEED`, `FLAGSHIP_RANGE`,
-  `CONVOY_SIZE`, `PACT_MS`, `PACT_WAVE_MS`), the rival contract constants (`AI_DEAL_MS`, `AI_GOALS`), `flagshipStats` and the types `Beacon`, `Deal`, `Shard`, `Mine`,
+  `CONVOY_SIZE`, `PACT_MS`, `PACT_WAVE_MS`), the rival contract constants (`AI_DEAL_MS`, `AI_GOALS`), the wormhole constants (`WORMHOLE_MOUTH`, `WORMHOLE_RADIUS`), `flagshipStats` and the types `AdmiralState`, `Beacon`, `Deal`, `Shard`, `Mine`,
   `Pop`, `Build`, `ContractState`, `Pact`, `WorldEvent`, `Struck`, `Cue`, `Derelict`, `SeenBuilding`. Fields `fog`, `known`, `mines`,
-  `derelicts`, `contract`, `convoyTo`, `pact`, `sector`, `mode`, `scenario`, `scenarioHeld`, `scenarioLost`, `carrier`, `docked`. Methods the scene and test use: `update(dt)`, `build`, `train`, `research`,
-  `command`, `fallBack`, `setRally`, `clearRally`, `fleet`, `pickContract`, `currentContract`, `buildFlagship`, `abilityOf`, `acceptTruce`, `declineTruce`, `bribe`, `bribeTarget`, `selectableIn`,
+  `derelicts`, `contract`, `convoyTo`, `pact`, `sector`, `mode`, `scenario`, `scenarioHeld`, `scenarioLost`, `carrier`, `docked`, `teams`, `admiral`, `wormholes`. Methods the scene and test use: `update(dt)`, `build`, `train`, `research`,
+  `command`, `fallBack`, `setRally`, `clearRally`, `useAdmiral`, `allyOfPlayer`, `fleet`, `pickContract`, `currentContract`, `buildFlagship`, `abilityOf`, `acceptTruce`, `declineTruce`, `bribe`, `bribeTarget`, `selectableIn`,
   `selectable`, `entityAt`, `derelictAt`, `placementProblem`, `count`, `hubOf`, `hubsOf`,
   `seesUnit`, `seesMine`, `inNebula`, `atPeace`, `rankOf`, `veteranBonus`, `unit`,
   `building`. No Phaser import.
@@ -470,7 +533,9 @@ File map (`src/`):
   corner: four build buttons with Expansion last, four train buttons, and the research column),
   `RESEARCH_COLUMN`, `FALL_BACK_BUTTON` (kind `command`, key `fallback`, at the right of the message
   line), `FLAGSHIP_BUTTON` (kind `command`, key `flagship`, above the build row), `RALLY_BUTTON`
-  (kind `command`, key `rally`, last in `BUTTONS`, left of the Flagship button),
+  (kind `command`, key `rally`, left of the Flagship button), `ADMIRAL_BUTTON` (kind `command`, key
+  `admiral`, last in `BUTTONS`, left of the Rally button over the BUILD label; drawn, pressed and
+  hovered only with an admiral), `ADMIRAL_PILL` (the picker's admiral pill),
   `BOARD` (the contract board's header and cards), `SECTOR_STRIP` (the picker's campaign strip),
   `KEEP` (the victory's perk cards), `MINIMAP` and `ARMY_TAB`, `PANEL_X` (where the message line and contract panel start), `RIVALS_PANEL` and `RIVALS_TAB`
   (the rivals panel's box and the top bar area that opens it), `ROLE_LABEL` (the generic
@@ -566,7 +631,8 @@ with the keys, two fingers or the minimap makes no sound:
 | `alert` | a new attack alert (`alarm`), once per alert, not on a refresh |
 | `whoosh` | the map jumps to an alert (`jumpToAlert`: Space or an edge arrow) |
 | `rally`, `rallyClear` | the rally point planted or taken down (`onDown` in rally mode) |
-| `flagshipReady`, `flagshipLaunch`, `flagshipLost` | cues from `updateContract` (third contract), `updateFlagship` and `removeDead` |
+| `flagshipReady`, `flagshipLaunch`, `flagshipLost` | cues from `updateContract` (third contract), `updateFlagship` and `removeDead`; `flagshipReady` also for the cue `admiralReady` (`updateAdmiral`) |
+| `upgrade`, `whoosh` | the shield wall raised and the jump made (`press`, `onDown` in jump mode); the windfall's crystal plays through its `gain` event |
 
 Watching (`?watch`), the music plays, the lasers and wrecks play quieter, a hub falling in sight
 plays, and no cue of the player's side or `gain` plays. Under browser automation the engine makes
@@ -591,7 +657,9 @@ follows or uses bounds (`scrollTo` clamps it), so it keeps the top-left origin r
 `scrollingCamera`. `index.html` has the shared `100dvh` and `touch-action: none` styles.
 `e2e/screens.spec.ts` checks the game on five screens.
 
-Save keys: `space-wars-campaign` (`CAMPAIGN_KEY` in `game/campaign.ts`): the sector campaign, as
+Save keys: `space-wars-admirals` (`ADMIRALS_KEY` in `game/admirals.ts`): the admiral picked and each
+one's experience, as `{ pick, xp }`; `space-wars-skirmish` (`SKIRMISH_KEY`): the skirmish options;
+`space-wars-campaign` (`CAMPAIGN_KEY` in `game/campaign.ts`): the sector campaign, as
 `{ unlocked, kept }`; `space-wars-galaxy` (`GALAXY_KEY`): a galaxy conquest under way;
 `space-wars-tech` (`TECH_KEY`): the salvage bank and each faction's tech; `space-wars-scenarios`
 (`SCENARIO_KEY`): the best time of each scenario won; and `space-wars-trophies` (by `shared/trophies.ts`): the trophies earned. `loadCampaign` rounds `unlocked` to a whole sector and turns a `kept` goal
@@ -621,7 +689,7 @@ Test hooks (read by `e2e/playthrough.spec.ts`):
   `offerMs`, `grudge`, `flagship`, `units[i].kills`, `nebula`, `repairing`, `flagship`, `convoy`,
   `state.pact`, `state.convoyTo`, `scene.rivalsOpen`, `keepCards`, `campaign`, `sector` and `sectorNodes`,
   `scene.mode`, `modeTabs`, `galaxy`, `target`, `galaxyNodes`, `galaxyButtons`, `tech`, `techFaction`,
-  `techChips`, `techCards`, `scenario`, `scenarioBest`, and `state.mode`, `scenario`, `scenarioHeld`, `carrier`.
+  `techChips`, `techCards`, `scenario`, `scenarioBest`, `admirals`, `jumpMode`, `skirmish`, `skirmishChips`, and `state.mode`, `scenario`, `scenarioHeld`, `carrier`, `teams`, `admiral`, `wormholes`.
 - `scene.camera.scrollX` and `scrollY`: the map's scroll, which the test reads to see whether a pan
   moved. `scene.toScreen(x, y)` gives where a battlefield point is in view pixels.
 - Not read by the test either: `scene.rallyMode`, `scene.alerts` (`x`, `y`, `first`, `last`,
@@ -685,6 +753,13 @@ Test hooks (read by `e2e/playthrough.spec.ts`):
   and its nodes off the rocks), its `ScenarioId`, its goal in `updateScenario` and any AI rule (search
   `this.scenario ===`), and its banner in `drawScenario`. The strip shows a node per scenario, so more
   than five needs a new layout.
+- **An admiral**: add it to `AdmiralId`, `ADMIRAL_IDS` and `ADMIRALS` (with its texts in all three
+  files and an `applyAura` on `Perks`), its active's rule to `World.useAdmiral` (and `press` if it
+  needs a tap on the map, like the jump), and its row to the README's table.
+- **A skirmish option**: add it to `Skirmish`, `SKIRMISH_OPTIONS`, `loadSkirmish` and
+  `stepSkirmish`, its chip text to `drawSkirmish` (the strip lays out two columns of two, so a fifth
+  needs `skirmishChips` moved) and its effect to `makeMap` (the map) or `BattleSetup.skirmish` (the
+  battle).
 - **A tech**: add it to `TechId` and `TECHS` with its branch, tier, cost, texts and `apply` on
   `Perks`; the tab lays out three columns of two, so a new branch or tier needs `techCards` moved.
 - **The galaxy**: sectors and lanes are `GALAXY` and `LANES` (shares of the map's area); a new
