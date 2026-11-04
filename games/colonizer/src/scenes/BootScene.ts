@@ -24,14 +24,20 @@ export const relicKey = (relic: RelicId, holder: FactionId | null) => `camp-reli
 /**
  * How far down the view, in game pixels, the shared full-screen and pause buttons in the top right
  * corner (`setupGame`'s `corner`) reach, safe area included: on a small screen they cover more of the
- * view. The page may be turned round (`shared/scaling.ts`), so this reads layout sizes, not boxes on screen.
+ * view. The page may be turned round (`shared/scaling.ts`), so this reads layout sizes, not boxes on
+ * screen. The canvas is fitted into the window taken the game's way round on a touch screen, like
+ * `fillView`, so a phone held upright under the hub's Ask me to turn it measures the canvas it shows
+ * once it is turned.
  */
-function cornerReach(scene: Phaser.Scene, viewH: number): number {
+function cornerReach(scene: Phaser.Scene, viewW: number, viewH: number): number {
   const bar = document.querySelector<HTMLElement>('.game-corner');
-  const shown = scene.scale.displaySize.height;
+  let pw = scene.scale.parentSize.width;
+  let ph = scene.scale.parentSize.height;
+  if (window.matchMedia('(pointer: coarse)').matches && pw > ph !== viewW > viewH) [pw, ph] = [ph, pw];
+  const shown = Math.min(ph, (pw * viewH) / viewW);
   if (!bar || !shown) return 0;
   const top = parseFloat(getComputedStyle(bar).top) || 12;
-  const canvasTop = Math.max(0, (scene.scale.parentSize.height - shown) / 2);
+  const canvasTop = Math.max(0, (ph - shown) / 2);
   // The buttons are 30 CSS px tall (`shared/corner.ts`).
   return ((top + 30 - canvasTop) * viewH) / shown;
 }
@@ -45,7 +51,7 @@ export class BootScene extends Phaser.Scene {
   create() {
     // The view's shape is picked once at start: fit the HUD to it before anything is painted.
     const view = viewSize(this);
-    fitLayout(view.width, view.height, cornerReach(this, view.height));
+    fitLayout(view.width, view.height, cornerReach(this, view.width, view.height));
     for (let v = 0; v < TREE_VARIANTS; v++) this.bake(`tree-${v}`, bakeTree(v));
     this.bake('bush', bakeBush());
     this.bake('mine', bakeMine());

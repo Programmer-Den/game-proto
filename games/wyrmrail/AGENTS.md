@@ -156,7 +156,8 @@ File map (all under `src/` unless it starts with `shared/`):
   charter), the orders and upgrades panel (with the Depot, Remove and Plain toggles), the banner, the
   charter cards, the moult's trait cards (`drawMoult`, over the charter cards, which wait under
   them), the daily link or tag (`drawDailyLink`; once today's try is used, `dailyDone` with today's
-  score in the link's place on a fresh first valley, not tappable) and the game over or festival panel (`openEnd`,
+  score in the link's place on a fresh first valley, not tappable; outside the daily it reads the
+  record again once the day has changed, so the link opens after midnight without a restart) and the game over or festival panel (`openEnd`,
   once: the medal, which it saves outside the daily, the traits, the Keep or Fly on buttons, Play
   again and the Daily valley button while today's try is unused; the daily's score through
   `finishDaily`), and wires

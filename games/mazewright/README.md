@@ -328,7 +328,7 @@ with the maze planted, telling how many of its pieces fit.
 | --- | --- | --- |
 | First hedge row | Bronze | Hold off your first wave |
 | The long way round | Bronze | Make a burrow walk 60 steps to the cottage (not on a path garden) |
-| Safe for the season | Bronze | Hold off all 20 waves in a garden (Classic, Challenge or Night) |
+| Safe for the season | Bronze | Hold off all 20 waves in a garden (Classic, Swarm, Challenge or Night) |
 | Master gardener | Bronze | Raise a tower to its master level |
 | Make do | Silver | Win a garden's Challenge |
 | Not one leaf lost | Silver | Win a garden with every cabbage still in the patch |

@@ -143,6 +143,8 @@ export interface Shot {
   /** A master crossbow's bolt goes through shells; a master cannon's ball knocks foes back. */
   pierce?: boolean;
   knock?: boolean;
+  /** In Versus, the half of the lawn its tower stands in: a cannon's splash hurts only that garden's foes. */
+  side?: number;
 }
 
 export type GameEvent =
@@ -1341,7 +1343,7 @@ function fire(g: Game, tower: Tower, dt: number, boost: number) {
   }
   const kind = tower.kind as ShotKind;
   const masterCannon = master && kind === 'cannon';
-  const shot = { kind, x, y, damage: def.damage[lvl], splash: masterCannon ? MASTER_TRICKS.splash : def.splash ?? 0, hits: def.hits, pierce: master && kind === 'crossbow', knock: masterCannon };
+  const shot = { kind, x, y, damage: def.damage[lvl], splash: masterCannon ? MASTER_TRICKS.splash : def.splash ?? 0, hits: def.hits, pierce: master && kind === 'crossbow', knock: masterCannon, side: g.versus ? side : undefined };
   g.shots.push({ ...shot, target: target.id, tx: target.x, ty: target.y });
   // A master bow or swallow nest looses a second shot at another foe.
   const second = master && (kind === 'bow' || kind === 'swallow') && inRange.length > 1 ? pick(g, inRange.filter((f) => f !== target), tower.target) : undefined;
@@ -1369,6 +1371,8 @@ function moveShot(g: Game, s: Shot, dt: number) {
   } else {
     for (const f of g.foes) {
       if (f.dead || FOE[f.kind].flies || Math.hypot(f.x - s.tx, f.y - s.ty) > s.splash + f.body) continue;
+      // In Versus the splash stays on its own side of the fence.
+      if (s.side !== undefined && gateSide(g, f.gate) !== s.side) continue;
       hurt(g, f, s.damage, s.hits);
       // A master cannon's thunderclap knocks foes back along their way.
       if (s.knock && !f.chew) f.t = Math.max(0, f.t - MASTER_TRICKS.knock);

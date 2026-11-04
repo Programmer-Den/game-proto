@@ -299,7 +299,9 @@ in code on 2D canvases (no image files), with `pixelArt` off.
   `corner: 'top-right'`, so the shared full screen and pause buttons sit over the top bar's
   decoration rather than the selection panel in the bottom left; on a small screen, where they
   reach further down the view, the BootScene's `cornerReach` hands their reach to `fitLayout`, which
-  moves the deeds and status cards down below them) and
+  moves the deeds and status cards down below them; it works out the canvas from the window taken
+  the game's way round on a touch screen, like `fillView`, so a phone held upright under Ask me to
+  turn it gets the move it needs once turned) and
   `setupScaling(game, { fill: true })` from `shared/scaling.ts`, and puts `game` on window in dev.
 - `src/game/data.ts`: every balance number and roster (names and texts are `TextKey`s, shown with `t`): `FACTIONS`, `UNITS` (cost, time, stats,
   trainer, `age`, `limit`, `gift`, `elite`, `vsBuildings`), `unitFor(faction, role)` (never an
