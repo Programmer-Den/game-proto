@@ -15,17 +15,20 @@ import {
   stuck,
   swapped,
   swapWorks,
+  turnToad,
   validMoves,
   type Board,
   type Cell,
   type Run,
   type Tile,
 } from './board';
+import { GUEST_STAR_COINS, TOAD_MAX } from './guests';
 import { randomKind, type Kind } from './kinds';
 import { MOVE_BONUS, TWIN_BONUS, type PotionId } from './orders';
 import { starsFor } from './ranks';
-import { drawPantry, filled, firstNeeds, progressOf, startDailyOrder, startEndless, startOrder, startTown, stockPantry, tileMaker, wanted, type GameState } from './state';
+import { drawPantry, filled, firstNeeds, progressOf, startDailyOrder, startEndless, startGuest, startOrder, startTown, startWeeklyOrder, stockPantry, tileMaker, wanted, type GameState } from './state';
 import { TOWN_STAR_COINS } from './towns';
+import { weeklyStars } from './weekly';
 
 /** One round of a swap's outcome: the tiles matched, then the board once the rest have fallen. */
 export interface Step {
@@ -50,8 +53,9 @@ export interface Step {
   board: Board;
   /** The board had no moves left, so its tiles were shuffled. */
   shuffled?: boolean;
-  /** Mould crept onto this tile after the move. */
+  /** Mould crept onto this tile after the move (or, with `toad`, the witch turned it into a toad). */
   spread?: Cell & Tile;
+  toad?: boolean;
   /** A royal commission moved on to this stage (from 1): the needs changed and the moves carried over. */
   stage?: number;
   /** A twin order's customer was served this round. */
@@ -112,6 +116,15 @@ export function trySwap(s: GameState, a: Cell, b: Cell): Step[] | null {
       steps.push({ ...emptyStep(s), board: grown.board, spread: grown.at });
     }
   }
+  // A town's witch turns a tile into a toad after every move.
+  if (s.phase === 'play' && s.current.guest?.rule === 'witch') {
+    const cursed = turnToad(s.board, TOAD_MAX);
+    if (cursed) {
+      s.board = cursed.board;
+      s.toads++;
+      steps.push({ ...emptyStep(s), board: cursed.board, spread: cursed.at, toad: true });
+    }
+  }
   return steps;
 }
 
@@ -138,7 +151,7 @@ function resolve(s: GameState, board: Board, prefer: Cell[], extra?: Extra, char
   const newTile = tileMaker(s);
   const steps: Step[] = [];
   let penalty = false;
-  for (let step = gather(s, board, prefer, extra); step; step = gather(s, board, [])) {
+  for (let step = gather(s, board, prefer, 0, extra); step; step = gather(s, board, [], steps.length)) {
     if (!charge || steps.length > 0) step.penalty = false;
     penalty ||= !!step.penalty;
     board = collapse(step.board, step.cleared, newTile);
@@ -175,7 +188,22 @@ function resolve(s: GameState, board: Board, prefer: Cell[], extra?: Extra, char
     steps.push({ ...emptyStep(s), stage: s.stage });
   }
 
-  if (filled(s) && s.current.exam) {
+  if (s.current.weekly) {
+    // The weekly order never sells: once its moves are played out, the score is what it earned.
+    if (s.moves === 0) {
+      s.phase = 'sold';
+      s.orderStars = weeklyStars(s.score);
+    }
+  } else if (filled(s) && s.current.guest) {
+    // A town's guest pays only for the stars they hadn't given before, and keeps the best.
+    s.phase = 'sold';
+    s.orderStars = starsFor(s.moves);
+    const { index } = s.current.guest;
+    const best = s.guests[index] ?? 0;
+    s.earned = Math.max(0, s.orderStars - best) * GUEST_STAR_COINS;
+    s.guests[index] = Math.max(best, s.orderStars);
+    s.coins += s.earned;
+  } else if (filled(s) && s.current.exam) {
     // A guild examination pays, and earns its seal, only when sold with the stars it asks for. It
     // leaves the orders, the stars and the pantry as they were.
     s.phase = 'sold';
@@ -221,9 +249,10 @@ function resolve(s: GameState, board: Board, prefer: Cell[], extra?: Extra, char
  * The matches on `board` (and `extra`), if any: what they gather, with the whole row of every
  * matched Catalyst, the 3x3 around every matched Bloom and the jars beside them, the Catalysts and
  * Blooms they brew and the resin they melt. `board` in the result has the brewed and melted tiles
- * changed but the cleared ones still in place.
+ * changed but the cleared ones still in place. `depth` is the round's place in the move: 0 for the
+ * swap's (or tool's) own match, then 1, 2... for the cascades after it.
  */
-function gather(s: GameState, board: Board, prefer: Cell[], extra?: Extra): Step | null {
+function gather(s: GameState, board: Board, prefer: Cell[], depth: number, extra?: Extra): Step | null {
   const runs = findRuns(board);
   if (runs.length === 0 && !extra) return null;
   const key = (c: Cell) => c.row * COLS + c.col;
@@ -290,14 +319,14 @@ function gather(s: GameState, board: Board, prefer: Cell[], extra?: Extra): Step
   }
   s.melted += melted.length;
 
-  // Mould is scrubbed off instead of its tile being gathered, whether hit or next to a match.
+  // Mould is scrubbed off instead of its tile being gathered, whether hit or next to a match; a toad turns back the same way.
   const touched = new Set([...hit, ...brewed.map(key), ...melted.map(key)]);
   const scrubbed: (Cell & Tile)[] = [];
   const near = (i: number) => neighbours(cell(i));
   for (let i = 0; i < ROWS * COLS; i++) {
-    if (!tile(i).mould || !(hit.has(i) || near(i).some((c) => touched.has(key(c))))) continue;
+    if (!(tile(i).mould || tile(i).toad) || !(hit.has(i) || near(i).some((c) => touched.has(key(c))))) continue;
     hit.delete(i);
-    next[cell(i).row][cell(i).col] = { ...tile(i), mould: false };
+    next[cell(i).row][cell(i).col] = { ...tile(i), mould: false, toad: false };
     scrubbed.push({ ...cell(i), ...next[cell(i).row][cell(i).col] });
   }
   s.scrubbed += scrubbed.length;
@@ -310,15 +339,19 @@ function gather(s: GameState, board: Board, prefer: Cell[], extra?: Extra): Step
   s.opened += [...hit].filter((i) => tile(i).jar).length;
 
   const cleared = [...hit].sort((x, y) => x - y).map((i) => ({ ...cell(i), ...tile(i) }));
-  // Only the ingredients the order asks for are counted.
-  for (const { kind } of cleared) if (wanted(s, kind)) s.got[kind]++;
+  // Only the ingredients the order asks for are counted, and for a town's miser only what a cascade gathers.
+  const pays = !(s.current.guest?.rule === 'miser' && depth === 0);
+  let count = 0;
+  if (pays) for (const { kind } of cleared) if (wanted(s, kind)) (s.got[kind]++, count++);
+  // The weekly order's score: each cascade step counts its ingredients once more than the one before.
+  if (s.current.weekly) s.score += count * (depth + 1);
   const penalty = !!s.current.forbid && runs.some((r) => r.kind === s.current.forbid);
   return {
     cleared,
     brewed,
     melted,
     scrubbed,
-    needs: Object.keys(s.current.needs) as Kind[],
+    needs: pays ? (Object.keys(s.current.needs) as Kind[]) : [],
     rows: [...new Set([...rows, ...(extra?.rows ?? [])])],
     cols: [...new Set([...cols, ...(extra?.cols ?? [])])],
     areas,
@@ -341,7 +374,8 @@ export const TOOLS: Record<Tool, { cost: number; name: TextKey; tip: TextKey }> 
 export const TOOL_ORDER: Tool[] = ['stir', 'sift', 'pestle', 'funnel'];
 export const STIR_MOVES = 3;
 
-export const canUse = (s: GameState, tool: Tool) => s.phase === 'play' && s.coins >= TOOLS[tool].cost;
+/** A tool can be used while an order is played and its price is in hand, but never on the weekly order (its scores stay fair). */
+export const canUse = (s: GameState, tool: Tool) => s.phase === 'play' && s.coins >= TOOLS[tool].cost && !s.current.weekly;
 
 /** Stir: three more moves for this order. False if it can't be bought. */
 export function stir(s: GameState): boolean {
@@ -418,3 +452,7 @@ export const nextTown = (s: GameState, index: number) => startTown(progressOf(s)
 export const nextEndless = (s: GameState, step: number) => startEndless(progressOf(s), step);
 /** The daily order for `day`. */
 export const nextDaily = (s: GameState, day: string) => startDailyOrder(progressOf(s), day);
+/** Town `index`'s guest (the same board again on a second try). */
+export const nextGuest = (s: GameState, index: number) => startGuest(progressOf(s), index);
+/** The weekly order for `week` (the same board and tiles on every try). */
+export const nextWeekly = (s: GameState, week: string) => startWeeklyOrder(progressOf(s), week);

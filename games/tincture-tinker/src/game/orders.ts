@@ -72,7 +72,22 @@ export interface Order {
   endless?: number;
   /** The daily order: the day it is for and the town whose board shape it borrows. */
   daily?: { day: string; town: number };
+  /** A town's rare ingredient: it drops in on this board beside the five everyday ones (see towns.ts). */
+  rare?: Kind;
+  /** A town's guest, after its own order: the town's index and the guest's board rule (see guests.ts). */
+  guest?: { index: number; rule: GuestRule };
+  /** The weekly order: the week it is for (its Monday) and the town whose board shape it borrows (see weekly.ts). */
+  weekly?: { week: string; town: number };
 }
+
+/**
+ * A town guest's board rule: the witch turns a tile to a toad after every move, the knight wants it
+ * all in ten moves and the miser only pays for what cascades gather.
+ */
+export type GuestRule = 'witch' | 'knight' | 'miser';
+
+/** The ingredients that drop in on an order's board: the five everyday ones, and a town's rare one. */
+export const poolOf = (o: Pick<Order, 'rare'>): readonly Kind[] => (o.rare ? [...KINDS, o.rare] : KINDS);
 
 /** What a rich order risks: fewer moves, or more jars, resin and mould. */
 export type Risk = 'moves' | 'blockers';

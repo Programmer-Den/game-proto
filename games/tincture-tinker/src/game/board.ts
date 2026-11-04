@@ -21,6 +21,8 @@ export interface Tile {
   mould?: boolean;
   /** A wall in a town's board shape: no tile is ever there, nothing matches through it and tiles fall past it. */
   hole?: boolean;
+  /** Turned to a toad by a town's witch: it can't be swapped and never matches; a match next to it turns it back. */
+  toad?: boolean;
 }
 export type Board = Tile[][];
 export interface Cell {
@@ -32,9 +34,9 @@ export type NewTile = () => Tile;
 export const adjacent = (a: Cell, b: Cell) => Math.abs(a.row - b.row) + Math.abs(a.col - b.col) === 1;
 export const inBoard = (c: Cell) => c.row >= 0 && c.row < ROWS && c.col >= 0 && c.col < COLS;
 /** What a tile matches as: its kind, or nothing for a corked jar or a mouldy tile. */
-export const matchKind = (t: Tile): Kind | null => (t.jar || t.mould || t.hole ? null : t.kind);
-/** Jars, resin and mould hold their tiles in place, and a wall is no tile at all: they can't be swapped. */
-export const stuck = (t: Tile) => !!(t.jar || t.resin || t.mould || t.hole);
+export const matchKind = (t: Tile): Kind | null => (t.jar || t.mould || t.hole || t.toad ? null : t.kind);
+/** Jars, resin, mould and toads hold their tiles in place, and a wall is no tile at all: they can't be swapped. */
+export const stuck = (t: Tile) => !!(t.jar || t.resin || t.mould || t.hole || t.toad);
 /** Catalysts and Blooms: the special tiles. */
 export const special = (t: Tile) => !!(t.catalyst || t.bloom);
 
@@ -238,6 +240,25 @@ export function spreadMould(board: Board): { board: Board; at: Cell & Tile } | n
     const at = spots[i];
     const next = board.map((row) => [...row]);
     next[at.row][at.col] = { ...board[at.row][at.col], mould: true };
+    if (validMoves(next).length > 0) return { board: next, at: { ...at, ...next[at.row][at.col] } };
+    spots.splice(i, 1);
+  }
+  return null;
+}
+
+/**
+ * The witch's curse: one random plain tile (not held, not a special) turns into a toad, leaving a
+ * move on the board, while fewer than `max` toads are on it. Returns the new board and the tile, or
+ * null if it couldn't.
+ */
+export function turnToad(board: Board, max: number): { board: Board; at: Cell & Tile } | null {
+  if (board.flat().filter((t) => t.toad).length >= max) return null;
+  const spots = board.flatMap((row, r) => row.flatMap((t, c) => (stuck(t) || special(t) ? [] : [{ row: r, col: c }])));
+  for (let attempt = 0; attempt < 8 && spots.length > 0; attempt++) {
+    const i = Math.floor(Math.random() * spots.length);
+    const at = spots[i];
+    const next = board.map((row) => [...row]);
+    next[at.row][at.col] = { ...board[at.row][at.col], toad: true };
     if (validMoves(next).length > 0) return { board: next, at: { ...at, ...next[at.row][at.col] } };
     spots.splice(i, 1);
   }

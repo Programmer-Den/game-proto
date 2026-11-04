@@ -15,6 +15,24 @@ const de: Translation<typeof en> = {
   moonpetalName: 'Mondblüte',
   moonpetalCount: { one: '{n} Mondblüte', other: '{n} Mondblüten' },
 
+  // Rare ingredients: one only found in each town on the journey map
+  fernName: 'Bachfarn',
+  fernCount: { one: '{n} Bachfarn', other: '{n} Bachfarne' },
+  honeyName: 'Mühlenhonig',
+  honeyCount: { one: '{n} Mühlenhonig', other: '{n} Mühlenhonig' },
+  pearlName: 'Salzperle',
+  pearlCount: { one: '{n} Salzperle', other: '{n} Salzperlen' },
+  thistleName: 'Distelflaum',
+  thistleCount: { one: '{n} Distelflaum', other: '{n} Distelflaum' },
+  acornName: 'Waldeichel',
+  acornCount: { one: '{n} Waldeichel', other: '{n} Waldeicheln' },
+  larkspurName: 'Rittersporn',
+  larkspurCount: { one: '{n} Rittersporn', other: '{n} Rittersporn' },
+  glowcapName: 'Leuchtkappe',
+  glowcapCount: { one: '{n} Leuchtkappe', other: '{n} Leuchtkappen' },
+  brambleName: 'Brombeere',
+  brambleCount: { one: '{n} Brombeere', other: '{n} Brombeeren' },
+
   // Potions
   healingDraught: 'Heiltrank',
   sleepingTonic: 'Schlaftonikum',
@@ -171,7 +189,7 @@ const de: Translation<typeof en> = {
   townStarsWon: { one: 'Ein neuer Stern: +{coins} Münzen', other: '{n} neue Sterne: +{coins} Münzen' },
   townNoNew: { one: 'Kein neuer Stern: am besten bleibt {n} Stern', other: 'Kein neuer Stern: am besten bleiben {n} Sterne' },
   townOpened: 'Der Weg nach {town} ist offen',
-  captionMap: 'Jede Stadt zahlt {coins} Münzen für jeden neuen Stern, und ein Stern öffnet die nächste Stadt am Weg',
+  captionMap: 'Jede Stadt zahlt {coins} Münzen für jeden neuen Stern, und ein Stern öffnet die nächste Stadt und ihren Gast',
   captionTown: 'Das eigene Brett einer Stadt: Felder fallen an ihren grünen Mauern vorbei, und durch sie passt nichts zusammen',
   dailyTitle: 'Tagesauftrag',
   dailyLine: 'Das Brett von heute, aus {town}',
@@ -193,6 +211,37 @@ const de: Translation<typeof en> = {
   runOverText: { one: '{n} Auftrag am Stück verkauft', other: '{n} Aufträge am Stück verkauft' },
   bestStreak: { one: 'Beste Serie: {n} Auftrag', other: 'Beste Serie: {n} Aufträge' },
   captionEndless: 'Eine endlose Serie: Jeder Auftrag verlangt mehr mit weniger Zügen, bis einer nicht reicht',
+  captionTownRare: 'Nur in {town} wächst {kind}: Es fällt hier zwischen den anderen herein, und Felder fallen an den grünen Mauern vorbei',
+
+  // Town guests, once a town has a star
+  guestWitch: 'Die Hexe',
+  guestKnight: 'Der Ritter',
+  guestMiser: 'Der Geizhals',
+  guestTitle: '{guest} von {town}',
+  witchLine: 'Macht jeden Zug ein Feld zur Kröte',
+  knightLine: 'Will alles in {n} Zügen',
+  miserLine: 'Zahlt nur für Kettenreaktionen',
+  captionWitch: 'Die Hexe macht nach jedem Zug ein Feld zur Kröte; ein Treffer daneben verwandelt sie zurück',
+  captionKnight: 'Der Ritter will alles in {n} Zügen: keine Zeit zum Trödeln',
+  captionMiser: 'Der Geizhals zählt nur, was Kettenreaktionen sammeln: der Treffer des Tauschs selbst bringt nichts',
+  guestServed: '{guest} von {town} ist zufrieden!',
+  guestWaits: '{guest} wartet jetzt in {town} auf der Reisekarte',
+  guestStars: { one: '{n} von {max} Gaststernen', other: '{n} von {max} Gaststernen' },
+
+  // The weekly order
+  weeklyTitle: 'Wochenauftrag',
+  weeklyLine: 'Das Brett dieser Woche, aus {town}',
+  weeklyScore: 'Punkte: {n}',
+  weeklyBest: 'Bestwert der Woche: {n}',
+  weeklyDone: 'Wochenauftrag gespielt!',
+  weeklyScored: '{n} Punkte',
+  weeklyNewBest: 'Ein neuer Bestwert für die Woche!',
+  weeklyRecord: { one: 'Bestwert der Woche: {best}, aus {n} Versuch', other: 'Bestwert der Woche: {best}, aus {n} Versuchen' },
+  weeklyNote: { one: 'Bestwert der Woche: {best}; {n} Versuch', other: 'Bestwert der Woche: {best}; {n} Versuche' },
+  weeklyNext: 'Nächster Stern ab {n} Punkten',
+  weeklyAllStars: 'Alle Sterne verdient',
+  playAgain: 'Noch einmal',
+  captionWeekly: 'Das Brett dieser Woche, für alle gleich: Jeder Treffer zählt, jede Stufe einer Kettenreaktion einmal mehr. Keine Werkzeuge',
 };
 
 export default de;
