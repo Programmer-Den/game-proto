@@ -2,6 +2,7 @@ import type { TextKey } from '../i18n';
 import type { EnemyKind } from './enemies';
 import type { EventId } from './events';
 import { random } from './rng';
+import type { Mutators } from './weekly';
 
 // The dungeon of each act: rooms in seven columns from the entrance on the left to the act's boss
 // on the right. Every column between holds two or three rooms, and from each room the paths lead
@@ -91,9 +92,10 @@ const COLUMN_KINDS: { must: RoomKind; extra: RoomKind[] }[] = [
  * columns of two or three rooms each, and the boss. Every column has its own kind of room that is
  * always there (an event, a campfire, a treasure chest, a merchant) and one or two drawn from a
  * few others, in random rows. Each room leads to the rooms facing it in the next column, sometimes
- * to a neighbour too, and every room can be reached.
+ * to a neighbour too, and every room can be reached. The weekly crypt's `mutators` swap campfires
+ * for fights and, from the fourth column on, fights for elites, after the same draws.
  */
-export function makeMap(act = 1): Room[] {
+export function makeMap(act = 1, mutators?: Mutators): Room[] {
   const foes = ACT_FOES[act - 1];
   const rnd = (n: number) => Math.floor(random() * n);
   const bag = <T>(items: T[]) => {
@@ -120,6 +122,12 @@ export function makeMap(act = 1): Room[] {
     columns.push(kinds);
   }
   columns.push(['boss']);
+  columns.forEach((kinds, col) => {
+    for (let i = 0; i < kinds.length; i++) {
+      if (mutators?.noRest && kinds[i] === 'rest') kinds[i] = 'fight';
+      if (mutators?.moreElites && col >= 3 && kinds[i] === 'fight') kinds[i] = 'elite';
+    }
+  });
 
   const rooms: Room[] = [];
   const index: number[][] = [];

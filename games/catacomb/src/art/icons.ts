@@ -70,7 +70,43 @@ const SHIELD = [
   '....gggg....',
 ];
 
+/** A tonic: a round-bellied vial with a long neck, each with its own colour (the Alchemist's tonics). A function, so CARD_ICONS can use it before this line. */
+function tonic(dark: string, light: string) {
+  return [
+    '.....ww.....',
+    '....ssss....',
+    '.....ss.....',
+    '.....ss.....',
+    '....sDDs....',
+    '...sDDDDs...',
+    '..sDLDDDDs..',
+    '..sDLDDDDs..',
+    '..sDDDDDDs..',
+    '..sDDDDDDs..',
+    '...sDDDDs...',
+    '....ssss....',
+  ].map((row) => row.replace(/D/g, dark).replace(/L/g, light));
+}
+
 const CARD_ICONS: Record<Icon, string[]> = {
+  fireTonic: tonic('f', 'y'),
+  ironTonic: tonic('b', 'B'),
+  venomTonic: tonic('l', 'h'),
+  // A stone mortar with a pestle leaning in it (the Alchemist's Grind and Distil).
+  mortar: [
+    '.........ww.',
+    '........wW..',
+    '.......wW...',
+    '......wW....',
+    '.....wW.....',
+    '.sssswssss..',
+    'sSSSSSSSSSs.',
+    'smmmmmmmmms.',
+    '.smmmmmmms..',
+    '..smmmmms...',
+    '...sssss....',
+    '..eeeeeee...',
+  ],
   // An evil eye, green iris in a purple lid, for the Hexer's cards.
   eye: [
     '............',

@@ -574,8 +574,60 @@ const HEXER: Figure = {
   },
 };
 
+/** An alchemist in a teal robe and a leather apron, brass goggles pushed up on a cap, vials at the belt and a bubbling round flask held up high. */
+const ALCHEMIST: Figure = {
+  w: 84,
+  h: 130,
+  fx: 462,
+  fy: 656,
+  draw(ctx) {
+    const { poly, ell, rrect } = shapes(ctx);
+    // Robe to the shins, darker behind.
+    poly([[432, 538], [492, 538], [508, 640], [416, 640]], '#1f4a4e');
+    poly([[432, 538], [462, 538], [452, 640], [416, 640]], '#183a3e');
+    // Boots.
+    for (const lx of [446, 478]) {
+      rrect(lx - 10, 620, 20, 26, 5, '#3b2416');
+      rrect(lx - 13, 640, 28, 16, 6, '#2a1c14');
+    }
+    // Robe front and the leather apron over it.
+    rrect(430, 540, 64, 86, 14, '#2c6a6e');
+    rrect(440, 556, 44, 76, 8, '#8a5a32');
+    rrect(444, 560, 18, 68, 6, '#9c6a3c');
+    rrect(430, 584, 66, 9, 3, '#3b2416');
+    // Vials at the belt: amber, green and blue.
+    for (const [vx, c] of [[438, '#f0a040'], [486, '#8cd060'], [494, '#6aa8e0']] as [number, string][]) {
+      rrect(vx - 4, 590, 8, 16, 3, '#d8e4e8');
+      rrect(vx - 3, 596, 6, 9, 2, c);
+    }
+    // The flask arm raised, a round flask bubbling orange over the hand.
+    poly([[486, 552], [502, 548], [512, 520], [498, 516]], '#2c6a6e');
+    ell(504, 512, 8, 8, '#d9b48c');
+    rrect(500, 472, 9, 26, 3, '#d8e4e8');
+    ell(504.5, 494, 18, 17, '#d8e4e8');
+    ell(504.5, 498, 14, 12, '#f0a040');
+    ell(499, 494, 4, 4, '#ffe0a0');
+    ell(508, 470, 4, 4, 'rgba(240,160,64,0.7)');
+    ell(500, 458, 3, 3, 'rgba(240,160,64,0.5)');
+    // Head with a cap, brass goggles pushed up and a short beard.
+    ell(462, 524, 22, 24, '#d9b48c');
+    ell(462, 538, 16, 10, '#8a6a4a');
+    ell(462, 504, 26, 14, '#4a3222');
+    rrect(440, 506, 44, 8, 3, '#6b4a2a');
+    ell(452, 510, 7, 7, '#c9a24a');
+    ell(472, 510, 7, 7, '#c9a24a');
+    ell(452, 510, 4, 4, '#6aa8e0');
+    ell(472, 510, 4, 4, '#6aa8e0');
+    ell(455, 524, 2, 2, '#15121a');
+    ell(469, 524, 2, 2, '#15121a');
+    // The free hand at the side, holding a pinch of green powder.
+    ell(426, 584, 8, 8, '#d9b48c');
+    ell(420, 572, 5, 5, 'rgba(140,208,96,0.7)');
+  },
+};
+
 /** The hero figures, by hero. */
-const HERO_FIGURES: Record<HeroId, Figure> = { knight: KNIGHT, hunter: HUNTER, hexer: HEXER };
+const HERO_FIGURES: Record<HeroId, Figure> = { knight: KNIGHT, hunter: HUNTER, hexer: HEXER, alchemist: ALCHEMIST };
 
 /** A glossy green slime with a highlight, two dark eyes and a small mouth. */
 const SLIME: Figure = {

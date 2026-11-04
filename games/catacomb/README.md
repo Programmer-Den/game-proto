@@ -3,7 +3,7 @@
 A dungeon deckbuilder prototype built with [Phaser 4](https://phaser.io), TypeScript and Vite, part
 of the [game hub](../../README.md).
 
-A hero, the Knight, the Hunter or (once unlocked) the Hexer, walks a dungeon in two acts: the
+A hero, the Knight, the Hunter or (once unlocked) the Hexer or the Alchemist, walks a dungeon in two acts: the
 Crypt, from the entrance on the left to the Bone King on the right, then down a stair to the Sunken
 Tombs and the Hollow Queen, and from depth 3 on up a third, the Bone Spire, to the Marrow Tyrant. Each
 room on the way is a fight, an elite, a campfire, a treasure chest, a merchant or a mystery, and the
@@ -13,7 +13,9 @@ drink for free, and foes who show what they will do on their next turn. Every fi
 and adds a new card to the deck; gold buys cards, relics, flasks and a card's removal from the
 merchant. Beating the Hollow Queen opens the next depth, a harder run with one more rule, and the
 best depth reached is saved. Once a day the daily crypt sends everyone out on the same run, with
-the same hero, map and card offers. Everything is painted in a painterly style, with brush strokes drawn
+the same hero, map and card offers, and all week the weekly crypt does the same with more elites
+and no campfires, as often as you like. Every card a hero adds to a deck goes into that hero's
+library, and the next run can start with up to three of them swapped in. Everything is painted in a painterly style, with brush strokes drawn
 in code.
 
 ![The map of the Crypt](docs/screenshots/playthrough-0-map.webp)
@@ -22,7 +24,9 @@ in code.
 
 | Control | Action |
 | --- | --- |
-| Tap a hero | Before the first room: set out as the Knight or the Hunter (`<` and `>` pick the depth once one is open) |
+| Tap a hero | Before the first room: set out as the Knight, the Hunter, the Hexer or the Alchemist once unlocked (`<` and `>` pick the depth once one is open) |
+| Tap a starting card, then a library card | In the hero's library, before the run: swap that card in (up to three); tap a swapped card to put it back, then Set out |
+| Daily crypt, Weekly crypt | Under the hero panel: set out on the day's run (once a day) or the week's (as often as you like) |
 | Tap a lit room | Walk there and go in |
 | Tap a card in hand | Play it, if there is energy for it |
 | Tap a flask | In a fight, on your turn: drink it, for no energy |
@@ -33,9 +37,9 @@ in code.
 | Tap a choice | In a mystery room: take one of its two choices |
 | Tap a relic in the top bar | Show its name and what it does |
 
-![Choosing the hero, with the depth ladder open](docs/screenshots/heroes.webp)
+![Choosing the hero: four heroes, and the daily and weekly crypts under the panel](docs/screenshots/heroes.webp)
 
-1. **The hero**: a run starts by picking one of three. The **Knight** has 50 health and sets out
+1. **The hero**: a run starts by picking one of four. The **Knight** has 50 health and sets out
    with five Strikes, four Defends, a Bash and a Stoneskin Flask. The **Hunter** has 40 health and
    sets out with three Strikes, three Venom Knives (deal 4, apply 2 Poison), three Dodges (gain 4
    block, draw 1), a Defend and a Venom Flask. The **Hexer** is locked until both the Knight and
@@ -43,24 +47,40 @@ in code.
    44 health and set out with three Strikes, three Defends, three Hex Bolts (deal 4, 4 more to a
    foe with any status on it), an Evil Eye (1 Weak and 1 Vulnerable for no energy) and a Foresight
    Flask, and find five cards of their own in rewards and at the merchant that no other hero does.
-2. **The map**: each act has seven columns of rooms, and from each room the dotted paths lead on
+   The **Alchemist** is locked until any hero has beaten the Bone Spire (won a run at depth 3 or
+   deeper); they have 42 health and set out with three Strikes, three Defends, two Fire Tonics, two
+   Iron Tonics and a Healing Flask. **Tonics combine**: the moment two of the same tonic are in hand
+   (drawn, or brewed by a card), they become one strong tonic that costs the same as one: two Fire
+   Tonics (4 to all foes) make a Blaze Tonic (11 to all), two Iron Tonics (5 block) a Steel Tonic
+   (13 block), two Venom Tonics (3 Poison to all) a Bane Tonic (8 to all). Strong tonics only last
+   the fight; the deck keeps the plain ones. The Alchemist finds four cards of their own, three of
+   which brew a tonic into the hand.
+2. **The library**: every card a hero adds to a deck (a reward or a purchase, in any run) goes into
+   that hero's library, saved in the browser. Once a hero's library holds a card, picking that hero
+   opens it before the run: tap a starting card, then a library card, to start with the library card
+   in its place, up to three swaps and one copy of each card; tap a swapped card to put the starting
+   card back, Back to pick another hero, or Set out. Depth 3's Wound can't be swapped out, and the
+   daily and weekly crypts always start with the hero's own deck.
+
+   ![The Knight's library, with a Fireball swapped in for a Strike and a second Strike picked](docs/screenshots/library.webp)
+3. **The map**: each act has seven columns of rooms, and from each room the dotted paths lead on
    to one or more rooms in the next. The rooms that can be entered next are lit gold; elites and
    the boss have a red ring. The first room is a lone fight (always a slime in the Crypt) and the
    last the act's boss. Every column between holds two or three rooms: one kind that is always
    there (a mystery in the second, a campfire in the third, a treasure chest in the fourth, a
    merchant in the fifth) and one or two more drawn from fights, elites, mysteries and merchants.
-3. **Turns**: each turn the hero draws five cards and has three energy. A card's cost is in its
+4. **Turns**: each turn the hero draws five cards and has three energy. A card's cost is in its
    corner. Attacks (red) hit the foe in front, or every foe; skills (blue) give block, health,
    energy or more cards; powers (purple) stay in play for the rest of the fight. When the draw pile
    runs out, the discard pile is shuffled into it.
-4. **Block** soaks up damage until the start of the hero's next turn. Health carries over from
+5. **Block** soaks up damage until the start of the hero's next turn. Health carries over from
    room to room, and the run is over when it reaches zero.
-5. **Intents**: a sword over a foe is the damage it will deal on its turn (with a status icon after
+6. **Intents**: a sword over a foe is the damage it will deal on its turn (with a status icon after
    it if the hit also leaves one), a shield the block it will gain, an arrow that it grows
    stronger, adding to every hit after, a purple skull the status it will put on the hero, and a
    purple flame the curse card an elite will add to the deck. Each foe opens with the same move,
    then picks its next one at random from its moves, never the same one twice in a row.
-6. **Statuses**, shown over a fighter's head with their numbers:
+7. **Statuses**, shown over a fighter's head with their numbers:
    - **Weak** (a broken sword): attacks deal a quarter less. Wears off by one each time its owner
      acts.
    - **Vulnerable** (a cracked shield): takes half as much damage again from attacks. Wears off by
@@ -68,48 +88,55 @@ in code.
      round later, so it lasts as many foe turns as its number.
    - **Poison** (a green drop): loses that much health at the start of its turn, ignoring block,
      then the poison drops by one.
-7. **Gold and rewards**: every fight drops gold (each foe has its own amount) and offers one of
+8. **Gold and rewards**: every fight drops gold (each foe has its own amount) and offers one of
    three common cards; an elite drops more gold, a flask and offers rare cards. A treasure chest
    offers three rare cards.
-8. **Flasks**: three slots down the left of a fight hold one-use potions, drunk on the hero's turn
+9. **Flasks**: three slots down the left of a fight hold one-use potions, drunk on the hero's turn
    for no energy. Each hero sets out with one, elites and bosses leave one behind, and the merchant
    sells two. Keep one for the boss, or drink it now.
-9. **Powers** are cards that stay in play once played, shown in purple rings by the hero: Bulwark
+10. **Powers** are cards that stay in play once played, shown in purple rings by the hero: Bulwark
    (3 block each turn), Thorns (deal 3 back to any foe that hits you), Battle Rage (1 Strength each
    turn, added to every hit) and Venom Veil (poison on one foe splashes half onto the rest). A second
    copy of a power in play adds its effect again and shows as a count (×2) on its ring.
-10. **Curses** are grey cards that can't be played and only leave the deck when burnt or removed:
+11. **Curses** are grey cards that can't be played and only leave the deck when burnt or removed:
     Rust clogs a slot in the hand, Wound costs 2 health when drawn (it never kills), and Doubt makes
     the first card each turn cost 1 more while in hand. Elites threaten them as a move, and the
     shrine's loot and the chained chest come with one.
-11. **Campfires**: rest to heal 30% of the hero's health (15% from depth 2), temper a card (each
+12. **Campfires**: rest to heal 30% of the hero's health (15% from depth 2), temper a card (each
     card but a curse can be tempered once, for more damage, block or effect, or a lower cost; tempered cards
     have a `+` and green lettering), or burn a card to thin the deck (down to no fewer than five
     cards).
-12. **The merchant** sells two common cards (30 gold), a rare card (65), two relics (80 each), two
+13. **The merchant** sells two common cards (30 gold), a rare card (65), two relics (80 each), two
     flasks (25 each, with a free slot) and removes one card from the deck per visit (40).
-13. **Mystery rooms** each hold one of four scenes with two choices: an altar (8 health for a rare
+14. **Mystery rooms** each hold one of four scenes with two choices: an altar (8 health for a rare
     card), a shrine (temper two random cards, or 45 gold and a Doubt curse), a chained chest (a
     relic and a Rust curse) and a pool (heal 15, or temper a random card for 4 health). Random
     tempering never picks a curse, and the pool's second choice is closed when no card can be tempered.
     The Bone Spire swaps the shrine and the chest for its own two: a bone brazier (burn a curse out
     of the deck, or heal 10) and a saint's reliquary (6 more health and maximum health, or a relic
     for 10 health).
-14. **Relics** are passive bonuses for the rest of the run, shown in the top bar.
-15. **Two acts**: beating the Bone King leaves a relic and opens the stair down to the Sunken
+15. **Relics** are passive bonuses for the rest of the run, shown in the top bar.
+16. **Two acts**: beating the Bone King leaves a relic and opens the stair down to the Sunken
     Tombs, with new foes, its own elite and the Hollow Queen; the hero heals a rest's worth on the
     way down. Beat her to clear the dungeon.
-16. **The Bone Spire**: from depth 3 down, the Hollow Queen's fall leaves a relic and opens a stair
+17. **The Bone Spire**: from depth 3 down, the Hollow Queen's fall leaves a relic and opens a stair
     up into a third act, the Bone Spire, with its own foes, elite, mystery rooms and pale violet
     stone, ending at the Marrow Tyrant. There the run is only won when the Tyrant falls.
-17. **The daily crypt**: the button under the hero panel sets out on the day's run, once a day:
+18. **The daily crypt**: the button under the hero panel sets out on the day's run, once a day:
     the same hero (the Knight or the Hunter), map, fights and card offers for everyone, at depth 0
     and on Normal. It scores 10 for each room cleared, plus the health left after beating the
     Hollow Queen; the panel at the end shows the score, the best and the days in a row, and the
     button shows today's score once the try is used. Leaving half way still uses up the day's try.
-    It changes neither the depth ladder nor the Hexer's unlock.
-18. **The depth ladder**: beating the last boss (the Hollow Queen, or the Marrow Tyrant from depth 3) opens the next depth, and the deepest one opened
-    is saved in the browser (the game's only save). Depth 0 is the dungeon as designed; each depth
+    It changes neither the depth ladder nor the heroes' unlocks.
+19. **The weekly crypt**: the button beside it sets out on the week's run, from Monday to Sunday:
+    the same hero, maps, fights and card offers for everyone, at depth 0 and on Normal, with two
+    mutators: no campfires (they become fights) and more elites (from the fourth column on, every
+    fight is an elite). It scores like the daily and can be tried as often as you like; the button
+    and the end panel show the week's best.
+
+    ![A weekly crypt's map: no campfire, and elites from the fourth column on](docs/screenshots/weekly-map.webp)
+20. **The depth ladder**: beating the last boss (the Hollow Queen, or the Marrow Tyrant from depth 3) opens the next depth, and the deepest one opened
+    is saved in the browser. Depth 0 is the dungeon as designed; each depth
     stacks one more rule, picked with `<` and `>` on the hero panel:
 
     | Depth | New rule |
@@ -181,13 +208,17 @@ in code.
 
 ![The end of a daily crypt, with its score, the best and the streak](docs/screenshots/daily-crypt.webp)
 
+![The Alchemist's first hand: two Fire Tonics have combined into a Blaze Tonic](docs/screenshots/alchemist-tonics.webp)
+
 ### Cards
 
 The Knight's deck starts with five Strikes, four Defends and a Bash; the Hunter's with three
 Strikes, three Venom Knives, three Dodges and a Defend; the Hexer's with three Strikes, three
-Defends, three Hex Bolts and an Evil Eye. A foe with a status is one with any Weak, Vulnerable or
+Defends, three Hex Bolts and an Evil Eye; the Alchemist's with three Strikes, three Defends, two
+Fire Tonics and two Iron Tonics. A foe with a status is one with any Weak, Vulnerable or
 Poison on it. Tempered at a campfire, each card becomes
-its `+` version.
+its `+` version; two tonics combine into a tempered strong one when either was tempered, and a brewed
+tonic joins the hand for the fight only.
 
 | Card | Cost | Effect | Tempered | Found |
 | --- | --- | --- | --- | --- |
@@ -203,6 +234,15 @@ its `+` version.
 | Blight | 1 | Apply 3 Poison and 1 Vulnerable | Apply 5 Poison and 2 Vulnerable | Hexer only, after a fight |
 | Hex Storm | 2 | Deal 5 to all foes, 5 more to each with a status | Deal 7, 7 more | Hexer only, rare |
 | Malediction | 1 | Power: apply 1 Weak to all foes at the start of each turn | Costs 0 | Hexer only, rare |
+| Fire Tonic | 1 | Deal 4 to all foes; two in hand combine into a Blaze Tonic | Deal 6 to all | Alchemist starter |
+| Iron Tonic | 1 | Gain 5 block; two in hand combine into a Steel Tonic | Gain 7 block | Alchemist starter |
+| Venom Tonic | 1 | Apply 3 Poison to all foes; two in hand combine into a Bane Tonic | Apply 4 Poison to all | Alchemist only, after a fight |
+| Blaze Tonic | 1 | Deal 11 to all foes | Deal 14 to all | Two Fire Tonics in hand |
+| Steel Tonic | 1 | Gain 13 block | Gain 17 block | Two Iron Tonics in hand |
+| Bane Tonic | 1 | Apply 8 Poison to all foes | Apply 10 Poison to all | Two Venom Tonics in hand |
+| Grind | 1 | Deal 5, brew a Fire Tonic | Deal 8 | Alchemist only, after a fight |
+| Distil | 1 | Gain 5 block, brew an Iron Tonic | Gain 8 block | Alchemist only, after a fight |
+| Transmute | 1 | Brew a Blaze Tonic, draw 1 | Costs 0 | Alchemist only, rare |
 | Cleave | 1 | Deal 7 to all foes | Deal 10 to all | After a fight |
 | Twin Strike | 1 | Deal 4 twice | Deal 6 twice | After a fight |
 | Iron Wall | 2 | Gain 13 block | Gain 18 block | After a fight |
@@ -276,7 +316,7 @@ hub's card. Each pops up at the top of the page once, when it is earned.
 
 ![The trophy list on the pause screen](docs/screenshots/trophy-list.webp)
 
-The difficulty, set on the hub page's Settings, changes one thing: foes have 25% less health on Easy and 30% more on Hard. The daily crypt is always on Normal.
+The difficulty, set on the hub page's Settings, changes one thing: foes have 25% less health on Easy and 30% more on Hard. The daily and weekly crypts are always on Normal.
 
 ## Running locally
 

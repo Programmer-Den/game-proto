@@ -29,7 +29,7 @@ type Spot = { id: CardId; x: number; y: number; w: number; h: number };
 
 const VIEW = { w: 960, h: 540 };
 /** The Knight's button on the hero panel (the first of HERO_PANEL.xs at HERO_PANEL.buttonY), the first room on the map and the End turn button, from src/scenes/layout.ts and src/game/map.ts. */
-const KNIGHT_BUTTON = { x: 300, y: 384 };
+const KNIGHT_BUTTON = { x: 255, y: 384 };
 const FIRST_ROOM = { x: 110, y: 290 };
 const END_TURN = { x: 884, y: 420 };
 /** The starter deck's cards, from src/game/cards.ts. */

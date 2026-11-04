@@ -8,7 +8,7 @@ import { sfx, type SoundName } from './sounds';
 /** Game time between two footsteps on the map. */
 const STEP_MS = 175;
 /** The phases shown on the map, where water drips now and then. */
-const DRIPPING: Phase[] = ['hero', 'map', 'walk'];
+const DRIPPING: Phase[] = ['hero', 'library', 'map', 'walk'];
 
 /**
  * Listens to the run as `GameScene.update` draws it and plays what happened since the last frame:
@@ -25,6 +25,7 @@ export class Cues {
   private foes: number;
   private drawn: number;
   private draw: number;
+  private brewed: number;
   private gold: number;
   private curses: number;
   private walkStep = -1;
@@ -39,6 +40,7 @@ export class Cues {
     this.foes = s.fight?.enemies.length ?? 0;
     this.drawn = s.fight?.drawn ?? 0;
     this.draw = s.fight?.draw.length ?? 0;
+    this.brewed = s.fight?.brewed ?? 0;
     this.gold = s.gold;
     this.curses = s.deck.filter(isCurse).length;
   }
@@ -81,11 +83,13 @@ export class Cues {
       if (same && f.enemies.length < this.foes) heard.add('die');
       if (f.drawn > (same ? this.drawn : 0)) heard.add('draw');
       if (same && f.draw.length > this.draw) heard.add('shuffle');
+      if (f.brewed > (same ? this.brewed : 0)) heard.add('brew');
     }
     this.fight = f;
     this.foes = f?.enemies.length ?? 0;
     this.drawn = f?.drawn ?? 0;
     this.draw = f?.draw.length ?? 0;
+    this.brewed = f?.brewed ?? 0;
 
     const curses = s.deck.filter(isCurse).length;
     const cursed = curses > this.curses;

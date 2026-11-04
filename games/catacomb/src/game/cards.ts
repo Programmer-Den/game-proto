@@ -31,7 +31,11 @@ export type Icon =
   | 'skull'
   | 'rust'
   | 'doubt'
-  | 'eye';
+  | 'eye'
+  | 'fireTonic'
+  | 'ironTonic'
+  | 'venomTonic'
+  | 'mortar';
 
 /** A power that stays in play for the rest of the fight. */
 export type PowerKind = 'rage' | 'thorns' | 'splash' | 'bulwark' | 'hex';
@@ -60,6 +64,8 @@ interface Effects {
   power?: PowerKind;
   /** A curse card: it can't be played; `curse` says what it does instead. */
   curse?: CurseKind;
+  /** Puts a copy of this card (a tonic, a key of `CARDS`) into the hand for this fight (the Alchemist's cards). */
+  brew?: string;
 }
 
 export interface Card extends Effects {
@@ -69,7 +75,9 @@ export interface Card extends Effects {
   /** Common cards are offered after a fight; rare ones in treasure rooms and by elites. Starter and curse cards neither. */
   rarity: 'starter' | 'common' | 'rare' | 'curse';
   /** A card only this hero finds, in rewards and at the merchant; no one else's pools hold it. */
-  hero?: 'hexer';
+  hero?: 'hexer' | 'alchemist';
+  /** A tonic: two of it in hand combine into this stronger one (a key of `CARDS`). */
+  tonic?: string;
   /** The fields a tempered copy changes. */
   up: Partial<Effects>;
 }
@@ -115,6 +123,18 @@ export const CARDS = {
   blight: { name: 'blightCard', cost: 1, icon: 'cloud', rarity: 'common', hero: 'hexer', poison: 3, vulnerable: 1, up: { poison: 5, vulnerable: 2 } },
   hexStorm: { name: 'hexStormCard', cost: 2, icon: 'whirl', rarity: 'rare', hero: 'hexer', damage: 5, hexed: 5, all: true, up: { damage: 7, hexed: 7 } },
   malediction: { name: 'maledictionCard', cost: 1, icon: 'eye', rarity: 'rare', hero: 'hexer', power: 'hex', up: { cost: 0 } },
+  // The Alchemist's tonics: two of the same in hand combine at once into a strong one (`tonic`),
+  // which costs the same as one. The strong ones are only ever made in hand, never in a deck.
+  fireTonic: { name: 'fireTonicCard', cost: 1, icon: 'fireTonic', rarity: 'starter', damage: 4, all: true, tonic: 'strongFireTonic', up: { damage: 6 } },
+  ironTonic: { name: 'ironTonicCard', cost: 1, icon: 'ironTonic', rarity: 'starter', block: 5, tonic: 'strongIronTonic', up: { block: 7 } },
+  venomTonic: { name: 'venomTonicCard', cost: 1, icon: 'venomTonic', rarity: 'common', hero: 'alchemist', poison: 3, all: true, tonic: 'strongVenomTonic', up: { poison: 4 } },
+  strongFireTonic: { name: 'strongFireTonicCard', cost: 1, icon: 'fireTonic', rarity: 'starter', damage: 11, all: true, up: { damage: 14 } },
+  strongIronTonic: { name: 'strongIronTonicCard', cost: 1, icon: 'ironTonic', rarity: 'starter', block: 13, up: { block: 17 } },
+  strongVenomTonic: { name: 'strongVenomTonicCard', cost: 1, icon: 'venomTonic', rarity: 'starter', poison: 8, all: true, up: { poison: 10 } },
+  // The cards only the Alchemist finds: they brew a tonic into the hand.
+  grind: { name: 'grindCard', cost: 1, icon: 'mortar', rarity: 'common', hero: 'alchemist', damage: 5, brew: 'fireTonic', up: { damage: 8 } },
+  distil: { name: 'distilCard', cost: 1, icon: 'mortar', rarity: 'common', hero: 'alchemist', block: 5, brew: 'ironTonic', up: { block: 8 } },
+  transmute: { name: 'transmuteCard', cost: 1, icon: 'fireTonic', rarity: 'rare', hero: 'alchemist', brew: 'strongFireTonic', draw: 1, up: { cost: 0 } },
 } satisfies Record<string, Card>;
 
 /** What each power does every turn (Bulwark, Battle Rage) or whenever it applies (Thorns, Venom Veil). */
@@ -168,6 +188,9 @@ export const HUNTER_DECK: CardId[] = ['strike', 'strike', 'strike', 'venomKnife'
 /** The Hexer's starting deck of ten: hex bolts that hit harder on a foe with a status, and an Evil Eye to put one on. */
 export const HEXER_DECK: CardId[] = ['strike', 'strike', 'strike', 'defend', 'defend', 'defend', 'hexBolt', 'hexBolt', 'hexBolt', 'evilEye'];
 
+/** The Alchemist's starting deck of ten: two Fire Tonics and two Iron Tonics, which combine when two meet in hand. */
+export const ALCHEMIST_DECK: CardId[] = ['strike', 'strike', 'strike', 'defend', 'defend', 'defend', 'fireTonic', 'fireTonic', 'ironTonic', 'ironTonic'];
+
 /** The reward pools every hero shares (curses and the heroes' own cards are in neither). */
 export const COMMON = (Object.keys(CARDS) as BaseId[]).filter((id) => card(id).rarity === 'common' && !card(id).hero);
 export const RARE = (Object.keys(CARDS) as BaseId[]).filter((id) => card(id).rarity === 'rare' && !card(id).hero);
@@ -200,7 +223,9 @@ export function describe(id: CardId) {
   if (c.block) parts.push(t('gainBlock', { n: c.block }));
   if (c.heal) parts.push(t('heal', { n: c.heal }));
   if (c.energy) parts.push(t('gainEnergy', { n: c.energy }));
+  if (c.brew) parts.push(t('brew', { name: cardName(c.brew as BaseId) }));
   if (c.draw) parts.push(t('draw', { n: c.draw }));
+  if (c.tonic) parts.push(t('tonicRider'));
   return parts.join(' ');
 }
 
@@ -214,3 +239,9 @@ export const kindOf = (id: CardId): CardKind => {
 export const isCurse = (id: CardId) => !!card(id).curse;
 /** Whether tempering would change the card: not tempered yet, and not a curse (a tempered curse is the same curse). */
 export const canBeTempered = (id: CardId) => !isTempered(id) && !isCurse(id);
+/** What two of this tonic make when they meet in hand (tempered if either was), or null for a card that isn't a tonic. */
+export const tonicOf = (a: CardId, b: CardId): CardId | null => {
+  const into = card(a).tonic as BaseId | undefined;
+  if (!into || baseOf(a) !== baseOf(b)) return null;
+  return isTempered(a) || isTempered(b) ? tempered(into) : into;
+};
