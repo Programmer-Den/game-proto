@@ -19,6 +19,8 @@ const de: Translation<typeof en> = {
   hunterText: 'Besiege die Hohle Königin als Jäger.',
   depthThree: 'Noch tiefer',
   depthThreeText: 'Besiege die Hohle Königin auf Tiefe 3.',
+  spire: 'Spitze des Turms',
+  spireText: 'Besiege den Marktyrannen auf dem Knochenturm.',
   depthFive: 'Bodenlos',
   depthFiveText: 'Besiege die Hohle Königin auf Tiefe 5.',
 };

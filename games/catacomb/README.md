@@ -3,15 +3,17 @@
 A dungeon deckbuilder prototype built with [Phaser 4](https://phaser.io), TypeScript and Vite, part
 of the [game hub](../../README.md).
 
-A hero, the Knight or the Hunter, walks a dungeon in two acts: the Crypt, from the entrance on the
-left to the Bone King on the right, then down a stair to the Sunken Tombs and the Hollow Queen. Each
+A hero, the Knight, the Hunter or (once unlocked) the Hexer, walks a dungeon in two acts: the
+Crypt, from the entrance on the left to the Bone King on the right, then down a stair to the Sunken
+Tombs and the Hollow Queen, and from depth 3 on up a third, the Bone Spire, to the Marrow Tyrant. Each
 room on the way is a fight, an elite, a campfire, a treasure chest, a merchant or a mystery, and the
 paths fork, so the route is the player's to pick. Each act is laid out anew for every run. Fights
 are played with a deck of cards: a hand of five each turn, three energy to spend on them, flasks to
 drink for free, and foes who show what they will do on their next turn. Every fight won drops gold
 and adds a new card to the deck; gold buys cards, relics, flasks and a card's removal from the
 merchant. Beating the Hollow Queen opens the next depth, a harder run with one more rule, and the
-best depth reached is saved. Everything is painted in a painterly style, with brush strokes drawn
+best depth reached is saved. Once a day the daily crypt sends everyone out on the same run, with
+the same hero, map and card offers. Everything is painted in a painterly style, with brush strokes drawn
 in code.
 
 ![The map of the Crypt](docs/screenshots/playthrough-0-map.webp)
@@ -33,10 +35,14 @@ in code.
 
 ![Choosing the hero, with the depth ladder open](docs/screenshots/heroes.webp)
 
-1. **The hero**: a run starts by picking one of two. The **Knight** has 50 health and sets out
+1. **The hero**: a run starts by picking one of three. The **Knight** has 50 health and sets out
    with five Strikes, four Defends, a Bash and a Stoneskin Flask. The **Hunter** has 40 health and
    sets out with three Strikes, three Venom Knives (deal 4, apply 2 Poison), three Dodges (gain 4
-   block, draw 1), a Defend and a Venom Flask.
+   block, draw 1), a Defend and a Venom Flask. The **Hexer** is locked until both the Knight and
+   the Hunter have beaten depth 2 (won a run at depth 2 or deeper, saved in the browser); they have
+   44 health and set out with three Strikes, three Defends, three Hex Bolts (deal 4, 4 more to a
+   foe with any status on it), an Evil Eye (1 Weak and 1 Vulnerable for no energy) and a Foresight
+   Flask, and find five cards of their own in rewards and at the merchant that no other hero does.
 2. **The map**: each act has seven columns of rooms, and from each room the dotted paths lead on
    to one or more rooms in the next. The rooms that can be entered next are lit gold; elites and
    the boss have a red ring. The first room is a lone fight (always a slime in the Crypt) and the
@@ -86,11 +92,23 @@ in code.
     card), a shrine (temper two random cards, or 45 gold and a Doubt curse), a chained chest (a
     relic and a Rust curse) and a pool (heal 15, or temper a random card for 4 health). Random
     tempering never picks a curse, and the pool's second choice is closed when no card can be tempered.
+    The Bone Spire swaps the shrine and the chest for its own two: a bone brazier (burn a curse out
+    of the deck, or heal 10) and a saint's reliquary (6 more health and maximum health, or a relic
+    for 10 health).
 14. **Relics** are passive bonuses for the rest of the run, shown in the top bar.
 15. **Two acts**: beating the Bone King leaves a relic and opens the stair down to the Sunken
     Tombs, with new foes, its own elite and the Hollow Queen; the hero heals a rest's worth on the
     way down. Beat her to clear the dungeon.
-16. **The depth ladder**: beating the Hollow Queen opens the next depth, and the deepest one opened
+16. **The Bone Spire**: from depth 3 down, the Hollow Queen's fall leaves a relic and opens a stair
+    up into a third act, the Bone Spire, with its own foes, elite, mystery rooms and pale violet
+    stone, ending at the Marrow Tyrant. There the run is only won when the Tyrant falls.
+17. **The daily crypt**: the button under the hero panel sets out on the day's run, once a day:
+    the same hero (the Knight or the Hunter), map, fights and card offers for everyone, at depth 0
+    and on Normal. It scores 10 for each room cleared, plus the health left after beating the
+    Hollow Queen; the panel at the end shows the score, the best and the days in a row, and the
+    button shows today's score once the try is used. Leaving half way still uses up the day's try.
+    It changes neither the depth ladder nor the Hexer's unlock.
+18. **The depth ladder**: beating the last boss (the Hollow Queen, or the Marrow Tyrant from depth 3) opens the next depth, and the deepest one opened
     is saved in the browser (the game's only save). Depth 0 is the dungeon as designed; each depth
     stacks one more rule, picked with `<` and `>` on the hero panel:
 
@@ -98,7 +116,7 @@ in code.
     | --- | --- |
     | 1 | Foes have 20% more health |
     | 2 | Campfires (and the stair down) heal only 15% |
-    | 3 | The deck starts with a Wound curse |
+    | 3 | The deck starts with a Wound curse, and the Bone Spire rises beyond the Hollow Queen |
     | 4 and down | Foes have 20% more health again, and again each depth |
 
 ![A Crypt with every kind of room, gold and relics in the top bar](docs/screenshots/map.webp)
@@ -144,6 +162,12 @@ in code.
 | Mummy | 2 | 44 | 18 | Block 10, attack 13, 2 Weak |
 | Gargoyle (elite) | 2 | 82 | 50 | Block 16, attack 17, attack 5 three times, curse (Rust) |
 | Hollow Queen (boss) | 2 | 130 | 100 | 4 Poison, attack 15, attack 6 three times and 1 Vulnerable, block 15, grow 3 stronger |
+| Bone Archer | 3 | 30 | 16 | Attack 5 twice, attack 9 and 1 Vulnerable, block 8 |
+| Shade | 3 | 26 | 15 | 2 Weak, attack 7 and 3 Poison, attack 4 three times |
+| Marrow Bat | 3 | 16 | 9 | Attack 3 three times, attack 5 and 1 Weak |
+| Ossuary Golem | 3 | 52 | 20 | Block 12, attack 15, grow 3 stronger |
+| Bell Ringer (elite) | 3 | 90 | 55 | 2 Vulnerable, attack 18, attack 6 three times, curse (Doubt), block 14 |
+| Marrow Tyrant (boss) | 3 | 170 | 120 | Grow 3 stronger, attack 18, attack 7 three times and 1 Vulnerable, block 20, curse (Wound), 5 Poison |
 
 ![The Bone King](docs/screenshots/boss.webp)
 
@@ -151,10 +175,18 @@ in code.
 
 ![The Hollow Queen](docs/screenshots/hollow-queen.webp)
 
+![The Hexer in the Bone Spire, with Malediction in play and their own cards in hand](docs/screenshots/spire-foes.webp)
+
+![The Marrow Tyrant atop the Bone Spire](docs/screenshots/marrow-tyrant.webp)
+
+![The end of a daily crypt, with its score, the best and the streak](docs/screenshots/daily-crypt.webp)
+
 ### Cards
 
 The Knight's deck starts with five Strikes, four Defends and a Bash; the Hunter's with three
-Strikes, three Venom Knives, three Dodges and a Defend. Tempered at a campfire, each card becomes
+Strikes, three Venom Knives, three Dodges and a Defend; the Hexer's with three Strikes, three
+Defends, three Hex Bolts and an Evil Eye. A foe with a status is one with any Weak, Vulnerable or
+Poison on it. Tempered at a campfire, each card becomes
 its `+` version.
 
 | Card | Cost | Effect | Tempered | Found |
@@ -164,6 +196,13 @@ its `+` version.
 | Bash | 2 | Deal 10 | Deal 14 | Knight starter |
 | Venom Knife | 1 | Deal 4, apply 2 Poison | Deal 6, apply 3 Poison | Hunter starter |
 | Dodge | 1 | Gain 4 block, draw 1 | Gain 6 block, draw 1 | Hunter starter |
+| Hex Bolt | 1 | Deal 4, 4 more to a foe with a status | Deal 6, 5 more | Hexer starter |
+| Evil Eye | 0 | Apply 1 Weak and 1 Vulnerable | Apply 2 Weak and 2 Vulnerable | Hexer starter |
+| Soul Drain | 1 | Deal 4, 3 more to a foe with a status, heal 3 | Deal 6, heal 4 | Hexer only, after a fight |
+| Hex Ward | 1 | Gain 7 block, apply 1 Weak | Gain 10 block | Hexer only, after a fight |
+| Blight | 1 | Apply 3 Poison and 1 Vulnerable | Apply 5 Poison and 2 Vulnerable | Hexer only, after a fight |
+| Hex Storm | 2 | Deal 5 to all foes, 5 more to each with a status | Deal 7, 7 more | Hexer only, rare |
+| Malediction | 1 | Power: apply 1 Weak to all foes at the start of each turn | Costs 0 | Hexer only, rare |
 | Cleave | 1 | Deal 7 to all foes | Deal 10 to all | After a fight |
 | Twin Strike | 1 | Deal 4 twice | Deal 6 twice | After a fight |
 | Iron Wall | 2 | Gain 13 block | Gain 18 block | After a fight |
@@ -186,8 +225,8 @@ its `+` version.
 | Battle Rage | 1 | Power: gain 1 Strength at the start of each turn | Costs 0 | Rare |
 | Venom Veil | 1 | Power: poison on one foe splashes half onto the rest | Costs 0 | Rare |
 | Rust | - | Curse: unplayable, clogs the hand | - | Gargoyle, chained chest |
-| Wound | - | Curse: unplayable, lose 2 health when drawn | - | Grave Knight, depth 3 |
-| Doubt | - | Curse: unplayable, the first card each turn costs 1 more | - | Bog Witch, shrine loot |
+| Wound | - | Curse: unplayable, lose 2 health when drawn | - | Grave Knight, Marrow Tyrant, depth 3 |
+| Doubt | - | Curse: unplayable, the first card each turn costs 1 more | - | Bog Witch, Bell Ringer, shrine loot |
 
 Rare cards come from treasure chests, elites, the merchant and the altar.
 
@@ -219,7 +258,7 @@ Rare cards come from treasure chests, elites, the merchant and the altar.
 
 ### Trophies
 
-Nine trophies, listed behind the Trophies button on the start and pause screens and counted on the
+Ten trophies, listed behind the Trophies button on the start and pause screens and counted on the
 hub's card. Each pops up at the top of the page once, when it is earned.
 
 | Tier | Trophy | Earned by |
@@ -232,11 +271,12 @@ hub's card. Each pops up at the top of the page once, when it is earned.
 | Silver | The hunt is over | Beating the Hollow Queen as the Hunter |
 | Gold | Queen of nothing | Beating the Hollow Queen |
 | Gold | Deeper still | Beating the Hollow Queen at depth 3 |
+| Gold | Top of the Spire | Beating the Marrow Tyrant atop the Bone Spire |
 | Gold | Bottomless (hidden) | Beating the Hollow Queen at depth 5 |
 
 ![The trophy list on the pause screen](docs/screenshots/trophy-list.webp)
 
-The difficulty, set on the hub page's Settings, changes one thing: foes have 25% less health on Easy and 30% more on Hard.
+The difficulty, set on the hub page's Settings, changes one thing: foes have 25% less health on Easy and 30% more on Hard. The daily crypt is always on Normal.
 
 ## Running locally
 
@@ -264,13 +304,14 @@ npx playwright test --project catacomb
 All paths are inside `games/catacomb/`.
 
 - `src/game/`: the rules in plain TypeScript with no Phaser dependency. `cards.ts` and `enemies.ts`
-  are data tables (the cards, powers and curses, the foes and their moves), `heroes.ts` the two
-  heroes, `flasks.ts` the flasks, `depth.ts` the depth ladder and its save, `map.ts` lays out a new
-  Crypt for each run, `relics.ts` and `events.ts` are the relics and mystery rooms, `state.ts`
+  are data tables (the cards, powers and curses, the foes and their moves), `heroes.ts` the three
+  heroes and the Hexer's unlock, `flasks.ts` the flasks, `depth.ts` the depth ladder and its save, `map.ts` lays out a new
+  map for each act of each run, `relics.ts` and `events.ts` are the relics and mystery rooms, `state.ts`
   describes a run, and `sim.ts` moves it on: choosing the hero, walking the map, playing cards and
   drinking flasks, statuses, the foes' turn, the campfire, the merchant, mystery rooms, rewards and
-  the descent to the second act. Randomness (the maps, shuffles, rewards, wares, relics, flasks,
-  foes' next moves) goes through `Math.random`.
+  the descent to the next act and the daily crypt. Randomness (the maps, shuffles, rewards, wares,
+  relics, flasks, foes' next moves) goes through `random` in `rng.ts`: `Math.random`, or the day's
+  seed in the daily crypt.
 - `src/scenes/`: `BootScene` bakes textures, `GameScene` draws the map, the fights, the merchant and the panels
   and wires taps to the rules, `layout.ts` says where things are drawn.
 - `src/art/`: all the art, drawn in code and baked into textures at startup, then repainted with

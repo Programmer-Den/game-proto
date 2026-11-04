@@ -19,6 +19,8 @@ const en = {
   hunterText: 'Beat the Hollow Queen as the Hunter.',
   depthThree: 'Deeper still',
   depthThreeText: 'Beat the Hollow Queen at depth 3.',
+  spire: 'Top of the Spire',
+  spireText: 'Beat the Marrow Tyrant atop the Bone Spire.',
   depthFive: 'Bottomless',
   depthFiveText: 'Beat the Hollow Queen at depth 5.',
 };

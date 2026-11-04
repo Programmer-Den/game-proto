@@ -6,8 +6,11 @@ import { trophies } from './index';
 /** Relics held at once for the Relic hoard trophy. */
 const RELIC_HOARD = 5;
 
+/** Whether the Hollow Queen fell in this run: the run was won, or (from depth 3) the way up the Bone Spire opened. */
+const queenFell = (s: GameState) => s.phase === 'won' || s.act >= 3 || (s.act === 2 && s.phase === 'descend');
+
 /** Whether the Hollow Queen fell at `depth` or deeper in this run. */
-const wonAt = (s: GameState, depth: number) => s.phase === 'won' && s.depth >= depth;
+const wonAt = (s: GameState, depth: number) => queenFell(s) && s.depth >= depth;
 
 /** Whether each trophy's condition holds in the state. */
 const EARNED: Record<string, (state: GameState) => boolean> = {
@@ -16,10 +19,11 @@ const EARNED: Record<string, (state: GameState) => boolean> = {
   elite: (s) => s.cleared.some((i) => s.rooms[i]?.kind === 'elite'),
   boneKing: (s) => s.act >= 2,
   relics: (s) => s.relics.length >= RELIC_HOARD,
-  hunter: (s) => s.phase === 'won' && s.hero === 'hunter',
+  hunter: (s) => queenFell(s) && s.hero === 'hunter',
   hollowQueen: (s) => wonAt(s, 0),
   depthThree: (s) => wonAt(s, 3),
   depthFive: (s) => wonAt(s, 5),
+  spire: (s) => s.phase === 'won' && s.act >= 3,
 };
 
 /**

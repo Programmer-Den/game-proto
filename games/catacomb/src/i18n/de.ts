@@ -33,12 +33,21 @@ const de: Translation<typeof en> = {
   rustCard: 'Rost',
   woundCard: 'Wunde',
   doubtCard: 'Zweifel',
+  hexBoltCard: 'Fluchblitz',
+  evilEyeCard: 'Böser Blick',
+  soulDrainCard: 'Seelenraub',
+  hexWardCard: 'Bannkreis',
+  blightCard: 'Fäulnis',
+  hexStormCard: 'Fluchsturm',
+  maledictionCard: 'Verwünschung',
 
   // Cards: rules, built from these parts
   deal: '{damage} Schaden.',
   dealHits: '{damage} Schaden x{hits}.',
   dealAll: '{damage} Schaden an alle Feinde.',
   dealHitsAll: '{damage} Schaden x{hits} an alle Feinde.',
+  dealHexed: '{damage} Schaden, +{n} mit Zustand.',
+  dealHexedAll: '{damage} Schaden an alle, +{n} je mit Zustand.',
   apply: 'Verleiht {statuses}.',
   applyAll: 'Allen Feinden {statuses}.',
   and: '{a} und {b}',
@@ -51,6 +60,7 @@ const de: Translation<typeof en> = {
   thornsPower: 'Wer dich trifft, erleidet {n} Schaden.',
   ragePower: 'Zu Beginn jedes Zuges {n} Stärke.',
   splashPower: 'Gift springt halb auf die anderen Feinde über.',
+  hexPower: 'Jede Runde {n} Schwäche auf alle Feinde.',
   curseLead: 'Fluch. Unspielbar.',
   rustCurse: 'Verstopft nur deine Hand.',
   woundCurse: 'Verliere {n} Leben beim Ziehen.',
@@ -75,16 +85,27 @@ const de: Translation<typeof en> = {
   mummyFoe: 'Mumie',
   gargoyleFoe: 'Wasserspeier',
   hollowQueenFoe: 'Hohle Königin',
+  boneArcherFoe: 'Knochenschütze',
+  shadeFoe: 'Schemen',
+  marrowBatFoe: 'Markfledermaus',
+  ossuaryFoe: 'Beinhausgolem',
+  bellRingerFoe: 'Glöckner',
+  marrowTyrantFoe: 'Marktyrann',
 
   // Acts
   cryptAct: 'Die Gruft',
   tombsAct: 'Die versunkenen Gräber',
+  spireAct: 'Der Knochenturm',
 
   // Heroes
   knightName: 'Ritter',
   knightText: 'Schwert und Schild, {hp} Leben',
   hunterName: 'Jäger',
   hunterText: 'Giftmesser und Ausweichen, {hp} Leben',
+  hexerName: 'Hexer',
+  hexerText: 'Flüche und Fluchblitze, {hp} Leben',
+  hexerLocked: 'Schlage Tiefe 2 als Ritter und als Jäger, um ihn freizuschalten',
+  locked: 'Gesperrt',
 
   // Flasks
   healFlask: 'Heiltrank',
@@ -131,11 +152,19 @@ const de: Translation<typeof en> = {
   poolText: 'Das Wasser ist kalt und seltsam klar.',
   poolDrink: 'Trinken (heile {n})',
   poolBathe: 'Baden (-{n} Leben, eine Karte härten)',
+  brazierTitle: 'Ein Knochenbecken',
+  brazierText: 'Bleiches Feuer brennt in einer Schale aus Schädeln, hungrig nach etwas.',
+  brazierFeed: 'Füttern (ein Fluch verlässt dein Deck)',
+  brazierWarm: 'Hände wärmen ({n} heilen)',
+  reliquaryTitle: 'Ein Heiligenschrein',
+  reliquaryText: 'Hinter staubigem Glas liegt ein goldumwickelter Fingerknochen.',
+  reliquaryPray: 'Beten (+{n} maximales Leben)',
+  reliquaryBreak: 'Glas zerschlagen (ein Relikt, -{n} Leben)',
 
   // Depths
   depthFoes: 'Feinde +20 % Leben',
   depthRest: 'Lagerfeuer heilen nur 15 %',
-  depthWound: 'Das Deck beginnt mit einer Wunde',
+  depthWound: 'Das Deck beginnt mit einer Wunde, und hinter der Hohlen Königin ragt der Knochenturm auf',
   depthMore: 'Feinde wieder +20 % Leben, je Tiefe mehr',
   depthNone: 'Das Verlies wie gewohnt',
 
@@ -159,6 +188,8 @@ const de: Translation<typeof en> = {
   healed: '{n} geheilt',
   waterTempers: 'Das Wasser härtet {name}',
   nothingHappens: 'Nichts geschieht',
+  brazierBurns: 'Das Feuer frisst deinen {curse}',
+  reliquaryBlesses: 'Du fühlst dich zäher: +{n} maximales Leben',
 
   // The map
   enterHint: 'Tippe einen Raum an, um einzutreten',
@@ -205,11 +236,20 @@ const de: Translation<typeof en> = {
   stairDown: '{notice}\nEine Treppe windet sich hinab ins Dunkel.',
   descend: 'Hinabsteigen',
   hollowQueenFalls: 'Die Hohle Königin fällt!',
+  spireUp: '{notice}\nHinter ihrem Thron ragt ein Turm aus Knochen ins Dunkel.',
+  climb: 'Hinaufsteigen',
+  marrowTyrantFalls: 'Der Marktyrann fällt!',
   fallen: 'Du bist gefallen',
   atDepth: ' in Tiefe {n}',
   wonText: 'Du hast das Verlies{deep} mit {hp} Leben, {gold} Gold und einem Deck aus {deck} Karten bezwungen.\nTiefe {next} ist offen: {rules}',
   fellText: '{act}{deep}, Raum {room} von {rooms}, mit einem Deck aus {deck} Karten.',
   delveAgain: 'Erneut hinab',
+  dailyButton: 'Tägliche Gruft: heute der {hero}',
+  dailyDone: 'Heutige tägliche Gruft: {score} (Bestwert {best})',
+  dailyStreak: { one: '{n} Tag in Folge', other: '{n} Tage in Folge' },
+  dailyWon: 'Du hast die tägliche Gruft mit {hp} Leben übrig geschafft.\nPunkte {score}, Bestwert {best}, {streak}. Morgen öffnet eine neue Gruft.',
+  dailyFell: 'Du bist in {act} gefallen, Raum {room} von {rooms}.\nPunkte {score}, Bestwert {best}, {streak}. Morgen öffnet eine neue Gruft.',
+  dailyBar: 'Tägliche Gruft',
 
   // The card picker
   burnPick: 'Karte verbrennen: Sie verlässt dein Deck für immer',
@@ -228,6 +268,6 @@ const de: Translation<typeof en> = {
 };
 
 /** Texts that are the same in German. */
-export const keepEnglish = ['deck'];
+export const keepEnglish = ['deck', 'hexerName'];
 
 export default de;

@@ -279,6 +279,115 @@ const FOES: Record<EnemyKind, string[]> = {
     '..pPPPPqPPPqPPPPPPp',
     '..ppppppppppppppppp',
   ],
+  // The Bone Spire, act three.
+  // A skeleton archer with a drawn bow and a quiver.
+  boneArcher: [
+    '.....OcccO...',
+    '....Occcccc..',
+    '....ceecec...',
+    '....cccccc...',
+    '..W..cOcOc...',
+    '.W....ccc..w.',
+    'W...ccOcOcww.',
+    'W..c..ccc.w..',
+    'Wcc..OcOc.w..',
+    'W.....ccc....',
+    '.W....OcO....',
+    '..W...ccc....',
+    '.....c...c...',
+    '.....c...c...',
+    '.....c...c...',
+    '....cc...cc..',
+  ],
+  // A shade: a shadow with two yellow eyes, ragged at the hem.
+  shade: [
+    '.....pppp.....',
+    '....peeeep....',
+    '...peeeeeep...',
+    '...peyeeyep...',
+    '...peeeeeep...',
+    '..peeeeeeeep..',
+    '.peepeeeepeep.',
+    'pep.peeeep.pep',
+    'p...peeeep...p',
+    '....peeeep....',
+    '....pepeep....',
+    '...pe.pe.ep...',
+    '...p..p...p...',
+  ],
+  // A bat of bone with red eyes and wide wings.
+  marrowBat: [
+    '.o............o.',
+    '.oO..........Oo.',
+    '.OcO..oooo..OcO.',
+    '.OccOocccoOccO..',
+    '..OcccrccrcccO..',
+    '...OOcccccccOO..',
+    '.....OcxxcO.....',
+    '......OccO......',
+    '.......OO.......',
+  ],
+  // A golem of stacked bones and skulls.
+  ossuary: [
+    '....oOOOOo.....',
+    '...oOccccOo....',
+    '...OcrcOrcO....',
+    '...OccccccO....',
+    '....OcOcOc.....',
+    '.ooOOOcOOOOoo..',
+    'oOccOcOcOcOccOo',
+    'Occ.OOcccOO.ccO',
+    'Oco.OcOcOcO.ocO',
+    'ccc.OOcccOO.ccc',
+    '....OcOcOcO....',
+    '....OO...OO....',
+    '...oOc...cOo...',
+    '...Occ...ccO...',
+    '..oOcc...ccOo..',
+  ],
+  // A hooded bell ringer in grey with a great bronze bell and its rope.
+  bellRinger: [
+    '......tttt......',
+    '.....tTTTTt.....',
+    '....tTTTTTTt....',
+    '....tTyTTyTt....',
+    '....tTTTTTTt....',
+    '.....tTTTTt.....',
+    '...ttxxxxxxtt...',
+    '..tTTtTTTTtTTt..',
+    '..tT.tTTTTt.Tt..',
+    '.gg..tTTTTt..w..',
+    'gGGg.tTTTTt..w..',
+    'gGGg.tTTTTt..w..',
+    'gGGGgtTTTTt..w..',
+    '.g..tTTTTTTt.w..',
+    '....tTTttTTt....',
+    '...ttTt..tTtt...',
+  ],
+  // The Marrow Tyrant: a towering crowned skeleton in purple robes with an iron mace.
+  marrowTyrant: [
+    '......g.G.g.G.g......',
+    '......gGgGgGgGg......',
+    '.....OcccccccccO.....',
+    '....Occcccccccccc....',
+    '....ccyycccccyycc....',
+    '....ccyycccccyycc....',
+    '....cccccOcOccccc....',
+    '.....ccOcOcOcOcc.....',
+    '......ccccccccc......',
+    '..I..ppPPPPPPPpp.....',
+    '.IiI.pPqPcccPqPPp....',
+    '.IiIpPPqcOcOcqPPPp...',
+    '..W.pPPqPcccPqPPPp...',
+    '..W.cPPqcOcOcqPPPpc..',
+    '..WcOPPqPcccPqPPPpOc.',
+    '..W.pPPPPPPPPPPPPp.c.',
+    '..W.pPPqPPPPPqPPPp...',
+    '..WpPPPqPPPPPqPPPPp..',
+    '..WpPPPPPPPPPPPPPPp..',
+    '.pPPPPqPPPPPPPqPPPPp.',
+    '.ppppppppppppppppppp.',
+  ],
 };
 
 export function bakeCharacters(scene: Phaser.Scene) {
@@ -420,8 +529,53 @@ const HUNTER: Figure = {
   },
 };
 
+/** A hexer in a hooded purple robe with a pale face and glowing eyes, a staff topped with a green eye raised, and a bone charm at the belt. */
+const HEXER: Figure = {
+  w: 84,
+  h: 130,
+  fx: 462,
+  fy: 656,
+  draw(ctx) {
+    const { poly, ell, rrect } = shapes(ctx);
+    // Robe to the ankles, darker behind.
+    poly([[432, 536], [492, 536], [512, 650], [412, 650]], '#3a1e4a');
+    poly([[432, 536], [462, 536], [452, 650], [412, 650]], '#2c163a');
+    // Feet under the hem.
+    for (const lx of [446, 478]) rrect(lx - 12, 640, 26, 16, 6, '#2a1c14');
+    // Robe front with a sash and a bone charm hanging from it.
+    rrect(430, 540, 64, 96, 14, '#6a3a8a');
+    poly([[440, 548], [484, 548], [496, 636], [428, 636]], '#5a2e78');
+    poly([[440, 548], [462, 548], [462, 636], [428, 636]], '#6a3a8a');
+    rrect(430, 584, 66, 9, 3, '#2a1c14');
+    rrect(452, 592, 4, 16, 2, '#c8bea8');
+    ell(454, 612, 7, 6, '#ece4d0');
+    ell(452, 611, 1.6, 1.6, '#141018');
+    ell(457, 611, 1.6, 1.6, '#141018');
+    // Staff arm raised, the staff upright with a green eye at its head.
+    poly([[486, 552], [502, 548], [512, 520], [498, 516]], '#6a3a8a');
+    ell(504, 516, 8, 8, '#d8c8b0');
+    rrect(501, 430, 7, 220, 3, '#5c3a21');
+    rrect(503, 432, 2, 214, 1, '#8a5a32');
+    ell(504.5, 420, 14, 14, '#2a5a2a');
+    ell(504.5, 420, 10, 10, '#8cd060');
+    ell(504.5, 420, 5, 6, '#141018');
+    ell(502, 417, 2, 2, '#e8ffe0');
+    // Hood with a pale face in its shadow and two green glints for eyes.
+    ell(462, 522, 30, 32, '#4a2862');
+    ell(466, 528, 18, 18, '#1a0f22');
+    ell(469, 528, 10, 12, '#d8c8b0');
+    ell(465, 525, 2.2, 1.6, '#8cd060');
+    ell(473, 525, 2.2, 1.6, '#8cd060');
+    poly([[436, 504], [462, 478], [488, 500], [482, 510], [462, 498], [442, 514]], '#3a1e4a');
+    poly([[456, 482], [462, 470], [470, 484]], '#3a1e4a');
+    // The free hand held out, a wisp of green over it.
+    ell(426, 580, 8, 8, '#d8c8b0');
+    ell(420, 566, 6, 9, 'rgba(140,208,96,0.7)');
+  },
+};
+
 /** The hero figures, by hero. */
-const HERO_FIGURES: Record<HeroId, Figure> = { knight: KNIGHT, hunter: HUNTER };
+const HERO_FIGURES: Record<HeroId, Figure> = { knight: KNIGHT, hunter: HUNTER, hexer: HEXER };
 
 /** A glossy green slime with a highlight, two dark eyes and a small mouth. */
 const SLIME: Figure = {

@@ -1,6 +1,6 @@
 // Mystery rooms: a scene with two choices. What each choice does is in `chooseEvent` in sim.ts.
 
-export type EventId = 'altar' | 'shrine' | 'chest' | 'pool';
+export type EventId = 'altar' | 'shrine' | 'chest' | 'pool' | 'brazier' | 'reliquary';
 
 import type { TextKey } from '../i18n';
 
@@ -23,6 +23,11 @@ export const CHEST_CURSE = 'rust';
 /** What drinking from the pool heals, and what bathing in it costs. */
 export const POOL_HEAL = 15;
 export const POOL_COST = 4;
+/** What warming at the Bone Spire's brazier heals. */
+export const BRAZIER_HEAL = 10;
+/** What praying at the reliquary adds to the hero's health and its most, and what breaking its glass costs. */
+export const RELIQUARY_MAX_HP = 6;
+export const RELIQUARY_COST = 10;
 
 export const EVENTS: Record<EventId, GameEvent> = {
   altar: {
@@ -48,6 +53,19 @@ export const EVENTS: Record<EventId, GameEvent> = {
     text: 'poolText',
     choices: ['poolDrink', 'poolBathe'],
     amounts: [POOL_HEAL, POOL_COST],
+  },
+  // The Bone Spire's own.
+  brazier: {
+    title: 'brazierTitle',
+    text: 'brazierText',
+    choices: ['brazierFeed', 'brazierWarm'],
+    amounts: [0, BRAZIER_HEAL],
+  },
+  reliquary: {
+    title: 'reliquaryTitle',
+    text: 'reliquaryText',
+    choices: ['reliquaryPray', 'reliquaryBreak'],
+    amounts: [RELIQUARY_MAX_HP, RELIQUARY_COST],
   },
 };
 

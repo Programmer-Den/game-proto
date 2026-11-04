@@ -29,10 +29,28 @@ export const PANEL_BUTTON = { x: 480, y: 360 };
 export const BUTTON = { w: 160, h: 44 };
 /** At the campfire, Rest, Temper and Remove a card sit in a row across the middle. */
 export const REST_BUTTONS = { dx: 182, w: 172 };
-/** A mystery room's two choices, one above the other. The hero choice uses the same two buttons. */
+/** A mystery room's two choices, one above the other. */
 export const EVENT_BUTTONS = { y: 324, gap: 52, w: 440 };
-/** On the hero panel: the two heroes standing either side (by their feet), and the depth row's arrows and label. */
-export const HERO_PANEL = { knightX: 280, hunterX: 680, feetY: 312, depthY: 216, depthDx: 90, rulesY: 270, rulesH: 58 };
+/**
+ * The hero panel, a taller box than the other panels: its title, the depth row's arrows and label
+ * with the depth's rules under it, the three heroes standing in a row (by their feet) with a
+ * button and a caption under each, and the daily crypt's button under the box.
+ */
+export const HERO_PANEL = {
+  box: { w: 620, h: 380 },
+  titleY: 108,
+  depthY: 152,
+  depthDx: 90,
+  rulesY: 192,
+  rulesH: 40,
+  xs: [300, 480, 660],
+  feetY: 352,
+  buttonY: 384,
+  buttonW: 172,
+  captionY: 412,
+  dailyY: 496,
+  dailyW: 460,
+};
 /** The flask slots down the left of a fight, by their centres. */
 export const FLASKS = { x: 60, y: 120, gap: 58, r: 24 };
 /** The powers in play, in a row under the flasks, left of the hero: one ring per kind (four at most), so the row ends clear of the hero. */
