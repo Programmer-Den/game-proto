@@ -10,7 +10,8 @@ straight up on a timer, and the player only moves them left and right. Zombies w
 to the middle of their lane, never chasing the soldier; upgrade crates drift down among them and are shot open for a stat upgrade, and
 fuel drums roll down and blow up the zombies round them when shot. Bosses fight back and leave a
 supply drop, and kills bank scrap that buys starting crates for the next run and lasting outpost
-upgrades. A run is the endless Open Road or a 10-wave operation, picked on the game over screen.
+upgrades. A run is the endless Open Road, the daily stand or a 10-wave town on the road map, picked
+on the game over screen.
 
 - **Implemented:** endless waves that grow in size and toughness, runners from wave 2, brutes from
   wave 3, spitters (acid from range) and crawler swarms from wave 4, riot zombies (a shield only
@@ -30,8 +31,12 @@ upgrades. A run is the endless Open Road or a 10-wave operation, picked on the g
   (every fourth grunt becomes armoured brutes, riot zombies or flank spitters, answering the
   squad's strongest stat), squad roles (a joining survivor picks Gunner, Grenadier or Marksman),
   outpost upgrades (Barricade, Field Medic, Fuel Depot, Veteran, three lasting levels each, bought
-  with scrap), operations (Hospital and Lights Out: 10 waves under fixed rules, each with its own
-  best and medal, picked on the game over screen beside the Open Road),
+  with scrap), the road map (five towns, each 10 waves under its own twist with its own best and
+  medal: Hospital, Lights Out, Fogbank with fog, Two Bridges with the middle lane blocked, and the
+  Evacuation; winning one opens the next and pays a first-win bounty), squad loyalty (survivors who
+  join get a call sign and, once they live through a won run, stay on a roster of six with their
+  role and a rank; two picked start the next run and rank up with each win, for more damage), the
+  daily stand (`shared/daily.ts`: the same seeded 10 waves for everyone on the day, one try),
   a squad of up to eight companions in three staggered rows of three, fuel drums with a
   blast ring that previews how many zombies they would catch, a frenzy streak (12 quick kills
   double the fire rate for 5s), damage numbers on hits, a wave progress strip with a boss warning,
@@ -50,13 +55,14 @@ upgrades. A run is the endless Open Road or a 10-wave operation, picked on the g
   textures it needs and begins wave 1 at once. The supply drop (phase `'supply'`), the role pick
   (phase `'role'`) and game over are overlays in the same scene; an extraction or a won operation
   ends in the same game over overlay with a win title (`state.extracted`). On game over a tap on a
-  starting crate buys or refunds it, on an outpost upgrade buys its next level, on an operation
-  picks it for the next run; any other tap calls `scene.restart()`. Taps count only once the
+  starting crate buys or refunds it, on an outpost upgrade buys its next level, on the Open Road,
+  the daily or an open town picks it for the next run, on a veteran picks or drops them; any other
+  tap calls `scene.restart()`. Taps count only once the
   screen has been up for `OVER_GRACE_MS` (600ms of game time, `overMs`), so a steering tap as the
   horde breaks through doesn't skip it.
 - **Persistence:** the Open Road's best wave, the art style, the trophies earned, banked scrap, the starting crates
-  bought for the next run, the outpost levels, the next operation and each operation's best (see
-  Save keys). It also reads the hub's
+  bought for the next run, the outpost levels, the next operation, each operation's best, the
+  roster of veterans and the daily stand's record (see Save keys). It also reads the hub's
   shared settings (the `hub-settings` key, see Hub settings below).
 - **Rough edges seen in the code:**
   - No camera shake.
@@ -64,8 +70,12 @@ upgrades. A run is the endless Open Road or a 10-wave operation, picked on the g
   - A spitter stands still at its range until shot, so a wave can't end while one stands; it is
     an easy target once the soldier walks under it. Zombies steer to their lane's middle, inside
     `HERO.minX..HERO.maxX`, so none stops out of every rifle's reach.
-  - Supply drop picks, kit panel items, squad roles and the operation are not shown in the
+  - Supply drop picks, kit panel items, squad roles, veterans and the operation are not shown in the
     wide-screen backdrop.
+  - The game over screen is full: the road map and the roster sit below the operation cards, and
+    in a tall view the frenzy panel shows faintly under the "tap to start" line.
+  - Two Bridges' wreck is the sandbag wall sprite, stretched; it doesn't block anything itself (no
+    zombie is planned in that lane), and a boss's pack can still land there.
   - Night-vision textures are baked the first time that style is shown, a hitch of about 0.4s
     (measured in headless Chromium) on that first switch; later switches take a frame or so. On a
     big screen the textures are painted finer, and the first switch takes about twice as long.
@@ -111,7 +121,9 @@ upgrades. A run is the endless Open Road or a 10-wave operation, picked on the g
   `KIT_PANEL`, `HUD_DEPTH`.
 - `src/game/rules.ts`: pure numbers and rules (also `OUTPOST`, `OUTPOST_KINDS`, `OUTPOST_MAX`,
   `NO_OUTPOST`, `outpostCost`, `ROLES`, `ROLE_KINDS`, `GRENADE`, `MARKSMAN`, `OPERATIONS`,
-  `OPERATION_KINDS`, `OPERATION_BONUS`, `MEDALS`, `medalOf`, `ADAPTS`, `ADAPT`, `adaptTo`,
+  `OPERATION_KINDS`, `OPERATION_BONUS`, `MEDALS`, `medalOf`, `TOWNS`, `isTown`, `townOpen`,
+  `nextTown`, `openLaneX`, `DAILY`, `dailyScore`, `dailyAdapt`, `LOYALTY`, `Veteran`, `CALL_SIGNS`,
+  `callSign`, `rankMult`, `promote`, `ADAPTS`, `ADAPT`, `ADAPT_KINDS`, `adaptTo`,
   `WaveRules`; every `label`, `detail` and `name` in them is a `TextKey`): `VIEW`, `HERO`, `REACH_Y`, `SQUAD_SLOTS`,
   `MAX_COMPANIONS`, `ENEMIES`, `SCRAP`, `SPITTER`, `ACID_SLOW`, `riotShield`, `SWARM`,
   `swarmCount`, `BOSS`, `BOSS_MOVES`, `BOSSES`, `BOSS_KINDS`, `isBoss`, `bossKind`, `bossMove`,
@@ -125,7 +137,7 @@ upgrades. A run is the endless Open Road or a 10-wave operation, picked on the g
   `CONDITIONS` has no entry for `'clear'`, which shows nothing.
 - `src/game/save.ts`: `loadBest`/`saveBest`, `loadStyle`/`saveStyle`, `loadScrap`/`saveScrap`,
   `loadKit`/`saveKit`, `loadOutpost`/`saveOutpost`, `loadOperation`/`saveOperation`,
-  `loadOperationBests`/`saveOperationBests`, the `ArtStyle` type (`'comic' | 'nv'`) and the key
+  `loadOperationBests`/`saveOperationBests`, `loadRoster`/`saveRoster` (`Roster`), the `ArtStyle` type (`'comic' | 'nv'`) and the key
   names.
 - `src/trophies/`: the game's ten trophies (`shared/trophies.ts`). `index.ts` lists them
   (`trophies`: id, tier, icon, `hidden` for Fortress) with their texts in `trophies/i18n/` (`en.ts`
@@ -276,8 +288,35 @@ upgrades. A run is the endless Open Road or a 10-wave operation, picked on the g
   rules from `OPERATIONS`; `pickOperation` sets `state.nextOperation` and saves it, so the choice
   sticks. In an operation `state.best` is its best (waves cleared, from `deadline-operation-best`),
   `deadline-best` is left alone, and `checkWave` calls `recordOperation` on each clear and
-  `completeOperation` (`endAsWin` with `OPERATION_BONUS`) once the last wave is cleared, in place of
-  its supply drop. `medalOf(cleared)` gives the medal. The HUD's best chip shows the operation.
+  `completeOperation(first)` (`endAsWin` with `OPERATION_BONUS`, plus the town's `bounty` when
+  `first`, the first win) once the last wave is cleared, in place of its supply drop. `medalOf(cleared)`
+  gives the medal. The HUD's best chip shows the operation.
+- **Road map:** the towns are `TOWNS` (operations in order). `townOpen(kind, bests)` opens the
+  first, and each one after once the town before has all its waves cleared (or once it has a best of
+  its own, so old saves keep Lights Out); `create` falls back to the Open Road for a saved town that
+  isn't open. A win sets `nextOperation` to `nextTown` (saved) and, on a first win, `state.opened`,
+  which the game over screen names. Twists: Fogbank's `condition: 'fog'` (`visibility` fades
+  anything above `CONDITION.fogY`, `fog` is a pale band over the far road, styled per art style
+  in `styleFog`); Two Bridges' `lanes: [0, 2]` (`startWave` moves every planned zombie but flank
+  spitters into an open lane with `openLaneX`, no draws, and `create` puts a `wrecks` image over
+  each blocked lane at `WRECK_Y`); the Evacuation's `conditionFrom: 1` (handed to `drawCondition`).
+- **Veterans:** `state.names` and `state.ranks` run beside `state.roles` (squad order; null and 0
+  for companions from crates or the outpost; `addCompanions` pads them). `create` loads the roster
+  (`deadline-roster`) and, off the daily, puts each picked veteran (`state.picked`, call signs) in
+  the squad first, before the starting crates, noting them in `state.brought`. `pickRole` gives a
+  joining survivor `callSign(taken)`. `fire` multiplies each companion's bullets' `mult` by
+  `rankMult(rank)`; only a marksman's round (`mult >= MARKSMAN.mult`) shows bigger.
+  `endAsWin` calls `promoteSquad` (not on the daily): `promote` ranks up the brought veterans and
+  adds this run's recruits at rank 1, replacing a rank 1 veteran once the roster has
+  `LOYALTY.size`. The game over screen's roster chips call `pickVeteran` (at most `LOYALTY.picks`).
+- **Daily stand:** `state.operation === 'daily'`. `create` takes today (`today()`, kept in `day`),
+  falls back to the Open Road when `loadDaily` says today's try is used, and otherwise calls
+  `startDaily`; the daily keeps the starting crates for the next run (`nextKit`), and uses no
+  outpost (`NO_OUTPOST`) and no veterans. `startWave` seeds `waveRand` with
+  `seeded(seedOf('deadline:<day>:<wave>'))` and draws, in order, `dailyAdapt` (the horde's answer,
+  in place of `adaptTo`), the condition, `planWave` and, on a boss wave, `supplyPick`. `gameOver` and
+  `completeOperation` call `finishDaily` with `dailyScore(scrap, cleared)`; the daily's best is
+  not in `deadline-operation-best`. The daily card can't be picked once today's try is used.
 - **Extraction:** `showSupply` adds a fourth, wide card when `canExtract(wave)` (a boss wave from
   `EXTRACT.fromWave`), tapped or taken with 4; `pickSupply('extract')` calls `extract`, which
   sets `state.extracted`, pays `state.payout = round(scrap * EXTRACT.bonus(wave))` into the bank
@@ -394,8 +433,13 @@ imports it. Under browser automation it all does nothing, so the playthrough is 
   missing or broken levels load as 0.
 - `deadline-operation`: the `OperationKind` the next run plays. Written by `pickOperation`, read
   (and kept) by `create`; anything unknown loads as `'road'`.
-- `deadline-operation-best`: a JSON object of each operation's most waves cleared. Written by
-  `recordOperation`.
+- `deadline-operation-best`: a JSON object of each operation's most waves cleared (towns only,
+  not the daily). Written by `recordOperation`; it also says which towns are open (`townOpen`).
+- `deadline-roster`: a JSON object `{ vets: [{ name, role, rank }], picked: [index] }`, at most
+  `LOYALTY.size` veterans and `LOYALTY.picks` picks. Written by `promoteSquad` and `pickVeteran`;
+  broken veterans and picks load as dropped.
+- `deadline-daily`: the daily stand's record (`shared/daily.ts`, not `save.ts`): today's try and
+  score, the best and the days in a row.
 - All are read and written through `src/game/save.ts`, wrapped in try/catch.
 - `deadline-trophies`: the trophies earned (`shared/trophies.ts`, not `save.ts`), each id with the
   time.
@@ -431,7 +475,8 @@ imports it. Under browser automation it all does nothing, so the playthrough is 
   `sandbags`, `placing` and `walls` (placed this run), `pellets`, `flames` and `medkits`, `offer`
   and `supplies` (picked this run), `inAcid`, `bossMove`, `bossMoves` and `bossKind`, `perks` and
   `headshots`, `survivorsSaved` and `survivorsLost`, `condition`, `extracted` and `payout`,
-  `outpost`, `roles`, `operation`, `nextOperation`, `operationBests` and `adapt`. The
+  `outpost`, `roles`, `operation`, `nextOperation`, `operationBests`, `adapt`, `roster`, `picked`,
+  `brought`, `names`, `ranks`, `bounty`, `opened`, `daily` and `dailyScore`. The
   scene's public `squad` holds the companion images, one per `stats.companions`,
   and `style` the current `ArtStyle`.
 - Entities (`Enemy`, `Survivor`, `Pickup`, `Drum`, `Bullet`, `Acid`, `Wall`, `Splat`, `Fx`) are private interfaces in
@@ -451,7 +496,7 @@ imports it. Under browser automation it all does nothing, so the playthrough is 
 ### Randomness and timing
 
 - `Math.random` is used only by `planWave`, `drawCondition` and `supplyPick` (their default
-  `rand`). The horde adapting draws nothing; an operation's extra survivors draw after the first
+  `rand`); on the daily stand they draw from the wave's seeded `waveRand` instead. The horde adapting draws nothing; an operation's extra survivors draw after the first
   one's, and its fixed condition skips the condition's draw. `startWave` calls `drawCondition` (one draw, from wave 6 only) before `planWave`. The order of
   `rand()` calls in `planWave` (per enemy: kind roll then x; then per crate: upgrade then x; then
   per drum: x; then per crawler swarm: x; then, from wave 2, the sandbag crate roll and its time
@@ -569,7 +614,11 @@ imports it. Under browser automation it all does nothing, so the playthrough is 
 - **Add an outpost upgrade, role or operation:** add it to `OUTPOST`, `ROLES` or `OPERATIONS` in
   `rules.ts` and a colour in `theme.ts`; apply an outpost level in `create` (or `planWave`), a role
   in `fire`, an operation's rules in `startWave`/`planWave`. The game over screen lays out four
-  outpost buttons and three operations; more need a new layout there.
+  outpost buttons, two run cards (Open Road and daily), five towns and six roster chips; more need
+  a new layout there.
+- **Add a town:** add it to `OperationKind` and `OPERATIONS` (with its twist and `bounty`), to
+  `TOWNS` where it opens, a colour in `OPERATION_COLORS`, and its name and two-line twist in each
+  language; the road map row then needs narrower nodes.
 - **Add a new phase or screen** (title, pause): extend `Phase`, guard `update`, `spawn` and the
   `pointerdown` handler on it, and keep wave 1 starting at once or update the test's opening steps.
 

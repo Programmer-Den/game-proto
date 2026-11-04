@@ -1,8 +1,8 @@
-import { NO_OUTPOST, OPERATION_KINDS, OUTPOST_KINDS, OUTPOST_MAX, type OperationKind, type Outpost, type UpgradeKind, UPGRADE_KINDS } from './rules';
+import { LOYALTY, NO_OUTPOST, OPERATION_KINDS, OUTPOST_KINDS, OUTPOST_MAX, ROLE_KINDS, type OperationKind, type Outpost, type UpgradeKind, type Veteran, UPGRADE_KINDS } from './rules';
 
 // What Deadline keeps between visits: the best wave reached, the chosen art style, the scrap banked
 // from kills, the starting crates and outpost upgrades bought with it, the operation picked for the
-// next run and each operation's best. Every game shares the hub's
+// next run, each operation's best and the squad's veterans. Every game shares the hub's
 // origin, so every key starts with the game's name.
 
 export const BEST_KEY = 'deadline-best';
@@ -12,6 +12,7 @@ export const KIT_KEY = 'deadline-kit';
 export const OUTPOST_KEY = 'deadline-outpost';
 export const OPERATION_KEY = 'deadline-operation';
 export const OPERATION_BEST_KEY = 'deadline-operation-best';
+export const ROSTER_KEY = 'deadline-roster';
 
 /** The two looks the game can be drawn in: a pulp horror comic, or a night-vision camera feed. */
 export type ArtStyle = 'comic' | 'nv';
@@ -147,4 +148,27 @@ export function loadOperationBests(): Record<OperationKind, number> {
 
 export function saveOperationBests(bests: Record<OperationKind, number>) {
   saveObject(OPERATION_BEST_KEY, bests);
+}
+
+/** The veterans on the roster, and the two (at most) picked to start the next run. */
+export interface Roster {
+  vets: Veteran[];
+  picked: number[];
+}
+
+/** The roster; empty on a fresh save. Broken veterans are dropped, and so are picks that point nowhere. */
+export function loadRoster(): Roster {
+  const o = loadObject(ROSTER_KEY) ?? {};
+  const vets = (Array.isArray(o.vets) ? o.vets : [])
+    .filter((v): v is Veteran => !!v && typeof v === 'object' && typeof v.name === 'string' && ROLE_KINDS.includes(v.role))
+    .slice(0, LOYALTY.size)
+    .map((v) => ({ name: v.name.slice(0, 16), role: v.role, rank: Math.max(1, level(v.rank, LOYALTY.maxRank)) }));
+  const picked = (Array.isArray(o.picked) ? o.picked : [])
+    .filter((i, k, all): i is number => typeof i === 'number' && Number.isInteger(i) && i >= 0 && i < vets.length && all.indexOf(i) === k)
+    .slice(0, LOYALTY.picks);
+  return { vets, picked };
+}
+
+export function saveRoster(roster: Roster) {
+  saveObject(ROSTER_KEY, roster);
 }
