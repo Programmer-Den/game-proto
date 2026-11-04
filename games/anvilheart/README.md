@@ -144,10 +144,34 @@ Masterwork.
    coins from sales and commissions as you can; the end window shows today's coins, your best and
    your days in a row, and "Back to my smithy" returns to your own smithy, untouched. One try a day:
    leaving half way uses it up.
-22. **The smithy is kept**: the board and barrel (and how long each sword has lain), coins, swords
+22. **The tourney.** Once you have made a Knight's Blade, a tourney comes every four minutes (the
+   first a minute and a half after it; the pane beside the board counts down). Three knights ride
+   in ahead of the adventurers, taking desks as they free up, each wanting any sword at least two
+   tiers under your best (an Iron Shortsword at least) within a minute. A knight pays a sword's own
+   worth (half again for a Masterwork) and jousts with it; while you hold a sword over one, its tag
+   says where it would place. Once every knight is armed or has ridden off, your best knight's
+   sword jousts against the field: a champion with a sword two tiers above the ask, then one with a
+   gem a tier above, then a plain one a tier above. A lance counts four a tier, two for a gem and
+   three for a Masterwork, and a tie goes to your knight. 1st pays the price of the sword two tiers
+   above the ask and hangs a banner in the smithy, 2nd half of that and 3rd a quarter. A knight who
+   rides off costs no reputation. Tourneys don't come in the daily forge.
+23. **Blade finishes.** Banners are kept in every charter and unlock finishes for good: **Blued**
+   at 1 banner (knights pay half again), **Etched** at 3 (the streak ring's gold Masterwork window
+   lasts 1.5 seconds) and **Gilded** at 6 (every sale pays 10% more).
+24. **The apprentice.** Once you have made a Steel Sword, "Hire" in the apprentice's pane takes on
+   an apprentice for 500 coins, kept in every charter after. Every 20 seconds (15% quicker in each
+   new charter, down to 8) they merge the lowest matching pair on the anvils by themselves, never a
+   Masterwork or the sword in your hand; a merge of theirs starts no hammer streak.
+25. **Ore carts.** Once you have made a Steel Sword, an ore cart comes a minute later and then
+   every two and a half minutes, and stays 45 seconds. It sells each of two ores once a visit, for
+   three minutes of forging: **silver** (three times the gems) and **starmetal** (the forge makes
+   Steel Swords, or Steel Bucklers, instead of daggers and Shortswords). Their price rises with
+   your best sword: silver 60 + 30 per tier, starmetal 100 + 50 per tier.
+26. **The smithy is kept**: the board and barrel (and how long each sword has lain), coins, swords
    sold, upgrades, the forge's mode and best buckler, the standing commission and its open offer,
-   your guild stars, perks, guild halls, charter and edict, reputation and whether you have won are
-   saved in the browser, and the daily forge's record under its own key.
+   your guild stars, perks, guild halls, charter and edict, reputation and whether you have won,
+   the apprentice, tourney banners and the ores' time left are saved in the browser, and the daily
+   forge's record under its own key.
 
 ![While a Steel Sword is held, the knight who asked for one shows the tipped price and the ranger who asked for less shows Overkill](docs/screenshots/exact-fit-tip.webp)
 
@@ -203,6 +227,12 @@ Masterwork.
 
 ![The daily forge's shift is over: today's coins, the best and the days in a row](docs/screenshots/daily-forge.webp)
 
+![Three tourney knights at the counter: a gemmed Golden Claymore held over one would ride 1st, with the tourney, apprentice and ore cart panes beside the board](docs/screenshots/tourney-knights.webp)
+
+![The ore cart is here: starmetal bought, so the forge lays Steel Swords, and silver still for sale](docs/screenshots/ore-cart.webp)
+
+![The apprentice merges two Rusty Daggers by themselves](docs/screenshots/apprentice-merge.webp)
+
 ![Dragging a dagger onto its twin](docs/screenshots/playthrough-1-dragging.webp)
 
 ### Swords
@@ -249,7 +279,7 @@ A buckler adds its price to a set order, before the set's 50% bonus.
 
 ### Trophies
 
-Nine trophies, listed behind the Trophies button on the start and pause screens and counted on the
+Ten trophies, listed behind the Trophies button on the start and pause screens and counted on the
 hub's card. Each pops up at the top of the page once, when it is earned.
 
 | Tier | Trophy | Earned by |
@@ -261,6 +291,7 @@ hub's card. Each pops up at the top of the page once, when it is earned.
 | Silver | Busy counter | Selling 100 swords |
 | Silver | Renowned smithy | Raising the guild's reputation to the top |
 | Silver | Dragon bane | Forging a Dragonslayer |
+| Silver | Tourney champion | Arming a knight who wins a tourney |
 | Gold | The Crown Blade | Delivering the Crown Blade |
 | Gold | Smithing dynasty (hidden) | Founding a third new smithy after a win |
 
@@ -300,11 +331,12 @@ All paths are inside `games/anvilheart/`.
 - `src/game/`: the rules in plain TypeScript with no Phaser dependency. `swords.ts`, `shields.ts`
   (the bucklers), `upgrades.ts`, `charter.ts` (the edicts and guild perks) and `commissions.ts`
   are data tables (the last also scales commissions per charter and makes the grand offers),
-  `items.ts` says what can lie on an anvil (swords, gems, gemmed, battered and Masterwork swords,
+  `tourney.ts` holds the tourney's field, lances, purses and blade finishes, `cart.ts` the ore
+  cart and its ores, `items.ts` says what can lie on an anvil (swords, gems, gemmed, battered and Masterwork swords,
   bucklers) and how two combine, `state.ts` holds the shop, its timings, the reputation, rust,
   trait and returning-hero rules and the sale price rule, `sim.ts` forges, rusts, merges (with
   streaks), repairs, delivers to the crown, offers commissions, sells, buys, brings heroes back,
-  buys perks, picks edicts and founds new charters, and `save.ts` keeps the smithy.
+  buys perks, picks edicts, founds new charters, runs tourneys, the apprentice and the ore cart, and `save.ts` keeps the smithy.
 - `src/scenes/`: `BootScene` bakes textures, `GameScene` draws the smithy and turns drags into
   rules calls, `layout.ts` says where things are drawn.
 - `src/art/`: all the stained-glass art, painted on canvases in code at startup: `glass.ts` holds

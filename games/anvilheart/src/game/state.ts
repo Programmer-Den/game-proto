@@ -4,6 +4,8 @@ import { SHIELD_TOP, shieldOf } from './shields';
 import { COMMISSIONS } from './commissions';
 import { EDICT_IDS, HALL_IDS, HALL_TOP, JEWELLER_GEMS, TAVERN_PATIENCE, edictRule, noHalls, noPerks, spentStars, type Edict, type Hall, type Perk } from './charter';
 import type { UpgradeId } from './upgrades';
+import { BLUED_PAY, ETCHED_MASTER, GILDED_PRICE, TOURNEY_TIER, freshTourney, hasFinish, type Tourney } from './tourney';
+import { CART_TIER, ORE_IDS, SILVER_GEMS, freshCart, noOres, type Cart, type Ore } from './cart';
 
 /**
  * The anvils the swords sit on: four rows of four, numbered row by row from the top left, and a
@@ -41,6 +43,17 @@ export const STREAK_TOP = 5;
 /** A merge in the streak ring's last this-many milliseconds strikes a Masterwork, which pays this much more and never rusts. */
 export const MASTER_MS = 1000;
 export const MASTER_PAY = 1.5;
+
+/**
+ * Apprentices (AN19): once the smithy has made a Steel Sword it can hire one, who merges a matching
+ * pair on the anvils by themselves every `APPRENTICE_MS`, a share quicker with every charter (down
+ * to `APPRENTICE_MIN_MS`). The apprentice stays across charters.
+ */
+export const APPRENTICE_TIER = 3;
+export const APPRENTICE_PRICE = 500;
+export const APPRENTICE_MS = 20_000;
+export const APPRENTICE_SPEED = 0.85;
+export const APPRENTICE_MIN_MS = 8_000;
 
 /** Guild reputation, from 0 to `REP_MAX`: where a new smithy starts, and what moves it. */
 export const REP_MAX = 100;
@@ -116,6 +129,8 @@ export interface Adventurer extends Order {
   look: number;
   /** Whether this is a hero back from a quest with a battered sword. */
   returned: boolean;
+  /** Whether this is a tourney knight (AN18), who takes any sword at least as good as `wants` and jousts with it. */
+  knight: boolean;
   /** The half of a set already handed over: the sword and the buckler, or null for neither yet. */
   given: { sword: number | null; shield: number | null };
 }
@@ -179,6 +194,17 @@ export interface GameState {
   halls: Record<Hall, number>;
   /** The rival smithy's day (AN16), from the second charter on: time left, and swords sold by you and by them. Not saved. */
   rival: { ms: number; mine: number; theirs: number };
+  /** Whether an apprentice is hired (AN19; kept across charters), and the time until their next merge. */
+  apprentice: boolean;
+  apprenticeMs: number;
+  /** Tourney banners won (AN18; kept across charters), and the tourney under way or the wait for the next. */
+  banners: number;
+  tourney: Tourney;
+  /** The ore cart (AN20), and the time left on each ore bought from it. */
+  cart: Cart;
+  ores: Record<Ore, number>;
+  /** The place (an anvil or `BARREL`) the player holds a sword from, or null; the apprentice leaves it be. Not saved. */
+  held: number | null;
   /** The daily forge (AN17): a seeded shift with its time left and the coins earned in it, or null in the smithy. Never saved. */
   daily: { ms: number; earned: number } | null;
   /** Things that just happened, for the scene to animate; it empties the list as it draws them. */
@@ -204,8 +230,15 @@ export type GameEvent =
   | { kind: 'hall'; hall: Hall }
   | { kind: 'rivalDay'; won: boolean; coins: number }
   | { kind: 'dailyEnd'; earned: number }
+  | { kind: 'apprenticed'; slot: number; from: number; tier: number }
+  | { kind: 'hired' }
+  | { kind: 'tourneyStart'; wants: number }
+  | { kind: 'armed'; desk: number; coins: number; place: number }
+  | { kind: 'tourney'; place: number; coins: number; banner: boolean }
+  | { kind: 'cart' }
+  | { kind: 'ore'; ore: Ore }
   /** `back` says where half a set they held went: an anvil, the barrel (`BARREL`), or (place -1) its plain price paid. */
-  | { kind: 'left'; desk: number; back?: { place: number; coins: number } };
+  | { kind: 'left'; desk: number; back?: { place: number; coins: number }; knight?: boolean };
 
 /** What is kept between visits: the board, the coins and the upgrades. */
 export interface Progress {
@@ -228,6 +261,9 @@ export interface Progress {
   perks: Record<Perk, boolean>;
   edict: Edict | null;
   halls: Record<Hall, number>;
+  apprentice: boolean;
+  banners: number;
+  ores: Record<Ore, number>;
 }
 
 export const freshProgress = (): Progress => ({
@@ -250,6 +286,9 @@ export const freshProgress = (): Progress => ({
   perks: noPerks(),
   edict: null,
   halls: noHalls(),
+  apprentice: false,
+  banners: 0,
+  ores: noOres(),
 });
 
 /** How many anvils the smithy has: 16, or 20 with the fifth row. */
@@ -291,6 +330,13 @@ export function newShop(progress: Progress): GameState {
     edict: EDICT_IDS.includes(progress.edict as Edict) ? progress.edict : null,
     halls: Object.fromEntries(HALL_IDS.map((id) => [id, Math.min(HALL_TOP, count(progress.halls?.[id]))])) as Record<Hall, number>,
     rival: freshRival(),
+    apprentice: progress.apprentice === true,
+    apprenticeMs: APPRENTICE_MS,
+    banners: count(progress.banners),
+    tourney: freshTourney(),
+    cart: freshCart(),
+    ores: Object.fromEntries(ORE_IDS.map((id) => [id, count(progress.ores?.[id])])) as Record<Ore, number>,
+    held: null,
     daily: null,
     events: [],
   };
@@ -329,6 +375,9 @@ export const progressOf = (s: GameState): Progress => {
     perks: { ...s.perks },
     edict: s.edict,
     halls: { ...s.halls },
+    apprentice: s.apprentice,
+    banners: s.banners,
+    ores: { ...s.ores },
   };
 };
 
@@ -365,14 +414,15 @@ export function fitOf(item: number, order: Order): Fit {
   return order.trait === 'veteran' && tier === order.wants - 1 ? 'lesser' : 'short';
 }
 /** What sets prices besides the order: the guild stars not spent on perks, and the charter's edict. */
-export type Market = Pick<GameState, 'stars' | 'perks' | 'edict'>;
+export type Market = Pick<GameState, 'stars' | 'perks' | 'edict' | 'banners'>;
 /** Guild stars still raising prices: those not spent on perks. */
 export const freeStars = (m: Market) => Math.max(0, m.stars - spentStars(m.perks));
-/** How much every price is raised: 5% per unspent guild star, times the edict's. */
+/** How much every price is raised: 5% per unspent guild star (and a tenth with the gilded finish), times the edict's. */
 export const priceFactor = (m?: Market, gem = false) => {
   if (!m) return 1;
   const rule = edictRule(m.edict);
-  return (1 + STAR_PRICE * freeStars(m)) * rule.pay * (gem ? 1 : rule.plainPay);
+  const gilded = hasFinish(m.banners, 'gilded') ? GILDED_PRICE : 0;
+  return (1 + STAR_PRICE * freeStars(m) + gilded) * rule.pay * (gem ? 1 : rule.plainPay);
 };
 /** What an item is worth on its own: a sword's price (doubled with a gem) or a buckler's, with the market's raise. */
 export const plainPrice = (item: number, m?: Market) =>
@@ -397,6 +447,20 @@ export function payFor(item: number, order: Order, m?: Market) {
 /** What a set pays once both halves are in: the sword's pay and the buckler's price, with the set bonus. */
 export const setPay = (swordItem: number, order: Order, m?: Market) => Math.floor((payFor(swordItem, order, m) + shieldPrice(order, m)) * SET_PAY);
 
+/** What a tourney knight pays for a sword: its own worth, half again for a Masterwork, and half again with the blued finish. */
+export const knightPay = (item: number, m: Market) =>
+  Math.floor(plainPrice(item, m) * (isMaster(item) ? MASTER_PAY : 1) * (hasFinish(m.banners, 'blued') ? BLUED_PAY : 1));
+/** How long the streak ring glows gold for a Masterwork: half again as long with the etched finish. */
+export const masterMs = (s: Pick<GameState, 'banners'>) => MASTER_MS * (hasFinish(s.banners, 'etched') ? ETCHED_MASTER : 1);
+/** How long the apprentice takes between merges: a share quicker each charter. */
+export const apprenticeEvery = (s: Pick<GameState, 'charter'>) => Math.max(APPRENTICE_MIN_MS, Math.round(APPRENTICE_MS * Math.pow(APPRENTICE_SPEED, s.charter)));
+/** Whether an apprentice can be hired (or is): once the smithy has made a Steel Sword. */
+export const apprenticeAbout = (s: Pick<GameState, 'bestTier' | 'apprentice'>) => s.apprentice || s.bestTier >= APPRENTICE_TIER;
+/** Whether tourneys come: once the smithy has made a Knight's Blade, and never in the daily forge. */
+export const tourneyOpen = (s: Pick<GameState, 'bestTier' | 'daily'>) => s.bestTier >= TOURNEY_TIER && s.daily === null;
+/** Whether ore carts come: once the smithy has made a Steel Sword. */
+export const cartsAbout = (s: Pick<GameState, 'bestTier'>) => s.bestTier >= CART_TIER;
+
 /** The forge's heat-up time with the bellows bought so far (and the edict's). */
 export const forgeMs = (s: GameState) => Math.round(FORGE_MS * Math.pow(0.8, s.ranks.bellows) * edictRule(s.edict).forge);
 /** The chance the forge makes an Iron Shortsword rather than a dagger. */
@@ -405,8 +469,9 @@ export const oreChance = (s: GameState) => 0.2 * s.ranks.ore;
 export const autoForging = (s: GameState) => s.ranks.auto > 0 && s.autoForge;
 /** Whether gems turn up yet: once the smithy has made a Steel Sword. */
 export const gemsAbout = (s: GameState) => s.bestTier >= GEM_TIER;
-/** The chance a forge makes a gem, once gems are about. */
-export const gemChance = (s: GameState) => GEM_CHANCE * edictRule(s.edict).gems * (1 + JEWELLER_GEMS * s.halls.jeweller);
+/** The chance a forge makes a gem, once gems are about: three times as likely while silver from the ore cart lasts. */
+export const gemChance = (s: GameState) =>
+  GEM_CHANCE * edictRule(s.edict).gems * (1 + JEWELLER_GEMS * s.halls.jeweller) * (s.ores.silver > 0 ? SILVER_GEMS : 1);
 /** How much longer adventurers wait thanks to the Tavern hall. */
 export const tavernFactor = (s: Pick<GameState, 'halls'>) => 1 + TAVERN_PATIENCE * s.halls.tavern;
 /** Whether the forge can make bucklers yet: once the smithy has made a Knight's Blade. */

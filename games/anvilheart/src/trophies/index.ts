@@ -16,6 +16,7 @@ export const trophies = trophySet(
     { id: 'hundredSold', tier: 'silver', icon: '📦' },
     { id: 'renowned', tier: 'silver', icon: '⭐' },
     { id: 'dragonslayer', tier: 'silver', icon: '🐉' },
+    { id: 'champion', tier: 'silver', icon: '🏇' },
     { id: 'crownBlade', tier: 'gold', icon: '👑' },
     { id: 'dynasty', tier: 'gold', icon: '🏛️', hidden: true },
   ],

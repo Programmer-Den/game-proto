@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { BANNER, BARREL, BOARD, DESK, DISCOVERED, ORDER, ROW_BOX, SCRAP, TAG, WIN } from '../scenes/layout';
+import { BANNER, BARREL, BOARD, DESK, DISCOVERED, ORDER, ROW_BOX, SCRAP, SIDE, TAG, TOURNEY_PANE, APPRENTICE_PANE, CART_PANE, WIN } from '../scenes/layout';
 import { ART, PI, bake, ctx, diamond, glass, glow, glowFrame, label, lit, mix, panel, rect, reseed, ring, type Pt } from './glass';
 
 // The leaded-glass interface: buttons, the order cards, the fit tags, the commission banner, the
@@ -20,6 +20,7 @@ export const BUTTON_STYLES = {
   row: { frame: '#6a5a3a', pane: '#2a3a5a', border: 7, diamonds: false },
   wide: { frame: '#c8962e', pane: '#4a2a6a', border: 9, diamonds: false },
   mode: { frame: '#6a5a3a', pane: '#3a2a20', border: 6, diamonds: false },
+  side: { frame: '#c8962e', pane: '#2a4a3a', border: 5, diamonds: false },
 };
 export type ButtonStyle = keyof typeof BUTTON_STYLES;
 
@@ -128,6 +129,28 @@ export function bakeUi(scene: Phaser.Scene, sizes: Record<ButtonStyle, { w: numb
   bake(scene, 'frame-banner', BANNER.w + gm, BANNER.h + gm, () => glowFrame(gm, gm, a(BANNER.w), a(BANNER.h), '#f0b830', 8));
   // The barrel's merge outline.
   bake(scene, 'frame-barrel', BARREL.w + gm, BARREL.h + gm, () => glowFrame(gm, gm, a(BARREL.w), a(BARREL.h), '#f0b830', 8));
+
+  // The side column's panes (tourney, apprentice, ore cart): dark glass in a lead-and-brass frame.
+  for (const [key, pane] of [['pane-tourney', TOURNEY_PANE], ['pane-apprentice', APPRENTICE_PANE], ['pane-cart', CART_PANE]] as const) {
+    bake(scene, key, SIDE.w, pane.h, () => {
+      reseed(19);
+      panel(2, 2, a(SIDE.w) - 4, a(pane.h) - 4, '#8a6a3a', '#22202e', 6);
+    });
+  }
+  // A tourney banner: a red pennant with a gold stripe on a pole.
+  bake(scene, 'pennant', 18, 22, () => {
+    glass(rect(4, 2, 4, 42), '#8a6a3a', { lw: 2, flat: true });
+    glass([[8, 4], [34, 10], [8, 24]], '#c03050', { lw: 3, hi: 0.4 });
+    glass([[8, 12], [22, 14], [8, 17]], '#ffd36a', { lw: 1.5, flat: true });
+  });
+  // The ore cart: a little wagon of ore on two wheels.
+  bake(scene, 'cart', 34, 22, () => {
+    reseed(20);
+    glass([[6, 10], [62, 10], [56, 30], [12, 30]], '#8a5a2a', { lw: 3 });
+    glass(ring(22, 36, 7, 10), '#4a4a5a', { lw: 2.5, flat: true });
+    glass(ring(48, 36, 7, 10), '#4a4a5a', { lw: 2.5, flat: true });
+    glass([[16, 10], [24, 2], [32, 8], [40, 1], [50, 10]], '#c8d0e0', { lw: 2.5, hi: 0.5 });
+  });
 
   // The scrap bin and the outline round it while something is held.
   bake(scene, 'scrap', SCRAP.w, SCRAP.h, scrapBin);

@@ -13,7 +13,10 @@ a counter of three desks buy swords at least as good as the one they ask for. Co
 upgrades, a fifth row and a quench barrel; royal commissions, delivered to the crown, set the long
 goal and end in a win, after which a new charter starts the smithy over with the guild stars kept
 (to raise prices or spend on perks) under an edict chosen from two. From the Knight's Blade on the
-forge can also make bucklers, for adventurers who order a sword and shield set.
+forge can also make bucklers, for adventurers who order a sword and shield set. Beside the board
+a column of panes holds the tourney (knights who joust with the swords handed them, for banners
+that unlock blade finishes), the apprentice (who merges pairs by themselves) and the ore cart
+(silver and starmetal for a few minutes of forging).
 
 Implemented today:
 
@@ -118,6 +121,50 @@ Implemented today:
   end window (`dailyWindow`, `win-panel`), whose "Back to my smithy" (`leaveDaily`) resets
   `useRandom(null)` and reloads the saved smithy. A reload during the shift lands in the saved
   smithy with the try used up.
+- The tourney (AN18, `src/game/tourney.ts`): while `tourneyOpen` (`bestTier >= TOURNEY_TIER` 4, not
+  a daily shift) `tick` runs `tourneyDay` after the walk-offs and before the visitors. `tourney`
+  (`Tourney`, not saved, reset by `foundCharter`) counts `inMs` down (`TOURNEY_FIRST_MS` 90s, then
+  `TOURNEY_EVERY_MS` 4 min), then turns `on` with `riding` `KNIGHTS` (3) and `wants`
+  `tourneyTier(bestTier)` (two under the best, 2 to 6), pushing `tourneyStart`. Each tick, while a
+  knight still rides and a desk is free (`freeDesk`), `arriveKnight` seats one (`knight: true`, look
+  `KNIGHT_LOOK` 0, no trait, gem or set, patience `KNIGHT_MS` 60s times the difficulty, no random
+  roll, `orders` untouched). `fitOf` takes any sword of `wants` or better; `sell` pays `knightPay`
+  (the sword's `plainPrice`, times `MASTER_PAY` for a Masterwork and `BLUED_PAY` 1.5 with the Blued
+  finish; no tip, reputation or returning roll, but it counts in `sold`, the rival's `mine` and a
+  daily's `earned`), pushes `lance(item)` (4 a tier, 2 a gem, 3 a Masterwork) onto `entries` and
+  an `armed` event with the place the sword alone would take. A knight whose patience runs out
+  pushes `left` with `knight: true` and costs nothing. Once no knight rides or waits, the best
+  entry jousts against `field(wants)` (two tiers up, one up gemmed, one up): `placeOf` (ties go to
+  the smithy) picks 1 to 4, `purse` pays `PURSE` (1, 0.5, 0.25) of the price of the sword two tiers
+  above `wants`, 1st adds a banner (`banners`, saved, kept by `foundCharter`), and `tourney` is
+  pushed (place 0 when no knight was armed). The scene's knight card shows "{sword} or better",
+  "pays its worth" and a pink "Tourney knight" line; its tag reads "Rides 1st" (`placeText`) with
+  `knightPay`.
+- Blade finishes (`FINISHES` in `tourney.ts`, unlocked by `banners`, `hasFinish`): Blued (1) in
+  `knightPay`, Etched (3) makes `masterMs` 1.5x `MASTER_MS` (`drop`'s Masterwork check and the
+  ring's gold), Gilded (6) adds `GILDED_PRICE` (0.1) inside `priceFactor` (so `Market` carries
+  `banners`). The `tourney` event floats "Blade finish: ..." when a win reaches a finish's count.
+- The apprentice (AN19): `apprentice` (saved, kept by `foundCharter`, wiped by "New smithy") is
+  hired with `hireApprentice` (`APPRENTICE_PRICE` 500c, once `apprenticeAbout`: `bestTier >=
+  APPRENTICE_TIER` 3). `tick` runs `apprentice`: `apprenticeMs` counts down from `apprenticeEvery`
+  (`APPRENTICE_MS` 20s times `APPRENTICE_SPEED` 0.85 per charter, at least `APPRENTICE_MIN_MS` 8s);
+  at 0 `apprenticePair` picks the lowest-tier pair `combine` merges, among anvils only, skipping
+  Masterworks and `held` (the place the scene's `hold` marks while a sword is in hand), and merges
+  the later slot into the earlier with no streak or Masterwork, pushing `apprenticed`. With no pair
+  it waits at 0.
+- Ore carts (AN20, `src/game/cart.ts`): while `cartsAbout` (`bestTier >= CART_TIER` 3) `tick`'s
+  `cartDay` counts `cart.inMs` (`CART_FIRST_MS` 60s, then `CART_EVERY_MS` 150s) and keeps the cart
+  `hereMs` (`CART_STAY_MS` 45s), pushing `cart`. `buyOre` sells each ore once a visit at
+  `orePrice(ore, bestTier)` and adds `ORE_MS` (3 min) to `ores[ore]` (saved), which `cartDay` runs
+  down every tick: silver multiplies `gemChance` by `SILVER_GEMS` (3), starmetal makes `forge` lay
+  `STARMETAL_TIER` (3) blanks (swords or bucklers; the Fine Ore roll is still made).
+- The side column (`SIDE`, `TOURNEY_PANE`, `APPRENTICE_PANE`, `CART_PANE` in `layout.ts`, x 593 to
+  679 over the scrap bin): `createSide` and `drawSide` in `GameScene` build and fill three containers
+  on `pane-*` textures, each shown once its feature is about: the tourney's title with a `pennant`
+  and the banner count, the countdown or "Knights ride! Armed n of 3", and the finishes owned; the
+  apprentice's Hire button (style `side`, `SIDE_BUTTON`) or a jewel bar (drawn in `hud`) and its
+  pace; the cart's countdown with its `cart` picture (or the ores' time left), or, while it is here,
+  its stay and two `side` buttons for the ores.
 - Bucklers (AN14, `src/game/shields.ts`, `SHIELDS`: Wooden 6, Iron 15, Steel 40, Silver 100, Golden
   240): once `shieldsAbout` (`bestTier >= SHIELD_TIER`, 4) the mode switch (`MODE_BUTTON`, style
   `mode`) calls `toggleShieldMode`; with `shieldMode` on `forge` makes `shield(tier)` (`SHIELD` +
@@ -196,7 +243,7 @@ Implemented today:
   ranks, the Auto Forge switch, the forge mode and best buckler, the standing commission (level,
   made, grand), the open offer (`choosing`), guild stars, perks, the charter, its edict, reputation
   and `won` in `localStorage`.
-- Trophies (`src/trophies/`, `shared/trophies.ts`): nine, listed on the start and pause screens and
+- Trophies (`src/trophies/`, `shared/trophies.ts`): ten, listed on the start and pause screens and
   on the hub (see the file map). The first round earns Masterwork and Open for trade.
 
 Missing or rough:
@@ -204,6 +251,9 @@ Missing or rough:
 - No title screen and no in-game settings (they are on the hub page). No furnace ambience loop.
 - With a long best sword name the top bar's stars slide under the banner, so their star can't be
   tapped; the "Guild perks" link still opens the perks.
+- The tourney, the cart and their timers are not saved, so a reload starts both waits afresh and
+  sends knights away; the ores' time left is saved only with the next save (a forge, merge or
+  sale), and the apprentice's clock starts at 20s on load.
 - `walkedOff` is counted but not saved (its cost is the reputation drop, which is: a walk-off
   saves at once, like a forge, rust or a returning hero). Heroes on
   their way back (`returning`) are not saved either, so a reload loses them.
@@ -244,15 +294,24 @@ File map (`src/`):
   `progressOf`, the sale price rules `fitOf`, `freeStars`, `priceFactor`, `plainPrice`, `orderPrice`,
   `shieldPrice`, `payFor` and `setPay`, and the formulas `forgeMs`, `oreChance`, `autoForging`,
   `gemsAbout`, `gemChance`, `shieldsAbout`, `visitorEveryMs`, `patienceFactor`, `rusts`, `rustMs`,
-  `dull`, `rustLeft`, `trophyFor` and `repairPay`.
+  `dull`, `rustLeft`, `trophyFor` and `repairPay`, and for AN18 to AN20 the `APPRENTICE_*` numbers,
+  `knightPay`, `masterMs`, `apprenticeEvery`, `apprenticeAbout`, `tourneyOpen` and `cartsAbout`.
 - `game/items.ts`: what lies on an anvil as one number (`GEM`, `SET`, `BATTERED`, `MASTER`,
   `SHIELD`, `tierOf`, `isGem`, `isSword`, `isShield`, `isGemmed`, `isBattered`, `isMaster`, `sword`,
   `shield`, `validItem`) and `combine`, the merge, gem-setting and repair rule.
 - `game/sim.ts`: the rules as pure functions on `GameState`: `tick`, `forge`, `toggleShieldMode`,
   `itemAt`, `touch`, `drop`, `standing`, `offers`, `chooseCommission`, `deliverable`, `deliver`, `takes`,
   `sell`, `buy`, `toggleAutoForge`, `buyPerk`, `edictOffers`, `chooseEdict`, `foundCharter`,
-  `hallOffers`, `chooseHall`, `dailyShop` and `useRandom` (the rules' random source), plus
-  the private `random`, `rivalDay`, `rust`, `arrive`, `rollTrait`, `comeBack`, `raiseBest`, `put` and `hammer` (streaks).
+  `hallOffers`, `chooseHall`, `dailyShop`, `useRandom` (the rules' random source), `hold`,
+  `hireApprentice`, `apprenticePair` and `buyOre`, plus the private `random`, `rivalDay`,
+  `tourneyDay`, `arriveKnight`, `apprentice`, `cartDay`, `freeDesk`, `rust`, `arrive`, `rollTrait`, `comeBack`, `raiseBest`, `put` and `hammer` (streaks).
+- `game/tourney.ts`: the tourney's numbers (`TOURNEY_*`, `KNIGHTS`, `KNIGHT_MS`, `KNIGHT_LOOK`,
+  `PURSE`), `lance`, `tourneyTier`, `field`, `placeOf`, `purse`, `Tourney` with `freshTourney`, and
+  the blade finishes (`Finish`, `FINISHES`, `FINISH_IDS`, `BLUED_PAY`, `ETCHED_MASTER`,
+  `GILDED_PRICE`, `hasFinish`, `finishesOf`, `nextFinish`). It imports only `items.ts` and
+  `swords.ts`.
+- `game/cart.ts`: `Ore`, `ORE_IDS`, `ORES`, the cart's numbers (`CART_*`, `ORE_MS`, `SILVER_GEMS`,
+  `STARMETAL_TIER`), `orePrice`, `Cart` with `freshCart`, and `noOres`.
 - `game/charter.ts`: `Edict`, `EDICTS`, `EDICT_IDS`, `edictsFor`, `edictRule`, `Perk`, `PERKS`,
   `PERK_IDS`, `noPerks`, `spentStars`, and the guild halls: `Hall`, `HALLS`, `HALL_IDS`,
   `HALL_TOP`, `JEWELLER_GEMS`, `TAVERN_PATIENCE`, `noHalls` and `hallLevels`.
@@ -269,13 +328,13 @@ File map (`src/`):
 - Every name, blurb and short line in these tables is a `TextKey` of `i18n/en.ts`, which the scene
   shows with `t`; game logic compares ids and tiers, never the texts.
 - `game/save.ts`: `loadProgress`, `saveProgress`, `clearProgress`.
-- `trophies/`: the game's nine trophies (`shared/trophies.ts`). `index.ts` lists them (`trophies`:
+- `trophies/`: the game's ten trophies (`shared/trophies.ts`). `index.ts` lists them (`trophies`:
   id, tier, icon, `hidden` for Smithing dynasty) with their texts in `trophies/i18n/` (`en.ts` and
   `de.ts`: the name keyed by the id, what earns it by `<id>Text`), and imports nothing else from the
   game, since the hub loads it for its trophy shelf. `main.ts` hands `trophies` to `setupGame`.
   `check.ts` holds each trophy's condition (`EARNED`: first sword sold, a Masterwork merge (a
   `merged` event with `master`), a streak of `LONG_STREAK` 5, the first guild star, 100 sold, full
-  reputation, `bestTier` at the Dragonslayer, the Crown Blade (`won` or a charter), and charter
+  reputation, `bestTier` at the Dragonslayer, a tourney banner (`banners` 1), the Crown Blade (`won` or a charter), and charter
   `DYNASTY` 3) and `checkTrophies(state)`, which `GameScene.update` calls every frame after `tick`
   and before `drawEvents` empties the events, so event conditions see the frame's events (pointer
   actions push theirs between frames). The first call after the page loads awards quietly, so a
@@ -290,7 +349,8 @@ File map (`src/`):
   `discoveredCentre`, `DESK` with `deskScale`, `deskBox` and `deskCentre` (all taking the desk
   count), inside a desk `ORDER`, `PATIENCE` and `TAG`, `PERK_LINK`, `DAILY_LINK`, and `WIN` with `tallH`), the
   `FONT` stack (Georgia, serif) and hit tests `slotAt`, `placeAt` (anvil or barrel), `onBanner` and
-  `deskAt`, and `DAILY_LINK`.
+  `deskAt`, `DAILY_LINK`, and the side column's `SIDE`, `TOURNEY_PANE`, `APPRENTICE_PANE`,
+  `CART_PANE` and `SIDE_BUTTON`.
 - `ui/Button.ts`: a leaded-glass caption button (style `forge`, `upgrade`, `row`, `wide` or `mode`,
   textures from `bakeUi`) that fires on `pointerdown` and can be disabled.
 - `art/glass.ts`: the painting kit: `bake` (paints a canvas in art units, twice the view's, at
@@ -306,7 +366,8 @@ File map (`src/`):
   `art/characters.ts`: `adventurer-<look>` (lancet window with a knight, ranger, viking or mage).
   `art/ui.ts`: button, emblem, order card, fit tag, streak tag, banner, pip, star, frame (gold,
   green, banner, barrel), discovered frame, tick, burst, spark, halo, `row-locked`,
-  `barrel`/`barrel-off`, `win-panel` (also the offer window's pane) and `tall-panel` (the perk and
+  `barrel`/`barrel-off`, the side panes `pane-tourney`, `pane-apprentice` and `pane-cart`, the
+  `pennant` and the `cart`, `win-panel` (also the offer window's pane) and `tall-panel` (the perk and
   edict windows) textures.
 
 Shared code the game imports (repo root, outside `src/`): `shared/setupGame.ts` (`setupGame`),
@@ -368,6 +429,9 @@ State model (`src/game/state.ts`):
   (minimum tier), `gem` (wants it gemmed), `trait`, `shield` (0, or the least buckler of a set
   order), `given` (the set's halves handed over), `patienceMs` counting down from `patience`, `look`
   (0 to `LOOKS - 1`) and `returned`. `returning` holds heroes on their way back.
+- `apprentice` and `apprenticeMs`, `banners` and `tourney`, `cart` and `ores` are AN18 to AN20's
+  (see above); `held` is the place the player holds a sword from (the scene calls `hold`), and
+  `Adventurer.knight` marks a tourney knight.
 - `halls` are the guild halls' levels; `rival` the rival smithy's day; `daily` the daily shift
   (null in the player's smithy).
 - `shieldMode` is the forge's mode, `bestShield` the best buckler made; `perks` the bought perks
@@ -395,7 +459,8 @@ State model (`src/game/state.ts`):
 
 Persistence: one key of its own, `anvilheart-progress`, holding `Progress` as JSON (`coins`,
 `slots`, `idle`, `sold`, `bestTier`, `ranks`, `autoForge`, `commission`, `choosing`, `stars`,
-`charter`, `barrel`, `reputation`, `won`, `shieldMode`, `bestShield`, `perks`, `edict`, `halls`). Adventurers
+`charter`, `barrel`, `reputation`, `won`, `shieldMode`, `bestShield`, `perks`, `edict`, `halls`,
+`apprentice`, `banners`, `ores`). Adventurers
 (half sets they hold go back onto empty anvils, or into the coins, in the snapshot), returning
 heroes, heat, the streak and timers are not saved. An old save
 loads with no perks, swords mode and no edict, so a charter past the first asks for its edict. `loadProgress` merges over `freshProgress()`, so a new upgrade id in `ranks`
@@ -405,7 +470,7 @@ won, no idle times, no open offer (its standing commission counts as the quick w
 commission level keeps its meaning for the first three; an old level past them lands on the
 multi-Dragonslayer ones or the win.
 The daily forge's record is `anvilheart-daily` (`shared/daily.ts`: today's try, score, best and
-streak); a daily shift itself is never saved. An old save loads with no halls.
+streak); a daily shift itself is never saved. An old save loads with no halls, no apprentice, no banners and no ores.
 The trophies earned are a second key, `anvilheart-trophies` (`shared/trophies.ts`, each id with
 the time); neither "New smithy" nor a new charter touches it.
 
@@ -420,6 +485,8 @@ Randomness and timing:
   forges the Auto Forge makes in `tick`; per completed `sell` of tier `RETURN_TIER`+, the returning
   roll. The set, gem, trait and returning rolls are skipped in the first round, so its random
   sequence is unchanged.
+- Knights, the tourney, the apprentice and the ore cart draw no random numbers; starmetal still
+  makes the Fine Ore roll, so the sequence holds.
 - Art uses the seeded `rnd()` from `src/art/glass.ts`, not `Math.random`.
 - The streak, Masterworks, commissions, their offers, charters, their edicts (taken in turn),
   perks, rust and reputation add no randomness.
@@ -526,7 +593,12 @@ Effects (`sfx`, plus the shared `ui`):
 | `seal` | a commission offer chosen (`choose`), `edict`, `hall` |
 | `fanfare` + `ui('coin')` / `grumble` | `rivalDay` won / lost |
 | `charter` sting | `dailyEnd` |
-| `buy` | an upgrade, the row or the barrel bought (`buy`), `perk` |
+| `buy` | an upgrade, the row or the barrel bought (`buy`), `perk`, `hired`, `ore` |
+| `clang` at half volume | `apprenticed` |
+| `horn` | `tourneyStart` |
+| `exact` | `armed` (a sword handed to a knight) |
+| `fanfare` + `ui('coin')` / `ui('coin')` / `grumble` | `tourney` won / placed 2nd or 3rd / no prize |
+| `cart` | `cart` (an ore cart stops by) |
 | `ui('click')` | mode switch, Auto Forge on/off, opening the offer, win or perk window, their close links, Keep smithing, New smithy |
 | `ui('refuse')` | a refused forge, buy, perk, charter or offer, a disabled button, a sword dropped where the anvil, crown or buyer won't take it |
 
@@ -557,7 +629,7 @@ Effects (`sfx`, plus the shared `ui`):
   `walkedOff` and `reputation` (55) exact after selling it; and the streak back to 0 within
   `STREAK_MS` + 1s with coins and the commission unchanged; `anvilheart-trophies` then holds exactly
   `firstSale` and `masterwork`, so a trophy a first round can reach in another way changes that
-  expectation. It fails on any page error. The first
+  expectation (Tourney champion needs a Knight's Blade first). It fails on any page error. The first
   round meets none of the later rules: no stars or edict (so prices are unchanged), no trait or set
   on the first order, a tier 2 sale (no returning hero), and under 20s of play (no rust).
 - Its screenshots are `0-forged`, `1-dragging`, `2-merged`, `3-masterwork`, `4-exact-fit` (the

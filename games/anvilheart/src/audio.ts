@@ -132,6 +132,10 @@ export const sfx = sounds({
   fanfare: { wave: 'pulse25', freq: 523, arp: [0, 4, 7, 12, 7, 12], arpStep: 0.08, length: 0.62, volume: 0.26, gap: 300 },
   /** An edict or the crown's offer chosen: a wax seal pressed. */
   seal: { wave: 'triangle', freq: 180, to: 60, length: 0.18, volume: 0.45, gap: 150 },
+  /** Knights ride in for a tourney: a herald's horn call. */
+  horn: { wave: 'pulse25', freq: 392, arp: [0, 0, 7, 12], arpStep: 0.12, length: 0.6, volume: 0.24, gap: 400 },
+  /** An ore cart stops by: a rattle of wheels and a creak. */
+  cart: { wave: 'noise', freq: 600, to: 1400, length: 0.3, volume: 0.22, gap: 400 },
   /** An upgrade, the row, the barrel or a perk bought: a coin blip. */
   buy: { wave: 'square', freq: 660, arp: [0, 7, 12], arpStep: 0.04, length: 0.14, volume: 0.22, gap: 80 },
 });
