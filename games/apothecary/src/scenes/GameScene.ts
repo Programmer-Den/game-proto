@@ -1702,9 +1702,11 @@ export class GameScene extends Phaser.Scene {
       e.stopPropagation();
       if (this.pinching()) return;
       if (this.closePanels()) return;
+      const handed = () => this.state.royal?.wants.reduce((n, w) => n + w.made, 0) ?? 0;
+      const before = handed();
       const feedback = deliverToRoyal(this.state);
       if (this.state.royal?.done) sfx('cascade');
-      else if (feedback && this.state.royal?.wants.some((w) => w.made > 0)) ui('coin');
+      else if (feedback && handed() > before) ui('coin');
       else ui('refuse');
       if (feedback) this.showFeedback(feedback);
     });

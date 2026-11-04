@@ -91,7 +91,7 @@ Implemented today:
   each); too early or late it gets away. Walking, rolling or being hurt ends it (`endFishing`); the
   hookvine, bellseeds and the horn wait until the line is in. Water on a map with no `fish`
   (`fishless`) answers act or a tap with the `fishNone` toast (`noFish`), except on the
-  Brinewyrm's pool while it is about (`brinePool`), so a swing or tap at it there still reaches it. Campfires (`campfire` props in the village, fen, peaks and coast) open
+  Brinewyrm's pool while it is about (`brinePool`), so a swing at it there still reaches it (a tap on the pool does nothing, as before). Campfires (`campfire` props in the village, fen, peaks and coast) open
   `openCook`, a `Hud.showShop` card of `MEALS` (`state.ts`): each takes two of one fish, `cook`
   eats it and heals fully. One meal at a time (`state.meal`) until the next fall (`endMeal`):
   `stew` one more heart (`maxHp` + 2), `skewer` a faster roll (`SKEWER`), `chowder` a longer

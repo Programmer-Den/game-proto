@@ -52,7 +52,7 @@ Implemented today:
   `swat`; a harvest of its cell sends it off empty-handed; Guard Bees (`ranks.guards`) drive it off
   as it lands. Not saved.
 - Brood cells: `BroodCell` (`type: 'brood'`, `hatchMs`) holds no nectar, hatches a bee every
-  `BROOD_MS` (45s) while there are fewer than `maxBees` (`MAX_BEES` per hive) and it is not winter, and counts for the comb bonus. The Brood
+  `BROOD_MS` (45s) while the estate has fewer than `maxBees` and its own hive fewer than `MAX_BEES` (so a pair never holds more than two rows at the entrance) and it is not winter, and counts for the comb bonus. The Brood
   cell shop button arms `placing` in the scene; the next tap on an empty spot calls `buildBrood`
   (price `broodPrice`: `cellPrice` plus `BROOD_EXTRA`, 30). Bees are no longer bought.
 - Wax: `harvest` adds one to `wax`; `withWax` lets wax pay `WAX_COINS` (3) each for up to half of
