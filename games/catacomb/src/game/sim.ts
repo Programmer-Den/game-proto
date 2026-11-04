@@ -735,7 +735,10 @@ function grantRelic(s: GameState) {
 export function descend(s: GameState) {
   if (s.phase !== 'descend') return false;
   s.act++;
-  s.rooms = makeMap(s.act, s.weekly ? WEEKLY_MUTATORS : undefined);
+  // A seeded run's next map comes from its own key, so it is the same for everyone whatever happened in the act before.
+  const key = seedKey(s);
+  const mutators = s.weekly ? WEEKLY_MUTATORS : undefined;
+  s.rooms = key ? withRandom(keyedRand(`${key}:map:${s.act}`), () => makeMap(s.act, mutators)) : makeMap(s.act, mutators);
   s.at = null;
   s.cleared = [];
   const healed = heal(s, restHeal(s));

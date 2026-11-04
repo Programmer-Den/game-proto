@@ -610,7 +610,11 @@ export class GameScene extends Phaser.Scene {
       else if (code === 'Escape' || code === 'Space' || code === 'Enter' || code === 'KeyN') this.hud.closeShop();
       return;
     }
-    if (this.hud.pageOpen && ['ArrowLeft', 'ArrowRight', 'KeyA', 'KeyD', 'Tab'].includes(code)) return this.turnPage();
+    if (this.hud.pageOpen && ['ArrowLeft', 'ArrowRight', 'KeyA', 'KeyD', 'Tab'].includes(code)) {
+      // Tab would also move the browser's focus onto a corner button, which Space or Enter then presses.
+      if (code === 'Tab') e.preventDefault();
+      return this.turnPage();
+    }
     if (code === 'KeyN' || (this.hud.pageOpen && (code === 'Escape' || code === 'Space' || code === 'Enter'))) return this.toggleStones();
     if (this.hud.covered || this.fading) return;
     if (this.dialog) {
@@ -702,6 +706,7 @@ export class GameScene extends Phaser.Scene {
     if (buried && s.items.sword) return this.goTo({ kind: 'dig', tx, ty }, tx, ty, true);
     if (this.map.props.some((p) => p.kind === 'campfire' && p.x === tx && p.y === ty)) return this.goTo({ kind: 'cook', tx, ty }, tx, ty);
     if (this.fishable(tx, ty)) return this.goTo({ kind: 'fish', tx, ty }, tx, ty);
+    if (this.fishless(tx, ty)) return this.noFish();
     this.target = null;
     this.walkTo(tx, ty);
   }
@@ -773,6 +778,7 @@ export class GameScene extends Phaser.Scene {
     // Facing water with the rod, the knight casts, unless a foe is close enough to swing at.
     const foeNear = this.foes.some((f) => f.alive && Math.hypot(f.x - (s.x + d.x * SWING_REACH), f.y - s.y - d.y * SWING_REACH) < 44);
     if (this.fishable(tx, ty) && !foeNear) return this.startFishing(tx, ty);
+    if (this.fishless(tx, ty) && !foeNear) return this.noFish();
     this.startSwing();
   }
 
@@ -1384,6 +1390,8 @@ export class GameScene extends Phaser.Scene {
   private startRoll() {
     const s = this.state;
     if (this.roll || this.rollCd > 0 || this.hook) return;
+    // Rolling away pulls the line in, like walking off.
+    if (this.fishing) this.endFishing();
     const mv = this.moveInput();
     const d = mv.x || mv.y ? mv : DIRS[s.facing];
     const len = Math.hypot(d.x, d.y) || 1;
@@ -1566,6 +1574,16 @@ export class GameScene extends Phaser.Scene {
   /** Whether the knight can cast into a tile: water on a map with fish, with the rod. */
   private fishable(tx: number, ty: number) {
     return this.state.items.rod && !!this.map.fish && tileAt(this.map, tx, ty) === 'water';
+  }
+
+  /** Water the rod could cast into, on a map whose water holds no fish. */
+  private fishless(tx: number, ty: number) {
+    return this.state.items.rod && !this.map.fish && tileAt(this.map, tx, ty) === 'water';
+  }
+
+  private noFish() {
+    ui('refuse');
+    this.hud.toast(t('fishNone'));
   }
 
   /** Casts into the water tile: a bite comes after a while, and must be pulled in time. */

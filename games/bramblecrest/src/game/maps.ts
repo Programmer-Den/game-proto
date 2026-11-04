@@ -573,6 +573,8 @@ function coast(): MapDef {
   b.scatter('tree', 10, { x: 2, y: 2, w: 10, h: 4 }, 51, 'grass', 1);
   b.scatter('tree', 14, { x: 2, y: 16, w: 26, h: 8 }, 52, 'grass', 1);
   b.scatter('reeds', 30, { x: 2, y: 8, w: 30, h: 16 }, 53, 'grass', 0);
+  // Pines close the strip west of the inlet, so the only way north is over the drained channel.
+  b.rect(2, 6, 10, 2, 'tree');
   d.enemies.push(
     { kind: 'crab', x: 14, y: 19 }, { kind: 'crab', x: 25, y: 20 }, { kind: 'crab', x: 29, y: 11 },
     { kind: 'gull', x: 9, y: 20 }, { kind: 'gull', x: 26, y: 17 }, { kind: 'gull', x: 23, y: 3 },
