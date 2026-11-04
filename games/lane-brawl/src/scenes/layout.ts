@@ -80,18 +80,22 @@ export function buffChip(i: number) {
   return { x: SCREEN.w - 222, y: 40 + i * 24, w: 212, h: 20 };
 }
 
-/** The fifteen champion cards on the pick screen, in three rows of five. */
-export const PICK_CARD = { w: 168, h: 114, gap: 8, y: 76 };
-export function pickCard(i: number) {
-  const total = 5 * PICK_CARD.w + 4 * PICK_CARD.gap;
-  const col = i % 5;
-  const row = Math.floor(i / 5);
+/** The seventeen champion cards on the pick screen, in rows of six (the last row of five centred). */
+export const PICK_CARD = { w: 146, h: 114, gap: 8, y: 76, cols: 6 };
+export function pickCard(i: number, n = 17) {
+  const cols = PICK_CARD.cols;
+  const row = Math.floor(i / cols);
+  const inRow = Math.min(cols, n - row * cols);
+  const total = inRow * PICK_CARD.w + (inRow - 1) * PICK_CARD.gap;
+  const col = i % cols;
   return { x: (SCREEN.w - total) / 2 + col * (PICK_CARD.w + PICK_CARD.gap), y: FRAME.y + PICK_CARD.y + row * (PICK_CARD.h + PICK_CARD.gap), w: PICK_CARD.w, h: PICK_CARD.h };
 }
 /** The battle spell button on the pick screen, under the champion cards: a click picks the next spell. */
-export const SPELL_PICK = { x: 214, y: 484, w: 280, h: 20 };
-/** Beside it, the match kind: a click switches between a full and a quick match. */
-export const MODE_PICK = { x: 506, y: 484, w: 240, h: 20 };
+export const SPELL_PICK = { x: 112, y: 484, w: 260, h: 20 };
+/** Beside it, the match kind: a click steps through full, quick, ranked and the week's event. */
+export const MODE_PICK = { x: 380, y: 484, w: 280, h: 20 };
+/** Then the champion's colours won on the ranked ladder: a click wears the next. */
+export const SKIN_PICK = { x: 668, y: 484, w: 180, h: 20 };
 
 /** The buffs the player's champion carries, as chips in a row above the portrait. */
 export function buffStrip(i: number) {
@@ -126,8 +130,9 @@ export function fitLayout(w: number, h: number) {
   RECALL_BUTTON.x = 530 + dx / 2;
   SCORE_CHIP.x = 380 + dx / 2;
   SPELL_BUTTON.x = 654 + dx / 2;
-  Object.assign(SPELL_PICK, { x: 214 + dx / 2, y: 484 + dy / 2 });
-  Object.assign(MODE_PICK, { x: 506 + dx / 2, y: 484 + dy / 2 });
+  Object.assign(SPELL_PICK, { x: 112 + dx / 2, y: 484 + dy / 2 });
+  Object.assign(MODE_PICK, { x: 380 + dx / 2, y: 484 + dy / 2 });
+  Object.assign(SKIN_PICK, { x: 668 + dx / 2, y: 484 + dy / 2 });
   Object.assign(SCORE_PANEL, { x: 100 + dx / 2, y: 38 + dy / 2 });
   Object.assign(SHOP_PANEL, { x: 100 + dx / 2, y: 38 + dy / 2 });
   Object.assign(END_PANEL, { x: 200 + dx / 2, y: 60 + dy / 2 });

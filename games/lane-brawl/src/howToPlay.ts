@@ -37,12 +37,15 @@ const en: HowToPlay = {
     'Standing inside the ring round your own Nexus heals you quickly.',
     'Clear the sellswords camped by a lane and they march down it for your team.',
     'The first kill of the match pays extra, and until 5:00 hitting an outer tower breaks gold plates off it.',
-    'Short on time? Switch the pick screen to a quick match: three a side on one lane, about ten minutes.',
+    'Short on time? Switch the pick screen\'s match button to a quick match: three a side on one lane, about ten minutes.',
     'A team that falls behind gets more for each kill, and from 15:00 the scoreboard lets you call a surrender vote.',
     'At night everyone sees less far, so the tall grass is the place for an ambush.',
     'From 2:30 a drake wakes in the river: each one your team slays gives all of you a lasting bonus, and the fourth doubles them.',
     'From 2:00, every two minutes two runes appear on the river: walk over one for more damage, speed, healing or gold.',
     'Stone walls line the lanes, and the jungle is forest you can only cross on its paths: walk through a gap in the wall. Click anywhere and your champion finds the way.',
+    'Ranked matches climb a ladder from Bronze to Champion: a win adds a star, three stars move you up a tier, and red plays smarter at each one. Every tier you reach wins your champion a new outfit.',
+    'Each week brings an event match with a rule of its own: all ten champions in mid, double gold, or sudden death at 12:00.',
+    'Two more champions, the Falconer and the Alchemist, join once you earn mastery ranks with the others.',
   ],
 };
 
@@ -87,6 +90,9 @@ const de: HowToPlay = {
     'Ab 2:30 erwacht ein Drache im Fluss: Jeder, den dein Team erschlägt, gibt euch allen einen bleibenden Bonus, und der vierte verdoppelt sie.',
     'Ab 2:00 erscheinen alle zwei Minuten zwei Runen am Fluss: Lauf über eine für mehr Schaden, Tempo, Heilung oder Gold.',
     'Steinmauern säumen die Lanes, und den Dschungel durchquerst du nur auf seinen Pfaden: Geh durch eine Lücke in der Mauer. Klick irgendwohin, und dein Champion findet den Weg.',
+    'Ranglistenmatches führen von Bronze bis Champion: Ein Sieg bringt einen Stern, drei Sterne eine Stufe höher, und Rot spielt auf jeder Stufe klüger. Jede erreichte Stufe schenkt deinem Champion ein neues Gewand.',
+    'Jede Woche gibt es ein Ereignismatch mit eigener Regel: alle zehn Champions in der Mitte, doppeltes Gold oder plötzlicher Tod ab 12:00.',
+    'Zwei weitere Champions, die Falknerin und die Alchemistin, kommen hinzu, sobald du Meisterränge mit den anderen sammelst.',
   ],
 };
 

@@ -54,8 +54,8 @@ const MAP_BOTTOM = 412;
 const OBJECTIVE_CARD = { x: 10, y: 42, w: 236, h: 62 };
 /** The first upgrade card in the bottom bar (the centre of layout.ts upgradeCard(0)). */
 const UPGRADE_CARD_1 = { x: 698, y: 461 };
-/** The Warden's card on the pick screen (its centre). */
-const WARDEN_CARD = { x: 120, y: 133 };
+/** The Warden's card on the pick screen (its centre: layout.ts pickCard(0), six cards a row). */
+const WARDEN_CARD = { x: 95, y: 133 };
 /** The Long Sword's row in the shop, opened from the B key. */
 const SWORD_ROW = { x: 202, y: 146 };
 /** The first red tower on the middle lane. */
@@ -92,9 +92,10 @@ function scene(page: Page) {
 test('plays the first round', async ({ page }, testInfo) => {
   // Seeded like the other games' tests, so the rosters repeat: the seed is picked so blue fields the
   // Harpooner, Tinker, Mage and Archer and red the Stalker, Wolfkin, Bruin, Blade and Berserker,
-  // the line-up this round was tuned with.
+  // the line-up this round was tuned with. The two champions unlocked by mastery stay out of the
+  // rosters with no save, so the shuffle is the same as before them.
   await page.addInitScript(() => {
-    let seed = -1266694543;
+    let seed = -1172448146;
     Math.random = () => {
       seed = (seed + 0x6d2b79f5) | 0;
       let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);

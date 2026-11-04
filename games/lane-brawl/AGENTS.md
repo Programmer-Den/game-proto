@@ -8,8 +8,8 @@ the game, per the root AGENTS.md.
 
 Lane Brawl is a single-player MOBA on one 3500x3500 square map with three lanes, a river, towers,
 inhibitors, minion waves, a jungle of twelve camps, watchstones, a guardian beast, tall grass, fog of
-war, two Nexuses, five champions a side and a shop. The player picks one of fifteen champion classes,
-from medieval fantasy to steampunk and beasts,
+war, two Nexuses, five champions a side and a shop. The player picks one of seventeen champion classes
+(two unlocked by mastery), from medieval fantasy to steampunk and beasts,
 and fights with four AI allies against five AI champions on red. Each class is played by one named
 champion with a story (`hero`, `title`, `motive` in `CHAMPIONS`), the same in every match. The art is toon low-poly 3D: every unit is a small mesh built in code and rendered at boot by a
 software renderer into sprite frames, in three cel bands with a dark ink outline, and each champion
@@ -17,10 +17,14 @@ has an oversized hero head and a prop from their story; there are no image asset
 
 Implemented today:
 
-- Pick screen with the fifteen classes in three rows of five cards (3D figure, the champion's name,
-  class and role, passive), two lines under them for the card under the pointer (`hoverPick`): the
-  champion's name, title, class, blurb and story perk, then their motive; with no card under the pointer, the
-  setting in one line. Then one match.
+- Pick screen with the seventeen classes in rows of six cards, the last row of five centred
+  (`pickCard(i, n)`; 3D figure, the champion's name, class and role, passive; a locked class's card
+  shows its figure dark, a padlock and what unlocks it), two lines under them for the card under the
+  pointer (`hoverPick`): the champion's name, title, class, blurb and story perk, then their motive;
+  with no card under the pointer, the setting in one line. Three buttons under them: the battle
+  spell (`SPELL_PICK`), the match kind (`MODE_PICK`) and the colours (`SKIN_PICK`); hovering one puts
+  what it means in the two lines. `fit` shrinks a text to its card or button where German runs long.
+  Then one match.
 - Map (`WORLD` 3500x3500): every spot on it (Nexuses, lanes, towers, inhibitors, the river, camps,
   watchstones, bushes, runes, ward spots, the beast's and the drake's pits, the ruins and the jungle's paths) is
   written at the first 2800x2800 layout and scaled by `MAP_SCALE` (1.25) with `at` in `data.ts`.
@@ -34,8 +38,9 @@ Implemented today:
   (`RIVER`, top left to bottom right, crossing the middle lane), twelve camps (`CAMPS`), three
   watchstones on river islands (`WATCHSTONES`), the beast's pit by the river (`BEAST`), eighteen
   bushes (`BUSHES`), four ruins (painted only) and minion waves every 25 s (three per lane per team).
-- Champions: fifteen classes (`CHAMPIONS`): ten medieval (Warden to Lancer) and five steampunk or
-  beast (Gunslinger, Automaton, Tinker, Wolfkin, Bruin), each with a passive (`PassiveDef`: `tough`, `critEvery` and
+- Champions: seventeen classes (`CHAMPIONS`): ten medieval (Warden to Lancer), five steampunk or
+  beast (Gunslinger, Automaton, Tinker, Wolfkin, Bruin) and the two unlockable ones last (Falconer,
+  Alchemist), each with a passive (`PassiveDef`: `tough`, `critEvery` and
   `critMult`, `haste`, `spellpower`, `aura`, `lifesteal`, `regen`, `slowHit`, `ambush`, `splash`)
   and Q, W, E, R. Abilities are data: `burst` (around a point or the caster, with optional `knock`),
   `bolt` (projectiles, optionally piercing, with optional `pull` or `executeBelow`), `dash` (move,
@@ -54,6 +59,44 @@ Implemented today:
   The setting (the Contest of Kessmoor) and each champion's story are in the README; ability,
   passive and upgrade names follow the stories, while ids (`wide-slam` and so on) keep the old
   names. Every name and line of a champion is a text key (see Languages below).
+- New champions (LB16): the Falconer (Bryn Talonmere, a marksman whose falcon is her Q bolt, W zone
+  and R burst) and the Alchemist (Ottilie Brassvial, a support with an acid zone, a heal and shield,
+  a stealth smoke bomb and a big slowing burst) sit last in `CHAMPIONS`. `UNLOCKS` in `data.ts` gives
+  each the mastery ranks it needs, summed over the other classes (`ranksBesides`, `isUnlocked` in
+  `mastery.ts`). A locked class can't be picked (its card plays `refuse`) and stays out of the
+  rosters: `startMatch` hands `createGame` the unlocked classes as `MatchOptions.pool` (every class
+  when watching), so with no save the shuffle is the old fifteen's and the playthrough's roster
+  holds. The end panel names a champion a win unlocks (`unlockedNow`) with the `promote` sound.
+- Ranked ladder (LB15): `TIERS` (Bronze to Champion), `LADDER.stars` (3) and `RANKED_AI` in
+  `data.ts`; `game/ladder.ts` keeps the ladder under the save key `lane-brawl-ladder` (`loadLadder`,
+  `climb`, `recordRanked`: JSON `{ tier, stars, best, wins, losses }`, every read and write in
+  try/catch). A win adds a star, `LADDER.stars` move up a tier; a loss takes a star, or at none
+  drops a tier to `stars - 1` (not below Bronze). A ranked match is a full one with
+  `MatchOptions.ranked` set to the tier: `s.ranked` and `s.aiTier`. `smarts(s, u)` in `sim.ts` is the
+  tier for red's units and 0 for everyone else, and scales red's AI: `castAi`'s gap, `RETREAT.hp`,
+  the flask's threshold and `SPELL_AI.from` per tier; from `focusFrom` `aiAct` targets the weakest
+  champion in reach (`weakest`), from `pairFrom` `updateGanks` sends red's two nearest hunters.
+  The end panel records the match once (`ladderResult`) and words it (`ladderUp`, `ladderPromoted`
+  and so on, with stars from `starText`). Colours: `SKINS` (the team's blue, then one per tier, its
+  `cloth`); `skinsWon` gives Bronze's after the first ranked win and each tier's once `best` reached
+  it, and the one worn is kept under `lane-brawl-skin` (`loadSkin`, `saveSkin`). `startMatch` bakes
+  the player's champion in it (`bakeChampions` with `skin`, sheet `champKey(id, 'skin-<id>')`,
+  `championModel` with a hex cloth), used for its sprite and the portrait. A chip under the top bar
+  shows the tier during the match.
+- Event matches (LB17): `EVENTS`, `eventOfWeek(ms)` and `weekEnds(ms)` in `data.ts` (weeks start on
+  Monday UTC; the three rules take turns), read by the scene from `Date.now()` on the pick screen
+  (`readWeek`), never by the rules. `MatchOptions.event` sets `s.event`: `allMid` plays on
+  `QUICK.lanes` with all ten champions there and `ALL_MID.hp` times the structures' health;
+  `doubleGold` sets `s.goldMult` to `DOUBLE_GOLD`, which `earn(s, u, gold)` (every gold gain but the
+  player's streak last hits, which multiply it themselves) and passive gold in `countDown` apply;
+  `suddenDeath` sets `s.suddenDeath` at `SUDDEN_DEATH.at` (a notice and the `suddenDeath` sound):
+  champions that fall get `respawnAt` Infinity, `buyBack` refuses, `invulnerable` lifts the Nexus
+  wards, and `checkWipe` ends the match for the team with every champion down for good
+  (`s.wipedOut`, worded on the end panel). `announceEvent` puts the rule in a notice at the start,
+  and the chip under the top bar names it (or counts down to sudden death).
+- The match kind: `MatchMode` (`full`, `quick`, `ranked`, `event`) in `spellChoice.ts`, stepped by
+  `nextMode` and kept under the save key `lane-brawl-mode` (`loadMode`, `saveMode`; an older
+  `lane-brawl-quick` pick still counts).
 - Languages: every text on screen is in British English, US English or German, following the hub's
   Language setting (`?lang=de` for a quick look). `CHAMPIONS`, `ITEMS`, `UPGRADES`, `CAMP_KINDS`
   and `BUFFS` hold text keys of `i18n/en.ts` instead of texts (roles too, so `AI_BUILD_FOR` is
@@ -428,7 +471,8 @@ Missing or rough:
 
 - Paths are found round the forest only; towers, pillars and stones are slid round one step at a
   time (`steer`), which their spacing keeps clear of pockets.
-- No title screen of its own. The only saves are class mastery and the battle spell (below).
+- No title screen of its own. The saves are class mastery, the ladder and colours, and the battle
+  spell and match kind (below).
 - Bushes hide champions only, not minions. The camera follows the player's champion.
 - AI champions use bushes only to wait in on a gank, and ward only the fixed `WARD_SPOTS` and bush
   centres.
@@ -469,7 +513,7 @@ File map (`src/`):
   live in the same map).
 - `scenes/skillFx.ts`: every ability's look (see "Skill looks" above): `drawSkill`, `skillMs`,
   `drawProjectile`, `drawZone` and `drawAura`, with small shape helpers. No game rules.
-- `scenes/layout.ts`: screen rectangles for the bars, the objective card, the streak chip, the
+- `scenes/layout.ts`: screen rectangles for the bars, the pick screen's cards and three buttons (`pickCard`, `SPELL_PICK`, `MODE_PICK`, `SKIN_PICK`), the objective card, the streak chip, the
   ability boxes, the upgrade panel and cards (`upgradeCard`), the shop, the kill score and scoreboard (`SCORE_CHIP`, `SCORE_PANEL`), the minimap, the pick cards
   and the end panel, plus `VIEW` (the designed 960x540), `SCREEN` (the view actually shown),
   `FRAME` (the designed rectangle's corner in it), `fitLayout` and `FONT` (a system font stack).
@@ -498,7 +542,9 @@ File map (`src/`):
   half-ice crystal, Maren's sun disc, Torvik's wrist chains (`chainLinks`), Morrow's whale tooth,
   Gwyth's moths and moss, Kaida's watchstone charm, Liora's plume and swallow-tail pennant, Rook's
   bandolier, AX-9's aether core, Winnie's lightning rod and copper gauntlets, Fenra's moon mark and
-  arm band, and Grumm's oak sapling and honey pot. Also
+  arm band, and Grumm's oak sapling and honey pot; the Falconer's green cap and feather, lure and
+  glove with the falcon on her shoulder, and the Alchemist's top hat, goggles, still, apron, vial
+  bandolier and two flasks. Also
   `wolfModel`, `bruteModel` (ember or moss), `watchstoneModel` (per side or neutral) and
   `ruinModel`. `classPose`
   gives the joint angles for `idle`, the walk `w0`..`w3`, the attack `a0` (wind-up) and `a1`
@@ -527,9 +573,11 @@ File map (`src/`):
   pines and rocks, from a fixed seed; then the beast's pit and the bushes (tall faceted grass).
 - `trophies/`: the trophy list (`index.ts`), its texts (`i18n/`) and the conditions (`check.ts`).
 - `game/names.ts`: `shortName`, a champion's first name from its full name.
-- `game/spellChoice.ts`: the player's battle spell and match kind, the save keys `lane-brawl-spell` (`loadSpell`, `saveSpell`) and `lane-brawl-quick` (`loadQuick`, `saveQuick`).
+- `game/spellChoice.ts`: the player's battle spell and match kind, the save keys `lane-brawl-spell` (`loadSpell`, `saveSpell`) and `lane-brawl-mode` (`loadMode`, `saveMode`; `lane-brawl-quick`, `loadQuick`, is the older quick pick).
 - `game/mastery.ts`: class mastery, the save key `lane-brawl-mastery` (`loadMastery`, `recordWin`,
-  `masteryRank`).
+  `masteryRank`), and the unlocks (`ranksBesides`, `isUnlocked`).
+- `game/ladder.ts`: the ranked ladder and colours, the save keys `lane-brawl-ladder` (`loadLadder`,
+  `climb`, `recordRanked`, `skinsWon`, `starText`) and `lane-brawl-skin` (`loadSkin`, `saveSkin`).
 - `game/terrain.ts`: the map's forest and paths (`JUNGLE_PATHS`, `PATHS`, `clearance`, `route`, `clearLine`), its obstacles (`SCENERY`, `OBSTACLES`, `SOLID`) and `steer`, `settle`, `blockedBy`; `art/map.ts` takes the lane and clearing helpers, the paths, the field and the scenery from it.
 - `game/data.ts`: plain data, with text keys for names and texts. `MAP_SCALE`, `at`, `WORLD`, `LANES`, `BASE`, `TOWERS`, `RIVER`, `CAMPS`, `CAMP_KINDS`,
   `PUPS`, `SIGHT`, `WATCHSTONES`, `WATCH`, `BUFFS`, `JUNGLE`, `KITE`, the balance constants (`TOWER`,
@@ -700,6 +748,8 @@ Effects (`sfx`), where they are raised:
 | `firstBlood`, `plate` | the first champion kill (`kill`), a tower plate breaks (`breakPlates`) |
 | `nightfall` / `daybreak` | night falls / day breaks (`tick`) |
 | `comeback`, `vote` | the player's kill pays a comeback bounty (`kill`), the player calls a surrender vote (`callSurrender`) |
+| `suddenDeath` | sudden death begins in a `suddenDeath` event (`tick`) |
+| `promote` | the end panel: a ranked tier or colours won, or a champion unlocked (the scene) |
 | `objective` / `objectiveMissed` | the player's objective done / missed (`updateObjective`) |
 
 Shared `ui` sounds: `click` for the Shop button, B and Play again; `coin` for a purchase;
@@ -725,12 +775,12 @@ Shared `ui` sounds: `click` for the Shop button, B and Play again; `coin` for a 
   through JSON) and its `cameras.main.worldView` (not `scrollX/Y`, which differ once `renderScale` zooms the camera),
   to turn world positions into view pixels. `e2e/screens.spec.ts` at the root opens the game on
   five screens.
-- Inputs: it clicks the Warden's card at the pick screen (top left of the fifteen), presses B, clicks the Long Sword's card (T, V and X are never pressed),
+- Inputs: it clicks the Warden's card at the pick screen (top left of the seventeen), presses B, clicks the Long Sword's card (T, V and X are never pressed),
   clicks the ground and the red tower, presses Q (down and up: abilities cast on the key's release), clicks the camp the second objective marks, clicks
   gold-outlined minions (`lastHitMark`) and clicks the first upgrade card. Clicks go to the canvas
   through the bounding box, never on the objective card (it blocks clicks).
 - The test mirrors these, so change them together: the card, shop row, tower, objective card and
-  upgrade card coordinates in `playthrough.spec.ts` (`WARDEN_CARD` (120, 133), `SWORD_ROW`,
+  upgrade card coordinates in `playthrough.spec.ts` (`WARDEN_CARD` (95, 133), `SWORD_ROW`,
   `RED_MID_TOWER` (1793, 1007), `OBJECTIVE_CARD`, `UPGRADE_CARD_1`) against `layout.ts` and
   `TOWERS`, `TOWER_REACH` against `TOWER.range`, `CAMP_GOLD` against `CAMP_KINDS`, the Warden's
   stats and Gatefall (Q) radius (`CHAMPIONS`), the Long Sword cost and damage (`ITEMS`), the first two
@@ -739,9 +789,14 @@ Shared `ui` sounds: `click` for the Shop button, B and Play again; `coin` for a 
   the Warden's level 2 `UPGRADES` pair (`wide-slam`, `stun-slam`), and the 240 s game-time budget.
 - The seed in `addInitScript` is picked so the shuffle in `createGame` fields Harpooner, Tinker,
   Mage and Archer on blue and Stalker, Wolfkin, Bruin, Blade and Berserker on red, the roster the
-  round was tuned with (about 2100 `Math.random` calls come before the shuffle in the browser).
-  Anything that adds or removes draws before the shuffle (a new text on the pick screen too: each Phaser text draws for its texture key), or a sixteenth class, changes the roster:
-  pick a new seed by replaying the generator and the shuffle in node, or re-tune the round.
+  round was tuned with (2388 `Math.random` calls come before the shuffle in the browser). With no
+  save the Falconer and Alchemist are locked and out of the pool, so the shuffle sees the old
+  fifteen. Anything that adds or removes draws before the shuffle (a new text on the pick screen
+  too: each Phaser text draws for its texture key) shifts the roster. The generator's state only
+  steps by `0x6d2b79f5` a draw, so d more draws are undone by starting d steps earlier: count the
+  draws before the shuffle in the old and the new build (a counter in the init script, read when
+  `createGame` starts shuffling) and set the seed to `(old - Math.imul(d, 0x6d2b79f5)) | 0`. A new
+  class in the pool changes the shuffle itself: pick a seed by replaying it in node, or re-tune.
 - It asserts the first objective and its target (title key `objTowerMid`, so it passes in any
   language), the objective paid and the siege banner after
   the tower falls, the camp objective, at least one last hit and a streak, level 2's offer, and

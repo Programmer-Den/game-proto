@@ -1,4 +1,4 @@
-// The low-poly models of Lane Brawl: fifteen champions, minions, the jungle's boar, wolves and brutes,
+// The low-poly models of Lane Brawl: seventeen champions, minions, the jungle's boar, wolves and brutes,
 // the guardian beast, towers, the Nexus, watchstones, pines and rocks. Each builder returns a fresh `Model` for one pose; `bake.ts` renders them into
 // sprite frames from eight directions. Units: one model unit is one screen pixel.
 
@@ -74,7 +74,9 @@ type ChampId =
   | 'automaton'
   | 'tinker'
   | 'wolfkin'
-  | 'bruin';
+  | 'bruin'
+  | 'falconer'
+  | 'alchemist';
 
 /** Attack and cast poses differ by class: a hammer swings, a bow draws, a staff points. */
 function classPose(id: ChampId | 'minion', name: PoseName): Pose {
@@ -139,6 +141,8 @@ function classPose(id: ChampId | 'minion', name: PoseName): Pose {
     case 'priest':
     case 'witch':
     case 'tinker':
+    case 'falconer':
+    case 'alchemist':
       p.armR = wind ? 2.4 : 1.45;
       p.armL = wind ? 0.6 : 1.1;
       p.lean = wind ? -0.06 : 0.12;
@@ -855,11 +859,115 @@ const KITS: Record<ChampId, (cloth: RGB) => Kit> = {
       leftHand: claw,
     };
   },
+  falconer: (cloth) => {
+    const tan = rgb('#c9a46a');
+    const hat = rgb('#3f6b3a');
+    const plume = rgb('#8a5d36');
+    const falcon = (md: Model) => {
+      // A falcon perched on the glove: a brown body, pale breast, hooked beak and folded wings.
+      ico(md, 3.4, plume);
+      md.at(T(0, 0.4, 1.8), () => ico(md, 2.4, CREAM));
+      md.at(T(0, 4.4, 0.6), () => {
+        ico(md, 2.3, plume);
+        md.at(T(0, -0.4, 2), () => gem(md, 0.8, -0.6, 0, 1.8, 4, GOLD, 0.2, 0));
+        for (const side of [-1, 1]) box(md, side * 1.3 - 0.4, 0.2, 1.6, side * 1.3 + 0.4, 0.9, 2.1, EYE);
+      });
+      for (const side of [-1, 1]) md.at(chain(T(side * 2.6, 0.5, -1), Rz(side * 0.3)), () => slab(md, [[0, 2], [1.2, 0], [0.6, -6], [-0.6, -4]], -0.5, 0.5, rgb('#6b4a2e')));
+      md.at(T(0, -2.6, -2.6), () => slab(md, [[-1.4, 0], [1.4, 0], [0.8, -4], [-0.8, -4]], -0.4, 0.4, rgb('#6b4a2e')));
+    };
+    return {
+      cloth,
+      accent: tan,
+      robe: false,
+      heavy: false,
+      head: (md) => {
+        // Auburn hair in a tail, and a green hunting cap with a long white feather.
+        md.at(chain(T(0, 0, -0.8), Rx(-0.25)), () => prism(md, 6.9, 5, 1.6, 6.4, 8, rgb('#a0522d'), Math.PI / 8));
+        md.at(chain(T(0, -1, -6), Rx(-0.4)), () => prism(md, 1.8, 1.2, -7, 0, 6, rgb('#a0522d')));
+        prism(md, 6.2, 4.6, 4.2, 9, 8, hat, Math.PI / 8);
+        box(md, -4.6, 4, 3.2, 4.6, 4.8, 8.4, hat);
+        md.at(chain(T(-4, 7, -1), Rz(0.6), Rx(-0.5)), () => slab(md, [[0, 0], [1.4, 3], [0.8, 13], [-0.6, 4]], -0.4, 0.4, rgb('#e8e2d0')));
+      },
+      back: (md) => {
+        // A short cloak, and a pouch of lures at the hip.
+        md.at(chain(T(0, 32, -4.3), Rx(-0.12)), () => slab(md, [[-8, 0], [8, 0], [7, -15], [0, -17], [-7, -15]], -1, 0, tan));
+        md.at(T(-6, 15, 2), () => box(md, -1.8, -3, -1.6, 1.8, 2, 1.6, LEATHER));
+      },
+      over: (md) => {
+        // A leather baldric, with the royal mews' falcon badge in gold.
+        md.at(chain(T(0, 25, 4.3), Rz(0.75)), () => box(md, -1.2, -10, 0, 1.2, 10, 1, LEATHER));
+        md.at(chain(T(-3, 27, 5.2), Rx(Math.PI / 2)), () => prism(md, 1.8, 1.8, -0.4, 0.4, 6, GOLD, 0));
+        // The falcon perched on her left shoulder, on a leather pad.
+        md.at(T(10, 34, 0), () => {
+          box(md, -2.8, -0.6, -2.6, 2.8, 0.8, 2.6, rgb('#b8864e'));
+          md.at(chain(T(0, 3.6, 0), S(1.25)), () => falcon(md));
+        });
+      },
+      rightHand: (md, arm) => {
+        // A lure on a cord: a leather pad with two feathers.
+        md.at(upright(arm, 0.3), () => {
+          box(md, -0.3, 0, -0.3, 0.3, 8, 0.3, CREAM);
+          md.at(T(0, 9, 0), () => {
+            box(md, -1.6, -1, -1, 1.6, 1, 1, LEATHER);
+            for (const side of [-1, 1]) md.at(Rz(side * 0.5), () => slab(md, [[0, 0], [0.8, 3], [0, 5], [-0.8, 3]], -0.3, 0.3, rgb('#e8e2d0')));
+          });
+        });
+      },
+      // A thick falconer's glove.
+      leftHand: (md) => box(md, -2.6, -3, -2.6, 2.6, 4, 2.6, rgb('#b8864e')),
+    };
+  },
+  alchemist: (cloth) => {
+    const glass = rgb('#9be15d');
+    const brass = rgb('#d8a24a');
+    const flask = (md: Model, liquid: RGB) => {
+      // A round glass flask with a cork, glowing with its brew.
+      ico(md, 3, liquid, 0.9);
+      prism(md, 1, 1, 2.2, 4.6, 6, rgb('#cfe9e6'));
+      prism(md, 1.2, 1.2, 4.6, 5.6, 6, rgb('#b88a5a'));
+    };
+    return {
+      cloth,
+      accent: glass,
+      robe: true,
+      heavy: false,
+      head: (md) => {
+        // A tall top hat with a brass band, and round tinted goggles over the eyes.
+        prism(md, 8.4, 8.4, 5, 5.8, 10, rgb('#2f2a33'), 0);
+        prism(md, 5.4, 5.8, 5.8, 15, 10, rgb('#2f2a33'), 0);
+        prism(md, 5.9, 5.9, 7, 8.4, 10, brass, 0);
+        for (const side of [-1, 1]) md.at(T(side * 2.6, 0, 5.8), () => {
+          prism(md, 2, 2, -1, 0.8, 8, brass, 0);
+          md.at(T(0, 0, 0.6), () => ico(md, 1.5, glass, 0.7));
+        });
+        // White curls under the hat.
+        for (const side of [-1, 1]) md.at(T(side * 6, -2, -1), () => ico(md, 2.4, rgb('#ece6dc')));
+      },
+      back: (md) => {
+        // A brass still on the back: a boiler, a coil and a green glow.
+        md.at(T(0, 18, -7.2), () => {
+          prism(md, 4, 4, 2, 12, 8, brass, Math.PI / 8);
+          md.at(T(0, 14, 0), () => ico(md, 3, glass, 0.9));
+          md.at(T(3.6, 6, 0), () => prism(md, 1.6, 1.6, 0, 8, 6, rgb('#b8693a')));
+        });
+      },
+      over: (md) => {
+        // A leather apron and a bandolier of little vials.
+        box(md, -5, 4, 4.3, 5, 28, 5.2, LEATHER);
+        md.at(chain(T(0, 25, 4.6), Rz(-0.75)), () => {
+          box(md, -1.2, -10, 0, 1.2, 10, 1, rgb('#5a3c26'));
+          for (const y of [-6, -2, 2, 6]) md.at(T(0, y, 1.4), () => ico(md, 1.1, y % 4 ? glass : rgb('#c79bff'), 0.9));
+        });
+      },
+      rightHand: (md) => md.at(T(0, -1, 1), () => flask(md, glass)),
+      leftHand: (md) => md.at(T(0, -1, 1), () => flask(md, rgb('#c79bff'))),
+    };
+  },
 };
 
 /** A champion of class `id` in a team's cloth, in one pose. */
-export function championModel(id: string, team: TeamName, pose: PoseName): Model {
-  const kit = (KITS[id as ChampId] ?? KITS.warden)(rgb(TEAM_CLOTH[team]));
+export function championModel(id: string, team: TeamName | `#${string}`, pose: PoseName): Model {
+  const kit = (KITS[id as ChampId] ?? KITS.warden)(rgb(team.startsWith('#') ? team : TEAM_CLOTH[team as TeamName]));
   return figure({ ...kit, hero: true }, classPose(id as ChampId, pose));
 }
 

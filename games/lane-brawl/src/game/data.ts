@@ -696,6 +696,59 @@ export const CHAMPIONS: ChampionDef[] = [
       { key: 'E', name: 'bruinE', kind: 'dash', cd: 10000, range: 300, radius: 100, damage: 60, stun: 500, level: 1 },
       { key: 'R', name: 'bruinR', kind: 'buff', cd: 60000, range: 0, ms: 6000, shield: 150, buff: { dmg: 25, atk: 30, armor: 15 }, level: 3 },
     ],
+  },  // The two champions a player unlocks with mastery on the others (LB16, `UNLOCKS`). Kept last, so
+  // a roster without them shuffles as before.
+  {
+    id: 'falconer',
+    name: 'falconerName',
+    role: 'roleMarksman',
+    hero: 'falconerHero',
+    short: 'Bryn',
+    title: 'falconerTitle',
+    motive: 'falconerMotive',
+    blurb: 'falconerBlurb',
+    color: '#c9a46a',
+    hp: 500,
+    hpPerLevel: 74,
+    dmg: 50,
+    dmgPerLevel: 4,
+    armor: 2,
+    range: 420,
+    speed: 128,
+    attackMs: 820,
+    passive: { name: 'falconerPassive', desc: 'falconerPassiveDesc', critEvery: 4, critMult: 1.6 },
+    abilities: [
+      { key: 'Q', name: 'falconerQ', kind: 'bolt', cd: 5000, range: 620, speed: 1000, width: 30, damage: 80, slow: 1200, level: 1 },
+      { key: 'W', name: 'falconerW', kind: 'zone', cd: 10000, range: 560, radius: 120, dps: 40, ms: 3000, slow: 600, level: 1 },
+      { key: 'E', name: 'falconerE', kind: 'dash', cd: 11000, range: 240, level: 1 },
+      { key: 'R', name: 'falconerR', kind: 'burst', cd: 60000, range: 650, radius: 200, damage: 200, stun: 600, level: 3 },
+    ],
+  },
+  {
+    id: 'alchemist',
+    name: 'alchemistName',
+    role: 'roleSupport',
+    hero: 'alchemistHero',
+    short: 'Ottilie',
+    title: 'alchemistTitle',
+    motive: 'alchemistMotive',
+    blurb: 'alchemistBlurb',
+    color: '#9be15d',
+    hp: 520,
+    hpPerLevel: 76,
+    dmg: 42,
+    dmgPerLevel: 3,
+    armor: 3,
+    range: 380,
+    speed: 124,
+    attackMs: 950,
+    passive: { name: 'alchemistPassive', desc: 'alchemistPassiveDesc', splash: 30, splashRadius: 90 },
+    abilities: [
+      { key: 'Q', name: 'alchemistQ', kind: 'zone', cd: 6000, range: 560, radius: 110, dps: 45, ms: 3000, slow: 500, level: 1 },
+      { key: 'W', name: 'alchemistW', kind: 'ally', cd: 9000, range: 450, radius: 150, heal: 70, shield: 50, level: 1 },
+      { key: 'E', name: 'alchemistE', kind: 'buff', cd: 13000, range: 0, ms: 1800, buff: { stealth: true, speed: 30 }, level: 1 },
+      { key: 'R', name: 'alchemistR', kind: 'burst', cd: 60000, range: 600, radius: 240, damage: 170, slow: 2000, level: 3 },
+    ],
   },
 ];
 
@@ -1069,6 +1122,20 @@ export const UPGRADES: Record<string, [UpgradeDef, UpgradeDef][]> = {
     [up('stunning-roar', 'W', 'upStunningRoar', { stun: 500 }), up('crushing-rush', 'E', 'upCrushingRush', { damage: 40 })],
     [up('quick-roar', 'W', 'upQuickRoar', { cd: -30 }), up('quick-wrath', 'R', 'upQuickWrath', { cd: -30 })],
   ],
+  falconer: [
+    [up('sharp-talons', 'Q', 'upSharpTalons', { damage: 30 }), up('far-talons', 'Q', 'upFarTalons', { range: 25 })],
+    [up('wide-circle', 'W', 'upWideCircle', { radius: 30 }), up('far-feather', 'E', 'upFarFeather', { range: 30 })],
+    [up('wide-stoop', 'R', 'upWideStoop', { radius: 25 }), up('quick-talons', 'Q', 'upQuickTalons', { cd: -25 })],
+    [up('long-circle', 'W', 'upLongCircle', { ms: 40 }), up('deep-stoop', 'R', 'upDeepStoop', { damage: 30 })],
+    [up('quick-feather', 'E', 'upQuickFeather', { cd: -30 }), up('pinning-talons', 'Q', 'upPinningTalons', { stun: 400 })],
+  ],
+  alchemist: [
+    [up('strong-acid', 'Q', 'upStrongAcid', { damage: 35 }), up('wide-acid', 'Q', 'upWideAcid', { radius: 30 })],
+    [up('rich-tonic', 'W', 'upRichTonic', { heal: 40 }), up('thick-smoke-bomb', 'E', 'upThickSmokeBomb', { ms: 50 })],
+    [up('wide-mixture', 'R', 'upWideMixture', { radius: 25 }), up('quick-acid', 'Q', 'upQuickAcid', { cd: -25 })],
+    [up('hard-tonic', 'W', 'upHardTonic', { shield: 50 }), up('volatile-mixture', 'R', 'upVolatileMixture', { damage: 30 })],
+    [up('quick-tonic', 'W', 'upQuickTonic', { cd: -30 }), up('quick-smoke-bomb', 'E', 'upQuickSmokeBomb', { cd: -30 })],
+  ],
 };
 
 /**
@@ -1076,6 +1143,78 @@ export const UPGRADES: Record<string, [UpgradeDef, UpgradeDef][]> = {
  * rank r the offers at the first r of `UPGRADE_LEVELS` get a third card.
  */
 export const MASTERY_WINS = [1, 2, 4, 6, 9];
+
+/**
+ * New champions (LB16): a class here is locked until the player has this many mastery ranks
+ * (`masteryRank`) summed over the other classes. A locked class can't be picked and stays out of
+ * the AI's rosters too, so it first shows up in a match once the player has unlocked it.
+ */
+export const UNLOCKS: Record<string, number> = { falconer: 3, alchemist: 6 };
+
+/**
+ * The ranked ladder (LB15): a ranked match is a full one whose result moves the player along the
+ * tiers. A win adds a star, a loss takes one; `stars` stars up a tier, and a loss at none drops a tier
+ * (never below Bronze), landing on `stars - 1`. Reaching a tier for the first time unlocks its
+ * `cloth`, a colour for the player's champion (`SKINS`; Bronze's comes with the first ranked win).
+ */
+export type TierId = 'bronze' | 'silver' | 'gold' | 'platinum' | 'diamond' | 'champion';
+export const TIERS: { id: TierId; name: TextKey; color: string }[] = [
+  { id: 'bronze', name: 'tierBronze', color: '#cd8a4a' },
+  { id: 'silver', name: 'tierSilver', color: '#c4cdd6' },
+  { id: 'gold', name: 'tierGold', color: '#f2c14e' },
+  { id: 'platinum', name: 'tierPlatinum', color: '#5fe0c6' },
+  { id: 'diamond', name: 'tierDiamond', color: '#9fd0ff' },
+  { id: 'champion', name: 'tierChampion', color: '#c79bff' },
+];
+export const LADDER = { stars: 3 };
+/**
+ * How much smarter red's champions play at each tier past Bronze (`s.aiTier`, 0 to 5), per tier:
+ * `castGap` shorter waits between abilities, `retreat` more health kept when falling back, `flask`
+ * more health when drinking the flask, `spellSooner` ms earlier battle spells. From `focusFrom` they
+ * hit the weakest champion in reach instead of the nearest, from `pairFrom` two of them go on a gank.
+ */
+export const RANKED_AI = { castGap: 0.1, retreat: 0.04, flask: 0.04, spellSooner: 12_000, focusFrom: 1, pairFrom: 3 };
+
+/** The player's champion's colours: the team's blue, or one won on the ladder (a tier's id). */
+export type SkinId = 'team' | TierId;
+export const SKINS: { id: SkinId; name: TextKey; cloth: `#${string}` }[] = [
+  { id: 'team', name: 'skinTeam', cloth: '#3b7be8' },
+  { id: 'bronze', name: 'tierBronze', cloth: '#a8652f' },
+  { id: 'silver', name: 'tierSilver', cloth: '#aab4bf' },
+  { id: 'gold', name: 'tierGold', cloth: '#d9a520' },
+  { id: 'platinum', name: 'tierPlatinum', cloth: '#2fb59a' },
+  { id: 'diamond', name: 'tierDiamond', cloth: '#7ec4ff' },
+  { id: 'champion', name: 'tierChampion', cloth: '#8a4fe0' },
+];
+
+/**
+ * Event matches (LB17): a full match with one rule of the week, the same for everyone that week
+ * (`eventOfWeek`, by the date): `allMid` puts all ten champions on the mid lane, the only one with
+ * towers (`ALL_MID.hp` times their health); `doubleGold` doubles all gold earned; `suddenDeath`
+ * stops respawns from `SUDDEN_DEATH.at` and lifts the Nexus wards then, and a team whose champions
+ * have all fallen loses.
+ */
+export type EventId = 'allMid' | 'doubleGold' | 'suddenDeath';
+export const EVENTS: { id: EventId; name: TextKey; desc: TextKey }[] = [
+  { id: 'allMid', name: 'eventAllMid', desc: 'eventAllMidDesc' },
+  { id: 'doubleGold', name: 'eventDoubleGold', desc: 'eventDoubleGoldDesc' },
+  { id: 'suddenDeath', name: 'eventSuddenDeath', desc: 'eventSuddenDeathDesc' },
+];
+export const ALL_MID = { hp: 1.6 };
+export const DOUBLE_GOLD = 2;
+export const SUDDEN_DEATH = { at: 12 * 60_000 };
+const WEEK_MS = 7 * 86_400_000;
+/** The event of the week holding `ms` (a date in ms): weeks start on Monday, UTC, and the rules take turns. */
+export function eventOfWeek(ms: number): EventId {
+  // 1 January 1970 was a Thursday; four days on is the first Monday.
+  const week = Math.floor((ms - 4 * 86_400_000) / WEEK_MS);
+  return EVENTS[((week % EVENTS.length) + EVENTS.length) % EVENTS.length].id;
+}
+/** When the week holding `ms` ends (next Monday 00:00 UTC), in ms. */
+export function weekEnds(ms: number): number {
+  const week = Math.floor((ms - 4 * 86_400_000) / WEEK_MS);
+  return (week + 1) * WEEK_MS + 4 * 86_400_000;
+}
 
 /**
  * The upgrades a level offers a champion: its pair less any it owns, topped up to `count` from its

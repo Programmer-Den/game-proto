@@ -3,7 +3,7 @@
 A single-player MOBA prototype built with [Phaser 4](https://phaser.io), TypeScript and Vite, part of
 the [game hub](../../README.md).
 
-You pick one of fifteen champions and lead a team of five down three lanes of a big square map.
+You pick one of seventeen champions (two of them unlocked by mastery) and lead a team of five down three lanes of a big square map.
 The cast runs from medieval fantasy to steampunk: knights, archers and witches fight beside
 gunslingers, brass automatons, tinkers with lightning coils, wolf-folk and a great bear. Four
 allies walk the lanes with you, and five NPC champions on the red team fight you. Every champion is
@@ -31,6 +31,8 @@ left, under bevelled slate panels.
 | --- | --- |
 | Click a champion card | Pick your champion and start the match |
 | Click Battle spell on the pick screen | Pick the next battle spell to take into matches (kept for next time) |
+| Click Match on the pick screen | Step through the match kinds: full, quick, ranked and the week's event (kept for next time) |
+| Click Colours on the pick screen | Wear the next colours your champion has won on the ranked ladder (kept for next time) |
 | Click the ground | Walk there |
 | Click an enemy | Walk to it and attack it until it dies or you stop it by clicking the ground |
 | Touch: put a finger down and drag | A steering stick appears where the finger went down and your champion walks the way you drag; it follows a finger that goes past its rim, and letting go stops the champion. A tap without dragging walks or attacks as a click does |
@@ -49,8 +51,8 @@ left, under bevelled slate panels.
 
 ![The floating touch stick under a steering finger](docs/screenshots/touch-stick.webp)
 
-1. **Your team**: you and four allies drawn at random from the other fourteen classes; red gets
-   five more of them. Allies walk a lane each and fight what they meet. Each champion's name shows
+1. **Your team**: you and four allies drawn at random from the other classes you have unlocked;
+   red gets five more of them. Allies walk a lane each and fight what they meet. Each champion's name shows
    over its health bar, and a notice says who slew whom.
 2. **The map** is a 3500 px square: the blue Nexus at the bottom left, the red at the top right,
    the top and bottom lanes along the edges and the middle lane on the diagonal. A river runs from
@@ -338,7 +340,7 @@ each team sends one healthy champion into the jungle for a brute's buff on its h
 watchstone it lacks. Ranged champions keep their distance from melee ones, and every champion keeps
 its finisher (R) for champions and the beast and its escape for when it falls back.
 
-![The pick screen: fifteen classes in three rows, from the Warden to the Gunslinger, the Automaton, the Tinker, the Wolfkin and the Bruin, each card with the champion's name, class and role and passive; the lines under the cards tell who the one under the pointer is and why they fight](docs/screenshots/playthrough-1-pick.webp)
+![The pick screen: seventeen classes in rows of six, from the Warden to the Gunslinger, the Automaton, the Tinker, the Wolfkin and the Bruin, then the locked Falconer and Alchemist, each card with the champion's name, class and role and passive; the lines under the cards tell who the one under the pointer is and why they fight](docs/screenshots/playthrough-1-pick.webp)
 
 ![The five steampunk and beast classes in one brawl by the river: Gunslinger, Automaton, Tinker, Wolfkin and Bruin](docs/screenshots/new-cast.webp)
 
@@ -401,6 +403,18 @@ its finisher (R) for champions and the beast and its escape for when it falls ba
 | Fenra Moonfang, Packleader of the Greywood | Wolfkin | Hunter | Feral Hunger: heals 12% of attack damage | Lunge: dash, hits and slows | Pack Howl: +30% attack speed and +20% speed for 4 s | Rend: burst around self, slows | Blood Moon: +25 damage, +25% lifesteal, +25% speed for 6 s |
 | Old Grumm Oakback, Keeper of the Hives | Bruin | Brawler | Thick Hide: heals 6 a second | Maul: burst around self | Roar: wide burst, slows | Oak Charge: dash, hits and stuns | Grovewrath: shield, +25 damage, +30% attack speed, +15 armor for 6 s |
 | Dame Liora Highbanner, Knight of the Concord | Lancer | Bruiser | Wide Reach: attacks hit foes beside the target for 40% | Thrust: short bolt through enemies | Sweep: burst around self, knocks back | Vault: dash, hits and stuns | Rally: shields allies around and gives +15 armor for 6 s |
+| Bryn Talonmere, Keeper of the Royal Mews (unlocked at 3 mastery ranks) | Falconer | Marksman | Falcon's Eye: every 4th shot hits 1.6x | Talon Strike: the falcon as a bolt, slows | Circling Hawk: zone at the cursor, hurts and slows | Feather Step: dash | Royal Stoop: big burst at the cursor, stuns |
+| Ottilie Brassvial, the Quicksilver Chemist (unlocked at 6 mastery ranks) | Alchemist | Support | Volatile Mix: shots splash foes beside the target for 30% | Acid Flask: zone at the cursor, hurts and slows | Tonic: heals and shields allies near the cursor | Smoke Bomb: unseen and +30% speed for 1.8 s | Grand Mixture: big burst at the cursor, slows |
+
+#### New champions
+
+The Falconer and the Alchemist start locked: their cards show a dark figure, a padlock and what
+unlocks them. Each opens once you hold enough mastery ranks with the other classes (one rank per
+mastery step, so three wins with three different champions open the Falconer, and six ranks the
+Alchemist). Until then they stay out of every roster, allies and red alike, so they first meet you
+in a match once they are yours. The end panel says when a win unlocks one.
+
+![Bryn's falcon stoops on red as Royal Stoop while Ottilie's Tonic heals red's front line](docs/screenshots/new-champions.webp)
 
 ### The Contest of Kessmoor
 
@@ -434,6 +448,8 @@ beastfolk of the Greywood, whose forest is dying from the overflow.
 | Winnie Voltwick, Storm Engineer | A Cogsport inventor whose storm engine makes lightning from thin air; she built AX-9's boiler | Proving her engine can replace the Rift taps |
 | Fenra Moonfang, Packleader of the Greywood | Leader of the wolfkin, whose kin are the feral wolf packs in the camps | Drawing the Rift out of her pack |
 | Old Grumm Oakback, Keeper of the Hives | The eldest bear of the Greywood, whose grove Cogsport's loggers are cutting | A voice for the forest in the Concord |
+| Bryn Talonmere, Keeper of the Royal Mews | The old kingdoms' falconer, whose birds the Rift twisted; one hunts at her side still | Riftwell water to heal the royal falcons |
+| Ottilie Brassvial, the Quicksilver Chemist | A Cogsport chemist who brews cures from Rift water, and acid when the cures are not enough | The Riftwell for medicine, not for war |
 
 Three stories give their champion a small edge on top of the class, shown on the pick screen:
 Morrow deals 25% more damage to the Rift Guardian, Kaida takes watchstones twice as fast, and Rook
@@ -458,8 +474,45 @@ claims 50% more gold from a bounty.
 | Fenra (Wolfkin) | Far Lunge (Q range +30%) or Savage Lunge (Q damage +30%) | Long Howl (W lasts 50% longer) or Wide Rend (E radius +30%) | Long Moon (R lasts 40% longer) or Quick Lunge (Q cooldown -25%) | Deep Rend (E damage +40%) or Quick Howl (W cooldown -30%) | Quick Rend (E cooldown -30%) or Red Moon (R cooldown -30%) |
 | Grumm (Bruin) | Wide Maul (Q radius +30%) or Heavy Maul (Q damage +30%) | Loud Roar (W radius +25%) or Long Charge (E range +30%) | Long Wrath (R lasts 40% longer) or Quick Maul (Q cooldown -25%) | Stunning Roar (W stuns 0.5s) or Crushing Charge (E damage +40%) | Quick Roar (W cooldown -30%) or Quick Wrath (R cooldown -30%) |
 | Liora (Lancer) | Long Thrust (Q range +30%) or Hard Thrust (Q damage +30%) | Wide Sweep (W radius +25%) or High Vault (E range +30%) | Iron Rally (R shield +40%) or Crippling Sweep (W slows 1.2s) | Stunning Vault (E stuns 0.4s longer) or Quick Thrust (Q cooldown -25%) | Quick Rally (R cooldown -30%) or Hard Sweep (W damage +40%) |
+| Bryn (Falconer) | Sharp Talons (Q damage +30%) or Far Talons (Q range +25%) | Wide Circle (W radius +30%) or Far Feather (E range +30%) | Wide Stoop (R radius +25%) or Quick Talons (Q cooldown -25%) | Long Circle (W lasts 40% longer) or Deep Stoop (R damage +30%) | Quick Feather (E cooldown -30%) or Pinning Talons (Q stuns 0.4s) |
+| Ottilie (Alchemist) | Strong Acid (Q damage +35%) or Wide Acid (Q radius +30%) | Rich Tonic (W heals +40%) or Dense Smoke (E lasts 50% longer) | Wide Mixture (R radius +25%) or Quick Acid (Q cooldown -25%) | Hard Tonic (W shield +50%) or Volatile Mixture (R damage +30%) | Quick Tonic (W cooldown -30%) or Quick Smoke (E cooldown -30%) |
 
 A stunned champion or minion neither moves nor attacks. AI champions take upgrades too (see The AI).
+
+### Ranked ladder
+
+Set the pick screen's Match button to ranked for a full match on the ladder. It climbs six tiers,
+Bronze, Silver, Gold, Platinum, Diamond and Champion, three stars each: a win adds a star and the
+third moves you up a tier, a loss takes one, and a loss with no star left drops you a tier (never
+below Bronze). The button shows your tier and stars, and the end panel what the match did to them.
+
+Each tier past Bronze makes red's champions play smarter: shorter waits between their abilities,
+falling back and drinking their flask with more health left, battle spells sooner, and from Silver
+they go for the weakest champion in reach rather than the nearest. From Platinum two of them come
+on every gank.
+
+Every tier you reach for the first time wins your champion its colours (Bronze's come with your
+first ranked win): the Colours button on the pick screen dresses your champion in them in place of
+the team's blue, in the match and on the portrait.
+
+![The pick screen on the ranked ladder, with the Falconer and the Alchemist unlocked](docs/screenshots/ranked-pick.webp)
+
+![A ranked win: promoted to Gold, its colours won, and the Alchemist unlocked by the mastery rank it brought](docs/screenshots/ranked-end.webp)
+
+### Event matches
+
+Set the Match button to event for a full match with the week's rule. The rules take turns each
+Monday, the same for everyone:
+
+| Rule | What changes |
+| --- | --- |
+| All mid | All ten champions fight on the mid lane, the only lane with towers (60% more health on its towers, inhibitor and Nexuses) |
+| Double gold | Every coin earned counts twice: passive gold, last hits, kills, camps and objectives |
+| Sudden death | From 12:00 nobody respawns and buy back is off, and the Nexuses lose their wards; a team whose champions have all fallen loses |
+
+A chip under the top bar names the rule, and for sudden death counts down to it.
+
+![Sudden death at 12:00: the notice, the chip under the top bar, and fallen champions out for good](docs/screenshots/event-sudden-death.webp)
 
 ### Watch AI
 
