@@ -3,7 +3,7 @@
 // whenever the knight changes place or the quest moves on.
 
 import { byDifficulty } from '../../../../shared/settings';
-import { isMapId, type EnemyKind, type Facing, type FishId, type ItemId, type MapId, type NpcId, type RequestId } from './maps';
+import { COAST_PINES, FEET, isMapId, TILE, type EnemyKind, type Facing, type FishId, type ItemId, type MapId, type NpcId, type RequestId } from './maps';
 import type { TextKey } from '../i18n';
 import { formatNumber } from '../../../../shared/i18n';
 
@@ -301,6 +301,49 @@ function placeOk(p: { map?: unknown; x?: unknown; y?: unknown } | undefined) {
   return !!p && isMapId(p.map) && Number.isFinite(p.x) && Number.isFinite(p.y);
 }
 
+type Place = { map: MapId; x: number; y: number; facing: Facing };
+
+/** Where the knight comes onto the coast from the fen. */
+const COAST_FROM_FEN: Place = { map: 'coast', x: 1.5 * TILE, y: 14.5 * TILE + 4, facing: 'right' };
+
+/** Whether the knight's feet at a place touch the pines west of the coast's inlet. */
+function inPines(p: Place) {
+  const P = COAST_PINES;
+  return p.map === 'coast' && FEET.some(([dx, dy]) => {
+    const tx = Math.floor((p.x + dx) / TILE);
+    const ty = Math.floor((p.y + dy) / TILE);
+    return tx >= P.x && tx < P.x + P.w && ty >= P.y && ty < P.y + P.h;
+  });
+}
+
+/** Whether a place is past the coast's inlet: its north shore or the Sea Cave. */
+function pastInlet(p: Place) {
+  return p.map === 'grotto' || (p.map === 'coast' && p.y < (COAST_PINES.y + COAST_PINES.h) * TILE);
+}
+
+/**
+ * Keeps saves from before the pines west of the coast's inlet playable. Those saves could walk
+ * round the inlet's west end: a knight (or spawn) saved where the pines now stand goes back to
+ * where they came onto the map (or in from the fen), and a save already past the inlet finds it
+ * drained and the windmill turned, since without the horn there would be no way back south.
+ */
+function migrateCoast(s: GameState) {
+  if (inPines(s.spawn)) s.spawn = { ...COAST_FROM_FEN };
+  if (inPines(s)) {
+    const to = s.spawn.map === s.map ? s.spawn : COAST_FROM_FEN;
+    s.map = to.map;
+    s.x = to.x;
+    s.y = to.y;
+    s.facing = to.facing;
+  }
+  if (!hasFlag(s, 'drained') && (pastInlet(s) || pastInlet(s.spawn))) {
+    setFlag(s, 'drained');
+    // The windmill's own flag (`GameScene.millKey`), so its sails turn as they would have.
+    setFlag(s, 'mill-coast-24-9');
+  }
+  return s;
+}
+
 /** The saved playthrough, or a new one when there is none (or it can't be read). */
 export function load(): GameState {
   try {
@@ -308,7 +351,8 @@ export function load(): GameState {
     if (raw) {
       const saved = JSON.parse(raw) as Partial<GameState>;
       const fresh = newState();
-      if (saved && QUESTS.includes(saved.quest as Quest) && placeOk(saved) && placeOk(saved.spawn ?? fresh.spawn)) return { ...fresh, ...saved, items: { ...fresh.items, ...saved.items }, fish: { ...fresh.fish, ...saved.fish } };
+      if (saved && QUESTS.includes(saved.quest as Quest) && placeOk(saved) && placeOk(saved.spawn ?? fresh.spawn))
+        return migrateCoast({ ...fresh, ...saved, items: { ...fresh.items, ...saved.items }, fish: { ...fresh.fish, ...saved.fish } });
     }
   } catch {
     // A broken save starts over.

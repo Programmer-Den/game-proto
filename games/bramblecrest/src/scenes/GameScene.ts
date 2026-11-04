@@ -4,7 +4,7 @@
 import Phaser from 'phaser';
 import { paintAll, texScale } from '../art/paint';
 import { paintGround, groundKey } from '../art/ground';
-import { AFTER_BOSS, BOSS_FLAG, BREAKABLE, buildMap, centre, CUTTABLE, DUNGEONS, LOW, MAP_IDS, setTile, SOLID, TILE, tileAt, underBoulder, type Door, type EnemyKind, type Facing, type FishId, type ItemId, type MapDef, type MapId, type NpcId, type Prop, type PropKind, type RequestId } from '../game/maps';
+import { AFTER_BOSS, BOSS_FLAG, BREAKABLE, buildMap, centre, CUTTABLE, DUNGEONS, FEET, LOW, MAP_IDS, setTile, SOLID, TILE, tileAt, underBoulder, type Door, type EnemyKind, type Facing, type FishId, type ItemId, type MapDef, type MapId, type NpcId, type Prop, type PropKind, type RequestId } from '../game/maps';
 import { findPath, type Step } from '../game/path';
 import { plusStones } from '../game/plus';
 import {
@@ -88,8 +88,6 @@ const BELL_LIFT = 72;
 
 const DIRS: Record<Facing, { x: number; y: number }> = { up: { x: 0, y: -1 }, down: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
 const WARM: [number, number, number] = [255, 190, 110];
-/** The corners of the knight's feet box, offset from their position. */
-const FEET: [number, number][] = [[-8, -6], [8, -6], [-8, 4], [8, 4]];
 
 /** What a tap asked the knight to do once they get there. */
 type Target =
@@ -706,7 +704,7 @@ export class GameScene extends Phaser.Scene {
     if (buried && s.items.sword) return this.goTo({ kind: 'dig', tx, ty }, tx, ty, true);
     if (this.map.props.some((p) => p.kind === 'campfire' && p.x === tx && p.y === ty)) return this.goTo({ kind: 'cook', tx, ty }, tx, ty);
     if (this.fishable(tx, ty)) return this.goTo({ kind: 'fish', tx, ty }, tx, ty);
-    if (this.fishless(tx, ty)) return this.noFish();
+    if (this.fishless(tx, ty) && !this.brinePool(tx, ty)) return this.noFish();
     this.target = null;
     this.walkTo(tx, ty);
   }
@@ -778,7 +776,8 @@ export class GameScene extends Phaser.Scene {
     // Facing water with the rod, the knight casts, unless a foe is close enough to swing at.
     const foeNear = this.foes.some((f) => f.alive && Math.hypot(f.x - (s.x + d.x * SWING_REACH), f.y - s.y - d.y * SWING_REACH) < 44);
     if (this.fishable(tx, ty) && !foeNear) return this.startFishing(tx, ty);
-    if (this.fishless(tx, ty) && !foeNear) return this.noFish();
+    // The Brinewyrm is not in `foes`: facing its pool, the swing goes on to `hitBrine`.
+    if (this.fishless(tx, ty) && !foeNear && !this.brinePool(tx, ty)) return this.noFish();
     this.startSwing();
   }
 
@@ -1579,6 +1578,12 @@ export class GameScene extends Phaser.Scene {
   /** Water the rod could cast into, on a map whose water holds no fish. */
   private fishless(tx: number, ty: number) {
     return this.state.items.rod && !this.map.fish && tileAt(this.map, tx, ty) === 'water';
+  }
+
+  /** Whether a tile is the Brinewyrm's pool while the wyrm is about: there act and a tap are at it, not a cast. */
+  private brinePool(tx: number, ty: number) {
+    const p = this.map.pool;
+    return !!this.brine && !!p && tx >= p.x && tx < p.x + p.w && ty >= p.y && ty < p.y + p.h;
   }
 
   private noFish() {
