@@ -130,7 +130,9 @@ before the moves run out and the potion sells, for coins and one to three stars.
    six at once), **the knight** wants it all in ten moves, and **the miser** pays only for cascades
    (what a swap's own match gathers doesn't count, only what falls into place after it). A guest
    is sold for one to three stars like a town, the best kept (a star beside the medallion once
-   served), and every star given for the first time pays 30 coins.
+   served), and every star given for the first time pays 30 coins. The knight's stars follow the
+   usual moves left (three at 8, two at 4), so Hard leaves his ten moves alone to keep the third star
+   in reach.
 16. **Daily order**: the journey map's Daily order is the same for every player on the same day: a
    recipe, a town's board shape and a few blockers, the board and every tile that drops in drawn
    from the day's seed. There is one try a day (starting it uses it up), and the map and the result
@@ -324,7 +326,7 @@ The favicon is the hub's bear with three potions lined up: a match of three.
 
 ![The favicon](docs/screenshots/favicon.webp)
 
-The difficulty, set on the hub page's Settings, changes one thing: each order (and each guild examination, town, town guest, daily, weekly and endless order) gives 5 more moves on Easy and 3 fewer on Hard.
+The difficulty, set on the hub page's Settings, changes one thing: each order (and each guild examination, town, town guest, daily, weekly and endless order) gives 5 more moves on Easy and 3 fewer on Hard (except the knight guest, who keeps his ten moves on Hard).
 
 ## Trophies
 

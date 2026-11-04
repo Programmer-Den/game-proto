@@ -194,7 +194,8 @@ const en = {
   dailyTitle: 'Daily order',
   dailyLine: "Today's board, from {town}",
   dailySold: 'Daily order sold!',
-  dailyRecord: { one: 'Daily best: {best} stars, {n} day in a row', other: 'Daily best: {best} stars, {n} days in a row' },
+  dailyBest: { one: 'Daily best: {n} star', other: 'Daily best: {n} stars' },
+  dailyStreak: { one: '{n} day in a row', other: '{n} days in a row' },
   dailyPlayed: { one: 'Today: {n} star. Back tomorrow', other: 'Today: {n} stars. Back tomorrow' },
   dailyUsed: "Today's try is used. Back tomorrow",
   dailyNew: { one: 'One try today; {n} day in a row', other: 'One try today; {n} days in a row' },
@@ -241,7 +242,7 @@ const en = {
   weeklyNext: 'Next star at a score of {n}',
   weeklyAllStars: 'Every star earned',
   playAgain: 'Play again',
-  captionWeekly: "This week's board, the same for everyone: every match scores, each cascade step once more. No bench tools",
+  captionWeekly: "This week's board, the same for everyone: the label's ingredients score, each cascade step once more. No bench tools",
 };
 
 export default en;

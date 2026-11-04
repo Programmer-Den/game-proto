@@ -1305,7 +1305,7 @@ export class GameScene extends Phaser.Scene {
   /** The daily's best and streak, for the result card. */
   private dailyRecord() {
     const record = loadDaily(GAME, this.state.current.daily?.day);
-    return t('dailyRecord', { best: record.best, n: record.streak });
+    return `${t('dailyBest', { n: record.best })}, ${t('dailyStreak', { n: record.streak })}`;
   }
 
   private townStars() {
