@@ -9,8 +9,11 @@ const de: Translation<typeof en> = {
   fen: 'Glimmermoor',
   shrine: 'Versunkener Schrein',
   belfry: 'Ertrunkener Glockenturm',
+  peaks: 'Hohle Gipfel',
+  caverns: 'Gläserne Höhlen',
   thornmother: 'Die Dornenmutter',
   bellwraith: 'Der Glockengeist',
+  gloamwing: 'Die Dämmerschwinge',
 
   // Speakers
   elderName: 'Älteste Wren',
@@ -18,6 +21,7 @@ const de: Translation<typeof en> = {
   bakerName: 'Marla',
   catName: 'Keks',
   hermitName: 'Der alte Sedge',
+  herderName: 'Tam',
   sign: 'Schild',
   wisp: 'Das Irrlicht',
 
@@ -27,6 +31,9 @@ const de: Translation<typeof en> = {
   signShrine: 'In den Stein gemeißelt: „Was der Dornbusch nimmt, gibt die Ranke zurück.“',
   signBells: 'Neben der Tür eingeritzt: „Zuerst die tiefste Stimme, dann die kleinste. Zuletzt die dazwischen.“',
   signWages: 'Notiz eines Glöckners: „Unseren Lohn bewahrten wir hinter den nassen Steinen auf, wo der Fluss nicht hinkommt.“',
+  signPass: 'Norden: die Hohlen Gipfel. Vorsicht vor Steinschlag.',
+  signLookout: 'Der Ausguck der Wächter. Was sie hier oben brennen ließen, haben sie mit einem Stein eingeschlossen.',
+  signIce: 'Ins Eis gefroren: „Wo die Laterne scheint, trägt der Boden.“',
 
   // The journal line, one per quest step
   objStart: 'Sprich mit der Ältesten Wren auf dem Platz',
@@ -38,7 +45,11 @@ const de: Translation<typeof en> = {
   objBell: 'Frag den alten Sedge im Glimmermoor nach der Glocke',
   objBelfry: 'Finde den Ertrunkenen Glockenturm im Glimmermoor',
   objHome: 'Sag der Ältesten Wren, dass die Glocke schweigt',
-  objEnd: 'Finde alle Mondsteine oder bezwinge die Sanduhren',
+  objEnd: 'Frag die Älteste Wren nach dem Licht auf den Gipfeln',
+  objPeaks: 'Finde die Laterne der Wächter auf den Hohlen Gipfeln',
+  objCaverns: 'Überquere die Schlucht zu den Gläsernen Höhlen',
+  objHomeward: 'Sag der Ältesten Wren, dass die Gipfel wieder dunkel sind',
+  objFinal: 'Finde alle Mondsteine, hilf den Leuten oder bezwinge die Sanduhren',
 
   // Pip
   pipNook1: 'Hinter dem Schuppen steckt ein Felsen zwischen den Bäumen fest.',
@@ -92,8 +103,25 @@ const de: Translation<typeof en> = {
   elderHome1: 'Ein Geist in der Glocke? Und du hast ihn hinausgeläutet. Hör nur: nichts als die Frösche.',
   elderHome2: 'Die Erbauer des Schreins haben auch ihre Fehler eingemauert, heißt es. Horch nach hohlem Stein nahe seiner Tür.',
   elderHome3: 'Ruh dich jetzt aus. Das Moor kann eine Nacht warten.',
+  elderPeaks1: 'Sieh nach Norden. Seit drei Nächten brennt ein kaltes Licht auf den Hohlen Gipfeln.',
+  elderPeaks2: 'Der Steinschlag am Pass über dem Wald hat sich gelöst, als wollte etwas, dass er offen ist.',
+  elderPeaks3: 'Der alte Tam hütet dort oben Ziegen. Finde ihn und finde heraus, was da brennt.',
+  elderPeaksHint: 'Der Pass führt vom Wald nach Norden, zwischen dem Schreinpfad und dem Fluss.',
+  elderCaverns: 'Eine Laterne, die verborgene Wege zeigt? Dann gab es die alten Wächter also doch.',
+  elderHomeward1: 'Eine Motte, groß wie eine Scheune, aus der Dunkelheit selbst? Und du hast sie zur Ruhe gebracht.',
+  elderHomeward2: 'Die Gipfel sind wieder dunkel, auf die richtige Art, mit Sternen darin.',
+  elderHomeward3: 'Ruh dich aus, Ritter. Bramblecrest ist wieder ganz.',
   elderEnd: 'Die Nacht ist lang, und das Moor glimmt noch. Na los.',
-  elderTrials: 'Man sagt, die alten Sanduhren an den Türen von Schrein und Glockenturm leuchten wieder. Dreh eine um, wenn du dich traust.',
+  elderTrials: 'Man sagt, die alten Sanduhren an den Verliestüren leuchten wieder. Dreh eine um, wenn du dich traust.',
+  elderPlus: 'Und wenn du alles noch einmal von der ersten Nacht an gehen willst, mit deinen Werkzeugen, sag einfach Bescheid.',
+
+  // Tam the goatherd
+  herderPass1: 'Vom Wald heraufgekommen, was? Dann hast du das kalte Licht hinter der Schlucht gesehen.',
+  herderPass2: 'Früher führte eine Brücke hinüber, sagen die Alten, die nur die Lampe der Wächter zeigen konnte.',
+  herderPass3: 'Ihr Ausguck liegt den Pfad entlang im Osten, seit Großmutters Zeiten mit einem Felsen verschlossen.',
+  herderLamp1: 'Die Lampe! Halt sie an der Schlucht hoch und sieh, was das Dunkel verbirgt. Die Höhlen liegen dahinter, unter dem höchsten Gipfel.',
+  herderLamp2: 'Eine der Kiefern hinter der Schlucht trägt nie Schnee, heißt es. Komisch, nicht?',
+  herderQuiet: 'Das Licht ist von den Gipfeln verschwunden, und meine Ziegen schlafen wieder ruhig.',
 
   // Chests and doors
   empty: 'Leer.',
@@ -106,6 +134,7 @@ const de: Translation<typeof en> = {
   foundKey: 'Du hast einen kleinen Schlüssel gefunden. Er öffnet eine verschlossene Tür an diesem Ort.',
   foundHeart: 'Du hast ein Herzgefäß gefunden! Ein Herz mehr.',
   foundOil: 'Du hast Laternenöl gefunden. Deine Laterne leuchtet jetzt heller.',
+  foundMoonlantern: 'Du hast die Mondlaterne gefunden! Ihr bleiches Licht zeigt verborgene Wege, etwa Brücken über dem Dunkel. Such sie an Schluchten.',
   foundSeeds: 'Du hast {n} Glockensamen! B, X oder die Samentaste pflanzt einen. Tritt zurück: er platzt und bricht rissigen Stein.',
   gotSeeds:
     'Du hast {n} Glockensamen! B, X oder die Samentaste pflanzt einen vor dir. Tritt zurück: er platzt, bricht rissigen Stein und Felsbrocken und verletzt alles in der Nähe.',
@@ -114,6 +143,8 @@ const de: Translation<typeof en> = {
   newQuestBlade: 'Neue Aufgabe: Die Alte Klinge',
   doneQuestBlade: 'Aufgabe erfüllt: Die Alte Klinge',
   newQuestBell: 'Neue Aufgabe: Die Ertrunkene Glocke',
+  newQuestPeaks: 'Neue Aufgabe: Die Hohlen Gipfel',
+  wayShut: 'Der Weg ist dunkel. Noch nicht.',
   seedsRefilled: 'Glockensamen {n}',
   moonstone: 'Mondstein! {n} von {total}',
   glint: 'Etwas glitzert im Schlamm!',
@@ -140,10 +171,16 @@ const de: Translation<typeof en> = {
   thornmotherWayOut: 'Oben in der Halle hat sich ein Ausgang geöffnet. Die Älteste Wren sollte davon hören.',
   wraithBeaten: 'Der Glockengeist zerfasert zu Nebel, und die große Glocke springt entzwei.',
   wraithQuiet: 'Das Moor wird still. Die Älteste Wren will es sicher von dir hören.',
+  gloamBeaten: 'Die Dämmerschwinge zerfällt zu einer Wolke aus dunklem Staub, und das kalte Licht erlischt.',
+  gloamQuiet: 'Die Gipfel werden dunkel und still. Die Älteste Wren will davon hören.',
+  gloamDown: 'Gefangen! Sie zappelt am Boden. Schlag zu!',
+  gloamHigh: 'Sie flattert außer Reichweite. Fang sie mit der Hakenranke, solange sie tief hängt!',
+  gloamFlees: 'Die Dämmerschwinge reißt sich los und steigt ins Dunkel!',
 
   // Chapter end cards
   chapterOne: 'Kapitel eins: Die Dornenmutter',
   chapterTwo: 'Kapitel zwei: Die Ertrunkene Glocke',
+  chapterThree: 'Kapitel drei: Die Hohlen Gipfel',
   endStats: 'Mondsteine {n} von {total}   ·   Besiegte Feinde {beaten}   ·   Stürze {falls}',
   endOneAll: 'Alle Mondsteine summen zugleich. Fern im Glimmermoor öffnet etwas Gewaltiges ein Auge und lächelt.',
   endOneSome: 'Ein kaltes Licht flackert über dem Glimmermoor. Ein Teil des Mondes fehlt noch.',
@@ -151,8 +188,20 @@ const de: Translation<typeof en> = {
   endTwoAll: 'Die Mondsteine klingen wie kleine Glocken, alle zusammen. Hoch über dem Moor klingt der Mond zurück.',
   endTwoSome: 'Endlich ist das Moor still. Irgendwo unter dem Wasser summen noch ein paar letzte Steine.',
   endTwoFew: 'Die Frösche singen über dem ertrunkenen Glockenturm. Die Nacht ist still, fürs Erste.',
+  endThreeAll: 'Alle Mondsteine des Königreichs leuchten auf einmal, und der Mond neigt sich so nah herab, dass man ihn berühren könnte. Bramblecrest wird nie wieder ganz dunkel sein.',
+  endThreeSome: 'Die Gipfel schlafen unter den Sternen. Ein paar Mondsteine glimmen noch, wo keine Laterne hingeschaut hat.',
+  endThreeFew: 'Das kalte Licht ist von den Gipfeln verschwunden. Das Königreich ruht, fürs Erste.',
   keepExploring: 'Weiter erkunden',
   newGame: 'Neues Spiel',
+  newGamePlus: 'Neues Spiel+',
+
+  // New game+
+  plusTitle: 'Neues Spiel+',
+  plusText: 'Noch einmal von der ersten Nacht an? Du behältst deine Werkzeuge, Verbesserungen und Münzen. Jeder Feind wird stärker, und die Mondsteine verstecken sich an neuen Orten: Achte auf ihr Glitzern im Licht deiner Laterne.',
+  plusBegin: 'Neu beginnen',
+  plusNotYet: 'Noch nicht',
+  plusStart: 'Neues Spiel+ {n}: Die Feinde sind stärker, und die Mondsteine sind umgezogen.',
+  plusLevel: 'Neues Spiel+ {n}',
 
   // The hourglass trials
   hourglassRead: 'Eine alte Sanduhr voll leuchtendem Sand. Dreh sie um, und jeder Feind hier erwacht wieder, und der Herr dieses Ortes erhebt sich stärker. Besiege ihn so schnell du kannst.',
@@ -164,13 +213,59 @@ const de: Translation<typeof en> = {
   trialRecord: 'Eine neue Bestzeit!',
   trialBestIs: 'Deine Bestzeit bleibt {time}.',
 
+  // The villagers' requests
+  reqLilies: 'Drei Moorlilien',
+  reqBoat: 'Pips Spielzeugboot',
+  reqGlowcaps: 'Drei Leuchtkappen',
+  reqSpecs: 'Sedges Brille',
+  reqGoatbells: 'Drei Ziegenglocken',
+  findLilies: 'eine Moorlilie',
+  findBoat: 'Pips Spielzeugboot',
+  findGlowcaps: 'eine Leuchtkappe',
+  findSpecs: 'Sedges Brille',
+  findGoatbells: 'eine Ziegenglocke',
+  findGot: 'Gefunden: {item}! {n} von {total}',
+  findGotOne: 'Gefunden: {item}!',
+  newRequest: 'Neue Bitte: {name}',
+  doneRequest: 'Bitte erfüllt: {name}',
+  lilies1: 'Bevor du gehst, Liebes: Draußen hinter dem Fluss blühen die Moorlilien. Sie leuchten weiß zwischen dem Schilf.',
+  lilies2: 'Bring mir drei, dann backe ich dir etwas Besonderes.',
+  liliesWait: 'Drei Moorlilien, Liebes, aus dem Glimmermoor. Sie leuchten weiß zwischen dem Schilf.',
+  liliesDone: 'Drei Moorlilien! Hier, ein herzförmiges Brot, noch warm. Iss nur, das tut dir gut.',
+  boat1: 'Mein Spielzeugboot ist im Wald den Fluss hinuntergesegelt! Es hängt auf der anderen Seite fest, wo ich nicht hindarf.',
+  boat2: 'Holst du es zurück? Bitte?',
+  boatWait: 'Mein Boot ist irgendwo hinter dem Fluss, auf der anderen Seite. Ich würde selbst gehen, aber er ist zu tief.',
+  boatDone: 'Mein Boot! Du bist der beste Ritter überhaupt. Hier, nimm Opas Wetzstein. Er sagt, damit reicht jede Klinge weiter.',
+  glowcaps1: 'Wo du schon unterwegs bist: Mein Lampenöl braucht Leuchtkappen, die kleinen Pilze, die von selbst leuchten.',
+  glowcaps2: 'Drei würden reichen. Sie wachsen im Wald und im Moor, wenn du dort suchst, wo es am dunkelsten ist.',
+  glowcapsWait: 'Drei Leuchtkappen für das Lampenöl. Im Wald und im Moor gibt es welche.',
+  glowcapsDone: 'Leuchtkappen! Damit bleibt der Platz den ganzen Winter hell. Nimm diesen alten Beutel; Münzen finden irgendwie ihren Weg hinein.',
+  specs1: 'Ich finde meine Brille nicht. Ich hatte sie im Glockenturm auf, hinter dem überfluteten Raum, bevor mich die Frösche verjagt haben.',
+  specs2: 'Bring sie mir zurück, dann lese ich dir vielleicht sogar etwas vor.',
+  specsWait: 'Meine Brille ist unten im Glockenturm, hinter dem Wasser, glaube ich. Ich wüsste es, wenn ich etwas sehen könnte.',
+  specsDone: 'Meine Brille! Ich sehe den Mond wieder. Nimm diesen Glücksbringer; er hält dir das Unheil einen Moment länger fern.',
+  goatbells1: 'Meine Ziegen sind im Sturm durchgegangen und haben ihre Glocken verloren. Ohne Glocken finden sie nicht nach Hause.',
+  goatbells2: 'Finde mir drei Glocken und läute sie heim, ja?',
+  goatbellsWait: 'Drei Ziegenglocken, überall auf den Gipfeln. Eine ist wohl hinter die Schlucht geraten.',
+  goatbellsDone: 'Das sind alle drei! Hörst du? Die Ziegen kommen schon herunter. Nimm den Herzanhänger meiner Mutter, mit Dank.',
+  gotWhetstone: 'Du hast den Wetzstein! Dein Schwert reicht weiter.',
+  gotPockets: 'Du hast einen tiefen Beutel! Besiegte Feinde lassen zwei Münzen fallen.',
+  gotCharm: 'Du hast einen Mondanhänger! Nach einem Treffer kann dir länger nichts schaden.',
+
   // The moonstone page
   stonesTitle: 'Mondsteine',
+  journalTitle: 'Tagebuch',
+  requestsTitle: 'Bitten',
+  requestsNone: 'Noch hat dich niemand um etwas gebeten.',
+  requestRow: '{giver}: {name}',
+  requestDone: 'Erledigt',
+  requestProgress: '{n} von {total}',
   stonesTotal: '{n} von {total} gefunden',
   trialsTitle: 'Sanduhr-Prüfungen',
   trialBest: '{place}: {time}',
   trialNone: '{place}: noch nicht gelaufen',
   closePage: 'Tippen oder N zum Schließen',
+  stonesPlus: '{stones}   ·   {plus}',
 
   // The shops
   shopTitle: 'Waren von {name}',
@@ -188,6 +283,12 @@ const de: Translation<typeof en> = {
   pouchText: '15 Glockensamen tragen statt 10.',
   vine: 'Lange Ranke',
   vineText: 'Die Hakenranke reicht viel weiter.',
+  whetstone: 'Wetzstein',
+  whetstoneText: 'Dein Schwert reicht weiter.',
+  pockets: 'Tiefer Beutel',
+  pocketsText: 'Besiegte Feinde lassen zwei Münzen fallen.',
+  charm: 'Mondanhänger',
+  charmText: 'Nach einem Treffer kann dir länger nichts schaden.',
 
   // HUD
   keys: 'Schlüssel {n}',
@@ -196,6 +297,6 @@ const de: Translation<typeof en> = {
 };
 
 /** Names and bell sounds that stay as they are in German. */
-export const keepEnglish: (keyof typeof en)[] = ['pipName', 'bakerName', 'bellLow', 'bellMid', 'trialBest'];
+export const keepEnglish: (keyof typeof en)[] = ['pipName', 'bakerName', 'herderName', 'bellLow', 'bellMid', 'trialBest', 'requestRow', 'stonesPlus'];
 
 export default de;

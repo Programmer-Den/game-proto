@@ -83,7 +83,7 @@ const walk = (bars: string) =>
     .map((c) => eighths(`${CHORDS[c].root} . - ${CHORDS[c].root} ${CHORDS[c].fifth} . ${CHORDS[c].root} -`))
     .join(' | ');
 
-/** The wild places: A Dorian in the Woods and a sparser D Dorian in the Fen, pulse arpeggios and a shaker. */
+/** The wild places: A Dorian in the Woods, a sparser D Dorian in the Fen and a cold E minor on the Peaks, pulse arpeggios and a shaker. */
 export const WILDS: Song = {
   bpm: 84,
   waves: { lead: 'pulse25', harmony: 'pulse12', bass: 'triangle' },
@@ -110,6 +110,17 @@ export const WILDS: Song = {
       harmony: arps('Dm G Dm Am Dm G F Am'),
       bass: walk('Dm G Dm Am Dm G F Am'),
       drums: 'k - - - h - - - - - h - h - - -',
+    },
+    peaks: {
+      lead: eighths(
+        [
+          'e5 . . . b4 . . . | g4 . . . a4 . b4 . | c5 . . . . . a4 . | b4 . . . . . - - |',
+          'g5 . . . e5 . . . | d5 . . . b4 . g4 . | a4 . . . c5 . b4 . | e4 . . . . . - - |',
+        ].join(' '),
+      ),
+      harmony: arps('Em C G D Em C Am Em'),
+      bass: walk('Em C G D Em C Am Em'),
+      drums: 'k - - - - - h - k - - - - - h -',
     },
   },
 };
@@ -146,6 +157,17 @@ export const DEEP: Song = {
       bass: [hold('e2', 16), hold('e2', 16), hold('c2', 16), hold('b1', 16)].join(' | '),
       drums: 'k - - - - - h - - - - - - - h -',
     },
+    caverns: {
+      lead: eighths(
+        [
+          'f#5 . . . . . c#5 . | e5 . d5 . c#5 . . . | - - b4 . c#5 . d5 . | c#5 . . . . . - - |',
+          'a5 . . . f#5 . . . | g5 . f#5 . e5 . c#5 . | d5 . . . b4 . . . | c#5 . . . . . - - |',
+        ].join(' '),
+      ),
+      harmony: [slowArp('f#4 a4 c#5 a4'), slowArp('f#4 a4 c#5 a4'), slowArp('d4 f#4 b4 f#4'), slowArp('c#4 f4 g#4 f4')].join(' | '),
+      bass: [hold('f#2', 16), hold('f#2', 16), hold('d2', 16), hold('c#2', 16)].join(' | '),
+      drums: 'k - - - - - - - h - - - - - - -',
+    },
   },
 };
 
@@ -154,7 +176,7 @@ export const DEEP: Song = {
 const pump = (bars: [string, string][]) => bars.map(([lo, hi]) => eighths(`${lo} ${hi} ${lo} ${hi} ${lo} ${hi} ${lo} ${hi}`)).join(' | ');
 const stabs = (notes: string) => notes.split(' ').map((n) => eighths(`- ${n} - ${n} - ${n} - ${n}`)).join(' | ');
 
-/** The two boss fights, at 140 BPM: the Thornmother in A minor, the Bellwraith in E Phrygian. */
+/** The three boss fights, at 140 BPM: the Thornmother in A minor, the Bellwraith in E Phrygian, the Gloamwing in B minor. */
 export const BOSS: Song = {
   bpm: 140,
   mix: { lead: 0.14, harmony: 0.06, bass: 0.28, drums: 0.28 },
@@ -180,6 +202,17 @@ export const BOSS: Song = {
       harmony: stabs('g4 g4 a4 g4 g4 e4 a4 a4'),
       bass: pump([['e2', 'e3'], ['e2', 'e3'], ['f2', 'f3'], ['e2', 'e3'], ['c2', 'c3'], ['a1', 'a2'], ['f2', 'f3'], ['f2', 'f3']]),
       drums: 'k - h - s - h k k - h - s - h -',
+    },
+    gloamwing: {
+      lead: eighths(
+        [
+          'b4 . d5 . f#5 . e5 d5 | c#5 . . . a4 . c#5 . | d5 . . . b4 . g4 . | f#4 . a#4 . c#5 . f#5 . |',
+          'b5 . a5 . f#5 . d5 . | e5 . . . c#5 . a4 . | g5 . f#5 . e5 . d5 . | c#5 . . . a#4 . c#5 . |',
+        ].join(' '),
+      ),
+      harmony: stabs('f#4 e4 d4 c#4 f#4 e4 d4 c#4'),
+      bass: pump([['b1', 'b2'], ['a1', 'a2'], ['g1', 'g2'], ['f#1', 'f#2'], ['b1', 'b2'], ['a1', 'a2'], ['e2', 'e3'], ['f#1', 'f#2']]),
+      drums: 'k - h k s - h - k - h - s - s s',
     },
   },
 };

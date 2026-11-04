@@ -4,9 +4,13 @@
 import Phaser from 'phaser';
 import { paintAll, texScale } from '../art/paint';
 import { paintGround, groundKey } from '../art/ground';
-import { BREAKABLE, buildMap, centre, CUTTABLE, DUNGEONS, LOW, MAP_IDS, setTile, SOLID, TILE, tileAt, underBoulder, type Door, type Facing, type ItemId, type MapDef, type MapId, type NpcId, type Prop, type PropKind } from '../game/maps';
+import { AFTER_BOSS, BOSS_FLAG, BREAKABLE, buildMap, centre, CUTTABLE, DUNGEONS, LOW, MAP_IDS, setTile, SOLID, TILE, tileAt, underBoulder, type Door, type Facing, type ItemId, type MapDef, type MapId, type NpcId, type Prop, type PropKind, type RequestId } from '../game/maps';
 import { findPath, type Step } from '../game/path';
-import { advance, buy, CHAPTER_ONE_STONES, clearSave, clock, give, hasFlag, hasUpgrade, load, maxSeeds, MOONSTONES, newState, reached, save, setFlag, stonesToFind, UPGRADES, type GameState, type Seller } from '../game/state';
+import { plusStones } from '../game/plus';
+import {
+  advance, buy, CHAPTER_ONE_STONES, CHAPTER_TWO_STONES, clearSave, clock, found, give, hasFlag, hasUpgrade, load, maxSeeds, MOONSTONES, newPlus, newState, reached, REQUESTS, reward, save, setFlag, stoneCounts, stonesToFind, UPGRADES,
+  type GameState, type Seller,
+} from '../game/state';
 import { talk, type TalkEffect } from '../game/talk';
 import { t, type TextKey } from '../i18n';
 import { settings } from '../../../../shared/settings';
@@ -18,13 +22,13 @@ import { Hud } from './hud';
 import { awardNow, checkTrophies } from '../trophies/check';
 import { NightLight, type Light } from './light';
 import {
-  ARMOURED, BELL_DOWN_MS, BULB_DOWN_MS, DOWN_MS, LANTERN_KEEP, LANTERN_LIFT, LANTERN_SHOT_MS, BULB_EVERY_MS, BULB_HP, BULB_UP_MS, BURST_PX, DROP_MS, EXPOSED_MS, FOES, foeFree, FROG_LEAP_MS, FROG_WAIT_MS, FUSE_MS, HOVER_MS, HOVER_SPEED,
-  makeFoe, SEED_SPEED, SLAM_PX, SUMMON_MS, THORNLING_SHOT_MS, TRIAL, VOLLEY_MS, WRAITH_HP,
-  type Bomb, type Boss, type Foe, type Seed, type Wraith,
+  ARMOURED, BELL_DOWN_MS, BULB_DOWN_MS, DOWN_MS, LANTERN_KEEP, LANTERN_LIFT, LANTERN_SHOT_MS, BULB_EVERY_MS, BULB_HP, BULB_UP_MS, BURST_PX, DROP_MS, EXPOSED_MS, FOES, foeFree, FROG_LEAP_MS, FROG_WAIT_MS, FUSE_MS, GLOAM, HOVER_MS, HOVER_SPEED,
+  makeFoe, PLUS, SEED_SPEED, SHADE_SEEN_PX, SLAM_PX, SUMMON_MS, THORNLING_SHOT_MS, TRIAL, VOLLEY_MS, WRAITH_HP,
+  type Bomb, type Boss, type Foe, type Gloam, type Seed, type Wraith,
 } from './foes';
 import {
-  BOOTS, HURT_MS, LANTERN, LONG_VINE, LANTERN_OIL, PICKUP_PX, PLANT_REACH, PULL_SPEED, ROLL_COOLDOWN_MS, ROLL_MS, ROLL_SPEED, STICK, SWING_COOLDOWN_MS, SWING_MS, SWING_RADIUS, SWING_REACH, VINE_RANGE, VINE_SPEED,
-  WALK_SPEED,
+  BOOTS, CHARM, GLIMMER_PX, HURT_MS, LANTERN, LONG_VINE, LANTERN_OIL, PICKUP_PX, PLANT_REACH, PULL_SPEED, ROLL_COOLDOWN_MS, ROLL_MS, ROLL_SPEED, STICK, SWING_COOLDOWN_MS, SWING_MS, SWING_RADIUS, SWING_REACH, VEIL_PX, VINE_RANGE, VINE_SPEED,
+  WALK_SPEED, WHETSTONE,
 } from './layout';
 
 /** Where each prop's art touches the ground, as a share of its texture's height, and whether it blocks. */
@@ -43,10 +47,21 @@ const PROP_ART: Record<PropKind, { key: string; foot: number; solid: boolean }> 
   tower: { key: 'tower', foot: 148 / 152, solid: true },
   bell: { key: 'bell-1', foot: 44 / 48, solid: true },
   candle: { key: 'candle', foot: 26 / 28, solid: false },
+  cave: { key: 'cave', foot: 96 / 104, solid: true },
+  crystal: { key: 'crystal', foot: 28 / 30, solid: true },
 };
 
-/** Moonstones that only show once a boss is beaten, and the flag that beats it. */
-const AFTER_BOSS: Record<string, string> = { 's-boss': 'boss', 'b-bell': 'wraith' };
+/** What each request's things look like where they lie, and the text that names one. */
+const FIND_ART: Record<RequestId, { key: string; name: TextKey; reward: TextKey }> = {
+  lilies: { key: 'find-lilies', name: 'findLilies', reward: 'foundHeart' },
+  boat: { key: 'find-boat', name: 'findBoat', reward: 'gotWhetstone' },
+  glowcaps: { key: 'find-glowcaps', name: 'findGlowcaps', reward: 'gotPockets' },
+  specs: { key: 'find-specs', name: 'findSpecs', reward: 'gotCharm' },
+  goatbells: { key: 'find-goatbells', name: 'findGoatbells', reward: 'foundHeart' },
+};
+/** A request's name on the journal page and in its toasts. */
+export const REQUEST_NAME: Record<RequestId, TextKey> = { lilies: 'reqLilies', boat: 'reqBoat', glowcaps: 'reqGlowcaps', specs: 'reqSpecs', goatbells: 'reqGoatbells' };
+const NPC_NAME: Record<NpcId, TextKey> = { elder: 'elderName', pip: 'pipName', baker: 'bakerName', cat: 'catName', hermit: 'hermitName', herder: 'herderName' };
 /** The order the belfry's bells must ring in, by voice (0 is the deepest). */
 const BELL_ORDER = [0, 2, 1];
 const BELL_SOUND: TextKey[] = ['bellLow', 'bellMid', 'bellHigh'];
@@ -86,6 +101,7 @@ export class GameScene extends Phaser.Scene {
   foes: Foe[] = [];
   boss: Boss | null = null;
   wraith: Wraith | null = null;
+  gloam: Gloam | null = null;
   /** Bellseeds planted and swelling. */
   bombs: Bomb[] = [];
   /**
@@ -117,6 +133,14 @@ export class GameScene extends Phaser.Scene {
   private glows: Light[] = [];
   private wisp: { i: number; sprite: Phaser.GameObjects.Image; hop: number } | null = null;
   private dug = new Set<string>();
+  /** The hidden bridges' stones (by tile), shown where the Moonlantern's light falls. */
+  private veilSprites = new Map<number, Phaser.GameObjects.Image>();
+  /** A request's things lying here, by `<request>-<index>` in the map's `finds`. */
+  private findSprites = new Map<string, Phaser.GameObjects.Image>();
+  /** The glimmer over each moonstone a new game+ buried, by stone id. */
+  private glimmers = new Map<string, Phaser.GameObjects.Image>();
+  /** Whether the knight stands on a way out the story has not opened yet, so its toast shows once. */
+  private onShutWay = false;
   private sword!: Phaser.GameObjects.Image;
   private vine!: Phaser.GameObjects.Graphics;
   private hookTip!: Phaser.GameObjects.Image;
@@ -199,7 +223,11 @@ export class GameScene extends Phaser.Scene {
     this.foes = [];
     this.boss = null;
     this.wraith = null;
+    this.gloam = null;
     this.wisp = null;
+    this.veilSprites.clear();
+    this.findSprites.clear();
+    this.glimmers.clear();
     this.blocks = [];
     this.blockers.clear();
     this.bushSprites.clear();
@@ -224,6 +252,9 @@ export class GameScene extends Phaser.Scene {
     const trial = !!this.trial;
     const map = buildMap(id);
     this.map = map;
+    plusStones(map, s.cycle);
+    // Fallen rock shuts the pass to the peaks until chapter three.
+    if (id === 'woods' && !reached(s, 'peaks')) map.props.push({ kind: 'rock', x: 24, y: 1, w: 1, h: 1 }, { kind: 'rock', x: 25, y: 1, w: 1, h: 1 });
     // What the knight has already changed here.
     if (id === 'village' && hasFlag(s, 'gate-cut')) for (const i of [19, 20]) setTile(map, i, 3, 'path');
     if (id === 'woods' && hasFlag(s, 'woods-thorns')) for (const i of [42, 43]) setTile(map, i, 10, 'path');
@@ -251,7 +282,7 @@ export class GameScene extends Phaser.Scene {
         const t = tileAt(map, tx, ty);
         if (t === 'tree' || t === 'faketree') {
           // Trees right at the edge of the map are left off where nobody can see behind them.
-          const key = map.theme === 'fen' ? 'tree-fen' : (tx * 7 + ty * 3) % 3 === 0 ? 'tree-b' : 'tree';
+          const key = map.theme === 'fen' ? 'tree-fen' : map.theme === 'peaks' ? 'tree-pine' : (tx * 7 + ty * 3) % 3 === 0 ? 'tree-b' : 'tree';
           this.addWorld(this.add.image(tx * TILE + 16, ty * TILE + 30, key).setOrigin(0.5, 64 / 72), (ty + 1) * TILE - 2);
         } else if (t === 'bush' || t === 'thorns') {
           const img = this.add.image(tx * TILE + 16, ty * TILE + 28, t).setOrigin(0.5, t === 'bush' ? 25 / 30 : 29 / 34);
@@ -261,6 +292,9 @@ export class GameScene extends Phaser.Scene {
           const img = this.add.image(tx * TILE + 16, ty * TILE + 28, 'boulder').setOrigin(0.5, 27 / 32);
           this.addWorld(img, (ty + 1) * TILE - 4);
           this.bushSprites.set(ty * map.w + tx, img);
+        } else if (t === 'veil') {
+          const img = this.addWorld(this.add.image(tx * TILE + 16, ty * TILE + 16, 'veil-stone'), -4999).setAlpha(0);
+          this.veilSprites.set(ty * map.w + tx, img);
         }
       }
 
@@ -319,7 +353,15 @@ export class GameScene extends Phaser.Scene {
       this.addWorld(img, c.y);
       img.setVisible(st.hidden !== 'buried');
       this.stoneSprites.set(st.id, img);
+      if (st.glimmer) this.glimmers.set(st.id, this.addWorld(this.add.image(c.x, c.y + 4, 'glimmer'), -4990).setAlpha(0).setScale(texScale('glimmer') * 1.4));
     }
+    // A request's things show once it is asked for, until they are picked up.
+    map.finds.forEach((f, i) => {
+      if (s.requests[f.req] !== 'taken' || hasFlag(s, `find-${f.req}-${i}`)) return;
+      const c = centre(f);
+      const key = FIND_ART[f.req].key;
+      this.findSprites.set(`${f.req}-${i}`, this.addWorld(this.add.image(c.x, c.y + 4, key).setOrigin(0.5, 0.8), c.y + 4));
+    });
     map.enemies.forEach((e, i) => {
       if (DUNGEONS.has(id) && hasFlag(s, this.foeFlag(i)) && !trial) return;
       const c = centre(e);
@@ -327,8 +369,9 @@ export class GameScene extends Phaser.Scene {
     });
     if (id === 'shrine' && map.boss && (!hasFlag(s, 'boss') || trial)) this.makeBoss(map.boss);
     if (id === 'belfry' && map.boss && (!hasFlag(s, 'wraith') || trial)) this.makeWraith(map.boss);
-    // The hourglass by a dungeon's entry turns up once chapter two is done.
-    if (map.hourglass && reached(s, 'end')) {
+    if (id === 'caverns' && map.boss && (!hasFlag(s, 'gloam') || trial)) this.makeGloam(map.boss);
+    // The hourglass by a dungeon's entry turns up once chapter two is done and its boss is beaten.
+    if (map.hourglass && this.hourglassUp()) {
       const c = centre(map.hourglass);
       this.addWorld(this.add.image(c.x, c.y + 14, 'hourglass').setOrigin(0.5, 45 / 48), c.y + 14);
       this.glows.push({ x: c.x, y: c.y - 6, r: 70, col: [170, 220, 255], power: 0.7 });
@@ -369,16 +412,24 @@ export class GameScene extends Phaser.Scene {
   private playAreaMusic() {
     if (this.boss?.awake) return playMusic(BOSS, 'thornmother');
     if (this.wraith?.awake) return playMusic(BOSS, 'bellwraith');
+    if (this.gloam?.awake) return playMusic(BOSS, 'gloamwing');
     switch (this.map.theme) {
       case 'village':
         return playMusic(VILLAGE, 'calm');
       case 'woods':
       case 'fen':
+      case 'peaks':
         return playMusic(WILDS, this.map.theme);
       case 'shrine':
       case 'belfry':
+      case 'caverns':
         return playMusic(DEEP, this.map.theme);
     }
+  }
+
+  /** Whether the bosses fight harder: in an hourglass trial and all through a new game+. */
+  private get hard() {
+    return !!this.trial || this.state.cycle > 0;
   }
 
   private addWorld<T extends Phaser.GameObjects.Image>(img: T, depth: number) {
@@ -421,6 +472,12 @@ export class GameScene extends Phaser.Scene {
       case 'arch':
         this.glows.push({ x, y: top + 30, r: 70, col: [150, 200, 240], power: 0.5 });
         break;
+      case 'cave':
+        this.glows.push({ x, y: top + 50, r: 110, col: [170, 220, 255], power: 0.6 });
+        break;
+      case 'crystal':
+        this.glows.push({ x, y: bottom - 16, r: 90, col: [150, 210, 255], power: 0.75 });
+        break;
     }
   }
 
@@ -443,7 +500,7 @@ export class GameScene extends Phaser.Scene {
       return tx >= room.x && tx < room.x + room.w && ty >= room.y && ty < room.y + room.h;
     });
     if (!inside) return false;
-    if (d.room === 'boss') return !!this.boss || !!this.wraith;
+    if (d.room === 'boss') return !!this.boss || !!this.wraith || !!this.gloam;
     return this.foes.some((f) => f.alive && f.room === d.room);
   }
 
@@ -463,11 +520,24 @@ export class GameScene extends Phaser.Scene {
     if (slam) sfx('door');
   }
 
-  /** Whether the knight can't walk onto a tile. */
+  /** Whether the knight can't walk onto a tile. A hidden bridge holds only where the Moonlantern shines. */
   solidTile(tx: number, ty: number) {
     if (tx < 0 || ty < 0 || tx >= this.map.w || ty >= this.map.h) return true;
     const k = ty * this.map.w + tx;
-    return SOLID.has(tileAt(this.map, tx, ty)) || this.blockers.has(k) || this.closedDoors.has(k) || this.blocks.some((b) => b.x === tx && b.y === ty);
+    const tile = tileAt(this.map, tx, ty);
+    const solid = tile === 'veil' ? !this.lit(tx, ty) : SOLID.has(tile);
+    return solid || this.blockers.has(k) || this.closedDoors.has(k) || this.blocks.some((b) => b.x === tx && b.y === ty);
+  }
+
+  /** How strongly the Moonlantern lights a tile, 0 to 1 (0 without it). */
+  private moonlight(x: number, y: number, reach: number) {
+    if (!this.state.items.moonlantern) return 0;
+    return Phaser.Math.Clamp(1.4 - Math.hypot(x - this.state.x, y - (this.state.y - 6)) / reach, 0, 1);
+  }
+
+  /** Whether the Moonlantern's light reaches a hidden bridge's tile. */
+  private lit(tx: number, ty: number) {
+    return this.moonlight((tx + 0.5) * TILE, (ty + 0.5) * TILE, VEIL_PX) > 0;
   }
 
   /** Things that stand on tiles, for foes (which can't walk through people or blocks either). */
@@ -709,7 +779,13 @@ export class GameScene extends Phaser.Scene {
   /** Whether the dungeon's hourglass stands on a tile (it is there only after chapter two). */
   private hourglassAt(tx: number, ty: number) {
     const h = this.map.hourglass;
-    return !!h && h.x === tx && h.y === ty && reached(this.state, 'end');
+    return !!h && h.x === tx && h.y === ty && this.hourglassUp();
+  }
+
+  /** Whether this map's hourglass has turned up: after chapter two, once its own boss is beaten. */
+  private hourglassUp() {
+    const flag = BOSS_FLAG[this.map.id];
+    return reached(this.state, 'end') && (!flag || hasFlag(this.state, flag));
   }
 
   /** Turns the hourglass: the dungeon is built again with its foes and its boss back, and the clock runs. */
@@ -744,19 +820,25 @@ export class GameScene extends Phaser.Scene {
     }
     if (this.hud.covered || this.dialog) return;
     const s = this.state;
-    const two = reached(s, 'bell');
     const rows = MAP_IDS.map((id) => buildMap(id))
       .map((m) => {
-        const ids = m.stones.filter((st) => two || st.chapter !== 2).map((st) => st.id);
+        const ids = m.stones.filter((st) => stoneCounts(s, st.chapter)).map((st) => st.id);
         return { name: m.name, found: ids.filter((i) => s.moonstones.includes(i)).length, total: ids.length };
       })
       .filter((r) => r.total > 0);
-    const trials = reached(s, 'end') ? (['shrine', 'belfry'] as const).map((id) => ({ place: t(id), ms: s.trials[id] })) : [];
+    const trials = reached(s, 'end')
+      ? (['shrine', 'belfry', 'caverns'] as const).filter((id) => id !== 'caverns' || hasFlag(s, 'gloam')).map((id) => ({ place: t(id), ms: s.trials[id] }))
+      : [];
+    const requests = REQUESTS.filter((r) => s.requests[r.id]).map((r) => ({
+      text: t('requestRow', { giver: t(NPC_NAME[r.giver]), name: t(REQUEST_NAME[r.id]) }),
+      state: s.requests[r.id] === 'done' ? t('requestDone') : t('requestProgress', { n: Math.min(r.count, found(s, r.id)), total: r.count }),
+      done: s.requests[r.id] === 'done',
+    }));
     ui('click');
     this.route = null;
     this.target = null;
     this.stick = null;
-    this.hud.showStones(rows, trials);
+    this.hud.showStones(rows, trials, requests, s.cycle > 0 ? t('plusLevel', { n: s.cycle }) : '');
   }
 
   private openChest(id: string, item: ItemId) {
@@ -773,7 +855,10 @@ export class GameScene extends Phaser.Scene {
       heart: t('foundHeart'),
       oil: t('foundOil'),
       seeds: t('foundSeeds', { n: s.seeds }),
+      moonlantern: t('foundMoonlantern'),
     };
+    // The Moonlantern is chapter three's tool: finding it points the story at the caverns.
+    if (item === 'moonlantern' && s.quest === 'peaks') advance(s, 'caverns');
     this.openDialog('', [text[item]]);
     this.persist();
   }
@@ -804,6 +889,8 @@ export class GameScene extends Phaser.Scene {
 
   private effect(e: TalkEffect) {
     const s = this.state;
+    if (e.startsWith('take-')) return this.takeRequest(e.slice(5) as RequestId);
+    if (e.startsWith('reward-')) return this.handIn(e.slice(7) as RequestId);
     switch (e) {
       case 'quest-blade':
         advance(s, 'blade');
@@ -851,6 +938,17 @@ export class GameScene extends Phaser.Scene {
         advance(s, 'end');
         this.chapterEnd(2);
         break;
+      case 'quest-peaks':
+        advance(s, 'peaks');
+        this.hud.toast(t('newQuestPeaks'));
+        break;
+      case 'finish-three':
+        advance(s, 'final');
+        this.chapterEnd(3);
+        break;
+      case 'plus-offer':
+        this.offerPlus();
+        return;
       case 'trial':
         this.startTrial();
         return;
@@ -858,33 +956,76 @@ export class GameScene extends Phaser.Scene {
     this.persist();
   }
 
-  private chapterEnd(chapter: 1 | 2) {
+  /** A villager's request taken: its things show where they lie. */
+  private takeRequest(id: RequestId) {
+    const s = this.state;
+    s.requests[id] = 'taken';
+    this.hud.toast(t('newRequest', { name: t(REQUEST_NAME[id]) }));
+    this.persist();
+    // Things of this request lying on this map show at once.
+    this.map.finds.forEach((f, i) => {
+      if (f.req !== id || hasFlag(s, `find-${id}-${i}`)) return;
+      const c = centre(f);
+      this.findSprites.set(`${id}-${i}`, this.addWorld(this.add.image(c.x, c.y + 4, FIND_ART[id].key).setOrigin(0.5, 0.8), c.y + 4));
+    });
+  }
+
+  /** A request's things handed in: it is done and pays its reward. */
+  private handIn(id: RequestId) {
+    const s = this.state;
+    reward(s, id);
+    ui('coin');
+    playSting(STINGS, 'item');
+    this.hud.toast(t('doneRequest', { name: t(REQUEST_NAME[id]) }));
+    this.openDialog('', [t(FIND_ART[id].reward)]);
+    this.persist();
+  }
+
+  /** Elder Wren's offer to begin again, kept from the first night with the tools. */
+  private offerPlus() {
+    this.route = null;
+    this.target = null;
+    this.stick = null;
+    this.hud.showEnd(t('plusTitle'), [t('plusText')], [{ label: t('plusNotYet') }, { label: t('plusBegin'), fn: () => this.startPlus() }]);
+  }
+
+  /** New game+: the kingdom starts over, the knight keeps their tools, and the foes and moonstones change. */
+  private startPlus() {
+    this.trial = null;
+    this.state = newPlus(this.state);
+    save(this.state);
+    this.enterMap(this.state.map, this.state.x, this.state.y, this.state.facing, false);
+    this.hud.toast(t('plusStart', { n: this.state.cycle }));
+  }
+
+  /** Each chapter's end card: its title, its moonstones, how many make the middle ending, and the three endings. */
+  private static readonly ENDS = {
+    1: { title: 'chapterOne', total: CHAPTER_ONE_STONES, many: 4, all: 'endOneAll', some: 'endOneSome', few: 'endOneFew' },
+    2: { title: 'chapterTwo', total: CHAPTER_TWO_STONES, many: 10, all: 'endTwoAll', some: 'endTwoSome', few: 'endTwoFew' },
+    3: { title: 'chapterThree', total: MOONSTONES, many: 14, all: 'endThreeAll', some: 'endThreeSome', few: 'endThreeFew' },
+  } as const;
+
+  private chapterEnd(chapter: 1 | 2 | 3) {
     const s = this.state;
     const n = s.moonstones.length;
-    const total = chapter === 1 ? CHAPTER_ONE_STONES : MOONSTONES;
-    const ending =
-      chapter === 1
-        ? n >= total
-          ? t('endOneAll')
-          : n >= 4
-            ? t('endOneSome')
-            : t('endOneFew')
-        : n >= total
-          ? t('endTwoAll')
-          : n >= 10
-            ? t('endTwoSome')
-            : t('endTwoFew');
-    const many = chapter === 1 ? 4 : 10;
-    playSting(STINGS, n >= total ? 'endAll' : n >= many ? 'endSome' : 'endFew');
-    this.hud.showEnd(
-      chapter === 1 ? t('chapterOne') : t('chapterTwo'),
-      [t('endStats', { n, total, beaten: s.beaten, falls: s.falls }), ending],
-      () => {
-        clearSave();
-        this.state = newState();
-        this.enterMap(this.state.map, this.state.x, this.state.y, this.state.facing, false);
+    const end = GameScene.ENDS[chapter];
+    const ending = n >= end.total ? t(end.all) : n >= end.many ? t(end.some) : t(end.few);
+    playSting(STINGS, n >= end.total ? 'endAll' : n >= end.many ? 'endSome' : 'endFew');
+    const buttons: { label: string; fn?: () => void }[] = [
+      { label: t('keepExploring') },
+      {
+        label: t('newGame'),
+        fn: () => {
+          clearSave();
+          this.trial = null;
+          this.state = newState();
+          this.enterMap(this.state.map, this.state.x, this.state.y, this.state.facing, false);
+        },
       },
-    );
+    ];
+    // After the last chapter the knight can also begin again, keeping their tools.
+    if (chapter === 3) buttons.push({ label: t('newGamePlus'), fn: () => this.startPlus() });
+    this.hud.showEnd(t(end.title), [t('endStats', { n, total: end.total, beaten: s.beaten, falls: s.falls }), ending], buttons);
   }
 
   private gainStone(id: string) {
@@ -907,13 +1048,18 @@ export class GameScene extends Phaser.Scene {
     this.swingCd = SWING_COOLDOWN_MS;
     sfx('swing');
     const d = DIRS[s.facing];
-    const hx = s.x + d.x * SWING_REACH;
-    const hy = s.y - 10 + d.y * SWING_REACH;
+    // Pip's whetstone makes the blade reach farther.
+    const sharp = hasUpgrade(s, 'whetstone') ? WHETSTONE : 1;
+    const hx = s.x + d.x * SWING_REACH * sharp;
+    const hy = s.y - 10 + d.y * SWING_REACH * sharp;
+    const reach = SWING_RADIUS * sharp;
     // Foes and the Thornmother's bulbs in reach.
-    for (const f of this.foes) if (f.alive && Math.hypot(f.x - hx, f.y - 8 - hy) < SWING_RADIUS + 12) this.hitFoe(f, d);
+    for (const f of this.foes) if (f.alive && Math.hypot(f.x - hx, f.y - 8 - hy) < reach + 12) this.hitFoe(f, d);
     if (this.boss) for (const b of this.boss.bulbs) if (b.state === 'down' && Math.hypot(b.x - hx, b.y - 10 - hy) < SWING_RADIUS + 14) this.hitBulb(b);
     const w = this.wraith;
     if (w && (w.state === 'tipped' || w.state === 'down') && Math.hypot(w.x - hx, w.y - 12 - hy) < SWING_RADIUS + 26) this.hitWraith();
+    const g = this.gloam;
+    if (g && (g.state === 'down' || g.state === 'low') && Math.hypot(g.x - hx, g.y - g.lift - 10 - hy) < reach + 26) this.hitGloam();
     // The belfry's bells, one at a time.
     const bell = this.bells.find((b) => Math.hypot((b.x + 0.5) * TILE - hx, (b.y + 0.5) * TILE - hy) < SWING_RADIUS + 14);
     if (bell) this.ringBell(bell);
@@ -929,10 +1075,13 @@ export class GameScene extends Phaser.Scene {
       if (
         st.hidden === 'buried' &&
         !this.dug.has(st.id) &&
+        !s.moonstones.includes(st.id) &&
         ((Math.floor(s.x / TILE) === st.x && Math.floor(s.y / TILE) === st.y) || Math.hypot((st.x + 0.5) * TILE - hx, (st.y + 0.5) * TILE - hy) <= 32)
       ) {
         this.dug.add(st.id);
         this.stoneSprites.get(st.id)?.setVisible(true);
+        this.glimmers.get(st.id)?.destroy();
+        this.glimmers.delete(st.id);
         sfx('glint');
         this.hud.toast(t('glint'));
       }
@@ -1248,6 +1397,7 @@ export class GameScene extends Phaser.Scene {
       this.updateBombs(dt);
       this.updateBoss(dt);
       this.updateWraith(dt);
+      this.updateGloam(dt);
       this.updateWisp(dt);
       this.pickups();
       this.updateDoors();
@@ -1449,6 +1599,12 @@ export class GameScene extends Phaser.Scene {
         h.phase = 'back';
         return;
       }
+      const g = this.gloam;
+      if (g && g.state === 'low' && Math.hypot(g.x - h.x, g.y - g.lift - 10 - h.y) < 24) {
+        this.pullGloam();
+        h.phase = 'back';
+        return;
+      }
       const foe = this.foes.find((f) => f.alive && Math.hypot(f.x - h.x, f.y - 10 - h.y) < 16);
       if (foe) {
         if (ARMOURED.has(foe.kind)) this.knockDown(foe);
@@ -1469,7 +1625,8 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     if (this.invuln > 0 || this.roll || this.hook?.phase === 'pull') return;
     s.hp = Math.max(0, s.hp - damage);
-    this.invuln = HURT_MS;
+    // Sedge's moon charm keeps harm off a while longer.
+    this.invuln = HURT_MS * (hasUpgrade(s, 'charm') ? CHARM : 1);
     sfx('hurt');
     const dx = s.x - from.x;
     const dy = s.y - from.y;
@@ -1513,7 +1670,15 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     const tx = Math.floor(s.x / TILE);
     const ty = Math.floor(s.y / TILE);
-    const exit = this.map.exits.find((e) => tx >= e.x && tx < e.x + e.w && ty >= e.y && ty < e.y + e.h && (!e.flag || hasFlag(s, e.flag)));
+    const on = this.map.exits.filter((e) => tx >= e.x && tx < e.x + e.w && ty >= e.y && ty < e.y + e.h && (!e.flag || hasFlag(s, e.flag)));
+    const exit = on.find((e) => !e.quest || reached(s, e.quest));
+    // A way the story has not opened yet (a new game+ knight has the tools for it early) says so once.
+    const shut = !exit && on.length > 0;
+    if (shut && !this.onShutWay) {
+      ui('refuse');
+      this.hud.toast(t('wayShut'));
+    }
+    this.onShutWay = shut;
     if (!exit) return;
     this.route = null;
     this.target = null;
@@ -1551,12 +1716,28 @@ export class GameScene extends Phaser.Scene {
       const c = centre(st);
       if (Math.hypot(c.x - s.x, c.y - s.y) < PICKUP_PX) this.gainStone(st.id);
     }
+    // A villager's thing, picked up by walking over it.
+    for (const [key, img] of this.findSprites) {
+      const i = Number(key.slice(key.lastIndexOf('-') + 1));
+      const f = this.map.finds[i];
+      const c = centre(f);
+      if (Math.hypot(c.x - s.x, c.y - s.y) >= PICKUP_PX + 4) continue;
+      img.destroy();
+      this.findSprites.delete(key);
+      setFlag(s, `find-${f.req}-${i}`);
+      sfx('find');
+      const req = REQUESTS.find((r) => r.id === f.req)!;
+      const name = t(FIND_ART[f.req].name);
+      this.hud.toast(req.count > 1 ? t('findGot', { item: name, n: Math.min(req.count, found(s, f.req)), total: req.count }) : t('findGotOne', { item: name }));
+      this.persist();
+    }
   }
 
   // ---------------------------------------------------------------- foes
 
   private spawnFoe(kind: Foe['kind'], x: number, y: number, index: number, room?: string) {
     const f = makeFoe(this, kind, x, y, index, room);
+    if (this.state.cycle > 0) f.hp = Math.ceil(f.hp * PLUS.hp);
     this.world.push(f.sprite);
     this.foes.push(f);
     return f;
@@ -1571,7 +1752,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** A toast that shows once since the page opened, to teach the armoured foes. */
-  private hint(key: 'beetleFlipped' | 'lanternDown' | 'shellHard') {
+  private hint(key: 'beetleFlipped' | 'lanternDown' | 'shellHard' | 'gloamHigh') {
     if (this.hinted.has(key)) return;
     this.hinted.add(key);
     this.hud.toast(t(key));
@@ -1599,11 +1780,12 @@ export class GameScene extends Phaser.Scene {
     f.alive = false;
     this.state.beaten++;
     if (f.kind === 'beetle') awardNow('bellyUp');
-    this.puff(f.x, f.y - 10, f.kind === 'moth' ? 0xc8bce0 : f.kind === 'lantern' ? 0xf0c070 : f.kind === 'beetle' ? 0x3a7a8a : 0x6a8a4a);
+    this.puff(f.x, f.y - 10, f.kind === 'moth' ? 0xc8bce0 : f.kind === 'lantern' ? 0xf0c070 : f.kind === 'beetle' ? 0x3a7a8a : f.kind === 'shade' ? 0x40466a : 0x6a8a4a);
     f.sprite.destroy();
     if (DUNGEONS.has(this.map.id) && f.index >= 0) setFlag(this.state, this.foeFlag(f.index));
-    // Every foe leaves a coin, and sometimes a heart or a seed pod beside it.
+    // Every foe leaves a coin (two with Wren's deep purse), and sometimes a heart or a seed pod beside it.
     this.dropCoin(f.x, f.y);
+    if (hasUpgrade(this.state, 'pockets')) this.dropCoin(f.x - 10, f.y + 4);
     if (Math.random() < 0.3) this.dropHeart(f.x + 10, f.y + 4);
     else if (this.state.items.seeds && Math.random() < 0.35) this.dropPod(f.x + 10, f.y + 4);
   }
@@ -1649,7 +1831,7 @@ export class GameScene extends Phaser.Scene {
           vx = f.dir.x * info.speed;
           vy = f.dir.y * info.speed;
         }
-      } else if (f.kind === 'moth') {
+      } else if (f.kind === 'moth' || f.kind === 'shade') {
         const wob = Math.sin(this.now / 220 + f.index);
         if (sees) {
           vx = (dx / dist) * info.speed + (-dy / dist) * wob * 50;
@@ -1701,8 +1883,10 @@ export class GameScene extends Phaser.Scene {
         sfx('spit');
         this.shoot(f.x, f.y - 16, dx / dist, dy / dist);
       }
-      const nx = f.x + vx * sec;
-      const ny = f.y + vy * sec;
+      // New game+ foes move faster.
+      const quick = s.cycle > 0 ? PLUS.speed : 1;
+      const nx = f.x + vx * sec * quick;
+      const ny = f.y + vy * sec * quick;
       // A foe that bumps into something turns at once; a frog just ends its leap.
       if (foeFree(this.map, this.standing, nx, f.y, info.flies)) f.x = nx;
       else if (f.kind === 'frog') f.leap = 0;
@@ -1711,7 +1895,7 @@ export class GameScene extends Phaser.Scene {
       else if (f.kind === 'frog') f.leap = 0;
       else f.t = 0;
       // A lantern moth flies too high to bump into.
-      if (f.kind !== 'lantern' && Math.hypot(s.x - f.x, s.y - f.y) < 18) this.hurt(info.damage, f);
+      if (f.kind !== 'lantern' && Math.hypot(s.x - f.x, s.y - f.y) < 18) this.hurt(info.damage * (s.cycle > 0 ? PLUS.damage : 1), f);
     }
     this.foes = this.foes.filter((f) => f.alive);
   }
@@ -1849,7 +2033,7 @@ export class GameScene extends Phaser.Scene {
       const next = boss.bulbs.find((b, i) => b.state === 'hidden' && i === (3 - left) % 3) ?? boss.bulbs.find((b) => b.state === 'hidden');
       if (next) {
         next.state = 'raised';
-        next.t = BULB_UP_MS * (this.trial ? TRIAL.bulbUp : 1);
+        next.t = BULB_UP_MS * (this.hard ? TRIAL.bulbUp : 1);
       }
       boss.raiseT = BULB_EVERY_MS;
     }
@@ -1868,10 +2052,10 @@ export class GameScene extends Phaser.Scene {
     }
     boss.volleyT -= dt;
     if (boss.volleyT <= 0) {
-      boss.volleyT = (VOLLEY_MS[3 - left] ?? VOLLEY_MS[2]) * (this.trial ? TRIAL.volley : 1);
+      boss.volleyT = (VOLLEY_MS[3 - left] ?? VOLLEY_MS[2]) * (this.hard ? TRIAL.volley : 1);
       sfx('volley');
       const turn = (this.now / 1000) % 1;
-      const shots = this.trial ? TRIAL.volleyShots : 8;
+      const shots = this.hard ? TRIAL.volleyShots : 8;
       for (let i = 0; i < shots; i++) {
         const a = ((i + turn) / shots) * Math.PI * 2;
         this.shoot(boss.x + Math.cos(a) * 30, boss.y + Math.sin(a) * 20, Math.cos(a), Math.sin(a));
@@ -1879,8 +2063,8 @@ export class GameScene extends Phaser.Scene {
     }
     boss.summonT -= dt;
     if (boss.summonT <= 0) {
-      boss.summonT = SUMMON_MS * (this.trial ? TRIAL.summon : 1);
-      if (this.foes.filter((f) => f.alive && f.room === 'boss').length < (this.trial ? TRIAL.summoned : 2)) {
+      boss.summonT = SUMMON_MS * (this.hard ? TRIAL.summon : 1);
+      if (this.foes.filter((f) => f.alive && f.room === 'boss').length < (this.hard ? TRIAL.summoned : 2)) {
         const room = this.map.rooms.find((r) => r.id === 'boss')!;
         const side = Math.random() < 0.5 ? room.x + 2 : room.x + room.w - 3;
         const c = centre({ x: side, y: room.y + 2 + Math.floor(Math.random() * (room.h - 4)) });
@@ -1899,13 +2083,13 @@ export class GameScene extends Phaser.Scene {
     const ghost = this.add.image(x, y, 'wraith').setOrigin(0.5, 0.9).setScale(texScale('wraith')).setVisible(false);
     const bell = this.add.image(x, y, 'bigbell').setOrigin(0.5, 78 / 88).setScale(texScale('bigbell'));
     this.world.push(shadow, ghost, bell);
-    this.wraith = { x, y, lift: BELL_LIFT, state: 'hover', t: HOVER_MS, hp: this.trial ? TRIAL.wraithHp : WRAITH_HP, bell, ghost, shadow, summonT: SUMMON_MS, podT: 3000, awake: false };
+    this.wraith = { x, y, lift: BELL_LIFT, state: 'hover', t: HOVER_MS, hp: this.hard ? TRIAL.wraithHp : WRAITH_HP, bell, ghost, shadow, summonT: SUMMON_MS, podT: 3000, awake: false };
   }
 
   private tipBell() {
     const w = this.wraith!;
     w.state = 'tipped';
-    w.t = EXPOSED_MS * (this.trial ? TRIAL.exposed : 1);
+    w.t = EXPOSED_MS * (this.hard ? TRIAL.exposed : 1);
     sfx('topple');
     this.hud.toast(t('bellTipped'));
   }
@@ -1970,7 +2154,7 @@ export class GameScene extends Phaser.Scene {
       const dx = s.x - w.x;
       const dy = s.y - w.y;
       const dist = Math.hypot(dx, dy);
-      const step = Math.min(dist, (HOVER_SPEED * (this.trial ? TRIAL.hoverSpeed : 1) * dt) / 1000);
+      const step = Math.min(dist, (HOVER_SPEED * (this.hard ? TRIAL.hoverSpeed : 1) * dt) / 1000);
       if (dist > 1) {
         w.x = Phaser.Math.Clamp(w.x + (dx / dist) * step, (room.x + 1.5) * TILE, (room.x + room.w - 1.5) * TILE);
         w.y = Phaser.Math.Clamp(w.y + (dy / dist) * step, (room.y + 1.5) * TILE, (room.y + room.h - 0.5) * TILE);
@@ -2002,7 +2186,7 @@ export class GameScene extends Phaser.Scene {
       w.lift = BELL_LIFT * (1 - Math.max(0, w.t) / 600);
       if (w.t <= 0) {
         w.state = 'hover';
-        w.t = HOVER_MS * (this.trial ? TRIAL.hover : 1);
+        w.t = HOVER_MS * (this.hard ? TRIAL.hover : 1);
       }
     }
     // The bell on the floor is in the way: the knight can't stand inside it.
@@ -2042,6 +2226,171 @@ export class GameScene extends Phaser.Scene {
     w.ghost.setVisible(tipped).setPosition(w.x, w.y - 6 - (settings.reduceMotion ? 0 : Math.sin(this.now / 200) * 3)).setDepth(w.y + 1);
     const near = 1 - w.lift / (BELL_LIFT + 10);
     w.shadow.setPosition(w.x, w.y).setScale(texScale('bell-shadow') * (0.6 + near * 0.5)).setAlpha(w.state === 'drop' ? 1 : 0.6 + near * 0.4);
+  }
+
+  // ---------------------------------------------------------------- the Gloamwing
+
+  private makeGloam(at: { x: number; y: number }) {
+    const x = at.x * TILE;
+    const y = at.y * TILE;
+    const shadow = this.add.image(x, y, 'bell-shadow').setScale(texScale('bell-shadow')).setDepth(-4000);
+    const sprite = this.add.image(x, y, 'gloam').setOrigin(0.5, 0.8).setScale(texScale('gloam'));
+    this.world.push(shadow, sprite);
+    const hp = this.hard ? TRIAL.gloamHp : GLOAM.hp;
+    this.gloam = { x, y, lift: GLOAM.lift, state: 'circle', t: GLOAM.circleMs, hp, home: { x, y }, angle: Math.PI / 2, mark: { x, y }, from: { x, y }, sprite, shadow, shotT: GLOAM.shotMs, summonT: SUMMON_MS, awake: false };
+  }
+
+  /** The hookvine catches the Gloamwing while it hangs low after a dive and pulls it to the ground. */
+  private pullGloam() {
+    const g = this.gloam!;
+    g.state = 'down';
+    g.t = GLOAM.downMs;
+    g.lift = 0;
+    sfx('latch');
+    sfx('thud');
+    this.hud.toast(t('gloamDown'));
+  }
+
+  private hitGloam() {
+    const g = this.gloam!;
+    if (g.state !== 'down') {
+      this.hint('gloamHigh');
+      return;
+    }
+    g.hp--;
+    sfx('screech', { pitch: g.hp > 0 ? 1 : 0.8 });
+    this.puff(g.x, g.y - 16, 0x40466a);
+    if (!settings.reduceMotion) this.flashes.push({ x: g.x, y: g.y - 20, r: 150, col: [190, 210, 255], power: 1, t: 400 });
+    if (g.hp <= 0) return this.gloamDown();
+    this.hud.toast(t('gloamFlees'));
+    g.state = 'rise';
+    g.t = GLOAM.riseMs;
+  }
+
+  private gloamDown() {
+    const s = this.state;
+    const g = this.gloam!;
+    this.puff(g.x, g.y - 20, 0x8a90c0);
+    this.tweens.add({ targets: [g.sprite, g.shadow], alpha: 0, duration: 900 });
+    this.gloam = null;
+    playSting(STINGS, 'victory');
+    this.playAreaMusic();
+    for (const sd of this.seeds) sd.sprite.destroy();
+    this.seeds = [];
+    for (const f of this.foes)
+      if (f.room === 'boss') {
+        f.alive = false;
+        f.sprite.destroy();
+      }
+    if (this.trial) return this.trialWon();
+    setFlag(s, 'gloam');
+    advance(s, 'homeward');
+    give(s, 'heart');
+    this.stoneSprites.get('c-boss')?.setVisible(true);
+    this.openDialog('', [t('gloamBeaten'), t('foundHeart'), t('gloamQuiet')]);
+    this.persist();
+  }
+
+  private updateGloam(dt: number) {
+    const g = this.gloam;
+    if (!g) return;
+    const s = this.state;
+    if (!g.awake) {
+      if (!this.inRoom('boss')) return;
+      g.awake = true;
+      this.playAreaMusic();
+      this.hud.showPlace(t('gloamwing'));
+    }
+    const room = this.map.rooms.find((r) => r.id === 'boss')!;
+    g.t -= dt;
+    if (g.state === 'circle') {
+      // High over the hall's middle, round and round, shedding rings of frost.
+      g.angle += (GLOAM.turn * dt) / 1000;
+      const tx = g.home.x + Math.cos(g.angle) * GLOAM.ring * 1.6;
+      const ty = g.home.y + Math.sin(g.angle) * GLOAM.ring * 0.6;
+      g.x += (tx - g.x) * Math.min(1, dt / 300);
+      g.y += (ty - g.y) * Math.min(1, dt / 300);
+      g.lift = GLOAM.lift;
+      g.shotT -= dt;
+      if (g.shotT <= 0) {
+        g.shotT = GLOAM.shotMs * (this.hard ? TRIAL.volley : 1);
+        sfx('volley', { pitch: 1.3 });
+        const shots = this.hard ? GLOAM.shots + 4 : GLOAM.shots;
+        const turn = (this.now / 1000) % 1;
+        for (let i = 0; i < shots; i++) {
+          const a = ((i + turn) / shots) * Math.PI * 2;
+          this.shoot(g.x + Math.cos(a) * 20, g.y + Math.sin(a) * 14, Math.cos(a), Math.sin(a), 'shard');
+        }
+      }
+      if (g.t <= 0) {
+        g.state = 'mark';
+        g.t = GLOAM.markMs;
+        g.mark = { x: s.x, y: s.y };
+        sfx('rattle', { pitch: 1.6 });
+      }
+    } else if (g.state === 'mark') {
+      // Its shadow settles on the knight's spot, then it drops on it.
+      g.x += (g.mark.x - g.x) * Math.min(1, dt / 500);
+      g.y += (g.mark.y - g.y) * Math.min(1, dt / 500);
+      if (g.t <= 0) {
+        g.state = 'dive';
+        g.t = GLOAM.diveMs;
+        g.from = { x: g.x, y: g.y };
+        sfx('swoop');
+      }
+    } else if (g.state === 'dive') {
+      const k = 1 - Math.max(0, g.t) / GLOAM.diveMs;
+      g.x = g.from.x + (g.mark.x - g.from.x) * k;
+      g.y = g.from.y + (g.mark.y - g.from.y) * k;
+      g.lift = GLOAM.lift * (1 - k) + 10 * k;
+      if (g.t <= 0) {
+        g.state = 'low';
+        g.t = GLOAM.lowMs * (this.hard ? TRIAL.gloamLow : 1);
+        this.puff(g.x, g.y - 4, 0x8a90c0);
+        if (!settings.reduceMotion) this.cameras.main.shake(160, 0.006);
+        if (Math.hypot(s.x - g.x, s.y - g.y) < GLOAM.hitPx) this.hurt(2, g);
+      }
+    } else if (g.state === 'low') {
+      g.lift = 12 + (settings.reduceMotion ? 0 : Math.sin(this.now / 140) * 3);
+      if (g.t <= 0) {
+        g.state = 'rise';
+        g.t = GLOAM.riseMs;
+      }
+    } else if (g.state === 'down') {
+      g.lift = 0;
+      if (g.t <= 0) {
+        g.state = 'rise';
+        g.t = GLOAM.riseMs;
+      }
+    } else if (g.state === 'rise') {
+      g.lift = GLOAM.lift * (1 - Math.max(0, g.t) / GLOAM.riseMs);
+      if (g.t <= 0) {
+        g.state = 'circle';
+        g.t = GLOAM.circleMs * (this.hard ? TRIAL.gloamCircle : 1);
+        g.shotT = GLOAM.shotMs / 2;
+        g.angle = Math.atan2((g.y - g.home.y) / 0.6, (g.x - g.home.x) / 1.6);
+      }
+    }
+    g.x = Phaser.Math.Clamp(g.x, (room.x + 1.5) * TILE, (room.x + room.w - 1.5) * TILE);
+    g.y = Phaser.Math.Clamp(g.y, (room.y + 1.5) * TILE, (room.y + room.h - 0.5) * TILE);
+    // Shades out of the dark while the knight fights it.
+    g.summonT -= dt;
+    if (g.summonT <= 0) {
+      g.summonT = SUMMON_MS * (this.hard ? TRIAL.summon : 1);
+      if (this.foes.filter((f) => f.alive && f.room === 'boss').length < 2) {
+        const c = centre({ x: Math.random() < 0.5 ? room.x + 2 : room.x + room.w - 3, y: room.y + 2 });
+        this.spawnFoe('shade', c.x, c.y, -1, 'boss');
+      }
+    }
+    // Drawing: the moth at its height, folded flat while it lies on the floor.
+    const down = g.state === 'down';
+    const flap = settings.reduceMotion || down ? 1 : 0.85 + Math.abs(Math.sin(this.now / 120)) * 0.15;
+    g.sprite
+      .setPosition(g.x, g.y - g.lift)
+      .setScale(texScale('gloam') * (down ? 0.9 : 1), texScale('gloam') * (down ? 0.6 : flap))
+      .setDepth(g.lift > 20 ? g.y + 200 : g.y);
+    if (g.state === 'mark') g.shadow.setPosition(g.mark.x, g.mark.y).setScale(texScale('bell-shadow') * (0.5 + (1 - g.t / GLOAM.markMs) * 0.6)).setAlpha(0.9);
+    else g.shadow.setPosition(g.x, g.y).setScale(texScale('bell-shadow') * (0.6 + (1 - g.lift / GLOAM.lift) * 0.4)).setAlpha(0.6);
   }
 
   private updateWisp(dt: number) {
@@ -2124,14 +2473,17 @@ export class GameScene extends Phaser.Scene {
         f.kind === 'moth' ? (flap ? 'moth-a' : 'moth-b')
         : f.kind === 'lantern' ? (f.down > 0 || !flap ? 'lantern-b' : 'lantern-a')
         : f.kind === 'beetle' && f.down > 0 ? 'beetle-back'
+        : f.kind === 'shade' ? (flap ? 'shade' : 'shade-b')
         : f.kind;
       const lift =
-        f.kind === 'moth' ? 12
+        f.kind === 'moth' || f.kind === 'shade' ? 12
         : f.kind === 'lantern' ? (f.down > 0 ? 2 : LANTERN_LIFT + (settings.reduceMotion ? 0 : Math.sin(this.now / 300 + f.index) * 3))
         : f.kind === 'frog' && f.leap > 0 ? Math.sin((1 - f.leap / FROG_LEAP_MS) * Math.PI) * 10
         : 0;
       f.sprite.setTexture(key).setScale(texScale(key)).setPosition(f.x, f.y - lift).setDepth(f.y);
-      f.sprite.setAlpha(f.stun > 0 ? 0.6 : 1);
+      // A shade shows only in the knight's light, most of all the Moonlantern's.
+      const seen = f.kind === 'shade' ? Phaser.Math.Clamp(1.3 - Math.hypot(f.x - s.x, f.y - s.y) / SHADE_SEEN_PX, 0.12, 1) : 1;
+      f.sprite.setAlpha((f.stun > 0 ? 0.6 : 1) * seen);
       if (f.hurt > 0 && !settings.reduceMotion) f.sprite.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
       else f.sprite.clearTint().setTintMode(Phaser.TintModes.MULTIPLY);
       if ((f.kind === 'slug' || f.kind === 'beetle' || f.kind === 'frog') && f.dir.x) f.sprite.setFlipX(f.kind === 'frog' ? f.dir.x < 0 : s.x < f.x);
@@ -2143,9 +2495,19 @@ export class GameScene extends Phaser.Scene {
       const c = centre(st);
       img.setY(c.y - 4 + (settings.reduceMotion ? 0 : Math.sin(this.now / 350 + c.x) * 2));
     }
+    // The hidden bridges fade in where the Moonlantern shines; a moved moonstone glimmers in the knight's light.
+    for (const [, img] of this.veilSprites) img.setAlpha(this.moonlight(img.x, img.y, VEIL_PX));
+    for (const [, img] of this.glimmers) {
+      const near = Phaser.Math.Clamp(1.2 - Math.hypot(img.x - s.x, img.y - s.y) / GLIMMER_PX, 0, 1);
+      img.setAlpha(near * (settings.reduceMotion ? 0.9 : 0.65 + Math.sin(this.now / 160 + img.x) * 0.35));
+    }
     // Lights: the map's own, the knight's lantern, moonstones, the wisp and the queen's lit bulbs.
     const lights = [...this.glows];
-    lights.push({ x: s.x, y: s.y - 16, r: s.items.oil ? LANTERN_OIL : LANTERN, col: [255, 210, 150], power: 0.9 });
+    const moon = s.items.moonlantern;
+    lights.push({ x: s.x, y: s.y - 16, r: s.items.oil ? LANTERN_OIL : LANTERN, col: moon ? [215, 230, 255] : [255, 210, 150], power: 0.9 });
+    for (const [, img] of this.findSprites) lights.push({ x: img.x, y: img.y - 6, r: 34, col: [255, 240, 200], power: 0.5 });
+    const g = this.gloam;
+    if (g) lights.push({ x: g.x, y: g.y - g.lift - 10, r: 130, col: [160, 170, 255], power: 0.6 });
     for (const [, img] of this.stoneSprites) if (img.visible) lights.push({ x: img.x, y: img.y, r: 40, col: [170, 210, 255], power: 0.6 });
     if (this.wisp) lights.push({ x: this.wisp.sprite.x, y: this.wisp.sprite.y, r: 110, col: [170, 230, 255], power: 0.9 });
     if (this.boss) {
@@ -2163,6 +2525,8 @@ export class GameScene extends Phaser.Scene {
       if (w.state === 'tipped') lights.push({ x: w.x, y: w.y - 30, r: 120, col: [170, 230, 255], power: 0.9 });
     }
     for (const f of this.flashes) lights.push({ ...f, power: f.power * Math.min(1, f.t / 200) });
+    for (const [, img] of this.glimmers) if (img.alpha > 0.1) lights.push({ x: img.x, y: img.y, r: 36, col: [190, 220, 255], power: 0.6 * img.alpha });
+    for (const [, img] of this.veilSprites) if (img.alpha > 0.3) lights.push({ x: img.x, y: img.y, r: 30, col: [180, 210, 255], power: 0.35 * img.alpha });
     this.night.draw(this.cameras.main.worldView, lights, this.map.dark);
   }
 

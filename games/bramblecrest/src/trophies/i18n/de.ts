@@ -20,7 +20,7 @@ const de: Translation<typeof en> = {
   swift: 'Schneller als Sand',
   swiftText: 'Schaffe die Prüfung im Schrein unter 2:30 und die im Glockenturm unter 2:00.',
   allStones: 'Der ganze Mond',
-  allStonesText: 'Finde alle dreizehn Mondsteine.',
+  allStonesText: 'Finde alle siebzehn Mondsteine.',
   unbroken: 'Ungebrochen',
   unbrokenText: 'Beende Kapitel zwei, ohne je zu stürzen.',
 };

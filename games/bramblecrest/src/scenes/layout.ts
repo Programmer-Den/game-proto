@@ -21,13 +21,19 @@ export const VINE_SPEED = 560;
 export const PULL_SPEED = 400;
 /** Sedge's long vine reaches this much farther. */
 export const LONG_VINE = 1.4;
-/** After a hit, how long the knight can't be hurt again. */
+/** After a hit, how long the knight can't be hurt again, and how much longer with Sedge's moon charm. */
 export const HURT_MS = 1000;
+export const CHARM = 1.6;
+/** Pip's whetstone: the sword reaches this much farther. */
+export const WHETSTONE = 1.3;
 /** How close (in pixels) the knight's feet must be to pick something up. */
 export const PICKUP_PX = 18;
 /** The lantern the knight carries, and with the lantern oil from the shrine. */
 export const LANTERN = 120;
 export const LANTERN_OIL = 175;
+/** How far the Moonlantern's light shows hidden bridges (and lets the knight walk them), and how close a moved moonstone glimmers. */
+export const VEIL_PX = 100;
+export const GLIMMER_PX = 110;
 
 /**
  * The floating touch stick: rim and knob radius, the dead zone, how far a finger drags before a
