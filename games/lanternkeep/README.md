@@ -75,7 +75,9 @@ stone joints, the lanterns have coloured-glass panes and the moths are lace-wing
    gust hits shields it: a moth that finishes lighting or refilling the warned lantern stays on it
    (a pale blue ring) until the gust has passed, then flies home. Otherwise the lantern goes dark.
    Night 1 has one gust (34 seconds before nightfall), nights 2 and 3 two (also 22), and every
-   night after three (also 10). With no lantern lit, the wind passes harmlessly.
+   night after three (also 10). A summer dusk is too short to warn a gust at 34 seconds, so its
+   gusts come a little later and every one is still warned (30, 22 and 10; a summer storm's 30,
+   24, 18, 12 and 6). With no lantern lit, the wind passes harmlessly.
 7. **Close calls**: a lit lantern with under 15% of its oil left shows an orange ring and a
    "Save it +2c" tag. A moth that reaches it before it goes dark refills it as a close call and
    pays 2 coins at once ("+2c close call!", with a flare of sparks).
@@ -186,7 +188,8 @@ stone joints, the lanterns have coloured-glass panes and the moths are lace-wing
     A building lasts for every later game and stands at the left end of the village.
 27. **Seasons**: the nights turn through spring, summer, autumn and winter, three nights each from
     spring on night 1, named on the night-kind plaque. Spring changes nothing. Summer dusks last
-    36 seconds and half of summer nights are stormy; half of autumn nights are foggy, with leaves
+    36 seconds (the first gust, tide or avalanche comes a little later to keep its warning) and
+    half of summer nights are stormy; half of autumn nights are foggy, with leaves
     falling. Winter dusks last 54 seconds, but snow slows every moth to 85%. The night panel says
     when a new season comes.
 28. **The monastery, a third keep**: the Great Festival's panel also offers "Climb". The keep then

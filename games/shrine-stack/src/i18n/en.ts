@@ -224,9 +224,10 @@ const en = {
   raceWinLeft: 'The left temple wins!',
   raceWinRight: 'The right temple wins!',
   raceDraw: 'Both temples fell at once',
+  raceBothCrowned: 'Both temples crowned at once',
   raceDrawText: 'A draw: race again?',
   raceCrowned: 'Crowned first, at {tiers} tiers.',
-  raceLast: 'The other temple fell first, at {tiers} tiers.',
+  raceLast: { one: 'The other temple fell first, at {n} tier.', other: 'The other temple fell first, at {n} tiers.' },
   raceAgain: 'Race again',
   raceBack: 'Back',
 };

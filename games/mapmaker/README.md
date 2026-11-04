@@ -212,7 +212,7 @@ the first village yet to trade gives it when you set sail:
 | --- | --- |
 | Stores | +4 supplies |
 | A guide | The first 3 surveys that would cost something are free, and snow hides nothing while they last |
-| A rumour | The isle's wonder is marked through the fog with a gold ring (on a new isle, that isle's wonder) |
+| A rumour | The isle's wonder is marked through the fog with a gold ring and "wonder?" (on a new isle, that isle's wonder) |
 
 ![The harbor with the Coastal Sloop and Village trade](docs/screenshots/harbor-sloop-trade.webp)
 

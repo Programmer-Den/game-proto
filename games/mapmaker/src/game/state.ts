@@ -273,6 +273,8 @@ export interface GameState {
   landing: Point | null;
   /** Surveys a village's guide still makes free on this voyage. */
   guide: number;
+  /** Supplies a village's stores added on top of this voyage's (`TRADE_STORES`, or 0), which a reload keeps. */
+  stores: number;
   /** The trade picked at the harbour for the next voyage, and the villages on this isle that have traded. */
   trade: Trade | null;
   traded: Point[];

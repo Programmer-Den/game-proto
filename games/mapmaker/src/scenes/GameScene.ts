@@ -211,7 +211,7 @@ export class GameScene extends Phaser.Scene {
   /** Cost labels under the survey stations, reused frame to frame. */
   private costLabels: Phaser.GameObjects.Text[] = [];
   /** The map's marks (finds, storms, camps, dug tiles, the treasure), by what and where. */
-  private marks = new Map<string, Phaser.GameObjects.Image>();
+  private marks = new Map<string, Phaser.GameObjects.Image | Phaser.GameObjects.Container>();
   private campButton: Phaser.GameObjects.Container | null = null;
   private campEnabled: boolean | null = null;
   private ring!: Phaser.GameObjects.Graphics;
@@ -885,9 +885,10 @@ export class GameScene extends Phaser.Scene {
       const pulse = settings.reduceMotion ? 0.5 : 0.5 + 0.5 * Math.sin(this.clock / 300);
       for (const p of frontier(s)) {
         // On a winter isle, snow hides what a tile costs (and so whether the supplies can pay it)
-        // until the surveyor stands next to it.
+        // until the surveyor stands next to it; one that costs nothing stays magenta with none left,
+        // since a tap surveys it and the voyage stays open for it.
         const hidden = snowHides(s, p.x, p.y);
-        const can = hidden ? s.supplies > 0 : canAfford(s, p);
+        const can = hidden ? s.supplies > 0 || canAfford(s, p) : canAfford(s, p);
         const m = can ? hex(MAGENTA) : hex(GREY);
         const x = MAP.x + p.x * MAP.tile + 3;
         const y = MAP.y + p.y * MAP.tile + 3;
@@ -985,7 +986,14 @@ export class GameScene extends Phaser.Scene {
     }
     for (const [id, m] of want) {
       if (this.marks.has(id)) continue;
-      this.marks.set(id, this.add.image(m.x, m.y, m.key).setScale(m.scale / HI).setDepth(m.key === 'camp' || m.key === 'claim' || m.key === 'sloop' ? 5.5 : m.key.startsWith('wonder') || m.key === 'rumour' ? 3.6 : 3.5));
+      if (m.key === 'rumour') {
+        // The rumour's ring gets a guess under it, like the Lodestone Compass's roses.
+        const ring = this.add.image(0, 0, m.key).setScale(m.scale / HI);
+        const label = this.text(0, 17, t('rumourHint'), { size: 7.5, italic: true, color: GOLD_DARK, stroke: true }).setOrigin(0.5);
+        this.marks.set(id, this.add.container(m.x, m.y, [ring, label]).setDepth(3.6));
+        continue;
+      }
+      this.marks.set(id, this.add.image(m.x, m.y, m.key).setScale(m.scale / HI).setDepth(m.key === 'camp' || m.key === 'claim' || m.key === 'sloop' ? 5.5 : m.key.startsWith('wonder') ? 3.6 : 3.5));
     }
   }
 

@@ -206,8 +206,8 @@ Implemented today:
   each moth (`TRAIT_LOOK`), a popup when one is gained, and the gust plaque's note says when a
   sheltered lantern is the target.
 - Daily night (LK17, `shared/daily.ts`, game `'lanternkeep'`): the night panel's "Daily night"
-  link (`dailyButton`, right of "Next dusk", its text `dailyLine()`: today's score, best and
-  streak once played) and the game-over panel's "Daily night" button call `openDaily`: once
+  link (`dailyButton`, right of "Next dusk"; once played, today's record from `dailyLine()`,
+  its score, best and streak, goes under it, smaller and wrapped to the link's 150 px) and the game-over panel's "Daily night" button call `openDaily`: once
   today's try is used it floats the record and buzzes; otherwise `startDaily`, the game is put
   aside in `run` and `state` becomes `dailyNight(dailyRand('lanternkeep'))`: a new game with
   `daily` set and `breeds` off, a night of `DAILY_NIGHTS` (6 to 12), a district of `MOVE_IDS`,
@@ -241,7 +241,11 @@ Implemented today:
   shrunk to fit), `drawKind` in the scene adds snowflakes in winter and leaves in autumn to the
   `rain` layer, and the night panel's last line says when a new season comes (`nextSeason`). Every
   event time (gusts, calls, bats, the owl, tides, ships) stays a time of dusk left, so a summer
-  dusk starts with the 37 s call already due and a winter dusk has a quiet first stretch.
+  dusk starts with the 37 s call already due and a winter dusk has a quiet first stretch; only the
+  warned gusts, tides and avalanches go through `fitTimes` in `startDusk`, which moves a time whose
+  warning would begin before the dusk does so that the warning begins 1 s into it, and keeps each
+  later one at least its warning and 1 s after the one before (a summer dusk's gusts come at 30, 22 and 10 s left, a summer storm's at 30,
+  24, 18, 12 and 6, the harbour's first tide at 30 and the monastery's first avalanche at 27).
 - A third keep (LK20): the Great Festival's panel (now `panel-move` size with three 180-wide
   buttons, `makeButton(..., narrow)` and the `btn-180` textures) has "Climb" (`climbButton`,
   `climb(s)`) right of "Set sail"; `sail` and `climb` exclude each other. It sets `climbed` and
@@ -254,7 +258,8 @@ Implemented today:
   comes, a missed pilgrim pushes a `pilgrim` event (`warned` false), and each lantern of the row
   pushes an `avalanche` event: kept if a moth sits on it, else dark and `buried`. A buried lantern
   adds `DIG_MS` (2 s) to `mothLightMs` and is cleared when a moth lights it. `ringBell` (called
-  after every lighting completes, even when the cask was dry) rings the named bell while warned:
+  after every lighting completes, even when the cask was dry, and as the warning comes for a moth
+  already guarding that bell) rings the named bell while warned:
   `PILGRIM_PAY` (6) coins, `pilgrimsWarned` and a `pilgrim` event. `mayTap` allows a tap on the
   bell (`pilgrimBell`) without a spare fill. A nightfall kept there counts `mountainKept`; the one
   that brings it to `FESTIVAL_NIGHTS` sets `mountainFestival`, `report.festival` and phase
@@ -278,7 +283,8 @@ Missing or rough:
 - The ten trophies are the most a game has, so the harbour, the traits, the daily, the village, the
   seasons and the monastery earn none.
 - The seasons only change the dusk's length, the kind draw and the moths' speed; the event times
-  stay as dusk left, so a summer dusk's first window call comes at once.
+  stay as dusk left (only moved for a warning, `fitTimes`), so a summer dusk's first window call
+  comes at once.
 - The Mountain Festival offers the harbour's boons rather than its own.
 - A moth's traits belong to its place in the jar, so a game with fewer Moths upgrades leaves the
   later places' flights waiting.
@@ -543,7 +549,7 @@ Sound table, `sfx` (plus the shared `ui('coin')`, `ui('refuse')` and `ui('click'
 | `hoot` / `sweep` | the owl warned / the owl starts its sweep |
 | `chime` / `callKept` + coin / `callLost` | a window calls / `call` kept / `call` ran out |
 | `yawn` / `swap` | a moth goes to rest / `swapJar` |
-| `toll`, coins, `thud` + `minor` | `nightfallSounds`: the bell, a rising coin per lit lantern, a lost hearth |
+| `toll`, coins, `thud` + `minor` | `nightfallSounds`: the bell, a rising coin per lit lantern, a lost hearth (not one the chapel spared) |
 | `kaching` / `glug` / `swell` | the shop: `buy` / `topUp` / `rekindle` |
 | `evening` / `rumble` / `pluck` | `nextDusk` / `moveTo` and `sail` / `takeCurse` |
 | `swellSea` / `wash` / fizzle | the tide warned / the tide rises / `tide` event (LK15) |

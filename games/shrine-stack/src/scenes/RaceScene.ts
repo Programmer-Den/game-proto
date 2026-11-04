@@ -80,6 +80,9 @@ export class RaceScene extends Phaser.Scene {
     for (const i of [0, 1]) this.sides.push(this.createSide(i, seed));
     this.add.rectangle(this.vw / 2, this.vh / 2, 4, this.vh, 0x14101f).setDepth(UI_DEPTH - 2);
 
+    // Phaser has one touch pointer by default, which would drop the second player's tap while the
+    // first player's finger is down.
+    if (this.input.manager.pointersTotal < 2) this.input.addPointer(1);
     for (const i of [0, 1]) {
       this.add
         .zone((i * this.vw) / 2, 0, this.vw / 2, this.vh)
@@ -191,14 +194,18 @@ export class RaceScene extends Phaser.Scene {
     if (drop(this.sides[i].state)) sfx('whoosh');
   }
 
-  /** The first temple crowned wins; one that missed loses to the other, and two misses at once are a draw. */
+  /**
+   * The first temple crowned wins; one that missed loses to the other, and two crowns or two misses
+   * in the same frame are a draw.
+   */
   private judge() {
     const [a, b] = this.sides.map((side) => side.state.phase);
-    if (a === 'crowned' || b === 'crowned') this.winner = a === 'crowned' ? 0 : 1;
+    if (a === 'crowned' && b === 'crowned') this.winner = -1;
+    else if (a === 'crowned' || b === 'crowned') this.winner = a === 'crowned' ? 0 : 1;
     else if (a === 'over' && b === 'over') this.winner = -1;
     else if (a === 'over' || b === 'over') this.winner = a === 'over' ? 1 : 0;
     if (this.winner === null) return;
-    if (this.winner >= 0) playSting(SONG, 'crown');
+    if (this.winner >= 0 || a === 'crowned') playSting(SONG, 'crown');
     else playSting(SONG, 'fall');
   }
 
@@ -301,7 +308,8 @@ export class RaceScene extends Phaser.Scene {
     });
     const back = makeButton(this, cx + 115, cy + 80, t('raceBack'), () => {
       ui('click');
-      this.scene.start('Game');
+      // Empty data, so the patron pick comes back rather than the village a build last restarted with.
+      this.scene.start('Game', {});
     });
     this.endParts = [dim, panel, this.endTitle, this.endText, ...again, ...back] as UiPart[];
     for (const part of this.endParts) part.setDepth(UI_DEPTH + 20).setVisible(false);
@@ -311,12 +319,12 @@ export class RaceScene extends Phaser.Scene {
     this.endShown = true;
     const w = this.winner!;
     if (w < 0) {
-      this.endTitle.setText(t('raceDraw'));
+      this.endTitle.setText(t(this.sides[0].state.phase === 'crowned' ? 'raceBothCrowned' : 'raceDraw'));
       this.endText.setText(t('raceDrawText'));
     } else {
       const s = this.sides[w].state;
       this.endTitle.setText(t(w === 0 ? 'raceWinLeft' : 'raceWinRight'));
-      this.endText.setText(t(s.phase === 'crowned' ? 'raceCrowned' : 'raceLast', { tiers: s.tiersBuilt }));
+      this.endText.setText(s.phase === 'crowned' ? t('raceCrowned', { tiers: s.tiersBuilt }) : t('raceLast', { n: s.tiersBuilt }));
     }
     for (const part of this.endParts) part.setVisible(true);
   }

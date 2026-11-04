@@ -120,7 +120,8 @@ rain or snow for more favor; and two players can race two temples side by side o
     multiplied by 1.5.
 22. **Two-player race**: two temples side by side on one screen, each player tapping their own half
     (or A and L). Both get the same stones, with no patron and no breaks between tiers; the first to
-    crown the shrine at tier 12 wins, and if a stone misses, the other temple wins.
+    crown the shrine at tier 12 wins, and if a stone misses, the other temple wins (both crowned or
+    both missed at once is a draw).
 
 ![The pilgrims' village](docs/screenshots/village.webp)
 
