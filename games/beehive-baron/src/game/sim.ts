@@ -622,9 +622,9 @@ function openFair(s: GameState) {
   s.events.push({ kind: 'fair-open' });
 }
 
-/** Autumn closes the fair: its result is told, the next fair asks for more, and the entries are cleared. */
+/** Autumn closes the fair: its result over the classes it held is told, the next fair asks for more, and the entries are cleared. */
 function closeFair(s: GameState) {
-  s.events.push({ kind: 'fair-closed', total: fairTotal(s), gold: fairGold(s.fairs), won: fairWon(s) });
+  s.events.push({ kind: 'fair-closed', total: fairTotal(s, true), gold: fairGold(s.fairs), won: fairWon(s, true) });
   s.fairs++;
   s.fair = noEntries();
 }

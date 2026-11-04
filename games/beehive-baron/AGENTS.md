@@ -137,7 +137,8 @@ Implemented today:
   fair's. It is on (`fairOn`) for the last `FAIR_MS` (60s) of every summer; `fairIn` counts down to
   it, and `turn` calls `openFair` as it opens (or `sell`, when the jar that opens the last meadow
   is sold during the fair's minute), which holds `fairRare` and pushes `fair-open`, and calls `closeFair` as autumn comes (a
-  `fair-closed` event, `fairs` + 1, entries cleared). The classes are `fairClasses(s)` (`classesFor(fairs, rare)`): the
+  `fair-closed` event judged over the held classes, `fairTotal(s, true)` and `fairWon(s, true)`, since
+  the season has already turned; `fairs` + 1, entries cleared). The classes are `fairClasses(s)` (`classesFor(fairs, rare)`): the
   three kinds, plus `mead` from the second fair and `fresh` from the third; gold needs
   `fairGold(fairs)` (`FAIR_GOLD` 14, plus `FAIR_STEP` 3 a fair, at most `FAIR_MAX` 28). While it is
   on a tap on the card toggles `entering`; the next tap on a capped cell calls `enterFair`, which
@@ -194,7 +195,7 @@ Implemented today:
   up to `RARE_CAP` (12) in all, and pushes `bloomed`. `sell` sells them at `rarePrice` and counts
   them as jars sold (`rareCount`; `shelfValue` and the Sell button include them). While
   `rarePairs` has any, `fairClasses(s)` (`classesFor(fairs, rare)`) adds the `rare` fair class; while
-  the fair is on it reads `fairRare` instead, set by `openFair` from `rarePairs` as the fair opens,
+  the fair is on (or its `held` argument is true) it reads `fairRare` instead, set by `openFair` from `rarePairs` as the fair opens,
   so a bed planted or replanted during the fair can't add or drop the class (the card's Enter line
   then says it counts from the next fair). `enterRare` enters the best rare jar kept (the card's
   Enter button). `garden`, `rare` and `fairRare` are saved (saves from before `fairRare` take the

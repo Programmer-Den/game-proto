@@ -456,13 +456,17 @@ export const meadReady = (s: GameState) => s.casks.filter((c) => c.agingMs === 0
 export const cellarValue = (s: GameState) => meadReady(s).reduce((n, c) => n + c.value, 0);
 /** Whether a cask is still aging, and how far along it is. */
 export const caskDone = (c: Cask) => 1 - c.agingMs / CASK_MS;
-/** This year's fair's points, over the classes it judges; null while a class is missing. */
-export function fairTotal(s: GameState) {
-  const classes = fairClasses(s);
+/** This year's fair's points, over the classes it judges; null while a class is missing. `held` judges the classes held as the fair opened (see `fairClasses`). */
+export function fairTotal(s: GameState, held = fairOn(s)) {
+  const classes = fairClasses(s, held);
   return classes.every((k) => s.fair[k] !== null) ? classes.reduce((n, k) => n + (s.fair[k] ?? 0), 0) : null;
 }
-/** The classes this year's fair judges: `classesFor` its number, and rare honey if the garden had a rare bloom as the fair opened (outside the fair, while it has one now). */
-export const fairClasses = (s: GameState) => classesFor(s.fairs, fairOn(s) ? s.fairRare : rarePairs(s.garden).length > 0);
+/**
+ * The classes this year's fair judges: `classesFor` its number, and rare honey if the garden had a rare bloom as the fair
+ * opened (outside the fair, while it has one now). `held` (true while the fair is on) reads the classes held as it opened;
+ * `closeFair` passes true, since the season has already turned when it judges.
+ */
+export const fairClasses = (s: GameState, held = fairOn(s)) => classesFor(s.fairs, held ? s.fairRare : rarePairs(s.garden).length > 0);
 /** Whether the county fair is held: every meadow is open. */
 export const fairOpen = (s: GameState) => s.meadows >= MEADOWS.length;
 /** The summer game time the fair opens at: `FAIR_MS` before autumn. */
@@ -471,7 +475,7 @@ const FAIR_FROM = SEASONS.indexOf('autumn') * SEASON_MS - FAIR_MS;
 export const fairOn = (s: GameState) => fairOpen(s) && s.seasonMs >= FAIR_FROM && season(s) === 'summer';
 export const fairIn = (s: GameState) => (FAIR_FROM - s.seasonMs + YEAR_MS) % YEAR_MS;
 /** Whether this year's fair is won: every class entered and gold's points reached. */
-export const fairWon = (s: GameState) => (fairTotal(s) ?? -1) >= fairGold(s.fairs);
+export const fairWon = (s: GameState, held = fairOn(s)) => (fairTotal(s, held) ?? -1) >= fairGold(s.fairs);
 
 export const isHoney = (c: Cell | null): c is HoneyCell => c?.type === 'honey';
 export const isBrood = (c: Cell | null): c is BroodCell => c?.type === 'brood';
