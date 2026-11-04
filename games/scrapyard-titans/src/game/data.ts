@@ -18,6 +18,10 @@ export interface UnitDef {
   cost: 1 | 2 | 3 | 4 | 5;
   origin: OriginId;
   cls: ClassId;
+  /** A workshop robot's own name, which the player typed (shown instead of `name`). */
+  label?: string;
+  /** Built in the workshop (`CUSTOM`). */
+  custom?: boolean;
 }
 
 export interface SetDef {
@@ -126,9 +130,13 @@ export const WIND_UP_S = 4;
 
 export const UNIT_BY_ID: Record<string, UnitDef> = Object.fromEntries(UNITS.map((d) => [d.id, d]));
 
-export function rosterOf(set: SetId): UnitDef[] {
+/** The player's workshop robots (`progress.ts` fills it from the save), which join a match's shop pool when `MatchOptions.custom` is set. */
+export const CUSTOM: UnitDef[] = [];
+
+/** A season's robots, with the workshop robots when `custom` is set. */
+export function rosterOf(set: SetId, custom = false): UnitDef[] {
   const origins = SETS.find((s) => s.id === set)!.origins;
-  return UNITS.filter((d) => origins.includes(d.origin));
+  return [...UNITS.filter((d) => origins.includes(d.origin)), ...(custom ? CUSTOM : [])];
 }
 
 export interface ClassStats {
@@ -470,6 +478,41 @@ export const CAMPAIGN: LobbyDef[] = [
 
 /** A lobby's rival commanders, in seat order. */
 export const lobbyRivals = (l: LobbyDef): CommanderDef[] => l.seats.map((s) => (typeof s === 'number' ? RIVALS[s] : BOSSES[Number(s.slice(1))]));
+
+// ---------------------------------------------------------------- the robot workshop
+
+/** Chassis (a workshop robot's origin): only origins both seasons share, so a build fits every match. */
+export const CHASSIS: OriginId[] = ['heavy', 'drone', 'sparker', 'clockwork'];
+/** Weapons (a workshop robot's class). */
+export const WEAPONS: ClassId[] = ['brawler', 'gunner', 'guardian', 'sniper', 'saboteur', 'mechanic', 'bomber'];
+/** A weapon's name in the workshop. */
+export const WEAPON_NAMES: Record<ClassId, TextKey> = {
+  brawler: 'weaponBrawler', gunner: 'weaponGunner', guardian: 'weaponGuardian', sniper: 'weaponSniper',
+  saboteur: 'weaponSaboteur', mechanic: 'weaponMechanic', bomber: 'weaponBomber',
+};
+/** The chassis and weapons each campaign lobby unlocks when it is first cleared (index into `CAMPAIGN`). */
+export const WORKSHOP_UNLOCKS: (OriginId | ClassId)[][] = [
+  ['heavy', 'brawler'], ['gunner'], ['drone'], ['guardian'], ['sniper'], ['sparker'], ['saboteur'], ['mechanic'], ['clockwork'], ['bomber'],
+];
+/** A workshop robot's shop cost, how many builds the workshop keeps and the longest name. */
+export const WORKSHOP = { cost: 3 as const, slots: 3, nameMax: 14 };
+/** Words a new build's suggested name is made of (names, so they stay as they are in every language). */
+export const NAME_PARTS = {
+  first: ['Rivet', 'Sprocket', 'Clank', 'Bolt', 'Gear', 'Scrap', 'Dyna', 'Tin', 'Rusty', 'Turbo', 'Piston', 'Cog'],
+  last: ['Rex', 'Max', 'Jack', 'Bruiser', 'Buddy', 'Nova', 'Duke', 'Ace', 'Fang', 'Boss', 'Kid', 'Titan'],
+};
+
+// ---------------------------------------------------------------- duo mode and the daily lobby
+
+/**
+ * Duo mode: four teams of two (seats 0 and 1, 2 and 3 and so on), the player with an AI partner.
+ * Teammates share one health bar, `hpScale` times a commander's, and never fight each other; the
+ * player can hand the partner a robot or `gift` gold during the plan phase.
+ */
+export const DUO = { hpScale: 2, gift: 2 };
+
+/** The daily lobby: the rivals' rank, and the chance one rival seat goes to a campaign boss. */
+export const DAILY = { rank: 1, bossChance: 0.4 };
 
 // ---------------------------------------------------------------- squad replays
 

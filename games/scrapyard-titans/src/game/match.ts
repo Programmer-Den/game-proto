@@ -5,15 +5,17 @@
  * calls `startFight`, `endFight` and `advance` as phases end.
  */
 import { byDifficulty } from '../../../../shared/settings';
+import { seedOf, seeded } from '../../../../shared/daily';
 import type { TextKey } from '../i18n';
 import {
-  AUGMENTS, BENCH_SLOTS, BOSS, CAMPAIGN, GHOST, RANKS, RARE, RARE_FROM_STAGE, BOARD, ECONOMY, GILDED, ITEM_BENCH, LEVEL_XP, MAX_ITEMS, MAX_LEVEL, PARTS, PLAYER_COMMANDERS,
+  AUGMENTS, BENCH_SLOTS, BOSS, DUO, CAMPAIGN, GHOST, RANKS, RARE, RARE_FROM_STAGE, BOARD, ECONOMY, GILDED, ITEM_BENCH, LEVEL_XP, MAX_ITEMS, MAX_LEVEL, PARTS, PLAYER_COMMANDERS,
   PLAYERS, RIVALS, SCRAP_TOKENS_PER_PART, lobbyRivals, SETS, SHOP_ODDS, SHOP_SLOTS, SURVIVOR_DAMAGE, TERRAIN_TILES, UNIT_BY_ID, comboOf,
   isPart, rosterOf, stageDamage, stageRounds,
   type AugmentId, type CommanderDef, type MonsterId, type OriginId, type PartId, type RoundDef, type SetId, type TerrainId,
   type TraitId,
 } from './data';
 import { Battle, type FighterSpec, type SideSpec } from './battle';
+import { rand, type Rand } from './rng';
 
 export interface Owned {
   uid: number;
@@ -47,6 +49,8 @@ export function meterOf(b: Battle): MeterRow[] {
 
 export interface Player {
   seat: number;
+  /** The team: the seat itself, or in duo mode the pair (seats 0 and 1 are team 0, and so on). Teammates share health. */
+  team: number;
   name: TextKey;
   commander: CommanderDef;
   human: boolean;
@@ -118,6 +122,14 @@ export interface MatchOptions {
   kit?: string[];
   /** A saved winning squad the player fights as a ghost in round 4-7 instead of its monsters. */
   ghost?: SavedSquad | null;
+  /** The workshop robots join the shop pool (`CUSTOM`). */
+  custom?: boolean;
+  /** Duo mode: teams of two sharing health (`DUO`), the player's partner in seat 1. */
+  duo?: boolean;
+  /** The daily lobby's day (`YYYY-MM-DD`): each seat's shop rolls from its own stream seeded by the day. */
+  daily?: string | null;
+  /** The rivals in seat order, when not the usual seven or a campaign lobby's (the daily lobby). */
+  rivals?: CommanderDef[];
 }
 
 /** A robot of a saved squad, where it stood on the board (rows 4 to 7). */
@@ -177,20 +189,22 @@ export interface Match {
   draft: Draft | null;
   /** A rival's call-out over the board, until `until`. */
   taunt: { seat: number; text: TextKey; until: number } | null;
-  /** The last round's outcome for the player, shown in the result phase. */
-  result: { outcome: 'win' | 'loss' | 'draw'; damage: number; gold: number } | null;
+  /** The last round's outcome for the player (and in duo mode its partner's), shown in the result phase. */
+  result: { outcome: 'win' | 'loss' | 'draw'; damage: number; gold: number; partner?: 'win' | 'loss' | 'draw' } | null;
   /** The player's robots in their last fight, by damage dealt: the damage meter. */
   meter: MeterRow[];
   /** The next robot's `Owned.uid`. */
   nextUid: number;
   roundsPlayed: number;
+  /** Each seat's own shop stream in the daily lobby, so its shops don't change with the fights; null elsewhere. */
+  shopRand: Rand[] | null;
 }
 
 export const ownRows = BOARD.ownRows;
-const pick = <T>(list: readonly T[]) => list[Math.floor(Math.random() * list.length)];
+const pick = <T>(list: readonly T[], r: Rand = rand) => list[Math.floor(r() * list.length)];
 const shuffle = <T>(list: T[]) => {
   for (let i = list.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(rand() * (i + 1));
     [list[i], list[j]] = [list[j], list[i]];
   }
   return list;
@@ -198,14 +212,17 @@ const shuffle = <T>(list: T[]) => {
 
 export function newMatch(opts: MatchOptions): Match {
   const players: Player[] = [];
-  const startHp = byDifficulty(130, 100, 80);
-  // A campaign lobby sets its own rivals, bosses among them; otherwise all seven rivals play.
-  const rivals = opts.lobby != null ? lobbyRivals(CAMPAIGN[opts.lobby]) : RIVALS.slice(0, PLAYERS - 1);
+  // Duo teammates share one health bar, bigger than a lone commander's.
+  const scale = opts.duo ? DUO.hpScale : 1;
+  const startHp = Math.round(byDifficulty(130, 100, 80) * scale);
+  // A campaign lobby (or the daily) sets its own rivals, bosses among them; otherwise all seven rivals play.
+  const rivals = opts.lobby != null ? lobbyRivals(CAMPAIGN[opts.lobby]) : opts.rivals ?? RIVALS.slice(0, PLAYERS - 1);
   for (let seat = 0; seat <= rivals.length; seat++) {
     const commander = seat === 0 ? PLAYER_COMMANDERS[opts.commander] : rivals[seat - 1];
-    const hp = seat === 0 ? startHp : commander.boss ? BOSS.hp : 100;
+    const team = opts.duo ? seat >> 1 : seat;
+    const hp = team === 0 ? startHp : commander.boss ? BOSS.hp : Math.round(100 * scale);
     players.push({
-      seat, name: seat === 0 ? 'you' : commander.name, commander, human: seat === 0 && !opts.watch,
+      seat, team, name: seat === 0 ? 'you' : commander.name, commander, human: seat === 0 && !opts.watch,
       hp, maxHp: hp, gold: ECONOMY.startGold, level: 1, xp: 0, board: {}, bench: Array(BENCH_SLOTS).fill(null),
       shop: [], items: [], augments: [], augmentOffer: null, streak: 0, alive: true, place: 0, scrapTokens: 0, freeRolls: 0, shopLocked: false, lastOpponent: -1, last: null,
     });
@@ -213,6 +230,7 @@ export function newMatch(opts: MatchOptions): Match {
   const m: Match = {
     opts, players, stage: 1, index: 0, round: stageRounds(1)[0], phase: 'plan', time: 0, phaseEnds: Infinity, battle: null,
     opponent: -1, ghost: false, ghostSquad: false, drops: [], terrain: {}, draft: null, taunt: null, result: null, meter: [], nextUid: 1, roundsPlayed: 0,
+    shopRand: opts.daily ? players.map((p) => seeded(seedOf(`scrapyard-titans:${opts.daily}:shop${p.seat}`))) : null,
   };
   for (const p of players) rollShop(m, p);
   for (const id of opts.kit ?? []) {
@@ -223,6 +241,12 @@ export function newMatch(opts: MatchOptions): Match {
 }
 
 export const player = (m: Match) => m.players[0];
+/** The player's partner in duo mode (seat 1), or null. */
+export const partner = (m: Match) => (m.opts.duo ? m.players[1] : null);
+/** Whether a seat plays against the player (not the player or its duo partner): ranks and difficulty toughen these. */
+export const isRival = (m: Match, p: Player) => p.team !== m.players[0].team;
+/** The robots a match's shops, drafts and cards draw from: the season's, and the workshop's when the match takes them. */
+export const poolOf = (m: Match) => rosterOf(m.opts.set, !!m.opts.custom);
 export const roundLabel = (m: Match) => `${m.round.stage}-${m.round.index}`;
 export const unitCost = (o: { defId: string; gilded: OriginId | null }) => UNIT_BY_ID[o.defId].cost + (o.gilded ? GILDED.extraCost : 0);
 export const sellValue = (o: Owned) => unitCost(o) * 3 ** (o.star - 1) - (o.star > 1 && UNIT_BY_ID[o.defId].cost > 1 ? 1 : 0);
@@ -245,11 +269,12 @@ export function countTraits(units: Owned[]): Partial<Record<TraitId, number>> {
 // ---------------------------------------------------------------- shop and economy
 
 export function rollShop(m: Match, p: Player) {
-  const roster = rosterOf(m.opts.set);
+  const roster = poolOf(m);
   const origins = SETS.find((s) => s.id === m.opts.set)!.origins;
+  const r = m.shopRand?.[p.seat] ?? rand;
   p.shop = Array.from({ length: SHOP_SLOTS }, () => {
-    const odds = SHOP_ODDS[Math.min(p.level + (p.seat !== 0 ? RANKS[m.opts.rank].odds : 0), MAX_LEVEL) - 1];
-    let roll = Math.random() * 100;
+    const odds = SHOP_ODDS[Math.min(p.level + (isRival(m, p) ? RANKS[m.opts.rank].odds : 0), MAX_LEVEL) - 1];
+    let roll = r() * 100;
     let cost = 1;
     for (let c = 0; c < 5; c++) {
       if (roll < odds[c]) {
@@ -258,9 +283,9 @@ export function rollShop(m: Match, p: Player) {
       }
       roll -= odds[c];
     }
-    const def = pick(roster.filter((d) => d.cost === cost));
+    const def = pick(roster.filter((d) => d.cost === cost), r);
     const gildedShop = p.augments.includes('gilded-shop');
-    const gilded = (gildedShop || p.level >= GILDED.fromLevel) && Math.random() < (gildedShop ? RARE.gildedChance : GILDED.chance) ? pick(origins.filter((o) => o !== def.origin)) : null;
+    const gilded = (gildedShop || p.level >= GILDED.fromLevel) && r() < (gildedShop ? RARE.gildedChance : GILDED.chance) ? pick(origins.filter((o) => o !== def.origin), r) : null;
     return { defId: def.id, gilded };
   });
 }
@@ -445,7 +470,7 @@ export function pickAugment(m: Match, p: Player, choice: number) {
   else if (id === 'free-rolls') p.freeRolls = RARE.freeRolls;
   else if (id === 'duplicator') {
     const best = allUnits(p).filter((o) => UNIT_BY_ID[o.defId].cost <= 2).sort((a, b) => b.star - a.star || UNIT_BY_ID[b.defId].cost - UNIT_BY_ID[a.defId].cost)[0];
-    const defId = best?.defId ?? pick(rosterOf(m.opts.set).filter((d) => d.cost === 2)).id;
+    const defId = best?.defId ?? pick(poolOf(m).filter((d) => d.cost === 2)).id;
     if (!addUnit(m, p, defId, null)) p.gold += UNIT_BY_ID[defId].cost;
   }
 }
@@ -468,7 +493,7 @@ export function startPlan(m: Match, planS: number) {
       // Hand to Mouth trades interest for a flat sum.
       const interest = p.augments.includes('hand-to-mouth') ? RARE.handToMouthGold : Math.min(Math.floor(p.gold / ECONOMY.interestPer), interestCap);
       p.gold += (m.stage === 1 ? ECONOMY.stageOneIncome : ECONOMY.baseIncome) + interest + streak;
-      if (p.seat !== 0) p.gold = Math.max(0, p.gold + byDifficulty(-1, 0, 1) + RANKS[m.opts.rank].gold + (p.commander.boss ? BOSS.gold : 0));
+      if (isRival(m, p)) p.gold = Math.max(0, p.gold + byDifficulty(-1, 0, 1) + RANKS[m.opts.rank].gold + (p.commander.boss ? BOSS.gold : 0));
       gainXp(p, ECONOMY.xpPerRound);
       if (!p.shopLocked) rollShop(m, p);
     }
@@ -483,8 +508,8 @@ export function startPlan(m: Match, planS: number) {
       let col: number;
       let row: number;
       do {
-        col = Math.floor(Math.random() * BOARD.cols);
-        row = 4 + Math.floor(Math.random() * 4);
+        col = Math.floor(rand() * BOARD.cols);
+        row = 4 + Math.floor(rand() * 4);
       } while (used.has(`${col},${row}`));
       used.add(`${col},${row}`);
       const kind = kinds[i % kinds.length];
@@ -572,7 +597,17 @@ export function startFight(m: Match) {
   m.ghostSquad = false;
   pairings = [];
   const alive = m.players.filter((p) => p.alive);
-  if (m.round.kind === 'pvp') {
+  if (m.round.kind === 'pvp' && m.opts.duo) {
+    // Teams in a ring, each pair's second seat against the next team's first: nobody meets a teammate.
+    const teams = shuffle([...new Set(alive.map((p) => p.team))]).map((team) => shuffle(alive.filter((p) => p.team === team).map((p) => p.seat)));
+    teams.forEach((team, k) => {
+      const next = teams[(k + 1) % teams.length];
+      if (next === team) return;
+      const a = team[team.length - 1];
+      const b = next[0];
+      pairings.push({ a, b, ghost: false, battle: new Battle(sideOf(m, m.players[a], false), sideOf(m, m.players[b], true), terrainMap(m)), drops: [] });
+    });
+  } else if (m.round.kind === 'pvp') {
     const seats = shuffle(alive.map((p) => p.seat));
     // Try a few shuffles to avoid a rematch of the last round.
     for (let tries = 0; tries < 6; tries++) {
@@ -648,7 +683,8 @@ export function endFight(m: Match) {
     else if (won === false) p.streak = p.streak < 0 ? p.streak - 1 : -1;
     p.last = won === null ? 'draw' : won ? 'win' : 'loss';
     const dmg = Math.round(damage * (p.augments.includes('last-stand') ? 0.7 : 1));
-    if (won !== true) p.hp -= dmg;
+    // Duo teammates share their health: a loss costs both bars alike.
+    if (won !== true) for (const q of m.players) if (q.team === p.team) q.hp -= dmg;
     p.gold += gold + (p.augments.includes('scrap-dividend') ? 2 : 0);
     if (won && m.opts.set === 'scrap' && m.round.kind === 'pvp') {
       p.scrapTokens++;
@@ -691,27 +727,37 @@ export function endFight(m: Match) {
     }
   }
   if (m.battle) m.meter = meterOf(m.battle);
+  const mate = partner(m);
+  if (m.result && mate?.last) m.result.partner = mate.last;
   knockOuts(m);
   m.phase = 'result';
   m.roundsPlayed++;
 }
 
+/** The teams still in the match (each seat is its own team outside duo mode). */
+export const teamsLeft = (m: Match) => new Set(m.players.filter((p) => p.alive).map((p) => p.team)).size;
+/** How many teams a match started with: its seats, or half of them in duo mode. */
+export const teamCount = (m: Match) => new Set(m.players.map((p) => p.team)).size;
+
+/** Knocks out the teams at 0 health, the lowest first; a team's place counts teams, so duo places run 1 to 4. */
 function knockOuts(m: Match) {
   const out = m.players.filter((p) => p.alive && p.hp <= 0).sort((a, b) => a.hp - b.hp);
   for (const p of out) {
-    p.alive = false;
-    p.place = m.players.filter((q) => q.alive).length + 1;
+    if (!p.alive) continue;
+    const team = m.players.filter((q) => q.team === p.team);
+    for (const q of team) q.alive = false;
+    const place = teamsLeft(m) + 1;
+    for (const q of team) q.place = place;
   }
-  const left = m.players.filter((p) => p.alive);
-  if (left.length === 1) left[0].place = 1;
+  if (teamsLeft(m) === 1) for (const p of m.players) if (p.alive) p.place = 1;
 }
 
-/** Whether the match is over for the player: knocked out, or the last one standing. */
+/** Whether the match is over for the player: knocked out, or the last one (or last team) standing. */
 export function matchOver(m: Match): 'won' | 'lost' | null {
   const me = player(m);
   // When the last commanders all fall in the same round, the best-placed of them wins.
   if (!me.alive) return me.place === 1 && !m.players.some((p) => p.alive) ? 'won' : 'lost';
-  if (m.players.filter((p) => p.alive).length === 1) return 'won';
+  if (teamsLeft(m) === 1) return 'won';
   return null;
 }
 
@@ -727,17 +773,42 @@ export function advance(m: Match) {
   m.round = rounds[m.index];
 }
 
+// ---------------------------------------------------------------- duo mode
+
+/** Hands a robot (stars and items with it) to the duo partner's bench. False without a partner or a free bench slot there. */
+export function passUnit(m: Match, o: Owned): boolean {
+  const mate = partner(m);
+  const me = player(m);
+  if (!mate?.alive || !allUnits(me).includes(o)) return false;
+  const slot = freeBench(mate);
+  if (slot < 0) return false;
+  removeUnit(me, o);
+  mate.bench[slot] = o;
+  merge(mate, o.defId);
+  return true;
+}
+
+/** Gives the duo partner `DUO.gift` gold. */
+export function giveGold(m: Match): boolean {
+  const mate = partner(m);
+  const me = player(m);
+  if (!mate?.alive || me.gold < DUO.gift) return false;
+  me.gold -= DUO.gift;
+  mate.gold += DUO.gift;
+  return true;
+}
+
 // ---------------------------------------------------------------- draft rounds
 
 export function startDraft(m: Match, now: number) {
   m.phase = 'draft';
   m.phaseEnds = Infinity;
   const alive = m.players.filter((p) => p.alive);
-  const roster = rosterOf(m.opts.set);
+  const roster = poolOf(m);
   const maxCost = Math.min(5, m.stage + (m.stage >= 3 ? 1 : 0));
   const options: DraftOption[] = Array.from({ length: alive.length + 1 }, () => {
     const def = pick(roster.filter((d) => d.cost <= Math.max(1, maxCost - 1) && d.cost >= Math.max(1, maxCost - 3)));
-    return { defId: def.id, item: m.stage >= 4 && Math.random() < 0.5 ? randomFinished() : randomPart(), takenBy: null };
+    return { defId: def.id, item: m.stage >= 4 && rand() < 0.5 ? randomFinished() : randomPart(), takenBy: null };
   });
   const order = shuffle(alive.map((p) => p.seat)).sort((a, b) => m.players[a].hp - m.players[b].hp);
   m.draft = { options, order, turn: 0, turnEnds: now + 1 };
