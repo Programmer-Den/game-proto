@@ -2,8 +2,10 @@ import { byDifficulty } from '../../../../shared/settings';
 import type { TextKey } from '../i18n';
 import { ARMOURY_EACH, noArmoury, type Armoury } from './armoury';
 import { BOONS, type BoonId } from './boons';
+import type { ChallengeRun } from './challenges';
 import { KNIGHT_EACH, type KnightId } from './knights';
 import { pairsOf } from './pairs';
+import { PET_EACH, noPets, type PetId, type PetLevels } from './pets';
 
 // The run in plain numbers. The course runs left to right along x in world pixels; heights are
 // measured up from the road, so the knight's feet are at h = 0 when running on it and at a
@@ -26,6 +28,8 @@ export const COIN_REACH = 14;
 /** Length of a stage, from one checkpoint to the next, and the clear run at its start. */
 export const STAGE_LEN = 3200;
 export const LEAD_IN = 700;
+/** On a challenge course coins fly in from this much further off (as with a rank of Lodestone), so a good leap can take a whole arc. */
+export const CHALLENGE_REACH = 45;
 /** Coins to buy the boon missed at the last checkpoint, to start the next run with it. */
 export const BOON_PRICE = 30;
 
@@ -171,6 +175,8 @@ export interface Trap {
   from?: number;
   to?: number;
   phase?: number;
+  /** Set once the hound has barked at it. */
+  barked?: boolean;
 }
 
 /**
@@ -265,7 +271,7 @@ export interface Coin {
 
 export interface Effect {
   id: number;
-  kind: 'coin' | 'hit' | 'block' | 'dust' | 'fall' | 'skid' | 'stomp' | 'pop' | 'heal' | 'refuse';
+  kind: 'coin' | 'hit' | 'block' | 'dust' | 'fall' | 'skid' | 'stomp' | 'pop' | 'heal' | 'refuse' | 'bark' | 'owl' | 'fox';
   x: number;
   h: number;
   ms: number;
@@ -292,7 +298,21 @@ export interface Runner {
   jumpQueued: boolean;
 }
 
+/**
+ * What kind of run this is: an ordinary run, the day's course, the week's road or a challenge
+ * course. Every kind but the ordinary run is seeded (`daily` holds its key) and run bare.
+ */
+export type Mode = 'run' | 'daily' | 'weekly' | 'challenge';
+
 export interface GameState {
+  mode: Mode;
+  /** The challenge course being run, or null. */
+  challenge: ChallengeRun | null;
+  /** The companion running along (null on a bare run or with none chosen), and each one's level, kept between runs. */
+  pet: PetId | null;
+  pets: PetLevels;
+  /** Hits the fox will still take for the knight on this stage. */
+  foxGuard: number;
   stage: number;
   /** Who runs this run: the knight, the squire or the heavy knight (always the knight on a daily course). */
   knight: KnightId;
@@ -358,7 +378,7 @@ export interface GameState {
   missed: BoonId | null;
   /** Levels bought in the armoury, kept between runs. */
   armoury: Armoury;
-  /** The date of the daily course being run (`YYYY-MM-DD`), or null for an ordinary run. */
+  /** The seed key of a seeded run: the daily course's date (`YYYY-MM-DD`), the weekly road's `weekly:YYYY-Www` or a challenge's `challenge:N`; null for an ordinary run. */
   daily: string | null;
   /** The daily course's random state; its course and boons are drawn from it instead of Math.random, reseeded from the date and stage by `buildStage` and `rollChoices`. */
   seed: number;
@@ -388,11 +408,13 @@ export function trackOf(s: Pick<GameState, 'distance' | 'checkpointX' | 'best' |
  * The knight's numbers with the boons taken so far (cursed ones included), the armoury bought (not
  * on a daily course, which everyone runs alike), and the rule of the ground underfoot.
  */
-export function stats(s: Pick<GameState, 'ranks' | 'armoury' | 'terrain' | 'daily' | 'knight'>) {
+export function stats(s: Pick<GameState, 'ranks' | 'armoury' | 'terrain' | 'daily' | 'knight' | 'pet' | 'pets' | 'challenge'>) {
   const r = (id: BoonId) => s.ranks[id] ?? 0;
   const a = s.daily ? noArmoury() : s.armoury;
   const k = KNIGHT_EACH[s.knight];
   const pairs = pairsOf(s.ranks);
+  // The companion running along, at its level (never on a seeded run).
+  const pet = (id: PetId) => (!s.daily && s.pet === id ? s.pets[id] : 0);
   // Jump height goes with the square of the speed off the ground.
   const height = (1 + 0.12 * r('boots') - 0.15 * r('oath')) * (s.terrain === 'marsh' ? MARSH.jump : 1) * k.height;
   return {
@@ -403,13 +425,19 @@ export function stats(s: Pick<GameState, 'ranks' | 'armoury' | 'terrain' | 'dail
     smash: k.smash,
     slideMs: SLIDE_MS * (1 + 0.3 * r('greaves')) * (1 + 0.6 * r('glass')) * (s.terrain === 'ice' ? ICE.slide : 1),
     hurtMs: HURT_MS * (1 + 0.5 * r('cloak')) * (r('glass') ? 0.5 : 1),
-    reach: COIN_REACH + 45 * r('magnet') + a.magnet * ARMOURY_EACH.magnet,
+    reach: COIN_REACH + 45 * r('magnet') + a.magnet * ARMOURY_EACH.magnet + (s.challenge ? CHALLENGE_REACH : 0),
     coinValue: (1 + r('greed')) * (r('gilt') ? 2 : 1),
     shields: r('aegis') + 2 * r('oath'),
     // The boon pairs' hidden bonuses.
     glide: pairs.includes('glide'),
     hoard: pairs.includes('hoard'),
     bulwark: pairs.includes('bulwark'),
+    // The companion: how far out of reach the owl grabs coins, how far ahead the hound barks, and
+    // the hits the fox takes a stage (and whether the streak survives them).
+    owl: PET_EACH.owl[pet('owl')],
+    bark: PET_EACH.hound[pet('hound')],
+    fox: PET_EACH.fox[pet('fox')],
+    foxStreak: pet('fox') >= PET_EACH.foxStreak,
   };
 }
 
@@ -447,6 +475,11 @@ export function today(now = new Date()) {
 
 export function freshState(best = 0, bank = 0, armoury: Armoury = noArmoury(), daily: string | null = null, crown = false, knight: KnightId = 'knight', knights: KnightId[] = ['knight']): GameState {
   return {
+    mode: daily ? 'daily' : 'run',
+    challenge: null,
+    pet: null,
+    pets: noPets(),
+    foxGuard: 0,
     stage: 1,
     knight,
     knights: [...knights],

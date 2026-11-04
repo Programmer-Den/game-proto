@@ -69,7 +69,7 @@ export class SoundCues {
 
     // New effects since the last frame.
     const fresh = s.effects.filter((e) => e.id >= this.nextId);
-    const hurt = fresh.some((e) => e.kind === 'hit' || e.kind === 'block' || e.kind === 'fall');
+    const hurt = fresh.some((e) => e.kind === 'hit' || e.kind === 'block' || e.kind === 'fall' || e.kind === 'fox');
 
     // The knight's own moves (a pit throws the knight up too, which is no jump).
     if (r.jumps < this.jumps && !hurt) play('jump', this.jumps < stats(s).jumps ? 1.35 : 1);
@@ -99,6 +99,10 @@ export class SoundCues {
       else if ((e.kind === 'dust' && !skid) || e.kind === 'fall') play('land');
       else if (e.kind === 'skid') play('skid');
       else if (e.kind === 'heal') play('heal');
+      // The companions: the hound's bark, the owl's swoop, the fox taking a hit.
+      else if (e.kind === 'bark') play('bark');
+      else if (e.kind === 'owl') play('owl');
+      else if (e.kind === 'fox') play('fox');
       // A shrine that can't give a heart refuses, with the buzz every refused action gets.
       else if (e.kind === 'refuse') ui('refuse');
       else if (e.kind === 'pop') {
@@ -140,6 +144,7 @@ export class SoundCues {
     // The run's phase and stage.
     if (s.phase !== this.phase) {
       if (s.phase === 'checkpoint') play('checkpoint');
+      else if (s.phase === 'over' && s.challenge?.done) play('cleared');
       else if (s.phase === 'over') playSting(SONG, 'lose');
     }
     if (s.stage > this.stage && s.phase === 'running') play('horn');
