@@ -14,6 +14,7 @@ import {
   type TerrainId, type TraitId,
 } from './data';
 import type { TextKey } from '../i18n';
+import { rand } from './rng';
 
 export const STEP_S = 0.05;
 /** Seconds a robot takes to step to the next tile. */
@@ -388,7 +389,7 @@ export class Battle {
 
   private attack(u: BUnit, target: BUnit) {
     const ranged = u.range > 1;
-    const crit = Math.random() < u.crit;
+    const crit = rand() < u.crit;
     const rally = this.time < this.rallyUntil[u.team] ? SKILL_POWER.rally.damage : 1;
     let dmg = u.atk * u.dmgMul * rally * (crit ? u.critDmg : 1);
     if (u.cls === 'sniper') dmg *= 1 + traitValue(this.sides[u.team].traits, 'sniper') / 100;
@@ -412,7 +413,7 @@ export class Battle {
   /** An attack or ability landing: dodge, armour, shields, then everything that hangs on a hit. */
   private hit(src: BUnit, dst: BUnit, amount: number, ability: boolean, crit: boolean) {
     if (!dst.alive) return;
-    if (!ability && Math.random() < dst.dodge) {
+    if (!ability && rand() < dst.dodge) {
       this.events.push({ t: 'dodge', id: dst.id });
       return;
     }
@@ -494,7 +495,7 @@ export class Battle {
     u.mana -= u.maxMana;
     u.castLock = 0.45;
     const power = u.power * u.powerMul;
-    const crit = !!u.sp.spellCrit && Math.random() < u.crit;
+    const crit = !!u.sp.spellCrit && rand() < u.crit;
     const dmg = power * (crit ? u.critDmg : 1);
     const enemies = this.enemiesOf(u);
     this.events.push({ t: 'cast', id: u.id, ability: u.ability! });
@@ -513,7 +514,7 @@ export class Battle {
       case 'barrage': {
         const shots = u.big ? 8 : 4;
         for (let i = 0; i < shots && enemies.length; i++) {
-          const e = enemies[Math.floor(Math.random() * enemies.length)];
+          const e = enemies[Math.floor(rand() * enemies.length)];
           const dur = 0.3 + i * 0.06;
           this.projectiles.push({ from: u.id, to: e.id, dmg, ability: true, crit, at: this.time + dur });
           this.events.push({ t: 'proj', from: u.id, to: e.id, kind: 'shell', dur, crit });
@@ -561,7 +562,7 @@ export class Battle {
     }
     const spark = traitValue(this.sides[u.team].traits, 'sparker');
     if (spark && u.origins.includes('sparker')) {
-      const hits = [...this.enemiesOf(u)].sort(() => Math.random() - 0.5).slice(0, 3);
+      const hits = [...this.enemiesOf(u)].sort(() => rand() - 0.5).slice(0, 3);
       if (hits.length) this.events.push({ t: 'lightning', from: u.id, to: hits.map((h) => h.id) });
       for (const h of hits) this.hit(u, h, spark, true, false);
     }

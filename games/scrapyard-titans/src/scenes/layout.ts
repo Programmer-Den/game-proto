@@ -72,11 +72,14 @@ export const BUTTONS = {
   reroll: { x: 12, y: 464, w: 70, h: 28 },
   xp: { x: 88, y: 464, w: 70, h: 28 },
   sell: { x: 76, y: 500, w: 82, h: 30 },
+
   fight: { x: 800, y: 440, w: 150, h: 48 },
   speed: { x: 800, y: 496, w: 72, h: 30 },
   skill: { x: 800, y: 440, w: 150, h: 48 },
   /** Right of the bench: keeps the shop for the next round. */
   lock: { x: 736, y: 380, w: 62, h: 26 },
+  /** Left of the bench in duo mode: pass the selected robot, or give gold, to the partner. */
+  pass: { x: 162, y: 380, w: 62, h: 26 },
 };
 
 export const TRAITS_PANEL = { x: 8, y: 38, rowH: 21, maxRows: 9 };
@@ -119,6 +122,7 @@ export function placeLayout(w: number, h: number, fx: number, fy: number) {
   for (const k of ['reroll', 'xp', 'sell'] as const) move(BUTTONS[k], D.BUTTONS[k], 0, bottom);
   for (const k of ['fight', 'speed', 'skill'] as const) move(BUTTONS[k], D.BUTTONS[k], right, bottom);
   move(BUTTONS.lock, D.BUTTONS.lock, fx, fy);
+  move(BUTTONS.pass, D.BUTTONS.pass, fx, fy);
   move(LEFT_BOTTOM, D.LEFT_BOTTOM, 0, bottom);
   move(INFO_PANEL, D.INFO_PANEL, right, bottom);
   move(PLAYERS_PANEL, D.PLAYERS_PANEL, right, 0);

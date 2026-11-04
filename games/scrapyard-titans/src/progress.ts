@@ -2,13 +2,17 @@
  * What lasts between matches, saved under `scrapyard-titans-stats`: matches played, wins, the best
  * place, the deeds done, which unlock commanders (`CommanderDef.unlock`), and the rank points
  * (`RANKS`), this week's best place in the weekly season and the campaign lobbies cleared. The
- * saved winning squads, which come back as ghosts, sit under `scrapyard-titans-squads`. Watched
- * matches never count. No Phaser.
+ * saved winning squads, which come back as ghosts, sit under `scrapyard-titans-squads`, the
+ * workshop's robots under `scrapyard-titans-workshop` and the daily lobby's record under
+ * `scrapyard-titans-daily` (`shared/daily.ts`). Watched matches never count. No Phaser.
  */
+import { dailyRand, finishDaily, loadDaily, seedOf, seeded, startDaily, today } from '../../../shared/daily';
 import {
-  CAMPAIGN, GHOST, ITEMS, MAX_LEVEL, ORIGIN_COLOR, PLAYER_COMMANDERS, RANKS, RANK_POINTS, SETS, TRAITS, UNIT_BY_ID, WEEKLY_ROTATION,
-  AUGMENT_BY_ID, type AugmentId, type CommanderDef, type DeedId, type OriginId,
+  BOSSES, CAMPAIGN, CHASSIS, CUSTOM, DAILY, GHOST, ITEMS, MAX_LEVEL, NAME_PARTS, ORIGIN_COLOR, PLAYER_COMMANDERS, RANKS, RANK_POINTS, RIVALS, SETS, TRAITS, UNIT_BY_ID,
+  WEAPONS, WEEKLY_ROTATION, WORKSHOP, WORKSHOP_UNLOCKS,
+  AUGMENT_BY_ID, type AugmentId, type ClassId, type CommanderDef, type DeedId, type OriginId, type SetId, type UnitDef,
 } from './game/data';
+import type { Rand } from './game/rng';
 import { allUnits, boardUnits, countTraits, type Match, type SavedSquad } from './game/match';
 
 const STORE_KEY = 'scrapyard-titans-stats';
@@ -181,3 +185,125 @@ export function pickSquad(): SavedSquad | null {
   return list.length ? list[Math.floor(Math.random() * list.length)] : null;
 }
 
+
+// ---------------------------------------------------------------- the robot workshop
+
+const WORKSHOP_KEY = 'scrapyard-titans-workshop';
+
+/** A robot built in the workshop: a chassis (origin), a weapon (class) and the name the player gave it. */
+export interface Build {
+  id: string;
+  name: string;
+  origin: OriginId;
+  cls: ClassId;
+}
+
+/** The chassis and weapons the cleared campaign lobbies have unlocked. */
+export const workshopParts = (p: Progress) => new Set<string>(WORKSHOP_UNLOCKS.slice(0, p.campaign).flat());
+/** The campaign lobby (index) whose first clear unlocks a chassis or weapon. */
+export const unlockedBy = (piece: string) => WORKSHOP_UNLOCKS.findIndex((l) => (l as string[]).includes(piece));
+
+/** A build as a robot the shop can sell, the cost every workshop robot has. */
+export const buildDef = (b: Build): UnitDef => ({ id: b.id, name: 'customRobot', label: b.name, cost: WORKSHOP.cost, origin: b.origin, cls: b.cls, custom: true });
+
+/** Puts the builds into `CUSTOM` and `UNIT_BY_ID`, so matches, saved squads and the painter find them. */
+function register(builds: Build[]) {
+  for (const d of CUSTOM) delete UNIT_BY_ID[d.id];
+  CUSTOM.length = 0;
+  for (const b of builds) {
+    const def = buildDef(b);
+    CUSTOM.push(def);
+    UNIT_BY_ID[def.id] = def;
+  }
+}
+
+/** Cleans a typed name: one line, no longer than `WORKSHOP.nameMax`. */
+export const cleanName = (name: string) => name.replace(/\s+/g, ' ').trim().slice(0, WORKSHOP.nameMax);
+
+/** The saved builds (registered as robots as they load). */
+export function loadBuilds(): Build[] {
+  let builds: Build[] = [];
+  try {
+    const list = JSON.parse(localStorage.getItem(WORKSHOP_KEY) ?? '[]');
+    if (Array.isArray(list)) {
+      builds = list
+        .filter((b) => b && typeof b.id === 'string' && /^w-[a-z0-9]+$/.test(b.id) && typeof b.name === 'string' && cleanName(b.name) && CHASSIS.includes(b.origin) && WEAPONS.includes(b.cls))
+        .map((b) => ({ id: b.id, name: cleanName(b.name), origin: b.origin, cls: b.cls }))
+        .slice(0, WORKSHOP.slots);
+    }
+  } catch {
+    // A broken or blocked save: an empty workshop.
+  }
+  register(builds);
+  return builds;
+}
+
+function saveBuilds(builds: Build[]) {
+  register(builds);
+  try {
+    localStorage.setItem(WORKSHOP_KEY, JSON.stringify(builds));
+  } catch {
+    // Blocked storage: the builds last until the page closes.
+  }
+}
+
+/** Builds a robot; null when the workshop is full, a piece is still locked or the name is empty. */
+export function addBuild(p: Progress, name: string, origin: OriginId, cls: ClassId): Build | null {
+  const builds = loadBuilds();
+  const parts = workshopParts(p);
+  const clean = cleanName(name);
+  if (builds.length >= WORKSHOP.slots || !parts.has(origin) || !parts.has(cls) || !clean) return null;
+  const build = { id: `w-${Date.now().toString(36)}${builds.length}`, name: clean, origin, cls };
+  saveBuilds([...builds, build]);
+  return build;
+}
+
+/** Scraps a build: it leaves the shop pool (and saved squads with it no longer come back). */
+export function scrapBuild(id: string) {
+  saveBuilds(loadBuilds().filter((b) => b.id !== id));
+}
+
+/** A name to suggest for a new build. */
+export const suggestName = () => `${NAME_PARTS.first[Math.floor(Math.random() * NAME_PARTS.first.length)]} ${NAME_PARTS.last[Math.floor(Math.random() * NAME_PARTS.last.length)]}`;
+
+// ---------------------------------------------------------------- the daily lobby
+
+const GAME = 'scrapyard-titans';
+
+/** The daily lobby's rules, the same for every player on the day. */
+export interface DailyRules {
+  day: string;
+  set: SetId;
+  terrain: boolean;
+  /** Index into `PLAYER_COMMANDERS`: the day lends one, locked or not. */
+  commander: number;
+  rivals: CommanderDef[];
+}
+
+export function dailyRules(day = today()): DailyRules {
+  const r = seeded(seedOf(`${GAME}:${day}:rules`));
+  const pick = (n: number) => Math.floor(r() * n);
+  const set: SetId = r() < 0.5 ? 'scrap' : 'neon';
+  const terrain = r() < 0.5;
+  const commander = pick(PLAYER_COMMANDERS.length);
+  const rivals = [...RIVALS];
+  for (let i = rivals.length - 1; i > 0; i--) {
+    const j = pick(i + 1);
+    [rivals[i], rivals[j]] = [rivals[j], rivals[i]];
+  }
+  if (r() < DAILY.bossChance) rivals[pick(rivals.length)] = BOSSES[pick(BOSSES.length)];
+  return { day, set, terrain, commander, rivals };
+}
+
+/** The daily lobby's random source for everything but the shops. */
+export const dailyMatchRand = (day: string): Rand => dailyRand(GAME, day);
+/** Today's daily record: whether it was played, today's place and the best one, and the streak. */
+export function dailyRecord(day = today()) {
+  const d = loadDaily(GAME, day);
+  // Scores are 9 - place, so the higher the better as `shared/daily.ts` keeps them.
+  return { played: d.played, place: d.score !== null ? 9 - d.score : 0, best: d.best ? 9 - d.best : 0, streak: d.streak };
+}
+/** Uses up the day's try. */
+export const startDailyTry = (day: string) => startDaily(GAME, day);
+/** Saves the day's place. */
+export const finishDailyTry = (day: string, place: number) => finishDaily(GAME, 9 - place, day);
