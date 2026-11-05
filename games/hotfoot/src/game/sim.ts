@@ -369,7 +369,8 @@ function hurt(s: GameState, kind: TrapKind | 'wall' | 'boss' | 'rock') {
   if (s.hearts <= 0) {
     s.hearts = 0;
     s.phase = 'over';
-    s.best = Math.max(s.best, metres(s.distance));
+    // A challenge course keeps stars, not a best distance.
+    if (!s.challenge) s.best = Math.max(s.best, metres(s.distance));
     // The Squire's Purse's coins are for the road, not the bank, so dying early can't farm them.
     // A challenge course banks nothing: it is run for its stars.
     if (!s.challenge) s.bank += Math.max(0, s.coins - s.purse);

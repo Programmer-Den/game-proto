@@ -175,10 +175,13 @@ study, shade gardens and a mirrored second production line.
   `alchemyOpen` (every recipe `researched`), `mixFor`, `brewedPrice` (raised by `SEAL_PRICE` per
   seal), `onHand`, `alchemyName`, and the actions `dropAtBench` (`BENCH_STOCK` of each refined
   good), `addToMix`, `clearMix`, `mixNow` (`MIX_MIN` to `MIX_MAX` ingredients; a new recipe goes into
-  `found`), `mixAgain`, `sellBrewed` (into the purse), `canCure` and `useCure` (`plagueAt` the next
+  `found`), `mixAgain` (refused, leaving the bowl as it is, unless the bench, the satchel and the
+  bowl together hold the mix), `sellBrewed` (into the purse), `canCure` and `useCure` (`plagueAt` the next
   stage, as `deliverForPlague` does when a stage's potions are in). The courier (AP19): `Place`,
   `PLACES`, `TRIPS` (herb, ms, how many it brings), `COURIER_COST`, `SATCHEL`, `hireCourier`,
-  `sendCourier` and `tickCourier`, which `tick` calls every step, so a trip also ends while away.
+  `sendCourier` and `tickCourier`, which `tick` calls every step, so a trip also ends while away
+  (`catchUp` runs it on its own when there is no automation). A return fills the herb up to
+  `SATCHEL` but never lowers a count that Clear or Make left above it (`clearMix` is uncapped).
   The decor (AP20): `DecorId`, `DECOR` (costs), `DECOR_IDS`, `decorOpen` (the guild joined),
   `hasDecor`, `buyDecor` (also `nudgeReputation` by 3) and the bonuses the sim reads: `decorTip`
   (`SIGN_TIP` on a filled order's tip in `serveFromShelf`), `decorPatience` (`LANTERN_PATIENCE` on
@@ -189,7 +192,8 @@ study, shade gardens and a mirrored second production line.
 - `src/game/away.ts`: the autopilot. `catchUp(state, now, rand)` plays the time since `lastSeen`
   (capped at `AWAY_CAP_MS`, 2h; nothing under `AWAY_MIN_MS`, 60s) through `tick` in 500ms steps
   with nobody on a work spot and every customer at the counter, and returns an `AwaySummary`
-  (`ms`, `coins`, `potions`) or null. `hasAutomation`: any craftsman hired or belt built.
+  (`ms`, `coins`, `potions`) or null. `hasAutomation`: any craftsman hired or belt built; without
+  it nothing is played but a courier's trip (`tickCourier` for the whole time away), and it returns null.
   It also runs `tickTown` each step, and counts the shops' tills into `coins`; `hasAutomation`
   also holds for `townAutomated` (a town worker, shopkeeper or pixie route).
 - `src/game/town.ts`: the town's data, free of Phaser: `GoodId` and `GOODS`, the shop defs
@@ -353,7 +357,7 @@ study, shade gardens and a mirrored second production line.
   favicon (`shopSign` in `stations.ts`, drawn from the favicon's own shapes).
 - `src/ui/Board.ts`: `Board`, a panel over the middle of the view whose `build(kit)` lays its
   contents out afresh on `toggle(true)` and after every button pressed on it (`refresh`), with a
-  `BoardKit` of `heading`, `text`, `icon`, `button` (faded and dead when disabled) and `next` line by
+  `BoardKit` of `heading`, `text`, `icon`, `button` (its whole card takes the tap; faded and dead when disabled) and `next` line by
   line; its background goes under its parts and stops taps. `GameScene.boards` holds the bench's,
   the courier's and the decor board's, and `closePanels` closes them like the others.
 - `src/art/alchemy.ts`: `bakeAlchemy` (called by `BootScene`) paints `alchemy-bench`,
@@ -594,7 +598,9 @@ study, shade gardens and a mirrored second production line.
   (`customerTexture(5)`) standing at `home` while hired and not out, and a status line ("Tap to
   hire", "Tap to send", "Back in 2:30" by `clock`). A tap opens `drawCourier`: Hire for
   `COURIER_COST`, then a Send per `PLACES` entry while home, and the satchel. The view says
-  "Courier back: +3 Silverleaf" when `courier.trips` goes up and refreshes the courier's board each
+  "Courier back: +3 Silverleaf" (what the satchel actually took, kept from the frame before, with
+  `ui('coin')`; "no room in the satchel" and no sound when it was full) when `courier.trips` goes up
+  and refreshes the courier's board each
   second for its countdown. No randomness: trips always take and bring the same.
 - Shop decor (AP20; layout `DECOR_SPOTS`): `createDecor` hangs a tappable "Shop decor" sign on the
   shop's front wall right of the street door (shown once `decorOpen`), which opens `drawDecor` (each
@@ -855,7 +861,7 @@ Under browser automation the engine is a no-op, so the playthrough is unchanged.
 | `blight` | `createSound`, more beds blighted than last frame |
 | `plagueUp` | `createPlague`, a stage beaten or the Panacea unlocked |
 
-- Shared sounds: `ui('click')` for the bench, the courier's post, the decor board and Send, `ui('coin')` when the courier comes back, `ui('refuse')` for a bench, courier or decor button that does nothing; `ui('click')` for the Recipes and Settings buttons, price signs, priority signs,
+- Shared sounds: `ui('click')` for the bench, the courier's post, the decor board and Send, `ui('coin')` when the courier comes back with herbs, `ui('refuse')` for a bench, courier or decor button that does nothing; `ui('click')` for the Recipes and Settings buttons, price signs, priority signs,
   the herb market's sign and a garden sign that replants; `ui('refuse')` for a garden sign with nothing else to plant, a tap on an order bubble
   that hands nothing over (out of the shop or not on the shelf), a wagon tap without a full crate, a royal courier tap with none of its potions on the shelf
   (`ui('coin')` when some were handed over),

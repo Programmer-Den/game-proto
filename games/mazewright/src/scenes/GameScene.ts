@@ -4,7 +4,7 @@ import { viewFrame, viewSize } from '../../../../shared/scaling';
 import { formatNumber } from '../../../../shared/i18n';
 import { settings } from '../../../../shared/settings';
 import { award } from '../../../../shared/trophies';
-import { dailyRand, finishDaily, loadDaily, startDaily, type DailyRecord } from '../../../../shared/daily';
+import { dailyRand, finishDaily, loadDaily, startDaily, today, type DailyRecord } from '../../../../shared/daily';
 import { dailyPlan } from '../game/daily';
 import { SFX, SONG } from '../audio';
 import { cellIndex, cellOf, MAPS, SEASON_STARS, SEASONS, VERSUS_MAP, type MapDef, type Season } from '../game/maps';
@@ -449,9 +449,15 @@ export class GameScene extends Phaser.Scene {
     this.recordTrophies();
   }
 
+  /** Reads the daily record again once the day it is for has passed, so a new day's try opens. */
+  private rollDaily() {
+    if (this.daily.day !== today()) this.daily = loadDaily(GAME);
+  }
+
   /** Ends today's daily maze with its score: only the first finish of the day counts. */
   private endDaily(g: Game) {
-    this.daily = finishDaily(GAME, dailyScore(g));
+    // Closed under the day the try began (`startDaily` set it), even when it ends after midnight.
+    this.daily = finishDaily(GAME, dailyScore(g), this.daily.day);
   }
 
   /** Earns a trophy, unless a replay is only being watched or the game is a free Sandbox one or a versus match. */
@@ -464,8 +470,8 @@ export class GameScene extends Phaser.Scene {
     const all = Object.values(this.records);
     const stars = all.reduce((n, r) => n + r.stars + (r.challenge ? 1 : 0), 0);
     const earned = {
-      firstWin: all.some((r) => r.won || r.challenge),
-      lastCabbage: this.records.lastcabbage.won || this.records.lastcabbage.challenge,
+      firstWin: all.some((r) => r.won || r.challenge || r.night),
+      lastCabbage: this.records.lastcabbage.won || this.records.lastcabbage.challenge || this.records.lastcabbage.night,
       firstChallenge: all.some((r) => r.challenge),
       allChallenges: all.every((r) => r.challenge),
       winter: stars >= SEASON_STARS.winter,
@@ -673,7 +679,7 @@ export class GameScene extends Phaser.Scene {
       // Played back quietly to its break: the foes met, a stolen cabbage and the weather are told no more.
       this.state = resumeGame(saved, STEP, (events) => {
         for (const e of events) {
-          if (e.type === 'wave') for (const [k] of waveGroups(e.wave)) this.seen.add(k);
+          if (e.type === 'wave') for (const [k] of waveGroups(e.wave, saved.mode === 'night')) this.seen.add(k);
           else if (e.type === 'grab') this.grabbed = true;
           else if (e.type === 'wilt' || e.type === 'frozen') this.weathered = true;
         }
@@ -717,6 +723,7 @@ export class GameScene extends Phaser.Scene {
 
   /** Starts today's daily maze: its own garden and pouch on Normal, with no gardener, using up today's try. */
   private startDailyMaze() {
+    this.rollDaily();
     if (this.daily.played) return ui('refuse');
     const plan = dailyPlan(dailyRand(GAME));
     this.daily = startDaily(GAME);
@@ -1166,6 +1173,8 @@ export class GameScene extends Phaser.Scene {
 
   /** Redraws the bars, buttons, panels and banners when what they show has changed. */
   private drawHud() {
+    // The gardens' daily button rolls over to the new day at midnight while the game stays open.
+    if (this.screen === 'menu') this.rollDaily();
     const s = this.state;
     const key = JSON.stringify([
       this.screen, this.vw, this.vh, this.tool, this.tool2, this.duo, this.pouch, this.kit, this.selected, this.sellArmed?.cell, this.speed, this.banner?.text, this.shed, this.earned, this.season, this.mode, !!this.replay,

@@ -625,14 +625,15 @@ export function endScreen(p: Panel, s: GameState, progress: Progress, banked = 0
   const hero = HEROES[s.hero!];
   const planet = PLANETS[s.planet];
   const vars = { hero: t(hero.name), planet: t(planet.name), n: s.stage + 1, of: stagesOf(s) };
-  const line = s.rush ? (won ? 'rushWon' : 'rushFell') : won ? BOSSES[planet.boss].beaten : s.arena ? 'fellArena' : 'fellOn';
-  p.text(VIEW.w / 2, 182, t(line, { ...vars, boss: t(BOSSES[planet.boss].name), n: s.rushBeaten, of: s.rushTotal }), 17, C.text, { origin: [0.5, 0] });
+  const line = s.rush ? (won ? 'rushWon' : 'rushFell') : won ? (s.daily ? 'dailyWon' : BOSSES[planet.boss].beaten) : s.arena ? 'fellArena' : 'fellOn';
+  const boss = t(BOSSES[planet.boss].name);
+  p.text(VIEW.w / 2, 182, t(line, s.rush ? { ...vars, boss, n: s.rushBeaten, of: s.rushTotal } : { ...vars, boss }), 17, C.text, { origin: [0.5, 0] });
   const caps = s.capstones.map((id) => t(CAPSTONES.find((c) => c.id === id)!.name));
   const lines = [
     t('runStats', { time: clock(s.runMs), level: s.level, kills: s.kills, elites: s.elitesKilled }),
     caps.length ? t('capstonesLine', { names: caps.join(', ') }) : '',
     s.heat > 0 ? t('endHeat', { n: s.heat }) : '',
-    won && heatOpen(s.heat) > s.heat ? t('heatOpened', { n: s.heat + 1, hero: t(hero.short) }) : '',
+    won && !s.daily && !s.rush && heatOpen(s.heat) > s.heat ? t('heatOpened', { n: s.heat + 1, hero: t(hero.short) }) : '',
     s.week >= 0 ? t('weeklyEnd', { mutators: s.mutators.map((id) => t(MUTATORS[id].name)).join(' + ') }) : '',
     s.daily && daily?.score != null ? t('dailyEnd', { n: daily.score, best: daily.best }) : '',
     s.endless ? t('endlessEnd', { n: s.endlessCleared, best: progress.endless }) : '',

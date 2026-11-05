@@ -220,8 +220,15 @@ function register(builds: Build[]) {
 /** Cleans a typed name: one line, no longer than `WORKSHOP.nameMax`. */
 export const cleanName = (name: string) => name.replace(/\s+/g, ' ').trim().slice(0, WORKSHOP.nameMax);
 
+/** The builds kept in memory once saving them failed (storage blocked or full), so they last until the page closes. */
+let unsaved: Build[] | null = null;
+
 /** The saved builds (registered as robots as they load). */
 export function loadBuilds(): Build[] {
+  if (unsaved) {
+    register(unsaved);
+    return unsaved;
+  }
   let builds: Build[] = [];
   try {
     const list = JSON.parse(localStorage.getItem(WORKSHOP_KEY) ?? '[]');
@@ -242,8 +249,10 @@ function saveBuilds(builds: Build[]) {
   register(builds);
   try {
     localStorage.setItem(WORKSHOP_KEY, JSON.stringify(builds));
+    unsaved = null;
   } catch {
-    // Blocked storage: the builds last until the page closes.
+    // Blocked or full storage: the builds last in memory until the page closes.
+    unsaved = builds;
   }
 }
 

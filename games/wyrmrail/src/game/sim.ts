@@ -178,6 +178,7 @@ export function newGame(boon: Medal | null = null, journey: Partial<Journey> = {
     towns: [],
     warehouses: [],
     lamps: [],
+    grewTown: null,
     rival: null,
     boon,
     festivalMs: 0,
@@ -513,6 +514,7 @@ export function pickCharter(s: GameState, i: number) {
   s.charter = charter;
   s.charterOffer = null;
   const news = roundNews(s);
+  s.grewTown = null;
   s.banner = { text: [tr('charterBanner', { name: tr(charter.name) }), ...news].join('\n'), ms: BANNER_MS * (news.length ? 1.5 : 1) };
   return true;
 }
@@ -527,9 +529,10 @@ export function pickMoult(s: GameState, i: number) {
   return true;
 }
 
-/** What is new this round, for its banner (again under the charter's, since the charter cards hide the first): the rival, lamps and night. */
+/** What is new this round, for its banner (again under the charter's, since the charter cards hide the first): a new town, the rival, lamps and night. */
 function roundNews(s: GameState) {
   const news: string[] = [];
+  if (s.grewTown !== null) news.push(tr('townBanner', { village: villages(s)[s.grewTown].name }));
   if (s.round === RIVAL_ROUND && s.rival) news.push(tr('rivalBanner'));
   if (s.round === LAMP_ROUND) news.push(tr('lampsBanner'));
   if (isNight(s)) news.push(tr('nightBanner'));
@@ -900,15 +903,23 @@ function arrive(s: GameState, i: number) {
   s.idleMs[o.to] = 0;
   cheer(s, o.to, 1);
   pop(s, `+${pay}`, villages(s)[o.to], '#f3c64e');
-  grow(s, o.to);
+  const town = grow(s, o.to);
   const shop = workshopOf(villages(s)[o.to]);
   if (shop && shop.takes === o.cargo) makeGoods(s, o.to);
-  if (s.delivered < roundGoal(s.round)) return;
+  if (s.delivered < roundGoal(s.round)) {
+    if (town) s.banner = { text: tr('townBanner', { village: villages(s)[o.to].name }), ms: BANNER_MS * 1.5 };
+    return;
+  }
   if (s.round === FESTIVAL_ROUND) {
     s.phase = 'won';
     s.medal = festivalMedal(s);
     s.banner = null;
-  } else nextRound(s);
+    return;
+  }
+  // A village that grew with the round's last delivery joins the next round's news (under the charter's banner too).
+  if (town) s.grewTown = o.to;
+  nextRound(s);
+  if (!s.charterOffer) s.grewTown = null;
 }
 
 /**
@@ -1058,12 +1069,15 @@ function randomOrder(s: GameState) {
   addOrder(s, from, shops.length && Math.random() < WORKSHOP_CHANCE ? pick(shops) : pick(others));
 }
 
-/** A village fed well grows (WR18): enough deliveries in time from `TOWN_ROUND` and it is a town. */
+/**
+ * A village fed well grows (WR18): enough deliveries in time from `TOWN_ROUND` and it is a town.
+ * Returns whether it grew; `arrive` shows its banner once the round check is done.
+ */
 function grow(s: GameState, v: number) {
-  if (s.round < TOWN_ROUND || s.towns.includes(v)) return;
-  if (++s.growth[v] < GROW_AT) return;
+  if (s.round < TOWN_ROUND || s.towns.includes(v)) return false;
+  if (++s.growth[v] < GROW_AT) return false;
   s.towns.push(v);
-  s.banner = { text: tr('townBanner', { village: villages(s)[v].name }), ms: BANNER_MS * 1.5 };
+  return true;
 }
 
 /** A tile the rival can lay track on: open ground off the wyrm's line, away from every village, the Roost and the hazard. */
@@ -1193,6 +1207,13 @@ function tickRival(s: GameState, dt: number) {
     const o = s.orders.find((o) => o.id === r.claim!.order);
     if (!o || o.status !== 'waiting') {
       if (o) pop(s, tr('beatRival'), villages(s)[o.from], '#9be883');
+      r.claim = null;
+      r.restMs = RIVAL_REST_MS;
+      return;
+    }
+    // A line cut since the claim (a rival tile bought out) drops it: the rival can't reach both ends.
+    const reach = rivalServes(s);
+    if (!reach.includes(o.from) || !reach.includes(o.to)) {
       r.claim = null;
       r.restMs = RIVAL_REST_MS;
       return;

@@ -344,8 +344,8 @@ npx playwright test --project catacomb
 All paths are inside `games/catacomb/`.
 
 - `src/game/`: the rules in plain TypeScript with no Phaser dependency. `cards.ts` and `enemies.ts`
-  are data tables (the cards, powers and curses, the foes and their moves), `heroes.ts` the three
-  heroes and the Hexer's unlock, `flasks.ts` the flasks, `depth.ts` the depth ladder and its save, `map.ts` lays out a new
+  are data tables (the cards, powers and curses, the foes and their moves), `heroes.ts` the four
+  heroes and the Hexer's and the Alchemist's unlocks, `flasks.ts` the flasks, `depth.ts` the depth ladder and its save, `map.ts` lays out a new
   map for each act of each run, `relics.ts` and `events.ts` are the relics and mystery rooms, `state.ts`
   describes a run, and `sim.ts` moves it on: choosing the hero, walking the map, playing cards and
   drinking flasks, statuses, the foes' turn, the campfire, the merchant, mystery rooms, rewards and

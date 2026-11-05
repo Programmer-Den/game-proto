@@ -141,10 +141,13 @@ export function mixNow(state: GameState): { feedback: Feedback; found: boolean }
 export function mixAgain(state: GameState, id: MixId): Feedback | null {
   const mix = MIXES.find((m) => m.id === id)!;
   if (!state.alchemy.found.includes(id)) return null;
-  clearMix(state);
   const need = new Map<Ingredient, number>();
   for (const i of mix.inputs) need.set(i, (need.get(i) ?? 0) + 1);
-  if ([...need].some(([i, n]) => onHand(state, i) < n)) return null;
+  // What is in the bowl goes back before the mix is filled, so it counts as at hand; when something
+  // is short, the bowl is left as it was.
+  const inBowl = (i: Ingredient) => state.alchemy.mix.filter((m) => m === i).length;
+  if ([...need].some(([i, n]) => onHand(state, i) + inBowl(i) < n)) return null;
+  clearMix(state);
   for (const i of mix.inputs) addToMix(state, i);
   return mixNow(state)!.feedback;
 }
@@ -199,7 +202,9 @@ export function tickCourier(state: GameState, dt: number) {
   trip.left -= dt;
   if (trip.left > 0) return;
   const { herb, brings } = TRIPS[trip.to];
-  state.alchemy.wild[herb] = Math.min(SATCHEL, (state.alchemy.wild[herb] ?? 0) + brings);
+  const have = state.alchemy.wild[herb] ?? 0;
+  // Never lower the count: Clear and Make return the bowl's herbs uncapped, so the satchel can hold more than SATCHEL.
+  state.alchemy.wild[herb] = Math.max(have, Math.min(SATCHEL, have + brings));
   courier.trip = null;
   courier.trips++;
 }

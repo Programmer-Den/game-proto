@@ -399,6 +399,7 @@ const de: Translation<typeof en> = {
   courierHired: 'Bote angestellt',
   courierSent: 'Bote geschickt: {place}',
   courierBack: 'Bote zurück: +{n} {herb}',
+  courierBackFull: 'Bote zurück: In der Tasche ist kein Platz mehr für {herb}',
   tripLine: '+{n} {herb}, {min} Min.',
   satchel: 'Tasche:',
   forest: 'Wald',

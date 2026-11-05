@@ -49,7 +49,9 @@ Implemented today:
   Scoring stays per cell over the whole grid, so neighbours of either side count, but
   `boardScore(grid, owns)` and `joinedCount(grid, owns)` (`Owns` in `castle.ts`) sum one side's
   cells, and the castle's chain only runs along a side's own cells. The player's decree marks,
-  decree draws, merges (`canMerge` refuses a rival house; `housesCanMerge(ownGrid(s))`) and feats
+  decree draws, merges (`canMerge` refuses a rival house; `housesCanMerge(ownGrid(s))`), feats,
+  trades (`canTrade` wants a market of the player's own; a tap or hover on the rival's market reads
+  `rivalOwns`) and clearing (`canClear` and `woodClearable` look for the camp on `ownGrid(s)`)
   read `ownGrid(s)`, the board with rival cells as `'sea'`. `end` pays the rival its castle bonus.
   `Placed.rival` carries its move for a plum popup and the `rival` knock; `refreshBoardMarks`
   frames each rival cell in plum with a `bead-rival` and names its last tile (`rivalLast`), the
@@ -69,7 +71,9 @@ Implemented today:
   Best stars save under `tiny-kingdom-puzzles`. The stars were set by a scratch script with the
   game's own hands: one at 85% of the greedy bot's score, two at it, three at the best of a 40-wide
   beam search (placements only), so three stars can always be won; `puzzleStars` scales them by
-  `byDifficulty(0.9, 1, 1.05)`.
+  `byDifficulty(0.9, 1, 1.05)` and caps the third at the found best (`stars[2]`) and the first two
+  one point below it, so Hard raises the first two stars but never the third, which stays
+  reachable, and two stars stay a step of their own.
 - The coast (`seaSides` in `tiles.ts`): a cell's sides off the board or on a `'sea'` cell face the
   sea. The harbour `fits` beside a lake or the sea and scores its sea sides in its `base` (so the
   neighbour links still add up); the lighthouse only fits on the coast.
@@ -125,17 +129,19 @@ Implemented today:
   tower with no home around it, or a `flood` on a grass or farm cell beside a named lake (the
   kinds are tried in a seeded order; null when neither fits). `state.omen` holds it; `settle`
   lets it `strike` as the next round begins (flood: the cell becomes a lake, whatever stood
-  there; storm: the tower becomes grass if it is still alone), recomputes the score, then draws the
+  there; on a wonder's cell (`fits` lets a wonder cover the marked cell) the whole wonder is lost:
+  the other three cells become grass and `Struck.cells` holds all four, so no part of it can turn
+  into a second scoring anchor; storm: the tower becomes grass if it is still alone), recomputes the score, then draws the
   decree and the next omen on the board as it stands. `Placed.struck` carries the cells for the
   scene's "Flooded" / "Toppled" popups. An omen holds no text: the scene's `omenLine` words it
   from `kind` and `place`, in a few words for the panel's omen strip (`OMEN`, coral) and in a line
   for the round banner, and `refreshBoardMarks` draws a coral dashed box with "Flood" or "Storm" on
   the threatened cell.
 - Clearing a wood: with `'lumber'` selected and in the hand, a tap on a forest beside a lumber camp
-  (`canClear`) calls `clear`, which turns it to grass, spends the lumber tile and settles like a
+  of the player's own (`canClear`) calls `clear`, which turns it to grass, spends the lumber tile and settles like a
   placement (undoable). `previewClear` gives the (usually negative) change; the hover shows a
   grass ghost, the bubble and a "Clear the wood" hint.
-- Market trades: `canTrade` needs the playing phase, a market on the board, no trade this round
+- Market trades: `canTrade` needs the playing phase, a market of the player's own on the board, no trade this round
   (`tradedIn !== round`) and a kind with `TRADE_GIVE` (2) in the pouch (`tradeGives`) to give
   for a different special won that has a use on the board (`tradeTakes`: `playable`, so a harbour
   with no lake shore left is never offered; a lone windmill pair with only the windmill won is no trade). A tap on a market (hover hint "Tap to trade") opens the trade card
@@ -243,7 +249,7 @@ Implemented today:
 - Trophies (`src/trophies/`, `shared/trophies.ts`): ten, listed in `trophies/index.ts` and handed to
   `setupGame(game, { howToPlay, trophies })`. Bronze: `firstCrown` (a decree fulfilled, `crowns >= 1`),
   `firstManor` (a manor on the board), `firstTrade` (a market trade, `tradedIn > 0`) and `allGifts`
-  (all five `SPECIALS` in `unlocked`). Silver: `roundEight` (round 8 reached), `longChain` (40
+  (all five `SPECIALS` in `unlocked`, not on a puzzle island, whose pouch puts its specials there). Silver: `roundEight` (round 8 reached), `longChain` (40
   buildings joined to the castle at once, `joinedCount`) and `tenCrowns` (10 crowns in all). Gold:
   `bigKingdom` (a kingdom finished with 350), `threeStars` (three stars on a campaign level or a
   puzzle island, `loadPuzzleStars` with a finished puzzle folded in) and

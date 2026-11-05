@@ -67,7 +67,8 @@ Implemented today:
 - Talent pages (LB18, round 4): `TALENTS`, `TALENT_ROWS` (damage, defence, utility, opened at
   mastery ranks 1, 2 and 3) and `TalentId` in `data.ts`; `game/talents.ts` keeps each class's page
   under `lane-brawl-talents` (`loadPage`, `chooseTalent`, `openRows`, `talentsOf`; JSON
-  `{ classId: [talentId, ...] }`, in try/catch). A pick of a class with rank 1 or more opens the
+  `{ classId: [talentId, ...] }`, in try/catch; `loadAll` keeps only arrays of known talent ids, so
+  a damaged save forgets the page rather than throwing). A pick of a class with rank 1 or more opens the
   lobby with its page (`talentCard(row, i, top)` in `layout.ts`, three cards a row; shut rows say
   the rank that opens them); Fight (`LOBBY_FIGHT`) starts the match with `MatchOptions.talents`.
   `createGame` sums the page's `buff`s into the player's `Unit.talent` (counted in `buffSum` like
@@ -136,9 +137,12 @@ Implemented today:
   (`readWeek`), never by the rules. `MatchOptions.event` sets `s.event`: `allMid` plays on
   `QUICK.lanes` with all ten champions there and `ALL_MID.hp` times the structures' health;
   `doubleGold` sets `s.goldMult` to `DOUBLE_GOLD`, which `earn(s, u, gold)` (every gold gain but the
-  player's streak last hits, which multiply it themselves) and passive gold in `countDown` apply;
+  player's streak last hits, which multiply it themselves) and passive gold in `countDown` apply
+  (`earn` returns the gold banked, which the coin popups and the comeback and first blood notices
+  show; the bounty claimed and kill streak notices, the objective card, its marker and
+  `lastObjective.gold` show the reward times `goldMult`);
   `suddenDeath` sets `s.suddenDeath` at `SUDDEN_DEATH.at` (a notice and the `suddenDeath` sound):
-  champions that fall get `respawnAt` Infinity, `buyBack` refuses, `invulnerable` lifts the Nexus
+  champions that fall, and those already down then, get `respawnAt` Infinity, `buyBack` refuses, `invulnerable` lifts the Nexus
   wards, and `checkWipe` ends the match for the team with every champion down for good
   (`s.wipedOut`, worded on the end panel). `announceEvent` puts the rule in a notice at the start,
   and the chip under the top bar names it (or counts down to sudden death).

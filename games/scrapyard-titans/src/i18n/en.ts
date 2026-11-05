@@ -415,7 +415,7 @@ const en = {
   campaignNext: '{sets} · {goal} · win: {reward} · your kit: {kit}',
   campaignDone: 'Ladder climbed! Play the last lobby again · {sets}',
   goalPlace: 'finish {place} or better',
-  goalBoss: '{place} or better and outlast the boss',
+  goalBoss: { one: '{place} or better and outlast the boss', other: '{place} or better and outlast all {n} bosses' },
   lobbySetsTerrain: 'The campaign lobby sets the terrain',
   lobbyCleared: 'Lobby {n}, {name}, cleared! New in your kit: {reward}',
   lobbyClearedAgain: 'Lobby {n}, {name}, cleared again!',

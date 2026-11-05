@@ -333,6 +333,8 @@ export interface GameState {
   warehouses: number[];
   /** Track tiles with a lamp (WR19), which lights it and the tiles beside it at night. */
   lamps: string[];
+  /** A village that grew into a town with its round's last delivery, for the next round's news (until the charter is picked), else null. */
+  grewTown: number | null;
   /** The rival line, once it has set up (null before `RIVAL_ROUND`). */
   rival: Rival | null;
   /** The best medal on this difficulty when the game began: its boons and the ones below it apply. */

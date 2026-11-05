@@ -90,6 +90,7 @@ export function newGame(): GameState {
     wonders: [],
     landing: null,
     guide: 0,
+    stores: 0,
     trade: null,
     traded: [],
   };
@@ -399,6 +400,7 @@ export function returnToPort(s: GameState) {
   s.storms = [];
   s.landing = null;
   s.guide = 0;
+  s.stores = 0;
   // Once this isle is charted in full (storms cleared, so they hide nothing), the next one is
   // rolled now, so the chart can tell whether a long commission carries over to it, and the sale
   // lays the board out for it.
@@ -630,7 +632,8 @@ export function setSail(s: GameState) {
   }
   s.voyage += 1;
   s.surveyor = { ...s.port };
-  s.supplies = maxSupplies(s) + (trade === 'stores' ? TRADE_STORES : 0);
+  s.stores = trade === 'stores' ? TRADE_STORES : 0;
+  s.supplies = maxSupplies(s) + s.stores;
   s.guide = trade === 'guide' ? TRADE_GUIDE : 0;
   if (trade === 'rumour' && s.wonder && !s.wonder.seen) s.wonder.rumour = true;
   s.landing = rankOf(s, 'sloop') > 0 ? landingSpot(s) : null;

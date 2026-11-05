@@ -107,8 +107,10 @@ export interface BUnit {
   target: number | null;
   alive: boolean;
   sp: Partial<Record<Special, number>>;
-  /** Attack speed piled up by Overclockers and Salvagers. */
+  /** Attack speed piled up by Salvagers and the Clockwork wind-up. */
   rampAs: number;
+  /** Attack speed piled up by an Overclocker, up to +50%, kept apart so it stacks with `rampAs`. */
+  itemRamp: number;
   revived: boolean;
   regenPerS: number;
   manaRegen: number;
@@ -183,7 +185,7 @@ export class Battle {
     const base = {
       id: this.nextId++, team, star: f.star, items: [...f.items], col: f.col, row: f.row, fromCol: f.col, fromRow: f.row,
       moveT: 1, moveDur: 0, shield: 0, shieldUntil: 0, stunUntil: 0, castLock: 0, target: null, alive: true, sp: {},
-      rampAs: 0, revived: false, regenPerS: 0, manaRegen: 0, manaGainMul: 1, goldOut: 0, dealt: 0, taken: 0, dmgMul: 1, powerMul: 1,
+      rampAs: 0, itemRamp: 0, revived: false, regenPerS: 0, manaRegen: 0, manaGainMul: 1, goldOut: 0, dealt: 0, taken: 0, dmgMul: 1, powerMul: 1,
       attackTimer: ((this.nextId * 0.137) % 0.5),
     };
     if (f.monster) {
@@ -311,7 +313,7 @@ export class Battle {
       return;
     }
     const buff = this.time < this.asBuffUntil[u.team] ? SKILL_POWER.overclock.speed : 1;
-    const speed = u.baseAs * (1 + u.asBonus + u.rampAs) * buff * (terrain === 'oil' ? 0.7 : 1);
+    const speed = u.baseAs * (1 + u.asBonus + u.rampAs + u.itemRamp) * buff * (terrain === 'oil' ? 0.7 : 1);
     u.attackTimer += dt * speed;
     if (u.attackTimer >= 1) {
       u.attackTimer -= 1;
@@ -395,7 +397,7 @@ export class Battle {
     if (u.cls === 'sniper') dmg *= 1 + traitValue(this.sides[u.team].traits, 'sniper') / 100;
     this.events.push({ t: 'attack', id: u.id, target: target.id, ranged });
     this.gainMana(u, MANA_PER_ATTACK + (u.sp.manaOnHit ?? 0), false);
-    if (u.sp.rampAS) u.rampAs = Math.min(0.5, u.rampAs + u.sp.rampAS);
+    if (u.sp.rampAS) u.itemRamp = Math.min(0.5, u.itemRamp + u.sp.rampAS);
     if (ranged) {
       const dur = 0.1 + cheb(u, target) * 0.08;
       this.projectiles.push({ from: u.id, to: target.id, dmg, ability: false, crit, at: this.time + dur });

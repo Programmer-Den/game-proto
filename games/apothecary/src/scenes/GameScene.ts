@@ -167,6 +167,7 @@ import {
   useCure,
   type Brewed,
   type Ingredient,
+  type Place,
 } from '../game/alchemy';
 import { ProgressBar } from '../ui/ProgressBar';
 import { COIN, itemName, potionCount, t, type TextKey } from '../i18n';
@@ -1701,9 +1702,11 @@ export class GameScene extends Phaser.Scene {
       e.stopPropagation();
       if (this.pinching()) return;
       if (this.closePanels()) return;
+      const handed = () => this.state.royal?.wants.reduce((n, w) => n + w.made, 0) ?? 0;
+      const before = handed();
       const feedback = deliverToRoyal(this.state);
       if (this.state.royal?.done) sfx('cascade');
-      else if (feedback && this.state.royal?.wants.some((w) => w.made > 0)) ui('coin');
+      else if (feedback && handed() > before) ui('coin');
       else ui('refuse');
       if (feedback) this.showFeedback(feedback);
     });
@@ -1834,6 +1837,9 @@ export class GameScene extends Phaser.Scene {
       const status = this.add.text(COURIER_POST.x, COURIER_POST.y + 40, '', style).setOrigin(0.5, 0).setDepth(COURIER_POST.y + 0.2);
       let trips = this.state.alchemy.courier.trips;
       let lastTrip = this.state.alchemy.courier.trip?.to;
+      // How many of the trip's herb the satchel held last frame, to tell what the courier added.
+      const herbOf = (to: Place | undefined) => TRIPS[to ?? 'forest'].herb;
+      let held = this.state.alchemy.wild[herbOf(lastTrip)] ?? 0;
       let second = -1;
       this.views.push(() => {
         const lab = this.state.alchemy;
@@ -1843,13 +1849,15 @@ export class GameScene extends Phaser.Scene {
         status.setText(!lab.courier.hired ? t('courierTapHire') : trip ? t('courierBackIn', { time: clock(trip.left) }) : t('courierTapSend'));
         // Back from a trip: say what came home.
         if (lab.courier.trips > trips) {
-          ui('coin');
-          const last = lastTrip ?? 'forest';
-          this.showFeedback([t('courierBack', { n: TRIPS[last].brings, herb: alchemyName(TRIPS[last].herb) })]);
+          const herb = herbOf(lastTrip);
+          const added = (lab.wild[herb] ?? 0) - held;
+          if (added > 0) ui('coin');
+          this.showFeedback([added > 0 ? t('courierBack', { n: added, herb: alchemyName(herb) }) : t('courierBackFull', { herb: alchemyName(herb) })]);
           bench.refresh();
         }
         trips = lab.courier.trips;
         if (trip) lastTrip = trip.to;
+        held = lab.wild[herbOf(lastTrip)] ?? 0;
         // The courier's panel counts the trip down.
         const now = Math.ceil((trip?.left ?? 0) / 1000);
         if (now !== second) {

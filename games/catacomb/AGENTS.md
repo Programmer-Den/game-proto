@@ -95,8 +95,8 @@ the daily record and the week's best carry over.
     half way (a reload) scores 0; a weekly try left half way only counts as a try.
   - Ten trophies is the most a game may list, so the Alchemist, the library and the weekly crypt
     earn none of their own.
-  - The library shows every card in up to two rows of 13; a hero who has found more than 26 kinds
-    of card would run off the bottom (the game has 27 a hero can find).
+  - The library shows every card in up to two rows of 13, which the Hexer's 26 kinds of card (the
+    most any hero can find) just fill; a hero with more cards to find would run off the bottom.
   - The card id `vampBite` is shown as "Leech".
   - A card face shows its own cost, not the one Doubt makes of it (`costOf` in `sim.ts`); the
     card simply dims when it can't be afforded.
@@ -144,7 +144,8 @@ File map (all under `src/` unless it starts with `shared/`):
   `ALCHEMIST_UNLOCK_DEPTH`, `HeroWins`,
   `loadHeroWins`/`saveHeroWins` (key `catacomb-heroes`) and `heroUnlocked`.
 - `game/library.ts`: `LIBRARY_SWAPS`, `Library` (base ids by hero), `loadLibrary` and
-  `addToLibrary` (key `catacomb-library`; never a curse, once per card).
+  `addToLibrary` (key `catacomb-library`; never a curse, once per card; `loadLibrary` drops ids
+  `CARDS` doesn't know and curses, so a record from another version never breaks a card face).
 - `game/weekly.ts`: `Mutators` and `WEEKLY_MUTATORS` (read by `makeMap`), `weekOf(day)` (the
   week's Monday), `weeklyRand(week)`, `WeeklyRecord` and `loadWeekly`/`saveWeekly` (key
   `catacomb-weekly`).
@@ -330,9 +331,10 @@ Randomness and timing:
   outside the daily and the weekly, so the list below is what the seeded test sees. The weekly
   works like the daily with `weeklyRand(week)` and offer keys `week:<monday>:offer:<act>:<room>`,
   and `weeklyHero` draws from its own key. In the daily, `startDailyRun`
-  sets the day's source (`dailyRand('catacomb')`) and draws a fresh act-one map from it, and the
-  rewards and wares come from `keyedRand('<day>:offer:<act>:<room>')` (`offerDraw`), so they match
-  for everyone whatever happened before. `dailyHero` draws from its own key, not from `random`.
+  sets the day's source (`dailyRand('catacomb')`) and draws a fresh act-one map from it, every
+  later act's map comes from `keyedRand('<day>:map:<act>')` (`descend`), and the rewards and wares
+  come from `keyedRand('<day>:offer:<act>:<room>')` (`offerDraw`), so they match for everyone
+  whatever happened before. `dailyHero` draws from its own key, not from `random`.
 - `random` is used in `makeMap` (once per act, in `newRun` and `descend`), in `shuffle` in
   `src/game/sim.ts`, which draws piles, reshuffles the discard and picks rewards (`pickSome`) and
   wares (cards, relics, then flasks), in `grantRelic`, `grantFlask` (after an elite or boss) and `temperRandom`, and in `nextIntent` after each foe acts. The test seeds it, so changing the number or order of these
@@ -345,7 +347,8 @@ Randomness and timing:
 
 Data tables (where to tune):
 
-- Cards and the starter decks: `CARDS`, `STARTER_DECK` and `HUNTER_DECK` in `src/game/cards.ts`;
+- Cards and the starter decks: `CARDS`, `STARTER_DECK`, `HUNTER_DECK`, `HEXER_DECK` and
+  `ALCHEMIST_DECK` in `src/game/cards.ts`;
   the heroes' health and starting flask in `src/game/heroes.ts`; the power and curse numbers at the
   top of `cards.ts`.
 - Flasks: `src/game/flasks.ts`. The depth rules: `src/game/depth.ts`.

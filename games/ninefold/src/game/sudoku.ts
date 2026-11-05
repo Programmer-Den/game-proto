@@ -248,7 +248,7 @@ function allowed(shape: Shape, ck: Checker, grid: number[], i: number, d: number
     }
     if (circle) {
       if (sum + open > circle || sum + open * shape.size < circle) return false;
-    } else if (sum + open + 1 > shape.size) return false;
+    } else if (sum + open > shape.size) return false;
   }
   if (ck.dotsAt) for (const [q, kind] of ck.dotsAt[i]) if (grid[q] && !dotFits(kind, d, grid[q])) return false;
   if (ck.sandwich && ck.lines) {

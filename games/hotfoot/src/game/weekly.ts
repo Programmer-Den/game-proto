@@ -2,6 +2,7 @@
 // two set boons drawn from the week's seed. It is run bare otherwise (no armoury, bought boon or
 // companion), as often as you like, and keeps its own best distance for the week.
 import { BOONS, BOON_IDS, type BoonId } from './boons';
+import { pairFor } from './pairs';
 import { rand, seedOf } from './state';
 
 /** The week of a date as `YYYY-Www` (ISO 8601 weeks, from Monday), in the player's own time zone. */
@@ -19,11 +20,20 @@ export function weekOf(now = new Date()) {
 /** The weekly road's seed key: its week, tagged so it never matches a daily course's date. */
 export const weeklyKey = (week: string) => `weekly:${week}`;
 
-/** The two boons the week's road starts with: two different ones that can be sold (no Field Dressing, no curse). */
+/**
+ * The two boons the week's road starts with: two different ones that can be sold (no Field Dressing,
+ * no curse) that never make a pair, so no pair (or its trophy) comes free on the first frame.
+ */
 export function weeklyBoons(week: string): BoonId[] {
   const s = { daily: weeklyKey(week), seed: seedOf(`${weeklyKey(week)}:boons`) };
   const pool = BOON_IDS.filter((id) => !BOONS[id].filler && !BOONS[id].cursed);
   const picks: BoonId[] = [];
-  while (picks.length < 2) picks.push(pool.splice(Math.floor(rand(s) * pool.length), 1)[0]);
+  picks.push(pool.splice(Math.floor(rand(s) * pool.length), 1)[0]);
+  // Redraw the second while it is the first one's partner in a pair.
+  const partner = pairFor(picks[0])?.partner;
+  while (picks.length < 2) {
+    const id = pool.splice(Math.floor(rand(s) * pool.length), 1)[0];
+    if (id !== partner) picks.push(id);
+  }
   return picks;
 }

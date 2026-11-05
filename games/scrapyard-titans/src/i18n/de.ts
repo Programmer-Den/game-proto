@@ -414,7 +414,7 @@ const de: Translation<typeof en> = {
   campaignNext: '{sets} · {goal} · Sieg: {reward} · dein Startpaket: {kit}',
   campaignDone: 'Leiter erklommen! Spiel die letzte Lobby noch einmal · {sets}',
   goalPlace: 'Platz {place} oder besser',
-  goalBoss: 'Platz {place} oder besser und den Boss überleben',
+  goalBoss: { one: 'Platz {place} oder besser und den Boss überleben', other: 'Platz {place} oder besser und alle {n} Bosse überleben' },
   lobbySetsTerrain: 'Die Kampagnen-Lobby legt das Gelände fest',
   lobbyCleared: 'Lobby {n}, {name}, geschafft! Neu im Startpaket: {reward}',
   lobbyClearedAgain: 'Lobby {n}, {name}, wieder geschafft!',

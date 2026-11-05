@@ -105,6 +105,8 @@ function loopBack(s: GameState) {
 export function enterEndless(s: GameState) {
   if (s.phase !== 'won' || s.endless || s.seed >= 0 || s.daily || s.rush) return false;
   s.endless = true;
+  // The credits left at the win were banked with its salvage, so the rift starts with none.
+  s.credits = 0;
   loopBack(s);
   nextPick(s);
   return true;

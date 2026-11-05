@@ -20,7 +20,7 @@ in code on 2D canvases (no image files), with `pixelArt` off.
   explored and in sight), click, Shift and box selection, control groups (1 to 9, Ctrl to set),
   right-click commands (attack, gather, build, walk; on a touch screen a tap gives them, `tapOrder`), attack-move (A), stop (S), build placement with
   a green or red ghost, a bottom panel with the selection, buttons for training, research and the
-  build list, and a minimap; a top bar with resources, population, a three-pip age track, the match
+  build list, and a minimap; a top bar with resources, population, a four-pip age track, the match
   clock, the faction, the chosen boon and Age III edge; and an end screen with Victory or Defeat (with a
   scenario's stars and the faction's mastery) and a click back to the menu.
 - Animation: every unit has a few baked frames per pose (see `src/art/figures.ts`), flipped for
@@ -42,7 +42,7 @@ in code on 2D canvases (no image files), with `pixelArt` off.
 - Roles (`Role` in data.ts): `villager` and `cart` are civil (`isCivil`), `melee`, `ranged`,
   `cavalry`, `siege` (the Ram) and `champion` are soldiers (`isSoldier`); `earnsRanks` is every
   soldier but the Ram. `unitFor(faction, role)` also finds the shared `neutral` units (villager,
-  cart, ram). A `UnitDef` may carry `age` (trained from that age), `limit` (alive, sheltering or
+  cart, ram, wagon, transport, warship). A `UnitDef` may carry `age` (trained from that age), `limit` (alive, sheltering or
   queued, counted by `unitCount`) and `gift` (a champion's power).
 - The town bell (`ringBell`, `releaseBell`, `Player.bell`): villagers within `BELL_RANGE` of a
   shelter (a building with `shelter`: the Town Center 12, a finished Watchtower 5) get a `garrison`
@@ -120,7 +120,8 @@ in code on 2D canvases (no image files), with `pixelArt` off.
   time), the rivals' temperaments (two for a three-way scenario), a `MissionSetup` and two
   `StarCheck`s. `createGame(sides, map, toLast, mission)` keeps it as `GameState.mission` and
   `startMission` applies its start (`startAge` for every side or `rivalAge` for the rivals, with the
-  picks open and Age III's deeds done; `startRes`; the escort's supply cart, `Mission.cart`; guards at
+  picks open and, in Age III, the Age II and army deeds marked done but not the raid deed, so the
+  repel trophy still needs a raid; `startRes`; the escort's supply cart, `Mission.cart`; guards at
   both trading posts, `guardPosts`); `raids` overrides the rivals' first raid (in `createGame`) and
   rest (in the planner); `noMonument` makes `notAllowed` refuse the Monument. `missionOver` (in
   `checkWinner`) ends the match for a goal: `survive` (time), `escort` (`Mission.trips`, counted when
@@ -214,10 +215,11 @@ in code on 2D canvases (no image files), with `pixelArt` off.
   `units`, into `cargo`; `popUsed` and `unitCount` still count them, and they sink with it in `reap`).
   `{ t: 'unload', x, y }` sails to the water nearest the point (`seaNear` for a point inland) and
   `dropCargo` puts them ashore within `LANDING` tiles; the panel's Unload does it where the ship is.
-  Land units ignore ships further than their range + 2 (`shipReach` in `nearestEnemy`), so they never
-  chase one they can't reach. The AI (`navy` in the planner, on a naval map once it has a Barracks)
+  Land units ignore a ship unless some land tile lies within their range of it (`shipReach` in
+  `nearestEnemy`, `shoreWithin`: the same goal their chase walks to), so they never chase one they
+  can't reach. The AI (`navy` in the planner, on a naval map once it has a Barracks)
   builds a Harbour, keeps `AI_WARSHIPS` (3) warships from Age II and sends idle ones to the sea
-  nearest its foe's Town Center (`logShell`); it never uses transports, since the fords carry its army.
+  nearest its foe's Town Center (`logShell`), leaving alone those already within 3 tiles of it; it never uses transports, since the fords carry its army.
 - Diplomacy (three-way matches only, `GameState.pacts`, one `Pact` per player: `truceUntil`,
   `allyUntil`, `mood`, `askAt`): clicking a rival's banner on the status card (`StatusCard.rivalAt`)
   sets `GameScene.talkTo` and the panel shows talks (`renderTalks`, `talkActions`). `offer(s, ai,
@@ -284,7 +286,8 @@ in code on 2D canvases (no image files), with `pixelArt` off.
   condition on the `GameState` (`EARNED`: Age II, a relic held, the raid deed, a soldier at the last
   of `RANK_KILLS`, Age III, a champion alive, a win, a win in a three-way match, a win on Hard, a
   win by Monument) and `checkTrophies(state)`, which `GameScene.update` calls every frame unless
-  watching. A new trophy is an entry in `index.ts`, its two texts in each language file and its
+  watching. Age II and Age III count only when reached in play (`reached`: not when a scenario's
+  `startAge` starts the player in them). A new trophy is an entry in `index.ts`, its two texts in each language file and its
   condition in `EARNED`.
 - `src/audio/sfx.ts`: the sound table (`sfx`), `src/audio/music.ts` the songs (`COLONY`, `RAID`). See
   Sound below.
@@ -294,7 +297,11 @@ in code on 2D canvases (no image files), with `pixelArt` off.
 - `src/main.ts`: creates the `Phaser.Game` (960x540, FIT scaling filling the screen shape, `pixelArt: false`, linen
   background), registers the three scenes, calls `setupGame(game)` from `shared/setupGame.ts` (with
   `corner: 'top-right'`, so the shared full screen and pause buttons sit over the top bar's
-  decoration rather than the selection panel in the bottom left) and
+  decoration rather than the selection panel in the bottom left; on a small screen, where they
+  reach further down the view, the BootScene's `cornerReach` hands their reach to `fitLayout`, which
+  moves the deeds and status cards down below them; it works out the canvas from the window taken
+  the game's way round on a touch screen, like `fillView`, so a phone held upright under Ask me to
+  turn it gets the move it needs once turned) and
   `setupScaling(game, { fill: true })` from `shared/scaling.ts`, and puts `game` on window in dev.
 - `src/game/data.ts`: every balance number and roster (names and texts are `TextKey`s, shown with `t`): `FACTIONS`, `UNITS` (cost, time, stats,
   trainer, `age`, `limit`, `gift`, `elite`, `vsBuildings`), `unitFor(faction, role)` (never an
@@ -359,16 +366,16 @@ in code on 2D canvases (no image files), with `pixelArt` off.
 - `src/art/ui.ts`: wool `icon`s, the top bar, the panel band, buttons, cards and the menu backdrop.
 - `src/scenes/layout.ts`: where every HUD piece sits in game space (`W`, `H`, `TOP_H`, `PANEL_Y`, the top
   bar's slots and bars, `TOP_RIGHT`, `AGE_PIPS`, `DEED_CARD`, `STATUS_CARD`, `TOAST`, `SEL`, `BUTTONS`, `BOON`,
-  `MINI`). The values are for 960x540; `fitLayout(w, h)`, called once by the BootScene with
-  `viewSize`, fits them to the view the game filled (see Screens).
+  `MINI`). The values are for 960x540; `fitLayout(w, h, corner)`, called once by the BootScene with
+  `viewSize` and `cornerReach`, fits them to the view the game filled (see Screens).
 - `src/scenes/BootScene.ts`: bakes every texture once, then starts `Menu`. Keys: `fig-<unit type>`
   for a faction's soldiers and `fig-<unit type>-<faction>` for the shared neutral units (villager,
-  cart, ram), with frames `<pose>-<n>` (e.g. `chop-2`),
+  cart, ram, wagon, transport, warship), with frames `<pose>-<n>` (e.g. `chop-2`),
   `bld-<faction>-<building>`, `post`, `tree-0`..`tree-3`, `bush`, `mine`, `fog-pattern`, `needle`,
   `icon-<kind>`, `icon-banner-<faction>`, `topbar`, `panel`, `btn-on|off|hot`, `card-*`, `backdrop`,
   `rally-flag`, `camp-cache-<res>`, `camp-relic-<relic>-<faction|none>` (`relicKey`) and
   `fig-wild-brigand`/`fig-wild-poacher`.
-- `src/scenes/MenuScene.ts`: the three faction cards, each with its three soldiers, its own
+- `src/scenes/MenuScene.ts`: the four faction cards, each with its three soldiers, its own
   building and its mastery line, the Skirmish / Campaign toggle (`MENU_MODE`), and below the cards
   either two rows of toggles (`MENU_OPTS`: map kind, one or two AIs) or the five scenario tiles with
   their stars (`MENU_SCENARIOS`; a locked one refuses), all kept in the module's `options` for the
@@ -435,7 +442,8 @@ in code on 2D canvases (no image files), with `pixelArt` off.
   960x540 or wider (up to 1296x540) or taller (up to 960x720), picked once at start. The BootScene
   calls `fitLayout(viewSize)` before baking, so the top bar, panel and menu backdrop are painted at the
   view's size; the boon and edge icons, the last two top-bar bars and beasts, the deeds and status
-  cards, the panel's right bar and the minimap follow the right edge, the toast stays centred, and the
+  cards, the panel's right bar and the minimap follow the right edge (the cards also move down
+  below the corner buttons where those reach past the deeds card's top border, a small screen), the toast stays centred, and the
   panel sits on the bottom edge (`PANEL_Y = H - 110`). The world simply shows more of itself; edge
   scrolling, the alert arrows and the end screens use `W` and `H`. The menu is laid out for 960x540
   and offset by `viewFrame(scene)`. At exactly 960x540 nothing moves.

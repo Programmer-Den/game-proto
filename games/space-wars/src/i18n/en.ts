@@ -493,6 +493,8 @@ const en = {
   scenarioNone: 'Not won yet',
   scenarioWon: 'SCENARIO WON\n{name} in {time} · tap to go on',
   scenarioLost: 'SCENARIO LOST\n{why} · tap to try again',
+  skirmishWon: 'VICTORY\nEvery rival hub fell · tap for the Skirmish tab',
+  skirmishLost: 'DEFEAT\nYour hub fell · tap for the Skirmish tab',
   hubLost: 'Your hub fell',
   carrierLost: 'The carrier was destroyed',
   relayLost: 'A rival held the beacon first',

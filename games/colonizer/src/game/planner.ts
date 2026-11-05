@@ -500,7 +500,12 @@ function navy(s: GameState, town: Building, idle: Unit[], peace: boolean) {
       const d = Math.hypot(x - foeTown.tx - 2, y - foeTown.ty - 2);
       if (!best || d < best.d) best = { x, y, d };
     }
-  if (best && act(() => (issue(s, ME, idleShips.map((u) => u.id), { t: 'attackMove', x: best.x + 0.5, y: best.y + 0.5 }), true))) log(t('logShell', { n: idleShips.length }));
+  if (!best) return;
+  const goal = best;
+  // Ships already parked there stay put, so they don't spend an action every think.
+  const away = idleShips.filter((u) => Math.hypot(u.x - goal.x - 0.5, u.y - goal.y - 0.5) > 3);
+  if (away.length === 0) return;
+  if (act(() => (issue(s, ME, away.map((u) => u.id), { t: 'attackMove', x: goal.x + 0.5, y: goal.y + 0.5 }), true))) log(t('logShell', { n: away.length }));
 }
 
 /**

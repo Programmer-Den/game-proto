@@ -494,6 +494,8 @@ const de: Translation<typeof en> = {
   scenarioNone: 'Noch nicht gewonnen',
   scenarioWon: 'SZENARIO GEWONNEN\n{name} in {time} · tippe, um weiterzumachen',
   scenarioLost: 'SZENARIO VERLOREN\n{why} · tippe für einen neuen Versuch',
+  skirmishWon: 'SIEG\nJede rivalisierende Basis fiel · tippe für den Gefecht-Reiter',
+  skirmishLost: 'NIEDERLAGE\nDeine Basis fiel · tippe für den Gefecht-Reiter',
   hubLost: 'Deine Basis ist gefallen',
   carrierLost: 'Der Träger wurde zerstört',
   relayLost: 'Ein Rivale hielt die Bake zuerst',

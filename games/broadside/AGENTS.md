@@ -65,7 +65,7 @@ wave brings a sea serpent or a kraken, and every fourth wave sails at night.
   phase `won` and `medals` (`medalsFor` plus `WIN_MEDALS`; `medalsBanked` remembers only the
   `medalsFor` part, so `playerSunk` awards only the waves beaten since), and the end card's "Sail on" (`sailOn`) goes to the harbor.
   Ships (`src/game/hulls.ts`): `GameState.hull` picks the `HULLS` row `stats()` starts from (the
-  frigate is the old `PLAYER`), `unlocked` by best wave, chosen on the end card and passed to
+  frigate is the old `PLAYER`), `unlocked` by best wave (on a daily's end card by `bestBefore`, since the daily keeps none), chosen on the end card and passed to
   `newRun`; a `mortarSide` (the Bomb Ketch's starboard) makes `firePlayer` `lob` a shell to where
   the arc reaches instead (pushed out until the burst clears her hull now and where she will be), `loadShot` refuses that side and the harbor shows it as a mortar.
   Bounties (`src/game/bounties.ts`): `setSail` draws `GameState.bounty` from wave
@@ -128,7 +128,7 @@ wave brings a sea serpent or a kraken, and every fourth wave sails at night.
   never steer round them. The Tempest (`ENEMIES.tempest`, look `extra: 'storm'`): `tempestCalls`
   brings the next squall to `SQUALL_WARN` as her hull falls past each `TEMPEST_CALLS` share
   (`GameState.tempestCalls`). Beating wave `TEMPEST_WAVE` sets phase `won` again, with
-  `TEMPEST_MEDALS`; `reachHarbor` keeps `reachesBest` (the best Reaches wave), which the scene saves.
+  `TEMPEST_MEDALS`; `reachHarbor` keeps `reachesBest` (the best Reaches wave, at most `REACHES_WAVES` so sailing on past the Tempest still reads 20 of 20), which the scene saves.
 - **Captain's log** (`src/game/captains.ts`): `CAPTAINS` names five captains, each with a ship
   kind and first wave. `GameState.captains` (`newCaptains`) tracks each in the run (`waiting`,
   `sailing`, `escaped`, `sunk`, `due`, `escapes`). `setSail` puts those due into `named` and their
@@ -175,10 +175,14 @@ wave brings a sea serpent or a kraken, and every fourth wave sails at night.
   `GameState.night` and `flares` (`FLARES`) in `setSail`. `fire` (every broadside) and `mortar`
   set the firing ship's `flashMs` (`FLASH_MS`, counted down in `tick`). `seen(s, e)` is true by
   day, under a flare (`flareMs`), while `e.flashMs` runs or within `NIGHT_SIGHT` of the player;
-  `firePlayer` only targets enemies `seen`. `fireFlare` (the scene's Flare button or F) spends a
+  `firePlayer`, `nearestFoe` (the Mortar perk, a prize ketch's mortar and the prizes' hunting) and
+  `escortBroadsides` only target enemies `seen`. `fireFlare` (the scene's Flare button or F) spends a
   flare, sets `flareMs` to `FLARE_MS` and leaves a `flare` effect. The darkness itself is the
   scene's: see "Rendering".
-- **Screens:** there is only `GameScene`. The wave banner, the captain's order card, the bounty
+- **Screens:** there is only `GameScene`. The wave banner (its line under the title picks, in
+  order, the haven, the Tempest, the daily's ship, the Reaches, a beast, the night, a named
+  captain, raiders, a convoy, forts, then the flagship or the sails; a beast or the night comes
+  before the captain so their first waves, which bring Tull and Maren, explain them), the captain's order card, the bounty
   line, the wind rose, the scuttle button, the harbor panel (ledger or prize draft) and the
   game-over panel (also the haven's end card) are overlays drawn on top of it. The start and pause
   screens, the M key and the P key come from `setupGame` (`shared/startScreen.ts`); the other
@@ -250,7 +254,7 @@ File map (all under `src/`, plus the shared files it imports):
 - `game/courses.ts`: `CourseId`, the `COURSES` table (name, desc for the sail button),
   `COURSE_IDS`, `FIRST_COURSE_WAVE`, `coursesFor`, `MERCHANTS`, `MERCHANT_LOOT`, `ESCAPE_MS`,
   `HUNTER_BRIGS` and `HUNTER_CARDS`.
-- `game/convoy.ts`: `CONVOY_WAVE`, `CONVOY_EVERY`, `isConvoyWave`, `convoyCargo`, `CONVOY_SAIL`,
+- `game/convoy.ts`: `CONVOY_WAVE`, `CONVOY_EVERY`, `isConvoyWave` (never `HAVEN_WAVE` or `TEMPEST_WAVE`), `convoyCargo`, `CONVOY_SAIL`,
   `CONVOY_ARRIVE` and `CONVOY_FAR`.
 - `game/consorts.ts`: `CONSORT_MAX` and `consortWage`.
 - `game/bounties.ts`: `BountyId`, the `BOUNTIES` table (`desc` for the wave, `kind` keep or do,
@@ -501,7 +505,7 @@ checks `Object.hasOwn(HULLS, id)`, so an inherited key like `constructor` is unk
 `broadside-trophies` holds the trophies earned (`shared/trophies.ts`, each id with the time).
 `broadside-log` holds the captain's log as a JSON array of `CaptainId`s (unknown ids dropped on
 load), saved by the scene the frame one is added, even on the daily voyage.
-`broadside-reaches-best` holds the best Storm Reaches wave beaten, saved like the best wave.
+`broadside-reaches-best` holds the best Storm Reaches wave beaten, saved like the best wave (read back at most `REACHES_WAVES`, for records saved past it before the cap).
 `broadside-beasts` holds the harbor wall, `{ kraken, serpent }` counts (anything broken loads as
 0), saved by the scene the frame a beast is sunk, even on the daily voyage.
 `broadside-daily` is the daily voyage's record (`shared/daily.ts`). The daily voyage saves no best

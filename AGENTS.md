@@ -182,9 +182,9 @@ and tries to link it to the repo (the run summary says if the link has to be mad
   and dates with `formatNumber` and `formatDate` (or `toLocaleString(locale())`), never by hand. The
   shared texts (hub page, Settings panel, loading, start, pause and How to play screens) are in
   `shared/i18n/`; the hub page marks its text with `data-i18n="key"` (`data-i18n-alt` for an
-  image's alt text, `data-i18n-label` for an `aria-label`). A game moves its own text into `games/<name>/src/i18n/` one game per PR, like
-  screen scaling, and from then on gives every new text its German (and, where the spelling
-  differs, US English) entry in the same PR; game logic compares ids, never translated text. The
+  image's alt text, `data-i18n-label` for an `aria-label`). Every game keeps its own text in
+  `games/<name>/src/i18n/` (a new game does too) and gives every new text its German (and, where
+  the spelling differs, US English) entry in the same PR; game logic compares ids, never translated text. The
   **Translations** workflow (`.github/workflows/translations.yml`, running
   `scripts/check-translations.mjs`) fails a PR whose translation has other placeholders or plural
   forms than English, or is left the same as English (a text that really is the same goes in that
@@ -235,7 +235,7 @@ and tries to link it to the repo (the run summary says if the link has to be mad
   `window.countPlayTime`, so a game needs nothing for it.
 - **Fit every screen.** A game stays sharp and fills the screen from an upright phone to a 4K
   monitor by calling `setupScaling(game)` from `shared/scaling.ts` right after `setupGame(game)`
-  (`grep -l setupScaling games/*/src/main.ts` lists the games that do; bring the others over one game per PR). The canvas then has
+  (every game does; a new game does too). The canvas then has
   `renderScale` canvas pixels per game pixel and every camera is zoomed to match, so: lay out with
   `viewSize(scene)` rather than `scene.scale`, read the world through `pointer.worldX/Y`,
   `getWorldPoint` and `worldView` rather than `pointer.x/y` or `scrollX/Y`, give a camera that
@@ -251,14 +251,13 @@ and tries to link it to the repo (the run summary says if the link has to be mad
   the games whose folder changed (every game when `shared/` or the test changes).
   Give its `index.html` the same `100dvh` and `touch-action: none` styles as Apothecary's.
   **Fill every screen shape.** A game also takes the screen's shape, with no bars at its sides, by
-  calling `setupScaling(game, { fill: true })` (`grep -l 'fill: true' games/*/src/main.ts` lists the
-  games that do; bring the others over one game per PR). Its view keeps the designed size as its
-  smallest and grows the other way, up to 2.4:1 (a 960x540 game is 960 to 1296 wide and 540 to 720
+  calling `setupScaling(game, { fill: true })` (every game does; a new game does too). Its view
+  keeps the designed size as its smallest and grows the other way, up to 2.4:1 (a 960x540 game is 960 to 1296 wide and 540 to 720
   tall), picked once when the game starts. So lay out every scene against `viewSize(scene)`, never
   the designed size: paint backgrounds and the world over the whole view, pin bars and buttons to the
   view's edges, centre panels and dialogs in the view, and put a play area that was laid out for the
   designed size in `viewFrame(scene)`, the designed-size rectangle in the middle of the view. A
-  scrolling world shows more of itself instead. A game laid out for upright screens too (Ninefold)
+  scrolling world shows more of itself instead. A game laid out for upright screens too (Augury and Ninefold)
   adds `bothWays: true`: its view turns round on an upright window and again when the phone turns,
   with no hint to turn it, so it picks its layout from `viewSize` and lays out again on the scale
   manager's `resize` event. The Screens check then also fails a filling game that

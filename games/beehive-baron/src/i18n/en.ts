@@ -288,6 +288,7 @@ const en = {
   rareScores: '{honey} scores {n}',
   noRareJar: 'no rare honey to enter',
   rareClassNone: 'needs a rare bloom',
+  rareClassNext: 'from the next fair',
   rareClassLater: 'when the fair is on',
   fairWonShort: 'this fair is won',
   rareRecipes: 'Side by side: Clover + Lavender give Blossom, Clover + Sunflower Sunburst, Lavender + Heather Mountain',

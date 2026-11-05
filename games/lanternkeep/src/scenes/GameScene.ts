@@ -178,7 +178,7 @@ export class GameScene extends Phaser.Scene {
   /** The Harbour Festival's boon cards, by id. */
   boonButtons: (ButtonSpot & { id: BoonId })[] = [];
   /** The night panel's "Daily night" link and the daily's "Back to my keep" button. */
-  dailyButton: ButtonSpot = { x: NIGHT_PANEL.x + NIGHT_PANEL.w / 2 - 92, y: NEXT_BUTTON.y, w: 150, h: 34 };
+  dailyButton: ButtonSpot = { x: NIGHT_PANEL.x + NIGHT_PANEL.w / 2 - 92, y: NEXT_BUTTON.y, w: 150, h: 60 };
   backButton: ButtonSpot = { x: VIEW.w / 2, y: VIEW.h / 2 + 76, w: 200, h: 40 };
   /** The village panel's building cards (LK18), by id, its "Back" button and the night panel's "Village" link. */
   villageButtons: (ButtonSpot & { id: BuildingId })[] = [];
@@ -525,9 +525,13 @@ export class GameScene extends Phaser.Scene {
       parts.push(bg, name, level, blurb, cost, hit);
     });
     parts.push(makeButton(this, NEXT_BUTTON.x, NEXT_BUTTON.y, t('nextDusk'), () => this.answer(nextDusk(this.state), 'evening')));
-    // The daily night's link, right of "Next dusk": the run waits while it is played.
+    // The daily night's link, right of "Next dusk": the run waits while it is played. Once played,
+    // today's record goes under it, smaller and wrapped to the link's width.
     const d = this.dailyButton;
-    this.dailyLink = this.label(d.x, d.y, '', { size: 12.5, bold: true, color: '#d8c8ff', glow: true }).setOrigin(0.5);
+    this.dailyLink = this.label(d.x, d.y, '', { size: 12.5, bold: true, color: '#d8c8ff', glow: true })
+      .setOrigin(0.5)
+      .setAlign('center')
+      .setWordWrapWidth(d.w);
     const dailyHit = this.add
       .zone(d.x, d.y, d.w, d.h)
       .setInteractive({ useHandCursor: true })
@@ -1547,7 +1551,8 @@ export class GameScene extends Phaser.Scene {
         goal,
         t('nextNight', { kind: t(next.name), where, blurb: language() === 'de' ? blurb : blurb[0].toLowerCase() + blurb.slice(1) }) + seasonLine,
       ]);
-      this.dailyLink.setText(this.dailyLine());
+      const played = this.dailyRecord.played;
+      this.dailyLink.setFontSize(played ? 11 : 12.5).setText(played ? `${t('dailyNight')}\n${this.dailyLine()}` : this.dailyLine());
       for (const [id, parts] of this.shop) {
         const cost = id === 'cask' ? (s.cask >= caskMax(s) ? null : caskCost(s)) : id === 'hearth' ? hearthCost(s) : nextCost(s, id);
         const affordable = cost !== null && s.coins >= cost;

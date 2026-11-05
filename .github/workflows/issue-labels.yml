@@ -39,7 +39,9 @@ jobs:
             const issue = context.payload.issue
               || (await github.rest.issues.get({ ...context.repo, issue_number: Number(process.env.ISSUE) })).data;
             const match = /^### Game\s*\r?\n\s*\r?\n(.+)$/m.exec(issue.body || '');
-            const label = match && games[match[1].trim()];
+            // Own keys only, so an answer like `constructor` is no game.
+            const name = match && match[1].trim();
+            const label = name && Object.hasOwn(games, name) ? games[name] : undefined;
             if (!label) {
               console.log('No game picked in the form; nothing to do.');
               return;

@@ -149,7 +149,8 @@ export function frameSounds(before: Snapshot, s: GameState, events: GameEvent[])
 
 /**
  * Nightfall's sounds, once `tick` has scored the dusk: the bell, then a coin for each lantern
- * still lit, rising; a lost hearth's thud; and the festival's or the game over's sting.
+ * still lit, rising; a lost hearth's thud (not on a night the chapel spared); and the festival's
+ * or the game over's sting.
  * `later(ms, fn)` runs `fn` after `ms` on the scene's clock.
  */
 export function nightfallSounds(s: GameState, later: (ms: number, fn: () => void) => void) {
@@ -157,7 +158,7 @@ export function nightfallSounds(s: GameState, later: (ms: number, fn: () => void
   sfx('toll');
   const lit = s.lanterns.filter((l) => l.lit).length;
   for (let k = 0; k < lit; k++) later(450 + k * 110, () => ui('coin', { pitch: 1 + k * 0.06 }));
-  if (r?.lostHearth) {
+  if (r?.lostHearth && !s.spared) {
     later(300, () => {
       sfx('thud');
       sfx('minor');

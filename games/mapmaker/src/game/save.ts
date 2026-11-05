@@ -44,9 +44,11 @@ function load(key: string): GameState | null {
     const s = unpack(JSON.parse(localStorage.getItem(key) ?? 'null') as Stored | GameState | null);
     // A save from a different grid size or a broken one starts over.
     if (!s || !Array.isArray(s.tiles) || s.tiles.length !== GRID.w * GRID.h || !s.port || !s.phase) return null;
-    // Supplies saved on an easier difficulty can exceed this one's maximum (plus this voyage's wrecks).
+    // Supplies saved on an easier difficulty can exceed this one's maximum (plus this voyage's
+    // wrecks and a village's stores; saves from before the stores were kept took none).
+    s.stores ??= 0;
     const wrecks = (s.surveyed ?? []).filter((p) => s.tiles[indexOf(p.x, p.y)]?.find === 'wreck').length;
-    s.supplies = Math.min(s.supplies, maxSupplies(s) + wrecks * WRECK_SUPPLIES);
+    s.supplies = Math.min(s.supplies, maxSupplies(s) + wrecks * WRECK_SUPPLIES + s.stores);
     // Saves from before the isle goal and the sell-back start with none of either.
     s.milestones ??= 0;
     s.isleStart ??= s.voyage;

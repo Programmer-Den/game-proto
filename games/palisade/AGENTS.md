@@ -60,7 +60,8 @@ seconds without a tap.
   bursts (an `arcane` effect), and the bolt leaps to the nearest unstruck foe within `LEAP_RANGE`
   while it has leaps. `retire(state, id, relic, hero)` makes the next hero of `LegacyPanel.hero`
   (the panel's "The next hero" row), and "New hero" uses `GameScene.nextHero` (the "Hero" button
-  over it, `toggleHero`). The scene shows `heroTexture(hero)` (`hero-mage`: the guard mage's rig in
+  over it, `toggleHero`, which cycles the open classes; while the warden is shut it shows
+  `wardenLocked` as a second line). The scene shows `heroTexture(hero)` (`hero-mage`: the guard mage's rig in
   violet at the hero's size) and the `spell-bolt` texture.
 - **The warden** (`hero: 'warden'`): the warden's upgrades come after the mage's in `UPGRADES`
   (`hero: 'warden'`: bash, vigil, reach, shove, daze, bane, bulwark, fangs, hold, pack), so neither
@@ -72,8 +73,9 @@ seconds without a tap.
   seen foe within `BARRICADE_FRONT + reach` takes the hit with armour, is pushed back `push` (a
   boss a third as far), stops hacking and is dazed (a `slam` effect). `houndsAct` keeps
   `state.hounds` (a `Hound` each: `x`, `y`, `target`, `cd`, `face`) at `hound.count`: each hound
-  runs at `HOUND_SPEED` to the walking foe nearest the barricade that is not flying nor the other
-  hound's, bites every `HOUND_MS` for `share` of the slam's damage and slows it (a `bite` effect),
+  runs at `HOUND_SPEED` to the first foe of `targets(state)` (the aim priority's order, nearest the
+  barricade by default) that is not flying, preferring one the other hound isn't on (both share
+  the only foe there is, and the second gives a shared foe up once a free one comes), bites every `HOUND_MS` for `share` of the slam's damage and slows it (a `bite` effect),
   and goes back to its spot in `HOUND_HOMES` when there is none. The scene shows `hero-warden`
   and the `hound-N` frames (`drawHounds`, called from `drawHero`).
 - **Siege engines** (`engines.ts`, `state.engine`, an `Engine` or null): the "Siege engine" button
@@ -86,7 +88,8 @@ seconds without a tap.
   ballista launches a `lance` missile from `ENGINE_SPOT` at the aim's target that flies straight
   at `LANCE_SPEED` and hits every foe it passes once, through shields (armour counts); the catapult
   launches a `stone` on the arc a Troll King's rock flies, at the back-most (or crowded) foe that is
-  not flying and is further than `BARRICADE_FRONT + 40`, leading it by `STONE_FLIGHT_MS`;
+  not flying and is further than `BARRICADE_FRONT + 40`, leading it by `STONE_FLIGHT_MS` at its
+  current pace (`paceOf`, the same chill, caltrops, road, omen and rage sum `moveEnemies` walks it by);
   `landStone` hurts every foe within `radius`, with armour, and Pitch Pots ignites them. The scene
   draws `engine-<kind>` (`drawEngine`) on the wall, moves the lookout aside while one stands, and
   dims it with the "Wall down" label while it is idle.
@@ -94,8 +97,10 @@ seconds without a tap.
   (`keepFighting`) sets `endless`. `endlessRules(endless, wave)` gives `hp` (`ENDLESS_GROWTH` to the
   power of the waves past `WIN_WAVE`, in `hpOf`) and `elites` (`ENDLESS_ELITES` a wave past it, added
   to the elite roll's chance). `clearWave` keeps the best endless wave per map in
-  `endlessBest[frontier]` (`Progress`). The chip at `ENDLESS_CHIP` shows it while `endless`, the
-  victory panel (`endlessOpen`) and the game-over panel after an endless run (`endlessFallen`) name it.
+  `endlessBest[frontier]` (`Progress`, 0 for none). The chip at `ENDLESS_CHIP` shows it while
+  `endless`, the victory panel (`endlessOpen`) and the game-over panel after an endless run
+  (`endlessFallen`) name it; while it is 0 they use `endlessChipNew`, `endlessOpenNew` and
+  `endlessFallenNew`, which name no wave.
 - **Daily siege** (`daily.ts`, `state.daily`, with `shared/daily.ts` under `palisade-daily`): the
   game-over panel's "Daily siege" button (`GameScene.startDaily`, refused once today's try is
   `played`) calls `startDaily` and `dailyRun(dailyPlan(dailyRand('palisade', day), day), aim)`: a

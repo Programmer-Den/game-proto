@@ -46,7 +46,10 @@ Implemented today:
   held times `DAILY.perWave` (10)) with `finishDaily`. A daily game is never `keep`-saved, leaves
   the saved game alone, notes no garden records or replay, and still pays seeds and trophies. Its
   end panel shows `dailyScore`/`dailyLostScore` and `dailyBest` with Gardens only, and the button
-  shows `dailyDone` (today's score) or `dailyUsed` until the next day.
+  shows `dailyDone` (today's score) or `dailyUsed` until the next day. `endDaily` passes the day
+  the try began to `finishDaily`, so a daily won after midnight is scored under that day, and
+  `rollDaily` (from `startDailyMaze` and from `drawHud` on the gardens) reads the record again once
+  its day has passed, so an open game offers the new day's try.
 - The hero gardener (`Hero`, `g.hero`): hired in the shed (`Shed.hero`, `HERO.seeds` 30) and given
   to every new game with one gardener as `Extra.hero` (the shed's `skills`); a replay or saved game
   carries them as `Fixed.hero` (`replayOf`), and one without it has no gardener, so old replays play
@@ -83,7 +86,9 @@ Implemented today:
   (one from a wave's spawn, not a split or egg, and not `Spawn.sent`) is `send`-ed: a sent spawn at
   the other burrow `VERSUS.delay` (1.5) seconds later, sorted into `spawns` (event `sent`, sound
   `send`). When a side has no cabbages left the phase is `won` with `g.winner` (0 left, 1 right, -1
-  a draw). The scene draws a fence instead of the dashed line, both cottages, the right side's
+  a draw). A tower (`fire`'s `reaches`, and a cannon's splash in `moveShot` through `Shot.side`) and a trap
+  (`springTraps`) act only on the foes of their own half (`gateSide` of the foe against `sideOf` the
+  cell), never across the fence. The scene draws a fence instead of the dashed line, both cottages, the right side's
   cabbages by its gold, and an end panel with `versusLeft`/`versusRight`/`versusDraw` and Rematch
   (`again`); a versus game is never kept, notes no records, pays no seeds and earns no trophies.
 - The night garden (`night` in `MODES`): `waveGroups(n, true)` leads every wave with
@@ -204,7 +209,8 @@ Implemented today:
   (never while a replay is watched, in Sandbox or in Versus, and nothing while `resumeGame` plays a save back): `firstHold`
   on `cleared`, `longMaze` on `built` once a burrow's `dist` reaches `LONG_MAZE` (60; not in a path
   garden), `master` on `upgraded` to `MASTER`, `everyCabbage` on `won` with `cabbagesLeft` at
-  `maxLives`, and `recordTrophies` the ones the records earn (`firstWin`, `lastCabbage`,
+  `maxLives`, and `recordTrophies` the ones the records earn (`firstWin` and `lastCabbage` by a
+  Classic, Swarm, Challenge or Night win,
   `firstChallenge`, `allChallenges`, `winter` at `SEASON_STARS.winter` stars with challenges
   counted, `endless` at `ENDLESS_WAVES` (30) in Endless) after each record and, quietly, in
   `create`. The playthrough checks that wave 1 earns `firstHold` and nothing else.

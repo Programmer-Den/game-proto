@@ -980,7 +980,8 @@ export class GameScene extends Phaser.Scene {
     this.stageText.setText(t('stageRest', { n: s.stage }));
     this.distText.setText(t('metres', { n: metres(s.distance) }));
     this.coinText.setText(formatNumber(s.coins));
-    const best = t('best', { n: s.best });
+    // A challenge course keeps stars, not a distance, so it shows no best.
+    const best = s.challenge ? '' : t('best', { n: s.best });
     if (this.bestText.text !== best) this.fitBest(best);
 
     // The coin streak, capped by the road.
@@ -1048,7 +1049,7 @@ export class GameScene extends Phaser.Scene {
       const ground = s.boss ? t(dragon ? 'dragonBeatenTag' : 'gateBeatenTag') : t(TERRAIN[s.terrain].name);
       this.tagText.setText(tag(daily, ground, s.rockfall && !s.boss ? t('rockfall') : '', s.road ? t(ROADS[s.road].short) : '', gustOf(s) === 'blow' ? t('gustTag') : ''));
     }
-    this.trackBest.setText(tr.best === 0 ? t('trackFirst') : tr.at > tr.best ? t('trackNewBest') : t('best', { n: tr.best }));
+    this.trackBest.setText(s.challenge ? '' : tr.best === 0 ? t('trackFirst') : tr.at > tr.best ? t('trackNewBest') : t('best', { n: tr.best }));
 
     // The herald's dare and its progress.
     const dare = s.dare;

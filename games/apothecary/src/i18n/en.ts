@@ -397,6 +397,7 @@ const en = {
   courierHired: 'Courier hired',
   courierSent: 'Courier sent: {place}',
   courierBack: 'Courier back: +{n} {herb}',
+  courierBackFull: 'Courier back: no room in the satchel for more {herb}',
   tripLine: '+{n} {herb}, {min} min',
   satchel: 'Satchel:',
   forest: 'Forest',

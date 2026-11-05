@@ -244,7 +244,7 @@ Every fair after the first asks for more and adds a class, a ladder after the en
 | 2nd | + Mead: tap a ready cask while entering (clover 4, lavender 5, heather 6 points) | 17 points |
 | 3rd | + Fresh: a jar from a cell whose first drop came this summer (it counts for its kind too) | 20 points |
 | later | the same five classes | 3 more each year, up to 28 |
-| any, with a rare bloom | + Rare: a jar of the garden's rare honey (5 to 7 points) | the same |
+| any, with a rare bloom as it opens | + Rare: a jar of the garden's rare honey (5 to 7 points) | the same |
 
 ![Entering honey: each capped cell shows the points it would score](docs/screenshots/fair-entering.webp)
 
@@ -300,8 +300,9 @@ bloom whose honey no meadow gives, marked by a coloured bar between the beds:
 | Lavender + Heather | Mountain | 2 times | 7 |
 
 Every rare pair gives a jar of its honey each minute (not in winter), up to 12 jars kept. **Sell**
-sells them with the jars. While the garden has a rare bloom the fair adds a **Rare** class: while
-the fair is on, the card's Enter button enters your best rare jar. A bed can belong to more than
+sells them with the jars. If the garden has a rare bloom when the fair opens, that fair adds a
+**Rare** class (a pair planted or broken during the fair counts from the next one): while the fair
+is on, the card's Enter button enters your best rare jar. A bed can belong to more than
 one pair, so a lavender bed between clover and heather gives two honeys.
 
 ![The flower garden: rare bloom bars between touching beds, the flower picker and the rare honey kept](docs/screenshots/flower-garden.webp)

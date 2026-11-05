@@ -49,7 +49,11 @@ export const guestSeed = (index: number) => 7919 * (index + 1) + 31;
 /** True when town `index`'s guest is waiting: the town's own order has a star. */
 export const guestOpen = (towns: number[], index: number) => (towns[index] ?? 0) > 0;
 
-/** Town `index`'s guest as an order on the town's board shape; Easy gives five more moves, Hard three fewer. */
+/**
+ * Town `index`'s guest as an order on the town's board shape; Easy gives five more moves, Hard three
+ * fewer, except for the knight: ten moves already sit close to the shared three-star mark
+ * (`STARS_3` moves left), so Hard keeps them and his third star stays in reach.
+ */
 export function guestOrder(index: number, number: number): Order {
   const guest = GUESTS[index];
   const town = TOWNS[index];
@@ -57,7 +61,7 @@ export function guestOrder(index: number, number: number): Order {
     number,
     potion: guest.potion,
     needs: { ...guest.needs },
-    moves: Math.max(5, guest.moves + byDifficulty(5, 0, -3)),
+    moves: Math.max(5, guest.moves + byDifficulty(5, 0, guest.rule === 'knight' ? 0 : -3)),
     price: GUEST_STAR_COINS,
     jars: guest.jars,
     resin: guest.resin,

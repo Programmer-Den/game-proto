@@ -192,7 +192,7 @@ const de: Translation<typeof en> = {
   dailyLink: 'Tagesschicht',
   dailyDone: 'Heute ✓ {n} M',
   dailyLine: 'Tagesschicht {time} · {n} M',
-  dailyStart: 'Tagesschicht: heute für alle dieselben 10 Minuten',
+  dailyStart: 'Tagesschicht: 10 Minuten, heute für alle derselbe Start',
   dailyBest: { one: 'Heute {score} M · Bestwert {best} M · {n} Tag in Folge', other: 'Heute {score} M · Bestwert {best} M · {n} Tage in Folge' },
   dailyTitle: 'Die Schicht ist vorbei',
   dailyText: {

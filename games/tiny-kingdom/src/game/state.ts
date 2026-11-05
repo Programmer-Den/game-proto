@@ -264,14 +264,17 @@ function fits(grid: Cell[][], col: number, row: number, kind: Building) {
 
 const fitsAnywhere = (grid: Cell[][], kind: Building) => grid.some((cells, row) => cells.some((_, col) => fits(grid, col, row, kind)));
 
-/** Whether some wood stands beside a lumber camp, so a lumber camp tile could clear it, whatever the phase. */
-const woodClearable = (grid: Cell[][]) => grid.some((cells, row) => cells.some((cell, col) => cell === 'forest' && beside(grid, col, row, 'lumber')));
+/** Whether some wood stands beside one of the player's own lumber camps (not the rival's), so a lumber camp tile could clear it, whatever the phase. */
+const woodClearable = (s: GameState) => {
+  const own = ownGrid(s);
+  return s.grid.some((cells, row) => cells.some((cell, col) => cell === 'forest' && beside(own, col, row, 'lumber')));
+};
 
-/** Whether a tile of `kind` has a use on `grid`: a cell to go on, or for a lumber camp, a wood to clear. */
-const playable = (grid: Cell[][], kind: Building) => fitsAnywhere(grid, kind) || (kind === 'lumber' && woodClearable(grid));
+/** Whether a tile of `kind` has a use on the board: a cell to go on, or for a lumber camp, a wood to clear. */
+const playable = (s: GameState, kind: Building) => fitsAnywhere(s.grid, kind) || (kind === 'lumber' && woodClearable(s));
 
-/** Whether any tile left in the pouch has a use on `grid` (see `playable`). */
-const pouchPlayable = (s: GameState) => BUILDINGS.some((b) => s.pouch[b] > 0 && playable(s.grid, b));
+/** Whether any tile left in the pouch has a use on the board (see `playable`). */
+const pouchPlayable = (s: GameState) => BUILDINGS.some((b) => s.pouch[b] > 0 && playable(s, b));
 
 /**
  * Draws the next hand: HAND tiles from the pouch, seeded by the island and the number of draws so
@@ -284,8 +287,8 @@ function drawHand(s: GameState) {
   const bag = BUILDINGS.flatMap((b) => Array<Building>(s.pouch[b]).fill(b));
   const hand: Building[] = [];
   while (hand.length < HAND && bag.length) hand.push(bag.splice(Math.floor(rand() * bag.length), 1)[0]);
-  if (hand.length && !hand.some((b) => playable(s.grid, b))) {
-    const fitting = BUILDINGS.filter((b) => s.pouch[b] > 0 && playable(s.grid, b));
+  if (hand.length && !hand.some((b) => playable(s, b))) {
+    const fitting = BUILDINGS.filter((b) => s.pouch[b] > 0 && playable(s, b));
     if (fitting.length) hand[0] = fitting[Math.floor(rand() * fitting.length)];
   }
   s.hand = hand.sort((a, b) => BUILDINGS.indexOf(a) - BUILDINGS.indexOf(b));
@@ -298,7 +301,7 @@ function drawHand(s: GameState) {
  * still refuses. A hand that has room is kept, so a merge is never a free redraw.
  */
 function keepHandPlayable(s: GameState) {
-  if (s.phase === 'playing' && !s.hand.some((b) => playable(s.grid, b)) && pouchPlayable(s)) drawHand(s);
+  if (s.phase === 'playing' && !s.hand.some((b) => playable(s, b)) && pouchPlayable(s)) drawHand(s);
 }
 
 /** Whether a tile of `kind` is in the hand, ready to place. */
@@ -506,7 +509,7 @@ export function undo(s: GameState) {
 }
 
 /** Whether a lumber camp tile in the pouch could clear a wood beside a camp. */
-export const canClearAny = (s: GameState) => s.pouch.lumber > 0 && woodClearable(s.grid);
+export const canClearAny = (s: GameState) => s.pouch.lumber > 0 && woodClearable(s);
 
 /** Whether any tile left in the pouch has somewhere to go. */
 export function anyPlace(s: GameState) {
@@ -687,9 +690,9 @@ export function place(s: GameState, col: number, row: number): Placed | null {
   return placed;
 }
 
-/** Whether the wood at (col, row) can be cleared: a lumber camp tile in the hand is spent on a forest beside a lumber camp. */
+/** Whether the wood at (col, row) can be cleared: a lumber camp tile in the hand is spent on a forest beside one of the player's own lumber camps. */
 export function canClear(s: GameState, col: number, row: number) {
-  return s.phase === 'playing' && s.selected === 'lumber' && inHand(s, 'lumber') && s.grid[row]?.[col] === 'forest' && beside(s.grid, col, row, 'lumber');
+  return s.phase === 'playing' && s.selected === 'lumber' && inHand(s, 'lumber') && s.grid[row]?.[col] === 'forest' && beside(ownGrid(s), col, row, 'lumber');
 }
 
 /** What clearing the wood at (col, row) would add to the score (usually a loss: the camp and houses beside it lose the forest), or null. */
@@ -714,16 +717,16 @@ export function clear(s: GameState, col: number, row: number): Placed | null {
   return placed;
 }
 
-/** Whether a market trade can be made now: a market stands, none was made this round, and the pouch has two of a kind to give for a different gift building already won that has a use on the board. */
+/** Whether a market trade can be made now: a market of the player's own stands (not the rival's), none was made this round, and the pouch has two of a kind to give for a different gift building already won that has a use on the board. */
 export function canTrade(s: GameState) {
-  return s.phase === 'playing' && s.tradedIn !== s.round && s.grid.some((cells) => cells.includes('market')) && tradeGives(s).some((g) => tradeTakes(s).some((t) => t !== g));
+  return s.phase === 'playing' && s.tradedIn !== s.round && ownGrid(s).some((cells) => cells.includes('market')) && tradeGives(s).some((g) => tradeTakes(s).some((t) => t !== g));
 }
 
 /** The kinds the pouch could give two of in a trade. */
 export const tradeGives = (s: GameState) => BUILDINGS.filter((b) => s.pouch[b] >= TRADE_GIVE);
 
 /** The gift buildings won that a trade could take: those with a use on the board (room, or a wood to clear). */
-export const tradeTakes = (s: GameState) => s.unlocked.filter((b) => playable(s.grid, b));
+export const tradeTakes = (s: GameState) => s.unlocked.filter((b) => playable(s, b));
 
 /**
  * A market trade, once per round: gives TRADE_GIVE tiles of `give` from the pouch for one tile of

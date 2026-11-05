@@ -52,7 +52,7 @@ Implemented today:
   `swat`; a harvest of its cell sends it off empty-handed; Guard Bees (`ranks.guards`) drive it off
   as it lands. Not saved.
 - Brood cells: `BroodCell` (`type: 'brood'`, `hatchMs`) holds no nectar, hatches a bee every
-  `BROOD_MS` (45s) while there are fewer than `maxBees` (`MAX_BEES` per hive) and it is not winter, and counts for the comb bonus. The Brood
+  `BROOD_MS` (45s) while `hiveFull` is false (the estate below `maxBees` and its own hive below `MAX_BEES`, so a pair never holds more than two rows at the entrance; the Brood cell caption and the green ring read the same test) and it is not winter, and counts for the comb bonus. The Brood
   cell shop button arms `placing` in the scene; the next tap on an empty spot calls `buildBrood`
   (price `broodPrice`: `cellPrice` plus `BROOD_EXTRA`, 30). Bees are no longer bought.
 - Wax: `harvest` adds one to `wax`; `withWax` lets wax pay `WAX_COINS` (3) each for up to half of
@@ -135,9 +135,10 @@ Implemented today:
   again, so a reload can't bring paid-for bees home early; offers are not saved.
 - The county fair (`src/game/fair.ts`): once `fairOpen` (every meadow open) the goal card is the
   fair's. It is on (`fairOn`) for the last `FAIR_MS` (60s) of every summer; `fairIn` counts down to
-  it, and `turn` pushes `fair-open` as it opens (or `sell`, when the jar that opens the last meadow
-  is sold during the fair's minute) and calls `closeFair` as autumn comes (a
-  `fair-closed` event, `fairs` + 1, entries cleared). The classes are `fairClasses(s)` (`classesFor(fairs, rare)`): the
+  it, and `turn` calls `openFair` as it opens (or `sell`, when the jar that opens the last meadow
+  is sold during the fair's minute), which holds `fairRare` and pushes `fair-open`, and calls `closeFair` as autumn comes (a
+  `fair-closed` event judged over the held classes, `fairTotal(s, true)` and `fairWon(s, true)`, since
+  the season has already turned; `fairs` + 1, entries cleared). The classes are `fairClasses(s)` (`classesFor(fairs, rare)`): the
   three kinds, plus `mead` from the second fair and `fresh` from the third; gold needs
   `fairGold(fairs)` (`FAIR_GOLD` 14, plus `FAIR_STEP` 3 a fair, at most `FAIR_MAX` 28). While it is
   on a tap on the card toggles `entering`; the next tap on a capped cell calls `enterFair`, which
@@ -193,8 +194,12 @@ Implemented today:
   jar to `rare[kind]` per rare pair every `GARDEN_MS` (60s, `gardenMs`, not saved) outside winter,
   up to `RARE_CAP` (12) in all, and pushes `bloomed`. `sell` sells them at `rarePrice` and counts
   them as jars sold (`rareCount`; `shelfValue` and the Sell button include them). While
-  `rarePairs` has any, `fairClasses(s)` (`classesFor(fairs, rare)`) adds the `rare` fair class, and
-  `enterRare` enters the best rare jar kept (the card's Enter button). `garden` and `rare` are saved.
+  `rarePairs` has any, `fairClasses(s)` (`classesFor(fairs, rare)`) adds the `rare` fair class; while
+  the fair is on (or its `held` argument is true) it reads `fairRare` instead, set by `openFair` from `rarePairs` as the fair opens,
+  so a bed planted or replanted during the fair can't add or drop the class (the card's Enter line
+  then says it counts from the next fair). `enterRare` enters the best rare jar kept (the card's
+  Enter button). `garden`, `rare` and `fairRare` are saved (saves from before `fairRare` take the
+  garden's rare bloom as it stands).
 - The candle workshop (`src/game/workshop.ts`): from `WORKSHOP_FROM` (50) jars sold the Workshop
   chip (`WORKSHOP`) opens its card. `make(s, ware)` turns `WARE[ware].wax` wax (candle 2, polish 3)
   into one of `wares`. `tick` writes `commissions` when there are none and `turn` writes them anew
@@ -273,7 +278,7 @@ File map (`src/`):
   `Progress`), the grid and balance constants, `hiveOf`, `localSlot`, `hiveSlots`, `freshProgress`,
   `emptyCell`, `newHive` (which also checks saved cells and moves old ones to clover), `progressOf`
   (stamps `seen` with `Date.now()`), and the formulas `isHoney`, `isBrood`, `isOpen`, `openKinds`,
-  `demand`, `marketLeft`, `season`, `seasonLeft`, `isWinter`, `maxBees`, `atHome`, `crowded`, `basePrice`, `stealMs`,
+  `demand`, `marketLeft`, `season`, `seasonLeft`, `isWinter`, `maxBees`, `hiveFull`, `atHome`, `crowded`, `basePrice`, `stealMs`,
   `meadValue`, `meadReady`, `cellarValue`, `caskDone`, `fairTotal`, `fairOpen`, `fairOn`, `fairIn`,
   `fairWon`, `fairClasses`, `seasonNo`, `openLeft`, `carry`, `beeCarry`, `rarePrice`, `rareCount`,
   `ripenTime` (per spot, for Riverside Meadow), `cellPrice` and `broodPrice` (per hive), `withWax`, `room` (per kind), `jarCount`,
@@ -286,7 +291,7 @@ File map (`src/`):
   `enterMead`, `buyPlot`, `breed`, `cutComb`, `canSupply`, `supply`, `plant`, `enterRare`, `make`,
   `fulfil`, `canGift`, `giveRoyal`, plus the private `garden`, `newCommissions`, `royal`, `turn`,
   `appetite`, `tire`, `eat`, `deliver`, `place`, `hatch`, `raid`, `orders`, `contracts`, `swarm`,
-  `dance`, `fly`, `recountLent`, `enter`, `closeFair`, `afterSale` and `newBook`.
+  `dance`, `fly`, `recountLent`, `enter`, `openFair`, `closeFair`, `afterSale` and `newBook`.
 - `game/honey.ts`: the `HONEY` table (name key, meadows needed, price), `KINDS`, `MARKET_MS`,
   `DEMAND`, `noJars`. `game/wasps.ts`: the `Wasp` type and raid timings. `game/orders.ts`: the
   `Order` type and order numbers. `game/seasons.ts`: `Season`, `SEASONS`, the
@@ -331,7 +336,8 @@ File map (`src/`):
   Garden, Workshop and Royal warrant chips (on the `book-chip` texture) and the cards they open (the
   `estate-card` texture, `ESTATE_CARD`), with their buttons (the flower picker, the beds, Enter rare
   honey, the two make buttons, the two commission rows and the gift), a graphics of each bed's
-  flower dot and the rare pairs' bars, `draw()` each frame, `close()` and `spots()`.
+  flower dot and the rare pairs' bars, `draw()` each frame, `close()` and `spots()`. `chipDetail`
+  shrinks a chip's second line (10px down to 7px) until it fits inside the chip.
 - `scenes/layout.ts`: every screen position (`VIEW`, `viewEdges` (the whole view in layout
   coordinates), `COMB`, `HIVE`, `PLAQUE`, `HIVE_TAB` and
   `hiveTab`, `ENTRANCE`, `FLOWER_GROUND`, `FAR_RIDGE` and `farY`, `GOAL`, `MEADOW_SPOTS`,
@@ -426,7 +432,8 @@ State model (`src/game/state.ts`):
   `flower`, `kind`, `lent` and `hive` (0 to 3). Only the count, each hive's count (`hiveBees`, and
   the second's as `queenBees` for older code) and the lent contract are saved; `newHive` rebuilds
   them all at home, the home hive's first and each later hive's after (`beeHive`; saves without
-  `hiveBees` use `queenBees`), then marks the saved contract's bees lent.
+  `hiveBees` use `queenBees`; `capHives` then moves any bee past a hive's `MAX_BEES`, which saves from
+  before the per-hive cap can hold, to a hive with room), then marks the saved contract's bees lent.
 - `room` is the nectar of the foraged kind the filling cells can still take; `send` refuses when it
   is 0 or no bee is home, and `gatherAway` never adds more than it.
 - `wasps`, `waspIn`, `order`, `orderIn`, `contractIn`, `swarmIn` and `marketMs` live
@@ -437,7 +444,7 @@ State model (`src/game/state.ts`):
 Persistence: one key of its own, `beehive-baron-progress`, holding `Progress` as JSON (`coins`,
 `cells`, `bees`, `jars` per kind, `wax`, `sold`, `ranks`, `meadows`, `forage`, `seasonMs`,
 `eatIn` (the time to the bees' next winter meal, clamped to 1 to `WINTER_EAT_MS`, so a reload
-can't put a meal off), `years`, `casks`, `hives`, `queen`, `queenBees`, `hiveBees`, `fair`, `fairs`, `golds`, `baron`, `tired`, `wilted`,
+can't put a meal off), `years`, `casks`, `hives`, `queen`, `queenBees`, `hiveBees`, `fair`, `fairs`, `golds`, `baron`, `fairRare`, `tired`, `wilted`,
 `breeds`, `breedPending`, `combs`, `book`, `garden`, `rare`, `wares`, `commissions`, `warrant`,
 `royal`, `lent`, `seen`). Saves from before the garden load with empty beds, no rare honey, wares or
 commissions and no warrant. Saves from before the estate have no

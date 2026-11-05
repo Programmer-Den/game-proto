@@ -104,7 +104,7 @@ bottle green, serif italics), all painted in code on 2D canvases. It shares no c
   hands `trophies` to `setupGame`, which lists them on the start and pause screens. `check.ts`
   holds each trophy's condition on the `GameState` (`EARNED`: first sale, a Catalyst fired
   (`fired`), a Bloom fired (`bloomsFired`), a three-star sale, a workbench upgrade, the Master
-  Tinker rank (a town, daily or endless sale counts for Flawless but not for the counts), `FIFTY_SOLD` potions, every upgrade at its top level, `royal`, every seal) and
+  Tinker rank (a town, guest, examination, daily or endless sale counts for Flawless but not for the counts; the weekly order, played out and never sold, doesn't count), `FIFTY_SOLD` potions, every upgrade at its top level, `royal`, every seal) and
   `checkTrophies(state, quiet)`, which `GameScene` calls at the end of `settle()` (once a move has
   played out and a sale is saved) and after a workbench upgrade is bought and saved, so a trophy
   never shows before the board does; `create()` calls it quietly after loading, so a loaded save
@@ -328,7 +328,7 @@ bottle green, serif italics), all painted in code on 2D canvases. It shares no c
   mould step, which turns a random plain tile into a `toad` while fewer than `TOAD_MAX` are on the
   board, as a last step with `spread` and `toad` (the scene swells it and plays `croak`). A toad is
   `stuck` and `matchKind` null; `gather`'s scrub loop turns it back like mould (in `scrubbed`). The
-  knight is only the guest's `moves` (10). The miser: `gather` takes the round's `depth` (0 for
+  knight is only the guest's `moves` (10, which Hard doesn't cut). The miser: `gather` takes the round's `depth` (0 for
   the swap's or tool's own match), and with `depth` 0 counts nothing and gives the step empty
   `needs`, so its tiles pop instead of flying to the label.
 - **Weekly order:** `weekOf(today())` names the week; the map's Weekly order starts
@@ -470,7 +470,9 @@ seals, rich orders, the towns, endless runs or the guests existed load with thei
   no-ops; this game uses neither).
 - Difficulty scales one number: the moves of every order. `orderFor` in `src/game/orders.ts` adds
   `byDifficulty(5, 0, -3)` to the order's `moves` (before a rush order's cut, never below 5), so Easy gives 5 more, Normal the table's value
-  and Hard 3 fewer. `examOrder`, `townOrder`, `guestOrder`, `dailyOrder`, `weeklyOrder` and `endlessOrder` do the same. `ORDERS`,
+  and Hard 3 fewer. `examOrder`, `townOrder`, `guestOrder`, `dailyOrder`, `weeklyOrder` and `endlessOrder` do the same,
+  except that `guestOrder` keeps the knight's ten moves on Hard (fewer than `STARS_3` would put his
+  third star out of reach). `ORDERS`,
   `RANK_RECIPES` and `EXAMS` themselves are unchanged.
 - `settings.reduceMotion` is read in `GameScene`: the hint tiles hold a fixed larger scale instead
   of swelling, a fired Catalyst's row band holds steady instead of blinking, brewed Catalysts don't

@@ -1266,6 +1266,8 @@ function avalanches(s: GameState) {
     const low = all[all.length - 1];
     const bell = BELL_TOWERS[(AVALANCHE_TIMES.length - s.avalancheTimes.length - 1) % BELL_TOWERS.length];
     if (low) s.avalanche = { y: low.y, lanterns: low.lanterns, atMs, bell, rung: false };
+    // A moth already guarding that bell tower (from a gust or the owl) is on it and rings it now.
+    if (s.moths.some((m) => m.task === 'guard' && m.target === bell)) ringBell(s, bell);
   }
   const a = s.avalanche;
   if (!a || s.duskMs > a.atMs) return;
@@ -1601,6 +1603,27 @@ export function nextDusk(s: GameState) {
   return true;
 }
 
+/**
+ * A gust is warned only while a lantern is lit, so a fitted first gust's warning begins as far into
+ * the dusk as a spring dusk's first one does (6 s), time for the moths to light a lantern.
+ */
+const GUST_LEAD_MS = DUSK_MS - 34_000 - GUST_WARN_MS;
+
+/**
+ * Warned event times (dusk left, latest first) moved later where a short dusk would start inside
+ * their warning: each comes at most `duskMax` - `warnMs` - `leadMs` of dusk left (its warning begins
+ * `leadMs` into the dusk), and at least `warnMs` + 1 s after the one before it, so a summer dusk
+ * keeps every gust, still warned. A dusk long enough for them leaves them as they are.
+ */
+function fitTimes(times: number[], warnMs: number, duskMax: number, leadMs = 1_000) {
+  let latest = duskMax - warnMs - leadMs;
+  return times.map((at) => {
+    const fitted = Math.min(at, latest);
+    latest = fitted - warnMs - 1_000;
+    return fitted;
+  });
+}
+
 /** Sets up a dusk of night `s.night` in `s.district`, of kind `s.kind`. */
 function startDusk(s: GameState) {
   s.phase = 'dusk';
@@ -1611,7 +1634,7 @@ function startDusk(s: GameState) {
   s.queue = [];
   s.report = null;
   s.order = orderFor(s.night);
-  s.gusts = gustsFor(s.night, s.kind);
+  s.gusts = fitTimes(gustsFor(s.night, s.kind), GUST_WARN_MS, s.duskMax, GUST_LEAD_MS);
   s.batTimes = batsFor(s.night, s.curses.bats);
   s.bats = [];
   s.chased = 0;
@@ -1624,13 +1647,13 @@ function startDusk(s: GameState) {
   s.call = null;
   s.callsKept = 0;
   const tide = districtOf(s).rule === 'tide';
-  s.tideTimes = tide ? [...TIDE_TIMES] : [];
+  s.tideTimes = tide ? fitTimes(TIDE_TIMES, TIDE_WARN_MS, s.duskMax) : [];
   s.tide = null;
   s.shipTimes = tide ? [...SHIP_TIMES] : [];
   s.ship = null;
   s.shipsGuided = 0;
   const snow = districtOf(s).rule === 'avalanche';
-  s.avalancheTimes = snow ? [...AVALANCHE_TIMES] : [];
+  s.avalancheTimes = snow ? fitTimes(AVALANCHE_TIMES, AVALANCHE_WARN_MS, s.duskMax) : [];
   s.avalanche = null;
   s.pilgrimsWarned = 0;
 }
