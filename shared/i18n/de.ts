@@ -219,6 +219,8 @@ const de: Translation<typeof en> = {
   mapmakerCard: 'Decke eine nebelverhangene Insel Feld für Feld mit knappen Vorräten auf und tausche deine Karten im Hafen gegen Verbesserungen.',
   mapmakerCover: 'Ein Bär als Landvermesser kartiert eine nebelverhangene Insel Feld für Feld',
   mazewrightCard: 'Pflanze Hecken und Türme auf offenem Rasen und baue so das Labyrinth, durch das die Käfer laufen müssen, aber schließe nie den letzten Weg.',
+  stonemateCard: 'Spiele Schach mit lebenden Statuen, in dem jeder Schlag seine eigene Szene hat: Jeder Angreifer schlägt auf eigene Art zu, jedes Opfer zerbricht auf eigene Art.',
+  stonemateCover: 'Ein Schachbrett mit Statuen aus Marmor und Obsidian mit leuchtenden Augen, ein weißer Läufer schießt einen leuchtenden Runenblitz auf einen schwarzen Springer',
   mazewrightCover: 'Ein Heckenlabyrinth auf einem Gartenrasen, mit Steintürmen in den Hecken und Käfern, die einen gepunkteten Weg zu einem Häuschen laufen',
   ninefoldCard: 'Löse Zahlenrätsel in zehn freischaltbaren Grafikstilen: ein Tagesrätsel, ein Wochenlauf, klassische Rätsel in acht Stufen und der Abstieg, eine Reihe immer größerer Rätsel mit Herzen und Relikten.',
   ninefoldCover: 'Ein Zahlenrätsel auf geschichtetem Papier, mit einigen eingetragenen Ziffern und einem gewählten Feld',

@@ -31,6 +31,7 @@ start page lists the games; each one lives in its own folder under `games/`.
 | [Ninefold](games/ninefold/README.md) | Fill every row, column and box with each digit once: a daily puzzle, a weekly gauntlet, Classic boards at eight levels (Killer, Thermo, Arrow, Kropki and Sandwich among them), Delve, a run of ever bigger boards with hearts, relics and five ascensions, a technique school and a calendar of dailies, in ten unlockable art styles. |
 | [Augury](games/augury/README.md) | Thirteen kinds of brain puzzle dealt like tarot cards (picture grids, bridges, code breaking, calc cages, cross sums, sliding blocks, tile flips, path links, a sliding-tile tray, turning pipes, a mirror maze, number series and a memory echo), with a mastery for each, in eight modes from a journey of five temples and a weekly league to pass and play. |
 | [Mazewright](games/mazewright/README.md) | A tower defense with no road: every hedge and tower you plant on the open lawn is a wall, so you build the maze the beetles walk, and a planting that would close the last way through is refused. Thirteen gardens, twenty waves, moths that fly over and moles that chew through hedges, a hero gardener and a daily maze. |
+| [Stonemate](games/stonemate/README.md) | Chess with living statues: marble and obsidian pieces that walk the board, where every capture plays its own scene, a blow for each kind of attacker and a way of breaking for each kind of victim, with eight hand-made scenes. Play the Stone AI or a friend, and watch any of the 30 capture pairs in the gallery. |
 
 ## Settings
 
@@ -77,6 +78,7 @@ The hub's **Settings** button opens the settings every game shares. They are sav
   | Ninefold | 5 hints a Classic board, 4 hearts a Delve run | 2 hints a Classic board, 2 hearts a Delve run |
   | Augury | 4 hearts in Endless and the drafts, 4 minutes of Blitz | 2 hearts in Endless and the drafts, 2½ minutes of Blitz |
   | Mazewright | 25 cabbages, and foes have 20% less health | 10 cabbages, and foes have 25% more health |
+  | Stonemate | the Stone AI looks one move ahead and often picks a weaker move | the Stone AI looks three moves ahead and always plays its best |
 
 - **Frame rate (FPS)**: the most frames per second a game draws, 30 to 320 (60 by default).
 - **Show FPS**: a readout of the frame rate in each game's corner.

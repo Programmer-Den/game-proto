@@ -33,10 +33,11 @@ body:
         - Ninefold
         - Augury
         - Mazewright
+        - Stonemate
         - Hub page
         - Shared / all games
       # Preselect Shared, so a report never lands on a game by accident.
-      default: 25
+      default: 26
     validations:
       required: true
   - type: textarea

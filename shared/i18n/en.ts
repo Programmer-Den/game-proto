@@ -219,6 +219,8 @@ const en = {
   mapmakerCard: 'Reveal a fog-covered island tile by tile on a limited store of supplies, and trade your charts at port for upgrades.',
   mapmakerCover: 'A bear surveyor charting a fog-covered island tile by tile',
   mazewrightCard: 'Plant hedges and towers on an open lawn to build the maze the beetles must walk, but never close the last way through.',
+  stonemateCard: 'Play chess with living statues, where every capture has its own scene: each attacker strikes its own way and each victim breaks its own way.',
+  stonemateCover: 'A chessboard of marble and obsidian statues with glowing eyes, a white bishop firing a glowing rune bolt at a black knight',
   mazewrightCover: 'A hedge maze on a garden lawn, with stone towers in the hedges and beetles walking a dotted route to a cottage',
   ninefoldCard: 'Solve number puzzles in ten unlockable art styles: a daily puzzle, a weekly gauntlet, Classic boards at eight levels, and Delve, a run of ever bigger boards with hearts and relics.',
   ninefoldCover: 'A number puzzle board on layered paper, with a few digits written in and one cell picked',
