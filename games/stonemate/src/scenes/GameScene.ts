@@ -543,7 +543,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   private undo() {
-    if (this.busy || this.promo || !this.pos.history.length) {
+    // Against the AI there must be one of the player's own moves to take back.
+    const mine = this.mode === 'duo' || this.pos.history.some((u) => sideOf(u.move.piece) === this.player);
+    if (this.busy || this.promo || !this.pos.history.length || !mine) {
       ui('refuse');
       return;
     }
