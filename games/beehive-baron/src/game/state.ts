@@ -331,7 +331,10 @@ export function newHive(progress: Progress): GameState {
     coins: progress.coins,
     cells: new Array(SLOTS * hives).fill(null).map((_, i) => cellOf(progress.cells[i])),
     // The home hive's bees come first, then each other hive's in turn.
-    bees: [...Array(count).keys()].map((i) => ({ id: i + 1, tripMs: 0, trip: 0, flower: 0, kind: 'clover', lent: false, hive: beeHive(progress, hives, count, i) })),
+    bees: capHives(
+      [...Array(count).keys()].map((i) => ({ id: i + 1, tripMs: 0, trip: 0, flower: 0, kind: 'clover', lent: false, hive: beeHive(progress, hives, count, i) })),
+      hives,
+    ),
     jars: { ...noJars(), ...progress.jars },
     wax: progress.wax,
     sold: progress.sold,
@@ -384,6 +387,21 @@ export function newHive(progress: Progress): GameState {
     s.contract = { bees: lent, pay: 0, phase: 'lent', leftMs: Math.max(1, Math.min(CONTRACT_MS, progress.lent.leftMs)) };
   }
   return s;
+}
+
+/** Moves each bee past a hive's `MAX_BEES` to a hive with room, for saves from before brood was capped per hive. */
+function capHives(bees: Bee[], hives: number) {
+  const counts = new Array(hives).fill(0);
+  for (const b of bees) counts[b.hive]++;
+  for (const b of bees) {
+    if (counts[b.hive] <= MAX_BEES) continue;
+    const to = counts.findIndex((n) => n < MAX_BEES);
+    if (to < 0) break;
+    counts[b.hive]--;
+    counts[to]++;
+    b.hive = to;
+  }
+  return bees;
 }
 
 /** The hive of the `i`th of `count` saved bees: each hive past the first takes its count from the end, the later hives last. */
@@ -445,6 +463,9 @@ export const isWinter = (s: GameState) => season(s) === 'winter';
 export const seasonNo = (s: GameState) => s.years * SEASONS.length + Math.floor(s.seasonMs / SEASON_MS);
 /** How many bees the hives can hold: `MAX_BEES` each. */
 export const maxBees = (s: GameState) => MAX_BEES * s.hives;
+/** Whether no bee can hatch for a hive: the estate is at `maxBees` or the hive itself at `MAX_BEES`. */
+export const hiveFull = (s: GameState, hive: number) =>
+  s.bees.length >= maxBees(s) || s.bees.filter((b) => b.hive === hive).length >= MAX_BEES;
 /** A bee at home and free to forage: not out on a trip and not lent to the orchard. */
 export const atHome = (b: Bee) => b.tripMs === 0 && !b.lent;
 /** Whether the hives are crowded enough to swarm: every spot built and the bees at their most, with one hive (`MAX_HIVES` is the swarm's two). */

@@ -33,6 +33,7 @@ import {
   fairOn,
   fairTotal,
   fairWon,
+  hiveFull,
   hiveOf,
   isBrood,
   isHoney,
@@ -40,7 +41,6 @@ import {
   isWinter,
   jarCount,
   jarPrice,
-  maxBees,
   meadReady,
   meadValue,
   openKinds,
@@ -212,12 +212,13 @@ function recountLent(s: GameState) {
 
 /** A brood cell counts down to its next bee while the hive has room for one; brood rests in winter. */
 function hatch(s: GameState, c: Extract<Cell, { type: 'brood' }>, slot: number, dt: number) {
-  if (s.bees.length >= maxBees(s) || isWinter(s)) return;
+  const hive = hiveOf(slot);
+  if (hiveFull(s, hive) || isWinter(s)) return;
   c.hatchMs = Math.max(0, c.hatchMs - dt);
   if (c.hatchMs > 0) return;
   c.hatchMs = BROOD_MS;
   const id = s.nextId++;
-  s.bees.push({ id, tripMs: 0, trip: 0, flower: 0, kind: s.forage, lent: false, hive: hiveOf(slot) });
+  s.bees.push({ id, tripMs: 0, trip: 0, flower: 0, kind: s.forage, lent: false, hive });
   s.events.push({ kind: 'hatched', slot, id });
 }
 

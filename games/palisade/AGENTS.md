@@ -75,7 +75,7 @@ seconds without a tap.
   `state.hounds` (a `Hound` each: `x`, `y`, `target`, `cd`, `face`) at `hound.count`: each hound
   runs at `HOUND_SPEED` to the first foe of `targets(state)` (the aim priority's order, nearest the
   barricade by default) that is not flying, preferring one the other hound isn't on (both share
-  the only foe there is), bites every `HOUND_MS` for `share` of the slam's damage and slows it (a `bite` effect),
+  the only foe there is, and the second gives a shared foe up once a free one comes), bites every `HOUND_MS` for `share` of the slam's damage and slows it (a `bite` effect),
   and goes back to its spot in `HOUND_HOMES` when there is none. The scene shows `hero-warden`
   and the `hound-N` frames (`drawHounds`, called from `drawHero`).
 - **Siege engines** (`engines.ts`, `state.engine`, an `Engine` or null): the "Siege engine" button

@@ -52,7 +52,7 @@ Implemented today:
   `swat`; a harvest of its cell sends it off empty-handed; Guard Bees (`ranks.guards`) drive it off
   as it lands. Not saved.
 - Brood cells: `BroodCell` (`type: 'brood'`, `hatchMs`) holds no nectar, hatches a bee every
-  `BROOD_MS` (45s) while there are fewer than `maxBees` (`MAX_BEES` per hive) and it is not winter, and counts for the comb bonus. The Brood
+  `BROOD_MS` (45s) while `hiveFull` is false (the estate below `maxBees` and its own hive below `MAX_BEES`, so a pair never holds more than two rows at the entrance; the Brood cell caption and the green ring read the same test) and it is not winter, and counts for the comb bonus. The Brood
   cell shop button arms `placing` in the scene; the next tap on an empty spot calls `buildBrood`
   (price `broodPrice`: `cellPrice` plus `BROOD_EXTRA`, 30). Bees are no longer bought.
 - Wax: `harvest` adds one to `wax`; `withWax` lets wax pay `WAX_COINS` (3) each for up to half of
@@ -278,7 +278,7 @@ File map (`src/`):
   `Progress`), the grid and balance constants, `hiveOf`, `localSlot`, `hiveSlots`, `freshProgress`,
   `emptyCell`, `newHive` (which also checks saved cells and moves old ones to clover), `progressOf`
   (stamps `seen` with `Date.now()`), and the formulas `isHoney`, `isBrood`, `isOpen`, `openKinds`,
-  `demand`, `marketLeft`, `season`, `seasonLeft`, `isWinter`, `maxBees`, `atHome`, `crowded`, `basePrice`, `stealMs`,
+  `demand`, `marketLeft`, `season`, `seasonLeft`, `isWinter`, `maxBees`, `hiveFull`, `atHome`, `crowded`, `basePrice`, `stealMs`,
   `meadValue`, `meadReady`, `cellarValue`, `caskDone`, `fairTotal`, `fairOpen`, `fairOn`, `fairIn`,
   `fairWon`, `fairClasses`, `seasonNo`, `openLeft`, `carry`, `beeCarry`, `rarePrice`, `rareCount`,
   `ripenTime` (per spot, for Riverside Meadow), `cellPrice` and `broodPrice` (per hive), `withWax`, `room` (per kind), `jarCount`,
@@ -432,7 +432,8 @@ State model (`src/game/state.ts`):
   `flower`, `kind`, `lent` and `hive` (0 to 3). Only the count, each hive's count (`hiveBees`, and
   the second's as `queenBees` for older code) and the lent contract are saved; `newHive` rebuilds
   them all at home, the home hive's first and each later hive's after (`beeHive`; saves without
-  `hiveBees` use `queenBees`), then marks the saved contract's bees lent.
+  `hiveBees` use `queenBees`; `capHives` then moves any bee past a hive's `MAX_BEES`, which saves from
+  before the per-hive cap can hold, to a hive with room), then marks the saved contract's bees lent.
 - `room` is the nectar of the foraged kind the filling cells can still take; `send` refuses when it
   is 0 or no bee is home, and `gatherAway` never adds more than it.
 - `wasps`, `waspIn`, `order`, `orderIn`, `contractIn`, `swarmIn` and `marketMs` live

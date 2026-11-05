@@ -130,7 +130,7 @@ const de: HowToPlay = {
     'Jeder neue Freibrief nach dem Sieg lässt dich einen von zwei Erlassen wählen, die seine Regeln ändern.',
     'Jeder neue Freibrief baut außerdem eine Gildenhalle für immer aus: mehr Schwerter zum Start, mehr Juwelen oder geduldigere Abenteurer.',
     'Ab dem zweiten Freibrief verkauft eine Rivalenschmiede gegenüber: Verkaufe in ihrem dreiminütigen Tag mehr als sie und gewinne einen Preis. Abenteurer, die du warten lässt, gehen zu ihr.',
-    'Die Tagesschicht unten sind zehn Minuten, die heute für alle gleich beginnen (Edikt und Startwert); was danach kommt, hängt von deinem Spiel ab. Verdiene so viele Münzen wie möglich. Ein Versuch pro Tag.',
+    'Die Tagesschicht unten sind zehn Minuten, die heute für alle gleich beginnen (Erlass und Startwert); was danach kommt, hängt von deinem Spiel ab. Verdiene so viele Münzen wie möglich. Ein Versuch pro Tag.',
     'Sobald du eine Ritterklinge gemacht hast, kommt alle vier Minuten ein Turnier: Drei Ritter wollen je binnen einer Minute ein Schwert und tjostieren damit. Stufe, Juwel und Meisterwerk entscheiden, welchen Platz dein bester Ritter belegt; ein Sieg hängt ein Banner auf, und Banner schalten Klingenschliffe frei.',
     'Ein Lehrling, anzuheuern sobald du ein Stahlschwert gemacht hast, verschmilzt alle 20 Sekunden das niedrigste gleiche Paar auf den Ambossen, in jedem Freibrief schneller. Meisterwerke und das Schwert in deiner Hand lässt er in Ruhe.',
     'Ab und zu hält ein Erzkarren für 45 Sekunden: Mit Silber findet die Esse dreimal so viele Juwelen, mit Sternmetall schmiedet sie Stahlschwerter, jeweils drei Minuten lang.',

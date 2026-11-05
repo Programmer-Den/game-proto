@@ -303,6 +303,8 @@ function houndsAct(state: GameState, s: Stats, dt: number) {
   state.hounds.forEach((d, i) => {
     d.cd = Math.max(0, d.cd - dt);
     let foe = state.enemies.find((e) => e.id === d.target && e.x < sight);
+    // A foe an earlier hound also holds is given up, so the pick below takes a free one if there is.
+    if (foe && state.hounds.some((o, j) => j < i && o.target === foe!.id)) foe = undefined;
     if (!foe) {
       const taken = new Set(state.hounds.filter((o) => o !== d).map((o) => o.target));
       const free = targets(state).filter((e) => !ENEMIES[e.kind].flying);
