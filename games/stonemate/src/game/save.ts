@@ -11,6 +11,8 @@ export interface SavedGame {
   mode: Mode;
   /** The side the player has against the AI; White in a two-player game. */
   player: Side;
+  /** The Stone AI's level, 1 to 7 (older saves have none and play the menu's level). */
+  level?: number;
   /** Every move so far as `e2e4` text. */
   moves: string[];
 }

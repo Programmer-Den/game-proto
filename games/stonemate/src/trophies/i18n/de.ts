@@ -17,8 +17,10 @@ const de: Translation<typeof en> = {
   quickMateText: 'Setze die Stein-KI in höchstens 25 eigenen Zügen matt.',
   allScenes: 'Alle Sonderszenen',
   allScenesText: 'Sieh alle 8 Sonderschläge in deinen Partien.',
-  hardWin: 'Großmeister aus Stein',
-  hardWinText: 'Setze die Stein-KI auf Schwer matt.',
+  hardWin: 'Meistersteinmetz',
+  hardWinText: 'Setze die Stein-KI als Vereinsspieler oder stärker matt.',
+  grandmasterWin: 'Großmeister aus Stein',
+  grandmasterWinText: 'Setze die Stein-KI als Großmeister matt.',
   allPairs: 'Der ganze Steinbruch',
   allPairsText: 'Sieh alle 30 Schlagpaare in deinen Partien.',
 };

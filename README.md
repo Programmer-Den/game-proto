@@ -78,7 +78,7 @@ The hub's **Settings** button opens the settings every game shares. They are sav
   | Ninefold | 5 hints a Classic board, 4 hearts a Delve run | 2 hints a Classic board, 2 hearts a Delve run |
   | Augury | 4 hearts in Endless and the drafts, 4 minutes of Blitz | 2 hearts in Endless and the drafts, 2½ minutes of Blitz |
   | Mazewright | 25 cabbages, and foes have 20% less health | 10 cabbages, and foes have 25% more health |
-  | Stonemate | the Stone AI looks one move ahead and often picks a weaker move | the Stone AI looks three moves ahead and always plays its best |
+  | Stonemate | the Stone AI starts on Novice (level 2 of 7), which looks one move ahead and often picks a weaker move | the Stone AI starts on Club player (level 4 of 7), which looks three moves ahead and always plays its best; the menu picks any of 7 levels |
 
 - **Frame rate (FPS)**: the most frames per second a game draws, 30 to 320 (60 by default).
 - **Show FPS**: a readout of the frame rate in each game's corner.
