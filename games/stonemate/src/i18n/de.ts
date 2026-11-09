@@ -5,10 +5,21 @@ import type en from './en';
 const de: Translation<typeof en> = {
   title: 'Stonemate',
   tagline: 'Schach mit lebenden Statuen: Jeder Schlag zerbricht eine Statue auf eigene Art.',
-  difficultyLine: 'Stein-KI: {level} (in den Einstellungen der Startseite)',
-  levelEasy: 'Leicht',
-  levelNormal: 'Normal',
-  levelHard: 'Schwer',
+  levelLine: 'Stein-KI: {level} ({n} von {of})',
+  levelBeginner: 'Anfänger',
+  levelNovice: 'Neuling',
+  levelCasual: 'Gelegenheitsspieler',
+  levelClub: 'Vereinsspieler',
+  levelExpert: 'Experte',
+  levelMaster: 'Meister',
+  levelGrandmaster: 'Großmeister',
+  blurbBeginner: 'Schaut einen Zug voraus und verschenkt oft Figuren',
+  blurbNovice: 'Schaut einen Zug voraus und wählt manchmal einen schwächeren Zug',
+  blurbCasual: 'Schaut zwei Züge voraus und spielt fast immer gut',
+  blurbClub: 'Schaut drei Züge voraus und spielt immer ihren besten Zug',
+  blurbExpert: 'Rechnet tiefer und kennt Bauernketten und offene Linien',
+  blurbMaster: 'Schaut fünf Züge voraus, in scharfen Stellungen weiter',
+  blurbGrandmaster: 'Denkt am längsten nach und schaut am weitesten voraus',
   playWhite: 'Als Weiß spielen',
   playBlack: 'Als Schwarz spielen',
   twoPlayers: 'Zu zweit',
@@ -73,6 +84,6 @@ const de: Translation<typeof en> = {
   decree: 'Königlicher Erlass',
 };
 
-export const keepEnglish: (keyof typeof en)[] = ['title', 'levelNormal', 'sceneLine'];
+export const keepEnglish: (keyof typeof en)[] = ['title', 'sceneLine'];
 
 export default de;

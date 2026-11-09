@@ -3,7 +3,7 @@ import { BISHOP, KING, KNIGHT, PAWN, QUEEN, ROOK, type Move, type Position, side
 /**
  * The Stone AI: a small alpha-beta search over material and piece-square tables, with a capture
  * search at the leaves so it doesn't stop counting in the middle of a trade. The hub's difficulty
- * sets how deep it looks and how loosely it picks among good moves (`aiLevel` in `rules.ts`).
+ * sets how deep it looks and how loosely it picks among good moves (`LEVELS` in `rules.ts`, levels 1 to 4; the top three use `deep.ts`).
  */
 
 const VALUE = [0, 100, 320, 330, 500, 900, 0];

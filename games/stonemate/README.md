@@ -22,8 +22,22 @@ or the same position three times).
   strike and play the fall at double speed.
 - **Menu** leaves the game; it is saved after every move, and **Continue game** on the menu picks it
   up again.
-- The hub's difficulty sets the Stone AI: Easy looks one move ahead and often picks a weaker move,
-  Normal looks two ahead, Hard three and always plays its best.
+- The arrows on the menu pick the Stone AI's level, from 1 to 7. Until you pick one, the hub's
+  difficulty picks it (Easy is Novice, Normal Casual player, Hard Club player). A saved game keeps
+  the level it was started on.
+
+  | Level | How it plays |
+  | --- | --- |
+  | 1 Beginner | Looks one move ahead and often gives pieces away |
+  | 2 Novice | Looks one move ahead and sometimes picks a weaker move |
+  | 3 Casual player | Looks two moves ahead and nearly always plays well |
+  | 4 Club player | Looks three moves ahead and always plays its best |
+  | 5 Expert | A deeper search that also weighs pawn structure, the bishop pair and open files |
+  | 6 Master | The deeper search to five moves ahead, further in sharp lines |
+  | 7 Grandmaster | The deeper search with the biggest budget, a few seconds a move |
+
+  Each level beat the one below it in matches of the Stone AI against itself. The top three think
+  in the background, so the statues keep moving while they do.
 
 ### Captures
 
@@ -69,8 +83,8 @@ on, the scenes play without screen shake or flashes.
 ### Trophies
 
 First blow, Carved anew (promote a pawn), Joust, Stone cold (beat the Stone AI), Upset! (a pawn
-takes a queen), Swift mason (mate within 25 moves), Every signature scene, Grandmaster of stone
-(win on Hard) and one hidden.
+takes a queen), Swift mason (mate within 25 moves), Every signature scene, Master mason
+(beat the Club player or stronger), Grandmaster of stone (beat the Grandmaster) and one hidden.
 
 ## Code layout
 
@@ -78,8 +92,10 @@ takes a queen), Swift mason (mate within 25 moves), Every signature scene, Grand
 | --- | --- |
 | `src/main.ts` | Creates the Phaser game and hands it to `setupGame` and `setupScaling` |
 | `src/game/chess.ts` | The rules: a position with make and unmake, legal moves, check, mate and draws |
-| `src/game/ai.ts` | The Stone AI: alpha-beta search with a capture search at the leaves |
-| `src/game/rules.ts` | The AI's level by difficulty, the signature pairs, the quick-mate limit |
+| `src/game/ai.ts` | The Stone AI's levels 1 to 4: alpha-beta search with a capture search at the leaves |
+| `src/game/deep.ts` | The Stone AI's levels 5 to 7: a deeper search with a richer evaluation |
+| `src/game/aiWorker.ts`, `src/game/think.ts` | Run the deep search in a web worker |
+| `src/game/rules.ts` | The seven AI levels, the signature pairs, the quick-mate limit |
 | `src/game/save.ts` | The saved game and the stats |
 | `src/scenes/GameScene.ts` | The menu, the board and panel, input, moves and the gallery |
 | `src/scenes/captures.ts` | Every strike, fall and signature scene |

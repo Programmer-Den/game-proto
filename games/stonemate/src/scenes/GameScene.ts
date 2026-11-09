@@ -6,7 +6,8 @@ import { award } from '../../../../shared/trophies';
 import { SFX, SONG } from '../audio';
 import { chooseMove } from '../game/ai';
 import { KINDS, type Kind, type Move, Flag, Position, type Result, type Side, VICTIMS, kindOf, moveText, sideOf } from '../game/chess';
-import { PAIR_COUNT, QUICK_MATE, SIGNATURES, aiLevel, isHard, pairKey } from '../game/rules';
+import { HARD_LEVEL, LEVELS, PAIR_COUNT, QUICK_MATE, SIGNATURES, clampLevel, type LevelId, pairKey } from '../game/rules';
+import { thinkDeep } from '../game/think';
 import { type Mode, type Stats, loadGame, loadStats, saveGame, saveStats } from '../game/save';
 import { t, type TextKey } from '../i18n';
 import { trophies } from '../trophies';
@@ -22,6 +23,24 @@ const UI_FONT = '"Segoe UI", Arial, sans-serif';
 const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
 const PIECE_TEXT: Record<Kind, TextKey> = { p: 'pieceP', n: 'pieceN', b: 'pieceB', r: 'pieceR', q: 'pieceQ', k: 'pieceK' };
 const PREFS_KEY = 'stonemate-prefs';
+const LEVEL_TEXT: Record<LevelId, TextKey> = {
+  beginner: 'levelBeginner',
+  novice: 'levelNovice',
+  casual: 'levelCasual',
+  club: 'levelClub',
+  expert: 'levelExpert',
+  master: 'levelMaster',
+  grandmaster: 'levelGrandmaster',
+};
+const LEVEL_BLURB: Record<LevelId, TextKey> = {
+  beginner: 'blurbBeginner',
+  novice: 'blurbNovice',
+  casual: 'blurbCasual',
+  club: 'blurbClub',
+  expert: 'blurbExpert',
+  master: 'blurbMaster',
+  grandmaster: 'blurbGrandmaster',
+};
 
 export class GameScene extends Phaser.Scene {
   screen: Screen = 'menu';
@@ -36,6 +55,10 @@ export class GameScene extends Phaser.Scene {
   promo: Move[] | null = null;
   lastCapture: { pair: string; scene: string | null } | null = null;
   quick = false;
+  /** The Stone AI level picked on the menu, 1 (Beginner) to 7 (Grandmaster). */
+  level = 3;
+  /** The level of the game in play, which a continued game keeps. */
+  gameLevel = 3;
   stats: Stats = loadStats();
   buttons: Record<string, Spot> = {};
   /** The board's top-left corner and square size in view pixels, and whether Black is at the bottom. */
@@ -69,11 +92,15 @@ export class GameScene extends Phaser.Scene {
     this.gallerySize = Math.min(110, Math.floor(this.H / 5));
     paintPuff(this);
     paintPieces(this, Math.max(S, this.gallerySize));
+    let prefs: { quick?: unknown; level?: unknown } = {};
     try {
-      this.quick = JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}').quick === true;
+      prefs = JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}') ?? {};
     } catch {
-      this.quick = false;
+      // Unreadable: the defaults.
     }
+    this.quick = prefs.quick === true;
+    // Until a level is picked on the menu, the hub's difficulty picks it.
+    this.level = clampLevel(prefs.level);
     this.input.on('pointerdown', (p: Phaser.Input.Pointer, over: Phaser.GameObjects.GameObject[]) => {
       if (!over.length) this.onBoardTap(p.worldX, p.worldY);
     });
@@ -88,6 +115,7 @@ export class GameScene extends Phaser.Scene {
       screen: this.screen,
       mode: this.mode,
       player: this.player,
+      level: this.gameLevel,
       turn: this.pos.turn,
       plies: this.pos.history.length,
       busy: this.busy,
@@ -148,8 +176,7 @@ export class GameScene extends Phaser.Scene {
     const cx = this.W / 2;
     this.add.text(cx, 52, t('title'), { fontFamily: FONT, fontSize: '54px', color: hex(C.ink), fontStyle: 'bold' }).setOrigin(0.5).setShadow(0, 3, '#000', 6);
     this.text(cx, 96, t('tagline'), 16, C.dim).setOrigin(0.5);
-    const level = t(({ easy: 'levelEasy', normal: 'levelNormal', hard: 'levelHard' } as const)[settings.difficulty]);
-    this.text(cx, 120, t('difficultyLine', { level }), 14, C.dim).setOrigin(0.5);
+    this.drawLevelPicker(cx, 128);
     // A parade of statues, White on the left and Black on the right.
     const size = 58;
     const order: Kind[] = ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'];
@@ -159,7 +186,7 @@ export class GameScene extends Phaser.Scene {
     });
     const saved = loadGame();
     const ids: [string, string, () => void][] = [];
-    if (saved && saved.moves.length) ids.push(['continue', t('continue', { n: Math.ceil(saved.moves.length / 2) }), () => this.startGame(saved.mode, saved.player, saved.moves)]);
+    if (saved && saved.moves.length) ids.push(['continue', t('continue', { n: Math.ceil(saved.moves.length / 2) }), () => this.startGame(saved.mode, saved.player, saved.moves, saved.level)]);
     ids.push(['play-white', t('playWhite'), () => this.startGame('ai', 'w')]);
     ids.push(['play-black', t('playBlack'), () => this.startGame('ai', 'b')]);
     ids.push(['two-players', t('twoPlayers'), () => this.startGame('duo', 'w')]);
@@ -172,10 +199,43 @@ export class GameScene extends Phaser.Scene {
 
   // ---- a game ----------------------------------------------------------------------------------
 
-  startGame(mode: Mode, player: Side, moves: string[] = []) {
+  /** The ◀ level ▶ row on the menu, with a line on how the level plays below it. */
+  private drawLevelPicker(cx: number, y: number) {
+    const name = this.text(cx, y, '', 16, C.ink, { fontStyle: 'bold' }).setOrigin(0.5);
+    const blurb = this.text(cx, y + 24, '', 12, C.dim).setOrigin(0.5);
+    const show = () => {
+      const id = LEVELS[this.level - 1].id;
+      name.setText(t('levelLine', { level: t(LEVEL_TEXT[id]), n: this.level, of: LEVELS.length }));
+      blurb.setText(t(LEVEL_BLURB[id]));
+    };
+    const step = (by: number) => {
+      const next = this.level + by;
+      if (next < 1 || next > LEVELS.length) {
+        ui('refuse');
+        return;
+      }
+      this.level = next;
+      this.savePrefs();
+      show();
+    };
+    this.button('level-down', cx - 190, y, 36, 28, '◀', () => step(-1));
+    this.button('level-up', cx + 190, y, 36, 28, '▶', () => step(1));
+    show();
+  }
+
+  private savePrefs() {
+    try {
+      localStorage.setItem(PREFS_KEY, JSON.stringify({ quick: this.quick, level: this.level }));
+    } catch {
+      // Not saved; the choice still holds for this visit.
+    }
+  }
+
+  startGame(mode: Mode, player: Side, moves: string[] = [], level = this.level) {
     this.screen = 'play';
     this.mode = mode;
     this.player = player;
+    this.gameLevel = clampLevel(level);
     this.pos = new Position();
     for (const text of moves) {
       const m = this.pos.findMove(text);
@@ -243,7 +303,7 @@ export class GameScene extends Phaser.Scene {
     const w = this.panelW;
     const top = this.board.y - 8;
     this.add.text(x, top, t('title'), { fontFamily: FONT, fontSize: '28px', color: hex(C.ink), fontStyle: 'bold' });
-    const level = t(({ easy: 'levelEasy', normal: 'levelNormal', hard: 'levelHard' } as const)[settings.difficulty]);
+    const level = t(LEVEL_TEXT[LEVELS[this.gameLevel - 1].id]);
     const mode = this.mode === 'ai' ? t('modeAi', { side: t(this.player === 'w' ? 'white' : 'black'), level }) : t('modeDuo');
     this.text(x, top + 38, mode, 13, C.dim, { wordWrap: { width: w } });
     this.statusText = this.text(x, top + 76, '', 22, C.ink, { fontStyle: 'bold', wordWrap: { width: w } });
@@ -260,11 +320,7 @@ export class GameScene extends Phaser.Scene {
 
   private toggleQuick() {
     this.quick = !this.quick;
-    try {
-      localStorage.setItem(PREFS_KEY, JSON.stringify({ quick: this.quick }));
-    } catch {
-      // Not saved; the toggle still holds for this visit.
-    }
+    this.savePrefs();
     const spot = this.buttons.quick;
     const label = this.children.list.find((o) => o instanceof Phaser.GameObjects.Text && o.x === spot.x && o.y === spot.y) as Phaser.GameObjects.Text | undefined;
     label?.setText(t(this.quick ? 'capturesQuick' : 'capturesFull'));
@@ -507,7 +563,8 @@ export class GameScene extends Phaser.Scene {
         this.trophy('firstWin');
         const mine = this.pos.history.filter((u) => sideOf(u.move.piece) === this.player).length;
         if (mine <= QUICK_MATE) this.trophy('quickMate');
-        if (isHard()) this.trophy('hardWin');
+        if (this.gameLevel >= HARD_LEVEL) this.trophy('hardWin');
+        if (this.gameLevel === LEVELS.length) this.trophy('grandmasterWin');
       } else s.losses++;
       saveStats(s);
     }
@@ -524,7 +581,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private save() {
-    saveGame({ mode: this.mode, player: this.player, moves: this.pos.history.map((u) => moveText(u.move)) });
+    saveGame({ mode: this.mode, player: this.player, level: this.gameLevel, moves: this.pos.history.map((u) => moveText(u.move)) });
   }
 
   /** Lets the Stone AI move when it is its turn. */
@@ -533,10 +590,13 @@ export class GameScene extends Phaser.Scene {
     this.busy = true;
     this.refresh();
     const gen = this.gen;
-    // A beat to show it thinking, then the search (fast enough to run in one frame).
-    this.time.delayedCall(450, () => {
+    // A beat to show it thinking, then the search: the lower levels are fast enough to run in one
+    // frame, the top three think in a web worker.
+    this.time.delayedCall(450, async () => {
       if (gen !== this.gen) return;
-      const m = chooseMove(this.pos, aiLevel());
+      const level = LEVELS[this.gameLevel - 1];
+      const m = level.deep ? await thinkDeep(this.pos, level.deep) : chooseMove(this.pos, level.shallow!);
+      if (gen !== this.gen) return;
       this.busy = false;
       if (m) void this.play(m);
     });

@@ -111,9 +111,9 @@ export class Position {
     this.keys.push(this.key());
   }
 
-  /** The position as text for repetition: pieces, side to move, castling and en passant. */
+  /** The position as text for repetition and the deep search's table: pieces, side to move, castling and en passant. */
   key() {
-    return this.board.join(',') + this.turn + this.castling + ',' + this.ep;
+    return String.fromCharCode(...this.board) + this.turn + this.castling + ',' + this.ep;
   }
 
   kingSquare(side: Side) {

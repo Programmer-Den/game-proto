@@ -17,8 +17,10 @@ const en = {
   quickMateText: 'Checkmate the Stone AI within 25 of your moves.',
   allScenes: 'Every signature scene',
   allScenesText: 'See all 8 signature captures in your games.',
-  hardWin: 'Grandmaster of stone',
-  hardWinText: 'Checkmate the Stone AI on Hard.',
+  hardWin: 'Master mason',
+  hardWinText: 'Checkmate the Stone AI as a Club player or stronger.',
+  grandmasterWin: 'Grandmaster of stone',
+  grandmasterWinText: 'Checkmate the Stone AI as a Grandmaster.',
   allPairs: 'The whole quarry',
   allPairsText: 'See all 30 capture pairs in your games.',
 };
