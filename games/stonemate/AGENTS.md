@@ -25,11 +25,15 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
   at double speed. The full scenes run at 1.2 times their written length (`Director.k`). Reduce
   motion drops camera shake and flashes (`Stage.still`). Checkmate plays `playMate` (the king
   cracks and falls to rubble), a promotion `playPromote` (a ring of rune light).
-- **Statues** (`scenes/art.ts`): classic piece shapes as SVG paths in a 100-unit box, painted on
-  canvases at boot by `paintPieces` (marble or obsidian gradient, a vein, rune eyes in amber or
-  violet); Black's statues face left (`flipX`). `fragment(kind, side, how)` cuts a statue into
-  halves side by side, head and body at its `NECK`, or 7 shards, painted once and kept. The king's
-  crown ends in a diamond, never a cross.
+- **Statues** (`scenes/statues.ts`, painted by `scenes/art.ts`): sculpted figures in a 100-unit
+  box: a hooded sentry with a shield (pawn), a tower with a lit gate and window slits (rook), a seer
+  with a lamp staff (bishop), a horse head with a carved mane (knight), a veiled queen with a tiara
+  and a bearded king in an ermine mantle, each on a studded plinth. White is marble with gold inlay
+  and amber gems, Black obsidian with silver inlay and violet gems, and every statue has rune eyes.
+  `paintPieces` paints them on canvases at boot; Black's statues face left (`flipX`).
+  `fragment(kind, side, how)` cuts a statue into halves side by side, head and body at its `NECK`,
+  or 7 shards, painted once and kept. The king's
+  crown ends in a diamond gem, never a cross.
 - **Trophies** (`src/trophies/`): `firstCapture` (a capture by the player), `promotion`, `joust`
   (knight takes knight), `firstWin`, `upset` (pawn takes queen), `quickMate` (mate the AI within
   `QUICK_MATE` = 25 of your moves), `allScenes` (all 8 signatures seen in games), `hardWin` and the
@@ -103,4 +107,5 @@ play them through `Stage.sfx`. A tap on the board while the AI is thinking plays
   name in `src/i18n/`.
 - **AI strength:** `aiLevel()` in `game/rules.ts`; keep Normal as it is (the playthrough plays it),
   and update the difficulty row in the root README.
-- **New art for a piece:** its path in `SIL` (and `EYES`, `NECK`) in `scenes/art.ts`.
+- **New art for a piece:** its painter in `STATUES` (and its `NECK`) in `scenes/statues.ts`; it
+  draws with plain canvas calls, so it can be bundled into a mockup page on its own.

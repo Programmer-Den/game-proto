@@ -1,8 +1,8 @@
 # Stonemate
 
-Chess with living statues. White marble and black obsidian pieces with rune-lit eyes walk the
-board, and every capture plays a scene of its own: the attacker strikes the way its kind fights,
-and the victim breaks the way its kind breaks. Play the Stone AI as White or Black, or a friend on
+Chess with living statues. Sculpted figures in white marble with gold inlay and black obsidian
+with silver inlay, all with rune-lit eyes, walk the board, and every capture plays a scene of its
+own: the attacker strikes the way its kind fights, and the victim breaks the way its kind breaks. Play the Stone AI as White or Black, or a friend on
 one screen, and watch any capture in the gallery.
 
 ![The menu](docs/screenshots/menu.webp)
@@ -64,7 +64,7 @@ Eight pairs play a hand-made scene instead (★ in the gallery):
 Checkmate ends with the beaten king cracking and falling to rubble. With the hub's Reduce motion
 on, the scenes play without screen shake or flashes.
 
-![Knight takes Knight in the capture gallery](docs/screenshots/gallery.webp)
+![Knight takes Bishop in the capture gallery](docs/screenshots/gallery.webp)
 
 ### Trophies
 
@@ -83,7 +83,8 @@ takes a queen), Swift mason (mate within 25 moves), Every signature scene, Grand
 | `src/game/save.ts` | The saved game and the stats |
 | `src/scenes/GameScene.ts` | The menu, the board and panel, input, moves and the gallery |
 | `src/scenes/captures.ts` | Every strike, fall and signature scene |
-| `src/scenes/art.ts` | The statues painted in code, and the fragments they break into |
+| `src/scenes/statues.ts` | The statues drawn in code: sculpted figures with gold and silver inlay |
+| `src/scenes/art.ts` | Paints the statues for the screen, and the fragments they break into |
 | `src/audio.ts` | Music and sound effects |
 | `src/howToPlay.ts`, `src/i18n/`, `src/trophies/` | How to play, texts and trophies |
 | `e2e/playthrough.spec.ts` | Plays the first round to White's first capture |

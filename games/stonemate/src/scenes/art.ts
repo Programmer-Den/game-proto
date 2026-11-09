@@ -1,10 +1,11 @@
 import Phaser from 'phaser';
 import { sharpRes } from '../../../../shared/scaling';
 import type { Kind, Side } from '../game/chess';
+import { NECK, paintStatue } from './statues';
 
-// The Living Statues, painted in code: classic piece shapes carved in white marble and black
-// obsidian, with faint veins and rune-lit eyes (amber for White, violet for Black). Each piece is
-// painted once at boot in a 100-unit box, sharp for this screen, and the capture scenes cut the
+// The Living Statues (drawn in `statues.ts`): sculpted figures in white marble with gold inlay and
+// black obsidian with silver inlay, with rune-lit eyes (amber for White, violet for Black). Each piece
+// is painted once at boot in a 100-unit box, sharp for this screen, and the capture scenes cut the
 // same painting into halves and shards when a statue breaks (`fragment`).
 
 /** Colours as numbers for Phaser and text for canvas. */
@@ -31,79 +32,9 @@ export const C = {
 export const RUNE: Record<Side, number> = { w: C.amber, b: C.violet };
 export const DUST: Record<Side, number> = { w: C.dust, b: C.darkDust };
 
-const SIL: Record<Kind, string> = {
-  p: 'M36 84 Q38 64 46 56 L54 56 Q62 64 64 84 Z M38 58 Q50 50 62 58 L60 62 L40 62 Z',
-  r: 'M30 84 L33 42 L67 42 L70 84 Z M26 42 L26 20 L36 20 L36 28 L44 28 L44 20 L56 20 L56 28 L64 28 L64 20 L74 20 L74 42 Z',
-  b: 'M36 84 Q42 66 45 60 L55 60 Q58 66 64 84 Z M50 24 Q66 38 62 52 Q58 60 50 60 Q42 60 38 52 Q34 38 50 24 Z',
-  n: 'M30 84 L34 62 Q28 50 36 40 L28 32 L40 28 Q48 16 60 20 Q76 26 72 50 Q70 66 70 84 Z',
-  q: 'M33 84 Q42 62 44 46 L56 46 Q58 62 67 84 Z M32 46 L27 22 L38 34 L44 16 L50 32 L56 16 L62 34 L73 22 L68 46 Z',
-  // The king's crown ends in a diamond, never a cross.
-  k: 'M31 84 Q40 62 42 44 L58 44 Q60 62 69 84 Z M34 44 L31 24 L69 24 L66 44 Z M50 4 L57 13 L50 22 L43 13 Z',
-};
-const BASE = 'M22 84 L78 84 Q80 90 78 95 L22 95 Q20 90 22 84 Z';
-/** Where each statue's eyes sit, in the 100-unit box. */
-export const EYES: Record<Kind, [number, number]> = { p: [50, 40], r: [50, 32], b: [50, 44], n: [58, 32], q: [50, 54], k: [50, 34] };
-/** Where each statue's neck is: the head topples off above it. */
-export const NECK: Record<Kind, number> = { p: 54, r: 44, b: 60, n: 48, q: 47, k: 45 };
-
 const canvases = new Map<string, HTMLCanvasElement>();
 
 export const pieceKey = (kind: Kind, side: Side) => `sm-${side}${kind}`;
-
-function paintStatue(c: CanvasRenderingContext2D, kind: Kind, side: Side) {
-  const white = side === 'w';
-  const g = c.createLinearGradient(20, 10, 85, 95);
-  g.addColorStop(0, white ? '#ffffff' : '#57506e');
-  g.addColorStop(0.55, white ? '#dcd8cf' : '#2a2638');
-  g.addColorStop(1, white ? '#a9a398' : '#0b0a12');
-  // A soft shadow on the floor.
-  c.fillStyle = 'rgba(0,0,0,0.28)';
-  c.beginPath();
-  c.ellipse(52, 95, 32, 5, 0, 0, Math.PI * 2);
-  c.fill();
-  const shape = new Path2D(`${SIL[kind]} ${BASE}`);
-  c.fillStyle = g;
-  c.fill(shape);
-  if (kind === 'p') {
-    c.beginPath();
-    c.arc(50, 40, 14, 0, Math.PI * 2);
-    c.fill();
-  }
-  c.lineJoin = 'round';
-  c.lineWidth = 2.5;
-  c.strokeStyle = white ? '#6d6a63' : '#000000';
-  c.stroke(shape);
-  if (kind === 'p') {
-    c.beginPath();
-    c.arc(50, 40, 14, 0, Math.PI * 2);
-    c.stroke();
-  }
-  // A carved band on the base and a vein through the body.
-  c.strokeStyle = white ? 'rgba(120,114,104,0.6)' : 'rgba(140,120,190,0.45)';
-  c.lineWidth = 1.5;
-  c.beginPath();
-  c.moveTo(24, 88.5);
-  c.lineTo(76, 88.5);
-  c.moveTo(45, 66);
-  c.lineTo(49, 72);
-  c.lineTo(46, 77);
-  c.lineTo(51, 83);
-  c.stroke();
-  // Rune-lit eyes with a glow.
-  const [ex, ey] = EYES[kind];
-  const glow = white ? '255,184,77' : '185,140,255';
-  for (const dx of [-5, 5]) {
-    const r = c.createRadialGradient(ex + dx, ey, 0, ex + dx, ey, 7);
-    r.addColorStop(0, `rgba(${glow},0.9)`);
-    r.addColorStop(1, `rgba(${glow},0)`);
-    c.fillStyle = r;
-    c.fillRect(ex + dx - 7, ey - 7, 14, 14);
-    c.fillStyle = white ? '#ffe2a8' : '#e2d0ff';
-    c.beginPath();
-    c.arc(ex + dx, ey, 2.4, 0, Math.PI * 2);
-    c.fill();
-  }
-}
 
 /** Paints every statue for pieces shown `size` game pixels across. */
 export function paintPieces(scene: Phaser.Scene, size: number) {
