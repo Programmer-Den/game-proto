@@ -897,10 +897,15 @@ export function checkDeeds(s: GameState) {
   done('grunda', s.hero === 'dax' && rank(s, 'smugglers-run') >= 5);
   done('kettle', s.powerUps >= DEEDS.powerUps);
   done('cassia', s.objectivesDone >= DEEDS.objectives);
+  done('vesk', s.elitesKilled >= DEEDS.elites);
+  done('rena', s.hero === 'kael' && rank(s, 'ace-pilot') >= 5);
+  done('thessa', s.arenaWins >= DEEDS.arenas);
+  done('wikka', s.level >= DEEDS.level);
 }
 
 /**
  * Elara Voss's deed (credits held at once), Triad-77's (foes defeated in one run), Dax Morrow's
- * (chests opened), Kettle's (power-ups taken) and Cassia Vane's (side objectives done), all in one run.
+ * (chests opened), Kettle's (power-ups taken), Cassia Vane's (side objectives done), Vesk Drayl's
+ * (elites defeated), Admiral Thessa Orn's (arenas won) and Chief Wikka's (the level reached), all in one run.
  */
-export const DEEDS = { credits: 100, kills: 2500, chests: 6, powerUps: 8, objectives: 6 };
+export const DEEDS = { credits: 100, kills: 2500, chests: 6, powerUps: 8, objectives: 6, elites: 25, arenas: 2, level: 25 };

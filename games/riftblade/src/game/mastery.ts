@@ -39,6 +39,7 @@ export const MASTERY_WEAPON: Record<HeroId, string> = {
   rook: 'drone', tr9: 'thermal', bram: 'scatter', kael: 'blade-throw', vharn: 'lightning-arc', oom: 'push-wave',
   corvin: 'crescent', veyl: 'dark-nova', kresh: 'spinning-guard', joren: 'lightning-arc', elara: 'callin', triad: 'drone',
   dax: 'ricochet', grunda: 'stun', kettle: 'drone', cassia: 'executioner',
+  vesk: 'thermal', rena: 'scatter', thessa: 'orbital-beacon', wikka: 'ricochet',
 };
 
 /** The text key of what each level opens (level 1 opens nothing). */
@@ -64,4 +65,8 @@ export const MASTERY_COLOURS: Record<HeroId, Omit<HeroScheme, 'name' | 'bolt'>> 
   grunda: { body: '#4a3a2e', accent: '#ff9a76', mark: '#2e2420' },
   kettle: { body: '#f0e6d0', accent: '#ff8a3c', mark: '#5a4630' },
   cassia: { body: '#f2f0f4', accent: '#7a5cff', mark: '#9aa0b0' },
+  vesk: { body: '#2a3a4a', accent: '#7ae0ff', mark: '#1a2430' },
+  rena: { body: '#4a2f3f', accent: '#9ef01a', mark: '#2a1a24' },
+  thessa: { body: '#e6e1d8', accent: '#e85d75', mark: '#8a8478' },
+  wikka: { body: '#3b2f4a', accent: '#ffd166', mark: '#241c2e' },
 };

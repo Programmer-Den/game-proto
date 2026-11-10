@@ -199,6 +199,8 @@ export interface Bullet {
   bossMs: number;
   /** Grunda's bursting bolts: the damage of the burst where it first hits (0 or left out: none). */
   burst?: number;
+  /** The burst's reach, where it is not the hero's usual one. */
+  burstR?: number;
 }
 
 /** A blade's swing on screen: an arc (a full ring when `half` is pi) that fades. */
@@ -282,7 +284,8 @@ export interface Fire {
 export type AllyKind =
   | 'trooper' | 'legionary' | 'brother' | 'drone' | 'escort' | 'fighter' | 'squadron' | 'copilot' | 'spirit' | 'puppet'
   | 'commando' | 'bike' | 'medic' | 'shieldbot' | 'command' | 'spare' | 'thawed'
-  | 'freighter' | 'patch' | 'spydrone';
+  | 'freighter' | 'patch' | 'spydrone'
+  | 'wingman' | 'tribesman' | 'log';
 
 export interface Ally {
   id: number;
@@ -426,7 +429,7 @@ export interface Hero {
   /** Body radius, px. */
   r: number;
   /** A dash: 'jet' (Bram), 'blade' (cuts through foes), 'leap' and 'hunt' (onto `dashTarget`). */
-  dashKind: 'jet' | 'blade' | 'leap' | 'hunt';
+  dashKind: 'jet' | 'blade' | 'leap' | 'hunt' | 'ram';
   dashSpeed: number;
   dashDmg: number;
   dashTarget: number;
@@ -611,6 +614,8 @@ export interface GameState {
   scrap: number;
   /** Cassia Vane's Cloak: where she vanished, which the foes go for while it lasts (null when seen). */
   decoy: { x: number; y: number } | null;
+  /** Admiral Thessa Orn's Study: foes of each kind felled (weighted), which make that kind take more. */
+  study: Record<string, number>;
 }
 
 /** The sea over half the field: the water's edge runs through `x`, `y`, and the water lies the way of `angle` from it. */
@@ -750,6 +755,7 @@ export function freshState(): GameState {
     formation: 'spread',
     scrap: 0,
     decoy: null,
+    study: {},
   };
 }
 
@@ -806,13 +812,14 @@ export function statsOf(s: GameState): Stats {
   const overdrive = s.overdriveMs > 0 ? POWER.overdrive : 1;
   let pierce = at([1, 1, 2, 2, 3], r('overcharge'), 0) + at([1, 1, 3, 3, 5], r('marksman'), 0);
   if (cap('longshot')) pierce = 999;
-  const bounces = at([1, 2, 2, 3, 4], r('ricochet'), 0) + (r('gunslinger') >= 2 ? 1 : 0) + (r('gunslinger') >= 5 ? 1 : 0);
+  let bounces = at([1, 2, 2, 3, 4], r('ricochet'), 0) + (r('gunslinger') >= 2 ? 1 : 0) + (r('gunslinger') >= 5 ? 1 : 0);
   const k = s.hero ? knightMods(s) : NO_MODS;
   const q = squadMods(s);
   const w = crewMods(s);
   const d = drillMods(s);
   fireRate += q.fireRate + d.fireRate + w.fireRate;
   if (pierce < 999) pierce += q.pierce + w.pierce;
+  bounces += w.bounces;
   // Adrenal Stim: faster and harder while health is low.
   const p = s.player;
   const stim = p.maxHp > 0 && p.hp < p.maxHp * 0.4 ? at([0.1, 0.15, 0.2, 0.25, 0.3], r('stim'), 0) : 0;
@@ -900,7 +907,7 @@ function squadMods(s: GameState) {
 function crewMods(s: GameState) {
   const r = (id: string) => s.ranks[id] ?? 0;
   const cap = (id: string) => s.capstones.includes(id);
-  const mods = { fireRate: 0, pierce: 0, damage: 1, sig: 1, speed: 1, armour: 0, hp: 0, regen: 0, crit: 0, credits: 0 };
+  const mods = { fireRate: 0, pierce: 0, bounces: 0, damage: 1, sig: 1, speed: 1, armour: 0, hp: 0, regen: 0, crit: 0, credits: 0 };
   const p = s.player;
   const missing = p.maxHp > 0 ? Math.max(0, 1 - p.hp / p.maxHp) : 0;
   if (s.hero === 'dax') {
@@ -932,6 +939,24 @@ function crewMods(s: GameState) {
     mods.damage *= r('deadeye') >= 5 ? 1.3 : 1;
     mods.sig *= r('ghost') >= 4 ? 0.75 : 1;
     if (p.sigActiveMs > 0 && r('ghost') >= 3) mods.speed *= 1.3;
+  } else if (s.hero === 'vesk') {
+    mods.damage *= r('arsenal') >= 3 ? 1.2 : 1;
+    mods.sig *= r('scorched-earth') >= 4 ? 0.75 : 1;
+  } else if (s.hero === 'rena') {
+    mods.speed *= r('afterburner') >= 1 ? 1.1 : 1;
+    mods.sig *= r('afterburner') >= 3 ? 0.75 : 1;
+    mods.fireRate += (r('gunship') >= 1 ? 0.15 : 0) + (cap('strafing-run') && p.moving ? 1 : 0);
+    mods.pierce += r('gunship') >= 2 ? 1 : 0;
+    mods.damage *= r('gunship') >= 4 ? 1.2 : 1;
+  } else if (s.hero === 'thessa') {
+    mods.crit += r('tactician') >= 2 ? 0.08 : 0;
+    mods.sig *= r('iron-ring') >= 3 ? 0.75 : 1;
+  } else if (s.hero === 'wikka') {
+    mods.fireRate += r('slinger') >= 1 ? 0.15 : 0;
+    mods.bounces += r('slinger') >= 2 ? 1 : 0;
+    mods.damage *= (r('slinger') >= 3 ? 1.25 : 1) * (cap('war-drums') ? 1 + 0.04 * s.allies.filter((a) => a.kind === 'tribesman').length : 1);
+    mods.pierce += cap('eagle-eye') ? 2 : 0;
+    mods.sig *= r('log-traps') >= 3 ? 0.75 : 1;
   }
   return mods;
 }
@@ -1030,6 +1055,7 @@ export const HERO_OBJECTIVES: Record<HeroId, ObjectiveId> = {
   rook: 'quickdraw', tr9: 'dropzone', bram: 'recon', kael: 'duel', vharn: 'unbroken', oom: 'lift', corvin: 'pilgrim',
   veyl: 'storm', kresh: 'bloodtrail', joren: 'monolith', elara: 'signal', triad: 'salvage',
   dax: 'quickdraw', grunda: 'unbroken', kettle: 'salvage', cassia: 'recon',
+  vesk: 'duel', rena: 'recon', thessa: 'signal', wikka: 'bloodtrail',
 };
 /** When each of a world's three objectives starts (ms of world time). */
 export const OBJECTIVE_AT = [60_000, 135_000, 210_000] as const;

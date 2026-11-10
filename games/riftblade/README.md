@@ -54,6 +54,10 @@ foes and bolts.
 | Grunda (slate fur, pale aqua trim) | Heavy crossbow: slow bolts that pierce a foe and push foes back. 160 health, big, slow. **Rage**: the more health she has lost, the harder she hits (up to +60%) | **Roar**: stuns and throws back every foe near her for 1.2 s; a boss is only slowed (16 s) | Heavy Bolts, Wild Heart, Warcry |
 | KT-4 "Kettle" (brass, mint lens) | Zap prod: a short-range zap at the nearest foe that jumps to one more. 100 health, tiny and very fast. **Self-repair**: mends 1.5 health a second | **Hack**: the 3 nearest foes fight for him for 6 s, never a boss or elite (11 s) | Prod, Hacker, Spare Parts |
 | Cassia Vane (umber cloak, orchid visor) | Long rifle: slow, hard shots from far away that pierce 2 foes. 90 health | **Cloak**: she vanishes for 4 s and takes no damage, the foes go for where she stood, and her next shot hits three times as hard (13 s) | Deadeye, Ghost, Spymaster |
+| Vesk Drayl (dusk plum armour, amber lens) | Rocket pod: slow rockets at the nearest foe that burst where they land. 150 health, slow | **Flamer**: 2.5 s of fire in a cone at the nearest foe (12 s) | Arsenal, Scorched Earth, Bounty |
+| Rena Kask (petrol flight suit, mustard trim) | Twin cannons: fast, light bolts side by side. 90 health, the fastest of all. **Momentum**: up to +50% damage after 2 s on the move, lost twice as fast standing still | **Trench Run**: rams straight ahead for 0.35 s, 40 damage to each foe in the way and no harm to her (7 s) | Afterburner, Gunship, Wingmates |
+| Admiral Thessa Orn (cocoa coat, periwinkle trim) | Service pistol at the nearest foe. 125 health, slow. **Study**: every 10 foes of a kind she fells, that kind takes 2% more from her (up to 30%) | **Blockade**: a ring of 8 bombs falls around her (14 s) | Fleet Command, Iron Ring, Tactician |
+| Chief Wikka (moss fur, cream eyes) | Slingshot stones at the nearest foe. 85 health, small and very fast. **Tribe**: a warrior joins him every 50 kills, up to 2, and throws stones too | **Log Trap**: 3 logs roll out ahead of him, 45 damage to each foe they meet and a knock back (12 s) | Slinger, Log Traps, Tribe |
 
 Only Legionary TR-9 is open from the start. Every other hero unlocks through a deed, which the game
 never shows: a locked card is a dark placeholder with no art or name. When a deed is done, the run
@@ -77,8 +81,12 @@ the next run on. The deeds:
 | Grunda | Take Dax Morrow's Smuggler's Run path to tier 5 |
 | KT-4 "Kettle" | Take 8 power-ups in one run |
 | Cassia Vane | Finish 6 side objectives in one run |
+| Vesk Drayl | Defeat 25 elites in one run |
+| Rena Kask | Take Kael Varro's Ace Pilot path to tier 5 |
+| Admiral Thessa Orn | Win 2 elite arenas in one run |
+| Chief Wikka | Reach level 25 in one run |
 
-All but the three path deeds can be done with any hero. A save from before this chain keeps every
+All but the four path deeds can be done with any hero. A save from before this chain keeps every
 hero it shows as played (a world reached) or unlocked.
 
 ![Dax Morrow's freighter strafing a swarm on a second pass, its charges going off](docs/screenshots/crew-dax.webp)
@@ -88,6 +96,14 @@ hero it shows as played (a world reached) or unlocked.
 ![Kettle's zap jumping from foe to foe, his repair drone beside him](docs/screenshots/crew-kettle.webp)
 
 ![Cassia Vane in her Cloak, the foes heading for where she stood, her spy drone beside her](docs/screenshots/crew-cassia.webp)
+
+![Vesk Drayl's Flamer burning around him as a bounty pays out](docs/screenshots/crew-vesk.webp)
+
+![Rena Kask firing her twin cannons, two wingmates flying with her](docs/screenshots/crew-rena.webp)
+
+![Admiral Thessa Orn's Blockade falling around her](docs/screenshots/crew-thessa.webp)
+
+![Chief Wikka's logs rolling out ahead of him, five warriors of his tribe around him](docs/screenshots/crew-wikka.webp)
 
 ![A new hero unlocked mid-run](docs/screenshots/hero-unlocked.webp)
 
@@ -330,15 +346,15 @@ under way when the boss comes is called off.
 | Seal the vents | Lava and Storm worlds | Stand on each of 3 vents for 1.5 s while the open ones erupt (50 s) | Upgrade card |
 | Quick draw | Captain Rook, Dax Morrow | Down 70 foes (30 s) | 30 credits |
 | Hold the drop zone | Legionary TR-9 | Stay 8 s in a small drop zone while foes push in hard (35 s) | Upgrade card |
-| Recon run | Corporal Bram-17, Cassia Vane | Reach 4 markers far apart (40 s) | 30 credits |
-| Duel | Kael Varro | Beat a marked elite (40 s) | Upgrade card |
+| Recon run | Corporal Bram-17, Cassia Vane, Rena Kask | Reach 4 markers far apart (40 s) | 30 credits |
+| Duel | Kael Varro, Vesk Drayl | Beat a marked elite (40 s) | Upgrade card |
 | Unbroken | Lord Vharn, Grunda | Take no more than 60 damage for 40 s | A level |
 | Lift the wreck | Master Oom | Stand by a wreck for 4 s; it then crashes down on the foes around it (40 s) | 25 credits |
 | Shelter the pilgrim | Elder Corvin Hale | Keep foes off a pilgrim for 30 s | Upgrade card |
 | Living storm | Regent Veyl | Land 220 hits (25 s) | A level |
-| Bloodtrail | Kresh the Twinblade | Down 30 foes in a row without being hit (60 s) | Upgrade card |
+| Bloodtrail | Kresh the Twinblade, Chief Wikka | Down 30 foes in a row without being hit (60 s) | Upgrade card |
 | Shatter the monolith | Master Joren Vask | Break a monolith (35 s) | Upgrade card |
-| Signal the fleet | Commander Elara Voss | Use Call for Aid inside a marked ring (45 s) | 40 credits |
+| Signal the fleet | Commander Elara Voss, Admiral Thessa Orn | Use Call for Aid inside a marked ring (45 s) | 40 credits |
 | Salvage run | Triad-77, KT-4 "Kettle" | Stand at each of 3 scrap piles for 1.2 s (45 s) | 35 credits |
 
 The shared one is drawn from those not seen yet this run. Beacons, nests, the cache and the
@@ -471,7 +487,15 @@ names the stat it raises.
   health, armour, a repair drone, shocks when hit); Deadeye (more pierce and range, more damage to
   healthy foes), Ghost (a longer Cloak that heals, speed while cloaked, every shot in it triple),
   Spymaster (marks the strongest foe for more damage, a spy drone that fires at it, credits from
-  marked kills).
+  marked kills); Arsenal (wider bursts, two rockets a shot, rockets that home in), Scorched Earth
+  (a longer, wider Flamer that slows), Bounty (a price on the strongest foe in reach: credits,
+  health and XP when it falls, elites too); Afterburner (speed, more Momentum, a longer, harder
+  Trench Run), Gunship (faster fire, pierce, a third cannon, missiles), Wingmates (up to two
+  pilots who fly and fire with her); Fleet Command (strikes on the thickest swarm, more often),
+  Iron Ring (a wider, fuller Blockade that heals, then a second ring), Tactician (faster, deeper
+  Study, crits and more damage to bosses); Slinger (faster stones that bounce and stun, two at a
+  time), Log Traps (more logs that hit harder and roll further), Tribe (warriors join sooner, up to
+  8, and hit harder and faster).
 - **Knight paths**: Prodigy (wider slashes, combos, a thrown blade), Ace Pilot (a starfighter
   strafes, a bot co-pilot repairs), The Fall (full Temper doubles damage, halves healing);
   Dread (a slowing aura, weak foes flee), Iron Grip (Grip takes more foes and throws them), Life
@@ -504,6 +528,10 @@ names the stat it raises.
   | Grunda | Thick Fur | +30 health, -6% damage taken, +8% damage, +1 health/s, +15% damage |
   | Kettle | Self-Repair | +20 health, +0.5 health/s, +6% speed, +1 health/s, +15% damage |
   | Cassia | Tradecraft | +8% damage, +6% crit chance, +6% speed, +8% damage, +15% damage |
+  | Vesk | Hunter's Code | +20 health, -6% damage taken, +8% damage, +30 health, +15% damage |
+  | Rena | Flight Hours | +6% speed, +8% damage, +20 health, +15% fire rate, +15% damage |
+  | Thessa | Chain of Command | +8% damage, signature 15% faster, +20 health, +6% crit chance, +15% damage |
+  | Wikka | Forest-Born | +6% speed, +20 health, +0.5 health/s, +8% damage, +15% damage |
 
 - **Blaster pool** (soldiers, Elara, Triad-77 and the crew): Ricochet Rounds, Overcharge (pierce), Thermal Grenade, Stun Rounds
   (slow), Quick Reload, Covering Drone, Scatter Shot, Call-In (a supply crate that crashes on the
@@ -577,6 +605,18 @@ names the stat it raises.
   | Cassia | Clean Shot | Deadeye + Overclock | Every 3rd shot does double damage |
   | Cassia | Vanish | Ghost + Servo Boots | A hit cloaks her for 2 s (at most every 8 s) |
   | Cassia | Dossier | Spymaster + Magnet Coil | Marked kills give 10 XP |
+  | Vesk | Rocket Swarm | Arsenal + Overclock | Three rockets every shot |
+  | Vesk | Inferno | Scorched Earth + Plate Armour | The Flamer burns all round him |
+  | Vesk | Big Game | Bounty + Magnet Coil | Bounties drop a chest |
+  | Rena | Barrel Roll | Afterburner + Servo Boots | Nothing hurts her for 1.5 s after a Trench Run |
+  | Rena | Strafing Run | Gunship + Overclock | Twice the fire rate while moving |
+  | Rena | Flight Leader | Wingmates + Magnet Coil | 4 wingmates, hitting 50% harder |
+  | Thessa | Orbital Barrage | Fleet Command + Overclock | A strike every 2 s |
+  | Thessa | Perfect Ring | Iron Ring + Plate Armour | The Blockade falls on its own every 10 s |
+  | Thessa | Grand Strategy | Tactician + Magnet Coil | Every kind of foe starts at half the Study cap |
+  | Wikka | Eagle Eye | Slinger + Overclock | Stones pierce 2 foes |
+  | Wikka | Stampede | Log Traps + Servo Boots | Logs roll out on their own every 6 s |
+  | Wikka | War Drums | Tribe + Plate Armour | +4% damage for each warrior of his tribe |
 
 - **Crossovers**: a pool skill held with a fitting path gives a bonus: Gunslinger + Ricochet
   Rounds (ricochets seek new targets), Riot Shield + Stun Rounds (shield bashes stun), Brothers in
@@ -620,7 +660,7 @@ npm run dev   # then open http://localhost:5173/games/riftblade/
 ## Playthrough test
 
 `e2e/playthrough.spec.ts` plays the first minute in headless Chromium with real inputs: on the
-hero select screen it checks the sixteen cards (all but Legionary TR-9 locked on a fresh save),
+hero select screen it checks the twenty cards (all but Legionary TR-9 locked on a fresh save),
 taps a locked card (no Fight button), then TR-9 and Fight, walks him in a wide circle by holding
 the mouse down at a point that turns around him, takes the first card at the first level-up and
 checks the upgrade was taken, fires Brace from its button and plays on to the one-minute mark. Side
@@ -637,7 +677,8 @@ npx playwright test --project riftblade
 - `src/game/`: the rules, without drawing: `heroes.ts` (the heroes, their pools, colour schemes
   and which are locked), `blades.ts` (the knights' attacks, signatures and skills, and the unlock
   deeds), `squad.ts` (Elara Voss and Triad-77: weapons, signatures, paths and allies), `crew.ts`
-  (Dax Morrow, Grunda, Kettle and Cassia Vane: the same),
+  (Dax Morrow, Grunda, Kettle, Cassia Vane, Vesk Drayl, Rena Kask, Admiral Thessa Orn and Chief
+  Wikka: the same),
   `upgrades.ts` (paths, pool, gear, capstones, crossovers and the card roll), `planets.ts` (the
   ten worlds, their bosses and the star map's numbers), `state.ts` (the state and the numbers),
   `sim.ts` (everything that happens in a fight), `voyage.ts` (between fights: the star map, trader,

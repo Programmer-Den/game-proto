@@ -11,17 +11,23 @@ of five minutes each, every one ending in its boss: the Dune world, then one of 
 Ocean, then one of Ice, Crystal, Storm and Ruin (each picked on the space map), then the Lava
 world, with a star map between them. A boss rush and hero mastery come on top.
 
-- Implemented: a hero select screen with sixteen heroes in an 8x3 grid (room for 24) and a detail
+- Implemented: a hero select screen with twenty heroes in an 8x3 grid (room for 24) and a detail
   panel with a Fight button: three soldiers (Captain Rook, Legionary TR-9, Corporal Bram-17), seven
   blade knights (Kael Varro, Lord Vharn, Master Oom, Elder Corvin Hale, Regent Veyl, Kresh the
   Twinblade, Master Joren Vask), two more Blaster heroes, Commander Elara Voss and Triad-77, and
-  the crew, four more Blaster heroes with mechanics of their own (`crew.ts`): Dax Morrow (a heavy
+  the crew, eight more Blaster heroes with mechanics of their own (`crew.ts`): Dax Morrow (a heavy
   pistol whose first shot at an unhurt foe is critical, Luck: every second chest gives a free
   card, Fly-By: a `freighter` ally strafes the swarm), Grunda (a piercing crossbow that knocks foes
   back, Rage from missing health, Roar: a stun and throw), KT-4 "Kettle" (aim `zap`: a short chain
   zap drawn as `state.zaps`, self-repair, Hack: foes turned with `charmMs`) and Cassia Vane (a long
   rifle, Cloak: untouchable while foes walk to `state.decoy`, her next shot triple; Spymaster marks
-  through `state.mark`).
+  through `state.mark`), Vesk Drayl (rockets that burst through `Bullet.burst` and `burstR`, the
+  Flamer: a cone of damage every 0.1 s while `sigActiveMs` lasts, Bounty marks through
+  `state.mark`), Rena Kask (twin cannons, Momentum in `cd.momentum`, Trench Run: a `dashKind`
+  `'ram'` dash that hits through `dashHit`, `wingman` allies), Admiral Thessa Orn (a pistol, Study:
+  kills per foe kind in `state.study` add damage, Blockade: a ring of `carpet` bombs, fleet strikes
+  on `swarmSpot`) and Chief Wikka (a slingshot, Log Trap: short-lived `log` allies that roll and
+  knock foes once each, `tribesman` allies joining as `kills` add up).
   Only TR-9 is open on a fresh save; every other hero is unlocked by a deed (`checkDeeds`), never
   shown in the game: a locked card is a dark placeholder (`rb-locked`, no art, name or colour) and
   its detail panel says only "Locked". A deed done mid-run pauses the game on the new hero's panel
@@ -215,7 +221,7 @@ world, with a star map between them. A boss rush and hero mastery come on top.
   button, the `pathKind` line of their path cards, `r`, `armour` and `locked`)
   and each hero's `schemes` (`HeroScheme`: `name`, `body`, `accent`, optional `mark`, `bolt`);
   `schemeOf(id, variant)` returns a scheme (Kael has a second, Fallen, used once he takes The
-  Fall), `isKnight`, `isCrew` (the four heroes `crew.ts` plays), `BOOT_HEROES` (12: the heroes
+  Fall), `isKnight`, `isCrew` (the eight heroes `crew.ts` plays), `BOOT_HEROES` (12: the heroes
   painted at boot) and `isLate` (a hero from the thirteenth on, painted when first shown). All hero colours come from here; each hero's accent is unique (Elara's red,
   Triad-77's white), except Kael's Fallen scheme, which takes Lord Vharn's colours. `locked` marks a hero that needs a deed (all but TR-9); Triad-77's `maxHp`
   is the sum of its three bots' and its `r` the whole unit's.
@@ -309,8 +315,8 @@ world, with a star map between them. A boss rush and hero mastery come on top.
   skill), the knights' allies (`knightAllies`, `moveKnightAlly`: starfighters, co-pilot, spirits,
   puppets), hooks for kills, heals and hits (`onKill`, `healFactor`, `onHurt`, `rescue`,
   `knightGuard`, `foeMod`, `contactMod`), `orbitBlades`, `bladeColor` and `heroVariant` for
-  drawing, and `checkDeeds` (every hero's unlock deed, into `state.deeds`; `DEEDS` holds Elara's
-  and Triad-77's numbers). Slashes and lightning are
+  drawing, and `checkDeeds` (every hero's unlock deed, into `state.deeds`; `DEEDS` holds the
+  deeds' numbers). Slashes and lightning are
   `state.slashes` / `state.zaps`, drawn by `GameScene` (lightning jitters from a hash).
 - `src/game/squad.ts`: Elara Voss and Triad-77, called from `sim.ts` like `blades.ts`:
   `squadAttack` (Elara's pistol on the nearest foe, the second pistol on the next nearest;
@@ -323,7 +329,7 @@ world, with a star map between them. A boss rush and hero mastery come on top.
   commandos, `bike`, `medic`, `shieldbot`, `command`, `spare`; `droneSpot` for Eyes in the Sky) and
   hooks (`squadHurt`, `hurtFactor`, `squadHeal`, `squadCrit`, `turnedBonus`, `squadKill`,
   `squadBlock`, `bubble`, `rebuildTime`). `AID`, `BUBBLE` and `TRIAD` hold their numbers.
-- `src/game/crew.ts`: Dax Morrow, Grunda, Kettle and Cassia Vane, called from `sim.ts` like
+- `src/game/crew.ts`: Dax Morrow, Grunda, Kettle, Cassia Vane, Vesk, Rena, Thessa and Wikka, called from `sim.ts` like
   `squad.ts` (behind its `crew` flag): `crewAttack` (Dax's pistol with Fast Hands' extra bolts,
   Grunda's crossbow with bursting bolts (`Bullet.burst`), Kettle's chain `zap`, Cassia's rifle
   with the Cloak's triple shot through `player.charge`), `crewSignature` (`flyBy`, `roar`, `hack`,
@@ -334,8 +340,13 @@ world, with a star map between them. A boss rush and hero mastery come on top.
   `crewUntouchable`, `crewTarget` (the decoy in `moveEnemies`), `crewTurned`, `crewKill`,
   `crewKillHeal`, `crewChest` (Luck and Jackpot in `openChest`), `crewHurt`, `crewRescue` (Second
   Wind and Reboot, once a world through `player.saved`) and `crewBoltHit` (Grunda's knockback and
-  bursts in `moveBullets`). `FLYBY`, `ROAR`, `ZAP` and `CLOAK` hold their numbers; their stat
-  numbers are `crewMods` in `state.ts`.
+  bursts in `moveBullets`, Wikka's Slinger 5 stun, any crew bolt's `burst`). The second four:
+  `rocket` (a bursting bolt), `trenchRun`, `blockade`, `logTrap`, `flame` and `strike`, `studied`
+  (Thessa's Study bonus for a kind), `tribeSize` (warriors due from the kills; `crewAbilities`
+  calls `syncAllies` when one more is due), `keepMark` (Cassia's marks and Vesk's bounties), and
+  the allies `wingman`, `tribesman` (lasting) and `log` (short-lived). `FLYBY`, `ROAR`, `ZAP`,
+  `CLOAK`, `ROCKET`, `RAM`, `FLEET` and `TRIBE` hold their numbers; their stat numbers are
+  `crewMods` in `state.ts` (with `bounces` for Wikka's Slinger 2).
 - `src/game/objectives.ts`: the side objectives, called from `sim.ts` once a step like `squad.ts`
   (it imports `sim.ts`, so the same rule about load-time values holds): `OBJ` (each one's time
   limit, goal, zone radius and reward), `OBJ_MISC` (pushes, escort and pilgrim, nests, vents, the
@@ -391,7 +402,8 @@ world, with a star map between them. A boss rush and hero mastery come on top.
   it), `bot`, `rebel` and `bakeSquad`: `rb-bot`, `rb-bot-down`, `rb-bike`, `rb-shieldbot`,
   `rb-command`, `rb-pod` (TR-9's drop pod) and `rb-locked` (the locked hero placeholder).
 - `src/art/crew.ts`: `drawCrewHero` (the crew, from their scheme; `drawHero` hands them to it)
-  and `bakeCrewAllies` (`rb-freighter`, `rb-patch`, `rb-spydrone`). Never painted at boot: `bakeLate`
+  and `bakeCrewAllies` (`rb-freighter`, `rb-patch`, `rb-spydrone`, `rb-wingman`, `rb-tribesman`,
+  `rb-log`; the wingman and log turn with `aim`). Never painted at boot: `bakeLate`
   in `sprites.ts` paints a later hero (its sprites, portrait, `rb-bolt-<id>` and allies) the first
   time it is shown (`looks` and `portraitOf` in the panels, `GameScene.draw` for the hero played).
 - `src/art/knights.ts`: `drawKnight` (the knights, from their scheme; `drawHero` hands knights to
@@ -554,15 +566,16 @@ events `map` (the space map too); trader `shop`; the end screen stops the music.
 the arena is won), `unlock` (a new hero), `win`, `lose`.
 
 **Effects** (`sfx.ts`), and where they play:
-- Hero bolts by colour (`boltSound`): `pistol` (Rook, Dax), `carbine` (TR-9, Cassia), `spread` (Bram),
-  `blaster` (Elara), `heavy` also for Grunda's bolts, `botShot` (Triad-77, drones), `heavy`, `rocket`, `boomerang` (a spinning
+- Hero bolts by colour (`boltSound`): `pistol` (Rook, Dax, Thessa, Wikka), `carbine` (TR-9, Cassia), `spread` (Bram),
+  `blaster` (Elara, Rena), `rocket` also for Vesk's rockets and Rena's missiles, `heavy` also for Grunda's bolts, `botShot` (Triad-77, drones), `heavy`, `rocket`, `boomerang` (a spinning
   thrown blade), `saber` (The Fall's wave).
 - Knights' swings, from new `slashes` by aim mode: `saber` (Kael and other slashes), `ripple`
   (Oom), `spinHum` (Corvin), `flurry` with `ping` on every tenth (Joren); `crackle` for new `zaps`
   (Veyl, Kettle); `whir` every 0.7 s while a foe is near Kresh's staff.
 - Signatures (`SIGNATURE`, on `signatures` going up): `sigHorn`, `sigPulse`, `sigToss`, `sigSlam`,
   `sigForce`, `sigDash`, `sigRing`, `sigStorm`, `sigFlare`, `sigShift` (the crew reuse `sigHorn`,
-  `sigForce`, `sigStorm` and `sigShift`). A signature asked for that
+  `sigForce`, `sigStorm` and `sigShift`; Vesk `sigFlare`, Rena `sigDash`, Thessa `sigHorn`, Wikka
+  `sigToss`). A signature asked for that
   does not go off plays `ui('refuse')`.
 - New bombs: `toss` (grenade, frag), `charge`, `whistle` (crate, orbital, carpet). New blasts:
   `boom` (radius 90 and up, louder with size) or `pop`.
@@ -607,7 +620,7 @@ free of audio) or from the scene's input handler.
   must make the same texts as before (a fresh save has no wins, nothing banked, nothing in the
   codex and no run ended). The codex records during the playthrough's run (no `rand` draws), so a
   later page load would show its button.
-- The playthrough (`e2e/playthrough.spec.ts`) checks the sixteen cards (all but TR-9 locked on a
+- The playthrough (`e2e/playthrough.spec.ts`) checks the twenty cards (all but TR-9 locked on a
   fresh save), waits out Phaser's start-up easing on the select screen (140 frames; its first 120
   steps are cut short, so a run started during them would play differently depending on load
   time), taps Rook's locked card (no Fight button), then TR-9 and Fight, walks a circle by holding
@@ -748,6 +761,11 @@ mostly on the Dune world. Things learned while tuning:
   Cassia 50% and Kettle 29%. That bot flatters ranged heroes that push foes back: Grunda won
   over 90% before her health, damage, pierce, knockback and Roar were cut. Recheck the crew with
   the full bot above before the next balance pass.
+- Vesk, Rena, Thessa and Wikka were checked with the same small bot (8 to 12 runs, the same
+  seeds as the others). On those seeds Dax won 5 of 12, Cassia 3 and Rook 1; Vesk and Rena won 3 of
+  8, Thessa and Wikka 2 of 12 after Thessa's damage, fire rate and health, Wikka's health, damage
+  and fire rate went up, Study came to count every 10 kills and Wikka's first two warriors came
+  without the Tribe path.
 
 ## Gotchas
 

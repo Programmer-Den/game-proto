@@ -74,7 +74,7 @@ const ALLY_KEYS: Record<GameState['allies'][number]['kind'], string> = {
   trooper: 'rb-trooper', legionary: 'rb-legionary', brother: 'rb-brother', escort: 'rb-escort', drone: 'rb-drone',
   fighter: 'rb-fighter', squadron: 'rb-fighter', copilot: 'rb-copilot', spirit: 'rb-spirit', puppet: 'rb-puppet',
   commando: 'rb-commando', bike: 'rb-bike', medic: 'rb-medic', shieldbot: 'rb-shieldbot', command: 'rb-command', spare: 'rb-bot', thawed: 'rb-trooper',
-  freighter: 'rb-freighter', patch: 'rb-patch', spydrone: 'rb-spydrone',
+  freighter: 'rb-freighter', patch: 'rb-patch', spydrone: 'rb-spydrone', wingman: 'rb-wingman', tribesman: 'rb-tribesman', log: 'rb-log',
 };
 /** Allies drawn from the hero art (small soldiers), placed by its origin. */
 const HERO_LIKE: readonly GameState['allies'][number]['kind'][] = ['trooper', 'legionary', 'brother', 'commando', 'medic', 'thawed'];
@@ -1182,7 +1182,8 @@ export class GameScene extends Phaser.Scene {
     // Under everything: pickup reach, fire, cones, bomb markers and shadows.
     u.lineStyle(1, hex(C.shard), 0.08).strokeCircle(p.x, p.y, stats.pickup);
     for (const f of s.fires) {
-      const k = Math.min(1, f.ms / 600);
+      // Vesk's Flamer (fire with no harm of its own, `dps` 0) burns brighter and briefly.
+      const k = Math.min(1, f.ms / 600) * (f.dps > 0 ? 1 : 2.4);
       u.fillStyle(0xff7a2e, 0.18 * k).fillCircle(f.x, f.y, f.r);
       u.fillStyle(0xffd36b, 0.22 * k).fillCircle(f.x, f.y, f.r * 0.5);
     }
@@ -1318,14 +1319,14 @@ export class GameScene extends Phaser.Scene {
     for (const a of s.allies) {
       const key = ALLY_KEYS[a.kind];
       const im = al.next(key, a.x, a.y);
-      if (a.kind === 'fighter' || a.kind === 'squadron' || a.kind === 'freighter') im.setRotation(a.aim);
+      if (a.kind === 'fighter' || a.kind === 'squadron' || a.kind === 'freighter' || a.kind === 'wingman' || a.kind === 'log') im.setRotation(a.aim);
       else if (a.kind === 'spirit') im.setAlpha(0.8).setFlipX(Math.cos(a.aim) < 0);
       else if (a.kind === 'puppet') {
         im.setFlipX(Math.cos(a.aim) < 0).setScale(a.elite ? 1.5 : 1);
         if (a.lifeMs < 1500) im.setAlpha(0.4 + 0.6 * (a.lifeMs / 1500));
       }
       if (HERO_LIKE.includes(a.kind)) im.setOrigin(HERO_ORIGIN.x, HERO_ORIGIN.y).setFlipX(Math.cos(a.aim) < 0);
-      else if (a.kind === 'escort' || a.kind === 'command') im.setFlipX(Math.cos(a.aim) < 0);
+      else if (a.kind === 'escort' || a.kind === 'command' || a.kind === 'tribesman') im.setFlipX(Math.cos(a.aim) < 0);
       else if (a.kind === 'bike') im.setRotation(a.aim);
       else if (a.kind === 'shieldbot') im.setRotation(still ? 0 : s.time / 120);
       else if (a.kind === 'spare') {

@@ -74,6 +74,10 @@ export const DRILLS: Record<HeroId, { id: string; name: TextKey; blurb: TextKey;
   grunda: { id: 'thick-fur', name: 'thickFurName', blurb: 'thickFurBlurb', steps: ['healthBig', 'armour', 'damage', 'regenBig', 'damageBig'] },
   kettle: { id: 'self-repair', name: 'selfRepairName', blurb: 'selfRepairBlurb', steps: ['health', 'regen', 'speed', 'regenBig', 'damageBig'] },
   cassia: { id: 'tradecraft', name: 'tradecraftName', blurb: 'tradecraftBlurb', steps: ['damage', 'crit', 'speed', 'damage', 'damageBig'] },
+  vesk: { id: 'hunters-code', name: 'huntersCodeName', blurb: 'huntersCodeBlurb', steps: ['health', 'armour', 'damage', 'healthBig', 'damageBig'] },
+  rena: { id: 'flight-hours', name: 'flightHoursName', blurb: 'flightHoursBlurb', steps: ['speed', 'damage', 'health', 'fire', 'damageBig'] },
+  thessa: { id: 'chain-of-command', name: 'chainOfCommandName', blurb: 'chainOfCommandBlurb', steps: ['damage', 'sig', 'health', 'crit', 'damageBig'] },
+  wikka: { id: 'forest-born', name: 'forestBornName', blurb: 'forestBornBlurb', steps: ['speed', 'health', 'regen', 'damage', 'damageBig'] },
 };
 
 function drillDefs(): UpgradeDef[] {
@@ -201,6 +205,58 @@ const defs: UpgradeDef[] = [
   {
     id: 'spymaster', kind: 'path', hero: 'cassia', name: 'spymasterName', blurb: 'spymasterBlurb',
     tiers: ['spymaster1', 'spymaster2', 'spymaster3', 'spymaster4', 'spymaster5'],
+  },
+  // Vesk Drayl
+  {
+    id: 'arsenal', kind: 'path', hero: 'vesk', name: 'arsenalName', blurb: 'arsenalBlurb',
+    tiers: ['arsenal1', 'arsenal2', 'arsenal3', 'arsenal4', 'arsenal5'],
+  },
+  {
+    id: 'scorched-earth', kind: 'path', hero: 'vesk', name: 'scorchedEarthName', blurb: 'scorchedEarthBlurb',
+    tiers: ['scorchedEarth1', 'scorchedEarth2', 'scorchedEarth3', 'scorchedEarth4', 'scorchedEarth5'],
+  },
+  {
+    id: 'bounty', kind: 'path', hero: 'vesk', name: 'bountyName', blurb: 'bountyBlurb',
+    tiers: ['bounty1', 'bounty2', 'bounty3', 'bounty4', 'bounty5'],
+  },
+  // Rena Kask
+  {
+    id: 'afterburner', kind: 'path', hero: 'rena', name: 'afterburnerName', blurb: 'afterburnerBlurb',
+    tiers: ['afterburner1', 'afterburner2', 'afterburner3', 'afterburner4', 'afterburner5'],
+  },
+  {
+    id: 'gunship', kind: 'path', hero: 'rena', name: 'gunshipName', blurb: 'gunshipBlurb',
+    tiers: ['gunship1', 'gunship2', 'gunship3', 'gunship4', 'gunship5'],
+  },
+  {
+    id: 'wingmates', kind: 'path', hero: 'rena', name: 'wingmatesName', blurb: 'wingmatesBlurb',
+    tiers: ['wingmates1', 'wingmates2', 'wingmates3', 'wingmates4', 'wingmates5'],
+  },
+  // Admiral Thessa Orn
+  {
+    id: 'fleet-command', kind: 'path', hero: 'thessa', name: 'fleetCommandName', blurb: 'fleetCommandBlurb',
+    tiers: ['fleetCommand1', 'fleetCommand2', 'fleetCommand3', 'fleetCommand4', 'fleetCommand5'],
+  },
+  {
+    id: 'iron-ring', kind: 'path', hero: 'thessa', name: 'ironRingName', blurb: 'ironRingBlurb',
+    tiers: ['ironRing1', 'ironRing2', 'ironRing3', 'ironRing4', 'ironRing5'],
+  },
+  {
+    id: 'tactician', kind: 'path', hero: 'thessa', name: 'tacticianName', blurb: 'tacticianBlurb',
+    tiers: ['tactician1', 'tactician2', 'tactician3', 'tactician4', 'tactician5'],
+  },
+  // Chief Wikka
+  {
+    id: 'slinger', kind: 'path', hero: 'wikka', name: 'slingerName', blurb: 'slingerBlurb',
+    tiers: ['slinger1', 'slinger2', 'slinger3', 'slinger4', 'slinger5'],
+  },
+  {
+    id: 'log-traps', kind: 'path', hero: 'wikka', name: 'logTrapsName', blurb: 'logTrapsBlurb',
+    tiers: ['logTraps1', 'logTraps2', 'logTraps3', 'logTraps4', 'logTraps5'],
+  },
+  {
+    id: 'tribe', kind: 'path', hero: 'wikka', name: 'tribeName', blurb: 'tribeBlurb',
+    tiers: ['tribe1', 'tribe2', 'tribe3', 'tribe4', 'tribe5'],
   },
   // The Blaster pool
   {
@@ -501,6 +557,18 @@ export const CAPSTONES: readonly CapstoneDef[] = [
   { id: 'clean-shot', name: 'cleanShotName', hero: 'cassia', path: 'deadeye', gear: 'overclock', text: 'cleanShotText' },
   { id: 'vanish', name: 'vanishName', hero: 'cassia', path: 'ghost', gear: 'boots', text: 'vanishText' },
   { id: 'dossier', name: 'dossierName', hero: 'cassia', path: 'spymaster', gear: 'magnet', text: 'dossierText' },
+  { id: 'rocket-swarm', name: 'rocketSwarmName', hero: 'vesk', path: 'arsenal', gear: 'overclock', text: 'rocketSwarmText' },
+  { id: 'inferno', name: 'infernoName', hero: 'vesk', path: 'scorched-earth', gear: 'armour', text: 'infernoText' },
+  { id: 'big-game', name: 'bigGameName', hero: 'vesk', path: 'bounty', gear: 'magnet', text: 'bigGameText' },
+  { id: 'barrel-roll', name: 'barrelRollName', hero: 'rena', path: 'afterburner', gear: 'boots', text: 'barrelRollText' },
+  { id: 'strafing-run', name: 'strafingRunName', hero: 'rena', path: 'gunship', gear: 'overclock', text: 'strafingRunText' },
+  { id: 'flight-leader', name: 'flightLeaderName', hero: 'rena', path: 'wingmates', gear: 'magnet', text: 'flightLeaderText' },
+  { id: 'orbital-barrage', name: 'orbitalBarrageName', hero: 'thessa', path: 'fleet-command', gear: 'overclock', text: 'orbitalBarrageText' },
+  { id: 'perfect-ring', name: 'perfectRingName', hero: 'thessa', path: 'iron-ring', gear: 'armour', text: 'perfectRingText' },
+  { id: 'grand-strategy', name: 'grandStrategyName', hero: 'thessa', path: 'tactician', gear: 'magnet', text: 'grandStrategyText' },
+  { id: 'eagle-eye', name: 'eagleEyeName', hero: 'wikka', path: 'slinger', gear: 'overclock', text: 'eagleEyeText' },
+  { id: 'stampede', name: 'stampedeName', hero: 'wikka', path: 'log-traps', gear: 'boots', text: 'stampedeText' },
+  { id: 'war-drums', name: 'warDrumsName', hero: 'wikka', path: 'tribe', gear: 'armour', text: 'warDrumsText' },
 ];
 
 export interface CrossoverDef {
@@ -684,7 +752,7 @@ export const BRANCHES: Record<BranchId, { name: TextKey; tiers: readonly [Gains,
 /** Upgrades that keep the hero standing: they branch into guard first. */
 const GUARD_FIRST = new Set([
   'riot-shield', 'life-support', 'stillness', 'bulwark', 'council-seat', 'rebuilt', 'diplomat', 'factory',
-  'wild-heart', 'spare-parts', 'ghost',
+  'wild-heart', 'spare-parts', 'ghost', 'afterburner', 'iron-ring',
   'riposte', 'iron-skin', 'mending', 'foresight', 'calm-mind', 'battle-trance', 'drain', 'soul-harvest',
   'armour', 'medpack', 'barrier', 'boots', 'stim',
   ...Object.values(DRILLS).map((d) => d.id),

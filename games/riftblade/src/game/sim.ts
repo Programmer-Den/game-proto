@@ -878,7 +878,7 @@ export function syncAllies(s: GameState) {
 }
 
 /** The allies that stay as long as the upgrades that bring them. */
-const LASTING = ['trooper', 'legionary', 'brother', 'drone', 'spirit', 'copilot', 'squadron', 'commando', 'medic', 'command', 'patch', 'spydrone'] as const;
+const LASTING = ['trooper', 'legionary', 'brother', 'drone', 'spirit', 'copilot', 'squadron', 'commando', 'medic', 'command', 'patch', 'spydrone', 'wingman', 'tribesman'] as const;
 
 function moveAllies(s: GameState, ms: number) {
   const p = s.player;
@@ -886,7 +886,7 @@ function moveAllies(s: GameState, ms: number) {
   const rally = s.hero === 'rook' && p.sigActiveMs > 0 ? 1.5 : 1;
   const counts: Record<AllyKind, number> = {
     trooper: 0, legionary: 0, brother: 0, drone: 0, escort: 0, fighter: 0, squadron: 0, copilot: 0, spirit: 0, puppet: 0,
-    commando: 0, bike: 0, medic: 0, shieldbot: 0, command: 0, spare: 0, thawed: 0, freighter: 0, patch: 0, spydrone: 0,
+    commando: 0, bike: 0, medic: 0, shieldbot: 0, command: 0, spare: 0, thawed: 0, freighter: 0, patch: 0, spydrone: 0, wingman: 0, tribesman: 0, log: 0,
   };
   for (const a of s.allies) counts[a.kind] += 1;
   for (const a of s.allies) {
@@ -956,8 +956,8 @@ function moveAllies(s: GameState, ms: number) {
 const KNIGHT_ALLIES: readonly AllyKind[] = ['fighter', 'squadron', 'copilot', 'spirit', 'puppet'];
 const SQUAD_ALLIES: readonly AllyKind[] = ['commando', 'bike', 'medic', 'shieldbot', 'command', 'spare'];
 /** Allies that last a while and are gone at the end of a fight. */
-export const SHORT_LIVED: readonly AllyKind[] = ['fighter', 'puppet', 'bike', 'spare', 'thawed', 'freighter'];
-const CREW_ALLIES: readonly AllyKind[] = ['freighter', 'patch', 'spydrone'];
+export const SHORT_LIVED: readonly AllyKind[] = ['fighter', 'puppet', 'bike', 'spare', 'thawed', 'freighter', 'log'];
+const CREW_ALLIES: readonly AllyKind[] = ['freighter', 'patch', 'spydrone', 'wingman', 'tribesman', 'log'];
 
 // ---------------------------------------------------------------------------------------------
 // The bots
@@ -2086,7 +2086,7 @@ function bombs(s: GameState, ms: number) {
 function fires(s: GameState, dt: number) {
   for (const f of s.fires) {
     f.ms -= dt * 1000;
-    near(s, f.x, f.y, f.r, (e) => damage(s, e, f.dps * dt, { noCrit: true }));
+    if (f.dps > 0) near(s, f.x, f.y, f.r, (e) => damage(s, e, f.dps * dt, { noCrit: true }));
   }
   s.fires = s.fires.filter((f) => f.ms > 0);
 }

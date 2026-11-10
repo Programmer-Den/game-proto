@@ -5,13 +5,16 @@
  * his side) and Cassia Vane (a long rifle, a Cloak the foes lose her in, and marks). Their
  * weapons, signatures and paths. `sim.ts` calls in here only for the crew, so every other hero's
  * run replays exactly as before. Pure state changes, randomness from `rand`, like the rest of the
- * rules.
+ * rules. Since then four more: Vesk Drayl (rockets, a Flamer and bounties), Rena Kask (twin cannons
+ * that hit harder on the move, a ramming Trench Run and wingmates), Admiral Thessa Orn (a pistol
+ * whose Study makes each kind of foe take more, a Blockade of bombs and fleet strikes) and Chief
+ * Wikka (a slingshot, rolling Log Traps and a tribe that grows with the kills).
  */
 import { t as tr } from '../i18n';
 import { HEROES, schemeOf } from './heroes';
 import { at } from './upgrades';
 import { type Ally, type Enemy, type GameState } from './state';
-import { HURT_GRACE_MS, addBomb, bolt, damage, explode, gainXp, heal, knock, near, nearest, pop, ready, swarmSpot, volley } from './sim';
+import { HURT_GRACE_MS, addBomb, angleDiff, bolt, damage, explode, gainXp, heal, knock, near, nearest, pop, ready, swarmSpot, syncAllies, volley } from './sim';
 import { rand } from './weekly';
 
 const rank = (s: GameState, id: string) => s.ranks[id] ?? 0;
@@ -25,6 +28,15 @@ export const ROAR = { r: 200, wideR: 260, stunMs: 1200, fleeMs: 2500, dmg: 35, h
 export const ZAP = { jump: 110, stunMs: 400, hack: 3, wideHack: 5, hackMs: 6000, longHackMs: 9000, botnet: 25 };
 /** Cassia's Cloak and marks. */
 export const CLOAK = { ms: 4000, longMs: 6000, heal: 15, vanishMs: 2000, vanishEvery: 8000, mark: 0.3, bigMark: 0.6, markCredits: 8, dossierXp: 10 };
+
+/** Vesk's rockets, Flamer and bounties. */
+export const ROCKET = { burst: 0.6, r: 45, flameMs: 2500, longFlameMs: 3500, flameDmg: 9, reach: 140, longReach: 180, cone: 0.45, wideCone: 0.9, bounty: 10, bigBounty: 15, bountyHeal: 10, bigBountyHeal: 25, bountyXp: 20, range: 380 };
+/** Rena's Momentum, Trench Run and wingmates. */
+export const RAM = { momentumMs: 2000, momentum: 0.5, bigMomentum: 0.75, ms: 350, longMs: 525, speed: 700, dmg: 40, knock: 200, rollMs: 1500 };
+/** Thessa's Study, Blockade and fleet strikes. */
+export const FLEET = { per: 10, step: 0.02, cap: 0.3, bigCap: 0.45, ring: 140, bombs: 8, moreBombs: 12, bombR: 60, bombDmg: 50, heal: 20, strikeR: 80, strikeDmg: 45, reach: 400 };
+/** Wikka's tribe and Log Traps. */
+export const TRIBE = { every: 50, fastEvery: 35, startCap: 2, cap: 3, bigCap: 5, hugeCap: 8, fireMs: 900, fastFireMs: 450, dmg: 8, bigDmg: 12, logs: 3, moreLogs: 4, mostLogs: 6, logSpeed: 320, logMs: 2200, longLogMs: 4400, logDmg: 45, logKnock: 160, stunMs: 300 };
 
 const color = (s: GameState) => schemeOf(s.hero!).bolt;
 
@@ -73,6 +85,31 @@ export function crewAttack(s: GameState, ms: number, rate: number) {
     }
     return;
   }
+  if (s.hero === 'vesk') {
+    const ar = rank(s, 'arsenal');
+    const n = cap(s, 'rocket-swarm') ? 3 : ar >= 5 ? 2 : ar >= 2 && p.shots % 3 === 0 ? 2 : 1;
+    for (let i = 0; i < n; i++) rocket(s, a + (i - (n - 1) / 2) * 0.22, hero.damage, ROCKET.r * (ar >= 1 ? 1.2 : 1), ar >= 4 ? 4 : 0);
+    return;
+  }
+  if (s.hero === 'rena') {
+    // Twin cannons (three on the Gunship), harder the longer she has been moving.
+    const gs = rank(s, 'gunship');
+    const dmg = hero.damage * (1 + (rank(s, 'afterburner') >= 2 ? RAM.bigMomentum : RAM.momentum) * ((s.cd.momentum ?? 0) / RAM.momentumMs));
+    const side = a + Math.PI / 2;
+    for (const off of gs >= 3 ? [-8, 0, 8] : [-8, 8]) volley(s, p.x + Math.cos(side) * off, p.y + Math.sin(side) * off, a, dmg);
+    if (gs >= 5 && p.shots % 4 === 0) rocket(s, a, dmg * 2, 50, 3);
+    return;
+  }
+  if (s.hero === 'thessa') {
+    volley(s, p.x, p.y, a, hero.damage);
+    return;
+  }
+  if (s.hero === 'wikka') {
+    volley(s, p.x, p.y, a, hero.damage);
+    // Slinger 4: a second stone at the next nearest.
+    if (rank(s, 'slinger') >= 4) bolt(s, p.x, p.y, targets[1] ? Math.atan2(targets[1].y - p.y, targets[1].x - p.x) : a + 0.1, hero.damage);
+    return;
+  }
   // Cassia: one long shot; out of the Cloak (or every shot in it, with Ghost 5) it hits three times as hard.
   const cloaked = p.sigActiveMs > 0;
   let dmg = hero.damage;
@@ -82,6 +119,15 @@ export function crewAttack(s: GameState, ms: number, rate: number) {
   }
   if (cap(s, 'clean-shot') && p.shots % 3 === 0) dmg *= 2;
   volley(s, p.x, p.y, a, dmg);
+}
+
+/** A rocket that bursts where it lands (Vesk's, and Rena's Gunship missile). */
+function rocket(s: GameState, a: number, dmg: number, r: number, homing: number) {
+  const p = s.player;
+  bolt(s, p.x, p.y, a, dmg, { color: 'rocket', homing, pierce: 0, r: 5 });
+  const b = s.bullets[s.bullets.length - 1];
+  b.burst = dmg * ROCKET.burst;
+  b.burstR = r;
 }
 
 /** Kettle's zap: the nearest foe, then on to the next one close by (more with the Prod). */
@@ -134,6 +180,22 @@ export function crewSignature(s: GameState) {
     const n = rank(s, 'hacker') >= 1 ? ZAP.wideHack : ZAP.hack;
     if (!hack(s, n)) return false;
     zapFx(s, [p.x, p.y, p.x, p.y - 30], color(s), 300);
+    return true;
+  }
+  if (s.hero === 'vesk') {
+    p.sigActiveMs = rank(s, 'scorched-earth') >= 1 ? ROCKET.longFlameMs : ROCKET.flameMs;
+    return true;
+  }
+  if (s.hero === 'rena') {
+    trenchRun(s);
+    return true;
+  }
+  if (s.hero === 'thessa') {
+    blockade(s);
+    return true;
+  }
+  if (s.hero === 'wikka') {
+    logTrap(s);
     return true;
   }
   cloak(s, rank(s, 'ghost') >= 1 ? CLOAK.longMs : CLOAK.ms);
@@ -198,6 +260,106 @@ function cloak(s: GameState, ms: number) {
   s.decoy = { x: p.x, y: p.y };
 }
 
+/** Rena's Trench Run: she rams straight ahead, through the foes in her way. */
+function trenchRun(s: GameState) {
+  const p = s.player;
+  const af = rank(s, 'afterburner');
+  p.dashKind = 'ram';
+  p.dashAngle = p.facing;
+  p.dashMs = af >= 4 ? RAM.longMs : RAM.ms;
+  p.dashSpeed = RAM.speed;
+  p.dashTarget = 0;
+  p.dashHit = [];
+  // Barrel Roll: no harm for a while after.
+  if (cap(s, 'barrel-roll')) p.hurtMs = Math.max(p.hurtMs, p.dashMs + RAM.rollMs);
+  // Wingmates 5: the wingmates follow her in with a burst each.
+  if (rank(s, 'wingmates') >= 5) {
+    for (const w of s.allies) {
+      if (w.kind !== 'wingman') continue;
+      const t = nearest(s, w.x, w.y, 1, 340)[0];
+      if (!t) continue;
+      const a = Math.atan2(t.y - w.y, t.x - w.x);
+      for (const off of [-0.12, 0, 0.12]) bolt(s, w.x, w.y, a + off, 10, { pierce: 0, bounces: 0, color: 'rena', speed: 820, life: 450 });
+    }
+  }
+}
+
+/** Thessa's Blockade: a ring of bombs around her (and a wider second one with Iron Ring 5). */
+function blockade(s: GameState) {
+  const p = s.player;
+  const ir = rank(s, 'iron-ring');
+  const ring = (r: number, delay: number) => {
+    const n = ir >= 2 ? FLEET.moreBombs : FLEET.bombs;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      addBomb(s, 'carpet', p.x + Math.cos(a) * r, p.y + Math.sin(a) * r, delay + 500 + (i * 600) / n, FLEET.bombR, FLEET.bombDmg);
+    }
+  };
+  const r = FLEET.ring * (ir >= 1 ? 1.3 : 1);
+  ring(r, 0);
+  if (ir >= 5) ring(r * 1.5, 1200);
+  if (ir >= 4) heal(s, FLEET.heal);
+  p.sigActiveMs = 600;
+}
+
+/** Wikka's Log Trap: logs roll out ahead of him, knocking down what they meet. */
+function logTrap(s: GameState) {
+  const p = s.player;
+  const lt = rank(s, 'log-traps');
+  const n = lt >= 5 ? TRIBE.mostLogs : lt >= 1 ? TRIBE.moreLogs : TRIBE.logs;
+  const life = lt >= 4 ? TRIBE.longLogMs : TRIBE.logMs;
+  const side = p.facing + Math.PI / 2;
+  for (let i = 0; i < n; i++) {
+    const off = (i - (n - 1) / 2) * 30;
+    s.allies.push({ id: s.nextId++, kind: 'log', x: p.x + Math.cos(side) * off, y: p.y + Math.sin(side) * off, cdMs: 0, lifeMs: life, slot: i, aim: p.facing, hit: [] });
+  }
+}
+
+/** Vesk's Flamer, each tenth of a second while it burns: a cone of fire at the nearest foe. */
+function flame(s: GameState) {
+  const p = s.player;
+  const se = rank(s, 'scorched-earth');
+  const inferno = cap(s, 'inferno');
+  const reach = se >= 2 ? ROCKET.longReach : ROCKET.reach;
+  const half = se >= 5 ? ROCKET.wideCone : ROCKET.cone;
+  const t = nearest(s, p.x, p.y, 1, reach * 1.5)[0];
+  if (t) p.aim = Math.atan2(t.y - p.y, t.x - p.x);
+  near(s, p.x, p.y, reach, (e) => {
+    if (!inferno && Math.abs(angleDiff(Math.atan2(e.y - p.y, e.x - p.x), p.aim)) > half) return;
+    damage(s, e, ROCKET.flameDmg, { noCrit: true });
+    if (se >= 3 && e.kind !== 'boss') {
+      e.slowPct = Math.max(e.slowPct, 0.3);
+      e.slowMs = Math.max(e.slowMs, 300);
+    }
+  });
+  // Flames to see, drawn as fire on the ground; they do no harm of their own (`dps` 0).
+  const flames = inferno ? [0, 1, 2, 3, 4, 5, 6, 7].map((i) => [(i / 8) * Math.PI * 2, 0.6] as const) : [0.3, 0.55, 0.8].flatMap((k) => [[p.aim - half * 0.5, k], [p.aim + half * 0.5, k]] as const);
+  for (const [a, k] of flames) s.fires.push({ id: s.nextId++, x: p.x + Math.cos(a) * reach * k, y: p.y + Math.sin(a) * reach * k, r: 10 + 26 * k, ms: 260, dps: 0 });
+}
+
+/** Thessa's fleet: a strike on the thickest swarm in reach (two with Fleet Command 4). */
+function strike(s: GameState) {
+  const fc = rank(s, 'fleet-command');
+  const dmg = FLEET.strikeDmg * (fc >= 2 ? 1.3 : 1);
+  const spot = swarmSpot(s, FLEET.reach);
+  addBomb(s, 'carpet', spot.x, spot.y, 700, FLEET.strikeR, dmg);
+  if (fc >= 4) addBomb(s, 'carpet', spot.x + 70, spot.y - 40, 900, FLEET.strikeR, dmg);
+}
+
+/** How much more Thessa's shots hurt a foe of this kind for her Study (0 to the cap). */
+export function studied(s: GameState, kind: string) {
+  const top = rank(s, 'tactician') >= 3 ? FLEET.bigCap : FLEET.cap;
+  const got = Math.min(top, FLEET.step * Math.floor(((s.study ??= {})[kind] ?? 0) / FLEET.per));
+  return cap(s, 'grand-strategy') ? Math.max(top / 2, got) : got;
+}
+
+/** How many of Wikka's tribe have joined so far: one every 50 kills, up to 2 (more with the Tribe path). */
+export function tribeSize(s: GameState) {
+  const tb = rank(s, 'tribe');
+  const top = tb >= 5 ? TRIBE.hugeCap : tb >= 2 ? TRIBE.bigCap : tb >= 1 ? TRIBE.cap : TRIBE.startCap;
+  return Math.min(top, Math.floor(s.kills / (tb >= 1 ? TRIBE.fastEvery : TRIBE.every)));
+}
+
 // ---------------------------------------------------------------------------------------------
 // Each step
 
@@ -226,12 +388,52 @@ export function crewAbilities(s: GameState, ms: number) {
     }
     return;
   }
+  if (s.hero === 'vesk') {
+    if (p.sigActiveMs > 0 && ready(s, 'flame', 100, ms)) flame(s);
+    // Bounty: the strongest foe in reach carries a price.
+    if (rank(s, 'bounty') > 0) keepMark(s, ROCKET.range, ms);
+    return;
+  }
+  if (s.hero === 'rena') {
+    // Momentum builds while she moves and drains twice as fast when she stops.
+    s.cd.momentum = Math.max(0, Math.min(RAM.momentumMs, (s.cd.momentum ?? 0) + (p.moving ? ms : -2 * ms)));
+    if (p.dashMs > 0 && p.dashKind === 'ram') {
+      near(s, p.x, p.y, p.r + 30, (e) => {
+        if (p.dashHit.includes(e.id)) return;
+        p.dashHit.push(e.id);
+        damage(s, e, RAM.dmg * (rank(s, 'afterburner') >= 5 ? 2 : 1));
+        if (e.kind !== 'boss') knock(e, p.x, p.y, RAM.knock);
+      });
+    }
+    return;
+  }
+  if (s.hero === 'thessa') {
+    const fc = rank(s, 'fleet-command');
+    const every = cap(s, 'orbital-barrage') ? 2000 : fc >= 5 ? 4000 : fc >= 3 ? 6000 : fc >= 1 ? 8000 : 0;
+    if (every > 0 && ready(s, 'strike', every, ms)) {
+      if (nearest(s, p.x, p.y, 1, FLEET.reach).length) strike(s);
+      else s.cd.strike = 300;
+    }
+    // Perfect Ring: the Blockade goes off on its own every 10 seconds.
+    if (cap(s, 'perfect-ring') && ready(s, 'ring', 10_000, ms)) {
+      if (nearest(s, p.x, p.y, 1, FLEET.ring * 1.3).length) blockade(s);
+      else s.cd.ring = 300;
+    }
+    return;
+  }
+  if (s.hero === 'wikka') {
+    if (s.allies.filter((a) => a.kind === 'tribesman').length < tribeSize(s)) syncAllies(s);
+    // Stampede: logs roll on their own every 6 seconds.
+    if (cap(s, 'stampede') && ready(s, 'stampede', 6000, ms)) {
+      if (nearest(s, p.x, p.y, 1, 300).length) logTrap(s);
+      else s.cd.stampede = 300;
+    }
+    return;
+  }
   // Cassia: the Cloak ends; marks are kept on the strongest foes in reach.
   if (p.sigActiveMs <= 0 && s.decoy) s.decoy = null;
   const spy = rank(s, 'spymaster');
-  if (spy > 0 && (s.mark === 0 || !s.enemies.some((e) => e.id === s.mark && e.hp > 0)) && ready(s, 'mark', 1000, ms)) {
-    s.mark = strongest(s, HEROES.cassia.range)?.id ?? 0;
-  }
+  if (spy > 0) keepMark(s, HEROES.cassia.range, ms);
   // Spymaster 4: the marked foe is slowed.
   if (spy >= 4 && s.mark) {
     const m = s.enemies.find((e) => e.id === s.mark);
@@ -239,6 +441,13 @@ export function crewAbilities(s: GameState, ms: number) {
       m.slowPct = Math.max(m.slowPct, 0.3);
       m.slowMs = Math.max(m.slowMs, 200);
     }
+  }
+}
+
+/** Keeps a mark on the strongest foe within `range` (Cassia's marks, Vesk's bounties). */
+function keepMark(s: GameState, range: number, ms: number) {
+  if ((s.mark === 0 || !s.enemies.some((e) => e.id === s.mark && e.hp > 0)) && ready(s, 'mark', 1000, ms)) {
+    s.mark = strongest(s, range)?.id ?? 0;
   }
 }
 
@@ -274,6 +483,8 @@ export function crewHit(s: GameState, e: Enemy): { k: number; crit: boolean } {
     if (e.id === s.mark) k *= 1 + (rank(s, 'spymaster') >= 5 && (e.elite || e.kind === 'boss') ? CLOAK.bigMark : CLOAK.mark);
     return { k, crit: false };
   }
+  if (s.hero === 'vesk') return { k: e.id === s.mark && rank(s, 'bounty') >= 3 ? 1.25 : 1, crit: false };
+  if (s.hero === 'thessa') return { k: (1 + studied(s, e.kind)) * (e.kind === 'boss' && rank(s, 'tactician') >= 5 ? 1.2 : 1), crit: false };
   return { k: 1, crit: false };
 }
 
@@ -297,6 +508,17 @@ export function crewKill(s: GameState, e: Enemy) {
     const ls = rank(s, 'lucky-streak');
     if (ls >= 2 && rand() < 0.03) s.pickups.push({ id: s.nextId++, kind: 'credits', x: e.x + 10, y: e.y, heal: 0, value: 3 });
     if (ls >= 4 && e.elite && !s.arena) s.pickups.push({ id: s.nextId++, kind: 'chest', x: e.x - 18, y: e.y + 6, heal: 0, value: 0 });
+  } else if (s.hero === 'vesk' && (e.id === s.mark || (e.elite && rank(s, 'bounty') >= 4)) && rank(s, 'bounty') > 0) {
+    // A bounty is paid: credits and a little health (more on Bounty 2 and 5), XP on Bounty 5, a chest on Big Game.
+    const bt = rank(s, 'bounty');
+    if (e.id === s.mark) s.mark = 0;
+    s.pickups.push({ id: s.nextId++, kind: 'credits', x: e.x, y: e.y, heal: 0, value: bt >= 5 ? ROCKET.bigBounty : ROCKET.bounty });
+    heal(s, bt >= 2 ? ROCKET.bigBountyHeal : ROCKET.bountyHeal);
+    if (bt >= 5) gainXp(s, ROCKET.bountyXp, true);
+    if (cap(s, 'big-game') && !s.arena && e.kind !== 'boss') s.pickups.push({ id: s.nextId++, kind: 'chest', x: e.x - 18, y: e.y + 6, heal: 0, value: 0 });
+  } else if (s.hero === 'thessa') {
+    const study = (s.study ??= {});
+    study[e.kind] = (study[e.kind] ?? 0) + (rank(s, 'tactician') >= 1 ? 2 : 1) * (e.elite && rank(s, 'tactician') >= 4 ? 10 : 1);
   } else if (s.hero === 'cassia' && e.id === s.mark) {
     s.mark = 0;
     if (rank(s, 'spymaster') >= 3) s.pickups.push({ id: s.nextId++, kind: 'credits', x: e.x, y: e.y, heal: 0, value: CLOAK.markCredits });
@@ -345,13 +567,13 @@ export function crewKillHeal(s: GameState) {
   return s.hero === 'grunda' && rank(s, 'wild-heart') >= 3 && p.hp < p.maxHp / 2 ? 1 : 0;
 }
 
-/** A bolt of Grunda's lands: it throws the foe back, and a bursting bolt blows up there. */
-export function crewBoltHit(s: GameState, e: Enemy, b: { vx: number; vy: number; burst?: number }) {
-  if (s.hero !== 'grunda') return;
-  knock(e, e.x - b.vx, e.y - b.vy, rank(s, 'heavy-bolts') >= 2 ? 80 : 35);
+/** A crew bolt lands: Grunda's throw the foe back, Wikka's stones stun with Slinger 5, and a bursting bolt blows up there. */
+export function crewBoltHit(s: GameState, e: Enemy, b: { vx: number; vy: number; burst?: number; burstR?: number }) {
+  if (s.hero === 'grunda') knock(e, e.x - b.vx, e.y - b.vy, rank(s, 'heavy-bolts') >= 2 ? 80 : 35);
+  if (s.hero === 'wikka' && rank(s, 'slinger') >= 5 && e.kind !== 'boss') e.stunMs = Math.max(e.stunMs, TRIBE.stunMs);
   if (b.burst) {
-    const r = ROAR.burstR * (cap(s, 'siege-crossbow') ? 1.5 : 1);
-    explode(s, e.x, e.y, r, b.burst, HEROES.grunda.schemes[0].bolt);
+    const r = b.burstR ?? ROAR.burstR * (cap(s, 'siege-crossbow') ? 1.5 : 1);
+    explode(s, e.x, e.y, r, b.burst, HEROES[s.hero!].schemes[0].bolt);
     b.burst = 0;
   }
 }
@@ -364,6 +586,8 @@ export function crewAllies(s: GameState) {
   return {
     patch: s.hero === 'kettle' && rank(s, 'spare-parts') >= 3 ? 1 : 0,
     spydrone: s.hero === 'cassia' && rank(s, 'spymaster') >= 2 ? 1 : 0,
+    wingman: s.hero !== 'rena' ? 0 : cap(s, 'flight-leader') ? 4 : at([1, 1, 2, 2, 2], rank(s, 'wingmates'), 0),
+    tribesman: s.hero === 'wikka' ? tribeSize(s) : 0,
   };
 }
 
@@ -393,6 +617,46 @@ export function moveCrewAlly(s: GameState, a: Ally, ms: number) {
     if (a.cdMs <= 0) {
       a.cdMs = 4000;
       if (p.hp < p.maxHp) heal(s, 4);
+    }
+    return;
+  }
+  if (a.kind === 'log') {
+    // A rolling log: on along its line, knocking each foe it meets once.
+    a.lifeMs -= ms;
+    a.x += Math.cos(a.aim) * TRIBE.logSpeed * dt;
+    a.y += Math.sin(a.aim) * TRIBE.logSpeed * dt;
+    const hit = (a.hit ??= []);
+    near(s, a.x, a.y, 24, (e) => {
+      if (hit.includes(e.id)) return;
+      hit.push(e.id);
+      damage(s, e, TRIBE.logDmg * (rank(s, 'log-traps') >= 2 ? 1.5 : 1));
+      if (e.kind !== 'boss') knock(e, a.x, a.y, TRIBE.logKnock);
+    });
+    return;
+  }
+  if (a.kind === 'wingman' || a.kind === 'tribesman') {
+    // Wingmates fly in a V behind Rena; the tribe walks in a loose ring around Wikka.
+    const wing = a.kind === 'wingman';
+    const n = Math.max(1, s.allies.filter((o) => o.kind === a.kind).length);
+    const ang = wing ? p.facing + Math.PI + (a.slot % 2 ? 1 : -1) * (0.6 + 0.3 * Math.floor(a.slot / 2)) : (a.slot * Math.PI * 2) / n + s.time / 4000;
+    const dist = wing ? 46 + 18 * Math.floor(a.slot / 2) : 48;
+    a.x += (p.x + Math.cos(ang) * dist - a.x) * Math.min(1, 6 * dt);
+    a.y += (p.y + Math.sin(ang) * dist - a.y) * Math.min(1, 6 * dt);
+    if (a.cdMs > 0) return;
+    const t = nearest(s, a.x, a.y, 1, 320)[0];
+    if (!t) {
+      a.cdMs = 0;
+      return;
+    }
+    a.aim = Math.atan2(t.y - a.y, t.x - a.x);
+    if (wing) {
+      const wm = rank(s, 'wingmates');
+      bolt(s, a.x, a.y, a.aim, 8 * (wm >= 2 || cap(s, 'flight-leader') ? 1.5 : 1), { pierce: 0, bounces: 0, color: 'rena', speed: 820, life: 420 });
+      a.cdMs = wm >= 4 ? 400 : 800;
+    } else {
+      const tb = rank(s, 'tribe');
+      bolt(s, a.x, a.y, a.aim, tb >= 3 ? TRIBE.bigDmg : TRIBE.dmg, { pierce: 0, bounces: 0, color: 'wikka', speed: 600, life: 550 });
+      a.cdMs = tb >= 4 ? TRIBE.fastFireMs : TRIBE.fireMs;
     }
     return;
   }
