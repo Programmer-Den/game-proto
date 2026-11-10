@@ -141,6 +141,15 @@ world, with a star map between them. A boss rush and hero mastery come on top.
   `progress.codex.seen` and pays every page filled for the first time into the bank
   (`progress.codex.paid`), said by a floating text. Once anything is seen, a Codex button (top left,
   beside the Armoury) opens `codexPanel` (`GameScene.codexOpen`, the page in `codexPage`).
+- The skill overview (`skills.ts`): the codex's Skill overview button (`SKILLS_BUTTON`, beside
+  its Back at `CODEX_BACK`) opens `skillsPanel` over it (`GameScene.skillsOpen`, the tab in
+  `skillsPage`, the entry tapped in `skillPick`; Back or Enter returns to the codex). `SKILL_PAGES`:
+  hero paths (hero by hero, drill last), the four pools, gear, specialisations (`branch:<BranchId>`)
+  and fusions (`fusion:<id>`). `GameScene.recordSkills` runs every frame of a run: `skillsNew` lists
+  what the run holds (`ranks`, `branches`, `fusions`) that `skillsKnown` lacks, and `recordSkills`
+  (save.ts) adds it to `progress.skills`. Only those entries show a name and, tapped, their text and
+  tiers on the right (`skillName`, `skillKind`, `skillLines` in `panels.ts`); the rest are `? ? ?`.
+  No pay, no trophy.
 - Trophies (`src/trophies/`, see `shared/trophies.ts`): ten, listed with `trophySet` in
   `trophies/index.ts` (handed to `setupGame`), texts in `trophies/i18n/`. `trophies/check.ts`'s
   `checkTrophies(state, progress)` runs every frame from `GameScene.update` and awards each one whose
@@ -242,6 +251,8 @@ world, with a star map between them. A boss rush and hero mastery come on top.
 - `src/game/endless.ts`: the endless rift's numbers: `ENDLESS`, `ENDLESS_SALVAGE`, `loopHp`, `loopDmg`.
 - `src/game/codex.ts`: `CodexPageId`, `CODEX_PAGES`, `CODEX_ENTRIES`, `pageDone`, `pageCount` and
   `codexNew`.
+- `src/game/skills.ts`: the skill overview: `SkillPageId`, `SKILL_PAGES`, `SKILL_ENTRIES`,
+  `BRANCH_PREFIX`, `branchOf` and `skillsNew`.
 - `src/game/weekly.ts`: the weekly run: `MutatorId`, `MUTATORS`, `MUTATOR_IDS`, `MUT`,
   `WEEKLY_BONUS`, `weekOf`, `weekSeed`, `seeded` (mulberry32), `weeklyOf`, `rand` (the rules' random number), `reseed`, `unseed`
   and `rngAt`.
@@ -325,7 +336,7 @@ world, with a star map between them. A boss rush and hero mastery come on top.
   events (`rollEvent`, `chooseEvent`) and `nextPlanet` (to `state.next`, `stage` + 1, onto
   `state.route`).
 - `src/game/save.ts`: `SAVE_KEY`, `loadProgress`, `saveProgress`, `recordRun`, `recordCharted`, `recordUnlocks`,
-  `buyArmoury`, `recordWeekly`, `recordEndless`, `recordRush`, `togglePlain`, `bankCredits`, `recordCodex`, `isUnlocked` ((TR-9, a deed done, a hero the save shows as played, or the old world deeds) and
+  `buyArmoury`, `recordWeekly`, `recordEndless`, `recordRush`, `togglePlain`, `bankCredits`, `recordCodex`, `recordSkills`, `isUnlocked` ((TR-9, a deed done, a hero the save shows as played, or the old world deeds) and
   `unlockedHeroes`; the run under way: `RUN_KEY`, `isResumable`, `saveRun`, `loadRun` and
   `clearRun`.
 - `src/audio/music.ts`: the songs (`PLANET_SONGS`, `MENU_SONG`, `STINGS`); `src/audio/sfx.ts`: the
@@ -363,7 +374,7 @@ world, with a star map between them. A boss rush and hero mastery come on top.
   the designed rectangle sits in it), `fitLayout`, `CENTER`, HUD places (`XP_BAR`, `HP_BAR`, `KIT`, `TIMER`,
   `LEVEL`, `PLANET_TAG`, `CREDITS_TAG`, `BOSS_BAR`, `OBJECTIVE_HUD`, `SIG_BUTTON`, `STICK`), card rectangles
   (`heroCardRect` for the 6x2 grid, `HEAT_ROW`, `HEAT_DOWN` and `HEAT_UP` for the Heat row, `ARMOURY_BUTTON`, `armouryCardRect` and
-  `BACK` for the Armoury, `CODEX_BUTTON`, `codexTabRect` and `CODEX_GRID` for the codex, `DAILY_BUTTON` for the daily run, `WEEKLY_BUTTON`, `MUTATOR_CARD`, `WEEKLY_START` and `WEEKLY_BACK` for the weekly run, `levelCardRect` with `LEVEL_CARD4` for four cards, `UNLOCK` and
+  `BACK` for the Armoury, `CODEX_BUTTON`, `codexTabRect`, `CODEX_GRID`, `CODEX_BACK` and `SKILLS_BUTTON` for the codex, `skillTabRect`, `SKILL_LIST` and `SKILL_DETAIL` for the skill overview, `DAILY_BUTTON` for the daily run, `WEEKLY_BUTTON`, `MUTATOR_CARD`, `WEEKLY_START` and `WEEKLY_BACK` for the weekly run, `levelCardRect` with `LEVEL_CARD4` for four cards, `UNLOCK` and
   `CONTINUE` for the new hero panel, `CHART`, `chartSpot` / `chartRect` (the space map), `mapNodeRect` / `mapNodeSpot`, `tradeCardRect`, `REROLL`,
   `LEAVE`, `eventOptionRect`, `AGAIN`, and `ENDLESS_BUTTON` with `AGAIN_SIDE` after a win), `DEPTH`, `inside`.
 - `src/scenes/objectiveArt.ts`: the objectives and power-ups, drawn in code on the graphics
@@ -383,7 +394,7 @@ world, with a star map between them. A boss rush and hero mastery come on top.
   `Panel` it is handed: `heroSelect` (12 cards from
   `heroCardRect`, keyed by `heroKeyLabel`, and the detail panel `HERO_DETAIL` with the `FIGHT`
   button, and the Heat row (`heatRow`) once the hero has won, the detail lines shrinking to end
-  above it; a locked hero shows only `rb-locked`), `armouryPanel` (the Armoury, see Current state), `weeklyPanel` (the weekly run), `dailyPanel` (the daily run), `codexPanel` (the codex), `unlockPanel` (the new hero, with a `continue`
+  above it; a locked hero shows only `rb-locked`), `armouryPanel` (the Armoury, see Current state), `weeklyPanel` (the weekly run), `dailyPanel` (the daily run), `codexPanel` (the codex), `skillsPanel` (the skill overview), `unlockPanel` (the new hero, with a `continue`
   spot), `levelUp` (also the arena's and an objective's reward, titled by `state.after`; three or four cards whose lines flow down; pool labels
   from `POOL_NAMES`, `linkIcon` for crossovers), `spaceMap` (the four jumps as columns, lanes, the
   route lit, the next jump's planets as cards with spot ids = `PlanetId`; a faction shows once
@@ -461,9 +472,9 @@ The foes and Triad-77's units are called bots everywhere (texts, ids, textures s
 `state.bots`); they went by another name before, but no save key or stored id ever held it, so old
 saves load unchanged.
 
-- `riftblade-progress`: `{ bestMs, wins: { [heroId]: count }, heat: { [heroId]: best heat won 0-5 }, bank: credits, armoury: { [ArmouryId]: rank }, weekly: { week, best, won } | null, endless: best worlds cleared, codex: { seen: entry ids, paid: page ids }, furthest: { [heroId]: jump 1-4 },
+- `riftblade-progress`: `{ bestMs, wins: { [heroId]: count }, heat: { [heroId]: best heat won 0-5 }, bank: credits, armoury: { [ArmouryId]: rank }, weekly: { week, best, won } | null, endless: best worlds cleared, codex: { seen: entry ids, paid: page ids }, skills: overview entry ids taken, furthest: { [heroId]: jump 1-4 },
   unlocked: HeroId[], charted: PlanetId[], mastery: { [heroId]: XP }, plain: HeroId[] (heroes in their usual colours), rush: { bosses, ms } | null }`. `bestMs` is the whole run's time (`runMs`). Older saves without
-  `furthest` load with `{}`, without `bank` or `armoury` with 0 and `{}` (unknown pieces dropped), without `weekly` with null, without `endless` with 0, without `codex` with nothing seen (unknown entries and pages dropped), without `heat` with heat 0 for every hero with a win, without `unlocked` or `charted` with `[]`, without `mastery`, `plain` or `rush` with `{}`, `[]` and null; unknown ids are dropped, and
+  `furthest` load with `{}`, without `bank` or `armoury` with 0 and `{}` (unknown pieces dropped), without `weekly` with null, without `endless` with 0, without `codex` with nothing seen (unknown entries and pages dropped), without `skills` with `[]` (unknown entries dropped), without `heat` with heat 0 for every hero with a win, without `unlocked` or `charted` with `[]`, without `mastery`, `plain` or `rush` with `{}`, `[]` and null; unknown ids are dropped, and
   so are `wins` and `furthest` values that are not finite numbers.
   `charted` gets a planet the first frame a run is on it (`recordCharted` in `GameScene.update`) and
   the route at the run's end (`recordRun`). A hero with a
@@ -554,7 +565,8 @@ free of audio) or from the scene's input handler.
   banked), `weekly` the Weekly run button (once a run has ended); in the Armoury (`.armouryOpen`)
   the spots are the `ArmouryId`s and `back`, in the weekly panel (`.weeklyOpen`) `start` and
   `back`, in the daily panel (`.dailyOpen`) `start` and `back`, in the codex (`.codexOpen`)
-  `page-<CodexPageId>` and `back`, in the boss rush panel (`.rushOpen`) `start` and `back`; `rush` (once two bosses are met) and `colour` (mastery level 2) are select-screen spots, as are `daily` and `codex` are the select screen's buttons and `endless`
+  `page-<CodexPageId>`, `skills` and `back`, in the skill overview (`.skillsOpen`) `page-<SkillPageId>`,
+  `skill-<entry id>` (taken skills only) and `back`, in the boss rush panel (`.rushOpen`) `start` and `back`; `rush` (once two bosses are met) and `colour` (mastery level 2) are select-screen spots, as are `daily` and `codex` are the select screen's buttons and `endless`
   the won end screen's. `state.week` and `state.mutators` are the weekly run's, `state.daily` and
   `state.seed` the daily's, `state.endless`, `state.loop` and `state.endlessCleared` the endless rift's. `.chosen` is the hero picked on the select screen
   (TR-9 at first), `.unlocking` the heroes waiting to be shown. `state.heat` is the run's heat.

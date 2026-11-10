@@ -12,6 +12,7 @@ import { RUSH, rushPlanets } from '../game/rush';
 import { DAILY, DAILY_GAME, dailyOf, dailyScore, dailySeed, stagesOf } from '../game/daily';
 import { finishDaily, loadDaily, startDaily, type DailyRecord } from '../../../../shared/daily';
 import { CODEX_PAGES, codexNew, type CodexPageId } from '../game/codex';
+import { SKILL_PAGES, skillsNew, type SkillPageId } from '../game/skills';
 import { ENDLESS_SALVAGE } from '../game/endless';
 import { heatOpen } from '../game/heat';
 import { checkTrophies } from '../trophies/check';
@@ -20,7 +21,7 @@ import { reseed, rngAt, unseed, weekOf, weeklyOf, type MutatorId } from '../game
 import { ARENA_MS, BOSSES, CHAMPION, PILLAR, PLANETS, SIEGE, STRIKE, TIDE, VENT, planetLabel } from '../game/planets';
 import { FUSION_BY_ID, FUSION_TIERS, MAX_TIER, UPGRADES, tierOf } from '../game/upgrades';
 import {
-  bankCredits, clearRun, isResumable, isUnlocked, loadProgress, loadRun, buyArmoury, recordCharted, recordCodex, recordEndless, recordRun, recordRush, recordWeekly, recordUnlocks, saveRun, togglePlain, unlockedHeroes, type Progress,
+  bankCredits, clearRun, isResumable, isUnlocked, loadProgress, loadRun, buyArmoury, recordCharted, recordCodex, recordEndless, recordSkills, recordRun, recordRush, recordWeekly, recordUnlocks, saveRun, togglePlain, unlockedHeroes, type Progress,
 } from '../game/save';
 import { C, hex } from '../art/glow';
 import { MASTERY_BOT, bakeMastery, heroKey, masteryKey } from '../art/sprites';
@@ -33,7 +34,7 @@ import { OBJ_COLOR, drawObjectiveGround, drawPowerUp, drawStructure, objectiveTa
 import { objectiveHint, objectiveName, OBJ_MISC } from '../game/objectives';
 import { SoundCues } from '../audio/cues';
 import { sfx } from '../audio/sfx';
-import { Panel, armouryPanel, codexPanel, dailyPanel, weeklyPanel, endScreen, eventPanel, heroSelect, levelUp, masteryLines, rushPanel, spaceMap, starMap, trader, unlockPanel, wearsColours } from '../ui/panels';
+import { Panel, armouryPanel, codexPanel, skillsPanel, dailyPanel, weeklyPanel, endScreen, eventPanel, heroSelect, levelUp, masteryLines, rushPanel, spaceMap, starMap, trader, unlockPanel, wearsColours } from '../ui/panels';
 import {
   BOSS_BAR, CENTER, CREDITS_TAG, OBJECTIVE_HUD, DEPTH, FONT, HP_BAR, KIT, LEVEL, PLANET_TAG, SIG_BUTTON, STICK, TIMER, SCREEN, FRAME, VIEW, XP_BAR, fitLayout, inside,
 } from './layout';
@@ -119,6 +120,12 @@ export class GameScene extends Phaser.Scene {
   /** Whether the codex is open over the hero select, and the page it shows. */
   codexOpen = false;
   codexPage: CodexPageId = 'foes';
+  /** Whether the skill overview is open (from the codex), its page and the skill picked on it. */
+  skillsOpen = false;
+  skillsPage: SkillPageId = 'paths';
+  skillPick: string | null = null;
+  /** The overview entries the save holds, so each frame only looks for new ones. */
+  private skillsKnown = new Set<string>(this.progress.skills);
   /** The codex entries the save holds, so each frame only looks for new ones. */
   private codexKnown = new Set<string>(this.progress.codex.seen);
   private savedDeeds = 0;
@@ -212,7 +219,9 @@ export class GameScene extends Phaser.Scene {
         const s = this.state;
         if (this.unlocking.length) return;
         if (s.phase === 'select' && (this.weeklyOpen || this.dailyOpen || this.rushOpen)) return;
-        if (s.phase === 'select' && this.codexOpen) {
+        if (s.phase === 'select' && this.skillsOpen) {
+          if (SKILL_PAGES[i]) this.openSkillPage(SKILL_PAGES[i].id);
+        } else if (s.phase === 'select' && this.codexOpen) {
           if (CODEX_PAGES[i]) this.openPage(CODEX_PAGES[i].id);
         } else if (s.phase === 'select' && this.armouryOpen) {
           if (ARMOURY[i]) this.buyArmoury(ARMOURY[i].id);
@@ -236,6 +245,7 @@ export class GameScene extends Phaser.Scene {
       if (this.unlocking.length) this.closeUnlock();
       else if (this.state.phase === 'won' || this.state.phase === 'lost') this.backToSelect();
       else if (this.state.phase === 'select' && this.armouryOpen) this.closeArmoury();
+      else if (this.state.phase === 'select' && this.skillsOpen) this.closeSkills();
       else if (this.state.phase === 'select' && this.codexOpen) this.closeCodex();
       else if (this.state.phase === 'select' && this.weeklyOpen) this.beginWeekly();
       else if (this.state.phase === 'select' && this.dailyOpen) this.beginDaily();
@@ -348,8 +358,19 @@ export class GameScene extends Phaser.Scene {
         this.rushOpen = false;
         ui('click');
       }
+    } else if (s.phase === 'select' && this.skillsOpen) {
+      if (spot.id === 'back') this.closeSkills();
+      else if (spot.id.startsWith('page-')) this.openSkillPage(spot.id.slice(5) as SkillPageId);
+      else if (spot.id.startsWith('skill-')) {
+        this.skillPick = spot.id.slice(6);
+        ui('click');
+      }
     } else if (s.phase === 'select' && this.codexOpen) {
       if (spot.id === 'back') this.closeCodex();
+      else if (spot.id === 'skills') {
+        this.skillsOpen = true;
+        ui('click');
+      }
       else if (spot.id.startsWith('page-')) this.openPage(spot.id.slice(5) as CodexPageId);
     } else if (s.phase === 'select' && this.armouryOpen) {
       if (spot.id === 'back') this.closeArmoury();
@@ -481,6 +502,18 @@ export class GameScene extends Phaser.Scene {
 
   private closeCodex() {
     this.codexOpen = false;
+    ui('click');
+  }
+
+  private openSkillPage(id: SkillPageId) {
+    this.skillsPage = id;
+    this.skillPick = null;
+    ui('click');
+  }
+
+  /** Back from the skill overview to the codex. */
+  private closeSkills() {
+    this.skillsOpen = false;
     ui('click');
   }
 
@@ -665,6 +698,7 @@ export class GameScene extends Phaser.Scene {
     if (this.panelKey() !== this.shown) this.syncPanel();
     else if (this.state.phase === 'run' && this.state.runMs - this.savedAt >= RUN_SAVE_MS) this.saveRun();
     this.recordCodex();
+    this.recordSkills();
     checkTrophies(this.state, this.progress);
     this.draw();
   }
@@ -688,6 +722,16 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /** Adds the skills the run holds that the overview lacks to the save. */
+  private recordSkills() {
+    const s = this.state;
+    if (!s.hero) return;
+    const fresh = skillsNew(s, this.skillsKnown);
+    if (!fresh.length) return;
+    for (const id of fresh) this.skillsKnown.add(id);
+    this.progress = recordSkills(fresh);
+  }
+
   /** Everything the panel showing depends on. */
   private panelKey() {
     const s = this.state;
@@ -696,6 +740,7 @@ export class GameScene extends Phaser.Scene {
     if (s.phase === 'select' && this.weeklyOpen) return `weekly|${this.week}|${JSON.stringify(this.progress.weekly)}`;
     if (s.phase === 'select' && this.armouryOpen) return `armoury|${this.progress.bank}|${JSON.stringify(this.progress.armoury)}`;
     if (s.phase === 'select' && this.dailyOpen) return `daily|${JSON.stringify(this.daily)}`;
+    if (s.phase === 'select' && this.skillsOpen) return `skills|${this.skillsPage}|${this.skillPick}|${this.progress.skills.length}`;
     if (s.phase === 'select' && this.codexOpen) return `codex|${this.codexPage}|${this.progress.codex.seen.length}`;
     if (s.phase === 'select' && this.rushOpen) return `rush|${this.chosen}|${JSON.stringify(this.progress.rush)}`;
     return [s.phase, this.chosen, this.progress.plain.join(), this.progress.bank, this.heatFor(this.chosen), s.choices?.join(), s.offers.join(), s.credits, s.event?.id, s.nodes.join(), s.rewardPicks].join('|');
@@ -762,6 +807,7 @@ export class GameScene extends Phaser.Scene {
     else if (s.phase === 'select' && this.weeklyOpen) build((p) => weeklyPanel(p, this.progress, this.week, this.weekly().hero, this.weekly().mutators));
     else if (s.phase === 'select' && this.armouryOpen) build((p) => armouryPanel(p, this.progress));
     else if (s.phase === 'select' && this.dailyOpen) build((p) => dailyPanel(p, this.daily, this.dailyRun().hero, this.dailyRun().mutators));
+    else if (s.phase === 'select' && this.skillsOpen) build((p) => skillsPanel(p, this.progress, this.skillsPage, this.skillPick));
     else if (s.phase === 'select' && this.codexOpen) build((p) => codexPanel(p, this.progress, this.codexPage));
     else if (s.phase === 'select' && this.rushOpen) build((p) => rushPanel(p, this.progress, this.chosen));
     else if (s.phase === 'select') build((p) => heroSelect(p, this.progress, this.chosen, this.heatFor(this.chosen), this.week, this.progress.bestMs > 0 ? loadDaily(DAILY_GAME) : null));

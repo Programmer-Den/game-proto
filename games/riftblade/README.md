@@ -223,6 +223,15 @@ Tap a page or press 1-5; Back or Enter returns. Entries not met yet show as `? ?
 
 ![The codex](docs/screenshots/codex.webp)
 
+The codex's **Skill overview** button opens a page of every skill a run can take, in eight tabs:
+hero paths (hero by hero, each drill last), the Blaster, Blade, Current and Hollow pools, gear,
+specialisations and fusions. A skill you have taken at least once in a run shows its name, and
+tapping it shows its text and every tier (with the specialisations it branches into, or for a
+fusion what it fuses and locks out); one never taken stays `? ? ?`. Press 1-8 for a tab; Back or
+Enter returns to the codex.
+
+![The skill overview](docs/screenshots/skill-overview.webp)
+
 ### Hero mastery
 
 Every run gives its hero mastery XP: 40 for each boss beaten, 25 for every 100 foes downed and 100
