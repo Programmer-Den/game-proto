@@ -27,6 +27,12 @@ export const defaultLevel = () => byDifficulty(2, 3, 4);
 /** Clamps a stored level number to 1 to 7. */
 export const clampLevel = (n: unknown) => (typeof n === 'number' && Number.isInteger(n) ? Math.min(LEVELS.length, Math.max(1, n)) : defaultLevel());
 
+/** Levels 1 to 3 are always open; each one above opens once the level below it is beaten. */
+export const OPEN_LEVELS = 3;
+
+/** The highest level open to play, given the strongest level beaten (0 for none). */
+export const unlockedLevel = (best: number) => Math.min(LEVELS.length, Math.max(OPEN_LEVELS, best + 1));
+
 /** Beating this level or a stronger one earns `hardWin` (Club player, the old Hard). */
 export const HARD_LEVEL = 4;
 

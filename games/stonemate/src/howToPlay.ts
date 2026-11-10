@@ -23,7 +23,7 @@ const en: HowToPlay = {
     'Eight pairs have a scene of their own, like a pawn toppling a queen or two knights jousting: the gallery marks them with a star.',
     'A pawn on the far row becomes a queen, rook, bishop or knight of your choice.',
     'Castle by moving your king two squares towards a rook that has not moved yet.',
-    'Pick the Stone AI’s level with the arrows on the menu, from Beginner to Grandmaster; the hub’s difficulty picks the first one.',
+    'Pick the Stone AI’s level with the arrows on the menu, from Beginner to Grandmaster. The first three are open; beat a level to unlock the next.',
     'A game is saved after every move, so Continue on the menu picks it up again.',
   ],
 };
@@ -50,7 +50,7 @@ const de: HowToPlay = {
     'Acht Paare haben eine eigene Szene, etwa ein Bauer, der eine Dame stürzt, oder zwei Springer im Tjost: Die Galerie markiert sie mit einem Stern.',
     'Ein Bauer auf der letzten Reihe wird zu Dame, Turm, Läufer oder Springer deiner Wahl.',
     'Rochiere, indem du den König zwei Felder auf einen Turm zu ziehst, der noch nicht gezogen hat.',
-    'Wähle die Stufe der Stein-KI mit den Pfeilen im Menü, vom Anfänger bis zum Großmeister; die Schwierigkeit der Startseite wählt die erste.',
+    'Wähle die Stufe der Stein-KI mit den Pfeilen im Menü, vom Anfänger bis zum Großmeister. Die ersten drei sind offen; besiege eine Stufe, um die nächste freizuschalten.',
     'Eine Partie wird nach jedem Zug gespeichert, also setzt Fortsetzen im Menü sie wieder fort.',
   ],
 };

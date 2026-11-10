@@ -25,6 +25,8 @@ export interface Stats {
   pairs: string[];
   /** Signature scenes seen in play, by id. */
   scenes: string[];
+  /** The strongest AI level beaten (0 for none), which opens the level above it. */
+  best: number;
 }
 
 const GAME_KEY = 'stonemate-game';
@@ -55,6 +57,6 @@ export const saveGame = (g: SavedGame | null) => write(GAME_KEY, g);
 
 export function loadStats(): Stats {
   const s = read<Partial<Stats>>(STATS_KEY) ?? {};
-  return { wins: s.wins ?? 0, losses: s.losses ?? 0, draws: s.draws ?? 0, pairs: s.pairs ?? [], scenes: s.scenes ?? [] };
+  return { wins: s.wins ?? 0, losses: s.losses ?? 0, draws: s.draws ?? 0, pairs: s.pairs ?? [], scenes: s.scenes ?? [], best: typeof s.best === 'number' ? s.best : 0 };
 }
 export const saveStats = (s: Stats) => write(STATS_KEY, s);
