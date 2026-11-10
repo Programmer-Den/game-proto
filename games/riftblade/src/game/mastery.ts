@@ -61,7 +61,7 @@ export const MASTERY_COLOURS: Record<HeroId, Omit<HeroScheme, 'name' | 'bolt'>> 
   elara: { body: '#2f4a5c', accent: '#ffb347', mark: '#e6dac2' },
   triad: { body: '#2a2d36', accent: '#7df9ff', mark: '#4a5266' },
   dax: { body: '#1e2a3a', accent: '#ffd23f', mark: '#c8b89a' },
-  grunda: { body: '#5c5a58', accent: '#7af0c0', mark: '#2e2c2a' },
+  grunda: { body: '#4a3a2e', accent: '#ff9a76', mark: '#2e2420' },
   kettle: { body: '#f0e6d0', accent: '#ff8a3c', mark: '#5a4630' },
   cassia: { body: '#f2f0f4', accent: '#7a5cff', mark: '#9aa0b0' },
 };

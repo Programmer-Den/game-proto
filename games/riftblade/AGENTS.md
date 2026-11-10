@@ -329,7 +329,7 @@ world, with a star map between them. A boss rush and hero mastery come on top.
   with the Cloak's triple shot through `player.charge`), `crewSignature` (`flyBy`, `roar`, `hack`,
   which spends nothing with no foe to take, and `cloak`), `crewAbilities` (the freighter and Roar
   on their own with Smuggler's Run 5, Full Throttle and Thunder Lungs, Botnet, Cassia's marks),
-  allies (`crewAllies`, `moveCrewAlly`: `freighter` (short-lived), `patch` and `spydrone`) and
+  allies (`crewAllies`, `moveCrewAlly`: `freighter` (short-lived, a boxy hauler), `patch` and `spydrone`) and
   hooks: `crewHit` (Dax's first-shot crit, Deadeye and the mark in `damage`), `crewRange`,
   `crewUntouchable`, `crewTarget` (the decoy in `moveEnemies`), `crewTurned`, `crewKill`,
   `crewKillHeal`, `crewChest` (Luck and Jackpot in `openChest`), `crewHurt`, `crewRescue` (Second
