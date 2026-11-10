@@ -35,7 +35,7 @@ const CENTER = { x: 480, y: 270 };
 /** The round signature button, bottom right (layout.ts SIG_BUTTON). */
 const SIG_BUTTON = { x: 890, y: 470 };
 /** The heroes on the select screen, in order; on a fresh save only TR-9 is open. */
-const HEROES = ['rook', 'tr9', 'bram', 'kael', 'vharn', 'oom', 'corvin', 'veyl', 'kresh', 'joren', 'elara', 'triad'];
+const HEROES = ['rook', 'tr9', 'bram', 'kael', 'vharn', 'oom', 'corvin', 'veyl', 'kresh', 'joren', 'elara', 'triad', 'dax', 'grunda', 'kettle', 'cassia'];
 /** Legionary TR-9's health and paths (heroes.ts) and how long his Brace lasts (sim.ts). */
 const TR9 = { hp: 150, braceMs: 3000, paths: ['suppressor', 'riot-shield', 'drop-doctrine'] };
 /** Where the test holds the mouse: this far from the hero, turning once every `turnMs` of game time. */
@@ -163,7 +163,7 @@ test('plays the first minute', async ({ page }, testInfo) => {
   }
   const middle = (r: Spot) => ({ x: r.x + r.w / 2, y: r.y + r.h / 2 });
 
-  // The hero select screen: twelve heroes and the Fight button, and no run yet. On a fresh save
+  // The hero select screen: sixteen heroes and the Fight button, and no run yet. On a fresh save
   // only TR-9 is open; the others are locked behind their deeds. The test waits here
   // until Phaser's start-up easing is over (its first STARTUP_FRAMES steps are cut short), so the
   // run always starts at full step length, however long the page took to load.

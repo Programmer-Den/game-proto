@@ -1,16 +1,27 @@
 /**
  * The heroes a run can start with: three blaster soldiers, seven blade knights of the Current or
- * the Hollow and two more blaster heroes (Elara Voss and Triad-77). Only Legionary TR-9 is open
+ * the Hollow, two more blaster heroes (Elara Voss and Triad-77) and the crew (Dax Morrow, Grunda,
+ * KT-4 "Kettle" and Cassia Vane). Only Legionary TR-9 is open
  * from the start; every other hero is unlocked by a deed. Their weapons, signature moves,
  * pools and colours. Names and texts are keys of `i18n/en.ts`, shown with `t`.
  */
 import type { TextKey } from '../i18n';
 
-export type HeroId = 'rook' | 'tr9' | 'bram' | 'kael' | 'vharn' | 'oom' | 'corvin' | 'veyl' | 'kresh' | 'joren' | 'elara' | 'triad';
+export type HeroId =
+  | 'rook' | 'tr9' | 'bram' | 'kael' | 'vharn' | 'oom' | 'corvin' | 'veyl' | 'kresh' | 'joren' | 'elara' | 'triad'
+  | 'dax' | 'grunda' | 'kettle' | 'cassia';
 /** The order of the hero select screen. */
 export const HERO_IDS: readonly HeroId[] = [
   'rook', 'tr9', 'bram', 'kael', 'vharn', 'oom', 'corvin', 'veyl', 'kresh', 'joren', 'elara', 'triad',
+  'dax', 'grunda', 'kettle', 'cassia',
 ];
+/**
+ * The first twelve heroes are painted at boot; the ones after them only when first shown (see
+ * `bakeLate` in sprites.ts), so a fresh save's boot makes the same textures as before.
+ */
+export const BOOT_HEROES = 12;
+/** Whether a hero is one of the later ones, painted when first shown. */
+export const isLate = (id: HeroId) => HERO_IDS.indexOf(id) >= BOOT_HEROES;
 
 /**
  * How a hero's primary attack works. Every gun aims at the nearest foe: Rook's two pistols take
@@ -19,7 +30,7 @@ export const HERO_IDS: readonly HeroId[] = [
  * knight has an attack of their own (see `blades.ts`).
  */
 export type AimMode =
-  | 'nearest-two' | 'nearest' | 'triad'
+  | 'nearest-two' | 'nearest' | 'triad' | 'zap'
   | 'slash' | 'throw' | 'ripple' | 'spin' | 'chain' | 'orbit' | 'flurry';
 
 /** A weapon class and a side, each with a pool of skills its heroes draw cards from. */
@@ -74,6 +85,8 @@ export interface HeroDef {
   blurb: TextKey;
   /** The kind line of a card of this hero's paths ("ROOK PATH"). */
   pathKind: TextKey;
+  /** One of the crew (Dax Morrow and the heroes after him): their weapons, signatures and paths are in `crew.ts`. */
+  crew?: boolean;
   /** Locked until a deed is done (see `checkDeeds` in blades.ts and `save.ts`); the deeds are never shown in the game. */
   locked?: boolean;
 }
@@ -368,10 +381,112 @@ export const HEROES: Record<HeroId, HeroDef> = {
     pathKind: 'triadPathKind',
     locked: true,
   },
+  dax: {
+    id: 'dax',
+    name: 'daxName',
+    short: 'daxShort',
+    weapon: 'daxWeapon',
+    pools: ['blaster'],
+    schemes: [{ name: 'Smuggler', body: '#3a3128', accent: '#7ee08a', mark: '#e8dcc0', bolt: '#ff7a5a' }],
+    maxHp: 125,
+    speed: 152,
+    aim: 'nearest',
+    fireMs: 480,
+    pellets: 1,
+    spread: 0,
+    jitter: 0.02,
+    damage: 17,
+    boltSpeed: 720,
+    range: 360,
+    signature: { name: 'daxSignature', text: 'daxSignatureText', cooldownMs: 14_000 },
+    paths: ['fast-hands', 'smugglers-run', 'lucky-streak'],
+    blurb: 'daxBlurb',
+    pathKind: 'daxPathKind',
+    crew: true,
+    locked: true,
+  },
+  grunda: {
+    id: 'grunda',
+    name: 'grundaName',
+    short: 'grundaShort',
+    weapon: 'grundaWeapon',
+    pools: ['blaster'],
+    // A big, furred body.
+    r: 17,
+    schemes: [{ name: 'Fur', body: '#8a6a48', accent: '#f0a050', mark: '#4a3826', bolt: '#9cff6a' }],
+    maxHp: 160,
+    speed: 130,
+    aim: 'nearest',
+    fireMs: 800,
+    pellets: 1,
+    spread: 0,
+    jitter: 0.02,
+    damage: 13,
+    boltSpeed: 600,
+    range: 340,
+    signature: { name: 'grundaSignature', text: 'grundaSignatureText', cooldownMs: 16_000 },
+    paths: ['heavy-bolts', 'wild-heart', 'warcry'],
+    blurb: 'grundaBlurb',
+    pathKind: 'grundaPathKind',
+    crew: true,
+    locked: true,
+  },
+  kettle: {
+    id: 'kettle',
+    name: 'kettleName',
+    short: 'kettleShort',
+    weapon: 'kettleWeapon',
+    pools: ['blaster'],
+    // A small droid.
+    r: 10,
+    schemes: [{ name: 'Shell', body: '#d8dde6', accent: '#4da6ff', mark: '#3a4a66', bolt: '#7fdfff' }],
+    maxHp: 100,
+    speed: 192,
+    aim: 'zap',
+    fireMs: 340,
+    pellets: 1,
+    spread: 0,
+    jitter: 0,
+    damage: 12,
+    boltSpeed: 560,
+    range: 140,
+    signature: { name: 'kettleSignature', text: 'kettleSignatureText', cooldownMs: 11_000 },
+    paths: ['prod', 'hacker', 'spare-parts'],
+    blurb: 'kettleBlurb',
+    pathKind: 'kettlePathKind',
+    crew: true,
+    locked: true,
+  },
+  cassia: {
+    id: 'cassia',
+    name: 'cassiaName',
+    short: 'cassiaShort',
+    weapon: 'cassiaWeapon',
+    pools: ['blaster'],
+    schemes: [{ name: 'Shadow', body: '#1c1f2a', accent: '#ff5c8a', mark: '#5a6070', bolt: '#ff8fb0' }],
+    maxHp: 90,
+    speed: 150,
+    aim: 'nearest',
+    fireMs: 1150,
+    pellets: 1,
+    spread: 0,
+    jitter: 0,
+    damage: 31,
+    boltSpeed: 1150,
+    range: 540,
+    signature: { name: 'cassiaSignature', text: 'cassiaSignatureText', cooldownMs: 13_000 },
+    paths: ['deadeye', 'ghost', 'spymaster'],
+    blurb: 'cassiaBlurb',
+    pathKind: 'cassiaPathKind',
+    crew: true,
+    locked: true,
+  },
 };
 
 /** Whether a hero fights with a blade (a knight) rather than a blaster. */
 export const isKnight = (id: HeroId) => HEROES[id].pools.includes('blade');
+/** Whether a hero is one of the crew (see `crew.ts`). */
+export const isCrew = (id: HeroId) => HEROES[id].crew === true;
 
 /** The colour scheme a hero is drawn in: the first of its schemes, or `variant` when it has one. */
 export function schemeOf(id: HeroId, variant = 0): HeroScheme {

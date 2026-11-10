@@ -893,7 +893,14 @@ export function checkDeeds(s: GameState) {
   done('vharn', s.hero === 'kael' && rank(s, 'the-fall') >= 5);
   done('elara', s.credits >= DEEDS.credits);
   done('triad', s.kills >= DEEDS.kills);
+  done('dax', s.chests >= DEEDS.chests);
+  done('grunda', s.hero === 'dax' && rank(s, 'smugglers-run') >= 5);
+  done('kettle', s.powerUps >= DEEDS.powerUps);
+  done('cassia', s.objectivesDone >= DEEDS.objectives);
 }
 
-/** Elara Voss's deed (credits held at once) and Triad-77's (foes defeated in one run). */
-export const DEEDS = { credits: 100, kills: 2500 };
+/**
+ * Elara Voss's deed (credits held at once), Triad-77's (foes defeated in one run), Dax Morrow's
+ * (chests opened), Kettle's (power-ups taken) and Cassia Vane's (side objectives done), all in one run.
+ */
+export const DEEDS = { credits: 100, kills: 2500, chests: 6, powerUps: 8, objectives: 6 };

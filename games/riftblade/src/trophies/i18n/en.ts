@@ -22,7 +22,7 @@ const en = {
   armouryFull: 'Fully stocked',
   armouryFullText: 'Buy every rank of every piece in the Armoury.',
   allHeroes: 'The full roster',
-  allHeroesText: 'Unlock all twelve heroes.',
+  allHeroesText: 'Unlock every hero.',
 };
 
 export default en;

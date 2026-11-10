@@ -70,6 +70,10 @@ export const DRILLS: Record<HeroId, { id: string; name: TextKey; blurb: TextKey;
   joren: { id: 'swordmaster', name: 'swordmasterName', blurb: 'swordmasterBlurb', steps: ['health', 'regen', 'damage', 'healthBig', 'regenBig'] },
   elara: { id: 'resistance-cell', name: 'resistanceCellName', blurb: 'resistanceCellBlurb', steps: ['damage', 'health', 'sig', 'fire', 'damageBig'] },
   triad: { id: 'hardened-chassis', name: 'hardenedChassisName', blurb: 'hardenedChassisBlurb', steps: ['armour', 'damage', 'armour', 'fire', 'damageBig'] },
+  dax: { id: 'old-hand', name: 'oldHandName', blurb: 'oldHandBlurb', steps: ['damage', 'fire', 'health', 'crit', 'damageBig'] },
+  grunda: { id: 'thick-fur', name: 'thickFurName', blurb: 'thickFurBlurb', steps: ['healthBig', 'armour', 'damage', 'regenBig', 'damageBig'] },
+  kettle: { id: 'self-repair', name: 'selfRepairName', blurb: 'selfRepairBlurb', steps: ['health', 'regen', 'speed', 'regenBig', 'damageBig'] },
+  cassia: { id: 'tradecraft', name: 'tradecraftName', blurb: 'tradecraftBlurb', steps: ['damage', 'crit', 'speed', 'damage', 'damageBig'] },
 };
 
 function drillDefs(): UpgradeDef[] {
@@ -145,6 +149,58 @@ const defs: UpgradeDef[] = [
   {
     id: 'uplink', kind: 'path', hero: 'triad', name: 'uplinkName', blurb: 'uplinkBlurb',
     tiers: ['uplink1', 'uplink2', 'uplink3', 'uplink4', 'uplink5'],
+  },
+  // Dax Morrow
+  {
+    id: 'fast-hands', kind: 'path', hero: 'dax', name: 'fastHandsName', blurb: 'fastHandsBlurb',
+    tiers: ['fastHands1', 'fastHands2', 'fastHands3', 'fastHands4', 'fastHands5'],
+  },
+  {
+    id: 'smugglers-run', kind: 'path', hero: 'dax', name: 'smugglersRunName', blurb: 'smugglersRunBlurb',
+    tiers: ['smugglersRun1', 'smugglersRun2', 'smugglersRun3', 'smugglersRun4', 'smugglersRun5'],
+  },
+  {
+    id: 'lucky-streak', kind: 'path', hero: 'dax', name: 'luckyStreakName', blurb: 'luckyStreakBlurb',
+    tiers: ['luckyStreak1', 'luckyStreak2', 'luckyStreak3', 'luckyStreak4', 'luckyStreak5'],
+  },
+  // Grunda
+  {
+    id: 'heavy-bolts', kind: 'path', hero: 'grunda', name: 'heavyBoltsName', blurb: 'heavyBoltsBlurb',
+    tiers: ['heavyBolts1', 'heavyBolts2', 'heavyBolts3', 'heavyBolts4', 'heavyBolts5'],
+  },
+  {
+    id: 'wild-heart', kind: 'path', hero: 'grunda', name: 'wildHeartName', blurb: 'wildHeartBlurb',
+    tiers: ['wildHeart1', 'wildHeart2', 'wildHeart3', 'wildHeart4', 'wildHeart5'],
+  },
+  {
+    id: 'warcry', kind: 'path', hero: 'grunda', name: 'warcryName', blurb: 'warcryBlurb',
+    tiers: ['warcry1', 'warcry2', 'warcry3', 'warcry4', 'warcry5'],
+  },
+  // KT-4 "Kettle"
+  {
+    id: 'prod', kind: 'path', hero: 'kettle', name: 'prodName', blurb: 'prodBlurb',
+    tiers: ['prod1', 'prod2', 'prod3', 'prod4', 'prod5'],
+  },
+  {
+    id: 'hacker', kind: 'path', hero: 'kettle', name: 'hackerName', blurb: 'hackerBlurb',
+    tiers: ['hacker1', 'hacker2', 'hacker3', 'hacker4', 'hacker5'],
+  },
+  {
+    id: 'spare-parts', kind: 'path', hero: 'kettle', name: 'sparePartsName', blurb: 'sparePartsBlurb',
+    tiers: ['spareParts1', 'spareParts2', 'spareParts3', 'spareParts4', 'spareParts5'],
+  },
+  // Cassia Vane
+  {
+    id: 'deadeye', kind: 'path', hero: 'cassia', name: 'deadeyeName', blurb: 'deadeyeBlurb',
+    tiers: ['deadeye1', 'deadeye2', 'deadeye3', 'deadeye4', 'deadeye5'],
+  },
+  {
+    id: 'ghost', kind: 'path', hero: 'cassia', name: 'ghostName', blurb: 'ghostBlurb',
+    tiers: ['ghost1', 'ghost2', 'ghost3', 'ghost4', 'ghost5'],
+  },
+  {
+    id: 'spymaster', kind: 'path', hero: 'cassia', name: 'spymasterName', blurb: 'spymasterBlurb',
+    tiers: ['spymaster1', 'spymaster2', 'spymaster3', 'spymaster4', 'spymaster5'],
   },
   // The Blaster pool
   {
@@ -433,6 +489,18 @@ export const CAPSTONES: readonly CapstoneDef[] = [
   { id: 'endless-ranks', name: 'endlessRanksName', hero: 'triad', path: 'firing-line', gear: 'overclock', text: 'endlessRanksText' },
   { id: 'assembly-line', name: 'assemblyLineName', hero: 'triad', path: 'factory', gear: 'magnet', text: 'assemblyLineText' },
   { id: 'hive-signal', name: 'hiveSignalName', hero: 'triad', path: 'uplink', gear: 'boots', text: 'hiveSignalText' },
+  { id: 'fan-the-hammer', name: 'fanTheHammerName', hero: 'dax', path: 'fast-hands', gear: 'overclock', text: 'fanTheHammerText' },
+  { id: 'full-throttle', name: 'fullThrottleName', hero: 'dax', path: 'smugglers-run', gear: 'boots', text: 'fullThrottleText' },
+  { id: 'jackpot', name: 'jackpotName', hero: 'dax', path: 'lucky-streak', gear: 'magnet', text: 'jackpotText' },
+  { id: 'siege-crossbow', name: 'siegeCrossbowName', hero: 'grunda', path: 'heavy-bolts', gear: 'overclock', text: 'siegeCrossbowText' },
+  { id: 'second-wind', name: 'secondWindName', hero: 'grunda', path: 'wild-heart', gear: 'medpack', text: 'secondWindText' },
+  { id: 'thunder-lungs', name: 'thunderLungsName', hero: 'grunda', path: 'warcry', gear: 'armour', text: 'thunderLungsText' },
+  { id: 'arc-welder', name: 'arcWelderName', hero: 'kettle', path: 'prod', gear: 'overclock', text: 'arcWelderText' },
+  { id: 'botnet', name: 'botnetName', hero: 'kettle', path: 'hacker', gear: 'magnet', text: 'botnetText' },
+  { id: 'reboot', name: 'rebootName', hero: 'kettle', path: 'spare-parts', gear: 'armour', text: 'rebootText' },
+  { id: 'clean-shot', name: 'cleanShotName', hero: 'cassia', path: 'deadeye', gear: 'overclock', text: 'cleanShotText' },
+  { id: 'vanish', name: 'vanishName', hero: 'cassia', path: 'ghost', gear: 'boots', text: 'vanishText' },
+  { id: 'dossier', name: 'dossierName', hero: 'cassia', path: 'spymaster', gear: 'magnet', text: 'dossierText' },
 ];
 
 export interface CrossoverDef {
@@ -616,6 +684,7 @@ export const BRANCHES: Record<BranchId, { name: TextKey; tiers: readonly [Gains,
 /** Upgrades that keep the hero standing: they branch into guard first. */
 const GUARD_FIRST = new Set([
   'riot-shield', 'life-support', 'stillness', 'bulwark', 'council-seat', 'rebuilt', 'diplomat', 'factory',
+  'wild-heart', 'spare-parts', 'ghost',
   'riposte', 'iron-skin', 'mending', 'foresight', 'calm-mind', 'battle-trance', 'drain', 'soul-harvest',
   'armour', 'medpack', 'barrier', 'boots', 'stim',
   ...Object.values(DRILLS).map((d) => d.id),

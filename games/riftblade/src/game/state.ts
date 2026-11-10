@@ -197,6 +197,8 @@ export interface Bullet {
   toad: boolean;
   /** Ms before a thrown blade can cut the boss it is passing through again. */
   bossMs: number;
+  /** Grunda's bursting bolts: the damage of the burst where it first hits (0 or left out: none). */
+  burst?: number;
 }
 
 /** A blade's swing on screen: an arc (a full ring when `half` is pi) that fades. */
@@ -274,11 +276,13 @@ export interface Fire {
  * Allies; the escort is the stranded bot of the event, for one planet. The knights': Kael's
  * strafing starfighter, his Squadron Run fighters and bot co-pilot, Oom's spirits and Veyl's
  * puppets. Elara Voss's rebel commandos, speeder bike and medic; Triad-77's rolling shield bots,
- * command bot and spare battle bots (`spare`, for a while).
+ * command bot and spare battle bots (`spare`, for a while). The crew's: Dax Morrow's freighter on
+ * its fly-by, Kettle's repair drone (`patch`) and Cassia Vane's spy drone.
  */
 export type AllyKind =
   | 'trooper' | 'legionary' | 'brother' | 'drone' | 'escort' | 'fighter' | 'squadron' | 'copilot' | 'spirit' | 'puppet'
-  | 'commando' | 'bike' | 'medic' | 'shieldbot' | 'command' | 'spare' | 'thawed';
+  | 'commando' | 'bike' | 'medic' | 'shieldbot' | 'command' | 'spare' | 'thawed'
+  | 'freighter' | 'patch' | 'spydrone';
 
 export interface Ally {
   id: number;
@@ -605,6 +609,8 @@ export interface GameState {
   bots: Bot[];
   formation: 'spread' | 'column';
   scrap: number;
+  /** Cassia Vane's Cloak: where she vanished, which the foes go for while it lasts (null when seen). */
+  decoy: { x: number; y: number } | null;
 }
 
 /** The sea over half the field: the water's edge runs through `x`, `y`, and the water lies the way of `angle` from it. */
@@ -743,6 +749,7 @@ export function freshState(): GameState {
     bots: [],
     formation: 'spread',
     scrap: 0,
+    decoy: null,
   };
 }
 
@@ -802,9 +809,10 @@ export function statsOf(s: GameState): Stats {
   const bounces = at([1, 2, 2, 3, 4], r('ricochet'), 0) + (r('gunslinger') >= 2 ? 1 : 0) + (r('gunslinger') >= 5 ? 1 : 0);
   const k = s.hero ? knightMods(s) : NO_MODS;
   const q = squadMods(s);
+  const w = crewMods(s);
   const d = drillMods(s);
-  fireRate += q.fireRate + d.fireRate;
-  if (pierce < 999) pierce += q.pierce;
+  fireRate += q.fireRate + d.fireRate + w.fireRate;
+  if (pierce < 999) pierce += q.pierce + w.pierce;
   // Adrenal Stim: faster and harder while health is low.
   const p = s.player;
   const stim = p.maxHp > 0 && p.hp < p.maxHp * 0.4 ? at([0.1, 0.15, 0.2, 0.25, 0.3], r('stim'), 0) : 0;
@@ -814,17 +822,17 @@ export function statsOf(s: GameState): Stats {
   const gv = (k: keyof typeof g) => g[k] ?? 0;
   const slow = at([0.25, 0.3, 0.35, 0.4, 0.5], r('stun'), 0);
   return {
-    speed: hero.speed * (1 + 0.08 * r('boots')) * k.speed * (1 + d.speed + stim + gv('speed')) * (mut('haste') ? MUT.haste : 1),
+    speed: hero.speed * (1 + 0.08 * r('boots')) * k.speed * w.speed * (1 + d.speed + stim + gv('speed')) * (mut('haste') ? MUT.haste : 1),
     pickup: PICKUP_R * (1 + 0.3 * r('magnet') + PERK.lens * (s.perks.lens ?? 0) + gv('pickup')) * (s.lureMs > 0 ? POWER.lure : 1),
-    armour: topUp(0.08 * r('armour') + k.armour + d.armour, gv('armour'), 0.8),
-    maxHp: s.hero === 'triad' ? botMax(s) * botCount(s) : Math.round((hero.maxHp + 10 * r('armour') + k.hp + d.hp + gv('hp')) * s.maxHpMod),
-    regen: mut('vampire') ? 0 : 0.5 * r('medpack') + k.regen + d.regen + gv('regen'),
+    armour: topUp(0.08 * r('armour') + k.armour + d.armour + w.armour, gv('armour'), 0.8),
+    maxHp: s.hero === 'triad' ? botMax(s) * botCount(s) : Math.round((hero.maxHp + 10 * r('armour') + k.hp + d.hp + w.hp + gv('hp')) * s.maxHpMod),
+    regen: mut('vampire') ? 0 : 0.5 * r('medpack') + k.regen + d.regen + w.regen + gv('regen'),
     cooldown: (1 - 0.07 * r('overclock')) * (1 - Math.min(0.5, gv('cooldown'))),
     damage:
-      (1 + 0.1 * r('cell')) * (1 + at([0, 0.1, 0.1, 0.2, 0.2], r('overcharge'), 0)) * (1 + at([0, 0.25, 0.25, 0.25, 0.75], r('marksman'), 0)) * k.damage * q.damage *
+      (1 + 0.1 * r('cell')) * (1 + at([0, 0.1, 0.1, 0.2, 0.2], r('overcharge'), 0)) * (1 + at([0, 0.25, 0.25, 0.25, 0.75], r('marksman'), 0)) * k.damage * q.damage * w.damage *
       (1 + d.damage) * (1 + stim) * (1 + gv('damage')) * (mut('glass') ? MUT.glassDmg : 1) * (s.mastery >= MASTERY.damageAt ? 1 + MASTERY.damage : 1),
     xp: 1 + 0.1 * r('lens') + gv('xp'),
-    crit: 0.06 * r('chip') + k.crit + d.crit + gv('crit'),
+    crit: 0.06 * r('chip') + k.crit + d.crit + w.crit + gv('crit'),
     fireRate: (fireRate + gv('fireRate')) * overdrive,
     pierce: pierce < 999 ? pierce + gv('pierce') : pierce,
     bounces: bounces + gv('bounces'),
@@ -833,11 +841,11 @@ export function statsOf(s: GameState): Stats {
     slowMs: r('stun') >= 3 ? 2000 : 1500,
     reach: k.reach * (1 + gv('reach')),
     dodge: topUp(k.dodge, gv('dodge'), 0.6),
-    sigCooldown: (1 - 0.07 * r('overclock')) * k.sig * q.sig * (1 - d.sig) * (1 - Math.min(0.5, gv('sig'))) * (mut('overcharged') ? MUT.overcharged : 1),
+    sigCooldown: (1 - 0.07 * r('overclock')) * k.sig * q.sig * w.sig * (1 - d.sig) * (1 - Math.min(0.5, gv('sig'))) * (mut('overcharged') ? MUT.overcharged : 1),
     bossDmg: 1 + 0.1 * r('scanner') + gv('boss'),
     execute: at([0.08, 0.1, 0.12, 0.15, 0.18], r('executioner'), 0) + gv('execute'),
     harvest: at([0.4, 0.6, 0.8, 1, 1.3], r('soul-harvest'), 0) + gv('harvest'),
-    creditMul: 1 + 0.2 * r('salvager') + gv('credits'),
+    creditMul: 1 + 0.2 * r('salvager') + w.credits + gv('credits'),
   };
 }
 
@@ -881,6 +889,49 @@ function squadMods(s: GameState) {
     mods.fireRate += at([0.2, 0.2, 0.2, 0.2, 0.45], r('firing-line'), 0) + (r('uplink') >= 1 ? 0.15 : 0);
     mods.pierce += r('firing-line') >= 3 ? 1 : 0;
     mods.damage *= r('uplink') >= 4 ? 1.25 : 1;
+  }
+  return mods;
+}
+
+/**
+ * What the crew's paths and natures add to the stats (all neutral for anyone else): Grunda's Rage
+ * and Wild Heart, Kettle's self-repair and Spare Parts, Cassia's long rifle and Ghost, Dax's luck.
+ */
+function crewMods(s: GameState) {
+  const r = (id: string) => s.ranks[id] ?? 0;
+  const cap = (id: string) => s.capstones.includes(id);
+  const mods = { fireRate: 0, pierce: 0, damage: 1, sig: 1, speed: 1, armour: 0, hp: 0, regen: 0, crit: 0, credits: 0 };
+  const p = s.player;
+  const missing = p.maxHp > 0 ? Math.max(0, 1 - p.hp / p.maxHp) : 0;
+  if (s.hero === 'dax') {
+    mods.fireRate += (r('fast-hands') >= 1 ? 0.15 : 0) + (r('fast-hands') >= 4 ? 0.2 : 0);
+    mods.sig *= r('smugglers-run') >= 3 ? 0.75 : 1;
+    if (cap('full-throttle')) mods.speed *= 1.15;
+    mods.credits += r('lucky-streak') >= 1 ? 0.2 : 0;
+    mods.crit += r('lucky-streak') >= 3 ? 0.08 : 0;
+    if (r('lucky-streak') >= 5 && s.credits >= 50) mods.damage *= 1.15;
+  } else if (s.hero === 'grunda') {
+    // Her bolts pierce from the start; Rage: up to +60% damage (+90% on Wild Heart) as health runs out.
+    mods.pierce += 1 + (r('heavy-bolts') >= 1 ? 1 : 0);
+    mods.damage *= (r('heavy-bolts') >= 2 ? 1.15 : 1) * (1 + (r('wild-heart') >= 1 ? 0.9 : 0.6) * missing);
+    const low = missing > 0.5;
+    if (low && r('wild-heart') >= 2) mods.regen += 1;
+    if (low && r('wild-heart') >= 4) mods.speed *= 1.15;
+    if (missing > 0.7 && r('wild-heart') >= 5) mods.armour += 0.2;
+    mods.sig *= r('warcry') >= 3 ? 0.75 : 1;
+  } else if (s.hero === 'kettle') {
+    // He mends himself as he goes.
+    mods.regen += 1.5 + (r('spare-parts') >= 1 ? 1 : 0);
+    mods.hp += r('spare-parts') >= 2 ? 25 : 0;
+    mods.armour += r('spare-parts') >= 4 ? 0.15 : 0;
+    mods.damage *= r('prod') >= 2 ? 1.3 : 1;
+    mods.sig *= r('hacker') >= 5 ? 0.7 : 1;
+  } else if (s.hero === 'cassia') {
+    mods.pierce += 2 + (r('deadeye') >= 1 ? 1 : 0) + (r('deadeye') >= 4 ? 2 : 0);
+    mods.crit += r('deadeye') >= 3 ? 0.12 : 0;
+    mods.damage *= r('deadeye') >= 5 ? 1.3 : 1;
+    mods.sig *= r('ghost') >= 4 ? 0.75 : 1;
+    if (p.sigActiveMs > 0 && r('ghost') >= 3) mods.speed *= 1.3;
   }
   return mods;
 }
@@ -978,6 +1029,7 @@ export const WORLD_OBJECTIVES: readonly ObjectiveId[] = ['cache', 'nests', 'thaw
 export const HERO_OBJECTIVES: Record<HeroId, ObjectiveId> = {
   rook: 'quickdraw', tr9: 'dropzone', bram: 'recon', kael: 'duel', vharn: 'unbroken', oom: 'lift', corvin: 'pilgrim',
   veyl: 'storm', kresh: 'bloodtrail', joren: 'monolith', elara: 'signal', triad: 'salvage',
+  dax: 'quickdraw', grunda: 'unbroken', kettle: 'salvage', cassia: 'recon',
 };
 /** When each of a world's three objectives starts (ms of world time). */
 export const OBJECTIVE_AT = [60_000, 135_000, 210_000] as const;

@@ -11,21 +11,28 @@ of five minutes each, every one ending in its boss: the Dune world, then one of 
 Ocean, then one of Ice, Crystal, Storm and Ruin (each picked on the space map), then the Lava
 world, with a star map between them. A boss rush and hero mastery come on top.
 
-- Implemented: a hero select screen with twelve heroes in a 6x2 grid and a detail panel with a
-  Fight button: three soldiers (Captain Rook, Legionary TR-9, Corporal Bram-17), seven blade
-  knights (Kael Varro, Lord Vharn, Master Oom, Elder Corvin Hale, Regent Veyl, Kresh the
-  Twinblade, Master Joren Vask) and two more Blaster heroes, Commander Elara Voss and Triad-77.
+- Implemented: a hero select screen with sixteen heroes in an 8x3 grid (room for 24) and a detail
+  panel with a Fight button: three soldiers (Captain Rook, Legionary TR-9, Corporal Bram-17), seven
+  blade knights (Kael Varro, Lord Vharn, Master Oom, Elder Corvin Hale, Regent Veyl, Kresh the
+  Twinblade, Master Joren Vask), two more Blaster heroes, Commander Elara Voss and Triad-77, and
+  the crew, four more Blaster heroes with mechanics of their own (`crew.ts`): Dax Morrow (a heavy
+  pistol whose first shot at an unhurt foe is critical, Luck: every second chest gives a free
+  card, Fly-By: a `freighter` ally strafes the swarm), Grunda (a piercing crossbow that knocks foes
+  back, Rage from missing health, Roar: a stun and throw), KT-4 "Kettle" (aim `zap`: a short chain
+  zap drawn as `state.zaps`, self-repair, Hack: foes turned with `charmMs`) and Cassia Vane (a long
+  rifle, Cloak: untouchable while foes walk to `state.decoy`, her next shot triple; Spymaster marks
+  through `state.mark`).
   Only TR-9 is open on a fresh save; every other hero is unlocked by a deed (`checkDeeds`), never
   shown in the game: a locked card is a dark placeholder (`rb-locked`, no art, name or colour) and
   its detail panel says only "Locked". A deed done mid-run pauses the game on the new hero's panel
   until Continue. Each hero has an auto-attacking weapon, a
   signature move (Space or the round button), three five-tier paths and a fourth, its drill (plain
   stat gains, `DRILLS`). Pools by weapon class
-  and side: Blaster (10 skills: soldiers, Elara, Triad-77), Blade (8, knights), Current (6: Kael, Oom, Corvin,
+  and side: Blaster (10 skills: soldiers, Elara, Triad-77, the crew), Blade (8, knights), Current (6: Kael, Oom, Corvin,
   Joren) and Hollow (6: Vharn, Veyl, Kresh, and Kael once he takes The Fall); Joren may also draw
   Lightning Arc. The shared Gear deck (12 pieces), the 7-ability and 5-gear limits, level-ups with
   three cards (four for Elara, her Hope; at least one of the hero's own paths while any are left,
-  the Field Ration as filler), 36 capstones and 13 crossovers (the cards show a link icon);
+  the Field Ration as filler), 48 capstones and 13 crossovers (the cards show a link icon);
   specialisations (at tier 5 every upgrade branches into three, `BRANCHES`; the first taken gives
   its tiers 6 and 7 and shuts out the other two) and 20 fusions (`FUSIONS`: two skills at tier 3 fuse
   into a third with three tiers and no slot; taking one locks its rivals and the skills it names); gold-ringed elites with
@@ -133,7 +140,7 @@ world, with a star map between them. A boss rush and hero mastery come on top.
   `won` false and nothing banked, then `recordEndless` keeps the best in `progress.endless` and
   banks `ENDLESS_SALVAGE` per world cleared. The HUD tag adds "rift loop n"; `nextStage` and the
   space map's `route` (the last `stage + 1` planets) keep the maps right on later loops.
-- The codex (`codex.ts`): `CODEX_PAGES` (foes 20, bosses 10, pool skills 30, gear 12, hero paths 48,
+- The codex (`codex.ts`): `CODEX_PAGES` (foes 20, bosses 10, pool skills 30, gear 12, hero paths 64,
   each with its pay) of entries `foe:<kind>`, `boss:<id>` and `card:<upgrade id>`.
   `GameScene.recordCodex` runs every frame of a run: `codexNew` lists what the state shows that
   `codexKnown` (the save's entries) lacks (foes and the boss on the field, the cards on offer and
@@ -156,7 +163,7 @@ world, with a star map between them. A boss rush and hero mastery come on top.
   condition holds (the first call of a page quietly): `firstBoss` (a stage past the Dune world or a
   boss down, or a saved furthest jump of 2), `capstone` (one in the run), `newHero` (two heroes
   open), `firstPiece` (any Armoury rank), `crusade` (any win), `weekly` (`progress.weekly.won`),
-  `heat3` and `heat5` (best heat won), `armouryFull` (every rank bought) and `allHeroes` (all twelve
+  `heat3` and `heat5` (best heat won), `armouryFull` (every rank bought) and `allHeroes` (every hero
   open, hidden). The playthrough's first minute earns none. There are ten, the most a game may
   have, so the daily, the endless rift and the codex brought none.
 - Hero mastery (`mastery.ts`): every run gives its hero mastery XP (`masteryXp`: `perBoss` a
@@ -208,7 +215,8 @@ world, with a star map between them. A boss rush and hero mastery come on top.
   button, the `pathKind` line of their path cards, `r`, `armour` and `locked`)
   and each hero's `schemes` (`HeroScheme`: `name`, `body`, `accent`, optional `mark`, `bolt`);
   `schemeOf(id, variant)` returns a scheme (Kael has a second, Fallen, used once he takes The
-  Fall), `isKnight`. All hero colours come from here; each hero's accent is unique (Elara's red,
+  Fall), `isKnight`, `isCrew` (the four heroes `crew.ts` plays), `BOOT_HEROES` (12: the heroes
+  painted at boot) and `isLate` (a hero from the thirteenth on, painted when first shown). All hero colours come from here; each hero's accent is unique (Elara's red,
   Triad-77's white), except Kael's Fallen scheme, which takes Lord Vharn's colours. `locked` marks a hero that needs a deed (all but TR-9); Triad-77's `maxHp`
   is the sum of its three bots' and its `r` the whole unit's.
 - `src/game/upgrades.ts`: `UPGRADES` (every path, pool skill and gear piece, with five tier lines),
@@ -266,7 +274,7 @@ world, with a star map between them. A boss rush and hero mastery come on top.
   `OBJECTIVE_AT`, `StructureKind`), `DIFF` (difficulty), `freshState`, `xpFor` (5 + 2·level +
   level²/3: a little quicker than before for the first levels, slower from level 8 and much slower
   later), `statsOf` (the hero's numbers from upgrades and
-  `maxHpMod`, with `squadMods` for Elara and Triad-77 and `drillMods` for the drills; `bossDmg`,
+  `maxHpMod`, with `squadMods` for Elara and Triad-77, `crewMods` for the crew and `drillMods` for the drills; `bossDmg`,
   `execute`, `harvest` and `creditMul` are the Threat Scanner, Executioner Rounds, Soul Harvest and
   Salvage Rig), `botCount` and `botMax` (Triad-77's
   bots and their health), `refreshUnlocks` and `clock`. `Bot` and `Flag` are Triad-77's bots
@@ -289,7 +297,8 @@ world, with a star map between them. A boss rush and hero mastery come on top.
   and `stats`, `near`, `nearest`, `swarmSpot`, `bolt`, `volley`, `ready`, `knock`, `damage`,
   `explode`, `addBomb`, `heal` and `SHORT_LIVED` (allies gone after a fight) for `blades.ts`,
   `squad.ts` and `voyage.ts`. Knight code runs only when the hero `isKnight`, squad code only for
-  Elara and Triad-77, so the soldiers' `Math.random` order is unchanged. `hurtHero` takes where a hit
+  Elara and Triad-77 and crew code only when the hero `isCrew`, so the soldiers' `Math.random`
+  order is unchanged. `hurtHero` takes where a hit
   came from (Triad-77's nearest bot takes it). TR-9's Drop Squad troopers (`legionary` allies)
   land with a drop pod (an `orbital` bomb) in `syncAllies`. Foes with `charmMs` (Persuasion's
   turned foes and the Diplomat's confused ones) fight other foes in `turned`.
@@ -314,6 +323,19 @@ world, with a star map between them. A boss rush and hero mastery come on top.
   commandos, `bike`, `medic`, `shieldbot`, `command`, `spare`; `droneSpot` for Eyes in the Sky) and
   hooks (`squadHurt`, `hurtFactor`, `squadHeal`, `squadCrit`, `turnedBonus`, `squadKill`,
   `squadBlock`, `bubble`, `rebuildTime`). `AID`, `BUBBLE` and `TRIAD` hold their numbers.
+- `src/game/crew.ts`: Dax Morrow, Grunda, Kettle and Cassia Vane, called from `sim.ts` like
+  `squad.ts` (behind its `crew` flag): `crewAttack` (Dax's pistol with Fast Hands' extra bolts,
+  Grunda's crossbow with bursting bolts (`Bullet.burst`), Kettle's chain `zap`, Cassia's rifle
+  with the Cloak's triple shot through `player.charge`), `crewSignature` (`flyBy`, `roar`, `hack`,
+  which spends nothing with no foe to take, and `cloak`), `crewAbilities` (the freighter and Roar
+  on their own with Smuggler's Run 5, Full Throttle and Thunder Lungs, Botnet, Cassia's marks),
+  allies (`crewAllies`, `moveCrewAlly`: `freighter` (short-lived), `patch` and `spydrone`) and
+  hooks: `crewHit` (Dax's first-shot crit, Deadeye and the mark in `damage`), `crewRange`,
+  `crewUntouchable`, `crewTarget` (the decoy in `moveEnemies`), `crewTurned`, `crewKill`,
+  `crewKillHeal`, `crewChest` (Luck and Jackpot in `openChest`), `crewHurt`, `crewRescue` (Second
+  Wind and Reboot, once a world through `player.saved`) and `crewBoltHit` (Grunda's knockback and
+  bursts in `moveBullets`). `FLYBY`, `ROAR`, `ZAP` and `CLOAK` hold their numbers; their stat
+  numbers are `crewMods` in `state.ts`.
 - `src/game/objectives.ts`: the side objectives, called from `sim.ts` once a step like `squad.ts`
   (it imports `sim.ts`, so the same rule about load-time values holds): `OBJ` (each one's time
   limit, goal, zone radius and reward), `OBJ_MISC` (pushes, escort and pilgrim, nests, vents, the
@@ -363,17 +385,22 @@ world, with a star map between them. A boss rush and hero mastery come on top.
   `rebel` in `squad.ts`), the bots (`rb-clanker`, `rb-clanker-elite`, `rb-roller`, `-armed`,
   `-elite`, `rb-boss`), bolts (`rb-bolt-<HeroId>`, `-drone`, `-heavy`, `-rocket`, `-shell`),
   shards, `rb-medkit` (a green cross), `rb-chest`, `rb-drone`, `rb-charge`, `rb-grenade`, `rb-crate`, `rb-shadow`.
-  Every scheme is baked: `heroKey(id, variant)` is `rb-hero-<id>` or `rb-hero-<id>-<variant>`.
+  Every scheme of the first `BOOT_HEROES` is baked (the later ones by `bakeLate`, see
+  `art/crew.ts`): `heroKey(id, variant)` is `rb-hero-<id>` or `rb-hero-<id>-<variant>`.
 - `src/art/squad.ts`: `drawSquadHero` (Elara and the Triad-77 portrait; `drawHero` hands them to
   it), `bot`, `rebel` and `bakeSquad`: `rb-bot`, `rb-bot-down`, `rb-bike`, `rb-shieldbot`,
   `rb-command`, `rb-pod` (TR-9's drop pod) and `rb-locked` (the locked hero placeholder).
+- `src/art/crew.ts`: `drawCrewHero` (the crew, from their scheme; `drawHero` hands them to it)
+  and `bakeCrewAllies` (`rb-freighter`, `rb-patch`, `rb-spydrone`). Never painted at boot: `bakeLate`
+  in `sprites.ts` paints a later hero (its sprites, portrait, `rb-bolt-<id>` and allies) the first
+  time it is shown (`looks` and `portraitOf` in the panels, `GameScene.draw` for the hero played).
 - `src/art/knights.ts`: `drawKnight` (the knights, from their scheme; `drawHero` hands knights to
   it) and `bakeKnights`: the blades (`bladeKey`, `rb-blade-<id>`), `rb-fighter`, `rb-copilot`,
   `rb-spirit`, `rb-puppet`, `rb-wreck`, `rb-ship` and `rb-bolt-fallen`.
 - `src/scenes/layout.ts`: `VIEW` (the designed 960x540), `SCREEN` (the real view), `FRAME` (where
   the designed rectangle sits in it), `fitLayout`, `CENTER`, HUD places (`XP_BAR`, `HP_BAR`, `KIT`, `TIMER`,
   `LEVEL`, `PLANET_TAG`, `CREDITS_TAG`, `BOSS_BAR`, `OBJECTIVE_HUD`, `SIG_BUTTON`, `STICK`), card rectangles
-  (`heroCardRect` for the 6x2 grid, `HEAT_ROW`, `HEAT_DOWN` and `HEAT_UP` for the Heat row, `ARMOURY_BUTTON`, `armouryCardRect` and
+  (`heroCardRect` for the 8x3 grid, `HEAT_ROW`, `HEAT_DOWN` and `HEAT_UP` for the Heat row, `ARMOURY_BUTTON`, `armouryCardRect` and
   `BACK` for the Armoury, `CODEX_BUTTON`, `codexTabRect`, `CODEX_GRID`, `CODEX_BACK` and `SKILLS_BUTTON` for the codex, `skillTabRect`, `SKILL_LIST` and `SKILL_DETAIL` for the skill overview, `DAILY_BUTTON` for the daily run, `WEEKLY_BUTTON`, `MUTATOR_CARD`, `WEEKLY_START` and `WEEKLY_BACK` for the weekly run, `levelCardRect` with `LEVEL_CARD4` for four cards, `UNLOCK` and
   `CONTINUE` for the new hero panel, `CHART`, `chartSpot` / `chartRect` (the space map), `mapNodeRect` / `mapNodeSpot`, `tradeCardRect`, `REROLL`,
   `LEAVE`, `eventOptionRect`, `AGAIN`, and `ENDLESS_BUTTON` with `AGAIN_SIDE` after a win), `DEPTH`, `inside`.
@@ -391,8 +418,9 @@ world, with a star map between them. A boss rush and hero mastery come on top.
   `drawObjectiveHud`: the objective's lines at `OBJECTIVE_HUD` and the edge arrow). `splitHudCamera` keeps the HUD fixed. The panel is rebuilt whenever `panelKey`
   changes.
 - `src/ui/panels.ts`: `Panel` (HUD objects plus tappable `spots`) and the builders, each filling a
-  `Panel` it is handed: `heroSelect` (12 cards from
-  `heroCardRect`, keyed by `heroKeyLabel`, and the detail panel `HERO_DETAIL` with the `FIGHT`
+  `Panel` it is handed: `heroSelect` (a card per hero from
+  `heroCardRect`, keyed by `heroKeyLabel`; a locked card from the thirteenth on has no key label,
+  so a fresh save makes no more texts than before, and the detail panel `HERO_DETAIL` with the `FIGHT`
   button, and the Heat row (`heatRow`) once the hero has won, the detail lines shrinking to end
   above it; a locked hero shows only `rb-locked`), `armouryPanel` (the Armoury, see Current state), `weeklyPanel` (the weekly run), `dailyPanel` (the daily run), `codexPanel` (the codex), `skillsPanel` (the skill overview), `unlockPanel` (the new hero, with a `continue`
   spot), `levelUp` (also the arena's and an objective's reward, titled by `state.after`; three or four cards whose lines flow down; pool labels
@@ -457,7 +485,8 @@ walks the way of knob minus base, full speed at `STICK.r`, nothing inside `STICK
 draws it. A second touch pointer (`addPointer(1)`) lets the other thumb tap the signature. A pointerdown inside
 `SIG_BUTTON` (or Space) queues the signature for the next frame of the sim; a press it cannot take
 (during a level-up or a panel) is dropped. Panel cards are hit-tested with `viewPoint` against
-`panel.spots`. On the hero select, tapping a card (or 1-9, 0, then - and = for the last two) sets
+`panel.spots`. On the hero select, tapping a card (or 1-9, 0, - and = for the first twelve, the same with
+Shift for the next twelve) sets
 `GameScene.chosen` and tapping Fight (or Enter) starts the run, if the hero is unlocked, at the
 heat `heatFor` gives (`heatPick`, else the highest open); the Heat row's arrows, Left / Right and
 A / D step it. At a
@@ -525,14 +554,15 @@ events `map` (the space map too); trader `shop`; the end screen stops the music.
 the arena is won), `unlock` (a new hero), `win`, `lose`.
 
 **Effects** (`sfx.ts`), and where they play:
-- Hero bolts by colour (`boltSound`): `pistol` (Rook), `carbine` (TR-9), `spread` (Bram),
-  `blaster` (Elara), `botShot` (Triad-77, drones), `heavy`, `rocket`, `boomerang` (a spinning
+- Hero bolts by colour (`boltSound`): `pistol` (Rook, Dax), `carbine` (TR-9, Cassia), `spread` (Bram),
+  `blaster` (Elara), `heavy` also for Grunda's bolts, `botShot` (Triad-77, drones), `heavy`, `rocket`, `boomerang` (a spinning
   thrown blade), `saber` (The Fall's wave).
 - Knights' swings, from new `slashes` by aim mode: `saber` (Kael and other slashes), `ripple`
   (Oom), `spinHum` (Corvin), `flurry` with `ping` on every tenth (Joren); `crackle` for new `zaps`
-  (Veyl); `whir` every 0.7 s while a foe is near Kresh's staff.
+  (Veyl, Kettle); `whir` every 0.7 s while a foe is near Kresh's staff.
 - Signatures (`SIGNATURE`, on `signatures` going up): `sigHorn`, `sigPulse`, `sigToss`, `sigSlam`,
-  `sigForce`, `sigDash`, `sigRing`, `sigStorm`, `sigFlare`, `sigShift`. A signature asked for that
+  `sigForce`, `sigDash`, `sigRing`, `sigStorm`, `sigFlare`, `sigShift` (the crew reuse `sigHorn`,
+  `sigForce`, `sigStorm` and `sigShift`). A signature asked for that
   does not go off plays `ui('refuse')`.
 - New bombs: `toss` (grenade, frag), `charge`, `whistle` (crate, orbital, carpet). New blasts:
   `boom` (radius 90 and up, louder with size) or `pop`.
@@ -577,7 +607,7 @@ free of audio) or from the scene's input handler.
   must make the same texts as before (a fresh save has no wins, nothing banked, nothing in the
   codex and no run ended). The codex records during the playthrough's run (no `rand` draws), so a
   later page load would show its button.
-- The playthrough (`e2e/playthrough.spec.ts`) checks the twelve cards (all but TR-9 locked on a
+- The playthrough (`e2e/playthrough.spec.ts`) checks the sixteen cards (all but TR-9 locked on a
   fresh save), waits out Phaser's start-up easing on the select screen (140 frames; its first 120
   steps are cut short, so a run started during them would play differently depending on load
   time), taps Rook's locked card (no Fight button), then TR-9 and Fight, walks a circle by holding
@@ -614,9 +644,11 @@ free of audio) or from the scene's input handler.
   paths' and capstones' names and tiers; no deed text, deeds are never shown), three paths in
   `UPGRADES`, its capstones, its art in `drawKnight`, its attack in `knightAttack` (or reuse an aim
   mode), its signature in `knightSignature` and its deed in `checkDeeds` (and `isUnlocked` if older
-  saves should count), and the deed in the README. Then the select grid (`HERO_CARD` holds 12,
-  keyed 1-9, 0, - and =) and the playthrough's card list. A Blaster hero with mechanics of its own
-  goes in `squad.ts` the same way.
+  saves should count), and the deed in the README. Then the select grid (`HERO_CARD` holds 24,
+  keyed 1-9, 0, - and =, with Shift from the thirteenth) and the playthrough's card list. A Blaster
+  hero with mechanics of its own goes in `squad.ts` or `crew.ts` the same way (and its art is
+  painted by `bakeLate`, never at boot). Give it a `SIGNATURE` sound in `cues.ts`, a
+  `MASTERY_WEAPON` and `MASTERY_COLOURS`, a `HERO_OBJECTIVES` entry and a `DRILLS` row.
 - **A fusion**: add it to `FUSIONS` (two `needs` a hero can hold together, the `locks`, three tiers
   of `Gains`) with its name and blurb in `i18n/`; a gain of a new kind needs a `Stat`, a `gain*`
   text and its line in `statsOf`.
@@ -710,6 +742,12 @@ mostly on the Dune world. Things learned while tuning:
   and a shorter range broke its first minute), so it was nerfed through its drill, a 20 s Brace,
   a narrower Riot Shield (`shieldHalf`) and softer high-tier Suppressor burn and shield bash.
 - Bram-17 swings a lot with small damage changes.
+- The crew (Dax, Grunda, Kettle, Cassia) came later and were checked only with a smaller, simpler
+  bot (it keeps away from foes, gathers shards and closes on a boss to the hero's range; 12 to 20
+  runs a hero). With it Elara won about 30% and Master Oom 12%, against Dax about 64%, Grunda 67%,
+  Cassia 50% and Kettle 29%. That bot flatters ranged heroes that push foes back: Grunda won
+  over 90% before her health, damage, pierce, knockback and Roar were cut. Recheck the crew with
+  the full bot above before the next balance pass.
 
 ## Gotchas
 
@@ -721,7 +759,9 @@ mostly on the Dune world. Things learned while tuning:
 - Phaser draws on `Math.random` for the id of every texture it makes, so baking more textures at
   boot shifts the seeded sequence the playthrough's run starts with (Rook's run then sees other
   bots and cards; the rules are unchanged). That is why `bakeWorlds` and `bakeRealms` wait until a run leaves the
-  Dune world (or a rush starts), and `bakeMastery` until a hero in mastery colours is shown. Adding upgrades to a pool TR-9 draws from shifts his card rolls the same way; the
+  Dune world (or a rush starts), and `bakeMastery` until a hero in mastery colours is shown; the heroes from the thirteenth on
+  are painted by `bakeLate` when first shown (a locked card shows only `rb-locked`), so a fresh
+  save's select screen makes the same textures and texts as with twelve heroes. Adding upgrades to a pool TR-9 draws from shifts his card rolls the same way; the
   first minute then plays out differently and the playthrough needs a rerun.
 - The playthrough's animation frames sit on a fixed grid of 64 ms (the fake clock's timers can fire
   late on a busy machine), so each step is the same length.

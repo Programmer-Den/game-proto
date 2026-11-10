@@ -4,7 +4,7 @@
  * reports where its tappable rectangles are so the scene (and the playthrough test) can use them.
  */
 import Phaser from 'phaser';
-import { HEROES, HERO_IDS, schemeOf, type HeroDef, type HeroId } from '../game/heroes';
+import { BOOT_HEROES, HEROES, HERO_IDS, schemeOf, type HeroDef, type HeroId } from '../game/heroes';
 import { clock, type GameState } from '../game/state';
 import { BASE_TIER, BRANCHES, CAPSTONES, FILLER, FUSIONS, FUSION_BY_ID, FUSION_NEEDS, FUSION_PREFIX, POOL_NAMES, UPGRADES, branchesOf, capstoneFor, cardTiers, crossoverFor, fusionCard, fusionShuts, lockedOf, parseCard } from '../game/upgrades';
 import { cardName, gainsText, tierText } from '../game/cardText';
@@ -21,7 +21,7 @@ import { MUTATORS, WEEKLY_BONUS, type MutatorId } from '../game/weekly';
 import { formatDate, type Vars } from '../../../../shared/i18n';
 import { t } from '../i18n';
 import { C, hex } from '../art/glow';
-import { bakeMastery, masteryPortraitKey, masteryScheme, portraitKey } from '../art/sprites';
+import { bakeLate, bakeMastery, masteryPortraitKey, masteryScheme, portraitKey, portraitOf } from '../art/sprites';
 import { MASTERY, MASTERY_REWARDS, MAX_MASTERY, masteryLevel, masteryNext } from '../game/mastery';
 import { RUSH, rushPlanets } from '../game/rush';
 import {
@@ -143,7 +143,7 @@ function sideOf(hero: HeroDef) {
 }
 
 /**
- * The hero select screen: twelve small cards (a hero still locked shows only a dark placeholder:
+ * The hero select screen: a small card per hero (a hero still locked shows only a dark placeholder:
  * no art, name or colour, and never its deed) and the chosen hero's details with the Fight button.
  */
 export function heroSelect(p: Panel, progress: Progress, chosen: HeroId, heat = 0, week = -1, daily: DailyRecord | null = null) {
@@ -197,7 +197,7 @@ export function dailyPanel(p: Panel, record: DailyRecord, hero: HeroId, mutators
   const sch = schemeOf(hero);
   const hx = 300;
   p.text(hx, MUTATOR_CARD.y, t('dailyHero'), 13, C.muted, { origin: [0.5, 0] });
-  p.add(scene.add.image(hx, MUTATOR_CARD.y + 80, portraitKey(hero)).setScale(0.8), 2);
+  p.add(scene.add.image(hx, MUTATOR_CARD.y + 80, portraitOf(scene, hero)).setScale(0.8), 2);
   fit(p.text(hx, MUTATOR_CARD.y + 130, t(HEROES[hero].name), 19, sch.accent, { bold: true, origin: [0.5, 0] }), 300);
   mutators.forEach((id) => {
     const r = { x: 520, y: MUTATOR_CARD.y, w: MUTATOR_CARD.w, h: MUTATOR_CARD.h };
@@ -368,7 +368,7 @@ export function weeklyPanel(p: Panel, progress: Progress, week: number, hero: He
   const sch = schemeOf(hero);
   const hx = 220;
   p.text(hx, MUTATOR_CARD.y, t('weeklyHero'), 13, C.muted, { origin: [0.5, 0] });
-  p.add(scene.add.image(hx, MUTATOR_CARD.y + 80, portraitKey(hero)).setScale(0.8), 2);
+  p.add(scene.add.image(hx, MUTATOR_CARD.y + 80, portraitOf(scene, hero)).setScale(0.8), 2);
   fit(p.text(hx, MUTATOR_CARD.y + 130, t(HEROES[hero].name), 19, sch.accent, { bold: true, origin: [0.5, 0] }), 300);
   mutators.forEach((id, i) => {
     const r = { x: MUTATOR_CARD.x + i * MUTATOR_CARD.gap, y: MUTATOR_CARD.y, w: MUTATOR_CARD.w, h: MUTATOR_CARD.h };
@@ -425,13 +425,14 @@ export const wearsColours = (progress: Progress, id: HeroId) =>
 
 /** A hero's portrait key and accent as the select screen shows them (in its mastery colours when worn). */
 function looks(p: Panel, progress: Progress, id: HeroId) {
+  bakeLate(p.scene, id);
   if (!wearsColours(progress, id)) return { portrait: portraitKey(id), accent: schemeOf(id).accent };
   bakeMastery(p.scene, id);
   return { portrait: masteryPortraitKey(id), accent: masteryScheme(id).accent };
 }
 
-/** The key that picks the hero card at `i`: 1-9 and 0, then - and =. */
-export const heroKeyLabel = (i: number) => (i < 10 ? String((i + 1) % 10) : i === 10 ? '-' : '=');
+/** The key that picks the hero card at `i`: 1-9 and 0, then - and =; Shift with the same for the next twelve. */
+export const heroKeyLabel = (i: number) => (i >= 12 ? '⇧' : '') + (i % 12 < 10 ? String(((i % 12) + 1) % 10) : i % 12 === 10 ? '-' : '=');
 
 /** The colours of a locked hero's placeholder. */
 const LOCKED = { frame: '#2a3550', fill: '#0b1222' };
@@ -449,19 +450,21 @@ function heroCard(p: Panel, scene: Phaser.Scene, id: HeroId, i: number, progress
     const g = p.add(scene.add.graphics(), 2);
     g.lineStyle(3, hex(open ? sch.accent : C.muted), 1).strokeRoundedRect(r.x, r.y, r.w, r.h, 14);
   }
-  p.text(r.x + 8, r.y + 7, heroKeyLabel(i), 12, C.muted);
+  // A locked card from the thirteenth on has no key label: a fresh save's screen makes no more texts than before.
+  if (open || i < BOOT_HEROES) p.text(r.x + 6, r.y + 5, heroKeyLabel(i), 11, C.muted);
   if (!open) {
-    p.add(scene.add.image(cx, r.y + r.h / 2 - 4, 'rb-locked'), 2);
+    p.add(scene.add.image(cx, r.y + r.h / 2 + 4, 'rb-locked').setScale(0.75), 2);
     return;
   }
-  p.add(scene.add.image(cx, r.y + 62, looks(p, progress, id).portrait).setScale(0.44), 2);
-  p.text(cx, r.y + 104, t(hero.name), 12.5, C.text, { bold: true, origin: [0.5, 0], align: 'center', wrap: r.w - 10 });
-  p.text(cx, r.y + 142, sideOf(hero), 11, sch.accent, { origin: [0.5, 0], align: 'center', wrap: r.w - 8 });
+  p.add(scene.add.image(cx, r.y + 44, looks(p, progress, id).portrait).setScale(0.32), 2);
+  p.text(cx, r.y + 66, t(hero.short), 12, C.text, { bold: true, origin: [0.5, 0], align: 'center', wrap: r.w - 6 });
+  p.text(cx, r.y + 84, sideOf(hero), 10, sch.accent, { origin: [0.5, 0], align: 'center', wrap: r.w - 6 });
   const wins = progress.wins[id] ?? 0;
   const furthest = progress.furthest[id] ?? 0;
   const best = progress.heat[id] ?? 0;
-  const status = wins > 0 ? `${t('wins', { n: wins })}${best > 0 ? `  ·  ${t('cardHeat', { n: best })}` : ''}` : furthest > 0 ? t('reached', { n: furthest, of: STAGES }) : '';
-  if (status) p.text(cx, r.y + r.h - 6, status, 10.5, wins > 0 ? C.elite : C.muted, { origin: [0.5, 1] });
+  const status = wins > 0 ? t('wins', { n: wins }) : furthest > 0 ? t('reached', { n: furthest, of: STAGES }) : '';
+  if (status) p.text(cx, r.y + r.h - (best > 0 ? 18 : 5), status, 9.5, wins > 0 ? C.elite : C.muted, { origin: [0.5, 1] });
+  if (wins > 0 && best > 0) p.text(cx, r.y + r.h - 5, t('cardHeat', { n: best }), 9.5, C.elite, { origin: [0.5, 1] });
 }
 
 /** The chosen hero in full: weapon, numbers, signature and paths; a locked one shows only its placeholder. */
@@ -627,7 +630,7 @@ export function unlockPanel(p: Panel, id: HeroId) {
   p.frame(r, sch.accent);
   const cx = r.x + r.w / 2;
   p.text(cx, r.y + 22, t('newHero'), 24, C.elite, { bold: true, origin: [0.5, 0], glow: true });
-  p.add(scene.add.image(cx, r.y + 130, portraitKey(id)), 2);
+  p.add(scene.add.image(cx, r.y + 130, portraitOf(scene, id)), 2);
   fit(p.text(cx, r.y + 204, t(hero.name), 22, C.text, { bold: true, origin: [0.5, 0] }), r.w - 30);
   p.text(cx, r.y + 236, `${t(hero.weapon)}  ·  ${sideOf(hero)}`, 13, sch.accent, { origin: [0.5, 0] });
   p.frame(CONTINUE, sch.accent, '#14244a');

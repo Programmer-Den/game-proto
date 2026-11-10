@@ -39,7 +39,8 @@ export const STICK = { r: 60, knob: 24, dead: 6 };
  * knights, then Elara Voss and Triad-77), and the chosen hero's details on the right with the Fight
  * button.
  */
-export const HERO_CARD = { w: 96, h: 196, top: 84, gap: 8, cols: 6, left: 14 };
+/** The hero select's cards: 8 a row, 3 rows (24 heroes), left of the detail panel. */
+export const HERO_CARD = { w: 72, h: 128, top: 84, gap: 6, cols: 8, left: 14 };
 export function heroCardRect(i: number) {
   const col = i % HERO_CARD.cols;
   const row = Math.floor(i / HERO_CARD.cols);
