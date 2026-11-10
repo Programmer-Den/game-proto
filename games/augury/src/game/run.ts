@@ -15,7 +15,7 @@ export const QUEUE = 3;
 /** How long the result banner shows between puzzles. */
 export const BETWEEN_MS = 1200;
 /** Hints a run starts with, by mode (Practice has as many as it wants). */
-export const START_HINTS: Record<Mode, number> = { journey: 1, endless: 2, daily: 1, blitz: 1, draft: 1, weekly: 1, duel: 3, practice: Infinity };
+export const START_HINTS: Record<Mode, number> = { journey: 1, endless: 2, daily: 1, blitz: 1, draft: 1, weekly: 1, duel: 3, practice: Infinity, solo: 2 };
 /** Hearts in Endless and Draft. Keep Normal at 3: the playthrough expects it. */
 export const startHearts = () => byDifficulty(4, 3, 2);
 export const MAX_HEARTS = 5;
@@ -276,7 +276,12 @@ const endlessCard = (run: Run, n: number, not: KindId[]) =>
 /** The kind a card ends on, which the next card must not repeat. */
 const lastKind = (card: Card) => card.boss?.kind ?? card.kind;
 
-/** Starts a run of a mode. Practice needs its kind and level. */
+/** The `n`th card (from 0) of a Solo Run: its one kind, at the level Endless deals the `n`th at, never a boss. */
+const soloCard = (kind: KindId, n: number): Card => ({ kind, level: endlessLevel(n), seed: Math.floor(Math.random() * 2 ** 31) });
+/** The kind a Solo Run plays (every card in its queue is of it). */
+export const soloKind = (run: Run) => run.queue[0]?.kind ?? run.current?.card.kind ?? KINDS[0];
+
+/** Starts a run of a mode. Practice and Solo Run need their kind, Practice its level too. */
 export function startRun(mode: Mode, progress: Progress, opts: { kind?: KindId; level?: Level; trial?: boolean; date?: Date; node?: number } = {}): Run {
   const run = newRun(mode, progress);
   switch (mode) {
@@ -288,6 +293,12 @@ export function startRun(mode: Mode, progress: Progress, opts: { kind?: KindId; 
         last = [lastKind(card)];
         run.queue.push(card);
       }
+      deal(run, run.queue.shift()!);
+      break;
+    }
+    case 'solo': {
+      const kind = opts.kind ?? 'nonogram';
+      for (let i = 0; i < QUEUE + 1; i++) run.queue.push(soloCard(kind, i));
       deal(run, run.queue.shift()!);
       break;
     }
@@ -634,12 +645,20 @@ export function next(run: Run) {
     case 'practice':
       deal(run, practiceNext(run));
       return true;
+    case 'solo':
+      if (run.hearts <= 0) return finish(run), true;
+      dealQueued(run);
+      return true;
   }
 }
 
-/** Deals the next card of an Endless or Blitz queue, and queues another. */
+/** Deals the next card of an Endless, Blitz or Solo Run queue, and queues another. */
 function dealQueued(run: Run) {
   const card = run.queue.shift()!;
+  if (run.mode === 'solo') {
+    run.queue.push(soloCard(card.kind, run.dealt + QUEUE));
+    return deal(run, card);
+  }
   const after = lastKind(run.queue[run.queue.length - 1] ?? card);
   run.queue.push(run.mode === 'blitz' ? randomCard(blitzLevel(run.solved), [after]) : endlessCard(run, run.dealt + QUEUE, [after]));
   deal(run, card);
@@ -673,6 +692,10 @@ function finish(run: Run) {
   const mode = run.mode;
   if (mode === 'endless' || mode === 'blitz') {
     if (run.score > best[mode]) (best[mode] = run.score), (run.newBest = true);
+  }
+  if (mode === 'solo') {
+    const kind = soloKind(run);
+    if (run.score > run.progress.solo[kind]) (run.progress.solo[kind] = run.score), (run.newBest = true);
   }
   if (mode === 'draft' && run.solved > best.draft) (best.draft = run.solved), (run.newBest = true);
   if (mode === 'weekly') {

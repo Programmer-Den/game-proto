@@ -7,7 +7,7 @@ the root AGENTS.md.
 ## Current state
 
 Augury is a collection of thirteen brain puzzles in an Arcane Tarot look (night-sky purple, thin gold
-frames, cyan for what is picked or done), played through eight modes. Every puzzle is made in code
+frames, cyan for what is picked or done), played through nine modes. Every puzzle is made in code
 from a seed at one of four levels (0 Novice to 3 Oracle), and is solved when its rules hold, not
 only by the answer it was made from.
 
@@ -19,8 +19,8 @@ Implemented today:
   house), Mirror Maze (`beam`, mirrors placed so a beam lights every crystal) and Memory Echo (`echo`), each in its own file under `game/puzzles/` with its maker, rules, moves and hint, and a
   view under `scenes/views/`.
 - Modes (`MODES`): Journey (`journey`), Endless Medley (`endless`), Daily Five (`daily`), Blitz,
-  Draft Run (`draft`), Weekly League (`weekly`), Pass and Play (`duel`) and Practice, all in
-  `game/run.ts`.
+  Draft Run (`draft`), Weekly League (`weekly`), Pass and Play (`duel`), Practice and Solo Run
+  (`solo`), all in `game/run.ts`.
 - Journey (`game/journey.ts`): forty set steps in five temples of eight (`TEMPLES`, `STEPS`,
   `NODES`), each temple dealing its `TEMPLE_KINDS` in turn and ending in a boss of its first two;
   `journeyCard(node)` is the same card for every player. A journey run is one card on its clock;
@@ -43,16 +43,23 @@ Implemented today:
   (`practiceNext`). Endless deals kinds by `weakWeights` (one share more per mastery level below the
   best kind's) through `randomCard`'s `weights`, which draws one number either way, so a fresh save
   (all alike) deals exactly as an even pick; Blitz, the drafts and the weekly league stay even.
+- Solo Run (`solo`): Endless with one kind, picked on the `solo` screen. `startRun` queues
+  `soloCard(kind, n)` (the kind at `endlessLevel(n)`, never a boss), `dealQueued` queues the next of
+  the same kind, `next` ends it at 0 hearts, and `finish` keeps its best score per kind in
+  `Progress.solo` (`newBest`). `soloKind(run)` reads the kind from its queue (Again on the end card
+  starts the same kind). It has hearts and omens (`hasHearts`), `START_HINTS.solo` 2, Endless's side
+  panel (Up next, score) and no relics. It is saved and continued like Endless.
 - The daily five's ghost: `run.marks` gets [time into the run, score] after each card; once the
   daily best rises (`run.newBest`), `Progress.ghost` takes a copy after every card of the run, so it
   keeps the cards that scored nothing too. `startRun` copies the ghost into `run.ghost`, so
   the run races the best from before it, and the side panel (`drawGhost`, at `side.ghost`) shows the
   score `ghostAt(run.ghost, runTime(run))` gives as a faint bar under the player's own. A best
   set before the ghost existed has none (the panel says so).
-- Screens (`screen`): `menu` (eight mode cards, Records, and Continue when a run was saved),
+- Screens (`screen`): `menu` (nine mode cards, five and four sideways, three rows of three upright, Records, and Continue when a run was saved),
   `journey` (the map: a row of eight steps per temple, each with its kind's icon and stars),
   `practice` (the four level buttons and Trial, and thirteen puzzle cards with their mastery badges; in
-  Trial each card shows its open tier, level and time, and the tiers cleared), `records` (with a
+  Trial each card shows its open tier, level and time, and the tiers cleared), `solo` (the same
+  thirteen cards under Solo Run's rule, each with its best Solo Run score; `drawPractice` draws both), `records` (with a
   mastery column) and `run`. A run's `phase` is `playing`, `between` (the result banner),
   `draft`, `relic`, `handover` (pass and play) or `over`.
 - Both ways round: a wide view gets the `WIDE` layout (the stage with a side panel at its right)
@@ -62,7 +69,8 @@ Implemented today:
   way.
 - Records (`Progress`): solves and losses per kind, the fastest hint-free solve per kind and level,
   the best score of Endless, Blitz and the daily five, the most solves in a draft run, the last
-  daily played, the weekly league's week and best, the journey's stars per step, the highest trial
+  daily played, the weekly league's week and best, the journey's stars per step, the best Solo Run
+  score per kind, the highest trial
   cleared per kind and the best daily five's marks (its ghost).
 
 Missing or rough:
@@ -76,7 +84,7 @@ Missing or rough:
 - The journey's temples teach the first eleven kinds only; Pipe Turn and Mirror Maze come from the
   other modes (adding them to `TEMPLE_KINDS` would change steps players have already starred).
 - No translations of the glyph names (there are none on screen); the How to play names the modes.
-- `docs/screenshots/menu.webp`, `puzzles.webp`, `draft.webp`, `upright.webp` (a 390x844 phone at
+- `docs/screenshots/menu.webp`, `solo-run.webp`, `puzzles.webp`, `draft.webp`, `upright.webp` (a 390x844 phone at
   2x), `pipe-turn.webp`, `mirror-maze.webp`, `mastery.webp`, `daily-ghost.webp` and `cover.png` are not made by the
   test; refresh them by hand (a Playwright script that taps the menu, Practice with hints, and a
   draft) when the look changes.
@@ -114,7 +122,7 @@ File map (`src/`):
   `Card`, `Current`, `Result`, `Run`, `RunEvent`, and the actions (`startRun`, `act`, `drag`,
   `undo`, `hint`, `skip`, `quit`, `next`, `draftPick`, `takeRelic`, `startSecondPlayer`, `tick`,
   `canUndo`, `canHint`, `dailyDone`, `endlessLevel`, `holdsCharm`, `offerRelics`, `weakWeights`,
-  `trialTier`, `trialCard`, `ghostAt`, `runTime`, and `makeCurrent`,
+  `trialTier`, `trialCard`, `soloKind`, `ghostAt`, `runTime`, and `makeCurrent`,
   which makes a card's puzzle fresh with its time and its charm's help, for `deal` and `loadRun`).
   A charm gives its kind's puzzles one free hint (`freeHints`; `freeUsed` counts them, and they
   cost no points) and `CHARM_POINTS` times the points, and slows Memory Echo's cards
@@ -145,7 +153,7 @@ File map (`src/`):
   deals at most `DRAFT_MAX` (3) cards, the deal layout's slots, so Crystal Ball is offered once;
   Blitz's queue is levelled again after every puzzle, so "Up next" shows the level that will be
   dealt, and Blitz ends where its clock runs out, without a result for the puzzle it cut off.
-- `game/catalog.ts`: `OMENS`/`OmenId`, `MODES`/`Mode`, `isDraft`, `hasHearts`, `GENERAL_RELICS`, `CHARMS` (each kind's relic, its charm) with
+- `game/catalog.ts`: `OMENS`/`OmenId`, `MODES`/`Mode`, `isDraft`, `hasHearts` (Endless, Solo Run and the drafts), `GENERAL_RELICS`, `CHARMS` (each kind's relic, its charm) with
   `CharmId`, `CHARM_KIND` and `isCharm`, `RELICS`/`RelicId` (both kinds), `KIND_COLOR`,
   `RELIC_COLOR` (a charm takes its kind's colour).
 - `game/journey.ts` and `game/weekly.ts`: see Current state.
@@ -223,12 +231,12 @@ first ends the saved one through `quit`, so its bests and its run count. `augury
 `Progress`. It is written when a run
 starts (the daily five counts as played, and as a run, from its first card), after every puzzle
 (with the daily five's score so far and its best), when a run ends and when leaving to the menu, which ends the run and records
-it (`quit`). `loadProgress` keeps only known kinds and whole, non-negative numbers (trials up to 10,
+it (`quit`). `loadProgress` keeps only known kinds and whole, non-negative numbers (Solo Run bests, trials up to 10,
 at most five ghost marks); `loadRun` gives a run saved before the ghost empty `marks` and `ghost`.
 
 ### Hub settings
 
-- Difficulty scales two numbers: hearts in Endless, Draft and the weekly league, `startHearts` =
+- Difficulty scales two numbers: hearts in Endless, Solo Run, Draft and the weekly league, `startHearts` =
   `byDifficulty(4, 3, 2)`, and Blitz's clock, `blitzSeconds` = `byDifficulty(240, 180, 150)`. Keep
   Normal at 3 hearts (the playthrough expects it) and the README's and the root README's rows in
   sync.
@@ -312,8 +320,9 @@ cell is picked, the daily five played today), and a Hint tap that finds nothing 
   screen's four rows of four sideways (the short last row centred) and two columns of seven upright;
   a seventeenth sideways or fifteenth upright needs `practice.cards` laid out again, and the records
   table's `step` (24 sideways, 32 upright) to shrink.
-- **Add a mode**: its id in `MODES` (eight fill the menu's two rows of four, three rows of three
-  upright; a ninth upright fits, a ninth sideways needs `menu.cards` laid out again), its `START_HINTS`, its rules in `startRun`, `end`, `next` and
+- **Add a mode**: its id in `MODES` (nine fill the menu's rows of five and four sideways, the short
+  row centred, and three rows of three upright; a tenth fits sideways, a tenth upright needs
+  `menu.cards` laid out again), its `START_HINTS`, its rules in `startRun`, `end`, `next` and
   `finish`, its side panel in `drawSide`, its top line in `topLine`, its icon in `modeIcon`, its
   `Name` and `Text` texts, and the README.
 - **Add a relic**: its id in `GENERAL_RELICS` and `RELIC_COLOR`, its effect in `takeRelic`,

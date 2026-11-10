@@ -7,7 +7,7 @@ Thirteen kinds of puzzle, dealt like cards from an arcane tarot deck: logic, num
 and memory. Every puzzle is made in code from a seed, so they never run out, and each kind comes at
 four levels, from Novice to Oracle. Walk a journey of forty set puzzles through five temples, play an endless medley of random puzzles, the same five puzzles
 as everyone else today, a race against the clock, a draft run where you pick the next card and
-gather relics, the same draft run as everyone else this week in the weekly league, a pass-and-play match for two, or practise any puzzle with no clock.
+gather relics, the same draft run as everyone else this week in the weekly league, a pass-and-play match for two, a solo run of the one puzzle you pick, or practise any puzzle with no clock.
 
 ![Endless Medley: a Path Link puzzle with the next three cards up next](cover.png)
 
@@ -60,7 +60,7 @@ Any answer that keeps the rules counts, not only the one the puzzle was made fro
 
 ### Modes
 
-![The menu: eight mode cards](docs/screenshots/menu.webp)
+![The menu: nine mode cards](docs/screenshots/menu.webp)
 
 - **Journey**: forty set puzzles, the same for everyone, in five temples of eight steps. Each
   temple teaches two or three kinds and ends in a boss. A step solved with half its time left earns
@@ -114,6 +114,12 @@ Any answer that keeps the rules counts, not only the one the puzzle was made fro
   lower total time wins; a skip or loss adds 30 seconds and a hint 15.
 - **Practice**: pick any puzzle and level. No clock, no hearts, free hints, and a new puzzle of the
   same kind whenever you like. Or pick **Trial** for each kind's hardest open trial (see Mastery).
+- **Solo Run**: pick one of the thirteen puzzles and play only that one, like Endless: its level
+  goes up every three puzzles, each has its own clock, and a lost, skipped or timed-out puzzle costs
+  one of 3 hearts. 2 hints, omens as in Endless, no bosses or relics. Each puzzle keeps its own best
+  score, shown on its card in the picker.
+
+  ![Solo Run: pick the one puzzle to play](docs/screenshots/solo-run.webp)
 
 **Mastery**: every solve of a kind, in any mode, raises its mastery, from 1 to 10 (2, 5, 9, 14, 20,
 28, 38, 50 and 65 solves). Practice and Records show each kind's level as a badge. Each level opens
@@ -133,7 +139,7 @@ timeout in either half loses the boss. Up next and the draft cards say which puz
 
 ![A boss: its second half, Picture Grid after Tile Flip](docs/screenshots/boss.webp)
 
-**Omens**: in Endless and the drafts, each puzzle offers an omen in the top bar until its first move or
+**Omens**: in Endless, Solo Run and the drafts, each puzzle offers an omen in the top bar until its first move or
 hint. Tempt it for double points: **Haste** halves the puzzle's time, **Silence** takes away Undo
 and hints, and **Peril** makes a loss cost two hearts (Memory Echo only offers Peril).
 
@@ -149,7 +155,7 @@ hint (never below 20), times a streak bonus of 10% per puzzle solved in a row (u
 **Records** keeps the puzzles solved of each kind, its mastery, the fastest solve without hints at
 each level, and the best score of each mode.
 
-**Difficulty** (hub setting): Easy gives 4 hearts in Endless and the drafts and 4 minutes of Blitz, Hard
+**Difficulty** (hub setting): Easy gives 4 hearts in Endless, Solo Run and the drafts and 4 minutes of Blitz, Hard
 2 hearts and 2½ minutes; Normal is 3 hearts and 3 minutes. The puzzles themselves don't change.
 
 ## Code layout
@@ -160,10 +166,10 @@ each level, and the best score of each mode.
 - `src/game/kinds.ts`: the puzzle kinds, their skills and the `PuzzleDef` they share.
 - `src/game/journey.ts`, `src/game/weekly.ts`: the journey's steps and stars, the weekly league's
   week and ranks.
-- `src/game/run.ts`: the eight modes: dealing, hearts, hints, clocks, points, drafts and relics.
+- `src/game/run.ts`: the nine modes: dealing, hearts, hints, clocks, points, drafts and relics.
 - `src/game/progress.ts`, `src/game/save.ts`: the records, mastery, trials and the daily ghost, and
   their save.
-- `src/scenes/GameScene.ts`: the menu, journey map, practice picker, records and the run screen.
+- `src/scenes/GameScene.ts`: the menu, journey map, practice and solo run pickers, records and the run screen.
 - `src/scenes/views/`: how each puzzle is drawn and played.
 - `src/scenes/painter.ts`, `glyphs.ts`, `theme.ts`, `layout.ts`: drawing, emblems, colours and
   positions.

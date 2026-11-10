@@ -10,7 +10,7 @@ import { nextRankAt, rankOf, weekOf } from '../game/weekly';
 import { DEFS, KINDS, LEVELS, SKILLS, SKILL_OF, type KindId, type Level } from '../game/kinds';
 import { MAX_MASTERY, masteryOf, toNextMastery, type Progress } from '../game/progress';
 import {
-  act, canHint, canTakeOmen, canUndo, dailyDone, draftPick, drag, ghostAt, hint, holdsCharm, next, omenFor, runTime, takeOmen, trialTier, quit, skip, startRun, startSecondPlayer, takeRelic, tick, undo,
+  act, canHint, canTakeOmen, canUndo, dailyDone, draftPick, drag, ghostAt, hint, holdsCharm, next, omenFor, runTime, takeOmen, trialTier, quit, skip, soloKind, startRun, startSecondPlayer, takeRelic, tick, undo,
   BLITZ_PENALTY_S, DUEL_FAIL_S, PERIL_HEARTS, QUEUE, TRIALS, type Card, type Run,
 } from '../game/run';
 import { clearRun, loadProgress, loadRun, saveProgress, saveRun } from '../game/save';
@@ -51,7 +51,7 @@ export class GameScene extends Phaser.Scene {
   run: Run | null = null;
   /** A run saved before the last reload, which the menu's Continue picks up. */
   saved: Run | null = null;
-  screen: 'menu' | 'journey' | 'practice' | 'records' | 'run' = 'menu';
+  screen: 'menu' | 'journey' | 'practice' | 'solo' | 'records' | 'run' = 'menu';
   /** The level Practice deals, or `trial` for each kind's highest open trial. */
   practiceLevel: Level | 'trial' = 0;
   /** Spots for the test: every tappable thing on screen by id, centred, in view pixels. */
@@ -327,7 +327,7 @@ export class GameScene extends Phaser.Scene {
     const p = this.p;
     p.begin();
     if (this.screen === 'menu') this.drawMenu();
-    else if (this.screen === 'practice') this.drawPractice();
+    else if (this.screen === 'practice' || this.screen === 'solo') this.drawPractice();
     else if (this.screen === 'journey') this.drawJourney();
     else if (this.screen === 'records') this.drawRecords();
     else this.drawRun();
@@ -354,8 +354,13 @@ export class GameScene extends Phaser.Scene {
     p.text(MENU.tagline.x, MENU.tagline.y, t('tagline'), { size: 16, color: C.inkDim, wrap: MENU.tagline.w });
     const { xs, ys, w, h, dy } = MENU.cards;
     MODES.forEach((mode, k) => {
-      const x = xs[k % xs.length];
-      const y = ys[Math.floor(k / xs.length)];
+      const across = xs.length;
+      const row = Math.floor(k / across);
+      // A short last row sits in the middle.
+      const inRow = Math.min(across, MODES.length - row * across);
+      const gap = across > 1 ? xs[1] - xs[0] : 0;
+      const x = (xs[0] + xs[across - 1]) / 2 + ((k % across) - (inRow - 1) / 2) * gap;
+      const y = ys[row];
       const done = mode === 'daily' && dailyDone(prog);
       p.frame(x - w / 2, y - h / 2, w, h, { alpha: done ? 0.6 : C.panelAlpha });
       p.text(x, y + dy.numeral, ROMAN[k], { size: 13, color: C.goldText, spacing: 2 });
@@ -363,9 +368,9 @@ export class GameScene extends Phaser.Scene {
       p.text(x, y + dy.name, t(`${mode}Name` as TextKey), { size: 16, color: C.goldText, bold: true, wrap: w - 16 });
       p.text(x, y + dy.text, t(`${mode}Text` as TextKey), { size: 11, color: C.inkDim, wrap: w - 18 });
       p.text(x, y + dy.best, this.modeBest(mode), { size: 11, color: C.cyanText, wrap: w - 12 });
-      // Practice and the journey open a screen to pick from; the other modes start a run.
+      // Practice, Solo Run and the journey open a screen to pick from; the other modes start a run.
       const open = () =>
-        mode === 'practice' || mode === 'journey' ? (ui('click'), (this.screen = mode)) : this.start(mode);
+        mode === 'practice' || mode === 'solo' || mode === 'journey' ? (ui('click'), (this.screen = mode)) : this.start(mode);
       p.hit(`mode-${mode}`, x - w / 2, y - h / 2, w, h, open, !done);
     });
     const saved = this.saved;
@@ -386,6 +391,11 @@ export class GameScene extends Phaser.Scene {
         return b[mode] ? t('bestScore', { n: formatNumber(b[mode]) }) : '';
       case 'draft':
         return b.draft ? t('bestSolved', { n: b.draft }) : '';
+      case 'solo': {
+        // The kind with the highest Solo Run best.
+        const top = KINDS.reduce((a, k) => (this.progress.solo[k] > this.progress.solo[a] ? k : a));
+        return this.progress.solo[top] ? t('soloBest', { n: formatNumber(this.progress.solo[top]), name: t(`${top}Name` as TextKey) }) : '';
+      }
       case 'daily':
         return dailyDone(this.progress) ? t('dailyToday', { n: formatNumber(this.progress.daily!.score) }) : t('dailyNew');
       case 'journey':
@@ -432,6 +442,12 @@ export class GameScene extends Phaser.Scene {
         break;
       case 'practice':
         drawGlyph(g, 5, x, y, 44, a);
+        break;
+      case 'solo':
+        // One card with a glyph on it.
+        g.fillStyle(C.deep, 1).fillRect(x - 15, y - 21, 30, 42);
+        g.lineStyle(2, C.gold, a).strokeRect(x - 15, y - 21, 30, 42);
+        drawGlyph(g, 3, x, y, 22, a);
         break;
       case 'journey':
         // A temple: a roof, four columns and a step.
@@ -488,6 +504,10 @@ export class GameScene extends Phaser.Scene {
     p.text(J.line.x, J.line.y, t('journeyRule', { n: TEMPLE_STARS }), { size: 12, color: C.inkDim, wrap: this.L.view.w - 60 });
   }
 
+  /**
+   * The puzzle picker: Practice's (the four levels and Trial over the thirteen kinds) or Solo Run's
+   * (the rule over the same cards, each with its best Solo Run score).
+   */
   private drawPractice() {
     const p = this.p;
     this.back(() => {
@@ -495,9 +515,14 @@ export class GameScene extends Phaser.Scene {
       this.screen = 'menu';
     });
     const PRACTICE = this.L.practice;
-    this.heading(PRACTICE.title.x, PRACTICE.title.y, t('practiceName'), 28);
+    const solo = this.screen === 'solo';
+    this.heading(PRACTICE.title.x, PRACTICE.title.y, t(solo ? 'soloName' : 'practiceName'), 28);
     const lv = PRACTICE.levels;
-    [...LEVELS, 'trial' as const].forEach((level, k) => {
+    if (solo) {
+      const mid = (lv.ys[0] + lv.ys[lv.ys.length - 1]) / 2;
+      p.text(this.L.view.w / 2, mid, t('soloRule'), { size: 14, color: C.inkDim, wrap: this.L.view.w - 60 });
+    }
+    if (!solo) [...LEVELS, 'trial' as const].forEach((level, k) => {
       const label = level === 'trial' ? `✦ ${t('trial')}` : `${ROMAN[k]} · ${t(`level${level}` as TextKey)}`;
       p.button(`level-${level}`, lv.xs[k % lv.xs.length], lv.ys[Math.floor(k / lv.xs.length)], lv.w, lv.h, label, () => {
         ui('click');
@@ -522,7 +547,11 @@ export class GameScene extends Phaser.Scene {
       this.masteryBadge(left + cards.w - 20, y - cards.h / 2 + 20, masteryOf(rec.solved));
       const tx = left + 76;
       p.text(tx, y - 22, t(`${kind}Name` as TextKey), { size: 16, color: C.goldText, bold: true, ox: 0 });
-      if (trial) {
+      if (solo) {
+        p.text(tx, y + 1, t(SKILL_OF[kind]), { size: 12, color: C.inkDim, ox: 0 });
+        const best = this.progress.solo[kind];
+        p.text(tx, y + 22, best ? t('bestScore', { n: formatNumber(best) }) : t('noRunYet'), { size: 12, color: C.cyanText, ox: 0 });
+      } else if (trial) {
         const tier = trialTier(this.progress, kind);
         const { level, share } = TRIALS[tier - 1];
         const time = timeText(DEFS[kind].limit[level] * share * 1000);
@@ -533,7 +562,7 @@ export class GameScene extends Phaser.Scene {
         const best = rec.best[this.practiceLevel as Level];
         p.text(tx, y + 22, best ? t('fastest', { time: timeText(best) }) : t('notYet'), { size: 12, color: C.cyanText, ox: 0 });
       }
-      p.hit(`kind-${kind}`, left, y - cards.h / 2, cards.w, cards.h, () => this.start('practice', kind));
+      p.hit(`kind-${kind}`, left, y - cards.h / 2, cards.w, cards.h, () => this.start(solo ? 'solo' : 'practice', kind));
     });
   }
 
@@ -677,6 +706,8 @@ export class GameScene extends Phaser.Scene {
     switch (run.mode) {
       case 'endless':
         return t('puzzleN', { n: run.dealt }) + boss;
+      case 'solo':
+        return t('puzzleN', { n: run.dealt });
       case 'blitz':
         return t('puzzleN', { n: run.dealt });
       case 'daily':
@@ -734,6 +765,7 @@ export class GameScene extends Phaser.Scene {
     switch (run.mode) {
       case 'endless':
       case 'blitz':
+      case 'solo':
         label(t('upNext'));
         run.queue.slice(0, QUEUE).forEach((card, i) => {
           const { top, h } = slot(i, QUEUE, 72);
@@ -980,7 +1012,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     const again = run.mode !== 'daily';
-    if (again) p.button('again', END_BUTTONS.xs[0], END_BUTTONS.y, END_BUTTONS.w, END_BUTTONS.h, t('again'), () => this.start(run.mode), { accent: true });
+    if (again) p.button('again', END_BUTTONS.xs[0], END_BUTTONS.y, END_BUTTONS.w, END_BUTTONS.h, t('again'), () => this.start(run.mode, run.mode === 'solo' ? soloKind(run) : undefined), { accent: true });
     p.button('done', again ? END_BUTTONS.xs[1] : END.x, END_BUTTONS.y, END_BUTTONS.w, END_BUTTONS.h, t('menu'), () => this.toMenu());
   }
 }
