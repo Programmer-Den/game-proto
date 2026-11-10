@@ -4,8 +4,8 @@
  * events) and the jump itself. Pure state changes like `sim.ts`; randomness from `rand`.
  */
 import { ELITE, OBJECTIVE_AT, WAVES, statsOf, xpFor, type EventState, type GameState } from './state';
-import { collectAll, heal, lower, nextPick, pop, raise, refreshHealth, spawnElite, startRun, tick, SHORT_LIVED, type Input } from './sim';
-import { DRILLS, FILLER, MAX_TIER, UPGRADES, UPGRADE_IDS, canOffer, rollChoices } from './upgrades';
+import { collectAll, heal, lower, nextPick, pop, raise, raiseCard, refreshHealth, spawnElite, startRun, tick, SHORT_LIVED, type Input } from './sim';
+import { BASE_TIER, DRILLS, FILLER, UPGRADES, UPGRADE_IDS, canOffer, cardTiers, extraChoices, lockedOf, parseCard, rollChoices } from './upgrades';
 import { HEROES, type HeroId } from './heroes';
 import { RUSH } from './rush';
 import { t } from '../i18n';
@@ -207,13 +207,22 @@ export function chooseNode(s: GameState, index: number) {
 
 /** Three offers: a level-up's cards, without the ration. */
 function rollOffers(s: GameState): (string | null)[] {
-  const ids = rollChoices(s.hero!, s.ranks).filter((id) => id !== FILLER.id);
+  const ids = rollChoices(s.hero!, s).filter((id) => id !== FILLER.id);
   return [0, 1, 2].map((i) => ids[i] ?? null);
 }
 
 /** What the next tier of an upgrade costs. */
 export function priceOf(s: GameState, id: string) {
-  return TRADE.base + TRADE.perTier * (s.ranks[id] ?? 0);
+  const c = parseCard(id);
+  return TRADE.base + TRADE.perTier * (c ? cardTiers(s, c).held : 0);
+}
+
+/** Whether an offer can still be bought (a slot, a fusion's lock or a specialisation may shut it). */
+function stillOpen(s: GameState, id: string) {
+  const c = parseCard(id);
+  if (!c || c.kind === 'filler') return false;
+  if (c.kind === 'upgrade') return canOffer(id, s.hero!, s.ranks, lockedOf(s));
+  return extraChoices(s).includes(id);
 }
 
 /** Buys the offer at `index`; false if it is gone or too dear. */
@@ -222,9 +231,9 @@ export function buy(s: GameState, index: number) {
   const id = s.offers[index];
   if (!id || s.credits < priceOf(s, id)) return false;
   s.credits -= priceOf(s, id);
-  raise(s, id);
-  // Sold; and anything the slots no longer allow goes too.
-  s.offers = s.offers.map((o, i) => (i === index || !o || !canOffer(o, s.hero!, s.ranks) ? null : o));
+  raiseCard(s, id);
+  // Sold; and anything the slots, locks or specialisations no longer allow goes too.
+  s.offers = s.offers.map((o, i) => (i === index || !o || !stillOpen(s, o) ? null : o));
   return true;
 }
 
@@ -267,7 +276,7 @@ function startArena(s: GameState) {
 /** Two abilities for the shrine: one to give a tier of, one to raise by two. */
 function shrinePair(s: GameState) {
   const abilities = Object.keys(s.ranks).filter((id) => UPGRADES[id].kind !== 'gear');
-  const gains = abilities.filter((id) => s.ranks[id] <= MAX_TIER - 2);
+  const gains = abilities.filter((id) => s.ranks[id] <= BASE_TIER - 2);
   if (abilities.length < 2 || !gains.length) return null;
   const gain = gains[Math.floor(rand() * gains.length)];
   const loses = abilities.filter((id) => id !== gain);
@@ -276,7 +285,7 @@ function shrinePair(s: GameState) {
 
 /** A gear piece the cache can give: a new one if a slot is free, else one held below tier 5. */
 function cacheGear(s: GameState) {
-  const open = UPGRADE_IDS.filter((id) => UPGRADES[id].kind === 'gear' && canOffer(id, s.hero!, s.ranks));
+  const open = UPGRADE_IDS.filter((id) => UPGRADES[id].kind === 'gear' && canOffer(id, s.hero!, s.ranks, lockedOf(s)));
   return open.length ? open[Math.floor(rand() * open.length)] : null;
 }
 

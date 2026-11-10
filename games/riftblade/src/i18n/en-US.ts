@@ -16,6 +16,9 @@ const enUS: Partial<Translation<typeof en>> = {
   usualColours: 'Usual colors',
   masteryColour: 'mastery colors to wear',
   rushRules: 'No heat, Armory or mastery: the same kit for every try. Fewest seconds wins.',
+  branchKind: 'SPECIALIZATION',
+  branchBlurb: 'Tiers 6 and 7 of {name}. Only one specialization per skill.',
+  branchPop: 'Specialized: {name}',
   hollowRebirthText: 'Armored and slow: +60 health, -30% damage taken, double slash damage',
 };
 

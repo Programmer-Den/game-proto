@@ -6,7 +6,8 @@
 import Phaser from 'phaser';
 import { HEROES, HERO_IDS, schemeOf, type HeroDef, type HeroId } from '../game/heroes';
 import { clock, type GameState } from '../game/state';
-import { CAPSTONES, FILLER, MAX_TIER, POOL_NAMES, UPGRADES, capstoneFor, crossoverFor } from '../game/upgrades';
+import { BASE_TIER, BRANCHES, CAPSTONES, FILLER, FUSIONS, FUSION_BY_ID, FUSION_NEEDS, POOL_NAMES, UPGRADES, branchesOf, capstoneFor, cardTiers, crossoverFor, fusionCard, fusionShuts, lockedOf, parseCard } from '../game/upgrades';
+import { cardName, tierText } from '../game/cardText';
 import { BOSSES, NODE_INFO, PLANETS, STAGES, planetLabel, planetsAt, type NodeKind } from '../game/planets';
 import { chartOptions, nextStage, priceOf, rerollPrice } from '../game/voyage';
 import { DAILY, stagesOf } from '../game/daily';
@@ -537,7 +538,9 @@ export function unlockPanel(p: Panel, id: HeroId) {
 /** Colour of a card by kind. */
 function kindColor(s: GameState, id: string) {
   if (id === FILLER.id) return C.heal;
-  const def = UPGRADES[id];
+  const card = parseCard(id);
+  if (card?.kind === 'fusion') return '#ff9de2';
+  const def = UPGRADES[card?.id ?? id];
   if (def.kind === 'path') return schemeOf(s.hero!).accent;
   return def.kind === 'pool' ? POOL_COLORS[def.pool!] : '#b48cff';
 }
@@ -574,44 +577,79 @@ export function levelUp(p: Panel, s: GameState) {
       p.text(left, r.y + 100, t(FILLER.text), 14, C.text, { wrap });
       return;
     }
-    const def = UPGRADES[id];
-    const rank = s.ranks[id] ?? 0;
-    const kind = t(def.kind === 'path' ? HEROES[s.hero!].pathKind : def.kind === 'pool' ? POOL_NAMES[def.pool!] : 'gearKind');
+    const card = parseCard(id)!;
+    const fusion = card.kind === 'fusion' ? FUSION_BY_ID[card.id] : null;
+    const def = fusion ? null : UPGRADES[card.id];
+    const { held, max } = cardTiers(s, card);
+    const kind = fusion ? t('fusionKind') : card.kind === 'branch' ? t('branchKind') : t(def!.kind === 'path' ? HEROES[s.hero!].pathKind : def!.kind === 'pool' ? POOL_NAMES[def!.pool!] : 'gearKind');
     p.text(cx, r.y + 18, kind, 11, color, { bold: true, origin: [0.5, 0] });
-    fit(p.text(cx, r.y + 40, t(def.name), 21, C.text, { bold: true, origin: [0.5, 0] }), r.w - 20);
-    // Tier pips: held tiers filled, the one this card gives ringed.
+    fit(p.text(cx, r.y + 40, cardName(id), 21, C.text, { bold: true, origin: [0.5, 0] }), r.w - 20);
+    // Tier pips: held tiers filled, the one this card gives ringed (the last two are the specialisation's).
     const pips = scene.add.graphics();
-    for (let t = 0; t < MAX_TIER; t++) {
-      const x = cx - 44 + t * 22;
+    const gap = max > 5 ? 17 : 22;
+    for (let t = 0; t < max; t++) {
+      const x = cx - (gap * (max - 1)) / 2 + t * gap;
       const y = r.y + 80;
-      if (t < rank) pips.fillStyle(hex(color), 1).fillCircle(x, y, 5);
-      else if (t === rank) pips.lineStyle(2, hex(color), 1).strokeCircle(x, y, 5).fillStyle(hex(color), 0.35).fillCircle(x, y, 5);
+      const c = !fusion && t >= BASE_TIER ? '#ffe066' : color;
+      if (t < held) pips.fillStyle(hex(c), 1).fillCircle(x, y, 5);
+      else if (t === held) pips.lineStyle(2, hex(c), 1).strokeCircle(x, y, 5).fillStyle(hex(c), 0.35).fillCircle(x, y, 5);
       else pips.lineStyle(1, hex(C.muted), 0.6).strokeCircle(x, y, 5);
     }
     p.add(pips, 2);
-    p.text(cx, r.y + 94, rank === 0 ? t('newUpgrade') : t('tier', { n: rank + 1 }), 12, rank === 0 ? C.elite : C.muted, { bold: true, origin: [0.5, 0] });
+    p.text(cx, r.y + 94, held === 0 ? t('newUpgrade') : t('tier', { n: held + 1 }), 12, held === 0 ? C.elite : C.muted, { bold: true, origin: [0.5, 0] });
     // The lines flow down, so a long tier line (German, or a narrow card of four) never runs into the next.
     const four = choices.length > 3;
-    const tier = p.text(left, r.y + 118, t(def.tiers[rank]), four ? 14 : 15, C.text, { bold: true, wrap });
-    const blurb = p.text(left, Math.max(r.y + 160, tier.y + tier.height + 8), t(def.blurb), four ? 12 : 12.5, C.muted, { wrap });
+    const tier = p.text(left, r.y + 118, tierText(s, id), four ? 14 : 15, C.text, { bold: true, wrap });
+    const blurbKey = fusion ? fusion.blurb : card.kind === 'branch' ? 'branchBlurb' : def!.blurb;
+    const blurb = p.text(left, Math.max(r.y + 160, tier.y + tier.height + 8), t(blurbKey, { name: t(def?.name ?? 'branchKind') }), four ? 12 : 12.5, C.muted, { wrap });
+    let y = Math.max(r.y + 206, blurb.y + blurb.height + 8);
+    if (card.kind === 'branch' && !s.branches[card.id]) {
+      // A specialisation shuts out the upgrade's other two.
+      const others = branchesOf(card.id).filter((b) => b !== card.branch).map((b) => t(BRANCHES[b].name));
+      p.text(left, y, t('branchLocks', { names: others.join(', ') }), 11.5, '#ffb86b', { wrap, bold: true });
+      return number(p, r, i);
+    }
+    if (fusion) {
+      // A fusion: what it fuses and what taking it shuts out.
+      linkIcon(p, scene, left, y, '#ff9de2');
+      const needs = p.text(left + 24, y, t('fusionNeeds', { a: t(UPGRADES[fusion.needs[0]].name), b: t(UPGRADES[fusion.needs[1]].name) }), 11.5, '#ff9de2', { wrap: wrap - 24 });
+      y += needs.height + 4;
+      if (!s.fusions[fusion.id]) {
+        const shut = fusionShuts(fusion, s.hero!, s);
+        const names = [...shut.upgrades.map((u) => t(UPGRADES[u].name)), ...shut.fusions.map((f) => t(FUSION_BY_ID[f].name))];
+        p.text(left, y, t('fusionLocks', { names: names.join(', ') }), 11.5, '#ffb86b', { wrap, bold: true });
+      }
+      return number(p, r, i);
+    }
+    if (card.kind !== 'upgrade') return number(p, r, i);
     const cross = crossoverFor(id, s.hero!);
     const partner = cross ? (cross.path === id ? cross.pool : cross.path) : null;
-    let y = Math.max(r.y + 206, blurb.y + blurb.height + 8);
     if (cross && partner) {
       // A crossover: a link icon and what the pair does.
       const done = s.crossovers.includes(cross.id);
-      const held = (s.ranks[partner] ?? 0) > 0;
-      const color = held || done ? '#e7d8ff' : '#c9b2ff';
+      const has = (s.ranks[partner] ?? 0) > 0;
+      const color = has || done ? '#e7d8ff' : '#c9b2ff';
       linkIcon(p, scene, left, y, color);
-      const key = done ? 'crossoverDone' : held ? 'crossoverCompletes' : 'crossoverWith';
-      const line = p.text(left + 24, y, t(key, { partner: t(UPGRADES[partner].name), text: t(cross.text) }), 11.5, color, { wrap: wrap - 24, bold: held && !done });
+      const key = done ? 'crossoverDone' : has ? 'crossoverCompletes' : 'crossoverWith';
+      const line = p.text(left + 24, y, t(key, { partner: t(UPGRADES[partner].name), text: t(cross.text) }), 11.5, color, { wrap: wrap - 24, bold: has && !done });
       y += line.height + 4;
     }
     const cap = capstoneFor(id, s.hero!);
-    if (cap && !s.capstones.includes(cap.id)) p.text(left, y, t('capstoneHint', { name: t(cap.name), path: t(UPGRADES[cap.path].name), n: MAX_TIER, gear: t(UPGRADES[cap.gear].name) }), 11.5, '#c9b2ff', { wrap });
-    p.text(r.x + 12, r.y + 10, String(i + 1), 12, C.muted);
+    if (cap && !s.capstones.includes(cap.id)) {
+      const line = p.text(left, y, t('capstoneHint', { name: t(cap.name), path: t(UPGRADES[cap.path].name), n: BASE_TIER, gear: t(UPGRADES[cap.gear].name) }), 11.5, '#c9b2ff', { wrap });
+      y += line.height + 4;
+    }
+    // A fusion this upgrade is half of, once it is held.
+    const fuse = FUSIONS.find((f) => f.needs.includes(id) && (s.ranks[id] ?? 0) > 0 && !lockedOf(s).has(fusionCard(f.id)) && !s.fusions[f.id] && f.needs.every((n) => n === id || (s.ranks[n] ?? 0) > 0));
+    if (fuse) p.text(left, y, t('fusionHint', { name: t(fuse.name), n: FUSION_NEEDS }), 11.5, '#ff9de2', { wrap });
+    number(p, r, i);
   });
   return p;
+}
+
+/** A card's key number in its top left corner. */
+function number(p: Panel, r: { x: number; y: number }, i: number) {
+  p.text(r.x + 12, r.y + 10, String(i + 1), 12, C.muted);
 }
 
 /** The end of a run: won or fallen, with the numbers and a button to go again. */
@@ -846,19 +884,21 @@ export function trader(p: Panel, s: GameState) {
       p.text(cx, r.y + r.h / 2, t('sold'), 18, C.muted, { origin: [0.5, 0.5] });
       return;
     }
-    const def = UPGRADES[id];
-    const rank = s.ranks[id] ?? 0;
+    const card = parseCard(id)!;
+    const def = card.kind === 'fusion' ? null : UPGRADES[card.id];
+    const rank = cardTiers(s, card).held;
     const price = priceOf(s, id);
     const can = s.credits >= price;
     const color = kindColor(s, id);
     p.frame(r, can ? color : C.muted);
     p.spots.push({ id, ...r });
-    const kind = t(def.kind === 'path' ? 'pathKind' : def.kind === 'pool' ? POOL_NAMES[def.pool!] : 'gearKind');
+    const kind = !def ? t('fusionKind') : card.kind === 'branch' ? t('branchKind') : t(def.kind === 'path' ? 'pathKind' : def.kind === 'pool' ? POOL_NAMES[def.pool!] : 'gearKind');
     p.text(cx, r.y + 16, kind, 11, color, { bold: true, origin: [0.5, 0] });
-    p.text(cx, r.y + 36, t(def.name), 19, C.text, { bold: true, origin: [0.5, 0] });
+    fit(p.text(cx, r.y + 36, cardName(id), 19, C.text, { bold: true, origin: [0.5, 0] }), r.w - 16);
     p.text(cx, r.y + 64, rank === 0 ? t('newUpgrade') : t('tier', { n: rank + 1 }), 12, rank === 0 ? C.elite : C.muted, { bold: true, origin: [0.5, 0] });
-    p.text(r.x + 14, r.y + 88, t(def.tiers[rank]), 14, C.text, { bold: true, wrap: r.w - 28 });
-    p.text(r.x + 14, r.y + 132, t(def.blurb), 12, C.muted, { wrap: r.w - 28 });
+    p.text(r.x + 14, r.y + 88, tierText(s, id), 14, C.text, { bold: true, wrap: r.w - 28 });
+    const blurb = card.kind === 'fusion' ? FUSION_BY_ID[card.id].blurb : card.kind === 'branch' ? 'branchBlurb' : def!.blurb;
+    p.text(r.x + 14, r.y + 132, t(blurb, { name: t(def?.name ?? 'branchKind') }), 12, C.muted, { wrap: r.w - 28 });
     p.text(cx, r.y + r.h - 30, t('credits', { n: price }), 16, can ? NODE_INFO.trader.color : C.danger, { bold: true, origin: [0.5, 0] });
     p.text(r.x + 10, r.y + 8, String(i + 1), 12, C.muted);
   });

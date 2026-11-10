@@ -377,9 +377,53 @@ cleared (12).
 ![New cards: Orbital Beacon, Executioner Rounds and the Threat Scanner](docs/screenshots/new-skills.webp)
 
 Each level-up offers three different cards (four for Elara Voss), at least one from your hero's own paths while any are
-left. Every upgrade has five tiers. A run holds at most **6 abilities** (your paths and pool
-skills) and **4 pieces of gear**; when both are full, only what you hold can come up, and when
-nothing is left a Field Ration heals you.
+left. Every upgrade has seven tiers: five of its own, then two of a specialisation. A run holds at
+most **7 abilities** (your paths and pool skills) and **5 pieces of gear**; when both are full,
+only what you hold can come up, and when nothing is left a Field Ration heals you. Every tier line
+names the stat it raises.
+
+- **Specialisations** (tiers 6 and 7): at tier 5 an upgrade branches into three, and the first one
+  taken is the only one it can have (the card says which two it locks out). Most upgrades branch
+  into Brute Force, Quickening and Hunter; the ones that keep you standing (Riot Shield, Iron Skin,
+  Mending, Plate Armour, the drills and the like) into Stalwart, Quickening and Brute Force; the
+  finding gear (Magnet Coil, Lumen Lens, Salvage Rig, Threat Scanner) into Prospector, Hunter and Stalwart.
+
+  | Specialisation | Tier 6 | Tier 7 |
+  | --- | --- | --- |
+  | Brute Force | +10% damage | +10% damage, +5% crit chance |
+  | Quickening | +10% attack speed, -5% skill cooldowns | the same again |
+  | Stalwart | +20 max health, +0.5 health/s | -5% damage taken, +4% dodge chance |
+  | Hunter | +15% damage to elites and bosses, +5% move speed | +15% damage to elites and bosses, +4% crit chance |
+  | Prospector | +10% XP, +25% pickup range | +10% XP, +25% credits |
+
+- **Fusions**: two skills held at tier 3 or more can fuse into a third, with three tiers of its
+  own and no slot of its own. Taking a fusion locks out every other fusion that shares one of its
+  halves, and the skills it names, which are offered no more and stop rising if held.
+
+  | Fusion | Fuses | Locks out | Tiers 1 / 2 / 3 |
+  | --- | --- | --- | --- |
+  | Chain Reaction | Ricochet Rounds + Thermal Grenade | Overcharge | +1 bounce, +10% damage / +12% damage / +1 bounce, +12% damage |
+  | Railgun | Overcharge + Quick Reload | Scatter Shot | +2 pierce, +10% damage / +15% damage / +2 pierce, +15% damage |
+  | Bullet Storm | Scatter Shot + Quick Reload | Overcharge | +15% attack speed / +10% attack speed, +10% damage / +15% attack speed |
+  | Kill Order | Executioner Rounds + Covering Drone | Stun Rounds | +4% execute, +5% crit / +3% execute, +5% crit / the same |
+  | Shock and Awe | Stun Rounds + Orbital Beacon | Thermal Grenade | +10% slow, +15% vs elites / +15% vs elites / +10% slow, +20% vs elites |
+  | Air Support | Call-In + Covering Drone | Executioner Rounds | -8% cooldowns, +8% damage / -8% cooldowns / -8% cooldowns, +12% damage |
+  | Thousand Cuts | Focus + Wide Arc | Iron Skin | +6% crit, +10% reach / +6% crit / +8% crit, +10% reach |
+  | Iron Fortress | Iron Skin + Riposte | Blade Dash | -5% damage taken, +20 health / +20 health / -5% damage taken, +30 health |
+  | Steel Cyclone | Spinning Guard + Blade Throw | Focus | +12% damage / -8% cooldowns / +15% damage, -7% cooldowns |
+  | Crescent Rush | Crescent Wave + Blade Dash | Riposte | +6% speed, -8% cooldowns / +12% damage / +6% speed, -8% cooldowns |
+  | Clear Water | Mending + Calm Mind | Battle Trance | +0.8 health/s, -10% signature cooldown / +0.8 health/s / +1 health/s, -10% signature cooldown |
+  | Prescience | Foresight + Battle Trance | Mending | +5% dodge, +5% speed / +5% dodge / +5% dodge, +6% speed |
+  | Frozen Moment | Stasis Pulse + Push Wave | Foresight | -10% cooldowns / +12% damage / -10% cooldowns, +10% damage |
+  | Blood Pact | Rage + Drain | Soul Harvest | +0.3 health a kill, +10% damage / +10% damage / +0.4 health a kill, +12% damage |
+  | Abyssal Storm | Lightning Arc + Dark Nova | Grip | -10% cooldowns, +8% damage / +12% damage / -10% cooldowns, +10% damage |
+  | Reaper | Soul Harvest + Grip | Drain | +0.3 health a kill, +10% vs elites / +15% vs elites / +0.4 health a kill, +15% vs elites |
+  | Juggernaut Plating | Plate Armour + Medpack | Servo Boots | -4% damage taken, +0.6 health/s / +25 health / -4% damage taken, +0.8 health/s |
+  | Overdrive Core | Overclock + Power Cell | Barrier Emitter | -8% cooldowns, +8% damage / +10% damage / -8% cooldowns, +10% damage |
+  | Hunter Kit | Threat Scanner + Targeting Chip | Lumen Lens | +20% vs elites, +4% crit / +15% vs elites / +20% vs elites, +5% crit |
+  | Treasure Hunter | Magnet Coil + Salvage Rig | Threat Scanner | +50% pickup, +30% credits / +10% XP / +50% pickup, +40% credits |
+
+![Specialisations and a fusion on offer](docs/screenshots/specialisations.webp)
 
 - **Hero paths** (three per hero, plus a drill, below), soldiers: Gunslinger (fire rate, ricochets, quick-draw bursts), Commander
   (1-3 squad troopers), Demolitions (timed charges, bigger blasts, bomblets); Suppressor (a slowing,

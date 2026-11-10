@@ -23,9 +23,12 @@ world, with a star map between them. A boss rush and hero mastery come on top.
   stat gains, `DRILLS`). Pools by weapon class
   and side: Blaster (10 skills: soldiers, Elara, Triad-77), Blade (8, knights), Current (6: Kael, Oom, Corvin,
   Joren) and Hollow (6: Vharn, Veyl, Kresh, and Kael once he takes The Fall); Joren may also draw
-  Lightning Arc. The shared Gear deck (12 pieces), the 6-ability and 4-gear limits, level-ups with
+  Lightning Arc. The shared Gear deck (12 pieces), the 7-ability and 5-gear limits, level-ups with
   three cards (four for Elara, her Hope; at least one of the hero's own paths while any are left,
-  the Field Ration as filler), 36 capstones and 13 crossovers (the cards show a link icon); gold-ringed elites with
+  the Field Ration as filler), 36 capstones and 13 crossovers (the cards show a link icon);
+  specialisations (at tier 5 every upgrade branches into three, `BRANCHES`; the first taken gives
+  its tiers 6 and 7 and shuts out the other two) and 20 fusions (`FUSIONS`: two skills at tier 3 fuse
+  into a third with three tiers and no slot; taking one locks its rivals and the skills it names); gold-ringed elites with
   chests and credits, ring waves at 1:30, 3:00 and 4:15 on every planet; once the boss appears
   no new foes spawn but its own adds. Every gun aims at the nearest foe.
 - Side objectives (`objectives.ts`): three a world, at 1:00 (one of four shared ones), 2:15 (the
@@ -200,13 +203,24 @@ world, with a star map between them. A boss rush and hero mastery come on top.
   Triad-77's white), except Kael's Fallen scheme, which takes Lord Vharn's colours. `locked` marks a hero that needs a deed (all but TR-9); Triad-77's `maxHp`
   is the sum of its three bots' and its `r` the whole unit's.
 - `src/game/upgrades.ts`: `UPGRADES` (every path, pool skill and gear piece, with five tier lines),
-  `MAX_TIER`, `MAX_ABILITIES`, `MAX_GEAR`, `FILLER`, `CAPSTONES`, `CROSSOVERS`, `capstonesOf`,
+  `BASE_TIER` (5, an upgrade's own tiers), `MAX_TIER` (7, with its specialisation's), `MAX_ABILITIES`, `MAX_GEAR`, `FILLER`, `CAPSTONES`, `CROSSOVERS`, `capstonesOf`,
   `crossoversOf`, `crossoverFor(id, hero)` and `capstoneFor` (card hints), `at` (per-tier tables),
   `DRILLS` (each hero's fourth path: an id, name and five `DrillStep`s, made into `UPGRADES` rows by
   `drillDefs`; `DRILL_STEPS` holds each step's numbers, summed by `drillMods` in `statsOf`),
   `POOL_NAMES` (the pools' card kind lines), `poolsOf` (the pools a hero draws from now), `canOffer`,
   `rollChoices` and `cardCount` (4 for Elara, else 3). Pool skills carry `pool`; a hero is only offered skills of `poolsOf` or its
-  `extra`.
+  `extra`. Then the specialisations and fusions: `Stat` / `Gains` (the plain gains their tiers
+  give, summed by `kitGains` into `statsOf`), `Kit` (`ranks`, `branches`, `fusions`; a `GameState` is
+  one), `BRANCHES` / `branchesOf` (the three an upgrade branches into: guard first for the ones that
+  keep the hero standing, fortune for the finding gear, else power, tempo and hunt), `FUSIONS`
+  (`needs`, `locks`, three tiers of gains), `lockedOf` (what the held fusions shut out),
+  `fusionShuts` (the card's "Locks out" line), `extraChoices` (the specialisation and fusion cards
+  open now, rolled after the upgrades so a run's first cards come out as before), `raisable` (a
+  chest's or the arena's cards), and card ids: `parseCard` reads an upgrade id, `<id>><branch>`
+  (`branchCard`) or `fusion:<id>` (`fusionCard`); `tierOf` / `cardTiers` give the pips.
+- `src/game/cardText.ts`: a card's name (`cardName`) and next tier line (`tierText`; for
+  specialisations and fusions `gainsText` lists the gains, each naming its stat, from the `gain*`
+  texts).
 - `src/game/planets.ts`: `PlanetId`, `PLANETS` (per planet: `stage` (its jump, 0 to 3), name, faction, `foes` (the HUD's kill count, with
   plural forms), `elite` (its pop), `hp` / `spawn` / `dmg`
   multipliers, ring-wave kind, elite kinds, boss, ground colours, `hint` (the space map's line)),
@@ -247,7 +261,7 @@ world, with a star map between them. A boss rush and hero mastery come on top.
   bots and their health), `refreshUnlocks` and `clock`. `Bot` and `Flag` are Triad-77's bots
   (`state.bots`, `formation`, `scrap`) and Elara's signal flag (`state.flag`, `supplyWorld`).
 - `src/game/sim.ts`: the rules of a fight. `startRun`, `choose` / `nextPick` (free picks first,
-  then level-ups, then `state.after`), `raise` / `lower` (a tier up or down), `tick` (splits a frame
+  then level-ups, then `state.after`), `raise` / `lower` (a tier up or down; `lower` takes a specialisation's tier first), `raiseCard` (takes any card: an upgrade, a specialisation or a fusion), `tick` (splits a frame
   into steps of at most 16 ms), and per step: the foe grid (`near`, `nearest`, `swarmSpot`), the
   hero (`moveHero` with slows, `hurtHero` with `HURT_GRACE_MS`, `signature`), weapons (`bolt`,
   `volley`, `primary`: every gun at the nearest foe, Rook's second at the next nearest, Bram's
@@ -463,7 +477,8 @@ saves load unchanged.
   as in `nextElite` and `objectiveAt`, is stored as the text `"Infinity"`). `loadRun` lays it over
   `freshState()` (and the hero over `freshHero()`), so fields added since take their fresh values;
   one with an unknown hero, a phase it can't resume in, a `daily`, `endless`, `loop`, `endlessCleared`, `seed`, `rush`, `rushQueue`, `mastery`, `colour`, `tide` or `pillars` of the wrong kind, an unknown planet or `next`, a `stage`
-  outside the crusade, unknown `nodes`, `offers` or `choices`, a malformed `event`, or a list field of the state or
+  outside the crusade, unknown `nodes`, `offers` or `choices` (card ids, read by `parseCard`), `branches` or `fusions`
+  that aren't real ones, a malformed `event`, or a list field of the state or
   hero (`enemies`, `bullets`, `dashHit`, ...) that is not an array is dropped (an `rng` that is not a
   generator position becomes -1). Keep
   `GameState` plain data (no Maps, Sets, class instances or shared references), or teach
@@ -576,7 +591,9 @@ free of audio) or from the scene's input handler.
   and `beaten`).
 - **A new hero colour scheme**: add it to the hero's `schemes` in `heroes.ts`; the art reads
   `schemeOf`. To use another scheme, change `schemeOf` (and bake per scheme if both are needed).
-- **A new upgrade**: add it to `UPGRADES` (five tier lines, and `pool` for a pool skill),
+- **A new upgrade**: add it to `UPGRADES` (five tier lines, each naming the stat it changes, and
+  `pool` for a pool skill; if it keeps the hero standing or finds things, add it to `GUARD_FIRST` or
+  `FORTUNE_FIRST` for its specialisations),
   implement it in `statsOf` (a passive number) or `abilities` (something with a cooldown) in
   `sim.ts`, and add allies in `syncAllies`. For knights: `knightMods` and `knightAbilities` in
   `blades.ts`.
@@ -588,6 +605,9 @@ free of audio) or from the scene's input handler.
   saves should count), and the deed in the README. Then the select grid (`HERO_CARD` holds 12,
   keyed 1-9, 0, - and =) and the playthrough's card list. A Blaster hero with mechanics of its own
   goes in `squad.ts` the same way.
+- **A fusion**: add it to `FUSIONS` (two `needs` a hero can hold together, the `locks`, three tiers
+  of `Gains`) with its name and blurb in `i18n/`; a gain of a new kind needs a `Stat`, a `gain*`
+  text and its line in `statsOf`.
 - **A capstone or crossover**: add to `CAPSTONES` / `CROSSOVERS`; check `s.capstones.includes(id)`
   / `s.crossovers.includes(id)` where it acts.
 - **Balance**: spawn rate `spawnRate`, per planet `PLANETS[i].hp` / `spawn` / `dmg`, boss health

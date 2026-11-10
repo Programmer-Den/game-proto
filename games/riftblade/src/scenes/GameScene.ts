@@ -18,7 +18,7 @@ import { checkTrophies } from '../trophies/check';
 import { ARMOURY, salvage, type ArmouryId } from '../game/armoury';
 import { reseed, rngAt, unseed, weekOf, weeklyOf, type MutatorId } from '../game/weekly';
 import { ARENA_MS, BOSSES, CHAMPION, PILLAR, PLANETS, SIEGE, STRIKE, TIDE, VENT, planetLabel } from '../game/planets';
-import { UPGRADES, MAX_TIER } from '../game/upgrades';
+import { FUSION_BY_ID, FUSION_TIERS, MAX_TIER, UPGRADES, tierOf } from '../game/upgrades';
 import {
   bankCredits, clearRun, isResumable, isUnlocked, loadProgress, loadRun, buyArmoury, recordCharted, recordCodex, recordEndless, recordRun, recordRush, recordWeekly, recordUnlocks, saveRun, togglePlain, unlockedHeroes, type Progress,
 } from '../game/save';
@@ -1605,10 +1605,15 @@ export class GameScene extends Phaser.Scene {
     if (s.shieldHits > 0) extra += `   ·   ${t('buffShield', { n: s.shieldHits })}`;
     this.texts.hp.setText(`${Math.ceil(p.hp)} / ${p.maxHp}   ·   ${t(PLANETS[s.planet].foes, { n: s.kills })}${extra}`);
     // The kit held.
-    const lines = Object.entries(s.ranks).map(([id, rank]) => {
-      const pips = '●'.repeat(rank) + '○'.repeat(MAX_TIER - rank);
+    const lines = Object.keys(s.ranks).map((id) => {
+      const held = tierOf(s, id);
+      const pips = '●'.repeat(held) + '○'.repeat(MAX_TIER - held);
       return `${pips}  ${t(UPGRADES[id].name)}`;
     });
+    for (const id of Object.keys(s.fusions)) {
+      const held = s.fusions[id];
+      lines.push(`${'◆'.repeat(held)}${'◇'.repeat(FUSION_TIERS - held)}  ${t(FUSION_BY_ID[id].name)}`);
+    }
     this.texts.kit.setText(lines.join('\n'));
     if (lines.length) {
       const b = this.texts.kit.getBounds();
