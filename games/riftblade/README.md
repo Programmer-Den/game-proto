@@ -58,6 +58,10 @@ foes and bolts.
 | Rena Kask (petrol flight suit, mustard trim) | Twin cannons: fast, light bolts side by side. 90 health, the fastest of all. **Momentum**: up to +50% damage after 2 s on the move, lost twice as fast standing still | **Trench Run**: rams straight ahead for 0.35 s, 40 damage to each foe in the way and no harm to her (7 s) | Afterburner, Gunship, Wingmates |
 | Admiral Thessa Orn (cocoa coat, periwinkle trim) | Service pistol at the nearest foe. 125 health, slow. **Study**: every 10 foes of a kind she fells, that kind takes 2% more from her (up to 30%) | **Blockade**: a ring of 8 bombs falls around her (14 s) | Fleet Command, Iron Ring, Tactician |
 | Chief Wikka (moss fur, cream eyes) | Slingshot stones at the nearest foe. 85 health, small and very fast. **Tribe**: a warrior joins him every 50 kills, up to 2, and throws stones too | **Log Trap**: 3 logs roll out ahead of him, 45 damage to each foe they meet and a knock back (12 s) | Slinger, Log Traps, Tribe |
+| Boss Gorbul (clay coat, sea-glass trim) | Flared blaster: three short-range bolts in a spread at the nearest foe. 240 health, huge, slow and armoured. **Fortune**: +1% damage for every 10 credits he holds (up to +25%) | **Hired Guns**: pays 10 credits for 3 thugs who fight beside him for 10 s; without the credits nothing happens (14 s) | Payroll, Bankroll, Heavyweight |
+| Sable Rhee (olive drab, peach blade) | Curved blade: a wide sweep in front, all the way round every third swing. 180 health, quick. Draws Blade cards, and Current cards too once she takes Awakening | **Pull**: draws the foes near in to her, stuns them for 0.8 s and cuts them for 30; a boss is only slowed (11 s) | Awakening, Scrapper, Steadfast |
+| General Krull (oxblood plate, brass blade) | Cleaver: a slow, heavy cut in front that throws foes back. 280 health, armoured, slow | **Shield Wall**: for 4 s he takes half damage, and foes that touch him are hurt and thrown back (15 s) | Warlord, Iron Legion, Shield Wall |
+| Mother Ysolde (fen green robe, dusty rose) | Hex staff: curses the nearest foe from afar; a cursed foe is hurt every 0.5 s for 3 s and passes the curse to 2 foes near when it falls. 140 health | **Raise the Dead**: 4 dead rise and fight for her for 10 s (14 s) | Blood Rites, Coven, Mist Veil |
 
 Only Legionary TR-9 is open from the start. Every other hero unlocks through a deed, which the game
 never shows: a locked card is a dark placeholder with no art or name. When a deed is done, the run
@@ -85,8 +89,12 @@ the next run on. The deeds:
 | Rena Kask | Take Kael Varro's Ace Pilot path to tier 5 |
 | Admiral Thessa Orn | Win 2 elite arenas in one run |
 | Chief Wikka | Reach level 25 in one run |
+| Boss Gorbul | Hold 250 credits at once |
+| Sable Rhee | Reach the Lava world with a hero who is not a knight |
+| General Krull | Take Lord Vharn's Iron Grip path to tier 5 |
+| Mother Ysolde | Take Regent Veyl's Puppet Master path to tier 5 |
 
-All but the four path deeds can be done with any hero. A save from before this chain keeps every
+All but the six path deeds can be done with any hero. A save from before this chain keeps every
 hero it shows as played (a world reached) or unlocked.
 
 ![Dax Morrow's freighter strafing a swarm on a second pass, its charges going off](docs/screenshots/crew-dax.webp)
@@ -104,6 +112,14 @@ hero it shows as played (a world reached) or unlocked.
 ![Admiral Thessa Orn's Blockade falling around her](docs/screenshots/crew-thessa.webp)
 
 ![Chief Wikka's logs rolling out ahead of him, five warriors of his tribe around him](docs/screenshots/crew-wikka.webp)
+
+![Boss Gorbul's hired thugs around him](docs/screenshots/crew-gorbul.webp)
+
+![Sable Rhee's Pull drawing foes in to her](docs/screenshots/knight-sable.webp)
+
+![General Krull behind his Shield Wall, his Hollow guards beside him](docs/screenshots/knight-krull.webp)
+
+![Mother Ysolde's curses spreading and the dead she raised](docs/screenshots/knight-ysolde.webp)
 
 ![A new hero unlocked mid-run](docs/screenshots/hero-unlocked.webp)
 
@@ -345,13 +361,13 @@ under way when the boss comes is called off.
 | Thaw the frozen squad | Ice world | Stand by each of 3 frozen troopers for 1.5 s; each one freed fights beside you for 40 s (60 s) | A level |
 | Seal the vents | Lava and Storm worlds | Stand on each of 3 vents for 1.5 s while the open ones erupt (50 s) | Upgrade card |
 | Quick draw | Captain Rook, Dax Morrow | Down 70 foes (30 s) | 30 credits |
-| Hold the drop zone | Legionary TR-9 | Stay 8 s in a small drop zone while foes push in hard (35 s) | Upgrade card |
+| Hold the drop zone | Legionary TR-9, General Krull | Stay 8 s in a small drop zone while foes push in hard (35 s) | Upgrade card |
 | Recon run | Corporal Bram-17, Cassia Vane, Rena Kask | Reach 4 markers far apart (40 s) | 30 credits |
 | Duel | Kael Varro, Vesk Drayl | Beat a marked elite (40 s) | Upgrade card |
-| Unbroken | Lord Vharn, Grunda | Take no more than 60 damage for 40 s | A level |
+| Unbroken | Lord Vharn, Grunda, Boss Gorbul | Take no more than 60 damage for 40 s | A level |
 | Lift the wreck | Master Oom | Stand by a wreck for 4 s; it then crashes down on the foes around it (40 s) | 25 credits |
-| Shelter the pilgrim | Elder Corvin Hale | Keep foes off a pilgrim for 30 s | Upgrade card |
-| Living storm | Regent Veyl | Land 220 hits (25 s) | A level |
+| Shelter the pilgrim | Elder Corvin Hale, Sable Rhee | Keep foes off a pilgrim for 30 s | Upgrade card |
+| Living storm | Regent Veyl, Mother Ysolde | Land 220 hits (25 s) | A level |
 | Bloodtrail | Kresh the Twinblade, Chief Wikka | Down 30 foes in a row without being hit (60 s) | Upgrade card |
 | Shatter the monolith | Master Joren Vask | Break a monolith (35 s) | Upgrade card |
 | Signal the fleet | Commander Elara Voss, Admiral Thessa Orn | Use Call for Aid inside a marked ring (45 s) | 40 credits |
@@ -495,7 +511,9 @@ names the stat it raises.
   Iron Ring (a wider, fuller Blockade that heals, then a second ring), Tactician (faster, deeper
   Study, crits and more damage to bosses); Slinger (faster stones that bounce and stun, two at a
   time), Log Traps (more logs that hit harder and roll further), Tribe (warriors join sooner, up to
-  8, and hit harder and faster).
+  8, and hit harder and faster); Payroll (more thugs, harder, longer, free), Bankroll (credits,
+  more Fortune, armour while flush, credits in chests), Heavyweight (health, a Belly Slam that
+  stuns, armour).
 - **Knight paths**: Prodigy (wider slashes, combos, a thrown blade), Ace Pilot (a starfighter
   strafes, a bot co-pilot repairs), The Fall (full Temper doubles damage, halves healing);
   Dread (a slowing aura, weak foes flee), Iron Grip (Grip takes more foes and throws them), Life
@@ -507,7 +525,13 @@ names the stat it raises.
   damage, kills heal); Dervish (a bigger, faster orbit, the staff flies out), Stalker (Hunts
   chain, kills speed him up), Rebuilt (rises once on mechanical legs); Duelist Form (more strikes,
   a lunge, a counter), Breaker (hits strip armour from elites and bosses), Council Seat (turns foe
-  bolts back, a ward).
+  bolts back, a ward); Awakening (the Current pool, a wider, harder Pull that heals, push waves),
+  Scrapper (faster swings that throw further and go all round), Steadfast (health, regeneration,
+  armour, damage when nearly down); Warlord (more against elites and bosses, wider cleaves,
+  healing and XP from elites), Iron Legion (Hollow guards), Shield Wall (a longer Shield Wall that
+  heals and hurts harder); Blood Rites (harder, longer curses that spread further and slow), Coven
+  (more dead for longer, cursed foes rise, the dead hit harder), Mist Veil (dodge, regeneration,
+  armour, curses on those who hit her).
 - **Drills** (each hero's fourth path): five plain gains in the hero's own order:
 
   | Hero | Drill | Tiers 1 to 5 |
@@ -532,6 +556,10 @@ names the stat it raises.
   | Rena | Flight Hours | +6% speed, +8% damage, +20 health, +15% fire rate, +15% damage |
   | Thessa | Chain of Command | +8% damage, signature 15% faster, +20 health, +6% crit chance, +15% damage |
   | Wikka | Forest-Born | +6% speed, +20 health, +0.5 health/s, +8% damage, +15% damage |
+  | Gorbul | Good Living | +30 health, -6% damage taken, +8% damage, +30 health, +15% damage |
+  | Sable | Desert Years | +20 health, +6% speed, +8% damage, +0.5 health/s, +15% damage |
+  | Krull | War College | +30 health, +8% damage, -6% damage taken, signature 15% faster, +15% damage |
+  | Ysolde | Old Blood | +20 health, +0.5 health/s, +8% damage, signature 15% faster, +15% damage |
 
 - **Blaster pool** (soldiers, Elara, Triad-77 and the crew): Ricochet Rounds, Overcharge (pierce), Thermal Grenade, Stun Rounds
   (slow), Quick Reload, Covering Drone, Scatter Shot, Call-In (a supply crate that crashes on the
@@ -617,6 +645,18 @@ names the stat it raises.
   | Wikka | Eagle Eye | Slinger + Overclock | Stones pierce 2 foes |
   | Wikka | Stampede | Log Traps + Servo Boots | Logs roll out on their own every 6 s |
   | Wikka | War Drums | Tribe + Plate Armour | +4% damage for each warrior of his tribe |
+  | Gorbul | Crime Lord | Payroll + Magnet Coil | Hired Guns brings 6 |
+  | Gorbul | Golden Touch | Bankroll + Overclock | Kills heal 1 while he holds 100 credits or more |
+  | Gorbul | Immovable | Heavyweight + Plate Armour | +30% armour |
+  | Sable | First Light | Awakening + Overclock | She pulls on her own every 6 s |
+  | Sable | Whirling Edge | Scrapper + Servo Boots | +40% swing speed and +20% speed |
+  | Sable | Unyielding | Steadfast + Plate Armour | +60 health and +15% armour |
+  | Krull | Conqueror | Warlord + Overclock | +3% damage for every elite defeated this run, up to +30% |
+  | Krull | Grand Army | Iron Legion + Magnet Coil | 5 guards |
+  | Krull | Fortress | Shield Wall + Plate Armour | The Shield Wall goes up on its own every 10 s |
+  | Ysolde | Withering | Blood Rites + Overclock | Each curse also falls on every foe close to its target |
+  | Ysolde | Night Mother | Coven + Magnet Coil | Raise the Dead raises 10 |
+  | Ysolde | Witch Mist | Mist Veil + Servo Boots | +25% dodge |
 
 - **Crossovers**: a pool skill held with a fitting path gives a bonus: Gunslinger + Ricochet
   Rounds (ricochets seek new targets), Riot Shield + Stun Rounds (shield bashes stun), Brothers in
@@ -660,7 +700,7 @@ npm run dev   # then open http://localhost:5173/games/riftblade/
 ## Playthrough test
 
 `e2e/playthrough.spec.ts` plays the first minute in headless Chromium with real inputs: on the
-hero select screen it checks the twenty cards (all but Legionary TR-9 locked on a fresh save),
+hero select screen it checks the twenty-four cards (all but Legionary TR-9 locked on a fresh save),
 taps a locked card (no Fight button), then TR-9 and Fight, walks him in a wide circle by holding
 the mouse down at a point that turns around him, takes the first card at the first level-up and
 checks the upgrade was taken, fires Brace from its button and plays on to the one-minute mark. Side
@@ -677,8 +717,8 @@ npx playwright test --project riftblade
 - `src/game/`: the rules, without drawing: `heroes.ts` (the heroes, their pools, colour schemes
   and which are locked), `blades.ts` (the knights' attacks, signatures and skills, and the unlock
   deeds), `squad.ts` (Elara Voss and Triad-77: weapons, signatures, paths and allies), `crew.ts`
-  (Dax Morrow, Grunda, Kettle, Cassia Vane, Vesk Drayl, Rena Kask, Admiral Thessa Orn and Chief
-  Wikka: the same),
+  (Dax Morrow, Grunda, Kettle, Cassia Vane, Vesk Drayl, Rena Kask, Admiral Thessa Orn, Chief
+  Wikka and Boss Gorbul: the same),
   `upgrades.ts` (paths, pool, gear, capstones, crossovers and the card roll), `planets.ts` (the
   ten worlds, their bosses and the star map's numbers), `state.ts` (the state and the numbers),
   `sim.ts` (everything that happens in a fight), `voyage.ts` (between fights: the star map, trader,

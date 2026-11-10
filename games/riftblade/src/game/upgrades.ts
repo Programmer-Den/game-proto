@@ -78,6 +78,10 @@ export const DRILLS: Record<HeroId, { id: string; name: TextKey; blurb: TextKey;
   rena: { id: 'flight-hours', name: 'flightHoursName', blurb: 'flightHoursBlurb', steps: ['speed', 'damage', 'health', 'fire', 'damageBig'] },
   thessa: { id: 'chain-of-command', name: 'chainOfCommandName', blurb: 'chainOfCommandBlurb', steps: ['damage', 'sig', 'health', 'crit', 'damageBig'] },
   wikka: { id: 'forest-born', name: 'forestBornName', blurb: 'forestBornBlurb', steps: ['speed', 'health', 'regen', 'damage', 'damageBig'] },
+  gorbul: { id: 'good-living', name: 'goodLivingName', blurb: 'goodLivingBlurb', steps: ['healthBig', 'armour', 'damage', 'healthBig', 'damageBig'] },
+  sable: { id: 'desert-years', name: 'desertYearsName', blurb: 'desertYearsBlurb', steps: ['health', 'speed', 'damage', 'regen', 'damageBig'] },
+  krull: { id: 'war-college', name: 'warCollegeName', blurb: 'warCollegeBlurb', steps: ['healthBig', 'damage', 'armour', 'sig', 'damageBig'] },
+  ysolde: { id: 'old-blood', name: 'oldBloodName', blurb: 'oldBloodBlurb', steps: ['health', 'regen', 'damage', 'sig', 'damageBig'] },
 };
 
 function drillDefs(): UpgradeDef[] {
@@ -257,6 +261,58 @@ const defs: UpgradeDef[] = [
   {
     id: 'tribe', kind: 'path', hero: 'wikka', name: 'tribeName', blurb: 'tribeBlurb',
     tiers: ['tribe1', 'tribe2', 'tribe3', 'tribe4', 'tribe5'],
+  },
+  // Boss Gorbul
+  {
+    id: 'payroll', kind: 'path', hero: 'gorbul', name: 'payrollName', blurb: 'payrollBlurb',
+    tiers: ['payroll1', 'payroll2', 'payroll3', 'payroll4', 'payroll5'],
+  },
+  {
+    id: 'bankroll', kind: 'path', hero: 'gorbul', name: 'bankrollName', blurb: 'bankrollBlurb',
+    tiers: ['bankroll1', 'bankroll2', 'bankroll3', 'bankroll4', 'bankroll5'],
+  },
+  {
+    id: 'heavyweight', kind: 'path', hero: 'gorbul', name: 'heavyweightName', blurb: 'heavyweightBlurb',
+    tiers: ['heavyweight1', 'heavyweight2', 'heavyweight3', 'heavyweight4', 'heavyweight5'],
+  },
+  // Sable Rhee
+  {
+    id: 'awakening', kind: 'path', hero: 'sable', name: 'awakeningName', blurb: 'awakeningBlurb',
+    tiers: ['awakening1', 'awakening2', 'awakening3', 'awakening4', 'awakening5'],
+  },
+  {
+    id: 'scrapper', kind: 'path', hero: 'sable', name: 'scrapperName', blurb: 'scrapperBlurb',
+    tiers: ['scrapper1', 'scrapper2', 'scrapper3', 'scrapper4', 'scrapper5'],
+  },
+  {
+    id: 'steadfast', kind: 'path', hero: 'sable', name: 'steadfastName', blurb: 'steadfastBlurb',
+    tiers: ['steadfast1', 'steadfast2', 'steadfast3', 'steadfast4', 'steadfast5'],
+  },
+  // General Krull
+  {
+    id: 'warlord', kind: 'path', hero: 'krull', name: 'warlordName', blurb: 'warlordBlurb',
+    tiers: ['warlord1', 'warlord2', 'warlord3', 'warlord4', 'warlord5'],
+  },
+  {
+    id: 'iron-legion', kind: 'path', hero: 'krull', name: 'ironLegionName', blurb: 'ironLegionBlurb',
+    tiers: ['ironLegion1', 'ironLegion2', 'ironLegion3', 'ironLegion4', 'ironLegion5'],
+  },
+  {
+    id: 'shield-wall', kind: 'path', hero: 'krull', name: 'shieldWallName', blurb: 'shieldWallBlurb',
+    tiers: ['shieldWall1', 'shieldWall2', 'shieldWall3', 'shieldWall4', 'shieldWall5'],
+  },
+  // Mother Ysolde
+  {
+    id: 'blood-rites', kind: 'path', hero: 'ysolde', name: 'bloodRitesName', blurb: 'bloodRitesBlurb',
+    tiers: ['bloodRites1', 'bloodRites2', 'bloodRites3', 'bloodRites4', 'bloodRites5'],
+  },
+  {
+    id: 'coven', kind: 'path', hero: 'ysolde', name: 'covenName', blurb: 'covenBlurb',
+    tiers: ['coven1', 'coven2', 'coven3', 'coven4', 'coven5'],
+  },
+  {
+    id: 'mist-veil', kind: 'path', hero: 'ysolde', name: 'mistVeilName', blurb: 'mistVeilBlurb',
+    tiers: ['mistVeil1', 'mistVeil2', 'mistVeil3', 'mistVeil4', 'mistVeil5'],
   },
   // The Blaster pool
   {
@@ -569,6 +625,18 @@ export const CAPSTONES: readonly CapstoneDef[] = [
   { id: 'eagle-eye', name: 'eagleEyeName', hero: 'wikka', path: 'slinger', gear: 'overclock', text: 'eagleEyeText' },
   { id: 'stampede', name: 'stampedeName', hero: 'wikka', path: 'log-traps', gear: 'boots', text: 'stampedeText' },
   { id: 'war-drums', name: 'warDrumsName', hero: 'wikka', path: 'tribe', gear: 'armour', text: 'warDrumsText' },
+  { id: 'crime-lord', name: 'crimeLordName', hero: 'gorbul', path: 'payroll', gear: 'magnet', text: 'crimeLordText' },
+  { id: 'golden-touch', name: 'goldenTouchName', hero: 'gorbul', path: 'bankroll', gear: 'overclock', text: 'goldenTouchText' },
+  { id: 'immovable', name: 'immovableName', hero: 'gorbul', path: 'heavyweight', gear: 'armour', text: 'immovableText' },
+  { id: 'first-light', name: 'firstLightName', hero: 'sable', path: 'awakening', gear: 'overclock', text: 'firstLightText' },
+  { id: 'whirling-edge', name: 'whirlingEdgeName', hero: 'sable', path: 'scrapper', gear: 'boots', text: 'whirlingEdgeText' },
+  { id: 'unyielding', name: 'unyieldingName', hero: 'sable', path: 'steadfast', gear: 'armour', text: 'unyieldingText' },
+  { id: 'conqueror', name: 'conquerorName', hero: 'krull', path: 'warlord', gear: 'overclock', text: 'conquerorText' },
+  { id: 'grand-army', name: 'grandArmyName', hero: 'krull', path: 'iron-legion', gear: 'magnet', text: 'grandArmyText' },
+  { id: 'fortress', name: 'fortressName', hero: 'krull', path: 'shield-wall', gear: 'armour', text: 'fortressText' },
+  { id: 'withering', name: 'witheringName', hero: 'ysolde', path: 'blood-rites', gear: 'overclock', text: 'witheringText' },
+  { id: 'night-mother', name: 'nightMotherName', hero: 'ysolde', path: 'coven', gear: 'magnet', text: 'nightMotherText' },
+  { id: 'witch-mist', name: 'witchMistName', hero: 'ysolde', path: 'mist-veil', gear: 'boots', text: 'witchMistText' },
 ];
 
 export interface CrossoverDef {
@@ -613,10 +681,12 @@ export function crossoverFor(id: string, hero: HeroId): CrossoverDef | undefined
 
 /**
  * The pools a hero draws from now: their class and side. Kael Varro turns to the Hollow once he
- * takes The Fall.
+ * takes The Fall, and Sable Rhee comes to the Current on Awakening.
  */
 export function poolsOf(hero: HeroId, ranks: Record<string, number>): readonly PoolId[] {
   if (hero === 'kael' && (ranks['the-fall'] ?? 0) > 0) return ['blade', 'hollow'];
+  // Sable Rhee wakes to the Current on her Awakening path.
+  if (hero === 'sable' && (ranks.awakening ?? 0) > 0) return ['blade', 'current'];
   return HEROES[hero].pools;
 }
 
@@ -752,7 +822,7 @@ export const BRANCHES: Record<BranchId, { name: TextKey; tiers: readonly [Gains,
 /** Upgrades that keep the hero standing: they branch into guard first. */
 const GUARD_FIRST = new Set([
   'riot-shield', 'life-support', 'stillness', 'bulwark', 'council-seat', 'rebuilt', 'diplomat', 'factory',
-  'wild-heart', 'spare-parts', 'ghost', 'afterburner', 'iron-ring',
+  'wild-heart', 'spare-parts', 'ghost', 'afterburner', 'iron-ring', 'heavyweight', 'steadfast', 'shield-wall', 'mist-veil',
   'riposte', 'iron-skin', 'mending', 'foresight', 'calm-mind', 'battle-trance', 'drain', 'soul-harvest',
   'armour', 'medpack', 'barrier', 'boots', 'stim',
   ...Object.values(DRILLS).map((d) => d.id),

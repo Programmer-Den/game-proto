@@ -24,7 +24,7 @@ const en: HowToPlay = {
     { input: '4 / Enter at the trader', action: 'Reroll the offers / leave' },
   ],
   loop: [
-    'Pick a hero: Legionary TR-9 at first; the other soldiers, the blade knights, a rebel commander, a trio of battle bots and a crew of rogues (a smuggler, a hunter, a droid, a spy, a bounty hunter, a pilot, an admiral and a forest chief) join as you unlock them.',
+    'Pick a hero: Legionary TR-9 at first; the other soldiers, the blade knights, a rebel commander, a trio of battle bots and a crew of rogues (a smuggler, a hunter, a droid, a spy, a bounty hunter, a pilot, an admiral, a forest chief and a crime boss) join as you unlock them.',
     'Keep moving: foes come at you from every side, and your weapon shoots them down.',
     'Walk over the green lumen shards they drop to fill the XP bar. Each level-up pauses the run on three cards (four for Elara Voss).',
     'At 5:00 the planet\'s boss comes, and no more foes arrive apart from those it calls itself; once it stands alone, it takes double damage. Beat it, and your hero, level and kit carry on to the next world.',
@@ -77,7 +77,7 @@ const de: HowToPlay = {
     { input: '4 / Enter beim Händler', action: 'Angebote neu würfeln / gehen' },
   ],
   loop: [
-    'Wähle einen Helden: zuerst Legionär TR-9; die anderen Soldaten, die Klingenritter, eine Rebellenkommandantin, ein Trio Kampfbots und eine Bande von Abenteurern (ein Schmuggler, eine Jägerin, ein Droide, eine Spionin, ein Kopfgeldjäger, eine Pilotin, eine Admiralin und ein Waldhäuptling) kommen hinzu, sobald du sie freischaltest.',
+    'Wähle einen Helden: zuerst Legionär TR-9; die anderen Soldaten, die Klingenritter, eine Rebellenkommandantin, ein Trio Kampfbots und eine Bande von Abenteurern (ein Schmuggler, eine Jägerin, ein Droide, eine Spionin, ein Kopfgeldjäger, eine Pilotin, eine Admiralin, ein Waldhäuptling und ein Gangsterboss) kommen hinzu, sobald du sie freischaltest.',
     'Bleib in Bewegung: Gegner kommen von allen Seiten, und deine Waffe schießt sie ab.',
     'Lauf über die grünen Lumensplitter, die sie fallen lassen, um die EP-Leiste zu füllen. Jeder Stufenaufstieg hält den Lauf auf drei Karten an (vier bei Elara Voss).',
     'Bei 5:00 kommt der Boss des Planeten, und außer denen, die er selbst ruft, kommen keine Gegner mehr; steht er allein, nimmt er doppelten Schaden. Besiege ihn, und dein Held, seine Stufe und Ausrüstung ziehen mit zur nächsten Welt.',

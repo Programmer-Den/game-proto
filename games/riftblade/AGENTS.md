@@ -11,11 +11,11 @@ of five minutes each, every one ending in its boss: the Dune world, then one of 
 Ocean, then one of Ice, Crystal, Storm and Ruin (each picked on the space map), then the Lava
 world, with a star map between them. A boss rush and hero mastery come on top.
 
-- Implemented: a hero select screen with twenty heroes in an 8x3 grid (room for 24) and a detail
-  panel with a Fight button: three soldiers (Captain Rook, Legionary TR-9, Corporal Bram-17), seven
+- Implemented: a hero select screen with twenty-four heroes in an 8x3 grid (full) and a detail
+  panel with a Fight button: three soldiers (Captain Rook, Legionary TR-9, Corporal Bram-17), ten
   blade knights (Kael Varro, Lord Vharn, Master Oom, Elder Corvin Hale, Regent Veyl, Kresh the
-  Twinblade, Master Joren Vask), two more Blaster heroes, Commander Elara Voss and Triad-77, and
-  the crew, eight more Blaster heroes with mechanics of their own (`crew.ts`): Dax Morrow (a heavy
+  Twinblade, Master Joren Vask, and later Sable Rhee, General Krull and Mother Ysolde, below), two
+  more Blaster heroes, Commander Elara Voss and Triad-77, and the crew, nine more Blaster heroes with mechanics of their own (`crew.ts`): Dax Morrow (a heavy
   pistol whose first shot at an unhurt foe is critical, Luck: every second chest gives a free
   card, Fly-By: a `freighter` ally strafes the swarm), Grunda (a piercing crossbow that knocks foes
   back, Rage from missing health, Roar: a stun and throw), KT-4 "Kettle" (aim `zap`: a short chain
@@ -26,8 +26,15 @@ world, with a star map between them. A boss rush and hero mastery come on top.
   `state.mark`), Rena Kask (twin cannons, Momentum in `cd.momentum`, Trench Run: a `dashKind`
   `'ram'` dash that hits through `dashHit`, `wingman` allies), Admiral Thessa Orn (a pistol, Study:
   kills per foe kind in `state.study` add damage, Blockade: a ring of `carpet` bombs, fleet strikes
-  on `swarmSpot`) and Chief Wikka (a slingshot, Log Trap: short-lived `log` allies that roll and
-  knock foes once each, `tribesman` allies joining as `kills` add up).
+  on `swarmSpot`), Chief Wikka (a slingshot, Log Trap: short-lived `log` allies that roll and
+  knock foes once each, `tribesman` allies joining as `kills` add up) and Boss Gorbul (a
+  three-bolt spread blaster, Fortune: damage from `state.credits` held, Hired Guns: pays credits
+  for short-lived `thug` allies and spends nothing without them, Heavyweight's Belly Slam). The
+  later knights, in `blades.ts`: Sable Rhee (aim `sweep`, Pull: draws foes in and stuns them; her
+  Awakening path adds the Current pool through `poolsOf`), General Krull (aim `cleave`, Shield
+  Wall: armour in `knightMods` and a knock round him while `sigActiveMs` lasts, `guard` allies)
+  and Mother Ysolde (aim `hex`: a curse in `Enemy.hexMs` that hurts every 0.5 s and spreads when
+  its foe falls, Raise the Dead: Veyl's `puppet` allies).
   Only TR-9 is open on a fresh save; every other hero is unlocked by a deed (`checkDeeds`), never
   shown in the game: a locked card is a dark placeholder (`rb-locked`, no art, name or colour) and
   its detail panel says only "Locked". A deed done mid-run pauses the game on the new hero's panel
@@ -35,7 +42,7 @@ world, with a star map between them. A boss rush and hero mastery come on top.
   signature move (Space or the round button), three five-tier paths and a fourth, its drill (plain
   stat gains, `DRILLS`). Pools by weapon class
   and side: Blaster (10 skills: soldiers, Elara, Triad-77, the crew), Blade (8, knights), Current (6: Kael, Oom, Corvin,
-  Joren) and Hollow (6: Vharn, Veyl, Kresh, and Kael once he takes The Fall); Joren may also draw
+  Joren, and Sable once she takes Awakening) and Hollow (6: Vharn, Veyl, Kresh, Krull, Ysolde, and Kael once he takes The Fall); Joren may also draw
   Lightning Arc. The shared Gear deck (12 pieces), the 7-ability and 5-gear limits, level-ups with
   three cards (four for Elara, her Hope; at least one of the hero's own paths while any are left,
   the Field Ration as filler), 48 capstones and 13 crossovers (the cards show a link icon);
@@ -221,7 +228,7 @@ world, with a star map between them. A boss rush and hero mastery come on top.
   button, the `pathKind` line of their path cards, `r`, `armour` and `locked`)
   and each hero's `schemes` (`HeroScheme`: `name`, `body`, `accent`, optional `mark`, `bolt`);
   `schemeOf(id, variant)` returns a scheme (Kael has a second, Fallen, used once he takes The
-  Fall), `isKnight`, `isCrew` (the eight heroes `crew.ts` plays), `BOOT_HEROES` (12: the heroes
+  Fall), `isKnight`, `isCrew` (the nine heroes `crew.ts` plays), `BOOT_HEROES` (12: the heroes
   painted at boot) and `isLate` (a hero from the thirteenth on, painted when first shown). All hero colours come from here; each hero's accent is unique (Elara's red,
   Triad-77's white), except Kael's Fallen scheme, which takes Lord Vharn's colours. `locked` marks a hero that needs a deed (all but TR-9); Triad-77's `maxHp`
   is the sum of its three bots' and its `r` the whole unit's.
@@ -311,9 +318,10 @@ world, with a star map between them. A boss rush and hero mastery come on top.
 - `src/game/blades.ts`: everything the knights do, called from `sim.ts`: `knightMods` (their
   `statsOf` numbers: reach, dodge, signature cooldown, Temper, Rage and the like), `knightAttack`
   per aim mode (`slash`, `throw` boomerang blades, `ripple`, `spin`, `chain` lightning, `orbit`,
-  `flurry`), `knightSignature`, `knightAbilities` (every knight path and Blade, Current and Hollow
+  `flurry`, and the later knights' `sweep`, `cleave` and `hexAttack` with `curse`), `knightSignature`
+  (with `pull` and `raise`; `PULL`, `WALL` and `CURSE` hold their numbers), `knightAbilities` (every knight path and Blade, Current and Hollow
   skill), the knights' allies (`knightAllies`, `moveKnightAlly`: starfighters, co-pilot, spirits,
-  puppets), hooks for kills, heals and hits (`onKill`, `healFactor`, `onHurt`, `rescue`,
+  puppets, Krull's guards), hooks for kills, heals and hits (`onKill`, `healFactor`, `onHurt`, `rescue`,
   `knightGuard`, `foeMod`, `contactMod`), `orbitBlades`, `bladeColor` and `heroVariant` for
   drawing, and `checkDeeds` (every hero's unlock deed, into `state.deeds`; `DEEDS` holds the
   deeds' numbers). Slashes and lightning are
@@ -329,7 +337,7 @@ world, with a star map between them. A boss rush and hero mastery come on top.
   commandos, `bike`, `medic`, `shieldbot`, `command`, `spare`; `droneSpot` for Eyes in the Sky) and
   hooks (`squadHurt`, `hurtFactor`, `squadHeal`, `squadCrit`, `turnedBonus`, `squadKill`,
   `squadBlock`, `bubble`, `rebuildTime`). `AID`, `BUBBLE` and `TRIAD` hold their numbers.
-- `src/game/crew.ts`: Dax Morrow, Grunda, Kettle, Cassia Vane, Vesk, Rena, Thessa and Wikka, called from `sim.ts` like
+- `src/game/crew.ts`: Dax Morrow, Grunda, Kettle, Cassia Vane, Vesk, Rena, Thessa, Wikka and Gorbul, called from `sim.ts` like
   `squad.ts` (behind its `crew` flag): `crewAttack` (Dax's pistol with Fast Hands' extra bolts,
   Grunda's crossbow with bursting bolts (`Bullet.burst`), Kettle's chain `zap`, Cassia's rifle
   with the Cloak's triple shot through `player.charge`), `crewSignature` (`flyBy`, `roar`, `hack`,
@@ -344,8 +352,9 @@ world, with a star map between them. A boss rush and hero mastery come on top.
   `rocket` (a bursting bolt), `trenchRun`, `blockade`, `logTrap`, `flame` and `strike`, `studied`
   (Thessa's Study bonus for a kind), `tribeSize` (warriors due from the kills; `crewAbilities`
   calls `syncAllies` when one more is due), `keepMark` (Cassia's marks and Vesk's bounties), and
-  the allies `wingman`, `tribesman` (lasting) and `log` (short-lived). `FLYBY`, `ROAR`, `ZAP`,
-  `CLOAK`, `ROCKET`, `RAM`, `FLEET` and `TRIBE` hold their numbers; their stat numbers are
+  the allies `wingman`, `tribesman` (lasting) and `log` (short-lived); Gorbul's `hireGuns` (false
+  when he can't pay), `bellySlam` and short-lived `thug` allies. `FLYBY`, `ROAR`, `ZAP`,
+  `CLOAK`, `ROCKET`, `RAM`, `FLEET`, `TRIBE` and `THUGS` hold their numbers; their stat numbers are
   `crewMods` in `state.ts` (with `bounces` for Wikka's Slinger 2).
 - `src/game/objectives.ts`: the side objectives, called from `sim.ts` once a step like `squad.ts`
   (it imports `sim.ts`, so the same rule about load-time values holds): `OBJ` (each one's time
@@ -403,12 +412,13 @@ world, with a star map between them. A boss rush and hero mastery come on top.
   `rb-command`, `rb-pod` (TR-9's drop pod) and `rb-locked` (the locked hero placeholder).
 - `src/art/crew.ts`: `drawCrewHero` (the crew, from their scheme; `drawHero` hands them to it)
   and `bakeCrewAllies` (`rb-freighter`, `rb-patch`, `rb-spydrone`, `rb-wingman`, `rb-tribesman`,
-  `rb-log`; the wingman and log turn with `aim`). Never painted at boot: `bakeLate`
+  `rb-log`, `rb-thug`; the wingman and log turn with `aim`). Never painted at boot: `bakeLate`
   in `sprites.ts` paints a later hero (its sprites, portrait, `rb-bolt-<id>` and allies) the first
   time it is shown (`looks` and `portraitOf` in the panels, `GameScene.draw` for the hero played).
 - `src/art/knights.ts`: `drawKnight` (the knights, from their scheme; `drawHero` hands knights to
   it) and `bakeKnights`: the blades (`bladeKey`, `rb-blade-<id>`), `rb-fighter`, `rb-copilot`,
-  `rb-spirit`, `rb-puppet`, `rb-wreck`, `rb-ship` and `rb-bolt-fallen`.
+  `rb-spirit`, `rb-puppet`, `rb-wreck`, `rb-ship` and `rb-bolt-fallen`. The later knights' blades and
+  `rb-guard` come from `bakeLateKnight`, called by `bakeLate`, never at boot.
 - `src/scenes/layout.ts`: `VIEW` (the designed 960x540), `SCREEN` (the real view), `FRAME` (where
   the designed rectangle sits in it), `fitLayout`, `CENTER`, HUD places (`XP_BAR`, `HP_BAR`, `KIT`, `TIMER`,
   `LEVEL`, `PLANET_TAG`, `CREDITS_TAG`, `BOSS_BAR`, `OBJECTIVE_HUD`, `SIG_BUTTON`, `STICK`), card rectangles
@@ -567,7 +577,7 @@ the arena is won), `unlock` (a new hero), `win`, `lose`.
 
 **Effects** (`sfx.ts`), and where they play:
 - Hero bolts by colour (`boltSound`): `pistol` (Rook, Dax, Thessa, Wikka), `carbine` (TR-9, Cassia), `spread` (Bram),
-  `blaster` (Elara, Rena), `rocket` also for Vesk's rockets and Rena's missiles, `heavy` also for Grunda's bolts, `botShot` (Triad-77, drones), `heavy`, `rocket`, `boomerang` (a spinning
+  `blaster` (Elara, Rena), `spread` also for Gorbul, `rocket` also for Vesk's rockets and Rena's missiles, `heavy` also for Grunda's bolts, `botShot` (Triad-77, drones), `heavy`, `rocket`, `boomerang` (a spinning
   thrown blade), `saber` (The Fall's wave).
 - Knights' swings, from new `slashes` by aim mode: `saber` (Kael and other slashes), `ripple`
   (Oom), `spinHum` (Corvin), `flurry` with `ping` on every tenth (Joren); `crackle` for new `zaps`
@@ -575,7 +585,7 @@ the arena is won), `unlock` (a new hero), `win`, `lose`.
 - Signatures (`SIGNATURE`, on `signatures` going up): `sigHorn`, `sigPulse`, `sigToss`, `sigSlam`,
   `sigForce`, `sigDash`, `sigRing`, `sigStorm`, `sigFlare`, `sigShift` (the crew reuse `sigHorn`,
   `sigForce`, `sigStorm` and `sigShift`; Vesk `sigFlare`, Rena `sigDash`, Thessa `sigHorn`, Wikka
-  `sigToss`). A signature asked for that
+  `sigToss`, Gorbul `sigHorn`, Sable `sigForce`, Krull `sigRing`, Ysolde `sigStorm`). A signature asked for that
   does not go off plays `ui('refuse')`.
 - New bombs: `toss` (grenade, frag), `charge`, `whistle` (crate, orbital, carpet). New blasts:
   `boom` (radius 90 and up, louder with size) or `pop`.
@@ -620,7 +630,7 @@ free of audio) or from the scene's input handler.
   must make the same texts as before (a fresh save has no wins, nothing banked, nothing in the
   codex and no run ended). The codex records during the playthrough's run (no `rand` draws), so a
   later page load would show its button.
-- The playthrough (`e2e/playthrough.spec.ts`) checks the twenty cards (all but TR-9 locked on a
+- The playthrough (`e2e/playthrough.spec.ts`) checks the twenty-four cards (all but TR-9 locked on a
   fresh save), waits out Phaser's start-up easing on the select screen (140 frames; its first 120
   steps are cut short, so a run started during them would play differently depending on load
   time), taps Rook's locked card (no Fight button), then TR-9 and Fight, walks a circle by holding
@@ -766,6 +776,12 @@ mostly on the Dune world. Things learned while tuning:
   8, Thessa and Wikka 2 of 12 after Thessa's damage, fire rate and health, Wikka's health, damage
   and fire rate went up, Study came to count every 10 kills and Wikka's first two warriors came
   without the Tribe path.
+- Gorbul, Sable, Krull and Ysolde were checked with the same small bot (12 runs each, seed 200). On
+  those seeds Kael won 2, Veyl and Joren 7, Corvin 0, Dax 5, Cassia 3 and Rook 1; Gorbul won 3 of
+  12 (after his speed, range and health went up: he fell on the Dune world in 11 of 12 before),
+  Sable 4, Krull 8 (after his health, armour and damage went down from 10) and Ysolde 8 (from 12,
+  after her curse damage, fire rate, range and health went down). Armour is capped at 0.9 in
+  `statsOf`, since Krull's Shield Wall stacks on it.
 
 ## Gotchas
 

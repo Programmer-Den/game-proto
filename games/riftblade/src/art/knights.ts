@@ -1,11 +1,12 @@
 /**
- * The seven knights in Glow Vector, drawn from their scheme like the soldiers (body = robes or
+ * The knights in Glow Vector (the first seven, then Sable Rhee, General Krull and Mother Ysolde), drawn from their scheme like the soldiers (body = robes or
  * armour, accent = blade and rim, mark = a second colour, bolt = the blade's glow), facing right,
  * plus their thrown blades and the knights' allies: Kael's starfighter and bot co-pilot, Oom's
- * spirit pupils and wreckage, and Veyl's puppets.
+ * spirit pupils and wreckage, Veyl's puppets (Ysolde raises them too) and Krull's guards. The
+ * later knights' blades and guards are painted lazily (`bakeLateKnight`), never at boot.
  */
 import Phaser from 'phaser';
-import { HERO_IDS, isKnight, schemeOf, type HeroId, type HeroScheme } from '../game/heroes';
+import { HERO_IDS, isKnight, isLate, schemeOf, type HeroId, type HeroScheme } from '../game/heroes';
 import { beam, glow, outline, paint, shade, shape, type Ctx } from './glow';
 
 const INK = '#0b0f1c';
@@ -205,6 +206,129 @@ export function drawKnight(ctx: Ctx, id: HeroId, x: number, y: number, z: number
     ctx.fillStyle = '#9aa3b5';
     ctx.fillRect(-12, -3, 24, 6);
     ctx.restore();
+  } else if (id === 'sable') {
+    // Cropped hair, a padded vest over a long shirt, a scarf, and a curved single-edged blade.
+    shape(ctx, robe(ctx, x, y + 8, 40, 56), shade(sch.body, -0.15), sch.accent, 8, z);
+    shape(ctx, () => ctx.roundRect(x - 17, y + 8, 34, 30, 7), sch.body, sch.accent, 6, z);
+    ctx.fillStyle = mark;
+    for (let i = 0; i < 3; i++) ctx.fillRect(x - 15, y + 14 + i * 8, 30, 2);
+    ctx.fillStyle = sch.accent;
+    ctx.beginPath();
+    ctx.moveTo(x - 14, y + 4);
+    ctx.lineTo(x + 14, y + 4);
+    ctx.lineTo(x + 6, y + 14);
+    ctx.lineTo(x - 2, y + 30);
+    ctx.lineTo(x - 6, y + 12);
+    ctx.closePath();
+    ctx.fill();
+    shape(ctx, head(ctx, x, y - 14, 16), '#c99a74', sch.accent, 6, z);
+    ctx.fillStyle = '#2e2420';
+    ctx.beginPath();
+    ctx.arc(x - 1, y - 18, 16, Math.PI * 0.95, Math.PI * 2.02);
+    ctx.lineTo(x - 15, y - 12);
+    ctx.closePath();
+    ctx.fill();
+    eyes(ctx, x + 2, y - 12, 6);
+    // The curved blade, its edge bowed out.
+    ctx.save();
+    glow(ctx, sch.bolt, 14, z);
+    ctx.strokeStyle = sch.bolt;
+    ctx.lineWidth = 6;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(x + 34, y + 22);
+    ctx.quadraticCurveTo(x + 70, y + 2, x + 60, y - 42);
+    ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle = '#9aa3b5';
+    ctx.fillRect(x + 22, y + 24, 14, 6);
+  } else if (id === 'krull') {
+    // Broad plate armour with brass trim, a horned great helm with round eye holes, a heavy cleaver.
+    shape(ctx, () => ctx.roundRect(x - 27, y + 6, 54, 60, 8), sch.body, sch.accent, 10, z);
+    ctx.fillStyle = mark;
+    ctx.fillRect(x - 27, y + 34, 54, 8);
+    ctx.fillStyle = sch.accent;
+    ctx.fillRect(x - 27, y + 6, 54, 3);
+    ctx.fillRect(x - 3, y + 34, 6, 8);
+    shape(ctx, () => ctx.roundRect(x - 36, y + 2, 20, 18, 6), shade(sch.body, 0.15), sch.accent, 4, z);
+    shape(ctx, () => ctx.roundRect(x + 16, y + 2, 20, 18, 6), shade(sch.body, 0.15), sch.accent, 4, z);
+    shape(ctx, () => ctx.roundRect(x - 18, y - 36, 36, 38, 10), shade(sch.body, 0.08), sch.accent, 6, z);
+    ctx.fillStyle = mark;
+    for (const side of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(x + side * 14, y - 30);
+      ctx.quadraticCurveTo(x + side * 30, y - 38, x + side * 26, y - 54);
+      ctx.lineTo(x + side * 20, y - 36);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.fillStyle = INK;
+    ctx.beginPath();
+    ctx.arc(x - 6, y - 18, 4, 0, Math.PI * 2);
+    ctx.arc(x + 7, y - 18, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = sch.accent;
+    ctx.fillRect(x - 2, y - 10, 4, 10);
+    // The cleaver: a short hilt and a broad glowing slab.
+    ctx.fillStyle = '#9aa3b5';
+    ctx.fillRect(x + 28, y + 24, 8, 16);
+    ctx.save();
+    glow(ctx, sch.bolt, 16, z);
+    ctx.fillStyle = sch.bolt;
+    ctx.beginPath();
+    ctx.moveTo(x + 26, y + 24);
+    ctx.lineTo(x + 46, y - 40);
+    ctx.lineTo(x + 62, y - 34);
+    ctx.lineTo(x + 40, y + 26);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  } else if (id === 'ysolde') {
+    // A tall hooded robe with a high pointed collar, a pale face and a staff crowned with a glowing stone.
+    shape(ctx, robe(ctx, x, y + 2, 46, 62), sch.body, sch.accent, 10, z);
+    ctx.fillStyle = mark;
+    ctx.fillRect(x - 3, y + 4, 6, 60);
+    for (const side of [-1, 1]) {
+      shape(ctx, () => {
+        ctx.moveTo(x + side * 6, y + 4);
+        ctx.lineTo(x + side * 26, y - 30);
+        ctx.lineTo(x + side * 18, y + 6);
+        ctx.closePath();
+      }, shade(sch.body, 0.12), sch.accent, 4, z);
+    }
+    shape(ctx, () => {
+      ctx.moveTo(x - 16, y + 2);
+      ctx.quadraticCurveTo(x - 18, y - 34, x, y - 40);
+      ctx.quadraticCurveTo(x + 18, y - 34, x + 16, y + 2);
+      ctx.closePath();
+    }, mark, sch.accent, 6, z);
+    shape(ctx, () => ctx.ellipse(x + 1, y - 13, 9, 12, 0, 0, Math.PI * 2), '#d8d2c8', sch.accent, 3, z);
+    eyes(ctx, x + 1, y - 14, 4, sch.accent);
+    ctx.strokeStyle = '#4a3a2a';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(x + 30, y + 64);
+    ctx.lineTo(x + 36, y - 30);
+    ctx.quadraticCurveTo(x + 44, y - 42, x + 34, y - 48);
+    ctx.stroke();
+    ctx.save();
+    glow(ctx, sch.bolt, 16, z);
+    ctx.fillStyle = sch.bolt;
+    ctx.beginPath();
+    ctx.arc(x + 38, y - 38, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    if (fx) {
+      ctx.save();
+      glow(ctx, sch.bolt, 10, z);
+      ctx.strokeStyle = sch.bolt;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 5]);
+      ctx.beginPath();
+      ctx.arc(x + 72, y - 10, 14, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
   } else {
     // Joren: pale grey robes, a sash, bald, a royal blue blade.
     shape(ctx, robe(ctx, x, y + 6, 48, 58), sch.body, sch.accent, 10, z);
@@ -228,23 +352,41 @@ export function drawKnight(ctx: Ctx, id: HeroId, x: number, y: number, z: number
 /** The texture of a knight's thrown blade (Kresh's is his whole double-ended staff). */
 export const bladeKey = (id: HeroId) => `rb-blade-${id}`;
 
-/** Paints the knights' thrown blades and allies. */
-export function bakeKnights(scene: Phaser.Scene) {
-  for (const id of HERO_IDS) {
-    if (!isKnight(id)) continue;
-    const color = schemeOf(id).bolt;
-    paint(scene, bladeKey(id), 48, 48, (ctx) => {
-      if (id === 'kresh') {
-        beam(ctx, 4, 24, 44, 24, color, 4, 10);
-        ctx.fillStyle = '#9aa3b5';
-        ctx.fillRect(18, 21, 12, 6);
-      } else {
-        beam(ctx, 22, 24, 44, 24, color, 4.5, 10);
-        ctx.fillStyle = '#9aa3b5';
-        ctx.fillRect(8, 21, 14, 6);
-      }
+/** Paints a knight's thrown blade. */
+function bakeBlade(scene: Phaser.Scene, id: HeroId) {
+  const color = schemeOf(id).bolt;
+  paint(scene, bladeKey(id), 48, 48, (ctx) => {
+    if (id === 'kresh') {
+      beam(ctx, 4, 24, 44, 24, color, 4, 10);
+      ctx.fillStyle = '#9aa3b5';
+      ctx.fillRect(18, 21, 12, 6);
+    } else {
+      beam(ctx, 22, 24, 44, 24, color, 4.5, 10);
+      ctx.fillStyle = '#9aa3b5';
+      ctx.fillRect(8, 21, 14, 6);
+    }
+  });
+}
+
+/** A later knight's blade and allies (Krull's guards), painted the first time the knight is shown. */
+export function bakeLateKnight(scene: Phaser.Scene, id: HeroId) {
+  if (!scene.textures.exists(bladeKey(id))) bakeBlade(scene, id);
+  if (id === 'krull' && !scene.textures.exists('rb-guard')) {
+    const sch = schemeOf('krull');
+    paint(scene, 'rb-guard', 30, 36, (ctx) => {
+      // A small Hollow guard: plate, a round helm and a short glowing blade.
+      shape(ctx, () => ctx.roundRect(7, 14, 16, 18, 4), sch.body, sch.accent, 4);
+      shape(ctx, () => ctx.arc(15, 10, 7, 0, Math.PI * 2), shade(sch.body, 0.1), sch.accent, 3);
+      ctx.fillStyle = INK;
+      ctx.fillRect(12, 9, 7, 2);
+      beam(ctx, 22, 22, 28, 4, sch.bolt, 2.5, 6);
     });
   }
+}
+
+/** Paints the knights' thrown blades and allies (the later knights' come with `bakeLateKnight`). */
+export function bakeKnights(scene: Phaser.Scene) {
+  for (const id of HERO_IDS) if (isKnight(id) && !isLate(id)) bakeBlade(scene, id);
   // Kael's starfighter: a slim dart with swept wings and a magenta engine.
   const kael = schemeOf('kael');
   paint(scene, 'rb-fighter', 44, 34, (ctx) => {

@@ -1,14 +1,15 @@
 /**
- * The seven knights: their attacks, signature moves and paths, and the Blade, Current and Hollow
+ * The knights (the first seven, then Sable Rhee, General Krull and Mother Ysolde): their attacks,
+ * signature moves and paths, and the Blade, Current and Hollow
  * pools any knight can draw from. `sim.ts` calls in here each step for a knight (and never for a
  * soldier, so the soldiers' runs replay exactly as before). Pure state changes, randomness from
  * `rand`, like the rest of the rules.
  */
 import { t as tr } from '../i18n';
-import { HEROES, schemeOf, type HeroId } from './heroes';
+import { HEROES, isKnight, schemeOf, type HeroId } from './heroes';
 import { at } from './upgrades';
-import { fullTemper, onPlatform, type Ally, type Enemy, type GameState } from './state';
-import { addBomb, angleDiff, bolt, damage, explode, heal, knock, near, nearest, pop, ready, stats, swarmSpot } from './sim';
+import { fullTemper, isStructure, onPlatform, type Ally, type Enemy, type GameState } from './state';
+import { addBomb, angleDiff, bolt, damage, explode, gainXp, heal, knock, near, nearest, pop, ready, stats, swarmSpot } from './sim';
 import { rand } from './weekly';
 
 const rank = (s: GameState, id: string) => s.ranks[id] ?? 0;
@@ -162,6 +163,7 @@ function attackRate(s: GameState) {
   if (p.formMs > 0) rate *= 2;
   if (s.hero === 'corvin' && p.sigActiveMs > 0 && rank(s, 'bulwark') >= 5) rate *= 2;
   if (s.hero === 'joren' && rank(s, 'duelist') >= 5) rate *= 1.3;
+  if (s.hero === 'sable') rate *= (rank(s, 'scrapper') >= 1 ? 1.15 : 1) * (cap(s, 'whirling-edge') ? 1.4 : 1);
   return rate;
 }
 
@@ -179,6 +181,9 @@ export function knightAttack(s: GameState, ms: number) {
     : hero.aim === 'spin' ? spin(s)
     : hero.aim === 'chain' ? chain(s)
     : hero.aim === 'flurry' ? flurry(s)
+    : hero.aim === 'sweep' ? sweep(s)
+    : hero.aim === 'cleave' ? cleave(s)
+    : hero.aim === 'hex' ? hexAttack(s)
     : true;
   // Nothing in reach: hold the swing until something is.
   if (struck) p.fireMs += hero.fireMs;
@@ -284,6 +289,102 @@ function flurry(s: GameState) {
   return true;
 }
 
+/** Sable: a wide sweep in front, all the way round every third swing; Awakening 3 adds a push wave. */
+function sweep(s: GameState) {
+  const p = s.player;
+  const R = HEROES.sable.range * stats().reach;
+  const t = nearest(s, p.x, p.y, 1, R)[0];
+  if (!t) return false;
+  const a = Math.atan2(t.y - p.y, t.x - p.x);
+  p.aim = a;
+  p.shots += 1;
+  const sc = rank(s, 'scrapper');
+  const half = sc >= 5 || p.shots % 3 === 0 ? Math.PI : 1.2;
+  const color = bladeColor(s);
+  cut(s, p.x, p.y, R, a, half, HEROES.sable.damage, sc >= 4 ? 160 : 80);
+  slashFx(s, p.x, p.y, R, a, half, color);
+  if (rank(s, 'awakening') >= 3 && p.shots % 4 === 0) {
+    cut(s, p.x, p.y, R * 1.8, a, 0.6, HEROES.sable.damage * 0.8, 220);
+    slashFx(s, p.x, p.y, R * 1.8, a, 0.6, '#8fd0ff', 280);
+  }
+  return true;
+}
+
+/** Krull: a slow, heavy cleave in front that throws foes back (wider on Warlord 4). */
+function cleave(s: GameState) {
+  const p = s.player;
+  const R = HEROES.krull.range * stats().reach * (rank(s, 'warlord') >= 4 ? 1.3 : 1);
+  const t = nearest(s, p.x, p.y, 1, R)[0];
+  if (!t) return false;
+  const a = Math.atan2(t.y - p.y, t.x - p.x);
+  const half = rank(s, 'warlord') >= 4 ? 1.2 : 0.8;
+  p.aim = a;
+  cut(s, p.x, p.y, R, a, half, HEROES.krull.damage, 220);
+  slashFx(s, p.x, p.y, R, a, half, bladeColor(s), 280);
+  return true;
+}
+
+/** Ysolde: curses the nearest foe not cursed yet (or the nearest); a curse hurts it a while. */
+function hexAttack(s: GameState) {
+  const p = s.player;
+  const R = HEROES.ysolde.range * stats().reach;
+  const pool = nearest(s, p.x, p.y, 6, R);
+  const t = pool.find((e) => !(e.hexMs! > 0)) ?? pool[0];
+  if (!t) return false;
+  p.aim = Math.atan2(t.y - p.y, t.x - p.x);
+  curse(s, t);
+  // Withering: every foe close to it is cursed too.
+  if (cap(s, 'withering')) near(s, t.x, t.y, 120, (e) => curse(s, e));
+  zapFx(s, [p.x, p.y, t.x, t.y], bladeColor(s), 200);
+  return true;
+}
+
+/** Puts Ysolde's curse on a foe (5 s on Blood Rites 2, else 3 s). */
+function curse(s: GameState, e: Enemy) {
+  if (e.hp <= 0 || e.charmMs > 0 || isStructure(e.kind)) return;
+  e.hexMs = Math.max(e.hexMs ?? 0, rank(s, 'blood-rites') >= 2 ? CURSE.longMs : CURSE.ms);
+}
+
+/** Ysolde's curse, Sable's Pull and Krull's Shield Wall. */
+export const CURSE = { ms: 3000, longMs: 5000, tickMs: 500, spread: 2, wideSpread: 3, riseMax: 8 };
+export const PULL = { r: 260, wideR: 340, dmg: 30, bigDmg: 60, stunMs: 800, heal: 4, every: 6000 };
+export const WALL = { ms: 4000, longMs: 6000, heal: 25, dmg: 20, bigDmg: 40, every: 10_000 };
+
+/** Sable's Pull: draws the foes near in to her and stuns them (a boss is only slowed). */
+function pull(s: GameState) {
+  const p = s.player;
+  const aw = rank(s, 'awakening');
+  const pool = nearest(s, p.x, p.y, 12, aw >= 1 ? PULL.wideR : PULL.r);
+  if (!pool.length) return false;
+  const color = bladeColor(s);
+  for (const e of pool) {
+    zapFx(s, [p.x, p.y, e.x, e.y], color, 220);
+    if (e.kind === 'boss') {
+      e.slowPct = Math.max(e.slowPct, 0.5);
+      e.slowMs = Math.max(e.slowMs, 2000);
+    } else if (!isStructure(e.kind)) {
+      const d = Math.hypot(e.x - p.x, e.y - p.y);
+      const keep = Math.max(e.r + p.r + 14, d * 0.35);
+      e.x = p.x + ((e.x - p.x) / Math.max(1, d)) * keep;
+      e.y = p.y + ((e.y - p.y) / Math.max(1, d)) * keep;
+      e.stunMs = Math.max(e.stunMs, PULL.stunMs);
+    }
+    hit(s, e, aw >= 2 ? PULL.bigDmg : PULL.dmg);
+  }
+  if (aw >= 5) heal(s, PULL.heal * pool.length);
+  slashFx(s, p.x, p.y, 70, 0, Math.PI, color, 320);
+  return true;
+}
+
+/** Ysolde raises the dead to fight for her a while. */
+function raise(s: GameState, n: number, x: number, y: number) {
+  const coven = rank(s, 'coven');
+  for (let i = 0; i < n; i++) {
+    const a = (i / Math.max(1, n)) * Math.PI * 2 + s.time / 1000;
+    s.allies.push({ id: s.nextId++, kind: 'puppet', x: x + Math.cos(a) * 30, y: y + Math.sin(a) * 30, cdMs: 300, lifeMs: coven >= 2 ? 15000 : 10000, slot: i, aim: a });
+  }
+}
+
 /** The blades orbiting the hero: Kresh's staff (and the second one, and the outer ring) and Spinning Guard. */
 export function orbitBlades(s: GameState) {
   const p = s.player;
@@ -380,6 +481,19 @@ export function knightSignature(s: GameState) {
     p.dashHit = [];
     p.chain = at([1, 1, 2, 2, 4], rank(s, 'stalker'), 0);
     huntDash(s, t, 75);
+    return true;
+  }
+  if (s.hero === 'sable') return pull(s);
+  if (s.hero === 'krull') {
+    const sw = rank(s, 'shield-wall');
+    p.sigActiveMs = sw >= 1 ? WALL.longMs : WALL.ms;
+    if (sw >= 2) heal(s, WALL.heal);
+    slashFx(s, p.x, p.y, p.r + 26, 0, Math.PI, color, 400);
+    return true;
+  }
+  if (s.hero === 'ysolde') {
+    raise(s, cap(s, 'night-mother') ? 10 : rank(s, 'coven') >= 1 ? 6 : 4, p.x, p.y);
+    slashFx(s, p.x, p.y, 80, 0, Math.PI, color, 400);
     return true;
   }
   // Joren's Breaking Point: one huge strike that stuns the strongest foe (every elite near with Shattering Blow).
@@ -583,6 +697,37 @@ export function knightAbilities(s: GameState, ms: number) {
       slashFx(s, p.x, p.y, 70, 0, Math.PI, '#c9ccd6', 220);
     }
     if (s.mark && !s.enemies.some((e) => e.id === s.mark && e.hp > 0)) s.mark = 0;
+  } else if (s.hero === 'sable') {
+    if (cap(s, 'first-light') && ready(s, 'first-light', PULL.every, ms)) {
+      if (!pull(s)) s.cd['first-light'] = 300;
+    }
+  } else if (s.hero === 'krull') {
+    if (p.sigActiveMs > 0 && ready(s, 'wall', 300, ms)) {
+      // The Shield Wall throws back and hurts whatever touches him.
+      near(s, p.x, p.y, p.r + 26, (e) => {
+        hit(s, e, rank(s, 'shield-wall') >= 4 ? WALL.bigDmg : WALL.dmg);
+        knock(e, p.x, p.y, rank(s, 'shield-wall') >= 4 ? 320 : 220);
+      });
+    }
+    if (cap(s, 'fortress') && p.sigActiveMs <= 0 && ready(s, 'fortress', WALL.every, ms)) {
+      if (nearest(s, p.x, p.y, 1, 150).length) p.sigActiveMs = WALL.ms;
+      else s.cd.fortress = 300;
+    }
+  } else if (s.hero === 'ysolde') {
+    // The curse: every tick, each cursed foe takes harm (and is slowed on Blood Rites 5).
+    const br = rank(s, 'blood-rites');
+    s.cd.hexTick = (s.cd.hexTick ?? CURSE.tickMs) - ms;
+    const tick = s.cd.hexTick <= 0;
+    if (tick) s.cd.hexTick += CURSE.tickMs;
+    for (const e of s.enemies) {
+      if (!(e.hexMs! > 0) || e.hp <= 0) continue;
+      e.hexMs! -= ms;
+      if (br >= 5) {
+        e.slowPct = Math.max(e.slowPct, 0.3);
+        e.slowMs = Math.max(e.slowMs, 200);
+      }
+      if (tick) hit(s, e, HEROES.ysolde.damage * (br >= 1 ? 1.3 : 1));
+    }
   } else if (s.hero === 'joren') {
     const duel = rank(s, 'duelist');
     if (duel >= 2 && ready(s, 'lunge', duel >= 5 ? 1500 : 3000, ms)) {
@@ -681,6 +826,22 @@ export function onKill(s: GameState, e: Enemy) {
     if (rank(s, 'stalker') >= 2) p.hasteMs = 2000;
     if (e.id === s.mark) s.mark = 0;
   }
+  if (s.hero === 'sable' && e.kind !== 'boss' && rank(s, 'scrapper') >= 2 && rand() < 0.05) {
+    s.pickups.push({ id: s.nextId++, kind: 'credits', x: e.x, y: e.y, heal: 0, value: 1 });
+  }
+  if (s.hero === 'krull' && e.elite) {
+    if (rank(s, 'warlord') >= 2) heal(s, 20);
+    if (rank(s, 'warlord') >= 5) gainXp(s, 15, true);
+  }
+  if (s.hero === 'ysolde' && e.hexMs! > 0 && e.kind !== 'boss') {
+    // A cursed foe passes its curse on as it falls, and rises again on Coven 3.
+    for (const o of nearest(s, e.x, e.y, rank(s, 'blood-rites') >= 3 ? CURSE.wideSpread : CURSE.spread, 150, [e.id])) {
+      curse(s, o);
+      zapFx(s, [e.x, e.y, o.x, o.y], bladeColor(s), 160);
+    }
+    if (rank(s, 'coven') >= 3 && s.allies.filter((a) => a.kind === 'puppet').length < CURSE.riseMax) raise(s, 1, e.x, e.y);
+    e.hexMs = 0;
+  }
 }
 
 /** The hero heals: The Fall halves it at full Temper, and healing drains Kael's Temper. */
@@ -705,6 +866,8 @@ export function onHurt(s: GameState) {
     cut(s, p.x, p.y, 70, 0, Math.PI, 25, 200);
     slashFx(s, p.x, p.y, 70, 0, Math.PI, bladeColor(s), 220);
   }
+  // Mist Veil 4: a hit on Ysolde curses the foes around her.
+  if (s.hero === 'ysolde' && rank(s, 'mist-veil') >= 4) near(s, p.x, p.y, 100, (e) => curse(s, e));
 }
 
 /** A killing blow: Rebuilt, Unbreakable or the Eternal Regent can keep the hero up. */
@@ -831,6 +994,24 @@ export function moveKnightAlly(s: GameState, a: Ally, ms: number, count: number)
     else lightning(s, a.x, a.y, t, 3, dmg, color);
     return;
   }
+  if (a.kind === 'guard') {
+    // Krull's Hollow guards: stand in a ring round him and cut whatever comes close.
+    const ang = (a.slot * Math.PI * 2) / Math.max(1, count) + s.time / 3000;
+    a.x += (p.x + Math.cos(ang) * 52 - a.x) * Math.min(1, 6 * dt);
+    a.y += (p.y + Math.sin(ang) * 52 - a.y) * Math.min(1, 6 * dt);
+    if (a.cdMs > 0) return;
+    const t = nearest(s, a.x, a.y, 1, 60)[0];
+    if (!t) {
+      a.cdMs = 0;
+      return;
+    }
+    const il = rank(s, 'iron-legion');
+    a.cdMs = 700;
+    a.aim = Math.atan2(t.y - a.y, t.x - a.x);
+    cut(s, a.x, a.y, 60, a.aim, 1, 14 * (il >= 2 ? 1.5 : 1), il >= 4 ? 240 : 120);
+    slashFx(s, a.x, a.y, 60, a.aim, 1, color, 180);
+    return;
+  }
   // A puppet: walks at the nearest foe and claws it; Loyal Dead heals Veyl with each hit.
   a.lifeMs -= ms;
   const t = nearest(s, a.x, a.y, 1, 320)[0];
@@ -844,7 +1025,7 @@ export function moveKnightAlly(s: GameState, a: Ally, ms: number, count: number)
     a.y += ((ty - a.y) / d) * step;
   } else if (t && a.cdMs <= 0) {
     a.cdMs = 600;
-    damage(s, t, 8 * (rank(s, 'puppet-master') >= 2 ? 1.4 : 1) * (a.elite ? 3 : 1));
+    damage(s, t, 8 * (rank(s, 'puppet-master') >= 2 ? 1.4 : 1) * (a.elite ? 3 : 1) * (s.hero === 'ysolde' && rank(s, 'coven') >= 4 ? 2 : 1));
     if (cross(s, 'loyal-dead')) heal(s, 0.25);
   }
 }
@@ -855,6 +1036,7 @@ export function knightAllies(s: GameState) {
     spirit: cap(s, 'council-of-spirits') ? 4 : at([1, 1, 2, 2, 3], rank(s, 'old-teacher'), 0),
     copilot: rank(s, 'ace-pilot') >= 3 ? 1 : 0,
     squadron: cap(s, 'squadron-run') ? 3 : 0,
+    guard: s.hero !== 'krull' ? 0 : cap(s, 'grand-army') ? 5 : at([1, 1, 2, 2, 3], rank(s, 'iron-legion'), 0),
   };
 }
 
@@ -865,6 +1047,7 @@ export function foeMod(s: GameState, e: Enemy) {
   if (s.hero === 'joren' && big) k *= 1 + at([0.1, 0.25, 0.25, 0.4, 0.4], rank(s, 'breaker'), 0);
   else if (s.hero === 'vharn' && rank(s, 'dread') >= 4 && Math.hypot(e.x - s.player.x, e.y - s.player.y) < dreadRadius(s)) k *= 1.15;
   else if (s.hero === 'kresh' && big && cap(s, 'apex-predator')) k *= 1.5;
+  else if (s.hero === 'krull' && big && rank(s, 'warlord') >= 1) k *= 1.2;
   return k;
 }
 
@@ -901,11 +1084,16 @@ export function checkDeeds(s: GameState) {
   done('rena', s.hero === 'kael' && rank(s, 'ace-pilot') >= 5);
   done('thessa', s.arenaWins >= DEEDS.arenas);
   done('wikka', s.level >= DEEDS.level);
+  done('gorbul', s.credits >= DEEDS.fortune);
+  done('sable', s.stage >= 3 && !isKnight(s.hero!));
+  done('krull', s.hero === 'vharn' && rank(s, 'iron-grip') >= 5);
+  done('ysolde', s.hero === 'veyl' && rank(s, 'puppet-master') >= 5);
 }
 
 /**
  * Elara Voss's deed (credits held at once), Triad-77's (foes defeated in one run), Dax Morrow's
  * (chests opened), Kettle's (power-ups taken), Cassia Vane's (side objectives done), Vesk Drayl's
- * (elites defeated), Admiral Thessa Orn's (arenas won) and Chief Wikka's (the level reached), all in one run.
+ * (elites defeated), Admiral Thessa Orn's (arenas won), Chief Wikka's (the level reached), Boss
+ * Gorbul's (credits held at once) and Sable Rhee's (the Lava world reached without a blade), all in one run.
  */
-export const DEEDS = { credits: 100, kills: 2500, chests: 6, powerUps: 8, objectives: 6, elites: 25, arenas: 2, level: 25 };
+export const DEEDS = { credits: 100, kills: 2500, chests: 6, powerUps: 8, objectives: 6, elites: 25, arenas: 2, level: 25, fortune: 250 };

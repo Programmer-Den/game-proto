@@ -159,6 +159,8 @@ export interface Enemy {
   charmMs: number;
   /** Ms before an orbiting blade or a turned foe can hit it again. */
   orbitMs: number;
+  /** Ms left of Mother Ysolde's curse on it (none when not set). */
+  hexMs?: number;
 }
 
 /**
@@ -285,7 +287,7 @@ export type AllyKind =
   | 'trooper' | 'legionary' | 'brother' | 'drone' | 'escort' | 'fighter' | 'squadron' | 'copilot' | 'spirit' | 'puppet'
   | 'commando' | 'bike' | 'medic' | 'shieldbot' | 'command' | 'spare' | 'thawed'
   | 'freighter' | 'patch' | 'spydrone'
-  | 'wingman' | 'tribesman' | 'log';
+  | 'wingman' | 'tribesman' | 'log' | 'thug' | 'guard';
 
 export interface Ally {
   id: number;
@@ -831,7 +833,8 @@ export function statsOf(s: GameState): Stats {
   return {
     speed: hero.speed * (1 + 0.08 * r('boots')) * k.speed * w.speed * (1 + d.speed + stim + gv('speed')) * (mut('haste') ? MUT.haste : 1),
     pickup: PICKUP_R * (1 + 0.3 * r('magnet') + PERK.lens * (s.perks.lens ?? 0) + gv('pickup')) * (s.lureMs > 0 ? POWER.lure : 1),
-    armour: topUp(0.08 * r('armour') + k.armour + d.armour + w.armour, gv('armour'), 0.8),
+    // Never more than 90% off (General Krull's Shield Wall on top of heavy armour).
+    armour: Math.min(0.9, topUp(0.08 * r('armour') + k.armour + d.armour + w.armour, gv('armour'), 0.8)),
     maxHp: s.hero === 'triad' ? botMax(s) * botCount(s) : Math.round((hero.maxHp + 10 * r('armour') + k.hp + d.hp + w.hp + gv('hp')) * s.maxHpMod),
     regen: mut('vampire') ? 0 : 0.5 * r('medpack') + k.regen + d.regen + w.regen + gv('regen'),
     cooldown: (1 - 0.07 * r('overclock')) * (1 - Math.min(0.5, gv('cooldown'))),
@@ -957,6 +960,12 @@ function crewMods(s: GameState) {
     mods.damage *= (r('slinger') >= 3 ? 1.25 : 1) * (cap('war-drums') ? 1 + 0.04 * s.allies.filter((a) => a.kind === 'tribesman').length : 1);
     mods.pierce += cap('eagle-eye') ? 2 : 0;
     mods.sig *= r('log-traps') >= 3 ? 0.75 : 1;
+  } else if (s.hero === 'gorbul') {
+    // Fortune: +1% damage for every 10 credits held, up to +25% (+40% on Bankroll 3).
+    mods.damage *= 1 + Math.min(r('bankroll') >= 3 ? 0.4 : 0.25, 0.01 * Math.floor(s.credits / 10));
+    mods.credits += r('bankroll') >= 1 ? 0.25 : 0;
+    mods.armour += (r('bankroll') >= 4 && s.credits >= 100 ? 0.1 : 0) + (r('heavyweight') >= 4 ? 0.15 : 0) + (cap('immovable') ? 0.3 : 0);
+    mods.hp += r('heavyweight') >= 1 ? 40 : 0;
   }
   return mods;
 }
@@ -1005,16 +1014,37 @@ function knightMods(s: GameState) {
     if (cap('steel-strider')) damage *= 1 + 0.25 * p.rises;
   } else if (s.hero === 'joren') {
     if (r('breaker') >= 5) sig *= 0.6;
+  } else if (s.hero === 'sable') {
+    if (r('scrapper') >= 3) damage *= 1.2;
+    if (r('awakening') >= 4) sig *= 0.75;
+    if (cap('whirling-edge')) speed *= 1.2;
+    if (low && r('steadfast') >= 5) damage *= 1.4;
+  } else if (s.hero === 'krull') {
+    if (r('warlord') >= 3) damage *= 1.15;
+    // Conqueror: +3% damage for every elite defeated this run, up to +30%.
+    if (cap('conqueror')) damage *= 1 + Math.min(0.3, 0.03 * s.elitesKilled);
+    if (r('shield-wall') >= 3) sig *= 0.75;
+  } else if (s.hero === 'ysolde') {
+    if (r('coven') >= 5) sig *= 0.7;
+    if (r('blood-rites') >= 4) damage *= 1.15;
+    if (r('mist-veil') >= 5) speed *= 1.2;
   }
   return {
     speed,
-    armour: (hero.armour ?? 0) + (cap('hollow-rebirth') ? 0.3 : 0) + at([0.04, 0.08, 0.12, 0.16, 0.2], r('iron-skin'), 0),
-    hp: (r('rebuilt') >= 2 ? 20 : 0) + (cap('hollow-rebirth') ? 60 : 0) + at([10, 20, 30, 40, 60], r('iron-skin'), 0),
-    regen: at([0.6, 1.2, 1.8, 2.4, 3], r('mending'), 0) + (s.hero === 'vharn' && low && r('life-support') >= 5 ? 2 : 0),
+    armour:
+      (hero.armour ?? 0) + (cap('hollow-rebirth') ? 0.3 : 0) + at([0.04, 0.08, 0.12, 0.16, 0.2], r('iron-skin'), 0) +
+      (s.hero === 'sable' ? (r('steadfast') >= 3 ? 0.1 : 0) + (r('steadfast') >= 4 ? 0.1 : 0) + (cap('unyielding') ? 0.15 : 0) : 0) +
+      (s.hero === 'krull' && p.sigActiveMs > 0 ? (r('shield-wall') >= 5 ? 0.7 : 0.5) : 0) +
+      (s.hero === 'ysolde' && r('mist-veil') >= 3 ? 0.1 : 0),
+    hp: (r('rebuilt') >= 2 ? 20 : 0) + (cap('hollow-rebirth') ? 60 : 0) + at([10, 20, 30, 40, 60], r('iron-skin'), 0) +
+      (s.hero === 'sable' ? (r('steadfast') >= 1 ? 30 : 0) + (cap('unyielding') ? 60 : 0) : 0),
+    regen: at([0.6, 1.2, 1.8, 2.4, 3], r('mending'), 0) + (s.hero === 'vharn' && low && r('life-support') >= 5 ? 2 : 0) +
+      (s.hero === 'sable' && r('steadfast') >= 2 ? 1 : 0) + (s.hero === 'ysolde' && r('mist-veil') >= 2 ? 1 : 0),
     damage,
     crit: 0.05 * r('focus'),
     reach,
-    dodge: 0.06 * r('foresight') + at([0.03, 0.05, 0.07, 0.09, 0.12], r('battle-trance'), 0),
+    dodge: 0.06 * r('foresight') + at([0.03, 0.05, 0.07, 0.09, 0.12], r('battle-trance'), 0) +
+      (s.hero === 'ysolde' ? (r('mist-veil') >= 1 ? 0.1 : 0) + (cap('witch-mist') ? 0.25 : 0) : 0),
     sig,
   };
 }
@@ -1056,6 +1086,7 @@ export const HERO_OBJECTIVES: Record<HeroId, ObjectiveId> = {
   veyl: 'storm', kresh: 'bloodtrail', joren: 'monolith', elara: 'signal', triad: 'salvage',
   dax: 'quickdraw', grunda: 'unbroken', kettle: 'salvage', cassia: 'recon',
   vesk: 'duel', rena: 'recon', thessa: 'signal', wikka: 'bloodtrail',
+  gorbul: 'unbroken', sable: 'pilgrim', krull: 'dropzone', ysolde: 'storm',
 };
 /** When each of a world's three objectives starts (ms of world time). */
 export const OBJECTIVE_AT = [60_000, 135_000, 210_000] as const;

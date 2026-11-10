@@ -23,6 +23,13 @@ const enUS: Partial<Translation<typeof en>> = {
   hollowRebirthText: 'Armored and slow: +60 health, -30% damage taken, double slash damage',
   wildHeart5: '+20% armor below 30% health',
   spareParts4: '+15% armor',
+  bankroll4: '+10% armor while holding 100 credits or more',
+  steadfast3: '+10% armor',
+  steadfast4: '+10% armor',
+  mistVeil3: '+10% armor',
+  goodLivingBlurb: 'Well fed and well armored.',
+  immovableText: '+30% armor',
+  unyieldingText: '+60 health and +15% armor',
   veskBlurb: 'A bounty hunter in heavy armor: slow rockets at the nearest foe that burst where they land.',
 };
 

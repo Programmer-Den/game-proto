@@ -40,6 +40,7 @@ export const MASTERY_WEAPON: Record<HeroId, string> = {
   corvin: 'crescent', veyl: 'dark-nova', kresh: 'spinning-guard', joren: 'lightning-arc', elara: 'callin', triad: 'drone',
   dax: 'ricochet', grunda: 'stun', kettle: 'drone', cassia: 'executioner',
   vesk: 'thermal', rena: 'scatter', thessa: 'orbital-beacon', wikka: 'ricochet',
+  gorbul: 'callin', sable: 'blade-dash', krull: 'grip', ysolde: 'drain',
 };
 
 /** The text key of what each level opens (level 1 opens nothing). */
@@ -69,4 +70,8 @@ export const MASTERY_COLOURS: Record<HeroId, Omit<HeroScheme, 'name' | 'bolt'>> 
   rena: { body: '#4a2f3f', accent: '#9ef01a', mark: '#2a1a24' },
   thessa: { body: '#e6e1d8', accent: '#e85d75', mark: '#8a8478' },
   wikka: { body: '#3b2f4a', accent: '#ffd166', mark: '#241c2e' },
+  gorbul: { body: '#3e4a5c', accent: '#f0b4a0', mark: '#262e3a' },
+  sable: { body: '#4a3a5e', accent: '#a8e6a1', mark: '#2c2238' },
+  krull: { body: '#2f4a4f', accent: '#ffb56b', mark: '#1b2c2f' },
+  ysolde: { body: '#5a4a2e', accent: '#9fc4ff', mark: '#352c1b' },
 };
