@@ -73,7 +73,7 @@ export class Hud {
     );
     this.place = fixed(add.text(this.vw / 2, 84, '', { fontFamily: FONT, fontSize: '30px', color: '#f3ead2', stroke: '#0a0e24', strokeThickness: 5 }).setOrigin(0.5).setAlpha(0));
     this.timer = fixed(add.text(this.vw / 2, 14, '', { fontFamily: FONT, fontSize: '22px', color: '#cfe8ff', stroke: '#0a0e24', strokeThickness: 4 }).setOrigin(0.5, 0));
-    this.toastText = fixed(add.text(this.vw / 2, 130, '', { fontFamily: FONT, fontSize: '18px', color: '#dff2ff', stroke: '#0a0e24', strokeThickness: 4 }).setOrigin(0.5).setAlpha(0));
+    this.toastText = fixed(add.text(this.vw / 2, 130, '', { fontFamily: FONT, fontSize: '18px', color: '#dff2ff', stroke: '#0a0e24', strokeThickness: 4, align: 'center', wordWrap: { width: 640 } }).setOrigin(0.5).setAlpha(0));
     this.buttons = {
       sword: fixed(add.image(this.btn('sword').x, this.btn('sword').y, 'btn-sword').setScale(texScale('btn-sword') * (BUTTONS.sword.r / 30))),
       roll: fixed(add.image(this.btn('roll').x, this.btn('roll').y, 'btn-roll').setScale(texScale('btn-roll') * (BUTTONS.roll.r / 30))),
@@ -127,9 +127,9 @@ export class Hud {
     this.placeMs = 2200;
   }
 
-  toast(text: string) {
+  toast(text: string, ms = 1800) {
     this.toastText.setText(text).setAlpha(1);
-    this.toastMs = 1800;
+    this.toastMs = ms;
   }
 
   /** Whether a view point is on the counters' plate, top left, which opens the moonstone page. */

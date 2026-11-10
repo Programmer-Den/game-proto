@@ -119,14 +119,18 @@ Implemented today:
   and drop an `ember` (a `shoot` with that key) every `LANTERN_SHOT_MS`, which sinks from `LANTERN_LIFT` to the
   knight's body on the way (the seed's `lift` and `drop`), so walls stop it at its ground point; carry a light, and never
   hurt by touch. Down, both lie still and harmless. `hint` shows a teaching toast once a page load
-  (`shellHard`, `beetleFlipped`, `lanternDown`, `gloamHigh`). New dungeon foes go at the end of the map's
+  (`shellHard`, `beetleFlipped`, `lanternDown`, `gloamHigh`, and the Thornmother's below), up for
+  `HINT_MS` (`Hud.toast` takes how long; a long toast wraps). New dungeon foes go at the end of the map's
   `enemies`, so the beaten flags of the old ones keep their index; new outdoor ones go after the
   scatter, so the trees and bushes it sows stay put. Dungeon foes stay
   beaten (`foe-<i>` flags in the shrine, `<map>-foe-<i>` in the others; `DUNGEONS` lists them).
 - The Thornmother: a ring no blade cuts, three bulbs raised one at a time (`BULB_*`), thorn volleys
   that speed up as bulbs fall (`VOLLEY_MS`) and summoned slugs (`SUMMON_MS`, by difficulty). A bulb
   yanked down by the hookvine takes `BULB_HP` sword hits. Beating her clears the ring, gives a
-  heart vessel, reveals a moonstone and opens the hall's top exit.
+  heart vessel, reveals a moonstone and opens the hall's top exit. She teaches the fight: waking,
+  she toasts `thornmotherHow` and holds her first bulb back for `HINT_MS`; then the `bulbUp` hint
+  when a bulb first glows, `bulbHigh` for a swing at a glowing bulb, `thornRing` for a swing at
+  the ring, and `bulbDown` once one is pulled down.
 - The Bellwraith (`wraith`, `updateWraith`): a great bell that hovers after the knight
   (`HOVER_MS`, `HOVER_SPEED`), shudders (`DROP_MS`) and slams down (`SLAM_PX`), then lies there
   (`BELL_DOWN_MS`). A bellseed bursting next to the downed bell tips it over and shows the wraith
@@ -368,7 +372,7 @@ elder's `quest-thorns` then moves the quest straight on to `shrine`.
 
 - **Add or change a text**: its key in `i18n/en.ts`, the German in `i18n/de.ts` (the build fails
   without it) and a US spelling in `i18n/en-US.ts` if it differs (colour, centre); run
-  `node scripts/check-translations.mjs`. German runs longer: the dialog box wraps, but toasts, the
+  `node scripts/check-translations.mjs`. German runs longer: the dialog box and toasts wrap, but the
   journal line and the end card's buttons don't, so check a new text with `?lang=de`.
 - **Add a person**: an `npcs` entry in the map (name via `t`), a sprite in `paint.ts` (keyed by id),
   and lines in `talk.ts` (each a key in the `i18n/` files).

@@ -85,6 +85,8 @@ const BELL_SOUND: TextKey[] = ['bellLow', 'bellMid', 'bellHigh'];
 const BELL_PITCH = [0.75, 1, 1.26];
 /** How high the Bellwraith's bell hangs while it hunts. */
 const BELL_LIFT = 72;
+/** How long a teaching toast stays up: longer than a plain one, since it has more to read. */
+const HINT_MS = 3600;
 
 const DIRS: Record<Facing, { x: number; y: number }> = { up: { x: 0, y: -1 }, down: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
 const WARM: [number, number, number] = [255, 190, 110];
@@ -1175,6 +1177,9 @@ export class GameScene extends Phaser.Scene {
     // Foes and the Thornmother's bulbs in reach.
     for (const f of this.foes) if (f.alive && Math.hypot(f.x - hx, f.y - 8 - hy) < reach + 12) this.hitFoe(f, d);
     if (this.boss) for (const b of this.boss.bulbs) if (b.state === 'down' && Math.hypot(b.x - hx, b.y - 10 - hy) < SWING_RADIUS + 14) this.hitBulb(b);
+    // A swing at a glowing bulb or at the ring teaches the hookvine.
+    if (this.boss?.bulbs.some((b) => b.state === 'raised' && Math.hypot(b.x - hx, b.y - 10 - hy) < SWING_RADIUS + 14)) this.hint('bulbHigh');
+    else if (this.boss && [16, SWING_REACH + 8].some((r) => tileAt(this.map, Math.floor((s.x + d.x * r) / TILE), Math.floor((s.y - 4 + d.y * r) / TILE)) === 'ring')) this.hint('thornRing');
     const w = this.wraith;
     if (w && (w.state === 'tipped' || w.state === 'down') && Math.hypot(w.x - hx, w.y - 12 - hy) < SWING_RADIUS + 26) this.hitWraith();
     const g = this.gloam;
@@ -2074,10 +2079,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** A toast that shows once since the page opened, to teach the armoured foes. */
-  private hint(key: 'beetleFlipped' | 'lanternDown' | 'shellHard' | 'gloamHigh' | 'brineSlick') {
+  private hint(key: 'beetleFlipped' | 'lanternDown' | 'shellHard' | 'gloamHigh' | 'brineSlick' | 'bulbHigh' | 'bulbUp' | 'thornRing') {
     if (this.hinted.has(key)) return;
     this.hinted.add(key);
-    this.hud.toast(t(key));
+    this.hud.toast(t(key), HINT_MS);
   }
 
   private hitFoe(f: Foe, d: { x: number; y: number }) {
@@ -2387,6 +2392,9 @@ export class GameScene extends Phaser.Scene {
       boss.awake = true;
       this.playAreaMusic();
       this.hud.showPlace(t('thornmother'));
+      this.hud.toast(t('thornmotherHow'), HINT_MS);
+      // The first bulb waits until that has been read.
+      boss.raiseT = Math.max(boss.raiseT, HINT_MS);
     }
     const left = boss.bulbs.filter((b) => b.state !== 'gone').length;
     boss.raiseT -= dt;
@@ -2395,6 +2403,7 @@ export class GameScene extends Phaser.Scene {
       if (next) {
         next.state = 'raised';
         next.t = BULB_UP_MS * (this.hard ? TRIAL.bulbUp : 1);
+        this.hint('bulbUp');
       }
       boss.raiseT = BULB_EVERY_MS;
     }

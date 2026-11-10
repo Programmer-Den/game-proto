@@ -69,8 +69,10 @@ chapter ends.
 2. Bring the blade back to her, then cut the thorns at the north gate.
 3. Find the Sunken Shrine in Bramble Woods. It has a locked door, a stone block that wants to be
    somewhere else, a chasm and a tool in a chest behind iron bars.
-4. Face the Thornmother at the bottom of the shrine. Her bulbs are her weak spot, but you can't
-   reach them from where you stand.
+4. Face the Thornmother at the bottom of the shrine. No blade cuts her ring of thorns, but her
+   three bulbs are her weak spot: when one glows, face it and throw the hookvine to pull it down,
+   then strike it twice before it rises again. Roll through her thorn volleys and keep her slugs
+   off you; once all three bulbs are gone, she withers.
 5. Bring the news back to the elder.
 
 ### Chapter two: the Drowned Bell
