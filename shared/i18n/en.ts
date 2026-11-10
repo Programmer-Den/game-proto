@@ -206,6 +206,8 @@ const en = {
   broadsideCover: 'A pirate ship firing a broadside at an enemy sloop',
   tinctureTinkerCard: 'Swap ingredients to match three or more and gather what each potion order asks for before the moves run out.',
   tinctureTinkerCover: 'A board of herbs, roots and crystals next to an order for a Healing Draught',
+  burrowBrigadeCard: 'Lead a squad of helmeted moles in turn-based artillery: aim over the hills, read the wind and pick from 26 weapons, while every blast digs the ground away.',
+  burrowBrigadeCover: 'Moles in blue and amber helmets on grassy hills, one aiming an acorn rocket over a ridge with a crater in it',
   catacombCard: 'Fight through a short dungeon with a deck of cards: play a hand of five each turn, and add a new card after every fight.',
   catacombCover: 'A knight with a hand of cards facing a slime in a dungeon room',
   golemGardenCard: 'Plant seeds beside the garden path that grow into golems, and keep the pests away from the Heartwood wave after wave.',

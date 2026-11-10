@@ -1,0 +1,56 @@
+# Burrow Brigade
+
+Turn-based artillery with squads of helmeted moles. Each turn one of your moles walks, aims with a
+slingshot drag and fires one of 26 weapons over the hills. Every blast digs the ground away and
+throws moles about, the wind changes every turn, and a mole that falls into the water is out. The
+last team with a mole standing wins. Play the Burrow AI or a friend on one screen.
+
+![Aiming an Acorn Rocket over the ridge](docs/screenshots/aim.webp)
+
+## How to play
+
+- **Aim and fire:** press on your mole and drag back, like a slingshot: the direction sets the
+  angle and the length the power. Let go to fire. Or use ↑ ↓ (W S) to aim, and hold and release
+  Space to charge and fire.
+- **Walk:** ← → (A D), hold the ◀ ▶ buttons, or tap the ground. **Jump** with Enter or ⤴, flip
+  backwards with Backspace.
+- **Weapons:** the weapon button (bottom left) opens the arsenal; Tab, Q and E step through it.
+  Weapons with a target (Balloon Drop, Storm Bolt, Tunnel Hop) are aimed by tapping the map; tools
+  and close moves go off with USE or Space.
+- **Turns:** 30 seconds to walk, aim and fire, then 3 seconds to scramble away. Crates float down
+  between turns: walk into one for a weapon, or into a green-cross crate to heal. From turn 24 the
+  water rises a little every turn.
+- **Wind:** the arrow at the top. It pushes rockets, the Dandelion's seeds, the Balloon Drop's
+  acorns, flames and bees, but never thrown weapons.
+
+![The arsenal](docs/screenshots/arsenal.webp)
+
+## Weapons
+
+| Group | Weapons |
+| --- | --- |
+| Rockets (wind) | Acorn Rocket (unlimited), Boulder Rocket, Dandelion (splits in three at the top), Wasp Rocket (homes in), Firecrackers (five in a row), Drill Rocket (bores on through earth) |
+| Thrown (no wind) | Pebble Grenade (unlimited, 3 second fuse), Pinecone (scatters five nuts), Rubber Ball (five bounces), Rolling Log (rolls along the ground), Ember Pot (flames that run downhill), Beehive (bees chase the nearest enemy), Dirt Clod (adds earth) |
+| Strikes | Mine, Dynamite, Balloon Drop (five acorns from a balloon), Storm Bolt (lightning), Quake |
+| Close | Paw Swipe (unlimited), Ground Pound, Burrow (dig a tunnel, unlimited), Sunbeam (a straight beam through everything) |
+| Tools | Tunnel Hop (dive and pop up elsewhere), Shield Bubble, Repair Kit, Skip Turn |
+
+![A Balloon Drop and a swarm of bees](docs/screenshots/balloon-and-bees.webp)
+
+## Difficulty
+
+The hub's difficulty sets how loosely the Burrow AI aims and how much of your shot's path you see
+while aiming: all of it on Easy, the start of it on Normal, none on Hard.
+
+## Code
+
+- `src/game/terrain.ts`: the ground as a mask of earth and air, the map maker, spawn points and the
+  flight steps shared by shells, the aim preview and the AI.
+- `src/game/world.ts`: everything that moves (moles, shells, flames, bees, crates, balloons, bolts,
+  particles) and what every weapon does.
+- `src/game/weapons.ts`: the arsenal's list. `src/game/ai.ts`: the Burrow AI. `src/game/save.ts`:
+  stats and settings.
+- `src/scenes/GameScene.ts`: menu, turns, input, HUD and drawing; `draw.ts` draws the moles, shells
+  and particles; `terrainArt.ts` paints the ground and the sky.
+
+See [AGENTS.md](AGENTS.md) for the architecture, save keys and test hooks.

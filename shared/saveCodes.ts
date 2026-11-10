@@ -10,6 +10,7 @@ export const SAVE_CODES: Record<string, string> = {
   'beehive-baron': 'bb',
   bramblecrest: 'br',
   broadside: 'bs',
+  'burrow-brigade': 'bg',
   catacomb: 'ca',
   colonizer: 'co',
   deadline: 'de',
