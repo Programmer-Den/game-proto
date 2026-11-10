@@ -22,9 +22,11 @@ or the same position three times).
   strike and play the fall at double speed.
 - **Menu** leaves the game; it is saved after every move, and **Continue game** on the menu picks it
   up again.
-- The arrows on the menu pick the Stone AI's level, from 1 to 7. Until you pick one, the hub's
-  difficulty picks it (Easy is Novice, Normal Casual player, Hard Club player). A saved game keeps
-  the level it was started on.
+- The arrows on the menu pick the Stone AI's level, from 1 to 7. Levels 1 to 3 are open from the
+  start; each level above opens once you beat the one below it (a locked level shows a lock and
+  which level to beat). Until you pick one, the hub's difficulty picks the level (Easy is Novice,
+  Normal and Hard Casual player, or Club player once it is open). A saved game keeps the level it
+  was started on.
 
   | Level | How it plays |
   | --- | --- |

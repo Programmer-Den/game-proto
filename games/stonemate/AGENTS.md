@@ -14,7 +14,12 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
   capture or pawn move) and threefold repetition.
 - **Stone AI levels:** seven, in `LEVELS` (`game/rules.ts`), picked on the menu with the
   `level-down` and `level-up` arrows and saved as `level` in `stonemate-prefs`. Until one is picked,
-  `defaultLevel()` follows the hub's difficulty: Easy is 2, Normal 3, Hard 4. A game keeps the level
+  `defaultLevel()` follows the hub's difficulty: Easy is 2, Normal 3, Hard 4. Levels 1 to 3
+  (`OPEN_LEVELS`) are always open; each one above opens when the player beats the level below it
+  (`unlockedLevel(stats.best)`). The arrows still step onto a locked level, which shows a lock and
+  the level to beat, and Play White and Play Black refuse it (`startAi`); a pick above the open
+  levels is lowered to the highest open one at boot. A win that opens a level says so in the result
+  box and moves the menu's pick up to it. A game keeps the level
   it started on (`gameLevel`, saved with the game). The names are Beginner, Novice, Casual player, Club player, Expert, Master and Grandmaster. Each level beat the
   one below it in AI-against-AI matches (a throwaway script, not in the repo).
 - **Levels 1 to 4** (`game/ai.ts`, `shallow` in `LEVELS`): negamax with alpha-beta, material plus
@@ -80,7 +85,8 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
 
 - `stonemate-game`: the game under way, `{ mode: 'ai' | 'duo', player: 'w' | 'b', level: 1-7, moves: ['e2e4', ...] }`;
   removed when a game ends. A save from before the levels has no `level` and plays the menu's.
-- `stonemate-stats`: `{ wins, losses, draws, pairs: ['nb', ...], scenes: ['joust', ...] }`.
+- `stonemate-stats`: `{ wins, losses, draws, pairs: ['nb', ...], scenes: ['joust', ...], best }`,
+  `best` being the strongest AI level beaten (0 for none), which opens the levels above 3.
 - `stonemate-prefs`: `{ quick, level }`, the Captures button and the menu's AI level.
 - `stonemate-trophies`: kept by `shared/trophies.ts`.
 
@@ -88,7 +94,7 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
 
 The dev build puts `game` on `window`; the playthrough reads `game.scene.getScene('Game')`:
 
-- `state`: `screen`, `mode`, `player`, `level` (the game's AI level), `turn`, `plies`, `busy`, `selected`, `result`, `inCheck`,
+- `state`: `screen`, `mode`, `player`, `level` (the game's AI level), `unlocked` (the highest open level), `turn`, `plies`, `busy`, `selected`, `result`, `inCheck`,
   `captures`, `lastCapture`, `promo`, and `legal` (the legal moves as `e2e4` text while a person is to
   move).
 - `buttons`: every button by id (`level-down`, `level-up`, `play-white`, `play-black`, `two-players`, `gallery`, `continue`,

@@ -6,7 +6,7 @@ import { award } from '../../../../shared/trophies';
 import { SFX, SONG } from '../audio';
 import { chooseMove } from '../game/ai';
 import { KINDS, type Kind, type Move, Flag, Position, type Result, type Side, VICTIMS, kindOf, moveText, sideOf } from '../game/chess';
-import { HARD_LEVEL, LEVELS, PAIR_COUNT, QUICK_MATE, SIGNATURES, clampLevel, type LevelId, pairKey } from '../game/rules';
+import { HARD_LEVEL, LEVELS, PAIR_COUNT, QUICK_MATE, SIGNATURES, clampLevel, type LevelId, pairKey, unlockedLevel } from '../game/rules';
 import { thinkDeep } from '../game/think';
 import { type Mode, type Stats, loadGame, loadStats, saveGame, saveStats } from '../game/save';
 import { t, type TextKey } from '../i18n';
@@ -100,7 +100,8 @@ export class GameScene extends Phaser.Scene {
     }
     this.quick = prefs.quick === true;
     // Until a level is picked on the menu, the hub's difficulty picks it.
-    this.level = clampLevel(prefs.level);
+    // A locked level can't be the pick (the hub's Hard picks 4 before 3 is beaten).
+    this.level = Math.min(clampLevel(prefs.level), unlockedLevel(this.stats.best));
     this.input.on('pointerdown', (p: Phaser.Input.Pointer, over: Phaser.GameObjects.GameObject[]) => {
       if (!over.length) this.onBoardTap(p.worldX, p.worldY);
     });
@@ -116,6 +117,8 @@ export class GameScene extends Phaser.Scene {
       mode: this.mode,
       player: this.player,
       level: this.gameLevel,
+      /** The highest level open to play: 3, then one past the strongest level beaten. */
+      unlocked: unlockedLevel(this.stats.best),
       turn: this.pos.turn,
       plies: this.pos.history.length,
       busy: this.busy,
@@ -187,8 +190,8 @@ export class GameScene extends Phaser.Scene {
     const saved = loadGame();
     const ids: [string, string, () => void][] = [];
     if (saved && saved.moves.length) ids.push(['continue', t('continue', { n: Math.ceil(saved.moves.length / 2) }), () => this.startGame(saved.mode, saved.player, saved.moves, saved.level)]);
-    ids.push(['play-white', t('playWhite'), () => this.startGame('ai', 'w')]);
-    ids.push(['play-black', t('playBlack'), () => this.startGame('ai', 'b')]);
+    ids.push(['play-white', t('playWhite'), () => this.startAi('w')]);
+    ids.push(['play-black', t('playBlack'), () => this.startAi('b')]);
     ids.push(['two-players', t('twoPlayers'), () => this.startGame('duo', 'w')]);
     ids.push(['gallery', t('gallery'), () => this.showGallery()]);
     const gap = Math.min(54, (this.H - 290) / ids.length);
@@ -205,8 +208,11 @@ export class GameScene extends Phaser.Scene {
     const blurb = this.text(cx, y + 24, '', 12, C.dim).setOrigin(0.5);
     const show = () => {
       const id = LEVELS[this.level - 1].id;
-      name.setText(t('levelLine', { level: t(LEVEL_TEXT[id]), n: this.level, of: LEVELS.length }));
-      blurb.setText(t(LEVEL_BLURB[id]));
+      const locked = this.level > unlockedLevel(this.stats.best);
+      name.setText(t(locked ? 'levelLocked' : 'levelLine', { level: t(LEVEL_TEXT[id]), n: this.level, of: LEVELS.length }));
+      name.setColor(hex(locked ? C.dim : C.ink));
+      blurb.setText(locked ? t('unlockHint', { level: t(LEVEL_TEXT[LEVELS[this.level - 2].id]) }) : t(LEVEL_BLURB[id]));
+      blurb.setColor(hex(locked ? C.amber : C.dim));
     };
     const step = (by: number) => {
       const next = this.level + by;
@@ -229,6 +235,15 @@ export class GameScene extends Phaser.Scene {
     } catch {
       // Not saved; the choice still holds for this visit.
     }
+  }
+
+  /** A new game against the Stone AI at the menu's level, unless that level is still locked. */
+  private startAi(player: Side) {
+    if (this.level > unlockedLevel(this.stats.best)) {
+      ui('refuse');
+      return;
+    }
+    this.startGame('ai', player);
   }
 
   startGame(mode: Mode, player: Side, moves: string[] = [], level = this.level) {
@@ -554,6 +569,8 @@ export class GameScene extends Phaser.Scene {
 
   private finish() {
     saveGame(null);
+    /** The level this win just opened, by name. */
+    let unlocked = '';
     const r = this.result!;
     const s = this.stats;
     if (this.mode === 'ai') {
@@ -565,6 +582,18 @@ export class GameScene extends Phaser.Scene {
         if (mine <= QUICK_MATE) this.trophy('quickMate');
         if (this.gameLevel >= HARD_LEVEL) this.trophy('hardWin');
         if (this.gameLevel === LEVELS.length) this.trophy('grandmasterWin');
+        // Beating a level opens the next one (from level 3 up).
+        const before = unlockedLevel(s.best);
+        s.best = Math.max(s.best, this.gameLevel);
+        const now = unlockedLevel(s.best);
+        if (now > before) {
+          unlocked = t(LEVEL_TEXT[LEVELS[now - 1].id]);
+          // The menu's arrows move on to the new level too.
+          if (this.level < now) {
+            this.level = now;
+            this.savePrefs();
+          }
+        }
       } else s.losses++;
       saveStats(s);
     }
@@ -574,7 +603,8 @@ export class GameScene extends Phaser.Scene {
     const cx = this.board.x + 4 * S;
     const cy = this.board.y + 4 * S;
     const bg = this.add.rectangle(cx, cy, S * 5.6, S * 2.2, C.panel, 0.94).setStrokeStyle(2, C.amber).setDepth(190);
-    const txt = this.text(cx, cy - S * 0.5, this.statusLine(), 20, C.ink, { fontStyle: 'bold', align: 'center', wordWrap: { width: S * 5.2 } }).setOrigin(0.5).setDepth(191);
+    const line = unlocked ? `${this.statusLine()}\n${t('unlockedNow', { level: unlocked })}` : this.statusLine();
+    const txt = this.text(cx, cy - S * 0.5, line, unlocked ? 17 : 20, C.ink, { fontStyle: 'bold', align: 'center', wordWrap: { width: S * 5.2 } }).setOrigin(0.5).setDepth(191);
     this.add.container(0, 0, [bg, txt]).setDepth(190);
     this.button('new-game', cx - S * 1.3, cy + S * 0.5, S * 2.4, 40, t('newGame'), () => this.startGame(this.mode, this.player), true);
     this.button('result-menu', cx + S * 1.3, cy + S * 0.5, S * 2.4, 40, t('menu'), () => this.showMenu());
