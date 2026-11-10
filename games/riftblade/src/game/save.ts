@@ -2,7 +2,7 @@
 import { HEROES, HERO_IDS, type HeroId } from './heroes';
 import { LAST_STAGE, NODE_INFO, PLANETS } from './planets';
 import { freshHero, freshState, type GameState, type Phase } from './state';
-import { UPGRADES } from './upgrades';
+import { FUSION_BY_ID, branchCard, parseCard } from './upgrades';
 import { MAX_HEAT } from './heat';
 import { ARMOURY_IDS, nextPrice, type ArmouryId } from './armoury';
 import { MUTATOR_IDS, WEEKLY_BONUS, weekSeed } from './weekly';
@@ -287,7 +287,7 @@ export function loadRun(): GameState | null {
     if (!lists(fresh, s) || !lists(fresh.player, s.player)) return null;
     if (!HERO_IDS.includes(s.hero as HeroId) || !isResumable(s) || !PLANETS[s.planet]) return null;
     // The panels read these as they open, so a run they would throw on is dropped here.
-    const known = (id: unknown) => typeof id === 'string' && id in UPGRADES;
+    const known = (id: unknown) => typeof id === 'string' && parseCard(id) !== null;
     if (!Number.isInteger(s.stage) || s.stage < 0 || s.stage > LAST_STAGE) return null;
     if (!Number.isInteger(s.heat) || s.heat < 0 || s.heat > MAX_HEAT) return null;
     if (!Number.isInteger(s.week) || !Array.isArray(s.mutators) || !s.mutators.every((m) => MUTATOR_IDS.includes(m))) return null;
@@ -301,6 +301,10 @@ export function loadRun(): GameState | null {
     if (s.next !== -1 && !PLANETS[s.next]) return null;
     if (!Array.isArray(s.nodes) || !s.nodes.every((k) => k in NODE_INFO)) return null;
     if (!Array.isArray(s.offers) || !s.offers.every((id) => id === null || known(id))) return null;
+    // Runs saved before specialisations and fusions have none.
+    if (typeof s.branches !== 'object' || !s.branches || typeof s.fusions !== 'object' || !s.fusions) return null;
+    if (!Object.entries(s.branches).every(([id, v]) => parseCard(branchCard(id, v?.b)) !== null && Number.isInteger(v.n))) return null;
+    if (!Object.keys(s.fusions).every((id) => FUSION_BY_ID[id] && Number.isInteger(s.fusions[id]))) return null;
     if (s.choices !== null && (!Array.isArray(s.choices) || !s.choices.every(known))) return null;
     if (s.event !== null && (typeof s.event !== 'object' || !Array.isArray(s.event.options))) return null;
     if (typeof s.rush !== 'boolean' || !s.rushQueue.every((i) => Number.isInteger(i) && PLANETS[i])) return null;

@@ -17,7 +17,8 @@ import {
   droneSpot, hurtFactor, moveSquadAlly, squadAbilities, squadAllies, squadAttack, squadBlock, squadCrit, squadHeal, squadHurt,
   squadKill, squadSignature, squadStart, syncSquad, turnedBonus,
 } from './squad';
-import { CAPSTONES, CROSSOVERS, FILLER, MAX_TIER, UPGRADES, at, canOffer, cardCount, rewardChoices, rollChoices } from './upgrades';
+import { BASE_TIER, BRANCHES, CAPSTONES, CROSSOVERS, FILLER, FUSION_BY_ID, FUSION_TIERS, at, canOffer, cardTiers, cardCount, parseCard, raisable, rewardChoices, rollChoices } from './upgrades';
+import { cardName } from './cardText';
 import { MASTERY, MASTERY_WEAPON } from './mastery';
 import { RUSH } from './rush';
 import { ARENA_MS, BOG, BOSSES, CHAMPION, CREDITS, PILLAR, PLANETS, SIEGE, STRIKE, TIDE, VENT, type FoeKind } from './planets';
@@ -118,7 +119,7 @@ export function choose(s: GameState, index: number) {
   const id = s.choices[index];
   if (!id) return;
   if (id === FILLER.id) heal(s, 0.3 * s.player.maxHp);
-  else raise(s, id);
+  else raiseCard(s, id);
   if (s.rewardPicks > 0) s.rewardPicks -= 1;
   else s.pendingLevels -= 1;
   nextPick(s);
@@ -128,13 +129,13 @@ export function choose(s: GameState, index: number) {
 export function nextPick(s: GameState) {
   if (s.rewardPicks > 0) {
     s.phase = 'levelup';
-    s.choices = rewardChoices(s.hero!, s.ranks);
+    s.choices = rewardChoices(s.hero!, s);
   } else if (s.pendingLevels > 0) {
     s.phase = 'levelup';
     // The Armoury's Field Briefing deals a fourth card at the run's first level-up.
     const briefing = (s.perks.briefing ?? 0) > 0 && !s.briefed;
     s.briefed ||= briefing;
-    s.choices = rollChoices(s.hero!, s.ranks, Math.min(4, cardCount(s.hero!) + (briefing ? 1 : 0)));
+    s.choices = rollChoices(s.hero!, s, Math.min(4, cardCount(s.hero!) + (briefing ? 1 : 0)));
   } else {
     s.choices = null;
     s.phase = s.after;
@@ -144,9 +145,16 @@ export function nextPick(s: GameState) {
 
 /** One tier less of an upgrade (the shrine's price); at tier 0 it is gone and frees its slot. */
 export function lower(s: GameState, id: string) {
-  const rank = (s.ranks[id] ?? 0) - 1;
-  if (rank <= 0) delete s.ranks[id];
-  else s.ranks[id] = rank;
+  // A specialisation's tiers go first (losing both frees the choice again).
+  const branch = s.branches[id];
+  if (branch) {
+    branch.n -= 1;
+    if (branch.n <= 0) delete s.branches[id];
+  } else {
+    const rank = (s.ranks[id] ?? 0) - 1;
+    if (rank <= 0) delete s.ranks[id];
+    else s.ranks[id] = rank;
+  }
   refreshUnlocks(s);
   refreshHealth(s);
   syncAllies(s);
@@ -162,7 +170,32 @@ export function refreshHealth(s: GameState) {
 /** One more tier of an upgrade, with what follows from it: health, allies, unlocks. */
 export function raise(s: GameState, id: string) {
   const before = statsOf(s).maxHp;
-  s.ranks[id] = Math.min(MAX_TIER, (s.ranks[id] ?? 0) + 1);
+  s.ranks[id] = Math.min(BASE_TIER, (s.ranks[id] ?? 0) + 1);
+  afterRaise(s, before);
+}
+
+/**
+ * Takes a card: an upgrade's next tier, a specialisation's (the first one taken at tier 5 is the
+ * upgrade's for good) or a fusion's.
+ */
+export function raiseCard(s: GameState, card: string) {
+  const c = parseCard(card);
+  if (!c || c.kind === 'filler') return;
+  if (c.kind === 'upgrade') return raise(s, c.id);
+  const before = statsOf(s).maxHp;
+  if (c.kind === 'branch') {
+    const had = s.branches[c.id];
+    if (had && had.b !== c.branch) return;
+    if (!had) pop(s, tr('branchPop', { name: cardName(card) }), '#ffe066');
+    s.branches[c.id] = { b: c.branch, n: Math.min(BRANCHES[c.branch].tiers.length, (had?.n ?? 0) + 1) };
+  } else {
+    if (!(c.id in s.fusions)) pop(s, tr('fusionPop', { name: tr(FUSION_BY_ID[c.id].name) }), '#ff9de2');
+    s.fusions[c.id] = Math.min(FUSION_TIERS, (s.fusions[c.id] ?? 0) + 1);
+  }
+  afterRaise(s, before);
+}
+
+function afterRaise(s: GameState, before: number) {
   for (const fresh of refreshUnlocks(s)) {
     const cap = CAPSTONES.find((c) => c.id === fresh);
     const cross = CROSSOVERS.find((c) => c.id === fresh);
@@ -2171,15 +2204,15 @@ export function gainXp(s: GameState, value: number, raw = false) {
 function openChest(s: GameState) {
   s.chests += 1;
   heal(s, 25);
-  const held = Object.keys(s.ranks).filter((id) => s.ranks[id] < MAX_TIER);
+  const held = raisable(s);
   if (!held.length) {
     heal(s, 25);
     pop(s, tr('supplyChest', { n: 50 }), '#ffe066');
     return;
   }
   const id = held[Math.floor(rand() * held.length)];
-  raise(s, id);
-  pop(s, tr('chestPop', { name: tr(UPGRADES[id].name), n: s.ranks[id] }), '#ffe066');
+  raiseCard(s, id);
+  pop(s, tr('chestPop', { name: cardName(id), n: cardTiers(s, parseCard(id)!).held }), '#ffe066');
 }
 
 export function pop(s: GameState, text: string, color: string) {

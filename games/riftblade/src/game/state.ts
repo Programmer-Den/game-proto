@@ -1,7 +1,7 @@
 /** The run's state and the numbers that shape it. The rules that change it are in `sim.ts`. */
 import { byDifficulty } from '../../../../shared/settings';
 import { HEROES, isKnight, type HeroId } from './heroes';
-import { DRILLS, DRILL_STEPS, at, capstonesOf, crossoversOf } from './upgrades';
+import { DRILLS, DRILL_STEPS, at, capstonesOf, crossoversOf, kitGains, type BranchId } from './upgrades';
 import type { EventId, FoeKind, NodeKind } from './planets';
 import type { TextKey } from '../i18n';
 import { PERK, type ArmouryId } from './armoury';
@@ -504,6 +504,9 @@ export interface GameState {
   after: 'run' | 'chart' | 'map' | 'travel';
   /** Tiers of each held upgrade, by id (paths, pool skills and gear). */
   ranks: Record<string, number>;
+  /** The specialisation each upgrade at tier 5 took and its tiers held, and the fusions held (`upgrades.ts`). */
+  branches: Record<string, { b: BranchId; n: number }>;
+  fusions: Record<string, number>;
   /** Unlocked capstones and completed crossovers, by id. */
   capstones: string[];
   crossovers: string[];
@@ -672,6 +675,8 @@ export function freshState(): GameState {
     rewardPicks: 0,
     after: 'run',
     ranks: {},
+    branches: {},
+    fusions: {},
     capstones: [],
     crossovers: [],
     choices: null,
@@ -804,33 +809,40 @@ export function statsOf(s: GameState): Stats {
   const p = s.player;
   const stim = p.maxHp > 0 && p.hp < p.maxHp * 0.4 ? at([0.1, 0.15, 0.2, 0.25, 0.3], r('stim'), 0) : 0;
   const mut = (id: MutatorId) => s.mutators.includes(id);
+  // Specialisations (tiers 6 and 7) and fusions: plain gains on top.
+  const g = kitGains(s);
+  const gv = (k: keyof typeof g) => g[k] ?? 0;
+  const slow = at([0.25, 0.3, 0.35, 0.4, 0.5], r('stun'), 0);
   return {
-    speed: hero.speed * (1 + 0.08 * r('boots')) * k.speed * (1 + d.speed + stim) * (mut('haste') ? MUT.haste : 1),
-    pickup: PICKUP_R * (1 + 0.3 * r('magnet') + PERK.lens * (s.perks.lens ?? 0)) * (s.lureMs > 0 ? POWER.lure : 1),
-    armour: 0.08 * r('armour') + k.armour + d.armour,
-    maxHp: s.hero === 'triad' ? botMax(s) * botCount(s) : Math.round((hero.maxHp + 10 * r('armour') + k.hp + d.hp) * s.maxHpMod),
-    regen: mut('vampire') ? 0 : 0.5 * r('medpack') + k.regen + d.regen,
-    cooldown: 1 - 0.07 * r('overclock'),
+    speed: hero.speed * (1 + 0.08 * r('boots')) * k.speed * (1 + d.speed + stim + gv('speed')) * (mut('haste') ? MUT.haste : 1),
+    pickup: PICKUP_R * (1 + 0.3 * r('magnet') + PERK.lens * (s.perks.lens ?? 0) + gv('pickup')) * (s.lureMs > 0 ? POWER.lure : 1),
+    armour: topUp(0.08 * r('armour') + k.armour + d.armour, gv('armour'), 0.8),
+    maxHp: s.hero === 'triad' ? botMax(s) * botCount(s) : Math.round((hero.maxHp + 10 * r('armour') + k.hp + d.hp + gv('hp')) * s.maxHpMod),
+    regen: mut('vampire') ? 0 : 0.5 * r('medpack') + k.regen + d.regen + gv('regen'),
+    cooldown: (1 - 0.07 * r('overclock')) * (1 - Math.min(0.5, gv('cooldown'))),
     damage:
       (1 + 0.1 * r('cell')) * (1 + at([0, 0.1, 0.1, 0.2, 0.2], r('overcharge'), 0)) * (1 + at([0, 0.25, 0.25, 0.25, 0.75], r('marksman'), 0)) * k.damage * q.damage *
-      (1 + d.damage) * (1 + stim) * (mut('glass') ? MUT.glassDmg : 1) * (s.mastery >= MASTERY.damageAt ? 1 + MASTERY.damage : 1),
-    xp: 1 + 0.1 * r('lens'),
-    crit: 0.06 * r('chip') + k.crit + d.crit,
-    fireRate: fireRate * overdrive,
-    pierce,
-    bounces,
+      (1 + d.damage) * (1 + stim) * (1 + gv('damage')) * (mut('glass') ? MUT.glassDmg : 1) * (s.mastery >= MASTERY.damageAt ? 1 + MASTERY.damage : 1),
+    xp: 1 + 0.1 * r('lens') + gv('xp'),
+    crit: 0.06 * r('chip') + k.crit + d.crit + gv('crit'),
+    fireRate: (fireRate + gv('fireRate')) * overdrive,
+    pierce: pierce < 999 ? pierce + gv('pierce') : pierce,
+    bounces: bounces + gv('bounces'),
     seek: cross('seeking-ricochets'),
-    slowPct: at([0.25, 0.3, 0.35, 0.4, 0.5], r('stun'), 0),
+    slowPct: slow > 0 ? Math.min(0.8, slow + gv('slow')) : 0,
     slowMs: r('stun') >= 3 ? 2000 : 1500,
-    reach: k.reach,
-    dodge: k.dodge,
-    sigCooldown: (1 - 0.07 * r('overclock')) * k.sig * q.sig * (1 - d.sig) * (mut('overcharged') ? MUT.overcharged : 1),
-    bossDmg: 1 + 0.1 * r('scanner'),
-    execute: at([0.08, 0.1, 0.12, 0.15, 0.18], r('executioner'), 0),
-    harvest: at([0.4, 0.6, 0.8, 1, 1.3], r('soul-harvest'), 0),
-    creditMul: 1 + 0.2 * r('salvager'),
+    reach: k.reach * (1 + gv('reach')),
+    dodge: topUp(k.dodge, gv('dodge'), 0.6),
+    sigCooldown: (1 - 0.07 * r('overclock')) * k.sig * q.sig * (1 - d.sig) * (1 - Math.min(0.5, gv('sig'))) * (mut('overcharged') ? MUT.overcharged : 1),
+    bossDmg: 1 + 0.1 * r('scanner') + gv('boss'),
+    execute: at([0.08, 0.1, 0.12, 0.15, 0.18], r('executioner'), 0) + gv('execute'),
+    harvest: at([0.4, 0.6, 0.8, 1, 1.3], r('soul-harvest'), 0) + gv('harvest'),
+    creditMul: 1 + 0.2 * r('salvager') + gv('credits'),
   };
 }
+
+/** `base` plus `extra`, the extra going no higher than `cap` (a base already past it stays). */
+const topUp = (base: number, extra: number, cap: number) => base + Math.min(extra, Math.max(0, cap - base));
 
 /** What the hero's drill (its fourth path) adds so far: the sum of its steps up to its tier. */
 function drillMods(s: GameState) {
@@ -854,7 +866,7 @@ export function botCount(s: GameState) {
 
 /** Each of Triad-77's bots' health: a third of the hero's, and a third of each armour tier's. */
 export function botMax(s: GameState) {
-  return Math.round(((HEROES.triad.maxHp + 10 * (s.ranks.armour ?? 0)) / 3) * s.maxHpMod);
+  return Math.round(((HEROES.triad.maxHp + 10 * (s.ranks.armour ?? 0) + (kitGains(s).hp ?? 0)) / 3) * s.maxHpMod);
 }
 
 /** What Elara Voss's and Triad-77's paths add to the stats (all neutral for anyone else). */

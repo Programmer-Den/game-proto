@@ -1,8 +1,10 @@
 /**
  * Every upgrade a level-up card can offer: the heroes' own paths, the class and side pools (Blaster,
- * Blade, Current, Hollow) and the Gear deck, each with five tiers, plus the capstones (a path at
- * tier 5 and its gear piece) and the crossovers (a pool skill held with a fitting path). Names and
- * texts are keys of `i18n/en.ts`, shown with `t`.
+ * Blade, Current, Hollow) and the Gear deck, each with five tiers of its own and two more from the
+ * specialisation it branches into at tier 5, plus the capstones (a path at tier 5 and its gear
+ * piece), the crossovers (a pool skill held with a fitting path) and the fusions (two skills at
+ * tier 3 fused into a third that locks out its rivals). Names and texts are keys of `i18n/en.ts`,
+ * shown with `t`.
  */
 import { HEROES, type HeroId, type PoolId } from './heroes';
 import type { TextKey } from '../i18n';
@@ -24,10 +26,13 @@ export interface UpgradeDef {
   tiers: readonly [TextKey, TextKey, TextKey, TextKey, TextKey];
 }
 
-export const MAX_TIER = 5;
+/** The tiers an upgrade's own card gives; tiers 6 and 7 come from one of its specialisations. */
+export const BASE_TIER = 5;
+/** An upgrade's last tier: its five own tiers and two of the specialisation picked at tier 5. */
+export const MAX_TIER = 7;
 /** A run holds at most this many abilities (paths and pool skills) and this many gear pieces. */
-export const MAX_ABILITIES = 6;
-export const MAX_GEAR = 4;
+export const MAX_ABILITIES = 7;
+export const MAX_GEAR = 5;
 
 /** What one tier of a drill adds; `drillMods` in state.ts sums them into the stats. */
 export type DrillStep = 'damage' | 'damageBig' | 'health' | 'healthBig' | 'armour' | 'speed' | 'crit' | 'regen' | 'regenBig' | 'sig' | 'fire';
@@ -457,7 +462,7 @@ export const CROSSOVERS: readonly CrossoverDef[] = [
 
 /** The capstones a run's tiers and gear unlock. */
 export function capstonesOf(ranks: Record<string, number>): CapstoneDef[] {
-  return CAPSTONES.filter((c) => (ranks[c.path] ?? 0) >= MAX_TIER && (ranks[c.gear] ?? 0) > 0);
+  return CAPSTONES.filter((c) => (ranks[c.path] ?? 0) >= BASE_TIER && (ranks[c.gear] ?? 0) > 0);
 }
 
 /** The crossovers a run's upgrades complete. */
@@ -503,12 +508,12 @@ export function countKinds(ranks: Record<string, number>) {
 }
 
 /** Whether a card for this upgrade can be offered now. */
-export function canOffer(id: string, hero: HeroId, ranks: Record<string, number>) {
+export function canOffer(id: string, hero: HeroId, ranks: Record<string, number>, locked?: ReadonlySet<string>) {
   const def = UPGRADES[id];
   if (!def) return false;
   if (def.kind === 'path' && def.hero !== hero) return false;
   const rank = ranks[id] ?? 0;
-  if (rank >= MAX_TIER) return false;
+  if (rank >= BASE_TIER || locked?.has(id)) return false;
   // A skill already held can always go up, even from a pool the hero has turned away from.
   if (rank > 0) return true;
   if (def.kind === 'pool' && !poolsOf(hero, ranks).includes(def.pool!) && !HEROES[hero].extra?.includes(id)) return false;
@@ -518,15 +523,23 @@ export function canOffer(id: string, hero: HeroId, ranks: Record<string, number>
 
 /**
  * Different cards for a level-up (three, or four for Elara Voss), at least one from the hero's own
- * paths while any can be offered; the Field Ration fills in when fewer upgrades are left.
+ * paths while any can be offered; the Field Ration fills in when fewer upgrades are left. Besides
+ * the upgrades themselves, the cards can be a specialisation of an upgrade at tier 5 or a fusion.
  */
-export function rollChoices(hero: HeroId, ranks: Record<string, number>, count = 3): string[] {
-  const open = UPGRADE_IDS.filter((id) => canOffer(id, hero, ranks));
-  const own = open.filter((id) => UPGRADES[id].kind === 'path');
+export function rollChoices(hero: HeroId, kit: Kit, count = 3): string[] {
+  const { ranks } = kit;
+  const locked = lockedOf(kit);
+  const open = UPGRADE_IDS.filter((id) => canOffer(id, hero, ranks, locked));
+  // Specialisation and fusion cards join after the upgrades, and only once one is open, so a run's
+  // first cards (and the playthrough's seeded rolls) come out as they always did.
+  const extra = extraChoices(kit, locked);
+  const all = [...open, ...extra];
+  let own = open.filter((id) => UPGRADES[id].kind === 'path');
+  if (!own.length) own = extra.filter((id) => UPGRADES[parseCard(id)?.id ?? '']?.kind === 'path');
   const picks: string[] = [];
   const take = (pool: string[]) => {
     // Upgrades already held come up a little more often, so a build can be finished.
-    const weights = pool.map((id) => ((ranks[id] ?? 0) > 0 ? 1.6 : 1));
+    const weights = pool.map((id) => (id.startsWith(FUSION_PREFIX) ? 2 : id.includes(BRANCH_SEP) ? 1.2 : (ranks[id] ?? 0) > 0 ? 1.6 : 1));
     let r = rand() * weights.reduce((a, b) => a + b, 0);
     for (let i = 0; i < pool.length; i++) {
       r -= weights[i];
@@ -536,7 +549,7 @@ export function rollChoices(hero: HeroId, ranks: Record<string, number>, count =
   };
   if (own.length) picks.push(take(own));
   while (picks.length < count) {
-    const rest = open.filter((id) => !picks.includes(id));
+    const rest = all.filter((id) => !picks.includes(id));
     if (!rest.length) break;
     picks.push(take(rest));
   }
@@ -548,16 +561,261 @@ export function rollChoices(hero: HeroId, ranks: Record<string, number>, count =
 export const cardCount = (hero: HeroId) => (hero === 'elara' ? 4 : 3);
 
 /**
- * A free pick (the arena's reward): up to three upgrades already held that can still go up, filled
+ * A free pick (the arena's reward): up to three cards that raise something already held, filled
  * with a level-up's cards when fewer are held.
  */
-export function rewardChoices(hero: HeroId, ranks: Record<string, number>): string[] {
-  const held = Object.keys(ranks).filter((id) => ranks[id] < MAX_TIER);
+export function rewardChoices(hero: HeroId, kit: Kit): string[] {
+  const held = raisable(kit);
   const picks: string[] = [];
   while (picks.length < 3 && held.length) picks.push(held.splice(Math.floor(rand() * held.length), 1)[0]);
-  for (const id of rollChoices(hero, ranks)) {
+  for (const id of rollChoices(hero, kit)) {
     if (picks.length >= 3) break;
     if (!picks.includes(id) && (id !== FILLER.id || !picks.length)) picks.push(id);
   }
   return picks;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Specialisations and fusions
+
+/** A stat a specialisation or fusion tier raises (shares, except health, regen and the counts). */
+export type Stat =
+  | 'damage' | 'fireRate' | 'hp' | 'armour' | 'speed' | 'crit' | 'regen' | 'sig' | 'cooldown' | 'dodge' | 'reach'
+  | 'pickup' | 'xp' | 'credits' | 'boss' | 'harvest' | 'pierce' | 'bounces' | 'execute' | 'slow';
+export type Gains = Partial<Record<Stat, number>>;
+/** The order a tier's gains are listed in on a card. */
+export const STATS: readonly Stat[] = [
+  'damage', 'fireRate', 'crit', 'boss', 'execute', 'pierce', 'bounces', 'slow', 'reach', 'cooldown', 'sig',
+  'hp', 'armour', 'regen', 'dodge', 'harvest', 'speed', 'pickup', 'xp', 'credits',
+];
+
+/** The upgrades, specialisations and fusions a run holds. */
+export interface Kit {
+  ranks: Record<string, number>;
+  /** The specialisation picked for an upgrade at tier 5, and how many of its two tiers are held. */
+  branches: Record<string, { b: BranchId; n: number }>;
+  /** Fusions held, by id, with their tier. */
+  fusions: Record<string, number>;
+}
+
+export type BranchId = 'power' | 'tempo' | 'guard' | 'hunt' | 'fortune';
+export const BRANCH_IDS: readonly BranchId[] = ['power', 'tempo', 'guard', 'hunt', 'fortune'];
+
+/**
+ * The specialisations: at tier 5 an upgrade branches, and the first one taken is the only one it
+ * can have; its two tiers are the upgrade's tiers 6 and 7.
+ */
+export const BRANCHES: Record<BranchId, { name: TextKey; tiers: readonly [Gains, Gains] }> = {
+  power: { name: 'branchPower', tiers: [{ damage: 0.1 }, { damage: 0.1, crit: 0.05 }] },
+  tempo: { name: 'branchTempo', tiers: [{ fireRate: 0.1, cooldown: 0.05 }, { fireRate: 0.1, cooldown: 0.05 }] },
+  guard: { name: 'branchGuard', tiers: [{ hp: 20, regen: 0.5 }, { armour: 0.05, dodge: 0.04 }] },
+  hunt: { name: 'branchHunt', tiers: [{ boss: 0.15, speed: 0.05 }, { boss: 0.15, crit: 0.04 }] },
+  fortune: { name: 'branchFortune', tiers: [{ xp: 0.1, pickup: 0.25 }, { xp: 0.1, credits: 0.25 }] },
+};
+
+/** Upgrades that keep the hero standing: they branch into guard first. */
+const GUARD_FIRST = new Set([
+  'riot-shield', 'life-support', 'stillness', 'bulwark', 'council-seat', 'rebuilt', 'diplomat', 'factory',
+  'riposte', 'iron-skin', 'mending', 'foresight', 'calm-mind', 'battle-trance', 'drain', 'soul-harvest',
+  'armour', 'medpack', 'barrier', 'boots', 'stim',
+  ...Object.values(DRILLS).map((d) => d.id),
+]);
+/** Gear that finds things: it branches into fortune. */
+const FORTUNE_FIRST = new Set(['magnet', 'lens', 'salvager', 'scanner']);
+
+/** The three specialisations an upgrade branches into at tier 5. */
+export function branchesOf(id: string): readonly BranchId[] {
+  if (FORTUNE_FIRST.has(id)) return ['fortune', 'hunt', 'guard'];
+  if (GUARD_FIRST.has(id)) return ['guard', 'tempo', 'power'];
+  return ['power', 'tempo', 'hunt'];
+}
+
+export interface FusionDef {
+  id: string;
+  name: TextKey;
+  blurb: TextKey;
+  /** The two upgrades it fuses, each held at `FUSION_NEEDS` or more. */
+  needs: readonly [string, string];
+  /** Upgrades it shuts out: they are offered no more, and stop rising if held. */
+  locks: readonly string[];
+  tiers: readonly [Gains, Gains, Gains];
+}
+
+/** The tier both halves of a fusion must reach before it is offered, and a fusion's tiers. */
+export const FUSION_NEEDS = 3;
+export const FUSION_TIERS = 3;
+/** How a fusion's card id starts, and what joins an upgrade's id to a specialisation's. */
+export const FUSION_PREFIX = 'fusion:';
+export const BRANCH_SEP = '>';
+
+/**
+ * The fusions: two upgrades held at tier 3 or more fuse into a third. Taking one shuts out the
+ * fusions that share one of its halves and the upgrades it `locks`.
+ */
+export const FUSIONS: readonly FusionDef[] = [
+  // The Blaster pool
+  { id: 'chain-reaction', name: 'chainReactionName', blurb: 'chainReactionBlurb', needs: ['ricochet', 'thermal'], locks: ['overcharge'],
+    tiers: [{ bounces: 1, damage: 0.1 }, { damage: 0.12 }, { bounces: 1, damage: 0.12 }] },
+  { id: 'railgun', name: 'railgunName', blurb: 'railgunBlurb', needs: ['overcharge', 'reload'], locks: ['scatter'],
+    tiers: [{ pierce: 2, damage: 0.1 }, { damage: 0.15 }, { pierce: 2, damage: 0.15 }] },
+  { id: 'bullet-storm', name: 'bulletStormName', blurb: 'bulletStormBlurb', needs: ['scatter', 'reload'], locks: ['overcharge'],
+    tiers: [{ fireRate: 0.15 }, { fireRate: 0.1, damage: 0.1 }, { fireRate: 0.15 }] },
+  { id: 'kill-order', name: 'killOrderName', blurb: 'killOrderBlurb', needs: ['executioner', 'drone'], locks: ['stun'],
+    tiers: [{ execute: 0.04, crit: 0.05 }, { execute: 0.03, crit: 0.05 }, { execute: 0.03, crit: 0.05 }] },
+  { id: 'shock-and-awe', name: 'shockAndAweName', blurb: 'shockAndAweBlurb', needs: ['stun', 'orbital-beacon'], locks: ['thermal'],
+    tiers: [{ slow: 0.1, boss: 0.15 }, { boss: 0.15 }, { slow: 0.1, boss: 0.2 }] },
+  { id: 'air-support', name: 'airSupportName', blurb: 'airSupportBlurb', needs: ['callin', 'drone'], locks: ['executioner'],
+    tiers: [{ cooldown: 0.08, damage: 0.08 }, { cooldown: 0.08 }, { cooldown: 0.08, damage: 0.12 }] },
+  // The Blade pool
+  { id: 'thousand-cuts', name: 'thousandCutsName', blurb: 'thousandCutsBlurb', needs: ['focus', 'wide-arc'], locks: ['iron-skin'],
+    tiers: [{ crit: 0.06, reach: 0.1 }, { crit: 0.06 }, { crit: 0.08, reach: 0.1 }] },
+  { id: 'iron-fortress', name: 'ironFortressName', blurb: 'ironFortressBlurb', needs: ['iron-skin', 'riposte'], locks: ['blade-dash'],
+    tiers: [{ armour: 0.05, hp: 20 }, { hp: 20 }, { armour: 0.05, hp: 30 }] },
+  { id: 'steel-cyclone', name: 'steelCycloneName', blurb: 'steelCycloneBlurb', needs: ['spinning-guard', 'blade-throw'], locks: ['focus'],
+    tiers: [{ damage: 0.12 }, { cooldown: 0.08 }, { damage: 0.15, cooldown: 0.07 }] },
+  { id: 'crescent-rush', name: 'crescentRushName', blurb: 'crescentRushBlurb', needs: ['crescent', 'blade-dash'], locks: ['riposte'],
+    tiers: [{ speed: 0.06, cooldown: 0.08 }, { damage: 0.12 }, { speed: 0.06, cooldown: 0.08 }] },
+  // The Current pool
+  { id: 'clear-water', name: 'clearWaterName', blurb: 'clearWaterBlurb', needs: ['mending', 'calm-mind'], locks: ['battle-trance'],
+    tiers: [{ regen: 0.8, sig: 0.1 }, { regen: 0.8 }, { regen: 1, sig: 0.1 }] },
+  { id: 'prescience', name: 'prescienceName', blurb: 'prescienceBlurb', needs: ['foresight', 'battle-trance'], locks: ['mending'],
+    tiers: [{ dodge: 0.05, speed: 0.05 }, { dodge: 0.05 }, { dodge: 0.05, speed: 0.06 }] },
+  { id: 'frozen-moment', name: 'frozenMomentName', blurb: 'frozenMomentBlurb', needs: ['stasis', 'push-wave'], locks: ['foresight'],
+    tiers: [{ cooldown: 0.1 }, { damage: 0.12 }, { cooldown: 0.1, damage: 0.1 }] },
+  // The Hollow pool
+  { id: 'blood-pact', name: 'bloodPactName', blurb: 'bloodPactBlurb', needs: ['rage', 'drain'], locks: ['soul-harvest'],
+    tiers: [{ harvest: 0.3, damage: 0.1 }, { damage: 0.1 }, { harvest: 0.4, damage: 0.12 }] },
+  { id: 'abyssal-storm', name: 'abyssalStormName', blurb: 'abyssalStormBlurb', needs: ['lightning-arc', 'dark-nova'], locks: ['grip'],
+    tiers: [{ cooldown: 0.1, damage: 0.08 }, { damage: 0.12 }, { cooldown: 0.1, damage: 0.1 }] },
+  { id: 'reaper', name: 'reaperName', blurb: 'reaperBlurb', needs: ['soul-harvest', 'grip'], locks: ['drain'],
+    tiers: [{ harvest: 0.3, boss: 0.1 }, { boss: 0.15 }, { harvest: 0.4, boss: 0.15 }] },
+  // The Gear deck, for everyone
+  { id: 'juggernaut-plating', name: 'juggernautPlatingName', blurb: 'juggernautPlatingBlurb', needs: ['armour', 'medpack'], locks: ['boots'],
+    tiers: [{ armour: 0.04, regen: 0.6 }, { hp: 25 }, { armour: 0.04, regen: 0.8 }] },
+  { id: 'overdrive-core', name: 'overdriveCoreName', blurb: 'overdriveCoreBlurb', needs: ['overclock', 'cell'], locks: ['barrier'],
+    tiers: [{ cooldown: 0.08, damage: 0.08 }, { damage: 0.1 }, { cooldown: 0.08, damage: 0.1 }] },
+  { id: 'hunter-kit', name: 'hunterKitName', blurb: 'hunterKitBlurb', needs: ['scanner', 'chip'], locks: ['lens'],
+    tiers: [{ boss: 0.2, crit: 0.04 }, { boss: 0.15 }, { boss: 0.2, crit: 0.05 }] },
+  { id: 'treasure-hunter', name: 'treasureHunterName', blurb: 'treasureHunterBlurb', needs: ['magnet', 'salvager'], locks: ['scanner'],
+    tiers: [{ pickup: 0.5, credits: 0.3 }, { xp: 0.1 }, { pickup: 0.5, credits: 0.4 }] },
+];
+export const FUSION_BY_ID: Record<string, FusionDef> = Object.fromEntries(FUSIONS.map((f) => [f.id, f]));
+
+/** What a card id stands for: an upgrade's next tier, a specialisation's, a fusion's, or the ration. */
+export type Card =
+  | { kind: 'upgrade'; id: string }
+  | { kind: 'branch'; id: string; branch: BranchId }
+  | { kind: 'fusion'; id: string }
+  | { kind: 'filler'; id: string };
+
+export function parseCard(card: string): Card | null {
+  if (card === FILLER.id) return { kind: 'filler', id: card };
+  if (card.startsWith(FUSION_PREFIX)) {
+    const id = card.slice(FUSION_PREFIX.length);
+    return FUSION_BY_ID[id] ? { kind: 'fusion', id } : null;
+  }
+  const [id, branch] = card.split(BRANCH_SEP);
+  if (!UPGRADES[id]) return null;
+  if (branch === undefined) return { kind: 'upgrade', id };
+  return BRANCH_IDS.includes(branch as BranchId) && branchesOf(id).includes(branch as BranchId) ? { kind: 'branch', id, branch: branch as BranchId } : null;
+}
+
+/** The card for a specialisation, and for a fusion. */
+export const branchCard = (id: string, b: BranchId) => `${id}${BRANCH_SEP}${b}`;
+export const fusionCard = (id: string) => `${FUSION_PREFIX}${id}`;
+
+/** An upgrade's tier counting its specialisation's (0 to 7). */
+export const tierOf = (kit: Kit, id: string) => (kit.ranks[id] ?? 0) + (kit.branches[id]?.n ?? 0);
+
+/** The tiers a card's line of pips shows, and how many of them are held. */
+export function cardTiers(kit: Kit, card: Card): { held: number; max: number } {
+  if (card.kind === 'fusion') return { held: kit.fusions[card.id] ?? 0, max: FUSION_TIERS };
+  return { held: tierOf(kit, card.id), max: MAX_TIER };
+}
+
+/** Whether a fusion's two halves are both held at tier 3 or more. */
+const fusionReady = (f: FusionDef, kit: Kit) => f.needs.every((id) => (kit.ranks[id] ?? 0) >= FUSION_NEEDS);
+
+/**
+ * What the fusions held shut out: the upgrades they lock, and (as `fusion:<id>`) every other fusion
+ * that shares a half with one held or would fuse an upgrade a held fusion locks.
+ */
+export function lockedOf(kit: Kit): Set<string> {
+  const out = new Set<string>();
+  const held = FUSIONS.filter((f) => (kit.fusions[f.id] ?? 0) > 0);
+  for (const f of held) for (const id of f.locks) out.add(id);
+  for (const f of FUSIONS) {
+    if ((kit.fusions[f.id] ?? 0) > 0) continue;
+    if (held.some((h) => h.needs.some((id) => f.needs.includes(id))) || f.needs.some((id) => out.has(id))) out.add(fusionCard(f.id));
+  }
+  return out;
+}
+
+/** What a fusion would shut out if taken now: its locks and the rival fusions open to this hero. */
+export function fusionShuts(f: FusionDef, hero: HeroId, kit: Kit): { upgrades: string[]; fusions: string[] } {
+  const rivals = FUSIONS.filter((o) => o.id !== f.id && fusionFits(o, hero, kit) && (o.needs.some((id) => f.needs.includes(id)) || o.needs.some((id) => f.locks.includes(id))));
+  return { upgrades: [...f.locks], fusions: rivals.map((o) => o.id) };
+}
+
+/** Whether this hero could ever hold both halves of a fusion. */
+function fusionFits(f: FusionDef, hero: HeroId, kit: Kit) {
+  return f.needs.every((id) => {
+    const def = UPGRADES[id];
+    if ((kit.ranks[id] ?? 0) > 0 || def.kind === 'gear') return true;
+    if (def.kind === 'path') return def.hero === hero;
+    return poolsOf(hero, kit.ranks).includes(def.pool!) || !!HEROES[hero].extra?.includes(id);
+  });
+}
+
+/** The specialisation and fusion cards open now. */
+export function extraChoices(kit: Kit, locked = lockedOf(kit)): string[] {
+  const out: string[] = [];
+  for (const id of Object.keys(kit.ranks)) {
+    if (kit.ranks[id] < BASE_TIER || locked.has(id) || !UPGRADES[id]) continue;
+    const had = kit.branches[id];
+    if (!had) out.push(...branchesOf(id).map((b) => branchCard(id, b)));
+    else if (had.n < BRANCHES[had.b].tiers.length) out.push(branchCard(id, had.b));
+  }
+  for (const f of FUSIONS) {
+    const n = kit.fusions[f.id] ?? 0;
+    if (n >= FUSION_TIERS || locked.has(fusionCard(f.id))) continue;
+    if (n > 0 || fusionReady(f, kit)) out.push(fusionCard(f.id));
+  }
+  return out;
+}
+
+/** The cards that raise something already held (a chest's or the arena's free tier). */
+export function raisable(kit: Kit): string[] {
+  const locked = lockedOf(kit);
+  const out = Object.keys(kit.ranks).filter((id) => kit.ranks[id] < BASE_TIER && !locked.has(id));
+  for (const id of Object.keys(kit.branches)) {
+    const had = kit.branches[id];
+    if (had.n < BRANCHES[had.b].tiers.length && !locked.has(id)) out.push(branchCard(id, had.b));
+  }
+  for (const id of Object.keys(kit.fusions)) if (kit.fusions[id] < FUSION_TIERS) out.push(fusionCard(id));
+  return out;
+}
+
+/** The gains of a card's next tier (specialisations and fusions; upgrades have their own text). */
+export function gainsOf(kit: Kit, card: Card): Gains | null {
+  if (card.kind === 'branch') {
+    const n = kit.branches[card.id]?.b === card.branch ? kit.branches[card.id].n : 0;
+    return BRANCHES[card.branch].tiers[Math.min(n, 1)];
+  }
+  if (card.kind === 'fusion') return FUSION_BY_ID[card.id].tiers[Math.min(kit.fusions[card.id] ?? 0, FUSION_TIERS - 1)];
+  return null;
+}
+
+/** Everything the specialisations and fusions held add up to. */
+export function kitGains(kit: Kit): Gains {
+  const out: Gains = {};
+  const add = (g: Gains) => {
+    for (const k of Object.keys(g) as Stat[]) out[k] = (out[k] ?? 0) + g[k]!;
+  };
+  for (const id of Object.keys(kit.branches)) {
+    const { b, n } = kit.branches[id];
+    BRANCHES[b].tiers.slice(0, n).forEach(add);
+  }
+  for (const id of Object.keys(kit.fusions)) FUSION_BY_ID[id]?.tiers.slice(0, kit.fusions[id]).forEach(add);
+  return out;
 }
