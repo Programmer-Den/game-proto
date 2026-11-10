@@ -3,7 +3,7 @@
 A survivor-style auto-attack roguelike built with [Phaser 4](https://phaser.io), TypeScript and
 Vite, part of the [game hub](../../README.md).
 
-Pick a hero (blaster soldiers, blade knights, a rebel commander or a trio of battle bots) and fight the Rift Crusade across four of ten worlds: from the Dune world,
+Pick a hero (blaster soldiers, blade knights, a rebel commander, a trio of battle bots or a crew of rogues: a smuggler, a hunter, a droid and a spy) and fight the Rift Crusade across four of ten worlds: from the Dune world,
 the space map lets you choose your way through two of the Swamp, Spore, Scrap, Ocean, Ice,
 Crystal, Storm and Ruin worlds to the Lava world. On each you hold out for five minutes while its faction pours in from every side, then
 beat its boss. You only steer: your weapon fires (or your blade strikes) on its own. Shot-down foes drop lumen shards, and
@@ -23,7 +23,7 @@ foes and bolts.
 | Hold the mouse anywhere on the field | Walk toward that point; the hero keeps walking while you hold |
 | Touch: put a finger down anywhere and drag | A steering stick appears where the finger went down; walk the way you drag, faster the further out (the stick follows a finger that goes past its rim) |
 | Space, or the round button bottom right | Signature move, once charged |
-| Tap a hero card, or 1-9, 0, - and =; then Fight, or Enter | Choose a hero and start the run |
+| Tap a hero card, or 1-9, 0, - and = (with Shift for the thirteenth hero on); then Fight, or Enter | Choose a hero and start the run |
 | Tap a card, or 1 / 2 / 3 (and 4 on Elara's level-ups) | Choose an upgrade at a level-up, the next planet on the space map, a node on the star map, an offer at the trader or an answer to an event |
 | Continue, Enter or Space | Close the panel of a hero just unlocked; the run waits behind it |
 | Reroll, or 4 | At the trader: new offers for a few credits |
@@ -50,6 +50,10 @@ foes and bolts.
 | Master Joren Vask (royal blue blade) | A fast flurry strikes in four directions around him. **Edge**: every 10th hit is a critical hit | **Breaking Point**: one huge strike that stuns the strongest foe (12 s) | Duelist Form, Breaker, Council Seat |
 | Commander Elara Voss (red) | Precise pistol: always aims at the nearest foe. 85 health, medium speed. **Hope**: her level-ups offer 4 cards instead of 3 | **Call for Aid**: plants a signal flag, and rebel fighters bombard the area round it (16 s) | Sharpshooter, Rebel Network, Diplomat |
 | Triad-77 (white) | Three skinny battle bots moving as one unit, each shooting the foe nearest to it. about 42 health per bot; a fallen bot is rebuilt after 10 s, and the run ends only when all are down | **Formation Shift**: toggles Spread (a wide triangle) and Column (stacked, all firing at the nearest foe, triple damage) (2.5 s) | Firing Line, Factory, Uplink |
+| Dax Morrow (green vest) | Heavy pistol at the nearest foe; his first shot at an unhurt foe (not a boss) is a critical hit. 125 health, quick. **Luck**: every second chest also gives a free card | **Fly-By**: his freighter swoops over the thickest swarm and strafes it (14 s) | Fast Hands, Smuggler's Run, Lucky Streak |
+| Grunda (amber fur) | Heavy crossbow: slow bolts that pierce a foe and push foes back. 160 health, big, slow. **Rage**: the more health she has lost, the harder she hits (up to +60%) | **Roar**: stuns and throws back every foe near her for 1.2 s; a boss is only slowed (16 s) | Heavy Bolts, Wild Heart, Warcry |
+| KT-4 "Kettle" (white and blue) | Zap prod: a short-range zap at the nearest foe that jumps to one more. 100 health, tiny and very fast. **Self-repair**: mends 1.5 health a second | **Hack**: the 3 nearest foes fight for him for 6 s, never a boss or elite (11 s) | Prod, Hacker, Spare Parts |
+| Cassia Vane (pink visor) | Long rifle: slow, hard shots from far away that pierce 2 foes. 90 health | **Cloak**: she vanishes for 4 s and takes no damage, the foes go for where she stood, and her next shot hits three times as hard (13 s) | Deadeye, Ghost, Spymaster |
 
 Only Legionary TR-9 is open from the start. Every other hero unlocks through a deed, which the game
 never shows: a locked card is a dark placeholder with no art or name. When a deed is done, the run
@@ -69,9 +73,21 @@ the next run on. The deeds:
 | Lord Vharn | Take Kael Varro's The Fall path to tier 5 |
 | Commander Elara Voss | Hold 100 credits at once |
 | Triad-77 | Defeat 2500 foes in one run |
+| Dax Morrow | Open 6 chests in one run |
+| Grunda | Take Dax Morrow's Smuggler's Run path to tier 5 |
+| KT-4 "Kettle" | Take 8 power-ups in one run |
+| Cassia Vane | Finish 6 side objectives in one run |
 
-All but the two path deeds can be done with any hero. A save from before this chain keeps every
+All but the three path deeds can be done with any hero. A save from before this chain keeps every
 hero it shows as played (a world reached) or unlocked.
+
+![Dax Morrow's freighter strafing a swarm on a second pass, its charges going off](docs/screenshots/crew-dax.webp)
+
+![Grunda's Roar throwing back the foes around her](docs/screenshots/crew-grunda.webp)
+
+![Kettle's zap jumping from foe to foe, his repair drone beside him](docs/screenshots/crew-kettle.webp)
+
+![Cassia Vane in her Cloak, the foes heading for where she stood, her spy drone beside her](docs/screenshots/crew-cassia.webp)
 
 ![A new hero unlocked mid-run](docs/screenshots/hero-unlocked.webp)
 
@@ -217,7 +233,7 @@ fills once, and a full page banks its credits for the Armoury:
 | Bosses | 10 | 100 |
 | Pool skills | 30 | 80 |
 | Gear | 12 | 50 |
-| Hero paths | 48 (every hero's four) | 150 |
+| Hero paths | 64 (every hero's four) | 150 |
 
 Tap a page or press 1-5; Back or Enter returns. Entries not met yet show as `? ? ?`.
 
@@ -278,7 +294,7 @@ Each shows a toast once, when it is earned; a save from before trophies earns it
 | Running hot | Silver | Winning a run at rift heat 3 |
 | Into the furnace | Gold | Winning a run at rift heat 5 |
 | Fully stocked | Gold | Buying every rank of every piece in the Armoury |
-| The full roster | Gold | Unlocking all twelve heroes (hidden until earned) |
+| The full roster | Gold | Unlocking every hero (hidden until earned) |
 
 ![The trophy list](docs/screenshots/trophies.webp)
 
@@ -312,18 +328,18 @@ under way when the boss comes is called off.
 | Purge the nests | Swamp, Spore and Ocean worlds | Break 4 nests, which breed the world's swarm while they stand (50 s) | Upgrade card |
 | Thaw the frozen squad | Ice world | Stand by each of 3 frozen troopers for 1.5 s; each one freed fights beside you for 40 s (60 s) | A level |
 | Seal the vents | Lava and Storm worlds | Stand on each of 3 vents for 1.5 s while the open ones erupt (50 s) | Upgrade card |
-| Quick draw | Captain Rook | Down 70 foes (30 s) | 30 credits |
+| Quick draw | Captain Rook, Dax Morrow | Down 70 foes (30 s) | 30 credits |
 | Hold the drop zone | Legionary TR-9 | Stay 8 s in a small drop zone while foes push in hard (35 s) | Upgrade card |
-| Recon run | Corporal Bram-17 | Reach 4 markers far apart (40 s) | 30 credits |
+| Recon run | Corporal Bram-17, Cassia Vane | Reach 4 markers far apart (40 s) | 30 credits |
 | Duel | Kael Varro | Beat a marked elite (40 s) | Upgrade card |
-| Unbroken | Lord Vharn | Take no more than 60 damage for 40 s | A level |
+| Unbroken | Lord Vharn, Grunda | Take no more than 60 damage for 40 s | A level |
 | Lift the wreck | Master Oom | Stand by a wreck for 4 s; it then crashes down on the foes around it (40 s) | 25 credits |
 | Shelter the pilgrim | Elder Corvin Hale | Keep foes off a pilgrim for 30 s | Upgrade card |
 | Living storm | Regent Veyl | Land 220 hits (25 s) | A level |
 | Bloodtrail | Kresh the Twinblade | Down 30 foes in a row without being hit (60 s) | Upgrade card |
 | Shatter the monolith | Master Joren Vask | Break a monolith (35 s) | Upgrade card |
 | Signal the fleet | Commander Elara Voss | Use Call for Aid inside a marked ring (45 s) | 40 credits |
-| Salvage run | Triad-77 | Stand at each of 3 scrap piles for 1.2 s (45 s) | 35 credits |
+| Salvage run | Triad-77, KT-4 "Kettle" | Stand at each of 3 scrap piles for 1.2 s (45 s) | 35 credits |
 
 The shared one is drawn from those not seen yet this run. Beacons, nests, the cache and the
 monolith take hits like foes (your weapon aims at them when they are the nearest), but do no harm
@@ -445,6 +461,17 @@ names the stat it raises.
   other); Firing Line (faster fire, a 4th and a 5th bot), Factory (faster rebuilding; scrap from
   kills builds rolling shield bots that catch bolts), Uplink (a command bot links the unit:
   linked aim, each bot on a different foe, then shared health).
+- **Crew paths**: Fast Hands (faster fire, a second bolt at the next nearest foe, triple first
+  shots), Smuggler's Run (the freighter hits harder, drops charges, comes back for a second pass
+  and later flies by on its own), Lucky Streak (credits, crits, a second chest from elites, more
+  damage while flush); Heavy Bolts (more pierce, bolts that burst, two bolts a shot), Wild Heart
+  (more Rage, healing and speed below half health), Warcry (a wider Roar that hurts, sends foes
+  running and heals her); Prod (the zap jumps from foe to foe, reaches further and stuns), Hacker
+  (Hack takes more foes, elites too, for longer and they hit harder), Spare Parts (faster repair,
+  health, armour, a repair drone, shocks when hit); Deadeye (more pierce and range, more damage to
+  healthy foes), Ghost (a longer Cloak that heals, speed while cloaked, every shot in it triple),
+  Spymaster (marks the strongest foe for more damage, a spy drone that fires at it, credits from
+  marked kills).
 - **Knight paths**: Prodigy (wider slashes, combos, a thrown blade), Ace Pilot (a starfighter
   strafes, a bot co-pilot repairs), The Fall (full Temper doubles damage, halves healing);
   Dread (a slowing aura, weak foes flee), Iron Grip (Grip takes more foes and throws them), Life
@@ -473,8 +500,12 @@ names the stat it raises.
   | Joren | Swordmaster | +20 health, +0.5 health/s, +8% damage, +30 health, +1 health/s |
   | Elara | Resistance Cell | +8% damage, +20 health, signature 15% faster, +15% fire rate, +15% damage |
   | Triad-77 | Hardened Chassis | -6% damage taken, +8% damage, -6% damage taken, +15% fire rate, +15% damage |
+  | Dax | Old Hand | +8% damage, +15% fire rate, +20 health, +6% crit chance, +15% damage |
+  | Grunda | Thick Fur | +30 health, -6% damage taken, +8% damage, +1 health/s, +15% damage |
+  | Kettle | Self-Repair | +20 health, +0.5 health/s, +6% speed, +1 health/s, +15% damage |
+  | Cassia | Tradecraft | +8% damage, +6% crit chance, +6% speed, +8% damage, +15% damage |
 
-- **Blaster pool** (soldiers, Elara and Triad-77): Ricochet Rounds, Overcharge (pierce), Thermal Grenade, Stun Rounds
+- **Blaster pool** (soldiers, Elara, Triad-77 and the crew): Ricochet Rounds, Overcharge (pierce), Thermal Grenade, Stun Rounds
   (slow), Quick Reload, Covering Drone, Scatter Shot, Call-In (a supply crate that crashes on the
   swarm and leaves a medkit), Orbital Beacon (a strike from orbit on the thickest crowd every 9 to
   5 s), Executioner Rounds (a foe a hit leaves under 8 to 18% health falls; an elite under half
@@ -534,6 +565,18 @@ names the stat it raises.
   | Triad-77 | Endless Ranks | Firing Line + Overclock | 8 bots, and every 15th kill adds a spare bot for 12 s |
   | Triad-77 | Assembly Line | Factory + Magnet Coil | Scrap from 20 kills: up to 3 shield bots that send bolts back, then spare bots |
   | Triad-77 | Hive Signal | Uplink + Servo Boots | Every bot fires a 360° burst on each Formation Shift |
+  | Dax | Fan the Hammer | Fast Hands + Overclock | Every shot also fires at the next nearest foe |
+  | Dax | Full Throttle | Smuggler's Run + Servo Boots | The freighter flies by every 5 s, and +15% speed |
+  | Dax | Jackpot | Lucky Streak + Magnet Coil | Every chest raises one more skill |
+  | Grunda | Siege Crossbow | Heavy Bolts + Overclock | Every bolt bursts, 50% wider |
+  | Grunda | Second Wind | Wild Heart + Medpack | Once a world, a killing blow leaves her at 40% health |
+  | Grunda | Thunder Lungs | Warcry + Plate Armour | She roars on her own every 8 s |
+  | Kettle | Arc Welder | Prod + Overclock | The zap jumps to 8 foes, and every 5th bursts |
+  | Kettle | Botnet | Hacker + Magnet Coil | Every 25 kills hacks the 3 nearest foes |
+  | Kettle | Reboot | Spare Parts + Plate Armour | Once a world, a killing blow leaves him at 50% health |
+  | Cassia | Clean Shot | Deadeye + Overclock | Every 3rd shot does double damage |
+  | Cassia | Vanish | Ghost + Servo Boots | A hit cloaks her for 2 s (at most every 8 s) |
+  | Cassia | Dossier | Spymaster + Magnet Coil | Marked kills give 10 XP |
 
 - **Crossovers**: a pool skill held with a fitting path gives a bonus: Gunslinger + Ricochet
   Rounds (ricochets seek new targets), Riot Shield + Stun Rounds (shield bashes stun), Brothers in
@@ -577,7 +620,7 @@ npm run dev   # then open http://localhost:5173/games/riftblade/
 ## Playthrough test
 
 `e2e/playthrough.spec.ts` plays the first minute in headless Chromium with real inputs: on the
-hero select screen it checks the twelve cards (all but Legionary TR-9 locked on a fresh save),
+hero select screen it checks the sixteen cards (all but Legionary TR-9 locked on a fresh save),
 taps a locked card (no Fight button), then TR-9 and Fight, walks him in a wide circle by holding
 the mouse down at a point that turns around him, takes the first card at the first level-up and
 checks the upgrade was taken, fires Brace from its button and plays on to the one-minute mark. Side
@@ -593,7 +636,8 @@ npx playwright test --project riftblade
 - `src/howToPlay.ts`: the How to play screen.
 - `src/game/`: the rules, without drawing: `heroes.ts` (the heroes, their pools, colour schemes
   and which are locked), `blades.ts` (the knights' attacks, signatures and skills, and the unlock
-  deeds), `squad.ts` (Elara Voss and Triad-77: weapons, signatures, paths and allies),
+  deeds), `squad.ts` (Elara Voss and Triad-77: weapons, signatures, paths and allies), `crew.ts`
+  (Dax Morrow, Grunda, Kettle and Cassia Vane: the same),
   `upgrades.ts` (paths, pool, gear, capstones, crossovers and the card roll), `planets.ts` (the
   ten worlds, their bosses and the star map's numbers), `state.ts` (the state and the numbers),
   `sim.ts` (everything that happens in a fight), `voyage.ts` (between fights: the star map, trader,
@@ -602,7 +646,8 @@ npx playwright test --project riftblade
   (the codex pages), `mastery.ts` (hero mastery), `rush.ts` (the boss rush) and `save.ts`.
 - `src/art/`: `glow.ts` (painting helpers), `sprites.ts` (the heroes, Scrap bots and pickups),
   `knights.ts` (the knights, their blades and allies), `squad.ts` (Elara, Triad-77, their allies,
-  the drop pod and the locked placeholder) and
+  the drop pod and the locked placeholder), `crew.ts` (the crew and their allies, painted the first
+  time one is shown) and
   `factions.ts` (the later factions and their bosses), all painted at boot, and `worlds.ts` and
   `realms.ts` (the space map's factions), painted once a run leaves the Dune world.
 - `src/scenes/`: `BootScene.ts`, `GameScene.ts` (input, camera and drawing), `objectiveArt.ts`

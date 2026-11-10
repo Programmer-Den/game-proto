@@ -6,10 +6,11 @@
  * their scheme (`schemeOf`), so a new scheme needs no art.
  */
 import Phaser from 'phaser';
-import { HEROES, HERO_IDS, isKnight, schemeOf, type HeroId, type HeroScheme } from '../game/heroes';
+import { BOOT_HEROES, HEROES, HERO_IDS, isCrew, isKnight, isLate, schemeOf, type HeroId, type HeroScheme } from '../game/heroes';
 import { C, beam, glow, outline, paint, shade, shape, type Ctx } from './glow';
 import { drawKnight } from './knights';
 import { bot, drawSquadHero, rebel } from './squad';
+import { bakeCrewAllies, drawCrewHero } from './crew';
 import { MASTERY_COLOURS } from '../game/mastery';
 
 /** How big a hero is drawn in play (their art is laid out at 1 for the portraits). */
@@ -54,6 +55,10 @@ export function drawHero(ctx: Ctx, id: HeroId, x: number, y: number, z: number, 
   }
   if (id === 'elara' || id === 'triad') {
     drawSquadHero(ctx, id, x, y, z, bolts, sch);
+    return;
+  }
+  if (isCrew(id)) {
+    drawCrewHero(ctx, id, x, y, z, bolts, sch);
     return;
   }
   const mark = sch.mark ?? shade(sch.accent, -0.15);
@@ -122,6 +127,7 @@ export const masteryScheme = (id: HeroId): HeroScheme => ({ name: 'Mastery', ...
  * on Math.random for every texture's id, and a fresh save's seeded first minute must stay as it was).
  */
 export function bakeMastery(scene: Phaser.Scene, id: HeroId) {
+  bakeLate(scene, id);
   if (scene.textures.exists(masteryKey(id))) return;
   const sch = masteryScheme(id);
   bakeHero(scene, masteryKey(id), id, HERO_SCALE, HERO_BOX, false, sch);
@@ -132,6 +138,32 @@ export function bakeMastery(scene: Phaser.Scene, id: HeroId) {
       bot(ctx, 30, 44, 0.5, sch);
     });
   }
+}
+
+/**
+ * Paints a hero added after the first twelve (its sprites, portrait, bolt and allies), the first
+ * time it is shown or played. Not at boot: every texture Phaser makes draws on Math.random for its
+ * id, and a fresh save's seeded first minute must stay as it was. Call it before using any of
+ * their keys; it does nothing for the first twelve, painted by `bakeSprites`, or once done.
+ */
+export function bakeLate(scene: Phaser.Scene, id: HeroId) {
+  if (!isLate(id) || scene.textures.exists(portraitKey(id))) return;
+  HEROES[id].schemes.forEach((sch, v) => bakeHero(scene, heroKey(id, v), id, HERO_SCALE, HERO_BOX, false, sch));
+  boltTexture(scene, `rb-bolt-${id}`, schemeOf(id).bolt, 18, 4);
+  if (isCrew(id)) bakeCrewAllies(scene, id, schemeOf(id));
+  // The portrait last: its key is what says the hero is painted.
+  bakeHero(scene, portraitKey(id), id, 1, PORTRAIT_BOX, true);
+}
+
+/** A hero's portrait key, painting the hero first if it is one of the later ones. */
+export function portraitOf(scene: Phaser.Scene, id: HeroId) {
+  bakeLate(scene, id);
+  return portraitKey(id);
+}
+
+/** A bolt texture, pointing right; each is rotated to its heading. */
+function boltTexture(scene: Phaser.Scene, key: string, color: string, len: number, w: number) {
+  paint(scene, key, len + 16, w + 14, (ctx) => beam(ctx, 8, (w + 14) / 2, len + 8, (w + 14) / 2, color, w, 10));
 }
 
 function bakeHero(scene: Phaser.Scene, key: string, id: HeroId, scale: number, box: typeof HERO_BOX, bolts: boolean, sch = schemeOf(id)) {
@@ -269,7 +301,8 @@ function diamond(ctx: Ctx, cx: number, cy: number, w: number, h: number, color: 
 export const BOLT_COLOR = { drone: '#7df9ff', rocket: '#ffd36b', shell: '#c77dff' } as const;
 
 export function bakeSprites(scene: Phaser.Scene) {
-  for (const id of HERO_IDS) {
+  // The first twelve heroes; the later ones are painted when first shown (`bakeLate`).
+  for (const id of HERO_IDS.slice(0, BOOT_HEROES)) {
     HEROES[id].schemes.forEach((sch, v) => bakeHero(scene, heroKey(id, v), id, HERO_SCALE, HERO_BOX, false, sch));
     bakeHero(scene, portraitKey(id), id, 1, PORTRAIT_BOX, true);
   }
@@ -294,9 +327,8 @@ export function bakeSprites(scene: Phaser.Scene) {
   paint(scene, 'rb-boss', 170, 150, (ctx) => grinder(ctx, 170, 150));
 
   // Bolts point right; each is rotated to its heading.
-  const boltTex = (key: string, color: string, len: number, w: number) =>
-    paint(scene, key, len + 16, w + 14, (ctx) => beam(ctx, 8, (w + 14) / 2, len + 8, (w + 14) / 2, color, w, 10));
-  for (const id of HERO_IDS) boltTex(`rb-bolt-${id}`, schemeOf(id).bolt, 18, 4);
+  const boltTex = (key: string, color: string, len: number, w: number) => boltTexture(scene, key, color, len, w);
+  for (const id of HERO_IDS.slice(0, BOOT_HEROES)) boltTex(`rb-bolt-${id}`, schemeOf(id).bolt, 18, 4);
   boltTex('rb-bolt-drone', BOLT_COLOR.drone, 14, 3.5);
   boltTex('rb-bolt-heavy', schemeOf('bram').bolt, 28, 7);
   paint(scene, 'rb-bolt-rocket', 30, 18, (ctx) => {

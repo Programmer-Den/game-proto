@@ -22,7 +22,7 @@ const de: Translation<typeof en> = {
   armouryFull: 'Voll ausgerüstet',
   armouryFullText: 'Kaufe jeden Rang jedes Teils in der Waffenkammer.',
   allHeroes: 'Die ganze Truppe',
-  allHeroesText: 'Schalte alle zwölf Helden frei.',
+  allHeroesText: 'Schalte jeden Helden frei.',
 };
 
 export default de;

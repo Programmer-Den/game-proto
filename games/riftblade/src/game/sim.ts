@@ -3,7 +3,7 @@
  * bots, pickups and level-ups. Pure state changes, no drawing; randomness comes from `rand`
  * and time from the `dt` the scene hands over, so a run replays exactly from the same inputs.
  */
-import { HEROES, isKnight, type HeroId } from './heroes';
+import { HEROES, isCrew, isKnight, type HeroId } from './heroes';
 import {
   BOSS, CRAB, DIFF, ELITE, EMBER, ENEMY, HERO_R, KNIGHT, LEASH, LINE, MAX_ENEMIES, MAX_SHARDS, RATS, ROLLER, RUN_MS, SENTINEL, SHADE, SQUID,
   POWER, POWER_UPS, SCRAP, SHARD, SPAWN_RING, SPORE, TOAD, WALKER, WISP, freshHero, freshState, isStructure, refreshUnlocks, statsOf, xpFor,
@@ -17,6 +17,10 @@ import {
   droneSpot, hurtFactor, moveSquadAlly, squadAbilities, squadAllies, squadAttack, squadBlock, squadCrit, squadHeal, squadHurt,
   squadKill, squadSignature, squadStart, syncSquad, turnedBonus,
 } from './squad';
+import {
+  crewAbilities, crewAllies, crewAttack, crewBoltHit, crewChest, crewHit, crewHurt, crewKill, crewKillHeal, crewRange, crewRescue,
+  crewSignature, crewTarget, crewTurned, crewUntouchable, moveCrewAlly,
+} from './crew';
 import { BASE_TIER, BRANCHES, CAPSTONES, CROSSOVERS, FILLER, FUSION_BY_ID, FUSION_TIERS, at, canOffer, cardTiers, cardCount, parseCard, raisable, rewardChoices, rollChoices } from './upgrades';
 import { cardName } from './cardText';
 import { MASTERY, MASTERY_WEAPON } from './mastery';
@@ -50,6 +54,7 @@ const BLAST = { bomb: '#9fe8ff', wreck: '#ffd23f', hero: '#ffb347', bot: '#ff6a4
 let st: Stats = statsOf(freshState());
 let knight = false;
 let squad = false;
+let crew = false;
 const isSquad = (id: HeroId) => id === 'elara' || id === 'triad';
 
 /** The stats for this frame (for `blades.ts`). */
@@ -63,6 +68,7 @@ export function prepare(s: GameState) {
   st = statsOf(s);
   knight = isKnight(s.hero!);
   squad = isSquad(s.hero!);
+  crew = isCrew(s.hero!);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -247,6 +253,7 @@ function step(s: GameState, ms: number, input: Input) {
   abilities(s, ms);
   if (knight) knightAbilities(s, ms);
   if (squad) squadAbilities(s, ms);
+  if (crew) crewAbilities(s, ms);
   moveAllies(s, ms);
   moveEnemies(s, ms);
   moveBullets(s, ms);
@@ -421,7 +428,7 @@ export function heal(s: GameState, amount: number) {
 
 /** Whether the hero takes no damage right now (Brace, mid-dash, or just hit). */
 function untouchable(s: GameState) {
-  return (s.hero === 'tr9' && s.player.sigActiveMs > 0) || s.player.dashMs > 0 || s.player.hurtMs > 0;
+  return (s.hero === 'tr9' && s.player.sigActiveMs > 0) || s.player.dashMs > 0 || s.player.hurtMs > 0 || (crew && crewUntouchable(s));
 }
 
 /** A hit on the hero; `x`, `y` say where it came from (Triad-77's nearest bot takes it). */
@@ -477,7 +484,8 @@ function hurtHero(s: GameState, dmg: number, x?: number, y?: number) {
   s.damageTaken += taken;
   // A moment of grace after each hit, so a crowd can't take it all at once.
   p.hurtMs = HURT_GRACE_MS;
-  if (p.hp <= 0) {
+  if (crew) crewHurt(s);
+  if (p.hp <= 0 && !(crew && crewRescue(s))) {
     p.hp = 0;
     s.phase = 'lost';
   }
@@ -491,6 +499,13 @@ function signature(s: GameState) {
   if (knight) {
     // A knight's move needs something to act on; without it, nothing is spent.
     if (!knightSignature(s)) return;
+    p.sigMs = hero.signature.cooldownMs * st.sigCooldown;
+    s.signatures += 1;
+    return;
+  }
+  if (crew) {
+    // Kettle's Hack needs a foe to take over; without one, nothing is spent.
+    if (!crewSignature(s)) return;
     p.sigMs = hero.signature.cooldownMs * st.sigCooldown;
     s.signatures += 1;
     return;
@@ -533,7 +548,7 @@ interface BoltOpts {
 export function bolt(s: GameState, x: number, y: number, angle: number, dmg: number, o: BoltOpts = {}) {
   const hero = HEROES[s.hero ?? 'rook'];
   const speed = o.speed ?? hero.boltSpeed;
-  const range = hero.range * ((s.ranks.marksman ?? 0) >= 3 ? 1.3 : 1);
+  const range = hero.range * ((s.ranks.marksman ?? 0) >= 3 ? 1.3 : 1) * (crew ? crewRange(s) : 1);
   s.bullets.push({
     id: s.nextId++, x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, dmg,
     pierce: o.pierce ?? st.pierce, bounces: o.bounces ?? st.bounces,
@@ -574,6 +589,10 @@ function primary(s: GameState, ms: number) {
   }
   if (squad) {
     squadAttack(s, ms, fireRate(s));
+    return;
+  }
+  if (crew) {
+    crewAttack(s, ms, fireRate(s));
     return;
   }
   const p = s.player;
@@ -839,6 +858,7 @@ export function syncAllies(s: GameState) {
     brother: s.capstones.includes('the-batch') ? 5 : at([1, 1, 2, 2, 3], r('brothers'), 0),
     ...knightAllies(s),
     ...squadWant,
+    ...crewAllies(s),
     drone: at([1, 1, 2, 2, 3], r('drone'), 0) + squadWant.drone,
   };
   syncSquad(s);
@@ -858,7 +878,7 @@ export function syncAllies(s: GameState) {
 }
 
 /** The allies that stay as long as the upgrades that bring them. */
-const LASTING = ['trooper', 'legionary', 'brother', 'drone', 'spirit', 'copilot', 'squadron', 'commando', 'medic', 'command'] as const;
+const LASTING = ['trooper', 'legionary', 'brother', 'drone', 'spirit', 'copilot', 'squadron', 'commando', 'medic', 'command', 'patch', 'spydrone'] as const;
 
 function moveAllies(s: GameState, ms: number) {
   const p = s.player;
@@ -866,7 +886,7 @@ function moveAllies(s: GameState, ms: number) {
   const rally = s.hero === 'rook' && p.sigActiveMs > 0 ? 1.5 : 1;
   const counts: Record<AllyKind, number> = {
     trooper: 0, legionary: 0, brother: 0, drone: 0, escort: 0, fighter: 0, squadron: 0, copilot: 0, spirit: 0, puppet: 0,
-    commando: 0, bike: 0, medic: 0, shieldbot: 0, command: 0, spare: 0, thawed: 0,
+    commando: 0, bike: 0, medic: 0, shieldbot: 0, command: 0, spare: 0, thawed: 0, freighter: 0, patch: 0, spydrone: 0,
   };
   for (const a of s.allies) counts[a.kind] += 1;
   for (const a of s.allies) {
@@ -876,6 +896,10 @@ function moveAllies(s: GameState, ms: number) {
     }
     if (SQUAD_ALLIES.includes(a.kind)) {
       moveSquadAlly(s, a, ms, counts[a.kind]);
+      continue;
+    }
+    if (CREW_ALLIES.includes(a.kind)) {
+      moveCrewAlly(s, a, ms);
       continue;
     }
     // Troopers thawed out on the Ice world fight for a while.
@@ -932,7 +956,8 @@ function moveAllies(s: GameState, ms: number) {
 const KNIGHT_ALLIES: readonly AllyKind[] = ['fighter', 'squadron', 'copilot', 'spirit', 'puppet'];
 const SQUAD_ALLIES: readonly AllyKind[] = ['commando', 'bike', 'medic', 'shieldbot', 'command', 'spare'];
 /** Allies that last a while and are gone at the end of a fight. */
-export const SHORT_LIVED: readonly AllyKind[] = ['fighter', 'puppet', 'bike', 'spare', 'thawed'];
+export const SHORT_LIVED: readonly AllyKind[] = ['fighter', 'puppet', 'bike', 'spare', 'thawed', 'freighter'];
+const CREW_ALLIES: readonly AllyKind[] = ['freighter', 'patch', 'spydrone'];
 
 // ---------------------------------------------------------------------------------------------
 // The bots
@@ -1343,8 +1368,10 @@ function moveEnemies(s: GameState, ms: number) {
       turned(s, e, ms);
       continue;
     }
-    const dx = p.x - e.x;
-    const dy = p.y - e.y;
+    // Cassia's Cloak: the foes go for where she was last seen.
+    const goal = (crew && crewTarget(s)) || p;
+    const dx = goal.x - e.x;
+    const dy = goal.y - e.y;
     const dist = Math.hypot(dx, dy) || 1;
     // Left far behind: brought back round ahead of the hero.
     if (dist > LEASH && e.kind !== 'boss') {
@@ -1621,7 +1648,7 @@ function turned(s: GameState, e: Enemy, ms: number) {
     e.y += ((t.y - e.y) / d) * step;
   } else if (e.orbitMs <= 0) {
     e.orbitMs = 700;
-    damage(s, t, e.dmg * 2 * ((s.ranks.persuasion ?? 0) >= 4 ? 1.5 : 1) * (squad ? turnedBonus(s) : 1), { noCrit: true });
+    damage(s, t, e.dmg * 2 * ((s.ranks.persuasion ?? 0) >= 4 ? 1.5 : 1) * (squad ? turnedBonus(s) : 1) * (crew ? crewTurned(s) : 1), { noCrit: true });
   }
 }
 
@@ -1783,8 +1810,11 @@ export function damage(s: GameState, e: Enemy, base: number, o: HitOpts = {}) {
   if (e.elite || e.kind === 'boss') dmg *= st.bossDmg;
   // Elara's Sharpshooter makes its own critical hits.
   const sure = squad ? squadCrit(s, e) : 1;
+  const own = crew ? crewHit(s, e) : null;
+  if (own) dmg *= own.k;
+  // Dax's first shot at a foe is a critical hit of its own (no roll for another).
   if (sure > 1) dmg *= sure;
-  else if (o.crit || (!o.noCrit && st.crit > 0 && rand() < st.crit)) dmg *= 2;
+  else if (!own?.crit && (o.crit || (!o.noCrit && st.crit > 0 && rand() < st.crit))) dmg *= 2;
   e.hp -= dmg;
   e.flashMs = 90;
   s.hits += 1;
@@ -1809,6 +1839,11 @@ function kill(s: GameState, e: Enemy) {
   if (s.mutators.includes('vampire')) heal(s, MUT.vampire);
   if (knight) onKill(s, e);
   if (squad) squadKill(s, e);
+  if (crew) {
+    crewKill(s, e);
+    const back = crewKillHeal(s);
+    if (back > 0) heal(s, back);
+  }
   if (e.kind === 'boss') {
     // The planet is cleared; the star map (or victory) comes next frame.
     s.phase = 'cleared';
@@ -1956,6 +1991,7 @@ function moveBullets(s: GameState, ms: number) {
       }
       damage(s, e, b.dmg, { slow: true });
       if (b.color === 'heavy') knock(e, e.x - b.vx, e.y - b.vy, 60);
+      if (crew) crewBoltHit(s, e, b);
       if (b.pierce > 0) {
         b.pierce -= 1;
         return;
@@ -2213,6 +2249,15 @@ function openChest(s: GameState) {
   const id = held[Math.floor(rand() * held.length)];
   raiseCard(s, id);
   pop(s, tr('chestPop', { name: cardName(id), n: cardTiers(s, parseCard(id)!).held }), '#ffe066');
+  if (crew) {
+    crewChest(s, () => {
+      const more = raisable(s);
+      if (!more.length) return;
+      const next = more[Math.floor(rand() * more.length)];
+      raiseCard(s, next);
+      pop(s, tr('chestPop', { name: cardName(next), n: cardTiers(s, parseCard(next)!).held }), '#ffe066');
+    });
+  }
 }
 
 export function pop(s: GameState, text: string, color: string) {

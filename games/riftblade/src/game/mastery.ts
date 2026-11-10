@@ -38,6 +38,7 @@ export const masteryXp = (bosses: number, kills: number, won: boolean) =>
 export const MASTERY_WEAPON: Record<HeroId, string> = {
   rook: 'drone', tr9: 'thermal', bram: 'scatter', kael: 'blade-throw', vharn: 'lightning-arc', oom: 'push-wave',
   corvin: 'crescent', veyl: 'dark-nova', kresh: 'spinning-guard', joren: 'lightning-arc', elara: 'callin', triad: 'drone',
+  dax: 'ricochet', grunda: 'stun', kettle: 'drone', cassia: 'executioner',
 };
 
 /** The text key of what each level opens (level 1 opens nothing). */
@@ -59,4 +60,8 @@ export const MASTERY_COLOURS: Record<HeroId, Omit<HeroScheme, 'name' | 'bolt'>> 
   joren: { body: '#2b2f3a', accent: '#ffd23f', mark: '#8a5a30' },
   elara: { body: '#2f4a5c', accent: '#ffb347', mark: '#e6dac2' },
   triad: { body: '#2a2d36', accent: '#7df9ff', mark: '#4a5266' },
+  dax: { body: '#1e2a3a', accent: '#ffd23f', mark: '#c8b89a' },
+  grunda: { body: '#5c5a58', accent: '#7af0c0', mark: '#2e2c2a' },
+  kettle: { body: '#f0e6d0', accent: '#ff8a3c', mark: '#5a4630' },
+  cassia: { body: '#f2f0f4', accent: '#7a5cff', mark: '#9aa0b0' },
 };

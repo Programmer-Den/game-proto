@@ -21,6 +21,8 @@ const enUS: Partial<Translation<typeof en>> = {
   branchPop: 'Specialized: {name}',
   skillsBranches: 'Specializations',
   hollowRebirthText: 'Armored and slow: +60 health, -30% damage taken, double slash damage',
+  wildHeart5: '+20% armor below 30% health',
+  spareParts4: '+15% armor',
 };
 
 export default enUS;

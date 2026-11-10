@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { settings } from '../../../../shared/settings';
 import { splitHudCamera, viewFrame, viewPoint, viewSize } from '../../../../shared/scaling';
-import { HEROES, HERO_IDS, isKnight, schemeOf, type HeroId } from '../game/heroes';
+import { HEROES, HERO_IDS, isCrew, isKnight, schemeOf, type HeroId } from '../game/heroes';
 import { HERO_R, POWER_UPS, RUN_MS, clock, freshState, isStructure, statsOf, type GameState, type PowerUp } from '../game/state';
 import { choose, inRingGap, phalanxSpots, prepare, shieldHalf, startRun, suppressorHalf, suppressorLength } from '../game/sim';
 import { bladeColor, dreadRadius, heroVariant, orbitBlades } from '../game/blades';
@@ -24,7 +24,7 @@ import {
   bankCredits, clearRun, isResumable, isUnlocked, loadProgress, loadRun, buyArmoury, recordCharted, recordCodex, recordEndless, recordSkills, recordRun, recordRush, recordWeekly, recordUnlocks, saveRun, togglePlain, unlockedHeroes, type Progress,
 } from '../game/save';
 import { C, hex } from '../art/glow';
-import { MASTERY_BOT, bakeMastery, heroKey, masteryKey } from '../art/sprites';
+import { MASTERY_BOT, bakeLate, bakeMastery, heroKey, masteryKey } from '../art/sprites';
 import { t } from '../i18n';
 import { bladeKey } from '../art/knights';
 import { bakeWorlds } from '../art/worlds';
@@ -74,6 +74,7 @@ const ALLY_KEYS: Record<GameState['allies'][number]['kind'], string> = {
   trooper: 'rb-trooper', legionary: 'rb-legionary', brother: 'rb-brother', escort: 'rb-escort', drone: 'rb-drone',
   fighter: 'rb-fighter', squadron: 'rb-fighter', copilot: 'rb-copilot', spirit: 'rb-spirit', puppet: 'rb-puppet',
   commando: 'rb-commando', bike: 'rb-bike', medic: 'rb-medic', shieldbot: 'rb-shieldbot', command: 'rb-command', spare: 'rb-bot', thawed: 'rb-trooper',
+  freighter: 'rb-freighter', patch: 'rb-patch', spydrone: 'rb-spydrone',
 };
 /** Allies drawn from the hero art (small soldiers), placed by its origin. */
 const HERO_LIKE: readonly GameState['allies'][number]['kind'][] = ['trooper', 'legionary', 'brother', 'commando', 'medic', 'thawed'];
@@ -213,9 +214,9 @@ export class GameScene extends Phaser.Scene {
       // Not at once: a press meant for the signature as the last boss falls stays on the end screen.
       else if (this.time.now - this.endAt > 800) this.goEndless();
     });
-    // 1-9 and 0 pick the first ten heroes, - and = the last two.
+    // 1-9, 0, - and = pick the first twelve heroes, the same with Shift the next twelve.
     ['ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE', 'ZERO', 'MINUS', 'PLUS'].forEach((key, i) => {
-      this.keys[key].on('down', () => {
+      this.keys[key].on('down', (_key: Phaser.Input.Keyboard.Key, ev?: KeyboardEvent) => {
         const s = this.state;
         if (this.unlocking.length) return;
         if (s.phase === 'select' && (this.weeklyOpen || this.dailyOpen || this.rushOpen)) return;
@@ -226,7 +227,8 @@ export class GameScene extends Phaser.Scene {
         } else if (s.phase === 'select' && this.armouryOpen) {
           if (ARMOURY[i]) this.buyArmoury(ARMOURY[i].id);
         } else if (s.phase === 'select') {
-          if (HERO_IDS[i]) this.choose(HERO_IDS[i]);
+          const id = HERO_IDS[i + (ev?.shiftKey ? 12 : 0)];
+          if (id) this.choose(id);
         } else if (s.phase === 'levelup') {
           if (i < (s.choices?.length ?? 0)) this.pickIndex(i);
         } else if (s.phase === 'chart') {
@@ -825,6 +827,8 @@ export class GameScene extends Phaser.Scene {
   private draw() {
     const s = this.state;
     const p = s.player;
+    // A hero from the thirteenth on is painted when first played (see bakeLate).
+    if (s.hero) bakeLate(this, s.hero);
     // The four later planets' textures are painted the first time a run gets past the Dune world, not
     // at boot: Phaser draws on Math.random for each texture's id, and the first minute's seeded draws
     // (the playthrough's) stay as they were.
@@ -1314,7 +1318,7 @@ export class GameScene extends Phaser.Scene {
     for (const a of s.allies) {
       const key = ALLY_KEYS[a.kind];
       const im = al.next(key, a.x, a.y);
-      if (a.kind === 'fighter' || a.kind === 'squadron') im.setRotation(a.aim);
+      if (a.kind === 'fighter' || a.kind === 'squadron' || a.kind === 'freighter') im.setRotation(a.aim);
       else if (a.kind === 'spirit') im.setAlpha(0.8).setFlipX(Math.cos(a.aim) < 0);
       else if (a.kind === 'puppet') {
         im.setFlipX(Math.cos(a.aim) < 0).setScale(a.elite ? 1.5 : 1);
@@ -1349,7 +1353,7 @@ export class GameScene extends Phaser.Scene {
       const face = p.moving ? p.facing : p.aim;
       const look = this.lookOf(s);
       if (this.hero.texture.key !== look) this.hero.setTexture(look);
-      this.hero.setVisible(true).setPosition(p.x, p.y + bob).setFlipX(Math.cos(face) < 0).setAlpha(p.dashMs > 0 ? 0.6 : 1);
+      this.hero.setVisible(true).setPosition(p.x, p.y + bob).setFlipX(Math.cos(face) < 0).setAlpha(p.dashMs > 0 ? 0.6 : s.hero === 'cassia' && p.sigActiveMs > 0 ? 0.35 : 1);
     }
 
     // Bolts.
@@ -1379,9 +1383,12 @@ export class GameScene extends Phaser.Scene {
       const color = s.hero === 'tr9' ? accent : hex(sch.bolt);
       o.lineStyle(6, color, 0.15).strokeCircle(p.x, p.y, 30);
       o.lineStyle(2, color, 0.8).strokeCircle(p.x, p.y, 30);
+      // Cassia's Cloak: where the foes think she is.
+      if (s.decoy) o.lineStyle(2, accent, 0.45).strokeCircle(s.decoy.x, s.decoy.y, 18);
     }
     if (p.hurtMs > 0) o.lineStyle(2, hex(C.danger), Math.min(1, p.hurtMs / 450) * 0.8).strokeCircle(p.x, p.y, 24);
-    if (isKnight(s.hero!)) this.drawKnight(s);
+    // The knights' blades and lightning, Kettle's zaps and Cassia's mark.
+    if (isKnight(s.hero!) || isCrew(s.hero!)) this.drawKnight(s);
     // Triad-77's Uplink: thin lines from the command bot to every standing bot.
     if (s.hero === 'triad') {
       const cmd = s.allies.find((a) => a.kind === 'command');
