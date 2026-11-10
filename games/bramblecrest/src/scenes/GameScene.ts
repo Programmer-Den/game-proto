@@ -393,6 +393,8 @@ export class GameScene extends Phaser.Scene {
     });
     map.enemies.forEach((e, i) => {
       if (DUNGEONS.has(id) && hasFlag(s, this.foeFlag(i)) && !trial) return;
+      // Armoured foes only take a sword hit once knocked down, so they wait for the hookvine.
+      if (ARMOURED.has(e.kind) && !s.items.hookvine) return;
       const c = centre(e);
       this.spawnFoe(e.kind, c.x, c.y, i, e.room);
     });
