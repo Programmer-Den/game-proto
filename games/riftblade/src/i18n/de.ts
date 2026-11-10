@@ -1148,6 +1148,23 @@ const de: Translation<typeof en> = {
   codexCount: '{n}/{of}  ·  zahlt {pay}',
   codexPaid: 'Voll  ·  bezahlt',
   codexHelp: 'Tippe eine Seite an oder drücke 1-5  ·  Enter kehrt um',
+  skillsButton: 'Fähigkeiten  ·  {n}/{of}',
+  skillsTitle: 'FÄHIGKEITEN',
+  skillsSubtitle: 'Jede Fähigkeit eines Laufs. Einmal genommen, zeigt sie Text und Stufen; der Rest bleibt verborgen.',
+  skillsHelp: 'Tippe eine Seite an oder drücke 1-8, dann eine Fähigkeit  ·  Enter kehrt um',
+  skillsPick: 'Tippe links eine Fähigkeit an, um zu sehen, was sie tut.',
+  skillsNone: 'Nimm in einem Lauf eine Fähigkeit, dann erscheint sie hier.',
+  skillsBlaster: 'Blaster',
+  skillsBlade: 'Klinge',
+  skillsCurrent: 'Strom',
+  skillsHollow: 'Das Hohle',
+  skillsBranches: 'Spezialisierungen',
+  skillsFusions: 'Fusionen',
+  skillsPathOf: 'PFAD VON {hero}',
+  skillsTier: 'Stufe {n}: {text}',
+  skillsBranchesOf: 'Stufen 6 und 7: {names} (eine wählen)',
+  skillsBranchText: 'Auf Stufe 5 verzweigt sich ein Upgrade; nimmst du diese, sind die anderen beiden gesperrt.',
+  skillsFusionTier: 'beide auf Stufe {n}',
   codexFilled: 'Kodexseite voll: {page}  ·  +{n} Credits eingelagert',
   foe_clanker: 'Klapperbot',
   foe_rollerbomb: 'Rollbombe',
@@ -1341,7 +1358,7 @@ const de: Translation<typeof en> = {
 /** Texts that are the same in German. */
 export const keepEnglish: (keyof typeof en)[] = [
   'phalanxName', 'planetLabel', 'bossTimer', 'seconds',
-  'kaelName', 'vharnName', 'veylName', 'rookShort', 'tr9Short', 'bramShort', 'kaelShort', 'vharnShort', 'oomShort', 'corvinShort', 'veylShort', 'kreshShort', 'jorenShort', 'elaraShort', 'triadName', 'triadShort', 'uplinkName', 'signatureFull', 'sideBlaster', 'riposteName', 'branchName', 'fusionKind', 'fusionPop', 'buffOverdrive', 'rushPop',
+  'kaelName', 'vharnName', 'veylName', 'rookShort', 'tr9Short', 'bramShort', 'kaelShort', 'vharnShort', 'oomShort', 'corvinShort', 'veylShort', 'kreshShort', 'jorenShort', 'elaraShort', 'triadName', 'triadShort', 'uplinkName', 'signatureFull', 'sideBlaster', 'riposteName', 'branchName', 'fusionKind', 'fusionPop', 'skillsBlaster', 'buffOverdrive', 'rushPop',
 ];
 
 export default de;

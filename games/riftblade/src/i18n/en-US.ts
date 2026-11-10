@@ -19,6 +19,7 @@ const enUS: Partial<Translation<typeof en>> = {
   branchKind: 'SPECIALIZATION',
   branchBlurb: 'Tiers 6 and 7 of {name}. Only one specialization per skill.',
   branchPop: 'Specialized: {name}',
+  skillsBranches: 'Specializations',
   hollowRebirthText: 'Armored and slow: +60 health, -30% damage taken, double slash damage',
 };
 

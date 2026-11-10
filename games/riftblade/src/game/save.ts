@@ -6,6 +6,7 @@ import { FUSION_BY_ID, branchCard, parseCard } from './upgrades';
 import { MAX_HEAT } from './heat';
 import { ARMOURY_IDS, nextPrice, type ArmouryId } from './armoury';
 import { MUTATOR_IDS, WEEKLY_BONUS, weekSeed } from './weekly';
+import { SKILL_ENTRIES } from './skills';
 import { CODEX_ENTRIES, CODEX_PAGES, pageDone, type CodexPageId } from './codex';
 import { beatsRush, type RushRecord } from './rush';
 
@@ -38,6 +39,8 @@ export interface Progress {
   endless: number;
   /** The codex: every foe, boss and card seen (`codex.ts` ids), and the full pages already paid for. */
   codex: { seen: string[]; paid: CodexPageId[] };
+  /** The skill overview: every path, pool skill, gear piece, specialisation and fusion a run has taken (`skills.ts` ids). */
+  skills: string[];
   /** Mastery XP by hero (see `mastery.ts`), and the heroes set to their usual colours rather than their mastery ones. */
   mastery: Partial<Record<HeroId, number>>;
   plain: HeroId[];
@@ -87,6 +90,7 @@ export function loadProgress(): Progress {
         seen: Array.isArray(saved.codex?.seen) ? saved.codex.seen.filter((id: unknown) => CODEX_ENTRIES.has(id as string)) : [],
         paid: Array.isArray(saved.codex?.paid) ? saved.codex.paid.filter((id: unknown) => CODEX_PAGES.some((pg) => pg.id === id)) : [],
       },
+      skills: Array.isArray(saved.skills) ? saved.skills.filter((id: unknown) => SKILL_ENTRIES.has(id as string)) : [],
       unlocked: Array.isArray(saved.unlocked) ? saved.unlocked.filter((id: unknown) => HERO_IDS.includes(id as HeroId)) : [],
       charted: Array.isArray(saved.charted) ? saved.charted.filter((id: unknown) => typeof id === 'string') : [],
       mastery: Object.fromEntries(Object.entries(perHero(saved.mastery)).filter(([, n]) => n! > 0).map(([id, n]) => [id, Math.floor(n!)])),
@@ -98,7 +102,7 @@ export function loadProgress(): Progress {
     };
   } catch {
     return {
-      bestMs: 0, wins: {}, heat: {}, bank: 0, armoury: {}, weekly: null, endless: 0, codex: { seen: [], paid: [] }, furthest: {}, unlocked: [], charted: [],
+      bestMs: 0, wins: {}, heat: {}, bank: 0, armoury: {}, weekly: null, endless: 0, codex: { seen: [], paid: [] }, skills: [], furthest: {}, unlocked: [], charted: [],
       mastery: {}, plain: [], rush: null,
     };
   }
@@ -178,6 +182,14 @@ export function togglePlain(hero: HeroId): Progress {
 export function bankCredits(credits: number): Progress {
   const progress = loadProgress();
   progress.bank += credits;
+  saveProgress(progress);
+  return progress;
+}
+
+/** Adds skills a run has taken to the overview; returns the updated progress. */
+export function recordSkills(ids: readonly string[]): Progress {
+  const progress = loadProgress();
+  for (const id of ids) if (SKILL_ENTRIES.has(id) && !progress.skills.includes(id)) progress.skills.push(id);
   saveProgress(progress);
   return progress;
 }

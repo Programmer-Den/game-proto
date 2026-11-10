@@ -6,8 +6,9 @@
 import Phaser from 'phaser';
 import { HEROES, HERO_IDS, schemeOf, type HeroDef, type HeroId } from '../game/heroes';
 import { clock, type GameState } from '../game/state';
-import { BASE_TIER, BRANCHES, CAPSTONES, FILLER, FUSIONS, FUSION_BY_ID, FUSION_NEEDS, POOL_NAMES, UPGRADES, branchesOf, capstoneFor, cardTiers, crossoverFor, fusionCard, fusionShuts, lockedOf, parseCard } from '../game/upgrades';
-import { cardName, tierText } from '../game/cardText';
+import { BASE_TIER, BRANCHES, CAPSTONES, FILLER, FUSIONS, FUSION_BY_ID, FUSION_NEEDS, FUSION_PREFIX, POOL_NAMES, UPGRADES, branchesOf, capstoneFor, cardTiers, crossoverFor, fusionCard, fusionShuts, lockedOf, parseCard } from '../game/upgrades';
+import { cardName, gainsText, tierText } from '../game/cardText';
+import { BRANCH_PREFIX, SKILL_ENTRIES, SKILL_PAGES, branchOf, type SkillPageId } from '../game/skills';
 import { BOSSES, NODE_INFO, PLANETS, STAGES, planetLabel, planetsAt, type NodeKind } from '../game/planets';
 import { chartOptions, nextStage, priceOf, rerollPrice } from '../game/voyage';
 import { DAILY, stagesOf } from '../game/daily';
@@ -24,7 +25,7 @@ import { bakeMastery, masteryPortraitKey, masteryScheme, portraitKey } from '../
 import { MASTERY, MASTERY_REWARDS, MAX_MASTERY, masteryLevel, masteryNext } from '../game/mastery';
 import { RUSH, rushPlanets } from '../game/rush';
 import {
-  FIGHT_SHORT, MASTERY_ROW, RUSH_BUTTON, AGAIN, AGAIN_SIDE, CODEX_BUTTON, CODEX_GRID, DAILY_BUTTON, ENDLESS_BUTTON, codexTabRect, ARMOURY_BUTTON, BACK, CHART, MUTATOR_CARD, WEEKLY_BACK, WEEKLY_BUTTON, WEEKLY_START, armouryCardRect, CONTINUE, DEPTH, FIGHT, FONT, HEAT_DOWN, HEAT_ROW, HEAT_UP, HERO_DETAIL, LEAVE, MAP, REROLL, SCREEN, UNLOCK, VIEW, chartRect, chartSpot, eventOptionRect, heroCardRect,
+  FIGHT_SHORT, MASTERY_ROW, RUSH_BUTTON, AGAIN, AGAIN_SIDE, CODEX_BUTTON, CODEX_GRID, CODEX_BACK, SKILLS_BUTTON, SKILL_DETAIL, SKILL_LIST, skillTabRect, DAILY_BUTTON, ENDLESS_BUTTON, codexTabRect, ARMOURY_BUTTON, BACK, CHART, MUTATOR_CARD, WEEKLY_BACK, WEEKLY_BUTTON, WEEKLY_START, armouryCardRect, CONTINUE, DEPTH, FIGHT, FONT, HEAT_DOWN, HEAT_ROW, HEAT_UP, HERO_DETAIL, LEAVE, MAP, REROLL, SCREEN, UNLOCK, VIEW, chartRect, chartSpot, eventOptionRect, heroCardRect,
   CHART4, levelCardRect, mapNodeRect, mapNodeSpot, tradeCardRect, type Rect,
 } from '../scenes/layout';
 
@@ -248,9 +249,110 @@ export function codexPanel(p: Panel, progress: Progress, open: CodexPageId) {
     const known = seen.has(e.id);
     fit(p.text(CODEX_GRID.x + col * CODEX_GRID.col, CODEX_GRID.y + row * CODEX_GRID.row, known ? t(e.name) : '? ? ?', 13, known ? C.text : '#3d4a66', { bold: known }), CODEX_GRID.col - 14);
   });
-  button(p, BACK, 'back', t('armouryBack'), CODEX_COLOR);
+  button(p, CODEX_BACK, 'back', t('armouryBack'), CODEX_COLOR);
+  button(p, SKILLS_BUTTON, 'skills', t('skillsButton', { n: progress.skills.length, of: SKILL_ENTRIES.size }), SKILLS_COLOR);
   p.text(VIEW.w / 2, BACK.y + BACK.h + 16, t('codexHelp'), 12, C.muted, { origin: [0.5, 0] });
   return p;
+}
+
+const SKILLS_COLOR = '#ffd36b';
+
+/**
+ * The skill overview: a tab per page (with how many of it a run has taken), the page's names (a
+ * skill never taken shows as "? ? ?") and, on the right, the one picked: its kind, text and every
+ * tier.
+ */
+export function skillsPanel(p: Panel, progress: Progress, open: SkillPageId, picked: string | null) {
+  const scene = p.scene;
+  p.dim(0.9);
+  stars(p, scene);
+  p.text(VIEW.w / 2, 24, t('skillsTitle'), 30, SKILLS_COLOR, { bold: true, origin: [0.5, 0], glow: true });
+  p.text(VIEW.w / 2, 64, t('skillsSubtitle'), 13, C.muted, { origin: [0.5, 0], align: 'center', wrap: VIEW.w - 80 });
+  const known = new Set(progress.skills);
+  SKILL_PAGES.forEach((pg, i) => {
+    const r = skillTabRect(i, SKILL_PAGES.length);
+    const n = pg.entries.filter((e) => known.has(e)).length;
+    const on = pg.id === open;
+    p.frame(r, on ? SKILLS_COLOR : n === pg.entries.length ? C.elite : C.muted, on ? '#2a2210' : C.panel);
+    p.spots.push({ id: `page-${pg.id}`, ...r });
+    fit(p.text(r.x + r.w / 2, r.y + 15, t(pg.name), 13, on ? C.text : C.muted, { bold: true, origin: [0.5, 0.5] }), r.w - 10);
+    p.text(r.x + r.w / 2, r.y + 32, `${n}/${pg.entries.length}`, 11, C.muted, { origin: [0.5, 0.5] });
+  });
+  const page = SKILL_PAGES.find((pg) => pg.id === open) ?? SKILL_PAGES[0];
+  const cols = page.entries.length > 24 ? 3 : 2;
+  const rows = Math.ceil(page.entries.length / cols);
+  const col = SKILL_LIST.w / cols;
+  const row = Math.min(24, SKILL_LIST.h / rows);
+  page.entries.forEach((id, i) => {
+    const x = SKILL_LIST.x + Math.floor(i / rows) * col;
+    const y = SKILL_LIST.y + (i % rows) * row;
+    if (!known.has(id)) {
+      p.text(x + 6, y, '? ? ?', 13, '#3d4a66');
+      return;
+    }
+    const r = { x, y: y - 2, w: col - 8, h: row };
+    if (id === picked) p.frame(r, SKILLS_COLOR, '#2a2210');
+    p.spots.push({ id: `skill-${id}`, ...r });
+    fit(p.text(x + 6, y, skillName(id), 13, id === picked ? SKILLS_COLOR : C.text, { bold: true }), col - 20);
+  });
+  // The one picked, described.
+  const d = SKILL_DETAIL;
+  p.frame(d, SKILLS_COLOR, C.panel);
+  if (!picked || !known.has(picked)) {
+    p.text(d.x + d.w / 2, d.y + d.h / 2, t(known.size ? 'skillsPick' : 'skillsNone'), 14, C.muted, { origin: [0.5, 0.5], align: 'center', wrap: d.w - 40 });
+  } else {
+    const left = d.x + 16;
+    const wrap = d.w - 32;
+    let y = d.y + 12;
+    const line = (text: string, size: number, color: string, bold = false) => {
+      const o = p.text(left, y, text, size, color, { wrap, bold });
+      y += o.height + 4;
+    };
+    p.text(left, y, skillKind(picked), 11, SKILLS_COLOR, { bold: true });
+    y += 18;
+    line(skillName(picked), 19, C.text, true);
+    for (const [text, color] of skillLines(picked)) line(text, 12.5, color);
+  }
+  button(p, BACK, 'back', t('armouryBack'), SKILLS_COLOR);
+  p.text(VIEW.w / 2, BACK.y + BACK.h + 16, t('skillsHelp'), 12, C.muted, { origin: [0.5, 0] });
+  return p;
+}
+
+/** An overview entry's name. */
+function skillName(id: string) {
+  if (id.startsWith(BRANCH_PREFIX)) return t(BRANCHES[branchOf(id)].name);
+  if (id.startsWith(FUSION_PREFIX)) return t(FUSION_BY_ID[id.slice(FUSION_PREFIX.length)].name);
+  return t(UPGRADES[id].name);
+}
+
+/** An overview entry's kind line: whose path, which pool, gear, specialisation or fusion. */
+function skillKind(id: string) {
+  if (id.startsWith(BRANCH_PREFIX)) return t('branchKind');
+  if (id.startsWith(FUSION_PREFIX)) return t('fusionKind');
+  const def = UPGRADES[id];
+  if (def.kind === 'path') return t('skillsPathOf', { hero: t(HEROES[def.hero!].name).toUpperCase() });
+  return t(def.kind === 'pool' ? POOL_NAMES[def.pool!] : 'gearKind');
+}
+
+/** An overview entry's description and tiers, each with its colour. */
+function skillLines(id: string): [string, string][] {
+  const tier = (n: number, text: string): [string, string] => [t('skillsTier', { n, text }), C.text];
+  if (id.startsWith(BRANCH_PREFIX)) {
+    const b = BRANCHES[branchOf(id)];
+    return [[t('skillsBranchText'), C.muted], ...b.tiers.map((g, i) => tier(BASE_TIER + 1 + i, gainsText(g)))];
+  }
+  if (id.startsWith(FUSION_PREFIX)) {
+    const f = FUSION_BY_ID[id.slice(FUSION_PREFIX.length)];
+    return [
+      [t(f.blurb), C.muted],
+      [t('fusionNeeds', { a: t(UPGRADES[f.needs[0]].name), b: t(UPGRADES[f.needs[1]].name) }) + ` (${t('skillsFusionTier', { n: FUSION_NEEDS })})`, '#ff9de2'],
+      [t('fusionLocks', { names: f.locks.map((u) => t(UPGRADES[u].name)).join(', ') }), '#ffb86b'],
+      ...f.tiers.map((g, i) => tier(i + 1, gainsText(g))),
+    ];
+  }
+  const def = UPGRADES[id];
+  const branches = branchesOf(id).map((b) => t(BRANCHES[b].name)).join(', ');
+  return [[t(def.blurb), C.muted], ...def.tiers.map((k, i) => tier(i + 1, t(k))), [t('skillsBranchesOf', { names: branches }), '#ffe066']];
 }
 
 const ARMOURY_COLOR = '#ffb347';
