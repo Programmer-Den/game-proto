@@ -48,6 +48,7 @@ export default defineConfig({
     { name: 'augury', testDir: 'games/augury/e2e' },
     { name: 'mazewright', testDir: 'games/mazewright/e2e' },
     { name: 'stonemate', testDir: 'games/stonemate/e2e' },
+    { name: 'burrow-brigade', testDir: 'games/burrow-brigade/e2e' },
   ],
   webServer: {
     command: 'npm run dev -- --port 5173 --strictPort',

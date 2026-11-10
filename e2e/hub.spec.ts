@@ -29,10 +29,11 @@ const GAMES = [
   { name: 'Augury', path: '/games/augury/' },
   { name: 'Mazewright', path: '/games/mazewright/' },
   { name: 'Stonemate', path: '/games/stonemate/' },
+  { name: 'Burrow Brigade', path: '/games/burrow-brigade/' },
 ];
 
 // The games with a Watch AI mode (`?watch`, see shared/watch.ts); there is no hub link to it.
-const WATCH = ['/games/colonizer/', '/games/space-wars/', '/games/lane-brawl/', '/games/scrapyard-titans/'];
+const WATCH = ['/games/colonizer/', '/games/space-wars/', '/games/lane-brawl/', '/games/scrapyard-titans/', '/games/burrow-brigade/'];
 
 // Every page links a favicon that loads.
 async function expectFavicon(page: Page) {

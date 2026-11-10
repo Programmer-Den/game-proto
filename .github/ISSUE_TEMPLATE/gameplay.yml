@@ -34,10 +34,11 @@ body:
         - Augury
         - Mazewright
         - Stonemate
+        - Burrow Brigade
         - Hub page
         - Shared / all games
       # Preselect Shared, so a report never lands on a game by accident.
-      default: 26
+      default: 27
     validations:
       required: true
   - type: dropdown
