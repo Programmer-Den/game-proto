@@ -8,7 +8,7 @@
 import Phaser from 'phaser';
 import { BOOT_HEROES, HEROES, HERO_IDS, isCrew, isKnight, isLate, schemeOf, type HeroId, type HeroScheme } from '../game/heroes';
 import { C, beam, glow, outline, paint, shade, shape, type Ctx } from './glow';
-import { drawKnight } from './knights';
+import { bakeLateKnight, drawKnight } from './knights';
 import { bot, drawSquadHero, rebel } from './squad';
 import { bakeCrewAllies, drawCrewHero } from './crew';
 import { MASTERY_COLOURS } from '../game/mastery';
@@ -151,6 +151,7 @@ export function bakeLate(scene: Phaser.Scene, id: HeroId) {
   HEROES[id].schemes.forEach((sch, v) => bakeHero(scene, heroKey(id, v), id, HERO_SCALE, HERO_BOX, false, sch));
   boltTexture(scene, `rb-bolt-${id}`, schemeOf(id).bolt, 18, 4);
   if (isCrew(id)) bakeCrewAllies(scene, id, schemeOf(id));
+  if (isKnight(id)) bakeLateKnight(scene, id);
   // The portrait last: its key is what says the hero is painted.
   bakeHero(scene, portraitKey(id), id, 1, PORTRAIT_BOX, true);
 }

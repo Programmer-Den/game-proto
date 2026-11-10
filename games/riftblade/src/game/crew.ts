@@ -8,7 +8,8 @@
  * rules. Since then four more: Vesk Drayl (rockets, a Flamer and bounties), Rena Kask (twin cannons
  * that hit harder on the move, a ramming Trench Run and wingmates), Admiral Thessa Orn (a pistol
  * whose Study makes each kind of foe take more, a Blockade of bombs and fleet strikes) and Chief
- * Wikka (a slingshot, rolling Log Traps and a tribe that grows with the kills).
+ * Wikka (a slingshot, rolling Log Traps and a tribe that grows with the kills), and last Boss
+ * Gorbul (a spread blaster, Fortune from the credits he holds, and thugs hired with them).
  */
 import { t as tr } from '../i18n';
 import { HEROES, schemeOf } from './heroes';
@@ -37,6 +38,9 @@ export const RAM = { momentumMs: 2000, momentum: 0.5, bigMomentum: 0.75, ms: 350
 export const FLEET = { per: 10, step: 0.02, cap: 0.3, bigCap: 0.45, ring: 140, bombs: 8, moreBombs: 12, bombR: 60, bombDmg: 50, heal: 20, strikeR: 80, strikeDmg: 45, reach: 400 };
 /** Wikka's tribe and Log Traps. */
 export const TRIBE = { every: 50, fastEvery: 35, startCap: 2, cap: 3, bigCap: 5, hugeCap: 8, fireMs: 900, fastFireMs: 450, dmg: 8, bigDmg: 12, logs: 3, moreLogs: 4, mostLogs: 6, logSpeed: 320, logMs: 2200, longLogMs: 4400, logDmg: 45, logKnock: 160, stunMs: 300 };
+
+/** Boss Gorbul's Hired Guns and Belly Slam. */
+export const THUGS = { cost: 10, n: 3, moreN: 4, lordN: 6, ms: 10_000, longMs: 15_000, fireMs: 600, dmg: 9, slamR: 90, slam: 30, slamEvery: 6000, fastSlam: 3000, slamStunMs: 500, chestCredits: 25 };
 
 const color = (s: GameState) => schemeOf(s.hero!).bolt;
 
@@ -100,7 +104,7 @@ export function crewAttack(s: GameState, ms: number, rate: number) {
     if (gs >= 5 && p.shots % 4 === 0) rocket(s, a, dmg * 2, 50, 3);
     return;
   }
-  if (s.hero === 'thessa') {
+  if (s.hero === 'thessa' || s.hero === 'gorbul') {
     volley(s, p.x, p.y, a, hero.damage);
     return;
   }
@@ -198,6 +202,7 @@ export function crewSignature(s: GameState) {
     logTrap(s);
     return true;
   }
+  if (s.hero === 'gorbul') return hireGuns(s);
   cloak(s, rank(s, 'ghost') >= 1 ? CLOAK.longMs : CLOAK.ms);
   if (rank(s, 'ghost') >= 2) heal(s, CLOAK.heal);
   return true;
@@ -315,6 +320,38 @@ function logTrap(s: GameState) {
   }
 }
 
+/** Gorbul's Hired Guns: thugs for a while, paid from the run's credits; false (nothing spent) when he can't pay. */
+function hireGuns(s: GameState) {
+  const p = s.player;
+  const pay = rank(s, 'payroll');
+  const cost = pay >= 3 ? 0 : THUGS.cost;
+  if (s.credits < cost) return false;
+  if (cost > 0) {
+    s.credits -= cost;
+    pop(s, tr('hirePop', { n: cost }), '#ffd36b');
+  }
+  const n = cap(s, 'crime-lord') ? THUGS.lordN : pay >= 1 ? THUGS.moreN : THUGS.n;
+  const life = pay >= 4 ? THUGS.longMs : THUGS.ms;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    s.allies.push({ id: s.nextId++, kind: 'thug', x: p.x + Math.cos(a) * 40, y: p.y + Math.sin(a) * 40, cdMs: 200 + i * 80, lifeMs: life, slot: i, aim: a });
+  }
+  return true;
+}
+
+/** Gorbul's Belly Slam (Heavyweight 2): a shockwave round him. */
+function bellySlam(s: GameState) {
+  const p = s.player;
+  const stun = rank(s, 'heavyweight') >= 3;
+  near(s, p.x, p.y, THUGS.slamR, (e) => {
+    damage(s, e, THUGS.slam);
+    if (e.kind === 'boss') return;
+    knock(e, p.x, p.y, 180);
+    if (stun) e.stunMs = Math.max(e.stunMs, THUGS.slamStunMs);
+  });
+  s.blasts.push({ id: s.nextId++, x: p.x, y: p.y, r: THUGS.slamR, ms: 350, maxMs: 350, color: HEROES.gorbul.schemes[0].accent });
+}
+
 /** Vesk's Flamer, each tenth of a second while it burns: a cone of fire at the nearest foe. */
 function flame(s: GameState) {
   const p = s.player;
@@ -421,6 +458,14 @@ export function crewAbilities(s: GameState, ms: number) {
     }
     return;
   }
+  if (s.hero === 'gorbul') {
+    const hw = rank(s, 'heavyweight');
+    if (hw >= 2 && ready(s, 'slam', hw >= 5 ? THUGS.fastSlam : THUGS.slamEvery, ms)) {
+      if (nearest(s, p.x, p.y, 1, THUGS.slamR).length) bellySlam(s);
+      else s.cd.slam = 300;
+    }
+    return;
+  }
   if (s.hero === 'wikka') {
     if (s.allies.filter((a) => a.kind === 'tribesman').length < tribeSize(s)) syncAllies(s);
     // Stampede: logs roll on their own every 6 seconds.
@@ -516,6 +561,8 @@ export function crewKill(s: GameState, e: Enemy) {
     heal(s, bt >= 2 ? ROCKET.bigBountyHeal : ROCKET.bountyHeal);
     if (bt >= 5) gainXp(s, ROCKET.bountyXp, true);
     if (cap(s, 'big-game') && !s.arena && e.kind !== 'boss') s.pickups.push({ id: s.nextId++, kind: 'chest', x: e.x - 18, y: e.y + 6, heal: 0, value: 0 });
+  } else if (s.hero === 'gorbul' && e.kind !== 'boss') {
+    if (rank(s, 'bankroll') >= 2 && rand() < 0.04) s.pickups.push({ id: s.nextId++, kind: 'credits', x: e.x + 10, y: e.y, heal: 0, value: 2 });
   } else if (s.hero === 'thessa') {
     const study = (s.study ??= {});
     study[e.kind] = (study[e.kind] ?? 0) + (rank(s, 'tactician') >= 1 ? 2 : 1) * (e.elite && rank(s, 'tactician') >= 4 ? 10 : 1);
@@ -528,6 +575,11 @@ export function crewKill(s: GameState, e: Enemy) {
 
 /** A chest is opened: Dax's Luck lets every second one raise an upgrade of his choice; Jackpot raises one more. */
 export function crewChest(s: GameState, raiseOne: () => void) {
+  // Bankroll 5: Gorbul finds credits in every chest.
+  if (s.hero === 'gorbul' && rank(s, 'bankroll') >= 5) {
+    s.credits += THUGS.chestCredits;
+    pop(s, tr('plusCredits', { n: THUGS.chestCredits }), '#ffd36b');
+  }
   if (s.hero !== 'dax') return;
   if (cap(s, 'jackpot')) raiseOne();
   if (s.chests % 2 === 0) {
@@ -561,9 +613,10 @@ export function crewRescue(s: GameState) {
   return true;
 }
 
-/** Healing on a kill: Wild Heart 3 gives Grunda 1 health a kill below half health. */
+/** Healing on a kill: Wild Heart 3 gives Grunda 1 health a kill below half health, Golden Touch Gorbul 1 while he holds 100 credits. */
 export function crewKillHeal(s: GameState) {
   const p = s.player;
+  if (s.hero === 'gorbul') return cap(s, 'golden-touch') && s.credits >= 100 ? 1 : 0;
   return s.hero === 'grunda' && rank(s, 'wild-heart') >= 3 && p.hp < p.maxHp / 2 ? 1 : 0;
 }
 
@@ -632,6 +685,25 @@ export function moveCrewAlly(s: GameState, a: Ally, ms: number) {
       damage(s, e, TRIBE.logDmg * (rank(s, 'log-traps') >= 2 ? 1.5 : 1));
       if (e.kind !== 'boss') knock(e, a.x, a.y, TRIBE.logKnock);
     });
+    return;
+  }
+  if (a.kind === 'thug') {
+    // A hired gun: keeps near Gorbul in a ring and shoots the nearest foe, until his pay runs out.
+    a.lifeMs -= ms;
+    const pay = rank(s, 'payroll');
+    const n = Math.max(1, s.allies.filter((o) => o.kind === 'thug').length);
+    const ang = (a.slot * Math.PI * 2) / n + s.time / 5000;
+    a.x += (p.x + Math.cos(ang) * 56 - a.x) * Math.min(1, 5 * dt);
+    a.y += (p.y + Math.sin(ang) * 56 - a.y) * Math.min(1, 5 * dt);
+    if (a.cdMs > 0) return;
+    const t = nearest(s, a.x, a.y, 1, 300)[0];
+    if (!t) {
+      a.cdMs = 0;
+      return;
+    }
+    a.aim = Math.atan2(t.y - a.y, t.x - a.x);
+    bolt(s, a.x, a.y, a.aim, THUGS.dmg * (pay >= 2 ? 1.5 : 1), { pierce: 0, bounces: 0, color: 'gorbul', speed: 640, life: 480 });
+    a.cdMs = THUGS.fireMs * (pay >= 5 ? 0.5 : 1);
     return;
   }
   if (a.kind === 'wingman' || a.kind === 'tribesman') {

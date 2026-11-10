@@ -3,9 +3,10 @@
  * hunter with a crossbow), KT-4 "Kettle" (a small boxy droid with a zap prod), Cassia Vane (a
  * hooded spy with a long rifle), Vesk Drayl (bulky plates, a one-lens helmet and a rocket pod),
  * Rena Kask (a pilot on a hover board), Admiral Thessa Orn (a long coat and a peaked cap) and Chief
- * Wikka (small, under a leaf hood, with a slingshot), each from its scheme, and their allies'
- * textures: Dax's freighter, Kettle's repair drone, Cassia's spy drone, Rena's wingmates, Wikka's
- * tribe and his logs. Painted lazily, the first time one is shown
+ * Wikka (small, under a leaf hood, with a slingshot) and Boss Gorbul (huge, in a draped coat with
+ * a wide-mouthed blaster), each from its scheme, and their allies' textures: Dax's freighter,
+ * Kettle's repair drone, Cassia's spy drone, Rena's wingmates, Wikka's tribe and his logs, and
+ * Gorbul's thugs. Painted lazily, the first time one is shown
  * (`bakeLate` in `sprites.ts`), never at boot.
  */
 import type Phaser from 'phaser';
@@ -334,6 +335,53 @@ export function drawCrewHero(ctx: Ctx, id: HeroId, x: number, y: number, z: numb
     }
     return;
   }
+  if (id === 'gorbul') {
+    // Huge and round: a draped coat with a wide collar, a sash with a gem, a broad bald head with
+    // a heavy brow and small eyes, rings on his fingers and a wide-mouthed blaster.
+    shape(ctx, () => ctx.ellipse(x, y + 34, 38, 34, 0, 0, Math.PI * 2), sch.body, sch.accent, 10, z);
+    ctx.fillStyle = shade(sch.body, -0.25);
+    ctx.beginPath();
+    ctx.moveTo(x - 36, y + 30);
+    ctx.quadraticCurveTo(x, y + 80, x + 36, y + 30);
+    ctx.lineTo(x + 30, y + 62);
+    ctx.lineTo(x - 30, y + 62);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = mark;
+    ctx.fillRect(x - 34, y + 36, 68, 7);
+    ctx.save();
+    glow(ctx, sch.accent, 10, z);
+    ctx.fillStyle = sch.accent;
+    ctx.beginPath();
+    ctx.arc(x, y + 39, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    shape(ctx, () => ctx.ellipse(x, y + 4, 30, 10, 0, 0, Math.PI * 2), shade(sch.body, 0.15), sch.accent, 4, z);
+    shape(ctx, () => ctx.ellipse(x, y - 16, 22, 19, 0, 0, Math.PI * 2), '#b08a6c', sch.accent, 5, z);
+    ctx.fillStyle = shade('#b08a6c', -0.3);
+    ctx.fillRect(x - 15, y - 24, 30, 4);
+    ctx.fillStyle = C.ink;
+    ctx.fillRect(x - 9, y - 18, 4, 3);
+    ctx.fillRect(x + 6, y - 18, 4, 3);
+    ctx.fillRect(x - 6, y - 6, 14, 2);
+    // The blaster: a short body and a flared mouth; rings on his hand.
+    ctx.fillStyle = '#2c3140';
+    ctx.fillRect(x + 22, y + 22, 22, 9);
+    ctx.beginPath();
+    ctx.moveTo(x + 44, y + 20);
+    ctx.lineTo(x + 54, y + 16);
+    ctx.lineTo(x + 54, y + 37);
+    ctx.lineTo(x + 44, y + 33);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#ffd36b';
+    ctx.fillRect(x + 22, y + 31, 4, 3);
+    ctx.fillRect(x + 28, y + 31, 4, 3);
+    if (bolts) {
+      for (const dy of [-8, 0, 8]) beam(ctx, x + 58, y + 26 + dy * 0.3, x + 86, y + 26 + dy, sch.bolt, 3, 18, z);
+    }
+    return;
+  }
   // Cassia: a slim figure in a hooded cloak, a glowing visor slit and a long rifle.
   shape(ctx, () => {
     ctx.moveTo(x - 16, y - 2);
@@ -444,6 +492,17 @@ export function bakeCrewAllies(scene: Phaser.Scene, id: HeroId, sch: HeroScheme)
       ctx.fillStyle = sch.accent;
       ctx.fillRect(7, 10, 3, 3);
       ctx.fillRect(12, 10, 3, 3);
+    });
+  }
+  if (id === 'gorbul' && !scene.textures.exists('rb-thug')) {
+    paint(scene, 'rb-thug', 26, 32, (ctx) => {
+      // A hired gun: a stocky body, a flat cap and a short blaster.
+      shape(ctx, () => ctx.roundRect(5, 13, 16, 17, 5), sch.mark ?? sch.body, sch.accent, 4);
+      shape(ctx, () => ctx.arc(13, 9, 6, 0, Math.PI * 2), '#b08a6c', sch.accent, 3);
+      ctx.fillStyle = sch.body;
+      ctx.fillRect(6, 2, 15, 4);
+      ctx.fillStyle = '#2c3140';
+      ctx.fillRect(16, 18, 9, 4);
     });
   }
   if (id === 'wikka' && !scene.textures.exists('rb-log')) {

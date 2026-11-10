@@ -74,7 +74,7 @@ const ALLY_KEYS: Record<GameState['allies'][number]['kind'], string> = {
   trooper: 'rb-trooper', legionary: 'rb-legionary', brother: 'rb-brother', escort: 'rb-escort', drone: 'rb-drone',
   fighter: 'rb-fighter', squadron: 'rb-fighter', copilot: 'rb-copilot', spirit: 'rb-spirit', puppet: 'rb-puppet',
   commando: 'rb-commando', bike: 'rb-bike', medic: 'rb-medic', shieldbot: 'rb-shieldbot', command: 'rb-command', spare: 'rb-bot', thawed: 'rb-trooper',
-  freighter: 'rb-freighter', patch: 'rb-patch', spydrone: 'rb-spydrone', wingman: 'rb-wingman', tribesman: 'rb-tribesman', log: 'rb-log',
+  freighter: 'rb-freighter', patch: 'rb-patch', spydrone: 'rb-spydrone', wingman: 'rb-wingman', tribesman: 'rb-tribesman', log: 'rb-log', thug: 'rb-thug', guard: 'rb-guard',
 };
 /** Allies drawn from the hero art (small soldiers), placed by its origin. */
 const HERO_LIKE: readonly GameState['allies'][number]['kind'][] = ['trooper', 'legionary', 'brother', 'commando', 'medic', 'thawed'];
@@ -1326,7 +1326,7 @@ export class GameScene extends Phaser.Scene {
         if (a.lifeMs < 1500) im.setAlpha(0.4 + 0.6 * (a.lifeMs / 1500));
       }
       if (HERO_LIKE.includes(a.kind)) im.setOrigin(HERO_ORIGIN.x, HERO_ORIGIN.y).setFlipX(Math.cos(a.aim) < 0);
-      else if (a.kind === 'escort' || a.kind === 'command' || a.kind === 'tribesman') im.setFlipX(Math.cos(a.aim) < 0);
+      else if (a.kind === 'escort' || a.kind === 'command' || a.kind === 'tribesman' || a.kind === 'thug' || a.kind === 'guard') im.setFlipX(Math.cos(a.aim) < 0);
       else if (a.kind === 'bike') im.setRotation(a.aim);
       else if (a.kind === 'shieldbot') im.setRotation(still ? 0 : s.time / 120);
       else if (a.kind === 'spare') {
@@ -1595,6 +1595,12 @@ export class GameScene extends Phaser.Scene {
     const apex = s.capstones.includes('apex-predator');
     for (const e of s.enemies) {
       if (e.gripMs > 0) o.lineStyle(2, blade, 0.8).strokeCircle(e.x, e.y - 12, e.r + 6);
+      // Mother Ysolde's curse: a dashed ring that turns.
+      if (e.hexMs! > 0 && e.hp > 0) {
+        const r = e.r + 7;
+        const turn = settings.reduceMotion ? 0 : s.time / 600;
+        for (let i = 0; i < 6; i++) o.lineStyle(2, blade, 0.85).beginPath().arc(e.x, e.y, r, turn + (i * Math.PI) / 3, turn + (i * Math.PI) / 3 + 0.6).strokePath();
+      }
       if (e.id === s.mark || (apex && (e.elite || e.kind === 'boss'))) {
         // The Hunt's mark: a ring with four ticks, in Kresh's violet.
         const r = e.r + 10;
@@ -1604,6 +1610,11 @@ export class GameScene extends Phaser.Scene {
           o.lineBetween(e.x + Math.cos(a) * (r + 3), e.y + Math.sin(a) * (r + 3), e.x + Math.cos(a) * (r + 9), e.y + Math.sin(a) * (r + 9));
         }
       }
+    }
+    if (s.hero === 'krull' && p.sigActiveMs > 0) {
+      // General Krull's Shield Wall.
+      o.lineStyle(10, blade, 0.16).strokeCircle(p.x, p.y, p.r + 22);
+      o.lineStyle(3, blade, 0.85).strokeCircle(p.x, p.y, p.r + 22);
     }
     if (p.barrier > 0) {
       o.lineStyle(6, blade, 0.12).strokeCircle(p.x, p.y, 27);

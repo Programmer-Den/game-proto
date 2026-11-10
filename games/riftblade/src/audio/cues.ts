@@ -12,6 +12,7 @@ const SIGNATURE: Record<HeroId, SfxName> = {
   corvin: 'sigRing', veyl: 'sigStorm', kresh: 'sigDash', joren: 'sigSlam', elara: 'sigFlare', triad: 'sigShift',
   dax: 'sigHorn', grunda: 'sigForce', kettle: 'sigStorm', cassia: 'sigShift',
   vesk: 'sigFlare', rena: 'sigDash', thessa: 'sigHorn', wikka: 'sigToss',
+  gorbul: 'sigHorn', sable: 'sigForce', krull: 'sigRing', ysolde: 'sigStorm',
 };
 
 /** The sound of a hero-side bolt, by its colour (a hero's own colour is that hero's weapon). */
@@ -28,6 +29,7 @@ function boltSound(color: BoltColor, spin: boolean): SfxName {
     case 'grunda': return 'heavy';
     case 'cassia': return 'carbine';
     case 'rena': return 'blaster';
+    case 'gorbul': return 'spread';
     default: return 'pistol';
   }
 }

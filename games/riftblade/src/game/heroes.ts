@@ -1,7 +1,8 @@
 /**
  * The heroes a run can start with: three blaster soldiers, seven blade knights of the Current or
- * the Hollow, two more blaster heroes (Elara Voss and Triad-77) and the crew (Dax Morrow, Grunda,
- * KT-4 "Kettle" and Cassia Vane). Only Legionary TR-9 is open
+ * the Hollow, two more blaster heroes (Elara Voss and Triad-77), the crew (Dax Morrow, Grunda,
+ * KT-4 "Kettle", Cassia Vane, Vesk Drayl, Rena Kask, Admiral Thessa Orn, Chief Wikka and Boss
+ * Gorbul) and three later knights (Sable Rhee, General Krull and Mother Ysolde). Only Legionary TR-9 is open
  * from the start; every other hero is unlocked by a deed. Their weapons, signature moves,
  * pools and colours. Names and texts are keys of `i18n/en.ts`, shown with `t`.
  */
@@ -9,11 +10,13 @@ import type { TextKey } from '../i18n';
 
 export type HeroId =
   | 'rook' | 'tr9' | 'bram' | 'kael' | 'vharn' | 'oom' | 'corvin' | 'veyl' | 'kresh' | 'joren' | 'elara' | 'triad'
-  | 'dax' | 'grunda' | 'kettle' | 'cassia' | 'vesk' | 'rena' | 'thessa' | 'wikka';
+  | 'dax' | 'grunda' | 'kettle' | 'cassia' | 'vesk' | 'rena' | 'thessa' | 'wikka'
+  | 'gorbul' | 'sable' | 'krull' | 'ysolde';
 /** The order of the hero select screen. */
 export const HERO_IDS: readonly HeroId[] = [
   'rook', 'tr9', 'bram', 'kael', 'vharn', 'oom', 'corvin', 'veyl', 'kresh', 'joren', 'elara', 'triad',
   'dax', 'grunda', 'kettle', 'cassia', 'vesk', 'rena', 'thessa', 'wikka',
+  'gorbul', 'sable', 'krull', 'ysolde',
 ];
 /**
  * The first twelve heroes are painted at boot; the ones after them only when first shown (see
@@ -31,7 +34,7 @@ export const isLate = (id: HeroId) => HERO_IDS.indexOf(id) >= BOOT_HEROES;
  */
 export type AimMode =
   | 'nearest-two' | 'nearest' | 'triad' | 'zap'
-  | 'slash' | 'throw' | 'ripple' | 'spin' | 'chain' | 'orbit' | 'flurry';
+  | 'slash' | 'throw' | 'ripple' | 'spin' | 'chain' | 'orbit' | 'flurry' | 'sweep' | 'cleave' | 'hex';
 
 /** A weapon class and a side, each with a pool of skills its heroes draw cards from. */
 export type PoolId = 'blaster' | 'blade' | 'current' | 'hollow';
@@ -576,6 +579,104 @@ export const HEROES: Record<HeroId, HeroDef> = {
     blurb: 'wikkaBlurb',
     pathKind: 'wikkaPathKind',
     crew: true,
+    locked: true,
+  },
+  gorbul: {
+    id: 'gorbul',
+    name: 'gorbulName',
+    short: 'gorbulShort',
+    weapon: 'gorbulWeapon',
+    pools: ['blaster'],
+    schemes: [{ name: 'Clay', body: '#7a5c48', accent: '#7fd1c7', mark: '#4a3628', bolt: '#b8f0e8' }],
+    r: 18,
+    armour: 0.15,
+    maxHp: 260,
+    speed: 135,
+    aim: 'nearest',
+    fireMs: 620,
+    pellets: 3,
+    spread: 0.16,
+    jitter: 0.03,
+    damage: 9,
+    boltSpeed: 640,
+    range: 300,
+    signature: { name: 'gorbulSignature', text: 'gorbulSignatureText', cooldownMs: 14_000 },
+    paths: ['payroll', 'bankroll', 'heavyweight'],
+    blurb: 'gorbulBlurb',
+    pathKind: 'gorbulPathKind',
+    crew: true,
+    locked: true,
+  },
+  sable: {
+    id: 'sable',
+    name: 'sableName',
+    short: 'sableShort',
+    weapon: 'sableWeapon',
+    pools: ['blade'],
+    schemes: [{ name: 'Drab', body: '#5e6b4a', accent: '#ff9f68', mark: '#3a4230', bolt: '#ffb38a' }],
+    maxHp: 180,
+    armour: 0.1,
+    speed: 165,
+    aim: 'sweep',
+    fireMs: 420,
+    pellets: 1,
+    spread: 0,
+    jitter: 0,
+    damage: 17,
+    boltSpeed: 520,
+    range: 82,
+    signature: { name: 'sableSignature', text: 'sableSignatureText', cooldownMs: 11_000 },
+    paths: ['awakening', 'scrapper', 'steadfast'],
+    blurb: 'sableBlurb',
+    pathKind: 'sablePathKind',
+    locked: true,
+  },
+  krull: {
+    id: 'krull',
+    name: 'krullName',
+    short: 'krullShort',
+    weapon: 'krullWeapon',
+    pools: ['blade', 'hollow'],
+    schemes: [{ name: 'Oxblood', body: '#6e3b3b', accent: '#e8d27a', mark: '#3a1f1f', bolt: '#ffe9a0' }],
+    r: 15,
+    maxHp: 210,
+    armour: 0.1,
+    speed: 130,
+    aim: 'cleave',
+    fireMs: 900,
+    pellets: 1,
+    spread: 0,
+    jitter: 0,
+    damage: 28,
+    boltSpeed: 520,
+    range: 96,
+    signature: { name: 'krullSignature', text: 'krullSignatureText', cooldownMs: 15_000 },
+    paths: ['warlord', 'iron-legion', 'shield-wall'],
+    blurb: 'krullBlurb',
+    pathKind: 'krullPathKind',
+    locked: true,
+  },
+  ysolde: {
+    id: 'ysolde',
+    name: 'ysoldeName',
+    short: 'ysoldeShort',
+    weapon: 'ysoldeWeapon',
+    pools: ['blade', 'hollow'],
+    schemes: [{ name: 'Fen', body: '#2e4a3f', accent: '#d98fb0', mark: '#1c2e27', bolt: '#f2b8d0' }],
+    maxHp: 120,
+    speed: 150,
+    aim: 'hex',
+    fireMs: 650,
+    pellets: 1,
+    spread: 0,
+    jitter: 0,
+    damage: 4,
+    boltSpeed: 520,
+    range: 200,
+    signature: { name: 'ysoldeSignature', text: 'ysoldeSignatureText', cooldownMs: 14_000 },
+    paths: ['blood-rites', 'coven', 'mist-veil'],
+    blurb: 'ysoldeBlurb',
+    pathKind: 'ysoldePathKind',
     locked: true,
   },
 };
