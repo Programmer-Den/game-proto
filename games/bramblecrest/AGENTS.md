@@ -112,7 +112,7 @@ Implemented today:
   the Brinewyrm), storm gulls (they fly, circle and swoop at the knight at `GULL_SWOOP_SPEED` every
   `GULL_SWOOP_MS`; a bump or a gust ends the swoop), slugs, moths (they fly over water and pits), thornlings (they
   stand still and spit seeds), frogs (they sit, then leap at the knight), shades (they fly like
-  moths but fade out beyond `SHADE_SEEN_PX` of the knight), shelled beetles and lantern moths. The last two are `ARMOURED`: the sword only hurts them while `down`. The hookvine
+  moths but fade out beyond `SHADE_SEEN_PX` of the knight), shelled beetles and lantern moths. The last two are `ARMOURED`: the sword only hurts them while `down`, so `enterMap` leaves them out until the knight has the hookvine (chapter one's woods and shrine hall would otherwise hold foes the sword can't beat). The hookvine
   or a burst calls `knockDown` (`DOWN_MS`; a beetle shows `beetle-back`, a lantern moth lands), and
   until then a swing on a beetle only goes `tink` and a lantern moth, flying `LANTERN_LIFT` up, is
   out of reach. Beetles walk like slugs; lantern moths keep `LANTERN_KEEP` from the knight, circle
