@@ -12,7 +12,7 @@ const en: HowToPlay = {
     { input: 'H, U', action: 'Use a hint, undo a move' },
   ],
   loop: [
-    'Pick a mode card on the menu: Journey, Endless Medley, Daily Five, Blitz, Draft Run, Weekly League, Pass and Play or Practice.',
+    'Pick a mode card on the menu: Journey, Endless Medley, Daily Five, Blitz, Draft Run, Weekly League, Pass and Play, Practice or Solo Run.',
     'Each puzzle shows its rule under its name; solve it before its clock runs out.',
     'A solved puzzle scores points for its level and the time left, more on a streak.',
     'A lost, skipped or timed-out puzzle costs a heart in Endless and Draft, or time in Blitz.',
@@ -20,6 +20,7 @@ const en: HowToPlay = {
   ],
   tips: [
     'Practice any puzzle with no clock first, and its hints are free.',
+    'Solo Run plays only the puzzle you pick, its level rising every three puzzles until your hearts run out; each puzzle keeps its own best score.',
     'In a Draft Run every third solve offers a relic: a hint, a heart, more time, more cards to choose from, or a charm that helps one kind of puzzle.',
     'Before your first move, tempt the omen in the top bar for double points: half the time, no undo or hints, or two hearts for a loss.',
     'Every fifth puzzle of Endless and Draft is a boss: two puzzles on one clock, for double points and a relic.',
@@ -43,7 +44,7 @@ const de: HowToPlay = {
     { input: 'H, U', action: 'Einen Tipp nutzen, einen Zug zurücknehmen' },
   ],
   loop: [
-    'Wähle im Menü eine Modus-Karte: Reise, Endlose Mischung, Tagesfünf, Blitz, Kartenwahl, Wochenliga, Weitergeben oder Üben.',
+    'Wähle im Menü eine Modus-Karte: Reise, Endlose Mischung, Tagesfünf, Blitz, Kartenwahl, Wochenliga, Weitergeben, Üben oder Solo-Lauf.',
     'Jedes Rätsel zeigt seine Regel unter seinem Namen; löse es, bevor seine Uhr abläuft.',
     'Ein gelöstes Rätsel bringt Punkte für seine Stufe und die übrige Zeit, mehr in einer Serie.',
     'Ein verlorenes, übersprungenes oder abgelaufenes Rätsel kostet ein Herz in Endlos und Kartenwahl oder Zeit im Blitz.',
@@ -51,6 +52,7 @@ const de: HowToPlay = {
   ],
   tips: [
     'Übe jedes Rätsel zuerst ohne Uhr, dort sind die Tipps frei.',
+    'Der Solo-Lauf spielt nur das Rätsel deiner Wahl, alle drei Rätsel eine Stufe höher, bis deine Herzen verbraucht sind; jedes Rätsel hat seinen eigenen Bestwert.',
     'In der Kartenwahl bietet jedes dritte gelöste Rätsel ein Relikt: einen Tipp, ein Herz, mehr Zeit, mehr Karten zur Wahl oder einen Talisman, der einer Rätselart hilft.',
     'Wage vor deinem ersten Zug das Omen oben für doppelte Punkte: halbe Zeit, kein Zurücknehmen und keine Tipps, oder zwei Herzen für einen Verlust.',
     'Jedes fünfte Rätsel in der Endlosen Mischung und der Kartenwahl ist ein Boss: zwei Rätsel auf einer Uhr, für doppelte Punkte und ein Relikt.',

@@ -25,8 +25,8 @@ export type Layout = {
   tools: { xs: number[]; y: number; w: number; h: number };
   /** The side panel: its list of cards (top-left), the score box, anchored at its bottom, and the daily five's ghost (top-left). */
   side: { list: Rect; score: { x: number; w: number; bottom: number }; ghost: Rect };
-  /** The menu: the title, the mode cards (by their centres, as many across as `xs` has) and the
-   * Records button. */
+  /** The menu: the title, the mode cards (by their centres, as many across as `xs` has, a short
+   * last row centred) and the Records button. */
   menu: {
     title: Point;
     tagline: Point & { w: number };
@@ -69,7 +69,7 @@ export const WIDE: Layout = {
   menu: {
     title: { x: 480, y: 64 },
     tagline: { x: 480, y: 108, w: 860 },
-    cards: { xs: [126, 362, 598, 834], ys: [218, 386], w: 222, h: 160, dy: { numeral: -64, icon: -32, name: 6, text: 36, best: 66 } },
+    cards: { xs: [104, 292, 480, 668, 856], ys: [218, 386], w: 180, h: 160, dy: { numeral: -64, icon: -32, name: 6, text: 36, best: 66 } },
     records: { x: 480, y: 494, w: 180, h: 36 },
     resume: { x: 365, y: 494, w: 270, h: 36 },
     recordsAside: { x: 605, y: 494, w: 180, h: 36 },

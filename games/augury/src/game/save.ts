@@ -22,6 +22,7 @@ export function loadProgress(): Progress {
       p.kinds[k].solved = count(rec.solved);
       p.kinds[k].lost = count(rec.lost);
       if (Array.isArray(rec.best)) p.kinds[k].best = LEVELS.map((l) => count(rec.best[l]));
+      p.solo[k] = count(saved.solo?.[k]);
       p.trials[k] = Math.min(MAX_MASTERY, count(saved.trials?.[k]));
     }
     if (Array.isArray(saved.ghost)) p.ghost = saved.ghost.filter(Array.isArray).slice(0, 5).map((m: unknown[]) => [count(m[0]), count(m[1])] as [number, number]);

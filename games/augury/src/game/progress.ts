@@ -19,6 +19,8 @@ export interface Progress {
   weekly: { week: number; best: number } | null;
   /** The journey: the stars each step holds, 0 to 3. */
   journey: number[];
+  /** The best Solo Run score per kind (0 for none yet). */
+  solo: Record<KindId, number>;
   /** The highest Practice trial cleared per kind (0 for none), up to its mastery. */
   trials: Record<KindId, number>;
   /** The daily five that set the best score, as [time into the run, score] after each card: the ghost the next one races. */
@@ -47,6 +49,7 @@ export function newProgress(): Progress {
     daily: null,
     weekly: null,
     journey: Array(NODES).fill(0),
+    solo: Object.fromEntries(KINDS.map((k) => [k, 0])) as Record<KindId, number>,
     trials: Object.fromEntries(KINDS.map((k) => [k, 0])) as Record<KindId, number>,
     ghost: [],
     runs: 0,
