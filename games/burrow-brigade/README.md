@@ -35,7 +35,7 @@ last team with a mole standing wins. Play the Burrow AI or a friend on one scree
 | Close | Paw Swipe (unlimited), Ground Pound, Burrow (dig a tunnel, unlimited), Sunbeam (a straight beam through everything) |
 | Tools | Tunnel Hop (dive and pop up elsewhere), Shield Bubble, Repair Kit, Skip Turn |
 
-![A Balloon Drop and a swarm of bees](docs/screenshots/balloon-and-bees.webp)
+![A Balloon Drop and a swarm of bees](docs/screenshots/swarm.webp)
 
 ## Difficulty
 
