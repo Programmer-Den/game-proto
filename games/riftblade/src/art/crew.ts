@@ -1,6 +1,6 @@
 /**
  * The crew's art: Dax Morrow (a smuggler in a vest with a heavy pistol), Grunda (a big furred
- * hunter with a crossbow), KT-4 "Kettle" (a small domed droid with a zap prod) and Cassia Vane (a
+ * hunter with a crossbow), KT-4 "Kettle" (a small boxy droid with a zap prod) and Cassia Vane (a
  * hooded spy with a long rifle), each from its scheme, and their allies' textures: Dax's freighter,
  * Kettle's repair drone and Cassia's spy drone. Painted lazily, the first time one is shown
  * (`bakeLate` in `sprites.ts`), never at boot.
@@ -65,7 +65,7 @@ export function drawCrewHero(ctx: Ctx, id: HeroId, x: number, y: number, z: numb
     return;
   }
   if (id === 'grunda') {
-    // A head taller than the rest: a shaggy body, a bandolier, a long face with dark eyes.
+    // A head taller than the rest: a shaggy body, a belt and shoulder guard, a long face with dark eyes.
     const fur = sch.body;
     shape(ctx, () => ctx.roundRect(x - 28, y - 4, 56, 70, 22), fur, sch.accent, 6, z);
     ctx.fillStyle = shade(fur, -0.2);
@@ -77,14 +77,12 @@ export function drawCrewHero(ctx: Ctx, id: HeroId, x: number, y: number, z: numb
       ctx.lineTo(fx + 8, y + 60);
       ctx.fill();
     }
-    ctx.strokeStyle = mark;
-    ctx.lineWidth = 7;
-    ctx.beginPath();
-    ctx.moveTo(x - 24, y + 4);
-    ctx.lineTo(x + 22, y + 52);
-    ctx.stroke();
+    // A wide belt with a buckle, and a shoulder guard.
+    ctx.fillStyle = mark;
+    ctx.fillRect(x - 28, y + 40, 56, 8);
     ctx.fillStyle = sch.accent;
-    for (let i = 0; i < 4; i++) ctx.fillRect(x - 16 + i * 10, y + 9 + i * 10.5, 5, 6);
+    ctx.fillRect(x - 5, y + 39, 10, 10);
+    shape(ctx, () => ctx.roundRect(x - 32, y - 2, 22, 14, 6), mark, sch.accent, 4, z);
     shape(ctx, () => ctx.roundRect(x - 19, y - 42, 38, 42, 16), fur, sch.accent, 6, z);
     ctx.fillStyle = shade(fur, 0.2);
     ctx.beginPath();
@@ -113,31 +111,39 @@ export function drawCrewHero(ctx: Ctx, id: HeroId, x: number, y: number, z: numb
     return;
   }
   if (id === 'kettle') {
-    // Small: a white barrel body with a blue dome, one big lens, stubby legs and a prod arm.
+    // Small and boxy: a squat brass body on three short legs, a flat-topped head with a visor slit
+    // and two antennae, and a prod arm.
     ctx.fillStyle = shade(sch.body, -0.45);
-    ctx.fillRect(x - 20, y + 46, 10, 18);
-    ctx.fillRect(x + 10, y + 46, 10, 18);
-    shape(ctx, () => ctx.roundRect(x - 20, y + 4, 40, 48, 8), sch.body, sch.accent, 8, z);
-    ctx.fillStyle = sch.accent;
-    ctx.fillRect(x - 20, y + 18, 40, 6);
-    ctx.fillRect(x - 12, y + 30, 8, 14);
+    ctx.fillRect(x - 18, y + 48, 8, 16);
+    ctx.fillRect(x - 4, y + 50, 8, 14);
+    ctx.fillRect(x + 10, y + 48, 8, 16);
+    shape(ctx, () => ctx.roundRect(x - 22, y + 14, 44, 38, 5), sch.body, sch.accent, 8, z);
     ctx.fillStyle = mark;
-    ctx.fillRect(x + 2, y + 30, 12, 4);
-    ctx.fillRect(x + 2, y + 38, 12, 4);
-    shape(ctx, () => {
-      ctx.arc(x, y + 6, 20, Math.PI, 0);
-      ctx.closePath();
-    }, sch.accent, sch.accent, 6, z);
-    ctx.fillStyle = sch.body;
-    ctx.fillRect(x - 14, y - 6, 28, 3);
-    shape(ctx, () => ctx.arc(x + 6, y - 2, 6, 0, Math.PI * 2), C.ink, sch.bolt, 8, z);
-    ctx.fillStyle = sch.bolt;
+    ctx.fillRect(x - 22, y + 26, 44, 5);
+    ctx.fillStyle = shade(sch.body, 0.25);
+    for (let i = 0; i < 3; i++) ctx.fillRect(x - 14 + i * 10, y + 36, 6, 8);
+    shape(ctx, () => ctx.roundRect(x - 15, y - 12, 30, 24, 4), shade(sch.body, 0.1), sch.accent, 6, z);
+    ctx.fillStyle = C.ink;
+    ctx.fillRect(x - 11, y - 4, 22, 7);
+    ctx.save();
+    glow(ctx, sch.accent, 10, z);
+    ctx.fillStyle = sch.accent;
+    ctx.fillRect(x - 2, y - 3, 10, 5);
+    ctx.restore();
+    ctx.strokeStyle = mark;
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(x + 7, y - 3, 2.5, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.moveTo(x - 9, y - 12);
+    ctx.lineTo(x - 13, y - 24);
+    ctx.moveTo(x + 9, y - 12);
+    ctx.lineTo(x + 11, y - 22);
+    ctx.stroke();
+    ctx.fillStyle = sch.accent;
+    ctx.fillRect(x - 15, y - 27, 4, 4);
+    ctx.fillRect(x + 9, y - 25, 4, 4);
     // The prod: a thin arm with a forked, sparking tip.
     ctx.fillStyle = '#8a93a6';
-    ctx.fillRect(x + 18, y + 26, 26, 4);
+    ctx.fillRect(x + 20, y + 26, 24, 4);
     ctx.fillRect(x + 42, y + 21, 3, 14);
     ctx.fillRect(x + 42, y + 21, 8, 3);
     ctx.fillRect(x + 42, y + 32, 8, 3);
@@ -192,20 +198,22 @@ export function drawCrewHero(ctx: Ctx, id: HeroId, x: number, y: number, z: numb
 /** Paints the crew's allies: the freighter (pointing right), the repair drone and the spy drone. */
 export function bakeCrewAllies(scene: Phaser.Scene, id: HeroId, sch: HeroScheme) {
   if (id === 'dax' && !scene.textures.exists('rb-freighter')) {
-    paint(scene, 'rb-freighter', 76, 56, (ctx) => {
-      // A round-nosed freighter seen from above, its cockpit off to one side.
-      shape(ctx, () => ctx.ellipse(34, 28, 26, 22, 0, 0, Math.PI * 2), '#b8b4a8', sch.accent, 10);
-      ctx.fillStyle = '#8a867c';
-      ctx.fillRect(48, 18, 22, 6);
-      ctx.fillRect(48, 32, 22, 6);
-      shape(ctx, () => ctx.roundRect(54, 6, 16, 10, 4), '#d6d2c6', sch.accent, 4);
+    paint(scene, 'rb-freighter', 76, 48, (ctx) => {
+      // A boxy hauler seen from above, pointing right: a long cargo hull, a narrow cab at the
+      // front and two engine pods at the back.
+      shape(ctx, () => ctx.roundRect(14, 14, 44, 20, 4), '#6f7a72', sch.accent, 10);
+      ctx.fillStyle = '#56605a';
+      for (let i = 0; i < 3; i++) ctx.fillRect(20 + i * 12, 17, 8, 14);
+      shape(ctx, () => ctx.roundRect(56, 18, 14, 12, 5), '#8a958c', sch.accent, 4);
       ctx.fillStyle = C.ink;
-      ctx.fillRect(64, 8, 5, 6);
-      outline(ctx, () => ctx.arc(34, 28, 10, 0, Math.PI * 2), shade('#b8b4a8', -0.3), 2, 0);
+      ctx.fillRect(64, 20, 4, 8);
+      shape(ctx, () => ctx.roundRect(8, 4, 20, 9, 3), '#56605a', sch.accent, 4);
+      shape(ctx, () => ctx.roundRect(8, 35, 20, 9, 3), '#56605a', sch.accent, 4);
       ctx.save();
-      glow(ctx, '#7fdfff', 10);
-      ctx.fillStyle = '#7fdfff';
-      ctx.fillRect(6, 22, 4, 12);
+      glow(ctx, sch.bolt, 10);
+      ctx.fillStyle = sch.bolt;
+      ctx.fillRect(4, 6, 4, 5);
+      ctx.fillRect(4, 37, 4, 5);
       ctx.restore();
     });
   }
