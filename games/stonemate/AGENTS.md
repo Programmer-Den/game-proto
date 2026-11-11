@@ -75,7 +75,10 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
   on the sprites (`playCapture` or `playMove`, plus the rook when castling), then `pos.make`, then
   `syncPieces()` puts fresh sprites on the board from the position. `busy` holds input while a move
   plays or the AI thinks. After a move: the result is checked, the game saved, and `maybeAi()`
-  schedules the AI. Once a game ends (`finish` has counted it in the stats), `undo` refuses, and
+  schedules the AI. A game that ends is counted (`record`: stats, trophies, the save removed) as
+  soon as its last move is made, before the mate scene, so leaving for the menu during that scene
+  can't skip it; the result box (`showResult`) follows the scene. Once a game against the AI has
+  ended, `undo` refuses (two players may still take back the last move), and
   the result box's New game plays the menu's level, or the highest open one if the arrows rest on a
   locked level. Reduce motion also holds the Upset! tremble and the rune duel's knot still.
 - Buttons are `button(id, ...)`: an interactive rectangle with its text, recorded in `buttons[id]`
