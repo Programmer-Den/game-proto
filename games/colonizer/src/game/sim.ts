@@ -1465,7 +1465,14 @@ function updateAssault(s: GameState) {
     for (const u of attackers) if (!ids.includes(u.id)) ids.push(u.id);
     const alive = ids.map((id) => s.units.get(id)).filter((u): u is Unit => !!u && u.hp > 0);
     if (alive.some((u) => near(u, ASSAULT_CLEAR))) continue;
-    if ((ids.length - alive.length) * 2 >= ids.length) p.deeds.raid = true;
+    // One that went back aboard a transport has left, not fallen.
+    const aboard = new Set<number>();
+    for (const u of s.units.values()) for (const c of u.cargo) aboard.add(c.id);
+    const fell = ids.filter((id) => {
+      const u = s.units.get(id);
+      return u ? u.hp <= 0 : !aboard.has(id);
+    }).length;
+    if (fell * 2 >= ids.length) p.deeds.raid = true;
     s.assault[p.id] = null;
   }
 }
