@@ -18,6 +18,7 @@ const en: HowToPlay = {
     'After you fire you have 3 seconds to scramble away from your own blast.',
     'Then the other team’s next mole takes its turn.',
     'The Campaign is eight battles against rival burrows, each with its own habit. Win one to open the next, and earn up to three stars: the win, a quick win and losing no mole.',
+    'The Daily range is one try a day, the same for everyone: five shots at four straw moles. Every point of damage counts, and each one knocked out adds 25.',
     'Campaign battles pay acorns. Spend them at the Quartermaster on helmets, longer turns, extra weapons, more crates and a new recruit.',
   ],
   tips: [
@@ -48,6 +49,7 @@ const de: HowToPlay = {
     'Nach dem Schuss hast du 3 Sekunden, um vor deiner eigenen Explosion zu fliehen.',
     'Dann ist der nächste Maulwurf des anderen Teams dran.',
     'Der Feldzug sind acht Schlachten gegen rivalisierende Baue, jeder mit seiner Eigenart. Gewinne eine, um die nächste zu öffnen, und hol bis zu drei Sterne: den Sieg, einen schnellen Sieg und keinen verlorenen Maulwurf.',
+    'Das Tagesziel ist ein Versuch am Tag, für alle gleich: fünf Schüsse auf vier Strohmaulwürfe. Jeder Schadenspunkt zählt, und jeder umgeworfene bringt 25 dazu.',
     'Schlachten im Feldzug bringen Eicheln. Gib sie beim Quartiermeister für Helme, längere Züge, Extrawaffen, mehr Kisten und einen neuen Rekruten aus.',
   ],
   tips: [

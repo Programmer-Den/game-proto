@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { playMusic, playSting, ui } from '../../../../shared/audio';
+import { dailyRand, finishDaily, loadDaily, startDaily, type DailyRecord } from '../../../../shared/daily';
 import { viewSize } from '../../../../shared/scaling';
 import { byDifficulty, settings } from '../../../../shared/settings';
 import { award } from '../../../../shared/trophies';
@@ -41,6 +42,11 @@ const SUDDEN_DEATH_TURN = 24;
 const BOLT_CLOUD = 96;
 /** The left team panel starts right of the corner buttons (full screen and pause). */
 const LEFT_PANEL = 104;
+/** The daily range: shots you get, straw moles to knock over, and the bonus for each one out. */
+const DAILY_SHOTS = 5;
+const DAILY_TARGETS = 4;
+const DAILY_KO = 25;
+const GAME = 'burrow-brigade';
 const FONT = '"Trebuchet MS", "Segoe UI", system-ui, sans-serif';
 const hex = (n: number) => '#' + n.toString(16).padStart(6, '0');
 const C = {
@@ -67,7 +73,7 @@ export class GameScene extends Phaser.Scene {
   terrain!: Terrain;
   theme!: Theme;
   teams: Team[] = [];
-  mode: 'ai' | 'duo' | 'watch' = 'ai';
+  mode: 'ai' | 'duo' | 'watch' | 'daily' = 'ai';
   turn = 0;
   turns = 0;
   active: Mole | null = null;
@@ -90,6 +96,11 @@ export class GameScene extends Phaser.Scene {
   private suddenDeath = SUDDEN_DEATH_TURN;
   /** The Quartermaster's upgrades for your side in this match (none outside the campaign). */
   private boost = boosts({});
+  /** Damage each mole dealt to enemies this match, for the match report. */
+  private dealt = new Map<Mole, number>();
+  /** The daily range's winds, one a shot, from today's seed; and the record once it ends. */
+  private dailyWinds: number[] = [];
+  private daily: DailyRecord | null = null;
   private walkTarget: number | null = null;
   private walkTimer = 0;
   private hold = { left: false, right: false };
@@ -168,6 +179,7 @@ export class GameScene extends Phaser.Scene {
       battle: this.battle,
       stars: this.campaign.stars.slice(),
       acorns: this.campaign.acorns,
+      dailyScore: this.daily?.score ?? null,
       view: { w: this.W, h: this.H },
     };
   }
@@ -261,14 +273,19 @@ export class GameScene extends Phaser.Scene {
     this.uiObjs.push(this.add.text(cx, top + 98, t('tagline'), { fontFamily: FONT, fontSize: '15px', color: hex(C.dim), align: 'center', wordWrap: { width: 380 } }).setOrigin(0.5).setDepth(151));
     this.button('play-ai', cx, top + 158, 300, 46, t('playAi'), () => this.startMatch('ai'), true);
     this.button('campaign', cx, top + 210, 300, 46, t('campaign'), () => this.showCampaign(), true);
-    this.button('play-duo', cx, top + 262, 300, 46, t('playDuo'), () => this.startMatch('duo'));
+    this.button('play-duo', cx - 77, top + 262, 146, 46, t('playDuo'), () => this.startMatch('duo'));
+    const today = loadDaily(GAME);
+    const d = this.button('daily', cx + 77, top + 262, 146, 46, t('daily'), () => this.startDaily(), !today.played);
+    if (today.played) d.txt.setColor(hex(0xa09080));
     this.button('size-down', cx - 120, top + 310, 40, 36, '◀', () => this.setSize(-1));
     this.button('size-up', cx + 120, top + 310, 40, 36, '▶', () => this.setSize(1));
     this.texts.size = this.add.text(cx, top + 310, t('teamSize', { n: this.size }), { fontFamily: FONT, fontSize: '17px', color: hex(C.ink), fontStyle: 'bold' }).setOrigin(0.5).setDepth(151);
     this.uiObjs.push(this.texts.size);
     const used = this.stats.used.length;
     this.uiObjs.push(
-      this.add.text(cx, top + 352, t('statsLine', { wins: this.stats.wins, games: this.stats.games, used, all: WEAPON_IDS.length }), {
+      this.add.text(cx, top + 352, t('statsLine', { wins: this.stats.wins, games: this.stats.games, used, all: WEAPON_IDS.length }) + '\n' + (today.score !== null
+        ? t('dailyDone', { score: today.score, best: today.best, streak: t('streak', { n: today.streak }) })
+        : t('dailyLine', { best: today.best, streak: t('streak', { n: today.streak }) })), {
         fontFamily: FONT, fontSize: '14px', color: hex(C.dim), align: 'center', wordWrap: { width: 380 },
       }).setOrigin(0.5).setDepth(151),
     );
@@ -375,7 +392,17 @@ export class GameScene extends Phaser.Scene {
     this.showDepot();
   }
 
-  startMatch(mode: 'ai' | 'duo' | 'watch', battle: number | null = null) {
+  /** Today's range: one mole, a few straw moles, five shots, on a map and winds the same for everyone today. */
+  startDaily() {
+    if (loadDaily(GAME).played) {
+      ui('refuse');
+      return;
+    }
+    startDaily(GAME);
+    this.startMatch('daily');
+  }
+
+  startMatch(mode: 'ai' | 'duo' | 'watch' | 'daily', battle: number | null = null) {
     this.clearAll();
     this.mode = mode;
     this.battle = mode === 'ai' ? battle : null;
@@ -387,11 +414,24 @@ export class GameScene extends Phaser.Scene {
     this.turns = 0;
     this.shots = 0;
     this.lostMole = false;
+    this.dealt.clear();
+    this.daily = null;
     playMusic(SONG, 'battle');
-    this.buildWorld(bt ? [bt.mine + this.boost.moles, bt.foes] : this.size, bt?.theme, [MAX_HP + this.boost.hp, MAX_HP]);
+    if (mode === 'daily') {
+      // Today's map, kegs and winds come from the day's seed, so every player shoots the same range.
+      const rand = dailyRand(GAME);
+      const real = Math.random;
+      Math.random = rand;
+      try {
+        this.buildWorld([1, DAILY_TARGETS]);
+        this.dailyWinds = Array.from({ length: DAILY_SHOTS }, () => Math.round((rand() * 2 - 1) * 10));
+      } finally {
+        Math.random = real;
+      }
+    } else this.buildWorld(bt ? [bt.mine + this.boost.moles, bt.foes] : this.size, bt?.theme, [MAX_HP + this.boost.hp, MAX_HP]);
     if (bt) for (const [id, n] of Object.entries(bt.bonus) as [WeaponId, number][]) this.teams[1].ammo[id] += n;
     for (const [id, n] of Object.entries(this.boost.ammo) as [WeaponId, number][]) this.teams[0].ammo[id] += n;
-    this.teams[1].ai = mode !== 'duo';
+    this.teams[1].ai = mode !== 'duo' && mode !== 'daily';
     this.teams[0].ai = mode === 'watch';
     this.turn = Math.random() < 0.5 && mode === 'watch' ? 1 : 0;
     this.buildHud();
@@ -401,7 +441,7 @@ export class GameScene extends Phaser.Scene {
         sides: { blue: { name: t('teamBlue'), color: hex(TEAM_COLORS[0]) }, amber: { name: t('teamAmber'), color: hex(TEAM_COLORS[1]) } },
         time: () => this.world.time * 1000,
       });
-    else {
+    else if (mode !== 'daily') {
       this.stats.games++;
       saveStats(this.stats);
     }
@@ -423,10 +463,11 @@ export class GameScene extends Phaser.Scene {
     this.world.turnTeam = this.turn;
     this.world.log = World.freshLog();
     const calm = Math.random() < 0.15;
+    if (this.mode === 'daily') this.world.wind = this.dailyWinds[Math.min(this.turns, DAILY_SHOTS - 1)];
     const kind = this.battle === null ? 'normal' : BATTLES[this.battle].wind;
     if (kind === 'strong') this.world.wind = (Math.random() < 0.5 ? -1 : 1) * Math.round(6 + Math.random() * 4);
     else if (kind === 'calm') this.world.wind = Math.round((Math.random() * 2 - 1) * 3);
-    else this.world.wind = calm ? 0 : Math.round((Math.random() * 2 - 1) * 10);
+    else if (this.mode !== 'daily') this.world.wind = calm ? 0 : Math.round((Math.random() * 2 - 1) * 10);
     this.phase = 'aim';
     this.timer = TURN_TIME + (this.turn === 0 ? this.boost.time : 0);
     this.aimAngle = m.facing > 0 ? -Math.PI / 4 : (-3 * Math.PI) / 4;
@@ -446,6 +487,12 @@ export class GameScene extends Phaser.Scene {
     const alive = this.teams.map((tm) => tm.moles.some((m) => m.alive));
     this.winner = alive[0] && !alive[1] ? 0 : alive[1] && !alive[0] ? 1 : -1;
     if (this.winner >= 0) for (const m of this.teams[this.winner].moles) if (m.alive) m.act = { kind: 'cheer', t: 0, dur: 99 };
+    if (this.mode === 'daily') {
+      this.daily = finishDaily(GAME, this.dailyScore());
+      playSting(SONG, 'win');
+      this.showResult();
+      return;
+    }
     if (this.mode === 'watch') {
       aiLog(this.winner === 1 ? 'amber' : 'blue', this.winner < 0 ? t('draw') : t('wins', { team: this.teamName(this.winner) }));
       this.time.delayedCall(4000, () => this.startMatch('watch'));
@@ -477,22 +524,56 @@ export class GameScene extends Phaser.Scene {
     this.showResult();
   }
 
+  /** The range's score: the damage done to the straw moles, plus a bonus for each one knocked out. */
+  private dailyScore() {
+    const straw = this.teams[1]?.moles ?? [];
+    return straw.reduce((s, m) => s + (m.maxHp - (m.alive ? m.hp : 0)) + (m.alive ? 0 : DAILY_KO), 0);
+  }
+
+  /** The mole that dealt the most damage to enemies this match, if any did. */
+  private star() {
+    let best: Mole | null = null;
+    for (const [m, n] of this.dealt) if (n > 0 && (!best || n > this.dealt.get(best)!)) best = m;
+    return best;
+  }
+
   private showResult() {
     this.clearUi();
     this.buildHud();
     const cx = this.W / 2;
     const cy = this.H / 2 - 20;
+    if (this.mode === 'daily') return this.showDailyResult(cx, cy);
     const tall = this.battle !== null;
-    this.uiObjs.push(this.add.rectangle(cx, tall ? cy + 40 : cy, 400, tall ? 320 : 200, C.panel, 0.95).setStrokeStyle(3, C.panelEdge).setDepth(150));
+    this.uiObjs.push(this.add.rectangle(cx, tall ? cy + 54 : cy + 12, 400, tall ? 348 : 224, C.panel, 0.95).setStrokeStyle(3, C.panelEdge).setDepth(150));
+    const star = this.star();
+    if (star)
+      this.uiObjs.push(
+        this.add.text(cx, cy + 4, t('starMole', { name: star.name, n: this.dealt.get(star)! }), { fontFamily: FONT, fontSize: '14px', color: hex(TEAM_COLORS[star.team]), fontStyle: 'bold' })
+          .setOrigin(0.5).setDepth(151),
+      );
     const title = this.winner! < 0 ? t('draw') : t('wins', { team: this.teamName(this.winner!) });
     this.uiObjs.push(
       this.add.text(cx, cy - 60, title, { fontFamily: FONT, fontSize: '30px', color: hex(this.winner! >= 0 ? TEAM_COLORS[this.winner!] : C.ink), fontStyle: 'bold', stroke: hex(INK), strokeThickness: 3 })
         .setOrigin(0.5).setDepth(151),
     );
     this.uiObjs.push(this.add.text(cx, cy - 20, t('resultLine', { turns: this.turns, shots: this.shots }), { fontFamily: FONT, fontSize: '15px', color: hex(C.dim) }).setOrigin(0.5).setDepth(151));
-    if (this.battle !== null) return this.showBattleResult(cx, cy);
-    this.button('rematch', cx, cy + 30, 260, 42, t('rematch'), () => this.startMatch(this.mode === 'duo' ? 'duo' : 'ai'), true);
-    this.button('menu', cx, cy + 78, 260, 36, t('menu'), () => this.showMenu());
+    if (this.battle !== null) return this.showBattleResult(cx, cy + 22);
+    this.button('rematch', cx, cy + 50, 260, 42, t('rematch'), () => this.startMatch(this.mode === 'duo' ? 'duo' : 'ai'), true);
+    this.button('menu', cx, cy + 98, 260, 36, t('menu'), () => this.showMenu());
+  }
+
+  /** The daily range's result: today's score, the best and the streak; one try a day. */
+  private showDailyResult(cx: number, cy: number) {
+    const d = this.daily!;
+    const out = this.teams[1].moles.filter((m) => !m.alive).length;
+    this.uiObjs.push(this.add.rectangle(cx, cy + 10, 400, 230, C.panel, 0.95).setStrokeStyle(3, C.panelEdge).setDepth(150));
+    this.uiObjs.push(
+      this.add.text(cx, cy - 70, t('daily'), { fontFamily: FONT, fontSize: '22px', color: hex(C.ink), fontStyle: 'bold' }).setOrigin(0.5).setDepth(151),
+      this.add.text(cx, cy - 32, t('dailyScore', { n: d.score ?? 0 }), { fontFamily: FONT, fontSize: '30px', color: hex(TEAM_COLORS[0]), fontStyle: 'bold', stroke: hex(INK), strokeThickness: 3 }).setOrigin(0.5).setDepth(151),
+      this.add.text(cx, cy + 6, t('dailyOut', { n: out, all: this.teams[1].moles.length }), { fontFamily: FONT, fontSize: '14px', color: hex(C.dim) }).setOrigin(0.5).setDepth(151),
+      this.add.text(cx, cy + 30, t('dailyBest', { best: d.best, streak: t('streak', { n: d.streak }) }), { fontFamily: FONT, fontSize: '14px', color: hex(C.ink), fontStyle: 'bold' }).setOrigin(0.5).setDepth(151),
+    );
+    this.button('menu', cx, cy + 82, 260, 40, t('dailyBack'), () => this.showMenu(), true);
   }
 
   /** A campaign battle's result: the three stars and what each asks, then on to the next battle. */
@@ -524,6 +605,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private teamName(i: number) {
+    if (i === 1 && this.mode === 'daily') return t('strawMoles');
     if (i === 1 && this.battle !== null) return t(`c_${BATTLES[this.battle].id}`);
     return i === 0 ? t('teamBlue') : t('teamAmber');
   }
@@ -983,9 +1065,16 @@ export class GameScene extends Phaser.Scene {
     }
     if (this.mode === 'ai' && this.teams[0].moles.some((m) => !m.alive)) this.lostMole = true;
     if (this.mode === 'watch' && log.damage) aiLog(this.side(), t('logDamage', { n: log.damage }));
+    if (this.active && log.damage) this.dealt.set(this.active, (this.dealt.get(this.active) ?? 0) + log.damage);
     this.turns++;
     const alive = this.teams.map((tm) => tm.moles.some((m) => m.alive));
     if (!alive[0] || !alive[1]) return this.finish();
+    if (this.mode === 'daily') {
+      // The straw moles never shoot back: the next shot is yours again, until the shots run out.
+      if (this.turns >= DAILY_SHOTS) return this.finish();
+      this.world.turnTeam = -1;
+      return this.beginTurn();
+    }
     // Sudden death: the water rises.
     if (this.turns >= this.suddenDeath) this.world.water -= 8;
     // Now and then a crate floats down.
@@ -1199,7 +1288,10 @@ export class GameScene extends Phaser.Scene {
         h.lineStyle(3, TEAM_COLORS[i], 1);
         h.strokeRoundedRect(x - 3, 5, 226, 50, 12);
       }
-      this.texts[`team${i}`]?.setText(`${this.teamName(i)}${tm.ai && this.battle === null ? ' · ' + t('aiTag') : ''}  ${tm.moles.filter((m) => m.alive).length}/${tm.moles.length}`);
+      const count = this.mode === 'daily' && i === 0
+        ? t('shotOf', { n: Math.min(this.turns + 1, DAILY_SHOTS), all: DAILY_SHOTS })
+        : `${tm.moles.filter((m) => m.alive).length}/${tm.moles.length}`;
+      this.texts[`team${i}`]?.setText(`${this.teamName(i)}${tm.ai && this.battle === null ? ' · ' + t('aiTag') : ''}  ${count}`);
     });
     // Wind.
     h.fillStyle(C.panel, 0.92);

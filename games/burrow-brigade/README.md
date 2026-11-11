@@ -3,8 +3,8 @@
 Turn-based artillery with squads of helmeted moles. Each turn one of your moles walks, aims with a
 slingshot drag and fires one of 26 weapons over the hills. Every blast digs the ground away and
 throws moles about, the wind changes every turn, and a mole that falls into the water is out. The
-last team with a mole standing wins. Play the Burrow AI, a campaign of eight rival burrows, or a
-friend on one screen.
+last team with a mole standing wins. Play the Burrow AI, a campaign of eight rival burrows, the daily
+range, or a friend on one screen.
 
 ![Aiming an Acorn Rocket over the ridge](docs/screenshots/aim.webp)
 
@@ -28,6 +28,15 @@ friend on one screen.
   acorns, flames and bees, but never thrown weapons.
 
 ![The arsenal](docs/screenshots/arsenal.webp)
+
+## Daily range
+
+One try a day at a range that is the same for every player that day: one mole, five shots, the
+day's winds and four straw moles. Every point of damage scores, and each straw mole knocked out
+adds 25. The menu keeps your best and your days in a row. After every match the result names the
+star of the match, the mole that did the most damage.
+
+![The daily range](docs/screenshots/daily.webp)
 
 ## Campaign
 

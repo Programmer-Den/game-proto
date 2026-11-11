@@ -73,6 +73,14 @@ export function planTurn(world: World, me: Mole, ammo: Record<WeaponId, number>,
         let score = Math.hypot(f.hit.x - target.x, f.hit.y - (target.y - 10));
         // Any enemy in the blast counts.
         for (const e of enemies) score = Math.min(score, Math.hypot(f.hit.x - e.x, f.hit.y - (e.y - 10)) + (e === target ? 0 : 12));
+        // A powder keg in the blast goes off too: good next to an enemy, bad next to a friend.
+        for (const k of world.kegs) {
+          if (Math.hypot(f.hit.x - k.x, f.hit.y - (k.y - 9)) > w.radius + 10) continue;
+          const near = (m: Mole) => Math.hypot(m.x - k.x, m.y - k.y) < 50;
+          if (near(me)) score += 600;
+          else if (friends.some(near)) score += 250;
+          else if (enemies.some(near)) score = Math.min(score, 4);
+        }
         if (Math.hypot(f.hit.x - me.x, f.hit.y - (me.y - 10)) < reach + 6) score += 600;
         for (const fr of friends) if (Math.hypot(f.hit.x - fr.x, f.hit.y - (fr.y - 10)) < reach) score += 250;
         // A thrown weapon rolls on: a little worse than a clean hit at the same spot.
