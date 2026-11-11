@@ -305,8 +305,8 @@ checkpoint. The armoury, also on the game-over panel, spends the same bank on la
 The difficulty, set on the hub page's Settings, changes one thing: the knight starts with 5 hearts on Easy and 2 on Hard.
 With Reduce motion on, the knight fades instead of blinking after a hit, the shield ring holds still,
 the coin pops stay where they appear instead of rising, the streak's trail of stars is not drawn,
-the Gatekeeper fades instead of flashing when stomped, and the snow, gusts, boulders, rockfall dust,
-fire vents, dragon fire and bats hold still, and a cloud about to fall doesn't tremble.
+the Gatekeeper fades instead of flashing when stomped, and the snow, gusts, boulders, barrels, axes,
+rockfall dust, fire vents, dragon fire, bats and coins hold still, and a cloud about to fall doesn't tremble.
 
 ## Running locally
 
