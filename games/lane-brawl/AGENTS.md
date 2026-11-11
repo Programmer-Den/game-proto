@@ -125,8 +125,8 @@ Implemented today:
   tier for red's units and 0 for everyone else, and scales red's AI: `castAi`'s gap, `RETREAT.hp`,
   the flask's threshold and `SPELL_AI.from` per tier; from `focusFrom` `aiAct` targets the weakest
   champion in reach (`weakest`), from `pairFrom` `updateGanks` sends red's two nearest hunters.
-  The end panel records the match once (`ladderResult`) and words it (`ladderUp`, `ladderPromoted`
-  and so on, with stars from `starText`). Colours: `SKINS` (the team's blue, then one per tier, its
+  The end panel records the match once (`ladderResult`) and words it (`ladderUp`, `ladderPromoted`,
+  `ladderTop` for a win at the top tier's full stars and so on, with stars from `starText`). Colours: `SKINS` (the team's blue, then one per tier, its
   `cloth`); `skinsWon` gives Bronze's after the first ranked win and each tier's once `best` reached
   it, and the one worn is kept under `lane-brawl-skin` (`loadSkin`, `saveSkin`). `startMatch` bakes
   the player's champion in it (`bakeChampions` with `skin`, sheet `champKey(id, 'skin-<id>')`,

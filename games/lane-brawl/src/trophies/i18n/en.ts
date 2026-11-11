@@ -16,7 +16,7 @@ const en = {
   beast: 'Beast tamer',
   beastText: 'Help your team slay the guardian beast.',
   firstWin: 'Nexus down',
-  firstWinText: 'Win a full match on three lanes.',
+  firstWinText: 'Win a full match, not a quick one.',
   drakeSoul: 'Drake soul',
   drakeSoulText: 'Help your team slay four drakes in one match.',
   flawless: 'Untouchable',
