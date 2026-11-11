@@ -58,7 +58,7 @@ const en: HowToPlay = {
 };
 
 /** US English only changes the spelling. */
-const us = (text: string) => text.replace(/harbour/g, 'harbor');
+const us = (text: string) => text.replace(/harbour/g, 'harbor').replace(/rumour/g, 'rumor');
 const enUS: HowToPlay = {
   goal: us(en.goal),
   controls: en.controls.map((c) => ({ input: us(c.input), action: us(c.action) })),
