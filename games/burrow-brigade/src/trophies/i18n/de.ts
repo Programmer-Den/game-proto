@@ -22,7 +22,7 @@ const de: Translation<typeof en> = {
   hardWin: 'Brigadegeneral',
   hardWinText: 'Besiege die Bau-KI auf Schwer.',
   allWeapons: 'Die ganze Waffenkammer',
-  allWeaponsText: 'Setze jede der 26 Waffen ein.',
+  allWeaponsText: 'Setze jede der 28 Waffen ein.',
 };
 
 export default de;

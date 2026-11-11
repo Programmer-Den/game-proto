@@ -131,7 +131,9 @@ export function drawMole(g: G, m: Mole, look: MoleLook) {
   }
   g.save();
   g.translateCanvas(m.x + lean * m.facing, m.y - lift);
-  g.scaleCanvas(m.facing * sx * MOLE_SCALE, sy * MOLE_SCALE);
+  // The boss stands a size bigger than its guard.
+  const big = m.hat === 'crown' ? 1.25 : 1;
+  g.scaleCanvas(m.facing * sx * MOLE_SCALE * big, sy * MOLE_SCALE * big);
   g.rotateCanvas(-rot);
 
   // Shield bubble behind the mole.
@@ -183,6 +185,7 @@ export function drawMole(g: G, m: Mole, look: MoleLook) {
   or(g, -10.5, -21.4, 20, 2.6, TEAM_DARK[m.team], 1);
   g.fillStyle(0xffffff, 0.45);
   g.fillEllipse(-3, -25.5, 5, 2.4, 10);
+  if (m.hat) drawHat(g, m.hat, look.time);
   // A bandage on a badly hurt mole.
   if (m.hp > 0 && m.hp < 30) {
     g.fillStyle(0xf6efe2, 1);
@@ -394,6 +397,16 @@ export function drawShotShape(g: G, kind: ShotKind, x: number, y: number, angle:
       g.lineBetween(-6, 4.5, 6, 4.5);
       g.fillStyle(INK, 1);
       g.fillCircle(0, 2, 1.6);
+      break;
+    case 'sap':
+      // A sticky ball of tree sap, dripping.
+      oc(g, 0, 0, 6.5, 0xd9a43a, 1.3);
+      g.fillStyle(0xf2c86a, 1);
+      g.fillCircle(-2, -2, 2);
+      g.fillStyle(0xd9a43a, 1);
+      g.fillEllipse(3, 7, 2.4, 4, 8);
+      g.fillStyle(INK, 1);
+      g.fillCircle(1.5, 1.5, 1);
       break;
     case 'clod':
       oc(g, 0, 0, 7, 0xa36a3d, 1.2);
@@ -676,6 +689,22 @@ export function drawParticle(g: G, p: Particle) {
   }
 }
 
+/** What a mole wears on top of its helmet, drawn in the mole's own space (helmet top near y -29). */
+export function drawHat(g: G, hat: string, time: number) {
+  switch (hat) {
+    case 'crown':
+      g.fillStyle(INK, 1);
+      g.fillPoints(pts([{ x: -8, y: -26 }, { x: -9, y: -36 }, { x: -4.5, y: -31 }, { x: -0.5, y: -38 }, { x: 3.5, y: -31 }, { x: 8, y: -36 }, { x: 7, y: -26 }]), true);
+      g.fillStyle(0xf2c230, 1);
+      g.fillPoints(pts([{ x: -6.8, y: -27 }, { x: -7.6, y: -34 }, { x: -4.3, y: -29.6 }, { x: -0.5, y: -35.6 }, { x: 3.3, y: -29.6 }, { x: 6.6, y: -34 }, { x: 5.8, y: -27 }]), true);
+      g.fillStyle(0x7a3bd0, 1);
+      g.fillCircle(-0.5, -29.5, 1.5);
+      g.fillStyle(0xffffff, 0.5 + Math.sin(time * 4) * 0.3);
+      g.fillCircle(-4, -31, 0.8);
+      break;
+  }
+}
+
 /** A weapon's icon in a box of about 30 by 30 around (x, y). */
 export function drawWeaponIcon(g: G, id: WeaponId, x: number, y: number, s = 1, time = 0) {
   g.save();
@@ -730,6 +759,15 @@ export function drawWeaponIcon(g: G, id: WeaponId, x: number, y: number, s = 1, 
       g.lineStyle(3, 0x8a6a3a, 1);
       g.lineBetween(-12, 0, 4, 0);
       oe(g, 9, 0, 11, 10, 0xb8c0c8, 1.3);
+      break;
+    case 'gust':
+      // A paper fan with three gusts of air.
+      g.fillStyle(INK, 1);
+      g.fillTriangle(-12, 8, -2, -10, 4, 2);
+      g.fillStyle(0xf6efe2, 1);
+      g.fillTriangle(-10.5, 6.5, -2.5, -7.5, 2.2, 1.6);
+      g.lineStyle(2, 0x8fd3ff, 1);
+      for (let i = 0; i < 3; i++) g.lineBetween(4, -6 + i * 6, 12, -8 + i * 6);
       break;
     case 'beam':
       oc(g, -4, -4, 7, 0xffd34d, 1.3);

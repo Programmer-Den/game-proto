@@ -22,7 +22,7 @@ const en = {
   hardWin: 'Brigade general',
   hardWinText: 'Beat the Burrow AI on Hard.',
   allWeapons: 'The whole arsenal',
-  allWeaponsText: 'Use every one of the 26 weapons.',
+  allWeaponsText: 'Use every one of the 28 weapons.',
 };
 
 export default en;

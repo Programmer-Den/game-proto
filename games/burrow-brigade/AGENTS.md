@@ -25,7 +25,13 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
   It plays as `mode` `ai` with `battle` set. A win gives up to three stars (`starsFor`): the win,
   within `par` turns, and no mole lost; the best per battle is saved, and a battle opens once the
   one before it is won (`isOpen`). The result screen shows the stars and Next battle. The rival's
-  name (`c_<id>`) replaces Amber Burrow in its panel; its card line is `cd_<id>`.
+  name (`c_<id>`) replaces Amber Burrow in its panel; its card line is `cd_<id>`. A battle with a
+  `boss` (Queen Dusk's Guard) turns the rival's first mole into its leader: that much health, a
+  crown (`Mole.hat` `crown`, drawn by `drawHat` and a size bigger) and the name `bossName`.
+  Winning the last battle opens the **Veteran** tier (the `tier` button on the Campaign screen,
+  `veteran` in the scene): the same battles with `VETERAN`'s changes (one more rival mole, aim
+  error times 0.6, one more of each bonus weapon, a tougher boss, 1.5 times the acorns) and their
+  own stars (`vstars`, through `tierStars`).
 - **Quartermaster** (`game/depot.ts`): every campaign battle pays acorns (`reward`: 15 for a loss,
   40 plus 15 a star for a win), spent from the Campaign screen (`showDepot`) on upgrades with levels
   (`UPGRADE_IDS`, prices in `UPGRADE_COSTS`): thicker helmets (+10 health a level, through
@@ -48,14 +54,17 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
   from -10 to 10 (calm 15% of the time). After a turn a crate falls 40% of the time (30% of those
   heal 25, the rest hold one weapon from `CRATE_WEAPONS`). From turn `SUDDEN_DEATH_TURN` (24) the
   water rises 8 px a turn. Fall damage starts at a landing speed of 360 px/s.
-- **Weapons:** 26 in `game/weapons.ts` (`WEAPON_IDS`, grouped `rocket`, `throw`, `strike`, `close`,
-  `tool`), each with a `mode`: `aim` (angle and power), `angle` (Burrow and Sunbeam), `target` (tap
+- **Weapons:** 28 in `game/weapons.ts` (`WEAPON_IDS`, grouped `rocket`, `throw`, `strike`, `close`,
+  `tool`), each with a `mode`: `aim` (angle and power), `angle` (Burrow, Sunbeam and Gust Fan),
+  `target` (tap
   the map: Balloon Drop, Storm Bolt, Tunnel Hop) or `use`. Ammo per team starts at `ammo` (-1 is
   unlimited: Acorn Rocket, Pebble Grenade, Paw Swipe, Burrow, Skip Turn). What each does is in
   `World.fire`, `World.use`, `stepShot`, `contact` and `goOff` (`game/world.ts`), all stepped at a
   fixed `DT` of 1/60 s. Blasts (`explode`) carve the ground, hurt by distance (full at the centre,
   at least 30% in reach), throw moles, set off mines, crates and loose explosives and put out
   nearby flames.
+  The Sap Bomb (`sap`) sticks where it touches (riding on a mole it hit, `Shot.target`) and goes off
+  2 s later; the Gust Fan (`gust`) knocks moles, kegs and loose bombs in a cone away, with no damage.
 - **Moles:** `Mole` in `game/world.ts` (health `hp` up to `maxHp`, 100 unless the Quartermaster's
   helmets add to it): feet at `y` on the first earth pixel, walking up steps of 5
   px, jumps (`jump`, Enter) and backflips (Backspace), an `act` for actions that hold it (`dig`,
@@ -78,7 +87,7 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
 - **Trophies** (`src/trophies/`): `firstHit` (hurt an enemy), `crate`, `splash` (an enemy into the
   water), `firstWin` (beat the AI), `triple` (three enemies hurt in one turn), `longShot` (a rocket
   hit more than 500 px from where it was fired), `arsenal` (15 weapons used), `flawless` (beat the
-  AI losing no mole), `hardWin` (beat the AI on Hard) and the hidden `allWeapons` (all 26 used).
+  AI losing no mole), `hardWin` (beat the AI on Hard) and the hidden `allWeapons` (all 28 used).
   Turn trophies come from `World.log` at the end of each human turn; none in Watch AI.
 
 ## Architecture
@@ -106,8 +115,8 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
 - `burrow-brigade-stats`: `{ games, wins, used }`, matches started (not in Watch AI), wins against the
   AI and the weapons the player has used.
 - `burrow-brigade-prefs`: `{ size }`, moles a team.
-- `burrow-brigade-campaign`: `{ stars, acorns, levels }`, the best stars (0 to 3) of each campaign
-  battle by its place in `BATTLES`, the acorns to spend and the Quartermaster's levels by id.
+- `burrow-brigade-campaign`: `{ stars, vstars, acorns, levels }`, the best stars (0 to 3) of each
+  campaign battle by its place in `BATTLES` (`vstars` for the Veteran tier), the acorns to spend and the Quartermaster's levels by id.
 - `burrow-brigade-daily`: the daily range's record (`shared/daily.ts`).
 - `burrow-brigade-trophies`: the shared trophies.
 
@@ -116,11 +125,11 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
 - `window.game` (dev build). `scene.state` gives `screen`, `phase`, `mode`, `turn`, `turns`,
   `wind`, `weapon`, `active` (`id`, `team`, `x`, `y`, `hp`, `alive`), `craters`, `shots`, `busy`,
   `teams` (`alive`, `hp`), `winner`, `arsenal`, `battle` (the campaign battle, or null), `stars`
-  (the campaign's best stars), `acorns`, `dailyScore` (the daily range's score once it ends) and `view` (the view's size, to turn view pixels into
+  (the campaign's best stars), `veteran`, `vstars`, `acorns`, `dailyScore` (the daily range's score once it ends) and `view` (the view's size, to turn view pixels into
   page pixels). `scene.buttons` has every button by id: `play-ai`, `campaign`, `play-duo`, `daily`,
   `size-down`, `size-up`, `weapon`, `left`, `right`, `jump`, `fire`, `rematch`, `menu`, `w-<id>`
-  for the arsenal's tiles while it is open, `battle-<i>`, `depot` and `back` on the Campaign
-  screen, `buy-<id>` and `back` at the Quartermaster, and `next` on a won battle's result.
+  for the arsenal's tiles while it is open, `battle-<i>`, `depot`, `back` and (once the
+  last battle is won) `tier` on the Campaign screen, `buy-<id>` and `back` at the Quartermaster, and `next` on a won battle's result.
 - The playthrough (`e2e/playthrough.spec.ts`) plays the first round: Play the Burrow AI, hold ▶,
   drag back from the mole to fire an Acorn Rocket, see a crater, wait through the AI's turn until
   the next blue mole is up, and checks the saved stats.
@@ -140,7 +149,7 @@ scene).
   damage), its look to `drawShotShape` or `drawWeaponIcon`, what it does to `World.fire` or
   `World.use` and, for a shell, `contact` and `goOff`, its `w_<id>` and `d_<id>` texts in
   `i18n/en.ts` and `de.ts`, and its row to the README's table. Mark `ai: true` only if `planTurn`
-  can aim it. The trophy texts name the number of weapons (26).
+  can aim it. The trophy texts name the number of weapons (28).
 - **A theme:** add it to `Theme['id']` and `THEMES` (`game/terrain.ts`) and its colour to the
   campaign screen's `swatch`.
 - **A campaign battle:** add it to `BATTLES` (its id to `BattleId`), with its `c_<id>` and

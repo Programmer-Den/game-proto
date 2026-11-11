@@ -52,7 +52,7 @@ export function planTurn(world: World, me: Mole, ammo: Record<WeaponId, number>,
   }
 
   // Aimed weapons: always a rocket and a grenade, and now and then something special.
-  const specials = (['heavy', 'splitter', 'seeker', 'firecracker', 'drill', 'cluster', 'bouncer', 'roller', 'ember', 'beehive'] as WeaponId[]).filter(
+  const specials = (['heavy', 'splitter', 'seeker', 'firecracker', 'drill', 'cluster', 'bouncer', 'roller', 'ember', 'beehive', 'sap'] as WeaponId[]).filter(
     (id) => has(id) && WEAPONS[id].ai,
   );
   const choices: WeaponId[] = ['rocket', 'grenade'];

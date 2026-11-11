@@ -18,9 +18,9 @@ export type Group = 'rocket' | 'throw' | 'strike' | 'close' | 'tool';
 
 export const WEAPON_IDS = [
   'rocket', 'heavy', 'splitter', 'seeker', 'firecracker', 'drill',
-  'grenade', 'cluster', 'bouncer', 'roller', 'ember', 'beehive', 'clod',
+  'grenade', 'cluster', 'bouncer', 'roller', 'ember', 'beehive', 'sap', 'clod',
   'mine', 'dynamite', 'skyrain', 'bolt', 'quake',
-  'swipe', 'pound', 'burrow', 'beam',
+  'swipe', 'pound', 'gust', 'burrow', 'beam',
   'hop', 'shield', 'repair', 'skip',
 ] as const;
 export type WeaponId = (typeof WEAPON_IDS)[number];
@@ -61,6 +61,7 @@ export const WEAPONS: Record<WeaponId, Weapon> = {
   roller: w('roller', 'aim', 'throw', 1, 560, 0, 44, 50),
   ember: w('ember', 'aim', 'throw', 1, 600, 0, 8, 6),
   beehive: w('beehive', 'aim', 'throw', 1, 600, 0, 10, 4),
+  sap: w('sap', 'aim', 'throw', 1, 600, 0, 38, 42),
   clod: w('clod', 'aim', 'throw', 2, 600, 0, 34, 0, false),
   mine: w('mine', 'use', 'strike', 2, 0, 0, 40, 45, false),
   dynamite: w('dynamite', 'use', 'strike', 1, 0, 0, 70, 70, false),
@@ -69,6 +70,7 @@ export const WEAPONS: Record<WeaponId, Weapon> = {
   quake: w('quake', 'use', 'strike', 1, 0, 0, 0, 10, false),
   swipe: w('swipe', 'use', 'close', -1, 0, 0, 24, 20),
   pound: w('pound', 'use', 'close', 1, 0, 0, 46, 25),
+  gust: w('gust', 'angle', 'close', 1, 0, 0, 0, 0, false),
   burrow: w('burrow', 'angle', 'close', -1, 0, 0, 12, 0, false, false),
   beam: w('beam', 'angle', 'close', 1, 0, 0, 7, 30, false),
   hop: w('hop', 'target', 'tool', 1, 0, 0, 0, 0, false),

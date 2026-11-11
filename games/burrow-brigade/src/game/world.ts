@@ -30,6 +30,8 @@ export interface Mole {
   shield: boolean;
   /** An action under way that holds the mole: digging, hopping through the ground, a ground pound, dying. */
   act: null | { kind: 'dig' | 'hop' | 'pound' | 'die' | 'swipe' | 'throw' | 'recoil' | 'cheer'; t: number; dur: number; dx?: number; dy?: number; tx?: number; ty?: number; phase?: number };
+  /** What it wears on its helmet: the boss's crown, or a hat (null for none). */
+  hat: string | null;
   /** Hidden in the ground during a Tunnel Hop. */
   hidden: boolean;
   drowned: boolean;
@@ -137,7 +139,7 @@ export class World {
   addMole(team: number, name: string, x: number, y: number, maxHp = MAX_HP) {
     const m: Mole = {
       id: this.moles.length, team, name, x, y, vx: 0, vy: 0, hp: maxHp, maxHp, alive: true, grounded: true, facing: team === 0 ? 1 : -1,
-      walk: 0, walkT: 0, hurtT: 0, shield: false, act: null, hidden: false, drowned: false, fallFrom: y, blink: Math.random() * 3,
+      walk: 0, walkT: 0, hurtT: 0, shield: false, act: null, hat: null, hidden: false, drowned: false, fallFrom: y, blink: Math.random() * 3,
     };
     this.moles.push(m);
     return m;
@@ -524,6 +526,46 @@ export class World {
         m.y -= 2;
         this.hooks.sound('jump');
         break;
+      case 'gust': {
+        // A blast of air the way you point: moles, kegs and loose bombs in front fly off.
+        m.act = { kind: 'swipe', t: 0, dur: 0.4 };
+        m.facing = Math.cos(angle) >= 0 ? 1 : -1;
+        this.hooks.sound('whoosh');
+        const cx = m.x;
+        const cy = m.y - 12;
+        const inCone = (x: number, y: number, reach: number) => {
+          const d = Math.hypot(x - cx, y - cy);
+          if (d > reach || d < 1) return 0;
+          let diff = Math.atan2(y - cy, x - cx) - angle;
+          while (diff > Math.PI) diff -= Math.PI * 2;
+          while (diff < -Math.PI) diff += Math.PI * 2;
+          return Math.abs(diff) < 0.6 ? 1 - d / (reach * 1.25) : 0;
+        };
+        for (const o of this.moles) {
+          if (o === m || !o.alive || o.hidden) continue;
+          const f = inCone(o.x, o.y - 10, 170);
+          if (f > 0) this.knock(o, Math.cos(angle) * 480 * f, Math.sin(angle) * 480 * f - 160);
+        }
+        for (const s of this.shots) {
+          const f = inCone(s.x, s.y, 170);
+          if (f > 0 && s.target === null) {
+            s.state = 'fly';
+            s.vx += Math.cos(angle) * 380 * f;
+            s.vy += Math.sin(angle) * 380 * f - 120;
+          }
+        }
+        for (const k of this.kegs) {
+          const f = inCone(k.x, k.y - 9, 150);
+          if (f > 0) {
+            k.landed = false;
+            k.x += Math.cos(angle) * 40 * f;
+            k.vy = -140 * f;
+          }
+        }
+        for (let i = 0; i < 5; i++)
+          this.particle('swoosh', cx + Math.cos(angle) * (20 + i * 22), cy + Math.sin(angle) * (20 + i * 22), Math.cos(angle) * 120, Math.sin(angle) * 120, 0.45, 10 + i * 3, 0xe8f6ff, 0, m.facing);
+        break;
+      }
       case 'burrow': {
         let dx = Math.cos(angle);
         let dy = Math.sin(angle);
@@ -724,6 +766,15 @@ export class World {
         return;
       }
       case 'rest': {
+        if (s.kind === 'sap') {
+          // Stuck fast: it rides on the mole it hit, or stays where it struck the earth.
+          if (s.target?.alive && !s.target.hidden) {
+            s.x = s.target.x;
+            s.y = s.target.y - 12;
+          }
+          this.fuseSpark(s);
+          return;
+        }
         if (s.kind === 'mine') this.stepMine(s);
         else if (s.kind === 'dynamite' || s.kind === 'grenade' || s.kind === 'cluster') this.fuseSpark(s);
         // Ground gone: fall again.
@@ -850,6 +901,16 @@ export class World {
         s.dir = 1.3;
         this.hooks.sound('crack');
         return;
+      case 'sap':
+        // Sticks to whatever it touches, a mole too, and goes off two seconds later.
+        s.state = 'rest';
+        s.vx = 0;
+        s.vy = 0;
+        s.fuse = 2;
+        s.target = res.mole;
+        this.hooks.sound('thud');
+        for (let i = 0; i < 6; i++) this.particle('drop', s.x, s.y, rnd(-50, 50), rnd(-90, -20), 0.5, 2, 0xd9a43a, 1);
+        return;
       case 'ember':
         return this.goOff(s);
       case 'beehive':
@@ -896,6 +957,7 @@ export class World {
       case 'seed': return at(26, 25);
       case 'acorn': return at(26, 25);
       case 'drill': return at(30, 40);
+      case 'sap': return at(38, 42);
       case 'grenade': return at(40, 45);
       case 'bomblet': return at(22, 20);
       case 'bouncer': return at(34, 35);
