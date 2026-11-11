@@ -21,6 +21,9 @@ friend on one screen.
 - **Turns:** 30 seconds to walk, aim and fire, then 3 seconds to scramble away. Crates float down
   between turns: walk into one for a weapon, or into a green-cross crate to heal. From turn 24 the
   water rises a little every turn.
+- **Powder kegs** stand about the map: any blast or flame that reaches one sets it off with a big
+  bang and burning powder, so a shot next to a keg near the enemy hits twice.
+- **Maps** come in five looks: meadow, autumn, frost, a red canyon and a volcano whose sea is lava.
 - **Wind:** the arrow at the top. It pushes rockets, the Dandelion's seeds, the Balloon Drop's
   acorns, flames and bees, but never thrown weapons.
 
@@ -40,6 +43,8 @@ Shield Bubbles and Repair Kits, more crates and a fourth (or fifth) mole.
 ![The Quartermaster](docs/screenshots/quartermaster.webp)
 
 ![The campaign](docs/screenshots/campaign.webp)
+
+![The volcano map, with powder kegs](docs/screenshots/ember.webp)
 
 ## Weapons
 

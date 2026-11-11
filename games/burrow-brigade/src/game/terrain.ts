@@ -14,7 +14,7 @@ export const DT = 1 / 60;
 export const WATER_GAP = 30;
 
 export interface Theme {
-  id: 'meadow' | 'autumn' | 'frost';
+  id: 'meadow' | 'autumn' | 'frost' | 'canyon' | 'ember';
   skyTop: string;
   skyBottom: string;
   hills: [string, string];
@@ -46,6 +46,17 @@ export const THEMES: Theme[] = [
     id: 'frost', skyTop: '#7a9fd8', skyBottom: '#e6f0ff', hills: ['#c4d4ec', '#a6bde0'],
     dirt: '#6f7a8f', dirtDark: '#5a6476', dirtLight: '#9aa6bb', grass: '#f4f8ff', grassDark: '#c8d6ec',
     back: '#2e3444', water: 0x2a5d9c, waterTop: 0xa8d4ff, speck: 0xffffff, sun: '#ffffff',
+  },
+  {
+    id: 'canyon', skyTop: '#4fa6d8', skyBottom: '#ffe9c4', hills: ['#e2a978', '#c98a5a'],
+    dirt: '#c9773f', dirtDark: '#a85f2e', dirtLight: '#e8a066', grass: '#9cae4f', grassDark: '#7a8a3a',
+    back: '#5a2c16', water: 0x2e9c9a, waterTop: 0x8fe0d6, speck: 0xe8c48a, sun: '#fff6d0',
+  },
+  {
+    // The sea is lava here: it works just like the water.
+    id: 'ember', skyTop: '#3a1e2e', skyBottom: '#d8643a', hills: ['#5a2e34', '#44222a'],
+    dirt: '#5b4a4a', dirtDark: '#463838', dirtLight: '#7a6464', grass: '#3a3434', grassDark: '#262222',
+    back: '#1c1414', water: 0xe0501c, waterTop: 0xffc04d, speck: 0xff9a3c, sun: '#ffd08a',
   },
 ];
 
