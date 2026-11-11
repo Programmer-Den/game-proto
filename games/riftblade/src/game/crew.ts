@@ -500,12 +500,12 @@ function keepMark(s: GameState, range: number, ms: number) {
   }
 }
 
-/** The strongest foe within `range`: the boss if it is there, else the one with the most health. */
+/** The strongest foe within `range`: the boss if it is there, else the one with the most health (never a structure). */
 function strongest(s: GameState, range: number) {
   const p = s.player;
   let best: Enemy | null = null;
   for (const e of s.enemies) {
-    if (e.hp <= 0 || e.charmMs > 0) continue;
+    if (e.hp <= 0 || e.charmMs > 0 || isStructure(e.kind)) continue;
     if (Math.hypot(e.x - p.x, e.y - p.y) - e.r > range) continue;
     const score = e.kind === 'boss' ? Infinity : e.hp;
     if (!best || score > (best.kind === 'boss' ? Infinity : best.hp)) best = e;

@@ -122,10 +122,10 @@ function strongest(s: GameState, range: number, skip: number[] = []) {
   return best;
 }
 
-/** Lifts the `n` nearest foes (never a boss); they are crushed when the grip ends. */
+/** Lifts the `n` nearest foes (never a boss or a structure); they are crushed when the grip ends. */
 function grip(s: GameState, n: number, dmg: number) {
   const p = s.player;
-  const pool = nearest(s, p.x, p.y, n + 4, 320).filter((e) => e.kind !== 'boss' && e.gripMs <= 0 && e.charmMs <= 0).slice(0, n);
+  const pool = nearest(s, p.x, p.y, n + 4, 320).filter((e) => e.kind !== 'boss' && !isStructure(e.kind) && e.gripMs <= 0 && e.charmMs <= 0).slice(0, n);
   for (const e of pool) {
     e.gripMs = 700;
     e.gripDmg = dmg;
@@ -661,7 +661,7 @@ export function knightAbilities(s: GameState, ms: number) {
     } else s.platform = null;
     if (cap(s, 'silver-tongue') && ready(s, 'silver', 10000, ms)) {
       const weak = s.enemies
-        .filter((e) => e.hp > 0 && e.kind !== 'boss' && e.charmMs <= 0 && Math.hypot(e.x - p.x, e.y - p.y) < 480)
+        .filter((e) => e.hp > 0 && e.kind !== 'boss' && !isStructure(e.kind) && e.charmMs <= 0 && Math.hypot(e.x - p.x, e.y - p.y) < 480)
         .sort((a, b) => a.hp - b.hp)
         .slice(0, 8);
       for (const e of weak) e.charmMs = 12000;
