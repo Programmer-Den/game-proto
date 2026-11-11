@@ -45,6 +45,7 @@ import {
   serveOrder,
   sellToWagon,
   deliverToRoyal,
+  finishedBy,
   type Feedback,
 } from '../game/sim';
 import { clearSave, loadState, saveState } from '../game/save';
@@ -2489,7 +2490,8 @@ export class GameScene extends Phaser.Scene {
       { id: 'cauldron', at: CAULDRON },
       { id: 'cauldron2', at: CAULDRON2 },
     ] as const;
-    const made = () => stations.map(({ id }) => this.state[id].output.length);
+    // Counted as made rather than read off the pallet, which a pixie route empties in the same tick.
+    const made = () => stations.map(({ id }) => finishedBy(this.state[id]));
     let output = made();
     let orders = [...this.state.orders];
     let sold = this.state.sold;

@@ -143,6 +143,15 @@ import { itemName, potionCount, t, type TextKey } from '../i18n';
 // Pure game rules, kept free of Phaser so later automation can drive the same functions.
 
 /**
+ * How many goods each station (an apothecary's refiner or cauldron, or a town shop's station) has
+ * finished since the page loaded, for the scenes' sounds. A pixie route can take a good off the
+ * pallet in the same tick it is made, so the pallet's length doesn't show it. Not saved.
+ */
+const finished = new WeakMap<object, number>();
+export const finishedBy = (station: object) => finished.get(station) ?? 0;
+export const countFinished = (station: object) => finished.set(station, finishedBy(station) + 1);
+
+/**
  * How many work a station: its craftsmen once any are hired, otherwise the doctor when standing on
  * its work spot. A station with craftsmen has no work spot left.
  */
@@ -193,6 +202,7 @@ export function tick(
       if (refiner.progress >= recipe.ms) {
         refiner.queue.shift();
         refiner.output.push(recipe.out);
+        countFinished(refiner);
         // Work past the end of this plant goes on the next, so a slow frame rate makes no less. The
         // next is picked now, so the priority applies to it as well.
         refiner.progress = refiner.queue.length > 0 ? refiner.progress - recipe.ms : 0;
@@ -402,6 +412,7 @@ function refineSecond(state: GameState, refiner: Refiner, ms: number, first: Pla
   second.progress = Math.min(second.progress + ms, recipe.ms);
   if (over < 0 || !palletHasRoom(state, refiner.output, recipe.out)) return;
   refiner.output.push(recipe.out);
+  countFinished(refiner);
   refiner.second = null;
   // Work past the end of this plant goes on the next, so a slow frame rate makes no less.
   if (over > 0) refineSecond(state, refiner, over, first);
@@ -510,7 +521,10 @@ function brew(state: GameState, cauldron: Cauldron, brewing: Brew | null, ms: nu
       state.untoldCure ??= { season: state.plague.season ?? 0, day: state.contract.day };
       state.seals = (state.seals ?? 0) + 1;
     }
-  } else cauldron.output.push(current.out);
+  } else {
+    cauldron.output.push(current.out);
+    countFinished(cauldron);
+  }
   // Work past the end of this brew goes on the next, if there is one.
   const next = startBrew(state, cauldron, first, current);
   if (next) next.progress = current.progress - current.ms;
