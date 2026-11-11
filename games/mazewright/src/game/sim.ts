@@ -1171,6 +1171,8 @@ function boosts(g: Game) {
     const boost = hive.level === MASTER ? MASTER_TRICKS.hiveBoost : TOWER.beehive.boost![tier(hive.level)];
     for (const t of g.towers) {
       const [x, y] = cellOf(t.cell);
+      // In Versus a hive tends only its own garden's towers, never over the fence.
+      if (g.versus && sideOf(g, t.cell) !== sideOf(g, hive.cell)) continue;
       if (t !== hive && Math.abs(x - hx) <= 1 && Math.abs(y - hy) <= 1) out.set(t.id, Math.max(out.get(t.id) ?? 0, boost));
     }
   }

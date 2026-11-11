@@ -97,7 +97,7 @@ Implemented today:
   stations. They show once the player has seen them (`derelictAt` for the hover label), cannot be
   destroyed or built beside, and the player can build at them only in the sense of training. From
   60 s (`AI_CLAIM_MS`) a rival with 3 warships sends one idle ship (`Side.claimer`) to the nearest
-  station it does not own within 600 px of its hub (`contestDerelicts`), sends it back whenever it
+  station it does not own (nor, in a teams skirmish, a teammate does) within 600 px of its hub (`contestDerelicts`), sends it back whenever it
   is idle away from the station (after a chase, a salvage run or repairs), and frees it once the
   station is its. Salvage runs and the beacon picket never take the claimer. Ships still queued at a
   shipyard that changes hands are refunded to its old owner (`refundQueue`), and a player ship that
@@ -186,8 +186,8 @@ Implemented today:
   speed, hit points, damage, sight and cost, harvester carry, repair rate), which `unitStats`,
   `buildingStats`, `harvest` and the repair rule multiply in; then the board opens: `contract.goal`
   is null and `offer` holds two goals from `CONTRACT_POOL`, drawn by `boardOffer` from those open at
-  that step (`from`), not `taken` yet and open in this battle (`contractOpen`: a living Veil rival
-  for `lattice`, a far field for `convoy`, fewer than two derelicts held for `derelicts`, a rival not under truce and not held by tribute for
+  that step (`from`), not `taken` yet and open in this battle (`contractOpen`: a living Veil rival,
+  not the player's ally, for `lattice`, a far field for `convoy`, fewer than two derelicts held for `derelicts`, a rival not under truce and not held by tribute for
   `survive`; a `survive` card taken once every rival is at peace or paid off fails at once, `noRaiders`). The second
   board always offers `kills` first (the playthrough takes it). `World.pickContract(goal)` takes a
   card; after `BOARD_MS` (15 s) the first is taken. The draw uses the world's own `rng`

@@ -168,7 +168,8 @@ in code on 2D canvases (no image files), with `pixelArt` off.
   Killing every raider repels it and does the raid deed. The AI's raid deed comes from the player's
   attacks instead (`updateAssault`, `GameState.assault`): `ASSAULT_MIN` (3) player soldiers within
   `BELL_RANGE` of its Town Center start one, and once none of them is within `ASSAULT_CLEAR` (20)
-  tiles it ends, repelled if at least half of them fell. The AI's Monument rush is a raid with the
+  tiles it ends, repelled if at least half of them fell (one back aboard a transport has left, not
+  fallen). The AI's Monument rush is a raid with the
   Monument as its goal, so it ends like any other once the Monument falls.
 - Attack alerts (scene only, `GameScene.alarm`, `renderAlerts`): every `hit` event whose `victim` is
   the player and whose striker is a rival (not `NEUTRAL`) starts an `Alert` or refreshes the live one

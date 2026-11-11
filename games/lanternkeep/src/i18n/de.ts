@@ -227,7 +227,7 @@ const de: Translation<typeof en> = {
   harbourHeldGoal: 'Das Hafenfest wurde gefeiert: die Nächte gehen weiter.',
   setSail: 'In See stechen',
   harbourFestivalTitle: 'Das Hafenfest!',
-  boonSub: '{n} Nächte am Meer gehalten. Die Hafenstadt schenkt eine Gunst,\nfür dieses und jedes spätere Spiel, in beiden Burgen.',
+  boonSub: '{n} Nächte am Meer gehalten. Die Hafenstadt schenkt eine Gunst,\nfür dieses und jedes spätere Spiel, in jeder Burg.',
   boonHint: 'Tippe eine Gunst an, um sie zu behalten. Ein späteres Fest kann sie tauschen.',
   yourBoon: 'jetzt deine',
   purseName: 'Kaufmannsbeutel',

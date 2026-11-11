@@ -1615,9 +1615,11 @@ export class GameScene extends Phaser.Scene {
     } else if (e.type === 'ship') {
       this.popup(l.x, l.y - 40, e.guided ? t('shipGuided', { n: e.coins }) : t('shipTurned'), e.guided ? '#9ad8e8' : '#b8a8c8');
     } else if (e.type === 'closeCall') {
-      // A flare of light and sparks round the saved lantern.
-      const flare = this.add.image(l.x, l.y, 'glow-pale').setBlendMode(Phaser.BlendModes.ADD).setScale(1.1).setDepth(4);
-      this.tweens.add({ targets: flare, alpha: 0, duration: 900, onComplete: () => flare.destroy() });
+      // A flare of light and sparks round the saved lantern; reduce motion skips the flash and keeps the sparks still.
+      if (!settings.reduceMotion) {
+        const flare = this.add.image(l.x, l.y, 'glow-pale').setBlendMode(Phaser.BlendModes.ADD).setScale(1.1).setDepth(4);
+        this.tweens.add({ targets: flare, alpha: 0, duration: 900, onComplete: () => flare.destroy() });
+      }
       for (let k = 0; k < 14; k++) {
         const a = (k / 14) * Math.PI * 2 + 0.3;
         const r0 = 14 + (k % 3) * 6;

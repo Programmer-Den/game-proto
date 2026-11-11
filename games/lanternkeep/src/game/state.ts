@@ -234,6 +234,8 @@ export const BASE_SPEED = 160;
 export const BASE_LIGHT_MS = 1500;
 /** How long a lantern burns on a full fill of oil, before upgrades: longer on Easy, shorter on Hard. */
 export const baseBurnMs = () => byDifficulty(26_000, 20_000, 16_000);
+/** The daily night burns as on Normal on every difficulty, so it is the same dusk for every player. */
+export const DAILY_BURN_MS = 20_000;
 
 /**
  * The three kinds of moth. The jar holds them in KIND_ORDER (fast, slow, heavy, fast, ...), so
@@ -743,7 +745,7 @@ export function stats(s: GameState) {
     fireflies: s.levels.firefly,
     speed: BASE_SPEED * (1 + 0.2 * s.levels.wings),
     lightMs: Math.round(BASE_LIGHT_MS * 0.75 ** s.levels.wick),
-    burnMs: baseBurnMs() + 6_000 * s.levels.oil,
+    burnMs: (s.daily ? DAILY_BURN_MS : baseBurnMs()) + 6_000 * s.levels.oil,
   };
 }
 
@@ -1635,7 +1637,8 @@ function startDusk(s: GameState) {
   s.report = null;
   s.order = orderFor(s.night);
   s.gusts = fitTimes(gustsFor(s.night, s.kind), GUST_WARN_MS, s.duskMax, GUST_LEAD_MS);
-  s.batTimes = batsFor(s.night, s.curses.bats);
+  // A bat comes only while a lantern is lit, so on a short dusk one is moved as late as a gust's first warning.
+  s.batTimes = fitTimes(batsFor(s.night, s.curses.bats), 0, s.duskMax, GUST_LEAD_MS);
   s.bats = [];
   s.chased = 0;
   s.gust = null;

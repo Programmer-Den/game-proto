@@ -182,7 +182,7 @@ const en = {
     other: '{n} raiders are out hunting your cargo!',
   },
   crewHold: 'Crew {crew}/{max}   Hold {hold}',
-  flareButton: 'Flare (F)   {n} left',
+  flareButton: 'Flare (R)   {n} left',
   bountyStanding: 'still standing',
   bountyLost: 'lost',
   bountyDone: 'done',

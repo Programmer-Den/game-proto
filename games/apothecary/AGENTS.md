@@ -847,7 +847,7 @@ Under browser automation the engine is a no-op, so the playthrough is unchanged.
 | `pay` | purple markers (`addLevelMarker`, `addBuildMarker`) and the herb market's buy marker, pitched up as the price fills |
 | `upgrade` | a level, craftsman, recipe, pixie route or build fully paid |
 | `toss` | a hands slot tapped (`dropItem`) |
-| `sell` / `served` | `createSound`: `state.sold` went up / an order left with nothing more to want |
+| `sell` / `served` | `createSound`, with the counter on screen: `state.sold` went up / an order left with nothing more to want |
 | `cascade` | the till collected, the herb market's sell marker, a crate sold to the wagon, a royal request filled |
 | `upgrade` (town map) | the next town founded |
 | `drop` | the alchemy bench's drop marker |
@@ -855,7 +855,7 @@ Under browser automation the engine is a no-op, so the playthrough is unchanged.
 | `bubble` | a bench mix that discovers nothing, Make |
 | `cascade` | a bench potion sold |
 | `plagueUp` | a cure given to the town |
-| `hmph` | `createSound`, an order gone with wants left and no patience |
+| `hmph` | `createSound`, with the counter on screen, an order gone with wants left and no patience |
 | `missed` | `createContract`, a day ended with its contract missed |
 | `rush` | `createSound`, a market day's crowd arrives |
 | `blight` | `createSound`, more beds blighted than last frame |

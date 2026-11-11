@@ -161,8 +161,8 @@ stone joints, the lanterns have coloured-glass panes and the moths are lace-wing
       then for the harbour master's lamp (a teal ring marks it). If that lantern is lit when the
       ship arrives 12 seconds later it pays 6 coins ("ship guided home!"); dark, it turns away.
     Keep ten nights in the harbour for the **Harbour Festival**, which offers three boons. The one
-    you pick lasts the rest of the game and every later game, in both keeps (a later Harbour
-    Festival can swap it):
+    you pick lasts the rest of the game and every later game, in every keep (a later
+    festival can swap it):
     - **Merchant's purse**: every game starts with 30 coins.
     - **Harbour cask**: the cask holds two more fills (8) and starts full.
     - **Pilot firefly**: every game starts with a free Firefly level.
@@ -281,6 +281,7 @@ stone joints, the lanterns have coloured-glass panes and the moths are lace-wing
 
 The difficulty, set on the hub page's Settings, changes one thing: lanterns burn 26 seconds on
 Easy and 16 on Hard, instead of 20. (A heavy moth's lanterns burn 50% longer on every setting.)
+The daily night always burns 20 seconds, so it is the same dusk on every setting.
 
 ### Trophies
 

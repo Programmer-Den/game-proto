@@ -88,7 +88,7 @@ Implemented today:
   `send`). When a side has no cabbages left the phase is `won` with `g.winner` (0 left, 1 right, -1
   a draw). A tower (`fire`'s `reaches`, and a cannon's splash in `moveShot` through `Shot.side`) and a trap
   (`springTraps`) act only on the foes of their own half (`gateSide` of the foe against `sideOf` the
-  cell), never across the fence. The scene draws a fence instead of the dashed line, both cottages, the right side's
+  cell), never across the fence, and a beehive (`boosts`) speeds only the towers of its own half. The scene draws a fence instead of the dashed line, both cottages, the right side's
   cabbages by its gold, and an end panel with `versusLeft`/`versusRight`/`versusDraw` and Rematch
   (`again`); a versus game is never kept, notes no records, pays no seeds and earns no trophies.
 - The night garden (`night` in `MODES`): `waveGroups(n, true)` leads every wave with
@@ -106,7 +106,8 @@ Implemented today:
   nothing. The banner `nightStart` tells the rule.
 - Maze codes (`game/code.ts`): `mazeCode(g)` is `<garden>.<hedges>.<towers>`, the hedges one bit a
   cell in base64url with trailing `A`s cut, and each other tower three base64url characters (cell,
-  its number in `KINDS`, level; traps left out); `readCode` gives the garden and the towers, hedges
+  its number in `KINDS`, level; traps left out; a daily maze's extra rocks, which its garden
+  lacks, written as hedges); `readCode` gives the garden and the towers, hedges
   first, or null. With one gardener the top bar's `code` button (left of Gardens, `CODE_BUTTON`)
   runs `copyCode`: the clipboard, or a `prompt` with the code where it is shut, then the banner
   `codeCopied`. In Sandbox the picker's `plant` button (under the shed) runs `plantCode`: a
@@ -132,7 +133,7 @@ Implemented today:
   `watch-<garden>` button starts `replayGame(r)`, and `GameScene.update` calls `replayStep` before
   each `step`, so the game plays out exactly as it did. A replay carries `REPLAY_VERSION` as `v`;
   `loadReplays` drops one of another version, or with a mode, tower or action it doesn't know. While `replay` is set, the board and keys
-  take nothing but F, the bottom bar shows `replayLabel` and the speed button (1x, 2x, 4x;
+  take nothing but X, the bottom bar shows `replayLabel` and the speed button (1x, 2x, 4x;
   `faster`), and records, seeds and replays are left alone; the end panel has Watch again
   (`again`) and Gardens. Any new chance in the sim must use `rand(g)`, never `Math.random`, and any
   new player action must call `note`, or replays drift. Raise `REPLAY_VERSION` with any change that
@@ -262,7 +263,7 @@ Implemented today:
 - Hover preview: the routes as they would be with the hovered tile planted, or the no-entry ring;
   made again when the board changes or a ground foe or loose cabbage moves on, and not shown while
   watching a replay.
-- Drag to plant a line; keys 1 to 8 (the pouch, in order), U and S (upgrade and sell mode), Space and F; a 2x speed button. The
+- Drag to plant a line; keys 1 to 8 (the pouch, in order), U and S (upgrade and sell mode), Space and X (F is the shared full-screen key); a 2x speed button. The
   picked tool's use is told in the top bar.
 - Banners name each new foe kind the first time it comes, the second burrow (and each later one,
   `burrowOpens`), the first stolen

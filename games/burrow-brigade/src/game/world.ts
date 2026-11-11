@@ -560,7 +560,9 @@ export class World {
           const f = inCone(k.x, k.y - 9, 150);
           if (f > 0) {
             k.landed = false;
-            k.x += Math.cos(angle) * 40 * f;
+            // Slid along a pixel at a time, stopping at a bank of earth rather than going into it.
+            const dx = Math.cos(angle) * 40 * f;
+            for (let i = 0; i < Math.abs(dx) && !t.solid(k.x + Math.sign(dx), k.y - 6); i++) k.x += Math.sign(dx);
             k.vy = -140 * f;
           }
         }
@@ -1137,7 +1139,6 @@ export class World {
     if (this.bees.length && Math.floor(this.time * 2) !== Math.floor((this.time - DT) * 2)) this.hooks.sound('buzz');
   }
 
-  /** Drops a crate from the sky at `x`. */
   /** Stands a powder keg on the ground below (x, y). */
   addKeg(x: number, y: number) {
     this.kegs.push({ x, y, vy: 0, landed: false, gone: false });
@@ -1173,6 +1174,7 @@ export class World {
     this.kegs = this.kegs.filter((k) => !k.gone);
   }
 
+  /** Drops a crate from the sky at `x`. */
   dropCrate(x: number, kind: 'weapon' | 'health', weapon: WeaponId | null) {
     this.crates.push({ x, y: -20, vy: 0, kind, weapon, landed: false, gone: false, sway: Math.random() * 6 });
   }

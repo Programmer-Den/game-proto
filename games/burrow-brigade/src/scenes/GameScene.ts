@@ -48,6 +48,9 @@ const LEFT_PANEL = 104;
 const DAILY_SHOTS = 5;
 const DAILY_TARGETS = 4;
 const DAILY_KO = 25;
+/** The daily range's map is this size whatever the screen's shape, so everyone shoots the same range. */
+const DAILY_W = 960;
+const DAILY_H = 540;
 const GAME = 'burrow-brigade';
 const FONT = '"Trebuchet MS", "Segoe UI", system-ui, sans-serif';
 const hex = (n: number) => '#' + n.toString(16).padStart(6, '0');
@@ -139,6 +142,11 @@ export class GameScene extends Phaser.Scene {
   private hover = { x: 0, y: 0 };
   private keys!: Record<string, Phaser.Input.Keyboard.Key>;
   private lostMole = false;
+  /** The browser's own `Math.random` while the daily range's seeded one stands in for it, else null. */
+  private realRandom: (() => number) | null = null;
+  /** How far the daily range's fixed map sits from the view's top-left (0 outside the daily). */
+  private ox = 0;
+  private oy = 0;
 
   constructor() {
     super('Game');
@@ -195,10 +203,11 @@ export class GameScene extends Phaser.Scene {
       vstars: this.campaign.vstars.slice(),
       acorns: this.campaign.acorns,
       dailyScore: this.daily?.score ?? null,
+      offset: { x: this.ox, y: this.oy },
       weather: this.weather,
       difficulty: difficulty(),
       hat: this.prefs.hat,
-      view: { w: this.W, h: this.H },
+      view: { w: viewSize(this).width, h: viewSize(this).height },
     };
   }
 
@@ -235,17 +244,21 @@ export class GameScene extends Phaser.Scene {
     const th = this.theme;
     const dirt = [th.dirt, th.dirtDark, th.dirtLight].map((c) => parseInt(c.slice(1), 16));
     this.world = new World(this.terrain, this.H - WATER_GAP, { sound: (n) => this.sfx(n), shake: (p) => this.shake(p) }, dirt);
-    this.objs.push(paintSky(this, this.W, this.H, th));
-    this.art = new TerrainArt(this, this.terrain, th, 2);
+    // The sky fills the whole view, also round the daily range's smaller map.
+    const view = viewSize(this);
+    this.objs.push(this.looks(() => paintSky(this, view.width, view.height, th)).setPosition(-this.ox, -this.oy));
+    this.art = this.looks(() => new TerrainArt(this, this.terrain, th, 2));
     const spots = spawnPoints(this.terrain, size, this.world.water);
-    const names = NAMES.map((n) => n.slice().sort(() => Math.random() - 0.5));
+    const names = this.looks(() => NAMES.map((n) => n.slice().sort(() => Math.random() - 0.5)));
     this.teams = [0, 1].map((i) => ({
       index: i, ai: false, ammo: startingAmmo(), weapon: 'rocket' as WeaponId, next: 0,
       moles: spots[i].map((p, k) => this.world.addMole(i, names[i][k], p.x, p.y, hp[i])),
     }));
     this.world.onCollect = (m, c) => this.onCrate(m, c.weapon);
-    this.clouds = Array.from({ length: 6 }, () => ({ x: Math.random() * this.W, y: 30 + Math.random() * this.H * 0.25, s: 0.6 + Math.random() * 0.7 }));
-    this.specks = Array.from({ length: 18 }, () => ({ x: Math.random() * this.W, y: Math.random() * this.H * 0.7, ph: Math.random() * 6 }));
+    this.looks(() => {
+      this.clouds = Array.from({ length: 6 }, () => ({ x: Math.random() * this.W, y: 30 + Math.random() * this.H * 0.25, s: 0.6 + Math.random() * 0.7 }));
+      this.specks = Array.from({ length: 18 }, () => ({ x: Math.random() * this.W, y: Math.random() * this.H * 0.7, ph: Math.random() * 6 }));
+    });
     if (th.id === 'ember') this.world.splash = 0xffb04d;
     this.placeKegs(2 + Math.floor(Math.random() * 2));
     for (const m of this.world.moles) {
@@ -253,6 +266,35 @@ export class GameScene extends Phaser.Scene {
         .setOrigin(0.5, 1).setDepth(8);
       this.labels.set(m, label);
     }
+  }
+
+  /**
+   * Runs `fn` on the browser's own `Math.random` during the daily range, so the looks of the map
+   * (sky, earth, names, clouds), whose draws vary with the screen and the browser, never shift the
+   * day's seeded draws for the map, the kegs and the winds. Outside the daily it just runs `fn`.
+   */
+  private looks<T>(fn: () => T): T {
+    if (!this.realRandom) return fn();
+    const seeded = Math.random;
+    Math.random = this.realRandom;
+    try {
+      return fn();
+    } finally {
+      Math.random = seeded;
+    }
+  }
+
+  /**
+   * Sizes the world: the whole view, or for the daily range a fixed DAILY_W by DAILY_H map in the
+   * middle of the view (the camera moved to frame it), the same on every screen.
+   */
+  private fitWorld(daily: boolean) {
+    const view = viewSize(this);
+    this.W = daily ? DAILY_W : view.width;
+    this.H = daily ? DAILY_H : view.height;
+    this.ox = (view.width - this.W) / 2;
+    this.oy = (view.height - this.H) / 2;
+    this.cameras.main.setScroll(-this.ox, -this.oy);
   }
 
   /** Stands `n` powder kegs on dry ground, clear of every mole and of each other. */
@@ -271,6 +313,7 @@ export class GameScene extends Phaser.Scene {
 
   showMenu() {
     this.clearAll();
+    this.fitWorld(false);
     this.screen = 'menu';
     this.phase = 'over';
     this.active = null;
@@ -539,17 +582,21 @@ export class GameScene extends Phaser.Scene {
     this.lostMole = false;
     this.dealt.clear();
     this.daily = null;
+    this.fitWorld(mode === 'daily');
     playMusic(SONG, 'battle');
     if (mode === 'daily') {
-      // Today's map, kegs and winds come from the day's seed, so every player shoots the same range.
+      // Today's map, kegs and winds come from the day's seed, on a map of one size for every screen,
+      // so every player shoots the same range.
       const rand = dailyRand(GAME);
       const real = Math.random;
+      this.realRandom = real;
       Math.random = rand;
       try {
         this.buildWorld([1, DAILY_TARGETS]);
         this.dailyWinds = Array.from({ length: DAILY_SHOTS }, () => Math.round((rand() * 2 - 1) * 10));
       } finally {
         Math.random = real;
+        this.realRandom = null;
       }
     } else this.buildWorld(bt ? [bt.mine + this.boost.moles, bt.foes + (this.veteran ? VETERAN.foes : 0)] : this.size, bt?.theme, [MAX_HP + this.boost.hp, MAX_HP]);
     if (bt) for (const [id, n] of Object.entries(bt.bonus) as [WeaponId, number][]) this.teams[1].ammo[id] += n + (this.veteran ? VETERAN.ammo : 0);
@@ -566,6 +613,8 @@ export class GameScene extends Phaser.Scene {
     if (mode !== 'watch') for (const tm of mode === 'duo' ? this.teams : [this.teams[0]]) for (const m of tm.moles) if (!m.hat) m.hat = this.prefs.hat;
     const roll = Math.random();
     this.weather = mode === 'daily' || !this.prefs.options.weather ? 'clear' : roll < 0.6 ? 'clear' : roll < 0.75 ? 'rain' : roll < 0.9 ? 'fog' : 'gusts';
+    // Gusts would undo a battle's calm or howling wind, so those battles stay clear instead.
+    if (this.weather === 'gusts' && bt && bt.wind !== 'normal') this.weather = 'clear';
     this.world.rain = this.weather === 'rain';
     this.gustT = 5;
     this.teams[0].ai = mode === 'watch';
@@ -1304,7 +1353,8 @@ export class GameScene extends Phaser.Scene {
 
   private render() {
     const w = this.world;
-    const time = w.time;
+    // Reduced motion holds every blink, flicker and wobble still.
+    const time = this.still() ? 0 : w.time;
     this.art?.sync();
     // Clouds and the specks the wind blows.
     const s = this.skyG.clear();
@@ -1335,7 +1385,8 @@ export class GameScene extends Phaser.Scene {
     for (const b of w.beams) drawBeam(g, b);
     this.drawAim(g);
     const fx = this.fx.clear();
-    for (const p of w.particles) drawParticle(fx, p);
+    // Reduced motion also skips the flash of each blast.
+    for (const p of w.particles) if (!(p.kind === 'flash' && this.still())) drawParticle(fx, p);
     this.drawWater();
     this.drawWeather();
     this.drawLabels();
@@ -1350,8 +1401,9 @@ export class GameScene extends Phaser.Scene {
     const w = WEAPONS[id];
     const col = TEAM_COLORS[m.team];
     // A bouncing arrow over the mole whose turn it is.
+    const time = this.still() ? 0 : this.world.time;
     if (this.banner > 0) {
-      const by = m.y - 50 - Math.abs(Math.sin(this.world.time * 5)) * 6;
+      const by = m.y - 50 - Math.abs(Math.sin(time * 5)) * 6;
       g.fillStyle(INK, 1);
       g.fillTriangle(m.x - 9, by - 2, m.x + 9, by - 2, m.x, by + 11);
       g.fillStyle(col, 1);
@@ -1399,8 +1451,13 @@ export class GameScene extends Phaser.Scene {
     if (team.ai && this.ai.stage === 'mark' && this.ai.plan) {
       const { tx, ty } = this.ai.plan;
       g.lineStyle(2, 0xffffff, 0.9);
-      g.strokeCircle(tx, ty - 10, 10 + Math.sin(this.world.time * 10) * 2);
+      g.strokeCircle(tx, ty - 10, 10 + Math.sin(time * 10) * 2);
     }
+  }
+
+  /** Whether the hub's reduced motion is on: blinking and flickering then hold still. */
+  private still() {
+    return settings.reduceMotion;
   }
 
   /** Rain streaks blown by the wind, or banks of fog drifting over the hills. Held still with reduced motion. */
@@ -1433,9 +1490,13 @@ export class GameScene extends Phaser.Scene {
     const top = this.world.water;
     const time = this.world.time;
     const wave: { x: number; y: number }[] = [];
-    for (let x = 0; x <= this.W + 8; x += 8) wave.push({ x, y: top + Math.sin(x / 22 + time * 2) * 3 });
+    // Across the whole view, also round the daily range's smaller map.
+    const x0 = -this.ox - 8;
+    const x1 = this.W + this.ox + 8;
+    const bottom = this.H + this.oy + 10;
+    for (let x = x0; x <= x1; x += 8) wave.push({ x, y: top + Math.sin(x / 22 + time * 2) * 3 });
     g.fillStyle(this.theme.water, 0.88);
-    g.fillPoints(pts([...wave, { x: this.W + 8, y: this.H + 10 }, { x: 0, y: this.H + 10 }]), true);
+    g.fillPoints(pts([...wave, { x: x1, y: bottom }, { x: x0, y: bottom }]), true);
     g.lineStyle(3, this.theme.waterTop, 0.9);
     g.strokePoints(pts(wave), false);
     g.fillStyle(0xffffff, 0.3);
@@ -1539,7 +1600,7 @@ export class GameScene extends Phaser.Scene {
       const b = this.buttons.weapon;
       ig.fillStyle(0xffffff, 1);
       ig.fillCircle(b.x - b.w / 2 + 26, b.y, 20);
-      drawWeaponIcon(ig, this.teams[this.turn].weapon, b.x - b.w / 2 + 26, b.y, 0.95, this.world.time);
+      drawWeaponIcon(ig, this.teams[this.turn].weapon, b.x - b.w / 2 + 26, b.y, 0.95, this.still() ? 0 : this.world.time);
     }
   }
 }

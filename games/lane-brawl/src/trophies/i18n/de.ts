@@ -16,7 +16,7 @@ const de: Translation<typeof en> = {
   beast: 'Bestienbändiger',
   beastText: 'Hilf deinem Team, die Wächterbestie zu erlegen.',
   firstWin: 'Nexus gefallen',
-  firstWinText: 'Gewinne ein volles Match auf drei Lanes.',
+  firstWinText: 'Gewinne ein volles Match, kein schnelles.',
   drakeSoul: 'Drachenseele',
   drakeSoulText: 'Hilf deinem Team, in einem Match vier Drachen zu erlegen.',
   flawless: 'Unantastbar',

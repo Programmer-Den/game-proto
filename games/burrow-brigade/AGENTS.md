@@ -11,8 +11,11 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
   menu. There is no save of a match under way.
 - **Daily range** (`mode` `daily`, `startDaily` in the scene, with `shared/daily.ts`): one try a
   day. `Math.random` is swapped for `dailyRand` while `buildWorld` makes the map, theme and kegs,
-  and the five winds (`dailyWinds`) are drawn from it too, so everyone shoots the same range: one
-  blue mole against `DAILY_TARGETS` (4) straw moles that never take a turn, for `DAILY_SHOTS` (5)
+  and the five winds (`dailyWinds`) are drawn from it too, so everyone shoots the same range: the
+  map is `DAILY_W` by `DAILY_H` (960x540) on every screen, framed in the middle of the view by
+  `fitWorld` (which moves the camera; the sky and water fill the rest), and the looks whose draws
+  vary with the screen or the browser (sky, earth, names, clouds) run on the real `Math.random`
+  (`looks`). One blue mole against `DAILY_TARGETS` (4) straw moles that never take a turn, for `DAILY_SHOTS` (5)
   turns. The score (`dailyScore`) is the damage done to them plus `DAILY_KO` (25) for each one
   out; `finishDaily` keeps today's, the best and the streak, shown on the menu and the result.
 - **Match report:** `dealt` adds up each mole's damage to enemies (from `World.log.damage` at the
@@ -76,7 +79,7 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
   hurting itself or a friend. A shot whose blast reaches a powder keg next to an enemy scores as a
   hit (and as a self or friendly hit if the keg is next to its own side). With no shot within 170
   px it walks towards the target once and plans
-  again. `aimError` from the difficulty (`byDifficulty(2.4, 1, 0.35)`) shakes the chosen angle and
+  again. `aimError` from the difficulty (`byLevel(2.4, 1, 0.35)`) shakes the chosen angle and
   power.
 - **Difficulty:** the AI's aim error above, and the aim preview while dragging or charging:
   `byLevel(3, 0.75, 0)` seconds of the path (Easy all of it, Normal its start, Hard none).
@@ -85,10 +88,11 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
 - **Options** (`game/options.ts`, the menu's Options panel, `showOptions`): Difficulty (Hub, Easy,
   Normal, Hard), Turn time for quick matches (`TURN_CHOICES`, 30 s by default; the campaign keeps
   30 plus its upgrades and the daily its own), Crates in quick matches (`CRATE_ODDS`, Normal is the
-  40% chance) and Weather on or off. The defaults play exactly as before.
+  40% chance) and Weather on or off. The defaults keep the hub's difficulty, 30 s turns and the 40% crates;
+  weather is on.
 - **Weather** (`weather` in the scene): rolled at the start of a quick or campaign match when the
   option is on (60% clear, 15% rain, 15% fog, 10% gusts, from one `Math.random` in `startMatch`),
-  never in the daily range. Rain (`World.rain`) puts fires out twice as fast and draws streaks,
+  never in the daily range, and never gusts in a battle with a strong or calm wind (it stays clear). Rain (`World.rain`) puts fires out twice as fast and draws streaks,
   fog halves the aim preview and draws drifting banks (held still with reduced motion), gusts shift
   the wind once in the middle of a turn. The wind panel names it (`weather_<id>`).
 - **Hats** (`game/hats.ts`): seven hats for your moles, each opened by a number of campaign stars
@@ -122,9 +126,12 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
   `ParticleKind`) are drawn by `drawParticle`. Nothing in drawing uses `Math.random`.
 - Input: a press within 44 px of the active mole starts the slingshot drag (`onDown`, `onMove`,
   `onUp`); any other press walks there, or picks the target for a `target` weapon. Buttons are made
-  by `button(id, ...)` and recorded in `buttons[id]` (middle and size in view pixels).
+  by `button(id, ...)` and recorded in `buttons[id]` (middle and size in world pixels, which are
+  the view's except in the daily range, where `state.offset` is added).
 - Sound goes out of `World` through `Hooks.sound` and the camera shake through `Hooks.shake`
-  (skipped with reduced motion).
+  (skipped with reduced motion). With reduced motion `render` also draws with the time held at 0
+  (`still`), so blinking mines, flickers and the Storm Bolt's flash hold still, and skips the
+  flash of each blast.
 
 ## Save keys
 
@@ -142,7 +149,7 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
 - `window.game` (dev build). `scene.state` gives `screen`, `phase`, `mode`, `turn`, `turns`,
   `wind`, `weapon`, `active` (`id`, `team`, `x`, `y`, `hp`, `alive`), `craters`, `shots`, `busy`,
   `teams` (`alive`, `hp`), `winner`, `arsenal`, `battle` (the campaign battle, or null), `stars`
-  (the campaign's best stars), `veteran`, `vstars`, `acorns`, `dailyScore` (the daily range's score once it ends), `difficulty` (the one in force), `weather`, `hat` and `view` (the view's size, to turn view pixels into
+  (the campaign's best stars), `veteran`, `vstars`, `acorns`, `dailyScore` (the daily range's score once it ends), `offset` (where the daily range's map sits in the view, 0 otherwise), `difficulty` (the one in force), `weather`, `hat` and `view` (the view's size, to turn view pixels into
   page pixels). `scene.buttons` has every button by id: `play-ai`, `campaign`, `play-duo`, `daily`,
   `size-down`, `size-up`, `weapon`, `left`, `right`, `jump`, `fire`, `rematch`, `menu`, `w-<id>`
   for the arsenal's tiles while it is open, `battle-<i>`, `depot`, `back` and (once the

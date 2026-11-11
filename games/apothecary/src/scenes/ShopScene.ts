@@ -1003,8 +1003,9 @@ export class ShopScene extends Phaser.Scene {
   }
 
   /**
-   * Sounds of what the shop does on its own: a station done, a sale, an order filled or walked off,
-   * the blight striking and a market crowd coming in; and the music, the rush's while a crowd waits.
+   * Sounds of what the shop does on its own: a station on screen done, a sale, an order filled or
+   * walked off (with the counter on screen), the blight striking and a market crowd coming in; and
+   * the music, the rush's while a crowd waits.
    */
   private createSound() {
     let made = shopStations(this.def).map((s) => this.shop.stations[s.id].output.length);
@@ -1024,13 +1025,18 @@ export class ShopScene extends Phaser.Scene {
         if (crowd) playMusic(RUSH_SONG, 'rush');
         else playMusic(SONG, 'calm');
       }
-      const now = shopStations(this.def).map((s) => this.shop.stations[s.id].output.length);
-      if (now.some((n, i) => n > made[i])) sfx('bubble');
+      // A station's pop and the counter's sounds only for what is on screen, as at the apothecary.
+      const view = this.cameras.main.worldView;
+      const seen = ({ x, y }: Point) => view.contains(x, y);
+      const stations = shopStations(this.def);
+      const now = stations.map((s) => this.shop.stations[s.id].output.length);
+      if (now.some((n, i) => n > made[i] && seen(stationLayout(this.id, stations[i].id).at))) sfx('bubble');
       made = now;
       const gone = orders.filter((o) => !this.shop.orders.includes(o));
-      if (gone.some((o) => o.wants.length === 0)) sfx('served');
-      else if (this.shop.sold > sold) sfx('sell');
-      if (gone.some((o) => o.wants.length > 0)) sfx('hmph');
+      const atCounter = seen(counterLayout(this.id).counter);
+      if (atCounter && gone.some((o) => o.wants.length === 0)) sfx('served');
+      else if (atCounter && this.shop.sold > sold) sfx('sell');
+      if (atCounter && gone.some((o) => o.wants.length > 0)) sfx('hmph');
       orders = [...this.shop.orders];
       sold = this.shop.sold;
     });

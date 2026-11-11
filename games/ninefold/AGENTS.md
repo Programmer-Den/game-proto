@@ -107,7 +107,7 @@ Implemented today:
   leaves the pool; `offer` 5: one relic fewer offered, the two cards sit between the three spots).
   `ASCENSION_RULES` in `catalog.ts` names each rule's text for the menu. The scene's `pickAscent`
   is the ascension the menu's Delve button starts at (the `ascent-down`/`ascent-up` arrows, shown
-  once one is open).
+  once one is open); the run-over card's Delve again starts at the ended run's `ascent`.
 - The weekly gauntlet (`mode: 'weekly'`): `GAUNTLET` lists the seven boards (givens and a board
   twist), Monday first; `startWeekly` deals today's from `seeded(weekSeed * 10 + weekDay)` once a
   day (it sets `Progress.weekScores[day]` to 0, so the try is used, and returns false when it
@@ -149,7 +149,7 @@ Missing or rough:
 File map (`src/`):
 
 - `main.ts`: creates the `Phaser.Game` (960x540 from `VIEW`, `Phaser.Scale.FIT`) with `GameScene`,
-  calls `setupGame(game, { howToPlay })` and then `setupScaling(game, { fill: true, bothWays: true })`, and in dev
+  calls `setupGame(game, { howToPlay, trophies })` and then `setupScaling(game, { fill: true, bothWays: true })`, and in dev
   builds puts `game` on `window`.
 - `howToPlay.ts`: the How to play text in English (also used for US English, which spells nothing
   differently there) and German; update both when the controls or the first round change.
@@ -173,7 +173,7 @@ File map (`src/`):
 - `game/catalog.ts`: `STYLES`/`StyleId`/`STYLE_INFO`, `MONTH_STYLE`, `PALETTE_STYLES`, `RELICS`/`RelicId`/`RELIC_INFO`, `TWISTS`/`Twist`/`TWIST_INFO`
   with `BOARD_TWISTS` and `PRESSING_TWISTS`, `ASCENSION_RULES`/`MAX_ASCENT` and `LEVELS` (`easy`,
   `normal`, `hard`, `killer`, `thermo`, `arrow`, `kropki`, `sandwich`).
-- `game/save.ts`: `loadProgress` and `saveProgress`.
+- `game/save.ts`: `loadProgress` and `saveProgress`, and `saveBoard` and `loadBoard` for the board in play.
 - `scenes/GameScene.ts`: everything drawn and all input.
 - `scenes/themes.ts`: `Theme`, `THEMES` (one per style) and `hex`.
 - `scenes/layout.ts`: the `Layout` type and its two values, `WIDE` (960x540) and `TALL` (540x960),
@@ -271,7 +271,7 @@ mistake, earns only First fill. A new trophy needs its id in `index.ts`, its two
 All sound is made in code by `shared/audio.ts`; `src/audio.ts` holds the song and effects, and
 only `GameScene` plays them. Nothing plays under browser automation.
 
-Music, `SONG` (84 BPM, a triangle music-box lead): `menu` on the menu and style screens, `calm` on
+Music, `SONG` (84 BPM, a triangle music-box lead): `menu` on every screen but the board (menu, styles, school, calendar), `calm` on
 Classic and daily boards (G major), `delve` on Delve floors (A minor, busier drums); stings `solved`
 (every solved board) and `over` (a Delve run ends). `drain` calls `playMusic` every frame with the
 part for the screen; the engine only switches when it changes.

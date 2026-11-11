@@ -718,7 +718,8 @@ function separate(s: GameState) {
 function aimBroadsides(s: GameState, dt: number) {
   const player = s.player;
   for (const side of SIDES) {
-    player.reload[side] = Math.max(0, player.reload[side] - dt * crewPace(player));
+    // Enemy grapeshot jams her reload just as the player's jams theirs.
+    player.reload[side] = Math.max(0, player.reload[side] - reloadStep(player, dt));
     const loaded = player.reload[side] <= 0;
     if (s.aim[side]) {
       if (loaded) s.charge[side] = Math.min(1, (s.charge[side] ?? 0) + dt / CHARGE_MS);

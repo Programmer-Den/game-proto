@@ -92,7 +92,8 @@ wave brings a sea serpent or a kraken, and every fourth wave sails at night.
   twice its loot; prizes left at the wave's end are sold for their loot in `reachHarbor`. Loadable
   shot (`src/game/shot.ts`): `GameState.loadout` per side, cycled at the harbor by `loadShot`; the
   chain and grape orders load both sides for the wave instead (`loadedShot`); grapeshot has
-  `range: 0.7` (`sideRange`) and a hit sets `Ship.jamMs`, slowing that ship's reload. Admiralty
+  `range: 0.7` (`sideRange`) and a hit sets `Ship.jamMs`, slowing that ship's reload (`reloadStep`, which
+  `aimBroadsides` uses for the player's own guns too). Admiralty
   rewards (`src/game/admiralty.ts`): `playerSunk` sets `GameState.medals` (`medalsFor`: one per
   wave beaten, `BEST_BONUS` more for beating `bestBefore`), the scene banks them, and the game-over
   panel spends them on `BOONS` passed to `newRun` on "Sail again". Hold-to-aim broadsides for the player (`aim` and `charge` in the
@@ -176,7 +177,7 @@ wave brings a sea serpent or a kraken, and every fourth wave sails at night.
   set the firing ship's `flashMs` (`FLASH_MS`, counted down in `tick`). `seen(s, e)` is true by
   day, under a flare (`flareMs`), while `e.flashMs` runs or within `NIGHT_SIGHT` of the player;
   `firePlayer`, `nearestFoe` (the Mortar perk, a prize ketch's mortar and the prizes' hunting) and
-  `escortBroadsides` only target enemies `seen`. `fireFlare` (the scene's Flare button or F) spends a
+  `escortBroadsides` only target enemies `seen`. `fireFlare` (the scene's Flare button or R; F stays the shared full-screen key) spends a
   flare, sets `flareMs` to `FLARE_MS` and leaves a `flare` effect. The darkness itself is the
   scene's: see "Rendering".
 - **Screens:** there is only `GameScene`. The wave banner (its line under the title picks, in

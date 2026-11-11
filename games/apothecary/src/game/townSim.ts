@@ -226,10 +226,13 @@ function runRoute(id: ShopId, shop: ShopState, def: ShopDef, route: RouteDef, dt
   // Goods at the end land on their station's queue or the shelf, or wait there for room.
   state.items = state.items.filter((item) => {
     if (item.at < ms) return true;
+    // A good the doctor stocked while it was on its way may have filled the spot: then it waits.
     if (route.to === 'shelf') {
+      if (!shelfRoom(shop, item.good)) return true;
       shop.shelf.push(item.good);
       return false;
     }
+    if (!queueRoom(shop, route.to.station, item.good)) return true;
     shop.stations[route.to.station].queue.push(item.good);
     return false;
   });

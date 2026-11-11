@@ -265,8 +265,8 @@ in.
 
 ### How it runs
 
-- Boot: `BootScene.create` calls `bakeScenery`, `bakeFoes`, `bakeKnight`, `bakeIcons` and
-  `bakeHud`, which paint 2D canvases (`ink.ts`) and add them as textures. There are no asset files.
+- Boot: `BootScene.create` fits the layout to the view (`fitLayout(viewSize)`), then calls
+  `bakeScenery`, `bakeFoes`, `bakeKnight`, `bakePets`, `bakeIcons` and `bakeHud`, which paint 2D canvases (`ink.ts`) and add them as textures. There are no asset files.
   A texture shows as big as it appears on screen (its canvas has more pixels on a big screen; see
   Screen scaling); most art is written in page units (twice screen size,
   the mockup's scale) under `ctx.scale(0.5)`, the knight at 0.5 and the foes at 0.46 and 0.45.
@@ -285,7 +285,8 @@ in.
   a landing starts a skid, and the rockfall gains `ROCK.skid`); a landing on a cloud starts its
   `sinkMs`; stomp a foe landed on; stomp or bump the boss (`bossContact`);
   refill jumps when grounded; count down slide, hurt and skid (a jump queued during the skid fires
-  as it ends, in the air too if the knight walked off a ledge meanwhile); check one trap hit (the
+  as it ends, in the air too if the knight walked off a ledge meanwhile, unless a slide is pressed
+  after it, which drops it); check one trap hit (the
   heavy knight's `smash` knocks out a goblin or bat it touches instead, through `knockOut`, as a
   stomp does; a pit only takes a knight on the road, `h` 0, never one on a cloud over it; a pit
   even while unhurtable: the fall and the throw-out happen, marked by a `fall` puff, but cost nothing); let the rockfall gain `ROCK.hit` if a hit landed this tick, and
@@ -347,7 +348,7 @@ in.
   most `MARGIN.captionW` (540) wide, so it stays clear of the shared corner buttons in the bottom
   left (up to about 165 game px in on a small phone) and of the touch Slide and Jump buttons.
 - Terrain: `drawWorld` swaps the `ground` tile sprite's texture by `state.terrain`, `drawWeather`
-  draws snow (ice) or gust streaks (wind) on a `Graphics` at depth 4.4, under the frame, and
+  draws snow (ice), gust streaks (wind) or the Sky Road's gusts (sky) on a `Graphics` at depth 4.4, under the frame, and
   `drawHud` fills the stage's tag (ground, "Rockfall!" and road) and the dare's strip, and fades
   the stage title (`createTitle`; its rule text takes several lines: the ground's rule, the road,
   the rockfall and the dare) over its first `LEAD_IN` px. A boss is one image (depth 3.5) posed by
@@ -609,7 +610,8 @@ the stage), at most one sound of each kind a frame, so a row of coins or a volle
   the streak's sparkle trail is not drawn, the Gatekeeper's flash after a stomp is held at 0.6
   alpha, the snow and wind streaks, the dragon's tail lash bob, the boulders' roll and the
   rockfall's dust are drawn still, the owl holds still with its wings up, the lit fire vents and the dragon's rolling fire keep one frame
-  (`flames-lit0`, `fire-0`) instead of flickering, and the bats keep one wing frame with no bob, and a cloud about to fall doesn't tremble.
+  (`flames-lit0`, `fire-0`) instead of flickering, and the bats keep one wing frame with no bob, a cloud about to fall doesn't tremble, and the coins
+  keep their full face (`coin-0`) instead of turning.
 - Normal must stay exactly as designed: the playthrough runs on Normal and its `STAGE_1` expects 3
   hearts.
 - Keep the README's difficulty line (5 hearts on Easy, 2 on Hard) in sync with `byDifficulty`.

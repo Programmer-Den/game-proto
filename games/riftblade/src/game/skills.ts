@@ -4,11 +4,11 @@
  * `branch:<BranchId>` and `fusion:<id>`.
  */
 import type { TextKey } from '../i18n';
-import { HEROES, HERO_IDS } from './heroes';
+import { HEROES, HERO_IDS, type HeroId } from './heroes';
 import type { GameState } from './state';
 import { BRANCH_IDS, DRILLS, FUSIONS, FUSION_PREFIX, UPGRADES, UPGRADE_IDS, type BranchId } from './upgrades';
 
-export type SkillPageId = 'paths' | 'blaster' | 'blade' | 'current' | 'hollow' | 'gear' | 'branches' | 'fusions';
+export type SkillPageId = 'paths' | 'paths2' | 'blaster' | 'blade' | 'current' | 'hollow' | 'gear' | 'branches' | 'fusions';
 
 export interface SkillPage {
   id: SkillPageId;
@@ -20,9 +20,16 @@ export const BRANCH_PREFIX = 'branch:';
 
 const pool = (p: string) => UPGRADE_IDS.filter((id) => UPGRADES[id].kind === 'pool' && UPGRADES[id].pool === p);
 
-/** The pages, in the panel's order; the paths go hero by hero, each hero's drill last. */
+/** A run of heroes' paths, hero by hero, each hero's drill last. */
+const paths = (heroes: readonly HeroId[]) => heroes.flatMap((h) => [...HEROES[h].paths, DRILLS[h].id]);
+
+/**
+ * The pages, in the panel's order. The hero paths take two pages of twelve heroes each, so a page's
+ * list stays readable.
+ */
 export const SKILL_PAGES: readonly SkillPage[] = [
-  { id: 'paths', name: 'codexPaths', entries: HERO_IDS.flatMap((h) => [...HEROES[h].paths, DRILLS[h].id]) },
+  { id: 'paths', name: 'skillsPaths1', entries: paths(HERO_IDS.slice(0, 12)) },
+  { id: 'paths2', name: 'skillsPaths2', entries: paths(HERO_IDS.slice(12)) },
   { id: 'blaster', name: 'skillsBlaster', entries: pool('blaster') },
   { id: 'blade', name: 'skillsBlade', entries: pool('blade') },
   { id: 'current', name: 'skillsCurrent', entries: pool('current') },

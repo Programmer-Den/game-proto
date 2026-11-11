@@ -7,7 +7,7 @@ import { DUST, RUNE, type Break, fragment } from './art';
 // followed by the victim's fall (one per kind of victim, 5 in all, since a king is never taken), so
 // all 30 pairs have their own mix; the 8 pairs in `SIGNATURES` play a hand-made scene instead.
 // Quick captures skip the strike and play the fall at double speed. Reduce motion drops the
-// screen shake and the flashes.
+// screen shake and the flashes, and holds the trembles still.
 
 export type Sfx = 'step' | 'stomp' | 'slam' | 'chop' | 'crack' | 'shatter' | 'rubble' | 'bolt' | 'beam' | 'clash' | 'hum';
 
@@ -443,9 +443,13 @@ class Director {
         const qs = v.img.scale;
         this.face(v, a);
         await this.tween(v.img, { scale: qs * 1.2, y: v.img.y - S * 0.08 }, 420);
-        await this.tween(a.img, { x: a.img.x + 2 }, 60, 'Linear');
-        await this.tween(a.img, { x: a.img.x - 4 }, 60, 'Linear');
-        await this.tween(a.img, { x: a.img.x + 2 }, 60, 'Linear');
+        // The pawn trembles; with reduce motion on it stands still for the same beat.
+        if (this.st.still) await this.wait(180);
+        else {
+          await this.tween(a.img, { x: a.img.x + 2 }, 60, 'Linear');
+          await this.tween(a.img, { x: a.img.x - 4 }, 60, 'Linear');
+          await this.tween(a.img, { x: a.img.x + 2 }, 60, 'Linear');
+        }
         await this.walk(a.img, this.contact(a, v, 0.5), 420);
         await this.tween(a.img, { angle: a.img.flipX ? -10 : 10 }, 120);
         this.st.sfx('chop');
@@ -492,9 +496,13 @@ class Director {
         const knot = this.s.add.image(mid.x, mid.y, 'sm-puff').setTint(RUNE[a.side]).setDepth(this.st.depth + 3).setBlendMode(Phaser.BlendModes.ADD);
         knot.setDisplaySize(S * 0.6, S * 0.6);
         const sc = knot.scale;
-        for (let i = 0; i < 3; i++) {
-          await this.tween(knot, { scale: sc * 1.3, x: mid.x + (Math.random() - 0.5) * S * 0.1 }, 110);
-          await this.tween(knot, { scale: sc, x: mid.x }, 110);
+        // The knot throbs and jitters; with reduce motion on it holds still for the same time.
+        if (this.st.still) await this.wait(660);
+        else {
+          for (let i = 0; i < 3; i++) {
+            await this.tween(knot, { scale: sc * 1.3, x: mid.x + (Math.random() - 0.5) * S * 0.1 }, 110);
+            await this.tween(knot, { scale: sc, x: mid.x }, 110);
+          }
         }
         knot.destroy();
         await this.bolt(mid, at, RUNE[a.side], 220);

@@ -79,7 +79,7 @@ The hub's **Settings** button opens the settings every game shares. They are sav
   | Ninefold | 5 hints a Classic board, 4 hearts a Delve run | 2 hints a Classic board, 2 hearts a Delve run |
   | Augury | 4 hearts in Endless, Solo Run and the drafts, 4 minutes of Blitz | 2 hearts in Endless, Solo Run and the drafts, 2½ minutes of Blitz |
   | Mazewright | 25 cabbages, and foes have 20% less health | 10 cabbages, and foes have 25% more health |
-  | Stonemate | the Stone AI starts on Novice (level 2 of 7), which looks one move ahead and often picks a weaker move | the Stone AI starts on Club player (level 4 of 7), which looks three moves ahead and always plays its best, once beating level 3 has unlocked it; the menu picks any open level, and each win opens the next |
+  | Stonemate | the Stone AI starts on Novice (level 2 of 7), which looks one move ahead and sometimes picks a weaker move | the Stone AI starts on Club player (level 4 of 7), which looks three moves ahead and always plays its best, once beating level 3 has unlocked it; the menu picks any open level, and each win opens the next |
   | Burrow Brigade | the Burrow AI aims more than twice as loosely, and you see the whole flight path while aiming | the Burrow AI aims about three times as tightly, and you see none of the path (its Options can also set a difficulty for this game alone) |
 
 - **Frame rate (FPS)**: the most frames per second a game draws, 30 to 320 (60 by default).

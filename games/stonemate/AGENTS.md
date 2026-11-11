@@ -9,7 +9,8 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
   stays with White at the bottom), and the Capture gallery, which plays any of the 30 capture pairs
   on a three-square stage. **Continue game** comes back to a saved game.
 - **Rules:** full chess in `game/chess.ts`: castling, en passant, promotion (a picker with queen,
-  rook, bishop and knight; the AI always takes a queen), check, checkmate, and draws by stalemate,
+  rook, bishop and knight; the AI weighs all four like any other move, so it nearly always takes a
+  queen, but may pick another piece that scores as well, for instance one that is taken at once), check, checkmate, and draws by stalemate,
   too little material (kings alone, or one bishop or knight), fifty moves (100 plies without a
   capture or pawn move) and threefold repetition.
 - **Stone AI levels:** seven, in `LEVELS` (`game/rules.ts`), picked on the menu with the
@@ -74,7 +75,9 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
   on the sprites (`playCapture` or `playMove`, plus the rook when castling), then `pos.make`, then
   `syncPieces()` puts fresh sprites on the board from the position. `busy` holds input while a move
   plays or the AI thinks. After a move: the result is checked, the game saved, and `maybeAi()`
-  schedules the AI.
+  schedules the AI. Once a game ends (`finish` has counted it in the stats), `undo` refuses, and
+  the result box's New game plays the menu's level, or the highest open one if the arrows rest on a
+  locked level. Reduce motion also holds the Upset! tremble and the rune duel's knot still.
 - Buttons are `button(id, ...)`: an interactive rectangle with its text, recorded in `buttons[id]`
   (middle and size in view pixels) for the playthrough. The scene's own `pointerdown` handles the
   board only when no button was hit.

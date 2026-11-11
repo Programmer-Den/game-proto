@@ -610,7 +610,7 @@ export class GameScene extends Phaser.Scene {
   private onKey(e: KeyboardEvent) {
     if (this.screen !== 'play' || !this.state) return;
     const n = Number(e.key);
-    if (e.key.toLowerCase() === 'f') this.faster();
+    if (e.key.toLowerCase() === 'x') this.faster();
     else if (this.replay) return;
     else if (n >= 1 && n <= this.kit.length) this.pickTool(this.kit[n - 1]);
     else if (e.key.toLowerCase() === 'u') this.pickTool('upgrade');
@@ -1129,13 +1129,14 @@ export class GameScene extends Phaser.Scene {
     const walkers = s.foes.map((f) => (f.dead || FOE[f.kind].flies ? '' : f.to)).join() + '|' + s.loose.map((c) => c.to).join();
     if (this.preview?.cell === cell && this.preview.version === this.version && this.preview.walkers === walkers && this.preview.tool === tool) return this.preview;
     // A trap, a tower beside a path or one taking a hedge's place never blocks: the routes stay as they are.
+    // A bonfire or sunglass is shown facing the way `build` will turn it.
+    const face = TOWER[tool].faces ? bestFace(s, cell, tool) : 0;
     if (trap || s.blocked[cell] === LAWN || overHedge) {
-      this.preview = { cell, version: this.version, walkers, tool, blocks: false, face: 0, routes: routesWith(s) };
+      this.preview = { cell, version: this.version, walkers, tool, blocks: false, face, routes: routesWith(s) };
       return this.preview;
     }
     const blocks = wouldBlock(s, cell);
     const routes = blocks ? [] : routesWith(s, cell);
-    const face = TOWER[tool].faces ? bestFace(s, cell, tool) : 0;
     this.preview = { cell, version: this.version, walkers, tool, blocks, face, routes };
     return this.preview;
   }
@@ -1653,10 +1654,10 @@ export class GameScene extends Phaser.Scene {
   }
 }
 
-/** Stars as a row of ★, with ☆ for the ones still to win (three, or four once a fourth is won). */
 /** The run's tools for a way of play: the night garden always adds a lantern. */
 const kitFor = (mode: Mode, kit: TowerKind[]): TowerKind[] => (mode === 'night' ? [...kit, 'lantern'] : kit);
 
+/** Stars as a row of ★, with ☆ for the ones still to win (three, or four once a fourth is won). */
 const starText = (n: number) => '★'.repeat(n) + '☆'.repeat(Math.max(0, 3 - n));
 
 /** Seconds as m:ss. */

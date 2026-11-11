@@ -106,7 +106,7 @@ done it pays its crystal reward at once, gives your faction its rank perk for th
 battle, and the contract board opens over the top of the map with two contracts for the next
 rank. Tap one to take it; after 15 seconds the board takes the first card. The second board always
 offers Break the raid beside one other. A contract is never offered twice in a battle, and one that
-can't be played (no Veil Syndicate left for Break a Mine Lattice, say) stays off the board. Only
+can't be played (no Veil Syndicate rival left for Break a Mine Lattice, say, or only a Veil Syndicate ally) stays off the board. Only
 progress made while a contract is current counts.
 
 | Contract | From rank | Goal | Reward | Perk |
@@ -226,7 +226,7 @@ saved for next time, and a tap on one steps it on:
 
 | Option | Choices |
 | --- | --- |
-| Teams | Free for all, or teams: you and the top-left start against the two starts on the right, with the centre on its own. Your ally fights beside you (its ships and buildings can't be attacked, and it leaves the relay beacon to you), shares its sight (you see its ships wherever they are, and enemies in a nebula that it spots), and you win once every hub but yours and your ally's has fallen. The rivals never sign the last-stand pact in a teams skirmish |
+| Teams | Free for all, or teams: you and the top-left start against the two starts on the right, with the centre on its own. Your ally fights beside you (its ships and buildings can't be attacked, it leaves the relay beacon to you and it never claims your derelict stations), shares its sight (you see its ships wherever they are, and enemies in a nebula that it spots), and you win once every hub but yours and your ally's has fallen. The rivals never sign the last-stand pact in a teams skirmish |
 | Map size | Small (1360 by 850), standard (1600 by 1000) or large (1920 by 1200); the start points and the number of loose crystal fields scale with it |
 | Starting crystal | 60, 120 or 300 for every faction |
 | Wormholes | On or off (below) |

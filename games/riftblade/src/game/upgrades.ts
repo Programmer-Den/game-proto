@@ -945,7 +945,8 @@ const fusionReady = (f: FusionDef, kit: Kit) => f.needs.every((id) => (kit.ranks
 
 /**
  * What the fusions held shut out: the upgrades they lock, and (as `fusion:<id>`) every other fusion
- * that shares a half with one held or would fuse an upgrade a held fusion locks.
+ * that shares a half with one held, would fuse an upgrade a held fusion locks or would lock a held
+ * fusion's half.
  */
 export function lockedOf(kit: Kit): Set<string> {
   const out = new Set<string>();
@@ -953,14 +954,17 @@ export function lockedOf(kit: Kit): Set<string> {
   for (const f of held) for (const id of f.locks) out.add(id);
   for (const f of FUSIONS) {
     if ((kit.fusions[f.id] ?? 0) > 0) continue;
-    if (held.some((h) => h.needs.some((id) => f.needs.includes(id))) || f.needs.some((id) => out.has(id))) out.add(fusionCard(f.id));
+    // Shut out: a rival sharing a half with a held fusion, one needing a skill a held fusion locks,
+    // or one that would lock a held fusion's half (so the order they are taken in doesn't matter).
+    const rival = held.some((h) => h.needs.some((id) => f.needs.includes(id) || f.locks.includes(id)));
+    if (rival || f.needs.some((id) => out.has(id))) out.add(fusionCard(f.id));
   }
   return out;
 }
 
 /** What a fusion would shut out if taken now: its locks and the rival fusions open to this hero. */
 export function fusionShuts(f: FusionDef, hero: HeroId, kit: Kit): { upgrades: string[]; fusions: string[] } {
-  const rivals = FUSIONS.filter((o) => o.id !== f.id && fusionFits(o, hero, kit) && (o.needs.some((id) => f.needs.includes(id)) || o.needs.some((id) => f.locks.includes(id))));
+  const rivals = FUSIONS.filter((o) => o.id !== f.id && !kit.fusions[o.id] && fusionFits(o, hero, kit) && (o.needs.some((id) => f.needs.includes(id)) || o.needs.some((id) => f.locks.includes(id)) || f.needs.some((id) => o.locks.includes(id))));
   return { upgrades: [...f.locks], fusions: rivals.map((o) => o.id) };
 }
 

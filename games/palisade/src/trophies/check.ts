@@ -9,13 +9,20 @@ export const STREAK = 10;
 const FIRST_BOSS_WAVE = 10;
 const TOP_HEAT = 3;
 
+/** The relics the hero holds, less the daily siege's two starting relics, which are given, not won. */
+function won(s: GameState) {
+  const relics = { ...s.relics };
+  for (const id of s.daily?.relics ?? []) relics[id] = (relics[id] ?? 0) - 1;
+  return relics;
+}
+
 /** Whether each trophy's condition holds in the state. Cloud of arrows is awarded by `GameScene.loose`. */
 const EARNED: Record<string, (s: GameState) => boolean> = {
   firstWave: (s) => s.bestWave >= 1,
   firstGuard: (s) => s.guards.some((g) => g !== null),
   streak: (s) => s.streak.best >= STREAK,
   firstBoss: (s) => s.bestWave >= FIRST_BOSS_WAVE,
-  relicSet: (s) => (Object.keys(SETS) as SetId[]).some((set) => setComplete(s.relics, set)),
+  relicSet: (s) => (Object.keys(SETS) as SetId[]).some((set) => setComplete(won(s), set)),
   retired: (s) => s.legacy.retired > 0,
   allSkills: (s) => offerable(s).length === 0,
   siegeLifted: (s) => s.won || s.heatUnlocked > 0,

@@ -55,4 +55,7 @@ const de: HowToPlay = {
   ],
 };
 
-export const howToPlay = byLanguage({ en, 'en-US': en, de });
+/** US English: the same, with "scepter" for "sceptre". */
+const enUS: HowToPlay = { ...en, tips: en.tips.map((tip) => tip.replace('sceptre', 'scepter')) };
+
+export const howToPlay = byLanguage({ en, 'en-US': enUS, de });
