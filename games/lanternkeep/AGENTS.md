@@ -97,7 +97,9 @@ Implemented today:
   (`'move'` or `'peril'` in practice, as the festival comes at night 10 or later, and every such
   nightfall offers curses).
 - Seven upgrades (five of three levels, Firefly of two, Jar of one), bought between nights, plus
-  the Cask and Hearth cards. Only the most nights kept, the best peril multiplier and the trophies persist.
+  the Cask and Hearth cards. A game itself is never saved; the most nights kept, the best peril
+  multiplier, the moths' flights, the boon, the village, the daily's record and the trophies persist
+  (see Persistence below).
 - Kinds of lantern (LK6): `LANTERN_KINDS` (`plain`, `beacon`, `candle`, `bell`), each with `oil`,
   `wick` and `pay` multipliers. `lanternKindsFor(night, count)` deals `min(LANTERN_KINDS_MAX,
   night - LANTERN_KINDS_NIGHT + 1)` special spots from `LANTERN_KINDS_NIGHT` (4), at indexes
@@ -242,7 +244,8 @@ Implemented today:
   `rain` layer, and the night panel's last line says when a new season comes (`nextSeason`). Every
   event time (gusts, calls, bats, the owl, tides, ships) stays a time of dusk left, so a summer
   dusk starts with the 37 s call already due and a winter dusk has a quiet first stretch; only the
-  warned gusts, tides and avalanches go through `fitTimes` in `startDusk`, which moves a time whose
+  warned gusts, tides and avalanches (and the bats, which only come while a lantern is lit) go through
+  `fitTimes` in `startDusk`, which moves a time whose
   warning would begin before the dusk does so that the warning begins 1 s into it (a gust's 6 s,
   `GUST_LEAD_MS`, as on a spring dusk, since a gust is only warned while a lantern is lit), and keeps each
   later one at least its warning and 1 s after the one before (a summer dusk's gusts come at 25, 19 and 10 s left, a summer storm's at 25,
@@ -284,7 +287,7 @@ Missing or rough:
 - The ten trophies are the most a game has, so the harbour, the traits, the daily, the village, the
   seasons and the monastery earn none.
 - The seasons only change the dusk's length, the kind draw and the moths' speed; the event times
-  stay as dusk left (only moved for a warning, `fitTimes`), so a summer dusk's first window call
+  stay as dusk left (only moved for a warning or a bat's lit lantern, `fitTimes`), so a summer dusk's first window call
   comes at once.
 - The Mountain Festival offers the harbour's boons rather than its own.
 - A moth's traits belong to its place in the jar, so a game with fewer Moths upgrades leaves the
@@ -501,11 +504,13 @@ seeded generator in `puppet.ts`. Popups, flares and sparks are cosmetic Phaser t
 
 - `src/main.ts` calls `setupGame(game)` right after creating the game (frame cap, FPS readout, reduced motion and full screen).
 - Difficulty scales one number: the burn time, `baseBurnMs()` = `byDifficulty(26_000, 20_000,
-  16_000)`. Keep Normal at 20 s: the playthrough expects it. The moth kinds, the queue, the gusts,
+  16_000)`. Keep Normal at 20 s: the playthrough expects it. A daily night burns
+  `DAILY_BURN_MS` (20 s, Normal's) on every difficulty (`stats`), so it is the same dusk for every player. The moth kinds, the queue, the gusts,
   the close-call share, the orders, the kinds of night, bats, chains and the festival are not
   scaled by difficulty.
 - `settings.reduceMotion` holds still: the moths' wing flaps (wings stay up) and bobbing, the
-  lantern glow's and flame's flicker, the pulse of the close-call rings, the spin of the gust's
+  lantern glow's and flame's flicker, the pulse of the close-call rings (the close call's flare is
+  skipped), the spin of the gust's
   dashed ring and the travelling gust along its wind curls, the rise of popups (they only fade)
   and the spread of the close-call sparks, the drift of the fog, the falling rain (drawn still),
   the bats' flapping and bobbing (a resting moth's wings stay folded either way), the owl's flapping and bobbing and the travelling dashes of its
