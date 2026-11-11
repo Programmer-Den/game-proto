@@ -2079,7 +2079,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** A toast that shows once since the page opened, to teach the armoured foes. */
-  private hint(key: 'beetleFlipped' | 'lanternDown' | 'shellHard' | 'gloamHigh' | 'brineSlick' | 'bulbHigh' | 'bulbUp' | 'thornRing') {
+  private hint(key: 'beetleFlipped' | 'lanternDown' | 'shellHard' | 'gloamHigh' | 'brineSlick' | 'bulbHigh' | 'bulbUp' | 'thornRing' | 'thornmotherHow') {
     if (this.hinted.has(key)) return;
     this.hinted.add(key);
     this.hud.toast(t(key), HINT_MS);
@@ -2392,9 +2392,12 @@ export class GameScene extends Phaser.Scene {
       boss.awake = true;
       this.playAreaMusic();
       this.hud.showPlace(t('thornmother'));
-      this.hud.toast(t('thornmotherHow'), HINT_MS);
-      // The first bulb waits until that has been read.
-      boss.raiseT = Math.max(boss.raiseT, HINT_MS);
+      // Once a page load, like the other teaching toasts, and never in the hourglass trial, whose
+      // clock it would slow: the toast, and the first bulb waits until it has been read.
+      if (!this.trial && !this.hinted.has('thornmotherHow')) {
+        this.hint('thornmotherHow');
+        boss.raiseT = Math.max(boss.raiseT, HINT_MS);
+      }
     }
     const left = boss.bulbs.filter((b) => b.state !== 'gone').length;
     boss.raiseT -= dt;
