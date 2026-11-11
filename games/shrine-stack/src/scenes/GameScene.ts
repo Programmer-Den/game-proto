@@ -524,7 +524,8 @@ export class GameScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true })
       .on('pointerdown', () => drop(this.state) && sfx('whoosh'));
     // R swaps the stone in hand with the reserve, like the panel's button.
-    this.input.keyboard?.on('keydown-R', () => this.trySwap());
+    // A held R swaps once, not on every auto-repeat.
+    this.input.keyboard?.on('keydown-R', (e: KeyboardEvent) => !e.repeat && this.trySwap());
     // The shared pause stops update but not the frame clock: the first frame after Resume steps nothing.
     const onResume = () => (this.lastFrame = null);
     this.events.on(Phaser.Scenes.Events.RESUME, onResume);
