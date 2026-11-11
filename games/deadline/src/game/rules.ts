@@ -636,7 +636,9 @@ export function planWave(wave: number, rand: () => number = Math.random, conditi
     }
   }
   if (isBossWave(wave)) {
-    spawns.push({ at: size * gap + 1500, x: VIEW.w / 2, type: 'enemy', kind: 'boss', hp: Math.round(ENEMIES.boss.hp * tough) });
+    // The bosses take turns: the Behemoth, the Brood Mother, the Bloater.
+    const kind = bossKind(wave);
+    spawns.push({ at: size * gap + 1500, x: VIEW.w / 2, type: 'enemy', kind, hp: Math.round(ENEMIES[kind].hp * tough) });
   }
   // Pickups come in among the enemies, the first a few seconds in, in the middle part of the screen.
   const pickups = 1 + Math.floor(wave / 3);
