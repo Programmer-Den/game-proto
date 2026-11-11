@@ -3,7 +3,7 @@ import { settings, type Difficulty } from '../../../../shared/settings';
 /**
  * Burrow Brigade's own options, set on the menu's Options panel and kept in `burrow-brigade-prefs`:
  * a difficulty of its own (or the hub's), the turn time and crates for quick matches, and weather.
- * The defaults play exactly like the game without them.
+ * The defaults keep the hub's difficulty, a 30 second turn and the usual crates; weather is on.
  */
 
 export const DIFFICULTY_CHOICES = ['hub', 'easy', 'normal', 'hard'] as const;
