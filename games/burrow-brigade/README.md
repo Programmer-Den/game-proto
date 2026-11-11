@@ -12,7 +12,7 @@ range, or a friend on one screen.
 
 - **Aim and fire:** press on your mole and drag back, like a slingshot: the direction sets the
   angle and the length the power. Let go to fire. Or use ↑ ↓ (W S) to aim, and hold and release
-  Space to charge and fire.
+  Space or the FIRE button to charge and fire (a quick tap on FIRE fires at 60% power).
 - **Walk:** ← → (A D), hold the ◀ ▶ buttons, or tap the ground. **Jump** with Enter or ⤴, flip
   backwards with Backspace.
 - **Weapons:** the weapon button (bottom left) opens the arsenal; Tab, Q and E step through it.
