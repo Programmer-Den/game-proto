@@ -2182,7 +2182,9 @@ export class World {
     const keen = side.deal.goal === 'derelicts';
     if (this.elapsedMs < AI_CLAIM_MS || army.length < (keen ? AI_DEAL_CLAIM_ARMY : AI_CLAIM_ARMY)) return;
     const hub = this.hubOf(f)!;
-    const open = this.derelicts.filter((d) => d.owner !== f && (keen || dist(d, hub) <= AI_CLAIM_REACH)).sort((a, b) => dist(a, hub) - dist(b, hub));
+    // In a teams skirmish a teammate's station is left alone.
+    const teams = this.teams;
+    const open = this.derelicts.filter((d) => d.owner !== f && !(teams && d.owner >= 0 && teams[d.owner] === teams[f]) && (keen || dist(d, hub) <= AI_CLAIM_REACH)).sort((a, b) => dist(a, hub) - dist(b, hub));
     const target = open[0];
     const current = this.unit(side.claimer);
     if (current && current.faction === f) {
@@ -2636,7 +2638,8 @@ export class World {
 
   /** Whether a contract from the pool can be played in this battle as it stands. */
   private contractOpen(goal: Goal) {
-    const rivals = this.sides.filter((s) => s.index !== PLAYER && s.alive);
+    // The player's ally in a teams skirmish is no rival: its buildings can't be razed.
+    const rivals = this.sides.filter((s) => s.index !== PLAYER && !this.allyOfPlayer(s.index) && s.alive);
     if (goal === 'lattice') return rivals.some((s) => s.def.buildings.turret.ability?.kind === 'mines');
     if (goal === 'convoy') return !!this.convoyField();
     if (goal === 'derelicts') return this.derelicts.filter((d) => d.owner === PLAYER).length < 2;
@@ -2650,7 +2653,7 @@ export class World {
     return this.layout.nebulae.some((n) => {
       let mine = false;
       for (const u of this.units) {
-        if (u.type === 'harvester' || u.decoyMs !== null || dist(u, n) > n.r) continue;
+        if (u.type === 'harvester' || u.decoyMs !== null || this.allyOfPlayer(u.faction) || dist(u, n) > n.r) continue;
         if (u.faction !== PLAYER) return false;
         mine = true;
       }
