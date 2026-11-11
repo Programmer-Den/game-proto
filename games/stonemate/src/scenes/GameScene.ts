@@ -606,7 +606,9 @@ export class GameScene extends Phaser.Scene {
     const line = unlocked ? `${this.statusLine()}\n${t('unlockedNow', { level: unlocked })}` : this.statusLine();
     const txt = this.text(cx, cy - S * 0.5, line, unlocked ? 17 : 20, C.ink, { fontStyle: 'bold', align: 'center', wordWrap: { width: S * 5.2 } }).setOrigin(0.5).setDepth(191);
     this.add.container(0, 0, [bg, txt]).setDepth(190);
-    this.button('new-game', cx - S * 1.3, cy + S * 0.5, S * 2.4, 40, t('newGame'), () => this.startGame(this.mode, this.player), true);
+    // The menu's pick may be a locked level the arrows stepped onto: play the highest open one then.
+    const next = Math.min(this.level, unlockedLevel(this.stats.best));
+    this.button('new-game', cx - S * 1.3, cy + S * 0.5, S * 2.4, 40, t('newGame'), () => this.startGame(this.mode, this.player, [], next), true);
     this.button('result-menu', cx + S * 1.3, cy + S * 0.5, S * 2.4, 40, t('menu'), () => this.showMenu());
   }
 
@@ -633,16 +635,16 @@ export class GameScene extends Phaser.Scene {
   }
 
   private undo() {
-    // Against the AI there must be one of the player's own moves to take back.
+    // Against the AI there must be one of the player's own moves to take back. A finished game
+    // stays finished: its result is already in the stats.
     const mine = this.mode === 'duo' || this.pos.history.some((u) => sideOf(u.move.piece) === this.player);
-    if (this.busy || this.promo || !this.pos.history.length || !mine) {
+    if (this.busy || this.promo || this.result || !this.pos.history.length || !mine) {
       ui('refuse');
       return;
     }
     this.pos.unmake();
     // Against the AI, take back its reply too, so it is the player's move again.
     if (this.mode === 'ai' && this.pos.turn !== this.player && this.pos.history.length) this.pos.unmake();
-    this.result = null;
     this.buildPlay();
   }
 
