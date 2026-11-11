@@ -1244,7 +1244,8 @@ ${played ? t('weeklyDone', { total }) : t('weeklyLine', { day: day + 1, total })
     if (s.progress.bestFloor) this.text(this.L.end.x, this.L.end.y - 14, t('bestFloor', { n: s.progress.bestFloor }), 15);
     this.button('again', this.L.endButtons.xs[0], this.L.endButtons.y, this.L.endButtons.w, this.L.endButtons.h, t('delveAgain'), () => {
       ui('click');
-      startDelve(this.state);
+      // Again at the ascension of the run that just ended.
+      startDelve(this.state, this.state.ascent);
     });
     this.button('done', this.L.endButtons.xs[1], this.L.endButtons.y, this.L.endButtons.w, this.L.endButtons.h, t('menu'), () => {
       ui('click');
