@@ -2478,7 +2478,7 @@ export class GameScene extends Phaser.Scene {
   /**
    * Music, and the sounds of what the sim does on its own each frame, found by comparing the state
    * with the last frame's: a station in view finishing a good, a sale, an order filled or walked
-   * off, a market day's crowd and the blight. It starts from the state as loaded, after `catchUp`,
+   * off (with the counter in view), a market day's crowd and the blight. It starts from the state as loaded, after `catchUp`,
    * so the time away stays silent. The music follows the day: the plague's part while it spreads,
    * the market rush while its crowd waits, and the calm part otherwise.
    */
@@ -2504,10 +2504,12 @@ export class GameScene extends Phaser.Scene {
       if (stations.some(({ at }, i) => now[i] > output[i] && view.contains(at.x, at.y))) sfx('bubble');
       output = now;
       // Orders gone since the last frame: filled (nothing left to want) or walked off (out of patience).
+      // Heard only with the counter on screen, as a craftsman sells on while the doctor is away.
       const gone = orders.filter((o) => !state.orders.includes(o));
-      if (gone.some((o) => o.wants.length === 0)) sfx('served');
-      else if (state.sold > sold) sfx('sell');
-      if (gone.some((o) => o.wants.length > 0 && o.patience <= 0)) sfx('hmph');
+      const atCounter = view.contains(COUNTER.x, COUNTER.y);
+      if (atCounter && gone.some((o) => o.wants.length === 0)) sfx('served');
+      else if (atCounter && state.sold > sold) sfx('sell');
+      if (atCounter && gone.some((o) => o.wants.length > 0 && o.patience <= 0)) sfx('hmph');
       orders = [...state.orders];
       sold = state.sold;
       if (state.rush && state.rush.day !== rushDay) sfx('rush');
