@@ -1,11 +1,12 @@
-import { MAPS } from './maps';
+import { cellIndex, MAPS } from './maps';
 import { COLS, MAX_LEVEL, ROWS, TOWER, type TowerKind } from './rules';
 import type { Game } from './sim';
 
 // Maze codes: a maze copied as a short text to share, and planted again in Sandbox. A code is
 // `<garden>.<hedges>.<towers>`: the garden's id, the hedges as one bit a cell in base64url (trailing
 // empty cells left off), and every other tower as three base64url characters (its cell, its kind
-// and its level). Traps lie on the lawn for one use, so they are left out.
+// and its level). Traps lie on the lawn for one use, so they are left out. A daily maze's extra rocks
+// are written as hedges, since the code names only the garden they were added to.
 
 const ABC = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
 /** The kinds by their number in a code: a new kind goes at the end, so older codes still read the same (at most 32). */
@@ -30,6 +31,11 @@ export function mazeCode(g: Game) {
       const n = (t.cell << 7) | (KINDS.indexOf(t.kind) << 2) | (t.level - 1);
       towers += ABC[(n >> 12) & 63] + ABC[(n >> 6) & 63] + ABC[n & 63];
     }
+  }
+  // The daily maze's extra rocks are not in its garden, so they go in the code as hedges and the maze keeps its shape.
+  if (g.daily) {
+    const base = MAPS.find((m) => m.id === g.map.id);
+    for (const rock of g.map.rocks) if (!base?.rocks.some((r) => r[0] === rock[0] && r[1] === rock[1])) bits[cellIndex(rock)] = 1;
   }
   let hedges = '';
   for (let i = 0; i < bits.length; i += 6) hedges += ABC[bits.slice(i, i + 6).reduce((n, b, j) => n | (b << j), 0)];

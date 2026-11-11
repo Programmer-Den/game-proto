@@ -289,7 +289,7 @@ played, and is kept for the next game:
 **Versus.** The Versus button under the gardeners plays two gardeners on one screen, each on a
 garden of their own: the lawn is fenced down the middle, with a burrow at each outer edge and a
 cottage each by the fence. Each has their own gold, tools and 10 cabbages, and both get every wave,
-which never stops. Towers and traps only reach the foes in their own garden, never over the fence. Every foe a gardener beats (but not one sent over) comes out of the other's
+which never stops. Towers and traps only reach the foes in their own garden, never over the fence, and a beehive only speeds its own garden's towers. Every foe a gardener beats (but not one sent over) comes out of the other's
 burrow a moment and a half later, at full health; held waves pay each gardener in full. The first
 to lose every cabbage loses (both on the same moment is a draw), and Rematch plays again. Versus
 keeps no records, pays no seeds and earns no trophies.
@@ -298,7 +298,8 @@ keeps no records, pays no seeds and earns no trophies.
 
 **Maze codes.** With one gardener, the Maze code button in the top bar copies the maze in play as
 a short code (`meadow.QAAAEAAA….E-EF…`: the garden, the hedges as bits, then three characters for
-each tower with its level; traps are left out), or shows it to copy where the clipboard is shut. In
+each tower with its level; traps are left out, and the daily maze's extra rocks come out as
+hedges), or shows it to copy where the clipboard is shut. In
 Sandbox, Plant code on the garden picker asks for a code and starts a Sandbox game in its garden
 with the maze planted, telling how many of its pieces fit.
 

@@ -88,7 +88,7 @@ Implemented today:
   `send`). When a side has no cabbages left the phase is `won` with `g.winner` (0 left, 1 right, -1
   a draw). A tower (`fire`'s `reaches`, and a cannon's splash in `moveShot` through `Shot.side`) and a trap
   (`springTraps`) act only on the foes of their own half (`gateSide` of the foe against `sideOf` the
-  cell), never across the fence. The scene draws a fence instead of the dashed line, both cottages, the right side's
+  cell), never across the fence, and a beehive (`boosts`) speeds only the towers of its own half. The scene draws a fence instead of the dashed line, both cottages, the right side's
   cabbages by its gold, and an end panel with `versusLeft`/`versusRight`/`versusDraw` and Rematch
   (`again`); a versus game is never kept, notes no records, pays no seeds and earns no trophies.
 - The night garden (`night` in `MODES`): `waveGroups(n, true)` leads every wave with
@@ -106,7 +106,8 @@ Implemented today:
   nothing. The banner `nightStart` tells the rule.
 - Maze codes (`game/code.ts`): `mazeCode(g)` is `<garden>.<hedges>.<towers>`, the hedges one bit a
   cell in base64url with trailing `A`s cut, and each other tower three base64url characters (cell,
-  its number in `KINDS`, level; traps left out); `readCode` gives the garden and the towers, hedges
+  its number in `KINDS`, level; traps left out; a daily maze's extra rocks, which its garden
+  lacks, written as hedges); `readCode` gives the garden and the towers, hedges
   first, or null. With one gardener the top bar's `code` button (left of Gardens, `CODE_BUTTON`)
   runs `copyCode`: the clipboard, or a `prompt` with the code where it is shut, then the banner
   `codeCopied`. In Sandbox the picker's `plant` button (under the shed) runs `plantCode`: a
