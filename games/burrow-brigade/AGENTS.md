@@ -9,6 +9,14 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
   screen, and Watch AI (`?watch`, both teams run by the AI, a new match four seconds after one
   ends). Teams have 2 to 5 moles (`size` in `burrow-brigade-prefs`, 3 by default), picked on the
   menu. There is no save of a match under way.
+- **Daily range** (`mode` `daily`, `startDaily` in the scene, with `shared/daily.ts`): one try a
+  day. `Math.random` is swapped for `dailyRand` while `buildWorld` makes the map, theme and kegs,
+  and the five winds (`dailyWinds`) are drawn from it too, so everyone shoots the same range: one
+  blue mole against `DAILY_TARGETS` (4) straw moles that never take a turn, for `DAILY_SHOTS` (5)
+  turns. The score (`dailyScore`) is the damage done to them plus `DAILY_KO` (25) for each one
+  out; `finishDaily` keeps today's, the best and the streak, shown on the menu and the result.
+- **Match report:** `dealt` adds up each mole's damage to enemies (from `World.log.damage` at the
+  end of its turn), and the result names the star of the match (`star`).
 - **Campaign** (`game/campaign.ts`): eight battles (`BATTLES`) against rival burrows, played from
   the menu's Campaign screen (`showCampaign`, a card per battle). Each has a set theme, its own team
   sizes (`mine` against `foes`, ignoring the menu's size), an aim multiplier for the AI (`aim`), a
@@ -56,7 +64,9 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
   next to it, the Repair Kit below 40 health, now and then a Storm Bolt or Balloon Drop (aimed
   upwind for the drift), otherwise tries Acorn Rocket, Pebble Grenade and sometimes one special over
   a grid of angles and powers with the game's own `flight`, scoring the miss, with big penalties for
-  hurting itself or a friend. With no shot within 170 px it walks towards the target once and plans
+  hurting itself or a friend. A shot whose blast reaches a powder keg next to an enemy scores as a
+  hit (and as a self or friendly hit if the keg is next to its own side). With no shot within 170
+  px it walks towards the target once and plans
   again. `aimError` from the difficulty (`byDifficulty(2.4, 1, 0.35)`) shakes the chosen angle and
   power.
 - **Difficulty:** the AI's aim error above, and the aim preview while dragging or charging:
@@ -98,6 +108,7 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
 - `burrow-brigade-prefs`: `{ size }`, moles a team.
 - `burrow-brigade-campaign`: `{ stars, acorns, levels }`, the best stars (0 to 3) of each campaign
   battle by its place in `BATTLES`, the acorns to spend and the Quartermaster's levels by id.
+- `burrow-brigade-daily`: the daily range's record (`shared/daily.ts`).
 - `burrow-brigade-trophies`: the shared trophies.
 
 ## Test hooks
@@ -105,8 +116,8 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
 - `window.game` (dev build). `scene.state` gives `screen`, `phase`, `mode`, `turn`, `turns`,
   `wind`, `weapon`, `active` (`id`, `team`, `x`, `y`, `hp`, `alive`), `craters`, `shots`, `busy`,
   `teams` (`alive`, `hp`), `winner`, `arsenal`, `battle` (the campaign battle, or null), `stars`
-  (the campaign's best stars), `acorns` and `view` (the view's size, to turn view pixels into
-  page pixels). `scene.buttons` has every button by id: `play-ai`, `campaign`, `play-duo`,
+  (the campaign's best stars), `acorns`, `dailyScore` (the daily range's score once it ends) and `view` (the view's size, to turn view pixels into
+  page pixels). `scene.buttons` has every button by id: `play-ai`, `campaign`, `play-duo`, `daily`,
   `size-down`, `size-up`, `weapon`, `left`, `right`, `jump`, `fire`, `rematch`, `menu`, `w-<id>`
   for the arsenal's tiles while it is open, `battle-<i>`, `depot` and `back` on the Campaign
   screen, `buy-<id>` and `back` at the Quartermaster, and `next` on a won battle's result.
