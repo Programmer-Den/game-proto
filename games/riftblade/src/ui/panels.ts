@@ -242,12 +242,16 @@ export function codexPanel(p: Panel, progress: Progress, open: CodexPageId) {
     fit(p.text(r.x + r.w / 2, r.y + 38, line, 12, full ? C.elite : C.muted, { origin: [0.5, 0.5] }), r.w - 12);
   });
   const page = CODEX_PAGES.find((pg) => pg.id === open) ?? CODEX_PAGES[0];
-  const rows = Math.ceil(page.entries.length / CODEX_GRID.cols);
+  // A long page (the hero paths) takes more, narrower columns and shorter rows, so it ends above Back.
+  const cols = Math.max(CODEX_GRID.cols, Math.ceil(page.entries.length / CODEX_GRID.maxRows));
+  const rows = Math.ceil(page.entries.length / cols);
+  const colW = (CODEX_GRID.col * CODEX_GRID.cols) / cols;
+  const rowH = Math.min(CODEX_GRID.row, CODEX_GRID.h / rows);
   page.entries.forEach((e, i) => {
     const col = Math.floor(i / rows);
     const row = i % rows;
     const known = seen.has(e.id);
-    fit(p.text(CODEX_GRID.x + col * CODEX_GRID.col, CODEX_GRID.y + row * CODEX_GRID.row, known ? t(e.name) : '? ? ?', 13, known ? C.text : '#3d4a66', { bold: known }), CODEX_GRID.col - 14);
+    fit(p.text(CODEX_GRID.x + col * colW, CODEX_GRID.y + row * rowH, known ? t(e.name) : '? ? ?', cols > CODEX_GRID.cols ? 12 : 13, known ? C.text : '#3d4a66', { bold: known }), colW - 14);
   });
   button(p, CODEX_BACK, 'back', t('armouryBack'), CODEX_COLOR);
   button(p, SKILLS_BUTTON, 'skills', t('skillsButton', { n: progress.skills.length, of: SKILL_ENTRIES.size }), SKILLS_COLOR);

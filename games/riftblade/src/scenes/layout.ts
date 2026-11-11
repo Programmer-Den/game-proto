@@ -85,13 +85,14 @@ export function codexTabRect(i: number, n: number) {
   const cx = VIEW.w / 2 + (i - (n - 1) / 2) * CODEX_TAB.gap;
   return { x: cx - CODEX_TAB.w / 2, y: CODEX_TAB.y, w: CODEX_TAB.w, h: CODEX_TAB.h };
 }
-export const CODEX_GRID = { x: 70, y: 176, col: 214, row: 18.5, cols: 4 };
+/** The entries' grid: four columns, more (with shorter rows) for a page longer than `maxRows` a column, kept `h` tall above Back. */
+export const CODEX_GRID = { x: 70, y: 176, col: 214, row: 18.5, cols: 4, maxRows: 16, h: 244 };
 /** The codex's Back and its Skill overview button, side by side. */
 export const CODEX_BACK = { x: VIEW.w / 2 - 230, y: 430, w: 220, h: 50 };
 export const SKILLS_BUTTON = { x: VIEW.w / 2 + 10, y: 430, w: 220, h: 50 };
 
 /** The skill overview: a tab per page, the page's names on the left, the one picked described on the right. */
-export const SKILL_TAB = { y: 100, w: 106, h: 44, gap: 112 };
+export const SKILL_TAB = { y: 100, w: 96, h: 44, gap: 101 };
 export function skillTabRect(i: number, n: number) {
   const cx = VIEW.w / 2 + (i - (n - 1) / 2) * SKILL_TAB.gap;
   return { x: cx - SKILL_TAB.w / 2, y: SKILL_TAB.y, w: SKILL_TAB.w, h: SKILL_TAB.h };

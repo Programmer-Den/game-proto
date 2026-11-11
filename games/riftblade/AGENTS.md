@@ -45,7 +45,7 @@ world, with a star map between them. A boss rush and hero mastery come on top.
   Joren, and Sable once she takes Awakening) and Hollow (6: Vharn, Veyl, Kresh, Krull, Ysolde, and Kael once he takes The Fall); Joren may also draw
   Lightning Arc. The shared Gear deck (12 pieces), the 7-ability and 5-gear limits, level-ups with
   three cards (four for Elara, her Hope; at least one of the hero's own paths while any are left,
-  the Field Ration as filler), 48 capstones and 13 crossovers (the cards show a link icon);
+  the Field Ration as filler), 72 capstones and 13 crossovers (the cards show a link icon);
   specialisations (at tier 5 every upgrade branches into three, `BRANCHES`; the first taken gives
   its tiers 6 and 7 and shuts out the other two) and 20 fusions (`FUSIONS`: two skills at tier 3 fuse
   into a third with three tiers and no slot; taking one locks its rivals and the skills it names); gold-ringed elites with
@@ -153,7 +153,7 @@ world, with a star map between them. A boss rush and hero mastery come on top.
   `won` false and nothing banked, then `recordEndless` keeps the best in `progress.endless` and
   banks `ENDLESS_SALVAGE` per world cleared. The HUD tag adds "rift loop n"; `nextStage` and the
   space map's `route` (the last `stage + 1` planets) keep the maps right on later loops.
-- The codex (`codex.ts`): `CODEX_PAGES` (foes 20, bosses 10, pool skills 30, gear 12, hero paths 64,
+- The codex (`codex.ts`): `CODEX_PAGES` (foes 20, bosses 10, pool skills 30, gear 12, hero paths 96,
   each with its pay) of entries `foe:<kind>`, `boss:<id>` and `card:<upgrade id>`.
   `GameScene.recordCodex` runs every frame of a run: `codexNew` lists what the state shows that
   `codexKnown` (the save's entries) lacks (foes and the boss on the field, the cards on offer and
@@ -164,7 +164,7 @@ world, with a star map between them. A boss rush and hero mastery come on top.
 - The skill overview (`skills.ts`): the codex's Skill overview button (`SKILLS_BUTTON`, beside
   its Back at `CODEX_BACK`) opens `skillsPanel` over it (`GameScene.skillsOpen`, the tab in
   `skillsPage`, the entry tapped in `skillPick`; Back or Enter returns to the codex). `SKILL_PAGES`:
-  hero paths (hero by hero, drill last), the four pools, gear, specialisations (`branch:<BranchId>`)
+  hero paths on two pages (`paths` the first twelve heroes, `paths2` the next twelve; hero by hero, drill last), the four pools, gear, specialisations (`branch:<BranchId>`)
   and fusions (`fusion:<id>`). `GameScene.recordSkills` runs every frame of a run: `skillsNew` lists
   what the run holds (`ranks`, `branches`, `fusions`) that `skillsKnown` lacks, and `recordSkills`
   (save.ts) adds it to `progress.skills`. Only those entries show a name and, tapped, their text and

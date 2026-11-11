@@ -14,7 +14,7 @@
 import { t as tr } from '../i18n';
 import { HEROES, schemeOf } from './heroes';
 import { at } from './upgrades';
-import { type Ally, type Enemy, type GameState } from './state';
+import { isStructure, type Ally, type Enemy, type GameState } from './state';
 import { HURT_GRACE_MS, addBomb, angleDiff, bolt, damage, explode, gainXp, heal, knock, near, nearest, pop, ready, swarmSpot, syncAllies, volley } from './sim';
 import { rand } from './weekly';
 
@@ -84,8 +84,10 @@ export function crewAttack(s: GameState, ms: number, rate: number) {
     const burst = siege || (hb >= 5) || (hb >= 3 && p.shots % 4 === 0) ? ROAR.burst * (siege ? 1.5 : 1) : 0;
     const angles = hb >= 4 ? [a - 0.1, a + 0.1] : [a];
     for (const ang of angles) {
+      // The burst rides the main bolt, the first of the volley (Scatter's side bolts come after it).
+      const main = s.bullets.length;
       volley(s, p.x, p.y, ang, hero.damage);
-      if (burst > 0) s.bullets[s.bullets.length - 1].burst = burst;
+      if (burst > 0) s.bullets[main].burst = burst;
     }
     return;
   }
@@ -249,7 +251,7 @@ function hack(s: GameState, n: number) {
   const p = s.player;
   const elites = rank(s, 'hacker') >= 3;
   const ms = rank(s, 'hacker') >= 2 ? ZAP.longHackMs : ZAP.hackMs;
-  const pool = nearest(s, p.x, p.y, n + 6, 320).filter((e) => e.kind !== 'boss' && (elites || !e.elite)).slice(0, n);
+  const pool = nearest(s, p.x, p.y, n + 6, 320).filter((e) => e.kind !== 'boss' && !isStructure(e.kind) && (elites || !e.elite)).slice(0, n);
   for (const e of pool) {
     e.charmMs = ms;
     zapFx(s, [p.x, p.y, e.x, e.y], color(s), 260);
@@ -332,9 +334,11 @@ function hireGuns(s: GameState) {
   }
   const n = cap(s, 'crime-lord') ? THUGS.lordN : pay >= 1 ? THUGS.moreN : THUGS.n;
   const life = pay >= 4 ? THUGS.longMs : THUGS.ms;
+  // New thugs take the ring's next slots, so they don't stand on those still on the payroll.
+  const have = s.allies.reduce((m, a) => (a.kind === 'thug' ? Math.max(m, a.slot + 1) : m), 0);
   for (let i = 0; i < n; i++) {
     const a = (i / n) * Math.PI * 2;
-    s.allies.push({ id: s.nextId++, kind: 'thug', x: p.x + Math.cos(a) * 40, y: p.y + Math.sin(a) * 40, cdMs: 200 + i * 80, lifeMs: life, slot: i, aim: a });
+    s.allies.push({ id: s.nextId++, kind: 'thug', x: p.x + Math.cos(a) * 40, y: p.y + Math.sin(a) * 40, cdMs: 200 + i * 80, lifeMs: life, slot: have + i, aim: a });
   }
   return true;
 }

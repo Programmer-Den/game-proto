@@ -265,17 +265,17 @@ fills once, and a full page banks its credits for the Armoury:
 | Bosses | 10 | 100 |
 | Pool skills | 30 | 80 |
 | Gear | 12 | 50 |
-| Hero paths | 64 (every hero's four) | 150 |
+| Hero paths | 96 (every hero's four) | 150 |
 
 Tap a page or press 1-5; Back or Enter returns. Entries not met yet show as `? ? ?`.
 
 ![The codex](docs/screenshots/codex.webp)
 
-The codex's **Skill overview** button opens a page of every skill a run can take, in eight tabs:
-hero paths (hero by hero, each drill last), the Blaster, Blade, Current and Hollow pools, gear,
+The codex's **Skill overview** button opens a page of every skill a run can take, in nine tabs:
+hero paths on two (the first twelve heroes, then the next twelve; hero by hero, each drill last), the Blaster, Blade, Current and Hollow pools, gear,
 specialisations and fusions. A skill you have taken at least once in a run shows its name, and
 tapping it shows its text and every tier (with the specialisations it branches into, or for a
-fusion what it fuses and locks out); one never taken stays `? ? ?`. Press 1-8 for a tab; Back or
+fusion what it fuses and locks out); one never taken stays `? ? ?`. Press 1-9 for a tab; Back or
 Enter returns to the codex.
 
 ![The skill overview](docs/screenshots/skill-overview.webp)
