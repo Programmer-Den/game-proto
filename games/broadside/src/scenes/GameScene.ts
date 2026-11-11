@@ -170,7 +170,7 @@ export class GameScene extends Phaser.Scene {
   private boardLabel!: Phaser.GameObjects.Text;
   private scuttleButton!: Phaser.GameObjects.Container;
   private scuttleText!: Phaser.GameObjects.Text;
-  private keys!: Record<'left' | 'right' | 'a' | 'd' | 'q' | 'e' | 'f', Phaser.Input.Keyboard.Key>;
+  private keys!: Record<'left' | 'right' | 'a' | 'd' | 'q' | 'e' | 'r', Phaser.Input.Keyboard.Key>;
   /** A night wave's dark, the lanterns and flashes drawn over it, and the flare button (made on the first night, see `drawNight`). */
   private night!: Phaser.GameObjects.Image;
   private glow!: Phaser.GameObjects.Graphics;
@@ -258,9 +258,9 @@ export class GameScene extends Phaser.Scene {
       d: kb.addKey(K.D),
       q: kb.addKey(K.Q),
       e: kb.addKey(K.E),
-      f: kb.addKey(K.F),
+      r: kb.addKey(K.R),
     };
-    this.keys.f.on('down', () => this.flare());
+    this.keys.r.on('down', () => this.flare());
   }
 
   update(time: number) {

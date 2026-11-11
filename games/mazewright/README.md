@@ -27,7 +27,7 @@ beetle already on the lawn) is refused with an orange no-entry ring.
 | Versus (garden picker) | Two gardeners on one screen, each with a garden of their own |
 | Maze code (top bar, one gardener) | Copy the maze in play as a short code; Plant code on the picker plants one in Sandbox |
 | Wave timer / Calm (garden picker) | After wave 1 the next wave comes by itself 20 seconds after the last is all out; Calm waits for Start wave |
-| Speed button, or F | Play at double speed |
+| Speed button, or X | Play at double speed |
 | One gardener / Two gardeners (garden picker) | Play alone, or two on one screen, each on their own half of the lawn |
 | Watch (on a garden card) | Watch your latest win in that garden again |
 | ▶ Wave (on a garden card) | Go on with the game you left there, from its last break between waves |
@@ -137,7 +137,7 @@ held wave's pay and the early bonus are shared out. The waves are the same for b
 
 **Replays.** Each garden keeps your latest Classic or Swarm win, and its card gets a Watch button
 that plays it back: every hedge, tower, upgrade and wave as you played it, at 2x, or 1x or 4x with
-the speed button (F). Nothing can be planted while it plays, and it changes no records or seeds.
+the speed button (X). Nothing can be planted while it plays, and it changes no records or seeds.
 
 ![Watching a win on the Meadow again](docs/screenshots/replay.webp)
 

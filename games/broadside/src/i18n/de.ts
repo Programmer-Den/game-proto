@@ -182,7 +182,7 @@ const de: Translation<typeof en> = {
     other: '{n} Plünderer jagen deine Ladung!',
   },
   crewHold: 'Crew {crew}/{max}   Laderaum {hold}',
-  flareButton: 'Leuchtkugel (F)   noch {n}',
+  flareButton: 'Leuchtkugel (R)   noch {n}',
   bountyStanding: 'steht noch',
   bountyLost: 'verfehlt',
   bountyDone: 'erfüllt',

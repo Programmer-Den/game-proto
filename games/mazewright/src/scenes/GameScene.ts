@@ -610,7 +610,7 @@ export class GameScene extends Phaser.Scene {
   private onKey(e: KeyboardEvent) {
     if (this.screen !== 'play' || !this.state) return;
     const n = Number(e.key);
-    if (e.key.toLowerCase() === 'f') this.faster();
+    if (e.key.toLowerCase() === 'x') this.faster();
     else if (this.replay) return;
     else if (n >= 1 && n <= this.kit.length) this.pickTool(this.kit[n - 1]);
     else if (e.key.toLowerCase() === 'u') this.pickTool('upgrade');
