@@ -2,12 +2,14 @@ import Phaser from 'phaser';
 import { playMusic, playSting, ui } from '../../../../shared/audio';
 import { dailyRand, finishDaily, loadDaily, startDaily, type DailyRecord } from '../../../../shared/daily';
 import { viewSize } from '../../../../shared/scaling';
-import { byDifficulty, settings } from '../../../../shared/settings';
+import { settings } from '../../../../shared/settings';
 import { award } from '../../../../shared/trophies';
 import { aiLog, mountWatch, watching, watchSteps } from '../../../../shared/watch';
 import { SFX, SONG } from '../audio';
 import { planTurn, type Plan } from '../game/ai';
 import { BATTLES, isOpen, starsFor, VETERAN } from '../game/campaign';
+import { HATS, type HatId } from '../game/hats';
+import { byLevel, CRATE_CHOICES, CRATE_ODDS, difficulty, DIFFICULTY_CHOICES, setDifficulty, TURN_CHOICES, type Options } from '../game/options';
 import { boosts, reward, UPGRADE_COSTS, UPGRADE_IDS, type UpgradeId } from '../game/depot';
 import { loadCampaign, loadPrefs, loadStats, saveCampaign, savePrefs, saveStats, type Stats } from '../game/save';
 import { DT, flight, generate, spawnPoints, Terrain, THEMES, WATER_GAP, WIND_ACC, type Theme } from '../game/terrain';
@@ -126,7 +128,12 @@ export class GameScene extends Phaser.Scene {
     stage: 'done', t: 0, plan: null, walked: false, from: 0,
   };
   private stats: Stats = loadStats();
-  private size = loadPrefs().size;
+  private prefs = loadPrefs();
+  private size = this.prefs.size;
+  /** This match's weather: clear, rain (flames burn out twice as fast), fog (a short aim preview) or gusts (the wind shifts mid-turn). */
+  weather: 'clear' | 'rain' | 'fog' | 'gusts' = 'clear';
+  private gustT = 0;
+  private fogG!: Phaser.GameObjects.Graphics;
   private hover = { x: 0, y: 0 };
   private keys!: Record<string, Phaser.Input.Keyboard.Key>;
   private lostMole = false;
@@ -141,6 +148,8 @@ export class GameScene extends Phaser.Scene {
     this.g = this.add.graphics().setDepth(5);
     this.fx = this.add.graphics().setDepth(6);
     this.waterG = this.add.graphics().setDepth(7);
+    this.fogG = this.add.graphics().setDepth(7.5);
+    setDifficulty(this.prefs.options.difficulty);
     this.hud = this.add.graphics().setDepth(100);
     this.iconG = this.add.graphics().setDepth(165);
     this.keys = this.input.keyboard!.addKeys('LEFT,RIGHT,UP,DOWN,A,D,W,S,SPACE,ENTER,BACKSPACE,TAB,Q,E,ESC') as Record<string, Phaser.Input.Keyboard.Key>;
@@ -184,6 +193,9 @@ export class GameScene extends Phaser.Scene {
       vstars: this.campaign.vstars.slice(),
       acorns: this.campaign.acorns,
       dailyScore: this.daily?.score ?? null,
+      weather: this.weather,
+      difficulty: difficulty(),
+      hat: this.prefs.hat,
       view: { w: this.W, h: this.H },
     };
   }
@@ -271,7 +283,7 @@ export class GameScene extends Phaser.Scene {
     this.clearUi();
     const cx = this.W / 2;
     const top = Math.max(20, this.H / 2 - 230);
-    const panel = this.add.rectangle(cx, top + 222, 420, 424, C.panel, 0.94).setStrokeStyle(3, C.panelEdge).setDepth(150);
+    const panel = this.add.rectangle(cx, top + 240, 420, 468, C.panel, 0.94).setStrokeStyle(3, C.panelEdge).setDepth(150);
     this.uiObjs.push(panel);
     this.uiObjs.push(this.add.text(cx, top + 44, t('title'), { fontFamily: FONT, fontSize: '46px', color: hex(C.ink), fontStyle: 'bold' }).setOrigin(0.5).setDepth(151));
     this.uiObjs.push(this.add.text(cx, top + 98, t('tagline'), { fontFamily: FONT, fontSize: '15px', color: hex(C.dim), align: 'center', wordWrap: { width: 380 } }).setOrigin(0.5).setDepth(151));
@@ -287,18 +299,115 @@ export class GameScene extends Phaser.Scene {
     this.uiObjs.push(this.texts.size);
     const used = this.stats.used.length;
     this.uiObjs.push(
-      this.add.text(cx, top + 352, t('statsLine', { wins: this.stats.wins, games: this.stats.games, used, all: WEAPON_IDS.length }) + '\n' + (today.score !== null
+      this.add.text(cx, top + 396, t('statsLine', { wins: this.stats.wins, games: this.stats.games, used, all: WEAPON_IDS.length }) + '\n' + (today.score !== null
         ? t('dailyDone', { score: today.score, best: today.best, streak: t('streak', { n: today.streak }) })
         : t('dailyLine', { best: today.best, streak: t('streak', { n: today.streak }) })), {
         fontFamily: FONT, fontSize: '14px', color: hex(C.dim), align: 'center', wordWrap: { width: 380 },
       }).setOrigin(0.5).setDepth(151),
     );
-    this.uiObjs.push(this.add.text(cx, top + 396, t('menuHint'), { fontFamily: FONT, fontSize: '13px', color: hex(C.dim), align: 'center', wordWrap: { width: 380 } }).setOrigin(0.5).setDepth(151));
+    this.button('options', cx, top + 352, 200, 34, t('options'), () => this.showOptions());
+    this.uiObjs.push(this.add.text(cx, top + 442, t('menuHint'), { fontFamily: FONT, fontSize: '13px', color: hex(C.dim), align: 'center', wordWrap: { width: 380 } }).setOrigin(0.5).setDepth(151));
+  }
+
+  /** The Options panel: the game's own difficulty, and turn time, crates and weather for quick matches. */
+  showOptions() {
+    this.clearUi();
+    const cx = this.W / 2;
+    const cy = this.H / 2;
+    const o = this.prefs.options;
+    const rows: { key: keyof Options; label: string; value: string; step: (d: number) => void }[] = [
+      {
+        key: 'difficulty', label: t('optDifficulty'),
+        value: o.difficulty === 'hub' ? t('optHub', { level: t(`level_${settings.difficulty}`) }) : t(`level_${o.difficulty}`),
+        step: (d) => (o.difficulty = DIFFICULTY_CHOICES[(DIFFICULTY_CHOICES.indexOf(o.difficulty) + d + 4) % 4]),
+      },
+      {
+        key: 'turn', label: t('optTurn'), value: t('seconds', { n: o.turn }),
+        step: (d) => (o.turn = TURN_CHOICES[Math.max(0, Math.min(TURN_CHOICES.length - 1, TURN_CHOICES.indexOf(o.turn) + d))]),
+      },
+      {
+        key: 'crates', label: t('optCrates'), value: t(`crates_${o.crates}`),
+        step: (d) => (o.crates = CRATE_CHOICES[Math.max(0, Math.min(CRATE_CHOICES.length - 1, CRATE_CHOICES.indexOf(o.crates) + d))]),
+      },
+      { key: 'weather', label: t('optWeather'), value: o.weather ? t('on') : t('off'), step: () => (o.weather = !o.weather) },
+    ];
+    const pw = 520;
+    const ph = rows.length * 56 + 150;
+    const top = cy - ph / 2;
+    this.uiObjs.push(this.add.rectangle(cx, cy, pw, ph, C.panel, 0.96).setStrokeStyle(3, C.panelEdge).setDepth(150));
+    this.uiObjs.push(this.add.text(cx, top + 28, t('options'), { fontFamily: FONT, fontSize: '26px', color: hex(C.ink), fontStyle: 'bold' }).setOrigin(0.5).setDepth(151));
+    rows.forEach((r, i) => {
+      const y = top + 84 + i * 56;
+      const change = (d: number) => {
+        r.step(d);
+        setDifficulty(o.difficulty);
+        savePrefs(this.prefs);
+        this.showOptions();
+      };
+      this.uiObjs.push(this.add.text(cx - pw / 2 + 24, y, r.label, { fontFamily: FONT, fontSize: '16px', color: hex(C.ink), fontStyle: 'bold' }).setOrigin(0, 0.5).setDepth(151));
+      this.button(`opt-${r.key}-left`, cx + 20, y, 38, 34, '◀', () => change(-1));
+      this.uiObjs.push(this.add.text(cx + 120, y, r.value, { fontFamily: FONT, fontSize: '15px', color: hex(C.ink) }).setOrigin(0.5).setDepth(151));
+      this.button(`opt-${r.key}-right`, cx + 220, y, 38, 34, '▶', () => change(1));
+    });
+    this.uiObjs.push(this.add.text(cx, top + ph - 70, t('optNote'), { fontFamily: FONT, fontSize: '12px', color: hex(C.dim), align: 'center', wordWrap: { width: pw - 40 } }).setOrigin(0.5).setDepth(151));
+    this.button('back', cx, top + ph - 30, 200, 36, t('back'), () => this.drawMenu());
+  }
+
+  /** Hats for your moles, opened by the campaign's stars. */
+  showHats() {
+    this.clearUi();
+    const cx = this.W / 2;
+    const cy = this.H / 2;
+    const total = this.campaign.stars.reduce((a, n) => a + n, 0) + this.campaign.vstars.reduce((a, n) => a + n, 0);
+    const choices: (HatId | null)[] = [null, ...HATS.map((h) => h.id)];
+    const tw = 112;
+    const th = 112;
+    const cols = 4;
+    const pw = cols * tw + 40;
+    const ph = Math.ceil(choices.length / cols) * th + 140;
+    const top = cy - ph / 2;
+    this.uiObjs.push(this.add.rectangle(cx, cy, pw, ph, C.panel, 0.96).setStrokeStyle(3, C.panelEdge).setDepth(150));
+    this.uiObjs.push(
+      this.add.text(cx, top + 26, t('hats'), { fontFamily: FONT, fontSize: '26px', color: hex(C.ink), fontStyle: 'bold' }).setOrigin(0.5).setDepth(151),
+      this.add.text(cx, top + 54, t('hatsStars', { n: total }), { fontFamily: FONT, fontSize: '14px', color: hex(C.dim) }).setOrigin(0.5).setDepth(151),
+    );
+    const g = this.add.graphics().setDepth(153);
+    this.uiObjs.push(g);
+    choices.forEach((id, i) => {
+      const x = cx - pw / 2 + 20 + (i % cols) * tw + tw / 2;
+      const y = top + 76 + Math.floor(i / cols) * th + th / 2;
+      const need = id ? HATS.find((h) => h.id === id)!.stars : 0;
+      const open = total >= need;
+      const picked = this.prefs.hat === id;
+      const tile = this.add.rectangle(x, y, tw - 8, th - 8, picked ? C.buttonHi : C.button, open ? 1 : 0.5).setStrokeStyle(2, picked ? C.fire : 0xc9b8a3).setDepth(151);
+      this.uiObjs.push(tile, this.add.text(x, y + 38, open ? t(id ? `hat_${id}` : 'hatNone') : `★ ${need}`, { fontFamily: FONT, fontSize: '12px', color: hex(open ? C.ink : 0xa09080), fontStyle: 'bold' }).setOrigin(0.5).setDepth(152));
+      drawMole(g, this.fakeMole(x, y + 22, id), { time: 0, aim: null, weapon: null });
+      if (!open) g.fillStyle(C.panel, 0.55).fillRect(x - tw / 2 + 4, y - th / 2 + 4, tw - 8, th - 28);
+      this.buttons[`hat-${id ?? 'none'}`] = { x, y, w: tw - 8, h: th - 8 };
+      tile.setInteractive({ useHandCursor: true });
+      tile.on('pointerdown', () => {
+        if (!open) return ui('refuse');
+        ui('click');
+        this.prefs.hat = id;
+        savePrefs(this.prefs);
+        this.showHats();
+      });
+    });
+    this.button('back', cx, top + ph - 30, 200, 36, t('back'), () => this.showCampaign());
+  }
+
+  /** A mole for a picture only (the hat picker), never added to the world. */
+  private fakeMole(x: number, y: number, hat: string | null): Mole {
+    return {
+      id: 0, team: 0, name: '', x, y, vx: 0, vy: 0, hp: MAX_HP, maxHp: MAX_HP, alive: true, grounded: true, facing: 1, walk: 0, walkT: 0,
+      hurtT: 0, shield: false, act: null, hat, hidden: false, drowned: false, fallFrom: y, blink: 1,
+    };
   }
 
   private setSize(d: number) {
     this.size = Math.max(2, Math.min(5, this.size + d));
-    savePrefs({ size: this.size });
+    this.prefs.size = this.size;
+    savePrefs(this.prefs);
     this.texts.size?.setText(t('teamSize', { n: this.size }));
   }
 
@@ -351,8 +460,9 @@ export class GameScene extends Phaser.Scene {
       }
       this.buttons[`battle-${i}`] = { x, y, w: cw, h: ch };
     });
-    this.button('back', cx - 110, top + ph - 26, 200, 36, t('back'), () => this.drawMenu());
-    this.button('depot', cx + 110, top + ph - 26, 200, 36, t('depot'), () => this.showDepot(), true);
+    this.button('back', cx - 216, top + ph - 26, 196, 36, t('back'), () => this.drawMenu());
+    this.button('hats', cx, top + ph - 26, 196, 36, t('hats'), () => this.showHats(), true);
+    this.button('depot', cx + 216, top + ph - 26, 196, 36, t('depot'), () => this.showDepot(), true);
   }
 
   /** The Quartermaster: a row per upgrade with its level and the price of the next one. */
@@ -450,6 +560,12 @@ export class GameScene extends Phaser.Scene {
     }
     for (const [id, n] of Object.entries(this.boost.ammo) as [WeaponId, number][]) this.teams[0].ammo[id] += n;
     this.teams[1].ai = mode !== 'duo' && mode !== 'daily';
+    // Your moles wear your hat (both sides in two players), never in Watch AI.
+    if (mode !== 'watch') for (const tm of mode === 'duo' ? this.teams : [this.teams[0]]) for (const m of tm.moles) if (!m.hat) m.hat = this.prefs.hat;
+    const roll = Math.random();
+    this.weather = mode === 'daily' || !this.prefs.options.weather ? 'clear' : roll < 0.6 ? 'clear' : roll < 0.75 ? 'rain' : roll < 0.9 ? 'fog' : 'gusts';
+    this.world.rain = this.weather === 'rain';
+    this.gustT = 5;
     this.teams[0].ai = mode === 'watch';
     this.turn = Math.random() < 0.5 && mode === 'watch' ? 1 : 0;
     this.buildHud();
@@ -487,7 +603,7 @@ export class GameScene extends Phaser.Scene {
     else if (kind === 'calm') this.world.wind = Math.round((Math.random() * 2 - 1) * 3);
     else if (this.mode !== 'daily') this.world.wind = calm ? 0 : Math.round((Math.random() * 2 - 1) * 10);
     this.phase = 'aim';
-    this.timer = TURN_TIME + (this.turn === 0 ? this.boost.time : 0);
+    this.timer = (this.quick() ? this.prefs.options.turn : TURN_TIME) + (this.turn === 0 ? this.boost.time : 0);
     this.aimAngle = m.facing > 0 ? -Math.PI / 4 : (-3 * Math.PI) / 4;
     this.power = 0;
     this.charging = false;
@@ -521,7 +637,7 @@ export class GameScene extends Phaser.Scene {
         this.stats.wins++;
         this.trophy('firstWin');
         if (!this.lostMole) this.trophy('flawless');
-        if (settings.difficulty === 'hard') this.trophy('hardWin');
+        if (difficulty() === 'hard') this.trophy('hardWin');
         if (this.battle !== null) {
           const stars = starsFor(BATTLES[this.battle], this.turns, this.lostMole);
           const tier = this.tierStars();
@@ -622,6 +738,11 @@ export class GameScene extends Phaser.Scene {
   private showMenuCampaign() {
     this.showMenu();
     this.showCampaign();
+  }
+
+  /** A quick match (against the AI or two players), where the Options panel's turn time and crates apply. */
+  private quick() {
+    return (this.mode === 'ai' || this.mode === 'duo') && this.battle === null;
   }
 
   /** The best stars of the campaign tier being played. */
@@ -931,6 +1052,16 @@ export class GameScene extends Phaser.Scene {
     switch (this.phase) {
       case 'aim':
         this.timer -= DT;
+        if (this.weather === 'gusts') {
+          this.gustT -= DT;
+          if (this.gustT <= 0) {
+            // A gust: the wind swings a few points, mid-turn.
+            this.gustT = 4 + Math.random() * 3;
+            const d = (Math.random() < 0.5 ? -1 : 1) * (2 + Math.floor(Math.random() * 3));
+            this.world.wind = Math.max(-10, Math.min(10, this.world.wind + d));
+            SFX('whoosh');
+          }
+        }
         if (team.ai) this.aiTick();
         else this.controlTick();
         if (this.charging) {
@@ -1016,7 +1147,7 @@ export class GameScene extends Phaser.Scene {
       case 'think':
         if (ai.t > 0) return;
         const rival = this.battle === null ? null : BATTLES[this.battle];
-        ai.plan = planTurn(this.world, m, team.ammo, byDifficulty(2.4, 1, 0.35) * (rival?.aim ?? 1) * (rival && this.veteran ? VETERAN.aim : 1), !ai.walked, rival?.habit ?? null);
+        ai.plan = planTurn(this.world, m, team.ammo, byLevel(2.4, 1, 0.35) * (rival?.aim ?? 1) * (rival && this.veteran ? VETERAN.aim : 1), !ai.walked, rival?.habit ?? null);
         if (ai.plan.walk) {
           ai.stage = 'walk';
           ai.t = 1.3;
@@ -1103,7 +1234,7 @@ export class GameScene extends Phaser.Scene {
     // Sudden death: the water rises.
     if (this.turns >= this.suddenDeath) this.world.water -= 8;
     // Now and then a crate floats down.
-    if (Math.random() < 0.4 + this.boost.crates) {
+    if (Math.random() < (this.quick() ? CRATE_ODDS[this.prefs.options.crates] : 0.4) + this.boost.crates) {
       const x = 40 + Math.random() * (this.W - 80);
       const health = Math.random() < 0.3;
       this.world.dropCrate(x, health ? 'health' : 'weapon', health ? null : CRATE_WEAPONS[Math.floor(Math.random() * CRATE_WEAPONS.length)]);
@@ -1184,6 +1315,7 @@ export class GameScene extends Phaser.Scene {
     const fx = this.fx.clear();
     for (const p of w.particles) drawParticle(fx, p);
     this.drawWater();
+    this.drawWeather();
     this.drawLabels();
     this.drawHud();
   }
@@ -1223,7 +1355,7 @@ export class GameScene extends Phaser.Scene {
           g.fillCircle(m.x + Math.cos(this.aimAngle) * d, m.y - 12 + Math.sin(this.aimAngle) * d, 1.5 + i * 0.35);
         }
         // The first part of the path, as the difficulty allows.
-        const seconds = team.ai ? 0 : byDifficulty(3, 0.75, 0);
+        const seconds = team.ai ? 0 : byLevel(3, 0.75, 0) * (this.weather === 'fog' ? 0.5 : 1);
         if (seconds > 0) {
           const p = World.muzzle(m, this.aimAngle);
           const sp = w.speed * Math.max(0.05, this.power);
@@ -1246,6 +1378,31 @@ export class GameScene extends Phaser.Scene {
       const { tx, ty } = this.ai.plan;
       g.lineStyle(2, 0xffffff, 0.9);
       g.strokeCircle(tx, ty - 10, 10 + Math.sin(this.world.time * 10) * 2);
+    }
+  }
+
+  /** Rain streaks blown by the wind, or banks of fog drifting over the hills. Held still with reduced motion. */
+  private drawWeather() {
+    const g = this.fogG.clear();
+    if (this.screen === 'menu') return;
+    const time = settings.reduceMotion ? 0 : this.world.time;
+    if (this.weather === 'rain') {
+      const slant = this.world.wind * 1.4;
+      g.lineStyle(1.5, 0xc8dcf0, 0.55);
+      for (let i = 0; i < 90; i++) {
+        const x = ((i * 97.3 + time * (slant * 20)) % (this.W + 40) + this.W + 40) % (this.W + 40) - 20;
+        const y = (i * 53.7 + time * 520) % this.H;
+        g.lineBetween(x, y, x + slant, y + 14);
+      }
+    } else if (this.weather === 'fog') {
+      for (let i = 0; i < 7; i++) {
+        const x = ((i * 211 + time * 12) % (this.W + 300)) - 150;
+        const y = this.H * (0.35 + (i % 3) * 0.12);
+        g.fillStyle(0xf2f0ea, 0.22);
+        g.fillEllipse(x, y, 380, 90, 24);
+      }
+      g.fillStyle(0xf2f0ea, 0.12);
+      g.fillRect(0, 0, this.W, this.H);
     }
   }
 
@@ -1324,7 +1481,8 @@ export class GameScene extends Phaser.Scene {
     h.lineStyle(2, INK, 1);
     h.strokeRoundedRect(W / 2 - 90, 8, 180, 44, 10);
     const wind = this.world.wind;
-    this.texts.wind?.setText(wind === 0 ? t('windCalm') : t('wind'));
+    const sky = this.weather === 'clear' ? '' : ' · ' + t(`weather_${this.weather}`);
+    this.texts.wind?.setText((wind === 0 ? t('windCalm') : t('wind')) + sky);
     if (wind) {
       const len = (Math.abs(wind) / 10) * 70;
       const dir = Math.sign(wind);

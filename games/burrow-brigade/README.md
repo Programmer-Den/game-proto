@@ -75,7 +75,21 @@ Shield Bubbles and Repair Kits, more crates and a fourth (or fifth) mole.
 ## Difficulty
 
 The hub's difficulty sets how loosely the Burrow AI aims and how much of your shot's path you see
-while aiming: all of it on Easy, the start of it on Normal, none on Hard.
+while aiming: all of it on Easy, the start of it on Normal, none on Hard. Options on the menu can
+set a difficulty for Burrow Brigade alone (or follow the hub's), and the turn time, crates and
+weather of quick matches.
+
+![The Options panel](docs/screenshots/options.webp)
+
+## Weather and hats
+
+Now and then a match brings weather: rain puts fires out twice as fast, fog shortens the aim
+preview and gusts shift the wind in the middle of a turn. Campaign stars open seven hats for your
+moles, from an acorn cap to a laurel wreath, picked on the Campaign screen.
+
+![Rain on a frosty hill](docs/screenshots/rain.webp)
+
+![The Hats screen](docs/screenshots/hats.webp)
 
 ## Code
 
@@ -84,7 +98,8 @@ while aiming: all of it on Easy, the start of it on Normal, none on Hard.
 - `src/game/world.ts`: everything that moves (moles, shells, flames, bees, crates, balloons, bolts,
   particles) and what every weapon does.
 - `src/game/weapons.ts`: the arsenal's list. `src/game/ai.ts`: the Burrow AI. `src/game/campaign.ts`:
-  the campaign's battles and stars. `src/game/save.ts`: stats, settings and campaign stars.
+  the campaign's battles and stars. `src/game/save.ts`: stats, settings and campaign stars. `src/game/options.ts`: the Options panel's
+  choices and the game's own difficulty. `src/game/hats.ts`: the hats and the stars each needs.
 - `src/scenes/GameScene.ts`: menu, turns, input, HUD and drawing; `draw.ts` draws the moles, shells
   and particles; `terrainArt.ts` paints the ground and the sky.
 

@@ -1,4 +1,6 @@
 import type { Levels } from './depot';
+import { isHat, type HatId } from './hats';
+import { cleanOptions, type Options } from './options';
 import type { WeaponId } from './weapons';
 
 /** What Burrow Brigade keeps on the device, under keys starting with the game's folder name. */
@@ -18,6 +20,10 @@ export interface Stats {
 export interface Prefs {
   /** Moles per team, 2 to 5. */
   size: number;
+  /** The hat your moles wear, or null. */
+  hat: HatId | null;
+  /** The Options panel's choices. */
+  options: Options;
 }
 
 function read<T>(key: string, fallback: T): T {
@@ -39,8 +45,12 @@ function write(key: string, value: unknown) {
 export const loadStats = (): Stats => read<Stats>(STATS_KEY, { games: 0, wins: 0, used: [] });
 export const saveStats = (s: Stats) => write(STATS_KEY, s);
 export const loadPrefs = (): Prefs => {
-  const p = read<Prefs>(PREFS_KEY, { size: 3 });
-  return { size: Math.max(2, Math.min(5, Math.round(p.size) || 3)) };
+  const p = read<Partial<Prefs>>(PREFS_KEY, { size: 3 });
+  return {
+    size: Math.max(2, Math.min(5, Math.round(Number(p.size)) || 3)),
+    hat: isHat(p.hat) ? p.hat : null,
+    options: cleanOptions(p.options ?? {}),
+  };
 };
 export const savePrefs = (p: Prefs) => write(PREFS_KEY, p);
 

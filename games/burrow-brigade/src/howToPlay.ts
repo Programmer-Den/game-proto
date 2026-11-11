@@ -20,6 +20,7 @@ const en: HowToPlay = {
     'The Campaign is eight battles against rival burrows, each with its own habit. Win one to open the next, and earn up to three stars: the win, a quick win and losing no mole. Winning the last battle opens the harder Veteran tier.',
     'The Daily range is one try a day, the same for everyone: five shots at four straw moles. Every point of damage counts, and each one knocked out adds 25.',
     'Campaign battles pay acorns. Spend them at the Quartermaster on helmets, longer turns, extra weapons, more crates and a new recruit.',
+    'Campaign stars open hats for your moles, picked on the Campaign screen.',
   ],
   tips: [
     'There are 28 weapons in five groups: rockets, throwing weapons, strikes, close moves and tools.',
@@ -28,7 +29,8 @@ const en: HowToPlay = {
     'Moles are diggers: Burrow and the Drill Rocket reach moles hiding in caves.',
     'Powder kegs go off when a blast or a flame reaches them: hit one next to an enemy for a second bang.',
     'From turn 24 the water rises a little every turn.',
-    'On Easy you see the whole flight path while aiming, on Normal its start, on Hard none.',
+    'On Easy you see the whole flight path while aiming, on Normal its start, on Hard none. Options on the menu sets the difficulty for this game alone, the turn time, crates and weather.',
+    'Rain puts fires out sooner, fog shortens the aim preview and gusts shift the wind in the middle of a turn.',
   ],
 };
 
@@ -51,6 +53,7 @@ const de: HowToPlay = {
     'Der Feldzug sind acht Schlachten gegen rivalisierende Baue, jeder mit seiner Eigenart. Gewinne eine, um die nächste zu öffnen, und hol bis zu drei Sterne: den Sieg, einen schnellen Sieg und keinen verlorenen Maulwurf. Der Sieg in der letzten Schlacht öffnet die schwerere Veteranenstufe.',
     'Das Tagesziel ist ein Versuch am Tag, für alle gleich: fünf Schüsse auf vier Strohmaulwürfe. Jeder Schadenspunkt zählt, und jeder umgeworfene bringt 25 dazu.',
     'Schlachten im Feldzug bringen Eicheln. Gib sie beim Quartiermeister für Helme, längere Züge, Extrawaffen, mehr Kisten und einen neuen Rekruten aus.',
+    'Sterne im Feldzug schalten Hüte für deine Maulwürfe frei, auszuwählen im Feldzug.',
   ],
   tips: [
     'Es gibt 28 Waffen in fünf Gruppen: Raketen, Wurfwaffen, Angriffe, Nahkampf und Werkzeuge.',
@@ -59,7 +62,8 @@ const de: HowToPlay = {
     'Maulwürfe sind Gräber: Graben und die Bohrrakete erreichen Maulwürfe in Höhlen.',
     'Pulverfässer gehen hoch, wenn eine Explosion oder eine Flamme sie erreicht: Triff eins neben einem Gegner für einen zweiten Knall.',
     'Ab Runde 24 steigt das Wasser jede Runde ein Stück.',
-    'Auf Leicht siehst du beim Zielen die ganze Flugbahn, auf Normal ihren Anfang, auf Schwer keine.',
+    'Auf Leicht siehst du beim Zielen die ganze Flugbahn, auf Normal ihren Anfang, auf Schwer keine. Unter Optionen im Menü stellst du den Schwierigkeitsgrad nur für dieses Spiel ein, dazu Zugzeit, Kisten und Wetter.',
+    'Regen löscht Feuer schneller, Nebel verkürzt die Zielhilfe und Böen drehen den Wind mitten im Zug.',
   ],
 };
 
