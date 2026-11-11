@@ -9,6 +9,15 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
   screen, and Watch AI (`?watch`, both teams run by the AI, a new match four seconds after one
   ends). Teams have 2 to 5 moles (`size` in `burrow-brigade-prefs`, 3 by default), picked on the
   menu. There is no save of a match under way.
+- **Campaign** (`game/campaign.ts`): eight battles (`BATTLES`) against rival burrows, played from
+  the menu's Campaign screen (`showCampaign`, a card per battle). Each has a set theme, its own team
+  sizes (`mine` against `foes`, ignoring the menu's size), an aim multiplier for the AI (`aim`), a
+  `habit` (a weapon the rival carries `bonus` extra uses of and reaches for first, through
+  `planTurn`'s `habit`), and sometimes a twist (`wind` strong or calm, an early `suddenDeath`).
+  It plays as `mode` `ai` with `battle` set. A win gives up to three stars (`starsFor`): the win,
+  within `par` turns, and no mole lost; the best per battle is saved, and a battle opens once the
+  one before it is won (`isOpen`). The result screen shows the stars and Next battle. The rival's
+  name (`c_<id>`) replaces Amber Burrow in its panel; its card line is `cd_<id>`.
 - **Map:** `generate` (`game/terrain.ts`) makes a fresh map for the view's size each match: rolling
   hills from four sine waves, a ridge in the middle, cliffs into the water at both ends, sometimes a
   water gap splitting the land, 2 to 4 caves and 1 or 2 floating ledges. One of three themes
@@ -76,16 +85,20 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
 - `burrow-brigade-stats`: `{ games, wins, used }`, matches started (not in Watch AI), wins against the
   AI and the weapons the player has used.
 - `burrow-brigade-prefs`: `{ size }`, moles a team.
+- `burrow-brigade-campaign`: `{ stars }`, the best stars (0 to 3) of each campaign battle, by its
+  place in `BATTLES`.
 - `burrow-brigade-trophies`: the shared trophies.
 
 ## Test hooks
 
 - `window.game` (dev build). `scene.state` gives `screen`, `phase`, `mode`, `turn`, `turns`,
   `wind`, `weapon`, `active` (`id`, `team`, `x`, `y`, `hp`, `alive`), `craters`, `shots`, `busy`,
-  `teams` (`alive`, `hp`), `winner`, `arsenal` and `view` (the view's size, to turn view pixels into
-  page pixels). `scene.buttons` has every button by id: `play-ai`, `play-duo`, `size-down`,
-  `size-up`, `weapon`, `left`, `right`, `jump`, `fire`, `rematch`, `menu`, and `w-<id>` for the
-  arsenal's tiles while it is open.
+  `teams` (`alive`, `hp`), `winner`, `arsenal`, `battle` (the campaign battle, or null), `stars`
+  (the campaign's best stars) and `view` (the view's size, to turn view pixels into
+  page pixels). `scene.buttons` has every button by id: `play-ai`, `campaign`, `play-duo`,
+  `size-down`, `size-up`, `weapon`, `left`, `right`, `jump`, `fire`, `rematch`, `menu`, `w-<id>`
+  for the arsenal's tiles while it is open, `battle-<i>` and `back` on the Campaign screen, and
+  `next` on a won battle's result.
 - The playthrough (`e2e/playthrough.spec.ts`) plays the first round: Play the Burrow AI, hold ▶,
   drag back from the mole to fire an Acorn Rocket, see a crater, wait through the AI's turn until
   the next blue mole is up, and checks the saved stats.
@@ -106,5 +119,8 @@ scene).
   `World.use` and, for a shell, `contact` and `goOff`, its `w_<id>` and `d_<id>` texts in
   `i18n/en.ts` and `de.ts`, and its row to the README's table. Mark `ai: true` only if `planTurn`
   can aim it. The trophy texts name the number of weapons (26).
+- **A campaign battle:** add it to `BATTLES` (its id to `BattleId`), with its `c_<id>` and
+  `cd_<id>` texts in `i18n/en.ts` and `de.ts`. Saved stars go by place, so add new battles at the
+  end.
 - **Balance:** blast radius and damage are in `goOff`; the turn and retreat times, sudden death and
   crate odds at the top of `GameScene.ts`; gravity, wind and the water's height in `terrain.ts`.

@@ -26,7 +26,8 @@ export interface Plan {
 
 const gauss = () => (Math.random() + Math.random() + Math.random() - 1.5) * 1.15;
 
-export function planTurn(world: World, me: Mole, ammo: Record<WeaponId, number>, aimError: number, canWalk: boolean): Plan {
+/** `habit` is a weapon this AI reaches for first whenever it has one (a campaign rival's). */
+export function planTurn(world: World, me: Mole, ammo: Record<WeaponId, number>, aimError: number, canWalk: boolean, habit: WeaponId | null = null): Plan {
   const enemies = world.moles.filter((m) => m.alive && m.team !== me.team);
   const has = (id: WeaponId) => ammo[id] !== 0;
   const base: Plan = { weapon: 'skip', angle: -Math.PI / 2, power: 0.5, tx: 0, ty: 0, walk: 0, miss: 9999, target: null };
@@ -42,8 +43,8 @@ export function planTurn(world: World, me: Mole, ammo: Record<WeaponId, number>,
     return { ...base, weapon: 'swipe', angle, target: close, miss: 0 };
   }
   if (me.hp < 40 && has('repair') && Math.random() < 0.6) return { ...base, weapon: 'repair', target: me, miss: 0 };
-  if (has('bolt') && Math.random() < 0.22) return { ...base, weapon: 'bolt', tx: target.x + gauss() * aimError * 30, ty: target.y, target, miss: 0 };
-  if (has('skyrain') && Math.random() < 0.22) {
+  if (has('bolt') && Math.random() < (habit === 'bolt' ? 0.6 : 0.22)) return { ...base, weapon: 'bolt', tx: target.x + gauss() * aimError * 30, ty: target.y, target, miss: 0 };
+  if (has('skyrain') && Math.random() < (habit === 'skyrain' ? 0.6 : 0.22)) {
     // The acorns drift with the wind on the way down: aim upwind of the target.
     const fall = Math.sqrt((2 * Math.max(40, target.y - 60)) / 520);
     const drift = world.wind * WIND_ACC * 1.2 * 0.5 * fall * fall;
@@ -55,7 +56,8 @@ export function planTurn(world: World, me: Mole, ammo: Record<WeaponId, number>,
     (id) => has(id) && WEAPONS[id].ai,
   );
   const choices: WeaponId[] = ['rocket', 'grenade'];
-  if (specials.length && Math.random() < 0.45) choices.unshift(specials[Math.floor(Math.random() * specials.length)]);
+  if (habit && specials.includes(habit) && Math.random() < 0.7) choices.unshift(habit);
+  else if (specials.length && Math.random() < 0.45) choices.unshift(specials[Math.floor(Math.random() * specials.length)]);
   const friends = world.moles.filter((m) => m.alive && m.team === me.team && m !== me);
   const bodies = enemies.map((m) => ({ x: m.x, y: m.y }));
   let best: Plan = { ...base };

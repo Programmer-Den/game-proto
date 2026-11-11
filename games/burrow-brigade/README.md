@@ -3,7 +3,8 @@
 Turn-based artillery with squads of helmeted moles. Each turn one of your moles walks, aims with a
 slingshot drag and fires one of 26 weapons over the hills. Every blast digs the ground away and
 throws moles about, the wind changes every turn, and a mole that falls into the water is out. The
-last team with a mole standing wins. Play the Burrow AI or a friend on one screen.
+last team with a mole standing wins. Play the Burrow AI, a campaign of eight rival burrows, or a
+friend on one screen.
 
 ![Aiming an Acorn Rocket over the ridge](docs/screenshots/aim.webp)
 
@@ -24,6 +25,15 @@ last team with a mole standing wins. Play the Burrow AI or a friend on one scree
   acorns, flames and bees, but never thrown weapons.
 
 ![The arsenal](docs/screenshots/arsenal.webp)
+
+## Campaign
+
+Eight battles against rival burrows, each with its own map theme, team sizes and habit: the Hazel
+Twins hoard Pinecones, the Frostwhisker Patrol rides a howling wind with Balloon Drops, the Rising
+Tide floods the map from turn 8. Every battle has three stars: win it, win within its turn limit,
+and win without losing a mole. Winning a battle opens the next.
+
+![The campaign](docs/screenshots/campaign.webp)
 
 ## Weapons
 
@@ -48,8 +58,8 @@ while aiming: all of it on Easy, the start of it on Normal, none on Hard.
   flight steps shared by shells, the aim preview and the AI.
 - `src/game/world.ts`: everything that moves (moles, shells, flames, bees, crates, balloons, bolts,
   particles) and what every weapon does.
-- `src/game/weapons.ts`: the arsenal's list. `src/game/ai.ts`: the Burrow AI. `src/game/save.ts`:
-  stats and settings.
+- `src/game/weapons.ts`: the arsenal's list. `src/game/ai.ts`: the Burrow AI. `src/game/campaign.ts`:
+  the campaign's battles and stars. `src/game/save.ts`: stats, settings and campaign stars.
 - `src/scenes/GameScene.ts`: menu, turns, input, HUD and drawing; `draw.ts` draws the moles, shells
   and particles; `terrainArt.ts` paints the ground and the sky.
 

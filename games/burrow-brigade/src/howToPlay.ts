@@ -17,6 +17,7 @@ const en: HowToPlay = {
     'Watch the wind at the top: it pushes rockets and the Balloon Drop, but not thrown things.',
     'After you fire you have 3 seconds to scramble away from your own blast.',
     'Then the other team’s next mole takes its turn.',
+    'The Campaign is eight battles against rival burrows, each with its own habit. Win one to open the next, and earn up to three stars: the win, a quick win and losing no mole.',
   ],
   tips: [
     'There are 26 weapons in five groups: rockets, throwing weapons, strikes, close moves and tools.',
@@ -44,6 +45,7 @@ const de: HowToPlay = {
     'Achte oben auf den Wind: Er treibt Raketen und den Ballonabwurf ab, aber keine Wurfwaffen.',
     'Nach dem Schuss hast du 3 Sekunden, um vor deiner eigenen Explosion zu fliehen.',
     'Dann ist der nächste Maulwurf des anderen Teams dran.',
+    'Der Feldzug sind acht Schlachten gegen rivalisierende Baue, jeder mit seiner Eigenart. Gewinne eine, um die nächste zu öffnen, und hol bis zu drei Sterne: den Sieg, einen schnellen Sieg und keinen verlorenen Maulwurf.',
   ],
   tips: [
     'Es gibt 26 Waffen in fünf Gruppen: Raketen, Wurfwaffen, Angriffe, Nahkampf und Werkzeuge.',
