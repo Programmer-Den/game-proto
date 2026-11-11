@@ -272,7 +272,7 @@ All sound is made in code by `shared/audio.ts`; `src/audio.ts` holds the song an
 only `GameScene` plays them. Nothing plays under browser automation.
 
 Music, `SONG` (84 BPM, a triangle music-box lead): `menu` on every screen but the board (menu, styles, school, calendar), `calm` on
-Classic and daily boards (G major), `delve` on Delve floors (A minor, busier drums); stings `solved`
+every other board (Classic, daily, weekly and School lessons; G major), `delve` on Delve floors (A minor, busier drums); stings `solved`
 (every solved board) and `over` (a Delve run ends). `drain` calls `playMusic` every frame with the
 part for the screen; the engine only switches when it changes.
 

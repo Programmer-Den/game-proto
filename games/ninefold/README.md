@@ -125,7 +125,8 @@ A cleared floor also offers three of ten relics. The last six give something and
 
 Clearing Delve floor 10 opens **Ascension 1**, a harder Delve; clearing floor 10 at the highest
 ascension open opens the next, up to Ascension 5. The arrows either side of Delve on the menu pick
-where the next run starts, and the menu names the newest rule. Each ascension keeps every rule below
+where the next run starts (Delve again on the run-over card starts at the ascension of the run that
+ended), and the menu names the newest rule. Each ascension keeps every rule below
 it:
 
 | Ascension | Adds |
