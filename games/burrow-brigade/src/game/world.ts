@@ -17,6 +17,8 @@ export interface Mole {
   vx: number;
   vy: number;
   hp: number;
+  /** Health it starts with and heals up to (more with the Quartermaster's helmets). */
+  maxHp: number;
   alive: boolean;
   grounded: boolean;
   facing: 1 | -1;
@@ -127,9 +129,9 @@ export class World {
     return { enemiesHurt: new Set(), drownedEnemies: 0, ownLost: 0, damage: 0, longShot: false };
   }
 
-  addMole(team: number, name: string, x: number, y: number) {
+  addMole(team: number, name: string, x: number, y: number, maxHp = MAX_HP) {
     const m: Mole = {
-      id: this.moles.length, team, name, x, y, vx: 0, vy: 0, hp: MAX_HP, alive: true, grounded: true, facing: team === 0 ? 1 : -1,
+      id: this.moles.length, team, name, x, y, vx: 0, vy: 0, hp: maxHp, maxHp, alive: true, grounded: true, facing: team === 0 ? 1 : -1,
       walk: 0, walkT: 0, hurtT: 0, shield: false, act: null, hidden: false, drowned: false, fallFrom: y, blink: Math.random() * 3,
     };
     this.moles.push(m);
@@ -545,7 +547,7 @@ export class World {
         for (let i = 0; i < 16; i++) this.particle('spark', m.x + rnd(-14, 14), m.y - 10 + rnd(-14, 14), 0, rnd(-30, -10), 0.7, 2, 0x8fd3ff, 0);
         break;
       case 'repair':
-        m.hp = Math.min(MAX_HP, m.hp + 30);
+        m.hp = Math.min(m.maxHp, m.hp + 30);
         this.pops.push({ x: m.x, y: m.y - 32, text: '+30', color: 0x3fae4a, t: 0 });
         this.hooks.sound('heal');
         for (let i = 0; i < 12; i++) this.particle('heal', m.x + rnd(-12, 12), m.y - rnd(0, 20), rnd(-10, 10), rnd(-60, -30), 1, 4, 0x4cc65a, 0);
@@ -1087,7 +1089,7 @@ export class World {
         if (m.alive && !m.hidden && Math.abs(m.x - c.x) < 14 && Math.abs(m.y - c.y) < 18) {
           c.gone = true;
           if (c.kind === 'health') {
-            m.hp = Math.min(MAX_HP, m.hp + 25);
+            m.hp = Math.min(m.maxHp, m.hp + 25);
             this.pops.push({ x: m.x, y: m.y - 32, text: '+25', color: 0x3fae4a, t: 0 });
             for (let i = 0; i < 10; i++) this.particle('heal', m.x + rnd(-12, 12), m.y - rnd(0, 20), 0, rnd(-60, -30), 1, 4, 0x4cc65a, 0);
             this.hooks.sound('heal');

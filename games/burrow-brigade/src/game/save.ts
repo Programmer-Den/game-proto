@@ -1,3 +1,4 @@
+import type { Levels } from './depot';
 import type { WeaponId } from './weapons';
 
 /** What Burrow Brigade keeps on the device, under keys starting with the game's folder name. */
@@ -46,10 +47,18 @@ export const savePrefs = (p: Prefs) => write(PREFS_KEY, p);
 export interface Campaign {
   /** The best stars won in each battle, by its place in `BATTLES` (0 for not won yet). */
   stars: number[];
+  /** Acorns to spend at the Quartermaster. */
+  acorns: number;
+  /** The Quartermaster's upgrades bought, by id. */
+  levels: Levels;
 }
 
 export const loadCampaign = (): Campaign => {
-  const c = read<Campaign>(CAMPAIGN_KEY, { stars: [] });
-  return { stars: Array.isArray(c.stars) ? c.stars.map((n) => Math.max(0, Math.min(3, Math.round(Number(n)) || 0))) : [] };
+  const c = read<Campaign>(CAMPAIGN_KEY, { stars: [], acorns: 0, levels: {} });
+  return {
+    stars: Array.isArray(c.stars) ? c.stars.map((n) => Math.max(0, Math.min(3, Math.round(Number(n)) || 0))) : [],
+    acorns: Math.max(0, Math.round(Number(c.acorns)) || 0),
+    levels: c.levels && typeof c.levels === 'object' ? c.levels : {},
+  };
 };
 export const saveCampaign = (c: Campaign) => write(CAMPAIGN_KEY, c);
