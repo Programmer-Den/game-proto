@@ -7,6 +7,7 @@ import { aiLog, mountWatch, watching, watchSteps } from '../../../../shared/watc
 import { SFX, SONG } from '../audio';
 import { planTurn, type Plan } from '../game/ai';
 import { BATTLES, isOpen, starsFor } from '../game/campaign';
+import { boosts, reward, UPGRADE_COSTS, UPGRADE_IDS, type UpgradeId } from '../game/depot';
 import { loadCampaign, loadPrefs, loadStats, saveCampaign, savePrefs, saveStats, type Stats } from '../game/save';
 import { DT, flight, generate, spawnPoints, Terrain, THEMES, WATER_GAP, WIND_ACC, type Theme } from '../game/terrain';
 import { CRATE_WEAPONS, GROUPS, startingAmmo, WEAPON_IDS, WEAPONS, type WeaponId } from '../game/weapons';
@@ -84,9 +85,11 @@ export class GameScene extends Phaser.Scene {
   /** The campaign battle under way (its place in `BATTLES`), or null outside the campaign. */
   battle: number | null = null;
   /** Stars won by the battle that just ended, and whether they beat the best so far. */
-  private earned = { stars: 0, best: false };
+  private earned = { stars: 0, best: false, acorns: 0 };
   private campaign = loadCampaign();
   private suddenDeath = SUDDEN_DEATH_TURN;
+  /** The Quartermaster's upgrades for your side in this match (none outside the campaign). */
+  private boost = boosts({});
   private walkTarget: number | null = null;
   private walkTimer = 0;
   private hold = { left: false, right: false };
@@ -164,6 +167,7 @@ export class GameScene extends Phaser.Scene {
       arsenal: this.arsenalOpen,
       battle: this.battle,
       stars: this.campaign.stars.slice(),
+      acorns: this.campaign.acorns,
       view: { w: this.W, h: this.H },
     };
   }
@@ -194,7 +198,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** Builds a fresh map and world with `size` moles a team (or `[left, right]`), on a set theme or a random one. */
-  private buildWorld(size: number | [number, number], themeId?: Theme['id']) {
+  private buildWorld(size: number | [number, number], themeId?: Theme['id'], hp: [number, number] = [MAX_HP, MAX_HP]) {
     const pick = THEMES[Math.floor(Math.random() * THEMES.length)];
     this.theme = THEMES.find((th) => th.id === themeId) ?? pick;
     this.terrain = generate(Math.ceil(this.W), Math.ceil(this.H));
@@ -207,7 +211,7 @@ export class GameScene extends Phaser.Scene {
     const names = NAMES.map((n) => n.slice().sort(() => Math.random() - 0.5));
     this.teams = [0, 1].map((i) => ({
       index: i, ai: false, ammo: startingAmmo(), weapon: 'rocket' as WeaponId, next: 0,
-      moles: spots[i].map((p, k) => this.world.addMole(i, names[i][k], p.x, p.y)),
+      moles: spots[i].map((p, k) => this.world.addMole(i, names[i][k], p.x, p.y, hp[i])),
     }));
     this.world.onCollect = (m, c) => this.onCrate(m, c.weapon);
     this.clouds = Array.from({ length: 6 }, () => ({ x: Math.random() * this.W, y: 30 + Math.random() * this.H * 0.25, s: 0.6 + Math.random() * 0.7 }));
@@ -277,7 +281,7 @@ export class GameScene extends Phaser.Scene {
     this.uiObjs.push(this.add.rectangle(cx, cy, pw, ph, C.panel, 0.96).setStrokeStyle(3, C.panelEdge).setDepth(150));
     const total = this.campaign.stars.reduce((a, n) => a + n, 0);
     this.uiObjs.push(this.add.text(cx, top + 26, t('campaign'), { fontFamily: FONT, fontSize: '26px', color: hex(C.ink), fontStyle: 'bold' }).setOrigin(0.5).setDepth(151));
-    this.uiObjs.push(this.add.text(cx, top + 54, t('campaignStars', { n: total, all: BATTLES.length * 3 }), { fontFamily: FONT, fontSize: '14px', color: hex(C.dim) }).setOrigin(0.5).setDepth(151));
+    this.uiObjs.push(this.add.text(cx, top + 54, t('campaignStars', { n: total, all: BATTLES.length * 3, acorns: this.campaign.acorns }), { fontFamily: FONT, fontSize: '14px', color: hex(C.dim) }).setOrigin(0.5).setDepth(151));
     const swatch: Record<string, number> = { meadow: 0x59c14a, autumn: 0xd98a2b, frost: 0x9fc0ea };
     BATTLES.forEach((bt, i) => {
       const x = cx - pw / 2 + 15 + (i % cols) * (cw + 10) + cw / 2;
@@ -304,7 +308,55 @@ export class GameScene extends Phaser.Scene {
       }
       this.buttons[`battle-${i}`] = { x, y, w: cw, h: ch };
     });
-    this.button('back', cx, top + ph - 26, 200, 36, t('back'), () => this.drawMenu());
+    this.button('back', cx - 110, top + ph - 26, 200, 36, t('back'), () => this.drawMenu());
+    this.button('depot', cx + 110, top + ph - 26, 200, 36, t('depot'), () => this.showDepot(), true);
+  }
+
+  /** The Quartermaster: a row per upgrade with its level and the price of the next one. */
+  showDepot() {
+    this.clearUi();
+    const cx = this.W / 2;
+    const rh = 50;
+    const pw = 600;
+    const ph = UPGRADE_IDS.length * rh + 130;
+    const cy = this.H / 2;
+    const top = cy - ph / 2;
+    this.uiObjs.push(this.add.rectangle(cx, cy, pw, ph, C.panel, 0.96).setStrokeStyle(3, C.panelEdge).setDepth(150));
+    this.uiObjs.push(this.add.text(cx, top + 26, t('depot'), { fontFamily: FONT, fontSize: '26px', color: hex(C.ink), fontStyle: 'bold' }).setOrigin(0.5).setDepth(151));
+    this.uiObjs.push(this.add.text(cx, top + 54, t('acorns', { n: this.campaign.acorns }), { fontFamily: FONT, fontSize: '15px', color: hex(0x9a5a1a), fontStyle: 'bold' }).setOrigin(0.5).setDepth(151));
+    UPGRADE_IDS.forEach((id, i) => {
+      const y = top + 74 + i * rh + rh / 2;
+      const x0 = cx - pw / 2 + 20;
+      const lv = this.campaign.levels[id] ?? 0;
+      const costs = UPGRADE_COSTS[id];
+      this.uiObjs.push(
+        this.add.text(x0, y - 10, t(`u_${id}`), { fontFamily: FONT, fontSize: '15px', color: hex(C.ink), fontStyle: 'bold' }).setOrigin(0, 0.5).setDepth(151),
+        this.add.text(x0, y + 10, t(`ud_${id}`), { fontFamily: FONT, fontSize: '12px', color: hex(C.dim) }).setOrigin(0, 0.5).setDepth(151),
+        this.add.text(cx + 120, y, '●'.repeat(lv) + '○'.repeat(costs.length - lv), { fontFamily: FONT, fontSize: '14px', color: hex(C.fire) }).setOrigin(0.5).setDepth(151),
+      );
+      if (lv >= costs.length) {
+        this.uiObjs.push(this.add.text(cx + pw / 2 - 70, y, t('maxed'), { fontFamily: FONT, fontSize: '13px', color: hex(C.dim), fontStyle: 'bold' }).setOrigin(0.5).setDepth(151));
+        return;
+      }
+      const cost = costs[lv];
+      const btn = this.button(`buy-${id}`, cx + pw / 2 - 70, y, 110, 34, t('buy', { n: cost }), () => this.buy(id), this.campaign.acorns >= cost);
+      if (this.campaign.acorns < cost) btn.txt.setColor(hex(0xa09080));
+    });
+    this.button('back', cx, top + ph - 28, 200, 36, t('back'), () => this.showCampaign());
+  }
+
+  private buy(id: UpgradeId) {
+    const lv = this.campaign.levels[id] ?? 0;
+    const cost = UPGRADE_COSTS[id][lv];
+    if (cost === undefined || this.campaign.acorns < cost) {
+      ui('refuse');
+      return;
+    }
+    this.campaign.acorns -= cost;
+    this.campaign.levels[id] = lv + 1;
+    saveCampaign(this.campaign);
+    ui('coin');
+    this.showDepot();
   }
 
   startMatch(mode: 'ai' | 'duo' | 'watch', battle: number | null = null) {
@@ -313,14 +365,16 @@ export class GameScene extends Phaser.Scene {
     this.battle = mode === 'ai' ? battle : null;
     const bt = this.battle === null ? null : BATTLES[this.battle];
     this.suddenDeath = bt?.suddenDeath ?? SUDDEN_DEATH_TURN;
+    this.boost = boosts(bt ? this.campaign.levels : {});
     this.screen = 'play';
     this.winner = null;
     this.turns = 0;
     this.shots = 0;
     this.lostMole = false;
     playMusic(SONG, 'battle');
-    this.buildWorld(bt ? [bt.mine, bt.foes] : this.size, bt?.theme);
+    this.buildWorld(bt ? [bt.mine + this.boost.moles, bt.foes] : this.size, bt?.theme, [MAX_HP + this.boost.hp, MAX_HP]);
     if (bt) for (const [id, n] of Object.entries(bt.bonus) as [WeaponId, number][]) this.teams[1].ammo[id] += n;
+    for (const [id, n] of Object.entries(this.boost.ammo) as [WeaponId, number][]) this.teams[0].ammo[id] += n;
     this.teams[1].ai = mode !== 'duo';
     this.teams[0].ai = mode === 'watch';
     this.turn = Math.random() < 0.5 && mode === 'watch' ? 1 : 0;
@@ -358,7 +412,7 @@ export class GameScene extends Phaser.Scene {
     else if (kind === 'calm') this.world.wind = Math.round((Math.random() * 2 - 1) * 3);
     else this.world.wind = calm ? 0 : Math.round((Math.random() * 2 - 1) * 10);
     this.phase = 'aim';
-    this.timer = TURN_TIME;
+    this.timer = TURN_TIME + (this.turn === 0 ? this.boost.time : 0);
     this.aimAngle = m.facing > 0 ? -Math.PI / 4 : (-3 * Math.PI) / 4;
     this.power = 0;
     this.charging = false;
@@ -390,13 +444,18 @@ export class GameScene extends Phaser.Scene {
         if (this.battle !== null) {
           const stars = starsFor(BATTLES[this.battle], this.turns, this.lostMole);
           const before = this.campaign.stars[this.battle] ?? 0;
-          this.earned = { stars, best: stars > before };
+          this.earned = { stars, best: stars > before, acorns: 0 };
           while (this.campaign.stars.length <= this.battle) this.campaign.stars.push(0);
           this.campaign.stars[this.battle] = Math.max(before, stars);
           saveCampaign(this.campaign);
         }
         playSting(SONG, 'win');
       } else playSting(SONG, 'lose');
+      if (this.battle !== null) {
+        this.earned.acorns = reward(this.winner === 0, this.winner === 0 ? starsFor(BATTLES[this.battle], this.turns, this.lostMole) : 0);
+        this.campaign.acorns += this.earned.acorns;
+        saveCampaign(this.campaign);
+      }
     } else playSting(SONG, 'win');
     saveStats(this.stats);
     this.showResult();
@@ -435,6 +494,7 @@ export class GameScene extends Phaser.Scene {
       );
     });
     if (won && this.earned.best) this.uiObjs.push(this.add.text(cx + 170, cy + 12, t('newBest'), { fontFamily: FONT, fontSize: '13px', color: hex(C.fire), fontStyle: 'bold' }).setOrigin(1, 0.5).setDepth(151));
+    this.uiObjs.push(this.add.text(cx + 170, cy + 60, t('acornsWon', { n: this.earned.acorns }), { fontFamily: FONT, fontSize: '14px', color: hex(0x9a5a1a), fontStyle: 'bold' }).setOrigin(1, 0.5).setDepth(151));
     const next = won && i + 1 < BATTLES.length;
     this.button('rematch', cx - 70, cy + 104, 130, 38, t('retry'), () => this.startMatch('ai', i), !next);
     if (next) this.button('next', cx + 70, cy + 104, 130, 38, t('nextBattle'), () => this.startMatch('ai', i + 1), true);
@@ -913,7 +973,7 @@ export class GameScene extends Phaser.Scene {
     // Sudden death: the water rises.
     if (this.turns >= this.suddenDeath) this.world.water -= 8;
     // Now and then a crate floats down.
-    if (Math.random() < 0.4) {
+    if (Math.random() < 0.4 + this.boost.crates) {
       const x = 40 + Math.random() * (this.W - 80);
       const health = Math.random() < 0.3;
       this.world.dropCrate(x, health ? 'health' : 'weapon', health ? null : CRATE_WEAPONS[Math.floor(Math.random() * CRATE_WEAPONS.length)]);
@@ -1113,7 +1173,7 @@ export class GameScene extends Phaser.Scene {
       h.lineStyle(2, INK, 1);
       h.strokeRoundedRect(x, 8, 220, 44, 10);
       const total = tm.moles.reduce((s, m) => s + (m.alive ? m.hp : 0), 0);
-      const full = tm.moles.length * MAX_HP;
+      const full = tm.moles.reduce((s, m) => s + m.maxHp, 0);
       h.fillStyle(0xe5ddd2, 1);
       h.fillRoundedRect(x + 12, 34, 196, 10, 5);
       h.fillStyle(TEAM_COLORS[i], 1);

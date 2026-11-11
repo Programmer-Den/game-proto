@@ -33,6 +33,12 @@ Twins hoard Pinecones, the Frostwhisker Patrol rides a howling wind with Balloon
 Tide floods the map from turn 8. Every battle has three stars: win it, win within its turn limit,
 and win without losing a mole. Winning a battle opens the next.
 
+Every battle pays acorns, more for a win and each star. Spend them at the **Quartermaster** on
+upgrades for your side in the campaign: thicker helmets, longer turns, extra Boulder Rockets,
+Shield Bubbles and Repair Kits, more crates and a fourth (or fifth) mole.
+
+![The Quartermaster](docs/screenshots/quartermaster.webp)
+
 ![The campaign](docs/screenshots/campaign.webp)
 
 ## Weapons
