@@ -117,6 +117,8 @@ export class World {
   beams: Beam[] = [];
   mounds: Mound[] = [];
   kegs: Keg[] = [];
+  /** Rain puts flames out twice as fast. */
+  rain = false;
   /** The colour of a splash: water, or the lava of the ember theme. */
   splash = 0xbfe6ff;
   particles: Particle[] = [];
@@ -1064,7 +1066,7 @@ export class World {
   private stepFlames() {
     const t = this.terrain;
     for (const f of this.flames) {
-      f.life -= DT;
+      f.life -= this.rain ? DT * 2 : DT;
       f.tick -= DT;
       if (!f.ground) {
         f.vx += this.wind * WIND_ACC * 0.4 * DT;

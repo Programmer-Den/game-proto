@@ -32,7 +32,7 @@ start page lists the games; each one lives in its own folder under `games/`.
 | [Augury](games/augury/README.md) | Thirteen kinds of brain puzzle dealt like tarot cards (picture grids, bridges, code breaking, calc cages, cross sums, sliding blocks, tile flips, path links, a sliding-tile tray, turning pipes, a mirror maze, number series and a memory echo), with a mastery for each, in nine modes from a journey of five temples and a weekly league to a solo run of one puzzle and pass and play. |
 | [Mazewright](games/mazewright/README.md) | A tower defense with no road: every hedge and tower you plant on the open lawn is a wall, so you build the maze the beetles walk, and a planting that would close the last way through is refused. Thirteen gardens, twenty waves, moths that fly over and moles that chew through hedges, a hero gardener and a daily maze. |
 | [Stonemate](games/stonemate/README.md) | Chess with living statues: marble and obsidian pieces that walk the board, where every capture plays its own scene, a blow for each kind of attacker and a way of breaking for each kind of victim, with eight hand-made scenes. Play the Stone AI or a friend, and watch any of the 30 capture pairs in the gallery. |
-| [Burrow Brigade](games/burrow-brigade/README.md) | Turn-based artillery with squads of helmeted moles: walk, aim with a slingshot drag and fire over the hills while the wind changes every turn, with 26 weapons from acorn rockets, pinecones and a rolling log to a balloon drop, a storm bolt, bees, a sunbeam and a tunnel hop. Every blast digs the ground away, and a mole knocked into the water is out. Play the Burrow AI or a friend on one screen. |
+| [Burrow Brigade](games/burrow-brigade/README.md) | Turn-based artillery with squads of helmeted moles: walk, aim with a slingshot drag and fire over the hills while the wind changes every turn, with 28 weapons from acorn rockets, pinecones and a rolling log to a balloon drop, a storm bolt, bees, a sunbeam and a tunnel hop. Every blast digs the ground away, and a mole knocked into the water is out. Play the Burrow AI or a friend on one screen. |
 
 ## Settings
 
@@ -80,7 +80,7 @@ The hub's **Settings** button opens the settings every game shares. They are sav
   | Augury | 4 hearts in Endless, Solo Run and the drafts, 4 minutes of Blitz | 2 hearts in Endless, Solo Run and the drafts, 2½ minutes of Blitz |
   | Mazewright | 25 cabbages, and foes have 20% less health | 10 cabbages, and foes have 25% more health |
   | Stonemate | the Stone AI starts on Novice (level 2 of 7), which looks one move ahead and often picks a weaker move | the Stone AI starts on Club player (level 4 of 7), which looks three moves ahead and always plays its best, once beating level 3 has unlocked it; the menu picks any open level, and each win opens the next |
-  | Burrow Brigade | the Burrow AI aims more than twice as loosely, and you see the whole flight path while aiming | the Burrow AI aims about three times as tightly, and you see none of the path |
+  | Burrow Brigade | the Burrow AI aims more than twice as loosely, and you see the whole flight path while aiming | the Burrow AI aims about three times as tightly, and you see none of the path (its Options can also set a difficulty for this game alone) |
 
 - **Frame rate (FPS)**: the most frames per second a game draws, 30 to 320 (60 by default).
 - **Show FPS**: a readout of the frame rate in each game's corner.

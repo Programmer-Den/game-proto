@@ -79,7 +79,21 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
   again. `aimError` from the difficulty (`byDifficulty(2.4, 1, 0.35)`) shakes the chosen angle and
   power.
 - **Difficulty:** the AI's aim error above, and the aim preview while dragging or charging:
-  `byDifficulty(3, 0.75, 0)` seconds of the path (Easy all of it, Normal its start, Hard none).
+  `byLevel(3, 0.75, 0)` seconds of the path (Easy all of it, Normal its start, Hard none).
+  `byLevel` and `difficulty()` (`game/options.ts`) follow the game's own Difficulty option, or the
+  hub's when it is left on "Hub setting"; the game never calls the shared `byDifficulty`.
+- **Options** (`game/options.ts`, the menu's Options panel, `showOptions`): Difficulty (Hub, Easy,
+  Normal, Hard), Turn time for quick matches (`TURN_CHOICES`, 30 s by default; the campaign keeps
+  30 plus its upgrades and the daily its own), Crates in quick matches (`CRATE_ODDS`, Normal is the
+  40% chance) and Weather on or off. The defaults play exactly as before.
+- **Weather** (`weather` in the scene): rolled at the start of a quick or campaign match when the
+  option is on (60% clear, 15% rain, 15% fog, 10% gusts, from one `Math.random` in `startMatch`),
+  never in the daily range. Rain (`World.rain`) puts fires out twice as fast and draws streaks,
+  fog halves the aim preview and draws drifting banks (held still with reduced motion), gusts shift
+  the wind once in the middle of a turn. The wind panel names it (`weather_<id>`).
+- **Hats** (`game/hats.ts`): seven hats for your moles, each opened by a number of campaign stars
+  (normal plus Veteran), picked on the Hats screen (`showHats`) from the Campaign screen. The pick
+  (`hat` in prefs) is worn by team 0 (both teams in Two players), never in Watch AI.
 - **Layout:** fills the screen (`setupScaling(game, { fill: true })`); the world is exactly the view,
   with no scrolling. The corner buttons sit top left (`corner: 'top-left'`) and the left team panel
   starts at `LEFT_PANEL` to stay clear of them. The bottom bar holds the weapon button (bottom
@@ -114,7 +128,8 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
 
 - `burrow-brigade-stats`: `{ games, wins, used }`, matches started (not in Watch AI), wins against the
   AI and the weapons the player has used.
-- `burrow-brigade-prefs`: `{ size }`, moles a team.
+- `burrow-brigade-prefs`: `{ size, hat, options }`, moles a team, the hat worn (or null) and the
+  Options panel's choices (`cleanOptions` checks each).
 - `burrow-brigade-campaign`: `{ stars, vstars, acorns, levels }`, the best stars (0 to 3) of each
   campaign battle by its place in `BATTLES` (`vstars` for the Veteran tier), the acorns to spend and the Quartermaster's levels by id.
 - `burrow-brigade-daily`: the daily range's record (`shared/daily.ts`).
@@ -125,11 +140,12 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
 - `window.game` (dev build). `scene.state` gives `screen`, `phase`, `mode`, `turn`, `turns`,
   `wind`, `weapon`, `active` (`id`, `team`, `x`, `y`, `hp`, `alive`), `craters`, `shots`, `busy`,
   `teams` (`alive`, `hp`), `winner`, `arsenal`, `battle` (the campaign battle, or null), `stars`
-  (the campaign's best stars), `veteran`, `vstars`, `acorns`, `dailyScore` (the daily range's score once it ends) and `view` (the view's size, to turn view pixels into
+  (the campaign's best stars), `veteran`, `vstars`, `acorns`, `dailyScore` (the daily range's score once it ends), `difficulty` (the one in force), `weather`, `hat` and `view` (the view's size, to turn view pixels into
   page pixels). `scene.buttons` has every button by id: `play-ai`, `campaign`, `play-duo`, `daily`,
   `size-down`, `size-up`, `weapon`, `left`, `right`, `jump`, `fire`, `rematch`, `menu`, `w-<id>`
   for the arsenal's tiles while it is open, `battle-<i>`, `depot`, `back` and (once the
-  last battle is won) `tier` on the Campaign screen, `buy-<id>` and `back` at the Quartermaster, and `next` on a won battle's result.
+  last battle is won) `tier` on the Campaign screen, `buy-<id>` and `back` at the Quartermaster, `options` on the menu and `opt-<key>-left`/`-right` and
+  `back` on its panel, `hats` on the Campaign screen and `hat-<id>` (`hat-none`) and `back` on its, and `next` on a won battle's result.
 - The playthrough (`e2e/playthrough.spec.ts`) plays the first round: Play the Burrow AI, hold ▶,
   drag back from the mole to fire an Acorn Rocket, see a crater, wait through the AI's turn until
   the next blue mole is up, and checks the saved stats.

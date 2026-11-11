@@ -702,6 +702,67 @@ export function drawHat(g: G, hat: string, time: number) {
       g.fillStyle(0xffffff, 0.5 + Math.sin(time * 4) * 0.3);
       g.fillCircle(-4, -31, 0.8);
       break;
+    case 'acorn':
+      // An acorn cap with its little stem.
+      g.fillStyle(INK, 1);
+      g.fillEllipse(-0.5, -29, 17, 8, 16);
+      g.fillStyle(0x8a5a2b, 1);
+      g.fillEllipse(-0.5, -29, 15, 6.4, 16);
+      g.fillStyle(0xa8743d, 1);
+      for (let i = -2; i <= 2; i++) g.fillCircle(-0.5 + i * 3, -29.5, 1);
+      g.fillStyle(INK, 1);
+      g.fillRect(-1.5, -36, 2.5, 5);
+      break;
+    case 'flower':
+      g.fillStyle(0xffffff, 1);
+      for (let i = 0; i < 6; i++) g.fillCircle(5 + Math.cos((i * Math.PI) / 3) * 3, -29 + Math.sin((i * Math.PI) / 3) * 3, 2.2);
+      g.fillStyle(0xffd34d, 1);
+      g.fillCircle(5, -29, 1.8);
+      break;
+    case 'feather':
+      g.fillStyle(INK, 1);
+      g.fillTriangle(-5, -26, -16, -46, -1, -29);
+      g.fillStyle(0x3fae4a, 1);
+      g.fillTriangle(-5, -27.5, -14.5, -44, -2.5, -29.5);
+      g.lineStyle(0.8, 0x2a7a30, 1);
+      g.lineBetween(-4, -28, -14, -43);
+      break;
+    case 'party':
+      g.fillStyle(INK, 1);
+      g.fillTriangle(-6.5, -27, 5.5, -27, -0.5, -46);
+      g.fillStyle(0xff7ab8, 1);
+      g.fillTriangle(-5, -28, 4, -28, -0.5, -43.5);
+      g.fillStyle(0xffe066, 1);
+      g.fillCircle(-2, -32, 1.1);
+      g.fillCircle(1, -36, 1.1);
+      g.fillCircle(-0.5, -46, 2.2);
+      break;
+    case 'horns':
+      for (const s of [-1, 1]) {
+        g.fillStyle(INK, 1);
+        g.fillTriangle(-0.5 + s * 6, -25, -0.5 + s * 10, -27, -0.5 + s * 14, -40);
+        g.fillStyle(0xf6efe2, 1);
+        g.fillTriangle(-0.5 + s * 6.8, -25.8, -0.5 + s * 9.6, -27.3, -0.5 + s * 12.8, -37.5);
+      }
+      break;
+    case 'tophat':
+      g.fillStyle(INK, 1);
+      g.fillRect(-10.5, -31, 20, 3.4);
+      g.fillRect(-7, -44, 13, 14);
+      g.fillStyle(0x3d8be0, 1);
+      g.fillRect(-7, -34.5, 13, 2.6);
+      g.fillStyle(0xffffff, 0.25);
+      g.fillRect(-5.5, -42.5, 2, 7);
+      break;
+    case 'laurel':
+      g.fillStyle(0x4f9a3a, 1);
+      for (let i = 0; i < 7; i++) {
+        const a = Math.PI + 0.25 + (i * (Math.PI - 0.5)) / 6;
+        g.fillEllipse(-0.5 + Math.cos(a) * 10.5, -21 + Math.sin(a) * 10.5, 4.6, 2.6, 8);
+      }
+      g.fillStyle(0xf2c230, 1);
+      g.fillCircle(-0.5, -31.5, 1.3);
+      break;
   }
 }
 
