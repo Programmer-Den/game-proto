@@ -86,6 +86,8 @@ export class GameScene extends Phaser.Scene {
   aimAngle = -Math.PI / 4;
   power = 0;
   charging = false;
+  /** FIRE is held down, charging an aimed shot. */
+  private fireHeld = false;
   dragging = false;
   shots = 0;
   winner: number | null = null;
@@ -811,8 +813,9 @@ export class GameScene extends Phaser.Scene {
     this.button('left', W - 300, y, 50, 44, '◀', () => undefined, false, (d) => (this.hold.left = d));
     this.button('right', W - 244, y, 50, 44, '▶', () => undefined, false, (d) => (this.hold.right = d));
     this.button('jump', W - 188, y, 50, 44, '⤴', () => this.humanTurn() && this.active && this.world.jump(this.active));
-    const fire = this.button('fire', W - 88, y, 130, 46, t('fire'), () => this.onFireButton(), true);
+    const fire = this.button('fire', W - 88, y, 130, 46, t('fire'), () => undefined, true, (d) => this.onFireButton(d));
     fire.box.setFillStyle(C.fire);
+    fire.box.on('pointerover', () => fire.box.setFillStyle(C.fire));
     fire.box.on('pointerout', () => fire.box.setFillStyle(C.fire));
     fire.txt.setColor('#ffffff').setFontSize(16);
     this.texts.fire = fire.txt;
@@ -951,6 +954,7 @@ export class GameScene extends Phaser.Scene {
   private onUp() {
     this.hold.left = false;
     this.hold.right = false;
+    this.onFireButton(false);
     if (!this.dragging) return;
     this.dragging = false;
     if (this.power > 0.08 && this.phase === 'aim') this.fire();
@@ -971,14 +975,32 @@ export class GameScene extends Phaser.Scene {
     } else if (down && w.mode !== 'target') this.fire();
   }
 
-  private onFireButton() {
-    if (!this.humanTurn() || this.phase !== 'aim') return;
+  /**
+   * FIRE, held like Space: an aimed weapon charges while it is held and fires when it is let go (or
+   * at full power); a quick tap fires at 60%. Other weapons go off as it is pressed.
+   */
+  private onFireButton(down: boolean) {
+    if (!down) {
+      if (!this.fireHeld) return;
+      this.fireHeld = false;
+      if (!this.charging) return;
+      this.charging = false;
+      if (this.power < 0.1) this.power = 0.6;
+      this.fire();
+      return;
+    }
+    if (!this.humanTurn() || this.phase !== 'aim' || this.arsenalOpen) return;
     const w = WEAPONS[this.teams[this.turn].weapon];
     if (w.mode === 'target') {
       this.texts.hint?.setText(t('hintTarget'));
       return;
     }
-    if (w.mode === 'aim' && this.power < 0.1) this.power = 0.6;
+    if (w.mode === 'aim') {
+      this.fireHeld = true;
+      this.charging = true;
+      this.power = 0;
+      return;
+    }
     this.fire();
   }
 

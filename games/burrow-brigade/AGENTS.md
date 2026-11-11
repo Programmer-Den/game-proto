@@ -97,7 +97,9 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
 - **Layout:** fills the screen (`setupScaling(game, { fill: true })`); the world is exactly the view,
   with no scrolling. The corner buttons sit top left (`corner: 'top-left'`) and the left team panel
   starts at `LEFT_PANEL` to stay clear of them. The bottom bar holds the weapon button (bottom
-  left), ◀ ▶, ⤴ and FIRE (bottom right), whose label follows the weapon's mode (FIRE, TAP MAP, USE).
+  left), ◀ ▶, ⤴ and FIRE (bottom right), whose label follows the weapon's mode (FIRE, TAP MAP, USE). FIRE is held like Space for an aimed
+  weapon (`onFireButton`, `fireHeld`): it charges while held and fires on release or at full power;
+  a quick tap fires at 60%.
 - **Trophies** (`src/trophies/`): `firstHit` (hurt an enemy), `crate`, `splash` (an enemy into the
   water), `firstWin` (beat the AI), `triple` (three enemies hurt in one turn), `longShot` (a rocket
   hit more than 500 px from where it was fired), `arsenal` (15 weapons used), `flawless` (beat the
