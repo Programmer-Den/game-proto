@@ -3,6 +3,7 @@ import type { WeaponId } from './weapons';
 /** What Burrow Brigade keeps on the device, under keys starting with the game's folder name. */
 const STATS_KEY = 'burrow-brigade-stats';
 const PREFS_KEY = 'burrow-brigade-prefs';
+const CAMPAIGN_KEY = 'burrow-brigade-campaign';
 
 export interface Stats {
   /** Matches started (not counting Watch AI). */
@@ -41,3 +42,14 @@ export const loadPrefs = (): Prefs => {
   return { size: Math.max(2, Math.min(5, Math.round(p.size) || 3)) };
 };
 export const savePrefs = (p: Prefs) => write(PREFS_KEY, p);
+
+export interface Campaign {
+  /** The best stars won in each battle, by its place in `BATTLES` (0 for not won yet). */
+  stars: number[];
+}
+
+export const loadCampaign = (): Campaign => {
+  const c = read<Campaign>(CAMPAIGN_KEY, { stars: [] });
+  return { stars: Array.isArray(c.stars) ? c.stars.map((n) => Math.max(0, Math.min(3, Math.round(Number(n)) || 0))) : [] };
+};
+export const saveCampaign = (c: Campaign) => write(CAMPAIGN_KEY, c);

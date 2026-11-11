@@ -179,11 +179,13 @@ export function generate(w: number, h: number) {
   return t;
 }
 
-/** Spots to stand on: `n` per team, team 0 on the left half and team 1 on the right. */
-export function spawnPoints(t: Terrain, n: number, water: number) {
+/** Spots to stand on: `n` per team (or `[left, right]`), team 0 on the left half and team 1 on the right. */
+export function spawnPoints(t: Terrain, size: number | [number, number], water: number) {
   const out: { x: number; y: number }[][] = [[], []];
+  const counts = typeof size === 'number' ? [size, size] : size;
   for (let team = 0; team < 2; team++) {
     const lo = team === 0 ? 0.06 : 0.56;
+    const n = counts[team];
     for (let i = 0; i < n; i++) {
       let best: { x: number; y: number } | null = null;
       for (let tries = 0; tries < 40 && !best; tries++) {

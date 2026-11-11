@@ -6,7 +6,8 @@ import { award } from '../../../../shared/trophies';
 import { aiLog, mountWatch, watching, watchSteps } from '../../../../shared/watch';
 import { SFX, SONG } from '../audio';
 import { planTurn, type Plan } from '../game/ai';
-import { loadPrefs, loadStats, savePrefs, saveStats, type Stats } from '../game/save';
+import { BATTLES, isOpen, starsFor } from '../game/campaign';
+import { loadCampaign, loadPrefs, loadStats, saveCampaign, savePrefs, saveStats, type Stats } from '../game/save';
 import { DT, flight, generate, spawnPoints, Terrain, THEMES, WATER_GAP, WIND_ACC, type Theme } from '../game/terrain';
 import { CRATE_WEAPONS, GROUPS, startingAmmo, WEAPON_IDS, WEAPONS, type WeaponId } from '../game/weapons';
 import { MAX_HP, World, windFactor, type Mole, type Pop, type Sfx } from '../game/world';
@@ -80,6 +81,12 @@ export class GameScene extends Phaser.Scene {
   shots = 0;
   winner: number | null = null;
   arsenalOpen = false;
+  /** The campaign battle under way (its place in `BATTLES`), or null outside the campaign. */
+  battle: number | null = null;
+  /** Stars won by the battle that just ended, and whether they beat the best so far. */
+  private earned = { stars: 0, best: false };
+  private campaign = loadCampaign();
+  private suddenDeath = SUDDEN_DEATH_TURN;
   private walkTarget: number | null = null;
   private walkTimer = 0;
   private hold = { left: false, right: false };
@@ -155,6 +162,8 @@ export class GameScene extends Phaser.Scene {
       teams: this.teams.map((tm) => ({ alive: tm.moles.filter((m) => m.alive).length, hp: tm.moles.reduce((s, m) => s + (m.alive ? m.hp : 0), 0) })),
       winner: this.winner,
       arsenal: this.arsenalOpen,
+      battle: this.battle,
+      stars: this.campaign.stars.slice(),
       view: { w: this.W, h: this.H },
     };
   }
@@ -184,16 +193,17 @@ export class GameScene extends Phaser.Scene {
     this.texts = {};
   }
 
-  /** Builds a fresh map and world; `demo` puts a few idle moles on it for the menu. */
-  private buildWorld(teamSize: number) {
-    this.theme = THEMES[Math.floor(Math.random() * THEMES.length)];
+  /** Builds a fresh map and world with `size` moles a team (or `[left, right]`), on a set theme or a random one. */
+  private buildWorld(size: number | [number, number], themeId?: Theme['id']) {
+    const pick = THEMES[Math.floor(Math.random() * THEMES.length)];
+    this.theme = THEMES.find((th) => th.id === themeId) ?? pick;
     this.terrain = generate(Math.ceil(this.W), Math.ceil(this.H));
     const th = this.theme;
     const dirt = [th.dirt, th.dirtDark, th.dirtLight].map((c) => parseInt(c.slice(1), 16));
     this.world = new World(this.terrain, this.H - WATER_GAP, { sound: (n) => this.sfx(n), shake: (p) => this.shake(p) }, dirt);
     this.objs.push(paintSky(this, this.W, this.H, th));
     this.art = new TerrainArt(this, this.terrain, th, 2);
-    const spots = spawnPoints(this.terrain, teamSize, this.world.water);
+    const spots = spawnPoints(this.terrain, size, this.world.water);
     const names = NAMES.map((n) => n.slice().sort(() => Math.random() - 0.5));
     this.teams = [0, 1].map((i) => ({
       index: i, ai: false, ammo: startingAmmo(), weapon: 'rocket' as WeaponId, next: 0,
@@ -215,6 +225,7 @@ export class GameScene extends Phaser.Scene {
     this.phase = 'over';
     this.active = null;
     this.winner = null;
+    this.battle = null;
     playMusic(SONG, 'calm');
     this.buildWorld(3);
     this.drawMenu();
@@ -224,23 +235,24 @@ export class GameScene extends Phaser.Scene {
     this.clearUi();
     const cx = this.W / 2;
     const top = Math.max(20, this.H / 2 - 230);
-    const panel = this.add.rectangle(cx, top + 200, 420, 380, C.panel, 0.94).setStrokeStyle(3, C.panelEdge).setDepth(150);
+    const panel = this.add.rectangle(cx, top + 222, 420, 424, C.panel, 0.94).setStrokeStyle(3, C.panelEdge).setDepth(150);
     this.uiObjs.push(panel);
     this.uiObjs.push(this.add.text(cx, top + 44, t('title'), { fontFamily: FONT, fontSize: '46px', color: hex(C.ink), fontStyle: 'bold' }).setOrigin(0.5).setDepth(151));
     this.uiObjs.push(this.add.text(cx, top + 98, t('tagline'), { fontFamily: FONT, fontSize: '15px', color: hex(C.dim), align: 'center', wordWrap: { width: 380 } }).setOrigin(0.5).setDepth(151));
     this.button('play-ai', cx, top + 158, 300, 46, t('playAi'), () => this.startMatch('ai'), true);
-    this.button('play-duo', cx, top + 212, 300, 46, t('playDuo'), () => this.startMatch('duo'));
-    this.button('size-down', cx - 120, top + 262, 40, 36, '◀', () => this.setSize(-1));
-    this.button('size-up', cx + 120, top + 262, 40, 36, '▶', () => this.setSize(1));
-    this.texts.size = this.add.text(cx, top + 262, t('teamSize', { n: this.size }), { fontFamily: FONT, fontSize: '17px', color: hex(C.ink), fontStyle: 'bold' }).setOrigin(0.5).setDepth(151);
+    this.button('campaign', cx, top + 210, 300, 46, t('campaign'), () => this.showCampaign(), true);
+    this.button('play-duo', cx, top + 262, 300, 46, t('playDuo'), () => this.startMatch('duo'));
+    this.button('size-down', cx - 120, top + 310, 40, 36, '◀', () => this.setSize(-1));
+    this.button('size-up', cx + 120, top + 310, 40, 36, '▶', () => this.setSize(1));
+    this.texts.size = this.add.text(cx, top + 310, t('teamSize', { n: this.size }), { fontFamily: FONT, fontSize: '17px', color: hex(C.ink), fontStyle: 'bold' }).setOrigin(0.5).setDepth(151);
     this.uiObjs.push(this.texts.size);
     const used = this.stats.used.length;
     this.uiObjs.push(
-      this.add.text(cx, top + 312, t('statsLine', { wins: this.stats.wins, games: this.stats.games, used, all: WEAPON_IDS.length }), {
+      this.add.text(cx, top + 352, t('statsLine', { wins: this.stats.wins, games: this.stats.games, used, all: WEAPON_IDS.length }), {
         fontFamily: FONT, fontSize: '14px', color: hex(C.dim), align: 'center', wordWrap: { width: 380 },
       }).setOrigin(0.5).setDepth(151),
     );
-    this.uiObjs.push(this.add.text(cx, top + 350, t('menuHint'), { fontFamily: FONT, fontSize: '13px', color: hex(C.dim), align: 'center', wordWrap: { width: 380 } }).setOrigin(0.5).setDepth(151));
+    this.uiObjs.push(this.add.text(cx, top + 396, t('menuHint'), { fontFamily: FONT, fontSize: '13px', color: hex(C.dim), align: 'center', wordWrap: { width: 380 } }).setOrigin(0.5).setDepth(151));
   }
 
   private setSize(d: number) {
@@ -249,16 +261,66 @@ export class GameScene extends Phaser.Scene {
     this.texts.size?.setText(t('teamSize', { n: this.size }));
   }
 
-  startMatch(mode: 'ai' | 'duo' | 'watch') {
+  /** The campaign: every battle as a card with its rival, team sizes, twist and best stars. */
+  showCampaign() {
+    this.clearUi();
+    this.screen = 'menu';
+    const cx = this.W / 2;
+    const cols = 2;
+    const cw = 318;
+    const ch = 72;
+    const rows = Math.ceil(BATTLES.length / cols);
+    const pw = cols * (cw + 10) + 30;
+    const ph = rows * (ch + 8) + 120;
+    const cy = this.H / 2;
+    const top = cy - ph / 2;
+    this.uiObjs.push(this.add.rectangle(cx, cy, pw, ph, C.panel, 0.96).setStrokeStyle(3, C.panelEdge).setDepth(150));
+    const total = this.campaign.stars.reduce((a, n) => a + n, 0);
+    this.uiObjs.push(this.add.text(cx, top + 26, t('campaign'), { fontFamily: FONT, fontSize: '26px', color: hex(C.ink), fontStyle: 'bold' }).setOrigin(0.5).setDepth(151));
+    this.uiObjs.push(this.add.text(cx, top + 54, t('campaignStars', { n: total, all: BATTLES.length * 3 }), { fontFamily: FONT, fontSize: '14px', color: hex(C.dim) }).setOrigin(0.5).setDepth(151));
+    const swatch: Record<string, number> = { meadow: 0x59c14a, autumn: 0xd98a2b, frost: 0x9fc0ea };
+    BATTLES.forEach((bt, i) => {
+      const x = cx - pw / 2 + 15 + (i % cols) * (cw + 10) + cw / 2;
+      const y = top + 76 + Math.floor(i / cols) * (ch + 8) + ch / 2;
+      const open = isOpen(this.campaign.stars, i);
+      const stars = this.campaign.stars[i] ?? 0;
+      const card = this.add.rectangle(x, y, cw, ch, open ? C.button : 0xe2dbd0, open ? 1 : 0.7).setStrokeStyle(2, stars ? C.fire : 0xc9b8a3).setDepth(151);
+      this.uiObjs.push(card, this.add.rectangle(x - cw / 2 + 5, y, 6, ch - 10, swatch[bt.theme], open ? 1 : 0.4).setDepth(152));
+      const ink = hex(open ? C.ink : 0xa09080);
+      this.uiObjs.push(
+        this.add.text(x - cw / 2 + 16, y - 22, `${i + 1}. ${t(`c_${bt.id}`)}`, { fontFamily: FONT, fontSize: '15px', color: ink, fontStyle: 'bold' }).setOrigin(0, 0.5).setDepth(152),
+        this.add.text(x - cw / 2 + 16, y, open ? t(`cd_${bt.id}`) : t('locked'), { fontFamily: FONT, fontSize: '12px', color: hex(open ? C.dim : 0xa09080), wordWrap: { width: cw - 30 } }).setOrigin(0, 0.5).setDepth(152),
+        this.add.text(x - cw / 2 + 16, y + 22, t('versus', { mine: bt.mine, foes: bt.foes }), { fontFamily: FONT, fontSize: '12px', color: ink, fontStyle: 'bold' }).setOrigin(0, 0.5).setDepth(152),
+        this.add.text(x + cw / 2 - 10, y + 22, '★'.repeat(stars) + '☆'.repeat(3 - stars), { fontFamily: FONT, fontSize: '16px', color: hex(stars ? 0xf0a020 : 0xb9a994) }).setOrigin(1, 0.5).setDepth(152),
+      );
+      if (open) {
+        card.setInteractive({ useHandCursor: true });
+        card.on('pointerover', () => card.setFillStyle(C.buttonHi));
+        card.on('pointerout', () => card.setFillStyle(C.button));
+        card.on('pointerdown', () => {
+          ui('click');
+          this.startMatch('ai', i);
+        });
+      }
+      this.buttons[`battle-${i}`] = { x, y, w: cw, h: ch };
+    });
+    this.button('back', cx, top + ph - 26, 200, 36, t('back'), () => this.drawMenu());
+  }
+
+  startMatch(mode: 'ai' | 'duo' | 'watch', battle: number | null = null) {
     this.clearAll();
     this.mode = mode;
+    this.battle = mode === 'ai' ? battle : null;
+    const bt = this.battle === null ? null : BATTLES[this.battle];
+    this.suddenDeath = bt?.suddenDeath ?? SUDDEN_DEATH_TURN;
     this.screen = 'play';
     this.winner = null;
     this.turns = 0;
     this.shots = 0;
     this.lostMole = false;
     playMusic(SONG, 'battle');
-    this.buildWorld(this.size);
+    this.buildWorld(bt ? [bt.mine, bt.foes] : this.size, bt?.theme);
+    if (bt) for (const [id, n] of Object.entries(bt.bonus) as [WeaponId, number][]) this.teams[1].ammo[id] += n;
     this.teams[1].ai = mode !== 'duo';
     this.teams[0].ai = mode === 'watch';
     this.turn = Math.random() < 0.5 && mode === 'watch' ? 1 : 0;
@@ -291,7 +353,10 @@ export class GameScene extends Phaser.Scene {
     this.world.turnTeam = this.turn;
     this.world.log = World.freshLog();
     const calm = Math.random() < 0.15;
-    this.world.wind = calm ? 0 : Math.round((Math.random() * 2 - 1) * 10);
+    const kind = this.battle === null ? 'normal' : BATTLES[this.battle].wind;
+    if (kind === 'strong') this.world.wind = (Math.random() < 0.5 ? -1 : 1) * Math.round(6 + Math.random() * 4);
+    else if (kind === 'calm') this.world.wind = Math.round((Math.random() * 2 - 1) * 3);
+    else this.world.wind = calm ? 0 : Math.round((Math.random() * 2 - 1) * 10);
     this.phase = 'aim';
     this.timer = TURN_TIME;
     this.aimAngle = m.facing > 0 ? -Math.PI / 4 : (-3 * Math.PI) / 4;
@@ -322,6 +387,14 @@ export class GameScene extends Phaser.Scene {
         this.trophy('firstWin');
         if (!this.lostMole) this.trophy('flawless');
         if (settings.difficulty === 'hard') this.trophy('hardWin');
+        if (this.battle !== null) {
+          const stars = starsFor(BATTLES[this.battle], this.turns, this.lostMole);
+          const before = this.campaign.stars[this.battle] ?? 0;
+          this.earned = { stars, best: stars > before };
+          while (this.campaign.stars.length <= this.battle) this.campaign.stars.push(0);
+          this.campaign.stars[this.battle] = Math.max(before, stars);
+          saveCampaign(this.campaign);
+        }
         playSting(SONG, 'win');
       } else playSting(SONG, 'lose');
     } else playSting(SONG, 'win');
@@ -334,18 +407,48 @@ export class GameScene extends Phaser.Scene {
     this.buildHud();
     const cx = this.W / 2;
     const cy = this.H / 2 - 20;
-    this.uiObjs.push(this.add.rectangle(cx, cy, 400, 200, C.panel, 0.95).setStrokeStyle(3, C.panelEdge).setDepth(150));
+    const tall = this.battle !== null;
+    this.uiObjs.push(this.add.rectangle(cx, tall ? cy + 40 : cy, 400, tall ? 320 : 200, C.panel, 0.95).setStrokeStyle(3, C.panelEdge).setDepth(150));
     const title = this.winner! < 0 ? t('draw') : t('wins', { team: this.teamName(this.winner!) });
     this.uiObjs.push(
       this.add.text(cx, cy - 60, title, { fontFamily: FONT, fontSize: '30px', color: hex(this.winner! >= 0 ? TEAM_COLORS[this.winner!] : C.ink), fontStyle: 'bold', stroke: hex(INK), strokeThickness: 3 })
         .setOrigin(0.5).setDepth(151),
     );
     this.uiObjs.push(this.add.text(cx, cy - 20, t('resultLine', { turns: this.turns, shots: this.shots }), { fontFamily: FONT, fontSize: '15px', color: hex(C.dim) }).setOrigin(0.5).setDepth(151));
+    if (this.battle !== null) return this.showBattleResult(cx, cy);
     this.button('rematch', cx, cy + 30, 260, 42, t('rematch'), () => this.startMatch(this.mode === 'duo' ? 'duo' : 'ai'), true);
     this.button('menu', cx, cy + 78, 260, 36, t('menu'), () => this.showMenu());
   }
 
+  /** A campaign battle's result: the three stars and what each asks, then on to the next battle. */
+  private showBattleResult(cx: number, cy: number) {
+    const i = this.battle!;
+    const bt = BATTLES[i];
+    const won = this.winner === 0;
+    const got = [won, won && this.turns <= bt.par, won && !this.lostMole];
+    const asks = [t('starWin'), t('starPar', { n: bt.par }), t('starFlawless')];
+    got.forEach((ok, k) => {
+      const y = cy + 12 + k * 24;
+      this.uiObjs.push(
+        this.add.text(cx - 150, y, ok ? '★' : '☆', { fontFamily: FONT, fontSize: '20px', color: hex(ok ? 0xf0a020 : 0xb9a994) }).setOrigin(0.5).setDepth(151),
+        this.add.text(cx - 132, y, asks[k], { fontFamily: FONT, fontSize: '14px', color: hex(ok ? C.ink : C.dim) }).setOrigin(0, 0.5).setDepth(151),
+      );
+    });
+    if (won && this.earned.best) this.uiObjs.push(this.add.text(cx + 170, cy + 12, t('newBest'), { fontFamily: FONT, fontSize: '13px', color: hex(C.fire), fontStyle: 'bold' }).setOrigin(1, 0.5).setDepth(151));
+    const next = won && i + 1 < BATTLES.length;
+    this.button('rematch', cx - 70, cy + 104, 130, 38, t('retry'), () => this.startMatch('ai', i), !next);
+    if (next) this.button('next', cx + 70, cy + 104, 130, 38, t('nextBattle'), () => this.startMatch('ai', i + 1), true);
+    else this.button('campaign', cx + 70, cy + 104, 130, 38, t('campaign'), () => this.showMenuCampaign());
+    this.button('menu', cx, cy + 148, 200, 32, t('menu'), () => this.showMenu());
+  }
+
+  private showMenuCampaign() {
+    this.showMenu();
+    this.showCampaign();
+  }
+
   private teamName(i: number) {
+    if (i === 1 && this.battle !== null) return t(`c_${BATTLES[this.battle].id}`);
     return i === 0 ? t('teamBlue') : t('teamAmber');
   }
 
@@ -729,7 +832,8 @@ export class GameScene extends Phaser.Scene {
     switch (ai.stage) {
       case 'think':
         if (ai.t > 0) return;
-        ai.plan = planTurn(this.world, m, team.ammo, byDifficulty(2.4, 1, 0.35), !ai.walked);
+        const rival = this.battle === null ? null : BATTLES[this.battle];
+        ai.plan = planTurn(this.world, m, team.ammo, byDifficulty(2.4, 1, 0.35) * (rival?.aim ?? 1), !ai.walked, rival?.habit ?? null);
         if (ai.plan.walk) {
           ai.stage = 'walk';
           ai.t = 1.3;
@@ -807,7 +911,7 @@ export class GameScene extends Phaser.Scene {
     const alive = this.teams.map((tm) => tm.moles.some((m) => m.alive));
     if (!alive[0] || !alive[1]) return this.finish();
     // Sudden death: the water rises.
-    if (this.turns >= SUDDEN_DEATH_TURN) this.world.water -= 8;
+    if (this.turns >= this.suddenDeath) this.world.water -= 8;
     // Now and then a crate floats down.
     if (Math.random() < 0.4) {
       const x = 40 + Math.random() * (this.W - 80);
@@ -1018,7 +1122,7 @@ export class GameScene extends Phaser.Scene {
         h.lineStyle(3, TEAM_COLORS[i], 1);
         h.strokeRoundedRect(x - 3, 5, 226, 50, 12);
       }
-      this.texts[`team${i}`]?.setText(`${this.teamName(i)}${tm.ai ? ' · ' + t('aiTag') : ''}  ${tm.moles.filter((m) => m.alive).length}/${tm.moles.length}`);
+      this.texts[`team${i}`]?.setText(`${this.teamName(i)}${tm.ai && this.battle === null ? ' · ' + t('aiTag') : ''}  ${tm.moles.filter((m) => m.alive).length}/${tm.moles.length}`);
     });
     // Wind.
     h.fillStyle(C.panel, 0.92);
