@@ -162,6 +162,8 @@ export function jump(s: GameState) {
 export function slide(s: GameState) {
   if (s.phase !== 'running') return false;
   const r = s.runner;
+  // A slide pressed after a jump queued in an ice skid wins: the jump is dropped.
+  r.jumpQueued = false;
   if (grounded(s)) {
     r.slideMs = stats(s).slideMs;
   } else {

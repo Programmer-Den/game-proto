@@ -559,7 +559,8 @@ export class GameScene extends Phaser.Scene {
         this.coins.set(c.id, sprite);
       }
       // Coins turn, each a little out of step with the next.
-      const spin = Math.floor(this.clock / 160 + c.id * 0.5) % 4 === 3 ? 'coin-1' : 'coin-0';
+      // Held still with reduced motion.
+      const spin = !settings.reduceMotion && Math.floor(this.clock / 160 + c.id * 0.5) % 4 === 3 ? 'coin-1' : 'coin-0';
       sprite.setTexture(spin).setPosition(this.sx(c.x), GROUND_Y - c.h);
     }
     for (const [id, sprite] of this.coins) {
@@ -707,21 +708,23 @@ export class GameScene extends Phaser.Scene {
   private drawKnight() {
     const s = this.state;
     const r = s.runner;
+    // Fallen: the run is over, but not by clearing a challenge course.
+    const fallen = s.phase === 'over' && !s.challenge?.done;
     let pose: KnightPose;
-    if (s.phase === 'over' || r.slideMs > 0) pose = 'slide';
+    if (fallen || r.slideMs > 0) pose = 'slide';
     else if (r.h > floorAt(s, s.distance - RUNNER.w / 2, s.distance + RUNNER.w / 2)) pose = r.vh > 0 ? 'jump' : 'fall';
-    else if (s.phase === 'checkpoint') pose = 'run1';
+    else if (s.phase === 'checkpoint' || s.phase === 'over') pose = 'run1';
     else pose = `run${Math.floor(s.distance / STRIDE_PX) % 4}` as KnightPose;
     const feet = pose === 'slide' ? KNIGHT_FEET.slide : KNIGHT_FEET.stand;
     this.knight
       .setTexture(`${s.knight}${this.boots ? '-gold' : ''}-${pose}`)
       .setOrigin(feet.x / feet.w, feet.y / feet.h)
       .setPosition(RUNNER_X, GROUND_Y - r.h)
-      .setAngle(s.phase === 'over' ? -8 : 0);
+      .setAngle(fallen ? -8 : 0);
     // Blinks while it can't be hurt after a hit (held faded with reduced motion); greyed once fallen.
     const hurt = r.hurtMs > 0 && s.phase === 'running';
     this.knight.setAlpha(!hurt ? 1 : settings.reduceMotion ? 0.6 : Math.floor(this.clock / 80) % 2 === 0 ? 0.35 : 1);
-    if (s.phase === 'over') this.knight.setTint(0x9a8f88).setTintMode(Phaser.TintModes.MULTIPLY);
+    if (fallen) this.knight.setTint(0x9a8f88).setTintMode(Phaser.TintModes.MULTIPLY);
     else this.knight.clearTint();
   }
 

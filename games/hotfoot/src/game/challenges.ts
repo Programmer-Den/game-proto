@@ -1,5 +1,5 @@
 // The challenge courses: ten short courses laid out by hand, each a fixed row of pieces on its own
-// ground at its own pace, run bare (no armoury, boons or companion) from three hearts to a finish
+// ground at its own pace, run bare (no armoury, boons or companion) from the run's hearts (three on Normal) to a finish
 // banner. Each pays up to three stars: one for reaching the banner, one for reaching it without a
 // hit, and one for reaching it with every coin on the course. Every star of all ten wins the gold
 // boots, worn in every run after. A piece's sizes come from the course's own seed, so a course is
