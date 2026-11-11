@@ -140,9 +140,10 @@ and tries to link it to the repo (the run summary says if the link has to be mad
   game's folder name (`<name>-...`), since every game shares the hub's origin and the hub's ⚙ on a
   card deletes a game's progress by that prefix (`shared/progress.ts`).
 - **Honour the hub's settings.** Every game calls `setupGame(game)` from `shared/setupGame.ts`
-  right after creating its `Phaser.Game`, which applies the frame cap, the FPS readout, reduced motion, full screen and the M key, which mutes, turns off the browser's right-click menu, and covers
+  right after creating its `Phaser.Game`, which applies the frame cap, the FPS readout, reduced motion, full screen (the F key) and the M key, which mutes, turns off the browser's right-click menu, and covers
   the page with the shared loading, start and pause screens (`shared/startScreen.ts`): the game's
-  scenes stand paused until Start is pressed, and the pause button, P or leaving the tab pause them. The corner row of
+  scenes stand paused until Start is pressed, and the pause button, P or leaving the tab pause them. F, M
+  and P are the shared keys, so a game never binds them to its own controls. The corner row of
   buttons (full screen and pause, `shared/corner.ts`) sits in the bottom left; a game whose own buttons
   sit there picks a free corner with `setupGame(game, { corner: 'top-right' })` (or `bottom-right`,
   `top-left`). A game
