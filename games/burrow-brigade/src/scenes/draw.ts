@@ -1,7 +1,7 @@
 import type Phaser from 'phaser';
 import type { WeaponId } from '../game/weapons';
 import { WEAPONS } from '../game/weapons';
-import type { Balloon, Beam, Bee, Bolt, Crate, Flame, Mole, Mound, Particle, Shot, ShotKind } from '../game/world';
+import type { Balloon, Beam, Bee, Bolt, Crate, Flame, Keg, Mole, Mound, Particle, Shot, ShotKind } from '../game/world';
 
 /**
  * Burrow Brigade's drawing, all with Phaser Graphics and no image files: the moles and their
@@ -574,6 +574,31 @@ export function drawBeam(g: G, b: Beam) {
 }
 
 /** A fallen mole's molehill with a little flag in its team's colour. */
+/** A powder keg: a banded barrel with a fuse cap; it glows faintly so it reads as dangerous. */
+export function drawKeg(g: G, k: Keg, time: number) {
+  const x = k.x;
+  const y = k.y;
+  g.fillStyle(INK, 1);
+  g.fillRoundedRect(x - 8.5, y - 19, 17, 19.5, 4);
+  g.fillStyle(0x9a5a2a, 1);
+  g.fillRoundedRect(x - 7.2, y - 17.7, 14.4, 17, 3.5);
+  g.fillStyle(0xb8743a, 1);
+  g.fillRect(x - 4, y - 17.5, 3, 16.6);
+  g.fillStyle(0x4a4a52, 1);
+  g.fillRect(x - 7.2, y - 14.5, 14.4, 2);
+  g.fillRect(x - 7.2, y - 5, 14.4, 2);
+  // A black powder mark with a little flame on it.
+  g.fillStyle(INK, 1);
+  g.fillCircle(x + 1.5, y - 9.2, 3);
+  g.fillStyle(0xffb03a, 0.85 + Math.sin(time * 5 + x) * 0.15);
+  g.fillTriangle(x - 0.2, y - 8, x + 3.2, y - 8, x + 1.5, y - 12);
+  // The fuse cap on top.
+  g.fillStyle(INK, 1);
+  g.fillRect(x - 1.5, y - 22, 3, 3.5);
+  g.lineStyle(1.2, INK, 1);
+  g.lineBetween(x, y - 22, x + 2.5, y - 25);
+}
+
 export function drawMound(g: G, m: Mound) {
   if (m.drowned) return;
   g.fillStyle(INK, 1);

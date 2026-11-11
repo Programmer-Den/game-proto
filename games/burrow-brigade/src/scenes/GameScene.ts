@@ -15,7 +15,7 @@ import { MAX_HP, World, windFactor, type Mole, type Pop, type Sfx } from '../gam
 import { t } from '../i18n';
 import { trophies } from '../trophies';
 import {
-  drawBalloon, drawBeam, drawBee, drawBolt, drawCrate, drawFlame, drawMole, drawMound, drawParticle, drawShot, drawWeaponIcon, INK, pts, TEAM_COLORS,
+  drawBalloon, drawBeam, drawBee, drawBolt, drawCrate, drawFlame, drawKeg, drawMole, drawMound, drawParticle, drawShot, drawWeaponIcon, INK, pts, TEAM_COLORS,
 } from './draw';
 import { paintSky, TerrainArt } from './terrainArt';
 
@@ -216,11 +216,27 @@ export class GameScene extends Phaser.Scene {
     this.world.onCollect = (m, c) => this.onCrate(m, c.weapon);
     this.clouds = Array.from({ length: 6 }, () => ({ x: Math.random() * this.W, y: 30 + Math.random() * this.H * 0.25, s: 0.6 + Math.random() * 0.7 }));
     this.specks = Array.from({ length: 18 }, () => ({ x: Math.random() * this.W, y: Math.random() * this.H * 0.7, ph: Math.random() * 6 }));
+    if (th.id === 'ember') this.world.splash = 0xffb04d;
+    this.placeKegs(2 + Math.floor(Math.random() * 2));
     for (const m of this.world.moles) {
       const label = this.add.text(0, 0, '', { fontFamily: FONT, fontSize: '11px', color: '#ffffff', fontStyle: 'bold', backgroundColor: hex(TEAM_COLORS[m.team]), padding: { x: 3, y: 1 } })
         .setOrigin(0.5, 1).setDepth(8);
       this.labels.set(m, label);
     }
+  }
+
+  /** Stands `n` powder kegs on dry ground, clear of every mole and of each other. */
+  private placeKegs(n: number) {
+    const w = this.world;
+    for (let i = 0; i < n; i++)
+      for (let tries = 0; tries < 30; tries++) {
+        const x = this.W * (0.1 + Math.random() * 0.8);
+        const y = this.terrain.groundBelow(x, 0);
+        if (y < 40 || y > w.water - 20) continue;
+        if (w.moles.some((m) => Math.hypot(m.x - x, m.y - y) < 60) || w.kegs.some((k) => Math.abs(k.x - x) < 50)) continue;
+        w.addKeg(x, y);
+        break;
+      }
   }
 
   showMenu() {
@@ -282,7 +298,7 @@ export class GameScene extends Phaser.Scene {
     const total = this.campaign.stars.reduce((a, n) => a + n, 0);
     this.uiObjs.push(this.add.text(cx, top + 26, t('campaign'), { fontFamily: FONT, fontSize: '26px', color: hex(C.ink), fontStyle: 'bold' }).setOrigin(0.5).setDepth(151));
     this.uiObjs.push(this.add.text(cx, top + 54, t('campaignStars', { n: total, all: BATTLES.length * 3, acorns: this.campaign.acorns }), { fontFamily: FONT, fontSize: '14px', color: hex(C.dim) }).setOrigin(0.5).setDepth(151));
-    const swatch: Record<string, number> = { meadow: 0x59c14a, autumn: 0xd98a2b, frost: 0x9fc0ea };
+    const swatch: Record<string, number> = { meadow: 0x59c14a, autumn: 0xd98a2b, frost: 0x9fc0ea, canyon: 0xc9773f, ember: 0xe0501c };
     BATTLES.forEach((bt, i) => {
       const x = cx - pw / 2 + 15 + (i % cols) * (cw + 10) + cw / 2;
       const y = top + 76 + Math.floor(i / cols) * (ch + 8) + ch / 2;
@@ -1036,6 +1052,7 @@ export class GameScene extends Phaser.Scene {
     const g = this.g.clear();
     for (const m of w.mounds) drawMound(g, m);
     for (const c of w.crates) drawCrate(g, c, time);
+    for (const k of w.kegs) drawKeg(g, k, time);
     const team = this.teams[this.turn];
     for (const m of w.moles) {
       const isActive = m === this.active && this.screen === 'play' && this.phase === 'aim';

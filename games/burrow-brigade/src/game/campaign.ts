@@ -39,10 +39,10 @@ export const BATTLES: Battle[] = [
   b('hazel', 'autumn', 3, 3, 1.3, 'cluster', { cluster: 3 }, 12),
   b('frost', 'frost', 3, 3, 1.2, 'skyrain', { skyrain: 3 }, 12, { wind: 'strong' }),
   b('wasps', 'meadow', 3, 4, 1.1, 'seeker', { seeker: 3, beehive: 2 }, 14),
-  b('storm', 'autumn', 3, 3, 1, 'bolt', { bolt: 4 }, 12, { wind: 'strong' }),
+  b('storm', 'canyon', 3, 3, 1, 'bolt', { bolt: 4 }, 12, { wind: 'strong' }),
   b('bramble', 'frost', 4, 4, 0.9, 'heavy', { heavy: 3, dynamite: 1 }, 14, { wind: 'calm' }),
   b('tide', 'meadow', 4, 5, 0.85, 'roller', { roller: 3, quake: 1 }, 14, { suddenDeath: 8 }),
-  b('dusk', 'autumn', 4, 5, 0.7, 'splitter', { splitter: 3, heavy: 2, bolt: 2 }, 16),
+  b('dusk', 'ember', 4, 5, 0.7, 'splitter', { splitter: 3, heavy: 2, bolt: 2 }, 16),
 ];
 
 /** Stars for a won battle: the win, within par, and no mole lost. */

@@ -26,8 +26,12 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
   into the match's `boost`; only campaign battles use it, never quick matches or two players.
 - **Map:** `generate` (`game/terrain.ts`) makes a fresh map for the view's size each match: rolling
   hills from four sine waves, a ridge in the middle, cliffs into the water at both ends, sometimes a
-  water gap splitting the land, 2 to 4 caves and 1 or 2 floating ledges. One of three themes
-  (`THEMES`: meadow, autumn, frost) is picked at random. `spawnPoints` puts team 0 on the left half
+  water gap splitting the land, 2 to 4 caves and 1 or 2 floating ledges. One of five themes
+  (`THEMES`: meadow, autumn, frost, canyon, and ember, whose sea is lava that works like the water
+  and splashes in `World.splash`) is picked at random, or set by a campaign battle. `placeKegs`
+  stands 2 or 3 powder kegs (`World.kegs`) on dry ground clear of the moles: any blast in reach, or
+  a flame touching one, sets it off (`kegBlast`: a radius 42 blast of 38 damage that counts for
+  whoever set it off, and six flames), and they fall and sink like crates. `spawnPoints` puts team 0 on the left half
   and team 1 on the right. The water sits `WATER_GAP` (30) above the bottom; a mole or shell in it
   is gone.
 - **Turns:** `TURN_TIME` (30 s) to walk, aim and use one weapon, then `RETREAT_TIME` (3 s) to keep
@@ -126,6 +130,8 @@ scene).
   `World.use` and, for a shell, `contact` and `goOff`, its `w_<id>` and `d_<id>` texts in
   `i18n/en.ts` and `de.ts`, and its row to the README's table. Mark `ai: true` only if `planTurn`
   can aim it. The trophy texts name the number of weapons (26).
+- **A theme:** add it to `Theme['id']` and `THEMES` (`game/terrain.ts`) and its colour to the
+  campaign screen's `swatch`.
 - **A campaign battle:** add it to `BATTLES` (its id to `BattleId`), with its `c_<id>` and
   `cd_<id>` texts in `i18n/en.ts` and `de.ts`. Saved stars go by place, so add new battles at the
   end.

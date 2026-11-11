@@ -71,6 +71,8 @@ export interface Crate { x: number; y: number; vy: number; kind: 'weapon' | 'hea
 export interface Balloon { x: number; y: number; dir: number; targetX: number; dropped: number; team: number; owner: Mole }
 export interface Bolt { x: number; t: number; y: number; struck: boolean; team: number; owner: Mole }
 export interface Beam { x: number; y: number; ex: number; ey: number; t: number }
+/** A powder keg standing on the map: any blast in reach sets it off. */
+export interface Keg { x: number; y: number; vy: number; landed: boolean; gone: boolean }
 export interface Mound { x: number; y: number; team: number; name: string; drowned: boolean }
 
 export type ParticleKind = 'dirt' | 'smoke' | 'spark' | 'fire' | 'flash' | 'ring' | 'drop' | 'heal' | 'feather' | 'swoosh' | 'star';
@@ -112,6 +114,9 @@ export class World {
   bolts: Bolt[] = [];
   beams: Beam[] = [];
   mounds: Mound[] = [];
+  kegs: Keg[] = [];
+  /** The colour of a splash: water, or the lava of the ember theme. */
+  splash = 0xbfe6ff;
   particles: Particle[] = [];
   pops: Pop[] = [];
   wind = 0;
@@ -142,7 +147,7 @@ export class World {
   busy() {
     if (this.shots.some((s) => !(s.kind === 'mine' && s.state === 'rest' && s.trip < 0))) return true;
     if (this.flames.length || this.bees.length || this.balloons.length || this.bolts.length || this.beams.length || this.quakeT > 0) return true;
-    if (this.crates.some((c) => !c.landed && !c.gone)) return true;
+    if (this.crates.some((c) => !c.landed && !c.gone) || this.kegs.some((k) => !k.landed)) return true;
     return this.moles.some((m) => m.alive && (!m.grounded || (m.act && m.act.kind !== 'cheer')));
   }
 
@@ -157,6 +162,7 @@ export class World {
     this.stepFlames();
     this.stepBees();
     this.stepCrates();
+    this.stepKegs();
     this.stepBalloons();
     this.stepBolts();
     for (const b of this.beams) b.t -= DT;
@@ -319,7 +325,7 @@ export class World {
     m.act = null;
     this.hooks.sound('splash');
     const x = Math.max(4, Math.min(this.terrain.w - 4, m.x));
-    for (let i = 0; i < 18; i++) this.particle('drop', x, this.water, rnd(-90, 90), rnd(-260, -80), 0.9, rnd(2, 4), 0xbfe6ff, 1);
+    for (let i = 0; i < 18; i++) this.particle('drop', x, this.water, rnd(-90, 90), rnd(-260, -80), 0.9, rnd(2, 4), this.splash, 1);
     this.mounds.push({ x, y: this.water, team: m.team, name: m.name, drowned: true });
     if (this.turnTeam >= 0) {
       if (m.team !== this.turnTeam) this.log.drownedEnemies++;
@@ -873,7 +879,7 @@ export class World {
   private sink(s: Shot) {
     s.gone = true;
     this.hooks.sound('splash');
-    for (let i = 0; i < 8; i++) this.particle('drop', s.x, this.water, rnd(-50, 50), rnd(-180, -60), 0.7, 2.5, 0xbfe6ff, 1);
+    for (let i = 0; i < 8; i++) this.particle('drop', s.x, this.water, rnd(-50, 50), rnd(-180, -60), 0.7, 2.5, this.splash, 1);
   }
 
   /** A shot's end: the blast, or what else it turns into. */
@@ -958,6 +964,11 @@ export class World {
       if (c.kind === 'weapon') this.pending.push(() => this.explode(c.x, c.y - 8, 24, 18, -1));
       else this.dust(c.x, c.y, 8);
     }
+    for (const k of this.kegs) {
+      if (k.gone || Math.hypot(k.x - x, k.y - 9 - y) > r + 10) continue;
+      k.gone = true;
+      this.pending.push(() => this.kegBlast(k, team));
+    }
     // Fire on the ground near the blast goes out.
     this.flames = this.flames.filter((f) => Math.hypot(f.x - x, f.y - y) > r * 0.7);
     this.hooks.sound(r >= 60 ? 'bigBoom' : r >= 30 ? 'boom' : 'smallBoom');
@@ -1019,6 +1030,12 @@ export class World {
         for (const m of this.moles)
           if (m.alive && !m.hidden && Math.abs(m.x - f.x) < 9 && f.y - m.y < 22 && f.y - m.y > -6) this.hurt(m, 2, f.team);
         if (f.ground && Math.random() < 0.3) t.carve(f.x, f.y, 3);
+        // Fire licking at a keg sets it off.
+        for (const k of this.kegs)
+          if (!k.gone && Math.abs(k.x - f.x) < 10 && Math.abs(k.y - 6 - f.y) < 12) {
+            k.gone = true;
+            this.pending.push(() => this.kegBlast(k, f.team));
+          }
       }
       if (Math.random() < 0.25) this.particle('smoke', f.x, f.y - 6, rnd(-6, 6), rnd(-40, -20), 0.6, 3, 0x6a625a, -10);
     }
@@ -1057,6 +1074,41 @@ export class World {
   }
 
   /** Drops a crate from the sky at `x`. */
+  /** Stands a powder keg on the ground below (x, y). */
+  addKeg(x: number, y: number) {
+    this.kegs.push({ x, y, vy: 0, landed: false, gone: false });
+  }
+
+  /** A keg going off: a big blast that counts for whoever set it off, and burning powder. */
+  private kegBlast(k: Keg, team: number) {
+    this.explode(k.x, k.y - 9, 42, 38, team);
+    for (let i = 0; i < 6; i++)
+      this.flames.push({ x: k.x + rnd(-6, 6), y: k.y - 14, vx: rnd(-160, 160), vy: rnd(-260, -120), life: rnd(2.5, 4), ground: false, tick: 0.3, team });
+    this.hooks.sound('bigBoom');
+  }
+
+  private stepKegs() {
+    const t = this.terrain;
+    for (const k of this.kegs) {
+      if (k.gone) continue;
+      if (!k.landed) {
+        k.vy = Math.min(k.vy + GRAVITY * DT, 600);
+        k.y += k.vy * DT;
+        if (t.solid(k.x, k.y)) {
+          k.landed = true;
+          for (let i = 0; i < 20 && t.solid(k.x, k.y - 1); i++) k.y -= 1;
+          if (k.vy > 200) this.hooks.sound('thud');
+          k.vy = 0;
+        }
+      } else if (!t.solid(k.x, k.y) && !t.solid(k.x, k.y + 1)) k.landed = false;
+      if (k.y > this.water) {
+        k.gone = true;
+        this.sink({ x: k.x } as Shot);
+      }
+    }
+    this.kegs = this.kegs.filter((k) => !k.gone);
+  }
+
   dropCrate(x: number, kind: 'weapon' | 'health', weapon: WeaponId | null) {
     this.crates.push({ x, y: -20, vy: 0, kind, weapon, landed: false, gone: false, sway: Math.random() * 6 });
   }
