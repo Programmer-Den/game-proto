@@ -1615,7 +1615,8 @@ const GUST_LEAD_MS = DUSK_MS - 34_000 - GUST_WARN_MS;
  * Warned event times (dusk left, latest first) moved later where a short dusk would start inside
  * their warning: each comes at most `duskMax` - `warnMs` - `leadMs` of dusk left (its warning begins
  * `leadMs` into the dusk), and at least `warnMs` + 1 s after the one before it, so a summer dusk
- * keeps every gust, still warned. A dusk long enough for them leaves them as they are.
+ * keeps every gust, still warned. The bats, which have no warning (`warnMs` 0), go through it too,
+ * since a bat only comes while a lantern is lit. A dusk long enough for them leaves them as they are.
  */
 function fitTimes(times: number[], warnMs: number, duskMax: number, leadMs = 1_000) {
   let latest = duskMax - warnMs - leadMs;

@@ -356,4 +356,4 @@ Retuning a night is the constants at the top of `src/game/state.ts`; an upgrade 
 the window calls `callsFor` and `CALL_MS`, the cask `CASK_START` and `CASK_MAX`, and a district
 (its spots, chains and rule) its entry in `DISTRICTS` in `places.ts`, the tide `TIDE_TIMES` and
 `TIDE_MS`, the ships `SHIP_TIMES`, `SHIP_MS` and `SHIP_PAY`, a boon its row in `BOONS`, the
-traits `TRAIT_FLIGHTS`, and the daily `DAILY_NIGHTS` and `DAILY_LEVELS`.
+traits `TRAIT_FLIGHTS`, and the daily `DAILY_NIGHTS`, `DAILY_LEVELS` and `DAILY_BURN_MS`.
