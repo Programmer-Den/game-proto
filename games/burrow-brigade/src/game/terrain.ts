@@ -233,14 +233,14 @@ export interface Flight {
  * the live game moves it (`scenes/world.ts` uses `flyStep`). Stops at earth, at one of `bodies`, in
  * the water or after `maxT` seconds. Used for the aim preview and the Burrow AI.
  */
-export function flight(t: Terrain, x: number, y: number, vx: number, vy: number, ax: number, water: number, maxT: number, bodies: { x: number; y: number }[] = [], every = 3): Flight {
+export function flight(t: Terrain, x: number, y: number, vx: number, vy: number, ax: number, water: number, maxT: number, bodies: { x: number; y: number }[] = [], every = 3, edge = 0): Flight {
   const points = [{ x, y }];
   const s = { x, y, vx, vy };
   for (let i = 1; i * DT <= maxT; i++) {
     const hit = flyStep(t, s, ax, bodies, i * DT > 0.12);
     if (i % every === 0) points.push({ x: s.x, y: s.y });
     if (hit) return { points, hit: { x: s.x, y: s.y }, time: i * DT, lost: false };
-    if (s.y > water || s.x < -60 || s.x > t.w + 60) return { points, hit: null, time: i * DT, lost: true };
+    if (s.y > water || s.x < -60 - edge || s.x > t.w + 60 + edge) return { points, hit: null, time: i * DT, lost: true };
   }
   return { points, hit: null, time: maxT, lost: false };
 }

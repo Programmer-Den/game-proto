@@ -107,6 +107,13 @@ const WALK_SPEED = 55;
 export const MAX_HP = 100;
 
 export class World {
+  /**
+   * How far past the map's sides (`edgeX`) and top (`edgeY`) things still fly before they are lost.
+   * 0 for a map that fills the view; the daily range's smaller map sets the widest view's margin, the
+   * same on every screen, so nothing vanishes in plain sight.
+   */
+  edgeX = 0;
+  edgeY = 0;
   moles: Mole[] = [];
   shots: Shot[] = [];
   flames: Flame[] = [];
@@ -202,7 +209,7 @@ export class World {
     } else {
       this.airStep(m);
     }
-    if (m.y > this.water + 4 || m.x < -40 || m.x > t.w + 40) this.drown(m);
+    if (m.y > this.water + 4 || m.x < -40 - this.edgeX || m.x > t.w + 40 + this.edgeX) this.drown(m);
   }
 
   private walkStep(m: Mole, dir: number) {
@@ -328,7 +335,7 @@ export class World {
     m.hp = 0;
     m.act = null;
     this.hooks.sound('splash');
-    const x = Math.max(4, Math.min(this.terrain.w - 4, m.x));
+    const x = Math.max(4 - this.edgeX, Math.min(this.terrain.w - 4 + this.edgeX, m.x));
     for (let i = 0; i < 18; i++) this.particle('drop', x, this.water, rnd(-90, 90), rnd(-260, -80), 0.9, rnd(2, 4), this.splash, 1);
     this.mounds.push({ x, y: this.water, team: m.team, name: m.name, drowned: true });
     if (this.turnTeam >= 0) {
@@ -487,7 +494,7 @@ export class World {
       }
       case 'skyrain': {
         const dir = tx < t.w / 2 ? 1 : -1;
-        this.balloons.push({ x: dir > 0 ? -60 : t.w + 60, y: 46, dir, targetX: tx, dropped: 0, team: m.team, owner: m });
+        this.balloons.push({ x: dir > 0 ? -60 - this.edgeX : t.w + 60 + this.edgeX, y: 46, dir, targetX: tx, dropped: 0, team: m.team, owner: m });
         this.hooks.sound('balloon');
         m.act = { kind: 'cheer', t: 0, dur: 0.8 };
         break;
@@ -560,9 +567,11 @@ export class World {
           const f = inCone(k.x, k.y - 9, 150);
           if (f > 0) {
             k.landed = false;
-            // Slid along a pixel at a time, stopping at a bank of earth rather than going into it.
+            // Slid along a pixel at a time, stopping at a bank of earth or an overhang rather than going
+            // into it (the keg stands about 24 px tall).
             const dx = Math.cos(angle) * 40 * f;
-            for (let i = 0; i < Math.abs(dx) && !t.solid(k.x + Math.sign(dx), k.y - 6); i++) k.x += Math.sign(dx);
+            const clear = (x: number) => !t.solid(x, k.y - 6) && !t.solid(x, k.y - 14) && !t.solid(x, k.y - 22);
+            for (let i = 0; i < Math.abs(dx) && clear(k.x + Math.sign(dx)); i++) k.x += Math.sign(dx);
             k.vy = -140 * f;
           }
         }
@@ -624,7 +633,7 @@ export class World {
     for (; len < 1400 && earth < 300; len += 2) {
       x += dx * 2;
       y += dy * 2;
-      if (x < -20 || x > t.w + 20 || y < -20 || y > this.water) break;
+      if (x < -20 - this.edgeX || x > t.w + 20 + this.edgeX || y < -20 - this.edgeY || y > this.water) break;
       if (t.solid(x, y)) {
         earth += 2;
         if (len % 6 === 0) t.carve(x, y, 7);
@@ -715,7 +724,7 @@ export class World {
         s.spin += s.vx * DT * 0.08;
         if (!res) {
           if (s.y > this.water) this.sink(s);
-          else if (s.x < -80 || s.x > t.w + 80) s.gone = true;
+          else if (s.x < -80 - this.edgeX || s.x > t.w + 80 + this.edgeX) s.gone = true;
           return;
         }
         this.contact(s, res);
@@ -1230,7 +1239,7 @@ export class World {
         this.hooks.sound('throw');
       }
     }
-    this.balloons = this.balloons.filter((b) => b.dropped < 5 || (b.x > -80 && b.x < this.terrain.w + 80));
+    this.balloons = this.balloons.filter((b) => b.dropped < 5 || (b.x > -80 - this.edgeX && b.x < this.terrain.w + 80 + this.edgeX));
   }
 
   private stepBolts() {

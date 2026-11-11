@@ -428,8 +428,9 @@ export function drawShotShape(g: G, kind: ShotKind, x: number, y: number, angle:
       g.closePath();
       g.fillPath();
       or(g, -8, 1.5, 16, 2, 0x34383e, 0.8);
-      // extra: 0 unarmed, 1 armed, 2 tripped. With the time held still (reduced motion) a tripped mine glows steadily.
-      const on = extra === 2 ? time === 0 || Math.sin(time * 30) > 0 : extra === 1 ? Math.sin(time * 4) > 0.6 : false;
+      // extra: 0 unarmed, 1 armed, 2 tripped. With the time held still (reduced motion) an armed or
+      // tripped mine glows steadily red, so it still reads as live.
+      const on = extra === 2 ? time === 0 || Math.sin(time * 30) > 0 : extra === 1 ? time === 0 || Math.sin(time * 4) > 0.6 : false;
       g.fillStyle(on ? 0xff5a3c : 0x5ad06a, 1);
       g.fillCircle(0, -4.5, 1.8);
       break;
