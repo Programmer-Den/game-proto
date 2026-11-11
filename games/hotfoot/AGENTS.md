@@ -608,7 +608,8 @@ the stage), at most one sound of each kind a frame, so a row of coins or a volle
   toggled every 80 ms) is held at a steady 0.6 alpha, the Aegis nimbus's pulse is held at a fixed
   alpha, the "+N" coin pops and the shrine's "+1 heart" stay where they appear instead of rising,
   the streak's sparkle trail is not drawn, the Gatekeeper's flash after a stomp is held at 0.6
-  alpha, the snow and wind streaks, the dragon's tail lash bob, the boulders' roll and the
+  alpha, the snow and wind streaks, the dragon's tail lash bob, the boulders' roll, the barrels' roll
+  and the axes' spin, and the
   rockfall's dust are drawn still, the owl holds still with its wings up, the lit fire vents and the dragon's rolling fire keep one frame
   (`flames-lit0`, `fire-0`) instead of flickering, and the bats keep one wing frame with no bob, a cloud about to fall doesn't tremble, and the coins
   keep their full face (`coin-0`) instead of turning.

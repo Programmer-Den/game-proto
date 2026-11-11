@@ -532,6 +532,9 @@ export class GameScene extends Phaser.Scene {
     if (m.captured) this.noteCapture(kindOf(m.piece), kindOf(m.captured), scene, human);
     this.result = this.pos.result();
     this.syncPieces();
+    // A finished game is counted before the mate scene plays, so leaving for the menu during the
+    // scene can't skip the result (or leave the save from before the last move to continue).
+    const unlocked = this.result ? this.record() : '';
     if (this.result?.kind === 'mate') {
       const king = this.pos.kingSquare(this.pos.turn);
       this.refresh();
@@ -540,7 +543,7 @@ export class GameScene extends Phaser.Scene {
     }
     if (!this.result && this.pos.inCheck()) SFX('check');
     this.busy = false;
-    if (this.result) this.finish();
+    if (this.result) this.showResult(unlocked);
     else this.save();
     this.refresh();
     this.maybeAi();
@@ -567,7 +570,11 @@ export class GameScene extends Phaser.Scene {
     award(trophies, id);
   }
 
-  private finish() {
+  /**
+   * Counts the game that just ended: removes its save and, against the AI, adds it to the stats,
+   * awards the win trophies and opens the next level. Returns the name of the level a win opened.
+   */
+  private record() {
     saveGame(null);
     /** The level this win just opened, by name. */
     let unlocked = '';
@@ -597,6 +604,12 @@ export class GameScene extends Phaser.Scene {
       } else s.losses++;
       saveStats(s);
     }
+    return unlocked;
+  }
+
+  /** The result box, with the sting, once the last move has played out. */
+  private showResult(unlocked: string) {
+    const r = this.result!;
     stopMusic();
     playSting(SONG, r.kind === 'mate' && (this.mode === 'duo' || r.winner === this.player) ? 'win' : 'lose');
     const S = this.board.size;
@@ -635,16 +648,18 @@ export class GameScene extends Phaser.Scene {
   }
 
   private undo() {
-    // Against the AI there must be one of the player's own moves to take back. A finished game
-    // stays finished: its result is already in the stats.
+    // Against the AI there must be one of the player's own moves to take back, and a finished game
+    // stays finished: its result is already in the stats. Two players, whose games aren't counted,
+    // may take back the last move even after it ended the game.
     const mine = this.mode === 'duo' || this.pos.history.some((u) => sideOf(u.move.piece) === this.player);
-    if (this.busy || this.promo || this.result || !this.pos.history.length || !mine) {
+    if (this.busy || this.promo || (this.result && this.mode === 'ai') || !this.pos.history.length || !mine) {
       ui('refuse');
       return;
     }
     this.pos.unmake();
     // Against the AI, take back its reply too, so it is the player's move again.
     if (this.mode === 'ai' && this.pos.turn !== this.player && this.pos.history.length) this.pos.unmake();
+    this.result = null;
     this.buildPlay();
   }
 

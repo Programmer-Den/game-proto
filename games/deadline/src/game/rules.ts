@@ -105,7 +105,11 @@ export const isBoss = (kind: EnemyKind): kind is BossKind => kind in BOSSES;
 export const bossKind = (wave: number): BossKind => BOSS_KINDS[(Math.floor(wave / 5) - 1) % BOSS_KINDS.length];
 export const BROOD = { pack: 8, burst: 10 };
 export const BLOATER = { spitRadius: 96, poolRadius: 150, poolMs: 7000 };
-/** The boss's `n`th move from its own round, started one further along per boss wave: the Behemoth opens with a charge, the Brood Mother with its call. */
+/**
+ * The boss's `n`th move from its own round, started one further along per boss wave. Each round has
+ * three moves and the three bosses take turns, so a boss always opens with the same move: the
+ * Behemoth with a charge, the Brood Mother with its call, the Bloater with a spit.
+ */
 export const bossMove = (wave: number, n: number) => {
   const moves = BOSSES[bossKind(wave)].moves;
   return moves[(Math.floor(wave / 5) - 1 + n) % moves.length];

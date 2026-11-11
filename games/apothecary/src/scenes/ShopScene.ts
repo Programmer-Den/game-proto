@@ -11,7 +11,7 @@ import { bakeYard, bedTexture, goodTexture, yardTexture } from '../art/town';
 import { craftsmanTexture, customerTexture } from '../art/townsfolk';
 import { signTexture } from '../art/ui';
 import { loadState } from '../game/save';
-import { tick, type Feedback } from '../game/sim';
+import { finishedBy, tick, type Feedback } from '../game/sim';
 import { FINE_SHARE, MAX_CARRY, SIGN_NAMES, UPGRADES, WEATHER, carryCapacity, gearLevel, harvestReach, isMarketDay, payBoost, payment, tipLeft, tipNow, walkSpeed, weatherFor, type GameState, type Upgrade } from '../game/state';
 import {
   BEDS,
@@ -1008,7 +1008,9 @@ export class ShopScene extends Phaser.Scene {
    * the music, the rush's while a crowd waits.
    */
   private createSound() {
-    let made = shopStations(this.def).map((s) => this.shop.stations[s.id].output.length);
+    // Counted as made rather than read off the pallet, which a pixie route empties in the same tick.
+    const finished = () => shopStations(this.def).map((s) => finishedBy(this.shop.stations[s.id]));
+    let made = finished();
     let sold = this.shop.sold;
     let orders = [...this.shop.orders];
     let blighted = this.shop.blight.length;
@@ -1029,7 +1031,7 @@ export class ShopScene extends Phaser.Scene {
       const view = this.cameras.main.worldView;
       const seen = ({ x, y }: Point) => view.contains(x, y);
       const stations = shopStations(this.def);
-      const now = stations.map((s) => this.shop.stations[s.id].output.length);
+      const now = finished();
       if (now.some((n, i) => n > made[i] && seen(stationLayout(this.id, stations[i].id).at))) sfx('bubble');
       made = now;
       const gone = orders.filter((o) => !this.shop.orders.includes(o));

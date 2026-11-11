@@ -51,6 +51,9 @@ const DAILY_KO = 25;
 /** The daily range's map is this size whatever the screen's shape, so everyone shoots the same range. */
 const DAILY_W = 960;
 const DAILY_H = 540;
+/** How far the widest view (1296x720, `shared/scaling.ts`) reaches past the daily range's map. */
+const DAILY_EDGE_X = (1296 - DAILY_W) / 2;
+const DAILY_EDGE_Y = (720 - DAILY_H) / 2;
 const GAME = 'burrow-brigade';
 const FONT = '"Trebuchet MS", "Segoe UI", system-ui, sans-serif';
 const hex = (n: number) => '#' + n.toString(16).padStart(6, '0');
@@ -256,8 +259,8 @@ export class GameScene extends Phaser.Scene {
     }));
     this.world.onCollect = (m, c) => this.onCrate(m, c.weapon);
     this.looks(() => {
-      this.clouds = Array.from({ length: 6 }, () => ({ x: Math.random() * this.W, y: 30 + Math.random() * this.H * 0.25, s: 0.6 + Math.random() * 0.7 }));
-      this.specks = Array.from({ length: 18 }, () => ({ x: Math.random() * this.W, y: Math.random() * this.H * 0.7, ph: Math.random() * 6 }));
+      this.clouds = Array.from({ length: 6 }, () => ({ x: -this.ox + Math.random() * view.width, y: 30 + Math.random() * this.H * 0.25, s: 0.6 + Math.random() * 0.7 }));
+      this.specks = Array.from({ length: 18 }, () => ({ x: -this.ox + Math.random() * view.width, y: Math.random() * this.H * 0.7, ph: Math.random() * 6 }));
     });
     if (th.id === 'ember') this.world.splash = 0xffb04d;
     this.placeKegs(2 + Math.floor(Math.random() * 2));
@@ -593,6 +596,8 @@ export class GameScene extends Phaser.Scene {
       Math.random = rand;
       try {
         this.buildWorld([1, DAILY_TARGETS]);
+        this.world.edgeX = DAILY_EDGE_X;
+        this.world.edgeY = DAILY_EDGE_Y;
         this.dailyWinds = Array.from({ length: DAILY_SHOTS }, () => Math.round((rand() * 2 - 1) * 10));
       } finally {
         Math.random = real;
@@ -830,39 +835,44 @@ export class GameScene extends Phaser.Scene {
     return { box, txt };
   }
 
+  /** The view's edges in world pixels: the world's own, except round the daily range's smaller map. */
+  private edges() {
+    return { l: -this.ox, r: this.W + this.ox, t: -this.oy, b: this.H + this.oy };
+  }
+
   private buildHud() {
     this.clearUi();
     const W = this.W;
-    const H = this.H;
+    const e = this.edges();
     const mk = (key: string, x: number, y: number, size: number, color: number, origin = 0.5) => {
       const tx = this.add.text(x, y, '', { fontFamily: FONT, fontSize: `${size}px`, color: hex(color), fontStyle: 'bold' }).setOrigin(origin, 0.5).setDepth(166);
       this.texts[key] = tx;
       this.uiObjs.push(tx);
       return tx;
     };
-    mk('team0', LEFT_PANEL + 14, 22, 14, C.ink, 0);
-    mk('team1', W - 30, 22, 14, C.ink, 1);
-    mk('wind', W / 2, 22, 13, C.ink);
-    mk('timer', W / 2, 62, 16, C.ink);
-    mk('banner', W / 2, 108, 22, C.ink).setStroke('#ffffff', 5);
-    mk('hint', W / 2, H - 84, 13, C.ink).setStroke('#ffffff', 4);
+    mk('team0', e.l + LEFT_PANEL + 14, e.t + 22, 14, C.ink, 0);
+    mk('team1', e.r - 30, e.t + 22, 14, C.ink, 1);
+    mk('wind', W / 2, e.t + 22, 13, C.ink);
+    mk('timer', W / 2, e.t + 62, 16, C.ink);
+    mk('banner', W / 2, e.t + 108, 22, C.ink).setStroke('#ffffff', 5);
+    mk('hint', W / 2, e.b - 84, 13, C.ink).setStroke('#ffffff', 4);
     if (this.screen !== 'play' || this.mode === 'watch') return;
-    const y = H - 34;
+    const y = e.b - 34;
     // The weapon button opens the arsenal.
-    const wb = this.add.rectangle(122, y, 210, 50, C.button).setStrokeStyle(2, C.panelEdge).setDepth(160).setInteractive({ useHandCursor: true });
+    const wb = this.add.rectangle(e.l + 122, y, 210, 50, C.button).setStrokeStyle(2, C.panelEdge).setDepth(160).setInteractive({ useHandCursor: true });
     wb.on('pointerdown', () => {
       ui('click');
       if (this.arsenalOpen) this.closeArsenal();
       else this.openArsenal();
     });
-    this.buttons.weapon = { x: 122, y, w: 210, h: 50 };
+    this.buttons.weapon = { x: e.l + 122, y, w: 210, h: 50 };
     this.uiObjs.push(wb);
-    mk('weaponName', 66, y - 8, 14, C.ink, 0);
-    mk('weaponAmmo', 66, y + 11, 12, C.dim, 0);
-    this.button('left', W - 300, y, 50, 44, '◀', () => undefined, false, (d) => (this.hold.left = d));
-    this.button('right', W - 244, y, 50, 44, '▶', () => undefined, false, (d) => (this.hold.right = d));
-    this.button('jump', W - 188, y, 50, 44, '⤴', () => this.humanTurn() && this.active && this.world.jump(this.active));
-    const fire = this.button('fire', W - 88, y, 130, 46, t('fire'), () => undefined, true, (d) => this.onFireButton(d));
+    mk('weaponName', e.l + 66, y - 8, 14, C.ink, 0);
+    mk('weaponAmmo', e.l + 66, y + 11, 12, C.dim, 0);
+    this.button('left', e.r - 300, y, 50, 44, '◀', () => undefined, false, (d) => (this.hold.left = d));
+    this.button('right', e.r - 244, y, 50, 44, '▶', () => undefined, false, (d) => (this.hold.right = d));
+    this.button('jump', e.r - 188, y, 50, 44, '⤴', () => this.humanTurn() && this.active && this.world.jump(this.active));
+    const fire = this.button('fire', e.r - 88, y, 130, 46, t('fire'), () => undefined, true, (d) => this.onFireButton(d));
     fire.box.setFillStyle(C.fire);
     fire.box.on('pointerover', () => fire.box.setFillStyle(C.fire));
     fire.box.on('pointerout', () => fire.box.setFillStyle(C.fire));
@@ -898,7 +908,7 @@ export class GameScene extends Phaser.Scene {
     const rows = Math.ceil(WEAPON_IDS.length / cols);
     const ph = rows * th + 104;
     const cx = this.W / 2;
-    const cy = Math.min(this.H / 2, this.H - 70 - ph / 2);
+    const cy = Math.min(this.H / 2, this.edges().b - 70 - ph / 2);
     const panel = this.add.rectangle(cx, cy, pw, ph, C.panel, 0.97).setStrokeStyle(3, C.panelEdge).setDepth(170).setInteractive();
     const objs: Phaser.GameObjects.GameObject[] = [panel];
     objs.push(this.add.text(cx - pw / 2 + 16, cy - ph / 2 + 18, t('arsenal'), { fontFamily: FONT, fontSize: '18px', color: hex(C.ink), fontStyle: 'bold' }).setOrigin(0, 0.5).setDepth(171));
@@ -1106,14 +1116,15 @@ export class GameScene extends Phaser.Scene {
     this.world.step();
     for (const c of this.clouds) {
       c.x += (4 + this.world.wind * 3) * DT * c.s;
-      if (c.x > this.W + 80) c.x = -80;
-      if (c.x < -80) c.x = this.W + 80;
+      // Across the whole view, also round the daily range's smaller map.
+      if (c.x > this.W + this.ox + 80) c.x = -this.ox - 80;
+      if (c.x < -this.ox - 80) c.x = this.W + this.ox + 80;
     }
     for (const s of this.specks) {
       s.x += this.world.wind * 9 * DT + Math.sin(this.world.time * 2 + s.ph) * 0.2;
       s.y += Math.sin(this.world.time + s.ph) * 0.15 + 0.1;
-      if (s.x > this.W + 10) s.x = -10;
-      if (s.x < -10) s.x = this.W + 10;
+      if (s.x > this.W + this.ox + 10) s.x = -this.ox - 10;
+      if (s.x < -this.ox - 10) s.x = this.W + this.ox + 10;
       if (s.y > this.world.water) s.y = 0;
     }
     if (this.banner > 0) this.banner -= DT;
@@ -1434,7 +1445,7 @@ export class GameScene extends Phaser.Scene {
           const p = World.muzzle(m, this.aimAngle);
           const sp = w.speed * Math.max(0.05, this.power);
           const ax = this.world.wind * WIND_ACC * windFactor(id);
-          const f = flight(this.terrain, p.x, p.y, Math.cos(this.aimAngle) * sp, Math.sin(this.aimAngle) * sp, ax, this.world.water, seconds, [], 4);
+          const f = flight(this.terrain, p.x, p.y, Math.cos(this.aimAngle) * sp, Math.sin(this.aimAngle) * sp, ax, this.world.water, seconds, [], 4, this.world.edgeX);
           f.points.forEach((pt, i) => {
             g.fillStyle(0xffffff, 0.9 - (i / f.points.length) * 0.7);
             g.fillCircle(pt.x, pt.y, 2.2);
@@ -1501,7 +1512,7 @@ export class GameScene extends Phaser.Scene {
     g.strokePoints(pts(wave), false);
     g.fillStyle(0xffffff, 0.3);
     for (let i = 0; i < 8; i++) {
-      const x = ((i * 157 + time * 20) % (this.W + 40)) - 20;
+      const x = ((i * 157 + time * 20) % (x1 - x0 + 24)) + x0 - 12;
       g.fillEllipse(x, top + 12 + (i % 3) * 7, 22, 2, 6);
     }
   }
@@ -1536,22 +1547,23 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     const W = this.W;
-    // Team panels: name and the team's health together.
+    const e = this.edges();
+    // Team panels: name and the team's health together, pinned to the view's top corners.
     this.teams.forEach((tm, i) => {
-      const x = i === 0 ? LEFT_PANEL : W - 236;
+      const x = i === 0 ? e.l + LEFT_PANEL : e.r - 236;
       h.fillStyle(C.panel, 0.92);
-      h.fillRoundedRect(x, 8, 220, 44, 10);
+      h.fillRoundedRect(x, e.t + 8, 220, 44, 10);
       h.lineStyle(2, INK, 1);
-      h.strokeRoundedRect(x, 8, 220, 44, 10);
+      h.strokeRoundedRect(x, e.t + 8, 220, 44, 10);
       const total = tm.moles.reduce((s, m) => s + (m.alive ? m.hp : 0), 0);
       const full = tm.moles.reduce((s, m) => s + m.maxHp, 0);
       h.fillStyle(0xe5ddd2, 1);
-      h.fillRoundedRect(x + 12, 34, 196, 10, 5);
+      h.fillRoundedRect(x + 12, e.t + 34, 196, 10, 5);
       h.fillStyle(TEAM_COLORS[i], 1);
-      if (total > 0) h.fillRoundedRect(x + 12, 34, Math.max(10, (196 * total) / full), 10, 5);
+      if (total > 0) h.fillRoundedRect(x + 12, e.t + 34, Math.max(10, (196 * total) / full), 10, 5);
       if (i === this.turn && this.screen === 'play') {
         h.lineStyle(3, TEAM_COLORS[i], 1);
-        h.strokeRoundedRect(x - 3, 5, 226, 50, 12);
+        h.strokeRoundedRect(x - 3, e.t + 5, 226, 50, 12);
       }
       const count = this.mode === 'daily' && i === 0
         ? t('shotOf', { n: Math.min(this.turns + 1, DAILY_SHOTS), all: DAILY_SHOTS })
@@ -1560,16 +1572,16 @@ export class GameScene extends Phaser.Scene {
     });
     // Wind.
     h.fillStyle(C.panel, 0.92);
-    h.fillRoundedRect(W / 2 - 90, 8, 180, 44, 10);
+    h.fillRoundedRect(W / 2 - 90, e.t + 8, 180, 44, 10);
     h.lineStyle(2, INK, 1);
-    h.strokeRoundedRect(W / 2 - 90, 8, 180, 44, 10);
+    h.strokeRoundedRect(W / 2 - 90, e.t + 8, 180, 44, 10);
     const wind = this.world.wind;
     const sky = this.weather === 'clear' ? '' : ' · ' + t(`weather_${this.weather}`);
     this.texts.wind?.setText((wind === 0 ? t('windCalm') : t('wind')) + sky);
     if (wind) {
       const len = (Math.abs(wind) / 10) * 70;
       const dir = Math.sign(wind);
-      const cy = 40;
+      const cy = e.t + 40;
       h.lineStyle(4, 0x3d8be0, 1);
       h.lineBetween(W / 2 - dir * len, cy, W / 2 + dir * len, cy);
       h.fillStyle(0x3d8be0, 1);
@@ -1579,9 +1591,9 @@ export class GameScene extends Phaser.Scene {
     if (this.screen === 'play') {
       const shown = this.phase === 'aim' ? Math.ceil(Math.max(0, this.timer)) : this.phase === 'retreat' ? Math.ceil(Math.max(0, this.retreat)) : 0;
       h.fillStyle(this.phase === 'aim' && this.timer < 6 ? 0xffd6c2 : C.panel, 0.92);
-      h.fillRoundedRect(W / 2 - 30, 50, 60, 26, 8);
+      h.fillRoundedRect(W / 2 - 30, e.t + 50, 60, 26, 8);
       h.lineStyle(2, INK, 1);
-      h.strokeRoundedRect(W / 2 - 30, 50, 60, 26, 8);
+      h.strokeRoundedRect(W / 2 - 30, e.t + 50, 60, 26, 8);
       this.texts.timer?.setText(shown ? String(shown) : '…');
       if (this.phase === 'aim' && this.timer < 5 && Math.floor(this.timer) !== Math.floor(this.timer + DT * 4)) SFX('tick');
     }

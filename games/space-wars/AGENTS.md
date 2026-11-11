@@ -94,7 +94,9 @@ Implemented today:
   `DERELICT_GUN` at the owner's enemies within 170 px). A faction alone in the 60 px ring
   (`DERELICT_RADIUS`) with warships fills `claim` in 10 s (`CLAIM_MS`), draining a rival's claim first
   (which costs the owner the station), and owns it until another takes it; a fallen owner loses its
-  stations. They show once the player has seen them (`derelictAt` for the hover label), cannot be
+  stations. In a teams skirmish teammates in a ring count as one side (`teamPresence`: as the owner
+  when it is on their team, else as the teammate already capturing, the player first), so an ally's
+  ships help a claim rather than block or drain it. They show once the player has seen them (`derelictAt` for the hover label), cannot be
   destroyed or built beside, and the player can build at them only in the sense of training. From
   60 s (`AI_CLAIM_MS`) a rival with 3 warships sends one idle ship (`Side.claimer`) to the nearest
   station it does not own (nor, in a teams skirmish, a teammate does) within 600 px of its hub (`contestDerelicts`), sends it back whenever it
@@ -175,10 +177,10 @@ Implemented today:
   damaged as it was: `takeOver`, counted in `Building.hacks`), `mines` (Veil Syndicate's Mine
   Lattice lays a hidden mine within 130 px every 8 s, up to 4, while not hacked: `World.mines`,
   `layMine`; an enemy ship within 16 px sets it off for 45 damage within 40 px: `updateMines`; a
-  rival's mine is drawn only with a player ship within `MINE_SPOT` 60 px), `shield` (Halo Cruiser: friends within 70 px take half of each shot), `brood` (Brood
+  rival's mine is drawn only with a player ship within `MINE_SPOT` 60 px), `shield` (Halo Cruiser: friends within 70 px take half of each shot; under two shields the stronger counts, `shieldShare`), `brood` (Brood
   Carrier spawns a scout every 12 s up to 6 scouts), `splash` (Siege Barge hits enemies within 28 px
   of its target for half damage), `salvage` (Nomad Salvage Yard pays 8 crystal per enemy unit
-  destroyed within 200 px).
+  destroyed within 200 px, a teammate's not counted).
 - Contract board (`game/contracts.ts`, state in `World.contract`, run by `World.updateContract`,
   `openBoard`, `startContract`, `failContract` and `score`): five contracts a battle (`CONTRACT_STEPS`,
   ranks `RANKS`). The first is always `FIRST_CONTRACT` (raise the Barracks). Each one done pays its
@@ -249,7 +251,8 @@ Implemented today:
   crystal and research levels and, for the first `outposts` rivals, a finished outpost
   (`seedOutpost`, at `expansionSpot` with any field and a looser gap if need be). A victory shows a
   card per goal in `contract.done` (`drawKeep`); tapping one runs `winSector` (keeps it, opens the
-  next sector) and saves; with no card any tap does. Watching always plays sector 1 and leaves the
+  next sector) and saves; with no card any tap does, and a sector won again with no card keeps its
+  earlier perk. Watching always plays sector 1 and leaves the
   campaign alone.
 - Picker tabs (`GameScene.mode`, a `PickMode`: `sectors`, `galaxy`, `scenario`, `skirmish`, `tech`;
   `modeTabs`, `PICK_TABS` in `layout.ts`, `drawTabs`, `pickMode`): five pills over the cards, then
@@ -310,8 +313,8 @@ Implemented today:
   splash skip them; `command` turns a tap on an ally into a move; the ally's ships and buildings stamp
   the player's fog, and so do sensors it holds; `seesUnit` shows the ally's ships wherever they are
   (cloaked or in a nebula), and `hidden` counts a teammate's spotting in a nebula as the faction's
-  own, so an enemy the ally spots there shows and can be attacked; it never pickets the beacon (`contestBeacon`); `bribe` and `acceptTruce` refuse
-  it (`allyNoTribute`); there is no pact (`updatePact`); the battle is won once every side but the
+  own, so an enemy the ally spots there shows and can be attacked; it never pickets the beacon (`contestBeacon`); `bribe` refuses
+  it (`allyNoTribute`) and it never offers a truce (it never holds a grudge against the player); there is no pact (`updatePact`); the battle is won once every side but the
   player's team has fallen. The rivals panel names the ally (`allyStatus`), and the battle opens
   with `teamsBattle` on the message line. The end overlay says `skirmishWon` or `skirmishLost`
   (`battleOver`), and its tap goes back to the Skirmish tab.
@@ -355,7 +358,7 @@ Implemented today:
 - Relay beacon (`World.beacon`, `World.updateBeacon`): the loose crystal node nearest the point
   halfway from the player's start to the map's centre, at least 300 px from every rival start
   (`beaconNode` in `game/map.ts`), is taken out of `nodes` and becomes the beacon. A faction alone in its 70 px ring with warships
-  fills `capture` in 5 s (draining a rival's first) and then owns it; the owner gets 3 crystal a
+  fills `capture` in 5 s (draining a rival's first; teammates count as one side, `teamPresence`) and then owns it; the owner gets 3 crystal a
   second while one of its warships is in the ring (`held`). `paid` counts what it paid the player.
   It sits at least 200 px from the player's start, outside the hub's sight, so it starts hidden in
   the fog. Buildings keep clear of it. The two rivals whose hubs are nearest the beacon each send

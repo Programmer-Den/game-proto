@@ -41,7 +41,7 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
   `Mole.maxHp`), a pocket watch (+5 s on your turns), an extra Boulder Rocket, Shield Bubble or
   Repair Kit, more crates (+15% a level) and a recruit (one more mole). `boosts` turns the levels
   into the match's `boost`; only campaign battles use it, never quick matches or two players.
-- **Map:** `generate` (`game/terrain.ts`) makes a fresh map for the view's size each match: rolling
+- **Map:** `generate` (`game/terrain.ts`) makes a fresh map for the view's size each match (960x540 in the daily range): rolling
   hills from four sine waves, a ridge in the middle, cliffs into the water at both ends, sometimes a
   water gap splitting the land, 2 to 4 caves and 1 or 2 floating ledges. One of five themes
   (`THEMES`: meadow, autumn, frost, canyon, and ember, whose sea is lava that works like the water
@@ -99,7 +99,11 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
   (normal plus Veteran), picked on the Hats screen (`showHats`) from the Campaign screen. The pick
   (`hat` in prefs) is worn by team 0 (both teams in Two players), never in Watch AI.
 - **Layout:** fills the screen (`setupScaling(game, { fill: true })`); the world is exactly the view,
-  with no scrolling. The corner buttons sit top left (`corner: 'top-left'`) and the left team panel
+  with no scrolling, except in the daily range, whose 960x540 map sits in the middle of the view
+  (`fitWorld` moves the camera; `edges()` gives the view's edges in world pixels). There the HUD
+  still pins to the view's edges, clouds and water cover the whole view, and `World.edgeX`/`edgeY`
+  (the widest view's margin, the same on every screen) keep shells, moles and balloons alive
+  until they leave any view. The corner buttons sit top left (`corner: 'top-left'`) and the left team panel
   starts at `LEFT_PANEL` to stay clear of them. The bottom bar holds the weapon button (bottom
   left), ◀ ▶, ⤴ and FIRE (bottom right), whose label follows the weapon's mode (FIRE, TAP MAP, USE). FIRE is held like Space for an aimed
   weapon (`onFireButton`, `fireHeld`): it charges while held and fires on release or at full power;

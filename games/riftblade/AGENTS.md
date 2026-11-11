@@ -816,7 +816,9 @@ mostly on the Dune world. Things learned while tuning:
   built from imported values).
 - The knights' random calls (crits, dodges, Persuasion) only happen when a knight is played (the
   same for Elara's and Triad-77's in `squad.ts`), and their pools are filtered out of a soldier's
-  card roll before `rand` is used, so a soldier's seeded playthrough plays exactly as before.
+  card roll before `rand` is used, so a soldier's seeded playthrough plays exactly as before. The
+  one dodge roll for other heroes (`hurtHero`, from a Guard specialisation) only draws `rand` once a
+  dodge is held.
 - `squad.ts` imports `sim.ts` like `blades.ts` does; the same rule about load-time values holds.
 - Triad-77's health lives in its bots: `p.hp` is recomputed from `state.bots` each step
   (`syncSquad`), so anything that changes it must go through `heal` or `hurtHero`.

@@ -176,7 +176,8 @@ Battles are fought across five sectors in a chain, shown under the faction cards
 opens the next sector, and lets you keep one of the perks you earned from that battle's contracts:
 it applies from the start of every later sector's battles. A harder sector has rivals that start
 with an outpost, more crystal and research, and fewer loose crystal fields on the map. You can
-replay any open sector by tapping it before the battle, and a lost battle is fought again in the
+replay any open sector by tapping it before the battle (a replay won with no perk to pick keeps the one
+kept from it before), and a lost battle is fought again in the
 same sector. The campaign is kept in the browser.
 
 | Sector | Rivals with an outpost | Rival crystal | Rival research | Loose crystal fields |
@@ -226,7 +227,7 @@ saved for next time, and a tap on one steps it on:
 
 | Option | Choices |
 | --- | --- |
-| Teams | Free for all, or teams: you and the top-left start against the two starts on the right, with the centre on its own. Your ally fights beside you (its ships and buildings can't be attacked, it leaves the relay beacon to you and it never claims your derelict stations), shares its sight (you see its ships wherever they are, and enemies in a nebula that it spots), and you win once every hub but yours and your ally's has fallen. The rivals never sign the last-stand pact in a teams skirmish |
+| Teams | Free for all, or teams: you and the top-left start against the two starts on the right, with the centre on its own. Your ally fights beside you (its ships and buildings can't be attacked, it leaves the relay beacon to you, it never claims your derelict stations, and its ships in the ring of a station or the beacon count on your side, so they never take one from you), shares its sight (you see its ships wherever they are, and enemies in a nebula that it spots), and you win once every hub but yours and your ally's has fallen. The rivals never sign the last-stand pact in a teams skirmish |
 | Map size | Small (1360 by 850), standard (1600 by 1000) or large (1920 by 1200); the start points and the number of loose crystal fields scale with it |
 | Starting crystal | 60, 120 or 300 for every faction |
 | Wormholes | On or off (below) |

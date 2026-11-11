@@ -164,7 +164,9 @@ study, shade gardens and a mirrored second production line.
   `payCraftsman`, `payBelt`, `payExpansion`, `payShade`, `joinGuild`, `dropItem`, `serveOrder`, `cyclePriority`,
   `cycleSign`, `replantGarden`, `clearBlight`, `sellToWagon`, `cycleMarketPick`, `buyHerb`,
   `sellHerb`) and `harvest` each change
-  state and return `Feedback` lines, already translated with `t`. Also `refining`, `hasRoom`, `doneByHand` and `isBlighted`.
+  state and return `Feedback` lines, already translated with `t`. Also `refining`, `hasRoom`, `doneByHand` and `isBlighted`, and
+  `finishedBy(station)`, how many goods a refiner, cauldron or town shop station has finished since the page
+  loaded (`countFinished`, not saved), which the scenes' `bubble` reads.
 - `src/game/save.ts`: `loadState`, `saveState` (stamps `lastSeen` with `Date.now()` and writes
   `thinSave`, which `baseline`, `trimmed`, `merged` and `roundTimers` serve), `clearSave` (key `apothecary-save`), `grantLessons` (lessons an old save was already
   using), and the `ontoOwnRuns`, `ontoColumns` and `ontoHeart` belt migrations.
@@ -843,7 +845,7 @@ Under browser automation the engine is a no-op, so the playthrough is unchanged.
 | `drop` | drop markers at a table, a cauldron and the counter (`sounded`) |
 | `pickUp` | pick-up markers at a table, or a cauldron's pallet (`pickUpPotion`) |
 | `fine` | `pickUpPotion`, a brew taken out in its fine window |
-| `bubble` | `createSound`, a station on screen puts out a good or potion (one per frame) |
+| `bubble` | `createSound`, a station on screen finishes a good or potion (`finishedBy` went up; one per frame), also when a pixie route takes it at once |
 | `pay` | purple markers (`addLevelMarker`, `addBuildMarker`) and the herb market's buy marker, pitched up as the price fills |
 | `upgrade` | a level, craftsman, recipe, pixie route or build fully paid |
 | `toss` | a hands slot tapped (`dropItem`) |
@@ -871,8 +873,8 @@ Under browser automation the engine is a no-op, so the playthrough is unchanged.
   at the counter or waiting. `ShopScene` plays `swish` + `pluck` for a bed cut, `rasp` for a
   blighted bed cleared, `blight` when a bed is blighted and `rush` when the crowd comes,
   `drop`, `pickUp`, `pay`, `cascade` (the till) and `upgrade` at its markers as the apothecary does,
-  `toss` for a hands slot, `bubble`, `sell`, `served` and `hmph` from what changed in its shop each
-  frame, `fine` for a pick-up in a station's fine window, the `kept` sting when its contract is
+  `toss` for a hands slot, `bubble` (a station on screen finished a good, by `finishedBy`), and
+  `sell`, `served` and `hmph` (with the counter on screen) from what changed in its shop each frame, `fine` for a pick-up in a station's fine window, the `kept` sting when its contract is
   kept (`createContract`), and `ui('refuse')` for a marker that takes nothing. `TownScene` plays `ui('click')` for a
   lot walked into, `upgrade` for a shop bought and `ui('refuse')` for one the purse can't pay.
 - Not done: no ambience (cauldron bubble loop, rain) and no sound per pixie, as the plan says.

@@ -17,7 +17,8 @@ or the same position three times).
 
 ![A game, with a bishop picked up](docs/screenshots/board.webp)
 
-- **Undo** (or U) takes back your last move, and the Stone AI's reply, while the game is on.
+- **Undo** (or U) takes back your last move, and the Stone AI's reply, while the game is on (two
+  players may also take back the move that ended it).
 - **Captures: full / quick** (or Q) switches between the full scenes and quick ones that skip the
   strike and play the fall at double speed.
 - **Menu** leaves the game; it is saved after every move, and **Continue game** on the menu picks it

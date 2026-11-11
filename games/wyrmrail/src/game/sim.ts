@@ -165,7 +165,8 @@ export function newGame(boon: Medal | null = null, journey: Partial<Journey> = {
     moods: valley.villages.map(() => 0),
     idleMs: valley.villages.map(() => 0),
     hazard: null,
-    hazardTimerMs: HAZARD_EVERY_MS,
+    // The canyon's quicker hazards start with its first one, not only after it.
+    hazardTimerMs: HAZARD_EVERY_MS * (valley.kind === 'canyon' ? CANYON_HAZARDS : 1),
     charter: null,
     charterOffer: null,
     depots: [],

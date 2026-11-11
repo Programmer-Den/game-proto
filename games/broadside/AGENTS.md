@@ -148,7 +148,9 @@ wave brings a sea serpent or a kraken, and every fourth wave sails at night.
   perks (no boons, no Renown). The first draft is drawn rather than `FIRST_DRAFT`. On phase `over`
   or `won` the scene calls `finishDaily` with `voyageScore` (`WAVE_POINTS` a wave beaten plus
   `plundered`), banks no medals and saves no best wave; the end card hides "Sail on" (the daily
-  ends at the haven) and shows the score, best and streak.
+  ends at the haven) and shows the score, best and streak. `drawGameOver` reads the record afresh
+  (`loadDaily`) once `today()` has moved past its day, so a run that ends after midnight offers the
+  new day's voyage.
 - **Trade** (`src/game/trade.ts`): the harbor's trade row calls `trade(s, good)`, which buys a
   crate (`Crate`: `good`, `paid`) at `cargoPrice(good, wave)` into `GameState.hold` (up to
   `HOLD_MAX`). `reachHarbor` sells the whole hold first, for `cargoSale` each (`markup` of what
@@ -386,7 +388,7 @@ How it runs:
   `over` or `won`. Escorts and shells are cleared in `reachHarbor`, forts in `setSail`.
 - **Input:** `readInput` sets `state.helm` to -1, 0 or 1 and `state.aim.port`/`.starboard` each
   frame. Keys win over the pointer for the helm (Left/A, Right/D); Q and E hold the port and
-  starboard fire controls. Each pointer that presses a control is remembered in `held` (pointer
+  starboard fire controls, and R fires a flare on a night wave (F, M and P are the shared keys). Each pointer that presses a control is remembered in `held` (pointer
   id to control), and its own `pointerup` releases only that control (`gameout` releases all), so
   one thumb can steer while the other fires. A fire control pressed and released within one frame
   still counts as held for that frame (`tapped`), so a quick tap fires an uncharged broadside.
@@ -403,7 +405,7 @@ How it runs:
   (on a hull's `mortarSide` it calls `lob` instead, to where the target will be in `SHELL_MS`,
   as far round as the arc trains, or straight out at the reach). The shot's lifetime is `reach *
   windReach / BALL_SPEED` (plus `Ball.skip` with Bouncing shot). Then the side reloads, at
-  `crewPace`. The reach starts from `sideRange` (shorter for grapeshot), and the target search
+  `reloadStep` (`crewPace`, and `SHOTS.grape.jam` while an enemy's grapeshot has her `jamMs` running). The reach starts from `sideRange` (shorter for grapeshot), and the target search
   and the drawn arc use the reach times `windReach` straight out from the side.
 - **Night:** on a night wave the scene shows `night`, a view-sized texture (baked in `bakeNight`)
   that is dark all over but for a glow of `NIGHT_SIGHT` round the middle, where the ship always
@@ -529,7 +531,7 @@ Phaser `Text` (each takes a UUID from `Math.random` when created), so a new text
 repeatably. That is why the end card's daily button is made the first time the card shows, and
 the captains' name labels as their ships appear.
 The art uses its own seeded generator (`rng` in `art.ts`), never `Math.random`. All timing comes
-from `update`'s `time`. There is no `Date` or `setTimeout` in the game.
+from `update`'s `time`. There is no `Date` or `setTimeout` in the game (the daily's day comes from `today()` in `shared/daily.ts`).
 
 Data tables, where to tune:
 

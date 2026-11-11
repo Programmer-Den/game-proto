@@ -3,7 +3,7 @@ import { t } from '../i18n';
 import { routeMs } from '../scenes/shopLayout';
 import { DISTRICTS, HAPPY, HAPPY_PULL, HOME_TIERS, MAX_HOMES, START_HOMES, SUPPLY_MS, UNHAPPY, cityPay, createDistricts, districtAsks, growRounds, townIsCity, townName, type DistrictState, type Need } from './districts';
 import { FINE, isFine, type PotionId } from './items';
-import type { Feedback } from './sim';
+import { countFinished, type Feedback } from './sim';
 import {
   BLIGHT_DAY,
   BLIGHT_EVERY_MS,
@@ -187,6 +187,7 @@ function runStation(shop: ShopState, shopDef: ShopDef, def: StationDef, dt: numb
     // Done: it waits on the station while its pallet is full.
     if (count(station.output, work.out) >= shopStorage(shop)) return;
     station.output.push(work.out);
+    countFinished(station);
     station.work = null;
   }
 }

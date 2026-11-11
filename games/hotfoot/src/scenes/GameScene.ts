@@ -617,10 +617,11 @@ export class GameScene extends Phaser.Scene {
       const flap = settings.reduceMotion ? 0 : Math.floor(this.clock / 110 + t.id) % 2;
       sprite.setTexture(`bat-${flap}`).setY(GROUND_Y - t.h - 10 + (settings.reduceMotion ? 0 : flap ? 2 : -2));
     } else if (t.kind === 'barrel') {
-      // Rolls towards the knight: it turns by how far it has rolled.
-      sprite.setRotation(t.x / 13);
+      // Rolls towards the knight: it turns by how far it has rolled (held still with reduced motion).
+      sprite.setRotation(settings.reduceMotion ? 0 : t.x / 13);
     } else if (t.kind === 'axe') {
-      sprite.setRotation(-t.x / 9);
+      // Spins as it flies (held still with reduced motion).
+      sprite.setRotation(settings.reduceMotion ? 0 : -t.x / 9);
     } else if (t.kind === 'fire') {
       // The fire flickers as it rolls (held still with reduced motion).
       sprite.setTexture(`fire-${settings.reduceMotion ? 0 : Math.floor(this.clock / 80) % 2}`);
@@ -663,7 +664,7 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  /** Snow falling over the frozen pass and gusts blowing over the windy pass; held still with reduced motion. */
+  /** Snow falling over the frozen pass, gusts blowing over the windy pass and the Sky Road's gusts; held still with reduced motion. */
   private drawWeather() {
     const g = this.weather.clear();
     const s = this.state;

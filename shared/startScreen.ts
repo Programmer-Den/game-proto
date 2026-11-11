@@ -208,6 +208,19 @@ export function addStartScreen(game: Phaser.Game, howToPlay?: HowToPlay, trophie
       }
       if (key === HELP_KEY) return openHelp();
       const go = key === 'enter' || key === ' ';
+      // Enter or Space on another button or link reached with Tab (How to play, Mute, All games)
+      // presses that one, as the browser would; only a focus the keyboard gave it counts.
+      const focused = document.activeElement;
+      if (
+        go &&
+        focused instanceof HTMLElement &&
+        focused !== startButton &&
+        focused !== resumeButton &&
+        overlay.contains(focused) &&
+        focused.matches('button, a') &&
+        focused.matches(':focus-visible')
+      )
+        return;
       if ((mode === 'start' && go) || (mode === 'paused' && (go || key === PAUSE_KEY || key === 'escape'))) {
         e.preventDefault();
         play();

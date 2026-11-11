@@ -608,7 +608,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onKey(e: KeyboardEvent) {
-    if (this.screen !== 'play' || !this.state) return;
+    // A held key repeats, and Ctrl, Cmd or Alt with a letter is the browser's shortcut, as with the shared F and M keys.
+    if (this.screen !== 'play' || !this.state || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
     const n = Number(e.key);
     if (e.key.toLowerCase() === 'x') this.faster();
     else if (this.replay) return;

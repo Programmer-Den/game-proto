@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { settings } from '../../../../shared/settings';
-import { dailyRand, finishDaily, loadDaily, startDaily, type DailyRecord } from '../../../../shared/daily';
+import { dailyRand, finishDaily, loadDaily, startDaily, today, type DailyRecord } from '../../../../shared/daily';
 import { ui } from '../../../../shared/audio';
 import { HI, lookOf, SEA_RES, SHEET_RES } from '../art/art';
 import { renderScale } from '../../../../shared/scaling';
@@ -1092,7 +1092,7 @@ export class GameScene extends Phaser.Scene {
     this.flareButton = pinToScreen(b.button).setDepth(UI_DEPTH - 5);
   }
 
-  /** Fires a flare (the button or F): the burst sounds through its effect, the buzz when none is left. */
+  /** Fires a flare (the button or R): the burst sounds through its effect, the buzz when none is left. */
   private flare() {
     const s = this.state;
     if (!s.night || (s.phase !== 'fighting' && s.phase !== 'break')) return;
@@ -1526,6 +1526,8 @@ export class GameScene extends Phaser.Scene {
   private drawGameOver() {
     const s = this.state;
     if (!this.dailyButton) this.createDailyButton();
+    // A run that ended after midnight offers the new day's voyage (the record is read afresh).
+    if (this.daily.day !== today()) this.daily = loadDaily(DAILY_GAME);
     const won = s.phase === 'won';
     const calmed = won && s.wave === TEMPEST_WAVE;
     const run = { wave: s.wave, sunk: s.sunk, taken: s.taken, gold: s.plundered };

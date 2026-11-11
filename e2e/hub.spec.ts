@@ -321,6 +321,14 @@ test('games have start and pause screens', async ({ page }, testInfo) => {
   testInfo.attach('how to play', { body: await page.screenshot({ path: testInfo.outputPath('how-to-play.png') }), contentType: 'image/png' });
   await page.keyboard.press('Escape');
   await expect(page.locator('.game-start-button')).toBeVisible();
+  // Enter on a button reached with Tab presses that button rather than Start.
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: 'How to play' })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('heading', { name: 'How to play Apothecary' })).toBeVisible();
+  expect(await running(), 'Enter on How to play does not start the game').toBe(false);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.game-start-button')).toBeVisible();
 
   await page.locator('.game-start-button').click();
   await expect(overlay).toBeHidden();

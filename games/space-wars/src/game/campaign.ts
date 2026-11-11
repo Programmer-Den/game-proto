@@ -67,11 +67,11 @@ export function keptFor(c: Campaign, sector: number): Goal[] {
   return c.kept.slice(0, sector).filter((g): g is Goal => !!g);
 }
 
-/** Records a win in `sector`, keeping `perk` from it, and opens the next sector. */
+/** Records a win in `sector`, keeping `perk` from it (or, with none, the perk kept from an earlier win there), and opens the next sector. */
 export function winSector(c: Campaign, sector: number, perk: Goal | null): Campaign {
   const kept = [...c.kept];
   while (kept.length < sector) kept.push(null);
-  kept[sector] = perk;
+  kept[sector] = perk ?? kept[sector] ?? null;
   return { unlocked: Math.min(SECTORS.length, Math.max(c.unlocked, sector + 2)), kept };
 }
 

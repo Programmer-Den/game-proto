@@ -964,7 +964,9 @@ export function lockedOf(kit: Kit): Set<string> {
 
 /** What a fusion would shut out if taken now: its locks and the rival fusions open to this hero. */
 export function fusionShuts(f: FusionDef, hero: HeroId, kit: Kit): { upgrades: string[]; fusions: string[] } {
-  const rivals = FUSIONS.filter((o) => o.id !== f.id && !kit.fusions[o.id] && fusionFits(o, hero, kit) && (o.needs.some((id) => f.needs.includes(id)) || o.needs.some((id) => f.locks.includes(id)) || f.needs.some((id) => o.locks.includes(id))));
+  // Leave out fusions held or already shut out by those held: taking this one costs them nothing.
+  const shut = lockedOf(kit);
+  const rivals = FUSIONS.filter((o) => o.id !== f.id && !kit.fusions[o.id] && !shut.has(fusionCard(o.id)) && fusionFits(o, hero, kit) && (o.needs.some((id) => f.needs.includes(id)) || o.needs.some((id) => f.locks.includes(id)) || f.needs.some((id) => o.locks.includes(id))));
   return { upgrades: [...f.locks], fusions: rivals.map((o) => o.id) };
 }
 

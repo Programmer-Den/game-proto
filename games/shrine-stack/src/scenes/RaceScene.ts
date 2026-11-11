@@ -90,8 +90,9 @@ export class RaceScene extends Phaser.Scene {
         .setInteractive({ useHandCursor: true })
         .on('pointerdown', () => this.dropSide(i));
     }
-    this.input.keyboard?.on('keydown-A', () => this.dropSide(0));
-    this.input.keyboard?.on('keydown-L', () => this.dropSide(1));
+    // A held key's auto-repeat must not drop the next stone the moment it swings in.
+    this.input.keyboard?.on('keydown-A', (e: KeyboardEvent) => !e.repeat && this.dropSide(0));
+    this.input.keyboard?.on('keydown-L', (e: KeyboardEvent) => !e.repeat && this.dropSide(1));
     const onResume = () => (this.lastFrame = null);
     this.events.on(Phaser.Scenes.Events.RESUME, onResume);
     this.events.on(Phaser.Scenes.Events.WAKE, onResume);
