@@ -7,7 +7,7 @@ import { award } from '../../../../shared/trophies';
 import { aiLog, mountWatch, watching, watchSteps } from '../../../../shared/watch';
 import { SFX, SONG } from '../audio';
 import { planTurn, type Plan } from '../game/ai';
-import { BATTLES, isOpen, starsFor } from '../game/campaign';
+import { BATTLES, isOpen, starsFor, VETERAN } from '../game/campaign';
 import { boosts, reward, UPGRADE_COSTS, UPGRADE_IDS, type UpgradeId } from '../game/depot';
 import { loadCampaign, loadPrefs, loadStats, saveCampaign, savePrefs, saveStats, type Stats } from '../game/save';
 import { DT, flight, generate, spawnPoints, Terrain, THEMES, WATER_GAP, WIND_ACC, type Theme } from '../game/terrain';
@@ -90,6 +90,8 @@ export class GameScene extends Phaser.Scene {
   arsenalOpen = false;
   /** The campaign battle under way (its place in `BATTLES`), or null outside the campaign. */
   battle: number | null = null;
+  /** Playing the campaign's Veteran tier. */
+  veteran = false;
   /** Stars won by the battle that just ended, and whether they beat the best so far. */
   private earned = { stars: 0, best: false, acorns: 0 };
   private campaign = loadCampaign();
@@ -178,6 +180,8 @@ export class GameScene extends Phaser.Scene {
       arsenal: this.arsenalOpen,
       battle: this.battle,
       stars: this.campaign.stars.slice(),
+      veteran: this.veteran,
+      vstars: this.campaign.vstars.slice(),
       acorns: this.campaign.acorns,
       dailyScore: this.daily?.score ?? null,
       view: { w: this.W, h: this.H },
@@ -312,22 +316,28 @@ export class GameScene extends Phaser.Scene {
     const cy = this.H / 2;
     const top = cy - ph / 2;
     this.uiObjs.push(this.add.rectangle(cx, cy, pw, ph, C.panel, 0.96).setStrokeStyle(3, C.panelEdge).setDepth(150));
-    const total = this.campaign.stars.reduce((a, n) => a + n, 0);
-    this.uiObjs.push(this.add.text(cx, top + 26, t('campaign'), { fontFamily: FONT, fontSize: '26px', color: hex(C.ink), fontStyle: 'bold' }).setOrigin(0.5).setDepth(151));
+    const total = this.tierStars().reduce((a, n) => a + n, 0);
+    if (!(this.campaign.stars[BATTLES.length - 1] > 0)) this.veteran = false;
+    this.uiObjs.push(this.add.text(cx, top + 26, this.veteran ? t('campaignVeteran') : t('campaign'), { fontFamily: FONT, fontSize: '26px', color: hex(this.veteran ? 0x8a3bb0 : C.ink), fontStyle: 'bold' }).setOrigin(0.5).setDepth(151));
+    if (this.campaign.stars[BATTLES.length - 1] > 0)
+      this.button('tier', cx + pw / 2 - 80, top + 26, 136, 32, this.veteran ? t('tierNormal') : t('tierVeteran'), () => {
+        this.veteran = !this.veteran;
+        this.showCampaign();
+      }, !this.veteran);
     this.uiObjs.push(this.add.text(cx, top + 54, t('campaignStars', { n: total, all: BATTLES.length * 3, acorns: this.campaign.acorns }), { fontFamily: FONT, fontSize: '14px', color: hex(C.dim) }).setOrigin(0.5).setDepth(151));
     const swatch: Record<string, number> = { meadow: 0x59c14a, autumn: 0xd98a2b, frost: 0x9fc0ea, canyon: 0xc9773f, ember: 0xe0501c };
     BATTLES.forEach((bt, i) => {
       const x = cx - pw / 2 + 15 + (i % cols) * (cw + 10) + cw / 2;
       const y = top + 76 + Math.floor(i / cols) * (ch + 8) + ch / 2;
-      const open = isOpen(this.campaign.stars, i);
-      const stars = this.campaign.stars[i] ?? 0;
+      const open = isOpen(this.tierStars(), i);
+      const stars = this.tierStars()[i] ?? 0;
       const card = this.add.rectangle(x, y, cw, ch, open ? C.button : 0xe2dbd0, open ? 1 : 0.7).setStrokeStyle(2, stars ? C.fire : 0xc9b8a3).setDepth(151);
       this.uiObjs.push(card, this.add.rectangle(x - cw / 2 + 5, y, 6, ch - 10, swatch[bt.theme], open ? 1 : 0.4).setDepth(152));
       const ink = hex(open ? C.ink : 0xa09080);
       this.uiObjs.push(
         this.add.text(x - cw / 2 + 16, y - 22, `${i + 1}. ${t(`c_${bt.id}`)}`, { fontFamily: FONT, fontSize: '15px', color: ink, fontStyle: 'bold' }).setOrigin(0, 0.5).setDepth(152),
         this.add.text(x - cw / 2 + 16, y, open ? t(`cd_${bt.id}`) : t('locked'), { fontFamily: FONT, fontSize: '12px', color: hex(open ? C.dim : 0xa09080), wordWrap: { width: cw - 30 } }).setOrigin(0, 0.5).setDepth(152),
-        this.add.text(x - cw / 2 + 16, y + 22, t('versus', { mine: bt.mine, foes: bt.foes }), { fontFamily: FONT, fontSize: '12px', color: ink, fontStyle: 'bold' }).setOrigin(0, 0.5).setDepth(152),
+        this.add.text(x - cw / 2 + 16, y + 22, t('versus', { mine: bt.mine, foes: bt.foes + (this.veteran ? VETERAN.foes : 0) }), { fontFamily: FONT, fontSize: '12px', color: ink, fontStyle: 'bold' }).setOrigin(0, 0.5).setDepth(152),
         this.add.text(x + cw / 2 - 10, y + 22, '★'.repeat(stars) + '☆'.repeat(3 - stars), { fontFamily: FONT, fontSize: '16px', color: hex(stars ? 0xf0a020 : 0xb9a994) }).setOrigin(1, 0.5).setDepth(152),
       );
       if (open) {
@@ -407,6 +417,7 @@ export class GameScene extends Phaser.Scene {
     this.mode = mode;
     this.battle = mode === 'ai' ? battle : null;
     const bt = this.battle === null ? null : BATTLES[this.battle];
+    if (!bt) this.veteran = false;
     this.suddenDeath = bt?.suddenDeath ?? SUDDEN_DEATH_TURN;
     this.boost = boosts(bt ? this.campaign.levels : {});
     this.screen = 'play';
@@ -428,8 +439,15 @@ export class GameScene extends Phaser.Scene {
       } finally {
         Math.random = real;
       }
-    } else this.buildWorld(bt ? [bt.mine + this.boost.moles, bt.foes] : this.size, bt?.theme, [MAX_HP + this.boost.hp, MAX_HP]);
-    if (bt) for (const [id, n] of Object.entries(bt.bonus) as [WeaponId, number][]) this.teams[1].ammo[id] += n;
+    } else this.buildWorld(bt ? [bt.mine + this.boost.moles, bt.foes + (this.veteran ? VETERAN.foes : 0)] : this.size, bt?.theme, [MAX_HP + this.boost.hp, MAX_HP]);
+    if (bt) for (const [id, n] of Object.entries(bt.bonus) as [WeaponId, number][]) this.teams[1].ammo[id] += n + (this.veteran ? VETERAN.ammo : 0);
+    if (bt?.boss) {
+      // The rival's leader leads in person: the first mole, with a crown and far more health.
+      const boss = this.teams[1].moles[0];
+      boss.hp = boss.maxHp = Math.round(bt.boss * (this.veteran ? VETERAN.boss : 1));
+      boss.hat = 'crown';
+      boss.name = t('bossName');
+    }
     for (const [id, n] of Object.entries(this.boost.ammo) as [WeaponId, number][]) this.teams[0].ammo[id] += n;
     this.teams[1].ai = mode !== 'duo' && mode !== 'daily';
     this.teams[0].ai = mode === 'watch';
@@ -506,16 +524,18 @@ export class GameScene extends Phaser.Scene {
         if (settings.difficulty === 'hard') this.trophy('hardWin');
         if (this.battle !== null) {
           const stars = starsFor(BATTLES[this.battle], this.turns, this.lostMole);
-          const before = this.campaign.stars[this.battle] ?? 0;
+          const tier = this.tierStars();
+          const before = tier[this.battle] ?? 0;
           this.earned = { stars, best: stars > before, acorns: 0 };
-          while (this.campaign.stars.length <= this.battle) this.campaign.stars.push(0);
-          this.campaign.stars[this.battle] = Math.max(before, stars);
+          while (tier.length <= this.battle) tier.push(0);
+          tier[this.battle] = Math.max(before, stars);
           saveCampaign(this.campaign);
         }
         playSting(SONG, 'win');
       } else playSting(SONG, 'lose');
       if (this.battle !== null) {
-        this.earned.acorns = reward(this.winner === 0, this.winner === 0 ? starsFor(BATTLES[this.battle], this.turns, this.lostMole) : 0);
+        const paid = reward(this.winner === 0, this.winner === 0 ? starsFor(BATTLES[this.battle], this.turns, this.lostMole) : 0);
+        this.earned.acorns = Math.round(paid * (this.veteran ? VETERAN.acorns : 1));
         this.campaign.acorns += this.earned.acorns;
         saveCampaign(this.campaign);
       }
@@ -602,6 +622,11 @@ export class GameScene extends Phaser.Scene {
   private showMenuCampaign() {
     this.showMenu();
     this.showCampaign();
+  }
+
+  /** The best stars of the campaign tier being played. */
+  private tierStars() {
+    return this.veteran ? this.campaign.vstars : this.campaign.stars;
   }
 
   private teamName(i: number) {
@@ -991,7 +1016,7 @@ export class GameScene extends Phaser.Scene {
       case 'think':
         if (ai.t > 0) return;
         const rival = this.battle === null ? null : BATTLES[this.battle];
-        ai.plan = planTurn(this.world, m, team.ammo, byDifficulty(2.4, 1, 0.35) * (rival?.aim ?? 1), !ai.walked, rival?.habit ?? null);
+        ai.plan = planTurn(this.world, m, team.ammo, byDifficulty(2.4, 1, 0.35) * (rival?.aim ?? 1) * (rival && this.veteran ? VETERAN.aim : 1), !ai.walked, rival?.habit ?? null);
         if (ai.plan.walk) {
           ai.stage = 'walk';
           ai.t = 1.3;
@@ -1247,7 +1272,7 @@ export class GameScene extends Phaser.Scene {
       label.setVisible(show);
       if (!show) continue;
       label.setText(m === this.active && this.screen === 'play' ? `${m.name} ${Math.ceil(m.hp)}` : String(Math.ceil(m.hp)));
-      label.setPosition(m.x, m.y - 34);
+      label.setPosition(m.x, m.y - (m.hat === 'crown' ? 52 : m.hat ? 44 : 34));
     }
     for (const p of this.world.pops) {
       let tx = this.popTexts.get(p);

@@ -206,7 +206,7 @@ const de: Translation<typeof en> = {
   broadsideCover: 'Ein Piratenschiff feuert eine Breitseite auf eine feindliche Schaluppe',
   tinctureTinkerCard: 'Tausche Zutaten, um drei oder mehr zu verbinden, und sammle, was jede Trankbestellung verlangt, bevor die Züge ausgehen.',
   tinctureTinkerCover: 'Ein Brett mit Kräutern, Wurzeln und Kristallen neben einer Bestellung für einen Heiltrank',
-  burrowBrigadeCard: 'Führe einen Trupp Maulwürfe mit Helm in rundenbasiertem Artilleriekampf: Ziele über die Hügel, lies den Wind und wähle aus 26 Waffen, während jede Explosion den Boden weggräbt.',
+  burrowBrigadeCard: 'Führe einen Trupp Maulwürfe mit Helm in rundenbasiertem Artilleriekampf: Ziele über die Hügel, lies den Wind und wähle aus 28 Waffen, während jede Explosion den Boden weggräbt.',
   burrowBrigadeCover: 'Maulwürfe mit blauen und bernsteinfarbenen Helmen auf grasigen Hügeln, einer zielt mit einer Eichelrakete über einen Kamm mit Krater',
   catacombCard: 'Kämpfe dich mit einem Kartendeck durch ein kurzes Verlies: spiele jede Runde fünf Karten und nimm nach jedem Kampf eine neue dazu.',
   catacombCover: 'Ein Ritter mit Handkarten gegenüber einem Schleim in einem Verliesraum',

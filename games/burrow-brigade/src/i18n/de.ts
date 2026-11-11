@@ -54,6 +54,10 @@ const de: Translation<typeof en> = {
   strawMoles: 'Strohmaulwürfe',
   shotOf: 'Schuss {n} von {all}',
   starMole: 'Star der Partie: {name}, {n} Schaden',
+  campaignVeteran: 'Feldzug · Veteran',
+  tierVeteran: 'Veteran ▸',
+  tierNormal: '◂ Normal',
+  bossName: 'Königin Dämmer',
   depot: 'Quartiermeister',
   acorns: 'Eicheln zum Ausgeben: {n}',
   acornsWon: '+{n} Eicheln',
@@ -113,6 +117,8 @@ const de: Translation<typeof en> = {
   d_ember: 'Zerbricht in Flammen, die bergab laufen und ein paar Sekunden brennen.',
   w_beehive: 'Bienenkorb',
   d_beehive: 'Bricht auf, und ein Schwarm Bienen jagt den nächsten Gegner und sticht ihn.',
+  w_sap: 'Harzbombe',
+  d_sap: 'Geworfen, klebt am ersten Ding, das sie berührt, auch an einem Maulwurf. Geht 2 Sekunden später hoch.',
   w_clod: 'Erdklumpen',
   d_clod: 'Setzt einen Klumpen Erde, wo er landet: Deckung für dich oder ein Deckel für einen Gegner.',
   w_mine: 'Mine',
@@ -129,6 +135,8 @@ const de: Translation<typeof en> = {
   d_swipe: 'Ein kräftiger Hieb gegen einen Maulwurf direkt neben dir, der ihn wegschleudert. Geht nie aus.',
   w_pound: 'Bodenstampfer',
   d_pound: 'Spring hoch und krach herunter: gräbt einen Krater unter dir und wirft Maulwürfe in der Nähe weg.',
+  w_gust: 'Windfächer',
+  d_gust: 'Ein Windstoß in die Richtung, in die du zeigst: bläst Maulwürfe, Fässer und lose Bomben vor dir weg. Kein Schaden, aber das Wasser ist nah.',
   w_burrow: 'Graben',
   d_burrow: 'Grab einen Tunnel in die gezeigte Richtung. Darin sind Maulwürfe gut. Geht nie aus.',
   w_beam: 'Sonnenstrahl',
@@ -143,6 +151,6 @@ const de: Translation<typeof en> = {
   d_skip: 'In dieser Runde nichts tun.',
 };
 
-export const keepEnglish: (keyof typeof en)[] = ['title', 'wind', 'w_mine'];
+export const keepEnglish: (keyof typeof en)[] = ['title', 'wind', 'w_mine', 'tierVeteran', 'tierNormal'];
 
 export default de;

@@ -47,6 +47,8 @@ export const savePrefs = (p: Prefs) => write(PREFS_KEY, p);
 export interface Campaign {
   /** The best stars won in each battle, by its place in `BATTLES` (0 for not won yet). */
   stars: number[];
+  /** The same for the Veteran tier, opened by winning the last battle. */
+  vstars: number[];
   /** Acorns to spend at the Quartermaster. */
   acorns: number;
   /** The Quartermaster's upgrades bought, by id. */
@@ -54,9 +56,11 @@ export interface Campaign {
 }
 
 export const loadCampaign = (): Campaign => {
-  const c = read<Campaign>(CAMPAIGN_KEY, { stars: [], acorns: 0, levels: {} });
+  const c = read<Campaign>(CAMPAIGN_KEY, { stars: [], vstars: [], acorns: 0, levels: {} });
+  const stars = (a: unknown) => (Array.isArray(a) ? a.map((n) => Math.max(0, Math.min(3, Math.round(Number(n)) || 0))) : []);
   return {
-    stars: Array.isArray(c.stars) ? c.stars.map((n) => Math.max(0, Math.min(3, Math.round(Number(n)) || 0))) : [],
+    stars: stars(c.stars),
+    vstars: stars(c.vstars),
     acorns: Math.max(0, Math.round(Number(c.acorns)) || 0),
     levels: c.levels && typeof c.levels === 'object' ? c.levels : {},
   };

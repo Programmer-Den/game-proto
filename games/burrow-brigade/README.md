@@ -1,7 +1,7 @@
 # Burrow Brigade
 
 Turn-based artillery with squads of helmeted moles. Each turn one of your moles walks, aims with a
-slingshot drag and fires one of 26 weapons over the hills. Every blast digs the ground away and
+slingshot drag and fires one of 28 weapons over the hills. Every blast digs the ground away and
 throws moles about, the wind changes every turn, and a mole that falls into the water is out. The
 last team with a mole standing wins. Play the Burrow AI, a campaign of eight rival burrows, the daily
 range, or a friend on one screen.
@@ -42,8 +42,13 @@ star of the match, the mole that did the most damage.
 
 Eight battles against rival burrows, each with its own map theme, team sizes and habit: the Hazel
 Twins hoard Pinecones, the Frostwhisker Patrol rides a howling wind with Balloon Drops, the Rising
-Tide floods the map from turn 8. Every battle has three stars: win it, win within its turn limit,
-and win without losing a mole. Winning a battle opens the next.
+Tide floods the map from turn 8, and Queen Dusk herself leads the last battle with a crown and
+220 health. Every battle has three stars: win it, win within its turn limit,
+and win without losing a mole. Winning a battle opens the next; winning the last opens the
+**Veteran** tier, the same battles with one more rival mole, sharper aim and more ammo for them,
+its own stars and half as many acorns again.
+
+![Queen Dusk on the volcano](docs/screenshots/boss.webp)
 
 Every battle pays acorns, more for a win and each star. Spend them at the **Quartermaster** on
 upgrades for your side in the campaign: thicker helmets, longer turns, extra Boulder Rockets,
@@ -60,9 +65,9 @@ Shield Bubbles and Repair Kits, more crates and a fourth (or fifth) mole.
 | Group | Weapons |
 | --- | --- |
 | Rockets (wind) | Acorn Rocket (unlimited), Boulder Rocket, Dandelion (splits in three at the top), Wasp Rocket (homes in), Firecrackers (five in a row), Drill Rocket (bores on through earth) |
-| Thrown (no wind) | Pebble Grenade (unlimited, 3 second fuse), Pinecone (scatters five nuts), Rubber Ball (five bounces), Rolling Log (rolls along the ground), Ember Pot (flames that run downhill), Beehive (bees chase the nearest enemy), Dirt Clod (adds earth) |
+| Thrown (no wind) | Pebble Grenade (unlimited, 3 second fuse), Pinecone (scatters five nuts), Rubber Ball (five bounces), Rolling Log (rolls along the ground), Ember Pot (flames that run downhill), Beehive (bees chase the nearest enemy), Sap Bomb (sticks to what it hits, a mole too), Dirt Clod (adds earth) |
 | Strikes | Mine, Dynamite, Balloon Drop (five acorns from a balloon), Storm Bolt (lightning), Quake |
-| Close | Paw Swipe (unlimited), Ground Pound, Burrow (dig a tunnel, unlimited), Sunbeam (a straight beam through everything) |
+| Close | Paw Swipe (unlimited), Ground Pound, Gust Fan (blows moles, kegs and bombs away), Burrow (dig a tunnel, unlimited), Sunbeam (a straight beam through everything) |
 | Tools | Tunnel Hop (dive and pop up elsewhere), Shield Bubble, Repair Kit, Skip Turn |
 
 ![A Balloon Drop and a swarm of bees](docs/screenshots/swarm.webp)

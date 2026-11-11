@@ -28,6 +28,8 @@ export interface Battle {
   suddenDeath: number;
   /** Win within this many turns (both teams' turns) for the second star. */
   par: number;
+  /** The rival's leader fights in person: one mole with this much health and a crown. */
+  boss?: number;
 }
 
 const b = (id: BattleId, theme: Theme['id'], mine: number, foes: number, aim: number, habit: WeaponId | null, bonus: Battle['bonus'], par: number, extra: Partial<Battle> = {}): Battle => ({
@@ -42,13 +44,16 @@ export const BATTLES: Battle[] = [
   b('storm', 'canyon', 3, 3, 1, 'bolt', { bolt: 4 }, 12, { wind: 'strong' }),
   b('bramble', 'frost', 4, 4, 0.9, 'heavy', { heavy: 3, dynamite: 1 }, 14, { wind: 'calm' }),
   b('tide', 'meadow', 4, 5, 0.85, 'roller', { roller: 3, quake: 1 }, 14, { suddenDeath: 8 }),
-  b('dusk', 'ember', 4, 5, 0.7, 'splitter', { splitter: 3, heavy: 2, bolt: 2 }, 16),
+  b('dusk', 'ember', 4, 5, 0.7, 'splitter', { splitter: 3, heavy: 2, bolt: 2 }, 16, { boss: 220 }),
 ];
 
 /** Stars for a won battle: the win, within par, and no mole lost. */
 export function starsFor(battle: Battle, turns: number, lostMole: boolean) {
   return 1 + (turns <= battle.par ? 1 : 0) + (lostMole ? 0 : 1);
 }
+
+/** The Veteran tier, once the last battle is won: one more rival mole, sharper aim, more ammo, more acorns. */
+export const VETERAN = { foes: 1, aim: 0.6, ammo: 1, boss: 1.35, acorns: 1.5 };
 
 /** Whether battle `i` can be played: the first always, the rest once the one before is won. */
 export const isOpen = (stars: number[], i: number) => i === 0 || (stars[i - 1] ?? 0) > 0;
