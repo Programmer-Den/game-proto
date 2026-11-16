@@ -643,6 +643,14 @@ out of a Tunnel Hop, a paw whoosh and thud, a splash for anything in the water, 
 last five seconds. One sound per blast, rate-limited, so a cluster or a burst of firecrackers stays
 clear.
 
+### Shardlight
+**Done.** See the Sound section of `games/shardlight/AGENTS.md`: a chapel tune in F (`calm`) on the
+map, a brisker `battle` part in a window, a darker `boss` part for the rose windows, and `win` and
+`lose` stings. Effects are a bounce off the bar and the walls, a glassy shatter that climbs along a
+chain with a tinkle of shards, a crack for thick glass, a clang off lead, a chime as a bead drops,
+an arpeggio for a good bead and a sour slide for a bad one, a launch and a falling note for a lost
+orb.
+
 ### Ninefold
 Number-placement puzzle in nine art styles; calm, tidy, a music box on a desk.
 

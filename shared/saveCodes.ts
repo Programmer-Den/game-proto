@@ -24,6 +24,7 @@ export const SAVE_CODES: Record<string, string> = {
   palisade: 'pa',
   riftblade: 'rb',
   'scrapyard-titans': 'st',
+  shardlight: 'sl',
   'shrine-stack': 'ss',
   'space-wars': 'sw',
   stonemate: 'sm',

@@ -221,6 +221,8 @@ const en = {
   mapmakerCard: 'Reveal a fog-covered island tile by tile on a limited store of supplies, and trade your charts at port for upgrades.',
   mapmakerCover: 'A bear surveyor charting a fog-covered island tile by tile',
   mazewrightCard: 'Plant hedges and towers on an open lawn to build the maze the beetles must walk, but never close the last way through.',
+  shardlightCard: 'Bounce a lantern orb off your brass bar to break the dull panes out of thirty chapel windows, on a map of five chapels with a rose window at the end of each.',
+  shardlightCover: 'A stained-glass window in a stone arch, half its coloured panes broken out so a glowing picture shows through, with a lantern orb above a brass bar',
   stonemateCard: 'Play chess with living statues, where every capture has its own scene: each attacker strikes its own way and each victim breaks its own way.',
   stonemateCover: 'A chessboard of marble and obsidian statues with glowing eyes, a white bishop firing a glowing rune bolt at a black knight',
   mazewrightCover: 'A hedge maze on a garden lawn, with stone towers in the hedges and beetles walking a dotted route to a cottage',
