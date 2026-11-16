@@ -14,8 +14,8 @@ Mapmaker, in `games/mapmaker/`, Lanternkeep, in `games/lanternkeep/`, Space Wars
 `games/space-wars/`, Lane Brawl, in `games/lane-brawl/`, Colonizer, in `games/colonizer/`, Riftblade,
 in `games/riftblade/`, Scrapyard Titans, in `games/scrapyard-titans/`, Bramblecrest, in
 `games/bramblecrest/`, Ninefold, in `games/ninefold/`, Augury, in `games/augury/`, Mazewright, in
-`games/mazewright/`, Stonemate, in `games/stonemate/`, and Burrow Brigade, in
-`games/burrow-brigade/`.
+`games/mazewright/`, Stonemate, in `games/stonemate/`, Burrow Brigade, in
+`games/burrow-brigade/`, and Shardlight, in `games/shardlight/`.
 
 Each game's guide for agents, to read before changing it:
 
@@ -47,6 +47,7 @@ Each game's guide for agents, to read before changing it:
 | Mazewright | [games/mazewright/AGENTS.md](games/mazewright/AGENTS.md) |
 | Stonemate | [games/stonemate/AGENTS.md](games/stonemate/AGENTS.md) |
 | Burrow Brigade | [games/burrow-brigade/AGENTS.md](games/burrow-brigade/AGENTS.md) |
+| Shardlight | [games/shardlight/AGENTS.md](games/shardlight/AGENTS.md) |
 
 ## Feedback and issues
 

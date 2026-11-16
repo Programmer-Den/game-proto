@@ -35,10 +35,11 @@ body:
         - Mazewright
         - Stonemate
         - Burrow Brigade
+        - Shardlight
         - Hub page
         - Shared / all games
       # Preselect Shared, so a report never lands on a game by accident.
-      default: 27
+      default: 28
     validations:
       required: true
   - type: dropdown
