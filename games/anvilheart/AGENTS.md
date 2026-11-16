@@ -183,7 +183,7 @@ Implemented today:
   the empty barrel, else as `plainPrice` in coins (the `left` event carries `back: { place, coins }`,
   place -1 for coins, and the scene floats "Their half set is back in the smithy" or "paid Nc"
   under "Left unhappy"). `progressOf` does the same in the saved snapshot (empty anvils, else
-  coins), since adventurers are not saved. The card shows both pictures,
+  the empty barrel, else coins), since adventurers are not saved. The card shows both pictures,
   greys and ticks (`tick` texture) the half handed, and the tag reads "Set: 1 of 2" or "Set
   complete". Textures `shield-<tier>`.
 - Rust on idle anvils (AN8): `idle[]` (parallel to `slots`, saved) counts how long each anvil's

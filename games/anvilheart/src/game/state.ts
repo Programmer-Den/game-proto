@@ -343,15 +343,17 @@ export function newShop(progress: Progress): GameState {
 }
 
 export const progressOf = (s: GameState): Progress => {
-  // Adventurers are not saved, so half a set they hold goes back onto an empty anvil, or, with no
-  // room, into the coins at its plain price.
+  // Adventurers are not saved, so half a set they hold goes back as `handBack` gives it: onto an
+  // empty anvil, else into the empty barrel, or, with no room, into the coins at its plain price.
   const slots = [...s.slots];
+  let barrel = s.barrel;
   let coins = s.coins;
   for (const a of s.adventurers) {
     for (const half of [a.given.sword, a.given.shield]) {
       if (half === null) continue;
       const slot = slots.indexOf(null);
       if (slot >= 0) slots[slot] = half;
+      else if (s.ranks.barrel > 0 && barrel === null) barrel = half;
       else coins += plainPrice(half, s);
     }
   }
@@ -367,7 +369,7 @@ export const progressOf = (s: GameState): Progress => {
     choosing: s.choosing,
     stars: s.stars,
     charter: s.charter,
-    barrel: s.barrel,
+    barrel,
     reputation: s.reputation,
     won: s.won,
     shieldMode: s.shieldMode,

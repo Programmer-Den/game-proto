@@ -1465,6 +1465,22 @@ export class World {
   }
 
   /**
+   * The factions in a ring (a derelict station's or the beacon's) as sides of a claim. In a teams
+   * skirmish teammates count as one: as the owner when it is on their team, else as the teammate
+   * already capturing (the player first, if no one is), so an ally's ships help a claim rather than
+   * block or drain it.
+   */
+  private teamPresence(present: Set<number>, owner: number, capturer: number): Set<number> {
+    const teams = this.teams;
+    if (!teams || present.size === 0) return present;
+    const lead = (f: number) => (owner >= 0 && teams[f] === teams[owner] ? owner : capturer >= 0 && teams[f] === teams[capturer] ? capturer : f);
+    const sides = new Set([...present].map(lead));
+    const [first] = sides;
+    if (sides.size > 1 && [...sides].every((f) => teams[f] === teams[first])) return new Set([sides.has(PLAYER) ? PLAYER : first]);
+    return sides;
+  }
+
+  /**
    * A derelict station: a faction alone in its ring claims it (draining a rival's claim first); the
    * owner's shipyard trains and its gun platform fires.
    */
@@ -1474,8 +1490,9 @@ export class World {
       if (u.type !== 'harvester' && u.decoyMs === null && dist(u, d) <= DERELICT_RADIUS) present.add(u.faction);
     }
     if (d.owner >= 0 && !this.sides[d.owner].alive) this.loseDerelict(d);
-    if (present.size === 1) {
-      const f = [...present][0];
+    const sides = this.teamPresence(present, d.owner, d.capturer);
+    if (sides.size === 1) {
+      const f = [...sides][0];
       const step = dt / CLAIM_MS;
       if (d.capturer === f || d.capturer < 0) {
         d.capturer = f;
@@ -1868,14 +1885,15 @@ export class World {
     return best;
   }
 
-  /** The share of a shot that reaches a unit: a Halo Cruiser's shield lets through half, from friends in range. */
+  /** The share of a shot that reaches a unit: the strongest shield of friends in range (a Halo Cruiser's lets through half, the Solar flagship's 35%). */
   private shieldShare(target: Unit | Building) {
     if (target.kind !== 'unit') return 1;
+    let share = 1;
     for (const s of this.units) {
       const ability = this.abilityOf(s);
-      if (s.faction === target.faction && ability?.kind === 'shield' && dist(s, target) <= ability.range) return ability.share;
+      if (s.faction === target.faction && ability?.kind === 'shield' && dist(s, target) <= ability.range) share = Math.min(share, ability.share);
     }
-    return 1;
+    return share;
   }
 
   private radiusOf(e: Unit | Building) {
@@ -2182,7 +2200,9 @@ export class World {
     const keen = side.deal.goal === 'derelicts';
     if (this.elapsedMs < AI_CLAIM_MS || army.length < (keen ? AI_DEAL_CLAIM_ARMY : AI_CLAIM_ARMY)) return;
     const hub = this.hubOf(f)!;
-    const open = this.derelicts.filter((d) => d.owner !== f && (keen || dist(d, hub) <= AI_CLAIM_REACH)).sort((a, b) => dist(a, hub) - dist(b, hub));
+    // In a teams skirmish a teammate's station is left alone.
+    const teams = this.teams;
+    const open = this.derelicts.filter((d) => d.owner !== f && !(teams && d.owner >= 0 && teams[d.owner] === teams[f]) && (keen || dist(d, hub) <= AI_CLAIM_REACH)).sort((a, b) => dist(a, hub) - dist(b, hub));
     const target = open[0];
     const current = this.unit(side.claimer);
     if (current && current.faction === f) {
@@ -2388,12 +2408,13 @@ export class World {
     }
   }
 
-  /** A salvage yard (or a salvage flagship) pays its faction for each enemy unit destroyed within its range. */
+  /** A salvage yard (or a salvage flagship) pays its faction for each enemy unit destroyed within its range (a teammate's is no enemy). */
   private salvage(u: Unit) {
     if (u.decoyMs !== null) return;
+    const teams = this.teams;
     for (const e of [...this.buildings, ...this.units]) {
       const ability = this.abilityOf(e);
-      if ((e.kind === 'unit' ? e.hp > 0 : e.done) && e.faction !== u.faction && ability?.kind === 'salvage' && dist(e, u) <= ability.range) {
+      if ((e.kind === 'unit' ? e.hp > 0 : e.done) && e.faction !== u.faction && !(teams && teams[e.faction] === teams[u.faction]) && ability?.kind === 'salvage' && dist(e, u) <= ability.range) {
         this.sides[e.faction].crystal += ability.pay;
       }
     }
@@ -2425,8 +2446,9 @@ export class World {
       bc.capturer = -1;
       bc.capture = 0;
     }
-    if (present.size === 1) {
-      const f = [...present][0];
+    const sides = this.teamPresence(present, bc.owner, bc.capturer);
+    if (sides.size === 1) {
+      const f = [...sides][0];
       const step = dt / CAPTURE_MS;
       if (bc.capturer === f || bc.capturer < 0) {
         bc.capturer = f;
@@ -2636,7 +2658,8 @@ export class World {
 
   /** Whether a contract from the pool can be played in this battle as it stands. */
   private contractOpen(goal: Goal) {
-    const rivals = this.sides.filter((s) => s.index !== PLAYER && s.alive);
+    // The player's ally in a teams skirmish is no rival: its buildings can't be razed.
+    const rivals = this.sides.filter((s) => s.index !== PLAYER && !this.allyOfPlayer(s.index) && s.alive);
     if (goal === 'lattice') return rivals.some((s) => s.def.buildings.turret.ability?.kind === 'mines');
     if (goal === 'convoy') return !!this.convoyField();
     if (goal === 'derelicts') return this.derelicts.filter((d) => d.owner === PLAYER).length < 2;
@@ -2650,7 +2673,7 @@ export class World {
     return this.layout.nebulae.some((n) => {
       let mine = false;
       for (const u of this.units) {
-        if (u.type === 'harvester' || u.decoyMs !== null || dist(u, n) > n.r) continue;
+        if (u.type === 'harvester' || u.decoyMs !== null || this.allyOfPlayer(u.faction) || dist(u, n) > n.r) continue;
         if (u.faction !== PLAYER) return false;
         mine = true;
       }

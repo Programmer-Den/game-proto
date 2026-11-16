@@ -14,7 +14,8 @@ Mapmaker, in `games/mapmaker/`, Lanternkeep, in `games/lanternkeep/`, Space Wars
 `games/space-wars/`, Lane Brawl, in `games/lane-brawl/`, Colonizer, in `games/colonizer/`, Riftblade,
 in `games/riftblade/`, Scrapyard Titans, in `games/scrapyard-titans/`, Bramblecrest, in
 `games/bramblecrest/`, Ninefold, in `games/ninefold/`, Augury, in `games/augury/`, Mazewright, in
-`games/mazewright/`, and Stonemate, in `games/stonemate/`.
+`games/mazewright/`, Stonemate, in `games/stonemate/`, Burrow Brigade, in
+`games/burrow-brigade/`, and Shardlight, in `games/shardlight/`.
 
 Each game's guide for agents, to read before changing it:
 
@@ -45,6 +46,8 @@ Each game's guide for agents, to read before changing it:
 | Augury | [games/augury/AGENTS.md](games/augury/AGENTS.md) |
 | Mazewright | [games/mazewright/AGENTS.md](games/mazewright/AGENTS.md) |
 | Stonemate | [games/stonemate/AGENTS.md](games/stonemate/AGENTS.md) |
+| Burrow Brigade | [games/burrow-brigade/AGENTS.md](games/burrow-brigade/AGENTS.md) |
+| Shardlight | [games/shardlight/AGENTS.md](games/shardlight/AGENTS.md) |
 
 ## Feedback and issues
 
@@ -138,9 +141,10 @@ and tries to link it to the repo (the run summary says if the link has to be mad
   game's folder name (`<name>-...`), since every game shares the hub's origin and the hub's ⚙ on a
   card deletes a game's progress by that prefix (`shared/progress.ts`).
 - **Honour the hub's settings.** Every game calls `setupGame(game)` from `shared/setupGame.ts`
-  right after creating its `Phaser.Game`, which applies the frame cap, the FPS readout, reduced motion, full screen and the M key, which mutes, turns off the browser's right-click menu, and covers
+  right after creating its `Phaser.Game`, which applies the frame cap, the FPS readout, reduced motion, full screen (the F key) and the M key, which mutes, turns off the browser's right-click menu, and covers
   the page with the shared loading, start and pause screens (`shared/startScreen.ts`): the game's
-  scenes stand paused until Start is pressed, and the pause button, P or leaving the tab pause them. The corner row of
+  scenes stand paused until Start is pressed, and the pause button, P or leaving the tab pause them. F, M
+  and P are the shared keys, so a game never binds them to its own controls. The corner row of
   buttons (full screen and pause, `shared/corner.ts`) sits in the bottom left; a game whose own buttons
   sit there picks a free corner with `setupGame(game, { corner: 'top-right' })` (or `bottom-right`,
   `top-left`). A game
@@ -230,8 +234,8 @@ and tries to link it to the repo (the run summary says if the link has to be mad
 - **Time played comes for free too.** `setupGame` adds up the time the game runs on this device
   (`shared/playTime.ts`, under `hub-playtime`), not on its start or pause screen, nor with the tab
   hidden or the turn-phone hint up, and the hub shows it on the card, beside the starred games
-  (`shared/favourites.ts`, `hub-favourites`). Both stay on the device: `hub-` keys never go into a
-  progress file or code. Browser automation doesn't count it unless a test sets
+  (`shared/favourites.ts`, `hub-favourites`). Both stay on the device: no progress file or code carries
+  them (the every-game file and code carry only the `hub-settings` and `hub-recent` keys). Browser automation doesn't count it unless a test sets
   `window.countPlayTime`, so a game needs nothing for it.
 - **Fit every screen.** A game stays sharp and fills the screen from an upright phone to a 4K
   monitor by calling `setupScaling(game)` from `shared/scaling.ts` right after `setupGame(game)`

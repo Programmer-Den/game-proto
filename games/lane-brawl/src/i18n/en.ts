@@ -711,6 +711,7 @@ const en = {
   ladderUp: 'Ranked: {tier} {stars}, a star won',
   ladderDown: 'Ranked: {tier} {stars}, a star lost',
   ladderHold: 'Ranked: {tier} {stars}, no star to lose',
+  ladderTop: 'Ranked: {tier} {stars}, still at the top',
   ladderPromoted: 'Ranked: promoted to {tier}!',
   ladderDemoted: 'Ranked: dropped to {tier} {stars}',
   ladderSkin: '{line} New colours: {skin}.',

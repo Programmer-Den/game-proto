@@ -276,7 +276,9 @@ function startArena(s: GameState) {
 /** Two abilities for the shrine: one to give a tier of, one to raise by two. */
 function shrinePair(s: GameState) {
   const abilities = Object.keys(s.ranks).filter((id) => UPGRADES[id].kind !== 'gear');
-  const gains = abilities.filter((id) => s.ranks[id] <= BASE_TIER - 2);
+  // A skill a held fusion locks stops rising, here as everywhere else.
+  const locked = lockedOf(s);
+  const gains = abilities.filter((id) => s.ranks[id] <= BASE_TIER - 2 && !locked.has(id));
   if (abilities.length < 2 || !gains.length) return null;
   const gain = gains[Math.floor(rand() * gains.length)];
   const loses = abilities.filter((id) => id !== gain);

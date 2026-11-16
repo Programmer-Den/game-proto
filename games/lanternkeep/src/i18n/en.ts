@@ -227,7 +227,7 @@ const en = {
   harbourHeldGoal: 'The Harbour Festival was held: the nights go on.',
   setSail: 'Set sail',
   harbourFestivalTitle: 'The Harbour Festival!',
-  boonSub: '{n} nights kept by the sea. The harbour town gives the keep a boon,\nkept in this game and every game after, in both keeps.',
+  boonSub: '{n} nights kept by the sea. The harbour town gives the keep a boon,\nkept in this game and every game after, in every keep.',
   boonHint: 'Tap a boon to keep it. A later festival can swap it.',
   yourBoon: 'kept now',
   purseName: "Merchant's purse",

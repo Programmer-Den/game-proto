@@ -607,9 +607,9 @@ function rivalTurn(s: GameState): Placed['rival'] {
   r.last = { col, row, kind };
   const bonus = seasonal(s, kind, cellScore(s.grid, col, row));
   r.bonus += bonus;
-  const was = r.score;
   r.score = boardScore(s.grid, owns) + r.bonus;
-  return { col, row, kind, gained: r.score - was };
+  // Against the board as the player's tile left it, so the popup shows only the rival's own move.
+  return { col, row, kind, gained: boardScore(s.grid, owns) - before + bonus };
 }
 
 /**

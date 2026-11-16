@@ -299,7 +299,7 @@ seconds without a tap.
   `<id>Text`), and imports nothing else from the game, since the hub loads it for its trophy shelf.
   `main.ts` hands `trophies` to `setupGame`, which lists them on the start and pause screens.
   `check.ts` holds each trophy's condition on the `GameState` (`EARNED`: a wave cleared, a guard hired, a `STREAK` of 10, the Troll King's wave cleared, a relic set
-  complete, a hero retired, every skill learned (`offerable` empty), the siege lifted, a win at
+  complete (on the daily siege not counting its two starting relics, so a day whose two relics make a set gives no free trophy), a hero retired, every skill learned (`offerable` empty), the siege lifted, a win at
   Heat 3; Cloud of arrows is not there but awarded by `GameScene.loose` when a volley is loosed,
   since a long frame can land it within one tick) and `checkTrophies(state)`, which
   `GameScene.update` calls every frame after the tick;

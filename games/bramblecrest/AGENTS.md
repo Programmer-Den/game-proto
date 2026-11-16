@@ -128,7 +128,8 @@ Implemented today:
   that speed up as bulbs fall (`VOLLEY_MS`) and summoned slugs (`SUMMON_MS`, by difficulty). A bulb
   yanked down by the hookvine takes `BULB_HP` sword hits. Beating her clears the ring, gives a
   heart vessel, reveals a moonstone and opens the hall's top exit. She teaches the fight: waking,
-  she toasts `thornmotherHow` and holds her first bulb back for `HINT_MS`; then the `bulbUp` hint
+  she toasts `thornmotherHow` (a `hint`, once a page load, and not in the hourglass trial) and
+  then holds her first bulb back for `HINT_MS`; then the `bulbUp` hint
   when a bulb first glows, `bulbHigh` for a swing at a glowing bulb, `thornRing` for a swing at
   the ring, and `bulbDown` once one is pulled down.
 - The Bellwraith (`wraith`, `updateWraith`): a great bell that hovers after the knight

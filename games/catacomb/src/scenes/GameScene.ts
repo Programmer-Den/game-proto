@@ -48,6 +48,7 @@ import {
   removeCard,
   rest,
   restHeal,
+  rollOverRecords,
   setDepth,
   setOutFromLibrary,
   startDailyRun,
@@ -850,6 +851,7 @@ export class GameScene extends Phaser.Scene {
         (this.heroButtons[i].list[1] as Phaser.GameObjects.Text).setText(open ? t(h.name) : t('locked'));
         this.heroCaptions[i].setText(open ? t(h.text, { hp: h.hp }) : t(LOCKED[id] ?? 'locked'));
       });
+      rollOverRecords(s);
       const r = s.dailyRecord;
       // Once today's try is used (even left half way), the button shows its score instead.
       const daily = r.played ? t('dailyDone', { score: r.score ?? 0, best: r.best }) : t('dailyButton', { hero: t(HEROES[dailyHero()].name) });

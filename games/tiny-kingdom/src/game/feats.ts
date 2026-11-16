@@ -32,7 +32,8 @@ export const FEATS: Feat[] = [
   { id: 'lakeFarm', text: 'featLakeFarm', skin: 'spring', done: (s) => any(ownGrid(s), 'farm', (c, r) => near(ownGrid(s), c, r, SIDES, (x) => x === 'lake') >= 3) },
   { id: 'tallWatch', text: 'featTallWatch', skin: 'autumn', done: (s) => any(ownGrid(s), 'tower', (c, r) => cellParts(ownGrid(s), c, r).from.length >= 6) },
   { id: 'richManor', text: 'featRichManor', skin: 'heather', done: (s) => any(ownGrid(s), 'manor', (c, r) => near(ownGrid(s), c, r, SIDES, (x) => x === 'farm') >= 3) },
-  { id: 'quietTemple', text: 'featQuietTemple', skin: 'snow', done: (s) => any(ownGrid(s), 'temple', (c, r) => templeWorth(ownGrid(s), c, r) >= 4 && ownGrid(s).some((cells) => cells.includes('tower'))) },
+  // A temple's worth counts every tower on the island, the rival's included, as its score does.
+  { id: 'quietTemple', text: 'featQuietTemple', skin: 'snow', done: (s) => any(ownGrid(s), 'temple', (c, r) => templeWorth(s.grid, c, r) >= 4 && s.grid.some((cells) => cells.includes('tower'))) },
   {
     id: 'busyMarket',
     text: 'featBusyMarket',

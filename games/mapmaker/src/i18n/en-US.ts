@@ -9,6 +9,7 @@ const enUS: Partial<Translation<typeof en>> = {
   harbourTitle: 'The harbor',
   noHands: 'No hands at the harbor',
   backToHarbour: 'Back to the harbor',
+  rumourName: 'A rumor',
 };
 
 export default enUS;

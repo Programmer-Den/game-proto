@@ -4,7 +4,8 @@ import { t } from './i18n';
 /**
  * How long each game has been played on this device, in seconds per game folder, kept under one
  * `hub-` key so it never travels with a game's progress export, QR code or link
- * (`saveFile.ts` carries only keys with the game's prefix). Nothing is sent anywhere.
+ * (`saveFile.ts` carries only keys with the game's prefix, and the every-game file and code add only
+ * `hub-settings` and `hub-recent`). Nothing is sent anywhere.
  *
  * `setupGame` calls `trackPlayTime`, which adds up game time only while the game is actually
  * running: not on the start or pause screen, not with the tab hidden and not while the turn-phone

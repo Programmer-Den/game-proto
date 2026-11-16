@@ -78,7 +78,9 @@ also picks the squad leader whose active the run brings. Kills fill a lasting zo
   shared settings (the `hub-settings` key, see Hub settings below).
 - **Rough edges seen in the code:**
   - No camera shake.
-  - Each boss's moves cycle in a fixed order (each boss wave starts one further along).
+  - Each boss's moves cycle in a fixed order. Each boss wave starts one further along, but every
+    round has three moves and the three bosses take turns, so a boss always opens with the same
+    move: the Behemoth with a charge, the Brood Mother with a call, the Bloater with a spit.
   - A spitter stands still at its range until shot, so a wave can't end while one stands; it is
     an easy target once the soldier walks under it. Zombies steer to their lane's middle, inside
     `HERO.minX..HERO.maxX`, so none stops out of every rifle's reach.

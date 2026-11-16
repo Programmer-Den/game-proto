@@ -11,7 +11,7 @@ import { bakeYard, bedTexture, goodTexture, yardTexture } from '../art/town';
 import { craftsmanTexture, customerTexture } from '../art/townsfolk';
 import { signTexture } from '../art/ui';
 import { loadState } from '../game/save';
-import { tick, type Feedback } from '../game/sim';
+import { finishedBy, tick, type Feedback } from '../game/sim';
 import { FINE_SHARE, MAX_CARRY, SIGN_NAMES, UPGRADES, WEATHER, carryCapacity, gearLevel, harvestReach, isMarketDay, payBoost, payment, tipLeft, tipNow, walkSpeed, weatherFor, type GameState, type Upgrade } from '../game/state';
 import {
   BEDS,
@@ -1003,11 +1003,14 @@ export class ShopScene extends Phaser.Scene {
   }
 
   /**
-   * Sounds of what the shop does on its own: a station done, a sale, an order filled or walked off,
-   * the blight striking and a market crowd coming in; and the music, the rush's while a crowd waits.
+   * Sounds of what the shop does on its own: a station on screen done, a sale, an order filled or
+   * walked off (with the counter on screen), the blight striking and a market crowd coming in; and
+   * the music, the rush's while a crowd waits.
    */
   private createSound() {
-    let made = shopStations(this.def).map((s) => this.shop.stations[s.id].output.length);
+    // Counted as made rather than read off the pallet, which a pixie route empties in the same tick.
+    const finished = () => shopStations(this.def).map((s) => finishedBy(this.shop.stations[s.id]));
+    let made = finished();
     let sold = this.shop.sold;
     let orders = [...this.shop.orders];
     let blighted = this.shop.blight.length;
@@ -1024,13 +1027,18 @@ export class ShopScene extends Phaser.Scene {
         if (crowd) playMusic(RUSH_SONG, 'rush');
         else playMusic(SONG, 'calm');
       }
-      const now = shopStations(this.def).map((s) => this.shop.stations[s.id].output.length);
-      if (now.some((n, i) => n > made[i])) sfx('bubble');
+      // A station's pop and the counter's sounds only for what is on screen, as at the apothecary.
+      const view = this.cameras.main.worldView;
+      const seen = ({ x, y }: Point) => view.contains(x, y);
+      const stations = shopStations(this.def);
+      const now = finished();
+      if (now.some((n, i) => n > made[i] && seen(stationLayout(this.id, stations[i].id).at))) sfx('bubble');
       made = now;
       const gone = orders.filter((o) => !this.shop.orders.includes(o));
-      if (gone.some((o) => o.wants.length === 0)) sfx('served');
-      else if (this.shop.sold > sold) sfx('sell');
-      if (gone.some((o) => o.wants.length > 0)) sfx('hmph');
+      const atCounter = seen(counterLayout(this.id).counter);
+      if (atCounter && gone.some((o) => o.wants.length === 0)) sfx('served');
+      else if (atCounter && this.shop.sold > sold) sfx('sell');
+      if (atCounter && gone.some((o) => o.wants.length > 0)) sfx('hmph');
       orders = [...this.shop.orders];
       sold = this.shop.sold;
     });

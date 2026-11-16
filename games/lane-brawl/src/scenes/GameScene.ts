@@ -2735,7 +2735,7 @@ export class GameScene extends Phaser.Scene {
       const r = this.ladderResult;
       const tier = TIERS[r.after.tier];
       const vars = { tier: t(tier.name), stars: starText(r.after.stars) };
-      let text = r.moved === 'up' ? t('ladderPromoted', vars) : r.moved === 'down' ? t('ladderDemoted', vars) : won ? t('ladderUp', vars) : r.before.stars === 0 ? t('ladderHold', vars) : t('ladderDown', vars);
+      let text = r.moved === 'up' ? t('ladderPromoted', vars) : r.moved === 'down' ? t('ladderDemoted', vars) : won ? t(r.after.stars > r.before.stars ? 'ladderUp' : 'ladderTop', vars) : r.before.stars === 0 ? t('ladderHold', vars) : t('ladderDown', vars);
       const skin = SKINS.find((k) => k.id === r.skin);
       if (skin) text = t('ladderSkin', { line: text, skin: t(skin.name) });
       this.t('end-ladder', SCREEN.w / 2, p.y + 318, text, 12, tier.color, 'center', true);

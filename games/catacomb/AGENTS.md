@@ -116,7 +116,7 @@ File map (all under `src/` unless it starts with `shared/`):
   controls or the first round change.
 - `i18n.ts` and `i18n/`: the game's texts (`shared/i18n.ts`). `i18n/en.ts` is the British English
   source, `i18n/de.ts` the German (with `keepEnglish` for "Deck {n}") and `i18n/en-US.ts` the US
-  spellings, none yet. `t(key, vars)` shows a text in the hub's language; `TextKey` types the keys.
+  spellings (`Distill`). `t(key, vars)` shows a text in the hub's language; `TextKey` types the keys.
   The data tables (`CARDS`, `ENEMIES`, `HEROES`, `FLASKS`, `RELICS`, `EVENTS`, `ACT_FOES`,
   `DEPTH_RULES`) hold `TextKey`s, not texts; numbers go in through placeholders (`{n}`, `{hp}`).
   The sim writes its pops and `notice` through `t` too, so they come in the language of the moment
@@ -193,7 +193,7 @@ File map (all under `src/` unless it starts with `shared/`):
   `played` this turn, the cards `drawn` this fight, `wasVulnerable` and the `gold` its foes drop), `Pop`, `GameState` (with `hero`, `depth`,
   `bestDepth`, `heroWins`, `daily`, `dailyRecord`, `weekly`, `weeklyRecord`, `dailyScore`, `library`, `swaps`, `flasks` and `flaskWon`).
 - `game/sim.ts`: all rules. `newRun`, `chooseHero`, `canSwap`, `swapIn`, `swapBack`,
-  `setOutFromLibrary`, `backToHeroes`, `setDepth`, `canStartDaily`, `startDailyRun`, `dailyHero`,
+  `setOutFromLibrary`, `backToHeroes`, `setDepth`, `canStartDaily`, `rollOverRecords` (the hero panel reads the daily's and weekly's records afresh once the day or week turns), `startDailyRun`, `dailyHero`,
   `startWeeklyRun`, `weeklyHero`, `dailyScore` (the daily's and the weekly's), `lastAct`, `hexed`, `walkTo`, `playCard`, `canPlay`,
   `costOf` (a card's cost in hand, with Doubt), `canUseFlask`, `useFlask`, `heroHit` and `foeHit`
   (damage after relics, strength and statuses), `endTurn`, `takeReward`, `descend`, `rest`,

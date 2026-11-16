@@ -36,7 +36,7 @@ round the held button, while a brig steers round the island on a dotted course](
 | Tap a row at the harbor | Buy that upgrade, patch the hull, hire sailors or keep a prize as a consort |
 | Tap **Port** or **Starboard** under the harbor's ledger | Load that side with the next kind of shot |
 | Tap **Rum**, **Silk** or **Spice** on the harbor's trade row | Buy a crate of cargo to sell at the next port |
-| Tap **Flare** (foot of the screen) or F on a night wave | Light the whole sea for six seconds |
+| Tap **Flare** (foot of the screen) or R on a night wave | Light the whole sea for six seconds |
 | **Set sail**, or from wave 6 **Merchant lane** or **Hunter patrol** | Leave the harbor for the next wave, on the course chosen |
 | Tap **Scuttle the prize** (under the bounty) | Sink your newest prize for twice its loot |
 | Tap a ship and rows on the "Sunk!" panel, then **Sail again** | Choose the ship for the next run and spend the Admiralty's medals on starting upgrades |
@@ -254,7 +254,7 @@ On a phone, one thumb can hold a wheel while the other holds a fire control.
    moment, the flash of her guns; her hull bar, name and the arrows at the screen's edge show only
    while you can see her. Your crews only train their guns on a ship they can see (within your
    lanterns' light, lit by her own guns' flash, or under a flare), otherwise they fire straight
-   out; your mortar and your prizes hold their fire and don't hunt a ship you can't see. Three flares a night (the **Flare** button or F) each light the whole sea for six seconds.
+   out; your mortar and your prizes hold their fire and don't hunt a ship you can't see. Three flares a night (the **Flare** button or R) each light the whole sea for six seconds.
 
 ![From wave 6 the harbor charts two courses, and a brig prize can be kept as a consort](docs/screenshots/harbor-courses.webp)
 

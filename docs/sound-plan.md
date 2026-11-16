@@ -634,6 +634,23 @@ stings. The capture scenes play stone and rune effects: a step for each shuffle,
 sword chop, cracking, shattering and tumbling rubble, a rune bolt, a beam and a clash, and a low
 gong for check. A tap while the Stone AI is thinking plays the shared `refuse` buzz.
 
+### Burrow Brigade
+**Done.** See the Sound section of `games/burrow-brigade/AGENTS.md`: a bouncy march in G (`calm`) on
+the menu, a busier `battle` part during a match, and `win` and `lose` stings. Every weapon plays its
+own effects through the world's hooks: a launch hiss, a throw, three sizes of blast, bounces and a
+rubber boing, a fuse, mine beeps, bees, thunder and a zap, a sunbeam, digging, a quake rumble, a pop
+out of a Tunnel Hop, a paw whoosh and thud, a splash for anything in the water, and a tick in a turn's
+last five seconds. One sound per blast, rate-limited, so a cluster or a burst of firecrackers stays
+clear.
+
+### Shardlight
+**Done.** See the Sound section of `games/shardlight/AGENTS.md`: a chapel tune in F (`calm`) on the
+map, a brisker `battle` part in a window, a darker `boss` part for the rose windows, and `win` and
+`lose` stings. Effects are a bounce off the bar and the walls, a glassy shatter that climbs along a
+chain with a tinkle of shards, a crack for thick glass, a clang off lead, a chime as a bead drops,
+an arpeggio for a good bead and a sour slide for a bad one, a launch and a falling note for a lost
+orb.
+
 ### Ninefold
 Number-placement puzzle in nine art styles; calm, tidy, a music box on a desk.
 

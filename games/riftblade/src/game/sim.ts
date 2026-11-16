@@ -475,6 +475,11 @@ function hurtHero(s: GameState, dmg: number, x?: number, y?: number) {
     }
     return;
   }
+  // A dodge from a Guard specialisation (no knight's Foresight here, so only once one is held).
+  if (st.dodge > 0 && rand() < st.dodge) {
+    p.hurtMs = HURT_GRACE_MS / 2;
+    return;
+  }
   let taken = dmg * (1 - st.armour);
   if (squad) {
     taken *= hurtFactor(s);

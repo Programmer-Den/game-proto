@@ -711,6 +711,7 @@ const de: Translation<typeof en> = {
   ladderUp: 'Rangliste: {tier} {stars}, ein Stern gewonnen',
   ladderDown: 'Rangliste: {tier} {stars}, ein Stern verloren',
   ladderHold: 'Rangliste: {tier} {stars}, kein Stern zu verlieren',
+  ladderTop: 'Rangliste: {tier} {stars}, weiter an der Spitze',
   ladderPromoted: 'Rangliste: aufgestiegen nach {tier}!',
   ladderDemoted: 'Rangliste: abgestiegen nach {tier} {stars}',
   ladderSkin: '{line} Neue Farben: {skin}.',

@@ -201,6 +201,17 @@ export function startWeeklyRun(s: GameState) {
   return true;
 }
 
+/**
+ * Reads the daily's and the weekly's records afresh once the day or the week has turned since the
+ * run was made, so a hero panel left open past midnight offers the new day's try.
+ */
+export function rollOverRecords(s: GameState) {
+  if (s.phase !== 'hero') return;
+  if (s.dailyRecord.day !== today()) s.dailyRecord = loadDaily(DAILY);
+  const week = weekOf();
+  if (s.weeklyRecord.week !== week) s.weeklyRecord = loadWeekly(week);
+}
+
 /** Whether today's daily crypt can still be tried, on the hero panel. */
 export const canStartDaily = (s: GameState) => s.phase === 'hero' && !s.dailyRecord.played;
 

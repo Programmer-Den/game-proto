@@ -52,8 +52,10 @@ Implemented today:
   decree draws, merges (`canMerge` refuses a rival house; `housesCanMerge(ownGrid(s))`), feats,
   trades (`canTrade` wants a market of the player's own; a tap or hover on the rival's market reads
   `rivalOwns`) and clearing (`canClear` and `woodClearable` look for the camp on `ownGrid(s)`)
-  read `ownGrid(s)`, the board with rival cells as `'sea'`. `end` pays the rival its castle bonus.
-  `Placed.rival` carries its move for a plum popup and the `rival` knock; `refreshBoardMarks`
+  read `ownGrid(s)`, the board with rival cells as `'sea'` (only the temple feat, `quietTemple`, reads
+  the temple's worth and the tower on the whole board, as the temple's score does). `end` pays the rival its castle bonus.
+  `Placed.rival` carries its move for a plum popup (its `gained` against the board as the player's
+  change left it, so the popup shows only the rival's own tile) and the `rival` knock; `refreshBoardMarks`
   frames each rival cell in plum with a `bead-rival` and names its last tile (`rivalLast`), the
   hover marks a rival cell (`rivalOwns`), the panel's bottom line reads `rivalLine`, the game over
   `overRivalWin`/`Lose`/`Draw`, and a win adds to `tiny-kingdom-rivals`. A greedy player (the
@@ -167,9 +169,10 @@ Implemented today:
   hovered level's island and star scores, the island of the day (with today's best), a random
   island, and a keypad (plus keyboard digits, Backspace, Enter and Escape) for an island number
   from 1 to `ISLANDS`. Each starts a new kingdom through `start(island, kingdom)`, which passes a
-  `Kingdom` (`mode` `'random'`, `'code'`, `'daily'` or `'campaign'`, with `level` or `day`) to
-  `newGame`. The island button reads "Island N", "Daily N" or "Level N"; the panel's bottom line
-  shows the best score, today's best or the level's star scores.
+  `Kingdom` (`mode` `'random'`, `'code'`, `'daily'`, `'campaign'` or `'rival'`, with `level` or
+  `day`; `'puzzle'` comes from the puzzles card and `'chain'` from Sail on) to `newGame`. The island
+  button reads "Island N", "Daily N", "Level N", "Chain L: N", "Puzzle N" or the rival's island;
+  the panel's bottom line shows the best score, today's best or the level's star scores.
 - Island of the day: `dailyIsland(today())` hashes the local date (YYYY-MM-DD, from `new Date()`)
   to an island number, the same for every player that day. Its best is saved per day.
 - Campaign: `LEVELS` (eight islands, each with three star scores set from a greedy bot's final
@@ -483,7 +486,7 @@ State model (`GameState` in `src/game/state.ts`):
   the last placement, clearing or merge, or null) and `undoneIn` (the round the undo was last used
   in, 0 for none).
 - `place`, `clear` and `merge` all end in `settle`; order matters: snapshot, change the grid, add
-  the season's bonus, then the decree (pays once, the first time `decreeMarks(...).have >= need`),
+  the season's bonus, let the rival lord answer (`rivalTurn`, with a rival only), then the decree (pays once, the first time `decreeMarks(...).have >= need`),
   then loop rounds while `score >= goal` (each adds `ROUND_POUCH` and a gift due), then, if a
   round began, let the omen strike and recompute the score, draw a new decree and the next omen on
   the board as it stands and set `phase = 'gift'`, keep the snapshot only if no round began and no
@@ -743,7 +746,9 @@ valid island number. Hovering makes no sound. The game has no `?watch` mode.
 - `state.best` is updated when the game ends but only written to storage by the scene;
   `start` keeps the higher of the stored and current best and crowns, so they survive blocked
   storage. A finished daily's "today's best" (game over and the panel's bottom line) also counts
-  the kingdom's own score, since `saveDailyBest` fails silently then.
+  the kingdom's own score, since `saveDailyBest` fails silently then. The campaign's and puzzles'
+  best stars are kept in the scene too (`stars`, `puzzleBest`, merged with the saved ones by
+  `keepBest`), so a level won opens the next even then.
 - `previewPlacement` checks every building for a change, since a tower changes a temple up to 4
   cells away.
 - `chainMap` only cuts grass, after `islandMap`, so a chain island keeps its lakes, woods and

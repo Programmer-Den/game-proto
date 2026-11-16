@@ -80,7 +80,7 @@ Implemented today:
   faster, a feast multiplies the lantern pay, all-lit bonus and chains by `FEAST_PAY` (2, not the
   order), and a storm adds `STORM_GUSTS` (28 s and 16 s) through `gustsFor(night, kind)`.
 - Bats (LK2): `batsFor(night)` gives the dusk-left times they come (none on nights 1 and 2, one on
-  3 to 5, then two). A bat enters from a side edge at `BAT_Y`, flies at `BAT_SPEED` to the lit
+  3 to 5, then two; `startDusk` fits them to a short dusk with `fitTimes`, see the seasons below). A bat enters from a side edge at `BAT_Y`, flies at `BAT_SPEED` to the lit
   lantern with the most oil (re-targeting if that goes dark, leaving if none is lit) and snuffs
   it, unless a moth sits on it. `chase(s, id)` sends an idle moth (not a firefly if another is
   idle) with task `chase`; catching the bat makes it flee (`BAT_FLEE` times faster, off the top
@@ -97,7 +97,9 @@ Implemented today:
   (`'move'` or `'peril'` in practice, as the festival comes at night 10 or later, and every such
   nightfall offers curses).
 - Seven upgrades (five of three levels, Firefly of two, Jar of one), bought between nights, plus
-  the Cask and Hearth cards. Only the most nights kept, the best peril multiplier and the trophies persist.
+  the Cask and Hearth cards. A game itself is never saved; the most nights kept, the best peril
+  multiplier, the moths' flights, the boon, the village, the daily's record and the trophies persist
+  (see Persistence below).
 - Kinds of lantern (LK6): `LANTERN_KINDS` (`plain`, `beacon`, `candle`, `bell`), each with `oil`,
   `wick` and `pay` multipliers. `lanternKindsFor(night, count)` deals `min(LANTERN_KINDS_MAX,
   night - LANTERN_KINDS_NIGHT + 1)` special spots from `LANTERN_KINDS_NIGHT` (4), at indexes
@@ -212,7 +214,7 @@ Implemented today:
   aside in `run` and `state` becomes `dailyNight(dailyRand('lanternkeep'))`: a new game with
   `daily` set and `breeds` off, a night of `DAILY_NIGHTS` (6 to 12), a district of `MOVE_IDS`,
   a kind and two different curses, drawn from the seed in that order, `DAILY_LEVELS` bought and
-  a full cask, then `startDusk`; a popup names its curses. Its nightfall scores as usual, halves
+  a full cask, then `startDusk`; its lanterns burn `DAILY_BURN_MS` (Normal's 20 s) on every difficulty; a popup names its curses. Its nightfall scores as usual, halves
   the coins if the quota is missed and sets phase `'daily'` (no hearth, kept, kind, move or
   curse offer). The scene then calls `finishDaily` with `coins` (once) and shows the daily panel
   (`createDailyPanel`), whose "Back to my keep" (`backButton`, `leaveDaily`) gives back `run`, or
@@ -242,11 +244,14 @@ Implemented today:
   `rain` layer, and the night panel's last line says when a new season comes (`nextSeason`). Every
   event time (gusts, calls, bats, the owl, tides, ships) stays a time of dusk left, so a summer
   dusk starts with the 37 s call already due and a winter dusk has a quiet first stretch; only the
-  warned gusts, tides and avalanches go through `fitTimes` in `startDusk`, which moves a time whose
+  warned gusts, tides and avalanches (and the bats, which only come while a lantern is lit) go through
+  `fitTimes` in `startDusk`, which moves a time whose
   warning would begin before the dusk does so that the warning begins 1 s into it (a gust's 6 s,
   `GUST_LEAD_MS`, as on a spring dusk, since a gust is only warned while a lantern is lit), and keeps each
   later one at least its warning and 1 s after the one before (a summer dusk's gusts come at 25, 19 and 10 s left, a summer storm's at 25,
-  19, 13, 7 and 1, the harbour's first tide at 30 and the monastery's first avalanche at 27).
+  19, 13, 7 and 1, the harbour's first tide at 30 and the monastery's first avalanche at 27; a bat,
+  with no warning, comes at most 30 s left, 6 s in, and 1 s after the one before, so a summer dusk
+  from night 6 with three Restless bats has bats at 30, 29, 22, 16 and 8 s left).
 - A third keep (LK20): the Great Festival's panel (now `panel-move` size with three 180-wide
   buttons, `makeButton(..., narrow)` and the `btn-180` textures) has "Climb" (`climbButton`,
   `climb(s)`) right of "Set sail"; `sail` and `climb` exclude each other. It sets `climbed` and
@@ -284,7 +289,7 @@ Missing or rough:
 - The ten trophies are the most a game has, so the harbour, the traits, the daily, the village, the
   seasons and the monastery earn none.
 - The seasons only change the dusk's length, the kind draw and the moths' speed; the event times
-  stay as dusk left (only moved for a warning, `fitTimes`), so a summer dusk's first window call
+  stay as dusk left (only moved for a warning or a bat's lit lantern, `fitTimes`), so a summer dusk's first window call
   comes at once.
 - The Mountain Festival offers the harbour's boons rather than its own.
 - A moth's traits belong to its place in the jar, so a game with fewer Moths upgrades leaves the
@@ -356,7 +361,7 @@ File map (`src/`):
   `swapJar`, `tick`, `nextCost`, `buy`, `rekindle`, `topUp`, `carryOn`, `moveTo`, `takeCurse`,
   `endPeril` and `nextDusk`; for LK15 to LK17 `TIDE_*`, `SHIP_*`, `Tide`, `Ship`, `flooded`,
   `shipX`, `BOONS`, `BOON_*`, `caskMax`, `sail`, `takeBoon`, `Carried`, `TRAIT_*`, `SWIFT_SPEED`,
-  `FRUGAL_OIL`, `traitsOf`, `DAILY_NIGHTS`, `DAILY_LEVELS` and `dailyNight`; for LK18 to LK20
+  `FRUGAL_OIL`, `traitsOf`, `DAILY_NIGHTS`, `DAILY_LEVELS`, `DAILY_BURN_MS` and `dailyNight`; for LK18 to LK20
   `BUILDINGS`, `BUILDING_IDS`, `Village`, `hasBuilt`, `SMITHY_CASK_COST`, `caskCost`, `buildCost`,
   `build`, `SEASONS`, `SEASON_IDS`, `SEASON_NIGHTS`, `SUMMER_DUSK_MS`, `WINTER_DUSK_MS`,
   `SNOW_SPEED`, `SEASON_KIND`, `seasonOf`, `duskFor`, `AVALANCHE_*`, `DIG_MS`, `PILGRIM_PAY`,
@@ -501,11 +506,13 @@ seeded generator in `puppet.ts`. Popups, flares and sparks are cosmetic Phaser t
 
 - `src/main.ts` calls `setupGame(game)` right after creating the game (frame cap, FPS readout, reduced motion and full screen).
 - Difficulty scales one number: the burn time, `baseBurnMs()` = `byDifficulty(26_000, 20_000,
-  16_000)`. Keep Normal at 20 s: the playthrough expects it. The moth kinds, the queue, the gusts,
+  16_000)`. Keep Normal at 20 s: the playthrough expects it. A daily night burns
+  `DAILY_BURN_MS` (20 s, Normal's) on every difficulty (`stats`), so it is the same dusk for every player. The moth kinds, the queue, the gusts,
   the close-call share, the orders, the kinds of night, bats, chains and the festival are not
   scaled by difficulty.
 - `settings.reduceMotion` holds still: the moths' wing flaps (wings stay up) and bobbing, the
-  lantern glow's and flame's flicker, the pulse of the close-call rings, the spin of the gust's
+  lantern glow's and flame's flicker, the pulse of the close-call rings (the close call's flare is
+  skipped), the spin of the gust's
   dashed ring and the travelling gust along its wind curls, the rise of popups (they only fade)
   and the spread of the close-call sparks, the drift of the fog, the falling rain (drawn still),
   the bats' flapping and bobbing (a resting moth's wings stay folded either way), the owl's flapping and bobbing and the travelling dashes of its
@@ -682,7 +689,7 @@ scene. Under browser automation nothing plays, so the playthrough is unchanged.
 - **Retune the monastery**: `AVALANCHE_*`, `DIG_MS` and `PILGRIM_PAY` in `state.ts`, the bells in
   `BELL_TOWERS` and its spots in `DISTRICTS.monastery` (the avalanche takes the lowest row, so keep
   the path the lowest).
-- **Change the daily night**: `DAILY_NIGHTS`, `DAILY_LEVELS` and the draws in `dailyNight`; any
+- **Change the daily night**: `DAILY_NIGHTS`, `DAILY_LEVELS`, `DAILY_BURN_MS` and the draws in `dailyNight`; any
   change to what it draws changes every player's daily from that day on, which is fine.
 - **Retune the owl, the calls or the cask**: `OWL_*`, `owlsFor`, `CALL_*`, `callsFor` and
   `CASK_*` in `state.ts`.
@@ -691,7 +698,8 @@ scene. Under browser automation nothing plays, so the playthrough is unchanged.
   `GameScene.drawKind`.
 - **Add or change a chain**: a row in the district's `chains` in `places.ts` (lanterns side by side, in the order the cord
   runs; `payout` puts its popup between the first and last).
-- **Retune bats**: `batsFor`, `BAT_SPEED`, `BAT_FLEE` and `BAT_Y` in `state.ts`.
+- **Retune bats**: `batsFor`, `RESTLESS_BATS`, `BAT_SPEED`, `BAT_FLEE` and `BAT_Y` in `state.ts`; a bat
+  time over 30 s is moved by `fitTimes` in `startDusk` on a summer dusk.
 - **Move or add a lantern spot**: edit `LANTERN_SPOTS`; the castle's merlons skip spots on their
   own, but check the castle art still reads around it and the test's timing margins.
 - **Add a moth kind**: add it to `MOTH_KINDS` and `KIND_ORDER` in `state.ts` (its speed, wick and

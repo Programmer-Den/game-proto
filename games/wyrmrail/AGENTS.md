@@ -370,7 +370,7 @@ State model (`src/game/state.ts`):
   upgrade and the boons. A kind changes `trackCost` (`terrainCost`), `hazardKind` (the meadow and
   the canyon: washouts and rockfalls; the snowy valley: avalanches beside mountains and no
   washouts; the marsh: washouts and sinkholes on the bank tiles beside water), the hazard timer
-  (`CANYON_HAZARDS` in the canyon), the belly (`COLD_HUNGER` in the snow) and `addOrder`'s pay
+  (`CANYON_HAZARDS` in the canyon, from `newGame`'s first timer on), the belly (`COLD_HUNGER` in the snow) and `addOrder`'s pay
   (`LOCAL_PAY` for the kind's `LOCAL_GOODS`, sent by the villages that send fish in the meadow).
 - Moults (WR16): `nextRound` into a round of `MOULT_ROUNDS` sets `moultOffer` to up to
   `MOULT_OFFER` traits the wyrms lack (random), if any are left; `tick` waits while `choosing`, and

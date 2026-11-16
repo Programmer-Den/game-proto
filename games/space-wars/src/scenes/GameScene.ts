@@ -2980,6 +2980,7 @@ export class GameScene extends Phaser.Scene {
       } else {
         this.placing = b.key as Build;
         this.rallyMode = false;
+        this.jumpMode = false;
         this.message = '';
         ui('click');
       }

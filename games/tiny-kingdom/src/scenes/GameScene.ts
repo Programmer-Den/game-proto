@@ -144,6 +144,9 @@ const fit = <T extends Phaser.GameObjects.Text>(text: T, max: number) => text.se
 /** A count of a building, such as "3 farms", in the hub's language. */
 const count = (kind: Building, n: number) => t(INFO[kind].count, { n });
 
+/** The better of the saved stars and those kept here, level by level, so a level won still opens the next when storage is blocked. */
+const keepBest = (saved: number[], kept: number[]) => Array.from({ length: Math.max(saved.length, kept.length) }, (_, i) => Math.max(saved[i] ?? 0, kept[i] ?? 0));
+
 /** Where a tile button is on screen and which building it holds; read by the playthrough test. */
 export interface TileButton {
   kind: Building;
@@ -253,7 +256,7 @@ export class GameScene extends Phaser.Scene {
   private codeHint!: Phaser.GameObjects.Text;
   /** The island number typed on the islands card's keypad. */
   private code = '';
-  /** The campaign's best stars per level, loaded when the card opens. */
+  /** The campaign's best stars per level, loaded when the card opens and kept here too, so the next level opens when storage is blocked. */
   private stars: number[] = [];
   /** Rival lords beaten, kept here too so the count shows when storage is blocked. */
   private rivalWins = 0;
@@ -907,7 +910,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private openIslands() {
-    this.stars = loadStars();
+    this.stars = keepBest(loadStars(), this.stars);
     this.code = '';
     this.refreshCode();
     LEVELS.forEach((_, i) => {
@@ -971,7 +974,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private openPuzzles() {
-    this.puzzleBest = loadPuzzleStars();
+    this.puzzleBest = keepBest(loadPuzzleStars(), this.puzzleBest);
     PUZZLES.forEach((_, i) => {
       const p = this.puzzleParts[i];
       const open = levelOpen(i + 1, this.puzzleBest);
@@ -997,7 +1000,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private playPuzzle(n: number) {
-    if (!levelOpen(n, loadPuzzleStars())) return;
+    if (!levelOpen(n, keepBest(loadPuzzleStars(), this.puzzleBest))) return;
     this.start(PUZZLES[n - 1].island, { mode: 'puzzle', puzzle: n });
   }
 
@@ -1010,7 +1013,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private playLevel(level: number) {
-    if (!levelOpen(level, loadStars())) return;
+    if (!levelOpen(level, keepBest(loadStars(), this.stars))) return;
     this.start(LEVELS[level - 1].island, { mode: 'campaign', level });
   }
 
@@ -1119,13 +1122,15 @@ export class GameScene extends Phaser.Scene {
     saveBest(s.best);
     if (s.mode === 'daily' && s.score > loadDailyBest(s.day)) saveDailyBest(s.day, s.score);
     if (s.mode === 'campaign') {
-      const stars = loadStars();
+      const stars = keepBest(loadStars(), this.stars);
       stars[s.level - 1] = Math.max(stars[s.level - 1] ?? 0, starsFor(s.level, s.score));
+      this.stars = stars;
       saveStars(stars);
     }
     if (s.mode === 'puzzle') {
-      const stars = loadPuzzleStars();
+      const stars = keepBest(loadPuzzleStars(), this.puzzleBest);
       stars[s.puzzle - 1] = Math.max(stars[s.puzzle - 1] ?? 0, puzzleStarsFor(s.puzzle, s.score));
+      this.puzzleBest = stars;
       savePuzzleStars(stars);
     }
     if (s.rival && s.score > s.rival.score) {
@@ -1310,7 +1315,7 @@ export class GameScene extends Phaser.Scene {
     g.lineStyle(3.5, ok && kind ? YELLOW : CORAL, 1).strokeRoundedRect(x + 1, y + 1, GRID.cell * size - 2, GRID.cell * size - 4, 8);
     if (!this.preview || !kind) return;
     if (isWonder(kind)) this.ghost.setTexture(wonderKey(kind)).setOrigin(WONDER_ORIGIN.x, WONDER_ORIGIN.y).setPosition(cx, cy).setAlpha(0.6);
-    else if (kind === 'farm' || kind === 'road') this.ghost.setTexture(`tile-${kind}`).setOrigin(0.5).setPosition(cx, cy).setAlpha(0.65);
+    else if (kind === 'farm' || kind === 'road') this.ghost.setTexture(tileKey(kind, 0, 0)).setOrigin(0.5).setPosition(cx, cy).setAlpha(0.65);
     else this.ghost.setTexture(`prop-${kind}`).setOrigin(PROP_ORIGIN.x, PROP_ORIGIN.y).setPosition(cx, cy).setAlpha(0.6);
     this.ghost.setVisible(true);
 

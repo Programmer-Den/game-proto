@@ -505,9 +505,9 @@ hub's card:
 | Hired hands | Bronze | Hiring a guard |
 | On a roll | Silver | A kill streak of 10 |
 | Kingslayer | Silver | Clearing the Troll King's wave |
-| Matched pair | Silver | Holding every relic of a set |
+| Matched pair | Silver | Holding every relic of a set (the daily siege's starting relics don't count) |
 | A hero remembered (hidden) | Silver | Retiring a hero for a legacy |
-| Master ranger | Gold | Learning every skill |
+| Skill master | Gold | Learning every skill |
 | Siege lifted | Gold | Clearing wave 30 |
 | Through the fire (hidden) | Gold | Lifting the siege at Heat 3 |
 

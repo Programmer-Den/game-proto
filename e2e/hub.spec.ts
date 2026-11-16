@@ -29,10 +29,12 @@ const GAMES = [
   { name: 'Augury', path: '/games/augury/' },
   { name: 'Mazewright', path: '/games/mazewright/' },
   { name: 'Stonemate', path: '/games/stonemate/' },
+  { name: 'Burrow Brigade', path: '/games/burrow-brigade/' },
+  { name: 'Shardlight', path: '/games/shardlight/' },
 ];
 
 // The games with a Watch AI mode (`?watch`, see shared/watch.ts); there is no hub link to it.
-const WATCH = ['/games/colonizer/', '/games/space-wars/', '/games/lane-brawl/', '/games/scrapyard-titans/'];
+const WATCH = ['/games/colonizer/', '/games/space-wars/', '/games/lane-brawl/', '/games/scrapyard-titans/', '/games/burrow-brigade/'];
 
 // Every page links a favicon that loads.
 async function expectFavicon(page: Page) {
@@ -318,6 +320,14 @@ test('games have start and pause screens', async ({ page }, testInfo) => {
   await expect(page.locator('.game-start-button')).toBeHidden();
   expect(await running(), 'paused while reading How to play').toBe(false);
   testInfo.attach('how to play', { body: await page.screenshot({ path: testInfo.outputPath('how-to-play.png') }), contentType: 'image/png' });
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.game-start-button')).toBeVisible();
+  // Enter on a button reached with Tab presses that button rather than Start.
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: 'How to play' })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('heading', { name: 'How to play Apothecary' })).toBeVisible();
+  expect(await running(), 'Enter on How to play does not start the game').toBe(false);
   await page.keyboard.press('Escape');
   await expect(page.locator('.game-start-button')).toBeVisible();
 
