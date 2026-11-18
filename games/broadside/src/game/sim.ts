@@ -25,6 +25,7 @@ import {
   CHARGE_MS,
   CREW_TO_BOARD,
   crewPace,
+  crewShare,
   FORT,
   GRAPE_KILLS,
   hasPerk,
@@ -59,6 +60,9 @@ import { DIVE_MS, FIRST_DIVE_MS, HEAD_MS, isBeast, type BeastKind, SURFACE_AT, T
 import { FLARE_MS, FLARES, FLASH_MS, isNightWave, NIGHT_SIGHT } from './night';
 import { cargoPrice, cargoSale, HOLD_MAX, RAIDER_BRIG_WAVE, raidersFor, type CargoId } from './trade';
 import { costOf, HIRE, REPAIR_COST, type UpgradeId } from './upgrades';
+import { GUNS_PACE, manStation, pumpRate, stationFactor, type Station } from './stations';
+import { nextFleetOrder, SCREEN_R } from './fleet';
+import { IRON_BOW_COST, RAM_DAMAGE, RAM_MIN_SPEED, RAM_MS, RAM_RECOIL } from './ram';
 import { fortsFor, HAVEN_WAVE, hpScale, inReaches, reachWave, REACHES_WAVES, TEMPEST_WAVE, waveShips } from './waves';
 
 /** Time between enemy ships coming over the horizon. */
@@ -136,6 +140,7 @@ export function tick(s: GameState, dt: number) {
     ship.slowMs = Math.max(0, ship.slowMs - dt);
     ship.jamMs = Math.max(0, ship.jamMs - dt);
     ship.flashMs = Math.max(0, ship.flashMs - dt);
+    ship.ramMs = Math.max(0, ship.ramMs - dt);
   }
   for (const fort of s.forts) fort.hitMs = Math.max(0, fort.hitMs - dt);
   if (s.phase === 'harbor' || s.phase === 'over' || s.phase === 'won') return;
@@ -161,11 +166,13 @@ export function tick(s: GameState, dt: number) {
   }
 
   s.waveMs += dt;
+  pump(s, dt);
   weather(s, dt);
   spawn(s, dt);
   for (const e of s.enemies) sailEnemy(s, e, dt);
   for (const e of s.escorts) sailEscort(s, e, dt);
   escape(s, dt);
+  ramming(s);
   separate(s);
   // A sea beast lies under the sea, out of reach of beaches and reefs.
   for (const ship of [s.player, ...s.enemies, ...s.escorts]) {
@@ -529,12 +536,89 @@ function sailEscort(s: GameState, e: Ship, dt: number) {
   if (s.convoy?.id === e.id) return sailConvoy(s, e, s.convoy.island, dt);
   const type = ENEMIES[e.kind as keyof typeof ENEMIES];
   // A merchantman taken as a prize has no guns to fight with, so she only keeps station.
-  const foe = type.role === 'merchant' ? null : nearestFoe(s, s.player, ESCORT_HUNT);
+  const armed = type.role !== 'merchant';
+  // Screening, she keeps by the convoy instead of the player.
+  const convoy = s.fleetOrder === 'screen' ? convoyShip(s) : undefined;
+  const ward = convoy ?? s.player;
+  const foe =
+    !armed || s.fleetOrder === 'follow' ? null
+    : s.fleetOrder === 'attack' ? fleetTarget(s)
+    : convoy ? nearestFoe(s, convoy, SCREEN_R)
+    : nearestFoe(s, s.player, ESCORT_HUNT);
   if (foe) return captain(s, e, foe, dt);
   e.detour = null;
-  const want = distance(e, s.player) > ESCORT_STATION ? bearing(e, s.player) : s.player.heading;
+  const want = distance(e, ward) > ESCORT_STATION ? bearing(e, ward) : ward.heading;
   const shorten = shoalAhead(e, e.heading) ? SHORTEN_SAIL : 1;
   steer(e, fend(e, want), type.turn, speedOf(s, e) * shorten, dt);
+}
+
+/**
+ * The enemy the prizes go after on the `attack` order: the one the player's last broadside was
+ * aimed at while it is afloat and seen, else the one nearest the player. Null with none in sight.
+ */
+export function fleetTarget(s: GameState) {
+  const aimed = s.enemies.find((e) => e.id === s.target);
+  if (aimed && afloat(aimed) && seen(s, aimed)) return aimed;
+  return nearestFoe(s, s.player, Infinity);
+}
+
+/** Tells the prizes and consorts the next order (`screen` only while a convoy sails); false when there are none to tell. */
+export function orderFleet(s: GameState) {
+  if (s.phase !== 'fighting' && s.phase !== 'break') return false;
+  if (!s.escorts.some((e) => e.id !== s.convoy?.id)) return false;
+  s.fleetOrder = nextFleetOrder(s.fleetOrder, !!convoyShip(s));
+  return true;
+}
+
+/** Moves a share of the crew to `station` (see `manStation`); false once it holds all it can. */
+export function man(s: GameState, station: Station) {
+  if (s.phase === 'over' || s.phase === 'won') return false;
+  const next = manStation(s.stations, station);
+  if (!next) return false;
+  s.stations = next;
+  return true;
+}
+
+/** The pumps mend the player's hull while fighting, with more than an even share of hands on them. */
+function pump(s: GameState, dt: number) {
+  const p = s.player;
+  const rate = pumpRate(s.stations.pumps, crewShare(p));
+  if (rate <= 0 || p.hp <= 0) return;
+  p.hp = Math.min(p.maxHp, p.hp + (rate * dt) / 1000);
+}
+
+/**
+ * With the iron bow, the player rams any ship she sails into: the faster she closes on her, the
+ * harder (`RAM_DAMAGE` a pixel a second, from `RAM_MIN_SPEED`), and her own hull takes only
+ * `RAM_RECOIL` of it. Each ship can be rammed once every `RAM_MS`. A sea beast can't be rammed, and
+ * a fireship blows up on touching as ever (`ram`).
+ */
+function ramming(s: GameState) {
+  if (!s.ironBow) return;
+  const p = s.player;
+  const speed = stats(s).speed * windSpeed(s.wind, p.heading);
+  for (const e of s.enemies) {
+    if (e.hp <= 0 || e.ramMs > 0 || isBeast(e.kind) || e.kind === 'fireship') continue;
+    if (distance(p, e) >= radiusOf(p) + radiusOf(e) + 2) continue;
+    const b = bearing(p, e);
+    const closing = speed * Math.cos(p.heading - b) - speedOf(s, e) * Math.cos(e.heading - b);
+    if (closing < RAM_MIN_SPEED) continue;
+    const damage = RAM_DAMAGE * closing;
+    hurt(s, e, damage);
+    hurt(s, p, damage * RAM_RECOIL);
+    e.ramMs = RAM_MS;
+    s.rams++;
+    const { dx, dy } = offset(p, e);
+    effect(s, 'ram', wrapCoord(p.x + dx / 2, WORLD.w), wrapCoord(p.y + dy / 2, WORLD.h), 700, { heading: p.heading });
+  }
+}
+
+/** Buys the iron bow at the harbor, once; false if it is already fitted or can't be afforded. */
+export function buyBow(s: GameState) {
+  if (s.phase !== 'harbor' || s.ironBow || s.gold < IRON_BOW_COST) return false;
+  s.gold -= IRON_BOW_COST;
+  s.ironBow = true;
+  return true;
 }
 
 /** The convoy sails for her island, round any other island in the way, and never fends off her own. */
@@ -719,7 +803,8 @@ function aimBroadsides(s: GameState, dt: number) {
   const player = s.player;
   for (const side of SIDES) {
     // Enemy grapeshot jams her reload just as the player's jams theirs.
-    player.reload[side] = Math.max(0, player.reload[side] - reloadStep(player, dt));
+    // More hands on the guns reload faster, fewer slower (exactly the old pace at an even split).
+    player.reload[side] = Math.max(0, player.reload[side] - reloadStep(player, dt * stationFactor(s.stations.guns, crewShare(player), GUNS_PACE)));
     const loaded = player.reload[side] <= 0;
     if (s.aim[side]) {
       if (loaded) s.charge[side] = Math.min(1, (s.charge[side] ?? 0) + dt / CHARGE_MS);
@@ -750,6 +835,8 @@ function firePlayer(s: GameState, side: Side, charge: number) {
   const target = s.enemies
     .filter((e) => afloat(e) && seen(s, e) && distance(player, e) < inReach + radiusOf(e) && Math.abs(wrap(bearing(player, e) - out)) < p.arc + TRAIN_SLACK)
     .sort((a, b) => distance(player, a) - distance(player, b))[0];
+  // The prizes told to attack go after what the player aims at.
+  if (target) s.target = target.id;
   if (hull.mortarSide === side) {
     // The shell comes down where the target will be (as far round as the mortar trains), or straight out at the reach.
     const shell = (hull.shell ?? 0) * (1 + CHARGE_DAMAGE * charge);
@@ -1453,6 +1540,7 @@ export function setSail(s: GameState, course: CourseId | null = null) {
   s.waveMs = 0;
   s.waveSunk = [];
   s.mortarMs = perkValue(s, 'mortar', OWN_MORTAR.reloadMs, 0);
+  s.target = null;
   s.forts = [];
   // Forts on islands drawn at random, never two on one. Uses random() once per fort.
   const islands = ISLANDS.map((_, i) => i);

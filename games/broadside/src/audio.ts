@@ -175,6 +175,8 @@ export const sfx = sounds({
   roar: { wave: 'sawtooth', freq: 70, to: 46, length: 0.8, attack: 0.12, volume: 0.32, gap: 800 },
   /** A flare going up on a night wave: a hiss rising to a pop. */
   flare: { wave: 'noise', freq: 1800, to: 5200, length: 0.5, attack: 0.05, volume: 0.22, gap: 400 },
+  /** The iron bow ramming a ship: a splintering crunch. */
+  ram: { wave: 'sawtooth', freq: 160, to: 50, length: 0.32, attack: 0.01, volume: 0.42, vary: 0.08, gap: 250 },
   /** The helm put over: a creak of the tiller ropes. */
   creak: { wave: 'sawtooth', freq: 210, to: 160, length: 0.14, attack: 0.03, volume: 0.1, vary: 0.1, gap: 350 },
 });
