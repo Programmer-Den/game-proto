@@ -1880,6 +1880,8 @@ export function kill(s: GameState, e: Enemy) {
     if (back > 0) heal(s, back);
   }
   if (e.kind === 'boss') {
+    // A hero who fell earlier in this step has lost, whatever brings the boss down after.
+    if (s.phase !== 'run') return;
     // The planet is cleared; the star map (or victory) comes next frame.
     s.phase = 'cleared';
     const credits = BOSSES[PLANETS[s.planet].boss].credits;

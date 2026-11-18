@@ -8,7 +8,7 @@ import type { HeroId, HeroScheme } from './heroes';
 
 /**
  * The XP each level starts at (level 1 at 0, up to `MAX_MASTERY`), what each level opens, the
- * perks' sizes and the XP a run gives: per boss beaten, per `perKills` kills and for a win.
+ * perks' sizes and the XP a run gives: per boss beaten, `perKills` per 100 kills and for a win.
  */
 export const MASTERY = {
   levels: [0, 250, 700, 1400, 2400],
@@ -32,7 +32,7 @@ export const masteryNext = (xp = 0) => MASTERY.levels.find((n) => xp < n) ?? nul
 
 /** The XP a finished run gives: per boss beaten, per so many kills and for a won crusade. */
 export const masteryXp = (bosses: number, kills: number, won: boolean) =>
-  MASTERY.perBoss * Math.max(0, bosses) + Math.floor(Math.max(0, kills) / MASTERY.perKills) + (won ? MASTERY.win : 0);
+  MASTERY.perBoss * Math.max(0, bosses) + MASTERY.perKills * Math.floor(Math.max(0, kills) / 100) + (won ? MASTERY.win : 0);
 
 /** The pool skill each hero starts with from `MASTERY.weaponAt` on (one its pools can draw). */
 export const MASTERY_WEAPON: Record<HeroId, string> = {
