@@ -145,6 +145,26 @@ and hints, and **Peril** makes a loss cost two hearts (Memory Echo only offers P
 
 ![An omen on offer: Tempt Haste](docs/screenshots/omen.webp)
 
+**Dares**: in Endless and Solo Run, every solve lays the next card face up beside a dare, a puzzle a
+level higher (at Oracle, the same level on three quarters of the time) worth half again the points.
+Tap the dare to take it; a tap anywhere else, or five seconds, takes the next card. No dare is
+offered when a boss or a rematch is next.
+
+![After a solve: the next card or a dare a level up](docs/screenshots/dare.webp)
+
+**Rematches**: in Endless and Solo Run, a lost, skipped or timed-out puzzle (not a boss) shows its
+answer on the board, and comes back a few cards later as a rematch, the same puzzle, worth double.
+A rematch lost doesn't come back again. Memory Echo has no answer to show, but still comes back.
+
+![A skipped Cross Sums showing its answer, its rematch queued](docs/screenshots/rematch.webp)
+
+**Challenge codes**: a finished Draft Run or Solo Run gives a code like `SB-4N4PRB-6W` and a button
+that copies a link to it. Whoever opens the link (or types the code under Enter a code on the menu)
+plays a run dealt the same cards, with the score to beat in the side panel and the end card saying
+whether they beat it. Hearts still follow each player's own difficulty.
+
+![A challenge from a link, with the score to beat](docs/screenshots/challenge.webp)
+
 **Trophies**: ten to earn, from the first solve to a boss beaten under an omen, listed behind the
 Trophies button on the start and pause screens.
 
@@ -166,7 +186,9 @@ each level, and the best score of each mode.
 - `src/game/kinds.ts`: the puzzle kinds, their skills and the `PuzzleDef` they share.
 - `src/game/journey.ts`, `src/game/weekly.ts`: the journey's steps and stars, the weekly league's
   week and ranks.
-- `src/game/run.ts`: the nine modes: dealing, hearts, hints, clocks, points, drafts and relics.
+- `src/game/run.ts`: the nine modes: dealing, hearts, hints, clocks, points, drafts and relics,
+  dares and rematches.
+- `src/game/challenge.ts`: challenge codes and links for Draft and Solo Runs.
 - `src/game/progress.ts`, `src/game/save.ts`: the records, mastery, trials and the daily ghost, and
   their save.
 - `src/scenes/GameScene.ts`: the menu, journey map, practice and solo run pickers, records and the run screen.
