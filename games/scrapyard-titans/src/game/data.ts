@@ -391,6 +391,36 @@ export const SKILLS: Record<SkillId, SkillDef> = {
 };
 
 /**
+ * Commander overdrives (ST7): a second active a side charges during a fight by dealing damage
+ * (`Battle.overdrive`), once per fight. Each commander's comes from its skill (`OVERDRIVE_OF`).
+ */
+export type OverdriveId = 'shieldWave' | 'empFront' | 'repairBurst';
+
+export const OVERDRIVE = {
+  /** The share of the enemy side's starting health a side has to deal to fill its charge. */
+  fill: 0.4,
+  /** Shield wave: every ally gets this share of its health as a shield, for `seconds`. */
+  shieldWave: { share: 0.25, seconds: 5 },
+  /** EMP on the front row: the enemies nearest your half lose their charge, are stunned and hurt. */
+  empFront: { stunS: 2, damage: 120 },
+  /** Repair burst: every ally gets this share of its health back. */
+  repairBurst: { share: 0.45 },
+};
+
+export const OVERDRIVES: Record<OverdriveId, { name: TextKey; text: TextKey; color: number }> = {
+  shieldWave: { name: 'shieldWaveName', text: 'shieldWaveText', color: 0x7cf3ff },
+  empFront: { name: 'empFrontName', text: 'empFrontText', color: 0x9b5cff },
+  repairBurst: { name: 'repairBurstName', text: 'repairBurstText', color: 0x4ccf6a },
+};
+
+/** Which overdrive a commander has, by its skill: a defensive one for the attacking skills and the other way round. */
+export const OVERDRIVE_OF: Record<SkillId, OverdriveId> = {
+  overclock: 'shieldWave', surge: 'shieldWave', rally: 'shieldWave',
+  zap: 'repairBurst', emp: 'repairBurst',
+  bulwark: 'empFront', mend: 'empFront', airstrike: 'empFront',
+};
+
+/**
  * Deeds a commander's unlock asks for, saved once done (`progress.ts`): finish in the top four, a
  * robot at three stars, a won fight with six robots of one origin, level 9, a won match.
  */
@@ -628,6 +658,44 @@ export function stageDamage(stage: number) {
   return Math.min(3 + Math.max(0, stage - 2) * 3, 15);
 }
 export const SURVIVOR_DAMAGE = [0, 1, 1, 2, 2, 3];
+
+// ---------------------------------------------------------------- stage events and finals
+
+/**
+ * Stage events (ST8): from stage 2 on, each stage draws one that changes every fight in it
+ * (`Battle`), shown in the top bar during planning. Stage 1 has none, so the first round stays as it is.
+ */
+export type StageEventId = 'scrapStorm' | 'magnet' | 'chargedAir' | 'rustRain' | 'liveWires';
+
+export const STAGE_EVENT = {
+  /** The first stage that draws an event. */
+  fromStage: 2,
+  /** Scrap storm: ranged robots attack this much slower. */
+  scrapStorm: { slow: 0.25 },
+  /** Magnet: as the fight starts (its first step), every robot is pulled a tile toward the middle columns. */
+  magnet: { atS: 0 },
+  /** Charged air: every robot starts with this share of its charge. */
+  chargedAir: { share: 0.5 },
+  /** Rust rain: every robot's armour is cut by this share. */
+  rustRain: { cut: 0.4 },
+  /** Live wires: overdrives charge this many times as fast. */
+  liveWires: { rate: 2 },
+};
+
+export const STAGE_EVENTS: Record<StageEventId, { name: TextKey; text: TextKey }> = {
+  scrapStorm: { name: 'scrapStormName', text: 'scrapStormText' },
+  magnet: { name: 'magnetEventName', text: 'magnetEventText' },
+  chargedAir: { name: 'chargedAirName', text: 'chargedAirText' },
+  rustRain: { name: 'rustRainName', text: 'rustRainText' },
+  liveWires: { name: 'liveWiresName', text: 'liveWiresText' },
+};
+
+/**
+ * Finals (ST9): when two commanders are left (not in duo mode), they play a best of three, with a
+ * plan phase between fights and no health lost. A draw is played again; after `maxFights` the
+ * one with more health wins.
+ */
+export const FINALS = { wins: 2, maxFights: 5 };
 
 // ---------------------------------------------------------------- rank ladder
 

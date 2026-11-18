@@ -76,6 +76,8 @@ export const BUTTONS = {
   fight: { x: 800, y: 440, w: 150, h: 48 },
   speed: { x: 800, y: 496, w: 72, h: 30 },
   skill: { x: 800, y: 440, w: 150, h: 48 },
+  /** Right of Speed during a fight: the commander's overdrive and its charge. */
+  overdrive: { x: 878, y: 496, w: 72, h: 30 },
   /** Right of the bench: keeps the shop for the next round. */
   lock: { x: 736, y: 380, w: 62, h: 26 },
   /** Left of the bench in duo mode: pass the selected robot, or give gold, to the partner. */
@@ -120,7 +122,7 @@ export function placeLayout(w: number, h: number, fx: number, fy: number) {
   SELL_ZONE.x = SHOP.x0;
   SELL_ZONE.y = SHOP.y;
   for (const k of ['reroll', 'xp', 'sell'] as const) move(BUTTONS[k], D.BUTTONS[k], 0, bottom);
-  for (const k of ['fight', 'speed', 'skill'] as const) move(BUTTONS[k], D.BUTTONS[k], right, bottom);
+  for (const k of ['fight', 'speed', 'skill', 'overdrive'] as const) move(BUTTONS[k], D.BUTTONS[k], right, bottom);
   move(BUTTONS.lock, D.BUTTONS.lock, fx, fy);
   move(BUTTONS.pass, D.BUTTONS.pass, fx, fy);
   move(LEFT_BOTTOM, D.LEFT_BOTTOM, 0, bottom);

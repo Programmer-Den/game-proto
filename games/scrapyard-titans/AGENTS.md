@@ -161,6 +161,30 @@ Implemented today:
   The partner plans in `beginPlan` and again in `goFight` with what it got. The players list joins
   each team with a bar and tags the partner; the result banner adds the partner's outcome
   (`Match.result.partner`).
+- Commander overdrives (ST7, `OVERDRIVE`, `OVERDRIVES`, `OVERDRIVE_OF` in `data.ts`): each commander's
+  skill picks one of three (`OverdriveId`: `shieldWave`, `empFront`, `repairBurst`), handed to the fight
+  as `SideSpec.overdrive` (null for monsters). `Battle.hurt` fills `Battle.charge[team]` (0 to 1) with
+  the damage a side deals, scaled so `OVERDRIVE.fill` of the other side's starting health fills it;
+  `useOverdrive(team)` fires it once a fight when `overdriveReady`, pushing an `overdrive` event with
+  its `targets`. The scene's `BUTTONS.overdrive` (right of Speed) shows the charge and fires it on a
+  tap or V (`doOverdrive`); the rival fires its own as soon as it is full (in `tick`, and seat 0 too
+  under `?watch`), and `runToEnd` fires both. The menu names each commander's overdrive under its
+  skill. The HUD redraws as the charge passes each twentieth (`chargeShown`).
+- Stage events (ST8, `STAGE_EVENT`, `STAGE_EVENTS`): from stage `fromStage` (2) `startPlan` draws
+  `Match.stageEvent` once per stage (`Match.eventStage`), never the last stage's again, through
+  `rand` so the daily repeats; stage 1 has none, so the first round is untouched. `startFight` passes it
+  to every `Battle` (fourth argument): `scrapStorm` slows ranged attacks in `act`, `magnet` pulls every
+  robot a tile toward the middle columns on the first step (`magnetPull`), `chargedAir` adds charge in
+  `build`, `rustRain` cuts every unit's armour in the constructor and `liveWires` speeds the
+  overdrive charge in `hurt`. The scene shows it at the top bar's right end (`eventText`) and calls a
+  new one out in `beginPlan` (with the `stageEvent` sound).
+- Finals (ST9, `FINALS`, `Match.finals`, `Finals`): when `knockOuts` leaves exactly two seats (never in
+  duo mode), `endFight` starts the finals. From then `advance` makes every round a `pvp` round in the
+  same stage, `settle` takes no health, and `settleFinals` counts wins: the first to `FINALS.wins`
+  places 1st and the other 2nd (out, so `matchOver` ends the match); draws replay, and after
+  `maxFights` the one with more wins, then more health, takes it. The top bar reads `Finals a–b`
+  (`finalsKind`), the players list draws a pip per win, the result banner adds the score and
+  `beginPlan` calls the finals out.
 - Progress (matches, wins, best place, `deeds`, rank `points`, `weekly` best and `campaign` lobbies cleared) saved under `scrapyard-titans-stats`
   (`progress.ts`, `loadProgress`/`saveProgress`); watched matches never count.
 
@@ -169,7 +193,7 @@ Missing or rough:
 - No pathing beyond one tile step at a time toward the target.
 - AI rivals use a simple scored plan (`aiPlan`). Balance is checked with AI-only matches (see
   Gotchas); every origin's average place (Clockwork about 4.8) sits between about 4.0 and 4.9 of 8, and matches end
-  around stages 5 and 6.
+  around stage 5 (the finals end them a little sooner than health alone did).
 - Only the weekly season and the daily lobby change by date; the two plain seasons are picked on the menu.
 
 ## Architecture
@@ -203,11 +227,11 @@ File map (`src/`):
 - `game/data.ts`: every rule and number (see above). Every name and text in its tables (robots,
   seasons, abilities, traits, parts and items, power cards, skills, commanders and taunts,
   monsters, terrain) is a `TextKey` of `i18n/en.ts`, which the scene shows with `t`. No Phaser.
-- `game/battle.ts`: `Battle(a, b, terrain)` with `step()` (fixed `STEP_S` 0.05 s), `useSkill`,
-  `zapRat`, `runToEnd`, and `events` (`BEvent`) the scene drains for animation. No Phaser.
+- `game/battle.ts`: `Battle(a, b, terrain, event)` with `step()` (fixed `STEP_S` 0.05 s), `useSkill`,
+  `useOverdrive`, `overdriveReady`, `charge`, `zapRat`, `runToEnd`, and `events` (`BEvent`) the scene drains for animation. No Phaser.
 - `game/match.ts`: the `Match`, `Player` and `SavedSquad` types (`Player.name` and `Match.taunt.text` are
   `TextKey`s too), `squadOf`, `isGhostRound` and every action: `newMatch`, `rollShop`, `reroll`, `buyXp`, `buy`, `sell`, `moveUnit`, `equip`, `giveItem`, `pickAugment`, `startPlan`,
-  `startFight`, `endFight`, `advance`, `startDraft`, `draftPick`, `newDrops`, plus helpers. No
+  `startFight`, `endFight` (with `settleFinals`), `advance`, `startDraft`, `draftPick`, `newDrops`, plus helpers. No
   Phaser. A board is a record keyed `"col,row"` (rows 4-7).
 - `game/ai.ts`: `aiPlan` (level, buy, sell, `arrange`, equip), `aiPickAugment`, `aiDraft`;
   reports to `aiLog` with side `p<seat>`.
@@ -221,7 +245,7 @@ File map (`src/`):
   homes and draft ring sit in the designed-size frame in the middle of the view, the shop and
   terrain legend in it sideways but down at the bottom edge, the left column's bottom panel and
   buttons (`LEFT_BOTTOM`, Reroll, Buy XP, Sell) at the bottom edge, the players list at the right
-  edge and the info panel, Fight, skill and speed buttons at the bottom right. The traits and parts
+  edge and the info panel, Fight, skill, speed and overdrive buttons at the bottom right. The traits and parts
   stay at the top left. At exactly 960x540 nothing moves. A new HUD position goes in `layout.ts`
   with its line in `placeLayout`.
 - `scenes/GameScene.ts`: scene key `Game`. It imports `VIEWPORT` as `VIEW`, so `VIEW.w` and `h`
@@ -248,13 +272,13 @@ Shared code it imports: `shared/audio.ts`, `shared/setupGame.ts`, `shared/scalin
   `Player.maxHp`, which scales its bar in the players list; times `DUO.hpScale` for a duo team), and
   `startPlan` gives each rival (`isRival`, so not the duo partner) `byDifficulty(-1, 0, 1)` gold a
   round. Keep the README rows in step.
-- Reduced motion: no camera shake on slams, no hit flash, no idle sway or orb bob, no avatar walk
+- Reduced motion: no camera shake on slams, no flash on the player's overdrive, no hit flash, no idle sway or orb bob, no avatar walk
   bounce or skill hop, and stun stars and the draft ring stand still instead of circling.
 - Watch AI (`?watch`): the scene starts a match at once with a random commander (any of the eight), season and
   terrain, seat 0 is AI-run (`human` false: `aiPlan` once, near the end of each plan phase, where the
   rivals plan in `beginPlan`; skill at 3 s;
-  the taps and keys that act for the player, R, X, E, L, G, 1-3 and Space, do nothing: the shop cards,
-  Reroll, Buy XP, FIGHT, Lock and the skill button are off and the Scrap Rat can't be zapped),
+  the taps and keys that act for the player, R, X, E, L, G, V, 1-3 and Space, do nothing: the shop cards,
+  Reroll, Buy XP, FIGHT, Lock, the skill and the overdrive buttons are off; the AI fires seat 0's overdrive once full and the Scrap Rat can't be zapped),
   and `mountWatch` shows the panel; `watchSteps()` ticks per frame. Watch another on the end screen
   starts the next match.
 
@@ -293,6 +317,8 @@ Sound table and where each plays:
 | `castShield`, `castSlam`, `castBarrage`, `castSnipe`, `blink`, `castRepair` | `consume`: `cast` by ability (`CAST_SOUND`, a Bomber's `bomb` plays `castBarrage`); `blink` also on `blink` |
 | `lightning`, `heal`, `shield`, `stun`, `dodge`, `revive`, `death`, `escape` | `consume`, the event of that name |
 | `skill` | `consume`: `skill` (the rival's at 0.6 volume) |
+| `overdrive` | `consume`: `overdrive` (the rival's at 0.6 volume) |
+| `stageEvent` | `beginPlan`, when a new stage event is drawn or the finals start |
 | `zap` | `onDown`, the player's tap on the Scrap Rat |
 | `orb` | `drawCommanders`, when the avatar picks an orb up |
 
@@ -321,7 +347,10 @@ greyed-out button or shop card (`button` pushes a refusal for them).
   the campaign card picked), `boss-lobby.webp` (lobby 6 with a Clockwork board set from the dev
   console) and `ghost-round.webp` (that board fighting a saved squad on round 4-7, set from the
   console) are from a scratch run; `trophies.webp` is the pause screen's Trophies list from a scratch run with five trophies saved; `rare-card.webp` is a scratch run's 4-2 offer (set from the dev console) with Lucky Dice in the third slot; `fill-ultrawide.webp` (2560x1080) and `fill-tablet.webp` (1024x768)
-  show the plan phase on a wider and a taller view, from a scratch run.
+  show the plan phase on a wider and a taller view, from a scratch run; `finals.webp` (a finals plan
+  phase with the scrap storm called out) and `overdrive.webp` (that finals fight with the overdrive
+  charged and the rival's repair burst) are from a scratch run whose seats, boards, stage and
+  `Match.finals` were set from the dev console.
 
 ## Making common changes
 
@@ -360,6 +389,13 @@ greyed-out button or shop card (`button` pushes a refusal for them).
 - **Change the rank ladder**: a row in `RANKS` (with its name and text keys), the points in
   `RANK_POINTS`; check the effect with the balance harness at each rank.
 - **Change rounds or damage**: `stageRounds`, `stageDamage`, `SURVIVOR_DAMAGE`.
+- **Add a stage event**: its id in `StageEventId`, a row in `STAGE_EVENTS` (name and short text keys,
+  the text fits the top bar beside the round text) and its numbers in `STAGE_EVENT`, then its rule in
+  `battle.ts` behind `this.event`. Keep it symmetric (both sides alike) and run the balance harness.
+- **Change an overdrive**: `OVERDRIVE` (numbers), `OVERDRIVE_OF` (which commander has which) and
+  `useOverdrive`; the texts in `i18n/` repeat the numbers. When they came in, the balance harness
+  (240 AI matches) put each overdrive's commanders within about 0.3 places of where they were
+  before.
 
 ## Gotchas
 

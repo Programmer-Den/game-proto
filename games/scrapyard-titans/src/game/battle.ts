@@ -1,6 +1,6 @@
 /**
  * The fight: two sides of robots (or monsters) on the 8x8 board, run in fixed steps of `STEP_S`
- * seconds with no input but the commanders' skills. Robots walk tile by tile to the nearest enemy,
+ * seconds with no input but the commanders' skills and overdrives. Robots walk tile by tile to the nearest enemy,
  * attack when in range, fill their charge and cast their ability when it is full. The scene plays
  * the player's fight from the events this pushes to `events`; every other fight of the round is
  * run to the end at once with `runToEnd`.
@@ -8,10 +8,10 @@
  * Side 0 holds rows 4 to 7 (the bottom half on screen), side 1 rows 0 to 3.
  */
 import {
-  BIG_ABILITY_COST, BOARD, BOMB_SPLASH, CLASS_STATS, COST_SCALE, FIGHT_LIMIT_S, ITEMS, MONSTERS, OVERCHARGE_MANA,
-  RAT, SKILL_POWER, STAR_POWER, STAR_STAT, TRAITS, UNIT_BY_ID, WIND_UP_S,
-  type AbilityKind, type AugmentId, type ClassId, type MonsterId, type OriginId, type SetId, type SkillId, type Special,
-  type TerrainId, type TraitId,
+  BIG_ABILITY_COST, BOARD, BOMB_SPLASH, CLASS_STATS, COST_SCALE, FIGHT_LIMIT_S, ITEMS, MONSTERS, OVERCHARGE_MANA, OVERDRIVE,
+  RAT, SKILL_POWER, STAGE_EVENT, STAR_POWER, STAR_STAT, TRAITS, UNIT_BY_ID, WIND_UP_S,
+  type AbilityKind, type AugmentId, type ClassId, type MonsterId, type OriginId, type OverdriveId, type SetId, type SkillId, type Special,
+  type StageEventId, type TerrainId, type TraitId,
 } from './data';
 import type { TextKey } from '../i18n';
 import { rand } from './rng';
@@ -43,6 +43,8 @@ export interface SideSpec {
   traits: Partial<Record<TraitId, number>>;
   augments: AugmentId[];
   skill: SkillId | null;
+  /** The commander's overdrive (`OVERDRIVE_OF`), or null for monsters. */
+  overdrive: OverdriveId | null;
   season: SetId;
 }
 
@@ -62,6 +64,7 @@ export type BEvent =
   | { t: 'revive'; id: number }
   | { t: 'gold'; team: 0 | 1; id: number; amount: number }
   | { t: 'skill'; team: 0 | 1; skill: SkillId; target?: number }
+  | { t: 'overdrive'; team: 0 | 1; kind: OverdriveId; targets: number[] }
   | { t: 'escape'; id: number };
 
 export interface BUnit {
@@ -156,7 +159,12 @@ export class Battle {
   /** Gold each side picked up during the fight (rat hits, scanner kills). */
   gold: [number, number] = [0, 0];
   skillUsed: [boolean, boolean];
+  /** Each side's overdrive charge, 0 to 1, filled by damage dealt to the other side. */
+  charge: [number, number] = [0, 0];
+  overdriveUsed: [boolean, boolean];
   terrain: Map<string, TerrainId>;
+  /** The stage event changing this fight, if any. */
+  event: StageEventId | null;
   private projectiles: Projectile[] = [];
   private nextId = 1;
   private occ = new Map<string, number>();
@@ -164,16 +172,24 @@ export class Battle {
   private rallyUntil: [number, number] = [0, 0];
   private leapsDone = false;
   private woundUp = false;
+  private pulled = false;
   private sides: [SideSpec, SideSpec];
+  /** Damage each side has to deal to fill its overdrive: a share of the other side's starting health. */
+  private fillAt: [number, number];
 
-  constructor(a: SideSpec, b: SideSpec, terrain: Map<string, TerrainId> = new Map()) {
+  constructor(a: SideSpec, b: SideSpec, terrain: Map<string, TerrainId> = new Map(), event: StageEventId | null = null) {
     this.sides = [a, b];
     this.terrain = terrain;
+    this.event = event;
     this.skillUsed = [!a.skill, !b.skill];
+    this.overdriveUsed = [!a.overdrive, !b.overdrive];
     for (const [team, side] of [[0, a], [1, b]] as const) {
       const enemy = team === 0 ? b : a;
       for (const f of side.fighters) this.add(this.build(f, team, side, enemy));
     }
+    if (event === 'rustRain') for (const u of this.units) u.armor *= 1 - STAGE_EVENT.rustRain.cut;
+    const health = (team: 0 | 1) => this.units.reduce((sum, u) => sum + (u.team === team ? u.maxHp : 0), 0);
+    this.fillAt = [Math.max(1, health(1) * OVERDRIVE.fill), Math.max(1, health(0) * OVERDRIVE.fill)];
   }
 
   private add(unit: BUnit) {
@@ -231,6 +247,7 @@ export class Battle {
     if (has('lucky-bolt')) crit += 0.1;
     if (has('hot-wiring')) mana += 25;
     if (side.season === 'neon') mana += OVERCHARGE_MANA;
+    if (this.event === 'chargedAir') mana += cs.mana * STAGE_EVENT.chargedAir.share;
     if (sp.hpPct) hp *= 1 + sp.hpPct;
     let powerMul = 1 + (sp.spellPower ?? 0) + (has('big-battery') ? 0.2 : 0);
     if (origins.includes('neon')) powerMul += tv('neon') / 100;
@@ -263,6 +280,10 @@ export class Battle {
     if (this.done) return;
     const dt = STEP_S;
     this.time += dt;
+    if (!this.pulled && this.event === 'magnet' && this.time >= STAGE_EVENT.magnet.atS) {
+      this.pulled = true;
+      this.magnetPull();
+    }
     if (!this.leapsDone && this.time >= 0.25) {
       this.leapsDone = true;
       for (const u of this.units) if (u.alive && u.cls === 'saboteur') this.leapBehind(u);
@@ -313,7 +334,8 @@ export class Battle {
       return;
     }
     const buff = this.time < this.asBuffUntil[u.team] ? SKILL_POWER.overclock.speed : 1;
-    const speed = u.baseAs * (1 + u.asBonus + u.rampAs + u.itemRamp) * buff * (terrain === 'oil' ? 0.7 : 1);
+    const storm = this.event === 'scrapStorm' && u.range > 1 ? 1 - STAGE_EVENT.scrapStorm.slow : 1;
+    const speed = u.baseAs * (1 + u.asBonus + u.rampAs + u.itemRamp) * buff * storm * (terrain === 'oil' ? 0.7 : 1);
     u.attackTimer += dt * speed;
     if (u.attackTimer >= 1) {
       u.attackTimer -= 1;
@@ -443,7 +465,13 @@ export class Battle {
     const real = amount - left + Math.min(left, Math.max(0, dst.hp));
     dst.hp -= left;
     dst.taken += real;
-    if (src && src.team !== dst.team) src.dealt += real;
+    if (src && src.team !== dst.team) {
+      src.dealt += real;
+      if (!this.overdriveUsed[src.team]) {
+        const rate = this.event === 'liveWires' ? STAGE_EVENT.liveWires.rate : 1;
+        this.charge[src.team] = Math.min(1, this.charge[src.team] + (real * rate) / this.fillAt[src.team]);
+      }
+    }
     if (show) this.events.push({ t: 'dmg', id: dst.id, amount: Math.round(amount), crit, ability });
     this.gainMana(dst, Math.min(MANA_PER_HIT_CAP, amount * MANA_PER_DAMAGE), false);
     if (dst.hp > 0) return;
@@ -636,6 +664,51 @@ export class Battle {
     return true;
   }
 
+  /** Whether `team`'s overdrive is charged and not yet used this fight. */
+  overdriveReady(team: 0 | 1) {
+    return !this.overdriveUsed[team] && !this.done && this.charge[team] >= 1;
+  }
+
+  /** The commander's overdrive for `team`: once per fight, when its charge is full. */
+  useOverdrive(team: 0 | 1): boolean {
+    const kind = this.sides[team].overdrive;
+    if (!kind || !this.overdriveReady(team)) return false;
+    this.overdriveUsed[team] = true;
+    const allies = this.alive(team);
+    const foes = this.alive(team === 0 ? 1 : 0);
+    if (kind === 'shieldWave') {
+      this.events.push({ t: 'overdrive', team, kind, targets: allies.map((a) => a.id) });
+      for (const a of allies) this.giveShield(a, a.maxHp * OVERDRIVE.shieldWave.share, OVERDRIVE.shieldWave.seconds);
+    } else if (kind === 'repairBurst') {
+      this.events.push({ t: 'overdrive', team, kind, targets: allies.map((a) => a.id) });
+      for (const a of allies) this.heal(a, a.maxHp * OVERDRIVE.repairBurst.share);
+    } else {
+      // The enemy front: those within a row of the enemy nearest this side's half.
+      const depth = (u: BUnit) => (team === 0 ? u.row : -u.row);
+      const front = Math.max(...foes.map(depth));
+      const hit = foes.filter((f) => depth(f) >= front - 1);
+      this.events.push({ t: 'overdrive', team, kind, targets: hit.map((f) => f.id) });
+      const src = allies[0] ?? null;
+      for (const f of hit) {
+        f.mana = 0;
+        this.stun(f, OVERDRIVE.empFront.stunS);
+        this.hurt(f, OVERDRIVE.empFront.damage * (1 - (f.sp.abilityResist ?? 0)), src, true, false, true);
+      }
+    }
+    return true;
+  }
+
+  /** The magnet stage event: every robot is pulled a tile toward the middle columns, nearest the middle first. */
+  private magnetPull() {
+    const mid = (BOARD.cols - 1) / 2;
+    const order = this.units.filter((u) => u.alive && u.monster !== 'rat').sort((a, b) => Math.abs(a.col - mid) - Math.abs(b.col - mid));
+    for (const u of order) {
+      if (Math.abs(u.col - mid) < 1) continue;
+      const col = u.col + (u.col < mid ? 1 : -1);
+      if (this.free(col, u.row)) this.moveTo(u, col, u.row, MOVE_S * 0.6);
+    }
+  }
+
   /** The player's zap on the Scrap Rat: a little damage, and the gold a hit shakes loose. */
   zapRat(id: number): boolean {
     const rat = this.get(id);
@@ -654,13 +727,15 @@ export class Battle {
     this.winner = a && !b ? 0 : b && !a ? 1 : null;
   }
 
-  /** Runs a fight nobody watches straight to its end; AI sides use their skill early on. */
+  /** Runs a fight nobody watches straight to its end; AI sides use their skill early on and their overdrive once charged. */
   runToEnd() {
     while (!this.done) {
       if (this.time >= 4) {
         if (!this.skillUsed[0]) this.useSkill(0);
         if (!this.skillUsed[1]) this.useSkill(1);
       }
+      this.useOverdrive(0);
+      this.useOverdrive(1);
       this.step();
       this.events.length = 0;
     }
