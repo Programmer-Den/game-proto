@@ -583,6 +583,37 @@ export function bakeRelic(relic: 'plenty' | 'valor' | 'haste', holder: FactionId
 }
 
 /**
+ * A neutral village: two thatched cottages and a well, with a banner in the colour of the side it has
+ * joined (plain linen while it has joined nobody).
+ */
+export function bakeVillage(holder: FactionId | null) {
+  const s = TILE * 2;
+  const { cv, c } = canvas(s, s + CAMP_TOP);
+  reseed(53 + (holder?.length ?? 0));
+  const y = CAMP_TOP;
+  c.fillStyle = 'rgba(110,90,60,0.14)';
+  c.beginPath();
+  c.ellipse(s / 2, y + s - 4, s / 2 - 1, 5, 0, 0, PI * 2);
+  c.fill();
+  // The back cottage, taller, on the left; the front one lower on the right.
+  wall(c, 4, y + 8, 30, y + 32, 2);
+  arch(c, 13, y + 18, 8, 14, T.brown);
+  tiles(c, 0, y - 14, 34, y + 10, T.tan, 3);
+  wall(c, 30, y + 30, s - 4, y + s - 6, 1);
+  arch(c, 40, y + 40, 8, 14, T.indigo);
+  tiles(c, 26, y + 12, s, y + 32, T.ochre, 3);
+  // The well: a round stone kerb under a little roof on two posts.
+  se(c, 14, y + s - 10, 8, 4, T.grey, { noCouch: true, lw: 0.7 });
+  for (const px of [7, 21]) thread(c, [[px, y + s - 10], [px, y + 38]], T.brown, 1.2);
+  sp(c, [[4, y + 39], [24, y + 39], [14, y + 31]], T.bark, { ang: 0, noCouch: true, lw: 0.6 });
+  // The banner of the side it has joined.
+  const col = holder ? WOOL[holder].cloth : T.card;
+  thread(c, [[s - 6, y + 14], [s - 6, y - 22]], T.ink, 1);
+  sp(c, [[s - 5, y - 22], [s + 0, y - 21], [s + 0, y - 6], [s - 5, y - 9]], col, { ang: PI / 2, noCouch: true, lw: 0.6 });
+  return cv;
+}
+
+/**
  * A trading post: a neutral timber hall with an open front, a hanging sign of scales and a cart
  * drawn up beside it, where trade carts load ore. Its 2x2 footprint's top-left is at (0, BUILDING_TOP).
  */

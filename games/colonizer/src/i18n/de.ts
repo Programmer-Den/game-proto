@@ -446,9 +446,49 @@ const de: Translation<typeof en> = {
   pactBroken: 'Du hast den Pakt mit {faction} gebrochen',
   allyOver: 'Das Bündnis mit {faction} ist vorbei',
   truceOver: 'Die Waffenruhe mit {faction} ist vorbei',
+  // Formations and stances
+  formation: 'Formation',
+  'formation-line': 'Linie',
+  'formation-box': 'Karree',
+  'formation-spread': 'Aufgefächert',
+  stance: 'Haltung',
+  'stance-aggressive': 'Angriffslustig',
+  'stance-hold': 'Stellung halten',
+  'stance-stand': 'Stillstehen',
+  stanceMixed: 'Gemischt',
+  stanceLine: 'Haltung: {stance}',
+
+  // Neutral villages
+  wolf: 'Wolf',
+  villageSpearman: 'Dorfspeerträger',
+  villageSpearmanInfo: 'Von einem Dorf geschickt, das sich dir angeschlossen hat',
+  villageWolves: 'Ein Dorf, von Wölfen bedrängt: bring ihm mit einem Dorfbewohner {n} Nahrung, oder erlege die Wölfe und stell dich daneben',
+  villageFree: 'Ein freies Dorf: bring ihm mit einem Dorfbewohner {n} Nahrung oder stell dich daneben, und es schließt sich dir an',
+  villageYours: 'Dein Dorf: es schickt Nahrung und einen Speerträger',
+  villageEnemy: 'Ein Dorf, das zu den {faction} hält: stell dich allein daneben oder bring ihm {n} Nahrung, um es zu gewinnen',
+  villageNeedsFood: 'Das Dorf will {n} Nahrung',
+  villageJoined: 'Ein Dorf schließt sich dir an: alle {s} s {n} Nahrung und ein Speerträger',
+  villageLost: 'Ein Dorf ist zum Feind übergelaufen',
+  villageSends: 'Dein Dorf schickt einen Speerträger',
+  bringingGift: 'Bringt einem Dorf Nahrung',
+  logVillage: 'schickt {n} Soldaten, um ein Dorf zu gewinnen',
+  logGift: 'schickt einen Dorfbewohner mit Nahrung zu einem Dorf',
+
+  // Dry years and floods
+  droughtWarn: 'Ein trockenes Jahr kommt: in {s} s tragen die Felder nur die Hälfte',
+  floodWarn: 'Die Seen steigen: in {s} s werden ihre Ufer überflutet',
+  floodWarnFord: 'Das Meer steigt: in {s} s wird eine Furt überflutet',
+  droughtNow: 'Dürre: die Felder tragen {s} s lang nur die Hälfte',
+  floodNow: 'Hochwasser: das Wasser versperrt {s} s lang den Weg',
+  droughtOver: 'Der Regen ist zurück: die Felder tragen wieder voll',
+  floodOver: 'Das Wasser fällt: der Weg ist wieder frei',
+  weatherDroughtSoon: 'Trockenes Jahr in {time}',
+  weatherDrought: 'Dürre · noch {time}',
+  weatherFloodSoon: 'Hochwasser in {time}',
+  weatherFlood: 'Hochwasser · noch {time}',
 };
 
 export default de;
 
 /** Texts that are the same in German: the game's name, the Palisade and the bare patterns. */
-export const keepEnglish: (keyof typeof en)[] = ['title', 'wall', 'uniqueLine', 'costPart', 'menuOptions', 'campRelic'];
+export const keepEnglish: (keyof typeof en)[] = ['title', 'wall', 'uniqueLine', 'costPart', 'menuOptions', 'campRelic', 'formation', 'wolf'];

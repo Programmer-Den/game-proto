@@ -4,7 +4,7 @@
 import Phaser from 'phaser';
 import { AGE3_DAMAGE, AGE4_DAMAGE, ARMY_DEED, BUILDINGS, DEEDS, DEEDS4, RANK_NAMES, VETERAN_RANK, FACTIONS, MAP_SIZE, RELICS, RESOURCES, TEMPERAMENTS, TILE, type FactionId, type RelicId } from '../game/data';
 import { DIRT, ROCK, SHALLOW, WATER } from '../game/map';
-import { deed4Count, deedCount, monumentLeft, NEUTRAL, PLAYER, popCap, popUsed, rivalsOf, type GameState, type Player } from '../game/sim';
+import { deed4Count, deedCount, monumentLeft, weatherLeft, NEUTRAL, PLAYER, popCap, popUsed, rivalsOf, type GameState, type Player } from '../game/sim';
 import type { Scenario } from '../game/campaign';
 import { WOOL } from '../art/figures';
 import { hexNum, mix, SERIF, T } from '../art/stitch';
@@ -330,9 +330,18 @@ export class StatusCard {
     const foe = left.length > 0 ? Math.min(...left) : null;
     const clock = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, '0')}`;
     const ours = own !== null && (foe === null || own <= foe);
-    const line = (ours ? t('monumentOwn', { time: clock(own) }) : foe !== null ? t('monumentFoe', { time: clock(foe) }) : '').toUpperCase();
+    let line = (ours ? t('monumentOwn', { time: clock(own) }) : foe !== null ? t('monumentFoe', { time: clock(foe) }) : '').toUpperCase();
+    let colour: string = ours ? T.green : T.red;
+    // With no Monument standing, the line counts down a dry year or flood warned of or under way.
+    const w = s.weather;
+    const due = weatherLeft(s);
+    if (!line && w && due !== null) {
+      const key = w.kind === 'flood' ? (w.on ? 'weatherFlood' : 'weatherFloodSoon') : w.on ? 'weatherDrought' : 'weatherDroughtSoon';
+      line = t(key, { time: clock(due) }).toUpperCase();
+      colour = w.kind === 'flood' ? T.indigo : T.brown;
+    }
     this.shown = line;
-    this.monument.setText(line).setColor(ours ? T.green : T.red);
+    this.monument.setText(line).setColor(colour);
     this.bg.setTexture(line ? 'card-status-tall' : 'card-status');
     if (line) stitchLine(g, x + 4, y + 48, x + STATUS_CARD.w - 4, y + 48, 0.8, hexNum(T.ochre));
   }
@@ -506,9 +515,10 @@ export class Minimap {
     }
     const wild: [number, number, number] = [122, 85, 48];
     const pale: [number, number, number] = [239, 228, 198];
+    const hamlet: [number, number, number] = [184, 149, 94];
     for (const c of s.camps) {
       if (c.claimed || s.sight[c.ty * MAP_SIZE + c.tx] === 0) continue;
-      const col = c.holder === null ? (c.kind === 'relic' ? pale : gold) : this.colours[c.holder];
+      const col = c.holder === null ? (c.kind === 'relic' ? pale : c.kind === 'village' ? hamlet : gold) : this.colours[c.holder];
       for (let j = 0; j < 2; j++) for (let i = 0; i < 2; i++) put(c.tx + i, c.ty + j, col);
     }
     // The trading posts are marked for everyone, like a landmark on a chart.

@@ -127,6 +127,8 @@ export interface UnitDef {
   limit?: number;
   /** A champion's gift: a damage aura for nearby soldiers, far sight, healing nearby units, or a quicker stride for them. */
   gift?: 'aura' | 'sight' | 'heal' | 'stride';
+  /** A neutral village's own fighter, sent to the side it has joined; nobody trains it. */
+  local?: boolean;
 }
 
 export const UNITS: Record<string, UnitDef> = {
@@ -256,6 +258,16 @@ export const UNITS: Record<string, UnitDef> = {
     id: 'wild-poacher', faction: 'wild', role: 'ranged', name: 'poacher',
     cost: {}, time: 0, hp: 35, dmg: 5, range: 4.5, speed: 2, sight: 6, cooldown: 1300, trainer: 'town',
   },
+  // The wolves that prowl round the neutral villages.
+  'wild-wolf': {
+    id: 'wild-wolf', faction: 'wild', role: 'melee', name: 'wolf',
+    cost: {}, time: 0, hp: 40, dmg: 5, range: 1, speed: 2.6, sight: 5, cooldown: 900, trainer: 'town',
+  },
+  // A joined village's spearman (VILLAGE_TRAIN_MS); shared by every faction, trained by nobody.
+  'village-spearman': {
+    id: 'village-spearman', faction: 'neutral', role: 'melee', name: 'villageSpearman', local: true,
+    cost: {}, time: 0, hp: 75, dmg: 7, range: 1, speed: 2, sight: 6, cooldown: 1200, trainer: 'town',
+  },
 };
 
 /** Faction mastery: this many wins with a faction unlock its second unique unit (`eliteFor`). */
@@ -267,7 +279,7 @@ export function eliteFor(faction: FactionId): UnitDef {
 
 /** The unit a faction trains for each role; villagers, carts and rams are shared by every faction. */
 export function unitFor(faction: FactionId, role: Role): UnitDef {
-  const def = Object.values(UNITS).find((u) => (u.faction === faction || u.faction === 'neutral') && u.role === role && !u.elite);
+  const def = Object.values(UNITS).find((u) => (u.faction === faction || u.faction === 'neutral') && u.role === role && !u.elite && !u.local);
   if (!def) throw new Error(`no ${role} for ${faction}`);
   return def;
 }
@@ -460,6 +472,52 @@ export type RelicId = keyof typeof RELICS;
 export const RELIC_GATHER = 1.1;
 export const RELIC_DAMAGE = 1;
 export const RELIC_SPEED = 1.1;
+/**
+ * Neutral villages (camps of kind `village`): wolves prowl round them. A side joins one by bringing
+ * VILLAGE_GIFT food (a villager sent to it pays on arrival) or, once the wolves are dead, by standing
+ * at it alone, like a relic. A joined village pays VILLAGE_FOOD food every VILLAGE_FOOD_MS and sends
+ * one village spearman every VILLAGE_TRAIN_MS while its last one is dead.
+ */
+export const VILLAGE_GIFT = 100;
+export const VILLAGE_FOOD = 5;
+export const VILLAGE_FOOD_MS = 10000;
+export const VILLAGE_TRAIN_MS = 60000;
+
+/**
+ * Formations (CO21): how a group of soldiers lines up where it is sent. A line stands side by side
+ * across the way it marches (archers in a second row), a box puts the archers in the middle, and a
+ * spread stands SPREAD_GAP tiles apart, out of reach of a volley's splash.
+ */
+export const FORMATIONS = ['line', 'box', 'spread'] as const;
+export type Formation = (typeof FORMATIONS)[number];
+export const FORMATION_GAP = 1;
+export const SPREAD_GAP = 2.2;
+/**
+ * Stances: an aggressive soldier chases what it sees, one holding ground fights within HOLD_RANGE of
+ * the spot it was left on and walks back to it, one standing still only strikes what is in its reach.
+ */
+export const STANCES = ['aggressive', 'hold', 'stand'] as const;
+export type Stance = (typeof STANCES)[number];
+export const HOLD_RANGE = 5;
+/**
+ * A tower's or Town Centre's volley and a warship's shot splash: every other enemy unit within
+ * SPLASH_RANGE tiles of the one hit takes SPLASH_SHARE of the blow (what a spread formation avoids).
+ */
+export const SPLASH_RANGE = 1.3;
+export const SPLASH_SHARE = 0.5;
+
+/**
+ * Dry years and floods (CO23): from WEATHER_FIRST of the match, every WEATHER_REST after the last
+ * ends, a drought or a flood is warned of WEATHER_WARN ahead and lasts WEATHER_MS. A drought makes
+ * farms yield DROUGHT_YIELD as fast; a flood drowns a ford on a map of islands (one at a time, in
+ * turn), or elsewhere the grass along every lake shore, until the waters fall.
+ */
+export const WEATHER_FIRST = 14 * 60000;
+export const WEATHER_REST = 8 * 60000;
+export const WEATHER_WARN = 45000;
+export const WEATHER_MS = 120000;
+export const DROUGHT_YIELD = 0.5;
+
 /** How close, in tiles from a camp's middle, a unit must stand to claim it. */
 export const CLAIM_RANGE = 2.6;
 /** A guard walks back to its camp when it strays this far from it. */

@@ -258,6 +258,39 @@ in code on 2D canvases (no image files), with `pixelArt` off.
 - Sound: effects and music made in code by `shared/audio.ts` (see Sound below).
 - Trophies (`src/trophies/`, `shared/trophies.ts`): ten, from Age II, a relic held, a raid repelled
   and a third-rank veteran to wins against two rivals, on Hard and by Monument (see the file map).
+- Formations and stances (CO21): `Player.formation` (`FORMATIONS`: `line`, `box`, `spread`, the
+  player's set by the panel's `formation` button) lines a group up where it is sent: `march(s,
+  owner, ids, 'move' | 'attackMove', x, y, formation?)` gives each unit its own spot from
+  `formationSpots` (a line across the way it marches, `frontRank` units in front and the rest a row
+  behind, rows of 12; a box's inner spots go to the back rank; a spread is `SPREAD_GAP` apart). The
+  scene's walk orders (`commandAt`) and attack-move clicks use it; the planner marches its raids in a
+  line, or spread out at a Town Center. `Unit.stance` (`STANCES`: `aggressive`, the default, `hold`,
+  `stand`), set by the panel's `stance` button (`setStance`), limits only the fights a soldier picks
+  itself (`attack` orders with `auto`): an idle soldier holding ground looks within `HOLD_RANGE` of
+  `Unit.anchor` (where it stopped; `issue` clears it), lets a foe go once it is past `HOLD_RANGE` + 1
+  of it and walks back; one standing still only takes what is within its reach. The scene rings the
+  ground a selected group holds and knots the feet of soldiers standing still. Towers' volleys and
+  warships' shots `splash`: the struck unit's side-mates within `SPLASH_RANGE` take `SPLASH_SHARE`.
+- Neutral villages (CO22): two camps of kind `village` in `CAMP_PLAN` (55,57 and its mirror), each
+  guarded by four `wild-wolf` units. A villager given `{ t: 'gift', camp }` (a right click on the
+  village with villagers selected) pays `VILLAGE_GIFT` food on arrival and the village joins its side
+  (`joinVillage`); with the wolves dead, a side alone within `CLAIM_RANGE` wins it like a relic
+  (`updateVillage`). A joined village pays `VILLAGE_FOOD` every `VILLAGE_FOOD_MS` (`Camp.foodMs`, a
+  `drop` event) and sends a `village-spearman` (`local: true`, never found by `unitFor`) at once and
+  `VILLAGE_TRAIN_MS` after the last one fell (`Camp.trainMs`, `Camp.local`). A side knocked out frees
+  its villages. The planner sends a villager with food to a village nobody holds from Age II (one at
+  a time, with `VILLAGE_GIFT` + 200 food), and its relic army to a rival's village when no relic is
+  left to take.
+- Dry years and floods (CO23): `updateWeather` warns of the next (`GameState.weather`, a `Weather`)
+  `WEATHER_WARN` ahead, from `WEATHER_FIRST` and then `WEATHER_REST` after the last ended
+  (`weatherNext`, `weatherCount`); each lasts `WEATHER_MS`. They take turns, starting with a flood on
+  a naval map and a drought elsewhere. A drought multiplies farm gathering by `DROUGHT_YIELD`; a
+  flood (`floodTiles`, taken again when it starts) sets one ford's shallows on Islands (fords in
+  turn), or elsewhere every free land tile next to a lake, to `WATER` (`GameState.flooded` marks them;
+  `nearWater` ignores them), moves land units off them (`dryNear`) and gives the old terrain back at
+  the end, floating any ship left on land to the nearest sea. The ground chunks are painted from
+  `dryTerrain`, so the scene draws the water over them (`renderFlood`); the status card counts the
+  weather down (`weatherLeft`) when no Monument line is up.
 - Not implemented yet: saves of a match (the campaign's stars and the mastery wins are kept).
 
 ## Architecture
@@ -359,11 +392,13 @@ in code on 2D canvases (no image files), with `pixelArt` off.
   the poses and frame counts. Kinds beyond the weapons: `cart` (a villager pulling a cart), `ram`
   (the slung log and two crewmen), and the champions `warlord` (a plumed, gold-shielded swordsman),
   `seer` and `druid` (robed, with a `staff`).
+- `src/art/figures.ts` draws the wolf (`wolf`, kind `wolf`) for `wild-wolf`; the village spearman
+  is a neutral unit, baked per faction like the villager.
 - `src/art/scenery.ts`: buildings (`bakeBuilding`, with `BUILDING_TOP` px above the footprint, the
   Market among them), the trading post (`bakePost`, also `BUILDING_TOP` above its 2x2 footprint),
   trees (`bakeTree`, `TREE_TOP` px above the tile), `bakeBush`, `bakeMine`, the ground
   (`paintChunk`, one `CHUNK`x`CHUNK` tile chunk at full size), `bakeFogPattern`, `bakeNeedle`,
-  `bakeRallyFlag`, and the camps (`bakeCache`, `bakeRelic`, with `CAMP_TOP` px above the footprint).
+  `bakeRallyFlag`, and the camps (`bakeCache`, `bakeRelic`, `bakeVillage`, with `CAMP_TOP` px above the footprint).
 - `src/art/ui.ts`: wool `icon`s, the top bar, the panel band, buttons, cards and the menu backdrop.
 - `src/scenes/layout.ts`: where every HUD piece sits in game space (`W`, `H`, `TOP_H`, `PANEL_Y`, the top
   bar's slots and bars, `TOP_RIGHT`, `AGE_PIPS`, `DEED_CARD`, `STATUS_CARD`, `TOAST`, `SEL`, `BUTTONS`, `BOON`,
@@ -374,7 +409,8 @@ in code on 2D canvases (no image files), with `pixelArt` off.
   cart, ram, wagon, transport, warship), with frames `<pose>-<n>` (e.g. `chop-2`),
   `bld-<faction>-<building>`, `post`, `tree-0`..`tree-3`, `bush`, `mine`, `fog-pattern`, `needle`,
   `icon-<kind>`, `icon-banner-<faction>`, `topbar`, `panel`, `btn-on|off|hot`, `card-*`, `backdrop`,
-  `rally-flag`, `camp-cache-<res>`, `camp-relic-<relic>-<faction|none>` (`relicKey`) and
+  `rally-flag`, `camp-cache-<res>`, `camp-relic-<relic>-<faction|none>` (`relicKey`),
+  `camp-village-<faction|none>` (`villageKey`) and
   `fig-wild-brigand`/`fig-wild-poacher`.
 - `src/scenes/MenuScene.ts`: the four faction cards, each with its three soldiers, its own
   building and its mastery line, the Skirmish / Campaign toggle (`MENU_MODE`), and below the cards
@@ -386,7 +422,7 @@ in code on 2D canvases (no image files), with `pixelArt` off.
   fog and needle, rings and health threads, input, the panel (selection, buttons, boon cards).
 - `src/scenes/hud.ts`: `TopBar` (four age pips), `DeedCard` (the Age III deeds, then from Age III
   the Age IV ones), `MissionCard` (a scenario's name, goal and progress), `stitchStars`, `StatusCard` (relics held, the Rivals row with each
-  rival's banner and temperament or `?`, and the Monument count),
+  rival's banner and temperament or `?`, and the Monument count, or with none the weather's),
   `Toast` and `Minimap` (camps, neutral units and every Monument, each side in its colour, and a `?`
   over every rival corner not yet seen), plus `stitchLine` and
   `stitchEllipse` for thread-like Graphics.
@@ -417,6 +453,9 @@ in code on 2D canvases (no image files), with `pixelArt` off.
 - `Unit.cargo` (a transport's passengers, whole `Unit`s taken out of `units`) and `Unit.packed`
   (a wagon's building, `{ type, hp }`, or null); orders `board` and `unload`. `GameState.naval` (an
   Islands map) and `GameState.pacts` (per player: the player's pact with that AI).
+- `Unit.stance` and `Unit.anchor`, the order `gift` and an `attack` order's `auto`;
+  `Player.formation`; `Camp.foodMs`, `trainMs` and `local` (a village's); `GameState.weather`,
+  `weatherNext`, `weatherCount` and `flooded`.
 - `Building.rally`, `doneAt`, `workMs` (the Dock's and Grove's timer) and `garrison` (the
   sheltering villagers, as whole `Unit`s taken out of `units`); `Unit.post` (a guard's post);
   `GameState.gates`, `camps`, `posts`, `winBy` (`town`, `monument`, `wonder`, `goal` or `cart`) and
@@ -469,6 +508,9 @@ in code on 2D canvases (no image files), with `pixelArt` off.
   button. A building the player may not place (`notAllowed`) shows disabled. `renderPanel` closes
   the build list (`buildMenu`, `buildPage`) whenever the selection changes (`panelSelection`) or no
   villager is left in it, so clicking another unit or building shows its own buttons.
+- Soldiers selected get `formation` and `stance` buttons after Attack and Stop; each press turns
+  to the next (`FORMATIONS`, `STANCES`), and the sub line names the current one (`Mixed` for a
+  selection whose stances differ, `stanceOf`).
 - Panel buttons are `Action`s: an `id` in no language (a unit, building or tech id, `build`,
   `more`, `back`, `bell`, `release`, `buy-wood` and so on), the `name` and the `sub` line under it (a
   cost from `costText`, the age it waits for, or "one only"). `fitWidth` squeezes a name or line
@@ -520,7 +562,10 @@ in code on 2D canvases (no image files), with `pixelArt` off.
 - `canPlace(s, type, tx, ty, owner)` also refuses gate tiles, and a Dock away from water
   (`nearWater`); a gate may go on the owner's own stake.
 - A grown tree never goes next to a building, so it can't box one in; its id comes from `nextId`.
-- Camps are solid until a cache is taken; relics stay. The camp patches change no other tile of the
+- The playthrough's first round ends near 5 minutes, long before `WEATHER_FIRST` (14 min). The
+  village patches clear terrain and nodes only round them, so a seed gives the same map as before
+  apart from them.
+- Camps are solid until a cache is taken; relics and villages stay. The camp patches change no other tile of the
   map, so a seed gives the same map as before camps (apart from the cleared patches).
 
 ## Sound
@@ -558,7 +603,8 @@ Sound table (`src/audio/sfx.ts`), and where each plays (in `GameScene` unless no
 - `whoosh`: `jumpTo` (Space, the toast or an edge marker).
 - `flag`, `flagDown`: `plantRally` plants or takes down rally flags.
 - `raidHorn`, `repelled`: a raid on the player starts, or is repelled (`SoundCues`).
-- `cache`, `relicGain`, `relicLost`: the player takes a cache, holds a relic or loses one (`SoundCues`).
+- `cache`, `relicGain`, `relicLost`: the player takes a cache, holds a relic or a village, or loses one (`SoundCues`).
+- `thunder`: a dry year or flood warned of, louder when it comes (`SoundCues`, not when watching).
 - `monument`: anyone's Monument finished, or anyone's Wonder begun (`SoundCues`).
 - `crumble`: a building falls on screen, a Town Centre included (`SoundCues`; not a palisade piece a
   new gate replaces).
@@ -586,7 +632,7 @@ There is no save of a match. Settings come from the hub (`shared/settings.ts`).
   `popLog` (the player's drop-off badges by resource id, such as `+10 wood`, in no language),
   `toastLog` (raid toasts shown, translated), `alertLog` (attack alert toasts, translated), `alerts`
   (the live alerts' `x`, `y`, `last`), `rallyMode`, `toast.shown`,
-  `placing`, `attackMode`, `buildMenu`, `buildPage`, `status.shown` (the Monument line),
+  `placing`, `attackMode`, `buildMenu`, `buildPage`, `status.shown` (the Monument line, or the weather's),
   `status.temperaments` (each rival's temperament as the card shows it, translated, `?` until scouted),
   `cameras.main.worldView.x/y` (not `scrollX/Y`, which differ once `renderScale` zooms the
   camera), and `toScreen(tx, ty)`. `e2e/screens.spec.ts` at the root opens the game on five screens. `state.camps` lists the camps with `holder`, `state.posts` the trading posts,
@@ -660,6 +706,11 @@ There is no save of a match. Settings come from the hub (`shared/settings.ts`).
   applies.
 - Add a faction's second unique unit: a `UNITS` entry with `elite: true`, sharing a role its
   faction's trainer trains, plus a figure (`kindOf`) and an `<name>Info` text; `eliteFor` finds it.
+- Add a formation or stance: add it to `FORMATIONS` (its spots in `formationSpots`) or `STANCES`
+  (its rule in `militaryUpdate`'s idle and `auto` attack branches), with its `formation-<id>` or
+  `stance-<id>` text.
+- Add a kind of weather: a `Weather['kind']`, its turn in `updateWeather`, its effect where it applies,
+  its warn, start and end notices and its status line in `StatusCard.update`.
 - Add a relic: add it to `RELICS`, apply it in the sim behind `holds`, give it a sign in `bakeRelic`
   and an icon in `RELIC_ICON` (hud.ts), and put a camp for it in `CAMP_PLAN` (mirrored pairs keep
   the map fair).

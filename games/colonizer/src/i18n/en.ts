@@ -449,6 +449,46 @@ const en = {
   pactBroken: 'You broke the pact with the {faction}',
   allyOver: 'The alliance with the {faction} is over',
   truceOver: 'The truce with the {faction} is over',
+  // Formations and stances
+  formation: 'Formation',
+  'formation-line': 'Line',
+  'formation-box': 'Box',
+  'formation-spread': 'Spread out',
+  stance: 'Stance',
+  'stance-aggressive': 'Aggressive',
+  'stance-hold': 'Hold ground',
+  'stance-stand': 'Stand still',
+  stanceMixed: 'Mixed',
+  stanceLine: 'Stance: {stance}',
+
+  // Neutral villages
+  wolf: 'Wolf',
+  villageSpearman: 'Village Spearman',
+  villageSpearmanInfo: 'Sent by a village that has joined you',
+  villageWolves: 'A village beset by wolves: bring it {n} food with a villager, or clear the wolves and stand by it',
+  villageFree: 'A free village: bring it {n} food with a villager, or stand by it, and it joins you',
+  villageYours: 'Your village: it sends food and a spearman',
+  villageEnemy: 'A village that has joined the {faction}: stand by it alone, or bring it {n} food, to win it over',
+  villageNeedsFood: 'The village wants {n} food',
+  villageJoined: 'A village joins you: {n} food every {s} s, and a spearman',
+  villageLost: 'A village has gone over to the enemy',
+  villageSends: 'Your village sends a spearman',
+  bringingGift: 'Bringing food to a village',
+  logVillage: 'sends {n} soldiers to win a village',
+  logGift: 'sends a villager with food to a village',
+
+  // Dry years and floods
+  droughtWarn: 'A dry year is coming: in {s} s farms will yield half',
+  floodWarn: 'The lakes are rising: in {s} s their shores will flood',
+  floodWarnFord: 'The sea is rising: in {s} s a ford will flood',
+  droughtNow: 'Drought: farms yield half for {s} s',
+  floodNow: 'Flood: the water blocks the way for {s} s',
+  droughtOver: 'The rains are back: farms yield in full again',
+  floodOver: 'The waters fall: the way is open again',
+  weatherDroughtSoon: 'Dry year in {time}',
+  weatherDrought: 'Drought · {time} left',
+  weatherFloodSoon: 'Flood in {time}',
+  weatherFlood: 'Flood · {time} left',
 };
 
 export default en;
