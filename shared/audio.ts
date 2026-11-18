@@ -478,12 +478,20 @@ function startMusic(song: Song, part: string) {
 /** Plays a part once (a win, a game over), with the music lowered under it. */
 export function playSting(song: Song, part: string) {
   if (!playable(ctx) || volumes.muted) return;
+  // Make the sting first: a part the song lacks throws here, before the music is lowered for good.
+  const sting = () =>
+    new Player(ctx!, song, part, false, () => {
+      stings--;
+      if (stings === 0) current?.player.duck(false);
+    });
   stings++;
-  current?.player.duck(true);
-  new Player(ctx, song, part, false, () => {
+  try {
+    sting();
+  } catch (e) {
     stings--;
-    if (stings === 0) current?.player.duck(false);
-  });
+    throw e;
+  }
+  current?.player.duck(true);
 }
 
 export function stopMusic() {

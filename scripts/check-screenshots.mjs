@@ -74,7 +74,8 @@ for (const [status, path] of changes) {
     errors.push(`${path} is a screenshot, so save it as WebP: npm run screenshots -- ${path}`);
   }
   const limit = shot ? SCREENSHOT_KB : IMAGE_KB;
-  if (kb > limit) errors.push(`${path} is ${kb} KB, over the ${limit} KB limit`);
+  // Compare the bytes, not the rounded figure, so a file half a KB over the limit doesn't pass.
+  if (buf.length > limit * 1024) errors.push(`${path} is ${kb} KB, over the ${limit} KB limit`);
   if (!dims) errors.push(`${path}: could not read its size`);
   else if (Math.max(...dims) > MAX_SIDE) errors.push(`${path} is ${dims.join('x')}, over ${MAX_SIDE} pixels`);
   if (shot && status === 'A' && !deleted.has(stem(path))) added.push(path);

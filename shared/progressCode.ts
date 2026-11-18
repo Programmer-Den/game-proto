@@ -191,7 +191,14 @@ let looping: ReturnType<typeof setInterval> | undefined;
  */
 export async function showProgressCode(kind: string, games: string[], title: string) {
   const dialog = document.getElementById('progress-code') as HTMLDialogElement;
-  const link = await progressLink(kind, games);
+  let link: string;
+  try {
+    link = await progressLink(kind, games);
+  } catch {
+    // Storage blocked, or no compression in this browser: say so rather than do nothing.
+    alert(t('exportProgressFailed'));
+    return;
+  }
   const qr = dialog.querySelector<HTMLElement>('.qr')!;
   const counter = dialog.querySelector<HTMLElement>('.frame-count')!;
   let fits = false;
