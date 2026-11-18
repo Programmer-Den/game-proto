@@ -29,6 +29,8 @@ export const MINIMAP = { x: 826, y: 420, w: 112, h: 112 };
 
 /** The objective card under the top bar, at the top left of the map. It blocks clicks. */
 export const OBJECTIVE_CARD = { x: 10, y: 42, w: 236, h: 62 };
+/** The champion quest's chip (LB21) under the objective card (and under the siege banner while it shows). */
+export const QUEST_CHIP = { x: 10, y: 110, w: 236, h: 20 };
 /** The last-hit streak chip, right of the gold counter. */
 export const STREAK_CHIP = { x: 96, y: 6, w: 118, h: 22 };
 
@@ -91,13 +93,15 @@ export function pickCard(i: number, n = 17) {
   return { x: (SCREEN.w - total) / 2 + col * (PICK_CARD.w + PICK_CARD.gap), y: FRAME.y + PICK_CARD.y + row * (PICK_CARD.h + PICK_CARD.gap), w: PICK_CARD.w, h: PICK_CARD.h };
 }
 /** The battle spell button on the pick screen, under the champion cards: a click picks the next spell. */
-export const SPELL_PICK = { x: 40, y: 484, w: 220, h: 20 };
+export const SPELL_PICK = { x: 47, y: 484, w: 196, h: 20 };
 /** Beside it, the match kind: a click steps through full, quick, ranked and the week's event. */
-export const MODE_PICK = { x: 266, y: 484, w: 240, h: 20 };
+export const MODE_PICK = { x: 249, y: 484, w: 196, h: 20 };
 /** Then the map (LB20): a click switches between Kessmoor and the Twin Rivers. */
-export const MAP_PICK = { x: 512, y: 484, w: 200, h: 20 };
+export const MAP_PICK = { x: 451, y: 484, w: 150, h: 20 };
 /** Then the champion's colours won on the ranked ladder: a click wears the next. */
-export const SKIN_PICK = { x: 718, y: 484, w: 200, h: 20 };
+export const SKIN_PICK = { x: 607, y: 484, w: 150, h: 20 };
+/** Then the role (LB22): a click steps through mid, top, bottom and jungle. */
+export const ROLE_PICK = { x: 763, y: 484, w: 150, h: 20 };
 
 /**
  * The panel before a match (LB18, LB19), over the pick screen: a ranked match's draft at the top,
@@ -116,10 +120,12 @@ export function buffStrip(i: number) {
 }
 
 /** The panel and button shown when a match is won or lost. */
-export const END_PANEL = { x: 200, y: 60, w: 560, h: 420 };
-export const PLAY_AGAIN = { x: 380, y: 418, w: 200, h: 44 };
+export const END_PANEL = { x: 200, y: 22, w: 560, h: 496 };
+export const PLAY_AGAIN = { x: 380, y: 468, w: 200, h: 40 };
 /** The net worth graph on the end panel. */
-export const WORTH_GRAPH = { x: 228, y: 230, w: 504, h: 130 };
+export const WORTH_GRAPH = { x: 228, y: 192, w: 504, h: 96 };
+/** The coach's notes on the end panel (LB23), under the graph (16 px lower for each ladder or unlock line). */
+export const COACH_BOX = { x: 228, y: 312, w: 504, h: 108 };
 
 /**
  * Lays the screen out for a view of `w` x `h` (at least 960x540), once at start. At 960x540 nothing
@@ -143,16 +149,18 @@ export function fitLayout(w: number, h: number) {
   RECALL_BUTTON.x = 530 + dx / 2;
   SCORE_CHIP.x = 380 + dx / 2;
   SPELL_BUTTON.x = 654 + dx / 2;
-  Object.assign(SPELL_PICK, { x: 40 + dx / 2, y: 484 + dy / 2 });
-  Object.assign(MODE_PICK, { x: 266 + dx / 2, y: 484 + dy / 2 });
-  Object.assign(MAP_PICK, { x: 512 + dx / 2, y: 484 + dy / 2 });
-  Object.assign(SKIN_PICK, { x: 718 + dx / 2, y: 484 + dy / 2 });
+  Object.assign(SPELL_PICK, { x: 47 + dx / 2, y: 484 + dy / 2 });
+  Object.assign(MODE_PICK, { x: 249 + dx / 2, y: 484 + dy / 2 });
+  Object.assign(MAP_PICK, { x: 451 + dx / 2, y: 484 + dy / 2 });
+  Object.assign(SKIN_PICK, { x: 607 + dx / 2, y: 484 + dy / 2 });
+  Object.assign(ROLE_PICK, { x: 763 + dx / 2, y: 484 + dy / 2 });
   Object.assign(LOBBY, { x: 130 + dx / 2, y: 52 + dy / 2 });
   Object.assign(LOBBY_BACK, { x: 150 + dx / 2, y: 454 + dy / 2 });
   Object.assign(LOBBY_FIGHT, { x: 660 + dx / 2, y: 454 + dy / 2 });
   Object.assign(SCORE_PANEL, { x: 100 + dx / 2, y: 38 + dy / 2 });
   Object.assign(SHOP_PANEL, { x: 100 + dx / 2, y: 38 + dy / 2 });
-  Object.assign(END_PANEL, { x: 200 + dx / 2, y: 60 + dy / 2 });
-  Object.assign(PLAY_AGAIN, { x: 380 + dx / 2, y: 418 + dy / 2 });
-  Object.assign(WORTH_GRAPH, { x: 228 + dx / 2, y: 230 + dy / 2 });
+  Object.assign(END_PANEL, { x: 200 + dx / 2, y: 22 + dy / 2 });
+  Object.assign(PLAY_AGAIN, { x: 380 + dx / 2, y: 468 + dy / 2 });
+  Object.assign(WORTH_GRAPH, { x: 228 + dx / 2, y: 192 + dy / 2 });
+  Object.assign(COACH_BOX, { x: 228 + dx / 2, y: 312 + dy / 2 });
 }

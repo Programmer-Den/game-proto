@@ -72,13 +72,18 @@ import {
   eventOfWeek,
   weekEnds,
   SUDDEN_DEATH,
+  QUESTS,
+  ROLES,
+  ROLE_NAMES,
+  RoleId,
 } from '../game/data';
 import { Fx, GameState, ObjectiveTitle, Phase, Unit, createGame, dist, getUnit } from '../game/state';
 import { isUnlocked, loadMastery, masteryRank, ranksBesides, recordWin } from '../game/mastery';
 import { Ladder, LadderResult, loadLadder, loadSkin, recordRanked, saveSkin, skinsWon, starText } from '../game/ladder';
 import { checkTrophies } from '../trophies/check';
-import { MODES, MatchMode, loadMap, loadMode, loadSpell, saveMap, saveMode, saveSpell } from '../game/spellChoice';
-import { announceEvent, abilityFor, atFountain, atShop, buy, buyBack, buybackCost, cast, castSpell, chooseUpgrade, commandAttack, commandMove, hiddenFrom, invulnerable, priceFor, sendPing, startRecall, stealthed, nightness, behind, callSurrender, mvpOf, tick, useActive, viewers } from '../game/sim';
+import { MODES, MatchMode, loadMap, loadMode, loadRole, loadSpell, saveMap, saveMode, saveRole, saveSpell } from '../game/spellChoice';
+import { coachNotes } from '../game/coach';
+import { announceEvent, abilityFor, atFountain, atShop, buy, buyBack, buybackCost, cast, castSpell, chooseUpgrade, commandAttack, commandMove, hiddenFrom, invulnerable, priceFor, sendPing, startRecall, stealthed, nightness, behind, callSurrender, mvpOf, questHave, tick, useActive, viewers } from '../game/sim';
 import { FxLayers, drawAura, drawProjectile, drawSkill, drawZone, skillMs } from './skillFx';
 import { shortName } from '../game/names';
 import { t, type TextKey } from '../i18n';
@@ -170,6 +175,9 @@ import {
   pingButton,
   shopRow,
   upgradeCard,
+  ROLE_PICK,
+  QUEST_CHIP,
+  COACH_BOX,
 } from './layout';
 
 /** Simulation step in ms. Each frame runs as many steps as the time since the last frame needs. */
@@ -384,6 +392,9 @@ export class GameScene extends Phaser.Scene {
   /** The map of the next full or ranked match (`loadMap`), and whether the pointer is on its button. */
   private mapId: MapId = 'classic';
   private hoverMap = false;
+  /** The player's role in the next match (LB22, `loadRole`), and whether the pointer is on its button. */
+  private role: RoleId = 'mid';
+  private hoverRole = false;
   /** A ranked match's bans so far (LB19): the player's, then red's. */
   private bans: { blue: ChampionDef; red: ChampionDef } | null = null;
   /** The panel before a match (LB18, LB19): the picked champion, its ranked draft and its talent page. */
@@ -424,6 +435,7 @@ export class GameScene extends Phaser.Scene {
     this.spell = loadSpell();
     this.mode = loadMode();
     this.mapId = loadMap();
+    this.role = loadRole();
     this.skin = loadSkin();
     this.readWeek();
     // The world camera follows the champion; the HUD (scroll factor 0) gets a fixed camera.
@@ -497,9 +509,11 @@ export class GameScene extends Phaser.Scene {
       this.hoverSkin = this.phase === 'pick' && v.x >= kb.x && v.x <= kb.x + kb.w && v.y >= kb.y && v.y <= kb.y + kb.h;
       const pb = MAP_PICK;
       this.hoverMap = this.phase === 'pick' && v.x >= pb.x && v.x <= pb.x + pb.w && v.y >= pb.y && v.y <= pb.y + pb.h;
+      const rb = ROLE_PICK;
+      this.hoverRole = this.phase === 'pick' && v.x >= rb.x && v.x <= rb.x + rb.w && v.y >= rb.y && v.y <= rb.y + rb.h;
       if (this.lobby) {
         this.hoverPick = -1;
-        this.hoverSpell = this.hoverMode = this.hoverSkin = this.hoverMap = false;
+        this.hoverSpell = this.hoverMode = this.hoverSkin = this.hoverMap = this.hoverRole = false;
       }
     });
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => this.onPointerDown(p));
@@ -638,6 +652,19 @@ export class GameScene extends Phaser.Scene {
     saveMap(this.mapId);
   }
 
+  /** The pick screen's role button (LB22): mid, top, bottom, jungle and round again. */
+  private nextRole() {
+    ui('click');
+    this.role = ROLES[(ROLES.indexOf(this.role) + 1) % ROLES.length];
+    saveRole(this.role);
+  }
+
+  /** A role's quest in words: its goal and the time it must be met by. */
+  private questLine(role: RoleId): string {
+    const q = QUESTS[role];
+    return t(q.text, { n: q.goal, time: clock(q.byMs) });
+  }
+
   /** The map the next match plays on: quick and event matches keep to Kessmoor. */
   private matchMap(): MapId {
     return this.mode === 'quick' || this.mode === 'event' ? 'classic' : this.mapId;
@@ -654,6 +681,7 @@ export class GameScene extends Phaser.Scene {
       watch: watching,
       mastery: masteryRank(this.mastery[def.id] ?? 0),
       spell: this.spell,
+      role: this.role,
       quick: mode === 'quick',
       ranked: mode === 'ranked' ? this.ladder.tier : undefined,
       event: mode === 'event' ? this.event : undefined,
@@ -856,6 +884,7 @@ export class GameScene extends Phaser.Scene {
       this.zones.push({ ...MODE_PICK, run: () => this.nextMode() });
       this.zones.push({ ...MAP_PICK, run: () => this.nextMap() });
       this.zones.push({ ...SKIN_PICK, run: () => this.nextSkin() });
+      this.zones.push({ ...ROLE_PICK, run: () => this.nextRole() });
       return;
     }
     if (phase === 'won' || phase === 'lost') {
@@ -1799,6 +1828,10 @@ export class GameScene extends Phaser.Scene {
     };
     const ranked = this.mode === 'ranked';
     if (this.hoverMode) line(this.modeLine(), UI.gold, this.modeDesc(), UI.text);
+    else if (this.hoverRole) {
+      const ab = t('questReward', { key: QUESTS[this.role].key });
+      line(`${t('pickRoleLine', { role: t(ROLE_NAMES[this.role].name) })} · ${t(ROLE_NAMES[this.role].desc)}`, UI.gold, `${t('questHead')}: ${this.questLine(this.role)} ${ab}`, UI.text);
+    }
     else if (this.hoverMap) {
       const m = MAP_NAMES[this.mapId];
       line(t('pickMapLine', { map: t(m.name) }), UI.gold, this.matchMap() === this.mapId ? t(m.desc) : t('pickMapClassicOnly'), UI.text);
@@ -1845,6 +1878,16 @@ export class GameScene extends Phaser.Scene {
     g.lineStyle(1, col(UI.edge), 1).strokeRect(kb.x + 7, kb.y + 5, 10, 10);
     this.t('pick-skin', kb.x + kb.w / 2 + 8, kb.y + 4, t('pickSkinLine', { skin: t(skin.name) }), 10, UI.gold, 'center', true);
     this.fit('pick-skin', kb.w - 28);
+    // The role: mid, top, bottom or jungle, with a small lane mark.
+    const rb = ROLE_PICK;
+    this.panel(g, rb.x, rb.y, rb.w, rb.h, this.hoverRole ? '#3a4660' : UI.card);
+    g.lineStyle(1.5, col(UI.goldDeep), 1).strokeRect(rb.x + 1, rb.y + 1, rb.w - 2, rb.h - 2);
+    const mark = { mid: [7, 15, 17, 5], top: [7, 15, 7, 5], bottom: [7, 15, 17, 15], jungle: [0, 0, 0, 0] }[this.role];
+    g.lineStyle(2, col(UI.gold), 1).strokeRect(rb.x + 6, rb.y + 4, 12, 12);
+    if (this.role === 'jungle') g.fillStyle(col('#6fbf6a'), 1).fillCircle(rb.x + 12, rb.y + 10, 3.5);
+    else g.lineStyle(2, col('#c9b27a'), 1).lineBetween(rb.x + mark[0] - 1, rb.y + mark[1], rb.x + mark[2] + 1, rb.y + mark[3]);
+    this.t('pick-role', rb.x + rb.w / 2 + 8, rb.y + 4, t('pickRoleLine', { role: t(ROLE_NAMES[this.role].name) }), 10, UI.gold, 'center', true);
+    this.fit('pick-role', rb.w - 30);
     this.t('hint', SCREEN.w / 2, FRAME.y + 509, `${t('pickHint1')}\n${t('pickHint2')}`, 11, UI.dim, 'center');
     this.texts.get('hint')?.setAlign('center').setLineSpacing(1);
   }
@@ -1964,6 +2007,7 @@ export class GameScene extends Phaser.Scene {
     const score = this.scoreOpen;
     if (!this.shopOpen && !score) {
       if (!watching) this.drawObjectiveCard(g, s);
+      if (!watching) this.drawQuest(g, s, me);
       this.drawBuffs(g, s);
       this.drawNotice(g, s);
       if (!watching && me.dead) this.drawRecap(g, s);
@@ -2146,6 +2190,29 @@ export class GameScene extends Phaser.Scene {
       g.fillStyle(col(UI.goldDeep), 1).fillRect(c.x + 7, y + 3, 1.5, 13);
       this.t('siege', c.x + 24, y + 3, t('siegeBanner', { pct: Math.round((SIEGE.mult - 1) * 100), time: clock(s.siegeUntil - s.time) }), 10, UI.gold, 'left', true);
     }
+  }
+
+  /** The champion quest's chip (LB21): its goal and progress, then done (the ability it empowered) or missed. */
+  private drawQuest(g: Phaser.GameObjects.Graphics, s: GameState, me: Unit) {
+    const q = s.quest;
+    if (!q) return;
+    const c = { ...QUEST_CHIP, y: QUEST_CHIP.y + (s.time < s.siegeUntil ? 24 : 0) };
+    const done = q.state === 'done';
+    g.fillStyle(col(UI.edge), 1).fillRect(c.x - 1, c.y - 1, c.w + 2, c.h + 2);
+    g.fillStyle(col(done ? '#4a3b14' : '#232b3a'), 0.94).fillRect(c.x, c.y, c.w, c.h);
+    // A little scroll, the quest's sign, and a gold bar of its progress along the bottom.
+    g.fillStyle(col(done ? UI.gold : '#e8dcc0'), 1).fillRect(c.x + 6, c.y + 5, 9, 10);
+    g.fillStyle(col(UI.goldDeep), 1).fillRect(c.x + 5, c.y + 4, 11, 2).fillRect(c.x + 5, c.y + 14, 11, 2);
+    const have = Math.min(questHave(s), q.def.goal);
+    if (q.state === 'open') g.fillStyle(col(UI.gold), 1).fillRect(c.x, c.y + c.h - 2, (c.w * have) / q.def.goal, 2);
+    let line: string;
+    if (done) {
+      const ab = me.champ?.abilities.find((a) => a.key === q.def.key);
+      line = t('questDone', { ability: ab ? t(ab.name) : q.def.key });
+    } else if (q.state === 'missed') line = t('questMissed');
+    else line = t('questChip', { what: t(q.def.short), have, n: q.def.goal, time: clock(Math.max(0, q.def.byMs - s.time)) });
+    this.t('quest', c.x + 22, c.y + 4, line, 10, done ? UI.gold : q.state === 'missed' ? UI.muted : UI.text, 'left', true);
+    this.fit('quest', c.w - 28);
   }
 
   /** A chip for each team whose minions the guardian beast empowered, and one for each team with the elder blessing, with the time left. */
@@ -2691,6 +2758,20 @@ export class GameScene extends Phaser.Scene {
     this.t('worth-red', r.x + 150, r.y + r.h + 4, t('worthRed', { gold: formatNumber(end.red) }), 11, SIDE_COLOR.red, 'left', true);
   }
 
+  /** The coach's three notes (LB23), each with its tip, under the net worth graph. */
+  private drawCoach(g: Phaser.GameObjects.Graphics, s: GameState, lines: number) {
+    const r = { ...COACH_BOX, y: COACH_BOX.y + lines * 16 };
+    this.t('coach-title', r.x, r.y, t('coachTitle'), 11, UI.dim, 'left', true);
+    coachNotes(s).forEach((n, i) => {
+      const y = r.y + 18 + i * 30;
+      g.fillStyle(col(n.good ? UI.green : UI.gold), 1).fillCircle(r.x + 5, y + 7, 3.5);
+      this.t(`coach-note-${i}`, r.x + 14, y, t(n.note, n.vars), 11, n.good ? UI.green : UI.gold, 'left', true);
+      this.t(`coach-tip-${i}`, r.x + 14, y + 14, t(n.tip, n.vars), 10, UI.text, 'left');
+      this.fit(`coach-note-${i}`, r.w - 14);
+      this.fit(`coach-tip-${i}`, r.w - 14);
+    });
+  }
+
   private drawEnd(g: Phaser.GameObjects.Graphics, s: GameState) {
     g.fillStyle(0x000000, 0.6).fillRect(0, 0, SCREEN.w, SCREEN.h);
     const p = END_PANEL;
@@ -2738,14 +2819,15 @@ export class GameScene extends Phaser.Scene {
       let text = r.moved === 'up' ? t('ladderPromoted', vars) : r.moved === 'down' ? t('ladderDemoted', vars) : won ? t(r.after.stars > r.before.stars ? 'ladderUp' : 'ladderTop', vars) : r.before.stars === 0 ? t('ladderHold', vars) : t('ladderDown', vars);
       const skin = SKINS.find((k) => k.id === r.skin);
       if (skin) text = t('ladderSkin', { line: text, skin: t(skin.name) });
-      this.t('end-ladder', SCREEN.w / 2, p.y + 318, text, 12, tier.color, 'center', true);
+      this.t('end-ladder', SCREEN.w / 2, p.y + 290, text, 12, tier.color, 'center', true);
       this.fit('end-ladder', p.w - 24);
     }
     if (!watching && this.unlockedNow.length) {
       const c = this.unlockedNow[0];
-      this.t('end-unlock', SCREEN.w / 2, p.y + (s.ranked ? 334 : 318), t('championUnlocked', { hero: t(c.hero), class: t(c.name) }), 12, c.color, 'center', true);
+      this.t('end-unlock', SCREEN.w / 2, p.y + (s.ranked ? 306 : 290), t('championUnlocked', { hero: t(c.hero), class: t(c.name) }), 12, c.color, 'center', true);
     }
     this.drawSummary(g, s);
+    if (!watching) this.drawCoach(g, s, (s.ranked ? 1 : 0) + (this.unlockedNow.length ? 1 : 0));
     this.panel(g, PLAY_AGAIN.x, PLAY_AGAIN.y, PLAY_AGAIN.w, PLAY_AGAIN.h, '#4a5876');
     this.t('again-label', PLAY_AGAIN.x + PLAY_AGAIN.w / 2, PLAY_AGAIN.y + 12, t(watching ? 'watchAnother' : 'playAgain'), 16, UI.text, 'center', true);
   }

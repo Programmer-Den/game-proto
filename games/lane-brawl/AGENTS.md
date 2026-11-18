@@ -516,6 +516,30 @@ Implemented today:
   (gold plus the full `cost` of each held item) onto `s.history`. `mvpOf` picks the champion with
   the best `SUMMARY` score. The end panel (`END_PANEL`, now 560x420) shows them in `drawSummary`:
   the MVP line in its team's colour and a line per team in `WORTH_GRAPH`, scaled to the top value.
+- Roles (LB22, round 5): `RoleId`, `ROLES`, `ROLE_NAMES`, `ROLE_ALLY_LANES` and `JUNGLER` in
+  `data.ts`. The pick screen's fifth button, `ROLE_PICK`, steps through mid, top, bottom and jungle
+  (`nextRole`; hovering it shows the role and its quest in the two lines), kept under
+  `lane-brawl-role` (`loadRole`, `saveRole` in `spellChoice.ts`; mid with no save).
+  `MatchOptions.role` sets `s.role`; `createGame` walks the allies by `ROLE_ALLY_LANES[s.role]`
+  (mid is the old `ALLY_LANES`, so the playthrough's match is unchanged; the Twin Rivers, quick and
+  all-mid matches keep their own lanes) and starts a jungler's objectives at the camp
+  (`objectiveIndex` 1). `updateObjective` picks the red tower of a top or bottom laner's own lane
+  while one stands. `damage` multiplies the player's hits on camps by `JUNGLER.campDmg` in the jungle.
+- Champion quests (LB21, round 5): `QUESTS` (per role: what it counts, `goal`, `byMs`, the ability
+  `key` it empowers, its sentence `text` and chip label `short`) and `QUEST` in `data.ts`.
+  `createGame` sets `s.quest` (`{ def, have, state }`, null when watching). `have` counts towers
+  and drakes that fall to blue with the player alive within `QUEST.near` (`questNear`, from `kill`
+  and `slayDrake`) and camps the player slays; `questHave` reads `s.lastHits` for the mid quest.
+  `updateQuest` (in `tick`) marks it `done` (`Unit.questKey`, a notice and the `quest` sound) or
+  `missed` at `byMs`. `abilityFor` applies `QUEST`'s percents to `questKey`'s ability. The view
+  draws `drawQuest` in `QUEST_CHIP` under the objective card (24 px lower under the siege banner).
+  No quest finishes in the playthrough's first round.
+- The coach (LB23, round 5): `s.coach` counts the player's deaths within `COACH.towerReach` of a
+  red tower's range (`kill`), marked last hits that fell to others (`missed`), wards planted,
+  spells cast, time alive with `COACH.rich` gold or more (`richMs`, in `updateQuest`) and missed
+  objectives. `coachNotes(s)` in `game/coach.ts` ranks the problems by weight and fills up to
+  `COACH.notes` with praise, then general tips. `drawCoach` shows them in `COACH_BOX` on the end
+  panel (`END_PANEL`, now 560x496), 16 px lower for each ladder or unlock line. Not when watching.
 - Victory and defeat panel with the match's objectives, last hits, best streak and beasts slain,
   and "Play again".
 
@@ -524,8 +548,10 @@ Missing or rough:
 - The AI ignores floods and the Twin Rivers' fords when it plans; AI champions have no talent pages.
 - Paths are found round the forest only; towers, pillars and stones are slid round one step at a
   time (`steer`), which their spacing keeps clear of pockets.
-- No title screen of its own. The saves are class mastery, the ladder and colours, and the battle
-  spell and match kind (below).
+- No title screen of its own. The saves are class mastery, the ladder and colours, talent pages,
+  and the battle spell, match kind, map and role (below).
+- Quests count only the player's own progress; the AI has no roles or quests, and the coach reads
+  only a few counters (no positions over time).
 - Bushes hide champions only, not minions. The camera follows the player's champion.
 - AI champions use bushes only to wait in on a gank, and ward only the fixed `WARD_SPOTS` and bush
   centres.
@@ -566,7 +592,7 @@ File map (`src/`):
   live in the same map).
 - `scenes/skillFx.ts`: every ability's look (see "Skill looks" above): `drawSkill`, `skillMs`,
   `drawProjectile`, `drawZone` and `drawAura`, with small shape helpers. No game rules.
-- `scenes/layout.ts`: screen rectangles for the bars, the pick screen's cards and four buttons (`pickCard`, `SPELL_PICK`, `MODE_PICK`, `MAP_PICK`, `SKIN_PICK`), the panel before a match (`LOBBY`, `talentCard`, `LOBBY_BACK`, `LOBBY_FIGHT`), the objective card, the streak chip, the
+- `scenes/layout.ts`: screen rectangles for the bars, the pick screen's cards and five buttons (`pickCard`, `SPELL_PICK`, `MODE_PICK`, `MAP_PICK`, `SKIN_PICK`, `ROLE_PICK`), the quest chip (`QUEST_CHIP`), the coach's notes (`COACH_BOX`), the panel before a match (`LOBBY`, `talentCard`, `LOBBY_BACK`, `LOBBY_FIGHT`), the objective card, the streak chip, the
   ability boxes, the upgrade panel and cards (`upgradeCard`), the shop, the kill score and scoreboard (`SCORE_CHIP`, `SCORE_PANEL`), the minimap, the pick cards
   and the end panel, plus `VIEW` (the designed 960x540), `SCREEN` (the view actually shown),
   `FRAME` (the designed rectangle's corner in it), `fitLayout` and `FONT` (a system font stack).
@@ -626,7 +652,8 @@ File map (`src/`):
   pines and rocks, from a fixed seed; then the beast's pit and the bushes (tall faceted grass).
 - `trophies/`: the trophy list (`index.ts`), its texts (`i18n/`) and the conditions (`check.ts`).
 - `game/names.ts`: `shortName`, a champion's first name from its full name.
-- `game/spellChoice.ts`: the player's battle spell, match kind and map, the save keys `lane-brawl-spell` (`loadSpell`, `saveSpell`), `lane-brawl-mode` (`loadMode`, `saveMode`; `lane-brawl-quick`, `loadQuick`, is the older quick pick) and `lane-brawl-map` (`loadMap`, `saveMap`).
+- `game/spellChoice.ts`: the player's battle spell, match kind, map and role, the save keys `lane-brawl-spell` (`loadSpell`, `saveSpell`), `lane-brawl-mode` (`loadMode`, `saveMode`; `lane-brawl-quick`, `loadQuick`, is the older quick pick), `lane-brawl-map` (`loadMap`, `saveMap`) and `lane-brawl-role` (`loadRole`, `saveRole`).
+- `game/coach.ts`: the coach's notes after the match (`coachNotes`, `CoachNote`).
 - `game/draft.ts`: a ranked match's pick and ban (`redBan`, `runDraft`, `counterTo`, `Draft`).
 - `game/talents.ts`: talent pages, the save key `lane-brawl-talents` (`loadPage`, `chooseTalent`, `openRows`, `talentsOf`).
 - `game/mastery.ts`: class mastery, the save key `lane-brawl-mastery` (`loadMastery`, `recordWin`,
@@ -807,6 +834,7 @@ Effects (`sfx`), where they are raised:
 | `suddenDeath` | sudden death begins in a `suddenDeath` event (`tick`) |
 | `flood` | the Twin Rivers flood (`updateFlood`) |
 | `promote` | the end panel: a ranked tier or colours won, or a champion unlocked (the scene) |
+| `quest` | the player's champion quest done (`updateQuest`); a missed one plays `objectiveMissed` |
 | `objective` / `objectiveMissed` | the player's objective done / missed (`updateObjective`) |
 
 Shared `ui` sounds: `click` for the Shop button, B and Play again; `coin` for a purchase;
@@ -846,8 +874,9 @@ Shared `ui` sounds: `click` for the Shop button, B and Play again; `coin` for a 
   the Warden's level 2 `UPGRADES` pair (`wide-slam`, `stun-slam`), and the 240 s game-time budget.
 - The seed in `addInitScript` is picked so the shuffle in `createGame` fields Harpooner, Tinker,
   Mage and Archer on blue and Stalker, Wolfkin, Bruin, Blade and Berserker on red, the roster the
-  round was tuned with (2419 `Math.random` calls come before the shuffle in the browser; the map
-  button's text added 31, as Phaser draws 31 for each text's texture key). With no
+  round was tuned with (2450 `Math.random` calls come before the shuffle in the browser; the map
+  button's text added 31, and the role button's (LB22) 31 more, as Phaser draws 31 for each text's
+  texture key). With no
   save the Falconer and Alchemist are locked and out of the pool, so the shuffle sees the old
   fifteen. Anything that adds or removes draws before the shuffle (a new text on the pick screen
   too: each Phaser text draws for its texture key) shifts the roster. The generator's state only
@@ -857,8 +886,8 @@ Shared `ui` sounds: `click` for the Shop button, B and Play again; `coin` for a 
   class in the pool changes the shuffle itself: pick a seed by replaying it in node, or re-tune.
 - It asserts the first objective and its target (title key `objTowerMid`, so it passes in any
   language), the objective paid and the siege banner after
-  the tower falls, the camp objective, at least one last hit and a streak, level 2's offer, and
-  Wide Gatefall (`wide-slam`) kept from the card.
+  the tower falls, the camp objective, at least one last hit and a streak, the mid role with its
+  last-hit quest still open, level 2's offer, and Wide Gatefall (`wide-slam`) kept from the card.
 - Round 2 stays out of the first round: the AI buys only a Healing Flask and a ward at 0:00 (its
   wards and recalls change nothing the test asserts), `GANK.firstAt` keeps bounty hunts past it,
   and the player never recalls, wards or buys back. `SPELL_AI.from` keeps the AI's battle spells
@@ -878,7 +907,7 @@ Shared `ui` sounds: `click` for the Shop button, B and Play again; `coin` for a 
   `skill-looks-3.webp` (every ability's effect, five classes each), `aim-indicators.webp`,
   `home-heal-and-dead-shop.webp`, `pick-and-ban.webp`, `draft-and-talents.webp` and
   `twin-rivers-flood.webp` (a Gold ladder, mastery, mode, map and talent saves set first, the
-  Blade banned and the Archer picked, then the Archer placed by a ford and the flood called early), `scoreboard.webp` (a match run 7 minutes with blue's fifth on the AI, Tab held), `river-rune.webp` (run to 2:00, the Warden placed by the first spot), `merc-camp.webp` and `mercs-march.webp` (the Warden placed by blue's camp, then made strong to clear it), `pick-spell.webp` and `spell-button.webp` (the spell button pressed once, then a match run to 2:30 and Firebrand cast), `loop-objective.webp`, `loop-last-hit.webp` and
+  Blade banned and the Archer picked, then the Archer placed by a ford and the flood called early), `scoreboard.webp` (a match run 7 minutes with blue's fifth on the AI, Tab held), `river-rune.webp` (run to 2:00, the Warden placed by the first spot), `merc-camp.webp` and `mercs-march.webp` (the Warden placed by blue's camp, then made strong to clear it), `pick-spell.webp` and `spell-button.webp` (the spell button pressed once, then a match run to 2:30 and Firebrand cast), `role-pick.webp`, `champion-quest.webp` and `coach.webp` (round 5: the role saved as bottom and its button hovered, then a match run to 2:20 with the quest's count set to its goal, then run on with coach counters set and the phase set to won), `loop-objective.webp`, `loop-last-hit.webp` and
   `upgrade-*.webp` and `round2-*.webp` (the ward in the shop and planted by a bush, a recall, a
   bounty, the buy back button and the watch log of the AI shopping) and `german-pick.webp` (the pick
   screen with `?lang=de`, Grumm's card under the pointer) are staged docs shots (a scratch
