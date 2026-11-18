@@ -18,6 +18,7 @@ export const trophies = trophySet(
     { id: 'firstChapel', tier: 'silver', icon: '🌹' },
     { id: 'allStars', tier: 'gold', icon: '🌟', hidden: true },
     { id: 'allChapels', tier: 'gold', icon: '⛪' },
+    { id: 'clerestory', tier: 'silver', icon: '🕯️' },
   ],
   { en, de },
 );
