@@ -6,12 +6,12 @@ of the [game hub](../../README.md).
 A hero, the Knight, the Hunter or (once unlocked) the Hexer or the Alchemist, walks a dungeon in two acts: the
 Crypt, from the entrance on the left to the Bone King on the right, then down a stair to the Sunken
 Tombs and the Hollow Queen, and from depth 3 on up a third, the Bone Spire, to the Marrow Tyrant. Each
-room on the way is a fight, an elite, a campfire, a treasure chest, a merchant or a mystery, and the
-paths fork, so the route is the player's to pick. Each act is laid out anew for every run. Fights
+room on the way is a fight, an elite, a campfire, a treasure chest, a merchant, a mystery or a
+locked vault whose key an elite carries, and the paths fork, so the route is the player's to pick. Each act is laid out anew for every run. Fights
 are played with a deck of cards: a hand of five each turn, three energy to spend on them, flasks to
 drink for free, and foes who show what they will do on their next turn. Every fight won drops gold
 and adds a new card to the deck; gold buys cards, relics, flasks and a card's removal from the
-merchant. Beating the Hollow Queen opens the next depth, a harder run with one more rule, and the
+merchant. Each act's boss leaves a choice of boss relics, strong but each with a cost. Beating the Hollow Queen opens the next depth, a harder run with one more rule, and the
 best depth reached is saved. Once a day the daily crypt sends everyone out on the same run, with
 the same hero, map and card offers, and all week the weekly crypt does the same with more elites
 and no campfires, as often as you like. Every card a hero adds to a deck goes into that hero's
@@ -69,10 +69,22 @@ in code.
    last the act's boss. Every column between holds two or three rooms: one kind that is always
    there (a mystery in the second, a campfire in the third, a treasure chest in the fourth, a
    merchant in the fifth) and one or two more drawn from fights, elites, mysteries and merchants.
+   **Vaults**: on a map with an elite in the campfire column, the farthest fight that elite's paths
+   reach (in the fourth or fifth column) is a locked vault instead. Felling an elite while the
+   vault is still shut gives the hero its key (shown in the top bar); with the key the
+   vault opens for a relic and a choice of three rare cards. Without it the vault stays dark and
+   can't be entered, so taking the elite becomes part of the route. The key is lost at the stair.
+
+   ![A vault on the map, the key in the top bar after the elite before it](docs/screenshots/vault-map.webp)
 4. **Turns**: each turn the hero draws five cards and has three energy. A card's cost is in its
    corner. Attacks (red) hit the foe in front, or every foe; skills (blue) give block, health,
    energy or more cards; powers (purple) stay in play for the rest of the fight. When the draw pile
-   runs out, the discard pile is shuffled into it.
+   runs out, the discard pile is shuffled into it. Two card words change where a card goes:
+   **Retain** keeps it in hand at the end of the turn (the hand is still drawn up to five), and
+   **Exhaust** takes it out of the fight once played (counted under the discard pile) in return
+   for a stronger effect; the deck keeps it for the next fight.
+
+   ![Retain and Exhaust cards in hand](docs/screenshots/retain-exhaust.webp)
 5. **Block** soaks up damage until the start of the hero's next turn. Health carries over from
    room to room, and the run is over when it reaches zero.
 6. **Intents**: a sword over a foe is the damage it will deal on its turn (with a status icon after
@@ -116,26 +128,32 @@ in code.
     of the deck, or heal 10) and a saint's reliquary (6 more health and maximum health, or a relic
     for 10 health).
 15. **Relics** are passive bonuses for the rest of the run, shown in the top bar.
-16. **Two acts**: beating the Bone King leaves a relic and opens the stair down to the Sunken
+16. **Boss relics**: an act's boss that doesn't end the run leaves three boss relics on the
+    descent panel, each strong and each with a cost. Tap one to pick it (again to put it back),
+    then Descend; with none picked the hero takes a plain relic instead, as before. They are never
+    sold or found anywhere else.
+
+    ![Picking a boss relic after the Bone King](docs/screenshots/descend.webp)
+17. **Two acts**: beating the Bone King leaves a boss relic and opens the stair down to the Sunken
     Tombs, with new foes, its own elite and the Hollow Queen; the hero heals a rest's worth on the
     way down. Beat her to clear the dungeon.
-17. **The Bone Spire**: from depth 3 down, the Hollow Queen's fall leaves a relic and opens a stair
+18. **The Bone Spire**: from depth 3 down, the Hollow Queen's fall leaves a boss relic and opens a stair
     up into a third act, the Bone Spire, with its own foes, elite, mystery rooms and pale violet
     stone, ending at the Marrow Tyrant. There the run is only won when the Tyrant falls.
-18. **The daily crypt**: the button under the hero panel sets out on the day's run, once a day:
+19. **The daily crypt**: the button under the hero panel sets out on the day's run, once a day:
     the same hero (the Knight or the Hunter), map, fights and card offers for everyone, at depth 0
     and on Normal. It scores 10 for each room cleared, plus the health left after beating the
     Hollow Queen; the panel at the end shows the score, the best and the days in a row, and the
     button shows today's score once the try is used. Leaving half way still uses up the day's try.
     It changes neither the depth ladder nor the heroes' unlocks.
-19. **The weekly crypt**: the button beside it sets out on the week's run, from Monday to Sunday:
+20. **The weekly crypt**: the button beside it sets out on the week's run, from Monday to Sunday:
     the same hero, maps, fights and card offers for everyone, at depth 0 and on Normal, with two
     mutators: no campfires (they become fights) and more elites (from the fourth column on, every
     fight is an elite). It scores like the daily and can be tried as often as you like; the button
     and the end panel show the week's best.
 
     ![A weekly crypt's map: no campfire, and elites from the fourth column on](docs/screenshots/weekly-map.webp)
-20. **The depth ladder**: beating the last boss (the Hollow Queen, or the Marrow Tyrant from depth 3) opens the next depth, and the deepest one opened
+21. **The depth ladder**: beating the last boss (the Hollow Queen, or the Marrow Tyrant from depth 3) opens the next depth, and the deepest one opened
     is saved in the browser. Depth 0 is the dungeon as designed; each depth
     stacks one more rule, picked with `<` and `>` on the hero panel:
 
@@ -167,8 +185,6 @@ in code.
 ![Curses and powers among the cards to burn at a campfire](docs/screenshots/curses.webp)
 
 ![An elite with statuses on both sides](docs/screenshots/elite-fight.webp)
-
-![The descent after the Bone King](docs/screenshots/descend.webp)
 
 ![The Sunken Tombs](docs/screenshots/act2-map.webp)
 
@@ -264,6 +280,18 @@ tonic joins the hand for the fight only.
 | War Cry | 1 | Apply 2 Weak and 2 Vulnerable to all foes | Costs 0 | Rare |
 | Battle Rage | 1 | Power: gain 1 Strength at the start of each turn | Costs 0 | Rare |
 | Venom Veil | 1 | Power: poison on one foe splashes half onto the rest | Costs 0 | Rare |
+| Bide | 1 | Gain 8 block, Retain | Gain 11 block | After a fight |
+| Waiting Blade | 1 | Deal 8, Retain | Deal 11 | After a fight |
+| Adrenaline | 0 | Gain 2 energy, draw 1, Exhaust | Draw 2 | After a fight |
+| Reckless Swing | 1 | Deal 15, Exhaust | Deal 20 | After a fight |
+| Execution | 2 | Deal 30, Exhaust | Deal 40 | Rare |
+| Last Stand | 1 | Gain 25 block, Exhaust | Gain 32 block | Rare |
+| Steady Aim | 2 | Deal 12, apply 2 Vulnerable, Retain | Deal 16 | Rare |
+| Grudge | 1 | Deal 3, 5 more to a foe with a status, Retain | Deal 5, 7 more | Hexer only, after a fight |
+| Doom | 1 | Apply 12 Poison and 2 Weak, Exhaust | Apply 16 Poison | Hexer only, rare |
+| Flash Brew | 0 | Brew a Steel Tonic, Exhaust | Also draw 1 | Alchemist only, after a fight |
+| Still Water | 1 | Gain 6 block, brew a Fire Tonic, Retain | Gain 9 block | Alchemist only, after a fight |
+| Elixir | 1 | Heal 12, draw 1, Exhaust | Heal 16 | Alchemist only, rare |
 | Rust | - | Curse: unplayable, clogs the hand | - | Gargoyle, chained chest |
 | Wound | - | Curse: unplayable, lose 2 health when drawn | - | Grave Knight, Marrow Tyrant, depth 3 |
 | Doubt | - | Curse: unplayable, the first card each turn costs 1 more | - | Bog Witch, Bell Ringer, shrine loot |
@@ -291,6 +319,16 @@ Rare cards come from treasure chests, elites, the merchant and the altar.
 | Golden Idol | Fights drop half as much gold again |
 | Bone Charm | Every foe starts each fight with 2 Vulnerable |
 | Venom Gland | Poison you apply is 2 higher |
+
+Boss relics, a choice of three after an act's boss (never sold or found):
+
+| Boss relic | Strength | Cost |
+| --- | --- | --- |
+| Ember Crown | 1 more energy every turn | Campfires and the stair heal nothing |
+| Seer's Eye | Draw 6 cards a turn | The merchant charges double |
+| Twin Blade | Every attack hits twice as often | Start every fight with 2 Weak |
+| Blood Chalice | 20 more health and maximum health | Card rewards offer two cards |
+| War Mask | Start every fight with 2 Strength | Every foe starts with 1 Strength |
 
 ![A treasure chest's rare cards](docs/screenshots/treasure.webp)
 

@@ -62,7 +62,16 @@ swapped in for starting cards. The art is painterly: shapes and pixel grids draw
   gold dropped by foes, card rewards after fights (common pool) and in treasure rooms (rare pool,
   with Skip), a campfire with three choices (heal 30%, temper one card, burn one card), a merchant
   (cards, relics, one removal per visit), four mystery rooms with two choices each, seven relics
-  (passive bonuses, shown in the top bar with a tap-for-text tip), and defeat and victory panels
+  (passive bonuses, shown in the top bar with a tap-for-text tip), boss relics (`BOSS_RELIC_IDS` in
+  `src/game/relics.ts`: an act's boss that doesn't end the run offers `BOSS_RELIC_CHOICES` (3) of
+  five on the descent panel, `s.bossRelics`, each strong with a cost; `pickBossRelic` picks one into
+  `s.bossPick` and `descend` takes it, or a plain relic from `grantRelic` with none picked; never
+  sold or granted at random), the card words Retain (`retain` on a `Card`: `endTurn` keeps it in
+  hand) and Exhaust (`exhaust`: `playCard` puts it in `fight.exhausted` instead of the discard pile,
+  for the rest of the fight), twelve cards that use them, locked vaults (room kind `vault`, made by
+  `addVault` in `map.ts` from a fight an elite in `KEY_COLUMN` (3) can reach; `walkTo` refuses it
+  without `s.vaultKey`, which `winFight` gives for an elite felled while the act's vault is shut;
+  entering it uses the key, grants a relic and offers rare cards), and defeat and victory panels
   whose button restarts the scene.
 - **Progression** within a run: the deck grows by rewards, purchases and curses, shrinks at a
   campfire or the merchant, cards (not curses) can be tempered once each, gold, relics and flasks are kept until
@@ -95,8 +104,13 @@ the daily record and the week's best carry over.
     half way (a reload) scores 0; a weekly try left half way only counts as a try.
   - Ten trophies is the most a game may list, so the Alchemist, the library and the weekly crypt
     earn none of their own.
-  - The library shows every card in up to two rows of 13, which the Hexer's 26 kinds of card (the
-    most any hero can find) just fill; a hero with more cards to find would run off the bottom.
+  - The library shows every card in up to two rows of 13, and in two smaller rows of 18
+    (`LIBRARY.dense`) past 26, which the 35 kinds of card the Hexer or the Alchemist can find
+    nearly fill; a hero with more than 36 cards to find would run off the bottom.
+  - The weekly crypt's maps never have a vault: its mutator turns the fights a vault would take
+    into elites first.
+  - A hand of eight or more (Retain cards and the Seer's Eye) overlaps its cards; hovering lifts one.
+  - The vault's relic is only told on the map (in `notice`) once its card is taken.
   - The card id `vampBite` is shown as "Leech".
   - A card face shows its own cost, not the one Doubt makes of it (`costOf` in `sim.ts`); the
     card simply dims when it can't be afforded.
@@ -173,15 +187,21 @@ File map (all under `src/` unless it starts with `shared/`):
   `apply` status, block, buff, debuff, and `curse`, which adds a curse card to the deck) and the
   `ENEMIES` table of health, `gold` and `moves` (the first is the opening move); whether a foe is an
   elite or a boss comes from its room's kind.
-- `game/relics.ts`: `RelicId`, `RELICS` (name, text and the number its `{n}` shows), each relic's
+- `game/relics.ts`: `PlainRelicId`, `BossRelicId`, `RelicId` (either), `RELICS` (name, text and the number its `{n}` shows), each relic's
   number (`OAK_WARD_BLOCK`, `WHETSTONE_DAMAGE`, `EMBER_LANTERN_ENERGY`, `MENDING_MOSS_HEAL`,
-  `GOLDEN_IDOL_GOLD`, `BONE_CHARM_VULNERABLE`, `VENOM_GLAND_POISON`), `relicText(id)` (the shown text
-  with its number) and `RELIC_IDS`. Their effects live in `sim.ts` (search for `hasRelic`).
+  `GOLDEN_IDOL_GOLD`, `BONE_CHARM_VULNERABLE`, `VENOM_GLAND_POISON`, and the boss relics'
+  `EMBER_CROWN_ENERGY`, `SEER_EYE_DRAW`, `SEER_EYE_PRICE`, `TWIN_BLADE_WEAK`, `BLOOD_CHALICE_HP`,
+  `WAR_MASK_STRENGTH`, `WAR_MASK_FOE_STRENGTH`), `relicText(id)` (the shown text
+  with its number), `BOSS_RELIC_IDS`, `BOSS_RELIC_CHOICES`, `isBossRelic` and `RELIC_IDS` (the plain
+  ones only: the merchant, events, vaults and `grantRelic` draw from it). Their effects live in
+  `sim.ts` (search for `hasRelic`): the Ember Crown in `turnEnergy` and `restHeal`, the Seer's Eye
+  in `startTurn` and `makeShop`, the Twin Blade in `playCard` and `startFight`, the Blood Chalice in
+  `descend` and `rewardChoices`, the War Mask in `startFight`.
 - `game/events.ts`: `EventId`, `EVENTS` (title, text, two choice captions and the number each
   caption's `{n}` shows), their cost constants
   and the curses the shrine's loot and the chest add (`SHRINE_CURSE`, `CHEST_CURSE`). Their effects
   live in `chooseEvent` in `sim.ts`.
-- `game/map.ts`: `RoomKind`, `Room` (kind, column, screen x/y, `next` links, foes, event),
+- `game/map.ts`: `RoomKind` (with `vault`), `Room` (kind, column, screen x/y, `next` links, foes, event), `KEY_COLUMN`, the private `addVault` (run at the end of `makeMap`, reading the map only),
   `COLUMNS` (7), `ACTS` (2, the acts of a run before the Bone Spire), `SPIRE_DEPTH` (3), `ACT_FOES` (each act's name, first fight, early, late and elite foe
   groups, boss and mystery rooms; three acts), `COLUMN_KINDS` (what each middle column holds), `makeMap(act)`, `ENTRANCE` and
   `reachable(rooms, at)`. `makeMap(act, mutators)` applies the weekly crypt's mutators after the
@@ -190,11 +210,11 @@ File map (all under `src/` unless it starts with `shared/`):
   `SHOP_RELICS`, `SHOP_FLASKS`, `WEAK_MULT` and `VULNERABLE_MULT`), `Phase`, `Status` and
   `noStatus`, `Ware`, `Shop` (cards, relics, flasks, removal), `Enemy` (with its `intent` and
   `status`), `Fight` (with the hero's `status`, `strength`, the `powers` in play, the cards
-  `played` this turn, the cards `drawn` this fight, `wasVulnerable` and the `gold` its foes drop), `Pop`, `GameState` (with `hero`, `depth`,
-  `bestDepth`, `heroWins`, `daily`, `dailyRecord`, `weekly`, `weeklyRecord`, `dailyScore`, `library`, `swaps`, `flasks` and `flaskWon`).
+  `played` this turn, the cards `drawn` this fight, `wasVulnerable`, the `gold` its foes drop and the cards `exhausted`), `Pop`, `GameState` (with `hero`, `depth`,
+  `bestDepth`, `heroWins`, `daily`, `dailyRecord`, `weekly`, `weeklyRecord`, `dailyScore`, `library`, `swaps`, `flasks`, `flaskWon`, `vaultKey`, `keyWon`, `bossRelics` and `bossPick`).
 - `game/sim.ts`: all rules. `newRun`, `chooseHero`, `canSwap`, `swapIn`, `swapBack`,
   `setOutFromLibrary`, `backToHeroes`, `setDepth`, `canStartDaily`, `rollOverRecords` (the hero panel reads the daily's and weekly's records afresh once the day or week turns), `startDailyRun`, `dailyHero`,
-  `startWeeklyRun`, `weeklyHero`, `dailyScore` (the daily's and the weekly's), `lastAct`, `hexed`, `walkTo`, `playCard`, `canPlay`,
+  `startWeeklyRun`, `weeklyHero`, `dailyScore` (the daily's and the weekly's), `lastAct`, `hexed`, `walkTo`, `playCard`, `canPlay`, `turnEnergy` (with the Ember Crown), `rewardChoices` (with the Blood Chalice), `pickBossRelic`,
   `costOf` (a card's cost in hand, with Doubt), `canUseFlask`, `useFlask`, `heroHit` and `foeHit`
   (damage after relics, strength and statuses), `endTurn`, `takeReward`, `descend`, `rest`,
   `restShare`, `restHeal`, `canRemove`, `removeCard`, `canTemper`, `temperCard`, `buyCard`,
@@ -221,9 +241,13 @@ File map (all under `src/` unless it starts with `shared/`):
   `state.hero`. Exposes `state`, `hand` and `rewards`.
 - `scenes/layout.ts`: screen positions and sizes for the fight, hand, reward, buttons, campfire
   buttons (`REST_BUTTONS`), event choices (`EVENT_BUTTONS`), the hero
-  panel (`HERO_PANEL`: its box, title, depth row, rules, the four heroes' places, buttons and captions, the daily and weekly buttons), the library (`LIBRARY`), the flask slots (`FLASKS`), the powers in play
+  panel (`HERO_PANEL`: its box, title, depth row, rules, the four heroes' places, buttons and captions, the daily and weekly buttons), the descent panel's boss relics (`BOSS_PANEL`), two reward cards (`REWARD_TWO`), the library (`LIBRARY`, with `dense` past two rows), the flask slots (`FLASKS`), the powers in play
   (`POWERS`), the card picker (`PICKER`), the merchant (`SHOP`, with `flasks`), the top bar (`HUD`)
   and statuses (`STATUS_GAP`), and `FONT` (a serif).
+- The descent panel reuses the panel with a bigger box (`BOSS_PANEL`) and three `bossBoxes` (a
+  box, big relic icon, name and text each) shown while `s.bossRelics` holds offers; the picked one
+  has a gold edge. The top bar's `keyIcon` shows while `s.vaultKey`, and the map leaves a locked
+  vault unlit (not in `next`) until then.
 - `ui/CardView.ts`: `makeCard`, a card face container: an ink edge (`bg`, the part that takes
   taps), the painted parchment, icon, name, rules and a gold cost seal (hidden on a curse).
 - `ui/Button.ts`: `makeButton`, a wooden button container.
@@ -243,7 +267,7 @@ File map (all under `src/` unless it starts with `shared/`):
   shapes at twice their size, and grids for the other foes (`FOES` keyed by `EnemyKind`); textures
   `hero-<hero>` and `hero-token-<hero>` (`heroTexture(hero, token)`), `foe-<kind>`.
 - `art/icons.ts`: `CARD_ICONS` keyed by `Icon` (the tonics' vials from `tonic(dark, light)`), `INTENTS` (with `curse`), `STATUSES`,
-  `RELIC_ICONS`, `FLASK_ICONS` (one bottle grid recoloured per flask), `COIN`, room icons keyed by
+  `RELIC_ICONS` (the boss relics' too), `FLASK_ICONS` (one bottle grid recoloured per flask), `COIN`, `KEY` (texture `key`), room icons keyed by
   `RoomKind`, all through `bakePainted`; textures `card-<icon>`, `intent-<kind>`, `status-<kind>`,
   `relic-<id>` and `relic-big-<id>` (`relicIcon`), `flask-<id>` (`flaskIcon`), `room-<kind>`,
   `coin`, `heart`.
@@ -281,7 +305,7 @@ How it runs:
   `walkTo`, hand cards `playCard(state, i)`, flask slots `useFlask(state, i)`, End turn `endTurn`, reward cards and Skip
   `takeReward`, the campfire's Rest `rest` and its picker's cards `temperCard` or `removeCard`, the
   merchant's wares `buyCard`, `buyRelic`, `buyFlask` and (through the picker) `buyRemoval`, Leave `leaveShop`,
-  a mystery's choices `chooseEvent`, Descend `descend`, Delve again `scene.restart()`. Sim functions check the phase
+  a mystery's choices `chooseEvent`, the descent panel's boss relics `pickBossRelic`, Descend `descend`, Delve again `scene.restart()`. Sim functions check the phase
   and return false when the action is not allowed.
 - **Rendering:** each frame, `update` picks the map or fight layer (the campfire, merchant,
   mystery and the rewards of treasure and the altar are shown over the map) and redraws. Graphics (paths, room rings, health bars, HUD) are cleared and
@@ -304,9 +328,9 @@ State model (`src/game/state.ts`):
   `goldWon` and `flaskWon`, `shop`, `notice` (what the last event, temper or descent did, shown on the map), plus
   timers (`timerMs`, `heroHitMs`), `healed`, `pops` and `nextId`.
 - `Phase` runs `hero` (-> `library`) -> `map` -> `walk` -> `player` <-> `enemy` -> `cleared` -> `reward` -> `map`, with
-  `rest`, `shop`, `event` (which can lead to `reward`), `descend` (to the next act's `map`), `over`
-  and `won` as side exits.
-- `Fight` holds the `draw`, `hand` and `discard` piles, `energy`, hero `block`, `turn`, `enemies`,
+  `rest`, `shop`, `event` (which can lead to `reward`), a vault (straight to `reward`), `descend`
+  (with its boss relic offers, to the next act's `map`), `over` and `won` as side exits.
+- `Fight` holds the `draw`, `hand`, `discard` and `exhausted` piles, `energy`, hero `block`, `turn`, `enemies`,
   `acted`, the hero's `status` and `strength`, the `powers` in play, the cards `played` this turn,
   the cards `drawn` this fight (for the draw sound), the tonics `brewed` (for the brew sound), `wasVulnerable` (set in `endTurn`) and the `gold`
   to drop. `enemies[0]` is the one in front and takes single-target damage.
@@ -317,13 +341,15 @@ State model (`src/game/state.ts`):
 - Invariants: a brewed or combined tonic lives in the fight's piles only, never in `deck`; a
   fight never changes `deck` except through a foe's `curse` intent, which pushes the
   curse onto both `deck` and `fight.discard` (each fight otherwise shuffles a copy into `draw`); a
-  played power goes to `fight.powers` and to no pile; a dead
+  played power goes to `fight.powers` and to no pile, and a played Exhaust card to `fight.exhausted`
+  (never back into the draw pile); Retain cards stay in `hand` across `endTurn`; a dead
   foe is spliced out of `enemies` at once (poison or Thorns can do it on the foes' turn, and `act`
   then returns false, skipping a multi-hit attack's remaining hits and its rider); the hero's block resets in `startTurn`, foes' block in
   `endTurn`; `nextId` is shared by foes and pops; a room joins `cleared` only when it is left (or
   a boss falls), so `cleared` drives which map paths are lit; a relic is owned at most once; at
   most `FLASK_SLOTS` flasks are held (a drop or purchase with full slots is refused); `depth` is
-  between 0 and `bestDepth`.
+  between 0 and `bestDepth`; a boss relic only ever comes from `descend`; an act's map has at
+  most one vault, and `vaultKey` is dropped at `descend`.
 
 Randomness and timing:
 
@@ -335,9 +361,11 @@ Randomness and timing:
   later act's map comes from `keyedRand('<day>:map:<act>')` (`descend`), and the rewards and wares
   come from `keyedRand('<day>:offer:<act>:<room>')` (`offerDraw`), so they match for everyone
   whatever happened before. `dailyHero` draws from its own key, not from `random`.
-- `random` is used in `makeMap` (once per act, in `newRun` and `descend`), in `shuffle` in
-  `src/game/sim.ts`, which draws piles, reshuffles the discard and picks rewards (`pickSome`) and
-  wares (cards, relics, then flasks), in `grantRelic`, `grantFlask` (after an elite or boss) and `temperRandom`, and in `nextIntent` after each foe acts. The test seeds it, so changing the number or order of these
+- `random` is used in `makeMap` (once per act, in `newRun` and `descend`; `addVault` draws
+  nothing), in `shuffle` in
+  `src/game/sim.ts`, which draws piles, reshuffles the discard and picks rewards (`pickSome`),
+  wares (cards, relics, then flasks) and the boss relics offered (through `offerDraw`, when a boss
+  falls), in `grantRelic` (a vault, a mystery, or `descend` with no boss relic picked), `grantFlask` (after an elite or boss) and `temperRandom`, and in `nextIntent` after each foe acts. The test seeds it, so changing the number or order of these
   calls changes the map, hands, rewards and foe moves the test sees. Choosing the hero and the
   depth, the library's swaps and combining tonics draw nothing. The Hexer's own cards are not in `COMMON` and `RARE`, so the Knight's and
   the Hunter's pools (and their draws) are as before.
@@ -431,7 +459,7 @@ Sound table (`src/audio/sounds.ts`) and where each plays:
 | `select` | a hero picked on the hero panel, the daily or weekly crypt started, or Set out in the library |
 | `ratchet` | the depth row's `<` or `>` |
 | `step` | every 175ms of walking on the map (`Cues`, alternating pitch) |
-| `door` | arriving at the merchant, a mystery room or a treasure room |
+| `door` | arriving at the merchant, a mystery room, a treasure room or a vault |
 | `fire` | arriving at a campfire |
 | `drip` | now and then on the hero panel, the library and the map (every 2.6 to 6.8s, steady pattern) |
 | `descend` | the descent panel's Descend (or Climb, up the Bone Spire) |
@@ -459,8 +487,8 @@ Sound table (`src/audio/sounds.ts`) and where each plays:
 | `buy` | a card, relic, flask or the removal bought from the merchant |
 | `mystery` | a mystery room's choice taken |
 | `ui('coin')` | the gold goes up (a fight's gold, the shrine, a boss's spare gold) |
-| `ui('click')` | Skip, Leave, Back (the picker's and the library's), Delve again, opening the temper, burn or removal picker, and picking or putting back a starting card in the library |
-| `ui('refuse')` | a locked hero, the daily crypt already tried today, an unplayable card, a flask off the hero's turn, a room out of reach, a ware too dear or with no slot, a greyed campfire or mystery choice, the depth at its end |
+| `ui('click')` | Skip, Leave, Back (the picker's and the library's), Delve again, a boss relic picked or put back, opening the temper, burn or removal picker, and picking or putting back a starting card in the library |
+| `ui('refuse')` | a locked hero, a vault without its key, the daily crypt already tried today, an unplayable card, a flask off the hero's turn, a room out of reach, a ware too dear or with no slot, a greyed campfire or mystery choice, the depth at its end |
 
 To add a sound: add it to `sfx` in `sounds.ts`, then play it from the tap handler (through `act`)
 for the hero's own action, or from `Cues.hear` for something the run does on its own.
@@ -493,7 +521,7 @@ for the hero's own action, or from `Cues.hear` for something the run does on its
 - Screenshots are saved as `playthrough-0-heroes` and `playthrough-0-map` through `playthrough-3-next-room` in
   `docs/screenshots/`; refresh them when the look of the first room changes. `map`, `boss`,
   `treasure`, `victory`, `campfire`, `campfire-temper`, `campfire-remove`, `shop`, `event`,
-  `elite-fight`, `descend`, `act2-map`, `tombs-foes`, `hollow-queen`, `heroes` (the four heroes and the daily and weekly buttons), `library` (the Knight's library with a swap), `alchemist-tonics` (a Blaze Tonic in the Alchemist's first hand), `weekly-map` (a weekly crypt's map),
+  `elite-fight`, `descend` (the boss relics after the Bone King, the Seer's Eye picked), `vault-map` (a vault with the key in the top bar), `retain-exhaust` (Retain and Exhaust cards in hand), `act2-map`, `tombs-foes`, `hollow-queen`, `heroes` (the four heroes and the daily and weekly buttons), `library` (the Knight's library with a swap), `alchemist-tonics` (a Blaze Tonic in the Alchemist's first hand), `weekly-map` (a weekly crypt's map),
   `flasks-and-powers`, `curses`, `spire-foes` (the Hexer in the Bone Spire), `marrow-tyrant`, `daily-crypt` (a daily's end panel) and `german-shop` (the merchant with `?lang=de`) there are taken by hand
   (not by the test); refresh them too when the look changes. `cover.png` is a copy of `playthrough-1-fight`.
 
@@ -552,6 +580,11 @@ for the hero's own action, or from `Cues.hear` for something the run does on its
 - **Add a relic:** add it to `RelicId` and `RELICS` in `src/game/relics.ts`, its number as a constant there (passed to its
   text as `{n}`), its icon to `RELIC_ICONS` in `src/art/icons.ts`, and its effect where it
   applies in `src/game/sim.ts` behind `hasRelic`, using that constant. Update the README's relic table.
+- **Add a boss relic:** add it to `BossRelicId`, `RELICS` and `BOSS_RELIC_IDS` in
+  `src/game/relics.ts` with its number, its icon to `RELIC_ICONS`, and both its strength and its
+  cost in `sim.ts` behind `hasRelic`. Update the README's boss relic table.
+- **Add a Retain or Exhaust card:** set `retain` or `exhaust` on its `CARDS` entry; `describe` adds
+  the word. An Exhaust card should do more than a plain card of its cost.
 - **Add an event:** add it to `EventId` and `EVENTS` in `src/game/events.ts` and its two choices
   to `chooseEvent` (and any health cost to `canChoose`) in `src/game/sim.ts`.
 - **Add a status:** extend `StatusKind`, `noStatus`, its name in `i18n/` under the kind as key, its effect in
