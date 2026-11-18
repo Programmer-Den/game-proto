@@ -1,6 +1,7 @@
 import { type Move, type Position, moveText } from './chess';
 import type { DeepLevel } from './deep';
-import { type ThinkReply, think } from './aiWorker';
+import { type ThinkReply, type ThinkRequest, think } from './aiWorker';
+import type { Style } from './rivals';
 
 /**
  * Runs the deep search for the position in a web worker and resolves with its move. Where a worker
@@ -32,8 +33,8 @@ function getWorker() {
   return worker;
 }
 
-export async function thinkDeep(pos: Position, level: DeepLevel): Promise<Move | undefined> {
-  const req = { id: ++next, moves: pos.history.map((u) => moveText(u.move)), level, seed: Math.floor(Math.random() * 2 ** 31) };
+/** Sends `req` to the worker, or answers it on the page when there is none or it failed. */
+async function ask(req: ThinkRequest): Promise<ThinkReply> {
   const w = getWorker();
   let reply: ThinkReply | null = null;
   if (w) {
@@ -43,6 +44,22 @@ export async function thinkDeep(pos: Position, level: DeepLevel): Promise<Move |
     });
   }
   // No worker, or it failed: search here.
-  if (!reply?.move) reply = think(req);
+  if (!reply || (reply.move === null && reply.score === undefined)) reply = think(req);
+  return reply;
+}
+
+/** The position's start as FEN and its moves as text, as the worker plays them out. */
+function game(pos: Position) {
+  return { start: pos.start, moves: pos.history.map((u) => moveText(u.move)) };
+}
+
+export async function thinkDeep(pos: Position, level: DeepLevel, style?: Style): Promise<Move | undefined> {
+  const reply = await ask({ id: ++next, kind: 'move', ...game(pos), level, seed: Math.floor(Math.random() * 2 ** 31), style });
   return reply.move ? pos.findMove(reply.move) : undefined;
+}
+
+/** The best move (as `e2e4` text) and the score for the side to move, for the game review. */
+export async function analyse(pos: Position, level: DeepLevel): Promise<{ move: string | null; score: number }> {
+  const reply = await ask({ id: ++next, kind: 'analyse', ...game(pos), level, seed: 0 });
+  return { move: reply.move, score: reply.score ?? 0 };
 }

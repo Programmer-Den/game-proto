@@ -5,7 +5,16 @@ import type { Side } from './chess';
  * can go on later) and the totals the menu and trophies read (`stonemate-stats`).
  */
 
-export type Mode = 'ai' | 'duo';
+/** Against the Stone AI, two players, a rival sculptor, or a statue puzzle (never saved). */
+export type Mode = 'ai' | 'duo' | 'rival' | 'puzzle';
+
+/** A game's clocks: the minutes each side starts with, the seconds added per move, and what is left (ms). */
+export interface Clock {
+  minutes: number;
+  plus: number;
+  w: number;
+  b: number;
+}
 
 export interface SavedGame {
   mode: Mode;
@@ -15,6 +24,12 @@ export interface SavedGame {
   level?: number;
   /** Every move so far as `e2e4` text. */
   moves: string[];
+  /** The start as FEN when it isn't the usual one (a shuffled back row, or a rival's odds). */
+  start?: string;
+  /** The rival being played, 0 to 7, in a rival game. */
+  rival?: number;
+  /** The clocks, in a game with them. */
+  clock?: Clock;
 }
 
 export interface Stats {
@@ -31,6 +46,8 @@ export interface Stats {
 
 const GAME_KEY = 'stonemate-game';
 const STATS_KEY = 'stonemate-stats';
+const RIVALS_KEY = 'stonemate-rivals';
+const PUZZLES_KEY = 'stonemate-puzzles';
 
 function read<T>(key: string): T | null {
   try {
@@ -51,7 +68,7 @@ function write(key: string, value: unknown) {
 
 export function loadGame(): SavedGame | null {
   const g = read<SavedGame>(GAME_KEY);
-  return g && Array.isArray(g.moves) && (g.mode === 'ai' || g.mode === 'duo') ? g : null;
+  return g && Array.isArray(g.moves) && (g.mode === 'ai' || g.mode === 'duo' || (g.mode === 'rival' && typeof g.rival === 'number')) ? g : null;
 }
 export const saveGame = (g: SavedGame | null) => write(GAME_KEY, g);
 
@@ -60,3 +77,17 @@ export function loadStats(): Stats {
   return { wins: s.wins ?? 0, losses: s.losses ?? 0, draws: s.draws ?? 0, pairs: s.pairs ?? [], scenes: s.scenes ?? [], best: typeof s.best === 'number' ? s.best : 0 };
 }
 export const saveStats = (s: Stats) => write(STATS_KEY, s);
+
+/** How many rival sculptors are beaten, 0 to 8: the next one to play is this one. */
+export function loadRivals(): number {
+  const r = read<{ beaten?: unknown }>(RIVALS_KEY);
+  return typeof r?.beaten === 'number' ? r.beaten : 0;
+}
+export const saveRivals = (beaten: number) => write(RIVALS_KEY, { beaten });
+
+/** The ladder puzzles solved, by number. */
+export function loadPuzzles(): number[] {
+  const p = read<{ solved?: unknown }>(PUZZLES_KEY);
+  return Array.isArray(p?.solved) ? p.solved.filter((n): n is number => typeof n === 'number') : [];
+}
+export const savePuzzles = (solved: number[]) => write(PUZZLES_KEY, { solved });
