@@ -12,6 +12,8 @@
  * match still without covering it; P is the shared pause screen's key (`shared/startScreen.ts`).
  */
 
+import { t } from './i18n';
+
 /** Whether the page was opened to watch the AI play (`?watch` in the URL). */
 export const watching: boolean = new URLSearchParams(location.search).has('watch');
 
@@ -56,7 +58,7 @@ export function mountWatch(opts: { title?: string; sides?: Record<string, WatchS
   for (const [key, side] of Object.entries(opts.sides ?? {})) sides.set(key, side);
   if (opts.time) clock = opts.time;
   if (log) {
-    aiLog('', '— a new match —');
+    aiLog('', t('watchNewMatch'));
     return;
   }
   addStyles();
@@ -64,21 +66,21 @@ export function mountWatch(opts: { title?: string; sides?: Record<string, WatchS
   const panel = document.createElement('div');
   panel.className = 'watch-panel';
   panel.setAttribute('role', 'region');
-  panel.setAttribute('aria-label', 'Watch AI');
+  panel.setAttribute('aria-label', t('watchRegion'));
   const title = document.createElement('div');
   title.className = 'watch-title';
-  title.textContent = opts.title ?? 'Watching AI';
+  title.textContent = opts.title ?? t('watchTitle');
   const bar = document.createElement('div');
   bar.className = 'watch-bar';
 
-  const pause = button('Hold the match', '❚❚');
-  const speeds = WATCH_SPEEDS.map((s) => button(`${s}x speed`, `${s}x`));
-  const logButton = button('AI log (L)', 'Log');
+  const pause = button(t('watchHold'), '❚❚');
+  const speeds = WATCH_SPEEDS.map((s) => button(t('watchSpeed', { n: s }), t('watchSpeedShort', { n: s })));
+  const logButton = button(t('watchLogButton'), t('watchLogShort'));
   bar.append(pause, ...speeds, logButton);
 
   log = document.createElement('ol');
   log.className = 'watch-log';
-  log.setAttribute('aria-label', 'AI log');
+  log.setAttribute('aria-label', t('watchLog'));
   log.hidden = true;
   panel.append(title, bar, log);
   document.body.append(panel);
@@ -86,7 +88,7 @@ export function mountWatch(opts: { title?: string; sides?: Record<string, WatchS
   const show = () => {
     pause.setAttribute('aria-pressed', String(state.paused));
     pause.textContent = state.paused ? '▶' : '❚❚';
-    pause.title = state.paused ? 'Play on' : 'Hold the match';
+    pause.title = state.paused ? t('watchPlayOn') : t('watchHold');
     pause.setAttribute('aria-label', pause.title);
     speeds.forEach((b, i) => b.setAttribute('aria-pressed', String(WATCH_SPEEDS[i] === state.speed)));
     logButton.setAttribute('aria-pressed', String(!log!.hidden));
@@ -155,7 +157,7 @@ function button(label: string, text: string) {
 function addStyles() {
   const style = document.createElement('style');
   style.textContent = `
-    .watch-panel { position: fixed; top: 6px; right: 6px; z-index: 11; width: min(300px, calc(100vw - 12px));
+    .watch-panel { position: fixed; top: calc(6px + var(--safe-top, env(safe-area-inset-top, 0px))); right: calc(6px + var(--safe-right, env(safe-area-inset-right, 0px))); z-index: 11; width: min(300px, calc(100vw - 12px));
       box-sizing: border-box; padding: 6px; font: 12px/1.35 ui-monospace, monospace; color: #f3e9d2;
       background: rgba(16, 11, 8, 0.86); border: 1px solid rgba(243, 233, 210, 0.35); border-radius: 3px; }
     /* A game whose corner row sits in the top right (setupGame's corner) keeps it clear: the panel goes below it. */

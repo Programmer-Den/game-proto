@@ -71,6 +71,16 @@ export function trophyCount(set: TrophySet) {
 
 /** The earned trophies `award` has seen, per game, so a game can award every frame without reading storage. */
 const known = new Map<string, Record<string, number>>();
+// Another page (the hub's ⚙ on a card) can delete a game's trophies while this one stays open, or
+// held in the back-forward cache, so the cache is read from storage again after either.
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key === null || e.key.endsWith('-trophies')) known.clear();
+  });
+  window.addEventListener('pageshow', (e) => {
+    if (e.persisted) known.clear();
+  });
+}
 
 /**
  * Earns a trophy: saves it, shows a toast at the top of the page with its name and plays the trophy
@@ -199,7 +209,7 @@ function injectStyles() {
 .trophy-badge.tier-silver { border-color: #c9d1d9; }
 .trophy-badge.tier-gold { border-color: #f3c64e; }
 .trophy-badge.locked { opacity: 0.45; filter: grayscale(1); }
-.trophy-toasts { position: fixed; top: calc(12px + env(safe-area-inset-top)); left: 50%; z-index: 12; display: flex;
+.trophy-toasts { position: fixed; top: calc(12px + var(--safe-top, env(safe-area-inset-top, 0px))); left: 50%; z-index: 12; display: flex;
   flex-direction: column; align-items: center; gap: 8px; transform: translateX(-50%); pointer-events: none; }
 .trophy-toast { display: flex; align-items: center; gap: 10px; padding: 8px 16px 8px 10px; font: 15px system-ui, sans-serif;
   color: #f3e9d2; background: rgba(20, 16, 12, 0.92); border: 1px solid rgba(243, 233, 210, 0.35); border-radius: 8px;
