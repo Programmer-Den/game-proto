@@ -461,7 +461,7 @@ export const dailyScore = (scrap: number, cleared: number) => scrap + DAILY.perW
  * extraction; not the daily) stays on the roster with their role and rank 1. Two picked from the
  * roster start the next run in the squad, and each win they live through raises their rank, up to
  * `maxRank`: every rank adds `damage` to their bullets' damage. The roster keeps `size` veterans;
- * a new one past that takes the place of the lowest rank.
+ * a new one past that takes the place of a rank 1 veteran, or is left off when every one is above it.
  */
 export const LOYALTY = { size: 6, picks: 2, maxRank: 3, damage: 0.2 };
 export interface Veteran {
@@ -482,7 +482,8 @@ export function callSign(taken: string[]) {
 export const rankMult = (rank: number) => 1 + LOYALTY.damage * rank;
 /**
  * The roster after a won run: the veterans brought along rank up, and the survivors who joined
- * this run come in at rank 1, taking the place of the lowest-ranked veteran once the roster is full.
+ * this run come in at rank 1, taking the place of a rank 1 veteran once the roster is full (and
+ * left off when there is none).
  */
 export function promote(roster: Veteran[], brought: number[], recruits: { name: string; role: Role }[]): Veteran[] {
   const next = roster.map((v, i) => (brought.includes(i) ? { ...v, rank: Math.min(LOYALTY.maxRank, v.rank + 1) } : v));

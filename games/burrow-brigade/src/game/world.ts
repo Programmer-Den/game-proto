@@ -104,6 +104,8 @@ export interface TurnLog {
   longShot: boolean;
 }
 
+/** Seconds after which a slow mine rests wherever it touches, even on a steep face. */
+const MINE_SETTLE = 3;
 const FALL_SAFE = 360;
 const MAX_PARTICLES = 900;
 const WALK_SPEED = 55;
@@ -564,7 +566,9 @@ export class World {
         }
         for (const s of this.shots) {
           const f = inCone(s.x, s.y, 170);
-          if (f > 0 && s.target === null) {
+          // A Sap Bomb stuck fast and a drill boring through the earth are not loose: the wind leaves them.
+          const fixed = (s.kind === 'sap' && s.state === 'rest') || s.state === 'drill';
+          if (f > 0 && s.target === null && !fixed) {
             s.state = 'fly';
             s.vx += Math.cos(angle) * 380 * f;
             s.vy += Math.sin(angle) * 380 * f - 120;
@@ -891,7 +895,9 @@ export class World {
           s.x += n.x;
           s.y += n.y;
         }
-        if (speed < 40 && n.y < -0.5) {
+        // A mine has no fuse, so one wedged slowly against a steep face for a while rests there too,
+        // or the world would never settle and the turn never end.
+        if (speed < 40 && (n.y < -0.5 || (s.kind === 'mine' && s.age > MINE_SETTLE))) {
           s.state = 'rest';
           s.vx = 0;
           s.vy = 0;

@@ -105,7 +105,9 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
   at least 30% in reach), throw moles, set off mines, crates and loose explosives and put out
   nearby flames.
   The Sap Bomb (`sap`) sticks where it touches (riding on a mole it hit, `Shot.target`) and goes off
-  2 s later; the Gust Fan (`gust`) knocks moles, kegs and loose bombs in a cone away, with no damage.
+  2 s later; the Gust Fan (`gust`) knocks moles, kegs and loose bombs in a cone away, with no damage (not a
+  Sap Bomb stuck fast or a drill boring underground). A mine has no fuse, so one still sliding
+  slowly on a steep face after `MINE_SETTLE` (3 s) rests there, or the turn would never end.
 - **Moles:** `Mole` in `game/world.ts` (health `hp` up to `maxHp`, 100 unless the Quartermaster's
   helmets add to it): feet at `y` on the first earth pixel, walking up steps of 5
   px, jumps (`jump`, Enter) and backflips (Backspace), an `act` for actions that hold it (`dig`,
@@ -184,7 +186,8 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
   Options panel's choices with the match kind (`cleanOptions` checks each).
 - `burrow-brigade-campaign`: `{ stars, vstars, acorns, levels, trades }`, the best stars (0 to 3) of each
   campaign battle by its place in `BATTLES` (`vstars` for the Veteran tier), the acorns to spend, the Quartermaster's levels by id
-  and the trades last picked, by place in the line-up.
+  and the trades last picked, by place in the line-up (`loadCampaign` keeps each level a whole
+  number up to its upgrade's last).
 - `burrow-brigade-daily`: the daily range's record (`shared/daily.ts`).
 - `burrow-brigade-trophies`: the shared trophies.
 
