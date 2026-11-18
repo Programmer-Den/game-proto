@@ -17,8 +17,10 @@ export function setArena(size: MapSize) {
   Object.assign(ARENA, ARENA_SIZES[size]);
 }
 
-/** Crystal a node holds when the map is made. */
+/** Crystal a loose node holds when the map is made. */
 export const NODE_AMOUNT = 1500;
+/** Crystal each of the three nodes beside a starting hub holds: a home belt runs dry in a long battle, so the faction has to expand. */
+export const HOME_NODE_AMOUNT = 900;
 /** How close a building can be to a crystal node. */
 export const NODE_CLEARANCE = 26;
 /** How far from its hub a player can place a building. */

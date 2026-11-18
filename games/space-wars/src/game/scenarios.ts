@@ -4,7 +4,7 @@
 // map is the same every time (no Math.random). The best time of each one won is saved under
 // `space-wars-scenarios`. No Phaser.
 
-import { NODE_AMOUNT } from './arena';
+import { HOME_NODE_AMOUNT, NODE_AMOUNT } from './arena';
 import { localRandom, type MapLayout, type Point } from './map';
 import type { TextKey } from '../i18n';
 
@@ -67,7 +67,7 @@ function handMade(s: Spec): MapLayout {
   s.homes.forEach((h, k) => {
     for (let i = 0; i < 3; i++) {
       const a = s.turn[k] + (i * Math.PI * 2) / 3;
-      nodes.push({ x: h.x + Math.cos(a) * 118, y: h.y + Math.sin(a) * 118, amount: NODE_AMOUNT });
+      nodes.push({ x: h.x + Math.cos(a) * 118, y: h.y + Math.sin(a) * 118, amount: HOME_NODE_AMOUNT });
     }
   });
   for (const p of s.loose) nodes.push({ ...p, amount: NODE_AMOUNT });

@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { ARENA, BUILD_RANGE, NODE_AMOUNT, setArena } from '../game/arena';
+import { ARENA, BUILD_RANGE, setArena } from '../game/arena';
 import { checkTrophies, galaxyWon } from '../trophies/check';
 import { DERELICT_KINDS, generateMap, localRandom, wormholes, type MapLayout } from '../game/map';
 import { FACTIONS, type Role, type UnitId } from '../game/factions';
@@ -15,11 +15,11 @@ import { admiralAt, admiralOf, admiralRank, admiralServed, loadAdmirals, nextAdm
 import { SKIRMISH_OPTIONS, START_CRYSTALS, loadSkirmish, saveSkirmish, stepSkirmish, type Skirmish, type SkirmishOption } from '../game/skirmish';
 import { BRANCHES, TECHS, bankSalvage, buyTech, loadTech, saveTech, techFor, techProblem, WIN_SALVAGE, type TechId, type TechTree } from '../game/tech';
 import {
-  BEACON_PAY, BEACON_RADIUS, BRIBE_COST, BRIBE_MS, DERELICT_DEFS, DERELICT_RADIUS, EXPANSION_GAP, FLAGSHIP_MS, PLAYER, POP_MS, SENSOR_RANGE, TRUCE_MS,
+  ACTIVES, BEACON_PAY, BEACON_RADIUS, SCREEN_RANGE, type ActiveKind, BRIBE_COST, BRIBE_MS, DERELICT_DEFS, DERELICT_RADIUS, EXPANSION_GAP, FLAGSHIP_MS, PLAYER, POP_MS, SENSOR_RANGE, TRUCE_MS,
   TRUCE_TRIBUTE, VETERAN_NAMES, WORMHOLE_MOUTH, World, buildInfo, type BattleSetup, flagshipStats, researchCost, unitStats, type Build, type Building, type Cue, type Derelict, type Effect, type SeenBuilding, type Struck,
 } from '../game/world';
 import {
-  admiralLines, buildingLines, derelictLines, expansionLines, factionLines, fallBackLines, flagshipLines, rallyLines, researchLines, unitLines,
+  activesLines, admiralLines, attackMoveLines, buildingLines, groupLines, derelictLines, expansionLines, factionLines, fallBackLines, flagshipLines, rallyLines, researchLines, unitLines,
 } from '../game/describe';
 import { FOG_CELL, FOG_COLS, FOG_ROWS } from '../game/fog';
 import { RESEARCH_LEVELS, RESEARCH_MS, TRACK_DEFS, type Track } from '../game/research';
@@ -36,7 +36,7 @@ import { mountWatch, watching, watchSteps } from '../../../../shared/watch';
 import { renderScale, viewPoint, viewSize } from '../../../../shared/scaling';
 // `tr` is the game's translator (`t` in the other files): `t` names the scene's text helpers here.
 import { t as tr } from '../i18n';
-import { ADMIRAL_PILL, ARMY_TAB, BAR, BOARD, BUTTONS, CONTRACT_PILL, FONT, GRID_X, GROW, KEEP, LEAD, MAP_VIEW, MINIMAP, PANEL_X, PICK_TABS, RIVALS_PANEL, RIVALS_TAB, ROLE_LABEL, SECTOR_STRIP, TOP, VIEW, fitView, type Button } from './layout';
+import { ADMIRAL_PILL, ARMY_TAB, BAR, BOARD, BUTTONS, CONTRACT_PILL, FONT, GRID_X, GROW, KEEP, LEAD, MAP_VIEW, MINIMAP, PANEL_X, PICK_TABS, RIVALS_PANEL, RIVALS_TAB, ROLE_LABEL, SECTOR_STRIP, STRIP, GROUPS, TOP, VIEW, fitView, stripBoxes, type Button } from './layout';
 
 // Game time for one step at most, so a hidden tab doesn't jump the battle ahead.
 const MAX_STEP_MS = 100;
@@ -112,11 +112,16 @@ const CUE_SOUND: Record<Exclude<Cue, 'hubFalls'>, Sfx> = {
   built: 'built', warpIn: 'warpIn', researchDone: 'upgrade', rankUp: 'upgrade', contractStarted: 'stamp',
   contractDone: 'contractDone', contractFailed: 'contractFailed', won: 'won', lost: 'lost', truceOffered: 'truceOffered',
   truceMade: 'truceMade', truceBroken: 'truceBroken', tribute: 'tribute', klaxon: 'klaxon', flagshipReady: 'flagshipReady',
-  flagshipLaunched: 'flagshipLaunch', flagshipLost: 'flagshipLost', admiralReady: 'flagshipReady',
+  flagshipLaunched: 'flagshipLaunch', flagshipLost: 'flagshipLost', admiralReady: 'flagshipReady', beltLow: 'beltLow',
 };
 /** The two wormhole pairs' colours. */
 const WORMHOLE_COLORS = [0x5fe0d0, 0xe58cff];
 const ALERT_COLOR = 0xff5a2c;
+/** A point-defence screen's dome. */
+const SCREEN_COLOR = 0x8ff0ff;
+/** How long a group chip is held to save the selection into it, and how soon a second recall centres the map, in ms of real time. */
+const CHIP_HOLD_MS = 450;
+const GROUP_TWICE_MS = 450;
 /** How close to the rally flag a tap in rally mode takes it down, in battlefield pixels. */
 const RALLY_GRAB = 22;
 /** The minimap's canvas texture, and how often it is repainted (in frames). */
@@ -326,6 +331,16 @@ export class GameScene extends Phaser.Scene {
   private captions!: { name: Phaser.GameObjects.Text; cost: Phaser.GameObjects.Text; icon: Phaser.GameObjects.Image }[];
   private admiralText!: Phaser.GameObjects.Text;
   private skirmishTexts: Phaser.GameObjects.Text[] = [];
+  /** The control groups (1 to GROUPS): the unit ids saved in each. */
+  groups: number[][] = Array.from({ length: GROUPS }, () => []);
+  /** Whether the next map tap is an attack-move for the selected ships (the strip's pill or X). */
+  attackMode = false;
+  /** The last group recalled and when (real time), so recalling it twice centres the map on it. */
+  private groupTap = { k: -1, at: 0 };
+  /** A group chip being pressed and since when (real time): held long enough, it saves the selection. */
+  private chipPress: { k: number; at: number } | null = null;
+  /** The strip's texts: a label per group chip, then the Attack-move and Actives pills'. */
+  private stripTexts: Phaser.GameObjects.Text[] = [];
 
   constructor() {
     super('Game');
@@ -485,6 +500,18 @@ export class GameScene extends Phaser.Scene {
     this.input.keyboard!.on('keydown-Q', () => playing() && this.selectFleet());
     // G uses the admiral's active.
     this.input.keyboard!.on('keydown-G', () => playing() && this.state.admiral && this.press(BUTTONS.find((b) => b.key === 'admiral')!));
+    // X arms an attack-move, E fires the selected ships' actives, and the number keys recall a
+    // control group (with Shift or Ctrl they save one).
+    this.input.keyboard!.on('keydown-X', () => playing() && this.armAttackMove());
+    this.input.keyboard!.on('keydown-E', () => playing() && this.fireActives());
+    this.input.keyboard!.on('keydown', (e: KeyboardEvent) => {
+      const k = Number(/^Digit(\d)$/.exec(e.code)?.[1] ?? 0) - 1;
+      if (!playing() || k < 0 || k >= GROUPS) return;
+      if (e.shiftKey || e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        this.saveGroup(k);
+      } else this.recallGroup(k);
+    });
     this.newGame(true);
     // Every Phaser text draws from Math.random for its texture's key, and the map and the AI draw from
     // it too: these are made on a generator of their own, so a seeded battle plays as it did before them.
@@ -544,6 +571,9 @@ export class GameScene extends Phaser.Scene {
       x: st.x + st.w - 14 - (2 - (k % 2)) * (optW + 8) + 8, y: st.y + 12 + Math.floor(k / 2) * 32, w: optW, h: 26, option,
     }));
     this.skirmishTexts = this.skirmishChips.map((c) => t(c.x + c.w / 2, c.y + c.h / 2, 10, INK_CSS.chocolate, true, 21).setOrigin(0.5));
+    // The command strip: the group chips' labels, then the Attack-move and Actives pills'.
+    const sb = stripBoxes();
+    this.stripTexts = [...sb.groups, sb.attackMove, sb.actives].map((b) => t(b.x + b.w / 2, b.y + b.h / 2, 10, INK_CSS.chocolate, true, 13).setOrigin(0.5).setVisible(false));
     Math.random = random;
   }
 
@@ -721,6 +751,10 @@ export class GameScene extends Phaser.Scene {
     this.placing = null;
     this.rallyMode = false;
     this.jumpMode = false;
+    this.attackMode = false;
+    this.groups = Array.from({ length: GROUPS }, () => []);
+    this.groupTap = { k: -1, at: 0 };
+    this.chipPress = null;
     this.alerts = [];
     this.edgeMarks = [];
     this.endPhase = 'playing';
@@ -829,6 +863,72 @@ export class GameScene extends Phaser.Scene {
     this.message = this.selected.size ? tr('fleetSelected', { n: this.selected.size }) : tr('noFleet');
     if (this.selected.size) sfx('select');
     else ui('refuse');
+  }
+
+  /** Saves the selected ships as control group `k` (Shift and its number, or holding its chip). */
+  private saveGroup(k: number) {
+    if (!this.selected.size) {
+      this.message = tr('groupEmpty', { k: k + 1 });
+      ui('refuse');
+      return;
+    }
+    this.groups[k] = [...this.selected];
+    this.message = tr('groupSaved', { k: k + 1, n: this.groups[k].length });
+    sfx('group');
+  }
+
+  /** Selects control group `k` again (its number, or a tap on its chip); twice in a row centres the map on it. */
+  private recallGroup(k: number) {
+    const ids = this.groups[k].filter((id) => this.state.selectable(id));
+    this.groups[k] = ids;
+    if (!ids.length) {
+      this.message = tr('groupEmpty', { k: k + 1 });
+      ui('refuse');
+      return;
+    }
+    const now = performance.now();
+    const twice = this.groupTap.k === k && now - this.groupTap.at < GROUP_TWICE_MS;
+    this.groupTap = { k, at: now };
+    this.selected = new Set(ids);
+    this.message = tr('groupSelected', { k: k + 1, n: ids.length });
+    if (twice) {
+      const units = ids.map((id) => this.state.unit(id)!);
+      this.centreOn(units.reduce((a, u) => a + u.x, 0) / units.length, units.reduce((a, u) => a + u.y, 0) / units.length);
+      sfx('whoosh');
+    } else sfx('select');
+  }
+
+  /** Arms (or calls off) an attack-move: the next map tap sends the selected ships there, fighting on the way. */
+  private armAttackMove() {
+    if (!this.selected.size && !this.attackMode) {
+      this.message = tr('attackMoveNoShips');
+      ui('refuse');
+      return;
+    }
+    this.attackMode = !this.attackMode;
+    this.rallyMode = false;
+    this.jumpMode = false;
+    this.placing = null;
+    if (this.attackMode) this.message = tr('attackMoveHow');
+    ui('click');
+  }
+
+  /** Fires every ready active among the selected ships (the strip's pill or E). */
+  private fireActives() {
+    const r = this.state.useActives([...this.selected]);
+    if ('reason' in r) {
+      this.message = r.reason;
+      ui('refuse');
+      return;
+    }
+    const kinds = Object.keys(r.used) as ActiveKind[];
+    this.message = kinds.map((kind) => tr('activeUsed', { name: tr(Object.values(ACTIVES).find((a) => a.kind === kind)!.name), n: r.used[kind]! })).join(', ');
+    for (const kind of kinds) sfx(kind);
+  }
+
+  /** Whether the command strip (groups, attack-move, actives) shows: in a battle the player commands. */
+  private stripShown() {
+    return !this.picking && !watching && this.state.phase === 'playing';
   }
 
   /** Centres the map on the latest attack alert (Space, or a tap on its edge arrow). */
@@ -1000,7 +1100,7 @@ export class GameScene extends Phaser.Scene {
     for (const n of s.nodes) {
       const c = this.crystals.get(n.id);
       if (!c) continue;
-      const k = 0.55 + 0.45 * (n.amount / NODE_AMOUNT);
+      const k = 0.55 + 0.45 * (n.amount / n.full);
       const shown = n.amount > 0 && s.fog.knows(n);
       c.gem.setVisible(shown).setScale(k / RES);
       c.glow.setVisible(shown).setScale(k * 0.9);
@@ -1032,7 +1132,53 @@ export class GameScene extends Phaser.Scene {
     this.drawScenario();
     this.drawKeep();
     this.drawMinimap();
+    this.drawCommandStrip();
     this.drawPicker();
+  }
+
+  /**
+   * The command strip: a chip per control group (cream with its count once saved, mustard while it
+   * is the selection), the Attack-move pill (mustard while armed) and the Actives pill (the ready
+   * actives among the selected warships).
+   */
+  private drawCommandStrip() {
+    const shown = this.stripShown();
+    for (const text of this.stripTexts) text.setVisible(shown);
+    if (!shown) return;
+    const g = this.uiGfx;
+    const sb = stripBoxes();
+    const pill = (b: { x: number; y: number; w: number; h: number }, fill: number, edge: number) => {
+      const round = b.h / 2;
+      g.fillStyle(0x000000, 0.35);
+      g.fillRoundedRect(b.x + 2, b.y + 3, b.w, b.h, round);
+      g.fillStyle(fill, 1);
+      g.fillRoundedRect(b.x, b.y, b.w, b.h, round);
+      g.lineStyle(1.5, edge, 1);
+      g.strokeRoundedRect(b.x, b.y, b.w, b.h, round);
+    };
+    sb.groups.forEach((b, k) => {
+      const ids = this.groups[k].filter((id) => this.state.selectable(id));
+      const picked = ids.length > 0 && ids.length === this.selected.size && ids.every((id) => this.selected.has(id));
+      pill(b, picked ? INK.mustard : ids.length ? INK.cream : INK.creamDim, picked ? INK.tangerine : INK.cocoa);
+      this.setText(this.stripTexts[k], ids.length ? `${k + 1}·${ids.length}` : `${k + 1}`);
+      this.stripTexts[k].setColor(ids.length ? INK_CSS.chocolate : INK_CSS.cocoa);
+    });
+    const ships = [...this.selected].map((id) => this.state.unit(id)).filter((u) => !!u);
+    const am = this.stripTexts[GROUPS];
+    pill(sb.attackMove, this.attackMode ? INK.mustard : ships.length ? INK.cream : INK.creamDim, this.attackMode ? INK.tangerine : INK.cocoa);
+    this.setText(am, tr(this.attackMode ? 'rallyTap' : 'attackMovePill'));
+    am.setColor(this.attackMode || ships.length ? INK_CSS.chocolate : INK_CSS.cocoa);
+    const ready = ships.filter((u) => u.activeMs <= 0).length;
+    const ac = this.stripTexts[GROUPS + 1];
+    pill(sb.actives, ready ? INK.cream : INK.creamDim, INK.cocoa);
+    // While none is ready, the pill fills as the soonest one cools down.
+    if (ships.length && !ready) {
+      const soonest = ships.reduce((a, u) => (u.activeMs / ACTIVES[u.type as keyof typeof ACTIVES].cooldownMs < a ? u.activeMs / ACTIVES[u.type as keyof typeof ACTIVES].cooldownMs : a), 1);
+      g.fillStyle(INK.cream, 0.6);
+      g.fillRoundedRect(sb.actives.x, sb.actives.y, Math.max(sb.actives.h, sb.actives.w * (1 - soonest)), sb.actives.h, sb.actives.h / 2);
+    }
+    this.setText(ac, ships.length ? tr('activesPill', { n: ready, m: ships.length }) : tr('activesPillNone'));
+    ac.setColor(ready ? INK_CSS.chocolate : INK_CSS.cocoa);
   }
 
   /** The minimap shows the fog grid's part that the battlefield covers (a skirmish's map size changes it), stretched over its box. */
@@ -1538,7 +1684,8 @@ export class GameScene extends Phaser.Scene {
       sp.flame.setVisible(moving && !this.picking);
       if (moving) {
         const flicker = settings.reduceMotion ? 1 : 0.85 + 0.15 * Math.sin(this.clock / 40 + u.id * 1.7);
-        const len = FLAME[u.type] * SHIP_ZOOM * flicker * size;
+        const burn = u.type === 'scout' && u.boostMs > 0 ? 1.8 : 1;
+        const len = FLAME[u.type] * SHIP_ZOOM * flicker * size * burn;
         const tail = TAIL[u.type] * SHIP_ZOOM * size;
         sp.flame
           .setPosition(u.x - Math.cos(u.angle) * tail, u.y - Math.sin(u.angle) * tail)
@@ -1552,7 +1699,23 @@ export class GameScene extends Phaser.Scene {
         this.underGfx.lineStyle(1.5, s.sides[u.faction].def.color, 0.3);
         this.underGfx.strokeCircle(u.x, u.y, ability.range);
       }
-      if (this.selected.has(u.id)) dashedCircle(this.gfx, u.x, u.y, u.flagship ? 34 : u.type === 'heavy' ? 22 : 16, 10, INK.tangerine, 1, 2);
+      // A heavy's point-defence screen: a pale cyan dome over the ships it covers.
+      if (u.type === 'heavy' && u.boostMs > 0) {
+        this.underGfx.fillStyle(SCREEN_COLOR, 0.07);
+        this.underGfx.fillCircle(u.x, u.y, SCREEN_RANGE);
+        dashedCircle(this.underGfx, u.x, u.y, SCREEN_RANGE, 24, SCREEN_COLOR, 0.75, 1.5);
+      }
+      if (this.selected.has(u.id)) {
+        const r = u.flagship ? 34 : u.type === 'heavy' ? 22 : 16;
+        dashedCircle(this.gfx, u.x, u.y, r, 10, INK.tangerine, 1, 2);
+        // A mustard pip under a selected ship whose active is ready.
+        if (u.activeMs <= 0) {
+          this.gfx.fillStyle(INK.mustard, 1);
+          this.gfx.fillCircle(u.x, u.y + r, 3);
+          this.gfx.lineStyle(1, INK.chocolate, 1);
+          this.gfx.strokeCircle(u.x, u.y + r, 3);
+        }
+      }
       if (u.hp < u.maxHp) drawHealth(this.gfx, u.x, u.y - (u.flagship ? 34 : 18), u.flagship ? 34 : 22, u.hp / u.maxHp);
       // Veteran chevrons above the ship, one per rank, in the faction's gold.
       const rank = s.rankOf(u);
@@ -1727,7 +1890,11 @@ export class GameScene extends Phaser.Scene {
       const name = b.expansion ? buildInfo(side, 'expansion').name : tr(side.def.buildings[b.type].name);
       const hp = inSight && live ? ` · ${tr('hp', { hp: Math.ceil(live.hp), max: live.maxHp })}` : '';
       const head = `${name} · ${tr(ROLE_LABEL[b.expansion ? 'expansion' : b.type])}${hp}`;
-      text = [head, ...(b.expansion ? expansionLines(side) : buildingLines(side, b.type))].join('\n');
+      const lines = b.expansion ? expansionLines(side) : buildingLines(side, b.type);
+      // A hub in sight says how much its crystal field has left.
+      const belt = b.type === 'hub' && inSight ? this.state.belt(b) : null;
+      if (belt?.full) lines.push(tr('beltLine', { left: formatNumber(belt.left), pct: Math.round((100 * belt.left) / belt.full) }));
+      text = [head, ...lines].join('\n');
       at = b;
     }
     if (label.text !== text) label.setText(text);
@@ -1924,6 +2091,15 @@ export class GameScene extends Phaser.Scene {
 
   /** Describes the command button under the pointer: its name, role, cost and stats. */
   private drawTip() {
+    const over = (r: { x: number; y: number; w: number; h: number }) => this.pointer.x >= r.x && this.pointer.x < r.x + r.w && this.pointer.y >= r.y && this.pointer.y < r.y + r.h;
+    const sb = this.stripShown() ? stripBoxes() : null;
+    const strip = !sb ? null : sb.groups.some(over) ? groupLines() : over(sb.attackMove) ? attackMoveLines() : over(sb.actives) ? activesLines() : null;
+    if (strip) {
+      const text = strip.join('\n');
+      if (this.tip.text !== text) this.tip.setText(text);
+      this.tip.setPosition(STRIP.x, STRIP.y - 6).setVisible(true);
+      return;
+    }
     const b = this.picking
       ? undefined
       : BUTTONS.find((btn) => (btn.key !== 'admiral' || this.state.admiral)
@@ -2687,6 +2863,7 @@ export class GameScene extends Phaser.Scene {
       this.placing = null;
       this.rallyMode = false;
       this.jumpMode = false;
+      this.attackMode = false;
       this.selected.clear();
       this.rivalsOpen = false;
       return;
@@ -2730,6 +2907,17 @@ export class GameScene extends Phaser.Scene {
       const h = rp.head + (this.state.sides.length - 1) * rp.row + 6;
       if (p.x >= rp.x && p.x < rp.x + rp.w && p.y >= rp.y && p.y < rp.y + h) return;
     }
+    // The command strip over the map's bottom-left: a group chip acts on release (held, it saves).
+    if (this.stripShown()) {
+      const sb = stripBoxes();
+      const chip = sb.groups.findIndex(inside);
+      if (chip >= 0) {
+        this.chipPress = { k: chip, at: performance.now() };
+        return;
+      }
+      if (inside(sb.attackMove)) return this.armAttackMove();
+      if (inside(sb.actives)) return this.fireActives();
+    }
     if (p.y >= BAR.y) {
       const b = BUTTONS.find((btn) => (btn.key !== 'admiral' || this.state.admiral) && p.x >= btn.x && p.x < btn.x + btn.w && p.y >= btn.y && p.y < btn.y + btn.h);
       if (b) this.press(b);
@@ -2750,6 +2938,18 @@ export class GameScene extends Phaser.Scene {
         this.message = reason;
         ui('refuse');
       } else sfx('whoosh');
+      return;
+    }
+    if (this.attackMode) {
+      const at = this.toWorld(p.x, p.y);
+      this.attackMode = false;
+      if (this.state.command([...this.selected], at.x, at.y, true)) {
+        this.message = tr('attackMoving');
+        sfx('attack');
+      } else {
+        this.message = tr('attackMoveNoShips');
+        ui('refuse');
+      }
       return;
     }
     if (this.rallyMode) {
@@ -2874,6 +3074,15 @@ export class GameScene extends Phaser.Scene {
     const p = viewPoint(pointer);
     const d = this.drag;
     this.drag = null;
+    // A group chip: held, it saves the selection; tapped, it selects its group (or saves into an empty one).
+    if (this.chipPress) {
+      const { k, at } = this.chipPress;
+      this.chipPress = null;
+      const held = performance.now() - at >= CHIP_HOLD_MS;
+      if (held || (!this.groups[k].some((id) => this.state.selectable(id)) && this.selected.size)) this.saveGroup(k);
+      else this.recallGroup(k);
+      return;
+    }
     if (this.miniDrag) {
       this.miniDrag = false;
       return;
@@ -2929,6 +3138,7 @@ export class GameScene extends Phaser.Scene {
         // The jump waits for a tap on the map; pressing again calls it off.
         this.jumpMode = !this.jumpMode;
         this.rallyMode = false;
+        this.attackMode = false;
         this.placing = null;
         if (this.jumpMode) this.message = this.selected.size ? tr('jumpHow') : tr('jumpNoShips');
         ui('click');
@@ -2945,6 +3155,7 @@ export class GameScene extends Phaser.Scene {
       this.rallyMode = !this.rallyMode;
       this.jumpMode = false;
       this.placing = null;
+      this.attackMode = false;
       if (this.rallyMode) this.message = tr('rallyHow');
       ui('click');
       return;
@@ -2981,6 +3192,7 @@ export class GameScene extends Phaser.Scene {
         this.placing = b.key as Build;
         this.rallyMode = false;
         this.jumpMode = false;
+        this.attackMode = false;
         this.message = '';
         ui('click');
       }
