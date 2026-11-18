@@ -1073,7 +1073,7 @@ export function festivalMedal(s: GameState): Medal {
 
 /** A workshop turns the goods just brought into better ones, and sends them on as a new order. */
 function makeGoods(s: GameState, at: number) {
-  if (s.orders.length > MAX_ORDERS) return;
+  if (s.orders.length >= MAX_ORDERS) return;
   const open = openIndexes(s).filter((i) => i !== at);
   const host = festivalHost(s);
   const to = s.round === FESTIVAL_ROUND && host !== at ? host : open[Math.floor(Math.random() * open.length)];

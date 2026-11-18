@@ -59,8 +59,8 @@ Implemented today:
   `drawnGarden` builds its `Garden` (one route, corners where the path turns, the Heartwood on its
   last cell, `'grass'` cells off the path and beds, where nothing is planted), which
   `StartData.plot` plants as `state.plot` (`{ slot, garden }`; `gardenOf` returns it) on the
-  `bg-plot` texture (`bakePlot`). Weekly gardens and plots are not `ordinary`: no stars, laurels,
-  wild record or harvest picker, and wave 30 can be called early; their own best wave (`ownBest`,
+  `bg-plot` texture (`bakePlot`). Weekly gardens and plots are not `ordinary` (nor is the daily): no stars, laurels,
+  wild record or harvest picker, no saved best or bloom (so they open no golems in ordinary gardens), and wave 30 can be called early; their own best wave (`ownBest`,
   `saveOwnBest`, `savedOwn`) shows on the wave tag and the cards. A plot drawn again while it is
   being played stops saving its best (`playedDrawing`).
 - Golem menu (GG1): tapping a golem opens Raise (`upgrade`), Aim (`setTarget`, `nextTarget`),

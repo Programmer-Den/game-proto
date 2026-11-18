@@ -315,6 +315,7 @@ export class GameScene extends Phaser.Scene {
   /** `journey` carries a chain of valleys on (WR15), or starts today's daily valley (WR17). */
   create(data: { journey?: Partial<Journey> } = {}) {
     const journey = data.journey ?? {};
+    this.lastFrame = 0;
     // Today's try is used up as soon as it starts, so leaving it half way still counts.
     if (journey.daily) startDaily(GAME);
     const daily = loadDaily(GAME);

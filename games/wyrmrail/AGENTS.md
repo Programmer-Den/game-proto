@@ -374,7 +374,7 @@ State model (`src/game/state.ts`):
   `STARVING_SLOWDOWN` speed.
 - Workshops (`WORKSHOPS`, by village name): delivering the cargo a workshop `takes` to it adds a
   `made` order of what it `makes`, from it to another open village (the host in the festival),
-  paying `WORKSHOP_PAY` times the usual, unless the board already has more than `MAX_ORDERS`.
+  paying `WORKSHOP_PAY` times the usual, unless the board already holds `MAX_ORDERS`.
   `randomOrder` sends cargo a workshop takes to it with `WORKSHOP_CHANCE`.
 - The festival: `FESTIVAL_ROUND` (9) follows round 8. Every new order goes to `festivalHost`
   (the last village) and `roundGoal` is `FESTIVAL_GOAL`; meeting it sets `phase` to `won` and
@@ -663,8 +663,8 @@ starts the music again.
 - `arrive` doesn't check where the wyrm is, so anything that empties a `path` must also clear the
   `job` (as `failOrder`, `strikeHazard` and `dropJob` do), and reset its junction wait and switch
   stop with `stopWaiting`, or the HUD keeps showing them.
-- `scene.restart()` reruns `create`, which resets the game and bakes a new `valley` texture, but
-  `lastFrame` carries over.
+- `scene.restart()` reruns `create`, which resets the game and bakes a new `valley` texture, and resets `lastFrame`, so the first frame after
+  a restart steps 0ms.
 - `tileCenter` positions of villages change every game; anything placed by a village (labels,
   workshop signs, bunting) is created in `create` from `state.valley`.
 - Don't give a graphics object `BlendModes.ADD` over the board: under WebGL it kept the night's
