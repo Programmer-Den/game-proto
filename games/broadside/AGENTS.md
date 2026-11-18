@@ -23,7 +23,9 @@ waves, run when beaten and come back with a bounty; sinking all five over any ru
 lasting captain's log for Renown. Between runs, the Admiralty's medals buy starting upgrades and
 the player chooses a ship, or sails the day's seeded daily voyage from the end card. The harbor
 also sells cargo to sell at the next port (a laden ship turns slower and draws raiders), a rare
-wave brings a sea serpent or a kraken, and every fourth wave sails at night.
+wave brings a sea serpent or a kraken, and every fourth wave sails at night. From wave 2 the crew
+is split between the guns, the sails and the pumps mid-wave, prizes and consorts take orders, and
+an iron bow bought at the harbor lets the ship ram.
 
 - **Implemented:** endless waves (sloops from wave 1, brigs and fireships from wave 3, mortar
   ketches from wave 4, galleons from wave 5, a flagship last in every fifth wave, the admiral's
@@ -106,7 +108,7 @@ wave brings a sea serpent or a kraken, and every fourth wave sails at night.
   as a dotted line), and a lookout bears off any beach ahead and shortens sail to come about in
   time. Broadsides lead their target, and enemy aim has a random spread. Loot drifts toward the
   player and expires; when a wave's last enemy sinks, every barrel still afloat is hauled in at
-  once. There is a harbor shop with five upgrades plus a paid repair, the hire and keep rows, the two
+  once. There is a harbor shop with five upgrades plus a paid repair, the hire, keep and iron bow rows, the two
   loading buttons and the sail (or course) buttons, a
   game-over panel with the Admiralty's rewards and "Sail again", and off-screen arrows pointing to
   enemies (rust), prizes (green) and loot (ochre). The sea wraps around at every edge
@@ -182,6 +184,33 @@ wave brings a sea serpent or a kraken, and every fourth wave sails at night.
   `escortBroadsides` only target enemies `seen`. `fireFlare` (the scene's Flare button or R; F stays the shared full-screen key) spends a
   flare, sets `flareMs` to `FLARE_MS` and leaves a `flare` effect. The darkness itself is the
   scene's: see "Rendering".
+- **Crew stations** (`src/game/stations.ts`): `GameState.stations` splits the crew in `HANDS` (6)
+  shares, `evenStations` (2 each) at `newRun`, kept from wave to wave. `man(s, station)` (the
+  scene's Guns, Sails and Pumps buttons, or 1, 2, 3; the scene only offers it from wave 2, in
+  `break` or `fighting`) moves one share to it with `manStation` (from the other station holding
+  the most, the later of a tie, between `MIN_HANDS` 1 and `MAX_HANDS` 4). `lift(hands)` is -0.5
+  to 1 (0 at even), and `stationFactor(hands, crewShare, k)` is `1 + k * lift`, with a positive
+  lift scaled by `crewShare` (sailors aboard of a full crew), so lost sailors cut the gain where
+  the hands are: the guns scale the player's reload step in `aimBroadsides` (`GUNS_PACE`), the
+  sails `stats().turn` (`SAILS_TURN`), and `pump` (in `tick` while fighting) mends `pumpRate`
+  (`PUMP_HP` a second at lift 1) up to `maxHp`. An even split gives factors of exactly 1 and no
+  pumping, so the first wave plays as before.
+- **Consort orders** (`src/game/fleet.ts`): `GameState.fleetOrder` (`hunt` at `newRun`, kept from
+  wave to wave) steers `sailEscort` for every prize and consort but the convoy: `hunt` is the old
+  way (`nearestFoe` within `ESCORT_HUNT` of the player), `follow` keeps station only (the
+  broadsides still fire at what comes by), `attack` goes after `fleetTarget(s)` (the enemy id in
+  `GameState.target`, set by `firePlayer` whenever a broadside trains on one and cleared in
+  `setSail`, while afloat and seen, else the nearest enemy seen), and `screen` keeps station by
+  the convoy and goes after enemies within `SCREEN_R` of her (with no convoy it acts as `hunt`).
+  `orderFleet(s)` (the scene's Consorts button or C) moves to `nextFleetOrder`, which skips
+  `screen` without a convoy at sea, and refuses without a prize or consort.
+- **Ramming** (`src/game/ram.ts`): `buyBow` (the harbor's `bow` row) sets `GameState.ironBow` for
+  `IRON_BOW_COST`, once a run. `ramming` (in `tick`, before `separate`) checks every enemy touching
+  the player (radii plus 2) that is not a beast or a fireship and whose `Ship.ramMs` cooldown has
+  run out: the closing speed (the player's `stats().speed` with the wind along the bearing, less
+  the enemy's `speedOf` along it) from `RAM_MIN_SPEED` `hurt`s her `RAM_DAMAGE` a pixel a second
+  and the player `RAM_RECOIL` of that, sets `ramMs` to `RAM_MS`, counts `GameState.rams` and
+  leaves a `ram` effect. Without the bow ships only push apart, as before.
 - **Screens:** there is only `GameScene`. The wave banner (its line under the title picks, in
   order, the haven, the Tempest, the daily's ship, the Reaches, a beast, the night, a named
   captain, raiders, a convoy, forts, then the flagship or the sails; a beast or the night comes
@@ -233,7 +262,7 @@ File map (all under `src/`, plus the shared files it imports):
   plays the sounds and music for what changed, so `game/` stays free of audio.
 - `scenes/layout.ts`: `DESIGN` (960x540), `VIEW` (the real view, set by `fitLayout`), `fitLayout`, `BANNER` (the wave banner's heights), `HUD_HEIGHT`, the `HELM` wheel centres (high enough to clear the
   shared corner buttons at the bottom left), the `FIRE` control centres,
-  `ORDER_CARD`, `FLARE` (the night's flare button, bottom middle), `BOUNTY` (the bounty line's left edge), `CONVOY` (the convoy's line under it), the
+  `ORDER_CARD`, `FLARE` (the night's flare button, bottom middle over the crew stations), `CREW` (the three crew station buttons at the foot, by the middle one), `FLEET` (the consort orders button beside the scuttle button), `BOUNTY` (the bounty line's left edge), `CONVOY` (the convoy's line under it), the
   `HARBOR` panel and row geometry (with `loadY` for the loading buttons), `COURSE` (the two course
   buttons), `DRAFT` (the prize draft's cards), the `OVER` (game-over)
   panel, its ship buttons (`shipY`, `shipW`) and rows, `WIND` (the wind rose), `SCUTTLE`,
@@ -276,7 +305,7 @@ File map (all under `src/`, plus the shared files it imports):
   own mortar (`ownMortar`, with `safeSpot`), enemy broadsides and mortars (`enemyBroadsides`, `mortar`), the
   forts' shelling (`fortsFire`), `fire`, `lobAt`/`lob` (shells), balls (chain shot sets `slowMs`,
   grapeshot `jamMs` and kills crew; forts are hit too), shells (`landShells`), blasts (`blast`),
-  fireships ramming (`ram`), sinking (`sink`, with Salvage, which can't save a player sunk the
+  fireships ramming (`ram`), the iron bow's rams (`ramming`), the pumps (`pump`), sinking (`sink`, with Salvage, which can't save a player sunk the
   same tick), razing (`raze`, after the sinking, so a fort a fireship's blast brings down is paid
   that tick), loot (`haulIn`),
   reaching the harbor (`reachHarbor`: prizes sold and crews back, the player's broadsides
@@ -284,8 +313,8 @@ File map (all under `src/`, plus the shared files it imports):
   and winning at the haven. `hurt` and `kill` are the only places hull and crew are taken off.
   `detourCourse`, `speedOf`, `boardable`, `canBoard`, `prizeCrew`, `boardMs`, `scuttleGold`,
   `fortBounty`, `convoyShip`, `keepCost`, `keepBlocked`, `SHELL_MS`, `SHELL_R` and `FIRE_BLAST`
-  are exported for the scene. `scuttle` is the in-battle action (never the convoy); `pickPerk`,
-  `buy`, `repair`, `hire`, `keep`, `loadShot` and `setSail` are the harbor actions, and `sailOn`
+  are exported for the scene, with `fleetTarget`. `scuttle`, `man` and `orderFleet` are the in-battle actions (`scuttle` never the convoy); `pickPerk`,
+  `buy`, `buyBow`, `repair`, `hire`, `keep`, `loadShot` and `setSail` are the harbor actions, and `sailOn`
   the end card's.
 - `game/ships.ts`: the `ENEMIES` table (name, hp, radius, speed, turn, guns, damage, reload,
   range, loot, `crew`, `grape` for ships that load grapeshot within `GRAPE_RANGE`, and `role`
@@ -311,6 +340,11 @@ File map (all under `src/`, plus the shared files it imports):
 - `game/beasts.ts`: `BeastKind`, `BEAST_KINDS`, `isBeast`, `FIRST_BEAST_WAVE`, `BEAST_EVERY`,
   `beastFor`, `BEAST_FLEET_CUT`, `HEAD_MS`, `DIVE_MS`, `FIRST_DIVE_MS`, `SURFACE_AT`,
   `TENTACLE_MS`, `TENTACLE_R`, `TENTACLE_SPREAD`, `Tentacle`, `Wall` and `emptyWall`.
+- `game/stations.ts`: `Station`, `STATION_IDS`, `STATION_NAMES`, `HANDS`, `EVEN_HANDS`,
+  `MIN_HANDS`, `MAX_HANDS`, `Stations`, `evenStations`, `lift`, `GUNS_PACE`, `SAILS_TURN`,
+  `PUMP_HP`, `stationFactor`, `pumpRate` and `manStation`.
+- `game/fleet.ts`: `FleetOrder`, `FLEET_ORDERS`, `FLEET_NAMES`, `SCREEN_R` and `nextFleetOrder`.
+- `game/ram.ts`: `IRON_BOW_COST`, `RAM_DAMAGE`, `RAM_MIN_SPEED`, `RAM_RECOIL` and `RAM_MS`.
 - `game/night.ts`: `FIRST_NIGHT_WAVE`, `NIGHT_EVERY`, `isNightWave`, `FLARES`, `FLARE_MS`,
   `NIGHT_SIGHT` and `FLASH_MS`.
 - `game/random.ts`: `random()`, the rules' only source of randomness, and `useRandom(rand?)`,
@@ -343,9 +377,9 @@ File map (all under `src/`, plus the shared files it imports):
   baked at one of these and shown at its inverse.
 - `ui/Harbor.ts`: the harbor panel, a ledger on parchment. Under the title, the gold line, a line
   of news (bounty, convoy, consorts' wages) and the perks held (`II` for rank 2). Its rows are
-  built from `UPGRADE_IDS` plus `repair`, `hire` and `keep`, followed by the two loading buttons
+  built from `UPGRADE_IDS` plus `repair`, `hire` and `keep` (`makeRow`), then the iron bow's `bow` row (made with the trade row, see below), followed by the two loading buttons
   (`load-port`, `load-starboard`), the trade row (`trade-<cargo>`, one button per `CARGO_IDS`
-  after a label with the hold, made the first time the harbor opens, by `makeTrade`, so its texts
+  after a label with the hold, made with the `bow` row the first time the harbor opens, by `makeTrade`, so their texts
   don't shift the first wave's randomness) and either a "Set sail" button (`sail`) or, when `coursesFor`
   the next wave, one button per course (`sail-<course>`, `COURSE` in `layout.ts`), and a second
   container holds up to `DRAFT_SIZE + HUNTER_CARDS` cards (`draft-<perk>`, headed "Prize: rank 2"
@@ -388,7 +422,7 @@ How it runs:
   `over` or `won`. Escorts and shells are cleared in `reachHarbor`, forts in `setSail`.
 - **Input:** `readInput` sets `state.helm` to -1, 0 or 1 and `state.aim.port`/`.starboard` each
   frame. Keys win over the pointer for the helm (Left/A, Right/D); Q and E hold the port and
-  starboard fire controls, and R fires a flare on a night wave (F, M and P are the shared keys). Each pointer that presses a control is remembered in `held` (pointer
+  starboard fire controls, R fires a flare on a night wave, 1, 2 and 3 man the guns, sails and pumps (`man`), and C gives the consorts their next order (`orderFleet`) (F, M and P are the shared keys). Each pointer that presses a control is remembered in `held` (pointer
   id to control), and its own `pointerup` releases only that control (`gameout` releases all), so
   one thumb can steer while the other fires. A fire control pressed and released within one frame
   still counts as held for that frame (`tapped`), so a quick tap fires an uncharged broadside.
@@ -418,6 +452,12 @@ How it runs:
   by `bakeBeast`) shows only while `afloat`, rising and sinking over `RISE_MS`, leaves no wake and
   always shows its hull bar; its tentacles' swirls are drawn with the shells, and the `tentacle`
   effect as a rising arm.
+- **Crew stations and orders on screen:** `drawCrew` makes the `CREW` buttons (each `<name> (n)`,
+  with the station's hands drawn as pips out of `MAX_HANDS`) the first time `break` or `fighting`
+  is reached from wave 2 and shows them then; `drawFleet` makes the `FLEET` button ("Consorts:
+  <order> (C)") the first time a prize or consort (not the convoy) sails and shows it while one
+  does. On the `attack` order `drawFleetTarget` rings `fleetTarget` in dashed rust (turning, held
+  still with reduced motion) in the `arcs` graphics.
 - **Rendering:** ships (the player's texture is `ship-<hull>`), forts, balls, loot (barrel plus
   a "Plunder" label), sinking hulks and the "+N gold" floaters are sprites kept in maps keyed by
   entity or effect id. They are created on first
@@ -472,7 +512,8 @@ State model (`src/game/state.ts`):
   log (`captains`, `named`, `log`, `renown`, `waveCaptains`), `daily`, the Storm Reaches
   (`squallMs`, `squallTo`, `squallBlowMs`, `reefs`, `reachesBest`, `tempestCalls`), trade
   (`hold`, `cargoSold`, `raiders`), the sea beasts (`tentacles`, `wall`), the night (`night`,
-  `flares`, `flareMs`) and `nextId`.
+  `flares`, `flareMs`), the crew stations (`stations`), the consorts' orders (`fleetOrder`,
+  `target`), the iron bow (`ironBow`, `rams`) and `nextId`.
 - `Ship` has a heading in radians (0 is east, positive is clockwise on screen), `hp`/`maxHp`,
   `radius`, `crew`/`maxCrew`, per-side `reload` timers, `hitMs`, `agroundMs` (the cooldown
   before an island can damage it again), `slowMs` (chain shot) and `jamMs` (grapeshot), which
@@ -480,8 +521,8 @@ State model (`src/game/state.ts`):
   doesn't stay tinted behind the panel; `boardMs` (time the player has been alongside); and
   `detour` (enemies and escorts); `escapeMs` (a fleeing merchantman's time left, else 0) and
   `kept` (a consort) and `captain` (a named captain's `CaptainId`, else null); `surfaceMs` and
-  `diveMs` (a sea beast's head up, and time to its next rising) and `flashMs` (lit by her guns'
-  flash at night). The player is always id 1 with kind `player`. A prize keeps its
+  `diveMs` (a sea beast's head up, and time to its next rising), `flashMs` (lit by her guns'
+  flash at night) and `ramMs` (time before the iron bow can ram her again). The player is always id 1 with kind `player`. A prize keeps its
   id, so its sprite carries over from the enemy it was. A `Fort` has its `island` index,
   position, `hp`/`maxHp`, `reload` and `hitMs`.
 - `Ball` carries its velocity, remaining `ms`, `damage`, `fromPlayer` (fired by the player or a
@@ -490,7 +531,7 @@ State model (`src/game/state.ts`):
   the water, 0 without Bouncing shot) and `bounces` (skips left, the perk's rank). A `Shell` has its landing spot, `ms`, `total` and `damage`. `Loot` has
   `gold` and `ms` to live. An `Effect` is visual only (`splash`, `smoke` with the side's
   `heading`, `hit`, `sink`, `coins`, `blast` with its `size`, `prize`, `escape` drawn as "She got
-  away!").
+  away!", `ram` with the player's `heading`, drawn as splinters thrown forward).
 - Only `sim.ts` functions mutate state, plus the scene writing `helm` and `aim` each frame. The
   player's derived stats always come from `stats(s)`. The stored derived values are
   `player.maxHp`, which `buy('hull')` updates, and `player.radius`/`maxCrew`, set from the hull
@@ -528,8 +569,10 @@ first order, wind and draft are fixed and wave 1 has no bounty, forts or grapesh
 Adding guns or shots therefore shifts the random sequence the test relies on. So does adding a
 Phaser `Text` (each takes a UUID from `Math.random` when created), so a new text object in
 `GameScene` or `Harbor` makes the playthrough's first wave play out differently, though just as
-repeatably. That is why the end card's daily button is made the first time the card shows, and
-the captains' name labels as their ships appear.
+repeatably. That is why the end card's daily button is made the first time the card shows, the
+captains' name labels as their ships appear, the crew stations (`createCrew`) the first time a
+wave from 2 is sailed, the consort orders button (`createFleet`) the first time a prize sails with
+the player, and the harbor's `bow` and trade rows the first time it opens.
 The art uses its own seeded generator (`rng` in `art.ts`), never `Math.random`. All timing comes
 from `update`'s `time`. There is no `Date` or `setTimeout` in the game (the daily's day comes from `today()` in `shared/daily.ts`).
 
@@ -664,11 +707,13 @@ Effects (`sfx` in `audio.ts`, and the shared `ui` sounds), and where `SoundCues`
 | `roar` | a sea beast's head breaking the surface (`afloat` turning true) |
 | `flare` | a new `flare` effect |
 | `squall` | a new `squall` effect: the wind swinging round in a Storm Reaches squall |
+| `ram` | a new `ram` effect: the iron bow striking a ship |
 
 `GameScene` plays the shared `ui` sounds for its buttons: `harborAction` plays `coin` for a
 purchase (upgrade, repair, hire, keep), `click` for a choice (perk, loading, sail) and `refuse`
 when the sim function returns false; the end card's ship buttons and boon rows `click` or
-`refuse`, "Sail again" and "Sail on" `click`, and the scuttle button `refuse`s if it fails (the
+`refuse`, "Sail again" and "Sail on" `click`, and the scuttle button `refuse`s if it fails, the crew stations
+and the consort orders button `click` or `refuse` (the
 scuttle itself sounds through its `sink` and `coins` effects). To add a sound: an entry in `sfx`,
 then a check in `SoundCues.after` (or a case in `effects` for a new effect kind).
 
@@ -716,8 +761,8 @@ then a check in `SoundCues.after` (or a case in `effects` for a new effect kind)
 
 - **Add an upgrade:** add an id to `UpgradeId` and an entry to `UPGRADES` in `upgrades.ts`, then
   apply it in `stats()` in `state.ts`. The harbor adds a row automatically, but `HARBOR` in
-  `layout.ts` only fits nine rows (five upgrades, repair, hire, keep and the trade row) plus the
-  loading buttons and the sail buttons, so adjust `h`, `firstRowY`, `rowGap` or `loadY`.
+  `layout.ts` only fits ten rows (five upgrades, repair, hire, keep, the iron bow and the trade
+  row) plus the loading buttons and the sail buttons, so adjust `h`, `firstRowY`, `rowGap` or `loadY`.
 - **Add a cargo:** an entry in `CARGO` in `trade.ts` with its name in each language; the trade
   row splits its width among `CARGO_IDS`.
 - **Add a perk:** add an id to `PerkId` and an entry to `PERKS` in `perks.ts` (with `desc2` for its

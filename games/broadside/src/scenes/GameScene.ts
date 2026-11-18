@@ -20,7 +20,9 @@ import { DAILY_GAME, drawVoyage, voyageScore, wavesBeaten } from '../game/voyage
 import { ENEMIES } from '../game/ships';
 import { SHOTS } from '../game/shot';
 import type { UpgradeId } from '../game/upgrades';
-import { afloat, boardable, boardMs, buy, canBoard, convoyShip, detourCourse, fireFlare, fortBounty, hire, keep, loadShot, pickPerk, repair, sailOn, scuttle, scuttleGold, seen as inSight, setSail, SHELL_R, tick, trade } from '../game/sim';
+import { afloat, boardable, boardMs, buy, buyBow, canBoard, convoyShip, detourCourse, fireFlare, fleetTarget, fortBounty, hire, keep, loadShot, man, orderFleet, pickPerk, repair, sailOn, scuttle, scuttleGold, seen as inSight, setSail, SHELL_R, tick, trade } from '../game/sim';
+import { MAX_HANDS, STATION_IDS, STATION_NAMES, type Station } from '../game/stations';
+import { FLEET_NAMES } from '../game/fleet';
 import {
   BREAK_MS,
   FORT,
@@ -46,7 +48,7 @@ import { Harbor, type HarborAction } from '../ui/Harbor';
 import { fitWidth, pinToScreen } from '../ui/screen';
 import { checkTrophies } from '../trophies/check';
 import { SoundCues } from './soundCues';
-import { BANNER, BOUNTY, CONVOY, FIRE, FLARE, FONT, HELM, HUD_HEIGHT, ORDER_CARD, OVER, SCUTTLE, UI_DEPTH, VIEW, WIND } from './layout';
+import { BANNER, BOUNTY, CONVOY, CREW, FIRE, FLARE, FLEET, FONT, HELM, HUD_HEIGHT, ORDER_CARD, OVER, SCUTTLE, UI_DEPTH, VIEW, WIND } from './layout';
 
 /** Longest simulated step, so a backgrounded tab doesn't jump the battle forward. */
 const MAX_STEP_MS = 250;
@@ -171,6 +173,14 @@ export class GameScene extends Phaser.Scene {
   private scuttleButton!: Phaser.GameObjects.Container;
   private scuttleText!: Phaser.GameObjects.Text;
   private keys!: Record<'left' | 'right' | 'a' | 'd' | 'q' | 'e' | 'r', Phaser.Input.Keyboard.Key>;
+  /**
+   * The crew stations at the foot of the screen, with the hands on each drawn as pips, and the
+   * fleet order button: both made the first time they are needed (from wave 2, and with the first
+   * prize), since a text made at the start would change the first wave.
+   */
+  private crewPanel: { container: Phaser.GameObjects.Container; pips: Phaser.GameObjects.Graphics } | null = null;
+  private fleetButton: Phaser.GameObjects.Container | null = null;
+  private fleetText!: Phaser.GameObjects.Text;
   /** A night wave's dark, the lanterns and flashes drawn over it, and the flare button (made on the first night, see `drawNight`). */
   private night!: Phaser.GameObjects.Image;
   private glow!: Phaser.GameObjects.Graphics;
@@ -202,6 +212,8 @@ export class GameScene extends Phaser.Scene {
     this.lastFrame = null;
     this.dailyButton = null;
     this.flareButton = null;
+    this.crewPanel = null;
+    this.fleetButton = null;
     this.commission = [];
     this.boonRows = [];
     this.shipRows = [];
@@ -261,6 +273,9 @@ export class GameScene extends Phaser.Scene {
       r: kb.addKey(K.R),
     };
     this.keys.r.on('down', () => this.flare());
+    // 1, 2 and 3 put a share of the crew on the guns, the sails or the pumps; C gives the prizes their next order.
+    STATION_IDS.forEach((station, i) => kb.addKey(K.ONE + i).on('down', () => this.man(station)));
+    kb.addKey(K.C).on('down', () => this.orderFleet());
   }
 
   update(time: number) {
@@ -313,6 +328,8 @@ export class GameScene extends Phaser.Scene {
     this.drawHud();
     this.drawControls();
     this.drawScuttle();
+    this.drawCrew();
+    this.drawFleet();
     this.harbor.show(s.phase === 'harbor' ? s : null);
     const ended = s.phase === 'over' || s.phase === 'won';
     this.gameOver.setVisible(ended);
@@ -378,6 +395,7 @@ export class GameScene extends Phaser.Scene {
       if (id === 'keep') done = keep(s);
       else if (id === 'repair') done = repair(s);
       else if (id === 'hire') done = hire(s);
+      else if (id === 'bow') done = buyBow(s);
       else done = buy(s, id as UpgradeId);
     }
     ui(!done ? 'refuse' : spent ? 'coin' : 'click');
@@ -869,6 +887,18 @@ export class GameScene extends Phaser.Scene {
         }
         g.fillStyle(OCHRE, a).fillCircle(e.x, e.y, 3.5);
         g.lineStyle(0.75, INK, a).strokeCircle(e.x, e.y, 3.5);
+      } else if (e.kind === 'ram') {
+        // The iron bow strikes: splinters thrown forward along her heading, and a ring of spray.
+        const a = 1 - age;
+        const fwd = e.heading ?? 0;
+        g.lineStyle(1.3, INK, a);
+        for (let k = -3; k <= 3; k++) {
+          const ang = fwd + k * 0.35;
+          const r = (k % 2 ? 14 : 20) * (0.5 + age * 0.8);
+          g.lineBetween(e.x + Math.cos(ang) * 4, e.y + Math.sin(ang) * 4, e.x + Math.cos(ang) * r, e.y + Math.sin(ang) * r);
+        }
+        g.lineStyle(1, INK, 0.7 * a).strokeCircle(e.x, e.y, 8 + age * 18);
+        g.fillStyle(0x8a8f96, a).fillCircle(e.x, e.y, 4);
       } else if (e.kind === 'blast') {
         // A burst of fire: an ochre and orange flash spreading to the blast's reach, ink rays and smoke.
         const r = (e.size ?? 40) * Math.min(1, 0.4 + age * 1.2);
@@ -951,6 +981,7 @@ export class GameScene extends Phaser.Scene {
     this.aimLabel.setVisible(false);
     const s = this.state;
     if (s.phase !== 'fighting' && s.phase !== 'break') return;
+    this.drawFleetTarget();
     const p = { ...s.player, ...this.view };
     const ARC = stats(s).arc;
     const at = (a: number, r: number) => ({ x: p.x + Math.cos(a) * r, y: p.y + Math.sin(a) * r });
@@ -1402,6 +1433,87 @@ export class GameScene extends Phaser.Scene {
         g.lineBetween(x + Math.cos(a) * (R - 4), y + Math.sin(a) * (R - 4), x + Math.cos(a) * (R + 4), y + Math.sin(a) * (R + 4));
       }
     }
+  }
+
+  /** On the attack order, a dashed rust ring round the enemy the prizes are going after. */
+  private drawFleetTarget() {
+    const s = this.state;
+    if (s.fleetOrder !== 'attack' || !this.scuttlePrize()) return;
+    const foe = fleetTarget(s);
+    if (!foe) return;
+    const at = this.place(foe);
+    const r = radiusOf(foe) + 12;
+    const g = this.arcs;
+    const turn = settings.reduceMotion ? 0 : this.clock / 900;
+    g.lineStyle(2, RUST, 0.85);
+    for (let k = 0; k < 12; k++) {
+      const a = turn + (k / 12) * Math.PI * 2;
+      g.beginPath().arc(at.x, at.y, r, a, a + 0.3).strokePath();
+    }
+  }
+
+  /** The crew stations, from wave 2: a button each, with its share of the hands as pips. */
+  private createCrew() {
+    const parts: Phaser.GameObjects.GameObject[] = [];
+    STATION_IDS.forEach((station, i) => {
+      const x = (i - 1) * (CREW.w + CREW.gap);
+      const b = makeButton(this, x, 0, `${t(STATION_NAMES[station])} (${i + 1})`, () => this.man(station), CREW.w, CREW.h);
+      b.text.setFontSize(14).setY(-8);
+      fitWidth(b.text, CREW.w - 12);
+      parts.push(b.button);
+    });
+    const pips = this.add.graphics();
+    parts.push(pips);
+    const container = pinToScreen(this.add.container(CREW.x, CREW.y, parts)).setDepth(UI_DEPTH - 5);
+    this.crewPanel = { container, pips };
+  }
+
+  private drawCrew() {
+    const s = this.state;
+    const show = (s.phase === 'break' || s.phase === 'fighting') && s.wave >= 2;
+    if (show && !this.crewPanel) this.createCrew();
+    if (!this.crewPanel) return;
+    this.crewPanel.container.setVisible(show);
+    if (!show) return;
+    const g = this.crewPanel.pips.clear();
+    STATION_IDS.forEach((station, i) => {
+      const x = (i - 1) * (CREW.w + CREW.gap);
+      for (let k = 0; k < MAX_HANDS; k++) {
+        const px = x + (k - (MAX_HANDS - 1) / 2) * 13;
+        const filled = k < s.stations[station];
+        g.fillStyle(filled ? OCHRE : CREAM, 1).fillCircle(px, 9, 4.2);
+        g.lineStyle(1, INK, 1).strokeCircle(px, 9, 4.2);
+      }
+    });
+  }
+
+  /** Puts a share of the crew on `station` (a button or 1, 2, 3): a click, or the buzz once it holds all it can. */
+  private man(station: Station) {
+    const s = this.state;
+    if (s.wave < 2 || (s.phase !== 'break' && s.phase !== 'fighting')) return;
+    ui(man(s, station) ? 'click' : 'refuse');
+  }
+
+  /** The fleet order button beside the scuttle button, while a prize or consort sails with the player. */
+  private createFleet() {
+    const b = makeButton(this, FLEET.x, FLEET.y, '', () => this.orderFleet(), FLEET.w, FLEET.h);
+    this.fleetText = b.text.setFontSize(14);
+    this.fleetButton = pinToScreen(b.button).setDepth(UI_DEPTH - 5);
+  }
+
+  private drawFleet() {
+    const s = this.state;
+    const show = (s.phase === 'break' || s.phase === 'fighting') && !!this.scuttlePrize();
+    if (show && !this.fleetButton) this.createFleet();
+    if (!this.fleetButton) return;
+    this.fleetButton.setVisible(show);
+    if (show) fitWidth(this.fleetText.setFontSize(14).setText(t('fleetButton', { order: t(FLEET_NAMES[s.fleetOrder]) })), FLEET.w - 16);
+  }
+
+  /** Gives the prizes their next order (the button or C). */
+  private orderFleet() {
+    if (!this.scuttlePrize()) return;
+    ui(orderFleet(this.state) ? 'click' : 'refuse');
   }
 
   /** While the player has a prize in tow, a button under the order card to scuttle the newest for double loot. */

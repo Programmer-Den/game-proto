@@ -10,6 +10,7 @@ import { HULLS } from '../game/hulls';
 import { DRAFT_SIZE, perkRank, PERKS, type PerkId } from '../game/perks';
 import { ENEMIES, type EnemyKind } from '../game/ships';
 import { keepBlocked, keepCost } from '../game/sim';
+import { IRON_BOW_COST } from '../game/ram';
 import { SHOTS } from '../game/shot';
 import { ISLANDS, rank, type GameState, type Side } from '../game/state';
 import { inReaches, reachWave } from '../game/waves';
@@ -21,7 +22,7 @@ import { t } from '../i18n';
 import { makeButton } from './Button';
 import { fitWidth, pinToScreen } from './screen';
 
-export type HarborAction = UpgradeId | 'repair' | 'hire' | 'keep' | 'sail' | `sail-${CourseId}` | `load-${Side}` | `draft-${PerkId}` | `trade-${CargoId}`;
+export type HarborAction = UpgradeId | 'repair' | 'hire' | 'keep' | 'bow' | 'sail' | `sail-${CourseId}` | `load-${Side}` | `draft-${PerkId}` | `trade-${CargoId}`;
 export interface HarborButton {
   id: HarborAction;
   x: number;
@@ -31,7 +32,7 @@ export interface HarborButton {
 }
 
 interface Row {
-  id: UpgradeId | 'repair' | 'hire' | 'keep';
+  id: UpgradeId | 'repair' | 'hire' | 'keep' | 'bow';
   bg: Phaser.GameObjects.Rectangle;
   name: Phaser.GameObjects.Text;
   desc: Phaser.GameObjects.Text;
@@ -113,21 +114,7 @@ export class Harbor {
     const parts: Phaser.GameObjects.GameObject[] = [dim, panel, this.title, this.gold, this.bounty, this.perks, rule];
 
     const ids: (UpgradeId | 'repair' | 'hire' | 'keep')[] = [...UPGRADE_IDS, 'repair', 'hire', 'keep'];
-    ids.forEach((id, i) => {
-      const y = HARBOR.firstRowY + i * HARBOR.rowGap;
-      const left = HARBOR.x - HARBOR.rowW / 2;
-      const bg = scene.add.rectangle(HARBOR.x, y, HARBOR.rowW, HARBOR.rowH, ROW, 0.9).setStrokeStyle(1.5, INK);
-      bg.setInteractive({ useHandCursor: true })
-        .on('pointerover', () => bg.setFillStyle(ROW_LIT, 0.95))
-        .on('pointerout', () => bg.setFillStyle(ROW, 0.9))
-        .on('pointerdown', () => onAction(id));
-      const name = scene.add.text(left + 14, y - 8, '', style(15, '#2b2118', 'bold')).setOrigin(0, 0.5);
-      const desc = scene.add.text(left + 14, y + 8, '', style(11, '#5a4a38', 'italic')).setOrigin(0, 0.5);
-      const cost = scene.add.text(left + HARBOR.rowW - 14, y, '', style(17, '#6a4410', 'bold italic')).setOrigin(1, 0.5);
-      this.rows.push({ id, bg, name, desc, cost });
-      this.ledgerButtons.push({ id, x: HARBOR.x, y, w: HARBOR.rowW, h: HARBOR.rowH });
-      parts.push(bg, name, desc, cost);
-    });
+    ids.forEach((id, i) => parts.push(...this.makeRow(id, i)));
 
     // Below the ledger, what each side's guns are loaded with; a tap loads the next kind of shot.
     const loadW = (HARBOR.rowW - 12) / 2;
@@ -191,19 +178,39 @@ export class Harbor {
     this.draftContainer = pinToScreen(scene.add.container(0, 0, draftParts)).setDepth(UI_DEPTH + 10).setVisible(false);
   }
 
+  /** One ledger row, the `i`th from the top: a name, a line under it and the price at the right. */
+  private makeRow(id: Row['id'], i: number) {
+    const scene = this.scene;
+    const y = HARBOR.firstRowY + i * HARBOR.rowGap;
+    const left = HARBOR.x - HARBOR.rowW / 2;
+    const bg = scene.add.rectangle(HARBOR.x, y, HARBOR.rowW, HARBOR.rowH, ROW, 0.9).setStrokeStyle(1.5, INK);
+    bg.setInteractive({ useHandCursor: true })
+      .on('pointerover', () => bg.setFillStyle(ROW_LIT, 0.95))
+      .on('pointerout', () => bg.setFillStyle(ROW, 0.9))
+      .on('pointerdown', () => this.onAction(id));
+    const name = scene.add.text(left + 14, y - 7, '', style(15, '#2b2118', 'bold')).setOrigin(0, 0.5);
+    const desc = scene.add.text(left + 14, y + 8, '', style(11, '#5a4a38', 'italic')).setOrigin(0, 0.5);
+    const cost = scene.add.text(left + HARBOR.rowW - 14, y, '', style(17, '#6a4410', 'bold italic')).setOrigin(1, 0.5);
+    this.rows.push({ id, bg, name, desc, cost });
+    this.ledgerButtons.push({ id, x: HARBOR.x, y, w: HARBOR.rowW, h: HARBOR.rowH });
+    return [bg, name, desc, cost];
+  }
+
   /**
    * The trade row under the ledger's last row: a label with the hold, then a button per cargo
    * that buys a crate at this harbor's price and says what it fetches at the next port.
    */
   private makeTrade() {
     const scene = this.scene;
-    const y = HARBOR.firstRowY + (UPGRADE_IDS.length + 3) * HARBOR.rowGap;
+    // The iron bow's row, after the keep row, is made here too, for the same reason.
+    const bowRow = this.makeRow('bow', UPGRADE_IDS.length + 3);
+    const y = HARBOR.firstRowY + (UPGRADE_IDS.length + 4) * HARBOR.rowGap;
     const left = HARBOR.x - HARBOR.rowW / 2;
     const labelBg = scene.add.rectangle(left + HARBOR.tradeLabelW / 2, y, HARBOR.tradeLabelW, HARBOR.rowH, ROW, 0.6).setStrokeStyle(1, INK, 0.6);
     const name = scene.add.text(left + 12, y - 8, '', style(15, '#2b2118', 'bold')).setOrigin(0, 0.5);
     const desc = scene.add.text(left + 12, y + 8, t('tradeDesc'), style(10, '#5a4a38', 'italic')).setOrigin(0, 0.5);
     fitWidth(desc, HARBOR.tradeLabelW - 16);
-    const parts: Phaser.GameObjects.GameObject[] = [labelBg, name, desc];
+    const parts: Phaser.GameObjects.GameObject[] = [...bowRow, labelBg, name, desc];
     const gap = 6;
     const goodW = (HARBOR.rowW - HARBOR.tradeLabelW - gap * CARGO_IDS.length) / CARGO_IDS.length;
     const goods = CARGO_IDS.map((id, i) => {
@@ -299,6 +306,14 @@ export class Harbor {
         );
         row.cost.setText(prize && why !== 'full' ? t('goldCost', { gold: keepCost(s, prize) }) : '-');
         row.bg.setAlpha(why ? 0.5 : 1);
+        continue;
+      }
+      if (row.id === 'bow') {
+        // Bought once, for the run: she then rams any ship she sails into.
+        row.name.setText(t('ironBow'));
+        row.desc.setText(t(s.ironBow ? 'ironBowFitted' : 'ironBowDesc'));
+        row.cost.setText(s.ironBow ? '-' : t('goldCost', { gold: IRON_BOW_COST }));
+        row.bg.setAlpha(!s.ironBow && s.gold >= IRON_BOW_COST ? 1 : 0.5);
         continue;
       }
       if (row.id === 'hire') {

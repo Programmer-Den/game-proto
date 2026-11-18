@@ -39,6 +39,8 @@ round the held button, while a brig steers round the island on a dotted course](
 | Tap **Flare** (foot of the screen) or R on a night wave | Light the whole sea for six seconds |
 | **Set sail**, or from wave 6 **Merchant lane** or **Hunter patrol** | Leave the harbor for the next wave, on the course chosen |
 | Tap **Scuttle the prize** (under the bounty) | Sink your newest prize for twice its loot |
+| Tap **Consorts** (beside it) or C | Give your prizes and consorts their next order: hunt, follow me, attack my target, screen the convoy |
+| Tap **Guns**, **Sails** or **Pumps** (foot of the screen, from wave 2), or 1, 2, 3 | Move a share of the crew to that station |
 | Tap a ship and rows on the "Sunk!" panel, then **Sail again** | Choose the ship for the next run and spend the Admiralty's medals on starting upgrades |
 | **Storm Reaches** (once the haven is razed), later **Sail on** | Sail the run on into the Storm Reaches, and after the Tempest through the waves beyond |
 | **Daily voyage** on the end card | Sail today's seeded voyage, once a day |
@@ -255,6 +257,27 @@ On a phone, one thumb can hold a wheel while the other holds a fire control.
    while you can see her. Your crews only train their guns on a ship they can see (within your
    lanterns' light, lit by her own guns' flash, or under a flare), otherwise they fire straight
    out; your mortar and your prizes hold their fire and don't hunt a ship you can't see. Three flares a night (the **Flare** button or R) each light the whole sea for six seconds.
+28. **Crew stations.** From wave 2 three buttons at the foot of the screen split the crew between
+   the **Guns**, the **Sails** and the **Pumps**, two shares of six each to start, which sails just
+   as before. Tapping one (or 1, 2, 3) moves a share to it from the station holding the most, up
+   to four and never below one. Each extra share on the guns reloads 30% faster and on the sails
+   turns 30% faster, and each share taken off slows them as much; with more than two shares on the
+   pumps they mend 0.4 hull a second (0.8 with four) while you fight. The gain from extra hands
+   shrinks with every sailor lost, so grapeshot and blasts hurt most where you put them. The split
+   carries on from wave to wave.
+29. **Consort orders.** While a prize or consort sails with you, the **Consorts** button beside
+   "Scuttle the prize" (or C) gives them their next order: **hunt** (the start: each goes after the
+   nearest enemy near you), **follow me** (they keep station and fire only at what comes by),
+   **attack my target** (all go after the ship your last broadside was aimed at, ringed in dashed
+   rust, else the nearest) and, while a convoy sails, **screen the convoy** (they keep by her and go
+   after any enemy that comes near her).
+30. **Ramming.** The harbor sells an **Iron bow** for 45 gold, fitted for the rest of the run. With
+   it, sailing into a ship rams her for about a third of your speed closing on her (a frigate at
+   full sail takes about 29 off a brig), and your own hull takes only a quarter of that. Each ship can be
+   rammed once every 1.2 seconds; a fireship still blows up on touching, and a sea beast can't be
+   rammed.
+
+![Crew stations at the foot of the screen, and a prize told to attack the ringed brig](docs/screenshots/crew-stations.webp)
 
 ![From wave 6 the harbor charts two courses, and a brig prize can be kept as a consort](docs/screenshots/harbor-courses.webp)
 
@@ -360,7 +383,9 @@ Every wave brings one more sloop than the last (out in the Storm Reaches, one mo
 | Fast Sails | 3 | Sail and turn 12% faster |
 
 Below them, "Patch the hull" repairs the ship for 10 gold and "Hire sailors" brings 8 aboard for
-12 gold, up to a full crew.
+12 gold, up to a full crew. The **Iron bow** (45 gold, once a run) lets the ship ram.
+
+![The harbor's ledger with the Iron bow under the consort row](docs/screenshots/harbor-iron-bow.webp)
 
 ![The harbor between waves](docs/screenshots/playthrough-4-harbor.webp)
 
@@ -426,7 +451,8 @@ All paths are inside `games/broadside/`.
   broadsides, shells from forts and mortars, boards prizes, keeps the crew and runs the harbor,
   `captains.ts` (the captain's log), `storm.ts` (the Storm Reaches' squalls and reefs),
   `trade.ts` (the harbor's cargo), `beasts.ts` (the sea serpent and the kraken), `night.ts` (night
-  waves and flares) and
+  waves and flares), `stations.ts` (the crew stations), `fleet.ts` (the consorts' orders),
+  `ram.ts` (the iron bow) and
   `voyage.ts` (the daily voyage's ship, perks and score) hold the loop's later goals, `random.ts`
   is the one source of the rules' randomness (seeded on the daily voyage), and `save.ts` keeps the
   best wave, the medals, the ship chosen, the captain's log, the best Storm Reaches wave and the
