@@ -100,6 +100,10 @@ export const sfx = sounds({
   caw: { wave: 'sawtooth', freq: 1100, to: 700, length: 0.16, volume: 0.12, gap: 400, vary: 0.08 },
   /** The Brinewyrm rises, sinks or is blown ashore. */
   splash: { wave: 'noise', freq: 1200, to: 220, length: 0.35, volume: 0.32, gap: 150 },
+  /** A swing meets an iron knight's strike: a bright ring of steel on steel. */
+  parry: { wave: 'triangle', freq: 1568, arp: [0, 7, 12], arpStep: 0.04, length: 0.35, attack: 0.002, volume: 0.36, gap: 150 },
+  /** An iron knight's sword comes down. */
+  slash: { wave: 'noise', freq: 3200, to: 900, length: 0.16, volume: 0.28, gap: 150 },
   /** Walking into another map. */
   swell: { wave: 'sine', freq: 220, to: 440, length: 0.6, attack: 0.3, volume: 0.2, gap: 400 },
 });

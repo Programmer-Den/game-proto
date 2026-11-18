@@ -203,11 +203,13 @@ export class Hud {
    * Cook, or why not), with the coins or a note under the title. The rows' live buttons, or 1 to 9
    * on the keyboard, pick; a dead one buzzes.
    */
-  showShop(title: string, note: string | null, coins: number | null, rows: { name: string; text: string; label: string; live: boolean }[], onPick: (i: number) => void) {
+  showShop(title: string, note: string | null, coins: number | null, rows: { name: string; text: string; label: string; live: boolean }[], onPick: (i: number) => void, compact = false) {
     const add = this.scene.add;
     const f = viewFrame(this.scene);
     const c = add.container(f.x, f.y).setScrollFactor(0).setDepth(DEPTH + 10);
-    const h = 150 + rows.length * 80;
+    // A compact card (the waystones) has one line a row: just the name and its button.
+    const rowH = compact ? 54 : 80;
+    const h = 150 + rows.length * rowH;
     const top = (VIEW.h - h) / 2;
     const g = add.graphics();
     g.fillStyle(0x05081a, 0.7).fillRect(-f.x, -f.y, this.vw, this.vh);
@@ -222,9 +224,9 @@ export class Hud {
     if (note) c.add(add.text(VIEW.w / 2, top + 64, note, { fontFamily: FONT, fontSize: '15px', color: '#cfe8ff' }).setOrigin(0.5));
     this.shopPress = [];
     rows.forEach((r, i) => {
-      const y = top + 112 + i * 80;
-      c.add(add.text(250, y - 12, `${i + 1}. ${r.name}`, { fontFamily: FONT, fontSize: '19px', color: '#f3ead2' }).setOrigin(0, 0.5));
-      c.add(add.text(250, y + 14, r.text, { fontFamily: FONT, fontSize: '14px', color: '#a8b0d0', wordWrap: { width: 330 } }).setOrigin(0, 0.5));
+      const y = top + (compact ? 104 : 112) + i * rowH;
+      c.add(add.text(250, compact ? y : y - 12, `${i + 1}. ${r.name}`, { fontFamily: FONT, fontSize: '19px', color: '#f3ead2' }).setOrigin(0, 0.5));
+      if (r.text) c.add(add.text(250, y + 14, r.text, { fontFamily: FONT, fontSize: '14px', color: '#a8b0d0', wordWrap: { width: 330 } }).setOrigin(0, 0.5));
       const live = r.live;
       const b = add.text(650, y, r.label, { fontFamily: FONT, fontSize: '17px', color: '#10163a', backgroundColor: live ? '#f0d890' : '#6a6e86', padding: { x: 12, y: 6 } }).setOrigin(0.5);
       const press = () => (live ? onPick(i) : ui('refuse'));
@@ -334,7 +336,9 @@ export class Hud {
     const add = this.scene.add;
     const f = viewFrame(this.scene);
     const c = add.container(f.x, f.y).setScrollFactor(0).setDepth(DEPTH + 10);
-    const h = 150 + families.length * 112;
+    // Four families still fit the 540-high view, a little closer together.
+    const rowH = families.length > 3 ? 96 : 112;
+    const h = 140 + families.length * rowH;
     const top = (VIEW.h - h) / 2;
     const g = add.graphics();
     g.fillStyle(0x05081a, 0.7).fillRect(-f.x, -f.y, this.vw, this.vh);
@@ -344,7 +348,7 @@ export class Hud {
     c.add(add.text(VIEW.w / 2, top + 30, t('bestiaryTitle'), { fontFamily: FONT, fontSize: '26px', color: '#f0d890' }).setOrigin(0.5));
     c.add(add.text(VIEW.w / 2, top + 62, t('bestiaryIntro', { n: pageAt }), { fontFamily: FONT, fontSize: '15px', color: '#a8b0d0' }).setOrigin(0.5));
     families.forEach((fam, i) => {
-      const y = top + 104 + i * 112;
+      const y = top + 100 + i * rowH;
       c.add(add.text(128, y, fam.name, { fontFamily: FONT, fontSize: '19px', color: fam.done ? '#cfe8ff' : '#f0d890' }).setOrigin(0, 0.5));
       c.add(add.text(836, y, fam.done ? t('familyPerk') : t('familyWant'), { fontFamily: FONT, fontSize: '14px', color: fam.done ? '#9ad86a' : '#a8b0d0' }).setOrigin(1, 0.5));
       fam.kinds.forEach((k, j) => {

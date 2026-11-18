@@ -63,7 +63,7 @@ Implemented today:
   `buy` (`state.ts`), and a tap off them, Space or Esc closes it. Bought upgrades are in
   `state.upgrades` (`hasUpgrade`). The HUD shows coins after the first one.
 - Items: the Old Blade, the Hookvine, lantern oil (a bigger lantern light), the Moonlantern, the
-  gust horn, the fishing rod, small keys and heart vessels, all from chests (`openChest`), plus hearts dropped by cut bushes.
+  gust horn, the fishing rod, small keys, heart vessels and a purse of coins (`purse`), all from chests (`openChest`), plus hearts dropped by cut bushes.
 - The Moonlantern (`items.moonlantern`) turns the knight's light pale and shows hidden bridges:
   `veil` tiles, painted as pit and listed in `SOLID` and `LOW` (so foes, shots and the hookvine
   treat them as a gap). `solidTile` lets the knight walk one only while `lit` (within `VEIL_PX` of
@@ -119,7 +119,7 @@ Implemented today:
   and drop an `ember` (a `shoot` with that key) every `LANTERN_SHOT_MS`, which sinks from `LANTERN_LIFT` to the
   knight's body on the way (the seed's `lift` and `drop`), so walls stop it at its ground point; carry a light, and never
   hurt by touch. Down, both lie still and harmless. `hint` shows a teaching toast once a page load
-  (`shellHard`, `beetleFlipped`, `lanternDown`, `gloamHigh`, and the Thornmother's below), up for
+  (`shellHard`, `beetleFlipped`, `lanternDown`, `gloamHigh`, the iron knights' and the mist's, and the Thornmother's below), up for
   `HINT_MS` (`Hud.toast` takes how long; a long toast wraps). New dungeon foes go at the end of the map's
   `enemies`, so the beaten flags of the old ones keep their index; new outdoor ones go after the
   scatter, so the trees and bushes it sows stay put. Dungeon foes stay
@@ -161,6 +161,35 @@ Implemented today:
   how many were found (`GameScene.ENDS`). Stones in `AFTER_BOSS` (`maps.ts`) show once their boss
   is beaten. **Keep the secrets in code**: the README and this file only hint at where stones are, so
   don't list their places or triggers in docs, PRs or commits.
+- Iron knights (`knight`, `KNIGHT` in `foes.ts`), round five's parry: one in the belfry's hub, one
+  in the caverns' hub and two in the grotto (entry and hub), added at the end of each map's
+  `enemies`. Not in `ARMOURED`: the sword, a burst and the hookvine only `tink` off them (`hitFoe`
+  and `updateHook`; the `knightGuard` hint) and a gust only spoils a strike (`strike` back to 0).
+  In `updateFoes` one walks up to `reach - 10`, raises its sword (`f.strike` = `windMs`, the
+  `knight-raise` art and a glint light, hint `knightWinds`) and strikes (`knightStrike`: `damage`
+  within `reach`, dodged by a roll), then rests `restMs`. `startSwing` parries one whose `strike` is
+  in its last `parryMs` (`parry`: `down` = `staggerMs`, the `knight-reel` art, sound `parry`, hint
+  `parried`); while `down` the sword hits. A sword hit on its guard sets `parryLock` (`lockMs`), so
+  mashing never parries, and a tap's `chase` walks up to a knight on guard without swinging. The
+  bestiary's fourth family, `iron`, holds it (the page's rows close up to fit four).
+- Tools together (round five): the hookvine catches a planted bellseed (`updateHook`, before posts)
+  and `fling`s it: `Bomb.fly` carries it `FLING.px` ahead at `FLING.speed` over low tiles until a
+  solid one stops it (`flyBomb`), with its fuse stretched to land first. The gust horn blown with
+  the Moonlantern lays `carried` moonlight (`CARRY` in `layout.ts`) along the blast; `veilLight`
+  lights hidden bridges from it as well as from the lantern, and under a map's `mist` (rects in
+  `MapDef.mist`, drawn as `mist` sprites, hint `mistHint`) only from it or under the knight's own
+  feet, so they never stand on a tile that vanished. With a foe hunting the knight (`canLure`: a
+  fish in the creel and a foe other than a knight within `LURE.range` and its own sight, or the
+  Brinewyrm under water), act at water or a tap on it throws a fish (`throwBait`, `bait`): foes in
+  range go for it at `LURE.speed`, harmless and not shooting, until it sinks after `LURE.ms`; in
+  the Brinewyrm's pool it rises at the spot nearest the bait. Two puzzles use them: a coast islet
+  (`tide-purse`, a `purse` of `PURSE` coins) behind boulders across the water, and a ledge under
+  the caverns' mist (`caverns-mist`, a heart vessel). Don't spell out where in docs or PRs.
+- Waystones (`WAYSTONES` in `maps.ts`, round five): a `waystone` prop that `buildMap` adds last in
+  Mossford, the woods, the fen, the peaks and the coast, each by a dungeon door. `useWaystone`
+  (act or a tap, target `way`) wakes one (flag `way-<map>`, the `waystone-lit` art and a glow), then
+  `openWays` shows the lit ones on a compact `Hud.showShop` card; a pick fades to the tile below
+  that stone, facing down. A new game+ starts with them dark again.
 - The night (`src/scenes/light.ts`): a dark layer with holes for lights, an added warm glow and a
   haze at the view's top and bottom edges for the miniature look. Lamps, windows, braziers,
   glowing mushrooms, candles, moonstones, seeds, bellseeds and the knight's lantern are
@@ -264,7 +293,10 @@ All in code through `shared/audio.ts` (no audio files), in `src/audio/`:
   `rattle` and `clang` (the Bellwraith's drop and slam; `rattle` higher when the Gloamwing marks
   its spot), `topple` (`tipBell`), `wail` (`hitWraith`), `swoop` (the Gloamwing dives), `screech`
   (`hitGloam`), `find` (a request's thing picked up), `wisp` (the wisp hops on) and `swell`
-  (`checkExits`, walking into another map). The Gloamwing's frost rings play `volley` higher. Chapter four's: `gust` (`blowHorn`), `whirr`
+  (`checkExits`, walking into another map, and a waystone's journey). Round five's: `parry` (`parry`),
+  `slash` (`knightStrike`), `rattle` pitched up (a knight raises its sword), `clang` pitched up (a
+  knight beaten), `tink` lower (a blade, burst or vine on its guard), `twang` (`fling`), `cast` and
+  a high `splash` (`throwBait`) and `chime` (a waystone woken). The Gloamwing's frost rings play `volley` higher. Chapter four's: `gust` (`blowHorn`), `whirr`
   (`turnMill`), `cast`, `bite` and `catch` (`startFishing`, `updateFishing`, `reel`), `sizzle`
   (`cook`, at a campfire), `caw` (a gull starts a swoop) and `splash` (the Brinewyrm rises or
   sinks).
@@ -335,7 +367,7 @@ pulls the knight (a bellseed bursting, a moonstone picked up) until they land on
 reload never puts them or their spawn over water or a pit. Trophies are saved apart, under `bramblecrest-trophies` (`shared/trophies.ts`), and outlive a
 new game. Flags in use: `chest-<id>`, `door-<id>`, `gate-cut`, `woods-thorns`, `plate`,
 `boss`, `foe-<i>`, `belfry-foe-<i>`, `caverns-foe-<i>`, `broke-<map>-<x>-<y>`, `bells`, `wraith`,
-`gloam`, `grotto-foe-<i>`, `mill-<map>-<x>-<y>`, `drained`, `gusts`, `brine`, `cat-1` to `cat-3`, `find-<request>-<i>`, plus the flags of hidden places. `load` fills in
+`gloam`, `grotto-foe-<i>`, `mill-<map>-<x>-<y>`, `drained`, `gusts`, `brine`, `cat-1` to `cat-3`, `find-<request>-<i>`, `way-<map>`, plus the flags of hidden places. `load` fills in
 fields a save from an older version lacks (`items.seeds`, `items.moonlantern`, `items.horn`,
 `items.rod`, `seeds`, `trials`, `coins`, `upgrades`, `requests`, `cycle`, `fish`, `meal`,
 `bestiary`); an old save at `end` meets chapter three's start at the elder, one at `final` meets
@@ -359,7 +391,7 @@ elder's `quest-thorns` then moves the quest straight on to `shrine`.
 - `window.game.scene.getScene('Game')` gives `state` (the `GameState`), `dialog` (`{ speaker,
   lines, i }` or null), `route` (the steps left of a tap's walk, or null), `target`, `foes` and
   `boss`, `wraith`, `gloam`, `brine` (the Brinewyrm, or null), `fishing` (`{ t, bite, fish }` while
-  a line is out, or null), `bombs`, `trial` (`{ map, ms }` or null) and `hud` (`shopOpen`, `pageOpen`); `spot('npc' | 'chest', id)` is where to tap a person or chest in the world and
+  a line is out, or null), `bombs` (each with `fly` while flung), `bait` and `carried`, `trial` (`{ map, ms }` or null) and `hud` (`shopOpen`, `pageOpen`); `spot('npc' | 'chest', id)` is where to tap a person or chest in the world and
   `screenOf(x, y)` turns a world point into view pixels (allowing for the camera's zoom).
 - `e2e/playthrough.spec.ts` taps the elder, taps through her lines, taps the `blade` chest, taps
   the elder again, walks to the street below the gate (`STREET`) and taps the gate's thorns
@@ -389,7 +421,11 @@ elder's `quest-thorns` then moves the quest straight on to `shrine`.
 - **Add a fish or meal**: its id in `FishId` and `FISH`, a map's `fish`, a row in `MEALS` with its
   `<id>`/`<id>Text` texts, and its effect where the number it changes is used (and `endMeal`).
 - **Add a foe to the bestiary**: its kind in a family of `FAMILIES` (`foes.ts`), its art in
-  `FOE_PAGE` and its name text.
+  `FOE_PAGE` and its name text. Four families fill the page; a fifth needs the page laid out again.
+- **Add a waystone**: a row in `WAYSTONES` (on plain ground, with plain ground below it to arrive
+  on); the card lists them in that order.
+- **Add mist**: a rect in the map's `mist` over hidden bridge tiles; check the bridge can be lit
+  from where the knight stands with the horn (`CARRY.px`).
 - **Add a chapter**: new stages at the end of `QUESTS` with their `OBJECTIVES` (text keys), lines in `talk.ts`
   that move them on (and in `STORY`, so no request gets in their way), and a row in
   `GameScene.ENDS`; raise `MOONSTONES` with the new stones (`chapter` on each, and `stoneCounts`).

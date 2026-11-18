@@ -394,6 +394,21 @@ const de: Translation<typeof en> = {
   keys: 'Schlüssel {n}',
   seeds: 'Samen {n}',
   readOn: 'Tippen oder Leertaste',
+  // Runde fünf: die Eisenritter parieren, die Werkzeuge zusammen und die Wegsteine.
+  knightName: 'Eisenritter',
+  iron: 'Eiserne Wache',
+  knightWinds: 'Der Eisenritter hebt sein Schwert. Schlag genau zu, wenn es herabsaust, um zu parieren, oder roll dich weg!',
+  knightGuard: 'Klong! Seine Rüstung hält alles ab. Pariere seinen Hieb, um ihn aus dem Gleichgewicht zu bringen.',
+  parried: 'Pariert! Er taumelt: jetzt zuschlagen!',
+  mistHint: 'Der Nebel verschluckt hier das Licht der Mondlaterne. Etwas muss es hinübertragen.',
+  wayWakes: 'Der Wegstein erwacht. Berühre einen leuchtenden Wegstein, um zu den anderen zu reisen.',
+  wayTitle: 'Wegsteine',
+  wayNote: 'Wohin?',
+  wayAlone: 'Noch leuchtet kein anderer Wegstein.',
+  wayHere: 'Du bist hier',
+  wayGo: 'Reisen',
+  foundPurse: 'Du hast einen Beutel alter Münzen gefunden! {n} Münzen.',
+  baitThrown: '{fish} ins Wasser geworfen. Das lockt etwas an.',
 };
 
 /** Names and bell sounds that stay as they are in German. */

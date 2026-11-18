@@ -20,6 +20,9 @@ export const MOONSTONES = 22;
 export const MAX_SEEDS = 10;
 export const BIG_POUCH = 15;
 
+/** Coins in the purse on the coast's far islet. */
+export const PURSE = 25;
+
 /** Who sells upgrades: Marla in Mossford and Old Sedge in the fen. */
 export type Seller = 'baker' | 'hermit';
 /** What coins buy (`UPGRADES`), and what the villagers give for their requests (`REQUESTS`). */
@@ -278,6 +281,7 @@ export function give(s: GameState, item: ItemId) {
   else if (item === 'horn') s.items.horn = true;
   else if (item === 'rod') s.items.rod = true;
   else if (item === 'key') s.keys++;
+  else if (item === 'purse') s.coins += PURSE;
   else if (item === 'seeds') {
     s.items.seeds = true;
     s.seeds = maxSeeds(s);
