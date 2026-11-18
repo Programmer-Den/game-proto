@@ -56,8 +56,8 @@ export interface Orb {
   held: number | null;
   /** -1 to 1: the bar spin it carries, curving it left or right; 0 for none. */
   spin: number;
-  /** The pane it bounced off and still touches: a moving pane pushes it without hitting it again. */
-  lastPane?: number;
+  /** The panes it touched last step: one it still touches pushes it out without being hit again. */
+  touching?: number[];
 }
 export interface Bead {
   x: number;
@@ -345,14 +345,18 @@ export class Sim {
 
   private hitPanes(orb: Orb) {
     const fire = !!this.timers.fire;
-    for (const p of this.panes) {
-      if (!p.alive) continue;
+    const touched = this.panes.filter((p) => {
+      if (!p.alive) return false;
       const nx = Math.max(p.x, Math.min(orb.x, p.x + p.w));
       const ny = Math.max(p.y, Math.min(orb.y, p.y + p.h));
-      if ((orb.x - nx) ** 2 + (orb.y - ny) ** 2 > ORB_R * ORB_R) continue;
-      // Still touching the pane it just bounced off (a sliding or turning pane can catch it up):
-      // pushed out again, but one touch is one hit.
-      if (p.id === orb.lastPane && !fire) {
+      return (orb.x - nx) ** 2 + (orb.y - ny) ** 2 <= ORB_R * ORB_R;
+    });
+    // The panes it was already touching last step: a sliding or turning pane can catch it up, or
+    // pin it against another, and it is pushed out again, but one touch is one hit.
+    const before = orb.touching ?? [];
+    orb.touching = touched.map((p) => p.id);
+    for (const p of touched) {
+      if (before.includes(p.id) && !fire) {
         this.bounceFrom(orb, p);
         return;
       }
@@ -370,10 +374,8 @@ export class Sim {
         else this.events.push({ type: 'crack', pane: p });
       }
       // One bounce a step, so an orb in a corner between two panes never turns twice.
-      orb.lastPane = p.id;
       return;
     }
-    orb.lastPane = undefined;
   }
 
   private bounceFrom(orb: Orb, p: Pane) {

@@ -628,7 +628,7 @@ study, shade gardens and a mirrored second production line.
   over the path and a lantern either side of it below.
 - Prime harvest (AP23, `PRIME_MS`, `inPrime`, `Plot.ripeMs`; `PrimeId`, `PRIME`, `isPrime`,
   `unprimed`, `anyPlant`, `anyRefined` in `items.ts`): `tick` sets `ripeMs` to 0 on the frame a bed
-  grows ripe and deletes it once past `PRIME_MS` (5s); a new game's beds start ripe without it, so the
+  grows ripe and deletes it once past `PRIME_MS` (5s) or when the bed is blighted (`blight`); a new game's beds start ripe without it, so the
   playthrough's harvest is plain. `harvest` in the window gives the `PRIME` plant. Prime items ride
   only in the hands: `takeAnyFromBack` drops one as its plain kind and counts it in the station's
   `primeIn`; `primeDone` (both refining pipes) moves a count to the table's `primeOut` for the good
@@ -659,7 +659,7 @@ study, shade gardens and a mirrored second production line.
   (`FIRST_FOLK_MS`, then every `FOLK_GAP_MS`, up to `FOLK_PER_NIGHT`), walks and waits them and
   serves them from the counter's work spot. At its end the folk go and the contract rolls to the
   next day as at dusk. `serveFolk` takes a plain nightshade potion first off its shelf, or a bench
-  potion off the rack, pays the wild herbs into the satchel (capped like the courier's) or a town
+  potion off the rack, pays the wild herbs into the satchel (capped like the courier's; its line names what the satchel took) or a town
   seal (`seals++`), and nudges the reputation. The scene walks each folk's `night-<kind>` sprite
   (`NIGHT_FOLK` in `townsfolk.ts`: a witch's hat, a cap and a lantern on a pole; the sailor at 0.7
   alpha) up the street path and along the customers' row to `customerPosition(i)` by its `walk`, and

@@ -380,6 +380,8 @@ function spreadBlight(state: GameState, dt: number, rand: () => number) {
 function blight(state: GameState, plot: number) {
   state.plots[plot].blighted = true;
   state.plots[plot].blightMs = 0;
+  // The blight ends a bed's prime window: it never comes back when the bed is cleared.
+  delete state.plots[plot].ripeMs;
 }
 
 /** Whether a bed is blighted. */

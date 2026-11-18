@@ -420,7 +420,8 @@ from `tick`; tweens are cosmetic only.
 - `src/main.ts` calls `setupGame(game)` right after creating the game, which applies the frame cap, the FPS readout, reduced motion and full screen (camera shake and flash become no-ops; the miss and topple shakes
   are the only ones here).
 - Difficulty scales one number: the swing speed. `speedFor` multiplies `BASE_SPEED` by
-  `byDifficulty(0.8, 1, 1.25)` (Easy, Normal, Hard). Nothing else changes (the patron's pace is a
+  `byDifficulty(0.8, 1, 1.25)` (Easy, Normal, Hard), except in the daily shrine, which always
+  swings at Normal so every player gets the same run. Nothing else changes (the patron's pace is a
   separate factor in `speedFor`).
 - `settings.reduceMotion` also stops the blessing card icons' gentle pulse in
   `drawBlessingIcon`. Debris, popups and the glow are single, non-blinking tweens and stay.
