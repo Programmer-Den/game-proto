@@ -73,7 +73,9 @@ an iron bow bought at the harbor lets the ship ram.
   Bounties (`src/game/bounties.ts`): `setSail` draws `GameState.bounty` from wave
   `FIRST_BOUNTY_WAVE` (2), the wave's trackers (`waveLoot`, `waveDamage`, `waveAground`,
   `wavePrizes`, `waveMs`, `waveSunk`, which `sink` and `board` both add to) feed
-  `BOUNTIES[id].met`, and `reachHarbor` pays `bountyPay` (half `waveLoot`) into `bountyPaid`.
+  `BOUNTIES[id].met`, and `reachHarbor` pays `bountyPay` (half `waveLoot`) into `bountyPaid`. The
+  Swift bounty's time (`swiftMs`) counts `GameState.fleet`, every ship `setSail` puts in `toSpawn`
+  (the course's, the named captains and the raiders).
   Crew (`Ship.crew`/`maxCrew`): `crewPace` scales every reload step (`reloadStep`, `aimBroadsides`), grapeshot pellets `kill`
   `GRAPE_KILLS` and blasts `BLAST_KILLS`, ships with `grape` in `ENEMIES` fire grapeshot within
   `GRAPE_RANGE`, `board` needs `canBoard` and moves `prizeCrew` sailors across (`crewBack` on

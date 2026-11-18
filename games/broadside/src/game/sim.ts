@@ -409,7 +409,8 @@ function spawn(s: GameState, dt: number) {
  * later, sturdier and with a bounty on her head.
  */
 function escape(s: GameState, dt: number) {
-  for (const e of s.enemies) {
+  // Over a copy, so a ship that gets away leaves the rest's countdown for this tick untouched.
+  for (const e of [...s.enemies]) {
     if (e.hp <= 0) continue;
     if (e.captain && e.escapeMs === 0 && e.hp <= e.maxHp * FLEE_HP) e.escapeMs = FLEE_MS;
     if (ENEMIES[e.kind as EnemyKind].role !== 'merchant' && !(e.captain && e.escapeMs > 0)) continue;
@@ -424,7 +425,6 @@ function escape(s: GameState, dt: number) {
       run.due = s.wave + RETURN_WAVES;
       s.waveCaptains.push({ id: e.captain, fate: 'escaped', gold: 0 });
     }
-    return escape(s, 0);
   }
 }
 
@@ -1520,6 +1520,7 @@ export function setSail(s: GameState, course: CourseId | null = null) {
   // Raiders come hunting a loaded hold, early in the wave: sloops, and from `RAIDER_BRIG_WAVE` brigs too.
   s.raiders = raidersFor(s.hold.length);
   for (let i = 0; i < s.raiders; i++) s.toSpawn.splice(Math.min(s.toSpawn.length, 1 + 2 * i), 0, s.wave >= RAIDER_BRIG_WAVE && i % 2 ? 'brig' : 'sloop');
+  s.fleet = s.toSpawn.length;
   s.night = isNightWave(s.wave);
   s.flares = s.night ? FLARES : 0;
   s.flareMs = 0;

@@ -316,6 +316,10 @@ export class GameScene extends Phaser.Scene {
   create(data: { journey?: Partial<Journey> } = {}) {
     const journey = data.journey ?? {};
     this.lastFrame = 0;
+    // Back from the shared pause, the first frame starts the clock afresh rather than playing the pause.
+    const onResume = () => (this.lastFrame = 0);
+    this.events.on(Phaser.Scenes.Events.RESUME, onResume);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.events.off(Phaser.Scenes.Events.RESUME, onResume));
     // Today's try is used up as soon as it starts, so leaving it half way still counts.
     if (journey.daily) startDaily(GAME);
     const daily = loadDaily(GAME);

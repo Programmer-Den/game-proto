@@ -228,7 +228,7 @@ How it runs:
   `valley` texture for it and creates every object once; the second wyrm's objects are created
   when it is bought.
 - **Time:** `GameScene.update(time)` computes `dt` from the frame timestamp, clamped to
-  `MAX_STEP_MS` (250), and calls `tick(state, dt)`. `tick` ages pops and the banner, then does
+  `MAX_STEP_MS` (250; the scene's `RESUME` resets `lastFrame`, so a frame after the shared pause plays none of it), and calls `tick(state, dt)`. `tick` ages pops and the banner, then does
   nothing more while `charterOffer` is set (the game waits for the pick); otherwise it spawns an
   order every `ORDER_EVERY_MS` (faster under a `Busy season` charter) while there are fewer than
   `MAX_ORDERS`, counts deadlines down (failing late orders, and stopping as soon as the last
