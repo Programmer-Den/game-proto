@@ -2,11 +2,15 @@ import type { HowToPlay } from '../../../shared/howToPlay';
 import { byLanguage } from '../../../shared/i18n';
 
 const en: HowToPlay = {
-  goal: 'Place buildings on your island to score as many points as you can. The kingdom ends when the pouch is empty or nothing fits.',
+  goal: 'Place buildings on your island to score as many points as you can. The kingdom ends when the pouch is empty or nothing fits, and then you crown one kind of building to score it once more.',
   controls: [
     {
       input: 'Click or tap a tile button',
       action: 'Pick one of the three tiles drawn this turn',
+    },
+    {
+      input: 'Reserve slot under the tiles',
+      action: 'Hold the picked tile for a later turn; tap it again to take it back, or on a later turn to swap it for the picked tile',
     },
     {
       input: 'Hover a grass cell',
@@ -51,6 +55,7 @@ const en: HowToPlay = {
     'Work towards the royal decree, a side goal that pays +8 points and a crown.',
     'Reach the round goal (20 points in round 1) to refill the pouch.',
     'Choose one of the two royal gifts, such as more towers or a new building.',
+    'When the kingdom is finished, crown one kind of building: every one of it scores again.',
   ],
   tips: [
     'Buildings only go on grass, but lakes and forests next to them add points.',
@@ -60,6 +65,9 @@ const en: HowToPlay = {
     'Each season doubles the score of some buildings when you place them, like farms at the Harvest festival.',
     'From round 3 an omen warns of a flood or a storm next round, so you have a round to prepare.',
     'Out of room? Merging two houses into a manor frees a cell.',
+    'A bad draw? Hold a tile in the reserve slot: it waits there, out of the draws, until you want it.',
+    'From round 2 some gifts are land: a pond digs a lake and a grove plants a wood on grass, for the farms, harbours and houses that like them.',
+    'Plan for the coronation: the more of one kind stand, and the more each scores, the bigger the crown pays.',
     'Harbours also go on the coast and score each side facing the sea; a temple scores more the further it stands from towers.',
     'Sail on after a kingdom to a neighbouring island with the sea cut into its shape and a building found only there. Your harbours ship tiles to it, and its harbours pay +2 each at the end.',
     'Kingdom feats, like a farm with 3 lakes beside it, unlock new paints for the tiles.',
@@ -79,11 +87,15 @@ const enUS: HowToPlay = {
 };
 
 const de: HowToPlay = {
-  goal: 'Setze Gebäude auf deine Insel und sammle so viele Punkte wie möglich. Das Königreich endet, wenn der Beutel leer ist oder nichts mehr passt.',
+  goal: 'Setze Gebäude auf deine Insel und sammle so viele Punkte wie möglich. Das Königreich endet, wenn der Beutel leer ist oder nichts mehr passt, und dann krönst du eine Gebäudeart, die noch einmal zählt.',
   controls: [
     {
       input: 'Ein Plättchen anklicken oder antippen',
       action: 'Eines der drei Plättchen wählen, die in diesem Zug gezogen wurden',
+    },
+    {
+      input: 'Ablage unter den Plättchen',
+      action: 'Das gewählte Plättchen für einen späteren Zug aufheben; noch einmal antippen holt es zurück, in einem späteren Zug tauscht es gegen das gewählte',
     },
     {
       input: 'Über ein Grasfeld fahren',
@@ -128,6 +140,7 @@ const de: HowToPlay = {
     'Arbeite auf den königlichen Erlass hin, ein Nebenziel, das +8 Punkte und eine Krone bringt.',
     'Erreiche das Rundenziel (20 Punkte in Runde 1), um den Beutel aufzufüllen.',
     'Wähle eines der zwei königlichen Geschenke, etwa mehr Türme oder ein neues Gebäude.',
+    'Ist das Königreich fertig, krönst du eine Gebäudeart: Jedes davon zählt noch einmal.',
   ],
   tips: [
     'Gebäude stehen nur auf Gras, aber Seen und Wälder daneben bringen Punkte.',
@@ -137,6 +150,9 @@ const de: HowToPlay = {
     'Jede Jahreszeit verdoppelt die Punkte mancher Gebäude beim Setzen, etwa Äcker beim Erntefest.',
     'Ab Runde 3 warnt ein Omen vor einer Flut oder einem Sturm in der nächsten Runde, so bleibt dir eine Runde zur Vorbereitung.',
     'Kein Platz mehr? Zwei Häuser zu einem Herrenhaus zu vereinen macht ein Feld frei.',
+    'Schlecht gezogen? Heb ein Plättchen in der Ablage auf: Dort wartet es, ohne gezogen zu werden, bis du es brauchst.',
+    'Ab Runde 2 sind manche Geschenke Land: Ein Teich gräbt einen See und ein Hain pflanzt einen Wald ins Gras, für die Äcker, Häfen und Häuser, die sie mögen.',
+    'Plane für die Krönung: Je mehr von einer Art stehen und je mehr jedes bringt, desto mehr bringt die Krone.',
     'Häfen stehen auch an der Küste und zählen jede Seite zum Meer; ein Tempel bringt mehr, je weiter er von Türmen steht.',
     'Segle nach einem Königreich weiter zu einer Nachbarinsel, in die das Meer schneidet, mit einem Gebäude, das es nur dort gibt. Deine Häfen schicken ihr Plättchen, und ihre Häfen bringen am Ende je +2.',
     'Taten des Königreichs, etwa ein Acker mit 3 Seen daneben, schalten neue Farben für die Plättchen frei.',

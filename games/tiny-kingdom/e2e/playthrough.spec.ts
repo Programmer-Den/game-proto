@@ -4,12 +4,12 @@ import { expect, test, type Page } from '@playwright/test';
 // button to pick a building from the hand of three drawn from the pouch, hovers a cell to see what
 // it would score, which neighbours pay into it and whether it joins the castle, taps cells to place
 // houses, farms and a road, fulfils the royal decree, reaches the round's goal and takes a gift,
-// which brings round 2 and its tiles.
+// which brings round 2 and its tiles. On the way it holds a tile in the reserve slot and takes it back.
 // Game state is only read, through the `game` object the dev build puts on window.
 
-type Building = 'farm' | 'house' | 'tower' | 'windmill' | 'market' | 'harbor' | 'lumber' | 'temple' | 'lighthouse' | 'orchard' | 'cathedral' | 'granary' | 'gardens' | 'road';
+type Building = 'farm' | 'house' | 'tower' | 'windmill' | 'market' | 'harbor' | 'lumber' | 'temple' | 'lighthouse' | 'orchard' | 'cathedral' | 'granary' | 'gardens' | 'pond' | 'grove' | 'road';
 type Cell = 'grass' | 'lake' | 'forest' | 'castle' | 'sea' | Building | 'manor';
-type Gift = 'towers' | 'houses' | 'farms' | 'windmill' | 'windmills' | 'market' | 'markets' | 'harbor' | 'harbors' | 'lumber' | 'lumbers' | 'temple' | 'temples';
+type Gift = 'towers' | 'houses' | 'farms' | 'ponds' | 'groves' | 'windmill' | 'windmills' | 'market' | 'markets' | 'harbor' | 'harbors' | 'lumber' | 'lumbers' | 'temple' | 'temples';
 interface Decree {
   kind: 'shore' | 'wood' | 'watch';
   place: string;
@@ -25,9 +25,10 @@ interface GameState {
   hand: Building[];
   draws: number;
   selected: Building | null;
+  held: Building | null;
   grid: Cell[][];
   placed: number;
-  phase: 'playing' | 'gift' | 'over';
+  phase: 'playing' | 'gift' | 'crown' | 'over';
   best: number;
   crowns: number;
   island: number;
@@ -43,6 +44,7 @@ interface GameState {
   chainScore: number;
   cargo: number;
   trade: number;
+  crowned: object | null;
   puzzle: number;
   rival: object | null;
 }
@@ -54,8 +56,8 @@ const VIEW = { w: 960, h: 540 };
 /** The board, from src/scenes/layout.ts. */
 const GRID = { x: 24, y: 46, cols: 10, rows: 7, cell: 64 };
 /** The first round's tiles and goal, and what round 2 adds and asks, from src/game/state.ts. */
-const FIRST_POUCH = { farm: 4, house: 4, tower: 2, windmill: 0, market: 0, harbor: 0, lumber: 0, temple: 0, lighthouse: 0, orchard: 0, cathedral: 0, granary: 0, gardens: 0, road: 1 };
-const ROUND_POUCH = { farm: 3, house: 3, tower: 2, windmill: 0, market: 0, harbor: 0, lumber: 0, temple: 0, lighthouse: 0, orchard: 0, cathedral: 0, granary: 0, gardens: 0, road: 1 };
+const FIRST_POUCH = { farm: 4, house: 4, tower: 2, windmill: 0, market: 0, harbor: 0, lumber: 0, temple: 0, lighthouse: 0, orchard: 0, cathedral: 0, granary: 0, gardens: 0, pond: 0, grove: 0, road: 1 };
+const ROUND_POUCH = { farm: 3, house: 3, tower: 2, windmill: 0, market: 0, harbor: 0, lumber: 0, temple: 0, lighthouse: 0, orchard: 0, cathedral: 0, granary: 0, gardens: 0, pond: 0, grove: 0, road: 1 };
 /** How many tiles each turn draws from the pouch. */
 const HAND = 3;
 const GOALS = [20, 45];
@@ -130,6 +132,8 @@ function scene(page: Page) {
     buttons: () => read<(Box & { kind: Building })[]>((s) => s.tileButtons),
     /** Where the undo button is on screen. */
     undoButton: () => read<Box>((s) => s.undoButton),
+    /** Where the reserve slot is on screen. */
+    holdButton: () => read<Box>((s) => s.holdButton),
     /** Where the gift card's buttons are while a gift is due. */
     giftButtons: () => read<(Box & { gift: Gift })[]>((s) => s.giftButtons),
   };
@@ -231,7 +235,7 @@ test('plays the first round', async ({ page }, testInfo) => {
   // hand drawn from them, nothing built yet, no omen yet, a decree to fulfil and the two gifts on
   // offer for reaching the goal.
   let s = await game.state();
-  expect(s).toMatchObject({ round: 1, goal: GOALS[0], score: 0, bonus: 0, pouch: FIRST_POUCH, hand: PLAN[0].hand, draws: 1, selected: null, placed: 0, phase: 'playing', omen: null, tradedIn: 0, castle: 0, link: 1, native: null, chainScore: 0, cargo: 0, trade: 0, puzzle: 0, rival: null });
+  expect(s).toMatchObject({ round: 1, goal: GOALS[0], score: 0, bonus: 0, pouch: FIRST_POUCH, hand: PLAN[0].hand, draws: 1, selected: null, placed: 0, phase: 'playing', omen: null, tradedIn: 0, castle: 0, link: 1, native: null, chainScore: 0, cargo: 0, trade: 0, crowned: null, held: null, puzzle: 0, rival: null });
   expect(s.hand, `a hand of ${HAND}`).toHaveLength(HAND);
   expect(s.island, 'the island the seeded Math.random picks').toBe(ISLAND);
   expect(s.grid, `island ${ISLAND} laid out as MAP`).toEqual(MAP.map((row) => [...row].map((c) => TERRAIN[c])));
@@ -250,6 +254,20 @@ test('plays the first round', async ({ page }, testInfo) => {
   expect(sorted(firstPreview.links), 'the forest links +1').toEqual(sorted([{ col: 0, row: 4, pts: 1 }]));
   expect((await game.state()).score).toBe(0);
   await snap('1-preview');
+
+  // The reserve slot: a tap holds the picked house out of the hand for a later turn, and a second
+  // tap (the hand has room again) puts it back, with nothing drawn and the house still picked.
+  const holdAt = async () => {
+    const b = await game.holdButton();
+    return onPage(b.x, b.y);
+  };
+  await tap(await holdAt());
+  s = await game.state();
+  const kept = [...first.hand];
+  kept.splice(kept.indexOf(first.kind), 1);
+  expect(s, 'the house held in reserve').toMatchObject({ held: first.kind, hand: kept, draws: 1, pouch: FIRST_POUCH, score: 0 });
+  await tap(await holdAt());
+  expect(await game.state(), 'the held house back in the hand').toMatchObject({ held: null, hand: first.hand, selected: first.kind, draws: 1, pouch: FIRST_POUCH });
 
   // Buildings only go on grass: a tap on the castle or a lake places nothing.
   for (const [col, row, cell] of [[1, 5, 'castle'], [0, 2, 'lake']] as const) {

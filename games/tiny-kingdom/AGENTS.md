@@ -20,10 +20,50 @@ scored with stars. A finished kingdom can sail on to the next island of its chai
 sea, with a building found only there (lighthouse or orchard), cargo from the last island's harbours
 and a trade bonus for its own. Seven kingdom feats unlock tile skins. Round 3 puts the kingdom's
 wonder (a 2x2 building) in the pouch, a rival lord can share a random island, and thirty puzzle
-islands give a set pouch to score for three stars.
+islands give a set pouch to score for three stars. A reserve slot holds one tile for a later turn,
+gift packs from round 2 include ponds and groves (land tiles that dig a lake or plant a wood), and a
+finished kingdom crowns one kind of building, which scores once more.
 
 Implemented today:
 
+- The reserve slot (`held`, `hold`, `drawable` in `state.ts`; `HOLD_BUTTON`, `tapHold`,
+  `refreshHold` in the scene): `hold(s)` with the slot empty moves the picked tile from the hand to
+  `state.held`; with a tile held, it puts it back when the hand has room (`hand.length < HAND`,
+  the turn it was held or near the pouch's end) or nothing is picked, else swaps it for the picked
+  tile (the held one is picked after). It takes no turn and draws nothing. The held tile stays
+  counted in `pouch` (so `checkEnd`, `anyPlace` and `pouchPlayable` still see it) but `drawHand`
+  and its fallback draw from `drawable` (the pouch less the held tile), and `tradeGives` / `trade`
+  never give it. `held` is in `Snapshot`, so undo puts the slot back with the tile. The slot is a
+  228x28 beech plaque under the tile buttons with the held tile's icon and a line saying what a tap
+  does (`holdEmpty`, `holdThis`, `holdBack`, `holdSwap`); it dims outside the playing phase or when
+  a tap would do nothing. Allowed in every mode (puzzles and campaign too: their stars were set
+  without it, so it makes them a little easier).
+- Ponds and groves (`LAND_TILES`, `LandTile`, `isLandTile`, `landOf` in `tiles.ts`): `'pond'` and
+  `'grove'` are `BUILDINGS` (before `road`, 0 in every pouch) won with the `ponds` / `groves` gifts
+  (2 each), which join the plain packs `giftsFor` picks from round 2 on (`plain` is towers, houses,
+  farms, ponds, groves) and the pool once all specials are won. They go on any grass (`fits`), and
+  `build` writes `landOf(kind)` (`'lake'` or `'forest'`), so the grid never holds `'pond'` or
+  `'grove'`: `isBuilding` leaves them out (`STRUCTURES`), the new cell scores nothing and gets no
+  popup, and the preview's links and popups show what the neighbours gain. A new lake or wood is not
+  part of a decree's named place (`Decree.cells` is fixed when it is drawn) but can be flooded by an
+  omen like any lake shore. The rival lord never gets them (`chooseGift` skips land tiles in the
+  gift it leaves, `rivalTurn` skips them). Art: `tileKey('pond')` is the lake tile, `propKey('grove')`
+  is `prop-forest`, and `icon-pond` / `icon-grove` are painted in `icon` in `textures.ts`.
+- The coronation (`Crowned`, `crownOptions`, `crown` in `state.ts`; `CROWN_CARD`,
+  `createCrownCard`, `refreshCrown`, `pickCrown` in the scene): `end` pays the castle and trade as
+  before, then sets `phase` to `'crown'` (not on a puzzle island, whose stars were set without it,
+  nor with nothing standing). `crownOptions(grid, owns)` lists each scoring kind standing (roads
+  aside; manors last; a wonder counts once, on its anchor) with its count `n` and `pts`, the sum of
+  their `cellScore`. `crown(s, kind)` adds that to `bonus` and `score`, stores `state.crowned`
+  (`{ kind, n, pts }`), sets `'over'` and keeps the best. A rival lord crowns its best kind inside
+  `end`, paid `rivalCrown()` of it (`byDifficulty(0.5, 0.75, 1)`, floored; `Rival.crowned`), which
+  keeps a greedy player's win rate on Normal where it was without the coronation (about a third with
+  this bot). The card (walnut 600x280 over the board, its dim swallowing taps) has a 68x66 chip per
+  kind, eight to a row, with its icon and "+N", the best one glowing; hovering one names it in the
+  line below (`crownInfo`), a tap crowns it: `decree` fanfare, a popup on every crowned cell, and the
+  game-over card waits `POPUP_MS + 200` (`crowning`) before it shows, with an `overCrowned` line.
+  `gameEnded` runs on the crown, not when `end` runs, so every caller checks `phase === 'over'`.
+  A greedy bot's coronation is worth 35 to 80 (about 23% of its final score).
 - Wonders (`WONDERS`, `isWonder`, `WONDER_CELLS`, `WONDER_AROUND`, `wonderAnchor`, `wonderFor` in
   `tiles.ts`; `WONDER_ROUND`, `WONDER_BASE`, `WONDER_COUNT`, `build` in `state.ts`): `cathedral`,
   `granary` (the Great barn) and `gardens` (the Royal gardens) are `BUILDINGS` (before `road`), 0
@@ -105,7 +145,8 @@ Implemented today:
   `pickSkin` paints the board in an open one (`skinOpen`) and saves it (`saveSkin`). Skins only
   change the grass, plain and road tiles: `useSkin` in `textures.ts` bakes `tile-<kind>-<skin>` from
   `SKIN_GREEN` the first time and `tileKey` names them from then on.
-- The hand (`HAND` = 3): `drawHand` draws three tiles from the pouch (which still counts them)
+- The hand (`HAND` = 3): `drawHand` draws three tiles from the pouch (which still counts them,
+  leaving out the one held in reserve, see above)
   with a generator seeded by the island and `draws`, so a kingdom's hands never touch
   `Math.random` and an undone placement redraws the same hand; when no drawn tile has room but a
   pouch tile has, the first is swapped for one that has (a lumber camp counts as having room while
@@ -176,7 +217,8 @@ Implemented today:
 - Island of the day: `dailyIsland(today())` hashes the local date (YYYY-MM-DD, from `new Date()`)
   to an island number, the same for every player that day. Its best is saved per day.
 - Campaign: `LEVELS` (eight islands, each with three star scores set from a greedy bot's final
-  score on Normal at 0.75, 0.9 and 1.05 of it). `starScores(level)` scales them by
+  score on Normal at 0.75, 0.9 and 1.05 of it, then scaled per level by what its best coronation
+  added to the same bot's final score, 1.16 to 1.27, and rounded to tens). `starScores(level)` scales them by
   `byDifficulty(1.01, 1, 0.94)`, the same bot's mean final score on Easy and Hard against Normal
   over 300 islands; `starsFor(level, score)` counts the stars against them, and the islands card
   and game over show them;
@@ -258,9 +300,9 @@ Implemented today:
   puzzle island, `loadPuzzleStars` with a finished puzzle folded in) and
   `campaign` (hidden: a star on all eight levels), the last two read from `loadStars` with a
   campaign kingdom just finished folded in, so `threeStars` also works with storage blocked
-  (`campaign` can't then: levels 2 to 8 open only from saved stars). A greedy player
-  finishes with 210 to 340 and joins about 50, so the gold and silver numbers ask for more
-  than it. `checkTrophies` in `trophies/check.ts` runs at the end of the scene's `refresh`, after
+  (`campaign` can't then: levels 2 to 8 open only from saved stars). `bigKingdom` asks 420: a greedy
+  player, its coronation included, finishes with 300 to 370 on most islands (about 400 at best) and
+  joins about 50, so the gold and silver numbers ask for more than it. `checkTrophies` in `trophies/check.ts` runs at the end of the scene's `refresh`, after
   every change; its first call on a page is quiet, so crowns and stars saved before trophies earn
   theirs without a toast. The playthrough's decree earns `firstCrown`.
 - One undo per round: `state.undo` holds a snapshot taken in `place`, `clear` or `merge`; `undo`
@@ -280,7 +322,7 @@ Implemented today:
   the last placement can still be undone, it stays Undo. A reached goal first gets its gift, unless
   the island is full and no two houses could merge nor a lumber camp tile clear a wood. `end` pays
   the castle bonus; the best final score, the crowns, the daily best and the campaign stars
-  persist (`gameEnded`).
+  persist (`gameEnded`), after the coronation (see above).
 
 Missing or rough:
 
@@ -324,6 +366,11 @@ Missing or rough:
   4821 started with `scene.start(4821, { mode: 'chain', link: 2, ... })`, greedy moves, then the
   hand set to a harbour, a lighthouse and a temple and real hovers; the feats card with
   `scene.feats` set and `pickSkin('spring')`.
+- `hold-pond` and `coronation` were taken with a scratch script against the dev server: island
+  4821 started with `scene.start`, greedy moves with `state.ts` imported in the page to round 3,
+  then the hand set to a house, a pond and a grove with a tower held and a real hover; then greedy
+  moves to the end and a real hover over the best chip. The rival's coronation share and the
+  campaign's new star scores come from the same greedy bot, not from human play.
 - `docs/screenshots/favicon.webp` is an older shot no README links.
 - `docs/screenshots/german-links.webp` is the playthrough's `3-links` shot from a run with the
   browser's locale set to `de-DE` (a copy of `playwright.config.ts` with `locale: 'de-DE'`).
@@ -357,12 +404,13 @@ File map (`src/`):
   and trade hints), the decree marks (`refreshDecree`), the omen mark and the chain's beads
   (`refreshBoardMarks`), popups and panel in `refresh`; saves at game over (`gameEnded`).
 - `scenes/layout.ts`: `VIEW`, `GRID`, `TRAY`, `DECREE`, `PANEL`, `TITLE`, `ISLAND_BUTTON`,
-  `GOAL_BAR`, `GIFT_ROW`, `SEASON`, `TILE_BUTTONS` (three 60px slots), `POUCH_LINE`, `OMEN`,
-  `UNDO_BUTTON`, `GIFT_CARD`, `TRADE_CARD`, `BUTTON`, `ISLANDS_CARD` (with the rival button),
+  `GOAL_BAR`, `GIFT_ROW`, `SEASON`, `TILE_BUTTONS` (three 56px slots), `HOLD_BUTTON` (the reserve
+  slot), `POUCH_LINE` (with the height it may fill; `refresh` steps its font from 10 down to 8 to
+  fit), `OMEN`, `UNDO_BUTTON`, `CROWN_CARD`, `GIFT_CARD`, `TRADE_CARD`, `BUTTON`, `ISLANDS_CARD` (with the rival button),
   `FEATS_BUTTON`, `FEATS_CARD`, `PUZZLES_BUTTON`, `PUZZLES_CARD`,
   `GAME_OVER` (the 700x260 card and its three buttons), `UI_DEPTH`, `FONT` and `cellCentre`.
 - `game/tiles.ts`: `BUILDINGS` (farm, house, tower, windmill, market, harbor, lumber, temple,
-  lighthouse, orchard, road), `SPECIALS` (the five gift buildings), `NATIVES` (the chain islands'
+  lighthouse, orchard, the three wonders, pond, grove, road), `LAND_TILES`, `isLandTile`, `landOf`, `SPECIALS` (the five gift buildings), `NATIVES` (the chain islands'
   own buildings), the `Building`, `Special`, `Native`, `Structure` (a building or `'manor'`),
   `Terrain` (grass, lake, forest, castle, sea) and `Cell` types, `seaSides`, `nextIsland`,
   `nativeFor`, `chainMap`, the wonders (`WONDERS`, `Wonder`, `isWonder`, `WONDER_CELLS`,
@@ -370,14 +418,15 @@ File map (`src/`):
   each one's name, rule and count, such as "3 farms"), `isBuilding`, `isBuilt`, `scores`, `isHome`, `MAP_SIZE`, `ISLANDS`,
   `SIDES`, `AROUND`, `islandMap` (lakes, woods, then the castle, redrawn until `fairIsland`), `seeded` (mulberry32),
   `randomIsland` and `startingGrid`.
-- `game/state.ts`: `GameState`, `Rival`, `Snapshot`, `Share`, `Preview`, `Placed`, `FIRST_POUCH`,
+- `game/state.ts`: `GameState`, `Rival`, `Crowned`, `Snapshot`, `Share`, `Preview`, `Placed`, `FIRST_POUCH`,
   `WONDER_ROUND`, `WONDER_BASE`, `mine`, `rivalAt`, `ownGrid`,
   `ROUND_POUCH`, `HAND`, `TRADE_GIVE`, `NATIVE_FIRST`, `NATIVE_ROUND`, `TRADE_BONUS`, `CARGO_MAX`,
   `TEMPLE_MAX`, `templeWorth`, `harbourCount`, `nextKingdom`, `goalFor`, `season`, `newGame(best, crowns, island?,
   kingdom?)`, `inHand`, `cellParts`, `cellScore`, `boardScore`, `canPlace(s, col, row, kind?)`,
   `previewPlacement`, `select`, `place`, `canClear`, `previewClear`, `clear`,
   `canTrade`, `tradeGives`, `tradeTakes`, `trade`, `canClearAny`, `canMerge`, `mergeable`, `previewMerge`, `merge`, `anyPlace`,
-  `finish`, `canUndo`, `undo`, `chooseGift`, `shownKinds` and `handCount`; `rivalTurn` is the rival
+  `finish`, `canUndo`, `undo`, `chooseGift`, `shownKinds`, `handCount`, `drawable`, `hold`,
+  `crownOptions` and `crown`; `rivalTurn` is the rival
   lord's move, `build` puts a tile (or a wonder's four cells) down; `settle` is the shared
   tail of `place`, `clear` and `merge`, `drawHand` draws the next hand, `keepHandPlayable` redraws
   a stuck one after a merge or gift, `playable` and `pouchPlayable` tell whether a tile has a use
@@ -393,7 +442,7 @@ File map (`src/`):
   `dailyIsland` and `parseIsland`.
 - `game/decree.ts`: `DECREE_BONUS`, `Decree`, `DecreeMarks`, `At`, `regions`, `namedPlaces`,
   `decreeRegion`, `decreeMarks` and `decreeFor`.
-- `game/gifts.ts`: `GIFTS`, `Gift`, `GIFT_INFO` (label and line as `TextKey`s, icon, tiles),
+- `game/gifts.ts`: `GIFTS` (with `ponds` and `groves`), `Gift`, `GIFT_INFO` (label and line as `TextKey`s, icon, tiles),
   `giftsFor` and `newSpecial`.
 - `game/save.ts`: `loadBest`, `saveBest`, `loadCrowns`, `saveCrowns`, `loadDailyBest`,
   `saveDailyBest`, `loadStars`, `saveStars`, `loadChain`, `saveChain` (`BestChain`), `loadFeats`,
@@ -465,6 +514,7 @@ State model (`GameState` in `src/game/state.ts`):
 - `grid` cells can also be `'manor'`, which is never in the pouch.
 - `pouch` counts tiles left per building, the hand's included (the specials 0 until their gift);
   `hand` is the three (or fewer) drawn this turn and `draws` how many hands have been drawn;
+  `held` is the tile in the reserve slot (counted in `pouch`, never drawn) or null;
   `selected` is the building the next tap places, always one in the hand.
 - `score` is `boardScore(grid) + bonus`, recomputed after each placement. It can fall: a tower
   next to another tower is worth 0, so a placement's gain or preview can be negative.
@@ -480,9 +530,10 @@ State model (`GameState` in `src/game/state.ts`):
 - `puzzle` (0 outside the puzzles), `wonder` (the kingdom's wonder) and `rival` (`Rival | null`,
   in `Snapshot` too, so an undo takes the rival's answer back with the tile; `snapshot` copies it).
 - `island`, `mode`, `level` (0 outside the campaign), `day` ('' unless daily), `round`, `goal`,
-  `placed`, `phase` (`'playing'`, `'gift'` or `'over'`) and `best`. The season is not stored:
+  `placed`, `phase` (`'playing'`, `'gift'`, `'crown'` while the coronation waits, or `'over'`),
+  `crowned` (the coronation, null before it and on a puzzle island) and `best`. The season is not stored:
   `season(s)` derives it from `round`.
-- `undo` (the `Snapshot` of grid, pouch, hand, draws, score, bonus, selected and placed before
+- `undo` (the `Snapshot` of grid, pouch, hand, held, draws, score, bonus, selected and placed before
   the last placement, clearing or merge, or null) and `undoneIn` (the round the undo was last used
   in, 0 for none).
 - `place`, `clear` and `merge` all end in `settle`; order matters: snapshot, change the grid, add
@@ -601,6 +652,10 @@ Effects (`sfx`), and where they play:
 | `bell` | a wonder placed, 140ms after its tok |
 | `rival` | the rival lord's tile, 260ms after the player's, with its plum popup |
 
+The reserve slot plays `select` pitched up (1.2) when a tap holds, takes back or swaps a tile, and
+`ui('refuse')` when it can't. Crowning a kind plays `decree`, then `gameEnded`'s ticks and sting.
+A pond plays `place` at 0.8 and a grove at 0.95 (`PLACE_PITCH`).
+
 A feat won plays the shared `ui('coin')`; the Feats button, its Close and a skin picked play
 `ui('click')`, a locked skin `ui('refuse')`. Sail on starts a kingdom, so it clicks like New
 kingdom.
@@ -617,15 +672,18 @@ valid island number. Hovering makes no sound. The game has no `?watch` mode.
   `game.scene.getScene('Game')` and its `state` (copied through JSON), `preview` (`{ col, row,
   gained, base, links, season, joins }` or null), `tileButtons` (`{ kind, x, y, w, h }` per shown
   button), `undoButton` (`{ x, y, w, h }`) and `giftButtons` (`{ gift, x, y, w, h }` while a gift
-  is due), all in layout pixels (the 960x540 layout, which is the view at 960x540; see Hub
-  settings for how it sits in a wider or taller view). `mergeFrom` and `islandButton` are public too but the test does not
-  use them.
-- Inputs: it clicks tile buttons, the undo button and a gift button at their centres, moves the
+  is due), `holdButton` (`{ x, y, w, h }`, the reserve slot), all in layout pixels (the 960x540 layout, which is the view at 960x540; see Hub
+  settings for how it sits in a wider or taller view). `mergeFrom`, `islandButton` and
+  `crownButtons` (`{ kind, x, y, w, h }` per coronation chip while `phase` is `'crown'`) are public
+  too but the test does not use them.
+- Inputs: it clicks tile buttons, the reserve slot (before the first placement it holds the
+  picked house, expecting it out of the hand with `draws` unchanged, then takes it back), the undo
+  button and a gift button at their centres, moves the
   mouse over cells to check `preview`, and clicks cell centres, scaling view pixels by the canvas
   bounding box. It reads `localStorage['tiny-kingdom-crowns']` to check the crown is saved, and
   `localStorage['tiny-kingdom-trophies']` to check the decree earned `firstCrown` and nothing else.
-- The test mirrors these, so change them together: the `GameState` shape (it expects `puzzle` 0
-  and `rival` null), `GRID`, `VIEW`,
+- The test mirrors these, so change them together: the `GameState` shape (it expects `puzzle` 0,
+  `rival`, `held` and `crowned` null), `GRID`, `VIEW`,
   `islandMap` (as `ISLAND` and `MAP`, the castle included), `FIRST_POUCH`, `ROUND_POUCH`, `HAND`,
   the goals 20 and 45 (`GOALS`), `DECREE_BONUS`, round 1's decree (`FIRST_DECREE`: kind `shore`,
   place `Eastmere`, need 3; round 2's must differ in kind or place, compared by those ids, never by
@@ -704,6 +762,12 @@ valid island number. Hovering makes no sound. The game has no `?watch` mode.
 - **Add a feat or a skin**: a row in `FEATS` (its text in the `i18n/` files as `feat<Id>`) and, for
   a new skin, its id in `SKINS`, its paint in `SKIN_GREEN` and its name as `skin<Name>`. The feats
   card fits about eight rows and eight swatches.
+- **Add a land tile**: add it to `BUILDINGS` (before `road`) and `LAND_TILES`, give `landOf` its
+  terrain, then its `INFO` texts, `PLACE_PITCH`, an icon in `ICONS` / `icon` and its tile in
+  `tileKey` / `propKey`, a gift for it in `gifts.ts`, and the test's `Building` type and pouches.
+- **Retune the coronation**: `crownOptions` (what a kind pays), `rivalCrown` (the rival's share;
+  check a greedy player's win rate over a hundred islands), `LEVELS` and `BIG` in
+  `trophies/check.ts`, which count it in.
 - **Add a gift**: add it to `GIFTS` and `GIFT_INFO` (its label and line in the `i18n/` files) and to a pool in `giftsFor`; a gift that is not
   a tile pack also needs handling in `chooseGift`.
 - **Retune rounds**: `FIRST_POUCH`, `ROUND_POUCH` and `goalFor` (keep its `byDifficulty` factor
@@ -762,3 +826,11 @@ valid island number. Hovering makes no sound. The game has no `?watch` mode.
   built cells (`settle` clears it where an omen struck).
 - In the `'gift'` phase `round` and `goal` already show the next round; the card's title uses
   `round - giftsDue` for the round whose goal was reached.
+- A pond or grove never stands on the grid: `build` writes its land. Anything that writes a tile
+  kind into the grid directly (like `rivalTurn`) must skip land tiles or go through `landOf`.
+- Anything that draws or gives tiles from the pouch reads `drawable(s, kind)`, not `s.pouch`, so the
+  held tile is never drawn twice or traded away; anything that asks whether tiles are left (the
+  end, `anyPlace`) reads `s.pouch`, which still counts it.
+- `end` no longer finishes the kingdom by itself: it leaves `'crown'` unless the island is a puzzle
+  or empty. Check `phase === 'over'` before calling `gameEnded`, and give a new end-of-kingdom
+  payout to `end` (before the coronation) or `crown` (after it).
