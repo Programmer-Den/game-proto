@@ -10,6 +10,8 @@ const enUS: Partial<Translation<typeof en>> = {
   noHands: 'No hands at the harbor',
   backToHarbour: 'Back to the harbor',
   rumourName: 'A rumor',
+  oilText: 'A flask lights a cave you survey: a second artifact',
+  lampLit: 'Lamp oil: a second artifact ({n}c)',
 };
 
 export default enUS;

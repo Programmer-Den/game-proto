@@ -72,6 +72,39 @@ export type Trade = 'stores' | 'guide' | 'rumour';
 export const TRADES: Trade[] = ['stores', 'guide', 'rumour'];
 
 /**
+ * Pack the sack (MM17): the sack holds a voyage's supplies, and at the harbour some of its room can
+ * go to gear instead of food: a coil of rope climbs a peak's cliffs for no supplies, a flask of lamp
+ * oil lights a cave the surveyor stands in for a second artefact, and a bale of trade goods sells at
+ * a village the surveyor stands in for `GOODS_VALUE` coins. Each takes one supply's room.
+ */
+export type Gear = 'rope' | 'oil' | 'goods';
+export const GEAR: Gear[] = ['rope', 'oil', 'goods'];
+export type Pack = Record<Gear, number>;
+export const NO_PACK: Pack = { rope: 0, oil: 0, goods: 0 };
+/** The most of each piece of gear a sack holds, and the food it always keeps. */
+export const PACK_MAX = 3;
+export const FOOD_MIN = 4;
+/** What a bale of trade goods sells for at a village. */
+export const GOODS_VALUE = 8;
+
+/**
+ * Fixes (MM18): a tile seen from two lookouts (hills or peaks the surveyor stood on) is fixed, a
+ * trig point on the chart, and pays `FIX_BONUS` on top with the voyage that fixed it. A charted
+ * lookout the surveyor hasn't stood on can be climbed for its survey cost to take a bearing.
+ */
+export const FIX_BONUS = 1;
+
+/**
+ * Press on (MM19): once the supplies can pay for nothing more, the surveyor may press on for
+ * `PRESS_STEPS` more surveys (one step a tile, whatever it costs), once a voyage. Each step taken
+ * adds `PRESS_RISK` to the chance that a storm on the way home washes out `PRESS_LOSS` of the
+ * voyage's least valuable tiles a step taken.
+ */
+export const PRESS_STEPS = 3;
+export const PRESS_RISK = 0.25;
+export const PRESS_LOSS = 2;
+
+/**
  * A voyage away from the atlas, on an isle of its own with one fixed budget of supplies and no
  * restocking: an expedition to one of the far isles (from the Royal Atlas on, scored by the share of
  * the isle charted) or the daily isle (the same for everyone on the same day, scored by coins).
@@ -184,6 +217,15 @@ export interface Chart {
   /** Features charted whole on this voyage, and what they pay together. */
   features: { name: TextKey; bonus: number }[];
   featureCoins: number;
+  /** Tiles fixed from two lookouts on this voyage, and what they pay (`FIX_BONUS` each). */
+  fixes: number;
+  fixCoins: number;
+  /** Bales of trade goods sold at villages, and what they paid. */
+  goods: number;
+  goodsCoins: number;
+  /** Tiles a storm washed out after pressing on (0 for none), and the coins they cost. */
+  storm: number;
+  stormLoss: number;
   /** Tiles the rival charted first, and the coins they cost (half of those tiles' value). */
   rivalTiles: number;
   rivalLoss: number;
@@ -278,12 +320,30 @@ export interface GameState {
   /** The trade picked at the harbour for the next voyage, and the villages on this isle that have traded. */
   trade: Trade | null;
   traded: Point[];
+  /** The sack's gear for every voyage from the harbour (food fills the rest), and what is left of it on this one. */
+  pack: Pack;
+  gear: Pack;
+  /** Tiles on this isle seen from one lookout, and those fixed from two; `fixes` counts this voyage's. */
+  sighted: Point[];
+  /** The lookouts on this isle the surveyor has stood on (surveyed or climbed). */
+  climbed: Point[];
+  fixed: Point[];
+  fixes: number;
+  /** Bales of trade goods sold at villages on this voyage. */
+  goods: number;
+  /** Steps left after pressing on, and the steps taken so on this voyage. */
+  pressOn: number;
+  pressed: number;
   /** Set on an expedition or the daily isle, which are played apart from the atlas. */
   run?: Run;
 }
 
 export const rankOf = (s: GameState, id: UpgradeId) => s.ranks[id] ?? 0;
 export const maxSupplies = (s: GameState) => s.run?.supplies ?? BASE_SUPPLIES + PROVISIONS_STEP * rankOf(s, 'provisions');
+/** The room the pack's gear takes in the sack. */
+export const packRoom = (p: Pack) => p.rope + p.oil + p.goods;
+/** The food a voyage sets out with: the sack, less the gear packed (a run packs none). */
+export const voyageFood = (s: GameState) => maxSupplies(s) - (s.run ? 0 : packRoom(s.pack));
 export const inkBonus = (s: GameState) => INK_STEP * rankOf(s, 'ink');
 
 export const indexOf = (x: number, y: number) => y * GRID.w + x;

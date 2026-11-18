@@ -314,9 +314,44 @@ const de: Translation<typeof en> = {
   guideJoins: { one: 'Ein Führer: {n} Vermessung frei', other: 'Ein Führer: {n} Vermessungen frei' },
   storesJoin: 'Vorräte aus dem Dorf: +{n}',
   rumourHint: 'Wunder?',
+  // Den Sack packen, Festpunkte und Weitergehen (MM17 bis MM19)
+  packHead: 'DER SACK · NÄCHSTE REISE',
+  packButton: 'Sack packen',
+  packTitle: 'Den Sack packen',
+  packLine: 'Der Sack fasst {n}. Proviant ist je ein Vermessungsschritt; Ausrüstung nimmt den Platz eines Proviants. Mindestens {min} Proviant bleibt drin.',
+  packAhead: 'Noch im Nebel voraus: {peaks} Gipfel · {villages} Dörfer',
+  packMax: 'Bis zu {n} von jedem. Der Sack bleibt für jede Reise so gepackt, bis du ihn änderst.',
+  foodName: 'Proviant',
+  foodText: 'Je ein Vermessungsschritt; übriger Proviant wird bei der Rückkehr verkauft',
+  foodCount: '{n} Proviant',
+  gearCount: '{gear} {n}',
+  ropeName: 'Seil',
+  ropeText: 'Eine Rolle erklimmt die Klippen eines Gipfels: er kostet keine Vorräte',
+  oilName: 'Lampenöl',
+  oilText: 'Eine Flasche leuchtet eine vermessene Höhle aus: ein zweites Artefakt',
+  goodsName: 'Handelsware',
+  goodsText: 'Ein Ballen bringt in einem vermessenen Dorf {n} M',
+  packNotice: 'Gepackt: {pack}',
+  ropeLabel: 'SEIL',
+  ropeCost: 'eine Rolle Seil',
+  lampLit: 'Lampenöl: ein zweites Artefakt ({n} M)',
+  goodsSold: 'Handelsware verkauft: +{n} M',
+  fixedTiles: { one: '{n} Feld festgelegt: +{coins} M', other: '{n} Felder festgelegt: +{coins} M' },
+  fixesRow: { one: 'Von zwei Aussichtspunkten festgelegt   {n} × {each}', other: 'Von zwei Aussichtspunkten festgelegt   {n} × {each}' },
+  goodsRow: 'Handelsware verkauft   {n} × {each}',
+  stormRow: { one: 'Sturm auf dem Heimweg: {n} Feld verwischt', other: 'Sturm auf dem Heimweg: {n} Felder verwischt' },
+  pressOn: 'Weiter',
+  pressingOn: { one: 'Weiter: {n} Schritt', other: 'Weiter: {n} Schritte' },
+  pressOnLine: 'Keine Vorräte: {n} Schritte weiter, mit Sturmgefahr',
+  pressingLine: { one: 'Noch {n} Schritt · Sturmgefahr {risk} %: {lose} Felder', other: 'Noch {n} Schritte · Sturmgefahr {risk} %: {lose} Felder' },
+  climb: 'Aufsteigen: {price}, eine Peilung',
+  climbFixes: { one: 'Aufsteigen: {price}, legt {n} Feld fest', other: 'Aufsteigen: {price}, legt {n} Felder fest' },
+  climbLabel: 'AUFSTIEG ×{n}',
+  stepLabel: 'SCHRITT',
+  stepCost: { one: 'ein Schritt (noch {n})', other: 'ein Schritt (noch {n})' },
 };
 
 export default de;
 
 /** Texts that are the same in German, so the translation check doesn't flag them. */
-export const keepEnglish: (keyof typeof en)[] = ['title', 'northArrow', 'atlasCount', 'atlasHead'];
+export const keepEnglish: (keyof typeof en)[] = ['title', 'northArrow', 'atlasCount', 'atlasHead', 'gearCount'];

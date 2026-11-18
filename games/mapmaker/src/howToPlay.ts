@@ -17,6 +17,14 @@ const en: HowToPlay = {
       action: 'Once you hold the riddle chart, dig there for 1 supply',
     },
     {
+      input: 'Click or tap a charted hill or peak',
+      action: "Climb a lookout you haven't stood on for its cost, to take a bearing",
+    },
+    {
+      input: 'Press on',
+      action: 'Out of supplies: survey 3 more tiles, at the risk of a storm on the way home',
+    },
+    {
       input: 'Return to port',
       action: 'End the voyage early and draw the chart',
     },
@@ -28,11 +36,12 @@ const en: HowToPlay = {
       input: 'Commission, hand or Buy',
       action: 'At the harbour: pick a commission, take a hand aboard or buy an upgrade',
     },
-    { input: 'Set sail', action: 'Start the next voyage with full supplies' },
+    { input: 'Set sail', action: 'Start the next voyage with a full sack' },
     { input: 'Daily isle', action: "At the harbour: one voyage on today's isle, the same for everyone, scored by coins" },
     { input: 'Wonders', action: 'At the harbour: the gallery of the wonders you have seen' },
     { input: 'Expeditions', action: 'At the harbour, once the Royal Atlas is bound: one voyage to a far isle, scored by how much you chart' },
     { input: 'Village trade', action: 'At the harbour: trade a copy of your chart with a charted village for stores, a guide or a rumour' },
+    { input: 'Pack the sack', action: 'At the harbour: swap some food for rope, lamp oil or trade goods' },
     { input: 'Moon or sun beside the logo', action: 'Switch between the white sheet and the dark night sheet' },
   ],
   loop: [
@@ -54,11 +63,14 @@ const en: HowToPlay = {
     'The daily isle and the expeditions have one sack of supplies for the whole isle and no restocking.',
     'The Coastal Sloop lands you on the far coast each voyage, so a big isle can be charted from two ends.',
     'From the fifth isle every third one is in winter: snow hides costs until you stand beside a tile, lookouts see less and frozen rivers cost 1.',
+    'A tile seen from two lookouts you stood on is fixed and pays 1 extra coin, so plan which hills and peaks to climb.',
+    "Rope climbs a peak for no supplies, lamp oil gives a cave you survey a second artefact, and trade goods sell at a village you survey for 8 coins.",
+    'Pressing on risks a storm on the way home that washes the cheapest tiles off the chart: the more steps, the likelier.',
   ],
 };
 
 /** US English only changes the spelling. */
-const us = (text: string) => text.replace(/harbour/g, 'harbor').replace(/rumour/g, 'rumor');
+const us = (text: string) => text.replace(/harbour/g, 'harbor').replace(/rumour/g, 'rumor').replace(/artefact/g, 'artifact');
 const enUS: HowToPlay = {
   goal: us(en.goal),
   controls: en.controls.map((c) => ({ input: us(c.input), action: us(c.action) })),
@@ -82,6 +94,14 @@ const de: HowToPlay = {
       action: 'Sobald du die Rätselkarte hast, dort für 1 Vorrat graben',
     },
     {
+      input: 'Kartierten Hügel oder Gipfel anklicken oder antippen',
+      action: 'Einen Aussichtspunkt, auf dem du noch nicht standest, für seine Kosten besteigen und peilen',
+    },
+    {
+      input: 'Weiter',
+      action: 'Ohne Vorräte: 3 Felder mehr vermessen, mit dem Risiko eines Sturms auf dem Heimweg',
+    },
+    {
       input: 'Zurück zum Hafen',
       action: 'Die Reise früh beenden und die Karte zeichnen',
     },
@@ -93,11 +113,12 @@ const de: HowToPlay = {
       input: 'Auftrag, Helfer oder Kaufen',
       action: 'Im Hafen: einen Auftrag wählen, einen Helfer an Bord nehmen oder eine Verbesserung kaufen',
     },
-    { input: 'In See stechen', action: 'Die nächste Reise mit vollen Vorräten beginnen' },
+    { input: 'In See stechen', action: 'Die nächste Reise mit vollem Sack beginnen' },
     { input: 'Tagesinsel', action: 'Im Hafen: eine Reise zur heutigen Insel, für alle gleich, gewertet nach Münzen' },
     { input: 'Wunder', action: 'Im Hafen: die Galerie der Wunder, die du gesehen hast' },
     { input: 'Expeditionen', action: 'Im Hafen, sobald der Königliche Atlas gebunden ist: eine Reise zu einer fernen Insel, gewertet nach dem kartierten Anteil' },
     { input: 'Dorfhandel', action: 'Im Hafen: eine Abschrift deiner Karte bei einem kartierten Dorf gegen Vorräte, einen Führer oder ein Gerücht tauschen' },
+    { input: 'Sack packen', action: 'Im Hafen: etwas Proviant gegen Seil, Lampenöl oder Handelsware tauschen' },
     { input: 'Mond oder Sonne neben dem Logo', action: 'Zwischen dem weißen Blatt und dem dunklen Nachtblatt wechseln' },
   ],
   loop: [
@@ -119,6 +140,9 @@ const de: HowToPlay = {
     'Die Tagesinsel und die Expeditionen haben einen Sack Vorräte für die ganze Insel und keinen Nachschub.',
     'Die Küstenschaluppe setzt dich auf jeder Reise an der fernen Küste ab, so lässt sich eine große Insel von zwei Seiten kartieren.',
     'Ab der fünften Insel liegt jede dritte im Winter: Schnee verdeckt die Kosten, bis du neben einem Feld stehst, Aussichtspunkte sehen weniger und gefrorene Flüsse kosten 1.',
+    'Ein Feld, das du von zwei bestiegenen Aussichtspunkten gesehen hast, ist festgelegt und bringt 1 Münze extra, also plane, welche Hügel und Gipfel du besteigst.',
+    'Seil erklimmt einen Gipfel ohne Vorräte, Lampenöl bringt in einer vermessenen Höhle ein zweites Artefakt, und Handelsware bringt in einem vermessenen Dorf 8 Münzen.',
+    'Weitergehen riskiert einen Sturm auf dem Heimweg, der die billigsten Felder von der Karte wäscht: je mehr Schritte, desto wahrscheinlicher.',
   ],
 };
 

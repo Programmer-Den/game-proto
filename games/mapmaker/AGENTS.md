@@ -47,6 +47,19 @@ isles: from `WINTER_FROM` (isle 5) every third isle (`isWinter`, by isle number,
 the daily and far isles included) lies under snow: a station's cost shows `?` until the surveyor
 stands next to it (`snowHides`), lookouts see only the tiles beside them, and frozen rivers cost 1.
 
+Round 5 (MM17 to MM19) works on the voyage itself. Pack the sack: at the harbor the sack's room
+(`maxSupplies`) is split between food (the supplies) and gear, one supply's room each, up to
+`PACK_MAX` of each with at least `FOOD_MIN` food: rope (a peak costs a coil instead of supplies),
+lamp oil (a cave on the tile surveyed gives a second artefact) and trade goods (a village surveyed
+buys a bale for `GOODS_VALUE` coins). The pack (`pack`) stays until changed; `setSail` loads it
+into `gear`. Fixes: every lookout the surveyor stands on sights the chartable tiles it sees; a tile
+sighted from two is fixed (a trig point on the map) and pays `FIX_BONUS` with that voyage's chart.
+A charted lookout not stood on yet (one seen from another) can be climbed by tapping it, for its
+survey cost, to take a bearing. Press on: once the supplies can pay for nothing and fog is left
+beside the chart, the voyage stays open and Camp gives way to Press on, `PRESS_STEPS` surveys of
+one step a tile, once a voyage; each step adds `PRESS_RISK` to the chance that a storm on the way
+home washes `PRESS_LOSS` of the voyage's least valuable tiles a step off the chart.
+
 - Implemented: island generation in four kinds (with rivers, a road, finds and a riddle),
   surveying with a walking surveyor and per-terrain costs, lookouts (hills and peaks) with the
   viewshed tally, sea as a dead end, finds (wrecks, caves, storms), base camps, the treasure riddle
@@ -55,7 +68,8 @@ stands next to it (`snowHides`), lookouts see only the tiles beside them, and fr
   supplies, the isle completion goal with milestones and the atlas (pages coloured by isle kind),
   the rival surveyor, the Royal Atlas ending with a saved best, the harbor with five upgrades, new
   islands, a full save after every action, hidden wonders and the wonder gallery, the daily isle and
-  expeditions to the far isles, the coastal sloop's landing, village trade and winter isles.
+  expeditions to the far isles, the coastal sloop's landing, village trade and winter isles, the
+  sack's pack, fixes and climbing lookouts, and pressing on.
 - Art style: a survey sheet on a drafting table. Charted ground has hypsometric tints, contour
   lines, hillshade, black map symbols and italic place names; uncharted ground is blank gridded
   paper with a dashed survey limit; rivers are blue lines and roads cased ink lines; finds, storms,
@@ -107,7 +121,9 @@ stands next to it (`snowHides`), lookouts see only the tiles beside them, and fr
   `INK_STEP`, `SELL_BACK`, `WRECK_SUPPLIES`, `ARTIFACT_VALUE`, `CAMP_COST`, `CAMP_REACH`,
   `DIG_COST`, `TREASURE_VALUE`, `FEATURE_BONUS`, `WOOD_MIN`, `RIVAL_FROM`, `RIVAL_PACE`,
   `RIVAL_STEPS`, `ROYAL_KINDS`, `MILESTONES`, `WINTER_FROM`, `LANDING_MIN`, `TRADE_STORES`,
-  `TRADE_GUIDE`, `TRADES`; helpers `rankOf`, `maxSupplies`, `inkBonus`, `isWinter`,
+  `TRADE_GUIDE`, `TRADES`, `Gear`, `GEAR`, `Pack`, `NO_PACK`, `PACK_MAX`, `FOOD_MIN`,
+  `GOODS_VALUE`, `FIX_BONUS`, `PRESS_STEPS`, `PRESS_RISK`, `PRESS_LOSS`; helpers `rankOf`,
+  `maxSupplies`, `packRoom`, `voyageFood` (the food a voyage sets out with), `inkBonus`, `isWinter`,
   `indexOf`, `inGrid`, `tileAt`, `neighbours`.
 - `src/game/wonders.ts`: `WonderKind`, the `WONDERS` table (name and line as `TextKey`s, the isle
   kind, the ground it hides under and what must lie beside it), `WONDER_IDS` (the gallery's order),
@@ -147,8 +163,11 @@ stands next to it (`snowHides`), lookouts see only the tiles beside them, and fr
   `sellBackOf`, `chartable`, `isleProgress`, `milestonesDue`, `atlasKinds`, `royalComplete`,
   `sellChart`, `carriesOver`, `closeAtlas`, `pickCommission`, `isPicked`, `hire`, `buy`, `islandCharted`,
   `setSail`, `landingSpot` (the sloop's landing), `tradeVillages`, `canTrade`, `pickTrade`,
+  `usesRope`, `canClimb`, `climbable`, `wouldFix`, `canPressOn`, `pressOn`, `stormRisk`, `canPack`,
+  `packGear`, `packAhead` (the fogged peaks and villages of the next voyage's isle),
   `runScore` (a run's score: the chart's total on the daily isle, the isle's percent on an
-  expedition), and the private `reveal` (turns up finds), `landRival` and `rivalTurn`, `fogged`,
+  expedition), and the private `reveal` (turns up finds), `sight` (a lookout's bearing on a tile),
+  `stormComes`, `landRival` and `rivalTurn`, `fogged`,
   `rollCommission` and `rollBoard` with the `COMMISSIONS` table, and `rollHands`.
 - `src/game/save.ts`: `loadRun` and `clearRun` for a run under way, `loadExpeditions` and
   `saveExpedition` for the far isles' bests; `saveGame` writes a run to its own key. `loadGame` (fills the new fields on older saves, and turns English feature
@@ -162,11 +181,12 @@ stands next to it (`snowHides`), lookouts see only the tiles beside them, and fr
   textures, draws the sheet, survey stations with their costs, the map marks, surveyor and rival,
   value chips and notices, the viewshed, the side panel (with the riddle box and the Camp button)
   and the chart, Royal Atlas and harbor overlays, the run's end (`showRunChart`), the far isles
-  (`showExpeditions`), the wonder gallery (`showWonders`) and the village trade page (`showTrade`),
+  (`showExpeditions`), the wonder gallery (`showWonders`), the village trade page (`showTrade`) and
+  the packing page (`showPack`),
   and the Set sail notices (`sailNotices`); exposes `spots`. `commissionText`, `voyagesLeft`
   and `clueText` put commissions and riddle clues into words.
 - `src/scenes/layout.ts`: screen constants (`VIEW`, `MAP`, `PANEL`, `CAMP_BUTTON`, `RETURN_BUTTON`, `OVERLAY`,
-  `OVERLAY_BUTTON`, `SHOP`, `HANDS_COLUMN`, `TRADE_CARD`, `BOARD`, `BUTTON`, `SMALL_BUTTON`, `UI_DEPTH`, `FONT`) and `tileCentre`.
+  `OVERLAY_BUTTON`, `SHOP`, `HANDS_COLUMN`, `TRADE_CARD`, `PACK_CARD`, `BOARD`, `BUTTON`, `SMALL_BUTTON`, `UI_DEPTH`, `FONT`) and `tileCentre`.
 - `src/ui/Button.ts`: `makeButton`, a flat ink button with an optional size, disabled look (a tap
   on a disabled one plays `ui('refuse')`) and left-aligned caption; a caption too wide for its
   button is squeezed to fit.
@@ -194,7 +214,9 @@ stands next to it (`snowHides`), lookouts see only the tiles beside them, and fr
   compass rose), `logo`, `atlas-<kind>` and `atlas-empty`, and the `MARKS`: `find-wreck`,
   `find-cave`, `artifact`, `storm`, `camp`, `dug`, `treasure`, `claim` (the rival's pennant) and
   `riddle`, `sloop` (the sloop off its landing, also `icon-sloop`), `rumour` (a dashed gold ring
-  with a question mark), `trade-guide` and `trade-rumour` (the stores trade uses `icon-provisions`);
+  with a question mark), `trade-guide` and `trade-rumour` (the stores trade uses `icon-provisions`),
+  `fix` (a solid magenta trig point) and `sighted` (a dashed one), `gear-sack`, `gear-rope`,
+  `gear-oil` and `gear-goods`;
   and `wonder-<kind>` (32 px, a picture in a gold ring, from `WONDER_ICONS`) and
   `wonder-unseen` (the gallery's empty frame).
 - `shared/setupGame.ts`, `shared/settings.ts` and `shared/i18n.ts` (outside the game folder): the
@@ -220,12 +242,16 @@ stands next to it (`snowHides`), lookouts see only the tiles beside them, and fr
   Buttons call `pitchCamp`, `returnToPort`, `sellChart` (then `saveBest` when the Royal Atlas
   page opens; it returns whether the voyages set a new best, which the page shows, kept in
   `newBest`, so a reload or a tie shows the best instead), `closeAtlas`, `newGame` (New atlas), `pickCommission` and `hire` (the harbor's
-  `card`s), `buy`, `pickTrade` (on the trade page) and `setSail`, which then calls `sailNotices`
-  (the trade taken, winter on a new isle, the sloop's landing). Every successful action calls `saveGame`. The harbor's heading row
+  `card`s), `buy`, `pickTrade` (on the trade page), `packGear` (the − and + on the packing page),
+  `pressOn` (the Press on button, which takes Camp's place while `canPressOn` holds) and `setSail`,
+  which then calls `sailNotices` (the trade taken, the pack, winter on a new isle, the sloop's
+  landing). A tap on a charted lookout `canClimb` goes to `survey` too, before `dig`; `announceGear`
+  puts up the notices for lamp oil, trade goods and the tiles a bearing fixed. Every successful action calls `saveGame`. The harbor's heading row
   (`headButton`, `HEAD_BUTTON`) holds Daily isle (disabled once today's try is used, then showing
   today's score), Wonders and Expeditions, which set `sheetView` to open the gallery or the far isles
   over the harbor (Back clears it). The Village trade card under the hands (`TRADE_CARD`, shown once
-  `tradeVillages` holds one) sets `sheetView` to `'trade'`, the trade page.
+  `tradeVillages` holds one) sets `sheetView` to `'trade'`, the trade page; the sack's card under it
+  (`PACK_CARD`, its line from `packText`) sets it to `'pack'`, the packing page.
 - Runs: Daily isle and an expedition's Set out call `startRun` (the daily calls `startDaily` first,
   so leaving half way still uses the day's try): the atlas moves to `atlasState`, `state` becomes
   `newRun(...)`, and every scene path (taps, Camp, Return to port, the theme switch, which hands
@@ -254,10 +280,12 @@ stands next to it (`snowHides`), lookouts see only the tiles beside them, and fr
     drawn as affordable while any supply is left, or with none left when it costs nothing (as
     `canAfford` and `survey` have it), and its pill says "under snow"), and once the
     riddle is known a dashed dig square and
-    pill on charted ground under the pointer. Cost labels come from a reused pool of texts.
+    pill on charted ground under the pointer. A station that would spend a coil says `ROPE`, and
+    while pressing on one the supplies can't pay says `STEP`. Climbable lookouts whose bearing would
+    fix tiles (`wouldFix`) get a dashed square and `CLIMB ×n`, and the one under the pointer a pill. Cost labels come from a reused pool of texts.
   - `syncMarks` keeps an image (the rumour's a container with its caption) per map mark (finds on charted tiles, storms, camps, dug tiles, the
     wonder once seen,
-    the treasure chest for the player's own find, a dug mark on the riddle's tile once charted when
+    the trig points of `fixed` and `sighted` tiles, the treasure chest for the player's own find, a dug mark on the riddle's tile once charted when
     the rival dug it, the rival's claims, the sloop off its landing while surveying, the rumour's
     gold ring on the wonder's tile, captioned "wonder?" (`rumourHint`) like the compass roses, until
     it is seen) and adds or removes them as the state changes.
@@ -266,7 +294,9 @@ stands next to it (`snowHides`), lookouts see only the tiles beside them, and fr
     each tile as the ring passes, from `GATHER_AT` the chips fly into the magenta tally ("VIEWSHED
     n tiles +v") which counts up, and everything fades after `HOLD_MS`.
   - `updatePanel` refreshes the texts (the header names the hand aboard, the guide's free surveys
-    left and "in winter" after the isle kind) and redraws the panel
+    left and "in winter" after the isle kind; the gear left beside the supplies' heading; the line
+    over the buttons offers pressing on, then shows the steps left and the storm's risk) and
+    redraws the panel (the supplies out of `voyageFood`)
     graphics: supply pips with the unused bracket (pips past the maximum, from wrecks, in magenta),
     the live chart (15x11 at 3 px, fresh tiles magenta for `FRESH_MS`), the commission progress
     (swatches up to four tiles, in words beyond, with the voyages left of a long one), the riddle
@@ -304,14 +334,29 @@ stands next to it (`snowHides`), lookouts see only the tiles beside them, and fr
   surveyor. It returns to `port` on `setSail`.
 - `surveyed` lists the tiles revealed this voyage (lookout reveals included); `chartOf` counts them.
   `sellChart` clears it.
-- `survey`, `pitchCamp` and `dig` end the voyage (`returnToPort`) once `canAct` is false: no
-  `frontier` tile the supplies can pay for, and nothing to dig.
+- `survey`, `pitchCamp` and `dig` end the voyage (`returnToPort`) once `canAct` is false (no
+  `frontier` tile or climbable lookout the supplies, or steps pressed on, can pay for, and nothing
+  to dig) and `canPressOn` is false (pressed on already this voyage, or no fog left beside the chart).
+- `pack` is the sack's gear for every voyage from the harbor (`packGear`, `canPack`); `setSail`
+  trims it so `voyageFood` stays at least `FOOD_MIN`, copies it into `gear` and sets the supplies to
+  `voyageFood` (plus a village's stores). `survey` spends a coil on a peak `usesRope` (`costOf` 0;
+  a guide goes first), a flask on a cave and a bale on a village it charts under the surveyor
+  (`artifacts`, `goods`); `returnToPort` empties `gear`. A run packs nothing.
+- `sighted` and `fixed` (reset on a new isle) are the tiles one and two lookouts have sighted, and
+  `climbed` the lookouts stood on: `survey` on a hill or peak (fogged, or charted and `canClimb`)
+  adds it to `climbed` and calls `sight` on every chartable tile in its sight but itself; a second
+  sighting moves a tile to `fixed` and counts `fixes` (this voyage's, reset by `sellChart`).
+- `pressOn` is the steps left after pressing on and `pressed` those taken: `canAfford` holds for
+  any tile while `pressOn` is above 0, and `survey` pays a tile the supplies can't with a step.
+  `returnToPort` clears both after `chartOf`, and `setSail` too.
 - `chart` (set by `returnToPort`): `counts`, `base` (the tiles' full value), `rivalTiles` and
   `rivalLoss` (tiles the rival `claims` first, and half their value, floored, taken off), `ink`
   (on `base - rivalLoss`), `features` and `featureCoins` (`featuresDone`: every feature whose
   tiles are all revealed with at least one in `surveyed`, so it pays once), `bonus` (the
   commission's, when `done` plus this voyage's count reaches `need`), `artifacts`, `artifactCoins`
-  (`artifactValue`: double with a Naturalist), `treasure`, `unused` and `sellBack`
+  (`artifactValue`: double with a Naturalist), `fixes` and `fixCoins`, `goods` and `goodsCoins`,
+  `storm` and `stormLoss` (after pressing on, when `stormComes`: `pressed * PRESS_LOSS` tiles, the
+  voyage's least valuable after the rival's half, taken off), `treasure`, `unused` and `sellBack`
   (`min(unused * SELL_BACK, base - rivalLoss)`, so turning back at once earns nothing), `milestones` and
   `milestoneCoins` (the `MILESTONES` reached and not yet paid), `atlas` (100% reached), `total`.
   Supplies are left as they are until `setSail` refills them.
@@ -415,6 +460,9 @@ atlas; only a progress file carries it, `fileOnly` in `shared/saveFile.ts`), cle
 `mapmaker-daily` is the daily isle's record (`shared/daily.ts`: today's try and score, the best and
 the streak). `mapmaker-expeditions` is the far isles' best percents, a list in `FAR_ISLES` order.
 Saves from before round 4 get `landing: null`, `guide: 0`, `trade: null` and `traded: []`.
+Saves from before round 5 get an empty `pack` and `gear`, no `sighted`, `fixed` or `climbed`
+tiles (so every charted lookout can be climbed), zero `fixes`, `goods`, `pressOn` and `pressed`,
+and zeroed new chart fields.
 Saves from before the wonders get their isle's wonder placed on load (seen at once if already in
 sight, filling the gallery) and an empty gallery.
 
@@ -424,7 +472,9 @@ sight, filling the gallery) and an empty gallery.
   lattices, landmark and find spots and the riddle's first candidate tile come from the seed) and in `rollCommission`, `rollBoard` and `rollHands` (called by
   `sellChart`; `returnToPort` also calls `makeIsland` for the next isle once this one is charted in full). Rivers, the road, features and their
   names, storms' targets, the rival's every move and the riddle's clues are worked out from the
-  tiles, without randomness, and so are the sloop's landing and the village trades. The wonder's tile comes from the island number by a hash. The daily
+  tiles, without randomness, and so are the sloop's landing and the village trades. Whether a storm
+  catches a voyage that pressed on (`stormComes`) is a hash of the isle's seed, its number and the
+  voyage, compared with `stormRisk`, so a reload can't roll it again. The wonder's tile comes from the island number by a hash. The daily
   isle's number and seed come from `dailyRand('mapmaker')` (the day), the far isles' are fixed. The art uses `rng()` and a sine hash; place names come from the island number
   and tile spots.
 - Animation time comes only from the `time` argument of `GameScene.update`. No timers or tweens.
@@ -441,7 +491,8 @@ sight, filling the gallery) and an empty gallery.
 - `src/game/state.ts`: `GRID`, `BASE_SUPPLIES`, `PROVISIONS_STEP`, `INK_STEP`, `SELL_BACK`,
   `WRECK_SUPPLIES`, `ARTIFACT_VALUE`, `CAMP_COST`, `CAMP_REACH`, `DIG_COST`, `TREASURE_VALUE`,
   `FEATURE_BONUS`, `WOOD_MIN`, `RIVAL_FROM`, `RIVAL_PACE`, `RIVAL_STEPS`, `ROYAL_KINDS`,
-  `MILESTONES`, `WINTER_FROM`, `LANDING_MIN`, `TRADE_STORES`, `TRADE_GUIDE`.
+  `MILESTONES`, `WINTER_FROM`, `LANDING_MIN`, `TRADE_STORES`, `TRADE_GUIDE`, `PACK_MAX`,
+  `FOOD_MIN`, `GOODS_VALUE`, `FIX_BONUS`, `PRESS_STEPS`, `PRESS_RISK`, `PRESS_LOSS`.
 - `src/game/island.ts`: `FINDS` (how many of each, on what, how far from the port), landmark
   counts per island, the riddle's clue tables and order (`DIRS`, `MARKS`, `GROUND`, `TILES_ORDER`, `DIR_ORDER`,
   `MARK_ORDER`), the feature name keys
@@ -471,7 +522,9 @@ has no audio imports.
     and `tally` when the values are added up (`ageSweep`); with reduced motion only `tally`.
   - One news sound a survey, the most important of `NEWS_ORDER`: `riddle` (the ruins charted),
     `rival` (the rival read the riddle or dug the treasure), `feature` (charted whole), `sparkle`
-    (a cave's artifact), `wreck` with `chime` (a wreck's stores), `thunder` (a storm settles).
+    (a cave's artifact, or lamp oil's second), `barter` (trade goods sold), `wreck` with `chime`
+    (a wreck's stores), `trig` (a bearing fixed tiles), `thunder` (a storm settles).
+  - `press` on Press on; `thunder` after the `horn` when a storm met the voyage on its way home.
   - `dig`, then `treasure` or `thud`, on a dig; `flap` and `peg` on Camp.
   - `horn` when the voyage ends (Return to port, or the last supplies spent); `swell` and `horn` on
     Set sail.
@@ -510,24 +563,28 @@ has no audio imports.
   `spots` (button centres by name: `return`, `camp`, `theme`, `sell`, `sail`, `buy-<upgrade>`,
   `hire-<hand>`, `pick-<n>` for the board's rows, `keep` and `newAtlas` on the Royal Atlas page,
   `daily`, `wonders` and `expeditions` in the harbor's heading row, `trade` (the Village trade card,
-  once a village is charted) and `trade-<stores|guide|rumour>` with `back` on the trade page, `far-<n>` and `back` on the far
+  once a village is charted), `pack` (the sack's card) and `pack-<gear>-less` and `pack-<gear>-more`
+  with `back` on the packing page and `trade-<stores|guide|rumour>` with `back` on the trade page, `far-<n>` and `back` on the far
   isles, `back` on the gallery, `finish` at a run's end).
 - It seeds `Math.random`, owns the clock with 64 ms frames, and blocks WebGL so Phaser uses canvas.
 - It taps tile centres (from `MAP` 24,64 and 40px tiles) of `frontier` tiles the supplies can pay
-  for, nearest the surveyor, until none is left; if the voyage is still open (a known riddle keeps
-  it open while a supply is left) it taps `return`, then `sell` and `sail`. It pitches no camp,
+  for, nearest the surveyor, until none is left; if the voyage is still open (a known riddle, a
+  lookout to climb or fog left to press on into keeps it open; it asserts the voyage is open while
+  fog is left beside the chart) it taps `return` without pressing on, then `sell` and `sail`. It pitches no camp,
   digs nothing, hires nobody, picks no commission (the board's first stays picked), buys nothing
   and never turns back early; the rival only lands from the third isle, so it never meets one.
 - Values the test copies and that must stay in sync: `VIEW`, `GRID` 15x11, `MAP`, `SUPPLIES` 12, the
   tile values in `VALUE`, the survey costs in `COST`, `WRECK_SUPPLIES`, `ARTIFACT_VALUE`,
-  `SELL_BACK`, `FEATURE_BONUS`, `WOOD_MIN`, `HANDS_OFFERED`, `MILESTONES`, the surveyable rule in
+  `SELL_BACK`, `FEATURE_BONUS`, `WOOD_MIN`, `FIX_BONUS`, `HANDS_OFFERED`, `MILESTONES`, the
+  lookouts' sight (a hill the four beside it, a peak all eight), the surveyable rule in
   its `frontier` (storms block, no camps, no Boatman) and the chartable rule in its `islePercent`.
   It asserts the isle hides an unseen wonder on land, and after every survey that the wonder is
   seen exactly when its tile and the tiles beside it are charted, with the gallery holding it then.
   It asserts the isle's features (a river and a road at least, each all of its terrain, named,
   paying `FEATURE_BONUS` a tile), each survey's cost and finds (wreck supplies, cave artifacts,
-  storms off the frontier), that only hills and peaks reveal more than the tapped tile, that a
-  chart's rows, features charted whole (and only those), commission, artifacts, sell-back and
+  storms off the frontier), that only hills and peaks reveal more than the tapped tile, the tiles
+  sighted and fixed after every survey (from the lookouts tapped), that a
+  chart's rows, features charted whole (and only those), fixes (no goods or storm), commission, artifacts, sell-back and
   milestones add up, that selling records the milestones and lays out a board (its first picked)
   and three hands, and that the second voyage keeps the charted tiles, the picked commission and
   no hand, and refills the supplies.
@@ -556,6 +613,11 @@ has no audio imports.
   the harbor's left column; a sixth needs `SHOP`, `BOARD` and `OVERLAY` in `layout.ts` adjusted.
 - Change a village trade: `Trade` and `TRADES` in `state.ts`, its effect in `setSail`, its name in
   `TRADE_NAMES` and its text in `showTrade` (`GameScene.ts`), its icon (`tradeIcon`, `MARKS`).
+- Change the pack: `Gear`, `GEAR`, `PACK_MAX`, `FOOD_MIN` and `GOODS_VALUE` in `state.ts`, a gear's
+  effect in `survey` or `costOf` (`usesRope`), its name in `GEAR_NAMES` and text in `showPack`
+  (`GameScene.ts`), its icon `gear-<id>` in `MARKS` (`icons.ts`) and the README's table.
+- Change fixes or pressing on: `FIX_BONUS` (and the test's), `PRESS_STEPS`, `PRESS_RISK` and
+  `PRESS_LOSS` in `state.ts`; which tiles a bearing sights is the lookout's sight (`sightOf`).
 - Change winter: `WINTER_FROM` and `isWinter` in `state.ts` (a change moves winter onto other isles
   of existing saves, the daily and far isles too), its rules in `costOf`, `sightOf` and `snowHides`.
 - Add a hand: add it to `Hand` and `HANDS` in `hands.ts` (name and card text of about 26 characters

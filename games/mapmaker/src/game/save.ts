@@ -3,7 +3,7 @@ import en from '../i18n/en';
 import type { TextKey } from '../i18n';
 import { findFeatures, makeIsland } from './island';
 import { placeWonder, wonderInSight } from './wonders';
-import { GRID, WRECK_SUPPLIES, indexOf, maxSupplies, type Clue, type GameState, type Ground, type Riddle, type Tile } from './state';
+import { GRID, NO_PACK, WRECK_SUPPLIES, indexOf, maxSupplies, type Clue, type GameState, type Ground, type Riddle, type Tile } from './state';
 
 // The whole game is saved after every successful action, so a
 // reload carries on where it left off. The best Royal Atlas (fewest voyages) is kept apart, so it
@@ -79,6 +79,16 @@ function load(key: string): GameState | null {
     s.guide ??= 0;
     s.trade ??= null;
     s.traded ??= [];
+    // Saves from before round 5: an all-food sack, no fixes, nothing pressed on.
+    s.pack ??= { ...NO_PACK };
+    s.gear ??= { ...NO_PACK };
+    s.sighted ??= [];
+    s.climbed ??= [];
+    s.fixed ??= [];
+    s.fixes ??= 0;
+    s.goods ??= 0;
+    s.pressOn ??= 0;
+    s.pressed ??= 0;
     if (s.wonder === undefined) {
       s.wonder = s.run ? null : placeWonder(s.tiles, s.island, s.kind);
       if (s.wonder && wonderInSight(s)) {
@@ -111,6 +121,12 @@ function load(key: string): GameState | null {
         featureCoins: old.featureCoins ?? 0,
         rivalTiles: old.rivalTiles ?? 0,
         rivalLoss: old.rivalLoss ?? 0,
+        fixes: old.fixes ?? 0,
+        fixCoins: old.fixCoins ?? 0,
+        goods: old.goods ?? 0,
+        goodsCoins: old.goodsCoins ?? 0,
+        storm: old.storm ?? 0,
+        stormLoss: old.stormLoss ?? 0,
       };
     }
     return s;
