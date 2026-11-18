@@ -13,7 +13,9 @@ import { INK, INK_NUM, SERIF, TEXT_HALO, fit, resOf } from '../art/paint';
 import { craftsmanTexture, customerTexture } from '../art/townsfolk';
 import { BUBBLE_TAIL, cardInset, cardTexture, signTexture, type CardKind } from '../art/ui';
 import { catchUp, type AwaySummary } from '../game/away';
-import { GROW_MS, ITEMS, PANACEA_RECIPE, PLANTS, POTIONS, REFINE, REFINED, isFine, isPlant, isPotion, isRefined, isSellable, plainOf, type ItemId, type SellableId } from '../game/items';
+import { GROW_MS, ITEMS, PANACEA_RECIPE, PLANTS, POTIONS, REFINE, REFINED, anyPlant, anyRefined, isFine, isPlant, isPotion, isPrime, isRefined, isSellable, plainOf, type ItemId, type SellableId } from '../game/items';
+import { FOLK_PER_NIGHT, FOLK_WALK_MS, NIGHT_MS, folkIn, hasWant, isNight, nightOpen, serveFolk, toggleNight, type NightFolk } from '../game/night';
+import { WAITS, idleOf, ledgerOpen, mostlyFor, slowest, type LedgerDay } from '../game/ledger';
 import {
   clearBlight,
   collectTill,
@@ -128,6 +130,7 @@ import {
   signOf,
   payBoost,
   payment,
+  inPrime,
 } from '../game/state';
 import { checkTrophies } from '../trophies/check';
 import { BackStack } from '../ui/BackStack';
@@ -169,6 +172,7 @@ import {
   type Brewed,
   type Ingredient,
   type Place,
+  type WildHerb,
 } from '../game/alchemy';
 import { ProgressBar } from '../ui/ProgressBar';
 import { COIN, itemName, potionCount, t, type TextKey } from '../i18n';
@@ -209,6 +213,8 @@ import {
   BENCH,
   COURIER_POST,
   DECOR_SPOTS,
+  LEDGER,
+  NIGHT_SIGN,
   customerPosition,
   plotPosition,
   type StationMarkers,
@@ -322,6 +328,9 @@ const TOWN_CARD = { x: 626, y: 50, w: 316, h: 44 };
 const AWAY_CHIP = { x: 652, y: 102, w: 290, h: 30 };
 /** The order bubble over a waiting customer: its height, how far above the customer's middle its middle is, the spacing of its icons, and its tip ring's radius. */
 const BUBBLE = { h: 30, above: 58, icon: 15, ring: 6 };
+/** The ledger's width and the x of its columns: the share worked and the idle time (right edges), and the waits. */
+const LEDGER_W = 620;
+const LEDGER_COLS = { worked: 220, idle: 290, waited: 310 };
 /** The refining bar's fill: a strong amber, since the cream track hides anything paler. */
 const REFINING_BAR = 0xc8741e;
 /** The refining bars' height, a little taller than the 6px default so they read under the table. */
@@ -465,6 +474,8 @@ export class GameScene extends Phaser.Scene {
     this.createHerbMarket();
     this.createAlchemy();
     this.createDecor();
+    this.createLedger();
+    this.createNight();
     this.createOrderStrip();
     this.views.push(addWeather(this, WORLD, WEATHER_DEPTH, () => this.state));
     this.createAwayChip();
@@ -670,6 +681,10 @@ export class GameScene extends Phaser.Scene {
         () => gardenBuilt(this.state, gardenOf(i)),
         () => {
           fit(this.add.image(x, y, 'plot').setDepth(-500));
+          // A gold glow over a bed in its prime window (AP23), pulsing unless motion is reduced.
+          const glow = this.add.ellipse(x, y + 2, 46, 34, 0xf2c94a, 0).setDepth(-499);
+          const ring = this.add.ellipse(x, y + 2, 48, 38).setStrokeStyle(3, 0xf0a820, 1).setDepth(y + 1).setVisible(false);
+          const star = fit(this.add.image(x + 16, y - 16, 'regular'), 1.2).setDepth(y + 2).setVisible(false);
           const plant = fit(this.add.image(x, y + 10, plantTexture(plot.plant, 2)).setOrigin(0.5, 1).setDepth(y));
           // Inside the bed's bottom edge, since the next row's bed starts right below it.
           const growth = new ProgressBar(this, x, y + 14, 40, 0x9ccf6a, WORLD_UI_DEPTH);
@@ -679,6 +694,12 @@ export class GameScene extends Phaser.Scene {
             // A blighted bed's plant withers to a sickly violet-grey and its bar goes.
             plant.setTint(plot.blighted ? BLIGHT_TINT : 0xffffff);
             growth.set(grown >= 1 || plot.blighted ? null : grown);
+            const prime = inPrime(plot);
+            const pulse = hubSettings.reduceMotion ? 1 : 0.75 + 0.25 * Math.sin(this.time.now / 140);
+            glow.setFillStyle(0xffd75a, prime ? 0.8 * pulse : 0);
+            ring.setVisible(prime).setAlpha(pulse);
+            star.setVisible(prime).setAlpha(pulse);
+            if (prime) plant.setTint(0xffe9a0);
           });
         },
       );
@@ -710,7 +731,7 @@ export class GameScene extends Phaser.Scene {
     // A second craftsman's pipe shows its own bar just below.
     const progress2 = new ProgressBar(this, at.x, at.y + 41, 60, REFINING_BAR, WORLD_UI_DEPTH, REFINING_BAR_H);
     this.addMarker(m.pickUp, pickUpPad('sack'), t('pickUp'), () => this.sounded(pickUpFromRefiner(this.state, id), 'pickUp'), () => this.state.belts[beltOut].built);
-    this.addMarker(m.drop, 'pad-in', t('drop'), () => this.sounded(dropAtRefiner(this.state, id), 'drop'), () => this.state.belts[beltIn].built && !this.carries(isPlant));
+    this.addMarker(m.drop, 'pad-in', t('drop'), () => this.sounded(dropAtRefiner(this.state, id), 'drop'), () => this.state.belts[beltIn].built && !this.carries(anyPlant));
     this.addWorkSpot(m.work, id);
     this.addUpgradeMarker(m.upgrade, id);
     this.addCraftsmen(id);
@@ -734,7 +755,7 @@ export class GameScene extends Phaser.Scene {
     const brewing = new ProgressBar(this, at.x, at.y + 34, 60, 0x58a35a, WORLD_UI_DEPTH).setZone(1 - FINE_SHARE, 0xe8b830);
     const brewing2 = new ProgressBar(this, at.x, at.y + 42, 60, 0x58a35a, WORLD_UI_DEPTH).setZone(1 - FINE_SHARE, 0xe8b830);
     this.addMarker(m.pickUp, pickUpPad('bottle'), t('pickUp'), () => this.pickUpPotion(id), () => this.state.belts[beltOut].built);
-    this.addMarker(m.drop, 'pad-in', t('drop'), () => this.sounded(dropInCauldron(this.state, id), 'drop'), () => this.state.belts[beltIn].built && !this.carries(isRefined));
+    this.addMarker(m.drop, 'pad-in', t('drop'), () => this.sounded(dropInCauldron(this.state, id), 'drop'), () => this.state.belts[beltIn].built && !this.carries(anyRefined));
     this.addWorkSpot(m.work, id);
     this.addUpgradeMarker(m.upgrade, id);
     this.addCraftsmen(id);
@@ -819,7 +840,8 @@ export class GameScene extends Phaser.Scene {
 
   /** The spot the doctor stands on to make the station work, gone once a craftsman is hired there. */
   private addWorkSpot(at: { x: number; y: number }, station: StationId) {
-    this.addMarker(at, 'pad-work', t('work'), () => null, () => this.state.craftsmen[station].level > 0);
+    // At night the craftsmen sleep, and the work spot is back for the doctor (AP21).
+    this.addMarker(at, 'pad-work', t('work'), () => null, () => this.state.craftsmen[station].level > 0 && !isNight(this.state));
     this.workSpots.push({ zone: new Phaser.Geom.Rectangle(at.x - 22, at.y - 22, 44, 44), station });
   }
 
@@ -2015,6 +2037,198 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
+   * The shop ledger (AP22): a book on the counter's right end, there once anything works without the
+   * doctor. A tap opens it: each station's day at work and waiting, and how long each shelf stood empty.
+   */
+  private createLedger() {
+    const board = new Board(this, UI_DEPTH + 1, LEDGER_W, (kit) => this.drawLedger(kit));
+    this.boards.push(board);
+    const book = fit(this.add.image(LEDGER.x, LEDGER.y, 'ledger')).setDepth(LEDGER.y + 30).setVisible(false);
+    const name = this.add
+      .text(LEDGER.x, LEDGER.y + 16, t('ledger'), { fontFamily: SERIF, fontSize: '11px', fontStyle: 'bold', color: INK, stroke: TEXT_HALO, strokeThickness: 3 })
+      .setOrigin(0.5, 0)
+      .setDepth(LEDGER.y + 30)
+      .setVisible(false);
+    this.opensBoard(book, board);
+    this.once(
+      () => ledgerOpen(this.state),
+      () => {
+        book.setVisible(true);
+        name.setVisible(true);
+      },
+    );
+  }
+
+  /** Which page of the ledger is open: yesterday's, when there is one, or today's so far. */
+  private ledgerPage: 'today' | 'yesterday' = 'yesterday';
+
+  private drawLedger(kit: BoardKit) {
+    const { ledger } = this.state;
+    const page: LedgerDay = (this.ledgerPage === 'yesterday' && ledger.yesterday) || ledger.today;
+    const w = kit.width;
+    kit.heading(t(page === ledger.today ? 'ledgerToday' : 'ledgerYesterday', { day: page.day }));
+    if (ledger.yesterday) {
+      kit.button(w / 2 - 50, t('ledgerTodayButton'), () => (this.ledgerPage = 'today'), page !== ledger.today, 90);
+      kit.button(w / 2 + 50, t('ledgerYesterdayButton'), () => (this.ledgerPage = 'yesterday'), page === ledger.today, 90);
+      kit.next(30);
+    }
+    const names: Record<CraftingId, TextKey> = { refiner: 'refiningTable', cauldron: 'cauldron', refiner2: 'refiningTable2', cauldron2: 'cauldron2' };
+    const worst = slowest(page);
+    kit.text(16, t('ledgerStation'), { bold: true, size: 12 });
+    kit.text(LEDGER_COLS.worked, t('ledgerWorked'), { bold: true, size: 12, right: true });
+    kit.text(LEDGER_COLS.idle, t('ledgerIdle'), { bold: true, size: 12, right: true });
+    kit.text(LEDGER_COLS.waited, t('ledgerWaited'), { bold: true, size: 12 });
+    kit.next(22);
+    const rows = (['refiner', 'cauldron', 'refiner2', 'cauldron2'] as const).filter((id) => page.stations[id]);
+    if (rows.length === 0) {
+      kit.text(16, t('ledgerNothing'), { italic: true, size: 12 });
+      kit.next(22);
+    }
+    for (const id of rows) {
+      const day = page.stations[id]!;
+      const total = Math.max(1, day.work + idleOf(day));
+      const slow = id === worst;
+      const color = slow ? '#8a3a10' : INK;
+      kit.text(16, t(names[id]), { bold: slow, size: 12, color });
+      kit.text(LEDGER_COLS.worked, `${Math.round((100 * day.work) / total)}%`, { size: 12, right: true, color });
+      kit.text(LEDGER_COLS.idle, clock(idleOf(day)), { size: 12, right: true, color });
+      const mostly = mostlyFor(day);
+      // Each wait it had, longest first.
+      const waits = WAITS.filter((wait) => day[wait] >= 1000)
+        .sort((a, b) => day[b] - day[a])
+        .map((wait) => `${t(`wait_${wait}` as TextKey)} ${clock(day[wait])}`)
+        .join(', ');
+      kit.text(LEDGER_COLS.waited, mostly ? waits : '', { size: 11, color });
+      if (slow) kit.text(w - 16, t('ledgerSlowest'), { bold: true, italic: true, size: 11, right: true, color });
+      kit.next(22);
+    }
+    kit.next(6);
+    kit.text(16, t('ledgerShelves'), { bold: true, size: 12 });
+    kit.next(22);
+    const empty = POTIONS.filter((p) => (page.empty[p] ?? 0) >= 1000).sort((a, b) => page.empty[b]! - page.empty[a]!);
+    if (empty.length === 0) {
+      kit.text(16, t('ledgerNeverEmpty'), { italic: true, size: 12 });
+      kit.next(22);
+    }
+    empty.forEach((potion, i) => {
+      // Two shelves to a line.
+      const x = i % 2 === 0 ? 16 : w / 2 + 8;
+      kit.icon(x + 8, itemTexture(potion), 1);
+      kit.text(x + 22, `${itemName(potion)} ${clock(page.empty[potion]!)}`, { size: 12, color: i === 0 ? '#8a3a10' : INK });
+      if (i % 2 === 1 || i === empty.length - 1) kit.next(22);
+    });
+  }
+
+  /**
+   * Night customers (AP21): the night sign inside the shop, left of the street door, which a tap turns
+   * open or closed for tonight, shown once the study has taught every recipe; and the night folk, who
+   * walk in from the street at night and wait at the counter under a bubble with what they want and
+   * what they pay, served from the counter's work spot or by a tap on the bubble.
+   */
+  private createNight() {
+    const at = NIGHT_SIGN;
+    const text = this.add.text(at.x, at.y, '', { fontFamily: SERIF, fontSize: '12px', fontStyle: 'bold', color: INK }).setOrigin(0.5).setDepth(-900);
+    const card = this.card(at.x, at.y, 'sign', signTexture(this, 110)).setDepth(-910);
+    card.setInteractive({ useHandCursor: true }).on('pointerdown', (_p: Phaser.Input.Pointer, _x: number, _y: number, e: Phaser.Types.Input.EventData) => {
+      e.stopPropagation();
+      if (this.pinching()) return;
+      if (this.closePanels()) return;
+      this.acted(toggleNight(this.state), 'click');
+    });
+    this.views.push(() => {
+      const shown = nightOpen(this.state);
+      card.setVisible(shown);
+      text.setVisible(shown);
+      if (shown) text.setText(t(this.state.night.open ? 'nightSignOpen' : 'nightSignClosed')).setColor(this.state.night.open ? '#2a3a7a' : INK);
+    });
+
+    const sprites = new Map<number, Phaser.GameObjects.Image>();
+    const slots = Array.from({ length: FOLK_PER_NIGHT }, (_, i) => this.addFolkBubble(i));
+    let served = this.state.night.served;
+    this.views.push(() => {
+      const night = this.state.night;
+      const here = new Set(night.folk.map((f) => f.id));
+      night.folk.forEach((folk, i) => {
+        let sprite = sprites.get(folk.id);
+        if (!sprite) {
+          sprite = fit(this.add.image(STREET.x, STREET.y, `night-${folk.kind}`)).setOrigin(0.5, 0.5);
+          // The ghostly sailor is half see-through.
+          if (folk.kind === 'sailor') sprite.setAlpha(0.7);
+          sprites.set(folk.id, sprite);
+        }
+        // Up the street path and through the door, then along the row to their spot, as the sim walks them.
+        const to = customerPosition(i);
+        const up = STREET.y - to.y;
+        const along = Math.abs(to.x - STREET.x);
+        let d = (1 - Math.max(0, folk.walk) / FOLK_WALK_MS) * (up + along);
+        const y = STREET.y - Math.min(d, up);
+        d = Math.max(0, d - up);
+        sprite.setPosition(STREET.x + Math.sign(to.x - STREET.x) * Math.min(d, along), y).setDepth(y);
+      });
+      for (const [id, sprite] of sprites) {
+        if (here.has(id)) continue;
+        if (walkTowards(sprite, STREET, (CUSTOMER_SPEED * this.frameMs) / 1000, true)) {
+          sprite.destroy();
+          sprites.delete(id);
+        }
+      }
+      slots.forEach((show, i) => show(night.folk[i] ?? null));
+      if (night.served > served) sfx('cascade');
+      served = night.served;
+    });
+  }
+
+  /**
+   * The bubble over the night folk in spot `i`: what they want, what they pay and their patience. A
+   * tap serves them, while the doctor is in the shop. Returns the view to show a folk, or none.
+   */
+  private addFolkBubble(i: number) {
+    const { x, y } = customerPosition(i);
+    const cy = y - BUBBLE.above;
+    const w = bubbleWidth(3) + 8;
+    const depth = WORLD_UI_DEPTH - 1 + i * 0.1;
+    const bubble = this.card(x, cy, 'bubble', cardTexture(this, 'bubble', w, BUBBLE.h)).setDepth(depth).setVisible(false);
+    let current: NightFolk | null = null;
+    bubble.setInteractive({ useHandCursor: true }).on('pointerdown', (_p: Phaser.Input.Pointer, _x: number, _y: number, e: Phaser.Types.Input.EventData) => {
+      e.stopPropagation();
+      if (this.pinching()) return;
+      if (this.closePanels()) return;
+      if (!current || !folkIn(current)) return;
+      if (!this.inShop({ x: this.feetX(), y: this.feetY() })) {
+        this.showFeedback([t('serveInShop')]);
+        ui('refuse');
+        return;
+      }
+      const feedback = serveFolk(this.state, current.id);
+      if (feedback) this.showFeedback(feedback);
+      else {
+        this.showFeedback([t('notOnShelf')]);
+        ui('refuse');
+      }
+    });
+    const want = fit(this.add.image(x - w / 2 + 12, cy - 4, 'coin')).setDepth(depth + 0.02).setVisible(false);
+    const arrow = this.add.text(x - w / 2 + 25, cy - 4, '→', { fontFamily: SERIF, fontSize: '11px', fontStyle: 'bold', color: INK }).setOrigin(0.5).setDepth(depth + 0.02).setVisible(false);
+    const pays = [0, 1, 2].map((k) => fit(this.add.image(x - w / 2 + 37 + k * 13, cy - 4, 'coin'), 0.8).setDepth(depth + 0.02).setVisible(false));
+    const patience = new ProgressBar(this, x, cy + 6, w - 10, 0x6a7ad8, depth + 0.02);
+    return (folk: NightFolk | null) => {
+      current = folk;
+      const there = !!folk && folkIn(folk);
+      bubble.setVisible(there);
+      want.setVisible(there);
+      arrow.setVisible(there);
+      if (!folk || !there) {
+        for (const p of pays) p.setVisible(false);
+        patience.set(null);
+        return;
+      }
+      want.setTexture(isPotionWant(folk.want) ? itemTexture(folk.want) : alchemyTexture(folk.want)).setAlpha(hasWant(this.state, folk.want) ? 1 : 0.5);
+      const icons = 'seal' in folk.pays ? ['seal'] : Object.keys(folk.pays.herbs).map((h) => alchemyTexture(h as WildHerb));
+      pays.forEach((p, k) => p.setVisible(k < icons.length).setTexture(icons[k] ?? 'coin'));
+      patience.set(folk.patience / folk.maxPatience);
+    };
+  }
+
+  /**
    * The town card under the top bar, right of the contract: today's weather from the almanac and what
    * it does, the street's reputation as a bar, and tomorrow's weather, or on a market day how its
    * crowd is going. When a market day's rush pays its bonus or loses it, a note under the card says so.
@@ -2263,16 +2477,26 @@ export class GameScene extends Phaser.Scene {
     for (const obj of [label, sky, passed, sun, banner]) obj.setScrollFactor(0);
     let day = this.state.contract.day;
     let drawn = -1;
+    // At night (AP21) the sky goes dark and the moon crosses it instead of the sun.
+    const nightSky = this.add.graphics().setDepth(UI_DEPTH + 0.15).setScrollFactor(0);
+    nightSky.fillStyle(0x1c2050, 0.92).fillRoundedRect(left, y - 5, right - left, 10, 3).setVisible(false);
+    const moon = fit(this.add.image(left, y, 'moon'), 1.1).setDepth(UI_DEPTH + 0.3).setScrollFactor(0).setVisible(false);
     this.views.push(() => {
       const c = this.state.contract;
-      label.setText(t('dayClock', { day: c.day }));
-      const share = Phaser.Math.Clamp(1 - c.dayLeft / DAY_MS, 0, 1);
+      const night = isNight(this.state);
+      label.setText(t(night ? 'nightClock' : 'dayClock', { day: c.day }));
+      nightSky.setVisible(night);
+      passed.setDepth(UI_DEPTH + (night ? 0.2 : 0.1));
+      moon.setVisible(night);
+      sun.setVisible(!night);
+      const share = night ? 1 - this.state.night.left / NIGHT_MS : Phaser.Math.Clamp(1 - c.dayLeft / DAY_MS, 0, 1);
       const x = left + (right - left) * share;
       sun.setX(x);
+      moon.setX(x);
       if (Math.round(x) !== drawn) {
         drawn = Math.round(x);
         // The part of the day gone by is shaded over.
-        passed.clear().fillStyle(INK_NUM, 0.28).fillRect(left, y - 5, x - left, 10);
+        passed.clear().fillStyle(night ? 0xffffff : INK_NUM, night ? 0.18 : 0.28).fillRect(left, y - 5, x - left, 10);
       }
       if (c.day === day) return;
       day = c.day;
@@ -2439,6 +2663,8 @@ export class GameScene extends Phaser.Scene {
       else if (feedback) {
         sfx('swish');
         sfx('pluck');
+        // A plant picked in its bed's prime window chimes like a fine potion (AP23).
+        if (isPrime(this.state.carrying[this.state.carrying.length - 1])) sfx('fine');
       }
       if (feedback) this.showFeedback(feedback);
     }
@@ -2558,7 +2784,7 @@ export class GameScene extends Phaser.Scene {
     this.frameMs = Math.min(delta, MAX_STEP_MS);
     const feetY = this.feetY();
     const workingAt = this.workSpots.find((w) => w.zone.contains(this.feetX(), feetY))?.station ?? null;
-    tick(this.state, this.frameMs, workingAt, (order) => this.atCounter.has(order.id));
+    tick(this.state, this.frameMs, workingAt, (order) => this.atCounter.has(order.id), Math.random, true);
     // The town's shops keep working while the doctor is in the apothecary.
     tickTown(this.state, this.frameMs, null);
     this.movePlayer();
@@ -2830,6 +3056,9 @@ function walkTowards(obj: Phaser.GameObjects.Image, to: Point, step: number, lea
   obj.setDepth(obj.y);
   return obj.x === to.x && obj.y === to.y;
 }
+
+/** Whether what one of the night folk wants is a potion off a shelf, rather than a bench potion. */
+const isPotionWant = (want: NightFolk['want']): want is (typeof POTIONS)[number] => (POTIONS as readonly string[]).includes(want);
 
 /** How wide an order bubble is for `n` potions: their icons and a margin. */
 function bubbleWidth(n: number) {

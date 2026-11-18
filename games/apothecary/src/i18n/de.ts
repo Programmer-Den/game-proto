@@ -26,6 +26,12 @@ const de: Translation<typeof en> = {
   fineShadowElixir: 'Feines Schattenelixier',
   fineMoonlightSalve: 'Feine Mondlichtsalbe',
   fineWitchsBrew: 'Feines Hexengebräu',
+  primeWheat: 'Erlesener Weizen',
+  primeMandrake: 'Erlesene Alraune',
+  primeNightshade: 'Erlesener Nachtschatten',
+  primeFlour: 'Erlesenes Weizenmehl',
+  primeMandrakeSeeds: 'Erlesene Alraunensamen',
+  primeNightshadeExtract: 'Erlesenes Nachtschattenextrakt',
 
   // A number of a potion, by the potion's id and "Count"
   healingDraughtCount: { one: '{n} Heiltrank', other: '{n} Heiltränke' },
@@ -416,9 +422,40 @@ const de: Translation<typeof en> = {
   fountainText: 'Wer geht, kostet halb so viel Ruf',
   decorBought: '{name} aufgestellt',
   decorUp: 'Aufgestellt',
+  // Nachtkundschaft (AP21)
+  nightSignOpen: 'Nachts geöffnet',
+  nightSignClosed: 'Nachts geschlossen',
+  nightOpenTonight: 'Der Laden bleibt heute Nacht offen',
+  nightClosedTonight: 'Der Laden schließt in der Dämmerung',
+  nightClock: 'Nacht {day}',
+  witch: 'Die Hexe',
+  lamplighter: 'Der Laternenanzünder',
+  sailor: 'Der Geisterseemann',
+  folkPaidHerbs: '{name} zahlt {herbs}',
+  folkPaidSeal: '{name} zahlt ein Stadtsiegel!',
+  herbGain: '+{n} {herb}',
+  // Das Ladenbuch (AP22)
+  ledger: 'Ladenbuch',
+  ledgerToday: 'Ladenbuch: Tag {day} bisher',
+  ledgerYesterday: 'Ladenbuch: Tag {day}',
+  ledgerTodayButton: 'Heute',
+  ledgerYesterdayButton: 'Gestern',
+  ledgerStation: 'Station',
+  ledgerWorked: 'Arbeit',
+  ledgerIdle: 'Leerlauf',
+  ledgerWaited: 'Wartete auf',
+  ledgerNothing: 'Noch nichts eingetragen.',
+  ledgerSlowest: 'Langsamste',
+  ledgerShelves: 'Leer gelaufene Regale',
+  ledgerNeverEmpty: 'Kein Regal lief leer.',
+  wait_input: 'Waren',
+  wait_room: 'Platz',
+  wait_hands: 'Hände',
+  refiningTable2: 'Mahltisch 2',
+  cauldron2: 'Kessel 2',
 };
 
 /** Texts that read the same in German. */
-export const keepEnglish: (keyof typeof en)[] = ['mild', 'land', 'fairSign', 'fairSet', 'gained', 'gainedFine', 'handedOver', 'coinsGained', 'coinPrice', 'bought', 'sold', 'buildCost', 'learnCost', 'coinsPaid'];
+export const keepEnglish: (keyof typeof en)[] = ['mild', 'herbGain', 'ledgerStation', 'land', 'fairSign', 'fairSet', 'gained', 'gainedFine', 'handedOver', 'coinsGained', 'coinPrice', 'bought', 'sold', 'buildCost', 'learnCost', 'coinsPaid'];
 
 export default de;

@@ -359,6 +359,35 @@ customer who walks off costs half the reputation).
 
 ![The street with the painted sign, the fountain, the herb arch and the lanterns](docs/screenshots/shop-decor.webp)
 
+**Prime harvest.** A bed that grows ripe while you play glows gold for five seconds, with a star
+over it. Cut it then and the plant is a Prime one (gold glow in the hands bar), which the refining
+table turns into a Prime good, and a potion brewed only from Prime goods always comes out Fine, at
+half again its price, however it is picked up. A bed picked later, or by the pixies, gives a plain
+plant as before, and the craftsmen and pixies leave the Prime goods and Fine potions on the pallets
+for you while plain ones are there.
+
+![A row of beds glowing gold in their prime window, and Prime goods in the hands bar](docs/screenshots/prime-harvest.webp)
+
+**The shop ledger.** Once a craftsman is hired or a pixie route built, a ledger lies on the right
+end of the counter. Tap it to see, for today so far and for yesterday, how much of the day each
+refining table and cauldron worked, how long it stood idle and what it waited for (goods to work,
+room on its pallets, or hands to work it), with the slowest station marked, and how long each
+shelf stood empty.
+
+![The ledger open over the shop: two stations, the cauldron marked slowest, and two shelves that ran empty](docs/screenshots/shop-ledger.webp)
+
+**Night customers.** Once the study has taught every recipe, a night sign stands inside the shop
+left of the street door. Tap it to Open at night, and at dusk the day doesn't end: the day's
+customers go home, the craftsmen sleep (their work spots come back for you) and a 90 second night
+begins, with the moon crossing the day bar. Up to four night folk come in and wait 40 seconds each:
+the witch wants a nightshade potion and pays 2 of a wild herb, the lamplighter wants one too and
+pays one of each wild herb, and every third night the ghostly sailor comes last for a bench potion
+you have discovered and pays a town seal, which raises every price for good. Serve them from the
+counter's work spot or by tapping their bubble. Closed at night, the default, the day ends as
+before; the shop only stays open while you play, never in the time away.
+
+![A witch at the counter at night, asking for a Shadow Elixir for Silverleaf](docs/screenshots/night-customers.webp)
+
 The **guild** in the market below the second line sells upgrades for the rest of the apothecary:
 growth makes every garden grow a quarter faster per level (20, then 40 coins), pixies fly half again
 as fast per level, carrying more goods a second (30, then 60), storage lets every pallet and shelf
@@ -640,5 +669,5 @@ All paths are inside `games/apothecary/`.
 - `src/art/`: all the art, painted in code on canvases at startup with the watercolour and ink
   helpers in `paint.ts` (no image files): the plague doctor, townsfolk, items, gardens, stations,
   the study, shop shelves, pixies, floor markers, the ground, the parchment interface cards, and the
-  alchemy bench, courier's post, wild herbs and shop decor (`alchemy.ts`).
+  alchemy bench, courier's post, wild herbs, shop decor, the ledger and the town seal (`alchemy.ts`).
 - `src/ui/`: small reusable display pieces (icon rows, progress bars, pallets, shop shelves), the recipe and settings panels and `Board`, the panel the bench, the courier's post and the decor board open.
