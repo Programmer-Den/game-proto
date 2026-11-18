@@ -413,6 +413,20 @@ const POTION_SHAPES = {
  * berries, and a sack for flour, seeds and extract. A fine potion is its flask with a gold sparkle.
  */
 export function itemIcon(c: Ctx, kind: string, x: number, y: number, s: number) {
+  // A Prime plant or good (AP23): its plain icon on a gold glow, with a small sparkle low on its left.
+  if (kind.startsWith('prime')) {
+    const plain = kind[5].toLowerCase() + kind.slice(6);
+    c.save();
+    const g = c.createRadialGradient(x, y, 0, x, y, s * 0.55);
+    g.addColorStop(0, 'rgba(255,214,90,0.85)');
+    g.addColorStop(1, 'rgba(255,214,90,0)');
+    c.fillStyle = g;
+    c.fillRect(x - s * 0.55, y - s * 0.55, s * 1.1, s * 1.1);
+    c.restore();
+    itemIcon(c, plain, x, y, s);
+    sparkle(c, x - s * 0.32, y + s * 0.3, s * 0.2);
+    return;
+  }
   if (kind.startsWith('fine')) {
     const plain = kind[4].toLowerCase() + kind.slice(5);
     itemIcon(c, plain, x, y, s);

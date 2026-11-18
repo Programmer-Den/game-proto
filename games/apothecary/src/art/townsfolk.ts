@@ -8,6 +8,10 @@ export const CUSTOMER_LOOKS = 5;
 export const customerTexture = (id: number) => `customer-${id % CUSTOMER_LOOKS}`;
 
 interface Look {
+  /** What sits on the head (AP21's night folk): a witch's pointed hat or a sailor's cap. */
+  hat?: 'witch' | 'cap';
+  /** A lamplighter's lit lantern on a pole, held at the right side. */
+  lantern?: boolean;
   shirt: string;
   hair: string;
   skin: string;
@@ -76,6 +80,23 @@ function drawPerson(c: Ctx, look: Look) {
     hair.push([x + 8.8, hy + 1], [x - 8.8, hy + 1]);
     both(c, hair, look.hair, { layers: 2 }, { w: 1 });
   }
+  if (look.hat === 'witch') {
+    both(c, ellPts(x, hy - 6, 13, 3, 20), '#2a2038', { layers: 2 }, { w: 1 });
+    both(c, [[x - 7, hy - 7], [x + 2, hy - 26], [x + 7, hy - 7]], '#2a2038', { layers: 2 }, { w: 1 });
+    ink(c, [[x - 6.5, hy - 9], [x + 6.5, hy - 9]], { closed: false, w: 1.4, col: '#7a5ab8' });
+  } else if (look.hat === 'cap') {
+    both(c, [[x - 9, hy - 4], [x - 7, hy - 10], [x + 7, hy - 10], [x + 9, hy - 4]], '#2a3a5a', { layers: 2 }, { w: 1 });
+    ink(c, [[x - 10, hy - 4], [x + 10, hy - 4]], { closed: false, w: 1.6, col: '#e8e8f0' });
+  }
+  if (look.lantern) {
+    ink(c, [[x + 15, y - 2], [x + 15, y - 54]], { closed: false, w: 1.4, col: '#5c3a21' });
+    const g = c.createRadialGradient(x + 15, y - 52, 0, x + 15, y - 52, 9);
+    g.addColorStop(0, 'rgba(255,214,110,0.9)');
+    g.addColorStop(1, 'rgba(255,214,110,0)');
+    c.fillStyle = g;
+    c.fillRect(x + 6, y - 61, 18, 18);
+    both(c, rectPts(x + 12, y - 56, 6, 7, 1), '#ffd88a', { layers: 1 }, { w: 0.8 });
+  }
   // Dot eyes.
   c.fillStyle = '#2a1d14';
   for (const dx of [-3, 3]) {
@@ -85,7 +106,15 @@ function drawPerson(c: Ctx, look: Look) {
   }
 }
 
+/** The night folk (AP21): a witch, a lamplighter and a ghostly sailor, drawn pale (the scene shows him half see-through). */
+export const NIGHT_FOLK: Record<'witch' | 'lamplighter' | 'sailor', Look> = {
+  witch: { shirt: '#4a3060', hair: '#1a1210', skin: '#c8d8b0', hat: 'witch', belt: '#7a8f22' },
+  lamplighter: { shirt: '#5a4a3a', hair: '#8a8a8a', skin: SKIN[1], hat: 'cap', lantern: true },
+  sailor: { shirt: '#9ab8c8', hair: '#d8e8f0', skin: '#d8e8f0', hat: 'cap', belt: '#5a7a9a' },
+};
+
 export function bakeTownsfolk(scene: Phaser.Scene) {
+  for (const [kind, look] of Object.entries(NIGHT_FOLK)) paint(scene, `night-${kind}`, 44, 68, (c) => drawPerson(c, look), 3);
   LOOKS.forEach((look, i) => paint(scene, `customer-${i}`, 44, 68, (c) => drawPerson(c, look), 3));
   CRAFTSMEN.forEach((look, i) => paint(scene, craftsmanTexture(i), 44, 68, (c) => drawPerson(c, look), 3));
 }

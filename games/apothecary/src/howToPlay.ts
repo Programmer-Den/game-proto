@@ -51,6 +51,9 @@ const en: HowToPlay = {
     'Once the study has taught every recipe, the alchemy bench opens north of the yard: drop refined goods on it, tap it and mix two or three ingredients. The right mix discovers a new potion that sells well or cures a plague stage at once; a wrong one makes a cheap Murky Draught.',
     "Hire a courier at the post beside the bench and send them to the forest, the marsh or the mountains: a few minutes later, even with the game closed, they bring back a rare wild herb for the bench.",
     'Once you have joined the guild, tap Shop decor on the shop front to put up a painted sign, lanterns, a herb arch and a fountain: bigger tips, more patient customers, more regulars and walk-offs that cost less reputation.',
+    'A bed that has just grown ripe glows gold for five seconds: pick it then for a Prime plant, which refines into a Prime good. A potion brewed only from Prime goods always comes out Fine.',
+    'Once anything works without you, a ledger lies on the counter: tap it to see how long each station worked or waited, what for, and which shelves ran empty, today and yesterday.',
+    'Once the study has taught every recipe, tap the night sign inside the shop to stay open after dusk. The craftsmen sleep, so serve by hand: a witch, a lamplighter and now and then a ghostly sailor come for nightshade potions and bench potions and pay in wild herbs or a town seal.',
   ],
 };
 
@@ -103,6 +106,9 @@ const de: HowToPlay = {
     'Hat die Studierstube jedes Rezept gelehrt, öffnet nördlich des Hofs der Alchemietisch: leg verarbeitete Waren darauf, tipp ihn an und misch zwei oder drei Zutaten. Die richtige Mischung entdeckt einen neuen Trank, der sich gut verkauft oder eine Seuchenstufe sofort heilt; eine falsche ergibt einen billigen Trüben Trank.',
     'Stell am Posten neben dem Tisch einen Boten an und schick ihn in den Wald, ins Moor oder in die Berge: ein paar Minuten später, auch bei geschlossenem Spiel, bringt er ein seltenes wildes Kraut für den Tisch.',
     'Bist du der Gilde beigetreten, tipp vorn am Laden auf Ladenschmuck, um ein bemaltes Schild, Laternen, einen Kräuterbogen und einen Brunnen aufzustellen: mehr Trinkgeld, geduldigere Kundschaft, mehr Stammkundschaft und weniger Rufverlust, wenn jemand geht.',
+    'Ein Beet, das gerade reif geworden ist, leuchtet fünf Sekunden golden: Erntest du es dann, bekommst du eine erlesene Pflanze, die zu einer erlesenen Ware verarbeitet wird. Ein Trank nur aus erlesenen Waren wird immer fein.',
+    'Sobald etwas ohne dich arbeitet, liegt ein Ladenbuch auf der Theke: Tipp darauf, um zu sehen, wie lange jede Station gearbeitet oder gewartet hat, worauf, und welche Regale leer liefen, heute und gestern.',
+    'Hat die Studierstube jedes Rezept gelehrt, tipp auf das Nachtschild im Laden, um nach der Dämmerung offen zu bleiben. Die Handwerker schlafen, also bedienst du selbst: Eine Hexe, ein Laternenanzünder und ab und zu ein Geisterseemann wollen Nachtschattentränke und Werkbanktränke und zahlen mit wilden Kräutern oder einem Stadtsiegel.',
   ],
 };
 

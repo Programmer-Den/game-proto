@@ -9,13 +9,19 @@ export type FineId =
   | 'fineShadowElixir'
   | 'fineMoonlightSalve'
   | 'fineWitchsBrew';
-export type ItemId = PlantId | RefinedId | PotionId | FineId;
+/**
+ * A plant picked in its bed's prime window (AP23), and the good it refines into: a potion brewed only
+ * from Prime goods is always Fine. They ride in the doctor's hands only; at a station they count as
+ * the plain plant or good (see `primeIn` and `primeOut` on the stations).
+ */
+export type PrimeId = 'primeWheat' | 'primeMandrake' | 'primeNightshade' | 'primeFlour' | 'primeMandrakeSeeds' | 'primeNightshadeExtract';
+export type ItemId = PlantId | RefinedId | PotionId | FineId | PrimeId;
 /** What can stand on the counter's shelf for sale: a potion, plain or fine. */
 export type SellableId = PotionId | FineId;
 
 /** An item's kind and colour; its name is the text keyed by its id (`itemName` in `i18n.ts`). */
 export interface ItemDef {
-  kind: 'plant' | 'refined' | 'potion' | 'fine';
+  kind: 'plant' | 'refined' | 'potion' | 'fine' | 'prime';
   color: number;
 }
 
@@ -38,6 +44,12 @@ export const ITEMS: Record<ItemId, ItemDef> = {
   fineShadowElixir: { kind: 'fine', color: 0x2f8a72 },
   fineMoonlightSalve: { kind: 'fine', color: 0x6fa8d6 },
   fineWitchsBrew: { kind: 'fine', color: 0x7a8f22 },
+  primeWheat: { kind: 'prime', color: 0xd9b24a },
+  primeMandrake: { kind: 'prime', color: 0xb07a4a },
+  primeNightshade: { kind: 'prime', color: 0x4a3060 },
+  primeFlour: { kind: 'prime', color: 0xf1e8d0 },
+  primeMandrakeSeeds: { kind: 'prime', color: 0x6b4426 },
+  primeNightshadeExtract: { kind: 'prime', color: 0x5a3a78 },
 };
 
 /**
@@ -116,6 +128,25 @@ export const FINE: Record<PotionId, FineId> = {
 const PLAIN = Object.fromEntries(Object.entries(FINE).map(([plain, fine]) => [fine, plain])) as Record<FineId, PotionId>;
 /** The potion an item on sale is: itself, or the plain potion of a fine one. */
 export const plainOf = (id: SellableId): PotionId => (isFine(id) ? PLAIN[id] : id);
+
+/** Whether an item is a Prime plant or good (AP23). */
+export const isPrime = (id: ItemId): id is PrimeId => ITEMS[id].kind === 'prime';
+/** Each plant's and refined good's Prime version, and back. */
+export const PRIME: Record<PlantId | RefinedId, PrimeId> = {
+  wheat: 'primeWheat',
+  mandrake: 'primeMandrake',
+  nightshade: 'primeNightshade',
+  flour: 'primeFlour',
+  mandrakeSeeds: 'primeMandrakeSeeds',
+  nightshadeExtract: 'primeNightshadeExtract',
+};
+const UNPRIMED = Object.fromEntries(Object.entries(PRIME).map(([plain, prime]) => [prime, plain])) as Record<PrimeId, PlantId | RefinedId>;
+/** The plain plant or good a Prime one is. */
+export const unprimed = (id: PrimeId) => UNPRIMED[id];
+/** Whether an item is a plant, plain or Prime. */
+export const anyPlant = (id: ItemId) => isPlant(id) || (isPrime(id) && isPlant(unprimed(id)));
+/** Whether an item is a refined good, plain or Prime. */
+export const anyRefined = (id: ItemId) => isRefined(id) || (isPrime(id) && isRefined(unprimed(id)));
 
 /** Every item of each kind, in the order their pallets stand. */
 export const PLANTS = Object.keys(GROW_MS) as PlantId[];

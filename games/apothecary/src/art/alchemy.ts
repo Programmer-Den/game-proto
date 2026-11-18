@@ -139,7 +139,35 @@ function drawFountain(c: Ctx) {
   sparkle(c, 22, 26, 2);
 }
 
+/** The shop ledger (AP22): an open account book with ruled pages and a ribbon. 30x22 as shown. */
+function drawLedger(c: Ctx) {
+  shadow(c, 15, 20, 13, 2, 0.2);
+  both(c, [[2, 6], [15, 4], [28, 6], [28, 19], [15, 17], [2, 19]], '#6a3a22', { layers: 1 }, { w: 0.9 });
+  both(c, [[3.5, 5], [15, 3.5], [15, 16], [3.5, 17.5]], '#efe2c0', { layers: 1 }, { w: 0.6 });
+  both(c, [[15, 3.5], [26.5, 5], [26.5, 17.5], [15, 16]], '#efe2c0', { layers: 1 }, { w: 0.6 });
+  for (let k = 0; k < 4; k++) {
+    ink(c, [[5.5, 7.5 + k * 2.5], [13.5, 6.5 + k * 2.5]], { closed: false, w: 0.45 });
+    ink(c, [[16.5, 6.5 + k * 2.5], [24.5, 7.5 + k * 2.5]], { closed: false, w: 0.45 });
+  }
+  ink(c, [[15, 3.5], [15, 16]], { closed: false, w: 0.8 });
+  both(c, [[19, 16.5], [21, 16.5], [21, 21], [20, 20], [19, 21]], '#3a6aa8', { layers: 1 }, { w: 0.4 });
+}
+
+/** A town seal (AP21): a gold wax disc with a crown stamped in it. 16x16 as shown. */
+function drawSeal(c: Ctx) {
+  const pts = Array.from({ length: 24 }, (_, k) => {
+    const a = (k / 24) * Math.PI * 2;
+    const r = k % 2 ? 6.4 : 7.2;
+    return [8 + Math.cos(a) * r, 8 + Math.sin(a) * r] as [number, number];
+  });
+  both(c, pts, '#d8a832', { layers: 2 }, { w: 0.8 });
+  both(c, ellPts(8, 8, 4.6, 4.6, 20), '#c48a22', { layers: 1 }, { w: 0.6 });
+  both(c, [[5, 10], [5, 6], [6.6, 7.6], [8, 5], [9.4, 7.6], [11, 6], [11, 10]], '#f2d878', { layers: 1 }, { w: 0.6 });
+}
+
 export function bakeAlchemy(scene: Phaser.Scene) {
+  paint(scene, 'ledger', 30, 22, drawLedger, 3);
+  paint(scene, 'seal', 16, 16, drawSeal, 4);
   for (const id of WILD_HERBS) paint(scene, `alchemy-${id}`, 16, 16, (c) => drawWild(c, id), 4);
   for (const id of [...MIXES.map((m) => m.id), MURKY]) paint(scene, `alchemy-${id}`, 16, 16, (c) => itemIcon(c, id, 8, 8.5, 15), 4);
   paint(scene, 'alchemy-bench', 88, 56, drawBench, 3);
