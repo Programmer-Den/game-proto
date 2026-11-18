@@ -60,7 +60,9 @@ Implemented today:
   rows 0-3), Chebyshev range and targeting, one robot per tile, charge (mana) and the class
   abilities, trait and item specials, commander skills (`useSkill`, numbers in `SKILL_POWER`),
   terrain (`TERRAIN`), and
-  `FIGHT_LIMIT_S`. The player's fight is played back step by step; every other pairing runs
+  `FIGHT_LIMIT_S`. Each shield keeps its own expiry (`BUnit.shields`, `shield` their total), and a
+  hit takes the one that runs out soonest first. A saboteur's backstab goes to the weakest enemy it
+  can blink beside, and strikes nobody when it can blink beside none. The player's fight is played back step by step; every other pairing runs
   `runToEnd` at once.
 - Pairings: `startFight` pairs the living seats at random, avoiding last round's opponent; with an
   odd count one seat fights a ghost copy of another board. Rivals call a taunt bubble at the start

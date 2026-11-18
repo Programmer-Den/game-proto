@@ -797,7 +797,9 @@ export class GameScene extends Phaser.Scene {
       if (path && (!best || path.length < best.length)) best = path;
     }
     if (!best) {
+      // Nowhere to stand beside it: stop rather than walk on along the last tap's route.
       this.target = null;
+      this.route = null;
       return;
     }
     this.route = best.slice(1);
@@ -1505,9 +1507,11 @@ export class GameScene extends Phaser.Scene {
       if (f.alive && Math.hypot(f.x - x, f.y - y) < BURST_PX + 8) {
         const d = { x: Math.sign(f.x - x), y: Math.sign(f.y - y) };
         if (ARMOURED.has(f.kind)) this.knockDown(f);
-        this.hitFoe(f, d);
+        const guarded = f.kind === 'knight' && f.down <= 0;
+        this.hitFoe(f, d, false);
         f.hurt = 0;
-        if (f.alive) this.hitFoe(f, d);
+        // A burst hits twice, but a knight's guard turns it once.
+        if (f.alive && !guarded) this.hitFoe(f, d, false);
       }
     if (Math.hypot(s.x - x, s.y - y) < BURST_PX * 0.8) this.hurt(1, { x, y });
     const w = this.wraith;
@@ -2335,7 +2339,8 @@ export class GameScene extends Phaser.Scene {
     this.hud.toast(t(key), HINT_MS);
   }
 
-  private hitFoe(f: Foe, d: { x: number; y: number }) {
+  /** `sword` is false for a bellseed's burst, which never sets the knight's `parryLock`. */
+  private hitFoe(f: Foe, d: { x: number; y: number }, sword = true) {
     if (f.hurt > 0) return;
     // A beetle's shell turns the blade, and a lantern moth flies above it, until knocked down.
     if (f.kind === 'beetle' && f.down <= 0) {
@@ -2348,7 +2353,7 @@ export class GameScene extends Phaser.Scene {
     // An iron knight's plate turns everything until a parry knocks it off balance.
     if (f.kind === 'knight' && f.down <= 0) {
       f.hurt = 250;
-      this.parryLock = KNIGHT.lockMs;
+      if (sword) this.parryLock = KNIGHT.lockMs;
       sfx('tink', { pitch: 0.8 });
       this.hint('knightGuard');
       return;
@@ -2875,7 +2880,7 @@ export class GameScene extends Phaser.Scene {
     // Moths when the knight is alone with it, and seed pods when they run short.
     w.summonT -= dt;
     if (w.summonT <= 0) {
-      w.summonT = SUMMON_MS;
+      w.summonT = SUMMON_MS * (this.hard ? TRIAL.summon : 1);
       if (this.foes.filter((f) => f.alive && f.room === 'boss').length < 2) {
         const c = centre({ x: Math.random() < 0.5 ? room.x + 2 : room.x + room.w - 3, y: room.y + 2 });
         this.spawnFoe('moth', c.x, c.y, -1, 'boss');

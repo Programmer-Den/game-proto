@@ -809,7 +809,7 @@ export class GameScene extends Phaser.Scene {
       } else if (e.kind === 'wasp') {
         // The comb the wasp is after comes to the front, so it can be swatted.
         const w = this.state.wasps.find((w) => w.id === e.id);
-        if (w) this.hive = hiveOf(w.slot);
+        if (w) this.showHive(hiveOf(w.slot));
         this.float(HIVE.x + HIVE.w / 2, HIVE.y + 70, t(this.state.ranks.guards > 0 ? 'waspGuards' : 'waspTap'), '#ffe08a', 15, 2000);
       } else if (e.kind === 'stolen') {
         const c = cellCentre(e.slot);
@@ -834,7 +834,7 @@ export class GameScene extends Phaser.Scene {
       } else if (e.kind === 'ate') {
         if (e.what === 'jar') this.float(SHELF.x + 100, SHELF.y - 40, t('ateJar'), '#ffd0b0', 14, 1600);
         else if (e.what === 'cell' && e.slot !== null) {
-          this.hive = hiveOf(e.slot);
+          this.showHive(hiveOf(e.slot));
           const c = cellCentre(e.slot);
           this.float(c.x, c.y - 10, t('ateCell'), '#ffc890', 14, 1600);
         } else this.float(ENTRANCE.x, ENTRANCE.y - 30, t('starved'), '#ffb0a0', 15, 2400);
@@ -846,7 +846,7 @@ export class GameScene extends Phaser.Scene {
       } else if (e.kind === 'swarm-ready') {
         this.float(HIVE.x + HIVE.w / 2, HIVE.y + 70, t('swarmReady'), '#ffe08a', 15, 2400);
       } else if (e.kind === 'caught') {
-        this.hive = 1;
+        this.showHive(1);
         this.float(HIVE.x + HIVE.w / 2, HIVE.y + 70, t('caught'), '#ffffff', 15, 3000);
       } else if (e.kind === 'swarmed') {
         this.float(ENTRANCE.x, ENTRANCE.y - 30, t('swarmed', { n: e.lost }), '#ffb0a0', 15, 2400);
@@ -876,11 +876,16 @@ export class GameScene extends Phaser.Scene {
         this.showEnd();
       } else if (e.kind === 'breed-ready') {
         // The Baron's end card comes first; the breed card follows when it is closed.
-        if (!this.endCard.root.visible && !events.some((o) => o.kind === 'baron')) this.breedCard.root.setVisible(true);
+        // The estate's and the loop's cards close first, so none of their buttons sits over it.
+        if (!this.endCard.root.visible && !events.some((o) => o.kind === 'baron')) {
+          this.estate.close();
+          this.loop.close();
+          this.breedCard.root.setVisible(true);
+        }
       } else if (e.kind === 'bred') {
         this.float(VIEW.w / 2, 170, t('bred', { name: t(BREEDS[e.trait].name), n: e.rank }), '#ffd25a', 16, 2600);
       } else if (e.kind === 'plot') {
-        this.hive = e.hive;
+        this.showHive(e.hive);
         const plot = plotOf(e.hive);
         if (plot) this.float(HIVE.x + HIVE.w / 2, HIVE.y + 70, t('plotBought', { plot: t(plot.name), quirk: t(plot.quirk) }), '#ffffff', 15, 3000);
       } else if (e.kind === 'cut') {
@@ -1730,6 +1735,14 @@ export class GameScene extends Phaser.Scene {
       return b;
     });
     this.breedCard = { root, sub, buttons };
+  }
+
+  /** Brings hive `h`'s comb to the front; a Brood cell or Cut comb armed for the other comb is put down, as the roof tabs do. */
+  private showHive(h: number) {
+    if (h === this.hive) return;
+    this.hive = h;
+    this.placing = false;
+    this.cutting = false;
   }
 
   /** The chip that buys the estate's next plot: in the swarm chip's place once the fair's first gold is won and two hives are kept. */
