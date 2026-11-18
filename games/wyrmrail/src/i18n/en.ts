@@ -29,6 +29,8 @@ const en = {
   ironLower: 'iron',
   wares: 'Wares',
   waresLower: 'wares',
+  letters: 'Letters',
+  lettersLower: 'letters',
   passengers: 'Passengers',
   passengersLower: 'passengers',
 
@@ -74,6 +76,9 @@ const en = {
   rivalBanner: 'A rival line sets up in the valley and races you for orders',
   lampsBanner: 'Tap track to hang a lamp: night rounds are coming',
   nightBanner: 'Night falls: unlit track slows the wyrm',
+  hitchBanner: 'Hitched: {a} and {b}',
+  contractBanner: '{village} asks for {n} loads this round: +{pay}c at the round\'s end',
+  contractPaid: 'Contract filled: +{n}c',
 
   // Floating texts over the valley
   depotPop: 'Depot -{n}',
@@ -93,6 +98,7 @@ const en = {
   backInStore: 'Back in store',
   beatRival: 'Beat the rival!',
   rivalTook: 'Rival took the {cargo}',
+  contractFilled: 'Contract filled!',
 
   // The kinds of valley in a chain, and what is different about each
   meadowName: 'the green meadow',
@@ -117,14 +123,26 @@ const en = {
   traitCharming: 'Warm breath',
   traitCharmingText: 'Villages wait half as long again before they sulk',
 
+  // Wagon kinds: name and card text
+  pickHitch: 'Round {round}: hitch two wagons.\nTap two cards',
+  wagonCold: 'Cold wagon',
+  wagonColdText: 'Fish keeps its full pay. Elsewhere it spoils, down to half',
+  wagonHopper: 'Big hopper',
+  wagonHopperText: 'Holds two grain orders in one wagon',
+  wagonMail: 'Mail coach',
+  wagonMailText: 'Letters pay up to double, the sooner they arrive',
+
   // The valley and the panel
   roost: 'Roost',
   orders: 'Orders',
-  upgrades: 'Upgrades',
   remove: 'Remove',
   removing: 'Removing',
   plain: 'Plain',
   plainOn: 'Plain on',
+  fastTrack: 'Fast track',
+  fastOn: 'Laying fast track',
+  fastRound: 'Fast track: round {round}',
+  contractTag: 'Contract {done}/{need}: {pay}c',
   playAgain: 'Play again',
   flyOn: 'Fly on',
   keepUpgrade: 'Keep {upgrade}',
@@ -157,6 +175,8 @@ const en = {
   rushOrder: 'rush order',
   morePay: '+{n}% pay',
   rivalRace: 'Rival racing!',
+  spoiling: 'spoiling',
+  mailBonus: 'fast post',
 
   // The HUD: the round and what each wyrm is doing
   festivalProgress: 'Festival: {n}/{goal} delivered',
@@ -188,6 +208,7 @@ const en = {
   hintAvalanche: 'An avalanche is coming: lay a way round it, or rebuild the track after.',
   hintSinkhole: 'A sinkhole is opening: lay a way round it, or rebuild the track after.',
   hintSwitch: 'Tap a junction to set its switch: the wyrm goes the way the switches send it.',
+  hintFast: 'Fast track: double the price, twice the speed. Tap or drag to lay it, or over track to make it fast.',
   hintBuild: 'Tap or drag to lay track: grass 2, forest 4, bridge {bridge}, tunnel 20. Then tap an order.',
 
   // Charter pick, game over and the won festival
