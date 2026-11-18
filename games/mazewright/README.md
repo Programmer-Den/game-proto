@@ -22,6 +22,8 @@ beetle already on the lawn) is refused with an orange no-entry ring.
 | Upgrade button (after the tools), or U | Upgrade mode: every tower you tap or drag over is upgraded at once, and a gold mark shows the ones you can afford; tap Upgrade again to go back to the tool you had |
 | Sell button, or S | Sell mode: every tower you tap or drag over is sold at once (for its whole price if it was planted since the last wave, else 70%), to clear a lot of the maze quickly; tap Sell again to go back |
 | A tower tool on a hedge | Plant the tower in the hedge's place, for its cost less what the hedge sells for (the route doesn't change) |
+| Tap a wicket gate | Swing it open or shut, even in the middle of a wave |
+| Puzzles (garden picker tab) | Six set puzzle lawns, with their own gold, towers and waves |
 | Start wave, or Space | Send the next wave; once the last one is all out, send the next early for 5 gold |
 | Way of play (garden picker, top left) | Classic, Challenge, Swarm, Endless, Night or Sandbox, for every garden |
 | Versus (garden picker) | Two gardeners on one screen, each with a garden of their own |
@@ -58,8 +60,8 @@ come, and upgrade between waves rather than in the thick of one.
 ![The garden picker](docs/screenshots/gardens.webp)
 
 Thirteen gardens: twelve in four seasons, three a season, each with its own rocks, water and
-burrows, so each asks for its own maze, and the greenhouse. The picker has a tab for each season
-and one for the greenhouse: spring is open from the start, and summer, autumn, winter and the
+burrows, so each asks for its own maze, and the greenhouse. The picker has a tab for each season,
+one for the greenhouse and one for the puzzle lawns (below): spring is open from the start, and summer, autumn, winter and the
 greenhouse open once 4, 10, 18 and 24 stars are won across all gardens.
 
 | Season | Gardens |
@@ -90,7 +92,7 @@ Under the cards is your **pouch**: the hedge and the bow always come along, and 
 more of the other thirteen towers and the two garden traps. The pick is kept for the next game.
 
 **Seeds and the potting shed.** Every finished game pays seeds: a win 10 plus 5 a star, a loss 2
-plus one for every 4 waves held (Sandbox pays none). The potting shed (top right of the garden
+plus one for every 4 waves held (Sandbox pays none), and a puzzle 5 for each star more than its best. The potting shed (top right of the garden
 picker) sells them back: every tower but the hedge, bow, frost and cannon costs as many seeds as
 its gold price, each tower's master level twice that, and the pouch's fifth and sixth slots 60 and
 100. Each card tells what the buy brings: a tower's gold price and use, then its master level's trick, and
@@ -206,6 +208,17 @@ first ground foe to step on it for 3 seconds and pricks it. Moths fly over both.
 
 ![A honey pot drawing beetles off their way, and a snare on the route](docs/screenshots/traps.webp)
 
+**Wicket gates.** Every run brings the Wicket (12 gold) on its tool bar, besides the pouch. It is
+planted shut, at once with no growing, and blocks like a hedge. Tap it, with any tool but Upgrade,
+Sell or the gardener, and it swings open: the tile is free again and foes walk through it. Tap it
+again to shut it. Opening always works; shutting is refused, like a planting, while a foe stands on
+the tile or steps onto it, or when it would close the last way through. Foes on their way take the
+new route at their next step, so a gate opened once they have walked the long way past it turns
+them back past your towers a second time. A gate never upgrades and sells like any tower; it can't
+go on a path garden or take a hedge's place.
+
+![A wicket gate swung open in the middle of a wave: the beetles turn back through it](docs/screenshots/wicket.webp)
+
 **Damage kinds and shells.** Every tower's hits are Sharp (bow, crossbow, whirligig), Blast
 (cannon), Heat (bonfire, sunglass, and burning), Spark (storm rod), Cold (frost) or Poison
 (puffball). Some foes wear a shell: the stag beetle's is waxy (half Heat, 1.5 times Blast), the
@@ -246,6 +259,14 @@ tougher and take more cabbages. After the Empress, one king of every kind rushes
 
 ![A mole chewing through the first hedge](docs/screenshots/mole.webp)
 
+**Bounty foes.** From wave 3, every third wave's first plain ground foe (not a king, queen or
+glow-worm) is a bounty foe, with a gold ring and a coin over it. It pays five times its gold if
+beaten before it has walked half its way from the burrow to the cottage: the ring empties step by
+step and is gone at the halfway point. So a maze that hits hard near its start pays. Puzzle lawns
+mark their own bounty foes; Versus has none.
+
+![A bounty beetle, its gold ring still full, walking past the first bows](docs/screenshots/bounty.webp)
+
 There are 20 waves, each tougher than the last. The second burrow opens at wave 6, and from then on
 foes come out of the open burrows in turn, so the maze has to serve every route; all must stay open
 from the start. Beaten foes pay gold, and a held wave pays 6 more plus its number. Hold all 20 to save the
@@ -269,6 +290,24 @@ button shows today's score until the next day. It keeps no garden records, but p
 trophies like any game.
 
 ![Today's daily maze: Brook with more rocks and its own pouch](docs/screenshots/daily.webp)
+
+**Puzzle lawns.** The Puzzles tab on the garden picker holds six small set lawns, the same for
+everyone: each lends its own towers (and the wicket gate), its own gold and 10 cabbages, and plays
+its own four to six waves at its own foe health, whatever the difficulty, started by hand. A win
+earns one to three stars by cabbages kept (three with 9 or 10), and each new star pays 5 seeds.
+The first is open, and each other opens once the one before has a star. Puzzles keep no garden
+records, replays or saved games.
+
+| Puzzle | Gold | Towers | The trick |
+| --- | --- | --- | --- |
+| Hedgerow | 80 | Hedge, Bow | A plain lawn and a short purse |
+| Wicket Walk | 70 | Hedge, Bow, Frost | A long wall with one gap in the middle: a wicket gate there sends foes the long way, or back |
+| Moth Meadow | 90 | Hedge, Bow, Swallow nest | Two burrows and many moths |
+| Lily Pond | 100 | Hedge, Frost, Cannon | Water down the middle, banks beside it, woodlice and snails |
+| Molehill | 90 | Hedge, Bow, Nettle patch, Snare | Moles that chew through hedges |
+| Bounty Hunt | 55 | Hedge, Bow, Crossbow | A bounty foe leads every wave, and the purse is thin without them |
+
+![The Puzzles tab: six lawns, the first three with stars](docs/screenshots/puzzles.webp)
 
 **Ways of play.** The button at the top left of the garden picker picks how every garden is
 played, and is kept for the next game:
@@ -348,6 +387,7 @@ with the maze planted, telling how many of its pieces fit.
 - `src/game/rules.ts`: the grid size, towers, foes, waves and tuning numbers.
 - `src/game/maps.ts`: the thirteen gardens and their seasons (burrows, cottage, rocks, water, banks, paths, glass, sprinklers).
 - `src/game/daily.ts`: the daily maze's garden and pouch, made from the day's seed.
+- `src/game/puzzles.ts`: the six puzzle lawns, with their gold, towers and waves.
 - `src/game/code.ts`: maze codes, to copy a maze and plant it again.
 - `src/game/grid.ts`: the walking field (steps from every tile to the cottage) and routes.
 - `src/game/sim.ts`: a game: building and the never-close rule, foes, shots, waves and events.
@@ -357,6 +397,6 @@ with the maze planted, telling how many of its pieces fit.
 - `src/audio.ts`: music and sound effects.
 - `src/i18n/`: the texts in British English, US English and German; `src/howToPlay.ts`.
 - `e2e/playthrough.spec.ts`: plays the first wave.
-- `e2e/bot.ts`: a greedy bot that plays every garden in Node, to check the balance (not a test).
+- `e2e/bot.ts`: a greedy bot that plays every garden (or, with `PUZZLES=1`, every puzzle lawn) in Node, to check the balance (not a test).
 
 Run it with `npm run dev` from the repo root and open `/games/mazewright/`.

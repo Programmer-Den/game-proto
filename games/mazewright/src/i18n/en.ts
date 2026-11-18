@@ -259,6 +259,22 @@ const en = {
   codePlanted: 'Maze code planted in {garden}: {n} of {total}',
   plantCode: 'Plant code',
   plantSub: 'a shared maze',
+  wicketName: 'Wicket',
+  wicketText: 'A gate in the maze: tap it to swing it open or shut, even mid-wave',
+  bountyPaid: '+{n} ◆ bounty!',
+  bountyComing: 'A bounty {name}! Beat it before it is halfway along for {n} times the gold',
+  puzzles: 'Puzzles',
+  puzzleStart: '{name}: set gold, set towers and {n} set waves. Start each wave when you are ready',
+  puzzleWon: { one: 'Every wave held off, with {n} cabbage left.', other: 'Every wave held off, with {n} cabbages left.' },
+  puzzleInfo: { one: '◆ {gold} · {n} wave · {lives} cabbages', other: '◆ {gold} · {n} waves · {lives} cabbages' },
+  puzzleLocked: 'Win a star on the one before',
+  puzzleNote: 'Each puzzle lawn lends its own towers and gold, the same for everyone. Stars by cabbages kept; a new star pays seeds.',
+  puzzle_hedgerow: 'Hedgerow',
+  puzzle_wicketwalk: 'Wicket Walk',
+  puzzle_mothmeadow: 'Moth Meadow',
+  puzzle_lilypond: 'Lily Pond',
+  puzzle_molehill: 'Molehill',
+  puzzle_bountyhunt: 'Bounty Hunt',
 };
 
 export default en;

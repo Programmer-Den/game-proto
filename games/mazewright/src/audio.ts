@@ -129,4 +129,8 @@ export const SFX = sounds({
   send: { wave: 'sine', freq: 600, to: 1500, length: 0.14, volume: 0.1, gap: 180 },
   /** A mole starts chewing, and a hedge gone. */
   chew: { wave: 'noise', freq: 900, to: 300, length: 0.22, volume: 0.18, gap: 200 },
+  /** A wicket gate swings open or shut: a wooden creak and clack. */
+  gate: { wave: 'square', freq: 260, to: 150, length: 0.12, volume: 0.1, gap: 120 },
+  /** A bounty foe beaten in time: a bright run of coins. */
+  bounty: { wave: 'triangle', freq: 988, arp: [0, 4, 7, 12], arpStep: 0.06, length: 0.3, volume: 0.16, gap: 300 },
 });

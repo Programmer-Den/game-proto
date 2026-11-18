@@ -262,6 +262,22 @@ const de: Translation<typeof en> = {
   codePlanted: 'Labyrinth-Code in {garden} gepflanzt: {n} von {total}',
   plantCode: 'Code pflanzen',
   plantSub: 'ein geteiltes Labyrinth',
+  wicketName: 'Gartentor',
+  wicketText: 'Ein Tor im Labyrinth: Antippen öffnet oder schließt es, auch mitten in der Welle',
+  bountyPaid: '+{n} ◆ Kopfgeld!',
+  bountyComing: 'Kopfgeld auf: {name}! Vor der Hälfte des Wegs besiegt, bringt das {n}-fache Gold',
+  puzzles: 'Rätsel',
+  puzzleStart: '{name}: festes Gold, feste Türme und {n} feste Wellen. Starte jede Welle, wenn du bereit bist',
+  puzzleWon: { one: 'Alle Wellen abgewehrt, mit {n} Kohlkopf übrig.', other: 'Alle Wellen abgewehrt, mit {n} Kohlköpfen übrig.' },
+  puzzleInfo: { one: '◆ {gold} · {n} Welle · {lives} Kohlköpfe', other: '◆ {gold} · {n} Wellen · {lives} Kohlköpfe' },
+  puzzleLocked: 'Erst einen Stern im vorigen gewinnen',
+  puzzleNote: 'Jeder Rätselrasen leiht eigene Türme und eigenes Gold, für alle gleich. Sterne für behaltene Kohlköpfe; ein neuer Stern bringt Samen.',
+  puzzle_hedgerow: 'Heckenreihe',
+  puzzle_wicketwalk: 'Torweg',
+  puzzle_mothmeadow: 'Mottenwiese',
+  puzzle_lilypond: 'Seerosenteich',
+  puzzle_molehill: 'Maulwurfshügel',
+  puzzle_bountyhunt: 'Kopfgeldjagd',
 };
 
 export const keepEnglish: (keyof typeof en)[] = ['title', 'frostName', 'season_winter'];
