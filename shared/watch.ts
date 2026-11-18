@@ -56,7 +56,7 @@ export function mountWatch(opts: { title?: string; sides?: Record<string, WatchS
   // A new match calls this again with its own sides and clock; the panel and its log stay.
   sides.clear();
   for (const [key, side] of Object.entries(opts.sides ?? {})) sides.set(key, side);
-  if (opts.time) clock = opts.time;
+  clock = opts.time ?? (() => performance.now());
   if (log) {
     aiLog('', t('watchNewMatch'));
     return;
