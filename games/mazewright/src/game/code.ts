@@ -10,7 +10,7 @@ import type { Game } from './sim';
 
 const ABC = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
 /** The kinds by their number in a code: a new kind goes at the end, so older codes still read the same (at most 32). */
-const KINDS: TowerKind[] = ['hedge', 'bow', 'frost', 'cannon', 'storm', 'crossbow', 'bonfire', 'puffball', 'sunglass', 'beehive', 'apple', 'whirligig', 'swallow', 'nettle', 'toadstool', 'honey', 'snare', 'lantern'];
+const KINDS: TowerKind[] = ['hedge', 'bow', 'frost', 'cannon', 'storm', 'crossbow', 'bonfire', 'puffball', 'sunglass', 'beehive', 'apple', 'whirligig', 'swallow', 'nettle', 'toadstool', 'honey', 'snare', 'lantern', 'wicket'];
 const CELLS = COLS * ROWS;
 
 /** A tower in a maze code. */

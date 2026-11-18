@@ -8,14 +8,20 @@
 // each garden's result: W and the cabbages kept, or L and the wave lost on.
 // Environment: POUCH (default hedge,bow,frost,cannon), DURING=0 to build only between waves,
 // SEEDS (runs per garden, default 1; only winter frost draws random numbers), ONLY=<garden>.
+// PUZZLES=1 plays the puzzle lawns instead, each with its own towers and waves: the cabbages the
+// default bot keeps, and the most a spread of bots keeps (a puzzle's three stars need 9 of 10).
 
 import { distances, route } from '../src/game/grid';
 import { cellOf, MAPS } from '../src/game/maps';
+import { PUZZLES } from '../src/game/puzzles';
 import { attacks, COLS, ROWS, startLives, TOWER, type TowerKind } from '../src/game/rules';
 import { build, cabbagesLeft, canBuild, goldAt, newGame, nextUpgrade, reachOf, startWave, step, towerAt, upgrade, type Game } from '../src/game/sim';
 
-const POUCH = (process.env.POUCH ?? 'hedge,bow,frost,cannon').split(',') as TowerKind[];
-const DURING = process.env.DURING !== '0';
+let POUCH = (process.env.POUCH ?? 'hedge,bow,frost,cannon').split(',') as TowerKind[];
+let DURING = process.env.DURING !== '0';
+/** The share of the towers' gold the hedges may take, and how much an upgrade must beat a new tower by. */
+let HEDGES = 0.6;
+let UPGRADE = 0.8;
 const SEEDS = Number(process.env.SEEDS ?? 1);
 
 /** The steps from every burrow to the cottage with `blocked`, or -1 when one is walled in. */
@@ -69,7 +75,7 @@ interface Spend {
 function act(g: Game, spend: Spend) {
   for (let guard = 0; guard < 40; guard++) {
     // A hedge where it lengthens the routes, while hedges have had less than 60% of the towers' gold.
-    if (!g.map.path && POUCH.includes('hedge') && spend.hedges < (spend.towers + 30) * 0.6 && g.gold >= TOWER.hedge.cost) {
+    if (!g.map.path && POUCH.includes('hedge') && spend.hedges < (spend.towers + 30) * HEDGES && g.gold >= TOWER.hedge.cost) {
       const base = routeSum(g, g.blocked);
       let best = -1;
       let gain = 1;
@@ -110,7 +116,7 @@ function act(g: Game, spend: Spend) {
       const value = (coverage(g, t.cell, t.kind, cells) * 0.6 * TOWER[t.kind].cost) / cost;
       if (value > upValue) (upValue = value), (up = t.cell);
     }
-    if (up >= 0 && upValue > spotValue * 0.8) {
+    if (up >= 0 && upValue > spotValue * UPGRADE) {
       if (upgrade(g, up)) {
         spend.towers += 1;
         continue;
@@ -127,9 +133,9 @@ function act(g: Game, spend: Spend) {
   }
 }
 
-function play(mapId: string, seed: number) {
+function play(mapId: string, seed: number, made?: Game) {
   const map = MAPS.find((m) => m.id === mapId)!;
-  const g = newGame(mapId, true, 'classic', [], { seed, toughness: 1, lives: map.lives ?? startLives() });
+  const g = made ?? newGame(mapId, true, 'classic', [], { seed, toughness: 1, lives: map.lives ?? startLives() });
   const spend: Spend = { hedges: 0, towers: 0, built: 0 };
   while (g.phase !== 'won' && g.phase !== 'lost' && g.clock < 3000) {
     if (g.phase === 'build') {
@@ -144,6 +150,28 @@ function play(mapId: string, seed: number) {
 
 let wins = 0;
 let games = 0;
+if (process.env.PUZZLES) {
+  // Each puzzle with the default bot, then the best of a spread of bots (hedge share, upgrade bar, building in waves or not).
+  const puzzle = (p: (typeof PUZZLES)[number]) => {
+    const g = newGame(p.id, true, 'classic', [], { seed: 1, toughness: Number(process.env.TOUGH ?? p.tough), lives: p.map.lives }, false, { map: p.map, puzzle: { id: p.id, waves: p.waves } });
+    play(p.id, 1, g);
+    return g.phase === 'won' ? cabbagesLeft(g) : -g.wave;
+  };
+  for (const p of PUZZLES.filter((p) => !process.env.ONLY || p.id === process.env.ONLY)) {
+    POUCH = p.kit;
+    [DURING, HEDGES, UPGRADE] = [true, 0.6, 0.8];
+    const first = puzzle(p);
+    let best = first;
+    let how = '';
+    for (const during of [true, false]) for (const hedges of [0.2, 0.4, 0.8, 1.4]) for (const up of [0.4, 0.8, 1.6]) {
+      [DURING, HEDGES, UPGRADE] = [during, hedges, up];
+      const kept = puzzle(p);
+      if (kept > best) (best = kept), (how = `during=${during} hedges=${hedges} upgrade=${up}`);
+    }
+    console.log(p.id.padEnd(12), 'default', first, 'best', best, '/', p.map.lives, how);
+  }
+  process.exit(0);
+}
 for (const m of MAPS.filter((m) => !process.env.ONLY || m.id === process.env.ONLY)) {
   const results: string[] = [];
   for (let s = 1; s <= SEEDS; s++) {

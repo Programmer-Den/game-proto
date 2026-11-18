@@ -20,6 +20,8 @@ const en: HowToPlay = {
     { input: 'Versus (garden picker)', action: 'Two gardeners on one screen, each with a garden of their own: every foe you beat is sent on to the other\'s burrow, and the first to lose every cabbage loses' },
     { input: 'Maze code (top bar)', action: 'Copy the maze in play as a short code to share; in Sandbox, Plant code on the garden picker plants a code again' },
     { input: 'Gardener button, G', action: 'Once hired in the potting shed: tap the lawn to walk him there, or a foe beside him to lift it back to its burrow' },
+    { input: 'Wicket tool, then tap the gate', action: 'Every run brings wicket gates: plant one shut like a hedge, then tap it to swing it open or shut, even mid-wave' },
+    { input: 'Puzzles tab (garden picker)', action: 'Six set lawns with their own gold, towers and few waves: three stars each by cabbages kept, and each opens with a star on the one before' },
   ],
   loop: [
     'Under the garden cards, pick up to four towers or traps to take along with the hedge and the bow.',
@@ -52,6 +54,8 @@ const en: HowToPlay = {
     'The daily maze scores 100 a cabbage kept plus the gold left, so a win that spent little scores most.',
     'At night towers only see foes in a lantern\'s light, so hang lanterns where your towers cover the route; glow-worms glow, so every tower sees them.',
     'In Versus a foe you beat comes back out of the other burrow: a strong maze sends your rival more to beat.',
+    'Open a wicket gate once the foes have walked past it the long way, and they turn back past your towers again. It won\'t shut on a foe or on the last way through.',
+    'From wave 3, every third wave sends a bounty foe with a gold ring: beat it before the ring runs out, halfway along its route, for five times its gold.',
   ],
 };
 
@@ -74,6 +78,8 @@ const de: HowToPlay = {
     { input: 'Gegeneinander (Gartenauswahl)', action: 'Zwei Gärtner an einem Bildschirm, jeder mit eigenem Garten: Jeder besiegte Gegner zieht in den Bau des anderen weiter, und wer zuerst alle Kohlköpfe verliert, verliert' },
     { input: 'Labyrinth-Code (obere Leiste)', action: 'Das Labyrinth im Spiel als kurzen Code zum Teilen kopieren; im Sandkasten pflanzt Code pflanzen in der Gartenauswahl einen Code wieder' },
     { input: 'Knopf Gärtner, G', action: 'Sobald im Gartenschuppen angestellt: Tippe auf den Rasen, damit er dorthin geht, oder auf einen Gegner neben ihm, um ihn in seinen Bau zurückzuheben' },
+    { input: 'Werkzeug Gartentor, dann das Tor antippen', action: 'Jede Runde bringt Gartentore: Pflanze eines geschlossen wie eine Hecke und tippe es dann an, um es zu öffnen oder zu schließen, auch mitten in der Welle' },
+    { input: 'Reiter Rätsel (Gartenauswahl)', action: 'Sechs feste Rasen mit eigenem Gold, eigenen Türmen und wenigen Wellen: je drei Sterne für behaltene Kohlköpfe, und jeder öffnet sich mit einem Stern im vorigen' },
   ],
   loop: [
     'Wähle unter den Gartenkarten bis zu vier Türme oder Fallen, die du neben Hecke und Bogen mitnimmst.',
@@ -106,6 +112,8 @@ const de: HowToPlay = {
     'Das Tageslabyrinth zählt 100 je behaltenem Kohlkopf plus das übrige Gold, also bringt ein sparsamer Sieg am meisten.',
     'Nachts sehen Türme nur Gegner im Licht einer Laterne, also häng Laternen dorthin, wo deine Türme den Weg abdecken; Glühwürmchen leuchten, also sieht jeder Turm sie.',
     'Beim Gegeneinander kommt ein besiegter Gegner aus dem anderen Bau wieder: Ein starkes Labyrinth schickt deinem Gegenüber mehr zu besiegen.',
+    'Öffne ein Gartentor, wenn die Gegner auf dem langen Weg daran vorbei sind, dann kehren sie um und laufen noch einmal an deinen Türmen vorbei. Es schließt sich nicht auf einem Gegner oder vor dem letzten Weg.',
+    'Ab Welle 3 schickt jede dritte Welle einen Kopfgeld-Gegner mit goldenem Ring: Besiege ihn, bevor der Ring zur Hälfte seines Wegs abläuft, für das Fünffache seines Golds.',
   ],
 };
 

@@ -127,7 +127,7 @@ Implemented today:
   often as one gardener does.
 - Replays: a game draws its random numbers from its own seed (`rand`, mulberry32 on `g.rng`; frost
   and nothing else uses chance today) and fixes `toughness` and `lives` at the start, and
-  `note` logs every player action (`Action`: build, upgrade, sell, turn, aim, wave, walk, lift) at the step it
+  `note` logs every player action (`Action`: build, upgrade, sell, turn, aim, wave, walk, lift, swing) at the step it
   came (`g.steps`). The wave timer starts waves through `beginWave`, which isn't logged. A Classic
   or Swarm win is kept with `replayOf` as the garden's `Replay` (`saveReplay`); the card's
   `watch-<garden>` button starts `replayGame(r)`, and `GameScene.update` calls `replayStep` before
@@ -263,8 +263,46 @@ Implemented today:
 - Hover preview: the routes as they would be with the hovered tile planted, or the no-entry ring;
   made again when the board changes or a ground foe or loose cabbage moves on, and not shown while
   watching a replay.
-- Drag to plant a line; keys 1 to 8 (the pouch, in order), U and S (upgrade and sell mode), Space and X (F is the shared full-screen key); a 2x speed button. The
+- Drag to plant a line; keys 1 to 9 (the kit, in order), U and S (upgrade and sell mode), Space and X (F is the shared full-screen key); a 2x speed button. The
   picked tool's use is told in the top bar.
+- Wicket gates (`wicket`, MW7): in `ALL_TOWERS` after the lantern but not in `TOWERS`, so never a
+  pouch chip or a shed card; `kitFor` adds it to every run's kit (after the pouch, before the night's
+  lantern; the daily, versus and planted-code kits too). `TOWER.wicket` costs 12, has range 0 (no
+  `attacks`), is built shut with no growing (`build` skips `growFor`), blocks like a hedge, never
+  upgrades (`nextUpgrade`), can't take a hedge's place (`hedgeUnder`) and is refused on a path garden
+  (`reserved`). `Tower.open` is its state: `swing(g, cell)` (a logged action, `swing`) opens it
+  (`blocked` back to `ground`) or shuts it (`blocked` 2), `refield`s and pushes `swung`; `canSwing`
+  always lets it open, and refuses a shut with `foe` (a ground foe's `from` or `to`, or a rolling
+  cabbage, on the tile) or `blocks` (`wouldBlock`), shown like a refused planting. `canBuild` now
+  refuses any tile with a tower on it (an open gate's tile is free in `blocked`) unless the tower
+  takes a hedge's place. In the scene a tap on a gate swings it with any tool but the modes and the
+  gardener (`onDown`, before the panel), so a gate never opens a panel; there is no hover preview on
+  it, `art.wicket` draws it open or shut, and `gate` plays on `swung`. Codes carry it (`KINDS`, at
+  the end) but not whether it stood open.
+- Bounty foes (MW9): `BOUNTY` (`pay` 5, `from` 3, `every` 3). In `beginWave`, from wave 3 every
+  third wave's first spawn that is a plain ground foe (no flier, king, queen or glow-worm) gets
+  `Spawn.bounty` (not in Versus or a puzzle); a puzzle marks its own with a `Group`'s
+  `{ bounty: true }` (the group's first foe). `spawn` sets `Foe.bounty` and `bountyFull` to half the
+  burrow's `routeLength` (rounded up) and pushes `bounty`; `moveFoe` takes one off on every new
+  tile, pushing `bountyGone` at 0. `hurt` pays `BOUNTY.pay` times the gold while `bounty` is above 0
+  (the `kill` event carries `bounty`). The scene draws `art.bounty` (a gold ring that empties, and a
+  coin), says `bountyComing` once a game (`bountied`, noted again when a save is played back), shows
+  `bountyPaid` and plays `bounty` on such a kill.
+- Puzzle lawns (`game/puzzles.ts`, MW8): `PUZZLES`, six `Puzzle`s, each a `MapDef` of its own (with
+  `gold` and `lives` 10; not in `MAPS`), a `kit`, its `waves` (`Group[][]`) and `tough` (the foes'
+  health scale, whatever the difficulty). The picker's `season-puzzles` tab (after the seasons,
+  `this.season` `'puzzles'`) runs `drawPuzzles`: three cards a row (`puzzle-<id>`), each with its
+  plan (`drawPlan`, shared with the garden cards), `puzzleInfo`, the kit and its stars; one opens
+  once the one before has a star (`puzzleOpen`). `startPuzzle` makes the game with `Fixed` (seed 1,
+  `tough`, its lives), calm, masters `[]`, no duo or gardener and `Extra.puzzle` (`g.puzzle`, the id,
+  and `g.waves`): `groupsOf` plays `g.waves` instead of `waveGroups`, `totalWaves` is their count,
+  `openGates` opens every burrow at once, and there is no rush or Empress. A puzzle game is never
+  kept, notes no records or replay, has no maze code button, and `seedsFor` pays nothing: `endPuzzle`
+  keeps the stars under `mazewright-puzzles` (`notePuzzle`) and pays `SEEDS.star` for each star more
+  than the best. Its end panel says `puzzleWon`, and Play again starts the same puzzle. Each puzzle's
+  `tough` was tuned with `e2e/bot.ts` `PUZZLES=1`: the plain greedy bot keeps 7 to 9 cabbages, and
+  the best of its spread of bots (hedge share, upgrade bar, building in waves or not) keeps 9 or 10,
+  so every puzzle has a three-star answer. The bot doesn't swing gates.
 - Banners name each new foe kind the first time it comes, the second burrow (and each later one,
   `burrowOpens`), the first stolen
   cabbage (`grabbed`), a chewing mole, a king
@@ -293,7 +331,8 @@ Missing or rough:
   a lantern by the bows), `maze-code.webp` (the picker in Sandbox with Versus and Plant code) and
   `planted.webp` (a maze planted from a code) were taken by a Playwright script that plants with
   real taps, copies the code and plants it with the prompt answered.
-- `docs/screenshots/gardens.webp` (the picker on its greenhouse tab, with the pouch and the daily button), `greenhouse.webp` (the greenhouse in wave 1, towers on both sides of the glass), `gardener.webp` (the Meadow with the gardener's tool picked) and `daily.webp` (a daily maze's first moment, its banner and lent pouch) were taken by a Playwright script with stored records and shed, `path.webp` (Gravel Walk), `ponds.webp` (Ice Pond, towers on its banks), `wilt.webp` (Brook, a wilted cannon), `frost.webp` (Ice Pond, a frozen frost tower), `towers.webp`, `aim.webp`, `kings.webp`, `cabbages.webp`, `grow.webp`, `master.webp`, `traps.webp`, `shed.webp` (the shed's cards with their info lines, and the gardener's row), `modes.webp` (upgrade mode and its gold marks), `hedge-swap.webp` (a bow hovered over a hedge), `no-tool.webp` (the tool put away), `gold-notes.webp` (the notes over a planting, an upgrade and a sale), `refund.webp` (a growing bow's panel, selling for all it cost), `maze.webp`,
+- `docs/screenshots/wicket.webp` (Wicket Walk in wave 1, the gate in the wall swung open), `bounty.webp` (Bounty Hunt's first bounty beetle and its banner) and `puzzles.webp` (the Puzzles tab, three won) were taken by a Playwright script with stored puzzle stars.
+- `docs/screenshots/gardens.webp` (the picker on its greenhouse tab, with the puzzles tab, the pouch and the daily button), `greenhouse.webp` (the greenhouse in wave 1, towers on both sides of the glass), `gardener.webp` (the Meadow with the gardener's tool picked) and `daily.webp` (a daily maze's first moment, its banner and lent pouch) were taken by a Playwright script with stored records and shed, `path.webp` (Gravel Walk), `ponds.webp` (Ice Pond, towers on its banks), `wilt.webp` (Brook, a wilted cannon), `frost.webp` (Ice Pond, a frozen frost tower), `towers.webp`, `aim.webp`, `kings.webp`, `cabbages.webp`, `grow.webp`, `master.webp`, `traps.webp`, `shed.webp` (the shed's cards with their info lines, and the gardener's row), `modes.webp` (upgrade mode and its gold marks), `hedge-swap.webp` (a bow hovered over a hedge), `no-tool.webp` (the tool put away), `gold-notes.webp` (the notes over a planting, an upgrade and a sale), `refund.webp` (a growing bow's panel, selling for all it cost), `maze.webp`,
   `mole.webp` and `cover.png` were taken by hand (a
   Playwright script that plants a maze and sends waves 8 and 9); `duo-replay.webp` (a
   two-gardener replay of the Meadow, both purses in the top bar) was made from a replay put in
@@ -328,13 +367,14 @@ File map (`src/`):
   `banks`, `path`, `glass`, `sprinklers`, `lives`; `line` and `block` spell paths and ponds), `SEASONS`, `SEASON_STARS`,
   `cellIndex`, `cellOf`, `inGrid`. A cell index is `row * COLS + col`.
 - `game/daily.ts`: `dailyPlan`, the daily maze's garden, pouch and seed from a random source.
+- `game/puzzles.ts`: `PUZZLES` and `Puzzle`, the puzzle lawns (see above).
 - `game/code.ts`: `mazeCode` and `readCode`, maze codes (see above).
 - `game/grid.ts`: `distances` (breadth-first search out from the cottage over free cells, 4
   neighbours), `nextStep` (a neighbour one step closer, keeping the heading on ties, then right,
   down, up, left), `route`, `UNREACHABLE`, `DIRS`.
 - `game/sim.ts`: `Game`, `Tower`, `Foe`, `Shot`, `GameEvent`, `Refusal` and the actions:
   `newGame`, `replayGame`, `replayStep`, `replayOf`, `resumeGame` (with `Action`, `Fixed` and `Replay`), `sideOf`, `goldAt`, `canBuild`, `hedgeUnder`, `costOn`, `wouldBlock`, `build`, `nextUpgrade`, `upgrade`, `sellValue`, `sell`, `turn`, `setAim`,
-  `canStartWave`, `startWave`, `step`, `remaining`, `routeLength`, `towerAt`, `totalWaves`, `dailyScore`, `sees`, the gardener's `walk`, `lift`, `liftable`, `liftReady` and `heroBoost`, and `beamCells`,
+  `canStartWave`, `startWave`, `groupsOf`, `canSwing`, `swing`, `step`, `remaining`, `routeLength`, `towerAt`, `totalWaves`, `dailyScore`, `sees`, the gardener's `walk`, `lift`, `liftable`, `liftReady` and `heroBoost`, and `beamCells`,
   `inCone` and `bestFace` for the towers that point one way, `reachOf`, `openGates`, versus's `gateSide`, `fieldOf`, `goalOf` and
   `routesWith` (each burrow's route now, or with one more cell planted), and the night's `lightOf` and `isLit`. Only this file
   changes a `Game`. `g.blocked` is 0 free (a path garden's path), 1 rock, 2 tower, 3 water, 4
@@ -376,6 +416,7 @@ stars, fastest win in seconds, the Endless best and whether its Challenge and it
 `mazewright-shed` (seeds, `owned` towers, `masters` bought and extra `slots`) and
 `mazewright-replays` (per garden, the latest Classic or Swarm win as a `Replay`) and
 `mazewright-game-replays` (the game in play at its last break, a `SavedGame`) and
+`mazewright-puzzles` (each puzzle lawn's most stars, `loadPuzzleStars`/`notePuzzle`) and
 `mazewright-trophies` (the trophies earned, kept by `shared/trophies.ts`) and `mazewright-daily`
 (the daily maze's day, try, score, best and streak, kept by `shared/daily.ts`); progress files carry
 both `-replays` keys, and progress codes leave them out as too big for a QR code (`shared/saveFile.ts` `fileOnly`
@@ -383,7 +424,7 @@ skips keys ending in `-replays`).
 
 Test hooks (read by `e2e/playthrough.spec.ts` through `window.game.scene.getScene('Game')`):
 `screen`, `state` (the `Game`), `replay` (the `Replay` watched, or null), `pouch`, `buttons` (every button by id, centred, in view pixels:
-`map-<garden>` (the cards of the season shown, `season-<season>`), `daily`, `versus`, `plant` (Sandbox only), `code`, `watch-<garden>`, `resume-<garden>`, `duo`, `pouch-<tower>`, `tool-<tower>`, `tool2-<tower>` (two gardeners), `tool-upgrade`, `tool-sell`, `tool2-upgrade`, `tool2-sell`, `tool-hero`, `wave`, `speed`, `gardens`, `upgrade`, `sell`,
+`map-<garden>` (the cards of the season shown, `season-<season>`), `season-puzzles`, `puzzle-<id>` (on the puzzles tab), `daily`, `versus`, `plant` (Sandbox only), `code`, `watch-<garden>`, `resume-<garden>`, `duo`, `pouch-<tower>`, `tool-<tower>`, `tool2-<tower>` (two gardeners), `tool-upgrade`, `tool-sell`, `tool2-upgrade`, `tool2-sell`, `tool-hero`, `wave`, `speed`, `gardens`, `upgrade`, `sell`,
 `turn`, `aim`, `again`) and `grid` (the grid's corner and cell size in view pixels).
 
 Difficulty: `startLives` (25, 15, 10) and `hpScale` (0.8, 1, 1.25) use `byDifficulty`. Reduced
@@ -411,6 +452,8 @@ motion holds the frost pulse and cannon boom rings at full size and the gold num
 | `wilt`, `freeze` | summer wilts a tower, winter frost freezes one (`wilt`, `frozen`) |
 | `step`, `lift` | the gardener sets off walking, and lifts a foe back to its burrow (`lifted`) |
 | `send` | versus: a beaten foe is sent on to the other burrow (`sent`) |
+| `gate` | a wicket gate swings open or shut (`swung`) |
+| `bounty` | a bounty foe beaten in time (a `kill` with `bounty`), instead of `pop` |
 | shared `refuse` | a refused placement, a disabled button, Start wave while a wave is still coming out |
 | shared `click` | every button |
 

@@ -2,8 +2,8 @@ import { DIRS, distances, nextStep, route, UNREACHABLE } from './grid';
 import { cellIndex, cellOf, inGrid, MAPS, type MapDef } from './maps';
 import {
   AIMS, attacks, BIG, CABBAGE, RUSH, CHEW_GAIN, EMPRESS, HEAT, KING, KING_TRICKS, RUSH_KINDS, shellFactor, CHEW_TIME, COLS, EARLY_BONUS, FINAL_QUEEN, FOE, GROUP_GAP, HP_PER_WAVE, hpScale, MAX_LEVEL, ROWS,
-  DAILY, HERO, NIGHT, SKILL, SPRINKLER, VERSUS, type Skill, GROW_RATE, SEEDS, SANDBOX_GOLD, STARS, SWARM_GOLD, waveGroups, type Mode, TRAP, type TrapKind, MASTER, MASTER_TRICKS, tier, GATE_WAVES, BANK_REACH, WEATHER, DUO_TOUGHNESS, SELL_BACK, WAVE_TIMER, SHOT_SPEED, SPREAD, START_GOLD, startLives, TOWER, upgradeCost, WAVES, waveReward,
-  type Aim, type DamageKind, type FoeKind, type ShellKind, type ShotKind, type TowerKind,
+  BOUNTY, DAILY, HERO, NIGHT, SKILL, SPRINKLER, VERSUS, type Skill, GROW_RATE, SEEDS, SANDBOX_GOLD, STARS, SWARM_GOLD, waveGroups, type Mode, TRAP, type TrapKind, MASTER, MASTER_TRICKS, tier, GATE_WAVES, BANK_REACH, WEATHER, DUO_TOUGHNESS, SELL_BACK, WAVE_TIMER, SHOT_SPEED, SPREAD, START_GOLD, startLives, TOWER, upgradeCost, WAVES, waveReward,
+  type Aim, type DamageKind, type FoeKind, type Group, type ShellKind, type ShotKind, type TowerKind,
 } from './rules';
 
 // A game of Mazewright, with no Phaser: the grid, the towers, the foes, the shots and the waves.
@@ -39,6 +39,8 @@ export interface Tower {
   busy: number;
   wiltUntil: number;
   frozenUntil: number;
+  /** A wicket gate standing open: foes walk through it, as if the tile were free. Shut, it is a wall like a hedge. */
+  open: boolean;
 }
 
 export interface Foe {
@@ -102,6 +104,9 @@ export interface Foe {
   home: boolean;
   /** The Empress: when she next lays a beetle and turns her shell, and the damage she took since. */
   empress: { eggAt: number; turnAt: number; taken: Partial<Record<DamageKind, number>> } | null;
+  /** A bounty foe: the steps it may still walk with its bounty on (0 for none or gone), out of `bountyFull`, half its route. */
+  bounty: number;
+  bountyFull: number;
   dead: boolean;
 }
 
@@ -166,7 +171,10 @@ export type GameEvent =
   | { type: 'snared'; x: number; y: number }
   | { type: 'boom'; x: number; y: number; r: number }
   | { type: 'hit'; x: number; y: number }
-  | { type: 'kill'; kind: FoeKind; x: number; y: number; gold: number }
+  | { type: 'kill'; kind: FoeKind; x: number; y: number; gold: number; bounty?: boolean }
+  | { type: 'swung'; cell: number; open: boolean }
+  | { type: 'bounty'; kind: FoeKind }
+  | { type: 'bountyGone'; x: number; y: number }
   | { type: 'grab'; kind: FoeKind; n: number }
   | { type: 'leak'; kind: FoeKind; lives: number }
   | { type: 'drop'; x: number; y: number; n: number }
@@ -205,6 +213,8 @@ export interface Spawn {
   rush?: boolean;
   /** Versus: sent over by the other gardener, so not sent back when beaten. */
   sent?: boolean;
+  /** A bounty foe, worth `BOUNTY.pay` times its gold when beaten before it is halfway along. */
+  bounty?: boolean;
 }
 
 /** The hero gardener, walking the lawn: where he is, where he walks to, his skills and when he can next lift a foe. */
@@ -221,6 +231,9 @@ export interface Game {
   map: MapDef;
   /** The daily maze: a seeded garden of its own, `DAILY.waves` waves, scored by `dailyScore`. */
   daily: boolean;
+  /** A puzzle lawn: its id, and its own set waves (null in every other game, which plays `waveGroups`). */
+  puzzle: string | null;
+  waves: Group[][] | null;
   /** The hero gardener, when one was hired in the potting shed (one gardener only). */
   hero: Hero | null;
   phase: Phase;
@@ -311,8 +324,8 @@ const SPRAY = 6;
 export interface Action {
   /** Steps of play before it (`Game.steps`). */
   s: number;
-  /** `walk` sends the gardener to cell `c`; `lift` has him lift the foe whose id is `c`. */
-  a: 'build' | 'upgrade' | 'sell' | 'turn' | 'aim' | 'wave' | 'walk' | 'lift';
+  /** `walk` sends the gardener to cell `c`; `lift` has him lift the foe whose id is `c`; `swing` opens or shuts the wicket gate on `c`. */
+  a: 'build' | 'upgrade' | 'sell' | 'turn' | 'aim' | 'wave' | 'walk' | 'lift' | 'swing';
   c?: number;
   k?: TowerKind;
 }
@@ -331,7 +344,7 @@ export interface Fixed {
  * actions play out differently (a tower's, foe's or wave's numbers, a new rule): replays of another
  * version are dropped when they load, since they would no longer play out as they did.
  */
-export const REPLAY_VERSION = 5;
+export const REPLAY_VERSION = 6;
 
 /** A game kept to watch again: how it began, and every action taken in it. */
 export interface Replay extends Fixed {
@@ -367,6 +380,8 @@ export interface Extra {
   hero?: Skill[] | null;
   /** Versus: two gardeners on gardens of their own (the map must have `goal2`). */
   versus?: boolean;
+  /** A puzzle lawn (with its garden in `map`): its id and its set waves. */
+  puzzle?: { id: string; waves: Group[][] };
 }
 
 export function newGame(mapId: string, calm = false, mode: Mode = 'classic', masters: readonly TowerKind[] | null = null, fixed?: Fixed, duo = false, extra: Extra = {}): Game {
@@ -398,6 +413,8 @@ export function newGame(mapId: string, calm = false, mode: Mode = 'classic', mas
   const g: Game = {
     map,
     daily: !!extra.daily,
+    puzzle: extra.puzzle?.id ?? null,
+    waves: extra.puzzle?.waves ?? null,
     hero,
     phase: 'build',
     wave: 0,
@@ -526,6 +543,10 @@ function open(g: Game, fs: Int16Array[]) {
 export function canBuild(g: Game, cell: number, kind: TowerKind): Refusal | null {
   if (cell === g.goal || cell === g.goal2 || g.gates.includes(cell)) return 'reserved';
   if (g.traps.some((t) => t.cell === cell)) return 'taken';
+  // A tower's tile is taken, an open wicket gate's too, unless the tower takes a hedge's place.
+  if (towerAt(g, cell) && !hedgeUnder(g, cell, kind)) return 'taken';
+  // A path garden's path is the foes' already: a gate on its lawn would shut nothing.
+  if (kind === 'wicket' && g.map.path) return 'reserved';
   // A trap never blocks, so it may go under foes and needs no way kept open, but only where foes walk.
   if (TOWER[kind].trap) return g.blocked[cell] ? 'taken' : goldAt(g, cell) < TOWER[kind].cost ? 'gold' : null;
   // A tower may take a hedge's place, for its cost less what the hedge sells for; the cell stays a wall.
@@ -544,7 +565,7 @@ export function canBuild(g: Game, cell: number, kind: TowerKind): Refusal | null
 
 /** The hedge a `kind` tower would take the place of on `cell`, if any. */
 export function hedgeUnder(g: Game, cell: number, kind: TowerKind) {
-  if (kind === 'hedge' || TOWER[kind].trap) return undefined;
+  if (kind === 'hedge' || kind === 'wicket' || TOWER[kind].trap) return undefined;
   const tower = towerAt(g, cell);
   return tower?.kind === 'hedge' ? tower : undefined;
 }
@@ -598,8 +619,9 @@ export function build(g: Game, cell: number, kind: TowerKind): Refusal | null {
     return null;
   }
   const face = TOWER[kind].faces ? bestFace(g, cell, kind) : 0;
-  g.towers.push({ id: g.nextId++, kind, cell, level: 1, spent: TOWER[kind].cost, fresh: g.phase === 'build' ? TOWER[kind].cost : 0, cooldown: 0, aim: Math.atan2(DIRS[face][1], DIRS[face][0]), face, spin: 0, idle: 0, target: TOWER[kind].aim ?? 'first', grow: 0, growFull: 0, lastShot: -Infinity, busy: 0, wiltUntil: 0, frozenUntil: 0 });
-  growFor(g.towers[g.towers.length - 1], TOWER[kind].cost, g);
+  g.towers.push({ id: g.nextId++, kind, cell, level: 1, spent: TOWER[kind].cost, fresh: g.phase === 'build' ? TOWER[kind].cost : 0, cooldown: 0, aim: Math.atan2(DIRS[face][1], DIRS[face][0]), face, spin: 0, idle: 0, target: TOWER[kind].aim ?? 'first', grow: 0, growFull: 0, lastShot: -Infinity, busy: 0, wiltUntil: 0, frozenUntil: 0, open: false });
+  // A wicket gate is hung at once, shut, ready to swing.
+  if (kind !== 'wicket') growFor(g.towers[g.towers.length - 1], TOWER[kind].cost, g);
   g.blocked[cell] = 2;
   refield(g);
   g.events.push({ type: 'built', kind, cell, gold: cost });
@@ -677,7 +699,7 @@ export function turn(g: Game, cell: number) {
 
 /** The gold an upgrade of `tower` costs, or null when it can't go higher (the master level waits for the potting shed). */
 export function nextUpgrade(tower: Tower, g?: Game) {
-  if (tower.kind === 'hedge' || tower.level >= MAX_LEVEL || TOWER[tower.kind].trap) return null;
+  if (tower.kind === 'hedge' || tower.kind === 'wicket' || tower.level >= MAX_LEVEL || TOWER[tower.kind].trap) return null;
   // A lantern goes up to level 3: it has no master level.
   if (tower.kind === 'lantern' && tower.level >= 3) return null;
   if (tower.level === MASTER - 1 && !masterOpen(g, tower.kind)) return null;
@@ -689,7 +711,8 @@ export const masterOpen = (g: Game | undefined, kind: TowerKind) => !g?.masters 
 
 /** Seeds a finished game pays, by its result; none in Sandbox. */
 export function seedsFor(g: Game) {
-  if (g.mode === 'sandbox' || g.versus) return 0;
+  // A puzzle pays for its new stars only, which the scene counts against its record.
+  if (g.mode === 'sandbox' || g.versus || g.puzzle) return 0;
   if (g.phase === 'won') return SEEDS.win + SEEDS.star * stars(g) + (g.mode === 'challenge' ? SEEDS.challenge : 0) + (g.mode === 'night' ? NIGHT.seeds : 0);
   return SEEDS.loss + Math.floor(Math.max(0, g.wave - 1) / SEEDS.waves);
 }
@@ -737,11 +760,42 @@ function removeTower(g: Game, tower: Tower) {
   refield(g);
 }
 
+/**
+ * Whether the wicket gate on `cell` can swing now, and if not why: opening always can, but shutting
+ * is refused while a foe or a rolling cabbage is on the tile or stepping onto it, or when it would
+ * close every way (the never-close rule, as for planting).
+ */
+export function canSwing(g: Game, cell: number): Refusal | null {
+  const gate = towerAt(g, cell);
+  if (!gate || gate.kind !== 'wicket' || over(g)) return 'taken';
+  if (!gate.open) return null;
+  if (g.foes.some((f) => !f.dead && !FOE[f.kind].flies && (f.from === cell || f.to === cell))) return 'foe';
+  if (g.loose.some((c) => c.from === cell || c.to === cell)) return 'foe';
+  if (wouldBlock(g, cell)) return 'blocks';
+  return null;
+}
+
+/** Opens a shut wicket gate, or shuts an open one: foes on their way take the new route at their next step. */
+export function swing(g: Game, cell: number): Refusal | null {
+  const refusal = canSwing(g, cell);
+  if (refusal) {
+    if (refusal !== 'taken') g.events.push({ type: 'refused', cell, reason: refusal });
+    return refusal;
+  }
+  const gate = towerAt(g, cell)!;
+  gate.open = !gate.open;
+  g.blocked[cell] = gate.open ? g.ground[cell] : 2;
+  refield(g);
+  g.events.push({ type: 'swung', cell, open: gate.open });
+  note(g, 'swing', cell);
+  return null;
+}
+
 /** Whether the next wave can be started: between waves, or once the wave in play is all out. */
 export const canStartWave = (g: Game) => !over(g) && g.wave < totalWaves(g) && g.spawns.length === 0;
 
 /** How many waves the game has: 20, fewer in the daily maze, or no end in Endless and Sandbox. */
-export const totalWaves = (g: Game) => (g.daily ? DAILY.waves : g.versus || g.mode === 'endless' || g.mode === 'sandbox' ? Infinity : WAVES.length);
+export const totalWaves = (g: Game) => (g.waves ? g.waves.length : g.daily ? DAILY.waves : g.versus || g.mode === 'endless' || g.mode === 'sandbox' ? Infinity : WAVES.length);
 
 /** The daily maze's score: a cabbage kept is worth `DAILY.perCabbage` and every gold left counts, or a loss scores the waves held. */
 export const dailyScore = (g: Game) => (g.phase === 'won' ? cabbagesLeft(g) * DAILY.perCabbage + g.gold : Math.max(0, g.wave - 1) * DAILY.perWave);
@@ -783,14 +837,21 @@ function beginWave(g: Game, byHand = false) {
     if (g.versus) g.spawns.push({ ...sp, gate: 0 }, { ...sp, gate: 1 });
     else g.spawns.push({ ...sp, gate: gateFor() });
   };
-  for (const [kind, count, opts] of waveGroups(g.wave, g.mode === 'night')) {
+  const first = g.spawns.length;
+  for (const [kind, count, opts] of groupsOf(g, g.wave)) {
     for (let i = 0; i < count; i++) {
-      add({ kind, at, wave: g.wave, big: opts?.size, king: opts?.king });
+      // A puzzle marks its own bounty foe: the first of a group set with `bounty`.
+      add({ kind, at, wave: g.wave, big: opts?.size, king: opts?.king, bounty: !!opts?.bounty && i === 0 });
       at += FOE[kind].gap * (opts?.king ? 2 : 1);
     }
     at += GROUP_GAP - FOE[kind].gap;
   }
-  if (g.wave === WAVES.length) {
+  // Every `BOUNTY.every`th wave the first plain ground foe out is a bounty foe (none in Versus, where foes are sent on).
+  if (!g.versus && !g.waves && g.wave >= BOUNTY.from && g.wave % BOUNTY.every === 0) {
+    const sp = g.spawns.slice(first).find((o) => !FOE[o.kind].flies && !o.king && o.kind !== 'queen' && o.kind !== 'glowworm');
+    if (sp) sp.bounty = true;
+  }
+  if (g.wave === WAVES.length && !g.waves) {
     // The rush: one king of every kind, a while after the queen is out.
     at += RUSH.delay;
     RUSH_KINDS.forEach((kind, i) => {
@@ -802,8 +863,11 @@ function beginWave(g: Game, byHand = false) {
   return true;
 }
 
-/** How many of the garden's burrows are open in the wave in play (they open in order). */
-export const openGates = (g: Game) => (g.versus ? g.gates.length : Math.max(1, GATE_WAVES.slice(0, g.gates.length).filter((w) => g.wave >= w).length));
+/** The groups of wave `n`: a puzzle's own, or the table's (`waveGroups`, with glow-worms at night). */
+export const groupsOf = (g: Game, n: number): Group[] => (g.waves ? g.waves[n - 1] ?? [] : waveGroups(n, g.mode === 'night'));
+
+/** How many of the garden's burrows are open in the wave in play (they open in order; a puzzle's all at once). */
+export const openGates = (g: Game) => (g.versus || g.waves ? g.gates.length : Math.max(1, GATE_WAVES.slice(0, g.gates.length).filter((w) => g.wave >= w).length));
 
 function spawn(g: Game, sp: Spawn) {
   const { kind, wave } = sp;
@@ -811,7 +875,7 @@ function spawn(g: Game, sp: Spawn) {
   const plain = { hp: 1, gold: 1, lives: 1, body: 1 };
   const sized = sp.big ? BIG[sp.big] : plain;
   const king = sp.king ? KING : plain;
-  const empress = kind === 'queen' && wave === WAVES.length;
+  const empress = kind === 'queen' && wave === WAVES.length && !g.waves;
   const hp = Math.round(def.hp * (1 + HP_PER_WAVE * (wave - 1)) * g.toughness * (empress ? FINAL_QUEEN : 1) * sized.hp * king.hp);
   const cell = g.gates[sp.gate];
   const { x, y } = centre(cell);
@@ -829,6 +893,11 @@ function spawn(g: Game, sp: Spawn) {
   if (empress) f.empress = { eggAt: g.clock + EMPRESS.egg, turnAt: g.clock + EMPRESS.turn, taken: {} };
   f.sendable = g.versus && !sp.sent;
   if (sp.rush) g.events.push({ type: 'rush' });
+  // A bounty foe keeps its bounty for half the way from its burrow to the cottage, in steps.
+  if (sp.bounty) {
+    f.bounty = f.bountyFull = Math.max(1, Math.ceil(routeLength(g, sp.gate) / 2));
+    g.events.push({ type: 'bounty', kind });
+  }
 }
 
 /** A new foe of `kind` with `hp` at a point, standing on `cell`. */
@@ -838,7 +907,7 @@ function makeFoe(g: Game, kind: FoeKind, hp: number, gate: number, x: number, y:
     id: g.nextId++, kind, hp, maxHp: hp, gate, x, y, from: cell, to: cell, t: 1, heading: 0, angle: 0,
     slowUntil: 0, slowFactor: 1, lure: 0, stunUntil: 0, shrunk: false, blueFlame: false, burnUntil: 0, burnDps: 0, poisonUntil: 0, poisonDps: 0, spreads: false, spreadAt: 0, heat: 0,
     chew: null, chews: def.digs ? 1 : 0, king: false, big: 1, body: def.size, gold: def.gold, lives: def.lives,
-    splits: def.splits ?? 0, shell: def.shell, carry: 0, sendable: false, home: false, empress: null, dead: false,
+    splits: def.splits ?? 0, shell: def.shell, carry: 0, sendable: false, home: false, empress: null, bounty: 0, bountyFull: 0, dead: false,
   };
   g.foes.push(f);
   return f;
@@ -917,11 +986,12 @@ function hurt(g: Game, f: Foe, damage: number, kind: DamageKind, pierce = false)
   if (f.hp > 0) return;
   f.dead = true;
   if (f.sendable) send(g, f);
-  // With two gardeners, a foe pays the one on whose half it was beaten.
-  const gold = pay(g, f.gold);
+  // With two gardeners, a foe pays the one on whose half it was beaten; a bounty foe still on its first half pays `BOUNTY.pay` times.
+  const bounty = f.bounty > 0;
+  const gold = pay(g, f.gold * (bounty ? BOUNTY.pay : 1));
   addGold(g, g.duo && f.x >= COLS / 2 ? 1 : 0, gold);
   g.kills++;
-  g.events.push({ type: 'kill', kind: f.kind, x: f.x, y: f.y, gold });
+  g.events.push(bounty ? { type: 'kill', kind: f.kind, x: f.x, y: f.y, gold, bounty } : { type: 'kill', kind: f.kind, x: f.x, y: f.y, gold });
   if (f.carry > 0) drop(g, f);
   if (f.splits > 0) {
     // A woodlouse falls apart into smaller ones, which split no further.
@@ -974,6 +1044,8 @@ function moveFoe(g: Game, f: Foe, dt: number) {
   f.t += speed * dt;
   while (f.t >= 1) {
     f.t -= 1;
+    // A bounty foe uses up a step of its bounty on every new tile it reaches.
+    if (f.bounty > 0 && f.to !== f.from && --f.bounty === 0) g.events.push({ type: 'bountyGone', x: f.x, y: f.y });
     f.from = f.to;
     if (f.home ? f.from === g.gates[f.gate] : f.from === goalCell) {
       if (f.home) return leak(g, f);
@@ -1530,6 +1602,7 @@ export function replayStep(g: Game, r: Replay, from: number) {
     else if (a === 'aim') setAim(g, c);
     else if (a === 'walk') walk(g, c);
     else if (a === 'lift') lift(g, c);
+    else if (a === 'swing') swing(g, c);
     else startWave(g);
   }
   return i;

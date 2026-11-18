@@ -9,8 +9,11 @@ export const ROWS = 11;
 
 /** The towers and traps of the pouch and the potting shed. */
 export const TOWERS = ['hedge', 'bow', 'frost', 'cannon', 'storm', 'crossbow', 'bonfire', 'puffball', 'sunglass', 'beehive', 'apple', 'whirligig', 'swallow', 'nettle', 'toadstool', 'honey', 'snare'] as const;
-/** Every kind that can be planted: the pouch's, and the lantern, which only the night garden brings (never in a pouch or the shed). */
-export const ALL_TOWERS = [...TOWERS, 'lantern'] as const;
+/**
+ * Every kind that can be planted: the pouch's, the lantern, which only the night garden brings, and
+ * the wicket gate, which every run brings (`KIT_EXTRAS`); neither is ever in a pouch or the shed.
+ */
+export const ALL_TOWERS = [...TOWERS, 'lantern', 'wicket'] as const;
 export type TowerKind = (typeof ALL_TOWERS)[number];
 
 /** The pouch: the towers a run can plant. Hedge and bow are always in it, with up to four more. */
@@ -119,6 +122,8 @@ export const TOWER: Record<TowerKind, TowerDef> = {
   honey: { cost: 20, hits: 'blast', range: 2.5, damage: [0, 0, 0], reload: [1, 1, 1], air: false, trap: true },
   snare: { cost: 15, hits: 'sharp', range: 0, damage: [0, 0, 0], reload: [1, 1, 1], air: false, trap: true },
   lantern: { cost: 15, hits: 'sharp', range: 0, damage: [0, 0, 0], reload: [1, 1, 1], air: false, light: [2.5, 3.2, 4] },
+  /** A wicket gate: a wall while shut, a free tile while open, swung with a tap during a wave. */
+  wicket: { cost: 12, hits: 'sharp', range: 0, damage: [0, 0, 0], reload: [1, 1, 1], air: false },
 };
 export type TrapKind = 'honey' | 'snare';
 /**
@@ -200,7 +205,13 @@ export const CHEW_TIME = 3;
 export const CHEW_GAIN = 6;
 
 /** A group of one kind of foe in a wave, optionally bigger (`size` 2 or 3) or crowned kings. */
-export type Group = [FoeKind, number] | [FoeKind, number, { size?: 2 | 3; king?: boolean }];
+export type Group = [FoeKind, number] | [FoeKind, number, { size?: 2 | 3; king?: boolean; bounty?: boolean }];
+
+/**
+ * Bounty foes: from wave `from`, every `every`th wave's first plain ground foe (a puzzle marks its
+ * own) pays `pay` times its gold when beaten before it has walked half its way to the cottage.
+ */
+export const BOUNTY = { pay: 5, from: 3, every: 3 };
 
 /** A bigger beetle: health, gold and lives times these, and its body this much larger, by size. */
 export const BIG = { 2: { hp: 3, gold: 2, lives: 2, body: 1.4 }, 3: { hp: 6, gold: 3, lives: 3, body: 1.8 } } as const;
