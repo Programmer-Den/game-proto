@@ -8,7 +8,7 @@ import type { Mutators } from './weekly';
 // on the right. Every column between holds two or three rooms, and from each room the paths lead
 // on to one or more rooms in the next column. (x, y) is where the room is drawn on the 960x540 map.
 
-export type RoomKind = 'fight' | 'elite' | 'rest' | 'treasure' | 'shop' | 'event' | 'boss';
+export type RoomKind = 'fight' | 'elite' | 'rest' | 'treasure' | 'shop' | 'event' | 'boss' | 'vault';
 
 export interface Room {
   kind: RoomKind;
@@ -93,7 +93,8 @@ const COLUMN_KINDS: { must: RoomKind; extra: RoomKind[] }[] = [
  * always there (an event, a campfire, a treasure chest, a merchant) and one or two drawn from a
  * few others, in random rows. Each room leads to the rooms facing it in the next column, sometimes
  * to a neighbour too, and every room can be reached. The weekly crypt's `mutators` swap campfires
- * for fights and, from the fourth column on, fights for elites, after the same draws.
+ * for fights and, from the fourth column on, fights for elites, after the same draws. A map with
+ * an elite in the campfire column gets a vault (`addVault`), drawing nothing more.
  */
 export function makeMap(act = 1, mutators?: Mutators): Room[] {
   const foes = ACT_FOES[act - 1];
@@ -170,7 +171,33 @@ export function makeMap(act = 1, mutators?: Mutators): Room[] {
     });
     for (const r of from) rooms[r].next.sort((a, b) => a - b);
   }
+  addVault(rooms);
   return rooms;
+}
+
+/** The column whose elites can carry a vault's key: the campfire column, the first that can hold one. */
+export const KEY_COLUMN = 3;
+
+/**
+ * Turns a fight past the key column into a locked vault when an elite in the key column can reach
+ * it: the farthest such fight, the lowest on the map of those. It only reads the map, so it draws
+ * nothing and the map's other rooms (and every later draw) stay as they were. Maps without such
+ * an elite, or without a fight it can reach, get no vault.
+ */
+function addVault(rooms: Room[]) {
+  const seen = new Set<number>();
+  const stack = rooms.flatMap((r) => (r.kind === 'elite' && r.col === KEY_COLUMN ? r.next : []));
+  while (stack.length) {
+    const i = stack.pop()!;
+    if (seen.has(i) || rooms[i].kind === 'boss') continue;
+    seen.add(i);
+    stack.push(...rooms[i].next);
+  }
+  const fights = [...seen].filter((i) => rooms[i].kind === 'fight').sort((a, b) => rooms[b].col - rooms[a].col || rooms[b].y - rooms[a].y);
+  if (fights.length === 0) return;
+  const vault = rooms[fights[0]];
+  vault.kind = 'vault';
+  delete vault.foes;
 }
 
 /** Where the hero waits before the first room. */

@@ -36,6 +36,9 @@ const en: HowToPlay = {
     'The weekly crypt scores the same way and keeps your best of the week, however many tries it takes.',
     "Every card a hero adds to a deck joins that hero's library, ready to swap in at the start of a later run.",
     "Beat the Bone Spire with any hero to unlock the Alchemist: two of the same tonic in hand combine at once into a strong one for the same cost.",
+    'Retain cards stay in hand at the end of the turn; Exhaust cards hit harder but are gone for the rest of the fight.',
+    "An act's boss leaves three boss relics, each strong but with a cost. Pick none to take a plain relic instead.",
+    'A locked vault holds a relic and rare cards: fell an elite on the way to it to win its key.',
   ],
 };
 
@@ -74,6 +77,9 @@ const de: HowToPlay = {
     'Die wöchentliche Gruft zählt genauso und behält deinen Bestwert der Woche, egal wie viele Versuche es braucht.',
     'Jede Karte, die ein Held in sein Deck nimmt, kommt in seine Bibliothek und kann zu Beginn eines späteren Laufs eingetauscht werden.',
     'Bezwinge den Knochenturm mit einem Helden, um den Alchemisten freizuschalten: Zwei gleiche Tränke auf der Hand verbinden sich sofort zu einem starken, zum selben Preis.',
+    'Karten mit Halten bleiben am Zugende auf der Hand; Karten mit Verbrauchen wirken stärker, sind aber für den Rest des Kampfes weg.',
+    'Der Endgegner eines Akts hinterlässt drei Bossrelikte, jedes stark, aber mit einem Preis. Wähle keines, um stattdessen ein einfaches Relikt zu nehmen.',
+    'Ein verschlossenes Gewölbe birgt ein Relikt und seltene Karten: Besiege auf dem Weg dorthin einen Elitegegner, um den Schlüssel zu bekommen.',
   ],
 };
 

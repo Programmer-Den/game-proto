@@ -22,6 +22,8 @@ export const PILES_Y = 492;
 
 /** The reward cards, by their centres, and the button to take none. */
 export const REWARD = { xs: [300, 480, 660], y: 290, scale: 1.25 };
+/** The reward cards when only two are offered (the Blood Chalice). */
+export const REWARD_TWO = [390, 570];
 export const SKIP = { x: 480, y: 476 };
 /** The button on the rest, defeat and victory panels. */
 export const PANEL_BUTTON = { x: 480, y: 360 };
@@ -54,7 +56,8 @@ export const HERO_PANEL = {
 };
 /**
  * The library, before a run: the starting deck in a row along the top, the library's cards in up
- * to two rows under it, by the cards' centres, and Back and Set out along the bottom.
+ * to two rows under it (`cards`, or smaller `dense` ones once two rows of `cards` are not enough),
+ * by the cards' centres, and Back and Set out along the bottom.
  */
 export const LIBRARY = {
   titleY: 64,
@@ -62,6 +65,7 @@ export const LIBRARY = {
   deck: { y: 180, gap: 78, scale: 0.55 },
   shelfY: 282,
   cards: { y: 340, rowGap: 92, gap: 68, perRow: 13, scale: 0.48 },
+  dense: { y: 336, rowGap: 84, gap: 48, perRow: 18, scale: 0.37 },
   back: { x: 300, y: 500 },
   go: { x: 660, y: 500 },
 };
@@ -85,8 +89,22 @@ export const SHOP = {
   box: { x: 720, w: 340, h: 76, ys: [170, 262, 354] },
   leave: { x: 480, y: 476 },
 };
-/** The top bar: health, deck, gold and the relics in a row. */
-export const HUD = { deckX: 128, coinX: 262, goldX: 278, relicX: 344, relicGap: 28 };
+/** The top bar: health, deck, the vault's key while carried, gold and the relics in a row. */
+export const HUD = { deckX: 128, keyX: 234, coinX: 262, goldX: 278, relicX: 344, relicGap: 28 };
+/**
+ * The descent panel after an act's boss: a bigger box, its title and text, the three boss relics
+ * in boxes side by side (by their centres) and the Descend button under them.
+ */
+export const BOSS_PANEL = {
+  box: { w: 840, h: 450 },
+  titleY: 82,
+  textY: 150,
+  xs: [210, 480, 750],
+  y: 296,
+  w: 250,
+  h: 150,
+  buttonY: 450,
+};
 /** The width given to each status on the row over a fighter's head. */
 export const STATUS_GAP = 46;
 export const ROOM_RADIUS = 32;

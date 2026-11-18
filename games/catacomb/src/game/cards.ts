@@ -66,6 +66,10 @@ interface Effects {
   curse?: CurseKind;
   /** Puts a copy of this card (a tonic, a key of `CARDS`) into the hand for this fight (the Alchemist's cards). */
   brew?: string;
+  /** Retain: it stays in hand at the end of the turn instead of going to the discard pile. */
+  retain?: boolean;
+  /** Exhaust: once played, it is gone for the rest of the fight (it hits harder for it). */
+  exhaust?: boolean;
 }
 
 export interface Card extends Effects {
@@ -135,6 +139,19 @@ export const CARDS = {
   grind: { name: 'grindCard', cost: 1, icon: 'mortar', rarity: 'common', hero: 'alchemist', damage: 5, brew: 'fireTonic', up: { damage: 8 } },
   distil: { name: 'distilCard', cost: 1, icon: 'mortar', rarity: 'common', hero: 'alchemist', block: 5, brew: 'ironTonic', up: { block: 8 } },
   transmute: { name: 'transmuteCard', cost: 1, icon: 'fireTonic', rarity: 'rare', hero: 'alchemist', brew: 'strongFireTonic', draw: 1, up: { cost: 0 } },
+  // Retain cards wait in hand for the right turn; Exhaust cards hit harder, once a fight.
+  bide: { name: 'bideCard', cost: 1, icon: 'shield', rarity: 'common', block: 8, retain: true, up: { block: 11 } },
+  waitingBlade: { name: 'waitingBladeCard', cost: 1, icon: 'sword', rarity: 'common', damage: 8, retain: true, up: { damage: 11 } },
+  adrenaline: { name: 'adrenalineCard', cost: 0, icon: 'bolt', rarity: 'common', energy: 2, draw: 1, exhaust: true, up: { draw: 2 } },
+  recklessSwing: { name: 'recklessSwingCard', cost: 1, icon: 'axe', rarity: 'common', damage: 15, exhaust: true, up: { damage: 20 } },
+  execution: { name: 'executionCard', cost: 2, icon: 'hammer', rarity: 'rare', damage: 30, exhaust: true, up: { damage: 40 } },
+  lastStand: { name: 'lastStandCard', cost: 1, icon: 'bulwark', rarity: 'rare', block: 25, exhaust: true, up: { block: 32 } },
+  steadyAim: { name: 'steadyAimCard', cost: 2, icon: 'dart', rarity: 'rare', damage: 12, vulnerable: 2, retain: true, up: { damage: 16 } },
+  grudge: { name: 'grudgeCard', cost: 1, icon: 'eye', rarity: 'common', hero: 'hexer', damage: 3, hexed: 5, retain: true, up: { damage: 5, hexed: 7 } },
+  doom: { name: 'doomCard', cost: 1, icon: 'cloud', rarity: 'rare', hero: 'hexer', poison: 12, weak: 2, exhaust: true, up: { poison: 16 } },
+  flashBrew: { name: 'flashBrewCard', cost: 0, icon: 'ironTonic', rarity: 'common', hero: 'alchemist', brew: 'strongIronTonic', exhaust: true, up: { draw: 1 } },
+  stillWater: { name: 'stillWaterCard', cost: 1, icon: 'mortar', rarity: 'common', hero: 'alchemist', block: 6, brew: 'fireTonic', retain: true, up: { block: 9 } },
+  elixir: { name: 'elixirCard', cost: 1, icon: 'heart', rarity: 'rare', hero: 'alchemist', heal: 12, draw: 1, exhaust: true, up: { heal: 16 } },
 } satisfies Record<string, Card>;
 
 /** What each power does every turn (Bulwark, Battle Rage) or whenever it applies (Thorns, Venom Veil). */
@@ -226,6 +243,8 @@ export function describe(id: CardId) {
   if (c.brew) parts.push(t('brew', { name: cardName(c.brew as BaseId) }));
   if (c.draw) parts.push(t('draw', { n: c.draw }));
   if (c.tonic) parts.push(t('tonicRider'));
+  if (c.retain) parts.push(t('retainWord'));
+  if (c.exhaust) parts.push(t('exhaustWord'));
   return parts.join(' ');
 }
 
