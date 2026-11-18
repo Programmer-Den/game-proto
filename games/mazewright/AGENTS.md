@@ -43,7 +43,9 @@ Implemented today:
   `fixed` gives Normal (`DAILY.lives` 15, toughness 1), masters `[]`, no duo, no gardener.
   `startDaily` uses up the try at the start; `won` or `lost` calls `endDaily`, which keeps
   `dailyScore` (a win: `cabbagesLeft` times `DAILY.perCabbage` (100) plus `g.gold`; a loss: waves
-  held times `DAILY.perWave` (10)) with `finishDaily`. A daily game is never `keep`-saved, leaves
+  held, `wavesHeld`, times `DAILY.perWave` (10); `wavesHeld` counts the waves before the one whose
+  foe last got home with cabbages, `Game.leakWave` from `Foe.wave`, so a wave started early never
+  counts as held; a loss's seeds and records count it too) with `finishDaily`. A daily game is never `keep`-saved, leaves
   the saved game alone, notes no garden records or replay, and still pays seeds and trophies. Its
   end panel shows `dailyScore`/`dailyLostScore` and `dailyBest` with Gardens only, and the button
   shows `dailyDone` (today's score) or `dailyUsed` until the next day. `endDaily` passes the day
