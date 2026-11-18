@@ -229,28 +229,75 @@ export interface GolemStats {
  * A golem's stats at its level: each level adds 60% damage and 12 pixels of reach, and at level 3
  * its form changes what it does.
  */
-export function golemStats(kind: GolemKind, level: number, form: FormKind | null = null): GolemStats {
+export function golemStats(kind: GolemKind, level: number, form: FormKind | null = null, elder = false): GolemStats {
   const info = GOLEM_INFO[kind];
   const f = form && level >= MAX_LEVEL ? FORM_INFO[form] : undefined;
   const grow = 1 + 0.6 * (level - 1);
+  // An elder golem (GG22), fused from two level-3 golems of one form, hits harder and further.
+  const e = elder ? ELDER : null;
   const spore = info.spore && {
     r: info.spore.r * (f?.spore?.r ?? 1),
     ms: info.spore.ms * (f?.spore?.ms ?? 1),
-    dps: info.spore.dps * grow * (f?.spore?.dps ?? 1),
+    dps: info.spore.dps * grow * (f?.spore?.dps ?? 1) * (e?.damage ?? 1),
   };
+  const slow = f?.slow ?? info.slow;
   return {
-    damage: info.damage * grow * (f?.damage ?? 1),
-    range: info.range + 12 * (level - 1) + (f?.range ?? 0),
+    damage: info.damage * grow * (f?.damage ?? 1) * (e?.damage ?? 1),
+    range: info.range + 12 * (level - 1) + (f?.range ?? 0) + (e?.range ?? 0),
     cooldownMs: info.cooldownMs * (f?.cooldown ?? 1),
-    slow: f?.slow ?? info.slow,
+    slow: slow && e ? { factor: slow.factor, ms: slow.ms * e.slow } : slow,
     area: !!(info.area || f?.area),
     splash: f?.splash ?? 0,
     pierce: !!f?.pierce,
     spore,
     // A ring stuns 20% longer per level.
-    stun: (info.stun ?? 0) * (1 + 0.2 * (level - 1)) * (f?.stun ?? 1),
+    stun: (info.stun ?? 0) * (1 + 0.2 * (level - 1)) * (f?.stun ?? 1) * (e?.stun ?? 1),
   };
 }
+
+/**
+ * Elder golems (GG22): two grown level-3 golems of the same form side by side fuse into one elder
+ * on the cell of the one tapped, freeing the other's. It hits `damage` times as hard (spores
+ * poison as much harder), reaches `range` pixels further, slows `slow` times as long and stuns
+ * `stun` times as long. An elder can't fuse again.
+ */
+export const ELDER = { damage: 2.2, range: 16, slow: 1.5, stun: 1.3 };
+
+/**
+ * Golem powers (GG20): during a wave a tap on a grown golem whose power is ready and with a pest in
+ * reach uses it; it is then ready again after `cooldownMs` (per kind). The Pebble golem stomps
+ * every pest within `stompR` of its target for `stomp` times its damage; Moss roots every pest in
+ * reach for `rootMs` (a Queen Slug half as long); Thorn pricks every pest in reach `burst` times;
+ * Fungus drops a spore cloud on its target, `cloud` times its patch's radius and poison and
+ * `cloudMs` times as long; Bell peals, stunning every pest in reach `peal` times as long, stun
+ * guard or not.
+ */
+export const POWER = {
+  cooldownMs: { pebble: 10000, moss: 14000, thorn: 10000, fungus: 12000, bell: 16000 } as Record<GolemKind, number>,
+  stomp: 4,
+  stompR: 40,
+  rootMs: 1500,
+  burst: 3,
+  cloud: 2,
+  cloudMs: 1.5,
+  peal: 1.5,
+};
+export const POWER_INFO: Record<GolemKind, { name: TextKey; blurb: TextKey }> = {
+  pebble: { name: 'stompName', blurb: 'stompBlurb' },
+  moss: { name: 'rootName', blurb: 'rootBlurb' },
+  thorn: { name: 'burstName', blurb: 'burstBlurb' },
+  fungus: { name: 'cloudName', blurb: 'cloudBlurb' },
+  bell: { name: 'pealName', blurb: 'pealBlurb' },
+};
+
+/**
+ * The root snare (GG21): every wave cleared in a garden (or called early, once done) opens a spare
+ * bud, up to `maxBuds`. `cost` of them lay a snare on a path cell for the waves on the path now or
+ * next; every pest walking over it is rooted for `rootMs` (a Queen Slug half as long), once a
+ * snare. Crows fly over it and a mole in its tunnel passes under. Snares wither once the garden is
+ * clear again.
+ */
+export const SNARE = { cost: 2, maxBuds: 4, rootMs: 2500 };
 
 /** A hedge: a cheap seed for a path cell that pests must chew through before they walk on. */
 export const HEDGE = { name: 'hedgeName' as TextKey, cost: 15, hp: 60 };

@@ -27,8 +27,11 @@ import {
   MOVE_FEE,
   PEST_INFO,
   PESTS,
+  POWER,
   PLOT,
+  POWER_INFO,
   SEEDS,
+  SNARE,
   STAR_LEAVES,
   TARGET_INFO,
   THORNY_STARS,
@@ -69,6 +72,7 @@ import {
   type SavedPlot,
 } from '../game/save';
 import {
+  POWER_RING_MS,
   RING_MS,
   SHOT_MS,
   barred,
@@ -77,6 +81,13 @@ import {
   boonedStats,
   canCallEarly,
   canGraft,
+  canPower,
+  canSnare,
+  fuse,
+  fusePartner,
+  laySnare,
+  powerReady,
+  usePower,
   canMove,
   canPlant,
   canRegrow,
@@ -164,6 +175,10 @@ const PREVIEW_PESTS = PESTS.filter((kind) => kind !== 'queen');
 
 /** The game's name for its daily record (`shared/daily.ts`). */
 const GAME = 'golem-garden';
+/** How much bigger an elder golem (GG22) stands. */
+const ELDER_SCALE = 1.22;
+/** The colour of each golem kind's power ring (GG20). */
+const POWER_COLOUR: Record<Golem['kind'], number> = { pebble: 0xc8b090, moss: 0x7ac050, thorn: 0xf2a6c8, fungus: 0xb0d860, bell: 0xa8ecff };
 /** The garden picker's modes: from the garden tag, after the Heartwood falls, at the harvest, at the daily plot's end. */
 type PickerMode = 'choose' | 'over' | 'harvest' | 'daily';
 /**
@@ -211,6 +226,8 @@ export class GameScene extends Phaser.Scene {
   private moving: number | null = null;
   /** Whether the open menu shows the level-3 forms to pick from instead of Raise, Aim, Move and Uproot. */
   private formMenu = false;
+  /** Laying a root snare (GG21): the next tap on a path cell lays it. */
+  private snaring = false;
   /** The menu chip under the pointer, so the hint can say what a form does. */
   private chipHover: number | null = null;
   private savedBest = 0;
@@ -256,6 +273,8 @@ export class GameScene extends Phaser.Scene {
   private graftBox: Phaser.GameObjects.Container | null = null;
   /** The warm stripes on the rows the Sunny row boons shine on. */
   private sunGfx!: Phaser.GameObjects.Graphics;
+  /** The root snares on the path (GG21). */
+  private snareGfx!: Phaser.GameObjects.Graphics;
   /** The music part playing: calm between waves, battle or boss while pests come. */
   private musicPart: 'calm' | 'battle' | 'boss' | null = null;
 
@@ -288,6 +307,7 @@ export class GameScene extends Phaser.Scene {
     this.picked = null;
     this.moving = null;
     this.formMenu = false;
+    this.snaring = false;
     this.picker = null;
     this.boonBox = null;
     this.graftBox = null;
@@ -317,6 +337,7 @@ export class GameScene extends Phaser.Scene {
     else bakeGarden(this, this.state.garden);
     this.add.image(0, 0, bg).setOrigin(0);
     this.sunGfx = this.add.graphics().setDepth(1);
+    this.snareGfx = this.add.graphics().setDepth(4);
     this.createBoard();
     this.bars = this.add.graphics().setDepth(UI_DEPTH - 20);
     this.hoverGfx = this.add.graphics().setDepth(UI_DEPTH - 30);
@@ -428,6 +449,7 @@ export class GameScene extends Phaser.Scene {
     this.drawSun();
     this.drawSlime();
     this.drawSpores();
+    this.drawSnares();
     this.drawHedges();
     this.drawGolems();
     this.drawPests();
@@ -561,13 +583,24 @@ export class GameScene extends Phaser.Scene {
     const moving = this.golemById(this.moving);
     this.moving = null;
     this.formMenu = false;
-    if (moving) {
+    if (this.snaring) {
+      this.snaring = false;
+      if (laySnare(s, col, row)) sfx('snare');
+      else ui('refuse');
+    } else if (moving) {
       if (move(s, moving, col, row)) sfx('move');
       else ui('refuse');
       this.picked = null;
     } else {
       const golem = golemAt(s, col, row);
-      if (golem) {
+      // During a wave a tap on a golem whose power is ready, with a pest in reach, uses it (GG20);
+      // otherwise it opens the golem's menu.
+      if (golem && this.picked !== golem.id && canPower(s, golem)) {
+        usePower(s, golem);
+        this.picked = null;
+        sfx('power');
+        sfx(golem.kind);
+      } else if (golem) {
         this.picked = this.picked === golem.id ? null : golem.id;
         ui('click');
       } else if (this.picked !== null) this.picked = null;
@@ -614,6 +647,22 @@ export class GameScene extends Phaser.Scene {
         this.regrowLeaf();
         this.refresh();
       });
+    // The bloom tag lays a root snare with the spare buds (GG21): a tap picks it, the next tap on the path lays it.
+    this.add
+      .zone(HUD.bloom.x, HUD.y - 18, HUD.bloom.w, 36)
+      .setOrigin(0)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', () => {
+        const s = this.state;
+        if (this.snaring || (s.buds >= SNARE.cost && s.phase !== 'over' && !s.offer.length)) {
+          this.snaring = !this.snaring;
+          this.picked = null;
+          this.moving = null;
+          this.formMenu = false;
+          ui('click');
+        } else ui('refuse');
+        this.refresh();
+      });
     const flowers = Array.from({ length: BLOOM_GOAL }, (_, i) => this.add.image(HUD.bloom.flowers + i * HUD.bloom.gap, HUD.y, 'bud').setScale(0.92));
     const glow = this.add.image(HUD.sap.icon, HUD.y, 'glow').setAlpha(0).setDepth(UI_DEPTH - 2);
     this.add.image(HUD.leaf.icon, HUD.y, 'leaf');
@@ -653,6 +702,7 @@ export class GameScene extends Phaser.Scene {
         if (select(this.state, kind)) sfx('select');
         else ui('refuse');
         this.moving = null;
+        this.snaring = false;
         this.picked = null;
         this.formMenu = false;
         this.refresh();
@@ -788,7 +838,13 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     if (i === 0) {
-      if (picksForm(g)) {
+      if (g.form) {
+        // A level-3 golem's first chip fuses it with a twin of its form beside it into an elder (GG22).
+        if (fuse(s, g)) {
+          sfx('elder');
+          this.picked = null;
+        } else ui('refuse');
+      } else if (picksForm(g)) {
         this.formMenu = upgradeCost(g) !== null && s.sap >= upgradeCost(g)!;
         if (this.formMenu) ui('click');
         else ui('refuse');
@@ -1445,7 +1501,10 @@ export class GameScene extends Phaser.Scene {
     this.hud.stars.setText(`${totalStars(s)} ★`);
     const full = s.bloom >= BLOOM_GOAL;
     this.hud.bloom.setText(full ? t('bloomFull') : t('bloomCount', { n: s.bloom, goal: BLOOM_GOAL }));
-    this.hud.bloomSub.setText(t(full ? 'thornUnlocked' : 'unlocksThorn'));
+    // Once a spare bud is open (GG21), the line under the bloom counts them toward a root snare.
+    if (this.snaring) this.hud.bloomSub.setText(t('snarePick')).setColor('#7a2a4a');
+    else if (s.buds) this.hud.bloomSub.setText(t('snareBuds', { n: s.buds, cost: SNARE.cost })).setColor(s.buds >= SNARE.cost ? '#2e6a1a' : '#4a6a24');
+    else this.hud.bloomSub.setText(t(full ? 'thornUnlocked' : 'unlocksThorn')).setColor('#4a6a24');
     this.hud.flowers.forEach((f, i) => f.setTexture(i < s.bloom ? 'bloom' : 'bud'));
     this.treeFlowers.forEach((f, i) => f.setTexture(i < s.bloom ? 'bloom' : 'bud'));
     this.speed.bg.setTexture(s.fast ? 'speed-on' : 'speed');
@@ -1561,9 +1620,11 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     this.formMenu = false;
-    const top = t(g.form ? FORM_INFO[g.form].name : 'maxLevel');
-    const raise = cost === null ? (g.growMs > 0 ? t('raiseGrowing') : t('raiseTop', { top })) : t(picksForm(g) ? 'formPickChip' : 'raiseChip', { cost });
-    set(0, raise, cost !== null && s.sap >= cost);
+    if (g.form) set(0, t(g.elder ? 'elderChip' : 'fuseChip'), !!fusePartner(s, g));
+    else {
+      const raise = cost === null ? (g.growMs > 0 ? t('raiseGrowing') : t('raiseTop', { top: t('maxLevel') })) : t(picksForm(g) ? 'formPickChip' : 'raiseChip', { cost });
+      set(0, raise, cost !== null && s.sap >= cost);
+    }
     const area = statsOf(s, g).area;
     set(1, area ? t('aimAll') : t('aimChip', { target: t(TARGET_INFO[g.target].name) }), !area);
     set(2, t('moveChip', { cost: MOVE_FEE }), s.sap >= MOVE_FEE);
@@ -1572,6 +1633,7 @@ export class GameScene extends Phaser.Scene {
 
   private hintText() {
     const s = this.state;
+    if (this.snaring) return t('hintSnare', { n: SNARE.cost });
     const moving = this.golemById(this.moving);
     if (moving) return t('hintMove', { golem: t(GOLEM_INFO[moving.kind].lower), cost: MOVE_FEE });
     const picked = this.golemById(this.picked);
@@ -1587,6 +1649,14 @@ export class GameScene extends Phaser.Scene {
         return t('hintFormPick', forms(picked.kind));
       }
       const combo = hovered.growMs === 0 ? comboAt(s, hovered.kind, hovered.col, hovered.row) : null;
+      // During a wave, the golem's power: ready to use, or how long until it is.
+      if (!picked && s.phase === 'wave' && hovered.growMs === 0) {
+        const power = POWER_INFO[hovered.kind];
+        if (powerReady(hovered)) return t('hintPowerReady', { power: t(power.name), blurb: t(power.blurb) });
+        return t('hintPowerWait', { power: t(power.name), n: Math.ceil(hovered.powerMs / 1000) });
+      }
+      if (picked?.form && !picked.elder) return t(fusePartner(s, picked) ? 'hintFuse' : 'hintFuseNeed', { form: t(FORM_INFO[picked.form].name) });
+      if (hovered.elder) return t('hintElder', { form: t(FORM_INFO[hovered.form!].name), golem: t(info.lower) });
       if (hovered.form) return t('hintFormed', { form: t(FORM_INFO[hovered.form].name), golem: t(info.lower), blurb: t(FORM_INFO[hovered.form].blurb) });
       const level = hovered.growMs > 0 ? t('hintGrowing', { golem }) : t('hintLevel', { golem, n: hovered.level });
       if (combo) return t(combo === 'slowed' ? 'hintComboSlowed' : 'hintComboPricks', { golem, n: hovered.level });
@@ -1607,6 +1677,7 @@ export class GameScene extends Phaser.Scene {
       return t(s.sap < regrowPrice(s) ? 'hintRegrowPoor' : 'hintRegrow', { n: regrowPrice(s) });
     }
     if (s.freeSeed) return t('hintFreeSeed');
+    if (s.phase === 'build' && s.buds >= SNARE.cost) return t('hintSnareReady', { n: SNARE.cost });
     if (s.phase === 'build' && isBossWave(nextWave(s))) return t('hintQueen');
     if (s.phase === 'build' && s.wave >= COMPOST.fromWave) return t('hintCompost', { pct: Math.round(COMPOST.rate * 100), cap: compostCap(s) });
     return t(s.golems.length ? 'hintCombo' : 'hintPlant');
@@ -1657,10 +1728,19 @@ export class GameScene extends Phaser.Scene {
         image.setTexture('sprout').setOrigin(0.5, 40 / 50).setY(y + 21);
         this.bar(x, y + 28, 40, 1 - g.growMs / GOLEM_INFO[g.kind].growMs, 0x8cd05a);
       } else {
-        image.setTexture(`golem-${g.kind}`).setOrigin(GOLEM_ORIGIN.x, GOLEM_ORIGIN.y).setY(y + FEET);
+        // An elder golem (GG22) stands bigger, with a crown of leaves and a gold bead.
+        image.setTexture(`golem-${g.kind}`).setOrigin(GOLEM_ORIGIN.x, GOLEM_ORIGIN.y).setY(y + FEET).setScale(g.elder ? ELDER_SCALE : 1);
         for (let i = 0; i < MAX_LEVEL; i++) this.bead(this.bars, x - 11 + i * 11, y + 31, 3.6, i < g.level ? 0xf2c44a : 0x4a5a3a);
         // A level-3 golem wears a bead in its form's colour on its shoulder.
         if (g.form) this.bead(this.bars, x + 20, y - 22, 5, FORM_INFO[g.form].colour);
+        if (g.elder) {
+          const top = y + FEET - 68 * ELDER_SCALE;
+          this.bars.fillStyle(0x457a30).fillEllipse(x - 9, top + 2, 14, 7).fillEllipse(x + 9, top + 2, 14, 7);
+          this.bars.fillStyle(0x80c050).fillEllipse(x - 8, top, 11, 5).fillEllipse(x + 8, top, 11, 5);
+          this.bead(this.bars, x, top - 1, 4.5, 0xf2c44a);
+        }
+        // During a wave, the power bead (GG20) by its head: lit when ready, filling while it recharges.
+        if (s.phase === 'wave') this.powerBead(x - 22, y - 22, g);
         // Combos: a vine to each grown moss golem beside a pebble or thorn golem.
         if (g.kind !== 'pebble' && g.kind !== 'thorn') continue;
         for (const o of s.golems) {
@@ -1671,6 +1751,38 @@ export class GameScene extends Phaser.Scene {
       }
     }
     for (const [id, image] of this.golems) if (!seen.has(id)) (image.destroy(), this.golems.delete(id));
+  }
+
+  /** A golem's power bead: lit gold (pulsing, held still with reduced motion) when ready, else a dim bead filling round. */
+  private powerBead(x: number, y: number, g: Golem) {
+    if (powerReady(g)) {
+      const pulse = settings.reduceMotion ? 0 : Math.sin(this.time.now / 160) * 0.8;
+      this.bars.fillStyle(0xffe890, 0.35).fillCircle(x, y, 8 + pulse);
+      this.bead(this.bars, x, y, 5, 0xffd24a);
+      return;
+    }
+    const done = 1 - g.powerMs / POWER.cooldownMs[g.kind];
+    this.bars.lineStyle(3, 0x2a1a10, 0.6).strokeCircle(x, y, 6.5);
+    this.bead(this.bars, x, y, 4.5, 0x8a7a5a);
+    this.bars.lineStyle(2.5, 0xffd24a).beginPath().arc(x, y, 6.5, -Math.PI / 2, -Math.PI / 2 + done * Math.PI * 2).strokePath();
+  }
+
+  /** The root snares on the path (GG21): a knot of clay roots across the cell. */
+  private drawSnares() {
+    const g = this.snareGfx.clear();
+    for (const n of this.state.snares) {
+      const { x, y } = cellCentre(n.col, n.row);
+      g.fillStyle(0x1a0e06, 0.25).fillEllipse(x + 1, y + 4, 52, 22);
+      for (let k = 0; k < 5; k++) {
+        const a = (k / 5) * Math.PI;
+        const dx = Math.cos(a) * 24;
+        const dy = Math.sin(a) * 10;
+        g.lineStyle(4, 0x6a4424).lineBetween(x - dx, y - dy + 2, x + dx, y + dy + 2);
+        g.lineStyle(1.5, 0x9a6a3a).lineBetween(x - dx, y - dy + 1, x + dx, y + dy + 1);
+      }
+      g.fillStyle(0x80c050).fillEllipse(x - 14, y - 6, 10, 6).fillEllipse(x + 16, y + 6, 10, 6);
+      this.bead(g, x, y + 2, 4, 0xf2a6c8);
+    }
   }
 
   /** Hedges on the path, each with its health bar as pests chew it down. */
@@ -1723,6 +1835,13 @@ export class GameScene extends Phaser.Scene {
       else if (p.slowMs > 0) art.body.setTint(0x9ae07a).setTintMode(Phaser.TintModes.MULTIPLY);
       else art.body.clearTint();
       if (p.hp < p.maxHp) this.bar(pos.x, top, p.kind === 'queen' ? 64 : p.kind === 'aphid' ? 18 : 30, Math.max(0, p.hp / p.maxHp), 0xf2c44a);
+      // A pest held by roots: clay roots curling up round its feet.
+      if (p.rootMs > 0) {
+        for (let k = -1; k <= 1; k++) {
+          this.bars.lineStyle(3, 0x6a4424).beginPath().arc(pos.x + k * 9, pos.y + 6, 7, Math.PI * 1.1, Math.PI * 1.9).strokePath();
+        }
+        this.bars.fillStyle(0x80c050).fillEllipse(pos.x - 12, pos.y - 2, 7, 4).fillEllipse(pos.x + 12, pos.y - 2, 7, 4);
+      }
       // A pest stunned by a bell golem: three pale blue beads circle over it (held still with reduced motion).
       if (p.stunMs > 0) {
         const spin = settings.reduceMotion ? 0 : p.stunMs / 160;
@@ -1779,6 +1898,14 @@ export class GameScene extends Phaser.Scene {
     for (const shot of this.state.shots) {
       seen.add(shot.id);
       let image = this.shots.get(shot.id);
+      if (shot.power) {
+        // A golem's power: a thick ring in its kind's colour spreading out (only fading, with reduced motion).
+        const k = 1 - shot.ms / POWER_RING_MS;
+        const r = shot.ring! * (settings.reduceMotion ? 1 : 0.3 + 0.7 * k);
+        this.bars.lineStyle(6, POWER_COLOUR[shot.kind], 0.8 * (1 - k)).strokeCircle(shot.from.x, shot.from.y, r);
+        this.bars.lineStyle(2, 0xfff8dc, 0.6 * (1 - k)).strokeCircle(shot.from.x, shot.from.y, r);
+        continue;
+      }
       if (shot.ring) {
         // A bell golem's ring spreads out to its reach and fades (only fades, with reduced motion).
         if (!image) {
@@ -1833,6 +1960,10 @@ export class GameScene extends Phaser.Scene {
     if (!this.hover) return;
     const { col, row } = this.hover;
     const { x, y } = cellCentre(col, row);
+    if (this.snaring) {
+      if (gardenOf(s).map[row][col] === 'path') outline(x, y, canSnare(s, col, row) ? 0x9ae07a : 0x8a7a6a);
+      return;
+    }
     const golem = golemAt(s, col, row);
     if (golem) {
       if (golem !== picked) {
