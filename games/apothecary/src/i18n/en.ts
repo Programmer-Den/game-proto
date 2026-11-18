@@ -430,6 +430,7 @@ const en = {
   lamplighter: 'The lamplighter',
   sailor: 'The ghostly sailor',
   folkPaidHerbs: '{name} paid {herbs}',
+  folkPaidFull: '{name} paid, but the satchel had no room',
   folkPaidSeal: '{name} paid a town seal!',
   herbGain: '+{n} {herb}',
   // The shop ledger (AP22)

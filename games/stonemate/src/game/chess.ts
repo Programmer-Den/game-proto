@@ -152,7 +152,15 @@ export class Position {
 
   /** The position as text for repetition and the deep search's table: pieces, side to move, castling and en passant. */
   key() {
-    return String.fromCharCode(...this.board) + this.turn + this.castling + ',' + this.ep;
+    return String.fromCharCode(...this.board) + this.turn + this.castling + ',' + (this.epTakeable() ? this.ep : -1);
+  }
+
+  /** Whether a pawn of the side to move stands ready to take en passant; only then does `ep` change the position for repetition. */
+  private epTakeable() {
+    if (this.ep < 0) return false;
+    const pr = this.turn === 'w' ? row(this.ep) + 1 : row(this.ep) - 1;
+    const pawn = PAWN + (this.turn === 'b' ? BLACK : 0);
+    return [-1, 1].some((dc) => on(pr, col(this.ep) + dc) && this.board[pr * 8 + col(this.ep) + dc] === pawn);
   }
 
   kingSquare(side: Side) {

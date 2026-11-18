@@ -27,7 +27,7 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
   falling beads back up (each bead once, `Bead.mirrored`), `bell` (1, Forest on, only where rows slide) stops the sliding rows,
   rings and guardians for `BELL_SECONDS` (4), `prism` (1, Moon on) splits the orb that breaks it in
   two. Chapel 1 (Dawn) has none, so windows 0 to 4 are as before. The orb is 5% faster per chapel
-  (`speed`). The daily is `windowSpec(-1, dailyRand('shardlight'), 2)`.
+  (`speed`). The daily is `windowSpec(-1, dailyRand('shardlight'), 2)`. It plays at Normal with no workshop upgrades, and its bead drops and picks come from `dailyRand('shardlight-beads')`, so every player gets the same run.
 - **Feats** (`featOf`): every window has one, shown under the bar: the rose windows `heart` (all
   three heart hits in one chain), the others in turn `quick` (restored in under `QUICK_SECONDS`, 60
   s of play with an orb in flight, `Sim.time`), `noBeads` (catch none) and `chain` (a chain of `featChain` = 6 + chapel panes).

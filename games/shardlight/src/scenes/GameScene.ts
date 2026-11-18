@@ -491,14 +491,17 @@ export class GameScene extends Phaser.Scene {
     this.endless = index >= WINDOWS ? endless : null;
     this.ended = false;
     const spec = index < 0 ? windowSpec(-1, dailyRand(GAME), DAILY_CHAPEL) : index >= WINDOWS ? endlessSpec(index - WINDOWS) : windowSpec(index);
-    const up = this.progress.upgrades;
+    // The daily is the same run for every player: Normal, no workshop upgrades, and its beads drawn from the day's seed.
+    const daily = index < 0;
+    const up = daily ? { wide: 0, orb: 0, magnet: 0, charm: 0 } : this.progress.upgrades;
     this.sim = new Sim(spec, this.field.h, {
-      speed: byDifficulty(320, 380, 450),
-      barW: byDifficulty(132, 110, 92) + up.wide * 12,
+      speed: daily ? 380 : byDifficulty(320, 380, 450),
+      barW: (daily ? 110 : byDifficulty(132, 110, 92)) + up.wide * 12,
       lives: this.endless ? this.endless.lives : 3 + up.orb,
       magnet: up.magnet,
       charmTime: 1 + up.charm * 0.25,
       dropChance: 0.08,
+      random: daily ? dailyRand(`${GAME}-beads`) : undefined,
     });
     playMusic(SONG, spec.rose ? 'boss' : 'battle');
     const { W, H, field: f } = this;

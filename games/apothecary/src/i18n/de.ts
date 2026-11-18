@@ -432,6 +432,7 @@ const de: Translation<typeof en> = {
   lamplighter: 'Der Laternenanzünder',
   sailor: 'Der Geisterseemann',
   folkPaidHerbs: '{name} zahlt {herbs}',
+  folkPaidFull: '{name} zahlt, doch in der Tasche ist kein Platz',
   folkPaidSeal: '{name} zahlt ein Stadtsiegel!',
   herbGain: '+{n} {herb}',
   // Das Ladenbuch (AP22)

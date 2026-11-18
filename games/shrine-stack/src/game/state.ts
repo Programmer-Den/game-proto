@@ -378,13 +378,13 @@ export const gildedOf = (s: Pick<GameState, 'site'>) => goalOf(s) - GILDED_BELOW
 export const patronSpeed = (patron: PatronId | null, rank = 0) =>
   patron === 'hands' ? HANDS_SPEED : patron === 'patient' ? PATIENT_SPEED - PATIENT_RANK * rank : 1;
 
-/** The swing speed for a tier, with the difficulty, the Calm Winds kept and the patron's pace. */
-export function speedFor(tier: number, calm: number, patron: PatronId | null = null, rank = 0) {
-  return BASE_SPEED * byDifficulty(0.8, 1, 1.25) * (1 + TIER_SPEEDUP * (tier - 1)) * CALM ** calm * patronSpeed(patron, rank);
+/** The swing speed for a tier, with the difficulty (Normal in the daily, shared by every player), the Calm Winds kept and the patron's pace. */
+export function speedFor(tier: number, calm: number, patron: PatronId | null = null, rank = 0, daily = false) {
+  return BASE_SPEED * (daily ? 1 : byDifficulty(0.8, 1, 1.25)) * (1 + TIER_SPEEDUP * (tier - 1)) * CALM ** calm * patronSpeed(patron, rank);
 }
 
 /** The swing speed for the tier being built, with the blessings kept. */
-const tierSpeed = (s: GameState) => speedFor(s.tier, s.blessings.filter((b) => b === 'calm').length, s.patron, s.rank);
+const tierSpeed = (s: GameState) => speedFor(s.tier, s.blessings.filter((b) => b === 'calm').length, s.patron, s.rank, s.daily);
 
 const NO_RANKS: Record<PatronId, number> = { gilded: 0, hands: 0, patient: 0, storm: 0 };
 
@@ -411,7 +411,7 @@ export function newGame(opts: NewGame = {}): GameState {
     tierFavor: 0,
     blessings: [],
     offer: [],
-    speed: speedFor(1, 0),
+    speed: speedFor(1, 0, null, 0, !!opts.daily),
     perfectPx: PERFECT_PX,
     favorPerStone: 1,
     grace: 0,

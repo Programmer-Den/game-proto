@@ -161,11 +161,12 @@ export function serveFolk(state: GameState, id: number): Feedback | null {
     return [t('folkPaidSeal', { name })];
   }
   const lab = state.alchemy;
-  const got = Object.entries(folk.pays.herbs).map(([herb, n]) => {
+  const got = Object.entries(folk.pays.herbs).flatMap(([herb, n]) => {
     const have = lab.wild[herb as WildHerb] ?? 0;
-    // Like the courier's, the satchel takes what fits and never loses what it holds.
+    // Like the courier's, the satchel takes what fits and never loses what it holds; the line says what it took.
     lab.wild[herb as WildHerb] = Math.max(have, Math.min(SATCHEL, have + n!));
-    return t('herbGain', { n: n!, herb: alchemyName(herb as WildHerb) });
+    const took = lab.wild[herb as WildHerb]! - have;
+    return took > 0 ? [t('herbGain', { n: took, herb: alchemyName(herb as WildHerb) })] : [];
   });
-  return [t('folkPaidHerbs', { name, herbs: got.join(', ') })];
+  return [got.length ? t('folkPaidHerbs', { name, herbs: got.join(', ') }) : t('folkPaidFull', { name })];
 }
