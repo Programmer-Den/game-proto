@@ -313,13 +313,14 @@ export class World {
       return;
     }
     if (team >= 0 && team !== m.team && team === this.turnTeam) dmg = Math.round(dmg * this.gunner);
+    const took = Math.min(m.hp, dmg);
     m.hp = Math.max(0, m.hp - dmg);
     m.hurtT = 0.7;
     this.pops.push({ x: m.x, y: m.y - 32, text: `-${dmg}`, color: m.team === 0 ? 0x3d8be0 : 0xe8a33d, t: 0 });
     this.hooks.sound('hurt');
     if (team >= 0 && team !== m.team) {
       this.log.enemiesHurt.add(m.id);
-      this.log.damage += dmg;
+      this.log.damage += took;
       if (ownerX !== undefined && Math.abs(ownerX - m.x) > 500 && (kind === 'rocket' || kind === 'heavy')) this.log.longShot = true;
     }
   }
@@ -1219,7 +1220,7 @@ export class World {
         continue;
       }
       for (const m of this.moles)
-        if (m.alive && !m.hidden && Math.abs(m.x - c.x) < 14 && Math.abs(m.y - c.y) < 18) {
+        if (m.alive && m.hp > 0 && !m.hidden && Math.abs(m.x - c.x) < 14 && Math.abs(m.y - c.y) < 18) {
           c.gone = true;
           if (c.kind === 'health') {
             m.hp = Math.min(m.maxHp, m.hp + 25);

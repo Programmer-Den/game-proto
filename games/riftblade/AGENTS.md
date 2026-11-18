@@ -61,7 +61,7 @@ world, with a star map between them. A boss rush and hero mastery come on top.
   Field Ration (spots `banish-<i>` after the cards; Shift with 1-4 too). A banished card goes into
   `banished`, which `rollChoices` (via `Kit.banished`) and `raisable` leave out, so it never comes up
   again at a level-up, a free pick, a trader or a chest; `rollChoices(hero, kit, 1, rest)` draws its
-  replacement (the card is dropped when nothing new is left).
+  replacement (the card is dropped when nothing new is left; a Field Ration takes its place only when it was the last card).
 - Rift altars and volatile barrels (`field.ts`, called once a step from `step` after `pickups`):
   at `ALTAR.atMs` (1:45) of each world (`state.altarAt`, Infinity once placed, in a rush and after
   a boss rush lands; skipped in the arena or once the boss is up) a pair of `Altar`s (`blood`,

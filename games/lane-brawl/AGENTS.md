@@ -395,7 +395,7 @@ Implemented today:
   aim)` in `sim.ts` casts it: Blink moves like Phase Boots, Firebrand `damage`s (through `dealt`)
   the visible enemy champion nearest the aim within `range` and `aim`, Mend heals the caster and the
   most hurt ally within `range`, Barrier sets `shield`/`shieldMs`; amounts are `base + perLevel *
-  level`. `aiSpell` (called in `aiAct` before `championPlan`) uses it from `SPELL_AI.from` (100 s, so
+  level`. A cast shows the caster like an ability does (`revealMs`, `lullMs` back to 0, stealth broken). `aiSpell` (called in `aiAct` before `championPlan`) uses it from `SPELL_AI.from` (100 s, so
   the first round plays as tuned), when under `SPELL_AI.low` with an enemy champion within
   `SPELL_AI.look` (Blink toward `fallbackPoint`), Mend also for a low ally, Firebrand on a champion
   it can finish. The player casts with G or `SPELL_BUTTON` (`drawSpellButton`, right of the recall

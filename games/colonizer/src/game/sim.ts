@@ -2551,6 +2551,8 @@ function reap(s: GameState) {
     if (!BUILDINGS[b.type].palisade) s.players[b.owner].razed++;
     // A fallen shelter spills its garrison out; whoever finds no room is lost with it.
     if (b.garrison.length > 0) ungarrison(s, b);
+    for (const u of b.garrison) s.players[u.owner].lost++;
+    b.garrison = [];
     s.buildings.delete(b.id);
     changed = true;
   }

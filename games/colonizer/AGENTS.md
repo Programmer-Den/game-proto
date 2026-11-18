@@ -436,7 +436,7 @@ in code on 2D canvases (no image files), with `pixelArt` off.
   `garrison` (a villager running to a shelter) and `trade` (a cart heading for a post); `Unit.site` is
   the building site a villager left for the bell.
 - `Player.age` is 1 to 4; `Player.deeds` is `{ age2, army, raid }` (`army` is the most soldiers
-  alive at once), `Player.deeds4` `{ relic, champion, veteran }`; `Player.lost` and `razed` count
+  alive at once), `Player.deeds4` `{ relic, champion, veteran }`; `Player.lost` (with a fallen shelter's garrison that finds no room) and `razed` count
   units and buildings (not palisade pieces) lost, `Player.elite` the mastery unlock; `Player.boon` and `Player.boonPending`, `Player.edge` and `Player.edgePending`,
   `Player.temperament`, `Player.scouted` and `Player.out`; `Player.bell` (the bell is ringing) and
   `Player.rates` (the Market's wood and food rates).

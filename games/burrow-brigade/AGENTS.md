@@ -44,7 +44,7 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
   (`looks`). One blue mole against `DAILY_TARGETS` (4) straw moles that never take a turn, for `DAILY_SHOTS` (5)
   turns. The score (`dailyScore`) is the damage done to them plus `DAILY_KO` (25) for each one
   out; `finishDaily` keeps today's, the best and the streak, shown on the menu and the result.
-- **Match report:** `dealt` adds up each mole's damage to enemies (from `World.log.damage` at the
+- **Match report:** `dealt` adds up each mole's damage to enemies (from `World.log.damage`, the health a hit really took, at the
   end of its turn), and the result names the star of the match (`star`).
 - **Campaign** (`game/campaign.ts`): eight battles (`BATTLES`) against rival burrows, played from
   the menu's Campaign screen (`showCampaign`, a card per battle). Each has a set theme, its own team
@@ -63,7 +63,8 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
   own stars (`vstars`, through `tierStars`).
   **Trades** (`showTrades`, opened by a battle's card; `trade-<k>-left`/`-right`, `fight`): each of
   your moles (`mine` plus the recruit) gets a trade by its place in the line-up, saved as
-  `trades` and filled by `tradesFor` (Digger, Gunner, Medic, Scout in turn). `Mole.trade` then:
+  `trades` and filled by `tradesFor` (Digger, Gunner, Medic, Scout in turn); opening the screen
+  starts from the saved trades, so picks left with Back are not kept. `Mole.trade` then:
   a Digger's Burrow lasts `DIGGER_REACH` (2) times as long; a Gunner sets `World.gunner` to
   `GUNNER_POWER` (1.15) on its turn, which `World.hurt` applies to damage to enemies while it is the
   turn team; a living Medic gives its team a Repair Kit on every `MEDIC_EVERY` (3)th turn
@@ -92,7 +93,7 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
   walking, then `settle` waits for the world to be still (`World.busy`), plays the deaths of moles at
   0 health (each becomes a molehill with a team flag) and ends the turn. Each turn has a new wind
   from -10 to 10 (calm 15% of the time). After a turn a crate falls 40% of the time (30% of those
-  heal 25, the rest hold one weapon from `CRATE_WEAPONS`). From turn `SUDDEN_DEATH_TURN` (24) the
+  heal 25, the rest hold one weapon from `CRATE_WEAPONS`; a mole at 0 health picks none up). From turn `SUDDEN_DEATH_TURN` (24) the
   water rises 8 px a turn. Fall damage starts at a landing speed of 360 px/s.
 - **Weapons:** 28 in `game/weapons.ts` (`WEAPON_IDS`, grouped `rocket`, `throw`, `strike`, `close`,
   `tool`), each with a `mode`: `aim` (angle and power), `angle` (Burrow, Sunbeam and Gust Fan),
@@ -109,8 +110,8 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
   helmets add to it): feet at `y` on the first earth pixel, walking up steps of 5
   px, jumps (`jump`, Enter) and backflips (Backspace), an `act` for actions that hold it (`dig`,
   `hop`, `pound`, `die`, and the short `swipe`, `throw`, `recoil` and `cheer` poses).
-- **Burrow AI** (`game/ai.ts`): picks the weakest enemy, uses Paw Swipe or Ground Pound when one is
-  next to it, the Repair Kit below 40 health, now and then a Storm Bolt or Balloon Drop (aimed
+- **Burrow AI** (`game/ai.ts`): picks the weakest enemy, uses Paw Swipe or Ground Pound (not with a friend
+  within its 50 px) when one is next to it, the Repair Kit below 40 health, now and then a Storm Bolt or Balloon Drop (aimed
   upwind for the drift), otherwise tries Acorn Rocket, Pebble Grenade and sometimes one special over
   a grid of angles and powers with the game's own `flight`, scoring the miss, with big penalties for
   hurting itself or a friend. A shot whose blast reaches a powder keg next to an enemy scores as a
@@ -178,7 +179,7 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
 ## Save keys
 
 - `burrow-brigade-stats`: `{ games, wins, used }`, matches started (not in Watch AI), wins against the
-  AI and the weapons the player has used.
+  AI and the weapons the player has used (`loadStats` keeps only well-formed fields).
 - `burrow-brigade-prefs`: `{ size, hat, options }`, moles a team, the hat worn (or null) and the
   Options panel's choices with the match kind (`cleanOptions` checks each).
 - `burrow-brigade-campaign`: `{ stars, vstars, acorns, levels, trades }`, the best stars (0 to 3) of each

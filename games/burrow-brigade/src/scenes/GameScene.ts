@@ -505,11 +505,12 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** The Trades screen before a campaign battle: a trade for each of your moles, in the order they go. */
-  showTrades(i: number) {
+  showTrades(i: number, fresh = false) {
     this.clearUi();
     const bt = BATTLES[i];
     const n = bt.mine + boosts(this.campaign.levels).moles;
-    if (this.tradePick.length !== n) this.tradePick = tradesFor(this.campaign.trades, n);
+    // Opened from the campaign it starts from the saved trades; a step keeps the picks on screen.
+    if (fresh || this.tradePick.length !== n) this.tradePick = tradesFor(this.campaign.trades, n);
     const cx = this.W / 2;
     const cy = this.H / 2;
     const rh = 52;
@@ -588,7 +589,7 @@ export class GameScene extends Phaser.Scene {
         card.on('pointerout', () => card.setFillStyle(C.button));
         card.on('pointerdown', () => {
           ui('click');
-          this.showTrades(i);
+          this.showTrades(i, true);
         });
       }
       this.buttons[`battle-${i}`] = { x, y, w: cw, h: ch };
