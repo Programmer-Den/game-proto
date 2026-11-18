@@ -4,11 +4,11 @@
 import Phaser from 'phaser';
 import { paintAll, texScale } from '../art/paint';
 import { paintGround, groundKey } from '../art/ground';
-import { AFTER_BOSS, BOSS_FLAG, BREAKABLE, buildMap, centre, CUTTABLE, DUNGEONS, FEET, LOW, MAP_IDS, setTile, SOLID, TILE, tileAt, underBoulder, type Door, type EnemyKind, type Facing, type FishId, type ItemId, type MapDef, type MapId, type NpcId, type Prop, type PropKind, type RequestId } from '../game/maps';
+import { AFTER_BOSS, BOSS_FLAG, BREAKABLE, buildMap, centre, CUTTABLE, DUNGEONS, FEET, LOW, MAP_IDS, setTile, SOLID, TILE, tileAt, underBoulder, type Door, type EnemyKind, type Facing, type FishId, type ItemId, type MapDef, type MapId, type NpcId, type Prop, type PropKind, type RequestId, WAYSTONES } from '../game/maps';
 import { findPath, type Step } from '../game/path';
 import { plusStones } from '../game/plus';
 import {
-  advance, buy, CHAPTER_ONE_STONES, CHAPTER_THREE_STONES, CHAPTER_TWO_STONES, clearSave, clock, cook, endMeal, FISH_MAX, found, give, hasFlag, hasUpgrade, load, maxSeeds, MEALS, MOONSTONES, newPlus, newState, reached, REQUESTS, reward, save, setFlag, stoneCounts, stonesToFind, UPGRADES,
+  advance, buy, PURSE, CHAPTER_ONE_STONES, CHAPTER_THREE_STONES, CHAPTER_TWO_STONES, clearSave, clock, cook, endMeal, FISH, FISH_MAX, found, give, hasFlag, hasUpgrade, load, maxSeeds, MEALS, MOONSTONES, newPlus, newState, reached, REQUESTS, reward, save, setFlag, stoneCounts, stonesToFind, UPGRADES,
   type GameState, type Seller,
 } from '../game/state';
 import { talk, type TalkEffect } from '../game/talk';
@@ -22,12 +22,12 @@ import { Hud } from './hud';
 import { awardNow, checkTrophies } from '../trophies/check';
 import { NightLight, type Light } from './light';
 import {
-  ARMOURED, BELL_DOWN_MS, BRINE, BULB_DOWN_MS, FAMILIES, familyDone, familyOf, GULL_SWOOP_MS, GULL_SWOOP_SPEED, PAGE_AT, DOWN_MS, LANTERN_KEEP, LANTERN_LIFT, LANTERN_SHOT_MS, BULB_EVERY_MS, BULB_HP, BULB_UP_MS, BURST_PX, DROP_MS, EXPOSED_MS, FOES, foeFree, FROG_LEAP_MS, FROG_WAIT_MS, FUSE_MS, GLOAM, HOVER_MS, HOVER_SPEED,
+  ARMOURED, BELL_DOWN_MS, BRINE, FLING, KNIGHT, LURE, BULB_DOWN_MS, FAMILIES, familyDone, familyOf, GULL_SWOOP_MS, GULL_SWOOP_SPEED, PAGE_AT, DOWN_MS, LANTERN_KEEP, LANTERN_LIFT, LANTERN_SHOT_MS, BULB_EVERY_MS, BULB_HP, BULB_UP_MS, BURST_PX, DROP_MS, EXPOSED_MS, FOES, foeFree, FROG_LEAP_MS, FROG_WAIT_MS, FUSE_MS, GLOAM, HOVER_MS, HOVER_SPEED,
   makeFoe, PLUS, SEED_SPEED, SHADE_SEEN_PX, SLAM_PX, SUMMON_MS, THORNLING_SHOT_MS, TRIAL, VOLLEY_MS, WRAITH_HP,
   type Bomb, type Boss, type Brine, type Foe, type Gloam, type Seed, type Wraith,
 } from './foes';
 import {
-  BITE_MS, BOOTS, CHARM, CHOWDER, FISH_WAIT_MS, GLIMMER_PX, GUST, SKEWER, HURT_MS, LANTERN, LONG_VINE, LANTERN_OIL, PICKUP_PX, PLANT_REACH, PULL_SPEED, ROLL_COOLDOWN_MS, ROLL_MS, ROLL_SPEED, STICK, SWING_COOLDOWN_MS, SWING_MS, SWING_RADIUS, SWING_REACH, VEIL_PX, VINE_RANGE, VINE_SPEED,
+  BITE_MS, BOOTS, CARRY, CHARM, CHOWDER, FISH_WAIT_MS, GLIMMER_PX, GUST, SKEWER, HURT_MS, LANTERN, LONG_VINE, LANTERN_OIL, PICKUP_PX, PLANT_REACH, PULL_SPEED, ROLL_COOLDOWN_MS, ROLL_MS, ROLL_SPEED, STICK, SWING_COOLDOWN_MS, SWING_MS, SWING_RADIUS, SWING_REACH, VEIL_PX, VINE_RANGE, VINE_SPEED,
   WALK_SPEED, WHETSTONE,
 } from './layout';
 
@@ -52,6 +52,7 @@ const PROP_ART: Record<PropKind, { key: string; foot: number; solid: boolean }> 
   campfire: { key: 'campfire', foot: 27 / 30, solid: true },
   mill: { key: 'mill', foot: 104 / 112, solid: true },
   pinwheel: { key: 'pinwheel', foot: 37 / 40, solid: true },
+  waystone: { key: 'waystone', foot: 42 / 46, solid: true },
 };
 
 /** Each kind of foe's name and picture on the bestiary page. */
@@ -65,6 +66,7 @@ const FOE_PAGE: Record<EnemyKind, { key: string; name: TextKey }> = {
   shade: { key: 'shade', name: 'shadeName' },
   crab: { key: 'crab', name: 'crabName' },
   gull: { key: 'gull-a', name: 'gullName' },
+  knight: { key: 'knight', name: 'knightName' },
 };
 
 /** What each request's things look like where they lie, and the text that names one. */
@@ -96,7 +98,7 @@ type Target =
   | { kind: 'npc'; id: NpcId }
   | { kind: 'chest'; id: string }
   | { kind: 'sign'; i: number }
-  | { kind: 'cut' | 'dig' | 'block' | 'door' | 'ring' | 'plant' | 'hourglass' | 'fish' | 'cook'; tx: number; ty: number }
+  | { kind: 'cut' | 'dig' | 'block' | 'door' | 'ring' | 'plant' | 'hourglass' | 'fish' | 'cook' | 'way' | 'lure'; tx: number; ty: number }
   | { kind: 'foe'; foe: Foe };
 
 interface Dialog {
@@ -123,6 +125,10 @@ export class GameScene extends Phaser.Scene {
   fishing: { t: number; bite: boolean; fish: FishId; x: number; y: number; bobber: Phaser.GameObjects.Image } | null = null;
   /** Bellseeds planted and swelling. */
   bombs: Bomb[] = [];
+  /** A fish thrown into the water, luring foes to it until it sinks (`LURE`). */
+  bait: { x: number; y: number; t: number; sprite: Phaser.GameObjects.Image } | null = null;
+  /** Moonlight the gust horn carried along its blast: points that light hidden bridges while `t` lasts (`CARRY`). */
+  carried: { x: number; y: number; t: number }[] = [];
   /**
    * The hourglass trial under way: its dungeon and the play time since it started. While it runs the
    * dungeon's foes are back and its boss wakes again, harder (`TRIAL`); leaving or falling ends it.
@@ -159,6 +165,10 @@ export class GameScene extends Phaser.Scene {
   private dug = new Set<string>();
   /** The hidden bridges' stones (by tile), shown where the Moonlantern's light falls. */
   private veilSprites = new Map<number, Phaser.GameObjects.Image>();
+  /** The mist's wisps over a chasm (`MapDef.mist`). */
+  private mistSprites: Phaser.GameObjects.Image[] = [];
+  /** This map's waystone, if it has one. */
+  private wayStone: Phaser.GameObjects.Image | null = null;
   /** A request's things lying here, by `<request>-<index>` in the map's `finds`. */
   private findSprites = new Map<string, Phaser.GameObjects.Image>();
   /** The glimmer over each moonstone a new game+ buried, by stone id. */
@@ -177,6 +187,8 @@ export class GameScene extends Phaser.Scene {
   stick: { id: number; ox: number; oy: number; x: number; y: number; wx: number; wy: number; live: boolean } | null = null;
   private swing: { t: number; dir: Facing } | null = null;
   private swingCd = 0;
+  /** A swing that rang off an iron knight's guard too early leaves the blade out of time to parry for a moment (`KNIGHT.lockMs`), so mashing never parries. */
+  private parryLock = 0;
   private roll: { t: number; dx: number; dy: number } | null = null;
   private rollCd = 0;
   /** The hookvine in flight: going out, coming back, or pulling the knight to a post. */
@@ -236,6 +248,11 @@ export class GameScene extends Phaser.Scene {
     for (const p of this.pods) p.sprite.destroy();
     for (const c of this.coins) c.sprite.destroy();
     for (const b of this.bombs) b.sprite.destroy();
+    this.bait?.sprite.destroy();
+    this.bait = null;
+    this.carried = [];
+    this.mistSprites = [];
+    this.wayStone = null;
     this.seeds = [];
     this.hearts = [];
     this.pods = [];
@@ -329,6 +346,9 @@ export class GameScene extends Phaser.Scene {
         }
       }
 
+    for (const m of map.mist ?? [])
+      for (let ty = m.y; ty < m.y + m.h; ty++)
+        for (let tx = m.x; tx < m.x + m.w; tx++) this.mistSprites.push(this.addWorld(this.add.image(tx * TILE + 16, ty * TILE + 16, 'mist'), -4990).setAlpha(0.7));
     for (const p of map.props) this.addProp(p);
     for (const n of map.npcs) {
       const c = centre(n);
@@ -477,11 +497,13 @@ export class GameScene extends Phaser.Scene {
 
   private addProp(p: Prop) {
     const art = PROP_ART[p.kind];
-    const key = p.kind === 'statue' ? `statue-${p.facing ?? 'down'}` : p.kind === 'bell' ? `bell-${p.note ?? 1}` : art.key;
+    const lit = p.kind === 'waystone' && hasFlag(this.state, `way-${this.map.id}`);
+    const key = p.kind === 'statue' ? `statue-${p.facing ?? 'down'}` : p.kind === 'bell' ? `bell-${p.note ?? 1}` : lit ? 'waystone-lit' : art.key;
     const x = (p.x + p.w / 2) * TILE;
     const bottom = (p.y + p.h) * TILE;
     const img = this.addWorld(this.add.image(x, bottom, key).setOrigin(0.5, art.foot), bottom - 1);
     if (p.kind === 'bell') this.bells.push({ note: p.note ?? 1, x: p.x, y: p.y, sprite: img });
+    if (p.kind === 'waystone') this.wayStone = img;
     if (p.kind === 'mill' || p.kind === 'pinwheel') {
       // The sails (or the pinwheel's head) are their own image, turning once the horn has blown on them.
       const mill = p.kind === 'mill';
@@ -526,6 +548,9 @@ export class GameScene extends Phaser.Scene {
         break;
       case 'mill':
         this.glows.push({ x, y: bottom - 56, r: 60, col: WARM, power: 0.6 });
+        break;
+      case 'waystone':
+        if (lit) this.glows.push(this.wayGlow(x, bottom));
         break;
     }
   }
@@ -584,9 +609,36 @@ export class GameScene extends Phaser.Scene {
     return Phaser.Math.Clamp(1.4 - Math.hypot(x - this.state.x, y - (this.state.y - 6)) / reach, 0, 1);
   }
 
-  /** Whether the Moonlantern's light reaches a hidden bridge's tile. */
+  /**
+   * Whether the Moonlantern's light reaches a hidden bridge's tile: its own light close by, or light
+   * the gust horn carried. Under mist only carried light shows it, and the tile under the knight's
+   * feet, so they never stand on one that vanished.
+   */
   private lit(tx: number, ty: number) {
-    return this.moonlight((tx + 0.5) * TILE, (ty + 0.5) * TILE, VEIL_PX) > 0;
+    return this.veilLight(tx, ty) > 0;
+  }
+
+  /** How brightly a hidden bridge's tile is lit, 0 to 1. */
+  private veilLight(tx: number, ty: number) {
+    const x = (tx + 0.5) * TILE;
+    const y = (ty + 0.5) * TILE;
+    const carried = this.carriedAt(x, y);
+    if (!this.inMist(tx, ty)) return Math.max(carried, this.moonlight(x, y, VEIL_PX));
+    const s = this.state;
+    const feet = FEET.some(([dx, dy]) => Math.floor((s.x + dx) / TILE) === tx && Math.floor((s.y + dy) / TILE) === ty);
+    return Math.max(carried, feet && s.items.moonlantern ? 0.5 : 0);
+  }
+
+  /** How much carried moonlight lies on a point, 0 to 1. */
+  private carriedAt(x: number, y: number) {
+    let best = 0;
+    for (const c of this.carried) if (Math.hypot(c.x - x, c.y - y) < CARRY.r) best = Math.max(best, Math.min(1, c.t / 600));
+    return best;
+  }
+
+  /** Whether a tile lies under the map's mist. */
+  private inMist(tx: number, ty: number) {
+    return (this.map.mist ?? []).some((m) => tx >= m.x && tx < m.x + m.w && ty >= m.y && ty < m.y + m.h);
   }
 
   /** Things that stand on tiles, for foes (which can't walk through people or blocks either). */
@@ -707,6 +759,9 @@ export class GameScene extends Phaser.Scene {
     const buried = this.map.stones.find((st) => st.hidden === 'buried' && st.x === tx && st.y === ty && !this.dug.has(st.id));
     if (buried && s.items.sword) return this.goTo({ kind: 'dig', tx, ty }, tx, ty, true);
     if (this.map.props.some((p) => p.kind === 'campfire' && p.x === tx && p.y === ty)) return this.goTo({ kind: 'cook', tx, ty }, tx, ty);
+    if (this.map.props.some((p) => p.kind === 'waystone' && p.x === tx && p.y === ty)) return this.goTo({ kind: 'way', tx, ty }, tx, ty);
+    // With a foe hunting the knight, a tap on water throws it a fish from the creel instead of casting.
+    if (tileAt(this.map, tx, ty) === 'water' && this.canLure()) return this.goTo({ kind: 'lure', tx, ty }, tx, ty);
     if (this.fishable(tx, ty)) return this.goTo({ kind: 'fish', tx, ty }, tx, ty);
     if (this.fishless(tx, ty) && !this.brinePool(tx, ty)) return this.noFish();
     this.target = null;
@@ -766,6 +821,7 @@ export class GameScene extends Phaser.Scene {
     if (t.kind === 'cut' || t.kind === 'dig' || t.kind === 'ring') this.startSwing();
     else if (t.kind === 'plant') this.plantSeed();
     else if (t.kind === 'fish') this.startFishing(t.tx, t.ty);
+    else if (t.kind === 'lure') this.throwBait(t.tx, t.ty);
     else this.interactAt(at.x, at.y);
   }
 
@@ -779,6 +835,8 @@ export class GameScene extends Phaser.Scene {
     if (this.interactAt(tx, ty)) return;
     // Facing water with the rod, the knight casts, unless a foe is close enough to swing at.
     const foeNear = this.foes.some((f) => f.alive && Math.hypot(f.x - (s.x + d.x * SWING_REACH), f.y - s.y - d.y * SWING_REACH) < 44);
+    // Foes about but none in reach: a fish thrown into the water draws them off.
+    if (tileAt(this.map, tx, ty) === 'water' && !foeNear && this.canLure()) return this.throwBait(tx, ty);
     if (this.fishable(tx, ty) && !foeNear) return this.startFishing(tx, ty);
     // The Brinewyrm is not in `foes`: facing its pool, the swing goes on to `hitBrine`.
     if (this.fishless(tx, ty) && !foeNear && !this.brinePool(tx, ty)) return this.noFish();
@@ -805,6 +863,10 @@ export class GameScene extends Phaser.Scene {
     }
     if (this.map.props.some((p) => p.kind === 'campfire' && p.x === tx && p.y === ty)) {
       this.openCook();
+      return true;
+    }
+    if (this.map.props.some((p) => p.kind === 'waystone' && p.x === tx && p.y === ty)) {
+      this.useWaystone();
       return true;
     }
     if (this.hourglassAt(tx, ty)) {
@@ -846,6 +908,53 @@ export class GameScene extends Phaser.Scene {
       return true;
     }
     return false;
+  }
+
+  /** A lit waystone's soft blue light. */
+  private wayGlow(x: number, bottom: number): Light {
+    return { x, y: bottom - 30, r: 90, col: [150, 210, 255], power: 0.75 };
+  }
+
+  /** Touching this map's waystone: the first time it wakes, after that it opens the way to the other lit ones. */
+  private useWaystone() {
+    const s = this.state;
+    const id = this.map.id;
+    if (!hasFlag(s, `way-${id}`)) {
+      setFlag(s, `way-${id}`);
+      sfx('chime');
+      const img = this.wayStone;
+      if (img) {
+        img.setTexture('waystone-lit').setScale(texScale('waystone-lit'));
+        this.glows.push(this.wayGlow(img.x, img.y));
+        if (!settings.reduceMotion) this.flashes.push({ x: img.x, y: img.y - 30, r: 140, col: [170, 220, 255], power: 1, t: 500 });
+      }
+      this.hud.toast(t('wayWakes'), HINT_MS);
+      this.persist();
+      return;
+    }
+    this.openWays();
+  }
+
+  /** The waystone's card: every lit stone, and the one the knight stands at. Picking one carries them there. */
+  private openWays() {
+    const s = this.state;
+    const here = this.map.id;
+    const stones = WAYSTONES.filter((w) => w.map === here || hasFlag(s, `way-${w.map}`));
+    const rows = stones.map((w) => ({
+      name: t(w.map),
+      text: '',
+      label: w.map === here ? t('wayHere') : t('wayGo'),
+      live: w.map !== here,
+    }));
+    this.route = null;
+    this.target = null;
+    this.stick = null;
+    this.hud.showShop(t('wayTitle'), stones.length > 1 ? t('wayNote') : t('wayAlone'), null, rows, (i) => {
+      const w = stones[i];
+      this.hud.closeShop();
+      sfx('swell');
+      this.fadeTo(() => this.enterMap(w.map, (w.x + 0.5) * TILE, (w.y + 1.5) * TILE + 4, 'down', false));
+    }, true);
   }
 
   /** Whether the dungeon's hourglass stands on a tile (it is there only after chapter two). */
@@ -967,6 +1076,7 @@ export class GameScene extends Phaser.Scene {
       moonlantern: t('foundMoonlantern'),
       horn: t('foundHorn'),
       rod: t('foundRod'),
+      purse: t('foundPurse', { n: PURSE }),
     };
     // The Moonlantern is chapter three's tool: finding it points the story at the caverns. The gust horn does the same for the sea cave.
     if (item === 'moonlantern' && s.quest === 'peaks') advance(s, 'caverns');
@@ -1174,6 +1284,9 @@ export class GameScene extends Phaser.Scene {
     const hx = s.x + d.x * SWING_REACH * sharp;
     const hy = s.y - 10 + d.y * SWING_REACH * sharp;
     const reach = SWING_RADIUS * sharp;
+    // A swing as an iron knight's sword comes down parries it: the knight reels, open to the blade.
+    for (const f of this.foes)
+      if (f.alive && f.kind === 'knight' && f.strike > 0 && f.strike <= KNIGHT.parryMs && this.parryLock <= 0 && Math.hypot(f.x - hx, f.y - 8 - hy) < reach + 26) this.parry(f);
     // Foes and the Thornmother's bulbs in reach.
     for (const f of this.foes) if (f.alive && Math.hypot(f.x - hx, f.y - 8 - hy) < reach + 12) this.hitFoe(f, d);
     if (this.boss) for (const b of this.boss.bulbs) if (b.state === 'down' && Math.hypot(b.x - hx, b.y - 10 - hy) < SWING_RADIUS + 14) this.hitBulb(b);
@@ -1304,8 +1417,46 @@ export class GameScene extends Phaser.Scene {
     this.target = null;
   }
 
+  /** The hookvine catches a planted bellseed and flings it: it flies over water and pits until a wall stops it, then bursts there. */
+  private fling(b: Bomb, dx: number, dy: number) {
+    b.fly = { dx, dy, left: FLING.px, from: FLING.px };
+    // It keeps its fuse long enough to land first.
+    b.t = Math.max(b.t, (FLING.px / FLING.speed) * 1000 + 300);
+    sfx('twang');
+  }
+
+  /** A flung bellseed's flight, a few pixels at a time so it stops at the first wall. */
+  private flyBomb(b: Bomb, dt: number) {
+    const f = b.fly!;
+    let left = Math.min(f.left, (FLING.speed * dt) / 1000);
+    while (left > 0) {
+      const step = Math.min(4, left);
+      left -= step;
+      const nx = b.x + f.dx * step;
+      const ny = b.y + f.dy * step;
+      const tx = Math.floor(nx / TILE);
+      const ty = Math.floor(ny / TILE);
+      const tile = tileAt(this.map, tx, ty);
+      const k = ty * this.map.w + tx;
+      if ((SOLID.has(tile) && !LOW.has(tile)) || this.blockers.has(k) || this.closedDoors.has(k)) {
+        f.left = 0;
+        break;
+      }
+      b.x = nx;
+      b.y = ny;
+      f.left -= step;
+    }
+    const p = 1 - f.left / f.from;
+    b.sprite.setPosition(b.x, b.y - Math.sin(p * Math.PI) * FLING.arc).setDepth(b.y);
+    if (f.left <= 0) {
+      b.fly = undefined;
+      b.sprite.setY(b.y);
+    }
+  }
+
   private updateBombs(dt: number) {
     for (const b of this.bombs) {
+      if (b.fly) this.flyBomb(b, dt);
       b.t -= dt;
       // The fuse ticks every 300ms, then quickly once it starts to flicker.
       if (b.t > 0 && b.t <= (this.ticks.get(b) ?? 0)) {
@@ -1536,6 +1687,8 @@ export class GameScene extends Phaser.Scene {
       if (f.kind === 'lantern') this.knockDown(f);
       else f.stun = Math.max(f.stun, GUST.stunMs);
       f.leap = 0;
+      // A gust spoils an iron knight's strike, but never opens its guard.
+      f.strike = 0;
       for (let k = 0; k < GUST.push / 4; k++)
         if (foeFree(this.map, this.standing, f.x + d.x * 4, f.y + d.y * 4, FOES[f.kind].flies)) {
           f.x += d.x * 4;
@@ -1548,6 +1701,11 @@ export class GameScene extends Phaser.Scene {
       return false;
     });
     for (const m of this.mills) if (!m.turned && inGust(m.cx, m.cy)) this.turnMill(m);
+    // Blown with the Moonlantern lit, the gust carries its light along the blast, past the lantern's reach and through mist.
+    if (s.items.moonlantern) {
+      this.carried = [];
+      for (let k = 0; k <= CARRY.px; k += CARRY.step) this.carried.push({ x: s.x + d.x * k, y: s.y - 4 + d.y * k, t: CARRY.ms });
+    }
     const b = this.brine;
     if (b && b.state === 'up' && inGust(b.x, b.y - 10)) this.beachBrine();
   }
@@ -1596,6 +1754,41 @@ export class GameScene extends Phaser.Scene {
   private noFish() {
     ui('refuse');
     this.hud.toast(t('fishNone'));
+  }
+
+  /** Whether a fish thrown into water would lure something: the creel holds one and a foe hunts the knight, or the Brinewyrm lurks. */
+  private canLure() {
+    const s = this.state;
+    if (!FISH.some((f) => s.fish[f] > 0)) return false;
+    if (this.brine?.awake && this.brine.state === 'under') return true;
+    return this.foes.some((f) => f.alive && f.kind !== 'knight' && Math.hypot(f.x - s.x, f.y - s.y) < Math.min(LURE.range, FOES[f.kind].sees));
+  }
+
+  /** Throws a fish from the creel into the water: foes nearby go for it until it sinks, and the Brinewyrm rises by it. */
+  private throwBait(tx: number, ty: number) {
+    const s = this.state;
+    if (this.fishing || this.roll || this.hook || tileAt(this.map, tx, ty) !== 'water' || !this.canLure()) return;
+    // The fish the creel holds most of.
+    const fish = FISH.reduce((a, b) => (s.fish[b] > s.fish[a] ? b : a));
+    s.fish[fish]--;
+    const c = centre({ x: tx, y: ty });
+    this.bait?.sprite.destroy();
+    this.bait = { x: c.x, y: c.y, t: LURE.ms, sprite: this.addWorld(this.add.image(c.x, c.y, 'bait'), -4000) };
+    sfx('cast');
+    sfx('splash', { pitch: 1.4 });
+    this.hud.toast(t('baitThrown', { fish: t(fish) }));
+    this.route = null;
+    this.target = null;
+    const b = this.brine;
+    if (b && b.state === 'under' && this.brinePool(tx, ty)) {
+      let best = 0;
+      b.spots.forEach((sp, i) => {
+        if (Math.hypot(sp.wx - c.x, sp.wy - c.y) < Math.hypot(b.spots[best].wx - c.x, b.spots[best].wy - c.y)) best = i;
+      });
+      b.spot = best;
+      b.t = Math.min(b.t, 350);
+    }
+    this.persist();
   }
 
   /** Casts into the water tile: a bite comes after a while, and must be pulled in time. */
@@ -1706,6 +1899,7 @@ export class GameScene extends Phaser.Scene {
     if (!this.dialog && !this.hud.covered && !this.fading) {
       if (this.trial) this.trial.ms += dt;
       this.swingCd = Math.max(0, this.swingCd - dt);
+      this.parryLock = Math.max(0, this.parryLock - dt);
       this.rollCd = Math.max(0, this.rollCd - dt);
       this.hornCd = Math.max(0, this.hornCd - dt);
       this.invuln = Math.max(0, this.invuln - dt);
@@ -1719,6 +1913,7 @@ export class GameScene extends Phaser.Scene {
       this.updateGloam(dt);
       this.updateBrine(dt);
       this.updateFishing(dt);
+      this.updateLights(dt);
       this.updateWisp(dt);
       this.pickups();
       this.updateDoors();
@@ -1730,6 +1925,24 @@ export class GameScene extends Phaser.Scene {
     this.drawWorld();
     this.hud.update(dt, s, this.dialog ? { speaker: this.dialog.speaker, text: this.dialog.lines[this.dialog.i] } : null, DUNGEONS.has(this.map.id), this.trial?.ms ?? null);
     this.hud.drawStick(this.stick?.live ? this.stick : null);
+  }
+
+  /** The bait sinks, the horn's carried moonlight fades, and the mist's hint shows once the Moonlantern nears it. */
+  private updateLights(dt: number) {
+    const s = this.state;
+    for (const c of this.carried) c.t -= dt;
+    this.carried = this.carried.filter((c) => c.t > 0);
+    const b = this.bait;
+    if (b) {
+      b.t -= dt;
+      const bob = settings.reduceMotion ? 0 : Math.sin(this.now / 200) * 1.5;
+      b.sprite.setY(b.y + bob).setAlpha(Math.min(1, b.t / 600));
+      if (b.t <= 0) {
+        b.sprite.destroy();
+        this.bait = null;
+      }
+    }
+    if (s.items.moonlantern && this.mistSprites.some((m) => Math.hypot(m.x - s.x, m.y - s.y) < 90)) this.hint('mistHint');
   }
 
   private movePlayer(dt: number) {
@@ -1836,7 +2049,8 @@ export class GameScene extends Phaser.Scene {
     const dist = Math.hypot(dx, dy);
     if (dist < SWING_REACH + 16) {
       s.facing = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : dy > 0 ? 'down' : 'up';
-      this.startSwing();
+      // An iron knight on guard waits for the player's own timed swing: only a reeling one is struck at once.
+      if (f.kind !== 'knight' || f.down > 0) this.startSwing();
       return { x: 0, y: 0 };
     }
     this.chaseT -= dt;
@@ -1906,6 +2120,13 @@ export class GameScene extends Phaser.Scene {
       h.x += h.dx * step;
       h.y += h.dy * step;
       h.dist += step;
+      // A planted bellseed caught on the vine is flung far on the way it flies.
+      const bomb = this.bombs.find((b) => !b.fly && Math.hypot(b.x - h.x, b.y - 14 - h.y) < 16);
+      if (bomb) {
+        this.fling(bomb, h.dx, h.dy);
+        h.phase = 'back';
+        return;
+      }
       // The post the knight stands on doesn't count, so they can throw on from it.
       const post = this.map.posts.find((p) => Math.hypot(centre(p).x - h.x, centre(p).y - 12 - h.y) < 16 && Math.hypot(centre(p).x - s.x, centre(p).y - s.y) > 20);
       if (post) {
@@ -1932,7 +2153,13 @@ export class GameScene extends Phaser.Scene {
       const foe = this.foes.find((f) => f.alive && Math.hypot(f.x - h.x, f.y - 10 - h.y) < 16);
       if (foe) {
         if (ARMOURED.has(foe.kind)) this.knockDown(foe);
-        else foe.stun = 1600;
+        // The vine only rings off an iron knight's plate.
+        else if (foe.kind === 'knight') {
+          sfx('tink', { pitch: 0.8 });
+          this.hint('knightGuard');
+          h.phase = 'back';
+          return;
+        } else foe.stun = 1600;
         sfx('latch');
         h.phase = 'back';
         return;
@@ -2078,8 +2305,31 @@ export class GameScene extends Phaser.Scene {
     this.hint(f.kind === 'beetle' ? 'beetleFlipped' : 'lanternDown');
   }
 
+  /** A swing met an iron knight's strike: it reels off balance for KNIGHT.staggerMs, when the sword bites. */
+  private parry(f: Foe) {
+    f.strike = 0;
+    f.down = KNIGHT.staggerMs;
+    // The parrying swing itself turns the blow; the next swing is the free hit.
+    f.hurt = 200;
+    f.t = KNIGHT.restMs;
+    sfx('parry');
+    this.puff(f.x, f.y - 22, 0xf0f4ff);
+    if (!settings.reduceMotion) this.flashes.push({ x: f.x, y: f.y - 22, r: 110, col: [230, 240, 255], power: 1, t: 300 });
+    this.hint('parried');
+  }
+
+  /** An iron knight's sword comes down: it hurts the knight if they are still in reach and not rolling. */
+  private knightStrike(f: Foe) {
+    const s = this.state;
+    f.t = KNIGHT.restMs;
+    sfx('slash');
+    const d = f.dir;
+    this.puff(f.x + d.x * 22, f.y - 10 + d.y * 22, 0xdfe6f0);
+    if (Math.hypot(s.x - f.x, s.y - f.y) < KNIGHT.reach + 6) this.hurt(KNIGHT.damage * (s.cycle > 0 ? PLUS.damage : 1), f);
+  }
+
   /** A toast that shows once since the page opened, to teach the armoured foes. */
-  private hint(key: 'beetleFlipped' | 'lanternDown' | 'shellHard' | 'gloamHigh' | 'brineSlick' | 'bulbHigh' | 'bulbUp' | 'thornRing' | 'thornmotherHow') {
+  private hint(key: 'beetleFlipped' | 'lanternDown' | 'shellHard' | 'gloamHigh' | 'brineSlick' | 'bulbHigh' | 'bulbUp' | 'thornRing' | 'thornmotherHow' | 'knightWinds' | 'knightGuard' | 'parried' | 'mistHint') {
     if (this.hinted.has(key)) return;
     this.hinted.add(key);
     this.hud.toast(t(key), HINT_MS);
@@ -2095,6 +2345,14 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     if (f.kind === 'lantern' && f.down <= 0) return;
+    // An iron knight's plate turns everything until a parry knocks it off balance.
+    if (f.kind === 'knight' && f.down <= 0) {
+      f.hurt = 250;
+      this.parryLock = KNIGHT.lockMs;
+      sfx('tink', { pitch: 0.8 });
+      this.hint('knightGuard');
+      return;
+    }
     f.hp--;
     f.hurt = 250;
     // Only the knight hits foes (the sword and their own bellseeds), so every hit is theirs.
@@ -2107,6 +2365,8 @@ export class GameScene extends Phaser.Scene {
     f.alive = false;
     this.state.beaten++;
     if (f.kind === 'beetle') awardNow('bellyUp');
+    // A beaten knight's plate falls with a clang.
+    if (f.kind === 'knight') sfx('clang', { pitch: 1.5 });
     // The bestiary: a page fills at PAGE_AT, a family with every page filled drops an extra coin.
     const book = this.state.bestiary;
     const family = familyOf(f.kind);
@@ -2114,7 +2374,7 @@ export class GameScene extends Phaser.Scene {
     book[f.kind] = (book[f.kind] ?? 0) + 1;
     if (book[f.kind] === PAGE_AT) this.hud.toast(!had && familyDone(book, family) ? t('familyFull', { family: t(family) }) : t('pageFilled', { name: t(FOE_PAGE[f.kind].name) }));
     if (familyDone(book, family)) this.dropCoin(f.x + 4, f.y - 10);
-    this.puff(f.x, f.y - 10, f.kind === 'moth' ? 0xc8bce0 : f.kind === 'lantern' ? 0xf0c070 : f.kind === 'beetle' ? 0x3a7a8a : f.kind === 'shade' ? 0x40466a : f.kind === 'crab' ? 0xc8603a : f.kind === 'gull' ? 0xe8eef4 : 0x6a8a4a);
+    this.puff(f.x, f.y - 10, f.kind === 'moth' ? 0xc8bce0 : f.kind === 'lantern' ? 0xf0c070 : f.kind === 'beetle' ? 0x3a7a8a : f.kind === 'shade' ? 0x40466a : f.kind === 'crab' ? 0xc8603a : f.kind === 'gull' ? 0xe8eef4 : f.kind === 'knight' ? 0x9aa4b4 : 0x6a8a4a);
     f.sprite.destroy();
     if (DUNGEONS.has(this.map.id) && f.index >= 0) setFlag(this.state, this.foeFlag(f.index));
     // Every foe leaves a coin (two with Wren's deep purse), and sometimes a heart or a seed pod beside it.
@@ -2152,7 +2412,47 @@ export class GameScene extends Phaser.Scene {
       f.t -= dt;
       let vx = 0;
       let vy = 0;
-      if (f.kind === 'slug' || f.kind === 'beetle') {
+      // A fish in the water draws every foe near it but the iron knights, who forget the knight meanwhile.
+      const bait = this.bait;
+      const lured = !!bait && f.kind !== 'knight' && Math.hypot(bait.x - f.x, bait.y - f.y) < LURE.range;
+      if (bait && lured) {
+        const bx = bait.x - f.x;
+        const by = bait.y - f.y;
+        const bd = Math.hypot(bx, by);
+        f.leap = 0;
+        if (bd > 14 && info.speed > 0) {
+          vx = (bx / bd) * LURE.speed;
+          vy = (by / bd) * LURE.speed;
+          f.dir = { x: bx / bd, y: by / bd };
+        }
+      } else if (f.kind === 'knight') {
+        // An iron knight closes in, raises its sword and strikes; a swing in time parries (`startSwing`).
+        if (f.strike > 0) {
+          f.strike -= dt;
+          if (f.strike <= 0) {
+            f.strike = 0;
+            this.knightStrike(f);
+          }
+        } else if (sees) {
+          f.dir = { x: dx / dist, y: dy / dist };
+          if (dist > KNIGHT.reach - 10) {
+            vx = (dx / dist) * info.speed;
+            vy = (dy / dist) * info.speed;
+          } else if (f.t <= 0) {
+            f.strike = KNIGHT.windMs;
+            sfx('rattle', { pitch: 2 });
+            this.hint('knightWinds');
+          }
+        } else {
+          if (f.t <= 0) {
+            const a = Math.random() * Math.PI * 2;
+            f.dir = Math.random() < 0.4 ? { x: 0, y: 0 } : { x: Math.cos(a), y: Math.sin(a) };
+            f.t = 1500 + Math.random() * 1500;
+          }
+          vx = f.dir.x * info.speed * 0.6;
+          vy = f.dir.y * info.speed * 0.6;
+        }
+      } else if (f.kind === 'slug' || f.kind === 'beetle') {
         if (sees) {
           vx = (dx / dist) * info.speed * 1.4;
           vy = (dy / dist) * info.speed * 1.4;
@@ -2261,7 +2561,7 @@ export class GameScene extends Phaser.Scene {
       else if (f.kind === 'frog' || f.kind === 'gull') f.leap = 0;
       else f.t = 0;
       // A lantern moth flies too high to bump into.
-      if (f.kind !== 'lantern' && Math.hypot(s.x - f.x, s.y - f.y) < 18) this.hurt(info.damage * (s.cycle > 0 ? PLUS.damage : 1), f);
+      if (f.kind !== 'lantern' && !lured && Math.hypot(s.x - f.x, s.y - f.y) < 18) this.hurt(info.damage * (s.cycle > 0 ? PLUS.damage : 1), f);
     }
     this.foes = this.foes.filter((f) => f.alive);
   }
@@ -3022,6 +3322,7 @@ export class GameScene extends Phaser.Scene {
         : f.kind === 'beetle' && f.down > 0 ? 'beetle-back'
         : f.kind === 'shade' ? (flap ? 'shade' : 'shade-b')
         : f.kind === 'gull' ? (flap ? 'gull-a' : 'gull-b')
+        : f.kind === 'knight' ? (f.down > 0 ? 'knight-reel' : f.strike > 0 ? 'knight-raise' : 'knight')
         : f.kind;
       const lift =
         f.kind === 'moth' || f.kind === 'shade' ? 12
@@ -3035,7 +3336,7 @@ export class GameScene extends Phaser.Scene {
       f.sprite.setAlpha((f.stun > 0 ? 0.6 : 1) * seen);
       if (f.hurt > 0 && !settings.reduceMotion) f.sprite.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
       else f.sprite.clearTint().setTintMode(Phaser.TintModes.MULTIPLY);
-      if ((f.kind === 'slug' || f.kind === 'beetle' || f.kind === 'frog') && f.dir.x) f.sprite.setFlipX(f.kind === 'frog' ? f.dir.x < 0 : s.x < f.x);
+      if ((f.kind === 'slug' || f.kind === 'beetle' || f.kind === 'frog' || f.kind === 'knight') && f.dir.x) f.sprite.setFlipX(f.kind === 'frog' || f.kind === 'knight' ? f.dir.x < 0 : s.x < f.x);
     }
     for (const [id, img] of this.stoneSprites) {
       const st = this.map.stones.find((x) => x.id === id);
@@ -3045,7 +3346,12 @@ export class GameScene extends Phaser.Scene {
       img.setY(c.y - 4 + (settings.reduceMotion ? 0 : Math.sin(this.now / 350 + c.x) * 2));
     }
     // The hidden bridges fade in where the Moonlantern shines; a moved moonstone glimmers in the knight's light.
-    for (const [, img] of this.veilSprites) img.setAlpha(this.moonlight(img.x, img.y, VEIL_PX));
+    for (const [k, img] of this.veilSprites) img.setAlpha(this.veilLight(k % this.map.w, Math.floor(k / this.map.w)));
+    // The mist thins where carried moonlight lies on it, and drifts unless motion is reduced.
+    for (const m of this.mistSprites) {
+      const drift = settings.reduceMotion ? 0 : Math.sin(this.now / 900 + m.x / 40) * 0.08;
+      m.setAlpha(Math.max(0.15, 0.65 + drift - this.carriedAt(m.x, m.y) * 0.5));
+    }
     // A mill or pinwheel the horn has blown on keeps turning.
     for (const m of this.mills) if (m.turned) m.head.setAngle((this.now / (m.prop.kind === 'mill' ? 30 : 6)) % 360);
     for (const [, img] of this.glimmers) {
@@ -3062,6 +3368,13 @@ export class GameScene extends Phaser.Scene {
     const bw = this.brine;
     if (bw && bw.awake) lights.push({ x: bw.x, y: bw.y - 30, r: 120, col: [140, 240, 210], power: bw.state === 'under' ? 0.3 : 0.6 });
     if (this.fishing) lights.push({ x: this.fishing.x, y: this.fishing.y, r: 30, col: [255, 230, 170], power: 0.5 });
+    if (this.bait) lights.push({ x: this.bait.x, y: this.bait.y, r: 30, col: [200, 230, 255], power: 0.4 });
+    for (let i = 0; i < this.carried.length; i += 2) {
+      const c = this.carried[i];
+      lights.push({ x: c.x, y: c.y, r: 46, col: [200, 220, 255], power: 0.5 * Math.min(1, c.t / 600) });
+    }
+    // An iron knight's raised sword glints as a warning.
+    for (const f of this.foes) if (f.alive && f.kind === 'knight' && f.strike > 0) lights.push({ x: f.x, y: f.y - 40, r: 50, col: [230, 240, 255], power: 0.8 });
     for (const [, img] of this.stoneSprites) if (img.visible) lights.push({ x: img.x, y: img.y, r: 40, col: [170, 210, 255], power: 0.6 });
     if (this.wisp) lights.push({ x: this.wisp.sprite.x, y: this.wisp.sprite.y, r: 110, col: [170, 230, 255], power: 0.9 });
     if (this.boss) {

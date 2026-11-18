@@ -394,6 +394,21 @@ const en = {
   keys: 'Keys {n}',
   seeds: 'Seeds {n}',
   readOn: 'Tap or Space',
+  // Round five: parrying the iron knights, the tools together, and the waystones.
+  knightName: 'Iron knight',
+  iron: 'Iron guard',
+  knightWinds: 'The iron knight raises its sword. Swing just as it comes down to parry, or roll clear!',
+  knightGuard: 'Clang! Its plate turns everything. Parry its strike to throw it off balance.',
+  parried: 'Parried! It reels off balance: strike now!',
+  mistHint: 'Mist swallows the Moonlantern\'s light here. Something has to carry it across.',
+  wayWakes: 'The waystone wakes. Touch any lit waystone to travel to the others.',
+  wayTitle: 'Waystones',
+  wayNote: 'Where to?',
+  wayAlone: 'No other waystone is lit yet.',
+  wayHere: 'You are here',
+  wayGo: 'Travel',
+  foundPurse: 'You found a purse of old coins! {n} coins.',
+  baitThrown: 'You throw {fish} into the water. Something will want it.',
 };
 
 export default en;

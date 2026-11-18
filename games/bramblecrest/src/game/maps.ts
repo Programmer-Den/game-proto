@@ -51,8 +51,8 @@ export const BOSS_FLAG: Partial<Record<MapId, string>> = { shrine: 'boss', belfr
 export const AFTER_BOSS: Record<string, string> = { 's-boss': 'boss', 'b-bell': 'wraith', 'c-boss': 'gloam', 'g-boss': 'brine' };
 export type Facing = 'up' | 'down' | 'left' | 'right';
 export type PropKind = 'house' | 'shed' | 'well' | 'lamp' | 'statue' | 'arch' | 'hut' | 'brazier' | 'shroom' | 'bench' | 'rock' | 'tower' | 'bell' | 'candle' | 'cave' | 'crystal'
-  | 'campfire' | 'mill' | 'pinwheel';
-export type EnemyKind = 'slug' | 'moth' | 'thornling' | 'frog' | 'beetle' | 'lantern' | 'shade' | 'crab' | 'gull';
+  | 'campfire' | 'mill' | 'pinwheel' | 'waystone';
+export type EnemyKind = 'slug' | 'moth' | 'thornling' | 'frog' | 'beetle' | 'lantern' | 'shade' | 'crab' | 'gull' | 'knight';
 export type NpcId = 'elder' | 'pip' | 'baker' | 'cat' | 'hermit' | 'herder' | 'fisher';
 /** What bites where the knight fishes: perch in the village pond, eels in the woods and the fen, bream off the coast. */
 export type FishId = 'perch' | 'eel' | 'bream';
@@ -105,7 +105,20 @@ export interface Moonstone { id: string; x: number; y: number; hidden?: 'buried'
 export interface Find { req: RequestId; x: number; y: number }
 export interface Room { id: string; x: number; y: number; w: number; h: number }
 
-export type ItemId = 'sword' | 'hookvine' | 'key' | 'heart' | 'oil' | 'seeds' | 'moonlantern' | 'horn' | 'rod';
+export type ItemId = 'sword' | 'hookvine' | 'key' | 'heart' | 'oil' | 'seeds' | 'moonlantern' | 'horn' | 'rod' | 'purse';
+
+/**
+ * The waystones, in the order the travel card lists them: one in Mossford and one outside each
+ * dungeon's door. Lit by the knight (flag `way-<map>`), a lit one carries them to any other lit one
+ * (`GameScene.openWays`); they arrive on the tile below it, facing down.
+ */
+export const WAYSTONES: { map: MapId; x: number; y: number }[] = [
+  { map: 'village', x: 22, y: 9 },
+  { map: 'woods', x: 45, y: 6 },
+  { map: 'fen', x: 28, y: 8 },
+  { map: 'peaks', x: 22, y: 6 },
+  { map: 'coast', x: 21, y: 4 },
+];
 
 export interface MapDef {
   id: MapId;
@@ -144,6 +157,11 @@ export interface MapDef {
   drain?: { x: number; y: number; w: number; h: number };
   /** The Brinewyrm's pool in the grotto's hall, in tiles. */
   pool?: { x: number; y: number; w: number; h: number };
+  /**
+   * Mist over a chasm: the Moonlantern's own light doesn't reach the hidden bridge under it, only
+   * moonlight the gust horn carries there (`GameScene.carried`).
+   */
+  mist?: { x: number; y: number; w: number; h: number }[];
 }
 
 /** A small fixed-seed random number generator, so the maps are the same every time. */
@@ -433,6 +451,8 @@ function belfry(): MapDef {
     { kind: 'frog', x: 4, y: 24, room: 'bells' }, { kind: 'frog', x: 8, y: 25, room: 'bells' }, { kind: 'slug', x: 9, y: 19, room: 'bells' },
     { kind: 'frog', x: 32, y: 19, room: 'flood' }, { kind: 'moth', x: 28, y: 24, room: 'flood' },
     { kind: 'beetle', x: 16, y: 24, room: 'hub' }, { kind: 'lantern', x: 32, y: 25, room: 'flood' },
+    // Round five: an iron knight, beaten only by parrying its strike.
+    { kind: 'knight', x: 19, y: 25, room: 'hub' },
   );
   b.prop('candle', 14, 31).prop('candle', 21, 31).prop('candle', 14, 19).prop('candle', 21, 25).prop('candle', 3, 19).prop('candle', 9, 19);
   b.prop('candle', 25, 19).prop('candle', 33, 26).prop('candle', 7, 4).prop('candle', 28, 4).prop('candle', 7, 12).prop('candle', 28, 12);
@@ -528,7 +548,15 @@ function caverns(): MapDef {
     { kind: 'beetle', x: 16, y: 24, room: 'hub' }, { kind: 'shade', x: 23, y: 27, room: 'hub' }, { kind: 'frog', x: 18, y: 28, room: 'hub' },
     { kind: 'shade', x: 3, y: 30, room: 'chasm' }, { kind: 'shade', x: 10, y: 22, room: 'chasm' },
     { kind: 'frog', x: 29, y: 22, room: 'ledges' }, { kind: 'lantern', x: 36, y: 29, room: 'ledges' },
+    { kind: 'knight', x: 21, y: 29, room: 'hub' },
   );
+  // A ledge at the foot of the chasm under a mist the Moonlantern's own light can't pierce: the gust
+  // horn has to carry its light down the bridges, from the stone's branch or from the east ledge.
+  b.set(6, 31, 'floor').set(7, 31, 'floor');
+  bridge(b, 6, 30, '');
+  bridge(b, 8, 31, 'r');
+  d.mist = [{ x: 6, y: 30, w: 4, h: 2 }];
+  d.chests.push({ id: 'caverns-mist', x: 7, y: 31, item: 'heart' });
   b.prop('crystal', 15, 35).prop('crystal', 24, 35).prop('crystal', 14, 22).prop('crystal', 25, 30).prop('crystal', 2, 31).prop('crystal', 11, 20);
   b.prop('crystal', 28, 31).prop('crystal', 37, 20).prop('crystal', 7, 4).prop('crystal', 32, 4).prop('crystal', 7, 14).prop('crystal', 32, 14);
   // The Gloamwing's hall, the coldest and darkest place in the kingdom.
@@ -584,6 +612,11 @@ function coast(): MapDef {
     { kind: 'crab', x: 14, y: 19 }, { kind: 'crab', x: 25, y: 20 }, { kind: 'crab', x: 29, y: 11 },
     { kind: 'gull', x: 9, y: 20 }, { kind: 'gull', x: 26, y: 17 }, { kind: 'gull', x: 23, y: 3 },
   );
+  // A third islet, out past the north shore: a post walled in by two boulders, which only a
+  // bellseed flung across the water on the hookvine can break.
+  b.rect(37, 11, 3, 3, 'grass').set(37, 12, 'boulder').set(38, 13, 'boulder');
+  d.posts.push({ x: 33, y: 12 }, { x: 38, y: 12 });
+  d.chests.push({ id: 'tide-purse', x: 39, y: 12, item: 'purse' });
   d.fish = 'bream';
   return d;
 }
@@ -616,6 +649,7 @@ function grotto(): MapDef {
     { kind: 'shade', x: 18, y: 22, room: 'hub' }, { kind: 'frog', x: 15, y: 24, room: 'hub' }, { kind: 'thornling', x: 21, y: 19, room: 'hub' },
     { kind: 'crab', x: 5, y: 21, room: 'wind' }, { kind: 'crab', x: 8, y: 23, room: 'wind' },
     { kind: 'frog', x: 33, y: 21, room: 'tide' }, { kind: 'lantern', x: 32, y: 25, room: 'tide' },
+    { kind: 'knight', x: 17, y: 34, room: 'entry' }, { kind: 'knight', x: 19, y: 24, room: 'hub' },
   );
   b.prop('shroom', 14, 31).prop('shroom', 21, 36).prop('shroom', 14, 19).prop('shroom', 21, 25).prop('shroom', 3, 25).prop('shroom', 9, 19);
   b.prop('shroom', 25, 19).prop('shroom', 33, 26).prop('shroom', 7, 3).prop('shroom', 28, 3).prop('shroom', 7, 12).prop('shroom', 28, 12);
@@ -640,7 +674,11 @@ export function isMapId(id: unknown): id is MapId {
 
 /** A fresh copy of a map's layout. */
 export function buildMap(id: MapId): MapDef {
-  return BUILT[id]();
+  const d = BUILT[id]();
+  // The waystone stands after everything else, so the scatter's trees and bushes stay put.
+  const w = WAYSTONES.find((x) => x.map === id);
+  if (w) d.props.push({ kind: 'waystone', x: w.x, y: w.y, w: 1, h: 1 });
+  return d;
 }
 
 export function tileAt(map: MapDef, x: number, y: number): Tile {
