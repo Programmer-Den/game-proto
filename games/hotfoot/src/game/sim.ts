@@ -311,6 +311,8 @@ function mission(s: GameState, kind: MissionKind, n: number) {
     effect(s, 'pop', s.distance + 360, RUNNER.h + 150, 2200, 'missionPop', reward);
     const next = dealMission(b, i);
     if (next.kind === 'metres') next.from = metres(s.distance);
+    // A row mission counts the stomps from when it is dealt, not the row already under way.
+    else if (next.kind === 'row') next.from = s.row;
     b.slots[i] = next;
   });
 }
@@ -418,6 +420,8 @@ function hurt(s: GameState, kind: TrapKind | 'wall' | 'boss' | 'rock') {
   }
   s.hits += 1;
   s.row = 0;
+  // A row mission dealt mid-row counts from 0 again once the row is broken.
+  for (const m of s.missions?.slots ?? []) if (m.kind === 'row') m.from = 0;
   r.hurtMs = st.hurtMs;
   // A no-hit dare is lost to any hit, a blocked one included.
   if (s.dare?.kind === 'nohit' && !s.dare.done) s.dare.failed = true;
@@ -560,6 +564,8 @@ export function tick(s: GameState, dt: number) {
       hurt(s, hit.kind);
     }
     if (s.phase !== 'running') return;
+    // A log run through while unhurtable did no harm, but it wasn't slid under either.
+    if (r.hurtMs > 0) for (const t of s.traps) if (t.kind === 'blade' && !t.touched && touches(s, t)) t.touched = true;
     // A hanging log passed without a hit was slid under.
     for (const t of s.traps) {
       if (t.kind !== 'blade' || t.passed || t.x + t.w >= s.distance - RUNNER.w / 2) continue;

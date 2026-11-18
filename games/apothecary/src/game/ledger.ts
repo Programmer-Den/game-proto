@@ -24,7 +24,7 @@ export interface Ledger {
 }
 
 const blankDay = (day: number): LedgerDay => ({ day, stations: {}, empty: {} });
-export const createLedger = (): Ledger => ({ today: blankDay(1), yesterday: null });
+export const createLedger = (day = 1): Ledger => ({ today: blankDay(day), yesterday: null });
 
 /** The ledger opens once anything works without the doctor: a craftsman hired or pixies flying. */
 export const ledgerOpen = (state: GameState) =>

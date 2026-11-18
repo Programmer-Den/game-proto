@@ -2,6 +2,7 @@ import type { ItemId } from './items';
 import { BELT_GAP_MS, BELT_MS, BELTS, COLUMNS_BELT_MS, COLUMNS_LAYOUT, FEEDERS_LAYOUT, GUILD_UPGRADES, HEART_LAYOUT, PLOTS_PER_GARDEN, U_BELT_MS, createInitialState, gardenOf, type GameState, type Plot } from './state';
 import { beltSpan } from '../scenes/layout';
 import { SHOP_IDS, createShop, normalizeTown } from './town';
+import { createLedger } from './ledger';
 
 const KEY = 'apothecary-save';
 
@@ -44,6 +45,9 @@ export function loadState(): GameState {
       state.untoldCure = { season: untold, day: day ?? state.contract.day };
     }
     if (state.plague) delete state.plague.told;
+    // A save from before the ledger got a blank one for day 1: start it on the save's own day, so its
+    // first yesterday is a real day.
+    if (!state.ledger.yesterday && state.ledger.today.day !== state.contract.day) state.ledger = createLedger(state.contract.day);
     // A save from before the guild took members has already joined if it bought any guild upgrade.
     if (!saved.guild && GUILD_UPGRADES.some((id) => state.upgrades[id].level > 0 || state.upgrades[id].paid > 0)) {
       state.guild = { built: true, paid: 0 };

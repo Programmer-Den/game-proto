@@ -903,6 +903,6 @@ export function playMade(s: GameState) {
 export function startCode(s: GameState, text: string) {
   const board = decode(text);
   if (!board || !playable(board.shape, board.grid)) return false;
-  s.made = { shape: board.shape, grid: board.grid.slice() };
+  // `s.made` stays the player's own maker board: a shared puzzle never takes its place.
   return playCustom(s, board.shape, board.grid);
 }

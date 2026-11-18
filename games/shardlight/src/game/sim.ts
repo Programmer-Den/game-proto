@@ -56,13 +56,17 @@ export interface Orb {
   held: number | null;
   /** -1 to 1: the bar spin it carries, curving it left or right; 0 for none. */
   spin: number;
+  /** The pane it bounced off and still touches: a moving pane pushes it without hitting it again. */
+  lastPane?: number;
 }
 export interface Bead {
   x: number;
   y: number;
-  /** Falling speed; a mirror pane throws a bead back up. */
+  /** Falling speed; a mirror pane throws a bead back up, once. */
   vy: number;
   kind: BeadKind;
+  /** Thrown back up by a mirror already, so it falls through the next one. */
+  mirrored?: boolean;
 }
 
 export type SimEvent =
@@ -120,7 +124,7 @@ export class Sim {
   timers: Partial<Record<BeadKind, number>> = {};
   sticky = 0;
   result: 'won' | 'over' | null = null;
-  /** Milliseconds played. */
+  /** Milliseconds played with an orb in flight (not while every orb waits on the bar). */
   time = 0;
   /** Seconds the moving panes have moved: it stands still while a bell rings. */
   motion = 0;
@@ -173,6 +177,13 @@ export class Sim {
   moveBar(x: number) {
     const half = this.barW / 2;
     this.barX = Math.max(half, Math.min(this.w - half, x));
+  }
+
+  /** Puts the bar straight at `x` (a tap): a jump, not a sweep, so it gives the orb no spin. */
+  jumpBar(x: number) {
+    this.moveBar(x);
+    this.barTrail = [this.barX];
+    this.barVel = 0;
   }
 
   /** Whether a guardian still stands, so the heart takes no harm. */
@@ -231,7 +242,7 @@ export class Sim {
   }
 
   private tick(dt: number) {
-    this.time += dt * 1000;
+    if (this.orbs.some((o) => o.held === null)) this.time += dt * 1000;
     if (this.still > 0) this.still = Math.max(0, this.still - dt);
     else this.motion += dt;
     this.placePanes();
@@ -339,6 +350,12 @@ export class Sim {
       const nx = Math.max(p.x, Math.min(orb.x, p.x + p.w));
       const ny = Math.max(p.y, Math.min(orb.y, p.y + p.h));
       if ((orb.x - nx) ** 2 + (orb.y - ny) ** 2 > ORB_R * ORB_R) continue;
+      // Still touching the pane it just bounced off (a sliding or turning pane can catch it up):
+      // pushed out again, but one touch is one hit.
+      if (p.id === orb.lastPane && !fire) {
+        this.bounceFrom(orb, p);
+        return;
+      }
       // A fire orb burns through every pane but the heart and the guardians, without bouncing.
       if (fire && !TOUGH.has(p.kind)) {
         this.breakPane(p, orb);
@@ -353,8 +370,10 @@ export class Sim {
         else this.events.push({ type: 'crack', pane: p });
       }
       // One bounce a step, so an orb in a corner between two panes never turns twice.
+      orb.lastPane = p.id;
       return;
     }
+    orb.lastPane = undefined;
   }
 
   private bounceFrom(orb: Orb, p: Pane) {
@@ -409,11 +428,12 @@ export class Sim {
     for (const bead of this.beads) {
       bead.vy = Math.min(BEAD_FALL, bead.vy + 600 * dt);
       bead.y += bead.vy * dt;
-      // A falling bead that meets a mirror pane is thrown back up.
-      if (bead.vy > 0)
+      // A falling bead that meets a mirror pane is thrown back up, once: after that it falls through.
+      if (bead.vy > 0 && !bead.mirrored)
         for (const p of this.panes)
           if (p.alive && p.kind === 'mirror' && bead.x > p.x && bead.x < p.x + p.w && bead.y + BEAD_R > p.y && bead.y < p.y + p.h / 2) {
             bead.vy = -BEAD_FALL * 1.3;
+            bead.mirrored = true;
             this.events.push({ type: 'mirror', bead });
             break;
           }

@@ -32,7 +32,7 @@ export interface Mission {
   tier: number;
   /** How far it has come this run. */
   progress: number;
-  /** For metres: the metre it was dealt at, which it counts from. */
+  /** For metres: the metre it was dealt at; for a row: the stomps in the row when it was dealt (0 again after a hit). It counts from there. */
   from: number;
 }
 
