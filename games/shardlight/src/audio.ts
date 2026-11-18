@@ -76,6 +76,16 @@ export const SFX = sounds({
   curse: { wave: 'sawtooth', freq: 300, to: 180, length: 0.22, volume: 0.18, gap: 80 },
   /** The orb leaves the bar. */
   launch: { wave: 'sine', freq: 440, to: 880, length: 0.12, volume: 0.2, gap: 100 },
+  /** The orb leaves a moving bar with a spin: a quick whoosh up. */
+  spin: { wave: 'noise', freq: 1200, to: 3600, length: 0.12, volume: 0.12, gap: 80 },
+  /** A guarded heart rings the orb off: a hollow stone knock. */
+  shield: { wave: 'triangle', freq: 150, to: 120, length: 0.16, volume: 0.22, gap: 80 },
+  /** A bell pane breaks and the rows stand still: a bell's strike. */
+  bell: { wave: 'sine', freq: 784, arp: [0, 12, 7], arpStep: 0.09, length: 0.7, volume: 0.26, gap: 300 },
+  /** A prism pane splits the orb. */
+  prism: { wave: 'pulse25', freq: 880, arp: [0, 4, 7, 12], arpStep: 0.04, length: 0.2, volume: 0.18, gap: 100 },
+  /** A bead bounces up off a mirror pane. */
+  mirror: { wave: 'sine', freq: 1046, to: 1568, length: 0.1, volume: 0.14, gap: 80 },
   /** An orb falls past the bar. */
   lost: { wave: 'triangle', freq: 392, to: 98, length: 0.45, volume: 0.3, gap: 200 },
 });

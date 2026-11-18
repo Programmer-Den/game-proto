@@ -3,7 +3,8 @@ import { expect, test, type Page } from '@playwright/test';
 // Plays the first round with real inputs: picks the first window on the map, launches the orb with a
 // click and steers the bar with the mouse, breaking panes until the window is restored. The bar is
 // put where the lowest orb will come down, off-centre so the orb flies back at the nearest pane
-// still standing, as a player aims. Then back on the map the second window is open.
+// still standing, as a player aims. On its first return the bar sweeps in under the orb, a spin shot
+// that curves the orb's flight. Then back on the map the second window is open.
 // Game state is only read, through the `game` object the dev build puts on window.
 
 interface Orb {
@@ -12,6 +13,8 @@ interface Orb {
   vx: number;
   vy: number;
   held: boolean;
+  /** The bar spin it carries, -1 to 1. */
+  spin: number;
 }
 interface Play {
   left: number;
@@ -22,6 +25,8 @@ interface Play {
   barY: number;
   barW: number;
   orbs: Orb[];
+  /** Bar hits that gave the orb a spin. */
+  spins: number;
   panes: { x: number; y: number; w: number; h: number }[];
 }
 interface State {
@@ -29,6 +34,8 @@ interface State {
   window: number;
   stars: number[];
   lead: number;
+  /** 1 for each window whose feat is done. */
+  feats: number[];
   play: Play | null;
 }
 type Spot = { x: number; y: number; w: number; h: number };
@@ -180,9 +187,22 @@ test('plays the first round', async ({ page }, testInfo) => {
   expect(s.play!.orbs[0].held, 'the orb is launched').toBe(false);
   expect(s.play!.orbs[0].vy).toBeLessThan(0);
 
+  /**
+   * The spin shot: the frame before the orb comes down for the first time, the bar waits 40 to the
+   * right of its spot, then sweeps left onto it in the last frame, so it is moving as it hits the orb (`SPIN_MIN` in
+   * `src/game/sim.ts`). `spin` goes from wait to armed to swept, and to done once checked.
+   */
+  let spin: 'wait' | 'armed' | 'swept' | 'done' = 'wait';
+  const SWEEP = 40;
   /** Puts the bar under the lowest falling orb, aimed back at the pane nearest the bar. */
   let lastX = -1;
   async function steer(state: Play) {
+    if (spin === 'swept' && state.orbs.some((o) => o.vy < 0)) {
+      // The orb is off the moving bar with a spin, turning it left, the way the bar swept.
+      expect(state.spins, 'a spin shot').toBe(1);
+      expect(state.orbs[0].spin, 'the orb spins the way the bar moved').toBeLessThan(-0.3);
+      spin = 'done';
+    }
     const falling = state.orbs.filter((o) => !o.held && o.vy > 0);
     if (!falling.length) return;
     const top = state.barY - ORB_R;
@@ -198,6 +218,12 @@ test('plays the first round', async ({ page }, testInfo) => {
       barX = x - (k * state.barW) / 2;
     }
     barX = Math.round(barX);
+    const due = ((top - orb.y) / orb.vy) * 1000;
+    if (spin === 'wait' && due > FRAME_MS && due <= 2 * FRAME_MS) spin = 'armed';
+    if (spin === 'armed') {
+      if (due > FRAME_MS) barX += SWEEP;
+      else spin = 'swept';
+    }
     if (barX === lastX) return;
     lastX = barX;
     p = await onPage({ x: field.x + barX, y: field.y + state.barY + 4 });
@@ -220,6 +246,7 @@ test('plays the first round', async ({ page }, testInfo) => {
     FRAME_MS,
   );
   expect(won, 'window played out').toBe(true);
+  expect(spin, 'the spin shot was played and checked').toBe('done');
   s = await game.state();
   expect(s.play!.result, 'the window is restored').toBe('won');
   expect(s.play!.left).toBe(0);
@@ -233,6 +260,9 @@ test('plays the first round', async ({ page }, testInfo) => {
   await snap('playthrough-2-restored');
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('shardlight-progress') ?? '{}'));
   expect(saved.stars[0]).toBe(s.stars[0]);
+  // The first window's feat, restoring it in under a minute, pays its seal (`featOf` in src/game/levels.ts).
+  expect(s.feats[0], 'the first window’s feat').toBe(1);
+  expect(saved.feats[0]).toBe(1);
 
   // Back on the map, the second window is open.
   await press('result-map');

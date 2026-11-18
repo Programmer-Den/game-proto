@@ -20,6 +20,8 @@ const de: Translation<typeof en> = {
   allStarsText: 'Hole drei Sterne in jedem Fenster einer Kapelle.',
   allChapels: 'Meisterglaser',
   allChapelsText: 'Erneuere jedes Fenster aller fünf Kapellen.',
+  clerestory: 'Endloses Licht',
+  clerestoryText: 'Erneuere 5 Fenster in Folge im Lichtgaden.',
 };
 
 export default de;
