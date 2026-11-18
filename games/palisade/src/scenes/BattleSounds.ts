@@ -2,7 +2,7 @@ import { playMusic, playSting, type Song } from '../../../../shared/audio';
 import { BOSS_MARCH, MARCH } from '../audio/music';
 import { sfx } from '../audio/sfx';
 import { ENEMIES } from '../game/enemies';
-import { omenEffects } from '../game/omens';
+import { fieldSight } from '../game/sim';
 import { SPAWN_X, type GameState } from '../game/state';
 import { isBossWave } from '../game/waves';
 
@@ -59,7 +59,7 @@ export class BattleSounds {
     this.music_(s);
     if (!b || b.state !== s) return;
     const fresh = (id: number) => id >= b.nextId;
-    const sight = omenEffects(s.omen).sight;
+    const sight = fieldSight(s);
 
     // What was launched: one sound per volley.
     const launched = new Set(s.missiles.filter((m) => fresh(m.id)).map((m) => m.kind));

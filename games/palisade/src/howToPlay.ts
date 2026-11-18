@@ -22,6 +22,8 @@ const en: HowToPlay = {
     },
     { input: 'Repair button, during a break', action: 'Mend 15% of the barricade for coins, a little dearer each time' },
     { input: 'Accept or Refuse an omen', action: 'From wave 4, take on a harder wave for 30% more experience' },
+    { input: 'Tap a foe during a wave', action: 'Mark it for 2 Arrow Rain charge: the ranger focuses it and hits it harder for 5 seconds' },
+    { input: 'Pick on a wayside event', action: 'From wave 6, tend a scout, buy from a peddler or pray at a shrine, or pass by' },
     { input: 'Tap a card', action: 'Take that upgrade at a level-up, or that road after a boss' },
     { input: '1x / 2x button', action: 'Switch the battle between normal and double speed' },
     { input: 'Skill book button', action: 'See every upgrade and relic you have found' },
@@ -48,6 +50,7 @@ const en: HowToPlay = {
     'Retiring a hero opens the mage, who casts bolts through shields and has a skill tree of their own.',
     'A second retirement opens the warden, who slams foes back from the barricade with a hound at their side.',
     'The ballista pierces a whole line of foes; the catapult lobs stones into the back ranks.',
+    'From wave 5 the chip at the top right names the weather a wave ahead: rain damps burning, wind slows shots, fog hides the far field.',
     'After lifting the siege, Endless siege keeps the waves coming, stronger each time, for a best wave per map.',
   ],
 };
@@ -72,6 +75,8 @@ const de: HowToPlay = {
     },
     { input: 'Reparieren, in einer Pause', action: '15 % der Barrikade für Münzen reparieren, jedes Mal etwas teurer' },
     { input: 'Ein Omen annehmen oder ablehnen', action: 'Ab Welle 4 eine härtere Welle für 30 % mehr Erfahrung wagen' },
+    { input: 'Einen Feind in einer Welle antippen', action: 'Für 2 Pfeilregen-Ladung markieren: Der Waldläufer nimmt ihn 5 Sekunden lang ins Visier und trifft ihn härter' },
+    { input: 'Bei einem Ereignis am Weg wählen', action: 'Ab Welle 6 einen Späher pflegen, beim Hausierer kaufen oder am Schrein beten, oder weitergehen' },
     { input: 'Eine Karte antippen', action: 'Diese Verbesserung beim Stufenaufstieg nehmen, oder diesen Weg nach einem Boss' },
     { input: '1x / 2x', action: 'Den Kampf zwischen normaler und doppelter Geschwindigkeit wechseln' },
     { input: 'Fertigkeiten-Taste', action: 'Jede gefundene Verbesserung und Reliquie ansehen' },
@@ -98,6 +103,7 @@ const de: HowToPlay = {
     'Der erste Ruhestand öffnet den Magier, der Bolzen durch Schilde zaubert und eigene Fertigkeiten hat.',
     'Der zweite Ruhestand öffnet den Wächter, der Feinde mit einem Hund an seiner Seite von der Barrikade zurückschlägt.',
     'Die Balliste durchbohrt eine ganze Reihe Feinde; das Katapult wirft Steine in die hinteren Reihen.',
+    'Ab Welle 5 nennt das Schild oben rechts das Wetter eine Welle im Voraus: Regen dämpft Brennen, Sturm bremst Schüsse, Nebel verbirgt das ferne Feld.',
     'Nach der gebrochenen Belagerung lässt Endlos weiter die Wellen immer stärker kommen, mit einer besten Welle pro Karte.',
   ],
 };

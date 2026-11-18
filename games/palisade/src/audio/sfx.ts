@@ -54,6 +54,8 @@ export const sfx = sounds({
   crash: { wave: 'noise', freq: 700, to: 50, length: 0.75, volume: 0.42, gap: 500 },
   /** Hammering something up: a guard hired or trained, a fortification, a repair. */
   build: { wave: 'triangle', freq: 420, to: 150, length: 0.12, volume: 0.32, gap: 100, vary: 0.05 },
+  /** A foe marked for the ranger: a short rising two-note call. */
+  mark: { wave: 'pulse25', freq: 880, arp: [0, 7], arpStep: 0.05, length: 0.14, volume: 0.16, gap: 120 },
   /** An omen accepted: an ominous chord. */
   omen: { wave: 'sawtooth', freq: 110, arp: [0, 3, 6], arpStep: 0.12, length: 0.6, attack: 0.05, volume: 0.18, gap: 400 },
   /** A boss's rock (or throw) landing. */

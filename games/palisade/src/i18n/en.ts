@@ -410,6 +410,48 @@ const en = {
   endlessOpenNew: 'Endless siege: hold on past wave 30 as every wave grows stronger.',
   endlessChipNew: 'Endless siege',
   endlessFallenNew: 'Endless siege on this map: no wave past 30 cleared yet.',
+
+  // Weather by wave
+  weatherRainName: 'Rain',
+  weatherRainText: 'Burning lasts half as long; the mud slows foes on foot by 10%',
+  weatherWindName: 'Wind',
+  weatherWindText: 'Shots fly slower; Arrow Rain is blown back towards the wall, on a wider ring',
+  weatherFogName: 'Fog',
+  weatherFogText: 'Foes stay unseen until three quarters of the way in; kills pay 25% more coins',
+  clearSky: 'Clear',
+  weatherChip: '{now} now · {next} next wave',
+
+  // Wayside events
+  eventTitle: 'On the road before wave {wave}: {event}',
+  scoutName: 'A wounded scout',
+  scoutText: 'Tend him and he joins you as a spearman (or trains a guard). Send him on and he scouts the road: the next wave’s foes have {n}% less health.',
+  scoutTake: 'Tend him',
+  scoutLeave: 'Send him on',
+  peddlerName: 'A peddler',
+  peddlerText: 'He offers {relic}: {text}. It costs half your coins.',
+  peddlerTake: 'Buy for {n}',
+  shrineName: 'A wayside shrine',
+  shrineText: 'Pray for a blessing and a curse, both for {n} waves: {blessing} ({blessingText}) and {curse} ({curseText}).',
+  shrineTake: 'Pray',
+  passBy: 'Pass by',
+  eventLeft: 'Left alone, it passes by.',
+  mightName: 'Might',
+  mightText: '25% more damage',
+  swiftBlessName: 'Swift Hands',
+  swiftBlessText: '20% faster shots',
+  fortuneName: 'Fortune',
+  fortuneText: '40% more coins',
+  restlessName: 'Restless',
+  restlessText: 'foes 15% faster',
+  brittleName: 'Brittle',
+  brittleText: 'the barricade takes 30% more damage',
+  dimName: 'Dim',
+  dimText: '25% less experience',
+  shrineChip: { one: '{blessing} · {curse}: {n} wave', other: '{blessing} · {curse}: {n} waves' },
+  scoutedChip: 'Scouted: weaker foes',
+
+  // Marking a foe
+  markHint: 'Tap a foe to mark it ({n} Arrow Rain charge)',
 };
 
 export default en;

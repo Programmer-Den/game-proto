@@ -12,6 +12,8 @@ import { MAX_HEAT, WIN_WAVE } from './heat';
 import { canKeep, type LegacyId } from './legacy';
 import { canMarch } from './march';
 import { OMEN_BREAK_MS, OMEN_IDS, omenEffects, omenWave } from './omens';
+import { PEDDLER_MIN, SCOUT_COINS, SCOUT_WEAKEN, SHRINE_WAVES, eventWave, peddlerPrice, rollEvent, shrineEffects } from './wayside';
+import { rollWeather, weatherEffects } from './weather';
 import {
   BOW,
   FIELD,
@@ -78,6 +80,12 @@ const FIRST_HEAL_MS = 1_000;
 const HEAL_RANGE = 120;
 const HEAL_SHARE = 0.12;
 const BOSS_HEAL_SHARE = 0.03;
+/** Marking a foe spends this much of Arrow Rain's charge. */
+export const MARK_COST = 2;
+/** A mark lasts this long, unless its foe falls first. */
+export const MARK_MS = 5_000;
+/** A marked foe takes this many times the damage from the hero's arrows and bolts. */
+export const MARK_DAMAGE = 1.25;
 /** How long a level-up waits for a tap before it takes one of the offered upgrades at random. */
 export const AUTO_PICK_MS = 10_000;
 /** Where the pop-up naming an auto-picked upgrade shows: over the battle, under the wave banner. */
@@ -131,6 +139,11 @@ function step(state: GameState, dt: number) {
   state.rain.need = rainNeed(state.wave, s);
   state.rain.charge = Math.min(state.rain.charge, state.rain.need);
   state.roarMs = Math.max(0, state.roarMs - dt);
+  // A mark wears off in time, or once its foe is gone.
+  if (state.mark) {
+    state.mark.ms -= dt;
+    if (state.mark.ms <= 0 || !state.enemies.some((e) => e.id === state.mark!.id)) state.mark = null;
+  }
   landVolleys(state, s, dt);
   for (const p of state.caltrops.patches) p.ms += dt;
   if (state.phase === 'break') {
@@ -144,6 +157,8 @@ function step(state: GameState, dt: number) {
       state.relicFound = null;
       // An omen left alone until the break ends is refused.
       if (state.omen && !state.omen.accepted) state.omen = null;
+      // So does a wayside event: it passes by.
+      state.event = null;
       state.toSpawn = waveFoes(state.wave, state.road, state.frontier);
       state.spawnMs = 0;
     }
@@ -182,10 +197,12 @@ function spawn(state: GameState, dt: number) {
   state.spawnMs = spawnInterval(state.wave, state.heat);
 }
 
-/** A foe's full health on this run's wave, road, heat and map, and past wave 30 of an endless siege. */
+/** A foe's full health on this run's wave, road, heat and map, past wave 30 of an endless siege, and after a scout's word. */
 const hpOf = (state: GameState, kind: EnemyKind) => {
   const hp = foeHp(kind, state.wave, state.road, state.heat, state.frontier);
-  return state.endless ? Math.round(hp * endlessRules(true, state.wave).hp) : hp;
+  const endless = state.endless ? Math.round(hp * endlessRules(true, state.wave).hp) : hp;
+  // A scout sent on found the wave's weak spots: its foes come on with less health.
+  return state.scouted ? Math.max(1, Math.round(endless * SCOUT_WEAKEN)) : endless;
 };
 
 /** Puts a foe on the field with this much health; a boss's move timer or a shaman's healing timer starts. */
@@ -218,12 +235,34 @@ function addFoe(state: GameState, kind: EnemyKind, x: number, y: number, hp: num
  */
 function targets(state: GameState, mode: AimMode = state.aimMode) {
   const sight = sightOf(state);
-  return sortTargets(state.enemies.filter((e) => e.x < sight), mode);
+  const foes = sortTargets(state.enemies.filter((e) => e.x < sight), mode);
+  // A marked foe comes first, whatever the aim priority.
+  const marked = markedFoe(state);
+  return marked && marked.x < sight ? [marked, ...foes.filter((e) => e !== marked)] : foes;
 }
 
-/** How far right foes can be seen and struck: the view's edge, or mid-field on a Night wave. */
+/** The foe the hero marked, while the mark lasts. */
+const markedFoe = (state: GameState) => (state.mark ? state.enemies.find((e) => e.id === state.mark!.id) : undefined);
+
+/** The line past which foes are hidden in the dark of a Night wave or in fog, Infinity when none is. */
+export const fieldSight = (state: Pick<GameState, 'omen' | 'weather'>) => Math.min(omenEffects(state.omen).sight, weatherEffects(state.weather).sight);
+
+/** How far right foes can be seen and struck: the view's edge, mid-field on a Night wave, or the fog's edge. */
 export function sightOf(state: GameState) {
-  return Math.min(VIEW_RIGHT, omenEffects(state.omen).sight);
+  return Math.min(VIEW_RIGHT, fieldSight(state));
+}
+
+/**
+ * Marks a seen foe in a wave for the ranger: every arrow (or bolt, or hound) goes at it first, and
+ * it takes MARK_DAMAGE times their hits, for MARK_MS. Spends MARK_COST of Arrow Rain's charge.
+ * Returns whether it did.
+ */
+export function markFoe(state: GameState, id: number) {
+  const foe = state.enemies.find((e) => e.id === id);
+  if (held(state) || state.choices || state.phase !== 'fighting' || !foe || foe.x >= sightOf(state) || state.rain.charge < MARK_COST) return false;
+  state.rain.charge -= MARK_COST;
+  state.mark = { id, ms: MARK_MS };
+  return true;
 }
 
 function shoot(state: GameState, s: Stats, dt: number) {
@@ -243,7 +282,9 @@ function shoot(state: GameState, s: Stats, dt: number) {
     // Each arrow of a volley (or the mage's bolt, with Twin Bolt) goes at a different foe while there are enough of them.
     const kind = state.hero === 'mage' ? 'spell' : 'arrow';
     const pierce = kind === 'spell' ? s.chain : s.pierce;
-    for (let i = 0; i < s.arrows; i++) launch(state, kind, foes[i % foes.length], pierce, i, s.arrows);
+    // A marked foe draws the whole volley.
+    const marked = state.mark && foes[0].id === state.mark.id;
+    for (let i = 0; i < s.arrows; i++) launch(state, kind, marked ? foes[0] : foes[i % foes.length], pierce, i, s.arrows);
     // The Frost Giant's roar slows the ranger's shots for a while.
     cd.arrow = s.shotMs * (state.roarMs > 0 ? ROAR_SLOW : 1);
   }
@@ -401,7 +442,7 @@ function landStone(state: GameState, m: GameState['missiles'][number]) {
   for (const e of state.enemies) {
     if (ENEMIES[e.kind].flying || Math.hypot(e.x - m.to!.x, (e.y - m.to!.y) * 1.4) > radius + ENEMIES[e.kind].radius) continue;
     hurt(e, m.damage ?? 0, true);
-    if (m.burn) ignite(e, m.burn.dps, m.burn.ms);
+    if (m.burn) ignite(state, e, m.burn.dps, m.burn.ms);
   }
 }
 
@@ -443,7 +484,7 @@ export function cycleEngineAim(state: GameState) {
 }
 
 function launch(state: GameState, kind: 'arrow' | 'spell' | 'fireball', target: Enemy, pierce: number, i: number, of: number) {
-  const speed = missileSpeed(kind);
+  const speed = shotSpeed(state, kind);
   // A volley fans out a little before the arrows turn towards their foes.
   const fan = of > 1 ? (i / (of - 1) - 0.5) * 0.5 : 0;
   const angle = Math.atan2(target.y - BOW.y, target.x - BOW.x) + fan;
@@ -492,7 +533,7 @@ function moveMissiles(state: GameState, s: Stats, dt: number) {
       }
       continue;
     }
-    const speed = missileSpeed(m.kind);
+    const speed = shotSpeed(state, m.kind);
     let target = state.enemies.find((e) => e.id === m.target);
     // A foe that fell before the arrow got there, or none was left to turn to: turn to the nearest
     // seen one not yet hit. An arrow that has pierced a foe never turns back: it only takes one ahead.
@@ -560,6 +601,9 @@ function moveMissiles(state: GameState, s: Stats, dt: number) {
   removeDead(state);
 }
 
+/** A missile's speed: wind slows the hero's arrows and bolts, fireballs and the hired mage's bolts. */
+const shotSpeed = (state: GameState, kind: string) => missileSpeed(kind) * (kind === 'lance' ? 1 : weatherEffects(state.weather).shots);
+
 const missileSpeed = (kind: string) => (kind === 'lance' ? LANCE_SPEED : kind === 'arrow' ? ARROW_SPEED : kind === 'spell' ? SPELL_SPEED : kind === 'magic' ? MAGIC_SPEED : FIREBALL_SPEED);
 
 /**
@@ -570,9 +614,9 @@ function spellHit(state: GameState, s: Stats, foe: Enemy, x: number, y: number) 
   const crit = Math.random() < s.critChance;
   const damage = s.damage * (crit ? 2 : 1);
   const type = ENEMIES[foe.kind];
-  hurt(foe, damage * (type.boss ? s.bossDamage : 1), true);
+  hurt(foe, damage * (type.boss ? s.bossDamage : 1) * markOf(state, foe), true);
   if (crit) addEffect(state, { kind: 'crit', x: foe.x, y: foe.y - type.radius });
-  if (s.burn) ignite(foe, s.burn.dps, s.burn.ms);
+  if (s.burn) ignite(state, foe, s.burn.dps, s.burn.ms);
   if (s.chill) chill(foe, s.chill.slow, s.chill.ms);
   if (s.burst) {
     addEffect(state, { kind: 'arcane', x, y, radius: s.burst.radius });
@@ -582,6 +626,9 @@ function spellHit(state: GameState, s: Stats, foe: Enemy, x: number, y: number) 
     }
   }
 }
+
+/** How many times harder the hero's arrows and bolts hit this foe: MARK_DAMAGE while it is marked. */
+const markOf = (state: GameState, foe: Enemy) => (state.mark?.id === foe.id ? MARK_DAMAGE : 1);
 
 /** Chills a foe, unless it is Warded or made of frost. */
 function chill(foe: Enemy, slow: number, ms: number) {
@@ -602,7 +649,7 @@ function arrowHit(state: GameState, s: Stats, foe: Enemy, x: number, y: number) 
   const shield = !!type.shield;
   // Shatter, Finishing Shot and Giant Slayer make the arrow itself hit harder, not its burst.
   const mult =
-    (foe.slowMs > 0 ? s.chilledDamage : 1) * (foe.hp < foe.maxHp * s.finisher ? 2 : 1) * (type.boss ? s.bossDamage : 1);
+    (foe.slowMs > 0 ? s.chilledDamage : 1) * (foe.hp < foe.maxHp * s.finisher ? 2 : 1) * (type.boss ? s.bossDamage : 1) * markOf(state, foe);
   hurt(foe, (shield ? damage * (1 - SHIELD_BLOCK) : damage) * mult, true);
   if (shield) {
     addEffect(state, { kind: 'block', x: foe.x - ENEMIES[foe.kind].radius, y: foe.y - 10 });
@@ -610,7 +657,7 @@ function arrowHit(state: GameState, s: Stats, foe: Enemy, x: number, y: number) 
     return true;
   }
   if (crit) addEffect(state, { kind: 'crit', x: foe.x, y: foe.y - ENEMIES[foe.kind].radius });
-  if (s.burn) ignite(foe, s.burn.dps, s.burn.ms);
+  if (s.burn) ignite(state, foe, s.burn.dps, s.burn.ms);
   // A Warded elite (or a foe made of frost) shrugs off burning and chill alike.
   if (s.chill) chill(foe, s.chill.slow, s.chill.ms);
   if (s.burst) explode(state, x, y, s.burst.radius, damage * s.burst.share, 'blast', s, foe.id);
@@ -624,15 +671,15 @@ function explode(state: GameState, x: number, y: number, radius: number, damage:
     if (e.id === spare || Math.hypot(e.x - x, e.y - y) > radius + ENEMIES[e.kind].radius) continue;
     hurt(e, damage, true);
     // Fireballs set foes alight when the arrows burn.
-    if (kind === 'fireblast' && s.burn) ignite(e, s.burn.dps, s.burn.ms);
+    if (kind === 'fireblast' && s.burn) ignite(state, e, s.burn.dps, s.burn.ms);
   }
 }
 
-/** Sets a foe alight, unless it is Warded or made of frost. */
-function ignite(foe: Enemy, dps: number, ms: number) {
+/** Sets a foe alight, unless it is Warded or made of frost; in rain the burning lasts half as long. */
+function ignite(state: GameState, foe: Enemy, dps: number, ms: number) {
   if (foe.trait === 'warded' || ENEMIES[foe.kind].cold) return;
   foe.burnDps = Math.max(foe.burnDps, dps);
-  foe.burnMs = ms;
+  foe.burnMs = ms * weatherEffects(state.weather).burn;
 }
 
 /** Lightning strikes the foe nearest the barricade and leaps on to the nearest seen foe it has not struck. */
@@ -661,7 +708,7 @@ function moveEnemies(state: GameState, s: Stats, dt: number) {
   // are past its face (the barricade was mended while they stood at the stakes).
   const stakesUp = state.forts.stakeHp > 0;
   // A Golden Road and Rich Plunder both hurry the foes.
-  const roadSpeed = roadEffects(state.road).speed * omenEffects(state.omen).speed;
+  const roadSpeed = roadEffects(state.road).speed * omenEffects(state.omen).speed * shrineEffects(state.shrine).pace;
   for (const e of state.enemies) {
     const type = ENEMIES[e.kind];
     e.hitMs = Math.max(0, e.hitMs - dt);
@@ -719,7 +766,7 @@ function burstOil(state: GameState, at: Enemy) {
   for (const e of state.enemies) {
     if (Math.hypot(e.x - at.x, e.y - at.y) > OIL_RADIUS + ENEMIES[e.kind].radius) continue;
     hurt(e, OIL_HIT, false);
-    ignite(e, OIL_DPS, OIL_MS);
+    ignite(state, e, OIL_DPS, OIL_MS);
   }
 }
 
@@ -793,11 +840,14 @@ const rageOf = (e: Enemy) => (e.trait === 'enraged' && e.hp < e.maxHp / 2 ? ENRA
 
 /**
  * How much faster (or slower) than its kind's pace a foe walks and hacks right now: chill,
- * caltrops (flyers pass over), a Golden Road and Rich Plunder, and an Enraged elite's rage.
+ * caltrops (flyers pass over), a Golden Road and Rich Plunder, rain's mud, a shrine's Restless
+ * curse, and an Enraged elite's rage.
  */
 function paceOf(state: GameState, s: Stats, e: Enemy) {
   const pricked = !ENEMIES[e.kind].flying && onCaltrops(state, e);
-  return (e.slowMs > 0 ? 1 - e.slow : 1) * (pricked ? 1 - s.caltropSlow : 1) * (roadEffects(state.road).speed * omenEffects(state.omen).speed) * rageOf(e);
+  // Rain's mud slows every foe on foot; a shrine's Restless curse hurries them all.
+  const mud = ENEMIES[e.kind].flying ? 1 : weatherEffects(state.weather).mud;
+  return (e.slowMs > 0 ? 1 - e.slow : 1) * (pricked ? 1 - s.caltropSlow : 1) * (roadEffects(state.road).speed * omenEffects(state.omen).speed * shrineEffects(state.shrine).pace) * mud * rageOf(e);
 }
 
 /** Whether a foe stands on a patch of caltrops. */
@@ -928,6 +978,39 @@ export function decideOmen(state: GameState, accept: boolean) {
   return true;
 }
 
+/**
+ * Takes (or leaves) the wayside event of this break; either way the break is cut short. Tended, the
+ * scout joins as a spearman on the first free slot (or trains the least trained guard, or leaves
+ * SCOUT_COINS); sent on, the coming wave's foes are weaker. The peddler's relic costs half the coins;
+ * the shrine's blessing and curse last SHRINE_WAVES waves. Returns whether it did.
+ */
+export function decideEvent(state: GameState, take: boolean) {
+  const ev = state.event;
+  if (state.phase !== 'break' || state.choices || !ev) return false;
+  if (ev.id === 'scout') {
+    if (take) {
+      const free = state.guards.indexOf(null);
+      const trainable = state.guards.filter((g) => g && g.level < MAX_GUARD_LEVEL).sort((a, b) => a!.level - b!.level)[0];
+      if (free >= 0) state.guards[free] = { kind: 'spear', level: 1, cd: 0, stunMs: 0 };
+      else if (trainable) trainable.level++;
+      else state.coins += SCOUT_COINS;
+    } else state.scouted = true;
+  } else if (take && ev.id === 'peddler') {
+    const price = peddlerPrice(state.coins);
+    if (state.coins < PEDDLER_MIN) return false;
+    state.coins -= price;
+    state.relics[ev.relic] = (state.relics[ev.relic] ?? 0) + 1;
+    // An Oakheart Charm makes the barricade bigger at once, as from a chest.
+    const max = stats(state).barricadeMax;
+    if (max > state.barricade.max) state.barricade = { hp: state.barricade.hp + max - state.barricade.max, max };
+  } else if (take && ev.id === 'shrine') {
+    state.shrine = { blessing: ev.blessing, curse: ev.curse, waves: SHRINE_WAVES };
+  }
+  state.event = null;
+  state.breakMs = Math.min(state.breakMs, BREAK_MS);
+  return true;
+}
+
 /** Sets who the ranger shoots first. */
 export function setAim(state: GameState, mode: AimMode) {
   state.aimMode = mode;
@@ -956,7 +1039,9 @@ function removeDead(state: GameState) {
     const elite = e.trait ? ELITE_COINS : 1;
     // The frozen pass pays more for every kill, in coins and experience.
     const reward = FRONTIERS[state.frontier].reward;
-    state.coins += Math.round((ENEMIES[e.kind].coins * elite + s.bounty) * road.coins * omen.coins * reward);
+    // Fog and a shrine's Fortune pay more; a shrine's Dim curse pays less experience.
+    const shrine = shrineEffects(state.shrine);
+    state.coins += Math.round((ENEMIES[e.kind].coins * elite + s.bounty) * road.coins * omen.coins * reward * weatherEffects(state.weather).coins * shrine.coins);
     // Each kill charges Arrow Rain and the caltrops and carries the streak on (or starts a new one).
     state.rain.charge = Math.min(state.rain.need, state.rain.charge + 1);
     state.caltrops.charge = Math.min(state.caltrops.need, state.caltrops.charge + 1);
@@ -964,7 +1049,7 @@ function removeDead(state: GameState) {
     streak.count = streak.ms > 0 ? streak.count + 1 : 1;
     streak.ms = s.streakMs;
     streak.best = Math.max(streak.best, streak.count);
-    const base = ENEMIES[e.kind].xp * s.xpGain * road.xp * omen.xp * (e.trait ? ELITE_XP : 1) * reward;
+    const base = ENEMIES[e.kind].xp * s.xpGain * road.xp * omen.xp * (e.trait ? ELITE_XP : 1) * reward * shrine.xp;
     const bonus = base * streakBonus(streak.count);
     streak.bonusXp += bonus;
     const radius = ENEMIES[e.kind].radius;
@@ -997,6 +1082,13 @@ export function fieldSpot(state: GameState, x: number, y: number) {
   };
 }
 
+/** Where a volley aimed at (x, y) comes down: the field spot, blown back towards the barricade by wind. */
+export function volleySpot(state: GameState, x: number, y: number) {
+  const spot = fieldSpot(state, x, y);
+  const drift = weatherEffects(state.weather).drift;
+  return drift ? { x: Math.max(BARRICADE_FRONT + 30, spot.x - drift), y: spot.y } : spot;
+}
+
 /**
  * Looses Arrow Rain on the ring around (x, y), kept on the seen road in front of the barricade
  * (short of mid-field on a Night wave), once kills have charged it. Returns whether it was loosed.
@@ -1006,7 +1098,7 @@ export function loose(state: GameState, x: number, y: number) {
   state.rain.charge = 0;
   state.rain.volleys.push({
     id: state.nextId++,
-    ...fieldSpot(state, x, y),
+    ...volleySpot(state, x, y),
     ms: RAIN_FALL_MS,
   });
   return true;
@@ -1034,8 +1126,9 @@ export function strew(state: GameState, x: number, y: number) {
 export const inRing = (cx: number, cy: number, x: number, y: number, radius: number, k = 1) =>
   ((x - cx) / (RAIN_RING.rx * k + radius / 2)) ** 2 + ((y - cy) / (RAIN_RING.ry * k + radius / 2)) ** 2 <= 1;
 
-/** How many times wider Arrow Rain's ring is: Cloudburst, and a lookout while its waves last. */
-export const rainRingOf = (state: Pick<GameState, 'ranks' | 'relics' | 'heat' | 'forts'>) => stats(state).rainRing * (state.forts.lookout > 0 ? LOOKOUT_RING : 1);
+/** How many times wider Arrow Rain's ring is: Cloudburst, a lookout while its waves last, and wind scattering the shafts. */
+export const rainRingOf = (state: Pick<GameState, 'ranks' | 'relics' | 'heat' | 'forts'> & Partial<Pick<GameState, 'weather'>>) =>
+  stats(state).rainRing * (state.forts.lookout > 0 ? LOOKOUT_RING : 1) * weatherEffects(state.weather ?? null).ring;
 
 /** Where Arrow Rain hits the most foes in view: on the one with the most others in its ring. */
 export function crowdSpot(state: GameState) {
@@ -1162,6 +1255,9 @@ function clearWave(state: GameState) {
   for (const p of state.caltrops.patches) p.waves--;
   state.caltrops.patches = state.caltrops.patches.filter((p) => p.waves > 0);
   if (state.forts.lookout > 0) state.forts.lookout--;
+  // A shrine's blessing and curse wear off after their waves, and a scout's word lasts one wave.
+  if (state.shrine && --state.shrine.waves <= 0) state.shrine = null;
+  state.scouted = false;
   // Clearing the third boss's wave lifts the siege (or wins the frozen pass): the run is won and the
   // next heat unlocked. The victory panel holds everything until "Keep fighting" (or a new run at a
   // heat). The daily siege has no victory panel: it fights on until the hero falls.
@@ -1175,9 +1271,17 @@ function clearWave(state: GameState) {
   state.phase = 'break';
   // From wave 4 the break names the next wave's omen (not after a boss), and lasts long enough to
   // read it; on the daily siege it is the day's omen for that wave.
-  const omen = omenWave(state.wave) ? (plan ? planned(plan.omens, state.wave) : OMEN_IDS[Math.floor(Math.random() * OMEN_IDS.length)]) : null;
+  // From wave 6 such a break may bring a wayside event instead (see wayside.ts).
+  const event = omenWave(state.wave) && eventWave(state.wave) ? (plan ? planned(plan.events, state.wave) : rollEvent(Math.random)) : null;
+  state.event = event && (event.id !== 'peddler' || state.coins >= PEDDLER_MIN) ? event : null;
+  const omen = omenWave(state.wave) && !state.event ? (plan ? planned(plan.omens, state.wave) : OMEN_IDS[Math.floor(Math.random() * OMEN_IDS.length)]) : null;
   state.omen = omen ? { id: omen, accepted: false } : null;
-  state.breakMs = state.omen ? OMEN_BREAK_MS : BREAK_MS;
+  state.breakMs = state.omen || state.event ? OMEN_BREAK_MS : BREAK_MS;
+  // The weather moves on a wave: the coming wave gets what was named for it, and the one after is
+  // named now (from wave 5; on the daily siege the plan's).
+  state.weather = state.nextWeather;
+  state.nextWeather = plan ? planned(plan.weather, state.wave + 1) : rollWeather(state.wave + 1, Math.random);
+  state.mark = null;
   state.missiles = [];
   // An Oakheart Charm from the chest makes the barricade bigger at once.
   const s = stats(state);
