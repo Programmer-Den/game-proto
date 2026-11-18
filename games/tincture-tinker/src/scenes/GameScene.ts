@@ -638,6 +638,9 @@ export class GameScene extends Phaser.Scene {
     } else if (!canUse(this.state, tool)) {
       return ui('refuse');
     } else if (tool === 'stir') {
+      // Stirring sets down any tool that was armed, so the next tap is a plain swap.
+      this.armed = null;
+      this.funnelFrom = null;
       stir(this.state);
       saveProgress(progressOf(this.state));
       this.pulse(this.movesText);

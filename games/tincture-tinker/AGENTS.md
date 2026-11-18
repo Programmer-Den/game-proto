@@ -385,7 +385,7 @@ bottle green, serif italics), all painted in code on 2D canvases. It shares no c
   fired Catalyst's column (`cols`); `startOrder` reads `upgrades.bloom` to brew one Bloom on a
   random free tile of the new board.
 - **Bench tools:** four buttons in `TOOL_ORDER`, `TOOL.gap` apart. `useTool` (a button's
-  `pointerdown`) checks `canUse`; Stir calls `stir` and saves; the others toggle `armed`. Sift's
+  `pointerdown`) checks `canUse`; Stir calls `stir` and saves (setting down an armed tool); the others toggle `armed`. Sift's
   board tap calls `siftRow`, which calls `sift` (new tiles for the row, specials, jars, resin and mould
   kept, rerolled until nothing matches and a move is left, else a shuffle; a row with nothing but kept
   tiles is refused and costs nothing), saves and animates the

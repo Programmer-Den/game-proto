@@ -344,7 +344,8 @@ export function hold(s: GameState) {
   if (s.phase !== 'playing') return false;
   const held = s.held;
   const picked = s.selected && inHand(s, s.selected) ? s.selected : null;
-  if (held && (s.hand.length < HAND || !picked)) {
+  // Back into the hand only while it has room: a full hand would grow past its HAND slots.
+  if (held && s.hand.length < HAND) {
     s.hand = sortHand([...s.hand, held]);
     s.held = null;
     s.selected = held;

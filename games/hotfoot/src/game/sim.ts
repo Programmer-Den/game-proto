@@ -507,8 +507,8 @@ export function tick(s: GameState, dt: number) {
     if (s.phase !== 'running') return;
   }
   const prevH = r.h;
-  // A dash in the air holds the knight's height.
-  if (dashing && r.h > floor) r.vh = 0;
+  // A dash in the air holds the knight's height, but a jump pressed during it still rises.
+  if (dashing && r.h > floor && r.vh <= 0) r.vh = 0;
   else if (r.h > floor || r.vh > 0) {
     // Falcon's Glide: the knight falls at half the pull. A gust lets the knight float.
     r.vh -= GRAVITY * (r.vh < 0 && st.glide ? GLIDE : 1) * (gust ? GUST.lift : 1) * sec;
