@@ -29,8 +29,8 @@ Implemented today:
 - The reserve slot (`held`, `hold`, `drawable` in `state.ts`; `HOLD_BUTTON`, `tapHold`,
   `refreshHold` in the scene): `hold(s)` with the slot empty moves the picked tile from the hand to
   `state.held`; with a tile held, it puts it back when the hand has room (`hand.length < HAND`,
-  the turn it was held or near the pouch's end) or nothing is picked, else swaps it for the picked
-  tile (the held one is picked after). It takes no turn and draws nothing. The held tile stays
+  the turn it was held or near the pouch's end), else swaps it for the picked tile (the held one
+  is picked after); a full hand with nothing picked refuses, so the hand never passes `HAND`. It takes no turn and draws nothing. The held tile stays
   counted in `pouch` (so `checkEnd`, `anyPlace` and `pouchPlayable` still see it) but `drawHand`
   and its fallback draw from `drawable` (the pouch less the held tile), and `tradeGives` / `trade`
   never give it. `held` is in `Snapshot`, so undo puts the slot back with the tile. The slot is a

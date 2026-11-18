@@ -303,7 +303,7 @@ in.
   it fall, carrying the knight standing on it, and drop it at the road); if the feet are now below
   the floor (`floorAt` under the knight's box), that is a ledge's side: hurt (`'wall'`, unless
   unhurtable or less than `STEP_UP` short) and snap onto its top; hold the knight's height while
-  dashing in the air, or else apply gravity (halved while
+  dashing in the air (not while a jump pressed in the dash still rises), or else apply gravity (halved while
   falling with Falcon's Glide, and to `GUST.lift` while a gust blows) and land on the floor (on ice,
   a landing starts a skid, and the rockfall gains `ROCK.skid`); a landing on a cloud starts its
   `sinkMs`; stomp a foe landed on; stomp or bump the boss (`bossContact`);
