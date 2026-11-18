@@ -430,7 +430,8 @@ also picks the squad leader whose active the run brings. Kills fill a lasting zo
   (`LAST_STAND.ms`, banner, the `standText` countdown). `tickLastStand` deals a `melee` blow every
   `LAST_STAND.everyMs` (`hurt` with `LAST_STAND.damage(wave)` and a shove of `push`, half for a
   boss, to every zombie within `reach` of the line; it also ends a boss's charge) and, when the time
-  runs out, calls `gameOver` if a zombie still stands at the line. `drawBars` shades the line and
+  runs out, calls `gameOver` if a zombie still stands at the line. `gameOver` and `endAsWin` both end
+  a running last stand (`lastStandMs` 0, `standText` hidden). `drawBars` shades the line and
   draws the time bar.
 - **Sandbag walls:** a `sandbag` crate adds to `state.sandbags`. A tap on `Hud.onKit` toggles
   `state.placing`; the next tap on the road calls `placeWall(laneAt(x))` (the S key places in the
