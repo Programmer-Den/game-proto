@@ -102,7 +102,8 @@ Implemented today:
 Missing or rough:
 
 - A reload during a puzzle deals that puzzle again from its start, with its full time, and a boss
-  from its first half (the run is saved between puzzles, not move by move).
+  from its first half (the run is saved between puzzles, not move by move; hints spent and Blitz's
+  run clock are saved as they go, so a reload gives neither back).
 - Puzzle levels are by size and settings, not by the solving steps a puzzle needs; Picture Grid,
   Calc Cages and Cross Sums may have more than one answer (any that keeps the rules counts).
 - Unjam makes its layouts by scattering blocks and searching (up to about half a second at

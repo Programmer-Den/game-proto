@@ -18,9 +18,11 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
 - **Clocks** (`CLOCKS` in `game/rules.ts`: 5+3, 10+5, 15+10, as minutes and seconds added per
   move): `GameScene.update` runs the clock of the side to move, except while a move animates
   (`moving`) or the scene is paused; the AI's thinking counts. A move adds the increment. An undo puts the clocks back as they stood before
-  the first move it takes back (`clockAt`; not for moves replayed from a save).
+  the first move it takes back (`clockAt`; not for moves replayed from a save, so a loss on time
+  whose clocks aren't known refuses the undo), and clears the last capture.
   `outOfTime` ends the game as `{ kind: 'time', winner }` (a draw, `timeout`, when the winner has
-  only its king), counted like a mate except for `quickMate`. The clocks are saved with the game.
+  only its king), counted like a mate except for `quickMate`. The clocks are saved with the game, after each move and when Menu or closing the page
+  leaves it (`keepClocks`), so leaving never gives back time spent.
 - **Rival sculptors** (`game/rivals.ts`): eight opponents in `RIVALS`, each an AI level with a
   `style` whose `styleBias` (points added to a move at the root of the search: `chooseMove`'s and
   `chooseMoveDeep`'s `bias`, sent to the worker as the style id) leans it among close moves, and

@@ -272,11 +272,12 @@ export class GameScene extends Phaser.Scene {
 
   /**
    * Saves the run (not Practice) each time it moves on: a puzzle dealt or ended, a draft or relic
-   * offer, the hand-over. An ended run is cleared, as its records are already saved.
+   * offer, the hand-over, a hint spent and each second of Blitz's clock. An ended run is cleared, as its records are already saved.
    */
   private keepRun(run: Run) {
     if (run.mode === 'practice') return;
-    const key = [run.phase, run.dealt, run.results.length, run.relics.length, run.player].join('|');
+    // The hints spent and Blitz's run clock (by the second) too, so a reload never gives them back.
+    const key = [run.phase, run.dealt, run.results.length, run.relics.length, run.player, run.hints, Math.floor(run.clockMs / 1000)].join('|');
     if (key === this.saveKey) return;
     this.saveKey = key;
     if (run.phase === 'over') clearRun();

@@ -409,7 +409,8 @@ function engineAct(state: GameState, s: Stats, dt: number) {
     const foes = targets(state, 'nearest').filter((e) => !ENEMIES[e.kind].flying && e.x > BARRICADE_FRONT + 40);
     if (foes.length === 0) return;
     const crowd = (e: Enemy) => foes.filter((o) => Math.hypot(o.x - e.x, o.y - e.y) < es.radius).length;
-    const foe = engine.aim === 'back' ? foes[foes.length - 1] : foes.reduce((best, e) => (crowd(e) > crowd(best) ? e : best), foes[0]);
+    // The back rank is the furthest foe, wherever a mark put it in the list.
+    const foe = engine.aim === 'back' ? foes.reduce((far, e) => (e.x > far.x ? e : far), foes[0]) : foes.reduce((best, e) => (crowd(e) > crowd(best) ? e : best), foes[0]);
     const lead = foe.attacking ? 0 : (ENEMIES[foe.kind].speed * paceOf(state, s, foe) * STONE_FLIGHT_MS) / 1000;
     const from = { x: ENGINE_SPOT.x, y: ENGINE_SPOT.y - 24 };
     const to = { x: Math.round(Math.max(BARRICADE_FRONT + 40, foe.x - lead)), y: Math.round(foe.y) };
@@ -560,7 +561,8 @@ function moveMissiles(state: GameState, s: Stats, dt: number) {
     // Only seen foes are struck: an arrow flying on into the dark of a Night wave misses.
     const sight = sightOf(state);
     const struck = state.enemies.find(
-      (e) => e.x < sight && !m.hit.includes(e.id) && Math.hypot(e.x - m.x, e.y - m.y) < ENEMIES[e.kind].radius + 4,
+      // A foe killed earlier this step is skipped, so it doesn't use up the arrows behind the killing one.
+      (e) => e.hp > 0 && e.x < sight && !m.hit.includes(e.id) && Math.hypot(e.x - m.x, e.y - m.y) < ENEMIES[e.kind].radius + 4,
     );
     if (!struck) continue;
     if (m.kind === 'fireball') {
@@ -634,7 +636,8 @@ const markOf = (state: GameState, foe: Enemy) => (state.mark?.id === foe.id ? MA
 function chill(foe: Enemy, slow: number, ms: number) {
   if (foe.trait === 'warded' || ENEMIES[foe.kind].cold) return;
   foe.slow = Math.max(foe.slow, slow);
-  foe.slowMs = ms;
+  // A short chill never cuts a longer hold or daze short.
+  foe.slowMs = Math.max(foe.slowMs, ms);
 }
 
 /**
@@ -1274,7 +1277,8 @@ function clearWave(state: GameState) {
   // From wave 6 such a break may bring a wayside event instead (see wayside.ts).
   const event = omenWave(state.wave) && eventWave(state.wave) ? (plan ? planned(plan.events, state.wave) : rollEvent(Math.random)) : null;
   state.event = event && (event.id !== 'peddler' || state.coins >= PEDDLER_MIN) ? event : null;
-  const omen = omenWave(state.wave) && !state.event ? (plan ? planned(plan.omens, state.wave) : OMEN_IDS[Math.floor(Math.random() * OMEN_IDS.length)]) : null;
+  // A dropped peddler brings no omen either.
+  const omen = omenWave(state.wave) && !event ? (plan ? planned(plan.omens, state.wave) : OMEN_IDS[Math.floor(Math.random() * OMEN_IDS.length)]) : null;
   state.omen = omen ? { id: omen, accepted: false } : null;
   state.breakMs = state.omen || state.event ? OMEN_BREAK_MS : BREAK_MS;
   // The weather moves on a wave: the coming wave gets what was named for it, and the one after is

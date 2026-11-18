@@ -354,9 +354,17 @@ export class Sim {
     // The panes it was already touching last step: a sliding or turning pane can catch it up, or
     // pin it against another, and it is pushed out again, but one touch is one hit.
     const before = orb.touching ?? [];
-    orb.touching = touched.map((p) => p.id);
+    // Only the panes this step dealt with count as touched, so a second pane met in the same step
+    // still takes its hit on the next one.
+    orb.touching = touched.filter((p) => before.includes(p.id)).map((p) => p.id);
+    const note = (p: Pane) => {
+      if (!orb.touching!.includes(p.id)) orb.touching!.push(p.id);
+    };
     for (const p of touched) {
-      if (before.includes(p.id) && !fire) {
+      note(p);
+      // A fire orb doesn't bounce off what it burns, but the heart and the guardians it does, and
+      // one touch of those is one hit as without fire.
+      if (before.includes(p.id) && (!fire || TOUGH.has(p.kind))) {
         this.bounceFrom(orb, p);
         return;
       }

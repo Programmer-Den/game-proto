@@ -35,7 +35,7 @@ seconds without a tap.
   every kill's coins and experience in `removeDead`). `waveFoes(wave, road, frontier)` adds frost
   wolves (`wolf`) from the pass's wave 1 and ice wisps (`wisp`, `flying`) from wave 3, never in the
   vale; `bossOf` and `waveTrack` take the map too. A foe with `cold` (the wisp and the Chieftain)
-  shrugs off burning and chill (`ignite`, `chill`). The Chieftain's move (`bossMoves`) is a howl
+  shrugs off burning and chill (`ignite`, `chill`; a chill keeps the longer of its time and a hold or daze already on). The Chieftain's move (`bossMoves`) is a howl
   every `HOWL_MS`: every hired guard's `stunMs` is set to `STUN_MS` and `roarMs` to `ROAR_SLOW_MS`
   (a `howl` effect). `clearWave` keeps the pass's best in `passBest` (`bestOn(state, frontier)`
   reads either map's best, which `canMarch` uses) and, on its wave 30, sets `passWon` as well as
@@ -87,7 +87,7 @@ seconds without a tap.
   upgrades. `engineAct` (in `step`, after `houndsAct`) waits while the barricade is at 0: the
   ballista launches a `lance` missile from `ENGINE_SPOT` at the aim's target that flies straight
   at `LANCE_SPEED` and hits every foe it passes once, through shields (armour counts); the catapult
-  launches a `stone` on the arc a Troll King's rock flies, at the back-most (or crowded) foe that is
+  launches a `stone` on the arc a Troll King's rock flies, at the back-most (the furthest along the road, even with a foe marked; or crowded) foe that is
   not flying and is further than `BARRICADE_FRONT + 40`, leading it by `STONE_FLIGHT_MS` at its
   current pace (`paceOf`, the same chill, caltrops, road, omen and rage sum `moveEnemies` walks it by);
   `landStone` hurts every foe within `radius`, with armour, and Pitch Pots ignites them. The scene
@@ -169,8 +169,8 @@ seconds without a tap.
   it, and with it the arrows (and their turn to a new foe when theirs dies, they pierce one or
   they fly on with none, every step until one is seen; an arrow that has pierced a foe only
   turns to one ahead of it, never back), lightning's leaps, fireballs, the mage and
-  `crowdSpot`; `moveMissiles` only lets an arrow, fireball or magic bolt strike a foe left of
-  `sightOf`, so a stray one flies on through the dark; `loose` and `strew` clamp to it through
+  `crowdSpot`; `moveMissiles` only lets an arrow, fireball or magic bolt strike a living foe (one killed earlier
+  in the step is skipped) left of `sightOf`, so a stray one flies on through the dark; `loose` and `strew` clamp to it through
   `fieldSpot`, so no volley or patch lands in the dark; the scene hides foes right of it, darkens
   the field with `nightG` and draws no effect (nor a shaman's healing mote) there), `elites` (Blood Moon doubles `eliteChance` in `spawn`), `coins` and `speed` (Rich
   Plunder, in `removeDead` and `moveEnemies` with the road's), and `xp` (`OMEN_XP`, 1.3, on every

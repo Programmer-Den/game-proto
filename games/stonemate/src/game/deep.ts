@@ -46,7 +46,7 @@ const KING_END = [
   -50, -40, -30, -20, -20, -30, -40, -50, -30, -20, -10, 0, 0, -10, -20, -30, -30, -10, 20, 30, 30, 20, -10, -30, -30, -10, 30, 40, 40, 30, -10, -30,
   -30, -10, 30, 40, 40, 30, -10, -30, -30, -10, 20, 30, 30, 20, -10, -30, -30, -30, 0, 0, 0, 0, -30, -30, -50, -30, -30, -30, -30, -30, -30, -50,
 ];
-/** A passed pawn's bonus by how many rows it has walked (0 on its home row). */
+/** A passed pawn's bonus by its row counted from its own back rank (1 on its home row, 6 one step from promoting). */
 const PASSED = [0, 10, 15, 25, 45, 75, 120, 0];
 
 /** The score of the position for the side to move. */

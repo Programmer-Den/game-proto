@@ -148,7 +148,16 @@ export class GameScene extends Phaser.Scene {
       if (!over.length) this.onBoardTap(p.worldX, p.worldY);
     });
     this.input.keyboard?.on('keydown', (e: KeyboardEvent) => this.onKey(e.key));
+    // The clocks are saved with each move; a page closed or reloaded mid-move keeps the time spent too.
+    const onHide = () => this.keepClocks();
+    window.addEventListener('pagehide', onHide);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => window.removeEventListener('pagehide', onHide));
     this.showMenu();
+  }
+
+  /** Saves a game under way with its clocks as they stand, so leaving it never gives time back. */
+  private keepClocks() {
+    if (this.screen === 'play' && !this.result && this.clock) this.save();
   }
 
   // ---- what the playthrough reads ---------------------------------------------------------------
@@ -467,7 +476,7 @@ export class GameScene extends Phaser.Scene {
     if (this.mode === 'puzzle') this.button('hint', x + bw / 2, by, bw, 38, t('hint'), () => this.showHint());
     else this.button('undo', x + bw / 2, by, bw, 38, t('undo'), () => this.undo());
     this.button('quick', x + bw * 1.5 + 8, by, bw, 38, t(this.quick ? 'capturesQuick' : 'capturesFull'), () => this.toggleQuick());
-    this.button('menu', x + bw * 2.5 + 16, by, bw, 38, t('menu'), () => (this.mode === 'puzzle' && !this.daily ? this.showPuzzles() : this.mode === 'rival' ? this.showRivals() : this.showMenu()));
+    this.button('menu', x + bw * 2.5 + 16, by, bw, 38, t('menu'), () => (this.keepClocks(), this.mode === 'puzzle' && !this.daily ? this.showPuzzles() : this.mode === 'rival' ? this.showRivals() : this.showMenu()));
   }
 
   private rivalName(i = this.rival) {
@@ -950,7 +959,11 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     const mine = this.mode === 'duo' || this.pos.history.some((u) => sideOf(u.move.piece) === this.player);
-    if (this.busy || this.promo || (this.result && this.mode !== 'duo') || !this.pos.history.length || !mine) {
+    // A loss on time can only be taken back while the clocks before that move are known (a move
+    // replayed from a save has none), or the flagged side would lose again at once.
+    const timeUp = this.result?.kind === 'time' || (this.result?.kind === 'draw' && this.result.reason === 'timeout');
+    const blind = timeUp && !this.clockAt[this.pos.history.length - 1];
+    if (this.busy || this.promo || (this.result && this.mode !== 'duo') || !this.pos.history.length || !mine || blind) {
       ui('refuse');
       return;
     }
@@ -962,6 +975,8 @@ export class GameScene extends Phaser.Scene {
     if (this.clock && before) Object.assign(this.clock, before);
     this.clockAt.length = this.pos.history.length;
     this.result = null;
+    // The capture taken back no longer stands as the last one.
+    this.lastCapture = null;
     this.buildPlay();
   }
 
