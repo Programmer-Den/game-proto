@@ -81,6 +81,17 @@ in.
   run seeded by the ISO week, starting bare with two boons drawn from the week, played as often as
   you like for the week's best). The game-over panel's third button is "Courses", which opens the
   Courses panel: the daily course, the weekly road and the ten challenge courses with their stars.
+- Round 5 loop improvements: **the shield dash** (a third control: Right, D or Shift, or the touch
+  Dash button; for `DASH.ms` the knight runs at `DASH.pace` times the speed, holds their height in
+  the air and skims over a pit, and smashes or knocks aside what `DASHABLE` lists (crates, shield
+  goblins, goblins, the Gatekeeper's barrels); `DASH.cooldown` ms to come back, shown by a kite
+  shield in the HUD at `DASH_SIGN`), its two new traps from stage 2 (`crate`, a 60 px stack to jump
+  or dash through for three coins, and `shield`, a goblin behind a tower shield whose pike, 150 px,
+  is too tall to leap), **run missions** (`missions.ts`: three standing missions met within one
+  ordinary run, paying 20 to 60 banked coins at once and replaced by the next in turn, a step
+  harder; shown on the game-over panel) and **high paths** (the `route` piece from stage 3: three
+  floating platforms, `Ledge.float`, `ROUTE.h` up, with coins along and over them and spikes or a
+  goblin on the middle one; the knight runs under them or jumps up through one).
 - The art is an illuminated manuscript: a gothic miniature on vellum, painted on 2D canvases
   (`src/art/ink.ts`): a lapis-and-madder diapered sky with a gold-leaf moon, crags and a pink
   castle, lollipop trees, a turf road, ink outlines with white highlights, gold-leaf coins, a lapis
@@ -151,10 +162,13 @@ in.
 - `src/game/sim.ts`: the rules. `newRun` (from a `Carry`: best, bank, pending boon, armoury,
   crown, knights, the companion chosen and the companions' levels; a seed key or null; and a
   `RunKind`: the mode, the challenge course, the weekly road's boons), `jump`, `slide`, `tick`,
-  `rollChoices`, `pick`, `pickRoad`, `buyMissed`, `buyArmoury`, `buyKnight`, `buyPet`, plus `runnerBox` and the private helpers: collision (`touches`), foe
+  `rollChoices`, `pick`, `pickRoad`, `buyMissed`, `buyArmoury`, `buyKnight`, `buyPet`, `dash`, plus `runnerBox` and the private helpers: collision (`touches`), foe
   movement (`moveFoes`), stomping (`stomp`, with the hoard's coins), a boss's stomps and bumps
   (`bossContact`, which also crowns the knight), coins (`gainCoin`: the streak and its multiplier),
-  the dare's progress and reward (`dared`, `meetDare`), shrines (`visitShrines`) and damage
+  the dare's progress and reward (`dared`, `meetDare`), a dash breaking through (`smash`: a crate
+  bursts into `CRATE_COINS` pulled coins, a barrel into splinters, a goblin or shield goblin goes
+  through `knockOut`), the run missions (`mission(s, kind, n)`, which pays a met one into `bank`
+  and deals the next), shrines (`visitShrines`) and damage
   (`hurt`, which also takes `'wall'` for a ledge's side, `'boss'` and `'rock'`, resets the streak,
   loses a no-hit dare and, with Bulwark, knocks foes away on a block; the fox takes a hit after the
   Aegis: a `fox` effect, no heart lost, the streak kept from its second level).
@@ -184,10 +198,16 @@ in.
   run's seed key) and `weeklyBoons` (the week's two boons, drawn from its own seed among the boons
   that can be sold; the second is drawn again while it would complete a pair with the first, so
   the `pair` trophy never comes free).
+- `src/game/missions.ts`: the run missions. `MissionKind`, `MISSIONS` (each kind's text key, goal
+  `base` and `step` per time round, `max` for a kind that keeps the most reached), `MISSION_ORDER`
+  (dealt round and round), `MISSION_SLOTS` (3), `Mission` (`kind`, `tier`, `progress`, `from`: the
+  metre a metres mission was dealt at), `MissionBoard` (`slots`, `dealt`), `goalOf`, `rewardOf` (20,
+  10 more a tier, at most 60), `dealMission` (the next kind in turn not already standing),
+  `freshBoard` and `boardForRun` (the board with every progress at 0).
 - `src/game/armoury.ts`: the `ARMOURY` table (name and text as `TextKey`s, price per level), `ARMOURY_EACH` (what a
   level adds), `noArmoury` and `nextPrice`.
 - `src/game/course.ts`: `buildStage` lays out a stage's pieces (`Piece`: each trap kind, `ledge`
-  and `steps`) and their coins (more on the High Road), from `SHRINE.from` its shrine
+  and `steps`, `crate`, `shield`, `route`) and their coins (more on the High Road), from `SHRINE.from` its shrine
   (`placeShrine`, in the gap between pieces nearest the stage's middle; none on the High Road), from
   `DARE.from` its dare and on a rockfall stage its rockfall; `planOf` sizes and places one piece,
   `piecesOf` is the pool per stage and road, `OPENING` is stage 1's fixed first four, `gapsOf` gives
@@ -212,7 +232,8 @@ in.
   `FRAME` (the miniature's gold frame), `TRACK` (the run track), `TAG` (the stage's tag),
   `DARE_TAG` (the dare's strip under it), `STAGE_TITLE`, `ARMOURY_PANEL`, `STREAK_CHIP`, `MARGIN`
   (the scrollwork and caption), `CARDS` (card size and the centres for one, two or three cards),
-  `BUTTON`, `ACTION_BUTTONS` (the touch Slide and Jump buttons), `HUD_HEIGHT`, `UI_DEPTH`, `FONT` (a Georgia serif stack)).
+  `BUTTON`, `ACTION_BUTTONS` (the touch Dash, Slide and Jump buttons), `DASH_SIGN` (the dash's
+  shield in the HUD), `OVER_PANEL` (the game-over panel's size and its rows' heights), `HUD_HEIGHT`, `UI_DEPTH`, `FONT` (a Georgia serif stack)).
 - `src/ui/BoonCards.ts`: the checkpoint overlay and its vellum cards: two or three boon cards (a
   cursed boon's card is edged in madder; a paired boon's card carries the pair's hint), then the
   two road cards; exposes `cards: CardSpot[]` (`id` is a `BoonId` or a `Road`).
@@ -232,9 +253,10 @@ in.
 - `src/art/scenery.ts`: the vellum `page` (stains, acanthus scrollwork, snail), `sky` (diaper,
   sunset clouds, stars, moon), `far` (crags and a castle), `near` (trees and a tower), the road
   strips `ground`, `ground-ice`, `ground-marsh` and `ground-wind` (`GROUNDS`), spikes, pits, the hanging log (`blade`), fire vent, `ledge` (pink ashlar),
-  coins, `checkpoint`, `shrine` and `shrine-used`, the shrine's `banderole` and the miniature's
+  coins, `crate` (40x62, two stacked, standing by its bottom left), `checkpoint`, `shrine` and `shrine-used`, the shrine's `banderole` and the miniature's
   `frame`. Exports `FAR_H`, `NEAR_H`, `GROUND_TOP` and `PIT_DEPTH`.
-- `src/art/foes.ts`: the goblin (`goblin-0`, `goblin-1`, sized by `GOBLIN_ART`), bat (`bat-0`,
+- `src/art/foes.ts`: the goblin (`goblin-0`, `goblin-1`, sized by `GOBLIN_ART`), the shield goblin
+  (`shield-goblin`, `SHIELD_ART`: 64x160, feet at (30, 156), its pike's tip 152 px up), bat (`bat-0`,
   `bat-1`, `BAT_ART`), the Gatekeeper (`gate-ready`, `gate-throw`, `gate-tired`, `GATE_ART`) and
   the dragon (`dragon-ready`, `dragon-breathe`, `dragon-tired`, `DRAGON_ART`; `BOSS_ART` maps a
   `BossKind` to its art), facing left, their thrown `barrel`, `axe`, `fire-0`/`fire-1` and `tail`,
@@ -256,7 +278,7 @@ in.
   "Stage", `stageInitial`: S, or E for German "Etappe"; the HUD writes the rest, `stageRest`), the `streak-chip` and its
   `medallion`, the `track-strip`, the `tag-strip` and `dare-strip`), `bakePanel` (vellum panels:
   cards, the title strip, the game-over panel), `bakeButton` and `bakeActionButtons` (the touch
-  Slide and Jump discs, called from `bakeHud`).
+  Dash, Slide and Jump discs, called from `bakeHud`).
 - `shared/setupGame.ts` and `shared/settings.ts` (outside the game folder): the hub's settings.
   `main.ts` imports `setupGame`; `state.ts` imports `byDifficulty`. `shared/scaling.ts`:
   `main.ts` imports `setupScaling`, `ink.ts` imports `sharpRes`, `GameScene` imports `viewPoint`.
@@ -275,26 +297,43 @@ in.
   once per frame (no fixed substeps) and advances its own `clock`, used only for animation.
 - `tick` order: age effects; stop unless `phase === 'running'`; add `dt` to `time`; move awake
   foes (`moveFoes`); while a boss stands, push `checkpointX` to at least its `holdBack` ahead;
-  move `distance` (at `WIND.air` of the speed when airborne on wind and `GUST.speed` while a gust
-  blows on the sky; clamped to `checkpointX`) and the rockfall with it (plus `ROCK.creep`); move the
+  move `distance` (at `WIND.air` of the speed when airborne on wind, `GUST.speed` while a gust
+  blows on the sky and `DASH.pace` while dashing; clamped to `checkpointX`) and the rockfall with it (plus `ROCK.creep`), and move a metres mission on; move the
   boss (`moveBoss`); move the clouds (`moveClouds`: count a stood-on cloud's `sinkMs` down, then let
   it fall, carrying the knight standing on it, and drop it at the road); if the feet are now below
   the floor (`floorAt` under the knight's box), that is a ledge's side: hurt (`'wall'`, unless
-  unhurtable or less than `STEP_UP` short) and snap onto its top; apply gravity (halved while
+  unhurtable or less than `STEP_UP` short) and snap onto its top; hold the knight's height while
+  dashing in the air, or else apply gravity (halved while
   falling with Falcon's Glide, and to `GUST.lift` while a gust blows) and land on the floor (on ice,
   a landing starts a skid, and the rockfall gains `ROCK.skid`); a landing on a cloud starts its
   `sinkMs`; stomp a foe landed on; stomp or bump the boss (`bossContact`);
-  refill jumps when grounded; count down slide, hurt and skid (a jump queued during the skid fires
+  refill jumps when grounded; count down slide, hurt, dash, the dash's cooldown and skid (a jump queued during the skid fires
   as it ends, in the air too if the knight walked off a ledge meanwhile, unless a slide is pressed
-  after it, which drops it); check one trap hit (the
+  after it, which drops it); while dashing, smash every `DASHABLE` trap touched (`smash`); check one trap hit (marked `touched`; the
   heavy knight's `smash` knocks out a goblin or bat it touches instead, through `knockOut`, as a
   stomp does; a pit only takes a knight on the road, `h` 0, never one on a cloud over it; a pit
-  even while unhurtable: the fall and the throw-out happen, marked by a `fall` puff, but cost nothing); let the rockfall gain `ROCK.hit` if a hit landed this tick, and
+  even while unhurtable: the fall and the throw-out happen, marked by a `fall` puff, but cost
+  nothing, and never while dashing); mark each blade the knight's back has passed (`passed`) and
+  move the logs mission on for one never `touched`; let the rockfall gain `ROCK.hit` if a hit landed this tick, and
   if it has reached the knight's back, hurt (`'rock'`) and drop it `ROCK.start` behind (a knight
   still unhurtable is only kept at their heels); visit a shrine slid into; collect or pull coins;
   drop traps, ledges, shrines, coins and a beaten boss more than `BEHIND` behind; enter
   `checkpoint`, note its banner, meet a no-hit dare still standing, roll choices and clear
-  the runner's slide, skid and queued jump and drop when `distance` reaches `checkpointX`.
+  the runner's slide, skid, dash, dash cooldown and queued jump and drop when `distance` reaches `checkpointX`.
+- Run missions (`mission`): on an ordinary run `newRun` copies `Carry.missions` with `boardForRun`
+  (a seeded run has `missions` null and plays none). `knockOut` moves `bats` (a bat) and `row`
+  (`GameState.row`, foes stomped since the last hit, reset by `hurt`; a boss stomp counts too),
+  `smash` moves `smash` (a crate or shield goblin), `gainCoin` moves `coins`, a coin with `high`
+  set moves `high`, `meetDare` moves `dares`, the knight's distance moves `metres` (from the
+  mission's `from`) and a blade passed unhurt moves `logs`. A met one adds `rewardOf` to `bank`,
+  `missionsMet` and `missionCoins`, pops `missionPop`, and `dealMission` replaces it (from 0).
+  `GameScene.update` saves as soon as `missionsMet` changes, so the bank's coins are kept.
+- High paths: a `route` piece pushes three `float` ledges `ROUTE.h` up (widths and gaps from
+  `PLATFORMS`), `high` coins along and over them, spikes (`h` `ROUTE.h`) or a goblin pacing the
+  middle one, and a few road coins under them. `floorAt(s, x0, x1, feet)` only counts a float for
+  feet at or above its top (`floorOf` passes the knight's `h`), so the knight runs under it, jumps
+  up through it and lands on it, and its side is never a wall. `drawWorld` draws a float as a
+  `ROUTE.thick` slab of the `ledge` texture with inked edges and two corbels.
 - A boss (`moveBoss`, `Boss.mode`, with the numbers `bossOf(boss)` from `BOSS[kind]`): `wait` on
   the road until `station` ahead of the knight; `throw` keeps that gap and throws `throws(hp)`
   things (its two `missiles` by turns: barrel, axe, barrel... or fire, tail, fire...) every
@@ -327,14 +366,14 @@ in.
 - Moving the knight forward before gravity is deliberate: a jump that is still above a ledge's top
   as it reaches the side lands on it, even if a long frame takes the feet below the top.
 - Input: a `pointerdown` on the scene with nothing interactive under it calls `jump` when
-  `viewPoint(pointer).y` is above `TAP_SPLIT_Y` and `slide` below it. Keys: Space, Up, W jump; Down, S slide.
+  `viewPoint(pointer).y` is above `TAP_SPLIT_Y` and `slide` below it. Keys: Space, Up, W jump; Down, S slide; Right, D, Shift dash.
   A key's auto-repeat (`event.repeat`) is ignored, so holding Space never fires the Second Leap and
   holding Down never keeps the slide going. On the scene's `RESUME` (the shared pause and Start let
   go) `lastFrame` is cleared, so the first frame back is a 0 ms step rather than a 100 ms catch-up.
   On a touch screen (`device.input.touch`, or once a pointer `wasTouch`) `createActionButtons`
-  shows two round buttons in the margin's bottom right (`ACTION_BUTTONS`: Slide at 780, Jump at
-  890, y 490, radius 40; textures `action-slide`/`action-jump` and their madder `-down` press,
-  baked by `bakeActionButtons` in `hud.ts`) while `phase === 'running'`; they call `slide` and
+  shows three round buttons in the margin's bottom right (`ACTION_BUTTONS`: Dash at 670, Slide at 780, Jump at
+  890, y 490, radius 40; textures `action-dash`/`action-slide`/`action-jump` and their madder `-down` press,
+  baked by `bakeActionButtons` in `hud.ts`) while `phase === 'running'`; they call `dash`, `slide` and
   `jump` on `pointerdown`, and the scene has a second touch pointer so a thumb on each works. Card and button taps
   are ignored by that handler because they hit interactive objects; the full-screen dims behind the
   cards and the game-over panel are interactive too, so they swallow stray taps.
@@ -344,9 +383,9 @@ in.
   (depth 3), traps, foes and coins (depth 4), the shrine's banderole (4.2), the `frame` overlay
   (4.5: vellum side strips and the gold rule), the knight (5), effects (6) and words (6.5), the hint
   and the HUD (`UI_DEPTH`). The margin caption is a `Text` at depth 0, set by `drawCaption` from
-  the phase and the nearest thing ahead. It is centred at `MARGIN.captionX` (458) and shrunk to at
-  most `MARGIN.captionW` (540) wide, so it stays clear of the shared corner buttons in the bottom
-  left (up to about 165 game px in on a small phone) and of the touch Slide and Jump buttons.
+  the phase and the nearest thing ahead (a float ledge reads as the high path). It is centred at `MARGIN.captionX` (400) and shrunk to at
+  most `MARGIN.captionW` (440) wide, so it stays clear of the shared corner buttons in the bottom
+  left (up to about 165 game px in on a small phone) and of the touch Dash, Slide and Jump buttons.
 - Terrain: `drawWorld` swaps the `ground` tile sprite's texture by `state.terrain`, `drawWeather`
   draws snow (ice), gust streaks (wind) or the Sky Road's gusts (sky) on a `Graphics` at depth 4.4, under the frame, and
   `drawHud` fills the stage's tag (ground, "Rockfall!" and road) and the dare's strip, and fades
@@ -366,7 +405,11 @@ in.
   frame; `pop`, `heal` and `refuse` effects are `Text` objects in `words`, keyed by effect id. The
   sparkle trail (`trail`) is a short list of course points the knight passed, laid every 45 ms of
   the scene's clock while the multiplier is x2 or more. The knight is one image whose texture and
-  origin change by pose. `BoonCards.show` rebuilds only when the choices change.
+  origin change by pose. `BoonCards.show` rebuilds only when the choices change. While
+  `runner.dashMs > 0` `drawEffects` draws speed lines behind the knight and a lapis kite shield in
+  front; `drawHud` draws the dash's shield at `DASH_SIGN`, gold when ready and filling while it comes
+  back. The game-over panel (`OVER_PANEL`, 640x470) has the missions' heading and three cells
+  (`drawMissions`), hidden after a challenge course.
 - The ghost: after `tick`, on an ordinary run, `record(samples, state)` adds the samples due; when
   the phase turns `over`, `keepGhost` keeps them with `ghostOf` and `saveGhosts` if the run went
   further than this knight's ghost. `drawGhost` places the `ghost` image (depth 4.9, `GHOST_LOOK`
@@ -410,7 +453,10 @@ in.
   "grounded" means feet at `floorAt` under the box and not rising. Screen x is
   `RUNNER_X + x - distance` (`GameScene.sx`), screen y is `GROUND_Y - h`.
 - `Runner`: `h`, `vh`, `slideMs`, `slideQueued` (slide on landing after an air drop), `jumps` left,
-  `hurtMs` (invulnerable time), `skidMs` and `jumpQueued` (the ice skid).
+  `hurtMs` (invulnerable time), `skidMs` and `jumpQueued` (the ice skid), `dashMs` and `dashCd`
+  (the dash and its cooldown).
+- `missions` is the run's `MissionBoard` (null on a seeded run), `missionsMet` and `missionCoins`
+  what it paid this run, and `row` the foes stomped since the last hit.
 - `terrain` is `terrainOf(stage, dragonBeaten)`, set by `freshState` and `nextStage` (`'road'` on
   any boss stage, `'sky'` on every ordinary stage after the dragon). `gustOf(state)` is the Sky
   Road's gust by `time` (`calm`, `warn`, `blow`; always `calm` elsewhere). `knight` is who runs this
@@ -424,7 +470,9 @@ in.
   daily course's date (null on an ordinary run) and `seed` its random state.
 - `traps: Trap[]`: `kind`, `x`, `w`, `h` (the ground it stands on; a bat's, an axe's and a tail
   lash's flying height, 34), `vx` (0 unless a foe or a boss's missile: barrel, axe, fire, tail), a
-  goblin's beat `from`/`to`, a fire vent's `phase` in its burn.
+  goblin's beat `from`/`to`, a fire vent's `phase` in its burn, and `touched` (it hurt the knight)
+  and `passed` (a blade behind the knight). A crate, a shield goblin and anything on a high path's
+  platform stand at that platform's `h` or on the road.
   Foes (`FOES`: goblin, bat) only move once within `AWAKE` (760 px) ahead of the knight, just off
   screen. A bat is placed so it meets the knight where its piece was laid out, from the stage's
   speed. A stomped foe is removed from `traps` and counted in `stomps`.
@@ -478,7 +526,9 @@ the `-replays` suffix keeps it out of a progress code, so only a progress file c
 `GameScene.create` via `loadProgress`, written by `saveProgress`; every access is wrapped in
 try/catch. `hotfoot-weekly` (JSON `{ week, best }` of the last weekly road run, `week` as `YYYY-Www`),
 `hotfoot-challenges` (JSON array of each challenge course's best score as star bits, `STAR`) and
-`hotfoot-pets` (JSON `{ levels, with }`: each companion's level and the one along, or null).
+`hotfoot-pets` (JSON `{ levels, with }`: each companion's level and the one along, or null) and
+`hotfoot-missions` (JSON `{ dealt, slots: [{ kind, tier }] }`: the three missions standing; a
+broken or missing one starts a fresh board; progress is never saved, it is the run's own).
 `hotfoot-trophies` holds the trophies earned (`shared/trophies.ts`, each id with the time). Nothing
 else is saved by the game; the hub's settings live under the shared `hub-settings`
 key (see Hub settings).
@@ -492,7 +542,8 @@ key (see Hub settings).
   the road (and `dragonBeaten`), never on how many draws the cards before it took (a third draw
   after a met dare, or a curse draw) or on an earlier stage. It is used only in
   `src/game/course.ts` (sizes and fire vent phases in `planOf`, ledge heights, `pickOf`, gap
-  length) and in `rollChoices` in `src/game/sim.ts`. `placeShrine`, the bosses, the terrains, the
+  length, a high path's widths, gaps and hazard) and in `rollChoices` in `src/game/sim.ts`. The
+  missions take no draws. `placeShrine`, the bosses, the terrains, the
   roads' extra coins, the dare (`dareOf` goes round by stage) and the rockfall take no draws, and
   the curse draw only happens from `CURSE.from` (stage 2). A challenge course seeds from
   `challenge:N` once, so its sizes and fire vents' phases are the same on every run; the weekly
@@ -529,7 +580,12 @@ key (see Hub settings).
   per stage), `BAT` (width, height, speed per stage), `LEDGE_H`, sizes and coin patterns per piece
   in `planOf` (two more coins per arc and row on the High Road, and 8 lead-in coins instead of 5),
   and the shrine's gap (at least `SHRINE.w + 160`) in `placeShrine`.
-- `src/game/sim.ts`: `PULL_SPEED`, `BEHIND`, `STOMP_REACH`, `STOMP_BOUNCE`, `STEP_UP`.
+- `src/game/sim.ts`: `PULL_SPEED`, `BEHIND`, `STOMP_REACH`, `STOMP_BOUNCE`, `STEP_UP`, `CRATE_COINS` (3).
+- `src/game/state.ts`: `DASH` (ms 260, pace 2.1, cooldown 1800), `DASHABLE`, `ROUTE` (from stage 3,
+  h 112, thick 18), and `TRAP_SPAN.crate` (60) and `.shield` (150); `src/game/course.ts`:
+  `CRATE_W`, `SHIELD_W`, `PLATFORMS` (3 platforms 240/280/320 wide, gaps 90/110/130) and crates
+  and shield goblins in the pool from stage 2 (crates only on the Sky Road), high paths from
+  `ROUTE.from`; `src/game/missions.ts`: `MISSIONS`, `MISSION_ORDER`, `rewardOf`.
 - `src/game/boons.ts`: names, card text, max ranks, and `CURSE` (from stage 2, half the time).
 
 ### Screen scaling
@@ -591,7 +647,8 @@ the stage), at most one sound of each kind a frame, so a row of coins or a volle
   cloud starts to fall), `bark` (a `bark` effect), `owl` (an `owl` effect), `fox` (a `fox`
   effect; it counts as a hurt, so a pit's throw-out it took plays no `jump`), `cleared` (a challenge
   course's banner reached, instead of the `lose` sting), `again` (Run again, Try again or a course
-  started from the Courses panel). Shared
+  started from the Courses panel), `dash` (a `dash` effect), `smash` (a `smash` effect),
+  `mission` (the `missionPop` pop). Shared
   sounds: `ui('refuse')` for a shrine's refusal and a refused purchase, `ui('coin')` for a boon or
   armoury level bought, `ui('click')` for Armoury, Back and choosing an unlocked knight (`ui('coin')` for unlocking one).
 
@@ -629,7 +686,9 @@ the stage), at most one sound of each kind a frame, so a row of coins or a volle
 - It drives only mouse clicks on the canvas: `JUMP_AT` (720,120) and `SLIDE_AT` (720,470), on
   either side of `TAP_SPLIT_Y`, and the centre of the first boon card. Nothing interactive may sit
   under those two points (the run track and the margin caption are not interactive). The touch
-  Slide and Jump buttons stay hidden in the test (no touch screen) and sit clear of `SLIDE_AT`.
+  Dash, Slide and Jump buttons stay hidden in the test (no touch screen) and sit clear of `SLIDE_AT`.
+  The test never dashes; stage 1 has no crate, shield goblin or high path. Run missions are dealt
+  on its ordinary run, but they pay into the bank, never into the run's coins it asserts.
 - Values the test copies and that must stay in sync: `VIEW` 960x540, `HALF_W` 14 (half of
   `RUNNER.w`), `STAGE_1` (3 hearts, speed 260, `checkpointX` 3200), and the reaction distances in
   `REACT`. Its `obstaclesOf` turns `traps` and the rising sides of `ledges` into one list; it
@@ -724,6 +783,13 @@ the stage), at most one sound of each kind a frame, so a row of coins or a volle
 - Tune the Sky Road: `GUST` and `CLOUD` in `state.ts`, `SKY_GAPS`, `CLOUD_INSET` and the sky's pool
   in `course.ts`. A new gap width needs its `pit-<w>` (`skyGaps`) and `cloud-<w - 120>` (`clouds`)
   baked in `scenery.ts`, which both follow `SKY_GAPS`.
+- Add a run mission: a `MissionKind` with its `MISSIONS` row (its text in the `i18n/` files, `base`
+  and `step`), a place in `MISSION_ORDER`, and a `mission(s, kind, n)` call in `sim.ts` where it
+  moves on. A saved board with a kind no longer listed starts fresh.
+- Tune the dash: `DASH` and `DASHABLE` in `state.ts`; the HUD sign and the touch button follow.
+  A new dashable trap also gets its case in `smash`.
+- Tune the high paths: `ROUTE` in `state.ts` (keep `h` under the knight's jump peak, 154 px, and
+  above the knight's head, 60, plus `thick`), `PLATFORMS` and the `route` case in `planOf`.
 - Change the run track: `trackOf` in `state.ts` (the numbers) and the track part of `drawHud` and
   `TRACK` in `layout.ts` (the drawing).
 
@@ -782,4 +848,9 @@ the stage), at most one sound of each kind a frame, so a row of coins or a volle
   little early.
 - The ghost samples by `state.time`, so a change to how fast the knight runs makes old ghosts drift
   from the course; they still replay, they only no longer match it.
-- Healing art uses green (`C.heal`). Never draw a red cross (root `AGENTS.md`).
+- Healing art uses green (`C.heal`). Never draw a red cross (root `AGENTS.md`). The shield goblin's
+  pennant is plain madder and the dash's kite shield a gold boss on lapis: no cross.
+- A float ledge is ground only from above: call `floorAt` with the feet's height (`floorOf` does)
+  wherever the knight or a pet stands, or a high path's platform turns into a wall.
+- A dash moves the knight faster than `speedOf`, so a bat met mid-dash arrives late, and ghosts
+  drift a little after a dash (they sample by time).

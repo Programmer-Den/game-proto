@@ -45,6 +45,12 @@ export const sfx = sounds({
   rock: { wave: 'noise', freq: 220, to: 45, length: 0.55, volume: 0.32, gap: 400 },
   /** Arriving at a checkpoint's banner. */
   checkpoint: { wave: 'triangle', freq: 784, arp: [0, 5, 9, 12], arpStep: 0.07, length: 0.45, volume: 0.36, gap: 400 },
+  /** A shield dash: a quick rushing whoosh. */
+  dash: { wave: 'noise', freq: 900, to: 2600, length: 0.2, attack: 0.02, volume: 0.16, gap: 150 },
+  /** A dash breaking through a crate, a barrel or a goblin's guard: a wooden crunch. */
+  smash: { wave: 'noise', freq: 420, to: 120, length: 0.22, volume: 0.3, gap: 90 },
+  /** A run mission met: a bright little fanfare. */
+  mission: { wave: 'pulse25', freq: 659, arp: [0, 4, 7, 12, 16], arpStep: 0.06, length: 0.45, volume: 0.24, gap: 400 },
   /** A boon or a road taken. */
   pick: { wave: 'square', freq: 660, arp: [0, 7], arpStep: 0.06, length: 0.14, volume: 0.22, gap: 120 },
   /** A boon pair completed: a magic arpeggio. */

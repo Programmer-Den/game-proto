@@ -166,7 +166,7 @@ export function bakeActionButtons(scene: Phaser.Scene) {
   const r = ACTION_BUTTONS.r;
   const size = r * 2 + 4;
   const c = size / 2;
-  for (const kind of ['jump', 'slide'] as const) {
+  for (const kind of ['jump', 'slide', 'dash'] as const) {
     for (const [suffix, fill] of [['', C.lapis], ['-down', C.madder]] as const) {
       paint(scene, `action-${kind}${suffix}`, size, size, (ctx) => {
         ctx.fillStyle = C.ink;
@@ -197,6 +197,16 @@ export function bakeActionButtons(scene: Phaser.Scene) {
           ctx.lineTo(c, c - 16);
           ctx.stroke();
           poly(ctx, [[c - 12, c - 12], [c, c - 26], [c + 12, c - 12]], C.goldPale, 0);
+        } else if (kind === 'dash') {
+          // A shield charging forward, with speed lines behind it.
+          ctx.lineWidth = 3;
+          for (const dy of [-18, -10, -2]) {
+            ctx.beginPath();
+            ctx.moveTo(c - 22, c + dy);
+            ctx.lineTo(c - 10, c + dy);
+            ctx.stroke();
+          }
+          poly(ctx, [[c - 4, c - 24], [c + 16, c - 24], [c + 16, c - 10], [c + 6, c + 4], [c - 4, c - 10]], C.goldPale, 0);
         } else {
           ctx.beginPath();
           ctx.moveTo(c - 14, c - 22);

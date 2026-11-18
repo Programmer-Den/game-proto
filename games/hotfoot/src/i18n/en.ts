@@ -292,6 +292,25 @@ const en = {
   tryAgain: 'Try again',
   bestWeekly: "Best on this week's road: {n} m.",
   captionCleared: 'Here the knight reacheth the banner, and is crowned with stars.',
+  // Round 5: the shield dash, its crates and shield goblins, the high paths and the run missions
+  buttonDash: 'Dash',
+  hintDash: 'Right / D: shield dash',
+  captionCrate: 'Here the knight leapeth the crates, or dasheth through them for the coins within.',
+  captionShield: 'Here a goblin hideth behind his tower shield: dash through him!',
+  captionRoute: 'Here the road splitteth: coins and peril above, safety below.',
+  missionLogs: 'Slide under {n} hanging logs',
+  missionCoins: 'Take {n} coins',
+  missionBats: 'Stomp {n} bats',
+  missionSmash: 'Dash through {n} crates or shield goblins',
+  missionRow: 'Stomp {n} foes in a row without a hit',
+  missionMetres: 'Run {n} m',
+  missionHigh: 'Take {n} coins on high paths',
+  missionDares: { one: "Meet {n} herald's dare", other: "Meet {n} herald's dares" },
+  missionsTitle: 'Missions, each in one run',
+  missionProgress: '{p}/{goal} · +{reward} to the bank',
+  missionPop: 'Mission met! +{n} banked',
+  missionsMet: { one: '{n} mission met: +{coins} banked.', other: '{n} missions met: +{coins} banked.' },
+  missionsSeeded: 'Missions count on ordinary runs only.',
 };
 
 export default en;

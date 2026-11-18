@@ -46,6 +46,42 @@ function goblin(scene: Phaser.Scene) {
   }
 }
 
+/** The shield goblin's texture: 64x160 px, its feet at (30, 156). Its pike stands 150 px tall (`TRAP_SPAN.shield`). */
+export const SHIELD_ART = { w: 64, h: 160, feetX: 30, feetY: 156 };
+
+/** A goblin behind a tower shield, its pike planted upright with a pennant: dashed through, never leapt. */
+function shieldGoblin(scene: Phaser.Scene) {
+  paint(scene, 'shield-goblin', SHIELD_ART.w, SHIELD_ART.h, (ctx) => {
+    ctx.translate(SHIELD_ART.feetX, SHIELD_ART.feetY);
+    ctx.scale(GS, GS);
+    // The pike, behind it, with a madder pennant at the top.
+    poly(ctx, [[22, 4], [30, 4], [30, -300], [22, -300]], C.wood, 2.5);
+    poly(ctx, [[18, -300], [26, -330], [34, -300]], C.silver, 2.5);
+    poly(ctx, [[30, -296], [62, -284], [30, -270]], C.madder, 2.5);
+    // Its legs and head peeping over the shield.
+    poly(ctx, [[-10, 0], [-6, -24], [2, -24], [0, 0]], '#4f7a2e', 2.5);
+    poly(ctx, [[6, 0], [6, -24], [14, -24], [18, 0]], '#4f7a2e', 2.5);
+    oval(ctx, 6, -110, 16, 14, '#7ab04a', 2.5, -0.2);
+    poly(ctx, [[-6, -114], [-26, -128], [-8, -104]], '#8cc25a', 2.5);
+    poly(ctx, [[18, -116], [34, -130], [22, -106]], '#6a9a3e', 2.5);
+    circle(ctx, 0, -114, 4, '#fff8e0', 1.5);
+    circle(ctx, -1, -114, 1.8, C.ink, 0);
+    // The tower shield, faced towards the knight: iron-rimmed planks with a gold boss.
+    poly(ctx, [[-40, -4], [-40, -96], [-30, -104], [20, -104], [30, -96], [30, -4]], C.iron, 3);
+    poly(ctx, [[-34, -10], [-34, -92], [-26, -98], [16, -98], [24, -92], [24, -10]], C.wood, 2);
+    ctx.strokeStyle = C.woodDark;
+    ctx.lineWidth = 2;
+    for (const x of [-20, -6, 8]) {
+      ctx.beginPath();
+      ctx.moveTo(x, -96);
+      ctx.lineTo(x, -12);
+      ctx.stroke();
+    }
+    circle(ctx, -5, -54, 11, gold(ctx, -16, -65, 6, -43), 2.5);
+    hl(ctx, [[-30, -16], [-30, -88]], 2);
+  });
+}
+
 /** The bat's texture: 76x40 px, centred on its body. */
 export const BAT_ART = { w: 76, h: 40 };
 const BS = 0.45;
@@ -409,6 +445,7 @@ function boulder(scene: Phaser.Scene) {
 
 export function bakeFoes(scene: Phaser.Scene) {
   goblin(scene);
+  shieldGoblin(scene);
   bat(scene);
   gatekeeper(scene);
   barrel(scene);
