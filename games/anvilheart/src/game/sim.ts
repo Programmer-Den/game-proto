@@ -5,7 +5,18 @@ import { GEM, MASTER, combine, isGemmed, isMaster, isShield, isSword, shield, sw
 import { SHIELD_TOP } from './shields';
 import {
   BARREL,
+  GRID,
   FIRST_ORDER,
+  JOBS,
+  PARTY_EVERY_MS,
+  PARTY_PATIENCE,
+  PARTY_PAY,
+  PARTY_SIZE,
+  TRAIN_TOP,
+  TRIPLE_TIER,
+  freshShift,
+  partiesAbout,
+  shiftOpen,
   FIRST_VISITOR_MS,
   GEM_ORDER_CHANCE,
   HAGGLER_PATIENCE,
@@ -66,6 +77,7 @@ import {
   type Adventurer,
   type Fit,
   type GameState,
+  type Job,
   type Returning,
   type Trait,
 } from './state';
@@ -93,7 +105,15 @@ export function useRandom(source: (() => number) | null) {
 export function tick(s: GameState, dt: number) {
   // A new charter's smithy stands still until its edict and hall are chosen, and a daily shift
   // stands still once its time is up.
-  if (edictOffers(s) || hallOffers(s) || (s.daily && s.daily.ms <= 0)) return;
+  if (edictOffers(s) || hallOffers(s) || nightOffers(s) || (s.daily && s.daily.ms <= 0)) return;
+  // Closing time: at dusk the smithy stands still until a job for the night is picked.
+  if (shiftOpen(s)) {
+    s.shift.ms = Math.max(0, s.shift.ms - dt);
+    if (s.shift.ms === 0) {
+      s.events.push({ kind: 'dusk' });
+      return;
+    }
+  }
   if (s.daily) {
     s.daily.ms = Math.max(0, s.daily.ms - dt);
     if (s.daily.ms === 0) {
@@ -135,9 +155,14 @@ export function tick(s: GameState, dt: number) {
     const half = a.given.sword ?? a.given.shield;
     s.events.push({ kind: 'left', desk: a.desk, back: half === null ? undefined : handBack(s, half) });
   }
+  // A party whose patience ran out has gone, bonus and all.
+  if (s.party.id !== 0 && !s.adventurers.some((a) => a.party === s.party.id)) s.party = { ...s.party, id: 0, paid: 0 };
 
   // Knights ride in ahead of the adventurers.
   if (tourneyOpen(s)) tourneyDay(s, dt);
+
+  // An adventuring party, once due, waits for three free desks, and nobody else comes meanwhile.
+  if (partyDay(s, dt)) return;
 
   if (s.adventurers.length < desksOf(s)) {
     s.nextVisitorMs -= dt;
@@ -146,6 +171,64 @@ export function tick(s: GameState, dt: number) {
       s.nextVisitorMs = visitorEveryMs(s);
     }
   }
+}
+
+/**
+ * Adventuring parties (AN21): once parties are about, one comes every `PARTY_EVERY_MS`. When it is
+ * due it holds the counter for itself (returns true, so no one else walks in) until three desks
+ * are free and no tourney is under way, then seats its three at once.
+ */
+function partyDay(s: GameState, dt: number) {
+  if (!partiesAbout(s) || s.party.id !== 0) return false;
+  const before = s.party.inMs;
+  s.party.inMs -= dt;
+  if (s.party.inMs > 0) return false;
+  if (before > 0) s.events.push({ kind: 'partyDue' });
+  const free = desksOf(s) - s.adventurers.length;
+  if (free < PARTY_SIZE || s.tourney.on) return true;
+  seatParty(s);
+  return true;
+}
+
+/** Seats a party of three, each wanting a different sword, with one shared patience. */
+function seatParty(s: GameState) {
+  const top = Math.min(ORDER_TOP, Math.max(3, s.bestTier + 1));
+  // Three different tiers from the Shortsword up to one better than the best made.
+  const pool = [...Array(top - 1).keys()].map((k) => k + 2);
+  const wants: number[] = [];
+  while (wants.length < PARTY_SIZE && pool.length > 0) wants.push(pool.splice(Math.floor(random() * pool.length), 1)[0]);
+  wants.sort((a, b) => a - b);
+  const patience =
+    (PATIENCE_MS + PATIENCE_PER_TIER_MS * wants[wants.length - 1]) *
+    PARTY_PATIENCE *
+    byDifficulty(1.5, 1, 0.7) *
+    patienceFactor(s) *
+    edictRule(s.edict).patience *
+    tavernFactor(s);
+  const id = s.nextId;
+  for (const tier of wants) {
+    const desk = freeDesk(s);
+    if (desk === undefined) break;
+    s.adventurers.push({
+      id: s.nextId++,
+      desk,
+      wants: tier,
+      gem: false,
+      trait: 'none',
+      shield: 0,
+      patience,
+      patienceMs: patience,
+      look: Math.floor(random() * LOOKS),
+      returned: false,
+      knight: false,
+      party: id,
+      given: { sword: null, shield: null },
+    });
+    s.orders++;
+  }
+  s.party = { inMs: PARTY_EVERY_MS, id, paid: 0 };
+  s.nextVisitorMs = visitorEveryMs(s);
+  s.events.push({ kind: 'partyIn' });
 }
 
 /**
@@ -211,6 +294,7 @@ function arriveKnight(s: GameState, wants: number) {
     look: KNIGHT_LOOK,
     returned: false,
     knight: true,
+    party: 0,
     given: { sword: null, shield: null },
   });
 }
@@ -358,6 +442,7 @@ function arrive(s: GameState, hero?: Returning) {
     look,
     returned: hero !== undefined,
     knight: false,
+    party: 0,
     given: { sword: null, shield: null },
   };
   s.adventurers.push(a);
@@ -406,7 +491,7 @@ function comeBack(s: GameState, hero: Returning) {
  */
 export function forge(s: GameState) {
   // A new charter forges nothing until its edict is chosen.
-  if (s.heatMs > 0 || edictOffers(s) || hallOffers(s) || (s.daily && s.daily.ms <= 0)) return false;
+  if (s.heatMs > 0 || edictOffers(s) || hallOffers(s) || nightOffers(s) || (s.daily && s.daily.ms <= 0)) return false;
   const slot = s.slots.indexOf(null);
   if (slot < 0) return false;
   // Starmetal from the ore cart forges Steel blanks; the Fine Ore roll is still made, so the random sequence holds.
@@ -469,6 +554,20 @@ export function drop(s: GameState, from: number, to: number) {
   const item = itemAt(s, from);
   if (item === null || from === to || !placeable(s, from) || !placeable(s, to)) return false;
   const there = itemAt(s, to);
+  // Onto a pair of twins side by side, a fine sword folds all three into one two tiers up.
+  const third = triplePartner(s, from, to);
+  if (third !== null) {
+    const gemmed = [item, there!, s.slots[third]!].some(isGemmed);
+    const master = s.streakMs > 0 && s.streakMs <= masterMs(s);
+    const made = sword(tierOf(item) + 2, gemmed, false, master);
+    put(s, from, null);
+    put(s, third, null);
+    put(s, to, made);
+    raiseBest(s, made);
+    s.events.push({ kind: 'merged', slot: to, tier: tierOf(made), master, triple: third });
+    hammer(s, to);
+    return true;
+  }
   const made = there === null ? null : combine(item, there);
   if (made) {
     const master = made.merged && isSword(made.item) && s.streakMs > 0 && s.streakMs <= masterMs(s);
@@ -477,7 +576,7 @@ export function drop(s: GameState, from: number, to: number) {
     put(s, to, item);
     if (made.merged) {
       raiseBest(s, item);
-      s.events.push({ kind: 'merged', slot: to, tier: tierOf(item), master });
+      s.events.push({ kind: 'merged', slot: to, tier: tierOf(item), master, triple: -1 });
       hammer(s, to);
     } else if (made.repaired) {
       const coins = repairPay(made.item);
@@ -491,6 +590,23 @@ export function drop(s: GameState, from: number, to: number) {
     put(s, to, item);
   }
   return true;
+}
+
+/**
+ * The anvil of the third sword a drop from `from` onto `to` would fold in (AN22), or null: the
+ * held sword and the one on `to` are twins of `TRIPLE_TIER` or better that can rise two tiers, and
+ * an anvil beside `to` (not `from`) holds a third twin. The first such neighbour counts: above,
+ * below, left, then right.
+ */
+export function triplePartner(s: GameState, from: number, to: number): number | null {
+  const item = itemAt(s, from);
+  if (to === BARREL || to < 0 || to >= s.slots.length || from === to || item === null) return null;
+  const there = s.slots[to];
+  const twin = (x: number | null): x is number => x !== null && isSword(x) && tierOf(x) === tierOf(item);
+  if (!isSword(item) || tierOf(item) < TRIPLE_TIER || tierOf(item) + 2 > MAX_TIER || !twin(there)) return null;
+  const col = to % GRID.cols;
+  const near = [to - GRID.cols, to + GRID.cols, col > 0 ? to - 1 : -1, col < GRID.cols - 1 ? to + 1 : -1];
+  return near.find((n) => n >= 0 && n < s.slots.length && n !== from && twin(s.slots[n])) ?? null;
 }
 
 /** Chains a merge on `slot` into the hammer streak, paying its bonus (capped at `STREAK_TOP` steps) from the second merge on. */
@@ -540,6 +656,7 @@ export function deliverable(s: GameState, item: number | null) {
 export function scrap(s: GameState, from: number) {
   if (itemAt(s, from) === null || !placeable(s, from)) return false;
   put(s, from, null);
+  s.shift.scrapped++;
   s.events.push({ kind: 'scrapped', slot: from });
   return true;
 }
@@ -561,6 +678,7 @@ export function deliver(s: GameState, from: number) {
   if (s.commission.made < c.count) return true;
   s.coins += c.reward;
   if (s.daily) s.daily.earned += c.reward;
+  s.shift.earned += c.reward;
   s.stars++;
   s.commission = { level: s.commission.level + 1, made: 0, grand: false };
   s.won = commissionAt(s.commission.level, s.charter) === null;
@@ -600,6 +718,8 @@ export function sell(s: GameState, from: number, id: number) {
     const coins = knightPay(item, s);
     s.coins += coins;
     s.sold++;
+    s.shift.sold++;
+    s.shift.earned += coins;
     if (rivalOpen(s)) s.rival.mine++;
     if (s.daily) s.daily.earned += coins;
     s.tourney.entries.push(lance(item));
@@ -613,11 +733,25 @@ export function sell(s: GameState, from: number, id: number) {
   const tier = tierOf(sold);
   s.coins += coins;
   s.sold++;
+  s.shift.sold++;
+  s.shift.earned += coins;
   if (rivalOpen(s)) s.rival.mine++;
   if (s.daily) s.daily.earned += coins;
   if (fit === 'exact') s.reputation = Math.min(REP_MAX, s.reputation + REP_EXACT);
   s.adventurers.splice(s.adventurers.indexOf(a), 1);
   s.events.push({ kind: 'sold', desk: a.desk, tier, coins, fit });
+  // The last of a party served pays the party's bonus on top of what the three paid.
+  if (a.party !== 0 && a.party === s.party.id) {
+    s.party.paid += coins;
+    if (!s.adventurers.some((b) => b.party === a.party)) {
+      const bonus = Math.floor(s.party.paid * PARTY_PAY);
+      s.coins += bonus;
+      s.shift.earned += bonus;
+      if (s.daily) s.daily.earned += bonus;
+      s.party = { ...s.party, id: 0, paid: 0 };
+      s.events.push({ kind: 'partyServed', desk: a.desk, coins: bonus });
+    }
+  }
   if (tier >= RETURN_TIER && random() < RETURN_CHANCE) {
     s.returning.push({ inMs: RETURN_MS, item: sword(tier - 1, isGemmed(sold), true), trophy: trophyFor(tier), look: a.look });
   }
@@ -709,6 +843,7 @@ export function foundCharter(s: GameState) {
   // The apprentice comes along, quicker for the new charter; the tourney, the cart and the ores start afresh.
   s.apprenticeMs = apprenticeEvery(s);
   s.tourney = freshTourney();
+  s.party = { ...s.party, id: 0, paid: 0 };
   s.cart = freshCart();
   s.ores = noOres();
   // The Armoury lays its Iron Shortswords on the new smithy's first anvils.
@@ -730,6 +865,37 @@ export function chooseHall(s: GameState, hall: Hall) {
     if (slot >= 0) put(s, slot, 2);
   }
   s.events.push({ kind: 'hall', hall });
+  return true;
+}
+
+/** Whether the shift has reached dusk and waits for a job for the night (AN23). */
+export const nightOffers = (s: GameState) => shiftOpen(s) && s.shift.ms <= 0;
+
+/** Whether a night job can be done: smelting needs something scrapped today and room for the gem, training a hired apprentice with steps left. */
+export function jobReady(s: GameState, job: Job) {
+  if (job === 'smelt') return s.shift.scrapped > 0 && (s.slots.includes(null) || (s.ranks.barrel > 0 && s.barrel === null));
+  if (job === 'train') return s.apprentice && s.training < TRAIN_TOP;
+  return true;
+}
+
+/**
+ * Picks the night's job at dusk and starts the next shift: sharpening starts every sword afresh
+ * against rust, smelting lays a gem from the day's scrap on the first empty anvil (else the
+ * barrel), and training makes the apprentice a step quicker for good.
+ */
+export function chooseJob(s: GameState, job: Job) {
+  if (!nightOffers(s) || !JOBS.includes(job) || !jobReady(s, job)) return false;
+  if (job === 'sharpen') s.idle.fill(0);
+  if (job === 'smelt') {
+    const slot = s.slots.indexOf(null);
+    put(s, slot >= 0 ? slot : BARREL, GEM);
+  }
+  if (job === 'train') {
+    s.training++;
+    s.apprenticeMs = Math.min(s.apprenticeMs, apprenticeEvery(s));
+  }
+  s.shift = freshShift();
+  s.events.push({ kind: 'night', job });
   return true;
 }
 

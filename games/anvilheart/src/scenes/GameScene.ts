@@ -20,7 +20,11 @@ import {
   chooseEdict,
   chooseHall,
   buyOre,
+  chooseJob,
   dailyShop,
+  jobReady,
+  nightOffers,
+  triplePartner,
   hireApprentice,
   hold,
   hallOffers,
@@ -45,6 +49,10 @@ import {
 import {
   BARREL as BARREL_PLACE,
   APPRENTICE_PRICE,
+  JOBS,
+  PARTY_PAY,
+  TRAIN_TOP,
+  type Job,
   MAX_DESKS,
   MAX_SLOTS,
   REP_MAX,
@@ -137,6 +145,8 @@ const STANDING: TextKey[] = ['shunned', 'doubted', 'known', 'respected', 'renown
 const LEAD = 0x17131c;
 /** The line under an adventurer's order that says what their trait does. */
 const TRAIT_LINES: Record<Exclude<Trait, 'none'>, TextKey> = { haggler: 'haggler', noble: 'noble', veteran: 'veteran' };
+/** What the night's job did, floated at dawn. */
+const NIGHT_TEXT: Record<Job, TextKey> = { sharpen: 'nightSharpen', smelt: 'nightSmelt', train: 'nightTrain' };
 const TRAIT_COLOURS: Record<Trait, string> = { none: '#d8c8a8', haggler: '#9ad0ff', noble: '#ffd36a', veteran: '#b8e8a0' };
 
 const textStyle = (size: number, color = '#fff1d0', stroke = 3): Phaser.Types.GameObjects.Text.TextStyle => ({
@@ -248,6 +258,12 @@ export class GameScene extends Phaser.Scene {
   private dailyLink!: Phaser.GameObjects.Text;
   private dailyWindow!: Phaser.GameObjects.Container;
   private dailyResult!: Phaser.GameObjects.Text;
+  /** Closing time (AN23): the dusk window with the day's tally and a button per night job. */
+  private nightWindow!: Phaser.GameObjects.Container;
+  private nightTally!: Phaser.GameObjects.Text;
+  private jobButtons = new Map<Job, Button>();
+  /** The line under a held sword's target anvil that names what a triple merge there makes (AN22). */
+  private tripleLabel!: Phaser.GameObjects.Text;
   /** The side column (AN18 to AN20): the tourney's pane, the apprentice's with its hire button, and the ore cart's with its two buttons. */
   private tourneyPane!: Phaser.GameObjects.Container;
   private tourneyStatus!: Phaser.GameObjects.Text;
@@ -384,7 +400,9 @@ export class GameScene extends Phaser.Scene {
     this.createEdicts();
     this.createHalls();
     this.createDaily();
+    this.createNight();
     this.createSide();
+    this.tripleLabel = this.add.text(0, 0, '', textStyle(12, '#ffe27a', 3.5)).setOrigin(0.5).setDepth(UI_DEPTH - 2).setVisible(false);
     // An offer still waiting from the last visit opens at once.
     this.chooser.setVisible(this.state.choosing);
 
@@ -404,7 +422,7 @@ export class GameScene extends Phaser.Scene {
 
   /** Keeps the song's part in step with the shop: tense while a choice waits, busier during a hammer streak. */
   private playPart() {
-    const part = this.chooser.visible || this.edictWindow.visible || this.hallWindow.visible ? 'tense' : this.state.streak >= 2 ? 'streak' : 'calm';
+    const part = this.chooser.visible || this.edictWindow.visible || this.hallWindow.visible || this.nightWindow.visible ? 'tense' : this.state.streak >= 2 ? 'streak' : 'calm';
     if (part === this.musicPart) return;
     this.musicPart = part;
     playMusic(SONG, part);
@@ -421,7 +439,7 @@ export class GameScene extends Phaser.Scene {
     // Forging (the Forge button's or the Auto Forge's inside tick), rust dropping tiers, heroes
     // bringing swords back, walk-offs costing reputation, the apprentice's merges, a tourney's end
     // and a rival day's end (its prize) are kept here.
-    if (this.state.events.some((e) => e.kind === 'forged' || e.kind === 'rusted' || e.kind === 'returned' || e.kind === 'left' || e.kind === 'apprenticed' || e.kind === 'tourney' || e.kind === 'rivalDay')) this.save();
+    if (this.state.events.some((e) => e.kind === 'forged' || e.kind === 'rusted' || e.kind === 'returned' || e.kind === 'left' || e.kind === 'apprenticed' || e.kind === 'tourney' || e.kind === 'rivalDay' || e.kind === 'dusk' || e.kind === 'partyServed')) this.save();
     checkTrophies(this.state);
 
     this.drawSwords();
@@ -434,6 +452,7 @@ export class GameScene extends Phaser.Scene {
     this.drawChooser();
     this.drawEdicts();
     this.drawHalls();
+    this.drawNight();
     this.playPart();
   }
 
@@ -460,7 +479,13 @@ export class GameScene extends Phaser.Scene {
   /** Whether a window (the win, the crown's offer, the guild perks or the edicts) is open over the board. */
   private get windowOpen() {
     return (
-      this.win.visible || this.chooser.visible || this.perkWindow.visible || this.edictWindow.visible || this.hallWindow.visible || this.dailyWindow.visible
+      this.win.visible ||
+      this.chooser.visible ||
+      this.perkWindow.visible ||
+      this.edictWindow.visible ||
+      this.hallWindow.visible ||
+      this.dailyWindow.visible ||
+      this.nightWindow.visible
     );
   }
 
@@ -609,8 +634,9 @@ export class GameScene extends Phaser.Scene {
       .text(mid, ORDER.y + 86, label, { fontFamily: FONT, fontStyle: 'bold', fontSize: label.length > 28 ? '9px' : label.length > 24 ? '10.5px' : a.gem || set ? '12px' : '13px', color: '#2a1a14' })
       .setOrigin(0.5);
     // Between the order card and the patience bar: the trait, that this is a set order, or that this hero is back from a quest.
-    const line = a.knight ? t('knightLine') : a.trait !== 'none' ? t(TRAIT_LINES[a.trait]) : set ? t('setLine') : a.returned ? t('backLine') : '';
-    const trait = this.add.text(mid, ORDER.y + ORDER.h + 8.5, line, textStyle(11, a.knight ? '#ff9ab8' : set ? '#ffd36a' : TRAIT_COLOURS[a.trait], 2.5)).setOrigin(0.5);
+    const line = a.knight ? t('knightLine') : a.party ? t('partyLine', { pct: Math.round(PARTY_PAY * 100) }) : a.trait !== 'none' ? t(TRAIT_LINES[a.trait]) : set ? t('setLine') : a.returned ? t('backLine') : '';
+    const colour = a.knight ? '#ff9ab8' : a.party ? '#c8a8ff' : set ? '#ffd36a' : TRAIT_COLOURS[a.trait];
+    const trait = this.add.text(mid, ORDER.y + ORDER.h + 8.5, line, textStyle(11, colour, 2.5)).setOrigin(0.5);
     const tagImage = this.image(0, 0, 'tag-exact').setOrigin(0);
     const tagTop = this.add.text(TAG.w / 2 + 1, 11.5, '', textStyle(10, '#eaffd8', 2)).setOrigin(0.5);
     const tagBottom = this.add.text(TAG.w / 2 + 1, 23.5, '', textStyle(11, '#ffe27a', 2)).setOrigin(0.5);
@@ -648,6 +674,10 @@ export class GameScene extends Phaser.Scene {
         if (e.kind === 'merged' && e.master) {
           const at = this.placeSpot(e.slot);
           this.float(at.x, at.y + 62, t('masterworkStruck'), '#ffe27a', 1800);
+        }
+        if (e.kind === 'merged' && e.triple >= 0) {
+          const at = this.placeSpot(e.slot);
+          this.float(at.x, at.y - 20, t('tripleMerged', { sword: t(swordOf(e.tier).name) }), '#ffd36a', 1800);
         }
         const sprite = this.spriteAt(e.slot);
         const at = this.placeSpot(e.slot);
@@ -720,6 +750,18 @@ export class GameScene extends Phaser.Scene {
         this.float(VIEW.w / 2, VIEW.h / 2 - 60, t('hired', { n: Math.round(apprenticeEvery(this.state) / 1000) }), '#b8e8a0', 2400);
       } else if (e.kind === 'cart') {
         this.float(VIEW.w / 2, VIEW.h / 2 - 150, t('cartCame'), '#c8d0e0', 2800);
+      } else if (e.kind === 'partyDue') {
+        this.float(VIEW.w / 2, VIEW.h / 2 - 150, t('partyDue'), '#c8a8ff', 3000);
+      } else if (e.kind === 'partyIn') {
+        this.float(VIEW.w / 2, VIEW.h / 2 - 150, t('partyIn', { pct: Math.round(PARTY_PAY * 100) }), '#c8a8ff', 3000);
+      } else if (e.kind === 'partyServed') {
+        const c = deskCentre(e.desk, desksOf(this.state));
+        this.float(c.x, c.y + 28, t('partyServed', { n: e.coins }), '#ffd36a', 2400);
+      } else if (e.kind === 'dusk') {
+        // The sword in hand goes back while the smithy closes for the night.
+        this.putDown(null);
+      } else if (e.kind === 'night') {
+        this.float(VIEW.w / 2, VIEW.h / 2, t(NIGHT_TEXT[e.job]), '#ffd36a', 2400);
       } else if (e.kind === 'ore') {
         this.float(VIEW.w / 2, VIEW.h / 2 - 90, t('oreBought', { name: t(ORES[e.ore].name), blurb: t(ORES[e.ore].blurb) }), '#c8d0e0', 2400);
       }
@@ -765,6 +807,19 @@ export class GameScene extends Phaser.Scene {
           break;
         case 'cart':
           sfx('cart');
+          break;
+        case 'partyDue':
+          sfx('horn');
+          break;
+        case 'partyServed':
+          sfx('fanfare');
+          ui('coin');
+          break;
+        case 'dusk':
+          sfx('chime');
+          break;
+        case 'night':
+          sfx('seal');
           break;
         case 'merged':
           // The clang climbs two semitones a tier; a Masterwork rings its bell over it.
@@ -949,6 +1004,15 @@ export class GameScene extends Phaser.Scene {
       return item !== null && there !== null && place !== held?.slot && combine(item, there) !== null;
     };
     this.mergeFrames.forEach((frame, slot) => frame.setVisible(joins(slot)).setAlpha(pulse));
+    // Over a twin with a third twin beside it, the held sword would make a triple merge: say what it makes.
+    const pointer = this.input.activePointer;
+    const target = held ? placeAt(pointer.worldX, pointer.worldY) : null;
+    const third = held && target !== null ? triplePartner(s, held.slot, target) : null;
+    this.tripleLabel.setVisible(third !== null);
+    if (third !== null && item !== null) {
+      const at = slotCentre(target!);
+      this.tripleLabel.setText(t('tripleHint', { sword: t(swordOf(Math.min(MAX_TIER, tierOf(item) + 2)).name) })).setPosition(at.x, at.y + 32);
+    }
     this.barrelFrame.setVisible(s.ranks.barrel > 0 && joins(BARREL_PLACE)).setAlpha(pulse);
     this.bannerFrame.setVisible(deliverable(s, item)).setAlpha(pulse);
     this.scrapFrame.setVisible(item !== null).setAlpha(pulse);
@@ -1425,13 +1489,54 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  /** The line under the edict plaque: the daily shift's clock and earnings, or the day against the rival smithy. */
+  /**
+   * The line under the edict plaque: the daily shift's clock and earnings, or the time to dusk (AN23),
+   * taking turns every few seconds with the day against the rival smithy once it is open.
+   */
   private statusText() {
     const s = this.state;
     const clock = clockText;
     if (s.daily) return t('dailyLine', { time: clock(s.daily.ms), n: s.daily.earned });
-    if (rivalOpen(s)) return t('rivalLine', { mine: s.rival.mine, theirs: s.rival.theirs, time: clock(s.rival.ms) });
-    return '';
+    const dusk = t('duskLine', { time: clock(s.shift.ms), n: s.shift.earned });
+    if (rivalOpen(s) && Math.floor(this.clock / 4000) % 2 === 0) return t('rivalLine', { mine: s.rival.mine, theirs: s.rival.theirs, time: clock(s.rival.ms) });
+    return dusk;
+  }
+
+  /** The dusk window (AN23): the day's tally and one button per night job; it stays until a job is picked. */
+  private createNight() {
+    this.nightTally = this.add
+      .text(0, -50, '', { ...textStyle(13, '#fff1d0', 3), align: 'center', fontStyle: 'normal' })
+      .setOrigin(0.5);
+    JOBS.forEach((job, i) => this.jobButtons.set(job, new Button(this, 0, -2 + i * 50, 'wide', '', () => this.chooseJob(job))));
+    this.nightWindow = this.add
+      .container(WIN.x, WIN.y, [
+        this.image(0, 0, 'tall-panel'),
+        this.add.text(0, -84, t('closingTitle'), textStyle(22, '#ffd36a', 4)).setOrigin(0.5),
+        this.nightTally,
+        ...[...this.jobButtons.values()].map((b) => b.root),
+      ])
+      .setDepth(UI_DEPTH + 5)
+      .setVisible(false);
+  }
+
+  private chooseJob(job: Job) {
+    if (chooseJob(this.state, job)) this.save();
+    else ui('refuse');
+  }
+
+  /** Shows the dusk window while the shift waits for its night job, behind any charter window. */
+  private drawNight() {
+    const s = this.state;
+    const open = nightOffers(s) && !this.win.visible && !this.chooser.visible && !this.edictWindow.visible && !this.hallWindow.visible && !this.dailyWindow.visible;
+    this.nightWindow.setVisible(open);
+    if (!open) return;
+    this.nightTally.setText(t('closingText', { sold: s.shift.sold, n: s.shift.earned }));
+    const captions: Record<Job, string> = {
+      sharpen: t('jobSharpen'),
+      smelt: s.shift.scrapped > 0 ? t('jobSmelt', { n: s.shift.scrapped }) : t('jobSmeltNone'),
+      train: !s.apprentice ? t('jobTrainNone') : s.training >= TRAIN_TOP ? t('jobTrainTop') : t('jobTrain', { from: s.training, to: s.training + 1 }),
+    };
+    for (const job of JOBS) this.jobButtons.get(job)!.set(captions[job], jobReady(s, job), 12.5);
   }
 
   /** The side column between the board and the counter: the tourney (AN18), the apprentice (AN19) and the ore cart (AN20). */

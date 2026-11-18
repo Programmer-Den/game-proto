@@ -24,6 +24,7 @@ Masterwork.
 | --- | --- |
 | Tap or click Forge | Make a Rusty Dagger on the first empty anvil, once the forge is hot |
 | Drag a sword onto a matching sword | Merge the two into one of the next tier |
+| Drag a Steel Sword or better onto a twin with another twin beside it | Fold all three into one sword two tiers up |
 | Drag a sword onto an empty anvil or another sword | Move it there, or swap the two |
 | Drag a gem onto a plain sword | Set the gem in it |
 | Drag a sword onto an adventurer | Sell it, if it is at least as good as the one they asked for; the exact one pays a tip |
@@ -168,11 +169,29 @@ Masterwork.
    three minutes of forging: **silver** (three times the gems) and **starmetal** (the forge makes
    Steel Swords, or Steel Bucklers, instead of daggers and Shortswords). Their price rises with
    your best sword: silver 60 + 30 per tier, starmetal 100 + 50 per tier.
-26. **The smithy is kept**: the board and barrel (and how long each sword has lain), coins, swords
+26. **Triple merge.** From the Steel Sword on, a sword dropped onto a twin that has a third twin on
+   an anvil beside it (left, right, above or below) folds all three into one sword two tiers up: three
+   Steel Swords make a Silver Saber, where merging pairs would take four. While you hold the sword
+   over such a twin, a line under the anvil names what it makes. It counts as one merge for the
+   hammer streak and can strike a Masterwork; a gem in any of the three is kept.
+27. **Adventuring parties.** Once you have made a Steel Sword, a party of three comes a minute and a
+   half later and then every three minutes. When it is due nobody else walks in until three desks
+   are free (and no tourney is on); then three adventurers sit down at once, each asking for a
+   different sword from the Iron Shortsword up to one better than your best. They share one
+   patience, half again as long as usual for the best sword asked. Serve all three and the last one
+   pays half of what the three paid on top; serve only some and the rest walk off as usual.
+28. **Closing time.** Every five minutes of play the shift ends at dusk (the line under the
+   reputation meter counts down, taking turns with the rival's day once it is open). The smithy
+   stands still while the day's tally shows (swords sold and coins earned) and you pick one job for
+   the night: **sharpen** every sword on the anvils (rust starts afresh), **smelt** the day's scrap
+   into a gem (if anything was scrapped and an anvil or the barrel is free), or **train** the
+   apprentice a step (each makes them a tenth quicker, five steps at most, kept for good). The
+   daily forge has no dusk.
+29. **The smithy is kept**: the board and barrel (and how long each sword has lain), coins, swords
    sold, upgrades, the forge's mode and best buckler, the standing commission and its open offer,
    your guild stars, perks, guild halls, charter and edict, reputation and whether you have won,
-   the apprentice, tourney banners and the ores' time left are saved in the browser, and the daily
-   forge's record under its own key.
+   the apprentice and their training, tourney banners, the ores' time left and the shift's clock
+   and tally are saved in the browser, and the daily forge's record under its own key.
 
 ![While a Steel Sword is held, the knight who asked for one shows the tipped price and the ranger who asked for less shows Overkill](docs/screenshots/exact-fit-tip.webp)
 
@@ -233,6 +252,12 @@ Masterwork.
 ![The ore cart is here: starmetal bought, so the forge lays Steel Swords, and silver still for sale](docs/screenshots/ore-cart.webp)
 
 ![The apprentice merges two Rusty Daggers by themselves](docs/screenshots/apprentice-merge.webp)
+
+![A Steel Sword held over a twin with a third beside it: the line under the anvil says the three make a Silver Saber](docs/screenshots/triple-merge.webp)
+
+![An adventuring party of three at the counter, each wanting a different sword, with one shared patience](docs/screenshots/adventuring-party.webp)
+
+![Closing time: the day's tally and three jobs for the night](docs/screenshots/closing-time.webp)
 
 ![Dragging a dagger onto its twin](docs/screenshots/playthrough-1-dragging.webp)
 
