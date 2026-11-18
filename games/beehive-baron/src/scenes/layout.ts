@@ -129,6 +129,15 @@ export const BOOK_CARD = { x: VIEW.w / 2, y: VIEW.h / 2, w: 470, h: 276 };
 export const GARDEN = { ...BOOK, y: 296 };
 export const WORKSHOP = { ...BOOK, y: 342 };
 export const WARRANT = { ...BOOK, y: 388 };
+/** The royal jelly chip, at the foot of the column, once the first royal jelly is made (it opens a card to sell or feed it). */
+export const JELLY = { ...BOOK, y: 434 };
+/**
+ * The weather forecast, in the sky between the hive and the goal card, under the sun, once weather
+ * comes: a row a day, today on top.
+ */
+export const FORECAST_CARD = { x: 432, y: 112, w: 92, h: 132, row: 27, top: 26 };
+/** The buyer bidding at a season's end, a note over the meadow above the swarm chip (tap it to accept). */
+export const AUCTION = { x: 530, y: 204, w: 410, h: 40 };
 /** The card those chips open, over everything: a little bigger than the book's, for the garden's beds. */
 export const ESTATE_CARD = { x: VIEW.w / 2, y: VIEW.h / 2, w: 520, h: 300 };
 /** The hint line for a new player, in the same place (it hides while the chip shows). */

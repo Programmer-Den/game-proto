@@ -68,6 +68,11 @@ export const WAX_CARD = { cake: '#f3d98c', shine: '#fff0c0' };
 export const ORCHARD_CARD = { paper: '#eef8dc', edge: '#9bb878', pin: '#a86e36' };
 export const MEAD_CARD = { stave: '#8a5a2e', hoop: '#3f2a16', bung: '#d9a95c' };
 
+/** Royal jelly: the jelly cell's rim, well, the milky jelly and its shine, and the gold of the buyer's note and the jelly jar's lid. */
+export const JELLY_CARD = { rim: '#f3e4b8', well: '#8a6a3a', jelly: '#fbf3dc', shine: '#ffffff', gold: '#d9a52a' };
+/** The weather icons: a rain cloud and its drops, the warm day's sun and winter's frost. */
+export const WEATHER_CARD = { cloud: '#b8c4d4', rain: '#5a8ad0', warm: '#f6a02a', frost: '#7aa8d8' };
+
 /** The tint laid over the scenery each season (the hive and the cards stay as they are), as a colour and how strong. */
 export const SEASON_TINT = {
   spring: { colour: 0xffffff, alpha: 0 },
@@ -101,6 +106,9 @@ export const LIVE = {
   tired: 0xc0602a,
   tiredTrack: 0xead9ad,
   snow: 0xffffff,
+  jellyArc: 0xfffbe8,
+  jellyPaused: 0x9a8a70,
+  jellyReady: 0xffe070,
 };
 
 /** The garden card's dots: each bed's flower, and the link between two beds that give a rare honey. */

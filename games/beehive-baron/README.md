@@ -16,7 +16,9 @@ and after the first gold the Baron can buy plots for a third and a fourth hive, 
 whose plots each have their own season quirks. The estate's flower garden cross-pollinates beds
 into rare honeys no meadow gives, a candle workshop turns spare wax into candles and polish for
 the church and the manor, and after three golds the crown asks for a gift of honey every autumn
-for a royal warrant that raises every price.
+for a royal warrant that raises every price. An empty cell ringed by six capped cells makes royal jelly to sell or
+feed to the queens, a forecast warns of rainy and warm days, and at every season's end a buyer bids
+on your best jars until they lose interest.
 
 ![A hive with every meadow open: clover, lavender and heather cells, two brood cells, the market board under the hive, a village order on the board and wax in the HUD](docs/screenshots/upgrades-overview.webp)
 
@@ -330,6 +332,54 @@ next autumn.
 ![The royal warrant: the crown's autumn ask and the price bonus](docs/screenshots/royal-warrant.webp)
 
 ![The estate's chips under the buyer's book: the garden, the workshop and the royal warrant](docs/screenshots/estate-chips.webp)
+
+### Royal jelly
+
+An empty honey cell ringed by six capped cells turns into a **royal jelly cell**. Only the comb's
+six inner spots have six neighbours, so plan the comb's shape around them. While the ring stays
+capped, a cream arc goes round and after a minute the jelly is ready: tap the cell to take it (the
+cell is an empty honey cell again, and turns back to jelly if the ring is still whole). Harvest a
+ring cell, let a wasp steal it or let the bees eat it in winter and the arc stops and greys; tap a
+cell whose ring is broken to clear it back to honey.
+
+The **Royal jelly** chip, at the foot of the column of chips under the buyer's book, opens a card
+to spend each jar:
+
+| Use | What it gives |
+| --- | --- |
+| Sell a jar | 3 times a heather jar's worth (not counted as jars sold) |
+| Feed the queens | Every brood cell hatches twice as fast for a season (2 minutes), from the moment it is fed |
+
+![A royal jelly cell, ready to take, ringed by six capped cells, and the Royal jelly chip](docs/screenshots/royal-jelly.webp)
+
+![The royal jelly card: sell a jar or feed the queens](docs/screenshots/jelly-card.webp)
+
+### Weather
+
+From 10 jars sold a **Forecast** card in the sky shows today's weather, with the time left in the
+day, and the next three days. A day is 30 seconds, four to a season, and each day's weather is
+drawn as it comes into the forecast:
+
+| Season | Rain | Warm | Fair |
+| --- | --- | --- | --- |
+| Spring | 30% | 10% | 60% |
+| Summer | 10% | 35% | 55% |
+| Autumn | 35% | 10% | 55% |
+| Winter | always frost (the bees stay in anyway) | | |
+
+On a rainy day the foragers stay home (Send and the Waggle Dance wait; bees already out finish
+their trip). On a warm day every bee brings twice the nectar a trip, so make room in the comb
+before it.
+
+### The honey auction
+
+From 10 jars sold, as each season ends a buyer comes to bid on up to 3 jars of the honey on your
+shelf that sells dearest. The note over the meadow shows the bid a jar, which starts at the jar's
+price and climbs to 4 times it over 12 seconds, but the buyer walks off at a moment you can't see,
+somewhere between 3 and 12 seconds. Tap the note to sell at the bid; the jars count as sold.
+Selling those jars first sends the buyer away too.
+
+![The forecast card in the sky and a buyer's note bidding at the season's end](docs/screenshots/forecast-auction.webp)
 
 ### Trophies
 

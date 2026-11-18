@@ -328,9 +328,43 @@ const de: Translation<typeof en> = {
   royalCame: 'Die Krone bittet um eine Gabe Honig!',
   warrantWon: { one: 'Hoflieferant gehalten: {n} Jahr', other: 'Hoflieferant gehalten: {n} Jahre' },
   warrantLost: 'Keine Gabe: Der Titel als Hoflieferant ist verloren',
+
+  // Gelée royale
+  jellyTake: 'nehmen',
+  ringBroken: 'offen',
+  jellyFormed: 'Gelée-royale-Zelle!',
+  jellyReady: 'Gelée royale fertig: antippen',
+  jellyTaken: '+1 Gelée royale',
+  royalJelly: 'Gelée royale',
+  jellyKept: '{n} vorrätig',
+  jellyFed: 'gefüttert · {time}',
+  jellySub: '{n} vorrätig · entsteht in einer leeren Zelle mit sechs verdeckelten Nachbarn',
+  jellySell: 'Ein Glas verkaufen\n{price}',
+  jellyFeed: 'Königinnen füttern\nBrut doppelt so schnell für {time}',
+  jellyFedFor: 'Königinnen füttern\nnoch {time} gefüttert',
+  jellyNote: 'Zählt nicht als verkaufte Gläser. Halte den Ring verdeckelter Zellen geschlossen, solange das Gelée entsteht.',
+  fedQueens: 'Die Königinnen sind gefüttert: Brut schlüpft doppelt so schnell',
+
+  // Wetter
+  forecast: 'Wetter',
+  today: 'Heute {time}',
+  weatherFair: 'Heiter',
+  weatherRain: 'Regen',
+  weatherWarm: 'Warm',
+  weatherFrost: 'Frost',
+  rainCame: 'Heute Regen: Die Sammlerinnen bleiben daheim',
+  warmCame: 'Ein warmer Tag: doppelter Nektar pro Flug',
+  rainHome: 'Regen: Die Bienen\nbleiben daheim',
+
+  // Die Honigauktion
+  auctionFor: 'Ein Käufer aus {city} bietet für {jars}',
+  auctionBid: '{price} pro Glas (×{mult}) · antippen: {total}',
+  auctionCame: 'Zum Ende der Jahreszeit bietet ein Käufer!',
+  auctionWon: 'Versteigert: +{n} Taler',
+  auctionLost: 'Der Käufer ist gegangen',
 };
 
-/** Texts that are the same in German: the game's name, the season Winter and texts made of other texts. */
-export const keepEnglish: (keyof typeof en)[] = ['title', 'winter', 'starred', 'rank', 'upgrade', 'breedRank', 'rarePrice', 'royalIn'];
+/** Texts that are the same in German: the game's name, the season Winter, the weathers Frost and Warm and texts made of other texts. */
+export const keepEnglish: (keyof typeof en)[] = ['title', 'winter', 'starred', 'rank', 'upgrade', 'breedRank', 'rarePrice', 'royalIn', 'weatherFrost', 'weatherWarm'];
 
 export default de;
