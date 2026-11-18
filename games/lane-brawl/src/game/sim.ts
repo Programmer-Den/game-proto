@@ -356,7 +356,7 @@ function updateObjective(s: GameState) {
       // The red tower closest to the blue Nexus: the next one in the way (on a top or bottom
       // laner's own lane while one stands there).
       const towers = s.units.filter((u) => u.kind === 'tower' && u.side === 'red' && !u.dead);
-      const mine = towers.filter((u) => u.lane === s.role);
+      const mine = s.role === 'top' || s.role === 'bottom' ? towers.filter((u) => u.lane === s.role) : [];
       target = closest(mine.length ? mine : towers, BASE.blue);
       const spot = target && TOWERS.find((t) => t.x === target!.x && t.y === target!.y);
       title = { key: spot ? TOWER_TITLE[spot.lane] : 'objTower' };

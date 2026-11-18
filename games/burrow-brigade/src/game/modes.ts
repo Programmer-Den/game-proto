@@ -42,10 +42,13 @@ export const FLAG_WIN = 5;
 /** The weapon draft: the pool's size and who picks when (Blue, Amber, Amber, Blue, ...). */
 export const DRAFT_POOL = 12;
 export const DRAFT_ORDER = [0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0];
-/** The order the Burrow AI likes the weapons in, best first. */
+/**
+ * The order the Burrow AI likes the weapons in, best first. Those its turns never fire (`ai` false
+ * in `WEAPONS`, and the shield, which `planTurn` has no case for) come last, so it drafts what it can use.
+ */
 const AI_TASTE: WeaponId[] = [
-  'heavy', 'splitter', 'cluster', 'seeker', 'bolt', 'skyrain', 'roller', 'sap', 'drill', 'bouncer', 'dynamite', 'beehive', 'repair',
-  'shield', 'pound', 'ember', 'firecracker', 'beam', 'mine', 'quake', 'hop', 'gust', 'clod',
+  'heavy', 'splitter', 'cluster', 'seeker', 'bolt', 'skyrain', 'roller', 'sap', 'drill', 'bouncer', 'beehive', 'repair',
+  'pound', 'ember', 'firecracker', 'dynamite', 'shield', 'beam', 'mine', 'quake', 'hop', 'gust', 'clod',
 ];
 
 /** A fresh pool: `DRAFT_POOL` weapons that run out, drawn at random. */

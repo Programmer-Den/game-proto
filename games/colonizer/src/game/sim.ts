@@ -1224,8 +1224,10 @@ export function setStance(s: GameState, owner: number, ids: number[], stance: St
     const u = s.units.get(id);
     if (!u || u.owner !== owner || !isSoldier(UNITS[u.type].role)) continue;
     u.stance = stance;
-    // Holding ground starts from where the soldier stands, if it has stopped.
-    u.anchor = u.order.t === 'idle' && stance !== 'aggressive' ? { x: u.x, y: u.y } : null;
+    // Holding ground starts from where the soldier stands, if it has stopped or is on a fight it
+    // picked itself (one it was ordered into anchors where it stops).
+    const free = u.order.t === 'idle' || (u.order.t === 'attack' && u.order.auto);
+    u.anchor = free && stance !== 'aggressive' ? { x: u.x, y: u.y } : null;
     n++;
   }
   return n;

@@ -7,7 +7,7 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
 
 - **Modes:** Play the Burrow AI (you are Blue Burrow, team 0, and go first), Two players on one
   screen, and Watch AI (`?watch`, both teams run by the AI, a new match four seconds after one
-  ends). Teams have 2 to 5 moles (`size` in `burrow-brigade-prefs`, 3 by default), picked on the
+  ends; a random side goes first, `firstTurn`, kept through a draft or a build phase). Teams have 2 to 5 moles (`size` in `burrow-brigade-prefs`, 3 by default), picked on the
   menu. There is no save of a match under way.
 - **Match kinds** (`game/modes.ts`, `kind` in the options, the menu's second stepper `kind-left`/
   `kind-right`, `setKind`): quick matches (`quick()`) are Classic, Forts or Flag hill; the campaign,
@@ -27,7 +27,7 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
   flag first (`flagWalk`, AI stage `flag`, hopping up steps) when the way is dry and under 380 px.
 - **Weapon draft** (`draft` in the options, `startDraft`, `phase` `draft`): before a quick match
   both sides pick from `draftPool()` (12 weapons that run out) in `DRAFT_ORDER` (snake order, 6
-  each), on a panel of tiles (`d-<id>`); the AI picks with `aiDraftPick` after 0.8 s. Then each side
+  each), on a panel of tiles (`d-<id>`); the AI picks with `aiDraftPick` after 0.8 s (`AI_TASTE` ranks the weapons its turns never fire last). Then each side
   keeps its unlimited weapons and only its own picks of the rest (at their usual ammo).
   `afterDraft` goes on to the build phase or the first turn.
 - **Pick your mole:** on a player's turn (not the AI's, not the daily range) a tap on another of
