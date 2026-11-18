@@ -1830,7 +1830,8 @@ function startDusk(s: GameState) {
   const tide = districtOf(s).rule === 'tide';
   s.tideTimes = tide ? fitTimes(TIDE_TIMES, TIDE_WARN_MS, s.duskMax) : [];
   s.tide = null;
-  s.shipTimes = tide ? [...SHIP_TIMES] : [];
+  // On a short summer dusk the first ship still comes a few seconds in, as on a usual one.
+  s.shipTimes = tide ? fitTimes(SHIP_TIMES, 0, s.duskMax, DUSK_MS - SHIP_TIMES[0]) : [];
   s.ship = null;
   s.shipsGuided = 0;
   const snow = districtOf(s).rule === 'avalanche';

@@ -181,7 +181,7 @@ Implemented today:
   and drops the move due, so the next dusk is in `DISTRICTS.harbour` (rule `tide`), and once
   `sailed` no nightfall offers a move (`MOVE_IDS`, the four first-keep districts, are the move
   panel's cards). `startDusk` gives a harbour dusk `TIDE_TIMES` (32 s and 14 s left) and
-  `SHIP_TIMES` (40 s and 24 s). `tides(s)`: `TIDE_WARN_MS` (5 s) before, `state.tide` names the
+  `SHIP_TIMES` (40 s and 24 s; `fitTimes` keeps the first 5 s into a short summer dusk). `tides(s)`: `TIDE_WARN_MS` (5 s) before, `state.tide` names the
   lowest row (`rows(s)`, the slips 7, 8 and 9); when it rises (`risen`) those lanterns go dark
   (`tide` event for each lit one), moths out to or sitting on them go home (`release`) and their
   queued taps are dropped; for `TIDE_MS` (7 s) `flooded(s, i)` holds, which `mayTap` (so `send`

@@ -1341,8 +1341,11 @@ function kill(s: GameState, t: Unit, killerId: number) {
     case 'nexus':
       sampleWorth(s);
       sound(s, 'nexus');
-      s.phase = t.side === 'blue' ? 'lost' : 'won';
-      s.winner = t.side === 'blue' ? 'red' : 'blue';
+      // The first end decided this tick stands (a surrender, or the other Nexus falling first).
+      if (s.phase === 'playing') {
+        s.phase = t.side === 'blue' ? 'lost' : 'won';
+        s.winner = t.side === 'blue' ? 'red' : 'blue';
+      }
       break;
     case 'champion': {
       t.deaths++;
