@@ -35,9 +35,9 @@ const en = {
 
   // Supply drop cards
   supplyShotgun: 'Shotgun',
-  supplyShotgunDetail: 'Two more bullets\nfan out from the\nsoldier every volley',
+  supplyShotgunDetail: 'Two more bullets\nfan out every volley,\nand a shotgun\nsidearm to swap to',
   supplyFlamer: 'Flamethrower',
-  supplyFlamerDetail: 'Two flame bursts:\nthey go off when\nzombies get close',
+  supplyFlamerDetail: 'Two flame bursts\nwhen zombies close in,\nand a flamer\nsidearm to swap to',
   supplyMedkit: 'Medkit',
   supplyMedkitDetail: 'The squad survives\none breach of\nthe sandbags',
   supplySandbags: 'Sandbags',
@@ -335,6 +335,44 @@ const en = {
   codexFull: 'CODEX PAGE FULL: {kind}\n+{n}% DAMAGE FOR GOOD',
   overPageSquad: 'LEADERS, CODEX & VETERANS ▶',
   overPageOutfit: '◀ SHOP, OUTPOST & ROAD MAP',
+
+  // Wave dares
+  dareTitle: 'WAVE {wave}: TAKE A DARE?\nHOLD IT FOR {n}x SCRAP',
+  nvDareTitle: 'WAVE {wave} · OPTIONAL DARE\nHOLD IT: {n}x SCRAP + CRATE',
+  dareRunners: 'Runners first',
+  dareRunnersDetail: 'Every grunt in\nthe wave comes\nas a runner',
+  dareTough: 'Thick skins',
+  dareToughDetail: 'Every zombie has\n40% more health',
+  dareJammed: 'Jammed rifles',
+  dareJammedDetail: 'The squad fires at\nhalf speed for the\nfirst 10 seconds',
+  dareMiddle: 'Hold the middle',
+  dareMiddleDetail: 'No zombie may cross\nthe line in the\nmiddle lane',
+  dareNone: 'No dare',
+  dareNoneDetail: 'Fight the wave\nas it comes',
+  dareReward: '{n}x SCRAP + A CRATE',
+  dareBanner: 'DARE: {dare}',
+  dareChip: 'DARE: {dare}',
+  dareChipLost: 'DARE LOST',
+  dareHeld: 'DARE HELD! +{n} SCRAP',
+  nvDareHeld: 'DARE HELD · +{n} SCRAP',
+  dareLost: 'DARE LOST!\nTHE MIDDLE BROKE',
+  nvDareLost: 'DARE FAILED · MIDDLE BREACHED',
+
+  // Sidearms
+  weaponRifle: 'Rifles',
+  weaponShotgun: 'Shotgun',
+  weaponFlamer: 'Flamer',
+  sidearmFound: '{weapon} SIDEARM!\nSWAP WITH THE BUTTON OR E',
+  nvSidearmFound: 'SIDEARM: {weapon}\nSWAP: BUTTON OR E',
+
+  // The last stand
+  lastStand: 'LAST STAND!\nHOLD THE LINE!',
+  nvLastStand: 'LAST STAND · HOLD THE LINE',
+  lastStandTimer: 'LAST STAND {n}',
+  nvLastStandTimer: 'LAST STAND · {n}',
+  standHeld: 'THE LINE HOLDS!',
+  nvStandHeld: 'LINE HELD',
+  fxMelee: 'WHAM!',
 };
 
 export default en;

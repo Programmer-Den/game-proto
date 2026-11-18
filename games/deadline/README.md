@@ -17,7 +17,9 @@ lasting upgrades for your outpost. Instead of the endless road, a run can also b
 evacuation, or the daily stand, the same for everyone that day. Survivors who live through a won
 run stay on as veterans for the runs to come, a squad leader you pick brings an active of their own
 and levels up across runs, two escort towns send a bus up the road that has to get through, and a
-zombie codex fills with your kills and makes you hit each kind harder once its page is full.
+zombie codex fills with your kills and makes you hit each kind harder once its page is full. From
+wave 5 you can take a dare before each wave for double scrap, the squad can swap to the sidearms its
+supply drops found, and once a run a breach starts a last stand instead of ending it.
 
 ![The comic style at wave 4, with its comic panels beside the road](docs/screenshots/style-comic.webp)
 
@@ -51,6 +53,8 @@ and the fuel drum's blast doesn't swell.
 | Tap a card, or 1 / 2 / 3 | Pick a supply after a boss, or the role of a survivor who joins |
 | Tap the wide card, or 4 | Extract: end the run as a win (from wave 20) |
 | Tap the leader button (right), or Q | Use the squad leader's active, once it has filled |
+| Tap the weapon button above it, or E | Swap the whole squad between rifles and the sidearms found |
+| Tap a dare card, or 1 / 2 / 3 | From wave 5, take one of two dares for the next wave, or none |
 | Tap the COMIC / NV switch, or V | Switch the art style |
 | Tap a starting crate after game over | Buy it with scrap for the next run (tap again to refund) |
 | Tap an outpost upgrade after game over | Buy its next level with scrap, for good |
@@ -252,6 +256,35 @@ and the fuel drum's blast doesn't swell.
   screen's second page, with the leaders and the veterans.
 
   ![The squad leaders and the zombie codex on the game over screen's second page](docs/screenshots/leaders-and-codex.webp)
+- **Wave dares**: from wave 5, before each wave two dares are on offer (a fixed turn through the
+  pairs, the same on the daily), with a third card for none. Hold the wave under the dare and it
+  pays its scrap twice over and drops a crate down the squad's column.
+
+  | Dare | What it does |
+  | --- | --- |
+  | Runners first | Every grunt in the wave comes as a runner |
+  | Thick skins | Every zombie has 40% more health |
+  | Jammed rifles | The squad fires at half speed for the first 10 seconds |
+  | Hold the middle | No zombie may cross the line in the middle lane (not offered on Two Bridges) |
+
+  ![The dare cards before wave 5](docs/screenshots/dares.webp)
+- **Sidearms**: picking the shotgun or the flamethrower from a supply drop also hands the squad
+  that sidearm for the rest of the run. The weapon button (or E) swaps every gun in the squad
+  between rifles and each sidearm found, with a short pause in the fire.
+
+  | Weapon | Strong against | Weak against |
+  | --- | --- | --- |
+  | Rifles | Everything at range, with pierce | Shields without pierce, armour |
+  | Shotgun | Swarms and packs: three pellets per gun, each 60% of a bullet, 25% slower | Riot shields stop every pellet; no pierce |
+  | Flamer | Shields and armour: each flame burns through three zombies and sets them alight, a little faster, 70% of a bullet | Only reaches 320 px up the road, so not the spitters at their stand |
+
+  ![The squad throwing flames with the flamer sidearm](docs/screenshots/sidearm-flamer.webp)
+- **Last stand**: once a run, the first zombie to reach the sandbags with no medkit left starts ten
+  seconds of hand-to-hand instead of ending the run. Zombies at the line are held there, and twice
+  a second the squad hits every zombie near the sandbags and shoves it back up the road. Any zombie
+  still at the line when the time runs out ends the run.
+
+  ![The last stand starting at the sandbags](docs/screenshots/last-stand.webp)
 - **Daily Stand**: the same 10 waves for every player on the same day (the crates, conditions,
   supply drops and the horde's answers all come from the day's seed), with no starting crates,
   outpost upgrades or veterans, and one try a day; the run after it is the Open Road again unless
@@ -272,8 +305,8 @@ Deadline follows the hub's Language setting: every text in the game, How to play
 - `src/game/rules.ts`: the numbers and rules: enemy stats, upgrades and their perks, fuel drums,
   the frenzy, wave plans and conditions, the horde adapting, the bosses and their moves, survivors
   and squad roles, sandbag walls, the supply drop, extraction, scrap, the outpost, the towns on the
-  road map and the escort bus, the daily stand, the veterans, the squad leaders and the codex.
-  No drawing; its names and texts are keys of `src/i18n/en.ts`.
+  road map and the escort bus, the daily stand, the veterans, the squad leaders, the codex, the
+  sidearms, the wave dares and the last stand. No drawing; its names and texts are keys of `src/i18n/en.ts`.
 - `src/i18n.ts` and `src/i18n/`: the game's texts in British English (`en.ts`), German (`de.ts`)
   and US spelling (`en-US.ts`, only what differs). `src/howToPlay.ts` has How to play in all three.
 - `src/game/save.ts`: the saved best wave, art style, banked scrap, starting crates, outpost
@@ -287,9 +320,10 @@ Deadline follows the hub's Language setting: every text in the game, How to play
 - `src/scenes/GameScene.ts`: the battle: moving the soldier, spawning, shooting, hits and perks,
   drums, the frenzy, acid, boss moves, survivors and their roles, conditions, sandbag walls,
   waves, the supply drop, extraction and operations, the escort bus, the squad leaders' actives,
-  the codex, switching styles and game over with its two pages: the scrap shop, outpost and
+  the codex, the sidearms, the dares and the last stand, switching styles and game over with its two pages: the scrap shop, outpost and
   operation picker, and the leaders, codex and veterans. `src/scenes/Hud.ts` draws the top bar, the
-  progress strip, the condition chip, the frenzy meter, the kit panel and the leader's button.
+  progress strip, the condition chip (with the wave's dare), the frenzy meter, the kit panel, the
+  leader's button and the sidearm button.
 - `e2e/playthrough.spec.ts`: plays the first wave with taps: switches the style and back, blows up
   the wave's fuel drum among the horde, collects its crate and checks the wave's scrap is banked
   (see `AGENTS.md` at the repo root).
