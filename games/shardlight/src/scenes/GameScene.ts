@@ -14,12 +14,27 @@ import {
   FIELD_W,
   WINDOWS,
   WINDOWS_PER_CHAPEL,
+  QUICK_SECONDS,
   chapelOf,
+  endlessSpec,
+  featChain,
   isRose,
   windowSpec,
+  type FeatId,
 } from '../game/levels';
 import { BAD_BEADS, BAR_H, Sim, type BeadKind, type SimEvent } from '../game/sim';
-import { UPGRADES, isOpen, loadProgress, saveProgress, type Progress, type UpgradeId } from '../game/save';
+import {
+  GLASSES,
+  UPGRADES,
+  allRestored,
+  isOpen,
+  loadProgress,
+  saveProgress,
+  sealCount,
+  type GlassId,
+  type Progress,
+  type UpgradeId,
+} from '../game/save';
 import { C, PANE_COLOURS, drawArch, drawBar, drawBead, drawNodeGlass, drawOrb, drawPane, drawPicture, drawQuarries, drawWall, hex } from './art';
 
 const FONT = 'Georgia, "Times New Roman", serif';
@@ -35,6 +50,24 @@ const DAILY_CHAPEL = 2;
 /** Panes broken before the orb is back at the bar that earn the Chain trophy. */
 const CHAIN = 8;
 const BEADS_TROPHY = 10;
+/** Clerestory windows in a row that earn the Endless light trophy. */
+const CLERESTORY_TROPHY = 5;
+/** Most orbs carried from one clerestory window to the next. */
+const MAX_CARRIED = 9;
+
+/** Whether a won window's feat is done. */
+function featMet(feat: FeatId, sim: Sim, index: number) {
+  switch (feat) {
+    case 'heart':
+      return sim.heartInOneChain;
+    case 'noBeads':
+      return sim.beadsCaught === 0;
+    case 'chain':
+      return sim.bestCombo >= featChain(index);
+    case 'quick':
+      return sim.time < QUICK_SECONDS * 1000;
+  }
+}
 
 type Spot = { x: number; y: number; w: number; h: number };
 interface Shard {
@@ -56,8 +89,11 @@ export class GameScene extends Phaser.Scene {
   buttons: Record<string, Spot> = {};
   progress: Progress = loadProgress();
   sim?: Sim;
-  /** The window in play, 0 to 29, or -1 for the daily. */
+  /** The window in play, 0 to 29, -1 for the daily, or 30 and on for the clerestory (30 its first). */
   windowIndex = 0;
+  /** A clerestory run: windows restored so far and the orbs carried to the next. */
+  endless: { restored: number; lives: number } | null = null;
+  private glassPanel = false;
   /** The field's top left and size in view pixels. */
   field = { x: 0, y: FIELD_TOP, w: FIELD_W, h: 400 };
   private workshop = false;
@@ -72,6 +108,8 @@ export class GameScene extends Phaser.Scene {
   private effectsText?: Phaser.GameObjects.Text;
   private hintText?: Phaser.GameObjects.Text;
   private shards: Shard[] = [];
+  /** The last few places of each spinning orb, drawn as a fading trail that shows its curve. */
+  private trails = new WeakMap<object, { x: number; y: number }[]>();
   private ended = false;
   private keys?: Record<'left' | 'right' | 'a' | 'd', Phaser.Input.Keyboard.Key>;
 
@@ -111,8 +149,14 @@ export class GameScene extends Phaser.Scene {
       screen: this.screen,
       window: this.windowIndex,
       workshop: this.workshop,
+      glassPanel: this.glassPanel,
       stars: this.progress.stars.slice(),
       lead: this.progress.lead,
+      feats: this.progress.feats.slice(),
+      seals: sealCount(this.progress),
+      glass: this.progress.glass,
+      endless: this.endless ? { ...this.endless } : null,
+      endlessBest: this.progress.endlessBest,
       play: sim
         ? {
             left: sim.left,
@@ -122,7 +166,10 @@ export class GameScene extends Phaser.Scene {
             barX: sim.barX,
             barY: sim.barY,
             barW: sim.barW,
-            orbs: sim.orbs.map((o) => ({ x: o.x, y: o.y, vx: o.vx, vy: o.vy, held: o.held !== null })),
+            orbs: sim.orbs.map((o) => ({ x: o.x, y: o.y, vx: o.vx, vy: o.vy, held: o.held !== null, spin: o.spin })),
+            /** Bar hits that gave the orb a spin. */
+            spins: sim.spins,
+            feat: sim.spec.feat,
             /** The panes still to break, in field pixels. */
             panes: sim.panes.filter((p) => p.alive && p.kind !== 'lead').map((p) => ({ x: p.x, y: p.y, w: p.w, h: p.h })),
           }
@@ -165,7 +212,7 @@ export class GameScene extends Phaser.Scene {
 
   private onKey(e: KeyboardEvent) {
     if (e.key === 'Escape') {
-      if (this.workshop) this.showMap(false);
+      if (this.workshop || this.glassPanel) this.showMap(false);
       else if (this.screen === 'play') this.leaveWindow();
       return;
     }
@@ -177,6 +224,7 @@ export class GameScene extends Phaser.Scene {
 
   private windowTitle(index: number) {
     if (index < 0) return t('dailyName');
+    if (index >= WINDOWS) return t('endlessName', { n: index - WINDOWS + 1 });
     const chapel = t(`chapel-${CHAPEL_IDS[chapelOf(index)]}` as TextKey);
     return isRose(index) ? t('roseName', { chapel }) : t('windowName', { chapel, n: (index % WINDOWS_PER_CHAPEL) + 1 });
   }
@@ -204,6 +252,8 @@ export class GameScene extends Phaser.Scene {
     this.screen = 'map';
     this.sim = undefined;
     this.workshop = false;
+    this.glassPanel = false;
+    this.endless = null;
     if (fresh) playMusic(SONG, 'calm');
     const { W, H } = this;
     const g = this.add.graphics();
@@ -253,6 +303,13 @@ export class GameScene extends Phaser.Scene {
       drawNodeGlass(g, p.x, p.y, r, chapelOf(i), stars[i] > 0);
       g.lineStyle(3, stars[i] > 0 ? C.gold : open ? C.arch : 0x3a3346, 1).strokeCircle(p.x, p.y, r);
       if (stars[i] === 0) this.text(p.x, p.y, open ? String(i + 1) : '·', rose ? 18 : 15, open ? C.ink : C.dim, { fontStyle: 'bold' }).setOrigin(0.5).setShadow(0, 1, '#000', 3);
+      // A gold seal on the node once its feat is done.
+      if (this.progress.feats[i]) {
+        const sx = p.x + r * 0.8;
+        const sy = p.y - r * 0.8;
+        g.fillStyle(0x6a1a1a, 1).fillCircle(sx, sy, 6);
+        g.fillStyle(C.gold, 1).fillCircle(sx, sy, 4);
+      }
       for (let k = 0; k < 3; k++) {
         const sx = p.x + (k - 1) * 11;
         const sy = p.y + r + 9;
@@ -271,8 +328,23 @@ export class GameScene extends Phaser.Scene {
     // The title bar and the bottom row of buttons.
     this.text(18, 10, t('title'), 28, C.gold, { fontStyle: 'bold' }).setShadow(0, 2, '#000', 4);
     const total = stars.reduce((a, b) => a + b, 0);
-    this.text(W / 2, 22, `${t('lead', { n: formatNumber(this.progress.lead) })}   ·   ${t('starsTotal', { n: total, total: WINDOWS * 3 })}`, 18, C.ink).setOrigin(0.5);
+    const seals = sealCount(this.progress);
+    this.text(
+      W / 2 + 40,
+      22,
+      `${t('lead', { n: formatNumber(this.progress.lead) })}  ·  ${t('starsTotal', { n: total, total: WINDOWS * 3 })}  ·  ${t('seals', { n: seals })}`,
+      17,
+      C.ink,
+    ).setOrigin(0.5);
+    // The endless clerestory, open once every window is restored.
+    const open = allRestored(this.progress);
+    const [eb, et] = this.button('endless', 245, 24, 120, 30, t('endless'), () => this.startEndless(), open, 50);
+    if (!open) {
+      eb.setAlpha(0.5);
+      et.setAlpha(0.5);
+    }
     const by = H - 26;
+    this.button('glass', W / 2 - 360, by, 180, 36, t('glass'), () => this.showGlass(), false);
     this.button('workshop', W / 2 - 130, by, 220, 36, t('workshop'), () => this.showWorkshop(), false);
     const daily = loadDaily(GAME);
     this.button('daily', W / 2 + 130, by, 220, 36, t('daily'), () => this.startDaily(), !daily.played);
@@ -332,6 +404,72 @@ export class GameScene extends Phaser.Scene {
     this.showWorkshop();
   }
 
+  /** The bar glass panel: every glass, open by the seals earned from window feats. */
+  private showGlass() {
+    this.showMap(false);
+    this.glassPanel = true;
+    const { W, H } = this;
+    const depth = 100;
+    this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.6).setDepth(depth).setInteractive();
+    const pw = Math.min(560, W - 40);
+    const ph = Math.min(470, H - 30);
+    const px = W / 2 - pw / 2;
+    const py = H / 2 - ph / 2;
+    const g = this.add.graphics().setDepth(depth);
+    g.fillStyle(C.stone, 1).fillRoundedRect(px, py, pw, ph, 10);
+    g.lineStyle(3, C.arch, 1).strokeRoundedRect(px, py, pw, ph, 10);
+    const seals = sealCount(this.progress);
+    this.text(W / 2, py + 12, t('glass'), 26, C.gold, { fontStyle: 'bold' }).setOrigin(0.5, 0).setDepth(depth);
+    this.text(W / 2, py + 46, `${t('glassText')}  ${t('seals', { n: seals })}`, 14, C.ink, { align: 'center', wordWrap: { width: pw - 40 } })
+      .setOrigin(0.5, 0)
+      .setDepth(depth);
+    const top = py + 96;
+    const rowH = (ph - 150) / GLASSES.length;
+    GLASSES.forEach((glass, k) => {
+      const y = top + k * rowH + rowH / 2;
+      drawBar(g, px + 80, y - BAR_H / 2, 110, BAR_H, false, glass.id);
+      const open = glass.seals <= seals;
+      this.text(px + 150, y - 9, t(`glass-${glass.id}` as TextKey), 17, open ? C.ink : C.dim, { fontStyle: 'bold' }).setOrigin(0, 0.5).setDepth(depth);
+      if (glass.seals) this.text(px + 150, y + 10, t('glassNeeds', { n: glass.seals }), 12, C.dim).setOrigin(0, 0.5).setDepth(depth);
+      const used = this.progress.glass === glass.id;
+      const [b, bt] = this.button(`glass-${glass.id}`, px + pw - 85, y, 130, 30, used ? t('inUse') : t('use'), () => this.useGlass(glass.id), used, depth + 1);
+      if (!open) {
+        b.setAlpha(0.5);
+        bt.setAlpha(0.5);
+      }
+    });
+    this.button('close', W / 2, py + ph - 26, 160, 34, t('close'), () => this.showMap(false), true, depth + 1);
+  }
+
+  private useGlass(id: GlassId) {
+    const glass = GLASSES.find((g) => g.id === id)!;
+    if (glass.seals > sealCount(this.progress)) {
+      ui('refuse');
+      return;
+    }
+    this.progress.glass = id;
+    saveProgress(this.progress);
+    this.showGlass();
+  }
+
+  /** Starts a clerestory run at its first window, once every window is restored. */
+  private startEndless() {
+    if (!allRestored(this.progress)) {
+      ui('refuse');
+      this.flashNote(t('endlessLocked'));
+      return;
+    }
+    this.startWindow(WINDOWS, { restored: 0, lives: 3 + this.progress.upgrades.orb });
+  }
+
+  /** A short note over the map that fades out. */
+  private flashNote(s: string) {
+    const note = this.text(this.W / 2, 160, s, 16, C.ink, { backgroundColor: '#000000c0', padding: { x: 10, y: 6 } })
+      .setOrigin(0.5)
+      .setDepth(120);
+    this.tweens.add({ targets: note, alpha: 0, delay: 1800, duration: 500, onComplete: () => note.destroy() });
+  }
+
   private startDaily() {
     if (loadDaily(GAME).played) {
       ui('refuse');
@@ -343,17 +481,19 @@ export class GameScene extends Phaser.Scene {
 
   // ---- a window in play ------------------------------------------------------------------------
 
-  startWindow(index: number) {
+  /** Plays a window; a clerestory window (30 and on) carries its run along. */
+  startWindow(index: number, endless: { restored: number; lives: number } | null = null) {
     this.clear();
     this.screen = 'play';
     this.windowIndex = index;
+    this.endless = index >= WINDOWS ? endless : null;
     this.ended = false;
-    const spec = index < 0 ? windowSpec(-1, dailyRand(GAME), DAILY_CHAPEL) : windowSpec(index);
+    const spec = index < 0 ? windowSpec(-1, dailyRand(GAME), DAILY_CHAPEL) : index >= WINDOWS ? endlessSpec(index - WINDOWS) : windowSpec(index);
     const up = this.progress.upgrades;
     this.sim = new Sim(spec, this.field.h, {
       speed: byDifficulty(320, 380, 450),
       barW: byDifficulty(132, 110, 92) + up.wide * 12,
-      lives: 3 + up.orb,
+      lives: this.endless ? this.endless.lives : 3 + up.orb,
       magnet: up.magnet,
       charmTime: 1 + up.charm * 0.25,
       dropChance: 0.08,
@@ -363,7 +503,7 @@ export class GameScene extends Phaser.Scene {
     const g = this.add.graphics();
     drawWall(g, W, H);
     drawArch(g, f.x, f.y, f.w, f.h);
-    const variant = index < 0 ? 7 : index % WINDOWS_PER_CHAPEL;
+    const variant = index < 0 ? 7 : index >= WINDOWS ? (index * 5) % 8 : index % WINDOWS_PER_CHAPEL;
     // The picture behind the panes starts dim and brightens as panes break.
     this.picture = this.add.graphics();
     drawPicture(this.picture, spec.chapel, variant, f.x, f.y + 20, f.w, PICTURE_H);
@@ -373,6 +513,17 @@ export class GameScene extends Phaser.Scene {
     this.dynGfx = this.add.graphics();
     this.button('map', 52, 24, 84, 30, t('map'), () => this.leaveWindow(), false, 60);
     this.text(104, 24, this.windowTitle(index), 18, C.ink, { fontStyle: 'bold' }).setOrigin(0, 0.5).setShadow(0, 2, '#000', 4).setDepth(60);
+    // The window's feat (with a tick once its seal is earned), or the clerestory run, under the bar.
+    const note = spec.feat
+      ? `${t(`feat-${spec.feat}` as TextKey, { n: spec.feat === 'quick' ? QUICK_SECONDS : featChain(index) })}${this.progress.feats[index] ? '  ✓' : ''}`
+      : this.endless
+        ? t('endlessRun', { n: this.endless.restored, best: this.progress.endlessBest })
+        : '';
+    if (note)
+      this.text(f.x + f.w / 2, f.y + f.h - 10, note, 12, spec.feat && this.progress.feats[index] ? C.gold : C.dim)
+        .setOrigin(0.5)
+        .setShadow(0, 1, '#000', 3)
+        .setDepth(60);
     this.scoreText = this.text(W - 120, 24, '', 18, C.gold, { fontStyle: 'bold' }).setOrigin(1, 0.5).setShadow(0, 2, '#000', 4).setDepth(60);
     this.comboText = this.text(f.x + f.w / 2, f.y + f.h - 70, '', 20, C.gold, { fontStyle: 'bold' }).setOrigin(0.5).setShadow(0, 2, '#000', 4).setDepth(60);
     this.effectsText = this.text(f.x + f.w + 10, f.y + 10, '', 13, C.ink, { lineSpacing: 4, wordWrap: { width: Math.max(60, f.x - 16) } }).setDepth(60);
@@ -403,6 +554,20 @@ export class GameScene extends Phaser.Scene {
     switch (e.type) {
       case 'bar':
         SFX('bar');
+        if (e.spin) SFX('spin');
+        break;
+      case 'shield':
+        SFX('shield');
+        break;
+      case 'bell':
+        SFX('bell');
+        break;
+      case 'prism':
+        SFX('prism');
+        if (sim.mostOrbs >= 3) award(trophies, 'triple');
+        break;
+      case 'mirror':
+        SFX('mirror');
         break;
       case 'wall':
         SFX('wall');
@@ -468,7 +633,8 @@ export class GameScene extends Phaser.Scene {
     const { x: ox, y: oy } = this.field;
     this.picture?.setAlpha(sim.result === 'won' ? 1 : 0.3 + 0.55 * (1 - sim.left / this.paneTotal));
     const pg = this.paneGfx.clear();
-    for (const p of sim.panes) if (p.alive) drawPane(pg, p, ox, oy);
+    const guarded = sim.guarded;
+    for (const p of sim.panes) if (p.alive) drawPane(pg, p, ox, oy, guarded);
     const g = this.dynGfx.clear();
     for (const s of this.shards) {
       g.fillStyle(s.colour, Math.min(1, s.life * 1.5));
@@ -477,9 +643,18 @@ export class GameScene extends Phaser.Scene {
       g.fillTriangle(ox + s.x + c, oy + s.y + d, ox + s.x - d, oy + s.y + c, ox + s.x - c * 0.6, oy + s.y - d * 0.6);
     }
     for (const b of sim.beads) drawBead(g, b.kind, ox + b.x, oy + b.y);
-    drawBar(g, ox + sim.barX, oy + sim.barY, sim.barW, BAR_H, sim.sticky > 0);
+    drawBar(g, ox + sim.barX, oy + sim.barY, sim.barW, BAR_H, sim.sticky > 0, this.progress.glass);
     const fire = !!sim.timers.fire;
-    for (const o of sim.orbs) drawOrb(g, ox + o.x, oy + o.y, fire);
+    for (const o of sim.orbs) {
+      let trail = this.trails.get(o);
+      if (o.spin && o.held === null) {
+        if (!trail) this.trails.set(o, (trail = []));
+        trail.push({ x: o.x, y: o.y });
+        if (trail.length > 12) trail.shift();
+      } else if (trail?.length) trail.shift();
+      trail?.forEach((p, i) => g.fillStyle(fire ? 0xff9a3a : 0xffe0a0, ((i + 1) / trail!.length) * 0.45).fillCircle(ox + p.x, oy + p.y, 2 + (i / trail!.length) * 4));
+      drawOrb(g, ox + o.x, oy + o.y, fire, o.spin);
+    }
     // The orbs left, down the left side of the field.
     const lx = Math.max(18, ox / 2);
     for (let i = 0; i < Math.min(sim.lives, 8); i++) drawOrb(g, lx, oy + 24 + i * 30, false);
@@ -488,12 +663,14 @@ export class GameScene extends Phaser.Scene {
     const lines: string[] = [];
     for (const [kind, left] of Object.entries(sim.timers) as [BeadKind, number][]) lines.push(`${t(`bead-${kind}` as TextKey)} ${Math.ceil(left)}`);
     if (sim.sticky > 0) lines.push(t('stickyLeft', { n: sim.sticky }));
+    if (sim.still > 0) lines.push(t('stillLeft', { n: Math.ceil(sim.still) }));
     this.effectsText?.setText(lines.join('\n'));
   }
 
   private leaveWindow() {
     // Leaving the daily uses up today's try with the score so far.
     if (this.windowIndex < 0 && this.sim && !this.ended) finishDaily(GAME, this.sim.score);
+    // Leaving the clerestory ends the run (its best is kept as each window is restored).
     this.showMap();
   }
 
@@ -508,9 +685,27 @@ export class GameScene extends Phaser.Scene {
     const p = this.progress;
     p.lead += lead;
     let best = sim.score;
-    if (index >= 0) {
+    // The feat: 'done' when it pays its seal now, 'had' when it was done before, 'missed' otherwise.
+    let feat: 'done' | 'had' | 'missed' | null = null;
+    const endless = this.endless;
+    if (endless) {
+      if (won) {
+        endless.restored++;
+        endless.lives = Math.min(MAX_CARRIED, sim.lives);
+        p.endlessBest = Math.max(p.endlessBest, endless.restored);
+        if (endless.restored >= CLERESTORY_TROPHY) award(trophies, 'clerestory');
+      }
+      best = p.endlessBest;
+    } else if (index >= 0) {
       if (won) p.stars[index] = Math.max(p.stars[index], sim.stars);
       p.best[index] = best = Math.max(p.best[index], sim.score);
+      if (sim.spec.feat) {
+        if (p.feats[index]) feat = 'had';
+        else if (won && featMet(sim.spec.feat, sim, index)) {
+          p.feats[index] = 1;
+          feat = 'done';
+        } else feat = 'missed';
+      }
     } else best = finishDaily(GAME, sim.score).best;
     saveProgress(p);
     if (won) {
@@ -527,11 +722,11 @@ export class GameScene extends Phaser.Scene {
     // The result box, after a moment to see the window light up.
     const gen = this.gen;
     this.time.delayedCall(won ? 700 : 400, () => {
-      if (gen === this.gen) this.showResult(won, sim.stars, sim.score, best, lead);
+      if (gen === this.gen) this.showResult(won, sim.stars, sim.score, best, lead, feat);
     });
   }
 
-  private showResult(won: boolean, stars: number, score: number, best: number, lead: number) {
+  private showResult(won: boolean, stars: number, score: number, best: number, lead: number, feat: 'done' | 'had' | 'missed' | null) {
     const { W, H } = this;
     const depth = 100;
     const bw = Math.min(440, W - 40);
@@ -542,18 +737,32 @@ export class GameScene extends Phaser.Scene {
     g.fillStyle(C.stone, 0.96).fillRoundedRect(x, y, bw, bh, 12);
     g.lineStyle(3, won ? C.gold : C.arch, 1).strokeRoundedRect(x, y, bw, bh, 12);
     const daily = this.windowIndex < 0;
+    const endless = this.endless;
     this.text(W / 2, y + 22, won ? t('won') : t('lost'), 28, won ? C.gold : C.ink, { fontStyle: 'bold' }).setOrigin(0.5, 0).setDepth(depth);
-    if (won && !daily)
+    if (won && !daily && !endless)
       for (let k = 0; k < 3; k++) {
         g.fillStyle(k < stars ? C.gold : 0x3a3346, 1);
         g.fillPoints(starPoints(W / 2 + (k - 1) * 40, y + 86, 16, 7), true);
       }
-    const line = daily ? t('dailyResult', { score: formatNumber(score) }) : t('scoreLine', { score: formatNumber(score), best: formatNumber(best) });
-    this.text(W / 2, y + 116, line, 18, C.ink).setOrigin(0.5, 0).setDepth(depth);
+    const line = daily
+      ? t('dailyResult', { score: formatNumber(score) })
+      : endless
+        ? t('endlessRun', { n: endless.restored, best })
+        : t('scoreLine', { score: formatNumber(score), best: formatNumber(best) });
+    this.text(W / 2, endless ? y + 86 : y + 116, line, 18, C.ink).setOrigin(0.5, 0).setDepth(depth);
+    if (endless) this.text(W / 2, y + 116, t('score', { n: formatNumber(score) }), 16, C.ink).setOrigin(0.5, 0).setDepth(depth);
     this.text(W / 2, y + 144, t('leadEarned', { n: lead }), 16, C.gold).setOrigin(0.5, 0).setDepth(depth);
+    if (feat) {
+      const key = feat === 'done' ? 'featDone' : feat === 'had' ? 'featHad' : 'featMissed';
+      this.text(W / 2, y + 168, t(key), 15, feat === 'done' ? C.gold : C.dim).setOrigin(0.5, 0).setDepth(depth);
+    }
     const by = y + bh - 34;
     const index = this.windowIndex;
-    if (daily) this.button('result-map', W / 2, by, 220, 36, t('toMap'), () => this.showMap(), true, depth + 1);
+    if (endless) {
+      this.button('result-map', W / 2 - 105, by, 190, 36, t('toMap'), () => this.showMap(), false, depth + 1);
+      if (won) this.button('result-next', W / 2 + 105, by, 190, 36, t('next'), () => this.startWindow(index + 1, endless), true, depth + 1);
+      else this.button('result-retry', W / 2 + 105, by, 190, 36, t('newRun'), () => this.startEndless(), true, depth + 1);
+    } else if (daily) this.button('result-map', W / 2, by, 220, 36, t('toMap'), () => this.showMap(), true, depth + 1);
     else {
       this.button('result-map', W / 2 - 105, by, 190, 36, t('toMap'), () => this.showMap(), !won || index === WINDOWS - 1, depth + 1);
       if (!won) this.button('result-retry', W / 2 + 105, by, 190, 36, t('retry'), () => this.startWindow(index), true, depth + 1);

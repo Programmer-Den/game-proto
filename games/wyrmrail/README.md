@@ -9,7 +9,8 @@ village's goods to another before the order runs out of time. Where the line bra
 decide which way the wyrm goes. Keep it fed at the Roost, bring goods to the workshops that make
 better ones, keep the villages in good cheer, grow them into towns, build depots and tunnels, light
 the line for night rounds, race a rival company for orders, wake a second wyrm late in the game, and
-after the eighth village finish with the festival and its medal. Every game is played in a new
+after the eighth village finish with the festival and its medal. Each round you hitch two of three
+wagon kinds, lay fast track for a main line and fill a village's standing contract. Every game is played in a new
 valley, a won festival flies the wyrm on to the next one (snowy, marsh, canyon) with one upgrade
 kept, its moults grow lasting traits along the way, and the daily valley gives everyone the same
 seeded valley once a day.
@@ -34,6 +35,8 @@ seeded valley once a day.
 | Tap track (not a junction) | Hang a lamp there, 4 coins (from round 3) |
 | Remove | Toggle: tap track to take it up for half what it cost |
 | Plain | Toggle: lay track that joins only the piece it continues, and crossings |
+| Fast track | Toggle: lay fast track, or tap or drag over track to make it fast (from round 2) |
+| Two wagon cards | Hitch the round's two wagons (from round 2) |
 | A charter card | Pick the round's charter (from round 3) |
 | Swift wings, Golden hoard, Second wyrm | Buy an upgrade |
 | A trait card | Pick the wyrm's trait when it moults (rounds 4 and 7) |
@@ -170,6 +173,27 @@ seeded valley once a day.
     rival goes after the best-paying waiting order between two villages it reaches (a plum bar and
     "Rival racing!" on the card): send the wyrm for it within 9 seconds, or the rival takes it off
     the board. Cut the rival's line to one of the two villages and it gives up the race. A lost order costs no heart, only the pay.
+25. **Wagon kinds**, from round 2: each round opens with three wagon cards, and the game waits while
+    you tap two to hitch for the round (after a moult, before the charter). The **cold wagon**
+    (frosty white) keeps fish at its full pay; fish in any other wagon spoils from round 2, its pay
+    falling to half over 12 seconds aboard ("spoiling" on the card). The **big hopper** (gold) holds
+    two grain orders in one wagon. The **mail coach** (blue) makes **letters**, a new order from
+    round 2 that pays a fifth less and allows 30% less time, pay up to double by the share of its
+    time left when it arrives ("fast post"). Goods ride in the wagon built for them when it is free,
+    else in any free wagon; a Third wagon from a moult is a plain one.
+26. **Fast track**, from round 2: with **Fast track** on, new track costs double, and a tap or drag
+    over plain track makes it fast for the difference. Fast track has a blue-grey bed and brass
+    rails, and the wyrm flies over it twice as fast, so a main line between busy villages pays for
+    itself. Taking it up refunds half of all it cost.
+27. **Standing contracts**, from round 2 until the festival: each round a village asks for a steady
+    flow, half the round's goal in loads from it (rounded up), shown as "Contract 1/3" under its
+    name. It sends more orders while the contract is open, and once filled the contract pays 12
+    coins a load at the round's end, on top of the orders' own pay. An unfilled contract simply
+    lapses.
+
+![Round 2's wagon cards: the cold wagon, the big hopper and the mail coach](docs/screenshots/wagon-kinds.webp)
+
+![Fast track from the Roost, the cold wagon and the mail coach hitched, and Ashford's standing contract](docs/screenshots/fast-track.webp)
 
 ![Laying track](docs/screenshots/playthrough-1-track.webp)
 
@@ -204,6 +228,7 @@ An order pays 10 coins plus 3 per tile between the two villages (as the crow fli
 | Depot | One per village | 60, then 30 more each, from round 2 | Goods at that village wait at half speed and load at once |
 | Warehouse | One per town with a depot | 50 | Goods waiting there that run late go back in store, costing no heart |
 | Lamp | One per track tile | 4, from round 3 | Lights its tile and the tiles beside it in night rounds |
+| Fast track | Any track tile | Double the track's price, from round 2 | The wyrm flies over it twice as fast |
 
 ![Millbrook and Fernhollow grown into towns, with towers, warehouses and an order of wares](docs/screenshots/towns.webp)
 
@@ -309,7 +334,8 @@ All paths are inside `games/wyrmrail/`.
   their workshops), `state.ts` the tuning numbers and the shape of a game, and `sim.ts` moves it
   on: laying and removing track (plain or joined, crossings), switches, routes along it, orders,
   the wyrms' trips and meals, workshops, village moods, washouts and rockfalls, round charters,
-  passengers, upgrades, rounds and the festival, the chain of valleys, moults and the daily valley.
+  passengers, upgrades, rounds and the festival, the chain of valleys, moults and the daily valley,
+  and the wagon kinds, fast track and standing contracts.
   The valley, new orders, hazards, charters and moults are picked with `Math.random`; the daily
   valley with today's seed (`shared/daily.ts`).
 - `src/scenes/`: `BootScene` bakes textures, `GameScene` draws the valley, the track, the wyrm,

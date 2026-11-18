@@ -1,6 +1,7 @@
 import type Phaser from 'phaser';
 import { seeded } from '../../../../shared/daily';
 import type { BeadKind, Pane } from '../game/sim';
+import type { GlassId } from '../game/save';
 
 /**
  * Shardlight's look: jewel-coloured panes held in black lead, a stone arch round the field, and the
@@ -243,9 +244,15 @@ export function drawPicture(g: Phaser.GameObjects.Graphics, chapel: number, vari
 }
 
 /** Draws a pane at its place in the field, `ox`, `oy` being the field's top left. */
-export function drawPane(g: Phaser.GameObjects.Graphics, p: Pane, ox: number, oy: number) {
+export function drawPane(g: Phaser.GameObjects.Graphics, p: Pane, ox: number, oy: number, guarded = false) {
   const x = ox + p.x;
   const y = oy + p.y;
+  if (p.kind === 'gargoyle' || p.kind === 'owl') return drawGuardian(g, p, x, y);
+  if (p.kind === 'mirror' || p.kind === 'prism' || p.kind === 'bell') return drawNewPane(g, p, x, y);
+  if (p.kind === 'heart' && guarded) {
+    // A guarded heart: a pale stone ward round it until its guardians fall.
+    g.lineStyle(3, 0xb8c0c8, 0.8).strokeRoundedRect(x - 6, y - 6, p.w + 12, p.h + 12, 8);
+  }
   const colour =
     p.kind === 'lead' ? LEAD_GREY : p.kind === 'bead' ? BEAD_PANE : p.kind === 'heart' ? PANE_COLOURS[4] : PANE_COLOURS[p.colour % 4];
   const fill = p.kind === 'thick' ? shade(colour, 0.75) : colour;
@@ -282,6 +289,81 @@ export function drawPane(g: Phaser.GameObjects.Graphics, p: Pane, ox: number, oy
     }
   }
   g.lineStyle(4, C.lead, 1).strokeRect(x, y, p.w, p.h);
+}
+
+/** Cracks across a pane as it is worn down: one line for each hit taken. */
+function cracks(g: Phaser.GameObjects.Graphics, x: number, y: number, w: number, h: number, n: number) {
+  g.lineStyle(1.5, 0xffffff, 0.75);
+  const lines = [
+    [0.15, 0.1, 0.45, 0.6, 0.35, 0.95],
+    [0.85, 0.15, 0.55, 0.5, 0.7, 0.9],
+    [0.05, 0.6, 0.4, 0.45, 0.6, 0.2],
+  ];
+  for (const l of lines.slice(0, n)) {
+    g.beginPath();
+    g.moveTo(x + w * l[0], y + h * l[1]);
+    g.lineTo(x + w * l[2], y + h * l[3]);
+    g.lineTo(x + w * l[4], y + h * l[5]);
+    g.strokePath();
+  }
+}
+
+/** The new panes: a silvered mirror, a clear prism with a rainbow, a bronze bell. */
+function drawNewPane(g: Phaser.GameObjects.Graphics, p: Pane, x: number, y: number) {
+  const { w, h } = p;
+  if (p.kind === 'mirror') {
+    g.fillStyle(0xa8b8c8, 1).fillRect(x, y, w, h);
+    g.fillStyle(0xe8f0f8, 0.8).fillTriangle(x + w * 0.1, y + h, x + w * 0.35, y, x + w * 0.5, y);
+    g.fillStyle(0xe8f0f8, 0.5).fillTriangle(x + w * 0.45, y + h, x + w * 0.62, y, x + w * 0.7, y);
+    // An arrow up: what falls on it goes back up.
+    g.fillStyle(0x304050, 1).fillTriangle(x + w * 0.82, y + 5, x + w * 0.74, y + h - 6, x + w * 0.9, y + h - 6);
+    if (p.hp < 2) cracks(g, x, y, w, h, 1);
+  } else if (p.kind === 'prism') {
+    g.fillStyle(0xd8e8f0, 0.85).fillRect(x, y, w, h);
+    const bands = [0xe84040, 0xf0a030, 0xf0e050, 0x50c060, 0x4080e0, 0x8050c0];
+    bands.forEach((c, i) => g.fillStyle(c, 0.9).fillRect(x + w * 0.5 + i * 3, y + 4 + i * 2.6, w * 0.42 - i * 3, 2.6));
+    g.fillStyle(0xffffff, 1).fillTriangle(x + w * 0.12, y + h - 4, x + w * 0.42, y + h - 4, x + w * 0.27, y + 4);
+    g.lineStyle(1.5, 0x8090a0, 1).strokeTriangle(x + w * 0.12, y + h - 4, x + w * 0.42, y + h - 4, x + w * 0.27, y + 4);
+  } else {
+    g.fillStyle(0x5a3a1a, 1).fillRect(x, y, w, h);
+    const cx = x + w / 2;
+    g.fillStyle(0xe0a840, 1);
+    g.fillCircle(cx, y + h * 0.38, h * 0.22);
+    g.fillRect(cx - h * 0.22, y + h * 0.38, h * 0.44, h * 0.28);
+    g.fillRect(cx - h * 0.32, y + h * 0.62, h * 0.64, h * 0.1);
+    g.fillCircle(cx, y + h * 0.8, h * 0.08);
+  }
+  g.lineStyle(4, C.lead, 1).strokeRect(x, y, w, h);
+}
+
+/** A guardian of a rose window: a horned, winged gargoyle or a round stone owl, cracking as it is struck. */
+function drawGuardian(g: Phaser.GameObjects.Graphics, p: Pane, x: number, y: number) {
+  const { w, h } = p;
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  const stone = 0x7a7480;
+  const dark = 0x4a4450;
+  if (p.kind === 'gargoyle') {
+    // Wings out to the sides, a squat body, horns and glowing eyes.
+    g.fillStyle(dark, 1);
+    g.fillTriangle(x, y + 2, x + w * 0.32, y + h * 0.35, x + w * 0.22, y + h);
+    g.fillTriangle(x + w, y + 2, x + w * 0.68, y + h * 0.35, x + w * 0.78, y + h);
+    g.fillStyle(stone, 1).fillRoundedRect(x + w * 0.25, y + 3, w * 0.5, h - 3, 6);
+    g.fillTriangle(cx - 10, y + 5, cx - 6, y + 5, cx - 12, y - 4);
+    g.fillTriangle(cx + 10, y + 5, cx + 6, y + 5, cx + 12, y - 4);
+    g.fillStyle(0xffb030, 1).fillCircle(cx - 5, cy - 2, 2.5).fillCircle(cx + 5, cy - 2, 2.5);
+    g.fillStyle(dark, 1).fillRect(cx - 5, cy + 5, 10, 2);
+  } else {
+    // A round owl with ear tufts and big eyes, its wings folded.
+    g.fillStyle(stone, 1).fillEllipse(cx, cy + 2, w * 0.86, h * 0.92);
+    g.fillTriangle(x + w * 0.14, y + 6, x + w * 0.3, y + 4, x + w * 0.14, y - 3);
+    g.fillTriangle(x + w * 0.86, y + 6, x + w * 0.7, y + 4, x + w * 0.86, y - 3);
+    g.fillStyle(dark, 1).fillEllipse(x + w * 0.16, cy + 6, w * 0.16, h * 0.5).fillEllipse(x + w * 0.84, cy + 6, w * 0.16, h * 0.5);
+    g.fillStyle(0xd8d0c0, 1).fillCircle(cx - 8, cy - 3, 7).fillCircle(cx + 8, cy - 3, 7);
+    g.fillStyle(0x5ad0e0, 1).fillCircle(cx - 8, cy - 3, 3.5).fillCircle(cx + 8, cy - 3, 3.5);
+    g.fillStyle(0xe0a840, 1).fillTriangle(cx - 3, cy + 3, cx + 3, cy + 3, cx, cy + 9);
+  }
+  cracks(g, x + w * 0.2, y, w * 0.6, h, Math.min(3, (p.kind === 'gargoyle' ? 3 : 4) - p.hp));
 }
 
 const BEAD_COLOURS: Record<BeadKind, number> = {
@@ -344,18 +426,47 @@ export function drawBead(g: Phaser.GameObjects.Graphics, kind: BeadKind, x: numb
   }
 }
 
-/** The lantern orb with its glow. */
-export function drawOrb(g: Phaser.GameObjects.Graphics, x: number, y: number, fire: boolean) {
+/** The lantern orb with its glow, and a swirl of light round it while it carries a bar spin. */
+export function drawOrb(g: Phaser.GameObjects.Graphics, x: number, y: number, fire: boolean, spin = 0) {
+  if (spin) {
+    const a = Math.min(1, Math.abs(spin) + 0.3);
+    g.lineStyle(2, 0xfff3c8, 0.7 * a);
+    const dir = Math.sign(spin);
+    for (const k of [0, Math.PI]) {
+      g.beginPath();
+      g.arc(x, y, 12, k - dir * 0.2, k + dir * 1.4, dir < 0);
+      g.strokePath();
+    }
+  }
   g.fillStyle(fire ? 0xff7a2a : 0xffc860, 0.18).fillCircle(x, y, 20);
   g.fillStyle(fire ? 0xff9a3a : 0xffc860, 0.35).fillCircle(x, y, 13);
   g.fillStyle(fire ? 0xffd0a0 : 0xfff3c8, 1).fillCircle(x, y, 7);
   g.fillStyle(0xffffff, 1).fillCircle(x - 2, y - 2, 2.5);
 }
 
-/** The brass glazing bar, with a ruby in the middle and green ends while it is sticky. */
-export function drawBar(g: Phaser.GameObjects.Graphics, x: number, y: number, w: number, h: number, sticky: boolean) {
+/** The colours of each bar glass, its panes in turn from the left. */
+export const GLASS_COLOURS: Record<GlassId, number[]> = {
+  brass: [C.brass],
+  ruby: [0xc0263a, 0xe05060],
+  sapphire: [0x1f5fbf, 0x5a90e0],
+  emerald: [0x2f9a5a, 0x60c080],
+  amber: [0xe0a020, 0xf4c860],
+  rose: [0xc0263a, 0xe0a020, 0x1f5fbf, 0x2f9a5a, 0xb04aa8],
+};
+
+/** The glazing bar, brass or in stained glass, with a ruby in the middle and green ends while it is sticky. */
+export function drawBar(g: Phaser.GameObjects.Graphics, x: number, y: number, w: number, h: number, sticky: boolean, glass: GlassId = 'brass') {
   g.fillStyle(C.brassDark, 1).fillRoundedRect(x - w / 2, y, w, h, h / 2);
-  g.fillStyle(C.brass, 1).fillRoundedRect(x - w / 2, y, w, h * 0.6, { tl: h / 2, tr: h / 2, bl: 2, br: 2 });
+  if (glass === 'brass') g.fillStyle(C.brass, 1).fillRoundedRect(x - w / 2, y, w, h * 0.6, { tl: h / 2, tr: h / 2, bl: 2, br: 2 });
+  else {
+    // Small panes held in lead along the bar.
+    const colours = GLASS_COLOURS[glass];
+    const n = Math.max(4, Math.round(w / 18));
+    const pw = (w - h) / n;
+    for (let i = 0; i < n; i++) g.fillStyle(colours[i % colours.length], 1).fillRect(x - w / 2 + h / 2 + i * pw, y + 2, pw, h - 4);
+    g.lineStyle(1.5, C.lead, 1);
+    for (let i = 1; i < n; i++) g.lineBetween(x - w / 2 + h / 2 + i * pw, y + 2, x - w / 2 + h / 2 + i * pw, y + h - 2);
+  }
   g.fillStyle(0xf8e8b0, 0.7).fillRect(x - w / 2 + 8, y + 2, w - 16, 2);
   if (sticky) {
     g.fillStyle(0x5ad07a, 1).fillCircle(x - w / 2 + h / 2, y + h / 2, h / 2 - 1);

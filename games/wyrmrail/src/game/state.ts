@@ -144,6 +144,39 @@ export const RIVAL_CLAIM_MS = 9_000;
 export const RIVAL_REST_MS = 5_000;
 /** Taking over a rival's tile costs this many times the usual track price. */
 export const RIVAL_BUYOUT = 3;
+/** Wagon kinds (WR21), from `WAGON_ROUND`: each round two of the three are hitched to every wyrm. */
+export const WAGON_ROUND = 2;
+export const WAGON_KINDS = ['cold', 'hopper', 'mail'] as const;
+export type WagonKind = (typeof WAGON_KINDS)[number];
+/** Each wagon's name and card text, as keys of `i18n/en.ts` (its paint is `wagon-<kind>-u` and `-v` in `art/sprites.ts`). */
+export const WAGON_TEXT: Record<WagonKind, { name: TextKey; text: TextKey }> = {
+  cold: { name: 'wagonCold', text: 'wagonColdText' },
+  hopper: { name: 'wagonHopper', text: 'wagonHopperText' },
+  mail: { name: 'wagonMail', text: 'wagonMailText' },
+};
+/** The goods each wagon is built for: fish in the cold wagon, grain in the hopper (two orders in one), letters in the mail coach. */
+export const WAGON_CARGO: Record<WagonKind, Cargo> = { cold: 'fish', hopper: 'grain', mail: 'letters' };
+/** How many grain orders the big hopper holds. */
+export const HOPPER_LOADS = 2;
+/** Fish aboard any other wagon spoils from `WAGON_ROUND`: its pay falls over this long aboard, down to `SPOILED_PAY` of it. */
+export const SPOIL_MS = 12_000;
+export const SPOILED_PAY = 0.5;
+/** Letters (from `WAGON_ROUND`): how often an order is letters, what they pay and how long they allow, times the usual. */
+export const LETTER_CHANCE = 0.15;
+export const LETTER_PAY = 0.8;
+export const LETTER_TIME = 0.7;
+/** Letters in the mail coach pay up to this much more, by the share of their time left on delivery. */
+export const MAIL_BONUS = 1;
+/** Fast track (WR22), from `FAST_ROUND`: it costs this many times the usual, and the wyrm flies on it this many times as fast. */
+export const FAST_ROUND = 2;
+export const FAST_COST = 2;
+export const FAST_SPEED = 2;
+/** Standing contracts (WR23), from `CONTRACT_ROUND` until the festival: what each load pays at the round's end, and how often the contract's village sends the next order. */
+export const CONTRACT_ROUND = 2;
+export const CONTRACT_PAY = 12;
+export const CONTRACT_CHANCE = 0.3;
+/** How many loads a round's contract asks for: half the round's goal, rounded up. */
+export const contractNeed = (round: number) => Math.ceil(roundGoal(round) / 2);
 /** How long a banner and a floating number stay on screen. */
 export const BANNER_MS = 2_800;
 export const POP_MS = 1_200;
@@ -216,6 +249,10 @@ export interface Order {
   made: boolean;
   /** The sending village's mood when the order was made, which set its pay or its time (0 before moods count). */
   mood: number;
+  /** The wagon it rides in once aboard (WR21): a hitched kind, or `plain` (the third wagon, or any before `WAGON_ROUND`). */
+  wagon: WagonKind | 'plain' | null;
+  /** How long it has been aboard, for fish spoiling. */
+  aboardMs: number;
 }
 
 /** Passengers fill both wagons: a wyrm carrying them loads nothing else. */
@@ -335,6 +372,15 @@ export interface GameState {
   lamps: string[];
   /** A village that grew into a town with its round's last delivery, for the next round's news (until the charter is picked), else null. */
   grewTown: number | null;
+  /** The two wagon kinds hitched this round (WR21), null before `WAGON_ROUND`; `hitchOffer` while the player has yet to pick (the game waits). */
+  hitch: WagonKind[] | null;
+  hitchOffer: boolean;
+  /** The lump last round's filled contract paid, for this round's news until the round's picks are made (0 if none). */
+  contractPaid: number;
+  /** Fast track tiles (WR22), as "c,r" keys. */
+  fast: string[];
+  /** This round's standing contract (WR23): loads from `village` delivered this round, paid `pay` at the round's end once `done` reaches `need`. */
+  contract: { village: number; need: number; done: number; pay: number } | null;
   /** The rival line, once it has set up (null before `RIVAL_ROUND`). */
   rival: Rival | null;
   /** The best medal on this difficulty when the game began: its boons and the ones below it apply. */

@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { ADAPTS, CONDITIONS, HUD_HEIGHT, LEADERS, PERKS, VIEW, type Adapt, type Condition, type LeaderKind, type Perk, type Stats } from '../game/rules';
+import { ADAPTS, CONDITIONS, DARES, HUD_HEIGHT, LEADERS, PERKS, VIEW, WEAPON_LABELS, type Adapt, type Condition, type DareKind, type LeaderKind, type Perk, type Stats, type Weapon } from '../game/rules';
 import type { ArtStyle } from '../game/save';
 import { formatNumber } from '../../../../shared/i18n';
 // `t` names this HUD's Text objects here, so the translator goes by `tr`.
@@ -30,6 +30,11 @@ export const KIT_PANEL = { x: 16, y: 852, w: 140, h: 50 };
  * out of the lanes, with its active's name (or the seconds left to wait) under it. `x`, `y` is its centre.
  */
 export const LEADER_BUTTON = { x: 514, y: 796, r: 23 };
+/**
+ * The sidearm swap button, on the same shoulder above the leader's, with the weapon the squad holds
+ * under it; shown once the run has found a sidearm. `x`, `y` is its centre.
+ */
+export const SIDEARM_BUTTON = { x: 514, y: 724, r: 20 };
 /** The wave condition's chip, under the progress strip at the right; it drops below the boss bar while a boss is up. */
 export const CONDITION_CHIP = { x: VIEW.w - 10, y: HUD_HEIGHT + 32, h: 16, bossDrop: 20 };
 
@@ -49,6 +54,8 @@ function fitHud() {
   CONDITION_CHIP.x = right - 10;
   LEADER_BUTTON.x = right - 26;
   LEADER_BUTTON.y = FIELD.h - (VIEW.h - 796);
+  SIDEARM_BUTTON.x = right - 26;
+  SIDEARM_BUTTON.y = FIELD.h - (VIEW.h - 724);
 }
 
 export interface HudData {
@@ -89,6 +96,10 @@ export interface HudData {
   operation: { label: TextKey; waves: number } | null;
   /** The squad leader of this run (null for none): its active's cooldown filled 0..1, and the whole seconds left. */
   leader: { kind: LeaderKind; fill: number; secs: number } | null;
+  /** The weapon the squad holds, once the run has found a sidearm (null before). */
+  weapon: Weapon | null;
+  /** The dare this wave is under (null for none), and whether it was lost. */
+  dare: { kind: DareKind; lost: boolean } | null;
 }
 
 type Text = Phaser.GameObjects.Text;
@@ -100,7 +111,7 @@ export class Hud {
   private bar: Phaser.GameObjects.Image;
   private g: Phaser.GameObjects.Graphics;
   private t: Record<
-    'wave' | 'kills' | 'best' | 'comic' | 'nv' | 'count' | 'note' | 'frenzy' | 'streak' | 'hint' | 'kit' | 'kitHint' | 'kitList' | 'acid' | 'condition' | 'leader',
+    'wave' | 'kills' | 'best' | 'comic' | 'nv' | 'count' | 'note' | 'frenzy' | 'streak' | 'hint' | 'kit' | 'kitHint' | 'kitList' | 'acid' | 'condition' | 'leader' | 'weapon',
     Text
   >;
   private statLabels: Text[];
@@ -113,6 +124,8 @@ export class Hud {
   private kitGrown = 0;
   /** Whether the leader's button is drawn. */
   private leaderShown = false;
+  /** Whether the sidearm button is drawn. */
+  private sidearmShown = false;
 
   constructor(scene: Phaser.Scene) {
     fitHud();
@@ -122,7 +135,7 @@ export class Hud {
     this.t = {
       wave: text(), kills: text(), best: text(), comic: text(), nv: text(),
       count: text(), note: text(), frenzy: text(), streak: text(), hint: text(),
-      kit: text(), kitHint: text(), kitList: text(), acid: text(), condition: text(), leader: text(),
+      kit: text(), kitHint: text(), kitList: text(), acid: text(), condition: text(), leader: text(), weapon: text(),
     };
     this.statLabels = [text(), text(), text(), text()];
     this.statValues = [text(), text(), text(), text()];
@@ -145,6 +158,11 @@ export class Hud {
     return this.leaderShown && Math.hypot(x - LEADER_BUTTON.x, y - LEADER_BUTTON.y) <= LEADER_BUTTON.r + 6;
   }
 
+  /** Whether a tap at x, y lands on the sidearm swap button (never before a sidearm is found). */
+  onSidearm(x: number, y: number) {
+    return this.sidearmShown && Math.hypot(x - SIDEARM_BUTTON.x, y - SIDEARM_BUTTON.y) <= SIDEARM_BUTTON.r + 6;
+  }
+
   setStyle(style: ArtStyle) {
     this.style = style;
     this.bar.setTexture(tex(style, 'hudbar'));
@@ -164,6 +182,41 @@ export class Hud {
     this.drawKit(d, th);
     this.drawCondition(d, th);
     this.drawLeader(d, th);
+    this.drawSidearm(d, th);
+  }
+
+  /**
+   * The sidearm swap button: the sign of the weapon the squad holds (a rifle round, a shotgun's
+   * fanned pellets or a flame), with its name under it.
+   */
+  private drawSidearm(d: HudData, th: Theme) {
+    const w = d.weapon, t = this.t.weapon;
+    this.sidearmShown = !!w;
+    t.setVisible(!!w);
+    if (!w) return;
+    const g = this.g, comic = this.style === 'comic', { x, y, r } = SIDEARM_BUTTON;
+    const line = num(comic ? th.ink : th.accent), col = num(comic ? (w === 'flamer' ? '#ff8a2a' : w === 'shotgun' ? '#c8a050' : '#d8c070') : th.accent);
+    if (comic) g.fillStyle(num(th.ink)).fillCircle(x + 3, y + 3, r);
+    g.fillStyle(num(comic ? '#fff8e8' : '#040c06'), comic ? 1 : 0.8).fillCircle(x, y, r);
+    g.lineStyle(comic ? 1.6 : 1, line);
+    if (w === 'rifle') {
+      g.fillStyle(col).fillRoundedRect(x - 4, y - 12, 8, 24, 4);
+      g.strokeRoundedRect(x - 4, y - 12, 8, 24, 4);
+    } else if (w === 'shotgun') {
+      for (const k of [-1, 0, 1]) {
+        g.lineStyle(3, line).lineBetween(x, y + 10, x + k * 9, y - 9);
+        g.fillStyle(col).fillCircle(x + k * 9, y - 10, 3.5);
+      }
+    } else {
+      const pts = [x, y - 13, x + 8, y - 1, x + 7, y + 8, x, y + 12, x - 7, y + 8, x - 8, y - 1];
+      g.fillStyle(col).fillPoints(this.points(pts), true);
+      g.lineStyle(comic ? 1.6 : 1, line).strokePoints(this.points(pts), true);
+    }
+    g.lineStyle(comic ? 2.4 : 1.4, line).strokeCircle(x, y, r);
+    if (comic) this.font(t, 9, th.ink, th).setStroke('#fff8e8', 3);
+    else this.font(t, 8.5, th.accent, th, { glow: th.accent, weight: 'bold' });
+    t.setText(tr(WEAPON_LABELS[w]).toUpperCase()).setOrigin(0.5).setScale(1).setPosition(x, y + r + 9);
+    t.setScale(Math.min(1, 54 / t.width));
   }
 
   /**
@@ -220,13 +273,14 @@ export class Hud {
 
   /** The wave's condition on a chip under the progress strip (none when the wave is clear). */
   private drawCondition(d: HudData, th: Theme) {
-    const t = this.t.condition, show = d.condition !== 'clear' || d.adapt !== null;
+    const t = this.t.condition, show = d.condition !== 'clear' || d.adapt !== null || d.dare !== null;
     t.setVisible(show);
     if (!show) return;
     const c = CONDITION_CHIP, comic = this.style === 'comic', y = c.y + (d.bossLive ? c.bossDrop : 0);
     const parts = [];
     if (d.condition !== 'clear') parts.push(`${tr(CONDITIONS[d.condition].label).toUpperCase()}: ${tr(CONDITIONS[d.condition].detail).toUpperCase()}`);
     if (d.adapt) parts.push(tr('adapted', { adapt: tr(ADAPTS[d.adapt].label).toUpperCase() }));
+    if (d.dare) parts.push(d.dare.lost ? tr('dareChipLost') : tr('dareChip', { dare: tr(DARES[d.dare.kind].label).toUpperCase() }));
     const label = parts.join(' · ');
     if (comic) this.font(t, 9.5, th.ink, th).setText(label).setOrigin(1, 0.5).setPosition(c.x - 8, y + c.h / 2);
     else this.font(t, 9, th.warn, th, { glow: th.warn }).setText(label).setOrigin(1, 0.5).setPosition(c.x - 8, y + c.h / 2);

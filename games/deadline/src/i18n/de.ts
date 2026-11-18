@@ -33,9 +33,9 @@ const de: Translation<typeof en> = {
 
   // Supply drop cards
   supplyShotgun: 'Schrotflinte',
-  supplyShotgunDetail: 'Zwei Kugeln mehr\nfächern bei jeder\nSalve aus',
+  supplyShotgunDetail: 'Zwei Kugeln mehr\npro Salve, und die\nSchrotflinte als\nZweitwaffe',
   supplyFlamer: 'Flammenwerfer',
-  supplyFlamerDetail: 'Zwei Feuerstöße:\nsie zünden, wenn\nZombies nahe kommen',
+  supplyFlamerDetail: 'Zwei Feuerstöße,\nwenn Zombies nahen,\nund der Flammenwerfer\nals Zweitwaffe',
   supplyMedkit: 'Medikit',
   supplyMedkitDetail: 'Der Trupp übersteht\neinen Durchbruch\nder Sandsäcke',
   supplySandbags: 'Sandsäcke',
@@ -333,6 +333,44 @@ const de: Translation<typeof en> = {
   codexFull: 'CODEXSEITE VOLL: {kind}\n+{n} % SCHADEN FÜR IMMER',
   overPageSquad: 'ANFÜHRER, CODEX & VETERANEN ▶',
   overPageOutfit: '◀ LADEN, AUSSENPOSTEN & KARTE',
+
+  // Wave dares
+  dareTitle: 'WELLE {wave}: EINE MUTPROBE?\nHALTE SIE FÜR {n}x SCHROTT',
+  nvDareTitle: 'WELLE {wave} · MUTPROBE NACH WAHL\nGEHALTEN: {n}x SCHROTT + KISTE',
+  dareRunners: 'Nur Renner',
+  dareRunnersDetail: 'Jeder Schlurfer\nder Welle kommt\nals Renner',
+  dareTough: 'Dicke Haut',
+  dareToughDetail: 'Jeder Zombie hat\n40% mehr Leben',
+  dareJammed: 'Ladehemmung',
+  dareJammedDetail: 'Der Trupp schießt\ndie ersten 10 Sekunden\nhalb so schnell',
+  dareMiddle: 'Halt die Mitte',
+  dareMiddleDetail: 'Kein Zombie darf\ndie Linie auf der\nmittleren Spur queren',
+  dareNone: 'Keine Mutprobe',
+  dareNoneDetail: 'Die Welle nehmen,\nwie sie kommt',
+  dareReward: '{n}x SCHROTT + KISTE',
+  dareBanner: 'MUTPROBE: {dare}',
+  dareChip: 'MUTPROBE: {dare}',
+  dareChipLost: 'MUTPROBE VERLOREN',
+  dareHeld: 'MUTPROBE GEHALTEN! +{n} SCHROTT',
+  nvDareHeld: 'MUTPROBE GEHALTEN · +{n} SCHROTT',
+  dareLost: 'MUTPROBE VERLOREN!\nDIE MITTE IST GEFALLEN',
+  nvDareLost: 'MUTPROBE GESCHEITERT · MITTE DURCHBROCHEN',
+
+  // Sidearms
+  weaponRifle: 'Gewehre',
+  weaponShotgun: 'Schrotflinte',
+  weaponFlamer: 'Flammenwerfer',
+  sidearmFound: 'ZWEITWAFFE: {weapon}!\nWECHSELN MIT DEM KNOPF ODER E',
+  nvSidearmFound: 'ZWEITWAFFE: {weapon}\nWECHSEL: KNOPF ODER E',
+
+  // The last stand
+  lastStand: 'LETZTES GEFECHT!\nHALTET DIE LINIE!',
+  nvLastStand: 'LETZTES GEFECHT · LINIE HALTEN',
+  lastStandTimer: 'LETZTES GEFECHT {n}',
+  nvLastStandTimer: 'LETZTES GEFECHT · {n}',
+  standHeld: 'DIE LINIE HÄLT!',
+  nvStandHeld: 'LINIE GEHALTEN',
+  fxMelee: 'WUMMS!',
 };
 
 export default de;

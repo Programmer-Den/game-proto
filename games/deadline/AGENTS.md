@@ -46,7 +46,13 @@ also picks the squad leader whose active the run brings. Kills fill a lasting zo
   and Night Convoy: a bus drives up the middle lane each wave and has to reach the far end;
   zombies block and bite it and go for it from close above; the wave waits for it and losing it
   ends the run), the zombie codex (kills fill a lasting page per kind; a full page makes hits on that
-  kind land 15% harder, not on the daily),
+  kind land 15% harder, not on the daily), wave dares (from wave 5 the break ends on a pick of two
+  dares or none: runners only, thicker skins, jammed rifles or holding the middle lane; a wave held
+  under its dare pays its scrap twice and drops a crate), sidearms (the shotgun and flamethrower
+  supplies also give the squad that weapon, swapped to from a button above the leader's or E: the
+  shotgun fans three pellets per gun, the flamer throws short flames through shields and armour),
+  the last stand (once a run, the first breach with no medkit gives ten seconds of melee at the
+  sandbags instead of a game over),
   a squad of up to eight companions in three staggered rows of three, fuel drums with a
   blast ring that previews how many zombies they would catch, a frenzy streak (12 quick kills
   double the fire rate for 5s), damage numbers on hits, a wave progress strip with a boss warning,
@@ -63,7 +69,7 @@ also picks the squad leader whose active the run brings. Kills fill a lasting zo
   supply drop from wave 20; an operation ends as a win when its wave 10 is cleared.
 - **Screens:** there is no title or menu. `BootScene` only starts `GameScene`, which bakes the
   textures it needs and begins wave 1 at once. The supply drop (phase `'supply'`), the role pick
-  (phase `'role'`) and game over are overlays in the same scene; an extraction or a won operation
+  (phase `'role'`), the dare pick (phase `'dare'`) and game over are overlays in the same scene; an extraction or a won operation
   ends in the same game over overlay with a win title (`state.extracted`). On game over a tap on a
   starting crate buys or refunds it, on an outpost upgrade buys its next level, on the Open Road,
   the daily or an open town picks it for the next run, on a veteran picks or drops them, on the wide
@@ -104,13 +110,18 @@ also picks the squad leader whose active the run brings. Kills fill a lasting zo
     through sandbag walls.
   - A boss wave can draw a condition too; a blackout hides the boss until it is close (its bar at
     the top still shows its health).
+  - The dare pick stops the game before every wave from 5, even for a player who never takes one.
+  - A flame is the bullet sprite stretched and tinted; a style switch doesn't retint flames in
+    flight. Sidearms, the dare and the last stand are not shown in the wide-screen backdrop.
+  - The middle lane dare checks the zombie's x lane, so a zombie lured onto the escort bus in the
+    middle lane can lose it.
 
 ## Architecture
 
 ### File map
 
 - `src/howToPlay.ts`: the How to play screen's text (goal, controls, core loop and tips) in British
-  English, US English (the same with "armored", made by `us`) and German, picked with `byLanguage`
+  English, US English (the same with "armored" and "armor", made by `us`) and German, picked with `byLanguage`
   and handed to `setupGame(game, { howToPlay })` in `src/main.ts`; update every language when the
   controls or the first round change.
 - `src/i18n.ts` and `src/i18n/`: the game's texts (`shared/i18n.ts`). `i18n/en.ts` is the British
@@ -139,13 +150,17 @@ also picks the squad leader whose active the run brings. Kills fill a lasting zo
   hidden with no leader), the
   in-acid warning, drawn per style into one Graphics plus Text objects, redrawn only when its data
   changes), and the layout constants `STYLE_SWITCH`, `PROGRESS`, `CONDITION_CHIP`, `FRENZY_PANEL`,
-  `KIT_PANEL`, `LEADER_BUTTON`, `HUD_DEPTH`.
+  `KIT_PANEL`, `LEADER_BUTTON`, `SIDEARM_BUTTON`, `HUD_DEPTH`. The sidearm button (`drawSidearm`,
+  `onSidearm`) shows once `HudData.weapon` is set (a sidearm found), and `HudData.dare` adds the
+  wave's dare (or that it was lost) to the condition chip.
 - `src/game/rules.ts`: pure numbers and rules (also `OUTPOST`, `OUTPOST_KINDS`, `OUTPOST_MAX`,
   `NO_OUTPOST`, `outpostCost`, `ROLES`, `ROLE_KINDS`, `GRENADE`, `MARKSMAN`, `OPERATIONS`,
   `OPERATION_KINDS`, `OPERATION_BONUS`, `MEDALS`, `medalOf`, `TOWNS`, `isTown`, `townOpen`,
   `nextTown`, `nextTowns`, `ESCORTS`, `BUS`, `busBite`, `openLaneX`, `LEADERS`, `LEADER_KINDS`,
   `LEADER`, `LEADER_MAX`, `leaderLevel`, `nextLevelXp`, `leaderCooldown`, `AIRSTRIKE`, `PATCH`,
-  `FLARE`, `CODEX`, `CODEX_KINDS`, `EMPTY_CODEX`, `codexFull`, `KIND_NAMES`, `Codex`, `DAILY`, `dailyScore`, `dailyAdapt`, `LOYALTY`, `Veteran`, `CALL_SIGNS`,
+  `FLARE`, `CODEX`, `CODEX_KINDS`, `EMPTY_CODEX`, `codexFull`, `KIND_NAMES`, `Codex`, `SIDEARM`,
+  `Sidearm`, `Weapon`, `WEAPON_LABELS`, `DARES`, `DARE_KINDS`, `DareKind`, `DARE`, `dareOffer`,
+  `LAST_STAND`, `DAILY`, `dailyScore`, `dailyAdapt`, `LOYALTY`, `Veteran`, `CALL_SIGNS`,
   `callSign`, `rankMult`, `promote`, `ADAPTS`, `ADAPT`, `ADAPT_KINDS`, `adaptTo`,
   `WaveRules`; every `label`, `detail` and `name` in them is a `TextKey`): `VIEW`, `HERO`, `REACH_Y`, `SQUAD_SLOTS`,
   `MAX_COMPANIONS`, `ENEMIES`, `SCRAP`, `SPITTER`, `ACID_SLOW`, `riotShield`, `SWARM`,
@@ -216,11 +231,11 @@ also picks the squad leader whose active the run brings. Kills fill a lasting zo
   shows or hides the night-vision overlay (`scan` image and `grain` tile sprite), clears effects,
   rebuilds the game over overlay if it is up, and tells the `Hud` and `Backdrop`.
 - **Tick:** `GameScene.update` clamps `delta` to 100ms, runs `animateFeed` (grain and flicker),
-  and unless the phase is `'over'`, `'supply'` or `'role'` (everything holds still then) runs in order:
+  and unless the phase is `'over'`, `'supply'`, `'role'` or `'dare'` (everything holds still then) runs in order:
   `moveHero`, `spawn`, `fire`, `moveBullets`, `tickBoss`, `moveEnemies` (stops the frame on game
   over; also ticks the burn of fire rounds), `movePickups`, `moveDrums`, `moveAcid`, `moveWalls`,
   `moveBus` (stops the frame when the bus is lost), `moveSurvivors`, `hitTargets`, `tickFlamer`,
-  `tickFrenzy`, `tickLeader`, `ageEffects`, `checkWave`, `drawBars`, `updateHud`, and once per game second
+  `tickFrenzy`, `tickLeader`, `tickLastStand` (stops the frame on game over), `ageEffects`, `checkWave`, `drawBars`, `updateHud`, and once per game second
   `refreshBackdrop`. All timing is accumulated `dt` in private clocks (`waveClock`, `fireClock`,
   `breakClock`, `sinceKill`, `runMs`, effect and splat ages); no Phaser timers drive gameplay.
   Tweens only fade the banner and the upgrade pop-up text.
@@ -386,6 +401,37 @@ also picks the squad leader whose active the run brings. Kills fill a lasting zo
   `EXTRACT.fromWave`), tapped or taken with 4; `pickSupply('extract')` calls `extract`, which
   sets `state.extracted`, pays `state.payout = round(scrap * EXTRACT.bonus(wave))` into the bank
   (saved) and shows the game over overlay with a win title.
+- **Wave dares:** the break ends in `nextWave`, which starts the next wave at once before
+  `DARE.fromWave` and otherwise sets `state.dareOffer = dareOffer(wave, middleOpen)` (a fixed turn
+  through the pairs of `DARE_KINDS`, no draws; `middle` is left out where an operation's `lanes`
+  closes lane 1) and moves to `'dare'`; `showDare` draws two dare cards and a "no dare" card
+  (`dareCards`, keys 1/2/3), and `pickDare` sets `state.dare` and calls `startWave`. `startWave`
+  applies it after the plan (no draws): `runners` turns planned grunts into runners (hp scaled by
+  `ENEMIES.runner.hp / ENEMIES.grunt.hp`), `tough` multiplies every planned hp by
+  `DARE.toughMult`, `jammed` sets `state.jamMs` (`fire` multiplies the interval by `DARE.jamMult`
+  while it counts down in the wave), and it notes the run's scrap in `dareScrapFrom`. For `middle`,
+  `moveEnemies` calls `loseDare` when a zombie in lane 1 gets to `DARE.middleY` (`drawBars` dashes
+  the line). On the wave clear `checkWave` calls `holdDare`: a dare not lost adds the wave's scrap
+  again (`DARE.scrapMult`), counts `state.daresHeld` and `dropCrate`s an upgrade crate
+  (`UPGRADE_KINDS[(wave + daresHeld) % 4]`, the wave's crate hp) at the hero's x; either way it
+  clears `dare` and `jamMs`.
+- **Sidearms:** `pickSupply` adds `'shotgun'` or `'flamer'` to `state.sidearms` the first time and
+  shows the `sidearmFound` banner. `swapWeapon` (the HUD button or E, in a wave or break only, else
+  `ui('refuse')`) cycles `state.weapon` through `'rifle'` and the sidearms, and holds the fire for
+  `SIDEARM.swapMs` (`swapMs`, counted in `fire`). In `fire` the interval is multiplied by
+  `SIDEARM[weapon].interval`; with the shotgun every gun (roles aside) fires `SIDEARM.shotgun.pellets`
+  pellets `spread` apart with no pierce at `mult` of its damage (only the straight one holds for a
+  survivor), and with the flamer one flame each (`b.flame`, `hitsLeft = SIDEARM.flamer.hits`,
+  `pierces`, no ricochet, tinted and drawn bigger), which `moveBullets` drops `range` px above
+  `fromY`. In `hitTargets` a flame sets `burn` like fire rounds and isn't stopped by `armoured`. The
+  hero's supply pellet pairs are added in every mode.
+- **Last stand:** in `moveEnemies` a zombie at the line during `state.lastStandMs` is held just
+  above it (`holdAtLine`); a breach with no medkit and `!lastStandUsed` calls `startLastStand`
+  (`LAST_STAND.ms`, banner, the `standText` countdown). `tickLastStand` deals a `melee` blow every
+  `LAST_STAND.everyMs` (`hurt` with `LAST_STAND.damage(wave)` and a shove of `push`, half for a
+  boss, to every zombie within `reach` of the line; it also ends a boss's charge) and, when the time
+  runs out, calls `gameOver` if a zombie still stands at the line. `drawBars` shades the line and
+  draws the time bar.
 - **Sandbag walls:** a `sandbag` crate adds to `state.sandbags`. A tap on `Hud.onKit` toggles
   `state.placing`; the next tap on the road calls `placeWall(laneAt(x))` (the S key places in the
   hero's lane). Both only work in the `'wave'` phase, since a wall placed in the break would run
@@ -479,13 +525,18 @@ imports it. Under browser automation it all does nothing, so the playthrough is 
   wave 2, not on boss waves), `cleared` and `supply` (`checkWave`), `confirm` (`pickSupply`,
   `pickRole`), `airstrike` (`useLeader`, the Sergeant's call; `boom` as it lands), `medkit` (also
   the Medic's patch-up), `flare` (the Scout's flare), `busHit` (`moveBus`, rate limited while
-  zombies bite), `busThrough` (the bus gets through), `boom` (the bus is lost) and `codex` (a codex
-  page fills, `recordCodex`).
+  zombies bite), `busThrough` (the bus gets through), `boom` (the bus is lost), `codex` (a codex
+  page fills, `recordCodex`), `flameShot` (`fire`, once per flamer volley, in place of `shot`; the
+  shotgun's volley is `shot` at pitch 0.7), `swap` (`swapWeapon`), `dare` (`pickDare`, a dare taken;
+  `confirm` for none), `dareHeld` (`holdDare`), `dareLost` (`loseDare`), `lastStand`
+  (`startLastStand`) and `melee` (a last stand blow that struck).
+- The dare pick plays the `calm` part (`music` treats every phase but `'wave'` as calm).
 - **Shared sounds:** `ui('click')` for the style switch, the kit panel toggle, putting the
   sandbags away, refunding a starting crate, picking an operation or a leader, turning the game over
   page and the restart tap;
   `ui('coin')` for buying a starting crate or an outpost level; `ui('refuse')` for one that can't
-  be afforded, for the leader's button or Q outside a wave or while it cools down, for S with no
+  be afforded, for the leader's button or Q outside a wave or while it cools down, for the sidearm
+  button or E with no sidearm or outside a wave or break, for S with no
   sandbags in a wave (`placeWall` returns whether it placed) and for a
   tap on the kit panel outside a wave or with no sandbags.
 - There is no `?watch` mode, so nothing for it.
@@ -544,7 +595,7 @@ imports it. Under browser automation it all does nothing, so the playthrough is 
 
 ### State model
 
-- `GameState` (exported from `GameScene.ts`): `wave`, `phase` (`'wave' | 'break' | 'supply' | 'role' | 'over'`),
+- `GameState` (exported from `GameScene.ts`): `wave`, `phase` (`'wave' | 'break' | 'supply' | 'role' | 'dare' | 'over'`),
   `kills`, `stats` (a `Stats` from `rules.ts`: `damage`, `fireInterval`, `companions`, `pierce`),
   `collected` (count per `UpgradeKind`), `best`, `fallen` and `waveTotal` (the progress strip),
   `streak`, `frenzyMs` and `frenzies`, `drumsBlown` and `lastBlast` (`{ caught, killed }` of the
@@ -555,8 +606,9 @@ imports it. Under browser automation it all does nothing, so the playthrough is 
   `outpost`, `roles`, `operation`, `nextOperation`, `operationBests`, `adapt`, `roster`, `picked`,
   `brought`, `names`, `ranks`, `bounty`, `opened` (the towns a first win opened, a list), `daily`,
   `dailyScore`, `leader`, `leaderLevel`, `leaderMs`, `leaderUses`, `nextLeader`, `leaderXp`,
-  `xpGained`, `flareMs`, `strike`, `busOn`, `busHp`, `busesThrough`, `busLost`, `codex` and
-  `codexFilled`. The
+  `xpGained`, `flareMs`, `strike`, `busOn`, `busHp`, `busesThrough`, `busLost`, `codex`,
+  `codexFilled`, `sidearms`, `weapon`, `dareOffer`, `dare`, `dareLost`, `daresHeld`, `jamMs`,
+  `lastStandUsed` and `lastStandMs`. The
   scene's public `squad` holds the companion images, one per `stats.companions`,
   and `style` the current `ArtStyle`.
 - Entities (`Enemy`, `Survivor`, `Pickup`, `Drum`, `Bullet`, `Acid`, `Wall`, `Splat`, `Fx`) are private interfaces in
@@ -706,6 +758,11 @@ imports it. Under browser automation it all does nothing, so the playthrough is 
   lays out three cards, so a fourth needs narrower ones.
 - **Change the codex:** `CODEX.pages` and `CODEX.bonus` in `rules.ts`; a new enemy kind goes into
   `CODEX_KINDS` and `KIND_NAMES` (the page grid is 3x3, so a tenth needs a new layout).
+- **Add a dare:** add it to `DareKind` and `DARES` (label and three-line detail), apply it in
+  `startWave` (no draws) or where it bites, and give it a lose check like `loseDare` if it can be
+  broken; `dareOffer` pairs every kind on its own.
+- **Add a sidearm:** add it to `Sidearm` and `SIDEARM`, a label in `WEAPON_LABELS`, the supply that
+  finds it in `pickSupply`, its shots in `fire` and its sign in `Hud.drawSidearm`.
 - **Add a new phase or screen** (title, pause): extend `Phase`, guard `update`, `spawn` and the
   `pointerdown` handler on it, and keep wave 1 starting at once or update the test's opening steps.
 

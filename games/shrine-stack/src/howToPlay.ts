@@ -20,6 +20,11 @@ const en: HowToPlay = {
       input: 'Swap button or R',
       action: 'From tier 2: hold the stone in reserve, or trade it with the held one',
     },
+    { input: 'Capstone button or C', action: "From tier 2: make a tier's third stone a capstone, or an ordinary stone again" },
+    {
+      input: 'Tap beside a falling stone, or the arrow keys',
+      action: 'From tier 2: nudge it 10 pixels that way, once a stone, for 2 favour',
+    },
     {
       input: 'Click or tap a blessing card',
       action: 'Keep that blessing after a balanced tier',
@@ -54,6 +59,8 @@ const en: HowToPlay = {
     "Each crown brings pilgrims with the temple's favour: build an inn (a free blessing), a well (10 favour to start) or a mason's yard (a wider first stone).",
     'After a crown some runs bring rain (stones that are not perfect slide further off) or snow (the swing slows and speeds up), for 1.5 times the favour.',
     'In a race both temples get the same stones and no breaks: crown first, or keep standing when the other stone misses.',
+    "A capstone that lands within 10 pixels of the stone below sets: it and the tier's balance bonus pay three times the favour. Any further off and it cracks, and the tier is wobbly.",
+    'Each site has a blueprint, the dashed outline over the temple: a tier whose top stone ends within 12 pixels of its width earns 4 more favour, so cutting a stone on purpose can pay.',
   ],
 };
 
@@ -84,6 +91,11 @@ const de: HowToPlay = {
     {
       input: 'Tausch-Taste oder R',
       action: 'Ab Ebene 2: den Stein in Reserve halten oder gegen den gehaltenen tauschen',
+    },
+    { input: 'Schlussstein-Taste oder C', action: 'Ab Ebene 2: den dritten Stein einer Ebene zum Schlussstein machen oder zurück' },
+    {
+      input: 'Neben einen fallenden Stein tippen oder Pfeiltasten',
+      action: 'Ab Ebene 2: ihn 10 Pixel in diese Richtung schubsen, einmal je Stein, für 2 Gunst',
     },
     {
       input: 'Eine Segenskarte anklicken oder antippen',
@@ -119,6 +131,8 @@ const de: HowToPlay = {
     'Jede Krone bringt Pilger mit der Gunst des Tempels: baue ein Gasthaus (ein Segen gratis), einen Brunnen (10 Gunst zum Start) oder einen Steinmetzhof (ein breiterer erster Stein).',
     'Nach einer Krone bringen manche Läufe Regen (nicht perfekte Steine rutschen weiter ab) oder Schnee (der Schwung wird langsamer und schneller), für 1,5-fache Gunst.',
     'Im Rennen bekommen beide Tempel dieselben Steine und keine Pausen: kröne zuerst oder bleib stehen, wenn der andere Stein danebengeht.',
+    'Ein Schlussstein, der bis 10 Pixel neben dem Stein darunter landet, sitzt: er und der Ausgewogenheitsbonus der Ebene bringen dreifache Gunst. Liegt er weiter daneben, springt er, und die Ebene wackelt.',
+    'Jeder Ort hat einen Bauplan, den gestrichelten Umriss über dem Tempel: Eine Ebene, deren oberster Stein bis 12 Pixel an seine Breite herankommt, bringt 4 Gunst mehr, also kann ein absichtlich gekürzter Stein sich lohnen.',
   ],
 };
 

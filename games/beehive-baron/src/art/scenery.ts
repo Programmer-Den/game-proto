@@ -1,9 +1,9 @@
 import Phaser from 'phaser';
 import { CELL_CAP, FLOWERS } from '../game/state';
 import { MEADOWS } from '../game/meadows';
-import { viewEdges, AWAY, BOARD, BOOK, BOOK_CARD, CASK, ESTATE_CARD, COMB, CONTRACT, END_CARD, FAR_RIDGE, FLOWER_GROUND, GOAL, HIVE, HIVE_TAB, MARKET, MEADOW_SPOTS, ORDER, PLAQUE, MEADOW_TAG, SWARM, farY, flowerSpot } from '../scenes/layout';
+import { viewEdges, AWAY, BOARD, BOOK, BOOK_CARD, CASK, ESTATE_CARD, COMB, CONTRACT, END_CARD, FAR_RIDGE, FLOWER_GROUND, GOAL, HIVE, HIVE_TAB, MARKET, MEADOW_SPOTS, ORDER, PLAQUE, MEADOW_TAG, SWARM, AUCTION, FORECAST_CARD, farY, flowerSpot } from '../scenes/layout';
 import { KINDS } from '../game/honey';
-import { BROOD_CARD, CARD, KIND_CARD, MEADOW_CARD, MEAD_CARD, NOTE_CARD, ORCHARD_CARD, PETALS, WAX_CARD } from './palette';
+import { BROOD_CARD, CARD, JELLY_CARD, KIND_CARD, MEADOW_CARD, MEAD_CARD, NOTE_CARD, ORCHARD_CARD, PETALS, WAX_CARD, WEATHER_CARD } from './palette';
 
 /** The rosette's deeper gold on the end card. */
 const LIVE_GOLD = '#e8a31c';
@@ -42,6 +42,8 @@ export function bakeScenery(scene: Phaser.Scene) {
   bakeJar(scene);
   bakeCells(scene);
   bakeCards(scene);
+  // Baked last, so the hand-cut wobble of everything before stays as it was.
+  bakeLoopArt(scene);
 }
 
 /** Sky, sun, clouds and the far hill. */
@@ -421,3 +423,79 @@ function bakeCards(scene: Phaser.Scene) {
 
 /** The padding the card textures above have round their card, so a sprite can be placed by its card's corner. */
 export const CARD_PAD = 8;
+
+/**
+ * The art of the round 5 loop: the jelly cell, the forecast card and the weather icons, the
+ * buyer's note and the royal jelly icon.
+ */
+function bakeLoopArt(scene: Phaser.Scene) {
+  const PAD = 8;
+  const card = (key: string, w: number, h: number, paint: (ctx: CanvasRenderingContext2D) => void) => {
+    const { canvas, ctx } = sketch(w + PAD * 2, h + PAD * 2);
+    ctx.translate(PAD, PAD);
+    paint(ctx);
+    addTexture(scene, key, canvas);
+  };
+  const c = CELL_TEX / 2;
+  const r = COMB.r;
+  const make = (key: string, paint: (ctx: CanvasRenderingContext2D) => void) => {
+    const { canvas, ctx } = sketch(CELL_TEX, CELL_TEX);
+    paint(ctx);
+    addTexture(scene, key, canvas);
+  };
+  // A jelly cell: a pale well of milky royal jelly, with a cream rim.
+  make('cell-jelly', (ctx) => {
+    cut(ctx, hex(c, c, r - 2.5), CARD.wax, { depth: 3 });
+    cut(ctx, hex(c, c, r - 6), JELLY_CARD.rim, { depth: 1.5 });
+    cut(ctx, hex(c, c, r - 11), JELLY_CARD.well, { depth: 0.5 });
+    cut(ctx, circ(c, c + 1, 10, 8, 14), JELLY_CARD.jelly, { depth: 1.5 });
+    cut(ctx, circ(c - 3, c - 2, 3.5, 2.5, 10), JELLY_CARD.shine, { depth: 0, wob: 0 });
+  });
+  // The forecast card in the sky and the buyer's note over the meadow.
+  card('forecast-card', FORECAST_CARD.w, FORECAST_CARD.h, (ctx) => {
+    cut(ctx, rr(0, 0, FORECAST_CARD.w, FORECAST_CARD.h, 8), CARD.goal, { depth: 4 });
+    outline(ctx, rr(4, 4, FORECAST_CARD.w - 8, FORECAST_CARD.h - 8, 6), NOTE_CARD.edge, 1, [4, 3]);
+  });
+  card('auction-card', AUCTION.w, AUCTION.h, (ctx) => {
+    cut(ctx, rr(0, 0, AUCTION.w, AUCTION.h, 6), NOTE_CARD.paper, { depth: 4 });
+    outline(ctx, rr(3.5, 3.5, AUCTION.w - 7, AUCTION.h - 7, 4), JELLY_CARD.gold, 1.5, [5, 3]);
+    // A paper gavel at the left.
+    cut(ctx, rr(9, 22, 22, 5, 2), MEAD_CARD.stave, { depth: 1 });
+    cut(ctx, rr(22, 8, 10, 16, 3), MEAD_CARD.hoop, { depth: 1.5 });
+  });
+  // A small jar of royal jelly, for the chip.
+  card('jelly-icon', 16, 18, (ctx) => {
+    cut(ctx, rr(1, 4, 13, 13, 3), JELLY_CARD.jelly, { depth: 1.5 });
+    cut(ctx, rr(0, 0, 15, 4.5, 1.5), JELLY_CARD.gold, { depth: 1 });
+  });
+  // The weather's icons: a sun, a rain cloud, a big warm sun, and a six-armed frost star.
+  card('weather-fair', 22, 22, (ctx) => {
+    cut(ctx, circ(9, 11, 6.5), CARD.sun, { depth: 1 });
+    cut(ctx, circ(14, 14, 6, 4.5, 12), CARD.cloud, { depth: 1 });
+  });
+  card('weather-rain', 22, 22, (ctx) => {
+    for (const x of [6, 11, 16]) cut(ctx, rr(x, 13, 2, 7, 1), WEATHER_CARD.rain, { depth: 0.5, wob: 0 });
+    cut(ctx, circ(11, 9, 9, 6, 14), WEATHER_CARD.cloud, { depth: 1.5 });
+  });
+  card('weather-warm', 22, 22, (ctx) => {
+    for (let n = 0; n < 8; n++) {
+      const a = (n / 8) * Math.PI * 2;
+      cut(ctx, circ(11 + Math.cos(a) * 8, 11 + Math.sin(a) * 8, 2.4, 2.4, 8), WEATHER_CARD.warm, { depth: 0.5 });
+    }
+    cut(ctx, circ(11, 11, 6.5), WEATHER_CARD.warm, { depth: 1.5 });
+  });
+  card('weather-frost', 22, 22, (ctx) => {
+    ctx.save();
+    ctx.strokeStyle = WEATHER_CARD.frost;
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    for (let n = 0; n < 3; n++) {
+      const a = (n / 3) * Math.PI + Math.PI / 6;
+      ctx.beginPath();
+      ctx.moveTo(11 - Math.cos(a) * 9, 11 - Math.sin(a) * 9);
+      ctx.lineTo(11 + Math.cos(a) * 9, 11 + Math.sin(a) * 9);
+      ctx.stroke();
+    }
+    ctx.restore();
+  });
+}

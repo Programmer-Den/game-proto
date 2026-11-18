@@ -37,7 +37,11 @@ import {
   hiveOf,
   isBrood,
   isHoney,
+  isJelly,
   isOpen,
+  jellyPrice,
+  rainy,
+  ringed,
   isWinter,
   jarCount,
   jarPrice,
@@ -61,6 +65,9 @@ import {
 } from './state';
 import { CATCH_PRICE, MAX_HIVES, SWARM_MS, type Queen } from './swarm';
 import { nextPrice, type UpgradeId } from './upgrades';
+import { AUCTION_FROM, AUCTION_JARS, WALK_MAX, WALK_MIN, bid } from './auction';
+import { FED_BROOD, FED_MS, JELLY_MS } from './jelly';
+import { FORECAST, WEATHER_FROM, calm, dayOf, draw } from './weather';
 import { WASPS_FROM, WASP_GAP, WASP_GAP_SPREAD, WASP_IN_MS, WASP_OUT_MS, type Wasp } from './wasps';
 
 /** A forager's trip time with the clover planted so far, longer with the Far flyers bred in. Easier difficulties have the flowers closer. */
@@ -70,13 +77,18 @@ export const tripMs = (s: GameState) => Math.round(TRIP_MS * Math.pow(0.8, s.ran
  * Moves the hive on by `dt` milliseconds: the year turns, foragers fly and bring nectar home, full
  * cells ripen, brood cells hatch bees, casks age, the market moves, wasps raid, village orders and
  * orchard contracts come and go, a crowded hive swarms, the buyer's book opens, in winter the bees
- * eat, meadows tire and rest, and with the Waggle Dance bees set off by themselves.
+ * eat, meadows tire and rest, the days' weather comes, jelly cells make royal jelly, a buyer bids
+ * at the season's end, and with the Waggle Dance bees set off by themselves.
  */
 export function tick(s: GameState, dt: number) {
   // Sampled before the year turns, since a meadow that shuts or opens with the season moves the demand too.
   const wanted = demand(s);
+  const day = dayOf(s.seasonMs);
   turn(s, dt);
+  if (dayOf(s.seasonMs) !== day) skies(s);
   tire(s, dt);
+  // Before the foragers deliver, so a cell just ringed turns to jelly before nectar can fill it.
+  jelly(s, dt);
   for (const b of s.bees) {
     if (b.tripMs <= 0) continue;
     b.tripMs = Math.max(0, b.tripMs - dt);
@@ -84,7 +96,7 @@ export function tick(s: GameState, dt: number) {
   }
   s.cells.forEach((c, slot) => {
     if (isBrood(c)) return hatch(s, c, slot, dt);
-    if (c?.phase !== 'ripening') return;
+    if (!isHoney(c) || c.phase !== 'ripening') return;
     c.ripenMs = Math.max(0, c.ripenMs - dt);
     if (c.ripenMs > 0) return;
     c.phase = 'capped';
@@ -107,6 +119,7 @@ export function tick(s: GameState, dt: number) {
   // So do the church's and the manor's commissions, once the workshop opens.
   if (s.sold >= WORKSHOP_FROM && s.commissions.length === 0) newCommissions(s);
   garden(s, dt);
+  auction(s, dt);
   if (s.ranks.dance > 0) dance(s);
 }
 
@@ -134,6 +147,8 @@ function turn(s: GameState, dt: number) {
     if (s.sold >= BOOK_FROM) newBook(s);
     if (s.sold >= WORKSHOP_FROM) newCommissions(s);
     royal(s, now);
+    // The season that just ended brings a buyer to bid on the best honey on the shelf.
+    bidder(s);
   }
   if (!fair && fairOn(s)) openFair(s);
   if (fair && !fairOn(s)) closeFair(s);
@@ -214,7 +229,8 @@ function recountLent(s: GameState) {
 function hatch(s: GameState, c: Extract<Cell, { type: 'brood' }>, slot: number, dt: number) {
   const hive = hiveOf(slot);
   if (hiveFull(s, hive) || isWinter(s)) return;
-  c.hatchMs = Math.max(0, c.hatchMs - dt);
+  // Queens fed royal jelly lay faster: the brood hatches `FED_BROOD` times as fast.
+  c.hatchMs = Math.max(0, c.hatchMs - dt * (s.fedMs > 0 ? FED_BROOD : 1));
   if (c.hatchMs > 0) return;
   c.hatchMs = BROOD_MS;
   const id = s.nextId++;
@@ -266,9 +282,9 @@ export const buildBrood = (s: GameState, slot: number) => place(s, slot, broodPr
 /** Whether there are coins and wax enough for a cell at this price. */
 export const canPay = (s: GameState, price: number) => s.coins >= withWax(s, price).coins;
 
-/** Sends every bee at home out for the nectar they forage now, if the comb has room for it. In winter they stay in. */
+/** Sends every bee at home out for the nectar they forage now, if the comb has room for it. In winter and on a rainy day they stay in. */
 export function send(s: GameState) {
-  if (room(s) === 0 || isWinter(s)) return false;
+  if (room(s) === 0 || isWinter(s) || rainy(s)) return false;
   const home = s.bees.filter(atHome);
   if (home.length === 0) return false;
   for (const b of home) fly(s, b);
@@ -278,10 +294,10 @@ export function send(s: GameState) {
 /**
  * The Waggle Dance: bees at home set off by themselves, but only as many as the comb has room for
  * beyond what the foragers out already carry, and while the farmer's offer stands enough of them
- * stay home to take it. In winter they stay in.
+ * stay home to take it. In winter and on a rainy day they stay in.
  */
 function dance(s: GameState) {
-  if (isWinter(s)) return;
+  if (isWinter(s) || rainy(s)) return;
   let free = room(s) - s.bees.reduce((n, b) => n + (b.tripMs > 0 ? beeCarry(s, b) : 0), 0);
   const stay = s.contract?.phase === 'offer' ? s.contract.bees : 0;
   for (const b of s.bees.filter(atHome).slice(stay)) {
@@ -814,5 +830,116 @@ export function giveRoyal(s: GameState) {
   r.done = true;
   s.warrant++;
   s.events.push({ kind: 'warranted', years: s.warrant });
+  return true;
+}
+
+/**
+ * A new day: the forecast moves on a day, and the day coming into it gets its weather, by chance
+ * for its season once `WEATHER_FROM` jars are sold (calm before). A rainy or warm day is announced.
+ */
+function skies(s: GameState) {
+  const day = dayOf(s.seasonMs) + FORECAST - 1;
+  s.weather = [...s.weather.slice(1), s.sold >= WEATHER_FROM ? draw(day, Math.random()) : calm(day)];
+  if (s.weather[0] === 'rain' || s.weather[0] === 'warm') s.events.push({ kind: 'weather', weather: s.weather[0] });
+}
+
+/**
+ * Royal jelly: an empty honey cell ringed by six capped cells turns into a jelly cell, which makes
+ * its royal jelly in `JELLY_MS` while the ring holds (its clock stops while it is broken). The
+ * queens' fed time runs down.
+ */
+function jelly(s: GameState, dt: number) {
+  s.fedMs = Math.max(0, s.fedMs - dt);
+  s.cells.forEach((c, slot) => {
+    if (isHoney(c) && c.phase === 'filling' && c.nectar === 0 && ringed(s, slot)) {
+      s.cells[slot] = { type: 'jelly', jellyMs: JELLY_MS };
+      return s.events.push({ kind: 'jelly-formed', slot });
+    }
+    if (!isJelly(c) || c.jellyMs === 0 || !ringed(s, slot)) return;
+    c.jellyMs = Math.max(0, c.jellyMs - dt);
+    if (c.jellyMs === 0) s.events.push({ kind: 'jelly-ready', slot });
+  });
+}
+
+/**
+ * A tap on a jelly cell: takes its royal jelly once ready, or turns a cell whose ring is broken
+ * back into an empty honey cell (losing its jelly so far). Its ring still whole and not ready, it
+ * refuses.
+ */
+export function tapJelly(s: GameState, slot: number) {
+  const c = s.cells[slot];
+  if (!isJelly(c)) return false;
+  if (c.jellyMs > 0 && ringed(s, slot)) return false;
+  if (c.jellyMs === 0) {
+    s.jelly++;
+    s.events.push({ kind: 'jelly-taken', slot });
+  }
+  s.cells[slot] = emptyCell();
+  return true;
+}
+
+/** Sells a jar of royal jelly at `jellyPrice` (not counted as jars sold). */
+export function sellJelly(s: GameState) {
+  if (s.jelly <= 0) return false;
+  const coins = jellyPrice(s);
+  s.jelly--;
+  s.coins += coins;
+  s.events.push({ kind: 'jelly-sold', coins });
+  return true;
+}
+
+/** Feeds a royal jelly to the queens: every brood cell hatches twice as fast for a season (`FED_MS`, a fresh season if they were fed already). */
+export function feedQueens(s: GameState) {
+  if (s.jelly <= 0) return false;
+  s.jelly--;
+  s.fedMs = FED_MS;
+  s.events.push({ kind: 'fed' });
+  return true;
+}
+
+/** The kind of honey on the shelf a jar of which sells dearest now, or null with no jars. */
+function bestKind(s: GameState): Kind | null {
+  return KINDS.filter((k) => s.jars[k] > 0).sort((a, b) => jarPrice(s, b) - jarPrice(s, a))[0] ?? null;
+}
+
+/** As a season ends, once `AUCTION_FROM` jars are sold, a buyer comes to bid on up to `AUCTION_JARS` jars of the dearest honey on the shelf. */
+function bidder(s: GameState) {
+  const kind = bestKind(s);
+  if (s.sold < AUCTION_FROM || !kind) return;
+  s.auction = {
+    city: Math.floor(Math.random() * CITIES.length),
+    kind,
+    jars: Math.min(AUCTION_JARS, s.jars[kind]),
+    base: jarPrice(s, kind),
+    ms: 0,
+    walkMs: WALK_MIN + Math.random() * (WALK_MAX - WALK_MIN),
+  };
+  s.events.push({ kind: 'auction' });
+}
+
+/** The bid rises while the buyer waits; they walk off at their time, or when the jars they bid on are gone from the shelf. */
+function auction(s: GameState, dt: number) {
+  const a = s.auction;
+  if (!a) return;
+  a.ms += dt;
+  a.jars = Math.min(a.jars, s.jars[a.kind]);
+  if (a.ms < a.walkMs && a.jars > 0) return;
+  s.auction = null;
+  s.events.push({ kind: 'auction-lost' });
+}
+
+/** Accepts the buyer's bid: the jars go for the bid each and count as sold. */
+export function acceptBid(s: GameState) {
+  const a = s.auction;
+  if (!a || s.jars[a.kind] < a.jars || a.jars <= 0) return false;
+  const fair = fairOn(s);
+  const wanted = demand(s);
+  const coins = a.jars * bid(a);
+  s.jars[a.kind] -= a.jars;
+  s.coins += coins;
+  s.sold += a.jars;
+  s.auction = null;
+  s.events.push({ kind: 'auction-won', jars: a.jars, coins });
+  afterSale(s, wanted, fair);
   return true;
 }

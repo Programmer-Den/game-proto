@@ -31,7 +31,7 @@ export const KIND_COST: Record<ValleyKind, Partial<Record<Terrain, number>>> = {
 export const terrainCost = (kind: ValleyKind, t: Terrain) => KIND_COST[kind][t] ?? TRACK_COST[t];
 
 /** Goods a village sends, and the better goods its workshops make from them. */
-export type Cargo = 'grain' | 'tools' | 'timber' | 'ore' | 'fish' | 'flour' | 'planks' | 'iron' | 'wool' | 'peat' | 'salt' | 'wares' | 'passengers';
+export type Cargo = 'grain' | 'tools' | 'timber' | 'ore' | 'fish' | 'flour' | 'planks' | 'iron' | 'wool' | 'peat' | 'salt' | 'wares' | 'letters' | 'passengers';
 
 /** The local goods of each valley kind after the meadow, sent by the villages that send fish in the meadow (WR15). */
 export const LOCAL_GOODS: Record<ValleyKind, Cargo | null> = { meadow: null, snow: 'wool', marsh: 'peat', canyon: 'salt' };
@@ -115,6 +115,7 @@ export const CARGO_NAMES: Record<Cargo, { name: TextKey; lower: TextKey }> = {
   planks: { name: 'planks', lower: 'planksLower' },
   iron: { name: 'iron', lower: 'ironLower' },
   wares: { name: 'wares', lower: 'waresLower' },
+  letters: { name: 'letters', lower: 'lettersLower' },
   passengers: { name: 'passengers', lower: 'passengersLower' },
 };
 

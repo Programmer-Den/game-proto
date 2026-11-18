@@ -140,6 +140,8 @@ export interface Fight {
   wasVulnerable: boolean;
   /** The gold the foes leave behind once they all fall. */
   gold: number;
+  /** The Exhaust cards played this fight: gone until the next fight. */
+  exhausted: CardId[];
 }
 
 /** A number that floats up from the hero or a foe: damage, block or healing. */
@@ -203,6 +205,14 @@ export interface GameState {
   goldWon: number;
   /** The flask the last elite left behind, shown with its reward. */
   flaskWon: FlaskId | null;
+  /** Whether the hero carries the key to this act's vault (an elite drops it). */
+  vaultKey: boolean;
+  /** Whether the last elite left the vault's key, shown with its reward. */
+  keyWon: boolean;
+  /** The boss relics offered on the descent panel, or null; each strong, each with a cost. */
+  bossRelics: RelicId[] | null;
+  /** The boss relic picked on the descent panel (its place in `bossRelics`), or null for a plain relic. */
+  bossPick: number | null;
   /** The merchant's wares, while in a shop. */
   shop: Shop | null;
   /** What the last event, purchase or descent did, shown on the map until the hero walks on. */

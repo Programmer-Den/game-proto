@@ -14,7 +14,9 @@
 // strengthens their boon, and the daily shrine gives every player the same patron and stones. Crowns
 // also bring pilgrims whose favour builds a village (an inn, a well, a mason's yard) that gives later
 // temples a head start, later runs can bring rain or snow for more favour, and two players can race
-// two temples side by side.
+// two temples side by side. The third stone of a tier can be a capstone, which pays triple for a
+// near-perfect drop and costs the tier its balance otherwise; a falling stone can be nudged for favour,
+// and each site's blueprint pays extra for tiers built to its widths.
 
 import { byDifficulty } from '../../../../shared/settings';
 import type { Rand } from '../../../../shared/daily';
@@ -172,6 +174,32 @@ export const SNOW_PERIOD = 2400;
 export const PILGRIMS_PER_CROWN = 5;
 export const WELL_FAVOR = 10;
 export const YARD_PX = 20;
+/**
+ * Capstones (SS17): from `CAPSTONE_FROM_TIER` the third stone of a tier can be a capstone. Landing within
+ * `CAPSTONE_PX` (or the perfect window, if wider) of the stone below sets it: it snaps on whole and it,
+ * and the tier's balance bonus, pay `CAPSTONE_MULT` times the favour. Anything wider cracks it, and the
+ * tier is wobbly.
+ */
+export const CAPSTONE_FROM_TIER = 2;
+export const CAPSTONE_PX = 10;
+export const CAPSTONE_MULT = 3;
+/** Nudge (SS18): from `NUDGE_FROM_TIER` a falling stone can be pushed `NUDGE_PX` sideways once, for `NUDGE_COST` favour. */
+export const NUDGE_FROM_TIER = 2;
+export const NUDGE_PX = 10;
+export const NUDGE_COST = 2;
+/**
+ * Blueprints (SS19): each site's temple has a width per tier (`BLUEPRINTS`, from `BLUEPRINT_FROM_TIER` up to
+ * the crown); a tier whose top stone ends within `BLUEPRINT_TOL` of it earns `BLUEPRINT_FAVOR` (times `favorMult`).
+ */
+export const BLUEPRINT_FROM_TIER = 2;
+export const BLUEPRINT_TOL = 12;
+export const BLUEPRINT_FAVOR = 4;
+/** The blueprints' widths, by tier from 1 (tier 1 has none): the hill a steady ziggurat, the cliff a needle, the lake a stepped pagoda. */
+export const BLUEPRINTS: Record<SiteId, number[]> = {
+  hill: [0, 190, 180, 170, 160, 150, 140, 130, 120, 110, 100, 90],
+  cliff: [0, 180, 160, 140, 120, 110, 100, 90, 80, 70],
+  lake: [0, 200, 200, 170, 170, 140, 140, 110, 110, 80, 80],
+};
 
 /**
  * `patron` is the pick of a patron before the first stone. `blessing` is the break between tiers: after
@@ -188,6 +216,8 @@ export interface Stone {
   perfect: boolean;
   kind: StoneKind;
   material: MaterialId;
+  /** A capstone that set (SS17). */
+  capstone: boolean;
 }
 
 /** The stone in play: swinging above the temple, then falling. `h` is its bottom's height above the plinth. */
@@ -232,6 +262,9 @@ export type GameEvent =
   | { type: 'swapped'; kind: StoneKind }
   | { type: 'patron'; patron: PatronId; gift: BlessingId | null }
   | { type: 'altar'; tier: number }
+  | { type: 'capstone'; set: boolean; favor: number }
+  | { type: 'nudged'; dir: 1 | -1; cost: number }
+  | { type: 'blueprint'; tier: number; favor: number }
   | { type: 'crowned'; site: SiteId; patron: PatronId | null; daily: boolean };
 
 export interface GameState {
@@ -309,6 +342,13 @@ export interface GameState {
   village: BuildingId[];
   startW: number;
   gift: BlessingId | null;
+  /** Whether the stone in hand is a capstone, and whether this tier's capstone set (tripling its balance bonus). */
+  capstone: boolean;
+  capped: boolean;
+  /** Whether the falling stone has been nudged. */
+  nudged: boolean;
+  /** Tiers built to the blueprint this run. */
+  blueprints: number;
   /** Where the run's chances come from: `kindRand` draws only the stone kinds, so the daily's stones come in the same order whatever else happens; `rand` everything else. */
   rand: Rand;
   kindRand: Rand;
@@ -407,6 +447,10 @@ export function newGame(opts: NewGame = {}): GameState {
     village,
     startW,
     gift: null,
+    capstone: false,
+    capped: false,
+    nudged: false,
+    blueprints: 0,
     rand,
     kindRand: seededBy?.kindRand ?? (() => Math.random()),
     events: [],
@@ -480,6 +524,8 @@ function spawn(s: GameState) {
   s.moving = { x: TOWER_X - dir * SWING, w, h: stackHeight(s) + DROP_GAP, dir, vy: 0, kind: s.nextKind, material: s.material };
   s.nextKind = kindFor(s, s.stones.length + 1);
   s.wind = cliffWind(s) + gustFor(s);
+  s.capstone = false;
+  s.nudged = false;
 }
 
 /** Whether a wind can blow on the tier being built: a gusty one, or on the cliff from `CLIFF_FROM_TIER`. */
@@ -564,6 +610,40 @@ export function swapReserve(s: GameState) {
   return true;
 }
 
+/** Whether the stone in hand can be made a capstone (or back): the third stone of a tier, from `CAPSTONE_FROM_TIER`, not in a race. */
+export const canCapstone = (s: GameState) =>
+  !s.race && s.phase === 'swinging' && s.tier >= CAPSTONE_FROM_TIER && s.inTier === STONES_PER_TIER - 1;
+
+/** Makes the stone in hand a capstone, or an ordinary stone again. */
+export function toggleCapstone(s: GameState) {
+  if (!canCapstone(s)) return false;
+  s.capstone = !s.capstone;
+  return true;
+}
+
+/** How close a capstone must land to set: `CAPSTONE_PX`, or the perfect window when that is wider. */
+export const capstoneWindow = (s: GameState) => Math.max(CAPSTONE_PX, perfectWindow(s));
+
+/** Whether the falling stone can be nudged: once, from `NUDGE_FROM_TIER`, with the favour for it, not in a race. */
+export const canNudge = (s: GameState) =>
+  !s.race && s.phase === 'falling' && s.tier >= NUDGE_FROM_TIER && !s.nudged && s.favor >= NUDGE_COST;
+
+/** Pushes the falling stone `NUDGE_PX` to the left (-1) or right (1), for `NUDGE_COST` favour. */
+export function nudge(s: GameState, dir: 1 | -1) {
+  if (!canNudge(s)) return false;
+  s.favor -= NUDGE_COST;
+  s.moving.x += dir * NUDGE_PX;
+  s.nudged = true;
+  s.events.push({ type: 'nudged', dir, cost: NUDGE_COST });
+  return true;
+}
+
+/** The blueprint's width for `tier` where the temple stands, or null where it has none (tier 1, past the crown, a race). */
+export function blueprintFor(s: Pick<GameState, 'site' | 'race'>, tier: number) {
+  if (s.race || tier < BLUEPRINT_FROM_TIER) return null;
+  return BLUEPRINTS[s.site][tier - 1] ?? null;
+}
+
 /** Moves the swinging or falling stone on by `dt` milliseconds. */
 export function tick(s: GameState, dt: number) {
   const m = s.moving;
@@ -607,11 +687,16 @@ function land(s: GameState) {
   let kept: number;
   // Only a drop that would also overlap enough to stand counts as perfect, so a wide window
   // can't save a narrow stone that misses.
-  const perfect = Math.abs(m.x - top.x) <= Math.min(perfectWindow(s), (top.w + m.w) / 2 - MIN_W);
+  const reach = Math.min(perfectWindow(s), (top.w + m.w) / 2 - MIN_W);
+  // A capstone sets within its own, wider window and snaps on like a perfect drop; it is perfect only within the usual one.
+  const capstone = s.capstone;
+  const set = capstone && Math.abs(m.x - top.x) <= Math.min(capstoneWindow(s), (top.w + m.w) / 2 - MIN_W);
+  const perfect = Math.abs(m.x - top.x) <= reach;
+  s.capstone = false;
   const cut: { x: number; w: number }[] = [];
   // In the rain a stone that isn't perfect slides a little further off as it lands.
   const mx = !perfect && s.weather === 'rain' ? m.x + Math.sign(m.x - top.x) * RAIN_SLIDE : m.x;
-  if (perfect) {
+  if (perfect || set) {
     x = top.x;
     kept = Math.min(m.w, top.w);
   } else {
@@ -655,12 +740,18 @@ function land(s: GameState) {
   const share = kept / m.w;
   const d: Drop = { x, w: m.w, kept, share, perfect, missed: false, caught: false };
   s.lastDrop = d;
-  const stone: Stone = { x: x - bob, w: kept, tier: s.tier, perfect, kind: m.kind, material: m.material };
+  const stone: Stone = { x: x - bob, w: kept, tier: s.tier, perfect, kind: m.kind, material: m.material, capstone: set };
   s.stones.push(stone);
-  const favor = stoneFavor(s, perfect, m.kind);
+  const favor = stoneFavor(s, perfect, m.kind) * (set ? CAPSTONE_MULT : 1);
   s.favor += favor;
   s.tierFavor += favor;
   if (share < BALANCE) s.wobbly = true;
+  // A capstone that sets triples the tier's balance bonus too; one that cracks costs the tier its balance.
+  if (capstone) {
+    if (set) s.capped = true;
+    else s.wobbly = true;
+    s.events.push({ type: 'capstone', set, favor: set ? favor : 0 });
+  }
   s.inTier++;
   s.chain = perfect ? s.chain + 1 : 0;
   // A copy, as the rules may still widen the stone or topple it before the scene draws the event.
@@ -702,7 +793,15 @@ function land(s: GameState) {
       s.balancedTiers++;
       // The Gilded Hand's rank adds to every balanced tier.
       const ranked = s.patron === 'gilded' ? GILDED_RANK_FAVOR * s.rank : 0;
-      s.favor += Math.ceil((TIER_FAVOR + ranked) * favorMult(s, done));
+      s.favor += Math.ceil((TIER_FAVOR + ranked) * favorMult(s, done) * (s.capped ? CAPSTONE_MULT : 1));
+    }
+    // A tier built to the site's blueprint (its top stone within `BLUEPRINT_TOL` of the width) pays extra.
+    const plan = s.endless ? null : blueprintFor(s, done);
+    if (plan !== null && Math.abs(s.stones.at(-1)!.w - plan) <= BLUEPRINT_TOL) {
+      const bonus = Math.ceil(BLUEPRINT_FAVOR * favorMult(s, done));
+      s.favor += bonus;
+      s.blueprints++;
+      s.events.push({ type: 'blueprint', tier: done, favor: bonus });
     }
     s.tiersBuilt++;
     s.best = Math.max(s.best, s.tiersBuilt);
@@ -712,6 +811,7 @@ function land(s: GameState) {
     s.wobbly = false;
     s.curse = null;
     s.swapped = false;
+    s.capped = false;
     s.material = 'limestone';
     // A finished tier settles: the temple keeps half its lean.
     s.lean = Math.trunc(s.lean * LEAN_SETTLE);
@@ -760,6 +860,7 @@ function topple(s: GameState) {
   s.wobbly = false;
   s.lean = 0;
   s.chain = 0;
+  s.capped = false;
   if (s.trial) s.trial = { id: s.trial.id, done: 0, failed: false };
 }
 

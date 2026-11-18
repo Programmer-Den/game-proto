@@ -102,6 +102,24 @@ import {
   WAREHOUSE_COST,
   WARES_CHANCE,
   WARES_PAY,
+  CONTRACT_CHANCE,
+  CONTRACT_PAY,
+  CONTRACT_ROUND,
+  FAST_COST,
+  FAST_ROUND,
+  FAST_SPEED,
+  HOPPER_LOADS,
+  LETTER_CHANCE,
+  LETTER_PAY,
+  LETTER_TIME,
+  MAIL_BONUS,
+  SPOILED_PAY,
+  SPOIL_MS,
+  WAGON_CARGO,
+  WAGON_KINDS,
+  WAGON_ROUND,
+  WAGON_TEXT,
+  contractNeed,
   isPassengers,
   roundGoal,
   type Charter,
@@ -113,6 +131,7 @@ import {
   type Trait,
   type Rival,
   type Upgrade,
+  type WagonKind,
   type Wyrm,
 } from './state';
 
@@ -180,6 +199,11 @@ export function newGame(boon: Medal | null = null, journey: Partial<Journey> = {
     warehouses: [],
     lamps: [],
     grewTown: null,
+    hitch: null,
+    hitchOffer: false,
+    fast: [],
+    contract: null,
+    contractPaid: 0,
     rival: null,
     boon,
     festivalMs: 0,
@@ -225,11 +249,66 @@ export const UPGRADE_NAMES = { wings: 'wingsName', hoard: 'hoardName', second: '
 /** Whether the wyrms have a trait from a moult. */
 export const hasTrait = (s: GameState, t: Trait) => s.traits.includes(t);
 
-/** How many orders a wyrm carries at once: one a wagon, and a third wagon from a moult. */
-export const wagons = (s: GameState) => WAGONS + (hasTrait(s, 'wagon') ? 1 : 0);
+/**
+ * The wagons each wyrm pulls, front first: two plain ones, or from `WAGON_ROUND` the two kinds
+ * hitched this round (WR21), and a plain third wagon from a moult.
+ */
+export const wagonList = (s: GameState): (WagonKind | 'plain')[] => [...(s.hitch ?? Array<'plain'>(WAGONS).fill('plain')), ...(hasTrait(s, 'wagon') ? ['plain' as const] : [])];
 
-/** The game waits for a pick: a moult's traits or the round's charters are on offer. */
-export const choosing = (s: GameState) => !!(s.charterOffer || s.moultOffer);
+/** How many wagons a wyrm pulls. */
+export const wagons = (s: GameState) => wagonList(s).length;
+
+/**
+ * The wagon an order would ride in on wyrm `i`, or null if none is free. Passengers fill every
+ * wagon, so they board an empty wyrm only and nothing boards with them. The big hopper takes two
+ * grain orders. Goods go to the wagon built for them when it is free, else to any free wagon.
+ */
+export function pickWagon(s: GameState, i: number, o: Order): WagonKind | 'plain' | null {
+  const aboard = s.orders.filter((x) => x.wyrm === i && x.status === 'carrying' && x.wagon !== null);
+  if (aboard.some(isPassengers)) return null;
+  if (isPassengers(o)) return aboard.length ? null : 'plain';
+  const list = wagonList(s);
+  const free = (k: WagonKind | 'plain') => {
+    const n = list.filter((w) => w === k).length;
+    const inside = aboard.filter((x) => x.wagon === k);
+    if (k === 'hopper' && n) return !inside.length || (o.cargo === 'grain' && inside.length < HOPPER_LOADS && inside.every((x) => x.cargo === 'grain'));
+    return inside.length < n;
+  };
+  const own = WAGON_KINDS.find((k) => WAGON_CARGO[k] === o.cargo && list.includes(k));
+  if (own && free(own)) return own;
+  return (['plain', ...WAGON_KINDS] as const).find((k) => k !== own && free(k)) ?? null;
+}
+
+/** An order goes aboard wyrm `i`, into its wagon. */
+function board(s: GameState, i: number, o: Order) {
+  o.wagon = pickWagon(s, i, o) ?? 'plain';
+  o.aboardMs = 0;
+  o.status = 'carrying';
+}
+
+/** Hitches two of the three wagon kinds for the round (WR21); cargo aboard moves to the new wagons. */
+export function pickHitch(s: GameState, a: number, b: number) {
+  const kinds = [WAGON_KINDS[a], WAGON_KINDS[b]];
+  if (s.phase !== 'play' || !s.hitchOffer || s.moultOffer || a === b || !kinds[0] || !kinds[1]) return false;
+  s.hitch = kinds;
+  s.hitchOffer = false;
+  s.wyrms.forEach((_, i) => {
+    const aboard = s.orders.filter((o) => o.wyrm === i && o.status === 'carrying' && !isPassengers(o));
+    for (const o of aboard) o.wagon = null;
+    for (const o of aboard) o.wagon = pickWagon(s, i, o) ?? 'plain';
+  });
+  const hitched = tr('hitchBanner', { a: tr(WAGON_TEXT[kinds[0]].name), b: tr(WAGON_TEXT[kinds[1]].name) });
+  if (s.charterOffer) s.banner = { text: hitched, ms: BANNER_MS };
+  else {
+    const news = roundNews(s);
+    clearNews(s);
+    s.banner = { text: [hitched, ...news].join('\n'), ms: BANNER_MS * (news.length ? 1.5 : 1) };
+  }
+  return true;
+}
+
+/** The game waits for a pick: a moult's traits, the round's wagons or its charters are on offer. */
+export const choosing = (s: GameState) => !!(s.charterOffer || s.moultOffer || s.hitchOffer);
 
 /** A station: the Roost or a village that has joined the line. */
 function isStation(s: GameState, t: Tile) {
@@ -256,9 +335,38 @@ export function trackCost(s: GameState, t: Tile): number | null {
   return Math.max(1, Math.round(terrainCost(s.valley.kind, terrain) * (s.charter?.track ?? 1) * buyout));
 }
 
-export function canBuild(s: GameState, t: Tile) {
-  const cost = trackCost(s, t);
+/** What fast track (WR22) on `t` would cost: `FAST_COST` times the price for new track, the difference over plain track already there; null if none can go there. */
+export function fastCost(s: GameState, t: Tile): number | null {
+  if (s.round < FAST_ROUND || s.fast.includes(key(t))) return null;
+  if (!s.track.includes(key(t))) {
+    const cost = trackCost(s, t);
+    return cost === null ? null : cost * FAST_COST;
+  }
+  if (s.hazard && sameTile(s.hazard.tile, t)) return null;
+  return Math.max(1, Math.round(terrainCost(s.valley.kind, terrainAt(s.valley, t)) * (s.charter?.track ?? 1) * (FAST_COST - 1)));
+}
+
+/** Whether track (fast track with `fast`) can be laid on `t` now. */
+export function canBuild(s: GameState, t: Tile, fast = false) {
+  const cost = fast ? (s.track.includes(key(t)) ? null : fastCost(s, t)) : trackCost(s, t);
   return s.phase === 'play' && !choosing(s) && cost !== null && cost <= s.coins;
+}
+
+/** Whether the plain track on `t` can be made fast now. */
+export function canUpgradeFast(s: GameState, t: Tile) {
+  const cost = s.track.includes(key(t)) ? fastCost(s, t) : null;
+  return s.phase === 'play' && !choosing(s) && cost !== null && cost <= s.coins;
+}
+
+/** Makes the track on `t` fast (WR22), for the difference in price; taking it up refunds half of all it cost. */
+export function upgradeFast(s: GameState, t: Tile) {
+  if (!canUpgradeFast(s, t)) return false;
+  const cost = fastCost(s, t)!;
+  s.coins -= cost;
+  s.fast.push(key(t));
+  s.paid[key(t)] = (s.paid[key(t)] ?? 0) + cost;
+  pop(s, `-${cost}`, t, '#f0c070');
+  return true;
 }
 
 /**
@@ -267,9 +375,10 @@ export function canBuild(s: GameState, t: Tile) {
  * and the tile straight across from that; with track on all four sides it is a crossing, two
  * straights that don't join.
  */
-export function buildTrack(s: GameState, t: Tile, plain = false, from: Tile | null = null) {
-  if (!canBuild(s, t)) return false;
-  const cost = trackCost(s, t)!;
+export function buildTrack(s: GameState, t: Tile, plain = false, from: Tile | null = null, fast = false) {
+  if (!canBuild(s, t, fast)) return false;
+  const cost = fast ? fastCost(s, t)! : trackCost(s, t)!;
+  if (fast) s.fast.push(key(t));
   s.coins -= cost;
   if (plain) {
     const line = neighbours(t).filter((n) => onLine(s, n));
@@ -308,6 +417,7 @@ export function removeTrack(s: GameState, t: Tile) {
   if (!canRemove(s, t)) return false;
   s.track = s.track.filter((k) => k !== key(t));
   s.lamps = s.lamps.filter((k) => k !== key(t));
+  s.fast = s.fast.filter((k) => k !== key(t));
   syncSwitches(s);
   // Half of what the tile cost when it was laid (a charter may have changed the price since).
   const refund = Math.floor(s.paid[key(t)] / 2);
@@ -448,11 +558,18 @@ export function buyUpgrade(s: GameState, u: Upgrade) {
   return true;
 }
 
-/** A wyrm's speed in tiles a second: Swift wings make it faster, an empty belly or unlit track at night slower. */
+/** A wyrm's speed in tiles a second: Swift wings and fast track make it faster, an empty belly or unlit track at night slower. */
 export const wyrmSpeed = (s: GameState, w: Wyrm) =>
   (BASE_SPEED + WINGS_SPEED * s.upgrades.wings + (hasTrait(s, 'swift') ? TRAIT_SPEED : 0)) *
   (w.food <= 0 ? STARVING_SLOWDOWN : 1) *
-  (isNight(s) && w.path.length && !isLit(s, w.path[0]) ? DARK_SLOWDOWN : 1);
+  (isNight(s) && w.path.length && !isLit(s, w.path[0]) ? DARK_SLOWDOWN : 1) *
+  (w.path.length && onFast(s, w.at, w.path[0]) ? FAST_SPEED : 1);
+
+/** Whether a step from `a` to `b` runs on fast track: both ends fast or a station, and at least one of them fast. */
+function onFast(s: GameState, a: Tile, b: Tile) {
+  const fast = (t: Tile) => s.fast.includes(key(t));
+  return (fast(a) || fast(b)) && (fast(a) || isStation(s, a)) && (fast(b) || isStation(s, b));
+}
 
 /** What each tile costs a wyrm's belly: more in the snowy valley's cold, less once it has moulted Frugal. */
 const foodPerTile = (s: GameState) => FOOD_PER_TILE * (s.valley.kind === 'snow' ? COLD_HUNGER : 1) * (hasTrait(s, 'frugal') ? FRUGAL_HUNGER : 1);
@@ -494,8 +611,19 @@ export function buyWarehouse(s: GameState, v: number) {
   return true;
 }
 
-/** What delivering an order pays, with the Golden hoard. */
-export const orderPay = (s: GameState, o: Order) => Math.round(o.pay * (1 + HOARD_BONUS * s.upgrades.hoard));
+/** What delivering an order pays, with the Golden hoard and what its wagon does to it. */
+export const orderPay = (s: GameState, o: Order) => Math.round(o.pay * (1 + HOARD_BONUS * s.upgrades.hoard) * wagonPay(s, o));
+
+/**
+ * What an order's wagon does to its pay (WR21), times the usual: fish aboard anything but the cold
+ * wagon spoils from `WAGON_ROUND`, and letters in the mail coach pay more the sooner they arrive.
+ */
+export function wagonPay(s: GameState, o: Order) {
+  if (o.status !== 'carrying') return 1;
+  if (o.cargo === 'fish' && s.round >= WAGON_ROUND && o.wagon !== 'cold') return 1 - (1 - SPOILED_PAY) * Math.min(1, o.aboardMs / SPOIL_MS);
+  if (o.cargo === 'letters' && o.wagon === 'mail') return 1 + (MAIL_BONUS * Math.max(0, o.timeLeftMs)) / o.totalMs;
+  return 1;
+}
 
 /** The order a job is for, if any. */
 export const jobOrder = (job: Job | null) => (job && 'order' in job ? job.order : null);
@@ -511,11 +639,11 @@ function jobTarget(s: GameState, job: Job): Tile | null {
 /** Picks one of the two charters on offer for the round; the game goes on. */
 export function pickCharter(s: GameState, i: number) {
   const charter = s.charterOffer?.[i];
-  if (s.phase !== 'play' || s.moultOffer || !charter) return false;
+  if (s.phase !== 'play' || s.moultOffer || s.hitchOffer || !charter) return false;
   s.charter = charter;
   s.charterOffer = null;
   const news = roundNews(s);
-  s.grewTown = null;
+  clearNews(s);
   s.banner = { text: [tr('charterBanner', { name: tr(charter.name) }), ...news].join('\n'), ms: BANNER_MS * (news.length ? 1.5 : 1) };
   return true;
 }
@@ -533,11 +661,19 @@ export function pickMoult(s: GameState, i: number) {
 /** What is new this round, for its banner (again under the charter's, since the charter cards hide the first): a new town, the rival, lamps and night. */
 function roundNews(s: GameState) {
   const news: string[] = [];
+  if (s.contractPaid) news.push(tr('contractPaid', { n: s.contractPaid }));
   if (s.grewTown !== null) news.push(tr('townBanner', { village: villages(s)[s.grewTown].name }));
+  if (s.contract) news.push(tr('contractBanner', { village: villages(s)[s.contract.village].name, n: s.contract.need, pay: s.contract.pay }));
   if (s.round === RIVAL_ROUND && s.rival) news.push(tr('rivalBanner'));
   if (s.round === LAMP_ROUND) news.push(tr('lampsBanner'));
   if (isNight(s)) news.push(tr('nightBanner'));
   return news;
+}
+
+/** The one-off news of a round's start (a new town, a contract paid) is shown once the round's picks are made. */
+function clearNews(s: GameState) {
+  s.grewTown = null;
+  s.contractPaid = 0;
 }
 
 /** What the next depot costs: each one costs more than the last. */
@@ -619,6 +755,7 @@ export function tick(s: GameState, dt: number) {
     randomOrder(s);
   }
   if (s.round === FESTIVAL_ROUND) s.festivalMs += dt;
+  for (const o of s.orders) if (o.status === 'carrying') o.aboardMs += dt;
   for (const o of [...s.orders]) {
     // Goods waiting at a depot keep longer.
     const wait = o.status !== 'carrying' && s.depots.includes(o.from) ? DEPOT_WAIT : 1;
@@ -715,6 +852,7 @@ function strikeHazard(s: GameState) {
   s.hazard = null;
   s.track = s.track.filter((k) => k !== key(h.tile));
   s.lamps = s.lamps.filter((k) => k !== key(h.tile));
+  s.fast = s.fast.filter((k) => k !== key(h.tile));
   delete s.paid[key(h.tile)];
   syncSwitches(s);
   pop(s, tr(HAZARD_TEXT[h.kind].pop), h.tile, '#f08a6a');
@@ -763,7 +901,7 @@ function moveWyrm(s: GameState, i: number, dt: number) {
     if ((w.loadMs -= dt) > 0) return;
     w.loadMs = 0;
     const o = s.orders.find((o) => o.id === jobOrder(w.job));
-    if (o) o.status = 'carrying';
+    if (o) board(s, i, o);
     w.job = null;
   }
   if (w.eatMs > 0) {
@@ -842,12 +980,10 @@ function nextStop(s: GameState, i: number) {
   }
   const carrying = s.orders.filter((o) => o.status === 'carrying' && o.wyrm === i);
   const stops: { order: Order; leg: 'pickup' | 'drop' }[] = carrying.map((order) => ({ order, leg: 'drop' }));
-  // Passengers take both wagons: a wyrm fetches them only when empty, and loads nothing else with them.
-  if (carrying.length < wagons(s) && !carrying.some(isPassengers)) {
-    for (const id of s.queue) {
-      const order = s.orders.find((o) => o.id === id);
-      if (order && !(isPassengers(order) && carrying.length)) stops.push({ order, leg: 'pickup' });
-    }
+  // Only orders with a free wagon are fetched: passengers take every wagon, the hopper two grain orders (`pickWagon`).
+  for (const id of s.queue) {
+    const order = s.orders.find((o) => o.id === id);
+    if (order && pickWagon(s, i, order)) stops.push({ order, leg: 'pickup' });
   }
   let best: { order: Order; leg: 'pickup' | 'drop'; path: Tile[] } | null = null;
   for (const stop of stops) {
@@ -886,7 +1022,7 @@ function arrive(s: GameState, i: number) {
     s.idleMs[o.from] = 0;
     // A depot has the goods ready on the platform: they are aboard at once.
     if (s.depots.includes(o.from)) {
-      o.status = 'carrying';
+      board(s, i, o);
       w.job = null;
       return;
     }
@@ -904,6 +1040,8 @@ function arrive(s: GameState, i: number) {
   s.idleMs[o.to] = 0;
   cheer(s, o.to, 1);
   pop(s, `+${pay}`, villages(s)[o.to], '#f3c64e');
+  const c = s.contract;
+  if (c && o.from === c.village && ++c.done === c.need) pop(s, tr('contractFilled'), { c: villages(s)[c.village].c, r: villages(s)[c.village].r - 1 }, '#9be883');
   const town = grow(s, o.to);
   const shop = workshopOf(villages(s)[o.to]);
   if (shop && shop.takes === o.cargo) makeGoods(s, o.to);
@@ -920,7 +1058,7 @@ function arrive(s: GameState, i: number) {
   // A village that grew with the round's last delivery joins the next round's news (under the charter's banner too).
   if (town) s.grewTown = o.to;
   nextRound(s);
-  if (!s.charterOffer) s.grewTown = null;
+  if (!choosing(s)) clearNews(s);
 }
 
 /**
@@ -946,6 +1084,14 @@ function makeGoods(s: GameState, at: number) {
 }
 
 function nextRound(s: GameState) {
+  // A filled contract pays its lump at the round's end (WR23).
+  const c = s.contract;
+  if (c && c.done >= c.need) {
+    s.coins += c.pay;
+    s.contractPaid = c.pay;
+    pop(s, `+${c.pay}`, { c: villages(s)[c.village].c, r: villages(s)[c.village].r - 1 }, '#9be883');
+  }
+  s.contract = null;
   s.round++;
   s.delivered = 0;
   syncSwitches(s);
@@ -959,6 +1105,12 @@ function nextRound(s: GameState) {
     const offer: Trait[] = [];
     while (offer.length < MOULT_OFFER && lacking.length) offer.push(lacking.splice(Math.floor(Math.random() * lacking.length), 1)[0]);
     s.moultOffer = offer;
+  }
+  if (s.round >= WAGON_ROUND) s.hitchOffer = true;
+  if (s.round >= CONTRACT_ROUND && s.round !== FESTIVAL_ROUND) {
+    const open = openIndexes(s);
+    const need = contractNeed(s.round);
+    s.contract = { village: open[Math.floor(Math.random() * open.length)], need, done: 0, pay: need * CONTRACT_PAY };
   }
   if (s.round === RIVAL_ROUND && !s.rival) s.rival = newRival(s);
   if (s.rival && s.round === FESTIVAL_ROUND) s.rival.claim = null;
@@ -1022,17 +1174,17 @@ function failOrder(s: GameState, o: Order) {
  * sending village's mood sets its pay (cheerful or delighted) or its time (sulking); the round's
  * charter and passengers scale both.
  */
-function addOrder(s: GameState, from: number, to: number, made = false, passengers = false, wares = false) {
+function addOrder(s: GameState, from: number, to: number, made = false, passengers = false, wares = false, letters = false) {
   const vs = villages(s);
   const dist = manhattan(vs[from], vs[to]);
-  const cargo: Cargo = passengers ? 'passengers' : wares ? 'wares' : made ? workshopOf(vs[from])!.makes : vs[from].cargo;
+  const cargo: Cargo = passengers ? 'passengers' : letters ? 'letters' : wares ? 'wares' : made ? workshopOf(vs[from])!.makes : vs[from].cargo;
   const mood = moodOf(s, from);
   const charter = s.charter;
-  const time = (mood < 0 ? MOOD_RUSH : 1) * (passengers ? PASSENGER_TIME : 1) * (charter?.time ?? 1);
+  const time = (mood < 0 ? MOOD_RUSH : 1) * (passengers ? PASSENGER_TIME : 1) * (letters ? LETTER_TIME : 1) * (charter?.time ?? 1);
   const totalMs = Math.round((DEADLINE_BASE_MS + DEADLINE_PER_TILE_MS * dist) * byDifficulty(1.5, 1, 0.7) * time);
   const local = cargo === LOCAL_GOODS[s.valley.kind] ? LOCAL_PAY : 1;
   const town = (s.towns.includes(from) ? TOWN_PAY : 1) * (wares ? WARES_PAY : 1);
-  const pay = local * (made ? WORKSHOP_PAY : 1) * MOOD_PAY[Math.max(0, mood)] * (passengers ? PASSENGER_PAY : 1) * charterPay(s, cargo) * town;
+  const pay = local * (made ? WORKSHOP_PAY : 1) * MOOD_PAY[Math.max(0, mood)] * (passengers ? PASSENGER_PAY : 1) * (letters ? LETTER_PAY : 1) * charterPay(s, cargo) * town;
   s.orders.push({
     id: s.nextId++,
     cargo,
@@ -1045,6 +1197,8 @@ function addOrder(s: GameState, from: number, to: number, made = false, passenge
     wyrm: null,
     made,
     mood,
+    wagon: null,
+    aboardMs: 0,
   });
 }
 
@@ -1060,10 +1214,14 @@ function randomOrder(s: GameState) {
   const pick = (list: number[]) => list[Math.floor(Math.random() * list.length)];
   const host = festivalHost(s);
   const passengers = s.round >= PASSENGER_ROUND && Math.random() < PASSENGER_CHANCE;
-  if (s.round === FESTIVAL_ROUND) return addOrder(s, pick(open.filter((i) => i !== host)), host, false, passengers);
-  const from = pick(open);
+  // Letters (WR21) from `WAGON_ROUND`, so the first round draws the numbers it always did.
+  const letters = !passengers && s.round >= WAGON_ROUND && Math.random() < LETTER_CHANCE;
+  if (s.round === FESTIVAL_ROUND) return addOrder(s, pick(open.filter((i) => i !== host)), host, false, passengers, false, letters);
+  // A standing contract's village (WR23) sends more often while its contract is open.
+  const c = s.contract;
+  const from = c && c.done < c.need && Math.random() < CONTRACT_CHANCE ? c.village : pick(open);
   const others = open.filter((i) => i !== from);
-  if (passengers) return addOrder(s, from, pick(others), false, true);
+  if (passengers || letters) return addOrder(s, from, pick(others), false, passengers, false, letters);
   // A town also sends its wares, anywhere on the line.
   if (s.towns.includes(from) && Math.random() < WARES_CHANCE) return addOrder(s, from, pick(others), false, false, true);
   const shops = others.filter((i) => workshopOf(villages(s)[i])?.takes === villages(s)[from].cargo);

@@ -57,7 +57,7 @@ before the moves run out and the potion sells, for coins and one to three stars.
    the Pestle hitting it) scrubs it clean and frees the tile.
 5. **Order twists**, from the third order on, in turn: a **rush order** gives 3 fewer moves and pays
    20 more coins; the next **forbids** one ingredient it doesn't need (on a royal commission, one no stage needs), and a swap that matches it
-   costs an extra move (cascades and tools never do); the one after is plain. The twist is written under the order's price.
+   costs an extra move (cascades and tools never do); the one after is plain. The twist is written under the order's price. Drop orders have none.
 6. **Orders** list the ingredients the potion needs, the moves allowed and what it pays. Filling one
    pays its price plus 5 coins for every move left; running out of moves means trying it again on a
    new board.
@@ -73,17 +73,29 @@ before the moves run out and the potion sells, for coins and one to three stars.
    their recipe, at 60%), of different kinds, so the label has four rows, each marked with its
    potion. The customer whose rows fill first is served there and then and earns 20 coins for speed, paid with the sale;
    the order sells when both are served. These orders have no twist.
-9. **Pantry**: whatever was gathered over what an order (or a stage) needed is kept, up to 5 of a
+9. **Drop orders**: every fifth order from the fourth (4, 9, 14...) is a drop order. Two vials
+   (one more every ten orders, up to four) start on the top row beside the recipe's ingredients.
+   A vial never matches and can't be swapped; it falls like any tile when the tiles under it are
+   cleared (past resin, as other tiles do), and it is delivered once it reaches the bottom row. The
+   label has a row for the vials, and the order sells only when they are all delivered too. Each
+   vial brings 2 more moves and 10 more coins. These orders have no twist.
+10. **Spare cauldron**, from the second order on: every ingredient a match gathers that the order
+   doesn't need goes into the cauldron beside the moves. When it holds 15 it turns a random plain
+   tile into a Catalyst and starts filling again. Hover it to see how full it is.
+11. **Flow**, from the second order on: a swap whose match sets off a cascade lights one of the
+   three dots under the stars; three such moves in a row give one move back. A move with no cascade
+   puts the dots out.
+12. **Pantry**: whatever was gathered over what an order (or a stage) needed is kept, up to 5 of a
    kind, and put towards the next order or stage that needs that ingredient when it starts, short of
    filling any row by one. The caption says what the pantry put in, and the pantry's contents sit at
    the foot of the label. An order that runs out of moves gives back what it drew from the pantry.
-10. **Bench tools** spend coins during an order: **Stir** gives 3 more moves for 40 coins, **Sift**
+13. **Bench tools** spend coins during an order: **Stir** gives 3 more moves for 40 coins, **Sift**
    rerolls one row of the board for 25 coins (its specials, jars, resin and mould stay, and the new tiles
    never make a match by themselves; a row with nothing to reroll costs nothing), **Pestle** smashes one tile for 30 coins (a jar opens, resin
    melts, a Catalyst or Bloom fires) and **Funnel** swaps any two tiles for 35 coins (not jars,
    resin or mould, nor two plain tiles of one kind; two specials go off together, as in a swap), and neither of those spends a move. Hover a tool to read what it does in the caption. A
    tool you can't afford is greyed out.
-11. **Workbench**: after an order, "Workbench" on the result card opens three
+14. **Workbench**: after an order, "Workbench" on the result card opens three
    upgrades that stay bought: **Steady hands** (+1 move on every order, three levels for 60, 100 and
    150 coins), **Potent Catalysts** (a fired Catalyst clears its column as well as its row, 120
    coins) and **Bloom starter** (every order's board starts with a Bloom, 90 coins).
@@ -94,9 +106,9 @@ before the moves run out and the potion sells, for coins and one to three stars.
    or 2 more jars and 2 more resin, and one more mould patch once there is mould (odd orders). The
    caption says which. The pick is kept if the order has to be tried again. The first order is
    never rich.
-12. **Stars**: a sold order earns 3 stars with 8 or more moves left, 2 with 4 to 7 and 1 otherwise.
+15. **Stars**: a sold order earns 3 stars with 8 or more moves left, 2 with 4 to 7 and 1 otherwise.
    The stars next to the moves show what the order is worth right now.
-13. **Tinker rank**: the stars add up on the ribbon above the board. Each rank unlocks a new recipe,
+16. **Tinker rank**: the stars add up on the ribbon above the board. Each rank unlocks a new recipe,
    which joins the round of orders:
 
    | Rank | Stars | Unlocks |
@@ -106,13 +118,13 @@ before the moves run out and the potion sells, for coins and one to three stars.
    | Master Tinker | 12 | Starlight Elixir |
    | Grand Master Tinker | 24 | Philosopher's Draught |
 
-14. **Guild examinations**: once Royal Apothecary, the result card offers the next of eight guild
+17. **Guild examinations**: once Royal Apothecary, the result card offers the next of eight guild
    examinations: a fixed board (the same every time it is tried, though the tiles that drop in
    later vary) that must be sold with 2 or 3 stars, as its label says. A pass pays its coins and
    moves bonus and adds a wax seal to the ribbon; selling it short of the stars, or running out of
    moves, pays nothing, and it can be tried again or left for the orders. Examinations leave the
    orders, the stars and the pantry as they were.
-15. **Journey map**: from the first sale on, the result card links to a map of eight towns along a
+18. **Journey map**: from the first sale on, the result card links to a map of eight towns along a
    road. Each town sends one order on a board of its own shape: dark green walls stand where no tile
    goes, nothing matches through them and tiles fall past them. Its board starts the same on every
    try, with the town's own jars, resin and mould. A town is sold for one to three stars, the best
@@ -123,7 +135,7 @@ before the moves run out and the potion sells, for coins and one to three stars.
    larkspur, glowcaps and brambleberries): it drops in on the town's boards beside the five
    everyday ones, and the town's order and its guest ask for it. Rare ingredients never go into the
    pantry.
-16. **Town guests**: a town's first star brings a demanding guest, shown as a medallion on the
+19. **Town guests**: a town's first star brings a demanding guest, shown as a medallion on the
    town's corner of the map. A guest's order is played on the town's board, asks for its rare
    ingredient and one everyday one, and comes with a rule: **the witch** turns a tile into a toad
    after every move (a toad never matches or moves, and a match next to it turns it back; at most
@@ -133,24 +145,24 @@ before the moves run out and the potion sells, for coins and one to three stars.
    served), and every star given for the first time pays 30 coins. The knight's stars follow the
    usual moves left (three at 8, two at 4), so Hard leaves his ten moves alone to keep the third star
    in reach.
-16. **Daily order**: the journey map's Daily order is the same for every player on the same day: a
+20. **Daily order**: the journey map's Daily order is the same for every player on the same day: a
    recipe, a town's board shape and a few blockers, the board and every tile that drops in drawn
    from the day's seed. There is one try a day (starting it uses it up), and the map and the result
    card show the day's stars, the best and how many days in a row were played.
-18. **Weekly order**: the journey map's Weekly order keeps one board for the whole week (from
+21. **Weekly order**: the journey map's Weekly order keeps one board for the whole week (from
    Monday), the same for every player: a recipe, a town's board shape, a few jars and resin, and
    every tile that drops in drawn from the week's seed. It never sells: its 20 moves are played out
    and it scores every ingredient of its recipe gathered, each cascade step counting once more than
    the one before (the swap's own match once, the first cascade twice...). 50, 100 and 150 points
    earn one, two and three stars. Bench tools can't be used on it. Play it as often as you like:
    the week's best score and number of tries are kept.
-19. **Endless orders**: once every guild examination is passed, the journey map starts an endless
+22. **Endless orders**: once every guild examination is passed, the journey map starts an endless
    run: one order after another, each asking for 2 more of every ingredient, with a move fewer
    every second order and more blockers. Each sale pays and offers the next order; running out of
    moves ends the run. The longest run is kept as the best streak.
-20. **Hints**: after a few idle seconds, two tiles that would match swell and settle (with the hub's
+23. **Hints**: after a few idle seconds, two tiles that would match swell and settle (with the hub's
    reduced motion on, they hold still, a little larger).
-21. If the board is left with no move to make, its tiles are shuffled.
+24. If the board is left with no move to make, its tiles are shuffled.
 
 Progress (the next order, coins, potions sold, stars, the pantry, the workbench upgrades, the
 royal title, the guild seals, a rich pick, each town's and each guest's stars and the best endless
@@ -260,6 +272,18 @@ moves:
 
 ![The weekly order](docs/screenshots/weekly-order.webp)
 
+A drop order: two vials on their way down to the bottom row, with their own row on the label:
+
+![A drop order](docs/screenshots/drop-order.webp)
+
+The spare cauldron, full, turns a tile into a Catalyst (its caption shows on hover):
+
+![The spare cauldron](docs/screenshots/spare-cauldron.webp)
+
+Flow: a third cascade in a row gives a move back, and all three dots under the stars light up:
+
+![Flow](docs/screenshots/flow.webp)
+
 ### Towns
 
 | Town | Board | Potion | Needs | Moves | Jars, resin, mould |
@@ -306,8 +330,8 @@ Recipes unlocked by rank join the round after the first five. The second order h
 and from the third on there are 4 resin tiles too; both grow by one every three orders (up to 8
 jars and 10 resin). From the fifth on there are 2 patches of mould, one more every five orders (up
 to 5). Every fifth order is a royal commission of the next three recipes at half strength, and from
-Journeyman on every fifth order after the second serves two customers. The first order is always
-plain.
+Journeyman on every fifth order after the second serves two customers. Every fifth order from the
+fourth is a drop order with vials to bring down. The first order is always plain.
 
 | Order | Needs | Moves | Pays |
 | --- | --- | --- | --- |

@@ -10,7 +10,28 @@ import { HEROES, heroUnlocked, loadHeroWins, saveHeroWins, type HeroId } from '.
 import { LIBRARY_SWAPS, addToLibrary, loadLibrary } from './library';
 import { ACTS, ACT_FOES, COLUMNS, SPIRE_DEPTH, makeMap, reachable } from './map';
 import { keyedRand, random, setRandom, withRandom } from './rng';
-import { BONE_CHARM_VULNERABLE, EMBER_LANTERN_ENERGY, GOLDEN_IDOL_GOLD, MENDING_MOSS_HEAL, OAK_WARD_BLOCK, RELICS, RELIC_IDS, VENOM_GLAND_POISON, WHETSTONE_DAMAGE, relicText, type RelicId } from './relics';
+import {
+  BLOOD_CHALICE_HP,
+  BONE_CHARM_VULNERABLE,
+  BOSS_RELIC_CHOICES,
+  BOSS_RELIC_IDS,
+  EMBER_CROWN_ENERGY,
+  EMBER_LANTERN_ENERGY,
+  GOLDEN_IDOL_GOLD,
+  MENDING_MOSS_HEAL,
+  OAK_WARD_BLOCK,
+  RELICS,
+  RELIC_IDS,
+  SEER_EYE_DRAW,
+  SEER_EYE_PRICE,
+  TWIN_BLADE_WEAK,
+  VENOM_GLAND_POISON,
+  WAR_MASK_FOE_STRENGTH,
+  WAR_MASK_STRENGTH,
+  WHETSTONE_DAMAGE,
+  relicText,
+  type RelicId,
+} from './relics';
 import {
   CARD_PRICE,
   CLEARED_MS,
@@ -85,6 +106,10 @@ export function newRun(): GameState {
     rewardRare: false,
     goldWon: 0,
     flaskWon: null,
+    vaultKey: false,
+    keyWon: false,
+    bossRelics: null,
+    bossPick: null,
     shop: null,
     notice: '',
     timerMs: 0,
@@ -321,6 +346,11 @@ export const actName = (s: GameState) => t(ACT_FOES[s.act - 1].name);
 /** Sets off towards a room next to the hero's; false if it isn't one. */
 export function walkTo(s: GameState, room: number) {
   if (s.phase !== 'map' || !reachable(s.rooms, s.at).includes(room)) return false;
+  // A vault stays shut without the key an elite of this act drops.
+  if (s.rooms[room].kind === 'vault' && !s.vaultKey) {
+    s.notice = t('vaultLocked');
+    return false;
+  }
   s.walk = { from: s.at, to: room, ms: 0 };
   s.notice = '';
   s.phase = 'walk';
@@ -341,6 +371,12 @@ function enterRoom(s: GameState, i: number) {
     s.phase = 'shop';
   } else if (room.kind === 'event') {
     s.phase = 'event';
+  } else if (room.kind === 'vault') {
+    // The key turns: a relic, then a rare card.
+    s.vaultKey = false;
+    const relic = grantRelic(s);
+    s.notice = relic ? t('foundRelic', { name: t(RELICS[relic].name), text: relicText(relic) }) : t('foundGold', { n: RELIC_GOLD });
+    offerReward(s, true);
   } else {
     startFight(s, room.foes ?? []);
   }
@@ -360,17 +396,19 @@ function startFight(s: GameState, foes: EnemyKind[]) {
       const hp = Math.round(ENEMIES[kind].hp * (seedKey(s) ? 1 : byDifficulty(0.75, 1, 1.3)) * depthFoeHp(s.depth));
       const status = noStatus();
       if (hasRelic(s, 'boneCharm')) status.vulnerable = BONE_CHARM_VULNERABLE;
-      return { id: s.nextId++, kind, hp, maxHp: hp, block: 0, strength: 0, status, step: 0, intent: ENEMIES[kind].moves[0], hitMs: 0, actMs: 0 };
+      const strength = hasRelic(s, 'warMask') ? WAR_MASK_FOE_STRENGTH : 0;
+      return { id: s.nextId++, kind, hp, maxHp: hp, block: 0, strength, status, step: 0, intent: ENEMIES[kind].moves[0], hitMs: 0, actMs: 0 };
     }),
     acted: 0,
-    status: noStatus(),
-    strength: 0,
+    status: { ...noStatus(), weak: hasRelic(s, 'twinBlade') ? TWIN_BLADE_WEAK : 0 },
+    strength: hasRelic(s, 'warMask') ? WAR_MASK_STRENGTH : 0,
     powers: [],
     played: 0,
     drawn: 0,
     brewed: 0,
     wasVulnerable: false,
     gold: foes.reduce((sum, kind) => sum + ENEMIES[kind].gold, 0),
+    exhausted: [],
   };
   startTurn(s);
 }
@@ -380,7 +418,7 @@ function startTurn(s: GameState) {
   f.block = hasRelic(s, 'oakWard') ? OAK_WARD_BLOCK : 0;
   f.turn++;
   f.played = 0;
-  f.energy = ENERGY + (f.turn === 1 && hasRelic(s, 'emberLantern') ? EMBER_LANTERN_ENERGY : 0);
+  f.energy = turnEnergy(s) + (f.turn === 1 && hasRelic(s, 'emberLantern') ? EMBER_LANTERN_ENERGY : 0);
   s.phase = 'player';
   // The powers in play do their turn's work before the hand is drawn.
   for (const id of f.powers) {
@@ -393,8 +431,11 @@ function startTurn(s: GameState) {
       for (const e of f.enemies) applyStatus(s, e.status, e.id, 'weak', HEX_WEAK);
     }
   }
-  drawCards(s, HAND_SIZE);
+  drawCards(s, HAND_SIZE + (hasRelic(s, 'seerEye') ? SEER_EYE_DRAW : 0));
 }
+
+/** The energy each turn starts with: more with the Ember Crown. */
+export const turnEnergy = (s: GameState) => ENERGY + (hasRelic(s, 'emberCrown') ? EMBER_CROWN_ENERGY : 0);
 
 /** How many copies of this power are in play; each copy adds its effect again. */
 const powerCount = (s: GameState, power: NonNullable<ReturnType<typeof card>['power']>) => s.fight?.powers.filter((id) => card(id).power === power).length ?? 0;
@@ -482,7 +523,9 @@ export function playCard(s: GameState, index: number) {
   }
   const targets = c.all ? [...f.enemies] : f.enemies.slice(0, 1);
   if (c.damage) {
-    for (let hit = 0; hit < (c.hits ?? 1); hit++) {
+    // The Twin Blade makes every attack hit twice as often.
+    const hits = (c.hits ?? 1) * (hasRelic(s, 'twinBlade') ? 2 : 1);
+    for (let hit = 0; hit < hits; hit++) {
       const now = c.all ? [...f.enemies] : f.enemies.slice(0, 1);
       for (const e of now) damageEnemy(s, e, heroHit(s, c.damage + (c.hexed && hexed(e) ? c.hexed : 0), e));
     }
@@ -501,7 +544,9 @@ export function playCard(s: GameState, index: number) {
     combineTonics(s);
   }
   if (c.draw) drawCards(s, c.draw);
-  f.discard.push(id);
+  // An Exhaust card is gone for the rest of the fight; the deck keeps it for the next.
+  if (c.exhaust) f.exhausted.push(id);
+  else f.discard.push(id);
   if (f.enemies.length === 0) clearFight(s);
   return true;
 }
@@ -576,8 +621,9 @@ function nextIntent(e: Enemy) {
 export function endTurn(s: GameState) {
   if (s.phase !== 'player') return false;
   const f = s.fight!;
-  f.discard.push(...f.hand);
-  f.hand = [];
+  // Retain cards stay in hand for the next turn; the rest go to the discard pile.
+  f.discard.push(...f.hand.filter((id) => !card(id).retain));
+  f.hand = f.hand.filter((id) => card(id).retain);
   for (const e of f.enemies) e.block = 0;
   f.status.weak = Math.max(0, f.status.weak - 1);
   f.wasVulnerable = f.status.vulnerable > 0;
@@ -691,8 +737,11 @@ function winFight(s: GameState) {
   if (hasRelic(s, 'mendingMoss')) heal(s, MENDING_MOSS_HEAL);
   const flask = room.kind === 'elite' || room.kind === 'boss' ? grantFlask(s) : null;
   if (room.kind !== 'boss') {
+    // The first elite felled in an act with a vault leaves its key.
+    const key = room.kind === 'elite' && !s.vaultKey && s.rooms.some((r, i) => r.kind === 'vault' && !s.cleared.includes(i));
     offerReward(s, room.kind === 'elite');
     s.flaskWon = flask;
+    if (key) s.vaultKey = s.keyWon = true;
     return;
   }
   s.cleared.push(s.at!);
@@ -701,16 +750,28 @@ function winFight(s: GameState) {
     endRun(s);
     return;
   }
-  const relic = grantRelic(s);
-  s.notice = relic ? t('boneRelic', { name: t(RELICS[relic].name), text: relicText(relic) }) : t('boneGold', { n: RELIC_GOLD });
-  if (flask) s.notice = t('boneFlask', { notice: s.notice, name: t(FLASKS[flask].name) });
+  // Three boss relics to pick from on the descent panel, each strong and each with a cost.
+  s.bossRelics = offerDraw(s, () => shuffle(BOSS_RELIC_IDS.filter((r) => !hasRelic(s, r))).slice(0, BOSS_RELIC_CHOICES));
+  s.bossPick = null;
+  s.notice = flask ? t('bossFlask', { name: t(FLASKS[flask].name) }) : '';
   s.phase = 'descend';
 }
 
+/** Picks the boss relic at this place on the descent panel, or puts it back when picked already. */
+export function pickBossRelic(s: GameState, i: number) {
+  if (s.phase !== 'descend' || !s.bossRelics?.[i]) return false;
+  s.bossPick = s.bossPick === i ? null : i;
+  return true;
+}
+
+/** How many cards a reward offers: one fewer with the Blood Chalice. */
+export const rewardChoices = (s: GameState) => REWARD_CHOICES - (hasRelic(s, 'bloodChalice') ? 1 : 0);
+
 function offerReward(s: GameState, rare: boolean) {
   s.rewardRare = rare;
-  s.reward = offerDraw(s, () => pickSome(poolFor(s.hero, rare ? 'rare' : 'common'), REWARD_CHOICES));
+  s.reward = offerDraw(s, () => pickSome(poolFor(s.hero, rare ? 'rare' : 'common'), rewardChoices(s)));
   s.flaskWon = null;
+  s.keyWon = false;
   s.phase = 'reward';
 }
 
@@ -725,6 +786,7 @@ export function takeReward(s: GameState, index: number | null) {
   s.reward = null;
   s.goldWon = 0;
   s.flaskWon = null;
+  s.keyWon = false;
   s.cleared.push(s.at!);
   s.phase = 'map';
   return true;
@@ -742,9 +804,25 @@ function grantRelic(s: GameState) {
   return relic;
 }
 
-/** Goes down to the next act: a new map, and a rest's worth of healing on the way. */
+/** Goes down to the next act with the boss relic picked (or a plain relic): a new map, and a rest's worth of healing on the way. */
 export function descend(s: GameState) {
   if (s.phase !== 'descend') return false;
+  const boss = s.bossPick === null ? null : s.bossRelics?.[s.bossPick];
+  let found: string;
+  if (boss) {
+    s.relics.push(boss);
+    if (boss === 'bloodChalice') {
+      s.maxHp += BLOOD_CHALICE_HP;
+      heal(s, BLOOD_CHALICE_HP);
+    }
+    found = t('tookRelic', { name: t(RELICS[boss].name) });
+  } else {
+    const relic = grantRelic(s);
+    found = relic ? t('tookRelic', { name: t(RELICS[relic].name) }) : t('boneGold', { n: RELIC_GOLD });
+  }
+  s.bossRelics = null;
+  s.bossPick = null;
+  s.vaultKey = false;
   s.act++;
   // A seeded run's next map comes from its own key, so it is the same for everyone whatever happened in the act before.
   const key = seedKey(s);
@@ -753,7 +831,7 @@ export function descend(s: GameState) {
   s.at = null;
   s.cleared = [];
   const healed = heal(s, restHeal(s));
-  s.notice = healed ? t('catchBreath', { act: actName(s), n: healed }) : actName(s);
+  s.notice = `${found} ${healed ? t('catchBreath', { act: actName(s), n: healed }) : actName(s)}`;
   s.phase = 'map';
   return true;
 }
@@ -764,7 +842,7 @@ export function descend(s: GameState) {
 export const restShare = (s: GameState) => (s.depth >= 2 ? DEEP_REST_HEAL : REST_HEAL);
 
 /** What resting at the campfire would heal. */
-export const restHeal = (s: GameState) => Math.min(s.maxHp - s.hp, Math.round(s.maxHp * restShare(s)));
+export const restHeal = (s: GameState) => (hasRelic(s, 'emberCrown') ? 0 : Math.min(s.maxHp - s.hp, Math.round(s.maxHp * restShare(s))));
 
 /** Rests at the campfire: heals, then goes back to the map. */
 export function rest(s: GameState) {
@@ -822,7 +900,9 @@ function leaveRoom(s: GameState) {
 // The merchant
 
 function makeShop(s: GameState) {
-  const ware = <T>(id: T, price: number) => ({ id, price, sold: false });
+  // The Seer's Eye doubles every price.
+  const dear = hasRelic(s, 'seerEye') ? SEER_EYE_PRICE : 1;
+  const ware = <T>(id: T, price: number) => ({ id, price: price * dear, sold: false });
   const relics = shuffle(RELIC_IDS.filter((r) => !hasRelic(s, r))).slice(0, SHOP_RELICS);
   return {
     cards: [
@@ -831,7 +911,7 @@ function makeShop(s: GameState) {
     ],
     relics: relics.map((id) => ware(id, RELIC_PRICE)),
     flasks: shuffle(FLASK_IDS).slice(0, SHOP_FLASKS).map((id) => ware(id, FLASK_PRICE)),
-    removePrice: REMOVE_PRICE,
+    removePrice: REMOVE_PRICE * dear,
     removed: false,
   };
 }

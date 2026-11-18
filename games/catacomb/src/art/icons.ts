@@ -662,6 +662,76 @@ const RELIC_ICONS: Record<RelicId, string[]> = {
     '....cccc....',
     '............',
   ],
+  emberCrown: [
+    '.....f......',
+    '....fFf.....',
+    '...f.y.f....',
+    '.g..gyg..g..',
+    '.gg.gGg.gg..',
+    '.gGggGggGg..',
+    '.gGGGGGGGg..',
+    '.gGrGGGrGg..',
+    '.gGGGGGGGg..',
+    '.gggggggggg.',
+    '............',
+    '............',
+  ],
+  seerEye: [
+    '............',
+    '............',
+    '....pppp....',
+    '..ppSSSSpp..',
+    '.pSSqPPqSSp.',
+    'pSSqPeePqSSp',
+    'pSSqPeePqSSp',
+    '.pSSqPPqSSp.',
+    '..ppSSSSpp..',
+    '....pppp....',
+    '............',
+    '............',
+  ],
+  twinBlade: [
+    '...i....i...',
+    '..iI...iI...',
+    '..iI...iI...',
+    '..iI...iI...',
+    '..iI...iI...',
+    '..iI...iI...',
+    '..iI...iI...',
+    '.gggg.gggg..',
+    '...w....w...',
+    '...w....w...',
+    '...g....g...',
+    '............',
+  ],
+  bloodChalice: [
+    '............',
+    '.gggggggggg.',
+    '.gRrrrrrrRg.',
+    '.gGrrrrrrGg.',
+    '..gGrrrrGg..',
+    '...gGGGGg...',
+    '....gGGg....',
+    '.....gg.....',
+    '.....Gg.....',
+    '...gGGGGg...',
+    '..gggggggg..',
+    '............',
+  ],
+  warMask: [
+    '............',
+    '...cccccc...',
+    '..cccccccc..',
+    '.cccccccccc.',
+    '.cceeccceec.',
+    '.ccerccrecc.',
+    '.cccccccccc.',
+    '.ccocccocc..',
+    '..ccrrrrcc..',
+    '..cccccccc..',
+    '...cccccc...',
+    '............',
+  ],
 };
 
 const COIN = [
@@ -676,6 +746,22 @@ const COIN = [
   '.gGGgggGGGg.',
   '..gGGGGGGg..',
   '...gggggg...',
+  '............',
+];
+
+/** The vault's key, shown in the top bar while the hero carries it. */
+const KEY = [
+  '............',
+  '..ggg.......',
+  '.gGGGg......',
+  '.gG.Gg......',
+  '.gGGGg......',
+  '..gggGg.....',
+  '......gGg...',
+  '.......gGg..',
+  '......gGgGg.',
+  '.......g.gG.',
+  '..........g.',
   '............',
 ];
 
@@ -751,6 +837,20 @@ const ROOMS: Record<RoomKind, string[]> = {
     '.....GG.....',
     '............',
   ],
+  vault: [
+    '..mmmmmmmm..',
+    '.mIIIIIIIIm.',
+    'mImmmmmmmmIm',
+    'mIm.i..i.mIm',
+    'mIm......mIm',
+    'mIm.gggg.mIm',
+    'mIm.g..g.mIm',
+    'mImggggggmIm',
+    'mImgGGGGgmIm',
+    'mImgGeeGgmIm',
+    'mImggggggmIm',
+    'mmmmmmmmmmmm',
+  ],
   boss: [
     '..g.g..g.g..',
     '..gGgggGgg..',
@@ -779,6 +879,7 @@ export function bakeIcons(scene: Phaser.Scene) {
   bakePainted(scene, 'heart', CARD_ICONS.heart, PALETTE, 2, INK, 1.4);
   for (const [id, rows] of Object.entries(FLASK_ICONS)) bakePainted(scene, `flask-${id}`, rows, PALETTE, 3, INK, 2);
   bakePainted(scene, 'coin', COIN, PALETTE, 2, INK, 1.4);
+  bakePainted(scene, 'key', KEY, PALETTE, 2, INK, 1.4);
 }
 
 export const relicIcon = (id: RelicId, big = false) => `relic-${big ? 'big-' : ''}${id}`;

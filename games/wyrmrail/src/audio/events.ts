@@ -24,8 +24,8 @@ const snapshot = (s: GameState): Snapshot => ({
   round: s.round,
   hearts: s.hearts,
   totalDelivered: s.totalDelivered,
-  // A moult's cards wait like the charter's.
-  charterOffer: !!(s.charterOffer || s.moultOffer),
+  // A moult's and the wagons' cards wait like the charter's.
+  charterOffer: !!(s.charterOffer || s.moultOffer || s.hitchOffer),
   hazard: s.hazard,
   moods: [...s.moods],
   orders: new Map(s.orders.map((o) => [o.id, o.status])),
@@ -37,7 +37,7 @@ const snapshot = (s: GameState): Snapshot => ({
 
 /** The part of the song the game calls for now. */
 function partFor(s: GameState) {
-  if (s.charterOffer || s.moultOffer) return 'charter';
+  if (s.charterOffer || s.moultOffer || s.hitchOffer) return 'charter';
   if (s.round === FESTIVAL_ROUND) return 'festival';
   if (s.hazard || s.orders.some((o) => o.timeLeftMs < o.totalMs * 0.25)) return 'busy';
   return s.charter ? 'travel' : 'calm';

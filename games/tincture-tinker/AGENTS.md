@@ -26,7 +26,12 @@ bottle green, serif italics), all painted in code on 2D canvases. It shares no c
   one played at Grand Master is the crown's last order, which ends the game with the title Royal
   Apothecary and a star total, after which play goes on), twin orders from Journeyman on every fifth
   order after the second (two customers' needs on one board and one pool of moves; the one filled
-  first pays a speed bonus), a pantry (ingredients gathered over the needs, up to 5 a kind, pre-fill
+  first pays a speed bonus), drop orders on every fifth order from the fourth (vials on the top row
+  that never match or swap, fall like tiles and are delivered at the bottom row; the label has a row
+  for them; no twist), a spare cauldron from order 2 (ingredients a match gathers that the order
+  doesn't need fill it by the moves; at `CAULDRON_SIZE` it turns a plain tile into a Catalyst), flow
+  from order 2 (three swaps in a row whose match sets off a cascade give a move back; three pips
+  under the stars), a pantry (ingredients gathered over the needs, up to 5 a kind, pre-fill
   the next order or stage that needs them), an
   automatic shuffle when no move is left, an idle hint that swells two tiles (held still with
   reduced motion), an order label with progress bars, four bench tools bought with coins mid-order
@@ -119,7 +124,8 @@ bottle green, serif italics), all painted in code on 2D canvases. It shares no c
   and `randomKind(rand?, pool?)` (from `KINDS` unless a pool is given).
 - `src/game/orders.ts`: `PotionId`, `POTION_NAMES` (`TextKey`s, the same as the ids), `Needs`, `Stage`, the `Order` type (with
   `rush`, `forbid`, `jars`, `resin`, `mould`, `stages`, `last`, `second`, `rich`, `exam`, `holes`,
-  `town`, `endless`, `daily`, `rare`, `guest`, `weekly`), `GuestRule`, `poolOf(order)` (the kinds that drop in:
+  `town`, `endless`, `daily`, `rare`, `guest`, `weekly`, `vials`), the drop order numbers (`DROP_AT`,
+  `DROP_VIALS`, `VIAL_MOVES`, `VIAL_COINS`), `isDrop`, `vialsFor`, `GuestRule`, `poolOf(order)` (the kinds that drop in:
   `KINDS`, plus the order's `rare`), `Recipe`, `Risk`,
   the `ORDERS` table,
   `RANK_RECIPES` (the three unlockable recipes), `MOVE_BONUS`, the per-round growth
@@ -153,7 +159,8 @@ bottle green, serif italics), all painted in code on 2D canvases. It shares no c
 - `src/game/upgrades.ts`: `UpgradeId`, `Upgrades`, the `UPGRADES` table (name and effect as `TextKey`s,
   the price of each level), `UPGRADE_ORDER`, `freshUpgrades`, `upgradeCost` and `buyUpgrade`.
 - `src/game/board.ts`: the `Board`, `Tile` (with optional `catalyst`, `bloom`, `jar`, `resin`,
-  `mould`, `hole`), `Cell` and `Run` types and pure board logic: `matchKind`, `stuck`, `special`, `swapped`,
+  `mould`, `hole`, `vial`), `landed` (a vial with nothing but walls or resin under it),
+  `placeVials` (a drop order's vials on the top row), `Cell` and `Run` types and pure board logic: `matchKind`, `stuck`, `special`, `swapped`,
   `findRuns`, `findMatches`, `matchesAt`, `swapWorks`, `validMoves`, `collapse`, `freshBoard`,
   `layBoard` (a fresh board with walls cut, `freshBoard` itself with none), `holesOf(shape)`,
   `shuffle`, `addBlockers`, `neighbours`, `spreadMould`, `turnToad`, `adjacent`, `inBoard`. A
@@ -166,8 +173,9 @@ bottle green, serif italics), all painted in code on 2D canvases. It shares no c
   walls cut, no Bloom starter and no pantry, and for the daily keeps `rand` on the state for the
   refills; the weekly order too), `tileMaker` (new tiles from the order's `poolOf`, drawn from `s.rand`, Math.random when unset), `wanted`, `filled(s, needs?)`, `firstNeeds`, `drawPantry`, `stockPantry`.
 - `src/game/sim.ts`: `trySwap` (plays a swap out to completion through `resolve` and returns its
-  `Step`s, brewing and firing specials, opening jars, melting resin and scrubbing mould in `gather`,
-  then letting mould creep), `CATALYST_RUN`, the bench tools (`Tool`, `TOOLS` with price, name and tip, `TOOL_ORDER`,
+  `Step`s, brewing and firing specials, opening jars, melting resin, scrubbing mould and delivering
+  landed vials in `gather`, then flow, the spare cauldron's Catalyst and letting mould creep),
+  `CATALYST_RUN`, `CAULDRON_SIZE`, `CAULDRON_FROM`, `FLOW_RUN`, `FLOW_FROM`, `cauldronOn`, `flowOn`, the bench tools (`Tool`, `TOOLS` with price, name and tip, `TOOL_ORDER`,
   `STIR_MOVES`, `canUse` (never on the weekly order), `stir`, `sift`, `pestle`, `funnel`), `nextOrder`, `nextExam`, `nextTown`,
   `nextEndless`, `nextDaily`, `nextGuest` and `nextWeekly`.
 - `src/game/save.ts`: `loadProgress` and `saveProgress` in `localStorage`.
@@ -196,7 +204,9 @@ bottle green, serif italics), all painted in code on 2D canvases. It shares no c
   cursed), `guest-<rule>` (a guest's medallion, `guestTexture`), `hole` (a town's wall:
   a bottle-green inlay with a gold rim over a cell), `map-card` (the journey map's 440x440 card), `table` (the static
   960x540 layout over it: tray and cells, ribbon band, order label with its crest and "Bench tools"
-  heading, painted in the hub's language at boot like the tool names), `kind-<kind>`, `catalyst-<kind>` (sunburst halo), `bloom-<kind>` (rose petal
+  heading, painted in the hub's language at boot like the tool names), `vial` (a drop order's vial tile), `need-vial` (its
+  label icon), `cauldron` and `cauldron-full` (the footer's spare cauldron, empty and brimming;
+  `CAULDRON_ICON` is their size), `kind-<kind>`, `catalyst-<kind>` (sunburst halo), `bloom-<kind>` (rose petal
   rosette), `jar-<kind>` (corked glass jar), `resin-<kind>` (amber coat), `mould-<kind>` (grey-green
   fuzz of spots), `need-<kind>`,
   `potion-<id>` (flask coloured from `BREWS`), `coin`, `star-on`, `star-off`,
@@ -264,7 +274,7 @@ bottle green, serif italics), all painted in code on 2D canvases. It shares no c
   neighbour (not held, not a special) that leaves a move on the board, as a last step with
   `spread`. Tools never spread mould.
 - **Twists:** `twistFor` gives order 3, 6, 9... `rush` and 4, 7, 10... a `forbid` kind not in its
-  needs (on a royal commission, not in any stage's needs; none if every kind is needed). `orderFor` takes `RUSH_MOVES` off and adds `RUSH_COINS` to the price. `resolve` takes one
+  needs (none on a twin or drop order, so 4, 9, 14... have none) (on a royal commission, not in any stage's needs; none if every kind is needed). `orderFor` takes `RUSH_MOVES` off and adds `RUSH_COINS` to the price. `resolve` takes one
   extra move (`penalties`) when called with `charge` (only `trySwap` does) and the swap's own first
   step matches the forbidden kind; cascade steps and tools (Pestle, Funnel) never cost one. The step
   that did it has `penalty`, and the scene pulses the moves (`penalised`, from `swap`).
@@ -288,6 +298,26 @@ bottle green, serif italics), all painted in code on 2D canvases. It shares no c
   `TWIN_BONUS` when the other isn't yet (added to `coins` only with the sale, so a failed order
   banks nothing), and pushes a step with `served`. Twin orders get no
   twist.
+- **Drop orders:** `orderFor` gives `isDrop` orders (`number % ROYAL_EVERY === DROP_AT`: 4, 9,
+  14...; never royal or twin) `vials` from `vialsFor` and `VIAL_MOVES` moves and `VIAL_COINS` coins
+  for each. `startOrder` calls `placeVials` after `addBlockers`: each vial is a top-row tile with
+  `vial` set, in its own column. A vial is `stuck` (no swap, Funnel, Sift reroll, shuffle, Pestle,
+  blocker, mould or toad) and `matchKind` null, but `collapse` lets it fall like any tile.
+  `gather` takes vials back out of swept rows and squares, and adds every `landed` vial to the
+  cleared set (a step with only vials when nothing matched), counting `delivered` but nothing in
+  `got`; `filled` also wants `delivered >= vials`. `shuffle`'s fallback board puts vials back where
+  they were. The scene flies a delivered vial to the label's vials row (`shownVials`, `vialText`),
+  laid out with the twin order's closer rows (`rowY`).
+- **Spare cauldron:** from `CAULDRON_FROM` (order 2; `cauldronOn`), `gather` adds every cleared
+  tile (not a vial) the order doesn't want to `cauldron`. After the cascades, `resolve` turns a
+  random plain tile into a Catalyst once `cauldron >= CAULDRON_SIZE` and the order isn't filled,
+  takes `CAULDRON_SIZE` off and pushes a step with `dropped` (the scene swells the tile and shows a
+  note). Tools fill it too. The footer shows `cauldron` under `cauldron-full`, the latter cropped to
+  the fill (`refreshCauldron`), and hovering it shows `captionCauldron`.
+- **Flow:** from `FLOW_FROM` (order 2; `flowOn`), `resolve` with `charge` (swaps only) raises `flow`
+  when a later step cleared something besides vials, else zeroes it; at `FLOW_RUN` it gives a move
+  back (`flowed`), zeroes `flow` and pushes a step with `flow` (a note, the moves pulse). The pips
+  under the stars (`refreshFlow`, a Graphics) show `flow`; hovering them shows `captionFlow`.
 - **Result card:** `showResult(title, text, rank, choices, stars)` shows the single `resultButton`
   (made in `create`) for one choice, or the `resultPair` (made the first time) for two.
   `orderChoice` offers Modest and Rich (`pick` sets `rich`, saves and starts the next order) and
@@ -386,12 +416,15 @@ bottle green, serif italics), all painted in code on 2D canvases. It shares no c
   `scrubbed` (mould), `penalties` (moves lost to the forbidden kind; `fired`, `bloomsFired`, `opened`,
   `melted`, `scrubbed` and `penalties` are only kept for debugging and the test's log), `stage`, `served`,
   `speedBonus`, `fromPantry`, `toPantry`, `startPantry`, `passed` (an examination sold with its
-  stars), `score` (the weekly order's), `toads` (made by the witch this order, for debugging), `board`, `nextId` and `rand` (the daily's seeded source for new tiles; a function, so it
+  stars), `score` (the weekly order's), `toads` (made by the witch this order, for debugging),
+  `cauldron` (the spare cauldron's fill), `flow` (the cascade streak), `flowed` (moves given back,
+  for debugging), `delivered` (a drop order's vials brought down), `board`, `nextId` and `rand` (the daily's seeded source for new tiles; a function, so it
   is never saved and drops out of the test's JSON copy).
 - `Board` is `Tile[][]`, rows from the top. Each `Tile` has a unique `id` from `nextId`, which
   restarts at 1 for every order; the scene relies on ids to track sprites through falls. A brewed
   Catalyst or Bloom keeps its tile's id and gains `catalyst` or `bloom`; a melted tile keeps its id
   and loses `resin`, a scrubbed one loses `mould` and one mould crept onto gains it.
+- None of `cauldron`, `flow`, `flowed` or `delivered` is saved: a retry or reload starts them at 0.
 - Only `trySwap`, `stir`, `sift`, `pestle`, `funnel`, `buyHerb`, `buyUpgrade` and `startOrder` /
   `nextOrder` / `nextExam` change the rules state (and `pick` sets `rich`); the scene owns only view state (`busy`, `selected`, `armed` (with the `sifting`
   getter), `funnelFrom`, `shown`, the queue, hints).
@@ -423,7 +456,9 @@ seals, rich orders, the towns, endless runs or the guests existed load with thei
 
 - `Math.random` is used in `randomKind` (new tiles, the rerolls in `freshBoard` and `sift`), in
   `shuffle`, in `addBlockers` (only for orders with jars, resin or mould), in `spreadMould` (only
-  when mould is on the board) and in `startOrder` for the Bloom starter (only once bought). A guild
+  when mould is on the board), in `startOrder` for the Bloom starter (only once bought) and the
+  vials (`placeVials`, only on drop orders), and in `resolve` for the tile the spare cauldron turns
+  into a Catalyst (from order 2, only when full; from `s.rand` on the daily and weekly orders). A guild
   examination's or a town's starting board comes from its own `seeded` generator instead, passed to
   `randomKind`, `layBoard` and `addBlockers` as `rand`. The daily order draws its recipe, shape,
   blockers, board and refills (through `s.rand` in `tileMaker`) from `dailyRand(GAME, day)`; its
@@ -451,7 +486,8 @@ seals, rich orders, the towns, endless runs or the guests existed load with thei
   order's mix: `TOWNS`, `TOWN_STAR_COINS`, `DAILY_COINS`, `dailyOrder` in `src/game/towns.ts`.
   Town guests: `GUESTS`, `GUEST_STAR_COINS`, `TOAD_MAX` in `src/game/guests.ts`. The weekly order:
   `WEEKLY_MOVES`, `WEEKLY_STARS` and `weeklyOrder` in `src/game/weekly.ts`.
-  Endless runs' growth: `src/game/endless.ts`.
+  Endless runs' growth: `src/game/endless.ts`. Drop orders: `DROP_*`, `VIAL_*` and `vialsFor` in
+  `src/game/orders.ts`. The spare cauldron and flow: `CAULDRON_*` and `FLOW_*` in `src/game/sim.ts`.
 - Ingredient kinds and names: `src/game/kinds.ts`. Board size: `ROWS`, `COLS` in
   `src/game/board.ts`.
 - Animation and hint timings: `SWAP_MS`, `CLEAR_MS`, `FALL_MS`, `SHUFFLE_MS`, `SIFT_MS`, `HINT_MS`,
@@ -523,7 +559,10 @@ seals, rich orders, the towns, endless runs or the guests existed load with thei
   with `src/game/orders.ts` and `src/game/ranks.ts`; `STIR` with `TOOL` and `TOOLS.stir.cost`;
   `VIEW` and `BOARD` with `src/scenes/layout.ts` and `ROWS`/`COLS`; the `Kind`, `Tile` and
   `GameState` shapes declared at the top of the test; the game's URL path in the test's `page.goto`.
-- Bench tools, the workbench, the herbalist, rich orders, guild examinations, the journey map,
+- Order 1 has no spare cauldron and no flow (`CAULDRON_FROM` and `FLOW_FROM` are 2): both change
+  moves and the board, so turning them on for order 1 means a new playthrough. The footer's
+  cauldron and pips are Images, a Graphics and a Zone made in `create`, never Texts (see Gotchas).
+- Bench tools, the workbench, the herbalist, rich orders, drop orders, the spare cauldron, flow, guild examinations, the journey map,
   towns and their walls, rare ingredients, town guests and toads, the daily and weekly orders,
   endless runs, mixed specials,
   ranks above Apprentice, blockers, mould, twists, royal commissions, twin orders and the pantry
@@ -567,7 +606,9 @@ triangle lead, a thin `pulse12` arpeggio and a triangle bass. It is written at `
 | `croak` | the witch turning a tile into a toad (a `spread` step with `toad`) |
 | `penalty` | a swap whose own match had the forbidden kind (`penalised`) |
 | `shuffle` | a step whose board was shuffled |
-| `served` / `stage` | a twin order's customer served / a royal commission's next stage |
+| `served` / `stage` | a twin order's customer served, or a drop order's vial delivered (`stepSounds`) / a royal commission's next stage |
+| `cauldron` | the spare cauldron turning a tile into a Catalyst (the `dropped` step) |
+| `flow` | flow giving a move back (the `flow` step) |
 | `stir`, `sift`, `pestle`, `funnel` | the bench tools, when they act (`useTool`, `siftRow`, `usePestle`, `pickFunnel`) |
 | `stamp` | a guild seal won (`showSold`) |
 | `hint` | the idle hint appearing (`updateHint`) |
@@ -608,6 +649,10 @@ triangle lead, a thin `pulse12` arpeggio and a triangle bass. It is written at `
   shrinks them) once they pass 350px, so a fifth needs a second row.
 - **Retune the pantry:** `PANTRY_MAX` in `src/game/state.ts`; `drawPantry` decides how much an
   order may start with. The herbalist's price is `HERB_COST` there too.
+- **Retune drop orders, the spare cauldron or flow:** `DROP_*`, `VIAL_*`, `vialsFor` and `isDrop`
+  in `src/game/orders.ts` (keep drop orders off royal and twin numbers: the label has room for four
+  rows); `CAULDRON_SIZE`, `CAULDRON_FROM`, `FLOW_RUN` and `FLOW_FROM` in `src/game/sim.ts`, and the
+  How to play tips and the README that name them.
 - **Retune rich orders:** `RICH_SHARE`, `RICH_MOVES`, `RICH_BLOCKERS` and `riskFor` in
   `src/game/orders.ts`; the result card's caption and the label read them.
 - **Add or retune a guild examination:** an entry in `EXAMS` in `src/game/exams.ts` (moves are

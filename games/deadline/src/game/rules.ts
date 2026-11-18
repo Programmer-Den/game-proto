@@ -243,6 +243,66 @@ export function supplyPick(shotgunMaxed = false, rand: () => number = Math.rando
   return pool;
 }
 
+/**
+ * Sidearms: a shotgun or flamethrower supply also hands the squad that weapon for the rest of the
+ * run, and a swap (the button on the right shoulder, or E) turns the whole squad between its rifles
+ * and the sidearms found. Each trades the rifles' reach and pierce for something the horde's answers
+ * fear:
+ * - shotgun: every gun fires `pellets` pellets, `spread` apart, each `mult` of a bullet's damage, at
+ *   `interval` times the fire interval: a wall of lead for swarms and packs, but shields stop every
+ *   pellet and pierce doesn't carry over;
+ * - flamer: every gun throws a flame that only flies `range` px up from the squad, burns through
+ *   `hits` zombies past shields and armour and sets them burning (fire rounds), for `mult` of a
+ *   bullet's damage at `interval` times the fire interval: it can't reach a spitter at its stand.
+ * A swap holds the squad's fire for `swapMs`.
+ */
+export type Sidearm = 'shotgun' | 'flamer';
+export type Weapon = 'rifle' | Sidearm;
+export const SIDEARM = {
+  shotgun: { pellets: 3, spread: 0.14, mult: 0.6, interval: 1.25 },
+  flamer: { range: 320, hits: 3, mult: 0.7, interval: 0.85 },
+  swapMs: 350,
+};
+export const WEAPON_LABELS: Record<Weapon, TextKey> = { rifle: 'weaponRifle', shotgun: 'weaponShotgun', flamer: 'weaponFlamer' };
+
+/**
+ * Wave dares: from wave `DARE.fromWave`, before each wave the player may take one of two dares. A
+ * wave held under its dare pays `scrapMult` times the scrap it earned and drops a crate.
+ * - runners: every grunt in the wave comes as a runner (its hit points scaled to a runner's);
+ * - tough: every zombie has `toughMult` times the hit points;
+ * - jammed: the squad fires `jamMult` times slower for the wave's first `jamMs`;
+ * - middle: no zombie may get below `middleY` in the middle lane, or the dare is lost (the wave
+ *   goes on, but pays nothing extra).
+ */
+export type DareKind = 'runners' | 'tough' | 'jammed' | 'middle';
+export const DARES: Record<DareKind, { label: TextKey; detail: TextKey }> = {
+  runners: { label: 'dareRunners', detail: 'dareRunnersDetail' },
+  tough: { label: 'dareTough', detail: 'dareToughDetail' },
+  jammed: { label: 'dareJammed', detail: 'dareJammedDetail' },
+  middle: { label: 'dareMiddle', detail: 'dareMiddleDetail' },
+};
+export const DARE_KINDS = Object.keys(DARES) as DareKind[];
+export const DARE = { fromWave: 5, scrapMult: 2, toughMult: 1.4, jamMs: 10000, jamMult: 2, middleY: 600 };
+/**
+ * The two dares on offer before a wave: a fixed turn through every pair (no draws, so the daily
+ * stays the same for every player and the seeded waves are unchanged). `middle` is left out where the
+ * middle lane is closed (Two Bridges), as it would be free.
+ */
+export function dareOffer(wave: number, middleOpen = true): DareKind[] {
+  const kinds = DARE_KINDS.filter((k) => middleOpen || k !== 'middle');
+  const pairs: DareKind[][] = [];
+  for (let i = 0; i < kinds.length; i++) for (let j = i + 1; j < kinds.length; j++) pairs.push([kinds[i], kinds[j]]);
+  return pairs[wave % pairs.length];
+}
+
+/**
+ * The last stand: once a run, the first zombie to reach the sandbags (with no medkit left) starts
+ * `ms` of melee instead of ending the run. The zombies at the line are held there, and every
+ * `everyMs` the squad hits every zombie within `reach` of it for `damage(wave)` and shoves it up
+ * `push` px. Any zombie still at the line when the time runs out ends the run.
+ */
+export const LAST_STAND = { ms: 10000, everyMs: 500, reach: 60, push: 28, damage: (wave: number) => 6 + 3 * wave };
+
 /** What each starting crate costs in scrap, bought on the game over screen for the next run. */
 export const KIT_COSTS: Record<UpgradeKind, number> = { rate: 40, damage: 60, companion: 80, pierce: 100 };
 /**

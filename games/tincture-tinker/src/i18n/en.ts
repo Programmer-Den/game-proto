@@ -243,6 +243,13 @@ const en = {
   weeklyAllStars: 'Every star earned',
   playAgain: 'Play again',
   captionWeekly: "This week's board, the same for everyone: the label's ingredients score, each cascade step once more. No bench tools",
+  vialsRow: 'Vials to the bottom row',
+  dropLine: 'Drop order: bring {n} vials to the bottom row',
+  captionVials: 'Clear the tiles under a vial to let it fall; it is delivered once it reaches the bottom row',
+  captionCauldron: "Spare cauldron {n}/{size}: ingredients the order doesn't need fill it, and when full it drops a Catalyst",
+  captionFlow: 'Flow {n}/{run}: moves in a row whose match sets off a cascade; the third gives a move back',
+  flowNote: 'Flow! One move back',
+  cauldronNote: 'The cauldron brews a Catalyst!',
 };
 
 export default en;

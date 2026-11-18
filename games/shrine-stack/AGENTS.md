@@ -22,7 +22,10 @@ whose raft bobs), each with its own crown height and best, and raises the patron
 strengthens their boon. The daily shrine gives every player the same patron and stones, one try a
 day. Every crown brings pilgrims to a village whose favour builds an inn, a well and a mason's yard,
 each a head start for later temples; once a shrine is crowned, runs can bring rain or snow for more
-favour; and a two-player race (`RaceScene`) stacks two temples side by side on one screen.
+favour; and a two-player race (`RaceScene`) stacks two temples side by side on one screen. From
+tier 2 a tier's third stone can be a capstone (triple favour if it lands near-perfect, a wobbly tier
+if not) and a falling stone can be nudged for favour, and each site's blueprint pays extra for tiers
+built to its widths.
 
 Implemented today:
 
@@ -170,6 +173,31 @@ Implemented today:
   second touch pointer (`addPointer`), so both players can tap at once. Its end panel has Race
   again (`scene.restart`) and Back (`scene.start('Game', {})`, with empty data so a village build's
   `{ village: true }` isn't reused). It keeps no save and awards no trophies.
+- Capstones (SS17): `canCapstone` (not in a race, `swinging`, from `CAPSTONE_FROM_TIER` (2), the
+  third stone of a tier: `inTier === STONES_PER_TIER - 1`) and `toggleCapstone` (the panel's
+  Capstone button, `CAPSTONE_BUTTON`, or the C key) flip `capstone` on the stone in hand; `spawn`
+  clears it. `land` reads and clears it: within `capstoneWindow` (`CAPSTONE_PX` (10) or
+  `perfectWindow`, whichever is wider, and only where the overlap would reach `MIN_W`) it sets: it
+  snaps on whole like a perfect drop (`perfect` stays the usual window's), its `stoneFavor` is
+  multiplied by `CAPSTONE_MULT` (3) and `capped` triples the tier's balance bonus at the tier end
+  (a tier end and `topple` clear `capped`). Otherwise it is cut as usual and sets `wobbly`. Either
+  way a `capstone` event (`set`, the favour) follows the `placed` one, and `Stone.capstone` marks a
+  set one, which `drawStone(..., capstone)` draws as a lintel with an arch and a gold keystone (the
+  stone in hand too, while `capstone` is on).
+- Nudge (SS18): `canNudge` (not in a race, `falling`, from `NUDGE_FROM_TIER` (2), not yet `nudged`,
+  `favor >= NUDGE_COST` (2)) and `nudge(s, dir)` move `moving.x` `NUDGE_PX` (10) at once, spend the
+  favour, set `nudged` (cleared by `spawn`) and push a `nudged` event. The scene's tap zone nudges
+  towards the side of the tap (`pointer.worldX` against `moving.x`) while a stone falls and
+  `canNudge` holds (otherwise a tap while falling does nothing, as before); the arrow keys and A/D
+  call `tryNudge`, which buzzes from tier 2 when it can't.
+- Blueprints (SS19): `BLUEPRINTS` (a width per tier from 1, tier 1's unused) per site, and
+  `blueprintFor(s, tier)` (null before `BLUEPRINT_FROM_TIER` (2), past the site's list or in a race).
+  At a tier end outside the endless sky, a top stone within `BLUEPRINT_TOL` (12) of the plan adds
+  `BLUEPRINT_FAVOR` (4, times `favorMult`, rounded up), counts in `blueprints` and pushes a
+  `blueprint` event. The scene's `drawBlueprint` paints the plan as dashed outlines over the stones
+  (its own graphics at depth 4, moved by `drift`; redrawn when the tier or the tiers met change),
+  the tier being built brighter with `blueprintTag` (plan and top width, gold when within the
+  tolerance) beside it, and the tiers met (`blueprintMet`, from the events) in gold.
 - The game ends on a miss (a stone keeping less than `MIN_W`) unless Mason's Grace catches it; a
   caught stone still marks the tier `wobbly` and fails its trial (with a `trial` event), then is
   replayed.
@@ -189,7 +217,7 @@ Missing or rough:
 - `docs/screenshots/game-over.webp`, `gilded.webp`, `crowned.webp`, `wobbly-break.webp`,
   `shop-bought.webp`, `curse-taken.webp`, `stone-kinds.webp`, `endless-gust.webp`, `four-blessings.webp`,
   `material-pick.webp`, `reserve.webp`, `lean-meter.webp`, `toppled.webp`, `regrown.webp`,
-  `storm-gust.webp`, `crowned-blessing.webp`, `sites-and-ranks.webp`, `cliff-wind.webp`, `lake-raft.webp`, `crown-opens-site.webp`, `sky-altar.webp`, `sky-altar-blessing.webp`, `trophy-earned.webp`, `trophies.webp`, `village.webp`, `rain-village.webp`, `weather-snow.webp`, `race.webp`, `fill-ultrawide.webp`, `fill-tablet.webp` (the play scene filling a 2560x1080 and a 1024x768 screen) and `cover.png` (a copy of `gilded.webp`) are not produced by the test; refresh
+  `storm-gust.webp`, `crowned-blessing.webp`, `sites-and-ranks.webp`, `cliff-wind.webp`, `lake-raft.webp`, `crown-opens-site.webp`, `sky-altar.webp`, `sky-altar-blessing.webp`, `trophy-earned.webp`, `trophies.webp`, `village.webp`, `rain-village.webp`, `weather-snow.webp`, `race.webp`, `capstone.webp`, `blueprint.webp`, `fill-ultrawide.webp`, `fill-tablet.webp` (the play scene filling a 2560x1080 and a 1024x768 screen) and `cover.png` (a copy of `gilded.webp`) are not produced by the test; refresh
   them by hand (play several tiers in the dev build, or drive it with a Playwright script that taps
   like the test does) if the look changes.
 
@@ -224,13 +252,14 @@ File map (`src/`):
   `RANK_MAX`, `GILDED_RANK_FAVOR`, `PATIENT_RANK`, `STORM_RANK_PX`, `CLIFF_FROM_TIER`, `CLIFF_WIND`,
   `CLIFF_PER_TIER`, `CLIFF_MAX`, `LAKE_BOB`, `LAKE_PER_TIER`, `LAKE_MAX`, `LAKE_PERIOD`,
   `WEATHER_CHANCE`, `WEATHER_MULT`, `RAIN_SLIDE`, `SNOW_SWAY`, `SNOW_PERIOD`, `PILGRIMS_PER_CROWN`,
-  `WELL_FAVOR`, `YARD_PX`), the types
+  `WELL_FAVOR`, `YARD_PX`, `CAPSTONE_FROM_TIER`, `CAPSTONE_PX`, `CAPSTONE_MULT`, `NUDGE_FROM_TIER`,
+  `NUDGE_PX`, `NUDGE_COST`, `BLUEPRINT_FROM_TIER`, `BLUEPRINT_TOL`, `BLUEPRINT_FAVOR`, `BLUEPRINTS`), the types
   (`Phase`, `Stone`, `Moving`, `Trial`, `Drop`, `GameEvent`, `GameState`, `NewGame`) and the rules
   (`goalOf`, `gildedOf`, `windy`, `drift`, `snowSway`, `rerollCost`, `patronSpeed`, `speedFor`, `newGame`, `choosePatron`, `offerSize`, `blessingsFor`, `shopFor`,
   `stackHeight`, `topOf`, `curseNow`, `swingSpeed`, `perfectWindow`, `canSwap`, `swapReserve`,
   `tick`, `drop`, `canPickMaterial`, `chooseMaterial`, `chooseBlessing`, `canReroll`, `reroll`,
   `canBuy`, `buy`, `toggleCurse`, `buildOn`, `keepBuilding`, `isAltar`, `nextAltar`, `gild`, `materialMult`, `favorMult`,
-  `stoneFavor`, `gusty`; `tierSpeed`, `pickPatrons`, `spawn`, `cliffWind`, `gustFor`, `kindFor`, `gust`, `land`, `topple`,
+  `stoneFavor`, `gusty`, `canCapstone`, `toggleCapstone`, `capstoneWindow`, `canNudge`, `nudge`, `blueprintFor`; `tierSpeed`, `pickPatrons`, `spawn`, `cliffWind`, `gustFor`, `kindFor`, `gust`, `land`, `topple`,
   `pickOffer`, `pickCurse`, `widenTop`, `endBreak`, `rollWeather` and `applyBlessing` are private). No Phaser; `speedFor` reads
   `byDifficulty` from `shared/settings.ts`.
 - `game/blessings.ts`: `BLESSINGS`, `BlessingId` and `BLESSING_INFO` (name and card text as
@@ -271,7 +300,7 @@ File map (`src/`):
   `PATRON_TITLE`, `PATRON_CARDS`, `SITE_ROW`, `BOTTOM_ROW` (the daily, village and race buttons),
   `VILLAGE_CARDS`, `VILLAGE_BACK`, `BUTTON`, `OFFER_TITLE`, `REROLL`, `MATERIAL_TITLE`,
   `MATERIAL_ROW`, `CURSE`, `SHOP_TITLE`, `SHOP_ROW`, `BUILD_ON`, `RESERVE_BUTTON`, `LEAN_BAR`,
-  `GOAL`, `UI_DEPTH`, `FONT`.
+  `GOAL`, `CAPSTONE_BUTTON`, `UI_DEPTH`, `FONT`.
 - `ui/Button.ts`: `makeButton`, the captioned buttons on the end panel (returned as loose parts).
 
 Shared code it imports (outside the game folder): `shared/setupGame.ts` (`setupGame`),
@@ -307,12 +336,13 @@ How it runs:
   earned, `missed` with the stone's tier, kind and material, `tier` (balanced, and whether a curse
   was in force), `trial` (failed mid-tier, or passed with its favor), `rerolled`, `bought`, `toppled` (how many
   stones, the lean and the favor lost), `regrown`, `swapped` (the kind now in hand), `patron`, `altar`,
-  `crowned`) onto
+  `capstone`, `nudged`, `blueprint`, `crowned`) onto
   `state.events`; the scene drains them each frame in `show`, which draws the new
   stone, debris, popups, glow, lanterns, the crown and banners, and on `toppled` sends the last
   stone views tumbling (`tumble`). Nothing else in the scene changes state.
-- Input: one interactive zone over the whole view calls `drop`; the panel's Swap button and the R
-  key call `swapReserve`. The patron layer (`patronParts`, built by `buildPatrons` while the phase
+- Input: one interactive zone over the whole view calls `drop` (and, while a stone falls, `nudge`
+  towards the tapped side); the panel's Swap button and the R key call `swapReserve`, the Capstone
+  button and C `toggleCapstone`, the arrow keys and A/D `nudge`. The patron layer (`patronParts`, built by `buildPatrons` while the phase
   is `patron`, with the site row and the daily button), the break layer (an interactive dim, the cards, the Reroll button, the material
   row, the curse toggle, the shop buttons, or "Build on") and the end layer (with "Build again"
   and "Keep building") sit above it and swallow taps. A reroll, a buy, a material pick or the curse
@@ -364,7 +394,7 @@ State model (`GameState`): `phase` (`patron`, `swinging`, `falling`, `blessing`,
 `nextKind`, `slow`, `bought`, `trial`, `curseOffer`, `cursed`, `curse` (`{ id, tier }`), `endless`,
 `wind`, `altars`, `lean`, `chain`, `material`, `reserve` and `swapped`, `patronOffer` and `patron`,
 `site` and `sites`, `ranks`, `rank` and `freeRerolls`, `clock`, `daily`, `race`, `weather`,
-`village`, `startW` and `gift`, the random sources `rand` and
+`village`, `startW` and `gift`, `capstone` and `capped`, `nudged`, `blueprints`, the random sources `rand` and
 `kindRand` (functions, dropped when the test copies the state through JSON), and `events`. `Stone` and `Moving` carry a `kind` and a `material`. Only
 `src/game/state.ts` mutates it. `moving` exists in every phase; it simply does not move outside
 `swinging`/`falling`.
@@ -438,6 +468,10 @@ Effects, `sfx` (all from `GameScene`):
 | `pluck` | the curse toggle taking the curse (`ui('click')` when untaking it) |
 | `rise` | "Build on", "Keep building", the Daily shrine button and the Race button |
 | `gust` | `updateSound`, once per stone in hand (keyed by `dropped`) that has a non-zero `wind` |
+| `keystone` / `crack` | `capstone`, set / cracked |
+| `stone` / `swish` | the Capstone button or C, turning the capstone on / off |
+| `nudge` | `nudged` |
+| `sparkle` | `blueprint` (as for a trial met) |
 
 In the race (`RaceScene`): the `calm` part plays throughout; `whoosh`, `thud`, `bell`, `crack`, `crash`,
 `rumble`, `shimmer`, `chime` and `meh` play on the same events for both temples, and the `crown`
@@ -447,8 +481,9 @@ Shared sounds: `ui('coin')` on `bought` and on a village build, `ui('click')` on
 site button, the Village button, the village's Back and the race's buttons, `ui('refuse')` on a
 building the village can't afford or a Village button with no pilgrims yet,
 `ui('refuse')` on a locked site or a used daily, and `ui('refuse')` for a
-Reroll or shop button that can't be used, and for the Swap button or R while stacking when
-`canSwap` is false.
+Reroll or shop button that can't be used, for the Swap button or R while stacking when
+`canSwap` is false, for the Capstone button or C while stacking when `canCapstone` is false, and
+for an arrow key (or A/D) while a stone falls from tier 2 when `canNudge` is false.
 
 ## Testing hooks
 
@@ -458,7 +493,7 @@ Reroll or shop button that can't be used, and for the Swap button or R while sta
   `rerollButton` (`{ x, y, w, h }` while choosing, else null), `shopButtons` (`{ id, x, y, w, h }`),
   `materialButtons` (`{ id, x, y, w, h }`, from tier 3), `curseToggle` and `buildOnButton`
   (`{ x, y, w, h }` or null) during a break, `reserveButton` (`{ x, y, w, h }` while a swap is
-  allowed, else null), `keepButton` while the crowned panel shows, and `siteButtons`
+  allowed, else null), `capstoneButton` (`{ x, y, w, h }` while `canCapstone`, else null), `keepButton` while the crowned panel shows, and `siteButtons`
   (`{ id, x, y, w, h }`), `dailyButton`, `villageButton` and `raceButton` on the patron screen, and
   `buildingButtons` (`{ id, x, y, w, h }`) and `villageBack` while the village is open.
   `RaceScene` exposes `states` (both sides' `GameState`) and `winner`.
@@ -468,7 +503,9 @@ Reroll or shop button that can't be used, and for the Swap button or R while sta
   card's centre from `blessingCards`, taps the centre of `rerollButton` once before choosing,
   and taps (480, 520) on the dim to check it does nothing (keep the shop row above it). It checks
   the curse toggle and the shop buttons the patron allows are there but takes neither, and leaves
-  the reserve alone: purchases and swaps stay out of the first round.
+  the reserve alone: purchases and swaps stay out of the first round. It checks tier 1 has no
+  capstone, nudge or blueprint (`capstone`, `capped`, `nudged` false and `blueprints` 0); its second
+  tap while a stone falls must stay a no-op, so `NUDGE_FROM_TIER` stays above 1.
   The sky point must stay clear of the panel; the cards are not shown when it is tapped. It checks the
   first temple is on the hill (`site`, `sites: ['hill']`), not the daily, with `rank` and
   `freeRerolls` 0, clear `weather`, an empty `village`, no `race` and no `gift`, and that
