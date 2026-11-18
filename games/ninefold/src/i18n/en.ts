@@ -176,6 +176,7 @@ const en = {
   makerKeys: 'Keys: 1-9 set a given, arrows move, Backspace clears',
   codeRefused: "That code doesn't open a puzzle with exactly one solution.",
   pastePrompt: 'Paste a Ninefold puzzle code or link:',
+  shareReplaces: 'Open the shared puzzle? The board you left in play will be lost.',
   openCode: 'Open code',
   check: 'Check',
   checkUnique: 'One solution!',

@@ -124,10 +124,12 @@ export function tick(s: GameState, dt: number) {
   if (rivalOpen(s)) rivalDay(s, dt);
   s.heatMs = Math.max(0, s.heatMs - dt);
 
-  // A due hero takes a free anvil before the Auto Forge can fill it.
+  // A due hero takes a free anvil before the Auto Forge can fill it, but waits while a due party
+  // holds the counter for its three desks.
   for (const hero of s.returning) hero.inMs -= dt;
   const due = s.returning.find((hero) => hero.inMs <= 0);
-  if (due && s.adventurers.length < desksOf(s) && s.slots.includes(null)) {
+  const partyWaits = partiesAbout(s) && s.party.id === 0 && s.party.inMs <= 0;
+  if (due && !partyWaits && s.adventurers.length < desksOf(s) && s.slots.includes(null)) {
     s.returning.splice(s.returning.indexOf(due), 1);
     comeBack(s, due);
   }
@@ -179,11 +181,17 @@ export function tick(s: GameState, dt: number) {
  * are free and no tourney is under way, then seats its three at once.
  */
 function partyDay(s: GameState, dt: number) {
-  if (!partiesAbout(s) || s.party.id !== 0) return false;
+  if (!partiesAbout(s)) return false;
+  // The next party's time runs from this one's arrival, also while it is seated; one due by then
+  // comes as soon as the last of it has left.
+  if (s.party.id !== 0) {
+    s.party.inMs = Math.max(0, s.party.inMs - dt);
+    return false;
+  }
   const before = s.party.inMs;
   s.party.inMs -= dt;
   if (s.party.inMs > 0) return false;
-  if (before > 0) s.events.push({ kind: 'partyDue' });
+  if (before >= 0) s.events.push({ kind: 'partyDue' });
   const free = desksOf(s) - s.adventurers.length;
   if (free < PARTY_SIZE || s.tourney.on) return true;
   seatParty(s);
@@ -848,6 +856,8 @@ export function foundCharter(s: GameState) {
   s.ores = noOres();
   // The Armoury lays its Iron Shortswords on the new smithy's first anvils.
   for (let k = 0; k < s.halls.armoury; k++) s.slots[k] = 2;
+  // They count as made, as a merged Shortsword does, for the orders and prices that follow the best.
+  if (s.halls.armoury > 0) raiseBest(s, 2);
   s.events.push({ kind: 'charter', charter: s.charter });
   return true;
 }
@@ -862,7 +872,10 @@ export function chooseHall(s: GameState, hall: Hall) {
   s.halls[hall]++;
   if (hall === 'armoury') {
     const slot = s.slots.indexOf(null);
-    if (slot >= 0) put(s, slot, 2);
+    if (slot >= 0) {
+      put(s, slot, 2);
+      raiseBest(s, 2);
+    }
   }
   s.events.push({ kind: 'hall', hall });
   return true;

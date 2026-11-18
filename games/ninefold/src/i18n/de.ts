@@ -175,6 +175,7 @@ const de: Translation<typeof en> = {
   makerKeys: 'Tasten: 1-9 setzen eine Vorgabe, Pfeile bewegen, Rücktaste löscht',
   codeRefused: 'Dieser Code öffnet kein Rätsel mit genau einer Lösung.',
   pastePrompt: 'Füge einen Ninefold-Rätselcode oder -Link ein:',
+  shareReplaces: 'Das geteilte Rätsel öffnen? Das angefangene Brett geht dabei verloren.',
   openCode: 'Code öffnen',
   check: 'Prüfen',
   checkUnique: 'Eine Lösung!',

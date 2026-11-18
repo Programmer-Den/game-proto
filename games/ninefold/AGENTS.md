@@ -51,7 +51,7 @@ Implemented today:
   1 to 26 empty cells as a letter `a`-`z`, and for Jigsaw `.` and the regions as digits;
   `decode` also takes a link carrying `puzzle=`. `startCode` plays a code that is `playable` (no
   clash, exactly one solution) as `mode: 'custom'`, which `solved` counts for nothing (no progress,
-  styles or trophies), and leaves `s.made` (the player's own maker board) as it was. `create` opens `?puzzle=<code>` once and drops it from the address; the
+  styles or trophies), and leaves `s.made` (the player's own maker board) as it was. `create` opens `?puzzle=<code>` once (over a board `loadBoard` brought back only after `window.confirm` with `shareReplaces`) and drops it from the address; the
   panel's `paste` button asks for a code with `window.prompt`.
 - Puzzles are made in code (`makePuzzle`): a random full board, then cells emptied while the
   solution stays unique, down to the givens asked for (a board that can't lose more keeps a few

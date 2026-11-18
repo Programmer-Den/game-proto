@@ -81,6 +81,8 @@ export class GameScene extends Phaser.Scene {
   clockPick = 0;
   /** The clocks of the game in play, or null. */
   clock: Clock | null = null;
+  /** The clocks before each ply played in this visit, by ply, so an undo puts them back as they were. */
+  private clockAt: { w: number; b: number }[] = [];
   /** The rival being played, or -1; and how many rivals are beaten. */
   rival = -1;
   rivalsBeaten = loadRivals();
@@ -374,6 +376,7 @@ export class GameScene extends Phaser.Scene {
     this.puzzle = opts.puzzle ?? null;
     if (!this.puzzle) this.daily = false;
     this.clock = opts.clock ? { ...opts.clock } : null;
+    this.clockAt = [];
     this.misses = 0;
     this.hintSquare = -1;
     this.pos = new Position(opts.start ?? START);
@@ -691,9 +694,9 @@ export class GameScene extends Phaser.Scene {
       SFX('promote');
       if (human && this.mode !== 'puzzle') this.trophy('promotion');
     }
+    if (this.clock) this.clockAt[this.pos.history.length] = { w: this.clock.w, b: this.clock.b };
     this.pos.make(m);
     if (this.clock) this.clock[mover] += this.clock.plus * 1000;
-    if (m.captured) this.noteCapture(kindOf(m.piece), kindOf(m.captured), scene, human);
     this.result = this.pos.result();
     // A puzzle's wrong move is taken back after a beat, and doesn't end anything.
     if (this.puzzle && human && !this.puzzleRight(m)) {
@@ -711,6 +714,8 @@ export class GameScene extends Phaser.Scene {
       this.refresh();
       return;
     }
+    // Noted only once a puzzle's move stands, so a wrong capture taken back never shows as the last one.
+    if (m.captured) this.noteCapture(kindOf(m.piece), kindOf(m.captured), scene, human);
     this.syncPieces();
     // A finished game is counted before the mate scene plays, so leaving for the menu during the
     // scene can't skip the result (or leave the save from before the last move to continue).
@@ -952,6 +957,10 @@ export class GameScene extends Phaser.Scene {
     this.pos.unmake();
     // Against the AI, take back its reply too, so it is the player's move again.
     if (this.mode !== 'duo' && this.pos.turn !== this.player && this.pos.history.length) this.pos.unmake();
+    // The clocks go back to where they stood before the first move taken back (a move replayed from a save has none kept).
+    const before = this.clockAt[this.pos.history.length];
+    if (this.clock && before) Object.assign(this.clock, before);
+    this.clockAt.length = this.pos.history.length;
     this.result = null;
     this.buildPlay();
   }
