@@ -11,6 +11,13 @@ import {
   buyDepot,
   buyLamp,
   buyUpgrade,
+  canBuild,
+  canUpgradeFast,
+  fastCost,
+  pickHitch,
+  upgradeFast,
+  wagonList,
+  wagonPay,
   UPGRADE_NAMES,
   buyWarehouse,
   canBuyWarehouse,
@@ -45,7 +52,6 @@ import {
   upgradeLocked,
   villageAt,
   villages,
-  wagons,
   workshopOf,
   type Journey,
 } from '../game/sim';
@@ -53,6 +59,10 @@ import { saveMedal, loadMedals } from '../game/medals';
 import {
   COURIER_COST,
   DEPOT_ROUND,
+  FAST_ROUND,
+  WAGON_CARGO,
+  WAGON_KINDS,
+  WAGON_TEXT,
   FESTIVAL_GOAL,
   FESTIVAL_ROUND,
   HAZARD_TEXT,
@@ -100,7 +110,6 @@ import {
   PANEL,
   SEGMENT_GAPS,
   UI_DEPTH,
-  UPGRADES_Y,
   VIEW,
   groundDepth,
   iso,
@@ -172,8 +181,8 @@ const MOOD_LOOKS: { color: number; mouth: number }[] = [
   { color: 0x5ad06a, mouth: 1 },
 ];
 
-/** How taps on the valley act: laying track that joins its neighbours, plain track, taking track up, or building a depot at a village. */
-type Mode = 'auto' | 'plain' | 'remove' | 'depot';
+/** How taps on the valley act: laying track that joins its neighbours, plain track, fast track (or making track fast), taking track up, or building a depot at a village. */
+type Mode = 'auto' | 'plain' | 'fast' | 'remove' | 'depot';
 
 /** A tile from a track key (`c,r`). */
 const tileOfKey = (k: string): Tile => {
@@ -262,6 +271,14 @@ export class GameScene extends Phaser.Scene {
   private depotButton!: Button;
   private removeButton!: Button;
   private plainButton!: Button;
+  private fastButton!: Button;
+  /** The wagon cards at a round's start (WR21): the first card tapped waits, lit, for the second. */
+  private hitchLayer!: Phaser.GameObjects.Container;
+  private hitchTitle!: Phaser.GameObjects.Text;
+  private hitchCards: { bg: Phaser.GameObjects.Rectangle }[] = [];
+  private hitchFirst: number | null = null;
+  /** The standing contract's tally under its village (WR23). */
+  private contractTag!: Phaser.GameObjects.Text;
   /** The round's two charters to choose from, over the board. */
   private charterLayer!: Phaser.GameObjects.Container;
   private charterTitle!: Phaser.GameObjects.Text;
@@ -319,6 +336,8 @@ export class GameScene extends Phaser.Scene {
     this.charterCards = [];
     this.moultKey = '';
     this.moultCards = [];
+    this.hitchCards = [];
+    this.hitchFirst = null;
     this.stations = [];
     this.pines.clear();
     this.markers = [];
@@ -344,6 +363,7 @@ export class GameScene extends Phaser.Scene {
     this.darkKey = '';
     this.glow = this.add.graphics().setDepth(UI_DEPTH - 3);
     this.hazardMark = this.add.text(0, 0, '!', textStyle(26, '#f0a050')).setOrigin(0.5, 1).setDepth(UI_DEPTH - 1).setVisible(false);
+    this.contractTag = this.add.text(0, 0, '', textStyle(11, '#f3c64e')).setOrigin(0.5).setDepth(UI_DEPTH - 2).setVisible(false);
     this.wyrmViews.push(this.createWyrm('wyrm'));
     this.createHud();
     this.createPanel();
@@ -403,7 +423,7 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     const village = villageAt(s, t);
     this.pressedVillage = down && this.mode !== 'remove' && this.mode !== 'depot' ? village : null;
-    this.pressedTrack = down && this.mode !== 'remove' && this.mode !== 'depot' && s.track.includes(key(t)) && !s.switches[key(t)] ? t : null;
+    this.pressedTrack = down && (this.mode === 'auto' || this.mode === 'plain') && s.track.includes(key(t)) && !s.switches[key(t)] ? t : null;
     if (this.mode === 'depot') {
       if (!down) return;
       // A tap on a village builds its depot; on a town with a depot, its warehouse.
@@ -418,6 +438,16 @@ export class GameScene extends Phaser.Scene {
         sfx('untok');
         ui('coin');
       } else if (down) ui('refuse');
+      return;
+    }
+    if (this.mode === 'fast') {
+      // Fast track (WR22): new track laid fast, or plain track made fast; a drag runs a whole main line.
+      if (upgradeFast(s, t) || buildTrack(s, t, false, this.lastLaid, true)) {
+        this.lastLaid = t;
+        sfx('tok', { pitch: 1.2 * Math.min(1.5, 1 + 0.05 * this.dragLaid++) });
+      } else if (down && throwSwitch(s, t)) sfx('switch');
+      else if (onLine(s, t)) this.lastLaid = t;
+      else if (down) ui('refuse');
       return;
     }
     if (down && throwSwitch(s, t)) return void sfx('switch');
@@ -526,7 +556,6 @@ export class GameScene extends Phaser.Scene {
     this.add.rectangle(left, PANEL.top, width - left, height - PANEL.top, 0x2c2018).setOrigin(0).setDepth(UI_DEPTH);
     this.add.rectangle(left, PANEL.top, 4, height - PANEL.top, 0x5a3f2a).setOrigin(0).setDepth(UI_DEPTH);
     this.add.text(PANEL.x, 62, t('orders'), textStyle(16, '#f3c64e')).setOrigin(0.5).setDepth(UI_DEPTH);
-    this.add.text(PANEL.x, UPGRADES_Y + dy, t('upgrades'), textStyle(14, '#f3c64e')).setOrigin(0.5).setDepth(UI_DEPTH);
     this.timers = this.add.graphics().setDepth(UI_DEPTH + 2);
     const button = (y: number, onClick: () => void) => {
       const b = makeButton(this, PANEL.x, y + dy, PANEL.w, BUTTONS.h, '', onClick);
@@ -544,10 +573,12 @@ export class GameScene extends Phaser.Scene {
     const toggle = (mode: Mode) => () => {
       // Depots are locked until their round: the dimmed Depot button refuses rather than turning on.
       if (mode === 'depot' && this.mode !== 'depot' && depotLocked(this.state)) return ui('refuse');
+      if (mode === 'fast' && this.mode !== 'fast' && this.state.round < FAST_ROUND) return ui('refuse');
       ui('click');
       this.mode = this.mode === mode ? 'auto' : mode;
     };
     this.depotButton = button(BUTTONS.depot, toggle('depot'));
+    this.fastButton = button(BUTTONS.fast, toggle('fast'));
     const dx = (PANEL.w - BUTTONS.half) / 2;
     this.removeButton = makeButton(this, PANEL.x - dx, BUTTONS.remove + dy, BUTTONS.half, BUTTONS.h, t('remove'), toggle('remove'));
     this.plainButton = makeButton(this, PANEL.x + dx, BUTTONS.remove + dy, BUTTONS.half, BUTTONS.h, t('plain'), toggle('plain'));
@@ -605,6 +636,25 @@ export class GameScene extends Phaser.Scene {
     }
     this.moultLayer = this.add.container(BOARD.x, BOARD.y, moultParts).setDepth(UI_DEPTH + 5).setVisible(false);
 
+    // The round's wagons (WR21): three cards over the board, two to tap, the game waiting meanwhile.
+    const hitchShade = this.add.rectangle(0, 0, BOARD.w, BOARD.h, 0x0e0a08, 0.6).setOrigin(0);
+    this.hitchTitle = this.add.text(BOARD.w / 2, MOULT_CARD.y + cy - MOULT_CARD.h / 2 - 44, '', { ...textStyle(19, '#a8e0f0'), align: 'center' }).setOrigin(0.5);
+    const hitchParts: Phaser.GameObjects.GameObject[] = [hitchShade, this.hitchTitle];
+    WAGON_KINDS.forEach((kind, i) => {
+      const x = BOARD.w / 2 + (i - 1) * (MOULT_CARD.w + MOULT_CARD.gap);
+      const y = MOULT_CARD.y + cy;
+      const bg = this.add.rectangle(x, y, MOULT_CARD.w, MOULT_CARD.h, 0x1f2c36).setStrokeStyle(3, 0x7ab0c8);
+      bg.setInteractive({ useHandCursor: true }).on('pointerdown', () => this.tapHitch(i));
+      // The wagon in its paint with the goods it is built for, beside what it does.
+      const wagon = fit(this.add.image(x - MOULT_CARD.w / 2 + 40, y + 22, `wagon-${kind}-v`));
+      const icon = fit(this.add.image(x - MOULT_CARD.w / 2 + 40, y - 12, `cargo-${WAGON_CARGO[kind]}`));
+      const name = this.add.text(x, y - 42, t(WAGON_TEXT[kind].name), textStyle(16, '#a8e0f0')).setOrigin(0.5);
+      const text = this.add.text(x + 32, y + 12, t(WAGON_TEXT[kind].text), { ...textStyle(12, '#f3e9d2'), align: 'center', wordWrap: { width: MOULT_CARD.w - 76 } }).setOrigin(0.5);
+      this.hitchCards.push({ bg });
+      hitchParts.push(bg, wagon, icon, name, text);
+    });
+    this.hitchLayer = this.add.container(BOARD.x, BOARD.y, hitchParts).setDepth(UI_DEPTH + 5).setVisible(false);
+
     // The daily valley: a link in the sky before the first track is laid, a tag while it is played.
     this.dailyLink = this.add
       .text(BOARD.x + DAILY_LINK.x, BOARD.y + DAILY_LINK.y, '', textStyle(14, '#f3c64e'))
@@ -615,6 +665,45 @@ export class GameScene extends Phaser.Scene {
         ui('click');
         this.scene.restart({ journey: { daily: true } });
       });
+  }
+
+  /** A tap on a wagon card: the first waits, lit; a second, other card hitches both. */
+  private tapHitch(i: number) {
+    if (this.hitchFirst === i) {
+      this.hitchFirst = null;
+      return ui('click');
+    }
+    if (this.hitchFirst === null) {
+      this.hitchFirst = i;
+      return ui('click');
+    }
+    if (pickHitch(this.state, this.hitchFirst, i)) sfx('stamp');
+    this.hitchFirst = null;
+  }
+
+  /** The wagon cards while the round's wagons are on offer, after a moult. */
+  private drawHitch() {
+    const s = this.state;
+    const open = s.hitchOffer && !s.moultOffer && s.phase === 'play';
+    this.hitchLayer.setVisible(open);
+    if (!open) return;
+    this.hitchTitle.setText(t('pickHitch', { round: s.round }));
+    this.hitchCards.forEach((card, i) => {
+      const lit = this.hitchFirst === i;
+      card.bg.setFillStyle(lit ? 0x35566a : 0x1f2c36).setStrokeStyle(3, lit ? 0xf3c64e : 0x7ab0c8);
+    });
+  }
+
+  /** The standing contract's tally under its village, gold while open and green once filled. */
+  private drawContract() {
+    const c = this.state.contract;
+    this.contractTag.setVisible(!!c && this.state.phase === 'play');
+    if (!c) return;
+    const v = villages(this.state)[c.village];
+    const { x, y } = tileCenter(v);
+    const text = t('contractTag', { done: Math.min(c.done, c.need), need: c.need, pay: c.pay });
+    if (this.contractTag.text !== text) this.contractTag.setText(text);
+    this.contractTag.setPosition(x, y + (workshopOf(v) ? 46 : 30)).setColor(c.done >= c.need ? '#9be883' : '#f3c64e');
   }
 
   /** Whether the daily valley's link can start today's try: a fresh first valley that hasn't laid track, with today's try unused. */
@@ -757,6 +846,8 @@ export class GameScene extends Phaser.Scene {
     this.overLayer.setVisible(s.phase !== 'play');
     this.drawCharters();
     this.drawMoult();
+    this.drawHitch();
+    this.drawContract();
     this.drawDailyLink();
   }
 
@@ -785,8 +876,8 @@ export class GameScene extends Phaser.Scene {
   private drawCharters() {
     const s = this.state;
     const offer = s.charterOffer;
-    // A moult comes first: the charter cards wait under its cards.
-    this.charterLayer.setVisible(!!offer && !s.moultOffer && s.phase === 'play');
+    // A moult and the wagons come first: the charter cards wait under their cards.
+    this.charterLayer.setVisible(!!offer && !s.moultOffer && !s.hitchOffer && s.phase === 'play');
     if (!offer) return;
     const k = `${s.round}|${offer.map((c) => c.id + (c.cargo ?? '')).join(';')}`;
     if (k === this.charterKey) return;
@@ -838,7 +929,7 @@ export class GameScene extends Phaser.Scene {
   /** Redraws the rails when the track, the switches or the open villages change. */
   private drawTrack() {
     const s = this.state;
-    const k = `${s.track.join(';')}|${s.round}|${Object.entries(s.switches).join(';')}|${s.cuts.join(';')}|${s.crossings.join(';')}|${s.hazard ? key(s.hazard.tile) : ''}|${s.lamps.join(';')}|${s.rival ? s.rival.track.join(';') : ''}`;
+    const k = `${s.track.join(';')}|${s.round}|${Object.entries(s.switches).join(';')}|${s.cuts.join(';')}|${s.crossings.join(';')}|${s.hazard ? key(s.hazard.tile) : ''}|${s.lamps.join(';')}|${s.fast.join(';')}|${s.rival ? s.rival.track.join(';') : ''}`;
     if (k === this.trackKey) return;
     this.trackKey = k;
     for (const [tile, pines] of this.pines) pines.setVisible(!s.track.includes(tile));
@@ -853,6 +944,8 @@ export class GameScene extends Phaser.Scene {
         const bridge = !station && terrainAt(s.valley, here) === 'river';
         const closed = s.switches[key(here)];
         const doomed = s.hazard && key(s.hazard.tile) === key(here);
+        // Fast track (WR22): a blue-grey bed and bright brass rails.
+        const fast = s.fast.includes(key(here));
         for (const n of arms(s, here)) {
           const dc = n.c - c;
           const dr = n.r - r;
@@ -863,7 +956,7 @@ export class GameScene extends Phaser.Scene {
           };
           const shut = closed === key(n);
           if (pass === 'bed') {
-            g.fillStyle(doomed ? 0xc06a3a : bridge ? WOOD.base : RAIL.bed).fillPoints([at(0, -0.24), at(1, -0.24), at(1, 0.24), at(0, 0.24)], true);
+            g.fillStyle(doomed ? 0xc06a3a : bridge ? WOOD.base : fast ? 0x4a5a70 : RAIL.bed).fillPoints([at(0, -0.24), at(1, -0.24), at(1, 0.24), at(0, 0.24)], true);
             if (bridge) for (const side of [-0.25, 0.25]) g.lineStyle(2, WOOD.dark).lineBetween(at(-0.5, side).x, at(-0.5, side).y, at(1, side).x, at(1, side).y);
           }
           if (pass === 'sleepers') {
@@ -878,7 +971,7 @@ export class GameScene extends Phaser.Scene {
               const a = at(0, side, 1.5);
               const b = at(1, side, 1.5);
               g.lineStyle(3, 0x4c4b55).lineBetween(a.x, a.y + 1, b.x, b.y + 1);
-              g.lineStyle(1.8, shut ? 0x8a8a94 : RAIL.shine, shut ? 0.7 : 1).lineBetween(a.x, a.y, b.x, b.y);
+              g.lineStyle(fast ? 2.2 : 1.8, shut ? 0x8a8a94 : fast ? 0xf3c64e : RAIL.shine, shut ? 0.7 : 1).lineBetween(a.x, a.y, b.x, b.y);
             }
           }
           if (pass === 'switches' && shut) {
@@ -1043,6 +1136,13 @@ export class GameScene extends Phaser.Scene {
           if (v !== null && (canBuyDepot(s, v) || canBuyWarehouse(s, v))) g.lineStyle(2.5, 0xf3c64e, 0.95).strokePoints(diamond(c, r), true);
           continue;
         }
+        if (this.mode === 'fast') {
+          const cost = fastCost(s, t);
+          if (cost === null) continue;
+          const ok = canBuild(s, t, true) || canUpgradeFast(s, t);
+          g.lineStyle(ok ? 2 : 1.5, ok ? 0xf3c64e : 0x6a6070, ok ? 0.95 : 0.5).strokePoints(diamond(c, r), true);
+          continue;
+        }
         const cost = trackCost(s, t);
         if (cost === null) continue;
         const pts = diamond(c, r);
@@ -1102,7 +1202,8 @@ export class GameScene extends Phaser.Scene {
       trail.unshift({ x: head.x + ((last.x - head.x) * (i - 1)) / step, y: head.y + ((last.y - head.y) * (i - 1)) / step });
     }
     trail.length = Math.min(trail.length, SEGMENT_GAPS[SEGMENT_GAPS.length - 1] + 2);
-    const shown = 4 + wagons(s);
+    const list = wagonList(s);
+    const shown = 4 + list.length;
     segments.forEach((seg, i) => {
       const gap = SEGMENT_GAPS[i];
       const p = i === 0 ? head : trail[Math.min(gap, trail.length - 1)];
@@ -1115,17 +1216,27 @@ export class GameScene extends Phaser.Scene {
       const dx = ahead.x - p.x;
       const dy = ahead.y - p.y;
       const angle = dx || dy ? Math.atan2(dy, dx) : view.headAngle;
-      seg.setTexture(Math.cos(angle) * Math.sin(angle) > 0 ? 'wagon-u' : 'wagon-v');
+      // A hitched wagon kind (WR21) shows in its own paint.
+      const kind = list[i - 4];
+      const paint = kind && kind !== 'plain' ? `wagon-${kind}` : 'wagon';
+      seg.setTexture(`${paint}-${Math.cos(angle) * Math.sin(angle) > 0 ? 'u' : 'v'}`);
     });
     const coil = segments[1];
     wings.setPosition(coil.x, coil.y).setDepth(coil.depth + 0.2).setVisible(coil.visible);
     const moving = w.path.length > 0 && w.switchMs <= 0 && w.waitMs <= 0;
     fit(wings, 1, moving && !settings.reduceMotion ? 0.75 + 0.25 * Math.sin(this.time.now / 90 + index) : 1);
-    // What the wagons carry: the orders this wyrm has loaded, first loaded in the front wagon.
+    // What the wagons carry: each loaded order in the wagon it rides in (passengers fill them all).
     const carried = s.orders.filter((o) => o.status === 'carrying' && o.wyrm === index);
+    const left = [...carried];
+    const inWagon = list.map((kind) => {
+      const j = left.findIndex((o) => o.wagon === kind);
+      return j < 0 ? undefined : left.splice(j, 1)[0];
+    });
+    // Anything left over (a hopper's second load, or cargo from before a rehitch) rides in an empty wagon's place.
+    for (let j = 0; j < inWagon.length && left.length; j++) if (!inWagon[j]) inWagon[j] = left.shift();
     wagonCargo.forEach((icon, i) => {
       const wagon = segments[4 + i];
-      const o = carried[i] ?? (carried[0] && isPassengers(carried[0]) ? carried[0] : undefined);
+      const o = inWagon[i] ?? (carried[0] && isPassengers(carried[0]) ? carried[0] : undefined);
       icon.setVisible(!!o && wagon.visible).setPosition(wagon.x, wagon.y - LOAD_LIFT).setDepth(wagon.depth + 0.1);
       if (o) icon.setTexture(`cargo-${o.cargo}`);
     });
@@ -1197,6 +1308,8 @@ export class GameScene extends Phaser.Scene {
     const text =
       this.mode === 'remove'
         ? t('hintRemove')
+        : this.mode === 'fast'
+          ? t('hintFast')
         : this.mode === 'plain'
           ? t('hintPlain')
           : this.mode === 'depot'
@@ -1247,7 +1360,7 @@ export class GameScene extends Phaser.Scene {
 
   private drawPanel() {
     const s = this.state;
-    const k = `${s.upgrades.hoard}|${s.wyrms.length}|${s.rival?.claim?.order ?? ''}|` + s.orders.map((o) => `${o.id}:${o.status}:${routable(s, o)}`).join(';');
+    const k = `${s.upgrades.hoard}|${s.wyrms.length}|${s.rival?.claim?.order ?? ''}|` + s.orders.map((o) => `${o.id}:${o.status}:${routable(s, o)}:${orderPay(s, o)}:${o.wagon}`).join(';');
     if (k !== this.cardKey) {
       this.cardKey = k;
       for (const c of this.cards) c.destroy();
@@ -1293,6 +1406,9 @@ export class GameScene extends Phaser.Scene {
     this.removeButton.setLit(this.mode === 'remove');
     this.plainButton.setCaption(t(this.mode === 'plain' ? 'plainOn' : 'plain'));
     this.plainButton.setLit(this.mode === 'plain');
+    this.fastButton.setCaption(this.mode === 'fast' ? t('fastOn') : s.round < FAST_ROUND ? t('fastRound', { round: FAST_ROUND }) : t('fastTrack'));
+    this.fastButton.setLit(this.mode === 'fast');
+    this.fastButton.setEnabled(this.mode === 'fast' || s.round >= FAST_ROUND);
   }
 
   private makeCard(o: Order, y: number) {
@@ -1313,8 +1429,15 @@ export class GameScene extends Phaser.Scene {
     const status = this.add.text(left, 5, t(raced ? 'rivalRace' : ok ? STATUS_TEXT[o.status] : 'noTrack'), textStyle(11, raced ? '#c7a0e8' : ok ? '#c9e8c0' : '#a8957a'));
     // What the sending village's mood did to the order when it was made: a sulking village wants it fast, a happy one pays more.
     const mood = o.mood;
+    // Aboard, the tag tells what its wagon does instead (WR21): fish spoiling, or letters paying for speed.
+    const wagon = wagonPay(s, o);
     const tag = this.add
-      .text(PANEL.w / 2 - 8, 5, mood < 0 ? t('rushOrder') : mood > 0 ? t('morePay', { n: Math.round((MOOD_PAY[mood] - 1) * 100) }) : '', textStyle(11, mood < 0 ? '#e8b040' : '#9be883'))
+      .text(
+        PANEL.w / 2 - 8,
+        5,
+        wagon < 1 ? t('spoiling') : wagon > 1 ? t('mailBonus') : mood < 0 ? t('rushOrder') : mood > 0 ? t('morePay', { n: Math.round((MOOD_PAY[mood] - 1) * 100) }) : '',
+        textStyle(11, wagon < 1 || (wagon === 1 && mood < 0) ? '#e8b040' : '#9be883'),
+      )
       .setOrigin(1, 0);
     const card = this.add.container(PANEL.x, y, [bg, icon, title, pay, route, status, tag]).setDepth(UI_DEPTH + 1);
     bg.setInteractive({ useHandCursor: true }).on('pointerdown', () => (dispatch(this.state, o.id) ? sfx('send') : ui('refuse')));

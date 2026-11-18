@@ -30,6 +30,8 @@ const de: Translation<typeof en> = {
   waresLower: 'Stadtwaren',
   passengers: 'Fahrgäste',
   passengersLower: 'Fahrgäste',
+  letters: 'Briefe',
+  lettersLower: 'Briefe',
 
   // Charters: name and card text
   fairName: 'Markt',
@@ -73,6 +75,9 @@ const de: Translation<typeof en> = {
   rivalBanner: 'Eine fremde Bahn baut im Tal und macht dir die Aufträge streitig',
   lampsBanner: 'Gleise antippen, um eine Laterne aufzuhängen: Nachtrunden kommen',
   nightBanner: 'Es wird Nacht: dunkle Gleise bremsen den Lindwurm',
+  hitchBanner: 'Angehängt: {a} und {b}',
+  contractBanner: '{village} will diese Runde {n} Ladungen: +{pay} M am Rundenende',
+  contractPaid: 'Vertrag erfüllt: +{n} M',
 
   // Floating texts over the valley
   depotPop: 'Depot -{n}',
@@ -92,15 +97,26 @@ const de: Translation<typeof en> = {
   backInStore: 'Zurück ins Lager',
   beatRival: 'Vor der Konkurrenz!',
   rivalTook: 'Konkurrenz holt {cargo}',
+  contractFilled: 'Vertrag erfüllt!',
 
   // The valley and the panel
   roost: 'Horst',
   orders: 'Aufträge',
-  upgrades: 'Ausbau',
+  pickHitch: 'Runde {round}: hänge zwei Wagen an.\nTippe zwei Karten an',
+  wagonCold: 'Kühlwagen',
+  wagonColdText: 'Fisch bringt vollen Lohn. Sonst verdirbt er, bis auf die Hälfte',
+  wagonHopper: 'Großer Trichter',
+  wagonHopperText: 'Fasst zwei Kornaufträge in einem Wagen',
+  wagonMail: 'Postkutsche',
+  wagonMailText: 'Briefe bringen bis zu doppelten Lohn, je früher sie ankommen',
   remove: 'Abbauen',
   removing: 'Baut ab',
   plain: 'Schlicht',
   plainOn: 'Schlicht an',
+  fastTrack: 'Schnellgleis',
+  fastOn: 'Schnellgleis an',
+  fastRound: 'Schnellgleis: Runde {round}',
+  contractTag: 'Vertrag {done}/{need}: {pay} M',
   playAgain: 'Nochmal',
   flyOn: 'Weiterfliegen',
   keepUpgrade: '{upgrade} behalten',
@@ -133,6 +149,8 @@ const de: Translation<typeof en> = {
   rushOrder: 'Eilauftrag',
   morePay: '+{n} % Lohn',
   rivalRace: 'Konkurrenz!',
+  spoiling: 'verdirbt',
+  mailBonus: 'Eilpost',
 
   // The HUD: the round and what each wyrm is doing
   festivalProgress: 'Fest: {n}/{goal} geliefert',
@@ -162,6 +180,7 @@ const de: Translation<typeof en> = {
   hintRockfall: 'Ein Steinschlag kommt: lege einen Umweg oder baue die Gleise danach neu.',
   hintCourier: 'Ein Dorf schmollt: antippen schickt einen freien Lindwurm mit Geschenken ({cost} M).',
   hintSwitch: 'Weiche antippen stellt sie um: der Lindwurm fährt, wohin die Weichen ihn schicken.',
+  hintFast: 'Schnellgleis: doppelter Preis, doppeltes Tempo. Tippen oder ziehen legt es, auch über alte Gleise.',
   hintBuild: 'Tippen oder ziehen legt Gleise: Wiese 2, Wald 4, Brücke {bridge}, Tunnel 20. Dann Auftrag antippen.',
 
   hintAvalanche: 'Eine Lawine kommt: lege einen Umweg oder baue die Gleise danach neu.',

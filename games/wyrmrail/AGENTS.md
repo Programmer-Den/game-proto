@@ -47,7 +47,12 @@ carry orders between villages before their time runs out.
   time becoming a town that pays more, sends wares and can build a warehouse; night rounds (WR19),
   rounds 5 and 8, where unlit track slows the wyrm and lamps bought from round 3 light the way; a
   rival line (WR20) from round 3 to the festival, laying its own track and racing the wyrm for
-  waiting orders.
+  waiting orders; wagon kinds (WR21) from round 2, two of three (a cold wagon for fish, which
+  spoils elsewhere, a big hopper holding two grain orders, a mail coach paying letters for speed)
+  hitched on cards at each round's start while the game waits, with letters as a new order; fast
+  track (WR22) from round 2, double-price track the wyrm flies twice as fast over, laid or upgraded
+  with the Fast track toggle; standing contracts (WR23) from round 2 to the festival, a village
+  asking for half the round's goal in loads from it, paid as a lump at the round's end.
 - **Progression** is mostly within a game: coins, track, upgrades, depots and the round, and
   across a chain of valleys the traits and one kept upgrade. The only meta progression is the best
   festival medal per difficulty and the boons it gives a new game, and the daily valley's record.
@@ -75,6 +80,13 @@ carry orders between villages before their time runs out.
     unlit one is shaded where it overlaps.
   - A town's only station upgrade is the warehouse; a second platform from the idea list is not
     built.
+  - From round 2 every round opens with the wagon cards, even when the player would hitch the same
+    two again; there is no "keep last round's" shortcut.
+  - A new hitch can leave cargo aboard with more loads than wagons (two grain from the hopper
+    moved to plain wagons): `pickHitch` puts what doesn't fit in `plain`, and nothing more boards
+    until it is delivered.
+  - The snowy valley, the marsh and the canyon have no fish (their local goods replace it), so the
+    cold wagon is only worth hitching in the meadow from round 4.
 
 ## Architecture
 
@@ -124,7 +136,11 @@ File map (all under `src/` unless it starts with `shared/`):
   `NIMBLE_TIME`, `CHARMING_GAP`, the towns' `TOWN_ROUND`, `GROW_AT`, `TOWN_PAY`,
   `WARES_CHANCE`, `WARES_PAY`, `WAREHOUSE_COST`, the nights' `NIGHT_ROUNDS`, `LAMP_ROUND`,
   `LAMP_COST`, `DARK_SLOWDOWN`, the rival's `RIVAL_ROUND`, `RIVAL_BUILD_MS`, `RIVAL_CLAIM_MS`,
-  `RIVAL_REST_MS`, `RIVAL_BUYOUT`), `CHAIN_KINDS` and `kindOfLeg` (the kind of each valley in a
+  `RIVAL_REST_MS`, `RIVAL_BUYOUT`, the wagons' `WAGON_ROUND`, `HOPPER_LOADS`, `SPOIL_MS`,
+  `SPOILED_PAY`, `LETTER_CHANCE`, `LETTER_PAY`, `LETTER_TIME`, `MAIL_BONUS`, fast track's
+  `FAST_ROUND`, `FAST_COST`, `FAST_SPEED`, the contracts' `CONTRACT_ROUND`, `CONTRACT_PAY`,
+  `CONTRACT_CHANCE` and `contractNeed`), `WAGON_KINDS`, `WagonKind`, `WAGON_TEXT` (each wagon's
+  name and card text) and `WAGON_CARGO` (the goods each is built for), `CHAIN_KINDS` and `kindOfLeg` (the kind of each valley in a
   chain), `KIND_TEXT` (each kind's name and arrival line), `TRAITS`, `Trait` and `TRAIT_TEXT`,
   `HazardKind` and `HAZARD_TEXT` (each hazard's warning, pop and hint), the charter table `CHARTERS` (name and text as
   `TextKey`s, the text's `{cargo}` filled in by the scene), `MEDALS`, `BOONS` (names as `TextKey`s),
@@ -139,9 +155,11 @@ File map (all under `src/` unless it starts with `shared/`):
   hoard, shown on the cards and paid on delivery), `jobOrder`, `pickCharter`, `depotCost`,
   `depotLocked`, `canBuyDepot`, `buyDepot`, `villageAt`, `canSendCourier`, `sendCourier`,
   `festivalMedal`, `hasBoon`, `boonNames`, `moodOf`, `tick`, and for the chain, the moults and the
-  daily `Journey`, `UPGRADE_NAMES`, `hasTrait`, `wagons`, `choosing` (a charter or a moult is on
-  offer), `hazardKind`, `pickMoult`, and for towns, nights and the rival `isNight`, `isLit`,
-  `canBuyLamp`, `buyLamp`, `canBuyWarehouse`, `buyWarehouse`, `rivalServes`, `rivalFlyovers`. No Phaser import. Banners and pops are
+  daily `Journey`, `UPGRADE_NAMES`, `hasTrait`, `wagons`, `choosing` (a charter, a moult or the wagons
+  are on offer), `hazardKind`, `pickMoult`, and for towns, nights and the rival `isNight`, `isLit`,
+  `canBuyLamp`, `buyLamp`, `canBuyWarehouse`, `buyWarehouse`, `rivalServes`, `rivalFlyovers`, and
+  for the wagons, fast track and contracts `wagonList`, `pickWagon`, `pickHitch`, `wagonPay`,
+  `fastCost`, `canUpgradeFast`, `upgradeFast` (`canBuild` and `buildTrack` take a `fast` flag). No Phaser import. Banners and pops are
   translated with `t` (imported as `tr`, since `t` is a tile there) when they are made.
 - `scenes/BootScene.ts`: bakes the props and sprites (`bakeProps`, `bakeSprites`), then starts
   `Game`.
@@ -153,9 +171,11 @@ File map (all under `src/` unless it starts with `shared/`):
   switches, crossing plates and tunnel mouths, build hints, the hazard's mark, each wyrm's planned route, cargo markers, the
   villages' mood faces, the town towers and warehouse icons, lamp posts, the rival's track,
   flyovers and yard (`drawRival`, with the rails), the night (`drawNight`), the wyrms (`WyrmView` each), pops, HUD (with the bellies and the round's
-  charter), the orders and upgrades panel (with the Depot, Remove and Plain toggles), the banner, the
+  charter), the orders and upgrades panel (with the Depot, Fast track, Remove and Plain toggles), the banner, the
   charter cards, the moult's trait cards (`drawMoult`, over the charter cards, which wait under
-  them), the daily link or tag (`drawDailyLink`; once today's try is used, `dailyDone` with today's
+  them), the wagon cards (`drawHitch`, after the moult and before the charter; `tapHitch` lights
+  the first card tapped and hitches both on the second), the standing contract's tally under its
+  village (`drawContract`), the daily link or tag (`drawDailyLink`; once today's try is used, `dailyDone` with today's
   score in the link's place on a fresh first valley, not tappable; outside the daily it reads the
   record again once the day has changed, so the link opens after midnight without a restart) and the game over or festival panel (`openEnd`,
   once: the medal, which it saves outside the daily, the traits, the Keep or Fly on buttons, Play
@@ -164,7 +184,8 @@ File map (all under `src/` unless it starts with `shared/`):
   input to sim functions. Exposes `state` and `orderSpots`.
 - `scenes/layout.ts`: `VIEW` (the designed 960x540), `BOARD` and `DESIGN_BOARD`, `placeBoard`, the
   isometric projection (`ISO`, `iso`, `tileCenter`, `tileAt`, `groundDepth`), the panel, order
-  card, button, charter card, `MOULT_CARD`, `END_BUTTON` and `DAILY_LINK` positions, `HINT_BOTTOM`,
+  card, button (`BUTTONS`: six rows of 28-pixel buttons, the panel has no Upgrades heading any
+  more), charter card, `MOULT_CARD` (the wagon cards use it too), `END_BUTTON` and `DAILY_LINK` positions, `HINT_BOTTOM`,
   `SEGMENT_GAPS` (where the wyrm's parts ride behind the head: three coils and three wagons, the
   third shown only with the Third wagon trait) and depths.
 - `audio/sounds.ts`: the sound table `sfx` (`shared/audio.ts`'s `sounds`) and the song `SONG`
@@ -189,9 +210,10 @@ File map (all under `src/` unless it starts with `shared/`):
   `village-<name>` (roofs in `ROOFS`), `bunting` and `town` (a grown town's tower).
 - `art/sprites.ts`: the wyrm in the isometric style, `wyrm-head`, `wyrm-coil-0` to `-2`,
   `wyrm-wings`, the copper second wyrm's `wyrm2-*` (the same drawing through `toCopper`),
-  `wagon-u` and `wagon-v` (lengthwise along the columns or the rows), each `PART` sized with its
+  `wagon-u` and `wagon-v` (lengthwise along the columns or the rows) and the wagon kinds'
+  `wagon-cold-u`, `wagon-hopper-u`, `wagon-mail-u` and their `-v` (painted from `WAGON_WOOD`), each `PART` sized with its
   ground point at `PART_ORIGIN`; and the pixel icons `cargo-<cargo>` (`cargo-passengers` among
-  them, and `cargo-wares`, a town's crate), `coin`, `heart`, `heart-empty`, `food`, `depot`,
+  them, `cargo-wares`, a town's crate, and `cargo-letters`, an envelope), `coin`, `heart`, `heart-empty`, `food`, `depot`,
   `warehouse`.
 - `shared/settings.ts` and `shared/setupGame.ts` (repo root, shared by every game): the hub's
   settings, `byDifficulty` and `setupGame`. `sim.ts` imports `byDifficulty`, `GameScene.ts`
@@ -253,8 +275,10 @@ How it runs:
   (`pressedTrack`), and the `pointerup` calls `buyLamp` for it (refused quietly before
   `LAMP_ROUND` or on a tile that has a lamp). In `depot` mode a tap on a
   village calls `buyDepot`, or `buyWarehouse` when it has a depot (and goes back to `auto` once bought); the Depot button toggles it (and refuses to turn it on while `depotLocked`, in round 1). While the charter cards are up (`charterOffer`), a tap on the board does nothing. Order cards call `dispatch`; the upgrade buttons `buyUpgrade`; the charter cards
-  `pickCharter`; Remove, Plain and Depot set the scene's `mode` (`auto`, `plain`, `remove` or `depot`), which
-  lives in the scene, not the state. Sim functions check the phase and return false when the
+  `pickCharter`; the wagon cards `pickHitch`; Remove, Plain, Fast track and Depot set the scene's `mode` (`auto`, `plain`, `fast`, `remove` or `depot`), which
+  lives in the scene, not the state. In `fast` mode a tap or drag calls `upgradeFast` on track,
+  else `buildTrack(..., true)`, and throws a switch only when neither goes; the Fast track button
+  refuses to turn on before `FAST_ROUND`, and no lamp is hung in that mode. Sim functions check the phase and return false when the
   action is not allowed; `canBuild`, `canRemove` and `throwSwitch` also refuse while
   `charterOffer` is set.
 - **Rendering:** the valley is one image, baked for each game; props are images sorted with the wyrm by
@@ -263,7 +287,8 @@ How it runs:
   only when the track, the switches or the round change (`trackKey`), as half rails from each
   tile's middle towards its arms (the sim's `arms`, so a cut draws no rail) in passes (ballast or
   bridge deck, sleepers, rails, then the switches: a striped barrier across the barred arm, dimmed
-  rails on it and a lever, and a plate on each crossing); the hazard's tile has an orange bed.
+  rails on it and a lever, and a plate on each crossing); the hazard's tile has an orange bed, and
+  a fast tile a blue-grey bed and brass rails.
   With the rails, `drawPortals` makes a graphics object per tunnel tile, just in front of its peak,
   with a dark mouth towards each arm; wyrm parts (and their wings and loads) standing on a tunnel
   tile are hidden (`inTunnel`). The
@@ -273,8 +298,10 @@ How it runs:
   drawn as dots on the hints layer with a ring on its stop (`WYRM_COLORS`). A wyrm's head is
   placed between `at` and `path[0]`; the three coils and two wagons follow a trail of the
   head's past screen positions, one point per pixel, at `SEGMENT_GAPS`. A wagon shows `wagon-u`
-  or `wagon-v` by the way the trail runs under it, and carries the icon of an order that wyrm
-  has loaded.
+  or `wagon-v` (`wagon-<kind>-u` and so on for a hitched kind, in `wagonList` order) by the way the
+  trail runs under it, and carries the icon of the order riding in it (`Order.wagon`). The
+  order cards are rebuilt when an order's pay changes too (spoiling fish, letters in the mail
+  coach), and an order aboard shows "spoiling" or "fast post" in place of its mood tag.
   The head is drawn in profile facing right; it is flipped to face left while the wyrm moves left
   across the screen.
 
@@ -294,12 +321,16 @@ State model (`src/game/state.ts`):
   `festivalMs` and `medal`, `wyrms`, `upgrades` (`wings`, `hoard`, `second`), `orderTimerMs`,
   `banner`, `pops`, `nextId`, and for the chain, the moults and the daily `leg` (1 for the first
   valley), `kept` (the upgrade kept from the last valley and its level), `traits`, `moultOffer`
-  and `daily`.
+  and `daily`, and `hitch` (the round's two `WagonKind`s, null before `WAGON_ROUND`) and
+  `hitchOffer`, `fast` (tile keys), `contract` (`village`, `need`, `done`, `pay`) and
+  `contractPaid` (last round's lump, for the round's news until its picks are made).
 - `Order.from` and `.to` index into `valley.villages`. `Order.status` runs `waiting` -> `queued`
   (sent; a wyrm is on its way or will be) -> `loading` -> `carrying` -> removed on delivery. A
   late order is removed in any status. `Order.wyrm` is the index of the wyrm that set off for it
   (null before); `Order.made` marks a workshop's goods; `Order.mood` is the sending village's mood
-  when the order was made (its card's mood tag shows it).
+  when the order was made (its card's mood tag shows it). `Order.wagon` is the wagon it rides in
+  once aboard (a `WagonKind` or `plain`, null before), and `Order.aboardMs` how long it has been
+  aboard.
 - `Wyrm` has `at` (last tile), `from` (the tile before it, for switches), `path` (tiles still to
   cross), `progress` (0-1 towards `path[0]`), `job` (the stop it is heading for: order id and
   `pickup` or `drop` leg, `feed`, or `visit` with a village for a courier call), `loadMs`, `switchMs`, `food` (0-1), `eatMs` and `waitMs`.
@@ -406,6 +437,31 @@ State model (`src/game/state.ts`):
   bought out cut its line) ends quietly; else the order leaves the board, with no heart lost, and
   `taken` counts it. `trackCost` refuses the yard and charges `RIVAL_BUYOUT` times on a rival
   tile, which `buildTrack` takes from the rival.
+- Wagon kinds (from `WAGON_ROUND`): `nextRound` sets `hitchOffer`; `choosing` waits for it, the
+  scene shows the wagon cards after a moult's, and `pickCharter` refuses while it is set.
+  `pickHitch(s, a, b)` sets `hitch` to two of `WAGON_KINDS`, moves cargo aboard into the new
+  wagons and shows the hitch and the round's news (or leaves the news for the charter's banner).
+  `wagonList` is the hitch (two `plain` before it) plus a `plain` third wagon with the Third wagon
+  trait. `pickWagon(s, i, o)` is the wagon an order would ride in on wyrm `i`: the one built for
+  its cargo (`WAGON_CARGO`) when free, else `plain` or any other free kind; the hopper holds up to
+  `HOPPER_LOADS` grain orders or one other; passengers need an empty wyrm and fill it. `nextStop`
+  fetches only orders `pickWagon` finds room for, and `board` (after loading, or at a depot) sets
+  `Order.wagon`. `wagonPay` (part of `orderPay`) falls for fish aboard anything but the cold wagon
+  from `WAGON_ROUND`, to `SPOILED_PAY` over `SPOIL_MS`, and adds up to `MAIL_BONUS` for letters in
+  the mail coach by the share of their time left. `randomOrder` makes letters with
+  `LETTER_CHANCE` from `WAGON_ROUND` (`LETTER_PAY`, `LETTER_TIME`).
+- Fast track (from `FAST_ROUND`): `fastCost` is `FAST_COST` times `trackCost` for new track, or the
+  terrain price times the charter's `track` times `FAST_COST - 1` to make plain track fast (not
+  the hazard's tile). `buildTrack(s, t, false, from, true)` lays it, `upgradeFast` upgrades;
+  both add to `paid`, so the refund is half of all of it. `removeTrack` and a hazard's strike drop
+  the tile from `fast`. `wyrmSpeed` is times `FAST_SPEED` on a step whose ends are both fast or a
+  station and at least one fast (`onFast`).
+- Standing contracts (from `CONTRACT_ROUND`, not in the festival): `nextRound` pays a filled
+  `contract` (`contractPaid`, a pop at its village) and sets a new one for a random open village,
+  `need` `contractNeed(round)` loads and `pay` `need * CONTRACT_PAY`. `arrive` counts every
+  delivery from its village (a pop when filled); `randomOrder` sends from its village with
+  `CONTRACT_CHANCE` while it is open. `roundNews` names the contract (and last round's lump), and
+  `clearNews` drops the one-off news once the round's picks are made.
 - Only `src/game/sim.ts` mutates state. The scene only reads it and calls sim functions.
 - Invariants: a station (the Roost or an open village) is on the line without track; track can't
   be laid on a station or a locked village's tile; track can't be removed from `wyrm.at` or any
@@ -418,7 +474,8 @@ Randomness and timing:
 - `Math.random` is used in `generateValley` (the valley, in `newGame`, except the daily's, which
   gets today's seeded `rand`), `randomOrder` (which villages a new order joins, and whether it is
   passengers, and a town's wares), `makeGoods` (where a workshop's goods go), `tickHazard` (which tile),
-  `offerCharters` (which two, and the cargo) and `nextRound` (a moult's traits) in `src/game/`. A
+  `offerCharters` (which two, and the cargo), `nextRound` (a moult's traits and the contract's
+  village) and, from round 2 only, `randomOrder`'s letters and contract draws in `src/game/`. A
   meadow's `generateValley` draws exactly the numbers it always did, so the test's seeded valley
   stays the same. The
   first order is fixed (`addOrder(s, 0, 1)` in `newGame`). The test seeds `Math.random`, so its
@@ -478,8 +535,9 @@ starts the music again.
   for a heart lost to a village at rock bottom, `sour` for a village souring, `munch` when a wyrm
   eats, `switchStop` when a wyrm stops to throw a switch, `warn` for a hazard warned, `splash` or
   `rumble` when a washout or sinkhole, or a rockfall or avalanche, strikes (none when it blows over and the track stays), `gifts` when a courier's visit ends, `round` for a
-  new round and `charter` when the charter or moult cards appear (the music's `charter` part
-  plays while either waits). The scene plays `stamp` for a trait picked, and `ui('click')` and
+  new round and `charter` when the charter, moult or wagon cards appear (the music's `charter` part
+  plays while any of them waits). The scene plays `stamp` for a trait picked or the wagons hitched
+  (`ui('click')` for the first wagon card), a higher `tok` for fast track, and `ui('click')` and
   `roar` for flying on. `grow` plays when a village grows into a town, `rival` when the rival
   takes an order (not counted as late) and `beatRival` when the wyrm is sent for an order the
   rival was after (not when the festival or a cut line ends the claim).
@@ -511,13 +569,17 @@ starts the music again.
   `plain-track.webp`, `charter.webp`, `passengers.webp`, `depot-courier.webp`, `tunnel.webp`,
   `festival-medal.webp`, `valley-chain.webp` (the snowy valley, the marsh, the canyon and the fly-on
   panel, four shots in one), `moult.webp`, `daily-valley.webp`, `towns.webp` (towns, wares and a warehouse), `night.webp` (a night
-  round with lamps), `rival.webp` (the rival line racing for an order), `german-round.webp` (round 5 with `?lang=de`), `fill-ultrawide.webp` and
+  round with lamps), `rival.webp` (the rival line racing for an order), `wagon-kinds.webp` (round
+  2's wagon cards), `fast-track.webp` (fast track, the cold wagon and the mail coach, and a
+  contract), `german-round.webp` (round 5 with `?lang=de`), `fill-ultrawide.webp` and
 `fill-tablet.webp` (the first screen at 2560x1080 and 1024x768) and `cover.png` are not made by
   the test: play the dev build and capture them by hand (a script can set up later rounds through
   the dev server's `/games/wyrmrail/src/game/sim.ts` module, the same instance the game uses).
-- Moods, courier calls, depots, towns, hazards, charters, passengers, lamps, the rival and nights
-  all start after round 1 (`MOOD_ROUND`, `DEPOT_ROUND` and `TOWN_ROUND` 2, `NIGHT_ROUNDS` from 5,
-  the rest 3), so the playthrough never meets them; keep them
+- Moods, courier calls, depots, towns, hazards, charters, passengers, lamps, the rival, nights,
+  wagon kinds, letters, fast track and contracts all start after round 1 (`MOOD_ROUND`,
+  `DEPOT_ROUND`, `TOWN_ROUND`, `WAGON_ROUND`, `FAST_ROUND` and `CONTRACT_ROUND` 2, `NIGHT_ROUNDS`
+  from 5, the rest 3), so the playthrough never meets them (round 2 opens with the wagon cards
+  and a contract once it has delivered, and the test stops there); keep them
   there or give the test a step for them. The test never taps a village, and its browser has no
   saved medals, so no boon changes the first round. It never taps the daily link (which only
   shows on the first valley before any track) and never reaches a moult or a won festival.
@@ -570,6 +632,9 @@ starts the music again.
 - **Tune towns, nights or the rival:** their constants in `src/game/state.ts` (see the State
   model above); a night round is a number in `NIGHT_ROUNDS`, and a new station upgrade for towns
   goes next to `buyWarehouse` (bought from the Depot mode's tap) with its icon by the label.
+- **Add a wagon kind:** add it to `WAGON_KINDS`, `WAGON_TEXT` (two texts in each language) and
+  `WAGON_CARGO` in `src/game/state.ts`, its paint to `WAGON_WOOD` in `src/art/sprites.ts`, its
+  rule in `pickWagon` or `wagonPay`, and its line in the README. The cards are laid out for three.
 - **Add a charter:** add an entry to `CHARTERS` in `src/game/state.ts` with its name and text in
   the `i18n/` files (a new effect needs a field
   on `Charter` and a check where it applies in `sim.ts`) and its line in the README.
