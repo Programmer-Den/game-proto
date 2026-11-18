@@ -783,7 +783,7 @@ export function chooseEdict(s: GameState, edict: Edict) {
   const two = edictOffers(s);
   if (!two || !two.includes(edict)) return false;
   s.edict = edict;
-  // An edict that slows the forge also lengthens a heat-up under way.
+  // An edict that speeds the forge also shortens a heat-up under way (a slower one leaves it as it is).
   s.heatMs = Math.min(s.heatMs, forgeMs(s));
   s.events.push({ kind: 'edict', edict });
   return true;

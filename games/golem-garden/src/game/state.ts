@@ -827,6 +827,8 @@ function step(s: GameState, dt: number) {
   // tunnel passes under).
   const gone = (p: Pest) => p.dist >= routes[p.route].length;
   for (const p of s.pests) {
+    // A pest a golem's power beat between steps lies still until it is squashed below.
+    if (p.hp <= 0) continue;
     const info = PEST_INFO[p.kind];
     const slowed = p.slowMs > 0 ? p.slowFactor : 1;
     const length = routes[p.route].length;

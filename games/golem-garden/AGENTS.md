@@ -33,7 +33,7 @@ Implemented today:
   and bell (stuns), each with three levels.
 - Fungus and Bell golems (GG17): `GolemInfo.unlockBest` (10 and 20) keeps them locked until
   `state.best` reaches it (`unlocked`; open in the daily plot and weekly garden), shown as padlock
-  cards ("Clear wave N to unlock"); `waveDone` adds a "… unlocked!" line the first time. A fungus
+  cards ("Clear wave N to unlock"); `waveDone` adds a "… unlocked!" line the first time, in an ordinary garden only. A fungus
   golem's `GolemStats.spore` (`r`, `ms`, `dps`, from `GolemInfo.spore`, its `dps` growing 60% a
   level like damage) makes each throw push a `Spores` patch onto `state.spores` at the target; in
   `step` each walking pest (not flying, not under ground) inside a patch loses the strongest
@@ -177,7 +177,7 @@ Implemented today:
   rules. `lastWave(s)` is `DAILY.waves` (15): it can't be called early and `step` sets phase
   'over' once `state.cleared` reaches it; the scene then calls `finishDaily` with `dailyScore(s)`
   (`DAILY.perWave` a wave cleared, `DAILY.perLeaf` a leaf kept) and opens the picker in 'daily'
-  mode. Planting a garden from the picker mid-plot (`leaveDaily`) scores it as it stands.
+  mode. Planting a garden from the picker mid-plot, or closing or reloading the page (`pagehide`, unless the page goes into the back/forward cache), calls `leaveDaily`, which scores it as it stands.
 - Golem powers (GG20): each `Golem` has `powerMs` (0 when ready; it counts down once grown, in
   build and wave alike). `canPower` (a wave on, `powerReady`, a pest in reach) and `usePower` run
   the kind's power (`POWER`, names and blurbs in `POWER_INFO`): Pebble's Stomp hits every pest
