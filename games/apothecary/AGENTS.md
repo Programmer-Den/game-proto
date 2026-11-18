@@ -205,7 +205,7 @@ study, shade gardens and a mirrored second production line.
   `rand`.
 - `src/game/ledger.ts`: the shop ledger (AP22): `Wait` (`input`, `room`, `hands`), `StationDay`,
   `LedgerDay` (`day`, `stations`, `empty` ms per potion), `Ledger` (`today`, `yesterday`),
-  `createLedger`, `ledgerOpen` (a craftsman hired or a pixie route built), `turnPage` (a new page when
+  `createLedger(day)` (`loadState` starts a save from before the ledger on its own day), `ledgerOpen` (a craftsman hired or a pixie route built), `turnPage` (a new page when
   `contract.day` changes), `note`, `noteEmpty`, `idleOf`, `mostlyFor` and `slowest` (the station
   with the smallest share of its day at work, with two or more written down).
 - `src/game/away.ts`: the autopilot. `catchUp(state, now, rand)` plays the time since `lastSeen`

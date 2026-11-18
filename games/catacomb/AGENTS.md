@@ -69,7 +69,7 @@ swapped in for starting cards. The art is painterly: shapes and pixel grids draw
   sold or granted at random), the card words Retain (`retain` on a `Card`: `endTurn` keeps it in
   hand) and Exhaust (`exhaust`: `playCard` puts it in `fight.exhausted` instead of the discard pile,
   for the rest of the fight), twelve cards that use them, locked vaults (room kind `vault`, made by
-  `addVault` in `map.ts` from a fight an elite in `KEY_COLUMN` (3) can reach; `walkTo` refuses it
+  `addVault` in `map.ts` from a fight an elite in `KEY_COLUMN` (3) can reach that has another room in its column; a room whose only path led to it gets a second one, to the nearest room beside it, so a hero without the key is never stuck; `walkTo` refuses it
   without `s.vaultKey`, which `winFight` gives for an elite felled while the act's vault is shut;
   entering it uses the key, grants a relic and offers rare cards), and defeat and victory panels
   whose button restarts the scene.
@@ -201,7 +201,7 @@ File map (all under `src/` unless it starts with `shared/`):
   caption's `{n}` shows), their cost constants
   and the curses the shrine's loot and the chest add (`SHRINE_CURSE`, `CHEST_CURSE`). Their effects
   live in `chooseEvent` in `sim.ts`.
-- `game/map.ts`: `RoomKind` (with `vault`), `Room` (kind, column, screen x/y, `next` links, foes, event), `KEY_COLUMN`, the private `addVault` (run at the end of `makeMap`, reading the map only),
+- `game/map.ts`: `RoomKind` (with `vault`), `Room` (kind, column, screen x/y, `next` links, foes, event), `KEY_COLUMN`, the private `addVault` (run at the end of `makeMap`, taking no draws),
   `COLUMNS` (7), `ACTS` (2, the acts of a run before the Bone Spire), `SPIRE_DEPTH` (3), `ACT_FOES` (each act's name, first fight, early, late and elite foe
   groups, boss and mystery rooms; three acts), `COLUMN_KINDS` (what each middle column holds), `makeMap(act)`, `ENTRANCE` and
   `reachable(rooms, at)`. `makeMap(act, mutators)` applies the weekly crypt's mutators after the

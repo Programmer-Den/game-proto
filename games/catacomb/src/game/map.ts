@@ -180,8 +180,10 @@ export const KEY_COLUMN = 3;
 
 /**
  * Turns a fight past the key column into a locked vault when an elite in the key column can reach
- * it: the farthest such fight, the lowest on the map of those. It only reads the map, so it draws
- * nothing and the map's other rooms (and every later draw) stay as they were. Maps without such
+ * it: the farthest such fight that has another room in its column, the lowest on the map of those.
+ * A room whose only way on was that fight gets a second path, to the nearest other room in its
+ * column, so the vault is never the only way through. It draws nothing, so the other rooms' kinds
+ * (and every later draw) stay as they were. Maps without such
  * an elite, or without a fight it can reach, get no vault.
  */
 function addVault(rooms: Room[]) {
@@ -193,11 +195,20 @@ function addVault(rooms: Room[]) {
     seen.add(i);
     stack.push(...rooms[i].next);
   }
-  const fights = [...seen].filter((i) => rooms[i].kind === 'fight').sort((a, b) => rooms[b].col - rooms[a].col || rooms[b].y - rooms[a].y);
+  const fights = [...seen].filter((i) => rooms[i].kind === 'fight' && rooms.some((r, j) => j !== i && r.col === rooms[i].col)).sort((a, b) => rooms[b].col - rooms[a].col || rooms[b].y - rooms[a].y);
   if (fights.length === 0) return;
-  const vault = rooms[fights[0]];
+  const v = fights[0];
+  const vault = rooms[v];
   vault.kind = 'vault';
   delete vault.foes;
+  // A vault is a side room: a room whose only way on was the vault also leads to the nearest other
+  // room beside it, or a hero who reached that room without the key could go nowhere.
+  const beside = rooms.map((r, j) => (j !== v && r.col === vault.col ? j : -1)).filter((j) => j >= 0);
+  for (const r of rooms) {
+    if (r.next.length !== 1 || r.next[0] !== v) continue;
+    const near = beside.reduce((a, b) => (Math.abs(rooms[b].y - vault.y) < Math.abs(rooms[a].y - vault.y) ? b : a));
+    r.next = [near, v].sort((a, b) => a - b);
+  }
 }
 
 /** Where the hero waits before the first room. */

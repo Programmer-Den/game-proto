@@ -214,7 +214,10 @@ function roseWindow(chapel: number, rand: Rand, look = chapel): PaneSpec[] {
   const guardSpeed = 0.7 + chapel * 0.12;
   if (gargoyle)
     panes.push({ x: cx - 30, y: 6, w: 60, h: 24, kind: 'gargoyle', colour: 0, slide: { reach: FIELD_W / 2 - 50, speed: guardSpeed } });
+  // Under the heart inside one ring; with two rings the inner one turns through that spot, so the
+  // owl sways just under the outer ring instead.
+  const owlY = rings.length > 1 ? cy + rings[1].radius + 18 : cy + 24;
   if (owl)
-    panes.push({ x: cx - 22, y: cy + 24, w: 44, h: 34, kind: 'owl', colour: 0, slide: { reach: 34, speed: guardSpeed * 1.4 } });
+    panes.push({ x: cx - 22, y: owlY, w: 44, h: 34, kind: 'owl', colour: 0, slide: { reach: 34, speed: guardSpeed * 1.4 } });
   return panes;
 }

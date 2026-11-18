@@ -20,17 +20,17 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
   is a rose window (`roseWindow`): a heart pane (3 hits) in a ring of panes that turns (`orbit`),
   two rings from chapel 3, shoulders of plain panes at the sides (with a bell in each from chapel 3)
   and the chapel's **guardians** (`GUARDIANS`): a gargoyle (3 hits) drifting along the top in Dawn
-  and the Forest, a stone owl (4 hits) swaying under the heart in the Fishers' and the Moon, both in
+  and the Forest, a stone owl (4 hits) swaying under the heart (under the outer ring once there are two) in the Fishers' and the Moon, both in
   the Sun Cathedral. They move by `slide`. While one stands the heart takes no harm (`guarded`,
   the orb rings off it with a `shield` event and a ward is drawn round it). **New panes**
   (`NEW_PANES`), a few among the glass from their chapel on: `mirror` (2 hits, Fishers' on) throws
-  falling beads back up, `bell` (1, Forest on, only where rows slide) stops the sliding rows,
+  falling beads back up (each bead once, `Bead.mirrored`), `bell` (1, Forest on, only where rows slide) stops the sliding rows,
   rings and guardians for `BELL_SECONDS` (4), `prism` (1, Moon on) splits the orb that breaks it in
   two. Chapel 1 (Dawn) has none, so windows 0 to 4 are as before. The orb is 5% faster per chapel
   (`speed`). The daily is `windowSpec(-1, dailyRand('shardlight'), 2)`.
 - **Feats** (`featOf`): every window has one, shown under the bar: the rose windows `heart` (all
   three heart hits in one chain), the others in turn `quick` (restored in under `QUICK_SECONDS`, 60
-  s of play), `noBeads` (catch none) and `chain` (a chain of `featChain` = 6 + chapel panes).
+  s of play with an orb in flight, `Sim.time`), `noBeads` (catch none) and `chain` (a chain of `featChain` = 6 + chapel panes).
   Window 0's is `quick`. A won window whose feat is done pays a seal once (`progress.feats`); the
   result box says so. Seals (`sealCount`) open the **bar glass** (`GLASSES` in `game/save.ts`:
   brass, then ruby at 2 seals, sapphire 5, emerald 9, amber 14, rose window 20), never spent; the
@@ -45,7 +45,7 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
   (`MAX_BOUNCE`), by where it hit. **Bar spin:** the bar's speed (`barVel`) is measured over the
   last 80 ms (`SPIN_TICKS`); a bar hit while it moves faster than `SPIN_MIN` (90 px/s) gives the
   orb a `spin` (full at 1000 px/s) that turns its path towards the bar's way, fading over about a
-  second and never flatter than 70° from upright (`curve`). A still bar bounces as before. A
+  second and never flatter than 70° from upright (`curve`). A still bar bounces as before, and so does a bar a tap put somewhere (`jumpBar` clears the measure). A
   spinning orb leaves a fading trail (`trails` in the scene). Panes: `glass` 1 hit, `thick` 2, `bead` 1 and always drops a
   bead, `heart` 3, `lead` never (only a fire orb breaks it) and is not needed to win. Other panes
   drop a bead with chance `dropChance` (8%). Beads (`BeadKind`): `wide` (bar ×1.4), `multi` (each

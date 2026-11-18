@@ -201,7 +201,7 @@ in.
 - `src/game/missions.ts`: the run missions. `MissionKind`, `MISSIONS` (each kind's text key, goal
   `base` and `step` per time round, `max` for a kind that keeps the most reached), `MISSION_ORDER`
   (dealt round and round), `MISSION_SLOTS` (3), `Mission` (`kind`, `tier`, `progress`, `from`: the
-  metre a metres mission was dealt at), `MissionBoard` (`slots`, `dealt`), `goalOf`, `rewardOf` (20,
+  metre a metres mission was dealt at, or the row a row mission was dealt in, 0 again after a hit), `MissionBoard` (`slots`, `dealt`), `goalOf`, `rewardOf` (20,
   10 more a tier, at most 60), `dealMission` (the next kind in turn not already standing),
   `freshBoard` and `boardForRun` (the board with every progress at 0).
 - `src/game/armoury.ts`: the `ARMOURY` table (name and text as `TextKey`s, price per level), `ARMOURY_EACH` (what a

@@ -135,7 +135,9 @@ export class GameScene extends Phaser.Scene {
     });
     this.input.on('pointerdown', (p: Phaser.Input.Pointer, over: Phaser.GameObjects.GameObject[]) => {
       if (this.screen !== 'play' || !this.sim || this.ended || over.length) return;
-      this.sim.moveBar(p.worldX - this.field.x);
+      // A tap puts the bar where it lands at once: no sweep, so no spin. A mouse got there by moving.
+      if (p.wasTouch) this.sim.jumpBar(p.worldX - this.field.x);
+      else this.sim.moveBar(p.worldX - this.field.x);
       this.sim.launch();
     });
     this.showMap();
@@ -657,7 +659,7 @@ export class GameScene extends Phaser.Scene {
     }
     // The orbs left, down the left side of the field.
     const lx = Math.max(18, ox / 2);
-    for (let i = 0; i < Math.min(sim.lives, 8); i++) drawOrb(g, lx, oy + 24 + i * 30, false);
+    for (let i = 0; i < Math.min(sim.lives, MAX_CARRIED); i++) drawOrb(g, lx, oy + 24 + i * 30, false);
     this.scoreText?.setText(t('score', { n: formatNumber(sim.score) }));
     this.comboText?.setText(sim.combo >= 3 ? t('combo', { n: sim.combo }) : '');
     const lines: string[] = [];
