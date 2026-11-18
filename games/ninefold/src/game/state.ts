@@ -489,7 +489,8 @@ export const notesLocked = (s: GameState) => s.mode === 'delve' && s.ascent >= A
 
 /** Switches notes mode; false when notes are locked. */
 export function toggleNotes(s: GameState) {
-  if (s.phase !== 'playing' || notesLocked(s)) return false;
+  // The maker places givens only, so notes refuse there too.
+  if (s.phase !== 'playing' || notesLocked(s) || s.mode === 'maker') return false;
   s.notesMode = !s.notesMode;
   return true;
 }

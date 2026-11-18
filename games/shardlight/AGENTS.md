@@ -50,7 +50,8 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
   bead, `heart` 3, `lead` never (only a fire orb breaks it) and is not needed to win. Other panes
   drop a bead with chance `dropChance` (8%). Beads (`BeadKind`): `wide` (bar ×1.4), `multi` (each
   orb becomes three, at most 9), `sticky` (the next 5 bar touches catch the orb), `fire` (burns
-  through panes), `slow` (×0.72), `life` (+1 orb), and the bad `short` (bar ×0.65) and `fast`
+  through panes; the heart and guardians still bounce it, and one touch of them is one hit, as
+  `Orb.touching` keeps the panes each step dealt with), `slow` (×0.72), `life` (+1 orb), and the bad `short` (bar ×0.65) and `fast`
   (×1.3). The orb speeds up by 0.8% per bar hit, at most 20%, until an orb is lost. Score: 10 per
   pane (30 lead, 50 a guardian, 100 heart) times the chain (`combo`, panes since the orb last touched the bar, at
   most 10).
