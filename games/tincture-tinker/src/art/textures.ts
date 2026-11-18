@@ -42,9 +42,9 @@ import {
 // art units (twice that).
 
 export const kindTexture = (kind: Kind, catalyst = false) => (catalyst ? `catalyst-${kind}` : `kind-${kind}`);
-/** The texture of a tile on the board: a town's wall, a toad, a jar, a resin-held or mouldy tile, a Bloom, a Catalyst or a plain ingredient. */
+/** The texture of a tile on the board: a drop order's vial, a town's wall, a toad, a jar, a resin-held or mouldy tile, a Bloom, a Catalyst or a plain ingredient. */
 export const tileTexture = (t: Tile) =>
-  t.hole ? 'hole' : t.toad ? 'toad' : t.jar ? `jar-${t.kind}` : t.resin ? `resin-${t.kind}` : t.mould ? `mould-${t.kind}` : t.bloom ? `bloom-${t.kind}` : kindTexture(t.kind, t.catalyst);
+  t.vial ? 'vial' : t.hole ? 'hole' : t.toad ? 'toad' : t.jar ? `jar-${t.kind}` : t.resin ? `resin-${t.kind}` : t.mould ? `mould-${t.kind}` : t.bloom ? `bloom-${t.kind}` : kindTexture(t.kind, t.catalyst);
 export const needTexture = (kind: Kind) => `need-${kind}`;
 /** A town guest's medallion on the journey map. */
 export const guestTexture = (rule: GuestRule) => `guest-${rule}`;
@@ -52,6 +52,8 @@ export const potionTexture = (potion: PotionId) => `potion-${potion}`;
 export const toolTexture = (tool: Tool, look: 'on' | 'off' | 'armed') => `tool-${tool}-${look}`;
 /** Where the flask texture's anchor (the middle of its bulb) sits, as a Phaser origin. */
 export const POTION_ORIGIN = { x: 0.5, y: 108 / 190 };
+/** The spare cauldron's icon's size, in view pixels. */
+export const CAULDRON_ICON = 36;
 /** View pixels a tool texture reaches past its button on every side (for the shadow). */
 export const TOOL_PAD = 2;
 
@@ -103,6 +105,13 @@ export function bakeTextures(scene: Phaser.Scene) {
   bake(scene, 'map-card', 440, 440, () => paintCard(880, 880));
   bake(scene, 'hole', BOARD.cell, BOARD.cell, paintHole);
   bake(scene, 'toad', BOARD.cell, BOARD.cell, paintToad);
+  bake(scene, 'vial', BOARD.cell, BOARD.cell, () => paintVial(56, 54, 1));
+  bake(scene, 'need-vial', 40, 40, () => {
+    circle(40, 40, 37, '#f6ecd2', GOLD, 2.5);
+    paintVial(40, 40, 0.68);
+  });
+  bake(scene, 'cauldron', CAULDRON_ICON, CAULDRON_ICON, () => paintCauldron(false));
+  bake(scene, 'cauldron-full', CAULDRON_ICON, CAULDRON_ICON, () => paintCauldron(true));
   for (const rule of ['witch', 'knight', 'miser'] as const) bake(scene, guestTexture(rule), 26, 26, () => paintGuest(rule));
 }
 
@@ -612,4 +621,80 @@ function paintGuest(rule: GuestRule) {
     }
     coin(c + 4, c - 9, 8);
   }
+}
+
+/** A drop order's vial at (`x`, `y`), `k` times its board size: a slim corked phial of glowing teal brew with a gold collar. */
+function paintVial(x: number, y: number, k: number) {
+  const w = 24 * k;
+  const top = y - 30 * k;
+  const bottom = y + 34 * k;
+  // A soft glow behind it, so it stands out from the ingredients.
+  circle(x, y + 6 * k, 38 * k, 'rgba(110,190,180,0.22)');
+  rrect(x - w / 2, top, w, bottom - top, w / 2);
+  ctx.fillStyle = '#e8eee4';
+  ctx.fill();
+  ctx.save();
+  ctx.clip();
+  ctx.fillStyle = '#4f9a92';
+  ctx.fillRect(x - w, y - 4 * k, w * 2, bottom);
+  ctx.restore();
+  rrect(x - w / 2, top, w, bottom - top, w / 2);
+  ctx.strokeStyle = SEPIA;
+  ctx.lineWidth = 5 * k;
+  ctx.stroke();
+  line(x - w / 2 + 6 * k, top + 12 * k, x - w / 2 + 6 * k, bottom - 14 * k, '#fbfdf6', 4 * k);
+  rrect(x - w / 2 - 4 * k, top - 6 * k, w + 8 * k, 10 * k, 4 * k);
+  ctx.fillStyle = GOLD;
+  ctx.fill();
+  ctx.strokeStyle = SEPIA;
+  ctx.lineWidth = 3.5 * k;
+  ctx.stroke();
+  rrect(x - w / 2 + 2 * k, top - 20 * k, w - 4 * k, 15 * k, 4 * k);
+  ctx.fillStyle = '#a0683c';
+  ctx.fill();
+  ctx.stroke();
+}
+
+/** The spare cauldron: a round iron pot on three feet, empty or brimming with a green brew and bubbles. */
+function paintCauldron(full: boolean) {
+  const c = CAULDRON_ICON;
+  for (const dx of [-18, 0, 18]) line(c + dx, c + 22, c + dx * 1.2, c + 32, SEPIA, 5);
+  ctx.beginPath();
+  ctx.arc(c, c + 2, 28, PI * 0.02, PI * 0.98);
+  ctx.lineTo(c - 30, c - 12);
+  ctx.lineTo(c + 30, c - 12);
+  ctx.closePath();
+  ctx.fillStyle = '#3c3a34';
+  ctx.fill();
+  ctx.strokeStyle = SEPIA;
+  ctx.lineWidth = 4;
+  ctx.stroke();
+  if (full) {
+    ctx.save();
+    ctx.clip();
+    ctx.fillStyle = '#7fa64e';
+    ctx.fillRect(c - 32, c - 14, 64, 48);
+    ctx.restore();
+    ctx.beginPath();
+    ctx.arc(c, c + 2, 28, PI * 0.02, PI * 0.98);
+    ctx.lineTo(c - 30, c - 12);
+    ctx.lineTo(c + 30, c - 12);
+    ctx.closePath();
+    ctx.strokeStyle = SEPIA;
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    for (const [dx, dy, r] of [[-12, -16, 6], [6, -20, 8], [16, -14, 5]] as const) circle(c + dx, c + dy, r, '#a9c97a', SEPIA, 2.5);
+  }
+  // The rim, and a highlight on the iron.
+  rrect(c - 34, c - 17, 68, 9, 4);
+  ctx.fillStyle = full ? '#5a5650' : '#4a4740';
+  ctx.fill();
+  ctx.strokeStyle = SEPIA;
+  ctx.lineWidth = 3.5;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(c - 4, c + 2, 20, PI * 0.6, PI * 0.85);
+  ctx.strokeStyle = 'rgba(255,248,232,0.45)';
+  ctx.lineWidth = 4;
+  ctx.stroke();
 }

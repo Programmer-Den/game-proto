@@ -6,6 +6,7 @@ import {
   findRuns,
   findMatches,
   inBoard,
+  landed,
   matchesAt,
   neighbours,
   ROWS,
@@ -60,10 +61,23 @@ export interface Step {
   stage?: number;
   /** A twin order's customer was served this round. */
   served?: PotionId;
+  /** The spare cauldron was full and turned this tile into a Catalyst. */
+  dropped?: Cell & Tile;
+  /** Flow: this was the third move in a row to set off a cascade, and it gave a move back. */
+  flow?: boolean;
 }
 
 /** Runs of this length or longer brew a Catalyst. */
 export const CATALYST_RUN = 4;
+/** The spare cauldron fills with this many ingredients the order doesn't need, then drops a Catalyst; from this order on. */
+export const CAULDRON_SIZE = 15;
+export const CAULDRON_FROM = 2;
+/** This many moves in a row that each set off a cascade give one move back; from this order on. */
+export const FLOW_RUN = 3;
+export const FLOW_FROM = 2;
+/** True when the spare cauldron and flow are at work: on every order but the first (so the first round stays as it was). */
+export const cauldronOn = (s: GameState) => s.current.number >= CAULDRON_FROM;
+export const flowOn = (s: GameState) => s.current.number >= FLOW_FROM;
 
 /** Tiles cleared on top of the matches: what two specials swapped together clear, or a tile a Pestle smashed. */
 interface Extra {
@@ -161,6 +175,28 @@ function resolve(s: GameState, board: Board, prefer: Cell[], extra?: Extra, char
     s.moves = Math.max(0, s.moves - 1);
     s.penalties++;
   }
+  // Flow: a swap whose match set off a cascade keeps the streak going, and the third gives a move back.
+  if (charge && flowOn(s)) {
+    const cascaded = steps.slice(1).some((st) => st.cleared.some((t) => !t.vial));
+    s.flow = cascaded ? s.flow + 1 : 0;
+    if (s.flow >= FLOW_RUN) {
+      s.flow = 0;
+      s.moves++;
+      s.flowed++;
+      steps.push({ ...emptyStep(s), board, flow: true });
+    }
+  }
+  // The spare cauldron, once full, turns a plain tile into a Catalyst (unless the order is already filled).
+  if (cauldronOn(s) && s.cauldron >= CAULDRON_SIZE && !filled(s)) {
+    const spots = board.flatMap((row, r) => row.flatMap((t, c) => (stuck(t) || special(t) ? [] : [{ row: r, col: c }])));
+    if (spots.length > 0) {
+      const at = spots[Math.floor((s.rand ?? Math.random)() * spots.length)];
+      board = board.map((row) => [...row]);
+      board[at.row][at.col] = { ...board[at.row][at.col], catalyst: true };
+      s.cauldron = Math.min(s.cauldron - CAULDRON_SIZE, CAULDRON_SIZE - 1);
+      steps.push({ ...emptyStep(s), board, dropped: { ...at, ...board[at.row][at.col] } });
+    }
+  }
   if (validMoves(board).length === 0) {
     board = shuffle(board, newTile);
     steps.push({ ...emptyStep(s), board, shuffled: true });
@@ -254,7 +290,9 @@ function resolve(s: GameState, board: Board, prefer: Cell[], extra?: Extra, char
  */
 function gather(s: GameState, board: Board, prefer: Cell[], depth: number, extra?: Extra): Step | null {
   const runs = findRuns(board);
-  if (runs.length === 0 && !extra) return null;
+  // A drop order's vials that have reached the bottom are delivered.
+  const arrived: Cell[] = board.flatMap((row, r) => row.flatMap((_, c) => (landed(board, { row: r, col: c }) ? [{ row: r, col: c }] : [])));
+  if (runs.length === 0 && !extra && arrived.length === 0) return null;
   const key = (c: Cell) => c.row * COLS + c.col;
   const cell = (i: number): Cell => ({ row: Math.floor(i / COLS), col: i % COLS });
   const tile = (i: number) => board[Math.floor(i / COLS)][i % COLS];
@@ -275,8 +313,8 @@ function gather(s: GameState, board: Board, prefer: Cell[], depth: number, extra
     for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) if (inBoard({ row: a.row + dr, col: a.col + dc })) swept.add(key({ row: a.row + dr, col: a.col + dc }));
   }
   for (const i of swept) hit.add(i);
-  // A town's walls are never gathered: a swept row or square passes over them.
-  for (const i of [...hit]) if (tile(i).hole) hit.delete(i);
+  // A town's walls are never gathered, nor a vial before it reaches the bottom: a swept row or square passes over them.
+  for (const i of [...hit]) if (tile(i).hole || tile(i).vial) hit.delete(i);
   // Only the Catalysts that fired count, not ones another special swept up.
   s.fired += [...firing].filter((i) => tile(i).catalyst).length;
   s.bloomsFired += areas.length;
@@ -337,12 +375,16 @@ function gather(s: GameState, board: Board, prefer: Cell[], depth: number, extra
     if (near(i).some((c) => touched.has(key(c)))) hit.add(i);
   }
   s.opened += [...hit].filter((i) => tile(i).jar).length;
+  for (const c of arrived) hit.add(key(c));
+  s.delivered += arrived.length;
 
   const cleared = [...hit].sort((x, y) => x - y).map((i) => ({ ...cell(i), ...tile(i) }));
   // Only the ingredients the order asks for are counted, and for a town's miser only what a cascade gathers.
   const pays = !(s.current.guest?.rule === 'miser' && depth === 0);
   let count = 0;
-  if (pays) for (const { kind } of cleared) if (wanted(s, kind)) (s.got[kind]++, count++);
+  if (pays) for (const { kind, vial } of cleared) if (!vial && wanted(s, kind)) (s.got[kind]++, count++);
+  // What the order doesn't need fills the spare cauldron.
+  if (cauldronOn(s)) s.cauldron += cleared.filter((t) => !t.vial && !wanted(s, t.kind)).length;
   // The weekly order's score: each cascade step counts its ingredients once more than the one before.
   if (s.current.weekly) s.score += count * (depth + 1);
   const penalty = !!s.current.forbid && runs.some((r) => r.kind === s.current.forbid);
@@ -418,7 +460,7 @@ export function sift(s: GameState, row: number): Tile[] | null {
  * melts, a Catalyst or Bloom fires) and the board plays out. Null if it can't be bought.
  */
 export function pestle(s: GameState, cell: Cell): Step[] | null {
-  if (!canUse(s, 'pestle') || !inBoard(cell) || s.board[cell.row][cell.col].hole) return null;
+  if (!canUse(s, 'pestle') || !inBoard(cell) || s.board[cell.row][cell.col].hole || s.board[cell.row][cell.col].vial) return null;
   s.coins -= TOOLS.pestle.cost;
   return resolve(s, s.board, [], { cells: [cell], fire: true });
 }

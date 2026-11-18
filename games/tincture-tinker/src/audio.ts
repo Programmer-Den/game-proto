@@ -121,6 +121,10 @@ export const sfx = sounds({
   served: { wave: 'triangle', freq: 1568, length: 0.55, volume: 0.32 },
   /** A royal commission's next stage: two chimes. */
   stage: { wave: 'triangle', freq: 1047, arp: [0, 7], arpStep: 0.13, length: 0.42, volume: 0.32 },
+  /** The spare cauldron full: it bubbles and brews a Catalyst on the board. */
+  cauldron: { wave: 'sine', freq: 220, to: 880, arp: [0, 4, 7, 12, 7, 12], arpStep: 0.05, length: 0.34, volume: 0.3 },
+  /** Flow: a third cascade in a row gives a move back, a bright rising run. */
+  flow: { wave: 'triangle', freq: 784, arp: [0, 2, 4, 7, 9, 12], arpStep: 0.04, length: 0.3, volume: 0.28 },
   /** Stir: +3 moves, a swirl. */
   stir: { wave: 'triangle', freq: 330, to: 700, arp: [0, 3, 0, 3, 0, 3], arpStep: 0.045, length: 0.28, volume: 0.3 },
   /** Sift rerolls a row: a rattle. */

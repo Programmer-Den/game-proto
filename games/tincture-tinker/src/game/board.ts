@@ -23,6 +23,8 @@ export interface Tile {
   hole?: boolean;
   /** Turned to a toad by a town's witch: it can't be swapped and never matches; a match next to it turns it back. */
   toad?: boolean;
+  /** A vial a drop order asks for: it never matches or swaps, falls like any tile and is delivered at the bottom row. */
+  vial?: boolean;
 }
 export type Board = Tile[][];
 export interface Cell {
@@ -34,9 +36,9 @@ export type NewTile = () => Tile;
 export const adjacent = (a: Cell, b: Cell) => Math.abs(a.row - b.row) + Math.abs(a.col - b.col) === 1;
 export const inBoard = (c: Cell) => c.row >= 0 && c.row < ROWS && c.col >= 0 && c.col < COLS;
 /** What a tile matches as: its kind, or nothing for a corked jar or a mouldy tile. */
-export const matchKind = (t: Tile): Kind | null => (t.jar || t.mould || t.hole || t.toad ? null : t.kind);
-/** Jars, resin, mould and toads hold their tiles in place, and a wall is no tile at all: they can't be swapped. */
-export const stuck = (t: Tile) => !!(t.jar || t.resin || t.mould || t.hole || t.toad);
+export const matchKind = (t: Tile): Kind | null => (t.jar || t.mould || t.hole || t.toad || t.vial ? null : t.kind);
+/** Jars, resin, mould and toads hold their tiles in place, a wall is no tile at all and a vial only falls: they can't be swapped. */
+export const stuck = (t: Tile) => !!(t.jar || t.resin || t.mould || t.hole || t.toad || t.vial);
 /** Catalysts and Blooms: the special tiles. */
 export const special = (t: Tile) => !!(t.catalyst || t.bloom);
 
@@ -174,9 +176,11 @@ export function shuffle(board: Board, newTile: NewTile): Board {
     free.forEach((c, i) => (next[c.row][c.col] = tiles[i]));
     if (findMatches(next).length === 0 && validMoves(next).length > 0) return next;
   }
-  // A town's walls stay where they are on the fresh board.
+  // A town's walls stay where they are on the fresh board, and so do a drop order's vials.
   const holes = board.flatMap((row, r) => row.flatMap((t, c) => (t.hole ? [{ row: r, col: c }] : [])));
-  return layBoard(newTile, holes);
+  const fresh = layBoard(newTile, holes);
+  board.forEach((row, r) => row.forEach((t, c) => t.vial && (fresh[r][c] = t)));
+  return fresh;
 }
 
 /**
@@ -263,4 +267,30 @@ export function turnToad(board: Board, max: number): { board: Board; at: Cell & 
     spots.splice(i, 1);
   }
   return null;
+}
+
+/** True if the vial at `c` has reached the bottom: every cell under it is a wall or holds resin, which tiles fall past. */
+export function landed(board: Board, c: Cell): boolean {
+  if (!board[c.row][c.col].vial) return false;
+  for (let r = c.row + 1; r < ROWS; r++) if (!(board[r][c.col].hole || board[r][c.col].resin)) return false;
+  return true;
+}
+
+/**
+ * Turns `n` tiles of the top row into vials, each in its own column over plain tiles and never one
+ * that has already landed, keeping a move on the board. Leaves the board alone when `n` is 0.
+ */
+export function placeVials(board: Board, n: number, rand: () => number = Math.random): Board {
+  if (n <= 0) return board;
+  for (let attempt = 0; attempt < 30; attempt++) {
+    const next = board.map((row) => [...row]);
+    const cols = Array.from({ length: COLS }, (_, c) => c).filter((c) => !stuck(next[0][c]) && !special(next[0][c]));
+    for (let placed = 0; placed < n && cols.length > 0; placed++) {
+      const col = cols.splice(Math.floor(rand() * cols.length), 1)[0];
+      next[0][col] = { ...next[0][col], vial: true };
+      if (landed(next, { row: 0, col })) next[0][col] = board[0][col];
+    }
+    if (validMoves(next).length > 0) return next;
+  }
+  return board;
 }
