@@ -102,8 +102,11 @@ export interface AiLevel {
   slack: number;
 }
 
-/** The AI's move for the side to move, or undefined when it has none. Randomness goes through Math.random. */
-export function chooseMove(pos: Position, level: AiLevel): Move | undefined {
+/**
+ * The AI's move for the side to move, or undefined when it has none. Randomness goes through
+ * Math.random. `bias` (a rival's style) adds to each move's score before it picks.
+ */
+export function chooseMove(pos: Position, level: AiLevel, bias: (m: Move) => number = () => 0): Move | undefined {
   const moves = pos.legalMoves();
   if (moves.length === 0) return undefined;
   const s: Search = { nodes: 0, limit: 60_000 };
@@ -113,7 +116,7 @@ export function chooseMove(pos: Position, level: AiLevel): Move | undefined {
     const repeats = pos.keys.filter((k) => k === pos.keys[pos.keys.length - 1]).length >= 3;
     const score = repeats ? 0 : -negamax(pos, level.depth - 1, -MATE, MATE, 1, s);
     pos.unmake();
-    return { m, score };
+    return { m, score: Math.abs(score) > MATE / 2 ? score : score + bias(m) };
   });
   const best = Math.max(...scored.map((x) => x.score));
   // Never throw away a mate, or walk into one, for the sake of variety.

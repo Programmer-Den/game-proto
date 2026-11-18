@@ -56,3 +56,32 @@ export const pairKey = (attacker: Kind, victim: Kind) => attacker + victim;
 
 /** There are 6 attackers and 5 victims (a king is never taken). */
 export const PAIR_COUNT = 30;
+
+/** The clocks the menu offers: minutes each, and seconds added after every move. */
+export const CLOCKS: readonly { minutes: number; plus: number }[] = [
+  { minutes: 5, plus: 3 },
+  { minutes: 10, plus: 5 },
+  { minutes: 15, plus: 10 },
+];
+
+/**
+ * A shuffled back row for both sides, as Black's letters (`rnbqkbnr` is the usual one). The king
+ * and rooks stay home so castling works as usual; the knights, bishops and queen are shuffled over
+ * the b, c, d, f and g files, the bishops on squares of opposite colours. Randomness goes through
+ * `random` (Math.random), and the usual row is never picked.
+ */
+export function shuffledRank(random: () => number): string {
+  for (;;) {
+    const row = ['r', '', '', '', 'k', '', '', 'r'];
+    const pick = <T,>(list: T[]) => list[Math.floor(random() * list.length)];
+    // One bishop on c or g and one on b, d or f, so they stand on squares of opposite colours.
+    row[pick([2, 6])] = 'b';
+    row[pick([1, 3, 5])] = 'b';
+    const rest = [1, 2, 3, 5, 6].filter((c) => !row[c]);
+    const q = pick(rest);
+    row[q] = 'q';
+    for (const c of rest) if (c !== q) row[c] = 'n';
+    const text = row.join('');
+    if (text !== 'rnbqkbnr') return text;
+  }
+}
