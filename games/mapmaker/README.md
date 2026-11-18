@@ -28,6 +28,8 @@ wonder for a copy of your chart, and from the fifth isle every third one lies un
 | Tap a magenta survey station | Survey that tile for its cost; the surveyor walks there |
 | Camp | Pitch a base camp where the surveyor stands, for 3 supplies |
 | Tap charted ground | Once the riddle chart is found, dig there for the treasure, for 1 supply |
+| Tap a charted hill or peak | Climb a lookout you haven't stood on, for its cost, to take a bearing (see Fixes) |
+| Press on | Out of supplies: three more surveys, at the risk of a storm (see Press on) |
 | Return to port | End the voyage (early, if you like: unused supplies sell back) and draw the chart |
 | Sell chart | Sell the voyage's chart at the port |
 | Moon or sun beside the logo | Switch between the white survey sheet and the dark night sheet |
@@ -35,7 +37,8 @@ wonder for a copy of your chart, and from the fifth isle every third one lies un
 | Tap a hand | Take them aboard for the next voyage (tap again to leave them ashore) |
 | Buy | Buy an upgrade at the harbor |
 | Keep charting, New atlas | On the Royal Atlas page: carry on, or start over and try for a better best |
-| Set sail | Start the next voyage with full supplies (to a new isle once this one is charted) |
+| Pack the sack | At the harbor: swap some food for rope, lamp oil or trade goods (see Pack the sack) |
+| Set sail | Start the next voyage with a full sack (to a new isle once this one is charted) |
 | Daily isle | At the harbor: one voyage on today's isle, the same for everyone, scored by coins (once a day) |
 | Wonders | At the harbor: the wonder gallery |
 | Expeditions | At the harbor: the far isles, open once the Royal Atlas is bound; Set out sails to one |
@@ -62,7 +65,7 @@ wonder for a copy of your chart, and from the fifth isle every third one lies un
    values gather into one tally ("Viewshed, 6 tiles, +18"), while the panel's small live chart inks
    the new tiles in magenta.
 7. **Supplies**: 12 a voyage. When they can't pay for anything more, the surveyor heads home on
-   their own.
+   their own, unless fogged ground is left to press on into (see Press on), or a lookout to climb.
 8. **Turn back early or push on**: every supply left when you tap Return to port sells back for 3
    coins, up to what the chart's tiles pay (after the rival's share). The panel brackets the unused supply pips and the
    button carries the sell-back as a magenta tag (+18c). A voyage that spends every supply sells
@@ -214,9 +217,47 @@ the first village yet to trade gives it when you set sail:
 | A guide | The first 3 surveys that would cost something are free, and snow hides nothing while they last |
 | A rumour | The isle's wonder is marked through the fog with a gold ring and "wonder?" (on a new isle, that isle's wonder) |
 
-![The harbor with the Coastal Sloop and Village trade](docs/screenshots/harbor-sloop-trade.webp)
+![The harbor with the Coastal Sloop, Village trade and the sack](docs/screenshots/harbor-sloop-trade.webp)
 
 ![The village trade page](docs/screenshots/village-trade.webp)
+
+### Pack the sack
+
+The sack holds a voyage's supplies (12 on Normal, more with Provisions). Pack the sack, under
+Village trade at the harbor, swaps some of its food for gear, one supply's room each and up to 3
+of each, with at least 4 food left; the pack stays for every voyage until you change it, and the
+page tells you how many peaks and villages the fog ahead still hides. The first voyage sails with
+food alone, and the daily isle and expeditions always do.
+
+| Gear | What it does |
+| --- | --- |
+| Rope | Surveying (or climbing) a peak spends a coil instead of 2 supplies |
+| Lamp oil | A cave on the tile you survey gives a second artefact |
+| Trade goods | A village you survey buys a bale for 8 coins, on the chart |
+
+Gear left when the voyage ends is gone, and only food sells back.
+
+![Packing the sack](docs/screenshots/pack-the-sack.webp)
+
+### Fixes
+
+Every hill or peak you stand on takes a bearing on the chartable tiles it sees. A tile seen from
+two of them is fixed: it gets a solid magenta trig point on the map and pays 1 coin on top with
+the chart of the voyage that fixed it (a tile seen from one so far has a dashed one). A hill or peak
+that was only seen from another lookout can be climbed: tap it for its survey cost and the surveyor
+walks up and takes a bearing. Lookouts whose bearing would fix tiles say how many (`CLIMB ×3`).
+
+### Press on
+
+When the supplies can pay for nothing more and fogged ground is left beside the chart, the voyage
+stays open and Camp turns into Press on: three more surveys, one step a tile whatever it costs,
+once a voyage. Each step taken adds a 25% chance that a storm catches you on the way home and
+washes the voyage's 2 least valuable tiles a step off the chart (they stay on the map). The storm
+is worked out from the isle and the voyage, so a reload doesn't change it.
+
+![Pressing on, with fixes and bearings on the map](docs/screenshots/press-on.webp)
+
+![A chart with fixes, trade goods and a storm](docs/screenshots/chart-round-5.webp)
 
 ### Winter isles
 

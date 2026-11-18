@@ -15,11 +15,13 @@ export const OVERLAY_BUTTON = { x: OVERLAY.x, y: OVERLAY.y + OVERLAY.h / 2 - 40 
 /** The harbor's upgrade rows (its left column): the first row's y, the gap between rows, and the Buy buttons' x. */
 export const SHOP = { y: 152, gap: 40, buyX: OVERLAY.x - OVERLAY.w / 2 + 34 + 36 + 230 + 48 };
 /** The harbor's hand cards (its right column): the first card's centre y, the gap, and their size. */
-export const HANDS_COLUMN = { x: OVERLAY.x + OVERLAY.w / 2 - 34 - 150, y: 158, gap: 46, w: 150, h: 40 };
+export const HANDS_COLUMN = { x: OVERLAY.x + OVERLAY.w / 2 - 34 - 150, y: 158, gap: 38, w: 150, h: 34 };
 /** The commission board under the upgrades: the first row's centre y and the gap between rows. */
-export const BOARD = { y: 370, gap: 24, h: 22 };
+export const BOARD = { y: 382, gap: 24, h: 22 };
 /** The village trade card under the hand cards (its column is `HANDS_COLUMN`): its centre y and height. */
-export const TRADE_CARD = { y: 308, h: 40 };
+export const TRADE_CARD = { y: 280, h: 30 };
+/** The sack's card under the village trade card (its column is `HANDS_COLUMN`): its centre y and height. */
+export const PACK_CARD = { y: 325, h: 30 };
 export const BUTTON = { w: 200, h: 40 };
 export const SMALL_BUTTON = { w: 96, h: 34 };
 

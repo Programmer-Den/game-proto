@@ -3,9 +3,10 @@ import { expect, test, type Page } from '@playwright/test';
 // Plays the first voyage with real inputs: the test taps fogged tiles next to the charted part of
 // the island, as on a phone, nearest the surveyor first, while the supplies can pay for one (forests
 // and peaks cost 2, rivers and roads are free), checking what each survey costs and what its finds
-// add (a wreck's supplies, a cave's artifact, a storm's blocked tile). When nothing more can be paid
-// for it heads back to port, and checks the chart adds up (tiles, features charted whole,
-// commission, artifacts, unused supplies sold back and any isle milestone the voyage reached), taps
+// add (a wreck's supplies, a cave's artifact, a storm's blocked tile) and which tiles the lookouts
+// sighted and fixed. When nothing more can be paid for it heads back to port without pressing on,
+// and checks the chart adds up (tiles, features charted whole, fixes, commission, artifacts, unused
+// supplies sold back and any isle milestone the voyage reached), taps
 // Sell chart and checks the coins, the isle goal and that the harbor lays out a commission board and
 // three hands, then taps Set sail and checks the second voyage starts with full supplies on the same
 // island, with no hand aboard. It pitches no camp, digs nothing, hires nobody, picks no commission
@@ -44,6 +45,12 @@ interface GameState {
     treasure: number;
     features: { name: string; bonus: number }[];
     featureCoins: number;
+    fixes: number;
+    fixCoins: number;
+    goods: number;
+    goodsCoins: number;
+    storm: number;
+    stormLoss: number;
     rivalTiles: number;
     rivalLoss: number;
     unused: number;
@@ -68,6 +75,10 @@ interface GameState {
   features: { kind: 'river' | 'road' | 'wood'; name: string; tiles: Point[]; bonus: number }[];
   rival: unknown | null;
   royal: unknown | null;
+  pack: { rope: number; oil: number; goods: number };
+  sighted: Point[];
+  fixed: Point[];
+  fixes: number;
 }
 interface Commission {
   terrain: Terrain;
@@ -95,6 +106,8 @@ const SELL_BACK = 3;
 /** What charting a whole river, road or wood pays for each of its tiles (FEATURE_BONUS in state.ts), and how many forest tiles make a wood (WOOD_MIN). */
 const FEATURE_BONUS = 2;
 const WOOD_MIN = 3;
+/** What a tile fixed from two lookouts pays on top (FIX_BONUS in state.ts). */
+const FIX_BONUS = 1;
 /** How many hands the harbor offers (HANDS_OFFERED in hands.ts). */
 const HANDS_OFFERED = 3;
 /** The isle goal's milestones (MILESTONES in state.ts): percent charted and the coins each pays. */
@@ -151,6 +164,11 @@ function frontier(s: GameState): Point[] {
 
 const revealedCount = (s: GameState) => s.tiles.filter((t) => t.revealed).length;
 
+/** Land, or sea beside land: the tiles that count toward the isle. */
+const chartable = (s: GameState, x: number, y: number) =>
+  at(s, x, y).terrain !== 'sea' ||
+  [[0, -1], [1, 0], [0, 1], [-1, 0]].some(([dx, dy]) => inGrid(x + dx, y + dy) && at(s, x + dx, y + dy).terrain !== 'sea');
+
 /** How much of the isle is charted, in whole percent: of its land and the sea beside land. */
 function islePercent(s: GameState) {
   let all = 0;
@@ -158,10 +176,7 @@ function islePercent(s: GameState) {
   for (let y = 0; y < GRID.h; y++) {
     for (let x = 0; x < GRID.w; x++) {
       const t = at(s, x, y);
-      const byLand = [[0, -1], [1, 0], [0, 1], [-1, 0]].some(
-        ([dx, dy]) => inGrid(x + dx, y + dy) && at(s, x + dx, y + dy).terrain !== 'sea',
-      );
-      if (t.terrain === 'sea' && !byLand) continue;
+      if (!chartable(s, x, y)) continue;
       all += 1;
       if (t.revealed) done += 1;
     }
@@ -268,6 +283,11 @@ test('plays the first voyage', async ({ page }, testInfo) => {
     rival: null,
     royal: null,
     wonders: [],
+    // An all-food sack, and nothing seen from a lookout yet.
+    pack: { rope: 0, oil: 0, goods: 0 },
+    sighted: [],
+    fixed: [],
+    fixes: 0,
   });
   // The isle hides one wonder on its land, unseen until its tile and the four beside it are charted.
   expect(s.wonder, 'the isle hides a wonder').toMatchObject({ seen: false });
@@ -305,6 +325,9 @@ test('plays the first voyage', async ({ page }, testInfo) => {
   let spent = 0;
   let wrecks = 0;
   let caves = 0;
+  // Tiles seen from one lookout the surveyor stood on, and those seen from two: fixed.
+  const sighted = new Set<string>();
+  const fixed = new Set<string>();
   const affordable = () => frontier(s).filter((p) => COST[at(s, p.x, p.y).terrain] <= s.supplies);
   while (s.phase === 'survey' && affordable().length > 0) {
     const d = (p: Point) => Math.abs(p.x - s.surveyor.x) + Math.abs(p.y - s.surveyor.y);
@@ -336,6 +359,23 @@ test('plays the first voyage', async ({ page }, testInfo) => {
     const lookout = terrain === 'hills' || terrain === 'mountain';
     if (lookout && fogAround) expect(gained, 'a hill or peak reveals the fog around it').toBeGreaterThan(1);
     if (!lookout) expect(gained, 'only hills and peaks reveal more').toBe(1);
+    // A lookout sights the chartable tiles around it (a hill the four beside it, a peak all eight);
+    // a tile sighted from a second lookout is fixed.
+    if (lookout) {
+      for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+        const x = target.x + dx;
+        const y = target.y + dy;
+        if ((terrain === 'hills' && dx && dy) || !inGrid(x, y) || !chartable(s, x, y)) continue;
+        const k = `${x},${y}`;
+        if (fixed.has(k)) continue;
+        if (sighted.delete(k)) fixed.add(k);
+        else sighted.add(k);
+      }
+    }
+    const keys = (ps: Point[]) => ps.map((p) => `${p.x},${p.y}`).sort();
+    expect(keys(s.sighted), 'tiles sighted from one lookout').toEqual([...sighted].sort());
+    expect(keys(s.fixed), 'tiles fixed from two lookouts').toEqual([...fixed].sort());
+    expect(s.fixes).toBe(fixed.size);
     if (terrain !== 'sea') expect(s.surveyor, 'the surveyor walks onto the tile').toEqual(target);
     // The wonder shows once it is in sight, and goes into the wonder gallery.
     expect(s.wonder!.seen, 'the wonder shows once its neighbours are charted').toBe(wonderInSight());
@@ -347,7 +387,9 @@ test('plays the first voyage', async ({ page }, testInfo) => {
   expect(spent, 'the supplies paid for the surveys').toBe(SUPPLIES + WRECK_SUPPLIES * wrecks - s.supplies);
   expect(s.surveyed.length, 'every revealed tile is on the chart').toBe(revealedCount(s) - 1);
   // Nothing left that the supplies can pay for: unless the voyage already ended on its own (it stays
-  // open while a known riddle can still be dug), the surveyor heads back to port.
+  // open while a known riddle can still be dug, a charted lookout can still be climbed, or fogged
+  // ground is left to press on into), the surveyor heads back to port without pressing on.
+  if (frontier(s).length > 0) expect(s.phase, 'the voyage stays open to press on').toBe('survey');
   if (s.phase === 'survey') {
     await tap((await game.spots()).return);
     expect(await play(1_000, async () => (s = await game.state()).phase === 'chart'), 'returned to port').toBe(true);
@@ -394,6 +436,12 @@ test('plays the first voyage', async ({ page }, testInfo) => {
     treasure: 0,
     features,
     featureCoins,
+    fixes: fixed.size,
+    fixCoins: fixed.size * FIX_BONUS,
+    goods: 0,
+    goodsCoins: 0,
+    storm: 0,
+    stormLoss: 0,
     rivalTiles: 0,
     rivalLoss: 0,
     unused,
@@ -401,7 +449,7 @@ test('plays the first voyage', async ({ page }, testInfo) => {
     milestones: reached.length,
     milestoneCoins,
     atlas: false,
-    total: base + featureCoins + bonus + caves * ARTIFACT_VALUE + sellBack + milestoneCoins,
+    total: base + featureCoins + fixed.size * FIX_BONUS + bonus + caves * ARTIFACT_VALUE + sellBack + milestoneCoins,
   });
   expect(s.chart!.total).toBeGreaterThan(SUPPLIES);
   await play(500, async () => false);
@@ -412,7 +460,7 @@ test('plays the first voyage', async ({ page }, testInfo) => {
   let spots = await game.spots();
   await tap(spots.sell);
   expect(await play(1_000, async () => (s = await game.state()).phase === 'harbor'), 'chart sold').toBe(true);
-  expect(s).toMatchObject({ coins: total, lastSale: total, chart: null, surveyed: [], artifacts: 0, milestones: reached.length, atlas: [], hand: null });
+  expect(s).toMatchObject({ coins: total, lastSale: total, chart: null, surveyed: [], artifacts: 0, fixes: 0, milestones: reached.length, atlas: [], hand: null });
   // The harbor lays out a commission board, with the first one picked, and three hands to choose from.
   expect(s.board.length, 'the board offers commissions').toBeGreaterThan(0);
   expect(s.board.length).toBeLessThanOrEqual(3);

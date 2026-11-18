@@ -244,6 +244,74 @@ function swatch(ctx: Ctx, t: Terrain) {
  * camp is magenta survey overprint like the stations, and the treasure gold like the compass.
  */
 const MARKS: Record<string, (ctx: Ctx) => void> = {
+  // A fixed tile: a solid magenta trig point, a triangle with a dot, seen from two lookouts.
+  fix: (ctx) => {
+    poly(ctx, [[12, 3], [21, 19], [3, 19]], MAGENTA, SHEET, 1.6);
+    circle(ctx, 12, 14, 2.2, SHEET);
+  },
+  // A tile seen from one lookout so far: a hollow trig point, waiting for a second sighting.
+  sighted: (ctx) => {
+    ctx.setLineDash([3, 2]);
+    poly(ctx, [[12, 4], [20, 18.5], [4, 18.5]], null, MAGENTA, 1.6);
+    ctx.setLineDash([]);
+  },
+  // The sack: a tied canvas bag with a magenta band.
+  'gear-sack': (ctx) => {
+    ctx.beginPath();
+    ctx.moveTo(8, 7);
+    ctx.quadraticCurveTo(3, 13, 4.5, 19);
+    ctx.quadraticCurveTo(12, 23, 19.5, 19);
+    ctx.quadraticCurveTo(21, 13, 16, 7);
+    ctx.closePath();
+    ctx.fillStyle = '#efe3c4';
+    ctx.fill();
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 1.3;
+    ctx.stroke();
+    poly(ctx, [[9, 2.5], [15, 2.5], [16, 7], [8, 7]], '#efe3c4', INK, 1.2);
+    ctx.fillStyle = MAGENTA;
+    ctx.fillRect(7.5, 6.2, 9, 2);
+  },
+  // A coil of rope: three brown loops and a loose end.
+  'gear-rope': (ctx) => {
+    ctx.strokeStyle = BROWN;
+    ctx.lineWidth = 2;
+    for (const r of [8, 5.5, 3]) {
+      ctx.beginPath();
+      ctx.ellipse(12, 12, r + 1, r, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.moveTo(19, 15);
+    ctx.quadraticCurveTo(22, 19, 18, 22);
+    ctx.stroke();
+  },
+  // A flask of lamp oil: a round bottle with a gold glow.
+  'gear-oil': (ctx) => {
+    circle(ctx, 12, 9, 6, '#f6d36b', null);
+    poly(ctx, [[10, 3], [14, 3], [14, 8], [18.5, 13], [18.5, 21], [5.5, 21], [5.5, 13], [10, 8]], SHEET, INK, 1.3);
+    poly(ctx, [[6.6, 15], [17.4, 15], [17.4, 20], [6.6, 20]], GOLD, null, 0);
+    ctx.fillStyle = BROWN;
+    ctx.fillRect(9.5, 1.5, 5, 2.5);
+  },
+  // A bale of trade goods: a bound bundle with a magenta tag.
+  'gear-goods': (ctx) => {
+    rrect(ctx, 3.5, 6, 17, 13, 3);
+    ctx.fillStyle = '#d9c39a';
+    ctx.fill();
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 1.3;
+    ctx.stroke();
+    ctx.strokeStyle = BROWN;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(9, 6);
+    ctx.lineTo(9, 19);
+    ctx.moveTo(15, 6);
+    ctx.lineTo(15, 19);
+    ctx.stroke();
+    poly(ctx, [[17, 3], [21.5, 3], [21.5, 7], [17, 7]], MAGENTA, null, 0);
+  },
   // The coastal sloop at anchor off its landing.
   sloop,
   // A village's rumour of the wonder: a dashed gold ring round a question mark, seen through the fog.

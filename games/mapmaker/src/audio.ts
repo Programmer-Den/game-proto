@@ -34,6 +34,12 @@ export const sfx = sounds({
   dig: { wave: 'noise', freq: 1600, to: 500, length: 0.13, volume: 0.28, vary: 0.05 },
   treasure: { wave: 'square', freq: 523, arp: [0, 4, 7, 12, 7, 12], arpStep: 0.08, length: 0.6, volume: 0.24 },
   thud: { wave: 'triangle', freq: 120, to: 55, length: 0.16, volume: 0.45 },
+  /** A lookout fixes tiles seen from a second lookout: two quick theodolite clicks. */
+  trig: { wave: 'triangle', freq: 1760, arp: [0, 5], arpStep: 0.05, length: 0.15, volume: 0.22 },
+  /** A bale of trade goods sold at a village. */
+  barter: { wave: 'pulse25', freq: 880, arp: [0, 4, 7], arpStep: 0.05, length: 0.2, volume: 0.22 },
+  /** Pressing on past the last supplies: a low, rising groan of effort. */
+  press: { wave: 'sawtooth', freq: 98, to: 131, length: 0.4, attack: 0.05, volume: 0.2 },
   /** A tent's flap and its peg. */
   flap: { wave: 'noise', freq: 2400, to: 700, length: 0.12, volume: 0.22 },
   peg: { wave: 'square', freq: 330, to: 220, length: 0.06, volume: 0.18 },
