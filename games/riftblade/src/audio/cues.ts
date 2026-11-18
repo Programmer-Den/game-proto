@@ -267,7 +267,8 @@ export class SoundCues {
     if (s.phase !== was) {
       if (s.phase === 'levelup' && was === 'run' && s.pendingLevels > 0) play('levelUp');
       if (s.phase === 'won') playSting(STINGS, 'win');
-      else if (s.phase === 'lost') playSting(STINGS, 'lose');
+      // A run ended on the star map (the endless rift) closes with the cleared sting, not the loss.
+      else if (s.phase === 'lost') playSting(STINGS, s.retreated ? 'cleared' : 'lose');
       else if (was === 'run' && s.phase !== 'run' && (this.arena ? s.arenaWon : s.after === 'chart' || s.phase === 'chart')) {
         playSting(STINGS, 'cleared');
       }

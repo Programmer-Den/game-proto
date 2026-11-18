@@ -483,11 +483,13 @@ export interface GameState {
   /**
    * The endless rift (`voyage.ts`, `enterEndless`), after a won crusade: the run goes on through
    * looping worlds, `loop` counting the loops begun past the first (each makes foes tougher), and
-   * `endlessCleared` the worlds cleared since, its score.
+   * `endlessCleared` the worlds cleared since, its score. `retreated` is set when the player ends it
+   * on the star map (`retreat`) rather than falling.
    */
   endless: boolean;
   loop: number;
   endlessCleared: number;
+  retreated: boolean;
   /**
    * The planet (an index into `PLANETS`: 0 Dune, 1 Swamp, 2 Ice, 3 Lava, then the later ones) and
    * the jump of the crusade it is (`stage`, 0 to 3), and whether this is the elite arena after it.
@@ -718,6 +720,7 @@ export function freshState(): GameState {
     endless: false,
     loop: 0,
     endlessCleared: 0,
+    retreated: false,
     planet: 0,
     stage: 0,
     route: [0],

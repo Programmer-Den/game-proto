@@ -25,7 +25,7 @@ import { bakeLate, bakeMastery, masteryPortraitKey, masteryScheme, portraitKey, 
 import { MASTERY, MASTERY_REWARDS, MAX_MASTERY, masteryLevel, masteryNext } from '../game/mastery';
 import { RUSH, rushPlanets } from '../game/rush';
 import {
-  FIGHT_SHORT, MASTERY_ROW, RUSH_BUTTON, AGAIN, AGAIN_SIDE, CODEX_BUTTON, CODEX_GRID, CODEX_BACK, SKILLS_BUTTON, SKILL_DETAIL, SKILL_LIST, skillTabRect, DAILY_BUTTON, ENDLESS_BUTTON, codexTabRect, ARMOURY_BUTTON, BACK, CHART, MUTATOR_CARD, WEEKLY_BACK, WEEKLY_BUTTON, WEEKLY_START, armouryCardRect, CONTINUE, DEPTH, FIGHT, FONT, HEAT_DOWN, HEAT_ROW, HEAT_UP, HERO_DETAIL, LEAVE, MAP, REROLL, SCREEN, UNLOCK, VIEW, chartRect, chartSpot, eventOptionRect, heroCardRect,
+  FIGHT_SHORT, MASTERY_ROW, RUSH_BUTTON, AGAIN, AGAIN_SIDE, CODEX_BUTTON, CODEX_GRID, CODEX_BACK, SKILLS_BUTTON, SKILL_DETAIL, SKILL_LIST, skillTabRect, DAILY_BUTTON, ENDLESS_BUTTON, codexTabRect, ARMOURY_BUTTON, BACK, CHART, MUTATOR_CARD, WEEKLY_BACK, WEEKLY_BUTTON, WEEKLY_START, armouryCardRect, CONTINUE, DEPTH, FIGHT, FONT, HEAT_DOWN, HEAT_ROW, HEAT_UP, HERO_DETAIL, LEAVE, MAP, REROLL, RETREAT, SCREEN, UNLOCK, VIEW, chartRect, chartSpot, eventOptionRect, heroCardRect,
   CHART4, levelCardRect, mapNodeRect, mapNodeSpot, tradeCardRect, type Rect,
 } from '../scenes/layout';
 
@@ -781,12 +781,13 @@ export function endScreen(p: Panel, s: GameState, progress: Progress, banked = 0
   const won = s.phase === 'won';
   // A won crusade (not a weekly, daily or boss rush) can go on into the endless rift.
   const endless = won && s.seed < 0 && !s.daily && !s.endless && !s.rush;
-  const color = won ? C.elite : C.danger;
-  p.text(VIEW.w / 2, 120, t(won ? 'victory' : 'fallen'), 46, color, { bold: true, origin: [0.5, 0], glow: true });
+  const color = won ? C.elite : s.retreated ? ENDLESS_COLOR : C.danger;
+  const title = won ? 'victory' : s.retreated ? 'retreated' : 'fallen';
+  p.text(VIEW.w / 2, 120, t(title), 46, color, { bold: true, origin: [0.5, 0], glow: true });
   const hero = HEROES[s.hero!];
   const planet = PLANETS[s.planet];
   const vars = { hero: t(hero.name), planet: t(planet.name), n: s.stage + 1, of: stagesOf(s) };
-  const line = s.rush ? (won ? 'rushWon' : 'rushFell') : won ? (s.daily ? 'dailyWon' : BOSSES[planet.boss].beaten) : s.arena ? 'fellArena' : 'fellOn';
+  const line = s.rush ? (won ? 'rushWon' : 'rushFell') : won ? (s.daily ? 'dailyWon' : BOSSES[planet.boss].beaten) : s.retreated ? 'retreatedFrom' : s.arena ? 'fellArena' : 'fellOn';
   const boss = t(BOSSES[planet.boss].name);
   p.text(VIEW.w / 2, 182, t(line, s.rush ? { ...vars, boss, n: s.rushBeaten, of: s.rushTotal } : { ...vars, boss }), 17, C.text, { origin: [0.5, 0] });
   const caps = s.capstones.map((id) => t(CAPSTONES.find((c) => c.id === id)!.name));
@@ -869,7 +870,7 @@ function nodeIcon(g: Phaser.GameObjects.Graphics, kind: NodeKind, x: number, y: 
 }
 
 /** The star map between planets: two or three nodes to choose from. */
-export function starMap(p: Panel, s: GameState) {
+export function starMap(p: Panel, s: GameState, retreatAsked = false) {
   const scene = p.scene;
   p.dim(0.9);
   stars(p, scene);
@@ -904,6 +905,14 @@ export function starMap(p: Panel, s: GameState) {
     p.text(spot.x + MAP.node.r + 14, spot.y + 2, t(info.text), 12, C.muted, { wrap: r.x + r.w - (spot.x + MAP.node.r + 14) - 10 });
     p.text(r.x + 10, r.y + 8, String(i + 1), 12, C.muted);
   });
+  // The endless rift has no last world: the run can end here, between worlds, with what it has won.
+  if (s.endless) {
+    const color = retreatAsked ? C.danger : C.muted;
+    p.frame(RETREAT, color);
+    p.spots.push({ id: 'retreat', ...RETREAT });
+    const label = retreatAsked ? t('retreatSure') : t('retreatButton');
+    fit(p.text(RETREAT.x + RETREAT.w / 2, RETREAT.y + RETREAT.h / 2, label, 15, retreatAsked ? C.danger : C.text, { bold: true, origin: [0.5, 0.5] }), RETREAT.w - 16);
+  }
   return p;
 }
 

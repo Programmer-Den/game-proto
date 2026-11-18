@@ -154,6 +154,9 @@ export function eventOptionRect(i: number) {
   return { x: VIEW.w / 2 - 300, y: 290 + i * 92, w: 600, h: 76 };
 }
 
+/** The star map's End run button, shown in the endless rift only (under the nodes). */
+export const RETREAT = { x: VIEW.w / 2 - 130, y: 476, w: 260, h: 44 };
+
 /** The end screen's "Run again" button, and beside it after a won crusade the endless rift's. */
 export const AGAIN = { x: VIEW.w / 2 - 110, y: 380, w: 220, h: 50 };
 export const AGAIN_SIDE = { x: VIEW.w / 2 + 10, y: 380, w: 220, h: 50 };
