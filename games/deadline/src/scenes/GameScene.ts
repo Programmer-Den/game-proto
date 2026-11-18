@@ -3114,8 +3114,8 @@ export class GameScene extends Phaser.Scene {
     // A shotgun or a flamethrower also hands the squad that sidearm, to swap to for the rest of the run.
     const found = (kind === 'shotgun' || kind === 'flamer') && !s.sidearms.includes(kind);
     if (found) s.sidearms.push(kind);
-    else if (kind === 'medkit') s.medkits++;
-    else s.sandbags += 2;
+    if (kind === 'medkit') s.medkits++;
+    else if (kind === 'sandbags') s.sandbags += 2;
     s.supplies.push(kind);
     s.offer = [];
     for (const o of this.supplyUi) o.destroy();

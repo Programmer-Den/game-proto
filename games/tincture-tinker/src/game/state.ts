@@ -151,6 +151,9 @@ export function startOrder(progress: Progress, exam = false): GameState {
   const s = blankState(progress, orderFor(progress.order, standingOf(progress)));
   const current = s.current;
   s.board = placeVials(addBlockers(freshBoard(tileMaker(s)), current.jars, current.resin, current.mould), current.vials ?? 0);
+  // A drop order asks for the vials the board could hold, so a board short of free columns can still be filled.
+  const vials = s.board.flat().filter((t) => t.vial).length;
+  if (current.vials && vials < current.vials) s.current = { ...current, vials };
   if (s.upgrades.bloom > 0) s.board = withBloom(s.board);
   drawPantry(s);
   return s;
