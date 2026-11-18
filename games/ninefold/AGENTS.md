@@ -7,9 +7,9 @@ AGENTS.md.
 ## Current state
 
 Ninefold is a number-placement puzzle (every row, column and box holds each digit once) with two
-modes, a technique school and ten unlockable art styles. Classic plays a 9x9 board at Easy, Normal,
-Hard, Killer, Thermo, Arrow, Kropki or Sandwich, plus a daily puzzle seeded by the date (each one
-solved stamps the calendar) and the weekly gauntlet (a seeded board a day, scored over the week);
+modes, a technique school, a puzzle maker and ten unlockable art styles. Classic plays a 9x9 board
+at Easy, Normal, Hard, Killer, Thermo, Arrow, Kropki, Sandwich or Jigsaw, plus a daily puzzle seeded
+by the date (each one solved stamps the calendar), a 6x6 daily mini beside it, and the weekly gauntlet (a seeded board a day, scored over the week);
 Delve is a run of floors (4x4, then 6x6, then 9x9 with fewer givens) with hearts, hints and relics
 between floors, at up to five ascensions. Every solved board counts towards the first nine style
 unlocks, and a full calendar month earns the tenth (Almanac); the worn style redraws everything
@@ -19,8 +19,40 @@ Implemented today:
 
 - One scene (`GameScene`) with five screens (`screen`: `menu`, `styles`, `school`, `calendar`,
   `board`) and cards over the board for the phases `lesson` (a lesson's opening card), `solved`
-  (Classic, daily, weekly, and a learned lesson's stamp), `relic` (a cleared Delve floor) and `over`
-  (a Delve run out of hearts).
+  (Classic, daily, mini, weekly, shared, and a learned lesson's stamp), `relic` (a cleared Delve
+  floor), `over` (a Delve run out of hearts) and `checked` (the puzzle maker's check card).
+- Jigsaw (`Shape.regions`, each cell's region): `boxOf` returns the region, so `units`, `peersOf`,
+  the solver, `explain` (its pointing pair reads the box units) and the Keystone all treat regions as
+  boxes. `jigsawShape(size, random)` starts from the boxes and makes `size * size * 6` swaps of two
+  cells across a region border (`swapAcross`, undone unless both regions stay in one piece, `whole`),
+  then keeps the layout only if a random search fills it within `JIGSAW_STEPS` (some layouts have no
+  full board; about 8 layouts are tried for a 9x9). `makePuzzle` fills a jigsaw's solution with the
+  same step budget, trying again until it does; a 9x9 Jigsaw board takes about 50 ms (a few hundred
+  at worst). It is a Classic level (`jigsaw`, 30 givens) and a board twist (`TWIST_GIVENS` 2), never
+  in the gauntlet. `drawBoard` insets cells by `boxOf` changes (so boxes and regions both get their
+  thick gaps) and on a Jigsaw board fences each region with a bold line in the given colour.
+- The daily mini (`mode: 'mini'`): `startMini` deals a `MINI_SIZE` (6x6) board with `MINI_GIVENS`
+  from `seeded(miniSeed(dailySeed))` (the date's seed negated, so it never repeats the daily's
+  numbers), keeping the date in `dailyDate`. `solved` counts it like any board and sets
+  `Progress.mini` (the date) and `miniBest` (the fastest, game ms); the menu's `mini` button is
+  disabled once `mini` is today and shows the best. It stamps no calendar day and keeps no streak.
+- The puzzle maker (`game/maker.ts` for the rules, the actions in `state.ts`): `mode: 'maker'`
+  plays on the normal board, with `puzzle.solution` mirroring `values` and every set digit a given,
+  so `drawBoard` draws it as is (`doneUnits` stays empty; `clashes` tints digits that stand twice in
+  a unit as wrong). `enter` and `erase` go to `makerSet` there; notes, hints and undo refuse.
+  `makerResize` cycles `MAKER_SIZES` (9, 4, 6) on a blank board, `makerVariant` cycles `VARIANTS`
+  (`classic`, `diagonal`, `jigsaw` with new regions) keeping the digits, and `s.made` (shape and
+  grid) always holds the maker's board, so `startMaker` reopens it. `checkMaker` runs `check`: a
+  clash, else `countWithin(CHECK_LIMIT)` steps (`none`, `many`, `unclear` when it runs out), else
+  `unique` with the `solve`d solution and `rate`: `explain` places a digit at a time, and the hardest
+  technique sets the rating (`RATING_OF`: singles `easy`, pairs `medium`, X-wing `hard`; stuck
+  `expert`). The card (`phase: 'checked'`) offers Play (`playMade`), Copy link and Edit
+  (`backToMaker`). Share codes (`encode`/`decode`): size, `C`/`D`/`J`, the givens with each run of
+  1 to 26 empty cells as a letter `a`-`z`, and for Jigsaw `.` and the regions as digits;
+  `decode` also takes a link carrying `puzzle=`. `startCode` plays a code that is `playable` (no
+  clash, exactly one solution) as `mode: 'custom'`, which `solved` counts for nothing (no progress,
+  styles or trophies). `create` opens `?puzzle=<code>` once and drops it from the address; the
+  panel's `paste` button asks for a code with `window.prompt`.
 - Puzzles are made in code (`makePuzzle`): a random full board, then cells emptied while the
   solution stays unique, down to the givens asked for (a board that can't lose more keeps a few
   more). 9x9 boards take a few to a few tens of milliseconds. An `Extra` rule adds `Puzzle.even`
@@ -129,13 +161,16 @@ Missing or rough:
 - The weekly gauntlet has no shared leaderboard either; a gauntlet board left by Menu scores 0 for
   its day, and a missed day of the week can't be played late.
 - The daily puzzle has no shared leaderboard; once solved, the menu ticks it off and disables its
-  button for today.
+  button for today. The daily mini neither: it keeps only the player's fastest.
+- The puzzle maker sets only givens on plain, Diagonal and Jigsaw boards; it can't draw cages,
+  thermometers, arrows, dots or sandwich sums, and its Jigsaw regions are drawn at random, not by
+  hand. `explain` knows no extra rule, so it couldn't rate those anyway.
 - Undo takes back notes, wrong digits and erases only; a right digit can't be taken back (it is
   right), and an undone mistake still counts.
 - Leaving a board by Menu drops it (the save is cleared); only a closed or reloaded page comes back
   to it.
-- Puzzle levels are by given count, not by the solving techniques they need; `explain` could grade
-  them, but it doesn't yet, and it knows no extra rule.
+- Puzzle levels are by given count, not by the solving techniques they need; the maker's `rate`
+  could grade them, but they don't use it yet, and it knows no extra rule.
 - The calendar can't fill a missed day late, so a full month needs every day's daily on its day.
 - Only four lessons, all 6x6; the hint can name a naked single, which has no lesson.
 - `docs/screenshots/all-styles.webp`, `style-picker.webp`, `menu.webp`, `upright-board.webp` (a
@@ -158,30 +193,35 @@ File map (`src/`):
   on screen goes through `t`; game logic compares ids.
 - `audio.ts`: `SONG` (parts `menu`, `calm`, `delve`, stings `solved` and `over`) and the `SFX` table.
 - `game/sudoku.ts`: `Shape`, `SHAPES`, `Puzzle`, `Cage`, `Arrow`, `Dot`, `Rules`, `EXTRAS`/`Extra`, `makeCages`, `makeThermos`, `makeArrows`, `makeDots`, `makeSandwich`, `dotFits`, `seeded` (mulberry32), `dailySeed`, `boxOf`,
-  `units`, `peersOf`, `countSolutions` and `makePuzzle` (the solver picks the cell with the fewest
-  candidates). No Phaser.
+  `units`, `peersOf`, `countSolutions`, `countWithin` and `solve` (within a step budget),
+  `jigsawShape` and `makePuzzle` (the solver picks the cell with the fewest candidates). No Phaser.
+- `game/maker.ts`: `VARIANTS`/`Variant`, `variantOf`, `MAKER_SIZES`, `RATINGS`/`Rating`, `CHECK_LIMIT`,
+  `MakerCheck`, `clashes`, `rate`, `check`, `encode`, `decode` and `playable`. No Phaser.
 - `game/techniques.ts`: `TECHNIQUES`/`Technique`, `Step`, `candidates` and `explain`. No Phaser.
 - `game/lessons.ts`: `Lesson`, `LESSONS` and `lessonPuzzle`.
-- `game/state.ts`: the tuning (`CLASSIC_GIVENS`, `HINT_NOTE_MS`, `DAILY_LEVEL`, `classicHints`, `delveHearts`,
+- `game/state.ts`: the tuning (`CLASSIC_GIVENS`, `HINT_NOTE_MS`, `DAILY_LEVEL`, `MINI_SIZE`, `MINI_GIVENS`, `miniSeed`, `classicHints`, `delveHearts`,
   `DELVE_HINTS`, `MAX_HEARTS`, `RELIC_OFFER`, `SEER_CELLS`, `FAST_MS`, `HARD_FLOOR`, `FLOORS`,
   `DEEPER_EVERY`, `MIN_GIVENS`, `TWIST_FLOOR`, `BOSS_EVERY`, `BOSS_GIVENS`, `TWIST_GIVENS`, `CLOCK_MS`,
   `LEVEL_EXTRA`, `ASCEND_FLOOR`, `ASCENT_GIVENS`, `ASCENT`, `GAUNTLET`, `GAUNTLET_SCORE`),
   `FloorPlan` and `planFloor`, `Progress`, `UNLOCKS`, `GameEvent`, `GameState` and the actions (`newGame`, `startClassic`,
-  `startDaily`, `startWeekly`, `startDelve`, `startLesson`, `beginLesson`, `lessonOf`, `daysIn`, `fullMonths`, `stampedDays`, `notesLocked`, `ascensionOpen`, `weekDay`, `weekSeed`, `weekScores`, `gauntletScore`, `select`, `toggleNotes`, `canEnter`, `enter`, `erase`, `hint`, `hasTwist`, `clockLeft`,
-  `takeRelic`, `chooseStyle`, `toMenu`, `tick`, `unlock`, `isRight`, `digitsLeft`). Only this file
-  changes `GameState`.
+  `startDaily`, `startMini`, `startWeekly`, `startDelve`, `startLesson`, `beginLesson`, `lessonOf`, `daysIn`, `fullMonths`, `stampedDays`, `notesLocked`, `ascensionOpen`, `weekDay`, `weekSeed`, `weekScores`, `gauntletScore`, `select`, `toggleNotes`, `canEnter`, `enter`, `erase`, `hint`, `hasTwist`, `clockLeft`,
+  `takeRelic`, `chooseStyle`, `toMenu`, `tick`, `unlock`, `isRight`, `digitsLeft`, and the maker's
+  `blankBoard`, `startMaker`, `makerShape`, `makerResize`, `makerVariant`, `checkMaker`, `backToMaker`,
+  `playMade` and `startCode`). Only this file changes `GameState`.
 - `game/catalog.ts`: `STYLES`/`StyleId`/`STYLE_INFO`, `MONTH_STYLE`, `PALETTE_STYLES`, `RELICS`/`RelicId`/`RELIC_INFO`, `TWISTS`/`Twist`/`TWIST_INFO`
   with `BOARD_TWISTS` and `PRESSING_TWISTS`, `ASCENSION_RULES`/`MAX_ASCENT` and `LEVELS` (`easy`,
-  `normal`, `hard`, `killer`, `thermo`, `arrow`, `kropki`, `sandwich`).
-- `game/save.ts`: `loadProgress` and `saveProgress`, and `saveBoard` and `loadBoard` for the board in play.
+  `normal`, `hard`, `killer`, `thermo`, `arrow`, `kropki`, `sandwich`, `jigsaw`).
+- `game/save.ts`: `loadProgress` and `saveProgress`, `saveBoard` and `loadBoard` for the board in play, and `saveMaker` and `loadMaker` for the maker's board.
 - `scenes/GameScene.ts`: everything drawn and all input.
 - `scenes/themes.ts`: `Theme`, `THEMES` (one per style) and `hex`.
 - `scenes/layout.ts`: the `Layout` type and its two values, `WIDE` (960x540) and `TALL` (540x960),
   with every spot (`board`, `panel` and its `rows`, `dock`, `pad` with its `cols`, `tools`,
   `keysHint`, `menuButton`, `menu`, `school`, `calendar`, `stylesTitle`, `styleCards`, `back`, `end`, `endButtons`,
-  `relicBox`, `relicCards`; the menu's `daily` and `weekly` side by side, eight `levels` (one row
-  wide, two rows of four upright), the `ascentDown`/`ascentUp` arrows beside `delve`, and `school`,
-  `styles` and `calendar` in its bottom row); `layoutFor(w, h)`, `VIEW` (= `WIDE.view`, for `main.ts`) and `UI_DEPTH`.
+  `relicBox`, `relicCards`, the maker's `paste` button on the panel's status row; the menu's
+  `daily`, `mini` and `weekly` (one row wide; upright the weekly under the other two), nine `levels`
+  (one row wide, five and four upright, a short last row centred), the `ascentDown`/`ascentUp`
+  arrows beside `delve`, and `school`, `styles`, `calendar` and `maker` at the bottom (one row wide,
+  two by two upright)); `layoutFor(w, h)`, `VIEW` (= `WIDE.view`, for `main.ts`) and `UI_DEPTH`.
 
 Shared code it imports: `shared/setupGame.ts`, `shared/scaling.ts` (`setupScaling`, `viewSize`,
 `viewFrame`), `shared/audio.ts` (`sounds`, `playMusic`, `playSting`, `ui`), `shared/settings.ts`
@@ -223,24 +263,24 @@ How it runs:
   panel's kicker names the mode, the ascension (`ascentTag`) and the twists, and shrinks to stay
   clear of the Menu button.
 
-State model (`GameState`): `phase` (`menu`, `lesson`, `playing`, `solved`, `relic`, `over`), `mode`
-(`classic`, `daily`, `weekly`, `delve`, `lesson`), `level`, `puzzle` (`size`, `boxW`, `boxH`, `diagonal`, `solution`, `givens`, and `even`, `cages`, `thermos`, `arrows`, `dots` or `sandwich`), `week` and `weekDay` (the gauntlet board in play), `score` and `weekTotal` (its result), `ascent` and `ascended`,
+State model (`GameState`): `phase` (`menu`, `lesson`, `playing`, `solved`, `relic`, `over`, `checked`), `mode`
+(`classic`, `daily`, `mini`, `weekly`, `delve`, `lesson`, `maker`, `custom`), `level`, `puzzle` (`size`, `boxW`, `boxH`, `diagonal`, `regions`, `solution`, `givens`, and `even`, `cages`, `thermos`, `arrows`, `dots` or `sandwich`), `week` and `weekDay` (the gauntlet board in play), `score` and `weekTotal` (its result), `ascent` and `ascended`,
 `values` (0 empty; may hold a wrong digit), `notes` (bit per digit), `selected` (-1 none),
 `notesMode`, `mistakes`, `hintsLeft`, `hintsUsed`, `timeMs`, `hearts`, `maxHearts`, `floor`,
-`plan` and `upcoming` (Delve `FloorPlan`s, null otherwise), `dailyDate` (the `dailySeed` a daily board was dealt for, 0 otherwise), `relics`, `relicOffer`, `warded`, `streak`, `keyHealed`, `lesson`, `hintNote`, `hintAt`, `undo` (the cells' digits and notes before each note, wrong digit or erase; `undoMove` restores the newest whose cell isn't right, `canUndo`), `doneUnits` (indexes into `units`), `newStyles`, `progress` and
+`plan` and `upcoming` (Delve `FloorPlan`s, null otherwise), `dailyDate` (the `dailySeed` a daily board was dealt for, 0 otherwise), `relics`, `relicOffer`, `warded`, `streak`, `keyHealed`, `lesson`, `hintNote`, `hintAt`, `undo` (the cells' digits and notes before each note, wrong digit or erase; `undoMove` restores the newest whose cell isn't right, `canUndo`), `doneUnits` (indexes into `units`), `newStyles`, `made` (the maker's board) and `makerCheck` (its last check), `progress` and
 `events`.
 
-Persistence: two `localStorage` keys of its own (and `ninefold-trophies`, kept by `shared/trophies.ts`). `ninefold-board` holds the board in play (`saveBoard`/`loadBoard`
+Persistence: three `localStorage` keys of its own (and `ninefold-trophies`, kept by `shared/trophies.ts`). `ninefold-maker` holds the maker's board as a share code (`saveMaker` whenever the maker's board changes, `loadMaker` into `made` in `create`). `ninefold-board` holds the board in play (`saveBoard`/`loadBoard`
 in `save.ts`: the `BOARD_FIELDS` of `GameState` plus `LATER_FIELDS` (`week`, `weekDay`, `ascent`, `ascended`, which a save from before them may lack and then load as their defaults), written by `update` whenever the scene is dirty and
-every `SAVE_EVERY_MS` of board time, and removed once the phase is neither `playing` nor `relic`, or the board is a lesson);
+every `SAVE_EVERY_MS` of board time, and removed once the phase is neither `playing` nor `relic` (the maker's `checked` saves as `playing`), or the board is a lesson; a Jigsaw puzzle carries its `regions`);
 `create` restores it, straight onto the board or the relic offer. `ninefold-progress` holds `Progress` (`solved`, `flawless`,
-`noHint`, `hard`, `fast`, `bestFloor`, `bosses`, `daily`, `dailyStreak`, `bestStreak`, `climbed`, `week`, `weekScores` (seven numbers, -1 not played), `bestWeek`, `dailyDays`, `lessons`, `style`, `unlocked`; a save from before `dailyDays` gets its `daily` stamped, and one
+`noHint`, `hard`, `fast`, `bestFloor`, `bosses`, `daily`, `dailyStreak`, `bestStreak`, `climbed`, `week`, `weekScores` (seven numbers, -1 not played), `bestWeek`, `dailyDays`, `mini`, `miniBest`, `lessons`, `style`, `unlocked`; a save from before `dailyDays` gets its `daily` stamped, and one
 from before ascensions with `bestFloor` at `ASCEND_FLOOR` or deeper gets `climbed` 1). It is written when a board is
 solved or a gauntlet board starts (that uses up the day's try), a style unlocks, a lesson is learned or an ascension opens, a Delve run ends or a style is picked. `loadProgress` keeps only known
 styles and re-checks `UNLOCKS`.
 
-Randomness and timing: `makePuzzle` and the relic offer use `Math.random`, except the daily puzzle,
-which uses `seeded(dailySeed(date))`, and the gauntlet, which uses `seeded(weekSeed * 10 + day)`.
+Randomness and timing: `makePuzzle`, `jigsawShape` and the relic offer use `Math.random`, except the daily puzzle,
+which uses `seeded(dailySeed(date))`, the daily mini, `seeded(miniSeed(date))`, and the gauntlet, which uses `seeded(weekSeed * 10 + day)`.
 A puzzle with no extra rule draws the same numbers as before, so daily boards didn't change. The backdrops use Phaser's `RandomDataGenerator` with a fixed
 seed. All rule timing is game time from `tick`.
 
@@ -296,9 +336,9 @@ digit, Erase or Hint that can't be used, a disabled pad key and a locked style.
 
 - `src/main.ts` exposes `window.game` in dev builds. The test reads `game.scene.getScene('Game')`
   and its `state` (copied through JSON, without `events`), `screen`, `cellSpots` (`{ cell, x, y,
-  w, h }` per cell of the board, in view pixels) and `buttons` (spots by id: `daily`, `easy`,
-  `normal`, `hard`, `killer`, `thermo`, `arrow`, `kropki`, `sandwich`, `weekly`, `delve`, `ascent-down`, `ascent-up` (once an ascension is open), `styles`, `school`, `calendar`, `menu`, `key-1`..`key-9`, `notes`, `erase`, `undo`, `hint`,
-  `relic-0`..`relic-2`, `next`, `done`, `again`, `back`, `style-<id>`, `lesson-0`..`lesson-3`, `start`, `month-prev`, `month-next`).
+  w, h }` per cell of the board, in view pixels) and `buttons` (spots by id: `daily`, `mini`, `easy`,
+  `normal`, `hard`, `killer`, `thermo`, `arrow`, `kropki`, `sandwich`, `jigsaw`, `weekly`, `delve`, `ascent-down`, `ascent-up` (once an ascension is open), `styles`, `school`, `calendar`, `maker`, `menu`, `key-1`..`key-9`, `notes`, `erase`, `undo`, `hint`,
+  `relic-0`..`relic-2`, `next`, `done`, `again`, `back`, `style-<id>`, `lesson-0`..`lesson-3`, `start`, `month-prev`, `month-next`; on the maker `size`, `rules`, `erase`, `check`, `paste`, and on its card `play`, `copy`, `edit`).
 - Inputs: it taps `delve`, taps cells from `cellSpots` and pad keys from `buttons`, toggles
   `notes`, taps `erase` and `relic-0`. It never uses hints and stays on Delve floors 1 and 2.
 - The playthrough also reads `ninefold-trophies` (only `firstSolve` after floor 1).
@@ -340,6 +380,12 @@ digit, Erase or Hint that can't be used, a disabled pad key and a locked style.
 - **Retune**: the constants at the top of `state.ts`; mirror the first two `FLOORS` and the Normal
   hearts in the test.
 - **Board sizes**: `SHAPES` in `sudoku.ts`; the pad has nine keys, so boards go up to 9x9.
+- **Let the maker set another rule**: its data has to be edited on the board (new tools and taps),
+  carried by the share code (a new variant letter or section after the regions, still read by
+  `decode`'s pattern), checked by `check` (`countWithin` takes no `Rules` yet) and drawn as for a
+  Classic level. Keep old codes opening as before.
+- **Change a share code**: never change what an existing code means, since links are out there;
+  add to the format instead.
 - **Move something on screen**: change it in both `WIDE` and `TALL`, and check an upright phone
   (390x844) and German there, where the style cards and relic cards are narrowest.
 
@@ -359,4 +405,8 @@ digit, Erase or Hint that can't be used, a disabled pad key and a locked style.
   `size * size` texts.
 - Buttons stop their `pointerdown` so the board never sees a tap on the panel; anything tappable
   that doesn't go through `button` must do the same.
+- A search given no `random` resets every cell it filled; `solve` passes a fixed order so the
+  solution it finds stays in its grid.
+- `currentKey` includes the board's variant, so the maker's panel (its heading and Rules caption)
+  rebuilds when the variant changes at the same size.
 - Never use a red cross in any art (root AGENTS.md).

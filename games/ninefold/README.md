@@ -4,11 +4,13 @@ A number-placement puzzle built with [Phaser 4](https://phaser.io), TypeScript a
 [game hub](../../README.md).
 
 Fill the board so every row, column and box holds each digit once. Play the daily puzzle (the same
-board for everyone that day), the **weekly gauntlet** (a board a day, scored over the week), Classic
-boards at eight levels (Killer, Thermo, Arrow, Kropki and Sandwich among them), or **Delve**: a run
+board for everyone that day) and its **daily mini** (a 6x6 for a two-minute solve), the **weekly
+gauntlet** (a board a day, scored over the week), Classic boards at nine levels (Killer, Thermo,
+Arrow, Kropki, Sandwich and **Jigsaw** among them), or **Delve**: a run
 of ever bigger boards where every mistake costs a heart and each cleared floor offers a relic, with
 five harder **ascensions** to climb. The **School** teaches four solving techniques, and the
-**Calendar** stamps every daily solved. Every puzzle is made in code with exactly one solution, so
+**Calendar** stamps every daily solved. The **Puzzle maker** sets up your own board, checks it has
+one solution, rates it and shares it as a link. Every puzzle is made in code with exactly one solution, so
 they never run out. Solving boards unlocks nine art styles, from Paper Cut-out to Stained Glass, and
 a full month of dailies a tenth, Almanac; the digits stay plain and easy to read in all of them.
 
@@ -50,6 +52,9 @@ floors, too), so closing the page and coming back goes on where you stood.
   month stamped; a month with every day stamped earns the **Almanac** style.
 
 ![The menu with a daily streak](docs/screenshots/streak-menu.webp)
+- **Daily mini**: beside the daily puzzle, a 6x6 board with 14 givens picked by the date, the same
+  for everyone that day, for a two-minute solve. The menu ticks it off once solved and shows your
+  fastest mini; it counts as a solved puzzle but stamps nothing on the calendar.
 
 ![A full month on the calendar, in Almanac](docs/screenshots/calendar.webp)
 - **Weekly gauntlet**: seven 9x9 boards, one for each day from Monday to Sunday, the same for
@@ -64,10 +69,14 @@ floors, too), so closing the page and coming back goes on where you stood.
   board (18 givens: the digits on each arrow add up to its circle), a **Kropki** board (14 givens:
   a white dot joins digits one apart, a black dot digits where one is double the other, and two
   cells with no dot are neither) or a **Sandwich** board (20 givens: each sum outside the board adds
-  up the digits between the 1 and the 9 of its row or column), with 3 hints and no limit on mistakes.
+  up the digits between the 1 and the 9 of its row or column) or a **Jigsaw** board (30 givens:
+  odd-shaped regions, fenced by bold lines, take the place of the boxes), with 3 hints and no limit
+  on mistakes.
   **Next puzzle** deals another at the same level.
 
 ![Arrow, Kropki and Sandwich boards](docs/screenshots/new-variants.webp)
+
+![A Jigsaw board](docs/screenshots/jigsaw-board.webp)
 
 ![A Killer board: dashed cages with their sums](docs/screenshots/killer-board.webp)
 
@@ -88,11 +97,12 @@ floors, too), so closing the page and coming back goes on where you stood.
 | Arrow | The digits on each arrow add up to the digit in its circle (8 fewer givens). |
 | Kropki | White dots join digits one apart, black dots digits where one is double the other; no dot, neither (14 fewer givens). |
 | Sandwich | Each sum outside the board adds up the digits between the 1 and the 9 of its row or column (6 fewer givens). |
+| Jigsaw | Odd-shaped regions take the place of the boxes; each holds every digit once (2 fewer givens). |
 | Clock | A heart is lost every 3 minutes on the floor; the clock counts down to it. |
 | Sealed | No hints on the floor; clearing it gives one back. |
 
-A boss floor draws its board twist from Diagonal, Parity, Killer, Thermo, Arrow, Kropki and
-Sandwich, and its pressing one from Clock and Sealed.
+A boss floor draws its board twist from Diagonal, Parity, Killer, Thermo, Arrow, Kropki, Sandwich
+and Jigsaw, and its pressing one from Clock and Sealed.
 
 ![A boss floor: Diagonal and Clock](docs/screenshots/boss-floor.webp)
 
@@ -157,6 +167,22 @@ hinted digit, or that no simple technique gets there.
 
 ![A hint naming its technique](docs/screenshots/hint-technique.webp)
 
+### Puzzle maker
+
+**Puzzle maker** on the menu opens a blank board to set your own puzzle. Pick a cell and a digit to
+set a given (Erase or Backspace clears it); a digit that stands twice in a unit shows in red. The
+tools pick the board's size (9x9, 4x4 or 6x6) and its kind (Classic, Diagonal, or Jigsaw with fresh
+regions), keeping the givens set. **Check** says whether the givens leave exactly one solution, none,
+more than one, or a clash, and rates a puzzle with one solution by the hardest technique it takes
+to solve by hand: Easy (singles), Medium (naked or pointing pairs), Hard (an X-wing) or Expert (more
+than the School teaches). From there, **Play** it, **Copy link** to share it, or **Edit** on.
+
+A shared link (`?puzzle=<code>`) opens its puzzle straight away, and **Open code** on the maker's
+panel takes a pasted code or link. Shared puzzles play like Classic boards but count towards no
+styles or trophies. The maker keeps its board until you change it, even after a reload.
+
+![The maker's check card: one solution, rated](docs/screenshots/puzzle-maker.webp)
+
 ### Styles
 
 **Styles** on the menu shows all ten; tap an unlocked one to wear it. Every solved board, in any
@@ -205,14 +231,15 @@ hints and 2 hearts; Normal is 3 and 3. The puzzles themselves don't change.
 ## Code layout
 
 - `src/game/sudoku.ts`: making and solving 4x4, 6x6 and 9x9 boards with one solution, with Killer
-  cages, Thermometer lines, Arrows, Kropki dots, Sandwich sums and Parity marks.
+  cages, Thermometer lines, Arrows, Kropki dots, Sandwich sums, Parity marks and Jigsaw regions.
+- `src/game/maker.ts`: the puzzle maker's check, difficulty rating and share codes.
 - `src/game/techniques.ts`: solving by hand (singles, naked pairs, pointing pairs, X-wings), which
   names a hint's technique.
 - `src/game/lessons.ts`: the technique school's four lessons.
 - `src/game/state.ts`: the rules of every mode, the weekly gauntlet, ascensions, hints, relics and
   style unlocks.
 - `src/game/catalog.ts`: the styles, relics, twists, ascensions and Classic levels.
-- `src/game/save.ts`: the saved progress.
+- `src/game/save.ts`: the saved progress, the board in play and the maker's board.
 - `src/scenes/GameScene.ts`: the menu, style picker, school, calendar, board, panel and end cards.
 - `src/scenes/layout.ts`: where everything sits, sideways and upright.
 - `src/scenes/themes.ts`: the colours and fonts of the ten styles.

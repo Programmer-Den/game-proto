@@ -13,7 +13,7 @@ const en: HowToPlay = {
     { input: 'Menu', action: 'Leave the board for the menu' },
   ],
   loop: [
-    'Pick the daily puzzle, the weekly gauntlet, a Classic level or a Delve run.',
+    'Pick the daily puzzle or its 6×6 daily mini, the weekly gauntlet, a Classic level or a Delve run.',
     'Pick a cell and write a digit; a right one stays, a wrong one shows in red and counts a mistake.',
     'Finish every row, column and box to solve the board.',
     'In Delve a mistake costs a heart; a cleared floor offers three relics, and the next floor is bigger.',
@@ -22,9 +22,11 @@ const en: HowToPlay = {
   tips: [
     'Picking a digit highlights every place it already stands, and the pad shows how many of each are left.',
     'Delve starts on a 4×4 board, then 6×6, then 9×9 floors with fewer and fewer givens.',
-    'From floor 4 each Delve floor has a twist (Diagonal, Parity, Killer, Thermo, Arrow, Kropki, Sandwich, Clock or Sealed), and every 5th is a boss floor with two; beating one restores your hearts.',
+    'From floor 4 each Delve floor has a twist (Diagonal, Parity, Killer, Thermo, Arrow, Kropki, Sandwich, Jigsaw, Clock or Sealed), and every 5th is a boss floor with two; beating one restores your hearts.',
     'Killer boards have dashed cages whose digits add up to the small sum in the corner, with no digit twice; on Thermo boards digits rise along each line from its round bulb.',
     'On Arrow boards the digits on an arrow add up to its circle. On Kropki boards a white dot joins digits one apart and a black dot digits where one is double the other; with no dot, neither. On Sandwich boards each sum outside the board adds up the digits between the 1 and the 9 of that row or column.',
+    'On Jigsaw boards, odd-shaped regions fenced by bold lines take the place of the boxes: each holds every digit once.',
+    'The Puzzle maker sets up your own board: set givens, then Check says if it has one solution and rates it by the hardest technique it takes. Play it, or copy its link to share it.',
     'The School teaches four techniques (hidden single, naked pair, pointing pair and X-wing), each on a small board with one step to find, and stamps each one you learn.',
     'Solve the daily puzzle every day of a month to fill a Calendar page and earn the Almanac style.',
     'Clear Delve floor 10 to open Ascension 1, a harder Delve with one rule more; each ascension cleared opens the next, up to 5. Pick one with the arrows beside Delve.',
@@ -47,7 +49,7 @@ const de: HowToPlay = {
     { input: 'Menü', action: 'Das Rätsel verlassen und zum Menü gehen' },
   ],
   loop: [
-    'Wähle das Tagesrätsel, die Wochenprüfung, eine klassische Stufe oder einen Abstieg.',
+    'Wähle das Tagesrätsel oder sein 6×6-Tagesmini, die Wochenprüfung, eine klassische Stufe oder einen Abstieg.',
     'Wähle ein Feld und schreibe eine Ziffer; eine richtige bleibt, eine falsche wird rot und zählt als Fehler.',
     'Vervollständige jede Zeile, Spalte und jedes Kästchen, um das Rätsel zu lösen.',
     'Im Abstieg kostet ein Fehler ein Herz; eine geschaffte Ebene bietet drei Relikte, und die nächste ist größer.',
@@ -56,9 +58,11 @@ const de: HowToPlay = {
   tips: [
     'Eine gewählte Ziffer leuchtet überall dort auf, wo sie schon steht, und das Ziffernfeld zeigt, wie viele noch fehlen.',
     'Der Abstieg beginnt auf einem 4×4-Feld, dann 6×6, dann 9×9-Ebenen mit immer weniger Vorgaben.',
-    'Ab Ebene 4 hat jede Ebene eine Wendung (Diagonale, Gerade, Killer, Thermo, Pfeil, Kropki, Sandwich, Uhr oder Versiegelt), und jede 5. ist eine Bossebene mit zweien; wer sie schafft, bekommt alle Herzen zurück.',
+    'Ab Ebene 4 hat jede Ebene eine Wendung (Diagonale, Gerade, Killer, Thermo, Pfeil, Kropki, Sandwich, Puzzle, Uhr oder Versiegelt), und jede 5. ist eine Bossebene mit zweien; wer sie schafft, bekommt alle Herzen zurück.',
     'Killer-Rätsel haben gestrichelte Käfige, deren Ziffern die kleine Summe in der Ecke ergeben, ohne doppelte Ziffer; bei Thermo steigen die Ziffern entlang jeder Linie ab der runden Kugel.',
     'Bei Pfeil ergeben die Ziffern auf einem Pfeil zusammen seinen Kreis. Bei Kropki verbindet ein weißer Punkt Ziffern mit Abstand eins und ein schwarzer Ziffern, von denen eine das Doppelte der anderen ist; ohne Punkt keins von beiden. Bei Sandwich zählt jede Summe am Rand die Ziffern zwischen der 1 und der 9 dieser Zeile oder Spalte zusammen.',
+    'Bei Puzzle ersetzen unregelmäßige, fett umrandete Gebiete die Kästchen: jedes enthält jede Ziffer einmal.',
+    'Der Rätselbauer baut dein eigenes Rätsel: setze Vorgaben, dann sagt Prüfen, ob es genau eine Lösung hat, und bewertet es nach der schwersten Technik, die es braucht. Spiele es oder kopiere seinen Link zum Teilen.',
     'Die Schule lehrt vier Techniken (versteckter Einer, nacktes Paar, zeigendes Paar und X-Flügel), jede auf einem kleinen Feld mit einem Schritt zum Finden, und stempelt jede gelernte.',
     'Löse das Tagesrätsel an jedem Tag eines Monats, um eine Kalenderseite zu füllen und den Stil Almanach zu verdienen.',
     'Schaffe Ebene 10 des Abstiegs, um Stufe 1 zu öffnen, einen schwereren Abstieg mit einer Regel mehr; jede geschaffte Stufe öffnet die nächste, bis 5. Wähle sie mit den Pfeilen neben Abstieg.',

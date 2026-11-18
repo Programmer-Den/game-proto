@@ -1,12 +1,15 @@
 import { STYLES } from './catalog';
+import { decode, encode } from './maker';
+import type { Shape } from './sudoku';
 import { TECHNIQUES } from './techniques';
 import { ASCEND_FLOOR, GAUNTLET, newProgress, unlock, type GameState, type Progress } from './state';
 
 // Ninefold keeps two keys: the progress that unlocks the styles (with the style worn, the
 // calendar's stamps and the school's), and the board in play (with a Delve run's relics, or its
-// relic offer between floors), so a reload goes on where it stood.
+// relic offer between floors, and the puzzle maker's board), so a reload goes on where it stood.
 const KEY = 'ninefold-progress';
 const BOARD_KEY = 'ninefold-board';
+const MAKER_KEY = 'ninefold-maker';
 
 /** The parts of `GameState` a reload restores: everything but the progress and the events. */
 const BOARD_FIELDS = [
@@ -22,7 +25,7 @@ export function loadProgress(): Progress {
   try {
     const saved = JSON.parse(localStorage.getItem(KEY) ?? 'null');
     if (saved && typeof saved === 'object') {
-      for (const key of ['solved', 'flawless', 'noHint', 'hard', 'fast', 'bestFloor', 'bosses', 'daily', 'dailyStreak', 'bestStreak', 'climbed', 'week', 'bestWeek'] as const) {
+      for (const key of ['solved', 'flawless', 'noHint', 'hard', 'fast', 'bestFloor', 'bosses', 'daily', 'dailyStreak', 'bestStreak', 'climbed', 'week', 'bestWeek', 'mini', 'miniBest'] as const) {
         if (Number.isFinite(saved[key])) p[key] = saved[key];
       }
       if (Array.isArray(saved.weekScores) && saved.weekScores.length === GAUNTLET.length && saved.weekScores.every(Number.isFinite)) p.weekScores = saved.weekScores;
@@ -54,8 +57,11 @@ export function saveProgress(p: Progress) {
 export function saveBoard(s: GameState) {
   try {
     // A lesson is short and starts over from the school, so it isn't kept.
-    if ((s.phase === 'playing' || s.phase === 'relic') && s.mode !== 'lesson') {
-      localStorage.setItem(BOARD_KEY, JSON.stringify(Object.fromEntries([...BOARD_FIELDS, ...LATER_FIELDS].map((k) => [k, s[k]]))));
+    // The maker's board stays saved under its check card, which reopens as the board.
+    const phase = s.phase === 'checked' ? 'playing' : s.phase;
+    if ((phase === 'playing' || phase === 'relic') && s.mode !== 'lesson') {
+      const fields = Object.fromEntries([...BOARD_FIELDS, ...LATER_FIELDS].map((k) => [k, s[k]]));
+      localStorage.setItem(BOARD_KEY, JSON.stringify({ ...fields, phase }));
     } else localStorage.removeItem(BOARD_KEY);
   } catch {
     // Storage can be full or blocked; the board just isn't kept.
@@ -72,11 +78,30 @@ export function loadBoard(s: GameState) {
       && [p.solution, p.givens, saved.values, saved.notes].every((a) => Array.isArray(a) && a.length === n)
       && BOARD_FIELDS.every((k) => k in saved);
     if (!ok) return false;
+    if (p.regions && !(Array.isArray(p.regions) && p.regions.length === n)) return false;
     Object.assign(s, Object.fromEntries(BOARD_FIELDS.map((k) => [k, saved[k]])));
     for (const k of LATER_FIELDS) if (Number.isFinite(saved[k])) s[k] = saved[k];
     s.events.push({ type: 'board' });
     return true;
   } catch {
     return false;
+  }
+}
+
+/** Keeps the puzzle maker's board, as a share code, so it waits in the maker after leaving it. */
+export function saveMaker(made: { shape: Shape; grid: number[] } | null) {
+  try {
+    if (made) localStorage.setItem(MAKER_KEY, encode(made.shape, made.grid));
+  } catch {
+    // Storage can be full or blocked; the maker starts blank next time.
+  }
+}
+
+/** The puzzle maker's board as it was left, if any. */
+export function loadMaker() {
+  try {
+    return decode(localStorage.getItem(MAKER_KEY) ?? '');
+  } catch {
+    return null;
   }
 }

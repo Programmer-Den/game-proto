@@ -1,5 +1,5 @@
 // Puzzle making and solving for every board size Ninefold plays: 4x4 (2x2 boxes), 6x6 (boxes two
-// rows tall and three cells wide) and 9x9 (3x3 boxes). Cells are indexed row by row from 0, a
+// rows tall and three cells wide) and 9x9 (3x3 boxes), or Jigsaw regions in place of the boxes. Cells are indexed row by row from 0, a
 // value of 0 is empty and digits run from 1 to `size`. No Phaser.
 
 /** A board's shape: its side and the width and height of its boxes. */
@@ -9,6 +9,8 @@ export interface Shape {
   boxH: number;
   /** Both long diagonals are units too (a Delve twist). */
   diagonal?: boolean;
+  /** Jigsaw: each cell's region, numbered from 0, in place of the boxes (`size` regions of `size` cells). */
+  regions?: number[];
 }
 
 export const SHAPES: Record<4 | 6 | 9, Shape> = {
@@ -99,6 +101,7 @@ export function nextDay(seed: number) {
 
 /** The box a cell is in, numbered row by row. */
 export function boxOf(shape: Shape, cell: number) {
+  if (shape.regions) return shape.regions[cell];
   const r = Math.floor(cell / shape.size);
   const c = cell % shape.size;
   return Math.floor(r / shape.boxH) * (shape.size / shape.boxW) + Math.floor(c / shape.boxW);
@@ -309,6 +312,73 @@ export function countSolutions(shape: Shape, grid: number[], limit = 2, rules: R
   return search(shape, grid.slice(), peersOf(shape), limit, undefined, hasRules(rules) ? checker(shape, rules) : undefined);
 }
 
+/**
+ * Like `countSolutions` on a board with no extra rule, but within `steps` search steps: -1 when
+ * it ran out before it could tell (the puzzle maker checks boards anyone may set up).
+ */
+export function countWithin(shape: Shape, grid: number[], steps: number, limit = 2) {
+  const budget = { left: steps };
+  const found = search(shape, grid.slice(), peersOf(shape), limit, undefined, undefined, budget);
+  return budget.left < 0 ? -1 : found;
+}
+
+/** A solution of the board (its digits kept), or null when it has none; within `steps` search steps when given. */
+export function solve(shape: Shape, grid: number[], steps?: number) {
+  const work = grid.slice();
+  const budget = steps ? { left: steps } : undefined;
+  // A search given a source of order keeps the solution it finds in the grid; any fixed order will do.
+  return search(shape, work, peersOf(shape), 1, () => 0, undefined, budget) === 1 && !work.includes(0) ? work : null;
+}
+
+/** Search steps a jigsaw layout gets to show it has a full board, before another layout is tried. */
+const JIGSAW_STEPS = 2000;
+
+/**
+ * Cuts a board into `size` regions of `size` cells, each in one piece, for a Jigsaw board: it
+ * starts from the boxes and swaps cells across region borders many times, keeping both regions
+ * whole. A layout that has no full board (some don't) is thrown away for another.
+ */
+export function jigsawShape(size: 4 | 6 | 9, random: Random): Shape {
+  const base = SHAPES[size];
+  for (;;) {
+    const regions = Array.from({ length: size * size }, (_, i) => boxOf(base, i));
+    for (let k = 0; k < size * size * 6; k++) swapAcross(size, regions, random);
+    const shape = { ...base, regions };
+    // A layout counts once a random search fills it; one that runs out of steps is dropped.
+    const grid = new Array<number>(size * size).fill(0);
+    const budget = { left: JIGSAW_STEPS };
+    if (search(shape, grid, peersOf(shape), 1, random, undefined, budget) === 1 && budget.left >= 0) return shape;
+  }
+}
+
+/** One swap: a cell on a border moves to the region across it, and a cell of that region comes back, if both stay whole. */
+function swapAcross(size: number, regions: number[], random: Random) {
+  const a = Math.floor(random() * regions.length);
+  const across = neighbours(size, a).filter((q) => regions[q] !== regions[a]);
+  if (!across.length) return;
+  const from = regions[a];
+  const to = regions[across[Math.floor(random() * across.length)]];
+  // A cell of `to` that touches `from` goes the other way.
+  const back = regions.flatMap((r, i) => (r === to && i !== a && neighbours(size, i).some((q) => q !== a && regions[q] === from) ? [i] : []));
+  if (!back.length) return;
+  const b = back[Math.floor(random() * back.length)];
+  regions[a] = to;
+  regions[b] = from;
+  if (!whole(size, regions, from) || !whole(size, regions, to)) {
+    regions[a] = from;
+    regions[b] = to;
+  }
+}
+
+/** Whether a region's cells are all joined, side by side. */
+function whole(size: number, regions: number[], region: number) {
+  const cells = regions.flatMap((r, i) => (r === region ? [i] : []));
+  const seen = new Set([cells[0]]);
+  const todo = [cells[0]];
+  while (todo.length) for (const q of neighbours(size, todo.pop()!)) if (regions[q] === region && !seen.has(q)) seen.add(q), todo.push(q);
+  return seen.size === cells.length;
+}
+
 /** The cells next to a cell, left, right, up and down. */
 function neighbours(size: number, cell: number) {
   const r = Math.floor(cell / size);
@@ -490,7 +560,11 @@ export function makePuzzle(shape: Shape, givens: number, random: Random, extra?:
   const peers = peersOf(shape);
   const n = shape.size * shape.size;
   const solution = new Array<number>(n).fill(0);
-  search(shape, solution, peers, 1, random);
+  if (shape.regions) {
+    // A jigsaw layout is known to fill, but a random search can wander: it gets steps and tries again.
+    do solution.fill(0);
+    while (search(shape, solution, peers, 1, random, undefined, { left: JIGSAW_STEPS }) !== 1 || solution.includes(0));
+  } else search(shape, solution, peers, 1, random);
   const rules: Rules = {};
   if (extra === 'parity') rules.even = solution.map((d) => d % 2 === 0);
   if (extra === 'killer') rules.cages = makeCages(shape, solution, random);
