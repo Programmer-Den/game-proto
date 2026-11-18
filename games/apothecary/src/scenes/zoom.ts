@@ -56,9 +56,10 @@ export function setupZoom(scene: Phaser.Scene, world: { w: number; h: number }, 
     if (!pinch) pinch = { spread, zoom: zoom() };
     else if (pinch.spread > 0) setZoom((pinch.zoom * spread) / pinch.spread);
   });
-  scene.input.on('pointerup', () => {
-    if (!scene.input.pointer1.isDown || !scene.input.pointer2.isDown) pinch = null;
-  });
+  for (const event of ['pointerup', 'pointerupoutside'])
+    scene.input.on(event, () => {
+      if (!scene.input.pointer1.isDown || !scene.input.pointer2.isDown) pinch = null;
+    });
 }
 
 function readZoom() {

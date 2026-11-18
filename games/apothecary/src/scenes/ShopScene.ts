@@ -104,6 +104,9 @@ import { TOWN_HUD_H, TOWN_TEXT, TOWN_UI_DEPTH, keepSaving, leaveFor, townCard, t
 const SPEED = 160;
 const MAX_STEP_MS = 250;
 const MAX_WALK_STEP_PX = 20;
+
+/** A tap on a card under the top bar stays on the card, so the doctor doesn't walk off under it. */
+const stopTaps = (_p: Phaser.Input.Pointer, _x: number, _y: number, e: Phaser.Types.Input.EventData) => e.stopPropagation();
 const WORLD_UI_DEPTH = TOWN_UI_DEPTH - 1;
 const PIXIE_DEPTH = 5_000;
 const MARKER_INTERVAL_MS = 200;
@@ -156,6 +159,8 @@ export class ShopScene extends Phaser.Scene {
   private wasd!: Record<'up' | 'down' | 'left' | 'right', Phaser.Input.Keyboard.Key>;
   private pointerTarget: Phaser.Math.Vector2 | null = null;
   private waypoint: Phaser.Math.Vector2 | null = null;
+  /** The way the last frame walked towards a tapped spot, to tell when a step carried the feet past it. */
+  private heading: Phaser.Math.Vector2 | null = null;
   private blockedAreas: Phaser.Geom.Rectangle[] = [];
   private markers: Marker[] = [];
   private workSpots: { zone: Phaser.Geom.Rectangle; at: string }[] = [];
@@ -192,6 +197,7 @@ export class ShopScene extends Phaser.Scene {
     this.blockedAreas = [];
     this.pointerTarget = null;
     this.waypoint = null;
+    this.heading = null;
     this.refused = null;
     if (!this.state.town.shops[this.id]) {
       leaveFor(this, this.state, 'Town');
@@ -739,6 +745,7 @@ export class ShopScene extends Phaser.Scene {
       const at = this.cameras.main.getWorldPoint(p.x, p.y);
       this.pointerTarget = this.reachable(new Phaser.Math.Vector2(at.x, at.y));
       this.waypoint = this.routeAround(this.pointerTarget);
+      this.heading = null;
     });
   }
 
@@ -785,7 +792,9 @@ export class ShopScene extends Phaser.Scene {
     } else if (this.pointerTarget) {
       const target = this.waypoint ?? this.pointerTarget;
       dir.set(target.x - feet.x, target.y - feet.y);
-      if (dir.length() < 5) {
+      // Walking past the spot counts as getting there, so a fast walk doesn't step back and forth over it.
+      const passed = this.heading !== null && dir.dot(this.heading) <= 0;
+      if (dir.length() < 5 || passed) {
         if (this.waypoint) {
           this.waypoint = this.routeAround(this.pointerTarget);
           const next = this.waypoint ?? this.pointerTarget;
@@ -796,7 +805,9 @@ export class ShopScene extends Phaser.Scene {
         }
       }
     }
-    dir.normalize().scale(SPEED * walkSpeed(this.state));
+    dir.normalize();
+    this.heading = this.pointerTarget && dir.lengthSq() > 0 ? dir.clone() : null;
+    dir.scale(SPEED * walkSpeed(this.state));
     this.player.setVelocity(dir.x, dir.y);
     if (dir.x !== 0) this.player.setFlipX(dir.x < 0);
     if (dir.lengthSq() > 0) this.player.anims.play('doctor-walk', true);
@@ -914,7 +925,7 @@ export class ShopScene extends Phaser.Scene {
    */
   private createContract() {
     const y = TOWN_HUD_H + 20;
-    const card = townCard(this, 12 + CONTRACT_W / 2, y, 'contract', CONTRACT_W, 28).setAlpha(0.72);
+    const card = townCard(this, 12 + CONTRACT_W / 2, y, 'contract', CONTRACT_W, 28).setAlpha(0.72).setInteractive().on('pointerdown', stopTaps);
     const icon = fit(this.add.image(28, y, goodTexture('bread')), 1.3);
     const icon2 = fit(this.add.image(46, y, goodTexture('bread')), 1.3);
     const text = coined(this.add.text(42, y, '', { ...TOWN_TEXT, fontSize: '13px' }).setOrigin(0, 0.5));
@@ -953,7 +964,7 @@ export class ShopScene extends Phaser.Scene {
     const { w, h } = TOWN_CARD;
     const x = width - 12 - w, y = TOWN_HUD_H + 8;
     const first = this.children.list.length;
-    townCard(this, x + w / 2, y + h / 2, 'town', w, h).setAlpha(0.72);
+    townCard(this, x + w / 2, y + h / 2, 'town', w, h).setAlpha(0.72).setInteractive().on('pointerdown', stopTaps);
     const icon = fit(this.add.image(x + 19, y + h / 2, 'weather-mild'));
     const title = this.add.text(x + 36, y + 13, '', { ...TOWN_TEXT, fontSize: '13px' }).setOrigin(0, 0.5);
     const label = this.add.text(x + 36, y + 31, t('reputation'), { ...TOWN_TEXT, fontSize: '12px', fontStyle: 'normal' }).setOrigin(0, 0.5);

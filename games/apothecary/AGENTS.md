@@ -337,7 +337,8 @@ study, shade gardens and a mirrored second production line.
   sickle, `autoHarvest`, clears them before it cuts), the shelf price with the overstock cut (orange
   when cut), a bundle contract with both goods' icons, and the town card (`createTownCard`:
   weather, reputation bar, tomorrow or the crowd, and a note when the blight strikes or the crowd
-  comes, is served or walks off). It passes `HUD_BAND` to `setupZoom`, so at the top the camera
+  comes, is served or walks off); both cards stop taps, so a tap on them doesn't walk the doctor.
+  Its tap walk counts walking past the spot as arriving (`heading`), as `GameScene` does. It passes `HUD_BAND` to `setupZoom`, so at the top the camera
   scrolls past the yard and the yard below `SHOP_HUD` shows below the top bar and the cards.
 - `src/scenes/weather.ts`: `addWeather(scene, world, depth, state)`, the weather over a yard, used
   by `GameScene` and `ShopScene`: a world-sized tint per weather (`TINTS`), rain streaks
@@ -378,7 +379,9 @@ study, shade gardens and a mirrored second production line.
   contents out afresh on `toggle(true)` and after every button pressed on it (`refresh`), with a
   `BoardKit` of `heading`, `text`, `icon`, `button` (its whole card takes the tap; faded and dead when disabled) and `next` line by
   line; its background goes under its parts and stops taps. `GameScene.boards` holds the bench's,
-  the courier's, the decor board's and the ledger's, and `closePanels` closes them like the others.
+  the courier's, the decor board's and the ledger's (emptied in `create`, with the stand-still
+  clock `stillSince` and the walk's `heading`, since the old ones are gone and Phaser's clock runs
+  on), and `closePanels` closes them like the others.
 - `src/art/alchemy.ts`: `bakeAlchemy` (called by `BootScene`) paints the ledger book (`ledger`) and the town `seal` (AP21, AP22), `alchemy-bench`,
   `courier-post`, the wild herbs' and bench potions' icons (`alchemy-<id>`; the potions are
   `itemIcon` flasks, their colours and shapes in `ITEM_COL` and `POTION_SHAPES` in `paint.ts`) and
@@ -444,7 +447,8 @@ study, shade gardens and a mirrored second production line.
   like a tap and also starts `stick` (screen pixels, from `viewPoint`). Dragged past `STICK.drag`
   it goes `live`, drops the tap's target and steers: `movePlayer` takes knob minus base after the
   keys, nothing inside `STICK.dead`; the base is dragged along past `STICK.r`. Lifting the finger
-  or a second finger (`pinching`) ends it. `drawStick` draws it at `UI_DEPTH` on the UI camera.
+  (`pointerup`, or `pointerupoutside` off the canvas, which also ends a pinch in `setupZoom`) or a
+  second finger (`pinching`) ends it. `drawStick` draws it at `UI_DEPTH` on the UI camera.
 - Zoom: two cameras. The main camera follows the doctor and zooms (`MIN_ZOOM` 0.62 to `MAX_ZOOM`
   2, by the mouse wheel, + and - keys, or a two-finger pinch on `pointer1`/`pointer2`; all of it in
   `setupZoom(scene, world, hud)` in `src/scenes/zoom.ts`, which `ShopScene` calls too, so every shop's

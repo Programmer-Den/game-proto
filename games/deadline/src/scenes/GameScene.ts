@@ -3084,6 +3084,9 @@ export class GameScene extends Phaser.Scene {
     this.supplyUi = [];
     this.cards = [];
     s.phase = 'over';
+    // A win in the middle of a last stand ends it, as a game over does.
+    s.lastStandMs = 0;
+    this.standText.setVisible(false);
     this.overMs = 0;
     s.frenzyMs = 0;
     s.placing = false;

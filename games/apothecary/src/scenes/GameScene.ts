@@ -440,6 +440,11 @@ export class GameScene extends Phaser.Scene {
     this.workSpots = [];
     this.pallets = {};
     this.views = [];
+    // Panels, the stand-still clock and the walk's heading start afresh with the scene: the old
+    // boards' objects are gone, and Phaser's clock runs on across a restart.
+    this.boards = [];
+    this.stillSince = null;
+    this.heading = null;
     this.pointerTarget = null;
     this.waypoint = null;
     this.blockedAreas = [];
@@ -1701,7 +1706,7 @@ export class GameScene extends Phaser.Scene {
       const w = this.state.wagon;
       const here = wagonHere(this.state);
       const have = w ? this.state.counter.shelf.filter((p) => plainOf(p) === w.potion).length : 0;
-      const key = `${here}:${w?.potion}:${have}:${w ? Math.ceil(w.left / 10_000) : 0}`;
+      const key = `${here}:${w?.potion}:${have}:${w ? Math.ceil(w.left / 1000) : 0}`;
       if (key === drawn) return;
       drawn = key;
       for (const part of [wagon, want, icon, left]) part.setVisible(here);
@@ -2618,9 +2623,11 @@ export class GameScene extends Phaser.Scene {
         st.oy += (st.y - st.oy) * k;
       }
     });
-    this.input.on('pointerup', (p: Phaser.Input.Pointer) => {
-      if (this.stick?.id === p.id) this.stick = null;
-    });
+    // A finger lifted off the canvas (over the corner buttons, say) ends the stick too.
+    for (const event of ['pointerup', 'pointerupoutside'])
+      this.input.on(event, (p: Phaser.Input.Pointer) => {
+        if (this.stick?.id === p.id) this.stick = null;
+      });
   }
 
   /** The stick under a steering finger: a faint ring and a knob, drawn by the fixed UI camera. */
