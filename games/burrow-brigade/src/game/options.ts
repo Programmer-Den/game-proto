@@ -1,9 +1,11 @@
 import { settings, type Difficulty } from '../../../../shared/settings';
+import { KIND_IDS, type KindId } from './modes';
 
 /**
  * Burrow Brigade's own options, set on the menu's Options panel and kept in `burrow-brigade-prefs`:
- * a difficulty of its own (or the hub's), the turn time and crates for quick matches, and weather.
- * The defaults keep the hub's difficulty, a 30 second turn and the usual crates; weather is on.
+ * a difficulty of its own (or the hub's), the turn time and crates for quick matches, weather, and
+ * the match kind and the weapon draft of quick matches. The defaults keep the hub's difficulty, a 30
+ * second turn and the usual crates in a Classic match with no draft; weather is on.
  */
 
 export const DIFFICULTY_CHOICES = ['hub', 'easy', 'normal', 'hard'] as const;
@@ -21,9 +23,13 @@ export interface Options {
   crates: CrateChoice;
   /** Rain, fog and gusts now and then (not in the daily range). */
   weather: boolean;
+  /** The match kind of quick matches (picked on the menu). */
+  kind: KindId;
+  /** Both sides draft their weapons before a quick match. */
+  draft: boolean;
 }
 
-export const DEFAULT_OPTIONS: Options = { difficulty: 'hub', turn: 30, crates: 'normal', weather: true };
+export const DEFAULT_OPTIONS: Options = { difficulty: 'hub', turn: 30, crates: 'normal', weather: true, kind: 'classic', draft: false };
 
 /** The options as saved, each checked against its choices. */
 export function cleanOptions(o: Partial<Options>): Options {
@@ -32,6 +38,8 @@ export function cleanOptions(o: Partial<Options>): Options {
     turn: TURN_CHOICES.includes(Number(o.turn)) ? Number(o.turn) : DEFAULT_OPTIONS.turn,
     crates: CRATE_CHOICES.includes(o.crates as CrateChoice) ? (o.crates as CrateChoice) : DEFAULT_OPTIONS.crates,
     weather: typeof o.weather === 'boolean' ? o.weather : DEFAULT_OPTIONS.weather,
+    kind: KIND_IDS.includes(o.kind as KindId) ? (o.kind as KindId) : DEFAULT_OPTIONS.kind,
+    draft: typeof o.draft === 'boolean' ? o.draft : DEFAULT_OPTIONS.draft,
   };
 }
 

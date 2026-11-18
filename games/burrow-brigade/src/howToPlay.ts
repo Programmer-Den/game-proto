@@ -11,16 +11,19 @@ const en: HowToPlay = {
     { input: 'Enter, the ⤴ button / Backspace', action: 'Jump forwards / flip backwards' },
     { input: 'Weapon button, Tab or Q E', action: 'Open the arsenal / pick the next or previous weapon' },
     { input: 'Tap the map', action: 'Aim Balloon Drop, Storm Bolt and Tunnel Hop' },
+    { input: 'Tap another of your moles with a ring', action: 'Hand it the turn, before your mole moves' },
   ],
   loop: [
     'Each turn one mole of your team gets 30 seconds: walk, aim and use one weapon.',
     'Watch the wind at the top: it pushes rockets and the Balloon Drop, but not thrown things.',
     'After you fire you have 3 seconds to scramble away from your own blast.',
-    'Then the other team’s next mole takes its turn.',
+    'Then the other team’s next mole takes its turn. Each of your moles goes once before any goes twice, and you pick which one.',
+    'The menu sets the match kind: Classic, Forts (start behind stone walls and place more blocks first) or Flag hill (a mole by the flag at the end of its side’s turn scores; five points win).',
     'The Campaign is eight battles against rival burrows, each with its own habit. Win one to open the next, and earn up to three stars: the win, a quick win and losing no mole. Winning the last battle opens the harder Veteran tier.',
     'The Daily range is one try a day, the same for everyone: five shots at four straw moles. Every point of damage counts, and each one knocked out adds 25.',
     'Campaign battles pay acorns. Spend them at the Quartermaster on helmets, longer turns, extra weapons, more crates and a new recruit.',
     'Campaign stars open hats for your moles, picked on the Campaign screen.',
+    'Before a campaign battle each mole gets a trade: a Digger burrows twice as far, a Gunner hits 15% harder, a Medic brings a Repair Kit every third turn and a Scout sees the next two winds.',
   ],
   tips: [
     'There are 28 weapons in five groups: rockets, throwing weapons, strikes, close moves and tools.',
@@ -31,6 +34,7 @@ const en: HowToPlay = {
     'From turn 24 the water rises a little every turn.',
     'On Easy you see the whole flight path while aiming, on Normal its start, on Hard none. Options on the menu sets the difficulty for this game alone, the turn time, crates and weather.',
     'Rain puts fires out sooner, fog shortens the aim preview and gusts shift the wind in the middle of a turn.',
+    'With Weapon draft on in Options, both sides pick six weapons in turn from a pool of twelve before a quick match.',
   ],
 };
 
@@ -44,16 +48,19 @@ const de: HowToPlay = {
     { input: 'Enter, der Knopf ⤴ / Rücktaste', action: 'Nach vorn springen / Rückwärtssalto' },
     { input: 'Waffenknopf, Tab oder Q E', action: 'Waffenkammer öffnen / nächste oder vorige Waffe' },
     { input: 'Auf die Karte tippen', action: 'Ballonabwurf, Sturmblitz und Tunnelsprung zielen' },
+    { input: 'Auf einen anderen deiner Maulwürfe mit Ring tippen', action: 'Ihm den Zug geben, bevor dein Maulwurf sich bewegt' },
   ],
   loop: [
     'In jeder Runde hat ein Maulwurf deines Teams 30 Sekunden: laufen, zielen und eine Waffe einsetzen.',
     'Achte oben auf den Wind: Er treibt Raketen und den Ballonabwurf ab, aber keine Wurfwaffen.',
     'Nach dem Schuss hast du 3 Sekunden, um vor deiner eigenen Explosion zu fliehen.',
-    'Dann ist der nächste Maulwurf des anderen Teams dran.',
+    'Dann ist der nächste Maulwurf des anderen Teams dran. Jeder deiner Maulwürfe kommt einmal dran, bevor einer zweimal drankommt, und du wählst, welcher.',
+    'Im Menü wählst du die Spielart: Klassisch, Festungen (hinter Steinmauern beginnen und vorher weitere Blöcke setzen) oder Fahnenhügel (ein Maulwurf an der Fahne am Ende des eigenen Zugs punktet; fünf Punkte gewinnen).',
     'Der Feldzug sind acht Schlachten gegen rivalisierende Baue, jeder mit seiner Eigenart. Gewinne eine, um die nächste zu öffnen, und hol bis zu drei Sterne: den Sieg, einen schnellen Sieg und keinen verlorenen Maulwurf. Der Sieg in der letzten Schlacht öffnet die schwerere Veteranenstufe.',
     'Das Tagesziel ist ein Versuch am Tag, für alle gleich: fünf Schüsse auf vier Strohmaulwürfe. Jeder Schadenspunkt zählt, und jeder umgeworfene bringt 25 dazu.',
     'Schlachten im Feldzug bringen Eicheln. Gib sie beim Quartiermeister für Helme, längere Züge, Extrawaffen, mehr Kisten und einen neuen Rekruten aus.',
     'Sterne im Feldzug schalten Hüte für deine Maulwürfe frei, auszuwählen im Feldzug.',
+    'Vor einer Schlacht im Feldzug bekommt jeder Maulwurf einen Beruf: Ein Gräber gräbt doppelt so weit, ein Kanonier trifft 15 % härter, ein Sanitäter bringt jeden dritten Zug ein Flickzeug und ein Späher sieht die nächsten zwei Winde.',
   ],
   tips: [
     'Es gibt 28 Waffen in fünf Gruppen: Raketen, Wurfwaffen, Angriffe, Nahkampf und Werkzeuge.',
@@ -64,6 +71,7 @@ const de: HowToPlay = {
     'Ab Runde 24 steigt das Wasser jede Runde ein Stück.',
     'Auf Leicht siehst du beim Zielen die ganze Flugbahn, auf Normal ihren Anfang, auf Schwer keine. Unter Optionen im Menü stellst du den Schwierigkeitsgrad nur für dieses Spiel ein, dazu Zugzeit, Kisten und Wetter.',
     'Regen löscht Feuer schneller, Nebel verkürzt die Zielhilfe und Böen drehen den Wind mitten im Zug.',
+    'Mit der Waffenwahl in den Optionen wählen beide Seiten vor einer schnellen Partie abwechselnd sechs Waffen aus zwölf.',
   ],
 };
 

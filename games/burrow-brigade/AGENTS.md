@@ -9,6 +9,32 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
   screen, and Watch AI (`?watch`, both teams run by the AI, a new match four seconds after one
   ends). Teams have 2 to 5 moles (`size` in `burrow-brigade-prefs`, 3 by default), picked on the
   menu. There is no save of a match under way.
+- **Match kinds** (`game/modes.ts`, `kind` in the options, the menu's second stepper `kind-left`/
+  `kind-right`, `setKind`): quick matches (`quick()`) are Classic, Forts or Flag hill; the campaign,
+  daily and Watch AI are always Classic. **Forts:** `buildFort` stands a wall of two 16 px stone
+  blocks with a wooden plank on top 30 px in front of every mole, then `startBuild` runs the build
+  phase (`phase` `build`): each human side in turn taps its own half (`placeBuild`, the half away
+  from the middle 40 px) to place `BUILD_BLOCKS` (4) stone blocks or wood planks (`BLOCKS`, toggled
+  by `build-kind`; `build-done` ends early), resting on what is below (`surface`); the AI's are
+  placed at once by `aiBuild`. Blocks are `Terrain.addBlock`: earth in the mask (so blasts carve
+  them like the hills), with an op carrying `block` that `TerrainArt.paintBlock` paints as stone or
+  wood. `placeBlock` refuses a block over a mole, keg or crate. **Flag hill:** `plantFlag` puts
+  `flag` on the highest point of the hills (from `Terrain.back`, never a ledge) in the middle fifth;
+  `settleFlag` drops it into craters and replants it if the water takes it. `scoreFlag` at the end
+  of each turn gives the side whose turn it was a point if it has a mole within `FLAG_REACH` (34 px)
+  and the other side has none; `FLAG_WIN` (5)
+  points win (`flagWinner`, checked in `endTurn` and `finish`). The AI's nearest mole walks to the
+  flag first (`flagWalk`, AI stage `flag`, hopping up steps) when the way is dry and under 380 px.
+- **Weapon draft** (`draft` in the options, `startDraft`, `phase` `draft`): before a quick match
+  both sides pick from `draftPool()` (12 weapons that run out) in `DRAFT_ORDER` (snake order, 6
+  each), on a panel of tiles (`d-<id>`); the AI picks with `aiDraftPick` after 0.8 s. Then each side
+  keeps its unlimited weapons and only its own picks of the rest (at their usual ammo).
+  `afterDraft` goes on to the build phase or the first turn.
+- **Pick your mole:** on a player's turn (not the AI's, not the daily range) a tap on another of
+  your moles that `canSwap` (alive, not in `Team.went`, and the active mole has not moved from
+  `startX` or acted) hands it the turn (`setActive`); a small ring marks each one that can. Each
+  mole goes once before any goes twice: `endTurn` adds the active mole to `went`, `beginTurn` skips
+  moles in it and clears it once every living mole has gone. AI teams keep the plain rotation.
 - **Daily range** (`mode` `daily`, `startDaily` in the scene, with `shared/daily.ts`): one try a
   day. `Math.random` is swapped for `dailyRand` while `buildWorld` makes the map, theme and kegs,
   and the five winds (`dailyWinds`) are drawn from it too, so everyone shoots the same range: the
@@ -35,6 +61,16 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
   `veteran` in the scene): the same battles with `VETERAN`'s changes (one more rival mole, aim
   error times 0.6, one more of each bonus weapon, a tougher boss, 1.5 times the acorns) and their
   own stars (`vstars`, through `tierStars`).
+  **Trades** (`showTrades`, opened by a battle's card; `trade-<k>-left`/`-right`, `fight`): each of
+  your moles (`mine` plus the recruit) gets a trade by its place in the line-up, saved as
+  `trades` and filled by `tradesFor` (Digger, Gunner, Medic, Scout in turn). `Mole.trade` then:
+  a Digger's Burrow lasts `DIGGER_REACH` (2) times as long; a Gunner sets `World.gunner` to
+  `GUNNER_POWER` (1.15) on its turn, which `World.hurt` applies to damage to enemies while it is the
+  turn team; a living Medic gives its team a Repair Kit on every `MEDIC_EVERY` (3)th turn
+  (`Team.taken`); a living Scout keeps `windAhead` filled with the next `SCOUT_AHEAD` (2) winds
+  (`rollWind`), shown beside the wind panel (`forecast`) on its side's turns. The trade's emoji
+  (`TRADE_ICON`; the Medic's is a plaster, never a red cross) leads the mole's label. Rivals have
+  no trades.
 - **Quartermaster** (`game/depot.ts`): every campaign battle pays acorns (`reward`: 15 for a loss,
   40 plus 15 a star for a win), spent from the Campaign screen (`showDepot`) on upgrades with levels
   (`UPGRADE_IDS`, prices in `UPGRADE_COSTS`): thicker helmets (+10 health a level, through
@@ -51,7 +87,8 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
   whoever set it off, and six flames), and they fall and sink like crates. `spawnPoints` puts team 0 on the left half
   and team 1 on the right. The water sits `WATER_GAP` (30) above the bottom; a mole or shell in it
   is gone.
-- **Turns:** `TURN_TIME` (30 s) to walk, aim and use one weapon, then `RETREAT_TIME` (3 s) to keep
+- **Turns:** each turn's wind comes from `rollWind` (or `windAhead` while a Scout looks out).
+  `TURN_TIME` (30 s) to walk, aim and use one weapon, then `RETREAT_TIME` (3 s) to keep
   walking, then `settle` waits for the world to be still (`World.busy`), plays the deaths of moles at
   0 health (each becomes a molehill with a team flag) and ends the turn. Each turn has a new wind
   from -10 to 10 (calm 15% of the time). After a turn a crate falls 40% of the time (30% of those
@@ -88,8 +125,9 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
 - **Options** (`game/options.ts`, the menu's Options panel, `showOptions`): Difficulty (Hub, Easy,
   Normal, Hard), Turn time for quick matches (`TURN_CHOICES`, 30 s by default; the campaign keeps
   30 plus its upgrades and the daily its own), Crates in quick matches (`CRATE_ODDS`, Normal is the
-  40% chance) and Weather on or off. The defaults keep the hub's difficulty, 30 s turns and the 40% crates;
-  weather is on.
+  40% chance), Weather on or off, and Weapon draft on or off (`draft`); the match kind (`kind`) is
+  set on the menu. The defaults keep the hub's difficulty, 30 s turns and the 40% crates in a
+  Classic match without a draft; weather is on.
 - **Weather** (`weather` in the scene): rolled at the start of a quick or campaign match when the
   option is on (60% clear, 15% rain, 15% fog, 10% gusts, from one `Math.random` in `startMatch`),
   never in the daily range, and never gusts in a battle with a strong or calm wind (it stays clear). Rain (`World.rain`) puts fires out twice as fast and draws streaks,
@@ -117,7 +155,7 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
 ## Architecture
 
 - `GameScene` is the only scene. `screen` is `menu`, `play` or `over`; `phase` is `aim`, `retreat`,
-  `settle` or `over`. `update` runs `tick` (one `World.step` plus the turn logic) as many times as
+  `settle` or `over`, or before the first turn of a quick match `draft` or `build`. `update` runs `tick` (one `World.step` plus the turn logic) as many times as
   the frame's time holds `DT` (times `watchSteps()` in watch mode), then `render` draws.
 - `buildWorld` makes the map, `World`, the sky (`paintSky`) and the ground (`TerrainArt`) for the menu
   and every match. The menu is a live map with idle moles behind its panel.
@@ -142,9 +180,10 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
 - `burrow-brigade-stats`: `{ games, wins, used }`, matches started (not in Watch AI), wins against the
   AI and the weapons the player has used.
 - `burrow-brigade-prefs`: `{ size, hat, options }`, moles a team, the hat worn (or null) and the
-  Options panel's choices (`cleanOptions` checks each).
-- `burrow-brigade-campaign`: `{ stars, vstars, acorns, levels }`, the best stars (0 to 3) of each
-  campaign battle by its place in `BATTLES` (`vstars` for the Veteran tier), the acorns to spend and the Quartermaster's levels by id.
+  Options panel's choices with the match kind (`cleanOptions` checks each).
+- `burrow-brigade-campaign`: `{ stars, vstars, acorns, levels, trades }`, the best stars (0 to 3) of each
+  campaign battle by its place in `BATTLES` (`vstars` for the Veteran tier), the acorns to spend, the Quartermaster's levels by id
+  and the trades last picked, by place in the line-up.
 - `burrow-brigade-daily`: the daily range's record (`shared/daily.ts`).
 - `burrow-brigade-trophies`: the shared trophies.
 
@@ -153,12 +192,12 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
 - `window.game` (dev build). `scene.state` gives `screen`, `phase`, `mode`, `turn`, `turns`,
   `wind`, `weapon`, `active` (`id`, `team`, `x`, `y`, `hp`, `alive`), `craters`, `shots`, `busy`,
   `teams` (`alive`, `hp`), `winner`, `arsenal`, `battle` (the campaign battle, or null), `stars`
-  (the campaign's best stars), `veteran`, `vstars`, `acorns`, `dailyScore` (the daily range's score once it ends), `offset` (where the daily range's map sits in the view, 0 otherwise), `difficulty` (the one in force), `weather`, `hat` and `view` (the view's size, to turn view pixels into
+  (the campaign's best stars), `veteran`, `vstars`, `acorns`, `dailyScore` (the daily range's score once it ends), `offset` (where the daily range's map sits in the view, 0 otherwise), `difficulty` (the one in force), `weather`, `hat`, `kind`, `flag` (`x`, `y`, `score`, or null), `draft` (`pool`, `picks`, `step`, or null), `buildLeft`, `trades` (your moles'), `windAhead`, `ammo` (each team's) and `view` (the view's size, to turn view pixels into
   page pixels). `scene.buttons` has every button by id: `play-ai`, `campaign`, `play-duo`, `daily`,
   `size-down`, `size-up`, `weapon`, `left`, `right`, `jump`, `fire`, `rematch`, `menu`, `w-<id>`
   for the arsenal's tiles while it is open, `battle-<i>`, `depot`, `back` and (once the
   last battle is won) `tier` on the Campaign screen, `buy-<id>` and `back` at the Quartermaster, `options` on the menu and `opt-<key>-left`/`-right` and
-  `back` on its panel, `hats` on the Campaign screen and `hat-<id>` (`hat-none`) and `back` on its, and `next` on a won battle's result.
+  `back` on its panel, `hats` on the Campaign screen and `hat-<id>` (`hat-none`) and `back` on its, and `next` on a won battle's result, `kind-left`/`kind-right` on the menu, `trade-<k>-left`/`-right` and `fight` on the Trades screen, `d-<id>` on the draft panel, and `build-kind` and `build-done` in the build phase.
 - The playthrough (`e2e/playthrough.spec.ts`) plays the first round: Play the Burrow AI, hold ▶,
   drag back from the mole to fire an Acorn Rocket, see a crater, wait through the AI's turn until
   the next blue mole is up, and checks the saved stats.
@@ -186,5 +225,9 @@ scene).
   end.
 - **A Quartermaster upgrade:** add its id to `UPGRADE_IDS` with its prices in `UPGRADE_COSTS`, what
   it does to `boosts` and where the scene uses `this.boost`, and its `u_<id>` and `ud_<id>` texts.
+- **A trade:** add its id to `TRADE_IDS` with its badge in `TRADE_ICON` (`game/modes.ts`), what it
+  does where the scene or `World` reads `Mole.trade`, and its `trade_<id>` and `tradeDesc_<id>` texts.
+- **A match kind:** add its id to `KIND_IDS`, its `kind_<id>` text, and its setup in `startMatch`
+  (after `buildWorld`) and its rules in `endTurn` and `finish`.
 - **Balance:** blast radius and damage are in `goOff`; the turn and retreat times, sudden death and
   crate odds at the top of `GameScene.ts`; gravity, wind and the water's height in `terrain.ts`.

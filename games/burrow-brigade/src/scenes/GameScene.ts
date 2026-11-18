@@ -11,6 +11,10 @@ import { BATTLES, isOpen, starsFor, VETERAN } from '../game/campaign';
 import { HATS, type HatId } from '../game/hats';
 import { byLevel, CRATE_CHOICES, CRATE_ODDS, difficulty, DIFFICULTY_CHOICES, setDifficulty, TURN_CHOICES, type Options } from '../game/options';
 import { boosts, reward, UPGRADE_COSTS, UPGRADE_IDS, type UpgradeId } from '../game/depot';
+import {
+  aiDraftPick, BLOCKS, BUILD_BLOCKS, DRAFT_ORDER, draftPool, FLAG_REACH, FLAG_WIN, GUNNER_POWER, KIND_IDS, MEDIC_EVERY, SCOUT_AHEAD, TRADE_ICON, TRADE_IDS, tradesFor,
+  type BlockKind, type TradeId,
+} from '../game/modes';
 import { loadCampaign, loadPrefs, loadStats, saveCampaign, savePrefs, saveStats, type Stats } from '../game/save';
 import { DT, flight, generate, spawnPoints, Terrain, THEMES, WATER_GAP, WIND_ACC, type Theme } from '../game/terrain';
 import { CRATE_WEAPONS, GROUPS, startingAmmo, WEAPON_IDS, WEAPONS, type WeaponId } from '../game/weapons';
@@ -24,7 +28,8 @@ import { paintSky, TerrainArt } from './terrainArt';
 
 type Spot = { x: number; y: number; w: number; h: number };
 type Screen = 'menu' | 'play' | 'over';
-type Phase = 'aim' | 'retreat' | 'settle' | 'over';
+/** Before the first turn a quick match may hold a weapon draft (`draft`) and a fort build (`build`). */
+type Phase = 'aim' | 'retreat' | 'settle' | 'over' | 'draft' | 'build';
 
 interface Team {
   index: number;
@@ -33,6 +38,10 @@ interface Team {
   weapon: WeaponId;
   next: number;
   moles: Mole[];
+  /** Moles that have had a turn in this go round the team (each goes once before any goes twice). */
+  went: Set<Mole>;
+  /** The team's turns so far, for the Medic's Repair Kits. */
+  taken: number;
 }
 
 /** Seconds to aim and fire in a turn, and to scramble away after. */
@@ -132,7 +141,7 @@ export class GameScene extends Phaser.Scene {
   private clouds: { x: number; y: number; s: number }[] = [];
   private specks: { x: number; y: number; ph: number }[] = [];
   private banner = 0;
-  private ai: { stage: 'think' | 'walk' | 'turn' | 'charge' | 'mark' | 'done'; t: number; plan: Plan | null; walked: boolean; from: number } = {
+  private ai: { stage: 'think' | 'walk' | 'flag' | 'turn' | 'charge' | 'mark' | 'done'; t: number; plan: Plan | null; walked: boolean; from: number } = {
     stage: 'done', t: 0, plan: null, walked: false, from: 0,
   };
   private stats: Stats = loadStats();
@@ -145,6 +154,20 @@ export class GameScene extends Phaser.Scene {
   private hover = { x: 0, y: 0 };
   private keys!: Record<string, Phaser.Input.Keyboard.Key>;
   private lostMole = false;
+  /** The winds of the next turns, rolled ahead while a Scout can see them. */
+  private windAhead: number[] = [];
+  /** Flag hill's flag: where it stands, each side's points and who scored last. */
+  flag: { x: number; y: number; score: [number, number]; last: number } | null = null;
+  /** The weapon draft under way: the pool, each side's picks and the pick it is on. */
+  draft: { pool: WeaponId[]; picks: [WeaponId[], WeaponId[]]; step: number; t: number } | null = null;
+  private draftObjs: Phaser.GameObjects.GameObject[] = [];
+  /** Forts' build phase: blocks the building side has left, and the kind it places. */
+  private buildLeft = 0;
+  private buildKind: BlockKind = 'stone';
+  /** Where the active mole stood when its turn began: it can be swapped for another until it moves. */
+  private startX = 0;
+  /** The trades being picked on the Trades screen. */
+  private tradePick: TradeId[] = [];
   /** The browser's own `Math.random` while the daily range's seeded one stands in for it, else null. */
   private realRandom: (() => number) | null = null;
   /** How far the daily range's fixed map sits from the view's top-left (0 outside the daily). */
@@ -210,6 +233,13 @@ export class GameScene extends Phaser.Scene {
       weather: this.weather,
       difficulty: difficulty(),
       hat: this.prefs.hat,
+      kind: this.prefs.options.kind,
+      flag: this.flag ? { x: this.flag.x, y: this.flag.y, score: this.flag.score.slice() } : null,
+      draft: this.draft ? { pool: this.draft.pool.slice(), picks: this.draft.picks.map((p) => p.slice()), step: this.draft.step } : null,
+      buildLeft: this.buildLeft,
+      trades: this.teams[0]?.moles.map((m) => m.trade ?? null) ?? [],
+      windAhead: this.windAhead.slice(),
+      ammo: this.teams.map((tm) => ({ ...tm.ammo })),
       view: { w: viewSize(this).width, h: viewSize(this).height },
     };
   }
@@ -254,7 +284,7 @@ export class GameScene extends Phaser.Scene {
     const spots = spawnPoints(this.terrain, size, this.world.water);
     const names = this.looks(() => NAMES.map((n) => n.slice().sort(() => Math.random() - 0.5)));
     this.teams = [0, 1].map((i) => ({
-      index: i, ai: false, ammo: startingAmmo(), weapon: 'rocket' as WeaponId, next: 0,
+      index: i, ai: false, ammo: startingAmmo(), weapon: 'rocket' as WeaponId, next: 0, went: new Set<Mole>(), taken: 0,
       moles: spots[i].map((p, k) => this.world.addMole(i, names[i][k], p.x, p.y, hp[i])),
     }));
     this.world.onCollect = (m, c) => this.onCrate(m, c.weapon);
@@ -341,10 +371,14 @@ export class GameScene extends Phaser.Scene {
     const today = loadDaily(GAME);
     const d = this.button('daily', cx + 77, top + 262, 146, 46, t('daily'), () => this.startDaily(), !today.played);
     if (today.played) d.txt.setColor(hex(0xa09080));
-    this.button('size-down', cx - 120, top + 310, 40, 36, '◀', () => this.setSize(-1));
-    this.button('size-up', cx + 120, top + 310, 40, 36, '▶', () => this.setSize(1));
-    this.texts.size = this.add.text(cx, top + 310, t('teamSize', { n: this.size }), { fontFamily: FONT, fontSize: '17px', color: hex(C.ink), fontStyle: 'bold' }).setOrigin(0.5).setDepth(151);
-    this.uiObjs.push(this.texts.size);
+    // Two steppers side by side: moles a team, and the match kind of quick matches.
+    this.button('size-down', cx - 182, top + 310, 34, 36, '◀', () => this.setSize(-1));
+    this.button('size-up', cx - 48, top + 310, 34, 36, '▶', () => this.setSize(1));
+    this.texts.size = this.add.text(cx - 115, top + 310, t('teamSize', { n: this.size }), { fontFamily: FONT, fontSize: '15px', color: hex(C.ink), fontStyle: 'bold' }).setOrigin(0.5).setDepth(151);
+    this.button('kind-left', cx + 48, top + 310, 34, 36, '◀', () => this.setKind(-1));
+    this.button('kind-right', cx + 182, top + 310, 34, 36, '▶', () => this.setKind(1));
+    this.texts.kind = this.add.text(cx + 115, top + 310, t(`kind_${this.prefs.options.kind}`), { fontFamily: FONT, fontSize: '15px', color: hex(C.ink), fontStyle: 'bold' }).setOrigin(0.5).setDepth(151);
+    this.uiObjs.push(this.texts.size, this.texts.kind);
     const used = this.stats.used.length;
     this.uiObjs.push(
       this.add.text(cx, top + 396, t('statsLine', { wins: this.stats.wins, games: this.stats.games, used, all: WEAPON_IDS.length }) + '\n' + (today.score !== null
@@ -378,6 +412,7 @@ export class GameScene extends Phaser.Scene {
         step: (d) => (o.crates = CRATE_CHOICES[Math.max(0, Math.min(CRATE_CHOICES.length - 1, CRATE_CHOICES.indexOf(o.crates) + d))]),
       },
       { key: 'weather', label: t('optWeather'), value: o.weather ? t('on') : t('off'), step: () => (o.weather = !o.weather) },
+      { key: 'draft', label: t('optDraft'), value: o.draft ? t('on') : t('off'), step: () => (o.draft = !o.draft) },
     ];
     const pw = 520;
     const ph = rows.length * 56 + 150;
@@ -459,6 +494,54 @@ export class GameScene extends Phaser.Scene {
     this.texts.size?.setText(t('teamSize', { n: this.size }));
   }
 
+  /** The match kind of quick matches: Classic, Forts or Flag hill. */
+  private setKind(d: number) {
+    const o = this.prefs.options;
+    o.kind = KIND_IDS[(KIND_IDS.indexOf(o.kind) + d + KIND_IDS.length) % KIND_IDS.length];
+    savePrefs(this.prefs);
+    this.texts.kind?.setText(t(`kind_${o.kind}`));
+  }
+
+  /** The Trades screen before a campaign battle: a trade for each of your moles, in the order they go. */
+  showTrades(i: number) {
+    this.clearUi();
+    const bt = BATTLES[i];
+    const n = bt.mine + boosts(this.campaign.levels).moles;
+    if (this.tradePick.length !== n) this.tradePick = tradesFor(this.campaign.trades, n);
+    const cx = this.W / 2;
+    const cy = this.H / 2;
+    const rh = 52;
+    const pw = 560;
+    const ph = n * rh + 150;
+    const top = cy - ph / 2;
+    this.uiObjs.push(this.add.rectangle(cx, cy, pw, ph, C.panel, 0.96).setStrokeStyle(3, C.panelEdge).setDepth(150));
+    this.uiObjs.push(
+      this.add.text(cx, top + 26, t('trades'), { fontFamily: FONT, fontSize: '26px', color: hex(C.ink), fontStyle: 'bold' }).setOrigin(0.5).setDepth(151),
+      this.add.text(cx, top + 54, t('tradesHint', { battle: t(`c_${bt.id}`) }), { fontFamily: FONT, fontSize: '13px', color: hex(C.dim) }).setOrigin(0.5).setDepth(151),
+    );
+    this.tradePick.forEach((id, k) => {
+      const y = top + 76 + k * rh + rh / 2;
+      const x0 = cx - pw / 2 + 22;
+      const step = (d: number) => {
+        this.tradePick[k] = TRADE_IDS[(TRADE_IDS.indexOf(id) + d + TRADE_IDS.length) % TRADE_IDS.length];
+        this.showTrades(i);
+      };
+      this.uiObjs.push(
+        this.add.text(x0, y, t('tradeSlot', { n: k + 1 }), { fontFamily: FONT, fontSize: '13px', color: hex(C.dim), fontStyle: 'bold' }).setOrigin(0, 0.5).setDepth(151),
+        this.add.text(x0 + 100, y - 10, `${TRADE_ICON[id]} ${t(`trade_${id}`)}`, { fontFamily: FONT, fontSize: '16px', color: hex(C.ink), fontStyle: 'bold' }).setOrigin(0, 0.5).setDepth(151),
+        this.add.text(x0 + 100, y + 11, t(`tradeDesc_${id}`), { fontFamily: FONT, fontSize: '12px', color: hex(C.dim) }).setOrigin(0, 0.5).setDepth(151),
+      );
+      this.button(`trade-${k}-left`, cx + pw / 2 - 86, y, 36, 34, '◀', () => step(-1));
+      this.button(`trade-${k}-right`, cx + pw / 2 - 40, y, 36, 34, '▶', () => step(1));
+    });
+    this.button('back', cx - 110, top + ph - 30, 190, 38, t('back'), () => this.showCampaign());
+    this.button('fight', cx + 110, top + ph - 30, 190, 38, t('fight'), () => {
+      this.campaign.trades = this.tradePick.slice();
+      saveCampaign(this.campaign);
+      this.startMatch('ai', i);
+    }, true);
+  }
+
   /** The campaign: every battle as a card with its rival, team sizes, twist and best stars. */
   showCampaign() {
     this.clearUi();
@@ -503,7 +586,7 @@ export class GameScene extends Phaser.Scene {
         card.on('pointerout', () => card.setFillStyle(C.button));
         card.on('pointerdown', () => {
           ui('click');
-          this.startMatch('ai', i);
+          this.showTrades(i);
         });
       }
       this.buttons[`battle-${i}`] = { x, y, w: cw, h: ch };
@@ -585,6 +668,12 @@ export class GameScene extends Phaser.Scene {
     this.lostMole = false;
     this.dealt.clear();
     this.daily = null;
+    this.active = null;
+    this.phase = 'over';
+    this.flag = null;
+    this.draft = null;
+    this.windAhead = [];
+    this.buildLeft = 0;
     this.fitWorld(mode === 'daily');
     playMusic(SONG, 'battle');
     if (mode === 'daily') {
@@ -613,6 +702,14 @@ export class GameScene extends Phaser.Scene {
       boss.name = t('bossName');
     }
     for (const [id, n] of Object.entries(this.boost.ammo) as [WeaponId, number][]) this.teams[0].ammo[id] += n;
+    // Campaign moles carry the trades picked on the Trades screen, in the order they go.
+    if (bt) {
+      const trades = tradesFor(this.campaign.trades, this.teams[0].moles.length);
+      this.teams[0].moles.forEach((m, k) => (m.trade = trades[k]));
+    }
+    const kind = this.quick() ? this.prefs.options.kind : 'classic';
+    if (kind === 'forts') for (const tm of this.teams) this.buildFort(tm);
+    if (kind === 'flag') this.plantFlag();
     this.teams[1].ai = mode !== 'duo' && mode !== 'daily';
     // Your moles wear your hat (both sides in two players), never in Watch AI.
     if (mode !== 'watch') for (const tm of mode === 'duo' ? this.teams : [this.teams[0]]) for (const m of tm.moles) if (!m.hat) m.hat = this.prefs.hat;
@@ -625,6 +722,7 @@ export class GameScene extends Phaser.Scene {
     this.teams[0].ai = mode === 'watch';
     this.turn = Math.random() < 0.5 && mode === 'watch' ? 1 : 0;
     this.buildHud();
+    this.windAhead = [];
     if (mode === 'watch')
       mountWatch({
         title: t('title'),
@@ -635,40 +733,296 @@ export class GameScene extends Phaser.Scene {
       this.stats.games++;
       saveStats(this.stats);
     }
-    this.beginTurn();
+    if (this.quick() && this.prefs.options.draft) this.startDraft();
+    else this.afterDraft();
+  }
+
+  // ------------------------------------------------------------ before the first turn
+
+  /** The weapon draft: both sides take turns picking from one pool of weapons that run out. */
+  private startDraft() {
+    this.draft = { pool: draftPool(), picks: [[], []], step: 0, t: 0.8 };
+    this.phase = 'draft';
+    this.turn = DRAFT_ORDER[0];
+    this.showDraft();
+  }
+
+  private showDraft() {
+    for (const o of this.draftObjs) o.destroy();
+    this.uiObjs = this.uiObjs.filter((o) => !this.draftObjs.includes(o));
+    for (const id of WEAPON_IDS) delete this.buttons[`d-${id}`];
+    this.draftObjs = [];
+    const d = this.draft;
+    if (!d) return;
+    const cols = 6;
+    const tw = 84;
+    const th = 78;
+    const pw = cols * tw + 24;
+    const ph = Math.ceil(d.pool.length / cols) * th + 120;
+    const cx = this.W / 2;
+    const cy = this.H / 2 - 10;
+    const objs: Phaser.GameObjects.GameObject[] = [];
+    objs.push(this.add.rectangle(cx, cy, pw, ph, C.panel, 0.97).setStrokeStyle(3, C.panelEdge).setDepth(170).setInteractive());
+    const who = this.teams[this.turn];
+    const left = DRAFT_ORDER.slice(d.step).filter((x) => x === this.turn).length;
+    objs.push(
+      this.add.text(cx, cy - ph / 2 + 22, t('draftTitle', { team: this.teamName(this.turn), n: left }), { fontFamily: FONT, fontSize: '18px', color: hex(TEAM_COLORS[this.turn]), fontStyle: 'bold', stroke: hex(INK), strokeThickness: 2 })
+        .setOrigin(0.5).setDepth(171),
+    );
+    const desc = this.add.text(cx - pw / 2 + 16, cy + ph / 2 - 30, who.ai ? t('draftWait') : t('draftHint'), { fontFamily: FONT, fontSize: '13px', color: hex(C.ink), wordWrap: { width: pw - 32 } }).setOrigin(0, 0.5).setDepth(171);
+    objs.push(desc);
+    const icons = this.add.graphics().setDepth(172);
+    objs.push(icons);
+    d.pool.forEach((id, i) => {
+      const x = cx - pw / 2 + 12 + (i % cols) * tw + tw / 2;
+      const y = cy - ph / 2 + 46 + Math.floor(i / cols) * th + th / 2;
+      const owner = d.picks[0].includes(id) ? 0 : d.picks[1].includes(id) ? 1 : -1;
+      const tile = this.add.rectangle(x, y, tw - 6, th - 6, owner < 0 ? C.button : TEAM_COLORS[owner], owner < 0 ? 1 : 0.35).setStrokeStyle(owner < 0 ? 2 : 3, owner < 0 ? 0xc9b8a3 : TEAM_COLORS[owner]).setDepth(171);
+      tile.setInteractive({ useHandCursor: owner < 0 });
+      tile.on('pointerover', () => desc.setText(`${t(`w_${id}`)}: ${t(`d_${id}`)}`));
+      tile.on('pointerdown', () => this.draftPick(id, false));
+      this.buttons[`d-${id}`] = { x, y, w: tw - 6, h: th - 6 };
+      objs.push(tile);
+      drawWeaponIcon(icons, id, x, y - 12, 1.15, 0);
+      objs.push(this.add.text(x, y + 20, t(`w_${id}`), { fontFamily: FONT, fontSize: '10px', color: hex(C.ink), fontStyle: 'bold', align: 'center', wordWrap: { width: tw - 10 } }).setOrigin(0.5).setDepth(173));
+    });
+    this.draftObjs = objs;
+    this.uiObjs.push(...objs);
+  }
+
+  /** A pick in the draft: by the side whose pick it is (the AI's own picks come with `ai`). */
+  private draftPick(id: WeaponId, ai: boolean) {
+    const d = this.draft;
+    if (!d || this.phase !== 'draft') return;
+    if (this.teams[this.turn].ai !== ai || d.picks.some((p) => p.includes(id))) {
+      if (!ai) ui('refuse');
+      return;
+    }
+    if (!ai) ui('click');
+    d.picks[this.turn].push(id);
+    d.step++;
+    d.t = 0.8;
+    if (d.step >= DRAFT_ORDER.length || d.step >= d.pool.length) {
+      // Each side keeps the weapons that never run out, and only the ones it drafted of the rest.
+      this.teams.forEach((tm, i) => {
+        for (const w of WEAPON_IDS) if (WEAPONS[w].ammo >= 0) tm.ammo[w] = d.picks[i].includes(w) ? WEAPONS[w].ammo : 0;
+      });
+      this.draft = null;
+      this.showDraft();
+      this.afterDraft();
+      return;
+    }
+    this.turn = DRAFT_ORDER[d.step];
+    this.showDraft();
+  }
+
+  /** After the draft: the forts' build phase, or the first turn. */
+  private afterDraft() {
+    if (this.quick() && this.prefs.options.kind === 'forts') this.startBuild(0);
+    else {
+      this.turn = this.mode === 'watch' ? this.turn : 0;
+      this.beginTurn();
+    }
+  }
+
+  /**
+   * Forts: each side's starting fort, a stone wall in front of every mole with a wooden plank along
+   * its top, low enough to lob over. Blocks are earth to everything that moves, so they break like
+   * the hills do.
+   */
+  private buildFort(tm: Team) {
+    const dir = tm.index === 0 ? 1 : -1;
+    for (const m of tm.moles) {
+      const wx = m.x + dir * 30;
+      const ground = this.terrain.groundBelow(wx, m.y - 40);
+      if (ground < 0 || ground > this.world.water - 10) continue;
+      for (let k = 1; k <= 2; k++) this.placeBlock(wx - 8, ground - k * 16, 16, 16, 'stone');
+      this.placeBlock(wx - 16, ground - 39, 32, 7, 'wood');
+    }
+  }
+
+  /** Puts a block (top-left x, y) where it covers no mole, keg or crate; returns whether it went in. */
+  private placeBlock(x: number, y: number, w: number, h: number, kind: BlockKind) {
+    if (y < 20 || y + h > this.world.water - 4 || x < 0 || x + w > this.W) return false;
+    const hits = (bx: number, by: number, bw: number, bh: number) => bx + bw > x && bx < x + w && by + bh > y && by < y + h;
+    if (this.world.moles.some((m) => m.alive && hits(m.x - 10, m.y - 32, 20, 32))) return false;
+    if (this.world.kegs.some((k) => !k.gone && hits(k.x - 10, k.y - 20, 20, 20))) return false;
+    if (this.world.crates.some((c) => !c.gone && hits(c.x - 12, c.y - 20, 24, 20))) return false;
+    this.terrain.addBlock(x, y, w, h, kind);
+    return true;
+  }
+
+  /** The build phase of Forts: a human side places its blocks; the AI's are placed for it at once. */
+  private startBuild(side: number): void {
+    if (side > 1) {
+      this.buildLeft = 0;
+      this.turn = 0;
+      this.buildHud();
+      return this.beginTurn();
+    }
+    this.turn = side;
+    this.phase = 'build';
+    this.buildLeft = BUILD_BLOCKS;
+    if (this.teams[side].ai) {
+      this.aiBuild(this.teams[side]);
+      return this.startBuild(side + 1);
+    }
+    this.buildKind = 'stone';
+    this.buildHud();
+    this.banner = 0;
+    const e = this.edges();
+    const kindBtn = this.button('build-kind', this.W / 2 - 76, e.b - 34, 140, 44, t(`block_${this.buildKind}`), () => {
+      this.buildKind = this.buildKind === 'stone' ? 'wood' : 'stone';
+      kindBtn.txt.setText(t(`block_${this.buildKind}`));
+    });
+    this.button('build-done', this.W / 2 + 76, e.b - 34, 140, 44, t('buildDone'), () => this.startBuild(side + 1), true);
+    this.refreshHud();
+  }
+
+  /** The AI's blocks: stone stacked a little in front of its front mole, two high. */
+  private aiBuild(tm: Team) {
+    const dir = tm.index === 0 ? 1 : -1;
+    const alive = tm.moles.filter((m) => m.alive);
+    if (!alive.length) return;
+    const front = alive.reduce((a, m) => (m.x * dir > a.x * dir ? m : a));
+    for (let i = 0; i < BUILD_BLOCKS; i++) {
+      const x = front.x + dir * (58 + Math.floor(i / 2) * 18);
+      const top = this.surface(x, front.y - 60);
+      if (top > 0) this.placeBlock(x - 8, top - 16, 16, 16, 'stone');
+    }
+  }
+
+  /** The top of whatever stands at column x, looking down from y (or up out of the earth). */
+  private surface(x: number, y: number) {
+    let yy = y;
+    while (yy > 0 && this.terrain.solid(x, yy)) yy--;
+    const g = this.terrain.groundBelow(x, yy);
+    return g;
+  }
+
+  /** A tap in the build phase: a block on the building side's half, resting on what is below. */
+  private placeBuild(x: number, y: number) {
+    if (this.buildLeft <= 0) return;
+    const half = this.turn === 0 ? x < this.W / 2 - 40 : x > this.W / 2 + 40;
+    const size = BLOCKS[this.buildKind];
+    const top = this.surface(x, y);
+    if (!half || top < 0 || !this.placeBlock(x - size.w / 2, top - size.h, size.w, size.h, this.buildKind)) {
+      ui('refuse');
+      return;
+    }
+    SFX('thud');
+    this.buildLeft--;
+    if (this.buildLeft <= 0) this.startBuild(this.turn + 1);
+    else this.refreshHud();
+  }
+
+  /** Flag hill: the flag goes on the highest dry ground of the hills near the middle (never a floating ledge). */
+  private plantFlag() {
+    let best: { x: number; y: number } | null = null;
+    const tr = this.terrain;
+    for (let x = Math.round(this.W * 0.4); x <= this.W * 0.6; x += 4) {
+      // The hills' own top here (from before the caves and ledges), then the ground as it is now.
+      let top = 0;
+      while (top < tr.h && !(tr.back ?? tr.mask)[top * tr.w + x]) top++;
+      const y = tr.groundBelow(x, top - 2);
+      if (y > 0 && y < this.world.water - 20 && (!best || y < best.y)) best = { x, y };
+    }
+    const at = best ?? { x: this.W / 2, y: this.world.water - 20 };
+    this.flag = { x: at.x, y: at.y, score: [0, 0], last: -1 };
+  }
+
+  /** The flag stays on the ground: it drops into a crater, and moves to dry ground if the water takes it. */
+  private settleFlag() {
+    const f = this.flag;
+    if (!f || this.terrain.solid(f.x, f.y + 1)) return;
+    const y = this.terrain.groundBelow(f.x, f.y);
+    if (y > 0 && y < this.world.water - 4) f.y = y;
+    else {
+      const { score, last } = f;
+      this.plantFlag();
+      this.flag!.score = score;
+      this.flag!.last = last;
+    }
+  }
+
+  /** At the end of a side's turn: a point to it if it has a mole by the flag and the other side has none. */
+  private scoreFlag() {
+    const f = this.flag;
+    if (!f) return;
+    const near = this.teams.map((tm) => tm.moles.some((m) => m.alive && Math.abs(m.x - f.x) < FLAG_REACH && Math.abs(m.y - f.y) < 40));
+    const side = this.turn;
+    if (!near[side] || near[1 - side]) return;
+    f.score[side]++;
+    f.last = side;
+    this.world.pops.push({ x: f.x, y: f.y - 84, text: `⚑ ${f.score[side]}`, color: TEAM_COLORS[side], t: 0 });
+    SFX('collect');
+    if (this.mode === 'watch') aiLog(side ? 'amber' : 'blue', t('flagPoint', { n: f.score[side] }));
   }
 
   private beginTurn() {
     const team = this.teams[this.turn];
     const alive = team.moles.filter((m) => m.alive);
     if (!alive.length) return this.finish();
-    // The next mole in the rotation that is still standing.
+    // A player's side picks its next mole from those that have not gone yet this time round.
+    const pick = !team.ai && this.mode !== 'watch';
+    if (pick && alive.every((m) => team.went.has(m))) team.went.clear();
+    // The next mole in the rotation that is still standing (and, for a player, has not gone yet).
     let m = team.moles[team.next % team.moles.length];
-    for (let i = 0; i < team.moles.length && !m.alive; i++) {
+    for (let i = 0; i < team.moles.length * 2 && (!m.alive || (pick && team.went.has(m))); i++) {
       team.next++;
       m = team.moles[team.next % team.moles.length];
     }
     team.next++;
-    this.active = m;
+    team.taken++;
     this.world.turnTeam = this.turn;
     this.world.log = World.freshLog();
-    const calm = Math.random() < 0.15;
-    if (this.mode === 'daily') this.world.wind = this.dailyWinds[Math.min(this.turns, DAILY_SHOTS - 1)];
-    const kind = this.battle === null ? 'normal' : BATTLES[this.battle].wind;
-    if (kind === 'strong') this.world.wind = (Math.random() < 0.5 ? -1 : 1) * Math.round(6 + Math.random() * 4);
-    else if (kind === 'calm') this.world.wind = Math.round((Math.random() * 2 - 1) * 3);
-    else if (this.mode !== 'daily') this.world.wind = calm ? 0 : Math.round((Math.random() * 2 - 1) * 10);
+    this.setActive(m);
+    // A Medic hands its team a Repair Kit every few turns.
+    const medic = team.moles.find((o) => o.alive && o.trade === 'medic');
+    if (medic && team.taken % MEDIC_EVERY === 0) {
+      team.ammo.repair = Math.max(0, team.ammo.repair) + 1;
+      this.world.pops.push({ x: medic.x, y: medic.y - 50, text: `+1 ${TRADE_ICON.medic}`, color: TEAM_COLORS[team.index], t: 0 });
+    }
+    // The wind: today's in the daily range, else the next one rolled (some ahead, while a Scout looks out).
+    const wind = this.windAhead.length ? this.windAhead.shift()! : this.rollWind();
+    this.world.wind = this.mode === 'daily' ? this.dailyWinds[Math.min(this.turns, DAILY_SHOTS - 1)] : wind;
+    if (this.mode !== 'daily' && this.teams.some((tm) => tm.moles.some((o) => o.alive && o.trade === 'scout')))
+      while (this.windAhead.length < SCOUT_AHEAD) this.windAhead.push(this.rollWind());
     this.phase = 'aim';
     this.timer = (this.quick() ? this.prefs.options.turn : TURN_TIME) + (this.turn === 0 ? this.boost.time : 0);
+    if (team.ammo[team.weapon] === 0) team.weapon = 'rocket';
+    this.ai = { stage: team.ai ? 'think' : 'done', t: 0.8, plan: null, walked: false, from: 0 };
+    this.refreshHud();
+  }
+
+  /** A turn's wind: a battle's strong or calm one, or anything from -10 to 10 (calm 15% of the time). */
+  private rollWind() {
+    const calm = Math.random() < 0.15;
+    const kind = this.battle === null ? 'normal' : BATTLES[this.battle].wind;
+    if (kind === 'strong') return (Math.random() < 0.5 ? -1 : 1) * Math.round(6 + Math.random() * 4);
+    if (kind === 'calm') return Math.round((Math.random() * 2 - 1) * 3);
+    return calm ? 0 : Math.round((Math.random() * 2 - 1) * 10);
+  }
+
+  /** Hands the turn to mole `m`: its aim, the arrow over it and a Gunner's harder blasts. */
+  private setActive(m: Mole) {
+    this.active = m;
+    this.startX = m.x;
+    this.world.gunner = m.trade === 'gunner' ? GUNNER_POWER : 1;
     this.aimAngle = m.facing > 0 ? -Math.PI / 4 : (-3 * Math.PI) / 4;
     this.power = 0;
     this.charging = false;
     this.dragging = false;
     this.walkTarget = null;
     this.banner = 2.2;
-    if (team.ammo[team.weapon] === 0) team.weapon = 'rocket';
-    this.ai = { stage: team.ai ? 'think' : 'done', t: 0.8, plan: null, walked: false, from: 0 };
-    this.refreshHud();
+  }
+
+  /** Whether the player may swap the active mole for `m`: one of theirs that has not gone yet, before the active one moves. */
+  private canSwap(m: Mole) {
+    const a = this.active;
+    const team = this.teams[this.turn];
+    if (!a || !this.humanTurn() || this.phase !== 'aim' || this.mode === 'daily' || m === a || !m.alive || m.team !== this.turn) return false;
+    return !team.went.has(m) && !a.act && a.grounded && Math.abs(a.x - this.startX) < 6;
   }
 
   private finish() {
@@ -676,6 +1030,8 @@ export class GameScene extends Phaser.Scene {
     this.screen = 'over';
     const alive = this.teams.map((tm) => tm.moles.some((m) => m.alive));
     this.winner = alive[0] && !alive[1] ? 0 : alive[1] && !alive[0] ? 1 : -1;
+    // Flag hill: the first to the points wins, whoever is left standing.
+    if (this.flagWinner() >= 0) this.winner = this.flagWinner();
     if (this.winner >= 0) for (const m of this.teams[this.winner].moles) if (m.alive) m.act = { kind: 'cheer', t: 0, dur: 99 };
     if (this.mode === 'daily') {
       this.daily = finishDaily(GAME, this.dailyScore());
@@ -716,6 +1072,11 @@ export class GameScene extends Phaser.Scene {
     this.showResult();
   }
 
+  /** Flag hill's winner once a side has the points, else -1. */
+  private flagWinner() {
+    return this.flag ? this.flag.score.findIndex((n) => n >= FLAG_WIN) : -1;
+  }
+
   /** The range's score: the damage done to the straw moles, plus a bonus for each one knocked out. */
   private dailyScore() {
     const straw = this.teams[1]?.moles ?? [];
@@ -748,7 +1109,8 @@ export class GameScene extends Phaser.Scene {
       this.add.text(cx, cy - 60, title, { fontFamily: FONT, fontSize: '30px', color: hex(this.winner! >= 0 ? TEAM_COLORS[this.winner!] : C.ink), fontStyle: 'bold', stroke: hex(INK), strokeThickness: 3 })
         .setOrigin(0.5).setDepth(151),
     );
-    this.uiObjs.push(this.add.text(cx, cy - 20, t('resultLine', { turns: this.turns, shots: this.shots }), { fontFamily: FONT, fontSize: '15px', color: hex(C.dim) }).setOrigin(0.5).setDepth(151));
+    const flagLine = this.flag ? ` · ⚑ ${this.flag.score[0]}–${this.flag.score[1]}` : '';
+    this.uiObjs.push(this.add.text(cx, cy - 20, t('resultLine', { turns: this.turns, shots: this.shots }) + flagLine, { fontFamily: FONT, fontSize: '15px', color: hex(C.dim) }).setOrigin(0.5).setDepth(151));
     if (this.battle !== null) return this.showBattleResult(cx, cy + 22);
     this.button('rematch', cx, cy + 50, 260, 42, t('rematch'), () => this.startMatch(this.mode === 'duo' ? 'duo' : 'ai'), true);
     this.button('menu', cx, cy + 98, 260, 36, t('menu'), () => this.showMenu());
@@ -853,6 +1215,7 @@ export class GameScene extends Phaser.Scene {
     mk('team0', e.l + LEFT_PANEL + 14, e.t + 22, 14, C.ink, 0);
     mk('team1', e.r - 30, e.t + 22, 14, C.ink, 1);
     mk('wind', W / 2, e.t + 22, 13, C.ink);
+    mk('forecast', W / 2 + 98, e.t + 30, 13, C.ink, 0).setStroke('#ffffff', 4);
     mk('timer', W / 2, e.t + 62, 16, C.ink);
     mk('banner', W / 2, e.t + 108, 22, C.ink).setStroke('#ffffff', 5);
     mk('hint', W / 2, e.b - 84, 13, C.ink).setStroke('#ffffff', 4);
@@ -892,7 +1255,10 @@ export class GameScene extends Phaser.Scene {
     const hint = this.humanTurn()
       ? t(w.mode === 'aim' ? 'hintAim' : w.mode === 'angle' ? 'hintAngle' : w.mode === 'target' ? 'hintTarget' : 'hintUse')
       : '';
-    this.texts.hint?.setText(this.phase === 'aim' && this.turns < 4 ? hint : '');
+    this.texts.hint?.setText(
+      this.phase === 'build' ? t('buildHint', { team: this.teamName(this.turn), n: this.buildLeft })
+        : this.phase === 'aim' && this.turns < 4 ? hint : '',
+    );
   }
 
   private openArsenal() {
@@ -979,10 +1345,20 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onDown(p: Phaser.Input.Pointer, over: Phaser.GameObjects.GameObject[]) {
-    if (over.length || this.arsenalOpen || !this.humanTurn() || !this.active) return;
+    if (over.length || this.arsenalOpen) return;
+    if (this.screen === 'play' && this.phase === 'build' && !this.teams[this.turn]?.ai) return this.placeBuild(p.worldX, p.worldY);
+    if (!this.humanTurn() || !this.active) return;
     const x = p.worldX;
     const y = p.worldY;
     const m = this.active;
+    // A tap on another of your moles that has not gone yet hands it the turn (before the active one moves).
+    const other = Math.hypot(x - m.x, y - (m.y - 10)) < 44 ? null : this.world.moles.find((o) => Math.abs(o.x - x) < 16 && y > o.y - 36 && y < o.y + 6 && this.canSwap(o));
+    if (other) {
+      ui('click');
+      this.setActive(other);
+      this.refreshHud();
+      return;
+    }
     const w = WEAPONS[this.teams[this.turn].weapon];
     if (this.phase === 'aim' && (w.mode === 'aim' || w.mode === 'angle') && Math.hypot(x - m.x, y - (m.y - 10)) < 44) {
       this.dragging = true;
@@ -1129,9 +1505,14 @@ export class GameScene extends Phaser.Scene {
     }
     if (this.banner > 0) this.banner -= DT;
     if (this.screen !== 'play') return;
+    this.settleFlag();
     const m = this.active;
     const team = this.teams[this.turn];
     switch (this.phase) {
+      case 'draft':
+        // The AI takes a moment over each pick.
+        if (this.draft && team.ai && (this.draft.t -= DT) <= 0) this.draftPick(aiDraftPick(this.draft.pool.filter((id) => !this.draft!.picks.some((p) => p.includes(id)))), true);
+        break;
       case 'aim':
         this.timer -= DT;
         if (this.weather === 'gusts') {
@@ -1228,6 +1609,13 @@ export class GameScene extends Phaser.Scene {
     switch (ai.stage) {
       case 'think':
         if (ai.t > 0) return;
+        if (this.flag && !ai.walked && this.flagWalk(m)) {
+          ai.stage = 'flag';
+          ai.t = 9;
+          ai.walked = true;
+          ai.from = m.x;
+          return;
+        }
         const rival = this.battle === null ? null : BATTLES[this.battle];
         ai.plan = planTurn(this.world, m, team.ammo, byLevel(2.4, 1, 0.35) * (rival?.aim ?? 1) * (rival && this.veteran ? VETERAN.aim : 1), !ai.walked, rival?.habit ?? null);
         if (ai.plan.walk) {
@@ -1244,6 +1632,24 @@ export class GameScene extends Phaser.Scene {
         ai.stage = WEAPONS[ai.plan.weapon].mode === 'target' ? 'mark' : 'turn';
         ai.t = WEAPONS[ai.plan.weapon].mode === 'target' ? 0.8 : 0.7;
         return;
+      case 'flag': {
+        // Walk to the flag, hopping up steps too tall to walk, then plan a shot from there.
+        const dx = this.flag!.x - m.x;
+        if (Math.abs(dx) > 8 && ai.t > 0) {
+          m.walk = m.grounded && !m.act ? Math.sign(dx) : 0;
+          if (m.grounded && Math.abs(m.x - ai.from) < 0.2) {
+            m.facing = dx > 0 ? 1 : -1;
+            this.world.jump(m);
+          }
+          ai.from = m.x;
+          return;
+        }
+        m.walk = 0;
+        if (!m.grounded) return;
+        ai.stage = 'think';
+        ai.t = 0.3;
+        return;
+      }
       case 'walk':
         if (ai.t > 0 && m.grounded) return;
         m.walk = 0;
@@ -1287,6 +1693,20 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /** Whether this AI mole should walk to the flag: its side's nearest, not there yet, with dry ground all the way. */
+  private flagWalk(m: Mole) {
+    const f = this.flag!;
+    const mine = this.teams[m.team].moles.filter((o) => o.alive);
+    const nearest = mine.reduce((a, o) => (Math.abs(o.x - f.x) < Math.abs(a.x - f.x) ? o : a));
+    if (nearest !== m || Math.abs(f.x - m.x) < FLAG_REACH * 0.6 || Math.abs(f.x - m.x) > 380) return false;
+    const dir = Math.sign(f.x - m.x);
+    for (let x = m.x; Math.abs(x - f.x) > 4; x += dir * 4) {
+      const y = this.terrain.groundBelow(x, Math.min(m.y, f.y) - 80);
+      if (y < 0 || y > this.world.water - 12) return false;
+    }
+    return true;
+  }
+
   private side() {
     return this.turn === 0 ? 'blue' : 'amber';
   }
@@ -1304,9 +1724,11 @@ export class GameScene extends Phaser.Scene {
     if (this.mode === 'ai' && this.teams[0].moles.some((m) => !m.alive)) this.lostMole = true;
     if (this.mode === 'watch' && log.damage) aiLog(this.side(), t('logDamage', { n: log.damage }));
     if (this.active && log.damage) this.dealt.set(this.active, (this.dealt.get(this.active) ?? 0) + log.damage);
+    if (this.active) team.went.add(this.active);
     this.turns++;
+    this.scoreFlag();
     const alive = this.teams.map((tm) => tm.moles.some((m) => m.alive));
-    if (!alive[0] || !alive[1]) return this.finish();
+    if (!alive[0] || !alive[1] || this.flagWinner() >= 0) return this.finish();
     if (this.mode === 'daily') {
       // The straw moles never shoot back: the next shot is yours again, until the shots run out.
       if (this.turns >= DAILY_SHOTS) return this.finish();
@@ -1381,6 +1803,7 @@ export class GameScene extends Phaser.Scene {
     for (const m of w.mounds) drawMound(g, m);
     for (const c of w.crates) drawCrate(g, c, time);
     for (const k of w.kegs) drawKeg(g, k, time);
+    if (this.flag) this.drawFlag(g, time);
     const team = this.teams[this.turn];
     for (const m of w.moles) {
       const isActive = m === this.active && this.screen === 'play' && this.phase === 'aim';
@@ -1395,6 +1818,16 @@ export class GameScene extends Phaser.Scene {
     for (const b of w.bolts) drawBolt(g, b, time, BOLT_CLOUD - 40);
     for (const b of w.beams) drawBeam(g, b);
     this.drawAim(g);
+    // A small ring over each of your moles that could take this turn instead.
+    if (this.screen === 'play' && this.phase === 'aim')
+      for (const m of w.moles)
+        if (this.canSwap(m)) {
+          g.lineStyle(2, 0xffffff, 0.9);
+          const y = m.y - (m.hat === 'crown' ? 52 : m.hat ? 44 : 34) - 24;
+          g.strokeCircle(m.x, y, 5);
+          g.fillStyle(TEAM_COLORS[m.team], 0.9);
+          g.fillCircle(m.x, y, 2.5);
+        }
     const fx = this.fx.clear();
     // Reduced motion also skips the flash of each blast.
     for (const p of w.particles) if (!(p.kind === 'flash' && this.still())) drawParticle(fx, p);
@@ -1466,6 +1899,26 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /** Flag hill's flag: a pole with a pennant in the colour of the side that scored last, and its reach on the ground. */
+  private drawFlag(g: Phaser.GameObjects.Graphics, time: number) {
+    const f = this.flag!;
+    g.fillStyle(0xffffff, 0.22);
+    g.fillEllipse(f.x, f.y, FLAG_REACH * 2, 10, 24);
+    g.lineStyle(1.5, 0xffffff, 0.7);
+    g.strokeEllipse(f.x, f.y, FLAG_REACH * 2, 10, 24);
+    g.fillStyle(INK, 1);
+    // Tall enough for the pennant to fly above the moles' labels.
+    const top = f.y - 72;
+    g.fillRect(f.x - 2, top, 4, 72);
+    g.fillCircle(f.x, top - 1, 3.5);
+    const col = f.last < 0 ? 0xf6f1e6 : TEAM_COLORS[f.last];
+    const wave = Math.sin(time * 4) * 3;
+    g.fillStyle(INK, 1);
+    g.fillTriangle(f.x + 1, top, f.x + 1, top + 22, f.x + 30 + wave, top + 11);
+    g.fillStyle(col, 1);
+    g.fillTriangle(f.x + 3, top + 3, f.x + 3, top + 19, f.x + 26 + wave, top + 11);
+  }
+
   /** Whether the hub's reduced motion is on: blinking and flickering then hold still. */
   private still() {
     return settings.reduceMotion;
@@ -1522,7 +1975,8 @@ export class GameScene extends Phaser.Scene {
       const show = m.alive && !m.hidden && (m.act?.kind !== 'die');
       label.setVisible(show);
       if (!show) continue;
-      label.setText(m === this.active && this.screen === 'play' ? `${m.name} ${Math.ceil(m.hp)}` : String(Math.ceil(m.hp)));
+      const badge = m.trade ? TRADE_ICON[m.trade] + ' ' : '';
+      label.setText(badge + (m === this.active && this.screen === 'play' ? `${m.name} ${Math.ceil(m.hp)}` : String(Math.ceil(m.hp))));
       label.setPosition(m.x, m.y - (m.hat === 'crown' ? 52 : m.hat ? 44 : 34));
     }
     for (const p of this.world.pops) {
@@ -1567,7 +2021,7 @@ export class GameScene extends Phaser.Scene {
       }
       const count = this.mode === 'daily' && i === 0
         ? t('shotOf', { n: Math.min(this.turns + 1, DAILY_SHOTS), all: DAILY_SHOTS })
-        : `${tm.moles.filter((m) => m.alive).length}/${tm.moles.length}`;
+        : `${tm.moles.filter((m) => m.alive).length}/${tm.moles.length}` + (this.flag ? `  ⚑ ${this.flag.score[i]}/${FLAG_WIN}` : '');
       this.texts[`team${i}`]?.setText(`${this.teamName(i)}${tm.ai && this.battle === null ? ' · ' + t('aiTag') : ''}  ${count}`);
     });
     // Wind.
@@ -1578,6 +2032,10 @@ export class GameScene extends Phaser.Scene {
     const wind = this.world.wind;
     const sky = this.weather === 'clear' ? '' : ' · ' + t(`weather_${this.weather}`);
     this.texts.wind?.setText((wind === 0 ? t('windCalm') : t('wind')) + sky);
+    // A Scout on the side whose turn it is (a player's) sees the next winds.
+    const scout = this.screen === 'play' && !this.teams[this.turn]?.ai && this.teams[this.turn]?.moles.some((m) => m.alive && m.trade === 'scout');
+    const ahead = scout ? this.windAhead.slice(0, SCOUT_AHEAD).map((n) => (n === 0 ? '·0' : (n > 0 ? '→' : '←') + Math.abs(n))).join(' ') : '';
+    this.texts.forecast?.setText(ahead ? `${TRADE_ICON.scout} ${ahead}` : '');
     if (wind) {
       const len = (Math.abs(wind) / 10) * 70;
       const dir = Math.sign(wind);
