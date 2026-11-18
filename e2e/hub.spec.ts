@@ -880,6 +880,8 @@ test('hub scans a progress code', async ({ page }, testInfo) => {
   await page.reload();
   await page.getByRole('button', { name: 'Settings for Palisade' }).click();
   await page.getByRole('dialog', { name: 'Palisade' }).getByRole('button', { name: 'QR code' }).click();
+  // The code is drawn once its link is packed, a moment after the click.
+  await page.locator('#progress-code .qr svg').waitFor();
   const svg = await page.locator('#progress-code .qr').innerHTML();
 
   await page.addInitScript((svg) => {

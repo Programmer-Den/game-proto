@@ -1459,8 +1459,10 @@ export class GameScene extends Phaser.Scene {
   /** Rewrites the HUD and panel from the state. */
   private refresh() {
     const s = this.state;
-    if (s.best > this.savedBest) saveBest((this.savedBest = s.best));
-    if (s.bloom > this.savedBloom) saveBloom((this.savedBloom = s.bloom));
+    // Only an ordinary garden's waves count toward the golems they open: the daily plot, the weekly
+    // garden and drawn plots keep their own records.
+    if (ordinary(s) && s.best > this.savedBest) saveBest((this.savedBest = s.best));
+    if (ordinary(s) && s.bloom > this.savedBloom) saveBloom((this.savedBloom = s.bloom));
     if (s.stars.join(',') !== this.savedStars) {
       this.savedStars = s.stars.join(',');
       saveStars(s.stars);
