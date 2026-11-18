@@ -278,7 +278,7 @@ and the fuel drum's blast doesn't swell.
   | Shotgun | Swarms and packs: three pellets per gun, each 60% of a bullet, 25% slower | Riot shields stop every pellet; no pierce |
   | Flamer | Shields and armour: each flame burns through three zombies and sets them alight, a little faster, 70% of a bullet | Only reaches 320 px up the road, so not the spitters at their stand |
 
-  ![The squad throwing flames with the flamer sidearm](docs/screenshots/sidearm-flamer.webp)
+  ![The squad throwing flames with the flamer sidearm](docs/screenshots/sidearm-swap.webp)
 - **Last stand**: once a run, the first zombie to reach the sandbags with no medkit left starts ten
   seconds of hand-to-hand instead of ending the run. Zombies at the line are held there, and twice
   a second the squad hits every zombie near the sandbags and shoves it back up the road. Any zombie
