@@ -87,6 +87,32 @@ Implemented today:
   (`keydown-Q`), selects every warship.
   `World.command` sends a wing of two or more on a move to the `RALLY_SPOTS` round the point, so it
   fans out instead of stacking; an attack order is unchanged.
+- Control groups and attack-move (`GameScene.groups`, `saveGroup`, `recallGroup`, `chipPress`,
+  `attackMode`, `armAttackMove`, `drawCommandStrip`; `STRIP`, `GROUPS` and `stripBoxes` in
+  `layout.ts`; `World.command(ids, x, y, attackMove)`, `Order.fight`, `Order.then`, `flyOn`): a
+  strip over the map's bottom-left corner (`stripShown`: in a battle the player commands) holds
+  `GROUPS` (5) group chips, then the Attack-move and Actives pills. Shift or Ctrl and a digit (a
+  `keydown` handler reading `e.code`), or a chip held `CHIP_HOLD_MS` (450 ms, real time), saves the
+  selection as a group (a tap on an empty chip saves too); the digit or a tap selects it again,
+  and a second recall within `GROUP_TWICE_MS` centres the map on it. The chips act on release
+  (`onUp`). The strip sits within 30 px of the command bar, under the playthrough's taps (they keep
+  60 px off the map's edges). The Attack-move pill or X arms `attackMode`; the next map tap calls
+  `command` with `attackMove`, which gives each ship a move with `fight`: `updateUnit` turns it into
+  an auto attack on the nearest enemy in sight that carries `then`, and `flyOn` turns that back into
+  the fighting move once the target is gone or out of reach. A tap on an enemy is a plain attack.
+- Ship actives (`ACTIVES`, `ActiveKind`, `Warship`, `Unit.activeMs`, `Unit.boostMs`,
+  `World.useActives`, `fireActive`, `screenShare`, `aiActives`; `GameScene.fireActives`): each warship
+  class has one active on its own cooldown. Scout `afterburner` (speed times `AFTERBURNER` 1.8 for
+  3 s, 15 s), gunship `salvo` (up to `SALVO_MISSILES` 3 enemies within its range plus `SALVO_REACH`
+  40, units first, each a `shoot` of `SALVO_DAMAGE` 2.5 times its shot with a small boom; only with
+  one in reach; 18 s), heavy and flagship `screen` (`screenShare`: shots at it and its faction's
+  ships within `SCREEN_RANGE` 70 times `SCREEN_SHARE` 0.6 for 6 s; 24 s). The Actives pill or E fires
+  every ready one in the selection; it returns the kinds used (each plays its sound) or a reason
+  (`activeSelect`, `activeCooling`, `activeNoTarget`). The scene draws a mustard pip under a
+  selected ship whose active is ready, a cyan dome (`SCREEN_COLOR`) round a screening heavy and a
+  longer flame on a burning scout; the pill shows the ready count and fills while all cool down. The
+  AI fires them from `AI_ACTIVE_MS` (90 s, after the playthrough): salvos whenever something is in
+  reach, screens with its target in sight, afterburners to reach a far raid target.
 - Derelict stations (`World.derelicts`, `Derelict`, `updateDerelict`, `DERELICT_DEFS`): three neutral
   wrecks per map, one of each `DerelictKind`: `sensors` (the owner sees 280 px round it,
   `SENSOR_RANGE`, stamped into the player's fog and spotting ships in nebulae), `shipyard` (it is a
@@ -123,6 +149,16 @@ Implemented today:
 - Harvesting: harvesters seek the crystal nearest their home hub (`Unit.home`: the hub or outpost
   that trained them), mine it, carry it to the nearest hub, outpost or depot of their faction and
   deposit it. Nomad Freight carries 14 a trip, the others 10.
+- Mining belts that run dry (`HOME_NODE_AMOUNT` in `arena.ts`, `Node.full`, `World.belt`, `beltLow`,
+  `updateBelts`, `BELT_RANGE`, `BELT_LOW`, `AI_MAX_OUTPOSTS`): the three nodes by each start hold 900
+  (loose ones `NODE_AMOUNT`, 1,500), so a home belt runs dry in a long battle. A hub's belt is
+  the nodes within 170 px of it. Once a second (`BELT_CHECK_MS`) `updateBelts` gives the player a
+  notice and the `beltLow` cue when a finished hub's belt falls under a third (`beltLowNotice`)
+  and again when it is empty (`beltDry`), once each per hub (`beltWarned`); never in watch mode.
+  The hub's hover adds `beltLine`, and a node is drawn smaller as it empties (`amount / full`). In
+  `think` a rival whose every hub's belt is low (`dry`) builds another outpost, up to 3, whatever
+  the time, at any rich field (`expand(f, true)`), and until it can pay for it (`starved`) it
+  neither trains warships nor researches. The playthrough's first round mines far less than a belt.
 - Fog of war (`game/fog.ts`, stamped in `World.updateFog`): a 10 px grid of `explored` and
   `visible` cells for the player only. Ships see `sight` times 1.2 (scouts 1.6), harvesters 80 px,
   the hub 175 px and other buildings 110 px past their radius. Rival units show only in sight
@@ -152,7 +188,7 @@ Implemented today:
   (`Barracks · 100`), and train and build messages name the faction's own building.
 - Training: a harvester is queued at the hub; the combat units (scout, gunship, heavy) are queued
   at a finished Barracks, up to five at a time per building.
-- Orders: move, attack a unit or building (one under the fog as last seen, see Fog of war), and
+- Orders: move, attack-move (see Control groups), attack a unit or building (one under the fog as last seen, see Fog of war), and
   auto-attack anything in sight when a unit has no order. Harvesters are never ordered.
 - AI (`World.think`, once a second per rival): keeps four harvesters (three more per outpost),
   builds a Depot, a Barracks and up to two Turrets, trains combat units up to 20, and after the
@@ -160,7 +196,8 @@ Implemented today:
   once the army reaches the difficulty's size, at the faction that hit it last (`Side.grudge`, set
   in `shoot`) or else the nearest enemy building, so rivals fight each other. From 120 s it
   researches its lowest track and from 150 s builds one outpost (`expand`) at a field away from
-  every other hub, saving crystal for both (no training) once its army is big enough. Idle
+  every other hub, saving crystal for both (no training) once its army is big enough, and expands
+  again whenever its belts run low (see Mining belts). From 90 s it fires its ships' actives. Idle
   warships fetch their faction's shards within 360 px (`fetchSalvage`).
 - Watch AI (`?watch`, `shared/watch.ts`): `newGame` skips the picker and starts
   `new World(layout, random pick, true)`. With `World.watch` the AI thinks for slot 0 too (and it
@@ -474,7 +511,7 @@ File map (`src/`):
 - `game/arena.ts`: `ARENA` (the battlefield in world pixels, 1600 by 1000 but for a skirmish's map
   size: `MapSize`, `MAP_SIZES`, `ARENA_SIZES`, `MAX_ARENA`, `setArena`), `START_POINTS` (the five
   fixed hub spots, player first, on the standard map) and `startPoints()` (scaled to `ARENA`),
-  `NODE_AMOUNT`, `NODE_CLEARANCE` and `BUILD_RANGE`.
+  `NODE_AMOUNT`, `HOME_NODE_AMOUNT`, `NODE_CLEARANCE` and `BUILD_RANGE`.
 - `game/pathing.ts`: `Pathing` (built from the map's rocks and a clearance, its grid sized from
   `ARENA` then: `over`, `clear`, `route`), `PATH_CELL` and the `Rock` type. No Phaser, no `Math.random`.
 - `game/map.ts`: `generateMap(count, loose)` returns a `MapLayout` (homes, nodes, rocks, nebulae, stars,
@@ -484,7 +521,7 @@ File map (`src/`):
   the retries that keep nebulae and derelicts clear.
 - `game/describe.ts`: the text for tooltips and faction cards (`unitLines`, `buildingLines`,
   `factionLines`, `abilityText`, `expansionLines`, `researchLines`, `fallBackLines`,
-  `derelictLines`, `rallyLines`, `admiralLines`), built from the faction data in the hub's language. No Phaser.
+  `derelictLines`, `rallyLines`, `admiralLines`, `activeLine`, `attackMoveLines`, `activesLines`, `groupLines`), built from the faction data in the hub's language. No Phaser.
 - `game/world.ts`: `World`, the whole battle. `new World(layout, pick, watch, sector, kept, setup)` puts faction `pick` in the
   player's slot (`watch`: the AI plays it, see Watch AI above; `sector` and `kept`: the campaign;
   `setup`, a `BattleSetup`: the mode (`Mode`, `skirmish` too), tech, scenario, a galaxy battle's defender and absent factions, the admiral and a skirmish's teams and crystal). `PLAYER` (0), `unitStats` and `buildingStats`
@@ -498,10 +535,10 @@ File map (`src/`):
   keys; `derelictText` fills in the numbers), `TRUCE_MS`,
   `TRUCE_TRIBUTE`, `OFFER_MS`, `BRIBE_COST`, `BRIBE_MS`), `RALLY_SPOTS`, the flagship, convoy and pact constants
   (`FLAGSHIP_COST`, `FLAGSHIP_MS`, `FLAGSHIP_HP`, `FLAGSHIP_DAMAGE`, `FLAGSHIP_SPEED`, `FLAGSHIP_RANGE`,
-  `CONVOY_SIZE`, `PACT_MS`, `PACT_WAVE_MS`), the rival contract constants (`AI_DEAL_MS`, `AI_GOALS`), the wormhole constants (`WORMHOLE_MOUTH`, `WORMHOLE_RADIUS`), `flagshipStats` and the types `AdmiralState`, `Beacon`, `Deal`, `Shard`, `Mine`,
+  `CONVOY_SIZE`, `PACT_MS`, `PACT_WAVE_MS`), the rival contract constants (`AI_DEAL_MS`, `AI_GOALS`), the wormhole constants (`WORMHOLE_MOUTH`, `WORMHOLE_RADIUS`), the belt constants (`BELT_RANGE`, `BELT_LOW`), `ACTIVES` and the active constants (`AFTERBURNER`, `SALVO_MISSILES`, `SALVO_DAMAGE`, `SALVO_REACH`, `SCREEN_RANGE`, `SCREEN_SHARE`), `flagshipStats` and the types `AdmiralState`, `Beacon`, `Deal`, `Shard`, `Mine`,
   `Pop`, `Build`, `ContractState`, `Pact`, `WorldEvent`, `Struck`, `Cue`, `Derelict`, `SeenBuilding`. Fields `fog`, `known`, `mines`,
   `derelicts`, `contract`, `convoyTo`, `pact`, `sector`, `mode`, `scenario`, `scenarioHeld`, `scenarioLost`, `carrier`, `docked`, `teams`, `admiral`, `wormholes`. Methods the scene and test use: `update(dt)`, `build`, `train`, `research`,
-  `command`, `fallBack`, `setRally`, `clearRally`, `useAdmiral`, `allyOfPlayer`, `fleet`, `pickContract`, `currentContract`, `buildFlagship`, `abilityOf`, `acceptTruce`, `declineTruce`, `bribe`, `bribeTarget`, `selectableIn`,
+  `command`, `useActives`, `belt`, `fallBack`, `setRally`, `clearRally`, `useAdmiral`, `allyOfPlayer`, `fleet`, `pickContract`, `currentContract`, `buildFlagship`, `abilityOf`, `acceptTruce`, `declineTruce`, `bribe`, `bribeTarget`, `selectableIn`,
   `selectable`, `entityAt`, `derelictAt`, `placementProblem`, `count`, `hubOf`, `hubsOf`,
   `seesUnit`, `seesMine`, `inNebula`, `atPeace`, `rankOf`, `veteranBonus`, `unit`,
   `building`. No Phaser import.
@@ -546,7 +583,7 @@ File map (`src/`):
   `admiral`, last in `BUTTONS`, left of the Rally button over the BUILD label; drawn, pressed and
   hovered only with an admiral), `ADMIRAL_PILL` (the picker's admiral pill),
   `BOARD` (the contract board's header and cards), `SECTOR_STRIP` (the picker's campaign strip),
-  `KEEP` (the victory's perk cards), `MINIMAP` and `ARMY_TAB`, `PANEL_X` (where the message line and contract panel start), `RIVALS_PANEL` and `RIVALS_TAB`
+  `KEEP` (the victory's perk cards), `STRIP`, `GROUPS` and `stripBoxes` (the command strip over the map's bottom-left), `MINIMAP` and `ARMY_TAB`, `PANEL_X` (where the message line and contract panel start), `RIVALS_PANEL` and `RIVALS_TAB`
   (the rivals panel's box and the top bar area that opens it), `ROLE_LABEL` (the generic
   name of each building and unit type as a `TextKey`, shown under the faction's own name), `FONT` (a system sans
   stack, bold italic for headings).
@@ -642,6 +679,10 @@ with the keys, two fingers or the minimap makes no sound:
 | `rally`, `rallyClear` | the rally point planted or taken down (`onDown` in rally mode) |
 | `flagshipReady`, `flagshipLaunch`, `flagshipLost` | cues from `updateContract` (third contract), `updateFlagship` and `removeDead`; `flagshipReady` also for the cue `admiralReady` (`updateAdmiral`) |
 | `upgrade`, `whoosh` | the shield wall raised and the jump made (`press`, `onDown` in jump mode); the windfall's crystal plays through its `gain` event |
+| `afterburner`, `salvo`, `screen` | the actives fired (`fireActives`), one per kind used |
+| `group`, `select`, `whoosh` | a control group saved, recalled, and recalled twice (the map centres on it) |
+| `attack` | an attack-move ordered (`onDown` in attack mode) |
+| `beltLow` | cue `beltLow` (`updateBelts`: a belt low or dry) |
 
 Watching (`?watch`), the music plays, the lasers and wrecks play quieter, a hub falling in sight
 plays, and no cue of the player's side or `gain` plays. Under browser automation the engine makes
@@ -701,7 +742,7 @@ Test hooks (read by `e2e/playthrough.spec.ts`):
   `techChips`, `techCards`, `scenario`, `scenarioBest`, `admirals`, `jumpMode`, `skirmish`, `skirmishChips`, and `state.mode`, `scenario`, `scenarioHeld`, `carrier`, `teams`, `admiral`, `wormholes`.
 - `scene.camera.scrollX` and `scrollY`: the map's scroll, which the test reads to see whether a pan
   moved. `scene.toScreen(x, y)` gives where a battlefield point is in view pixels.
-- Not read by the test either: `scene.rallyMode`, `scene.alerts` (`x`, `y`, `first`, `last`,
+- Not read by the test either: `scene.groups`, `scene.attackMode`, `units[i].activeMs` and `boostMs`, `state.belt(hub)`, `nodes[i].full`, `scene.rallyMode`, `scene.alerts` (`x`, `y`, `first`, `last`,
   `struck`) and `state.sides[0].rally`.
 - `scene.state.placementProblem(role, x, y)` answers whether a building can go somewhere. The test
   calls it to pick a clear spot, then taps it.
@@ -732,7 +773,10 @@ Test hooks (read by `e2e/playthrough.spec.ts`):
 - **Shooting and approach** share a half-pixel slack (`approach` and `updateUnit`), so a unit that
   stops at its range can always fire.
 - **A new command**: add a method on `World` that the scene calls from `tapMap` or `press`. Keep
-  the rule in `World` so the AI can use it too.
+  the rule in `World` so the AI can use it too. The command strip (`stripBoxes`) has room for a
+  pill or two more right of Actives before it reaches the minimap.
+- **An active**: change its row in `ACTIVES` and its numbers at the top of `game/world.ts`, its rule
+  in `fireActive` (or `screenShare`), its text in `activeLine` and the README's table.
 - **A new setting**: add it to `shared/settings.ts` and honour it here; `reduceMotion` already
   skips the fireballs, steadies the beams, flames, shard and beacon glows, keeps pops from rising
   and stops the Solar Concord's pylons bobbing in `GameScene`.

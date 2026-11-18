@@ -534,9 +534,38 @@ const de: Translation<typeof en> = {
   techOwned: 'Gekauft',
   techLocked: 'Braucht erst {name}',
   techCost: 'Zum Kaufen tippen · {n} Bergegut',
+  activeAfterburner: 'Nachbrenner',
+  activeAfterburnerText: 'fliegt {s} s lang {pct} % schneller',
+  activeSalvo: 'Raketensalve',
+  activeSalvoText: 'trifft bis zu {n} Gegner in Reichweite mit {x}-fachem Schuss',
+  activeScreen: 'Abwehrschirm',
+  activeScreenText: 'Schüsse auf das Schiff und Schiffe im Umkreis von {range} px richten {s} s lang {pct} % weniger an',
+  activeLine: '{name} (E, alle {s} s): {text}',
+  activeSelect: 'Wähle zuerst Schiffe, dann setze ihre Aktionen ein',
+  activeNone: 'Keine Aktionen bereit',
+  activeCooling: 'Aktionen laden noch: die nächste ist in {s} s bereit',
+  activeNoTarget: 'Nichts in Reichweite: eine Raketensalve braucht einen Gegner in der Nähe',
+  activeUsed: '{name} ×{n}',
+  activesPill: 'AKTIONEN {n}/{m} · E',
+  activesPillNone: 'AKTIONEN · E',
+  activesName: 'Aktionen (E): jedes bereite gewählte Schiff setzt seine ein',
+  attackMovePill: 'ANGRIFFSZUG · X',
+  attackMoveName: 'Angriffszug (X)',
+  attackMoveText: 'Der nächste Tipp auf die Karte schickt die gewählten Schiffe dorthin, und sie bekämpfen jeden Gegner unterwegs.',
+  attackMoveHow: 'Tippe auf die Karte, wohin der Angriffszug geht',
+  attackMoving: 'Angriffszug unterwegs',
+  attackMoveNoShips: 'Wähle zuerst Schiffe, dann den Angriffszug',
+  groupsName: 'Gruppen (1 bis 5)',
+  groupsText: 'Umschalt und eine Zahl, oder ein lang gedrückter Chip, speichert die gewählten Schiffe als Gruppe. Die Zahl oder ein Tipp auf den Chip wählt sie wieder; zweimal zentriert die Karte auf sie.',
+  groupSaved: { one: 'Gruppe {k}: {n} Schiff gespeichert', other: 'Gruppe {k}: {n} Schiffe gespeichert' },
+  groupSelected: { one: 'Gruppe {k}: {n} Schiff', other: 'Gruppe {k}: {n} Schiffe' },
+  groupEmpty: 'Gruppe {k} ist leer: wähle Schiffe und halte ihren Chip (oder Umschalt+{k}), um sie zu speichern',
+  beltLine: 'Kristallfeld: noch {left} ({pct} %)',
+  beltLowNotice: 'Kristallfeld bei {hub} nur noch {n} %: Zeit für einen Ausbau',
+  beltDry: 'Kristallfeld bei {hub} erschöpft: baue an einem frischen Feld aus',
 };
 
 /** Texts that are the same in German. */
-export const keepEnglish: (keyof typeof en)[] = ['gameTitle', 'rankVeteran', 'seconds', 'roleCost', 'progress', 'boardTitle', 'sectorNode', 'dockLabel', 'techCard', 'admiralRanked', 'admiralNavigator', 'roleAdmiral'];
+export const keepEnglish: (keyof typeof en)[] = ['gameTitle', 'rankVeteran', 'seconds', 'roleCost', 'progress', 'boardTitle', 'sectorNode', 'dockLabel', 'techCard', 'admiralRanked', 'admiralNavigator', 'roleAdmiral', 'activeUsed'];
 
 export default de;

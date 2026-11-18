@@ -1,4 +1,4 @@
-import { ARENA, NODE_AMOUNT, startPoints } from './arena';
+import { ARENA, HOME_NODE_AMOUNT, NODE_AMOUNT, startPoints } from './arena';
 
 export interface Point {
   x: number;
@@ -139,7 +139,7 @@ export function generateMap(factionCount: number, loose = 16): MapLayout {
     for (let i = 0; i < 3; i++) {
       const angle = Math.random() * Math.PI * 2;
       const d = 95 + Math.random() * 60;
-      nodes.push({ x: home.x + Math.cos(angle) * d, y: home.y + Math.sin(angle) * d, amount: NODE_AMOUNT });
+      nodes.push({ x: home.x + Math.cos(angle) * d, y: home.y + Math.sin(angle) * d, amount: HOME_NODE_AMOUNT });
     }
   }
   for (let i = 0; i < loose; i++) {

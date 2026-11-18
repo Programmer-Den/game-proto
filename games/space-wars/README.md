@@ -35,6 +35,10 @@ stripes and long exhaust flames, under a chocolate-and-mustard striped HUD with 
 | The army count on the top bar, or Q | Select every warship you have |
 | Tap empty space | Move the selected units there (a wing fans out round the spot) |
 | Tap an enemy unit or building | Attack it with the selected units |
+| Attack-move pill, or X, then tap the map | Send the selected ships there; they fight every enemy they meet on the way, then fly on |
+| Actives pill, or E | Fire every ready active among the selected ships (see Ship actives) |
+| Shift+1 to 5 (or Ctrl), or hold a group chip | Save the selected ships as control group 1 to 5 (a tap on an empty chip saves too) |
+| 1 to 5, or tap a group chip | Select that group again; twice in a row centres the map on it |
 | Build buttons, then tap the map | Place a building (green ring when it can go there) |
 | Expansion button, then tap a far crystal field | Place an outpost, a second hub |
 | Train buttons | Queue a unit: harvesters at a hub, combat units at a Barracks |
@@ -44,7 +48,7 @@ stripes and long exhaust flames, under a chocolate-and-mustard striped HUD with 
 | Rally point button, or R, then tap the map | Plant the rally point: new warships fly there and fan out round it. Tap the flag in rally mode to take it down |
 | Space, or tap an arrow on the map's edge | Jump to the latest attack on your ships or base |
 | The rivals on the top bar, or T | Open the rivals panel: accept or decline a truce, or pay tribute to turn a rival |
-| Right-click | Cancel a placement or the rally point, clear the selection and close the rivals panel |
+| Right-click | Cancel a placement, an attack-move or the rally point, clear the selection and close the rivals panel |
 | Arrow keys or WASD, or drag with two fingers | Scroll the map |
 | Tap or drag on the minimap | Move the view there |
 | H | Centre the map on your hub |
@@ -345,6 +349,28 @@ rather than stacking on the Barracks. Tap the flag in rally mode to take it down
 
 ![The map scrolled away from the base: two orange arrows on the map's bottom edge point at attacks off screen, and the message line says the base is under attack](docs/screenshots/alert-edge.webp)
 
+### Control groups, attack-move and ship actives
+
+A strip over the map's bottom-left corner holds five **control group** chips and two pills. Shift
+and a number (or Ctrl), or holding a chip, saves the selected ships as that group, and the chip then
+shows how many ships it holds; the number or a tap on the chip selects them again, and doing it
+twice in a row centres the map on them. **Attack-move** (or X) arms the next map tap: the selected
+ships fly there, taking on every enemy that comes into sight and flying on once it is gone.
+
+Every warship class has one **active** on a cooldown of its own, fired with the **Actives** pill
+(or E) for every ready ship in the selection. A mustard pip under a selected ship means its active
+is ready, and the pill counts the ready ones.
+
+| Class | Active | Cooldown | What it does |
+| --- | --- | --- | --- |
+| Scout | Afterburner | 15 s | Flies 80% faster for 3 s |
+| Gunship | Missile salvo | 18 s | Hits up to 3 enemies within its range plus 40 px for 2.5 times a shot (only with an enemy in reach) |
+| Heavy (and the flagship) | Point-defence screen | 24 s | For 6 s, shots at it and at its faction's ships within 70 px do 40% less damage |
+
+Rivals use their actives too once the first minute and a half is over.
+
+![The command strip with two saved groups, the Attack-move tip, and a fleet in a fight: a point-defence dome round the Aegis and missile salvo bursts on the rival ships](docs/screenshots/actives.webp)
+
 ### Minimap
 
 The minimap in the map's bottom-right corner shows the whole battlefield: the space you have
@@ -393,6 +419,13 @@ nearest it; every harvester drops its crystal at the nearest hub, outpost or Dep
 build within 240 pixels of it. Losing an outpost does not end the battle.
 
 ![A Sun Outpost finished beside a far crystal field, its harvesters mining nearby](docs/screenshots/expansion.webp)
+
+The three crystal fields beside each starting hub hold 900 crystal each (the loose fields out on the
+map 1,500), so a home belt runs dry in a long battle. Hovering a hub shows how much its field has
+left; when a field falls under a third, and again when it runs dry, the message line says so with a
+chime. Rivals whose fields all run low build another outpost, up to three, whatever the time.
+
+![The hub's hover saying its crystal field has 530 left (20%), with the message line warning that the field at Sun Ring is down to 20%](docs/screenshots/belt.webp)
 
 ### Research
 
