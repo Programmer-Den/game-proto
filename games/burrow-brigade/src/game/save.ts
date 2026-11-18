@@ -1,4 +1,4 @@
-import type { Levels } from './depot';
+import { UPGRADE_COSTS, UPGRADE_IDS, type Levels } from './depot';
 import { isHat, type HatId } from './hats';
 import { isTrade, type TradeId } from './modes';
 import { cleanOptions, type Options } from './options';
@@ -73,6 +73,16 @@ export interface Campaign {
   trades: TradeId[];
 }
 
+/** The Quartermaster's levels, each a whole number from 0 to its upgrade's last; anything else is dropped. */
+const cleanLevels = (raw: unknown): Levels => {
+  const levels: Levels = {};
+  if (!raw || typeof raw !== 'object') return levels;
+  for (const id of UPGRADE_IDS) {
+    const n = Math.round(Number((raw as Record<string, unknown>)[id]));
+    if (Number.isFinite(n) && n > 0) levels[id] = Math.min(UPGRADE_COSTS[id].length, n);
+  }
+  return levels;
+};
 export const loadCampaign = (): Campaign => {
   const c = read<Campaign>(CAMPAIGN_KEY, { stars: [], vstars: [], acorns: 0, levels: {}, trades: [] });
   const stars = (a: unknown) => (Array.isArray(a) ? a.map((n) => Math.max(0, Math.min(3, Math.round(Number(n)) || 0))) : []);
@@ -80,7 +90,7 @@ export const loadCampaign = (): Campaign => {
     stars: stars(c.stars),
     vstars: stars(c.vstars),
     acorns: Math.max(0, Math.round(Number(c.acorns)) || 0),
-    levels: c.levels && typeof c.levels === 'object' ? c.levels : {},
+    levels: cleanLevels(c.levels),
     trades: Array.isArray(c.trades) ? c.trades.filter(isTrade) : [],
   };
 };

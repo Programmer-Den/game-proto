@@ -161,12 +161,19 @@ export interface Roster {
 /** The roster; empty on a fresh save. Broken veterans are dropped, and so are picks that point nowhere. */
 export function loadRoster(): Roster {
   const o = loadObject(ROSTER_KEY) ?? {};
-  const vets = (Array.isArray(o.vets) ? o.vets : [])
-    .filter((v): v is Veteran => !!v && typeof v === 'object' && typeof v.name === 'string' && ROLE_KINDS.includes(v.role))
-    .slice(0, LOYALTY.size)
-    .map((v) => ({ name: v.name.slice(0, 16), role: v.role, rank: Math.max(1, level(v.rank, LOYALTY.maxRank)) }));
+  const raw: unknown[] = Array.isArray(o.vets) ? o.vets : [];
+  // Each veteran kept with where it stood in the save, since the picks point there.
+  const kept = raw
+    .map((v, at) => ({ v, at }))
+    .filter((e): e is { v: Veteran; at: number } => {
+      const v = e.v as Veteran;
+      return !!v && typeof v === 'object' && typeof v.name === 'string' && ROLE_KINDS.includes(v.role);
+    })
+    .slice(0, LOYALTY.size);
+  const vets = kept.map(({ v }) => ({ name: v.name.slice(0, 16), role: v.role, rank: Math.max(1, level(v.rank, LOYALTY.maxRank)) }));
   const picked = (Array.isArray(o.picked) ? o.picked : [])
-    .filter((i, k, all): i is number => typeof i === 'number' && Number.isInteger(i) && i >= 0 && i < vets.length && all.indexOf(i) === k)
+    .map((i: unknown) => kept.findIndex((e) => e.at === i))
+    .filter((i: number, k: number, all: number[]) => i >= 0 && all.indexOf(i) === k)
     .slice(0, LOYALTY.picks);
   return { vets, picked };
 }

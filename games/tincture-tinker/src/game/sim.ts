@@ -434,7 +434,8 @@ export function stir(s: GameState): boolean {
  */
 export function sift(s: GameState, row: number): Tile[] | null {
   if (!canUse(s, 'sift') || row < 0 || row >= s.board.length) return null;
-  const newTile = tileMaker(s);
+  // Rerolls are everyday kinds from Math.random, so the daily's seeded refills stay the same for everyone.
+  const newTile = (): Tile => ({ id: s.nextId++, kind: randomKind() });
   const keep = (t: Tile) => special(t) || stuck(t);
   const old = s.board[row].filter((t) => !keep(t));
   // A row of nothing but kept tiles can't change, so it costs nothing.
