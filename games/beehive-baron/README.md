@@ -379,7 +379,7 @@ price and climbs to 4 times it over 12 seconds, but the buyer walks off at a mom
 somewhere between 3 and 12 seconds. Tap the note to sell at the bid; the jars count as sold.
 Selling those jars first sends the buyer away too.
 
-![The forecast card in the sky and a buyer's note bidding at the season's end](docs/screenshots/forecast-auction.webp)
+![The forecast card in the sky and a buyer's note bidding at the season's end](docs/screenshots/weather-buyer.webp)
 
 ### Trophies
 
