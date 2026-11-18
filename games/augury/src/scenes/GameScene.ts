@@ -1112,7 +1112,7 @@ export class GameScene extends Phaser.Scene {
         const at = nextRankAt(best);
         lines.push(t('weeklyRank', { rank: t(rankOf(best)) }) + (at === null ? '' : ` · ${t('weeklyNext', { n: formatNumber(at) })}`));
       }
-      if (run.challenge !== null) lines.push(run.score > run.challenge ? t('challengeBeaten') : t('challengeShort', { n: formatNumber(run.challenge - run.score) }));
+      if (run.challenge !== null) lines.push(run.score >= run.challenge ? t('challengeBeaten') : t('challengeShort', { n: formatNumber(run.challenge - run.score) }));
       if (run.newBest) lines.push(t('newBest'));
     }
     this.heading(END.x, END.y - 120, title, 28);

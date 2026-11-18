@@ -282,15 +282,23 @@ export function landed(board: Board, c: Cell): boolean {
  */
 export function placeVials(board: Board, n: number, rand: () => number = Math.random): Board {
   if (n <= 0) return board;
+  // The order counts on `n` vials, so an attempt that places them all comes first; one that falls
+  // short (too few free columns) is kept only if none does.
+  let short: Board | null = null;
   for (let attempt = 0; attempt < 30; attempt++) {
     const next = board.map((row) => [...row]);
     const cols = Array.from({ length: COLS }, (_, c) => c).filter((c) => !stuck(next[0][c]) && !special(next[0][c]));
-    for (let placed = 0; placed < n && cols.length > 0; placed++) {
+    let placed = 0;
+    while (placed < n && cols.length > 0) {
       const col = cols.splice(Math.floor(rand() * cols.length), 1)[0];
       next[0][col] = { ...next[0][col], vial: true };
+      // One that has already landed is put back, and doesn't count.
       if (landed(next, { row: 0, col })) next[0][col] = board[0][col];
+      else placed++;
     }
-    if (validMoves(next).length > 0) return next;
+    if (validMoves(next).length === 0) continue;
+    if (placed === n) return next;
+    short ??= next;
   }
-  return board;
+  return short ?? board;
 }

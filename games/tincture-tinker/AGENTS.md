@@ -301,7 +301,8 @@ bottle green, serif italics), all painted in code on 2D canvases. It shares no c
 - **Drop orders:** `orderFor` gives `isDrop` orders (`number % ROYAL_EVERY === DROP_AT`: 4, 9,
   14...; never royal or twin) `vials` from `vialsFor` and `VIAL_MOVES` moves and `VIAL_COINS` coins
   for each. `startOrder` calls `placeVials` after `addBlockers`: each vial is a top-row tile with
-  `vial` set, in its own column. A vial is `stuck` (no swap, Funnel, Sift reroll, shuffle, Pestle,
+  `vial` set, in its own column (a vial that would land at once doesn't count; on a board with too
+  few free columns the order's `vials` drops to the vials placed). A vial is `stuck` (no swap, Funnel, Sift reroll, shuffle, Pestle,
   blocker, mould or toad) and `matchKind` null, but `collapse` lets it fall like any tile.
   `gather` takes vials back out of swept rows and squares, and adds every `landed` vial to the
   cleared set (a step with only vials when nothing matched), counting `delivered` but nothing in
