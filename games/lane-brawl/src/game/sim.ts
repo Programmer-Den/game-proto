@@ -97,6 +97,10 @@ import {
   EVENTS,
   FLOOD,
   RIVER_HALF,
+  COACH,
+  JUNGLER,
+  QUEST,
+  QuestCount,
 } from './data';
 import { DeathRecap, GameState, HitHow, ObjectiveTitle, RecapRow, SoundId, Unit, dist, getUnit, laneNear, levelFor, refreshStats, spawnMercs, spawnWard, spawnWave } from './state';
 import { shortName } from './names';
@@ -163,6 +167,7 @@ export function tick(s: GameState, dt: number) {
   if (s.phase !== 'playing') return;
   // Objectives are the player's errands, so a watched match runs none.
   if (!s.watch) updateObjective(s);
+  if (s.quest) updateQuest(s, dt);
   updateLastHitMark(s);
 }
 
@@ -170,9 +175,18 @@ export function tick(s: GameState, dt: number) {
 export function abilityFor(u: Unit, key: AbilityKey): AbilityDef | undefined {
   const base = u.champ?.abilities.find((a) => a.key === key);
   const ranks = key === 'R' ? ultRank(u.level) : 0;
-  if (!base || (u.upgrades.length === 0 && ranks === 0)) return base;
+  const quest = u.questKey === key;
+  if (!base || (u.upgrades.length === 0 && ranks === 0 && !quest)) return base;
   const ab: AbilityDef = { ...base };
   const pct = (v: number | undefined, p: number | undefined) => (v === undefined || !p ? v : v * (1 + p / 100));
+  // A finished champion quest (LB21) empowers one ability for the rest of the match.
+  if (quest) {
+    ab.damage = pct(ab.damage, QUEST.damage);
+    ab.dps = pct(ab.dps, QUEST.damage);
+    ab.heal = pct(ab.heal, QUEST.heal);
+    ab.shield = pct(ab.shield, QUEST.shield);
+    ab.cd *= 1 + QUEST.cd / 100;
+  }
   for (let r = 0; r < ranks; r++) {
     ab.damage = pct(ab.damage, ULT_RANK.damage);
     ab.dps = pct(ab.dps, ULT_RANK.damage);
@@ -325,6 +339,7 @@ function updateObjective(s: GameState) {
       if (t) s.fx.push({ kind: 'ring', x: t.x, y: t.y, r: 80, color: '#f2c14e', ms: 700 });
     }
     sound(s, done ? 'objective' : 'objectiveMissed');
+    if (!done) s.coach.objMissed++;
     s.lastObjective = { title: o.title, done, gold: o.gold * s.goldMult, at: s.time };
     s.objective = null;
     s.nextObjectiveAt = s.time + OBJECTIVE_GAP_MS;
@@ -338,8 +353,11 @@ function updateObjective(s: GameState) {
     let target: Unit | null = null;
     let title: ObjectiveTitle = { key: 'objBeast' };
     if (def.kind === 'tower') {
-      // The red tower closest to the blue Nexus: the next one in the way.
-      target = closest(s.units.filter((u) => u.kind === 'tower' && u.side === 'red' && !u.dead), BASE.blue);
+      // The red tower closest to the blue Nexus: the next one in the way (on a top or bottom
+      // laner's own lane while one stands there).
+      const towers = s.units.filter((u) => u.kind === 'tower' && u.side === 'red' && !u.dead);
+      const mine = towers.filter((u) => u.lane === s.role);
+      target = closest(mine.length ? mine : towers, BASE.blue);
       const spot = target && TOWERS.find((t) => t.x === target!.x && t.y === target!.y);
       title = { key: spot ? TOWER_TITLE[spot.lane] : 'objTower' };
     } else if (def.kind === 'camp') {
@@ -360,6 +378,40 @@ function updateObjective(s: GameState) {
     return;
   }
   s.nextObjectiveAt = s.time + OBJECTIVE_GAP_MS;
+}
+
+/** A tower or drake fell to blue: it counts for the player's quest when the champion stood alive near it. */
+function questNear(s: GameState, count: QuestCount, at: Vec) {
+  const q = s.quest;
+  const p = getUnit(s, s.player);
+  if (q?.state === 'open' && q.def.count === count && p && !p.dead && dist(p, at) <= QUEST.near) q.have++;
+}
+
+/** How far along the player's quest is. */
+export function questHave(s: GameState): number {
+  const q = s.quest;
+  if (!q) return 0;
+  return q.def.count === 'lastHits' ? s.lastHits : q.have;
+}
+
+/** The champion quest (LB21): finished, it empowers its ability; past its time, it is missed. Also the coach's banked gold. */
+function updateQuest(s: GameState, dt: number) {
+  const p = getUnit(s, s.player);
+  if (p && !p.dead && p.gold >= COACH.rich) s.coach.richMs += dt;
+  const q = s.quest!;
+  if (q.state !== 'open' || !p?.champ) return;
+  if (questHave(s) >= q.def.goal) {
+    q.state = 'done';
+    p.questKey = q.def.key;
+    const ab = p.champ.abilities.find((a) => a.key === q.def.key);
+    notice(s, text('noticeQuestDone', { ability: ab ? text(ab.name) : q.def.key }), '#f2c14e');
+    s.fx.push({ kind: 'ring', x: p.x, y: p.y, r: 70, color: '#f2c14e', ms: 800 });
+    sound(s, 'quest', undefined, true);
+  } else if (s.time >= q.def.byMs) {
+    q.state = 'missed';
+    notice(s, text('noticeQuestMissed'), '#9aa3b5');
+    sound(s, 'objectiveMissed', undefined, true);
+  }
 }
 
 function closest(units: Unit[], to: Vec): Unit | null {
@@ -538,6 +590,7 @@ export function castSpell(s: GameState, u: Unit, aim: Vec): boolean {
     }
   }
   u.spellCd = def.cd;
+  if (u.id === s.player) s.coach.spells++;
   if (def.id !== 'teleport') u.recallMs = 0;
   u.castMs = 300;
   if (u.id === s.player) sound(s, 'spell', u, true);
@@ -625,6 +678,7 @@ export function plantWard(s: GameState, u: Unit, aim: Vec): boolean {
   spawnWard(s, u.side, at.x, at.y);
   u.wards--;
   u.recallMs = 0;
+  if (u.id === s.player) s.coach.wards++;
   if (dist(u, at) > 1) u.facing = Math.atan2(at.y - u.y, at.x - u.x);
   u.castMs = 300;
   s.fx.push({ kind: 'ring', x: at.x, y: at.y, r: 30, color: SIDE_COLOR[u.side], ms: 500 });
@@ -871,6 +925,8 @@ export function damage(s: GameState, t: Unit, amount: number, sourceId: number, 
   if (blessed && (t.kind === 'tower' || t.kind === 'inhibitor' || t.kind === 'nexus')) amount *= ELDER.structMult;
   // Morrow's grudge: the Whaler hits the beast that sank his ship harder.
   if (t.kind === 'beast') amount *= 1 + (getUnit(s, sourceId)?.champ?.perk?.beastDmg ?? 0) / 100;
+  // A jungler (LB22) hunts the camps harder.
+  if (t.kind === 'camp' && sourceId === s.player && s.role === 'jungle' && !s.watch) amount *= JUNGLER.campDmg;
   let rest = ((amount * 100) / (100 + Math.max(0, armorOf(t)))) * takenMult(s, t);
   if (t.champ?.passive.tough) rest *= 1 - t.champ.passive.tough / 100;
   if (t.shield > 0) {
@@ -960,6 +1016,7 @@ function deathRecap(s: GameState, killerId: number): DeathRecap {
  */
 function slayDrake(s: GameState, killer: Unit) {
   const team = killer.side as Team;
+  if (team === 'blue') questNear(s, 'drakes', DRAKE);
   const element = s.drakeElement;
   const stacks = s.drakeStacks[team];
   const def = DRAKES[element];
@@ -1188,7 +1245,10 @@ function kill(s: GameState, t: Unit, killerId: number) {
           champKiller.cs++;
         }
         // The minion the player could have finished fell to someone else: the streak breaks.
-        if (s.lastHitMark === t.id) s.streak = 0;
+        if (s.lastHitMark === t.id) {
+          s.streak = 0;
+          s.coach.missed++;
+        }
       }
       for (const c of s.units) {
         if (c.kind === 'champion' && !c.dead && c.side !== t.side && c.side !== 'neutral' && dist(c, t) <= XP_RANGE) {
@@ -1199,6 +1259,7 @@ function kill(s: GameState, t: Unit, killerId: number) {
     case 'camp': {
       const def = CAMP_KINDS[t.campKind ?? 'boar'];
       t.respawnAt = s.time + def.respawnMs;
+      if (champKiller?.player && s.quest?.def.count === 'monsters') s.quest.have++;
       if (champKiller) {
         earn(s, champKiller, def.gold);
         champKiller.cs++;
@@ -1268,6 +1329,7 @@ function kill(s: GameState, t: Unit, killerId: number) {
     }
     case 'tower':
       if (champKiller) earn(s, champKiller, TOWER.gold);
+      if (t.side === 'red') questNear(s, 'towers', t);
       aiLog(t.side === 'blue' ? 'red' : 'blue', `takes a ${t.lane} tower`);
       s.fx.push({ kind: 'ring', x: t.x, y: t.y, r: 60, color: SIDE_COLOR[t.side], ms: 600 });
       sound(s, 'crash', t);
@@ -1280,6 +1342,8 @@ function kill(s: GameState, t: Unit, killerId: number) {
       break;
     case 'champion': {
       t.deaths++;
+      // The coach notes a death under a red tower.
+      if (t.player && s.units.some((w) => w.kind === 'tower' && !w.dead && w.side !== t.side && dist(w, t) <= w.range + COACH.towerReach)) s.coach.towerDeaths++;
       t.recallMs = 0;
       const streak = t.killStreak;
       t.killStreak = 0;

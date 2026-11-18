@@ -142,6 +142,7 @@ export const sfx = sounds<SfxName>({
   brute: { wave: 'triangle', freq: 440, to: 880, length: 0.3, volume: 0.3 },
   objective: { wave: 'pulse25', freq: 587, arp: [0, 4, 7, 12, 7, 12], arpStep: 0.07, length: 0.5, volume: 0.3 },
   objectiveMissed: { wave: 'triangle', freq: 392, arp: [0, -3], arpStep: 0.15, length: 0.35, volume: 0.3 },
+  quest: { wave: 'square', freq: 523, arp: [0, 7, 12, 16, 19, 24], arpStep: 0.06, length: 0.6, volume: 0.26 },
 });
 
 /** Sounds too frequent for a watched match, where nothing is the player's own. */

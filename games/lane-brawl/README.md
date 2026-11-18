@@ -303,7 +303,27 @@ left, under bevelled slate panels.
     a first takedown, a red tower down, a first drake, a quick match won, three kills without
     dying, the guardian beast slain, a full match won and a drake soul, plus two hidden ones for
     the long run. Each shows a toast the moment it is earned.
-32. **Winning** destroys the red Nexus. Losing means your Nexus falls first.
+32. **Roles** (round 5): the pick screen's role button picks mid (the old line-up: two allies
+    with you in mid, one each top and bottom), top, bottom or jungle, and your four allies take
+    the lanes left. Your first objective is your lane's red tower, or for a jungler the nearest
+    camp, and a jungler hits jungle monsters 30% harder. The pick is kept between matches.
+
+    ![The pick screen's role button on Bottom, with its quest under the cards](docs/screenshots/role-pick.webp)
+33. **Champion quests** (round 5): each match gives your champion one quest by its role, shown in
+    a chip under the objective card with its progress and time left: 40 last hits by 10:00 in
+    mid, be there when two red towers fall by 15:00 on top, be there when blue takes two drakes by
+    18:00 on bottom, and 24 jungle monsters by 10:00 in the jungle. Finish it in time and one
+    ability (Q, W, E and R in that order) deals and heals 30% more and cools down 20% faster for the
+    rest of the match.
+
+    ![The quest chip under the objective card after the quest is done: Gate Rush empowered](docs/screenshots/champion-quest.webp)
+34. **The coach** (round 5): the end panel shows three notes on how you played, each with one tip:
+    deaths under a red tower, last hits lost to others, gold left unspent, objectives missed, no
+    wards or no battle spell, a missed quest. The worst come first; a clean match gets praise or
+    general tips instead.
+
+    ![The end panel's coach: three notes, each with a tip](docs/screenshots/coach.webp)
+35. **Winning** destroys the red Nexus. Losing means your Nexus falls first.
 
 Every ability has an animation of its own (a hammer that splits the ground, a meteor from the
 sky, a harpoon on its rope, a coil pylon arcing, a blood moon rising and so on), and so do bolts in

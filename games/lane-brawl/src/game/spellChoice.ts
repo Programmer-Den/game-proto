@@ -1,8 +1,8 @@
 // The player's battle spell, match kind and map, kept between matches under the save keys
 // `lane-brawl-spell`, `lane-brawl-mode` (`lane-brawl-quick` before ranked and event matches) and
-// `lane-brawl-map`.
+// `lane-brawl-map`, and the role (LB22) under `lane-brawl-role`.
 
-import { MAP_IDS, MapId, SPELLS, SpellId } from './data';
+import { MAP_IDS, MapId, ROLES, RoleId, SPELLS, SpellId } from './data';
 
 const KEY = 'lane-brawl-spell';
 
@@ -83,6 +83,26 @@ export function loadMap(): MapId {
 export function saveMap(map: MapId) {
   try {
     localStorage.setItem(MAP_KEY, map);
+  } catch {
+    // Storage blocked: the pick holds until the page closes.
+  }
+}
+
+const ROLE_KEY = 'lane-brawl-role';
+
+/** The role the player picked (LB22), mid when none is saved. */
+export function loadRole(): RoleId {
+  try {
+    const r = localStorage.getItem(ROLE_KEY) as RoleId | null;
+    return r && ROLES.includes(r) ? r : 'mid';
+  } catch {
+    return 'mid';
+  }
+}
+
+export function saveRole(role: RoleId) {
+  try {
+    localStorage.setItem(ROLE_KEY, role);
   } catch {
     // Storage blocked: the pick holds until the page closes.
   }
