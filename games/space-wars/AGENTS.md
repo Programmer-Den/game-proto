@@ -216,7 +216,8 @@ Implemented today:
   `layMine`; an enemy ship within 16 px sets it off for 45 damage within 40 px: `updateMines`; a
   rival's mine is drawn only with a player ship within `MINE_SPOT` 60 px), `shield` (Halo Cruiser: friends within 70 px take half of each shot; under two shields the stronger counts, `shieldShare`), `brood` (Brood
   Carrier spawns a scout every 12 s up to 6 scouts), `splash` (Siege Barge hits enemies within 28 px
-  of its target for half damage), `salvage` (Nomad Salvage Yard pays 8 crystal per enemy unit
+  of its target for half damage; a splash and a mine's blast are cut by `guardShare`, the shield,
+  Bulwark and screen together, like a shot), `salvage` (Nomad Salvage Yard pays 8 crystal per enemy unit
   destroyed within 200 px, a teammate's not counted).
 - Contract board (`game/contracts.ts`, state in `World.contract`, run by `World.updateContract`,
   `openBoard`, `startContract`, `failContract` and `score`): five contracts a battle (`CONTRACT_STEPS`,

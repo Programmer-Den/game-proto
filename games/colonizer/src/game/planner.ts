@@ -152,7 +152,8 @@ function plan(s: GameState) {
   if (!town) return;
   const p = s.players[ME];
   const villagers = [...s.units.values()].filter((u) => u.owner === ME && UNITS[u.type].role === 'villager');
-  const idleVillagers = villagers.filter((u) => u.order.t === 'idle');
+  // Read afresh each time: a villager given an order earlier in this think is no longer idle.
+  const idleVillagers = () => villagers.filter((u) => u.order.t === 'idle');
   // The army on land; warships keep to the sea (8c).
   const military = [...s.units.values()].filter((u) => u.owner === ME && isSoldier(UNITS[u.type].role) && !isNaval(UNITS[u.type].role));
   // No side to fight this think: a truce or alliance with each rival left.
@@ -176,7 +177,7 @@ function plan(s: GameState) {
     // A Wonder gets its whole crew; anything else one builder.
     const working = [...s.units.values()].filter((u) => u.owner === ME && u.order.t === 'build' && u.order.b === b.id).length;
     if (working >= (b.type === 'wonder' ? WONDER_CREW : 1)) continue;
-    const builder = nearestUnit(idleVillagers, b.tx, b.ty) ?? nearestVillager(s, ME, b.tx, b.ty);
+    const builder = nearestUnit(idleVillagers(), b.tx, b.ty) ?? nearestVillager(s, ME, b.tx, b.ty);
     if (builder) act(() => (issue(s, ME, [builder.id], { t: 'build', b: b.id }), true));
   }
 
@@ -188,7 +189,7 @@ function plan(s: GameState) {
   // 2. Population: a house before the cap is hit.
   const houseQueued = [...s.buildings.values()].some((b) => b.owner === ME && b.type === 'house' && !b.built);
   if (popUsed(s, ME) >= popCap(s, ME) - 3 && !houseQueued) {
-    act(() => buildNear(s, ME, 'house', town, idleVillagers));
+    act(() => buildNear(s, ME, 'house', town, idleVillagers()));
   }
 
   // 3. Buildings in plan order, one at a time, as soon as the AI can pay for each.
@@ -201,14 +202,14 @@ function plan(s: GameState) {
       if (notAllowed(s, ME, type)) continue;
       if (!affordable(p, BUILDINGS[type].cost)) break;
       if (type === 'lumber' || type === 'mine') {
-        if (act(() => buildAtResource(s, type === 'lumber' ? 'wood' : 'ore', idleVillagers))) break;
+        if (act(() => buildAtResource(s, type === 'lumber' ? 'wood' : 'ore', idleVillagers()))) break;
         continue;
       }
       if (type === 'dock') {
-        if (act(() => buildAtShore(s, town, idleVillagers))) break;
+        if (act(() => buildAtShore(s, town, idleVillagers()))) break;
         continue;
       }
-      if (act(() => buildNear(s, ME, type, town, idleVillagers))) break;
+      if (act(() => buildNear(s, ME, type, town, idleVillagers()))) break;
     }
   }
 
@@ -338,13 +339,14 @@ function plan(s: GameState) {
   }
 
   // 6c. On a map of islands, a Harbour on the nearest shore, then warships that shell the foe's shore.
-  if (s.naval && hasBuilt(s, ME, 'barracks')) navy(s, town, idleVillagers, peace);
+  if (s.naval && hasBuilt(s, ME, 'barracks')) navy(s, town, idleVillagers(), peace);
 
   // 6d. The Steppe Horde packs up a camp whose wood or ore has run out and pitches it by fresh ground.
   if (p.faction === 'steppe') nomads(s);
 
   // 7. Gather: idle villagers go to the resource the AI is shortest of.
-  for (const u of idleVillagers) {
+  for (const u of idleVillagers()) {
+    if (u.order.t !== 'idle') continue;
     const res = neediest(s);
     const src = nearestNode(s, res, u);
     if (src) act(() => (issue(s, ME, [u.id], { t: 'gather', node: src }), true));

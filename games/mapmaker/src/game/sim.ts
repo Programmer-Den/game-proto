@@ -580,19 +580,6 @@ export function chartOf(s: GameState): Chart {
     }
   }
   const base = CHART_ORDER.reduce((sum, t) => sum + (counts[t] ?? 0) * TERRAIN[t].value, 0);
-  const ink = Math.round((base - rivalLoss) * inkBonus(s));
-  const done = featuresDone(s).map((f) => ({ name: f.name, bonus: f.bonus }));
-  const featureCoins = done.reduce((sum, f) => sum + f.bonus, 0);
-  const c = s.commission;
-  const bonus = c && c.done + (counts[c.terrain] ?? 0) >= c.need ? c.bonus : 0;
-  const unused = s.supplies;
-  const sellBack = sellBackOf(s, base - rivalLoss);
-  const due = milestonesDue(s);
-  const milestoneCoins = due.reduce((sum, m) => sum + m.coins, 0);
-  const atlas = due.some((m) => m.atlas);
-  const artifactCoins = s.artifacts * artifactValue(s);
-  const fixCoins = s.fixes * FIX_BONUS;
-  const goodsCoins = s.goods * GOODS_VALUE;
   // A storm on the way home washes out the voyage's least valuable tiles.
   const storm = s.pressed > 0 && stormComes(s) ? Math.min(s.pressed * PRESS_LOSS, s.surveyed.length) : 0;
   const worths = s.surveyed
@@ -602,6 +589,21 @@ export function chartOf(s: GameState): Chart {
     })
     .sort((a, b) => a - b);
   const stormLoss = worths.slice(0, storm).reduce((sum, v) => sum + v, 0);
+  // Fine Ink and the sell-back cap count only the tiles the chart still holds.
+  const kept = base - rivalLoss - stormLoss;
+  const ink = Math.round(kept * inkBonus(s));
+  const done = featuresDone(s).map((f) => ({ name: f.name, bonus: f.bonus }));
+  const featureCoins = done.reduce((sum, f) => sum + f.bonus, 0);
+  const c = s.commission;
+  const bonus = c && c.done + (counts[c.terrain] ?? 0) >= c.need ? c.bonus : 0;
+  const unused = s.supplies;
+  const sellBack = sellBackOf(s, kept);
+  const due = milestonesDue(s);
+  const milestoneCoins = due.reduce((sum, m) => sum + m.coins, 0);
+  const atlas = due.some((m) => m.atlas);
+  const artifactCoins = s.artifacts * artifactValue(s);
+  const fixCoins = s.fixes * FIX_BONUS;
+  const goodsCoins = s.goods * GOODS_VALUE;
   return {
     counts,
     base,
