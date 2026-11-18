@@ -1317,6 +1317,7 @@ export class GameScene extends Phaser.Scene {
         st.hidden === 'buried' &&
         !this.dug.has(st.id) &&
         !s.moonstones.includes(st.id) &&
+        stoneCounts(s, st.chapter) &&
         ((Math.floor(s.x / TILE) === st.x && Math.floor(s.y / TILE) === st.y) || Math.hypot((st.x + 0.5) * TILE - hx, (st.y + 0.5) * TILE - hy) <= 32)
       ) {
         this.dug.add(st.id);
@@ -2271,6 +2272,9 @@ export class GameScene extends Phaser.Scene {
       if (st.x < 0 || s.moonstones.includes(st.id)) continue;
       if (st.hidden === 'buried' && !this.dug.has(st.id)) continue;
       if (AFTER_BOSS[st.id] && !hasFlag(s, AFTER_BOSS[st.id])) continue;
+      // A later chapter's stone (new game+ can bury one where chapter one reaches) waits for its
+      // chapter, so the counter never runs past the chapter's total.
+      if (!stoneCounts(s, st.chapter)) continue;
       const c = centre(st);
       if (Math.hypot(c.x - s.x, c.y - s.y) < PICKUP_PX) this.gainStone(st.id);
     }

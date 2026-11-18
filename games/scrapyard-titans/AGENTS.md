@@ -40,7 +40,8 @@ Implemented today:
   streak bonus, levels 1 to 9 (the level is the robots allowed on the board). Gilded robots
   (`GILDED`) count a second origin, cost 2 more and never merge.
 - Star-ups: `addUnit` merges three copies of the same star into the next star (up to 3), keeping
-  their items up to `MAX_ITEMS` and sending the rest to the player's parts.
+  their items up to `MAX_ITEMS` and sending the rest to the player's parts; it returns the robot
+  that holds the new copy (the raised one when the copy was folded in).
 - Items: six parts (`PARTS`) and 21 finished items (`COMBOS`, `comboOf`); `equip` bolts a part on
   and builds the finished item when a robot already carries a lone part. The item bench holds
   `ITEM_BENCH` (10): every part or item a player gets (drops, sales, star-ups, drafts, power cards,

@@ -934,6 +934,8 @@ function offspring(g: Game, parent: Foe, kind: FoeKind, hp: number, lag: number)
     f.from = f.to = g.blocked[cell] ? parent.from : cell;
   }
   f.angle = parent.angle;
+  // A split, an egg or a king moth's moth belongs to its parent's wave, not the one in play.
+  f.wave = parent.wave;
   return f;
 }
 

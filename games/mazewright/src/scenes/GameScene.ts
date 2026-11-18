@@ -254,6 +254,8 @@ export class GameScene extends Phaser.Scene {
   /** Drops the saved game: it is over, or another has started. */
   private forget() {
     this.saved = null;
+    // A new game that comes to the same garden, wave and action count must still be saved.
+    this.kept = '';
     saveGame(null);
   }
 
