@@ -17,6 +17,8 @@ with its own crown height and best, and raises your patron's rank, which strengt
 daily shrine gives every player the same patron and stones, one try a day. Every crown also brings
 pilgrims, whose favor builds a village that gives later temples a head start; later runs can bring
 rain or snow for more favor; and two players can race two temples side by side on one screen.
+A tier's third stone can be a capstone that pays triple for a near-perfect drop, a falling stone can
+be nudged for favor, and each site's blueprint pays extra for tiers built to its widths.
 
 ![Building the gilded tenth tier](cover.png)
 
@@ -31,6 +33,8 @@ rain or snow for more favor; and two players can race two temples side by side o
 | Race | Before the first stone: start a two-player race; the left player taps the left half (or A), the right player the right half (or L) |
 | Tap or click anywhere | Drop the swinging stone |
 | Swap (R) | From tier 2: put the stone in hand in reserve, or swap it with the one held (once per tier) |
+| Capstone (C) | From tier 2: make the third stone of a tier a capstone (tap again for an ordinary stone) |
+| Tap beside a falling stone, or the arrow keys (A, D) | From tier 2: nudge it 10 pixels that way, once a stone, for 2 favor |
 | Tap or click a blessing card | Keep that blessing after a balanced tier |
 | Marble, Sandstone, Basalt | Between tiers, from tier 3: pick the next tier's stone (tap again for plain limestone) |
 | Reroll | Spend 5 favor to swap the three blessings on offer (four under the Many-Handed) for new ones |
@@ -122,6 +126,23 @@ rain or snow for more favor; and two players can race two temples side by side o
     (or A and L). Both get the same stones, with no patron and no breaks between tiers; the first to
     crown the shrine at tier 12 wins, and if a stone misses, the other temple wins (both crowned or
     both missed at once is a draw).
+23. **Capstones**: from tier 2 the third stone of a tier can be made a capstone (the Capstone button
+    beside the tier pips, or C), drawn as a lintel with an arch and a keystone. One that lands within
+    10 pixels of the stone below (or the perfect window, if that is wider) sets: it snaps on whole,
+    and it and the tier's balance bonus pay three times the favor. One that lands further off cracks:
+    it is cut as usual and the tier is wobbly, so no blessing. A gamble at the end of each tier.
+24. **Nudge**: from tier 2 a tap beside a falling stone (or the arrow keys, or A and D) pushes it 10
+    pixels towards that side, once a stone, for 2 favor. A tap while it falls on tier 1 still does nothing.
+25. **Blueprints**: each site has a temple plan, a dashed outline over the temple with a width for
+    every tier from 2 to the crown (the hill a steady ziggurat from 190 down to 90, the cliff a narrow
+    needle, the lake a stepped pagoda). The tier being built is outlined brighter, with its width and
+    the top stone's beside it. A tier whose top stone ends within 12 pixels of the plan earns 4 more
+    favor (times the tier's multipliers), and its outline turns gold, so a narrower tower, cut on
+    purpose, can be the right one.
+
+![A capstone swinging for the third stone of tier 2](docs/screenshots/capstone.webp)
+
+![The hill's blueprint, with the tiers built to it in gold](docs/screenshots/blueprint.webp)
 
 ![The pilgrims' village](docs/screenshots/village.webp)
 
