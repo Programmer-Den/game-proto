@@ -22,7 +22,7 @@ export interface Node {
 
 /** A neutral camp's spot: a 2x2 footprint, what it holds, and the wild guards around it. */
 export interface CampSpot {
-  kind: 'cache' | 'relic';
+  kind: 'cache' | 'relic' | 'village';
   tx: number;
   ty: number;
   /** A cache's pile. */
@@ -51,6 +51,7 @@ export interface MapData {
 
 const B = 'wild-brigand';
 const PO = 'wild-poacher';
+const W = 'wild-wolf';
 /**
  * The camps of the first side, by top-left tile; generateMap adds each one's point mirror (with the
  * mirror's own relic, for the flank pair). The middle relic is its own mirror. Each sits in a patch
@@ -61,6 +62,8 @@ const CAMP_PLAN: (CampSpot & { mirrorRelic?: RelicId })[] = [
   { kind: 'relic', tx: 100, ty: 26, relic: 'plenty', mirrorRelic: 'haste', guards: [B, B, PO, PO] },
   { kind: 'cache', tx: 38, ty: 18, res: 'ore', amount: 250, guards: [B, B, B] },
   { kind: 'cache', tx: 16, ty: 40, res: 'food', amount: 300, guards: [B, B, B] },
+  // A neutral village on the near side of the middle, with wolves about it; its mirror lies on the far side.
+  { kind: 'village', tx: 55, ty: 57, guards: [W, W, W, W] },
 ];
 /** Tiles cleared around a camp's footprint, so its guards and visitors can stand there. */
 const CAMP_CLEAR = 3;

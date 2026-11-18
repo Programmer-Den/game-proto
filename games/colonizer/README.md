@@ -223,6 +223,28 @@ is on a Lumber or Mining Camp (or a Grove) works the nearest wood or ore to it.
 ![Two Barracks and a Stable given one rally flag with a single right click: a thread runs from each building to the pennant](docs/screenshots/rally-many.webp) Units no longer stack on one spot: they push gently apart until each
 has room, so a group spreads out where it stops (villagers at work hold their place).
 
+## Formations and stances
+
+With soldiers selected, the panel shows two more buttons, each turning to the next choice when
+pressed:
+
+- **Formation** (Line, Box or Spread out) is how your groups line up wherever you send them, by right
+  click or attack-move. A **line** stands side by side across the way it marches, with the
+  footmen, riders and champions in front and archers, rams and villagers a row behind. A **box** puts
+  the archers in the middle with the front rank round them. **Spread out** stands two tiles apart.
+- **Stance** (Aggressive, Hold ground or Stand still) is how the selected soldiers fight when left
+  alone. **Aggressive** soldiers go after anything they see, as before. Soldiers **holding ground**
+  fight whatever comes within 5 tiles of the spot they stopped on and walk back there after (the
+  ground they hold is ringed in blue while they are selected); soldiers **standing still** never
+  move and only strike what is in their reach (a blue knot at their feet). Orders you give are
+  always obeyed: the stance only limits the fights a soldier picks for itself.
+
+Towers' and Town Centers' volleys and warships' shots now **splash**: every other unit of the same
+side within 1.3 tiles of the one hit takes half the blow. A line or a box takes that splash; a
+spread does not, which is why the AI marches spread out when it goes for a Town Center.
+
+![Ten Ember soldiers in a box, archers in the middle, holding ground: the blue ring marks the ground they hold, and the panel shows Formation: Box and Stance: Hold ground](docs/screenshots/formations-and-stances.webp)
+
 ## The town bell and the garrison
 
 Select the Town Center and press **Ring the bell** when a raid comes in: every villager within 14
@@ -307,7 +329,7 @@ once it reaches Age II, a Warden a longer one in Age I, and a Raider none.
 
 ## Neutral camps and relics
 
-Seven camps sit in cleared patches on every map, guarded by wild Brigands and Poachers who fight
+Seven camps (and the two villages below) sit in cleared patches on every map, guarded by wild Brigands and Poachers who fight
 anyone who comes near and never stray far from their post:
 
 - Four **caches**, a cart of 250 ore and a cart of 300 food near each side. Kill the guards and stand
@@ -325,6 +347,37 @@ its army to take relics between raids.
 ![Ember militia fight the Brigands and Poachers guarding the Relic of Valor](docs/screenshots/camp-fight.webp)
 
 ![The Relic of Valor taken: the shrine flies the Ember banner and the relics card rings the sword in green](docs/screenshots/relic-held.webp)
+
+## Neutral villages
+
+Two **villages** sit either side of the middle of every map, each with four **wolves** prowling round
+it. A village joins whoever wins it over:
+
+- **Bring it food**: right click the village with villagers selected. The first to arrive hands over
+  100 food from your stores (the wolves may bite on the way), and the village joins you.
+- **Clear the wolves** and stand at it alone, as with a relic.
+
+A village that has joined you flies your banner, pays you 5 food every 10 seconds and sends you a
+**Village Spearman** (75 health, 7 damage) at once and again a minute after the last one falls. A
+rival takes it from you the same two ways. The AI sends a villager with food to a village nobody
+holds from Age II, and its army to one a rival holds between raids.
+
+![A villager hands 100 food to the near village, which flies the Ember banner and sends its spearman against the wolves](docs/screenshots/neutral-village.webp)
+
+## Dry years and floods
+
+From the 14th minute, and every 8 minutes after the last one ends, the weather turns. The toast
+warns 45 seconds ahead, the status card counts it down, and it lasts two minutes:
+
+- A **dry year** halves what farms yield (berry bushes and the Dock are unaffected).
+- A **flood** drowns the open ground along every lake shore, or on the Islands map one ford at a time,
+  so armies need another way across (ships still sail the flooded ford). Units standing there wade
+  out to the nearest dry tile, and nothing can be built on the water.
+
+On Lowlands, Lakes and Highlands the first is a dry year and they take turns; on Islands the first is
+a flood.
+
+![A flood on a Lakes map: the shore round the lake is under water and the status card counts down Flood · 1:56 left](docs/screenshots/flood.webp)
 
 ## The Monument
 

@@ -31,7 +31,7 @@ export type Pose = keyof typeof VILLAGER_POSES;
 
 type Kind =
   | 'villager' | 'sword' | 'club' | 'spear' | 'bow' | 'longbow' | 'sling' | 'lance' | 'horsespear' | 'horseaxe' | 'cart' | 'ram'
-  | 'warlord' | 'seer' | 'druid' | 'torch' | 'harpoon' | 'warden' | 'axe' | 'chieftain' | 'horsebow' | 'wagon' | 'transport' | 'warship';
+  | 'warlord' | 'seer' | 'druid' | 'torch' | 'harpoon' | 'warden' | 'axe' | 'chieftain' | 'horsebow' | 'wagon' | 'transport' | 'warship' | 'wolf';
 
 /** Which figure a unit type is drawn as. */
 function kindOf(type: string, role: Role): Kind {
@@ -44,7 +44,7 @@ function kindOf(type: string, role: Role): Kind {
     militia: 'sword', spearman: 'spear', brute: 'club',
     archer: 'bow', slinger: 'sling', hunter: 'longbow',
     knight: 'lance', rider: 'horsespear', stalker: 'horseaxe',
-    brigand: 'club', poacher: 'bow',
+    brigand: 'club', poacher: 'bow', wolf: 'wolf',
     warlord: 'warlord', seer: 'seer', druid: 'druid',
     torchbearer: 'torch', harpooner: 'harpoon', warden: 'warden',
     clansman: 'axe', bowman: 'bow', outrider: 'horsespear', chieftain: 'chieftain', horsebow: 'horsebow',
@@ -264,8 +264,37 @@ export function drawFigure(c: Ctx, type: string, role: Role, faction: Side, pose
   if (kind === 'ram') return ram(c, w, pose, f, x, y);
   if (kind === 'wagon') return wagon(c, w, pose, f, x, y);
   if (kind === 'transport' || kind === 'warship') return ship(c, w, kind, pose, f, x, y);
+  if (kind === 'wolf') return wolf(c, pose, f, x, y);
   if (kind === 'lance' || kind === 'horsespear' || kind === 'horseaxe' || kind === 'horsebow') return rider(c, w, kind, pose, f, x, y);
   return footman(c, w, kind, pose, f, x, y);
+}
+
+/** A grey wolf in profile, prowling round a neutral village: it trots, and lunges to bite. */
+function wolf(c: Ctx, pose: string, f: number, x: number, y0: number) {
+  const trot = pose === 'walk' ? (f * Math.PI) / 2 : null;
+  const lunge = pose === 'attack' ? [0, 3, 5][f] : 0;
+  const y = y0 + (pose === 'walk' ? BOB[f] : 0);
+  const fur = T.grey;
+  const dark = mix(T.grey, '#000000', 0.35);
+  // Legs first, so the body covers the hips.
+  for (const [lx, ph] of [[-7, 0], [-4, Math.PI], [5, Math.PI / 2], [8, Math.PI * 1.5]] as [number, number][]) {
+    const a = trot === null ? 0 : trot + ph;
+    const dx = trot === null ? (lx > 0 ? lunge * 0.4 : 0) : Math.sin(a) * 2.5;
+    const lift = trot === null ? 0 : Math.max(0, Math.cos(a)) * 2;
+    thread(c, [[x + lx, y - 9], [x + lx + dx * 0.5, y - 5 - lift * 0.5], [x + lx + dx, y - lift]], dark, 1.5);
+  }
+  const hx = x + 10 + lunge;
+  const hy = y - 14 + lunge * 0.4;
+  // The body, a long low back sloping to the haunches.
+  sp(c, [[x - 11, y - 14], [x + 7 + lunge * 0.4, y - 15], [x + 10 + lunge * 0.5, y - 10], [x + 6, y - 7], [x - 9, y - 7], [x - 12, y - 10]], fur, { ang: 0 });
+  // The bushy tail, held low.
+  sp(c, [[x - 11, y - 13], [x - 17, y - 11], [x - 19, y - 6], [x - 15, y - 8], [x - 11, y - 10]], fur, { ang: 0.6, noCouch: true, lw: 0.6 });
+  // The head: a long snout and pricked ears; the jaw drops open in the bite.
+  sp(c, [[hx - 3, hy - 3], [hx + 2, hy - 5], [hx + 9, hy - 2], [hx + 9, hy], [hx + 2, hy + 2], [hx - 3, hy + 2]], fur, { ang: 0.2, lw: 0.7 });
+  sp(c, [[hx - 1, hy - 4], [hx, hy - 9], [hx + 2, hy - 4.5]], dark, { noCouch: true, lw: 0.5 });
+  if (pose === 'attack' && f > 0) thread(c, [[hx + 2, hy + 1.5], [hx + 8, hy + 3.5]], T.ink, 0.9);
+  knot(c, hx + 3, hy - 2, 0.6, T.ink);
+  knot(c, hx + 9, hy - 1, 0.7, T.ink);
 }
 
 /** A spoked cart wheel centred at (x, y), turned by `turn`. */

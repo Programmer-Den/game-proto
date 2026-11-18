@@ -34,6 +34,8 @@ export class SoundCues {
   private raid: { n: number; mine: boolean } | null;
   private repelled: number;
   private camps: { holder: number | null; claimed: boolean }[];
+  /** The weather as last seen: none, warned of, or under way. */
+  private weather = '';
   private music = '';
 
   constructor(
@@ -117,12 +119,17 @@ export class SoundCues {
       if (!before) return;
       if (own && c.holder !== before.holder) {
         if (c.kind === 'cache' && c.holder === PLAYER) sfx('cache');
-        else if (c.kind === 'relic' && c.holder === PLAYER) sfx('relicGain');
-        else if (c.kind === 'relic' && before.holder === PLAYER) sfx('relicLost');
+        else if (c.kind !== 'cache' && c.holder === PLAYER) sfx('relicGain');
+        else if (c.kind !== 'cache' && before.holder === PLAYER) sfx('relicLost');
       }
       before.holder = c.holder;
       before.claimed = c.claimed;
     });
+
+    // A dry year or flood warned of, and the moment it comes: a roll of thunder.
+    const weather = s.weather ? `${s.weather.kind}:${s.weather.on}` : '';
+    if (own && weather && weather !== this.weather) sfx('thunder', { volume: s.weather!.on ? 1 : 0.6 });
+    this.weather = weather;
 
     this.updateMusic(s);
   }

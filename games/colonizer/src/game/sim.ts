@@ -74,6 +74,22 @@ import {
   MAP_SIZE,
   TILE,
   takesRally,
+  DROUGHT_YIELD,
+  FORMATION_GAP,
+  HOLD_RANGE,
+  SPLASH_RANGE,
+  SPLASH_SHARE,
+  SPREAD_GAP,
+  VILLAGE_FOOD,
+  VILLAGE_FOOD_MS,
+  VILLAGE_GIFT,
+  VILLAGE_TRAIN_MS,
+  WEATHER_FIRST,
+  WEATHER_MS,
+  WEATHER_REST,
+  WEATHER_WARN,
+  type Formation,
+  type Stance,
   type BuildingId,
   type Cost,
   type FactionId,
@@ -87,7 +103,8 @@ export type Order =
   | { t: 'idle' }
   | { t: 'move'; x: number; y: number }
   | { t: 'attackMove'; x: number; y: number }
-  | { t: 'attack'; target: number; resume: { x: number; y: number } | null }
+  /** `auto`: picked by the soldier itself while idle, so its stance limits the chase. */
+  | { t: 'attack'; target: number; resume: { x: number; y: number } | null; auto?: boolean }
   | { t: 'gather'; node: number }
   | { t: 'build'; b: number }
   | { t: 'return' }
@@ -98,7 +115,9 @@ export type Order =
   /** A villager or soldier walks to the shore by a transport and goes aboard. */
   | { t: 'board'; ship: number }
   /** A transport sails to a shore and puts its cargo on land there. */
-  | { t: 'unload'; x: number; y: number };
+  | { t: 'unload'; x: number; y: number }
+  /** A villager takes VILLAGE_GIFT food to a neutral village, which joins its side. */
+  | { t: 'gift'; camp: number };
 
 export interface Unit {
   id: number;
@@ -139,6 +158,10 @@ export interface Unit {
   cargo: Unit[];
   /** A wagon's packed camp (the Steppe Horde): its building type and health, as a share of full. */
   packed: { type: BuildingId; hp: number } | null;
+  /** A soldier's stance (`STANCES`): aggressive, hold ground or stand still. */
+  stance: Stance;
+  /** Where a soldier holding ground (or standing still) was left; null until it stops, cleared by a new order. */
+  anchor: { x: number; y: number } | null;
 }
 
 /** Things that happened this tick, for the scene's effects; the scene empties the list each frame. */
@@ -216,10 +239,13 @@ export interface Building {
   crewAt: number;
 }
 
-/** A neutral camp: a cache to take once, or a relic to hold. Its guards are units of NEUTRAL. */
+/**
+ * A neutral camp: a cache to take once, a relic to hold, or a village to win over. Its guards (the
+ * village's wolves) are units of NEUTRAL.
+ */
 export interface Camp {
   id: number;
-  kind: 'cache' | 'relic';
+  kind: 'cache' | 'relic' | 'village';
   tx: number;
   ty: number;
   res: Resource | null;
@@ -230,6 +256,23 @@ export interface Camp {
   /** A cache that was taken: it is gone from the map. */
   claimed: boolean;
   guards: number[];
+  /** A village's timers towards its next food and its next spearman, and that spearman's id while it lives. */
+  foodMs: number;
+  trainMs: number;
+  local: number | null;
+}
+
+/**
+ * A dry year or a flood (CO23): warned of when it is set, under way from `start` to `end`. A flood's
+ * drowned tiles and the terrain they had are kept to give back when the waters fall.
+ */
+export interface Weather {
+  kind: 'drought' | 'flood';
+  start: number;
+  end: number;
+  on: boolean;
+  tiles: number[];
+  was: number[];
 }
 
 export interface Player {
@@ -265,6 +308,8 @@ export interface Player {
   razed: number;
   /** Faction mastery has unlocked this side's second unique unit (`eliteFor`). */
   elite: boolean;
+  /** How this side's groups line up where they are sent (`march`). */
+  formation: Formation;
 }
 
 /**
@@ -372,6 +417,12 @@ export interface GameState {
   naval: boolean;
   /** The player's truces and alliances with each AI, by the AI's index (see `Pact`). */
   pacts: Pact[];
+  /** The dry year or flood warned of or under way, the time the next is warned of, and how many have passed. */
+  weather: Weather | null;
+  weatherNext: number;
+  weatherCount: number;
+  /** 1 on a tile a flood has drowned (it was land or shallows). */
+  flooded: Uint8Array;
 }
 
 export type Command =
@@ -383,6 +434,7 @@ export type Command =
   | { t: 'trade' }
   | { t: 'board'; ship: number }
   | { t: 'unload'; x: number; y: number }
+  | { t: 'gift'; camp: number }
   | { t: 'stop' };
 
 export const PLAYER = 0;
@@ -421,6 +473,7 @@ export function createGame(sides: SideSetup[], map: MapData, toLast = false, mis
     lost: 0,
     razed: 0,
     elite: side.elite ?? false,
+    formation: 'line',
   });
   // The camp guards' side. Its faction is only a placeholder: wild units have their own colours.
   const wild = { ...player(NEUTRAL, sides[0]), res: { wood: 0, food: 0, ore: 0 }, temperament: null };
@@ -455,12 +508,16 @@ export function createGame(sides: SideSetup[], map: MapData, toLast = false, mis
     mission: mission ? { ...mission, cart: null, trips: 0, heldSince: null } : null,
     naval: map.naval ?? false,
     pacts: players.map(() => ({ truceUntil: 0, allyUntil: 0, mood: 0, askAt: 0 })),
+    weather: null,
+    weatherNext: WEATHER_FIRST,
+    weatherCount: 0,
+    flooded: new Uint8Array(MAP_SIZE * MAP_SIZE),
   };
   for (const n of map.nodes) s.nodes.set(n.id, n);
   // Node ids come from the map, so units and buildings count on from the largest of them.
   s.nextId = Math.max(s.nextId, ...[...s.nodes.keys()]) + 1;
   for (const spot of map.camps) {
-    s.camps.push({ id: s.nextId++, kind: spot.kind, tx: spot.tx, ty: spot.ty, res: spot.res ?? null, amount: spot.amount ?? 0, relic: spot.relic ?? null, holder: null, claimed: false, guards: [] });
+    s.camps.push({ id: s.nextId++, kind: spot.kind, tx: spot.tx, ty: spot.ty, res: spot.res ?? null, amount: spot.amount ?? 0, relic: spot.relic ?? null, holder: null, claimed: false, guards: [], foodMs: 0, trainMs: 0, local: null });
   }
   map.starts.forEach((start, k) => {
     addBuilding(s, SIDES[k], 'town', start.tx, start.ty, true);
@@ -834,6 +891,8 @@ function spawnAt(s: GameState, owner: number, type: string, x: number, y: number
     pulse: 0,
     cargo: [],
     packed: null,
+    stance: 'aggressive',
+    anchor: null,
   };
   s.units.set(u.id, u);
   return u;
@@ -1034,6 +1093,8 @@ export function issue(s: GameState, owner: number, ids: number[], cmd: Command) 
     const role = unitDef(u).role;
     u.path = [];
     u.repath = 0;
+    // A new order frees a soldier from the spot it was holding; it holds where it stops next.
+    u.anchor = null;
     switch (cmd.t) {
       case 'move':
         u.order = { t: 'move', x: cmd.x, y: cmd.y };
@@ -1071,11 +1132,103 @@ export function issue(s: GameState, owner: number, ids: number[], cmd: Command) 
       case 'build':
         if (role === 'villager') u.order = { t: 'build', b: cmd.b };
         break;
+      case 'gift':
+        if (role === 'villager' && s.camps.some((c) => c.id === cmd.camp && c.kind === 'village')) u.order = { t: 'gift', camp: cmd.camp };
+        break;
       case 'stop':
         u.order = { t: 'idle' };
         break;
     }
   }
+}
+
+/** Whether a unit stands in a formation's front (melee, riders, champions) or behind and inside it. */
+const frontRank = (u: Unit) => {
+  const role = UNITS[u.type].role;
+  return role === 'melee' || role === 'cavalry' || role === 'champion';
+};
+
+/**
+ * Where each of a group's units stands in a formation round (x, y), in the order of `units`. A line
+ * stands across the way the group marches (from its middle to the point), its front rank first and
+ * the archers and the rest a row behind; a box puts the archers in its middle and the front rank
+ * round them; a spread stands SPREAD_GAP apart.
+ */
+export function formationSpots(units: Unit[], x: number, y: number, formation: Formation): { x: number; y: number }[] {
+  const n = units.length;
+  if (n === 0) return [];
+  const cx = units.reduce((a, u) => a + u.x, 0) / n;
+  const cy = units.reduce((a, u) => a + u.y, 0) / n;
+  const d = Math.hypot(x - cx, y - cy);
+  // Forward is the way the group marches; across is at right angles to it.
+  const fx = d < 0.01 ? 1 : (x - cx) / d;
+  const fy = d < 0.01 ? 0 : (y - cy) / d;
+  const ax = -fy;
+  const ay = fx;
+  const clamp = (v: number) => Math.min(MAP_SIZE - 0.5, Math.max(0.5, v));
+  const out: { x: number; y: number }[] = new Array(n);
+  const front = units.map((u, i) => ({ u, i })).filter((e) => frontRank(e.u));
+  const back = units.map((u, i) => ({ u, i })).filter((e) => !frontRank(e.u));
+  if (formation === 'line') {
+    // Rows of up to 12, each sorted across so nobody walks through a neighbour.
+    const across = (e: { u: Unit }) => e.u.x * ax + e.u.y * ay;
+    const rows: { u: Unit; i: number }[][] = [];
+    for (const group of [front, back]) {
+      const sorted = [...group].sort((a, b) => across(a) - across(b));
+      for (let k = 0; k < sorted.length; k += 12) rows.push(sorted.slice(k, k + 12));
+    }
+    rows.forEach((row, r) =>
+      row.forEach((e, j) => {
+        const side = (j - (row.length - 1) / 2) * FORMATION_GAP;
+        const along = -r * FORMATION_GAP;
+        out[e.i] = { x: clamp(x + side * ax + along * fx), y: clamp(y + side * ay + along * fy) };
+      }),
+    );
+    return out;
+  }
+  // A box or a spread: a grid as near square as the group allows, its spots nearest the middle first.
+  const gapK = formation === 'spread' ? SPREAD_GAP : FORMATION_GAP;
+  const k = Math.ceil(Math.sqrt(n));
+  const rows = Math.ceil(n / k);
+  const spots: { x: number; y: number; d: number }[] = [];
+  for (let j = 0; j < rows; j++)
+    for (let i = 0; i < k; i++) {
+      const ox = (i - (k - 1) / 2) * gapK;
+      const oy = (j - (rows - 1) / 2) * gapK;
+      spots.push({ x: ox, y: oy, d: Math.hypot(ox, oy) });
+    }
+  spots.sort((a, b) => a.d - b.d);
+  // In a box the archers take the inner spots and the front rank the outer ones.
+  const order = formation === 'box' ? [...back, ...front] : units.map((u, i) => ({ u, i }));
+  order.forEach((e, m) => {
+    const p = spots[m];
+    out[e.i] = { x: clamp(x + p.x * ax + p.y * fx), y: clamp(y + p.x * ay + p.y * fy) };
+  });
+  return out;
+}
+
+/**
+ * Sends a group to a point in a formation (the owner's own, or `formation`): each unit walks, or
+ * attack-moves, to its own spot in it.
+ */
+export function march(s: GameState, owner: number, ids: number[], how: 'move' | 'attackMove', x: number, y: number, formation = s.players[owner].formation) {
+  const units = ids.map((id) => s.units.get(id)).filter((u): u is Unit => !!u && u.owner === owner && !isShip(u));
+  const spots = formationSpots(units, x, y, formation);
+  units.forEach((u, i) => issue(s, owner, [u.id], { t: how, x: spots[i].x, y: spots[i].y }));
+}
+
+/** Sets the stance of a player's soldiers; returns how many took it. */
+export function setStance(s: GameState, owner: number, ids: number[], stance: Stance): number {
+  let n = 0;
+  for (const id of ids) {
+    const u = s.units.get(id);
+    if (!u || u.owner !== owner || !isSoldier(UNITS[u.type].role)) continue;
+    u.stance = stance;
+    // Holding ground starts from where the soldier stands, if it has stopped.
+    u.anchor = u.order.t === 'idle' && stance !== 'aggressive' ? { x: u.x, y: u.y } : null;
+    n++;
+  }
+  return n;
 }
 
 /**
@@ -1134,7 +1287,8 @@ export function canPlace(s: GameState, type: BuildingId, tx: number, ty: number,
 /** Whether water touches a footprint's edge (the Dock's shore). */
 export function nearWater(s: GameState, tx: number, ty: number, w: number, h: number) {
   for (let y = ty - 1; y <= ty + h; y++)
-    for (let x = tx - 1; x <= tx + w; x++) if (inMap(x, y) && s.terrain[idx(x, y)] === WATER) return true;
+    // A flood's water is gone again in two minutes, so it doesn't count.
+    for (let x = tx - 1; x <= tx + w; x++) if (inMap(x, y) && s.terrain[idx(x, y)] === WATER && !s.flooded[idx(x, y)]) return true;
   return false;
 }
 
@@ -1527,7 +1681,8 @@ export function tick(s: GameState, dt: number) {
   separate(s, dt);
   updateMarkets(s, dt);
   reap(s);
-  updateCamps(s);
+  updateCamps(s, dt);
+  updateWeather(s);
   updateDeeds(s);
   updateRaid(s);
   updateAssault(s);
@@ -1547,8 +1702,10 @@ function updateBuilding(s: GameState, b: Building, dt: number) {
       const target = nearestEnemy(s, b.owner, b.tx + 0.5 * def.w, b.ty + 0.5 * def.h, def.tower.range);
       if (target) {
         // Each villager sheltering inside looses an arrow with the volley.
-        const dmg = takenBy(s, target, def.tower.dmg + b.garrison.length * GARRISON_ARROW);
+        const raw = def.tower.dmg + b.garrison.length * GARRISON_ARROW;
+        const dmg = takenBy(s, target, raw);
         target.hp -= dmg;
+        splash(s, target, raw);
         b.cool = def.tower.cooldown;
         const at = centre(footprint(target));
         emit(s, { t: 'hit', x: at.x, y: at.y, fromX: b.tx + def.w / 2, fromY: b.ty + 0.5, dmg, ranged: true, owner: b.owner, victim: target.owner, target: target.id, tower: true });
@@ -1894,8 +2051,14 @@ function militaryUpdate(s: GameState, u: Unit, def: UnitDef, dt: number) {
   // A soldier on land only goes for a ship close enough to the shore to hit.
   const reach = def.range;
   if (o.t === 'idle') {
-    const t = nearestEnemy(s, u.owner, u.x, u.y, def.sight, pick, reach);
-    if (t) u.order = { t: 'attack', target: t.id, resume: null };
+    // Stances: an aggressive soldier takes on what it sees; one holding ground what comes within
+    // HOLD_RANGE of its spot, walking back there after; one standing still only what is in its reach.
+    if (u.stance !== 'aggressive' && !u.anchor) u.anchor = { x: u.x, y: u.y };
+    const from = u.stance === 'hold' && u.anchor ? u.anchor : u;
+    const range = u.stance === 'stand' ? def.range + 0.5 : u.stance === 'hold' ? HOLD_RANGE : def.sight;
+    const t = nearestEnemy(s, u.owner, from.x, from.y, range, pick, reach);
+    if (t) u.order = { t: 'attack', target: t.id, resume: null, auto: true };
+    else if (u.stance === 'hold' && u.anchor && Math.hypot(u.x - u.anchor.x, u.y - u.anchor.y) > 1.2) u.order = { t: 'move', x: u.anchor.x, y: u.anchor.y };
     return;
   }
   if (o.t === 'move') {
@@ -1924,7 +2087,14 @@ function militaryUpdate(s: GameState, u: Unit, def: UnitDef, dt: number) {
     }
     const f = footprintOf(s, o.target);
     if (!f) return;
-    if (gap(u.x, u.y, f) <= def.range + 0.5) {
+    const inReach = gap(u.x, u.y, f) <= def.range + 0.5;
+    // A fight the soldier picked itself goes no further than its stance allows: one standing still
+    // lets a foe out of reach go, one holding ground lets it go once it is past HOLD_RANGE of its spot.
+    if (o.auto && !inReach && u.stance !== 'aggressive') {
+      const a = u.anchor ?? { x: u.x, y: u.y };
+      if (u.stance === 'stand' || gap(a.x, a.y, f) > HOLD_RANGE + 1) return void (u.order = { t: 'idle' });
+    }
+    if (inReach) {
       u.path = [];
       u.act = 'fight';
       faceTo(u, centre(f).x);
@@ -2014,6 +2184,25 @@ function villagerUpdate(s: GameState, u: Unit, def: UnitDef, dt: number) {
     if (!pursue(s, u, speedOf(s, u, def), dt, goalNear(s, o.x, o.y))) u.order = { t: 'idle' };
     return;
   }
+  if (o.t === 'gift') {
+    const c = s.camps.find((k) => k.id === o.camp);
+    if (!c || c.kind !== 'village') return void backToWork(s, u);
+    const cx = c.tx + 1;
+    const cy = c.ty + 1;
+    if (Math.hypot(u.x - cx, u.y - cy) <= CLAIM_RANGE) {
+      u.path = [];
+      const p = s.players[u.owner];
+      if (c.holder !== u.owner) {
+        if (p.res.food >= VILLAGE_GIFT) {
+          p.res.food -= VILLAGE_GIFT;
+          joinVillage(s, c, u.owner);
+        } else if (u.owner === PLAYER) say(s, t('villageNeedsFood', { n: VILLAGE_GIFT }));
+      }
+      return void backToWork(s, u);
+    }
+    if (!pursue(s, u, speedOf(s, u, def), dt, (tx, ty) => !s.solid[idx(tx, ty)] && Math.hypot(tx + 0.5 - cx, ty + 0.5 - cy) <= CLAIM_RANGE)) backToWork(s, u);
+    return;
+  }
   if (o.t === 'garrison') {
     const b = s.buildings.get(o.b);
     const def2 = b ? BUILDINGS[b.type] : null;
@@ -2089,8 +2278,10 @@ function villagerUpdate(s: GameState, u: Unit, def: UnitDef, dt: number) {
       faceTo(u, centre(f).x);
       // Harvest Rites, the Age II boon, speeds up work on farms.
       const rites = !node && s.players[u.owner].boon === 'harvest' ? HARVEST_RITES : 1;
+      // A dry year halves what farms yield.
+      const dry = !node && s.weather?.on && s.weather.kind === 'drought' ? DROUGHT_YIELD : 1;
       const relic = holds(s, u.owner, 'plenty') ? RELIC_GATHER : 1;
-      u.gatherMs += dt * gatherBonus(s, u.owner, res) * s.players[u.owner].gatherMul * rites * relic;
+      u.gatherMs += dt * gatherBonus(s, u.owner, res) * s.players[u.owner].gatherMul * rites * relic * dry;
       if (u.gatherMs >= GATHER_MS[res]) {
         u.gatherMs -= GATHER_MS[res];
         u.amount++;
@@ -2284,6 +2475,8 @@ function strike(s: GameState, u: Unit, def: UnitDef, target: Unit | Building) {
   let dmg = def.dmg + ownBonus(s, u, def);
   if (def.vsCavalry && 'order' in target && UNITS[target.type].role === 'cavalry') dmg *= def.vsCavalry;
   if (def.vsBuildings && !('order' in target)) dmg *= def.vsBuildings;
+  // A warship's shot splashes over the units round the one it hits.
+  if (def.role === 'warship') splash(s, target, dmg);
   dmg = takenBy(s, target, dmg);
   const alive = target.hp > 0;
   target.hp -= dmg;
@@ -2299,6 +2492,19 @@ function strike(s: GameState, u: Unit, def: UnitDef, target: Unit | Building) {
   }
   const at = centre(footprint(target));
   emit(s, { t: 'hit', x: at.x, y: at.y, fromX: u.x, fromY: u.y, dmg, ranged: def.range > 1, owner: u.owner, victim: target.owner, target: target.id });
+}
+
+/**
+ * A volley's splash: every other unit of the struck one's side (on land, or at sea for a ship) within
+ * SPLASH_RANGE of it takes SPLASH_SHARE of the blow. A spread formation stands out of its reach.
+ */
+function splash(s: GameState, target: Unit | Building, raw: number) {
+  if (!('order' in target)) return;
+  const ship = isShip(target);
+  for (const o of s.units.values()) {
+    if (o === target || o.hp <= 0 || o.owner !== target.owner || isShip(o) !== ship) continue;
+    if (Math.hypot(o.x - target.x, o.y - target.y) <= SPLASH_RANGE) o.hp -= takenBy(s, o, raw * SPLASH_SHARE);
+  }
 }
 
 /** The damage a target really takes: Shieldwall, the Age II boon, shields melee infantry. */
@@ -2371,7 +2577,7 @@ function checkWinner(s: GameState) {
     }
     // A raid it was leading ends here, with no credit to its target for raiders it never fought.
     if (s.raid?.by === p.id) s.raid = null;
-    for (const c of s.camps) if (c.relic && c.holder === p.id) c.holder = null;
+    for (const c of s.camps) if ((c.relic || c.kind === 'village') && c.holder === p.id) c.holder = null;
     say(s, p.id === PLAYER ? t('townFallen') : t('sideFallen', { faction: t(FACTIONS[p.faction].name) }));
   }
   if (fallen.length > 0) reap(s);
@@ -2470,8 +2676,12 @@ function separate(s: GameState, dt: number) {
  * Neutral camps: once a camp's guards are all dead, a side that has units at it, with none of the
  * other side's, takes the cache (once) or holds the relic (until the other side takes it the same way).
  */
-function updateCamps(s: GameState) {
+function updateCamps(s: GameState, dt: number) {
   for (const c of s.camps) {
+    if (c.kind === 'village') {
+      updateVillage(s, c, dt);
+      continue;
+    }
     if (c.claimed || c.guards.some((id) => s.units.has(id))) continue;
     const cx = c.tx + 1;
     const cy = c.ty + 1;
@@ -2495,6 +2705,186 @@ function updateCamps(s: GameState) {
     if (who === PLAYER) say(s, t('relicHeld', { relic, effect: t(RELICS[c.relic].text) }));
     else if (had === PLAYER) say(s, t('relicTaken', { relic }));
   }
+}
+
+/**
+ * A neutral village: with its wolves dead, a side alone at it wins it over (as with a relic); a
+ * joined village pays its side food and sends it a spearman whenever the last one has fallen.
+ */
+function updateVillage(s: GameState, c: Camp, dt: number) {
+  if (!c.guards.some((id) => s.units.has(id))) {
+    const present = new Set<number>();
+    for (const u of s.units.values()) if (u.owner !== NEUTRAL && u.hp > 0 && !isShip(u) && Math.hypot(u.x - c.tx - 1, u.y - c.ty - 1) <= CLAIM_RANGE) present.add(u.owner);
+    if (present.size === 1) {
+      const who = [...present][0];
+      if (c.holder !== who) joinVillage(s, c, who);
+    }
+  }
+  if (c.holder === null || s.players[c.holder].out) return;
+  const holder = c.holder;
+  c.foodMs += dt;
+  if (c.foodMs >= VILLAGE_FOOD_MS) {
+    c.foodMs -= VILLAGE_FOOD_MS;
+    s.players[holder].res.food += VILLAGE_FOOD;
+    emit(s, { t: 'drop', x: c.tx + 1, y: c.ty + 0.5, res: 'food', n: VILLAGE_FOOD, owner: holder });
+  }
+  const local = c.local !== null ? s.units.get(c.local) : undefined;
+  if (local && local.owner === holder) return;
+  c.trainMs += dt;
+  if (c.trainMs < VILLAGE_TRAIN_MS) return;
+  const spots = campSpots(s, c);
+  const at = spots.find((p) => ![...s.units.values()].some((u) => Math.hypot(u.x - p.x, u.y - p.y) < 0.5)) ?? spots[0];
+  if (!at) return;
+  c.trainMs = 0;
+  // The first spearman comes with the joining, whose notice says so; a later one is news.
+  const later = c.local !== null;
+  c.local = spawnAt(s, holder, 'village-spearman', at.x, at.y).id;
+  if (later && holder === PLAYER) say(s, t('villageSends'));
+}
+
+/** A village joins a side: it pays from now on, and sends its first spearman at once. */
+function joinVillage(s: GameState, c: Camp, who: number) {
+  const had = c.holder;
+  c.holder = who;
+  c.foodMs = 0;
+  c.trainMs = VILLAGE_TRAIN_MS;
+  c.local = null;
+  if (who === PLAYER) say(s, t('villageJoined', { n: VILLAGE_FOOD, s: VILLAGE_FOOD_MS / 1000 }));
+  else if (had === PLAYER) say(s, t('villageLost'));
+}
+
+// ---------------------------------------------------------------- weather
+
+/**
+ * Dry years and floods: the next is warned of WEATHER_WARN before it comes, lasts WEATHER_MS, and the
+ * one after is warned of WEATHER_REST after it ends. On a map of islands they take turns starting with
+ * a flood (one ford at a time); elsewhere with a drought, and a flood drowns the lake shores.
+ */
+function updateWeather(s: GameState) {
+  const w = s.weather;
+  if (!w) {
+    if (s.time < s.weatherNext) return;
+    const n = s.weatherCount;
+    let kind: Weather['kind'] = (n % 2 === 0) === s.naval ? 'flood' : 'drought';
+    const tiles = kind === 'flood' ? floodTiles(s) : [];
+    if (tiles.length === 0) kind = 'drought';
+    s.weather = { kind, start: s.time + WEATHER_WARN, end: s.time + WEATHER_WARN + WEATHER_MS, on: false, tiles, was: [] };
+    say(s, t(kind === 'flood' ? (s.naval ? 'floodWarnFord' : 'floodWarn') : 'droughtWarn', { s: WEATHER_WARN / 1000 }));
+    return;
+  }
+  if (!w.on && s.time >= w.start) {
+    w.on = true;
+    if (w.kind === 'flood') {
+      // Taken again now, so nothing built during the warning stands in the water.
+      w.tiles = floodTiles(s);
+      w.was = w.tiles.map((i) => s.terrain[i]);
+      for (const i of w.tiles) {
+        s.terrain[i] = WATER;
+        s.flooded[i] = 1;
+      }
+      rebuildSolid(s);
+      // Whoever stood in the water wades out to the nearest dry tile, and everyone finds a new way.
+      for (const u of s.units.values()) {
+        if (isShip(u)) continue;
+        u.path = [];
+        u.repath = 0;
+        if (s.flooded[idx(Math.floor(u.x), Math.floor(u.y))]) {
+          const dry = dryNear(s, u.x, u.y, u.owner);
+          if (dry) Object.assign(u, dry);
+        }
+      }
+    }
+    say(s, t(w.kind === 'flood' ? 'floodNow' : 'droughtNow', { s: WEATHER_MS / 1000 }));
+    return;
+  }
+  if (w.on && s.time >= w.end) {
+    if (w.kind === 'flood') {
+      w.tiles.forEach((i, k) => {
+        s.terrain[i] = w.was[k];
+        s.flooded[i] = 0;
+      });
+      rebuildSolid(s);
+      // A ship left on dry land is floated back to the nearest water.
+      for (const u of s.units.values()) {
+        if (!isShip(u)) continue;
+        u.path = [];
+        if (!seaAt(s, Math.floor(u.x), Math.floor(u.y))) {
+          const sea = seaNear(s, u.x, u.y);
+          if (sea) Object.assign(u, sea);
+        }
+      }
+    }
+    say(s, t(w.kind === 'flood' ? 'floodOver' : 'droughtOver'));
+    s.weather = null;
+    s.weatherNext = s.time + WEATHER_REST;
+    s.weatherCount++;
+  }
+}
+
+/**
+ * The tiles a flood drowns: on a map of islands one ford's shallows (the fords taking turns), elsewhere
+ * every open land tile on a lake shore. Never a tile with something on it.
+ */
+function floodTiles(s: GameState): number[] {
+  const free = (i: number) => !s.solid[i] && s.gates[i] < 0;
+  if (s.naval) {
+    const seen = new Uint8Array(MAP_SIZE * MAP_SIZE);
+    const fords: number[][] = [];
+    for (let i = 0; i < s.terrain.length; i++) {
+      if (seen[i] || s.terrain[i] !== SHALLOW) continue;
+      const ford = [i];
+      seen[i] = 1;
+      for (let k = 0; k < ford.length; k++) {
+        const x = ford[k] % MAP_SIZE;
+        const y = Math.floor(ford[k] / MAP_SIZE);
+        for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) {
+          if (!inMap(nx, ny) || seen[idx(nx, ny)] || s.terrain[idx(nx, ny)] !== SHALLOW) continue;
+          seen[idx(nx, ny)] = 1;
+          ford.push(idx(nx, ny));
+        }
+      }
+      fords.push(ford);
+    }
+    if (fords.length === 0) return [];
+    return fords[Math.floor(s.weatherCount / 2) % fords.length].filter(free);
+  }
+  const out: number[] = [];
+  for (let y = 0; y < MAP_SIZE; y++)
+    for (let x = 0; x < MAP_SIZE; x++) {
+      const i = idx(x, y);
+      if (s.terrain[i] === WATER || s.terrain[i] === ROCK || s.terrain[i] === SHALLOW || !free(i)) continue;
+      if ([[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]].some(([nx, ny]) => inMap(nx, ny) && s.terrain[idx(nx, ny)] === WATER)) out.push(i);
+    }
+  return out;
+}
+
+/** The middle of the nearest tile a land unit of `owner` can stand on, up to 8 tiles away. */
+function dryNear(s: GameState, x: number, y: number, owner: number): { x: number; y: number } | null {
+  const cx = Math.floor(x);
+  const cy = Math.floor(y);
+  for (let r = 1; r <= 8; r++)
+    for (let dy = -r; dy <= r; dy++)
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r || blocked(s, cx + dx, cy + dy, owner)) continue;
+        return { x: cx + dx + 0.5, y: cy + dy + 0.5 };
+      }
+  return null;
+}
+
+/** The terrain as it lies without a flood's water, for painting the ground. */
+export function dryTerrain(s: GameState): Uint8Array {
+  const w = s.weather;
+  if (!w?.on || w.kind !== 'flood') return s.terrain;
+  const out = s.terrain.slice();
+  w.tiles.forEach((i, k) => (out[i] = w.was[k]));
+  return out;
+}
+
+/** Time left, in ms, of the weather under way or until the one warned of comes, or null with none. */
+export function weatherLeft(s: GameState): number | null {
+  const w = s.weather;
+  if (!w) return null;
+  return Math.max(0, (w.on ? w.end : w.start) - s.time);
 }
 
 /** The free tiles next to a camp, where units stand to claim it. */

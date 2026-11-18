@@ -18,6 +18,7 @@ import {
   TEMPERAMENTS,
   UNIQUE,
   UNITS,
+  VILLAGE_GIFT,
   WONDER_CREW,
   type BuildingId,
   type Resource,
@@ -47,6 +48,7 @@ import {
   hasBuildingFor,
   holds,
   issue,
+  march,
   monumentLeft,
   NEUTRAL,
   notAllowed,
@@ -305,20 +307,34 @@ function plan(s: GameState) {
       const party = goal.kind === 'town' ? army : [...army].sort((a, b) => Math.hypot(a.x - goal.x, a.y - goal.y) - Math.hypot(b.x - goal.x, b.y - goal.y)).slice(0, T.party);
       const ids = party.map((u) => u.id);
       Object.assign(raid, { goal, foe: FOE, party: ids, started: s.time, count: raid.count + 1 });
-      issue(s, ME, ids, { t: 'attackMove', x: goal.x, y: goal.y });
+      // A raid on a Town Center marches spread out, out of the splash of its volleys; the rest in a line.
+      march(s, ME, ids, 'attackMove', goal.x, goal.y, goal.kind === 'town' ? 'spread' : 'line');
       // The player is told about each new raid.
       startRaid(s, ME, FOE, ids);
       log(t('logRaid', { faction: t(FACTIONS[s.players[FOE].faction].name), goal: goalName(s, goal), n: ids.length }));
     }
   } else if (army.length >= ARMY_FOR_RELIC && ready.length >= army.length / 2) {
-    // 6b. Between raids, a fair-sized army goes to take the nearest relic the AI doesn't hold.
-    const relic = s.camps
-      .filter((c) => c.kind === 'relic' && !holds(s, ME, c.relic!))
-      .sort((a, b) => Math.hypot(a.tx - town.tx, a.ty - town.ty) - Math.hypot(b.tx - town.tx, b.ty - town.ty))[0];
+    // 6b. Between raids, a fair-sized army goes to take the nearest relic the AI doesn't hold, or
+    // else the nearest village that hasn't joined it.
+    const near = (a: { tx: number; ty: number }, b: { tx: number; ty: number }) => Math.hypot(a.tx - town.tx, a.ty - town.ty) - Math.hypot(b.tx - town.tx, b.ty - town.ty);
+    const relic =
+      s.camps.filter((c) => c.kind === 'relic' && !holds(s, ME, c.relic!)).sort(near)[0] ??
+      s.camps.filter((c) => c.kind === 'village' && c.holder !== ME).sort(near)[0];
     const spot = relic ? campSpots(s, relic)[0] : undefined;
     if (spot && act(() => (issue(s, ME, army.map((u) => u.id), { t: 'attackMove', x: spot.x, y: spot.y }), true))) {
-      log(t('logRelic', { n: army.length, relic: t(RELICS[relic.relic!].name) }));
+      log(relic.relic ? t('logRelic', { n: army.length, relic: t(RELICS[relic.relic].name) }) : t('logVillage', { n: army.length }));
     }
+  }
+
+  // 6e. From Age II, with food to spare, a villager takes a gift to the nearest village that has
+  // joined nobody yet, one at a time (one that has joined a rival is taken by the army, above).
+  const gifting = villagers.some((u) => u.order.t === 'gift');
+  if (p.age >= 2 && !gifting && p.res.food >= VILLAGE_GIFT + 200) {
+    const village = s.camps
+      .filter((c) => c.kind === 'village' && c.holder === null)
+      .sort((a, b) => Math.hypot(a.tx - town.tx, a.ty - town.ty) - Math.hypot(b.tx - town.tx, b.ty - town.ty))[0];
+    const bearer = village && nearestUnit(villagers, village.tx, village.ty);
+    if (village && bearer && act(() => (issue(s, ME, [bearer.id], { t: 'gift', camp: village.id }), true))) log(t('logGift'));
   }
 
   // 6c. On a map of islands, a Harbour on the nearest shore, then warships that shell the foe's shore.

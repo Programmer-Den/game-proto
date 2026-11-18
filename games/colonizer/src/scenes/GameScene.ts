@@ -41,8 +41,13 @@ import {
   type MapKind,
   type Cost,
   takesRally,
+  FORMATIONS,
+  HOLD_RANGE,
+  STANCES,
+  VILLAGE_GIFT,
+  type Stance,
 } from '../game/data';
-import { generateMap, idx } from '../game/map';
+import { generateMap, idx, SHALLOW, WATER } from '../game/map';
 import {
   AI,
   AI2,
@@ -97,6 +102,9 @@ import {
   unitCount,
   visible,
   wallLine,
+  dryTerrain,
+  march,
+  setStance,
   type Building,
   type Camp,
   type GameState,
@@ -110,7 +118,7 @@ import { t, type TextKey } from '../i18n';
 import { FEET, FRAME, WOOL } from '../art/figures';
 import { BUILDING_TOP, CAMP_TOP, CHUNK, paintChunk, TREE_TOP } from '../art/scenery';
 import { hexNum, SERIF, T } from '../art/stitch';
-import { buildingKey, figKey, relicKey, TREE_VARIANTS } from './BootScene';
+import { buildingKey, figKey, relicKey, TREE_VARIANTS, villageKey } from './BootScene';
 import { Effects } from './fx';
 import { DeedCard, Minimap, MissionCard, StatusCard, stitchEllipse, stitchLine, stitchStars, Toast, TopBar } from './hud';
 import { scenarioById, SCENARIOS, starsFor, withSeed, type Scenario } from '../game/campaign';
@@ -231,6 +239,8 @@ export class GameScene extends Phaser.Scene {
   private chunks = new Set<number>();
   private terrain!: Uint8Array;
   private rings!: Phaser.GameObjects.Graphics;
+  private floodG!: Phaser.GameObjects.Graphics;
+  private floodKey = '';
   private fogTex!: Phaser.Textures.CanvasTexture;
   private fogMask!: HTMLCanvasElement;
   private fogData!: ImageData;
@@ -372,6 +382,9 @@ export class GameScene extends Phaser.Scene {
     this.add.image(0, 0, 'fog').setOrigin(0, 0).setScale((MAP_SIZE * TILE) / FOG_RES).setDepth(5000);
     this.needle = this.add.image(0, 0, 'needle').setOrigin(40 / 56, 9 / 56).setDepth(5001).setVisible(false);
     this.rings = this.add.graphics().setDepth(4950);
+    // A flood's water lies over the painted ground, under everything standing on it.
+    this.floodG = this.add.graphics().setDepth(-5);
+    this.floodKey = '';
     this.dragBox = this.add.graphics().setDepth(4960);
     // Placement ghosts sit above the fog, so a site in explored land still shows clearly.
     this.wallGhost = this.add.graphics().setDepth(5002);
@@ -410,6 +423,7 @@ export class GameScene extends Phaser.Scene {
     this.cues.update(this.state, { x0: v.x / TILE, y0: v.y / TILE, x1: v.right / TILE, y1: v.bottom / TILE });
     this.fx.update(dt);
     this.renderFog(dt);
+    this.renderFlood();
     this.renderRings();
     this.top.update(this.state);
     this.deeds.update(this.state);
@@ -449,7 +463,8 @@ export class GameScene extends Phaser.Scene {
         if (this.chunks.has(key) || budget-- <= 0) continue;
         this.chunks.add(key);
         const tex = `ground-${cx}-${cy}`;
-        this.textures.addCanvas(tex, paintChunk(this.terrain, cx, cy));
+        // A flood's water is drawn over the ground while it lasts, never painted into it.
+        this.textures.addCanvas(tex, paintChunk(dryTerrain(this.state), cx, cy));
         this.add.image(cx * span, cy * span, tex).setOrigin(0, 0).setDepth(-10);
       }
   }
@@ -562,6 +577,7 @@ export class GameScene extends Phaser.Scene {
   private campKey(c: Camp) {
     if (c.kind === 'cache') return `camp-cache-${c.res}`;
     const holder = c.holder === null ? null : this.state.players[c.holder].faction;
+    if (c.kind === 'village') return villageKey(holder);
     return relicKey(c.relic!, holder);
   }
 
@@ -648,6 +664,8 @@ export class GameScene extends Phaser.Scene {
     for (const id of this.selected) {
       const u = s.units.get(id);
       if (u) stitchEllipse(g, u.x * TILE, u.y * TILE + 1, 11, 4.5, 1.5, ochre);
+      // A soldier standing still shows a knot at its feet.
+      if (u && u.stance === 'stand') g.fillStyle(hexNum(T.indigo), 0.9).fillCircle(u.x * TILE, u.y * TILE + 5, 2.2);
       const b = s.buildings.get(id);
       if (b) {
         const def = BUILDINGS[b.type];
@@ -659,6 +677,22 @@ export class GameScene extends Phaser.Scene {
         stitchLine(g, x0, y0 + def.h * TILE * 0.5, x0, y1, 1.5, ochre);
         stitchLine(g, x1, y0 + def.h * TILE * 0.5, x1, y1, 1.5, ochre);
       }
+    }
+    // The ground the selected soldiers hold: one ring round each group's spots.
+    const held: { x: number; y: number; pts: { x: number; y: number }[] }[] = [];
+    for (const id of this.selected) {
+      const a = s.units.get(id)?.stance === 'hold' ? s.units.get(id)!.anchor : null;
+      if (!a) continue;
+      const near = held.find((h) => Math.hypot(h.x - a.x, h.y - a.y) <= HOLD_RANGE);
+      if (near) {
+        near.pts.push(a);
+        near.x = near.pts.reduce((t, p) => t + p.x, 0) / near.pts.length;
+        near.y = near.pts.reduce((t, p) => t + p.y, 0) / near.pts.length;
+      } else held.push({ x: a.x, y: a.y, pts: [a] });
+    }
+    for (const h of held) {
+      const r = (HOLD_RANGE + Math.max(...h.pts.map((p) => Math.hypot(p.x - h.x, p.y - h.y)))) * TILE;
+      stitchEllipse(g, h.x * TILE, h.y * TILE, r, r * 0.6, 1.2, hexNum(T.indigo), 0.5);
     }
     for (const u of s.units.values()) {
       const def = UNITS[u.type];
@@ -715,6 +749,41 @@ export class GameScene extends Phaser.Scene {
       for (let k = 0; k < b.garrison.length; k++) {
         g.fillStyle(ochre, 1).fillCircle(b.tx * TILE + 8 + (k % 6) * 7, b.ty * TILE - BUILDING_TOP + 10 + Math.floor(k / 6) * 7, 2.4);
       }
+    }
+  }
+
+  /** A flood's drowned tiles, as laid blue wool with teal ripples, redrawn when a flood starts or ends. */
+  private renderFlood() {
+    const w = this.state.weather;
+    const on = w?.on && w.kind === 'flood' ? w : null;
+    const key = on ? `${on.start}:${on.tiles.length}` : '';
+    if (key === this.floodKey) return;
+    this.floodKey = key;
+    const g = this.floodG.clear();
+    if (!on) return;
+    for (const i of on.tiles) {
+      const x = (i % MAP_SIZE) * TILE;
+      const y = Math.floor(i / MAP_SIZE) * TILE;
+      g.fillStyle(hexNum(T.indigo), 1).fillRect(x - 0.5, y - 0.5, TILE + 1, TILE + 1);
+      g.lineStyle(1, hexNum(T.teal), 0.9);
+      for (let b = 0; b < 4; b++) {
+        g.beginPath();
+        g.moveTo(x, y + 5 + b * 8);
+        for (let xx = 4; xx <= TILE; xx += 4) g.lineTo(x + xx, y + 5 + b * 8 + (xx % 8 === 0 ? 1.4 : -1.4));
+        g.strokePath();
+      }
+    }
+    // The new shore stitched shut in ink, where the flood meets dry land.
+    const wet = (tx: number, ty: number) => tx < 0 || ty < 0 || tx >= MAP_SIZE || ty >= MAP_SIZE || this.state.terrain[idx(tx, ty)] === WATER || this.state.terrain[idx(tx, ty)] === SHALLOW;
+    for (const i of on.tiles) {
+      const tx = i % MAP_SIZE;
+      const ty = Math.floor(i / MAP_SIZE);
+      const x = tx * TILE;
+      const y = ty * TILE;
+      if (!wet(tx, ty - 1)) stitchLine(g, x, y, x + TILE, y, 1.1, hexNum(T.ink));
+      if (!wet(tx, ty + 1)) stitchLine(g, x, y + TILE, x + TILE, y + TILE, 1.1, hexNum(T.ink));
+      if (!wet(tx - 1, ty)) stitchLine(g, x, y, x, y + TILE, 1.1, hexNum(T.ink));
+      if (!wet(tx + 1, ty)) stitchLine(g, x + TILE, y, x + TILE, y + TILE, 1.1, hexNum(T.ink));
     }
   }
 
@@ -878,9 +947,11 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     if (this.attackMode) {
-      const ids = this.selectedUnits().map((u) => u.id);
-      issue(this.state, PLAYER, ids, { t: 'attackMove', x: tx, y: ty });
-      if (ids.length > 0) sfx('order');
+      const ids = this.selectedUnits().filter((u) => !isShip(u)).map((u) => u.id);
+      const ships = this.selectedUnits().filter((u) => isShip(u)).map((u) => u.id);
+      march(this.state, PLAYER, ids, 'attackMove', tx, ty);
+      issue(this.state, PLAYER, ships, { t: 'attackMove', x: tx, y: ty });
+      if (ids.length + ships.length > 0) sfx('order');
       this.attackMode = false;
       return;
     }
@@ -989,6 +1060,11 @@ export class GameScene extends Phaser.Scene {
   private campText(c: Camp) {
     const guarded = c.guards.some((id) => this.state.units.has(id));
     if (c.kind === 'cache') return t(guarded ? 'cacheGuarded' : 'cacheFree', { n: c.amount, res: t(c.res!) });
+    if (c.kind === 'village') {
+      if (c.holder === PLAYER) return t('villageYours');
+      if (c.holder !== null) return t('villageEnemy', { faction: t(FACTIONS[this.state.players[c.holder].faction].name), n: VILLAGE_GIFT });
+      return t(guarded ? 'villageWolves' : 'villageFree', { n: VILLAGE_GIFT });
+    }
     const r = RELICS[c.relic!];
     const by = c.holder === null ? (guarded ? 'relicGuarded' : 'relicNobody') : c.holder === PLAYER ? 'relicYours' : 'relicEnemy';
     return t('campRelic', { relic: t(r.name), effect: t(r.text), by: t(by) });
@@ -1013,11 +1089,13 @@ export class GameScene extends Phaser.Scene {
     const camp = campAt(this.state, tx, ty, true);
     if (camp) {
       // To a camp: stand round it, close enough to take it once its guards are down.
+      // A village: villagers bring it food from the stores, so it joins the player.
       const spots = campSpots(this.state, camp);
       units.forEach((u, i) => {
         const at = spots[i % Math.max(1, spots.length)];
-        const order = UNITS[u.type].role === 'villager' ? 'move' : 'attackMove';
-        if (at) issue(this.state, PLAYER, [u.id], { t: order, x: at.x, y: at.y });
+        const villager = UNITS[u.type].role === 'villager';
+        if (villager && camp.kind === 'village') issue(this.state, PLAYER, [u.id], { t: 'gift', camp: camp.id });
+        else if (at) issue(this.state, PLAYER, [u.id], { t: villager ? 'move' : 'attackMove', x: at.x, y: at.y });
       });
       return;
     }
@@ -1051,12 +1129,8 @@ export class GameScene extends Phaser.Scene {
       issue(this.state, PLAYER, [...army, ...carts].map((u) => u.id), { t: 'move', x: tx, y: ty });
       return;
     }
-    // Walk: spread the group around the spot so the units don't stack on one tile.
-    units.forEach((u, i) => {
-      const ox = (i % 4) - 1.5;
-      const oy = Math.floor(i / 4) - 1.5;
-      issue(this.state, PLAYER, [u.id], { t: 'move', x: tx + ox, y: ty + oy });
-    });
+    // Walk: the group lines up round the spot in the player's formation.
+    march(this.state, PLAYER, units.map((u) => u.id), 'move', tx, ty);
   }
 
   /**
@@ -1344,6 +1418,8 @@ export class GameScene extends Phaser.Scene {
       if (def.elite) lines.push(t(`${def.name}Info` as TextKey));
       if (this.state.mission?.cart === u.id) lines.push(t('supplyCartInfo'));
       if (inAura(this.state, u) && def.gift !== 'aura') lines.push(t('inAura'));
+      if (def.local) lines.push(t('villageSpearmanInfo'));
+      if (isSoldier(def.role)) lines.push(t('stanceLine', { stance: t(`stance-${u.stance}` as TextKey) }));
       lines.push(doing(u));
       this.info(76, 26, lines.join('\n'));
       return;
@@ -1494,7 +1570,8 @@ export class GameScene extends Phaser.Scene {
     const pop = `${popUsed(this.state, PLAYER)}/${popCap(this.state, PLAYER)}`;
     const talks = this.talkTo !== null ? `${this.talkTo}:${atPeace(this.state, PLAYER, this.talkTo)}:${this.state.pacts[this.talkTo].allyUntil > this.state.time}` : '';
     const cargo = this.selectedUnits().map((u) => u.cargo.length).join('');
-    return [...this.selected].join(',') + `|${talks}|${cargo}|${b?.built}|${pop}|${this.buildMenu}|${this.buildPage}|${this.placing}|${this.attackMode}|${this.rallyMode}|${this.rallyBuildings().map((x) => (x.rally ? 1 : 0)).join('')}|${q}|${p.techs.join(',')}|${p.age}|${p.boonPending}|${p.edgePending}|${deedsDone(p)}|${this.resourceKey()}|${own}|${hasBuilt(this.state, PLAYER, 'forge')}|${p.bell}|${rates}|${champion}`;
+    const ranks = `${p.formation}:${stanceOf(this.selectedUnits().filter((u) => isSoldier(UNITS[u.type].role))) ?? 'mixed'}`;
+    return [...this.selected].join(',') + `|${talks}|${cargo}|${ranks}|${b?.built}|${pop}|${this.buildMenu}|${this.buildPage}|${this.placing}|${this.attackMode}|${this.rallyMode}|${this.rallyBuildings().map((x) => (x.rally ? 1 : 0)).join('')}|${q}|${p.techs.join(',')}|${p.age}|${p.boonPending}|${p.edgePending}|${deedsDone(p)}|${this.resourceKey()}|${own}|${hasBuilt(this.state, PLAYER, 'forge')}|${p.bell}|${rates}|${champion}`;
   }
 
   private resourceKey() {
@@ -1562,6 +1639,24 @@ export class GameScene extends Phaser.Scene {
     if (army.length > 0) {
       out.push({ id: 'attack', name: t('attack'), sub: '', enabled: true, run: () => void (this.attackMode = true) });
       out.push({ id: 'stop', name: t('stop'), sub: '', enabled: true, run: () => order(issue(this.state, PLAYER, units.map((u) => u.id), { t: 'stop' })) });
+      // The formation the player's groups march in, and the stance of the selected soldiers: each
+      // button turns to the next.
+      const formation = p.formation;
+      out.push({
+        id: 'formation',
+        name: t('formation'),
+        sub: t(`formation-${formation}` as TextKey),
+        enabled: true,
+        run: () => void (p.formation = FORMATIONS[(FORMATIONS.indexOf(formation) + 1) % FORMATIONS.length]),
+      });
+      const stance = stanceOf(army);
+      out.push({
+        id: 'stance',
+        name: t('stance'),
+        sub: stance ? t(`stance-${stance}` as TextKey) : t('stanceMixed'),
+        enabled: true,
+        run: () => void setStance(this.state, PLAYER, army.map((u) => u.id), STANCES[stance ? (STANCES.indexOf(stance) + 1) % STANCES.length : 0]),
+      });
     }
     const b = this.selectedBuilding();
     if (b && b.built) {
@@ -1825,11 +1920,18 @@ function fitWidth(label: Phaser.GameObjects.Text, width: number) {
 }
 
 /** What a unit is doing, in words, for the panel. */
+/** The stance every one of a group's soldiers holds, or null when they differ (or there are none). */
+function stanceOf(army: Unit[]): Stance | null {
+  const first = army[0]?.stance ?? null;
+  return army.every((u) => u.stance === first) ? first : null;
+}
+
 function doing(u: Unit) {
   if (u.act === 'gather') return t(u.carry === 'wood' ? 'chopping' : u.carry === 'ore' ? 'mining' : 'foraging');
   if (u.act === 'build') return t('building');
   if (u.act === 'fight') return t('fighting');
   if (u.order.t === 'garrison') return t('sheltering');
+  if (u.order.t === 'gift') return t('bringingGift');
   if (u.order.t === 'board') return t('boarding');
   if (u.packed && u.act === 'walk') return t('packing');
   if (isNaval(UNITS[u.type].role) && u.act === 'walk') return t('sailing');

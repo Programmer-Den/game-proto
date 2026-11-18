@@ -60,6 +60,8 @@ export const sfx = sounds({
   monument: { wave: 'triangle', freq: 147, arp: [0, 7, 12], arpStep: 0.3, length: 1.4, attack: 0.15, volume: 0.5, gap: 2000 },
   /** A building falls on screen (a Town Centre too). */
   crumble: { wave: 'noise', freq: 420, to: 70, length: 0.5, volume: 0.34, gap: 250 },
+  /** A dry year or flood warned of, or come: a low roll of thunder. */
+  thunder: { wave: 'noise', freq: 260, to: 60, length: 1.2, attack: 0.12, volume: 0.36, gap: 2000 },
 });
 
 export type SfxName = Parameters<typeof sfx>[0];
