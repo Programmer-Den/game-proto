@@ -253,6 +253,13 @@ best, and each one banks **15 salvage**.
 
 ![The endless rift on the victory screen](docs/screenshots/endless-rift.webp)
 
+The rift has no last world, so every star map in it has an **End run and bank rewards** button
+under the nodes. Tap it twice (the first tap asks) to end the run there: the end screen says
+**Run ended** rather than Fallen, and banks the salvage for the worlds cleared plus the credits you
+hold, which a fall would lose.
+
+![Ending an endless rift run on the star map](docs/screenshots/endless-end-run.webp)
+
 ### The codex
 
 Every foe, boss and card you meet goes into the codex, kept across runs: a foe or boss once it is

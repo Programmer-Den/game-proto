@@ -6,7 +6,7 @@ import { ALTAR, HERO_R, POWER_UPS, RUN_MS, clock, freshState, isStructure, stats
 import { banish, choose, inRingGap, phalanxSpots, prepare, shieldHalf, startRun, suppressorHalf, suppressorLength } from '../game/sim';
 import { bladeColor, dreadRadius, heroVariant, orbitBlades } from '../game/blades';
 import { bubble, rebuildTime } from '../game/squad';
-import { buy, chooseEvent, chooseNode, chooseWorld, chartOptions, enterEndless, frame, leave, nextPlanet, reroll, startRush } from '../game/voyage';
+import { buy, chooseEvent, chooseNode, chooseWorld, chartOptions, enterEndless, frame, leave, nextPlanet, reroll, retreat, startRush } from '../game/voyage';
 import { masteryLevel, masteryXp } from '../game/mastery';
 import { RUSH, rushPlanets } from '../game/rush';
 import { DAILY, DAILY_GAME, dailyOf, dailyScore, dailySeed, stagesOf } from '../game/daily';
@@ -136,6 +136,8 @@ export class GameScene extends Phaser.Scene {
   private recorded = false;
   /** When the run ended (`time.now`), so a Space press meant for the signature doesn't go on into the endless rift. */
   private endAt = 0;
+  /** The star map's End run button was pressed once and asks to be pressed again. */
+  private retreatAsked = false;
   /** Plays the run's sounds and music by watching the state frame to frame. */
   private cues = new SoundCues();
   /** The run time of the last save of the run under way. */
@@ -411,6 +413,7 @@ export class GameScene extends Phaser.Scene {
     }
     else if (s.phase === 'won' && spot.id === 'endless') this.goEndless();
     else if (s.phase === 'won' || s.phase === 'lost') this.backToSelect();
+    else if (spot.id === 'retreat') this.endEndless();
     else if (spot.id === 'reroll') this.reroll();
     else if (spot.id === 'leave') this.leave();
     else if (spot.id.startsWith('banish-')) this.banishCard(Number(spot.id.slice(7)));
@@ -532,6 +535,18 @@ export class GameScene extends Phaser.Scene {
     // Its end is recorded again (only the endless part: the win already banked its credits).
     this.recorded = false;
     this.settle();
+  }
+
+  /** The star map's End run button: the first press asks, the second ends the endless rift run. */
+  private endEndless() {
+    if (this.state.phase !== 'map' || !this.state.endless) return;
+    if (!this.retreatAsked) {
+      this.retreatAsked = true;
+      ui('click');
+      return;
+    }
+    this.retreatAsked = false;
+    if (retreat(this.state)) ui('click');
   }
 
   /** Buys the next rank of an Armoury piece, if the bank holds enough. */
@@ -758,7 +773,7 @@ export class GameScene extends Phaser.Scene {
     if (s.phase === 'select' && this.skillsOpen) return `skills|${this.skillsPage}|${this.skillPick}|${this.progress.skills.length}`;
     if (s.phase === 'select' && this.codexOpen) return `codex|${this.codexPage}|${this.progress.codex.seen.length}`;
     if (s.phase === 'select' && this.rushOpen) return `rush|${this.chosen}|${JSON.stringify(this.progress.rush)}`;
-    return [s.phase, this.chosen, this.progress.plain.join(), this.progress.bank, this.heatFor(this.chosen), s.choices?.join(), s.banishes, s.offers.join(), s.credits, s.event?.id, s.nodes.join(), s.rewardPicks].join('|');
+    return [s.phase, this.chosen, this.progress.plain.join(), this.progress.bank, this.heatFor(this.chosen), s.choices?.join(), s.banishes, s.offers.join(), s.credits, s.event?.id, s.nodes.join(), s.rewardPicks, this.retreatAsked].join('|');
   }
 
   /** Shows the panel for the phase the run is in. */
@@ -766,6 +781,7 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     this.panel?.destroy();
     this.panel = null;
+    if (s.phase !== 'map') this.retreatAsked = false;
     if ((s.phase === 'won' || s.phase === 'lost') && !this.recorded) {
       this.recorded = true;
       this.endAt = this.time.now;
@@ -783,8 +799,9 @@ export class GameScene extends Phaser.Scene {
         this.endLines.push(t('rushEnd', { n: s.rushBeaten, of: s.rushTotal, time: clock(s.runMs) }));
         if (best) this.endLines.push(t('rushNewBest'));
       } else if (s.endless) {
-        // The endless rift's end: the win already banked the credits (and its mastery), so only its salvage now.
-        this.banked = ENDLESS_SALVAGE * s.endlessCleared;
+        // The endless rift's end: the win already banked the credits (and its mastery), so only its
+        // salvage now, and the credits held when the run is ended on the star map rather than lost.
+        this.banked = ENDLESS_SALVAGE * s.endlessCleared + (s.retreated ? s.credits : 0);
         xp = masteryXp(s.endlessCleared, 0, false);
         recordRun(s.hero!, s.runMs, false, s.stage + 1, route, s.heat, 0, xp);
         recordEndless(s.endlessCleared, this.banked);
@@ -828,7 +845,7 @@ export class GameScene extends Phaser.Scene {
     else if (s.phase === 'select') build((p) => heroSelect(p, this.progress, this.chosen, this.heatFor(this.chosen), this.week, this.progress.bestMs > 0 ? loadDaily(DAILY_GAME) : null));
     else if (s.phase === 'levelup') build((p) => levelUp(p, s));
     else if (s.phase === 'chart') build((p) => spaceMap(p, s, this.progress.charted));
-    else if (s.phase === 'map') build((p) => starMap(p, s));
+    else if (s.phase === 'map') build((p) => starMap(p, s, this.retreatAsked));
     else if (s.phase === 'trader') build((p) => trader(p, s));
     else if (s.phase === 'event') build((p) => eventPanel(p, s));
     else if (s.phase === 'won' || s.phase === 'lost') build((p) => endScreen(p, s, this.progress, this.banked, this.bonus, s.daily ? this.daily : null, this.endLines));

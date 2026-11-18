@@ -171,7 +171,12 @@ world, with a star map between them. A boss rush and hero mastery come on top.
   boss `loopHp(loop)` health and `hurtHero` takes `loopDmg(loop)` (`ENDLESS`). Every boss cleared in
   it adds to `state.endlessCleared`. At its end the win is not recorded again: `recordRun` with
   `won` false and nothing banked, then `recordEndless` keeps the best in `progress.endless` and
-  banks `ENDLESS_SALVAGE` per world cleared. The HUD tag adds "rift loop n"; `nextStage` and the
+  banks `ENDLESS_SALVAGE` per world cleared. It can also be ended by choice: the star map shows an
+  End run button (`RETREAT`, spot `retreat`) while `state.endless` is set; the first press sets
+  `GameScene.retreatAsked` (the button asks again, reset when the phase leaves `map`), the second
+  calls `retreat` (voyage.ts), which sets `state.retreated` and `lost`. `syncPanel` then also banks
+  the credits held, `endScreen` titles it `retreated` ("Run ended", `retreatedFrom`) in the endless
+  colour and `SoundCues` plays the `cleared` sting rather than `lose`. The HUD tag adds "rift loop n"; `nextStage` and the
   space map's `route` (the last `stage + 1` planets) keep the maps right on later loops.
 - The codex (`codex.ts`): `CODEX_PAGES` (foes 20, bosses 10, pool skills 30, gear 12, hero paths 96,
   each with its pay) of entries `foe:<kind>`, `boss:<id>` and `card:<upgrade id>`.
@@ -397,7 +402,7 @@ world, with a star map between them. A boss rush and hero mastery come on top.
 - `src/game/voyage.ts`: between fights. `frame` (tick, then `afterClear` and `nextPlanet` for the
   passing phases), `afterClear` (collect, credits, arena reward, the space map or victory),
   `chartOptions` and `chooseWorld` (the space map: sets `state.next` and rolls the nodes), `rollNodes`,
-  `chooseNode`, `startRush` and `rushLand` (the boss rush), `enterEndless`, `loopBack` and `nextStage` (the endless rift), the trader (`priceOf`, `buy`, `reroll`, `leave`), the arena (`startArena`),
+  `chooseNode`, `startRush` and `rushLand` (the boss rush), `enterEndless`, `loopBack`, `nextStage` and `retreat` (the endless rift), the trader (`priceOf`, `buy`, `reroll`, `leave`), the arena (`startArena`),
   events (`rollEvent`, `chooseEvent`) and `nextPlanet` (to `state.next`, `stage` + 1, onto
   `state.route`).
 - `src/game/save.ts`: `SAVE_KEY`, `loadProgress`, `saveProgress`, `recordRun`, `recordCharted`, `recordUnlocks`,
@@ -448,7 +453,7 @@ world, with a star map between them. A boss rush and hero mastery come on top.
   (`heroCardRect` for the 8x3 grid, `HEAT_ROW`, `HEAT_DOWN` and `HEAT_UP` for the Heat row, `ARMOURY_BUTTON`, `armouryCardRect` and
   `BACK` for the Armoury, `CODEX_BUTTON`, `codexTabRect`, `CODEX_GRID`, `CODEX_BACK` and `SKILLS_BUTTON` for the codex, `skillTabRect`, `SKILL_LIST` and `SKILL_DETAIL` for the skill overview, `DAILY_BUTTON` for the daily run, `WEEKLY_BUTTON`, `MUTATOR_CARD`, `WEEKLY_START` and `WEEKLY_BACK` for the weekly run, `levelCardRect` with `LEVEL_CARD4` for four cards, `UNLOCK` and
   `CONTINUE` for the new hero panel, `CHART`, `chartSpot` / `chartRect` (the space map), `mapNodeRect` / `mapNodeSpot`, `tradeCardRect`, `REROLL`,
-  `LEAVE`, `eventOptionRect`, `AGAIN`, and `ENDLESS_BUTTON` with `AGAIN_SIDE` after a win), `DEPTH`, `inside`.
+  `LEAVE`, `RETREAT` (the star map's End run in the endless rift), `eventOptionRect`, `AGAIN`, and `ENDLESS_BUTTON` with `AGAIN_SIDE` after a win), `DEPTH`, `inside`.
 - `src/scenes/objectiveArt.ts`: the objectives and power-ups, drawn in code on the graphics
   layers (no baked textures, so boot's Math.random draws are unchanged): `drawObjectiveGround`
   (zones, spots, the escort's goal, the pilgrim, the duel's mark), `drawStructure`, `drawPowerUp`
@@ -472,7 +477,7 @@ world, with a star map between them. A boss rush and hero mastery come on top.
   spot), `levelUp` (also the arena's and an objective's reward, titled by `state.after`; three or four cards whose lines flow down, with a Banish button under each while banishes are left; pool labels
   from `POOL_NAMES`, `linkIcon` for crossovers), `spaceMap` (the four jumps as columns, lanes, the
   route lit, the next jump's planets as cards with spot ids = `PlanetId`; a faction shows once
-  `progress.charted` has it), `starMap` (on the way to `state.next`), `trader`, `eventPanel`, `endScreen`.
+  `progress.charted` has it), `starMap` (on the way to `state.next`, with the End run button in the endless rift), `trader`, `eventPanel`, `endScreen`.
 
 ### Layout on every screen shape
 
@@ -652,7 +657,7 @@ free of audio) or from the scene's input handler.
   `page-<CodexPageId>`, `skills` and `back`, in the skill overview (`.skillsOpen`) `page-<SkillPageId>`,
   `skill-<entry id>` (taken skills only) and `back`, in the boss rush panel (`.rushOpen`) `start` and `back`; `rush` (once two bosses are met) and `colour` (mastery level 2) are select-screen spots, as are `daily` and `codex` are the select screen's buttons and `endless`
   the won end screen's. `state.week` and `state.mutators` are the weekly run's, `state.daily` and
-  `state.seed` the daily's, `state.endless`, `state.loop` and `state.endlessCleared` the endless rift's. `.chosen` is the hero picked on the select screen
+  `state.seed` the daily's, `state.endless`, `state.loop`, `state.endlessCleared` and `state.retreated` the endless rift's, and `retreat` its star map's End run button. `.chosen` is the hero picked on the select screen
   (TR-9 at first), `.unlocking` the heroes waiting to be shown. `state.heat` is the run's heat.
 - The hero is always at `CENTER` (480, 270 at 960x540: the middle of the view) on screen;
   `SIG_BUTTON` is at (890, 470) at 960x540, 70 px in from the bottom right corner.

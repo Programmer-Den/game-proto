@@ -116,6 +116,17 @@ export function enterEndless(s: GameState) {
 }
 
 /**
+ * Ends an endless rift run from the star map, between worlds: the run ends as if lost (no new win
+ * is recorded), but `retreated` marks it so the end screen says so and the credits held are banked.
+ */
+export function retreat(s: GameState) {
+  if (s.phase !== 'map' || !s.endless) return false;
+  s.retreated = true;
+  s.phase = 'lost';
+  return true;
+}
+
+/**
  * Starts a boss rush with `hero` against the bosses of `planets` (in order, from `rushPlanets`):
  * no heat, Armoury or mastery, and the set kit (`RUSH`): the hero's three paths and its drill a few
  * tiers up, at a set level.
