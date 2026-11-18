@@ -20,7 +20,9 @@ line, and after the first gold an apiary estate buys plots for a third and a fou
 its own season quirks. The estate also has a flower garden whose touching beds cross-pollinate
 into rare honeys (a fair class of their own), a candle workshop that turns wax into candles and
 polish for the church's and the manor's commissions, and, after three golds, a royal warrant kept
-by an autumn gift to the crown that raises every price.
+by an autumn gift to the crown that raises every price. An empty cell ringed by six capped cells
+makes royal jelly (sold, or fed to the queens for faster brood), a forecast brings rainy and warm
+days, and a buyer bids on the best jars at every season's end.
 
 Implemented today:
 
@@ -217,6 +219,40 @@ Implemented today:
   (`WARRANT_STEP` 10% a year, at most `WARRANT_MAX` 50%) multiplies `jarPrice` and `basePrice`, so
   mead, the buyer's book, commissions and rare honey rise with it; at 0 every price is as before.
   `warrant` and `royal` are saved.
+- Royal jelly (`src/game/jelly.ts`): `Cell` has a third kind, `JellyCell` (`type: 'jelly'`,
+  `jellyMs`). `jelly` in `tick` (run before the foragers deliver, so a cell just emptied turns
+  before nectar can fill it) turns an empty honey cell (`filling`, no nectar) that is `ringed`
+  (all `RING`, 6, neighbours capped honey; only the comb's six inner spots have six) into a jelly
+  cell (`jelly-formed`), and counts a ringed jelly cell's `jellyMs` down from `JELLY_MS` (60s; it
+  stops while the ring is broken) to 0 (`jelly-ready`). A tap on a jelly cell calls `tapJelly`: a
+  ready one adds one to `jelly` (`jelly-taken`), a broken-ring one is cleared, and either becomes
+  `emptyCell()`; a ringed one not ready refuses. `sellJelly` sells one at `jellyPrice`
+  (`JELLY_MULT`, 3, times `basePrice(s, 'heather')`, not counted as sold); `feedQueens` spends one
+  and sets `fedMs` to `FED_MS` (a season), while which `hatch` counts down `FED_BROOD` (2) times as
+  fast. The comb draws a jelly cell with `cell-jelly`, a cream arc (grey while the ring is broken,
+  with "broken") and a gold rim with "take" once ready. The Royal jelly chip (`JELLY`, the foot of
+  the chip column) shows once there is jelly, a fed time or a jelly cell, and opens a card (the
+  `queen-card` texture) with Sell a jar and Feed the queens. `jelly`, `fedMs` and jelly cells are
+  saved.
+- Weather (`src/game/weather.ts`): the year has `DAYS` (16) days of `DAY_MS` (30s), four a season,
+  numbered by `dayOf(seasonMs)`. `weather` is the forecast, today first, `FORECAST` (4) days.
+  When `tick` crosses into a new day, `skies` drops today and draws the day coming in
+  (`FORECAST - 1` ahead): from `WEATHER_FROM` (10) jars sold by `draw` with `Math.random` and
+  `CHANCES` by its season (winter is always `frost`), before that `calm` (fair, frost in winter).
+  A rainy or warm today pushes `weather`. `rainy` makes `send` refuse and the Waggle Dance wait;
+  a warm today multiplies `beeCarry` by `WARM_NECTAR` (2), before a wilted meadow halves it. The
+  Forecast card (`FORECAST_CARD`, in the sky under the sun, shown from `WEATHER_FROM`) shows a
+  `weather-<w>` icon and name a day, with today's time left. `weather` is saved (saves without it
+  start calm).
+- The honey auction (`src/game/auction.ts`): as each season ends (`turn`), from `AUCTION_FROM`
+  (10) jars sold and with jars on the shelf, `bidder` writes `auction` (`Auction`: a town, the
+  kind whose jar sells dearest now, up to `AUCTION_JARS` (3) of it, `base` the jar's `jarPrice`,
+  `ms`, and `walkMs` drawn between `WALK_MIN` and `WALK_MAX`, 3 to 12s) and pushes `auction`.
+  `auction` in `tick` runs `ms` on; the `bid` a jar is `base` times `bidMult` (`BID_FROM` 1 up to
+  `BID_TOP` 4 over `BID_RISE_MS`, 12s). At `walkMs`, or once the shelf no longer holds a jar of its
+  kind, the buyer leaves (`auction-lost`). `acceptBid` (a tap on the note, `AUCTION`, over the
+  meadow above the swarm chip) sells the jars at the bid, counts them as sold (`afterSale`) and
+  pushes `auction-won`. Not saved.
 - One screen (`GameScene`) with a scalloped HUD strip, the goal card, a hint line for the first
   jar, bees flying to and from the flowers with dotted trails, a shelf of jars, and a "New hive"
   reset link in the bottom right corner.
@@ -224,11 +260,11 @@ Implemented today:
   jars per kind, wax, jars sold, bee count, upgrade ranks, unlocked meadows, the kind foraged, the
   season and years, the casks, the hives, their bees and the queen, the fair entries, fairs and
   golds, the tired and wilted meadows, the traits bred in, the comb honey, the buyer's book, the
-  garden, rare honey, wares, commissions, the warrant and the crown's ask, and the last-seen time in
-  `localStorage`.
+  garden, rare honey, wares, commissions, the warrant and the crown's ask, the royal jelly and the
+  queens' fed time, the forecast, and the last-seen time in `localStorage`.
 - Trophies (`src/trophies/`, `shared/trophies.ts`): ten, listed on the start and pause screens
   and on the hub (see the file map). The first round earns First jar. Ten is the most a game may
-  list, so the garden, workshop and warrant have none of their own.
+  list, so the garden, workshop, warrant, royal jelly, weather and auction have none of their own.
 
 Missing or rough:
 
@@ -252,6 +288,10 @@ Missing or rough:
 - The garden's timer, like the market's, starts afresh on load, and rare honey does not grow while
   the page is closed. Candles and polish only sell to the commissions.
 - The crown's comb asks need Cut comb honey, which only the buyer's book card arms.
+- The weather is the same for every hive, a rainy day doesn't stop the away nectar, and a day's
+  weather is only drawn as it comes into the forecast, so the first three days after 10 jars sold
+  are calm.
+- The auction's buyer is not saved: a reload during the bid sends them away.
 - `room` only counts the kind being foraged, so a comb of half-filled clover cells can show "No
   room for lavender nectar" until a cell is empty.
 
@@ -281,7 +321,7 @@ File map (`src/`):
   `demand`, `marketLeft`, `season`, `seasonLeft`, `isWinter`, `maxBees`, `hiveFull`, `atHome`, `crowded`, `basePrice`, `stealMs`,
   `meadValue`, `meadReady`, `cellarValue`, `caskDone`, `fairTotal`, `fairOpen`, `fairOn`, `fairIn`,
   `fairWon`, `fairClasses`, `seasonNo`, `openLeft`, `carry`, `beeCarry`, `rarePrice`, `rareCount`,
-  `ripenTime` (per spot, for Riverside Meadow), `cellPrice` and `broodPrice` (per hive), `withWax`, `room` (per kind), `jarCount`,
+  `isJelly`, `ringed`, `jellyPrice`, `rainy`, `ripenTime` (per spot, for Riverside Meadow), `cellPrice` and `broodPrice` (per hive), `withWax`, `room` (per kind), `jarCount`,
   `neighbours`, `touching`, `fairScore`, `sharedEdges`, `combBonus`, `jarPrice` (per kind) and `shelfValue`
   (jars and ready mead).
 - `game/sim.ts`: the rules as pure functions on `GameState`: `tick`, `build`, `buildBrood`,
@@ -289,7 +329,7 @@ File map (`src/`):
   unlocks meadows), `buy`, `swat`, `gatherAway`, `tripMs` (trip length with clover and
   difficulty and Far flyers), `caskKind`, `cask`, `catchSwarm`, `acceptContract`, `enterFair`,
   `enterMead`, `buyPlot`, `breed`, `cutComb`, `canSupply`, `supply`, `plant`, `enterRare`, `make`,
-  `fulfil`, `canGift`, `giveRoyal`, plus the private `garden`, `newCommissions`, `royal`, `turn`,
+  `fulfil`, `canGift`, `giveRoyal`, `tapJelly`, `sellJelly`, `feedQueens`, `acceptBid`, plus the private `skies`, `jelly`, `bestKind`, `bidder`, `auction`, `garden`, `newCommissions`, `royal`, `turn`,
   `appetite`, `tire`, `eat`, `deliver`, `place`, `hatch`, `raid`, `orders`, `contracts`, `swarm`,
   `dance`, `fly`, `recountLent`, `enter`, `openFair`, `closeFair`, `afterSale` and `newBook`.
 - `game/honey.ts`: the `HONEY` table (name key, meadows needed, price), `KINDS`, `MARKET_MS`,
@@ -309,7 +349,11 @@ File map (`src/`):
   `GARDEN_MS`, `RARE_CAP`, `noRare`, `noBeds`, `BED_PAIRS`, `rareOf`, `rarePairs`.
   `game/workshop.ts`: `Ware`, `WARES`, `WARE`, `WORKSHOP_FROM`, `WINTER_CANDLES`, `Commission`,
   `noWares`. `game/warrant.ts`: `WARRANT_GOLDS`, `WARRANT_STEP`, `WARRANT_MAX`, `RoyalAsk`,
-  `royalAsk`, `warrantBonus`.
+  `royalAsk`, `warrantBonus`. `game/jelly.ts`: `JellyCell`, `JELLY_MS`, `JELLY_MULT`, `FED_MS`,
+  `FED_BROOD`, `RING`. `game/weather.ts`: `Weather`, `WEATHERS`, `DAY_MS`, `DAYS`, `FORECAST`,
+  `WEATHER_FROM`, `WARM_NECTAR`, `CHANCES`, `dayOf`, `daySeason`, `calm`, `draw`, `calmForecast`.
+  `game/auction.ts`: `Auction`, `AUCTION_FROM`, `AUCTION_JARS`, `BID_FROM`, `BID_TOP`,
+  `BID_RISE_MS`, `WALK_MIN`, `WALK_MAX`, `bidMult`, `bid`.
 - `game/meadows.ts`: the `MEADOWS` goal chain (name key, jars sold needed, benefit key) and
   `SUNFLOWER_COINS`.
 - `game/upgrades.ts`: the `UPGRADES` table (name and blurb keys, price per rank), `UPGRADE_IDS`,
@@ -338,10 +382,14 @@ File map (`src/`):
   honey, the two make buttons, the two commission rows and the gift), a graphics of each bed's
   flower dot and the rare pairs' bars, `draw()` each frame, `close()` and `spots()`. `chipDetail`
   shrinks a chip's second line (10px down to 7px) until it fits inside the chip.
+- `scenes/LoopPanels.ts`: the `LoopPanels` class `GameScene` creates after the estate's: the
+  Forecast card, the buyer's note (a tap calls `acceptBid`) and the Royal jelly chip with its card
+  (Sell a jar calls `sellJelly`, Feed the queens `feedQueens`), `draw()` each frame, `close()` and
+  `spots()`.
 - `scenes/layout.ts`: every screen position (`VIEW`, `viewEdges` (the whole view in layout
   coordinates), `COMB`, `HIVE`, `PLAQUE`, `HIVE_TAB` and
   `hiveTab`, `ENTRANCE`, `FLOWER_GROUND`, `FAR_RIDGE` and `farY`, `GOAL`, `MEADOW_SPOTS`,
-  `MEADOW_TAG`, `AWAY`, `SWARM`, `BOOK`, `BOOK_CARD`, `GARDEN`, `WORKSHOP`, `WARRANT`, `ESTATE_CARD`, `HINT`, `MARKET` and `marketEntry`, `SHELF`, `CASK` and
+  `MEADOW_TAG`, `AWAY`, `SWARM`, `BOOK`, `BOOK_CARD`, `GARDEN`, `WORKSHOP`, `WARRANT`, `JELLY`, `FORECAST_CARD`, `AUCTION`, `ESTATE_CARD`, `HINT`, `MARKET` and `marketEntry`, `SHELF`, `CASK` and
   `caskSpot`, `BOARD`, `SEND_BUTTON`, `SELL_BUTTON`, `SHOP_BUTTONS` and `shopSpot`, `ORDER`,
   `CONTRACT`, `END_CARD`, `WASP_FROM`, `WASP_TO`), the hex helpers `cellCentre` (which takes a
   spot of either comb), `hexPoints` and `cellAt` (a local spot), `homeSpot`, `flowerSpot`,
@@ -376,7 +424,9 @@ How it runs:
   `honey-icon-<kind>`, `wax-icon`, `goal-card`, `meadow-icon-<i>`, `lock`, `meadow-tag`,
   `away-chip`, `swarm-chip`, `market-card`, `order-card`, `contract-card`, `cask`,
   `hive-tab-on/off`, `end-card`, `queen-card`, `book-chip`, `book-card`, `estate-card`, `tag-build`, `tag-touching`, `bee-0/1`, `wasp-0/1`, and the
-  buttons' `button-<w>x<h>-<look>`. There are no asset files.
+  buttons' `button-<w>x<h>-<look>`; `bakeLoopArt`, baked last so the wobble of everything before
+  stays the same, adds `cell-jelly`, `forecast-card`, `auction-card`, `jelly-icon` and
+  `weather-<fair|rain|warm|frost>`. There are no asset files.
 - Load: `create` loads the progress, builds the state, calls `gatherAway(state, Date.now() -
   seen)` when a `seen` time was saved, shows the chip if any nectar came in, and saves at once so a
   reload does not count the same time twice.
@@ -420,8 +470,8 @@ State model (`src/game/state.ts`):
 
 - `GameState.cells` is `SLOTS` (20) entries per hive (`hives` times, up to 4), each `null` (no cell
   built), a `HoneyCell` (`type: 'honey'`, `nectar` 0 to `CELL_CAP`, `phase`
-  `filling`/`ripening`/`capped`, `ripenMs`, `kind`, and `since` once its first drop is in) or a `BroodCell` (`type: 'brood'`,
-  `hatchMs`). A honey cell leaves `filling` only when full. Harvesting (or a wasp's theft, the
+  `filling`/`ripening`/`capped`, `ripenMs`, `kind`, and `since` once its first drop is in), a `BroodCell` (`type: 'brood'`,
+  `hatchMs`) or a `JellyCell` (`type: 'jelly'`, `jellyMs`). A honey cell leaves `filling` only when full. Harvesting (or a wasp's theft, the
   bees eating it in winter, or a fair entry) resets it to `emptyCell()`.
 - Neighbours: odd rows sit half a cell right, so spot `(col,row)` touches `col±1` on its row and,
   on the rows above and below, `col-1,col` (even rows) or `col,col+1` (odd rows). `sharedEdges`
@@ -446,7 +496,8 @@ Persistence: one key of its own, `beehive-baron-progress`, holding `Progress` as
 `eatIn` (the time to the bees' next winter meal, clamped to 1 to `WINTER_EAT_MS`, so a reload
 can't put a meal off), `years`, `casks`, `hives`, `queen`, `queenBees`, `hiveBees`, `fair`, `fairs`, `golds`, `baron`, `fairRare`, `tired`, `wilted`,
 `breeds`, `breedPending`, `combs`, `book`, `garden`, `rare`, `wares`, `commissions`, `warrant`,
-`royal`, `lent`, `seen`). Saves from before the garden load with empty beds, no rare honey, wares or
+`royal`, `jelly`, `fedMs`, `weather`, `lent`, `seen`; a saved cell can be a jelly cell). Saves from before the jelly and the
+weather have none, and start with a calm forecast. Saves from before the garden load with empty beds, no rare honey, wares or
 commissions and no warrant. Saves from before the estate have no
 `hiveBees`, `breeds`, `combs` or `book`; they load with none (the book is written on the next tick
 once 20 jars are sold). Saves from before the yearly fair load with `fairs` and `golds` 1 for a Baron. `seen` is the `Date.now()` of the last save, 0
@@ -465,7 +516,8 @@ Randomness and timing:
   and contracts only start after the first round (8, 3 and 5 jars sold), so the playthrough only
   draws for the bees. `newBook` draws for the towns, kinds, counts and the season's swing, only
   from `BOOK_FROM` (20) jars sold, and `newCommissions` for the commissions' counts and swing, from
-  `WORKSHOP_FROM` (50). The garden and the warrant draw nothing. The seasons are deterministic, and spring (2 min) outlasts the playthrough.
+  `WORKSHOP_FROM` (50). `skies` draws a day's weather from `WEATHER_FROM` (10) jars sold, and
+  `bidder` the auction's town and walk-off time as a season ends from `AUCTION_FROM` (10). The garden and the warrant draw nothing. The seasons are deterministic, and spring (2 min) outlasts the playthrough.
 - Art uses `seeded()` from `src/art/paper.ts`, not `Math.random`.
 - Game time comes only from the `time` Phaser passes to `update`; tweens use Phaser's clock.
   `Date.now()` is read only to stamp `seen` and to measure the time away on load.
@@ -504,7 +556,11 @@ only `GameScene` (and the refusal buzz in `ui/Button.ts`) plays them, so the sim
   `harvest` for `cut`, `ding` for `book` (not when a season's chime comes in the same step) and
   `orderDone` for `supplied`; `build` for `planted`, `capped` for `bloomed`, `casked` for `made`,
   `ding` for `commissions` and `royal` (not when a season's chime comes in the same step),
-  `orderDone` for `fulfilled`, the `gold` sting for `warranted` and `sad` for `warrant-lost`. `fair-closed` has no sound of its own, since the
+  `orderDone` for `fulfilled`, the `gold` sting for `warranted` and `sad` for `warrant-lost`;
+  `capped` for `jelly-formed` and `jelly-ready` (comb shown only), `harvest` for a jelly cell
+  tapped, `sell` for `jelly-sold`, `hatched` for `fed`, `wilted` for a rainy and `demand` for a
+  warm `weather` and `ding` for `auction` (neither when a season's chime comes in the same step),
+  `orderDone` for `auction-won` and `sad` for `auction-lost`. `fair-closed` has no sound of its own, since the
   autumn chime comes in the same step. `lent` plays the shared `ui('coin')`.
 - Shared `ui('click')`: the Brood cell toggle, a market pick, the fair card, a hive tab, the swarm
   chip, closing the queen card or the end card, and "New hive". `ui('refuse')`: any action `act`
@@ -572,7 +628,9 @@ only `GameScene` (and the refusal buzz in `ui/Button.ts`) plays them, so the sim
   tabs, the plot chip, the book chip, the book card's rows (`asks`) and Cut comb honey button
   (`cut`), the breed card's buttons by trait (`breeds`), and from `EstatePanels.spots()` the
   `garden`, `workshop` and `warrant` chips, the flower picker by flower (`blooms`), the `beds`,
-  `enterRare`, the make buttons by ware (`makes`), the `commissions` rows and the `gift` button. Positions therefore follow `layout.ts`. The test uses only Send, Sell and the cells.
+  `enterRare`, the make buttons by ware (`makes`), the `commissions` rows and the `gift` button,
+  and from `LoopPanels.spots()` the `forecast` card, the `auction` note, the `jelly` chip and the
+  jelly card's `jellySell` and `jellyFeed` buttons. Positions therefore follow `layout.ts`. The test uses only Send, Sell and the cells.
 - Inputs: mouse clicks only, mapped from the 960x540 view to the canvas's size on the page (not
   its pixels, which are `renderScale` times more). The click on slot 7
   moves the mouse there first, so the build preview shows for a moment before the cell is built.
@@ -658,6 +716,14 @@ only `GameScene` (and the refusal buzz in `ui/Button.ts`) plays them, so the sim
   well above 1 so the first round never meets it.
 - Retune the royal warrant: `WARRANT_GOLDS`, `WARRANT_STEP`, `WARRANT_MAX` and `royalAsk` in
   `src/game/warrant.ts`; the bonus is in `jarPrice` and `basePrice`.
+- Retune royal jelly: `JELLY_MS`, `JELLY_MULT`, `FED_MS`, `FED_BROOD` in `src/game/jelly.ts`;
+  `ringed` and `jellyPrice` in `state.ts`. A first round's lone cell can never be ringed. Update
+  the README's jelly table.
+- Retune the weather: `DAY_MS` (keep it a whole fraction of `SEASON_MS`), `CHANCES`, `WARM_NECTAR`
+  and `WEATHER_FROM` in `src/game/weather.ts` (keep it above 1, so the first round stays calm).
+  Update the README's weather table.
+- Retune the auction: `src/game/auction.ts`. Keep `AUCTION_FROM` above 1; the first season's end
+  is well past the first round anyway.
 - Add an effect for a new rule: push a new `GameEvent` kind from `src/game/sim.ts` and handle it in
   `GameScene.drawEvents`.
 
@@ -667,7 +733,7 @@ only `GameScene` (and the refusal buzz in `ui/Button.ts`) plays them, so the sim
   red with four petals), since no game may show a red cross.
 - Depths: `bg-back` 0, meadows 0.01 to 0.02, `bg-front` 0.05, flowers about 0.1, the season
   tint 0.5, hive 1, hive tabs and plaque 1.5, cells 2, comb graphics 2.5, casks 3 to 4, goal card
-  20, buttons and the order and contract cards 30 to 31, bees 50, wasps 51, the market
+  20, the forecast card, the buyer's note and the jelly chip `UI_DEPTH - 1`, the jelly card `UI_DEPTH + 5`, buttons and the order and contract cards 30 to 31, bees 50, wasps 51, the market
   `UI_DEPTH - 2`, HUD, the away chip and the swarm chip near `UI_DEPTH`, the end card
   `UI_DEPTH + 5`. The away chip covers the market while it shows (a tap hides it); the swarm
   chip sits above the button board, so the market stays in reach while a swarm gathers. Anything new on the board or meadow must sit above `bg-front` (and below the season tint
@@ -677,7 +743,7 @@ only `GameScene` (and the refusal buzz in `ui/Button.ts`) plays them, so the sim
   above the market (y 384). A third row would cover one or the other, so `drawBees` shows the two
   rows for the pair of hives whose comb is shown (1 and 2, or 3 and 4) and hides the other pair's
   bees at home.
-- `Cell` is a union: check `type` (or `isHoney`/`isBrood`) before reading `phase` or `nectar`.
+- `Cell` is a union of honey, brood and jelly cells: check `type` (or `isHoney`/`isBrood`/`isJelly`) before reading `phase` or `nectar`.
 - `cellAt` hits the nearest centre within half a hex width, so taps right on a corner between
   cells may miss.
 - The button board and jar shelf are baked into `bg-front`; moving `BOARD` or `SHELF` in

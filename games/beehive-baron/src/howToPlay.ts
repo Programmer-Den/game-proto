@@ -15,6 +15,9 @@ const en: HowToPlay = {
     { input: 'Click or tap a wasp', action: 'Swat it away before it steals the honey' },
     { input: "Buyer's book (on the hill)", action: 'Supply town buyers, or arm Cut comb honey and tap a capped cell' },
     { input: 'Garden, Workshop and Royal warrant (under the book)', action: 'Plant beds, make candles and polish, and give the crown its gift' },
+    { input: 'Click or tap a royal jelly cell', action: 'Take its jelly once ready (or clear it once its ring is broken)' },
+    { input: 'Royal jelly (under the warrant)', action: 'Sell a jar of royal jelly, or feed it to the queens' },
+    { input: "A buyer's note over the meadow", action: 'Accept the bid for your jars before the buyer walks off' },
     { input: 'New hive (bottom right)', action: 'Start over from scratch, at once' },
   ],
   loop: [
@@ -39,6 +42,9 @@ const en: HowToPlay = {
     'After the first gold, plant the garden: clover beside lavender, clover beside sunflower and lavender beside heather cross-pollinate into rare honeys that sell dear and score in the fair\'s Rare class.',
     'From 50 jars sold, the candle workshop turns spare wax into candles and polish for the church\'s and the manor\'s commissions, new every season.',
     'After three golds the crown asks for a gift of honey each autumn: give it before winter to keep the royal warrant, which raises every price 10% a year, up to 50%.',
+    'Leave an empty cell ringed by six capped cells and it turns to a royal jelly cell: keep the ring whole for a minute, tap the cell to take the jelly, then sell it dear or feed it to the queens for a season of brood twice as fast.',
+    'From 10 jars sold the forecast shows the next days: on a rainy day the foragers stay home, and on a warm day each bee brings twice the nectar.',
+    "From 10 jars sold, a buyer bids on your best jars as each season ends: the bid rises, but they walk off when they like, so tap the note before they do.",
   ],
 };
 
@@ -56,6 +62,9 @@ const de: HowToPlay = {
     { input: 'Eine Wespe anklicken oder antippen', action: 'Sie verscheuchen, bevor sie den Honig stiehlt' },
     { input: 'Käuferbuch (auf dem Hügel)', action: 'Käufer aus der Stadt beliefern, oder Wabenhonig schneiden und eine verdeckelte Zelle antippen' },
     { input: 'Garten, Werkstatt und Hoflieferant (unter dem Buch)', action: 'Beete pflanzen, Kerzen und Politur machen und der Krone ihre Gabe geben' },
+    { input: 'Eine Gelée-royale-Zelle anklicken oder antippen', action: 'Ihr Gelée nehmen, sobald es fertig ist (oder sie räumen, wenn ihr Ring offen ist)' },
+    { input: 'Gelée royale (unter dem Hoflieferanten)', action: 'Ein Glas Gelée royale verkaufen oder die Königinnen damit füttern' },
+    { input: 'Die Notiz eines Käufers über der Wiese', action: 'Das Gebot für deine Gläser annehmen, bevor der Käufer geht' },
     { input: 'Neuer Stock (unten rechts)', action: 'Sofort ganz von vorn beginnen' },
   ],
   loop: [
@@ -80,6 +89,9 @@ const de: HowToPlay = {
     'Pflanze nach dem ersten Gold den Garten: Klee neben Lavendel, Klee neben Sonnenblume und Lavendel neben Heide bestäuben sich zu seltenem Honig, der teuer verkauft und in der Klasse Selten der Honigschau punktet.',
     'Ab 50 verkauften Gläsern macht die Kerzenwerkstatt aus übrigem Wachs Kerzen und Politur für die Aufträge von Kirche und Gut, neu in jeder Jahreszeit.',
     'Nach dreimal Gold bittet die Krone jeden Herbst um eine Gabe Honig: Gib sie vor dem Winter, um Hoflieferant zu bleiben, was jeden Preis um 10\u00a0% im Jahr hebt, bis 50\u00a0%.',
+    'Bleibt eine leere Zelle von sechs verdeckelten Zellen umringt, wird sie zur Gelée-royale-Zelle: Halte den Ring eine Minute geschlossen, tipp die Zelle an, um das Gelée zu nehmen, und verkaufe es teuer oder füttere die Königinnen für eine Jahreszeit doppelt so schneller Brut.',
+    'Ab 10 verkauften Gläsern zeigt die Wettervorhersage die nächsten Tage: An Regentagen bleiben die Sammlerinnen daheim, an warmen Tagen bringt jede Biene doppelt so viel Nektar.',
+    'Ab 10 verkauften Gläsern bietet zum Ende jeder Jahreszeit ein Käufer auf deine besten Gläser: Das Gebot steigt, aber er geht, wann er will, also tipp die Notiz an, bevor er weg ist.',
   ],
 };
 
