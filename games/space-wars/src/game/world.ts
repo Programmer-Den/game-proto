@@ -1778,7 +1778,7 @@ export class World {
   /** One shot from `from` at `target`: shields soak part of it, and the shot's own ability acts. */
   private shoot(from: Shooter, damage: number, target: Unit | Building) {
     const faction = from.kind === 'derelict' ? from.owner : from.faction;
-    const dealt = Math.round(damage * this.shieldShare(target) * this.bulwarkShare(target) * this.screenShare(target));
+    const dealt = Math.round(damage * this.guardShare(target));
     target.hp -= dealt;
     target.lastHit = faction;
     if (target.kind === 'unit') target.lastHitBy = from.kind === 'unit' ? from.id : -1;
@@ -1802,7 +1802,8 @@ export class World {
       this.booms.push({ x: target.x, y: target.y, color: this.sides[faction].def.color, life: BOOM_MS, r: ability.radius });
       for (const e of [...this.units, ...this.buildings]) {
         if (e === target || e.faction === faction || this.atPeace(faction, e.faction) || dist(e, target) > ability.radius) continue;
-        e.hp -= Math.round(damage * ability.share);
+        // A splash is cut by the same shields and screens as the shot itself.
+        e.hp -= Math.round(damage * ability.share * this.guardShare(e));
         e.lastHit = faction;
         if (e.kind === 'unit') e.lastHitBy = from.kind === 'unit' ? from.id : -1;
         this.alarm(e, faction);
@@ -1862,7 +1863,7 @@ export class World {
       if (!this.units.some((u) => u.faction !== m.faction && !this.atPeace(m.faction, u.faction) && u.hp > 0 && dist(u, m) <= def.trigger)) return true;
       for (const u of this.units) {
         if (u.faction === m.faction || this.atPeace(m.faction, u.faction) || dist(u, m) > def.radius) continue;
-        u.hp -= Math.round(def.damage * this.shieldShare(u));
+        u.hp -= Math.round(def.damage * this.guardShare(u));
         u.lastHit = m.faction;
         u.lastHitBy = -1;
         this.alarm(u, m.faction);
@@ -2035,6 +2036,11 @@ export class World {
       }
     }
     return best;
+  }
+
+  /** Every share a hit on `target` is cut by: its shield, the Warden's wall and a screening heavy. */
+  private guardShare(target: Unit | Building) {
+    return this.shieldShare(target) * this.bulwarkShare(target) * this.screenShare(target);
   }
 
   /** The share of a shot that reaches a unit: the strongest shield of friends in range (a Halo Cruiser's lets through half, the Solar flagship's 35%). */

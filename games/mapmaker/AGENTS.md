@@ -351,13 +351,13 @@ home washes `PRESS_LOSS` of the voyage's least valuable tiles a step off the cha
   `returnToPort` clears both after `chartOf`, and `setSail` too.
 - `chart` (set by `returnToPort`): `counts`, `base` (the tiles' full value), `rivalTiles` and
   `rivalLoss` (tiles the rival `claims` first, and half their value, floored, taken off), `ink`
-  (on `base - rivalLoss`), `features` and `featureCoins` (`featuresDone`: every feature whose
+  (on `base - rivalLoss - stormLoss`, the tiles the chart still holds), `features` and `featureCoins` (`featuresDone`: every feature whose
   tiles are all revealed with at least one in `surveyed`, so it pays once), `bonus` (the
   commission's, when `done` plus this voyage's count reaches `need`), `artifacts`, `artifactCoins`
   (`artifactValue`: double with a Naturalist), `fixes` and `fixCoins`, `goods` and `goodsCoins`,
   `storm` and `stormLoss` (after pressing on, when `stormComes`: `pressed * PRESS_LOSS` tiles, the
   voyage's least valuable after the rival's half, taken off), `treasure`, `unused` and `sellBack`
-  (`min(unused * SELL_BACK, base - rivalLoss)`, so turning back at once earns nothing), `milestones` and
+  (`min(unused * SELL_BACK, base - rivalLoss - stormLoss)`, so turning back at once earns nothing), `milestones` and
   `milestoneCoins` (the `MILESTONES` reached and not yet paid), `atlas` (100% reached), `total`.
   Supplies are left as they are until `setSail` refills them.
 - `features` (from `makeIsland`, or `findFeatures` on a load): each with `kind`, `name` (a `TextKey`), `tiles`
