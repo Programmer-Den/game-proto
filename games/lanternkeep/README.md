@@ -289,7 +289,7 @@ stone joints, the lanterns have coloured-glass panes and the moths are lace-wing
 
 ![A moth round being dragged from the jar through three lanterns](docs/screenshots/loop-moth-round.webp)
 
-![Night 2's new lantern: three marked spots, two of which complete a chain](docs/screenshots/loop-place-lantern.webp)
+![Night 2's new lantern: three marked spots, two of which complete a chain](docs/screenshots/loop-new-lantern.webp)
 
 ![The fittings bar: a gust guard and a bat shutter fitted, the reservoir picked](docs/screenshots/loop-fittings.webp)
 

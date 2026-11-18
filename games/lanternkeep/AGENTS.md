@@ -708,7 +708,7 @@ scene. Under browser automation nothing plays, so the playthrough is unchanged.
   `nextDusk`, and `duskMs` set to 35 s for the avalanche's warning; and `kept` 9 on night 10 for
   the festival.
 
-- `loop-moth-round`, `loop-place-lantern` and `loop-fittings` were staged with a scratch script:
+- `loop-moth-round`, `loop-new-lantern` and `loop-fittings` were staged with a scratch script:
   every trophy set before the page loads, a round dragged with `page.mouse` from the jar through
   lanterns 3, 0 and 1 (shot before letting go); night 1 ended with every lantern lit and 100
   coins, "Fittings" clicked, a gust guard and a bat shutter fitted and the reservoir picked; then
