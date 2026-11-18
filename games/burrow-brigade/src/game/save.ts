@@ -43,7 +43,12 @@ function write(key: string, value: unknown) {
   }
 }
 
-export const loadStats = (): Stats => read<Stats>(STATS_KEY, { games: 0, wins: 0, used: [] });
+export const loadStats = (): Stats => {
+  // An imported or hand-edited save may hold anything: keep only well-formed fields.
+  const s = read<Partial<Stats>>(STATS_KEY, {});
+  const count = (n: unknown) => (Number.isFinite(n) && (n as number) >= 0 ? Math.floor(n as number) : 0);
+  return { games: count(s.games), wins: count(s.wins), used: Array.isArray(s.used) ? s.used.filter((id) => typeof id === 'string') : [] };
+};
 export const saveStats = (s: Stats) => write(STATS_KEY, s);
 export const loadPrefs = (): Prefs => {
   const p = read<Partial<Prefs>>(PREFS_KEY, { size: 3 });

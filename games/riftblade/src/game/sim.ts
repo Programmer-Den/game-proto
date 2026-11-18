@@ -144,7 +144,8 @@ export function banish(s: GameState, index: number) {
   s.banished.push(id);
   const rest = s.choices.filter((_, i) => i !== index);
   const next = rollChoices(s.hero!, s, 1, rest)[0];
-  if (next && !rest.includes(next)) s.choices[index] = next;
+  // A Field Ration is no new card: the slot goes, unless it was the only card left.
+  if (next && !rest.includes(next) && (next !== FILLER.id || !rest.length)) s.choices[index] = next;
   else s.choices.splice(index, 1);
   return true;
 }
@@ -186,6 +187,8 @@ export function lower(s: GameState, id: string) {
 
 /** Puts max health back in line with the stats (after the cache's cost or a tier lost). */
 export function refreshHealth(s: GameState) {
+  // Triad-77's health is its bots': size them to the new maximum first.
+  syncSquad(s);
   st = statsOf(s);
   s.player.maxHp = st.maxHp;
   s.player.hp = Math.min(s.player.hp, st.maxHp);

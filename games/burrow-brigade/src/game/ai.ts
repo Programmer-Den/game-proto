@@ -39,7 +39,9 @@ export function planTurn(world: World, me: Mole, ammo: Record<WeaponId, number>,
   const close = enemies.find((m) => Math.abs(m.x - me.x) < 24 && Math.abs(m.y - me.y) < 18);
   if (close) {
     const angle = close.x >= me.x ? 0 : Math.PI;
-    if (has('pound') && Math.random() < 0.4) return { ...base, weapon: 'pound', angle, target: close, miss: 0 };
+    // A slam hurts every mole within 50 px, so not with a friend that close.
+    const friendNear = world.moles.some((m) => m.alive && m !== me && m.team === me.team && Math.hypot(m.x - me.x, m.y - me.y) < 50);
+    if (has('pound') && !friendNear && Math.random() < 0.4) return { ...base, weapon: 'pound', angle, target: close, miss: 0 };
     return { ...base, weapon: 'swipe', angle, target: close, miss: 0 };
   }
   if (me.hp < 40 && has('repair') && Math.random() < 0.6) return { ...base, weapon: 'repair', target: me, miss: 0 };

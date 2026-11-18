@@ -590,6 +590,10 @@ export function castSpell(s: GameState, u: Unit, aim: Vec): boolean {
     }
   }
   u.spellCd = def.cd;
+  // Casting shows a champion, like an ability or an attack.
+  u.revealMs = REVEAL_MS;
+  u.lullMs = 0;
+  breakStealth(u);
   if (u.id === s.player) s.coach.spells++;
   if (def.id !== 'teleport') u.recallMs = 0;
   u.castMs = 300;
