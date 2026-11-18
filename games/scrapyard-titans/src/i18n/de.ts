@@ -486,12 +486,45 @@ const de: Translation<typeof en> = {
   place2: '{n}',
   place3: '{n}',
   placeN: '{n}',
+
+  // Overdrives (ST7): charged by dealing damage, once per fight
+  shieldWaveName: 'Schildwelle',
+  shieldWaveText: 'Deine Roboter erhalten 5 Sekunden lang Schilde von 25 % ihrer Lebenspunkte.',
+  empFrontName: 'Front-EMP',
+  empFrontText: 'Die vorderste Gegnerreihe verliert ihre Ladung, wird 2 Sekunden betäubt und erleidet 120 Schaden.',
+  repairBurstName: 'Reparaturstoß',
+  repairBurstText: 'Jeder deiner Roboter bekommt 45 % seiner Lebenspunkte zurück.',
+  overdriveTag: 'Overdrive: {name}',
+  overdriveHint: 'Lädt sich mit Schaden auf: dann antippen oder V.',
+  overdriveKey: 'Overdrive V',
+  overdriveCharge: 'Ladung {n} %',
+  overdriveUsed: 'Verbraucht',
+  overdriveCall: '{name}: {kind}!',
+
+  // Stage events (ST8): one per stage from stage 2
+  scrapStormName: 'Schrottsturm',
+  scrapStormText: 'Schützen greifen 25 % langsamer an',
+  magnetEventName: 'Magnetfeld',
+  magnetEventText: 'Roboter zur Mitte gezogen',
+  chargedAirName: 'Geladene Luft',
+  chargedAirText: 'Roboter starten halb geladen',
+  rustRainName: 'Rostregen',
+  rustRainText: 'Rüstung um 40 % gesenkt',
+  liveWiresName: 'Offene Leitungen',
+  liveWiresText: 'Overdrives laden doppelt so schnell',
+  eventLine: 'Stufenereignis · {name}: {text}',
+  eventCall: 'Stufenereignis: {name}!',
+
+  // Finals (ST9): the last two commanders play a best of three
+  finalsCall: 'Finale gegen {name}! Best of three',
+  finalsKind: 'Finale {a}–{b}',
+  finalsScore: 'Finale {a}–{b}',
 };
 
 /** Texts that are the same in German. */
 export const keepEnglish: (keyof typeof en)[] = [
   'magnetTrait', 'neonTrait', 'hackerTrait', 'saboteurTrait', 'servoName', 'firewall', 'kernel', 'flicker', 'sparks', 'magna',
-  'tauntWin', 'title', 'skillCall', 'hexa', 'nova', 'rankTitan', 'bomberTrait', 'partnerTag',
+  'tauntWin', 'title', 'skillCall', 'hexa', 'nova', 'rankTitan', 'bomberTrait', 'partnerTag', 'overdriveKey', 'overdriveCall', 'overdriveTag',
 ];
 
 export default de;

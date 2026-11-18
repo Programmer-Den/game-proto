@@ -488,6 +488,39 @@ const en = {
   place2: '{n}nd',
   place3: '{n}rd',
   placeN: '{n}th',
+
+  // Overdrives (ST7): charged by dealing damage, once per fight
+  shieldWaveName: 'Shield wave',
+  shieldWaveText: 'Every robot of yours gets a shield of 25% of its health for 5 seconds.',
+  empFrontName: 'Front EMP',
+  empFrontText: 'The enemy front row loses its charge, is stunned for 2 seconds and takes 120 damage.',
+  repairBurstName: 'Repair burst',
+  repairBurstText: 'Every robot of yours gets 45% of its health back.',
+  overdriveTag: 'Overdrive: {name}',
+  overdriveHint: 'It charges as your robots deal damage: then tap it or press V.',
+  overdriveKey: 'Overdrive V',
+  overdriveCharge: 'Charge {n}%',
+  overdriveUsed: 'Spent',
+  overdriveCall: '{name}: {kind}!',
+
+  // Stage events (ST8): one per stage from stage 2
+  scrapStormName: 'Scrap storm',
+  scrapStormText: 'shooters attack 25% slower',
+  magnetEventName: 'Magnet field',
+  magnetEventText: 'robots pulled to the middle',
+  chargedAirName: 'Charged air',
+  chargedAirText: 'robots start half charged',
+  rustRainName: 'Rust rain',
+  rustRainText: 'armour cut by 40%',
+  liveWiresName: 'Live wires',
+  liveWiresText: 'overdrives charge twice as fast',
+  eventLine: 'Stage event · {name}: {text}',
+  eventCall: 'Stage event: {name}!',
+
+  // Finals (ST9): the last two commanders play a best of three
+  finalsCall: 'Finals vs {name}! Best of three',
+  finalsKind: 'Finals {a}–{b}',
+  finalsScore: 'Finals {a}–{b}',
 };
 
 export default en;

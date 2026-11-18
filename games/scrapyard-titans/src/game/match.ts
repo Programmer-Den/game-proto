@@ -8,10 +8,10 @@ import { byDifficulty } from '../../../../shared/settings';
 import { seedOf, seeded } from '../../../../shared/daily';
 import type { TextKey } from '../i18n';
 import {
-  AUGMENTS, BENCH_SLOTS, BOSS, DUO, CAMPAIGN, GHOST, RANKS, RARE, RARE_FROM_STAGE, BOARD, ECONOMY, GILDED, ITEM_BENCH, LEVEL_XP, MAX_ITEMS, MAX_LEVEL, PARTS, PLAYER_COMMANDERS,
+  AUGMENTS, BENCH_SLOTS, BOSS, DUO, CAMPAIGN, FINALS, GHOST, OVERDRIVE_OF, STAGE_EVENT, STAGE_EVENTS, RANKS, RARE, RARE_FROM_STAGE, BOARD, ECONOMY, GILDED, ITEM_BENCH, LEVEL_XP, MAX_ITEMS, MAX_LEVEL, PARTS, PLAYER_COMMANDERS,
   PLAYERS, RIVALS, SCRAP_TOKENS_PER_PART, lobbyRivals, SETS, SHOP_ODDS, SHOP_SLOTS, SURVIVOR_DAMAGE, TERRAIN_TILES, UNIT_BY_ID, comboOf,
   isPart, rosterOf, stageDamage, stageRounds,
-  type AugmentId, type CommanderDef, type MonsterId, type OriginId, type PartId, type RoundDef, type SetId, type TerrainId,
+  type AugmentId, type CommanderDef, type MonsterId, type OriginId, type PartId, type RoundDef, type SetId, type StageEventId, type TerrainId,
   type TraitId,
 } from './data';
 import { Battle, type FighterSpec, type SideSpec } from './battle';
@@ -198,6 +198,18 @@ export interface Match {
   roundsPlayed: number;
   /** Each seat's own shop stream in the daily lobby, so its shops don't change with the fights; null elsewhere. */
   shopRand: Rand[] | null;
+  /** This stage's event (ST8), drawn in the stage's first plan phase, and the stage it was drawn for. */
+  stageEvent: StageEventId | null;
+  eventStage: number;
+  /** The finals (ST9) once two commanders are left, or null. */
+  finals: Finals | null;
+}
+
+/** A best-of-three between the last two commanders: their seats, fights won and fights played. */
+export interface Finals {
+  seats: [number, number];
+  wins: [number, number];
+  fights: number;
 }
 
 export const ownRows = BOARD.ownRows;
@@ -230,6 +242,7 @@ export function newMatch(opts: MatchOptions): Match {
   const m: Match = {
     opts, players, stage: 1, index: 0, round: stageRounds(1)[0], phase: 'plan', time: 0, phaseEnds: Infinity, battle: null,
     opponent: -1, ghost: false, ghostSquad: false, drops: [], terrain: {}, draft: null, taunt: null, result: null, meter: [], nextUid: 1, roundsPlayed: 0,
+    stageEvent: null, eventStage: 0, finals: null,
     shopRand: opts.daily ? players.map((p) => seeded(seedOf(`scrapyard-titans:${opts.daily}:shop${p.seat}`))) : null,
   };
   for (const p of players) rollShop(m, p);
@@ -500,6 +513,11 @@ export function startPlan(m: Match, planS: number) {
     p.freeRolls = p.augments.includes('free-rolls') ? RARE.freeRolls : 0;
     if (m.round.augment) offerAugments(m, p);
   }
+  // Each stage from the second draws a stage event, never the last stage's again.
+  if (m.stage >= STAGE_EVENT.fromStage && m.eventStage !== m.stage) {
+    m.eventStage = m.stage;
+    m.stageEvent = pick((Object.keys(STAGE_EVENTS) as StageEventId[]).filter((id) => id !== m.stageEvent));
+  }
   m.terrain = {};
   if (m.opts.terrain && m.round.kind !== 'draft') {
     const kinds: TerrainId[] = ['oil', 'charger', 'plate', 'furnace'];
@@ -539,14 +557,14 @@ function sideOf(m: Match, p: Player, mirrored: boolean): SideSpec {
     const [col, row] = k.split(',').map(Number);
     return { defId: o.defId, star: o.star, items: o.items, gilded: o.gilded, col: mirrored ? BOARD.cols - 1 - col : col, row: mirrored ? 7 - row : row };
   });
-  return { fighters, traits: countTraits(units), augments: p.augments, skill: p.commander.skill, season: m.opts.set };
+  return { fighters, traits: countTraits(units), augments: p.augments, skill: p.commander.skill, overdrive: OVERDRIVE_OF[p.commander.skill], season: m.opts.set };
 }
 
 function monsterSide(m: Match, monsters: MonsterId[]): SideSpec {
   const spots: [number, number][] = [[3, 2], [4, 2], [2, 1], [5, 1], [3, 0], [4, 0]];
   return {
     fighters: monsters.map((id, i) => ({ monster: id, star: 1, items: [], gilded: null, col: id === 'rat' ? 3 : spots[i][0], row: id === 'rat' ? 1 : spots[i][1] })),
-    traits: {}, augments: [], skill: null, season: m.opts.set,
+    traits: {}, augments: [], skill: null, overdrive: null, season: m.opts.set,
   };
 }
 
@@ -554,7 +572,8 @@ function monsterSide(m: Match, monsters: MonsterId[]): SideSpec {
 function ghostSide(m: Match, squad: SavedSquad): SideSpec {
   const fighters: FighterSpec[] = squad.fighters.map((f) => ({ defId: f.defId, star: f.star, items: f.items, gilded: f.gilded, col: BOARD.cols - 1 - f.col, row: 7 - f.row }));
   const traits = countTraits(squad.fighters.map((f, i) => ({ uid: -1 - i, defId: f.defId, star: f.star, items: f.items, gilded: f.gilded })));
-  return { fighters, traits, augments: squad.augments, skill: PLAYER_COMMANDERS[squad.commander]?.skill ?? null, season: m.opts.set };
+  const skill = PLAYER_COMMANDERS[squad.commander]?.skill ?? null;
+  return { fighters, traits, augments: squad.augments, skill, overdrive: skill && OVERDRIVE_OF[skill], season: m.opts.set };
 }
 
 function terrainMap(m: Match) {
@@ -605,7 +624,7 @@ export function startFight(m: Match) {
       if (next === team) return;
       const a = team[team.length - 1];
       const b = next[0];
-      pairings.push({ a, b, ghost: false, battle: new Battle(sideOf(m, m.players[a], false), sideOf(m, m.players[b], true), terrainMap(m)), drops: [] });
+      pairings.push({ a, b, ghost: false, battle: new Battle(sideOf(m, m.players[a], false), sideOf(m, m.players[b], true), terrainMap(m), m.stageEvent), drops: [] });
     });
   } else if (m.round.kind === 'pvp') {
     const seats = shuffle(alive.map((p) => p.seat));
@@ -620,7 +639,7 @@ export function startFight(m: Match) {
       const a = seats[i];
       const ghost = i + 1 >= seats.length;
       const b = ghost ? pick(seats.filter((s) => s !== a)) : seats[i + 1];
-      const battle = new Battle(sideOf(m, m.players[a], false), sideOf(m, m.players[b], true), terrainMap(m));
+      const battle = new Battle(sideOf(m, m.players[a], false), sideOf(m, m.players[b], true), terrainMap(m), m.stageEvent);
       pairings.push({ a, b, ghost, battle, drops: [] });
     }
   } else {
@@ -629,7 +648,7 @@ export function startFight(m: Match) {
       const ghost = p.seat === 0 && isGhostRound(m) && p.human;
       if (ghost) m.ghostSquad = true;
       const foe = ghost ? ghostSide(m, m.opts.ghost!) : monsterSide(m, m.round.monsters!);
-      const battle = new Battle(sideOf(m, p, false), foe, terrainMap(m));
+      const battle = new Battle(sideOf(m, p, false), foe, terrainMap(m), m.stageEvent);
       pairings.push({ a: p.seat, b: -1, ghost: false, battle, drops: [] });
     }
     for (const pr of pairings) pr.drops = rollDrops(m, pr.battle);
@@ -644,7 +663,7 @@ export function startFight(m: Match) {
   }
   // The player's fight is always seen from the bottom: swap the sides if the player is side 1.
   if (mine.b === 0) {
-    mine.battle = new Battle(sideOf(m, m.players[0], false), sideOf(m, m.players[mine.a], true), terrainMap(m));
+    mine.battle = new Battle(sideOf(m, m.players[0], false), sideOf(m, m.players[mine.a], true), terrainMap(m), m.stageEvent);
     [mine.a, mine.b] = [0, mine.a];
     mine.ghost = false;
   }
@@ -683,8 +702,8 @@ export function endFight(m: Match) {
     else if (won === false) p.streak = p.streak < 0 ? p.streak - 1 : -1;
     p.last = won === null ? 'draw' : won ? 'win' : 'loss';
     const dmg = Math.round(damage * (p.augments.includes('last-stand') ? 0.7 : 1));
-    // Duo teammates share their health: a loss costs both bars alike.
-    if (won !== true) for (const q of m.players) if (q.team === p.team) q.hp -= dmg;
+    // Duo teammates share their health: a loss costs both bars alike. The finals cost no health.
+    if (won !== true && !m.finals) for (const q of m.players) if (q.team === p.team) q.hp -= dmg;
     p.gold += gold + (p.augments.includes('scrap-dividend') ? 2 : 0);
     if (won && m.opts.set === 'scrap' && m.round.kind === 'pvp') {
       p.scrapTokens++;
@@ -693,7 +712,7 @@ export function endFight(m: Match) {
         giveItem(p, randomPart());
       }
     }
-    return dmg;
+    return m.finals ? 0 : dmg;
   };
   for (const pr of pairings) {
     const b = pr.battle;
@@ -729,9 +748,30 @@ export function endFight(m: Match) {
   if (m.battle) m.meter = meterOf(m.battle);
   const mate = partner(m);
   if (m.result && mate?.last) m.result.partner = mate.last;
-  knockOuts(m);
+  if (m.finals) settleFinals(m);
+  else {
+    knockOuts(m);
+    const left = m.players.filter((p) => p.alive);
+    if (!m.opts.duo && left.length === 2) m.finals = { seats: [left[0].seat, left[1].seat], wins: [0, 0], fights: 0 };
+  }
   m.phase = 'result';
   m.roundsPlayed++;
+}
+
+/** Scores a finals fight: the first to `FINALS.wins` takes 1st, the other 2nd; after `maxFights` the healthier one wins. */
+function settleFinals(m: Match) {
+  const f = m.finals!;
+  const [a, b] = f.seats.map((seat) => m.players[seat]);
+  f.fights++;
+  if (a.last === 'win') f.wins[0]++;
+  else if (b.last === 'win') f.wins[1]++;
+  let winner = f.wins[0] >= FINALS.wins ? 0 : f.wins[1] >= FINALS.wins ? 1 : -1;
+  if (winner < 0 && f.fights >= FINALS.maxFights) winner = f.wins[0] !== f.wins[1] ? (f.wins[0] > f.wins[1] ? 0 : 1) : a.hp >= b.hp ? 0 : 1;
+  if (winner < 0) return;
+  const [won, lost] = winner === 0 ? [a, b] : [b, a];
+  lost.alive = false;
+  lost.place = 2;
+  won.place = 1;
 }
 
 /** The teams still in the match (each seat is its own team outside duo mode). */
@@ -764,6 +804,11 @@ export function matchOver(m: Match): 'won' | 'lost' | null {
 /** Moves on to the next round (or stage). */
 export function advance(m: Match) {
   m.index++;
+  // The finals are fights between the two, one after another, in the stage they started in.
+  if (m.finals) {
+    m.round = { stage: m.stage, index: m.index + 1, kind: 'pvp' };
+    return;
+  }
   let rounds = stageRounds(m.stage);
   if (m.index >= rounds.length) {
     m.stage++;
