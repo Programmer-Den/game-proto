@@ -123,7 +123,7 @@ function showFps(game: Phaser.Game) {
   const label = document.createElement('div');
   label.className = 'fps-readout';
   label.style.cssText =
-    'position:fixed;bottom:4px;right:4px;z-index:10;padding:2px 6px;pointer-events:none;' +
+    'position:fixed;bottom:calc(4px + var(--safe-bottom, env(safe-area-inset-bottom, 0px)));right:calc(4px + var(--safe-right, env(safe-area-inset-right, 0px)));z-index:10;padding:2px 6px;pointer-events:none;' +
     'font:12px ui-monospace,monospace;color:#f3e9d2;background:rgba(0,0,0,0.55)';
   document.body.append(label);
   game.events.on(Phaser.Core.Events.POST_RENDER, () => {

@@ -37,12 +37,16 @@ function qrDetector() {
   return detector;
 }
 
+/** Counts the scans started, so a scan's loop stops once the dialog is opened for another. */
+let scans = 0;
+
 /**
  * Opens the `#scan-code` dialog with the camera's picture and calls `found` with the first QR code
  * that is a progress link (it has `#p=`), or with the digits of a loop of frames once every frame
  * is in, closing the dialog. Closing it stops the camera.
  */
 export async function scanCode(found: (text: string) => void) {
+  const scan = ++scans;
   const dialog = document.getElementById('scan-code') as HTMLDialogElement;
   const video = dialog.querySelector('video')!;
   const status = dialog.querySelector('.lede')!;
@@ -73,9 +77,10 @@ export async function scanCode(found: (text: string) => void) {
   status.textContent = t('scanHint');
   const loop = frameCollector();
   const tick = async () => {
-    if (!dialog.open) return;
+    if (!dialog.open || scan !== scans) return;
     try {
       const codes = await reader.detect(video);
+      if (!dialog.open || scan !== scans) return;
       const code = codes.find((c) => c.rawValue.includes('#p='));
       const whole = code?.rawValue ?? codes.map((c) => loop.add(c.rawValue)).find(Boolean);
       if (whole) {

@@ -351,7 +351,11 @@ class Player {
       }
       if (!this.loop && this.step >= this.length) {
         window.clearInterval(this.timer);
-        window.setTimeout(() => this.onEnd?.(), Math.max(0, (this.time - this.context.currentTime) * 1000));
+        window.setTimeout(() => {
+          this.onEnd?.();
+          // Let the last notes ring out, then let go of the music bus.
+          window.setTimeout(() => this.out.disconnect(), 1000);
+        }, Math.max(0, (this.time - this.context.currentTime) * 1000));
         return;
       }
       const all = tracks(this.part);
