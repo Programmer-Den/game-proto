@@ -4,6 +4,7 @@ import { ARMOURY_EACH, noArmoury, type Armoury } from './armoury';
 import { BOONS, type BoonId } from './boons';
 import type { ChallengeRun } from './challenges';
 import { KNIGHT_EACH, type KnightId } from './knights';
+import type { MissionBoard } from './missions';
 import { pairsOf } from './pairs';
 import { PET_EACH, noPets, type PetId, type PetLevels } from './pets';
 
@@ -100,6 +101,23 @@ export const DRAGON_AT = 1500;
  */
 export const SHRINE = { from: 2, price: 15, w: 46 };
 
+/**
+ * The shield dash, the third control beside jump and slide: for `ms` the knight charges on at `pace`
+ * times the speed behind the shield, holding their height in the air and skimming over a pit. It
+ * smashes crates and barrels and knocks goblins and shield goblins aside; then it needs `cooldown`
+ * ms to come back.
+ */
+export const DASH = { ms: 260, pace: 2.1, cooldown: 1800 };
+/** What a dash smashes or knocks aside instead of being hurt by it. */
+export const DASHABLE: readonly TrapKind[] = ['crate', 'shield', 'goblin', 'barrel'];
+
+/**
+ * A high route: from stage `from`, a stretch of road splits under a row of floating stone platforms
+ * `h` px up and `thick` px deep. The knight jumps up through one from below and runs along them for
+ * the coins (and the spikes or goblin up there), or keeps to the plain road under them.
+ */
+export const ROUTE = { from: 3, h: 112, thick: 18 };
+
 /** Running speed on a stage, in pixels per second; `HARDER.speed` more once the dragon is beaten. */
 export const speedOf = (stage: number, hard = false) => Math.min(480, 260 + 30 * (stage - 1)) + (hard ? HARDER.speed : 0);
 /** How the run goes on after the dragon is beaten: faster, with the obstacles closer together, on the Sky Road. */
@@ -157,7 +175,7 @@ export function terrainOf(stage: number, sky = false): Terrain {
   return (['ice', 'marsh', 'wind'] as const)[(stage - 2) % 3];
 }
 
-export type TrapKind = 'spikes' | 'pit' | 'blade' | 'flames' | 'goblin' | 'bat' | 'barrel' | 'axe' | 'fire' | 'tail';
+export type TrapKind = 'spikes' | 'pit' | 'blade' | 'flames' | 'goblin' | 'bat' | 'crate' | 'shield' | 'barrel' | 'axe' | 'fire' | 'tail';
 /** The traps that move along the course and can be stomped on from above. */
 export const FOES: readonly TrapKind[] = ['goblin', 'bat'];
 
@@ -177,6 +195,9 @@ export interface Trap {
   phase?: number;
   /** Set once the hound has barked at it. */
   barked?: boolean;
+  /** Set once it has hurt the knight (or been blocked), and once the knight is past it. */
+  touched?: boolean;
+  passed?: boolean;
 }
 
 /**
@@ -189,6 +210,9 @@ export const TRAP_SPAN: Record<Exclude<TrapKind, 'pit'>, { lo: number; hi: numbe
   flames: { lo: 0, hi: 64 },
   goblin: { lo: 0, hi: 34 },
   bat: { lo: 0, hi: 20 },
+  // A stack of two crates, and a goblin behind a tower shield whose pike stands too tall to leap.
+  crate: { lo: 0, hi: 60 },
+  shield: { lo: 0, hi: 150 },
   barrel: { lo: 0, hi: 26 },
   axe: { lo: 0, hi: 18 },
   fire: { lo: 0, hi: 30 },
@@ -221,12 +245,17 @@ export interface Ledge {
   sinkMs?: number;
   /** A falling cloud's speed downward. */
   fallV?: number;
+  /** A floating platform of a high route (`ROUTE`): ground only for feet at or above its top, so the knight runs under it and jumps up through it. */
+  float?: boolean;
 }
 
-/** Height of the ground under a stretch of course: the highest ledge over it, or the road. */
-export function floorAt(s: Pick<GameState, 'ledges'>, x0: number, x1 = x0) {
+/**
+ * Height of the ground under a stretch of course: the highest ledge over it, or the road. A high
+ * route's floating platform only counts for feet at or above its top (`feet`, by default any).
+ */
+export function floorAt(s: Pick<GameState, 'ledges'>, x0: number, x1 = x0, feet = Infinity) {
   let h = 0;
-  for (const l of s.ledges) if (x1 > l.x && x0 < l.x + l.w) h = Math.max(h, l.h);
+  for (const l of s.ledges) if (x1 > l.x && x0 < l.x + l.w && !(l.float && feet < l.h - 0.5)) h = Math.max(h, l.h);
   return h;
 }
 
@@ -267,11 +296,13 @@ export interface Coin {
   h: number;
   /** Set once a lodestone has caught it; it then flies to the knight. */
   pulled: boolean;
+  /** A coin up on a high route, for the high route mission. */
+  high?: boolean;
 }
 
 export interface Effect {
   id: number;
-  kind: 'coin' | 'hit' | 'block' | 'dust' | 'fall' | 'skid' | 'stomp' | 'pop' | 'heal' | 'refuse' | 'bark' | 'owl' | 'fox';
+  kind: 'coin' | 'hit' | 'block' | 'dust' | 'fall' | 'skid' | 'stomp' | 'pop' | 'heal' | 'refuse' | 'bark' | 'owl' | 'fox' | 'dash' | 'smash';
   x: number;
   h: number;
   ms: number;
@@ -296,6 +327,9 @@ export interface Runner {
   /** Time left skidding after landing on ice, and a jump waiting for the skid to end. */
   skidMs: number;
   jumpQueued: boolean;
+  /** Time left on a shield dash, and until the next one can be made. */
+  dashMs: number;
+  dashCd: number;
 }
 
 /**
@@ -347,6 +381,12 @@ export interface GameState {
   hits: number;
   /** Goblins and bats stomped on this run. */
   stomps: number;
+  /** Foes stomped (or knocked aside) since the last hit, for the run missions. */
+  row: number;
+  /** The three standing run missions (on an ordinary run; null on a seeded one), and the missions met and coins they paid this run. */
+  missions: MissionBoard | null;
+  missionsMet: number;
+  missionCoins: number;
   /** Time spent running this run, in ms; fire vents burn by it. */
   time: number;
   /** Hits the aegis will still shrug off before the next checkpoint. */
@@ -493,13 +533,17 @@ export function freshState(best = 0, bank = 0, armoury: Armoury = noArmoury(), d
     crown,
     distance: 0,
     speed: speedOf(1),
-    runner: { h: 0, vh: 0, slideMs: 0, slideQueued: false, jumps: 1, hurtMs: 0, skidMs: 0, jumpQueued: false },
+    runner: { h: 0, vh: 0, slideMs: 0, slideQueued: false, jumps: 1, hurtMs: 0, skidMs: 0, jumpQueued: false, dashMs: 0, dashCd: 0 },
     hearts: START_HEARTS,
     coins: 0,
     purse: 0,
     streak: 0,
     hits: 0,
     stomps: 0,
+    row: 0,
+    missions: null,
+    missionsMet: 0,
+    missionCoins: 0,
     time: 0,
     shields: 0,
     ranks: {},

@@ -38,12 +38,16 @@ export const STREAK_CHIP = { x: 565, y: 8, w: 98, h: 24 };
  * at most `captionW` wide, so it stays clear of the shared corner buttons in the bottom left (on a
  * small phone they reach about 165 px in) and of the touch Slide and Jump buttons on the right.
  */
-export const MARGIN = { scrollY: 487, captionX: 458, captionY: 525, captionW: 540 };
+export const MARGIN = { scrollY: 487, captionX: 400, captionY: 525, captionW: 440 };
 /** The boon cards at a checkpoint, by their centres: two of them, or three after a met dare (one once only Field Dressing is left). The road cards use the two. */
 export const CARDS = { xs: { 1: [480], 2: [330, 630], 3: [205, 480, 755] } as Record<number, number[]>, y: 300, w: 250, h: 260 };
 export const BUTTON = { w: 180, h: 40 };
-/** The round Slide and Jump buttons in the margin's bottom right, shown on touch screens: their centres and radius. */
-export const ACTION_BUTTONS = { y: 490, r: 40, slideX: 780, jumpX: 890 };
+/** The round Dash, Slide and Jump buttons in the margin's bottom right, shown on touch screens: their centres and radius. */
+export const ACTION_BUTTONS = { y: 490, r: 40, dashX: 670, slideX: 780, jumpX: 890 };
+/** The shield dash's sign in the HUD, between the hearts and the stage's name: lit when ready, filling while it comes back. */
+export const DASH_SIGN = { x: 405, y: 20 };
+/** The game-over panel's size, and its parts' heights from its centre. */
+export const OVER_PANEL = { w: 640, h: 470, title: -195, text: -105, shop: -8, buy: 34, missions: 78, buttons: 195 };
 
 export const UI_DEPTH = 10_000;
 export const FONT = 'Georgia, "Times New Roman", "DejaVu Serif", serif';
@@ -80,6 +84,7 @@ export function fitLayout(w: number, h: number) {
   for (const xs of Object.values(CARDS.xs)) xs.forEach((x, i) => (xs[i] = x + mid));
   CARDS.y += Math.round(dy / 2);
   ACTION_BUTTONS.y += dy;
+  ACTION_BUTTONS.dashX += dx;
   ACTION_BUTTONS.slideX += dx;
   ACTION_BUTTONS.jumpX += dx;
 }

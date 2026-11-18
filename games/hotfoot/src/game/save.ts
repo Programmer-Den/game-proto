@@ -3,13 +3,15 @@ import { BOON_IDS, type BoonId } from './boons';
 import { CHALLENGES } from './challenges';
 import type { Ghost } from './ghost';
 import { KNIGHT_IDS, type KnightId } from './knights';
+import { MISSIONS, MISSION_SLOTS, freshBoard, type MissionBoard, type MissionKind } from './missions';
 import { PETS, PET_IDS, noPets, type PetId, type PetLevels } from './pets';
 
 // Progress kept between runs, in the browser's local storage: the best distance, the coins banked,
 // the boon bought for the next run, the armoury's levels and the daily course's best. Every key is
 // prefixed with the game's name, since every game shares the hub's origin, and the crown from the
 // Dragon's Keep, the knights unlocked and ridden with their own bests, each knight's ghost, the
-// weekly road's best, the challenge courses' stars and the companions bought.
+// weekly road's best, the challenge courses' stars, the companions bought and the run missions
+// standing.
 // Storage can be blocked or full, so every access is wrapped.
 
 const BEST = 'hotfoot-best';
@@ -22,6 +24,7 @@ const KNIGHTS_KEY = 'hotfoot-knights';
 const WEEKLY = 'hotfoot-weekly';
 const CHALLENGES_KEY = 'hotfoot-challenges';
 const PETS_KEY = 'hotfoot-pets';
+const MISSIONS_KEY = 'hotfoot-missions';
 /** The ghosts: `-replays`, so they go into a progress file but never into a progress code (too big for a QR code). */
 const GHOSTS = 'hotfoot-replays';
 
@@ -42,6 +45,8 @@ export interface Progress {
   challenges: number[];
   /** Each companion's level (0 until bought), and the one that runs along on ordinary runs. */
   pets: { levels: PetLevels; with: PetId | null };
+  /** The three run missions standing, and how many have been dealt. */
+  missions: MissionBoard;
 }
 
 function read(key: string) {
@@ -81,7 +86,23 @@ export function loadProgress(): Progress {
     weekly: loadWeekly(),
     challenges: loadChallenges(),
     pets: loadPets(),
+    missions: loadMissions(),
   };
+}
+
+/** The missions standing (each kind once, at a tier of 1 or more); a fresh board if none are saved. */
+function loadMissions(): MissionBoard {
+  const raw = parse(read(MISSIONS_KEY)) as { slots?: unknown; dealt?: unknown } | null;
+  const dealt = Number(raw?.dealt);
+  const slots = Array.isArray(raw?.slots)
+    ? (raw.slots as { kind?: unknown; tier?: unknown }[]).flatMap((m) => {
+        const tier = Number(m?.tier);
+        return typeof m?.kind === 'string' && m.kind in MISSIONS && Number.isInteger(tier) && tier >= 1 ? [{ kind: m.kind as MissionKind, tier, progress: 0, from: 0 }] : [];
+      })
+    : [];
+  const kinds = new Set(slots.map((m) => m.kind));
+  if (slots.length !== MISSION_SLOTS || kinds.size !== MISSION_SLOTS || !Number.isInteger(dealt) || dealt < MISSION_SLOTS) return freshBoard();
+  return { slots, dealt };
 }
 
 function loadWeekly(): Progress['weekly'] {
@@ -139,7 +160,7 @@ export function saveGhosts(ghosts: Partial<Record<KnightId, Ghost>>) {
   }
 }
 
-export function saveProgress({ best, bank, pending, armoury, daily, crown, knights, weekly, challenges, pets }: Progress) {
+export function saveProgress({ best, bank, pending, armoury, daily, crown, knights, weekly, challenges, pets, missions }: Progress) {
   try {
     localStorage.setItem(BEST, String(best));
     localStorage.setItem(BANK, String(bank));
@@ -152,6 +173,7 @@ export function saveProgress({ best, bank, pending, armoury, daily, crown, knigh
     if (weekly) localStorage.setItem(WEEKLY, JSON.stringify(weekly));
     localStorage.setItem(CHALLENGES_KEY, JSON.stringify(challenges));
     localStorage.setItem(PETS_KEY, JSON.stringify(pets));
+    localStorage.setItem(MISSIONS_KEY, JSON.stringify({ dealt: missions.dealt, slots: missions.slots.map(({ kind, tier }) => ({ kind, tier })) }));
   } catch {
     // Storage can be full or blocked (private mode); the game keeps running unsaved.
   }

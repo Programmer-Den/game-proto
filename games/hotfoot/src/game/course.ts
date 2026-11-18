@@ -10,6 +10,7 @@ import {
   LEAD_IN,
   ROAD,
   ROCK,
+  ROUTE,
   SHRINE,
   STAGE_LEN,
   dareOf,
@@ -45,7 +46,7 @@ const CLEAR_BEFORE_CHECKPOINT = 420;
 const RUNNER_BACK = 14;
 
 /** One obstacle on the course: a trap, a foe, or a ledge or flight of steps to climb. */
-export type Piece = Exclude<TrapKind, 'barrel' | 'axe' | 'fire' | 'tail'> | 'ledge' | 'steps' | 'cloud';
+export type Piece = Exclude<TrapKind, 'barrel' | 'axe' | 'fire' | 'tail'> | 'ledge' | 'steps' | 'cloud' | 'route';
 
 /**
  * What can turn up on a stage. Spikes come up most often; fire vents and bats join on stage 2, steps
@@ -55,7 +56,10 @@ export type Piece = Exclude<TrapKind, 'barrel' | 'axe' | 'fire' | 'tail'> | 'led
 export function piecesOf(stage: number, road: Road | null = null, sky = false): Piece[] {
   const pool: Piece[] = sky ? ['spikes', 'spikes', 'blade', 'goblin', 'bat', 'bat', 'cloud', 'cloud'] : ['spikes', 'spikes', 'blade', 'pit', 'goblin', 'ledge'];
   if (stage >= 2 && !sky) pool.push('flames', 'bat');
+  // Crates and shield goblins for the shield dash, from stage 2 (crates on the Sky Road too).
+  if (stage >= 2) pool.push(sky ? 'crate' : 'shield', 'crate');
   if (stage >= 3 && !sky) pool.push('steps', 'goblin');
+  if (stage >= ROUTE.from && !sky) pool.push('route');
   if (road === 'high') pool.push('goblin', 'bat');
   return pool;
 }
@@ -80,6 +84,11 @@ export function gapsOf(stage: number, road: Road | null = null, hard = false) {
 const GOBLIN = { w: 24, beat: 160, speed: (stage: number) => Math.min(100, 50 + 10 * stage) };
 /** A bat's size, its height over the road (too low to run under) and its speed. */
 const BAT = { w: 34, h: 34, speed: (stage: number) => Math.min(160, 80 + 15 * stage) };
+/** A crate stack's and a shield goblin's width. */
+const CRATE_W = 40;
+const SHIELD_W = 30;
+/** A high route's platforms: how many, their widths and the gaps between them. */
+const PLATFORMS = { n: 3, w: [240, 280, 320], gap: [90, 110, 130] };
 /** Ledge heights: a low step, and a tall one from stage 3. */
 const LEDGE_H = { low: 48, high: 80 };
 /** The Sky Road's gaps in the clouds (each width has a baked `pit-<w>`), and how far in from each edge the cloud over one floats. */
@@ -164,6 +173,48 @@ function planOf(s: GameState, piece: Piece): Plan {
           s.ledges.push({ id: id(), x, w, h: LEDGE_H.low }, { id: id(), x: x + w, w, h: LEDGE_H.high });
           arc(x + w, LEDGE_H.low);
           for (let cx = x + w + 140; cx < x + 2 * w - 20; cx += 40) coin(cx, LEDGE_H.high + 12);
+        },
+      };
+    }
+    case 'crate':
+      // A stack of crates to jump, or to smash with a dash for the coins inside.
+      return { span: CRATE_W, place: (x) => (trap('crate', x, CRATE_W), arc(x + CRATE_W / 2)) };
+    case 'shield':
+      // A goblin behind a tower shield, its pike too tall to leap: dash through it.
+      return { span: SHIELD_W, place: (x) => (trap('shield', x, SHIELD_W), low(x - 60)) };
+    case 'route': {
+      // The road splits: a row of floating platforms with coins along them and over their gaps, and
+      // a spikes trap or a goblin on the middle one; under them the plain road, with a few coins.
+      const ws = Array.from({ length: PLATFORMS.n }, () => pickOf(s, PLATFORMS.w));
+      const gaps = Array.from({ length: PLATFORMS.n - 1 }, () => pickOf(s, PLATFORMS.gap));
+      const goblin = rand(s) < 0.5;
+      const span = ws.reduce((a, b) => a + b, 0) + gaps.reduce((a, b) => a + b, 0);
+      const top = ROUTE.h;
+      const high = (x: number, h: number) => s.course.push({ id: id(), x, h, pulled: false, high: true });
+      return {
+        span,
+        place: (x) => {
+          let at = x;
+          ws.forEach((w, i) => {
+            s.ledges.push({ id: id(), x: at, w, h: top, float: true });
+            const mid = i === 1;
+            if (mid && goblin) {
+              trap('goblin', at + w - 30 - GOBLIN.w, GOBLIN.w, { h: top, vx: -GOBLIN.speed(s.stage), from: at + 30, to: at + w - 30 });
+              for (let cx = at + 40; cx < at + w - 20; cx += 60) high(cx, top + 110);
+            } else if (mid) {
+              const sx = at + w / 2 - 18;
+              trap('spikes', sx, 36, { h: top });
+              for (let cx = at + 30; cx < at + w - 20; cx += 36) if (cx < sx - 16 || cx > sx + 52) high(cx, top + 12);
+              for (const [dx, h] of [[-36, 70], [0, 100], [36, 70]]) high(sx + 18 + dx, top + h);
+            } else for (let cx = at + 30; cx < at + w - 20; cx += 36) high(cx, top + 12);
+            at += w;
+            if (i < gaps.length) {
+              for (const [dx, h] of [[-30, 40], [0, 60], [30, 40]]) high(at + gaps[i] / 2 + dx, top + h);
+              at += gaps[i];
+            }
+          });
+          // The low road: a few coins along it, safe and plain.
+          for (let cx = x + 120; cx < x + span - 60; cx += 200) coin(cx, 12);
         },
       };
     }

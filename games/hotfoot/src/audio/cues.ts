@@ -103,10 +103,14 @@ export class SoundCues {
       else if (e.kind === 'bark') play('bark');
       else if (e.kind === 'owl') play('owl');
       else if (e.kind === 'fox') play('fox');
+      // The shield dash, and what it breaks through.
+      else if (e.kind === 'dash') play('dash');
+      else if (e.kind === 'smash') play('smash');
       // A shrine that can't give a heart refuses, with the buzz every refused action gets.
       else if (e.kind === 'refuse') ui('refuse');
       else if (e.kind === 'pop') {
         if (e.text === 'dareMetPop') play('dare');
+        else if (e.text === 'missionPop') play('mission');
         else if (e.text === 'gateBeaten') play('bossDown');
         else if (e.text === 'dragonBeaten') playSting(SONG, 'crown');
         else if (e.text && e.text !== 'coinPop') play('pair');
