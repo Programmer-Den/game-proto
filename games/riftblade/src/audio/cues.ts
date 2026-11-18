@@ -59,6 +59,7 @@ export class SoundCues {
   private elites = 0;
   private chests = 0;
   private powerUps = 0;
+  private pact = false;
   private objectivesDone = 0;
   private objective = false;
   private signatures = 0;
@@ -135,6 +136,7 @@ export class SoundCues {
     this.warned.clear();
     this.landed = new Set(s.pillars.filter((pl) => pl.warnMs <= 0).map((pl) => pl.id));
     this.tide = !!s.tide;
+    this.pact = !!s.pact;
     this.hp = s.player.hp;
     this.hurtMs = s.player.hurtMs;
     this.barrier = s.player.barrier;
@@ -193,6 +195,10 @@ export class SoundCues {
       else if (pl.warnMs <= 0 && !this.landed.has(pl.id)) play('stomp');
     }
     this.landed = new Set(s.pillars.filter((pl) => pl.warnMs <= 0).map((pl) => pl.id));
+    // Rift altars rising, and a pact taken.
+    if (s.altars.some((al) => fresh(al.id))) play('altar');
+    if (s.pact && !this.pact) play('pact');
+    this.pact = !!s.pact;
     // The Ocean world's tide: the siren as it starts to come in.
     if (s.tide && !this.tide) play('siren');
     this.tide = !!s.tide;

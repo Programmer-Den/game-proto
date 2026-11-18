@@ -1,7 +1,7 @@
 /** Lasting progress, in local storage under a key prefixed with the game's name. */
 import { HEROES, HERO_IDS, type HeroId } from './heroes';
 import { LAST_STAGE, NODE_INFO, PLANETS } from './planets';
-import { freshHero, freshState, type GameState, type Phase } from './state';
+import { BANISHES, freshHero, freshState, type GameState, type Phase } from './state';
 import { FUSION_BY_ID, branchCard, parseCard } from './upgrades';
 import { MAX_HEAT } from './heat';
 import { ARMOURY_IDS, nextPrice, type ArmouryId } from './armoury';
@@ -323,6 +323,13 @@ export function loadRun(): GameState | null {
     if (!Number.isInteger(s.rushTotal) || !Number.isInteger(s.rushBeaten) || !Number.isInteger(s.mastery) || typeof s.colour !== 'boolean') return null;
     if (s.tide !== null && (typeof s.tide !== 'object' || typeof s.tide.angle !== 'number')) return null;
     if (!s.pillars.every((pl) => typeof pl === 'object' && pl && typeof pl.x1 === 'number')) return null;
+    // Runs saved before banishes, altars and barrels take the fresh values (the merge above).
+    if (!s.banished.every(known) || !Number.isInteger(s.banishes) || s.banishes < 0 || s.banishes > BANISHES) return null;
+    const pact = (k: unknown) => k === 'blood' || k === 'greed';
+    if (!s.altars.every((al) => typeof al === 'object' && al && pact(al.kind) && typeof al.x === 'number' && typeof al.ms === 'number')) return null;
+    if (s.pact !== null && (typeof s.pact !== 'object' || !pact(s.pact.kind) || typeof s.pact.ms !== 'number')) return null;
+    if (!s.barrels.every((b) => typeof b === 'object' && b && typeof b.x === 'number' && typeof b.fuseMs === 'number')) return null;
+    if (typeof s.altarAt !== 'number' || typeof s.nextBarrel !== 'number') return null;
     return s;
   } catch {
     return null;

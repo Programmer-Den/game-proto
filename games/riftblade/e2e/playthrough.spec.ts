@@ -5,7 +5,7 @@ import { expect, test, type Page } from '@playwright/test';
 // taps a locked card (no Fight button), then TR-9's card and Fight. Then walks him in a wide circle
 // by holding the mouse down at a point that turns around him, as a thumb on a phone would, while
 // his spread rifle fires on its own. Bots die and drop lumen shards he picks up, the first
-// level-up pauses the run on three cards, and the test taps the first one and checks the upgrade
+// level-up pauses the run on three cards (each with a Banish button under it), and the test taps the first one and checks the upgrade
 // was taken. It fires the signature move (Brace) from its round button, then plays on to the
 // one-minute mark, taking the first card at each later level-up.
 // Game state is only read, through the `game` object the dev build puts on window.
@@ -20,6 +20,8 @@ interface GameState {
   xpNext: number;
   ranks: Record<string, number>;
   choices: string[] | null;
+  /** Banishes left this run. */
+  banishes: number;
   /** How many bots and shards are on the field. */
   enemies: number;
   shards: number;
@@ -240,7 +242,9 @@ test('plays the first minute', async ({ page }, testInfo) => {
   expect(new Set(s.choices).size).toBe(3);
   expect(s.choices!.some((id) => TR9.paths.includes(id)), 'a path of his own on offer').toBe(true);
   spots = await game.spots();
-  expect(spots.map((c) => c.id)).toEqual(s.choices);
+  // The cards come first, then a Banish button under each, with all three banishes left.
+  expect(spots.map((c) => c.id)).toEqual([...s.choices!, 'banish-0', 'banish-1', 'banish-2']);
+  expect(s.banishes, 'three banishes a run').toBe(3);
   const paused = s.time;
   await play(1_000, async () => false);
   expect((await game.state()).time, 'the run waits for the pick').toBe(paused);
@@ -252,6 +256,7 @@ test('plays the first minute', async ({ page }, testInfo) => {
   await play(FRAME_MS * 2, async () => false);
   s = await game.state();
   expect(s.ranks).toEqual({ [picked]: 1 });
+  expect(s.banishes, 'taking a card spends no banish').toBe(3);
   expect(s.phase).toBe('run');
   expect(s.time, 'running again').toBeGreaterThan(paused);
 

@@ -77,11 +77,16 @@ export const sfx = sounds({
   card: { wave: 'pulse25', freq: 880, arp: [0, 7], arpStep: 0.05, length: 0.12, volume: 0.22, gap: 80 },
   capstone: { wave: 'square', freq: 784, arp: [0, 4, 7, 12, 7, 12], arpStep: 0.07, length: 0.5, volume: 0.28, gap: 400 },
   crossover: { wave: 'triangle', freq: 1046, arp: [0, 3, 7, 10, 14], arpStep: 0.06, length: 0.45, volume: 0.28, gap: 400 },
+  /** A card banished at a level-up. */
+  banish: { wave: 'sawtooth', freq: 700, to: 140, length: 0.22, volume: 0.16, gap: 150 },
   chest: { wave: 'pulse25', freq: 1046, arp: [0, 4, 7, 12], arpStep: 0.06, length: 0.3, volume: 0.24, gap: 200 },
 
   // Foes and the field.
   eliteHorn: { wave: 'sawtooth', freq: 196, to: 185, length: 0.5, attack: 0.04, volume: 0.2, gap: 1000 },
   siren: { wave: 'square', freq: 500, to: 950, length: 0.9, attack: 0.1, volume: 0.15, gap: 2000 },
+  /** A pair of rift altars rising, and a pact taken at one. */
+  altar: { wave: 'triangle', freq: 220, arp: [0, 7, 12], arpStep: 0.12, length: 0.6, attack: 0.05, volume: 0.24, gap: 1000 },
+  pact: { wave: 'sawtooth', freq: 110, arp: [0, 6, 12], arpStep: 0.08, length: 0.5, volume: 0.24, gap: 600 },
   warn: { wave: 'pulse25', freq: 600, to: 1000, length: 0.2, volume: 0.13, gap: 150 },
   stomp: { wave: 'sine', freq: 90, to: 40, length: 0.3, volume: 0.42, gap: 300 },
   enemyShot: { wave: 'square', freq: 300, to: 140, length: 0.08, volume: 0.1, gap: 120, vary: 0.1 },
