@@ -122,8 +122,9 @@ Implemented today:
   and `broodPrice` take a hive (each comb's first cell is free), and `combBonus` adds both combs.
   The scene shows one comb at a time (`hive`), switched by the roof tabs (`hiveTab`, `HIVE_TAB`,
   shown once `hives > 1`); taps map `cellAt`'s local spot to `hive * SLOTS + local`, the gold edges
-  and wasp bars are drawn for the comb shown, a wasp's `wasp` event brings its comb to the front,
-  and wasps on the other comb are hidden. `hives`, `queen` and `queenBees` (her bees' count) are
+  and wasp bars are drawn for the comb shown, a wasp's `wasp` event brings its comb to the front
+  (`showHive`, which, like the roof tabs, puts down an armed Brood cell or Cut comb when the comb
+  changes; so do `ate`, `caught` and `plot`), and wasps on the other comb are hidden. `hives`, `queen` and `queenBees` (her bees' count) are
   saved; `swarmIn` is not.
 - Orchard contracts (`src/game/contracts.ts`): from `CONTRACTS_FROM` (5) jars sold, outside winter
   and with more than `CONTRACT_BEES.min` bees, an offer comes `CONTRACT_GAP_MS` (50s) after the last

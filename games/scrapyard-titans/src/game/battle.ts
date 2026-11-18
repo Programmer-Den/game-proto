@@ -102,8 +102,10 @@ export interface BUnit {
   power: number;
   ability: AbilityKind | null;
   big: boolean;
+  /** The shields' total, and each shield with its own expiry (`shields`), taken from the soonest to go first. */
   shield: number;
   shieldUntil: number;
+  shields: { left: number; until: number }[];
   stunUntil: number;
   castLock: number;
   attackTimer: number;
@@ -200,7 +202,7 @@ export class Battle {
   private build(f: FighterSpec, team: 0 | 1, side: SideSpec, enemy: SideSpec): BUnit {
     const base = {
       id: this.nextId++, team, star: f.star, items: [...f.items], col: f.col, row: f.row, fromCol: f.col, fromRow: f.row,
-      moveT: 1, moveDur: 0, shield: 0, shieldUntil: 0, stunUntil: 0, castLock: 0, target: null, alive: true, sp: {},
+      moveT: 1, moveDur: 0, shield: 0, shieldUntil: 0, shields: [], stunUntil: 0, castLock: 0, target: null, alive: true, sp: {},
       rampAs: 0, itemRamp: 0, revived: false, regenPerS: 0, manaRegen: 0, manaGainMul: 1, goldOut: 0, dealt: 0, taken: 0, dmgMul: 1, powerMul: 1,
       attackTimer: ((this.nextId * 0.137) % 0.5),
     };
@@ -313,7 +315,10 @@ export class Battle {
         u.moveDur = 0;
       }
     }
-    if (u.shield > 0 && this.time >= u.shieldUntil) u.shield = 0;
+    if (u.shields.some((sh) => this.time >= sh.until)) {
+      u.shields = u.shields.filter((sh) => this.time < sh.until);
+      u.shield = u.shields.reduce((sum, sh) => sum + sh.left, 0);
+    }
     if (terrain === 'furnace') this.hurt(u, 40 * dt, null, true, false, false);
     if (!u.alive) return;
     if (terrain === 'charger') this.gainMana(u, 6 * dt, true);
@@ -456,11 +461,15 @@ export class Battle {
 
   private hurt(dst: BUnit, amount: number, src: BUnit | null, ability: boolean, crit: boolean, show: boolean) {
     let left = amount;
-    if (dst.shield > 0) {
-      const used = Math.min(dst.shield, left);
+    // The shield that runs out soonest takes the blow first.
+    for (const sh of dst.shields) {
+      if (left <= 0) break;
+      const used = Math.min(sh.left, left);
+      sh.left -= used;
       dst.shield -= used;
       left -= used;
     }
+    dst.shields = dst.shields.filter((sh) => sh.left > 0);
     // Overkill doesn't count toward the damage meter.
     const real = amount - left + Math.min(left, Math.max(0, dst.hp));
     dst.hp -= left;
@@ -501,8 +510,12 @@ export class Battle {
   }
 
   private giveShield(u: BUnit, amount: number, seconds: number, show = true) {
+    // Each shield keeps its own expiry, so a short one added to a fight-long one still drops on time.
+    const until = this.time + seconds;
+    u.shields.push({ left: amount, until });
+    u.shields.sort((a, b) => a.until - b.until);
     u.shield = Math.max(u.shield, 0) + amount;
-    u.shieldUntil = Math.max(u.shieldUntil, this.time + seconds);
+    u.shieldUntil = Math.max(u.shieldUntil, until);
     if (show) this.events.push({ t: 'shield', id: u.id, amount: Math.round(amount) });
   }
 
@@ -560,9 +573,9 @@ export class Battle {
         break;
       }
       case 'backstab': {
-        const weak = [...enemies].sort((a, b) => a.hp - b.hp)[0];
+        // The weakest enemy with a free tile beside it: a saboteur strikes only where it can blink to.
+        const weak = [...enemies].sort((a, b) => a.hp - b.hp).find((e) => this.blinkNear(u, e));
         if (weak) {
-          this.blinkNear(u, weak);
           this.hit(u, weak, dmg, true, crit);
           if (u.big) this.stun(weak, 1.2);
         }
@@ -605,12 +618,13 @@ export class Battle {
     for (let dc = -1; dc <= 1; dc++) for (let dr = -1; dr <= 1; dr++) {
       if ((dc || dr) && this.free(target.col + dc, target.row + dr)) spots.push({ col: target.col + dc, row: target.row + dr });
     }
-    if (!spots.length) return;
+    if (!spots.length) return false;
     const back = target.team === 0 ? 1 : -1;
     spots.sort((a, b) => b.row * back - a.row * back || Math.abs(a.col - u.col) - Math.abs(b.col - u.col));
     this.moveTo(u, spots[0].col, spots[0].row, 0);
     u.target = target.id;
     this.events.push({ t: 'blink', id: u.id });
+    return true;
   }
 
   /** A saboteur's opening jump to the enemy's back line. */
