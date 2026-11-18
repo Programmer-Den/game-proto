@@ -65,7 +65,7 @@ export class Terrain {
   /** Bumped on every change, so the painter knows to redraw. */
   version = 0;
   /** Every carve and fill since the map was made, which the painter replays on its canvas. */
-  ops: { x: number; y: number; r: number; add: boolean }[] = [];
+  ops: { x: number; y: number; r: number; add: boolean; block?: { w: number; h: number; kind: 'stone' | 'wood' } }[] = [];
   /** The ground before its caves were dug, painted as the dark back wall. */
   back: Uint8Array | null = null;
 
@@ -113,6 +113,17 @@ export class Terrain {
       this.ops.push({ x: cx, y: cy, r, add: v === 1 });
     }
     return n;
+  }
+
+  /** Fills a block of a fort (its top-left at x, y): earth to everything that moves, wood or stone to look at. */
+  addBlock(x: number, y: number, w: number, h: number, kind: 'stone' | 'wood') {
+    const x0 = Math.max(0, Math.floor(x));
+    const x1 = Math.min(this.w, Math.floor(x + w));
+    const y0 = Math.max(0, Math.floor(y));
+    const y1 = Math.min(this.h, Math.floor(y + h));
+    for (let yy = y0; yy < y1; yy++) this.mask.fill(1, yy * this.w + x0, yy * this.w + x1);
+    this.version++;
+    this.ops.push({ x: x0, y: y0, r: 0, add: true, block: { w: x1 - x0, h: y1 - y0, kind } });
   }
 
   /** The first earth pixel at or below `y` in column `x`, or -1. */

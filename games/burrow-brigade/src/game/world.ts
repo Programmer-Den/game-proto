@@ -1,5 +1,6 @@
 import { DT, GRAVITY, WIND_ACC, type Terrain } from './terrain';
 import { WEAPONS, type WeaponId } from './weapons';
+import { DIGGER_REACH, type TradeId } from './modes';
 
 /**
  * Everything that moves in a match, stepped at a fixed `DT`: moles, shells, flames, bees, crates,
@@ -32,6 +33,8 @@ export interface Mole {
   act: null | { kind: 'dig' | 'hop' | 'pound' | 'die' | 'swipe' | 'throw' | 'recoil' | 'cheer'; t: number; dur: number; dx?: number; dy?: number; tx?: number; ty?: number; phase?: number };
   /** What it wears on its helmet: the boss's crown, or a hat (null for none). */
   hat: string | null;
+  /** A campaign mole's trade (Digger, Gunner, Medic or Scout), or none. */
+  trade?: TradeId | null;
   /** Hidden in the ground during a Tunnel Hop. */
   hidden: boolean;
   drowned: boolean;
@@ -136,6 +139,8 @@ export class World {
   private quakeTick = 0;
   craters = 0;
   log: TurnLog = World.freshLog();
+  /** Damage to enemies on this turn is multiplied by this (a Gunner's turn). */
+  gunner = 1;
   /** Set while a blast goes off, so mines and crates set off in it wait a step. */
   private pending: (() => void)[] = [];
 
@@ -307,6 +312,7 @@ export class World {
       for (let i = 0; i < 14; i++) this.particle('spark', m.x, m.y - 10, rnd(-120, 120), rnd(-120, 60), 0.5, 3, 0x8fd3ff, 0);
       return;
     }
+    if (team >= 0 && team !== m.team && team === this.turnTeam) dmg = Math.round(dmg * this.gunner);
     m.hp = Math.max(0, m.hp - dmg);
     m.hurtT = 0.7;
     this.pops.push({ x: m.x, y: m.y - 32, text: `-${dmg}`, color: m.team === 0 ? 0x3d8be0 : 0xe8a33d, t: 0 });
@@ -588,7 +594,7 @@ export class World {
           dx = Math.sign(dx || m.facing) * 0.5;
         }
         m.facing = dx >= 0 ? 1 : -1;
-        m.act = { kind: 'dig', t: 0, dur: 1.7, dx, dy };
+        m.act = { kind: 'dig', t: 0, dur: 1.7 * (m.trade === 'digger' ? DIGGER_REACH : 1), dx, dy };
         this.hooks.sound('dig');
         break;
       }

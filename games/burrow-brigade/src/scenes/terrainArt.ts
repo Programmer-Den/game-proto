@@ -161,6 +161,38 @@ export class TerrainArt {
     }
   }
 
+  /** A fort's block: grey stone with mortar lines, or a wooden plank with its grain. */
+  private paintBlock(e: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, kind: 'stone' | 'wood') {
+    const r = this.res;
+    const stone = kind === 'stone';
+    e.fillStyle = stone ? '#a8a49a' : '#b97c40';
+    e.fillRect(x * r, y * r, w * r, h * r);
+    e.fillStyle = stone ? '#c8c4b8' : '#d39a5a';
+    e.fillRect(x * r, y * r, w * r, 2 * r);
+    e.strokeStyle = stone ? '#6f6b62' : '#7d4f24';
+    e.lineWidth = r;
+    if (stone) {
+      // Mortar: a cross of lines splitting the block into four bricks.
+      e.beginPath();
+      e.moveTo(x * r, (y + h / 2) * r);
+      e.lineTo((x + w) * r, (y + h / 2) * r);
+      e.moveTo((x + w / 2) * r, y * r);
+      e.lineTo((x + w / 2) * r, (y + h / 2) * r);
+      e.moveTo((x + w / 4) * r, (y + h / 2) * r);
+      e.lineTo((x + w / 4) * r, (y + h) * r);
+      e.stroke();
+    } else {
+      // Grain along the plank.
+      e.beginPath();
+      e.moveTo((x + 3) * r, (y + h * 0.55) * r);
+      e.lineTo((x + w - 6) * r, (y + h * 0.55) * r);
+      e.stroke();
+    }
+    e.lineWidth = 1.4 * r;
+    e.strokeStyle = '#3a2a1c';
+    e.strokeRect(x * r + 0.7 * r, y * r + 0.7 * r, (w - 1.4) * r, (h - 1.4) * r);
+  }
+
   /** Replays the ground's changes since last time onto the canvas. */
   sync() {
     const ops = this.terrain.ops;
@@ -170,7 +202,8 @@ export class TerrainArt {
     for (; this.done < ops.length; this.done++) {
       const op = ops[this.done];
       e.save();
-      if (op.add) {
+      if (op.block) this.paintBlock(e, op.x, op.y, op.block.w, op.block.h, op.block.kind);
+      else if (op.add) {
         e.beginPath();
         e.arc(op.x * r, op.y * r, op.r * r, 0, Math.PI * 2);
         e.clip();

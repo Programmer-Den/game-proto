@@ -1,5 +1,6 @@
 import type { Levels } from './depot';
 import { isHat, type HatId } from './hats';
+import { isTrade, type TradeId } from './modes';
 import { cleanOptions, type Options } from './options';
 import type { WeaponId } from './weapons';
 
@@ -63,16 +64,19 @@ export interface Campaign {
   acorns: number;
   /** The Quartermaster's upgrades bought, by id. */
   levels: Levels;
+  /** The trades last picked for your moles, by their place in the battle's line-up. */
+  trades: TradeId[];
 }
 
 export const loadCampaign = (): Campaign => {
-  const c = read<Campaign>(CAMPAIGN_KEY, { stars: [], vstars: [], acorns: 0, levels: {} });
+  const c = read<Campaign>(CAMPAIGN_KEY, { stars: [], vstars: [], acorns: 0, levels: {}, trades: [] });
   const stars = (a: unknown) => (Array.isArray(a) ? a.map((n) => Math.max(0, Math.min(3, Math.round(Number(n)) || 0))) : []);
   return {
     stars: stars(c.stars),
     vstars: stars(c.vstars),
     acorns: Math.max(0, Math.round(Number(c.acorns)) || 0),
     levels: c.levels && typeof c.levels === 'object' ? c.levels : {},
+    trades: Array.isArray(c.trades) ? c.trades.filter(isTrade) : [],
   };
 };
 export const saveCampaign = (c: Campaign) => write(CAMPAIGN_KEY, c);
