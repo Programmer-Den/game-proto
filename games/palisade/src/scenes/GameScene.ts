@@ -38,7 +38,9 @@ import {
   canRetire,
   crowdSpot,
   dailyRun,
+  decideEvent,
   decideOmen,
+  fieldSight,
   fieldSpot,
   fightAgain,
   fortify,
@@ -47,6 +49,8 @@ import {
   keepFighting,
   loose,
   marchOn,
+  MARK_COST,
+  markFoe,
   pick,
   pickRoad,
   rainRingOf,
@@ -60,7 +64,11 @@ import {
   tick,
   train,
   upgradeEngine,
+  volleySpot,
 } from '../game/sim';
+import { BLESSINGS, CURSES } from '../game/wayside';
+import { WEATHERS } from '../game/weather';
+import { EventCard } from '../ui/EventCard';
 import {
   BARRICADE_FRONT,
   FIELD,
@@ -93,7 +101,7 @@ import { checkTrophies } from '../trophies/check';
 import { trophies } from '../trophies';
 import { award } from '../../../../shared/trophies';
 import { viewFrame } from '../../../../shared/scaling';
-import { AIM, BARRICADE, ENDLESS_CHIP, ENGINE, BARRICADE_BAR, BARRICADE_TIP_W, BOSS_BAR, CALTROPS, FORTIFY, FRONTIER_CHIP, GUARD_HIT, HEAT, HERO_FEET, HUD_HEIGHT, MARCH, OMEN_CHIP, RAIN, RAIN_HINT, REPAIR, ROAR_CHIP, SEEN, SKILL_BOOK, SPEED, STREAK, TRACK, UI_DEPTH, VIEW, XP_BAR, placeHud } from './layout';
+import { AIM, BARRICADE, ENDLESS_CHIP, ENGINE, BARRICADE_BAR, BARRICADE_TIP_W, BOSS_BAR, CALTROPS, FORTIFY, FRONTIER_CHIP, GUARD_HIT, HEAT, HERO_FEET, HUD_HEIGHT, MARCH, OMEN_CHIP, RAIN, RAIN_HINT, REPAIR, ROAR_CHIP, SEEN, SHRINE_CHIP, WEATHER_CHIP, SKILL_BOOK, SPEED, STREAK, TRACK, UI_DEPTH, VIEW, XP_BAR, placeHud } from './layout';
 
 /** Longest simulated step, so a backgrounded tab doesn't jump the battle forward. */
 const MAX_STEP_MS = 250;
@@ -144,6 +152,15 @@ export class GameScene extends Phaser.Scene {
   }
   /** The omen card during a break from wave 4. */
   omenCard!: OmenCard;
+  /** The wayside event card, made when the first event comes (see `EventCard`). */
+  eventCard: EventCard | null = null;
+  /** The weather and shrine chips' texts, made when first needed, so no Text is made before the first round's random calls. */
+  private weatherText: Phaser.GameObjects.Text | null = null;
+  private shrineText: Phaser.GameObjects.Text | null = null;
+  /** Rain and wind over the field. */
+  private weatherG!: Phaser.GameObjects.Graphics;
+  /** Whether a foe has been marked this visit: the mark hint shows until then. */
+  private markedOnce = false;
   /** The legacy cards when the hero retires. */
   legacyPanel!: LegacyPanel;
   /** The wave the next run starts on, picked on the game-over panel's "Start at" row (a forced march). */
@@ -304,6 +321,7 @@ export class GameScene extends Phaser.Scene {
     this.aimG = this.add.graphics().setDepth(UI_DEPTH - 8);
     // The dark of a Night wave lies over the foes, under their bars and the effects.
     this.nightG = this.add.graphics().setDepth(UI_DEPTH - 40);
+    this.weatherG = this.add.graphics().setDepth(UI_DEPTH - 41);
     this.createHud();
     this.createTrack();
     this.createRain();
@@ -366,7 +384,7 @@ export class GameScene extends Phaser.Scene {
     if (!this.skillBook.open && !this.hirePanel.open && !this.shopOpen) {
       // The battle plays at the chosen speed; the level-up's and the road choice's auto-pick
       // countdowns and the break with an undecided omen card stay in real seconds.
-      const realTime = s.choices || s.roadChoices || (s.phase === 'break' && s.omen && !s.omen.accepted);
+      const realTime = s.choices || s.roadChoices || (s.phase === 'break' && ((s.omen && !s.omen.accepted) || s.event));
       const game = realTime ? dt : dt * this.speed;
       tick(s, game, this.levelUp.autoPick);
       if (!s.choices && !held(s)) this.clock += game;
@@ -399,6 +417,10 @@ export class GameScene extends Phaser.Scene {
     this.roadChoice.show(s.phase === 'break' && !s.choices ? s.roadChoices : null, s.roadMs);
     const omen = s.phase === 'break' && s.omen && !s.omen.accepted && !s.choices && !this.hirePanel.open && !this.shopOpen ? s.omen.id : null;
     this.omenCard.show(omen, s.wave);
+    const event = s.phase === 'break' && !s.choices && !this.hirePanel.open && !this.shopOpen ? s.event : null;
+    if (event && !this.eventCard) this.eventCard = new EventCard(this, (take) => this.decideEvent(take));
+    this.eventCard?.show(event, s.wave, s.coins);
+    this.drawWeather();
     this.levelUp.show(held(s) ? null : s.choices, s.ranks, s.level - s.levelUps + 1, s.levelUps, s.pickMs);
     this.discover();
     this.skillBook.show(this.found, s.ranks, s.relics, held(s), s.hero);
@@ -450,6 +472,18 @@ export class GameScene extends Phaser.Scene {
   /** Saves the hero's progress, unless this is the daily siege, whose hero is the day's own. */
   private saveHero() {
     if (!this.state.daily) saveProgress(progressOf(this.state));
+  }
+
+  /** Takes or leaves the wayside event, with the sound of what it brought. */
+  private decideEvent(take: boolean) {
+    const id = this.state.event?.id;
+    if (!decideEvent(this.state, take)) return ui('refuse');
+    if (!take) return;
+    if (id === 'peddler') {
+      sfx('relic');
+      ui('coin');
+    } else if (id === 'shrine') sfx('omen');
+    else sfx('build');
   }
 
   private pickRoad(id: RoadId) {
@@ -511,14 +545,17 @@ export class GameScene extends Phaser.Scene {
     const seen = new Set<number>();
     this.bars.clear();
     // On a Night wave the field beyond mid-field lies in the dark, and the foes in it are unseen.
-    const sight = omenEffects(this.state.omen).sight;
+    // In fog the far field lies in a pale murk instead, and the foes in it are unseen too.
+    const sight = fieldSight(this.state);
     const night = this.nightG.clear();
     if (sight < Infinity && !held(this.state)) {
       const top = SEEN.y + HUD_HEIGHT;
       const h = XP_BAR.y - 10 - top;
-      night.fillStyle(0x08101e, 0.3).fillRect(SEEN.x, top, SEEN.w, h);
-      // Strips that overlap towards the right darken it from mid-field on, with a soft edge.
-      for (let i = 0; i < 6; i++) night.fillStyle(0x08101e, 0.16).fillRect(sight + i * 8, top, SEEN.x + SEEN.w - sight, h);
+      const dark = omenEffects(this.state.omen).sight <= sight;
+      const [color, base, strip] = dark ? [0x08101e, 0.3, 0.16] : [0xd8dee6, 0.08, 0.15];
+      night.fillStyle(color, base).fillRect(SEEN.x, top, SEEN.w, h);
+      // Strips that overlap towards the right darken (or fog) it from the line on, with a soft edge.
+      for (let i = 0; i < 6; i++) night.fillStyle(color, strip).fillRect(sight + i * 8, top, SEEN.x + SEEN.w - sight, h);
     }
     for (const e of this.state.enemies) {
       seen.add(e.id);
@@ -558,6 +595,7 @@ export class GameScene extends Phaser.Scene {
       if (!type.boss) this.drawHpBar(e, feet - fig.height - 8);
       if (e.burnMs > 0) this.drawFlames(e, feet - fig.height / 2);
       if (e.trait) this.drawElite(e, feet - fig.height - 8);
+      if (this.state.mark?.id === e.id) this.drawMark(e, feet, feet - fig.height - (type.boss ? 8 : 18));
     }
     for (const [id, sprite] of this.foes) {
       if (seen.has(id)) continue;
@@ -589,6 +627,17 @@ export class GameScene extends Phaser.Scene {
       const feet = e.y + r * 0.6 + (ENEMIES[e.kind].flying ? FLY_HEIGHT : 0);
       this.glow.lineStyle(2, trait.color, 0.5 + 0.3 * this.pulse(900)).strokeEllipse(e.x, feet, r * 2.4, r * 0.9);
     }
+  }
+
+  /** The hero's mark on a foe: a gold ring at its feet and a gold chevron over its head (never a red crosshair). */
+  private drawMark(e: Enemy, feet: number, top: number) {
+    const g = this.bars;
+    const r = ENEMIES[e.kind].radius;
+    const bob = settings.reduceMotion ? 0 : Math.sin(this.clock / 160) * 2;
+    g.lineStyle(2.5, GOLD.light, 0.9).strokeEllipse(e.x, feet, r * 2.4, r * 0.9);
+    const y = top - 6 + bob;
+    g.fillStyle(0x281a08, 0.6).fillTriangle(e.x - 9, y - 9, e.x + 9, y - 9, e.x, y + 2);
+    g.fillStyle(GOLD.light, 1).fillTriangle(e.x - 7, y - 8, e.x + 7, y - 8, e.x, y);
   }
 
   private drawHpBar(e: Enemy, y: number) {
@@ -659,7 +708,7 @@ export class GameScene extends Phaser.Scene {
     }
     // Nothing in the dark of a Night wave shows: no puff or pop from a kill by a blast's edge or a
     // volley, no spark, burst or healing mote over a hidden foe.
-    const sight = omenEffects(this.state.omen).sight;
+    const sight = fieldSight(this.state);
     for (const e of this.state.effects) {
       if (e.x >= sight) continue;
       const life = 1 - e.ms / e.total;
@@ -1259,6 +1308,18 @@ export class GameScene extends Phaser.Scene {
     this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
       if (this.aim) this.aim = { x: p.worldX, y: p.worldY };
     });
+    // A tap on a foe (on nothing else) marks it for the ranger's arrows.
+    this.input.on('pointerdown', (p: Phaser.Input.Pointer, over: Phaser.GameObjects.GameObject[]) => {
+      const s = this.state;
+      if (over.length > 0 || this.aim || this.skillBook.open || this.hirePanel.open || this.shopOpen) return;
+      if (s.phase !== 'fighting' || s.choices || held(s)) return;
+      const foe = this.foeAt(p.worldX, p.worldY);
+      if (!foe) return;
+      if (markFoe(s, foe.id)) {
+        this.markedOnce = true;
+        sfx('mark');
+      } else ui('refuse');
+    });
     const release = (p: Phaser.Input.Pointer) => {
       if (!this.aim) return;
       this.aim = { x: p.worldX, y: p.worldY };
@@ -1416,6 +1477,76 @@ export class GameScene extends Phaser.Scene {
     const roar = s.roarMs > 0 && !held(s);
     this.roarText.setVisible(roar);
     if (roar) drawPanel(g, ROAR_CHIP.x - ROAR_CHIP.w / 2, ROAR_CHIP.y - ROAR_CHIP.h / 2, ROAR_CHIP.w, ROAR_CHIP.h, { c: 5, fill: 0x1a2a3a, alpha: 0.95, edge: 0xa8dcf8, lw: 1.5 });
+    this.drawWeatherChips(g);
+  }
+
+  /**
+   * The weather chip at the top right: the coming (or current) wave's weather and the next one's,
+   * named a wave ahead, with what the weather does; and under it the shrine's blessing and curse
+   * (or the scout's word) while they last. Their texts are made the first time they show.
+   */
+  private drawWeatherChips(g: Phaser.GameObjects.Graphics) {
+    const s = this.state;
+    const W = WEATHER_CHIP;
+    const weather = !held(s) && (s.weather || s.nextWeather);
+    if (weather && !this.weatherText) {
+      this.weatherText = this.add
+        .text(W.x, W.y, '', { ...textStyle(10, '#dceaf8'), align: 'center', wordWrap: { width: W.w - 16 } })
+        .setOrigin(0.5, 0)
+        .setDepth(UI_DEPTH - 5);
+    }
+    let bottom = W.y;
+    if (this.weatherText) {
+      this.weatherText.setVisible(!!weather);
+      if (weather) {
+        const name = (id: typeof s.weather) => (id ? t(WEATHERS[id].name) : t('clearSky'));
+        const about = s.weather ?? s.nextWeather!;
+        this.weatherText.setPosition(W.x, W.y + 4).setText(`${t('weatherChip', { now: name(s.weather), next: name(s.nextWeather) })}\n${t(WEATHERS[about].text)}`);
+        const h = this.weatherText.height + 8;
+        drawPanel(g, W.x - W.w / 2, W.y, W.w, h, { c: 5, fill: 0x1c2836, alpha: 0.92, edge: 0x8fb4d8, lw: 1.5 });
+        bottom = W.y + h + 6;
+      }
+    }
+    const S = SHRINE_CHIP;
+    const shrine = !held(s) && (s.shrine || s.scouted);
+    if (shrine && !this.shrineText) this.shrineText = this.add.text(S.x, S.y, '', textStyle(10, '#d8f5b8')).setOrigin(0.5).setDepth(UI_DEPTH - 5);
+    if (!this.shrineText) return;
+    this.shrineText.setVisible(!!shrine);
+    if (!shrine) return;
+    const lines = [
+      ...(s.shrine ? [t('shrineChip', { blessing: t(BLESSINGS[s.shrine.blessing].name), curse: t(CURSES[s.shrine.curse].name), n: s.shrine.waves })] : []),
+      ...(s.scouted ? [t('scoutedChip')] : []),
+    ];
+    const y = Math.max(S.y - S.h / 2, bottom);
+    const h = S.h + (lines.length - 1) * 13;
+    this.shrineText.setPosition(S.x, y + h / 2).setText(lines.join('\n')).setAlign('center');
+    drawPanel(g, S.x - S.w / 2, y, S.w, h, { c: 5, fill: 0x22301e, alpha: 0.92, edge: 0x9ad07a, lw: 1.5 });
+  }
+
+  /** Rain or wind over the field while the weather lasts: slanted drops, or streaks blowing towards the wall (held still with reduced motion). */
+  private drawWeather() {
+    const g = this.weatherG.clear();
+    const s = this.state;
+    if (held(s) || (s.weather !== 'rain' && s.weather !== 'wind')) return;
+    const top = SEEN.y + HUD_HEIGHT;
+    const h = XP_BAR.y - 10 - top;
+    const clock = settings.reduceMotion ? 0 : this.clock;
+    const wrap = (n: number, m: number) => ((n % m) + m) % m;
+    if (s.weather === 'rain') {
+      g.lineStyle(1.5, 0xc8dcf0, 0.45);
+      for (let i = 0; i < 90; i++) {
+        const x = SEEN.x + wrap(i * 137.5 - clock * 0.12, SEEN.w + 40);
+        const y = top + wrap(i * 61.3 + clock * 0.7, h);
+        g.lineBetween(x, y, x - 4, y + 14);
+      }
+    } else {
+      g.lineStyle(1.5, 0xe8eef4, 0.35);
+      for (let i = 0; i < 26; i++) {
+        const x = SEEN.x + wrap(i * 211.7 - clock * 0.55, SEEN.w + 120) - 60;
+        const y = top + wrap(i * 47.9, h);
+        g.lineBetween(x, y, x + 46 + (i % 3) * 14, y + 2);
+      }
+    }
   }
 
   private createForts() {
@@ -1493,6 +1624,21 @@ export class GameScene extends Phaser.Scene {
     return s.caltrops.charge >= s.caltrops.need && !s.choices && !held(s) && !this.skillBook.open && !this.hirePanel?.open && !this.shopOpen;
   }
 
+  /** The seen foe drawn under (x, y), the nearest to it, if any. */
+  private foeAt(x: number, y: number) {
+    const sight = fieldSight(this.state);
+    let best: Enemy | undefined;
+    let bestD = Infinity;
+    for (const e of this.state.enemies) {
+      if (e.x >= sight || e.x > SPAWN_X) continue;
+      const r = ENEMIES[e.kind].radius;
+      // The body stands above the feet (e.y is about its middle): reach a little round it.
+      const d = Math.hypot(e.x - x, e.y - r * 0.4 - y);
+      if (d < r * 1.3 + 16 && d < bestD) [best, bestD] = [e, d];
+    }
+    return best;
+  }
+
   private rainReady() {
     const s = this.state;
     return s.rain.charge >= s.rain.need && !s.choices && !held(s) && !this.skillBook.open && !this.hirePanel?.open && !this.shopOpen;
@@ -1528,15 +1674,18 @@ export class GameScene extends Phaser.Scene {
       }
     }
     // The hint over the field, for Arrow Rain first, else for the caltrops.
-    const hint = ready || this.caltropsReady();
-    this.rainHint.setVisible(hint).setText(ready ? t('rainHint') : t('caltropsHint'));
+    // From wave 2, until a foe has been marked, the hint says a tap marks one once the charge allows.
+    const markable = !this.markedOnce && s.wave >= 2 && s.phase === 'fighting' && !s.choices && s.rain.charge >= MARK_COST;
+    const hint = ready || this.caltropsReady() || markable;
+    this.rainHint.setVisible(hint).setText(ready ? t('rainHint') : this.caltropsReady() ? t('caltropsHint') : t('markHint', { n: MARK_COST }));
     if (hint) drawPanel(g, RAIN_HINT.x - 118, RAIN_HINT.y - 12, 236, 24, { c: 6, fill: 0x1e222c, alpha: 0.88, edge: GOLD.mid, lw: 1.5 });
 
     // While dragged: a dashed arc from the button up over the field to a gold ring on the road,
     // where the volley or patch will land (kept short of the dark on a Night wave).
     if (this.aim) {
       const on = this.onField(this.aim);
-      const to = on ? fieldSpot(s, this.aim.x, this.aim.y) : { x: this.aim.x, y: this.aim.y };
+      // Wind blows a volley back towards the wall: the ring shows where it will come down.
+      const to = on ? (this.aimKind === 'rain' ? volleySpot : fieldSpot)(s, this.aim.x, this.aim.y) : { x: this.aim.x, y: this.aim.y };
       const from = ARC_FROM[this.aimKind];
       const ctrl = { x: (from.x + to.x) / 2, y: Math.min(from.y, to.y) - 150 };
       const pts: V[] = [];

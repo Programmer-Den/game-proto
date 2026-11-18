@@ -49,6 +49,9 @@ export const HEAT = { x: 398, y: 58, w: 68, h: 20 };
 /** The chip right of the Repair button naming the frozen pass or the daily siege, by its centre. */
 export const FRONTIER_CHIP = { x: 318, y: 108, w: 124, h: 22 };
 /** The "Chilled bow" chip over the hero while the Frost Giant's roar slows the shots, by its centre. */
+/** The weather chip at the top right (it grows down with its text), and the shrine's chip under it. */
+export const WEATHER_CHIP = { x: 750, y: 84, w: 340, h: 20 };
+export const SHRINE_CHIP = { x: 750, y: 140, w: 340, h: 20 };
 export const ROAR_CHIP = { x: 300, y: 236, w: 150, h: 20 };
 /**
  * The tap area of each guard slot on the barricade, round the guard's feet (`GUARD_SLOTS` in
@@ -100,6 +103,8 @@ const PINS: [Box, 'left' | 'right' | 'stretch', 'top' | 'bottom', Box][] = (
     [ENDLESS_CHIP, 'left', 'top'],
     [FRONTIER_CHIP, 'left', 'top'],
     [BOSS_BAR, 'left', 'top'],
+    [WEATHER_CHIP, 'right', 'top'],
+    [SHRINE_CHIP, 'right', 'top'],
     [FORTIFY, 'left', 'top'],
     [REPAIR, 'left', 'top'],
     [SKILL_BOOK.button, 'left', 'top'],
