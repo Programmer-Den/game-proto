@@ -9,6 +9,10 @@ const en: HowToPlay = {
       action: "Send an idle moth to light it, or to refill a lit one's oil",
     },
     {
+      input: 'Drag from a jar through lanterns',
+      action: 'Send one moth on a round: it lights or refills up to four lanterns in that order, then flies home',
+    },
+    {
       input: 'Click or tap a bat',
       action: 'Send an idle moth to chase it off',
     },
@@ -28,7 +32,11 @@ const en: HowToPlay = {
       input: 'Click or tap a curse / Go on',
       action: 'At every nightfall from the tenth: take a curse for more pay, or take none',
     },
-    { input: 'Next dusk', action: "Start the next night's dusk" },
+    { input: 'Next dusk', action: "Start the next night's dusk; when it adds a lantern, tap one of the marked spots to hang it there" },
+    {
+      input: 'Fittings',
+      action: 'On the night panel: pick a reservoir, a gust guard or a bat shutter, then tap a lantern to fit it for the rest of the game',
+    },
     {
       input: 'Village',
       action: 'On the night panel: build a smithy, a chandler or a chapel, kept for every game after',
@@ -65,6 +73,9 @@ const en: HowToPlay = {
     'Moths grow traits from the flights they fly, kept from game to game: swift, frugal and gust-proof.',
     'Every night kept adds a house to the village below the keep; with enough houses, coins build a smithy (cheaper cask fills), a chandler (a spare moth) or a chapel (it spares the first hearth a game loses).',
     'The nights turn through the seasons, three nights each: summer dusks are short and stormy, autumn brings fog, and winter dusks are long but snow slows the moths.',
+    'A round is one flight for a tired moth, and it passes by a lantern another moth has already taken.',
+    'You choose where each new lantern hangs: a spot that completes a chain pays at nightfall, and a bell near the others holds bats still.',
+    'Fit a gust guard to the lantern you fill fullest, since gusts and bats go for the lantern with the most oil.',
     'In the monastery avalanches bury the low path twice a dusk: a moth sitting on a path lantern keeps it, and a buried one takes 2 seconds to dig out. Ring the named bell tower before the snow comes to warn a pilgrim for 6 coins.',
   ],
 };
@@ -75,6 +86,10 @@ const de: HowToPlay = {
     {
       input: 'Eine Laterne anklicken oder antippen',
       action: 'Eine freie Motte schicken, um sie anzuzünden oder das Öl einer brennenden nachzufüllen',
+    },
+    {
+      input: 'Von einem Glas durch Laternen ziehen',
+      action: 'Eine Motte auf eine Runde schicken: sie zündet bis zu vier Laternen in dieser Reihenfolge an oder füllt sie nach und fliegt dann heim',
     },
     {
       input: 'Eine Fledermaus anklicken oder antippen',
@@ -96,7 +111,11 @@ const de: HowToPlay = {
       input: 'Einen Fluch anklicken oder antippen / Weiter',
       action: 'Bei jedem Einbruch der Nacht ab der zehnten: einen Fluch für mehr Lohn nehmen oder keinen',
     },
-    { input: 'Nächste Nacht', action: 'Die Dämmerung der nächsten Nacht beginnen' },
+    { input: 'Nächste Nacht', action: 'Die Dämmerung der nächsten Nacht beginnen; kommt eine Laterne dazu, tippe auf einen markierten Platz, um sie dort aufzuhängen' },
+    {
+      input: 'Beschläge',
+      action: 'Im Nachtfenster: einen großen Tank, einen Windschutz oder ein Schutzgitter wählen und dann auf eine Laterne tippen, um sie für den Rest des Spiels damit auszurüsten',
+    },
     {
       input: 'Dorf',
       action: 'Im Nachtfenster: eine Schmiede, einen Kerzler oder eine Kapelle bauen, die für jedes spätere Spiel bleiben',
@@ -133,6 +152,9 @@ const de: HowToPlay = {
     'Motten bekommen durch ihre Flüge Eigenschaften, die von Spiel zu Spiel bleiben: flink, sparsam und windfest.',
     'Jede gehaltene Nacht baut ein Haus im Dorf unter der Burg; mit genug Häusern bauen Münzen eine Schmiede (billigere Fassfüllungen), einen Kerzler (eine Ersatzmotte) oder eine Kapelle (sie rettet das erste Herdfeuer eines Spiels).',
     'Die Nächte folgen den Jahreszeiten, je drei Nächte: Sommerdämmerungen sind kurz und stürmisch, der Herbst bringt Nebel, und Winterdämmerungen sind lang, doch Schnee bremst die Motten.',
+    'Eine Runde zählt für eine müde Motte als ein Flug, und sie lässt eine Laterne aus, die schon eine andere Motte übernommen hat.',
+    'Du wählst, wo jede neue Laterne hängt: ein Platz, der eine Kette schließt, zahlt bei Einbruch der Nacht, und eine Glocke nahe den anderen hält Fledermäuse fest.',
+    'Gib der Laterne, die du am vollsten füllst, einen Windschutz, denn Böen und Fledermäuse wollen die Laterne mit dem meisten Öl.',
     'Im Kloster begraben Lawinen zweimal je Dämmerung den unteren Pfad: eine Motte auf einer Pfadlaterne hält sie, und eine verschüttete braucht 2 Sekunden zum Freigraben. Läute vor dem Schnee den genannten Glockenturm, um einen Pilger für 6 Münzen zu warnen.',
   ],
 };

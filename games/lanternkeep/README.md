@@ -19,7 +19,9 @@ the Great Festival; the nights go on after it, here, in a harbour town or up at 
 monastery where avalanches bury the path and bells warn pilgrims, and every nightfall from the
 tenth offers two curses that make the nights harder and pay more. The nights turn through the
 seasons, and every night kept adds a house to a village below the keep, whose smithy, chandler and
-chapel last from game to game.
+chapel last from game to game. A drag from the jar through several lanterns sends one moth on a
+round, you choose where each night's new lantern hangs, and lanterns can be fitted with a bigger
+reservoir, a gust guard or a bat shutter.
 
 It is played as a shadow-puppet theatre: the keep is black cut card in front of a backlit paper
 screen that turns from saffron to indigo as dusk falls, light shows through its arrow slits and
@@ -32,12 +34,14 @@ stone joints, the lanterns have coloured-glass panes and the moths are lace-wing
 | Control | Action |
 | --- | --- |
 | Tap or click a lantern | Send an idle moth to light it, or to refill a lit one's oil; with every moth busy, the tap waits in line |
+| Drag from a jar through lanterns | Send one moth on a round of up to four lanterns, lit or refilled in that order |
 | Tap or click a bat | Send an idle moth to chase it off |
 | Tap or click an idle moth on its jar | With the second jar bought: send it to rest at the other jar |
 | Tap or click an upgrade | Between nights: buy its next level, or put a fill in the cask |
 | Tap or click a district | At a fifth nightfall: move the keep there (or stay) |
 | Tap or click a curse | At a nightfall from the tenth: take it (or press Go on to take none) |
-| Next dusk | Between nights: start the next night's dusk |
+| Next dusk | Between nights: start the next night's dusk (then tap a marked spot to hang its new lantern) |
+| Fittings | On the night panel: pick a fitting, then tap a lantern to fit it |
 | Village | On the night panel: open the village, and tap a building to build it |
 | Keep going / Set sail / Climb | After the Great Festival: play on here, sail to the harbour or climb to the monastery |
 | Tap or click a boon | At the Harbour or Mountain Festival: keep it for this and every later game |
@@ -206,6 +210,26 @@ stone joints, the lanterns have coloured-glass panes and the moths are lace-wing
       the snow comes warns the pilgrim for 6 coins, even with the cask dry.
     Keep ten nights in the monastery for the **Mountain Festival**, which offers the same three
     boons as the harbour's (picking one replaces the boon you had).
+29. **Moth rounds**: press on the jar and drag through up to four lanterns (gold rings number
+    them, a dotted line shows the way), then let go: one idle moth of that jar flies the round,
+    lighting or refilling each lantern in that order, and flies home after the last. A lantern
+    another moth has by then, or one a tap couldn't go to (a refill with the cask spoken for), is
+    passed by. The round counts as one flight for a tired moth, and a moth that stays to guard a
+    gust's lantern goes on with its round when the gust has passed. Its stops ahead show as faint
+    numbers. A tap on a lantern still works as before; a tap on a moth (with two jars) still
+    swaps it.
+30. **Place the new lantern**: when "Next dusk" adds a lantern, up to three free spots are marked
+    with a ghost lantern first. Each says if the lantern there would be a beacon, a candle or a
+    bell, and if it completes a chain (its cord shows in gold). Tap one to hang the lantern there
+    and start the dusk. The herald passes over an order that names a spot with no lantern yet.
+    From night 6 every spot has a lantern.
+31. **Lantern fittings**: the "Fittings" link on the night panel opens a bar over the lanterns.
+    Pick a fitting and tap a lantern (gold rings show where it can go) to fit it for the rest of
+    the game; a lantern holds one, and a new one replaces it. A small badge shows it.
+    - **Reservoir** (15 coins, an oil drop): every fill holds half again the oil.
+    - **Gust guard** (20 coins, a wind curl): gusts, and the docks' sea wind, pass it by.
+    - **Bat shutter** (20 coins, bars): bats pass it by.
+    Fittings stay when the keep moves, on the lantern hung on the same numbered spot there.
 
 ![The first lantern lit](docs/screenshots/playthrough-1-first-lantern.webp)
 
@@ -262,6 +286,12 @@ stone joints, the lanterns have coloured-glass panes and the moths are lace-wing
 ![A winter night: snow falling and the plaque naming the season](docs/screenshots/loop-winter.webp)
 
 ![The monastery: an avalanche warned over the pilgrims' path, and a pilgrim asking for the west bell tower](docs/screenshots/loop-monastery.webp)
+
+![A moth round being dragged from the jar through three lanterns](docs/screenshots/loop-moth-round.webp)
+
+![Night 2's new lantern: three marked spots, two of which complete a chain](docs/screenshots/loop-new-lantern.webp)
+
+![The fittings bar: a gust guard and a bat shutter fitted, the reservoir picked](docs/screenshots/loop-fittings.webp)
 
 ### Upgrades
 
