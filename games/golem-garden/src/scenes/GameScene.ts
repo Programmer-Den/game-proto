@@ -379,6 +379,12 @@ export class GameScene extends Phaser.Scene {
     // can bring them over the board again: place the frame afresh then.
     this.scale.on(Phaser.Scale.Events.RESIZE, this.relayout, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.scale.off(Phaser.Scale.Events.RESIZE, this.relayout, this));
+    // A daily plot left by closing or reloading the page is scored as it stands, as the picker does.
+    const onHide = (e: PageTransitionEvent) => {
+      if (!e.persisted) this.leaveDaily();
+    };
+    window.addEventListener('pagehide', onHide);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => window.removeEventListener('pagehide', onHide));
   }
 
   /**
@@ -2052,7 +2058,8 @@ export class GameScene extends Phaser.Scene {
     // A golem that unlocks at this wave (Fungus at 10, Bell at 20), the first time it is reached.
     for (const kind of GOLEMS) {
       const at = GOLEM_INFO[kind].unlockBest;
-      if (at === n && this.savedBest < at) lines.push(t('golemUnlocked', { golem: t(GOLEM_INFO[kind].name) }));
+      // Only an ordinary garden saves the best wave that opens it.
+      if (ordinary(s) && at === n && this.savedBest < at) lines.push(t('golemUnlocked', { golem: t(GOLEM_INFO[kind].name) }));
     }
     const buds = Math.min(BLOOM_GOAL, bloomBefore + 1);
     if (buds > bloomBefore) lines.push(buds >= BLOOM_GOAL ? t('bloomBanner') : t('budBanner', { n: buds, goal: BLOOM_GOAL }));
