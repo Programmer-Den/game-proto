@@ -29,8 +29,8 @@ export interface Bounty {
 export const BOUNTY_HULL = 20;
 /** The share of the wave's loot a met bounty pays on top. */
 export const BOUNTY_SHARE = 0.5;
-/** The time a `swift` bounty allows: a base plus some seconds a ship on the wave's course. */
-export const swiftMs = (s: GameState) => (30 + 8 * waveShips(s.wave, s.course).length) * 1000;
+/** The time a `swift` bounty allows: a base plus some seconds a ship the wave sails with (`fleet`). */
+export const swiftMs = (s: GameState) => (30 + 8 * s.fleet) * 1000;
 
 const firstSunk = (s: GameState, kind: EnemyKind) => s.waveSunk.indexOf(kind);
 

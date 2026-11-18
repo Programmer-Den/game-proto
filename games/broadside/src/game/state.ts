@@ -347,6 +347,8 @@ export interface GameState {
   hold: Crate[];
   cargoSold: number | null;
   raiders: number;
+  /** The ships the wave sails with: its course's, the named captains and the raiders (the Swift bounty's time counts them all). */
+  fleet: number;
   /** A sea beast's tentacles about to rise, and the lasting harbor wall of beasts sunk (which the scene saves). */
   tentacles: Tentacle[];
   wall: Wall;
@@ -495,6 +497,7 @@ export function newRun(bestWave = 0, boons: BoonId[] = [], hull: HullId = FIRST_
     hold: [],
     cargoSold: null,
     raiders: 0,
+    fleet: 0,
     tentacles: [],
     wall: { ...emptyWall(), ...extras.wall },
     night: false,
