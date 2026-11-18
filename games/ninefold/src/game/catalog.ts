@@ -55,11 +55,11 @@ export const UNIQUE_RELICS: readonly RelicId[] = ['twin'];
  * sums), Thermo (digits rise along each thermometer from its bulb), Arrow (the digits on an arrow
  * add up to its circle), Kropki (dots join digits one apart or one double the other; no dot,
  * neither), Sandwich (the sums outside the board add up the digits between the 1 and the highest
- * digit), Clock (a heart is lost every 3 minutes) and Sealed (no hints on the floor; clearing it
+ * digit), Jigsaw (irregular regions in place of the boxes), Clock (a heart is lost every 3 minutes) and Sealed (no hints on the floor; clearing it
  * gives one back). All but the last two change the board's rules (`BOARD_TWISTS`); those two press
  * the player.
  */
-export const TWISTS = ['diagonal', 'parity', 'killer', 'thermo', 'arrow', 'kropki', 'sandwich', 'clock', 'sealed'] as const;
+export const TWISTS = ['diagonal', 'parity', 'killer', 'thermo', 'arrow', 'kropki', 'sandwich', 'jigsaw', 'clock', 'sealed'] as const;
 export type Twist = (typeof TWISTS)[number];
 
 export const TWIST_INFO: Record<Twist, { name: TextKey; rule: TextKey }> = {
@@ -71,10 +71,11 @@ export const TWIST_INFO: Record<Twist, { name: TextKey; rule: TextKey }> = {
   arrow: { name: 'arrow', rule: 'arrowRule' },
   kropki: { name: 'kropki', rule: 'kropkiRule' },
   sandwich: { name: 'sandwich', rule: 'sandwichRule' },
+  jigsaw: { name: 'jigsaw', rule: 'jigsawRule' },
   sealed: { name: 'sealedName', rule: 'sealedRule' },
 };
 
-export const BOARD_TWISTS = ['diagonal', 'parity', 'killer', 'thermo', 'arrow', 'kropki', 'sandwich'] as const satisfies readonly Twist[];
+export const BOARD_TWISTS = ['diagonal', 'parity', 'killer', 'thermo', 'arrow', 'kropki', 'sandwich', 'jigsaw'] as const satisfies readonly Twist[];
 export const PRESSING_TWISTS = ['clock', 'sealed'] as const satisfies readonly Twist[];
 
 /**
@@ -85,6 +86,6 @@ export const PRESSING_TWISTS = ['clock', 'sealed'] as const satisfies readonly T
 export const ASCENSION_RULES = ['ascentHearts', 'ascentHint', 'ascentGivens', 'ascentNotes', 'ascentOffer'] as const satisfies readonly TextKey[];
 export const MAX_ASCENT = ASCENSION_RULES.length;
 
-/** Classic's puzzle levels: three by givens, then a board for each extra rule. */
-export const LEVELS = ['easy', 'normal', 'hard', 'killer', 'thermo', 'arrow', 'kropki', 'sandwich'] as const;
+/** Classic's puzzle levels: three by givens, then a board for each extra rule, then Jigsaw regions. */
+export const LEVELS = ['easy', 'normal', 'hard', 'killer', 'thermo', 'arrow', 'kropki', 'sandwich', 'jigsaw'] as const;
 export type Level = (typeof LEVELS)[number];

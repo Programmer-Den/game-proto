@@ -4,10 +4,12 @@ import { viewFrame, viewSize } from '../../../../shared/scaling';
 import { settings } from '../../../../shared/settings';
 import { ASCENSION_RULES, LEVELS, MONTH_STYLE, RELIC_INFO, STYLES, STYLE_INFO, TWIST_INFO, type Level, type RelicId, type StyleId, type Twist } from '../game/catalog';
 import { LESSONS } from '../game/lessons';
-import { loadBoard, loadProgress, saveBoard, saveProgress } from '../game/save';
+import { clashes, encode, variantOf } from '../game/maker';
+import { loadBoard, loadMaker, loadProgress, saveBoard, saveMaker, saveProgress } from '../game/save';
 import {
-  ascensionOpen, beginLesson, canEnter, canUndo, chooseStyle, clockLeft, dailyStreakNow, daysIn, undoMove, digitsLeft, enter, erase, GAUNTLET, hasTwist, hint, HINT_NOTE_MS, isRight, lessonOf, newGame,
-  notesLocked, select, stampedDays, startClassic, startDaily, startDelve, startLesson, startWeekly, takeRelic, tick, toggleNotes, toMenu, weekDay, weekScores, type FloorPlan, type GameState,
+  ascensionOpen, backToMaker, beginLesson, canEnter, canUndo, checkMaker, chooseStyle, clockLeft, dailyStreakNow, daysIn, undoMove, digitsLeft, enter, erase, GAUNTLET, hasTwist, hint, HINT_NOTE_MS, isRight, lessonOf,
+  makerResize, makerVariant, newGame, notesLocked, playMade, select, stampedDays, startClassic, startCode, startDaily, startDelve, startLesson, startMaker, startMini, startWeekly, takeRelic, tick,
+  toggleNotes, toMenu, weekDay, weekScores, type FloorPlan, type GameState,
 } from '../game/state';
 import { boxOf, dailySeed, peersOf, units, type Puzzle } from '../game/sudoku';
 import type { Technique } from '../game/techniques';
@@ -17,6 +19,12 @@ import { t, type TextKey } from '../i18n';
 import { checkTrophies } from '../trophies/check';
 import { layoutFor, UI_DEPTH, WIDE, type Layout } from './layout';
 import { hex, THEMES, type Theme } from './themes';
+
+/** Game time as minutes and seconds, like 2:05. */
+const clock = (ms: number) => {
+  const secs = Math.floor(ms / 1000);
+  return `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+};
 
 /** A spot the test can tap, in view pixels. */
 type Spot = { x: number; y: number; w: number; h: number };
@@ -72,6 +80,10 @@ export class GameScene extends Phaser.Scene {
   private shapeOf: { puzzle: Puzzle; units: number[][]; peers: number[][] } | null = null;
   /** The board's clock when it was last saved, so a board left alone is saved every few seconds. */
   private savedAt = 0;
+  /** The maker's line on its panel: a refused share code, else its how-to. */
+  private makerNote: TextKey = 'makerHelp';
+  /** The check card's share link was copied. */
+  private copied = false;
 
   constructor() {
     super('Game');
@@ -80,8 +92,17 @@ export class GameScene extends Phaser.Scene {
   create() {
     this.fitView();
     this.state = newGame(loadProgress());
+    this.state.made = loadMaker();
     // A board left in play (or a relic offer between Delve floors) comes back where it stood.
     loadBoard(this.state);
+    // A share link (`?puzzle=<code>`) opens its puzzle straight away, once.
+    const shared = new URLSearchParams(location.search).get('puzzle');
+    if (shared) {
+      startCode(this.state, shared);
+      const url = new URL(location.href);
+      url.searchParams.delete('puzzle');
+      history.replaceState(history.state, '', url);
+    }
     checkTrophies(this.state.progress);
     this.backdrop = this.add.graphics();
     this.boardG = this.add.graphics();
@@ -145,6 +166,7 @@ export class GameScene extends Phaser.Scene {
     }
     if (this.dirty || Math.abs(this.state.timeMs - this.savedAt) > SAVE_EVERY_MS) {
       saveBoard(this.state);
+      if (this.state.mode === 'maker') saveMaker(this.state.made);
       this.savedAt = this.state.timeMs;
     }
     if (this.dirty) {
@@ -200,6 +222,12 @@ export class GameScene extends Phaser.Scene {
 
   private enterDigit(d: number) {
     const s = this.state;
+    if (s.mode === 'maker') {
+      if (!enter(s, d)) return ui('refuse');
+      SFX('place');
+      this.dirty = true;
+      return;
+    }
     if (!canEnter(s) || !s.puzzle || d > s.puzzle.size) return ui('refuse');
     if (!enter(s, d)) return ui('refuse');
     if (s.notesMode) SFX('note');
@@ -227,6 +255,36 @@ export class GameScene extends Phaser.Scene {
   private onHint() {
     if (!hint(this.state)) ui('refuse');
     this.dirty = true;
+  }
+
+  /** Asks for a share code (or a link) and plays it; a code that holds no fair puzzle is refused. */
+  private onPaste() {
+    const text = window.prompt(t('pastePrompt'));
+    if (!text) return;
+    if (!startCode(this.state, text)) {
+      ui('refuse');
+      this.makerNote = 'codeRefused';
+      this.layerKey = '';
+      return;
+    }
+    ui('click');
+  }
+
+  /** Copies the checked puzzle's share link. */
+  private onCopy() {
+    const s = this.state;
+    if (!s.made) return;
+    const url = new URL(location.href);
+    url.search = '';
+    url.hash = '';
+    url.searchParams.set('puzzle', encode(s.made.shape, s.made.grid));
+    navigator.clipboard?.writeText(url.toString()).then(
+      () => {
+        this.copied = true;
+        this.layerKey = '';
+      },
+      () => ui('refuse'),
+    );
   }
 
   // -------------------------------------------------------------------------------------------
@@ -455,20 +513,24 @@ export class GameScene extends Phaser.Scene {
     const sumSize = Math.round(cs * 0.22);
     // A lesson marks the cells that show its technique and rings the cell it unlocks.
     const lesson = lessonOf(s);
+    // On the maker, digits that stand twice in a unit show as wrong.
+    const clash = s.mode === 'maker' ? clashes(p, s.values) : new Set<number>();
+    // Thick lines between boxes (or Jigsaw regions), thin ones elsewhere.
+    const edge = (a: number, b: number) => (boxOf(p, a) !== boxOf(p, b) ? th.thick / 2 : th.thin / 2);
     const marks = new Set<number>(lesson && s.phase !== 'solved' ? lesson.marks : []);
     for (let i = 0; i < size * size; i++) {
       const r = Math.floor(i / size);
       const c = i % size;
-      // Thick lines between boxes, thin ones elsewhere: each cell is inset from its edges.
-      const left = c === 0 ? 0 : c % p.boxW === 0 ? th.thick / 2 : th.thin / 2;
-      const right = c === size - 1 ? 0 : (c + 1) % p.boxW === 0 ? th.thick / 2 : th.thin / 2;
-      const top = r === 0 ? 0 : r % p.boxH === 0 ? th.thick / 2 : th.thin / 2;
-      const bottom = r === size - 1 ? 0 : (r + 1) % p.boxH === 0 ? th.thick / 2 : th.thin / 2;
+      // Each cell is inset from its edges, more where a box or region ends.
+      const left = c === 0 ? 0 : edge(i, i - 1);
+      const right = c === size - 1 ? 0 : edge(i, i + 1);
+      const top = r === 0 ? 0 : edge(i, i - size);
+      const bottom = r === size - 1 ? 0 : edge(i, i + size);
       const cx = x + c * cs + left;
       const cy = y + r * cs + top;
       const w = cs - left - right;
       const h = cs - top - bottom;
-      const wrong = s.values[i] !== 0 && !isRight(s, i);
+      const wrong = (s.values[i] !== 0 && !isRight(s, i)) || clash.has(i);
       const base = th.boxes ? th.boxes[boxOf(p, i) % th.boxes.length] : th.cell;
       g.fillStyle(base, 1).fillRoundedRect(cx, cy, w, h, th.cellRadius);
       const tint = wrong ? th.wrongBg : i === sel ? th.sel : selValue && s.values[i] === selValue ? th.same : peers.has(i) ? th.peer : done.has(i) ? th.done : -1;
@@ -521,6 +583,20 @@ export class GameScene extends Phaser.Scene {
         }
       }
       this.cellSpots.push({ cell: i, x: this.fx + x + c * cs + cs / 2, y: this.fy + y + r * cs + cs / 2, w: cs, h: cs });
+    }
+    // Jigsaw: each region is fenced by a bold line wherever it meets another, so its shape reads at a glance.
+    if (p.regions) {
+      const lw = Math.max(3, th.thick + 1);
+      g.lineStyle(lw, hex(th.given), 0.7);
+      // Each piece runs half a line past its cell to close the corners, but never past the board.
+      const from = (k: number) => (k === 0 ? 0 : k * cs - lw / 2);
+      const to = (k: number) => (k === size - 1 ? size * cs : (k + 1) * cs + lw / 2);
+      for (let i = 0; i < size * size; i++) {
+        const r = Math.floor(i / size);
+        const c = i % size;
+        if (c < size - 1 && p.regions[i] !== p.regions[i + 1]) g.lineBetween(x + (c + 1) * cs, y + from(r), x + (c + 1) * cs, y + to(r));
+        if (r < size - 1 && p.regions[i] !== p.regions[i + size]) g.lineBetween(x + from(c), y + (r + 1) * cs, x + to(c), y + (r + 1) * cs);
+      }
     }
     // Thermo: a bulb on each line's first cell and a tube through the rest, under the digits.
     for (const line of p.thermos ?? []) {
@@ -647,6 +723,11 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     const pt = this.panelTexts;
     if (this.screen !== 'board' || !pt.clock) return;
+    if (s.mode === 'maker') {
+      pt.status.setText(t('makerGivens', { n: s.values.filter(Boolean).length }));
+      pt.relics?.setText(t(this.makerNote));
+      return;
+    }
     const secs = Math.floor(s.timeMs / 1000);
     if (hasTwist(s, 'clock')) {
       // A Clock floor counts down to the next heart it takes.
@@ -683,7 +764,8 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     // The menu's daily button depends on today's date, so the menu is rebuilt when the date changes.
     const today = this.screen === 'menu' ? dailySeed(new Date()) : 0;
-    return `${this.screen}|${s.phase}|${s.progress.style}|${s.puzzle?.size ?? 0}|${s.floor}|${s.relicOffer.join()}|${s.mode}|${today}|${this.pickAscent}|${s.lesson}|${this.calMonth}`;
+    const variant = s.puzzle ? variantOf(s.puzzle) : '';
+    return `${this.screen}|${s.phase}|${s.progress.style}|${s.puzzle?.size ?? 0}|${variant}|${s.floor}|${s.relicOffer.join()}|${s.mode}|${today}|${this.pickAscent}|${s.lesson}|${this.calMonth}`;
   }
 
   private buildLayer() {
@@ -703,6 +785,7 @@ export class GameScene extends Phaser.Scene {
       if (phase === 'solved') (this.state.mode === 'lesson' ? this.buildLearned() : this.buildSolved());
       if (phase === 'relic') this.buildRelics();
       if (phase === 'over') this.buildOver();
+      if (phase === 'checked') this.buildCheck();
     }
   }
 
@@ -748,6 +831,8 @@ export class GameScene extends Phaser.Scene {
     g.setAlpha(enabled ? 1 : 0.4);
     const label = this.text(x, y, caption, size, th.keyText);
     label.setAlpha(enabled ? 1 : 0.5);
+    // A caption too wide for its button (German, or a long weekly line) shrinks to fit.
+    if (label.width > w - 12) label.setScale((w - 12) / label.width);
     if (th.glow === 'auto') label.setShadow(0, 0, th.keyText, 8, false, true);
     const zone = this.add_(this.add.zone(x, y, w, h).setDepth(UI_DEPTH + 3).setInteractive({ useHandCursor: true }));
     zone.on('pointerover', () => draw(true)).on('pointerout', () => draw(false));
@@ -776,6 +861,15 @@ export class GameScene extends Phaser.Scene {
       ui('click');
       startDaily(this.state, new Date());
     }, m.topFont, !dailyDone);
+    // The daily mini: today's 6x6, once, with the fastest mini solve under it.
+    const miniDone = p.mini === today;
+    const best = p.miniBest ? `\n${t('miniBest', { time: clock(p.miniBest) })}` : '';
+    const mini = this.button('mini', m.mini.x, m.mini.y, m.mini.w, m.mini.h, (miniDone ? t('miniDone') : t('mini')) + best, () => {
+      ui('click');
+      startMini(this.state, new Date());
+    }, m.topFont, !miniDone);
+    mini.label.setLineSpacing(2);
+    if (best) mini.label.setFontSize(m.topFont - 1);
     // The weekly gauntlet: today's board, once, and the week's total so far.
     const scores = weekScores(p, now);
     const day = weekDay(now);
@@ -791,7 +885,11 @@ ${played ? t('weeklyDone', { total }) : t('weeklyLine', { day: day + 1, total })
     this.text(m.delve.x, m.levels.ys[0] - 44, t('classic'), 15);
     LEVELS.forEach((level, k) => {
       const cols = m.levels.xs.length;
-      this.button(level, m.levels.xs[k % cols], m.levels.ys[Math.floor(k / cols)], m.levels.w, m.levels.h, t(level), () => {
+      // A last row that isn't full sits in the middle.
+      const row = Math.floor(k / cols);
+      const inRow = Math.min(cols, LEVELS.length - row * cols);
+      const shift = cols > 1 ? ((cols - inRow) * (m.levels.xs[1] - m.levels.xs[0])) / 2 : 0;
+      this.button(level, m.levels.xs[k % cols] + shift, m.levels.ys[row], m.levels.w, m.levels.h, t(level), () => {
         ui('click');
         startClassic(this.state, level as Level);
       }, m.levels.font);
@@ -827,6 +925,11 @@ ${played ? t('weeklyDone', { total }) : t('weeklyLine', { day: day + 1, total })
       ui('click');
       this.calMonth = now.getFullYear() * 12 + now.getMonth();
       this.screen = 'calendar';
+    }, m.bottomFont);
+    this.button('maker', m.maker.x, m.maker.y, m.maker.w, m.maker.h, t('maker'), () => {
+      ui('click');
+      this.makerNote = 'makerHelp';
+      startMaker(this.state);
     }, m.bottomFont);
     const streak = dailyStreakNow(p, today);
     const stats = t('stats', { solved: p.solved, flawless: p.flawless }) + (streak ? ` · ${t('streak', { n: streak })}` : '');
@@ -1049,7 +1152,7 @@ ${played ? t('weeklyDone', { total }) : t('weeklyLine', { day: day + 1, total })
     const left = (x: number, y: number, content: string, size: number, color?: string) =>
       this.add_(this.add.text(x, y, content, { fontFamily: th.font, fontSize: `${size}px`, color: color ?? th.text, fontStyle: th.bold ? 'bold' : '' }).setOrigin(0, 0.5).setDepth(UI_DEPTH + 2));
     const twistIds: Twist[] = s.mode === 'delve' ? (s.plan?.twists ?? []) : s.mode === 'weekly' && GAUNTLET[s.weekDay]?.twist ? [GAUNTLET[s.weekDay].twist!] : [];
-    const modeName = { delve: t('delve'), daily: t('daily'), weekly: t('weekly'), classic: t('classic'), lesson: t('schoolTitle') }[s.mode];
+    const modeName = { delve: t('delve'), daily: t('daily'), mini: t('mini'), weekly: t('weekly'), classic: t('classic'), lesson: t('schoolTitle'), maker: t('maker'), custom: t('custom') }[s.mode];
     const ascent = s.mode === 'delve' && s.ascent ? [t('ascentTag', { n: s.ascent })] : [];
     const kicker = [modeName, ...ascent, ...twistIds.map((tw) => t(TWIST_INFO[tw].name))].join(' · ');
     const kickerText = left(panel.x + 24, panel.y + rows.kicker, kicker.toUpperCase(), 13).setAlpha(0.75);
@@ -1057,8 +1160,10 @@ ${played ? t('weeklyDone', { total }) : t('weeklyLine', { day: day + 1, total })
     const room = this.L.menuButton.x - this.L.menuButton.w / 2 - 10 - (panel.x + 24);
     if (kickerText.width > room) kickerText.setScale(room / kickerText.width);
     const lesson = lessonOf(s);
+    const boardName = t('boardName', { variant: t(variantOf(p)), size: p.size });
     const heading = lesson ? this.techniqueName(lesson.id) : s.mode === 'weekly' ? t('weeklyHeading', { day: s.weekDay + 1 })
-      : s.mode !== 'delve' ? t(s.level) : s.plan?.boss ? t('bossFloor', { n: s.floor }) : t('floor', { n: s.floor, size: p.size });
+      : s.mode === 'mini' ? t('miniHeading', { size: p.size }) : s.mode === 'maker' || s.mode === 'custom' ? boardName
+        : s.mode !== 'delve' ? t(s.level) : s.plan?.boss ? t('bossFloor', { n: s.floor }) : t('floor', { n: s.floor, size: p.size });
     const h1 = left(panel.x + 24, panel.y + rows.heading, heading, 28, th.accent);
     if (th.glow) h1.setShadow(0, 0, th.glow === 'auto' ? th.accent : th.glow, 10, false, true);
     this.button('menu', this.L.menuButton.x, this.L.menuButton.y, this.L.menuButton.w, this.L.menuButton.h, t('menu'), () => {
@@ -1082,6 +1187,10 @@ ${played ? t('weeklyDone', { total }) : t('weeklyLine', { day: day + 1, total })
       this.padTexts.push(count);
     }
     const tool = this.L.tools;
+    if (s.mode === 'maker') {
+      this.buildMakerTools();
+      return;
+    }
     const notes = this.button('notes', tool.xs[0], tool.y, tool.w, tool.h, '', () => this.onNotes(), tool.font);
     this.panelTexts.notes = notes.label;
     this.button('erase', tool.xs[1], tool.y, tool.w, tool.h, t('erase'), () => this.onErase(), tool.font);
@@ -1089,6 +1198,73 @@ ${played ? t('weeklyDone', { total }) : t('weeklyLine', { day: day + 1, total })
     const hintButton = this.button('hint', tool.xs[3], tool.y, tool.w, tool.h, '', () => this.onHint(), tool.font);
     this.panelTexts.hint = hintButton.label;
     this.add_(this.add.text(this.L.keysHint.x, this.L.keysHint.y, t('keysHint'), { fontFamily: th.font, fontSize: '11px', color: th.text }).setOrigin(0.5).setDepth(UI_DEPTH + 2).setAlpha(0.6));
+  }
+
+  /** The maker's tools: board size, variant, Erase and Check, and Open code on the status row. */
+  private buildMakerTools() {
+    const s = this.state;
+    const p = s.puzzle!;
+    const tool = this.L.tools;
+    this.panelTexts.clock.setVisible(false);
+    this.button('size', tool.xs[0], tool.y, tool.w, tool.h, `${p.size}×${p.size}`, () => {
+      ui('click');
+      makerResize(this.state);
+    }, tool.font);
+    this.button('rules', tool.xs[1], tool.y, tool.w, tool.h, t(variantOf(p)), () => {
+      ui('click');
+      makerVariant(this.state);
+    }, tool.font);
+    this.button('erase', tool.xs[2], tool.y, tool.w, tool.h, t('erase'), () => this.onErase(), tool.font);
+    this.button('check', tool.xs[3], tool.y, tool.w, tool.h, t('check'), () => {
+      ui('click');
+      this.copied = false;
+      checkMaker(this.state);
+    }, tool.font);
+    const P = this.L.paste;
+    this.button('paste', P.x, P.y, P.w, P.h, t('openCode'), () => this.onPaste(), 14);
+    this.add_(this.add.text(this.L.keysHint.x, this.L.keysHint.y, t('makerKeys'), { fontFamily: this.theme.font, fontSize: '11px', color: this.theme.text }).setOrigin(0.5).setDepth(UI_DEPTH + 2).setAlpha(0.6));
+  }
+
+  /** The maker's check card: one solution (rated, with Play and the share link), or what is wrong. */
+  private buildCheck() {
+    const s = this.state;
+    const c = s.makerCheck!;
+    const th = this.theme;
+    const E = this.L.end;
+    const B = this.L.endButtons;
+    this.dim();
+    const from = this.parts.length;
+    this.box(E.x - E.w / 2, E.y - E.h / 2, E.w, E.h, UI_DEPTH, undefined, Math.max(0.95, th.panelAlpha));
+    const unique = c.result === 'unique';
+    const title = { unique: 'checkUnique', none: 'checkNone', many: 'checkMany', clash: 'checkClash', unclear: 'checkUnclear' } as const;
+    this.text(E.x, E.y - E.h / 2 + 34, t(title[c.result]), 28, unique ? th.accent : th.heart);
+    const wrap = { wordWrap: { width: E.w - 48 } };
+    if (c.result === 'unique') {
+      this.text(E.x, E.y - E.h / 2 + 76, t('rating', { rating: t(`rate${c.rating[0].toUpperCase()}${c.rating.slice(1)}` as TextKey) }), 20, th.accent);
+      const why = c.rating === 'expert' ? t('ratingExpert') : t('ratingStep', { technique: this.techniqueName(c.hardest ?? 'nakedSingle') });
+      this.text(E.x, E.y - E.h / 2 + 110, `${why} ${t('makerGivens', { n: c.givens })}`, 14, undefined, wrap);
+      const code = s.made ? encode(s.made.shape, s.made.grid) : '';
+      this.text(E.x, E.y - E.h / 2 + 150, this.copied ? t('copied') : t('codeLine', { code }), 12, undefined, { wordWrap: { width: E.w - 48, useAdvancedWrap: true } }).setAlpha(0.85);
+      const w = Math.min(B.w, (E.w - 40) / 3);
+      const xs = [E.x - w - 8, E.x, E.x + w + 8];
+      this.button('play', xs[0], B.y, w, B.h, t('play'), () => {
+        ui('click');
+        playMade(this.state);
+      }, 16);
+      this.button('copy', xs[1], B.y, w, B.h, t('copyLink'), () => this.onCopy(), 16);
+      this.button('edit', xs[2], B.y, w, B.h, t('edit'), () => {
+        ui('click');
+        backToMaker(this.state);
+      }, 16);
+    } else {
+      const advice = { none: 'adviceNone', many: 'adviceMany', clash: 'adviceClash', unclear: 'adviceUnclear' } as const;
+      this.text(E.x, E.y - 20, t(advice[c.result]), 15, undefined, wrap);
+      this.button('edit', E.x, B.y, B.w, B.h, t('edit'), () => {
+        ui('click');
+        backToMaker(this.state);
+      });
+    }
+    this.raise(from);
   }
 
   /** A dim over the whole view that swallows taps, under an end card. */
@@ -1115,8 +1291,7 @@ ${played ? t('weeklyDone', { total }) : t('weeklyLine', { day: day + 1, total })
     const from = this.parts.length;
     this.box(this.L.end.x - this.L.end.w / 2, this.L.end.y - this.L.end.h / 2, this.L.end.w, this.L.end.h, UI_DEPTH, undefined, Math.max(0.95, this.theme.panelAlpha));
     this.text(this.L.end.x, this.L.end.y - 92, t('solved'), 34, this.theme.accent);
-    const secs = Math.floor(s.timeMs / 1000);
-    this.text(this.L.end.x, this.L.end.y - 46, t('solvedLine', { time: `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`, mistakes: s.mistakes, hints: s.hintsUsed }), 16);
+    this.text(this.L.end.x, this.L.end.y - 46, t('solvedLine', { time: clock(s.timeMs), mistakes: s.mistakes, hints: s.hintsUsed }), 16);
     // A gauntlet board shows its score and the week's total so far.
     const weekly = s.mode === 'weekly';
     if (weekly) this.text(this.L.end.x, this.L.end.y - 12, t('weeklyScore', { score: formatNumber(s.score), total: formatNumber(s.weekTotal) }), 20, this.theme.accent);
@@ -1127,14 +1302,25 @@ ${played ? t('weeklyDone', { total }) : t('weeklyLine', { day: day + 1, total })
       const line = t('calendarStamp', { n: stampedDays(s.progress, year, month).size, of: daysIn(year, month) });
       this.text(this.L.end.x, this.L.end.y + 22, line, 14, undefined, { wordWrap: { width: this.L.end.w - 40 } });
     }
+    // The daily mini names the fastest mini solve; a shared puzzle says it counts for nothing.
+    if (s.mode === 'mini') this.text(this.L.end.x, this.L.end.y + 22, t('miniBest', { time: clock(s.progress.miniBest) }), 16, this.theme.accent);
+    if (s.mode === 'custom') this.text(this.L.end.x, this.L.end.y + 22, t('customSolved'), 14, undefined, { wordWrap: { width: this.L.end.w - 40 } });
     this.text(this.L.end.x, this.L.end.y + (weekly ? 24 : -12), this.unlockedLine(), weekly ? 14 : 16, this.theme.accent, { wordWrap: { width: this.L.end.w - 40 } });
+    const second = s.mode === 'classic' || s.mode === 'custom';
     if (s.mode === 'classic') {
       this.button('next', this.L.endButtons.xs[0], this.L.endButtons.y, this.L.endButtons.w, this.L.endButtons.h, t('next'), () => {
         ui('click');
         startClassic(this.state, this.state.level);
       });
     }
-    this.button('done', s.mode === 'classic' ? this.L.endButtons.xs[1] : this.L.end.x, this.L.endButtons.y, this.L.endButtons.w, this.L.endButtons.h, t('menu'), () => {
+    if (s.mode === 'custom') {
+      this.button('next', this.L.endButtons.xs[0], this.L.endButtons.y, this.L.endButtons.w, this.L.endButtons.h, t('maker'), () => {
+        ui('click');
+        this.makerNote = 'makerHelp';
+        startMaker(this.state);
+      });
+    }
+    this.button('done', second ? this.L.endButtons.xs[1] : this.L.end.x, this.L.endButtons.y, this.L.endButtons.w, this.L.endButtons.h, t('menu'), () => {
       ui('click');
       toMenu(this.state);
       this.screen = 'menu';

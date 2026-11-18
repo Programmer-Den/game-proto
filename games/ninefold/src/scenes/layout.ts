@@ -23,15 +23,19 @@ export type Layout = {
   tools: { xs: number[]; y: number; w: number; h: number; font: number };
   /** The line naming the keyboard keys, by its centre. */
   keysHint: Point;
+  /** The maker's Open code button on the panel's status row, by its centre. */
+  paste: Rect;
   /** The Menu button at the panel's top right, by its centre. */
   menuButton: Rect;
   /** The menu's title, box (top-left) and buttons, by their centres. */
   menu: {
     title: Point;
     box: Rect;
+    /** The daily puzzle, the daily mini beside it and the weekly gauntlet. */
     daily: Rect;
+    mini: Rect;
     weekly: Rect;
-    /** The caption size of the daily and weekly buttons. */
+    /** The caption size of the daily, mini and weekly buttons. */
     topFont: number;
     /** The Classic levels, as many across as `xs` has, in rows at `ys`. */
     levels: { xs: number[]; ys: number[]; w: number; h: number; font: number };
@@ -39,10 +43,11 @@ export type Layout = {
     /** The buttons either side of Delve that pick its ascension, by their centres. */
     ascentDown: Rect;
     ascentUp: Rect;
-    /** The bottom row: the technique school, the styles and the calendar, and their captions' size. */
+    /** The bottom buttons: the technique school, the styles, the calendar and the puzzle maker, and their captions' size. */
     school: Rect;
     styles: Rect;
     calendar: Rect;
+    maker: Rect;
     bottomFont: number;
     stats: Point;
   };
@@ -73,20 +78,23 @@ export const WIDE: Layout = {
   tools: { xs: [WIDE_PANEL.x + 64, WIDE_PANEL.x + 150, WIDE_PANEL.x + 236, WIDE_PANEL.x + 322], y: WIDE_PANEL.y + 394, w: 80, h: 40, font: 13 },
   keysHint: { x: WIDE_PANEL.x + WIDE_PANEL.w / 2, y: WIDE_PANEL.y + WIDE_PANEL.h - 22 },
   menuButton: { x: WIDE_PANEL.x + WIDE_PANEL.w - 58, y: WIDE_PANEL.y + 34, w: 92, h: 32 },
+  paste: { x: WIDE_PANEL.x + WIDE_PANEL.w - 94, y: WIDE_PANEL.y + 100, w: 140, h: 32 },
   menu: {
     title: { x: 480, y: 62 },
     box: { x: 120, y: 132, w: 720, h: 384 },
-    daily: { x: 310, y: 186, w: 300, h: 56 },
-    weekly: { x: 650, y: 186, w: 300, h: 56 },
-    topFont: 18,
-    levels: { xs: [179, 265, 351, 437, 523, 609, 695, 781], ys: [270], w: 80, h: 54, font: 15 },
+    daily: { x: 250, y: 186, w: 216, h: 56 },
+    mini: { x: 480, y: 186, w: 216, h: 56 },
+    weekly: { x: 710, y: 186, w: 216, h: 56 },
+    topFont: 17,
+    levels: { xs: [164, 243, 322, 401, 480, 559, 638, 717, 796], ys: [270], w: 72, h: 54, font: 14 },
     delve: { x: 480, y: 352, w: 330, h: 54 },
     ascentDown: { x: 282, y: 352, w: 50, h: 54 },
     ascentUp: { x: 678, y: 352, w: 50, h: 54 },
-    school: { x: 262, y: 430, w: 196, h: 50 },
-    styles: { x: 480, y: 430, w: 220, h: 50 },
-    calendar: { x: 698, y: 430, w: 196, h: 50 },
-    bottomFont: 17,
+    school: { x: 216, y: 430, w: 164, h: 50 },
+    styles: { x: 392, y: 430, w: 164, h: 50 },
+    calendar: { x: 568, y: 430, w: 164, h: 50 },
+    maker: { x: 744, y: 430, w: 164, h: 50 },
+    bottomFont: 16,
     stats: { x: 480, y: 490 },
   },
   school: { title: { x: 480, y: 50 }, line: { x: 480, y: 98 }, cards: { xs: [300, 660], ys: [214, 392], w: 340, h: 150 } },
@@ -115,21 +123,24 @@ export const TALL: Layout = {
   tools: { xs: [87, 209, 331, 453], y: 818, w: 114, h: 50, font: 15 },
   keysHint: { x: 270, y: 886 },
   menuButton: { x: TALL_PANEL.x + TALL_PANEL.w - 58, y: TALL_PANEL.y + 34, w: 92, h: 32 },
+  paste: { x: TALL_PANEL.x + TALL_PANEL.w - 94, y: TALL_PANEL.y + 104, w: 140, h: 34 },
   menu: {
-    title: { x: 270, y: 110 },
-    box: { x: 40, y: 220, w: 460, h: 560 },
-    daily: { x: 157, y: 290, w: 214, h: 66 },
-    weekly: { x: 383, y: 290, w: 214, h: 66 },
+    title: { x: 270, y: 88 },
+    box: { x: 40, y: 200, w: 460, h: 640 },
+    daily: { x: 157, y: 252, w: 214, h: 60 },
+    mini: { x: 383, y: 252, w: 214, h: 60 },
+    weekly: { x: 270, y: 324, w: 440, h: 60 },
     topFont: 15,
-    levels: { xs: [100, 213, 327, 440], ys: [400, 466], w: 104, h: 56, font: 15 },
-    delve: { x: 270, y: 562, w: 300, h: 60 },
-    ascentDown: { x: 84, y: 562, w: 52, h: 60 },
-    ascentUp: { x: 456, y: 562, w: 52, h: 60 },
-    school: { x: 117, y: 682, w: 142, h: 56 },
-    styles: { x: 270, y: 682, w: 152, h: 56 },
-    calendar: { x: 423, y: 682, w: 142, h: 56 },
-    bottomFont: 14,
-    stats: { x: 270, y: 748 },
+    levels: { xs: [86, 178, 270, 362, 454], ys: [442, 502], w: 84, h: 52, font: 14 },
+    delve: { x: 270, y: 590, w: 300, h: 60 },
+    ascentDown: { x: 84, y: 590, w: 52, h: 60 },
+    ascentUp: { x: 456, y: 590, w: 52, h: 60 },
+    school: { x: 157, y: 692, w: 214, h: 52 },
+    styles: { x: 383, y: 692, w: 214, h: 52 },
+    calendar: { x: 157, y: 754, w: 214, h: 52 },
+    maker: { x: 383, y: 754, w: 214, h: 52 },
+    bottomFont: 15,
+    stats: { x: 270, y: 812 },
   },
   school: { title: { x: 300, y: 50 }, line: { x: 270, y: 112 }, cards: { xs: [270], ys: [240, 410, 580, 750], w: 460, h: 150 } },
   calendar: {

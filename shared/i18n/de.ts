@@ -226,7 +226,7 @@ const de: Translation<typeof en> = {
   stonemateCard: 'Spiele Schach mit lebenden Statuen, in dem jeder Schlag seine eigene Szene hat: Jeder Angreifer schlägt auf eigene Art zu, jedes Opfer zerbricht auf eigene Art.',
   stonemateCover: 'Ein Schachbrett mit Statuen aus Marmor und Obsidian mit leuchtenden Augen, ein weißer Läufer schießt einen leuchtenden Runenblitz auf einen schwarzen Springer',
   mazewrightCover: 'Ein Heckenlabyrinth auf einem Gartenrasen, mit Steintürmen in den Hecken und Käfern, die einen gepunkteten Weg zu einem Häuschen laufen',
-  ninefoldCard: 'Löse Zahlenrätsel in zehn freischaltbaren Grafikstilen: ein Tagesrätsel, ein Wochenlauf, klassische Rätsel in acht Stufen und der Abstieg, eine Reihe immer größerer Rätsel mit Herzen und Relikten.',
+  ninefoldCard: 'Löse Zahlenrätsel in zehn freischaltbaren Grafikstilen: ein Tagesrätsel samt Mini, ein Wochenlauf, klassische Rätsel in neun Stufen, ein Rätselbauer und der Abstieg, eine Reihe immer größerer Rätsel mit Herzen und Relikten.',
   ninefoldCover: 'Ein Zahlenrätsel auf geschichtetem Papier, mit einigen eingetragenen Ziffern und einem gewählten Feld',
   lanternkeepCard: 'Schicke Motten aus ihrem Glas, um die Laternen der Burg vor Einbruch der Nacht anzuzünden, und gib die Münzen für Dochte, Öl und mehr Motten aus.',
   lanternkeepCover: 'Eine Burg bei Einbruch der Nacht mit leuchtenden Laternen auf den Türmen und Motten, die zwischen ihnen fliegen',

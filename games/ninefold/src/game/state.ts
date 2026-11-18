@@ -1,22 +1,28 @@
 import { byDifficulty } from '../../../../shared/settings';
 import { BOARD_TWISTS, MAX_ASCENT, PALETTE_STYLES, PRESSING_TWISTS, RELICS, STYLES, TWISTS, UNIQUE_RELICS, type Level, type RelicId, type StyleId, type Twist } from './catalog';
 import { LESSONS, lessonPuzzle } from './lessons';
-import { dailySeed, EXTRAS, makePuzzle, nextDay, peersOf, seeded, SHAPES, shuffle, units, type Extra, type Puzzle, type Random } from './sudoku';
+import { check, decode, playable, type MakerCheck, MAKER_SIZES, VARIANTS, variantOf, type Variant } from './maker';
+import { dailySeed, EXTRAS, jigsawShape, makePuzzle, nextDay, peersOf, seeded, SHAPES, shuffle, solve, units, type Extra, type Puzzle, type Random, type Shape } from './sudoku';
 import { candidates, explain, TECHNIQUES, type Technique } from './techniques';
 
-// Ninefold's rules: Classic (a daily puzzle, the weekly gauntlet and free play at eight levels),
+// Ninefold's rules: Classic (a daily puzzle and its daily mini, the weekly gauntlet and free play at nine levels),
 // Delve (a run of ever bigger puzzles with hearts and relics, at up to five ascensions), the
-// technique school's lessons, and the progress that unlocks the art styles and stamps the calendar.
+// technique school's lessons, the puzzle maker (and the shared puzzles it makes), and the progress that unlocks the art styles and stamps the calendar.
 // The scene calls the actions below and reads `GameState`; nothing here knows about Phaser.
 
 /** Givens on a Classic 9x9 board at each level. */
-export const CLASSIC_GIVENS: Record<Level, number> = { easy: 40, normal: 32, hard: 26, killer: 16, thermo: 24, arrow: 18, kropki: 14, sandwich: 20 };
+export const CLASSIC_GIVENS: Record<Level, number> = { easy: 40, normal: 32, hard: 26, killer: 16, thermo: 24, arrow: 18, kropki: 14, sandwich: 20, jigsaw: 30 };
 /** The extra rule a Classic level's boards carry. */
 export const LEVEL_EXTRA: Partial<Record<Level, Extra>> = { killer: 'killer', thermo: 'thermo', arrow: 'arrow', kropki: 'kropki', sandwich: 'sandwich' };
 /** How long the panel names the technique a hint used, in game time. */
 export const HINT_NOTE_MS = 6_000;
 /** The daily puzzle is a Normal board. */
 export const DAILY_LEVEL: Level = 'normal';
+/** The daily mini: a 6x6 board each day with this many givens, for a two-minute solve. */
+export const MINI_SIZE = 6;
+export const MINI_GIVENS = 14;
+/** The mini's seed is the date's, turned round so it never deals the daily puzzle's numbers. */
+export const miniSeed = (date: number) => -date;
 /** Hints a Classic board starts with (hub difficulty: Easy, Normal, Hard). */
 export const classicHints = () => byDifficulty(5, 3, 2);
 /** Hearts a Delve run starts with (hub difficulty: Easy, Normal, Hard). */
@@ -59,7 +65,7 @@ export const TWIST_FLOOR = 4;
 export const BOSS_EVERY = 5;
 export const BOSS_GIVENS = 3;
 /** Givens a twist takes away, since its rule tells the solver more. */
-export const TWIST_GIVENS: Record<Twist, number> = { diagonal: 2, parity: 6, killer: 14, thermo: 6, arrow: 8, kropki: 14, sandwich: 6, clock: 0, sealed: 0 };
+export const TWIST_GIVENS: Record<Twist, number> = { diagonal: 2, parity: 6, killer: 14, thermo: 6, arrow: 8, kropki: 14, sandwich: 6, jigsaw: 2, clock: 0, sealed: 0 };
 /** On a Clock floor a heart is lost every this much game time. */
 export const CLOCK_MS = 3 * 60_000;
 /** Clearing this Delve floor at the highest ascension open opens the next one. */
@@ -132,9 +138,10 @@ export function planFloor(floor: number, random: Random, ascent = 0): FloorPlan 
 
 const pick = <T>(items: readonly T[], random: Random) => items[Math.floor(random() * items.length)];
 
-export type Mode = 'classic' | 'daily' | 'weekly' | 'delve' | 'lesson';
-/** `lesson` is a lesson's opening card, over its board, before play starts. */
-export type Phase = 'menu' | 'lesson' | 'playing' | 'solved' | 'relic' | 'over';
+/** `maker` is the puzzle maker's board, `custom` a puzzle it made (or one opened from a share code). */
+export type Mode = 'classic' | 'daily' | 'mini' | 'weekly' | 'delve' | 'lesson' | 'maker' | 'custom';
+/** `lesson` is a lesson's opening card, over its board, before play starts; `checked` the maker's check card. */
+export type Phase = 'menu' | 'lesson' | 'playing' | 'solved' | 'relic' | 'over' | 'checked';
 
 /** What a player has done across every board, saved by `save.ts`. */
 export interface Progress {
@@ -159,13 +166,16 @@ export interface Progress {
   bestWeek: number;
   /** Every daily solved, by the date it was dealt for (`dailySeed`), oldest first: the calendar's stamps. */
   dailyDays: number[];
+  /** The date (`dailySeed`) of the last daily mini solved, and the fastest mini solve (game ms, 0 none). */
+  mini: number;
+  miniBest: number;
   /** The school's lessons stamped. */
   lessons: Technique[];
   style: StyleId;
   unlocked: StyleId[];
 }
 
-export const newProgress = (): Progress => ({ solved: 0, flawless: 0, noHint: 0, hard: 0, fast: 0, bestFloor: 0, bosses: 0, daily: 0, dailyStreak: 0, bestStreak: 0, climbed: 0, week: 0, weekScores: GAUNTLET.map(() => -1), bestWeek: 0, dailyDays: [], lessons: [], style: 'paper', unlocked: ['paper'] });
+export const newProgress = (): Progress => ({ solved: 0, flawless: 0, noHint: 0, hard: 0, fast: 0, bestFloor: 0, bosses: 0, daily: 0, dailyStreak: 0, bestStreak: 0, climbed: 0, week: 0, weekScores: GAUNTLET.map(() => -1), bestWeek: 0, dailyDays: [], mini: 0, miniBest: 0, lessons: [], style: 'paper', unlocked: ['paper'] });
 
 /** The highest Delve ascension open. */
 export const ascensionOpen = (p: Progress) => Math.min(MAX_ASCENT, p.climbed);
@@ -273,6 +283,10 @@ export interface GameState {
   /** The technique the last hint used (`revealed` when none found it), and the board time it was given at. */
   hintNote: Technique | 'revealed' | null;
   hintAt: number;
+  /** The maker's board as the player left it (its shape and givens), kept while they play what they made. */
+  made: { shape: Shape; grid: number[] } | null;
+  /** The maker's last check, shown on its card (`phase` `checked`). */
+  makerCheck: MakerCheck | null;
   progress: Progress;
   events: GameEvent[];
 }
@@ -281,7 +295,7 @@ export function newGame(progress: Progress): GameState {
   return {
     phase: 'menu', mode: 'classic', level: 'easy', puzzle: null, values: [], notes: [], selected: -1, notesMode: false,
     mistakes: 0, hintsLeft: 0, hintsUsed: 0, timeMs: 0, hearts: 0, maxHearts: 0, floor: 0, plan: null, upcoming: null, dailyDate: 0, week: 0, weekDay: 0, score: 0, weekTotal: 0, ascent: 0, ascended: 0, relics: [], relicOffer: [],
-    warded: false, streak: 0, keyHealed: 0, undo: [], doneUnits: [], newStyles: [], lesson: -1, hintNote: null, hintAt: 0, progress, events: [],
+    warded: false, streak: 0, keyHealed: 0, undo: [], doneUnits: [], newStyles: [], lesson: -1, hintNote: null, hintAt: 0, made: null, makerCheck: null, progress, events: [],
   };
 }
 
@@ -311,7 +325,8 @@ export function startClassic(s: GameState, level: Level, random: Random = Math.r
   s.level = level;
   s.dailyDate = 0;
   s.plan = s.upcoming = null;
-  load(s, makePuzzle(SHAPES[9], CLASSIC_GIVENS[level], random, LEVEL_EXTRA[level]));
+  const shape = level === 'jigsaw' ? jigsawShape(9, random) : SHAPES[9];
+  load(s, makePuzzle(shape, CLASSIC_GIVENS[level], random, LEVEL_EXTRA[level]));
   s.hintsLeft = classicHints();
 }
 
@@ -322,6 +337,16 @@ export function startDaily(s: GameState, date: Date) {
   s.plan = s.upcoming = null;
   s.dailyDate = dailySeed(date);
   load(s, makePuzzle(SHAPES[9], CLASSIC_GIVENS[DAILY_LEVEL], seeded(s.dailyDate)));
+  s.hintsLeft = classicHints();
+}
+
+/** Starts today's daily mini: a small board, the same for everyone on that date, beside the daily puzzle. */
+export function startMini(s: GameState, date: Date) {
+  s.mode = 'mini';
+  s.level = 'normal';
+  s.plan = s.upcoming = null;
+  s.dailyDate = dailySeed(date);
+  load(s, makePuzzle(SHAPES[MINI_SIZE], MINI_GIVENS, seeded(miniSeed(s.dailyDate))));
   s.hintsLeft = classicHints();
 }
 
@@ -402,7 +427,8 @@ function nextFloor(s: GameState) {
   s.plan = plan;
   s.upcoming = null;
   s.relicOffer = [];
-  const shape = { ...SHAPES[plan.size], ...(plan.twists.includes('diagonal') ? { diagonal: true } : {}) };
+  const base = plan.twists.includes('jigsaw') ? jigsawShape(plan.size, Math.random) : SHAPES[plan.size];
+  const shape = { ...base, ...(plan.twists.includes('diagonal') ? { diagonal: true } : {}) };
   load(s, makePuzzle(shape, plan.givens, Math.random, extraOf(plan.twists)));
   // Each Seer's Eye fills in a few cells, picked at random, before play starts.
   const seers = s.relics.filter((r) => r === 'seer').length * SEER_CELLS;
@@ -489,6 +515,7 @@ function fill(s: GameState, cell: number) {
  */
 export function enter(s: GameState, digit: number) {
   const p = s.puzzle;
+  if (s.mode === 'maker') return makerSet(s, digit);
   if (!p || !canEnter(s) || digit < 1 || digit > p.size) return false;
   const cell = s.selected;
   if (s.notesMode) {
@@ -540,6 +567,7 @@ export const clockLeft = (s: GameState) => CLOCK_MS - (s.timeMs % CLOCK_MS);
 
 /** Clears a wrong digit from the selected cell, or, if it holds none, its notes; false if there was nothing to clear. */
 export function erase(s: GameState) {
+  if (s.mode === 'maker') return makerSet(s, 0);
   if (!canEnter(s)) return false;
   const cell = s.selected;
   if (!s.values[cell] && !s.notes[cell]) return false;
@@ -639,6 +667,14 @@ function learned(s: GameState, lesson: Technique) {
 
 function solved(s: GameState) {
   const p = s.progress;
+  // A puzzle from the maker or a share code counts for nothing: anyone can make an easy one.
+  if (s.mode === 'custom') {
+    s.selected = -1;
+    s.phase = 'solved';
+    s.newStyles = [];
+    s.events.push({ type: 'solved' });
+    return;
+  }
   p.solved++;
   if (s.mistakes === 0) p.flawless++;
   if (s.hintsUsed === 0) p.noHint++;
@@ -650,6 +686,10 @@ function solved(s: GameState) {
     p.daily = s.dailyDate;
     // The calendar's stamp for the day.
     if (!p.dailyDays.includes(s.dailyDate)) p.dailyDays = [...p.dailyDays, s.dailyDate].sort((a, b) => a - b);
+  }
+  if (s.mode === 'mini') {
+    p.mini = s.dailyDate;
+    p.miniBest = p.miniBest ? Math.min(p.miniBest, s.timeMs) : s.timeMs;
   }
   if (s.mode === 'weekly') {
     s.score = gauntletScore(s.mistakes, s.hintsUsed, s.timeMs);
@@ -759,3 +799,110 @@ export function digitsLeft(s: GameState) {
   return left;
 }
 
+
+// -------------------------------------------------------------------------------------------
+// The puzzle maker
+
+/** A blank board of a size and variant (Jigsaw draws new regions). */
+export function blankBoard(size: 4 | 6 | 9, variant: Variant, random: Random = Math.random): { shape: Shape; grid: number[] } {
+  const shape: Shape = variant === 'jigsaw' ? jigsawShape(size, random) : { ...SHAPES[size], ...(variant === 'diagonal' ? { diagonal: true } : {}) };
+  return { shape, grid: new Array<number>(size * size).fill(0) };
+}
+
+/** The maker's board as a puzzle the scene can draw: every digit set is a given, and its own "solution". */
+function makerLoad(s: GameState, shape: Shape, grid: number[]) {
+  s.mode = 'maker';
+  s.level = 'normal';
+  s.dailyDate = 0;
+  s.plan = s.upcoming = null;
+  s.makerCheck = null;
+  load(s, { ...shape, solution: grid.slice(), givens: grid.map((v) => v !== 0) });
+  // Nothing on a maker's board is finished: every digit is the player's to change.
+  s.doneUnits = [];
+  s.hintsLeft = 0;
+  s.made = { shape, grid: grid.slice() };
+}
+
+/** Opens the puzzle maker on the board left in it, or a blank 9x9. */
+export function startMaker(s: GameState) {
+  const made = s.made ?? blankBoard(9, 'classic');
+  makerLoad(s, made.shape, made.grid);
+}
+
+/** The shape of the board on the maker (without its digits). */
+export function makerShape(s: GameState): Shape {
+  const { size, boxW, boxH, diagonal, regions } = s.puzzle!;
+  return { size, boxW, boxH, ...(diagonal ? { diagonal } : {}), ...(regions ? { regions } : {}) };
+}
+
+/** Sets a digit (0 clears it) in the maker's picked cell; false when no cell is picked or nothing changes. */
+function makerSet(s: GameState, digit: number) {
+  const p = s.puzzle;
+  const cell = s.selected;
+  if (s.phase !== 'playing' || !p || cell < 0 || digit > p.size || s.values[cell] === digit) return false;
+  s.values[cell] = p.solution[cell] = digit;
+  p.givens[cell] = digit !== 0;
+  s.made = { shape: makerShape(s), grid: s.values.slice() };
+  return true;
+}
+
+/** The next board size on the maker (9, 4, 6): the board starts blank, in the same variant. */
+export function makerResize(s: GameState) {
+  if (s.mode !== 'maker' || s.phase !== 'playing' || !s.puzzle) return false;
+  const next = MAKER_SIZES[(MAKER_SIZES.indexOf(s.puzzle.size as 4 | 6 | 9) + 1) % MAKER_SIZES.length];
+  const board = blankBoard(next, variantOf(s.puzzle));
+  makerLoad(s, board.shape, board.grid);
+  return true;
+}
+
+/** The next variant on the maker (Classic, Diagonal, Jigsaw with new regions), keeping the digits set. */
+export function makerVariant(s: GameState) {
+  if (s.mode !== 'maker' || s.phase !== 'playing' || !s.puzzle) return false;
+  const next = VARIANTS[(VARIANTS.indexOf(variantOf(s.puzzle)) + 1) % VARIANTS.length];
+  const { shape } = blankBoard(s.puzzle.size as 4 | 6 | 9, next);
+  makerLoad(s, shape, s.values);
+  return true;
+}
+
+/** Checks the maker's board: one solution, and how hard; shown on its card. */
+export function checkMaker(s: GameState) {
+  if (s.mode !== 'maker' || s.phase !== 'playing' || !s.puzzle) return false;
+  s.makerCheck = check(makerShape(s), s.values);
+  s.selected = -1;
+  s.phase = 'checked';
+  return true;
+}
+
+/** Closes the check card, back to editing. */
+export function backToMaker(s: GameState) {
+  if (s.phase === 'checked') s.phase = 'playing';
+  else if (s.made) startMaker(s);
+}
+
+/** Plays a board with exactly one solution as a shared puzzle (no progress counts). */
+function playCustom(s: GameState, shape: Shape, grid: number[]) {
+  const solution = solve(shape, grid);
+  if (!solution) return false;
+  s.mode = 'custom';
+  s.level = 'normal';
+  s.dailyDate = 0;
+  s.plan = s.upcoming = null;
+  s.makerCheck = null;
+  load(s, { ...shape, solution, givens: grid.map((v) => v !== 0) });
+  s.hintsLeft = classicHints();
+  return true;
+}
+
+/** Plays the maker's board once its check found exactly one solution. */
+export function playMade(s: GameState) {
+  if (s.phase !== 'checked' || s.makerCheck?.result !== 'unique' || !s.made) return false;
+  return playCustom(s, s.made.shape, s.made.grid);
+}
+
+/** Opens a share code (or a link carrying one) as a shared puzzle; false when it doesn't hold a fair puzzle. */
+export function startCode(s: GameState, text: string) {
+  const board = decode(text);
+  if (!board || !playable(board.shape, board.grid)) return false;
+  s.made = { shape: board.shape, grid: board.grid.slice() };
+  return playCustom(s, board.shape, board.grid);
+}
