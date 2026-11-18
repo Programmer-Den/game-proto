@@ -6,7 +6,7 @@
 import { HEROES, isCrew, isKnight, type HeroId } from './heroes';
 import {
   BOSS, CRAB, DIFF, ELITE, EMBER, ENEMY, HERO_R, KNIGHT, LEASH, LINE, MAX_ENEMIES, MAX_SHARDS, RATS, ROLLER, RUN_MS, SENTINEL, SHADE, SQUID,
-  POWER, POWER_UPS, SCRAP, SHARD, SPAWN_RING, SPORE, TOAD, WALKER, WISP, freshHero, freshState, isStructure, refreshUnlocks, statsOf, xpFor,
+  ALTAR, POWER, POWER_UPS, SCRAP, SHARD, SPAWN_RING, SPORE, TOAD, WALKER, WISP, freshHero, freshState, isStructure, refreshUnlocks, statsOf, xpFor,
   type AllyKind, type PowerUp, type BoltColor, type Bomb, type Bullet, type Enemy, type EnemyKind, type GameState, type Hazard, type Pickup, type Pillar, type Stats,
 } from './state';
 import {
@@ -29,6 +29,7 @@ import { ARENA_MS, BOG, BOSSES, CHAMPION, CREDITS, PILLAR, PLANETS, SIEGE, STRIK
 // `t` is a common local name here (targets, time), so the translator goes by `tr`.
 import { t as tr, type TextKey } from '../i18n';
 import { cancelObjective, objectives } from './objectives';
+import { field, pactOn, strikeBarrels } from './field';
 import { HEAT, hot } from './heat';
 import { PERK, type ArmouryId } from './armoury';
 import { loopDmg, loopHp } from './endless';
@@ -129,6 +130,23 @@ export function choose(s: GameState, index: number) {
   if (s.rewardPicks > 0) s.rewardPicks -= 1;
   else s.pendingLevels -= 1;
   nextPick(s);
+}
+
+/**
+ * Banishes the card at `index` during a level-up (or a free pick): it never comes up again this
+ * run, and another card takes its place. Returns false when none are left or it can't be banished.
+ */
+export function banish(s: GameState, index: number) {
+  if (s.phase !== 'levelup' || !s.choices || s.banishes <= 0) return false;
+  const id = s.choices[index];
+  if (!id || id === FILLER.id) return false;
+  s.banishes -= 1;
+  s.banished.push(id);
+  const rest = s.choices.filter((_, i) => i !== index);
+  const next = rollChoices(s.hero!, s, 1, rest)[0];
+  if (next && !rest.includes(next)) s.choices[index] = next;
+  else s.choices.splice(index, 1);
+  return true;
 }
 
 /** Shows the next cards (free picks first), or goes where the run is headed when none are left. */
@@ -263,6 +281,7 @@ function step(s: GameState, ms: number, input: Input) {
   tides(s, ms);
   ruins(s, ms);
   pickups(s, ms);
+  field(s, ms);
   s.enemies = s.enemies.filter((e) => e.hp > 0);
   // The arena ends when every elite has fallen, or when its minute is up.
   if (s.arena && s.phase === 'run') {
@@ -415,6 +434,8 @@ function moveHero(s: GameState, ms: number, input: Input) {
 }
 
 export function heal(s: GameState, amount: number) {
+  // The Greed pact: no healing while it lasts.
+  if (s.pact?.kind === 'greed') return;
   const p = s.player;
   if (knight) {
     const before = p.hp;
@@ -438,6 +459,8 @@ function hurtHero(s: GameState, dmg: number, x?: number, y?: number) {
   if (s.mutators.includes('fragile')) dmg *= MUT.fragileHurt;
   // The endless rift's later loops hit harder.
   if (s.loop > 0) dmg *= loopDmg(s.loop);
+  // The Blood pact: hits land harder while it lasts.
+  if (pactOn(s, 'blood')) dmg *= ALTAR.hurt;
   const p = s.player;
   // The Barrier Emitter takes a hit when charged.
   const barrier = s.ranks.barrier ?? 0;
@@ -982,7 +1005,9 @@ export function spawnAt(s: GameState, kind: EnemyKind, x: number, y: number, eli
     // The endless rift's later loops: tougher foes and bosses.
     (!isStructure(kind) && s.loop > 0 ? loopHp(s.loop) : 1) *
     // The boss rush's bosses come with half their health, for a kit that is not a full run's.
-    (boss && s.rush ? RUSH.bossHp : 1);
+    (boss && s.rush ? RUSH.bossHp : 1) *
+    // The Blood pact: foes born while it lasts are tougher.
+    (foe && pactOn(s, 'blood') ? ALTAR.hp : 1);
   const speed = spec.speed * (boss ? 1 : 1 + t / 1200) * (elite ? ELITE.speed : 1) * (0.92 + rand() * 0.16) * (mut('haste') ? MUT.haste : 1);
   const e: Enemy = {
     id: s.nextId++, kind, elite, x, y, r: spec.r * (elite ? ELITE.size : 1), hp, maxHp: hp, speed,
@@ -1823,6 +1848,8 @@ export function damage(s: GameState, e: Enemy, base: number, o: HitOpts = {}) {
   e.hp -= dmg;
   e.flashMs = 90;
   s.hits += 1;
+  // A foe struck while it touches a volatile barrel lights it.
+  if (s.barrels.length) strikeBarrels(s, e.x, e.y, e.r);
   // Executioner Rounds: a foe left this low falls (an elite at half the share; never a boss or structure).
   if (st.execute > 0 && e.hp > 0 && e.kind !== 'boss' && !isStructure(e.kind) && e.hp < e.maxHp * st.execute * (e.elite ? 0.5 : 1)) e.hp = 0;
   if (o.slow && st.slowPct > 0) {
@@ -1833,7 +1860,7 @@ export function damage(s: GameState, e: Enemy, base: number, o: HitOpts = {}) {
   return dmg;
 }
 
-function kill(s: GameState, e: Enemy) {
+export function kill(s: GameState, e: Enemy) {
   e.hp = 0;
   // A structure breaks: no kill, no shard (its objective counts it).
   if (isStructure(e.kind)) {
@@ -1975,6 +2002,8 @@ function moveBullets(s: GameState, ms: number) {
       if (hostileBolt(s, b, shield)) keep.push(b);
       continue;
     }
+    // A bolt through a volatile barrel lights it.
+    if (s.barrels.length) strikeBarrels(s, b.x, b.y, b.r);
     let alive = true;
     b.bossMs -= ms;
     near(s, b.x, b.y, b.r, (e) => {
@@ -2184,7 +2213,7 @@ function take(s: GameState, k: Pickup) {
     pop(s, tr('plusHealth', { n: k.heal }), '#7dffa0');
   } else if (k.kind === 'credits') {
     // The Salvage Rig finds more in each chip.
-    const value = Math.round(k.value * st.creditMul);
+    const value = Math.round(k.value * st.creditMul * (pactOn(s, 'greed') ? ALTAR.credits : 1));
     s.credits += value;
     pop(s, tr('plusCredits', { n: value }), '#ffd36b');
   } else openChest(s);
@@ -2224,7 +2253,7 @@ function powerUp(s: GameState, kind: PowerUp) {
   else if (kind === 'freeze') {
     for (const e of s.enemies) if (e.kind !== 'boss' && !isStructure(e.kind)) e.stunMs = Math.max(e.stunMs, POWER.freezeMs);
   } else {
-    s.credits += POWER.cacheCredits;
+    s.credits += POWER.cacheCredits * (pactOn(s, 'greed') ? ALTAR.credits : 1);
   }
 }
 
@@ -2232,7 +2261,7 @@ function powerUp(s: GameState, kind: PowerUp) {
 export function gainXp(s: GameState, value: number, raw = false) {
   // The boss rush is fought with a set kit: no level-ups.
   if (s.rush) return;
-  s.xp += value * (raw ? 1 : st.xp);
+  s.xp += value * (raw ? 1 : st.xp * (pactOn(s, 'blood') ? ALTAR.xp : 1));
   while (s.xp >= s.xpNext) {
     s.xp -= s.xpNext;
     s.level += 1;

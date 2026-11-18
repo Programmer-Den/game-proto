@@ -56,6 +56,26 @@ world, with a star map between them. A boss rush and hero mastery come on top.
   screen's edge and two HUD lines under the clock; rewards are credits, a level or a free card.
   None in the arena; the boss calls one off. Power-ups (bomb, magnet, lure, overdrive, shield,
   freeze, credit cache) drop from foes after a world's first minute.
+- Banish (`banish` in `sim.ts`): a run has `BANISHES` (3) banishes (`state.banishes` left,
+  `state.banished` the card ids). The level-up panel shows a Banish button under each card but the
+  Field Ration (spots `banish-<i>` after the cards; Shift with 1-4 too). A banished card goes into
+  `banished`, which `rollChoices` (via `Kit.banished`) and `raisable` leave out, so it never comes up
+  again at a level-up, a free pick, a trader or a chest; `rollChoices(hero, kit, 1, rest)` draws its
+  replacement (the card is dropped when nothing new is left).
+- Rift altars and volatile barrels (`field.ts`, called once a step from `step` after `pickups`):
+  at `ALTAR.atMs` (1:45) of each world (`state.altarAt`, Infinity once placed, in a rush and after
+  a boss rush lands; skipped in the arena or once the boss is up) a pair of `Altar`s (`blood`,
+  `greed`) rises `ALTAR.dist` from the hero for `ALTAR.lifeMs`; walking onto one sets `state.pact`
+  for `ALTAR.ms`. Blood: `gainXp` (not raw) times `ALTAR.xp`, `spawnAt` foes `ALTAR.hp`, `hurtHero`
+  `ALTAR.hurt`. Greed: `heal` does nothing; credit chips and the cache times `ALTAR.credits`. The
+  HUD's health line shows it (`buffBlood` / `buffGreed`), and the scene labels each altar
+  (`altarTexts`, `altarBlood` / `altarGreed`). Barrels (`state.barrels`, `Barrel`, `BARREL`): from
+  `BARREL.fromMs` (1:10, `state.nextBarrel`) one every `everyMs` up to `max`, `min`-`far` from the
+  hero, gone past `leash`; `strikeBarrels` (from `moveBullets` for hero bolts and from `damage` for
+  a foe struck) lights one (`fuseMs`), and `blow` takes `share` / `elite` / `boss` of each foe's
+  health within `blastR`, knocks them back and lights barrels near. They never hurt the hero. On
+  the Ruin world they are drawn as cracked pillars. `clearField` empties altars, pact and barrels;
+  `nextPlanet` resets `altarAt` and `nextBarrel`.
 - Ten factions. The first four: Scrap bots (Clankers, Rollerbombs; the Grinder Crawler), wild beasts (mire rat
   packs, spitter toads with slowing globs; the Bog Mother with globs, young and bog pools), the
   Iron Dominion (line trooper squads firing volleys, walker gunners; the Siege Walker with volleys,
@@ -356,6 +376,9 @@ world, with a star map between them. A boss rush and hero mastery come on top.
   when he can't pay), `bellySlam` and short-lived `thug` allies. `FLYBY`, `ROAR`, `ZAP`,
   `CLOAK`, `ROCKET`, `RAM`, `FLEET`, `TRIBE` and `THUGS` hold their numbers; their stat numbers are
   `crewMods` in `state.ts` (with `bounces` for Wikka's Slinger 2).
+- `src/game/field.ts`: rift altars (`altars`, `pactOn`) and volatile barrels (`barrels`,
+  `strikeBarrels`, `blow`), run by `field` once a step (see Current state). It imports `sim.ts`
+  (`kill` is exported for it), so the same rule about load-time values holds.
 - `src/game/objectives.ts`: the side objectives, called from `sim.ts` once a step like `squad.ts`
   (it imports `sim.ts`, so the same rule about load-time values holds): `OBJ` (each one's time
   limit, goal, zone radius and reward), `OBJ_MISC` (pushes, escort and pilgrim, nests, vents, the
@@ -429,7 +452,8 @@ world, with a star map between them. A boss rush and hero mastery come on top.
 - `src/scenes/objectiveArt.ts`: the objectives and power-ups, drawn in code on the graphics
   layers (no baked textures, so boot's Math.random draws are unchanged): `drawObjectiveGround`
   (zones, spots, the escort's goal, the pilgrim, the duel's mark), `drawStructure`, `drawPowerUp`
-  (`POWER_COLORS`), `objectiveTarget` (where the HUD arrow points) and `OBJ_COLOR` (cyan).
+  (`POWER_COLORS`), `objectiveTarget` (where the HUD arrow points) and `OBJ_COLOR` (cyan); also
+  `drawAltar` (`ALTAR_COLORS`) and `drawBarrel` (a drum, or a cracked pillar on the Ruin world).
 - `src/scenes/GameScene.ts`: owns `state`, reads input, runs `frame`, follows the hero with the
   camera and draws: the planet's ground (`drawGround` with `duneCell`, `swampCell`, `iceCell`,
   `lavaCell`, `sporeCell`, `scrapCell`, `crystalCell`, `stormCell`, scenery from a hash, so the rules' `Math.random` is untouched), graphics layers under
@@ -445,7 +469,7 @@ world, with a star map between them. A boss rush and hero mastery come on top.
   so a fresh save makes no more texts than before, and the detail panel `HERO_DETAIL` with the `FIGHT`
   button, and the Heat row (`heatRow`) once the hero has won, the detail lines shrinking to end
   above it; a locked hero shows only `rb-locked`), `armouryPanel` (the Armoury, see Current state), `weeklyPanel` (the weekly run), `dailyPanel` (the daily run), `codexPanel` (the codex), `skillsPanel` (the skill overview), `unlockPanel` (the new hero, with a `continue`
-  spot), `levelUp` (also the arena's and an objective's reward, titled by `state.after`; three or four cards whose lines flow down; pool labels
+  spot), `levelUp` (also the arena's and an objective's reward, titled by `state.after`; three or four cards whose lines flow down, with a Banish button under each while banishes are left; pool labels
   from `POOL_NAMES`, `linkIcon` for crossovers), `spaceMap` (the four jumps as columns, lanes, the
   route lit, the next jump's planets as cards with spot ids = `PlanetId`; a faction shows once
   `progress.charted` has it), `starMap` (on the way to `state.next`), `trader`, `eventPanel`, `endScreen`.
@@ -512,7 +536,7 @@ Shift for the next twelve) sets
 `GameScene.chosen` and tapping Fight (or Enter) starts the run, if the hero is unlocked, at the
 heat `heatFor` gives (`heatPick`, else the highest open); the Heat row's arrows, Left / Right and
 A / D step it. At a
-level-up 1-4 pick a card (as many as there are); elsewhere 1/2/3 pick (a planet on the space
+level-up 1-4 pick a card (as many as there are) and Shift with 1-4 banishes it; elsewhere 1/2/3 pick (a planet on the space
 map, a node, an offer or an answer), 4 rerolls at the trader, Enter leaves the trader or runs again. While `GameScene.unlocking`
 holds heroes just unlocked, `frame` is not run, the new hero panel shows, and Continue, Enter or
 Space closes it.
@@ -538,7 +562,9 @@ saves load unchanged.
   code moves `riftblade-progress`, `riftblade-daily` and the trophies; files carry it), the whole `GameState` as JSON (it is plain data; `Infinity`,
   as in `nextElite` and `objectiveAt`, is stored as the text `"Infinity"`). `loadRun` lays it over
   `freshState()` (and the hero over `freshHero()`), so fields added since take their fresh values;
-  one with an unknown hero, a phase it can't resume in, a `daily`, `endless`, `loop`, `endlessCleared`, `seed`, `rush`, `rushQueue`, `mastery`, `colour`, `tide` or `pillars` of the wrong kind, an unknown planet or `next`, a `stage`
+  one with an unknown hero, a phase it can't resume in, `banished` cards that aren't real ones or a
+  `banishes` outside 0 to `BANISHES`, malformed `altars`, `pact`, `barrels`, `altarAt` or
+  `nextBarrel`, a `daily`, `endless`, `loop`, `endlessCleared`, `seed`, `rush`, `rushQueue`, `mastery`, `colour`, `tide` or `pillars` of the wrong kind, an unknown planet or `next`, a `stage`
   outside the crusade, unknown `nodes`, `offers` or `choices` (card ids, read by `parseCard`), `branches` or `fusions`
   that aren't real ones, a malformed `event`, or a list field of the state or
   hero (`enemies`, `bullets`, `dashHit`, ...) that is not an array is dropped (an `rng` that is not a
@@ -594,7 +620,10 @@ the arena is won), `unlock` (a new hero), `win`, `lose`.
   `hurtMs` up to half the grace; the Barrier Emitter and a Shield power-up set the full grace and
   play `pop` for their blast), `barrier`, `heal` (health up by more than 8), `shard` (pitch rises with a combo), `chest`,
   `ui('coin')` for credits gained.
-- `levelUp` (into the cards), `card` (a pick), `capstone`, `crossover`.
+- `levelUp` (into the cards), `card` (a pick), `banish` (a card banished, from the scene; a press
+  with none left plays `ui('refuse')`), `capstone`, `crossover`.
+- `altar` when a pair of rift altars rises (new altar ids), `pact` when a pact is taken
+  (`state.pact` set); a barrel's blast plays `boom` like any other.
 - `eliteHorn`, `siren` (ring wave), hazards `warn` (vent, shell, lightning strike), `stomp`, `fireRing`
   (also the Storm Herald's sparks), `glob` (bog pool, toad globs, spore puffs and ink; a sporeling's
   cloud is silent), `enemyShot`, `enemyVolley` (volley, slug and splinter bolts), `bossStab`,
@@ -612,7 +641,9 @@ free of audio) or from the scene's input handler.
 - `window.game.scene.getScene('Game').state`: the `GameState` (`objective` is the side objective
   under way, `objectivesDone` and `powerUps` count them).
 - `.panel.spots`: the cards of the panel showing (moved into `FRAME` on a wider or taller view; `id` is a `HeroId`, `fight`, an upgrade id, a
-  node kind, a `PlanetId` on the space map, `option-0` / `option-1`, `sold`, `reroll`, `leave`, `again` or `continue`), in game
+  node kind, a `PlanetId` on the space map, `option-0` / `option-1`, `sold`, `reroll`, `leave`, `again` or `continue`;
+  at a level-up the cards come first, then `banish-<i>` for each card's Banish button while
+  `state.banishes` > 0), in game
   pixels. A locked hero card has `locked: true`; `heat-down` and `heat-up` are the Heat row's
   arrows (only once the chosen hero has won), `armoury` the Armoury button (once credits are
   banked), `weekly` the Weekly run button (once a run has ended); in the Armoury (`.armouryOpen`)
@@ -641,8 +672,11 @@ free of audio) or from the scene's input handler.
   A fresh browser has no saved run, so the playthrough starts on the hero select as before; saving
   draws no `Math.random`.
   Side objectives start at `OBJECTIVE_AT[0]` (1:00) and power-ups drop from `POWER.fromMs` (1:00),
-  neither calling `rand` before then, so they leave the playthrough's minute as it was. Keep
-  both at or after 1:00, or update the playthrough.
+  neither calling `rand` before then, so they leave the playthrough's minute as it was. Barrels
+  start at `BARREL.fromMs` (1:10) and altars at `ALTAR.atMs` (1:45), later still. Keep all of them
+  at or after 1:00, or update the playthrough. The playthrough also checks the Banish buttons at
+  the first level-up (`banish-0` to `banish-2` after the cards, `banishes` 3, and still 3 after
+  the pick).
 
 ## Making common changes
 

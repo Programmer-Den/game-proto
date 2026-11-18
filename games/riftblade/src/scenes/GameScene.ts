@@ -2,8 +2,8 @@ import Phaser from 'phaser';
 import { settings } from '../../../../shared/settings';
 import { splitHudCamera, viewFrame, viewPoint, viewSize } from '../../../../shared/scaling';
 import { HEROES, HERO_IDS, isCrew, isKnight, schemeOf, type HeroId } from '../game/heroes';
-import { HERO_R, POWER_UPS, RUN_MS, clock, freshState, isStructure, statsOf, type GameState, type PowerUp } from '../game/state';
-import { choose, inRingGap, phalanxSpots, prepare, shieldHalf, startRun, suppressorHalf, suppressorLength } from '../game/sim';
+import { ALTAR, HERO_R, POWER_UPS, RUN_MS, clock, freshState, isStructure, statsOf, type GameState, type PowerUp } from '../game/state';
+import { banish, choose, inRingGap, phalanxSpots, prepare, shieldHalf, startRun, suppressorHalf, suppressorLength } from '../game/sim';
 import { bladeColor, dreadRadius, heroVariant, orbitBlades } from '../game/blades';
 import { bubble, rebuildTime } from '../game/squad';
 import { buy, chooseEvent, chooseNode, chooseWorld, chartOptions, enterEndless, frame, leave, nextPlanet, reroll, startRush } from '../game/voyage';
@@ -30,7 +30,7 @@ import { bladeKey } from '../art/knights';
 import { bakeWorlds } from '../art/worlds';
 import { bakeRealms } from '../art/realms';
 import { ui } from '../../../../shared/audio';
-import { OBJ_COLOR, drawObjectiveGround, drawPowerUp, drawStructure, objectiveTarget } from './objectiveArt';
+import { OBJ_COLOR, drawAltar, drawBarrel, drawObjectiveGround, drawPowerUp, drawStructure, objectiveTarget } from './objectiveArt';
 import { objectiveHint, objectiveName, OBJ_MISC } from '../game/objectives';
 import { SoundCues } from '../audio/cues';
 import { sfx } from '../audio/sfx';
@@ -148,6 +148,7 @@ export class GameScene extends Phaser.Scene {
   private pools!: Record<'pickups' | 'enemies' | 'allies' | 'bolts', Pool>;
   private hero!: Phaser.GameObjects.Image;
   private popTexts: Phaser.GameObjects.Text[] = [];
+  private altarTexts: Phaser.GameObjects.Text[] = [];
   /** The side objective's two HUD lines, made when the first objective starts. */
   private objTexts: { name: Phaser.GameObjects.Text; hint: Phaser.GameObjects.Text } | null = null;
   private texts!: Record<'timer' | 'level' | 'planet' | 'credits' | 'hp' | 'kit' | 'sig' | 'sigKey' | 'boss', Phaser.GameObjects.Text>;
@@ -230,7 +231,11 @@ export class GameScene extends Phaser.Scene {
           const id = HERO_IDS[i + (ev?.shiftKey ? 12 : 0)];
           if (id) this.choose(id);
         } else if (s.phase === 'levelup') {
-          if (i < (s.choices?.length ?? 0)) this.pickIndex(i);
+          // Shift with 1-4 banishes that card instead.
+          if (i < (s.choices?.length ?? 0)) {
+            if (ev?.shiftKey) this.banishCard(i);
+            else this.pickIndex(i);
+          }
         } else if (s.phase === 'chart') {
           if (i < chartOptions(s).length) this.pickIndex(i);
         } else if (i === 3) this.reroll();
@@ -408,6 +413,7 @@ export class GameScene extends Phaser.Scene {
     else if (s.phase === 'won' || s.phase === 'lost') this.backToSelect();
     else if (spot.id === 'reroll') this.reroll();
     else if (spot.id === 'leave') this.leave();
+    else if (spot.id.startsWith('banish-')) this.banishCard(Number(spot.id.slice(7)));
     else this.pickIndex(this.panel!.spots.indexOf(spot));
   }
 
@@ -589,6 +595,13 @@ export class GameScene extends Phaser.Scene {
     if (this.state.phase === 'travel') nextPlanet(this.state);
   }
 
+  /** Banishes the level-up card at `i` (its Banish button, or Shift with its number key). */
+  private banishCard(i: number) {
+    if (banish(this.state, i)) sfx('banish');
+    else ui('refuse');
+    this.settle();
+  }
+
   /** The card, node, offer or answer at `i` (a tap or the 1/2/3 keys). */
   private pickIndex(i: number) {
     const s = this.state;
@@ -745,7 +758,7 @@ export class GameScene extends Phaser.Scene {
     if (s.phase === 'select' && this.skillsOpen) return `skills|${this.skillsPage}|${this.skillPick}|${this.progress.skills.length}`;
     if (s.phase === 'select' && this.codexOpen) return `codex|${this.codexPage}|${this.progress.codex.seen.length}`;
     if (s.phase === 'select' && this.rushOpen) return `rush|${this.chosen}|${JSON.stringify(this.progress.rush)}`;
-    return [s.phase, this.chosen, this.progress.plain.join(), this.progress.bank, this.heatFor(this.chosen), s.choices?.join(), s.offers.join(), s.credits, s.event?.id, s.nodes.join(), s.rewardPicks].join('|');
+    return [s.phase, this.chosen, this.progress.plain.join(), this.progress.bank, this.heatFor(this.chosen), s.choices?.join(), s.banishes, s.offers.join(), s.credits, s.event?.id, s.nodes.join(), s.rewardPicks].join('|');
   }
 
   /** Shows the panel for the phase the run is in. */
@@ -1217,6 +1230,10 @@ export class GameScene extends Phaser.Scene {
     drawObjectiveGround(u, s, still);
     for (const e of s.enemies) if (isStructure(e.kind)) drawStructure(u, e, s.time, still);
     for (const k of s.pickups) if (POWER_UPS.includes(k.kind as PowerUp)) drawPowerUp(u, k, s.time, still);
+    // Rift altars and volatile barrels (cracked pillars on the Ruin world).
+    for (const al of s.altars) drawAltar(u, al, s.time, still);
+    const ruin = PLANETS[s.planet].id === 'ruin';
+    for (const b of s.barrels) drawBarrel(u, b, ruin, s.time, still);
     // The knights: Vharn's Dread aura, Corvin's platform, foes turned to the hero's side.
     const dread = dreadRadius(s);
     if (dread > 0) {
@@ -1449,6 +1466,18 @@ export class GameScene extends Phaser.Scene {
       t.setPosition(p.x, p.y - 44 - i * 20 - (still ? 0 : age * 0.012)).setAlpha(Math.min(1, pop.ms / 400));
     });
     for (let i = pops.length; i < this.popTexts.length; i++) this.popTexts[i].setVisible(false);
+    // What each rift altar's pact does, under it (made the first time altars rise).
+    const altars = s.phase === 'run' ? s.altars : [];
+    altars.forEach((al, i) => {
+      let label = this.altarTexts[i];
+      if (!label) {
+        label = this.add.text(0, 0, '', { fontFamily: FONT, fontSize: '12px', fontStyle: 'bold', color: '#ffffff', align: 'center' }).setOrigin(0.5, 0).setDepth(DEPTH.pops);
+        this.altarTexts.push(label);
+      }
+      label.setText(t(al.kind === 'blood' ? 'altarBlood' : 'altarGreed')).setColor(al.kind === 'blood' ? '#ff8fa3' : '#ffd36b');
+      label.setPosition(al.x, al.y + ALTAR.r + 22).setVisible(true);
+    });
+    for (let i = altars.length; i < this.altarTexts.length; i++) this.altarTexts[i].setVisible(false);
   }
 
   /** The hero's texture: its mastery colours when worn (not Kael's Fallen look), else its scheme. */
@@ -1668,6 +1697,7 @@ export class GameScene extends Phaser.Scene {
     if (s.lureMs > 0) extra += `   ·   ${t('buffLure', { n: Math.ceil(s.lureMs / 1000) })}`;
     if (s.overdriveMs > 0) extra += `   ·   ${t('buffOverdrive', { n: Math.ceil(s.overdriveMs / 1000) })}`;
     if (s.shieldHits > 0) extra += `   ·   ${t('buffShield', { n: s.shieldHits })}`;
+    if (s.pact) extra += `   ·   ${t(s.pact.kind === 'blood' ? 'buffBlood' : 'buffGreed', { n: Math.ceil(s.pact.ms / 1000) })}`;
     this.texts.hp.setText(`${Math.ceil(p.hp)} / ${p.maxHp}   ·   ${t(PLANETS[s.planet].foes, { n: s.kills })}${extra}`);
     // The kit held.
     const lines = Object.keys(s.ranks).map((id) => {

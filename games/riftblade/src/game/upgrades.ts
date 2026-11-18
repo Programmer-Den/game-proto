@@ -732,13 +732,15 @@ export function canOffer(id: string, hero: HeroId, ranks: Record<string, number>
  * paths while any can be offered; the Field Ration fills in when fewer upgrades are left. Besides
  * the upgrades themselves, the cards can be a specialisation of an upgrade at tier 5 or a fusion.
  */
-export function rollChoices(hero: HeroId, kit: Kit, count = 3): string[] {
+export function rollChoices(hero: HeroId, kit: Kit, count = 3, exclude: readonly string[] = []): string[] {
   const { ranks } = kit;
   const locked = lockedOf(kit);
-  const open = UPGRADE_IDS.filter((id) => canOffer(id, hero, ranks, locked));
+  // Banished cards (and `exclude`, the cards a banished one's replacement must not repeat) never come up.
+  const out = [...(kit.banished ?? []), ...exclude];
+  const open = UPGRADE_IDS.filter((id) => canOffer(id, hero, ranks, locked) && !out.includes(id));
   // Specialisation and fusion cards join after the upgrades, and only once one is open, so a run's
   // first cards (and the playthrough's seeded rolls) come out as they always did.
-  const extra = extraChoices(kit, locked);
+  const extra = extraChoices(kit, locked).filter((id) => !out.includes(id));
   const all = [...open, ...extra];
   let own = open.filter((id) => UPGRADES[id].kind === 'path');
   if (!own.length) own = extra.filter((id) => UPGRADES[parseCard(id)?.id ?? '']?.kind === 'path');
@@ -802,6 +804,8 @@ export interface Kit {
   branches: Record<string, { b: BranchId; n: number }>;
   /** Fusions held, by id, with their tier. */
   fusions: Record<string, number>;
+  /** Cards banished at a level-up (Banish): never offered again this run. */
+  banished?: readonly string[];
 }
 
 export type BranchId = 'power' | 'tempo' | 'guard' | 'hunt' | 'fortune';
@@ -1006,7 +1010,8 @@ export function raisable(kit: Kit): string[] {
     if (had.n < BRANCHES[had.b].tiers.length && !locked.has(id)) out.push(branchCard(id, had.b));
   }
   for (const id of Object.keys(kit.fusions)) if (kit.fusions[id] < FUSION_TIERS) out.push(fusionCard(id));
-  return out;
+  const banished = kit.banished ?? [];
+  return banished.length ? out.filter((id) => !banished.includes(id)) : out;
 }
 
 /** The gains of a card's next tier (specialisations and fusions; upgrades have their own text). */

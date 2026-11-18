@@ -521,6 +521,16 @@ export interface GameState {
   crossovers: string[];
   /** The cards on offer during a level-up (upgrade ids, or the filler). */
   choices: string[] | null;
+  /** Cards banished this run (never offered again) and banishes left (`BANISHES`). */
+  banished: string[];
+  banishes: number;
+  /** Rift altars standing, when the world's pair comes (Infinity once it has), and the pact running. */
+  altars: Altar[];
+  altarAt: number;
+  pact: { kind: PactKind; ms: number } | null;
+  /** Volatile barrels standing and when the next is set down (world time, ms). */
+  barrels: Barrel[];
+  nextBarrel: number;
   /** Cooldowns of the abilities, ms, by name. */
   cd: Record<string, number>;
   enemies: Enemy[];
@@ -643,6 +653,41 @@ export interface Pillar {
   ms: number;
 }
 
+/** A pact a rift altar offers (`field.ts`): Blood (tougher foes, double XP) or Greed (no healing, double credits). */
+export type PactKind = 'blood' | 'greed';
+/** A rift altar on the field: walking onto it takes its pact; `ms` left before the pair fades. */
+export interface Altar {
+  id: number;
+  kind: PactKind;
+  x: number;
+  y: number;
+  ms: number;
+}
+/** A volatile barrel (a cracked pillar on the Ruin world): a hit sets it off after `fuseMs` (-1 while it stands untouched). */
+export interface Barrel {
+  id: number;
+  x: number;
+  y: number;
+  fuseMs: number;
+}
+
+/** Banishes a run has: a card banished at a level-up never shows again that run. */
+export const BANISHES = 3;
+/**
+ * Rift altars: a pair comes `atMs` into each world (not the arena or a boss rush), `dist` from the
+ * hero and `gap` apart, and fades after `lifeMs` unless walked onto (`r`). A pact lasts `ms`; Blood
+ * gives `xp` times the XP, and foes born and hits taken while it lasts get `hp` and `hurt` times
+ * as much; Greed stops all healing and gives `credits` times the credits picked up.
+ */
+export const ALTAR = { atMs: 105_000, dist: 170, gap: 170, lifeMs: 30_000, r: 26, ms: 60_000, xp: 2, hp: 1.35, hurt: 1.3, credits: 2 };
+/**
+ * Volatile barrels: from `fromMs` into a world one is set down every `everyMs` while fewer than
+ * `max` stand, `min` to `far` from the hero (ones left past `leash` are taken away). A hero's bolt
+ * through one or a hit on a foe touching it lights it; after `fuseMs` it blows up, taking `share`
+ * of each foe's health within `r` (`elite` for elites, `boss` for a boss) and lighting barrels near.
+ */
+export const BARREL = { fromMs: 70_000, everyMs: 8000, max: 4, min: 240, far: 420, leash: 1100, r: 14, fuseMs: 160, blastR: 120, share: 0.85, elite: 0.35, boss: 0.03 };
+
 export function freshHero(): Hero {
   return {
     x: 0, y: 0, hp: 100, maxHp: 100, facing: 0, aim: 0, moving: false,
@@ -693,6 +738,13 @@ export function freshState(): GameState {
     capstones: [],
     crossovers: [],
     choices: null,
+    banished: [],
+    banishes: BANISHES,
+    altars: [],
+    altarAt: ALTAR.atMs,
+    pact: null,
+    barrels: [],
+    nextBarrel: BARREL.fromMs,
     cd: {},
     enemies: [],
     bullets: [],
