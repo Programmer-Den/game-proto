@@ -21,6 +21,8 @@ import {
   MAX_LEVEL,
   MOVE_FEE,
   PEST_INFO,
+  POWER,
+  SNARE,
   SLIME,
   START,
   TARGETS,
@@ -66,6 +68,19 @@ export interface Golem {
   form: FormKind | null;
   /** Which pest within reach it throws at. */
   target: Target;
+  /** Time left until its power (GG20) is ready again, in ms; 0 when it is. */
+  powerMs: number;
+  /** An elder golem (GG22), fused from two level-3 golems of its form. */
+  elder: boolean;
+}
+
+/** A root snare (GG21) on a path cell: each pest walking over it is rooted once. */
+export interface Snare {
+  id: number;
+  col: number;
+  row: number;
+  /** Where on each of the garden's routes it catches pests (the cell's centre), in pixels, or null for a route that misses it. */
+  stops: (number | null)[];
 }
 
 /** A hedge on a path cell: pests stop at it and chew until it is gone. */
@@ -103,6 +118,10 @@ export interface Pest {
   stunMs: number;
   /** Time left until a ring can stun it again, in ms: its stun and STUN_GUARD_MS after it. */
   stunGuardMs: number;
+  /** Time left held by roots (a moss golem's power, a root snare), in ms: it stands still. */
+  rootMs: number;
+  /** The root snares that have caught it already. */
+  snared: number[];
 }
 
 /** A patch of a fungus golem's spores on the path: it poisons pests walking through until it fades. */
@@ -126,6 +145,8 @@ export interface Shot {
   ms: number;
   /** A bell golem's ring, which spreads from the golem out to this reach instead of flying. */
   ring?: number;
+  /** A golem's power (GG20): a ring spreading from `from` out to `ring` (a stomp, roots, a spike burst, a peal). */
+  power?: boolean;
 }
 
 /** A wave called early, still waiting for its last pests to be squashed or get through. */
@@ -231,6 +252,10 @@ export interface GameState {
   plot: { slot: number; garden: Garden } | null;
   /** The fungus golems' spore patches on the path. */
   spores: Spores[];
+  /** Spare buds opened in this garden (GG21), one per wave cleared, up to SNARE.maxBuds; they lay root snares. */
+  buds: number;
+  /** Root snares on the path; they wither once the garden is clear again. */
+  snares: Snare[];
   nextId: number;
 }
 
@@ -244,6 +269,8 @@ export const SHOT_MS = 160;
 const HIT_MS = 120;
 /** How long a bell golem's ring takes to spread, in ms. */
 export const RING_MS = 320;
+/** How long a golem's power ring (GG20) takes to spread, in ms. */
+export const POWER_RING_MS = 600;
 
 /** What a new garden is planted with besides the saved progress `newGame` takes first. */
 export interface Extras {
@@ -315,6 +342,8 @@ export function newGame(
     weekly,
     plot,
     spores: [],
+    buds: 0,
+    snares: [],
     nextId: 1,
   };
   // The first seed that can be planted here is picked: Moss in a garden with only Moss and Thorn.
@@ -421,7 +450,7 @@ export function plant(s: GameState, col: number, row: number) {
   }
   const info = GOLEM_INFO[s.selected];
   s.freeSeed = false;
-  s.golems.push({ id: s.nextId++, kind: s.selected, col, row, level: 1, growMs: info.growMs, cooldownMs: 0, spent: cost, form: null, target: 'first' });
+  s.golems.push({ id: s.nextId++, kind: s.selected, col, row, level: 1, growMs: info.growMs, cooldownMs: 0, spent: cost, form: null, target: 'first', powerMs: 0, elder: false });
   return true;
 }
 
@@ -454,8 +483,8 @@ export function upgrade(s: GameState, g: Golem, form: FormKind | null = null) {
  * The stats a golem of `kind` at `level` and `form` throws with on `row` of this garden: its own,
  * with the garden's boons (Sharp rocks, Long moss, Sunny row) folded in.
  */
-export function boonedStats(s: GameState, kind: GolemKind, level: number, form: FormKind | null, row: number) {
-  const stats = golemStats(kind, level, form);
+export function boonedStats(s: GameState, kind: GolemKind, level: number, form: FormKind | null, row: number, elder = false) {
+  const stats = golemStats(kind, level, form, elder);
   if (kind === 'pebble') stats.damage *= 1 + BOON.pebbleDamage * boonCount(s, 'pebble');
   if (stats.slow) stats.slow = { factor: stats.slow.factor, ms: stats.slow.ms * (1 + BOON.mossSlow * boonCount(s, 'moss')) };
   stats.range += BOON.sunReach * s.sunRows.filter((r) => r === row).length;
@@ -463,7 +492,7 @@ export function boonedStats(s: GameState, kind: GolemKind, level: number, form: 
 }
 
 /** The stats this golem throws with now. */
-export const statsOf = (s: GameState, g: Golem) => boonedStats(s, g.kind, g.level, g.form, g.row);
+export const statsOf = (s: GameState, g: Golem) => boonedStats(s, g.kind, g.level, g.form, g.row, g.elder);
 
 /** Sets how a golem picks its target; a golem that hits everything in reach has no pick to make. */
 export function setTarget(s: GameState, g: Golem, target: Target) {
@@ -496,6 +525,26 @@ export function move(s: GameState, g: Golem, col: number, row: number) {
   s.sap -= MOVE_FEE;
   g.col = col;
   g.row = row;
+  return true;
+}
+
+/**
+ * The golem `g` can fuse with into an elder (GG22): a grown level-3 golem of its form side by side
+ * with it, neither an elder already; or undefined.
+ */
+export function fusePartner(s: GameState, g: Golem) {
+  if (s.phase === 'over' || !g.form || g.elder || g.growMs > 0) return undefined;
+  return neighbours(s, g.col, g.row).find((o) => o.form === g.form && !o.elder);
+}
+
+/** Fuses `g` and its partner into an elder on `g`'s cell, freeing the partner's. */
+export function fuse(s: GameState, g: Golem) {
+  const other = fusePartner(s, g);
+  if (!other) return false;
+  g.elder = true;
+  g.spent += other.spent;
+  g.powerMs = Math.min(g.powerMs, other.powerMs);
+  s.golems = s.golems.filter((o) => o !== other);
   return true;
 }
 
@@ -575,6 +624,101 @@ export function takeBoon(s: GameState, boon: Boon) {
   return true;
 }
 
+/** Pests a grown golem can reach now: alive, above ground and within its reach. */
+function pestsInReach(s: GameState, g: Golem, range: number) {
+  const { routes } = gardenOf(s);
+  const at = cellCentre(g.col, g.row);
+  return s.pests.filter((p) => {
+    if (p.hp <= 0 || p.under) return false;
+    const pos = pathPoint(routes[p.route], p.dist);
+    return Math.hypot(pos.x - at.x, pos.y - at.y) <= range;
+  });
+}
+
+/** Whether this golem's power (GG20) is ready: grown, and its cooldown over. */
+export const powerReady = (g: Golem) => g.growMs === 0 && g.powerMs <= 0;
+
+/** Whether this golem's power can be used now: during a wave, ready, with a pest in its reach. */
+export const canPower = (s: GameState, g: Golem) =>
+  s.phase === 'wave' && s.golems.includes(g) && powerReady(g) && pestsInReach(s, g, statsOf(s, g).range).length > 0;
+
+/** Holds a pest still with roots for `ms` (a Queen Slug half as long); a longer hold already on it stays. */
+function root(p: Pest, ms: number) {
+  p.rootMs = Math.max(p.rootMs, ms * (PEST_INFO[p.kind].boss ? 0.5 : 1));
+}
+
+/** One power hit: `damage` less armour (none for a piercing form), at least 1. */
+function powerHit(p: Pest, damage: number, pierce: boolean) {
+  p.hp -= Math.max(1, damage - (pierce ? 0 : (PEST_INFO[p.kind].armour ?? 0)));
+  p.hitMs = HIT_MS;
+  p.hits++;
+}
+
+/**
+ * Uses a golem's power (GG20), if it can: Pebble stomps round its target, Moss roots every pest in
+ * reach, Thorn pricks them POWER.burst times, Fungus drops a spore cloud on its target and Bell
+ * peals, stunning every pest in reach for longer, stun guard or not. The power is then ready again
+ * after its POWER.cooldownMs.
+ */
+export function usePower(s: GameState, g: Golem) {
+  if (!canPower(s, g)) return false;
+  const { routes } = gardenOf(s);
+  const stats = statsOf(s, g);
+  const at = cellCentre(g.col, g.row);
+  const inReach = pestsInReach(s, g, stats.range);
+  const where = (p: Pest) => pathPoint(routes[p.route], p.dist);
+  const ring = (x: number, y: number, r: number) =>
+    s.shots.push({ id: s.nextId++, kind: g.kind, from: { x, y }, to: { x, y }, ms: POWER_RING_MS, ring: r, power: true });
+  if (g.kind === 'pebble' || g.kind === 'fungus') {
+    const target = stats.area ? pickTarget(inReach, 'first', routes) : pickTarget(inReach, g.target, routes);
+    const to = where(target);
+    if (g.kind === 'pebble') {
+      for (const p of s.pests) {
+        if (p.hp <= 0 || p.under) continue;
+        const pos = where(p);
+        if (Math.hypot(pos.x - to.x, pos.y - to.y) <= POWER.stompR) powerHit(p, stats.damage * POWER.stomp, stats.pierce);
+      }
+      ring(to.x, to.y, POWER.stompR);
+    } else {
+      const spore = stats.spore!;
+      const r = spore.r * POWER.cloud;
+      const ms = spore.ms * POWER.cloudMs;
+      s.spores.push({ id: s.nextId++, x: to.x, y: to.y, r, ms, maxMs: ms, dps: spore.dps * POWER.cloud });
+      ring(to.x, to.y, r);
+    }
+  } else {
+    for (const p of inReach) {
+      if (g.kind === 'moss') root(p, POWER.rootMs);
+      else if (g.kind === 'thorn') for (let k = 0; k < POWER.burst; k++) powerHit(p, stats.damage, stats.pierce);
+      else {
+        powerHit(p, stats.damage, stats.pierce);
+        p.stunMs = stats.stun * POWER.peal * (PEST_INFO[p.kind].boss ? BOSS_STUN : 1);
+        p.stunGuardMs = p.stunMs + STUN_GUARD_MS;
+      }
+    }
+    ring(at.x, at.y, stats.range);
+  }
+  g.powerMs = POWER.cooldownMs[g.kind];
+  return true;
+}
+
+/** Whether a root snare (GG21) can be laid on (col, row) now: SNARE.cost spare buds, a path cell (not the Heartwood's) without a snare. */
+export const canSnare = (s: GameState, col: number, row: number) =>
+  s.phase !== 'over' &&
+  s.offer.length === 0 &&
+  s.buds >= SNARE.cost &&
+  gardenOf(s).map[row]?.[col] === 'path' &&
+  !s.snares.some((n) => n.col === col && n.row === row);
+
+/** Lays a root snare on a path cell for SNARE.cost spare buds. */
+export function laySnare(s: GameState, col: number, row: number) {
+  if (!canSnare(s, col, row)) return false;
+  s.buds -= SNARE.cost;
+  const stops = gardenOf(s).routes.map((route) => routeDist(route, col, row));
+  s.snares.push({ id: s.nextId++, col, row, stops });
+  return true;
+}
+
 function beginWave(s: GameState) {
   const { spawns, hpScale } = waveFor(s.wave, twistOf(s));
   s.phase = 'wave';
@@ -594,6 +738,7 @@ function finishWave(s: GameState, n: number, queenSquashed: boolean) {
   s.compost = n >= COMPOST.fromWave ? Math.min(compostCap(s), Math.floor(s.sap * COMPOST.rate)) : 0;
   s.sap += waveBonus(n) + s.compost;
   s.bloom = Math.min(BLOOM_GOAL, s.bloom + 1);
+  s.buds = Math.min(SNARE.maxBuds, s.buds + 1);
   s.best = Math.max(s.best, n);
   s.cleared = Math.max(s.cleared, n);
   // The weekly garden and drawn plots keep only their own best wave: no stars, laurels or wild record.
@@ -672,7 +817,7 @@ function step(s: GameState, dt: number) {
       const { kind } = s.queue.shift()!;
       const hp = Math.round(PEST_INFO[kind].hp * s.waveHpScale);
       const route = s.spawned++ % routes.length;
-      s.pests.push({ id: s.nextId++, kind, wave: s.wave, hp, maxHp: hp, route, dist: 0, under: false, slowMs: 0, slowFactor: 1, hitMs: 0, hits: 0, stunMs: 0, stunGuardMs: 0 });
+      s.pests.push({ id: s.nextId++, kind, wave: s.wave, hp, maxHp: hp, route, dist: 0, under: false, slowMs: 0, slowFactor: 1, hitMs: 0, hits: 0, stunMs: 0, stunGuardMs: 0, rootMs: 0, snared: [] });
     }
   }
 
@@ -685,9 +830,10 @@ function step(s: GameState, dt: number) {
     const info = PEST_INFO[p.kind];
     const slowed = p.slowMs > 0 ? p.slowFactor : 1;
     const length = routes[p.route].length;
-    // A pest stunned by a bell golem's ring stands still, and doesn't chew.
-    const stunned = p.stunMs > 0;
+    // A pest stunned by a bell golem's ring, or held by roots, stands still, and doesn't chew.
+    const stunned = p.stunMs > 0 || p.rootMs > 0;
     p.stunMs = Math.max(0, p.stunMs - dt);
+    p.rootMs = Math.max(0, p.rootMs - dt);
     p.stunGuardMs = Math.max(0, p.stunGuardMs - dt);
     let next = stunned ? p.dist : p.dist + (info.speed * slowed * dt) / 1000;
     if (!info.flies && !p.under && !stunned) {
@@ -696,6 +842,16 @@ function step(s: GameState, dt: number) {
         if (stop === null || p.dist > stop || next < stop) continue;
         next = stop;
         hedge.hp -= (info.bite * CHEW_PER_BITE * dt) / 1000;
+      }
+    }
+    // A root snare catches a walking pest that reaches it, once.
+    if (!info.flies && !p.under && !stunned) {
+      for (const snare of s.snares) {
+        const at = snare.stops[p.route];
+        if (at === null || p.dist > at || next < at || p.snared.includes(snare.id)) continue;
+        next = at;
+        p.snared.push(snare.id);
+        root(p, SNARE.rootMs);
       }
     }
     p.dist = next;
@@ -741,6 +897,7 @@ function step(s: GameState, dt: number) {
       g.growMs = Math.max(0, g.growMs - dt);
       continue;
     }
+    g.powerMs = Math.max(0, g.powerMs - dt);
     g.cooldownMs = Math.max(0, g.cooldownMs - dt * (slimed(s, g.col, g.row) ? SLIME.slow : 1));
     if (g.cooldownMs > 0) continue;
     const stats = statsOf(s, g);
@@ -822,6 +979,8 @@ function step(s: GameState, dt: number) {
     finishWave(s, s.wave, s.queenSquashed);
     s.wave++;
     s.phase = 'build';
+    // The garden is clear: the root snares wither.
+    s.snares = [];
   }
   // The daily plot ends once its last wave is cleared.
   if (s.cleared >= lastWave(s)) s.phase = 'over';

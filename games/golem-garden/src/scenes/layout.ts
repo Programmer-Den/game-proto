@@ -23,7 +23,7 @@ export const HUD = {
 };
 /** The speed button, at the right end of the HUD strip. */
 export const SPEED_BUTTON = { x: 914, y: 32, w: 54, h: 32 };
-/** The menu a tapped golem opens, above or below it: Raise, Aim, Move and Uproot (or, raising to level 3, its two forms and Back). */
+/** The menu a tapped golem opens, above or below it: Raise (Fuse at level 3), Aim, Move and Uproot (or, raising to level 3, its two forms and Back). */
 export const GOLEM_MENU = { w: 270, h: 50, chip: { w: 60, h: 38, gap: 6 } };
 /** The garden picker's cards, side by side. */
 export const GARDEN_CARD = { y: 318, w: 236, h: 196, gap: 20 };

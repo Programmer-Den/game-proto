@@ -178,6 +178,34 @@ Implemented today:
   'over' once `state.cleared` reaches it; the scene then calls `finishDaily` with `dailyScore(s)`
   (`DAILY.perWave` a wave cleared, `DAILY.perLeaf` a leaf kept) and opens the picker in 'daily'
   mode. Planting a garden from the picker mid-plot (`leaveDaily`) scores it as it stands.
+- Golem powers (GG20): each `Golem` has `powerMs` (0 when ready; it counts down once grown, in
+  build and wave alike). `canPower` (a wave on, `powerReady`, a pest in reach) and `usePower` run
+  the kind's power (`POWER`, names and blurbs in `POWER_INFO`): Pebble's Stomp hits every pest
+  within `POWER.stompR` of its target for `POWER.stomp` times its damage, Moss's Roots set
+  `Pest.rootMs` (`root`, half for the queen) on every pest in reach, Thorn's Spike burst pricks them
+  `POWER.burst` times (`powerHit`, armour counts unless the form pierces), Fungus's Spore cloud
+  pushes a `Spores` patch `POWER.cloud` times as wide and strong and `POWER.cloudMs` as long on its
+  target, and Bell's Peal stuns every pest in reach `POWER.peal` times its ring, ignoring
+  `stunGuardMs`; then `powerMs` is `POWER.cooldownMs[kind]`. Each pushes a `Shot` with `power`
+  (and `ring`, its radius, centred on `from`), drawn by `drawShots` as a ring in the kind's
+  `POWER_COLOUR` over `POWER_RING_MS`. A rooted pest stands still like a stunned one (`step`) and is
+  drawn with clay roots round its feet. In `tapCell`, a tap on a golem whose menu isn't the open one
+  uses its power when `canPower`, else opens its menu as before; `drawGolems` adds the power bead
+  (`powerBead`) during a wave, and the hint names the power or the seconds left.
+- Root snares (GG21): `finishWave` adds a spare bud to `state.buds` (up to `SNARE.maxBuds`, apart
+  from the saved `bloom`). The HUD bloom tag's zone toggles the scene's `snaring` (refused under
+  `SNARE.cost` buds); the next `tapCell` calls `laySnare` (`canSnare`: a path cell without a snare),
+  which pushes a `Snare` with `stops` (each route's distance to the cell's centre). In `step` a
+  walking pest (not flying, not under ground, not held) that would pass a stop halts on it, records
+  the snare in `Pest.snared` and is rooted for `SNARE.rootMs`. `state.snares` is emptied when the
+  garden goes back to build (`drawSnares` paints them on `snareGfx`). The bloom tag's second line
+  counts the buds (`snareBuds`) once one is open, or says to tap the path while snaring.
+- Elder golems (GG22): `fusePartner(s, g)` finds a grown level-3 neighbour with `g`'s form, neither
+  an elder; `fuse` sets `g.elder`, adds the partner's `spent` and removes it. `golemStats(kind,
+  level, form, elder)` (through `boonedStats`/`statsOf`) folds in `ELDER` (damage and spore poison,
+  reach, slow time, stun). A level-3 golem's first menu chip is Fuse (or Elder golem, off, on an
+  elder) in place of the maxed Raise; `menuTap` calls `fuse`. An elder is drawn `ELDER_SCALE` bigger
+  with a leaf crown.
 - Sap pops: each squashed pest pushes a `Pop` onto `state.pops`; the scene drains them into a
   splat, a "+N" label and three droplets that arc to the sap counter, whose glow pulses as they
   land.
@@ -210,7 +238,8 @@ Missing or rough:
   `golem-move`, `new-pests`, `queen-slug`, `garden-picker`, `forked-brook`, `two-gates`,
   `level-3-forms`, `targeting`, `hedge`, `compost`, `harvest`, `harvest-wave`, `boons`,
   `regrow-leaf`, `thorny-picker`, `thorny-meadow`, `trophies`, `wild-garden`,
-  `daily-grafts-picker`, `grafts`, `daily-plot`, `new-golems`, `garden-editor`, `plots`) were
+  `daily-grafts-picker`, `grafts`, `daily-plot`, `new-golems`, `garden-editor`, `plots`,
+  `golem-powers`, `root-snare`, `elder-golem`) were
   staged through `window.game` with a scratch Playwright script against the dev server (set
   `state` fields and `localStorage` keys, push pests or pops, click cells and buttons, pause the
   scene); refresh them the same way.
@@ -262,17 +291,17 @@ File map (`src/`):
   `waveCounts(n, twist)`, `waveBonus`, `START`, `REGROW`/`regrowCost`, `BOONS`/`Boon`,
   `BOON_INFO`, `BOON`, `boonOffer`, `TWISTS`/`Twist`, `TWIST_INFO`, `GARDEN_TWISTS`,
   `THORNY_STARS`, `LEAN_SAP`, `TWIST_SEEDS`, `DAILY`, `Plot`, `dailyPlot`, `WEEK_TWISTS`, `Week`,
-  `weekOf`, `weeklyGarden` and `PLOT`. Every name and blurb in the catalogues (golems, with `lower` for
+  `weekOf`, `weeklyGarden`, `PLOT`, `ELDER`, `POWER`, `POWER_INFO` and `SNARE`. Every name and blurb in the catalogues (golems, with `lower` for
   inside a sentence, the hedge, forms, targets, boons and
   twists) is a `TextKey`, shown with `t`.
-- `game/state.ts`: `GameState`, `Golem` (with `form` and `target`), `Hedge`, `Pest` (with `stunMs`,
-  `stunGuardMs` and `hits`), `Spores`, `Shot` (with `ring`),
-  `Pop`, `Called`, `Settled`, `Slime`, `SHOT_MS`, `RING_MS`, `Extras`, `newGame(best, bloom, garden, stars, thorny, laurels, extras)`
+- `game/state.ts`: `GameState`, `Golem` (with `form`, `target`, `powerMs` and `elder`), `Hedge`, `Snare`, `Pest` (with `stunMs`,
+  `stunGuardMs`, `rootMs`, `snared` and `hits`), `Spores`, `Shot` (with `ring` and `power`),
+  `Pop`, `Called`, `Settled`, `Slime`, `SHOT_MS`, `RING_MS`, `POWER_RING_MS`, `Extras`, `newGame(best, bloom, garden, stars, thorny, laurels, extras)`
   (`extras`: `wild`, `grafts`, `daily`, `weekly`, `plot`; it picks the first open golem seed),
   `ordinary`, `gardenOf`, `totalStars`, `gardenOpen`, `thornyOpen`, `twistOf`, `boonCount`, `barred`, `unlocked`, `seedCost(s, kind)`, `formsFor`,
   `lastWave`, `dailyScore`, `laurelsFree`, `canGraft`, `select`, `golemAt`, `hedgeAt`,
   `freeSoil`, `freePath`, `canPlant`, `plant`, `upgradeCost`, `picksForm`, `upgrade(s, g, form)`,
-  `boonedStats`, `statsOf(s, g)`, `setTarget`, `nextTarget`, `uprootValue`, `uproot`, `canMove`, `move`, `neighbours`,
+  `boonedStats`, `statsOf(s, g)`, `fusePartner`, `fuse`, `powerReady`, `canPower`, `usePower`, `canSnare`, `laySnare`, `setTarget`, `nextTarget`, `uprootValue`, `uproot`, `canMove`, `move`, `neighbours`,
   `comboAt`, `slimed`, `queenOnPath`, `canCallEarly`, `nextWave`, `regrowPrice`, `canRegrow`, `regrow`, `sunRow`,
   `compostCap`, `takeBoon`, `startWave` (returns `'start'`, `'early'` or null) and `tick`. No Phaser.
 - `game/save.ts`: `loadBest`/`saveBest`, `loadBloom`/`saveBloom`, `loadGarden`/`saveGarden`,
@@ -362,6 +391,7 @@ How it runs:
   cell (`picked`), else closes an open menu, else plants (a golem on soil or a hedge on the path,
   by `selected`). The menu's chips (`menuTap`) call `upgrade` (or open the form chips for the
   raise to level 3, which call `upgrade` with the form), `setTarget`, start a move or `uproot`.
+  The HUD bloom tag toggles `snaring` (GG21), so the next board tap lays a root snare.
   The seed cards call `select` (refused for a locked kind; the locked thorn card's own image is
   hidden, so a tap on it does nothing), the wave button `startWave`, the speed button toggles
   `fast`, the garden tag opens the picker. The picker's dim rectangle swallows taps.
@@ -381,9 +411,9 @@ garden), `boons`, `sunRows`, `offer` (the boons to pick from, or empty), `queenS
 called early whose last pests still walk), `settled` (called waves just finished, each with `clean`; the scene
 empties it), `regrown`, `cleared` (the most waves cleared in this garden), `wild` (per garden), `grafts`,
 `freeSeed`, `daily` (the `Plot`, or null), `weekly` (the `Week`, or null), `plot` (a drawn plot's slot
-and `Garden`, or null), `spores` and `nextId`. Golem
+and `Garden`, or null), `spores`, `buds` (spare buds for root snares), `snares` and `nextId`. Golem
 positions are cells; pest positions are `dist` pixels along their route. The open menu, its form
-mode and the golem being moved (`picked`, `formMenu`, `moving`) are the scene's, not the state's.
+mode, the golem being moved and snare laying (`picked`, `formMenu`, `moving`, `snaring`) are the scene's, not the state's.
 
 Persistence: twelve `localStorage` keys, ten written by the scene: `golem-garden-best` (the most waves
 ever cleared, when `state.best` rises), `golem-garden-bloom` (the Heartwood's bloom, when it rises;
@@ -398,7 +428,7 @@ when one rises), `golem-garden-grafts` (the grafts bought, comma-separated ids),
 `golem-garden-plots` (JSON: `PLOT.slots` entries, each null or `{ path, soil, best }`, written by the
 editor and as a plot's best rises) and
 `golem-garden-trophies` (the trophies earned, each id with
-the time, written by `award` in `shared/trophies.ts`). The garden's golems, hedges, pests and boons are never saved.
+the time, written by `award` in `shared/trophies.ts`). The garden's golems, hedges, snares, spare buds, pests and boons are never saved.
 The hub's settings are read from the shared `hub-settings` key.
 
 Randomness and timing: no `Math.random`, `Date.now` or `performance.now`. Waves are fixed by
@@ -441,6 +471,9 @@ Heartwood falls (`harvest3` instead when a daily plot ends with leaves left).
 | `cleared`, `bud` (higher per bud), `bloom` | `waveDone`: a wave cleared, or a called wave whose last pests are gone |
 | `rustle` + `chime` / buzz | `regrowLeaf` (the Heartwood's cell, the leaf tag) |
 | `boon` | a boon card taken |
+| `power` + the kind's throw | `tapCell`: a golem's power used |
+| `elder` / buzz | `menuTap`: Fuse / no twin to fuse with |
+| `snare` / buzz | `tapCell` while snaring: a root snare laid / refused (also the bloom tag with too few buds) |
 | `boon` + `ui('coin')` / buzz | a graft bought / refused (bought, or no laurel) |
 | `select` / `rustle` / buzz | the garden editor: a path cell / a soil bed drawn or taken back; a refused tap |
 | `ui('click')` | the Plots button, a plot or weekly card, an Edit tag, the editor's tool tags and Back, opening a golem's menu, form-menu open and Back, Move chip, speed button, garden tag, garden and thorny cards, the picker's Back, Keep going, Daily plot (buzz once played) and Grafts, the grafts' Back |
@@ -548,6 +581,9 @@ Heartwood falls (`harvest3` instead when a daily plot ends with leaves left).
   early" banner itself (from the click), while a natural clear is spotted in `update`.
 - A golem's damage lands when it throws; the shot image is cosmetic, so a pest can vanish before
   the rock arrives.
+- During a wave `tapCell` uses a golem's power when it can (`canPower`) instead of opening its
+  menu; with the power spent or no pest in reach the tap opens the menu, and a tap on the golem
+  whose menu is open closes it. A power needs a pest in reach, so a tap never wastes one.
 - `tapCell` opens the menu whenever the cell has a golem, so planting never replaces one; with a
   menu open, a tap on another golem switches the menu to it, and a tap anywhere else only closes
   it. A seed card closes the menu, so the next tap on soil plants.

@@ -54,6 +54,12 @@ export const sfx = sounds({
   bloom: { wave: 'sine', freq: 784, arp: [0, 4, 7, 12, 16, 19], arpStep: 0.035, length: 0.7, volume: 0.32 },
   /** A leaf regrown: a chime over the rustle. */
   chime: { wave: 'triangle', freq: 880, arp: [0, 5, 9], arpStep: 0.07, length: 0.3, volume: 0.3 },
+  /** A golem's power used (GG20): a rising whoosh under its own throw. */
+  power: { wave: 'triangle', freq: 260, to: 1040, length: 0.22, attack: 0.02, volume: 0.32, gap: 120 },
+  /** Two golems fused into an elder (GG22): a deep swell and a bright chord. */
+  elder: { wave: 'square', freq: 262, arp: [0, 7, 12, 16, 19, 24], arpStep: 0.06, length: 0.5, volume: 0.24 },
+  /** A root snare laid (GG21): a creaking of roots. */
+  snare: { wave: 'sawtooth', freq: 180, to: 120, length: 0.22, attack: 0.03, volume: 0.2, vary: 0.05 },
   /** A boon taken: a sparkle. */
   boon: { wave: 'square', freq: 1760, arp: [0, 7, 12, 19], arpStep: 0.04, length: 0.25, volume: 0.16 },
 });

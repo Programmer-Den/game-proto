@@ -37,6 +37,9 @@ and pressed lettering on clay tags. It is all painted in code at startup; there 
 | Tap or click a soil cell | Plant the picked seed there, if you have the sap |
 | Hedge card, then a path cell | Plant a hedge on the path for 15 sap; pests stop and chew through it |
 | Tap or click a golem | Open its menu: Raise (a level, up to 3), Aim, Move or Uproot; tap it again to close |
+| Tap a golem with its power ready (during a wave) | Use its power: Stomp, Roots, Spike burst, Spore cloud or Peal |
+| Fuse (a level-3 golem's menu) | Fuse it with a twin of its form beside it into one elder golem |
+| Bloom tag, then a path cell | Lay a root snare for 2 spare buds |
 | Raise a level-2 golem | Pick its level-3 form from the two offered (Boulder or Sling, Bog or Spore, Bramble or Barb, Puffball or Blight, Chime or Gong) |
 | Aim | Step the golem's targeting: First, Strongest, Weakest or Flyers |
 | Move, then tap soil | Move the golem there for 10 sap, as it is (level and all) |
@@ -244,7 +247,33 @@ and pressed lettering on clay tags. It is all painted in code at startup; there 
     goes back. A drawn plot's card plants it, and its Edit tag opens the editor again. Each plot
     keeps its own best wave (changing its drawing starts that afresh) and, like the weekly garden,
     earns no stars, laurels or wild record.
-24. **Trophies.** Ten trophies, listed on the start and pause screens (Trophies) and counted on the
+24. **Golem powers.** During a wave each grown golem wears a power bead by its head: lit gold
+    when its power is ready, filling round while it recharges. Tap a golem whose bead is lit, with a
+    pest in its reach, to use its power (otherwise the tap opens its menu as usual); hovering it
+    names the power and how long until it is back:
+
+    | Golem | Power | What it does | Ready again after |
+    | --- | --- | --- | --- |
+    | Pebble golem | Stomp | 4 times its damage on every pest within 40px of its target | 10s |
+    | Moss golem | Roots | every pest in reach stands still for 1.5s (the Queen Slug half as long) | 14s |
+    | Thorn golem | Spike burst | pricks every pest in reach three times | 10s |
+    | Fungus golem | Spore cloud | a spore patch on its target twice as wide and strong, lasting half again as long | 12s |
+    | Bell golem | Peal | stuns every pest in reach half again as long as its ring, even one just stunned | 16s |
+
+25. **Root snares.** Every wave you clear in a garden (or call early, once done) also opens a spare
+    bud, up to 4, counted under the bloom in the top bar. Tap the bloom tag, then a path cell, to
+    spend 2 of them on a root snare there: every walking pest that reaches it is held still for
+    2.5s (the Queen Slug half as long), once a snare. Crows fly over it and a mole in its tunnel
+    passes under. A snare laid between waves lasts through the next wave, one laid during a wave
+    through that one; all snares wither once the garden is clear again. Spare buds don't count
+    toward the Heartwood's bloom, which they leave as it is.
+26. **Elder golems.** Two grown level-3 golems of the same form side by side (up, down, left or
+    right) can fuse: the first chip of a level-3 golem's menu reads **Fuse** when it has such a
+    twin. The tapped golem becomes an elder on its own cell and the twin's cell is freed. An elder
+    stands bigger, with a crown of leaves, hits 2.2 times as hard (its spores poison as much harder),
+    reaches 16px further, slows half again as long and stuns 30% longer. Uprooting it gives back 70%
+    of the sap spent on both. An elder can't fuse again.
+27. **Trophies.** Ten trophies, listed on the start and pause screens (Trophies) and counted on the
     hub's card; a toast shows each one as it is earned:
 
     | Trophy | Tier | Earned by |
@@ -259,6 +288,12 @@ and pressed lettering on clay tags. It is all painted in code at startup; there 
     | Perfect harvest | gold | harvesting a garden with all ten leaves |
     | Every garden | gold | harvesting all three gardens |
     | Thorny laurel | gold, hidden | harvesting a thorny garden |
+
+![Golem powers: a moss golem's roots hold the beetles still, with the power beads lit on the other golems](docs/screenshots/golem-powers.webp)
+
+![A root snare on the path, and a beetle held by another](docs/screenshots/root-snare.webp)
+
+![An elder Boulder golem, bigger and crowned with leaves, and a Bog moss elder](docs/screenshots/elder-golem.webp)
 
 ![The Fungus and Bell golems in play: spore patches on the path and stunned pests](docs/screenshots/new-golems.webp)
 
