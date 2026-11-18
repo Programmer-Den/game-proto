@@ -3,8 +3,9 @@ import { SPECIALS, seeded, type Building, type Special } from './tiles';
 
 // Royal gifts: reaching a round's goal offers a choice of two, shown in the panel all round long.
 // The windmill, the market, the harbor, the lumber camp and the temple are won this way: each is a new tile.
+// From round 2 the plain packs also include the land tiles: ponds that dig a lake and groves that plant a wood.
 
-export const GIFTS = ['towers', 'houses', 'farms', 'windmill', 'windmills', 'market', 'markets', 'harbor', 'harbors', 'lumber', 'lumbers', 'temple', 'temples'] as const;
+export const GIFTS = ['towers', 'houses', 'farms', 'ponds', 'groves', 'windmill', 'windmills', 'market', 'markets', 'harbor', 'harbors', 'lumber', 'lumbers', 'temple', 'temples'] as const;
 export type Gift = (typeof GIFTS)[number];
 
 export interface GiftInfo {
@@ -22,6 +23,8 @@ export const GIFT_INFO: Record<Gift, GiftInfo> = {
   towers: { label: 'towersGift', icon: 'tower', desc: 'towersDesc', tiles: { tower: 2 } },
   houses: { label: 'housesGift', icon: 'house', desc: 'housesDesc', tiles: { house: 3 } },
   farms: { label: 'farmsGift', icon: 'farm', desc: 'farmsDesc', tiles: { farm: 3 } },
+  ponds: { label: 'pondsGift', icon: 'pond', desc: 'pondsDesc', tiles: { pond: 2 } },
+  groves: { label: 'grovesGift', icon: 'grove', desc: 'grovesDesc', tiles: { grove: 2 } },
   windmill: { label: 'windmillGift', icon: 'windmill', desc: 'windmillDesc', tiles: { windmill: 2 } },
   windmills: { label: 'windmillsGift', icon: 'windmill', desc: 'windmillsDesc', tiles: { windmill: 2 } },
   market: { label: 'marketGift', icon: 'market', desc: 'marketDesc', tiles: { market: 2 } },
@@ -41,15 +44,15 @@ const MORE: Record<Special, Gift> = { windmill: 'windmills', market: 'markets', 
 /**
  * The two gifts offered for reaching round `round`'s goal on island `island`, with `unlocked` the
  * special buildings already won. Round 1 always offers +2 Towers or the Windmill. Later rounds
- * offer one special not yet won (in the order of SPECIALS) beside a plain tile pack, until all
- * are won; then two of the tile packs and more of the specials. Seeded by island and round, so a
+ * offer one special not yet won (in the order of SPECIALS) beside a plain tile pack (towers, houses,
+ * farms, ponds or groves), until all are won; then two of the tile packs and more of the specials. Seeded by island and round, so a
  * kingdom's gifts never touch Math.random.
  */
 export function giftsFor(island: number, round: number, unlocked: readonly Special[]): [Gift, Gift] {
   if (round === 1 && unlocked.length === 0) return ['towers', 'windmill'];
   const rand = seeded(island * 7919 + round * 104729);
   const pick = <T>(list: T[]) => list.splice(Math.floor(rand() * list.length), 1)[0];
-  const plain: Gift[] = ['towers', 'houses', 'farms'];
+  const plain: Gift[] = ['towers', 'houses', 'farms', 'ponds', 'groves'];
   const next = SPECIALS.find((b) => !unlocked.includes(b));
   if (next) return [pick(plain), NEW[next]];
   const pool: Gift[] = [...plain, ...SPECIALS.map((b) => MORE[b])];

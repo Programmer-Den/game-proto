@@ -14,7 +14,9 @@ import {
   WONDER_CELLS,
   isBuilding,
   isHome,
+  isLandTile,
   isWonder,
+  landOf,
   nativeFor,
   nextIsland,
   randomIsland,
@@ -28,6 +30,7 @@ import {
   type Cell,
   type Native,
   type Special,
+  type Structure,
   type Wonder,
 } from './tiles';
 
@@ -59,6 +62,16 @@ export interface Rival {
   placed: number;
   /** The rival's last placement, for the board's mark. */
   last: { col: number; row: number; kind: Building } | null;
+  /** The kind the rival crowned when the kingdom was finished, and what it paid; null before. */
+  crowned: Crowned | null;
+}
+
+/** A coronation: the kind of building crowned at the kingdom's end and what it paid (each one of that kind scored once more). */
+export interface Crowned {
+  kind: Structure;
+  /** How many of that kind stand (a wonder counts once). */
+  n: number;
+  pts: number;
 }
 
 export interface GameState {
@@ -77,6 +90,11 @@ export interface GameState {
   draws: number;
   /** The building the next tap places, if any; always one in the hand. */
   selected: Building | null;
+  /**
+   * The tile kept in the reserve slot for a later turn, or null. It stays counted in `pouch` but is
+   * never drawn into a hand while held; `hold` swaps it back.
+   */
+  held: Building | null;
   /** Which island this kingdom is built on; `islandMap` lays it out. */
   island: number;
   /** How the island was chosen: at random, typed in, the island of the day or a campaign level. */
@@ -94,8 +112,11 @@ export interface GameState {
   /** The board by row, then column. */
   grid: Cell[][];
   placed: number;
-  /** 'gift' while a reached goal's gift waits to be chosen; nothing can be placed then. */
-  phase: 'playing' | 'gift' | 'over';
+  /**
+   * 'gift' while a reached goal's gift waits to be chosen; nothing can be placed then. 'crown' once
+   * the kingdom is finished, while the player picks the kind of building to crown (`crown`); 'over' after.
+   */
+  phase: 'playing' | 'gift' | 'crown' | 'over';
   /** The best final score of any finished game, saved in the browser. */
   best: number;
   /** Crowns won from decrees, in every kingdom so far; saved in the browser. */
@@ -124,6 +145,8 @@ export interface GameState {
   cargo: number;
   /** The trade bonus paid when a chain island was finished: TRADE_BONUS per harbour. 0 before. */
   trade: number;
+  /** The coronation picked at the kingdom's end, or null (before it, and on a puzzle island, which has none). */
+  crowned: Crowned | null;
   /** The board as it was before the last placement, if that placement can be undone. */
   undo: Snapshot | null;
   /** The round in which the undo was last used; 0 if none yet. One undo per round. */
@@ -135,6 +158,7 @@ export interface Snapshot {
   grid: Cell[][];
   pouch: Pouch;
   hand: Building[];
+  held: Building | null;
   draws: number;
   score: number;
   bonus: number;
@@ -144,9 +168,9 @@ export interface Snapshot {
 }
 
 /** The first round's tiles. */
-export const FIRST_POUCH: Pouch = { farm: 4, house: 4, tower: 2, windmill: 0, market: 0, harbor: 0, lumber: 0, temple: 0, lighthouse: 0, orchard: 0, cathedral: 0, granary: 0, gardens: 0, road: 1 };
+export const FIRST_POUCH: Pouch = { farm: 4, house: 4, tower: 2, windmill: 0, market: 0, harbor: 0, lumber: 0, temple: 0, lighthouse: 0, orchard: 0, cathedral: 0, granary: 0, gardens: 0, pond: 0, grove: 0, road: 1 };
 /** The tiles each later round adds to whatever is left. */
-export const ROUND_POUCH: Pouch = { farm: 3, house: 3, tower: 2, windmill: 0, market: 0, harbor: 0, lumber: 0, temple: 0, lighthouse: 0, orchard: 0, cathedral: 0, granary: 0, gardens: 0, road: 1 };
+export const ROUND_POUCH: Pouch = { farm: 3, house: 3, tower: 2, windmill: 0, market: 0, harbor: 0, lumber: 0, temple: 0, lighthouse: 0, orchard: 0, cathedral: 0, granary: 0, gardens: 0, pond: 0, grove: 0, road: 1 };
 /** The round whose start puts the kingdom's wonder in the pouch. */
 export const WONDER_ROUND = 3;
 /** What a wonder is worth on its own, before what stands around it. */
@@ -162,6 +186,12 @@ const WONDER_COUNT: Record<Wonder, (c: Cell) => number> = {
  * none on Easy (it only builds its own), half on Normal, as much as its own on Hard.
  */
 const rivalSpite = () => byDifficulty(0, 0.5, 1);
+/**
+ * What share of its coronation the rival lord is paid (it crowns its best kind at the end): half on
+ * Easy, three quarters on Normal, all of it on Hard. On Normal a greedy player beats it about as often
+ * with the coronation as without one.
+ */
+const rivalCrown = () => byDifficulty(0.5, 0.75, 1);
 /** How many tiles the rival lord draws each turn to pick one from. */
 const RIVAL_HAND = 4;
 /** How much the rival weighs a building more joined to the castle (each pays +1 at the end). */
@@ -204,7 +234,7 @@ export function newGame(best = 0, crowns = 0, island = randomIsland(), kingdom: 
     cargo += kingdom.cargo?.[b] ?? 0;
   }
   const rival: Rival | null =
-    kingdom.mode === 'rival' ? { cells: grid.map((cells) => cells.map(() => false)), pouch: { ...FIRST_POUCH }, draws: 0, score: 0, bonus: 0, castle: 0, placed: 0, last: null } : null;
+    kingdom.mode === 'rival' ? { cells: grid.map((cells) => cells.map(() => false)), pouch: { ...FIRST_POUCH }, draws: 0, score: 0, bonus: 0, castle: 0, placed: 0, last: null, crowned: null } : null;
   const s: GameState = {
     round: 1,
     goal: puzzle ? puzzleStars(puzzle)[2] : goalFor(1),
@@ -212,6 +242,7 @@ export function newGame(best = 0, crowns = 0, island = randomIsland(), kingdom: 
     bonus: 0,
     pouch,
     hand: [],
+    held: null,
     draws: 0,
     selected: null,
     island,
@@ -238,6 +269,7 @@ export function newGame(best = 0, crowns = 0, island = randomIsland(), kingdom: 
     chainScore: kingdom.chainScore ?? 0,
     cargo,
     trade: 0,
+    crowned: null,
     undo: null,
     undoneIn: 0,
   };
@@ -276,23 +308,55 @@ const playable = (s: GameState, kind: Building) => fitsAnywhere(s.grid, kind) ||
 /** Whether any tile left in the pouch has a use on the board (see `playable`). */
 const pouchPlayable = (s: GameState) => BUILDINGS.some((b) => s.pouch[b] > 0 && playable(s, b));
 
+/** How many tiles of `kind` a hand can be drawn from: the pouch's, less the one held in reserve. */
+export const drawable = (s: GameState, kind: Building) => s.pouch[kind] - (s.held === kind ? 1 : 0);
+
+/** A hand sorted in BUILDINGS order, as the tile buttons show it. */
+const sortHand = (hand: Building[]) => hand.sort((a, b) => BUILDINGS.indexOf(a) - BUILDINGS.indexOf(b));
+
 /**
- * Draws the next hand: HAND tiles from the pouch, seeded by the island and the number of draws so
- * far, so a kingdom's hands never touch Math.random and an undone placement redraws the same hand.
- * When no drawn tile has room (or a wood to clear) but one in the pouch has, the first is swapped for one that has.
+ * Draws the next hand: HAND tiles from the pouch (never the one held in reserve), seeded by the
+ * island and the number of draws so far, so a kingdom's hands never touch Math.random and an undone
+ * placement redraws the same hand. When no drawn tile has room (or a wood to clear) but one in the
+ * pouch has, the first is swapped for one that has.
  */
 function drawHand(s: GameState) {
   const rand = seeded(s.island * 7 + s.draws * 48271 + 11);
   s.draws++;
-  const bag = BUILDINGS.flatMap((b) => Array<Building>(s.pouch[b]).fill(b));
+  const bag = BUILDINGS.flatMap((b) => Array<Building>(drawable(s, b)).fill(b));
   const hand: Building[] = [];
   while (hand.length < HAND && bag.length) hand.push(bag.splice(Math.floor(rand() * bag.length), 1)[0]);
   if (hand.length && !hand.some((b) => playable(s, b))) {
-    const fitting = BUILDINGS.filter((b) => s.pouch[b] > 0 && playable(s, b));
+    const fitting = BUILDINGS.filter((b) => drawable(s, b) > 0 && playable(s, b));
     if (fitting.length) hand[0] = fitting[Math.floor(rand() * fitting.length)];
   }
-  s.hand = hand.sort((a, b) => BUILDINGS.indexOf(a) - BUILDINGS.indexOf(b));
+  s.hand = sortHand(hand);
   if (s.selected && !s.hand.includes(s.selected)) s.selected = s.hand[0] ?? null;
+}
+
+/**
+ * The reserve slot: with the slot empty, keeps the picked tile out of the hand for a later turn.
+ * With a tile held, puts it back in the hand when the hand has room (the turn it was held, or
+ * near the pouch's end), or else swaps it for the picked tile. It takes no turn and draws nothing,
+ * so the next hand is drawn from the rest of the pouch. False if nothing can be held or swapped now.
+ */
+export function hold(s: GameState) {
+  if (s.phase !== 'playing') return false;
+  const held = s.held;
+  const picked = s.selected && inHand(s, s.selected) ? s.selected : null;
+  if (held && (s.hand.length < HAND || !picked)) {
+    s.hand = sortHand([...s.hand, held]);
+    s.held = null;
+    s.selected = held;
+    return true;
+  }
+  if (!picked) return false;
+  s.hand.splice(s.hand.indexOf(picked), 1);
+  if (held) s.hand.push(held);
+  s.hand = sortHand(s.hand);
+  s.held = picked;
+  s.selected = held ?? (s.hand.includes(picked) ? picked : (s.hand[0] ?? null));
+  return true;
 }
 
 /**
@@ -418,7 +482,7 @@ export const ownGrid = (s: GameState): Cell[][] => (s.rival ? s.grid.map((cells,
 /** Puts `kind` on `grid` at (col, row): one cell, or a wonder's four. */
 function build(grid: Cell[][], col: number, row: number, kind: Building) {
   if (isWonder(kind)) for (const [dc, dr] of WONDER_CELLS) grid[row + dr][col + dc] = kind;
-  else grid[row][col] = kind;
+  else grid[row][col] = landOf(kind);
 }
 
 /** What the season adds for placing `kind` worth `pts`: nothing on a puzzle island, which has no seasons. */
@@ -520,20 +584,60 @@ export function anyPlace(s: GameState) {
 export const harbourCount = (grid: Cell[][]) => grid.reduce((n, cells) => n + cells.filter((c) => c === 'harbor').length, 0);
 
 /**
- * Finishes the kingdom: the castle pays a point per building its chain reaches, a chain island's
- * harbours pay their trade, and the best score is kept.
+ * Each kind of building that could be crowned on `grid` (the kinds standing among `owns`' cells,
+ * roads aside), in BUILDINGS order with manors last, with how many stand and what crowning it pays:
+ * every one of that kind scores once more (a wonder once, on its scoring cell).
+ */
+export function crownOptions(grid: Cell[][], owns?: Owns): { kind: Structure; n: number; pts: number }[] {
+  const found = new Map<Structure, { n: number; pts: number }>();
+  grid.forEach((cells, row) =>
+    cells.forEach((cell, col) => {
+      if (!scores(cell) || (owns && !owns(col, row)) || (isWonder(cell) && !wonderAnchor(grid, col, row))) return;
+      const o = found.get(cell) ?? { n: 0, pts: 0 };
+      o.n++;
+      o.pts += cellScore(grid, col, row);
+      found.set(cell, o);
+    }),
+  );
+  const order: Structure[] = [...BUILDINGS, 'manor'];
+  return [...found].map(([kind, o]) => ({ kind, ...o })).sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind));
+}
+
+/**
+ * Finishes the kingdom: the castle pays a point per building its chain reaches and a chain island's
+ * harbours pay their trade. Then the coronation waits (`'crown'`) while any building stands, except
+ * on a puzzle island, whose stars were set without one; a rival lord crowns its best kind at once.
  */
 function end(s: GameState) {
   s.castle = joinedCount(s.grid, mine(s));
   if (s.rival) {
-    s.rival.castle = joinedCount(s.grid, theirs(s.rival));
-    s.rival.score = boardScore(s.grid, theirs(s.rival)) + s.rival.bonus + s.rival.castle;
+    const r = s.rival;
+    r.castle = joinedCount(s.grid, theirs(r));
+    const best = crownOptions(s.grid, theirs(r)).reduce<Crowned | null>((b, o) => (!b || o.pts > b.pts ? o : b), null);
+    r.crowned = best && { ...best, pts: Math.floor(best.pts * rivalCrown()) };
+    r.score = boardScore(s.grid, theirs(r)) + r.bonus + r.castle + (r.crowned?.pts ?? 0);
   }
   s.trade = s.link > 1 ? TRADE_BONUS * harbourCount(s.grid) : 0;
   s.bonus += s.castle + s.trade;
   s.score += s.castle + s.trade;
+  s.phase = !s.puzzle && crownOptions(s.grid, mine(s)).length ? 'crown' : 'over';
+  s.best = Math.max(s.best, s.score);
+}
+
+/**
+ * The coronation at the kingdom's end: crowns `kind`, one of `crownOptions`, so every building of
+ * that kind scores once more, and the kingdom is over. False if not allowed now.
+ */
+export function crown(s: GameState, kind: Structure) {
+  if (s.phase !== 'crown') return false;
+  const option = crownOptions(s.grid, mine(s)).find((o) => o.kind === kind);
+  if (!option) return false;
+  s.crowned = { ...option };
+  s.bonus += option.pts;
+  s.score += option.pts;
   s.phase = 'over';
   s.best = Math.max(s.best, s.score);
+  return true;
 }
 
 /** Ends the kingdom when no tiles are left, or none can go anywhere and no merge or cleared wood would make room. */
@@ -556,12 +660,13 @@ const snapshot = (s: GameState): Snapshot => ({
   grid: s.grid.map((cells) => [...cells]),
   pouch: { ...s.pouch },
   hand: [...s.hand],
+  held: s.held,
   draws: s.draws,
   score: s.score,
   bonus: s.bonus,
   selected: s.selected,
   placed: s.placed,
-  rival: s.rival ? { ...s.rival, cells: s.rival.cells.map((cells) => [...cells]), pouch: { ...s.rival.pouch }, last: s.rival.last && { ...s.rival.last } } : null,
+  rival: s.rival ? { ...s.rival, cells: s.rival.cells.map((cells) => [...cells]), pouch: { ...s.rival.pouch }, last: s.rival.last && { ...s.rival.last }, crowned: null } : null,
 });
 
 /**
@@ -585,7 +690,7 @@ function rivalTurn(s: GameState): Placed['rival'] {
   const spite = rivalSpite();
   let best: { col: number; row: number; kind: Building; value: number } | null = null;
   for (const kind of new Set(hand)) {
-    if (isWonder(kind)) continue;
+    if (isWonder(kind) || isLandTile(kind)) continue;
     for (let row = 0; row < s.grid.length; row++)
       for (let col = 0; col < s.grid[row].length; col++) {
         if (!fits(s.grid, col, row, kind)) continue;
@@ -722,8 +827,8 @@ export function canTrade(s: GameState) {
   return s.phase === 'playing' && s.tradedIn !== s.round && ownGrid(s).some((cells) => cells.includes('market')) && tradeGives(s).some((g) => tradeTakes(s).some((t) => t !== g));
 }
 
-/** The kinds the pouch could give two of in a trade. */
-export const tradeGives = (s: GameState) => BUILDINGS.filter((b) => s.pouch[b] >= TRADE_GIVE);
+/** The kinds the pouch could give two of in a trade (the tile held in reserve is not given). */
+export const tradeGives = (s: GameState) => BUILDINGS.filter((b) => drawable(s, b) >= TRADE_GIVE);
 
 /** The gift buildings won that a trade could take: those with a use on the board (room, or a wood to clear). */
 export const tradeTakes = (s: GameState) => s.unlocked.filter((b) => playable(s, b));
@@ -734,7 +839,7 @@ export const tradeTakes = (s: GameState) => s.unlocked.filter((b) => playable(s,
  * the end. It cannot be undone. False if not allowed.
  */
 export function trade(s: GameState, give: Building, take: Special) {
-  if (!canTrade(s) || s.pouch[give] < TRADE_GIVE || !tradeTakes(s).includes(take) || give === take) return false;
+  if (!canTrade(s) || drawable(s, give) < TRADE_GIVE || !tradeTakes(s).includes(take) || give === take) return false;
   s.pouch[give] -= TRADE_GIVE;
   s.pouch[take]++;
   s.tradedIn = s.round;
@@ -788,9 +893,9 @@ export function chooseGift(s: GameState, gift: Gift) {
   if (s.phase !== 'gift' || s.giftsDue <= 0 || !s.gifts.includes(gift)) return false;
   const tiles = GIFT_INFO[gift].tiles;
   for (const b of BUILDINGS) s.pouch[b] += tiles[b] ?? 0;
-  // A rival lord takes the gift left over.
+  // A rival lord takes the gift left over (but no land tiles: it only builds).
   const other = GIFT_INFO[s.gifts[0] === gift ? s.gifts[1] : s.gifts[0]].tiles;
-  if (s.rival) for (const b of BUILDINGS) s.rival.pouch[b] += other[b] ?? 0;
+  if (s.rival) for (const b of BUILDINGS) if (!isLandTile(b)) s.rival.pouch[b] += other[b] ?? 0;
   const won = newSpecial(gift);
   if (won && !s.unlocked.includes(won)) s.unlocked.push(won);
   s.giftsDue--;

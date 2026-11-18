@@ -18,7 +18,7 @@ const en = {
   tenCrowns: 'Crown jewels',
   tenCrownsText: 'Win 10 crowns in all.',
   bigKingdom: 'Golden age',
-  bigKingdomText: 'Finish a kingdom with 350 points.',
+  bigKingdomText: 'Finish a kingdom with 420 points.',
   threeStars: 'Star of the realm',
   threeStarsText: 'Win three stars on a campaign level or a puzzle island.',
   campaign: 'Ruler of the isles',

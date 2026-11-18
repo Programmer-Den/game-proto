@@ -123,5 +123,7 @@ export const PLACE_PITCH: Record<Building, number> = {
   cathedral: 0.6,
   granary: 0.65,
   gardens: 0.7,
+  pond: 0.8,
+  grove: 0.95,
   road: 0.75,
 };

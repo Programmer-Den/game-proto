@@ -5,8 +5,18 @@ import type { TextKey } from '../i18n';
  * Every building the pouch holds, in the order of the panel's tile buttons. The first three are
  * there from the start; the rest are gifts, and each one's button shows once it is won.
  */
-export const BUILDINGS = ['farm', 'house', 'tower', 'windmill', 'market', 'harbor', 'lumber', 'temple', 'lighthouse', 'orchard', 'cathedral', 'granary', 'gardens', 'road'] as const;
+export const BUILDINGS = ['farm', 'house', 'tower', 'windmill', 'market', 'harbor', 'lumber', 'temple', 'lighthouse', 'orchard', 'cathedral', 'granary', 'gardens', 'pond', 'grove', 'road'] as const;
 export type Building = (typeof BUILDINGS)[number];
+/**
+ * The land tiles, won as gifts from round 2: placed on grass, a pond digs a lake and a grove plants
+ * a wood (`landOf`), so the board gets the lakes and woods its buildings want. They are tiles in
+ * the pouch and the hand like any other, but what they leave on the grid is land, not a building.
+ */
+export const LAND_TILES = ['pond', 'grove'] as const;
+export type LandTile = (typeof LAND_TILES)[number];
+export const isLandTile = (kind: string | null | undefined): kind is LandTile => (LAND_TILES as readonly string[]).includes(kind as string);
+/** What a tile leaves on the grid: a land tile its land, any other tile itself. */
+export const landOf = (kind: Building): Cell => (kind === 'pond' ? 'lake' : kind === 'grove' ? 'forest' : kind);
 /** The buildings won as gifts, in the order they join the panel. */
 export const SPECIALS = ['windmill', 'market', 'harbor', 'lumber', 'temple'] as const;
 export type Special = (typeof SPECIALS)[number];
@@ -79,11 +89,14 @@ export const INFO: Record<Structure, BuildingInfo> = {
   cathedral: { name: 'cathedralName', rule: 'cathedralRule', count: 'cathedralCount' },
   granary: { name: 'granaryName', rule: 'granaryRule', count: 'granaryCount' },
   gardens: { name: 'gardensName', rule: 'gardensRule', count: 'gardensCount' },
+  pond: { name: 'pondName', rule: 'pondRule', count: 'pondCount' },
+  grove: { name: 'groveName', rule: 'groveRule', count: 'groveCount' },
   road: { name: 'roadName', rule: 'roadRule', count: 'roadCount' },
   manor: { name: 'manorName', rule: 'manorRule', count: 'manorCount' },
 };
 
-const STRUCTURES: readonly string[] = [...BUILDINGS, 'manor'];
+// The land tiles never stand on the grid (they leave a lake or a wood), so they are no structure there.
+const STRUCTURES: readonly string[] = [...BUILDINGS.filter((b) => !isLandTile(b)), 'manor'];
 export const isBuilding = (cell: Cell): cell is Structure => STRUCTURES.includes(cell);
 /** Whether a cell is built on: a building, a manor or a road (what a chain to the castle runs along). */
 export const isBuilt = (cell: Cell | undefined) => cell !== undefined && isBuilding(cell);

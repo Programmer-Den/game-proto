@@ -36,14 +36,14 @@ export interface Level {
  * quarters of it, two at nine tenths, three above it.
  */
 export const LEVELS: Level[] = [
-  { island: 75, stars: [230, 270, 320] },
-  { island: 324, stars: [230, 280, 320] },
-  { island: 1990, stars: [200, 230, 270] },
-  { island: 4242, stars: [210, 250, 300] },
-  { island: 6772, stars: [190, 230, 270] },
-  { island: 2718, stars: [190, 220, 260] },
-  { island: 9473, stars: [180, 210, 250] },
-  { island: 5810, stars: [170, 200, 230] },
+  { island: 75, stars: [290, 340, 400] },
+  { island: 324, stars: [280, 340, 380] },
+  { island: 1990, stars: [250, 290, 340] },
+  { island: 4242, stars: [270, 320, 380] },
+  { island: 6772, stars: [230, 280, 330] },
+  { island: 2718, stars: [240, 280, 330] },
+  { island: 9473, stars: [210, 240, 290] },
+  { island: 5810, stars: [210, 250, 280] },
 ];
 
 /**

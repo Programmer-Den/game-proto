@@ -30,6 +30,7 @@ for up to three stars.
 | Control | Action |
 | --- | --- |
 | Tap or click a tile button | Pick one of the three tiles drawn this turn |
+| Tap the reserve slot (under the tile buttons) | Hold the picked tile for a later turn; tap again to take it back, or on a later turn to swap it for the picked tile |
 | Hover a cell | See what the picked building would score there, which neighbours pay into it, and whether it joins the castle |
 | Tap or click a grass cell | Place the building there; the other two tiles go back and a new three are drawn |
 | On a touchscreen, tap a grass cell once, then again | The first tap shows the preview (there is no hover); a second tap on the same cell places the building (clearing a wood works the same way) |
@@ -37,6 +38,7 @@ for up to three stars.
 | Pick the lumber camp, then tap a wood beside a camp | Clear the wood to grass, spending the camp tile |
 | Tap a market | Open the market trade: give two tiles of one kind for one gift building, once a round |
 | Tap a gift | When the round's goal is reached: take one of the two gifts |
+| Tap a building on the coronation card | When the kingdom is finished: crown that kind, so every one of it scores once more |
 | Undo last tile | Take back the last placement, clearing or merge; once per round |
 | Island button (next to the round) | Open the islands card: campaign levels, the island of the day, a random island, a rival lord, or type a number (keypad or keyboard digits, Enter to play, Esc to close) |
 | Puzzles (on the islands card) | Open the puzzle islands and play one that is open |
@@ -71,7 +73,7 @@ for up to three stars.
    Towers or Windmill"). When the goal is reached, the board pauses on a card until you take one.
    Round 1 always offers +2 Towers or the Windmill; later rounds offer one new building you don't
    have yet (the Windmill, then the Market, the Harbor, the Lumber camp and the Temple) beside +2
-   Towers, +3 Houses or +3 Farms. Once all five are won, two of the tile packs and +2 of each new
+   Towers, +3 Houses, +3 Farms, +2 Ponds or +2 Groves. Once all five are won, two of the tile packs and +2 of each new
    building.
 8. **New buildings**, each won as a gift: the **market** scores 1 for each different kind of
    building around it; the **harbor** goes on a lake's shore or the coast (a cell on the island's
@@ -118,11 +120,11 @@ for up to three stars.
     merge, or a lumber camp clear a wood, to make room, the undo button reads "No room: merge houses
     or finish" (or "No room: clear a wood or finish"): make room, or tap it to finish the kingdom.
     While the last tile can still be undone, the button stays Undo, so a slip on the last grass
-    cell can be taken back first. The castle then pays its bonus, and the best final score and the
-    crowns are saved in the browser.
+    cell can be taken back first. The castle then pays its bonus, the coronation follows (see 27),
+    and the best final score and the crowns are saved in the browser.
 19. **Trophies**: ten to earn across your kingdoms, listed behind the Trophies button on the start
     and pause screens. A first decree, manor, market trade and all five gift buildings are bronze;
-    round 8, 40 buildings joined to the castle and 10 crowns in all are silver; a kingdom of 350
+    round 8, 40 buildings joined to the castle and 10 crowns in all are silver; a kingdom of 420
     points, three stars on a campaign level or a puzzle island and a star on every level are gold.
 20. **Island chains**: when a kingdom is finished, **Sail on** settles the next island of its
     chain (the same chain for every player who starts from the same island). From the second
@@ -159,6 +161,21 @@ for up to three stars.
     decrees, omens or seasons: place the whole pouch, the castle pays its bonus and the final score
     earns up to three stars, shown on the puzzles card. A star opens the next puzzle, and the best
     stars are saved. The goal bar runs to the next star.
+25. **Hold a tile**: the reserve slot under the tile buttons keeps one tile for a later turn. Pick
+    a tile and tap the slot: it leaves the hand and waits there, still counted in the pouch but
+    never drawn, so the next hands come from the rest. Tap the slot again the same turn to take it
+    back, or on a later turn to swap it for the picked tile. Holding takes no turn, and undo puts
+    the slot back as it was with the tile.
+26. **Ponds and groves**: from round 2 the plain gift packs include **+2 Ponds** and **+2 Groves**,
+    land tiles drawn like any other. A pond placed on grass digs a lake there and a grove plants a
+    wood, so you can make the lakes and woods your farms, harbours, houses, lumber camps, orchards
+    and royal gardens want. They score nothing themselves; the preview shows what their neighbours
+    gain. A rival lord never gets them.
+27. **The coronation**: when the kingdom is finished (not on a puzzle island), a card lists each
+    kind of building standing with what crowning it pays, and you crown one: every building of that
+    kind scores once more (a wonder once), with a popup on each. A rival lord crowns its best kind
+    too, paid three quarters of it on Normal (half on Easy, all on Hard). The campaign's star scores
+    and the Golden age trophy count the coronation in.
 
 ![Hovering a cell beside the castle: the house would score 1 from the forest and join the castle's chain](docs/screenshots/playthrough-1-preview.webp)
 
@@ -181,6 +198,8 @@ for up to three stars.
 | Royal gardens (a wonder, 2x2) | 4, plus 2 per lake or forest and 3 per temple around its block |
 | Lighthouse (chain islands only) | Only on the coast: 1 per side facing the sea and 2 per harbor around it |
 | Orchard (chain islands only) | 1 per farm, forest or windmill around it |
+| Pond (a gift) | Nothing itself: it digs a lake on grass |
+| Grove (a gift) | Nothing itself: it plants a wood on grass |
 | Road | Nothing; it runs the castle's chain on |
 | Manor (two houses merged) | 4, plus 3 per farm and 1 per house, manor or forest beside it |
 | Castle (on every island) | Nothing itself; every building joined to it by a chain of buildings and roads pays 1 when the kingdom is finished |
@@ -255,9 +274,15 @@ for up to three stars.
 
 ![A trophy earned: its toast at the top of the page](docs/screenshots/trophy-toast.webp)
 
+### Hold a tile, ponds and groves, and the coronation
+
+![The reserve slot holds a tower for later, and a pond's preview shows the farms beside it gaining](docs/screenshots/hold-pond.webp)
+
+![The coronation: each kind of building standing with what crowning it pays](docs/screenshots/coronation.webp)
+
 ![The Trophies list on the pause screen](docs/screenshots/trophies.webp)
 
-The difficulty, set on the hub page's Settings, changes the round goals, 20% lower on Easy and 20% higher on Hard, and moves the campaign's star scores with what that does to a final score: 1% higher on Easy and 6% lower on Hard. The puzzle islands' star scores are 10% lower on Easy and 5% higher on Hard (but never above the three-star score, so three stars stay reachable), and the rival lord ignores the points it could take from you on Easy and weighs them as much as its own on Hard (half on Normal).
+The difficulty, set on the hub page's Settings, changes the round goals, 20% lower on Easy and 20% higher on Hard, and moves the campaign's star scores with what that does to a final score: 1% higher on Easy and 6% lower on Hard. The puzzle islands' star scores are 10% lower on Easy and 5% higher on Hard (but never above the three-star score, so three stars stay reachable), and the rival lord ignores the points it could take from you on Easy and weighs them as much as its own on Hard (half on Normal), and is paid half its coronation on Easy and all of it on Hard (three quarters on Normal).
 
 ## Running locally
 
