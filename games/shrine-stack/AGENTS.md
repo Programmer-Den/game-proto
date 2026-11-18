@@ -476,7 +476,7 @@ Effects, `sfx` (all from `GameScene`):
 
 In the race (`RaceScene`): the `calm` part plays throughout; `whoosh`, `thud`, `bell`, `crack`, `crash`,
 `rumble`, `shimmer`, `chime` and `meh` play on the same events for both temples, and the `crown`
-sting (a win) or `fall` sting (a draw) when the race is decided.
+sting (a win, or a draw of two crowns) or `fall` sting (a draw of two temples lost) when the race is decided.
 
 Shared sounds: `ui('coin')` on `bought` and on a village build, `ui('click')` on "Build again", a
 site button, the Village button, the village's Back and the race's buttons, `ui('refuse')` on a

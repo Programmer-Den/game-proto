@@ -101,7 +101,7 @@ Implemented today:
   `tall-panel`, three `wide` buttons, no way to close it) shows after the edict window, and `tick`
   and `forge` wait like they do for an edict, until `chooseHall` raises one (pushing `hall`). The
   Armoury lays one Iron Shortsword (tier 2) on the first empty anvil when raised and
-  `halls.armoury` of them on the first anvils in `foundCharter`; the Jeweller multiplies
+  `halls.armoury` of them on the first anvils in `foundCharter` (both count as made: `raiseBest`); the Jeweller multiplies
   `gemChance` by `1 + JEWELLER_GEMS * level` (0.5); the Tavern multiplies patience in `arrive` by
   `tavernFactor` (`1 + TAVERN_PATIENCE * level`, 0.1).
 - The rival smithy (AN16): while `rivalOpen` (charter > 0, not a daily shift) `tick` runs
@@ -172,7 +172,7 @@ Implemented today:
   Shortswords never triple, so the first round is unchanged.
 - Adventuring parties (AN21): while `partiesAbout` (`bestTier >= PARTY_TIER` 3) `tick`'s `partyDay`
   (after the tourney, before the visitors) counts `party.inMs` (`Party`, not saved:
-  `PARTY_FIRST_MS` 90s, then `PARTY_EVERY_MS` 180s from each party's arrival). Once due it pushes
+  `PARTY_FIRST_MS` 90s, then `PARTY_EVERY_MS` 180s from each party's arrival, counted while it is seated too). Once due it pushes
   `partyDue` and holds the counter (no visitor comes) until `PARTY_SIZE` (3) desks are free and no
   tourney is on, then `seatParty` seats three (`Adventurer.party` is the party's id, the first
   member's) wanting three different tiers drawn with `random()` from 2 to the usual order top, no
@@ -236,7 +236,8 @@ Implemented today:
 - Returning heroes (AN10): `sell` of tier `RETURN_TIER` (4) or better rolls `RETURN_CHANCE` (30%,
   one `Math.random`) to push a `Returning` (`RETURN_MS` 30s, the sword a tier lower with the
   `BATTERED` flag, `trophyFor` a tenth of its price, the buyer's look). `tick` brings the first
-  due hero back once a desk and an anvil are free, before the Auto Forge gets to fill that anvil
+  due hero back once a desk and an anvil are free (not while a due party holds the counter),
+  before the Auto Forge gets to fill that anvil
   (`comeBack`: `arrive` with their look and
   `returned` true, the sword on the first empty anvil, the trophy paid, a `returned` event). A
   battered sword (`isBattered`, textures `sword-<tier>[-gem]-worn`, dull glass with notches)

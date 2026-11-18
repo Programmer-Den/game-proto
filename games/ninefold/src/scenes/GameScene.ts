@@ -94,11 +94,12 @@ export class GameScene extends Phaser.Scene {
     this.state = newGame(loadProgress());
     this.state.made = loadMaker();
     // A board left in play (or a relic offer between Delve floors) comes back where it stood.
-    loadBoard(this.state);
-    // A share link (`?puzzle=<code>`) opens its puzzle straight away, once.
+    const resumed = loadBoard(this.state);
+    // A share link (`?puzzle=<code>`) opens its puzzle straight away, once; over a board left in play
+    // (a Delve run, a gauntlet board) only once the player agrees to give that board up.
     const shared = new URLSearchParams(location.search).get('puzzle');
     if (shared) {
-      startCode(this.state, shared);
+      if (!resumed || window.confirm(t('shareReplaces'))) startCode(this.state, shared);
       const url = new URL(location.href);
       url.searchParams.delete('puzzle');
       history.replaceState(history.state, '', url);

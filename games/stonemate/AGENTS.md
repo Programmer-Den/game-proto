@@ -17,7 +17,8 @@ the game, and keep it up to date in the same PR as the change (see the root `AGE
   unchanged. A game keeps its start as FEN (`Position.start`, saved as `start`).
 - **Clocks** (`CLOCKS` in `game/rules.ts`: 5+3, 10+5, 15+10, as minutes and seconds added per
   move): `GameScene.update` runs the clock of the side to move, except while a move animates
-  (`moving`) or the scene is paused; the AI's thinking counts. A move adds the increment.
+  (`moving`) or the scene is paused; the AI's thinking counts. A move adds the increment. An undo puts the clocks back as they stood before
+  the first move it takes back (`clockAt`; not for moves replayed from a save).
   `outOfTime` ends the game as `{ kind: 'time', winner }` (a draw, `timeout`, when the winner has
   only its king), counted like a mate except for `quickMate`. The clocks are saved with the game.
 - **Rival sculptors** (`game/rivals.ts`): eight opponents in `RIVALS`, each an AI level with a
