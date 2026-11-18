@@ -13,6 +13,10 @@ const en: HowToPlay = {
       action: 'Merge the two into one sword of the next tier',
     },
     {
+      input: 'Drag a Steel Sword or better onto two twins side by side',
+      action: 'Fold all three into one sword two tiers up',
+    },
+    {
       input: 'Drag a sword onto an anvil or sword',
       action: 'Move it there, or swap the two',
     },
@@ -66,6 +70,9 @@ const en: HowToPlay = {
     "Once you have made a Knight's Blade, a tourney comes every four minutes: three knights each want a sword within a minute and joust with it. Tier, gem and Masterwork decide where your best knight places; a win hangs a banner, and banners unlock blade finishes.",
     'An apprentice, hired once you have made a Steel Sword, merges the lowest matching pair on the anvils every 20 seconds, quicker in every charter. They leave Masterworks and the sword in your hand alone.',
     'Now and then an ore cart stops for 45 seconds: silver makes the forge find three times the gems, starmetal makes it forge Steel Swords, each for three minutes.',
+    'From the Steel Sword on, three twins make a sword two tiers up: drop one onto a twin that has another twin on an anvil beside it (left, right, above or below). The label under the anvil names what it makes.',
+    'Once you have made a Steel Sword, an adventuring party comes every three minutes. It waits for three free desks, then three adventurers ask for three different swords with one shared patience bar. Serve all three for 50% of what they paid on top.',
+    'Every five minutes the shift ends at dusk (the line under the reputation meter counts down): see what you earned and pick one job for the night: sharpen every sword against rust, smelt the day\'s scrap into a gem, or train the apprentice to merge a tenth quicker.',
   ],
 };
 
@@ -79,6 +86,10 @@ const de: HowToPlay = {
     {
       input: 'Ein Schwert auf seinen Zwilling ziehen',
       action: 'Beide zu einem Schwert der nächsten Stufe verschmelzen',
+    },
+    {
+      input: 'Ein Stahlschwert oder besser auf zwei Zwillinge nebeneinander ziehen',
+      action: 'Alle drei zu einem Schwert zwei Stufen höher verschmelzen',
     },
     {
       input: 'Ein Schwert auf einen Amboss oder ein Schwert ziehen',
@@ -134,6 +145,9 @@ const de: HowToPlay = {
     'Sobald du eine Ritterklinge gemacht hast, kommt alle vier Minuten ein Turnier: Drei Ritter wollen je binnen einer Minute ein Schwert und tjostieren damit. Stufe, Juwel und Meisterwerk entscheiden, welchen Platz dein bester Ritter belegt; ein Sieg hängt ein Banner auf, und Banner schalten Klingenschliffe frei.',
     'Ein Lehrling, anzuheuern sobald du ein Stahlschwert gemacht hast, verschmilzt alle 20 Sekunden das niedrigste gleiche Paar auf den Ambossen, in jedem Freibrief schneller. Meisterwerke und das Schwert in deiner Hand lässt er in Ruhe.',
     'Ab und zu hält ein Erzkarren für 45 Sekunden: Mit Silber findet die Esse dreimal so viele Juwelen, mit Sternmetall schmiedet sie Stahlschwerter, jeweils drei Minuten lang.',
+    'Ab dem Stahlschwert machen drei Zwillinge ein Schwert zwei Stufen höher: Leg eines auf einen Zwilling, neben dem (links, rechts, oben oder unten) ein weiterer Zwilling liegt. Die Zeile unter dem Amboss nennt, was daraus wird.',
+    'Sobald du ein Stahlschwert gemacht hast, kommt alle drei Minuten eine Abenteurergruppe. Sie wartet auf drei freie Plätze, dann wollen drei Abenteurer drei verschiedene Schwerter mit einer gemeinsamen Geduld. Bediene alle drei für 50 % ihres Preises obendrauf.',
+    'Alle fünf Minuten endet die Schicht mit dem Feierabend (die Zeile unter der Rufanzeige zählt herunter): Sieh, was du verdient hast, und wähle eine Arbeit für die Nacht: alle Schwerter gegen Rost schärfen, den Schrott des Tages zu einem Juwel einschmelzen oder den Lehrling ein Zehntel schneller machen.',
   ],
 };
 

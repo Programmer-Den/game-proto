@@ -161,6 +161,39 @@ Implemented today:
   `orePrice(ore, bestTier)` and adds `ORE_MS` (3 min) to `ores[ore]` (saved), which `cartDay` runs
   down every tick: silver multiplies `gemChance` by `SILVER_GEMS` (3), starmetal makes `forge` lay
   `STARMETAL_TIER` (3) blanks (swords or bucklers; the Fine Ore roll is still made).
+- Triple merge (AN22): `triplePartner(s, from, to)` in `sim.ts` finds the anvil of a third twin
+  beside `to` (above, below, left, right; never `from`) when the held item and the one on `to` are
+  swords of one tier, at least `TRIPLE_TIER` (3) and at most `MAX_TIER - 2`. `drop` checks it before
+  `combine`: the three become `sword(tier + 2)` (gemmed if any was, never battered, a Masterwork in
+  the ring's gold second), `from` and the third anvil empty, and the `merged` event carries `triple`
+  (the third anvil, -1 for a plain merge), which floats "Triple merge: ...". It chains the hammer
+  streak like any merge. While a sword is held over such a twin, `drawMarks` shows `tripleLabel`
+  ("Triple: Silver Saber") under the anvil. The apprentice never makes one. Rusty Daggers and
+  Shortswords never triple, so the first round is unchanged.
+- Adventuring parties (AN21): while `partiesAbout` (`bestTier >= PARTY_TIER` 3) `tick`'s `partyDay`
+  (after the tourney, before the visitors) counts `party.inMs` (`Party`, not saved:
+  `PARTY_FIRST_MS` 90s, then `PARTY_EVERY_MS` 180s from each party's arrival). Once due it pushes
+  `partyDue` and holds the counter (no visitor comes) until `PARTY_SIZE` (3) desks are free and no
+  tourney is on, then `seatParty` seats three (`Adventurer.party` is the party's id, the first
+  member's) wanting three different tiers drawn with `random()` from 2 to the usual order top, no
+  gem, trait or set, all with one patience: `PARTY_PATIENCE` (1.5) times the usual for the best
+  tier, with the difficulty, reputation, edict and Tavern factors, so their bars drain together.
+  `sell` adds each member's pay to `party.paid`; the last one served pays `PARTY_PAY` (0.5) of it
+  on top (`partyServed`, counted in the shift's and a daily's earnings). Members who walk off are
+  ordinary walk-offs; `tick` clears `party.id` once none is left. The card's line reads "Party of
+  three: all served +50%" in lilac.
+- Closing time (AN23): `shift` (`Shift`, saved: `ms` from `SHIFT_MS` 5 min, and the day's
+  `earned`, `sold` and `scrapped`) runs down in `tick` while `shiftOpen` (not in a daily shift). At 0
+  it pushes `dusk` (the scene saves and puts a held sword back) and `nightOffers` holds: `tick` and
+  `forge` stand still, and the dusk window (`createNight`/`drawNight`, `tall-panel`, `closingTitle`,
+  the tally and three `wide` buttons, no way to close it) shows behind any charter or offer window.
+  `chooseJob(s, job)` (`Job`, `JOBS`) does `sharpen` (every `idle` to 0), `smelt` (a `GEM` on the
+  first empty anvil, else the barrel; `jobReady` needs `scrapped > 0` and room) or `train`
+  (`training`, saved and kept across charters, up to `TRAIN_TOP` 5; `apprenticeEvery` multiplies by
+  `TRAIN_SPEED` 0.9 per step; needs a hired apprentice), pushes `night` (a dawn float) and starts a
+  `freshShift`. `sell`, `deliver` and the party bonus add to `shift.earned`, sales to `shift.sold`,
+  `scrap` to `shift.scrapped`. `statusLine` shows "Dusk in m:ss · today Nc", taking turns every 4s
+  with the rival's line once the rival is open.
 - The side column (`SIDE`, `TOURNEY_PANE`, `APPRENTICE_PANE`, `CART_PANE` in `layout.ts`, x 593 to
   679 over the scrap bin): `createSide` and `drawSide` in `GameScene` build and fill three containers
   on `pane-*` textures, each shown once its feature is about: the tourney's title with a `pennant`
@@ -298,7 +331,9 @@ File map (`src/`):
   `shieldPrice`, `payFor` and `setPay`, and the formulas `forgeMs`, `oreChance`, `autoForging`,
   `gemsAbout`, `gemChance`, `shieldsAbout`, `visitorEveryMs`, `patienceFactor`, `rusts`, `rustMs`,
   `dull`, `rustLeft`, `trophyFor` and `repairPay`, and for AN18 to AN20 the `APPRENTICE_*` numbers,
-  `knightPay`, `masterMs`, `apprenticeEvery`, `apprenticeAbout`, `tourneyOpen` and `cartsAbout`.
+  `knightPay`, `masterMs`, `apprenticeEvery`, `apprenticeAbout`, `tourneyOpen` and `cartsAbout`, and
+  for AN21 to AN23 `TRIPLE_TIER`, the `PARTY_*` numbers with `Party` and `freshParty`, `partiesAbout`,
+  `SHIFT_MS`, `TRAIN_TOP`, `TRAIN_SPEED`, `Job`, `JOBS`, `Shift`, `freshShift` and `shiftOpen`.
 - `game/items.ts`: what lies on an anvil as one number (`GEM`, `SET`, `BATTERED`, `MASTER`,
   `SHIELD`, `tierOf`, `isGem`, `isSword`, `isShield`, `isGemmed`, `isBattered`, `isMaster`, `sword`,
   `shield`, `validItem`) and `combine`, the merge, gem-setting and repair rule.
@@ -306,7 +341,8 @@ File map (`src/`):
   `itemAt`, `touch`, `drop`, `standing`, `offers`, `chooseCommission`, `deliverable`, `deliver`, `takes`,
   `sell`, `buy`, `toggleAutoForge`, `buyPerk`, `edictOffers`, `chooseEdict`, `foundCharter`,
   `hallOffers`, `chooseHall`, `dailyShop`, `useRandom` (the rules' random source), `hold`,
-  `hireApprentice`, `apprenticePair` and `buyOre`, plus the private `random`, `rivalDay`,
+  `hireApprentice`, `apprenticePair`, `buyOre`, `triplePartner`, `nightOffers`, `jobReady` and
+  `chooseJob`, plus the private `random`, `partyDay`, `seatParty`, `rivalDay`,
   `tourneyDay`, `arriveKnight`, `apprentice`, `cartDay`, `freeDesk`, `rust`, `arrive`, `rollTrait`, `comeBack`, `raiseBest`, `put` and `hammer` (streaks).
 - `game/tourney.ts`: the tourney's numbers (`TOURNEY_*`, `KNIGHTS`, `KNIGHT_MS`, `KNIGHT_LOOK`,
   `PURSE`), `lance`, `tourneyTier`, `field`, `placeOf`, `purse`, `Tourney` with `freshTourney`, and
@@ -385,7 +421,7 @@ How it runs:
   view pixel, which matches the screen's `renderScale`) and add them with `textures.addCanvas`. There are no asset files. The
   background's mosaic is computed pixel by pixel once at boot.
 - Tick: `GameScene.update(time)` takes `dt` from the frame timestamp (clamped to `MAX_STEP_MS`,
-  250ms), adds it to `clock`, and, unless a window is open (`windowOpen`: the win, offer, perk, edict, hall or daily end
+  250ms), adds it to `clock`, and, unless a window is open (`windowOpen`: the win, offer, perk, edict, hall, dusk or daily end
   window, so nothing waits out its patience behind one), calls `tick(state, dt)`, which cools the forge,
   brings heroes back, forges when `autoForging`, drains the hammer streak and patience (a walk-off
   costs reputation and gives a held half set back), rusts idle swords and brings adventurers. If that (or the Forge button since the last
@@ -401,8 +437,8 @@ How it runs:
   `pointerup` never arrives) put the sword back. A press on an interactive object (a button or
   link) never reaches `pickUp`, so a window button that closes its window can't pick up the sword
   under it. Forging, pick-ups and buys are ignored while a window shows (`windowOpen`: the win,
-  offer, perk, edict, hall or daily end window), and `forge` in the sim also refuses while a new charter's edict
-  waits. A `pointerdown` on the banner with
+  offer, perk, edict, hall, dusk or daily end window), and `forge` in the sim also refuses while a new charter's edict
+  or a night job waits. A `pointerdown` on the banner with
   nothing under it opens the offer window while `choosing`, or the win window once `won`. Forge
   and upgrade buttons call `forge` and `buy`; a
   bought Auto Forge's button calls `toggleAutoForge` instead. The offer window's buttons call
@@ -464,7 +500,7 @@ State model (`src/game/state.ts`):
 Persistence: one key of its own, `anvilheart-progress`, holding `Progress` as JSON (`coins`,
 `slots`, `idle`, `sold`, `bestTier`, `ranks`, `autoForge`, `commission`, `choosing`, `stars`,
 `charter`, `barrel`, `reputation`, `won`, `shieldMode`, `bestShield`, `perks`, `edict`, `halls`,
-`apprentice`, `banners`, `ores`). Adventurers
+`apprentice`, `banners`, `ores`, `shift`, `training`). Adventurers
 (half sets they hold go back onto empty anvils, or into the coins, in the snapshot), returning
 heroes, heat, the streak and timers are not saved. An old save
 loads with no perks, swords mode and no edict, so a charter past the first asks for its edict. `loadProgress` merges over `freshProgress()`, so a new upgrade id in `ranks`
@@ -491,6 +527,8 @@ Randomness and timing:
   sequence is unchanged.
 - Knights, the tourney, the apprentice and the ore cart draw no random numbers; starmetal still
   makes the Fine Ore roll, so the sequence holds.
+- A party (once `bestTier >= 3`, so never in the first round) draws its three tiers and then each
+  member's look from `random()`. The triple merge and closing time draw none.
 - Art uses the seeded `rnd()` from `src/art/glass.ts`, not `Math.random`.
 - The streak, Masterworks, commissions, their offers, charters, their edicts (taken in turn),
   perks, rust and reputation add no randomness.
@@ -570,8 +608,8 @@ Music, `SONG`: a folk groove in C major at 108 BPM (square lead, 12% pulse pluck
 hammer-clink drums). `playPart` (called from `create` and every `update`) picks the part:
 - `calm` (eight bars, C F G C Am F G C), the smithy at work;
 - `streak` (two bars, the same chords busier) while a hammer streak of two or more runs;
-- `tense` (four bars in A minor, high and held) while the crown's offer or a new charter's edict
-  window is open;
+- `tense` (four bars in A minor, high and held) while the crown's offer, a new charter's edict or
+  hall window or the dusk window is open;
 - stings: `win` (a fanfare with a Lydian lift, D major over C) when the Crown Blade completes the
   last commission, `charter` (a rising arpeggio) when a new smithy is founded.
 
@@ -603,6 +641,10 @@ Effects (`sfx`, plus the shared `ui`):
 | `exact` | `armed` (a sword handed to a knight) |
 | `fanfare` + `ui('coin')` / `ui('coin')` / `grumble` | `tourney` won / placed 2nd or 3rd / no prize |
 | `cart` | `cart` (an ore cart stops by) |
+| `horn` | `partyDue` (an adventuring party is coming) |
+| `fanfare` + `ui('coin')` | `partyServed` |
+| `chime` | `dusk` |
+| `seal` | `night` (a night job picked) |
 | `ui('click')` | mode switch, Auto Forge on/off, opening the offer, win or perk window, their close links, Keep smithing, New smithy |
 | `ui('refuse')` | a refused forge, buy, perk, charter or offer, a disabled button, a sword dropped where the anvil, crown or buyer won't take it |
 
@@ -634,7 +676,8 @@ Effects (`sfx`, plus the shared `ui`):
   `STREAK_MS` + 1s with coins and the commission unchanged; `anvilheart-trophies` then holds exactly
   `firstSale` and `masterwork`, so a trophy a first round can reach in another way changes that
   expectation (Tourney champion needs a Knight's Blade first). It fails on any page error. The first
-  round meets none of the later rules: no stars or edict (so prices are unchanged), no trait or set
+  round meets none of the later rules: no triple merge (daggers and Shortswords never triple), no
+  party (Steel Sword first), no dusk (5 min), no stars or edict (so prices are unchanged), no trait or set
   on the first order, a tier 2 sale (no returning hero), and under 20s of play (no rust).
 - Its screenshots are `0-forged`, `1-dragging`, `2-merged`, `3-masterwork`, `4-exact-fit` (the
   sale drag midway, showing the tag) and `5-sold`; only `1-dragging` is kept, as

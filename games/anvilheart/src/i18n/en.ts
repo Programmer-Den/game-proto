@@ -267,6 +267,26 @@ const en = {
   silverBlurb: 'three times the gems for 3 minutes',
   starmetalName: 'Starmetal',
   starmetalBlurb: 'the forge makes Steel blanks for 3 minutes',
+
+  // Adventuring parties (AN21), the triple merge (AN22) and closing time (AN23)
+  partyLine: 'Party of three: all served +{pct}%',
+  partyDue: 'An adventuring party is coming: they wait for three free desks',
+  partyIn: 'An adventuring party! Serve all three for +{pct}%',
+  partyServed: 'Party served! Bonus +{n}c',
+  tripleHint: 'Triple: {sword}',
+  tripleMerged: 'Triple merge: {sword}!',
+  duskLine: 'Dusk in {time} · today {n}c',
+  closingTitle: 'Closing time',
+  closingText: 'Swords sold today: {sold} · coins earned: {n}\nPick one job for the night.',
+  jobSharpen: 'Sharpen the swords\nEvery sword on the anvils starts afresh against rust',
+  jobSmelt: 'Smelt the scrap bin\nA gem from the {n} scrapped today',
+  jobSmeltNone: 'Smelt the scrap bin\nNothing was scrapped today (or no room)',
+  jobTrain: 'Train the apprentice: step {from} to {to}\nThey merge a tenth quicker, for good',
+  jobTrainNone: 'Train the apprentice\nNo apprentice hired yet',
+  jobTrainTop: 'Train the apprentice\nFully trained',
+  nightSharpen: 'Dawn: every sword sharpened',
+  nightSmelt: 'Dawn: a gem smelted from the scrap',
+  nightTrain: 'Dawn: the apprentice works quicker',
 };
 
 export default en;

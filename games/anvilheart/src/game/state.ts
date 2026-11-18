@@ -108,6 +108,53 @@ export const SET_ORDER_CHANCE = 0.2;
 export const SET_PAY = 1.5;
 export const SET_PATIENCE = 1.4;
 
+/**
+ * Triple merge (AN22): a sword of this tier or better dropped onto a twin that has another twin on
+ * an anvil beside it (left, right, above or below) folds all three into a sword two tiers up.
+ */
+export const TRIPLE_TIER = 3;
+
+/**
+ * Adventuring parties (AN21): once the smithy has made a Steel Sword, a party of three comes every
+ * `PARTY_EVERY_MS` (the first after `PARTY_FIRST_MS`), each wanting a different sword. They share
+ * one patience, `PARTY_PATIENCE` times the usual for the best sword asked, and serving all three
+ * pays `PARTY_PAY` of what they paid on top. While a party is due, nobody else comes to the counter
+ * until three desks are free.
+ */
+export const PARTY_TIER = 3;
+export const PARTY_SIZE = 3;
+export const PARTY_FIRST_MS = 90_000;
+export const PARTY_EVERY_MS = 180_000;
+export const PARTY_PATIENCE = 1.5;
+export const PARTY_PAY = 0.5;
+/** The party coming or at the counter: time until the next, and the one being served (its id, 0 for none, and what it has paid). Not saved. */
+export interface Party {
+  inMs: number;
+  id: number;
+  paid: number;
+}
+export const freshParty = (): Party => ({ inMs: PARTY_FIRST_MS, id: 0, paid: 0 });
+
+/**
+ * Closing time (AN23): every `SHIFT_MS` of play (not in the daily forge) the shift ends at dusk.
+ * The smithy stands still while the day's tally shows and one overnight job of three is picked:
+ * sharpen every sword (rust starts afresh), smelt the day's scrap into a gem, or train the
+ * apprentice a step (`TRAIN_SPEED` quicker each, up to `TRAIN_TOP` steps).
+ */
+export const SHIFT_MS = 300_000;
+export const TRAIN_TOP = 5;
+export const TRAIN_SPEED = 0.9;
+export type Job = 'sharpen' | 'smelt' | 'train';
+export const JOBS: Job[] = ['sharpen', 'smelt', 'train'];
+/** The shift under way: time left until dusk, and the coins earned, swords sold and items scrapped in it. */
+export interface Shift {
+  ms: number;
+  earned: number;
+  sold: number;
+  scrapped: number;
+}
+export const freshShift = (): Shift => ({ ms: SHIFT_MS, earned: 0, sold: 0, scrapped: 0 });
+
 /** What an adventurer asks for. */
 export interface Order {
   /** The least tier they will take. */
@@ -131,6 +178,8 @@ export interface Adventurer extends Order {
   returned: boolean;
   /** Whether this is a tourney knight (AN18), who takes any sword at least as good as `wants` and jousts with it. */
   knight: boolean;
+  /** The adventuring party they came with (AN21), or 0 for none. */
+  party: number;
   /** The half of a set already handed over: the sword and the buckler, or null for neither yet. */
   given: { sword: number | null; shield: number | null };
 }
@@ -205,6 +254,11 @@ export interface GameState {
   ores: Record<Ore, number>;
   /** The place (an anvil or `BARREL`) the player holds a sword from, or null; the apprentice leaves it be. Not saved. */
   held: number | null;
+  /** The next adventuring party, or the one at the counter (AN21). */
+  party: Party;
+  /** The shift until dusk and its tally (AN23), and how many steps the apprentice has been trained (kept across charters). */
+  shift: Shift;
+  training: number;
   /** The daily forge (AN17): a seeded shift with its time left and the coins earned in it, or null in the smithy. Never saved. */
   daily: { ms: number; earned: number } | null;
   /** Things that just happened, for the scene to animate; it empties the list as it draws them. */
@@ -213,7 +267,8 @@ export interface GameState {
 
 export type GameEvent =
   | { kind: 'forged'; slot: number; tier: number }
-  | { kind: 'merged'; slot: number; tier: number; master: boolean }
+  /** `triple` is the anvil of the third sword a triple merge took (AN22), or -1 for a plain merge. */
+  | { kind: 'merged'; slot: number; tier: number; master: boolean; triple: number }
   | { kind: 'set'; slot: number }
   | { kind: 'repaired'; slot: number; tier: number; coins: number }
   | { kind: 'rusted'; slot: number; tier: number }
@@ -236,6 +291,11 @@ export type GameEvent =
   | { kind: 'armed'; desk: number; coins: number; place: number }
   | { kind: 'tourney'; place: number; coins: number; banner: boolean }
   | { kind: 'cart' }
+  | { kind: 'partyDue' }
+  | { kind: 'partyIn' }
+  | { kind: 'partyServed'; desk: number; coins: number }
+  | { kind: 'dusk' }
+  | { kind: 'night'; job: Job }
   | { kind: 'ore'; ore: Ore }
   /** `back` says where half a set they held went: an anvil, the barrel (`BARREL`), or (place -1) its plain price paid. */
   | { kind: 'left'; desk: number; back?: { place: number; coins: number }; knight?: boolean };
@@ -264,6 +324,8 @@ export interface Progress {
   apprentice: boolean;
   banners: number;
   ores: Record<Ore, number>;
+  shift: Shift;
+  training: number;
 }
 
 export const freshProgress = (): Progress => ({
@@ -289,6 +351,8 @@ export const freshProgress = (): Progress => ({
   apprentice: false,
   banners: 0,
   ores: noOres(),
+  shift: freshShift(),
+  training: 0,
 });
 
 /** How many anvils the smithy has: 16, or 20 with the fifth row. */
@@ -337,6 +401,14 @@ export function newShop(progress: Progress): GameState {
     cart: freshCart(),
     ores: Object.fromEntries(ORE_IDS.map((id) => [id, count(progress.ores?.[id])])) as Record<Ore, number>,
     held: null,
+    party: freshParty(),
+    shift: {
+      ms: Math.min(SHIFT_MS, typeof progress.shift?.ms === 'number' && Number.isFinite(progress.shift.ms) ? Math.max(0, progress.shift.ms) : SHIFT_MS),
+      earned: count(progress.shift?.earned),
+      sold: count(progress.shift?.sold),
+      scrapped: count(progress.shift?.scrapped),
+    },
+    training: Math.min(TRAIN_TOP, count(progress.training)),
     daily: null,
     events: [],
   };
@@ -380,6 +452,8 @@ export const progressOf = (s: GameState): Progress => {
     apprentice: s.apprentice,
     banners: s.banners,
     ores: { ...s.ores },
+    shift: { ...s.shift },
+    training: s.training,
   };
 };
 
@@ -455,7 +529,12 @@ export const knightPay = (item: number, m: Market) =>
 /** How long the streak ring glows gold for a Masterwork: half again as long with the etched finish. */
 export const masterMs = (s: Pick<GameState, 'banners'>) => MASTER_MS * (hasFinish(s.banners, 'etched') ? ETCHED_MASTER : 1);
 /** How long the apprentice takes between merges: a share quicker each charter. */
-export const apprenticeEvery = (s: Pick<GameState, 'charter'>) => Math.max(APPRENTICE_MIN_MS, Math.round(APPRENTICE_MS * Math.pow(APPRENTICE_SPEED, s.charter)));
+export const apprenticeEvery = (s: Pick<GameState, 'charter' | 'training'>) =>
+  Math.max(APPRENTICE_MIN_MS, Math.round(APPRENTICE_MS * Math.pow(APPRENTICE_SPEED, s.charter) * Math.pow(TRAIN_SPEED, s.training)));
+/** Whether adventuring parties come: once the smithy has made a Steel Sword. */
+export const partiesAbout = (s: Pick<GameState, 'bestTier'>) => s.bestTier >= PARTY_TIER;
+/** Whether the shift runs towards dusk: always, except in the daily forge, which has its own end. */
+export const shiftOpen = (s: Pick<GameState, 'daily'>) => s.daily === null;
 /** Whether an apprentice can be hired (or is): once the smithy has made a Steel Sword. */
 export const apprenticeAbout = (s: Pick<GameState, 'bestTier' | 'apprentice'>) => s.apprentice || s.bestTier >= APPRENTICE_TIER;
 /** Whether tourneys come: once the smithy has made a Knight's Blade, and never in the daily forge. */
