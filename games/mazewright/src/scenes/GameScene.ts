@@ -12,7 +12,7 @@ import { mazeCode, readCode } from '../game/code';
 import { PUZZLES, type Puzzle } from '../game/puzzles';
 import { loadCalm, loadDuo, loadGame, loadMode, loadPouch, loadPuzzleStars, loadRecords, loadReplays, loadShed, notePuzzle, noteRecord, picksOf, pouchOf, saveCalm, saveDuo, saveGame, saveMode, savePouch, saveReplay, saveShed, usable, type PuzzleStars, type Records, type Replays, type SavedGame, type Shed } from '../game/save';
 import {
-  groupsOf, swing, dailyScore, gateSide, goalOf, isLit, lightOf, routeLength, routesWith, heroBoost, lift, liftable, liftReady, walk, beamCells, bestFace, build, hedgeUnder, LAWN, openGates, reachOf, cabbagesLeft, canStartWave, masterOpen, seedsFor, stars, totalWaves, newGame, nextUpgrade, goldAt, sideOf, replayGame, replayOf, replayStep, resumeGame, sell, sellValue, setAim, startWave, step, towerAt, turn, upgrade, wouldBlock,
+  groupsOf, swing, dailyScore, wavesHeld, gateSide, goalOf, isLit, lightOf, routeLength, routesWith, heroBoost, lift, liftable, liftReady, walk, beamCells, bestFace, build, hedgeUnder, LAWN, openGates, reachOf, cabbagesLeft, canStartWave, masterOpen, seedsFor, stars, totalWaves, newGame, nextUpgrade, goldAt, sideOf, replayGame, replayOf, replayStep, resumeGame, sell, sellValue, setAim, startWave, step, towerAt, turn, upgrade, wouldBlock,
   type Game, type GameEvent, type Refusal, type Replay, type Tower,
 } from '../game/sim';
 import { DIRS } from '../game/grid';
@@ -459,7 +459,7 @@ export class GameScene extends Phaser.Scene {
         if (g.daily) this.endDaily(g);
         else if (g.puzzle) this.earned = 0;
         else if (!this.replay) this.forget();
-        this.note(g, g.wave - 1);
+        this.note(g, wavesHeld(g));
         this.earn(g);
         break;
     }
@@ -1442,12 +1442,12 @@ export class GameScene extends Phaser.Scene {
     if (s.daily) {
       // The daily maze's score, the best and the days in a row; one try a day, so no Play again.
       const score = dailyScore(s);
-      this.text(this.vw / 2, y + 80, won ? t('dailyScore', { n: score, kept: cabbagesLeft(s), gold: s.gold }) : t('dailyLostScore', { n: score, waves: s.wave - 1 }), 15, css(C.cream), 0.5, false);
+      this.text(this.vw / 2, y + 80, won ? t('dailyScore', { n: score, kept: cabbagesLeft(s), gold: s.gold }) : t('dailyLostScore', { n: score, waves: wavesHeld(s) }), 15, css(C.cream), 0.5, false);
       this.text(this.vw / 2, y + 104, t('dailyBest', { best: this.daily.best, n: this.daily.streak }), 15, css(C.gold), 0.5);
       this.button('gardens', this.vw / 2 - 85, y + 128, 170, 40, t('gardens'), () => this.toMenu(), { fill: C.gold });
       return;
     }
-    const over = won && s.puzzle ? t('puzzleWon', { n: cabbagesLeft(s), waves: s.wave }) : won ? t('wonText', { n: cabbagesLeft(s) }) : totalWaves(s) === Infinity ? t('endlessOver', { n: s.wave - 1 }) : t('lostText', { n: s.wave });
+    const over = won && s.puzzle ? t('puzzleWon', { n: cabbagesLeft(s), waves: s.wave }) : won ? t('wonText', { n: cabbagesLeft(s) }) : totalWaves(s) === Infinity ? t('endlessOver', { n: wavesHeld(s) }) : t('lostText', { n: wavesHeld(s) + 1 });
     this.text(this.vw / 2, y + 80, over, 15, css(C.cream), 0.5, false);
     const reward = this.earned ? t('seedsEarned', { n: this.earned }) : '';
     const replay = this.replay;

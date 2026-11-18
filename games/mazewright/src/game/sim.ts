@@ -46,6 +46,8 @@ export interface Tower {
 export interface Foe {
   id: number;
   kind: FoeKind;
+  /** The wave in play when it came out (missing in runs saved before it: the wave in play). */
+  wave?: number;
   hp: number;
   maxHp: number;
   /** The burrow it came out of (an index into `Game.gates`). */
@@ -241,6 +243,8 @@ export interface Game {
   wave: number;
   /** The last wave whose reward has been paid. */
   paid: number;
+  /** The wave of the last foe that got home with cabbages, so a loss counts the wave that broke through, not a later one started early. */
+  leakWave?: number;
   /** The gold of the (left-hand) gardener, and with two gardeners the right-hand one's (`gold2`). */
   gold: number;
   gold2: number;
@@ -714,7 +718,7 @@ export function seedsFor(g: Game) {
   // A puzzle pays for its new stars only, which the scene counts against its record.
   if (g.mode === 'sandbox' || g.versus || g.puzzle) return 0;
   if (g.phase === 'won') return SEEDS.win + SEEDS.star * stars(g) + (g.mode === 'challenge' ? SEEDS.challenge : 0) + (g.mode === 'night' ? NIGHT.seeds : 0);
-  return SEEDS.loss + Math.floor(Math.max(0, g.wave - 1) / SEEDS.waves);
+  return SEEDS.loss + Math.floor(wavesHeld(g) / SEEDS.waves);
 }
 
 export function upgrade(g: Game, cell: number) {
@@ -798,7 +802,10 @@ export const canStartWave = (g: Game) => !over(g) && g.wave < totalWaves(g) && g
 export const totalWaves = (g: Game) => (g.waves ? g.waves.length : g.daily ? DAILY.waves : g.versus || g.mode === 'endless' || g.mode === 'sandbox' ? Infinity : WAVES.length);
 
 /** The daily maze's score: a cabbage kept is worth `DAILY.perCabbage` and every gold left counts, or a loss scores the waves held. */
-export const dailyScore = (g: Game) => (g.phase === 'won' ? cabbagesLeft(g) * DAILY.perCabbage + g.gold : Math.max(0, g.wave - 1) * DAILY.perWave);
+export const dailyScore = (g: Game) => (g.phase === 'won' ? cabbagesLeft(g) * DAILY.perCabbage + g.gold : wavesHeld(g) * DAILY.perWave);
+
+/** How many waves a lost game held: those before the wave that broke through, even when a later one was already started. */
+export const wavesHeld = (g: Game) => Math.max(0, Math.min(g.wave, g.leakWave ?? g.wave) - 1);
 
 /** Gold paid for beating foes and holding waves: more in Swarm. */
 const pay = (g: Game, gold: number) => (g.mode === 'swarm' ? Math.round(gold * SWARM_GOLD) : gold);
@@ -904,7 +911,7 @@ function spawn(g: Game, sp: Spawn) {
 function makeFoe(g: Game, kind: FoeKind, hp: number, gate: number, x: number, y: number, cell: number): Foe {
   const def = FOE[kind];
   const f: Foe = {
-    id: g.nextId++, kind, hp, maxHp: hp, gate, x, y, from: cell, to: cell, t: 1, heading: 0, angle: 0,
+    id: g.nextId++, kind, wave: g.wave, hp, maxHp: hp, gate, x, y, from: cell, to: cell, t: 1, heading: 0, angle: 0,
     slowUntil: 0, slowFactor: 1, lure: 0, stunUntil: 0, shrunk: false, blueFlame: false, burnUntil: 0, burnDps: 0, poisonUntil: 0, poisonDps: 0, spreads: false, spreadAt: 0, heat: 0,
     chew: null, chews: def.digs ? 1 : 0, king: false, big: 1, body: def.size, gold: def.gold, lives: def.lives,
     splits: def.splits ?? 0, shell: def.shell, carry: 0, sendable: false, home: false, empress: null, bounty: 0, bountyFull: 0, dead: false,
@@ -1100,6 +1107,7 @@ function leak(g: Game, f: Foe) {
   f.dead = true;
   const lives = f.carry;
   f.carry = 0;
+  if (lives > 0) g.leakWave = f.wave ?? g.wave;
   g.events.push({ type: 'leak', kind: f.kind, lives });
 }
 
