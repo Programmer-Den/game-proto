@@ -156,7 +156,7 @@ Implemented today:
   notice and the `beltLow` cue when a finished hub's belt falls under a third (`beltLowNotice`)
   and again when it is empty (`beltDry`), once each per hub (`beltWarned`); never in watch mode.
   The hub's hover adds `beltLine`, and a node is drawn smaller as it empties (`amount / full`). In
-  `think` a rival whose every hub's belt is low (`dry`) builds another outpost, up to 3, whatever
+  `think` a rival whose every hub's belt is low while a rich field is left for an outpost (`dry`, `expansionSites`) builds another outpost, up to 3, whatever
   the time, at any rich field (`expand(f, true)`), and until it can pay for it (`starved`) it
   neither trains warships nor researches. The playthrough's first round mines far less than a belt.
 - Fog of war (`game/fog.ts`, stamped in `World.updateFog`): a 10 px grid of `explored` and

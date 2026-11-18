@@ -92,6 +92,8 @@ export class GameScene extends Phaser.Scene {
   teams: Team[] = [];
   mode: 'ai' | 'duo' | 'watch' | 'daily' = 'ai';
   turn = 0;
+  /** The side that takes the first turn of the match (random in Watch AI). */
+  private firstTurn = 0;
   turns = 0;
   active: Mole | null = null;
   phase: Phase = 'aim';
@@ -720,7 +722,9 @@ export class GameScene extends Phaser.Scene {
     this.world.rain = this.weather === 'rain';
     this.gustT = 5;
     this.teams[0].ai = mode === 'watch';
-    this.turn = Math.random() < 0.5 && mode === 'watch' ? 1 : 0;
+    // Who goes first (a random side in Watch AI); kept, since a draft or a build phase moves `turn` on.
+    this.firstTurn = Math.random() < 0.5 && mode === 'watch' ? 1 : 0;
+    this.turn = this.firstTurn;
     this.buildHud();
     this.windAhead = [];
     if (mode === 'watch')
@@ -820,7 +824,7 @@ export class GameScene extends Phaser.Scene {
   private afterDraft() {
     if (this.quick() && this.prefs.options.kind === 'forts') this.startBuild(0);
     else {
-      this.turn = this.mode === 'watch' ? this.turn : 0;
+      this.turn = this.firstTurn;
       this.beginTurn();
     }
   }
@@ -856,7 +860,7 @@ export class GameScene extends Phaser.Scene {
   private startBuild(side: number): void {
     if (side > 1) {
       this.buildLeft = 0;
-      this.turn = 0;
+      this.turn = this.firstTurn;
       this.buildHud();
       return this.beginTurn();
     }

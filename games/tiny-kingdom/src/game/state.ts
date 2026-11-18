@@ -365,7 +365,9 @@ export function hold(s: GameState) {
  * still refuses. A hand that has room is kept, so a merge is never a free redraw.
  */
 function keepHandPlayable(s: GameState) {
-  if (s.phase === 'playing' && !s.hand.some((b) => playable(s, b)) && pouchPlayable(s)) drawHand(s);
+  // Only when a new hand could hold a playable tile: one held in reserve is never drawn, so a held
+  // tile that alone has room waits to be swapped back rather than spending a draw.
+  if (s.phase === 'playing' && !s.hand.some((b) => playable(s, b)) && BUILDINGS.some((b) => drawable(s, b) > 0 && playable(s, b))) drawHand(s);
 }
 
 /** Whether a tile of `kind` is in the hand, ready to place. */

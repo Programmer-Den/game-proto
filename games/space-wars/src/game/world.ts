@@ -2263,7 +2263,8 @@ export class World {
     // Once the opening is over, an AI with a fair army saves up to expand and to research.
     let saving = false;
     // A rival expands once the opening is over, and again whenever every belt it mines runs low.
-    const dry = expansions < AI_MAX_OUTPOSTS && this.hubsOf(f).every((h) => this.beltLow(h));
+    // Only while a rich field is left for the outpost: with none, saving for it would stall the rival for nothing.
+    const dry = expansions < AI_MAX_OUTPOSTS && this.hubsOf(f).every((h) => this.beltLow(h)) && this.expansionSites(f, AI_EXPAND_RIVAL_GAP / 2).length > 0;
     if ((this.elapsedMs >= AI_EXPAND_MS && expansions === 0) || dry) {
       if (side.crystal >= expansionStats(side).cost) {
         if (this.expand(f, dry)) aiLog(String(f), t('aiOutpost'));
@@ -2404,13 +2405,7 @@ export class World {
    * at least `rivalGap` from every other faction's hubs, or null.
    */
   private expansionSpot(f: number, rivalGap = AI_EXPAND_RIVAL_GAP, fields = 3): Point | null {
-    const hub = this.hubOf(f)!;
-    const others = this.buildings.filter((b) => b.type === 'hub' && b.faction !== f);
-    const sites = this.nodes
-      .filter((n) => n.amount > NODE_AMOUNT / 3 && dist(n, hub) >= EXPANSION_GAP && dist(n, this.beacon) >= 150
-        && others.every((o) => dist(o, n) >= rivalGap))
-      .sort((a, b) => dist(a, hub) - dist(b, hub));
-    for (const n of sites.slice(0, fields)) {
+    for (const n of this.expansionSites(f, rivalGap).slice(0, fields)) {
       for (let tries = 0; tries < 8; tries++) {
         const angle = Math.random() * Math.PI * 2;
         const d = 50 + Math.random() * 50;
@@ -2420,6 +2415,16 @@ export class World {
       }
     }
     return null;
+  }
+
+  /** The rich crystal fields an outpost of `f` could go beside, nearest its hub first (no draws). */
+  private expansionSites(f: number, rivalGap: number) {
+    const hub = this.hubOf(f)!;
+    const others = this.buildings.filter((b) => b.type === 'hub' && b.faction !== f);
+    return this.nodes
+      .filter((n) => n.amount > NODE_AMOUNT / 3 && dist(n, hub) >= EXPANSION_GAP && dist(n, this.beacon) >= 150
+        && others.every((o) => dist(o, n) >= rivalGap))
+      .sort((a, b) => dist(a, hub) - dist(b, hub));
   }
 
   /**

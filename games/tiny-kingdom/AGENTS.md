@@ -153,7 +153,7 @@ Implemented today:
   a wood beside a camp could be cleared, `playable`). `hand` is sorted in `BUILDINGS` order.
   `select`, `previewPlacement` and `place` only take kinds in the hand (`inHand`); `place`, `clear`
   and `trade` draw the next hand; `merge` and `chooseGift` keep it unless none of it has room while
-  a pouch tile has (`keepHandPlayable` then redraws, so a full board can't get stuck). `shownKinds` gives one tile button per
+  a pouch tile other than the held one has (`keepHandPlayable` then redraws, so a full board can't get stuck). `shownKinds` gives one tile button per
   kind in the hand and `handCount` how many of it the hand holds; the pouch line under the
   buttons lists what is left to draw.
 - The castle (`src/game/castle.ts`): `islandMap` puts a `'C'` (`'castle'`, a `Terrain`) on a random
