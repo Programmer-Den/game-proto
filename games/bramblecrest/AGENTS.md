@@ -226,7 +226,8 @@ Implemented today:
   (`src/game/plus.ts`) moves every moonstone that lies on a map (not one given by a person, the
   wisp or a boss) to a seeded spot of the same map that a knight with every tool can reach, buried
   with `glimmer`: `glimmers` shows a sparkle within `GLIMMER_PX` of the knight, and a swing digs it
-  up. Exits with a `quest` (the belfry's, the peaks' and the coast's) stay shut until the story gets there, so
+  up. A stone of a chapter not started yet (`stoneCounts`) can't be dug up or picked up until then,
+  so the HUD's count and the end card never run past the chapter's total. Exits with a `quest` (the belfry's, the peaks' and the coast's) stay shut until the story gets there, so
   the early tools can't skip ahead (`wayShut` toast).
 - The HUD (`src/scenes/hud.ts`): hearts, moonstones, keys (in a dungeon), bellseeds, the journal
   line (the quest's objective), place banners, toasts, the touch buttons, the floating touch stick,

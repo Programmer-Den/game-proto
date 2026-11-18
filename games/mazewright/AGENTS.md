@@ -147,8 +147,8 @@ Implemented today:
   that garden's season. `start(map, null, true)` makes the game with `resumeGame` (`sim.ts`), which
   plays the replay back to its step with nothing drawn or heard, and the scene notes the foes met,
   a stolen cabbage and the weather from its events so their banners aren't shown again; the banner
-  `resumed` says which wave was held. A win or loss (`forget`) or starting any game afresh drops
-  it; leaving with Gardens keeps it, so a wave left half-played starts again from the break before.
+  `resumed` says which wave was held. A win or loss (`forget`, which also resets the `kept` key so the next game saves) or starting
+  any game afresh drops it; leaving with Gardens keeps it, so a wave left half-played starts again from the break before.
   Playing back a whole 20-wave game takes about a second in Node. A save of another
   `REPLAY_VERSION` is dropped. Swarm has hardly any breaks, so it is seldom saved.
 - The pouch: under the garden cards, chips in two rows (`CHIPS.perRow`) for the thirteen towers and two traps besides `hedge` and `bow` (`ALWAYS`);
@@ -226,7 +226,7 @@ Implemented today:
   catches the first ground foe whose `from` is its cell. Events `lured`, `burst`, `snared`.
 - Kings and big foes: a `Group` may carry `{ king: true }` (`KING`: hp, gold, lives, body, speed;
   `KING_TRICKS`: a king mole chews 3 hedges, a king woodlouse splits into 4, a king moth lets 3
-  moths go) or `{ size: 2 | 3 }` (`BIG`). `makeFoe` and `offspring` build foes; a `Foe` keeps its
+  moths go) or `{ size: 2 | 3 }` (`BIG`). `makeFoe` and `offspring` build foes (an offspring takes its parent's `wave`); a `Foe` keeps its
   `body` (draw radius in tiles), `gold`, `lives`, `chews`, `splits` and `shell`. After the last
   wave's groups, `RUSH_KINDS` each send one king, `RUSH.delay` seconds later and `RUSH.gap` apart (event `rush`); events `king`, `split`, `egg`.
 - Damage kinds (`DAMAGE_KINDS`, a tower's `hits`) and shells (`SHELLS`, a foe's `shell`):

@@ -354,10 +354,11 @@ export function addUnit(m: Match, p: Player, defId: string, gilded: OriginId | n
   if (slot >= 0) p.bench[slot] = owned;
   else p.bench.push(owned);
   owned.items.push(...items.slice(0, MAX_ITEMS));
-  merge(p, defId);
+  const kept = merge(p, defId);
   p.bench.length = BENCH_SLOTS;
   for (let i = 0; i < BENCH_SLOTS; i++) p.bench[i] ??= null;
-  return owned;
+  // A merge may fold the new copy into another: hand back the robot that holds it now.
+  return allUnits(p).includes(owned) ? owned : (kept ?? owned);
 }
 
 export function buy(m: Match, p: Player, slot: number): Owned | null {
@@ -372,8 +373,9 @@ export function buy(m: Match, p: Player, slot: number): Owned | null {
   return owned;
 }
 
-/** Folds three copies of a robot at the same star into one a star higher, as often as it can. */
-function merge(p: Player, defId: string) {
+/** Folds three copies of a robot at the same star into one a star higher, as often as it can; returns the last one raised. */
+function merge(p: Player, defId: string): Owned | null {
+  let raised: Owned | null = null;
   for (let star = 1; star <= 2; star++) {
     const copies = allUnits(p).filter((o) => o.defId === defId && o.star === star && !o.gilded);
     if (copies.length < 3) continue;
@@ -381,6 +383,7 @@ function merge(p: Player, defId: string) {
     const keep = onBoard ?? copies[0];
     const rest = copies.filter((o) => o !== keep).slice(0, 2);
     keep.star = star + 1;
+    raised = keep;
     for (const o of rest) {
       for (const item of o.items) {
         if (keep.items.length < MAX_ITEMS) keep.items.push(item);
@@ -389,6 +392,7 @@ function merge(p: Player, defId: string) {
       removeUnit(p, o);
     }
   }
+  return raised;
 }
 
 export function removeUnit(p: Player, o: Owned) {
