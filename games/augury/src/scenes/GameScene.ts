@@ -10,9 +10,10 @@ import { nextRankAt, rankOf, weekOf } from '../game/weekly';
 import { DEFS, KINDS, LEVELS, SKILLS, SKILL_OF, type KindId, type Level } from '../game/kinds';
 import { MAX_MASTERY, masteryOf, toNextMastery, type Progress } from '../game/progress';
 import {
-  act, canHint, canTakeOmen, canUndo, dailyDone, draftPick, drag, ghostAt, hint, holdsCharm, next, omenFor, runTime, takeOmen, trialTier, quit, skip, soloKind, startRun, startSecondPlayer, takeRelic, tick, undo,
-  BLITZ_PENALTY_S, DUEL_FAIL_S, PERIL_HEARTS, QUEUE, TRIALS, type Card, type Run,
+  act, canHint, canTakeOmen, canUndo, dailyDone, draftPick, drag, ghostAt, hint, holdsCharm, next, omenFor, pickNext, runTime, takeOmen, trialTier, quit, skip, soloKind, startRun, startSecondPlayer, takeRelic, tick, undo,
+  BLITZ_PENALTY_S, DARE_POINTS, DUEL_FAIL_S, PERIL_HEARTS, PICK_MS, QUEUE, REMATCH_POINTS, TRIALS, type Card, type Run,
 } from '../game/run';
+import { challengeCode, challengeLink, parseChallenge, type Challenge } from '../game/challenge';
 import { clearRun, loadProgress, loadRun, saveProgress, saveRun } from '../game/save';
 import { t, type TextKey } from '../i18n';
 import { checkTrophies } from '../trophies/check';
@@ -56,6 +57,10 @@ export class GameScene extends Phaser.Scene {
   practiceLevel: Level | 'trial' = 0;
   /** Spots for the test: every tappable thing on screen by id, centred, in view pixels. */
   buttons: Record<string, Spot> = {};
+  /** A challenge from a link or a typed code, waiting on the menu to be played. */
+  invite: Challenge | null = null;
+  /** The end card's challenge link was copied. */
+  private copied = false;
 
   /** The layout for the view's shape: wide or upright. */
   private L: Layout = WIDE;
@@ -81,6 +86,14 @@ export class GameScene extends Phaser.Scene {
     this.progress = loadProgress();
     this.saved = loadRun(this.progress);
     checkTrophies(this.progress, this.saved, true);
+    // A challenge link (`?challenge=<code>`) waits on the menu; the address loses it, so a reload doesn't ask again.
+    const params = new URLSearchParams(location.search);
+    if (params.has('challenge')) {
+      this.invite = parseChallenge(params.get('challenge'));
+      params.delete('challenge');
+      const query = params.toString();
+      history.replaceState(history.state, '', location.pathname + (query ? `?${query}` : '') + location.hash);
+    }
     this.backdrop = this.add.graphics().setDepth(0);
     this.p = new Painter(this, UI_DEPTH);
     this.fitView();
@@ -115,7 +128,7 @@ export class GameScene extends Phaser.Scene {
       this.drain();
       this.keepRun(run);
       const cur = run.current;
-      const key = [run.phase, Math.floor((cur?.timeLeftMs ?? 0) / 100), Math.floor(run.clockMs / 100), cur?.card.kind === 'echo' ? Math.floor(cur.state.ms / 100) + cur.state.step * 100 : 0].join('|');
+      const key = [run.phase, run.pick ? Math.floor(run.betweenMs / 100) : 0, Math.floor((cur?.timeLeftMs ?? 0) / 100), Math.floor(run.clockMs / 100), cur?.card.kind === 'echo' ? Math.floor(cur.state.ms / 100) + cur.state.step * 100 : 0].join('|');
       if (key !== this.clockKey) (this.clockKey = key), (this.dirty = true);
     }
     const part = this.screen !== 'run' ? 'menu' : run?.mode === 'blitz' ? 'blitz' : 'calm';
@@ -220,7 +233,7 @@ export class GameScene extends Phaser.Scene {
   // -------------------------------------------------------------------------------------------
   // Runs and events
 
-  private start(mode: Mode, kind?: KindId, node?: number) {
+  private start(mode: Mode, kind?: KindId, node?: number, challenge?: Challenge) {
     if (mode === 'daily' && dailyDone(this.progress)) return ui('refuse');
     ui('click');
     // A new run ends the saved one there, its bests and its run recorded as if it was left.
@@ -229,7 +242,9 @@ export class GameScene extends Phaser.Scene {
     clearRun();
     resetUnjam();
     const trial = this.practiceLevel === 'trial';
-    this.run = startRun(mode, this.progress, { kind, level: trial ? 0 : (this.practiceLevel as Level), trial, node });
+    this.run = startRun(mode, this.progress, { kind, level: trial ? 0 : (this.practiceLevel as Level), trial, node, seed: challenge?.seed, challenge: challenge?.score });
+    this.invite = null;
+    this.copied = false;
     this.screen = 'run';
     saveProgress(this.progress);
   }
@@ -381,6 +396,33 @@ export class GameScene extends Phaser.Scene {
       this.screen = 'records';
     });
     p.text(MENU.line.x, MENU.line.y, t('runsLine', { n: prog.runs }), { size: 12, color: C.inkDim });
+    p.button('code', MENU.code.x, MENU.code.y, MENU.code.w, MENU.code.h, t('enterCode'), () => this.askCode(), { size: 13 });
+    if (this.invite) this.drawInvite(this.invite);
+  }
+
+  /** Asks for a challenge code; a good one waits on the menu. */
+  private askCode() {
+    ui('click');
+    const challenge = parseChallenge(window.prompt(t('codePrompt')));
+    if (challenge) this.invite = challenge;
+    else ui('refuse');
+    this.dirty = true;
+  }
+
+  /** A challenge waiting to be played: what it is, the score to beat, Play and Not now. */
+  private drawInvite(c: Challenge) {
+    const p = this.p;
+    const { end: END, endButtons: END_BUTTONS } = this.L;
+    p.layer(1);
+    this.dim();
+    p.frame(END.x - END.w / 2, END.y - END.h / 2, END.w, END.h, { alpha: 0.98 });
+    this.heading(END.x, END.y - 110, t('challengeTitle'), 26);
+    const what = c.mode === 'draft' ? t('challengeDraft') : t('challengeSolo', { name: t(`${c.kind!}Name` as TextKey) });
+    p.text(END.x, END.y - 50, what, { size: 16, wrap: END.w - 60 });
+    p.text(END.x, END.y + 10, t('toBeatLine', { n: formatNumber(c.score) }), { size: 20, color: C.goldText, bold: true });
+    p.text(END.x, END.y + 48, t('challengeRule'), { size: 13, color: C.inkDim, wrap: END.w - 60 });
+    p.button('challenge-play', END_BUTTONS.xs[0], END_BUTTONS.y, END_BUTTONS.w, END_BUTTONS.h, t('playIt'), () => this.start(c.mode, c.kind, undefined, c), { accent: true });
+    p.button('challenge-close', END_BUTTONS.xs[1], END_BUTTONS.y, END_BUTTONS.w, END_BUTTONS.h, t('notNow'), () => (ui('click'), (this.invite = null)));
   }
 
   private modeBest(mode: Mode) {
@@ -622,11 +664,14 @@ export class GameScene extends Phaser.Scene {
     p.frame(STAGE.x, STAGE.y, STAGE.w, STAGE.h, boss ? { line: C.rose } : {});
     if (cur && run.phase !== 'draft' && run.phase !== 'relic' && run.phase !== 'handover') {
       const kind = cur.card.kind;
-      this.heading(STAGE.x + STAGE.w / 2, STAGE.y + 28, t(`${kind}Name` as TextKey), 22);
-      p.text(STAGE.x + STAGE.w / 2, STAGE.y + 54, t(`${kind}Rule` as TextKey), { size: 12, color: C.inkDim, wrap: STAGE.w - 160 });
-      const level = `${ROMAN[cur.card.level]} · ${t(`level${cur.card.level}` as TextKey)}`;
-      p.text(STAGE.x + STAGE.w - 16, STAGE.y + 22, cur.card.trial ? `${t('trialN', { n: ROMAN[cur.card.trial - 1] })} · ${level}` : level, { size: 12, color: C.cyanText, ox: 1 });
-      p.text(STAGE.x + 16, STAGE.y + 22, t(SKILL_OF[kind]), { size: 12, color: C.inkDim, ox: 0 });
+      // A shown answer's strip covers the name and rule.
+      if (!run.revealed) {
+        this.heading(STAGE.x + STAGE.w / 2, STAGE.y + 28, t(`${kind}Name` as TextKey), 22);
+        p.text(STAGE.x + STAGE.w / 2, STAGE.y + 54, t(`${kind}Rule` as TextKey), { size: 12, color: C.inkDim, wrap: STAGE.w - 160 });
+        const level = `${ROMAN[cur.card.level]} · ${t(`level${cur.card.level}` as TextKey)}`;
+        p.text(STAGE.x + STAGE.w - 16, STAGE.y + 22, cur.card.trial ? `${t('trialN', { n: ROMAN[cur.card.trial - 1] })} · ${level}` : level, { size: 12, color: C.cyanText, ox: 1 });
+        p.text(STAGE.x + 16, STAGE.y + 22, t(SKILL_OF[kind]), { size: 12, color: C.inkDim, ox: 0 });
+      }
       VIEWS[kind].draw(this.ctx());
       const def = DEFS[kind];
       p.button('undo', TOOLS.xs[0], TOOLS.y, TOOLS.w, TOOLS.h, t('undo'), () => undo(run) && SFX('tap'), { enabled: def.undo && canUndo(run) });
@@ -770,7 +815,8 @@ export class GameScene extends Phaser.Scene {
         run.queue.slice(0, QUEUE).forEach((card, i) => {
           const { top, h } = slot(i, QUEUE, 72);
           const level = t(`level${card.level}` as TextKey);
-          const line = card.boss ? t('bossWith', { name: t(`${card.boss.kind}Name` as TextKey) }) : i === 0 ? t('nextLevel', { level }) : level;
+          const tag = card.rematch ? t('rematchTag', { n: formatNumber(REMATCH_POINTS) }) : card.dare ? t('dareTag', { n: formatNumber(DARE_POINTS) }) : '';
+          const line = card.boss ? t('bossWith', { name: t(`${card.boss.kind}Name` as TextKey) }) : tag ? `${level} · ${tag}` : i === 0 ? t('nextLevel', { level }) : level;
           this.smallCard(card, x, top, w, h, line, i === 0);
         });
         if (run.mode === 'endless') this.relicRow(run, score.x, score.bottom - 122, score.w);
@@ -778,6 +824,7 @@ export class GameScene extends Phaser.Scene {
           [t('score'), formatNumber(run.score)],
           [t('streak'), `×${run.streak}`],
           [t('solvedLabel'), String(run.solved)],
+          ...this.toBeat(run),
         ]);
         break;
       case 'daily':
@@ -825,6 +872,7 @@ export class GameScene extends Phaser.Scene {
           [t('score'), formatNumber(run.score)],
           [t('solvedLabel'), String(run.solved)],
           [t('streak'), `×${run.streak}`],
+          ...this.toBeat(run),
         ]);
         break;
       }
@@ -859,6 +907,11 @@ export class GameScene extends Phaser.Scene {
         break;
       }
     }
+  }
+
+  /** A challenge's score to beat, as a line of the score box. */
+  private toBeat(run: Run): [string, string][] {
+    return run.challenge === null ? [] : [[t('toBeat'), formatNumber(run.challenge)]];
   }
 
   /**
@@ -912,6 +965,8 @@ export class GameScene extends Phaser.Scene {
     const last = run.last!;
     const solved = last.reason === 'solved';
     const STAGE = this.L.stage;
+    if (run.revealed) return this.drawReveal(run);
+    if (run.pick && solved) return this.drawPick(run);
     const bx = STAGE.x + 60;
     const practice = run.mode === 'practice';
     const h = practice ? 170 : 120;
@@ -927,6 +982,64 @@ export class GameScene extends Phaser.Scene {
       p.button('next', bx + (STAGE.w - 120) / 2 - 95, by + 130, 170, 40, t('nextPuzzle'), () => (ui('click'), next(run)), { accent: true });
       p.button('done', bx + (STAGE.w - 120) / 2 + 95, by + 130, 170, 40, t('menu'), () => this.toMenu());
     }
+  }
+
+  /**
+   * After a solve in Endless or Solo Run: the result, and the next card and a dare face up to pick
+   * from, with a bar for the time left before the next card is taken.
+   */
+  private drawPick(run: Run) {
+    const p = this.p;
+    const last = run.last!;
+    const STAGE = this.L.stage;
+    const bx = STAGE.x + 24;
+    const bw = STAGE.w - 48;
+    const cx = bx + bw / 2;
+    const by = Math.round(STAGE.y + STAGE.h / 2 - 120);
+    const h = 240;
+    // A tap anywhere else takes the next card.
+    p.hit('dim', STAGE.x, STAGE.y, STAGE.w, STAGE.h, () => pickNext(run, 0));
+    p.frame(bx, by, bw, h, { alpha: 0.97, line: C.cyan });
+    this.heading(cx, by + 34, last.boss ? t('bossBeaten') : t('res_solved'), 24, C.cyanText);
+    p.text(cx, by + 66, t('pointsLine', { n: last.points }) + (last.omen ? ` · ${t('omenLine')}` : ''), { size: 15, color: C.ink });
+    p.text(cx, by + 94, t('pickLine'), { size: 13, color: C.inkDim, wrap: bw - 24 });
+    const gap = 14;
+    const cw = Math.floor((bw - 32 - gap) / 2);
+    const ch = 58;
+    const cy = by + 114;
+    const cards: Card[] = [run.queue[0], run.pick!];
+    cards.forEach((card, i) => {
+      const x = bx + 16 + i * (cw + gap);
+      const level = t(`level${card.level}` as TextKey);
+      const line = i === 0 ? t('nextLevel', { level }) : t(card.dare === 'fast' ? 'dareFast' : 'dareUp', { level, n: formatNumber(DARE_POINTS) });
+      this.smallCard(card, x, cy, cw, ch, line, i === 0);
+      p.hit(`pick-${i}`, x, cy, cw, ch, () => (ui('click'), pickNext(run, i as 0 | 1)));
+    });
+    // The time left to choose: the next card is taken when it runs out.
+    const share = Math.max(0, run.betweenMs / PICK_MS);
+    const barY = cy + ch + 18;
+    p.g.fillStyle(C.deep, 1).fillRect(bx + 16, barY, bw - 32, 6);
+    p.g.fillStyle(C.cyan, 0.8).fillRect(bx + 16, barY, (bw - 32) * share, 6);
+    p.text(cx, barY + 26, t('pickAuto'), { size: 12, color: C.inkDim, wrap: bw - 24 });
+  }
+
+  /**
+   * After a loss in Endless or Solo Run: the board shows the answer, under a strip over the
+   * puzzle's name that says it comes back as a rematch, with Next to move on.
+   */
+  private drawReveal(run: Run) {
+    const p = this.p;
+    const last = run.last!;
+    const { stage: STAGE, board: BOARD } = this.L;
+    const h = BOARD.y - STAGE.y - 6;
+    p.hit('dim', STAGE.x, STAGE.y, STAGE.w, STAGE.h, () => {});
+    p.frame(STAGE.x + 4, STAGE.y + 4, STAGE.w - 8, h - 4, { alpha: 0.98, line: C.rose });
+    const heart = last.omen === 'peril' ? t('heartsLost', { n: PERIL_HEARTS }) : t('heartLost');
+    const tx = STAGE.x + 20;
+    const bw = 130;
+    p.text(tx, STAGE.y + h / 2 - 10, `${t(`res_${last.reason}` as TextKey)} · ${heart}`, { size: 15, color: C.roseText, ox: 0, bold: true });
+    p.text(tx, STAGE.y + h / 2 + 12, t('revealLine', { n: formatNumber(REMATCH_POINTS) }), { size: 12, color: C.ink, ox: 0, wrap: STAGE.w - bw - 50, align: 'left' });
+    p.button('next', STAGE.x + STAGE.w - 16 - bw / 2, STAGE.y + h / 2 + 2, bw, 36, t('nextPuzzle'), () => (ui('click'), next(run)), { accent: true, size: 14 });
   }
 
   /** Cards dealt for a pick: puzzle cards in a draft, relics after a few solves. */
@@ -999,10 +1112,11 @@ export class GameScene extends Phaser.Scene {
         const at = nextRankAt(best);
         lines.push(t('weeklyRank', { rank: t(rankOf(best)) }) + (at === null ? '' : ` · ${t('weeklyNext', { n: formatNumber(at) })}`));
       }
+      if (run.challenge !== null) lines.push(run.score > run.challenge ? t('challengeBeaten') : t('challengeShort', { n: formatNumber(run.challenge - run.score) }));
       if (run.newBest) lines.push(t('newBest'));
     }
     this.heading(END.x, END.y - 120, title, 28);
-    const cyan = [t('newBest'), t('newStars')];
+    const cyan = [t('newBest'), t('newStars'), t('challengeBeaten')];
     lines.forEach((line, i) => p.text(END.x, END.y - 66 + i * 30, line, { size: i === 0 ? 20 : 16, color: cyan.includes(line) ? C.cyanText : i === 0 && run.mode === 'journey' ? C.goldText : C.ink, wrap: END.w - 60 }));
     if (run.mode === 'journey') {
       const nextNode = run.node + 1;
@@ -1011,9 +1125,26 @@ export class GameScene extends Phaser.Scene {
       p.button('done', END_BUTTONS.xs[1], END_BUTTONS.y, END_BUTTONS.w, END_BUTTONS.h, t('map'), () => this.toMenu('journey'));
       return;
     }
+    // A Draft Run or Solo Run shares its cards and score as a challenge code and link.
+    const code = challengeCode(run);
+    if (code) {
+      p.button('share', END.x, END_BUTTONS.y - END_BUTTONS.h - 14, Math.min(END.w - 60, 400), 36, this.copied ? t('copied', { code }) : t('shareCode', { code }), () => this.share(code), { size: 13 });
+    }
     const again = run.mode !== 'daily';
     if (again) p.button('again', END_BUTTONS.xs[0], END_BUTTONS.y, END_BUTTONS.w, END_BUTTONS.h, t('again'), () => this.start(run.mode, run.mode === 'solo' ? soloKind(run) : undefined), { accent: true });
     p.button('done', again ? END_BUTTONS.xs[1] : END.x, END_BUTTONS.y, END_BUTTONS.w, END_BUTTONS.h, t('menu'), () => this.toMenu());
+  }
+
+  /** Copies a challenge's link; where the browser can't, the code on the button is there to read out. */
+  private share(code: string) {
+    ui('click');
+    navigator.clipboard
+      ?.writeText(challengeLink(code))
+      .then(() => {
+        this.copied = true;
+        this.dirty = true;
+      })
+      .catch(() => ui('refuse'));
   }
 }
 

@@ -55,7 +55,33 @@ Implemented today:
   the run races the best from before it, and the side panel (`drawGhost`, at `side.ghost`) shows the
   score `ghostAt(run.ghost, runTime(run))` gives as a faint bar under the player's own. A best
   set before the ghost existed has none (the panel says so).
-- Screens (`screen`): `menu` (nine mode cards, five and four sideways, three rows of three upright, Records, and Continue when a run was saved),
+- Dares (`hasPicks`: Endless and Solo Run): after a solve, `end` sets `run.pick` to `dareFor(run)`,
+  a card in place of the next one (`queue[0]`) a level higher (`dare: 'up'`), or at Oracle the same
+  level on `DARE_TIME` of its time (`dare: 'fast'`, in `timeFor`), of a kind other than the one just
+  played, the next card's and the one after (Solo Run: its one kind, seeded from `soloSeed(seed, n, 1)`);
+  none when the next card is a boss or a rematch. The banner (`drawPick`) waits `PICK_MS` with both
+  face up (`pick-0`, the next card, and `pick-1`, the dare); `pickNext(run, i)` takes one and deals it,
+  and a tap elsewhere or the time running out takes the next card (`next` clears `pick`). A dare pays
+  `DARE_POINTS` times (`pointsFor`).
+- Rematches (Endless and Solo Run): a puzzle lost, skipped or timed out (not a boss, not itself a
+  rematch) while hearts are left is queued again by `queueRematch`, a copy of its card with
+  `rematch: true`, in place of the latest queued card it can take (never the next one, a boss or
+  another rematch, and in Endless never beside its own kind), and pays `REMATCH_POINTS` times. Its
+  answer is shown on the board: `reveal(cur)` runs the kind's hint until it is solved (Code Breaker
+  shows every place, Star Series strikes the current row's wrong options), `run.revealed` is set and
+  the banner (`drawReveal`, a strip over the puzzle's name with `next`) waits `REVEAL_MS`. Memory
+  Echo has no answer to show, so it gets the usual banner (but still comes back).
+- Challenge codes (`game/challenge.ts`): a Draft Run or Solo Run draws its cards from `run.seed`
+  (`startRun` makes one, or takes a challenge's): a draft through `luck(run)`, like the weekly
+  league, and a Solo Run's `n`th card from `soloSeed(seed, n)`. `challengeCode(run)` gives
+  `D-<seed>-<score>` or `S<kind letter>-<seed>-<score>` (base 36, upper case), `parseChallenge` reads
+  one, and `challengeLink` makes `?challenge=<code>`. The end card of a draft or Solo Run has the
+  `share` button (copies the link); the menu's `code` button asks for a code (`window.prompt`), and a
+  link's code is taken off the address in `create`. Either waits on the menu as `invite`
+  (`drawInvite`, `challenge-play` and `challenge-close`); playing it starts the run with the seed and
+  `run.challenge`, the score to beat, which the score box shows (`toBeat`) and the end card compares.
+  Hearts follow each player's own difficulty.
+- Screens (`screen`): `menu` (nine mode cards, five and four sideways, three rows of three upright, Records, Enter a code, and Continue when a run was saved),
   `journey` (the map: a row of eight steps per temple, each with its kind's icon and stars),
   `practice` (the four level buttons and Trial, and thirteen puzzle cards with their mastery badges; in
   Trial each card shows its open tier, level and time, and the tiers cleared), `solo` (the same
@@ -84,7 +110,7 @@ Missing or rough:
 - The journey's temples teach the first eleven kinds only; Pipe Turn and Mirror Maze come from the
   other modes (adding them to `TEMPLE_KINDS` would change steps players have already starred).
 - No translations of the glyph names (there are none on screen); the How to play names the modes.
-- `docs/screenshots/menu.webp`, `solo-run.webp`, `puzzles.webp`, `draft.webp`, `upright.webp` (a 390x844 phone at
+- `docs/screenshots/menu.webp`, `dare.webp`, `rematch.webp`, `challenge.webp`, `solo-run.webp`, `puzzles.webp`, `draft.webp`, `upright.webp` (a 390x844 phone at
   2x), `pipe-turn.webp`, `mirror-maze.webp`, `mastery.webp`, `daily-ghost.webp` and `cover.png` are not made by the
   test; refresh them by hand (a Playwright script that taps the menu, Practice with hints, and a
   draft) when the look changes.
@@ -114,7 +140,7 @@ File map (`src/`):
   its move functions (`nonoTap`, `bridgesTap`, `codeAdd`/`codeBack`/`codeGuess`, `calcSelect`/
   `calcEnter`, `sumsSelect`/`sumsEnter`, `unjamMove`, `flipTap`, `linkStart`/`linkMove`/`linkEnd`,
   `echoAnswer`, `slideTap`, `seriesPick`, `pipeTap`, `beamTap`), each returning whether it made a move worth keeping for Undo.
-- `game/run.ts`: the tuning (`QUEUE`, `BETWEEN_MS`, `START_HINTS`, `startHearts`, `MAX_HEARTS`,
+- `game/run.ts`: the tuning (`QUEUE`, `BETWEEN_MS`, `PICK_MS`, `DARE_POINTS`, `DARE_TIME`, `REVEAL_MS`, `REMATCH_POINTS`, `START_HINTS`, `startHearts`, `MAX_HEARTS`,
   `blitzSeconds`, `BLITZ_SOLVE_S`, `BLITZ_PENALTY_S`, `DAILY_LEVELS`, `DUEL_LEVELS`, `DUEL_FAIL_S`,
   `DUEL_HINT_S`, `RELIC_EVERY`, `RELIC_OFFER`, `DRAFT_MAX`, `HOURGLASS`, `CHARM_POINTS`,
   `CHARM_ECHO_SLOW`, `OMEN_POINTS`, `PERIL_HEARTS`, `BOSS_EVERY`, `BOSS_TIME`, `BOSS_POINTS`, `TRIALS`, the
@@ -122,7 +148,7 @@ File map (`src/`):
   `Card`, `Current`, `Result`, `Run`, `RunEvent`, and the actions (`startRun`, `act`, `drag`,
   `undo`, `hint`, `skip`, `quit`, `next`, `draftPick`, `takeRelic`, `startSecondPlayer`, `tick`,
   `canUndo`, `canHint`, `dailyDone`, `endlessLevel`, `holdsCharm`, `offerRelics`, `weakWeights`,
-  `trialTier`, `trialCard`, `soloKind`, `ghostAt`, `runTime`, and `makeCurrent`,
+  `trialTier`, `trialCard`, `soloKind`, `ghostAt`, `runTime`, `hasPicks`, `pickNext`, `reveal`, and `makeCurrent`,
   which makes a card's puzzle fresh with its time and its charm's help, for `deal` and `loadRun`).
   A charm gives its kind's puzzles one free hint (`freeHints`; `freeUsed` counts them, and they
   cost no points) and `CHARM_POINTS` times the points, and slows Memory Echo's cards
@@ -156,7 +182,7 @@ File map (`src/`):
 - `game/catalog.ts`: `OMENS`/`OmenId`, `MODES`/`Mode`, `isDraft`, `hasHearts` (Endless, Solo Run and the drafts), `GENERAL_RELICS`, `CHARMS` (each kind's relic, its charm) with
   `CharmId`, `CHARM_KIND` and `isCharm`, `RELICS`/`RelicId` (both kinds), `KIND_COLOR`,
   `RELIC_COLOR` (a charm takes its kind's colour).
-- `game/journey.ts` and `game/weekly.ts`: see Current state.
+- `game/journey.ts`, `game/weekly.ts` and `game/challenge.ts`: see Current state.
 - `game/progress.ts`: `Progress`, `newProgress`, `recordResult`, and mastery (`MASTERY_AT`,
   `MAX_MASTERY`, `masteryOf`, `toNextMastery`). `game/save.ts`: `loadProgress`,
   `saveProgress`, and `saveRun`, `loadRun` (checks the saved run and deals its puzzle in play again
@@ -212,15 +238,16 @@ How it runs:
   `drain` for sound and saving.
 - Randomness: every card carries a seed, and its puzzle is made with `seeded(card.seed)`. Card seeds,
   kinds, draft offers and relic offers come from `Math.random`, except the daily five, whose kinds,
-  levels and seeds come from `seeded(dailySeed(date))`, the weekly league (`luck(run)`) and the
-  journey (`journeyCard`). The backdrop uses Phaser's
+  levels and seeds come from `seeded(dailySeed(date))`, the weekly league and drafts (`luck(run)`,
+  from the week's or the run's seed), Solo Run (`soloSeed`) and the journey (`journeyCard`). A run's
+  own seed comes from `Math.random`. The backdrop uses Phaser's
   `RandomDataGenerator` with a fixed seed.
 
 State model (`Run`): `mode`, `phase`, `hearts`, `maxHearts`, `hints`, `score`, `streak`, `dealt`,
 `solved`, `current` (`card`, `state`, `timeLeftMs`, `timeTotalMs`, `elapsedMs`, `hintsUsed`, `freeHints`,
 `freeUsed`, `omen`, `touched`, `pair`, `pairMs`, `pairHints`, `history`), `queue`, `results`, `last`, `betweenMs`, `clockMs`, `relics`, `relicOffer`,
-`draftOffer`, `player`, `totals`, `duelSolved`, `day`, `week`, `draws`, `node`, `stars`, `marks`, `ghost`, `progress`, `newBest` and `events`. A `Card` may carry
-`trial` (a Practice trial's tier) and a `Result` `cleared`.
+`draftOffer`, `player`, `totals`, `duelSolved`, `day`, `week`, `draws`, `node`, `stars`, `marks`, `ghost`, `progress`, `newBest`, `pick`, `revealed`, `seed`, `challenge` and `events`. A `Card` may carry
+`trial` (a Practice trial's tier), `dare` and `rematch`, and a `Result` `cleared`.
 
 Persistence: three `localStorage` keys. `augury-trophies` holds the trophies earned (written by
 `shared/trophies.ts`). `augury-run` holds the run in play (every mode but Practice,
@@ -232,7 +259,9 @@ first ends the saved one through `quit`, so its bests and its run count. `augury
 starts (the daily five counts as played, and as a run, from its first card), after every puzzle
 (with the daily five's score so far and its best), when a run ends and when leaving to the menu, which ends the run and records
 it (`quit`). `loadProgress` keeps only known kinds and whole, non-negative numbers (Solo Run bests, trials up to 10,
-at most five ghost marks); `loadRun` gives a run saved before the ghost empty `marks` and `ghost`.
+at most five ghost marks); `loadRun` gives a run saved before the ghost empty `marks` and `ghost`,
+one saved before dares and challenges no `pick`, seed 0 (drawn from `Math.random`) and no
+`challenge`, and shows a saved `revealed` answer again.
 
 ### Hub settings
 
@@ -296,12 +325,16 @@ cell is picked, the daily five played today), and a Hint tap that finds nothing 
   (every spot on screen by id, centred, in view pixels: `mode-<mode>`, `records`, `back`,
   `resume`, `omen`, `level-<n>` (`level-trial` for Trial), `kind-<kind>`, `node-<i>` (a journey step), `next-step`, `option-<i>` (Star Series), `undo`, `hint`, `skip`, `leave`, `cell-<i>`, `key-<n>` (0 is Clear),
   `island-<i>`, `glyph-<i>`, `code-back`, `code-guess`, `block-<k>`, `echo-same`, `echo-diff`,
-  `draft-<i>`, `relic-<i>`, `next`, `done`, `again`, `start2`, `dim`).
+  `draft-<i>`, `relic-<i>`, `pick-<i>` (0 the next card, 1 the dare), `next` (also a shown answer's),
+  `done`, `again`, `start2`, `share`, `code`, `challenge-play`, `challenge-close`, `dim`).
 - Inputs: it taps `mode-endless`, then solves whatever the seeded deck deals with real taps and
   drags, reading each puzzle's answer from its state (`picture`, `needed`, `answer`, `code`,
   `solution`, `open`, `blocks`, `trail` (Star Slide), `rows` (Star Series), `tiles`/`answer` (Pipe Turn),
-  `mirrors`/`answer` (Mirror Maze), `seq`/`step`/`back`/`answers`), and taps `skip`.
-- Mirrored in `e2e/playthrough.spec.ts`, so change them together: the `Run` field names, `VIEW`,
+  `mirrors`/`answer` (Mirror Maze), `seq`/`step`/`back`/`answers`), checks each solve offers a
+  dare a level up and taps `pick-0` for the next card, taps `skip` on the third, checks its rematch
+  is queued (not next) and its answer shown, and taps `next`.
+- Mirrored in `e2e/playthrough.spec.ts`, so change them together: the `Run` field names (with
+  `pick`, `revealed`, `dare` and `rematch`), `VIEW`,
   3 hearts on Normal, `QUEUE`, `BETWEEN_MS`, `POINTS_PER_LEVEL`, the first puzzle at level 0 with a
   clock, never the same kind twice in a row, Unjam's 6x6 board, every puzzle state's answer fields
   and every spot id above, the scene key `'Game'` and the save key `augury-progress`.
