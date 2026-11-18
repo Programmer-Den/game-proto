@@ -30,6 +30,9 @@ const en: HowToPlay = {
     'The Weekly League is the same Draft Run for everyone all week: play it as often as you like, and your best score sets your rank, from Novice to Seer.',
     'Every solve raises that kind\'s mastery, from 1 to 10. Each level opens a harder trial of it in Practice (pick Trial), and Endless deals your weakest kinds more often.',
     'In the Daily Five, a faint bar races you: the score your best daily five had at this point.',
+    'After a solve in Endless or Solo Run, take the next card or dare a harder one for half again the points.',
+    'A puzzle you lose in Endless or Solo Run shows its answer, then comes back later as a rematch worth double.',
+    'A finished Draft Run or Solo Run gives a challenge code: a friend who plays it gets the same cards and your score to beat.',
   ],
 };
 
@@ -62,6 +65,9 @@ const de: HowToPlay = {
     'Die Wochenliga ist die ganze Woche dieselbe Kartenwahl für alle: Spiel sie so oft du willst, dein bester Punktestand bestimmt deinen Rang, vom Novizen bis zum Seher.',
     'Jede Lösung hebt die Meisterung dieser Rätselart, von 1 bis 10. Jede Stufe öffnet beim Üben eine schwerere Prüfung (wähle Prüfung), und die Endlose Mischung teilt deine schwächsten Arten öfter aus.',
     'In der Tagesfünf läuft ein blasser Balken gegen dich: der Punktestand deiner besten Tagesfünf an dieser Stelle.',
+    'Nach einer Lösung in der Endlosen Mischung oder im Solo-Lauf nimmst du die nächste Karte oder wagst eine schwerere für die Hälfte mehr Punkte.',
+    'Ein verlorenes Rätsel in der Endlosen Mischung oder im Solo-Lauf zeigt seine Lösung und kommt später als Revanche wieder, doppelt so viel wert.',
+    'Eine beendete Kartenwahl oder ein Solo-Lauf gibt einen Herausforderungscode: Wer ihn spielt, bekommt dieselben Karten und deinen Punktestand zum Schlagen.',
   ],
 };
 

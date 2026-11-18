@@ -5,8 +5,8 @@ import { aiLog, mountWatch, watching, watchSteps } from '../../../../shared/watc
 import { playMusic, playSting, stopMusic, ui, type PlayOptions } from '../../../../shared/audio';
 import { FIGHT_SONG, PLAN_SONG, play, type Sfx } from '../audio';
 import {
-  AUGMENT_BY_ID, CAMPAIGN, CHASSIS, CLASS_STATS, DAILY, DUO, GHOST, WEAPONS, WEAPON_NAMES, WORKSHOP, WORKSHOP_UNLOCKS, COST_COLOR, DRAFT_PICK_S, ECONOMY, ITEM_BENCH, ITEMS, MAX_LEVEL, ORIGIN_COLOR, PLAN_S, PLAYER_COMMANDERS, RANKS, RIVALS, SETS,
-  PARTS, PLAYERS, RAT, SCRAP_TOKENS_PER_PART, SKILLS, TERRAIN, TRAITS, UNIT_BY_ID, comboOf, isPart,
+  AUGMENT_BY_ID, CAMPAIGN, FINALS, CHASSIS, CLASS_STATS, DAILY, DUO, GHOST, WEAPONS, WEAPON_NAMES, WORKSHOP, WORKSHOP_UNLOCKS, COST_COLOR, DRAFT_PICK_S, ECONOMY, ITEM_BENCH, ITEMS, MAX_LEVEL, ORIGIN_COLOR, PLAN_S, PLAYER_COMMANDERS, RANKS, RIVALS, SETS,
+  OVERDRIVES, OVERDRIVE_OF, PARTS, PLAYERS, RAT, SCRAP_TOKENS_PER_PART, SKILLS, STAGE_EVENTS, TERRAIN, TRAITS, UNIT_BY_ID, comboOf, isPart,
   type ClassId, type CommanderDef, type DeedId, type OriginId, type PartId, type SetId, type TraitId, type UnitDef,
 } from '../game/data';
 import {
@@ -144,6 +144,10 @@ export class GameScene extends Phaser.Scene {
   private hudG!: Phaser.GameObjects.Graphics;
   private overlay!: Phaser.GameObjects.Container;
   private topText!: Phaser.GameObjects.Text;
+  /** The stage event, at the top bar's right end. */
+  private eventText!: Phaser.GameObjects.Text;
+  /** The player's overdrive charge as last drawn, in twentieths, so the HUD redraws as it fills. */
+  private chargeShown = -1;
   private banner!: Phaser.GameObjects.Text;
   private views = new Map<string, View>();
   private fx: Fx[] = [];
@@ -212,6 +216,7 @@ export class GameScene extends Phaser.Scene {
     this.hud.add(this.hudG);
     this.overlay = this.add.container(0, 0).setDepth(2000);
     this.topText = this.add.text(12, 8, '', { fontFamily: FONT, fontSize: '13px', color: C.text, fontStyle: 'bold' }).setDepth(1001);
+    this.eventText = this.add.text(VIEW.w - 12, 9, '', { fontFamily: FONT, fontSize: '11px', color: C.gold }).setOrigin(1, 0).setDepth(1001);
     this.banner = this.add.text(VIEW.w / 2, VIEW.fy + 206, '', { fontFamily: FONT, fontSize: '34px', color: '#ffffff', fontStyle: 'bold', stroke: INK, strokeThickness: 6 }).setOrigin(0.5).setDepth(1500);
     this.avatar = this.add.image(0, 0, cmdKey(PLAYER_COMMANDERS[0].name)).setOrigin(0.5, CMD_TEX.footY / CMD_TEX.h).setVisible(false);
     this.rivalImg = this.add.image(RIVAL_HOME.x, RIVAL_HOME.y, cmdKey(RIVALS[0].name)).setOrigin(0.5, CMD_TEX.footY / CMD_TEX.h).setVisible(false);
@@ -305,7 +310,16 @@ export class GameScene extends Phaser.Scene {
   private beginPlan() {
     const m = this.state!;
     const level = player(m).level;
+    const event = m.eventStage;
     startPlan(m, watching ? 3 : PLAN_S);
+    // A new stage's event, and the start of the finals, are called out over the board.
+    if (m.finals && m.finals.fights === 0 && m.finals.seats.includes(0)) {
+      this.number({ x: VIEW.w / 2, y: VIEW.fy + 200, s: 1 }, t('finalsCall', { name: t(m.players[m.finals.seats.find((x) => x !== 0)!].name) }), '#ffd166', 20, 2.8);
+      this.sfx('stageEvent');
+    } else if (m.eventStage !== event && m.stageEvent) {
+      this.number({ x: VIEW.w / 2, y: VIEW.fy + 200, s: 1 }, t('eventCall', { name: t(STAGE_EVENTS[m.stageEvent].name) }), '#ffd166', 18, 2.6);
+      this.sfx('stageEvent');
+    }
     if (player(m).human && player(m).level > level) this.sfx('levelUp');
     this.lastTick = 0;
     playMusic(PLAN_SONG, 'calm');
@@ -337,6 +351,7 @@ export class GameScene extends Phaser.Scene {
     this.fightDoneAt = 0;
     this.acc = 0;
     this.zapReadyAt = 0;
+    this.chargeShown = -1;
     const rival = m.opponent >= 0 ? m.players[m.opponent] : null;
     this.rivalImg.setVisible(!!rival);
     if (rival) this.rivalImg.setTexture(cmdKey(rival.commander.name));
@@ -359,8 +374,10 @@ export class GameScene extends Phaser.Scene {
     if (r) {
       const text = t(r.outcome === 'win' ? 'victory' : r.outcome === 'draw' ? 'draw' : 'defeat');
       const extra = r.damage ? t('lostHp', { n: r.damage }) : r.gold ? t('wonGold', { n: r.gold }) : '';
+      const f = m.finals;
+      const finals = f && f.fights > 0 && f.seats.includes(0) ? `\n${t('finalsScore', { a: f.wins[f.seats.indexOf(0)], b: f.wins[1 - f.seats.indexOf(0)] })}` : '';
       const mate = r.partner ? `\n${t(r.partner === 'win' ? 'partnerWon' : r.partner === 'draw' ? 'partnerDraw' : 'partnerLost', { name: t(partner(m)!.name) })}` : '';
-      this.banner.setText(text + extra + mate).setColor(r.outcome === 'win' ? '#7cf3ff' : r.outcome === 'draw' ? '#ffd166' : '#ff8a7a');
+      this.banner.setText(text + extra + mate + finals).setColor(r.outcome === 'win' ? '#7cf3ff' : r.outcome === 'draw' ? '#ffd166' : '#ff8a7a');
       playSting(FIGHT_SONG, r.outcome === 'win' ? 'roundWin' : r.outcome === 'draw' ? 'roundDraw' : 'roundLoss');
     }
     this.resultUntil = m.time + 2;
@@ -481,9 +498,17 @@ export class GameScene extends Phaser.Scene {
         this.acc -= STEP_S;
         if (b.time >= 4 && !b.skillUsed[1]) b.useSkill(1);
         if (!player(m).human && b.time >= 3 && !b.skillUsed[0]) b.useSkill(0);
+        // The rival fires its overdrive as soon as it is charged; so does the AI in a watched match.
+        b.useOverdrive(1);
+        if (!player(m).human) b.useOverdrive(0);
         b.step();
         this.consume(b.events.splice(0));
         for (const d of newDrops(m)) this.dropOrb(d.monsterId, d.item, d.gold);
+      }
+      const charge = Math.floor(b.charge[0] * 20);
+      if (charge !== this.chargeShown) {
+        this.chargeShown = charge;
+        this.dirty = true;
       }
       if (b.done) {
         if (!this.fightDoneAt) {
@@ -657,6 +682,20 @@ export class GameScene extends Phaser.Scene {
           const skill = t(SKILLS[e.skill].name);
           const label = t('skillCall', { name: e.team === 0 ? t(player(m).commander.name) : m.opponent >= 0 ? t(m.players[m.opponent].name) : t('rival'), skill });
           this.number({ x: e.team === 0 ? COMMANDER_HOME.x + 60 : RIVAL_HOME.x - 60, y: e.team === 0 ? COMMANDER_HOME.y - 20 : RIVAL_HOME.y + 40, s: 1 } as View, label, e.team === 0 ? '#7cf3ff' : '#ff8a7a', 13, 1.4);
+          this.dirty = true;
+          break;
+        }
+        case 'overdrive': {
+          const od = OVERDRIVES[e.kind];
+          for (const id of e.targets) {
+            this.fx.push({ kind: 'ring', at, dur: 0.8, from: id, color: od.color });
+            this.fx.push({ kind: 'ring', at, dur: 0.6, from: id, color: od.color, x: 2 });
+          }
+          if (!reduced && e.team === 0) this.cameras.main.flash(160, 124, 243, 255, false);
+          if (e.team === 0) this.avatarHop = at;
+          this.sfx('overdrive', { volume: e.team === 0 ? 1 : 0.6 });
+          const name = e.team === 0 ? t(player(m).commander.name) : m.opponent >= 0 ? t(m.players[m.opponent].name) : t('rival');
+          this.number({ x: e.team === 0 ? COMMANDER_HOME.x + 60 : RIVAL_HOME.x - 60, y: e.team === 0 ? COMMANDER_HOME.y - 44 : RIVAL_HOME.y + 64, s: 1 } as View, t('overdriveCall', { name, kind: t(od.name) }), e.team === 0 ? '#7cf3ff' : '#ff8a7a', 14, 1.6);
           this.dirty = true;
           break;
         }
@@ -1267,6 +1306,12 @@ export class GameScene extends Phaser.Scene {
       g.fillStyle(p.seat === 0 ? C.cyan : C.good).fillRect(PLAYERS_PANEL.x + 26, y + 17, Math.min(hpW, (hpW * Math.max(0, p.hp)) / p.maxHp), 5);
       this.txt(PLAYERS_PANEL.x + 110, y + 11, p.alive ? `${Math.max(0, p.hp)}` : `#${p.place}`, 11, p.alive ? '#ffffff' : C.dim, { fontStyle: 'bold' });
       if (p.last && p.alive) g.fillStyle(p.last === 'win' ? C.good : p.last === 'loss' ? C.bad : 0xffd166).fillCircle(PLAYERS_PANEL.x + PLAYERS_PANEL.w - 6, y + 6, 3);
+      // The finals: a pip for each fight won of the two needed.
+      const fi = m.finals?.seats.indexOf(p.seat) ?? -1;
+      if (m.finals && fi >= 0) for (let k = 0; k < FINALS.wins; k++) {
+        const px = PLAYERS_PANEL.x + PLAYERS_PANEL.w - 30 + k * 8;
+        g.fillStyle(k < m.finals.wins[fi] ? 0xffd166 : 0x000000, k < m.finals.wins[fi] ? 1 : 0.6).fillCircle(px, y + 6, 3);
+      }
       if (this.scout === p.seat) g.lineStyle(2, 0xffd166, 1).strokeRoundedRect(PLAYERS_PANEL.x, y, PLAYERS_PANEL.w, PLAYERS_PANEL.rowH - 3, 6);
       // Duo teams: a bar joins each pair's rows, the player's own in cyan, and the partner is tagged.
       if (m.opts.duo && p.seat % 2 === 0) g.fillStyle(p.team === me.team ? C.cyan : 0x8f8cc0, p.alive ? 0.9 : 0.35).fillRect(PLAYERS_PANEL.x - 5, y + 2, 3, PLAYERS_PANEL.rowH * 2 - 7);
@@ -1287,6 +1332,15 @@ export class GameScene extends Phaser.Scene {
       const skill = SKILLS[me.commander.skill];
       const used = m.battle.skillUsed[0] || m.battle.done;
       this.button(g, BUTTONS.skill, t(used ? 'skillUsed' : 'skillKey', { skill: t(skill.name) }), () => this.doSkill(), { on: !used && me.human, size: 13, color: 0xff5cf0 });
+      // The overdrive fills with the damage the player's robots deal; tap it (or V) once it is full.
+      const b = m.battle;
+      const od = OVERDRIVES[OVERDRIVE_OF[me.commander.skill]];
+      const ready = b.overdriveReady(0);
+      const spent = b.overdriveUsed[0] || b.done;
+      const label = spent ? t('overdriveUsed') : ready ? t('overdriveKey') : t('overdriveCharge', { n: Math.floor(b.charge[0] * 100) });
+      this.button(g, BUTTONS.overdrive, label, () => this.doOverdrive(), { on: ready && me.human, size: 10, color: od.color });
+      const r = BUTTONS.overdrive;
+      if (!spent) g.fillStyle(od.color, ready ? 1 : 0.8).fillRect(r.x + 5, r.y + r.h - 6, (r.w - 10) * b.charge[0], 3);
     }
     if (m.phase === 'fight' || m.phase === 'result' || m.phase === 'plan') this.button(g, BUTTONS.speed, t('speed', { n: this.speed }), () => this.toggleSpeed(), { size: 11 });
     if (m.opts.terrain) this.txt(TERRAIN_LEGEND.x, TERRAIN_LEGEND.y, t('terrainLegend'), 9, C.dim);
@@ -1394,10 +1448,15 @@ export class GameScene extends Phaser.Scene {
     const m = this.state;
     if (!m) {
       this.topText.setText('');
+      this.eventText.setText('');
       return;
     }
+    const ev = m.stageEvent && m.phase !== 'won' && m.phase !== 'lost' ? STAGE_EVENTS[m.stageEvent] : null;
+    this.eventText.setText(ev ? t('eventLine', { name: t(ev.name), text: t(ev.text) }) : '');
     const label = roundLabel(m);
-    const kind = t(m.round.kind === 'pvp' ? 'vsRival' : m.round.kind === 'draft' ? 'draft' : m.round.kind === 'rat' ? 'ratChase' : isGhostRound(m) && player(m).human ? 'vsGhostSquad' : 'vsMonsters');
+    const f = m.finals;
+    const mine = f && f.seats[0] === 0 ? f.wins : f ? [f.wins[1], f.wins[0]] : null;
+    const kind = mine ? t('finalsKind', { a: mine[0], b: mine[1] }) : t(m.round.kind === 'pvp' ? 'vsRival' : m.round.kind === 'draft' ? 'draft' : m.round.kind === 'rat' ? 'ratChase' : isGhostRound(m) && player(m).human ? 'vsGhostSquad' : 'vsMonsters');
     let phase = '';
     if (m.phase === 'plan') phase = t('planPhase', { n: Math.max(0, Math.ceil(m.phaseEnds - m.time)) });
     else if (m.phase === 'fight') {
@@ -1534,8 +1593,10 @@ export class GameScene extends Phaser.Scene {
     const pickedOpen = isUnlocked(this.progress, pickedC) || !!daily;
     const skill = SKILLS[pickedC.skill];
     if (pickedOpen) {
-      say(X0, Y + 240, `${t(pickedC.name)}: ${t(skill.name)}${daily ? ` · ${t('dailyLent')}` : ''}`, 13, '#ff5cf0', { fontStyle: 'bold' }).setOrigin(0.5, 0);
-      say(X0, Y + 260, `${t(skill.text)} ${t('skillHint')}`, 11, C.text, { align: 'center', wordWrap: { width: 640 } }).setOrigin(0.5, 0);
+      const odDef = OVERDRIVES[OVERDRIVE_OF[pickedC.skill]];
+      const od = t('overdriveTag', { name: t(odDef.name) });
+      say(X0, Y + 240, `${t(pickedC.name)}: ${t(skill.name)} · ${od}${daily ? ` · ${t('dailyLent')}` : ''}`, 13, '#ff5cf0', { fontStyle: 'bold' }).setOrigin(0.5, 0);
+      say(X0, Y + 260, `${t(skill.text)} ${t('skillHint')}\n${t(odDef.text)} ${t('overdriveHint')}`, 11, C.text, { align: 'center', wordWrap: { width: 720 } }).setOrigin(0.5, 0);
     } else {
       say(X0, Y + 240, t('lockedCommander', { name: t(pickedC.name), skill: t(skill.name) }), 13, C.dim, { fontStyle: 'bold' }).setOrigin(0.5, 0);
       say(X0, Y + 260, t(`${pickedC.unlock!}Unlock`), 11, C.gold, { align: 'center', wordWrap: { width: 640 } }).setOrigin(0.5, 0);
@@ -1870,6 +1931,13 @@ export class GameScene extends Phaser.Scene {
     else ui('refuse');
   }
 
+  private doOverdrive() {
+    const m = this.state;
+    if (m?.phase !== 'fight' || !m.battle || !player(m).human) return;
+    if (m.battle.useOverdrive(0)) this.dirty = true;
+    else ui('refuse');
+  }
+
   private doAugment(i: number) {
     const m = this.state!;
     const id = player(m).augmentOffer?.[i];
@@ -2080,6 +2148,7 @@ export class GameScene extends Phaser.Scene {
     else if (k === 'x' && me.human) this.doXp();
     else if (k === 'e' && me.human) this.doSell();
     else if (k === 't') this.toggleSpeed();
+    else if (k === 'v' && m.phase === 'fight' && me.human) this.doOverdrive();
     else if (k === 'l' && me.human) this.toggleLock();
     else if (k === 'g' && me.human && partner(m)) {
       if (this.selected?.kind === 'unit') this.doPass();

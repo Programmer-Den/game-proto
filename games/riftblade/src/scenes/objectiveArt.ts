@@ -4,7 +4,7 @@
  * makes the same textures (and Phaser the same Math.random draws) as before.
  */
 import type Phaser from 'phaser';
-import { POWER, isStructure, type Enemy, type GameState, type Pickup, type PowerUp } from '../game/state';
+import { ALTAR, BARREL, POWER, isStructure, type Altar, type Barrel, type Enemy, type GameState, type Pickup, type PowerUp } from '../game/state';
 import { OBJ_MISC } from '../game/objectives';
 import { C, hex } from '../art/glow';
 
@@ -199,3 +199,74 @@ export function objectiveTarget(s: GameState) {
 
 /** Whether a foe is drawn by `drawStructure` rather than as a sprite. */
 export const drawnAsStructure = (e: Enemy) => isStructure(e.kind);
+
+/** The rift altars' colours: Blood a deep rose, Greed gold. */
+export const ALTAR_COLORS = { blood: 0xff6b8a, greed: 0xffd36b } as const;
+
+/** A rift altar: a stone plinth with a rune ring in its pact's colour and its sign on top. */
+export function drawAltar(g: G, al: Altar, time: number, still: boolean) {
+  const fading = al.ms < 5000;
+  if (fading && !still && Math.floor(time / 150) % 2 === 0) return;
+  const color = ALTAR_COLORS[al.kind];
+  const { x, y } = al;
+  const pulse = still ? 0.6 : 0.6 + 0.4 * Math.sin(time / 240 + al.id);
+  const r = ALTAR.r;
+  g.fillStyle(color, 0.1 + 0.08 * pulse).fillCircle(x, y, r + 14);
+  g.lineStyle(2, color, 0.5 + 0.4 * pulse).strokeCircle(x, y, r + 8);
+  // Runes round the ring: short ticks turning slowly.
+  const turn = still ? 0 : time / 2400;
+  for (let i = 0; i < 8; i++) {
+    const a = turn + (i * Math.PI) / 4;
+    g.lineStyle(2, color, 0.8).lineBetween(x + Math.cos(a) * (r + 3), y + Math.sin(a) * (r + 3), x + Math.cos(a + 0.2) * (r + 12), y + Math.sin(a + 0.2) * (r + 12));
+  }
+  // The plinth: an octagon of dark stone.
+  const pts: Phaser.Math.Vector2[] = [];
+  for (let i = 0; i < 8; i++) {
+    const a = Math.PI / 8 + (i * Math.PI) / 4;
+    pts.push({ x: x + Math.cos(a) * r, y: y + Math.sin(a) * r * 0.8 } as Phaser.Math.Vector2);
+  }
+  g.fillStyle(0x1b1626, 1).fillPoints(pts, true);
+  g.lineStyle(2, 0x5a4c72, 1).strokePoints(pts, true);
+  g.fillStyle(color, 1);
+  if (al.kind === 'blood') {
+    // A drop.
+    g.fillCircle(x, y + 3, 7);
+    g.fillTriangle(x - 6, y + 1, x + 6, y + 1, x, y - 12);
+    g.fillStyle(0xffffff, 0.6).fillCircle(x - 2.5, y + 1, 2);
+  } else {
+    // A coin stack.
+    for (const dy of [5, 0, -5]) {
+      g.fillStyle(color, 1).fillEllipse(x, y + dy, 18, 7);
+      g.lineStyle(1, 0x7a5a10, 1).strokeEllipse(x, y + dy, 18, 7);
+    }
+  }
+  // The time left: an arc round the outside.
+  const k = Math.max(0, al.ms / ALTAR.lifeMs);
+  g.lineStyle(3, color, 0.9).beginPath().arc(x, y, r + 18, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * k).strokePath();
+}
+
+/** A volatile barrel (a cracked pillar on the Ruin world), flashing once it is lit. */
+export function drawBarrel(g: G, b: Barrel, ruin: boolean, time: number, still: boolean) {
+  const { x, y } = b;
+  const r = BARREL.r;
+  const lit = b.fuseMs > 0;
+  const flash = lit && (still || Math.floor(time / 50) % 2 === 0);
+  g.fillStyle(0x000000, 0.3).fillEllipse(x + 2, y + r - 1, r * 2.2, r * 0.9);
+  if (ruin) {
+    // A broken column stub, its cracks glowing with what is inside.
+    g.fillStyle(flash ? 0xfff2c0 : 0x5a4a30, 1).fillCircle(x, y, r + 1);
+    g.lineStyle(2, 0xd8c08a, 0.9).strokeCircle(x, y, r + 1);
+    g.lineStyle(2, flash ? 0xffffff : 0xffa04d, 1);
+    g.lineBetween(x - 9, y - 6, x - 2, y).lineBetween(x - 2, y, x - 5, y + 8).lineBetween(x - 2, y, x + 7, y - 3).lineBetween(x + 7, y - 3, x + 10, y + 5);
+    return;
+  }
+  // A drum seen from above: its rim, two hoops and a glowing hazard cap.
+  g.fillStyle(flash ? 0xffffff : 0x8a3a1a, 1).fillRoundedRect(x - r, y - r - 2, r * 2, r * 2 + 4, 5);
+  g.fillStyle(0x3a1a0c, 1).fillRect(x - r, y - 6, r * 2, 2.5).fillRect(x - r, y + 4, r * 2, 2.5);
+  g.fillStyle(flash ? 0xffffff : 0xffa04d, 1).fillEllipse(x, y - r + 1, r * 1.8, 7);
+  g.fillStyle(0x3a1a0c, 1).fillTriangle(x - 4, y - r + 3, x + 4, y - r + 3, x, y - r - 2);
+  if (!still && !lit) {
+    const glow = 0.15 + 0.1 * Math.sin(time / 300 + b.id);
+    g.fillStyle(0xffa04d, glow).fillCircle(x, y, r + 7);
+  }
+}

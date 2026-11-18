@@ -245,6 +245,26 @@ const de: Translation<typeof en> = {
   silverBlurb: 'drei Minuten lang dreimal so viele Juwelen',
   starmetalName: 'Sternmetall',
   starmetalBlurb: 'drei Minuten lang Stahlrohlinge aus der Esse',
+
+  // Abenteurergruppen (AN21), dreifaches Verschmelzen (AN22) und Feierabend (AN23)
+  partyLine: 'Dreiergruppe: alle bedient +{pct} %',
+  partyDue: 'Eine Abenteurergruppe kommt: Sie wartet auf drei freie Plätze',
+  partyIn: 'Eine Abenteurergruppe! Bediene alle drei für +{pct} %',
+  partyServed: 'Gruppe bedient! Bonus +{n} M',
+  tripleHint: 'Dreifach: {sword}',
+  tripleMerged: 'Dreifach verschmolzen: {sword}!',
+  duskLine: 'Feierabend in {time} · heute {n} M',
+  closingTitle: 'Feierabend',
+  closingText: 'Heute verkaufte Schwerter: {sold} · verdiente Münzen: {n}\nWähle eine Arbeit für die Nacht.',
+  jobSharpen: 'Schwerter schärfen\nJedes Schwert auf den Ambossen fängt neu gegen Rost an',
+  jobSmelt: 'Schrott einschmelzen\nEin Juwel aus den {n} heute verschrotteten Dingen',
+  jobSmeltNone: 'Schrott einschmelzen\nHeute nichts verschrottet (oder kein Platz)',
+  jobTrain: 'Lehrling ausbilden: Stufe {from} auf {to}\nEr verschmilzt ein Zehntel schneller, für immer',
+  jobTrainNone: 'Lehrling ausbilden\nNoch kein Lehrling angeheuert',
+  jobTrainTop: 'Lehrling ausbilden\nVoll ausgebildet',
+  nightSharpen: 'Morgengrauen: alle Schwerter geschärft',
+  nightSmelt: 'Morgengrauen: ein Juwel aus dem Schrott',
+  nightTrain: 'Morgengrauen: der Lehrling arbeitet schneller',
 };
 
 

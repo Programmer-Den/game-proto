@@ -25,6 +25,7 @@ foes and bolts.
 | Space, or the round button bottom right | Signature move, once charged |
 | Tap a hero card, or 1-9, 0, - and = (with Shift for the thirteenth hero on); then Fight, or Enter | Choose a hero and start the run |
 | Tap a card, or 1 / 2 / 3 (and 4 on Elara's level-ups) | Choose an upgrade at a level-up, the next planet on the space map, a node on the star map, an offer at the trader or an answer to an event |
+| Banish under a level-up card, or Shift with its number | Banish that card for the rest of the run; another takes its place (three a run) |
 | Continue, Enter or Space | Close the panel of a hero just unlocked; the run waits behind it |
 | Reroll, or 4 | At the trader: new offers for a few credits |
 | Leave, or Enter | At the trader: on to the next world |
@@ -404,6 +405,31 @@ lying when a world is cleared are lost.
 
 ![The seven power-ups](docs/screenshots/power-ups.webp)
 
+### Rift altars
+
+At 1:45 on every world (not the arena or the boss rush, and not once the boss is up) two rift
+altars rise near you, each named on the ground, for 30 s. Walk onto one to take its pact for 60 s;
+the other sinks away. Beside your health the HUD shows the pact and its time left.
+
+| Pact | For 60 s |
+| --- | --- |
+| Blood | Double XP from shards; foes born while it lasts have 35% more health, and hits on you land 30% harder |
+| Greed | Double the credits you pick up (chips and credit caches); nothing heals you |
+
+![Two rift altars: Greed and Blood](docs/screenshots/rift-altars.webp)
+
+### Volatile barrels
+
+From 1:10 on every world a barrel is set down near you every 8 s, up to four at once (on the Ruin
+world they are cracked pillars glowing from inside). A bolt through one, or any hit on a foe
+touching it, lights it, and a moment later it blows up: every foe within its blast loses 85% of
+its health (an elite 35%, a boss 3%) and is thrown back, and other barrels in the blast go off too.
+They never hurt you. Lead the swarm past them and shoot.
+
+![Barrels waiting for the swarm](docs/screenshots/volatile-barrels.webp)
+
+![A barrel blows up and sets off its neighbour](docs/screenshots/barrel-blast.webp)
+
 ### The star map
 
 After a boss falls, you collect what is lying about, earn credits for the clear, choose the next
@@ -429,7 +455,7 @@ cleared (12).
 
 ### Upgrades
 
-![A level-up](docs/screenshots/level-up.webp)
+![A level-up, with a Banish button under each card](docs/screenshots/level-up.webp)
 
 ![New cards: Orbital Beacon, Executioner Rounds and the Threat Scanner](docs/screenshots/new-skills.webp)
 
@@ -438,6 +464,11 @@ left. Every upgrade has seven tiers: five of its own, then two of a specialisati
 most **7 abilities** (your paths and pool skills) and **5 pieces of gear**; when both are full,
 only what you hold can come up, and when nothing is left a Field Ration heals you. Every tier line
 names the stat it raises.
+
+**Banish**: each run has three banishes. The Banish button under a level-up card (or Shift with the
+card's number) throws that card out for the rest of the run, and another card takes its place: it
+never comes up again at a level-up, a free pick, a trader or a chest. The Field Ration can't be
+banished.
 
 - **Specialisations** (tiers 6 and 7): at tier 5 an upgrade branches into three, and the first one
   taken is the only one it can have (the card says which two it locks out). Most upgrades branch
@@ -703,8 +734,9 @@ npm run dev   # then open http://localhost:5173/games/riftblade/
 hero select screen it checks the twenty-four cards (all but Legionary TR-9 locked on a fresh save),
 taps a locked card (no Fight button), then TR-9 and Fight, walks him in a wide circle by holding
 the mouse down at a point that turns around him, takes the first card at the first level-up and
-checks the upgrade was taken, fires Brace from its button and plays on to the one-minute mark. Side
-objectives and power-ups only begin at 1:00, so they leave that first minute as it was.
+checks the upgrade was taken (and that a Banish button stands under each card, with three left),
+fires Brace from its button and plays on to the one-minute mark. Side objectives and power-ups only
+begin at 1:00, and barrels and rift altars later still, so they leave that first minute as it was.
 
 ```sh
 npx playwright test --project riftblade

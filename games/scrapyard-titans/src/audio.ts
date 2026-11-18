@@ -155,6 +155,9 @@ export const play = sounds({
   revive: { wave: 'pulse25', freq: 392, arp: [0, 7, 12, 16], arpStep: 0.06, length: 0.34, volume: 0.3, gap: 200 },
   death: { wave: 'noise', freq: 1200, to: 150, length: 0.32, volume: 0.38, gap: 80, vary: 0.08 },
   skill: { wave: 'noise', freq: 800, to: 5000, attack: 0.15, length: 0.5, volume: 0.38, gap: 300 },
+  overdrive: { wave: 'sawtooth', freq: 110, to: 880, arp: [0, 7, 12, 19], arpStep: 0.06, attack: 0.02, length: 0.6, volume: 0.34, gap: 400 },
+  /** A new stage event called out at the start of its stage. */
+  stageEvent: { wave: 'pulse25', freq: 392, arp: [0, 5, 10], arpStep: 0.09, length: 0.36, volume: 0.24, gap: 400 },
   zap: { wave: 'sawtooth', freq: 1800, to: 600, length: 0.14, volume: 0.22, gap: 100 },
   escape: { wave: 'square', freq: 600, to: 1800, length: 0.25, volume: 0.22, gap: 300 },
   orb: { wave: 'triangle', freq: 1319, arp: [0, 7, 12], arpStep: 0.04, length: 0.2, volume: 0.26, gap: 100 },

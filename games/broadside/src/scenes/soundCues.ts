@@ -179,6 +179,9 @@ export class SoundCues {
         case 'flare':
           heard.add('flare');
           break;
+        case 'ram':
+          heard.add('ram');
+          break;
       }
     }
     this.lastEffect = newest;

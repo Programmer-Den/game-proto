@@ -30,6 +30,7 @@ the nearer they stand, and the commanders walk around the board's edge.
 | Tap the panel under the list | Switch between the last fight's damage meter and your power cards |
 | X, or Buy XP | 4 XP for 4 gold; each level lets one more robot onto the board |
 | Space, or FIGHT! | Start the fight early; during a fight, use your commander's skill once |
+| V, or Overdrive | During a fight, once its charge is full, fire your commander's overdrive |
 | T, or Speed | Play fights at 1x or 2x |
 | 1, 2 or 3 | Pick a power card when one is offered |
 | Tap the Scrap Rat | On the rat round, zap it for gold before it escapes |
@@ -96,6 +97,21 @@ terrain tiles. The plan phase lasts 30 seconds; when it runs out the fight start
   seconds) for level 9 and Nova Quinn (Air Strike: 140 damage to every enemy) for a won match. A
   locked commander's card says what unlocks it. The rivals use their skills on their own and call
   out a taunt at the start of a fight.
+- **Overdrives.** Every commander also has an overdrive, set by its skill: a shield wave (Overclock,
+  Power Surge, Rally Cry: every robot shielded for 25% of its health for 5 seconds), a front EMP
+  (Scrap Wall, Patch-Up, Air Strike: the enemy front row drained, stunned for 2 seconds and hit for
+  120) or a repair burst (Big Zap, EMP Blast: every robot repaired for 45% of its health). Its
+  button, right of Speed, fills as your robots deal damage (40% of the enemy side's starting health
+  fills it) and fires once per fight with a tap or V. The rivals fire theirs as soon as it is full.
+- **Stage events.** From stage 2 each stage draws one event (never the last stage's) that changes
+  every fight in it, the rivals' too: Scrap storm (shooters attack 25% slower), Magnet field (every
+  robot is pulled a tile toward the middle as the fight starts), Charged air (robots start half
+  charged), Rust rain (armour cut by 40%) and Live wires (overdrives charge twice as fast). The top
+  bar names it, and a new one is called out when its stage starts.
+- **Finals.** When two commanders are left (not in duo mode), they play a best of three: fights
+  between the two with a plan phase between each, and no health lost. The first to win two takes
+  1st; a draw is played again, and after five fights the one with more wins, or more health, takes
+  it. The top bar keeps the score and the players list shows a pip for each fight won.
 - **Weekly season.** The third season card is this week's: the date (weeks run Monday to Sunday,
   UTC) picks one of the two seasons with or without terrain, in turn, so every combination comes
   round once a month. The card shows the rules and this week's best place, which is saved apart from
@@ -204,3 +220,7 @@ shows your seat's fights on the board.
 ![A picked-up part: tags over each robot name what it would build, and the panel lists the recipes](docs/screenshots/part-preview.webp)
 
 ![The damage meter after a fight](docs/screenshots/damage-meter.webp)
+
+![A finals fight: the overdrive button charged right of Speed, the rival's repair burst, the score in the top bar and the stage event at its right end](docs/screenshots/overdrive.webp)
+
+![The finals' plan phase: Finals 1–0 in the top bar, the win pips in the players list and the stage event called out](docs/screenshots/finals.webp)

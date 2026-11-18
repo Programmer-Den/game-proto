@@ -753,8 +753,22 @@ export function levelUp(p: Panel, s: GameState) {
     if (fuse) p.text(left, y, t('fusionHint', { name: t(fuse.name), n: FUSION_NEEDS }), 11.5, '#ff9de2', { wrap });
     number(p, r, i);
   });
+  // Banish: a button under each card while any are left (spots after the cards, so card i is spot i).
+  if (s.banishes > 0) {
+    choices.forEach((id, i) => {
+      if (id === FILLER.id) return;
+      const r = levelCardRect(i, choices.length);
+      const b = { x: r.x + r.w / 2 - 70, y: r.y + r.h + 8, w: 140, h: 28 };
+      p.frame(b, BANISH_COLOR, '#160c14');
+      p.spots.push({ id: `banish-${i}`, ...b });
+      p.text(b.x + b.w / 2, b.y + b.h / 2, t('banishButton', { n: s.banishes }), 12.5, BANISH_COLOR, { bold: true, origin: [0.5, 0.5] });
+    });
+  }
   return p;
 }
+
+/** The Banish buttons' colour. */
+const BANISH_COLOR = '#ff8fa3';
 
 /** A card's key number in its top left corner. */
 function number(p: Panel, r: { x: number; y: number }, i: number) {

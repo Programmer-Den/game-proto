@@ -9,6 +9,8 @@ const en: HowToPlay = {
     { input: 'Hold Port guns or Q, then let go', action: 'Aim and charge the port broadside, then fire it' },
     { input: 'Hold Starboard guns or E, then let go', action: 'Aim and charge the starboard broadside, then fire it' },
     { input: 'Tap Scuttle the prize', action: 'Sink your newest prize at once for twice her loot' },
+    { input: 'Tap Consorts or C', action: 'Order your prizes and consorts: hunt, follow me, attack my target or screen the convoy' },
+    { input: 'Tap Guns, Sails or Pumps, or 1, 2, 3 (from wave 2)', action: 'Move a share of the crew to that station' },
     {
       input: 'Tap a card or a row at the harbour',
       action: 'Keep a perk, buy an upgrade, patch the hull, hire sailors or keep a prize as a consort',
@@ -41,6 +43,8 @@ const en: HowToPlay = {
     'Cargo sells for half again or more at the next port, but a full hold turns 30% slower and every two crates bring a raider hunting you.',
     "From wave 9 a rare wave brings a sea serpent or a kraken: dodge the rings where its arms will rise, and fire when its head comes up beside you. Each one sunk hangs on the harbour wall.",
     'Every fourth wave from wave 4 sails at night: you only see enemies by their lanterns and gun flashes, and your guns only train on what you can see, so fire a flare.',
+    'Crew stations: more hands on the guns reload faster, on the sails turn faster, and on the pumps mend the hull mid-fight, but each share comes from another station, and lost sailors cut the gain.',
+    "Buy the Iron bow at the harbour to ram: sail into a ship as fast as you can, and your own hull takes only a quarter of the blow.",
   ],
 };
 
@@ -60,6 +64,8 @@ const de: HowToPlay = {
     { input: 'Backbord-Kanonen oder Q halten, dann loslassen', action: 'Die Backbord-Breitseite zielen und laden, dann feuern' },
     { input: 'Steuerbord-Kanonen oder E halten, dann loslassen', action: 'Die Steuerbord-Breitseite zielen und laden, dann feuern' },
     { input: 'Prise versenken tippen', action: 'Deine neueste Prise sofort für doppelte Beute versenken' },
+    { input: 'Begleiter tippen oder C', action: 'Deinen Prisen und Begleitschiffen befehlen: jagen, mir folgen, mein Ziel angreifen oder den Geleitzug schützen' },
+    { input: 'Kanonen, Segel oder Pumpen tippen, oder 1, 2, 3 (ab Welle 2)', action: 'Einen Teil der Crew auf diese Station schicken' },
     {
       input: 'Im Hafen eine Karte oder Zeile tippen',
       action: 'Einen Vorteil behalten, eine Verbesserung kaufen, den Rumpf flicken, Seeleute anheuern oder eine Prise als Begleitschiff behalten',
@@ -92,6 +98,8 @@ const de: HowToPlay = {
     'Ladung bringt im nächsten Hafen die Hälfte mehr oder noch mehr ein, aber ein voller Laderaum wendet 30 % träger, und je zwei Kisten locken einen Plünderer an, der dich jagt.',
     'Ab Welle 9 bringt eine seltene Welle eine Seeschlange oder einen Kraken: weiche den Ringen aus, wo seine Arme auftauchen, und feuere, wenn sein Kopf neben dir hochkommt. Jeder versenkte hängt an der Hafenmauer.',
     'Jede vierte Welle ab Welle 4 segelt bei Nacht: Feinde siehst du nur an Laternen und Mündungsfeuer, und deine Kanonen zielen nur auf das, was du siehst, also schieß eine Leuchtkugel.',
+    'Crew-Stationen: mehr Hände an den Kanonen laden schneller nach, an den Segeln wenden schneller, und an den Pumpen flicken sie den Rumpf mitten im Kampf, aber jeder Teil fehlt einer anderen Station, und verlorene Seeleute schmälern den Gewinn.',
+    'Kauf im Hafen den Eisernen Bug, um zu rammen: segle so schnell du kannst in ein Schiff, und dein eigener Rumpf trägt nur ein Viertel des Stoßes.',
   ],
 };
 
