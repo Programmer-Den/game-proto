@@ -243,6 +243,13 @@ const de: Translation<typeof en> = {
   weeklyAllStars: 'Alle Sterne verdient',
   playAgain: 'Noch einmal',
   captionWeekly: 'Das Brett dieser Woche, für alle gleich: Die Zutaten auf dem Etikett zählen, jede Stufe einer Kettenreaktion einmal mehr. Keine Werkzeuge',
+  vialsRow: 'Phiolen zur untersten Reihe',
+  dropLine: 'Fallauftrag: {n} Phiolen zur untersten Reihe bringen',
+  captionVials: 'Räume die Felder unter einer Phiole ab, damit sie fällt; in der untersten Reihe ist sie geliefert',
+  captionCauldron: 'Restkessel {n}/{size}: Zutaten, die der Auftrag nicht braucht, füllen ihn, und voll gibt er einen Katalysator',
+  captionFlow: 'Im Fluss {n}/{run}: Züge in Folge, deren Treffer eine Kettenreaktion auslöst; der dritte gibt einen Zug zurück',
+  flowNote: 'Im Fluss! Ein Zug zurück',
+  cauldronNote: 'Der Kessel braut einen Katalysator!',
 };
 
 export default de;

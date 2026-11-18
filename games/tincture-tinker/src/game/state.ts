@@ -1,5 +1,5 @@
 import { dailyRand } from '../../../../shared/daily';
-import { addBlockers, freshBoard, layBoard, stuck, type Board, type Cell, type Tile } from './board';
+import { addBlockers, freshBoard, layBoard, placeVials, stuck, type Board, type Cell, type Tile } from './board';
 import { endlessOrder } from './endless';
 import { EXAMS, examOrder, examSeed, seeded } from './exams';
 import { guestOrder, guestSeed } from './guests';
@@ -80,6 +80,14 @@ export interface GameState extends Progress {
   score: number;
   /** Toads the witch made this order (a guest's rule; see guests.ts). */
   toads: number;
+  /** The spare cauldron: ingredients the order doesn't need gathered since it last dropped a Catalyst (see sim.ts). */
+  cauldron: number;
+  /** Flow: moves in a row whose match set off a cascade, since the last move given back (see sim.ts). */
+  flow: number;
+  /** Moves given back by flow this order. */
+  flowed: number;
+  /** A drop order's vials brought down to the bottom row so far. */
+  delivered: number;
   board: Board;
   nextId: number;
   /** Where new tiles' kinds come from on the daily order (today's seeded source); Math.random otherwise. Never saved. */
@@ -142,7 +150,7 @@ export function startOrder(progress: Progress, exam = false): GameState {
   if (exam) return startAside(progress, examOrder(progress.seals, progress.order), seeded(examSeed(progress.seals)));
   const s = blankState(progress, orderFor(progress.order, standingOf(progress)));
   const current = s.current;
-  s.board = addBlockers(freshBoard(tileMaker(s)), current.jars, current.resin, current.mould);
+  s.board = placeVials(addBlockers(freshBoard(tileMaker(s)), current.jars, current.resin, current.mould), current.vials ?? 0);
   if (s.upgrades.bloom > 0) s.board = withBloom(s.board);
   drawPantry(s);
   return s;
@@ -210,6 +218,10 @@ function blankState(progress: Progress, current: Order): GameState {
     passed: false,
     score: 0,
     toads: 0,
+    cauldron: 0,
+    flow: 0,
+    flowed: 0,
+    delivered: 0,
     board: [],
     nextId: 1,
   };
@@ -228,9 +240,9 @@ function withBloom(board: Board): Board {
 /** True if the order counts `kind`: only the ingredients it asks for are gathered towards it. */
 export const wanted = (s: GameState, kind: Kind) => kind in s.current.needs;
 
-/** True once every ingredient in `needs` (the order's, by default) has been gathered. */
+/** True once every ingredient in `needs` (the order's, by default) has been gathered, and a drop order's vials brought down. */
 export const filled = (s: GameState, needs: Needs = s.current.needs) =>
-  Object.entries(needs).every(([kind, n]) => s.got[kind as Kind] >= n);
+  Object.entries(needs).every(([kind, n]) => s.got[kind as Kind] >= n) && (needs !== s.current.needs || s.delivered >= (s.current.vials ?? 0));
 
 /** The first customer's needs on a twin order: the order's without the second customer's. */
 export const firstNeeds = (o: Order): Needs =>

@@ -78,6 +78,8 @@ export interface Order {
   guest?: { index: number; rule: GuestRule };
   /** The weekly order: the week it is for (its Monday) and the town whose board shape it borrows (see weekly.ts). */
   weekly?: { week: string; town: number };
+  /** A drop order: this many vials start on the top row and must be brought down to the bottom one. */
+  vials?: number;
 }
 
 /**
@@ -124,6 +126,13 @@ const TWIN_MOVES = 0.5;
 export const RICH_SHARE = 0.5;
 export const RICH_MOVES = 4;
 export const RICH_BLOCKERS = 2;
+/** Every fifth order from the fourth (4, 9, 14...) is a drop order: vials to bring down, more as rounds go by... */
+export const DROP_AT = 4;
+export const DROP_VIALS = 2;
+const DROP_MAX = 4;
+/** ...each bringing this many more moves and this many more coins. */
+export const VIAL_MOVES = 2;
+export const VIAL_COINS = 10;
 
 const ORDERS: Recipe[] = [
   { potion: 'healingDraught', needs: { ember: 12, sage: 12 }, moves: 15, price: 30 },
@@ -148,12 +157,17 @@ export const isRoyal = (number: number) => number % ROYAL_EVERY === 0;
 /** True on the orders two customers share, once a recipe is unlocked (Journeyman): 7, 12, 17... */
 export const isTwin = (number: number, unlocked: PotionId[]) => unlocked.length > 0 && number > ROYAL_EVERY && number % ROYAL_EVERY === TWIN_AT;
 
+/** True on the drop orders (4, 9, 14...), which never fall on a royal commission or a twin order. */
+export const isDrop = (number: number) => number % ROYAL_EVERY === DROP_AT;
+/** How many vials drop order `number` asks for: two, one more every two rounds, at most four. */
+export const vialsFor = (number: number) => Math.min(DROP_VIALS + Math.floor((number - DROP_AT) / (ROYAL_EVERY * 2)), DROP_MAX);
+
 /**
- * The twist on order `number`: none on the first two or on a twin order, then a rush order, one that
+ * The twist on order `number`: none on the first two, on a twin order or on a drop order, then a rush order, one that
  * forbids an ingredient it doesn't need (none if it needs every kind), and a plain one, round and round.
  */
 export function twistFor(number: number, needs: Needs, unlocked: PotionId[] = []): Pick<Order, 'rush' | 'forbid'> {
-  if (number < 3 || isTwin(number, unlocked)) return {};
+  if (number < 3 || isTwin(number, unlocked) || isDrop(number)) return {};
   if (number % 3 === 0) return { rush: true };
   if (number % 3 === 1) {
     const spare = KINDS.filter((k) => !(k in needs));
@@ -234,6 +248,10 @@ export function orderFor(number: number, standing: Standing | PotionId[] = {}): 
       price: Math.round(recipe.price * TWIN_SHARE) + price,
       second: { potion: other.potion, needs, price },
     };
+  } else if (isDrop(number)) {
+    // Vials to bring down to the bottom row beside the recipe, with moves and coins for each.
+    const vials = vialsFor(number);
+    recipe = { ...recipe, vials, moves: recipe.moves + vials * VIAL_MOVES, price: recipe.price + vials * VIAL_COINS };
   }
   // A royal commission's forbidden kind must be one none of its stages needs.
   const needed = recipe.stages ? Object.assign({}, ...recipe.stages.map((st) => st.needs)) : recipe.needs;
