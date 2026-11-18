@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { BUTTON, DECREE, FEATS_BUTTON, GIFT_CARD, ISLAND_BUTTON, ISLANDS_CARD, PANEL, PUZZLES_CARD, TILE_BUTTONS, TITLE, TRADE_CARD, TRAY, UNDO_BUTTON } from '../scenes/layout';
+import { BUTTON, CROWN_CARD, DECREE, FEATS_BUTTON, GIFT_CARD, ISLAND_BUTTON, ISLANDS_CARD, PANEL, PUZZLES_CARD, TILE_BUTTONS, TITLE, TRADE_CARD, TRAY, UNDO_BUTTON } from '../scenes/layout';
 import { viewFrame, viewSize } from '../../../../shared/scaling';
 import { bake, setArtRes, ball, castle, cathedral, circle, crown, ctx, gardens, grain, granary, harbor, house, lighthouse, lumber, manor, market, orchard, peg, PI, reseed, rnd, rrect, stripes, T, temple, tile, tower, walnut, windmill } from './wood';
 import { WONDERS, type Wonder } from '../game/tiles';
@@ -21,7 +21,7 @@ import type { Skin } from '../game/feats';
 // - `icon-<building>` and `icon-<building>-big`: icons for the gift chips and the gift card; `spot-farm`, `spot-house`: the decree's open
 //   spots; `tick`, `bead-on`, `bead-off`, `crown`, `count`, `star-on` and `star-off` (campaign stars).
 // - `plaque-<w>x<h>`, `plaque-<w>x<h>-sel`, `glow-<w>x<h>`: beech plaques for buttons;
-//   `walnut-<w>x<h>`: walnut boards for the gift card, the islands card, the trade card, the round
+//   `walnut-<w>x<h>`: walnut boards for the gift card, the islands card, the trade and coronation cards, the round
 //   banner and the game-over card.
 
 /** One cell in art units. */
@@ -237,8 +237,8 @@ function spot(kind: 'farm' | 'house') {
 }
 
 /** A building on its own, `k` times the size of a gift chip's icon. */
-type IconKind = 'farm' | 'house' | 'tower' | 'windmill' | 'market' | 'harbor' | 'lumber' | 'temple' | 'lighthouse' | 'orchard';
-const ICONS: IconKind[] = ['farm', 'house', 'tower', 'windmill', 'market', 'harbor', 'lumber', 'temple', 'lighthouse', 'orchard'];
+type IconKind = 'farm' | 'house' | 'tower' | 'windmill' | 'market' | 'harbor' | 'lumber' | 'temple' | 'lighthouse' | 'orchard' | 'pond' | 'grove';
+const ICONS: IconKind[] = ['farm', 'house', 'tower', 'windmill', 'market', 'harbor', 'lumber', 'temple', 'lighthouse', 'orchard', 'pond', 'grove'];
 
 function icon(kind: IconKind, k = 1) {
   reseed(77);
@@ -247,6 +247,25 @@ function icon(kind: IconKind, k = 1) {
     ctx.fillStyle = T.soil;
     ctx.fill();
     stripes(-12 * k, -11 * k, 24 * k, 22 * k, 0.4 * k);
+  } else if (kind === 'pond') {
+    // a little lake with a ripple: the pond tile digs one
+    rrect(-16 * k, -12 * k, 32 * k, 26 * k, 9 * k);
+    const g = ctx.createLinearGradient(0, -12 * k, 0, 14 * k);
+    g.addColorStop(0, '#4a92dc');
+    g.addColorStop(1, '#2f6bab');
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+    ctx.lineWidth = 2.5 * k;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.arc(-3 * k, 3 * k, 7 * k, PI * 1.1, PI * 1.9);
+    ctx.stroke();
+  } else if (kind === 'grove') {
+    // three young trees: the grove tile plants a wood
+    peg(-9 * k, 12 * k, 0.42 * k);
+    peg(9 * k, 10 * k, 0.42 * k);
+    peg(0, 19 * k, 0.46 * k);
   } else if (kind === 'house') house(0, 3 * k, 0.4 * k);
   else if (kind === 'tower') tower(0, 6 * k, 0.36 * k);
   else if (kind === 'windmill') windmill(0, 2 * k, 0.38 * k);
@@ -362,7 +381,9 @@ export function bakeTextures(scene: Phaser.Scene) {
   plaques(scene, TILE_BUTTONS.w, TILE_BUTTONS.h);
   plaques(scene, ISLAND_BUTTON.w, ISLAND_BUTTON.h, 14);
   plaques(scene, TRADE_CARD.chip.w, TRADE_CARD.chip.h, 12);
+  plaques(scene, CROWN_CARD.chip.w, CROWN_CARD.chip.h, 12);
   walnutBoard(scene, TRADE_CARD.w, TRADE_CARD.h);
+  for (const h of CROWN_CARD.hs) walnutBoard(scene, CROWN_CARD.w, h);
   const C = ISLANDS_CARD;
   for (const b of [C.level, C.daily, C.random, C.key, C.close]) plaques(scene, b.w, b.h, 14);
   walnutBoard(scene, C.w, C.h);
@@ -399,6 +420,8 @@ export function useSkin(scene: Phaser.Scene, k: Skin) {
 
 /** The texture of a cell's tile: grass shows one of its flower variants, picked by position. */
 export function tileKey(cell: string, col: number, row: number) {
+  // The land tiles show what they leave: a pond the lake, a grove the wood's plain tile.
+  if (cell === 'pond') cell = 'lake';
   if (cell === 'grass') return `tile-grass-${(col * 7 + row * 13 + ((col * row) % 5)) % GRASS_VARIANTS}${suffix(skin)}`;
   if (cell === 'road') return `tile-road${suffix(skin)}`;
   if (cell === 'lake' || cell === 'farm' || cell === 'sea') return `tile-${cell}`;
@@ -407,6 +430,7 @@ export function tileKey(cell: string, col: number, row: number) {
 
 /** The prop standing on a cell, or null for flat cells. */
 export function propKey(cell: string) {
+  if (cell === 'grove') return 'prop-forest';
   return (PROPS as string[]).includes(cell) ? `prop-${cell}` : null;
 }
 

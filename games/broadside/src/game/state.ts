@@ -9,6 +9,8 @@ import { perkRank, SWIVEL_ARC, type PerkId } from './perks';
 import type { EnemyKind } from './ships';
 import { FIRST_SQUALL, type Reef } from './storm';
 import { SHOTS, type ShotKind } from './shot';
+import { evenStations, SAILS_TURN, stationFactor, type Stations } from './stations';
+import type { FleetOrder } from './fleet';
 import { HOLD_MAX, HOLD_TURN, type Crate } from './trade';
 import type { UpgradeId } from './upgrades';
 import { waveShips } from './waves';
@@ -159,6 +161,8 @@ export interface Ship {
   diveMs: number;
   /** Time the flash of this ship's guns still lights her up at night. */
   flashMs: number;
+  /** After the player rams her with the iron bow, time before she can be rammed again. */
+  ramMs: number;
 }
 
 export interface Ball {
@@ -221,8 +225,8 @@ export interface Loot {
 
 export interface Effect {
   id: number;
-  /** `squall` marks the wind swinging round in a Storm Reaches squall, at the player. */
-  kind: 'splash' | 'smoke' | 'hit' | 'sink' | 'coins' | 'blast' | 'prize' | 'escape' | 'squall' | 'tentacle' | 'flare';
+  /** `squall` marks the wind swinging round in a Storm Reaches squall, at the player; `ram` the iron bow striking a ship. */
+  kind: 'splash' | 'smoke' | 'hit' | 'sink' | 'coins' | 'blast' | 'prize' | 'escape' | 'squall' | 'tentacle' | 'flare' | 'ram';
   x: number;
   y: number;
   ms: number;
@@ -350,6 +354,14 @@ export interface GameState {
   night: boolean;
   flares: number;
   flareMs: number;
+  /** Crew stations: the player's crew split between the guns, the sails and the pumps, in sixths. */
+  stations: Stations;
+  /** What the prizes and consorts are told to do, and the enemy the player last aimed a broadside at (its id, else null). */
+  fleetOrder: FleetOrder;
+  target: number | null;
+  /** The iron bow bought at the harbor, so the player rams; and how many rams this run. */
+  ironBow: boolean;
+  rams: number;
   nextId: number;
 }
 
@@ -378,10 +390,12 @@ export function stats(s: GameState) {
   const sails = (1 + 0.12 * rank(s, 'sails')) * (order.sails ?? 1);
   // A loaded hold makes her slower to come about.
   const laden = 1 - (HOLD_TURN * s.hold.length) / HOLD_MAX;
+  // More hands on the sails bring her about faster, fewer slower.
+  const trim = stationFactor(s.stations.sails, crewShare(s.player), SAILS_TURN);
   return {
     maxHp: hull.hp + 30 * rank(s, 'hull'),
     speed: hull.speed * sails,
-    turn: hull.turn * sails * laden,
+    turn: hull.turn * sails * laden * trim,
     guns: hull.guns + rank(s, 'guns'),
     damage: hull.damage * (1 + 0.25 * rank(s, 'shot')) * (order.damage ?? 1),
     reloadMs: hull.reloadMs * Math.pow(0.85, rank(s, 'crew')) * (order.reload ?? 1),
@@ -392,13 +406,16 @@ export function stats(s: GameState) {
 }
 
 /** How fast a ship's crew reloads, as a share of the full pace: all of it with a full crew, down to `CREW_PACE_MIN`. */
+/** The sailors aboard, as a share of a full crew. */
+export const crewShare = (ship: Ship) => ship.crew / ship.maxCrew;
+
 export const crewPace = (ship: Ship) => Math.max(CREW_PACE_MIN, ship.crew / ship.maxCrew);
 
 /** How far a broadside charged to `charge` (0 to 1) reaches, given the full `range`. */
 export const reachOf = (range: number, charge: number) => range * (REACH_MIN + (1 - REACH_MIN) * charge);
 
 export function newShip(id: number, kind: Ship['kind'], x: number, y: number, heading: number, hp: number, radius: number, crew: number): Ship {
-  return { id, kind, x, y, heading, hp, maxHp: hp, reload: { port: 0, starboard: 0 }, hitMs: 0, agroundMs: 0, slowMs: 0, jamMs: 0, boardMs: 0, radius, crew, maxCrew: crew, detour: null, escapeMs: 0, kept: false, captain: null, surfaceMs: 0, diveMs: 0, flashMs: 0 };
+  return { id, kind, x, y, heading, hp, maxHp: hp, reload: { port: 0, starboard: 0 }, hitMs: 0, agroundMs: 0, slowMs: 0, jamMs: 0, boardMs: 0, radius, crew, maxCrew: crew, detour: null, escapeMs: 0, kept: false, captain: null, surfaceMs: 0, diveMs: 0, flashMs: 0, ramMs: 0 };
 }
 
 /** The shot one side fires this wave: what the captain's order loads, or else what was loaded at the harbor. */
@@ -483,6 +500,11 @@ export function newRun(bestWave = 0, boons: BoonId[] = [], hull: HullId = FIRST_
     night: false,
     flares: 0,
     flareMs: 0,
+    stations: evenStations(),
+    fleetOrder: 'hunt',
+    target: null,
+    ironBow: false,
+    rams: 0,
     nextId: 2,
   };
   if (extras.daily) s.perks = [...extras.daily.perks];

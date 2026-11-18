@@ -68,6 +68,20 @@ export const SOUNDS = {
   busHit: { wave: 'square', freq: 180, to: 130, length: 0.08, volume: 0.16, gap: 450 },
   /** A codex page fills up. */
   codex: { wave: 'pulse25', freq: 880, arp: [0, 7, 12], arpStep: 0.06, length: 0.3, volume: 0.24, gap: 300 },
+  /** A volley of the flamethrower sidearm: a short whoosh, once however many guns throw. */
+  flameShot: { wave: 'noise', freq: 1900, to: 600, attack: 0.02, length: 0.14, volume: 0.18, gap: 70, vary: 0.06 },
+  /** The squad swaps weapons: a click-clack. */
+  swap: { wave: 'square', freq: 260, arp: [0, 12], arpStep: 0.05, length: 0.12, volume: 0.22, gap: 150 },
+  /** A dare taken. */
+  dare: { wave: 'square', freq: 330, arp: [0, 6, 12], arpStep: 0.06, length: 0.22, volume: 0.26, gap: 200 },
+  /** A wave held under its dare. */
+  dareHeld: { wave: 'pulse25', freq: 659, arp: [0, 4, 7, 12, 16], arpStep: 0.06, length: 0.4, volume: 0.28, gap: 300 },
+  /** The middle lane dare broken. */
+  dareLost: { wave: 'square', freq: 330, to: 150, length: 0.32, volume: 0.24, gap: 300 },
+  /** The last stand begins: a rising call to arms. */
+  lastStand: { wave: 'square', freq: 196, arp: [0, 3, 7, 12], arpStep: 0.09, length: 0.5, volume: 0.32, gap: 500 },
+  /** A melee blow in the last stand. */
+  melee: { wave: 'noise', freq: 900, to: 200, length: 0.09, volume: 0.26, gap: 120, vary: 0.08 },
 } satisfies Record<string, SoundDef>;
 
 export type SoundName = keyof typeof SOUNDS;

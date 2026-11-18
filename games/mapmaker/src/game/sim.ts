@@ -6,7 +6,15 @@ import {
   CAMP_COST,
   CAMP_REACH,
   DIG_COST,
+  FIX_BONUS,
+  FOOD_MIN,
+  GOODS_VALUE,
   GRID,
+  NO_PACK,
+  PACK_MAX,
+  PRESS_LOSS,
+  PRESS_RISK,
+  PRESS_STEPS,
   LANDING_MIN,
   RIVAL_FROM,
   RIVAL_PACE,
@@ -25,10 +33,12 @@ import {
   neighbours,
   rankOf,
   tileAt,
+  voyageFood,
   type Chart,
   type Commission,
   type Feature,
   type GameState,
+  type Gear,
   type Point,
   type Rival,
   type Tile,
@@ -93,6 +103,15 @@ export function newGame(): GameState {
     stores: 0,
     trade: null,
     traded: [],
+    pack: { ...NO_PACK },
+    gear: { ...NO_PACK },
+    sighted: [],
+    fixed: [],
+    climbed: [],
+    fixes: 0,
+    goods: 0,
+    pressOn: 0,
+    pressed: 0,
   };
   s.supplies = maxSupplies(s);
   s.commission = rollCommission(fogged(s.tiles));
@@ -138,7 +157,12 @@ export function frontier(s: GameState): Point[] {
  * winter isle costs 1. While a village's guide is aboard, every survey is free.
  */
 export function costOf(s: GameState, x: number, y: number) {
-  return s.guide > 0 ? 0 : groundCost(s, x, y);
+  return s.guide > 0 || usesRope(s, x, y) ? 0 : groundCost(s, x, y);
+}
+
+/** True when surveying (x, y) would spend a coil of rope: a peak that costs something, with no guide aboard. */
+export function usesRope(s: GameState, x: number, y: number) {
+  return s.guide === 0 && s.gear.rope > 0 && tileAt(s, x, y)!.terrain === 'mountain' && groundCost(s, x, y) > 0;
 }
 
 /** What a tile costs to survey, guide or not. */
@@ -159,8 +183,8 @@ export function snowHides(s: GameState, x: number, y: number) {
   return isWinter(s.island) && s.guide === 0 && Math.max(Math.abs(x - s.surveyor.x), Math.abs(y - s.surveyor.y)) > 1;
 }
 
-/** True while a survey can still be paid for. */
-export const canAfford = (s: GameState, p: Point) => costOf(s, p.x, p.y) <= s.supplies;
+/** True while a survey can still be paid for, in supplies or in steps pressed on. */
+export const canAfford = (s: GameState, p: Point) => costOf(s, p.x, p.y) <= s.supplies || s.pressOn > 0;
 
 /**
  * How far and in what shape the surveyor sees from a tile, with the Spyglass and a Climber. On a
@@ -175,21 +199,47 @@ export function sightOf(s: GameState, terrain: Terrain) {
 
 /**
  * Surveys the fogged tile (x, y) for its cost: reveals it, walks the surveyor there (or to the
- * shore beside it, for sea), and from hills and peaks also reveals the tiles in sight for free.
+ * shore beside it, for sea), and from hills and peaks also reveals the tiles in sight for free; on a
+ * charted lookout not stood on yet it climbs it the same way, for the bearing.
  * Finds under the revealed tiles turn up at once. Every `RIVAL_PACE` surveys the rival takes a
  * turn. The voyage ends when nothing more can be done. Returns false when the tile can't be surveyed,
  * else the storms it `settled` (which may have ended the voyage, clearing `storms`), the storm
- * finds that found no fogged tile to settle on (they `passed`) and whether the isle's wonder came
- * into sight (`wonder`).
+ * finds that found no fogged tile to settle on (they `passed`), whether the isle's wonder came
+ * into sight (`wonder`), the tiles a lookout `fixed`, and whether lamp oil `lit` a cave or trade
+ * goods were `sold` at a village.
  */
-export function survey(s: GameState, x: number, y: number): { settled: Point[]; passed: Point[]; wonder: boolean } | false {
-  if (s.phase !== 'survey' || !canSurvey(s, x, y) || !canAfford(s, { x, y })) return false;
-  s.supplies -= costOf(s, x, y);
+export function survey(
+  s: GameState,
+  x: number,
+  y: number,
+): { settled: Point[]; passed: Point[]; wonder: boolean; fixed: Point[]; lit: boolean; sold: boolean } | false {
+  if (s.phase !== 'survey' || !(canSurvey(s, x, y) || canClimb(s, x, y)) || !canAfford(s, { x, y })) return false;
+  const cost = costOf(s, x, y);
+  // Pressing on, a step pays for a tile the supplies can't.
+  if (cost <= s.supplies) s.supplies -= cost;
+  else {
+    s.pressOn -= 1;
+    s.pressed += 1;
+  }
+  if (usesRope(s, x, y)) s.gear.rope -= 1;
   // The guide spends one of their surveys on any tile that would have cost something.
   if (s.guide > 0 && groundCost(s, x, y) > 0) s.guide -= 1;
   const tile = tileAt(s, x, y)!;
+  // A climb stands on a charted lookout: nothing new is charted under the surveyor's feet.
+  const fresh = !tile.revealed;
   const storms: Point[] = [];
   reveal(s, x, y, storms);
+  // Gear works where the surveyor stands: lamp oil lights a cave deeper, trade goods sell at a village.
+  const lit = fresh && tile.find === 'cave' && s.gear.oil > 0;
+  if (lit) {
+    s.gear.oil -= 1;
+    s.artifacts += 1;
+  }
+  const sold = fresh && tile.terrain === 'village' && s.gear.goods > 0;
+  if (sold) {
+    s.gear.goods -= 1;
+    s.goods += 1;
+  }
   if (tile.terrain === 'sea' && s.hand !== 'boatman') {
     const shore = neighbours(x, y).filter((n) => {
       const t = tileAt(s, n.x, n.y)!;
@@ -205,10 +255,16 @@ export function survey(s: GameState, x: number, y: number): { settled: Point[]; 
   }
 
   const { range, shape } = sightOf(s, tile.terrain);
+  if (range > 0) s.climbed.push({ x, y });
+  const fixed: Point[] = [];
   for (let dy = -range; dy <= range; dy++) {
     for (let dx = -range; dx <= range; dx++) {
       const inSight = shape === 'ring' ? true : Math.abs(dx) + Math.abs(dy) <= range;
-      if (inSight) reveal(s, x + dx, y + dy, storms);
+      if (!inSight) continue;
+      reveal(s, x + dx, y + dy, storms);
+      // A chartable tile seen from a second lookout is fixed.
+      const p = { x: x + dx, y: y + dy };
+      if ((dx || dy) && isChartable(s, p.x, p.y) && sight(s, p)) fixed.push(p);
     }
   }
   // Each storm settles on the nearest fogged tile within two steps, once the lookout has seen what
@@ -237,7 +293,56 @@ export function survey(s: GameState, x: number, y: number): { settled: Point[]; 
     rivalTurn(s);
   }
   endIfDone(s);
-  return { settled, passed, wonder };
+  return { settled, passed, wonder, fixed, lit, sold };
+}
+
+/** True for a lookout (a hill or a peak). */
+const isLookout = (s: GameState, x: number, y: number) => {
+  const t = tileAt(s, x, y)?.terrain;
+  return t === 'hills' || t === 'mountain';
+};
+
+/**
+ * A charted lookout the surveyor hasn't stood on (one seen from another lookout) can be climbed for
+ * its survey cost, to take a bearing from it: it sights the tiles around it, for fixes.
+ */
+export function canClimb(s: GameState, x: number, y: number) {
+  const t = tileAt(s, x, y);
+  return s.phase === 'survey' && !!t && t.revealed && isLookout(s, x, y) && !has(s.climbed, x, y);
+}
+
+/** Every lookout that can be climbed now, whatever it costs. */
+export function climbable(s: GameState): Point[] {
+  const out: Point[] = [];
+  for (let y = 0; y < GRID.h; y++) for (let x = 0; x < GRID.w; x++) if (canClimb(s, x, y)) out.push({ x, y });
+  return out;
+}
+
+/** How many tiles standing on the lookout at (x, y) would fix: tiles in its sight seen from one lookout so far. */
+export function wouldFix(s: GameState, x: number, y: number) {
+  const { range, shape } = sightOf(s, tileAt(s, x, y)!.terrain);
+  let n = 0;
+  for (let dy = -range; dy <= range; dy++) {
+    for (let dx = -range; dx <= range; dx++) {
+      if ((!dx && !dy) || (shape !== 'ring' && Math.abs(dx) + Math.abs(dy) > range)) continue;
+      if (has(s.sighted, x + dx, y + dy)) n += 1;
+    }
+  }
+  return n;
+}
+
+/** Marks a tile seen from a lookout: sighted the first time, fixed the second. True when it was just fixed. */
+function sight(s: GameState, p: Point) {
+  if (has(s.fixed, p.x, p.y)) return false;
+  const k = s.sighted.findIndex((q) => q.x === p.x && q.y === p.y);
+  if (k < 0) {
+    s.sighted.push(p);
+    return false;
+  }
+  s.sighted.splice(k, 1);
+  s.fixed.push(p);
+  s.fixes += 1;
+  return true;
 }
 
 /**
@@ -257,10 +362,42 @@ function reveal(s: GameState, x: number, y: number, storms: Point[]) {
 }
 
 /** True while the surveyor can still survey something they can pay for, or dig for the treasure. */
-export const canAct = (s: GameState) => frontier(s).some((p) => canAfford(s, p)) || diggable(s).length > 0;
+export const canAct = (s: GameState) =>
+  frontier(s).some((p) => canAfford(s, p)) || climbable(s).some((p) => canAfford(s, p)) || diggable(s).length > 0;
 
+/** The voyage ends once nothing more can be done, unless the surveyor may still press on. */
 function endIfDone(s: GameState) {
-  if (!canAct(s)) returnToPort(s);
+  if (!canAct(s) && !canPressOn(s)) returnToPort(s);
+}
+
+/**
+ * Pressing on is open once a voyage, when the supplies can pay for nothing more and there is still
+ * fogged ground beside the chart.
+ */
+export function canPressOn(s: GameState) {
+  return s.phase === 'survey' && s.pressed === 0 && s.pressOn === 0 && !canAct(s) && frontier(s).length > 0;
+}
+
+/** Presses on: `PRESS_STEPS` more surveys, one step a tile, at the risk of a storm on the way home. */
+export function pressOn(s: GameState) {
+  if (!canPressOn(s)) return false;
+  s.pressOn = PRESS_STEPS;
+  return true;
+}
+
+/** The chance a storm catches the voyage on its way home, from the steps pressed on. */
+export const stormRisk = (s: GameState) => Math.min(1, s.pressed * PRESS_RISK);
+
+/**
+ * Whether the storm comes, from a hash of the isle's seed and the voyage (no random draw), so a
+ * reload can't roll it again and every player of the daily isle meets the same weather.
+ */
+function stormComes(s: GameState) {
+  let h = ((s.seed ?? s.island) ^ Math.imul(s.island, 0x27d4eb2d) ^ Math.imul(s.voyage, 0x165667b1)) >>> 0;
+  h = Math.imul(h ^ (h >>> 15), 0x85ebca6b);
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
+  h ^= h >>> 16;
+  return (h >>> 0) / 4294967296 < stormRisk(s);
 }
 
 /** A base camp can go on the surveyor's tile (not the port, not twice) for `CAMP_COST` supplies. */
@@ -397,6 +534,9 @@ export function returnToPort(s: GameState) {
   if (s.phase !== 'survey') return false;
   s.chart = chartOf(s);
   s.phase = 'chart';
+  s.pressOn = 0;
+  s.pressed = 0;
+  s.gear = { ...NO_PACK };
   s.storms = [];
   s.landing = null;
   s.guide = 0;
@@ -451,6 +591,17 @@ export function chartOf(s: GameState): Chart {
   const milestoneCoins = due.reduce((sum, m) => sum + m.coins, 0);
   const atlas = due.some((m) => m.atlas);
   const artifactCoins = s.artifacts * artifactValue(s);
+  const fixCoins = s.fixes * FIX_BONUS;
+  const goodsCoins = s.goods * GOODS_VALUE;
+  // A storm on the way home washes out the voyage's least valuable tiles.
+  const storm = s.pressed > 0 && stormComes(s) ? Math.min(s.pressed * PRESS_LOSS, s.surveyed.length) : 0;
+  const worths = s.surveyed
+    .map((p) => {
+      const v = TERRAIN[s.tiles[indexOf(p.x, p.y)].terrain].value;
+      return v - (claimed(s, p.x, p.y) ? Math.floor(v / 2) : 0);
+    })
+    .sort((a, b) => a - b);
+  const stormLoss = worths.slice(0, storm).reduce((sum, v) => sum + v, 0);
   return {
     counts,
     base,
@@ -461,6 +612,12 @@ export function chartOf(s: GameState): Chart {
     treasure: s.treasure,
     features: done,
     featureCoins,
+    fixes: s.fixes,
+    fixCoins,
+    goods: s.goods,
+    goodsCoins,
+    storm,
+    stormLoss,
     rivalTiles,
     rivalLoss,
     unused,
@@ -468,7 +625,7 @@ export function chartOf(s: GameState): Chart {
     milestones: due.length,
     milestoneCoins,
     atlas,
-    total: base - rivalLoss + ink + featureCoins + bonus + artifactCoins + s.treasure + sellBack + milestoneCoins,
+    total: base - rivalLoss + ink + featureCoins + fixCoins + goodsCoins - stormLoss + bonus + artifactCoins + s.treasure + sellBack + milestoneCoins,
   };
 }
 
@@ -535,6 +692,8 @@ export function sellChart(s: GameState) {
   s.surveyed = [];
   s.artifacts = 0;
   s.treasure = 0;
+  s.fixes = 0;
+  s.goods = 0;
   s.hand = null;
   s.hands = rollHands();
   const fog = fogged(s.next?.tiles ?? s.tiles);
@@ -626,6 +785,9 @@ export function setSail(s: GameState) {
     s.camps = [];
     s.dug = [];
     s.traded = [];
+    s.sighted = [];
+    s.fixed = [];
+    s.climbed = [];
     s.milestones = 0;
     s.isleStart = s.voyage + 1;
     s.rival = landRival(s);
@@ -633,7 +795,12 @@ export function setSail(s: GameState) {
   s.voyage += 1;
   s.surveyor = { ...s.port };
   s.stores = trade === 'stores' ? TRADE_STORES : 0;
-  s.supplies = maxSupplies(s) + s.stores;
+  // The pack never squeezes the food below FOOD_MIN (a harder difficulty can shrink the sack).
+  for (const g of ['goods', 'oil', 'rope'] as Gear[]) while (s.pack[g] > 0 && voyageFood(s) < FOOD_MIN) s.pack[g] -= 1;
+  s.gear = { ...s.pack };
+  s.supplies = voyageFood(s) + s.stores;
+  s.pressOn = 0;
+  s.pressed = 0;
   s.guide = trade === 'guide' ? TRADE_GUIDE : 0;
   if (trade === 'rumour' && s.wonder && !s.wonder.seen) s.wonder.rumour = true;
   s.landing = rankOf(s, 'sloop') > 0 ? landingSpot(s) : null;
@@ -699,6 +866,30 @@ export function pickTrade(s: GameState, trade: Trade | null) {
   if (s.phase !== 'harbor') return false;
   s.trade = trade;
   return true;
+}
+
+// ---- Pack the sack (MM17).
+
+/** Whether a piece of gear can go into (step 1) or come out of (step -1) the sack at the harbour. */
+export function canPack(s: GameState, gear: Gear, step: 1 | -1) {
+  if (s.phase !== 'harbor' || s.run) return false;
+  const n = s.pack[gear] + step;
+  if (n < 0 || n > PACK_MAX) return false;
+  return step < 0 || voyageFood(s) - 1 >= FOOD_MIN;
+}
+
+/** Packs one more of a piece of gear (or one less), in place of a supply's food. */
+export function packGear(s: GameState, gear: Gear, step: 1 | -1) {
+  if (!canPack(s, gear, step)) return false;
+  s.pack[gear] += step;
+  return true;
+}
+
+/** What the fog of the next voyage's isle still hides that the pack can be made for: peaks and villages. */
+export function packAhead(s: GameState) {
+  const tiles = islandCharted(s) ? s.next?.tiles : s.tiles;
+  const fog = tiles ? fogged(tiles) : {};
+  return { peaks: fog.mountain ?? 0, villages: fog.village ?? 0 };
 }
 
 /** How many tiles of each terrain the fog still hides; for sea, only sea beside land, since open sea can't be surveyed. */

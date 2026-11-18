@@ -59,7 +59,13 @@ function bakeWyrm(scene: Phaser.Scene, prefix: string, copper: boolean) {
     poly(ctx, [w, { x: w.x + 66 * k, y: w.y - 52 * k }, { x: w.x + 50 * k, y: w.y - 10 * k }, { x: w.x + 68 * k, y: w.y + 4 * k }], '#2f8a3f', '#25623a', 1);
   });
   // The wagons, lengthwise along the columns (`wagon-u`) or along the rows (`wagon-v`).
-  if (!copper) for (const along of ['u', 'v'] as const) part(`wagon-${along}`, (ctx, x, y) => wagon(ctx, x, y, along));
+  if (!copper) {
+    for (const along of ['u', 'v'] as const) {
+      part(`wagon-${along}`, (ctx, x, y) => wagon(ctx, x, y, along, WAGON_WOOD.plain));
+      // The hitched wagon kinds (WR21), each in its own paint: `wagon-cold-u` and so on.
+      for (const kind of ['cold', 'hopper', 'mail'] as const) part(`wagon-${kind}-${along}`, (ctx, x, y) => wagon(ctx, x, y, along, WAGON_WOOD[kind]));
+    }
+  }
 }
 
 /** Turns every green on the canvas to copper, keeping its shading; cream horns and the gold eye stay. */
@@ -187,7 +193,15 @@ function head(ctx: Ctx, hx: number, hy: number) {
   }
 }
 
-function wagon(ctx: Ctx, x: number, y: number, along: 'u' | 'v') {
+/** Each wagon's paint, lit side, shaded side and top: plain wood, the cold wagon's frosty white, the hopper's gold and the mail coach's blue. */
+const WAGON_WOOD = {
+  plain: ['#a8703f', '#8a5a31', '#5c3d22'],
+  cold: ['#d8eef4', '#a8cad8', '#6e94a8'],
+  hopper: ['#e0b84a', '#b8902e', '#7a5a1c'],
+  mail: ['#4a78c0', '#34599a', '#1e3a6a'],
+} as const;
+
+function wagon(ctx: Ctx, x: number, y: number, along: 'u' | 'v', paint: readonly string[]) {
   const P = (u: number, v: number, z = 0): Pt => ({ x: x + ((u - v) * ISO.tw) / 2, y: y + ((u + v) * ISO.th) / 2 - z });
   const [hu, hv] = along === 'v' ? [0.14, 0.19] : [0.19, 0.14];
   const h = 22 * SCALE;
@@ -199,9 +213,9 @@ function wagon(ctx: Ctx, x: number, y: number, along: 'u' | 'v') {
     const p = P(wu, wv, 8 * SCALE);
     ellipse(ctx, p.x, p.y, 4, 6, '#3b2a1c', along === 'v' ? 0.5 : -0.5);
   }
-  poly(ctx, [P(u0, v1, z), P(u1, v1, z), P(u1, v1, z + h), P(u0, v1, z + h)], '#a8703f', '#4a3220', 1);
-  poly(ctx, [P(u1, v1, z), P(u1, v0, z), P(u1, v0, z + h), P(u1, v1, z + h)], '#8a5a31', '#4a3220', 1);
-  poly(ctx, [P(u0, v0, z + h), P(u1, v0, z + h), P(u1, v1, z + h), P(u0, v1, z + h)], '#5c3d22', '#4a3220', 1);
+  poly(ctx, [P(u0, v1, z), P(u1, v1, z), P(u1, v1, z + h), P(u0, v1, z + h)], paint[0], '#4a3220', 1);
+  poly(ctx, [P(u1, v1, z), P(u1, v0, z), P(u1, v0, z + h), P(u1, v1, z + h)], paint[1], '#4a3220', 1);
+  poly(ctx, [P(u0, v0, z + h), P(u1, v0, z + h), P(u1, v1, z + h), P(u0, v1, z + h)], paint[2], '#4a3220', 1);
   const front = along === 'v' ? [[u1, v0 + 0.06], [u1, v1 - 0.06]] : [[u0 + 0.06, v1], [u1 - 0.06, v1]];
   for (const [wu, wv] of front) {
     const p = P(wu + (along === 'u' ? 0 : 0), wv, 8 * SCALE);
@@ -256,6 +270,7 @@ const CARGO_ICONS: Record<Cargo, string[]> = {
   peat: ['.......', '.bbbbb.', '.DbDbD.', 'bbbbbbb', 'DbDbDbD', 'bbbbbbb', '.DDDDD.'],
   salt: ['...I...', '..IcI..', '..III..', '.ttttt.', 'tnnnnnt', 'tnnnnnt', '.ttttt.'],
   wares: ['..GGG..', '...G...', 'WWWGWWW', 'wwwGwwD', 'GGGGGGG', 'wwwGwwD', 'DDDGDDD'],
+  letters: ['.......', 'nnnnnnn', 'NnnnnnN', 'nNnnnNn', 'nnNGNnn', 'nnnNnnn', 'NNNNNNN'],
   passengers: ['.s...s.', 'sss.sss', '.s...s.', 'hhh.ddd', 'hhh.ddd', '.hh.dd.', '.h...d.'],
 };
 

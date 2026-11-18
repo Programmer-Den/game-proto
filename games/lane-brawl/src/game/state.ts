@@ -25,6 +25,10 @@ import {
   ChampionDef,
   ENEMY_LANES,
   ALLY_LANES,
+  ROLE_ALLY_LANES,
+  QUESTS,
+  QuestDef,
+  RoleId,
   ITEMS,
   LANES,
   LaneId,
@@ -180,6 +184,8 @@ export interface Unit {
   /** The player's talent page (LB18): its passives summed, counted with the buffs, and the health it adds. */
   talent: BuffDef | null;
   talentHp: number;
+  /** The player's champion: the ability its finished quest empowers (LB21), null until then. */
+  questKey: AbilityKey | null;
   /** AI champions: the point a ping of the player's sent it to, the enemy marked there, and until when. */
   pingGoal: Vec | null;
   pingTarget: number | null;
@@ -291,7 +297,7 @@ export type SoundId =
   | 'burst' | 'bolt' | 'dash' | 'ally' | 'buff' | 'zone' | 'impact'
   | 'lastHit' | 'slain' | 'youDie' | 'streak' | 'crash' | 'nexus' | 'wardBreak'
   | 'levelUp' | 'flask' | 'blink' | 'ward' | 'recallHome' | 'respawn' | 'buyBack'
-  | 'wave' | 'watchstone' | 'rune' | 'runeTaken' | 'mercs' | 'spell' | 'ping' | 'drake' | 'drakeWakes' | 'firstBlood' | 'plate' | 'nightfall' | 'daybreak' | 'comeback' | 'vote' | 'growl' | 'beastSlain' | 'brute' | 'objective' | 'objectiveMissed' | 'suddenDeath' | 'flood';
+  | 'wave' | 'watchstone' | 'rune' | 'runeTaken' | 'mercs' | 'spell' | 'ping' | 'drake' | 'drakeWakes' | 'firstBlood' | 'plate' | 'nightfall' | 'daybreak' | 'comeback' | 'vote' | 'growl' | 'beastSlain' | 'brute' | 'objective' | 'objectiveMissed' | 'suddenDeath' | 'flood' | 'quest';
 
 /**
  * A sound raised by the rules: at a point in the world (the view plays it only where blue sees and
@@ -420,6 +426,14 @@ export interface GameState {
   surrendered: Team | null;
   /** Each team's net worth over the match, every `SUMMARY.every` ms and at its end (`sampleWorth`). */
   history: { t: number; blue: number; red: number }[];
+  /** The player's role (LB22): its allies' lanes, its quest and its first objective. */
+  role: RoleId;
+  /** The player's champion quest (LB21); null when watching. `have` counts all but last hits (`s.lastHits`). */
+  quest: { def: QuestDef; have: number; state: 'open' | 'done' | 'missed' } | null;
+  /** What the coach after the match reads (LB23): the player's deaths under a red tower, marked
+   * last hits lost to others, wards planted, battle spells cast, time spent alive with `COACH.rich`
+   * gold or more, and objectives missed. */
+  coach: { towerDeaths: number; missed: number; wards: number; spells: number; richMs: number; objMissed: number };
   /** Pings on the map (the player's, and blue's AI calling a retreat), newest last, and when the player last pinged. */
   pings: Ping[];
   lastPingAt: number;
@@ -554,6 +568,7 @@ export function blankUnit(
     drake: null,
     talent: null,
     talentHp: 0,
+    questKey: null,
     pingGoal: null,
     pingTarget: null,
     pingUntil: 0,
@@ -645,6 +660,8 @@ export interface MatchOptions {
   roster?: { blue: ChampionDef[]; red: ChampionDef[] };
   /** The player's talent page (LB18): one talent per opened row. */
   talents?: TalentId[];
+  /** The player's role (LB22): mid when not given, as before roles. */
+  role?: RoleId;
 }
 
 /**
@@ -715,11 +732,17 @@ export function createGame(pick: ChampionDef, enemyDamage: number, opts: MatchOp
     nextSurrender: opts.quick ? SURRENDER.quickAt : SURRENDER.at,
     surrendered: null,
     history: [],
+    role: opts.role ?? 'mid',
+    quest: opts.watch ? null : { def: QUESTS[opts.role ?? 'mid'], have: 0, state: 'open' },
+    coach: { towerDeaths: 0, missed: 0, wards: 0, spells: 0, richMs: 0, objMissed: 0 },
     pings: [],
     lastPingAt: -Infinity,
     zones: [],
     notices: [],
   };
+
+  // A jungler's first objective is a camp; the lanes start with their red tower.
+  if (s.role === 'jungle' && !s.watch) s.objectiveIndex = 1;
 
   const structHp = opts.quick ? QUICK.hp : opts.event === 'allMid' ? ALL_MID.hp : map === 'twin' ? TWIN.hp : 1;
   for (const team of ['blue', 'red'] as Team[]) {
@@ -831,7 +854,7 @@ export function createGame(pick: ChampionDef, enemyDamage: number, opts: MatchOp
     player.hp = player.maxHp;
   }
   others.slice(0, allies).forEach((def, i) => {
-    spawnChampion(s, def, 'blue', blueAt(i + 1).x, blueAt(i + 1).y, false, laneOf(ALLY_LANES, i), def.hero);
+    spawnChampion(s, def, 'blue', blueAt(i + 1).x, blueAt(i + 1).y, false, laneOf(opts.watch ? ALLY_LANES : ROLE_ALLY_LANES[s.role], i), def.hero);
   });
   others.slice(allies, allies + enemies).forEach((def, i) => {
     spawnChampion(s, def, 'red', redAt(i).x, redAt(i).y, false, laneOf(ENEMY_LANES, i), def.hero);

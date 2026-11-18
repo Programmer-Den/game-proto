@@ -994,6 +994,60 @@ export const ALLY_LANES: LaneId[] = ['top', 'mid', 'bottom', 'mid'];
 export const QUICK = { lanes: ['mid'] as LaneId[], allies: 2, enemies: 3, hp: 2.5 };
 export const ENEMY_LANES: LaneId[] = ['top', 'mid', 'bottom', 'mid', 'top'];
 
+/**
+ * Roles (LB22, round 5): the player picks top, mid, bottom or jungle on the pick screen, and the
+ * four allied AI champions walk the lanes left (`ROLE_ALLY_LANES`, on Kessmoor's full matches; mid is
+ * the old `ALLY_LANES`). The role picks the champion's quest (`QUESTS`) and the first objective: a top
+ * or bottom laner's is that lane's red tower, a jungler's the nearest camp. A jungler hits jungle
+ * monsters `JUNGLER.campDmg` times harder.
+ */
+export type RoleId = 'mid' | 'top' | 'bottom' | 'jungle';
+export const ROLES: RoleId[] = ['mid', 'top', 'bottom', 'jungle'];
+export const ROLE_NAMES: Record<RoleId, { name: TextKey; desc: TextKey }> = {
+  mid: { name: 'positionMid', desc: 'positionMidDesc' },
+  top: { name: 'positionTop', desc: 'positionTopDesc' },
+  bottom: { name: 'positionBottom', desc: 'positionBottomDesc' },
+  jungle: { name: 'positionJungle', desc: 'positionJungleDesc' },
+};
+export const ROLE_ALLY_LANES: Record<RoleId, LaneId[]> = {
+  mid: ALLY_LANES,
+  top: ['mid', 'bottom', 'mid', 'bottom'],
+  bottom: ['top', 'mid', 'top', 'mid'],
+  jungle: ['top', 'mid', 'bottom', 'bottom'],
+};
+export const JUNGLER = { campDmg: 1.3 };
+
+/**
+ * Champion quests (LB21, round 5): one per match, by the role. What it counts (`lastHits`, the
+ * player's own; `towers` and `drakes` that fall to blue with the player alive within `QUEST.near`;
+ * `monsters`, jungle monsters the player slays), the goal and the time it has to be met by.
+ * Finishing it empowers the ability `key` for the rest of the match by `QUEST`'s percents.
+ */
+export type QuestCount = 'lastHits' | 'towers' | 'drakes' | 'monsters';
+export interface QuestDef {
+  count: QuestCount;
+  goal: number;
+  byMs: number;
+  key: AbilityKey;
+  /** The goal in a sentence (the pick screen) and what it counts in a word or two (the chip). */
+  text: TextKey;
+  short: TextKey;
+}
+export const QUESTS: Record<RoleId, QuestDef> = {
+  mid: { count: 'lastHits', goal: 40, byMs: 600_000, key: 'Q', text: 'questLastHits', short: 'questLastHitsShort' },
+  top: { count: 'towers', goal: 2, byMs: 900_000, key: 'W', text: 'questTowers', short: 'questTowersShort' },
+  bottom: { count: 'drakes', goal: 2, byMs: 1_080_000, key: 'E', text: 'questDrakes', short: 'questDrakesShort' },
+  jungle: { count: 'monsters', goal: 24, byMs: 600_000, key: 'R', text: 'questMonsters', short: 'questMonstersShort' },
+};
+export const QUEST = { damage: 30, heal: 30, shield: 30, cd: -20, near: 900 };
+
+/**
+ * The coach after the match (LB23, round 5): `rich` gold banked counts as unspent, `richMs` of it
+ * makes a note; `wardsBy` and `spellBy` are the match times after which no ward or no spell make one;
+ * `towerReach` is how near a red tower a death counts as under it.
+ */
+export const COACH = { rich: 1500, richMs: 120_000, wardsBy: 480_000, spellBy: 360_000, towerReach: 80, notes: 3 };
+
 /** The colour of each side's rings, bolts and lines. */
 export const SIDE_COLOR = { blue: '#3d8bfd', red: '#e0553f', neutral: '#f4d35e' } as const;
 

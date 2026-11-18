@@ -68,6 +68,20 @@ export const TRIALS: readonly { level: Level; share: number }[] = [
   { level: 3, share: 0.5 },
 ];
 /** Points: per level, per second left, taken per hint (down to a floor), and the streak bonus. */
+/**
+ * Endless and Solo Run: after a solve, a dare lies face up beside the next card for `PICK_MS` (a tap
+ * on the banner, or the time running out, takes the next card). A dare is a level higher (at Oracle,
+ * the same level on `DARE_TIME` of its time) and pays `DARE_POINTS` times.
+ */
+export const PICK_MS = 5000;
+export const DARE_POINTS = 1.5;
+export const DARE_TIME = 0.75;
+/**
+ * Endless and Solo Run: a lost puzzle (not a boss, nor a rematch) shows its answer for `REVEAL_MS`
+ * and comes back later in the run as a rematch, the same puzzle, worth `REMATCH_POINTS` times.
+ */
+export const REVEAL_MS = 4000;
+export const REMATCH_POINTS = 2;
 export const POINTS_PER_LEVEL = 100;
 export const POINTS_PER_SECOND = 2;
 export const HINT_COST = 40;
@@ -84,6 +98,10 @@ export interface Card {
   boss?: Card;
   /** A Practice trial: its tier, 1 to 10 (see `TRIALS`). */
   trial?: number;
+  /** A dare taken instead of the next card: a level `up`, or at Oracle `fast` (less time). */
+  dare?: 'up' | 'fast';
+  /** A puzzle lost earlier in the run, dealt again. */
+  rematch?: boolean;
 }
 
 export interface Current {
@@ -182,6 +200,14 @@ export interface Run {
   progress: Progress;
   /** A new best this run set, for the end card. */
   newBest: boolean;
+  /** Endless and Solo Run, between puzzles after a solve: the dare offered instead of the next card. */
+  pick: Card | null;
+  /** The puzzle on the board shows its answer (a loss in Endless or Solo Run, between puzzles). */
+  revealed: boolean;
+  /** Draft and Solo Run: the seed its cards are drawn from, which a challenge code shares (0 for none). */
+  seed: number;
+  /** A challenge's score to beat, or null. */
+  challenge: number | null;
   events: RunEvent[];
 }
 
@@ -217,6 +243,10 @@ export function newRun(mode: Mode, progress: Progress = newProgress()): Run {
     ghost: [],
     progress,
     newBest: false,
+    pick: null,
+    revealed: false,
+    seed: 0,
+    challenge: null,
     events: [],
   };
 }
@@ -225,11 +255,20 @@ export function newRun(mode: Mode, progress: Progress = newProgress()): Run {
 export const endlessLevel = (n: number) => Math.min(3, Math.floor(n / 3)) as Level;
 const blitzLevel = (solved: number) => Math.min(3, Math.floor(solved / 2)) as Level;
 
-/** Where a run draws its luck: the week's seed for the weekly league, else `Math.random`. */
+/**
+ * Where a run draws its luck: the week's seed for the weekly league, the run's own seed for a draft
+ * (so a challenge code deals the same), else `Math.random`.
+ */
 export function luck(run: Run): Rand {
-  if (run.mode !== 'weekly') return Math.random;
-  return () => seeded(Math.imul(run.week, 1_000_003) + Math.imul(run.draws++, 7919))();
+  const base = run.mode === 'weekly' ? run.week : run.mode === 'draft' ? run.seed : 0;
+  if (!base) return Math.random;
+  return () => seeded(Math.imul(base, 1_000_003) + Math.imul(run.draws++, 7919))();
 }
+
+/** A new seed for a run's cards, never 0 (which means none). */
+const runSeed = () => 1 + Math.floor(Math.random() * (2 ** 31 - 1));
+/** Endless and Solo Run: whether a solve offers a dare and a loss comes back as a rematch. */
+export const hasPicks = (mode: Mode) => mode === 'endless' || mode === 'solo';
 
 /** A random card of a kind other than `not`, each kind as likely as its weight (all alike without). */
 function randomCard(level: Level, not: KindId[] = [], rand: Rand = Math.random, weights?: Record<KindId, number>): Card {
@@ -276,14 +315,24 @@ const endlessCard = (run: Run, n: number, not: KindId[]) =>
 /** The kind a card ends on, which the next card must not repeat. */
 const lastKind = (card: Card) => card.boss?.kind ?? card.kind;
 
+/** The seed of a Solo Run's `n`th card (`salt` 1 for its dare), from the run's seed, so a challenge deals the same. */
+const soloSeed = (seed: number, n: number, salt = 0) => Math.floor(seeded(Math.imul(seed, 1_000_003) + Math.imul(n, 7919) + salt)() * 2 ** 31);
 /** The `n`th card (from 0) of a Solo Run: its one kind, at the level Endless deals the `n`th at, never a boss. */
-const soloCard = (kind: KindId, n: number): Card => ({ kind, level: endlessLevel(n), seed: Math.floor(Math.random() * 2 ** 31) });
+const soloCard = (kind: KindId, n: number, seed: number): Card => ({ kind, level: endlessLevel(n), seed: soloSeed(seed, n) });
 /** The kind a Solo Run plays (every card in its queue is of it). */
 export const soloKind = (run: Run) => run.queue[0]?.kind ?? run.current?.card.kind ?? KINDS[0];
 
 /** Starts a run of a mode. Practice and Solo Run need their kind, Practice its level too. */
-export function startRun(mode: Mode, progress: Progress, opts: { kind?: KindId; level?: Level; trial?: boolean; date?: Date; node?: number } = {}): Run {
+export function startRun(
+  mode: Mode,
+  progress: Progress,
+  opts: { kind?: KindId; level?: Level; trial?: boolean; date?: Date; node?: number; seed?: number; challenge?: number } = {},
+): Run {
   const run = newRun(mode, progress);
+  if (mode === 'draft' || mode === 'solo') {
+    run.seed = opts.seed || runSeed();
+    run.challenge = opts.challenge ?? null;
+  }
   switch (mode) {
     case 'endless':
     case 'blitz': {
@@ -298,7 +347,7 @@ export function startRun(mode: Mode, progress: Progress, opts: { kind?: KindId; 
     }
     case 'solo': {
       const kind = opts.kind ?? 'nonogram';
-      for (let i = 0; i < QUEUE + 1; i++) run.queue.push(soloCard(kind, i));
+      for (let i = 0; i < QUEUE + 1; i++) run.queue.push(soloCard(kind, i, run.seed));
       deal(run, run.queue.shift()!);
       break;
     }
@@ -347,7 +396,7 @@ function timeFor(run: Run, card: Card) {
   const hourglasses = run.relics.filter((r) => r === 'hourglass').length;
   const limit = (c: Card) => DEFS[c.kind].limit[c.level];
   const seconds = card.boss ? (limit(card) + limit(card.boss)) * BOSS_TIME : limit(card);
-  return seconds * 1000 * (1 + HOURGLASS * hourglasses);
+  return seconds * 1000 * (1 + HOURGLASS * hourglasses) * (card.dare === 'fast' ? DARE_TIME : 1);
 }
 
 /** Whether the run holds the charm of a kind. */
@@ -547,7 +596,8 @@ function pointsFor(run: Run, cur: Current) {
   const charm = holdsCharm(run, cur.card.kind) ? CHARM_POINTS : 1;
   const omen = cur.omen ? OMEN_POINTS : 1;
   const boss = cur.pair ? BOSS_POINTS : 1;
-  return Math.round(afterHints * charm * omen * boss * (1 + STREAK_STEP * Math.min(run.streak, STREAK_CAP)));
+  const card = (cur.card.dare ? DARE_POINTS : 1) * (cur.card.rematch ? REMATCH_POINTS : 1);
+  return Math.round(afterHints * charm * omen * boss * card * (1 + STREAK_STEP * Math.min(run.streak, STREAK_CAP)));
 }
 
 function end(run: Run, reason: EndReason) {
@@ -602,11 +652,71 @@ function end(run: Run, reason: EndReason) {
   }
   run.phase = 'between';
   run.betweenMs = BETWEEN_MS;
+  if (hasPicks(run.mode) && run.hearts > 0) {
+    if (solved) {
+      run.pick = dareFor(run);
+      if (run.pick) run.betweenMs = PICK_MS;
+    } else if (!boss && !cur.card.rematch) {
+      queueRematch(run, cur.card);
+      // Memory Echo has no answer to show.
+      if (cur.card.kind !== 'echo') {
+        reveal(cur);
+        run.revealed = true;
+        run.betweenMs = REVEAL_MS;
+      }
+    }
+  }
+}
+
+/**
+ * The dare offered after a solve in place of the next card: a level higher (at Oracle, the same
+ * level on less time), of a kind other than the one just played, the next card's and the one after
+ * it (Solo Run: its one kind). None when the next card is a boss or a rematch.
+ */
+function dareFor(run: Run): Card | null {
+  const next = run.queue[0];
+  if (!next || next.boss || next.rematch) return null;
+  const dare = next.level === 3 ? 'fast' : 'up';
+  const level = Math.min(3, next.level + 1) as Level;
+  if (run.mode === 'solo') return { kind: next.kind, level, seed: soloSeed(run.seed, run.dealt, 1), dare };
+  const not = [lastKind(run.current!.card), next.kind, ...(run.queue[1] ? [run.queue[1].kind] : [])];
+  return { ...randomCard(level, not), dare };
+}
+
+/** Takes the dare (1) or the next card (0) after a solve, and deals it. */
+export function pickNext(run: Run, index: 0 | 1) {
+  if (run.phase !== 'between' || !run.pick) return false;
+  if (index === 1) run.queue[0] = run.pick;
+  run.pick = null;
+  return next(run);
+}
+
+/**
+ * Queues a lost puzzle again, as a rematch: in place of the latest queued card it can take (not the
+ * next one, a boss or another rematch), where no neighbour is of its kind (Solo Run: its one kind).
+ */
+function queueRematch(run: Run, card: Card) {
+  const q = run.queue;
+  const rematch: Card = { kind: card.kind, level: card.level, seed: card.seed, rematch: true };
+  for (let i = q.length - 1; i >= 1; i--) {
+    if (q[i].boss || q[i].rematch) continue;
+    if (run.mode === 'endless' && (lastKind(q[i - 1]) === card.kind || q[i + 1]?.kind === card.kind)) continue;
+    q[i] = rematch;
+    return;
+  }
+}
+
+/** Shows a lost puzzle's answer on its board: hints, one after another, until it is solved. */
+export function reveal(cur: Current) {
+  const def = DEFS[cur.card.kind];
+  for (let i = 0; i < 400 && !def.solved(cur.state) && def.hint(cur.state); i++);
 }
 
 /** Moves on from the result banner: the next puzzle, a draft, relics, the hand-over or the end. */
 export function next(run: Run) {
   if (run.phase !== 'between') return false;
+  run.pick = null;
+  run.revealed = false;
   const done = run.results.length;
   switch (run.mode) {
     case 'endless':
@@ -656,7 +766,7 @@ export function next(run: Run) {
 function dealQueued(run: Run) {
   const card = run.queue.shift()!;
   if (run.mode === 'solo') {
-    run.queue.push(soloCard(card.kind, run.dealt + QUEUE));
+    run.queue.push(soloCard(card.kind, run.dealt + QUEUE, run.seed));
     return deal(run, card);
   }
   const after = lastKind(run.queue[run.queue.length - 1] ?? card);

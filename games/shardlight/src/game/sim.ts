@@ -1,4 +1,4 @@
-import { FIELD_W, type PaneKind, type PaneSpec, type WindowSpec } from './levels';
+import { FIELD_W, GUARDIANS, type PaneKind, type PaneSpec, type WindowSpec } from './levels';
 
 /**
  * One window in play: the orbs, the bar, the panes and the falling beads, moved in small fixed
@@ -25,7 +25,22 @@ const STEP_MS = 4;
 const BEAD_FALL = 150;
 const BEAD_R = 11;
 /** A pane breaks after this many hits. */
-const HITS: Record<PaneKind, number> = { glass: 1, thick: 2, lead: Infinity, bead: 1, heart: 3 };
+const HITS: Record<PaneKind, number> = { glass: 1, thick: 2, lead: Infinity, bead: 1, heart: 3, mirror: 2, prism: 1, bell: 1, gargoyle: 3, owl: 4 };
+/** Panes a fire orb bounces off and only hurts, rather than burning through. */
+const TOUGH = new Set<PaneKind>(['heart', 'gargoyle', 'owl']);
+/** Seconds a bell pane stops the sliding rows, the turning rings and the guardians. */
+export const BELL_SECONDS = 4;
+/**
+ * Bar spin: the bar's speed is measured over the last `SPIN_TICKS` steps (80 ms). Hitting the orb
+ * while it moves faster than `SPIN_MIN` gives the orb a spin, full at `SPIN_FULL`, that turns its
+ * path towards the way the bar moved by up to `SPIN_TURN` of its speed a second, fading over
+ * `SPIN_FADE` seconds. A bar standing still bounces exactly as before.
+ */
+const SPIN_TICKS = 20;
+export const SPIN_MIN = 90;
+const SPIN_FULL = 1000;
+const SPIN_TURN = 1.1;
+const SPIN_FADE = 0.9;
 
 export interface Pane extends PaneSpec {
   id: number;
@@ -39,19 +54,27 @@ export interface Orb {
   vy: number;
   /** Held on the bar at this offset from its middle, until launched. */
   held: number | null;
+  /** -1 to 1: the bar spin it carries, curving it left or right; 0 for none. */
+  spin: number;
 }
 export interface Bead {
   x: number;
   y: number;
+  /** Falling speed; a mirror pane throws a bead back up. */
+  vy: number;
   kind: BeadKind;
 }
 
 export type SimEvent =
-  | { type: 'bar'; x: number; y: number }
+  | { type: 'bar'; x: number; y: number; spin: number }
   | { type: 'wall'; x: number; y: number }
   | { type: 'crack'; pane: Pane }
   | { type: 'break'; pane: Pane; combo: number }
   | { type: 'clang'; pane: Pane }
+  | { type: 'shield'; pane: Pane }
+  | { type: 'bell' }
+  | { type: 'prism' }
+  | { type: 'mirror'; bead: Bead }
   | { type: 'bead'; bead: Bead }
   | { type: 'catch'; kind: BeadKind }
   | { type: 'lost' }
@@ -99,6 +122,18 @@ export class Sim {
   result: 'won' | 'over' | null = null;
   /** Milliseconds played. */
   time = 0;
+  /** Seconds the moving panes have moved: it stands still while a bell rings. */
+  motion = 0;
+  /** Seconds left of a bell's stillness. */
+  still = 0;
+  /** The bar's speed, field pixels a second, over the last few steps (signed). */
+  barVel = 0;
+  /** Spin shots: bar hits that gave the orb a spin. */
+  spins = 0;
+  /** Heart hits since the orb last touched the bar, and whether the heart broke in one chain. */
+  private heartRun = 0;
+  heartInOneChain = false;
+  private barTrail: number[] = [];
   events: SimEvent[] = [];
   private carry = 0;
   private readonly random: () => number;
@@ -140,6 +175,11 @@ export class Sim {
     this.barX = Math.max(half, Math.min(this.w - half, x));
   }
 
+  /** Whether a guardian still stands, so the heart takes no harm. */
+  get guarded() {
+    return this.panes.some((p) => p.alive && GUARDIANS.has(p.kind));
+  }
+
   /** Lets every orb held on the bar go. */
   launch() {
     if (this.result) return false;
@@ -166,11 +206,11 @@ export class Sim {
   }
 
   private newOrb() {
-    this.orbs = [{ x: this.barX, y: this.barY - ORB_R, vx: 0, vy: 0, held: 0 }];
+    this.orbs = [{ x: this.barX, y: this.barY - ORB_R, vx: 0, vy: 0, held: 0, spin: 0 }];
   }
 
   private placePanes() {
-    const t = this.time / 1000;
+    const t = this.motion;
     for (const p of this.panes) {
       const spec = this.spec.panes[p.id];
       if (p.slide) p.x = spec.x + Math.sin(t * p.slide.speed) * p.slide.reach;
@@ -192,12 +232,17 @@ export class Sim {
 
   private tick(dt: number) {
     this.time += dt * 1000;
+    if (this.still > 0) this.still = Math.max(0, this.still - dt);
+    else this.motion += dt;
     this.placePanes();
     for (const kind of Object.keys(this.timers) as BeadKind[]) {
       this.timers[kind]! -= dt;
       if (this.timers[kind]! <= 0) delete this.timers[kind];
     }
     this.moveBar(this.barX);
+    this.barTrail.push(this.barX);
+    if (this.barTrail.length > SPIN_TICKS + 1) this.barTrail.shift();
+    this.barVel = (this.barX - this.barTrail[0]) / ((this.barTrail.length - 1 || 1) * dt);
     const speed = this.speed;
     for (const orb of this.orbs) {
       if (orb.held !== null) {
@@ -205,6 +250,7 @@ export class Sim {
         orb.y = this.barY - ORB_R;
         continue;
       }
+      if (orb.spin) this.curve(orb, speed, dt);
       // Keep the speed in step with slow and fast beads.
       const v = Math.hypot(orb.vx, orb.vy) || 1;
       orb.vx *= speed / v;
@@ -223,6 +269,21 @@ export class Sim {
       this.result = 'won';
       this.events.push({ type: 'won' });
     }
+  }
+
+  /** A spinning orb's path turns towards its spin, never flatter than 70° from straight up or down. */
+  private curve(orb: Orb, speed: number, dt: number) {
+    orb.vx += orb.spin * SPIN_TURN * speed * dt;
+    const v = Math.hypot(orb.vx, orb.vy) || 1;
+    orb.vx *= speed / v;
+    orb.vy *= speed / v;
+    const minVy = speed * 0.35;
+    if (Math.abs(orb.vy) < minVy) {
+      orb.vy = Math.sign(orb.vy || -1) * minVy;
+      orb.vx = Math.sign(orb.vx) * Math.sqrt(speed * speed - minVy * minVy);
+    }
+    orb.spin *= Math.exp(-dt / SPIN_FADE);
+    if (Math.abs(orb.spin) < 0.02) orb.spin = 0;
   }
 
   private walls(orb: Orb) {
@@ -253,15 +314,22 @@ export class Sim {
     orb.y = top - ORB_R;
     const offset = orb.x - this.barX;
     this.combo = 0;
+    this.heartRun = 0;
     this.barHits++;
-    this.events.push({ type: 'bar', x: orb.x, y: orb.y });
+    const v = this.barVel;
+    const spin = Math.abs(v) < SPIN_MIN ? 0 : Math.max(-1, Math.min(1, v / SPIN_FULL));
     if (this.sticky > 0) {
+      this.events.push({ type: 'bar', x: orb.x, y: orb.y, spin: 0 });
       this.sticky--;
       orb.held = Math.max(-half + ORB_R, Math.min(half - ORB_R, offset));
       orb.vx = orb.vy = 0;
+      orb.spin = 0;
       return;
     }
+    this.events.push({ type: 'bar', x: orb.x, y: orb.y, spin });
     this.bounceOff(orb, offset);
+    orb.spin = spin;
+    if (spin) this.spins++;
   }
 
   private hitPanes(orb: Orb) {
@@ -271,15 +339,19 @@ export class Sim {
       const nx = Math.max(p.x, Math.min(orb.x, p.x + p.w));
       const ny = Math.max(p.y, Math.min(orb.y, p.y + p.h));
       if ((orb.x - nx) ** 2 + (orb.y - ny) ** 2 > ORB_R * ORB_R) continue;
-      // A fire orb burns through every pane but the heart, without bouncing.
-      if (fire && p.kind !== 'heart') {
-        this.breakPane(p);
+      // A fire orb burns through every pane but the heart and the guardians, without bouncing.
+      if (fire && !TOUGH.has(p.kind)) {
+        this.breakPane(p, orb);
         continue;
       }
       this.bounceFrom(orb, p);
       if (p.kind === 'lead') this.events.push({ type: 'clang', pane: p });
-      else if (--p.hp <= 0) this.breakPane(p);
-      else this.events.push({ type: 'crack', pane: p });
+      else if (p.kind === 'heart' && this.guarded) this.events.push({ type: 'shield', pane: p });
+      else {
+        if (p.kind === 'heart') this.heartRun++;
+        if (--p.hp <= 0) this.breakPane(p, orb);
+        else this.events.push({ type: 'crack', pane: p });
+      }
       // One bounce a step, so an orb in a corner between two panes never turns twice.
       return;
     }
@@ -301,14 +373,22 @@ export class Sim {
     }
   }
 
-  private breakPane(p: Pane) {
+  private breakPane(p: Pane, orb: Orb) {
     p.alive = false;
     this.combo++;
     this.bestCombo = Math.max(this.bestCombo, this.combo);
-    this.score += (p.kind === 'heart' ? 100 : p.kind === 'lead' ? 30 : 10) * Math.min(this.combo, 10);
+    const worth = p.kind === 'heart' ? 100 : GUARDIANS.has(p.kind) ? 50 : p.kind === 'lead' ? 30 : 10;
+    this.score += worth * Math.min(this.combo, 10);
     this.events.push({ type: 'break', pane: p, combo: this.combo });
-    if (p.kind === 'bead' || (p.kind !== 'lead' && this.random() < this.options.dropChance)) {
-      const bead: Bead = { x: p.x + p.w / 2, y: p.y + p.h / 2, kind: this.pickBead() };
+    if (p.kind === 'heart' && this.heartRun >= HITS.heart) this.heartInOneChain = true;
+    if (p.kind === 'bell') {
+      this.still = BELL_SECONDS;
+      this.events.push({ type: 'bell' });
+    }
+    if (p.kind === 'prism') this.prism(orb);
+    // A bead pane and a guardian always drop a bead.
+    if (p.kind === 'bead' || GUARDIANS.has(p.kind) || (p.kind !== 'lead' && this.random() < this.options.dropChance)) {
+      const bead: Bead = { x: p.x + p.w / 2, y: p.y + p.h / 2, vy: BEAD_FALL, kind: this.pickBead() };
       this.beads.push(bead);
       this.events.push({ type: 'bead', bead });
     }
@@ -327,7 +407,16 @@ export class Sim {
   private fall(dt: number) {
     const half = this.barW / 2;
     for (const bead of this.beads) {
-      bead.y += BEAD_FALL * dt;
+      bead.vy = Math.min(BEAD_FALL, bead.vy + 600 * dt);
+      bead.y += bead.vy * dt;
+      // A falling bead that meets a mirror pane is thrown back up.
+      if (bead.vy > 0)
+        for (const p of this.panes)
+          if (p.alive && p.kind === 'mirror' && bead.x > p.x && bead.x < p.x + p.w && bead.y + BEAD_R > p.y && bead.y < p.y + p.h / 2) {
+            bead.vy = -BEAD_FALL * 1.3;
+            this.events.push({ type: 'mirror', bead });
+            break;
+          }
       if (this.options.magnet && bead.y > this.h / 2) {
         const pull = 70 * this.options.magnet * dt;
         bead.x += Math.max(-pull, Math.min(pull, this.barX - bead.x));
@@ -371,11 +460,30 @@ export class Sim {
         // Never flat: keep a fair share of the speed up or down.
         if (Math.abs(vy) < this.speed * 0.4) vy = Math.sign(vy || -1) * this.speed * 0.4;
         vx = Math.sign(vx) * Math.sqrt(Math.max(0, this.speed ** 2 - vy * vy));
-        extra.push({ x: orb.x, y: orb.y, vx, vy, held: null });
+        extra.push({ x: orb.x, y: orb.y, vx, vy, held: null, spin: 0 });
       }
     }
     this.orbs.push(...extra.slice(0, Math.max(0, 9 - this.orbs.length)));
     this.mostOrbs = Math.max(this.mostOrbs, this.orbs.length);
+  }
+
+  /** A prism pane splits the orb that broke it in two, the new one turned aside. */
+  private prism(orb: Orb) {
+    if (orb.held !== null || this.orbs.length >= 9) return;
+    const turn = orb.vx >= 0 ? -0.6 : 0.6;
+    const c = Math.cos(turn);
+    const s = Math.sin(turn);
+    const speed = Math.hypot(orb.vx, orb.vy) || this.speed;
+    let vx = orb.vx * c - orb.vy * s;
+    let vy = orb.vx * s + orb.vy * c;
+    // Never flat: keep a fair share of the speed up or down.
+    if (Math.abs(vy) < speed * 0.4) {
+      vy = Math.sign(vy || -1) * speed * 0.4;
+      vx = Math.sign(vx) * Math.sqrt(speed * speed - vy * vy);
+    }
+    this.orbs.push({ x: orb.x, y: orb.y, vx, vy, held: null, spin: 0 });
+    this.mostOrbs = Math.max(this.mostOrbs, this.orbs.length);
+    this.events.push({ type: 'prism' });
   }
 
   private loseOrb() {
@@ -387,6 +495,7 @@ export class Sim {
     this.beads = [];
     this.barHits = 0;
     this.combo = 0;
+    this.heartRun = 0;
     if (this.lives <= 0) {
       this.result = 'over';
       this.events.push({ type: 'over' });

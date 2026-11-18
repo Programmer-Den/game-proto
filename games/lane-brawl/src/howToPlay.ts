@@ -49,6 +49,9 @@ const en: HowToPlay = {
     'Wins with a champion open its talent page: before each match, pick one small bonus from each row its mastery has opened (damage, then defensive, then utility).',
     'Ranked matches start with a draft: ban a champion, red bans one back, then the sides pick in turn. From Gold up red bans your best champion and picks to counter yours.',
     'The map button picks Kessmoor or the Twin Rivers for full and ranked matches: two lanes, a jungle between them and two rivers that flood every three minutes and slow anyone wading.',
+    'The role button picks your role: mid, top, bottom or jungle. Your allies take the other lanes, your first objective is on your lane (a jungler starts with a camp and hits monsters harder), and your role sets your quest.',
+    'Each match gives your champion a quest, shown under the objective card (40 last hits by 10:00 in mid, for one). Finish it in time and one of your abilities hits harder and comes back sooner for the rest of the match.',
+    'After the match the coach on the end panel gives you three notes on how you played, each with a tip.',
   ],
 };
 
@@ -99,6 +102,9 @@ const de: HowToPlay = {
     'Siege mit einem Champion öffnen seine Talentseite: Wähle vor jedem Match einen kleinen Bonus aus jeder Reihe, die seine Meisterschaft geöffnet hat (Schaden, dann Abwehr, dann Nutzen).',
     'Ranglisten-Matches beginnen mit einem Draft: Banne einen Champion, Rot bannt einen zurück, dann wählen beide Seiten abwechselnd. Ab Gold bannt Rot deinen besten Champion und wählt gegen deinen.',
     'Die Kartentaste wählt Kessmoor oder die Zwillingsflüsse für volle und Ranglisten-Matches: zwei Lanes, Dschungel dazwischen und zwei Flüsse, die alle drei Minuten über die Ufer treten und jeden beim Waten bremsen.',
+    'Die Rollentaste wählt deine Rolle: Mitte, oben, unten oder Dschungel. Deine Verbündeten nehmen die anderen Lanes, dein erstes Ziel liegt auf deiner Lane (im Dschungel ist es ein Lager, und du triffst Monster härter), und deine Rolle bestimmt deinen Auftrag.',
+    'Jedes Match gibt deinem Champion einen Auftrag, unter der Zielkarte angezeigt (in der Mitte etwa 40 letzte Treffer bis 10:00). Erfüllst du ihn rechtzeitig, trifft eine deiner Fähigkeiten für den Rest des Matches härter und ist schneller wieder bereit.',
+    'Nach dem Match gibt dir der Trainer auf der Endtafel drei Hinweise, wie du gespielt hast, jeden mit einem Tipp.',
   ],
 };
 

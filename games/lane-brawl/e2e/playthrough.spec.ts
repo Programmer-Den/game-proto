@@ -42,6 +42,8 @@ interface GameState {
   lastHitMark: number | null;
   lastHits: number;
   streak: number;
+  role: string;
+  quest: { def: { count: string; goal: number }; state: string } | null;
   bestStreak: number;
   upgradeOffers: { level: number; options: [string, string] }[];
 }
@@ -95,7 +97,7 @@ test('plays the first round', async ({ page }, testInfo) => {
   // the line-up this round was tuned with. The two champions unlocked by mastery stay out of the
   // rosters with no save, so the shuffle is the same as before them.
   await page.addInitScript(() => {
-    let seed = -2116413501;
+    let seed = 1234588440;
     Math.random = () => {
       seed = (seed + 0x6d2b79f5) | 0;
       let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
@@ -360,6 +362,10 @@ test('plays the first round', async ({ page }, testInfo) => {
   expect(s.lastHits, `a last hit; state: ${JSON.stringify({ time: s.time, me: me() })}`).toBeGreaterThanOrEqual(1);
   // Each last hit grows the streak the chip by the gold counter shows.
   expect(s.bestStreak, 'last-hit streak').toBeGreaterThanOrEqual(1);
+  // The champion quest (LB21) follows the role, mid with no save: its last hits count toward it.
+  expect(s.role, 'role').toBe('mid');
+  expect(s.quest?.def.count, 'quest counts last hits').toBe('lastHits');
+  expect(s.quest?.state, 'quest still open in the first round').toBe('open');
   expect(me().level, 'level 2').toBe(2);
 
   // Level 2 offers two upgrades to Gatefall in the bottom bar: Wide Gatefall is the first card.

@@ -212,6 +212,13 @@ export const DECOR_SPOTS = {
   lanterns: [{ x: 800, y: 832 }, { x: 880, y: 832 }],
 };
 /**
+ * Inside the shop (AP21, AP22): the night sign on the floor left of the street door, below the
+ * customers' row, which turns the shop open or closed at night; and the ledger lying on the counter's
+ * right end, which opens the day's ledger.
+ */
+export const NIGHT_SIGN = { x: SHOP.x + 82, y: SHOP.y + SHOP.h - 34 };
+export const LEDGER = { x: COUNTER.x + 76, y: COUNTER.y - 2 };
+/**
  * The herb market below the outfitter: its stall, the marker to sell plants and refined goods, the
  * marker to buy the good its tappable sign shows, and that sign above the buy marker.
  */

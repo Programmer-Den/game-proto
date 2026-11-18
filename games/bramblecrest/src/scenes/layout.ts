@@ -56,6 +56,12 @@ export const BUTTONS = {
  */
 export const GUST = { range: 130, width: 26, spread: 0.3, push: 64, stunMs: 900, cooldownMs: 900 };
 
+/**
+ * The gust horn carries the Moonlantern's light: blown with it, moonlight lies along the blast this
+ * far ahead for `ms`, lighting hidden bridges within `r` of it, even under mist (`MapDef.mist`).
+ */
+export const CARRY = { px: 210, step: 16, r: 30, ms: 3600 };
+
 /** Fishing: how long before a bite (a random time between the two), and how long a bite lasts. */
 export const FISH_WAIT_MS = [1200, 3200] as const;
 export const BITE_MS = 900;

@@ -106,7 +106,8 @@ seconds without a tap.
   `played`) calls `startDaily` and `dailyRun(dailyPlan(dailyRand('palisade', day), day), aim)`: a
   fresh ranger with the plan's two `relics`. With `state.daily` set, `clearWave` takes each boss's
   chest from `plan.chests`, sets `road` from `plan.roads` (no road choice) and the omen from
-  `plan.omens` (through `planned`), never sets `phase` to `'won'` and unlocks nothing; `canRetire`
+  `plan.omens` (through `planned`), the weather from `plan.weather` and the wayside events from
+  `plan.events` (both drawn after the rest of the plan, so older plan entries stay), never sets `phase` to `'won'` and unlocks nothing; `canRetire`
   is false; `GameScene.saveHero` saves nothing. When it falls, `GameScene.update` calls
   `finishDaily` once with the waves cleared (`wave - 1`), and the game-over panel (`drawGameOver`)
   hides the hero's rows (`heroOnly`) and shows the score with "Back to your hero" (`leaveDaily`,
@@ -175,6 +176,46 @@ seconds without a tap.
   Plunder, in `removeDead` and `moveEnemies` with the road's), and `xp` (`OMEN_XP`, 1.3, on every
   kill's base experience). The chip at `OMEN_CHIP` names an accepted omen until the wave is cleared,
   when `clearWave` replaces it.
+- **Wayside events** (`wayside.ts`, `state.event`): in a break that would name an omen, from
+  `EVENT_FROM_WAVE` (6), `clearWave` first calls `rollEvent(Math.random)` (one draw against
+  `EVENT_CHANCE`, three more for an event: its `relic`, `blessing` and `curse`, so the card shows
+  them before the choice) and, when it gives one, names no omen; a peddler is dropped (no event, no
+  omen) when the coins are below `PEDDLER_MIN`. The break lasts `OMEN_BREAK_MS` and is read at 1x;
+  `EventCard` (made by the scene the first time an event shows) offers take and leave, which call
+  `decideEvent(state, take)`; an undecided event is cleared when the break ends. The scout, taken,
+  puts a level 1 spearman on the first free slot (or trains the least trained guard, or pays
+  `SCOUT_COINS`); left, sets `state.scouted`, which `hpOf` turns into `SCOUT_WEAKEN` of every foe's
+  health for the coming wave (`clearWave` clears it). The peddler, taken, adds `event.relic` for
+  `peddlerPrice(coins)` (half). The shrine, taken, sets `state.shrine` (`blessing`, `curse`,
+  `waves` = `SHRINE_WAVES`), counted down in `clearWave`; `shrineEffects` gives `damage` and
+  `shots` (Might, Swift Hands, read in `stats`, which now also takes `shrine`), `coins` (Fortune,
+  `removeDead`), `pace` (Restless, with the road's speed in `moveEnemies` and `paceOf`), `hack`
+  (Brittle, in `stats().hack`) and `xp` (Dim, on the kill's base experience). A green chip at
+  `SHRINE_CHIP` (under the weather chip) names the pair with the waves left, and "Scouted" while
+  `scouted` holds.
+- **Weather** (`weather.ts`, `state.weather`, `state.nextWeather`): `clearWave` moves
+  `nextWeather` into `weather` (the coming wave's) and names the next one with
+  `rollWeather(wave + 1, Math.random)`, which draws once only from `WEATHER_FROM_WAVE` (5), so the
+  first random call is at wave 3's clear. `weatherEffects` gives `burn` (rain: `ignite`, which now
+  takes the state, shortens burning), `mud` (rain: `paceOf` slows foes on foot), `shots` (wind:
+  `shotSpeed` slows arrows, bolts and fireballs, not the ballista's lance), `drift` and `ring`
+  (wind: `volleySpot` lands a volley `WIND_DRIFT` back towards the barricade, the scene's aiming
+  ring shows it there, and `rainRingOf` widens the ring), `sight` (fog: `FOG_X`, folded with a
+  Night omen's into `fieldSight`, which `sightOf`, the scene's dark or murk, the hidden foes and
+  effects and `BattleSounds` read) and `coins` (fog, `removeDead`). The chip at `WEATHER_CHIP` (top
+  right, pinned to the view's edge) reads "{now} now · {next} next wave" with the text of the
+  coming (or else the next) weather; `drawWeather` draws rain or wind streaks on `weatherG` (held
+  still with reduced motion) and fog lies in `nightG` in a pale colour.
+- **Mark a foe** (`markFoe` in `sim.ts`, `state.mark`): a scene-wide `pointerdown` that lands on no
+  interactive object during a wave (no aim, panel or book up) finds the seen foe under it
+  (`GameScene.foeAt`) and calls `markFoe(state, id)`, which spends `MARK_COST` (2) of
+  `rain.charge` and sets `mark` to `{ id, ms: MARK_MS }`; refused (a buzz) without the charge.
+  `step` counts it down and drops it when its foe is gone; `clearWave` clears it. `targets` puts
+  the marked foe first whatever the aim (so the hounds, the mage and lightning follow it), `shoot`
+  sends the whole volley at it, and `markOf` multiplies the hero's arrow and bolt hits on it by
+  `MARK_DAMAGE`. The scene draws a gold ring and chevron on it (`drawMark`, never a red crosshair),
+  and from wave 2, until the first mark of the visit (`markedOnce`), the rain hint reads
+  `markHint` while the charge allows one.
 - **Forced march** (`march.ts`): `newRun(progress, aim, start)` starts a run on `start` with
   `marchCoins(start)` coins and the rain need for that wave. `MARCH_STARTS` are waves 1, 11 (120
   coins) and 21 (300 coins); `canMarch(bestWave, wave)` needs `bestWave >= wave - 1`.
@@ -286,7 +327,7 @@ seconds without a tap.
   English source, `i18n/de.ts` the German and `i18n/en-US.ts` the texts spelled differently in US
   English (none so far, so it is empty). `t(key, vars)` shows a text in the hub's language;
   `TextKey` types the keys. Every text on screen goes through `t`: the tables in `src/game/`
-  (`UPGRADES`, `RELICS`, `SETS`, `ENEMIES`, `TRAITS`, `AIMS`, `GUARDS`, `ROADS`, `OMENS`, `FORTS`,
+  (`UPGRADES`, `RELICS`, `SETS`, `ENEMIES`, `TRAITS`, `AIMS`, `GUARDS`, `ROADS`, `OMENS`, `WEATHERS`, `EVENTS`, `BLESSINGS`, `CURSES`, `FORTS`,
   `LEGACIES`, `HEAT_RULES` and `HEAT_UNLOCKED`) hold `TextKey`s for their names and texts, never
   the text itself, and the scene and `src/ui/` look them up with `t`. Game logic compares ids only.
   German joins a number and its unit (`25 %`, `3 s`) with a no-break space so wrapping never
@@ -328,7 +369,11 @@ seconds without a tap.
     trait numbers. `bosses.ts`: the bosses' move numbers. `forts.ts`: `FortId`, `FORTS`,
     `FORT_IDS`, `STAKE_FRONT`, `STAKE_HP`, the oil and lookout numbers, `REPAIR_SHARE` and
     `repairCost`. `omens.ts`: `OmenId`, `OMENS`, `OMEN_IDS`, `OMEN_FROM_WAVE`, `OMEN_BREAK_MS`,
-    `NIGHT_X`, `OMEN_XP`, `omenWave`, `omenEffects`. `march.ts`: `MARCH_STARTS`, `canMarch`,
+    `NIGHT_X`, `OMEN_XP`, `omenWave`, `omenEffects`. `wayside.ts`: `EventId`, `EVENTS`,
+    `BLESSINGS`, `CURSES`, `WaysideEvent`, `Shrine`, `EVENT_FROM_WAVE`, `EVENT_CHANCE`, the scout,
+    peddler and shrine numbers, `eventWave`, `rollEvent`, `shrineEffects`, `peddlerPrice`.
+    `weather.ts`: `WeatherId`, `WEATHERS`, `WEATHER_FROM_WAVE`, `WEATHER_CHANCE`, the rain, wind and
+    fog numbers, `rollWeather`, `weatherEffects`. `march.ts`: `MARCH_STARTS`, `canMarch`,
     `marchCoins`. `legacy.ts`: `LegacyId`, `LEGACIES`, `LEGACY_IDS`, `Legacy`, `freshLegacy`,
     `QUICK_RAIN`, `canKeep`. `heat.ts`: `WIN_WAVE`,
     `MAX_HEAT`, `HEAT_RULES` and `HEAT_UNLOCKED` (text keys: each heat's rule, and the victory
@@ -403,6 +448,10 @@ seconds without a tap.
 - `src/ui/OmenCard.ts`: the omen card at `OMEN` during a break: "Omen for wave N: name", its text,
   the experience it pays and Accept and Refuse (`buttons` holds their spots), calling back with
   the choice.
+- `src/ui/EventCard.ts`: the wayside event card at `OMEN` (a little taller): "On the road before
+  wave N: name", the choice's text (the peddler's relic and price, the shrine's pair), "Left alone,
+  it passes by" and the take and leave buttons (`buttons`), relabelled for each event. The scene
+  makes it the first time an event shows (`GameScene.eventCard`, null until then).
 - `src/ui/LegacyPanel.ts`: the retire panel over the game-over or victory panel: three cards at
   `LEGACY` (an icon, the perk's name and text; the relic card names its relic; a kept perk reads
   "Kept already" and is not tappable), what earlier heroes left, and Cancel. `cards` records each
@@ -526,7 +575,9 @@ seconds without a tap.
   `guards`, `road`, `roadChoices`, `roadMs`, `streak` (`count`, `ms` left, `best`, `bonusXp`),
   `relicFound` (a list, or null), `aimMode`, `roarMs`, `forts` (`stakeHp`, `oil`, `lookout`,
   `boughtWave`, `queued`), `daily` (the day's plan, or null), `won`, `repairs`, `omen` (`id`,
-  `accepted`, or null) and `nextId`.
+  `accepted`, or null), `weather` and `nextWeather` (a `WeatherId` or null), `event` (a
+  `WaysideEvent` or null), `scouted`, `shrine` (a `Shrine` or null), `mark` (`id`, `ms`, or null)
+  and `nextId`.
 - `Enemy` holds its position, `hp`/`maxHp`, boss `bars`, slow and burn timers, `attacking`,
   `hitMs`, `castMs` (a shaman's healing timer, a boss's move timer), `trait` (an elite's, or null)
   and `moved` (the Ogre Warlord's call). `Missile` is an arrow, a fireball, a mage's
@@ -591,21 +642,23 @@ unlocked, so an older save is a ranger in the vale) and falls back to fresh on a
 "New hero" (on its confirming second tap) calls `clearProgress`, which also drops the relics and the heats, then saves a fresh hero
 with the legacy kept. The run itself (wave, foes,
 barricade, Arrow Rain and caltrops charge, streak, coins, guards, road, fortifications, repairs, omen,
-siege engine, hounds, endless) is never saved, so a reload
+weather, wayside event, shrine, mark, siege engine, hounds, endless) is never saved, so a reload
 starts at wave 1.
 `palisade-trophies` holds the trophies earned (`shared/trophies.ts`), each id with the time; "New
 hero" keeps them.
 
 ### Randomness and timing
 
-- `Math.random` is called from fourteen spots, all in `src/game/`. In `sim.ts`: `spawn` (a foe's
+- `Math.random` is called from sixteen spots, all in `src/game/`. In `sim.ts`: `spawn` (a foe's
   y, one call for every kind but a boss, which walks down the middle, then from wave 4 the elite
   roll and, for an elite, its trait), `arrowHit` (crit roll, called on every arrow hit even at 0% crit
   and on a shield), `rollChoices`, the auto-pick in `tick` (only when the countdown runs out), the
   relic chest and the two roads offered in `clearWave` (only on boss waves), the road auto-pick
   in `step` (only when its countdown runs out), the Troll King's choice of guard in `bossMoves`
   (only on its waves, with a guard hired), the omen in `clearWave` (only when the next wave is 4 or
-  more; on the daily siege the plan's instead) and `rollLegacyRelic` (only when the retire panel
+  more; on the daily siege the plan's instead), the wayside event in `clearWave` (`rollEvent`,
+  only in the breaks before wave 6 on; the plan's on the daily), the weather in `clearWave` (`rollWeather`, only
+  for wave 5 on; the plan's on the daily) and `rollLegacyRelic` (only when the retire panel
   opens); the mage's `spellHit` rolls its crit like `arrowHit`, and the daily siege's relic chests
   and roads come from its plan rather than `Math.random`. In `waves.ts`: `waveFoes` (shuffle). Arrow Rain,
   the caltrops, guards, shamans, the other boss moves, splitting, the fortifications and the streak use none. Art uses
@@ -614,7 +667,8 @@ hero" keeps them.
 - **Every Phaser Text object takes 31 `Math.random` calls** (a UUID for its texture key), so a new
   `Text` made in `GameScene.create` (or before the first level-up) shifts the seeded sequence and
   can change the first card the playthrough taps (the siege engine button and the endless chip did,
-  from Frost to Bounty Hunter).
+  from Frost to Bounty Hunter). So the event card and the weather and shrine chips make their texts
+  the first time they show (from wave 4 at the earliest), never in `create`.
 - Time comes only from Phaser's frame timestamp in `GameScene.update`. There are no timers or
   `Date.now`.
 
@@ -690,7 +744,9 @@ nothing plays for it. The player's own taps play from `GameScene` and the panels
   chest). Effects at or right of a Night wave's `sight` stay silent, the same line past which the scene hides them.
 - **The player's taps:** `rainLoose` and `caltrops` when `loose`/`strew` succeed (drag, R, Space,
   C), `pick` for a card, a road or a legacy, `build` with `ui('coin')` for `hire`, `train`,
-  `fortify`, `repair`, `buildEngine` and `upgradeEngine`, `omen` for an accepted omen, `ui('click')` for every `makeButton`, the aim
+  `fortify`, `repair`, `buildEngine` and `upgradeEngine`, `omen` for an accepted omen or a prayer at
+  a shrine, `build` for a tended scout, `relic` with `ui('coin')` for the peddler's relic, `mark`
+  for a marked foe (and `ui('refuse')` without the charge), `ui('click')` for every `makeButton`, the aim
   toggle, the speed switch, the Fortify button, a guard slot, the skill book button, the
   auto-pick checkbox and a "Start at" pick. `ui('refuse')` for every refused action: a tap on an
   uncharged Arrow Rain or caltrops button (or R, Space, C), letting go off the road, a repair or
@@ -726,7 +782,7 @@ nothing plays for it. The player's own taps play from `GameScene` and the panels
   the current wave: `first`, `last`, `boss`, `step`), `.rainSpot` (the Arrow Rain button's centre)
   and `.aim` (where Arrow Rain is being dragged, or null). It never writes to the game. Also there
   to read: `.aimKind`, `.caltropsSpot`, `.roadChoice.cards`, `.hirePanel.slot`,
-  `.omenCard.buttons`, `.enginePanel.buttons`, `.legacyPanel.cards` (and `.legacyPanel.hero`), `.startWave`,
+  `.omenCard.buttons`, `.eventCard?.buttons` (take, leave), `.enginePanel.buttons`, `.legacyPanel.cards` (and `.legacyPanel.hero`), `.startWave`,
   `.nextFrontier` and `.nextHero`. The playthrough plays a fresh ranger in the vale and never opens
   the daily siege: a fresh hero is a ranger (`hero`), the vale (`frontier`) and no `daily`, and the
   mage's upgrades are filtered out of the ranger's offers without changing their random sequence.
@@ -747,9 +803,12 @@ nothing plays for it. The player's own taps play from `GameScene` and the panels
     1 of the road to the Troll King (1 to 10). It never touches the aim toggle, the Fortify button
     or the heats: with no `palisade-aim` saved the ranger shoots the nearest foe, as always, and a
     fresh hero is on Heat 0 with no legacy (two guard slots, Arrow Rain at 4). Elites and omens only
-    come from wave 4 and boss moves from wave 10, so wave 1 plays as before; keep `ELITE_FROM_WAVE`
-    above 1 and `OMEN_FROM_WAVE` above 2, since the elite roll and the omen roll (made when the wave
-    before is cleared) add random calls. The Repair button is never tapped (the barricade stays full).
+    come from wave 4, the weather's first roll at wave 3's clear, events from wave 6 and boss moves
+    from wave 10, so wave 1 plays as before; keep `ELITE_FROM_WAVE` above 1, `OMEN_FROM_WAVE`,
+    `EVENT_FROM_WAVE` and `WEATHER_FROM_WAVE` above 2, since the elite roll and the omen roll (made when the wave
+    before is cleared) add random calls. The Repair button is never tapped (the barricade stays full),
+    and no foe is tapped (no mark): the test's taps land on cards and the Arrow Rain button, never
+    on the bare field, where a tap on a foe would mark it.
   - Wave 1 is exactly 3 goblins and 3 orcs, with an orc first.
   - An arrow is fired and hits.
   - The first kill: earned experience equals that foe's `xp` (a streak of 1 has no bonus), the
@@ -823,6 +882,13 @@ nothing plays for it. The player's own taps play from `GameScene` and the panels
 - **Add a boss move:** give the boss a branch in `bossMoves` in `sim.ts` (its numbers in
   `bosses.ts`), an effect kind if it needs one (in `Effect`, `EFFECT_MS` and `drawEffects`), and
   describe it in the README's foe table.
+- **Add a wayside event, blessing or curse:** add its id to `EventId` and `EVENTS` (or
+  `BlessingId`/`BLESSINGS`, `CurseId`/`CURSES`) in `src/game/wayside.ts`, what taking it does in
+  `decideEvent` (a blessing or curse: a field in `shrineEffects`, read where it acts), its card text
+  in `EventCard.show`, its texts in `src/i18n/` and a row in the README's tables.
+- **Add a weather:** add its id to `WeatherId` and `WEATHERS` in `src/game/weather.ts`, a field to
+  `weatherEffects` read where it acts in `sim.ts`, a look in `GameScene.drawWeather`, its texts in
+  `src/i18n/` and a row in the README's weather table.
 - **Add an omen:** add its id to `OmenId` and `OMENS` in `src/game/omens.ts`, a field to
   `omenEffects`, read it where it acts in `sim.ts`, and add a row to the README's omen table.
 - **Add a legacy:** add its id to `LegacyId` and `LEGACIES` in `src/game/legacy.ts` (and a field to

@@ -23,7 +23,9 @@ export const WINDOWS = CHAPELS * WINDOWS_PER_CHAPEL;
 export const CHAPEL_IDS = ['dawn', 'sea', 'forest', 'moon', 'sun'] as const;
 export type ChapelId = (typeof CHAPEL_IDS)[number];
 
-export type PaneKind = 'glass' | 'thick' | 'lead' | 'bead' | 'heart';
+export type PaneKind = 'glass' | 'thick' | 'lead' | 'bead' | 'heart' | 'mirror' | 'prism' | 'bell' | 'gargoyle' | 'owl';
+/** The rose windows' guardians: the heart takes no harm while one stands. */
+export const GUARDIANS = new Set<PaneKind>(['gargoyle', 'owl']);
 
 export interface PaneSpec {
   /** Top left, in field pixels, before any sliding or turning. */
@@ -41,13 +43,28 @@ export interface PaneSpec {
 }
 
 export interface WindowSpec {
-  /** 0 to 29, or -1 for the daily window. */
+  /** 0 to 29, -1 for the daily window, or 30 and on for the endless clerestory. */
   index: number;
   chapel: number;
   rose: boolean;
   panes: PaneSpec[];
   /** Times the base orb speed. */
   speed: number;
+  /** The feat that pays a seal (none for the daily and the clerestory). */
+  feat: FeatId | null;
+}
+
+/**
+ * Each window's feat, which pays a seal once: break the rose's heart in one chain, catch no beads,
+ * a chain of `featChain` panes, or restore it in under `QUICK_SECONDS`.
+ */
+export type FeatId = 'heart' | 'noBeads' | 'chain' | 'quick';
+export const QUICK_SECONDS = 60;
+export const featChain = (index: number) => 6 + chapelOf(index);
+export function featOf(index: number): FeatId | null {
+  if (index < 0 || index >= WINDOWS) return null;
+  if (isRose(index)) return 'heart';
+  return (['quick', 'noBeads', 'chain'] as const)[index % 3];
 }
 
 export const chapelOf = (index: number) => Math.floor(index / WINDOWS_PER_CHAPEL);
@@ -99,12 +116,35 @@ export function windowSpec(index: number, rand: Rand = seeded(9001 + index * 791
   const level = daily ? chapel + 0.5 : stage(index);
   const rose = !daily && isRose(index);
   const speed = 1 + chapel * 0.05;
-  if (index === 0) return { index, chapel, rose, panes: firstWindow(), speed };
-  const panes = rose ? roseWindow(chapel, rand) : gridWindow(index, level, rand);
-  return { index, chapel, rose, panes, speed };
+  const feat = featOf(index);
+  if (index === 0) return { index, chapel, rose, panes: firstWindow(), speed, feat };
+  const panes = rose ? roseWindow(chapel, rand) : gridWindow(index, level, rand, chapel);
+  return { index, chapel, rose, panes, speed, feat };
 }
 
-function gridWindow(index: number, level: number, rand: Rand): PaneSpec[] {
+/**
+ * The `n`th window of the endless clerestory (from 0), which opens once all 30 are restored: the
+ * chapels' looks in turn, every 6th a rose window, as hard as the Sun Cathedral and a little
+ * faster with each window, up to 1.8 times the base speed.
+ */
+export function endlessSpec(n: number): WindowSpec {
+  const rand = seeded(4241 + n * 6151);
+  const chapel = n % CHAPELS;
+  const rose = n % WINDOWS_PER_CHAPEL === WINDOWS_PER_CHAPEL - 1;
+  const level = Math.min(5, 4 + n * 0.1);
+  const speed = Math.min(1.8, 1.2 + n * 0.03);
+  const panes = rose ? roseWindow(Math.max(2, chapel), rand, chapel) : gridWindow(WINDOWS + n, level, rand, CHAPELS - 1);
+  return { index: WINDOWS + n, chapel, rose, panes, speed, feat: null };
+}
+
+/** The chapel each new pane comes in at: mirrors in the Fishers', bells in the Forest, prisms in the Moon. */
+const NEW_PANES: { kind: PaneKind; from: number }[] = [
+  { kind: 'mirror', from: 1 },
+  { kind: 'bell', from: 2 },
+  { kind: 'prism', from: 3 },
+];
+
+function gridWindow(index: number, level: number, rand: Rand, chapel: number): PaneSpec[] {
   const rows = Math.min(9, 4 + Math.floor(level * 1.2 + rand() * 1.5));
   const pattern = index > 0 && index < 3 ? PATTERNS[index] : PATTERNS[Math.floor(rand() * PATTERNS.length)];
   const thick = 0.06 + level * 0.06;
@@ -121,8 +161,14 @@ function gridWindow(index: number, level: number, rand: Rand): PaneSpec[] {
       if (slides && (c === 0 || c === COLS - 1)) continue;
       const roll = rand();
       // Lead panes sit only in the upper rows, so they never wall the orb in.
-      const kind: PaneKind =
+      let kind: PaneKind =
         roll < lead && r < rows - 2 ? 'lead' : roll < lead + thick ? 'thick' : roll < lead + thick + bead ? 'bead' : 'glass';
+      // A few of the new panes, each from its own chapel on (a bell only where rows slide).
+      const kinds = NEW_PANES.filter((k) => chapel >= k.from && (k.kind !== 'bell' || sliding.size > 0));
+      if (kind === 'glass' && kinds.length) {
+        const extra = rand();
+        if (extra < kinds.length * 0.045) kind = kinds[Math.floor(extra / 0.045)].kind;
+      }
       const pane = cell(c, r, kind, (Math.floor(Math.abs(c - 5.5)) + r + colourShift) % 4);
       if (slides) pane.slide = { reach: CELL_W * 0.8, speed: 0.9 + level * 0.15 };
       panes.push(pane);
@@ -131,8 +177,13 @@ function gridWindow(index: number, level: number, rand: Rand): PaneSpec[] {
   return panes;
 }
 
-/** The rose window: a ring (two from chapel 3) of panes turning round a heart pane, over a low arch. */
-function roseWindow(chapel: number, rand: Rand): PaneSpec[] {
+/**
+ * The rose window: a ring (two from chapel 3) of panes turning round a heart pane, with shoulders
+ * of plain panes, and the chapel's guardians: a gargoyle drifting along the top, a stone owl
+ * swaying under the heart (Dawn and the Forest a gargoyle, the Fishers' and the Moon an owl, the
+ * Sun Cathedral both). `look` picks the guardians in the clerestory.
+ */
+function roseWindow(chapel: number, rand: Rand, look = chapel): PaneSpec[] {
   const cx = FIELD_W / 2;
   const cy = ROWS_TOP + 130;
   const panes: PaneSpec[] = [];
@@ -156,5 +207,14 @@ function roseWindow(chapel: number, rand: Rand): PaneSpec[] {
   // Shoulders of plain panes on each side, so there is always something to break on the way in.
   for (let r = 0; r < 2 + Math.min(2, chapel); r++)
     for (const c of [0, 1, 10, 11]) panes.push(cell(c, r + 5, rand() < 0.2 ? 'bead' : 'glass', (c + r) % 4));
+  // From the Forest a bell in each shoulder stops the rings for a while.
+  if (chapel >= 2) for (const c of [1, 10]) panes.push(cell(c, 4, 'bell', 0));
+  const gargoyle = look % 2 === 0;
+  const owl = look % 2 === 1 || look === CHAPELS - 1;
+  const guardSpeed = 0.7 + chapel * 0.12;
+  if (gargoyle)
+    panes.push({ x: cx - 30, y: 6, w: 60, h: 24, kind: 'gargoyle', colour: 0, slide: { reach: FIELD_W / 2 - 50, speed: guardSpeed } });
+  if (owl)
+    panes.push({ x: cx - 22, y: cy + 24, w: 44, h: 34, kind: 'owl', colour: 0, slide: { reach: 34, speed: guardSpeed * 1.4 } });
   return panes;
 }

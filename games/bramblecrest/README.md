@@ -57,7 +57,22 @@ chapter ends.
   into a meal that lasts until you next fall: perch stew (one more heart), eel skewers (a faster
   roll, sooner again) or bream chowder (the hookvine reaches farther). One meal at a time.
 
+- **Waystones.** A standing stone waits in Mossford and outside each dungeon's door. Touch one to
+  wake it; touch any lit one again to travel to another lit one (tap the place, or press its
+  number).
+- **Tools together.** Throw the hookvine at a bellseed you just planted and it flings the seed far
+  ahead, over water and pits, until a wall stops it. Blow the gust horn with the Moonlantern and
+  the wind carries its light down the blast for a few seconds: it shows hidden bridges farther out,
+  even under the mist that swallows the lantern's own light. With foes hunting you, Space at water
+  (or a tap on it) throws a fish from your creel in instead of casting: everything nearby but iron
+  goes for it until it sinks, and the Brinewyrm rises next to it. A few places want two tools at
+  once.
+
 ![Cooking at the campfire](docs/screenshots/campfire.webp)
+
+![The waystones' card in Mossford](docs/screenshots/waystones.webp)
+
+![The gust horn carrying moonlight through the mist over a chasm](docs/screenshots/mist.webp)
 
 ![Marla's wares](docs/screenshots/shop.webp)
 
@@ -146,7 +161,7 @@ Once chapter two is told, the kingdom stays open, and there is more to do in it:
   moonstones, the found ones lit, so you know where to look again (but not where), the requests
   you took and how far along they are, your best trial times, and your creel and meal.
 - **Bestiary.** The journal's corner button, or the left and right arrow keys, turn to the
-  bestiary: every kind of foe in three families (crawlers, moths and wild things), dark until you
+  bestiary: every kind of foe in four families (crawlers, moths, wild things and the iron guard), dark until you
   beat one. Beat three of a kind to fill its page; fill every page of a family and its foes drop an
   extra coin from then on.
 - **Hourglass trials.** An hourglass now stands by the door of the shrine and of the belfry, of
@@ -173,17 +188,23 @@ creel and your bestiary;
 
 ### Foes that need your tools
 
-Most foes fall to the sword, but two don't, and the coast has two of its own:
+Most foes fall to the sword, but three don't, and the coast has two of its own:
 
 - **Shelled beetles** turn the blade with their shell. Flip one on its back with the hookvine or a
   bellseed's burst, then strike before it rights itself.
 - **Lantern moths** fly too high for the sword and drop embers on you. Pull one down with the
   hookvine, or burst a bellseed under it, and strike while it lies on the ground. A blast of the
   gust horn brings one down too.
+- **Iron knights** guard the belfry, the caverns and the sea cave. Their plate turns the sword, the
+  hookvine and bellseeds alike. When one raises its sword, swing just as it comes down to
+  **parry**: it reels off balance, and then the blade bites. Swing too early and your blade is out
+  of time for a moment, so mashing never parries; roll clear if you miss it.
 - **Rock crabs** scuttle sideways at you along the shore. **Storm gulls** wheel round you and then
   swoop straight through where you stand: roll, or blow them off course with the horn.
 
 ![A lantern moth and a shelled beetle in Glimmer Fen](docs/screenshots/new-foes.webp)
+
+![An iron knight reeling from a parry in the Drowned Belfry](docs/screenshots/parry.webp)
 
 ### Trophies
 
@@ -238,15 +259,15 @@ the north gate, checking the quest, items, flags and save at each step. Run it w
 | `src/main.ts` | Creates the game and hands it to the hub's `setupGame` and `setupScaling` |
 | `src/howToPlay.ts` | The How to play shown on the start and pause screens |
 | `src/trophies/` | The ten trophies, their texts and when each is earned |
-| `src/game/maps.ts` | The nine maps as tile grids, with their people, chests, signs, exits, foes, posts, doors, blocks, plates, rooms, moonstones, the requests' things, mills, fish and the grotto's pool |
+| `src/game/maps.ts` | The nine maps as tile grids, with their people, chests, signs, exits, foes, posts, doors, blocks, plates, rooms, moonstones, the requests' things, mills, fish, the grotto's pool, the mist and the waystones |
 | `src/game/state.ts` | The save: where the knight is, hearts, items, keys, moonstones, flags, the quest, the trials' best times, coins, upgrades, requests, the new game+ cycle, the creel, the meal and the bestiary, and what each upgrade, request and meal gives |
 | `src/game/plus.ts` | Where new game+ buries the moonstones |
 | `src/game/talk.ts` | What each person says, by where the quest stands |
 | `src/game/path.ts` | A* for tap-to-walk |
 | `src/art/paint.ts` | Every sprite, painted onto canvases in soft 3D |
 | `src/art/ground.ts` | Paints each map's ground into one texture |
-| `src/scenes/GameScene.ts` | The world: walking, the sword, the hookvine, bellseeds, the Moonlantern, the gust horn, fishing and cooking, foes, puzzles, the bosses, requests, the bestiary, new game+ and the story |
-| `src/scenes/foes.ts` | Foe stats, the bestiary's families, bellseed timings and the four bosses' timings, and how much harder they are in a trial and in new game+ |
+| `src/scenes/GameScene.ts` | The world: walking, the sword and the parry, the hookvine, bellseeds, the Moonlantern, the gust horn and the tools together, fishing, bait and cooking, foes, puzzles, the bosses, requests, the waystones, the bestiary, new game+ and the story |
+| `src/scenes/foes.ts` | Foe stats, the iron knights' strike and parry timings, the lure, the bestiary's families, bellseed and fling timings and the four bosses' timings, and how much harder they are in a trial and in new game+ |
 | `src/scenes/light.ts` | The night: the dark, the lamp glow and the miniature haze |
 | `src/scenes/hud.ts` | Hearts, moonstones, keys, bellseeds, the journal line, dialog, touch buttons, the trial's clock, the journal and bestiary pages, the shops and campfires, and the end and new game+ cards |
 | `src/scenes/layout.ts` | The view, speeds, reaches and button positions |

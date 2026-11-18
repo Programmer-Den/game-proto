@@ -39,9 +39,18 @@ import {
 } from '../game/save';
 import { dailyRand, finishDaily, loadDaily, seedOf, seeded as seededRand, startDaily, today, type DailyRecord } from '../../../../shared/daily';
 import {
+  blueprintFor,
+  BLUEPRINT_TOL,
   buildOn,
   buy,
   canBuy,
+  canCapstone,
+  canNudge,
+  CAPSTONE_FROM_TIER,
+  CAPSTONE_MULT,
+  NUDGE_FROM_TIER,
+  nudge,
+  toggleCapstone,
   canPickMaterial,
   canReroll,
   canSwap,
@@ -99,6 +108,7 @@ import { viewFrame, viewSize } from '../../../../shared/scaling';
 import {
   BOTTOM_ROW,
   BUILD_ON,
+  CAPSTONE_BUTTON,
   CARDS,
   CARDS_FOUR,
   CURSE,
@@ -276,6 +286,7 @@ export function drawStone(
   kind: StoneKind,
   material: MaterialId,
   goal: number,
+  capstone = false,
 ) {
   const base = materialColor(tier, material, goal);
   const color = kind === 'heavy' ? shade(base, -0.28) : kind === 'light' ? shade(base, 0.35) : base;
@@ -323,6 +334,20 @@ export function drawStone(
     g.fillStyle(0xfff1b8).fillRect(x + 1, y + 1, w - 2, 2);
     g.fillStyle(0xfff8dc).fillRect(x + 6, y + 6, 3, 3).fillRect(x + w - 10, y + 9, 2, 2);
   }
+  if (capstone && w > 30) {
+    // A capstone: an arch under it and a pale keystone wedged in the middle of its top.
+    const aw = Math.min(44, w * 0.4);
+    g.fillStyle(shade(color, -0.55)).fillEllipse(0, y + STONE_H - 7, aw, 12).fillRect(-aw / 2, y + STONE_H - 7, aw, 6);
+    g.fillStyle(OUTLINE).fillPoints(
+      [new Phaser.Math.Vector2(-9, y), new Phaser.Math.Vector2(9, y), new Phaser.Math.Vector2(5, y + 13), new Phaser.Math.Vector2(-5, y + 13)],
+      true,
+    );
+    g.fillStyle(blend(shade(color, 0.3), GOLD, 0.45)).fillPoints(
+      [new Phaser.Math.Vector2(-8, y + 1), new Phaser.Math.Vector2(8, y + 1), new Phaser.Math.Vector2(4, y + 12), new Phaser.Math.Vector2(-4, y + 12)],
+      true,
+    );
+    return;
+  }
   if (perfect) {
     // A gold rune in the middle of a stone that snapped on whole.
     g.fillStyle(GOLD).fillTriangle(-5, y + STONE_H / 2, 0, y + 7, 5, y + STONE_H / 2);
@@ -348,6 +373,8 @@ export class GameScene extends Phaser.Scene {
   /** The material buttons during a break (from tier 3), and the reserve's swap button while it can be used. */
   materialButtons: MaterialButton[] = [];
   reserveButton: Spot | null = null;
+  /** The panel's capstone button while the stone in hand can be made a capstone, else null. */
+  capstoneButton: Spot | null = null;
   /** The site buttons and the daily shrine's button on the patron pick. */
   siteButtons: (Spot & { id: SiteId })[] = [];
   dailyButton: Spot | null = null;
@@ -391,6 +418,14 @@ export class GameScene extends Phaser.Scene {
   private patronText!: Phaser.GameObjects.Text;
   private reserveText!: Phaser.GameObjects.Text;
   private reserveParts: UiPart[] = [];
+  private capstoneParts: UiPart[] = [];
+  private capstoneBg!: Phaser.GameObjects.Rectangle;
+  private capstoneLabel!: Phaser.GameObjects.Text;
+  /** The site's blueprint over the temple, its label by the tier being built, what it was drawn for and the tiers built to it. */
+  private blueprint!: Phaser.GameObjects.Graphics;
+  private blueprintLabel!: Phaser.GameObjects.Text;
+  private blueprintKey = '';
+  private blueprintMet = new Set<number>();
   private leanLabel!: Phaser.GameObjects.Text;
   private leanBar!: Phaser.GameObjects.Graphics;
   private windText!: Phaser.GameObjects.Text;
@@ -472,6 +507,9 @@ export class GameScene extends Phaser.Scene {
     this.patronCards = [];
     this.materialButtons = [];
     this.reserveButton = null;
+    this.capstoneButton = null;
+    this.blueprintKey = '';
+    this.blueprintMet = new Set();
     this.patronParts = [];
     this.patronShown = false;
     this.crown = null;
@@ -488,6 +526,9 @@ export class GameScene extends Phaser.Scene {
     this.createBackdrop();
     this.temple = this.add.container(0, 0).setDepth(3);
     this.createPlinth();
+    // The blueprint is drawn faintly over the stones, so a narrower plan still shows; it bobs with the raft.
+    this.blueprint = this.add.graphics().setDepth(4);
+    this.blueprintLabel = this.add.text(0, 0, '', { fontFamily: FONT, fontSize: '11px', color: '#f3e9d2' }).setOrigin(0, 0.5).setAlpha(0.8).setDepth(4);
     this.guide = this.add.graphics().setDepth(4);
     this.moving = this.add.graphics().setDepth(5);
     this.weatherFx = this.add.graphics().setScrollFactor(0).setDepth(7);
@@ -522,10 +563,21 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0)
       .setScrollFactor(0)
       .setInteractive({ useHandCursor: true })
-      .on('pointerdown', () => drop(this.state) && sfx('whoosh'));
+      .on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+        const s = this.state;
+        // A tap while the stone falls nudges it towards the tapped side, from tier 2 and for favour.
+        if (s.phase === 'falling') {
+          if (canNudge(s)) this.tryNudge(pointer.worldX < s.moving.x ? -1 : 1);
+        } else if (drop(s)) sfx('whoosh');
+      });
     // R swaps the stone in hand with the reserve, like the panel's button.
     // A held R swaps once, not on every auto-repeat.
     this.input.keyboard?.on('keydown-R', (e: KeyboardEvent) => !e.repeat && this.trySwap());
+    // C makes the third stone a capstone; the arrows (or A and D) nudge a falling stone.
+    this.input.keyboard?.on('keydown-C', (e: KeyboardEvent) => !e.repeat && this.tryCapstone());
+    for (const [key, dir] of [['LEFT', -1], ['A', -1], ['RIGHT', 1], ['D', 1]] as const) {
+      this.input.keyboard?.on(`keydown-${key}`, (e: KeyboardEvent) => !e.repeat && this.tryNudge(dir));
+    }
     // The shared pause stops update but not the frame clock: the first frame after Resume steps nothing.
     const onResume = () => (this.lastFrame = null);
     this.events.on(Phaser.Scenes.Events.RESUME, onResume);
@@ -557,6 +609,7 @@ export class GameScene extends Phaser.Scene {
       checkTrophies(s, e);
     }
     this.updateSound();
+    this.drawBlueprint();
 
     // The camera follows the temple's top up, easing so each new stone slides the view gently.
     const target = Math.min(0, PLINTH_Y - stackHeight(s) - TOP_SCREEN_Y) - this.fy;
@@ -703,6 +756,15 @@ export class GameScene extends Phaser.Scene {
       .on('pointerout', () => swapBg.setFillStyle(0x4a3a6a))
       .on('pointerdown', () => this.trySwap());
     this.reserveParts = [swapBg, swapLabel];
+    // The capstone button beside the tier pips, lit for the third stone of a tier and gold while it is a capstone.
+    const { x: cx, y: cy, w: cw, h: ch } = CAPSTONE_BUTTON;
+    this.capstoneBg = fixed(this.add.rectangle(cx, cy, cw, ch, 0x4a3a6a).setStrokeStyle(2, GOLD));
+    this.capstoneLabel = fixed(this.add.text(cx, cy, '', { fontFamily: FONT, fontSize: '10px', color: '#f3e9d2' }).setOrigin(0.5));
+    setFitted(this.capstoneLabel, t('capstoneButton'), cw - 6, 10);
+    this.capstoneBg
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', () => this.tryCapstone());
+    this.capstoneParts = [this.capstoneBg, this.capstoneLabel];
     this.trialText = fixed(this.add.text(PANEL.x + 16, PANEL.y + 186, '', small('#9ad46a')));
     this.curseText = fixed(this.add.text(PANEL.x + 16, PANEL.y + 203, '', small('#e8a0d4')));
     this.leanLabel = fixed(this.add.text(PANEL.x + 16, PANEL.y + 220, t('lean'), small('#d8cbe8')));
@@ -763,6 +825,64 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /** The panel's Capstone button and the C key: make the stone in hand a capstone or not, or buzz while stacking when it can't be. */
+  private tryCapstone() {
+    const s = this.state;
+    if (toggleCapstone(s)) sfx(s.capstone ? 'stone' : 'swish');
+    else if (s.phase === 'swinging' || s.phase === 'falling') ui('refuse');
+  }
+
+  /** A tap beside the falling stone, or an arrow key: nudge it, or buzz from tier 2 when it can't be. */
+  private tryNudge(dir: 1 | -1) {
+    const s = this.state;
+    if (nudge(s, dir)) return;
+    if (s.phase === 'falling' && s.tier >= NUDGE_FROM_TIER && !s.race) ui('refuse');
+  }
+
+  /**
+   * The site's blueprint: a dashed outline of each tier's planned width up to the crown, the tier being built
+   * brighter with its width beside it, and the tiers built to it in gold. Redrawn when the tier changes.
+   */
+  private drawBlueprint() {
+    const s = this.state;
+    const bob = drift(s);
+    this.blueprint.x = bob;
+    const now = s.endless || s.phase === 'patron' ? null : blueprintFor(s, s.tier);
+    const top = s.stones.at(-1);
+    const key = `${s.tier}|${s.endless}|${s.phase === 'patron'}|${[...this.blueprintMet].join(',')}`;
+    if (key !== this.blueprintKey) {
+      this.blueprintKey = key;
+      const g = this.blueprint.clear();
+      if (!s.endless) {
+        for (let tier = 2; tier <= this.goal; tier++) {
+          const w = blueprintFor(s, tier);
+          if (w === null) continue;
+          const y0 = this.worldY(tier * STONES_PER_TIER * STONE_H);
+          const y1 = this.worldY((tier - 1) * STONES_PER_TIER * STONE_H);
+          const met = this.blueprintMet.has(tier);
+          const current = tier === s.tier && s.phase !== 'patron';
+          const color = met ? GOLD : current ? 0xf3e9d2 : 0xd8cbe8;
+          const alpha = met ? 0.9 : current ? 0.7 : 0.22;
+          g.fillStyle(color, alpha);
+          // Dashed sides and top: faint enough to read the stones through.
+          const thick = met ? 2 : 1;
+          for (const x of [TOWER_X - w / 2, TOWER_X + w / 2 - thick]) for (let y = y0; y < y1; y += 8) g.fillRect(Math.round(x), y, thick, 4);
+          for (let x = TOWER_X - w / 2; x < TOWER_X + w / 2; x += 8) g.fillRect(Math.round(x), y0, 4, 1);
+          if (current) g.fillStyle(color, 0.06).fillRect(TOWER_X - w / 2, y0, w, y1 - y0);
+        }
+      }
+    }
+    this.blueprintLabel.setVisible(now !== null);
+    if (now !== null) {
+      const width = Math.round(top ? top.w : s.moving.w);
+      const near = Math.abs(width - now) <= BLUEPRINT_TOL;
+      this.blueprintLabel
+        .setText(t('blueprintTag', { w: now, now: width }))
+        .setColor(near ? '#f3c64e' : '#f3e9d2')
+        .setPosition(bob + TOWER_X + Math.max(now, width) / 2 + 8, this.worldY((s.tier - 0.5) * STONES_PER_TIER * STONE_H));
+    }
+  }
+
   /** The panel's Swap button and the R key: swap, or buzz while stacking when it isn't allowed. */
   private trySwap() {
     const s = this.state;
@@ -810,7 +930,7 @@ export class GameScene extends Phaser.Scene {
       // Drawn from the event: a topple may already have taken the stone off `s.stones`.
       const { stone, row: i } = e;
       const g = this.add.graphics().setPosition(stone.x, this.worldY(i * STONE_H));
-      drawStone(g, stone.w, stone.tier, stone.perfect, stone.kind, stone.material, this.goal);
+      drawStone(g, stone.w, stone.tier, stone.perfect, stone.kind, stone.material, this.goal, stone.capstone);
       this.temple.add(g);
       this.stoneViews.push(g);
       // The event's stone sits where the raft was when it landed, which is where it is drawn now.
@@ -857,6 +977,25 @@ export class GameScene extends Phaser.Scene {
     } else if (e.type === 'swapped') {
       sfx('swish');
       this.popup(PANEL.x + PANEL.w + 90, RESERVE_BUTTON.y + 8, t('inHand', { kind: t(KIND_INFO[e.kind].name) }), false, true);
+    } else if (e.type === 'capstone') {
+      const top = s.stones.at(-1);
+      const x = (top?.x ?? TOWER_X) + drift(s);
+      const y = this.worldY(stackHeight(s)) - 62;
+      if (e.set) {
+        sfx('keystone');
+        this.popup(x, y, t('capstoneSet', { mult: CAPSTONE_MULT }), true);
+      } else {
+        sfx('crack');
+        this.popup(x, y, t('capstoneCracked'), false);
+      }
+    } else if (e.type === 'nudged') {
+      sfx('nudge');
+      this.popup(PANEL.x + 150, PANEL.y + 126, `-${e.cost}`, false, true);
+    } else if (e.type === 'blueprint') {
+      this.blueprintMet.add(e.tier);
+      sfx('sparkle');
+      const top = s.stones.at(-1)!;
+      this.popup(top.x + drift(s) + top.w / 2 + 50, this.worldY(e.tier * STONES_PER_TIER * STONE_H) - 4, t('blueprintMet', { n: e.favor }), true);
     } else if (e.type === 'altar') {
       // A sky altar: trimmed and lit like a balanced tier, and a blessing either way.
       this.ornament(e.tier);
@@ -1015,11 +1154,11 @@ export class GameScene extends Phaser.Scene {
     this.moving.setVisible(show);
     this.guide.clear();
     if (!show) return;
-    const key = `${m.w}|${s.tier}|${m.kind}|${m.material}`;
+    const key = `${m.w}|${s.tier}|${m.kind}|${m.material}|${s.capstone}`;
     if (key !== this.movingKey) {
       this.movingKey = key;
       this.moving.clear();
-      drawStone(this.moving, m.w, s.tier, false, m.kind, m.material, this.goal);
+      drawStone(this.moving, m.w, s.tier, false, m.kind, m.material, this.goal, s.capstone);
     }
     const y = this.worldY(m.h);
     this.moving.setPosition(m.x, y);
@@ -1094,6 +1233,11 @@ export class GameScene extends Phaser.Scene {
     const swappable = canSwap(s);
     for (const part of this.reserveParts) part.setVisible(reserveOn).setAlpha(swappable ? 1 : 0.4);
     this.reserveButton = swappable ? { ...RESERVE_BUTTON } : null;
+    const capOn = s.tier >= CAPSTONE_FROM_TIER && !s.race;
+    const cappable = canCapstone(s);
+    for (const part of this.capstoneParts) part.setVisible(capOn).setAlpha(cappable ? 1 : 0.4);
+    this.capstoneBg.setFillStyle(s.capstone ? 0x8a6a1a : 0x4a3a6a);
+    this.capstoneButton = cappable ? { ...CAPSTONE_BUTTON } : null;
     this.drawLean();
     const playing = s.phase === 'swinging' || s.phase === 'falling';
     this.windText.setText(windy(s) && playing ? (s.wind ? t('gust', { arrows: s.wind > 0 ? '>>>' : '<<<', n: Math.abs(s.wind) }) : t('calmAir')) : '');
@@ -1746,7 +1890,7 @@ export class GameScene extends Phaser.Scene {
     const i = this.state.stones.length - 1;
     const top = this.state.stones[i];
     this.stoneViews[i].clear();
-    drawStone(this.stoneViews[i], top.w, top.tier, top.perfect, top.kind, top.material, this.goal);
+    drawStone(this.stoneViews[i], top.w, top.tier, top.perfect, top.kind, top.material, this.goal, top.capstone);
     this.glow(top.x + drift(this.state), this.worldY(i * STONE_H), top.w);
     if (this.ornaments.has(top.tier) && i === top.tier * STONES_PER_TIER - 1) this.ornament(top.tier);
   }

@@ -330,6 +330,40 @@ const en = {
   royalCame: 'The crown asks for a gift of honey!',
   warrantWon: { one: 'Royal warrant kept: {n} year', other: 'Royal warrant kept: {n} years' },
   warrantLost: 'No gift: the royal warrant is lost',
+
+  // Royal jelly
+  jellyTake: 'take',
+  ringBroken: 'broken',
+  jellyFormed: 'Royal jelly cell!',
+  jellyReady: 'Royal jelly ready: tap it',
+  jellyTaken: '+1 royal jelly',
+  royalJelly: 'Royal jelly',
+  jellyKept: '{n} kept',
+  jellyFed: 'fed · {time}',
+  jellySub: '{n} kept · an empty cell ringed by six capped cells makes one',
+  jellySell: 'Sell a jar\n{price}',
+  jellyFeed: 'Feed the queens\nbrood twice as fast for {time}',
+  jellyFedFor: 'Feed the queens\nfed for {time} more',
+  jellyNote: 'Not counted as jars sold. Keep the ring of capped cells whole while the jelly is made.',
+  fedQueens: 'The queens are fed: brood hatches twice as fast',
+
+  // Weather
+  forecast: 'Forecast',
+  today: 'Today {time}',
+  weatherFair: 'Fair',
+  weatherRain: 'Rain',
+  weatherWarm: 'Warm',
+  weatherFrost: 'Frost',
+  rainCame: 'Rain today: the foragers stay home',
+  warmCame: 'A warm day: double nectar a trip',
+  rainHome: 'Rain: the bees\nstay home',
+
+  // The honey auction
+  auctionFor: 'A buyer from {city} bids for {jars}',
+  auctionBid: '{price} a jar (×{mult}) · tap to sell for {total}',
+  auctionCame: "A buyer bids at the season's end!",
+  auctionWon: 'Sold at auction: +{n} coins',
+  auctionLost: 'The buyer walked off',
 };
 
 

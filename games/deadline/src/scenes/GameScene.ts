@@ -11,6 +11,15 @@ import { ACID_COLOR, BURN_COLOR, CRATE_COLORS, LEADER_COLORS, OPERATION_COLORS, 
 import { Pool } from '../game/pool';
 import {
   ACID_SLOW,
+  DARE,
+  DARES,
+  LAST_STAND,
+  SIDEARM,
+  WEAPON_LABELS,
+  dareOffer,
+  type DareKind,
+  type Sidearm,
+  type Weapon,
   AIRSTRIKE,
   BUS,
   CODEX,
@@ -259,6 +268,9 @@ interface Bullet {
   /** Its damage as a multiple of the squad's (a marksman's shot), and whether it is a grenadier's grenade. */
   mult: number;
   grenade: boolean;
+  /** A flamethrower sidearm's flame: it burns past shields and armour, and dies `SIDEARM.flamer.range` above where it left (`fromY`). */
+  flame: boolean;
+  fromY: number;
   sprite: Phaser.GameObjects.Image;
 }
 
@@ -308,9 +320,9 @@ interface Fx {
 
 /**
  * What the game is doing: fighting a wave, the pause after one, picking a boss's supply drop,
- * picking a joining survivor's role, or overrun.
+ * picking a joining survivor's role, picking the next wave's dare, or overrun.
  */
-export type Phase = 'wave' | 'break' | 'supply' | 'role' | 'over';
+export type Phase = 'wave' | 'break' | 'supply' | 'role' | 'dare' | 'over';
 
 export interface GameState {
   wave: number;
@@ -412,6 +424,19 @@ export interface GameState {
   /** The zombie codex (saved): kills of each kind towards its page, and the pages this run filled. */
   codex: Codex;
   codexFilled: EnemyKind[];
+  /** The sidearms this run has found (from the shotgun and flamethrower supplies), and the weapon the squad holds now. */
+  sidearms: Sidearm[];
+  weapon: Weapon;
+  /** The two dares on offer while the phase is 'dare', the one this wave is under (null for none), whether it was lost, and the dares held this run. */
+  dareOffer: DareKind[];
+  dare: DareKind | null;
+  dareLost: boolean;
+  daresHeld: number;
+  /** A jammed dare's slow fire time left. */
+  jamMs: number;
+  /** The last stand: used this run, and its time left while it runs (0 otherwise). */
+  lastStandUsed: boolean;
+  lastStandMs: number;
 }
 
 export class GameScene extends Phaser.Scene {
@@ -447,6 +472,15 @@ export class GameScene extends Phaser.Scene {
   private bossClock = 0;
   private bossAct: { move: BossMove; ms: number; acting: boolean; tx: number; fromX: number; fromY: number } | null = null;
   private flameClock = 0;
+  /** A sidearm swap holds the squad's fire this long. */
+  private swapMs = 0;
+  /** The scrap this run had when the wave started, so a held dare can pay the wave's scrap again. */
+  private dareScrapFrom = 0;
+  /** The dare cards while one is picked. */
+  private dareCards: { kind: DareKind | null; x: number; y: number; w: number; h: number }[] = [];
+  /** The last stand's clock towards its next melee blow, and its countdown over the sandbags. */
+  private standClock = 0;
+  private standText!: Phaser.GameObjects.Text;
   /** The press that is down started on a button, so dragging it doesn't move the hero. */
   private pressOnUi = false;
   /** Game time since the game over screen opened; taps on it count only after `OVER_GRACE_MS`. */
@@ -564,6 +598,15 @@ export class GameScene extends Phaser.Scene {
       busLost: false,
       codex: loadCodex(),
       codexFilled: [],
+      sidearms: [],
+      weapon: 'rifle',
+      dareOffer: [],
+      dare: null,
+      dareLost: false,
+      daresHeld: 0,
+      jamMs: 0,
+      lastStandUsed: false,
+      lastStandMs: 0,
     };
     const s0 = this.state, roster = loadRoster();
     s0.roster = roster.vets;
@@ -624,6 +667,10 @@ export class GameScene extends Phaser.Scene {
     this.bossClock = 0;
     this.bossAct = null;
     this.flameClock = 0;
+    this.swapMs = 0;
+    this.dareScrapFrom = 0;
+    this.dareCards = [];
+    this.standClock = 0;
     this.pressOnUi = false;
     this.overMs = 0;
     this.overPage = 0;
@@ -688,7 +735,7 @@ export class GameScene extends Phaser.Scene {
       (d) => [d.sprite, d.ring, d.label].forEach((o) => o.setVisible(false)),
     );
     this.bullets = new Pool<Bullet>(
-      () => ({ alive: false, x: 0, y: 0, vx: 0, vy: 0, prevX: 0, prevY: 0, pierces: false, hitsLeft: 0, hit: [], ricochets: 0, mult: 1, grenade: false, sprite: this.skin(this.add.image(0, 0, '__DEFAULT'), 'bullet').setDepth(DEPTH.bullets) }),
+      () => ({ alive: false, x: 0, y: 0, vx: 0, vy: 0, prevX: 0, prevY: 0, pierces: false, hitsLeft: 0, hit: [], ricochets: 0, mult: 1, grenade: false, flame: false, fromY: 0, sprite: this.skin(this.add.image(0, 0, '__DEFAULT'), 'bullet').setDepth(DEPTH.bullets) }),
       (b) => b.sprite.setVisible(false),
     );
     this.splats = new Pool<Splat>(
@@ -738,6 +785,7 @@ export class GameScene extends Phaser.Scene {
     this.banner = this.add.text(VIEW.w / 2, VIEW.h * 0.38, '', { align: 'center', wordWrap: { width: VIEW.w - 40, useAdvancedWrap: true } }).setOrigin(0.5).setDepth(DEPTH.hud).setAlpha(0);
     this.bossCall = this.add.text(0, 0, '').setOrigin(0.5).setDepth(DEPTH.pops).setVisible(false);
     this.placeHint = this.add.text(VIEW.w / 2, WALL.y - 70, '', { align: 'center' }).setOrigin(0.5).setDepth(DEPTH.pops).setVisible(false);
+    this.standText = this.add.text(VIEW.w / 2, REACH_Y - 92, '', { align: 'center' }).setOrigin(0.5).setDepth(DEPTH.pops).setVisible(false);
     this.createInput();
     this.applyStyle();
     this.startWave(1);
@@ -830,11 +878,13 @@ export class GameScene extends Phaser.Scene {
     this.font(this.banner, 40, nv ? th.accent : '#ffe04a', nv ? { glow: th.accent } : { stroke: th.ink, sw: 8 });
     this.font(this.bossCall, nv ? 16 : 20, nv ? th.warn : '#ffe04a', nv ? { glow: th.warn } : { stroke: th.ink, sw: 6 });
     this.font(this.placeHint, nv ? 14 : 16, nv ? th.accent : '#fff8e8', nv ? { glow: th.accent } : { stroke: th.ink, sw: 5 });
+    this.font(this.standText, nv ? 18 : 24, nv ? th.warn : '#ff9a3a', nv ? { glow: th.warn } : { stroke: th.ink, sw: 7 });
     for (const t of this.overText) t.destroy();
     this.overText = [];
     if (this.state.phase === 'over') this.showGameOver();
     if (this.state.phase === 'supply') this.showSupply();
     if (this.state.phase === 'role') this.showRoles();
+    if (this.state.phase === 'dare') this.showDare();
     this.hud.setStyle(this.style);
     GameScene.backdrop?.setStyle(this.style);
     this.refreshBackdrop();
@@ -892,15 +942,18 @@ export class GameScene extends Phaser.Scene {
       kb.addKey(code).on('down', () => {
         if (this.state.phase === 'supply') this.pickSupply(this.state.offer[i]);
         else if (this.state.phase === 'role') this.pickRole(ROLE_KINDS[i]);
+        else if (this.state.phase === 'dare') this.pickDare(this.dareCards[i]?.kind ?? null);
       }),
     );
     // Q uses the squad leader's active.
     kb.addKey(K.Q).on('down', () => this.useLeader());
+    // E swaps the squad's weapon to the next sidearm found (and back to the rifles).
+    kb.addKey(K.E).on('down', () => this.swapWeapon());
     // 4 takes the extraction, when it is on offer.
     kb.addKey(K.FOUR).on('down', () => this.state.phase === 'supply' && this.cards.some((c) => c.kind === 'extract') && this.pickSupply('extract'));
     // Tap or drag anywhere: the hero walks along their line to below that spot.
     const aim = (p: Phaser.Input.Pointer) => {
-      if (this.state.phase === 'over' || this.state.phase === 'supply' || this.state.phase === 'role') return;
+      if (this.state.phase === 'over' || this.state.phase === 'supply' || this.state.phase === 'role' || this.state.phase === 'dare') return;
       const [minX, maxX] = this.heroRange();
       this.pointerTarget = Phaser.Math.Clamp(p.worldX, minX, maxX);
     };
@@ -924,8 +977,13 @@ export class GameScene extends Phaser.Scene {
       } else if (s.phase === 'role') {
         const card = this.roleCards.find((c) => inBox(x, y, c));
         if (card) this.pickRole(card.role);
+      } else if (s.phase === 'dare') {
+        const card = this.dareCards.find((c) => inBox(x, y, c));
+        if (card) this.pickDare(card.kind);
       } else if (this.hud.onLeader(x, y)) {
         this.useLeader();
+      } else if (this.hud.onSidearm(x, y)) {
+        this.swapWeapon();
       } else if (this.hud.onKit(x, y) && ((s.phase === 'wave' && s.sandbags > 0) || s.placing)) {
         s.placing = !s.placing;
         ui('click');
@@ -974,6 +1032,18 @@ export class GameScene extends Phaser.Scene {
     // Two Bridges: the horde and the fuel drums only come down the open lanes (no draws, so the plan
     // stays the same otherwise).
     if (op.lanes) for (const sp of this.plan) if ((sp.type === 'enemy' && !sp.flank) || sp.type === 'drum') sp.x = openLaneX(sp.x, op.lanes);
+    // A dare taken for this wave changes its plan (no draws) or its first seconds.
+    const dare = this.state.dare;
+    for (const sp of this.plan) {
+      if (sp.type !== 'enemy') continue;
+      if (dare === 'runners' && sp.kind === 'grunt') {
+        sp.kind = 'runner';
+        sp.hp = (sp.hp * ENEMIES.runner.hp) / ENEMIES.grunt.hp;
+      } else if (dare === 'tough') sp.hp *= DARE.toughMult;
+    }
+    this.state.jamMs = dare === 'jammed' ? DARE.jamMs : 0;
+    this.state.dareLost = false;
+    this.dareScrapFrom = this.state.scrap;
     this.waveClock = 0;
     this.bossClock = 0;
     this.bossAct = null;
@@ -993,6 +1063,7 @@ export class GameScene extends Phaser.Scene {
     if (this.state.condition !== 'clear') lines.push(`${tr(CONDITIONS[this.state.condition].label).toUpperCase()}!`);
     if (this.state.adapt) lines.push(tr('hordeAdapts', { adapt: tr(ADAPTS[this.state.adapt].label).toUpperCase() }));
     if (op.escort) lines.push(tr(this.style === 'comic' ? 'busBanner' : 'nvBusBanner'));
+    if (dare) lines.push(tr('dareBanner', { dare: tr(DARES[dare].label).toUpperCase() }));
     this.showBanner(lines.filter(Boolean).join('\n'));
     this.applyCondition();
     this.refreshBackdrop();
@@ -1055,8 +1126,8 @@ export class GameScene extends Phaser.Scene {
     this.animateFeed();
     checkTrophies(this.state);
     if (this.state.phase === 'over') this.overMs += dt;
-    // Nothing moves while the game is over, or a supply drop or a survivor's role is being picked.
-    if (this.state.phase === 'over' || this.state.phase === 'supply' || this.state.phase === 'role') return;
+    // Nothing moves while the game is over, or a supply drop, a survivor's role or a dare is being picked.
+    if (this.state.phase === 'over' || this.state.phase === 'supply' || this.state.phase === 'role' || this.state.phase === 'dare') return;
     this.runMs += dt;
     this.moveHero(dt);
     this.spawn(dt);
@@ -1080,6 +1151,7 @@ export class GameScene extends Phaser.Scene {
     this.tickFlamer(dt);
     this.tickFrenzy(dt);
     this.tickLeader(dt);
+    if (this.tickLastStand(dt)) return checkTrophies(this.state);
     this.ageEffects(dt);
     this.checkWave(dt);
     // Again after the step, so a trophy its events earn is saved in the same frame.
@@ -1145,14 +1217,7 @@ export class GameScene extends Phaser.Scene {
         e.armoured = !!s.armoured;
         e.flank = !!s.flank;
       } else if (s.type === 'pickup') {
-        // Once every slot in the squad is filled, a companion crate brings extra damage instead.
-        const upgrade: CrateKind = s.upgrade === 'companion' && this.state.stats.companions >= MAX_COMPANIONS ? 'damage' : s.upgrade;
-        const p = this.pickups.take();
-        Object.assign(p, { id: this.nextId++, upgrade, hp: s.hp, maxHp: s.hp, x: s.x, y: SPAWN_Y });
-        this.skin(p.sprite, `crate-${upgrade}`).setVisible(true);
-        this.skin(p.label, `label-${upgrade}`).setVisible(true);
-        this.styleCrateText(p.hpText);
-        p.hpText.setVisible(true);
+        this.dropCrate(s.upgrade, s.hp, s.x);
       } else if (s.type === 'survivor') {
         const v = this.survivors.take();
         Object.assign(v, { id: this.nextId++, hp: s.hp, maxHp: s.hp, x: s.x, y: SPAWN_Y });
@@ -1167,6 +1232,17 @@ export class GameScene extends Phaser.Scene {
         [d.sprite, d.ring, d.label].forEach((o) => o.setVisible(true));
       }
     }
+  }
+
+  /** A crate comes down the road at x. Once every slot in the squad is filled, a companion crate brings extra damage instead. */
+  private dropCrate(kind: CrateKind, hp: number, x: number) {
+    const upgrade: CrateKind = kind === 'companion' && this.state.stats.companions >= MAX_COMPANIONS ? 'damage' : kind;
+    const p = this.pickups.take();
+    Object.assign(p, { id: this.nextId++, upgrade, hp, maxHp: hp, x, y: SPAWN_Y });
+    this.skin(p.sprite, `crate-${upgrade}`).setVisible(true);
+    this.skin(p.label, `label-${upgrade}`).setVisible(true);
+    this.styleCrateText(p.hpText);
+    p.hpText.setVisible(true);
   }
 
   private addEnemy(kind: EnemyKind, hp: number, x: number, y: number) {
@@ -1184,36 +1260,62 @@ export class GameScene extends Phaser.Scene {
    * zombie. A frenzy fires `FRENZY.rate` times as fast; standing in acid, `ACID_SLOW` times slower.
    */
   private fire(dt: number) {
+    // A sidearm swap holds the squad's fire for a moment.
+    if (this.swapMs > 0) {
+      this.swapMs = Math.max(0, this.swapMs - dt);
+      return;
+    }
     this.fireClock += dt;
-    const { pierce } = this.state.stats;
-    const interval = (this.state.stats.fireInterval / (this.state.frenzyMs > 0 ? FRENZY.rate : 1)) * (this.state.inAcid ? ACID_SLOW : 1) * (this.state.condition === 'shortage' ? CONDITION.shortageFire : 1);
-    const ricochets = this.state.perks.includes('ricochet') ? 1 : 0;
-    const shoot = (x: number, y: number, angle: number, o: { mult?: number; pierce?: number; grenade?: boolean } = {}) => {
+    const s = this.state, { pierce } = s.stats, weapon = s.weapon;
+    // A jammed dare slows the squad's fire for the wave's first seconds.
+    if (s.jamMs > 0 && s.phase === 'wave') s.jamMs = Math.max(0, s.jamMs - dt);
+    const interval =
+      (s.stats.fireInterval / (s.frenzyMs > 0 ? FRENZY.rate : 1)) * (s.inAcid ? ACID_SLOW : 1) * (s.condition === 'shortage' ? CONDITION.shortageFire : 1) *
+      (weapon === 'rifle' ? 1 : SIDEARM[weapon].interval) * (s.jamMs > 0 ? DARE.jamMult : 1);
+    const ricochets = s.perks.includes('ricochet') ? 1 : 0;
+    const shoot = (x: number, y: number, angle: number, o: { mult?: number; pierce?: number; grenade?: boolean; pellet?: boolean; flame?: boolean } = {}) => {
       const b = this.bullets.take();
       b.x = b.prevX = x;
       b.y = b.prevY = y;
+      b.fromY = y;
       b.vx = Math.sin(angle) * BULLET.speed;
       b.vy = Math.cos(angle) * BULLET.speed;
-      b.hitsLeft = 1 + pierce + (o.pierce ?? 0);
-      b.pierces = pierce + (o.pierce ?? 0) > 0;
-      b.ricochets = ricochets;
+      // A sidearm's pellet has no pierce; a flame burns through a few zombies, past shields.
+      const extra = o.pellet ? -pierce : o.flame ? SIDEARM.flamer.hits - 1 - pierce : (o.pierce ?? 0);
+      b.hitsLeft = 1 + pierce + extra;
+      b.pierces = o.flame || pierce + extra > 0;
+      b.ricochets = o.flame ? 0 : ricochets;
       b.mult = o.mult ?? 1;
       b.grenade = !!o.grenade;
+      b.flame = !!o.flame;
       b.hit.length = 0;
       b.sprite.setPosition(b.x, b.y).setRotation(angle).setVisible(true);
-      // A grenade and a marksman's round show bigger than a bullet.
-      b.sprite.setScale(this.unit(b.sprite) * (b.grenade ? 2 : b.mult >= MARKSMAN.mult ? 1.5 : 1));
+      // A grenade, a flame and a marksman's round show bigger than a bullet; a flame glows.
+      b.sprite.setScale(this.unit(b.sprite) * (b.grenade || b.flame ? 2 : b.mult >= MARKSMAN.mult ? 1.5 : 1));
+      if (b.flame) b.sprite.setTint(this.style === 'comic' ? 0xff8a2a : 0xd8ffb0);
+      else b.sprite.clearTint();
     };
     while (this.fireClock >= interval) {
       this.fireClock -= interval;
       this.volleys++;
-      sfx('shot');
+      if (weapon === 'flamer') sfx('flameShot');
+      else sfx('shot', weapon === 'shotgun' ? { pitch: 0.7 } : undefined);
       for (let i = 0; i <= this.squad.length; i++) {
         const x = this.player.x + SQUAD_SLOTS[i].dx, y = HERO.y + SQUAD_SLOTS[i].dy - 30;
         const role = i === 0 ? 'gunner' : this.state.roles[i - 1];
         // A veteran's rank adds to the damage of their bullets.
         const rank = i === 0 ? 1 : rankMult(this.state.ranks[i - 1] ?? 0);
-        if (role === 'marksman') {
+        if (weapon === 'shotgun') {
+          // Every gun fans its pellets out; only the straight one holds for a survivor.
+          const p = SIDEARM.shotgun;
+          for (let k = 0; k < p.pellets; k++) {
+            const a = (k - (p.pellets - 1) / 2) * p.spread;
+            if (a === 0 && this.survivorAhead(x, y)) continue;
+            shoot(x, y, a, { mult: rank * p.mult, pellet: true });
+          }
+        } else if (weapon === 'flamer') {
+          if (!this.survivorAhead(x, y)) shoot(x, y, 0, { mult: rank * SIDEARM.flamer.mult, flame: true });
+        } else if (role === 'marksman') {
           if (this.volleys % MARKSMAN.every) continue;
           const t = this.toughestEnemy(y);
           shoot(x, y, t ? Math.atan2(t.x - x, y - t.y) : 0, { mult: MARKSMAN.mult * rank, pierce: MARKSMAN.pierce });
@@ -1249,7 +1351,8 @@ export class GameScene extends Phaser.Scene {
       b.x += (b.vx * dt) / 1000;
       b.y -= (b.vy * dt) / 1000;
       // A ricochet can fly downwards, so the bottom edge counts too.
-      if (b.y < HUD_HEIGHT - 10 || b.y > FIELD.y + FIELD.h || b.x < FIELD.x || b.x > FIELD.x + FIELD.w) this.bullets.release(b);
+      // A flame dies out a short way up the road.
+      if (b.y < HUD_HEIGHT - 10 || b.y > FIELD.y + FIELD.h || b.x < FIELD.x || b.x > FIELD.x + FIELD.w || (b.flame && b.y < b.fromY - SIDEARM.flamer.range)) this.bullets.release(b);
       else b.sprite.setPosition(b.x, b.y);
     }
   }
@@ -1315,10 +1418,18 @@ export class GameScene extends Phaser.Scene {
       // A little shamble from side to side, the same for every frame rate (none when motion is reduced).
       const sway = settings.reduceMotion || boss ? 0 : Math.sin((e.y + e.id * 37) / 9) * 1.5;
       e.sprite.setPosition(e.x + sway, e.y).setDepth(DEPTH.enemies + e.y / VIEW.h).setAlpha(this.visibility(e.x, e.y));
+      // The middle lane dare is lost once a zombie gets past its line there.
+      const s = this.state;
+      if (s.dare === 'middle' && !s.dareLost && s.phase === 'wave' && laneAt(e.x) === 1 && e.y >= DARE.middleY) this.loseDare();
       if (e.y + radius >= REACH_Y) {
-        // A medkit gets the squad through one breach; without one, it's over.
-        if (this.state.medkits > 0) this.useMedkit();
-        else {
+        // A medkit gets the squad through one breach, and once a run the last stand holds the line
+        // for a few seconds; without either, it's over.
+        if (s.lastStandMs > 0) this.holdAtLine(e);
+        else if (s.medkits > 0) this.useMedkit();
+        else if (!s.lastStandUsed) {
+          this.startLastStand();
+          this.holdAtLine(e);
+        } else {
           this.gameOver();
           return true;
         }
@@ -1389,6 +1500,69 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** The squad patches up and throws back every zombie near the line. */
+  /** A zombie at the sandbags during the last stand is held there, just above the line. */
+  private holdAtLine(e: Enemy) {
+    e.y = REACH_Y - ENEMIES[e.kind].radius - 0.5;
+    e.sprite.setY(e.y);
+  }
+
+  /** Once a run, with no medkit left, the first breach starts the last stand instead of ending the run. */
+  private startLastStand() {
+    const s = this.state;
+    s.lastStandUsed = true;
+    s.lastStandMs = LAST_STAND.ms;
+    this.standClock = 0;
+    sfx('lastStand');
+    this.showBanner(tr(this.style === 'comic' ? 'lastStand' : 'nvLastStand'));
+    this.standText.setVisible(true);
+  }
+
+  /**
+   * The last stand's clock: a melee blow on the zombies at the line every `LAST_STAND.everyMs`, and
+   * at the end of it the run is over if any zombie still stands at the line. Returns whether it ended
+   * the run.
+   */
+  private tickLastStand(dt: number) {
+    const s = this.state;
+    if (s.lastStandMs <= 0) return false;
+    s.lastStandMs = Math.max(0, s.lastStandMs - dt);
+    this.standClock += dt;
+    while (this.standClock >= LAST_STAND.everyMs) {
+      this.standClock -= LAST_STAND.everyMs;
+      this.melee();
+    }
+    if (s.lastStandMs > 0) {
+      this.standText.setText(tr(this.style === 'comic' ? 'lastStandTimer' : 'nvLastStandTimer', { n: Math.ceil(s.lastStandMs / 1000) }));
+      return false;
+    }
+    this.standText.setVisible(false);
+    if (this.enemies.all.some((e) => e.alive && e.y + ENEMIES[e.kind].radius >= REACH_Y - 1)) {
+      this.gameOver();
+      return true;
+    }
+    this.showBanner(tr(this.style === 'comic' ? 'standHeld' : 'nvStandHeld'));
+    return false;
+  }
+
+  /** The squad's melee blow in the last stand: every zombie near the line is hit and shoved back up the road. */
+  private melee() {
+    const { reach, push, damage } = LAST_STAND;
+    let struck = false;
+    for (const e of this.enemies.all) {
+      if (!e.alive || e.y + ENEMIES[e.kind].radius < REACH_Y - reach) continue;
+      struck = true;
+      this.hurt(e, damage(this.state.wave));
+      if (!e.alive) continue;
+      // A boss only gives half as much ground.
+      e.y -= isBoss(e.kind) ? push / 2 : push;
+      e.sprite.setY(e.y);
+    }
+    if (!struck) return;
+    sfx('melee');
+    if (this.bossAct?.acting) this.endBossMove();
+    if (this.style === 'comic') this.effect('', this.player.x, REACH_Y - 40, { life: 360, rise: 30, text: tr('fxMelee') });
+  }
+
   private useMedkit() {
     this.state.medkits--;
     sfx('medkit');
@@ -1661,11 +1835,11 @@ export class GameScene extends Phaser.Scene {
             this.state.headshots++;
             this.effect('', e.x, e.y - ENEMIES[e.kind].radius - 12, { life: 600, rise: 30, text: tr(this.style === 'comic' ? 'fxHeadshot' : 'nvFxHeadshot') });
           }
-          if (fire) e.burn = FIRE_ROUNDS.ms;
+          if (fire || b.flame) e.burn = FIRE_ROUNDS.ms;
           this.hurt(e, head ? exact * HEADSHOT.mult : exact);
           if (e.alive && this.visibility(e.x, e.y) > 0) struck = true;
-          // An armoured brute stops the bullet, pierce or not, and nothing ricochets off it.
-          if (e.armoured) {
+          // An armoured brute stops the bullet, pierce or not, and nothing ricochets off it; a flame burns on past.
+          if (e.armoured && !b.flame) {
             b.hitsLeft = 0;
             b.ricochets = 0;
             if (this.volleys % 3 === 0) this.effect('', e.x, e.y + ENEMIES[e.kind].radius, { life: 360, rise: 20, text: tr(this.style === 'comic' ? 'fxArmour' : 'nvFxArmour') });
@@ -1935,6 +2109,7 @@ export class GameScene extends Phaser.Scene {
         this.state.phase = 'break';
         this.breakClock = 0;
         this.state.placing = false;
+        this.holdDare();
         // The wave's scrap is banked, and the codex saved.
         saveScrap(this.state.bank + this.state.scrap);
         saveCodex(this.state.codex);
@@ -1956,7 +2131,7 @@ export class GameScene extends Phaser.Scene {
       }
     } else if (this.state.phase === 'break') {
       this.breakClock += dt;
-      if (this.breakClock >= BREAK_MS) this.startWave(this.state.wave + 1);
+      if (this.breakClock >= BREAK_MS) this.nextWave();
     }
   }
 
@@ -2127,6 +2302,19 @@ export class GameScene extends Phaser.Scene {
       }
     }
     this.placeHint.setText(tr(this.style === 'comic' ? 'placeHint' : 'nvPlaceHint')).setVisible(this.state.placing);
+    // The middle lane dare: the line no zombie may cross there, dashed, until it is lost.
+    if (this.state.dare === 'middle' && !this.state.dareLost && this.state.phase === 'wave') {
+      const l = LANES[1], col = num(comic ? '#ff7a3a' : th.warn);
+      g.fillStyle(col, 0.08).fillRect(l.x0 + 3, DARE.middleY, l.x1 - l.x0 - 6, REACH_Y - DARE.middleY - 10);
+      for (let x = l.x0 + 6; x < l.x1 - 6; x += 18) g.fillStyle(col, 0.9).fillRect(x, DARE.middleY - 2, 10, 4);
+    }
+    // The last stand: the sandbags glow while the squad holds the line hand to hand.
+    if (this.state.lastStandMs > 0) {
+      const col = num(comic ? '#ff7a3a' : th.warn), f = this.state.lastStandMs / LAST_STAND.ms;
+      g.fillStyle(col, 0.18).fillRect(FIELD.x, REACH_Y - LAST_STAND.reach, FIELD.w, LAST_STAND.reach);
+      g.fillStyle(col, 0.9).fillRect(VIEW.w / 2 - 120, REACH_Y - 64, 240 * f, 6);
+      g.lineStyle(1.5, num(comic ? th.ink : th.warn)).strokeRect(VIEW.w / 2 - 120, REACH_Y - 64, 240, 6);
+    }
     // A boss also gets a big bar along the top of the screen, under the progress strip.
     if (boss) {
       // Across the whole view, like the progress strip above it.
@@ -2330,6 +2518,8 @@ export class GameScene extends Phaser.Scene {
       bossLive: this.enemies.all.some((e) => e.alive && isBoss(e.kind)),
       operation: s.operation === 'road' ? null : { label: OPERATIONS[s.operation].label, waves: OPERATIONS[s.operation].waves ?? 0 },
       leader: s.leader ? { kind: s.leader, fill: this.leaderFill(), secs: Math.ceil(s.leaderMs / 1000) } : null,
+      weapon: s.sidearms.length ? s.weapon : null,
+      dare: s.dare ? { kind: s.dare, lost: s.dareLost } : null,
     });
   }
 
@@ -2373,6 +2563,8 @@ export class GameScene extends Phaser.Scene {
 
   private gameOver() {
     this.state.phase = 'over';
+    this.state.lastStandMs = 0;
+    this.standText.setVisible(false);
     this.overMs = 0;
     this.state.frenzyMs = 0;
     this.state.placing = false;
@@ -2919,6 +3111,9 @@ export class GameScene extends Phaser.Scene {
     }
     if (kind === 'shotgun') s.pellets = Math.min(SHOTGUN.maxPairs, s.pellets + 1);
     else if (kind === 'flamer') s.flames += FLAMER.charges;
+    // A shotgun or a flamethrower also hands the squad that sidearm, to swap to for the rest of the run.
+    const found = (kind === 'shotgun' || kind === 'flamer') && !s.sidearms.includes(kind);
+    if (found) s.sidearms.push(kind);
     else if (kind === 'medkit') s.medkits++;
     else s.sandbags += 2;
     s.supplies.push(kind);
@@ -2929,7 +3124,124 @@ export class GameScene extends Phaser.Scene {
     s.phase = 'break';
     this.breakClock = 0;
     this.pop(tr(SUPPLIES[kind].label).toUpperCase(), this.style === 'comic' ? '#ffe04a' : this.theme().accent);
+    if (found) this.showBanner(tr(this.style === 'comic' ? 'sidearmFound' : 'nvSidearmFound', { weapon: tr(WEAPON_LABELS[kind]).toUpperCase() }));
     this.music();
+  }
+
+  /**
+   * Swaps the whole squad to the next weapon: the rifles, then each sidearm found, then the rifles
+   * again. It holds the fire for `SIDEARM.swapMs`. Refused with no sidearm, or on an overlay.
+   */
+  swapWeapon() {
+    const s = this.state;
+    if (!s.sidearms.length || (s.phase !== 'wave' && s.phase !== 'break')) {
+      ui('refuse');
+      return;
+    }
+    const order: Weapon[] = ['rifle', ...s.sidearms];
+    s.weapon = order[(order.indexOf(s.weapon) + 1) % order.length];
+    this.swapMs = SIDEARM.swapMs;
+    sfx('swap');
+    this.pop(tr(WEAPON_LABELS[s.weapon]).toUpperCase(), this.style === 'comic' ? '#ffe04a' : this.theme().accent);
+    this.updateHud();
+  }
+
+  /** After a break, the next wave: from `DARE.fromWave` it waits for a dare to be picked (or none). */
+  private nextWave() {
+    const s = this.state, wave = s.wave + 1, lanes = OPERATIONS[s.operation].lanes;
+    s.dare = null;
+    if (wave < DARE.fromWave) {
+      this.startWave(wave);
+      return;
+    }
+    s.dareOffer = dareOffer(wave, !lanes || lanes.includes(1));
+    s.phase = 'dare';
+    s.placing = false;
+    this.pointerTarget = null;
+    this.showDare();
+    this.music();
+  }
+
+  private showDare() {
+    this.drawDare();
+    this.centreOverlay(this.supplyUi, this.dareCards);
+  }
+
+  /** Two dare cards and a third to fight the wave as it comes. */
+  private drawDare() {
+    for (const o of this.supplyUi) o.destroy();
+    this.tweens.killTweensOf(this.banner);
+    this.banner.setAlpha(0);
+    const th = this.theme(), comic = this.style === 'comic', s = this.state;
+    const shade = this.fieldRect(comic ? 0x15121a : 0x000000, comic ? 0.5 : 0.55).setDepth(DEPTH.hud + 1);
+    const title = this.add.text(VIEW.w / 2, 300, tr(comic ? 'dareTitle' : 'nvDareTitle', { wave: s.wave + 1, n: DARE.scrapMult }), { align: 'center' }).setOrigin(0.5).setDepth(DEPTH.hud + 2);
+    if (comic) this.font(title, 30, '#ffe04a', { stroke: th.ink, sw: 8 });
+    else this.font(title, 22, th.accent, { glow: th.accent });
+    const g = this.add.graphics().setDepth(DEPTH.hud + 2);
+    this.supplyUi = [shade, title, g];
+    this.dareCards = [];
+    const kinds: (DareKind | null)[] = [...s.dareOffer, null];
+    kinds.forEach((kind, i) => {
+      const w = 160, h = 200, x = 18 + i * (w + 11), y = 370, cx = x + w / 2, band = kind ? '#ff7a3a' : '#b8c0c8';
+      if (comic) {
+        g.fillStyle(num(th.ink)).fillRect(x + 5, y + 5, w, h);
+        g.fillStyle(num('#fff8e8')).fillRect(x, y, w, h);
+        g.lineStyle(3, num(th.ink)).strokeRect(x, y, w, h);
+        g.fillStyle(num(band)).fillRect(x, y, w, 30);
+        g.lineStyle(2, num(th.ink)).lineBetween(x, y + 30, x + w, y + 30);
+      } else {
+        g.fillStyle(num('#020a05'), 0.85).fillRoundedRect(x, y, w, h, 4);
+        g.lineStyle(1.5, num(kind ? th.warn : th.accent)).strokeRoundedRect(x, y, w, h, 4);
+      }
+      const key = this.add.text(cx, y + 15, `${i + 1}`).setOrigin(0.5).setDepth(DEPTH.hud + 3);
+      this.font(key, 14, comic ? th.ink : th.accent, comic ? {} : { glow: th.accent });
+      const name = this.add.text(cx, y + 60, tr(kind ? DARES[kind].label : 'dareNone').toUpperCase()).setOrigin(0.5).setDepth(DEPTH.hud + 3);
+      this.fit(this.font(name, comic ? 17 : 15, comic ? th.ink : th.text, comic ? {} : { glow: th.text }), w - 14);
+      const detail = this.add.text(cx, y + 84, tr(kind ? DARES[kind].detail : 'dareNoneDetail'), { align: 'center' }).setOrigin(0.5, 0).setDepth(DEPTH.hud + 3);
+      this.font(detail, 11, comic ? th.ink : th.muted);
+      this.supplyUi.push(key, name, detail);
+      if (kind) {
+        const reward = this.add.text(cx, y + h - 24, tr('dareReward', { n: DARE.scrapMult }), { align: 'center' }).setOrigin(0.5).setDepth(DEPTH.hud + 3);
+        this.fit(this.font(reward, comic ? 12 : 11, comic ? '#a0401a' : th.warn, comic ? {} : { glow: th.warn }), w - 12);
+        this.supplyUi.push(reward);
+      }
+      this.dareCards.push({ kind, x, y, w, h });
+    });
+  }
+
+  /** The dare picked (or none) and the wave begins under it. */
+  private pickDare(kind: DareKind | null) {
+    const s = this.state;
+    if (s.phase !== 'dare') return;
+    sfx(kind ? 'dare' : 'confirm');
+    s.dare = kind;
+    s.dareOffer = [];
+    for (const o of this.supplyUi) o.destroy();
+    this.supplyUi = [];
+    this.dareCards = [];
+    this.startWave(s.wave + 1);
+  }
+
+  /** A wave cleared under its dare pays its scrap again (`DARE.scrapMult`) and drops a crate at the squad. */
+  private holdDare() {
+    const s = this.state, dare = s.dare;
+    s.dare = null;
+    s.jamMs = 0;
+    if (!dare || s.dareLost) return;
+    const bonus = Math.round((s.scrap - this.dareScrapFrom) * (DARE.scrapMult - 1));
+    s.scrap += bonus;
+    s.daresHeld++;
+    const kind = UPGRADE_KINDS[(s.wave + s.daresHeld) % UPGRADE_KINDS.length];
+    this.dropCrate(kind, 10 + 6 * s.wave, Phaser.Math.Clamp(this.player.x, 70, VIEW.w - 70));
+    sfx('dareHeld');
+    this.pop(tr(this.style === 'comic' ? 'dareHeld' : 'nvDareHeld', { n: bonus }), '#ffb03a');
+  }
+
+  /** The middle lane dare broken: the wave goes on, but it pays nothing extra. */
+  private loseDare() {
+    this.state.dareLost = true;
+    sfx('dareLost');
+    this.showBanner(tr(this.style === 'comic' ? 'dareLost' : 'nvDareLost'));
   }
 
   /** A survivor reached the sandbags: three cards for the role they take in the squad. */

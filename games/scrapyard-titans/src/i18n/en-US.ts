@@ -9,6 +9,7 @@ const enUS: Partial<Translation<typeof en>> = {
   plateText: '+25 armor',
   steelText: 'Robots on it gain 25 armor.',
   sirSprocket3: 'A duel of honor!',
+  rustRainText: 'armor cut by 40%',
   terrainLegend: 'Terrain: dark oil slows, green pad charges, gray plate armors, orange grate burns',
 };
 

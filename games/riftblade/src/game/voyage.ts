@@ -3,7 +3,7 @@
  * space map (which planet to jump to), the star map's nodes on the way (trader, elite arena, rest,
  * events) and the jump itself. Pure state changes like `sim.ts`; randomness from `rand`.
  */
-import { ELITE, OBJECTIVE_AT, WAVES, statsOf, xpFor, type EventState, type GameState } from './state';
+import { ALTAR, BARREL, ELITE, OBJECTIVE_AT, WAVES, statsOf, xpFor, type EventState, type GameState } from './state';
 import { collectAll, heal, lower, nextPick, pop, raise, raiseCard, refreshHealth, spawnElite, startRun, tick, SHORT_LIVED, type Input } from './sim';
 import { BASE_TIER, DRILLS, FILLER, UPGRADES, UPGRADE_IDS, canOffer, cardTiers, extraChoices, lockedOf, parseCard, rollChoices } from './upgrades';
 import { HEROES, type HeroId } from './heroes';
@@ -47,6 +47,9 @@ function clearField(s: GameState) {
   s.lureMs = s.overdriveMs = s.shieldHits = 0;
   s.tide = null;
   s.pillars = [];
+  s.altars = [];
+  s.pact = null;
+  s.barrels = [];
 }
 
 /** A boss (or the arena) has fallen: take what is lying about, then the cards, the map or the win. */
@@ -147,6 +150,7 @@ function rushLand(s: GameState, planet: number) {
   s.nextVent = RUSH.firstPillarMs;
   s.nextTide = RUSH.firstTideMs;
   s.objectiveAt = Infinity;
+  s.altarAt = s.nextBarrel = Infinity;
   s.bossSpawned = false;
   s.arena = false;
   s.phase = 'run';
@@ -394,6 +398,8 @@ export function nextPlanet(s: GameState) {
   s.globHits = 0;
   s.objectiveSlot = 0;
   s.objectiveAt = OBJECTIVE_AT[0];
+  s.altarAt = ALTAR.atMs;
+  s.nextBarrel = BARREL.fromMs;
   s.player.saved = false;
   s.allies = s.allies.filter((a) => a.kind !== 'escort');
   if (s.escort) {

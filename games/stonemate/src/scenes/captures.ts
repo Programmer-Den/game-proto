@@ -617,3 +617,13 @@ export function playPromote(stage: Stage, at: P, side: Side) {
 }
 
 export const SCENE_IDS = Object.values(SIGNATURES);
+
+/** A rival sculptor beaten: their favourite statue cracks and breaks the way `how` breaks. */
+export async function playDefeat(stage: Stage, statue: Actor, how: Exclude<Kind, 'k'>) {
+  const d = new Director(stage);
+  statue.img.setDepth(stage.depth);
+  const g = await d.cracks(statue, 600);
+  g.destroy();
+  d.shake(0.008);
+  await d.fall(statue, { x: statue.img.x - 1, y: statue.img.y }, how);
+}

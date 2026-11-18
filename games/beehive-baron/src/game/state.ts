@@ -15,6 +15,9 @@ import { WORKSHOP_FROM, noWares, type Commission, type Ware } from './workshop';
 import { warrantBonus, type RoyalAsk } from './warrant';
 import type { UpgradeId } from './upgrades';
 import { WASP_GAP, WASP_STEAL_MS, type Wasp } from './wasps';
+import { FED_MS, JELLY_MS, JELLY_MULT, RING, type JellyCell } from './jelly';
+import { FORECAST, WARM_NECTAR, WEATHERS, calmForecast, dayOf, type Weather } from './weather';
+import type { Auction } from './auction';
 
 /**
  * Each hive's comb: a hex grid of 5 x 4 spots, numbered row by row from the top left. Each further
@@ -69,7 +72,8 @@ export interface BroodCell {
   hatchMs: number;
 }
 
-export type Cell = HoneyCell | BroodCell;
+export type Cell = HoneyCell | BroodCell | JellyCell;
+export type { JellyCell };
 
 export interface Bee {
   id: number;
@@ -159,6 +163,13 @@ export interface GameState {
   /** Years the royal warrant has been kept in a row, and this autumn's ask from the crown (null outside autumn). */
   warrant: number;
   royal: RoyalAsk | null;
+  /** Royal jelly kept, and the game time the queens' brood still hatches faster after a jelly was fed to them. */
+  jelly: number;
+  fedMs: number;
+  /** The forecast: today's weather first, then each day after it (`FORECAST` days). */
+  weather: Weather[];
+  /** The buyer bidding at the season's end, or null. */
+  auction: Auction | null;
   nextId: number;
   /** Things that just happened, for the scene to animate; it empties the list as it draws them. */
   events: GameEvent[];
@@ -213,7 +224,16 @@ export type GameEvent =
   | { kind: 'fulfilled'; ware: Ware; coins: number }
   | { kind: 'royal' }
   | { kind: 'warranted'; years: number }
-  | { kind: 'warrant-lost' };
+  | { kind: 'warrant-lost' }
+  | { kind: 'jelly-formed'; slot: number }
+  | { kind: 'jelly-ready'; slot: number }
+  | { kind: 'jelly-taken'; slot: number }
+  | { kind: 'jelly-sold'; coins: number }
+  | { kind: 'fed' }
+  | { kind: 'weather'; weather: Weather }
+  | { kind: 'auction' }
+  | { kind: 'auction-won'; jars: number; coins: number }
+  | { kind: 'auction-lost' };
 
 /** What is kept between visits: the comb, the coins, the jars, the wax, the bees, the upgrades and the meadows. */
 export interface Progress {
@@ -255,6 +275,9 @@ export interface Progress {
   commissions: Commission[];
   warrant: number;
   royal: RoyalAsk | null;
+  jelly: number;
+  fedMs: number;
+  weather: Weather[];
   /** The orchard contract whose bees are away (paid up front), so a reload can't bring them home early; null if none. */
   lent: { bees: number; leftMs: number } | null;
   /** When the hive was last seen (`Date.now()`), for the nectar gathered while away; 0 if never. */
@@ -296,6 +319,9 @@ export const freshProgress = (): Progress => ({
   commissions: [],
   warrant: 0,
   royal: null,
+  jelly: 0,
+  fedMs: 0,
+  weather: calmForecast(0),
   lent: null,
   seen: 0,
 });
@@ -307,6 +333,10 @@ export const emptyCell = (): HoneyCell => ({ type: 'honey', nectar: 0, phase: 'f
 function cellOf(saved: unknown): Cell | null {
   if (!saved || typeof saved !== 'object') return null;
   const c = saved as Partial<HoneyCell> & Partial<BroodCell>;
+  if (c.type === 'jelly') {
+    const j = saved as Partial<JellyCell>;
+    return { type: 'jelly', jellyMs: typeof j.jellyMs === 'number' && j.jellyMs >= 0 ? Math.min(JELLY_MS, j.jellyMs) : JELLY_MS };
+  }
   if (c.type === 'brood') {
     const hatchMs = typeof c.hatchMs === 'number' && c.hatchMs >= 0 ? Math.min(BROOD_MS, c.hatchMs) : BROOD_MS;
     return { type: 'brood', hatchMs };
@@ -374,6 +404,13 @@ export function newHive(progress: Progress): GameState {
     commissions: progress.sold >= WORKSHOP_FROM ? progress.commissions.map((c) => ({ ...c })) : [],
     warrant: Math.max(0, Math.floor(progress.warrant) || 0),
     royal: progress.royal ? { ...progress.royal } : null,
+    jelly: Math.max(0, Math.floor(progress.jelly) || 0),
+    fedMs: Math.max(0, Math.min(FED_MS, progress.fedMs || 0)),
+    weather:
+      progress.weather?.length === FORECAST && progress.weather.every((w) => WEATHERS.includes(w))
+        ? [...progress.weather]
+        : calmForecast(dayOf(Math.max(0, Math.min(YEAR_MS - 1, Math.floor(progress.seasonMs) || 0)))),
+    auction: null,
     nextId: count + 1,
     events: [],
   };
@@ -451,6 +488,9 @@ export const progressOf = (s: GameState): Progress => ({
   commissions: s.commissions.map((c) => ({ ...c })),
   warrant: s.warrant,
   royal: s.royal ? { ...s.royal } : null,
+  jelly: s.jelly,
+  fedMs: s.fedMs,
+  weather: [...s.weather],
   lent: s.contract?.phase === 'lent' ? { bees: s.contract.bees, leftMs: s.contract.leftMs } : null,
   seen: Date.now(),
 });
@@ -500,6 +540,19 @@ export const fairWon = (s: GameState, held = fairOn(s)) => (fairTotal(s, held) ?
 
 export const isHoney = (c: Cell | null): c is HoneyCell => c?.type === 'honey';
 export const isBrood = (c: Cell | null): c is BroodCell => c?.type === 'brood';
+export const isJelly = (c: Cell | null): c is JellyCell => c?.type === 'jelly';
+/** Whether a spot is ringed for royal jelly: all six of its neighbours are capped honey cells. */
+export function ringed(s: GameState, slot: number) {
+  const around = neighbours(slot);
+  return around.length === RING && around.every((n) => {
+    const c = s.cells[n];
+    return isHoney(c) && c.phase === 'capped';
+  });
+}
+/** What a jar of royal jelly sells for: `JELLY_MULT` times a heather jar's worth before the market. */
+export const jellyPrice = (s: GameState) => Math.round(basePrice(s, 'heather') * JELLY_MULT);
+/** Whether today is rainy, and the foragers stay home. */
+export const rainy = (s: GameState) => s.weather[0] === 'rain';
 
 /** Whether the bees can forage a kind now: its meadow is open, and the Lavender Field shuts for autumn. */
 export const isOpen = (s: GameState, kind: Kind) => s.meadows >= HONEY[kind].meadows && !(kind === 'lavender' && season(s) === 'autumn');
@@ -523,11 +576,13 @@ export const marketLeft = (s: GameState) => MARKET_MS - (s.marketMs % MARKET_MS)
 export const carry = (s: GameState) => 1 + s.ranks.baskets + (s.meadows >= 1 ? 1 : 0) + (season(s) === 'summer' ? SUMMER_NECTAR : 0);
 /**
  * What one bee brings home: `carry`, one more from a Busy queen's hive, more with the Far flyers
- * bred in, more from Orchard Hollow in spring, and half of it (rounded up) from a wilted meadow.
+ * bred in, more from Orchard Hollow in spring, all of it doubled on a warm day, and half of it
+ * (rounded up) from a wilted meadow.
  */
 export function beeCarry(s: GameState, b: Bee) {
   const orchard = plotOf(b.hive)?.id === 'orchard' && season(s) === 'spring' ? ORCHARD_SPRING_NECTAR : 0;
-  const drops = carry(s) + (b.hive === 1 && s.queen === 'busy' ? BUSY_NECTAR : 0) + s.breeds.far * FAR_NECTAR + orchard;
+  const warm = s.weather[0] === 'warm' ? WARM_NECTAR : 1;
+  const drops = (carry(s) + (b.hive === 1 && s.queen === 'busy' ? BUSY_NECTAR : 0) + s.breeds.far * FAR_NECTAR + orchard) * warm;
   return s.wilted[b.kind] ? Math.ceil(drops / 2) : drops;
 }
 /** How long a full cell takes to ripen: half as long once the Heather Moor is unlocked, and faster on Riverside Meadow in summer. */

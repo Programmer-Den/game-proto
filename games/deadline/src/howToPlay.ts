@@ -15,6 +15,8 @@ const en: HowToPlay = {
     { input: 'Tap a card, or 1 / 2 / 3', action: 'Pick a supply after a boss, or the role of a survivor who joins' },
     { input: 'Tap the wide card, or 4', action: 'Extract and end the run as a win, from wave 20' },
     { input: 'The leader button on the right, or Q', action: "Use your squad leader's active: an airstrike, a patch-up or a flare" },
+    { input: 'The weapon button above it, or E', action: 'Swap the whole squad between rifles and the sidearms the run has found' },
+    { input: 'Tap a dare card, or 1 / 2 / 3', action: 'From wave 5, take one of two dares for the next wave, or none' },
     { input: 'COMIC / NV switch, or V', action: 'Switch between the comic and night-vision art styles' },
     {
       input: 'Tap a starting crate after game over',
@@ -49,11 +51,14 @@ const en: HowToPlay = {
     'A squad leader leads every run you pick them for: the Sergeant calls an airstrike on your lane, the Medic throws back the zombies at the sandbags, the Scout lights the road with a flare. Each levels up with the waves they clear, for a shorter wait and a stronger active.',
     'Win the Hospital to open the escort route: a bus drives up the middle lane every wave and has to reach the far end. Zombies stop it and bite it, so keep its lane clear; lose the bus and you lose the run.',
     'Every kill fills a page of the zombie codex. A full page makes every hit on that kind 15% stronger, for good (not on the daily stand).',
+    'From wave 5 you may take a dare before each wave, like runners only or jammed rifles. Hold the wave under it for double its scrap and a crate.',
+    'A shotgun or flamethrower supply is also a sidearm for the whole squad. The shotgun shreds swarms but shields stop it; flames burn through shields and armour but only reach a short way up the road.',
+    'Once a run, the first zombie to reach the sandbags starts a last stand: ten seconds of hand-to-hand to push them back. Any zombie still at the line when it ends ends the run.',
   ],
 };
 
 /** US English only changes the spelling. */
-const us = (text: string) => text.replace(/armoured/g, 'armored');
+const us = (text: string) => text.replace(/armour/g, 'armor');
 const enUS: HowToPlay = {
   goal: en.goal,
   controls: en.controls,
@@ -75,6 +80,8 @@ const de: HowToPlay = {
     { input: 'Eine Karte antippen, oder 1 / 2 / 3', action: 'Nach einem Boss Nachschub wählen, oder die Rolle eines Überlebenden, der dazukommt' },
     { input: 'Die breite Karte antippen, oder 4', action: 'Ab Welle 20 abziehen und den Lauf als Sieg beenden' },
     { input: 'Der Anführer-Knopf rechts, oder Q', action: 'Die Fähigkeit deines Anführers nutzen: Luftangriff, Notversorgung oder Leuchtkugel' },
+    { input: 'Der Waffen-Knopf darüber, oder E', action: 'Den ganzen Trupp zwischen Gewehren und den gefundenen Zweitwaffen wechseln' },
+    { input: 'Eine Mutprobe antippen, oder 1 / 2 / 3', action: 'Ab Welle 5 eine von zwei Mutproben für die nächste Welle annehmen, oder keine' },
     { input: 'Schalter COMIC / NACHT, oder V', action: 'Zwischen Comic- und Nachtsicht-Grafik wechseln' },
     {
       input: 'Nach dem Spielende eine Startkiste antippen',
@@ -109,6 +116,9 @@ const de: HowToPlay = {
     'Ein Anführer führt jeden Lauf, für den du ihn wählst: der Feldwebel ruft einen Luftangriff auf deine Spur, der Feldarzt wirft die Zombies an den Sandsäcken zurück, der Späher erhellt die Straße mit einer Leuchtkugel. Jeder steigt mit den Wellen, die er schafft, im Rang: kürzere Wartezeit, stärkere Fähigkeit.',
     'Gewinne das Krankenhaus, um die Geleitroute zu öffnen: Jede Welle fährt ein Bus die mittlere Spur hinauf und muss das Ende erreichen. Zombies halten ihn auf und beißen ihn, also halte seine Spur frei; geht der Bus verloren, ist der Lauf verloren.',
     'Jeder Kill füllt eine Seite des Zombie-Codex. Eine volle Seite macht jeden Treffer auf diese Art für immer 15 % stärker (nicht im Tageskampf).',
+    'Ab Welle 5 kannst du vor jeder Welle eine Mutprobe annehmen, etwa nur Renner oder Ladehemmung. Hältst du die Welle damit, gibt es doppelten Schrott und eine Kiste.',
+    'Schrotflinte und Flammenwerfer aus dem Nachschub sind auch Zweitwaffen für den ganzen Trupp. Die Schrotflinte zerfetzt Schwärme, aber Schilde halten sie auf; Flammen brennen durch Schilde und Panzer, reichen aber nur ein kurzes Stück die Straße hinauf.',
+    'Einmal pro Lauf löst der erste Zombie an den Sandsäcken ein letztes Gefecht aus: zehn Sekunden Nahkampf, um sie zurückzudrängen. Steht dann noch ein Zombie an der Linie, endet der Lauf.',
   ],
 };
 

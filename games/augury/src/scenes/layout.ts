@@ -36,6 +36,8 @@ export type Layout = {
     /** With a saved run: the Continue button, and the Records button beside it. */
     resume: Rect;
     recordsAside: Rect;
+    /** The button that takes a challenge code. */
+    code: Rect;
     line: Point;
   };
   /** The journey map: a row per temple (its name at `label`, its steps from `x0`, `step` apart). */
@@ -73,6 +75,7 @@ export const WIDE: Layout = {
     records: { x: 480, y: 494, w: 180, h: 36 },
     resume: { x: 365, y: 494, w: 270, h: 36 },
     recordsAside: { x: 605, y: 494, w: 180, h: 36 },
+    code: { x: 846, y: 494, w: 150, h: 36 },
     line: { x: 480, y: 527 },
   },
   journey: {
@@ -119,6 +122,7 @@ export const TALL: Layout = {
     records: { x: 270, y: 806, w: 200, h: 44 },
     resume: { x: 190, y: 806, w: 270, h: 44 },
     recordsAside: { x: 420, y: 806, w: 140, h: 44 },
+    code: { x: 270, y: 902, w: 220, h: 40 },
     line: { x: 270, y: 852 },
   },
   journey: {

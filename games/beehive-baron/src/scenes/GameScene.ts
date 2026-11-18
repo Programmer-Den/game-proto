@@ -38,6 +38,7 @@ import {
   sell,
   supply,
   swat,
+  tapJelly,
   tick,
 } from '../game/sim';
 import {
@@ -71,6 +72,8 @@ import {
   newHive,
   openKinds,
   progressOf,
+  rainy,
+  ringed,
   rareCount,
   ripenTime,
   room,
@@ -91,6 +94,8 @@ import { t } from '../i18n';
 import { checkTrophies } from '../trophies/check';
 import { Button } from '../ui/Button';
 import { EstatePanels } from './EstatePanels';
+import { LoopPanels } from './LoopPanels';
+import { JELLY_MS } from '../game/jelly';
 import {
   AWAY,
   BOOK,
@@ -98,6 +103,8 @@ import {
   CASK,
   GARDEN,
   WORKSHOP,
+  AUCTION,
+  JELLY,
   COMB,
   CONTRACT,
   END_CARD,
@@ -218,6 +225,7 @@ export class GameScene extends Phaser.Scene {
   private bookCard!: { root: Phaser.GameObjects.Container; title: Phaser.GameObjects.Text; sub: Phaser.GameObjects.Text; rows: Button[]; cut: Button };
   /** The garden, workshop and royal warrant chips and their cards. */
   private estate!: EstatePanels;
+  private loop!: LoopPanels;
   private goalZone!: Phaser.GameObjects.Zone;
   private market!: {
     root: Phaser.GameObjects.Container;
@@ -319,6 +327,7 @@ export class GameScene extends Phaser.Scene {
       cut: { x: this.bookCard.cut.root.x, y: this.bookCard.cut.root.y },
       breeds: Object.fromEntries(TRAITS.map((k, i) => [k, { x: this.breedCard.buttons[i].root.x, y: this.breedCard.buttons[i].root.y }])),
       ...this.estate.spots(),
+      ...this.loop.spots(),
     };
   }
 
@@ -407,6 +416,7 @@ export class GameScene extends Phaser.Scene {
     this.createPlot();
     this.createBook();
     this.estate = new EstatePanels(this, () => this.state, (done) => this.act(done));
+    this.loop = new LoopPanels(this, () => this.state, (done) => this.act(done));
     this.createEnd();
     this.createQueenCard();
     this.createBreedCard();
@@ -440,7 +450,7 @@ export class GameScene extends Phaser.Scene {
     checkTrophies(this.state);
     // Nectar coming home and cells capping change the comb; keep it. Save now and then anyway,
     // so the last-seen time stays fresh.
-    const changed = (e: GameState['events'][number]) => ['nectar', 'capped', 'hatched', 'stolen', 'season', 'ate', 'mead', 'swarmed', 'returned', 'wilted', 'fair-closed'].includes(e.kind);
+    const changed = (e: GameState['events'][number]) => ['nectar', 'capped', 'hatched', 'stolen', 'season', 'ate', 'mead', 'swarmed', 'returned', 'wilted', 'fair-closed', 'jelly-formed', 'jelly-ready'].includes(e.kind);
     if (this.state.events.some(changed) || this.clock - this.lastSave >= SAVE_EVERY_MS) this.save();
     if (this.awayLeft > 0) {
       this.awayLeft = Math.max(0, this.awayLeft - dt);
@@ -464,6 +474,7 @@ export class GameScene extends Phaser.Scene {
     this.drawPlot();
     this.drawBook();
     this.estate.draw();
+    this.loop.draw();
     this.drawQueenCard();
     this.drawEvents();
     this.drawGoal();
@@ -517,6 +528,8 @@ export class GameScene extends Phaser.Scene {
     const slot = this.hive * SLOTS + local;
     const cell = this.state.cells[slot];
     if (cell !== null) {
+      // A jelly cell gives its royal jelly once ready, or goes back to honey once its ring is broken.
+      if (cell.type === 'jelly') return this.act(tapJelly(this.state, slot), 'harvest');
       if (this.cutting) {
         if (!cutComb(this.state, slot)) return ui('refuse');
         this.cutting = false;
@@ -568,6 +581,23 @@ export class GameScene extends Phaser.Scene {
           const done = 1 - cell.hatchMs / BROOD_MS;
           g.lineStyle(3.5, LIVE.broodArc, 0.95).beginPath().arc(c.x, c.y, 15, -Math.PI / 2, -Math.PI / 2 + done * Math.PI * 2).strokePath();
         }
+        continue;
+      }
+      if (cell.type === 'jelly') {
+        image.setTexture('cell-jelly');
+        const ring = ringed(s, slot);
+        if (cell.jellyMs === 0) {
+          // Ready: a pulsing gold rim, and "take".
+          g.lineStyle(3, LIVE.jellyReady, pulse).strokePoints(hexPoints(slot, 3), true);
+          label.setText(t('jellyTake'));
+        } else {
+          // A cream arc goes round while the ring holds; it greys while the ring is broken.
+          const done = 1 - cell.jellyMs / JELLY_MS;
+          g.lineStyle(3.5, ring ? LIVE.jellyArc : LIVE.jellyPaused, 0.95).beginPath().arc(c.x, c.y, 15, -Math.PI / 2, -Math.PI / 2 + Math.max(0.02, done) * Math.PI * 2).strokePath();
+          label.setText(ring ? '' : t('ringBroken'));
+        }
+        if (label.style.color !== '#4a2c10') label.setColor('#4a2c10');
+        label.setAlpha(1);
         continue;
       }
       const kind = cell.kind ?? 'clover';
@@ -876,6 +906,23 @@ export class GameScene extends Phaser.Scene {
         this.float(VIEW.w / 2, 200, t('warrantWon', { n: e.years }), '#ffd25a', 16, 3000);
       } else if (e.kind === 'warrant-lost') {
         this.float(VIEW.w / 2, 200, t('warrantLost'), '#ffd0b0', 16, 3000);
+      } else if (e.kind === 'jelly-formed' || e.kind === 'jelly-ready' || e.kind === 'jelly-taken') {
+        if (hiveOf(e.slot) !== this.hive) continue;
+        const c = cellCentre(e.slot);
+        const text = e.kind === 'jelly-formed' ? 'jellyFormed' : e.kind === 'jelly-ready' ? 'jellyReady' : 'jellyTaken';
+        this.float(c.x, c.y - 10, t(text), '#fff6d0', 14, 2000);
+      } else if (e.kind === 'jelly-sold') {
+        this.float(JELLY.x + JELLY.w / 2, JELLY.y - 10, t('coinsGained', { n: e.coins }), '#ffd25a', 15, 2000);
+      } else if (e.kind === 'fed') {
+        this.float(VIEW.w / 2, 200, t('fedQueens'), '#e4ffd0', 16, 2600);
+      } else if (e.kind === 'weather') {
+        this.float(HIVE.x + HIVE.w / 2, HIVE.y + 120, t(e.weather === 'rain' ? 'rainCame' : 'warmCame'), e.weather === 'rain' ? '#d8e8ff' : '#ffe08a', 16, 2600);
+      } else if (e.kind === 'auction') {
+        this.float(AUCTION.x + AUCTION.w / 2, AUCTION.y - 12, t('auctionCame'), '#ffd25a', 15, 2400);
+      } else if (e.kind === 'auction-won') {
+        this.float(AUCTION.x + AUCTION.w / 2, AUCTION.y - 12, t('auctionWon', { n: e.coins }), '#ffd25a', 16, 2400);
+      } else if (e.kind === 'auction-lost') {
+        this.float(AUCTION.x + AUCTION.w / 2, AUCTION.y - 12, t('auctionLost'), '#ffd0b0', 15, 2000);
       } else if (e.kind === 'sold') {
         this.float(SELL_BUTTON.x, SELL_BUTTON.y - 34, t('coinsGained', { n: e.coins }), '#ffd25a');
       } else if (e.kind === 'unlocked') {
@@ -1043,6 +1090,31 @@ export class GameScene extends Phaser.Scene {
         case 'warrant-lost':
           sfx('sad');
           break;
+        case 'jelly-formed':
+        case 'jelly-ready':
+          if (shown(e.slot)) sfx('capped');
+          break;
+        case 'jelly-taken':
+          break;
+        case 'jelly-sold':
+          sfx('sell');
+          break;
+        case 'fed':
+          sfx('hatched');
+          break;
+        case 'weather':
+          // A day can turn with the season, whose chime comes in the same step.
+          if (!events.some((o) => o.kind === 'season')) sfx(e.weather === 'rain' ? 'wilted' : 'demand');
+          break;
+        case 'auction':
+          if (!events.some((o) => o.kind === 'season')) sfx('ding');
+          break;
+        case 'auction-won':
+          sfx('orderDone');
+          break;
+        case 'auction-lost':
+          sfx('sad');
+          break;
       }
     }
   }
@@ -1073,8 +1145,8 @@ export class GameScene extends Phaser.Scene {
     const built = s.cells.some((c) => c !== null);
     // Once a second kind is open, the Send button says which nectar the bees go for.
     const nectar = openKinds(s).length > 1 ? t(`${s.forage}Nectar`) : null;
-    const sendCaption = isWinter(s)
-      ? t('winterHome')
+    const sendCaption = isWinter(s) || rainy(s)
+      ? t(isWinter(s) ? 'winterHome' : 'rainHome')
       : s.ranks.dance > 0
         ? nectar ? t('forageAloneFor', { nectar }) : t('forageOwn')
         : !built
@@ -1084,7 +1156,7 @@ export class GameScene extends Phaser.Scene {
             : home === 0
               ? t('foragersOut')
               : nectar ? t('sendFor', { n: home, nectar }) : t('send', { n: home });
-    const canSend = s.ranks.dance === 0 && home > 0 && room(s) > 0 && !isWinter(s);
+    const canSend = s.ranks.dance === 0 && home > 0 && room(s) > 0 && !isWinter(s) && !rainy(s);
     this.sendButton.set(sendCaption, canSend, true);
     const jars = jarCount(s) + rareCount(s);
     const mead = meadReady(s).length;
@@ -1428,6 +1500,7 @@ export class GameScene extends Phaser.Scene {
       this.breedCard.root.setVisible(false);
       this.bookCard.root.setVisible(false);
       this.estate.close();
+      this.loop.close();
     });
   }
 

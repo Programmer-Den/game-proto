@@ -11,6 +11,8 @@ const en: HowToPlay = {
     { input: 'Click or tap a soil cell', action: 'Plant the picked seed there, if you have the sap' },
     { input: 'Hedge card, then a path cell', action: 'Plant a hedge that blocks pests until they chew through it' },
     { input: 'Click or tap a golem', action: 'Open its menu: Raise, Aim, Move or Uproot' },
+    { input: 'Tap a golem with its power ready', action: 'During a wave, use its power (Stomp, Roots, Spike burst, Spore cloud or Peal)' },
+    { input: 'Bloom tag, then a path cell', action: 'Lay a root snare with 2 spare buds' },
     { input: 'Start wave / Call wave now', action: 'Send the next wave, or call it early for bonus sap' },
     { input: '1x / 2x button', action: 'Play at double speed, or back to normal' },
     { input: 'Garden tag under the title', action: 'Pick a garden to plant, or its thorny variant' },
@@ -43,6 +45,9 @@ const en: HowToPlay = {
     'Clear wave 10 to unlock the Fungus golem, whose spores poison pests walking through them, and wave 20 for the Bell golem, which stuns every pest near it.',
     'The weekly garden is the same for everyone all week, with a twist; play it as often as you like for your best wave.',
     'In the garden editor, draw a path from the left edge to the Heartwood and soil beds beside it; each plot keeps its own best wave.',
+    "A gold bead by a golem's head means its power is ready: tap the golem during a wave to use it.",
+    'Every wave cleared opens a spare bud; two of them lay a root snare that holds pests still on the path.',
+    'Two level-3 golems of the same form side by side can fuse into one stronger elder, freeing a cell.',
   ],
 };
 
@@ -55,6 +60,8 @@ const de: HowToPlay = {
     { input: 'Ein Erdfeld anklicken oder antippen', action: 'Den gewählten Samen dort pflanzen, wenn du genug Saft hast' },
     { input: 'Heckenkarte, dann ein Wegfeld', action: 'Eine Hecke pflanzen, die Schädlinge aufhält, bis sie sich durchgenagt haben' },
     { input: 'Einen Golem anklicken oder antippen', action: 'Sein Menü öffnen: Stärken, Ziel, Umsetzen oder Ausreißen' },
+    { input: 'Einen Golem mit bereiter Kraft antippen', action: 'Während einer Welle seine Kraft nutzen (Stampfer, Wurzeln, Stachelhagel, Sporenwolke oder Geläut)' },
+    { input: 'Blüten-Schild, dann ein Wegfeld', action: 'Mit 2 übrigen Knospen eine Wurzelfalle legen' },
     { input: 'Welle starten / Welle rufen', action: 'Die nächste Welle schicken oder sie für Bonussaft früher rufen' },
     { input: 'Taste 1x / 2x', action: 'Doppelt so schnell spielen oder zurück zu normal' },
     { input: 'Garten-Schild unter dem Titel', action: 'Einen Garten zum Pflanzen wählen oder seine dornige Variante' },
@@ -87,6 +94,9 @@ const de: HowToPlay = {
     'Schaffe Welle 10, um den Pilzgolem freizuschalten, dessen Sporen Schädlinge auf dem Weg vergiften, und Welle 20 für den Glockengolem, der jeden Schädling in seiner Nähe betäubt.',
     'Der Wochengarten ist die ganze Woche für alle gleich, mit einem Kniff; spiele ihn, so oft du willst, für deinen besten Wellenrekord.',
     'Zeichne im Garteneditor einen Weg vom linken Rand zum Herzholz und Erdbeete daneben; jedes Beet behält seinen eigenen Wellenrekord.',
+    'Eine goldene Perle am Kopf eines Golems heißt: Seine Kraft ist bereit. Tippe ihn während einer Welle an, um sie zu nutzen.',
+    'Jede geschaffte Welle öffnet eine übrige Knospe; zwei davon legen eine Wurzelfalle, die Schädlinge auf dem Weg festhält.',
+    'Zwei Golems der Stufe 3 mit derselben Form direkt nebeneinander verschmelzen zu einem stärkeren Ahnen und machen ein Feld frei.',
   ],
 };
 

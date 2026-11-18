@@ -18,10 +18,14 @@ const en: HowToPlay = {
   ],
   tips: [
     'Where the orb hits the bar sets where it goes: the middle sends it straight up, the ends send it off to the side.',
+    'Hit the orb while the bar is moving to give it a spin: it curves the way the bar went, more the faster you swing.',
+    'A rose window’s heart is kept by its guardians, a gargoyle or a stone owl: break them first. Mirror panes throw beads back up, bells stop the sliding rows and prisms split the orb.',
     'Thick panes take two hits, and lead panes only break to a fire orb. The heart of a rose window takes three.',
     'Good beads: wide bar, three orbs, sticky bar, fire orb, slow orb and an extra orb. Watch out for the dark ones, which shorten the bar or speed the orb up.',
     'Breaking many panes before the orb comes back to the bar builds a chain, worth more points with each pane.',
     'Lose no orb for three stars. A daily window, the same for everyone, opens once a day.',
+    'Each window has a feat, shown under the bar. Do it for a seal; seals open stained glass for the bar.',
+    'Restore all thirty windows to open the clerestory: endless windows, your orbs carried from one to the next.',
   ],
 };
 
@@ -42,10 +46,14 @@ const de: HowToPlay = {
   ],
   tips: [
     'Wo die Kugel die Leiste trifft, bestimmt ihre Richtung: Die Mitte schickt sie gerade nach oben, die Enden zur Seite.',
+    'Triff die Kugel, während die Leiste sich bewegt, und sie bekommt einen Drall: Sie fliegt eine Kurve in Richtung der Leiste, umso stärker, je schneller du schwingst.',
+    'Das Herz einer Rosette wird von Wächtern bewacht, einem Wasserspeier oder einer steinernen Eule: Zerbrich sie zuerst. Spiegelscheiben werfen Perlen zurück nach oben, Glocken halten die gleitenden Reihen an, und Prismen teilen die Kugel.',
     'Dicke Scheiben brauchen zwei Treffer, bleierne zerbrechen nur an einer Feuerkugel. Das Herz einer Rosette braucht drei.',
     'Gute Perlen: breite Leiste, drei Kugeln, klebrige Leiste, Feuerkugel, langsame Kugel und eine Extrakugel. Vorsicht vor den dunklen, sie kürzen die Leiste oder machen die Kugel schneller.',
     'Viele Scheiben, bevor die Kugel zur Leiste zurückkommt, bilden eine Kette, die mit jeder Scheibe mehr Punkte bringt.',
     'Verliere keine Kugel für drei Sterne. Ein Tagesfenster, für alle gleich, öffnet sich einmal am Tag.',
+    'Jedes Fenster hat ein Kunststück, unter der Leiste angezeigt. Schaffe es für ein Siegel; Siegel öffnen Buntglas für die Leiste.',
+    'Erneuere alle dreißig Fenster, um den Lichtgaden zu öffnen: endlose Fenster, und deine Kugeln nimmst du von einem zum nächsten mit.',
   ],
 };
 

@@ -20,15 +20,19 @@ export const GIFT_ROW = { x: 704, y: 142, h: 22 };
 /** The season strip under the gift row: the round's season and its rule. */
 export const SEASON = { x: 704, y: 170, w: 220, h: 22 };
 /** The tile buttons, by their centres: one per kind in the hand (up to HAND), in BUILDINGS order. */
-export const TILE_BUTTONS = { x: 814, w: 228, ys: [228, 290, 352], h: 60 };
-/** The pouch line under the tile buttons: what is left to draw, by its top left. */
-export const POUCH_LINE = { x: 704, y: 386, w: 220 };
+export const TILE_BUTTONS = { x: 814, w: 228, ys: [227, 285, 343], h: 56 };
+/** The reserve slot under the tile buttons, by its centre: holds a tile for a later turn and swaps it back. */
+export const HOLD_BUTTON = { x: 814, y: 386, w: 228, h: 28 };
+/** The pouch line under the reserve slot: what is left to draw, by its top left, and the height it may fill. */
+export const POUCH_LINE = { x: 704, y: 404, w: 220, h: 28 };
 /** The omen strip under the pouch line: what the next round brings, from round 3 on. */
-export const OMEN = { x: 704, y: 426, w: 220, h: 22 };
+export const OMEN = { x: 704, y: 434, w: 220, h: 22 };
 /** The undo button under the omen strip, by its centre. */
-export const UNDO_BUTTON = { x: 814, y: 474, w: 228, h: 28 };
+export const UNDO_BUTTON = { x: 814, y: 476, w: 228, h: 28 };
 /** The market trade card over the board, by its centre: a row of kinds to give two of, a row of gift buildings to take one of, and its two buttons. */
 export const TRADE_CARD = { x: 346, y: 270, w: 600, h: 320, chip: { w: 68, h: 58, gap: 4 }, giveY: 130, takeY: 218, buttonY: 290 };
+/** The coronation card over the board at the kingdom's end, by its centre: a chip per kind of building standing, up to eight a row, and a line under the last row; its height (`hs`) for one row or two. */
+export const CROWN_CARD = { x: 346, y: 270, w: 600, hs: [236, 310], chip: { w: 68, h: 66, gap: 6 }, rowY: 114, rowH: 74, perRow: 8 };
 /** The gift choice card over the board, by its centre, and its two buttons. */
 export const GIFT_CARD = { x: 346, y: 270, w: 440, h: 220, button: { w: 190, h: 96, dx: 100, dy: 30 } };
 export const BUTTON = { w: 200, h: 40 };

@@ -154,6 +154,16 @@ export const sfx = sounds({
   flagshipLaunch: { wave: 'noise', freq: 220, to: 60, attack: 0.2, length: 0.9, volume: 0.42, gap: 500 },
   /** The flagship lost: a mournful horn. */
   flagshipLost: { wave: 'sawtooth', freq: 220, to: 165, attack: 0.1, length: 0.9, volume: 0.2, gap: 500 },
+  /** Afterburners lit: a rising roar. */
+  afterburner: { wave: 'noise', freq: 300, to: 4200, attack: 0.05, length: 0.35, volume: 0.26, gap: 150 },
+  /** A missile salvo: three quick launches. */
+  salvo: { wave: 'square', freq: 220, to: 1400, arp: [0, 5, 10], arpStep: 0.05, length: 0.18, volume: 0.2, gap: 150 },
+  /** A point-defence screen raised: a bright shimmer. */
+  screen: { wave: 'triangle', freq: 1046, arp: [0, 7, 12, 19], arpStep: 0.04, length: 0.3, volume: 0.22, gap: 200 },
+  /** A home belt running low or dry: a falling two-note chime. */
+  beltLow: { wave: 'triangle', freq: 784, arp: [0, -5, -12], arpStep: 0.14, length: 0.45, volume: 0.24, gap: 600 },
+  /** A control group saved: a short double click. */
+  group: { wave: 'pulse12', freq: 1318, arp: [0, 12], arpStep: 0.03, length: 0.07, volume: 0.18, gap: 60 },
 });
 
 export type Sfx = Parameters<typeof sfx>[0];

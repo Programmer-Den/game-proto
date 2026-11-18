@@ -151,6 +151,10 @@ export const sfx = sounds({
   pluck: { wave: 'sawtooth', freq: 233, arp: [0, 6], arpStep: 0.06, length: 0.25, volume: 0.18 },
   /** Build on, or on into the sky. */
   rise: { wave: 'noise', freq: 600, to: 4000, length: 0.4, attack: 0.2, volume: 0.18, gap: 200 },
+  /** A falling stone nudged aside. */
+  nudge: { wave: 'noise', freq: 2200, to: 3600, length: 0.08, volume: 0.16, gap: 80 },
+  /** A capstone sets: a deep knock under a rising bright chord. */
+  keystone: { wave: 'triangle', freq: 392, arp: [0, 4, 7, 12, 19], arpStep: 0.06, length: 0.55, volume: 0.32, gap: 300 },
   /** A gust picks up around a new stone. */
   gust: { wave: 'noise', freq: 900, to: 1600, length: 0.7, attack: 0.3, volume: 0.12, gap: 500 },
 });

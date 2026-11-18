@@ -31,13 +31,15 @@ run a day, the same for everyone.
 | Fortify (under the wave track) | Buy one fortification for the coming waves: a stake line, an oil pot or a lookout; one per break (bought during a wave, it is set up when the next break starts) |
 | Repair (right of Fortify) | During a break, mend 15% of the barricade for coins; each repair of the run costs 10 more |
 | Accept / Refuse on an omen card | From wave 4, take on (or turn down) the coming wave's omen for 30% more experience; left alone it is refused |
+| Tap a foe during a wave | Mark it for 2 of Arrow Rain's charge: for 5 seconds every arrow goes at it first and hits it 25% harder (see Mark a foe) |
+| Take / leave on a wayside event card | From wave 6, some breaks bring a scout, a peddler or a shrine instead of an omen; left alone it passes by |
 | Aim toggle (above the caltrops) or T | Cycle who the ranger shoots first: Nearest, Strongest, Flyers or Healers |
 | Endless siege / Heat N | After the siege is lifted on wave 30: fight on past it as the waves grow stronger, or start a new run at the next heat |
 | Siege engine button | In a break: build a ballista or a catapult on the wall, upgrade it, and set its aim (any time) |
 | Tap a road card | After a boss, take that road for the next ten waves (after 10 seconds one is taken at random) |
 | Tap or click a card | Take that upgrade when a level-up comes up (after 10 seconds one is taken at random, and a pop-up names it) |
 | Auto-pick checkbox (beside the level-up's countdown) | On by default; untick it to halt the countdown so a level-up waits for your pick, tick it to let it run again |
-| 1x / 2x (bottom right) | Switch the battle between normal and double speed; the level-up and road countdowns stay 10 real seconds, and an omen card's break stays 6 |
+| 1x / 2x (bottom right) | Switch the battle between normal and double speed; the level-up and road countdowns stay 10 real seconds, and an omen or event card's break stays 6 |
 | Skill book (in the top bar) | Open the skill book; the battle waits until Back |
 | Hover over (or tap) the barricade's bar | Show its health, what Stout Timber adds and how much it mends after each wave |
 | Fight again / New hero | After a fall: start again keeping the hero, or with a new one (tap New hero twice); the "Next run at" row picks the heat and the "Start at" row the wave (a forced march) |
@@ -226,8 +228,8 @@ their base skills with no cap are Vigilance, Heavy Shield and Stout Timber.
 
 The game-over panel's **Daily siege** button starts today's daily: one try a day, the same run for
 every player. A fresh ranger (level 1, no upgrades, legacy or heat) starts on wave 1 of the vale
-with two relics, and the day's seed sets every road taken after a boss, every omen offered and
-every relic in the chests, instead of the hero picking or the game rolling them. There is no
+with two relics, and the day's seed sets every road taken after a boss, every omen offered, every
+relic in the chests, the weather and the wayside events, instead of the hero picking or the game rolling them. There is no
 victory panel: the daily fights on until the hero falls, and the score is the waves cleared. The
 panel then shows the score, the best daily and the days in a row, and "Back to your hero" returns
 to the hero's own run, which the daily never touches. Starting it uses up the day's try, even if it
@@ -266,6 +268,53 @@ ranger names it until the wave is cleared. Left alone, an omen is refused.
 
 ![An omen named during the break, and the Repair button](docs/screenshots/omen-card.webp)
 ![A Night wave: the foes beyond mid-field are hidden](docs/screenshots/night-omen.webp)
+
+### Wayside events
+
+From wave 6, a break that would name an omen brings a wayside event instead about one time in
+three, on a green card with two choices. It lasts 6 seconds like an omen's, and left alone the
+event passes by.
+
+| Event | Take it | Leave it |
+| --- | --- | --- |
+| A wounded scout | Tend him: he joins as a spearman on a free slot (or trains the least trained guard, or leaves 30 coins when every guard is trained) | Send him on: the next wave's foes have 15% less health |
+| A peddler (only with 20 coins or more) | Buy the relic he offers for half your coins | Pass by |
+| A wayside shrine | Pray: a blessing and a curse together, both for 5 waves (the coming one included) | Pass by |
+
+A shrine pairs one blessing with one curse, both named on its card, and a green chip under the
+weather chip counts their waves down.
+
+| Blessing | Curse |
+| --- | --- |
+| Might: 25% more damage | Restless: foes walk and hack 15% faster |
+| Swift Hands: 20% faster shots | Brittle: the barricade and stake line take 30% more damage |
+| Fortune: 40% more coins | Dim: 25% less experience |
+
+![A wayside shrine offering a blessing and a curse](docs/screenshots/wayside-shrine.webp)
+
+### Weather
+
+From wave 5 a wave may come on in rain, wind or fog (about half of them do). The chip at the top
+right names the weather a wave ahead ("Rain now · Fog next wave") with what it does, and the field
+shows it: drops of rain, streaks of wind or a pale murk.
+
+| Weather | What it does |
+| --- | --- |
+| Rain | Burning lasts half as long; the mud slows every foe on foot by 10% |
+| Wind | Arrows, bolts and fireballs fly 25% slower; Arrow Rain comes down 45 pixels back towards the wall (its ring shows where), on a 25% wider ring |
+| Fog | Foes stay unseen, and out of aim, until three quarters of the way in; every kill pays 25% more coins |
+
+![Fog over the far field, with the weather and shrine chips](docs/screenshots/weather-fog.webp)
+
+### Mark a foe
+
+During a wave, tap a foe to mark it for 2 of Arrow Rain's charge. For 5 seconds (or until it falls)
+the ranger's whole volley, the mage's bolts and the warden's hounds go at it first, whatever the aim
+priority, and the hero's arrows and bolts hit it 25% harder. A gold ring at its feet and a gold
+chevron over its head show the mark. From wave 2 a hint says so once the charge allows, until the
+first mark. Foes hidden by a Night wave or fog can't be marked.
+
+![A goblin marked in the rain](docs/screenshots/mark-foe.webp)
 
 ### Arrow Rain
 
@@ -549,12 +598,12 @@ All paths are inside `games/palisade/`.
   the vale and the frozen pass), `hero.ts` (the classes: the ranger and the mage), `daily.ts` (the
   daily siege's plan for the day), `enemies.ts`,
   `upgrades.ts`, `relics.ts` (with the relic sets), `guards.ts`, `roads.ts`, `forts.ts` (the
-  fortifications and paid repairs), `elites.ts` (the traits), `omens.ts` (the omens), `march.ts` (the forced
+  fortifications and paid repairs), `elites.ts` (the traits), `omens.ts` (the omens), `wayside.ts` (the wayside events), `weather.ts` (the weather), `march.ts` (the forced
   march's starts), `legacy.ts` (the legacies), `bosses.ts` (the bosses' moves), `heat.ts` (the heats
   and the winning wave) and `aim.ts` (the aim priority) are data tables, `waves.ts` says what each wave brings and which
   road and boss it is on, `state.ts` holds the run and works out the hero's stats from the upgrade
   ranks, relics and heat, `sim.ts` moves the battle on, takes upgrades and roads, looses Arrow Rain, strews caltrops,
-  hires and trains guards, buys fortifications and repairs, decides omens, lifts the siege and
+  hires and trains guards, buys fortifications and repairs, decides omens and wayside events, marks foes, lifts the siege and
   retires the hero, and `save.ts` keeps the hero's progress (with the legacies), the speed and the aim priority.
 - `src/scenes/`: `BootScene` paints the textures, `GameScene` draws the battle, the HUD, the wave
   track, Arrow Rain, the caltrops and the guard slots and wires taps and drags to the rules, `layout.ts` says where things are
@@ -567,7 +616,7 @@ All paths are inside `games/palisade/`.
 - `src/trophies/`: the trophies (`index.ts`), their texts (`i18n/`) and when each is earned
   (`check.ts`).
 - `src/ui/`: the level-up cards, the road cards (`RoadChoice`), the hire panel (`HirePanel`), the
-  fortify panel (`FortifyPanel`), the siege engine panel (`EnginePanel`), the omen card (`OmenCard`), the legacy cards (`LegacyPanel`), the skill book, and `panel.ts` with the slate-and-gold panels,
+  fortify panel (`FortifyPanel`), the siege engine panel (`EnginePanel`), the omen card (`OmenCard`), the wayside event card (`EventCard`), the legacy cards (`LegacyPanel`), the skill book, and `panel.ts` with the slate-and-gold panels,
   buttons and text style.
 
 Adding an upgrade is an entry in `src/game/upgrades.ts` and its effect in `stats` in

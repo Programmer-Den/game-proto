@@ -1422,6 +1422,131 @@ export function paintAll(scene: Phaser.Scene) {
     c.fillRect(5, 0, 2, 5);
   });
 
+  // Round five: the iron knights of the later dungeons, the waystones, the mist over a chasm and a
+  // fish thrown in as bait.
+  const ironKnight = (key: string, pose: 'stand' | 'raise' | 'reel') =>
+    paint(scene, key, 44, 52, (c) => {
+      shadow(c, 20, 48, 14, 4);
+      c.save();
+      if (pose === 'reel') {
+        c.translate(20, 46);
+        c.rotate(-0.22);
+        c.translate(-20, -46);
+      }
+      // The sword: at its side, raised high to strike, or trailing on the floor.
+      const blade = (x1: number, y1: number, x2: number, y2: number) => {
+        c.strokeStyle = '#d8e0ec';
+        c.lineWidth = 3.5;
+        c.lineCap = 'round';
+        c.beginPath();
+        c.moveTo(x1, y1);
+        c.lineTo(x2, y2);
+        c.stroke();
+        c.strokeStyle = '#5a4630';
+        c.lineWidth = 4;
+        c.beginPath();
+        c.moveTo(x1 - (x2 - x1) * 0.18, y1 - (y2 - y1) * 0.18);
+        c.lineTo(x1, y1);
+        c.stroke();
+      };
+      if (pose === 'raise') blade(28, 18, 36, 1);
+      body(c, 20, 22, 22, 24, '#4a5262', 0.35);
+      // A dull plum tabard over the plate.
+      c.fillStyle = '#5a3a56';
+      c.fillRect(15, 28, 10, 15);
+      c.fillStyle = '#2a2e38';
+      c.fillRect(11, 44, 6, 4);
+      c.fillRect(23, 44, 6, 4);
+      ball(c, 12, 25, 5, '#6a7484');
+      ball(c, 28, 25, 5, '#6a7484');
+      // The helm, with a cold blue light behind its visor.
+      ball(c, 20, 15, 10, '#7a8494', 11);
+      c.fillStyle = '#12141c';
+      c.fillRect(13, 14, 14, 3);
+      glowDot(c, 20, 15.5, 7, 'rgba(160,220,255,0.75)');
+      c.fillStyle = '#bfe8ff';
+      c.fillRect(16, 15, 8, 1);
+      c.fillStyle = '#9aa4b4';
+      c.beginPath();
+      c.moveTo(20, 2);
+      c.lineTo(23, 7);
+      c.lineTo(17, 7);
+      c.fill();
+      if (pose === 'stand') blade(30, 34, 36, 14);
+      if (pose === 'reel') blade(30, 36, 41, 46);
+      c.restore();
+      if (pose === 'raise') glowDot(c, 36, 2, 7, 'rgba(240,248,255,0.95)');
+      if (pose === 'reel')
+        for (const [x, y] of [[8, 6], [20, 1], [32, 5]]) {
+          c.fillStyle = '#f0d070';
+          c.beginPath();
+          for (let i = 0; i < 10; i++) {
+            const r = i % 2 ? 1.4 : 3.4;
+            const a = (i / 10) * Math.PI * 2 - Math.PI / 2;
+            c.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r);
+          }
+          c.fill();
+        }
+    });
+  ironKnight('knight', 'stand');
+  ironKnight('knight-raise', 'raise');
+  ironKnight('knight-reel', 'reel');
+  // A waystone: a tall standing stone carved with a spiral, dark until the knight wakes it.
+  const waystone = (key: string, lit: boolean) =>
+    paint(scene, key, 30, 46, (c) => {
+      shadow(c, 15, 42, 13, 4);
+      c.fillStyle = '#5a5e6a';
+      c.beginPath();
+      c.moveTo(6, 43);
+      c.lineTo(7, 10);
+      c.quadraticCurveTo(15, 0, 23, 9);
+      c.lineTo(25, 43);
+      c.closePath();
+      c.fill();
+      const g = c.createLinearGradient(6, 0, 25, 0);
+      g.addColorStop(0, 'rgba(255,255,255,0.22)');
+      g.addColorStop(0.5, 'rgba(255,255,255,0)');
+      g.addColorStop(1, 'rgba(0,0,10,0.35)');
+      c.fillStyle = g;
+      c.fill();
+      if (lit) glowDot(c, 15, 22, 13, 'rgba(150,210,255,0.8)');
+      c.strokeStyle = lit ? '#dff2ff' : '#3a3d48';
+      c.lineWidth = 1.8;
+      c.beginPath();
+      for (let i = 0; i <= 30; i++) {
+        const a = i * 0.42;
+        const r = 1 + i * 0.22;
+        c.lineTo(15 + Math.cos(a) * r, 22 + Math.sin(a) * r);
+      }
+      c.stroke();
+      c.fillStyle = '#4a6a3a';
+      c.beginPath();
+      c.ellipse(9, 42, 5, 2.5, 0, 0, Math.PI * 2);
+      c.ellipse(22, 42, 4, 2, 0, 0, Math.PI * 2);
+      c.fill();
+    });
+  waystone('waystone', false);
+  waystone('waystone-lit', true);
+  paint(scene, 'mist', 32, 32, (c) => {
+    for (const [x, y, r] of [[10, 12, 12], [22, 10, 11], [16, 20, 13], [6, 24, 8], [26, 24, 9]]) glowDot(c, x, y, r, 'rgba(210,225,245,0.55)');
+  });
+  paint(scene, 'bait', 22, 14, (c) => {
+    c.strokeStyle = 'rgba(220,240,255,0.6)';
+    c.lineWidth = 1;
+    c.beginPath();
+    c.ellipse(11, 9, 10, 4, 0, 0, Math.PI * 2);
+    c.stroke();
+    ball(c, 10, 7, 5, '#b8c8d4', 3);
+    c.fillStyle = '#90a4b4';
+    c.beginPath();
+    c.moveTo(15, 7);
+    c.lineTo(20, 3);
+    c.lineTo(20, 11);
+    c.fill();
+    c.fillStyle = '#1a1c28';
+    c.fillRect(6, 6, 1.5, 1.5);
+  });
+
   // The HUD's icons and the touch buttons.
   const icon = (key: string, draw: (c: Ctx) => void) => paint(scene, key, 22, 20, draw);
   icon('ui-heart', (c) => heart(c, 11, 10, 8, '#e8506a'));

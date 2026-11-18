@@ -2,13 +2,16 @@ import { expect, test, type Page } from '@playwright/test';
 
 // Plays the first round of Endless Medley with real inputs: opens the run from the menu, solves
 // the first two puzzles the deck deals (whichever kinds the seeded deck picks, each by taps and
-// drags like a player's) and checks their points and the streak, then skips the third and checks
-// it costs a heart, and that the first solve earned its trophy. Game state is only read, through the `game` object the dev build puts on window.
+// drags like a player's) and checks their points and the streak, taking the next card over the dare
+// each solve offers, then skips the third and checks it costs a heart, shows its answer and comes
+// back as a rematch, and that the first solve earned its trophy. Game state is only read, through the `game` object the dev build puts on window.
 
 type KindId = 'nonogram' | 'bridges' | 'code' | 'calc' | 'sums' | 'unjam' | 'flip' | 'link' | 'slide' | 'pipe' | 'beam' | 'series' | 'echo';
 interface Card {
   kind: KindId;
   level: number;
+  dare?: string;
+  rematch?: boolean;
 }
 interface Run {
   mode: string;
@@ -21,6 +24,8 @@ interface Run {
   current: { card: Card; state: any; timeLeftMs: number | null } | null;
   queue: Card[];
   results: { card: Card; reason: string; points: number }[];
+  pick: Card | null;
+  revealed: boolean;
 }
 type Spot = { x: number; y: number; w: number; h: number };
 
@@ -270,13 +275,15 @@ test('plays the first round', async ({ page }, testInfo) => {
     expect(run.results[n - 1].points).toBeGreaterThanOrEqual(POINTS_PER_LEVEL);
     expect(run.streak).toBe(n);
     expect(run.solved).toBe(n);
+    // The banner offers a dare a level up beside the card up next; taking the next card deals it.
+    expect(run.pick, 'a dare offered').toBeTruthy();
+    expect(run.pick!.dare).toBe('up');
+    expect(run.pick!.level).toBe(run.queue[0].level + 1);
+    expect(run.pick!.kind).not.toBe(kind);
     if (n === 1) await snap('playthrough-2-solved');
-    // The banner shows for a moment, then the card that was up next is dealt.
-    expect(
-      await play(BETWEEN_MS + 1_000, async () => (await game.run()).phase === 'playing'),
-      'next puzzle dealt',
-    ).toBe(true);
+    await press('pick-0');
     run = await game.run();
+    expect(run.phase, 'next puzzle dealt').toBe('playing');
     expect(run.current!.card.kind).toBe(upNext);
     expect(run.dealt).toBe(n + 1);
     expect(run.queue).toHaveLength(QUEUE);
@@ -291,6 +298,13 @@ test('plays the first round', async ({ page }, testInfo) => {
   expect(run.hearts).toBe(HEARTS_NORMAL - 1);
   expect(run.streak).toBe(0);
   expect(run.score).toBe(score);
+  // A loss shows its answer and queues the puzzle again, later, as a rematch.
+  const lost = run.results[2].card;
+  expect(run.revealed, 'answer shown').toBe(run.current!.card.kind !== 'echo');
+  const rematch = run.queue.find((c) => c.rematch);
+  expect(rematch, 'a rematch queued').toMatchObject({ kind: lost.kind, level: lost.level });
+  expect(run.queue[0].rematch, 'not dealt next').toBeFalsy();
+  if (run.revealed) await press('next');
   expect(await play(BETWEEN_MS + 1_000, async () => (await game.run()).phase === 'playing'), 'fourth puzzle dealt').toBe(true);
 
   // The first puzzle solved earns the First sight trophy (src/trophies/), and nothing else yet.

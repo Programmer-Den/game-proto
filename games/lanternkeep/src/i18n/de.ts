@@ -310,6 +310,21 @@ const de: Translation<typeof en> = {
   climb: 'Aufsteigen',
   mountainFestivalTitle: 'Das Bergfest!',
   mountainBoonSub: '{n} Nächte auf dem Berg gehalten. Die Mönche schenken der Burg eine Gunst,\nfür dieses Spiel und jedes danach, in jeder Burg.',
+
+  // Mottenrunden, die neue Laterne und Beschläge (LK21 bis LK23)
+  placeTitle: 'Häng die neue Laterne auf',
+  placeSub: 'Tippe auf einen der markierten Plätze',
+  placeChain: 'schließt eine Kette',
+  fittingsButton: 'Beschläge',
+  fittingsTitle: 'Wähle einen Beschlag, dann tippe auf eine Laterne',
+  fittingsDone: 'Fertig',
+  fitted: 'Angebracht!',
+  reservoirName: 'Großer Tank',
+  reservoirBlurb: 'Fasst anderthalbmal so viel Öl',
+  gustGuardName: 'Windschutz',
+  gustGuardBlurb: 'Böen ziehen vorbei',
+  shutterName: 'Schutzgitter',
+  shutterBlurb: 'Fledermäuse ziehen vorbei',
 };
 
 /** Texts that are the same in German. */

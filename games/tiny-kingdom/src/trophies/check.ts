@@ -12,8 +12,8 @@ const ROUND = 8;
 const CHAIN = 40;
 /** Crowns won in all for Crown jewels. */
 const CROWNS = 10;
-/** A finished kingdom's score for Golden age (a greedy player finishes with 210 to 340). */
-const BIG = 350;
+/** A finished kingdom's score for Golden age (a greedy player, its coronation included, finishes with 300 to 370 and at most about 400). */
+const BIG = 420;
 
 /** Whether each trophy's condition holds in the state; the campaign's read the saved stars. */
 const EARNED: Record<string, (s: GameState, stars: number[], puzzles: number[]) => boolean> = {

@@ -267,22 +267,28 @@ class Search {
     return best;
   }
 
-  /** Searches every root move at `depth`, best first, and returns their order with the best score. */
-  root(moves: Move[], depth: number): { move: Move; score: number } | null {
+  /**
+   * Searches every root move at `depth`, and returns the best with its score. `bias` (a rival's
+   * style) adds to each root move's score, so the best is the best with its bias added.
+   */
+  root(moves: Move[], depth: number, bias: (m: Move) => number = () => 0): { move: Move; score: number } | null {
     let alpha = -INF;
     let best: { move: Move; score: number } | null = null;
     for (const m of moves) {
+      const lean = bias(m);
       this.pos.make(m);
       let score: number;
       if (!best) score = -this.search(depth - 1, -INF, INF, 1, true);
       else {
-        score = -this.search(depth - 1, -alpha - 1, -alpha, 1, true);
-        if (score > alpha && !this.stopped) score = -this.search(depth - 1, -INF, -alpha, 1, true);
+        const a = alpha - lean;
+        score = -this.search(depth - 1, -a - 1, -a, 1, true);
+        if (score > a && !this.stopped) score = -this.search(depth - 1, -INF, -a, 1, true);
       }
       this.pos.unmake();
       if (this.stopped) break;
-      if (!best || score > best.score) best = { move: m, score };
-      if (score > alpha) alpha = score;
+      const total = score + lean;
+      if (!best || total > best.score) best = { move: m, score: total };
+      if (total > alpha) alpha = total;
     }
     return best;
   }
@@ -299,7 +305,7 @@ export interface DeepLevel {
  * The deep search's move for the side to move, or undefined when it has none. `random` (0 to 1,
  * from the caller's Math.random) shuffles the root moves first, so equal moves vary from game to game.
  */
-export function chooseMoveDeep(pos: Position, level: DeepLevel, random: () => number): Move | undefined {
+export function chooseMoveDeep(pos: Position, level: DeepLevel, random: () => number, bias?: (m: Move) => number): Move | undefined {
   let moves = pos.legalMoves();
   if (moves.length <= 1) return moves[0];
   for (let i = moves.length - 1; i > 0; i--) {
@@ -309,7 +315,7 @@ export function chooseMoveDeep(pos: Position, level: DeepLevel, random: () => nu
   const s = new Search(pos, level.nodes);
   let chosen = moves[0];
   for (let depth = 1; depth <= level.depth; depth++) {
-    const found = s.root(moves, depth);
+    const found = s.root(moves, depth, bias);
     // A cut-off iteration still counts once its first move (the last best) was searched in full:
     // a move that beat it in full is better still.
     if (found) chosen = found.move;
@@ -317,4 +323,28 @@ export function chooseMoveDeep(pos: Position, level: DeepLevel, random: () => nu
     moves = [chosen, ...moves.filter((m) => m !== chosen)];
   }
   return chosen;
+}
+
+/** A mate score is cut to this, so a review weighs a missed mate like a big blunder, not a huge one. */
+export const MATE_SCORE = 2000;
+
+/**
+ * The best move for the side to move and its score (for the side to move, a pawn being 100, a mate
+ * `MATE_SCORE`), as the game review reads it: the deep search without shuffling, to `level`.
+ * A finished position has no move: a mate scores `-MATE_SCORE`, a draw 0.
+ */
+export function analyseDeep(pos: Position, level: DeepLevel): { move: Move | undefined; score: number } {
+  const moves = pos.legalMoves();
+  if (!moves.length) return { move: undefined, score: pos.inCheck() ? -MATE_SCORE : 0 };
+  const s = new Search(pos, level.nodes);
+  let best: { move: Move; score: number } = { move: moves[0], score: 0 };
+  let order = moves;
+  for (let depth = 1; depth <= level.depth; depth++) {
+    const found = s.root(order, depth);
+    if (found) best = found;
+    if (s.stopped || Math.abs(best.score) > MATE / 2) break;
+    order = [best.move, ...order.filter((m) => m !== best.move)];
+  }
+  const score = Math.abs(best.score) > MATE / 2 ? Math.sign(best.score) * MATE_SCORE : Math.max(-MATE_SCORE + 1, Math.min(MATE_SCORE - 1, best.score));
+  return { move: best.move, score };
 }

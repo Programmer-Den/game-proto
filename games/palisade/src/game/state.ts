@@ -14,6 +14,8 @@ import { marchCoins } from './march';
 import type { OmenId } from './omens';
 import { setComplete, type RelicId } from './relics';
 import type { RoadId } from './roads';
+import { shrineEffects, type Shrine, type WaysideEvent } from './wayside';
+import type { WeatherId } from './weather';
 import { UPGRADES, UPGRADE_IDS, learns, type UpgradeId } from './upgrades';
 
 // The battlefield, in the 960x540 view. Foes walk in from the right towards the barricade, and past
@@ -277,6 +279,17 @@ export interface GameState {
   hounds: Hound[];
   /** Whether this run went on past the lifted siege into the endless siege (see endless.ts). */
   endless: boolean;
+  /** The weather of the coming (or current) wave, and of the wave after it, named a wave ahead (see weather.ts); null for clear. */
+  weather: WeatherId | null;
+  nextWeather: WeatherId | null;
+  /** The wayside event of this break, waiting for the hero's choice (see wayside.ts); null for none. */
+  event: WaysideEvent | null;
+  /** The scout was sent on: the coming wave's foes come on weaker. */
+  scouted: boolean;
+  /** A shrine's blessing and curse while they last (see wayside.ts), or null. */
+  shrine: Shrine | null;
+  /** The foe the hero marked for the ranger's arrows, and how much longer the mark lasts (see `markFoe` in sim.ts), or null. */
+  mark: { id: number; ms: number } | null;
   nextId: number;
 }
 
@@ -294,7 +307,7 @@ export const streakBonus = (count: number) => (count >= 2 ? Math.min(0.5, 0.05 *
 export const STREAK_MS = 2_500;
 
 /** Everything the upgrades and relics change, worked out from their ranks and counts. */
-export function stats(state: Pick<GameState, 'ranks' | 'relics' | 'heat'> & Partial<Pick<GameState, 'legacy' | 'hero'>>) {
+export function stats(state: Pick<GameState, 'ranks' | 'relics' | 'heat'> & Partial<Pick<GameState, 'legacy' | 'hero' | 'shrine'>>) {
   const r = (id: UpgradeId) => rank(state, id);
   const relic = (id: RelicId) => state.relics?.[id] ?? 0;
   const relics = state.relics ?? {};
@@ -306,10 +319,12 @@ export function stats(state: Pick<GameState, 'ranks' | 'relics' | 'heat'> & Part
   const deep = r('deepFreeze') + r('glacier');
   const pyro = r('pyromancy') + r('orbMastery');
   const fork = r('forked') + r('arc');
+  // A shrine's blessing (Might, Swift Hands) and curse (Brittle) while they last.
+  const shrine = shrineEffects(state.shrine ?? null);
   return {
     /** Milliseconds between two shots of the bow (or casts of the mage's bolt). */
-    shotMs: (mage ? MAGE_CAST_MS : warden ? WARDEN_SLAM_MS : 1_000) / (1 + 0.2 * (r('swift') + r('focus') + r('vigil'))) / (1 + 0.1 * relic('drum')),
-    damage: (mage ? MAGE_DAMAGE : warden ? WARDEN_DAMAGE : 10) * (1 + 0.25 * (r('sharp') + r('potency') + r('bash'))) * (1 + 0.15 * relic('feather')),
+    shotMs: (mage ? MAGE_CAST_MS : warden ? WARDEN_SLAM_MS : 1_000) / (1 + 0.2 * (r('swift') + r('focus') + r('vigil'))) / (1 + 0.1 * relic('drum')) / shrine.shots,
+    damage: (mage ? MAGE_DAMAGE : warden ? WARDEN_DAMAGE : 10) * (1 + 0.25 * (r('sharp') + r('potency') + r('bash'))) * (1 + 0.15 * relic('feather')) * shrine.damage,
     arrows: 1 + r('volley') + r('twin'),
     pierce: r('pierce'),
     /** Chain Spark: how many more foes a mage's bolt leaps on to. */
@@ -360,7 +375,7 @@ export function stats(state: Pick<GameState, 'ranks' | 'relics' | 'heat'> & Part
     /** The warden's hounds: how many, the bite's share of a slam's hit and how long it holds a foe; null for the other classes. */
     hound: warden ? { count: Math.min(HOUND_HOMES.length, 1 + r('pack')), share: HOUND_BITE * (1 + 0.4 * r('fangs')), slow: HOUND_HOLD.slow, ms: HOUND_HOLD.ms + 350 * r('hold') } : null,
     /** Bulwark: foes hack at the barricade and the stake line this many times as fast. */
-    hack: 1 - 0.1 * r('bulwark'),
+    hack: (1 - 0.1 * r('bulwark')) * shrine.hack,
   };
 }
 
@@ -434,6 +449,12 @@ export function newRun(progress: Progress, aimMode: AimMode = 'nearest', start =
     engine: null,
     hounds: [],
     endless: false,
+    weather: null,
+    nextWeather: null,
+    event: null,
+    scouted: false,
+    shrine: null,
+    mark: null,
     daily,
     nextId: 1,
   };

@@ -39,6 +39,7 @@ every star of them winning a pair of gold boots.
 | --- | --- |
 | Tap the top half of the screen or the Jump button, or Space / Up / W | Jump (again in the air with Second Leap) |
 | Tap the bottom half of the screen or the Slide button, or Down / S | Slide; in the air, drop fast and slide on landing |
+| The Dash button, or Right / D / Shift | Shield dash: charge ahead through crates, barrels and goblins, and skim over a pit |
 | Tap a card | Take that boon at a checkpoint |
 | Tap a road card | From stage 3: pick the road the next stage runs on, once the boon is taken |
 | Run again | After a fall: a new run from the start, with no boons (or the one bought on the game-over panel) |
@@ -47,7 +48,8 @@ every star of them winning a pair of gold boots.
 | Armoury | After a fall: spend banked coins on lasting upgrades, knights and companions |
 
 A hint on the first stretch of the run shows where to tap. On a touch screen, round Slide and Jump
-buttons in the bottom right of the margin do the same while the knight runs.
+buttons in the bottom right of the margin do the same while the knight runs, with a Dash button
+beside them.
 
 ![The Slide and Jump buttons](docs/screenshots/action-buttons.webp)
 
@@ -195,11 +197,30 @@ buttons in the bottom right of the margin do the same while the knight runs.
    the panel (never the two halves of a pair). Run it as often as you like; it starts bare otherwise, like the daily course, and
    keeps the week's best distance, shown on the panel and on the game-over panel. The tag reads
    "Weekly" while it runs.
+28. **The shield dash**: the third control. For a quarter of a second the knight charges on at
+   twice the speed behind a raised shield, holding their height in the air and skimming over a pit.
+   It smashes crates and the Gatekeeper's barrels and knocks goblins and shield goblins aside (a
+   coin each, counted as a stomp); spikes, logs, fire, bats and walls still hurt. Then it needs
+   1.8 s to come back: the kite shield in the top bar, between the hearts and the stage's name,
+   fills up and turns gold when it is ready. From stage 2 the road has **crates** (two stacked, to
+   jump, or to dash through for three coins) and **shield goblins** (a goblin behind a tower
+   shield, its pike too tall to leap: dash through it).
+29. **Run missions**: three standing missions, shown on the game-over panel, each to be met within
+   one ordinary run: slide under hanging logs, take coins, stomp bats, dash through crates or shield
+   goblins, stomp foes in a row without a hit, run a distance, take coins on high paths, meet the
+   herald's dares. Meeting one pays 20 banked coins at once (10 more each time round the list, up to
+   60), with a pop over the road, and the next mission in turn takes its place, a step harder. Daily,
+   weekly and challenge runs play no missions.
+30. **High paths**: from stage 3, a stretch of road sometimes splits under three floating stone
+   platforms. Jump up through one from below and run along them for the coins along their tops and
+   over their gaps, past the spikes or the goblin on the middle one; or keep to the plain road under
+   them, with a few coins and nothing to hurt you. Missing a gap just drops the knight back to the
+   road.
 
    The best distance, the banked coins, any boon bought, the armoury, the day's best on the
    daily course, the crown, the knights unlocked and chosen with their bests, each knight's
-   ghost, the companions, the week's best on the weekly road and each challenge course's stars
-   are saved between runs.
+   ghost, the companions, the week's best on the weekly road, each challenge course's stars
+   and the run missions standing are saved between runs.
 
 ![A streak at x3: the chip, a "+3" pop and the trail of gold stars](docs/screenshots/streak.webp)
 
@@ -264,6 +285,12 @@ buttons in the bottom right of the margin do the same while the knight runs.
 ![The Courses panel: the daily course, the weekly road and the ten challenge courses with their stars](docs/screenshots/courses.webp)
 
 ![A challenge course cleared with all three stars](docs/screenshots/challenge-cleared.webp)
+
+![The shield dash: the knight charges at a shield goblin, with crates ahead](docs/screenshots/shield-dash.webp)
+
+![A high path: the knight runs along the floating platforms, past the spikes on the middle one](docs/screenshots/high-path.webp)
+
+![The run missions on the game-over panel](docs/screenshots/run-missions.webp)
 
 ### Boons and the coin shop
 

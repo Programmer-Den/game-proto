@@ -216,8 +216,9 @@ test('plays the first round', async ({ page }, testInfo) => {
   expect(s).toMatchObject({ phase: 'swinging', patron: patronCards[0].id, patronOffer: [], favorPerStone: patron.perStone, perfectPx: patron.perfectPx, rank: 0, freeRerolls: 0 });
   expect(s.moving.w).toBe(START_W);
   expect(s.speed).toBeCloseTo(SPEED_NORMAL * patron.speed);
-  // The first tier is all ordinary limestone, with no trial, curse, wind, lean or reserve.
+  // The first tier is all ordinary limestone, with no trial, curse, wind, lean, reserve, capstone or nudge (both open on tier 2).
   expect(s).toMatchObject({ nextKind: 'normal', trial: null, curse: null, endless: false, wind: 0, slow: false, lean: 0, chain: 0, material: 'limestone', reserve: null });
+  expect(s).toMatchObject({ capstone: false, capped: false, nudged: false, blueprints: 0 });
   expect(s.moving).toMatchObject({ kind: 'normal', material: 'limestone' });
   await play(STEP_MS, async () => false);
   await snap('0-start');

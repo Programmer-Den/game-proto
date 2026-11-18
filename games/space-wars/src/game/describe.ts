@@ -3,7 +3,7 @@ import { FLAGSHIP_STEP } from './contracts';
 import { RESEARCH_LEVELS, RESEARCH_MS, RESEARCH_STEP, TRACK_DEFS, type Track } from './research';
 import type { DerelictKind } from './map';
 import {
-  CLAIM_MS, EXPANSION_GAP, REPAIR_RANGE, REPAIR_RATE, VETERAN_NAMES, VETERAN_RANKS, VETERAN_STEP, buildingStats,
+  ACTIVES, AFTERBURNER, CLAIM_MS, EXPANSION_GAP, SALVO_DAMAGE, SALVO_MISSILES, SCREEN_RANGE, SCREEN_SHARE, REPAIR_RANGE, REPAIR_RATE, VETERAN_NAMES, VETERAN_RANKS, VETERAN_STEP, buildingStats,
   derelictText, expansionStats, flagshipStats, researchCost, unitStats, type Side,
 } from './world';
 import { ADMIRAL_RANKS, MAX_ADMIRAL_RANK, admiralAt, admiralOf, type AdmiralId } from './admirals';
@@ -46,7 +46,28 @@ export function unitLines(side: Side, type: UnitId): string[] {
   if (type === 'harvester') lines.push(t('harvesterLine', { n: Math.round(side.def.tune.carry * side.perks.carry) }));
   if (s.weapon) lines.push(weaponLine(s.weapon));
   if (def.ability) lines.push(abilityText(def.ability));
+  if (type !== 'harvester') lines.push(activeLine(type));
   return lines;
+}
+
+/** A warship class's active (ACTIVES in `world.ts`): its name, cooldown and what it does. */
+export function activeLine(type: Exclude<UnitId, 'harvester'>): string {
+  const a = ACTIVES[type];
+  const text = a.kind === 'afterburner' ? t(a.text, { pct: Math.round((AFTERBURNER - 1) * 100), s: a.ms / 1000 })
+    : a.kind === 'salvo' ? t(a.text, { n: SALVO_MISSILES, x: SALVO_DAMAGE })
+    : t(a.text, { range: SCREEN_RANGE, pct: Math.round((1 - SCREEN_SHARE) * 100), s: a.ms / 1000 });
+  return t('activeLine', { name: t(a.name), s: a.cooldownMs / 1000, text });
+}
+
+/** The command strip's Attack-move and Actives pills, for their tooltips. */
+export function attackMoveLines(): string[] {
+  return [t('attackMoveName'), t('attackMoveText')];
+}
+export function activesLines(): string[] {
+  return [t('activesName'), ...(['scout', 'gunship', 'heavy'] as const).map((type) => activeLine(type))];
+}
+export function groupLines(): string[] {
+  return [t('groupsName'), t('groupsText')];
 }
 
 /** The lines a building's tooltip shows under its name. */

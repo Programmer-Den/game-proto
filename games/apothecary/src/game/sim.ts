@@ -1,5 +1,7 @@
 import { byDifficulty } from '../../../../shared/settings';
 import { decorPatience, decorRegulars, decorTip, decorWalkOff, tickCourier } from './alchemy';
+import { isNight, runNight, startNight } from './night';
+import { note, noteEmpty, turnPage, type Wait } from './ledger';
 import {
   FINE,
   GROW_MS,
@@ -8,7 +10,10 @@ import {
   POTIONS,
   RECIPES,
   REFINE,
+  PRIME,
   isPlant,
+  isPrime,
+  unprimed,
   isRefined,
   isSellable,
   PLANTS,
@@ -16,6 +21,7 @@ import {
   type ItemId,
   type PlantId,
   type PotionId,
+  type RefinedId,
 } from './items';
 import {
   BELT_COST,
@@ -120,6 +126,9 @@ import {
   wagonHere,
   WAGON_ARRIVES,
   HERBS,
+  inPrime,
+  PRIME_MS,
+  type PrimeCount,
   type HerbId,
   type BeltId,
   type CraftingId,
@@ -156,10 +165,13 @@ export const countFinished = (station: object) => finished.set(station, finished
  * its work spot. A station with craftsmen has no work spot left.
  */
 const crew = (state: GameState, id: StationId, workingAt: StationId | null) =>
-  state.craftsmen[id].level > 0 ? state.craftsmen[id].level : workingAt === id ? 1 : 0;
+  hired(state, id) > 0 ? hired(state, id) : workingAt === id ? 1 : 0;
+
+/** The craftsmen at work at a station: none at night, when they sleep (AP21). */
+const hired = (state: GameState, id: StationId) => (isNight(state) ? 0 : state.craftsmen[id].level);
 
 /** Whether a refining table or cauldron has its second pipe open: a second craftsman works it. */
-const secondPipe = (state: GameState, id: StationId) => state.craftsmen[id].level >= 2;
+const secondPipe = (state: GameState, id: StationId) => hired(state, id) >= 2;
 
 /**
  * Advances the world by `dt` ms. Stations only work while someone works them: the doctor standing
@@ -167,7 +179,8 @@ const secondPipe = (state: GameState, id: StationId) => state.craftsmen[id].leve
  * progress, a second craftsman working a second pipe alongside the first, and customers are
  * served. A counter's second craftsman also takes the coins from the till. Customers are served,
  * and lose patience, only once they stand at the counter, as `atCounter` says; without anyone
- * showing them walk in, they are there at once.
+ * showing them walk in, they are there at once. Only `byHand`, the apothecary played rather than
+ * the time away or a town scene, can keep the shop open at night (AP21).
  */
 export function tick(
   state: GameState,
@@ -175,10 +188,21 @@ export function tick(
   workingAt: StationId | null,
   atCounter: (order: Order) => boolean = () => true,
   rand: () => number = Math.random,
+  byHand = false,
 ) {
-  // A blighted bed stands still until the sickle clears it.
+  turnPage(state);
+  // A blighted bed stands still until the sickle clears it. A bed that grows ripe glows in its prime
+  // window for a while (AP23).
   for (const plot of state.plots) {
-    if (!plot.blighted) plot.grown = Math.min(plot.grown + dt * growthSpeed(state), GROW_MS[plot.plant]);
+    if (plot.blighted) continue;
+    const ripe = GROW_MS[plot.plant];
+    const was = plot.grown;
+    plot.grown = Math.min(plot.grown + dt * growthSpeed(state), ripe);
+    if (was < ripe && plot.grown >= ripe) plot.ripeMs = 0;
+    else if (plot.ripeMs !== undefined) {
+      plot.ripeMs += dt;
+      if (plot.ripeMs >= PRIME_MS) delete plot.ripeMs;
+    }
   }
 
   for (const id of REFINERS) {
@@ -186,7 +210,13 @@ export function tick(
     const speed = dt * speedAt(state.upgrades[id].level) * masterySpeed(state, id);
     const next = refining(state, refiner, state.priority[id]);
     // Hired craftsmen at work grow towards mastery.
-    if (state.craftsmen[id].level > 0 && (next >= 0 || refiner.second)) state.mastery[id] = (state.mastery[id] ?? 0) + dt;
+    if (hired(state, id) > 0 && (next >= 0 || refiner.second)) state.mastery[id] = (state.mastery[id] ?? 0) + dt;
+    // The ledger (AP22): at work, or waiting for plants, for room on the pallets or for hands.
+    if (stationBuilt(state, id)) {
+      const wait: Wait | null =
+        refiner.queue.length === 0 && !refiner.second ? 'input' : crew(state, id, workingAt) === 0 ? 'hands' : next < 0 && !refiner.second ? 'room' : null;
+      note(state, id, dt, wait);
+    }
     // Each pair of hands works its own pipe at the same speed: the first the front of the queue, a
     // second craftsman's a plant of its own (see `refineSecond`).
     if (crew(state, id, workingAt) > 0 && next >= 0) {
@@ -200,7 +230,7 @@ export function tick(
       refiner.progress += speed;
       const recipe = REFINE[refiner.queue[0]];
       if (refiner.progress >= recipe.ms) {
-        refiner.queue.shift();
+        primeDone(refiner, refiner.queue.shift()!, recipe.out);
         refiner.output.push(recipe.out);
         countFinished(refiner);
         // Work past the end of this plant goes on the next, so a slow frame rate makes no less. The
@@ -215,18 +245,27 @@ export function tick(
 
   for (const id of CAULDRONS) {
     const cauldron = state[id];
-    if (crew(state, id, workingAt) === 0) continue;
+    if (crew(state, id, workingAt) === 0) {
+      if (stationBuilt(state, id)) note(state, id, dt, cauldron.contents.length === 0 && !cauldron.brewing && !cauldron.brewing2 ? 'input' : 'hands');
+      continue;
+    }
     const speed = dt * speedAt(state.upgrades[id].level) * masterySpeed(state, id);
-    if (state.craftsmen[id].level > 0 && (cauldron.brewing || cauldron.brewing2)) state.mastery[id] = (state.mastery[id] ?? 0) + dt;
+    if (hired(state, id) > 0 && (cauldron.brewing || cauldron.brewing2)) state.mastery[id] = (state.mastery[id] ?? 0) + dt;
     // The first pipe, then a second craftsman's: each brews on its own at the same speed.
     cauldron.brewing = brew(state, cauldron, cauldron.brewing, speed, state.priority[id]);
     if (secondPipe(state, id)) cauldron.brewing2 = brew(state, cauldron, cauldron.brewing2 ?? null, speed, state.priority[id]);
+    // Nothing brewing: either nothing it knows can be made from what is in, or its pallets are full.
+    const idle = !cauldron.brewing && !cauldron.brewing2;
+    const makeable = RECIPES.some((r) => researched(state, r.out) && without(cauldron.contents, r.inputs));
+    if (stationBuilt(state, id)) note(state, id, dt, idle ? (makeable ? 'room' : 'input') : null);
   }
 
   for (const id of BELTS) runBelt(state, id, dt);
 
   serveCustomers(state, dt, workingAt, atCounter);
-  if (state.craftsmen.counter.level >= 2) collectTill(state);
+  if (hired(state, 'counter') >= 2) collectTill(state);
+  // The ledger counts the time each known potion's shelf stands empty.
+  for (const potion of POTIONS) if (researched(state, potion) && !state.counter.shelf.some((p) => plainOf(p) === potion)) noteEmpty(state, potion, dt);
   // Patience runs out faster while a potion wanted is sold dear.
   for (const order of state.orders) if (atCounter(order)) order.patience -= dt * patienceRate(state, order);
   // A customer who runs out of patience walks off, and the street thinks less of the shop. One of a
@@ -238,9 +277,17 @@ export function tick(
   }
   state.orders = state.orders.filter((o) => o.patience > 0);
 
-  // At dusk a contract still open is missed and the next day's comes in.
-  state.contract.dayLeft -= dt;
-  if (state.contract.dayLeft <= 0) state.contract = contractFor(state, state.contract.day + 1, state.contract.kept);
+  // At dusk a contract still open is missed and the next day's comes in; with the shop kept open,
+  // only once the night is over (AP21).
+  if (isNight(state)) {
+    if (runNight(state, dt, workingAt === 'counter')) state.contract = contractFor(state, state.contract.day + 1, state.contract.kept);
+  } else {
+    state.contract.dayLeft -= dt;
+    if (state.contract.dayLeft <= 0) {
+      if (byHand && state.night.open) startNight(state);
+      else state.contract = contractFor(state, state.contract.day + 1, state.contract.kept);
+    }
+  }
 
   // On a market day, a crowd comes in at midday.
   const day = state.contract.day;
@@ -269,7 +316,8 @@ export function tick(
   }
   spreadBlight(state, dt, rand);
 
-  state.nextOrderIn -= dt;
+  // Customers come by day only.
+  if (!isNight(state)) state.nextOrderIn -= dt;
   if (state.nextOrderIn <= 0) {
     state.nextOrderIn = orderInterval(state, rand());
     if (state.orders.length < maxOrders(state)) state.orders.push(newOrder(state, rand));
@@ -411,6 +459,7 @@ function refineSecond(state: GameState, refiner: Refiner, ms: number, first: Pla
   const over = second.progress + ms - recipe.ms;
   second.progress = Math.min(second.progress + ms, recipe.ms);
   if (over < 0 || !palletHasRoom(state, refiner.output, recipe.out)) return;
+  primeDone(refiner, second.plant, recipe.out);
   refiner.output.push(recipe.out);
   countFinished(refiner);
   refiner.second = null;
@@ -428,6 +477,7 @@ function takeForBelt(state: GameState, belt: BeltId, fits: (id: ItemId, run: num
     const i = state.plots.findIndex((p, i) => GARDEN_LINE[gardenOf(i)] === line && isRipe(state, i) && fits(p.plant, GARDEN_RUN[gardenOf(i)]));
     if (i < 0) return null;
     state.plots[i].grown = 0;
+    delete state.plots[i].ripeMs;
     const run = GARDEN_RUN[gardenOf(i)];
     return { id: state.plots[i].plant, at: beltStart(belt, state.plots[i].plant, run), run };
   }
@@ -435,6 +485,8 @@ function takeForBelt(state: GameState, belt: BeltId, fits: (id: ItemId, run: num
   const i = output.findIndex((id) => fits(id, 0));
   if (i < 0) return null;
   const id = output.splice(i, 1)[0];
+  // Pixies take the plain ones: the Prime or Fine ones wait for the doctor while plain ones are left.
+  keepPrime(state[belt].primeOut, output, id);
   return { id, at: beltStart(belt, id) };
 }
 
@@ -523,6 +575,8 @@ function brew(state: GameState, cauldron: Cauldron, brewing: Brew | null, ms: nu
     }
   } else {
     cauldron.output.push(current.out);
+    // Brewed from Prime goods only, it waits on the pallet as a Fine potion (AP23).
+    if (current.prime) addPrime((cauldron.primeOut ??= {}), current.out);
     countFinished(cauldron);
   }
   // Work past the end of this brew goes on the next, if there is one.
@@ -550,6 +604,7 @@ function startBrew(state: GameState, cauldron: Cauldron, first: PotionId | null 
     const left = without(cauldron.contents, PANACEA_RECIPE.inputs);
     if (left) {
       cauldron.contents = left;
+      usePrime(cauldron, PANACEA_RECIPE.inputs);
       return { out: PANACEA, ms: PANACEA_RECIPE.ms, progress: 0 };
     }
   }
@@ -569,7 +624,8 @@ function startBrew(state: GameState, cauldron: Cauldron, first: PotionId | null 
     const left = without(cauldron.contents, recipe.inputs);
     if (left) {
       cauldron.contents = left;
-      return { out: recipe.out, ms: recipe.ms, progress: 0 };
+      const prime = usePrime(cauldron, recipe.inputs);
+      return { out: recipe.out, ms: recipe.ms, progress: 0, ...(prime ? { prime } : {}) };
     }
   }
   return null;
@@ -638,9 +694,12 @@ export function harvest(state: GameState, plotIndex: number): Feedback {
   const plot = state.plots[plotIndex];
   if (!isRipe(state, plotIndex)) return [t('notRipe')];
   if (freeHands(state) === 0) return [t('handsFull')];
+  // Picked in its prime window, the plant is a Prime one (AP23).
+  const item = inPrime(plot) ? PRIME[plot.plant] : plot.plant;
   plot.grown = 0;
-  state.carrying.push(plot.plant);
-  return [t('gained', { item: itemName(plot.plant) })];
+  delete plot.ripeMs;
+  state.carrying.push(item);
+  return [t('gained', { item: itemName(item) })];
 }
 
 /**
@@ -649,8 +708,8 @@ export function harvest(state: GameState, plotIndex: number): Feedback {
  */
 function serveCustomers(state: GameState, dt: number, workingAt: StationId | null, atCounter: (order: Order) => boolean) {
   const { counter } = state;
-  const hired = state.craftsmen.counter.level;
-  if (hired === 0) {
+  const hands = hired(state, 'counter');
+  if (hands === 0) {
     if (workingAt === 'counter') serveFromShelf(state, atCounter);
     return;
   }
@@ -658,7 +717,7 @@ function serveCustomers(state: GameState, dt: number, workingAt: StationId | nul
     counter.serving = 0;
     return;
   }
-  counter.serving = (counter.serving ?? 0) + dt * hired;
+  counter.serving = (counter.serving ?? 0) + dt * hands;
   if (counter.serving < SERVE_MS) return;
   counter.serving -= SERVE_MS;
   serveFromShelf(state, atCounter, 1);
@@ -781,31 +840,87 @@ function takeTopFromBack<T extends ItemId>(state: GameState, pick: (id: ItemId) 
  * Picks one item up off a station's pallets, so the hands fill with a mix of every kind there: the
  * kind the doctor carries fewest of, then the kind with the most waiting, then the first.
  */
-function pickUpOne(state: GameState, from: ItemId[]): Feedback | null {
+function pickUpOne(state: GameState, from: ItemId[], prime?: PrimeCount, primed?: (id: ItemId) => ItemId): Feedback | null {
   if (from.length === 0 || freeHands(state) === 0) return null;
-  const held = (id: ItemId) => state.carrying.filter((i) => i === id).length;
+  // A Prime good counts as its plain one, a Fine potion as its potion.
+  const plain = (id: ItemId) => (isPrime(id) ? unprimed(id) : isSellable(id) ? plainOf(id) : id);
+  const held = (id: ItemId) => state.carrying.filter((i) => plain(i) === id).length;
   const waiting = (id: ItemId) => from.filter((i) => i === id).length;
   let best = 0;
   from.forEach((id, i) => {
     const other = from[best];
     if (held(id) < held(other) || (held(id) === held(other) && waiting(id) > waiting(other))) best = i;
   });
-  const id = from.splice(best, 1)[0];
+  const taken = from.splice(best, 1)[0];
+  // The doctor takes the Prime or Fine ones of a kind first.
+  const id = prime && primed && (prime[taken] ?? 0) > 0 ? primed(taken) : taken;
+  if (id !== taken) prime![taken]!--;
   state.carrying.push(id);
-  return [t('gained', { item: itemName(id) })];
+  return [t(id !== taken && isSellable(id) ? 'gainedFine' : 'gained', { item: itemName(id) })];
+}
+
+/** Counts one more Prime or Fine `id` in `count`. */
+const addPrime = (count: PrimeCount, id: string) => {
+  count[id] = (count[id] ?? 0) + 1;
+};
+
+/** After `id` left `items`, keeps `count`'s Prime ones of it to no more than are left. */
+function keepPrime(count: PrimeCount | undefined, items: readonly string[], id: string) {
+  if (!count?.[id]) return;
+  count[id] = Math.min(count[id]!, items.filter((i) => i === id).length);
+  if (count[id] === 0) delete count[id];
+}
+
+/** A refining table finished `plant` into `out`: a Prime plant waiting makes it a Prime good. */
+function primeDone(refiner: Refiner, plant: PlantId, out: RefinedId) {
+  if (!refiner.primeIn?.[plant]) return;
+  refiner.primeIn[plant]!--;
+  addPrime((refiner.primeOut ??= {}), out);
+}
+
+/**
+ * A cauldron took `inputs` out to brew: when every one of them can be a Prime good, they are, and
+ * the brew is Prime. Plain goods go first otherwise, so the Prime ones wait for a brew of their own.
+ */
+function usePrime(cauldron: Cauldron, inputs: readonly RefinedId[]) {
+  const prime = cauldron.primeIn;
+  if (!prime) return false;
+  const need = new Map<RefinedId, number>();
+  for (const good of inputs) need.set(good, (need.get(good) ?? 0) + 1);
+  const all = [...need].every(([good, n]) => (prime[good] ?? 0) >= n);
+  if (all) for (const [good, n] of need) prime[good]! -= n;
+  for (const good of need.keys()) keepPrime(prime, cauldron.contents, good);
+  return all;
+}
+
+/**
+ * Takes the topmost carried plant (`isPlant`) or refined good, plain or Prime, that has room in `to`
+ * off the doctor's back, as its plain kind; a Prime one is counted in `prime`.
+ */
+function takeAnyFromBack<T extends PlantId | RefinedId>(state: GameState, pick: (id: ItemId) => id is T, to: readonly ItemId[], station: { primeIn?: PrimeCount }): T | null {
+  for (let i = state.carrying.length - 1; i >= 0; i--) {
+    const id = state.carrying[i];
+    const plain = isPrime(id) ? unprimed(id) : id;
+    if (!pick(plain) || !hasRoom(state, to, plain)) continue;
+    state.carrying.splice(i, 1);
+    if (id !== plain) addPrime((station.primeIn ??= {}), plain);
+    return plain;
+  }
+  return null;
 }
 
 export function dropAtRefiner(state: GameState, id: RefinerId = 'refiner'): Feedback | null {
-  const plant = takeTopFromBack(state, isPlant, state[id].queue);
+  const plant = takeAnyFromBack(state, isPlant, state[id].queue, state[id]);
   if (!plant) return null;
   state[id].queue.push(plant);
   return [t('handedOver', { item: itemName(plant) })];
 }
 
-export const pickUpFromRefiner = (state: GameState, id: RefinerId = 'refiner') => pickUpOne(state, state[id].output);
+export const pickUpFromRefiner = (state: GameState, id: RefinerId = 'refiner') =>
+  pickUpOne(state, state[id].output, state[id].primeOut, (good) => PRIME[good as RefinedId]);
 
 export function dropInCauldron(state: GameState, id: CauldronId = 'cauldron'): Feedback | null {
-  const good = takeTopFromBack(state, isRefined, state[id].contents);
+  const good = takeAnyFromBack(state, isRefined, state[id].contents, state[id]);
   if (!good) return null;
   state[id].contents.push(good);
   return [t('handedOver', { item: itemName(good) })];
@@ -827,7 +942,7 @@ export function pickUpFromCauldron(state: GameState, id: CauldronId = 'cauldron'
     state.carrying.push(fine);
     return [t('gainedFine', { item: itemName(fine) })];
   }
-  return pickUpOne(state, cauldron.output);
+  return pickUpOne(state, cauldron.output, cauldron.primeOut, (potion) => FINE[potion as PotionId]);
 }
 
 const UPGRADE_STEP = 5;
@@ -898,6 +1013,7 @@ export function replantGarden(state: GameState, garden: number): Feedback | null
   // Changed in place: the scene keeps each bed's plot object.
   for (let i = garden * PLOTS_PER_GARDEN; i < (garden + 1) * PLOTS_PER_GARDEN; i++) {
     Object.assign(state.plots[i], { plant: next, grown: 0, blighted: false, blightMs: 0 });
+    delete state.plots[i].ripeMs;
   }
   return [t('replanted', { garden: t(GARDEN_NAMES_IN[next]) })];
 }

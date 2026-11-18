@@ -9,6 +9,7 @@ const enUS: Partial<Translation<typeof en>> = {
   harborDesc: 'A new tile: 2 harbors',
   harborsGift: '+2 Harbors',
   harborsDesc: '2 more harbors',
+  pondRule: 'Digs a lake on grass, for farms, harbors and gardens',
   springRule: 'Markets and harbors score double',
   springShort: 'markets, harbors x2',
   lighthouseRule: 'Coast only: +1 per sea side, +2 per harbor around it',

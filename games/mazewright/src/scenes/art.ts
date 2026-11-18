@@ -147,8 +147,60 @@ export function rock(g: G, x: number, y: number) {
   g.fillTriangle(x - 8, y - 6, x + 6, y - 7, x - 2, y - 3);
 }
 
+/**
+ * A wicket gate between two posts: shut, a slatted gate with a brace across the tile; open, the gate
+ * swung back against its post and a trodden path through, so the tile reads as free.
+ */
+export function wicket(g: G, x: number, y: number, open: boolean, alpha = 1) {
+  const light = 0xb98a52;
+  if (open) {
+    g.fillStyle(0xd9c79f, 0.55 * alpha);
+    g.fillRoundedRect(x - 12, y - 18, 24, 36, 6);
+  } else shadow(g, () => g.fillRect(x - 14 + 2, y - 10 + 3, 28, 22));
+  // The posts, at the tile's left and right edges.
+  for (const px of [-17, 13]) {
+    g.fillStyle(C.wood, alpha);
+    g.fillRoundedRect(x + px, y - 16, 5, 32, 2);
+    g.fillStyle(light, alpha);
+    g.fillRect(x + px + 1, y - 15, 2, 4);
+  }
+  g.fillStyle(light, alpha);
+  if (open) {
+    // Swung back: the gate seen edge-on along its hinge post, with its latch.
+    g.fillRoundedRect(x - 12, y - 16, 4, 32, 1.5);
+    g.fillStyle(C.gold, alpha);
+    g.fillCircle(x - 10, y + 12, 1.8);
+    return;
+  }
+  // Shut: two rails, three slats and a brace from the hinge.
+  g.fillRect(x - 12, y - 9, 25, 4);
+  g.fillRect(x - 12, y + 5, 25, 4);
+  for (const sx of [-9, -1, 7]) g.fillRect(x + sx, y - 12, 3.5, 24);
+  g.lineStyle(3, C.wood, alpha);
+  g.lineBetween(x - 11, y + 7, x + 11, y - 7);
+  g.fillStyle(C.gold, alpha);
+  g.fillCircle(x + 10, y, 1.8);
+}
+
+/** A bounty foe's mark: a gold ring round it that empties as its bounty runs out, and a coin over it. */
+export function bounty(g: G, x: number, y: number, r: number, left: number) {
+  g.lineStyle(2.5, C.gold, 0.35);
+  g.strokeCircle(x, y, r + 5);
+  g.lineStyle(2.5, C.gold, 1);
+  g.beginPath();
+  g.arc(x, y, r + 5, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * left);
+  g.strokePath();
+  g.fillStyle(0x8a5a12, 1);
+  g.fillCircle(x, y - r - 12, 5.5);
+  g.fillStyle(C.gold, 1);
+  g.fillCircle(x, y - r - 12, 4.5);
+  g.fillStyle(0xfff3c4, 1);
+  g.fillRect(x - 0.8, y - r - 15, 1.6, 6);
+}
+
 /** A tower's stone plinth on its hedge, with its weapon turned to `aim` and a pip per level. */
 export function tower(g: G, kind: TowerKind, x: number, y: number, level: number, aim = 0, alpha = 1) {
+  if (kind === 'wicket') return wicket(g, x, y, false, alpha);
   hedge(g, x, y, alpha);
   if (kind === 'hedge') return;
   shadow(g, () => g.fillCircle(x + 2, y + 3, 14));

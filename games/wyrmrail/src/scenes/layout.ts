@@ -60,16 +60,15 @@ export function placeBoard(width: number, height: number) {
 }
 /** The order cards, by their centres: room for four, three orders and a workshop's goods. */
 export const ORDER_CARD = { y: 106, h: 62, gap: 6 };
-/** The Upgrades heading, the upgrade buttons (moved down with the view's bottom edge in a taller view), the Depot toggle and the Remove and Plain track toggles (side by side, `half` wide), by their centres. */
-export const UPGRADES_Y = 353;
-export const BUTTONS = { wings: 377, hoard: 411, second: 445, depot: 479, remove: 513, h: 30, half: (PANEL.w - 6) / 2 };
+/** The upgrade buttons (moved down with the view's bottom edge in a taller view), the Depot and Fast track toggles and the Remove and Plain track toggles (side by side, `half` wide), by their centres. */
+export const BUTTONS = { wings: 360, hoard: 391, second: 422, depot: 453, fast: 484, remove: 515, h: 28, half: (PANEL.w - 6) / 2 };
 /** The charter cards on the board at a round's start: two side by side, by their centres. */
 export const CHARTER_CARD = { y: 250, w: 300, h: 110, gap: 20 };
 /** The hint line, up from the view's bottom edge. */
 export const HINT_BOTTOM = 22;
 /** The end panel's buttons, in the designed view (centred in a bigger board): the last row's centre line, each button's size, the room between two and between rows. */
 export const END_BUTTON = { y: 330, w: 200, h: 44, gap: 12, step: 54 };
-/** A moult's trait cards on the board, side by side, by their centres (WR16). */
+/** A moult's trait cards on the board, side by side, by their centres (WR16); the wagon cards (WR21) use the same places. */
 export const MOULT_CARD = { y: 250, w: 220, h: 120, gap: 16 };
 /** The daily valley's link in the board's top left corner (WR17). */
 export const DAILY_LINK = { x: 14, y: 10 };

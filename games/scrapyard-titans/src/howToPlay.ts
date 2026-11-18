@@ -15,6 +15,7 @@ const en: HowToPlay = {
     { input: 'Tap the panel under the list', action: 'Switch between the last fight’s damage and your power cards' },
     { input: 'X, or Buy XP', action: '4 XP for 4 gold; each level lets one more robot fight' },
     { input: 'Space, or FIGHT!', action: 'Start the fight; during a fight, use your commander’s skill' },
+    { input: 'V, or Overdrive (right of Speed)', action: 'Once your robots have charged it by dealing damage, fire your commander’s overdrive' },
     { input: 'T, or Speed', action: 'Watch fights at 1x or 2x' },
     { input: '1, 2 or 3', action: 'Pick a power card when one is offered' },
     { input: 'G, or Pass and Give left of the bench (duo mode)', action: 'Hand the selected robot to your partner, or give it 2 gold' },
@@ -24,7 +25,7 @@ const en: HowToPlay = {
     'Pick a commander, a season (or this week’s, the next campaign lobby or today’s daily lobby), whether the board has terrain tiles, and whether to play as a duo.',
     'Buy robots from the shop with your gold.',
     'Place them on your half of the board: tanks in front, shooters behind.',
-    'Press FIGHT! and watch them battle on their own.',
+    'Press FIGHT! and watch them battle; use your commander’s skill, and its overdrive once charged.',
     'Earn gold and XP each round, merge three copies into a stronger robot, and repeat.',
   ],
   tips: [
@@ -44,6 +45,9 @@ const en: HowToPlay = {
     'Win a match and its final board is saved: in later matches it comes back as a ghost in round 4-7, in place of the monsters.',
     'Each campaign lobby you clear unlocks a chassis or a weapon for the workshop. Build up to three named robots there: they cost 3 gold, wear a gold stripe and join the shops of your later matches.',
     'The daily lobby is the same for everyone today: its season, terrain, rivals, loaned commander and your shops all come from the date. You get one try a day.',
+    'Every commander has an overdrive as well as a skill: a shield wave, an EMP on the enemy front row or a repair burst. It fills as your robots deal damage, once per fight.',
+    'From stage 2, each stage draws a stage event that changes every fight in it, like a scrap storm that slows shooters or a magnet that pulls robots to the middle. The top bar names it.',
+    'When only two commanders are left they play the finals: a best of three with planning between fights and no health lost. Win two fights to win the match.',
     'In duo mode you and Baron Bolt are a team against three other pairs: you share one bigger health bar, never fight each other, and the last team standing wins. Pass him robots you don’t need, or gold, during planning.',
   ],
 };
@@ -61,6 +65,7 @@ const de: HowToPlay = {
     { input: 'Das Feld unter der Liste antippen', action: 'Zwischen dem Schaden des letzten Kampfs und deinen Machtkarten wechseln' },
     { input: 'X, oder XP für 4', action: '4 XP für 4 Gold; jede Stufe lässt einen Roboter mehr kämpfen' },
     { input: 'Leertaste, oder KAMPF!', action: 'Den Kampf starten; im Kampf die Fähigkeit deines Kommandanten nutzen' },
+    { input: 'V, oder Overdrive (rechts neben Tempo)', action: 'Den Overdrive deines Kommandanten auslösen, sobald deine Roboter ihn mit Schaden aufgeladen haben' },
     { input: 'T, oder Tempo', action: 'Kämpfe mit 1x oder 2x ansehen' },
     { input: '1, 2 oder 3', action: 'Eine Machtkarte wählen, wenn eine angeboten wird' },
     { input: 'G, oder Geben links neben der Bank (Duo)', action: 'Den ausgewählten Roboter deinem Partner geben, oder ihm 2 Gold geben' },
@@ -70,7 +75,7 @@ const de: HowToPlay = {
     'Wähle einen Kommandanten, eine Saison (oder die der Woche, die nächste Kampagnen-Lobby oder die heutige Tageslobby), ob das Brett Geländefelder hat und ob du im Duo spielst.',
     'Kaufe mit deinem Gold Roboter im Shop.',
     'Stelle sie auf deine Bretthälfte: Tanks nach vorn, Schützen nach hinten.',
-    'Drücke KAMPF! und sieh zu, wie sie von selbst kämpfen.',
+    'Drücke KAMPF! und sieh zu, wie sie kämpfen; nutze die Fähigkeit deines Kommandanten und, sobald geladen, seinen Overdrive.',
     'Verdiene jede Runde Gold und XP, verschmelze drei Kopien zu einem stärkeren Roboter und wiederhole.',
   ],
   tips: [
@@ -90,6 +95,9 @@ const de: HowToPlay = {
     'Gewinnst du ein Match, wird sein letztes Brett gespeichert: In späteren Matches kehrt es in Runde 4-7 als Geist zurück, statt der Monster.',
     'Jede geschaffte Kampagnen-Lobby schaltet ein Fahrwerk oder eine Waffe für die Werkstatt frei. Baue dort bis zu drei Roboter mit eigenem Namen: Sie kosten 3 Gold, tragen einen goldenen Streifen und kommen in die Shops deiner späteren Partien.',
     'Die Tageslobby ist heute für alle gleich: Saison, Gelände, Rivalen, der geliehene Kommandant und deine Shops ergeben sich aus dem Datum. Du hast einen Versuch pro Tag.',
+    'Jeder Kommandant hat neben seiner Fähigkeit einen Overdrive: eine Schildwelle, einen EMP auf die vorderste Gegnerreihe oder einen Reparaturstoß. Er lädt sich mit dem Schaden deiner Roboter auf, einmal pro Kampf.',
+    'Ab Stufe 2 zieht jede Stufe ein Stufenereignis, das jeden Kampf darin verändert, etwa einen Schrottsturm, der Schützen bremst, oder ein Magnetfeld, das Roboter zur Mitte zieht. Die obere Leiste nennt es.',
+    'Sind nur noch zwei Kommandanten übrig, spielen sie das Finale: Best of three mit Planung zwischen den Kämpfen und ohne Lebensverlust. Wer zwei Kämpfe gewinnt, gewinnt das Match.',
     'Im Duo bildest du mit Baron Bolzen ein Team gegen drei andere Paare: Ihr teilt eine größere Lebensleiste, kämpft nie gegeneinander, und das letzte Team gewinnt. Gib ihm beim Planen Roboter, die du nicht brauchst, oder Gold.',
   ],
 };

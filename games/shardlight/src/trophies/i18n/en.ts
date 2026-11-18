@@ -21,6 +21,8 @@ const en = {
   allStarsText: 'Earn three stars on every window of a chapel.',
   allChapels: 'Master glazier',
   allChapelsText: 'Restore every window of all five chapels.',
+  clerestory: 'Endless light',
+  clerestoryText: 'Restore 5 windows in a row in the clerestory.',
 };
 
 export default en;

@@ -51,7 +51,12 @@ interface Undo {
   halfmove: number;
 }
 
-export type Result = { kind: 'mate'; winner: Side } | { kind: 'draw'; reason: 'stalemate' | 'material' | 'fifty' | 'repetition' } | null;
+export type Result =
+  | { kind: 'mate'; winner: Side }
+  /** A clock ran out (only a game with clocks): the other side wins. */
+  | { kind: 'time'; winner: Side }
+  | { kind: 'draw'; reason: 'stalemate' | 'material' | 'fifty' | 'repetition' | 'timeout' }
+  | null;
 
 const row = (sq: number) => sq >> 3;
 const col = (sq: number) => sq & 7;
@@ -83,7 +88,11 @@ export const squareAt = (name: string) => (8 - Number(name[1])) * 8 + 'abcdefgh'
 /** A move as `e2e4` (with the promotion letter, `e7e8q`), how saves keep it. */
 export const moveText = (m: Move) => squareName(m.from) + squareName(m.to) + (m.promo ? kindOf(m.promo) : '');
 
-const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR';
+/** The usual starting position, in FEN (pieces, side to move, castling, en passant). */
+export const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -';
+
+/** A start with `rank` (Black's back row as letters, like `rnbqkbnr`) behind the pawns, mirrored for White. */
+export const startWith = (rank: string) => `${rank}/pppppppp/8/8/8/8/PPPPPPPP/${rank.toUpperCase()} w KQkq -`;
 
 export class Position {
   board = new Array<number>(64).fill(0);
@@ -98,9 +107,12 @@ export class Position {
   /** A key for each position reached, for threefold repetition. */
   keys: string[] = [];
 
-  constructor() {
+  /** A position from FEN: the pieces, then optionally the side to move, castling and en passant. */
+  constructor(readonly start = START) {
+    const fen = start;
+    const [pieces, turn = 'w', castles = '-', ep = '-'] = fen.trim().split(/\s+/);
     let sq = 0;
-    for (const ch of START) {
+    for (const ch of pieces) {
       if (ch === '/') continue;
       if (/\d/.test(ch)) sq += Number(ch);
       else {
@@ -108,7 +120,34 @@ export class Position {
         this.board[sq++] = pieceOf(kind, ch === kind ? 'b' : 'w');
       }
     }
+    this.turn = turn === 'b' ? 'b' : 'w';
+    this.castling = (castles.includes('K') ? WK : 0) | (castles.includes('Q') ? WQ : 0) | (castles.includes('k') ? BK : 0) | (castles.includes('q') ? BQ : 0);
+    this.ep = ep !== '-' && /^[a-h][36]$/.test(ep) ? squareAt(ep) : -1;
     this.keys.push(this.key());
+  }
+
+  /** The position as FEN (pieces, side to move, castling, en passant), as a save keeps a start. */
+  fen() {
+    const rows: string[] = [];
+    for (let r = 0; r < 8; r++) {
+      let text = '';
+      let empty = 0;
+      for (let c = 0; c < 8; c++) {
+        const p = this.board[r * 8 + c];
+        if (!p) {
+          empty++;
+          continue;
+        }
+        if (empty) text += empty;
+        empty = 0;
+        const k = kindOf(p);
+        text += sideOf(p) === 'w' ? k.toUpperCase() : k;
+      }
+      rows.push(text + (empty ? empty : ''));
+    }
+    const c = this.castling;
+    const castles = (c & WK ? 'K' : '') + (c & WQ ? 'Q' : '') + (c & BK ? 'k' : '') + (c & BQ ? 'q' : '') || '-';
+    return `${rows.join('/')} ${this.turn} ${castles} ${this.ep >= 0 ? squareName(this.ep) : '-'}`;
   }
 
   /** The position as text for repetition and the deep search's table: pieces, side to move, castling and en passant. */
@@ -230,10 +269,11 @@ export class Position {
     if (from !== home || this.attacked(home, enemy)) return;
     const [kRight, qRight] = side === 'w' ? [WK, WQ] : [BK, BQ];
     const piece = b[from];
-    if (this.castling & kRight && !b[home + 1] && !b[home + 2] && !this.attacked(home + 1, enemy) && !this.attacked(home + 2, enemy)) {
+    const rook = ROOK + (side === 'b' ? BLACK : 0);
+    if (this.castling & kRight && b[home + 3] === rook && !b[home + 1] && !b[home + 2] && !this.attacked(home + 1, enemy) && !this.attacked(home + 2, enemy)) {
       moves.push({ from, to: home + 2, piece, captured: 0, capturedAt: home + 2, promo: 0, flag: Flag.CastleKing });
     }
-    if (this.castling & qRight && !b[home - 1] && !b[home - 2] && !b[home - 3] && !this.attacked(home - 1, enemy) && !this.attacked(home - 2, enemy)) {
+    if (this.castling & qRight && b[home - 4] === rook && !b[home - 1] && !b[home - 2] && !b[home - 3] && !this.attacked(home - 1, enemy) && !this.attacked(home - 2, enemy)) {
       moves.push({ from, to: home - 2, piece, captured: 0, capturedAt: home - 2, promo: 0, flag: Flag.CastleQueen });
     }
   }

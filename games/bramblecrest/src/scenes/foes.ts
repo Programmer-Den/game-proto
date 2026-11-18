@@ -1,7 +1,8 @@
 // The things that bite back: slugs, moths, thornlings, frogs, shelled beetles, lantern moths and
 // shades, the thornlings' seeds and the lantern moths' embers, the Thornmother at the bottom of the
 // shrine with her three bulbs, the Bellwraith in the belfry, the Gloamwing in the Glass Caverns,
-// rock crabs and storm gulls on the coast, the Brinewyrm in the Brine Grotto, and the bestiary's families.
+// rock crabs and storm gulls on the coast, the iron knights of the later dungeons, the Brinewyrm in the
+// Brine Grotto, and the bestiary's families.
 
 import Phaser from 'phaser';
 import { texScale } from '../art/paint';
@@ -29,17 +30,31 @@ export const FOES: Record<EnemyKind, FoeInfo> = {
   shade: { hp: 2, speed: 60, sees: 190, damage: 1, flies: true },
   crab: { hp: 2, speed: 46, sees: 170, damage: 1 },
   gull: { hp: 1, speed: 96, sees: 230, damage: 1, flies: true },
+  knight: { hp: 3, speed: 46, sees: 180, damage: 1 },
 };
+
+/**
+ * The iron knights of the later dungeons: their plate turns every blade, bellseed and hookvine. One
+ * walks up to the knight, raises its sword for `windMs` and strikes within `reach` (`damage` half
+ * hearts); a sword swing in the last `parryMs` of the wind-up parries it, and the iron knight reels
+ * off balance for `staggerMs`, when the sword bites. It rests `restMs` between strikes. A swing that
+ * rings off its guard can't parry for `lockMs`, so only a timed swing works, not mashing.
+ */
+export const KNIGHT = { reach: 46, windMs: 820, parryMs: 420, staggerMs: 1500, restMs: 1000, damage: 2, lockMs: 450 };
+
+/** A fish thrown into the water (`GameScene.throwBait`): foes this close go for it, this fast, until it sinks. */
+export const LURE = { range: 220, ms: 5000, speed: 70 };
 
 /**
  * The bestiary: every kind of foe in a family. Beating `PAGE_AT` of a kind fills its page; a family
  * whose pages are all filled drops one more coin from each of its foes (`familyDone`).
  */
-export type FamilyId = 'crawlers' | 'moths' | 'wilds';
+export type FamilyId = 'crawlers' | 'moths' | 'wilds' | 'iron';
 export const FAMILIES: { id: FamilyId; kinds: EnemyKind[] }[] = [
   { id: 'crawlers', kinds: ['slug', 'beetle', 'crab'] },
   { id: 'moths', kinds: ['moth', 'lantern', 'shade'] },
   { id: 'wilds', kinds: ['thornling', 'frog', 'gull'] },
+  { id: 'iron', kinds: ['knight'] },
 ];
 export const PAGE_AT = 3;
 
@@ -182,8 +197,10 @@ export interface Foe {
   room?: string;
   /** A frog's leap: time left in it. */
   leap: number;
-  /** An armoured foe knocked down (a beetle on its back, a lantern moth on the ground): time left. */
+  /** An armoured foe knocked down (a beetle on its back, a lantern moth on the ground), or an iron knight reeling from a parry: time left. */
   down: number;
+  /** An iron knight's raised sword: time left before it strikes. */
+  strike: number;
   /** Its place in the map's list, for remembering shrine foes that are beaten. */
   index: number;
   alive: boolean;
@@ -239,7 +256,7 @@ export function foeFree(map: MapDef, extra: (tx: number, ty: number) => boolean,
 export function makeFoe(scene: Phaser.Scene, kind: EnemyKind, x: number, y: number, index: number, room?: string): Foe {
   const key = kind === 'moth' ? 'moth-a' : kind === 'lantern' ? 'lantern-a' : kind;
   const sprite = scene.add.image(x, y, key).setOrigin(0.5, 0.85).setScale(texScale(key));
-  return { kind, x, y, hp: FOES[kind].hp, sprite, home: { x, y }, dir: { x: 0, y: 0 }, t: Math.random() * 1500, stun: 0, hurt: 0, room, leap: 0, down: 0, index, alive: true };
+  return { kind, x, y, hp: FOES[kind].hp, sprite, home: { x, y }, dir: { x: 0, y: 0 }, t: Math.random() * 1500, stun: 0, hurt: 0, room, leap: 0, down: 0, strike: 0, index, alive: true };
 }
 
 /** The Bellwraith's bell: hovering after the knight, dropping, lying on the floor, tipped over to
@@ -267,4 +284,9 @@ export interface Bomb {
   y: number;
   t: number;
   sprite: Phaser.GameObjects.Image;
+  /** Flung by the hookvine: the way it flies and how far it has left to go. */
+  fly?: { dx: number; dy: number; left: number; from: number };
 }
+
+/** A bellseed caught on the hookvine flies this far, this fast, over water and pits, until a wall stops it. */
+export const FLING = { px: 200, speed: 360, arc: 26 };

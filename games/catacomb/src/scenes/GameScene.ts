@@ -44,6 +44,7 @@ import {
   lastAct,
   leaveShop,
   newRun,
+  pickBossRelic,
   playCard,
   removeCard,
   rest,
@@ -58,15 +59,17 @@ import {
   takeReward,
   temperCard,
   tick,
+  turnEnergy,
   useFlask,
   walkTo,
   weeklyHero,
 } from '../game/sim';
-import { ENERGY, HAND_SIZE, POP_MS, WALK_MS, type Enemy, type GameState, type Status } from '../game/state';
+import { HAND_SIZE, POP_MS, WALK_MS, type Enemy, type GameState, type Status } from '../game/state';
 import { checkTrophies } from '../trophies/check';
 import { makeButton } from '../ui/Button';
 import { makeCard } from '../ui/CardView';
 import {
+  BOSS_PANEL,
   BUTTON,
   END_TURN,
   ENERGY_ORB,
@@ -88,6 +91,7 @@ import {
   POWERS,
   REST_BUTTONS,
   REWARD,
+  REWARD_TWO,
   ROOM_RADIUS,
   SHOP,
   SKIP,
@@ -240,6 +244,8 @@ export class GameScene extends Phaser.Scene {
   private heroPics: Phaser.GameObjects.Image[] = [];
   private heroButtons: Phaser.GameObjects.Container[] = [];
   private heroCaptions: Phaser.GameObjects.Text[] = [];
+  /** On the descent panel: the boss relics on offer, each a box with its icon, name and text. */
+  private bossBoxes: { bg: Phaser.GameObjects.Rectangle; pic: Phaser.GameObjects.Image; name: Phaser.GameObjects.Text; text: Phaser.GameObjects.Text }[] = [];
   private dailyButton!: Phaser.GameObjects.Container;
   private weeklyButton!: Phaser.GameObjects.Container;
   /** The library before a run: the starting deck and the library's cards, rebuilt when the deck or the pick changes. */
@@ -264,6 +270,8 @@ export class GameScene extends Phaser.Scene {
   private hpText!: Phaser.GameObjects.Text;
   private deckText!: Phaser.GameObjects.Text;
   private goldText!: Phaser.GameObjects.Text;
+  /** The vault's key in the top bar, while carried. */
+  private keyIcon!: Phaser.GameObjects.Image;
   private roomText!: Phaser.GameObjects.Text;
   private relicLayer!: Phaser.GameObjects.Container;
   /** The top bar's room text and relic count it was last laid out for. */
@@ -394,7 +402,8 @@ export class GameScene extends Phaser.Scene {
     this.buildRooms();
     const s = this.state;
     const rooms = s.rooms;
-    const next = s.phase === 'map' ? reachable(rooms, s.at) : [];
+    // A locked vault is not lit as a room to enter until the key is carried.
+    const next = s.phase === 'map' ? reachable(rooms, s.at).filter((i) => rooms[i].kind !== 'vault' || s.vaultKey) : [];
     const g = this.paths.clear();
     // Dotted paths between rooms; the ones walked are lit.
     const walked = new Set(s.cleared.map((r, i) => `${i === 0 ? -1 : s.cleared[i - 1]}>${r}`));
@@ -527,9 +536,11 @@ export class GameScene extends Phaser.Scene {
     this.drawHand();
     this.drawFlasks();
     this.drawPowers();
-    this.energyText.setText(f ? `${f.energy}/${ENERGY}` : '');
+    this.energyText.setText(f ? `${f.energy}/${turnEnergy(s)}` : '');
     this.drawText.setText(f ? t('drawPile', { n: f.draw.length }) : '');
-    this.discardText.setText(f ? t('discardPile', { n: f.discard.length }) : '');
+    // The Exhaust cards played this fight are counted under the discard pile.
+    const exhausted = f?.exhausted.length ? `\n${t('exhaustedPile', { n: f.exhausted.length })}` : '';
+    this.discardText.setText(f ? t('discardPile', { n: f.discard.length }) + exhausted : '');
     this.endTurnButton.setVisible(s.phase === 'player').setAlpha(s.phase === 'player' ? 1 : 0.4);
     const opening = f && f.turn === 1 && s.phase === 'player' && f.discard.length === 0 && f.hand.length === HAND_SIZE;
     const banner = s.phase === 'enemy' ? t('foesTurn') : s.phase === 'cleared' ? t('victory') : opening ? t('yourTurn') : '';
@@ -674,11 +685,12 @@ export class GameScene extends Phaser.Scene {
     if (!choices) return;
     const kind = s.rooms[s.at!]?.kind;
     const gold = !s.goldWon ? '' : s.flaskWon ? t('goldAndFlask', { n: s.goldWon, flask: t(FLASKS[s.flaskWon].name) }) : t('goldWon', { n: s.goldWon });
-    this.rewardTitle.setText(
-      kind === 'treasure' ? t('treasureReward') : kind === 'event' ? t('altarReward') : t(s.rewardRare ? 'eliteReward' : 'cardReward', { gold }),
-    );
+    const title =
+      kind === 'treasure' ? t('treasureReward') : kind === 'vault' ? t('vaultReward') : kind === 'event' ? t('altarReward') : t(s.rewardRare ? 'eliteReward' : 'cardReward', { gold });
+    this.rewardTitle.setText(s.keyWon ? `${t('keyWon')}\n${title}` : title);
+    const xs = choices.length === 2 ? REWARD_TWO : REWARD.xs;
     choices.forEach((id, i) => {
-      const x = REWARD.xs[i];
+      const x = xs[i];
       const { view, bg } = makeCard(this, id, x, REWARD.y, REWARD.scale);
       view.setData('card', true);
       bg.setInteractive({ useHandCursor: true })
@@ -804,8 +816,18 @@ export class GameScene extends Phaser.Scene {
     for (const b of [this.dailyButton, this.weeklyButton]) (b.list[1] as Phaser.GameObjects.Text).setFontSize(15);
     this.depthButtons = [-1, 1].map((d) => makeButton(this, VIEW.w / 2 + d * HERO_PANEL.depthDx, HERO_PANEL.depthY, d < 0 ? '<' : '>', () => this.act(setDepth(this.state, this.state.depth + d), 'ratchet'), 44));
     this.depthText = this.add.text(VIEW.w / 2, HERO_PANEL.depthY, '', textStyle(20, '#e6c766')).setOrigin(0.5);
+    // The descent panel's boss relics: tap one to pick it (again to put it back), then Descend.
+    this.bossBoxes = BOSS_PANEL.xs.map((x, i) => {
+      const { y, w, h } = BOSS_PANEL;
+      const bg = this.add.rectangle(x, y, w, h, 0x1e1a24).setStrokeStyle(3, 0x5a5366);
+      bg.setInteractive({ useHandCursor: true }).on('pointerdown', () => this.act(pickBossRelic(this.state, i), 'click'));
+      const pic = artImage(this, x - w / 2 + 34, y - h / 2 + 32, relicIcon('emberCrown', true));
+      const name = this.add.text(x - w / 2 + 66, y - h / 2 + 32, '', textStyle(16, '#e6c766')).setOrigin(0, 0.5);
+      const text = this.add.text(x - w / 2 + 12, y - h / 2 + 62, '', { fontFamily: FONT, fontSize: '14px', color: '#f1e3c6', wordWrap: { width: w - 24 } });
+      return { bg, pic, name, text };
+    });
     this.panel = this.add
-      .container(this.fx, this.fy, [dim, box, this.panelTitle, this.panelText, this.panelButton, this.temperButton, this.removeButton, ...this.choiceButtons, ...this.heroPics, ...this.heroButtons, ...this.heroCaptions, this.dailyButton, this.weeklyButton, ...this.depthButtons, this.depthText])
+      .container(this.fx, this.fy, [dim, box, this.panelTitle, this.panelText, this.panelButton, this.temperButton, this.removeButton, ...this.choiceButtons, ...this.heroPics, ...this.heroButtons, ...this.heroCaptions, this.dailyButton, this.weeklyButton, ...this.depthButtons, this.depthText, ...this.bossBoxes.flatMap((b) => [b.bg, b.pic, b.name, b.text])])
       .setDepth(UI_DEPTH + 20)
       .setVisible(false);
   }
@@ -829,9 +851,23 @@ export class GameScene extends Phaser.Scene {
     const ladder = heroes && s.bestDepth > 0;
     this.depthText.setVisible(ladder).setText(t('depth', { n: s.depth }));
     this.depthButtons.forEach((b, i) => b.setVisible(ladder).setAlpha((i === 0 ? s.depth > 0 : s.depth < s.bestDepth) ? 1 : 0.4));
-    this.panelBox.setSize(heroes ? HERO_PANEL.box.w : 580, heroes ? HERO_PANEL.box.h : 290).setOrigin(0.5);
-    this.panelTitle.setY(heroes ? HERO_PANEL.titleY : VIEW.h / 2 - 100);
-    this.panelText.setWordWrapWidth(520).setY(heroes ? HERO_PANEL.rulesY : VIEW.h / 2 - 26);
+    // The descent panel is bigger, with the boss relics on offer in a row.
+    const offers = s.phase === 'descend' ? (s.bossRelics ?? []) : [];
+    const boss = offers.length > 0;
+    this.bossBoxes.forEach((b, i) => {
+      const id = offers[i];
+      for (const item of [b.bg, b.pic, b.name, b.text]) item.setVisible(!!id);
+      if (!id) return;
+      b.bg.setStrokeStyle(s.bossPick === i ? 5 : 3, s.bossPick === i ? GOLD.light : 0x5a5366);
+      b.pic.setTexture(relicIcon(id, true));
+      b.name.setText(t(RELICS[id].name));
+      b.text.setText(relicText(id));
+    });
+    const size = heroes ? HERO_PANEL.box : boss ? BOSS_PANEL.box : { w: 580, h: 290 };
+    this.panelBox.setSize(size.w, size.h).setOrigin(0.5);
+    this.panelTitle.setY(heroes ? HERO_PANEL.titleY : boss ? BOSS_PANEL.titleY : VIEW.h / 2 - 100);
+    this.panelText.setWordWrapWidth(boss ? 760 : 520).setY(heroes ? HERO_PANEL.rulesY : boss ? BOSS_PANEL.textY : VIEW.h / 2 - 26);
+    this.panelButton.setY(boss ? BOSS_PANEL.buttonY : PANEL_BUTTON.y);
     if (!heroes && this.panelText.style.fontSize !== '16px') this.panelText.setFontSize(16);
     if (heroes) {
       this.panelTitle.setText(t('chooseHero')).setColor('#e6c766');
@@ -881,7 +917,8 @@ export class GameScene extends Phaser.Scene {
       // The Bone King's fall leads down to the Tombs; from depth 3 the Hollow Queen's leads up the Bone Spire.
       const spire = s.act >= 2;
       this.panelTitle.setText(t(spire ? 'hollowQueenFalls' : 'boneKingFalls')).setColor('#e6c766');
-      this.panelText.setText(t(spire ? 'spireUp' : 'stairDown', { notice: s.notice }));
+      const down = t(spire ? 'spireUp' : 'stairDown', { notice: s.notice }).trim();
+      this.panelText.setText(boss ? `${down}\n${t('bossRelicHint')}` : down);
       caption.setText(t(spire ? 'climb' : 'descend'));
       this.panelAction = () => this.act(descend(this.state), 'descend');
     } else {
@@ -1019,7 +1056,7 @@ export class GameScene extends Phaser.Scene {
       });
       add(view);
     });
-    const C = LIBRARY.cards;
+    const C = shelf.length > LIBRARY.cards.perRow * 2 ? LIBRARY.dense : LIBRARY.cards;
     shelf.forEach((id: BaseId, i) => {
       const row = Math.floor(i / C.perRow);
       const inRow = Math.min(C.perRow, shelf.length - row * C.perRow);
@@ -1073,6 +1110,7 @@ export class GameScene extends Phaser.Scene {
     this.deckText = this.add.text(HUD.deckX, 12, '', textStyle(15)).setDepth(UI_DEPTH + 1);
     artImage(this, HUD.coinX, HUD_HEIGHT / 2, 'coin').setDepth(UI_DEPTH + 1);
     this.goldText = this.add.text(HUD.goldX, 10, '', textStyle(18, '#e6c766')).setDepth(UI_DEPTH + 1);
+    this.keyIcon = artImage(this, HUD.keyX, HUD_HEIGHT / 2, 'key').setDepth(UI_DEPTH + 1).setVisible(false);
     this.relicLayer = this.add.container(0, 0).setDepth(UI_DEPTH + 1);
     this.roomText = this.add.text(this.W - 16, 12, '', textStyle(15, '#e6c766')).setOrigin(1, 0).setDepth(UI_DEPTH + 1);
     this.tip = this.add
@@ -1100,6 +1138,7 @@ export class GameScene extends Phaser.Scene {
     this.hpText.setText(`${s.hp}/${s.maxHp}`);
     this.deckText.setText(t('deck', { n: s.deck.length }));
     this.goldText.setText(String(s.gold));
+    this.keyIcon.setVisible(s.vaultKey);
     const relicKey = s.relics.join();
     if (relicKey !== this.relicKey) {
       this.relicKey = relicKey;
@@ -1113,7 +1152,7 @@ export class GameScene extends Phaser.Scene {
     this.tip.setVisible(this.tipMs > 0);
     const room = s.at === null ? null : s.rooms[s.at];
     const depth = room ? room.col + 1 : 0;
-    const names: Record<string, TextKey> = { rest: 'campfireRoom', treasure: 'treasureRoom', shop: 'merchantRoom', event: 'mysteryRoom' };
+    const names: Record<string, TextKey> = { rest: 'campfireRoom', treasure: 'treasureRoom', shop: 'merchantRoom', event: 'mysteryRoom', vault: 'vaultRoom' };
     const name = room?.foes ? room.foes.map((k) => t(ENEMIES[k].name)).reduce((a, b) => t('and', { a, b })) : t(room ? names[room.kind] : 'entrance');
     const where = s.phase === 'map' || s.phase === 'walk' || s.phase === 'hero' || s.phase === 'library' ? '' : name;
     const deep = s.weekly ? `${t('weeklyBar')}   ` : s.daily ? `${t('dailyBar')}   ` : s.depth > 0 ? `${t('depth', { n: s.depth })}   ` : '';

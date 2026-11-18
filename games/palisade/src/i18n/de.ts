@@ -410,6 +410,48 @@ const de: Translation<typeof en> = {
   endlessOpenNew: 'Endlose Belagerung: halte über Welle 30 hinaus stand, während jede Welle stärker wird.',
   endlessChipNew: 'Endlos',
   endlessFallenNew: 'Endlose Belagerung auf dieser Karte: noch keine Welle nach 30 gehalten.',
+
+  // Weather by wave
+  weatherRainName: 'Regen',
+  weatherRainText: 'Brennen hält nur halb so lange; der Schlamm bremst Feinde zu Fuß um 10 %',
+  weatherWindName: 'Sturm',
+  weatherWindText: 'Schüsse fliegen langsamer; der Pfeilregen weht zur Mauer zurück, auf einen weiteren Ring',
+  weatherFogName: 'Nebel',
+  weatherFogText: 'Feinde bleiben bis drei Viertel des Wegs unsichtbar; Siege bringen 25 % mehr Münzen',
+  clearSky: 'Klar',
+  weatherChip: 'Jetzt {now} · nächste Welle {next}',
+
+  // Wayside events
+  eventTitle: 'Am Weg vor Welle {wave}: {event}',
+  scoutName: 'Ein verwundeter Späher',
+  scoutText: 'Pflege ihn, und er dient dir als Speerträger (oder bildet eine Wache aus). Schick ihn weiter, und er erkundet den Weg: Die Feinde der nächsten Welle haben {n} % weniger Leben.',
+  scoutTake: 'Pflegen',
+  scoutLeave: 'Weiterschicken',
+  peddlerName: 'Ein Hausierer',
+  peddlerText: 'Er bietet {relic} an: {text}. Es kostet die Hälfte deiner Münzen.',
+  peddlerTake: 'Kaufen für {n}',
+  shrineName: 'Ein Wegschrein',
+  shrineText: 'Bete um einen Segen und einen Fluch, beide für {n} Wellen: {blessing} ({blessingText}) und {curse} ({curseText}).',
+  shrineTake: 'Beten',
+  passBy: 'Weitergehen',
+  eventLeft: 'Ohne Wahl geht es vorüber.',
+  mightName: 'Macht',
+  mightText: '25 % mehr Schaden',
+  swiftBlessName: 'Flinke Hände',
+  swiftBlessText: '20 % schnellere Schüsse',
+  fortuneName: 'Glück',
+  fortuneText: '40 % mehr Münzen',
+  restlessName: 'Rastlos',
+  restlessText: 'Feinde 15 % schneller',
+  brittleName: 'Brüchig',
+  brittleText: 'die Barrikade nimmt 30 % mehr Schaden',
+  dimName: 'Trüb',
+  dimText: '25 % weniger Erfahrung',
+  shrineChip: { one: '{blessing} · {curse}: {n} Welle', other: '{blessing} · {curse}: {n} Wellen' },
+  scoutedChip: 'Erkundet: schwächere Feinde',
+
+  // Marking a foe
+  markHint: 'Tippe einen Feind an, um ihn zu markieren ({n} Pfeilregen-Ladung)',
 };
 
 export default de;

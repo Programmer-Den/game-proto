@@ -2,7 +2,7 @@ import { MODES, RELICS } from './catalog';
 import { NODES } from './journey';
 import { KINDS, LEVELS } from './kinds';
 import { MAX_MASTERY, newProgress, type Progress } from './progress';
-import { makeCurrent, type Card, type Run } from './run';
+import { makeCurrent, reveal, type Card, type Run } from './run';
 
 // Augury keeps two keys: the records (per kind and per mode) and the last daily five, and the run
 // in play (not Practice), saved whenever it moves on between puzzles.
@@ -84,12 +84,19 @@ export function loadRun(progress: Progress): Run | null {
       Array.isArray(run.queue) && run.queue.every(isCard) &&
       Array.isArray(run.results) && run.results.every((r: any) => isCard(r?.card)) &&
       Array.isArray(run.draftOffer) && run.draftOffer.every(isCard) &&
+      (run.pick == null || isCard(run.pick)) &&
       Array.isArray(run.relics) && [...run.relics, ...(run.relicOffer ?? [])].every((r: string) => (RELICS as readonly string[]).includes(r)) &&
       (run.phase !== 'playing' || isCard(run.current?.pair ?? run.current?.card));
     if (!ok) return clearRun(), null;
     // A boss in play starts again from its first half.
     const card = run.current?.pair ?? run.current?.card;
     run.current = isCard(card) ? makeCurrent(run, card) : null;
+    // Runs saved before dares, rematches and challenge codes have none of them.
+    run.pick = run.pick ?? null;
+    run.seed = Number.isFinite(run.seed) ? run.seed : 0;
+    run.challenge = Number.isFinite(run.challenge) ? run.challenge : null;
+    run.revealed = !!run.revealed && run.phase === 'between' && !!run.current;
+    if (run.revealed) reveal(run.current);
     // Runs saved before the daily five's ghost have neither list.
     const marks = (v: unknown) => (Array.isArray(v) ? v.filter((m) => Array.isArray(m) && m.every(Number.isFinite)) : []);
     run.marks = marks(run.marks);

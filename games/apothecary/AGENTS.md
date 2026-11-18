@@ -41,6 +41,8 @@ study, shade gardens and a mirrored second production line.
 - Round five (AP18 to AP20): the alchemy bench, herb expeditions and shop decor (see their entries
   under "How it runs"). No trophies were added for them: the game already lists ten, the most a
   game may have.
+- Round six (AP21 to AP23): night customers, the shop ledger and prime harvest (see their entries
+  under "How it runs"). No trophies either, for the same reason.
 - The town (the first of a planned series of PRs): once `state.seals > 0` (`townOpen`) a Town
   button left of Recipes opens the `Town` scene, a map of lot cards: the apothecary and one per shop
   in `SHOPS`. A shop costs `shopCost` (1,000 for the bakery, then ten times more each `tier`) and is
@@ -191,6 +193,21 @@ study, shade gardens and a mirrored second production line.
   `decorWalkOff` (`FOUNTAIN_WALK_OFF` on `REPUTATION_WALKED_OFF`). Each is 1 without the decor, so
   a new game plays exactly as before. `alchemy.ts` imports values from `state.ts` and `state.ts` only
   `createAlchemy` from it, which `createInitialState` calls.
+- `src/game/night.ts`: night customers (AP21), free of Phaser: `Night` (the `state.night` record:
+  `open`, the night sign; `left`, ms of the night under way, 0 by day; `nights` kept open; `came`
+  and `next` for tonight's folk; `folk`; `nextId`; `served`) and `createNight`, `NightFolk` (`kind`
+  of `FOLK_KINDS`, `want` a potion or a `MixId`, `pays` herbs or a seal, `walk` ms still to walk
+  in, `patience`), the numbers (`NIGHT_MS` 90s, `FIRST_FOLK_MS`, `FOLK_GAP_MS`, `FOLK_PER_NIGHT` 4,
+  `FOLK_WALK_MS`, `FOLK_PATIENCE`, `SAILOR_EVERY` 3, `WITCH_HERBS`, `FOLK_REPUTATION`,
+  `NIGHT_POTIONS`), `nightOpen` (`alchemyOpen`), `isNight`, `folkIn`, `hasWant`, and `toggleNight`,
+  `startNight`, `runNight` (returns true when the night is over) and `serveFolk`. Who comes and
+  what they want come from the night count and their place in the night (`folkFor`), never from
+  `rand`.
+- `src/game/ledger.ts`: the shop ledger (AP22): `Wait` (`input`, `room`, `hands`), `StationDay`,
+  `LedgerDay` (`day`, `stations`, `empty` ms per potion), `Ledger` (`today`, `yesterday`),
+  `createLedger`, `ledgerOpen` (a craftsman hired or a pixie route built), `turnPage` (a new page when
+  `contract.day` changes), `note`, `noteEmpty`, `idleOf`, `mostlyFor` and `slowest` (the station
+  with the smallest share of its day at work, with two or more written down).
 - `src/game/away.ts`: the autopilot. `catchUp(state, now, rand)` plays the time since `lastSeen`
   (capped at `AWAY_CAP_MS`, 2h; nothing under `AWAY_MIN_MS`, 60s) through `tick` in 500ms steps
   with nobody on a work spot and every customer at the counter, and returns an `AwaySummary`
@@ -361,8 +378,8 @@ study, shade gardens and a mirrored second production line.
   contents out afresh on `toggle(true)` and after every button pressed on it (`refresh`), with a
   `BoardKit` of `heading`, `text`, `icon`, `button` (its whole card takes the tap; faded and dead when disabled) and `next` line by
   line; its background goes under its parts and stops taps. `GameScene.boards` holds the bench's,
-  the courier's and the decor board's, and `closePanels` closes them like the others.
-- `src/art/alchemy.ts`: `bakeAlchemy` (called by `BootScene`) paints `alchemy-bench`,
+  the courier's, the decor board's and the ledger's, and `closePanels` closes them like the others.
+- `src/art/alchemy.ts`: `bakeAlchemy` (called by `BootScene`) paints the ledger book (`ledger`) and the town `seal` (AP21, AP22), `alchemy-bench`,
   `courier-post`, the wild herbs' and bench potions' icons (`alchemy-<id>`; the potions are
   `itemIcon` flasks, their colours and shapes in `ITEM_COL` and `POTION_SHAPES` in `paint.ts`) and
   `decor-<id>` for each piece of decor; `alchemyTexture(id)` gives an ingredient's or bench
@@ -609,6 +626,46 @@ study, shade gardens and a mirrored second production line.
   piece's name, bonus, cost and Buy, or "Put up"), and stands each bought piece's `decor-<id>` on the
   street: the painted sign and the fountain right of the path above the wagon's lines, the herb arch
   over the path and a lantern either side of it below.
+- Prime harvest (AP23, `PRIME_MS`, `inPrime`, `Plot.ripeMs`; `PrimeId`, `PRIME`, `isPrime`,
+  `unprimed`, `anyPlant`, `anyRefined` in `items.ts`): `tick` sets `ripeMs` to 0 on the frame a bed
+  grows ripe and deletes it once past `PRIME_MS` (5s); a new game's beds start ripe without it, so the
+  playthrough's harvest is plain. `harvest` in the window gives the `PRIME` plant. Prime items ride
+  only in the hands: `takeAnyFromBack` drops one as its plain kind and counts it in the station's
+  `primeIn`; `primeDone` (both refining pipes) moves a count to the table's `primeOut` for the good
+  made; `pickUpOne` hands the doctor a Prime good (or a Fine potion at a cauldron) while `primeOut`
+  holds one of the kind taken, and `keepPrime` cuts `primeOut` to what is left when a pixie route
+  takes one (pixies take plain ones first, in effect). `usePrime` in `startBrew` makes a brew `prime`
+  only when every input can be a Prime good, using them up (plain first otherwise), and `brew`
+  counts a finished prime brew in the cauldron's `primeOut`, so it is picked up Fine. `createPlots`
+  draws the window as a pulsing gold glow, ring and star with the plant tinted gold; `autoHarvest`
+  plays `fine` for a Prime plant. `itemIcon` paints a `prime*` item as its plain icon on a gold glow
+  with a sparkle; the drop markers a pixie route hid come back for a Prime plant or good in hand.
+- Shop ledger (AP22; layout `LEDGER`): `tick` calls `turnPage`, then notes every built table and
+  cauldron each step: at work, or waiting for `input` (nothing queued, or nothing it knows how to
+  brew), `room` (its pallets full) or `hands` (no crew), and the time each known potion's shelf
+  stands empty. The time away fills it too. `createLedger` lays the `ledger` book on the counter's
+  right end once `ledgerOpen`; a tap opens `drawLedger` (a `Board`, `LEDGER_W` wide, columns
+  `LEDGER_COLS`): yesterday's page when there is one, with Today and Yesterday buttons, the share
+  worked, the idle time and each wait of every station, the slowest in rust with "Slowest", and the
+  shelves that ran empty, longest first.
+- Night customers (AP21; layout `NIGHT_SIGN`): once `nightOpen`, `createNight` shows the tappable
+  night sign inside the shop left of the street door ("Closed at night" / "Open at night",
+  `toggleNight`). When the day's `dayLeft` runs out, `tick` calls `startNight` instead of rolling
+  the contract, but only when called `byHand` (its sixth argument: `GameScene` passes true; the time
+  away and the town's scenes never start a night, though they run one under way to its end). The
+  day's orders go home (a waiting market crowd loses its bonus), and while `isNight`: `hired` is 0,
+  so craftsmen neither work, master nor collect the till and every work spot shows again
+  (`addWorkSpot`); no new day customers come; `dayLeft` stands at 0; `runNight` brings the folk in
+  (`FIRST_FOLK_MS`, then every `FOLK_GAP_MS`, up to `FOLK_PER_NIGHT`), walks and waits them and
+  serves them from the counter's work spot. At its end the folk go and the contract rolls to the
+  next day as at dusk. `serveFolk` takes a plain nightshade potion first off its shelf, or a bench
+  potion off the rack, pays the wild herbs into the satchel (capped like the courier's) or a town
+  seal (`seals++`), and nudges the reputation. The scene walks each folk's `night-<kind>` sprite
+  (`NIGHT_FOLK` in `townsfolk.ts`: a witch's hat, a cap and a lantern on a pole; the sailor at 0.7
+  alpha) up the street path and along the customers' row to `customerPosition(i)` by its `walk`, and
+  `addFolkBubble` shows its want (faded while not at hand), an arrow and the herbs or `seal` it pays,
+  with a patience bar; a tap serves from inside the shop. The day bar reads "Night N", goes dark and
+  moves the moon by `night.left`; the weather's dusk light stays at its darkest.
 - Master craftsmen (AP16, `MASTERY_MS`, `MASTERY_SPEED`, `masteryLevel`, `masterySpeed`):
   `state.mastery[id]` adds `dt` while a refining table or cauldron with hired craftsmen has work in
   hand (also while away, through `tick`); each of `MASTERY_MS` (10, 30, 90 min) reached is a level,
@@ -670,7 +727,8 @@ save or load, 0 in a new game), `reputation` (0 to 100), `regulars` (`face`, `wa
 `seals` (town seals), `wagon` (`day`, `potion`, `crate`, `pay`, `left`, `sold`, or null), `royal`
 (`day`, `until`, `wants`, `reward`, `done`, or null), `mastery` (ms worked per station) and
 `marketPick` (the herb market's good to buy), `alchemy` (the bench, the courier and the satchel,
-see `alchemy.ts`) and `decor` (the decor bought). `town` (`TownState`) holds the shops bought, the
+see `alchemy.ts`), `decor` (the decor bought), `night` (`night.ts`) and `ledger` (`ledger.ts`). A
+plot may have `ripeMs`, a refiner or cauldron `primeIn` and `primeOut` and a brew `prime` (AP23). `town` (`TownState`) holds the shops bought, the
 doctor's hands in town, the `districts` and `cities` (towns made cities, 0 when missing); `loadState` fills it through `normalizeTown`, which merges each shop, station
 and route per key and each district by index, so new shops, stations and districts load into old saves. The contract may have a `bundle` (`potion`, `need`,
 `made`); the plague may have `season` and `curedDay`, and the state `untoldCure`. Each order also has `tip`, its full tip (`maxTip`
@@ -857,13 +915,15 @@ Under browser automation the engine is a no-op, so the playthrough is unchanged.
 | `bubble` | a bench mix that discovers nothing, Make |
 | `cascade` | a bench potion sold |
 | `plagueUp` | a cure given to the town |
+| `fine` | `autoHarvest`, a Prime plant cut (with `swish` + `pluck`) |
+| `cascade` | `createNight`, one of the night folk served |
 | `hmph` | `createSound`, with the counter on screen, an order gone with wants left and no patience |
 | `missed` | `createContract`, a day ended with its contract missed |
 | `rush` | `createSound`, a market day's crowd arrives |
 | `blight` | `createSound`, more beds blighted than last frame |
 | `plagueUp` | `createPlague`, a stage beaten or the Panacea unlocked |
 
-- Shared sounds: `ui('click')` for the bench, the courier's post, the decor board and Send, `ui('coin')` when the courier comes back with herbs, `ui('refuse')` for a bench, courier or decor button that does nothing; `ui('click')` for the Recipes and Settings buttons, price signs, priority signs,
+- Shared sounds: `ui('click')` for the bench, the courier's post, the decor board, the ledger, the night sign and Send, `ui('coin')` when the courier comes back with herbs, `ui('refuse')` for a bench, courier or decor button that does nothing; `ui('click')` for the Recipes and Settings buttons, price signs, priority signs,
   the herb market's sign and a garden sign that replants; `ui('refuse')` for a garden sign with nothing else to plant, a tap on an order bubble
   that hands nothing over (out of the shop or not on the shelf), a wagon tap without a full crate, a royal courier tap with none of its potions on the shelf
   (`ui('coin')` when some were handed over),
@@ -989,7 +1049,10 @@ Under browser automation the engine is a no-op, so the playthrough is unchanged.
   bought. A new bench potion is a `MixId` and `MIXES` entry, its colour in `ITEM_COL` and a
   `POTION_SHAPES` entry, and its name and `<id>Hint` in each language file.
 - New randomness in `tick` must stay behind a condition that is false on day 1 (like the blight's),
-  or the playthrough's seeded orders change.
+  or the playthrough's seeded orders change. The night folk use none.
+- Prime and Fine counts (`primeIn`, `primeOut`) say how many of a station's plain items are Prime or
+  Fine; anything new that takes items off a station's trays or pallets keeps them in step (`keepPrime`).
+- Only `GameScene` passes `byHand`; a test or tool calling `tick` without it never starts a night.
 - The town's randomness (`tickTown`'s customers) runs only for a shop bought, which needs the
   cure, so the playthrough never reaches it. A new shop is a `SHOPS` entry (at most three gardens,
   which is what the yard has room for, the third opened by its `research`) with its goods in `GoodId`, `GOODS` and art in

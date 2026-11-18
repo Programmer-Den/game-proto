@@ -33,7 +33,10 @@ screen, kept from game to game, where coins build a smithy, a chandler and a cha
 perks (LK18); the nights turn through four seasons, with short stormy summers and long snowy
 winters (LK19); and the Great Festival can instead send the keep up to a mountain monastery, where
 avalanches bury the low path and bell towers are rung to warn pilgrims, with a Mountain Festival
-of its own (LK20).
+of its own (LK20). A drag from a jar through up to four lanterns sends one moth on a round that
+lights them in order (LK21), "Next dusk" marks up to three free spots for the night's new lantern
+and the player picks one (LK22), and between nights a lantern can be fitted with a reservoir, a
+gust guard or a bat shutter (LK23).
 
 Implemented today:
 
@@ -273,6 +276,48 @@ Implemented today:
   same). The scene's `drawMountain` draws the warning (a dashed snow line, rings on the row, the
   `snowLabel` countdown), the pilgrim's lamp climbing the path, a violet ring on the bell and the
   `pilgrimLabel`, and snow mounds on buried lanterns, whose kind label says "snowed in".
+- Moth rounds (LK21): `sendRound(s, jar, stops)` takes an idle moth resting at that jar (`homeOf`,
+  else any idle moth), sets its `route` to the stops (unique, at most `ROUND_MAX` 4) and
+  dispatches it to the first one `nextStop` accepts. `nextStop(s, m)` shifts the route until a
+  lantern that exists, is not `claimed` and `mayTap(s, i, m)` allows (taking a queued tap for it
+  off the queue), else -1. After lighting, `tick` takes `nextStop` before a firefly's `nextHop`
+  (and dispatches with no hops); a moth that guards a threatened lantern keeps its route and
+  `releaseGuards` sends it on to its next stop when the threat has passed; `release` clears the
+  route. Only the flight out of the jar counts for `flights` and `flown`. The scene's
+  `createRounds` listens on the scene's input: a `pointerdown` within `JAR_HIT` of a jar (the
+  second only once bought) starts `round`, `pointermove` adds each lantern the pointer passes
+  within `LANTERN_HIT` (a `pip`), and `pointerup` (or `pointerupoutside`) calls `sendRound` with
+  `answer(..., 'flutter')` when it has a stop. `drawRounds` (the `roundMarks` graphics and pooled
+  `roundNumbers`) draws the dragged round (a dotted line from the jar through gold rings numbered
+  in order, then to the pointer) and each moth's stops still ahead (faint dots and numbers). The
+  moths' swap zones answer on `pointerup` and swap nothing when a round was dragged.
+- Place the new lantern (LK22): `state.placed` lists the spots that have lanterns, in spot order;
+  lantern i hangs on `placed[i]` (`spotOf`, `lanternOn` map both ways), and `makeLanterns(s)` hangs
+  them. `placeChoices(s)` gives the first `PLACE_CHOICES` (3) spots of `nextDistrict` that have no
+  lantern when the next night adds one. `nextDusk` with more than one choice sets phase `'place'`
+  (with one it hangs it and starts); `place(s, spot)` hangs it and starts the dusk (`beginNight`).
+  `startDusk` fills any spots still missing in order (a daily night, which starts from night 6),
+  so from night 6 `placed` is every spot and lantern i is spot i. Chains and the herald's `lit`
+  orders name spots: `chainLanterns(s, i)` maps a chain to its lanterns (-1 for a missing spot),
+  `chainsFor` keeps chains with every spot hung, `orderProgress` maps through `lanternOn`, and
+  `orderFor(night, placed)` passes over a `lit` order naming a spot with no lantern. The scene's
+  `createPlacing` and `drawPlacing` show the title (`placeTitle`, `placeSub`, low over the gate),
+  a ghost lantern of the kind it would be (`lanternKindsFor` for the next night with that spot
+  hung), a pulsing gold ring and a note ("completes a chain") on each choice, with a tap zone
+  calling `place` (`evening`); `drawChains` draws, in gold, the cords of chains a choice would
+  complete.
+- Lantern fittings (LK23): `FITTINGS` (`reservoir` 15, `guard` 20, `shutter` 20), kept per spot
+  in `state.fittings` and copied to each lantern's `fitting` by `makeLanterns`. `fitCost(s, i, id)`
+  is null when the lantern has none or already has that one; `fit(s, i, id)` buys it in the night
+  phase (not on a daily) and replaces any other. A reservoir multiplies `mothFill` by
+  `RESERVOIR_OIL` (1.5); `gustTarget` (the gust and the sea wind) passes over a `guard`, and
+  `batTarget` (`gustTarget` with `passBy` `'shutter'`) over a `shutter`. The night panel's
+  "Fittings" link (`fittingsButton`, under "Village") sets `fittingOpen`, which swaps the panel for
+  the fittings bar (`createFittings`: a dark strip along the foot, the title, a card per fitting at
+  `FIT_CARDS` showing `card-on` for the picked one, `fitPick`, and "Done"); while it is open a
+  lantern tap calls `fit` (`kaching` and a "Fitted!" popup) and `drawLanterns` rings the lanterns
+  the pick can go on. `fittingBadge` draws each fitted lantern's badge at its top left (an amber
+  drop, a pale blue wind curl, lilac bars).
 
 Missing or rough:
 
@@ -294,6 +339,9 @@ Missing or rough:
 - The Mountain Festival offers the harbour's boons rather than its own.
 - A moth's traits belong to its place in the jar, so a game with fewer Moths upgrades leaves the
   later places' flights waiting.
+- Rounds, the placing of new lanterns and fittings are not exercised by the playthrough either
+  (night 1 adds no lantern and the test never drags or opens the fittings bar). The marked spots
+  are always the first three free ones in the district's order, and a fitting cannot be taken off.
 - The upgrade buttons are not exercised by the playthrough (purchases stay out of it), only by
   hand.
 - Canvas `filter: blur` (the card's soft shadows and the far hills) is ignored by Safari, so those
@@ -337,7 +385,7 @@ File map (`src/`):
   (baking it with `bakeScenery` the first time), and `drawLanterns` moves each lantern's images,
   tag, kind label and tap zone to where the district hangs it, and hides the images and tap zone
   of a spot the night has no lantern on.
-- `scenes/layout.ts`: `VIEW`, `HUD`, `DUSK_BAR`, `NIGHT_PANEL`, `SHOP` (three columns, three
+- `scenes/layout.ts`: `FIT_CARDS` (the fittings bar's cards and "Done"), `JAR_HIT` (where a round starts), `VIEW`, `HUD`, `DUSK_BAR`, `NIGHT_PANEL`, `SHOP` (three columns, three
   rows: the seven upgrades, the cask and the hearth), `NEXT_BUTTON`, `SMALL_PANEL` (game over and festival),
   `MOVE_PANEL` and `MOVE_CARDS` (the choice of district; the peril panel reuses the panel and
   the first row's x), `BUTTON`, `ORDER` (the order card),
@@ -365,7 +413,9 @@ File map (`src/`):
   `BUILDINGS`, `BUILDING_IDS`, `Village`, `hasBuilt`, `SMITHY_CASK_COST`, `caskCost`, `buildCost`,
   `build`, `SEASONS`, `SEASON_IDS`, `SEASON_NIGHTS`, `SUMMER_DUSK_MS`, `WINTER_DUSK_MS`,
   `SNOW_SPEED`, `SEASON_KIND`, `seasonOf`, `duskFor`, `AVALANCHE_*`, `DIG_MS`, `PILGRIM_PAY`,
-  `Avalanche`, `pilgrimBell` and `climb`. No Phaser;
+  `Avalanche`, `pilgrimBell` and `climb`; for LK21 to LK23 `ROUND_MAX`, `sendRound`,
+  `PLACE_CHOICES`, `placeChoices`, `place`, `spotOf`, `lanternOn`, `chainLanterns`, `FITTINGS`,
+  `FITTING_IDS`, `FittingId`, `RESERVOIR_OIL`, `fitCost` and `fit`. No Phaser;
   `baseBurnMs` reads `byDifficulty` from `shared/settings.ts`. The catalogues name their texts by
   `TextKey` (`UPGRADES`, `CURSES` and `NIGHT_KINDS` names and blurbs, `LANTERN_KINDS` names, and each
   `Order`'s `text`), which the scene shows with `t`; the rules never read a text.
@@ -440,24 +490,28 @@ How it runs:
   lanterns' zones, moved off screen when unused) calls `chase`; the shop cards' zones call `buy`
   (the Cask card `topUp`, the Hearth card `rekindle`); the move panel's district cards call
   `moveTo`; the peril panel's two cards `takeCurse` (and save the best multiplier) and "Go on"
-  `endPeril`; a moth's zone calls `swapJar`; "Next dusk" calls
-  `nextDusk`, "Keep going" `carryOn`, and "New keep" `restart`.
+  `endPeril`; a moth's zone calls `swapJar` (on `pointerup`); "Next dusk" calls
+  `nextDusk`, a marked spot `place`, "Keep going" `carryOn`, and "New keep" `restart`. A press on a
+  jar dragged through lanterns calls `sendRound` (the scene's own `pointerdown`, `pointermove` and
+  `pointerup`), and with the fittings bar open a lantern's zone calls `fit` instead of `send`.
 - Panels open `PANEL_DELAY_MS` after nightfall so the popups show first; `panelOpen` says when.
 
 State model (`GameState` in `src/game/state.ts`):
 
-- `phase` is `'dusk'`, `'night'` (panel open, shop live), `'festival'` (the Great Festival's
+- `phase` is `'dusk'`, `'night'` (panel open, shop live), `'place'` (the new lantern's spot to pick, LK22), `'festival'` (the Great Festival's
   panel, once), `'move'` (a fifth nightfall's choice of district), `'peril'` (the curses offered),
   `'boon'` (the Harbour or Mountain Festival's boons), `'daily'` (a daily night's end) or `'over'`. `duskMs` counts
   down.
 - `lanterns[i]` sits at the district's `spots[i]`: `kind`, `lit`, `oilMs` left of `oilMaxMs`,
   `claimed` while a moth is on its way to it, lighting it or guarding it, `sheltered` once a
-  gust-proof moth lit it, `buried` while an avalanche's snow is on it.
+  gust-proof moth lit it, `buried` while an avalanche's snow is on it, `fitting` (LK23). It sits at
+  the district's `spots[placed[i]]` (LK22), which is `spots[i]` from night 6.
 - `moths[i]` has a `kind`, a position, a `task` (`idle`, `out`, `lighting`, `guard`, `chase`,
   `home`, `rest`), its `target` lantern, `lightingMs`, `closeCall` (set when it arrived at a nearly
   dry lantern), `bat` (the id it chases), `hops` (lanterns left on a firefly's flight),
   `reserved` (left with a cask fill reserved: a spare fill and a fill that adds oil to its lit
-  lantern, settled in `dispatch`), `flights` (since it last rested) and `restMs`.
+  lantern, settled in `dispatch`), `flights` (since it last rested), `restMs` and `route` (the
+  stops of its round still to come, LK21).
 - `kind` and `nextKind` are this night's and the next night's kind. `batTimes` are the bats still
   to come, `bats` those on screen (`id`, position, `target`, `task` `fly` or `flee`), `nextBat`
   the next id and `chased` the bats chased off this dusk. `festival` is set once the Great
@@ -476,7 +530,8 @@ State model (`GameState` in `src/game/state.ts`):
   `moveDue`, `homes`, `rekindled`, `curses`, `offer`, `paidMult`, `bestPeril`, `sailed`,
   `harbourKept`, `harbourFestival`, `tideTimes`, `tide`, `shipTimes`, `ship`, `shipsGuided`,
   `boon`, `breeds`, `flown`, `daily`, `duskMax`, `village`, `chapelUsed`, `spared`, `climbed`,
-  `mountainKept`, `mountainFestival`, `avalancheTimes`, `avalanche` and `pilgrimsWarned` are described
+  `mountainKept`, `mountainFestival`, `avalancheTimes`, `avalanche`, `pilgrimsWarned`, `placed` and
+  `fittings` are described
   under their upgrades above.
 - `levels` per upgrade; `stats(s)` turns them into moth count, speed, wick time and burn time.
 - `report` is the last nightfall's tally (`lit`, `count`, `required`, `earned` with the order's
@@ -566,6 +621,9 @@ Sound table, `sfx` (plus the shared `ui('coin')`, `ui('refuse')` and `ui('click'
 | `bloom` | `trait` event (LK16) |
 | `crack` / `slide` + fizzle / `peal` + coin / `callLost` | an avalanche warned / it comes down (a `ting` for a kept lantern) / `pilgrim` warned / `pilgrim` missed (LK20) |
 | `kaching` | `build` in the village (LK18) |
+| `pip` / `flutter` | a lantern added to a dragged round / the round sent (LK21) |
+| `evening` | `place` (LK22) |
+| `kaching` | `fit` (LK23) |
 | click | "Go on", "Keep going", "New keep", "Daily night", "Back to my keep" (refuse when today's daily is used) |
 
 The nightfall coins and stings are timed with `this.time.delayedCall`, so they pause with the
@@ -580,7 +638,10 @@ scene. Under browser automation nothing plays, so the playthrough is unchanged.
   `sailButton` the festival's "Set sail", `boonButtons` the Harbour (or Mountain) Festival's cards, and
   `dailyButton` and `backButton` the daily night's link and way back; `climbButton` the festival's
   "Climb" (the three festival buttons are 180 wide, at y + 115), `villageButton` the night
-  panel's "Village" link, `villageButtons` the village panel's cards and `villageBack` its "Back".
+  panel's "Village" link, `villageButtons` the village panel's cards and `villageBack` its "Back";
+  `fittingsButton` the "Fittings" link under it, `fittingButtons` the fittings bar's cards and
+  `fittingsDone` its "Done"; `placeButtons` the marked spots (with their `spot`) while the phase
+  is `'place'`.
 - Inputs: it clicks lanterns at their `x`, `y` from state, scaled by the canvas bounding box.
 - The test mirrors these, so change them together: `DUSK_MS` (45 s), the first night's five
   lanterns and quota of three, three moths in kind order (fast, slow, heavy), three lives, the 20 s
@@ -647,6 +708,12 @@ scene. Under browser automation nothing plays, so the playthrough is unchanged.
   `nextDusk`, and `duskMs` set to 35 s for the avalanche's warning; and `kept` 9 on night 10 for
   the festival.
 
+- `loop-moth-round`, `loop-new-lantern` and `loop-fittings` were staged with a scratch script:
+  every trophy set before the page loads, a round dragged with `page.mouse` from the jar through
+  lanterns 3, 0 and 1 (shot before letting go); night 1 ended with every lantern lit and 100
+  coins, "Fittings" clicked, a gust guard and a bat shutter fitted and the reservoir picked; then
+  "Done" and "Next dusk" for the marked spots.
+
 ## Making common changes
 
 - **Add or change a text**: its key in `i18n/en.ts` and the German in `i18n/de.ts` (the build
@@ -684,6 +751,9 @@ scene. Under browser automation nothing plays, so the playthrough is unchanged.
 - **Add a building**: a row in `BUILDINGS` (name and blurb keys, `cost`, `houses`), its effect
   where the rule lives (read with `hasBuilt`), its gel in `drawVillage`'s `BUILDING_GEL` and a card
   spot in `createVillagePanel` (three fit, like the boons).
+- **Add a fitting**: a row in `FITTINGS` (name and blurb keys, cost), its effect where the rule
+  lives (`mothFill`, `gustTarget`'s `passBy`), its badge in `fittingBadge`, and a card spot in
+  `FIT_CARDS` (three fit).
 - **Retune the seasons**: `SEASON_NIGHTS`, `SUMMER_DUSK_MS`, `WINTER_DUSK_MS`, `SNOW_SPEED`,
   `SEASON_KIND` and `drawKind` in `state.ts`; night 1 must stay spring at 45 s for the playthrough.
 - **Retune the monastery**: `AVALANCHE_*`, `DIG_MS` and `PILGRIM_PAY` in `state.ts`, the bells in

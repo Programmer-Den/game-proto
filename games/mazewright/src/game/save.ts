@@ -1,14 +1,16 @@
 import { MAPS } from './maps';
+import { PUZZLES } from './puzzles';
 import { REPLAY_VERSION, type Action, type Replay } from './sim';
 import { ALL_TOWERS, ALWAYS, DEFAULT_POUCH, FREE, MODES, POUCH_PICKS, SEEDS, SKILLS, SLOT_SEEDS, TOWERS, type Mode, type Skill, type TowerKind } from './rules';
 
-// Mazewright keeps nine keys (the ninth, the daily maze's `mazewright-daily`, is kept by
+// Mazewright keeps ten keys (the tenth, the daily maze's `mazewright-daily`, is kept by
 // `shared/daily.ts`): each garden's records (best wave, win, stars, best time, Endless
 // best), the towers picked for the pouch, whether waves wait to be started (calm), whether two
 // gardeners play (duo), the way of play
 // picked (mode), the potting shed (seeds, the towers and master levels bought, extra slots),
 // each garden's latest win to watch again (replays) and the game in play, kept at its last break
-// between waves as a replay of everything done so far (game). Both replay keys end in `-replays`,
+// between waves as a replay of everything done so far (game), and each puzzle lawn's most stars
+// (puzzles). Both replay keys end in `-replays`,
 // so progress files carry them and progress codes, too small for them, leave them out.
 const KEY = 'mazewright-best';
 const POUCH_KEY = 'mazewright-pouch';
@@ -18,6 +20,35 @@ const MODE_KEY = 'mazewright-mode';
 const SHED_KEY = 'mazewright-shed';
 const REPLAY_KEY = 'mazewright-replays';
 const GAME_KEY = 'mazewright-game-replays';
+const PUZZLE_KEY = 'mazewright-puzzles';
+
+/** Each puzzle lawn's most stars (0 to 3), by its id. */
+export type PuzzleStars = Record<string, number>;
+
+export function loadPuzzleStars(): PuzzleStars {
+  const out: PuzzleStars = {};
+  for (const p of PUZZLES) out[p.id] = 0;
+  try {
+    const saved = JSON.parse(localStorage.getItem(PUZZLE_KEY) ?? 'null');
+    for (const p of PUZZLES) out[p.id] = Math.min(3, count(saved?.[p.id]));
+  } catch {
+    // A broken or blocked save starts fresh.
+  }
+  return out;
+}
+
+/** Keeps a puzzle's stars when they beat its best, and gives back how many more it won (0 for none). */
+export function notePuzzle(stars: PuzzleStars, id: string, won: number) {
+  const more = Math.max(0, won - (stars[id] ?? 0));
+  if (!more) return 0;
+  stars[id] = won;
+  try {
+    localStorage.setItem(PUZZLE_KEY, JSON.stringify(stars));
+  } catch {
+    // Storage can be full or blocked; the stars hold until the page is closed.
+  }
+  return more;
+}
 
 function loadFlag(key: string) {
   try {
@@ -199,7 +230,7 @@ export function pouchOf(kinds: TowerKind[], shed: Shed): TowerKind[] {
 /** Each garden's latest win (Classic or Swarm), to watch again, by garden. */
 export type Replays = Record<string, Replay>;
 
-const ACTIONS: readonly Action['a'][] = ['build', 'upgrade', 'sell', 'turn', 'aim', 'wave', 'walk', 'lift'];
+const ACTIONS: readonly Action['a'][] = ['build', 'upgrade', 'sell', 'turn', 'aim', 'wave', 'walk', 'lift', 'swing'];
 const whole = (v: unknown) => Number.isInteger(v) && (v as number) >= 0;
 /** Whether a logged action can be played: a known action at a step, on a cell, with a tower that exists. */
 const playable = (a: Action) =>

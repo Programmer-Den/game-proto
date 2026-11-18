@@ -497,6 +497,30 @@ function spikes(scene: Phaser.Scene) {
   }
 }
 
+/** A stack of two crates, 40x62 px, standing on the road by its bottom left: jumped, or smashed by a dash. */
+function crate(scene: Phaser.Scene) {
+  paint(scene, 'crate', 40, 62, (ctx) => {
+    half(ctx);
+    const box = (x: number, y: number, w: number, h: number) => {
+      poly(ctx, [[x, y], [x + w, y], [x + w, y + h], [x, y + h]], C.wood, 2.5);
+      ctx.strokeStyle = C.woodDark;
+      ctx.lineWidth = 2;
+      for (const k of [1, 2]) {
+        ctx.beginPath();
+        ctx.moveTo(x + 3, y + (h * k) / 3);
+        ctx.lineTo(x + w - 3, y + (h * k) / 3);
+        ctx.stroke();
+      }
+      // A brace from corner to corner, and iron corners.
+      poly(ctx, [[x + 5, y + h - 9], [x + w - 13, y + 4], [x + w - 5, y + 9], [x + 13, y + h - 4]], C.wood, 2);
+      for (const [cx, cy] of [[x, y], [x + w - 10, y], [x, y + h - 10], [x + w - 10, y + h - 10]]) poly(ctx, [[cx, cy], [cx + 10, cy], [cx + 10, cy + 10], [cx, cy + 10]], C.iron, 1.5);
+      hl(ctx, [[x + 5, y + h - 14], [x + 5, y + 5], [x + w - 14, y + 5]], 1.6);
+    };
+    box(4, 64, 72, 58);
+    box(10, 6, 62, 58);
+  });
+}
+
 /** Depth of a pit's art below the road, cut through the turf into the page. */
 export const PIT_DEPTH = 64;
 
@@ -836,6 +860,7 @@ export function bakeScenery(scene: Phaser.Scene) {
   blade(scene);
   flames(scene);
   ledge(scene);
+  crate(scene);
   coin(scene);
   checkpoint(scene);
   shrine(scene);

@@ -4,7 +4,7 @@ import { finishDaily, loadDaily, startDaily, today } from '../../../../shared/da
 import { renderScale, viewFrame } from '../../../../shared/scaling';
 import { settings } from '../../../../shared/settings';
 import { BROWN, GOLD, MOSS, num, OCHRE, RES, RUST, SEPIA, shown } from '../art/nouveau';
-import { guestTexture, needTexture, POTION_ORIGIN, potionTexture, tileTexture, TOOL_PAD, toolTexture } from '../art/textures';
+import { CAULDRON_ICON, guestTexture, needTexture, POTION_ORIGIN, potionTexture, tileTexture, TOOL_PAD, toolTexture } from '../art/textures';
 import { adjacent, COLS, holesOf, inBoard, ROWS, special, stuck, validMoves, type Board, type Cell, type Tile } from '../game/board';
 import { EXAMS } from '../game/exams';
 import { formatNumber } from '../../../../shared/i18n';
@@ -12,7 +12,7 @@ import { KIND_COUNTS, KIND_NAMES, KINDS, type Kind } from '../game/kinds';
 import { blockersFor, MOVE_BONUS, orderFor, POTION_NAMES, RICH_BLOCKERS, RICH_MOVES, RICH_SHARE, riskFor, RUSH_COINS, RUSH_MOVES, TWIN_BONUS } from '../game/orders';
 import { RANKS, rankOf, starsFor, STARS_2, STARS_3 } from '../game/ranks';
 import { loadProgress, saveProgress } from '../game/save';
-import { canUse, funnel, nextDaily, nextEndless, nextExam, nextGuest, nextOrder, nextTown, nextWeekly, pestle, sift, stir, TOOL_ORDER, TOOLS, trySwap, type Step, type Tool } from '../game/sim';
+import { canUse, CAULDRON_SIZE, cauldronOn, FLOW_RUN, flowOn, funnel, nextDaily, nextEndless, nextExam, nextGuest, nextOrder, nextTown, nextWeekly, pestle, sift, stir, TOOL_ORDER, TOOLS, trySwap, type Step, type Tool } from '../game/sim';
 import { GUEST_STAR_COINS, GUEST_TEXTS, guestOpen, GUESTS } from '../game/guests';
 import { TOWN_STAR_COINS, townOpen, TOWNS } from '../game/towns';
 import { finishWeekly, loadWeekly, weekOf, WEEKLY_STARS, weeklyStars } from '../game/weekly';
@@ -145,6 +145,18 @@ export class GameScene extends Phaser.Scene {
   private pantry?: Phaser.GameObjects.Container;
   private pantryShown = '';
   private note?: Phaser.GameObjects.Text;
+  /** The spare cauldron in the footer: the empty pot, and the brimming one over it cropped to how full it is. */
+  private cauldron!: Phaser.GameObjects.Image;
+  private cauldronFull!: Phaser.GameObjects.Image;
+  /** Flow's three pips under the stars, and a zone over them for its caption. */
+  private flowPips!: Phaser.GameObjects.Graphics;
+  private flowZone!: Phaser.GameObjects.Zone;
+  /** What the footer's hover shows in the caption: the cauldron or flow. */
+  private hoverFooter: 'cauldron' | 'flow' | null = null;
+  /** A drop order's vials the label shows as delivered, catching up with the state like `shown`. */
+  private shownVials = 0;
+  /** The label's text for the vials row, on a drop order. */
+  private vialText?: Phaser.GameObjects.Text;
   /** The ingredients the label's rows show, from the top: the first customer's, then the second's. */
   private rows: Kind[] = [];
   /** How many of each the rows ask for: kept from `buildPanel`, since a royal commission's needs move on before its label is rebuilt. */
@@ -203,6 +215,7 @@ export class GameScene extends Phaser.Scene {
     this.hint = [];
     this.idleMs = 0;
     this.shown = { ...state.got };
+    this.shownVials = state.delivered;
     state.board.forEach((row, r) => row.forEach((tile, c) => this.sprites.set(tile.id, this.tileSprite(tile, cellX(c), cellY(r)))));
     this.result.setVisible(false);
     this.bench?.setVisible(false);
@@ -390,7 +403,8 @@ export class GameScene extends Phaser.Scene {
           flying = [];
           for (const t of step.cleared) {
             const sprite = this.sprites.get(t.id)!;
-            const row = needs.indexOf(t.kind);
+            // A delivered vial flies to its own row, under the ingredients'.
+            const row = t.vial ? this.rows.length : needs.indexOf(t.kind);
             if (row < 0) popping.push(sprite);
             else flying.push({ sprite: sprite.setDepth(DEPTH.flying), x0: sprite.x, y0: sprite.y, x1: NEEDS.x, y1: this.rowY(row) });
           }
@@ -420,7 +434,8 @@ export class GameScene extends Phaser.Scene {
           for (const t of step.cleared) {
             this.sprites.get(t.id)?.destroy();
             this.sprites.delete(t.id);
-            if (needs.includes(t.kind)) this.shown[t.kind] = (this.shown[t.kind] ?? 0) + 1;
+            if (t.vial) this.shownVials++;
+            else if (needs.includes(t.kind)) this.shown[t.kind] = (this.shown[t.kind] ?? 0) + 1;
           }
           this.refreshNeeds();
         },
@@ -454,6 +469,28 @@ export class GameScene extends Phaser.Scene {
       });
       return;
     }
+    if (step.dropped) {
+      // The spare cauldron was full: a tile turns into a Catalyst with a swell, and the pot empties.
+      const brewed = step.dropped;
+      let sprite: Phaser.GameObjects.Image | undefined;
+      this.queue.push({
+        ms: MOULD_MS,
+        start: () => {
+          sprite = this.sprites.get(brewed.id)?.setTexture(tileTexture(brewed)).setDepth(DEPTH.catalyst);
+          sfx('cauldron');
+          this.refreshCauldron();
+        },
+        step: (k) => sprite && shown(sprite, settings.reduceMotion ? 1 : 1 + 0.3 * Math.sin(Math.PI * k)),
+      });
+      this.queue.push(this.showNote(t('cauldronNote')));
+      return;
+    }
+    if (step.flow) {
+      // Flow: the third cascade in a row gives a move back.
+      this.queue.push({ ms: 0, start: () => (sfx('flow'), this.pulse(this.movesText), this.refreshFlow(FLOW_RUN)) });
+      this.queue.push(this.showNote(t('flowNote')));
+      return;
+    }
     if (step.served) {
       // A customer is served: a note over the board, and their rows finish.
       const potion = step.served;
@@ -480,6 +517,7 @@ export class GameScene extends Phaser.Scene {
     else if (step.rows.length + step.cols.length + step.areas.length > 0) sfx('fire');
     if (step.brewed.length > 0) sfx('brew');
     if (step.cleared.some((t) => t.jar)) sfx('cork');
+    if (step.cleared.some((t) => t.vial)) sfx('served');
     if (step.melted.length > 0) sfx('sizzle');
     if (step.scrubbed.length > 0) sfx('scrub');
   }
@@ -537,6 +575,7 @@ export class GameScene extends Phaser.Scene {
   private settle() {
     this.busy = false;
     this.shown = { ...this.state.got };
+    this.shownVials = this.state.delivered;
     this.refresh();
     const s = this.state;
     // The daily's try ends with the stars it was sold with, or none.
@@ -707,6 +746,44 @@ export class GameScene extends Phaser.Scene {
     this.ruleText = this.add.text(560, 490, '', ink(11, RUST, 'italic')).setOrigin(0, 0.5).setDepth(DEPTH.panel);
     this.coinIcon = shown(this.add.image(852, 465, 'coin')).setDepth(DEPTH.panel);
     this.coinsText = this.add.text(906, 466, '', ink(21, SEPIA, 'bold')).setOrigin(1, 0.5).setDepth(DEPTH.panel);
+    // The spare cauldron and flow's pips (no Texts, so the first board is laid as before); hovering shows their captions.
+    this.cauldron = shown(this.add.image(800, 461, 'cauldron')).setDepth(DEPTH.panel);
+    this.cauldronFull = shown(this.add.image(800, 461, 'cauldron-full')).setDepth(DEPTH.panel);
+    this.cauldron.setInteractive({ useHandCursor: false });
+    this.cauldron.on('pointerover', () => ((this.hoverFooter = 'cauldron'), this.refreshCaption()));
+    this.cauldron.on('pointerout', () => ((this.hoverFooter = null), this.refreshCaption()));
+    this.flowPips = this.add.graphics().setDepth(DEPTH.panel);
+    this.flowZone = this.add.zone(734, 482, 44, 12).setInteractive();
+    this.flowZone.on('pointerover', () => ((this.hoverFooter = 'flow'), this.refreshCaption()));
+    this.flowZone.on('pointerout', () => ((this.hoverFooter = null), this.refreshCaption()));
+  }
+
+  /** The spare cauldron fills as the order's unwanted ingredients go in; it is hidden on the first order. */
+  private refreshCauldron() {
+    const on = cauldronOn(this.state);
+    this.cauldron.setVisible(on);
+    this.cauldronFull.setVisible(on);
+    if (on) this.cauldron.setInteractive();
+    else this.cauldron.disableInteractive();
+    if (!on) return;
+    // The brimming pot shows from a line that rises with the count: the feet at empty, the bubbles once full.
+    const f = Math.min(1, this.state.cauldron / CAULDRON_SIZE);
+    const from = (CAULDRON_ICON - 3) * (1 - f) + 3 * f;
+    this.cauldronFull.setCrop(0, from * RES, CAULDRON_ICON * RES, (CAULDRON_ICON - from) * RES);
+  }
+
+  /** Flow's pips: one filled for each move in the streak, under the stars; hidden on the first order. */
+  private refreshFlow(lit = this.state.flow) {
+    const on = flowOn(this.state);
+    this.flowPips.clear();
+    if (on) this.flowZone.setInteractive();
+    else this.flowZone.disableInteractive();
+    if (!on) return;
+    for (let k = 0; k < FLOW_RUN; k++) {
+      const x = 734 + (k - 1) * 13;
+      if (k < lit) this.flowPips.fillStyle(num(OCHRE)).fillCircle(x, 482, 3.5);
+      this.flowPips.lineStyle(1.25, num(k < lit ? SEPIA : BROWN)).strokeCircle(x, 482, 3.5);
+    }
   }
 
   private createTools() {
@@ -779,7 +856,9 @@ export class GameScene extends Phaser.Scene {
     ];
     this.scoreText = o.weekly ? (items[items.length - 1] as Phaser.GameObjects.Text) : undefined;
     // The order's twist, stage or second customer, under the price.
-    const line = o.exam
+    const line = o.vials
+      ? t('dropLine', { n: o.vials })
+      : o.exam
       ? t('examLine', { stars: o.exam.stars, moves: o.exam.stars === 3 ? STARS_3 : STARS_2 })
       : o.guest
       ? t(GUEST_TEXTS[o.guest.rule].line, { n: o.moves })
@@ -814,17 +893,26 @@ export class GameScene extends Phaser.Scene {
       items.push(shown(this.add.image(NEEDS.x, y, needTexture(kind))));
       const name = t(KIND_NAMES[kind]);
       const label = o.second ? t('needFor', { kind: name, potion: t(POTION_NAMES[second.includes(kind) ? o.second.potion : o.potion]) }) : name;
-      items.push(this.add.text(NEEDS.barX, y - 17, label, ink(o.second ? 11 : 13, BROWN, 'italic bold')).setOrigin(0, 0.5));
+      items.push(this.add.text(NEEDS.barX, y - 17, label, ink(o.second || o.vials ? 11 : 13, BROWN, 'italic bold')).setOrigin(0, 0.5));
       const text = this.add.text(906, y + 2, '', ink(18, SEPIA, 'bold')).setOrigin(1, 0.5);
       this.needTexts.set(kind, text);
       items.push(text);
     });
+    // A drop order's vials, in a row of their own under the ingredients.
+    this.vialText = undefined;
+    if (o.vials) {
+      const y = this.rowY(this.rows.length);
+      items.push(shown(this.add.image(NEEDS.x, y, 'need-vial')));
+      items.push(this.add.text(NEEDS.barX, y - 17, t('vialsRow'), ink(11, BROWN, 'italic bold')).setOrigin(0, 0.5));
+      this.vialText = this.add.text(906, y + 2, '', ink(18, SEPIA, 'bold')).setOrigin(1, 0.5);
+      items.push(this.vialText);
+    }
     this.panel = this.add.container(0, 0, items).setDepth(DEPTH.panel);
   }
 
-  /** Where row `i` of the label's ingredients sits: a twin order's four rows are closer together. */
+  /** Where row `i` of the label's ingredients sits: a twin order's four rows, and a drop order's with its vials, are closer together. */
   private rowY(i: number) {
-    return this.state.current.second ? NEEDS.twinY + i * NEEDS.twinRow : NEEDS.y + i * NEEDS.row;
+    return this.state.current.second || this.state.current.vials ? NEEDS.twinY + i * NEEDS.twinRow : NEEDS.y + i * NEEDS.row;
   }
 
   private refresh() {
@@ -835,6 +923,8 @@ export class GameScene extends Phaser.Scene {
     this.coinsText.setText(formatNumber(this.state.coins));
     this.coinIcon.setX(this.coinsText.x - this.coinsText.width - 18);
     this.refreshPantry();
+    this.refreshCauldron();
+    this.refreshFlow();
     this.refreshCaption();
     this.drawCursor();
     if (!this.busy) this.showBands(true);
@@ -868,6 +958,12 @@ export class GameScene extends Phaser.Scene {
       this.needTexts.get(kind)?.setText(`${formatNumber(have)}/${formatNumber(n)}`).setColor(done ? '#3d6a32' : SEPIA);
       this.bar(NEEDS.barX - 1.5, y - 5.5, NEEDS.barW + 3, NEEDS.barH + 3, have / n, done ? MOSS : OCHRE, this.bars);
     });
+    const vials = this.state.current.vials;
+    if (!vials || !this.vialText) return;
+    const have = Math.min(this.shownVials, vials);
+    const y = this.rowY(this.rows.length);
+    this.vialText.setText(`${formatNumber(have)}/${formatNumber(vials)}`).setColor(have >= vials ? '#3d6a32' : SEPIA);
+    this.bar(NEEDS.barX - 1.5, y - 5.5, NEEDS.barW + 3, NEEDS.barH + 3, have / vials, have >= vials ? MOSS : OCHRE, this.bars);
   }
 
   /** What the pantry holds, at the foot of the label: a small icon and count per kind (nothing when it is empty). */
@@ -949,6 +1045,8 @@ export class GameScene extends Phaser.Scene {
     else if (this.armed === 'sift') text = t('captionSift', { cost: TOOLS.sift.cost });
     else if (this.armed === 'pestle') text = t('captionPestle', { cost: TOOLS.pestle.cost });
     else if (this.armed === 'funnel') text = this.funnelFrom ? t('captionFunnelTo') : t('captionFunnel', { cost: TOOLS.funnel.cost });
+    else if (this.hoverFooter === 'cauldron' && cauldronOn(s)) text = t('captionCauldron', { n: Math.min(s.cauldron, CAULDRON_SIZE), size: CAULDRON_SIZE });
+    else if (this.hoverFooter === 'flow' && flowOn(s)) text = t('captionFlow', { n: s.flow, run: FLOW_RUN });
     else if (this.hoverTool) text = t('toolTip', { tip: t(TOOLS[this.hoverTool].tip), cost: TOOLS[this.hoverTool].cost });
     else if (given.length > 0 && Object.values(s.got).every((n, i) => n === (s.fromPantry[Object.keys(s.got)[i] as Kind] ?? 0)))
       text = t('captionPantry', { list: given.map(([k, n]) => t(KIND_COUNTS[k as Kind], { n })).reduce((a, b) => t('and', { a, b })) });
@@ -962,6 +1060,7 @@ export class GameScene extends Phaser.Scene {
       text = s.current.rich === 'moves'
         ? t('captionRichMoves', { share: RICH_SHARE * 100, moves: RICH_MOVES })
         : t(s.current.mould > 0 ? 'captionRichBlockersMould' : 'captionRichBlockers', { share: RICH_SHARE * 100, blockers: RICH_BLOCKERS });
+    else if (s.current.vials) text = t('captionVials');
     else if (s.current.stages) text = t('captionRoyal');
     else if (s.current.second) text = t('captionTwin', { coins: TWIN_BONUS });
     else if (forbid) text = t('captionForbid', { kind: t(KIND_NAMES[forbid]) });

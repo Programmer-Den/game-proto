@@ -6,6 +6,7 @@ import { CHALLENGES } from './challenges';
 import { buildStage, nextStage, roadChoiceDue } from './course';
 import { KNIGHTS, type KnightId } from './knights';
 import { PAIRS, pairsOf } from './pairs';
+import { MISSIONS, boardForRun, dealMission, goalOf, rewardOf, type MissionBoard, type MissionKind } from './missions';
 import { nextPetPrice, noPets, type PetId, type PetLevels } from './pets';
 import {
   AWAKE,
@@ -13,6 +14,8 @@ import {
   CLOUD,
   COIN_REACH,
   DARE,
+  DASH,
+  DASHABLE,
   DROP_V,
   FOES,
   GRAVITY,
@@ -52,7 +55,8 @@ import {
 // checkpoint stops the run on a choice of two boons (three after a met dare), sometimes a cursed
 // one, and then, from stage 3, of the next road. Beyond the dragon the Sky Road's gusts carry the
 // knight on and its clouds fall away once stood on, and the heavy knight smashes the foes he runs
-// into. Between runs the bank buys the missed boon, the armoury's lasting upgrades or a knight.
+// into. The shield dash charges through crates, barrels and goblins and skims over pits; high
+// routes float over the road; three run missions pay banked coins when met. Between runs the bank buys the missed boon, the armoury's lasting upgrades or a knight.
 
 /** A pulled coin's speed towards the knight. */
 const PULL_SPEED = 700;
@@ -69,6 +73,8 @@ const GLIDE = 0.5;
 const HOARD = 2;
 /** Bulwark: how far ahead of the knight a blocked hit knocks the foes away. */
 const BULWARK_REACH = 220;
+/** Coins a crate smashed by a dash bursts into. */
+const CRATE_COINS = 3;
 
 /** What a new run carries over from the runs before it. */
 export interface Carry {
@@ -85,6 +91,8 @@ export interface Carry {
   /** The companion chosen to run along on ordinary runs, and each companion's level. */
   pet: PetId | null;
   pets: PetLevels;
+  /** The standing run missions, played on an ordinary run only. */
+  missions?: MissionBoard;
 }
 
 /** A seeded run's kind (the daily course by default), the challenge course it runs, and the boons it starts with (the weekly road's). */
@@ -102,7 +110,7 @@ export interface RunKind {
  * next ordinary run.
  */
 export function newRun(
-  { best, bank, pending, armoury, crown, knight, knights, pet, pets }: Carry = {
+  { best, bank, pending, armoury, crown, knight, knights, pet, pets, missions }: Carry = {
     best: 0,
     bank: 0,
     pending: null,
@@ -120,6 +128,7 @@ export function newRun(
   s.mode = daily ? (kind.mode ?? 'daily') : 'run';
   s.pets = { ...pets };
   s.pet = daily || !pet || pets[pet] <= 0 ? null : pet;
+  s.missions = daily || !missions ? null : boardForRun(missions);
   if (daily && kind.challenge !== undefined) {
     s.challenge = { index: kind.challenge, coins: 0, got: 0, done: false };
     s.stage = CHALLENGES[kind.challenge].stage;
@@ -138,7 +147,7 @@ export function newRun(
 }
 
 /** Height of the ground under the knight's feet. */
-const floorOf = (s: GameState) => floorAt(s, s.distance - RUNNER.w / 2, s.distance + RUNNER.w / 2);
+const floorOf = (s: GameState) => floorAt(s, s.distance - RUNNER.w / 2, s.distance + RUNNER.w / 2, s.runner.h);
 const grounded = (s: GameState) => s.runner.h <= floorOf(s) && s.runner.vh <= 0;
 
 /** Jump: off the ground, or again in the air with Second Leap. A jump ends a slide. On ice, a jump during a landing's skid waits for it to end. */
@@ -173,6 +182,25 @@ export function slide(s: GameState) {
   return true;
 }
 
+/**
+ * The shield dash: a short charge behind the shield, at `DASH.pace` times the speed, holding the
+ * knight's height in the air; it ends a slide or a skid. Then it comes back after `DASH.cooldown`.
+ */
+export function dash(s: GameState) {
+  if (s.phase !== 'running') return false;
+  const r = s.runner;
+  if (r.dashCd > 0) return false;
+  r.dashMs = DASH.ms;
+  r.dashCd = DASH.cooldown;
+  r.slideMs = 0;
+  r.slideQueued = false;
+  r.skidMs = 0;
+  r.jumpQueued = false;
+  if (!grounded(s)) r.vh = 0;
+  effect(s, 'dash', s.distance, r.h + RUNNER.h / 2, DASH.ms + 120);
+  return true;
+}
+
 /** The knight's box this moment: x along the course, and heights from feet to head. */
 export function runnerBox(s: GameState) {
   const tall = s.runner.slideMs > 0 ? RUNNER.slideH : RUNNER.h;
@@ -182,8 +210,9 @@ export function runnerBox(s: GameState) {
 function touches(s: GameState, t: Trap) {
   const box = runnerBox(s);
   if (t.kind === 'pit') {
-    // The knight falls in when standing on the road over the middle of the pit (not on a cloud over it).
-    return grounded(s) && s.runner.h <= 0 && s.distance > t.x + 8 && s.distance < t.x + t.w - 8;
+    // The knight falls in when standing on the road over the middle of the pit (not on a cloud over
+    // it, nor skimming over it in a dash).
+    return grounded(s) && s.runner.h <= 0 && s.runner.dashMs <= 0 && s.distance > t.x + 8 && s.distance < t.x + t.w - 8;
   }
   if (t.kind === 'flames' && flameOf(s, t) !== 'lit') return false;
   const span = TRAP_SPAN[t.kind];
@@ -235,12 +264,55 @@ function knockOut(s: GameState, foe: Trap) {
   const top = foe.h + TRAP_SPAN[foe.kind as Exclude<TrapKind, 'pit'>].hi;
   s.traps = s.traps.filter((t) => t !== foe);
   s.stomps += 1;
+  s.row += 1;
+  if (foe.kind === 'bat') mission(s, 'bats', 1);
+  mission(s, 'row', s.row);
   dared(s, 'stomp', 1);
   gainCoin(s, foe.x + foe.w / 2, top);
   effect(s, 'stomp', foe.x + foe.w / 2, top, 450);
   // Goblin's Hoard: the foe bursts into more coins, which fly to the knight.
   if (stats(s).hoard) for (let i = 0; i < HOARD; i++) s.course.push({ id: s.nextId++, x: foe.x + foe.w / 2 + (i ? 30 : -30), h: top + 30, pulled: true });
   return top;
+}
+
+/**
+ * A dash meeting something it breaks: a crate bursts into coins, a barrel into splinters, and a
+ * goblin or shield goblin is knocked aside (as a stomp, with its coin).
+ */
+function smash(s: GameState, t: Trap) {
+  if (t.kind === 'goblin' || t.kind === 'shield') {
+    knockOut(s, t);
+    effect(s, 'smash', t.x + t.w / 2, t.h + 30, 450);
+  } else {
+    s.traps = s.traps.filter((o) => o !== t);
+    effect(s, 'smash', t.x + t.w / 2, t.h + 24, 450);
+    // A crate bursts into coins, which fly to the knight.
+    if (t.kind === 'crate') for (let i = 0; i < CRATE_COINS; i++) s.course.push({ id: s.nextId++, x: t.x + t.w / 2 + (i - 1) * 24, h: t.h + 40 + (i % 2) * 20, pulled: true });
+  }
+  if (t.kind === 'crate' || t.kind === 'shield') mission(s, 'smash', 1);
+}
+
+/**
+ * Moves the run missions of a kind on: a count goes up by `n`, a `max` kind keeps the most reached
+ * (metres count from where the mission was dealt). A met mission pays its banked coins at once and
+ * the next one in turn takes its place, from 0.
+ */
+function mission(s: GameState, kind: MissionKind, n: number) {
+  const b = s.missions;
+  if (!b) return;
+  b.slots.forEach((m, i) => {
+    if (m.kind !== kind) return;
+    m.progress = MISSIONS[kind].max ? Math.max(m.progress, n - m.from) : m.progress + n;
+    if (m.progress < goalOf(m)) return;
+    const reward = rewardOf(m);
+    s.bank += reward;
+    s.missionsMet += 1;
+    s.missionCoins += reward;
+    effect(s, 'pop', s.distance + 360, RUNNER.h + 150, 2200, 'missionPop', reward);
+    const next = dealMission(b, i);
+    if (next.kind === 'metres') next.from = metres(s.distance);
+    b.slots[i] = next;
+  });
 }
 
 /**
@@ -278,6 +350,7 @@ function gainCoin(s: GameState, x: number, h: number) {
   s.streak += 1;
   s.coins += value;
   if (value > 1) effect(s, 'pop', x, h + 40, 700, 'coinPop', value);
+  mission(s, 'coins', 1);
   dared(s, 'coins', 1);
   dared(s, 'streak', streakMult(s.streak, streakMax(s.road)));
 }
@@ -298,6 +371,7 @@ function meetDare(s: GameState) {
   if (!d || d.done) return;
   d.done = true;
   s.coins += DARE.reward;
+  mission(s, 'dares', 1);
   effect(s, 'pop', s.distance + 420, RUNNER.h + 100, 1600, 'dareMetPop', DARE.reward);
 }
 
@@ -343,6 +417,7 @@ function hurt(s: GameState, kind: TrapKind | 'wall' | 'boss' | 'rock') {
     }
   }
   s.hits += 1;
+  s.row = 0;
   r.hurtMs = st.hurtMs;
   // A no-hit dare is lost to any hit, a blocked one included.
   if (s.dare?.kind === 'nohit' && !s.dare.done) s.dare.failed = true;
@@ -404,10 +479,13 @@ export function tick(s: GameState, dt: number) {
 
   // In the windy pass a headwind slows the knight while they are off the ground; on the Sky Road a
   // gust at their back speeds them on.
+  // A shield dash charges on faster.
   const gust = gustOf(s) === 'blow';
-  const pace = (s.terrain === 'wind' && !grounded(s) ? WIND.air : 1) * (gust ? GUST.speed : 1);
+  const dashing = r.dashMs > 0;
+  const pace = (s.terrain === 'wind' && !grounded(s) ? WIND.air : 1) * (gust ? GUST.speed : 1) * (dashing ? DASH.pace : 1);
   const from = s.distance;
   s.distance = Math.min(s.checkpointX, s.distance + s.speed * pace * sec);
+  mission(s, 'metres', metres(s.distance));
   // The rockfall keeps the knight's pace and creeps up a little; hits and skids let it gain.
   const rock = s.rockfall;
   if (rock) rock.x += s.distance - from + ROCK.creep * sec;
@@ -425,7 +503,9 @@ export function tick(s: GameState, dt: number) {
     if (s.phase !== 'running') return;
   }
   const prevH = r.h;
-  if (r.h > floor || r.vh > 0) {
+  // A dash in the air holds the knight's height.
+  if (dashing && r.h > floor) r.vh = 0;
+  else if (r.h > floor || r.vh > 0) {
     // Falcon's Glide: the knight falls at half the pull. A gust lets the knight float.
     r.vh -= GRAVITY * (r.vh < 0 && st.glide ? GLIDE : 1) * (gust ? GUST.lift : 1) * sec;
     r.h += r.vh * sec;
@@ -455,6 +535,8 @@ export function tick(s: GameState, dt: number) {
   if (grounded(s)) r.jumps = st.jumps;
   r.slideMs = Math.max(0, r.slideMs - dt);
   r.hurtMs = Math.max(0, r.hurtMs - dt);
+  r.dashMs = Math.max(0, r.dashMs - dt);
+  r.dashCd = Math.max(0, r.dashCd - dt);
   if (r.skidMs > 0) {
     r.skidMs = Math.max(0, r.skidMs - dt);
     // The queued jump comes as the skid ends, in the air too (as the first jump, or Second Leap)
@@ -468,11 +550,22 @@ export function tick(s: GameState, dt: number) {
   // One trap hit a frame, and none while unhurtable, except a pit: a fall is not a contact hit,
   // so nothing holds the knight up over one.
   if (s.phase === 'running') {
+    // A dash breaks through what it meets first.
+    if (dashing) for (const t of s.traps.filter((o) => DASHABLE.includes(o.kind) && touches(s, o))) smash(s, t);
     const hit = s.traps.find((t) => (t.kind === 'pit' || r.hurtMs <= 0) && touches(s, t));
     // The heavy knight smashes a goblin or bat he runs into.
     if (hit && st.smash && FOES.includes(hit.kind)) knockOut(s, hit);
-    else if (hit) hurt(s, hit.kind);
+    else if (hit) {
+      hit.touched = true;
+      hurt(s, hit.kind);
+    }
     if (s.phase !== 'running') return;
+    // A hanging log passed without a hit was slid under.
+    for (const t of s.traps) {
+      if (t.kind !== 'blade' || t.passed || t.x + t.w >= s.distance - RUNNER.w / 2) continue;
+      t.passed = true;
+      if (!t.touched) mission(s, 'logs', 1);
+    }
   }
   if (rock && s.phase === 'running') {
     if (s.hits > hitsBefore) rock.x += ROCK.hit;
@@ -500,6 +593,7 @@ export function tick(s: GameState, dt: number) {
     if (near < COIN_REACH) {
       c.x = Number.NaN;
       if (s.challenge) s.challenge.got += 1;
+      if (c.high) mission(s, 'high', 1);
       gainCoin(s, s.distance, midH);
       effect(s, 'coin', s.distance, midH, 400);
       continue;
@@ -546,6 +640,8 @@ export function tick(s: GameState, dt: number) {
     r.skidMs = 0;
     r.jumpQueued = false;
     r.slideQueued = false;
+    r.dashMs = 0;
+    r.dashCd = 0;
   }
 }
 
@@ -623,6 +719,8 @@ function bossContact(s: GameState, prevH: number) {
     b.hp -= 1;
     b.hurtMs = n.hurtMs;
     s.stomps += 1;
+    s.row += 1;
+    mission(s, 'row', s.row);
     effect(s, 'stomp', b.x + b.w / 2, n.h, 450);
     r.h = n.h;
     r.vh = st.jumpV * STOMP_BOUNCE;

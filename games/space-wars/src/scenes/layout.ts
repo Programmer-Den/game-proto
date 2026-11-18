@@ -98,6 +98,20 @@ export let PANEL_X = RESEARCH_COLUMN.x + RESEARCH_COLUMN.w + 8;
 export const RIVALS_PANEL = { x: VIEW.w - 326, y: TOP.h + 8, w: 318, head: 24, row: 64 };
 /** The minimap: the whole battlefield at a tenth of its size, one pixel a fog cell, in the map's bottom-right corner. */
 export const MINIMAP = { x: VIEW.w - 168, y: BAR.y - 108, w: 160, h: 100 };
+/**
+ * The command strip over the map's bottom-left corner, in battle only: GROUPS control group chips,
+ * then the Attack-move and Actives pills. It sits under the playthrough's taps (they keep 60 px off
+ * the map's edges), so it never takes one.
+ */
+export const GROUPS = 5;
+export const STRIP = { x: 8, y: BAR.y - 30, h: 22, chip: 30, gap: 4, pill: 132 };
+/** The strip's boxes, in view pixels: the group chips by index, then the two pills. */
+export function stripBoxes() {
+  const { x, y, h, chip, gap, pill } = STRIP;
+  const groups = Array.from({ length: GROUPS }, (_, k) => ({ x: x + k * (chip + gap), y, w: chip, h }));
+  const after = x + GROUPS * (chip + gap) + 4;
+  return { groups, attackMove: { x: after, y, w: pill, h }, actives: { x: after + pill + gap, y, w: pill, h } };
+}
 /** The army count on the top bar: tapping it selects every warship. */
 export const ARMY_TAB = { x: 360, w: 70 };
 /** The contract pill in the middle of the top bar: its left edge (it is 308 wide). */
@@ -154,6 +168,7 @@ export function fitView(w: number, h: number, corner = { w: 0, h: 0 }) {
   Object.assign(LEAD, { x, lift });
   BAR.y = base.BAR.y + dy - lift;
   BAR.h = base.BAR.h + lift;
+  STRIP.y = BAR.y - 30;
   Object.assign(MAP_VIEW, { w, h: BAR.y - TOP.h });
   RESEARCH_COLUMN.y = base.RESEARCH_COLUMN.y + dy - lift;
   PANEL_X = base.PANEL_X + x;

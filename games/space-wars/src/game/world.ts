@@ -194,6 +194,37 @@ export const PACT_WAVE_MS = 45000;
 const PACT_FUNDS = 100;
 const PACT_HUB_SHARE = 1 / 3;
 const PACT_RIVALS = 2;
+/**
+ * Mining belts that run dry: a hub's belt is the crystal in the nodes within BELT_RANGE of it. Once
+ * it falls under BELT_LOW of what it held the player hears so (and again once it is dry), and a
+ * rival whose every hub's belt is that low builds another outpost, up to AI_MAX_OUTPOSTS, whatever
+ * the time. BELT_CHECK_MS is how often the belts are looked at.
+ */
+export const BELT_RANGE = 170;
+export const BELT_LOW = 1 / 3;
+const BELT_CHECK_MS = 1000;
+const AI_MAX_OUTPOSTS = 3;
+/**
+ * Ship actives: one tap ability per warship class, each on a cooldown of its own (`Unit.activeMs`).
+ * A scout's afterburner flies at AFTERBURNER times its speed for `ms`; a gunship's missile salvo hits
+ * up to SALVO_MISSILES enemies within its weapon's range plus SALVO_REACH for SALVO_DAMAGE times its
+ * shot; a heavy's point-defence screen cuts every shot at it and its faction's ships within
+ * SCREEN_RANGE to SCREEN_SHARE for `ms`. The AI uses them from AI_ACTIVE_MS (after the first round).
+ */
+export type ActiveKind = 'afterburner' | 'salvo' | 'screen';
+export type Warship = Exclude<UnitId, 'harvester'>;
+export const ACTIVES: Record<Warship, { kind: ActiveKind; name: TextKey; text: TextKey; cooldownMs: number; ms: number }> = {
+  scout: { kind: 'afterburner', name: 'activeAfterburner', text: 'activeAfterburnerText', cooldownMs: 15000, ms: 3000 },
+  gunship: { kind: 'salvo', name: 'activeSalvo', text: 'activeSalvoText', cooldownMs: 18000, ms: 0 },
+  heavy: { kind: 'screen', name: 'activeScreen', text: 'activeScreenText', cooldownMs: 24000, ms: 6000 },
+};
+export const AFTERBURNER = 1.8;
+export const SALVO_MISSILES = 3;
+export const SALVO_DAMAGE = 2.5;
+export const SALVO_REACH = 40;
+export const SCREEN_RANGE = 70;
+export const SCREEN_SHARE = 0.6;
+const AI_ACTIVE_MS = 90000;
 
 /**
  * The spots round a rally point that new ships fly to, in turn, so a wing fans out rather than
@@ -209,10 +240,12 @@ export const RALLY_SPOTS: readonly Point[] = [
  * Where a unit is going: a point to move to, or an entity to attack. A player's attack on a rival
  * building under the fog carries `seen`, the spot and owner it was last seen with: while that spot
  * is out of sight and the building is gone, the ships fly there to look rather than give up.
+ * An attack-move is a move with `fight`: the ship takes on every enemy in sight on the way, each as
+ * an attack that carries `then`, the point to fly on to once that fight is over.
  */
 export type Order =
-  | { kind: 'move'; x: number; y: number }
-  | { kind: 'attack'; id: number; auto: boolean; seen?: { x: number; y: number; faction: number } };
+  | { kind: 'move'; x: number; y: number; fight?: boolean }
+  | { kind: 'attack'; id: number; auto: boolean; seen?: { x: number; y: number; faction: number }; then?: Point };
 
 export interface Mining {
   node: number;
@@ -258,6 +291,10 @@ export interface Unit {
   convoy: boolean;
   /** The `escort` scenario's carrier: the player's, unarmed, never ordered, flying its own route. */
   carrier: boolean;
+  /** Time before the ship's active (ACTIVES) can be used again, in ms; 0 when ready. */
+  activeMs: number;
+  /** Time its afterburner or point-defence screen has left, in ms. */
+  boostMs: number;
 }
 
 /** What a faction can build: the buildings beside a hub, and an expansion (a second hub) at a far crystal field. */
@@ -313,6 +350,8 @@ export interface Mine extends Point {
 export interface Node extends Point {
   id: number;
   amount: number;
+  /** What it held when the map was made. */
+  full: number;
 }
 
 /**
@@ -487,7 +526,7 @@ export type WorldEvent =
 export type Cue =
   | 'built' | 'warpIn' | 'researchDone' | 'rankUp' | 'contractStarted' | 'contractDone' | 'contractFailed'
   | 'won' | 'lost' | 'truceOffered' | 'truceMade' | 'truceBroken' | 'tribute' | 'klaxon'
-  | 'flagshipReady' | 'flagshipLaunched' | 'flagshipLost' | 'hubFalls' | 'admiralReady';
+  | 'flagshipReady' | 'flagshipLaunched' | 'flagshipLost' | 'hubFalls' | 'admiralReady' | 'beltLow';
 
 /** Anything that can fire a shot. */
 type Shooter = Unit | Building | Derelict;
@@ -687,6 +726,9 @@ export class World {
   readonly pathing: Pathing;
   /** Each ship's way round the rocks while its straight flight is blocked: the waypoints, where to, and when it was found. */
   private readonly routes = new WeakMap<Unit, { path: Point[]; to: Point; at: number }>();
+  /** How low each of the player's hubs' belts the player has been told it is (by hub id): 1 low, 2 dry. */
+  private readonly beltWarned = new Map<number, number>();
+  private beltMs = 0;
 
   /**
    * `pick` is the faction the player commands, an index into `FACTIONS`. It takes the player's start
@@ -718,7 +760,7 @@ export class World {
     this.rng = localRandom((layout.homes[0].x * 3.7 + layout.homes[0].y) % 1);
     this.dealRng = localRandom((layout.homes[0].y * 5.3 + layout.homes[0].x) % 1);
     this.pathing = new Pathing(layout.rocks, UNIT_RADIUS - ROCK_OVERLAP);
-    const nodes = layout.nodes.map((n) => ({ id: this.id(), x: n.x, y: n.y, amount: n.amount }));
+    const nodes = layout.nodes.map((n) => ({ id: this.id(), x: n.x, y: n.y, amount: n.amount, full: n.amount }));
     // One loose crystal node partway to the centre becomes the relay beacon and is no longer mined.
     const spot = nodes[layout.beacon ?? beaconNode(layout.homes, layout.nodes)];
     this.nodes = nodes.filter((n) => n !== spot);
@@ -977,7 +1019,7 @@ export class World {
    * The player's order to the selected combat units: attack what is at (x, y) when it is an enemy,
    * otherwise move there. Harvesters are not commanded.
    */
-  command(ids: number[], x: number, y: number): boolean {
+  command(ids: number[], x: number, y: number, attackMove = false): boolean {
     if (this.phase !== 'playing') return false;
     const target = this.entityAt(x, y);
     // A rival building under the fog is attacked as last seen, whether it still stands or has fallen.
@@ -1003,6 +1045,7 @@ export class World {
           kind: 'move',
           x: Math.min(ARENA.x + ARENA.w - 8, Math.max(ARENA.x + 8, x + spot.x)),
           y: Math.min(ARENA.y + ARENA.h - 8, Math.max(ARENA.y + 8, y + spot.y)),
+          fight: attackMove || undefined,
         };
     });
     return units.length > 0;
@@ -1219,6 +1262,7 @@ export class World {
     this.updateFlagship(dt);
     this.updateBeacon(dt);
     this.updateShards(dt);
+    this.updateBelts(dt);
     // The player's own contracts; a watched battle runs every side's rival chain instead (updateDeals).
     if (!this.watch) this.updateContract(dt);
     this.updateDeals(dt);
@@ -1344,6 +1388,8 @@ export class World {
     const ability = this.abilityOf(u);
     u.cooldown -= dt;
     u.revealMs = Math.max(0, u.revealMs - dt);
+    u.activeMs = Math.max(0, u.activeMs - dt);
+    u.boostMs = Math.max(0, u.boostMs - dt);
     u.repairing = false;
     if (u.decoyMs !== null) {
       // A decoy only draws fire: it never acts, and it fades when its time runs out.
@@ -1352,7 +1398,7 @@ export class World {
       return;
     }
     // A nebula slows every ship inside it.
-    const speed = u.nebula ? stats.speed * NEBULA_SLOW : stats.speed;
+    const speed = (u.nebula ? stats.speed * NEBULA_SLOW : stats.speed) * (u.type === 'scout' && u.boostMs > 0 ? AFTERBURNER : 1);
     // Beside a hub or Depot of its own, a ship slowly repairs.
     if (u.hp < u.maxHp && this.repairSpots(u.faction).some((b) => dist(b, u) <= REPAIR_RANGE)) {
       u.hp = Math.min(u.maxHp, u.hp + (u.maxHp * REPAIR_RATE * this.sides[u.faction].perks.repair * dt) / 1000);
@@ -1379,6 +1425,11 @@ export class World {
       return;
     }
     if (!u.order) this.acquire(u, stats.sight);
+    // An attack-move takes on the nearest enemy in sight, then flies on.
+    if (u.order?.kind === 'move' && u.order.fight) {
+      const foe = this.nearestEnemy(u, u.faction, stats.sight);
+      if (foe) u.order = { kind: 'attack', id: foe.id, auto: true, then: { x: u.order.x, y: u.order.y } };
+    }
     const order = u.order;
     if (!order) return;
     if (order.kind === 'move') {
@@ -1397,11 +1448,11 @@ export class World {
     }
     // A target can change sides when a hack takes it over, slip into a nebula, or come under a truce.
     if (!target || target.hp <= 0 || target.faction === u.faction || this.hidden(target, u.faction) || this.atPeace(u.faction, target.faction)) {
-      u.order = null;
+      u.order = this.flyOn(order);
       return;
     }
     if (order.auto && dist(u, target) > stats.sight * 1.6) {
-      u.order = null;
+      u.order = this.flyOn(order);
       return;
     }
     if (!stats.weapon) return;
@@ -1414,6 +1465,107 @@ export class World {
       }
     } else {
       this.approach(u, target.x, target.y, stop, dt, speed);
+    }
+  }
+
+  /** What a ship does once its attack is over: an attack-move flies on to its point, anything else stops. */
+  private flyOn(order: Order): Order | null {
+    return order.kind === 'attack' && order.then ? { kind: 'move', x: order.then.x, y: order.then.y, fight: true } : null;
+  }
+
+  /**
+   * The player's order to use the selected ships' actives (ACTIVES): every ready ship fires its own,
+   * a gunship only with an enemy in reach. Returns how many fired of each kind, or why none did.
+   */
+  useActives(ids: number[]): { used: Partial<Record<ActiveKind, number>> } | { reason: string } {
+    if (this.phase !== 'playing') return { reason: t('activeNone') };
+    const units = ids.map((id) => this.unit(id)).filter((u): u is Unit => !!u && this.commandable(u));
+    if (!units.length) return { reason: t('activeSelect') };
+    const used: Partial<Record<ActiveKind, number>> = {};
+    for (const u of units) {
+      if (u.activeMs > 0 || u.type === 'harvester') continue;
+      if (this.fireActive(u)) used[ACTIVES[u.type].kind] = (used[ACTIVES[u.type].kind] ?? 0) + 1;
+    }
+    if (Object.keys(used).length) return { used };
+    const cooling = units.filter((u) => u.activeMs > 0);
+    return { reason: cooling.length === units.length ? t('activeCooling', { s: Math.ceil(Math.min(...cooling.map((u) => u.activeMs)) / 1000) }) : t('activeNoTarget') };
+  }
+
+  /** Fires a warship's active if it can: the afterburner and screen always, the salvo only with an enemy in reach. */
+  private fireActive(u: Unit): boolean {
+    if (u.type === 'harvester' || u.activeMs > 0) return false;
+    const active = ACTIVES[u.type];
+    if (active.kind === 'salvo') {
+      const weapon = this.statsOf(u).weapon;
+      if (!weapon) return false;
+      const reach = weapon.range + SALVO_REACH;
+      const targets = [...this.units, ...this.buildings]
+        .filter((e) => e.faction !== u.faction && e.hp > 0 && !this.hidden(e, u.faction) && !this.atPeace(u.faction, e.faction)
+          && dist(u, e) <= reach + this.radiusOf(e))
+        .sort((a, b) => (a.kind === b.kind ? dist(u, a) - dist(u, b) : a.kind === 'unit' ? -1 : 1))
+        .slice(0, SALVO_MISSILES);
+      if (!targets.length) return false;
+      for (const e of targets) {
+        this.shoot(u, Math.round(weapon.damage * SALVO_DAMAGE * this.veteranBonus(u)), e);
+        this.booms.push({ x: e.x, y: e.y, color: this.sides[u.faction].def.accent, life: BOOM_MS, r: 12 });
+      }
+    } else u.boostMs = active.ms;
+    u.activeMs = active.cooldownMs;
+    return true;
+  }
+
+  /** A point-defence screen cuts a shot at a ship within SCREEN_RANGE of a screening heavy of its faction. */
+  private screenShare(target: Unit | Building) {
+    if (target.kind !== 'unit') return 1;
+    const screened = this.units.some((h) => h.boostMs > 0 && h.type === 'heavy' && h.faction === target.faction && dist(h, target) <= SCREEN_RANGE);
+    return screened ? SCREEN_SHARE : 1;
+  }
+
+  /** The AI fires its warships' actives once the first round is over: salvos at whatever is in reach, screens and afterburners in a fight. */
+  private aiActives(army: Unit[]) {
+    if (this.elapsedMs < AI_ACTIVE_MS) return;
+    for (const u of army) {
+      if (u.activeMs > 0 || u.type === 'harvester') continue;
+      const order = u.order;
+      const target = order?.kind === 'attack' ? this.unit(order.id) ?? this.building(order.id) : null;
+      if (u.type === 'gunship') this.fireActive(u);
+      else if (u.type === 'heavy' && target && dist(u, target) <= this.statsOf(u).sight) this.fireActive(u);
+      else if (u.type === 'scout' && target && order?.kind === 'attack' && !order.auto && dist(u, target) > this.statsOf(u).sight) this.fireActive(u);
+    }
+  }
+
+  /** A hub's mining belt: the crystal left in the nodes within BELT_RANGE of it, and what they held at the start. */
+  belt(hub: Point) {
+    let left = 0, full = 0;
+    for (const n of this.nodes) {
+      if (dist(n, hub) > BELT_RANGE) continue;
+      left += Math.max(0, n.amount);
+      full += n.full;
+    }
+    return { left, full };
+  }
+
+  /** Whether a hub's belt has run low (under BELT_LOW of what it held). */
+  private beltLow(hub: Point) {
+    const b = this.belt(hub);
+    return b.full > 0 && b.left < b.full * BELT_LOW;
+  }
+
+  /** Tells the player once when a hub's belt runs low, and again when it runs dry. */
+  private updateBelts(dt: number) {
+    this.beltMs += dt;
+    if (this.beltMs < BELT_CHECK_MS || this.watch) return;
+    this.beltMs = 0;
+    const side = this.sides[PLAYER];
+    for (const hub of this.hubsOf(PLAYER, true)) {
+      const b = this.belt(hub);
+      if (!b.full) continue;
+      const level = b.left <= 0 ? 2 : b.left < b.full * BELT_LOW ? 1 : 0;
+      if (level <= (this.beltWarned.get(hub.id) ?? 0)) continue;
+      this.beltWarned.set(hub.id, level);
+      const name = t(hub.expansion ? side.def.outpost : side.def.buildings.hub.name);
+      this.events.push({ kind: 'notice', text: level === 2 ? t('beltDry', { hub: name }) : t('beltLowNotice', { hub: name, n: Math.round((100 * b.left) / b.full) }) });
+      this.cue('beltLow');
     }
   }
 
@@ -1626,7 +1778,7 @@ export class World {
   /** One shot from `from` at `target`: shields soak part of it, and the shot's own ability acts. */
   private shoot(from: Shooter, damage: number, target: Unit | Building) {
     const faction = from.kind === 'derelict' ? from.owner : from.faction;
-    const dealt = Math.round(damage * this.shieldShare(target) * this.bulwarkShare(target));
+    const dealt = Math.round(damage * this.shieldShare(target) * this.bulwarkShare(target) * this.screenShare(target));
     target.hp -= dealt;
     target.lastHit = faction;
     if (target.kind === 'unit') target.lastHitBy = from.kind === 'unit' ? from.id : -1;
@@ -2084,7 +2236,7 @@ export class World {
       y: Math.min(ARENA.y + ARENA.h - 12, Math.max(ARENA.y + 12, y)),
       angle: -Math.PI / 2, hp: stats.hp, maxHp: stats.hp, cooldown: 0, order: null, mining: null, carry: 0,
       timer: 0, revealMs: 0, decoyMs, lastHit: -1, lastHitBy: -1, home: -1, kills: 0, nebula: false, repairing: false,
-      flagship, convoy: false, carrier: false,
+      flagship, convoy: false, carrier: false, activeMs: 0, boostMs: 0,
     };
     unit.nebula = this.inNebula(unit);
     this.units.push(unit);
@@ -2110,13 +2262,17 @@ export class World {
     const army = this.units.filter((u) => u.faction === f && u.type !== 'harvester' && u.decoyMs === null);
     // Once the opening is over, an AI with a fair army saves up to expand and to research.
     let saving = false;
-    if (this.elapsedMs >= AI_EXPAND_MS && expansions === 0) {
+    // A rival expands once the opening is over, and again whenever every belt it mines runs low.
+    const dry = expansions < AI_MAX_OUTPOSTS && this.hubsOf(f).every((h) => this.beltLow(h));
+    if ((this.elapsedMs >= AI_EXPAND_MS && expansions === 0) || dry) {
       if (side.crystal >= expansionStats(side).cost) {
-        if (this.expand(f)) aiLog(String(f), t('aiOutpost'));
+        if (this.expand(f, dry)) aiLog(String(f), t('aiOutpost'));
       }
       else saving = true;
     }
-    if (this.elapsedMs >= AI_RESEARCH_MS && !side.research.current && has('barracks')) {
+    // With every belt running dry, the outpost comes before research and new warships.
+    const starved = dry && saving;
+    if (this.elapsedMs >= AI_RESEARCH_MS && !starved && !side.research.current && has('barracks')) {
       // The lowest track next, picked at random among equals.
       const open = TRACKS.filter((t) => side.research.levels[t] < RESEARCH_LEVELS);
       const low = open.filter((t) => side.research.levels[t] === Math.min(...open.map((o) => side.research.levels[o])));
@@ -2127,7 +2283,7 @@ export class World {
       else if (track) saving = true;
     }
     const cap = this.scenario === 'survive' ? SURVIVE_ARMY : AI_MAX_ARMY;
-    if (army.length < cap && !(saving && army.length >= AI_ARMY_TO_ATTACK)) {
+    if (army.length < cap && !starved && !(saving && army.length >= AI_ARMY_TO_ATTACK)) {
       for (const type of [...COMBAT_UNITS].sort(() => Math.random() - 0.5)) {
         if (this.train(type, f) === null) break;
       }
@@ -2136,6 +2292,7 @@ export class World {
     this.contestDerelicts(side, army);
     this.fetchSalvage(side);
     this.considerTruce(side);
+    this.aiActives(army);
     // A badly hurt warship that is not on a raid falls back to repair.
     for (const u of army) {
       if (u.hp < u.maxHp * AI_FALL_BACK_HP && !u.repairing && u.id !== side.picket && (!u.order || (u.order.kind === 'attack' && u.order.auto))) {
@@ -2224,8 +2381,9 @@ export class World {
   }
 
   /** An AI expansion: a second hub beside the richest-looking crystal field away from everyone. */
-  private expand(f: number): boolean {
-    const spot = this.expansionSpot(f);
+  private expand(f: number, anywhere = false): boolean {
+    // Driven out by dry belts, it takes any rich field, even one nearer a rival.
+    const spot = anywhere ? this.expansionSpot(f, AI_EXPAND_RIVAL_GAP, Infinity) ?? this.expansionSpot(f, AI_EXPAND_RIVAL_GAP / 2, Infinity) : this.expansionSpot(f);
     return !!spot && this.build('expansion', spot.x, spot.y, f) === null;
   }
 

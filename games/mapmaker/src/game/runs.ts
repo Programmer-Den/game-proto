@@ -6,7 +6,7 @@ import { byDifficulty } from '../../../../shared/settings';
 import { makeIsland } from './island';
 import { landingSpot } from './sim';
 import type { IsleKind } from './kinds';
-import { rankOf, type GameState, type Run } from './state';
+import { NO_PACK, rankOf, type GameState, type Run } from './state';
 
 /** The storage name the daily isle keeps its record under (`mapmaker-daily`). */
 export const DAILY_GAME = 'mapmaker';
@@ -81,6 +81,16 @@ export function newRun(atlas: GameState, run: Run): GameState {
     stores: 0,
     trade: null,
     traded: [],
+    // A run sails with food alone.
+    pack: { ...NO_PACK },
+    gear: { ...NO_PACK },
+    sighted: [],
+    climbed: [],
+    fixed: [],
+    fixes: 0,
+    goods: 0,
+    pressOn: 0,
+    pressed: 0,
     run,
   };
   // An expedition with the coastal sloop gets its second landing too.

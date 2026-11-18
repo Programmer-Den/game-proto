@@ -12,6 +12,10 @@ const en: HowToPlay = {
       input: 'Tap the bottom half or the Slide button, or Down / S',
       action: 'Slide; in the air, drop fast and slide on landing',
     },
+    {
+      input: 'The Dash button, or Right / D / Shift',
+      action: 'Shield dash: charge ahead through crates, barrels and goblins, and skim over a pit',
+    },
     { input: 'Tap a boon card', action: 'Take that boon at a checkpoint' },
     {
       input: 'Tap a road card',
@@ -32,11 +36,14 @@ const en: HowToPlay = {
     'Reach the checkpoint banner every 100 m and choose one of the boons on offer.',
     'Each stage after runs a little faster, on new ground with its own rule.',
     'When you fall, the coins you picked up are banked for the armoury and the next run.',
+    'Three run missions stand at a time; each one met pays banked coins at once, and a harder one takes its place.',
   ],
   tips: [
     'Every hit costs a heart and resets your coin streak; you blink and stay safe for a moment after.',
     'Landing on a goblin or bat from above knocks it out for a coin and bounces you back up.',
     'Fire vents only burn part of the time: jump them, or run over while they are out.',
+    'From stage 2, crates and shield goblins block the road: a shield goblin is too tall to leap, so dash through it. The dash needs a moment to come back (the shield in the top bar).',
+    'From stage 3 the road sometimes splits under floating platforms: jump up through one for the coins and the spikes or goblin up there, or keep to the safe road below.',
     'From stage 2, slide into a wayside shrine to trade 15 coins for a heart.',
     "Meet the herald's dare on a stage for 20 coins and a third boon card.",
     'Every fifth stage a Gatekeeper bars the road: dodge its barrels and axes, then stomp its helm three times.',
@@ -70,6 +77,10 @@ const de: HowToPlay = {
       input: 'Untere Hälfte oder den Rutschen-Knopf antippen, oder Runter / S',
       action: 'Rutschen; in der Luft schnell fallen und bei der Landung rutschen',
     },
+    {
+      input: 'Den Stoß-Knopf, oder Rechts / D / Umschalt',
+      action: 'Schildstoß: durch Kisten, Fässer und Kobolde vorwärts stürmen und über eine Grube gleiten',
+    },
     { input: 'Eine Gabenkarte antippen', action: 'Diese Gabe an einem Rastplatz nehmen' },
     {
       input: 'Eine Wegkarte antippen',
@@ -90,11 +101,14 @@ const de: HowToPlay = {
     'Erreiche alle 100 m die Rastplatzfahne und wähle eine der angebotenen Gaben.',
     'Jede weitere Etappe läuft etwas schneller, auf neuem Boden mit eigener Regel.',
     'Wenn du fällst, werden die gesammelten Münzen für die Rüstkammer und den nächsten Lauf gespart.',
+    'Drei Aufträge stehen jeweils an; jeder erfüllte bringt sofort gesparte Münzen, und ein schwererer tritt an seine Stelle.',
   ],
   tips: [
     'Jeder Treffer kostet ein Herz und setzt deine Münzserie zurück; danach blinkst du und bist kurz sicher.',
     'Wer von oben auf einem Kobold oder einer Fledermaus landet, schaltet ihn für eine Münze aus und federt wieder hoch.',
     'Feueröffnungen brennen nur zeitweise: spring darüber, oder lauf hinüber, wenn sie aus sind.',
+    'Ab Etappe 2 versperren Kisten und Schildkobolde den Weg: ein Schildkobold ist zu hoch zum Überspringen, also stoß hindurch. Der Stoß braucht einen Moment, bis er wieder bereit ist (der Schild in der oberen Leiste).',
+    'Ab Etappe 3 teilt sich der Weg manchmal unter schwebenden Plattformen: spring von unten durch eine hinauf, für die Münzen und die Stacheln oder den Kobold dort, oder bleib auf dem sicheren Weg darunter.',
     'Ab Etappe 2 rutsch in einen Wegschrein, um 15 Münzen gegen ein Herz zu tauschen.',
     'Erfülle die Mutprobe des Herolds auf einer Etappe für 20 Münzen und eine dritte Gabenkarte.',
     'Jede fünfte Etappe versperrt ein Torwächter den Weg: weiche seinen Fässern und Äxten aus und zertritt dann dreimal seinen Helm.',

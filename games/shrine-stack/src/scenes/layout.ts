@@ -36,6 +36,8 @@ export const SHOP_ROW = { xs: [372, 590, 808], y: 460, w: 200, h: 36 };
 export const BUILD_ON = { x: 590, y: 226, w: 240, h: 52 };
 /** The reserve's swap button in the side panel, by its centre. */
 export const RESERVE_BUTTON = { x: 194, y: 190, w: 60, h: 18 };
+/** The capstone button beside the tier pips in the side panel, by its centre. */
+export const CAPSTONE_BUTTON = { x: 172, y: 105, w: 96, h: 18 };
 /** The lean meter in the side panel: its top-left, width and height. */
 export const LEAN_BAR = { x: 66, y: 238, w: 148, h: 10 };
 /** The goal box in the side panel: its top, and the size and gap of its tier pips. */

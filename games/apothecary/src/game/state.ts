@@ -2,6 +2,8 @@ import { GROW_MS, PLANTS, POTION_PRICE, POTIONS, REFINED, type BrewOut, type Ite
 import type { TextKey } from '../i18n';
 import { SHOP_IDS, createTown, type Gear, type TownState } from './town';
 import { createAlchemy, type Alchemy, type DecorId } from './alchemy';
+import { createNight, type Night } from './night';
+import { createLedger, type Ledger } from './ledger';
 
 export interface Plot {
   plant: PlantId;
@@ -11,7 +13,24 @@ export interface Plot {
   blighted?: boolean;
   /** Milliseconds since this blighted bed last spread the blight; it spreads every `BLIGHT_SPREAD_MS`. */
   blightMs?: number;
+  /**
+   * Milliseconds since the bed grew ripe, while that is under `PRIME_MS`: its prime window (AP23).
+   * Missing outside it, and on the beds a new game starts ripe with.
+   */
+  ripeMs?: number;
 }
+
+/** How many of each plain good or potion at a station count as Prime or Fine (AP23); missing counts as none. */
+export type PrimeCount = Partial<Record<string, number>>;
+
+/**
+ * Prime harvest (AP23): a bed glows gold for `PRIME_MS` after it grows ripe, and a plant the doctor
+ * picks then is a Prime plant, which refines into a Prime good. A potion brewed from Prime goods only
+ * is Fine. The pixies and craftsmen take the plain ones.
+ */
+export const PRIME_MS = 5_000;
+/** Whether a bed is in its prime window. */
+export const inPrime = (plot: Plot) => !plot.blighted && plot.ripeMs !== undefined && plot.ripeMs < PRIME_MS;
 
 export interface Refiner {
   queue: PlantId[];
@@ -23,6 +42,10 @@ export interface Refiner {
    * the front one, with its own progress. Missing in saves from before it, which counts as empty.
    */
   second?: { plant: PlantId; progress: number } | null;
+  /** How many plants in the queue (or the second pipe) are Prime, by plant (AP23). */
+  primeIn?: PrimeCount;
+  /** How many goods on the output pallets are Prime, by good (AP23). */
+  primeOut?: PrimeCount;
 }
 
 export interface Brew {
@@ -30,6 +53,8 @@ export interface Brew {
   out: BrewOut;
   ms: number;
   progress: number;
+  /** Brewed from Prime goods only, so it comes out Fine (AP23). */
+  prime?: boolean;
 }
 
 export interface Cauldron {
@@ -38,6 +63,10 @@ export interface Cauldron {
   /** The second pipe's brew, opened by a second craftsman. Missing in saves from before it. */
   brewing2?: Brew | null;
   output: PotionId[];
+  /** How many goods in the cauldron are Prime, by good (AP23). */
+  primeIn?: PrimeCount;
+  /** How many potions on the output pallets are Fine, brewed from Prime goods, by potion (AP23). */
+  primeOut?: PrimeCount;
 }
 
 /**
@@ -309,6 +338,10 @@ export interface GameState {
   alchemy: Alchemy;
   /** The shop decor bought (AP20). */
   decor: DecorId[];
+  /** The shop kept open at night, and the night folk (AP21; see `night.ts`). */
+  night: Night;
+  /** Each station's work and waits, and the shelves' empty time, today and yesterday (AP22; see `ledger.ts`). */
+  ledger: Ledger;
 }
 
 /**
@@ -964,6 +997,8 @@ export function createInitialState(): GameState {
     mastery: {},
     alchemy: createAlchemy(),
     decor: [],
+    night: createNight(),
+    ledger: createLedger(),
   };
   state.contract = contractFor(state, 1, 0);
   return state;

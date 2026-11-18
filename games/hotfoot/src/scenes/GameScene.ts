@@ -5,7 +5,7 @@ import { ui } from '../../../../shared/audio';
 import { settings } from '../../../../shared/settings';
 import { SoundCues } from '../audio/cues';
 import { sfx } from '../audio/sound';
-import { BOSS_ART, GOBLIN_ART } from '../art/foes';
+import { BOSS_ART, GOBLIN_ART, SHIELD_ART } from '../art/foes';
 import { bakePanel } from '../art/hud';
 import { armouryIcon } from '../art/icons';
 import { C, N, tileAt } from '../art/ink';
@@ -23,10 +23,13 @@ import { PAIRS, pairsOf } from '../game/pairs';
 import { PETS, PET_IDS, nextPetPrice, type PetId } from '../game/pets';
 import { weekOf, weeklyBoons, weeklyKey } from '../game/weekly';
 import { loadGhosts, loadProgress, saveGhosts, saveProgress, type Progress } from '../game/save';
-import { buyArmoury, buyKnight, buyMissed, buyPet, jump, newRun, pick, pickRoad, slide, tick } from '../game/sim';
+import { MISSIONS, goalOf, rewardOf } from '../game/missions';
+import { buyArmoury, buyKnight, buyMissed, buyPet, dash, jump, newRun, pick, pickRoad, slide, tick } from '../game/sim';
 import {
   BOON_PRICE,
+  DASH,
   LEAD_IN,
+  ROUTE,
   ROADS,
   ROCK,
   TERRAIN,
@@ -54,7 +57,7 @@ import {
 import { t, type TextKey } from '../i18n';
 import { BoonCards } from '../ui/BoonCards';
 import { makeButton } from '../ui/Button';
-import { ACTION_BUTTONS, ARMOURY_PANEL, DARE_TAG, FONT, FRAME, GROUND_Y, HUD_SHIFT, MARGIN, RUNNER_X, STAGE_TITLE, STREAK_CHIP, TAG, TAP_SPLIT_Y, TRACK, UI_DEPTH, VIEW } from './layout';
+import { ACTION_BUTTONS, ARMOURY_PANEL, DARE_TAG, DASH_SIGN, FONT, FRAME, GROUND_Y, HUD_SHIFT, MARGIN, OVER_PANEL, RUNNER_X, STAGE_TITLE, STREAK_CHIP, TAG, TAP_SPLIT_Y, TRACK, UI_DEPTH, VIEW } from './layout';
 import { checkTrophies } from '../trophies/check';
 
 /** Longest simulated step, so a backgrounded tab doesn't jump the run forward. */
@@ -158,6 +161,11 @@ export class GameScene extends Phaser.Scene {
   private gameOver!: Phaser.GameObjects.Container;
   private gameOverText!: Phaser.GameObjects.Text;
   private shopText!: Phaser.GameObjects.Text;
+  /** The run missions on the game-over panel: their heading and a cell each. */
+  private missionsTitle!: Phaser.GameObjects.Text;
+  private missionCells: Phaser.GameObjects.Text[] = [];
+  /** Missions met so far this run, to save the bank as soon as one pays. */
+  private missionsMet = 0;
   private buyButton!: Phaser.GameObjects.Container;
   /** The boss's sprite (the Gatekeeper or the dragon), shown on its stage. */
   private boss!: Phaser.GameObjects.Image;
@@ -277,6 +285,9 @@ export class GameScene extends Phaser.Scene {
     keys?.on('keydown-W', press(jump));
     keys?.on('keydown-DOWN', press(slide));
     keys?.on('keydown-S', press(slide));
+    keys?.on('keydown-RIGHT', press(dash));
+    keys?.on('keydown-D', press(dash));
+    keys?.on('keydown-SHIFT', press(dash));
     // Back from the shared pause, the first frame starts the clock again rather than catching up.
     this.events.on(Phaser.Scenes.Events.RESUME, () => (this.lastFrame = null));
   }
@@ -294,6 +305,9 @@ export class GameScene extends Phaser.Scene {
     if (!s.daily) record(this.samples, s);
     if (s.phase !== phase && s.phase === 'over') this.keepGhost();
     if (s.phase !== phase && s.phase !== 'running') this.persist();
+    // A mission met pays into the bank at once, so it is saved at once.
+    else if (s.missionsMet !== this.missionsMet) this.persist();
+    this.missionsMet = s.missionsMet;
     this.cues.update(s);
 
     this.drawWorld();
@@ -331,8 +345,9 @@ export class GameScene extends Phaser.Scene {
     this.samples = [];
     this.ghostSaved = false;
     this.bootsNew = false;
+    this.missionsMet = 0;
     return newRun(
-      { best, bank: p.bank, pending: p.pending, armoury: p.armoury, crown: p.crown, knight, knights: p.knights.unlocked, pet: p.pets.with, pets: p.pets.levels },
+      { best, bank: p.bank, pending: p.pending, armoury: p.armoury, crown: p.crown, knight, knights: p.knights.unlocked, pet: p.pets.with, pets: p.pets.levels, missions: p.missions },
       key,
       { mode, challenge: mode === 'challenge' ? challenge : undefined, boons: mode === 'weekly' ? weeklyBoons(week) : undefined },
     );
@@ -369,6 +384,8 @@ export class GameScene extends Phaser.Scene {
     p.armoury = { ...s.armoury };
     p.crown = p.crown || s.crown;
     p.pets.levels = { ...s.pets };
+    // The missions standing (their progress is the run's own).
+    if (s.missions) p.missions = { dealt: s.missions.dealt, slots: s.missions.slots.map((m) => ({ ...m, progress: 0, from: 0 })) };
     saveProgress(p);
     // Every star of every challenge course wins the gold boots.
     const boots = totalStars(p.challenges) >= ALL_STARS;
@@ -382,6 +399,8 @@ export class GameScene extends Phaser.Scene {
     this.overStars.clear().setVisible(!!s.challenge);
     for (const label of this.overStarLabels) label.setVisible(!!s.challenge);
     this.retryButton.setVisible(!!s.challenge);
+    this.missionsTitle.setVisible(!s.challenge);
+    for (const cell of this.missionCells) cell.setVisible(!s.challenge);
     if (s.challenge) {
       this.drawChallengeOver();
       if (this.armouryPanel.visible) this.drawArmoury();
@@ -394,6 +413,7 @@ export class GameScene extends Phaser.Scene {
     const missed = s.missed ? `\n${t('missed', { boon: t(BOONS[s.missed].name) })}` : '';
     const fell = [
       t('fellAt', { m: metres(s.distance), stage: s.stage, coins: s.coins, bank: s.bank }),
+      s.missionsMet ? t('missionsMet', { n: s.missionsMet, coins: s.missionCoins }) : '',
       s.bosses ? t('gatesBeaten', { n: s.bosses }) : '',
       s.dragonBeaten ? t('dragonDown') : '',
     ];
@@ -419,8 +439,23 @@ export class GameScene extends Phaser.Scene {
     }
     this.shopText.setText(line);
     this.buyButton.setVisible(canBuy);
+    this.drawMissions();
     if (this.armouryPanel.visible) this.drawArmoury();
     if (this.petsPanel.visible) this.drawPets();
+  }
+
+  /** The run missions on the game-over panel: each one's goal, how far this run took it and what it pays; a seeded run plays none. */
+  private drawMissions() {
+    const s = this.state;
+    const board = s.missions ?? this.progress.missions;
+    const title = s.missions ? t('missionsTitle') : t('missionsSeeded');
+    if (this.missionsTitle.text !== title) this.missionsTitle.setText(title);
+    this.missionCells.forEach((cell, i) => {
+      const m = board.slots[i];
+      const goal = goalOf(m);
+      const words = `${t(MISSIONS[m.kind].text, { n: goal })}\n${t('missionProgress', { p: Math.min(m.progress, goal), goal, reward: rewardOf(m) })}`;
+      if (cell.text !== words) cell.setText(words);
+    });
   }
 
   /** The game-over panel after a challenge course: cleared or fallen, its coins and its three stars, and Try again. */
@@ -476,12 +511,24 @@ export class GameScene extends Phaser.Scene {
       }
       let sprite = this.ledges.get(l.id);
       if (!sprite) {
-        // The wall reaches a little below the road's top so it sits on the road.
-        sprite = this.add.tileSprite(0, GROUND_Y - l.h, l.w, l.h + 10, 'ledge').setOrigin(0).setDepth(1.5);
+        // The wall reaches a little below the road's top so it sits on the road; a high path's
+        // platform is a slab of the same stone.
+        sprite = this.add.tileSprite(0, GROUND_Y - l.h, l.w, l.float ? ROUTE.thick : l.h + 10, 'ledge').setOrigin(0).setDepth(1.5);
         this.ledges.set(l.id, sprite);
       }
       const x = this.sx(l.x);
       tileAt(sprite.setX(x), l.x);
+      if (l.float) {
+        // Inked ends and underside, and a carved corbel under each end.
+        const top = GROUND_Y - l.h;
+        const bottom = top + ROUTE.thick;
+        sides.lineStyle(1.5, N.ink).strokeRect(x, top, l.w, ROUTE.thick);
+        for (const cx of [x + 14, x + l.w - 14]) {
+          const corbel = [new Phaser.Math.Vector2(cx - 10, bottom), new Phaser.Math.Vector2(cx + 10, bottom), new Phaser.Math.Vector2(cx, bottom + 14)];
+          sides.fillStyle(N.pink).fillPoints(corbel, true).lineStyle(1.25, N.ink).strokePoints(corbel, true);
+        }
+        continue;
+      }
       // Inked ends, and an arched lapis door in a long wall.
       sides.lineStyle(1.5, N.ink).lineBetween(x, GROUND_Y - l.h, x, GROUND_Y + 10).lineBetween(x + l.w, GROUND_Y - l.h, x + l.w, GROUND_Y + 10);
       if (l.w >= 160 && l.h >= 40) {
@@ -535,6 +582,8 @@ export class GameScene extends Phaser.Scene {
         else if (t.kind === 'blade') sprite = this.add.image(0, -t.h, 'blade').setOrigin(0.5, 0).setDepth(4);
         else if (t.kind === 'flames') sprite = this.add.image(0, GROUND_Y - t.h + 2, 'flames-off').setOrigin(0, 1).setDepth(4);
         else if (t.kind === 'goblin') sprite = this.add.image(0, GROUND_Y - t.h, 'goblin-0').setOrigin(0.5, GOBLIN_ART.feetY / GOBLIN_ART.h).setDepth(4);
+        else if (t.kind === 'crate') sprite = this.add.image(0, GROUND_Y - t.h + 2, 'crate').setOrigin(0, 1).setDepth(4);
+        else if (t.kind === 'shield') sprite = this.add.image(0, GROUND_Y - t.h, 'shield-goblin').setOrigin(SHIELD_ART.feetX / SHIELD_ART.w, SHIELD_ART.feetY / SHIELD_ART.h).setDepth(4);
         else if (t.kind === 'barrel') sprite = this.add.image(0, GROUND_Y - t.h - 13, 'barrel').setDepth(4);
         else if (t.kind === 'axe') sprite = this.add.image(0, GROUND_Y - t.h - 9, 'axe').setDepth(4);
         else if (t.kind === 'fire') sprite = this.add.image(0, GROUND_Y - t.h + 2, 'fire-0').setOrigin(0.5, 1).setDepth(4);
@@ -602,7 +651,7 @@ export class GameScene extends Phaser.Scene {
 
   /** Places a trap's sprite, and animates the ones that move or burn. */
   private drawTrap(t: Trap, sprite: Phaser.GameObjects.Image) {
-    if (t.kind === 'blade' || t.kind === 'goblin' || t.kind === 'bat' || MISSILES.includes(t.kind)) sprite.setX(this.sx(t.x + t.w / 2));
+    if (t.kind === 'blade' || t.kind === 'goblin' || t.kind === 'shield' || t.kind === 'bat' || MISSILES.includes(t.kind)) sprite.setX(this.sx(t.x + t.w / 2));
     else sprite.setX(this.sx(t.x));
     if (t.kind === 'flames') {
       const burn = flameOf(this.state, t);
@@ -713,7 +762,7 @@ export class GameScene extends Phaser.Scene {
     const fallen = s.phase === 'over' && !s.challenge?.done;
     let pose: KnightPose;
     if (fallen || r.slideMs > 0) pose = 'slide';
-    else if (r.h > floorAt(s, s.distance - RUNNER.w / 2, s.distance + RUNNER.w / 2)) pose = r.vh > 0 ? 'jump' : 'fall';
+    else if (r.h > floorAt(s, s.distance - RUNNER.w / 2, s.distance + RUNNER.w / 2, r.h)) pose = r.vh > 0 || r.dashMs > 0 ? 'jump' : 'fall';
     else if (s.phase === 'checkpoint' || s.phase === 'over') pose = 'run1';
     else pose = `run${Math.floor(s.distance / STRIDE_PX) % 4}` as KnightPose;
     const feet = pose === 'slide' ? KNIGHT_FEET.slide : KNIGHT_FEET.stand;
@@ -750,7 +799,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     const x = s.distance - 60;
-    const floor = floorAt(s, x - 12, x + 12);
+    const floor = floorAt(s, x - 12, x + 12, s.runner.h);
     const under = s.traps.some((t) => t.h === 0 && t.kind !== 'blade' && x + 16 > t.x && x - 16 < t.x + t.w);
     const step = s.phase === 'running' ? Math.floor(s.distance / 18) % 2 : 0;
     this.pet.setTexture(`${id}-${step}`).setPosition(RUNNER_X - 60, GROUND_Y - floor - (under ? 34 : 0));
@@ -840,6 +889,16 @@ export class GameScene extends Phaser.Scene {
         // The fox leaps in front of the blow: an orange ring round it.
         g.lineStyle(5, N.ink, 0.8 * (1 - t)).strokeCircle(x, y, 14 + 20 * t);
         g.lineStyle(3, 0xd9792e, 1 - t).strokeCircle(x, y, 14 + 20 * t);
+      } else if (e.kind === 'smash') {
+        // Splinters flying from what a dash broke through.
+        for (let i = 0; i < 6; i++) {
+          const a = -Math.PI * 0.9 + (i / 5) * Math.PI * 0.8;
+          const px = x + Math.cos(a) * 34 * t;
+          const py = y + Math.sin(a) * 34 * t + 30 * t * t;
+          g.fillStyle(N.wood, 1 - t).fillRect(px - 3, py - 1.5, 6, 3).lineStyle(0.75, N.ink, 1 - t).strokeRect(px - 3, py - 1.5, 6, 3);
+        }
+      } else if (e.kind === 'dash') {
+        // Drawn with the knight while the dash lasts (below).
       } else if (e.kind === 'dust') {
         g.fillStyle(N.vellum, 0.7 * (1 - t)).fillCircle(x - 10 - 16 * t, y - 4 - 6 * t, 5 + 4 * t).fillCircle(x - 22 - 20 * t, y - 3 - 4 * t, 4 + 3 * t);
       } else {
@@ -877,7 +936,8 @@ export class GameScene extends Phaser.Scene {
         if (!tr.barked || tr.x + tr.w < s.distance) continue;
         const mx = this.sx(tr.kind === 'pit' ? tr.x - 10 : tr.x + tr.w / 2);
         if (mx > VIEW.w + 20) continue;
-        const pts = [new Phaser.Math.Vector2(mx, GROUND_Y + 1), new Phaser.Math.Vector2(mx + 5, GROUND_Y + 6), new Phaser.Math.Vector2(mx, GROUND_Y + 11), new Phaser.Math.Vector2(mx - 5, GROUND_Y + 6)];
+        const my = GROUND_Y - (tr.kind === 'bat' ? 0 : tr.h);
+        const pts = [new Phaser.Math.Vector2(mx, my + 1), new Phaser.Math.Vector2(mx + 5, my + 6), new Phaser.Math.Vector2(mx, my + 11), new Phaser.Math.Vector2(mx - 5, my + 6)];
         g.fillStyle(N.madder, 0.9).fillPoints(pts, true).lineStyle(1, N.ink).strokePoints(pts, true);
       }
     }
@@ -921,6 +981,29 @@ export class GameScene extends Phaser.Scene {
       this.trail.forEach((p, i) => this.star(g, this.sx(p.x) - i * 4, GROUND_Y - p.h, 5.5 - i * 0.5, 1 - i / (TRAIL.stars + 1)));
     } else if (running || s.phase === 'over') {
       this.trail.length = 0;
+    }
+
+    if (s.runner.dashMs > 0 && running) {
+      // The shield dash: speed lines streaming behind the knight, and the shield held out in front.
+      const r = s.runner;
+      const cy = GROUND_Y - r.h - 32;
+      const fade = r.dashMs / DASH.ms;
+      for (let i = 0; i < 4; i++) {
+        const ly = cy - 18 + i * 12;
+        const len = 30 + (i % 2) * 18;
+        g.lineStyle(3, N.ink, 0.35 * fade).lineBetween(RUNNER_X - 26 - len, ly, RUNNER_X - 22, ly);
+        g.lineStyle(1.5, 0xffffff, 0.9 * fade).lineBetween(RUNNER_X - 26 - len, ly, RUNNER_X - 22, ly);
+      }
+      const sx = RUNNER_X + 22;
+      const kite = [
+        new Phaser.Math.Vector2(sx - 8, cy - 20),
+        new Phaser.Math.Vector2(sx + 8, cy - 20),
+        new Phaser.Math.Vector2(sx + 10, cy - 2),
+        new Phaser.Math.Vector2(sx, cy + 18),
+        new Phaser.Math.Vector2(sx - 10, cy - 2),
+      ];
+      g.fillStyle(N.lapis).fillPoints(kite, true).lineStyle(2, N.gold).strokePoints(kite, true).lineStyle(1, N.ink).strokePoints(kite, true);
+      g.fillStyle(N.goldLight).fillCircle(sx, cy - 4, 3);
     }
 
     if (s.shields > 0 && running) {
@@ -987,6 +1070,21 @@ export class GameScene extends Phaser.Scene {
     // A challenge course keeps stars, not a distance, so it shows no best.
     const best = s.challenge ? '' : t('best', { n: s.best });
     if (this.bestText.text !== best) this.fitBest(best);
+
+    // The shield dash's sign: a kite shield lit gold when ready, filling up while it comes back.
+    {
+      const { x, y } = DASH_SIGN;
+      const r = s.runner;
+      const ready = r.dashCd <= 0;
+      const kite = [new Phaser.Math.Vector2(x - 9, y - 12), new Phaser.Math.Vector2(x + 9, y - 12), new Phaser.Math.Vector2(x + 11, y + 1), new Phaser.Math.Vector2(x, y + 14), new Phaser.Math.Vector2(x - 11, y + 1)];
+      g.fillStyle(ready ? N.goldLight : N.lapisDeep).fillPoints(kite, true);
+      if (!ready) {
+        const share = 1 - r.dashCd / DASH.cooldown;
+        const top = y + 14 - 26 * share;
+        g.fillStyle(N.gold, 0.7).fillRect(x - 6, top, 12, y + 10 - top);
+      }
+      g.lineStyle(1.5, N.ink).strokePoints(kite, true);
+    }
 
     // The coin streak, capped by the road.
     const cap = streakMax(s.road);
@@ -1144,11 +1242,12 @@ export class GameScene extends Phaser.Scene {
       const ahead = (x: number) => x > s.distance && x < s.distance + 700;
       const trap = s.traps.find((t) => t.x + t.w > s.distance - 20 && t.x < s.distance + 700);
       const wall = s.ledges.find((l) => !l.cloud && ahead(l.x));
+      const route = wall?.float;
       const shrine = s.shrines.find((sh) => !sh.used && ahead(sh.x));
       const next = [
         // A gap in the clouds is crossed on its cloud.
         trap && { x: trap.x, kind: trap.kind === 'pit' && trap.w >= SKY_GAPS[0] ? 'cloud' : (trap.kind as string) },
-        wall && { x: wall.x, kind: 'wall' },
+        wall && { x: wall.x, kind: route ? 'route' : 'wall' },
         shrine && { x: shrine.x, kind: 'shrine' },
       ]
         .filter((n): n is { x: number; kind: string } => !!n)
@@ -1160,6 +1259,9 @@ export class GameScene extends Phaser.Scene {
         flames: 'captionFlames',
         goblin: 'captionGoblin',
         bat: 'captionBat',
+        crate: 'captionCrate',
+        shield: 'captionShield',
+        route: 'captionRoute',
         wall: 'captionWall',
         cloud: 'captionCloud',
         shrine: 'captionShrine',
@@ -1188,7 +1290,8 @@ export class GameScene extends Phaser.Scene {
     g.lineStyle(2, N.goldPale, 0.5).lineBetween(FRAME.x, TAP_SPLIT_Y, FRAME.x + FRAME.w, TAP_SPLIT_Y);
     const up = this.add.text(VIEW.w / 2 + 100, TAP_SPLIT_Y - 70, t('hintJump'), textStyle(19, C.goldPale, 4)).setOrigin(0.5).setAlign('center');
     const down = this.add.text(VIEW.w / 2 + 100, TAP_SPLIT_Y + 70, t('hintSlide'), textStyle(19, C.goldPale, 4)).setOrigin(0.5).setAlign('center');
-    this.hint = this.add.container(0, 0, [g, up, down]).setDepth(UI_DEPTH - 5);
+    const dashHint = this.add.text(VIEW.w / 2 + 100, TAP_SPLIT_Y - 16, t('hintDash'), textStyle(15, C.goldPale, 4)).setOrigin(0.5);
+    this.hint = this.add.container(0, 0, [g, up, down, dashHint]).setDepth(UI_DEPTH - 5);
   }
 
   /**
@@ -1196,14 +1299,14 @@ export class GameScene extends Phaser.Scene {
    * once the screen has been touched), next to the tap halves and keys, which still work.
    */
   private createActionButtons() {
-    const { y, r, slideX, jumpX } = ACTION_BUTTONS;
+    const { y, r, dashX, slideX, jumpX } = ACTION_BUTTONS;
     this.touchScreen = this.sys.game.device.input.touch;
     // Two thumbs at once: one on a button, one tapping the screen.
     this.input.addPointer(1);
-    const button = (kind: 'jump' | 'slide', x: number, act: () => void) => {
+    const button = (kind: 'jump' | 'slide' | 'dash', x: number, act: () => void) => {
       const key = `action-${kind}`;
       const disc = this.add.image(0, 0, key).setInteractive(new Phaser.Geom.Circle(r + 2, r + 2, r), Phaser.Geom.Circle.Contains);
-      const caption = this.add.text(0, 20, t(kind === 'jump' ? 'buttonJump' : 'buttonSlide'), textStyle(13, C.goldPale, 3)).setOrigin(0.5);
+      const caption = this.add.text(0, 20, t(kind === 'jump' ? 'buttonJump' : kind === 'dash' ? 'buttonDash' : 'buttonSlide'), textStyle(13, C.goldPale, 3)).setOrigin(0.5);
       disc
         .on('pointerdown', () => {
           disc.setTexture(`${key}-down`);
@@ -1214,28 +1317,38 @@ export class GameScene extends Phaser.Scene {
       return this.add.container(x, y, [disc, caption]);
     };
     this.actionButtons = this.add
-      .container(0, 0, [button('slide', slideX, () => slide(this.state)), button('jump', jumpX, () => jump(this.state))])
+      .container(0, 0, [button('dash', dashX, () => dash(this.state)), button('slide', slideX, () => slide(this.state)), button('jump', jumpX, () => jump(this.state))])
       .setDepth(UI_DEPTH - 4)
       .setVisible(false);
   }
 
   private createGameOver() {
-    bakePanel(this, 'over-panel', 600, 400);
-    const dim = this.add.rectangle(VIEW.w / 2, VIEW.h / 2, VIEW.w, VIEW.h, N.ink, 0.6).setInteractive();
-    const panel = this.add.image(VIEW.w / 2, VIEW.h / 2, 'over-panel');
+    const o = OVER_PANEL;
+    const cx = VIEW.w / 2;
+    const cy = VIEW.h / 2;
+    bakePanel(this, 'over-panel', o.w, o.h);
+    const dim = this.add.rectangle(cx, cy, VIEW.w, VIEW.h, N.ink, 0.6).setInteractive();
+    const panel = this.add.image(cx, cy, 'over-panel');
     const title = (this.overTitle = this.add
-      .text(VIEW.w / 2, VIEW.h / 2 - 160, t('fallen'), { fontFamily: FONT, fontSize: '30px', fontStyle: 'bold', color: C.madder })
+      .text(cx, cy + o.title, t('fallen'), { fontFamily: FONT, fontSize: '30px', fontStyle: 'bold', color: C.madder })
       .setOrigin(0.5));
     this.gameOverText = this.add
-      .text(VIEW.w / 2, VIEW.h / 2 - 70, '', { fontFamily: FONT, fontSize: '16px', color: C.ink, align: 'center', wordWrap: { width: 540 } })
+      .text(cx, cy + o.text, '', { fontFamily: FONT, fontSize: '15px', color: C.ink, align: 'center', wordWrap: { width: 580 } })
       .setOrigin(0.5, 0.5);
     this.shopText = this.add
-      .text(VIEW.w / 2, VIEW.h / 2 + 32, '', { fontFamily: FONT, fontSize: '16px', fontStyle: 'italic', color: C.lapis, align: 'center', wordWrap: { width: 540 } })
+      .text(cx, cy + o.shop, '', { fontFamily: FONT, fontSize: '15px', fontStyle: 'italic', color: C.lapis, align: 'center', wordWrap: { width: 580 } })
       .setOrigin(0.5);
-    this.buyButton = makeButton(this, VIEW.w / 2, VIEW.h / 2 + 80, t('buy', { n: BOON_PRICE }), () => this.buy(), 400);
-    this.armouryButton = makeButton(this, VIEW.w / 2 - 190, VIEW.h / 2 + 150, t('armoury'), () => this.openArmoury());
-    const again = makeButton(this, VIEW.w / 2, VIEW.h / 2 + 150, t('runAgain'), () => this.restart('run'));
-    const courses = makeButton(this, VIEW.w / 2 + 190, VIEW.h / 2 + 150, t('courses'), () => this.openCourses());
+    this.buyButton = makeButton(this, cx, cy + o.buy, t('buy', { n: BOON_PRICE }), () => this.buy(), 400);
+    // The three run missions, in a row of cells under a heading.
+    this.missionsTitle = this.add.text(cx, cy + o.missions, '', { fontFamily: FONT, fontSize: '14px', fontStyle: 'bold italic', color: C.madder }).setOrigin(0.5);
+    this.missionCells = [-1, 0, 1].map((k) =>
+      this.add
+        .text(cx + k * 200, cy + o.missions + 14, '', { fontFamily: FONT, fontSize: '12px', color: C.ink, align: 'center', wordWrap: { width: 186 }, lineSpacing: 2 })
+        .setOrigin(0.5, 0),
+    );
+    this.armouryButton = makeButton(this, cx - 190, cy + o.buttons, t('armoury'), () => this.openArmoury());
+    const again = makeButton(this, cx, cy + o.buttons, t('runAgain'), () => this.restart('run'));
+    const courses = makeButton(this, cx + 190, cy + o.buttons, t('courses'), () => this.openCourses());
     // A challenge course's three stars, with Try again under them.
     this.overStars = this.add.graphics();
     this.overStarLabels = (['starFinish', 'starNohit', 'starCoins'] as const).map((key, i) =>
@@ -1243,7 +1356,7 @@ export class GameScene extends Phaser.Scene {
     );
     this.retryButton = makeButton(this, VIEW.w / 2, VIEW.h / 2 + 104, t('tryAgain'), () => this.restart('challenge', this.state.challenge?.index ?? 0), 220);
     this.gameOver = this.add
-      .container(0, 0, [dim, panel, title, this.gameOverText, this.shopText, this.buyButton, this.overStars, ...this.overStarLabels, this.retryButton, this.armouryButton, again, courses])
+      .container(0, 0, [dim, panel, title, this.gameOverText, this.shopText, this.buyButton, this.missionsTitle, ...this.missionCells, this.overStars, ...this.overStarLabels, this.retryButton, this.armouryButton, again, courses])
       .setDepth(UI_DEPTH + 20)
       .setVisible(false);
   }

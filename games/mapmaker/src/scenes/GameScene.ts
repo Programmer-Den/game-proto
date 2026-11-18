@@ -44,9 +44,13 @@ import {
   buy,
   canAfford,
   canCamp,
+  canClimb,
+  canPack,
+  canPressOn,
   canTrade,
   carriesOver,
   chartOf,
+  climbable,
   closeAtlas,
   costOf,
   dig,
@@ -60,25 +64,38 @@ import {
   islandCharted,
   milestonesDue,
   newGame,
+  packAhead,
+  packGear,
   pickCommission,
   pickTrade,
   pitchCamp,
+  pressOn,
   returnToPort,
   runScore,
   sellChart,
   setSail,
   snowHides,
+  stormRisk,
   survey,
   tradeVillages,
+  usesRope,
   valueOf,
+  wouldFix,
 } from '../game/sim';
 import { HANDS } from '../game/hands';
 import { kindOf, KINDS, type IsleKind } from '../game/kinds';
 import {
   CAMP_COST,
   DIG_COST,
+  FIX_BONUS,
+  FOOD_MIN,
+  GEAR,
+  GOODS_VALUE,
   GRID,
   MILESTONES,
+  PACK_MAX,
+  PRESS_LOSS,
+  PRESS_STEPS,
   ROYAL_KINDS,
   SELL_BACK,
   TRADES,
@@ -89,10 +106,14 @@ import {
   indexOf,
   isWinter,
   maxSupplies,
+  packRoom,
   rankOf,
+  voyageFood,
+  type Chart,
   type Clue,
   type Commission,
   type GameState,
+  type Gear,
   type Ground,
   type Point,
   type Run,
@@ -112,6 +133,7 @@ import {
   MAP,
   OVERLAY,
   OVERLAY_BUTTON,
+  PACK_CARD,
   PANEL,
   RETURN_BUTTON,
   SHOP,
@@ -213,7 +235,7 @@ export class GameScene extends Phaser.Scene {
   /** The map's marks (finds, storms, camps, dug tiles, the treasure), by what and where. */
   private marks = new Map<string, Phaser.GameObjects.Image | Phaser.GameObjects.Container>();
   private campButton: Phaser.GameObjects.Container | null = null;
-  private campEnabled: boolean | null = null;
+  private campEnabled: string | null = null;
   private ring!: Phaser.GameObjects.Graphics;
   private hoverPill!: Phaser.GameObjects.Container;
   private surveyor!: Phaser.GameObjects.Image;
@@ -230,6 +252,7 @@ export class GameScene extends Phaser.Scene {
     atlasIcon: Phaser.GameObjects.Image;
     supplies: Phaser.GameObjects.Text;
     max: Phaser.GameObjects.Text;
+    gear: Phaser.GameObjects.Text;
     riddle: Phaser.GameObjects.Text;
     riddleTag: Phaser.GameObjects.Text;
     unused: Phaser.GameObjects.Text;
@@ -261,7 +284,7 @@ export class GameScene extends Phaser.Scene {
   /** The atlas waiting at the harbour while an expedition or the daily isle is under way (`state`). */
   private atlasState: GameState | null = null;
   /** A page opened over the harbour: the far isles or the wonder gallery. */
-  private sheetView: '' | 'expeditions' | 'wonders' | 'trade' = '';
+  private sheetView: '' | 'expeditions' | 'wonders' | 'trade' | 'pack' = '';
 
   constructor() {
     super('Game');
@@ -350,6 +373,7 @@ export class GameScene extends Phaser.Scene {
           this.announceFeatures(before.features),
           this.announceRival(before.rivalRuins, before.rivalTreasure),
         ].filter((n): n is News => n !== null);
+        news.push(...this.announceGear(at, storms));
         if (storms.wonder && s.wonder) {
           const c = tileCentre(s.wonder.at.x, s.wonder.at.y);
           this.notice(c.x, c.y - 30, t('wonderSeen', { name: t(WONDERS[s.wonder.kind].name) }), true);
@@ -407,7 +431,10 @@ export class GameScene extends Phaser.Scene {
 
   /** The ship's horn when an action ended the voyage (the last supplies spent, or Return to port). */
   private endedVoyage() {
-    if (this.state.phase === 'chart') sfx('horn');
+    if (this.state.phase !== 'chart') return;
+    sfx('horn');
+    // Pressing on met a storm on the way home.
+    if (this.state.chart?.storm) sfx('thunder');
   }
 
   // ---- Helpers.
@@ -677,6 +704,30 @@ export class GameScene extends Phaser.Scene {
     return news;
   }
 
+  /**
+   * Notices for what the pack did where the surveyor stands (lamp oil lit a cave, goods sold at a
+   * village) and for the tiles a lookout fixed, over the lookout.
+   */
+  private announceGear(at: Point, r: { fixed: Point[]; lit: boolean; sold: boolean }): News[] {
+    const c = tileCentre(at.x, at.y);
+    const out: News[] = [];
+    let n = 0;
+    const say = (caption: string) => this.notice(c.x, c.y + 26 + 18 * n++, caption, true);
+    if (r.lit) {
+      say(t('lampLit', { n: artifactValue(this.state) }));
+      out.push('cave');
+    }
+    if (r.sold) {
+      say(t('goodsSold', { n: GOODS_VALUE }));
+      out.push('goods');
+    }
+    if (r.fixed.length > 0) {
+      say(t('fixedTiles', { n: r.fixed.length, coins: r.fixed.length * FIX_BONUS }));
+      out.push('fix');
+    }
+    return out;
+  }
+
   /** A notice for each feature the survey charted whole: its name and bonus, over its middle tile. */
   private announceFeatures(doneBefore: string[]): News | null {
     const s = this.state;
@@ -907,22 +958,54 @@ export class GameScene extends Phaser.Scene {
         g.lineStyle(1, m).strokeTriangle(c.x, cy - 5, c.x + 5, cy + 3.5, c.x - 5, cy + 3.5);
         g.fillStyle(lit ? hex(ON_MAGENTA) : m).fillCircle(c.x, cy + 0.75, 1);
         const cost = costOf(s, p.x, p.y);
-        if (!lit && (cost !== 1 || hidden)) {
+        const rope = !hidden && usesRope(s, p.x, p.y);
+        // Pressing on, a tile the supplies can't pay for takes a step.
+        const step = s.pressOn > 0 && !hidden && cost > s.supplies;
+        if (!lit && (cost !== 1 || hidden || step)) {
           const label = this.costLabel(used++);
-          const caption = hidden ? '?' : cost === 0 ? t('free') : `−${cost}`;
+          const caption = hidden ? '?' : step ? t('stepLabel') : rope ? t('ropeLabel') : cost === 0 ? t('free') : `−${cost}`;
           if (label.text !== caption) label.setText(caption);
           label.setPosition(c.x, c.y + 10).setColor(can ? MAGENTA : GREY).setVisible(true);
         }
         if (lit) {
           const f = featureAt(s, p.x, p.y);
           const landing = s.landing?.x === p.x && s.landing.y === p.y;
-          const price = hidden ? t('underSnow') : cost === 0 ? t('freeToFollow') : t('supplyCost', { n: cost });
+          const price = hidden
+            ? t('underSnow')
+            : step
+              ? t('stepCost', { n: s.pressOn })
+              : rope
+                ? t('ropeCost')
+                : cost === 0
+                  ? t('freeToFollow')
+                  : t('supplyCost', { n: cost });
           const caption = f && !hidden ? t('finishes', { price, name: t(f.name), n: f.bonus }) : price;
           this.showPill(c, landing ? t('sloopLanding', { price: caption }) : caption);
         }
       }
+      // Charted lookouts not stood on yet can be climbed for a bearing; those whose bearing would fix
+      // tiles say so, and the one under the pointer gets a pill.
       const h = this.hover;
-      if (h && diggable(s).some((p) => p.x === h.x && p.y === h.y)) {
+      for (const p of climbable(s)) {
+        const can = canAfford(s, p);
+        const fixes = wouldFix(s, p.x, p.y);
+        const under = h?.x === p.x && h.y === p.y;
+        if (!can || (!fixes && !under)) continue;
+        const c = tileCentre(p.x, p.y);
+        g.lineStyle(1.25, hex(MAGENTA));
+        dashedRect(g, c.x - 14, c.y - 14, 28, 28, 3, 3);
+        if (under) {
+          const cost = costOf(s, p.x, p.y);
+          const price = s.pressOn > 0 && cost > s.supplies ? t('stepCost', { n: s.pressOn }) : cost === 0 ? t('free') : t('supplyCost', { n: cost });
+          this.showPill(c, fixes ? t('climbFixes', { price, n: fixes }) : t('climb', { price }));
+        } else {
+          const label = this.costLabel(used++);
+          const caption = t('climbLabel', { n: fixes });
+          if (label.text !== caption) label.setText(caption);
+          label.setPosition(c.x, c.y + 10).setColor(MAGENTA).setVisible(true);
+        }
+      }
+      if (h && diggable(s).some((p) => p.x === h.x && p.y === h.y) && !canClimb(s, h.x, h.y)) {
         const c = tileCentre(h.x, h.y);
         g.lineStyle(1.25, hex(MAGENTA));
         dashedRect(g, c.x - 12, c.y - 12, 24, 24, 3, 3);
@@ -976,6 +1059,9 @@ export class GameScene extends Phaser.Scene {
     else if (s.wonder?.rumour) want.set('rumour', { key: 'rumour', ...at(s.wonder.at, 0, 0), scale: 1.1 });
     // The coastal sloop at anchor off its landing, until the landing is charted.
     if (s.phase === 'survey' && s.landing) want.set(`sloop:${indexOf(s.landing.x, s.landing.y)}`, { key: 'sloop', ...at(s.landing, 10, -9), scale: 0.85 });
+    // Fixes are solid trig points; a tile seen from one lookout so far has a hollow one, waiting for a second.
+    for (const p of s.fixed) want.set(`fix:${indexOf(p.x, p.y)}`, { key: 'fix', ...at(p, 12, 12), scale: 0.62 });
+    for (const p of s.sighted) want.set(`sight:${indexOf(p.x, p.y)}`, { key: 'sighted', ...at(p, 13, 13), scale: 0.5 });
     for (const p of s.camps) want.set(`camp:${indexOf(p.x, p.y)}`, { key: 'camp', ...at(p, 9, -9), scale: 1 });
     // The rival's claims show through the paper, so you know which tiles will sell for half.
     for (const p of s.rival?.claims ?? []) want.set(`claim:${indexOf(p.x, p.y)}`, { key: 'claim', ...at(p, 11, -10), scale: 0.8 });
@@ -1013,6 +1099,8 @@ export class GameScene extends Phaser.Scene {
     label(PL, 99, t('supplies'));
     const supplies = this.text(PL, 120, '', { size: 22, weight: 800 }).setOrigin(0, 0.5);
     const max = this.text(PL + 15, 123, '', { size: 12, weight: 600, color: GREY }).setOrigin(0, 0.5);
+    // The sack's gear left on this voyage, beside the supplies' heading.
+    const gear = this.text(PR, 99, '', { size: 8, weight: 700, color: MAGENTA, ls: 1 }).setOrigin(1, 0.5);
     const unused = this.text(PL + 55, 143, t('unusedEach', { n: SELL_BACK }), { size: 8, weight: 600, color: MAGENTA }).setOrigin(0, 0.5);
     rule(154);
     label(PL, 167, t('coinsHead'));
@@ -1074,6 +1162,7 @@ export class GameScene extends Phaser.Scene {
       atlasIcon,
       supplies,
       max,
+      gear,
       riddle,
       riddleTag,
       unused,
@@ -1137,12 +1226,34 @@ export class GameScene extends Phaser.Scene {
     this.spots.theme = { x, y };
   }
 
-  /** The Camp button, rebuilt when it turns on or off. */
+  /**
+   * The Camp button, rebuilt when it turns on or off; it gives way to Press on while the voyage can
+   * press on (the supplies can pay for nothing, so no camp either).
+   */
   private syncCampButton() {
+    const press = canPressOn(this.state);
     const on = canCamp(this.state);
-    if (on === this.campEnabled) return;
-    this.campEnabled = on;
+    const mode = press ? 'press' : on ? 'camp' : 'off';
+    if (mode === this.campEnabled) return;
+    this.campEnabled = mode;
     this.campButton?.destroy();
+    if (press) {
+      this.campButton = makeButton(
+        this,
+        CAMP_BUTTON.x,
+        CAMP_BUTTON.y,
+        t('pressOn'),
+        () => {
+          if (!pressOn(this.state)) return ui('refuse');
+          saveGame(this.state);
+          sfx('press');
+          const c = tileCentre(this.state.surveyor.x, this.state.surveyor.y);
+          this.notice(c.x, c.y - 30, t('pressingOn', { n: PRESS_STEPS }), true);
+        },
+        CAMP_BUTTON,
+      );
+      return;
+    }
     this.campButton = makeButton(
       this,
       CAMP_BUTTON.x,
@@ -1163,7 +1274,8 @@ export class GameScene extends Phaser.Scene {
   private updatePanel() {
     const s = this.state;
     const p = this.panel;
-    const max = maxSupplies(s);
+    // The food the sack set out with (the gear takes the rest of its room).
+    const max = voyageFood(s);
     const set = (text: Phaser.GameObjects.Text, v: string) => text.text !== v && text.setText(v);
     const head = runHead(s.run);
     set(this.header.isle, head ?? t('isleHead', { n: s.island }));
@@ -1186,7 +1298,13 @@ export class GameScene extends Phaser.Scene {
     set(p.coins, formatNumber(s.coins));
     const chart = s.chart ?? chartOf(s);
     set(p.tiles, t('tiles', { n: s.surveyed.length }));
-    set(p.worth, t('worth', { n: chart.base - chart.rivalLoss + chart.ink + chart.featureCoins + chart.artifactCoins + chart.treasure }));
+    set(
+      p.worth,
+      t('worth', { n: chart.base - chart.rivalLoss + chart.ink + chart.featureCoins + chart.fixCoins + chart.goodsCoins + chart.artifactCoins + chart.treasure }),
+    );
+    // The gear still in the sack: "ROPE 1 · OIL 2".
+    const gearLeft = s.phase === 'survey' ? GEAR.filter((g) => s.gear[g] > 0).map((g) => t('gearCount', { gear: t(GEAR_NAMES[g]).toUpperCase(), n: s.gear[g] })) : [];
+    set(p.gear, gearLeft.join(' · '));
 
     const g = p.live.clear();
     // Supply pips, with the unused ones bracketed in magenta while they can still sell back. A
@@ -1306,9 +1424,16 @@ export class GameScene extends Phaser.Scene {
     const capped = s.phase === 'survey' && back < s.supplies * SELL_BACK;
     p.tag.setVisible(back > 0);
     set(p.tagText, `+${coins(back)}`);
+    const risk = Math.round(stormRisk(s) * 100);
     set(
       p.turnBack,
-      s.phase !== 'survey' || s.supplies === 0
+      s.phase !== 'survey'
+        ? ''
+        : s.pressOn > 0 || s.pressed > 0
+          ? t('pressingLine', { n: s.pressOn, risk, lose: s.pressed * PRESS_LOSS })
+          : canPressOn(s)
+            ? t('pressOnLine', { n: PRESS_STEPS })
+        : s.supplies === 0
         ? ''
         : back === 0
           ? t('sellBackNone', { each: SELL_BACK })
@@ -1325,7 +1450,7 @@ export class GameScene extends Phaser.Scene {
   private syncOverlay() {
     const s = this.state;
     const pick = s.board.findIndex((_, n) => isPicked(s, n));
-    const key = s.phase === 'survey' ? '' : `${s.phase}:${s.coins}:${JSON.stringify(s.ranks)}:${s.hand}:${pick}:${s.trade}:${this.sheetView}:${s.run?.mode ?? ''}`;
+    const key = s.phase === 'survey' ? '' : `${s.phase}:${s.coins}:${JSON.stringify(s.ranks)}:${s.hand}:${pick}:${s.trade}:${JSON.stringify(s.pack)}:${this.sheetView}:${s.run?.mode ?? ''}`;
     if (key === this.overlayKey) return;
     this.overlayKey = key;
     this.overlay?.destroy();
@@ -1336,6 +1461,7 @@ export class GameScene extends Phaser.Scene {
     if (s.phase === 'harbor' && this.sheetView === 'expeditions') this.showExpeditions();
     else if (s.phase === 'harbor' && this.sheetView === 'wonders') this.showWonders();
     else if (s.phase === 'harbor' && this.sheetView === 'trade') this.showTrade();
+    else if (s.phase === 'harbor' && this.sheetView === 'pack') this.showPack();
     else if (s.phase === 'harbor') this.showHarbor();
   }
 
@@ -1380,6 +1506,7 @@ export class GameScene extends Phaser.Scene {
     }
     if (chart.ink > 0) rows.push({ label: t('inkName'), value: `+${chart.ink}` });
     for (const f of chart.features) rows.push({ label: t('featureRow', { name: t(f.name) }), value: `+${f.bonus}`, color: GREEN });
+    rows.push(...gearRows(chart));
     if (chart.artifacts > 0) {
       const each = artifactValue(s);
       const hand = s.hand === 'naturalist' ? ` (${t('naturalistName')})` : '';
@@ -1466,6 +1593,7 @@ export class GameScene extends Phaser.Scene {
     if (daily) {
       if (chart.ink > 0) rows.push({ label: t('inkName'), value: `+${chart.ink}` });
       for (const f of chart.features) rows.push({ label: t('featureRow', { name: t(f.name) }), value: `+${f.bonus}`, color: GREEN });
+      rows.push(...gearRows(chart));
       if (chart.artifacts > 0) rows.push({ icon: 'artifact', label: t('artefactsRow', { n: chart.artifacts, each: artifactValue(s) }), value: `+${chart.artifactCoins}`, color: GOLD_DARK });
       if (chart.treasure > 0) rows.push({ icon: 'treasure', label: t('treasureRow'), value: `+${chart.treasure}`, color: GOLD_DARK });
       if (chart.unused > 0) {
@@ -1688,6 +1816,61 @@ export class GameScene extends Phaser.Scene {
     this.spots.back = { ...OVERLAY_BUTTON };
   }
 
+  /**
+   * Pack the sack: the sack's room split between food (a survey step each) and gear, a row for each
+   * piece of gear with − and + buttons, and what the fog ahead still hides to pack for.
+   */
+  private showPack() {
+    const s = this.state;
+    const c = this.overlayBase(t('packTitle'));
+    const top = OVERLAY.y - OVERLAY.h / 2;
+    const left = OVERLAY.x - OVERLAY.w / 2 + 34;
+    const right = OVERLAY.x + OVERLAY.w / 2 - 34;
+    c.add(this.text(left, top + 72, t('packLine', { n: maxSupplies(s), min: FOOD_MIN }), { size: 11.5, weight: 600, wrap: right - left }).setOrigin(0, 0.5));
+    const ahead = packAhead(s);
+    c.add(this.text(left, top + 104, t('packAhead', { peaks: ahead.peaks, villages: ahead.villages }), { size: 10, weight: 700, color: MAGENTA }).setOrigin(0, 0.5));
+    const g = this.add.graphics();
+    c.add(g);
+    const rowY = (n: number) => top + 150 + n * 56;
+    // Food first: what is left of the sack's room.
+    g.fillStyle(hex(RULE)).fillRect(left, rowY(0) - 28, right - left, 1);
+    c.add(this.add.image(left + 14, rowY(0), 'icon-provisions').setScale(1.1 / HI));
+    c.add(this.text(left + 40, rowY(0) - 9, t('foodName'), { size: 13, weight: 800 }).setOrigin(0, 0.5));
+    c.add(this.text(left + 40, rowY(0) + 9, t('foodText'), { size: 10.5, weight: 500, color: SLATE }).setOrigin(0, 0.5));
+    c.add(this.text(right - 54, rowY(0), `${voyageFood(s)}`, { size: 18, weight: 800 }).setOrigin(0.5));
+    const step = { w: 34, h: 30 };
+    GEAR.forEach((id, k) => {
+      const y = rowY(k + 1);
+      g.fillStyle(hex(RULE)).fillRect(left, y - 28, right - left, 1);
+      c.add(this.add.image(left + 14, y, `gear-${id}`).setScale(1.1 / HI));
+      c.add(this.text(left + 40, y - 9, t(GEAR_NAMES[id]), { size: 13, weight: 800 }).setOrigin(0, 0.5));
+      const text = id === 'rope' ? t('ropeText') : id === 'oil' ? t('oilText') : t('goodsText', { n: GOODS_VALUE });
+      const line = this.text(left + 40, y + 9, text, { size: 10.5, weight: 500, color: SLATE }).setOrigin(0, 0.5);
+      const room = right - 120 - (left + 40);
+      c.add(line.setScale(Math.min(1, room / line.width), 1));
+      const minus = { x: right - 54 - 38, y };
+      const plus = { x: right - 54 + 38, y };
+      const press = (dir: 1 | -1) => () => {
+        if (!packGear(this.state, id, dir)) return ui('refuse');
+        saveGame(this.state);
+        ui('click');
+      };
+      c.add(makeButton(this, minus.x, y, '−', press(-1), step, canPack(s, id, -1)));
+      c.add(this.text(right - 54, y, `${s.pack[id]}`, { size: 18, weight: 800, color: s.pack[id] ? MAGENTA : GREY }).setOrigin(0.5));
+      c.add(makeButton(this, plus.x, y, '+', press(1), step, canPack(s, id, 1)));
+      this.spots[`pack-${id}-less`] = minus;
+      this.spots[`pack-${id}-more`] = plus;
+    });
+    c.add(this.text(OVERLAY.x, OVERLAY_BUTTON.y - 38, t('packMax', { n: PACK_MAX }), { size: 9.5, weight: 600, color: SLATE }).setOrigin(0.5));
+    c.add(
+      makeButton(this, OVERLAY_BUTTON.x, OVERLAY_BUTTON.y, t('back'), () => {
+        ui('click');
+        this.sheetView = '';
+      }),
+    );
+    this.spots.back = { ...OVERLAY_BUTTON };
+  }
+
   /** Notices for a voyage just set out: the village's trade, winter, and the sloop's landing. */
   private sailNotices(trade: Trade | null, newIsle: boolean) {
     const s = this.state;
@@ -1699,6 +1882,7 @@ export class GameScene extends Phaser.Scene {
     };
     if (trade === 'stores') say(t('storesJoin', { n: TRADE_STORES }));
     if (trade === 'guide') say(t('guideJoins', { n: TRADE_GUIDE }));
+    if (packRoom(s.gear) > 0) say(t('packNotice', { pack: packText(s) }));
     if (newIsle && isWinter(s.island)) say(t('winterNotice'));
     if (s.landing) {
       const c = tileCentre(s.landing.x, s.landing.y);
@@ -1841,7 +2025,7 @@ export class GameScene extends Phaser.Scene {
     });
     if (s.hands.length === 0) c.add(this.text(hx, HANDS_COLUMN.y, t('noHands'), { size: 9.5, weight: 500, color: SLATE }).setOrigin(0, 0.5));
     // Village trade, under the hands: a card that opens the trade page once a village is charted.
-    c.add(small(hx, TRADE_CARD.y - TRADE_CARD.h / 2 - 12, t('tradeHead')));
+    c.add(small(hx, TRADE_CARD.y - TRADE_CARD.h / 2 - 9, t('tradeHead')));
     const villages = tradeVillages(s).length;
     if (villages > 0) {
       const on = !!s.trade;
@@ -1851,7 +2035,7 @@ export class GameScene extends Phaser.Scene {
       }, 'click');
       c.add(card);
       c.add(this.add.image(hx + 16, TRADE_CARD.y, s.trade ? tradeIcon(s.trade) : 'icon-provisions').setScale(0.9 / HI));
-      c.add(this.text(hx + 32, TRADE_CARD.y - 8, t('tradeButton'), { size: 11, weight: 800, color: on ? ON_INK : INK }).setOrigin(0, 0.5));
+      c.add(this.text(hx + 32, TRADE_CARD.y - 7, t('tradeButton'), { size: 11, weight: 800, color: on ? ON_INK : INK }).setOrigin(0, 0.5));
       const sub = s.trade ? t('tradePicked', { trade: t(TRADE_NAMES[s.trade]) }) : t('tradeOffers', { n: villages });
       const line = this.text(hx + 32, TRADE_CARD.y + 7, sub, { size: 8, weight: 500, color: on ? ON_INK_ACCENT : SLATE }).setOrigin(0, 0.5);
       c.add(line.setScale(Math.min(1, (HANDS_COLUMN.w - 38) / line.width), 1));
@@ -1859,6 +2043,20 @@ export class GameScene extends Phaser.Scene {
     } else {
       c.add(this.text(hx, TRADE_CARD.y, t('tradeNone'), { size: 9.5, weight: 500, color: SLATE }).setOrigin(0, 0.5));
     }
+    // The sack, under the village trade: a card that opens the packing page.
+    c.add(small(hx, PACK_CARD.y - PACK_CARD.h / 2 - 9, t('packHead')));
+    const packed = packRoom(s.pack) > 0;
+    c.add(
+      this.card(hx, PACK_CARD.y, HANDS_COLUMN.w, PACK_CARD.h, packed, () => {
+        this.sheetView = 'pack';
+        return true;
+      }, 'click'),
+    );
+    c.add(this.add.image(hx + 16, PACK_CARD.y, 'gear-sack').setScale(0.9 / HI));
+    c.add(this.text(hx + 32, PACK_CARD.y - 7, t('packButton'), { size: 11, weight: 800, color: packed ? ON_INK : INK }).setOrigin(0, 0.5));
+    const packLine = this.text(hx + 32, PACK_CARD.y + 7, packText(s), { size: 8, weight: 500, color: packed ? ON_INK_ACCENT : SLATE }).setOrigin(0, 0.5);
+    c.add(packLine.setScale(Math.min(1, (HANDS_COLUMN.w - 38) / packLine.width), 1));
+    this.spots.pack = { x: hx + HANDS_COLUMN.w / 2, y: PACK_CARD.y };
     // The commission board, across the bottom: the one picked is inked.
     const by = BOARD.y - BOARD.h / 2 - 14;
     g.fillStyle(hex(RULE)).fillRect(left, by - 12, right - left, 1);
@@ -1947,6 +2145,24 @@ export class GameScene extends Phaser.Scene {
   }
 }
 
+/** The chart's rows for this round's rules: tiles fixed, goods sold and a storm's washed-out tiles. */
+function gearRows(chart: Chart): { icon?: string; label: string; value: string; color?: string }[] {
+  const rows: { icon?: string; label: string; value: string; color?: string }[] = [];
+  if (chart.fixes > 0) rows.push({ icon: 'fix', label: t('fixesRow', { n: chart.fixes, each: FIX_BONUS }), value: `+${chart.fixCoins}`, color: MAGENTA });
+  if (chart.goods > 0) rows.push({ icon: 'gear-goods', label: t('goodsRow', { n: chart.goods, each: GOODS_VALUE }), value: `+${chart.goodsCoins}`, color: GOLD_DARK });
+  if (chart.storm > 0) rows.push({ icon: 'storm', label: t('stormRow', { n: chart.storm }), value: `−${chart.stormLoss}`, color: GREY });
+  return rows;
+}
+
+/** The sack on the harbour's card: "12 food" or "9 food · rope 1 · oil 2". */
+function packText(s: GameState) {
+  const gear = GEAR.filter((g) => s.pack[g] > 0).map((g) => t('gearCount', { gear: t(GEAR_NAMES[g]), n: s.pack[g] }));
+  return [t('foodCount', { n: voyageFood(s) }), ...gear].join(' · ');
+}
+
+/** Each piece of gear's name. */
+const GEAR_NAMES: Record<Gear, TextKey> = { rope: 'ropeName', oil: 'oilName', goods: 'goodsName' };
+
 /** Each village trade's name, and its icon. */
 const TRADE_NAMES: Record<Trade, TextKey> = { stores: 'storesName', guide: 'guideName', rumour: 'rumourName' };
 const tradeIcon = (id: Trade) => (id === 'stores' ? 'icon-provisions' : `trade-${id}`);
@@ -2011,8 +2227,8 @@ function dashedRect(g: Phaser.GameObjects.Graphics, x: number, y: number, w: num
 }
 
 /** What a survey turned up that has a sound; `NEWS_ORDER` puts the most important first. */
-type News = 'wonder' | 'riddle' | 'rival' | 'feature' | 'cave' | 'wreck' | 'storm';
-const NEWS_ORDER: News[] = ['wonder', 'riddle', 'rival', 'feature', 'cave', 'wreck', 'storm'];
+type News = 'wonder' | 'riddle' | 'rival' | 'feature' | 'cave' | 'goods' | 'wreck' | 'fix' | 'storm';
+const NEWS_ORDER: News[] = ['wonder', 'riddle', 'rival', 'feature', 'cave', 'goods', 'wreck', 'fix', 'storm'];
 
 function playNews(news: News) {
   switch (news) {
@@ -2024,6 +2240,10 @@ function playNews(news: News) {
       return sfx('sparkle');
     case 'storm':
       return sfx('thunder');
+    case 'goods':
+      return sfx('barter');
+    case 'fix':
+      return sfx('trig');
     default:
       return sfx(news);
   }

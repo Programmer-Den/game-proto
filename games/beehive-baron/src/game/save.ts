@@ -12,13 +12,15 @@ import { BEDS, BLOOMS, RARE_CAP, RARE_KINDS, rarePairs, type Bloom } from './gar
 import { WARES, type Commission, type Ware } from './workshop';
 import type { RoyalAsk } from './warrant';
 import { QUEEN_IDS, type Queen } from './swarm';
+import { FED_MS } from './jelly';
+import { FORECAST, WEATHERS, type Weather } from './weather';
 import { UPGRADES, UPGRADE_IDS } from './upgrades';
 
 // The comb, the coins, the jars, the wax, the bees, the upgrades, the meadows unlocked, where the
 // bees forage, the season and years, the time to the bees' next winter meal, the casks, the hives and the queen, the fair entries, its classes and fairs held,
 // the tired meadows, the traits bred in, the comb honey cut, this season's buyer's book, the garden and its rare honey, the
 // workshop's goods and commissions, the royal warrant and the crown's ask, the bees lent to the orchard and when the hive was last seen are saved; bees out foraging come home on load, and
-// wasps, the market, village orders, contract offers and a swarm start afresh.
+// wasps, the market, village orders, contract offers, a buyer's bid and a swarm start afresh.
 const KEY = 'beehive-baron-progress';
 
 export function loadProgress(): Progress {
@@ -81,6 +83,10 @@ export function loadProgress(): Progress {
       ).slice(0, WARES.length),
       warrant: num(saved.warrant, 0),
       royal: royalOf(saved.royal),
+      jelly: num(saved.jelly, 0),
+      fedMs: Math.min(FED_MS, num(saved.fedMs, 0)),
+      // Saves from before the weather start with a calm forecast (`newHive` fills it in).
+      weather: Array.isArray(saved.weather) && saved.weather.length === FORECAST && saved.weather.every((w) => WEATHERS.includes(w as Weather)) ? (saved.weather as Weather[]) : [],
       lent:
         saved.lent && typeof saved.lent === 'object' && num(saved.lent.bees, 0) > 0
           ? { bees: num(saved.lent.bees, 0), leftMs: Math.min(CONTRACT_MS, num(saved.lent.leftMs, CONTRACT_MS)) }
