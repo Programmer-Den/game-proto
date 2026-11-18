@@ -33,9 +33,19 @@ import {
   type TraitId,
   callPay,
   CHAIN_BONUS,
+  chainLanterns,
   chainLit,
   chainsFor,
-  chainsOf,
+  fit,
+  fitCost,
+  FITTING_IDS,
+  FITTINGS,
+  lanternKindsFor,
+  place,
+  placeChoices,
+  ROUND_MAX,
+  sendRound,
+  type FittingId,
   carryOn,
   chase,
   CLOSE_CALL,
@@ -89,6 +99,8 @@ import {
   FONT,
   GUST_TAG,
   KIND_TAG,
+  FIT_CARDS,
+  JAR_HIT,
   LANTERN_HIT,
   MOTH_HIT,
   MOVE_CARDS,
@@ -183,11 +195,27 @@ export class GameScene extends Phaser.Scene {
   /** The village panel's building cards (LK18), by id, its "Back" button and the night panel's "Village" link. */
   villageButtons: (ButtonSpot & { id: BuildingId })[] = [];
   villageBack: ButtonSpot = { x: VIEW.w / 2, y: VIEW.h / 2 + 115, w: 200, h: 40 };
-  villageButton: ButtonSpot = { x: NIGHT_PANEL.x - NIGHT_PANEL.w / 2 + 92, y: NEXT_BUTTON.y, w: 150, h: 34 };
+  villageButton: ButtonSpot = { x: NIGHT_PANEL.x - NIGHT_PANEL.w / 2 + 92, y: NEXT_BUTTON.y - 14, w: 150, h: 26 };
   /** The Great Festival's "Climb" button (LK20). */
   climbButton: ButtonSpot = { x: VIEW.w / 2 + 190, y: VIEW.h / 2 + 115, w: 180, h: 40 };
   /** True while the village panel is open over the night panel. */
   private villageOpen = false;
+  /** The fittings bar (LK23): open over the night's lanterns, with the fitting a lantern tap fits. */
+  private fittingOpen = false;
+  private fitPick: FittingId = 'reservoir';
+  private fittingBar!: Phaser.GameObjects.Container;
+  private fitCards = new Map<FittingId, Phaser.GameObjects.Image>();
+  fittingsButton: ButtonSpot = { x: NIGHT_PANEL.x - NIGHT_PANEL.w / 2 + 92, y: NEXT_BUTTON.y + 14, w: 150, h: 26 };
+  fittingButtons: (ButtonSpot & { id: FittingId })[] = [];
+  fittingsDone: ButtonSpot = { x: FIT_CARDS.done.x, y: FIT_CARDS.y, w: 110, h: 40 };
+  /** A round being dragged from a jar (LK21): the jar, the lanterns so far and where the pointer is. */
+  private round: { jar: number; stops: number[]; x: number; y: number } | null = null;
+  private roundMarks!: Phaser.GameObjects.Graphics;
+  private roundNumbers: Phaser.GameObjects.Text[] = [];
+  /** The marked spots for the new lantern (LK22): a ghost lantern, a note and a tap zone each. */
+  private placeTitle!: Phaser.GameObjects.Text;
+  private placeSub!: Phaser.GameObjects.Text;
+  private ghosts: { lamp: Phaser.GameObjects.Image; note: Phaser.GameObjects.Text; hit: Phaser.GameObjects.Zone }[] = [];
   private villagePanel!: Phaser.GameObjects.Container;
   private villageSub!: Phaser.GameObjects.Text;
   private villageCards = new Map<BuildingId, { bg: Phaser.GameObjects.Image; note: Phaser.GameObjects.Text }>();
@@ -334,6 +362,9 @@ export class GameScene extends Phaser.Scene {
     this.createBoonPanel();
     this.createDailyPanel();
     this.createVillagePanel();
+    this.createRounds();
+    this.createPlacing();
+    this.createFittings();
     updateMusic(this.state, true);
   }
 
@@ -345,6 +376,13 @@ export class GameScene extends Phaser.Scene {
   /** A tap on lantern `i`: a moth flutters off, or the tap queues with a pip; a lost tap buzzes. */
   private tapLantern(i: number) {
     const s = this.state;
+    // With the fittings bar open, a tap fits the picked fitting to the lantern (LK23).
+    if (this.fittingOpen && s.phase === 'night') {
+      const done = fit(s, i, this.fitPick);
+      this.answer(done, 'kaching');
+      if (done) this.popup(s.lanterns[i].x, s.lanterns[i].y - 40, t('fitted'), '#ffd890', 13);
+      return;
+    }
     const queued = s.queue.length;
     if (send(s, i)) sfx(s.queue.length > queued ? 'pip' : 'flutter');
     else if (s.phase === 'dusk' && s.lanterns[i]) ui('refuse');
@@ -548,6 +586,17 @@ export class GameScene extends Phaser.Scene {
         this.villageOpen = true;
       });
     parts.push(villageLink, villageHit);
+    // The fittings link, under the village's (LK23).
+    const f = this.fittingsButton;
+    const fittingsLink = this.label(f.x, f.y, t('fittingsButton'), { size: 14, bold: true, color: '#ffd890', glow: true }).setOrigin(0.5);
+    const fittingsHit = this.add
+      .zone(f.x, f.y, f.w, f.h)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', () => {
+        ui('click');
+        this.fittingOpen = true;
+      });
+    parts.push(fittingsLink, fittingsHit);
     this.nightPanel = this.add.container(0, 0, parts).setDepth(UI_DEPTH + 10).setVisible(false);
   }
 
@@ -761,6 +810,100 @@ export class GameScene extends Phaser.Scene {
    * Starts today's daily night, putting the game aside (from the night panel or the game over).
    * Once today's try is used it floats today's record at (`x`, `y`) instead.
    */
+  /**
+   * Moth rounds (LK21): a press on a jar starts a round, dragging over lanterns adds them in order
+   * (up to ROUND_MAX), and letting go sends one moth of that jar round them. A press that drags over
+   * no lantern does nothing, so a tap on a moth still swaps its jar.
+   */
+  private createRounds() {
+    this.roundMarks = this.add.graphics().setDepth(6.3);
+    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
+      const s = this.state;
+      if (s.phase !== 'dusk') return;
+      const jar = JARS.findIndex(
+        (j, k) => (k === 0 || s.levels.jar > 0) && Math.abs(p.worldX - j.x) <= JAR_HIT.w / 2 && Math.abs(p.worldY - (j.y - JAR_HIT.up)) <= JAR_HIT.h / 2,
+      );
+      this.round = jar >= 0 ? { jar, stops: [], x: p.worldX, y: p.worldY } : null;
+    });
+    this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
+      const r = this.round;
+      if (!r) return;
+      r.x = p.worldX;
+      r.y = p.worldY;
+      if (r.stops.length >= ROUND_MAX) return;
+      const i = this.state.lanterns.findIndex((l) => Math.abs(p.worldX - l.x) <= LANTERN_HIT.w / 2 && Math.abs(p.worldY - l.y) <= LANTERN_HIT.h / 2);
+      if (i >= 0 && !r.stops.includes(i)) {
+        r.stops.push(i);
+        sfx('pip');
+      }
+    });
+    const end = () => {
+      const r = this.round;
+      this.round = null;
+      if (r?.stops.length) this.answer(sendRound(this.state, r.jar, r.stops), 'flutter');
+    };
+    this.input.on('pointerup', end);
+    this.input.on('pointerupoutside', end);
+  }
+
+  /** The marked spots for the new lantern (LK22): a ghost lantern on each, with a note, and the plaque's title. */
+  private createPlacing() {
+    this.placeTitle = this.label(VIEW.w / 2, 380, t('placeTitle'), { size: 20, bold: true, color: '#ffc870', glow: true, stroke: true }).setOrigin(0.5).setDepth(UI_DEPTH);
+    this.placeSub = this.label(VIEW.w / 2, 405, t('placeSub'), { size: 12.5, color: '#f4e2c8', stroke: true }).setOrigin(0.5).setDepth(UI_DEPTH);
+    for (let k = 0; k < 3; k++) {
+      const lamp = this.sprite(-200, -200, 'lantern-dark').setDepth(5).setAlpha(0.8);
+      const note = this.label(0, 0, '', { size: 9.5, bold: true, color: '#ffd8a0', stroke: true }).setOrigin(0.5, 0).setAlign('center').setDepth(6.1);
+      const hit = this.add
+        .zone(-200, -200, LANTERN_HIT.w, LANTERN_HIT.h)
+        .setDepth(7.6)
+        .setInteractive({ useHandCursor: true })
+        .on('pointerdown', () => {
+          const spot = placeChoices(this.state)[k];
+          this.answer(spot !== undefined && place(this.state, spot), 'evening');
+        });
+      this.ghosts.push({ lamp, note, hit });
+    }
+  }
+
+  /** The fittings bar (LK23): its title, a card for each fitting and "Done", over the night's lanterns. */
+  private createFittings() {
+    const parts: Phaser.GameObjects.GameObject[] = [];
+    const plaque = this.add.rectangle(VIEW.w / 2, FIT_CARDS.y, this.right - this.left, 104, 0x0a0610, 0.72);
+    const title = this.label(VIEW.w / 2, FIT_CARDS.y - 38, t('fittingsTitle'), { size: 14, bold: true, color: '#ffc870', glow: true }).setOrigin(0.5);
+    parts.push(plaque, title);
+    FITTING_IDS.forEach((id, i) => {
+      const bx = FIT_CARDS.xs[i];
+      const by = FIT_CARDS.y;
+      const left = bx - FIT_CARDS.w / 2;
+      const top = by - FIT_CARDS.h / 2;
+      const bg = this.add.image(left - PAD, top - PAD, 'card-off').setOrigin(0).setScale(1 / RES);
+      const name = this.label(left + 12, top + 7, t(FITTINGS[id].name), { size: 15, bold: true, color: '#ffc870', glow: true });
+      const cost = this.label(left + FIT_CARDS.w - 12, top + 9, t('cost', { n: FITTINGS[id].cost }), { size: 12, bold: true, color: '#ffc870' }).setOrigin(1, 0);
+      const blurb = this.label(left + 12, top + 31, t(FITTINGS[id].blurb), { size: 10.5, color: '#e0cfb4' });
+      const hit = this.add
+        .zone(bx, by, FIT_CARDS.w, FIT_CARDS.h)
+        .setInteractive({ useHandCursor: true })
+        .on('pointerdown', () => {
+          ui('click');
+          this.fitPick = id;
+        });
+      this.fitCards.set(id, bg);
+      this.fittingButtons.push({ id, x: bx, y: by, w: FIT_CARDS.w, h: FIT_CARDS.h });
+      parts.push(bg, name, cost, blurb, hit);
+    });
+    const d = this.fittingsDone;
+    const done = this.label(d.x, d.y, t('fittingsDone'), { size: 16, bold: true, color: '#ffd890', glow: true }).setOrigin(0.5);
+    const doneHit = this.add
+      .zone(d.x, d.y, d.w, d.h)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', () => {
+        ui('click');
+        this.fittingOpen = false;
+      });
+    parts.push(done, doneHit);
+    this.fittingBar = this.add.container(0, 0, parts).setDepth(UI_DEPTH + 5).setVisible(false);
+  }
+
   private openDaily(x = this.dailyButton.x, y = this.dailyButton.y - 30) {
     this.dailyRecord = loadDaily(GAME);
     if (this.dailyRecord.played || this.state.daily) {
@@ -835,6 +978,8 @@ export class GameScene extends Phaser.Scene {
     this.drawMountain();
     this.drawVillage();
     this.drawMoths();
+    this.drawRounds();
+    this.drawPlacing();
     this.drawBats();
     this.drawOrder();
     this.drawHud();
@@ -998,19 +1143,34 @@ export class GameScene extends Phaser.Scene {
     const g = this.cords.clear();
     for (const i of chainsFor(s)) {
       const lit = chainLit(s, i);
-      const spots = chainsOf(s)[i].lanterns.map((l) => s.lanterns[l]);
-      for (let k = 1; k < spots.length; k++) {
-        const a = spots[k - 1];
-        const b = spots[k];
-        const d = Math.hypot(b.x - a.x, b.y - a.y);
-        const n = Math.floor(d / 7);
-        for (let j = 2; j < n - 1; j++) {
-          const f = j / n;
-          const x = a.x + (b.x - a.x) * f;
-          const y = a.y - 22 + (b.y - a.y) * f + Math.sin(f * Math.PI) * 18;
-          if (lit) g.fillStyle(0xffc870, 0.25).fillCircle(x, y, 3.2);
-          g.fillStyle(lit ? 0xffd890 : 0xfff0c8, lit ? 1 : 0.35).fillCircle(x, y, lit ? 1.5 : 1.1);
+      this.cord(g, chainLanterns(s, i).map((l) => s.lanterns[l]), lit ? 'lit' : 'dark');
+    }
+    // While the new lantern's spot is picked (LK22), the chains a marked spot would complete show in amber.
+    if (s.phase === 'place') {
+      const spots = DISTRICTS[s.nextDistrict].spots;
+      for (const c of placeChoices(s)) {
+        const chains: readonly { lanterns: readonly number[] }[] = DISTRICTS[s.nextDistrict].chains;
+        for (const chain of chains) {
+          if (chain.lanterns.includes(c) && chain.lanterns.every((k) => k === c || s.placed.includes(k))) this.cord(g, chain.lanterns.map((k) => spots[k]), 'new');
         }
+      }
+    }
+  }
+
+  /** A chain's dotted cord sagging from lantern to lantern: faint, amber when all lit, or gold for a chain a marked spot would complete. */
+  private cord(g: Phaser.GameObjects.Graphics, spots: readonly { x: number; y: number }[], look: 'dark' | 'lit' | 'new') {
+    for (let k = 1; k < spots.length; k++) {
+      const a = spots[k - 1];
+      const b = spots[k];
+      const d = Math.hypot(b.x - a.x, b.y - a.y);
+      const n = Math.floor(d / 7);
+      for (let j = 2; j < n - 1; j++) {
+        const f = j / n;
+        const x = a.x + (b.x - a.x) * f;
+        const y = a.y - 22 + (b.y - a.y) * f + Math.sin(f * Math.PI) * 18;
+        if (look !== 'dark') g.fillStyle(0xffc870, 0.25).fillCircle(x, y, 3.2);
+        if (look === 'new') g.fillStyle(0xffe08a, 0.85).fillCircle(x, y, 1.4);
+        else g.fillStyle(look === 'lit' ? 0xffd890 : 0xfff0c8, look === 'lit' ? 1 : 0.35).fillCircle(x, y, look === 'lit' ? 1.5 : 1.1);
       }
     }
   }
@@ -1066,6 +1226,9 @@ export class GameScene extends Phaser.Scene {
       } else if (flooded(s, i)) this.holes(g, x, y, 23, 1, 0x7ab8e0, 1.3);
       else if (!lantern.lit && !lantern.claimed && s.phase === 'dusk') this.holes(g, x, y, 23, 0, 0xffffff, 1.3);
       this.queueBadge(i, queued);
+      if (lantern.fitting) this.fittingBadge(g, x - 21, y - 22, lantern.fitting);
+      // With the fittings bar open, the lanterns the picked fitting can go on are ringed in gold.
+      if (this.fittingOpen && s.phase === 'night' && fitCost(s, i, this.fitPick) !== null) this.holes(g, x, y, 27, 1, 0xffe08a, 1.6);
       // A nearly dry lantern with no moth on its way: a refill now is a close call.
       // With the cask dry (or every fill spoken for) no refill can be sent, so nothing invites one.
       if (s.phase === 'dusk' && lantern.lit && !lantern.claimed && f < CLOSE_CALL && caskSpare(s)) {
@@ -1076,6 +1239,21 @@ export class GameScene extends Phaser.Scene {
         parts.tagText.setText(t('saveIt', { n: closeCallPay(s) }));
       }
     });
+  }
+
+  /** A lantern's fitting (LK23) as a small inked badge: an oil drop, a wind curl or shutter bars. */
+  private fittingBadge(g: Phaser.GameObjects.Graphics, x: number, y: number, id: FittingId) {
+    g.fillStyle(INK_HEX).fillCircle(x, y, 7);
+    if (id === 'reservoir') {
+      g.fillStyle(0xffc060).fillCircle(x, y + 1.5, 3);
+      g.fillTriangle(x - 2.6, y, x + 2.6, y, x, y - 4.5);
+    } else if (id === 'guard') {
+      g.lineStyle(1.6, 0xbcd4ff).beginPath().arc(x, y, 3.8, Math.PI * 0.9, Math.PI * 2.1).strokePath();
+      g.lineBetween(x - 4, y + 2.5, x + 3, y + 2.5);
+    } else {
+      g.fillStyle(0xd8c8ff);
+      for (let k = -1; k <= 1; k++) g.fillRect(x + k * 3 - 0.8, y - 4, 1.6, 8);
+    }
   }
 
   /** The queue position badge numbers, made on demand. */
@@ -1280,7 +1458,10 @@ export class GameScene extends Phaser.Scene {
         .zone(-200, -200, MOTH_HIT.w, MOTH_HIT.h)
         .setDepth(7.4)
         .setInteractive({ useHandCursor: true })
-        .on('pointerdown', () => this.answer(swapJar(this.state, k), 'swap'));
+        // On letting go, so a press here can start a round instead (LK21); a round dragged over lanterns swaps nothing.
+        .on('pointerup', () => {
+          if (!this.round?.stops.length) this.answer(swapJar(this.state, k), 'swap');
+        });
       const nap = this.label(0, 0, '', { size: 9, bold: true, color: '#e4d8ff', stroke: true }).setOrigin(0.5).setDepth(7.3).setVisible(false);
       this.moths.push({ halo, body, hit, nap });
     }
@@ -1324,6 +1505,91 @@ export class GameScene extends Phaser.Scene {
         const d = Math.hypot(jx - m.x, jy - m.y);
         for (let k = 10; k < d; k += 5.5) trail.fillStyle(0xffe4b4, 0.45).fillCircle(m.x + ((jx - m.x) * k) / d, m.y + 6 + ((jy - m.y - 6) * k) / d, 0.8);
       }
+    });
+  }
+
+  /**
+   * Moth rounds (LK21): the round being dragged (a dotted line from the jar through each lantern,
+   * gold rings and their order, then on to the pointer) and the stops still ahead of each moth on a
+   * round (a faint dotted line and small numbers).
+   */
+  private drawRounds() {
+    const s = this.state;
+    const g = this.roundMarks.clear();
+    let used = 0;
+    const number = (x: number, y: number, n: number, alpha: number) => {
+      let text = this.roundNumbers[used];
+      if (!text) {
+        text = this.label(0, 0, '', { size: 10, bold: true, color: '#ffe08a', stroke: true }).setOrigin(0.5).setDepth(6.4);
+        this.roundNumbers.push(text);
+      }
+      text.setVisible(true).setPosition(x, y).setText(formatNumber(n)).setAlpha(alpha);
+      used++;
+    };
+    const dots = (ax: number, ay: number, bx: number, by: number, alpha: number) => {
+      const d = Math.hypot(bx - ax, by - ay);
+      for (let k = 6; k < d; k += 7) g.fillStyle(0xffe08a, alpha).fillCircle(ax + ((bx - ax) * k) / d, ay + ((by - ay) * k) / d, 1.3);
+    };
+    const r = this.round;
+    if (r && s.phase === 'dusk') {
+      let px: number = JARS[r.jar].x;
+      let py: number = JARS[r.jar].y - JAR_HIT.up;
+      r.stops.forEach((i, k) => {
+        const l = s.lanterns[i];
+        dots(px, py, l.x, l.y, 0.9);
+        this.holes(g, l.x, l.y, 27, 1, 0xffe08a, 1.6);
+        number(l.x - 22, l.y - 28, k + 1, 1);
+        px = l.x;
+        py = l.y;
+      });
+      if (r.stops.length < ROUND_MAX) dots(px, py, r.x, r.y, 0.5);
+    }
+    if (s.phase === 'dusk') {
+      for (const m of s.moths) {
+        if (!m.route.length || m.target < 0) continue;
+        let p = s.lanterns[m.target];
+        m.route.forEach((i, k) => {
+          const l = s.lanterns[i];
+          dots(p.x, p.y, l.x, l.y, 0.4);
+          number(l.x - 22, l.y - 28, k + 1, 0.7);
+          p = l;
+        });
+      }
+    }
+    for (let k = used; k < this.roundNumbers.length; k++) this.roundNumbers[k].setVisible(false);
+  }
+
+  /** The new lantern's marked spots (LK22): a ghost lantern on each, a pulsing ring, its kind and the chains it completes. */
+  private drawPlacing() {
+    const s = this.state;
+    const placing = s.phase === 'place';
+    this.placeTitle.setVisible(placing);
+    this.placeSub.setVisible(placing);
+    const choices = placing ? placeChoices(s) : [];
+    const spots = DISTRICTS[s.nextDistrict].spots;
+    const g = this.roundMarks;
+    const pulse = settings.reduceMotion ? 1 : 0.6 + 0.4 * Math.sin(this.clock / 160);
+    this.ghosts.forEach((ghost, k) => {
+      const spot = choices[k];
+      if (spot === undefined) {
+        ghost.lamp.setVisible(false);
+        ghost.note.setVisible(false);
+        ghost.hit.setPosition(-200, -200);
+        return;
+      }
+      const { x, y } = spots[spot];
+      // The kind the new lantern would be, from the kinds the next night deals with this spot hung.
+      const placed = [...s.placed, spot].sort((a, b) => a - b);
+      const kind = lanternKindsFor(s.night + 1, placed.length)[placed.indexOf(spot)];
+      const key = kind === 'plain' ? 'lantern-dark' : `lantern-${kind}-dark`;
+      ghost.lamp.setVisible(true).setPosition(x, y).setTexture(key).setOrigin(0.5, lampOriginY(kind));
+      const chains: readonly { lanterns: readonly number[] }[] = DISTRICTS[s.nextDistrict].chains;
+      const chain = chains.some((c) => c.lanterns.includes(spot) && c.lanterns.every((i) => i === spot || s.placed.includes(i)));
+      const lines = [kind === 'plain' ? '' : t(LANTERN_KINDS[kind].name), chain ? t('placeChain') : ''].filter(Boolean);
+      ghost.note.setVisible(lines.length > 0).setPosition(x, y + 32).setText(lines.join('\n'));
+      ghost.hit.setPosition(x, y);
+      g.lineStyle(2, 0xffe08a, 0.9 * pulse).strokeCircle(x, y, 26);
+      this.holes(g, x, y, 32, 1, 0xffe08a, 1.4);
     });
   }
 
@@ -1429,14 +1695,26 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** True once the night panel or the game-over panel is open; read by the playthrough test. */
+  /** The new lantern's marked spots (LK22) while one is picked, in frame coordinates, for tests. */
+  get placeButtons(): (ButtonSpot & { spot: number })[] {
+    const s = this.state;
+    if (s.phase !== 'place') return [];
+    return placeChoices(s).map((spot) => ({ spot, x: DISTRICTS[s.nextDistrict].spots[spot].x, y: DISTRICTS[s.nextDistrict].spots[spot].y, w: LANTERN_HIT.w, h: LANTERN_HIT.h }));
+  }
+
   get panelOpen() {
     return this.state.phase !== 'dusk' && this.clock - this.nightAt >= PANEL_DELAY_MS;
   }
 
   private drawPanels() {
     const s = this.state;
-    if (s.phase !== 'night') this.villageOpen = false;
-    this.nightPanel.setVisible(s.phase === 'night' && this.panelOpen && !this.villageOpen);
+    if (s.phase !== 'night') {
+      this.villageOpen = false;
+      this.fittingOpen = false;
+    }
+    this.nightPanel.setVisible(s.phase === 'night' && this.panelOpen && !this.villageOpen && !this.fittingOpen);
+    this.fittingBar.setVisible(s.phase === 'night' && this.panelOpen && this.fittingOpen);
+    if (this.fittingOpen) for (const [id, bg] of this.fitCards) bg.setTexture(id === this.fitPick ? 'card-on' : 'card-off');
     this.villagePanel.setVisible(s.phase === 'night' && this.panelOpen && this.villageOpen);
     if (this.villageOpen) {
       this.villageSub.setText(t('villageSub', { n: s.village.houses }));
@@ -1649,7 +1927,7 @@ export class GameScene extends Phaser.Scene {
     for (const lantern of s.lanterns) if (lantern.lit) this.popup(lantern.x, lantern.y - 34, `+${Math.round(lanternPay(s, lantern) * mult)}`, '#ffc870', 18);
     for (const i of chainsFor(s)) {
       if (!chainLit(s, i)) continue;
-      const [a, , b] = chainsOf(s)[i].lanterns.map((l) => s.lanterns[l]);
+      const [a, , b] = chainLanterns(s, i).map((l) => s.lanterns[l]);
       this.popup((a.x + b.x) / 2, (a.y + b.y) / 2 + 4, t('chainPay', { n: Math.round(CHAIN_BONUS * mult) }), '#ffd890', 15);
     }
     // Every night kept adds a house to the village (LK18).

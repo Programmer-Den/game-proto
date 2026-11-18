@@ -38,6 +38,10 @@ export const CASK_HUD = { x: 296, y: 20 };
 /** The tap area around each lantern, and around a bat. */
 export const LANTERN_HIT = { w: 64, h: 72 };
 export const BAT_HIT = { w: 64, h: 52 };
+/** The fittings bar (LK23): its three cards' centres and "Done", along the foot of the view. */
+export const FIT_CARDS = { xs: [250, 446, 642], y: 490, w: 184, h: 52, done: { x: 800 } };
+/** Where a press starts a moth round (LK21): around a jar, centred `up` above its foot. */
+export const JAR_HIT = { w: 110, h: 90, up: 30 };
 /** The tap area around a moth resting on a jar, to swap it to the other jar. */
 export const MOTH_HIT = { w: 28, h: 36 };
 

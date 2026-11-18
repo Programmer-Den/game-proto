@@ -310,6 +310,21 @@ const en = {
   climb: 'Climb',
   mountainFestivalTitle: 'The Mountain Festival!',
   mountainBoonSub: '{n} nights kept on the mountain. The monks give the keep a boon,\nkept in this game and every game after, in every keep.',
+
+  // Moth rounds, placing the new lantern and fittings (LK21 to LK23)
+  placeTitle: "Hang tonight's new lantern",
+  placeSub: 'Tap one of the marked spots',
+  placeChain: 'completes a chain',
+  fittingsButton: 'Fittings',
+  fittingsTitle: 'Pick a fitting, then tap a lantern to fit it',
+  fittingsDone: 'Done',
+  fitted: 'Fitted!',
+  reservoirName: 'Reservoir',
+  reservoirBlurb: 'Holds half again the oil',
+  gustGuardName: 'Gust guard',
+  gustGuardBlurb: 'Gusts pass it by',
+  shutterName: 'Bat shutter',
+  shutterBlurb: 'Bats pass it by',
 };
 
 export default en;
