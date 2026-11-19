@@ -49,8 +49,14 @@ export async function updateNow(): Promise<'updated' | 'current' | 'failed' | 'n
   if (!('serviceWorker' in navigator)) return 'none';
   const registration = await navigator.serviceWorker.getRegistration(root()).catch(() => undefined);
   if (!registration) return 'none';
-  const cache = await caches.open(UPDATES_CACHE);
-  await cache.put(updatesKey('update-now'), new Response(String(Date.now())));
+  // Storage full or Cache Storage blocked: the worker can't be told to let the update through.
+  let cache: Cache;
+  try {
+    cache = await caches.open(UPDATES_CACHE);
+    await cache.put(updatesKey('update-now'), new Response(String(Date.now())));
+  } catch {
+    return 'failed';
+  }
   try {
     await registration.update();
     const worker = registration.installing ?? registration.waiting;
@@ -66,7 +72,7 @@ export async function updateNow(): Promise<'updated' | 'current' | 'failed' | 'n
   } catch {
     return 'failed';
   } finally {
-    await cache.delete(updatesKey('update-now'));
+    await cache.delete(updatesKey('update-now')).catch(() => false);
   }
 }
 

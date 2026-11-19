@@ -110,7 +110,7 @@ test('plays the first round', async ({ page }, testInfo) => {
   startedAt = Date.now();
 
   const snap = async (name: string) =>
-    testInfo.attach(name, { body: await page.screenshot({ path: testInfo.outputPath(`${name}.png`) }), contentType: 'image/png' });
+    await testInfo.attach(name, { body: await page.screenshot({ path: testInfo.outputPath(`${name}.png`) }), contentType: 'image/png' });
 
   /** Where a point in the game's view is on the page. */
   async function onPage(at: { x: number; y: number }) {

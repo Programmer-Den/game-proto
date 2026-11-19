@@ -132,7 +132,7 @@ test('plays the first room', async ({ page }, testInfo) => {
   startedAt = Date.now();
 
   const snap = async (name: string) =>
-    testInfo.attach(name, { body: await page.screenshot({ path: testInfo.outputPath(`${name}.png`) }), contentType: 'image/png' });
+    await testInfo.attach(name, { body: await page.screenshot({ path: testInfo.outputPath(`${name}.png`) }), contentType: 'image/png' });
 
   /** Plays on until `check` holds, for up to `ms` of game time. */
   async function until(what: string, check: (s: GameState) => boolean, ms = 10_000) {

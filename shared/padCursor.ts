@@ -90,11 +90,12 @@ export function addPadCursor() {
     }
   };
 
-  onPadFrame(({ left, right, held, dt }) => {
+  onPadFrame(({ left, right, held, dt, first }) => {
     const a = held.has('a');
     const b = held.has('b');
-    const pressedA = a && !heldA;
-    const pressedB = b && !heldB;
+    // A button already down as the pad connects (the press that woke it) is not a tap.
+    const pressedA = a && !heldA && !first;
+    const pressedB = b && !heldB && !first;
     heldA = a;
     heldB = b;
     if (!active()) {

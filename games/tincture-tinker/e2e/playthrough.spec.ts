@@ -206,7 +206,7 @@ test('sells the first potion', async ({ page }, testInfo) => {
   startedAt = Date.now();
 
   const snap = async (name: string) =>
-    testInfo.attach(name, { body: await page.screenshot({ path: testInfo.outputPath(`${name}.png`) }), contentType: 'image/png' });
+    await testInfo.attach(name, { body: await page.screenshot({ path: testInfo.outputPath(`${name}.png`) }), contentType: 'image/png' });
 
   /** Plays on until the swap on the board has played out. */
   async function settled(what: string) {

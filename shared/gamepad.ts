@@ -47,6 +47,8 @@ export interface PadFrame {
   held: ReadonlySet<PadButton>;
   /** Seconds since the last frame, at most 0.1. */
   dt: number;
+  /** The first frame since a pad connected, whose held buttons are not presses. */
+  first: boolean;
 }
 
 const pressListeners: ((button: PadButton) => void)[] = [];
@@ -122,7 +124,7 @@ function tick(time: number) {
 
   const dt = last ? Math.min(time - lastTime, 100) / 1000 : 0;
   lastTime = time;
-  for (const listener of frameListeners) listener({ left, right, held, dt });
+  for (const listener of frameListeners) listener({ left, right, held, dt, first: !last });
   if (last) {
     for (const button of held) {
       const repeats = DIRECTIONS.includes(button);

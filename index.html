@@ -568,6 +568,8 @@
         }
         document.querySelector('.trophy-shelf').innerHTML = trophyShelfHtml(trophySets, (game) => {
           const card = cards.find((c) => folder(c) === game);
+          // A game with trophies but no card yet shows under its folder name and the hub's icon.
+          if (!card) return { title: game, icon: 'favicon.svg' };
           return { title: title(card), icon: card.querySelector('h2 .icon').getAttribute('src') };
         });
       };

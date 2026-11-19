@@ -129,7 +129,7 @@ test('plays the first wave', async ({ page }, testInfo) => {
   startedAt = Date.now();
 
   const snap = async (name: string) =>
-    testInfo.attach(name, { body: await page.screenshot({ path: testInfo.outputPath(`${name}.png`) }), contentType: 'image/png' });
+    await testInfo.attach(name, { body: await page.screenshot({ path: testInfo.outputPath(`${name}.png`) }), contentType: 'image/png' });
 
   // The view takes the window's shape around the designed 960x560 frame the board is laid out in.
   const view = await game.view();

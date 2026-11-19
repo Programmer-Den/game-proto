@@ -84,7 +84,7 @@ function addFullscreen() {
     button.blur();
   });
   window.addEventListener('keydown', (e) => {
-    if (e.key.toLowerCase() !== 'f' || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+    if ((e.key ?? '').toLowerCase() !== 'f' || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
     toggle();
   });
   document.addEventListener('fullscreenchange', () => label(document.fullscreenElement !== null));

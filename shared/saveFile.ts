@@ -135,7 +135,8 @@ export function download(blob: Blob, kind: string) {
   document.body.append(link);
   link.click();
   link.remove();
-  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+  // A browser that asks where to save reads the file only once the player answers, so keep it a minute.
+  setTimeout(() => URL.revokeObjectURL(link.href), 60_000);
 }
 
 /** Exports `kind` and hands the player the file, or says it failed. */
