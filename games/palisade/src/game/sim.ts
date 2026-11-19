@@ -678,11 +678,12 @@ function explode(state: GameState, x: number, y: number, radius: number, damage:
   }
 }
 
-/** Sets a foe alight, unless it is Warded or made of frost; in rain the burning lasts half as long. */
+/** Sets a foe alight (the stronger burn and the longer time), unless it is Warded or made of frost; in rain the burning lasts half as long. */
 function ignite(state: GameState, foe: Enemy, dps: number, ms: number) {
   if (foe.trait === 'warded' || ENEMIES[foe.kind].cold) return;
   foe.burnDps = Math.max(foe.burnDps, dps);
-  foe.burnMs = ms * weatherEffects(state.weather).burn;
+  // Like a chill, a shorter burn never cuts a longer one short.
+  foe.burnMs = Math.max(foe.burnMs, ms * weatherEffects(state.weather).burn);
 }
 
 /** Lightning strikes the foe nearest the barricade and leaps on to the nearest seen foe it has not struck. */

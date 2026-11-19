@@ -35,7 +35,7 @@ seconds without a tap.
   every kill's coins and experience in `removeDead`). `waveFoes(wave, road, frontier)` adds frost
   wolves (`wolf`) from the pass's wave 1 and ice wisps (`wisp`, `flying`) from wave 3, never in the
   vale; `bossOf` and `waveTrack` take the map too. A foe with `cold` (the wisp and the Chieftain)
-  shrugs off burning and chill (`ignite`, `chill`; a chill keeps the longer of its time and a hold or daze already on). The Chieftain's move (`bossMoves`) is a howl
+  shrugs off burning and chill (`ignite`, `chill`; a burn keeps the stronger damage and the longer time, and a chill the longer of its time and a hold or daze already on). The Chieftain's move (`bossMoves`) is a howl
   every `HOWL_MS`: every hired guard's `stunMs` is set to `STUN_MS` and `roarMs` to `ROAR_SLOW_MS`
   (a `howl` effect). `clearWave` keeps the pass's best in `passBest` (`bestOn(state, frontier)`
   reads either map's best, which `canMarch` uses) and, on its wave 30, sets `passWon` as well as
