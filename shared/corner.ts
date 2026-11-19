@@ -65,7 +65,7 @@ function toggleMuted() {
 /** The M key, which mutes every sound or turns it back on, on any screen. */
 export function addMuteKey() {
   window.addEventListener('keydown', (e) => {
-    if (e.key.toLowerCase() !== SOUND_KEY || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+    if ((e.key ?? '').toLowerCase() !== SOUND_KEY || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
     toggleMuted();
   });
 }

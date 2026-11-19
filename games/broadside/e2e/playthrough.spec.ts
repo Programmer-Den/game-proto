@@ -226,7 +226,7 @@ test('plays the first wave', async ({ page }, testInfo) => {
   startedAt = Date.now();
 
   const snap = async (name: string) =>
-    testInfo.attach(name, { body: await page.screenshot({ path: testInfo.outputPath(`${name}.png`) }), contentType: 'image/png' });
+    await testInfo.attach(name, { body: await page.screenshot({ path: testInfo.outputPath(`${name}.png`) }), contentType: 'image/png' });
 
   /** A point in the game's 960x540 view, on the page. */
   async function onPage(x: number, y: number) {

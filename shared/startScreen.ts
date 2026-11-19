@@ -186,7 +186,7 @@ export function addStartScreen(game: Phaser.Game, howToPlay?: HowToPlay, trophie
     'keydown',
     (e) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
-      const key = e.key.toLowerCase();
+      const key = (e.key ?? '').toLowerCase();
       if (mode === 'playing') {
         if (key === PAUSE_KEY && !e.repeat) {
           e.stopPropagation();

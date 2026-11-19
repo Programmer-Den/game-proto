@@ -66,7 +66,7 @@ test('hub lists every game', async ({ page }, testInfo) => {
   for (const icon of await icons.all()) {
     await expect.poll(() => icon.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
   }
-  testInfo.attach('hub', { body: await page.screenshot({ path: testInfo.outputPath('hub.png') }), contentType: 'image/png' });
+  await testInfo.attach('hub', { body: await page.screenshot({ path: testInfo.outputPath('hub.png') }), contentType: 'image/png' });
 });
 
 // Each card opens its game, one test per game. `HUB_GAME` (a game's folder name) checks just that
@@ -105,7 +105,7 @@ test('hub settings reach the games', async ({ page }, testInfo) => {
   await choice('Show FPS', 'On').click();
   await dialog.getByRole('slider', { name: 'Music' }).fill('35');
   await expect(choice('Difficulty', 'Hard')).toHaveAttribute('aria-pressed', 'true');
-  testInfo.attach('settings', { body: await page.screenshot({ path: testInfo.outputPath('settings.png') }), contentType: 'image/png' });
+  await testInfo.attach('settings', { body: await page.screenshot({ path: testInfo.outputPath('settings.png') }), contentType: 'image/png' });
   await dialog.getByRole('button', { name: 'Close' }).click();
   await expect(dialog).toBeHidden();
 
@@ -193,7 +193,7 @@ test('hub game settings, continue playing and genre filter', async ({ page }, te
   await expect(dialog).toContainText('This game has progress saved on this device');
   await expect(dialog.getByRole('link', { name: 'Play' })).toHaveAttribute('href', 'games/apothecary/');
   await expect(dialog.getByRole('link', { name: 'Install' })).toHaveAttribute('href', 'games/apothecary/?install');
-  testInfo.attach('game settings', { body: await dialog.screenshot({ path: testInfo.outputPath('game-settings.png') }), contentType: 'image/png' });
+  await testInfo.attach('game settings', { body: await dialog.screenshot({ path: testInfo.outputPath('game-settings.png') }), contentType: 'image/png' });
   page.once('dialog', (d) => d.accept());
   await dialog.getByRole('button', { name: "Delete this game's progress" }).click();
   await expect(dialog).toContainText('Nothing is saved for this game yet.');
@@ -213,7 +213,7 @@ test('hub game settings, continue playing and genre filter', async ({ page }, te
   await expect(genres.getByRole('button', { name: 'Puzzle' })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('.game:visible h2')).toContainText(['Augury', 'Lanternkeep', 'Mapmaker', 'Ninefold', 'Shrine Stack', 'TinctureTinker', 'Tiny Kingdom', 'Wyrmrail']);
   await expect(page.locator('.game:visible')).toHaveCount(8);
-  testInfo.attach('genre filter', { body: await page.screenshot({ path: testInfo.outputPath('genre-filter.png') }), contentType: 'image/png' });
+  await testInfo.attach('genre filter', { body: await page.screenshot({ path: testInfo.outputPath('genre-filter.png') }), contentType: 'image/png' });
   await genres.getByRole('button', { name: 'All' }).click();
   await expect(page.locator('.game:visible')).toHaveCount(GAMES.length);
 });
@@ -283,7 +283,7 @@ test('hub shares its link as a QR code', async ({ page, context }, testInfo) => 
   await expect(qr.locator('svg')).toHaveAttribute('viewBox', '0 0 33 33');
   const box = (await qr.boundingBox())!;
   expect(box.width).toBeGreaterThan(120);
-  testInfo.attach('share', { body: await page.screenshot({ path: testInfo.outputPath('share.png') }), contentType: 'image/png' });
+  await testInfo.attach('share', { body: await page.screenshot({ path: testInfo.outputPath('share.png') }), contentType: 'image/png' });
   await card.getByRole('button', { name: 'Copy link' }).click();
   await expect(card.getByRole('button', { name: 'Link copied' })).toBeVisible();
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('http://localhost:5173/');
@@ -312,14 +312,14 @@ test('games have start and pause screens', async ({ page }, testInfo) => {
   expect(await running(), 'paused on the start screen').toBe(false);
   // Install shows only where the browser can install the page, which a test browser can't.
   await expect(page.getByRole('button', { name: 'Install as an app' })).toBeHidden();
-  testInfo.attach('start', { body: await page.screenshot({ path: testInfo.outputPath('start.png') }), contentType: 'image/png' });
+  await testInfo.attach('start', { body: await page.screenshot({ path: testInfo.outputPath('start.png') }), contentType: 'image/png' });
 
   // How to play opens from the start screen, keeps the game paused, and Esc goes back.
   await page.getByRole('button', { name: 'How to play' }).click();
   await expect(page.getByRole('heading', { name: 'How to play Apothecary' })).toBeVisible();
   await expect(page.locator('.game-start-button')).toBeHidden();
   expect(await running(), 'paused while reading How to play').toBe(false);
-  testInfo.attach('how to play', { body: await page.screenshot({ path: testInfo.outputPath('how-to-play.png') }), contentType: 'image/png' });
+  await testInfo.attach('how to play', { body: await page.screenshot({ path: testInfo.outputPath('how-to-play.png') }), contentType: 'image/png' });
   await page.keyboard.press('Escape');
   await expect(page.locator('.game-start-button')).toBeVisible();
   // Enter on a button reached with Tab presses that button rather than Start.
@@ -338,7 +338,7 @@ test('games have start and pause screens', async ({ page }, testInfo) => {
   await page.locator('.pause-button').click();
   await expect(page.locator('.game-resume-button')).toBeVisible();
   expect(await running(), 'paused by the button').toBe(false);
-  testInfo.attach('paused', { body: await page.screenshot({ path: testInfo.outputPath('paused.png') }), contentType: 'image/png' });
+  await testInfo.attach('paused', { body: await page.screenshot({ path: testInfo.outputPath('paused.png') }), contentType: 'image/png' });
   await page.keyboard.press(' ');
   await expect(overlay).toBeHidden();
   expect(await running(), 'playing after Space').toBe(true);
@@ -367,7 +367,7 @@ test('hub and games show trophies', async ({ page }, testInfo) => {
   await expect(shelf.locator('.trophy-game h3')).toHaveText(/Apothecary/);
   await expect(shelf.locator('.trophy-chip')).toHaveText(['🧪First customer']);
   await expect(shelf.locator('.trophy-total').first()).toHaveText('🏆Bronze 1');
-  testInfo.attach('trophy shelf', { body: await shelf.screenshot({ path: testInfo.outputPath('trophy-shelf.png') }), contentType: 'image/png' });
+  await testInfo.attach('trophy shelf', { body: await shelf.screenshot({ path: testInfo.outputPath('trophy-shelf.png') }), contentType: 'image/png' });
   await shelf.locator('.close').click();
 
   await page.goto('/games/apothecary/');
@@ -379,7 +379,7 @@ test('hub and games show trophies', async ({ page }, testInfo) => {
   await expect(rows.first()).toContainText('First customer');
   // A hidden trophy keeps its name until it is earned.
   await expect(rows.last()).toContainText('Hidden trophy');
-  testInfo.attach('trophy list', { body: await page.screenshot({ path: testInfo.outputPath('trophy-list.png') }), contentType: 'image/png' });
+  await testInfo.attach('trophy list', { body: await page.screenshot({ path: testInfo.outputPath('trophy-list.png') }), contentType: 'image/png' });
   await page.keyboard.press('Escape');
   await expect(page.locator('.game-start-button')).toBeVisible();
 });
@@ -447,7 +447,7 @@ test('hub favourites, time played and sort', async ({ page }, testInfo) => {
   await star.click();
   await expect(star).toHaveAttribute('aria-pressed', 'true');
   expect((await names()).slice(0, 2)).toEqual(['Wyrmrail', 'Anvilheart']);
-  testInfo.attach('favourites', { body: await page.screenshot({ path: testInfo.outputPath('favourites.png') }), contentType: 'image/png' });
+  await testInfo.attach('favourites', { body: await page.screenshot({ path: testInfo.outputPath('favourites.png') }), contentType: 'image/png' });
   await page.reload();
   expect((await names())[0]).toBe('Wyrmrail');
   expect(await page.evaluate(() => localStorage.getItem('hub-favourites'))).toBe('["wyrmrail"]');
@@ -533,7 +533,7 @@ test('hub works with a controller', async ({ page }, testInfo) => {
   const names = (await page.locator('.game h2').allTextContents()).map((n) => n.trim());
   expect(below).toBe(names[columns]);
   await expect(page.locator('html')).toHaveClass(/pad-focus/);
-  testInfo.attach('focus', { body: await page.screenshot({ path: testInfo.outputPath('pad-focus.png') }), contentType: 'image/png' });
+  await testInfo.attach('focus', { body: await page.screenshot({ path: testInfo.outputPath('pad-focus.png') }), contentType: 'image/png' });
   await pad.press('up');
   await expect(cards.first()).toBeFocused();
   await pad.press('x');
@@ -604,7 +604,7 @@ test('games work with a controller', async ({ page }, testInfo) => {
   expect(await pointerTarget(), 'standing before the tap').toBeNull();
   await pad.press('a');
   await expect.poll(pointerTarget).not.toBeNull();
-  testInfo.attach('cursor', { body: await page.screenshot({ path: testInfo.outputPath('pad-cursor.png') }), contentType: 'image/png' });
+  await testInfo.attach('cursor', { body: await page.screenshot({ path: testInfo.outputPath('pad-cursor.png') }), contentType: 'image/png' });
   // A real mouse move hides it again.
   await page.mouse.move(100, 100);
   await expect(cursor).toBeHidden();
@@ -628,7 +628,7 @@ test('hub shows play counts', async ({ page }, testInfo) => {
   await expect(page.locator('.game .plays')).toHaveCount(GAMES.length - 2);
   await expect(plays('/games/deadline/')).toHaveCount(0);
   await expect(plays('/games/palisade/')).toHaveCount(0);
-  testInfo.attach('play counts', {
+  await testInfo.attach('play counts', {
     body: await page.locator('.game').first().screenshot({ path: testInfo.outputPath('play-counts.png') }),
     contentType: 'image/png',
   });
@@ -655,7 +655,7 @@ test('hub switches language', async ({ page }, testInfo) => {
   await expect(page.locator('html')).toHaveAttribute('lang', 'de-DE');
   await expect(page.locator('.game a[href="games/apothecary/"] p').first()).toHaveText(/^Führe als Pestdoktor/);
   await expect(page.locator('.game a[href="games/apothecary/"] .plays')).toHaveText('1.234-mal gespielt');
-  testInfo.attach('german settings', { body: await page.screenshot({ path: testInfo.outputPath('german-settings.png') }), contentType: 'image/png' });
+  await testInfo.attach('german settings', { body: await page.screenshot({ path: testInfo.outputPath('german-settings.png') }), contentType: 'image/png' });
   await einstellungen.getByRole('button', { name: 'Schließen' }).click();
 
   // It is kept, and a game opened now shows its start, pause and How to play screens in German.
@@ -667,7 +667,7 @@ test('hub switches language', async ({ page }, testInfo) => {
   await page.getByRole('button', { name: 'Spielanleitung' }).click();
   await expect(page.getByRole('heading', { name: 'Spielanleitung: Apothecary' })).toBeVisible();
   await expect(page.locator('.game-help h3').first()).toHaveText('Steuerung');
-  testInfo.attach('german how to play', { body: await page.screenshot({ path: testInfo.outputPath('german-how-to-play.png') }), contentType: 'image/png' });
+  await testInfo.attach('german how to play', { body: await page.screenshot({ path: testInfo.outputPath('german-how-to-play.png') }), contentType: 'image/png' });
 
   // ?lang= shows another language without changing the setting.
   await page.goto('/?lang=en');
@@ -725,7 +725,7 @@ test('hub progress files', async ({ page }, testInfo) => {
 
   await page.getByRole('button', { name: 'Settings for Apothecary' }).click();
   const dialog = page.getByRole('dialog', { name: 'Apothecary' });
-  testInfo.attach('game progress file', { body: await dialog.screenshot({ path: testInfo.outputPath('game-progress-file.png') }), contentType: 'image/png' });
+  await testInfo.attach('game progress file', { body: await dialog.screenshot({ path: testInfo.outputPath('game-progress-file.png') }), contentType: 'image/png' });
   const file = await save(dialog.getByRole('button', { name: 'Export progress' }));
   expect(file.name).toMatch(/^apothecary-\d{4}-\d\d-\d\d\.ghap$/);
   const bytes = readFileSync(file.path);
@@ -758,7 +758,7 @@ test('hub progress files', async ({ page }, testInfo) => {
   const settings = page.getByRole('dialog', { name: 'Settings' });
   await settings.getByRole('group', { name: 'Difficulty' }).getByRole('button', { name: 'Hard' }).click();
   const progressRow = settings.locator('.setting').filter({ has: page.locator('#export-progress') });
-  testInfo.attach('progress files', { body: await progressRow.screenshot({ path: testInfo.outputPath('progress-files.png') }), contentType: 'image/png' });
+  await testInfo.attach('progress files', { body: await progressRow.screenshot({ path: testInfo.outputPath('progress-files.png') }), contentType: 'image/png' });
   const all = await save(settings.getByRole('button', { name: 'Export all' }));
   expect(all.name).toMatch(/^game-hub-progress-\d{4}-\d\d-\d\d\.gh$/);
   await page.evaluate(() => {
@@ -809,7 +809,7 @@ test('hub progress codes', async ({ page }, testInfo) => {
   await page.getByRole('dialog', { name: 'Apothecary' }).getByRole('button', { name: 'QR code' }).click();
   const codeDialog = page.getByRole('dialog', { name: 'Apothecary: progress code' });
   await expect(codeDialog.getByRole('img', { name: 'QR code of the progress' }).locator('svg')).toBeVisible();
-  testInfo.attach('progress code', { body: await codeDialog.screenshot({ path: testInfo.outputPath('progress-code.png') }), contentType: 'image/png' });
+  await testInfo.attach('progress code', { body: await codeDialog.screenshot({ path: testInfo.outputPath('progress-code.png') }), contentType: 'image/png' });
   const link = await codeDialog.getByRole('textbox', { name: 'Progress code' }).inputValue();
   expect(link).toMatch(/^http:\/\/localhost:5173\/#p=\d+$/);
   await codeDialog.getByRole('button', { name: 'Done' }).click();
@@ -917,7 +917,7 @@ test('hub scans a progress code', async ({ page }, testInfo) => {
   await expect.poll(() => page.evaluate(() => localStorage.getItem('palisade-best')), { timeout: 20_000 }).toBe('7');
   expect(messages.at(-1)).toMatch(/^Replace the progress of Palisade on this device with the one in the code/);
   await expect(scanner).toBeHidden();
-  testInfo.attach('scanned', { body: await page.screenshot(), contentType: 'image/png' });
+  await testInfo.attach('scanned', { body: await page.screenshot(), contentType: 'image/png' });
 });
 
 // Progress too big for one QR code shows as a loop of codes, which Scan code collects.
@@ -936,7 +936,7 @@ test('hub scans a loop of progress codes', async ({ page }, testInfo) => {
   await expect(codeDialog.locator('.lede')).toContainText('QR codes, shown in turn');
   const count = Number((await codeDialog.locator('.frame-count').textContent())!.split(' of ')[1]);
   expect(count).toBeGreaterThan(1);
-  testInfo.attach('progress loop', { body: await codeDialog.screenshot({ path: testInfo.outputPath('progress-loop.png') }), contentType: 'image/png' });
+  await testInfo.attach('progress loop', { body: await codeDialog.screenshot({ path: testInfo.outputPath('progress-loop.png') }), contentType: 'image/png' });
   // Every frame as it is shown.
   const svgs = new Map<string, string>();
   await expect
@@ -1009,7 +1009,7 @@ test('a game installs from its start screen', async ({ page }, testInfo) => {
   const install = page.getByRole('button', { name: 'Install as an app' });
   await expect(install).toBeVisible();
   await expect(install).toHaveClass(/game-overlay-button/);
-  testInfo.attach('install', { body: await page.screenshot({ path: testInfo.outputPath('install.png') }), contentType: 'image/png' });
+  await testInfo.attach('install', { body: await page.screenshot({ path: testInfo.outputPath('install.png') }), contentType: 'image/png' });
   let hint = '';
   page.once('dialog', (d) => {
     hint = d.message();
@@ -1033,7 +1033,7 @@ test('hub update settings', async ({ page }, testInfo) => {
   await updates.getByRole('button', { name: 'Off' }).click();
   await expect(updates.getByRole('button', { name: 'Off' })).toHaveAttribute('aria-pressed', 'true');
   const row = updates.locator('xpath=..');
-  testInfo.attach('updates', { body: await row.screenshot({ path: testInfo.outputPath('updates.png') }), contentType: 'image/png' });
+  await testInfo.attach('updates', { body: await row.screenshot({ path: testInfo.outputPath('updates.png') }), contentType: 'image/png' });
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('hub-settings')!).updates)).toBe('off');
   let message = '';
   page.once('dialog', (d) => {
@@ -1070,12 +1070,12 @@ test('hub marks updated games until they are opened', async ({ page }, testInfo)
   const card = page.locator('.game').filter({ has: page.getByRole('heading', { name: 'Apothecary' }) });
   await expect(card.locator('.badge')).toHaveText('Updated');
   await expect(card.locator('.badge')).toHaveAttribute('title', /^Updated \d{1,2} \w+ \d{4}$/);
-  testInfo.attach('badge', { body: await card.screenshot({ path: testInfo.outputPath('badge.png') }), contentType: 'image/png' });
+  await testInfo.attach('badge', { body: await card.screenshot({ path: testInfo.outputPath('badge.png') }), contentType: 'image/png' });
 
   await card.getByRole('button', { name: 'Settings for Apothecary' }).click();
   const dialog = page.getByRole('dialog', { name: 'Apothecary' });
   await expect(dialog.getByText(/^Last updated \d{1,2} \w+ \d{4}$/)).toBeVisible();
-  testInfo.attach('last-updated', { body: await dialog.screenshot({ path: testInfo.outputPath('last-updated.png') }), contentType: 'image/png' });
+  await testInfo.attach('last-updated', { body: await dialog.screenshot({ path: testInfo.outputPath('last-updated.png') }), contentType: 'image/png' });
   await dialog.getByRole('button', { name: 'Close' }).click();
 
   // Opening the game clears its badge.
@@ -1124,7 +1124,7 @@ test('the old address forwards with its saves', async ({ page }, testInfo) => {
   await expect(page.getByRole('heading', { name: 'Die Spielesammlung ist umgezogen' })).toBeVisible();
   const link = await page.getByRole('link', { name: 'Neue Adresse öffnen' }).getAttribute('href');
   expect(link).toMatch(/^http:\/\/localhost:5173\/move\.html#move=[\w-]+$/);
-  testInfo.attach('moved app', { body: await page.screenshot({ path: testInfo.outputPath('moved-app.png') }), contentType: 'image/png' });
+  await testInfo.attach('moved app', { body: await page.screenshot({ path: testInfo.outputPath('moved-app.png') }), contentType: 'image/png' });
 
   // The new address already has Apothecary played and a favourite of its own.
   await page.goto('/');

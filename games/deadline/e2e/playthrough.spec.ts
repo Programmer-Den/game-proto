@@ -158,7 +158,7 @@ test('plays the first wave', async ({ page }, testInfo) => {
   }
 
   const snap = async (name: string) =>
-    testInfo.attach(name, { body: await page.screenshot({ path: testInfo.outputPath(`${name}.png`) }), contentType: 'image/png' });
+    await testInfo.attach(name, { body: await page.screenshot({ path: testInfo.outputPath(`${name}.png`) }), contentType: 'image/png' });
 
   /** Taps a spot on the battlefield, as a player would. */
   async function tap(to: Point) {
