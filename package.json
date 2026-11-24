@@ -15,13 +15,13 @@
     "screenshots": "node scripts/shrink-screenshots.mjs"
   },
   "dependencies": {
-    "barcode-detector": "3.2.3",
+    "barcode-detector": "3.2.4",
     "phaser": "^4.2.1"
   },
   "devDependencies": {
-    "@playwright/test": "^1.65.0",
+    "@playwright/test": "^1.65.1",
     "@types/node": "^26.6.6",
     "typescript": "^7.0.2",
-    "vite": "^8.3.6"
+    "vite": "^8.3.8"
   }
 }
